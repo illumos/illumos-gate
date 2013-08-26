@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <assert.h>
@@ -188,7 +188,7 @@ _be_list(char *be_name, be_node_list_t **be_nodes)
 
 	if (be_defaults.be_deflt_rpool_container && rpool != NULL) {
 		if ((zphp = zpool_open(g_zfs, rpool)) == NULL) {
-			be_print_err(gettext("be_get_node_data: failed to "
+			be_print_err(gettext("be_list: failed to "
 			    "open rpool (%s): %s\n"), rpool,
 			    libzfs_error_description(g_zfs));
 			free(cb.be_name);
@@ -824,7 +824,9 @@ be_get_node_data(
 	char prop_buf[MAXPATHLEN];
 	nvlist_t *userprops = NULL;
 	nvlist_t *propval = NULL;
+	nvlist_t *zone_propval = NULL;
 	char *prop_str = NULL;
+	char *zone_prop_str = NULL;
 	char *grub_default_bootfs = NULL;
 	zpool_handle_t *zphp = NULL;
 	int err = 0;
@@ -865,27 +867,38 @@ be_get_node_data(
 
 	be_node->be_space_used = zfs_prop_get_int(zhp, ZFS_PROP_USED);
 
-	if ((zphp = zpool_open(g_zfs, rpool)) == NULL) {
-		be_print_err(gettext("be_get_node_data: failed to open pool "
-		    "(%s): %s\n"), rpool, libzfs_error_description(g_zfs));
-		return (zfs_err_to_be_err(g_zfs));
-	}
+	if (getzoneid() == GLOBAL_ZONEID) {
+		if ((zphp = zpool_open(g_zfs, rpool)) == NULL) {
+			be_print_err(gettext("be_get_node_data: failed to open "
+			    "pool (%s): %s\n"), rpool,
+			    libzfs_error_description(g_zfs));
+			return (zfs_err_to_be_err(g_zfs));
+		}
 
-	(void) zpool_get_prop(zphp, ZPOOL_PROP_BOOTFS, prop_buf, ZFS_MAXPROPLEN,
-	    NULL);
-	if (be_has_grub() &&
-	    (be_default_grub_bootfs(rpool, &grub_default_bootfs)
-	    == BE_SUCCESS) && grub_default_bootfs != NULL)
-		if (strcmp(grub_default_bootfs, be_ds) == 0)
+		(void) zpool_get_prop(zphp, ZPOOL_PROP_BOOTFS, prop_buf,
+		    ZFS_MAXPROPLEN, NULL);
+		if (be_has_grub() && (be_default_grub_bootfs(rpool,
+		    &grub_default_bootfs) == BE_SUCCESS) &&
+		    grub_default_bootfs != NULL)
+			if (strcmp(grub_default_bootfs, be_ds) == 0)
+				be_node->be_active_on_boot = B_TRUE;
+			else
+				be_node->be_active_on_boot = B_FALSE;
+		else if (prop_buf != NULL && strcmp(prop_buf, be_ds) == 0)
 			be_node->be_active_on_boot = B_TRUE;
 		else
 			be_node->be_active_on_boot = B_FALSE;
-	else if (prop_buf != NULL && strcmp(prop_buf, be_ds) == 0)
-		be_node->be_active_on_boot = B_TRUE;
-	else
-		be_node->be_active_on_boot = B_FALSE;
-	free(grub_default_bootfs);
-	zpool_close(zphp);
+
+		be_node->be_global_active = B_TRUE;
+
+		free(grub_default_bootfs);
+		zpool_close(zphp);
+	} else {
+		if (be_zone_compare_uuids(be_node->be_root_ds))
+			be_node->be_global_active = B_TRUE;
+		else
+			be_node->be_global_active = B_FALSE;
+	}
 
 	/*
 	 * If the dataset is mounted use the mount point
@@ -910,6 +923,22 @@ be_get_node_data(
 	if ((userprops = zfs_get_user_props(zhp)) == NULL) {
 		be_node->be_policy_type = strdup(be_default_policy());
 	} else {
+		if (getzoneid() != GLOBAL_ZONEID) {
+			if (nvlist_lookup_nvlist(userprops,
+			    BE_ZONE_ACTIVE_PROPERTY, &zone_propval) != 0 ||
+			    zone_propval == NULL) {
+				be_node->be_active_on_boot = B_FALSE;
+			} else {
+				verify(nvlist_lookup_string(zone_propval,
+				    ZPROP_VALUE, &zone_prop_str) == 0);
+				if (strcmp(zone_prop_str, "on") == 0) {
+					be_node->be_active_on_boot = B_TRUE;
+				} else {
+					be_node->be_active_on_boot = B_FALSE;
+				}
+			}
+		}
+
 		if (nvlist_lookup_nvlist(userprops, BE_POLICY_PROPERTY,
 		    &propval) != 0 || propval == NULL) {
 			be_node->be_policy_type =
@@ -924,11 +953,19 @@ be_get_node_data(
 			else
 				be_node->be_policy_type = strdup(prop_str);
 		}
-
-		if (nvlist_lookup_nvlist(userprops, BE_UUID_PROPERTY, &propval)
-		    == 0 && nvlist_lookup_string(propval, ZPROP_VALUE,
-		    &prop_str) == 0) {
-			be_node->be_uuid_str = strdup(prop_str);
+		if (getzoneid() != GLOBAL_ZONEID) {
+			if (nvlist_lookup_nvlist(userprops,
+			    BE_ZONE_PARENTBE_PROPERTY, &propval) != 0 &&
+			    nvlist_lookup_string(propval, ZPROP_VALUE,
+			    &prop_str) == 0) {
+				be_node->be_uuid_str = strdup(prop_str);
+			}
+		} else {
+			if (nvlist_lookup_nvlist(userprops, BE_UUID_PROPERTY,
+			    &propval) == 0 && nvlist_lookup_string(propval,
+			    ZPROP_VALUE, &prop_str) == 0) {
+				be_node->be_uuid_str = strdup(prop_str);
+			}
 		}
 	}
 

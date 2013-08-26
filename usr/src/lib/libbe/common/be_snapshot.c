@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  */
 
 /*
@@ -323,6 +323,15 @@ be_rollback(nvlist_t *be_attrs)
 	    sizeof (obe_root_ds));
 	bt.obe_root_ds = obe_root_ds;
 
+	if (getzoneid() != GLOBAL_ZONEID) {
+		if (!be_zone_compare_uuids(bt.obe_root_ds)) {
+			be_print_err(gettext("be_rollback: rolling back zone "
+			    "root dataset from non-active global BE is not "
+			    "supported\n"));
+			return (BE_ERR_NOTSUP);
+		}
+	}
+
 	/* Get handle to BE's root dataset */
 	if ((zhp = zfs_open(g_zfs, bt.obe_root_ds, ZFS_TYPE_DATASET)) == NULL) {
 		be_print_err(gettext("be_rollback: "
@@ -429,6 +438,16 @@ _be_create_snapshot(char *be_name, char **snap_name, char *policy)
 	    sizeof (root_ds));
 	bt.obe_root_ds = root_ds;
 
+	if (getzoneid() != GLOBAL_ZONEID) {
+		if (!be_zone_compare_uuids(bt.obe_root_ds)) {
+			be_print_err(gettext("be_create_snapshot: creating "
+			    "snapshot for the zone root dataset from "
+			    "non-active global BE is not "
+			    "supported\n"));
+			return (BE_ERR_NOTSUP);
+		}
+	}
+
 	/* If BE policy not specified, use the default policy */
 	if (bt.policy == NULL) {
 		bt.policy = be_default_policy();
@@ -482,27 +501,30 @@ _be_create_snapshot(char *be_name, char **snap_name, char *policy)
 	 * cleanup policy there.  Otherwise don't set one - this snapshot
 	 * will always inherit the cleanup policy from its parent.
 	 */
-	if (pool_version >= SPA_VERSION_SNAP_PROPS) {
-		if (nvlist_alloc(&ss_props, NV_UNIQUE_NAME, 0) != 0) {
-			be_print_err(gettext("be_create_snapshot: internal "
-			    "error: out of memory\n"));
-			return (BE_ERR_NOMEM);
+	if (getzoneid() == GLOBAL_ZONEID) {
+		if (pool_version >= SPA_VERSION_SNAP_PROPS) {
+			if (nvlist_alloc(&ss_props, NV_UNIQUE_NAME, 0) != 0) {
+				be_print_err(gettext("be_create_snapshot: "
+				    "internal error: out of memory\n"));
+				return (BE_ERR_NOMEM);
+			}
+			if (nvlist_add_string(ss_props, BE_POLICY_PROPERTY,
+			    bt.policy) != 0) {
+				be_print_err(gettext("be_create_snapshot: "
+				    "internal error: out of memory\n"));
+				nvlist_free(ss_props);
+				return (BE_ERR_NOMEM);
+			}
+		} else if (policy != NULL) {
+			/*
+			 * If an explicit cleanup policy was requested
+			 * by the caller and we don't support it, error out.
+			 */
+			be_print_err(gettext("be_create_snapshot: cannot set "
+			    "cleanup policy: ZFS pool version is %d\n"),
+			    pool_version);
+			return (BE_ERR_NOTSUP);
 		}
-		if (nvlist_add_string(ss_props, BE_POLICY_PROPERTY, bt.policy)
-		    != 0) {
-			be_print_err(gettext("be_create_snapshot: internal "
-			    "error: out of memory\n"));
-			nvlist_free(ss_props);
-			return (BE_ERR_NOMEM);
-		}
-	} else if (policy != NULL) {
-		/*
-		 * If an explicit cleanup policy was requested
-		 * by the caller and we don't support it, error out.
-		 */
-		be_print_err(gettext("be_create_snapshot: cannot set "
-		    "cleanup policy: ZFS pool version is %d\n"), pool_version);
-		return (BE_ERR_NOTSUP);
 	}
 
 	/* Create the snapshots recursively */

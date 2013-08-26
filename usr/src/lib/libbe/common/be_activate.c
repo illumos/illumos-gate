@@ -23,6 +23,10 @@
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
+/*
+ * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
+ */
+
 #include <assert.h>
 #include <libintl.h>
 #include <libnvpair.h>
@@ -131,6 +135,7 @@ _be_activate(char *be_name)
 	be_transaction_data_t cb = { 0 };
 	zfs_handle_t	*zhp = NULL;
 	char		root_ds[MAXPATHLEN];
+	char		active_ds[MAXPATHLEN];
 	char		*cur_vers = NULL, *new_vers = NULL;
 	be_node_list_t	*be_nodes = NULL;
 	uuid_t		uu = {0};
@@ -224,10 +229,13 @@ _be_activate(char *be_name)
 		goto done;
 	}
 
-	if ((ret = set_bootfs(be_nodes->be_rpool, root_ds)) != BE_SUCCESS) {
-		be_print_err(gettext("be_activate: failed to set "
-		    "bootfs pool property for %s\n"), root_ds);
-		goto done;
+	if (getzoneid() == GLOBAL_ZONEID) {
+		if ((ret = set_bootfs(be_nodes->be_rpool,
+		    root_ds)) != BE_SUCCESS) {
+			be_print_err(gettext("be_activate: failed to set "
+			    "bootfs pool property for %s\n"), root_ds);
+			goto done;
+		}
 	}
 
 	if ((zhp = zfs_open(g_zfs, root_ds, ZFS_TYPE_FILESYSTEM)) != NULL) {
@@ -246,7 +254,7 @@ _be_activate(char *be_name)
 			goto done;
 		}
 	} else {
-		be_print_err(gettext("be_activate:: failed to open "
+		be_print_err(gettext("be_activate: failed to open "
 		    "dataset (%s): %s\n"), root_ds,
 		    libzfs_error_description(g_zfs));
 		ret = zfs_err_to_be_err(g_zfs);
@@ -262,6 +270,67 @@ _be_activate(char *be_name)
 		    cb.obe_name);
 	}
 
+	if (getzoneid() != GLOBAL_ZONEID) {
+		if (!be_zone_compare_uuids(root_ds)) {
+			be_print_err(gettext("be_activate: activating zone "
+			    "root dataset from non-active global BE is not "
+			    "supported\n"));
+			ret = BE_ERR_NOTSUP;
+			goto done;
+		}
+		if ((zhp = zfs_open(g_zfs, root_ds,
+		    ZFS_TYPE_FILESYSTEM)) == NULL) {
+			be_print_err(gettext("be_activate: failed to open "
+			    "dataset (%s): %s\n"), root_ds,
+			    libzfs_error_description(g_zfs));
+			ret = zfs_err_to_be_err(g_zfs);
+			goto done;
+		}
+		/* Find current active zone root dataset */
+		if ((ret = be_find_active_zone_root(zhp, cb.obe_zpool,
+		    active_ds, sizeof (active_ds))) != BE_SUCCESS) {
+			be_print_err(gettext("be_activate: failed to find "
+			    "active zone root dataset\n"));
+			ZFS_CLOSE(zhp);
+			goto done;
+		}
+		/* Do nothing if requested BE is already active */
+		if (strcmp(root_ds, active_ds) == 0) {
+			ret = BE_SUCCESS;
+			ZFS_CLOSE(zhp);
+			goto done;
+		}
+
+		/* Set active property for BE */
+		if (zfs_prop_set(zhp, BE_ZONE_ACTIVE_PROPERTY, "on") != 0) {
+			be_print_err(gettext("be_activate: failed to set "
+			    "active property (%s): %s\n"), root_ds,
+			    libzfs_error_description(g_zfs));
+			ret = zfs_err_to_be_err(g_zfs);
+			ZFS_CLOSE(zhp);
+			goto done;
+		}
+		ZFS_CLOSE(zhp);
+
+		/* Unset active property for old active root dataset */
+		if ((zhp = zfs_open(g_zfs, active_ds,
+		    ZFS_TYPE_FILESYSTEM)) == NULL) {
+			be_print_err(gettext("be_activate: failed to open "
+			    "dataset (%s): %s\n"), active_ds,
+			    libzfs_error_description(g_zfs));
+			ret = zfs_err_to_be_err(g_zfs);
+			goto done;
+		}
+		if (zfs_prop_set(zhp, BE_ZONE_ACTIVE_PROPERTY, "off") != 0) {
+			be_print_err(gettext("be_activate: failed to unset "
+			    "active property (%s): %s\n"), active_ds,
+			    libzfs_error_description(g_zfs));
+			ret = zfs_err_to_be_err(g_zfs);
+			ZFS_CLOSE(zhp);
+			goto done;
+		}
+		ZFS_CLOSE(zhp);
+	}
 done:
 	be_free_list(be_nodes);
 	return (ret);

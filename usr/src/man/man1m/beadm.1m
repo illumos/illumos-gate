@@ -1,6 +1,6 @@
 '\" te
-.\" Copyright 2012 Nexenta Systems, Inc. All rights reserved.
-.TH BEADM 1M "Feb 26, 2011"
+.\" Copyright 2013 Nexenta Systems, Inc. All rights reserved.
+.TH BEADM 1M "Jul 25, 2013"
 .SH NAME
 beadm \- utility for managing zfs boot environments
 .SH SYNOPSIS
@@ -239,6 +239,7 @@ the
 Create the new BE in the specified zpool.  If this is not provided, the
 default
 behavior is to create the new BE in the same pool as as the origin BE.
+This option is not supported in non-global zone.
 .RE
 .sp
 .ne 2
@@ -338,7 +339,12 @@ The 'Active'
 field indicates whether the boot environment is active now,
 represented
 by 'N'; active on reboot, represented by 'R'; or both, represented
-by 'NR'.
+by 'NR'. In non-global zone the 'Active' field also indicates whether the
+boot environment has a non-active parent BE, represented by 'x'; is active
+on boot in a non-active parent BE, represented by 'b'. Activate, rollback
+and snapshot operations for boot environments from non-active global parent
+BE aren't supported, destroy is allowed if these boot environments aren't
+active on boot.
 .sp
 Each line in the machine parasable output has the boot environment name as the
 first field.  The 'Space' field is displayed in bytes and the 'Created' field
@@ -346,7 +352,8 @@ is displayed in UTC format.  The \fB-H\fR option used with no other options
 gives
 the boot environment's uuid in the second field.  This field will be
 blank if
-the boot environment does not have a uuid.  See the EXAMPLES section.
+the boot environment does not have a uuid. See the EXAMPLES section.
+In non-global zones, this field shows the uuid of the parent BE.
 .sp
 .ne 2
 .na

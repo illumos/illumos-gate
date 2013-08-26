@@ -23,7 +23,7 @@
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
- * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  */
 
 /*
@@ -31,6 +31,7 @@
  */
 #include <assert.h>
 #include <errno.h>
+#include <libgen.h>
 #include <libintl.h>
 #include <libnvpair.h>
 #include <libzfs.h>
@@ -326,14 +327,29 @@ _be_mount(char *be_name, char **altroot, int flags)
 		tmp_altroot = *altroot;
 	}
 
+	md.altroot = tmp_altroot;
+	md.shared_fs = flags & BE_MOUNT_FLAG_SHARED_FS;
+	md.shared_rw = flags & BE_MOUNT_FLAG_SHARED_RW;
+
 	/* Mount the BE's root file system */
-	if ((ret = be_mount_root(zhp, tmp_altroot)) != BE_SUCCESS) {
-		be_print_err(gettext("be_mount: failed to "
-		    "mount BE root file system\n"));
-		if (gen_tmp_altroot)
-			free(tmp_altroot);
-		ZFS_CLOSE(zhp);
-		return (ret);
+	if (getzoneid() == GLOBAL_ZONEID) {
+		if ((ret = be_mount_root(zhp, tmp_altroot)) != BE_SUCCESS) {
+			be_print_err(gettext("be_mount: failed to "
+			    "mount BE root file system\n"));
+			if (gen_tmp_altroot)
+				free(tmp_altroot);
+			ZFS_CLOSE(zhp);
+			return (ret);
+		}
+	} else {
+		/* Legacy mount the zone root dataset */
+		if ((ret = be_mount_zone_root(zhp, &md)) != BE_SUCCESS) {
+			be_print_err(gettext("be_mount: failed to "
+			    "mount BE zone root file system\n"));
+			free(md.altroot);
+			ZFS_CLOSE(zhp);
+			return (ret);
+		}
 	}
 
 	/* Iterate through BE's children filesystems */
@@ -346,10 +362,6 @@ _be_mount(char *be_name, char **altroot, int flags)
 		ZFS_CLOSE(zhp);
 		return (err);
 	}
-
-	md.altroot = tmp_altroot;
-	md.shared_fs = flags & BE_MOUNT_FLAG_SHARED_FS;
-	md.shared_rw = flags & BE_MOUNT_FLAG_SHARED_RW;
 
 	/*
 	 * Mount shared file systems if mount flag says so.
@@ -528,9 +540,16 @@ _be_unmount(char *be_name, int flags)
 	}
 
 	/* Unmount this BE's root filesystem */
-	if ((ret = be_unmount_root(zhp, &ud)) != BE_SUCCESS) {
-		ZFS_CLOSE(zhp);
-		return (ret);
+	if (getzoneid() == GLOBAL_ZONEID) {
+		if ((ret = be_unmount_root(zhp, &ud)) != BE_SUCCESS) {
+			ZFS_CLOSE(zhp);
+			return (ret);
+		}
+	} else {
+		if ((ret = be_unmount_zone_root(zhp, &ud)) != BE_SUCCESS) {
+			ZFS_CLOSE(zhp);
+			return (ret);
+		}
 	}
 
 	ZFS_CLOSE(zhp);
@@ -553,6 +572,7 @@ _be_unmount(char *be_name, int flags)
 int
 be_mount_zone_root(zfs_handle_t *zhp, be_mount_data_t *md)
 {
+	struct stat buf;
 	char	mountpoint[MAXPATHLEN];
 	int	err = 0;
 
@@ -574,6 +594,16 @@ be_mount_zone_root(zfs_handle_t *zhp, be_mount_data_t *md)
 		be_print_err(gettext("be_mount_zone_root: "
 		    "zone root dataset mountpoint is not 'legacy'\n"));
 		return (BE_ERR_ZONE_ROOT_NOT_LEGACY);
+	}
+
+	/* Create the mountpoint if it doesn't exist */
+	if (lstat(md->altroot, &buf) != 0) {
+		if (mkdirp(md->altroot, 0755) != 0) {
+			err = errno;
+			be_print_err(gettext("be_mount_zone_root: failed "
+			    "to create mountpoint %s\n"), md->altroot);
+			return (errno_to_be_err(err));
+		}
 	}
 
 	/*

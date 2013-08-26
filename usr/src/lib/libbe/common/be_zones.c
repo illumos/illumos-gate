@@ -24,6 +24,10 @@
  */
 
 /*
+ * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
+ */
+
+/*
  * System includes
  */
 #include <assert.h>
@@ -113,14 +117,25 @@ be_find_active_zone_root(zfs_handle_t *be_zhp, char *zonepath_ds,
 	int				ret = BE_SUCCESS;
 
 	/* Get the uuid of the parent global BE */
-	if ((ret = be_get_uuid(zfs_get_name(be_zhp), &azr_data.parent_uuid))
-	    != BE_SUCCESS) {
-		be_print_err(gettext("be_find_active_zone_root: failed to "
-		    "get uuid for BE root dataset %s\n"), zfs_get_name(be_zhp));
-		return (ret);
+	if (getzoneid() == GLOBAL_ZONEID) {
+		if ((ret = be_get_uuid(zfs_get_name(be_zhp),
+		    &azr_data.parent_uuid)) != BE_SUCCESS) {
+			be_print_err(gettext("be_find_active_zone_root: failed "
+			    "to get uuid for BE root dataset %s\n"),
+			    zfs_get_name(be_zhp));
+			return (ret);
+		}
+	} else {
+		if ((ret = be_zone_get_parent_uuid(zfs_get_name(be_zhp),
+		    &azr_data.parent_uuid)) != BE_SUCCESS) {
+			be_print_err(gettext("be_find_active_zone_root: failed "
+			    "to get parentbe uuid for zone root dataset %s\n"),
+			    zfs_get_name(be_zhp));
+			return (ret);
+		}
 	}
 
-	/* Generate string for the root container dataset for this zone. */
+	/* Generate string for the root container dataset  for this zone. */
 	be_make_container_ds(zonepath_ds, zone_container_ds,
 	    sizeof (zone_container_ds));
 
@@ -374,6 +389,100 @@ be_zone_get_parent_uuid(const char *root_ds, uuid_t *uu)
 done:
 	ZFS_CLOSE(zhp);
 	return (ret);
+}
+
+/*
+ * Function:	be_zone_set_parent_uuid
+ * Description:	This function sets parentbe uuid into
+ *		a zfs user property for a root zone dataset.
+ * Parameters:
+ *		root_ds - Root zone dataset of the BE to set a uuid on.
+ * Return:
+ *		be_errno_t - Failure
+ *		BE_SUCCESS - Success
+ * Scope:
+ *		Semi-private (library wide uses only)
+ */
+int
+be_zone_set_parent_uuid(char *root_ds, uuid_t uu)
+{
+	zfs_handle_t	*zhp = NULL;
+	char		uu_string[UUID_PRINTABLE_STRING_LENGTH];
+	int		ret = BE_SUCCESS;
+
+	uuid_unparse(uu, uu_string);
+
+	/* Get handle to the root zone dataset. */
+	if ((zhp = zfs_open(g_zfs, root_ds, ZFS_TYPE_FILESYSTEM)) == NULL) {
+		be_print_err(gettext("be_zone_set_parent_uuid: failed to "
+		    "open root zone dataset (%s): %s\n"), root_ds,
+		    libzfs_error_description(g_zfs));
+		return (zfs_err_to_be_err(g_zfs));
+	}
+
+	/* Set parentbe uuid property for the root zone dataset */
+	if (zfs_prop_set(zhp, BE_ZONE_PARENTBE_PROPERTY, uu_string) != 0) {
+		be_print_err(gettext("be_zone_set_parent_uuid: failed to "
+		    "set parentbe uuid property for root zone dataset: %s\n"),
+		    libzfs_error_description(g_zfs));
+		ret = zfs_err_to_be_err(g_zfs);
+	}
+
+	ZFS_CLOSE(zhp);
+	return (ret);
+}
+
+/*
+ * Function:	be_zone_compare_uuids
+ * Description:	This function compare the parentbe uuid of the
+ *		current running root zone dataset with the parentbe
+ *		uuid of the given root zone dataset.
+ * Parameters:
+ *		root_ds - Root zone dataset of the BE to compare.
+ * Return:
+ *		B_TRUE - root dataset has right parentbe uuid
+ *		B_FALSE - root dataset has wrong parentbe uuid
+ * Scope:
+ *		Semi-private (library wide uses only)
+ */
+boolean_t
+be_zone_compare_uuids(char *root_ds)
+{
+	char		*active_ds;
+	uuid_t		parent_uuid = {0};
+	uuid_t		cur_parent_uuid = {0};
+
+	/* Get parentbe uuid from given zone root dataset */
+	if ((be_zone_get_parent_uuid(root_ds,
+	    &parent_uuid)) != BE_SUCCESS) {
+		be_print_err(gettext("be_zone_compare_uuids: failed to get "
+		    "parentbe uuid from the given BE\n"));
+		return (B_FALSE);
+	}
+
+	/*
+	 * Find current running zone root dataset and get it's parentbe
+	 * uuid property.
+	 */
+	if ((active_ds = be_get_ds_from_dir("/")) != NULL) {
+		if ((be_zone_get_parent_uuid(active_ds,
+		    &cur_parent_uuid)) != BE_SUCCESS) {
+			be_print_err(gettext("be_zone_compare_uuids: failed "
+			"to get parentbe uuid from the current running zone "
+			"root dataset\n"));
+			return (B_FALSE);
+		}
+	} else {
+		be_print_err(gettext("be_zone_compare_uuids: zone root dataset "
+		    "is not mounted\n"));
+		return (B_FALSE);
+	}
+
+	if (uuid_compare(parent_uuid, cur_parent_uuid) != 0) {
+		return (B_FALSE);
+	}
+
+	return (B_TRUE);
 }
 
 /* ******************************************************************** */
