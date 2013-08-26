@@ -274,6 +274,26 @@ zfs_params(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	 */
 	static const char *params[] = {
 		"arc_reduce_dnlc_percent",
+		"arc_lotsfree_percent",
+		"zfs_dirty_data_max",
+		"zfs_dirty_data_sync",
+		"zfs_delay_max_ns",
+		"zfs_delay_min_dirty_percent",
+		"zfs_delay_scale",
+		"zfs_vdev_max_active",
+		"zfs_vdev_sync_read_min_active",
+		"zfs_vdev_sync_read_max_active",
+		"zfs_vdev_sync_write_min_active",
+		"zfs_vdev_sync_write_max_active",
+		"zfs_vdev_async_read_min_active",
+		"zfs_vdev_async_read_max_active",
+		"zfs_vdev_async_write_min_active",
+		"zfs_vdev_async_write_max_active",
+		"zfs_vdev_scrub_min_active",
+		"zfs_vdev_scrub_max_active",
+		"zfs_vdev_async_write_active_min_dirty_percent",
+		"zfs_vdev_async_write_active_max_dirty_percent",
+		"spa_asize_inflation",
 		"zfs_arc_max",
 		"zfs_arc_min",
 		"arc_shrink_shift",
@@ -291,24 +311,14 @@ zfs_params(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		"spa_max_replication_override",
 		"spa_mode_global",
 		"zfs_flags",
-		"zfs_txg_synctime_ms",
 		"zfs_txg_timeout",
-		"zfs_write_limit_min",
-		"zfs_write_limit_max",
-		"zfs_write_limit_shift",
-		"zfs_write_limit_override",
-		"zfs_no_write_throttle",
 		"zfs_vdev_cache_max",
 		"zfs_vdev_cache_size",
 		"zfs_vdev_cache_bshift",
 		"vdev_mirror_shift",
-		"zfs_vdev_max_pending",
-		"zfs_vdev_min_pending",
 		"zfs_scrub_limit",
 		"zfs_no_scrub_io",
 		"zfs_no_scrub_prefetch",
-		"zfs_vdev_time_shift",
-		"zfs_vdev_ramp_rate",
 		"zfs_vdev_aggregation_limit",
 		"fzap_default_block_shift",
 		"zfs_immediate_write_sz",
@@ -1836,7 +1846,7 @@ zio_child_cb(uintptr_t addr, const void *unknown, void *arg)
 	else
 		ziop = (uintptr_t)zl.zl_child;
 
-	return (zio_print_cb(ziop, arg));
+	return (zio_print_cb(ziop, zpa));
 }
 
 /* ARGSUSED */
