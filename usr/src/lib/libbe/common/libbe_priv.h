@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  */
 
 #ifndef	_LIBBE_PRIV_H
@@ -205,6 +205,8 @@ int be_find_mounted_zone_root(char *, char *, char *, int);
 boolean_t be_zone_supported(char *);
 zoneBrandList_t *be_get_supported_brandlist(void);
 int be_zone_get_parent_uuid(const char *, uuid_t *);
+int be_zone_set_parent_uuid(char *, uuid_t);
+boolean_t be_zone_compare_uuids(char *);
 
 /* check architecture functions */
 char *be_get_default_isa(void);
