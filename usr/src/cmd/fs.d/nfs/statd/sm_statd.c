@@ -36,7 +36,9 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 2012 by Delphix. All rights reserved.
+ */
 
 /*
  * sm_statd.c consists of routines used for the intermediate
@@ -130,20 +132,20 @@ statd_init()
 	for (i = 0; i < pathix; i++) {
 		(void) sprintf(state_file, "%s/statmon/state", path_name[i]);
 		if ((fp_tmp = fopen(state_file, "r+")) == (FILE *)NULL) {
-			if ((fp_tmp = fopen(state_file, "w+"))
-				== (FILE *)NULL) {
+			if ((fp_tmp = fopen(state_file, "w+")) ==
+			    (FILE *)NULL) {
 				if (debug)
-				    syslog(LOG_ERR,
-					"can't open %s: %m",
-					state_file);
+					syslog(LOG_ERR,
+					    "can't open %s: %m",
+					    state_file);
 				continue;
 			} else
 				(void) chmod(state_file, 0644);
 		}
 		if ((fscanf(fp_tmp, "%d", &tmp_state)) == EOF) {
 			if (debug)
-			    syslog(LOG_ERR,
-				"statd: %s: file empty\n", state_file);
+				syslog(LOG_ERR,
+				    "statd: %s: file empty\n", state_file);
 			(void) fclose(fp_tmp);
 			continue;
 		}
@@ -151,7 +153,7 @@ statd_init()
 			LOCAL_STATE = tmp_state;
 			if (debug)
 				(void) printf("Update LOCAL STATE: %d\n",
-						tmp_state);
+				    tmp_state);
 		}
 		(void) fclose(fp_tmp);
 	}
@@ -180,8 +182,8 @@ statd_init()
 	for (i = 0; i < pathix; i++) {
 		(void) sprintf(state_file, "%s/statmon/state", path_name[i]);
 		if ((fp_tmp = fopen(state_file, "r+")) == (FILE *)NULL) {
-			if ((fp_tmp = fopen(state_file, "w+"))
-				== (FILE *)NULL) {
+			if ((fp_tmp = fopen(state_file, "w+")) ==
+			    (FILE *)NULL) {
 				syslog(LOG_ERR,
 				    "can't open %s: %m", state_file);
 				continue;
@@ -223,8 +225,8 @@ statd_init()
 
 	while ((dirp = readdir(dp)) != NULL) {
 		if (strcmp(dirp->d_name, ".") != 0 &&
-			strcmp(dirp->d_name, "..") != 0) {
-		/* rename all entries from CURRENT to BACKUP */
+		    strcmp(dirp->d_name, "..") != 0) {
+			/* rename all entries from CURRENT to BACKUP */
 			(void) move_file(CURRENT, dirp->d_name, BACKUP);
 		}
 	}
@@ -297,17 +299,17 @@ thr_statd_init()
 		name = strdup(dirp->d_name);
 		if (name == (char *)NULL) {
 			syslog(LOG_ERR,
-				"statd: unable to allocate space for name %s\n",
-				dirp->d_name);
+			    "statd: unable to allocate space for name %s\n",
+			    dirp->d_name);
 			continue;
 		}
 
 		/* Create a thread to do a statd_call_statd for name */
 		if (thr_create(NULL, NULL, thr_call_statd,
-					(void *) name, 0, 0)) {
+		    (void *) name, 0, 0)) {
 			syslog(LOG_ERR,
-		"statd: unable to create thr_call_statd() for name %s.\n",
-				dirp->d_name);
+			    "statd: unable to create thr_call_statd() "
+			    "for name %s.\n", dirp->d_name);
 			free(name);
 			continue;
 		}
@@ -334,7 +336,7 @@ thr_statd_init()
 	num_threads = 0;
 	while ((dirp = readdir(dp)) != NULL) {
 		if (strcmp(dirp->d_name, ".") == 0 ||
-			strcmp(dirp->d_name, "..") == 0) {
+		    strcmp(dirp->d_name, "..") == 0) {
 			continue;
 		}
 
@@ -350,7 +352,7 @@ thr_statd_init()
 
 		if (debug) {
 			(void) printf("thr_statd_init: legacy %s\n",
-					dirp->d_name);
+			    dirp->d_name);
 		}
 
 		/*
@@ -372,17 +374,17 @@ thr_statd_init()
 		name = strdup(dirp->d_name);
 		if (name == (char *)NULL) {
 			syslog(LOG_ERR,
-			"statd: unable to allocate space for name %s\n",
-				dirp->d_name);
+			    "statd: unable to allocate space for name %s\n",
+			    dirp->d_name);
 			continue;
 		}
 
 		/* Create a thread to do a statd_call_statd for name */
 		if (thr_create(NULL, NULL, thr_call_statd,
-					(void *) name, 0, 0)) {
+		    (void *) name, 0, 0)) {
 			syslog(LOG_ERR,
-		"statd: unable to create thr_call_statd() for name %s.\n",
-				dirp->d_name);
+			    "statd: unable to create thr_call_statd() "
+			    "for name %s.\n", dirp->d_name);
 			free(name);
 			continue;
 		}
@@ -410,7 +412,7 @@ thr_statd_init()
 		if ((mkdir(buf, SM_DIRECTORY_MODE)) == -1) {
 			if (errno != EEXIST)
 				syslog(LOG_ERR, "statd: mkdir %s error %m\n",
-					buf);
+				    buf);
 			else
 				copydir_from_to(BACKUP, buf);
 		} else
@@ -434,7 +436,7 @@ thr_statd_init()
 	/* Continue to notify statd on hosts that were unreachable. */
 	if (thr_create(NULL, NULL, sm_try, NULL, THR_DETACHED, 0))
 		syslog(LOG_ERR,
-			"statd: unable to create thread for sm_try().\n");
+		    "statd: unable to create thread for sm_try().\n");
 	thr_exit((void *) 0);
 #ifdef lint
 	return (0);
@@ -489,8 +491,8 @@ thr_call_statd(void *namep)
 			if (n <= 0) {
 				if (debug >= 2) {
 					(void) printf(
-					"thr_call_statd: can't read link %s\n",
-							path);
+					    "thr_call_statd: can't read "
+					    "link %s\n", path);
 				}
 			} else {
 				rname[n] = '\0';
@@ -581,8 +583,8 @@ statd_call_statd(name)
 	tottimeout.tv_sec = SM_RPC_TIMEOUT;
 	tottimeout.tv_usec = 0;
 
-	if ((clnt = create_client(name_or_addr, SM_PROG, SM_VERS,
-	    &tottimeout)) == (CLIENT *) NULL) {
+	if ((clnt = create_client(name_or_addr, SM_PROG, SM_VERS, NULL,
+	    &tottimeout)) == NULL) {
 		return (-1);
 	}
 
@@ -675,8 +677,8 @@ sm_try()
 				 */
 				if (delay == 0)
 					syslog(LOG_WARNING,
-					"statd: host %s is not responding\n",
-						nl->name);
+					    "statd: host %s is not "
+					    "responding\n", nl->name);
 			}
 		}
 		/*
@@ -1035,16 +1037,16 @@ remove_single_name(char *name, char *dir1, char *dir2)
 	char dirpath[MAXPATHLEN];
 	char rname[MAXNAMELEN + 1]; /* +1 for NULL term */
 
-	if (strlen(name) + strlen(dir1) + (dir2 != NULL ? strlen(dir2) : 0)
-			+ 3 > MAXPATHLEN) {
+	if (strlen(name) + strlen(dir1) + (dir2 != NULL ? strlen(dir2) : 0) +
+	    3 > MAXPATHLEN) {
 		if (dir2 != NULL)
 			syslog(LOG_ERR,
-				"statd: pathname too long: %s/%s/%s\n",
-						dir1, dir2, name);
+			    "statd: pathname too long: %s/%s/%s\n",
+			    dir1, dir2, name);
 		else
 			syslog(LOG_ERR,
-				"statd: pathname too long: %s/%s\n",
-						dir1, name);
+			    "statd: pathname too long: %s/%s\n",
+			    dir1, name);
 
 		return;
 	}
@@ -1078,12 +1080,13 @@ remove_single_name(char *name, char *dir1, char *dir2)
 				if (debug >= 2) {
 					if (error < 0) {
 						(void) printf(
-					"remove_name: can't unlink %s\n",
-							dirpath);
+						    "remove_name: can't "
+						    "unlink %s\n",
+						    dirpath);
 					} else {
 						(void) printf(
-					"remove_name: unlinked %s\n",
-							dirpath);
+						    "remove_name: unlinked ",
+						    "%s\n", dirpath);
 					}
 				}
 			}
@@ -1093,7 +1096,7 @@ remove_single_name(char *name, char *dir1, char *dir2)
 			 * here for analysis by the system administrator.
 			 */
 			syslog(LOG_ERR,
-				"statd: can't read link %s: %m\n", path);
+			    "statd: can't read link %s: %m\n", path);
 		}
 	}
 
@@ -1122,13 +1125,13 @@ count_symlinks(char *dir, char *name, int *count)
 
 	if ((dp = opendir(dir)) == (DIR *)NULL) {
 		syslog(LOG_ERR, "count_symlinks: open %s dir, error %m\n",
-			dir);
+		    dir);
 		return (-1);
 	}
 
 	while ((dirp = readdir(dp)) != NULL) {
 		if (strcmp(dirp->d_name, ".") == 0 ||
-			strcmp(dirp->d_name, "..") == 0) {
+		    strcmp(dirp->d_name, "..") == 0) {
 			continue;
 		}
 
@@ -1141,8 +1144,8 @@ count_symlinks(char *dir, char *name, int *count)
 			if (n <= 0) {
 				if (debug >= 2) {
 					(void) printf(
-					"count_symlinks: can't read link %s\n",
-						lpath);
+					    "count_symlinks: can't read link "
+					    "%s\n", lpath);
 				}
 				continue;
 			}
@@ -1329,15 +1332,15 @@ record_addr(char *name, sa_family_t family, struct netobj *ah)
 			(void) printf("record_addr: addr= %x\n", addr.s_addr);
 		else if (family == AF_INET6)
 			(void) printf("record_addr: addr= %x\n", \
-				((struct in6_addr *)addr6)->s6_addr);
+			    ((struct in6_addr *)addr6)->s6_addr);
 	}
 
 	if (family == AF_INET) {
 		if (addr.s_addr == INADDR_ANY ||
 		    ((addr.s_addr && 0xff000000) == 0)) {
 			syslog(LOG_DEBUG,
-				"record_addr: illegal IP address %x\n",
-				addr.s_addr);
+			    "record_addr: illegal IP address %x\n",
+			    addr.s_addr);
 			return;
 		}
 	}
@@ -1346,28 +1349,27 @@ record_addr(char *name, sa_family_t family, struct netobj *ah)
 	famstr = family2string(family);
 	if (famstr == NULL) {
 		syslog(LOG_DEBUG,
-			"record_addr: unsupported address family %d\n",
-			family);
+		    "record_addr: unsupported address family %d\n",
+		    family);
 		return;
 	}
 
 	switch (family) {
 		char abuf[INET6_ADDRSTRLEN];
-	    case AF_INET:
+	case AF_INET:
 		(void) sprintf(ascii_addr, "%s.%s", famstr, inet_ntoa(addr));
 		break;
 
-	    case AF_INET6:
+	case AF_INET6:
 		(void) sprintf(ascii_addr, "%s.%s", famstr,\
 		    inet_ntop(family, addr6, abuf, sizeof (abuf)));
 		break;
 
-	    default:
+	default:
 		if (debug) {
 			(void) printf(
-		"record_addr: family2string supports unknown family %d (%s)\n",
-				family,
-				famstr);
+			    "record_addr: family2string supports unknown "
+			    "family %d (%s)\n", family, famstr);
 		}
 		free(famstr);
 		return;
@@ -1389,13 +1391,13 @@ record_addr(char *name, sa_family_t family, struct netobj *ah)
 	 */
 	for (i = 0; i < pathix; i++) {
 		path_len = strlen(path_name[i]) +
-					strlen("/statmon/sm/") +
-					strlen(name) + 1;
+		    strlen("/statmon/sm/") +
+		    strlen(name) + 1;
 
 		if (path_len > MAXPATHLEN) {
 			syslog(LOG_ERR,
-				"statd: pathname too long: %s/statmon/sm/%s\n",
-				path_name[i], name);
+			    "statd: pathname too long: %s/statmon/sm/%s\n",
+			    path_name[i], name);
 			continue;
 		}
 		(void) strcpy(path, path_name[i]);

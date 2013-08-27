@@ -20,6 +20,7 @@
 #
 #
 # Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 #
 
 #
@@ -76,8 +77,6 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	xdr_fhandle;
 	xdr_fhandle3;
 	xdr_fhstatus;
-	xdr_fsh4_access;
-	xdr_fsh4_mode;
 	xdr_fsh_access;
 	xdr_fsh_mode;
 	xdr_groupnode;
@@ -127,17 +126,17 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	xdr_ppathcnf;
 	xdr_reg1args;
 	xdr_reg1res;
-	xdr_res;
 	xdr_rstat_timeval;
 	xdr_rusers_utmp;
 	xdr_sm_name;
+	xdr_sm_res;
 	xdr_sm_stat;
 	xdr_sm_stat_res;
+	xdr_sm_status;
 	xdr_sprayarr;
 	xdr_spraycumul;
 	xdr_spraytimeval;
 	xdr_stat_chge;
-	xdr_status;
 	xdr_timeval;
 	xdr_uint32;
 	xdr_uint64;

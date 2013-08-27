@@ -24,6 +24,7 @@
  */
 /*
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright (c) 2012 by Delphix. All rights reserved.
  */
 
 /*
@@ -4252,7 +4253,7 @@ tl_addr_req(mblk_t *mp, tl_endpt_t *tep)
 static void
 tl_connected_cots_addr_req(mblk_t *mp, tl_endpt_t *tep)
 {
-	tl_endpt_t		*peer_tep;
+	tl_endpt_t		*peer_tep = tep->te_conp;
 	size_t			ack_sz;
 	mblk_t			*ackmp;
 	struct T_addr_ack	*taa;
@@ -4263,11 +4264,15 @@ tl_connected_cots_addr_req(mblk_t *mp, tl_endpt_t *tep)
 		return;
 	}
 
+	if (peer_tep == NULL || peer_tep->te_closing) {
+		tl_error_ack(tep->te_wq, mp, TSYSERR, ECONNRESET, T_ADDR_REQ);
+		return;
+	}
+
 	ASSERT(tep->te_state >= TS_IDLE);
 
 	ack_sz = sizeof (struct T_addr_ack);
 	ack_sz += T_ALIGN(tep->te_alen);
-	peer_tep = tep->te_conp;
 	ack_sz += peer_tep->te_alen;
 
 	ackmp = tpi_ack_alloc(mp, ack_sz, M_PCPROTO, T_ADDR_ACK);

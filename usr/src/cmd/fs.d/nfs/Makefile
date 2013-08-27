@@ -34,7 +34,9 @@ include $(SRC)/Makefile.master
 SUBDIR1=	exportfs nfsd rquotad \
 		statd nfsstat mountd dfshares \
 		nfsfind nfs4cbd share
-SUBDIR2=	clear_locks umount showmount \
+
+# These do "make catalog"
+SUBDIR2=	clear_locks lockd umount showmount \
 		mount dfmounts nfslog nfsmapid \
 		nfsref rp_basic
 
@@ -45,11 +47,6 @@ SUBDIRS=	$(SUBDIR1) $(SUBDIR2) $(SUBDIR3)
 #
 POFILES=        $(SUBDIR2:%=%/%.po)
 POFILE=         nfs.po
-
-LOCKD=		$(CLOSED)/cmd/fs.d/nfs/lockd
-$(CLOSED_BUILD)CLOSED_SUBDIR2=	$(LOCKD)
-$(CLOSED_BUILD)POFILES +=	$(LOCKD)/lockd.po
-$(CLOSED_BUILD)SUBDIRS +=	$(CLOSED_SUBDIR2)
 
 all:=		TARGET= all
 install:=	TARGET= install
@@ -64,7 +61,7 @@ catalog:=       TARGET= catalog
 
 all install clean clobber lint: $(SUBDIRS)
 
-catalog: $(SUBDIR2) $(CLOSED_SUBDIR2)
+catalog: $(SUBDIR2)
 	$(RM) $(POFILE)
 	cat $(POFILES) > $(POFILE)
 
