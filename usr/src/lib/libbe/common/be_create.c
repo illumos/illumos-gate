@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  */
 
 /*
@@ -450,6 +450,17 @@ be_destroy(nvlist_t *be_attrs)
 	    sizeof (obe_root_ds));
 	bt.obe_root_ds = obe_root_ds;
 
+	if (getzoneid() != GLOBAL_ZONEID) {
+		if (!be_zone_compare_uuids(bt.obe_root_ds)) {
+			if (be_is_active_on_boot(bt.obe_name)) {
+				be_print_err(gettext("be_destroy: destroying "
+				    "active zone root dataset from non-active "
+				    "global BE is not supported\n"));
+				return (BE_ERR_NOTSUP);
+			}
+		}
+	}
+
 	/*
 	 * Detect if the BE to destroy has the 'active on boot' property set.
 	 * If so, set the 'active on boot' property on the the 'active' BE.
@@ -482,9 +493,12 @@ be_destroy(nvlist_t *be_attrs)
 	}
 
 	/* Get the UUID of the global BE */
-	if (be_get_uuid(zfs_get_name(zhp), &dd.gz_be_uuid) != BE_SUCCESS) {
-		be_print_err(gettext("be_destroy: BE has no UUID (%s)\n"),
-		    zfs_get_name(zhp));
+	if (getzoneid() == GLOBAL_ZONEID) {
+		if (be_get_uuid(zfs_get_name(zhp),
+		    &dd.gz_be_uuid) != BE_SUCCESS) {
+			be_print_err(gettext("be_destroy: BE has no "
+			"UUID (%s)\n"), zfs_get_name(zhp));
+		}
 	}
 
 	/*
@@ -595,6 +609,7 @@ be_copy(nvlist_t *be_attrs)
 	zpool_handle_t	*zphp = NULL;
 	nvlist_t	*zfs_props = NULL;
 	uuid_t		uu = { 0 };
+	uuid_t		parent_uu = { 0 };
 	char		obe_root_ds[MAXPATHLEN];
 	char		nbe_root_ds[MAXPATHLEN];
 	char		ss[MAXPATHLEN];
@@ -753,17 +768,30 @@ be_copy(nvlist_t *be_attrs)
 		}
 
 		/* Verify it doesn't already exist */
-		if ((zret = zpool_iter(g_zfs, be_exists_callback, bt.nbe_name))
-		    > 0) {
-			be_print_err(gettext("be_copy: BE (%s) already "
-			    "exists\n"), bt.nbe_name);
-			ret = BE_ERR_BE_EXISTS;
-			goto done;
-		} else if (zret < 0) {
-			be_print_err(gettext("be_copy: zpool_iter failed: "
-			    "%s\n"), libzfs_error_description(g_zfs));
-			ret = zfs_err_to_be_err(g_zfs);
-			goto done;
+		if (getzoneid() == GLOBAL_ZONEID) {
+			if ((zret = zpool_iter(g_zfs, be_exists_callback,
+			    bt.nbe_name)) > 0) {
+				be_print_err(gettext("be_copy: BE (%s) already "
+				    "exists\n"), bt.nbe_name);
+				ret = BE_ERR_BE_EXISTS;
+				goto done;
+			} else if (zret < 0) {
+				be_print_err(gettext("be_copy: zpool_iter "
+				    "failed: %s\n"),
+				    libzfs_error_description(g_zfs));
+				ret = zfs_err_to_be_err(g_zfs);
+				goto done;
+			}
+		} else {
+			be_make_root_ds(bt.nbe_zpool, bt.nbe_name, nbe_root_ds,
+			    sizeof (nbe_root_ds));
+			if (zfs_dataset_exists(g_zfs, nbe_root_ds,
+			    ZFS_TYPE_FILESYSTEM)) {
+				be_print_err(gettext("be_copy: BE (%s) already "
+				    "exists\n"), bt.nbe_name);
+				ret = BE_ERR_BE_EXISTS;
+				goto done;
+			}
 		}
 	} else {
 		/*
@@ -1016,9 +1044,24 @@ be_copy(nvlist_t *be_attrs)
 	}
 
 	/* Set UUID for new BE */
-	if (be_set_uuid(bt.nbe_root_ds) != BE_SUCCESS) {
-		be_print_err(gettext("be_copy: failed to "
-		    "set uuid for new BE\n"));
+	if (getzoneid() == GLOBAL_ZONEID) {
+		if (be_set_uuid(bt.nbe_root_ds) != BE_SUCCESS) {
+			be_print_err(gettext("be_copy: failed to "
+			    "set uuid for new BE\n"));
+		}
+	} else {
+		if ((ret = be_zone_get_parent_uuid(bt.obe_root_ds,
+		    &parent_uu)) != BE_SUCCESS) {
+			be_print_err(gettext("be_copy: failed to get "
+			    "parentbe uuid from orig BE\n"));
+			ret = BE_ERR_ZONE_NO_PARENTBE;
+			goto done;
+		} else if ((ret = be_zone_set_parent_uuid(bt.nbe_root_ds,
+		    parent_uu)) != BE_SUCCESS) {
+			be_print_err(gettext("be_copy: failed to set "
+			    "parentbe uuid for newly created BE\n"));
+			goto done;
+		}
 	}
 
 	/*

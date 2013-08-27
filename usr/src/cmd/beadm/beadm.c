@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  */
 
 /*
@@ -386,10 +386,17 @@ print_be_nodes(const char *be_name, boolean_t parsable, struct hdr_info *hdr,
 		    snap = snap->be_next_snapshot)
 			used += snap->be_snapshot_space_used;
 
+		if (!cur_be->be_global_active)
+			active[ai++] = 'x';
+
 		if (cur_be->be_active)
 			active[ai++] = 'N';
-		if (cur_be->be_active_on_boot)
-			active[ai] = 'R';
+		if (cur_be->be_active_on_boot) {
+			if (!cur_be->be_global_active)
+				active[ai] = 'b';
+			else
+				active[ai] = 'R';
+		}
 
 		nicenum(used, buf, sizeof (buf));
 		if (parsable)

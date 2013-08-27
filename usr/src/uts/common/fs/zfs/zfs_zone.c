@@ -777,49 +777,6 @@ get_sched_pri_cb(zone_t *zonep, void *arg)
  * In all cases, we fall back to simply pulling the next op off the queue
  * if something should go wrong.
  */
-static zio_t *
-get_next_zio(vdev_queue_t *vq, int qdepth)
-{
-	zone_q_bump_t qbump;
-	zio_t *zp = NULL, *zphead;
-	int cnt = 0;
-
-	ASSERT(MUTEX_HELD(&vq->vq_lock));
-
-	/* To avoid problems with int rounding, scale the queue depth by 10 */
-	qbump.zq_qdepth = qdepth * 10;
-	qbump.zq_priority = 0;
-	qbump.zq_zoneid = 0;
-	(void) zone_walk(get_sched_pri_cb, &qbump);
-
-	zphead = avl_first(&vq->vq_deadline_tree);
-
-	/* Check if the scheduler didn't pick a zone for some reason!? */
-	if (qbump.zq_zoneid != 0) {
-		for (zp = avl_first(&vq->vq_deadline_tree); zp != NULL;
-		    zp = avl_walk(&vq->vq_deadline_tree, zp, AVL_AFTER)) {
-			if (zp->io_zoneid == qbump.zq_zoneid)
-				break;
-			cnt++;
-		}
-	}
-
-	if (zp == NULL) {
-		zp = zphead;
-	} else if (zp != zphead) {
-		/*
-		 * Only fire the probe if we actually picked a different zio
-		 * than the one already at the head of the queue.
-		 */
-		extern void __dtrace_probe_zfs__zone__sched__bump(uintptr_t,
-		    uintptr_t, uintptr_t, uintptr_t);
-		__dtrace_probe_zfs__zone__sched__bump(
-		    (uintptr_t)(zp->io_zoneid), (uintptr_t)(cnt),
-		    (uintptr_t)(qbump.zq_priority), (uintptr_t)(qbump.zq_wt));
-	}
-
-	return (zp);
-}
 
 /*
  * Add our zone ID to the zio so we can keep track of which zones are doing
@@ -1148,39 +1105,7 @@ zfs_zone_zio_enqueue(zio_t *zp)
 zio_t *
 zfs_zone_schedule(vdev_queue_t *vq)
 {
-	int cnt;
-	zoneid_t last_zone;
-	zio_t *zp;
-
-	ASSERT(MUTEX_HELD(&vq->vq_lock));
-
-	cnt = avl_numnodes(&vq->vq_deadline_tree);
-	last_zone = vq->vq_last_zone_id;
-
-	/*
-	 * If there are only a few ops in the queue then just issue the head.
-	 * If there are more than a few ops already queued up, then use
-	 * scheduling to get the next zio.
-	 */
-	if (!zfs_zone_schedule_enable || cnt < zfs_zone_schedule_thresh)
-		zp = avl_first(&vq->vq_deadline_tree);
-	else
-		zp = get_next_zio(vq, cnt);
-
-	vq->vq_last_zone_id = zp->io_zoneid;
-
-	/*
-	 * Probe with 3 args; the number of IOs in the queue, the zone that
-	 * was last scheduled off this queue, and the zone that was associated
-	 * with the next IO that is scheduled.
-	 */
-	extern void __dtrace_probe_zfs__zone__sched(uintptr_t, uintptr_t,
-	    uintptr_t);
-
-	__dtrace_probe_zfs__zone__sched((uintptr_t)(cnt),
-	    (uintptr_t)(last_zone), (uintptr_t)(zp->io_zoneid));
-
-	return (zp);
+	return (NULL);
 }
 
 #endif
