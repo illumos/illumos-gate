@@ -165,8 +165,6 @@ extern int aok;
  */
 #define	curthread	((void *)(uintptr_t)thr_self())
 
-#define	kpreempt(x)	yield()
-
 typedef struct kthread kthread_t;
 
 #define	thread_create(stk, stksize, func, arg, len, pp, state, pri)	\

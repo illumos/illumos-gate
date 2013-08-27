@@ -48,4 +48,3 @@ clean:
 lint: lint_SRCS
 
 include ../Makefile.targ
-include ../Makefile.ctf
