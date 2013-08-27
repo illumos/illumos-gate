@@ -7,13 +7,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH XARGS 1 "Jul 17, 2007"
+.TH XARGS 1 "November 24, 2012"
 .SH NAME
 xargs \- construct argument lists and invoke utility
 .SH SYNOPSIS
 .LP
 .nf
-\fBxargs\fR [\fB-t\fR] [\fB-p\fR] [\fB-e\fR[\fIeofstr\fR]] [\fB-E\fR \fIeofstr\fR]
+\fBxargs\fR [\fB-t\fR] [\fB-0\fR] [\fB-p\fR] [\fB-e\fR[\fIeofstr\fR]] [\fB-E\fR \fIeofstr\fR]
      [\fB-I\fR \fIreplstr\fR] [\fB-i\fR[\fIreplstr\fR]] [\fB-L\fR \fInumber\fR] [\fB-l\fR[\fInumber\fR]]
      [\fB-n\fR \fInumber\fR [\fB-x\fR]] [\fB-s\fR \fIsize\fR] [\fIutility\fR [\fIargument\fR...]]
 .fi
@@ -158,7 +158,7 @@ remaining.
 .sp
 .ne 2
 .na
-\fB\fB-p\fR\fR
+\fB-p\fR
 .ad
 .RS 15n
 Prompt mode. The user is asked whether to execute \fIutility\fR at each
@@ -222,6 +222,17 @@ just prior to invocation.
 Terminates if a command line containing \fInumber\fR arguments (see the
 \fB-n\fR option above) or \fInumber\fR lines (see the \fB-L\fR option above)
 does not fit in the implied or specified size (see the \fB-s\fR option above).
+.RE
+
+.sp
+.ne 2
+.na
+\fB-0\fR
+.ad
+.RS 6n
+Null separator mode.  Instead of using white space or new lines to
+delimit arguments, zero bytes are used.  This is suitable for use with
+the -print0 argument to \fBfind\fR(1).
 .RE
 
 .SH OPERANDS
