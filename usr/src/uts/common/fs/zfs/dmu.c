@@ -960,7 +960,6 @@ xuio_stat_wbuf_nocopy()
 }
 
 #ifdef _KERNEL
-
 int
 dmu_read_uio(objset_t *os, uint64_t object, uio_t *uio, uint64_t size)
 {

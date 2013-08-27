@@ -21,7 +21,6 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright (c) 2011, Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -33,7 +32,6 @@
 #include <sys/spa_impl.h>
 #include <sys/zio.h>
 #include <sys/avl.h>
-#include <sys/zfs_zone.h>
 
 /*
  * These tunables are for performance analysis.
@@ -131,8 +129,6 @@ vdev_queue_init(vdev_t *vd)
 
 	avl_create(&vq->vq_pending_tree, vdev_queue_offset_compare,
 	    sizeof (zio_t), offsetof(struct zio, io_offset_node));
-
-	vq->vq_last_zone_id = 0;
 }
 
 void
@@ -153,7 +149,6 @@ vdev_queue_io_add(vdev_queue_t *vq, zio_t *zio)
 {
 	spa_t *spa = zio->io_spa;
 	avl_add(&vq->vq_deadline_tree, zio);
-	zfs_zone_zio_enqueue(zio);
 	avl_add(zio->io_vdev_tree, zio);
 
 	if (spa->spa_iokstat != NULL) {
@@ -168,7 +163,6 @@ vdev_queue_io_remove(vdev_queue_t *vq, zio_t *zio)
 {
 	spa_t *spa = zio->io_spa;
 	avl_remove(&vq->vq_deadline_tree, zio);
-	zfs_zone_zio_dequeue(zio);
 	avl_remove(zio->io_vdev_tree, zio);
 
 	if (spa->spa_iokstat != NULL) {
@@ -250,11 +244,7 @@ again:
 	    avl_numnodes(&vq->vq_deadline_tree) == 0)
 		return (NULL);
 
-#ifdef _KERNEL
-	fio = lio = zfs_zone_schedule(vq);
-#else
 	fio = lio = avl_first(&vq->vq_deadline_tree);
-#endif
 
 	t = fio->io_vdev_tree;
 	flags = fio->io_flags & ZIO_FLAG_AGG_INHERIT;
