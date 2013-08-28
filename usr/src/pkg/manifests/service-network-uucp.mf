@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/service/network/uucp@$(PKGVERS)
@@ -114,12 +115,8 @@ file path=usr/share/man/man1c/ct.1c
 file path=usr/share/man/man1c/cu.1c
 file path=usr/share/man/man1c/rup.1c
 file path=usr/share/man/man1c/uucp.1c
-file path=usr/share/man/man1c/uudecode.1c
 file path=usr/share/man/man1c/uuencode.1c
 file path=usr/share/man/man1c/uuglist.1c
-file path=usr/share/man/man1c/uulog.1c
-file path=usr/share/man/man1c/uuname.1c
-file path=usr/share/man/man1c/uupick.1c
 file path=usr/share/man/man1c/uustat.1c
 file path=usr/share/man/man1c/uuto.1c
 file path=usr/share/man/man1c/uux.1c
@@ -128,9 +125,7 @@ file path=usr/share/man/man1m/in.uucpd.1m
 file path=usr/share/man/man1m/uucheck.1m
 file path=usr/share/man/man1m/uucico.1m
 file path=usr/share/man/man1m/uucleanup.1m
-file path=usr/share/man/man1m/uucpd.1m
 file path=usr/share/man/man1m/uusched.1m
-file path=usr/share/man/man1m/uutry.1m
 file path=usr/share/man/man1m/uuxqt.1m
 hardlink path=etc/rc2.d/S70uucp target=../../etc/init.d/uucp
 legacy pkg=SUNWbnur desc="configuration and start-up files for UUCP utilities" \
@@ -142,6 +137,12 @@ license lic_CDDL license=lic_CDDL
 license usr/src/cmd/bnu/THIRDPARTYLICENSE \
     license=usr/src/cmd/bnu/THIRDPARTYLICENSE
 link path=etc/uucp/remote.unknown target=../../usr/lib/uucp/remote.unknown
+link path=usr/share/man/man1c/uudecode.1c target=uuencode.1c
+link path=usr/share/man/man1c/uulog.1c target=uucp.1c
+link path=usr/share/man/man1c/uuname.1c target=uucp.1c
+link path=usr/share/man/man1c/uupick.1c target=uuto.1c
+link path=usr/share/man/man1m/uucpd.1m target=in.uucpd.1m
+link path=usr/share/man/man1m/uutry.1m target=Uutry.1m
 link path=var/spool/uucp/.Admin target=../../uucp/.Admin
 link path=var/spool/uucp/.Log target=../../uucp/.Log
 link path=var/spool/uucp/.Old target=../../uucp/.Old

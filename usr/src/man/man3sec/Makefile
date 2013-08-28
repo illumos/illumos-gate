@@ -9,13 +9,16 @@
 # at http://www.illumos.org/license/CDDL.
 #
 
+#
 # Copyright 2011, Richard Lowe
+# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+#
 
-include ../../Makefile.master
+include		$(SRC)/Makefile.master
 
-MANSECT = 	3sec
+MANSECT= 	3sec
 
-MANFILES = 	acl_check.3sec		\
+MANFILES= 	acl_check.3sec		\
 	 	acl_free.3sec		\
 	 	acl_get.3sec		\
 	 	acl_strip.3sec		\
@@ -26,29 +29,25 @@ MANFILES = 	acl_check.3sec		\
 	 	acltomode.3sec		\
 	 	acltotext.3sec
 
-MANSOFILES =	acl_fromtext.3sec	\
+MANLINKS=	acl_fromtext.3sec	\
 		acl_set.3sec		\
 		aclfrommode.3sec	\
 		aclfromtext.3sec	\
 		facl_get.3sec		\
 		facl_set.3sec
 
-MANFILES +=	$(MANSOFILES)
+acl_set.3sec		:= LINKSRC = acl_get.3sec
+facl_get.3sec		:= LINKSRC = acl_get.3sec
+facl_set.3sec		:= LINKSRC = acl_get.3sec
 
-acl_set.3sec		:= SOSRC = man3sec/acl_get.3sec
-facl_get.3sec		:= SOSRC = man3sec/acl_get.3sec
-facl_set.3sec		:= SOSRC = man3sec/acl_get.3sec
+acl_fromtext.3sec	:= LINKSRC = acl_totext.3sec
 
-acl_fromtext.3sec	:= SOSRC = man3sec/acl_totext.3sec
+aclfrommode.3sec	:= LINKSRC = acltomode.3sec
 
-aclfrommode.3sec	:= SOSRC = man3sec/acltomode.3sec
-
-aclfromtext.3sec	:= SOSRC = man3sec/acltotext.3sec
+aclfromtext.3sec	:= LINKSRC = acltotext.3sec
 
 .KEEP_STATE:
 
-include ../Makefile.man
+include		$(SRC)/man/Makefile.man
 
-install: $(ROOTMANFILES)
-
-
+install:	$(ROOTMANFILES) $(ROOTMANLINKS)

@@ -9,7 +9,10 @@
 # at http://www.illumos.org/license/CDDL.
 #
 
+#
 # Copyright 2011, Richard Lowe
+# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+#
 
 file path=usr/share/man/man9s/Intro.9s
 file path=usr/share/man/man9s/aio_req.9s
@@ -18,11 +21,9 @@ file path=usr/share/man/man9s/cb_ops.9s
 file path=usr/share/man/man9s/copyreq.9s
 file path=usr/share/man/man9s/copyresp.9s
 file path=usr/share/man/man9s/datab.9s
-file path=usr/share/man/man9s/dblk.9s
 file path=usr/share/man/man9s/ddi_device_acc_attr.9s
 file path=usr/share/man/man9s/ddi_dma_attr.9s
 file path=usr/share/man/man9s/ddi_dma_cookie.9s
-file path=usr/share/man/man9s/ddi_dma_lim.9s
 file path=usr/share/man/man9s/ddi_dma_lim_sparc.9s
 file path=usr/share/man/man9s/ddi_dma_lim_x86.9s
 file path=usr/share/man/man9s/ddi_dma_req.9s
@@ -38,7 +39,6 @@ file path=usr/share/man/man9s/gld_stats.9s
 file path=usr/share/man/man9s/hook_nic_event.9s
 file path=usr/share/man/man9s/hook_pkt_event.9s
 file path=usr/share/man/man9s/hook_t.9s
-file path=usr/share/man/man9s/intro.9s
 file path=usr/share/man/man9s/iocblk.9s
 file path=usr/share/man/man9s/iovec.9s
 file path=usr/share/man/man9s/kstat.9s
@@ -46,7 +46,6 @@ file path=usr/share/man/man9s/kstat_intr.9s
 file path=usr/share/man/man9s/kstat_io.9s
 file path=usr/share/man/man9s/kstat_named.9s
 file path=usr/share/man/man9s/linkblk.9s
-file path=usr/share/man/man9s/mblk.9s
 file path=usr/share/man/man9s/modldrv.9s
 file path=usr/share/man/man9s/modlinkage.9s
 file path=usr/share/man/man9s/modlmisc.9s
@@ -72,3 +71,7 @@ file path=usr/share/man/man9s/streamtab.9s
 file path=usr/share/man/man9s/stroptions.9s
 file path=usr/share/man/man9s/tuple.9s
 file path=usr/share/man/man9s/uio.9s
+link path=usr/share/man/man9s/dblk.9s target=datab.9s
+link path=usr/share/man/man9s/ddi_dma_lim.9s target=ddi_dma_lim_sparc.9s
+link path=usr/share/man/man9s/intro.9s target=Intro.9s
+link path=usr/share/man/man9s/mblk.9s target=msgb.9s

@@ -9,13 +9,16 @@
 # at http://www.illumos.org/license/CDDL.
 #
 
+#
 # Copyright 2011, Richard Lowe
+# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+#
 
-include ../../Makefile.master
+include		$(SRC)/Makefile.master
 
-MANSECT = 	3sysevent
+MANSECT= 	3sysevent
 
-MANFILES =	sysevent_bind_handle.3sysevent		\
+MANFILES=	sysevent_bind_handle.3sysevent		\
 		sysevent_free.3sysevent			\
 		sysevent_get_attr_list.3sysevent	\
 		sysevent_get_class_name.3sysevent	\
@@ -23,7 +26,7 @@ MANFILES =	sysevent_bind_handle.3sysevent		\
 		sysevent_post_event.3sysevent		\
 		sysevent_subscribe_event.3sysevent
 
-MANSOFILES =	sysevent_get_pid.3sysevent		\
+MANLINKS=	sysevent_get_pid.3sysevent		\
 		sysevent_get_pub_name.3sysevent		\
 		sysevent_get_seq.3sysevent		\
 		sysevent_get_size.3sysevent		\
@@ -32,24 +35,20 @@ MANSOFILES =	sysevent_get_pid.3sysevent		\
 		sysevent_unbind_handle.3sysevent	\
 		sysevent_unsubscribe_event.3sysevent
 
-MANFILES +=	$(MANSOFILES)
+sysevent_unbind_handle.3sysevent	:= LINKSRC = sysevent_bind_handle.3sysevent
 
-sysevent_unbind_handle.3sysevent	:= SOSRC = man3sysevent/sysevent_bind_handle.3sysevent
+sysevent_get_seq.3sysevent		:= LINKSRC = sysevent_get_class_name.3sysevent
+sysevent_get_size.3sysevent		:= LINKSRC = sysevent_get_class_name.3sysevent
+sysevent_get_subclass_name.3sysevent	:= LINKSRC = sysevent_get_class_name.3sysevent
+sysevent_get_time.3sysevent		:= LINKSRC = sysevent_get_class_name.3sysevent
 
-sysevent_get_seq.3sysevent		:= SOSRC = man3sysevent/sysevent_get_class_name.3sysevent
-sysevent_get_size.3sysevent		:= SOSRC = man3sysevent/sysevent_get_class_name.3sysevent
-sysevent_get_subclass_name.3sysevent	:= SOSRC = man3sysevent/sysevent_get_class_name.3sysevent
-sysevent_get_time.3sysevent		:= SOSRC = man3sysevent/sysevent_get_class_name.3sysevent
+sysevent_get_pid.3sysevent		:= LINKSRC = sysevent_get_vendor_name.3sysevent
+sysevent_get_pub_name.3sysevent		:= LINKSRC = sysevent_get_vendor_name.3sysevent
 
-sysevent_get_pid.3sysevent		:= SOSRC = man3sysevent/sysevent_get_vendor_name.3sysevent
-sysevent_get_pub_name.3sysevent		:= SOSRC = man3sysevent/sysevent_get_vendor_name.3sysevent
-
-sysevent_unsubscribe_event.3sysevent	:= SOSRC = man3sysevent/sysevent_subscribe_event.3sysevent
+sysevent_unsubscribe_event.3sysevent	:= LINKSRC = sysevent_subscribe_event.3sysevent
 
 .KEEP_STATE:
 
-include ../Makefile.man
+include		$(SRC)/man/Makefile.man
 
-install: $(ROOTMANFILES)
-
-
+install:	$(ROOTMANFILES) $(ROOTMANLINKS)

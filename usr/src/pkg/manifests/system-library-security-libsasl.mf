@@ -21,7 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2011 Nexenta Systems, Inc.
+# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/system/library/security/libsasl@$(PKGVERS)
@@ -57,77 +57,17 @@ file path=usr/lib/sasl/login.so.1
 file path=usr/lib/sasl/plain.so.1
 file path=usr/share/man/man3lib/libsasl.3lib
 file path=usr/share/man/man3proc/proc_service.3proc
-file path=usr/share/man/man3proc/ps_kill.3proc
-file path=usr/share/man/man3proc/ps_lcontinue.3proc
-file path=usr/share/man/man3proc/ps_lgetfpregs.3proc
 file path=usr/share/man/man3proc/ps_lgetregs.3proc
-file path=usr/share/man/man3proc/ps_lgetxregs.3proc
-file path=usr/share/man/man3proc/ps_lgetxregsize.3proc
-file path=usr/share/man/man3proc/ps_lrolltoaddr.3proc
-file path=usr/share/man/man3proc/ps_lsetfpregs.3proc
-file path=usr/share/man/man3proc/ps_lsetregs.3proc
-file path=usr/share/man/man3proc/ps_lsetxregs.3proc
-file path=usr/share/man/man3proc/ps_lstop.3proc
-file path=usr/share/man/man3proc/ps_pcontinue.3proc
-file path=usr/share/man/man3proc/ps_pdread.3proc
-file path=usr/share/man/man3proc/ps_pdwrite.3proc
 file path=usr/share/man/man3proc/ps_pglobal_lookup.3proc
-file path=usr/share/man/man3proc/ps_pglobal_sym.3proc
 file path=usr/share/man/man3proc/ps_pread.3proc
 file path=usr/share/man/man3proc/ps_pstop.3proc
-file path=usr/share/man/man3proc/ps_ptread.3proc
-file path=usr/share/man/man3proc/ps_ptwrite.3proc
-file path=usr/share/man/man3proc/ps_pwrite.3proc
-file path=usr/share/man/man3project/endprojent.3project
-file path=usr/share/man/man3project/fgetprojent.3project
-file path=usr/share/man/man3project/getdefaultproj.3project
-file path=usr/share/man/man3project/getprojbyid.3project
-file path=usr/share/man/man3project/getprojbyname.3project
 file path=usr/share/man/man3project/getprojent.3project
-file path=usr/share/man/man3project/getprojidbyname.3project
-file path=usr/share/man/man3project/inproj.3project
 file path=usr/share/man/man3project/project_walk.3project
 file path=usr/share/man/man3project/setproject.3project
-file path=usr/share/man/man3project/setprojent.3project
-file path=usr/share/man/man3resolv/dn_comp.3resolv
-file path=usr/share/man/man3resolv/dn_expand.3resolv
-file path=usr/share/man/man3resolv/fp_resstat.3resolv
-file path=usr/share/man/man3resolv/herror.3resolv
-file path=usr/share/man/man3resolv/hstrerror.3resolv
-file path=usr/share/man/man3resolv/res_getservers.3resolv
-file path=usr/share/man/man3resolv/res_hostalias.3resolv
-file path=usr/share/man/man3resolv/res_init.3resolv
-file path=usr/share/man/man3resolv/res_mkquery.3resolv
-file path=usr/share/man/man3resolv/res_nclose.3resolv
-file path=usr/share/man/man3resolv/res_ndestroy.3resolv
-file path=usr/share/man/man3resolv/res_ninit.3resolv
-file path=usr/share/man/man3resolv/res_nmkquery.3resolv
-file path=usr/share/man/man3resolv/res_nquery.3resolv
-file path=usr/share/man/man3resolv/res_nquerydomain.3resolv
-file path=usr/share/man/man3resolv/res_nsearch.3resolv
-file path=usr/share/man/man3resolv/res_nsend.3resolv
-file path=usr/share/man/man3resolv/res_nsendsigned.3resolv
-file path=usr/share/man/man3resolv/res_query.3resolv
-file path=usr/share/man/man3resolv/res_search.3resolv
-file path=usr/share/man/man3resolv/res_send.3resolv
-file path=usr/share/man/man3resolv/res_setservers.3resolv
 file path=usr/share/man/man3resolv/resolver.3resolv
-file path=usr/share/man/man3rpc/havedisk.3rpc
-file path=usr/share/man/man3rpc/rnusers.3rpc
 file path=usr/share/man/man3rpc/rstat.3rpc
 file path=usr/share/man/man3rpc/rusers.3rpc
 file path=usr/share/man/man3rpc/rwall.3rpc
-file path=usr/share/man/man3sasl/prop_clear.3sasl
-file path=usr/share/man/man3sasl/prop_dispose.3sasl
-file path=usr/share/man/man3sasl/prop_dup.3sasl
-file path=usr/share/man/man3sasl/prop_erase.3sasl
-file path=usr/share/man/man3sasl/prop_format.3sasl
-file path=usr/share/man/man3sasl/prop_get.3sasl
-file path=usr/share/man/man3sasl/prop_getnames.3sasl
-file path=usr/share/man/man3sasl/prop_new.3sasl
-file path=usr/share/man/man3sasl/prop_request.3sasl
-file path=usr/share/man/man3sasl/prop_set.3sasl
-file path=usr/share/man/man3sasl/prop_setvals.3sasl
 file path=usr/share/man/man3sasl/sasl_authorize_t.3sasl
 file path=usr/share/man/man3sasl/sasl_auxprop.3sasl
 file path=usr/share/man/man3sasl/sasl_auxprop_add_plugin.3sasl
@@ -150,7 +90,6 @@ file path=usr/share/man/man3sasl/sasl_dispose.3sasl
 file path=usr/share/man/man3sasl/sasl_done.3sasl
 file path=usr/share/man/man3sasl/sasl_encode.3sasl
 file path=usr/share/man/man3sasl/sasl_encode64.3sasl
-file path=usr/share/man/man3sasl/sasl_encodev.3sasl
 file path=usr/share/man/man3sasl/sasl_erasebuffer.3sasl
 file path=usr/share/man/man3sasl/sasl_errdetail.3sasl
 file path=usr/share/man/man3sasl/sasl_errors.3sasl
@@ -191,3 +130,80 @@ license usr/src/lib/libsasl/THIRDPARTYLICENSE \
     license=usr/src/lib/libsasl/THIRDPARTYLICENSE
 link path=usr/lib/$(ARCH64)/libsasl.so target=libsasl.so.1
 link path=usr/lib/libsasl.so target=libsasl.so.1
+link path=usr/share/man/man3proc/ps_kill.3proc target=ps_pstop.3proc
+link path=usr/share/man/man3proc/ps_lcontinue.3proc target=ps_pstop.3proc
+link path=usr/share/man/man3proc/ps_lgetfpregs.3proc target=ps_lgetregs.3proc
+link path=usr/share/man/man3proc/ps_lgetxregs.3proc target=ps_lgetregs.3proc
+link path=usr/share/man/man3proc/ps_lgetxregsize.3proc \
+    target=ps_lgetregs.3proc
+link path=usr/share/man/man3proc/ps_lrolltoaddr.3proc target=ps_pstop.3proc
+link path=usr/share/man/man3proc/ps_lsetfpregs.3proc target=ps_lgetregs.3proc
+link path=usr/share/man/man3proc/ps_lsetregs.3proc target=ps_lgetregs.3proc
+link path=usr/share/man/man3proc/ps_lsetxregs.3proc target=ps_lgetregs.3proc
+link path=usr/share/man/man3proc/ps_lstop.3proc target=ps_pstop.3proc
+link path=usr/share/man/man3proc/ps_pcontinue.3proc target=ps_pstop.3proc
+link path=usr/share/man/man3proc/ps_pdread.3proc target=ps_pread.3proc
+link path=usr/share/man/man3proc/ps_pdwrite.3proc target=ps_pread.3proc
+link path=usr/share/man/man3proc/ps_pglobal_sym.3proc \
+    target=ps_pglobal_lookup.3proc
+link path=usr/share/man/man3proc/ps_ptread.3proc target=ps_pread.3proc
+link path=usr/share/man/man3proc/ps_ptwrite.3proc target=ps_pread.3proc
+link path=usr/share/man/man3proc/ps_pwrite.3proc target=ps_pread.3proc
+link path=usr/share/man/man3project/endprojent.3project \
+    target=getprojent.3project
+link path=usr/share/man/man3project/fgetprojent.3project \
+    target=getprojent.3project
+link path=usr/share/man/man3project/getdefaultproj.3project \
+    target=getprojent.3project
+link path=usr/share/man/man3project/getprojbyid.3project \
+    target=getprojent.3project
+link path=usr/share/man/man3project/getprojbyname.3project \
+    target=getprojent.3project
+link path=usr/share/man/man3project/getprojidbyname.3project \
+    target=getprojent.3project
+link path=usr/share/man/man3project/inproj.3project target=getprojent.3project
+link path=usr/share/man/man3project/setprojent.3project \
+    target=getprojent.3project
+link path=usr/share/man/man3resolv/dn_comp.3resolv target=resolver.3resolv
+link path=usr/share/man/man3resolv/dn_expand.3resolv target=resolver.3resolv
+link path=usr/share/man/man3resolv/fp_resstat.3resolv target=resolver.3resolv
+link path=usr/share/man/man3resolv/herror.3resolv target=resolver.3resolv
+link path=usr/share/man/man3resolv/hstrerror.3resolv target=resolver.3resolv
+link path=usr/share/man/man3resolv/res_getservers.3resolv \
+    target=resolver.3resolv
+link path=usr/share/man/man3resolv/res_hostalias.3resolv \
+    target=resolver.3resolv
+link path=usr/share/man/man3resolv/res_init.3resolv target=resolver.3resolv
+link path=usr/share/man/man3resolv/res_mkquery.3resolv target=resolver.3resolv
+link path=usr/share/man/man3resolv/res_nclose.3resolv target=resolver.3resolv
+link path=usr/share/man/man3resolv/res_ndestroy.3resolv \
+    target=resolver.3resolv
+link path=usr/share/man/man3resolv/res_ninit.3resolv target=resolver.3resolv
+link path=usr/share/man/man3resolv/res_nmkquery.3resolv \
+    target=resolver.3resolv
+link path=usr/share/man/man3resolv/res_nquery.3resolv target=resolver.3resolv
+link path=usr/share/man/man3resolv/res_nquerydomain.3resolv \
+    target=resolver.3resolv
+link path=usr/share/man/man3resolv/res_nsearch.3resolv target=resolver.3resolv
+link path=usr/share/man/man3resolv/res_nsend.3resolv target=resolver.3resolv
+link path=usr/share/man/man3resolv/res_nsendsigned.3resolv \
+    target=resolver.3resolv
+link path=usr/share/man/man3resolv/res_query.3resolv target=resolver.3resolv
+link path=usr/share/man/man3resolv/res_search.3resolv target=resolver.3resolv
+link path=usr/share/man/man3resolv/res_send.3resolv target=resolver.3resolv
+link path=usr/share/man/man3resolv/res_setservers.3resolv \
+    target=resolver.3resolv
+link path=usr/share/man/man3rpc/havedisk.3rpc target=rstat.3rpc
+link path=usr/share/man/man3rpc/rnusers.3rpc target=rusers.3rpc
+link path=usr/share/man/man3sasl/prop_clear.3sasl target=sasl_auxprop.3sasl
+link path=usr/share/man/man3sasl/prop_dispose.3sasl target=sasl_auxprop.3sasl
+link path=usr/share/man/man3sasl/prop_dup.3sasl target=sasl_auxprop.3sasl
+link path=usr/share/man/man3sasl/prop_erase.3sasl target=sasl_auxprop.3sasl
+link path=usr/share/man/man3sasl/prop_format.3sasl target=sasl_auxprop.3sasl
+link path=usr/share/man/man3sasl/prop_get.3sasl target=sasl_auxprop.3sasl
+link path=usr/share/man/man3sasl/prop_getnames.3sasl target=sasl_auxprop.3sasl
+link path=usr/share/man/man3sasl/prop_new.3sasl target=sasl_auxprop.3sasl
+link path=usr/share/man/man3sasl/prop_request.3sasl target=sasl_auxprop.3sasl
+link path=usr/share/man/man3sasl/prop_set.3sasl target=sasl_auxprop.3sasl
+link path=usr/share/man/man3sasl/prop_setvals.3sasl target=sasl_auxprop.3sasl
+link path=usr/share/man/man3sasl/sasl_encodev.3sasl target=sasl_encode.3sasl

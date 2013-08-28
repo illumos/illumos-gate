@@ -9,13 +9,16 @@
 # at http://www.illumos.org/license/CDDL.
 #
 
+#
 # Copyright 2011, Richard Lowe
+# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+#
 
-include ../../Makefile.master
+include		$(SRC)/Makefile.master
 
-MANSECT = 	3mpapi
+MANSECT= 	3mpapi
 
-MANFILES = 	MP_AssignLogicalUnitToTPG.3mpapi		\
+MANFILES= 	MP_AssignLogicalUnitToTPG.3mpapi		\
 		MP_CancelOverridePath.3mpapi			\
 		MP_CompareOIDs.3mpapi				\
 		MP_DeregisterForObjectPropertyChanges.3mpapi	\
@@ -63,6 +66,6 @@ MANFILES = 	MP_AssignLogicalUnitToTPG.3mpapi		\
 
 .KEEP_STATE:
 
-include ../Makefile.man
+include		$(SRC)/man/Makefile.man
 
-install: $(ROOTMANFILES)
+install:	$(ROOTMANFILES)

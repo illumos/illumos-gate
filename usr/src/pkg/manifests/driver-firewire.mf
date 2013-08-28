@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
 #
 
 #
@@ -48,11 +49,11 @@ $(i386_ONLY)file path=kernel/drv/hci1394 group=sys
 file path=kernel/drv/hci1394.conf group=sys
 file path=kernel/misc/$(ARCH64)/s1394 group=sys mode=0755
 $(i386_ONLY)file path=kernel/misc/s1394 group=sys mode=0755
-file path=usr/share/man/man7d/1394.7d
-file path=usr/share/man/man7d/firewire.7d
 file path=usr/share/man/man7d/hci1394.7d
 file path=usr/share/man/man7d/ieee1394.7d
 legacy pkg=SUNW1394 desc="IEEE1394 Framework and OpenHCI Driver" \
     name="Sun IEEE1394 Framework"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
+link path=usr/share/man/man7d/1394.7d target=ieee1394.7d
+link path=usr/share/man/man7d/firewire.7d target=ieee1394.7d

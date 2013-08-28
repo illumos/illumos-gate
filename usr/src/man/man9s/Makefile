@@ -9,13 +9,16 @@
 # at http://www.illumos.org/license/CDDL.
 #
 
+#
 # Copyright 2011, Richard Lowe
+# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+#
 
-include ../../Makefile.master
+include		$(SRC)/Makefile.master
 
-MANSECT = 	9s
+MANSECT= 	9s
 
-MANFILES = 	Intro.9s			\
+MANFILES= 	Intro.9s			\
 	 	aio_req.9s			\
 	 	buf.9s				\
 	 	cb_ops.9s			\
@@ -88,23 +91,21 @@ MANFILES = 	Intro.9s			\
 	 	usb_request_attributes.9s	\
 	 	usb_string_descr.9s
 
-MANSOFILES =	dblk.9s		\
+MANLINKS=	dblk.9s		\
 		ddi_dma_lim.9s	\
 		intro.9s	\
 		mblk.9s
 
-MANFILES +=	$(MANSOFILES)
+intro.9s	:= LINKSRC = Intro.9s
 
-intro.9s	:= SOSRC = man9s/Intro.9s
+dblk.9s		:= LINKSRC = datab.9s
 
-dblk.9s		:= SOSRC = man9s/datab.9s
+ddi_dma_lim.9s	:= LINKSRC = ddi_dma_lim_sparc.9s
 
-ddi_dma_lim.9s	:= SOSRC = man9s/ddi_dma_lim_sparc.9s
-
-mblk.9s		:= SOSRC = man9s/msgb.9s
+mblk.9s		:= LINKSRC = msgb.9s
 
 .KEEP_STATE:
 
-include ../Makefile.man
+include		$(SRC)/man/Makefile.man
 
-install: $(ROOTMANFILES)
+install:	$(ROOTMANFILES) $(ROOTMANLINKS)

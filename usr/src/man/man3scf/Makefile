@@ -9,13 +9,16 @@
 # at http://www.illumos.org/license/CDDL.
 #
 
+#
 # Copyright 2011, Richard Lowe
+# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+#
 
-include ../../Makefile.master
+include		$(SRC)/Makefile.master
 
-MANSECT = 	3scf
+MANSECT= 	3scf
 
-MANFILES = 	scf_entry_create.3scf		\
+MANFILES= 	scf_entry_create.3scf		\
 	 	scf_error.3scf			\
 	 	scf_handle_create.3scf		\
 	 	scf_handle_decode_fmri.3scf	\
@@ -40,7 +43,7 @@ MANFILES = 	scf_entry_create.3scf		\
 	 	smf_enable_instance.3scf
 
 
-MANSOFILES =	scf_count_ranges_destroy.3scf			\
+MANLINKS=	scf_count_ranges_destroy.3scf			\
 		scf_entry_add_value.3scf			\
 		scf_entry_destroy.3scf				\
 		scf_entry_destroy_children.3scf			\
@@ -244,234 +247,232 @@ MANSOFILES =	scf_count_ranges_destroy.3scf			\
 		smf_restart_instance.3scf			\
 		smf_restore_instance.3scf
 
-MANFILES +=	$(MANSOFILES)
+scf_entry_add_value.3scf			:= LINKSRC = scf_entry_create.3scf
+scf_entry_destroy.3scf				:= LINKSRC = scf_entry_create.3scf
+scf_entry_destroy_children.3scf			:= LINKSRC = scf_entry_create.3scf
+scf_entry_handle.3scf				:= LINKSRC = scf_entry_create.3scf
+scf_entry_reset.3scf				:= LINKSRC = scf_entry_create.3scf
 
-scf_entry_add_value.3scf			:= SOSRC = man3scf/scf_entry_create.3scf
-scf_entry_destroy.3scf				:= SOSRC = man3scf/scf_entry_create.3scf
-scf_entry_destroy_children.3scf			:= SOSRC = man3scf/scf_entry_create.3scf
-scf_entry_handle.3scf				:= SOSRC = man3scf/scf_entry_create.3scf
-scf_entry_reset.3scf				:= SOSRC = man3scf/scf_entry_create.3scf
+scf_strerror.3scf				:= LINKSRC = scf_error.3scf
 
-scf_strerror.3scf				:= SOSRC = man3scf/scf_error.3scf
+scf_handle_bind.3scf				:= LINKSRC = scf_handle_create.3scf
+scf_handle_decorate.3scf			:= LINKSRC = scf_handle_create.3scf
+scf_handle_destroy.3scf				:= LINKSRC = scf_handle_create.3scf
+scf_handle_unbind.3scf				:= LINKSRC = scf_handle_create.3scf
+scf_myname.3scf					:= LINKSRC = scf_handle_create.3scf
 
-scf_handle_bind.3scf				:= SOSRC = man3scf/scf_handle_create.3scf
-scf_handle_decorate.3scf			:= SOSRC = man3scf/scf_handle_create.3scf
-scf_handle_destroy.3scf				:= SOSRC = man3scf/scf_handle_create.3scf
-scf_handle_unbind.3scf				:= SOSRC = man3scf/scf_handle_create.3scf
-scf_myname.3scf					:= SOSRC = man3scf/scf_handle_create.3scf
+scf_instance_to_fmri.3scf			:= LINKSRC = scf_handle_decode_fmri.3scf
+scf_pg_to_fmri.3scf				:= LINKSRC = scf_handle_decode_fmri.3scf
+scf_property_to_fmri.3scf			:= LINKSRC = scf_handle_decode_fmri.3scf
+scf_scope_to_fmri.3scf				:= LINKSRC = scf_handle_decode_fmri.3scf
+scf_service_to_fmri.3scf			:= LINKSRC = scf_handle_decode_fmri.3scf
 
-scf_instance_to_fmri.3scf			:= SOSRC = man3scf/scf_handle_decode_fmri.3scf
-scf_pg_to_fmri.3scf				:= SOSRC = man3scf/scf_handle_decode_fmri.3scf
-scf_property_to_fmri.3scf			:= SOSRC = man3scf/scf_handle_decode_fmri.3scf
-scf_scope_to_fmri.3scf				:= SOSRC = man3scf/scf_handle_decode_fmri.3scf
-scf_service_to_fmri.3scf			:= SOSRC = man3scf/scf_handle_decode_fmri.3scf
+scf_instance_delete.3scf			:= LINKSRC = scf_instance_create.3scf
+scf_instance_destroy.3scf			:= LINKSRC = scf_instance_create.3scf
+scf_instance_get_name.3scf			:= LINKSRC = scf_instance_create.3scf
+scf_instance_get_parent.3scf			:= LINKSRC = scf_instance_create.3scf
+scf_instance_handle.3scf			:= LINKSRC = scf_instance_create.3scf
+scf_service_add_instance.3scf			:= LINKSRC = scf_instance_create.3scf
+scf_service_get_instance.3scf			:= LINKSRC = scf_instance_create.3scf
 
-scf_instance_delete.3scf			:= SOSRC = man3scf/scf_instance_create.3scf
-scf_instance_destroy.3scf			:= SOSRC = man3scf/scf_instance_create.3scf
-scf_instance_get_name.3scf			:= SOSRC = man3scf/scf_instance_create.3scf
-scf_instance_get_parent.3scf			:= SOSRC = man3scf/scf_instance_create.3scf
-scf_instance_handle.3scf			:= SOSRC = man3scf/scf_instance_create.3scf
-scf_service_add_instance.3scf			:= SOSRC = man3scf/scf_instance_create.3scf
-scf_service_get_instance.3scf			:= SOSRC = man3scf/scf_instance_create.3scf
+scf_iter_destroy.3scf				:= LINKSRC = scf_iter_create.3scf
+scf_iter_handle.3scf				:= LINKSRC = scf_iter_create.3scf
+scf_iter_handle_scopes.3scf			:= LINKSRC = scf_iter_create.3scf
+scf_iter_instance_pgs.3scf			:= LINKSRC = scf_iter_create.3scf
+scf_iter_instance_pgs_composed.3scf		:= LINKSRC = scf_iter_create.3scf
+scf_iter_instance_pgs_typed.3scf		:= LINKSRC = scf_iter_create.3scf
+scf_iter_instance_pgs_typed_composed.3scf	:= LINKSRC = scf_iter_create.3scf
+scf_iter_instance_snapshots.3scf		:= LINKSRC = scf_iter_create.3scf
+scf_iter_next_instance.3scf			:= LINKSRC = scf_iter_create.3scf
+scf_iter_next_pg.3scf				:= LINKSRC = scf_iter_create.3scf
+scf_iter_next_property.3scf			:= LINKSRC = scf_iter_create.3scf
+scf_iter_next_scope.3scf			:= LINKSRC = scf_iter_create.3scf
+scf_iter_next_service.3scf			:= LINKSRC = scf_iter_create.3scf
+scf_iter_next_snapshot.3scf			:= LINKSRC = scf_iter_create.3scf
+scf_iter_next_value.3scf			:= LINKSRC = scf_iter_create.3scf
+scf_iter_pg_properties.3scf			:= LINKSRC = scf_iter_create.3scf
+scf_iter_property_values.3scf			:= LINKSRC = scf_iter_create.3scf
+scf_iter_reset.3scf				:= LINKSRC = scf_iter_create.3scf
+scf_iter_scope_services.3scf			:= LINKSRC = scf_iter_create.3scf
+scf_iter_service_instances.3scf			:= LINKSRC = scf_iter_create.3scf
+scf_iter_service_pgs.3scf			:= LINKSRC = scf_iter_create.3scf
+scf_iter_service_pgs_typed.3scf			:= LINKSRC = scf_iter_create.3scf
+scf_iter_snaplevel_pgs.3scf			:= LINKSRC = scf_iter_create.3scf
+scf_iter_snaplevel_pgs_typed.3scf		:= LINKSRC = scf_iter_create.3scf
 
-scf_iter_destroy.3scf				:= SOSRC = man3scf/scf_iter_create.3scf
-scf_iter_handle.3scf				:= SOSRC = man3scf/scf_iter_create.3scf
-scf_iter_handle_scopes.3scf			:= SOSRC = man3scf/scf_iter_create.3scf
-scf_iter_instance_pgs.3scf			:= SOSRC = man3scf/scf_iter_create.3scf
-scf_iter_instance_pgs_composed.3scf		:= SOSRC = man3scf/scf_iter_create.3scf
-scf_iter_instance_pgs_typed.3scf		:= SOSRC = man3scf/scf_iter_create.3scf
-scf_iter_instance_pgs_typed_composed.3scf	:= SOSRC = man3scf/scf_iter_create.3scf
-scf_iter_instance_snapshots.3scf		:= SOSRC = man3scf/scf_iter_create.3scf
-scf_iter_next_instance.3scf			:= SOSRC = man3scf/scf_iter_create.3scf
-scf_iter_next_pg.3scf				:= SOSRC = man3scf/scf_iter_create.3scf
-scf_iter_next_property.3scf			:= SOSRC = man3scf/scf_iter_create.3scf
-scf_iter_next_scope.3scf			:= SOSRC = man3scf/scf_iter_create.3scf
-scf_iter_next_service.3scf			:= SOSRC = man3scf/scf_iter_create.3scf
-scf_iter_next_snapshot.3scf			:= SOSRC = man3scf/scf_iter_create.3scf
-scf_iter_next_value.3scf			:= SOSRC = man3scf/scf_iter_create.3scf
-scf_iter_pg_properties.3scf			:= SOSRC = man3scf/scf_iter_create.3scf
-scf_iter_property_values.3scf			:= SOSRC = man3scf/scf_iter_create.3scf
-scf_iter_reset.3scf				:= SOSRC = man3scf/scf_iter_create.3scf
-scf_iter_scope_services.3scf			:= SOSRC = man3scf/scf_iter_create.3scf
-scf_iter_service_instances.3scf			:= SOSRC = man3scf/scf_iter_create.3scf
-scf_iter_service_pgs.3scf			:= SOSRC = man3scf/scf_iter_create.3scf
-scf_iter_service_pgs_typed.3scf			:= SOSRC = man3scf/scf_iter_create.3scf
-scf_iter_snaplevel_pgs.3scf			:= SOSRC = man3scf/scf_iter_create.3scf
-scf_iter_snaplevel_pgs_typed.3scf		:= SOSRC = man3scf/scf_iter_create.3scf
+scf_instance_add_pg.3scf			:= LINKSRC = scf_pg_create.3scf
+scf_instance_get_pg.3scf			:= LINKSRC = scf_pg_create.3scf
+scf_instance_get_pg_composed.3scf		:= LINKSRC = scf_pg_create.3scf
+scf_pg_delete.3scf				:= LINKSRC = scf_pg_create.3scf
+scf_pg_destroy.3scf				:= LINKSRC = scf_pg_create.3scf
+scf_pg_get_flags.3scf				:= LINKSRC = scf_pg_create.3scf
+scf_pg_get_name.3scf				:= LINKSRC = scf_pg_create.3scf
+scf_pg_get_parent_instance.3scf			:= LINKSRC = scf_pg_create.3scf
+scf_pg_get_parent_service.3scf			:= LINKSRC = scf_pg_create.3scf
+scf_pg_get_parent_snaplevel.3scf		:= LINKSRC = scf_pg_create.3scf
+scf_pg_get_type.3scf				:= LINKSRC = scf_pg_create.3scf
+scf_pg_get_underlying_pg.3scf			:= LINKSRC = scf_pg_create.3scf
+scf_pg_handle.3scf				:= LINKSRC = scf_pg_create.3scf
+scf_pg_update.3scf				:= LINKSRC = scf_pg_create.3scf
+scf_service_add_pg.3scf				:= LINKSRC = scf_pg_create.3scf
+scf_service_get_pg.3scf				:= LINKSRC = scf_pg_create.3scf
+scf_snaplevel_get_pg.3scf			:= LINKSRC = scf_pg_create.3scf
 
-scf_instance_add_pg.3scf			:= SOSRC = man3scf/scf_pg_create.3scf
-scf_instance_get_pg.3scf			:= SOSRC = man3scf/scf_pg_create.3scf
-scf_instance_get_pg_composed.3scf		:= SOSRC = man3scf/scf_pg_create.3scf
-scf_pg_delete.3scf				:= SOSRC = man3scf/scf_pg_create.3scf
-scf_pg_destroy.3scf				:= SOSRC = man3scf/scf_pg_create.3scf
-scf_pg_get_flags.3scf				:= SOSRC = man3scf/scf_pg_create.3scf
-scf_pg_get_name.3scf				:= SOSRC = man3scf/scf_pg_create.3scf
-scf_pg_get_parent_instance.3scf			:= SOSRC = man3scf/scf_pg_create.3scf
-scf_pg_get_parent_service.3scf			:= SOSRC = man3scf/scf_pg_create.3scf
-scf_pg_get_parent_snaplevel.3scf		:= SOSRC = man3scf/scf_pg_create.3scf
-scf_pg_get_type.3scf				:= SOSRC = man3scf/scf_pg_create.3scf
-scf_pg_get_underlying_pg.3scf			:= SOSRC = man3scf/scf_pg_create.3scf
-scf_pg_handle.3scf				:= SOSRC = man3scf/scf_pg_create.3scf
-scf_pg_update.3scf				:= SOSRC = man3scf/scf_pg_create.3scf
-scf_service_add_pg.3scf				:= SOSRC = man3scf/scf_pg_create.3scf
-scf_service_get_pg.3scf				:= SOSRC = man3scf/scf_pg_create.3scf
-scf_snaplevel_get_pg.3scf			:= SOSRC = man3scf/scf_pg_create.3scf
+scf_pg_get_property.3scf			:= LINKSRC = scf_property_create.3scf
+scf_property_destroy.3scf			:= LINKSRC = scf_property_create.3scf
+scf_property_get_name.3scf			:= LINKSRC = scf_property_create.3scf
+scf_property_get_value.3scf			:= LINKSRC = scf_property_create.3scf
+scf_property_handle.3scf			:= LINKSRC = scf_property_create.3scf
+scf_property_is_type.3scf			:= LINKSRC = scf_property_create.3scf
+scf_property_type.3scf				:= LINKSRC = scf_property_create.3scf
+scf_string_to_type.3scf				:= LINKSRC = scf_property_create.3scf
+scf_type_to_string.3scf				:= LINKSRC = scf_property_create.3scf
 
-scf_pg_get_property.3scf			:= SOSRC = man3scf/scf_property_create.3scf
-scf_property_destroy.3scf			:= SOSRC = man3scf/scf_property_create.3scf
-scf_property_get_name.3scf			:= SOSRC = man3scf/scf_property_create.3scf
-scf_property_get_value.3scf			:= SOSRC = man3scf/scf_property_create.3scf
-scf_property_handle.3scf			:= SOSRC = man3scf/scf_property_create.3scf
-scf_property_is_type.3scf			:= SOSRC = man3scf/scf_property_create.3scf
-scf_property_type.3scf				:= SOSRC = man3scf/scf_property_create.3scf
-scf_string_to_type.3scf				:= SOSRC = man3scf/scf_property_create.3scf
-scf_type_to_string.3scf				:= SOSRC = man3scf/scf_property_create.3scf
+scf_handle_get_scope.3scf			:= LINKSRC = scf_scope_create.3scf
+scf_scope_destroy.3scf				:= LINKSRC = scf_scope_create.3scf
+scf_scope_get_name.3scf				:= LINKSRC = scf_scope_create.3scf
+scf_scope_handle.3scf				:= LINKSRC = scf_scope_create.3scf
 
-scf_handle_get_scope.3scf			:= SOSRC = man3scf/scf_scope_create.3scf
-scf_scope_destroy.3scf				:= SOSRC = man3scf/scf_scope_create.3scf
-scf_scope_get_name.3scf				:= SOSRC = man3scf/scf_scope_create.3scf
-scf_scope_handle.3scf				:= SOSRC = man3scf/scf_scope_create.3scf
+scf_scope_add_service.3scf			:= LINKSRC = scf_service_create.3scf
+scf_scope_get_service.3scf			:= LINKSRC = scf_service_create.3scf
+scf_service_delete.3scf				:= LINKSRC = scf_service_create.3scf
+scf_service_destroy.3scf			:= LINKSRC = scf_service_create.3scf
+scf_service_get_name.3scf			:= LINKSRC = scf_service_create.3scf
+scf_service_get_parent.3scf			:= LINKSRC = scf_service_create.3scf
+scf_service_handle.3scf				:= LINKSRC = scf_service_create.3scf
 
-scf_scope_add_service.3scf			:= SOSRC = man3scf/scf_service_create.3scf
-scf_scope_get_service.3scf			:= SOSRC = man3scf/scf_service_create.3scf
-scf_service_delete.3scf				:= SOSRC = man3scf/scf_service_create.3scf
-scf_service_destroy.3scf			:= SOSRC = man3scf/scf_service_create.3scf
-scf_service_get_name.3scf			:= SOSRC = man3scf/scf_service_create.3scf
-scf_service_get_parent.3scf			:= SOSRC = man3scf/scf_service_create.3scf
-scf_service_handle.3scf				:= SOSRC = man3scf/scf_service_create.3scf
+scf_simple_app_props_free.3scf			:= LINKSRC = scf_simple_prop_get.3scf
+scf_simple_app_props_get.3scf			:= LINKSRC = scf_simple_prop_get.3scf
+scf_simple_app_props_next.3scf			:= LINKSRC = scf_simple_prop_get.3scf
+scf_simple_app_props_search.3scf		:= LINKSRC = scf_simple_prop_get.3scf
+scf_simple_prop_free.3scf			:= LINKSRC = scf_simple_prop_get.3scf
+scf_simple_prop_name.3scf			:= LINKSRC = scf_simple_prop_get.3scf
+scf_simple_prop_next_astring.3scf		:= LINKSRC = scf_simple_prop_get.3scf
+scf_simple_prop_next_boolean.3scf		:= LINKSRC = scf_simple_prop_get.3scf
+scf_simple_prop_next_count.3scf			:= LINKSRC = scf_simple_prop_get.3scf
+scf_simple_prop_next_integer.3scf		:= LINKSRC = scf_simple_prop_get.3scf
+scf_simple_prop_next_opaque.3scf		:= LINKSRC = scf_simple_prop_get.3scf
+scf_simple_prop_next_reset.3scf			:= LINKSRC = scf_simple_prop_get.3scf
+scf_simple_prop_next_time.3scf			:= LINKSRC = scf_simple_prop_get.3scf
+scf_simple_prop_next_ustring.3scf		:= LINKSRC = scf_simple_prop_get.3scf
+scf_simple_prop_numvalues.3scf			:= LINKSRC = scf_simple_prop_get.3scf
+scf_simple_prop_pgname.3scf			:= LINKSRC = scf_simple_prop_get.3scf
+scf_simple_prop_type.3scf			:= LINKSRC = scf_simple_prop_get.3scf
 
-scf_simple_app_props_free.3scf			:= SOSRC = man3scf/scf_simple_prop_get.3scf
-scf_simple_app_props_get.3scf			:= SOSRC = man3scf/scf_simple_prop_get.3scf
-scf_simple_app_props_next.3scf			:= SOSRC = man3scf/scf_simple_prop_get.3scf
-scf_simple_app_props_search.3scf		:= SOSRC = man3scf/scf_simple_prop_get.3scf
-scf_simple_prop_free.3scf			:= SOSRC = man3scf/scf_simple_prop_get.3scf
-scf_simple_prop_name.3scf			:= SOSRC = man3scf/scf_simple_prop_get.3scf
-scf_simple_prop_next_astring.3scf		:= SOSRC = man3scf/scf_simple_prop_get.3scf
-scf_simple_prop_next_boolean.3scf		:= SOSRC = man3scf/scf_simple_prop_get.3scf
-scf_simple_prop_next_count.3scf			:= SOSRC = man3scf/scf_simple_prop_get.3scf
-scf_simple_prop_next_integer.3scf		:= SOSRC = man3scf/scf_simple_prop_get.3scf
-scf_simple_prop_next_opaque.3scf		:= SOSRC = man3scf/scf_simple_prop_get.3scf
-scf_simple_prop_next_reset.3scf			:= SOSRC = man3scf/scf_simple_prop_get.3scf
-scf_simple_prop_next_time.3scf			:= SOSRC = man3scf/scf_simple_prop_get.3scf
-scf_simple_prop_next_ustring.3scf		:= SOSRC = man3scf/scf_simple_prop_get.3scf
-scf_simple_prop_numvalues.3scf			:= SOSRC = man3scf/scf_simple_prop_get.3scf
-scf_simple_prop_pgname.3scf			:= SOSRC = man3scf/scf_simple_prop_get.3scf
-scf_simple_prop_type.3scf			:= SOSRC = man3scf/scf_simple_prop_get.3scf
+scf_snaplevel_destroy.3scf			:= LINKSRC = scf_snaplevel_create.3scf
+scf_snaplevel_get_instance_name.3scf		:= LINKSRC = scf_snaplevel_create.3scf
+scf_snaplevel_get_next_snaplevel.3scf		:= LINKSRC = scf_snaplevel_create.3scf
+scf_snaplevel_get_parent.3scf			:= LINKSRC = scf_snaplevel_create.3scf
+scf_snaplevel_get_scope_name.3scf		:= LINKSRC = scf_snaplevel_create.3scf
+scf_snaplevel_get_service_name.3scf		:= LINKSRC = scf_snaplevel_create.3scf
+scf_snaplevel_handle.3scf			:= LINKSRC = scf_snaplevel_create.3scf
+scf_snapshot_get_base_snaplevel.3scf		:= LINKSRC = scf_snaplevel_create.3scf
 
-scf_snaplevel_destroy.3scf			:= SOSRC = man3scf/scf_snaplevel_create.3scf
-scf_snaplevel_get_instance_name.3scf		:= SOSRC = man3scf/scf_snaplevel_create.3scf
-scf_snaplevel_get_next_snaplevel.3scf		:= SOSRC = man3scf/scf_snaplevel_create.3scf
-scf_snaplevel_get_parent.3scf			:= SOSRC = man3scf/scf_snaplevel_create.3scf
-scf_snaplevel_get_scope_name.3scf		:= SOSRC = man3scf/scf_snaplevel_create.3scf
-scf_snaplevel_get_service_name.3scf		:= SOSRC = man3scf/scf_snaplevel_create.3scf
-scf_snaplevel_handle.3scf			:= SOSRC = man3scf/scf_snaplevel_create.3scf
-scf_snapshot_get_base_snaplevel.3scf		:= SOSRC = man3scf/scf_snaplevel_create.3scf
+scf_instance_get_snapshot.3scf			:= LINKSRC = scf_snapshot_create.3scf
+scf_snapshot_destroy.3scf			:= LINKSRC = scf_snapshot_create.3scf
+scf_snapshot_get_name.3scf			:= LINKSRC = scf_snapshot_create.3scf
+scf_snapshot_get_parent.3scf			:= LINKSRC = scf_snapshot_create.3scf
+scf_snapshot_handle.3scf			:= LINKSRC = scf_snapshot_create.3scf
+scf_snapshot_update.3scf			:= LINKSRC = scf_snapshot_create.3scf
 
-scf_instance_get_snapshot.3scf			:= SOSRC = man3scf/scf_snapshot_create.3scf
-scf_snapshot_destroy.3scf			:= SOSRC = man3scf/scf_snapshot_create.3scf
-scf_snapshot_get_name.3scf			:= SOSRC = man3scf/scf_snapshot_create.3scf
-scf_snapshot_get_parent.3scf			:= SOSRC = man3scf/scf_snapshot_create.3scf
-scf_snapshot_handle.3scf			:= SOSRC = man3scf/scf_snapshot_create.3scf
-scf_snapshot_update.3scf			:= SOSRC = man3scf/scf_snapshot_create.3scf
+scf_tmpl_get_by_pg.3scf				:= LINKSRC = scf_tmpl_pg_create.3scf
+scf_tmpl_get_by_pg_name.3scf			:= LINKSRC = scf_tmpl_pg_create.3scf
+scf_tmpl_iter_pgs.3scf				:= LINKSRC = scf_tmpl_pg_create.3scf
+scf_tmpl_pg_destroy.3scf			:= LINKSRC = scf_tmpl_pg_create.3scf
+scf_tmpl_pg_reset.3scf				:= LINKSRC = scf_tmpl_pg_create.3scf
 
-scf_tmpl_get_by_pg.3scf				:= SOSRC = man3scf/scf_tmpl_pg_create.3scf
-scf_tmpl_get_by_pg_name.3scf			:= SOSRC = man3scf/scf_tmpl_pg_create.3scf
-scf_tmpl_iter_pgs.3scf				:= SOSRC = man3scf/scf_tmpl_pg_create.3scf
-scf_tmpl_pg_destroy.3scf			:= SOSRC = man3scf/scf_tmpl_pg_create.3scf
-scf_tmpl_pg_reset.3scf				:= SOSRC = man3scf/scf_tmpl_pg_create.3scf
+scf_tmpl_pg_common_name.3scf			:= LINKSRC = scf_tmpl_pg_name.3scf
+scf_tmpl_pg_description.3scf			:= LINKSRC = scf_tmpl_pg_name.3scf
+scf_tmpl_pg_required.3scf			:= LINKSRC = scf_tmpl_pg_name.3scf
+scf_tmpl_pg_target.3scf				:= LINKSRC = scf_tmpl_pg_name.3scf
+scf_tmpl_pg_type.3scf				:= LINKSRC = scf_tmpl_pg_name.3scf
 
-scf_tmpl_pg_common_name.3scf			:= SOSRC = man3scf/scf_tmpl_pg_name.3scf
-scf_tmpl_pg_description.3scf			:= SOSRC = man3scf/scf_tmpl_pg_name.3scf
-scf_tmpl_pg_required.3scf			:= SOSRC = man3scf/scf_tmpl_pg_name.3scf
-scf_tmpl_pg_target.3scf				:= SOSRC = man3scf/scf_tmpl_pg_name.3scf
-scf_tmpl_pg_type.3scf				:= SOSRC = man3scf/scf_tmpl_pg_name.3scf
+scf_tmpl_get_by_prop.3scf			:= LINKSRC = scf_tmpl_prop_create.3scf
+scf_tmpl_iter_props.3scf			:= LINKSRC = scf_tmpl_prop_create.3scf
+scf_tmpl_prop_destroy.3scf			:= LINKSRC = scf_tmpl_prop_create.3scf
+scf_tmpl_prop_reset.3scf			:= LINKSRC = scf_tmpl_prop_create.3scf
 
-scf_tmpl_get_by_prop.3scf			:= SOSRC = man3scf/scf_tmpl_prop_create.3scf
-scf_tmpl_iter_props.3scf			:= SOSRC = man3scf/scf_tmpl_prop_create.3scf
-scf_tmpl_prop_destroy.3scf			:= SOSRC = man3scf/scf_tmpl_prop_create.3scf
-scf_tmpl_prop_reset.3scf			:= SOSRC = man3scf/scf_tmpl_prop_create.3scf
+scf_count_ranges_destroy.3scf			:= LINKSRC = scf_tmpl_prop_name.3scf
+scf_int_ranges_destroy.3scf			:= LINKSRC = scf_tmpl_prop_name.3scf
+scf_tmpl_prop_cardinality.3scf			:= LINKSRC = scf_tmpl_prop_name.3scf
+scf_tmpl_prop_common_name.3scf			:= LINKSRC = scf_tmpl_prop_name.3scf
+scf_tmpl_prop_description.3scf			:= LINKSRC = scf_tmpl_prop_name.3scf
+scf_tmpl_prop_internal_seps.3scf		:= LINKSRC = scf_tmpl_prop_name.3scf
+scf_tmpl_prop_required.3scf			:= LINKSRC = scf_tmpl_prop_name.3scf
+scf_tmpl_prop_type.3scf				:= LINKSRC = scf_tmpl_prop_name.3scf
+scf_tmpl_prop_units.3scf			:= LINKSRC = scf_tmpl_prop_name.3scf
+scf_tmpl_prop_visibility.3scf			:= LINKSRC = scf_tmpl_prop_name.3scf
+scf_tmpl_value_common_name.3scf			:= LINKSRC = scf_tmpl_prop_name.3scf
+scf_tmpl_value_count_range_choices.3scf		:= LINKSRC = scf_tmpl_prop_name.3scf
+scf_tmpl_value_count_range_constraints.3scf	:= LINKSRC = scf_tmpl_prop_name.3scf
+scf_tmpl_value_description.3scf			:= LINKSRC = scf_tmpl_prop_name.3scf
+scf_tmpl_value_in_constraint.3scf		:= LINKSRC = scf_tmpl_prop_name.3scf
+scf_tmpl_value_int_range_choices.3scf		:= LINKSRC = scf_tmpl_prop_name.3scf
+scf_tmpl_value_int_range_constraints.3scf	:= LINKSRC = scf_tmpl_prop_name.3scf
+scf_tmpl_value_name_choices.3scf		:= LINKSRC = scf_tmpl_prop_name.3scf
+scf_tmpl_value_name_constraints.3scf		:= LINKSRC = scf_tmpl_prop_name.3scf
+scf_tmpl_visibility_to_string.3scf		:= LINKSRC = scf_tmpl_prop_name.3scf
+scf_values_destroy.3scf				:= LINKSRC = scf_tmpl_prop_name.3scf
 
-scf_count_ranges_destroy.3scf			:= SOSRC = man3scf/scf_tmpl_prop_name.3scf
-scf_int_ranges_destroy.3scf			:= SOSRC = man3scf/scf_tmpl_prop_name.3scf
-scf_tmpl_prop_cardinality.3scf			:= SOSRC = man3scf/scf_tmpl_prop_name.3scf
-scf_tmpl_prop_common_name.3scf			:= SOSRC = man3scf/scf_tmpl_prop_name.3scf
-scf_tmpl_prop_description.3scf			:= SOSRC = man3scf/scf_tmpl_prop_name.3scf
-scf_tmpl_prop_internal_seps.3scf		:= SOSRC = man3scf/scf_tmpl_prop_name.3scf
-scf_tmpl_prop_required.3scf			:= SOSRC = man3scf/scf_tmpl_prop_name.3scf
-scf_tmpl_prop_type.3scf				:= SOSRC = man3scf/scf_tmpl_prop_name.3scf
-scf_tmpl_prop_units.3scf			:= SOSRC = man3scf/scf_tmpl_prop_name.3scf
-scf_tmpl_prop_visibility.3scf			:= SOSRC = man3scf/scf_tmpl_prop_name.3scf
-scf_tmpl_value_common_name.3scf			:= SOSRC = man3scf/scf_tmpl_prop_name.3scf
-scf_tmpl_value_count_range_choices.3scf		:= SOSRC = man3scf/scf_tmpl_prop_name.3scf
-scf_tmpl_value_count_range_constraints.3scf	:= SOSRC = man3scf/scf_tmpl_prop_name.3scf
-scf_tmpl_value_description.3scf			:= SOSRC = man3scf/scf_tmpl_prop_name.3scf
-scf_tmpl_value_in_constraint.3scf		:= SOSRC = man3scf/scf_tmpl_prop_name.3scf
-scf_tmpl_value_int_range_choices.3scf		:= SOSRC = man3scf/scf_tmpl_prop_name.3scf
-scf_tmpl_value_int_range_constraints.3scf	:= SOSRC = man3scf/scf_tmpl_prop_name.3scf
-scf_tmpl_value_name_choices.3scf		:= SOSRC = man3scf/scf_tmpl_prop_name.3scf
-scf_tmpl_value_name_constraints.3scf		:= SOSRC = man3scf/scf_tmpl_prop_name.3scf
-scf_tmpl_visibility_to_string.3scf		:= SOSRC = man3scf/scf_tmpl_prop_name.3scf
-scf_values_destroy.3scf				:= SOSRC = man3scf/scf_tmpl_prop_name.3scf
+scf_tmpl_error_pg.3scf				:= LINKSRC = scf_tmpl_validate_fmri.3scf
+scf_tmpl_error_pg_tmpl.3scf			:= LINKSRC = scf_tmpl_validate_fmri.3scf
+scf_tmpl_error_prop.3scf			:= LINKSRC = scf_tmpl_validate_fmri.3scf
+scf_tmpl_error_prop_tmpl.3scf			:= LINKSRC = scf_tmpl_validate_fmri.3scf
+scf_tmpl_error_source_fmri.3scf			:= LINKSRC = scf_tmpl_validate_fmri.3scf
+scf_tmpl_error_type.3scf			:= LINKSRC = scf_tmpl_validate_fmri.3scf
+scf_tmpl_error_value.3scf			:= LINKSRC = scf_tmpl_validate_fmri.3scf
+scf_tmpl_errors_destroy.3scf			:= LINKSRC = scf_tmpl_validate_fmri.3scf
+scf_tmpl_next_error.3scf			:= LINKSRC = scf_tmpl_validate_fmri.3scf
+scf_tmpl_reset_errors.3scf			:= LINKSRC = scf_tmpl_validate_fmri.3scf
+scf_tmpl_strerror.3scf				:= LINKSRC = scf_tmpl_validate_fmri.3scf
 
-scf_tmpl_error_pg.3scf				:= SOSRC = man3scf/scf_tmpl_validate_fmri.3scf
-scf_tmpl_error_pg_tmpl.3scf			:= SOSRC = man3scf/scf_tmpl_validate_fmri.3scf
-scf_tmpl_error_prop.3scf			:= SOSRC = man3scf/scf_tmpl_validate_fmri.3scf
-scf_tmpl_error_prop_tmpl.3scf			:= SOSRC = man3scf/scf_tmpl_validate_fmri.3scf
-scf_tmpl_error_source_fmri.3scf			:= SOSRC = man3scf/scf_tmpl_validate_fmri.3scf
-scf_tmpl_error_type.3scf			:= SOSRC = man3scf/scf_tmpl_validate_fmri.3scf
-scf_tmpl_error_value.3scf			:= SOSRC = man3scf/scf_tmpl_validate_fmri.3scf
-scf_tmpl_errors_destroy.3scf			:= SOSRC = man3scf/scf_tmpl_validate_fmri.3scf
-scf_tmpl_next_error.3scf			:= SOSRC = man3scf/scf_tmpl_validate_fmri.3scf
-scf_tmpl_reset_errors.3scf			:= SOSRC = man3scf/scf_tmpl_validate_fmri.3scf
-scf_tmpl_strerror.3scf				:= SOSRC = man3scf/scf_tmpl_validate_fmri.3scf
+scf_transaction_commit.3scf			:= LINKSRC = scf_transaction_create.3scf
+scf_transaction_destroy.3scf			:= LINKSRC = scf_transaction_create.3scf
+scf_transaction_destroy_children.3scf		:= LINKSRC = scf_transaction_create.3scf
+scf_transaction_handle.3scf			:= LINKSRC = scf_transaction_create.3scf
+scf_transaction_property_change.3scf		:= LINKSRC = scf_transaction_create.3scf
+scf_transaction_property_change_type.3scf	:= LINKSRC = scf_transaction_create.3scf
+scf_transaction_property_delete.3scf		:= LINKSRC = scf_transaction_create.3scf
+scf_transaction_property_new.3scf		:= LINKSRC = scf_transaction_create.3scf
+scf_transaction_reset.3scf			:= LINKSRC = scf_transaction_create.3scf
+scf_transaction_reset_all.3scf			:= LINKSRC = scf_transaction_create.3scf
+scf_transaction_start.3scf			:= LINKSRC = scf_transaction_create.3scf
 
-scf_transaction_commit.3scf			:= SOSRC = man3scf/scf_transaction_create.3scf
-scf_transaction_destroy.3scf			:= SOSRC = man3scf/scf_transaction_create.3scf
-scf_transaction_destroy_children.3scf		:= SOSRC = man3scf/scf_transaction_create.3scf
-scf_transaction_handle.3scf			:= SOSRC = man3scf/scf_transaction_create.3scf
-scf_transaction_property_change.3scf		:= SOSRC = man3scf/scf_transaction_create.3scf
-scf_transaction_property_change_type.3scf	:= SOSRC = man3scf/scf_transaction_create.3scf
-scf_transaction_property_delete.3scf		:= SOSRC = man3scf/scf_transaction_create.3scf
-scf_transaction_property_new.3scf		:= SOSRC = man3scf/scf_transaction_create.3scf
-scf_transaction_reset.3scf			:= SOSRC = man3scf/scf_transaction_create.3scf
-scf_transaction_reset_all.3scf			:= SOSRC = man3scf/scf_transaction_create.3scf
-scf_transaction_start.3scf			:= SOSRC = man3scf/scf_transaction_create.3scf
+scf_type_base_type.3scf				:= LINKSRC = scf_value_create.3scf
+scf_value_base_type.3scf			:= LINKSRC = scf_value_create.3scf
+scf_value_destroy.3scf				:= LINKSRC = scf_value_create.3scf
+scf_value_get_as_string.3scf			:= LINKSRC = scf_value_create.3scf
+scf_value_get_as_string_typed.3scf		:= LINKSRC = scf_value_create.3scf
+scf_value_get_astring.3scf			:= LINKSRC = scf_value_create.3scf
+scf_value_get_boolean.3scf			:= LINKSRC = scf_value_create.3scf
+scf_value_get_count.3scf			:= LINKSRC = scf_value_create.3scf
+scf_value_get_integer.3scf			:= LINKSRC = scf_value_create.3scf
+scf_value_get_opaque.3scf			:= LINKSRC = scf_value_create.3scf
+scf_value_get_time.3scf				:= LINKSRC = scf_value_create.3scf
+scf_value_get_ustring.3scf			:= LINKSRC = scf_value_create.3scf
+scf_value_handle.3scf				:= LINKSRC = scf_value_create.3scf
+scf_value_is_type.3scf				:= LINKSRC = scf_value_create.3scf
+scf_value_reset.3scf				:= LINKSRC = scf_value_create.3scf
+scf_value_set_astring.3scf			:= LINKSRC = scf_value_create.3scf
+scf_value_set_boolean.3scf			:= LINKSRC = scf_value_create.3scf
+scf_value_set_count.3scf			:= LINKSRC = scf_value_create.3scf
+scf_value_set_from_string.3scf			:= LINKSRC = scf_value_create.3scf
+scf_value_set_integer.3scf			:= LINKSRC = scf_value_create.3scf
+scf_value_set_opaque.3scf			:= LINKSRC = scf_value_create.3scf
+scf_value_set_time.3scf				:= LINKSRC = scf_value_create.3scf
+scf_value_set_ustring.3scf			:= LINKSRC = scf_value_create.3scf
+scf_value_type.3scf				:= LINKSRC = scf_value_create.3scf
 
-scf_type_base_type.3scf				:= SOSRC = man3scf/scf_value_create.3scf
-scf_value_base_type.3scf			:= SOSRC = man3scf/scf_value_create.3scf
-scf_value_destroy.3scf				:= SOSRC = man3scf/scf_value_create.3scf
-scf_value_get_as_string.3scf			:= SOSRC = man3scf/scf_value_create.3scf
-scf_value_get_as_string_typed.3scf		:= SOSRC = man3scf/scf_value_create.3scf
-scf_value_get_astring.3scf			:= SOSRC = man3scf/scf_value_create.3scf
-scf_value_get_boolean.3scf			:= SOSRC = man3scf/scf_value_create.3scf
-scf_value_get_count.3scf			:= SOSRC = man3scf/scf_value_create.3scf
-scf_value_get_integer.3scf			:= SOSRC = man3scf/scf_value_create.3scf
-scf_value_get_opaque.3scf			:= SOSRC = man3scf/scf_value_create.3scf
-scf_value_get_time.3scf				:= SOSRC = man3scf/scf_value_create.3scf
-scf_value_get_ustring.3scf			:= SOSRC = man3scf/scf_value_create.3scf
-scf_value_handle.3scf				:= SOSRC = man3scf/scf_value_create.3scf
-scf_value_is_type.3scf				:= SOSRC = man3scf/scf_value_create.3scf
-scf_value_reset.3scf				:= SOSRC = man3scf/scf_value_create.3scf
-scf_value_set_astring.3scf			:= SOSRC = man3scf/scf_value_create.3scf
-scf_value_set_boolean.3scf			:= SOSRC = man3scf/scf_value_create.3scf
-scf_value_set_count.3scf			:= SOSRC = man3scf/scf_value_create.3scf
-scf_value_set_from_string.3scf			:= SOSRC = man3scf/scf_value_create.3scf
-scf_value_set_integer.3scf			:= SOSRC = man3scf/scf_value_create.3scf
-scf_value_set_opaque.3scf			:= SOSRC = man3scf/scf_value_create.3scf
-scf_value_set_time.3scf				:= SOSRC = man3scf/scf_value_create.3scf
-scf_value_set_ustring.3scf			:= SOSRC = man3scf/scf_value_create.3scf
-scf_value_type.3scf				:= SOSRC = man3scf/scf_value_create.3scf
-
-smf_degrade_instance.3scf			:= SOSRC = man3scf/smf_enable_instance.3scf
-smf_disable_instance.3scf			:= SOSRC = man3scf/smf_enable_instance.3scf
-smf_get_state.3scf				:= SOSRC = man3scf/smf_enable_instance.3scf
-smf_maintain_instance.3scf			:= SOSRC = man3scf/smf_enable_instance.3scf
-smf_refresh_instance.3scf			:= SOSRC = man3scf/smf_enable_instance.3scf
-smf_restart_instance.3scf			:= SOSRC = man3scf/smf_enable_instance.3scf
-smf_restore_instance.3scf			:= SOSRC = man3scf/smf_enable_instance.3scf
+smf_degrade_instance.3scf			:= LINKSRC = smf_enable_instance.3scf
+smf_disable_instance.3scf			:= LINKSRC = smf_enable_instance.3scf
+smf_get_state.3scf				:= LINKSRC = smf_enable_instance.3scf
+smf_maintain_instance.3scf			:= LINKSRC = smf_enable_instance.3scf
+smf_refresh_instance.3scf			:= LINKSRC = smf_enable_instance.3scf
+smf_restart_instance.3scf			:= LINKSRC = smf_enable_instance.3scf
+smf_restore_instance.3scf			:= LINKSRC = smf_enable_instance.3scf
 
 .KEEP_STATE:
 
-include ../Makefile.man
+include		$(SRC)/man/Makefile.man
 
-install: $(ROOTMANFILES)
+install:	$(ROOTMANFILES) $(ROOTMANLINKS)

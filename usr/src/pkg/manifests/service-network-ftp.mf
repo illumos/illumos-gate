@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/service/network/ftp@$(PKGVERS)
@@ -64,7 +65,6 @@ file path=usr/share/man/man1/ftpcount.1
 file path=usr/share/man/man1/ftpwho.1
 file path=usr/share/man/man1m/ftpaddhost.1m
 file path=usr/share/man/man1m/ftpconfig.1m
-file path=usr/share/man/man1m/ftpd.1m
 file path=usr/share/man/man1m/ftprestart.1m
 file path=usr/share/man/man1m/ftpshut.1m
 file path=usr/share/man/man1m/in.ftpd.1m
@@ -83,3 +83,4 @@ legacy pkg=SUNWftpu desc="FTP Server and Utilities" name="FTP Server, (Usr)"
 license cr_Sun license=cr_Sun
 license usr/src/cmd/cmd-inet/usr.sbin/in.ftpd/LICENSE \
     license=usr/src/cmd/cmd-inet/usr.sbin/in.ftpd/LICENSE
+link path=usr/share/man/man1m/ftpd.1m target=in.ftpd.1m

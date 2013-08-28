@@ -9,20 +9,21 @@
 # at http://www.illumos.org/license/CDDL.
 #
 
+#
 # Copyright 2011, Richard Lowe
+# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+#
 
-include ../../Makefile.master
+include		$(SRC)/Makefile.master
 
-MANSECT = 	3fcoe
+MANSECT= 	3fcoe
 
-MANFILES = 	FCOE_CreatePort.3fcoe	\
+MANFILES= 	FCOE_CreatePort.3fcoe	\
 		FCOE_DeletePort.3fcoe	\
 		FCOE_GetPortList.3fcoe
 
 .KEEP_STATE:
 
-include ../Makefile.man
+include		$(SRC)/man/Makefile.man
 
-install: $(ROOTMANFILES)
-
-
+install:	$(ROOTMANFILES)

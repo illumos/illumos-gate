@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/service/picl@$(PKGVERS)
@@ -660,19 +661,15 @@ file path=usr/share/man/man3picl/libpicl.3picl
 file path=usr/share/man/man3picl/picl_find_node.3picl
 file path=usr/share/man/man3picl/picl_get_first_prop.3picl
 file path=usr/share/man/man3picl/picl_get_frutree_parent.3picl
-file path=usr/share/man/man3picl/picl_get_next_by_col.3picl
 file path=usr/share/man/man3picl/picl_get_next_by_row.3picl
-file path=usr/share/man/man3picl/picl_get_next_prop.3picl
 file path=usr/share/man/man3picl/picl_get_node_by_path.3picl
 file path=usr/share/man/man3picl/picl_get_prop_by_name.3picl
 file path=usr/share/man/man3picl/picl_get_propinfo.3picl
 file path=usr/share/man/man3picl/picl_get_propinfo_by_name.3picl
 file path=usr/share/man/man3picl/picl_get_propval.3picl
-file path=usr/share/man/man3picl/picl_get_propval_by_name.3picl
 file path=usr/share/man/man3picl/picl_get_root.3picl
 file path=usr/share/man/man3picl/picl_initialize.3picl
 file path=usr/share/man/man3picl/picl_set_propval.3picl
-file path=usr/share/man/man3picl/picl_set_propval_by_name.3picl
 file path=usr/share/man/man3picl/picl_shutdown.3picl
 file path=usr/share/man/man3picl/picl_strerror.3picl
 file path=usr/share/man/man3picl/picl_wait.3picl
@@ -682,35 +679,26 @@ file path=usr/share/man/man3picltree/picld_log.3picltree
 file path=usr/share/man/man3picltree/picld_plugin_register.3picltree
 file path=usr/share/man/man3picltree/ptree_add_node.3picltree
 file path=usr/share/man/man3picltree/ptree_add_prop.3picltree
-file path=usr/share/man/man3picltree/ptree_add_row_to_table.3picltree
 file path=usr/share/man/man3picltree/ptree_create_and_add_node.3picltree
 file path=usr/share/man/man3picltree/ptree_create_and_add_prop.3picltree
 file path=usr/share/man/man3picltree/ptree_create_node.3picltree
 file path=usr/share/man/man3picltree/ptree_create_prop.3picltree
 file path=usr/share/man/man3picltree/ptree_create_table.3picltree
-file path=usr/share/man/man3picltree/ptree_delete_node.3picltree
-file path=usr/share/man/man3picltree/ptree_delete_prop.3picltree
-file path=usr/share/man/man3picltree/ptree_destroy_node.3picltree
-file path=usr/share/man/man3picltree/ptree_destroy_prop.3picltree
 file path=usr/share/man/man3picltree/ptree_find_node.3picltree
 file path=usr/share/man/man3picltree/ptree_get_first_prop.3picltree
 file path=usr/share/man/man3picltree/ptree_get_frutree_parent.3picltree
-file path=usr/share/man/man3picltree/ptree_get_next_by_col.3picltree
 file path=usr/share/man/man3picltree/ptree_get_next_by_row.3picltree
-file path=usr/share/man/man3picltree/ptree_get_next_prop.3picltree
 file path=usr/share/man/man3picltree/ptree_get_node_by_path.3picltree
 file path=usr/share/man/man3picltree/ptree_get_prop_by_name.3picltree
 file path=usr/share/man/man3picltree/ptree_get_propinfo.3picltree
 file path=usr/share/man/man3picltree/ptree_get_propinfo_by_name.3picltree
 file path=usr/share/man/man3picltree/ptree_get_propval.3picltree
-file path=usr/share/man/man3picltree/ptree_get_propval_by_name.3picltree
 file path=usr/share/man/man3picltree/ptree_get_root.3picltree
 file path=usr/share/man/man3picltree/ptree_init_propinfo.3picltree
 file path=usr/share/man/man3picltree/ptree_post_event.3picltree
 file path=usr/share/man/man3picltree/ptree_register_handler.3picltree
 file path=usr/share/man/man3picltree/ptree_unregister_handler.3picltree
 file path=usr/share/man/man3picltree/ptree_update_propval.3picltree
-file path=usr/share/man/man3picltree/ptree_update_propval_by_name.3picltree
 file path=usr/share/man/man3picltree/ptree_walk_tree_by_class.3picltree
 legacy pkg=SUNWpiclr desc="PICL Framework init scripts" \
     name="PICL Framework (Root)"
@@ -933,3 +921,29 @@ $(sparc_ONLY)link path=usr/platform/sun4v/lib/picl/plugins/libpriplugin.so \
     target=./libpriplugin.so.1
 $(sparc_ONLY)link path=usr/platform/sun4v/lib/picl/plugins/libsnmpplugin.so \
     target=./libsnmpplugin.so.1
+link path=usr/share/man/man3picl/picl_get_next_by_col.3picl \
+    target=picl_get_next_by_row.3picl
+link path=usr/share/man/man3picl/picl_get_next_prop.3picl \
+    target=picl_get_first_prop.3picl
+link path=usr/share/man/man3picl/picl_get_propval_by_name.3picl \
+    target=picl_get_propval.3picl
+link path=usr/share/man/man3picl/picl_set_propval_by_name.3picl \
+    target=picl_set_propval.3picl
+link path=usr/share/man/man3picltree/ptree_add_row_to_table.3picltree \
+    target=ptree_create_table.3picltree
+link path=usr/share/man/man3picltree/ptree_delete_node.3picltree \
+    target=ptree_add_node.3picltree
+link path=usr/share/man/man3picltree/ptree_delete_prop.3picltree \
+    target=ptree_add_prop.3picltree
+link path=usr/share/man/man3picltree/ptree_destroy_node.3picltree \
+    target=ptree_create_node.3picltree
+link path=usr/share/man/man3picltree/ptree_destroy_prop.3picltree \
+    target=ptree_create_prop.3picltree
+link path=usr/share/man/man3picltree/ptree_get_next_by_col.3picltree \
+    target=ptree_get_next_by_row.3picltree
+link path=usr/share/man/man3picltree/ptree_get_next_prop.3picltree \
+    target=ptree_get_first_prop.3picltree
+link path=usr/share/man/man3picltree/ptree_get_propval_by_name.3picltree \
+    target=ptree_get_propval.3picltree
+link path=usr/share/man/man3picltree/ptree_update_propval_by_name.3picltree \
+    target=ptree_update_propval.3picltree

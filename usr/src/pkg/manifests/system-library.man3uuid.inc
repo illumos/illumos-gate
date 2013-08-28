@@ -9,15 +9,20 @@
 # at http://www.illumos.org/license/CDDL.
 #
 
+#
 # Copyright 2011, Richard Lowe
+# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+#
 
 file path=usr/share/man/man3uuid/uuid_clear.3uuid
-file path=usr/share/man/man3uuid/uuid_compare.3uuid
-file path=usr/share/man/man3uuid/uuid_copy.3uuid
-file path=usr/share/man/man3uuid/uuid_generate.3uuid
-file path=usr/share/man/man3uuid/uuid_generate_random.3uuid
-file path=usr/share/man/man3uuid/uuid_generate_time.3uuid
-file path=usr/share/man/man3uuid/uuid_is_null.3uuid
-file path=usr/share/man/man3uuid/uuid_parse.3uuid
-file path=usr/share/man/man3uuid/uuid_time.3uuid
-file path=usr/share/man/man3uuid/uuid_unparse.3uuid
+link path=usr/share/man/man3uuid/uuid_compare.3uuid target=uuid_clear.3uuid
+link path=usr/share/man/man3uuid/uuid_copy.3uuid target=uuid_clear.3uuid
+link path=usr/share/man/man3uuid/uuid_generate.3uuid target=uuid_clear.3uuid
+link path=usr/share/man/man3uuid/uuid_generate_random.3uuid \
+    target=uuid_clear.3uuid
+link path=usr/share/man/man3uuid/uuid_generate_time.3uuid \
+    target=uuid_clear.3uuid
+link path=usr/share/man/man3uuid/uuid_is_null.3uuid target=uuid_clear.3uuid
+link path=usr/share/man/man3uuid/uuid_parse.3uuid target=uuid_clear.3uuid
+link path=usr/share/man/man3uuid/uuid_time.3uuid target=uuid_clear.3uuid
+link path=usr/share/man/man3uuid/uuid_unparse.3uuid target=uuid_clear.3uuid

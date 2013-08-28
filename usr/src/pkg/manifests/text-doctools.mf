@@ -297,7 +297,6 @@ file path=usr/share/lib/tmac/v
 file path=usr/share/lib/tmac/vgrind
 file path=usr/share/man/man1/addbib.1
 file path=usr/share/man/man1/apropos.1
-file path=usr/share/man/man1/checkeq.1
 file path=usr/share/man/man1/checknr.1
 file path=usr/share/man/man1/deroff.1
 file path=usr/share/man/man1/diffmk.1
@@ -305,7 +304,6 @@ file path=usr/share/man/man1/eqn.1
 file path=usr/share/man/man1/indxbib.1
 file path=usr/share/man/man1/lookbib.1
 file path=usr/share/man/man1/man.1
-file path=usr/share/man/man1/neqn.1
 file path=usr/share/man/man1/nroff.1
 file path=usr/share/man/man1/refer.1
 file path=usr/share/man/man1/roffbib.1
@@ -358,6 +356,8 @@ license usr/src/cmd/vgrind/THIRDPARTYLICENSE \
     license=usr/src/cmd/vgrind/THIRDPARTYLICENSE
 link path=usr/lib/tmac target=../share/lib/tmac
 link path=usr/man target=./share/man
+link path=usr/share/man/man1/checkeq.1 target=eqn.1
+link path=usr/share/man/man1/neqn.1 target=eqn.1
 # lp is used by man -t and -r
 depend fmri=print/lp/print-client-commands type=require
 # awk is used by catman (via makewhatis)

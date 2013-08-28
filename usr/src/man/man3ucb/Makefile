@@ -9,39 +9,40 @@
 # at http://www.illumos.org/license/CDDL.
 #
 
+#
 # Copyright 2011, Richard Lowe
+# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+#
 
-include ../../Makefile.master
+include		$(SRC)/Makefile.master
 
-MANSECT = 	3ucb
+MANSECT=	3ucb
 
-MANFILES = 	dbm.3ucb		\
-	 	flock.3ucb		\
-	 	fopen.3ucb		\
-	 	gettimeofday.3ucb	\
-	 	mctl.3ucb		\
-	 	nice.3ucb		\
-	 	nlist.3ucb		\
-	 	printf.3ucb		\
-	 	psignal.3ucb		\
-	 	rand.3ucb		\
-	 	readdir.3ucb		\
-	 	scandir.3ucb		\
-	 	setjmp.3ucb		\
-	 	sigblock.3ucb		\
-	 	siginterrupt.3ucb	\
-	 	signal.3ucb		\
-	 	sigstack.3ucb		\
-	 	sigvec.3ucb		\
-	 	sleep.3ucb		\
-	 	syscall.3ucb		\
-	 	times.3ucb		\
-	 	wait.3ucb
+MANFILES=	dbm.3ucb		\
+		flock.3ucb		\
+		fopen.3ucb		\
+		gettimeofday.3ucb	\
+		mctl.3ucb		\
+		nice.3ucb		\
+		nlist.3ucb		\
+		printf.3ucb		\
+		psignal.3ucb		\
+		rand.3ucb		\
+		readdir.3ucb		\
+		scandir.3ucb		\
+		setjmp.3ucb		\
+		sigblock.3ucb		\
+		siginterrupt.3ucb	\
+		signal.3ucb		\
+		sigstack.3ucb		\
+		sigvec.3ucb		\
+		sleep.3ucb		\
+		syscall.3ucb		\
+		times.3ucb		\
+		wait.3ucb
 
 .KEEP_STATE:
 
-include ../Makefile.man
+include		$(SRC)/man/Makefile.man
 
-install: $(ROOTMANFILES)
-
-
+install:	$(ROOTMANFILES)

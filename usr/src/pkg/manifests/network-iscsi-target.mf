@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/network/iscsi/target@$(PKGVERS)
@@ -66,26 +67,11 @@ file path=usr/lib/llib-liscsit
 file path=usr/lib/llib-liscsit.ln
 file path=usr/sbin/itadm mode=0555
 file path=usr/share/man/man1m/itadm.1m
-file path=usr/share/man/man3iscsit/it_config_commit.3iscsit
-file path=usr/share/man/man3iscsit/it_config_free.3iscsit
 file path=usr/share/man/man3iscsit/it_config_load.3iscsit
-file path=usr/share/man/man3iscsit/it_config_setprop.3iscsit
 file path=usr/share/man/man3iscsit/it_ini_create.3iscsit
-file path=usr/share/man/man3iscsit/it_ini_delete.3iscsit
-file path=usr/share/man/man3iscsit/it_ini_free.3iscsit
-file path=usr/share/man/man3iscsit/it_ini_setprop.3iscsit
 file path=usr/share/man/man3iscsit/it_portal_create.3iscsit
-file path=usr/share/man/man3iscsit/it_portal_delete.3iscsit
 file path=usr/share/man/man3iscsit/it_tgt_create.3iscsit
-file path=usr/share/man/man3iscsit/it_tgt_delete.3iscsit
-file path=usr/share/man/man3iscsit/it_tgt_free.3iscsit
-file path=usr/share/man/man3iscsit/it_tgt_setprop.3iscsit
 file path=usr/share/man/man3iscsit/it_tpg_create.3iscsit
-file path=usr/share/man/man3iscsit/it_tpg_delete.3iscsit
-file path=usr/share/man/man3iscsit/it_tpg_free.3iscsit
-file path=usr/share/man/man3iscsit/it_tpgt_create.3iscsit
-file path=usr/share/man/man3iscsit/it_tpgt_delete.3iscsit
-file path=usr/share/man/man3iscsit/it_tpgt_free.3iscsit
 file path=usr/share/man/man3lib/libiscsit.3lib
 legacy pkg=SUNWiscsitr desc="Sun iSCSI COMSTAR Port Provider" \
     name="Sun iSCSI COMSTAR Port Provider (root)"
@@ -95,3 +81,33 @@ license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 link path=usr/lib/$(ARCH64)/libiscsit.so target=libiscsit.so.1
 link path=usr/lib/libiscsit.so target=libiscsit.so.1
+link path=usr/share/man/man3iscsit/it_config_commit.3iscsit \
+    target=it_config_load.3iscsit
+link path=usr/share/man/man3iscsit/it_config_free.3iscsit \
+    target=it_config_load.3iscsit
+link path=usr/share/man/man3iscsit/it_config_setprop.3iscsit \
+    target=it_config_load.3iscsit
+link path=usr/share/man/man3iscsit/it_ini_delete.3iscsit \
+    target=it_ini_create.3iscsit
+link path=usr/share/man/man3iscsit/it_ini_free.3iscsit \
+    target=it_ini_create.3iscsit
+link path=usr/share/man/man3iscsit/it_ini_setprop.3iscsit \
+    target=it_ini_create.3iscsit
+link path=usr/share/man/man3iscsit/it_portal_delete.3iscsit \
+    target=it_portal_create.3iscsit
+link path=usr/share/man/man3iscsit/it_tgt_delete.3iscsit \
+    target=it_tgt_create.3iscsit
+link path=usr/share/man/man3iscsit/it_tgt_free.3iscsit \
+    target=it_tgt_create.3iscsit
+link path=usr/share/man/man3iscsit/it_tgt_setprop.3iscsit \
+    target=it_tgt_create.3iscsit
+link path=usr/share/man/man3iscsit/it_tpg_delete.3iscsit \
+    target=it_tpg_create.3iscsit
+link path=usr/share/man/man3iscsit/it_tpg_free.3iscsit \
+    target=it_tpg_create.3iscsit
+link path=usr/share/man/man3iscsit/it_tpgt_create.3iscsit \
+    target=it_tgt_create.3iscsit
+link path=usr/share/man/man3iscsit/it_tpgt_delete.3iscsit \
+    target=it_tgt_create.3iscsit
+link path=usr/share/man/man3iscsit/it_tpgt_free.3iscsit \
+    target=it_tgt_create.3iscsit

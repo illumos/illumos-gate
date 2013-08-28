@@ -9,15 +9,27 @@
 # at http://www.illumos.org/license/CDDL.
 #
 
+#
 # Copyright 2011, Richard Lowe
+# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+#
 
 file path=usr/share/man/man3cfgadm/config_admin.3cfgadm
-file path=usr/share/man/man3cfgadm/config_ap_id_cmp.3cfgadm
-file path=usr/share/man/man3cfgadm/config_change_state.3cfgadm
-file path=usr/share/man/man3cfgadm/config_list.3cfgadm
-file path=usr/share/man/man3cfgadm/config_list_ext.3cfgadm
-file path=usr/share/man/man3cfgadm/config_private_func.3cfgadm
-file path=usr/share/man/man3cfgadm/config_stat.3cfgadm
-file path=usr/share/man/man3cfgadm/config_strerror.3cfgadm
-file path=usr/share/man/man3cfgadm/config_test.3cfgadm
-file path=usr/share/man/man3cfgadm/config_unload_libs.3cfgadm
+link path=usr/share/man/man3cfgadm/config_ap_id_cmp.3cfgadm \
+    target=config_admin.3cfgadm
+link path=usr/share/man/man3cfgadm/config_change_state.3cfgadm \
+    target=config_admin.3cfgadm
+link path=usr/share/man/man3cfgadm/config_list.3cfgadm \
+    target=config_admin.3cfgadm
+link path=usr/share/man/man3cfgadm/config_list_ext.3cfgadm \
+    target=config_admin.3cfgadm
+link path=usr/share/man/man3cfgadm/config_private_func.3cfgadm \
+    target=config_admin.3cfgadm
+link path=usr/share/man/man3cfgadm/config_stat.3cfgadm \
+    target=config_admin.3cfgadm
+link path=usr/share/man/man3cfgadm/config_strerror.3cfgadm \
+    target=config_admin.3cfgadm
+link path=usr/share/man/man3cfgadm/config_test.3cfgadm \
+    target=config_admin.3cfgadm
+link path=usr/share/man/man3cfgadm/config_unload_libs.3cfgadm \
+    target=config_admin.3cfgadm

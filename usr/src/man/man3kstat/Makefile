@@ -9,32 +9,33 @@
 # at http://www.illumos.org/license/CDDL.
 #
 
+#
 # Copyright 2011, Richard Lowe
+# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+#
 
-include ../../Makefile.master
+include		$(SRC)/Makefile.master
 
-MANSECT = 	3kstat
+MANSECT= 	3kstat
 
-MANFILES = 	kstat.3kstat			\
+MANFILES= 	kstat.3kstat			\
 		kstat_chain_update.3kstat	\
 		kstat_lookup.3kstat		\
 		kstat_open.3kstat		\
 		kstat_read.3kstat
 
-MANSOFILES =	kstat_close.3kstat		\
+MANLINKS=	kstat_close.3kstat		\
 		kstat_data_lookup.3kstat	\
 		kstat_write.3kstat
 
-MANFILES +=	$(MANSOFILES)
+kstat_data_lookup.3kstat	:= LINKSRC = kstat_lookup.3kstat
 
-kstat_data_lookup.3kstat	:= SOSRC = man3kstat/kstat_lookup.3kstat
+kstat_close.3kstat		:= LINKSRC = kstat_open.3kstat
 
-kstat_close.3kstat		:= SOSRC = man3kstat/kstat_open.3kstat
-
-kstat_write.3kstat		:= SOSRC = man3kstat/kstat_read.3kstat
+kstat_write.3kstat		:= LINKSRC = kstat_read.3kstat
 
 .KEEP_STATE:
 
-include ../Makefile.man
+include		$(SRC)/man/Makefile.man
 
-install: $(ROOTMANFILES)
+install:	$(ROOTMANFILES) $(ROOTMANLINKS)

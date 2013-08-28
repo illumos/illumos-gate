@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/print/lp/print-client-commands@$(PKGVERS)
@@ -51,7 +52,6 @@ file path=usr/share/applications/desktop-print-management-prefs.desktop
 file path=usr/share/applications/desktop-print-management.desktop
 file path=usr/share/gnome/autostart/desktop-print-management-applet.desktop
 file path=usr/share/man/man1/cancel.1
-file path=usr/share/man/man1/disable.1
 file path=usr/share/man/man1/enable.1
 file path=usr/share/man/man1/lp.1
 file path=usr/share/man/man1/lpstat.1
@@ -59,7 +59,6 @@ file path=usr/share/man/man1m/accept.1m
 file path=usr/share/man/man1m/lpadmin.1m
 file path=usr/share/man/man1m/lpmove.1m
 file path=usr/share/man/man1m/print-service.1m
-file path=usr/share/man/man1m/reject.1m
 legacy pkg=SUNWpcu \
     desc="client configuration files and utilities for the print service" \
     name="Solaris Print - Client, (usr)" version=13.1,REV=2009.11.11
@@ -80,4 +79,6 @@ link path=usr/sbin/accept target=./print-service
 link path=usr/sbin/lpadmin target=./print-service
 link path=usr/sbin/lpmove target=./print-service
 link path=usr/sbin/reject target=./print-service
+link path=usr/share/man/man1/disable.1 target=enable.1
+link path=usr/share/man/man1m/reject.1m target=accept.1m
 depend fmri=runtime/perl-510 type=require

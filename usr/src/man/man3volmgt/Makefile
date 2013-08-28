@@ -9,13 +9,16 @@
 # at http://www.illumos.org/license/CDDL.
 #
 
+#
 # Copyright 2011, Richard Lowe
+# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+#
 
-include ../../Makefile.master
+include		$(SRC)/Makefile.master
 
-MANSECT = 	3volmgt
+MANSECT= 	3volmgt
 
-MANFILES = 	media_findname.3volmgt		\
+MANFILES= 	media_findname.3volmgt		\
 		media_getattr.3volmgt		\
 		media_getid.3volmgt		\
 		volmgt_acquire.3volmgt		\
@@ -28,19 +31,15 @@ MANFILES = 	media_findname.3volmgt		\
 		volmgt_running.3volmgt		\
 		volmgt_symname.3volmgt
 
-MANSOFILES =	media_setattr.3volmgt	\
+MANLINKS=	media_setattr.3volmgt		\
 		volmgt_symdev.3volmgt
 
-MANFILES +=	$(MANSOFILES)
+media_setattr.3volmgt	:= LINKSRC = media_getattr.3volmgt
 
-media_setattr.3volmgt := SOSRC = man3volmgt/media_getattr.3volmgt
-
-volmgt_symdev.3volmgt := SOSRC = man3volmgt/volmgt_symname.3volmgt
+volmgt_symdev.3volmgt	:= LINKSRC = volmgt_symname.3volmgt
 
 .KEEP_STATE:
 
-include ../Makefile.man
+include		$(SRC)/man/Makefile.man
 
-install: $(ROOTMANFILES)
-
-
+install:	$(ROOTMANFILES) $(ROOTMANLINKS)

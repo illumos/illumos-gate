@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/system/remote-shared-memory@$(PKGVERS)
@@ -45,50 +46,75 @@ file path=usr/lib/$(ARCH64)/librsm.so.2
 file path=usr/lib/librsm.so.2
 file path=usr/share/man/man3lib/librsm.3lib
 file path=usr/share/man/man3rsm/rsm_create_localmemory_handle.3rsm
-file path=usr/share/man/man3rsm/rsm_free_interconnect_topology.3rsm
-file path=usr/share/man/man3rsm/rsm_free_localmemory_handle.3rsm
 file path=usr/share/man/man3rsm/rsm_get_controller.3rsm
-file path=usr/share/man/man3rsm/rsm_get_controller_attr.3rsm
 file path=usr/share/man/man3rsm/rsm_get_interconnect_topology.3rsm
 file path=usr/share/man/man3rsm/rsm_get_segmentid_range.3rsm
 file path=usr/share/man/man3rsm/rsm_intr_signal_post.3rsm
-file path=usr/share/man/man3rsm/rsm_intr_signal_wait.3rsm
 file path=usr/share/man/man3rsm/rsm_intr_signal_wait_pollfd.3rsm
 file path=usr/share/man/man3rsm/rsm_memseg_export_create.3rsm
-file path=usr/share/man/man3rsm/rsm_memseg_export_destroy.3rsm
 file path=usr/share/man/man3rsm/rsm_memseg_export_publish.3rsm
-file path=usr/share/man/man3rsm/rsm_memseg_export_rebind.3rsm
-file path=usr/share/man/man3rsm/rsm_memseg_export_republish.3rsm
-file path=usr/share/man/man3rsm/rsm_memseg_export_unpublish.3rsm
 file path=usr/share/man/man3rsm/rsm_memseg_get_pollfd.3rsm
-file path=usr/share/man/man3rsm/rsm_memseg_import_close_barrier.3rsm
 file path=usr/share/man/man3rsm/rsm_memseg_import_connect.3rsm
-file path=usr/share/man/man3rsm/rsm_memseg_import_destroy_barrier.3rsm
-file path=usr/share/man/man3rsm/rsm_memseg_import_disconnect.3rsm
 file path=usr/share/man/man3rsm/rsm_memseg_import_get.3rsm
-file path=usr/share/man/man3rsm/rsm_memseg_import_get16.3rsm
-file path=usr/share/man/man3rsm/rsm_memseg_import_get32.3rsm
-file path=usr/share/man/man3rsm/rsm_memseg_import_get64.3rsm
-file path=usr/share/man/man3rsm/rsm_memseg_import_get8.3rsm
-file path=usr/share/man/man3rsm/rsm_memseg_import_get_mode.3rsm
-file path=usr/share/man/man3rsm/rsm_memseg_import_getv.3rsm
 file path=usr/share/man/man3rsm/rsm_memseg_import_init_barrier.3rsm
 file path=usr/share/man/man3rsm/rsm_memseg_import_map.3rsm
 file path=usr/share/man/man3rsm/rsm_memseg_import_open_barrier.3rsm
-file path=usr/share/man/man3rsm/rsm_memseg_import_order_barrier.3rsm
 file path=usr/share/man/man3rsm/rsm_memseg_import_put.3rsm
-file path=usr/share/man/man3rsm/rsm_memseg_import_put16.3rsm
-file path=usr/share/man/man3rsm/rsm_memseg_import_put32.3rsm
-file path=usr/share/man/man3rsm/rsm_memseg_import_put64.3rsm
-file path=usr/share/man/man3rsm/rsm_memseg_import_put8.3rsm
 file path=usr/share/man/man3rsm/rsm_memseg_import_putv.3rsm
 file path=usr/share/man/man3rsm/rsm_memseg_import_set_mode.3rsm
-file path=usr/share/man/man3rsm/rsm_memseg_import_unmap.3rsm
-file path=usr/share/man/man3rsm/rsm_memseg_release_pollfd.3rsm
-file path=usr/share/man/man3rsm/rsm_release_controller.3rsm
 legacy pkg=SUNWrsm desc="Remote Shared Memory API Library, Driver" \
     name="Remote Shared Memory"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 link path=usr/lib/$(ARCH64)/librsm.so target=librsm.so.2
 link path=usr/lib/librsm.so target=librsm.so.2
+link path=usr/share/man/man3rsm/rsm_free_interconnect_topology.3rsm \
+    target=rsm_get_interconnect_topology.3rsm
+link path=usr/share/man/man3rsm/rsm_free_localmemory_handle.3rsm \
+    target=rsm_create_localmemory_handle.3rsm
+link path=usr/share/man/man3rsm/rsm_get_controller_attr.3rsm \
+    target=rsm_get_controller.3rsm
+link path=usr/share/man/man3rsm/rsm_intr_signal_wait.3rsm \
+    target=rsm_intr_signal_post.3rsm
+link path=usr/share/man/man3rsm/rsm_memseg_export_destroy.3rsm \
+    target=rsm_memseg_export_create.3rsm
+link path=usr/share/man/man3rsm/rsm_memseg_export_rebind.3rsm \
+    target=rsm_memseg_export_create.3rsm
+link path=usr/share/man/man3rsm/rsm_memseg_export_republish.3rsm \
+    target=rsm_memseg_export_publish.3rsm
+link path=usr/share/man/man3rsm/rsm_memseg_export_unpublish.3rsm \
+    target=rsm_memseg_export_publish.3rsm
+link path=usr/share/man/man3rsm/rsm_memseg_import_close_barrier.3rsm \
+    target=rsm_memseg_import_open_barrier.3rsm
+link path=usr/share/man/man3rsm/rsm_memseg_import_destroy_barrier.3rsm \
+    target=rsm_memseg_import_init_barrier.3rsm
+link path=usr/share/man/man3rsm/rsm_memseg_import_disconnect.3rsm \
+    target=rsm_memseg_import_connect.3rsm
+link path=usr/share/man/man3rsm/rsm_memseg_import_get16.3rsm \
+    target=rsm_memseg_import_get.3rsm
+link path=usr/share/man/man3rsm/rsm_memseg_import_get32.3rsm \
+    target=rsm_memseg_import_get.3rsm
+link path=usr/share/man/man3rsm/rsm_memseg_import_get64.3rsm \
+    target=rsm_memseg_import_get.3rsm
+link path=usr/share/man/man3rsm/rsm_memseg_import_get8.3rsm \
+    target=rsm_memseg_import_get.3rsm
+link path=usr/share/man/man3rsm/rsm_memseg_import_get_mode.3rsm \
+    target=rsm_memseg_import_set_mode.3rsm
+link path=usr/share/man/man3rsm/rsm_memseg_import_getv.3rsm \
+    target=rsm_memseg_import_putv.3rsm
+link path=usr/share/man/man3rsm/rsm_memseg_import_order_barrier.3rsm \
+    target=rsm_memseg_import_open_barrier.3rsm
+link path=usr/share/man/man3rsm/rsm_memseg_import_put16.3rsm \
+    target=rsm_memseg_import_put.3rsm
+link path=usr/share/man/man3rsm/rsm_memseg_import_put32.3rsm \
+    target=rsm_memseg_import_put.3rsm
+link path=usr/share/man/man3rsm/rsm_memseg_import_put64.3rsm \
+    target=rsm_memseg_import_put.3rsm
+link path=usr/share/man/man3rsm/rsm_memseg_import_put8.3rsm \
+    target=rsm_memseg_import_put.3rsm
+link path=usr/share/man/man3rsm/rsm_memseg_import_unmap.3rsm \
+    target=rsm_memseg_import_map.3rsm
+link path=usr/share/man/man3rsm/rsm_memseg_release_pollfd.3rsm \
+    target=rsm_memseg_get_pollfd.3rsm
+link path=usr/share/man/man3rsm/rsm_release_controller.3rsm \
+    target=rsm_get_controller.3rsm

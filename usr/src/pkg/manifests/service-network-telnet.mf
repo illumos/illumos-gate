@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/service/network/telnet@$(PKGVERS)
@@ -43,10 +44,10 @@ file path=etc/default/telnetd group=sys \
 file path=lib/svc/manifest/network/telnet.xml group=sys mode=0444
 file path=usr/sbin/in.telnetd mode=0555
 file path=usr/share/man/man1m/in.telnetd.1m
-file path=usr/share/man/man1m/telnetd.1m
 legacy pkg=SUNWtnetd desc="Telnet Server Daemon (Usr)" \
     name="Telnet Server Daemon (Usr)"
 legacy pkg=SUNWtnetr desc="Telnet Server Daemon (Root)" \
     name="Telnet Server Daemon (Root)"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
+link path=usr/share/man/man1m/telnetd.1m target=in.telnetd.1m

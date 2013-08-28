@@ -9,13 +9,16 @@
 # at http://www.illumos.org/license/CDDL.
 #
 
+#
 # Copyright 2011, Richard Lowe
+# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+#
 
-include ../../Makefile.master
+include		$(SRC)/Makefile.master
 
-MANSECT = 	3lgrp
+MANSECT= 	3lgrp
 
-MANFILES =	lgrp_affinity_get.3lgrp		\
+MANFILES=	lgrp_affinity_get.3lgrp		\
 	 	lgrp_children.3lgrp		\
 	 	lgrp_cookie_stale.3lgrp		\
 	 	lgrp_cpus.3lgrp			\
@@ -31,17 +34,15 @@ MANFILES =	lgrp_affinity_get.3lgrp		\
 	 	lgrp_version.3lgrp		\
 	 	lgrp_view.3lgrp
 
-MANSOFILES =	lgrp_affinity_set.3lgrp	\
+MANLINKS=	lgrp_affinity_set.3lgrp		\
 		lgrp_latency_cookie.3lgrp
 
-MANFILES +=	$(MANSOFILES)
+lgrp_affinity_set.3lgrp		:= LINKSRC = lgrp_affinity_get.3lgrp
 
-lgrp_affinity_set.3lgrp		:= SOSRC = man3lgrp/lgrp_affinity_get.3lgrp
-
-lgrp_latency_cookie.3lgrp	:= SOSRC = man3lgrp/lgrp_latency.3lgrp
+lgrp_latency_cookie.3lgrp	:= LINKSRC = lgrp_latency.3lgrp
 
 .KEEP_STATE:
 
-include ../Makefile.man
+include		$(SRC)/man/Makefile.man
 
-install: $(ROOTMANFILES)
+install:	$(ROOTMANFILES) $(ROOTMANLINKS)

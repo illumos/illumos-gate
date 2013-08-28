@@ -9,15 +9,18 @@
 # at http://www.illumos.org/license/CDDL.
 #
 
+#
 # Copyright 2011, Richard Lowe
+# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+#
 
-include ../../Makefile.master
+include		$(SRC)/Makefile.master
 
-MANSECT = 	3resolv
+MANSECT= 	3resolv
 
-MANFILES = resolver.3resolv
+MANFILES=	resolver.3resolv
 
-MANSOFILES =	dn_comp.3resolv		\
+MANLINKS=	dn_comp.3resolv			\
 	 	dn_expand.3resolv		\
 	 	fp_resstat.3resolv		\
 	 	herror.3resolv			\
@@ -40,35 +43,31 @@ MANSOFILES =	dn_comp.3resolv		\
 	 	res_send.3resolv		\
 	 	res_setservers.3resolv
 
-MANFILES +=	$(MANSOFILES)
-
-dn_comp.3resolv			:= SOSRC = man3resolv/resolver.3resolv
-dn_expand.3resolv		:= SOSRC = man3resolv/resolver.3resolv
-fp_resstat.3resolv		:= SOSRC = man3resolv/resolver.3resolv
-herror.3resolv			:= SOSRC = man3resolv/resolver.3resolv
-hstrerror.3resolv		:= SOSRC = man3resolv/resolver.3resolv
-res_getservers.3resolv		:= SOSRC = man3resolv/resolver.3resolv
-res_hostalias.3resolv		:= SOSRC = man3resolv/resolver.3resolv
-res_init.3resolv		:= SOSRC = man3resolv/resolver.3resolv
-res_mkquery.3resolv		:= SOSRC = man3resolv/resolver.3resolv
-res_nclose.3resolv		:= SOSRC = man3resolv/resolver.3resolv
-res_ndestroy.3resolv		:= SOSRC = man3resolv/resolver.3resolv
-res_ninit.3resolv		:= SOSRC = man3resolv/resolver.3resolv
-res_nmkquery.3resolv		:= SOSRC = man3resolv/resolver.3resolv
-res_nquery.3resolv		:= SOSRC = man3resolv/resolver.3resolv
-res_nquerydomain.3resolv	:= SOSRC = man3resolv/resolver.3resolv
-res_nsearch.3resolv		:= SOSRC = man3resolv/resolver.3resolv
-res_nsend.3resolv		:= SOSRC = man3resolv/resolver.3resolv
-res_nsendsigned.3resolv		:= SOSRC = man3resolv/resolver.3resolv
-res_query.3resolv		:= SOSRC = man3resolv/resolver.3resolv
-res_search.3resolv		:= SOSRC = man3resolv/resolver.3resolv
-res_send.3resolv		:= SOSRC = man3resolv/resolver.3resolv
-res_setservers.3resolv		:= SOSRC = man3resolv/resolver.3resolv
+dn_comp.3resolv			:= LINKSRC = resolver.3resolv
+dn_expand.3resolv		:= LINKSRC = resolver.3resolv
+fp_resstat.3resolv		:= LINKSRC = resolver.3resolv
+herror.3resolv			:= LINKSRC = resolver.3resolv
+hstrerror.3resolv		:= LINKSRC = resolver.3resolv
+res_getservers.3resolv		:= LINKSRC = resolver.3resolv
+res_hostalias.3resolv		:= LINKSRC = resolver.3resolv
+res_init.3resolv		:= LINKSRC = resolver.3resolv
+res_mkquery.3resolv		:= LINKSRC = resolver.3resolv
+res_nclose.3resolv		:= LINKSRC = resolver.3resolv
+res_ndestroy.3resolv		:= LINKSRC = resolver.3resolv
+res_ninit.3resolv		:= LINKSRC = resolver.3resolv
+res_nmkquery.3resolv		:= LINKSRC = resolver.3resolv
+res_nquery.3resolv		:= LINKSRC = resolver.3resolv
+res_nquerydomain.3resolv	:= LINKSRC = resolver.3resolv
+res_nsearch.3resolv		:= LINKSRC = resolver.3resolv
+res_nsend.3resolv		:= LINKSRC = resolver.3resolv
+res_nsendsigned.3resolv		:= LINKSRC = resolver.3resolv
+res_query.3resolv		:= LINKSRC = resolver.3resolv
+res_search.3resolv		:= LINKSRC = resolver.3resolv
+res_send.3resolv		:= LINKSRC = resolver.3resolv
+res_setservers.3resolv		:= LINKSRC = resolver.3resolv
 
 .KEEP_STATE:
 
-include ../Makefile.man
+include		$(SRC)/man/Makefile.man
 
-install: $(ROOTMANFILES)
-
-
+install:	$(ROOTMANFILES) $(ROOTMANLINKS)

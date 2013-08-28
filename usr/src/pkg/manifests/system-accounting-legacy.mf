@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/system/accounting/legacy@$(PKGVERS)
@@ -109,38 +110,12 @@ file path=usr/share/man/man1/timex.1
 file path=usr/share/man/man1m/acct.1m
 file path=usr/share/man/man1m/acctcms.1m
 file path=usr/share/man/man1m/acctcon.1m
-file path=usr/share/man/man1m/acctcon1.1m
-file path=usr/share/man/man1m/acctcon2.1m
-file path=usr/share/man/man1m/acctdisk.1m
-file path=usr/share/man/man1m/acctdusg.1m
 file path=usr/share/man/man1m/acctmerg.1m
-file path=usr/share/man/man1m/accton.1m
 file path=usr/share/man/man1m/acctprc.1m
-file path=usr/share/man/man1m/acctprc1.1m
-file path=usr/share/man/man1m/acctprc2.1m
 file path=usr/share/man/man1m/acctsh.1m
-file path=usr/share/man/man1m/acctwtmp.1m
-file path=usr/share/man/man1m/chargefee.1m
-file path=usr/share/man/man1m/ckpacct.1m
-file path=usr/share/man/man1m/closewtmp.1m
-file path=usr/share/man/man1m/dodisk.1m
 file path=usr/share/man/man1m/fwtmp.1m
-file path=usr/share/man/man1m/lastlogin.1m
-file path=usr/share/man/man1m/monacct.1m
-file path=usr/share/man/man1m/nulladm.1m
-file path=usr/share/man/man1m/prctmp.1m
-file path=usr/share/man/man1m/prdaily.1m
-file path=usr/share/man/man1m/prtacct.1m
 file path=usr/share/man/man1m/runacct.1m
-file path=usr/share/man/man1m/sa1.1m
-file path=usr/share/man/man1m/sa2.1m
-file path=usr/share/man/man1m/sadc.1m
 file path=usr/share/man/man1m/sar.1m
-file path=usr/share/man/man1m/shutacct.1m
-file path=usr/share/man/man1m/startup.1m
-file path=usr/share/man/man1m/turnacct.1m
-file path=usr/share/man/man1m/utmp2wtmp.1m
-file path=usr/share/man/man1m/wtmpfix.1m
 file path=usr/share/man/man4/holidays.4
 file path=var/spool/cron/crontabs/sys group=sys mode=0600 \
     original_name=SUNWacc:var/spool/cron/crontabs/sys preserve=true
@@ -154,3 +129,29 @@ license cr_ATT license=cr_ATT
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 link path=usr/bin/sar target=../sbin/sar
+link path=usr/share/man/man1m/acctcon1.1m target=acctcon.1m
+link path=usr/share/man/man1m/acctcon2.1m target=acctcon.1m
+link path=usr/share/man/man1m/acctdisk.1m target=acct.1m
+link path=usr/share/man/man1m/acctdusg.1m target=acct.1m
+link path=usr/share/man/man1m/accton.1m target=acct.1m
+link path=usr/share/man/man1m/acctprc1.1m target=acctprc.1m
+link path=usr/share/man/man1m/acctprc2.1m target=acctprc.1m
+link path=usr/share/man/man1m/acctwtmp.1m target=acct.1m
+link path=usr/share/man/man1m/chargefee.1m target=acctsh.1m
+link path=usr/share/man/man1m/ckpacct.1m target=acctsh.1m
+link path=usr/share/man/man1m/closewtmp.1m target=acct.1m
+link path=usr/share/man/man1m/dodisk.1m target=acctsh.1m
+link path=usr/share/man/man1m/lastlogin.1m target=acctsh.1m
+link path=usr/share/man/man1m/monacct.1m target=acctsh.1m
+link path=usr/share/man/man1m/nulladm.1m target=acctsh.1m
+link path=usr/share/man/man1m/prctmp.1m target=acctsh.1m
+link path=usr/share/man/man1m/prdaily.1m target=acctsh.1m
+link path=usr/share/man/man1m/prtacct.1m target=acctsh.1m
+link path=usr/share/man/man1m/sa1.1m target=sar.1m
+link path=usr/share/man/man1m/sa2.1m target=sar.1m
+link path=usr/share/man/man1m/sadc.1m target=sar.1m
+link path=usr/share/man/man1m/shutacct.1m target=acctsh.1m
+link path=usr/share/man/man1m/startup.1m target=acctsh.1m
+link path=usr/share/man/man1m/turnacct.1m target=acctsh.1m
+link path=usr/share/man/man1m/utmp2wtmp.1m target=acct.1m
+link path=usr/share/man/man1m/wtmpfix.1m target=fwtmp.1m

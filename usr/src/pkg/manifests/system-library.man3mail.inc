@@ -9,8 +9,11 @@
 # at http://www.illumos.org/license/CDDL.
 #
 
+#
 # Copyright 2011, Richard Lowe
+# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+#
 
 file path=usr/share/man/man3mail/maillock.3mail
-file path=usr/share/man/man3mail/mailunlock.3mail
-file path=usr/share/man/man3mail/touchlock.3mail
+link path=usr/share/man/man3mail/mailunlock.3mail target=maillock.3mail
+link path=usr/share/man/man3mail/touchlock.3mail target=maillock.3mail

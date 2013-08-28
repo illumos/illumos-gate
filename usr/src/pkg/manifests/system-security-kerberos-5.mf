@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/system/security/kerberos-5@$(PKGVERS)
@@ -98,7 +99,6 @@ file path=usr/sbin/kproplog mode=0555
 file path=usr/share/lib/ldif/kerberos.ldif
 file path=usr/share/man/man1m/k5srvutil.1m
 file path=usr/share/man/man1m/kadmin.1m
-file path=usr/share/man/man1m/kadmin.local.1m
 file path=usr/share/man/man1m/kadmind.1m
 file path=usr/share/man/man1m/kclient.1m
 file path=usr/share/man/man1m/kdb5_ldap_util.1m
@@ -131,5 +131,6 @@ link path=usr/lib/krb5/libkadm5srv.so target=libkadm5srv.so.1
 link path=usr/lib/krb5/libkadmin.so target=libkadmin.so.1
 link path=usr/lib/krb5/libkdb.so target=libkdb.so.1
 link path=usr/lib/krb5/libkdb_ldap.so target=libkdb_ldap.so.1
+link path=usr/share/man/man1m/kadmin.local.1m target=kadmin.1m
 depend fmri=naming/ldap type=require
 depend fmri=system/library/security/rpcsec type=require

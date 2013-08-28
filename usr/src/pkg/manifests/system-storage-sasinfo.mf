@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
 #
 
 #
@@ -58,43 +59,7 @@ file path=usr/lib/llib-lSMHBAAPI
 file path=usr/lib/llib-lSMHBAAPI.ln
 file path=usr/sbin/sasinfo mode=0555
 file path=usr/share/man/man1m/sasinfo.1m
-file path=usr/share/man/man3lib/SMHBA_GetAdapterAttributes.3lib
-file path=usr/share/man/man3lib/SMHBA_GetAdapterPortAttributes.3lib
-file path=usr/share/man/man3lib/SMHBA_GetBindingCapability.3lib
-file path=usr/share/man/man3lib/SMHBA_GetBindingSupport.3lib
-file path=usr/share/man/man3lib/SMHBA_GetDiscoveredPortAttributes.3lib
-file path=usr/share/man/man3lib/SMHBA_GetFCPhyAttributes.3lib
-file path=usr/share/man/man3lib/SMHBA_GetLUNStatistics.3lib
-file path=usr/share/man/man3lib/SMHBA_GetNumberofPorts.3lib
-file path=usr/share/man/man3lib/SMHBA_GetPersistentBinding.3lib
-file path=usr/share/man/man3lib/SMHBA_GetPhyStatistics.3lib
-file path=usr/share/man/man3lib/SMHBA_GetPortAttributesByWWN.3lib
-file path=usr/share/man/man3lib/SMHBA_GetPortType.3lib
-file path=usr/share/man/man3lib/SMHBA_GetProtocolStatistics.3lib
-file path=usr/share/man/man3lib/SMHBA_GetSASPhyAttributes.3lib
-file path=usr/share/man/man3lib/SMHBA_GetTargetMapping.3lib
-file path=usr/share/man/man3lib/SMHBA_GetVendorLibraryAttributes.3lib
-file path=usr/share/man/man3lib/SMHBA_GetVersion.3lib
-file path=usr/share/man/man3lib/SMHBA_GetWrapperLibraryAttributes.3lib
-file path=usr/share/man/man3lib/SMHBA_RegisterForAdapterAddEvents.3lib
-file path=usr/share/man/man3lib/SMHBA_RegisterForAdapterEvents.3lib
-file path=usr/share/man/man3lib/SMHBA_RegisterForAdapterPhyStatEvents.3lib
-file path=usr/share/man/man3lib/SMHBA_RegisterForAdapterPortEvents.3lib
-file path=usr/share/man/man3lib/SMHBA_RegisterForAdapterPortStatEvents.3lib
-file path=usr/share/man/man3lib/SMHBA_RegisterForTargetEvents.3lib
-file path=usr/share/man/man3lib/SMHBA_RegisterLibrary.3lib
-file path=usr/share/man/man3lib/SMHBA_RemoveAllPersistentBindings.3lib
-file path=usr/share/man/man3lib/SMHBA_RemovePersistentBinding.3lib
-file path=usr/share/man/man3lib/SMHBA_ScsiInquiry.3lib
-file path=usr/share/man/man3lib/SMHBA_ScsiReadCapacity.3lib
-file path=usr/share/man/man3lib/SMHBA_ScsiReportLuns.3lib
-file path=usr/share/man/man3lib/SMHBA_SendECHO.3lib
-file path=usr/share/man/man3lib/SMHBA_SendSMPPassThru.3lib
-file path=usr/share/man/man3lib/SMHBA_SendTEST.3lib
-file path=usr/share/man/man3lib/SMHBA_SetBindingSupport.3lib
-file path=usr/share/man/man3lib/SMHBA_SetPersistentBinding.3lib
 file path=usr/share/man/man3lib/libSMHBAAPI.3lib
-file path=usr/share/man/man3lib/libsmhbaapi.3lib
 file path=usr/share/man/man4/smhba.conf.4
 legacy pkg=SUNWsmhba desc="T11 Storage Management HBA API Libraries and CLI" \
     name="SM-HBA Libraries and CLI"
@@ -109,3 +74,69 @@ link path=usr/lib/$(ARCH64)/libSMHBAAPI.so target=libSMHBAAPI.so.1
 link path=usr/lib/$(ARCH64)/libsun_sas.so target=libsun_sas.so.1
 link path=usr/lib/libSMHBAAPI.so target=libSMHBAAPI.so.1
 link path=usr/lib/libsun_sas.so target=libsun_sas.so.1
+link path=usr/share/man/man3lib/SMHBA_GetAdapterAttributes.3lib \
+    target=libSMHBAAPI.3lib
+link path=usr/share/man/man3lib/SMHBA_GetAdapterPortAttributes.3lib \
+    target=libSMHBAAPI.3lib
+link path=usr/share/man/man3lib/SMHBA_GetBindingCapability.3lib \
+    target=libSMHBAAPI.3lib
+link path=usr/share/man/man3lib/SMHBA_GetBindingSupport.3lib \
+    target=libSMHBAAPI.3lib
+link path=usr/share/man/man3lib/SMHBA_GetDiscoveredPortAttributes.3lib \
+    target=libSMHBAAPI.3lib
+link path=usr/share/man/man3lib/SMHBA_GetFCPhyAttributes.3lib \
+    target=libSMHBAAPI.3lib
+link path=usr/share/man/man3lib/SMHBA_GetLUNStatistics.3lib \
+    target=libSMHBAAPI.3lib
+link path=usr/share/man/man3lib/SMHBA_GetNumberofPorts.3lib \
+    target=libSMHBAAPI.3lib
+link path=usr/share/man/man3lib/SMHBA_GetPersistentBinding.3lib \
+    target=libSMHBAAPI.3lib
+link path=usr/share/man/man3lib/SMHBA_GetPhyStatistics.3lib \
+    target=libSMHBAAPI.3lib
+link path=usr/share/man/man3lib/SMHBA_GetPortAttributesByWWN.3lib \
+    target=libSMHBAAPI.3lib
+link path=usr/share/man/man3lib/SMHBA_GetPortType.3lib target=libSMHBAAPI.3lib
+link path=usr/share/man/man3lib/SMHBA_GetProtocolStatistics.3lib \
+    target=libSMHBAAPI.3lib
+link path=usr/share/man/man3lib/SMHBA_GetSASPhyAttributes.3lib \
+    target=libSMHBAAPI.3lib
+link path=usr/share/man/man3lib/SMHBA_GetTargetMapping.3lib \
+    target=libSMHBAAPI.3lib
+link path=usr/share/man/man3lib/SMHBA_GetVendorLibraryAttributes.3lib \
+    target=libSMHBAAPI.3lib
+link path=usr/share/man/man3lib/SMHBA_GetVersion.3lib target=libSMHBAAPI.3lib
+link path=usr/share/man/man3lib/SMHBA_GetWrapperLibraryAttributes.3lib \
+    target=libSMHBAAPI.3lib
+link path=usr/share/man/man3lib/SMHBA_RegisterForAdapterAddEvents.3lib \
+    target=libSMHBAAPI.3lib
+link path=usr/share/man/man3lib/SMHBA_RegisterForAdapterEvents.3lib \
+    target=libSMHBAAPI.3lib
+link path=usr/share/man/man3lib/SMHBA_RegisterForAdapterPhyStatEvents.3lib \
+    target=libSMHBAAPI.3lib
+link path=usr/share/man/man3lib/SMHBA_RegisterForAdapterPortEvents.3lib \
+    target=libSMHBAAPI.3lib
+link path=usr/share/man/man3lib/SMHBA_RegisterForAdapterPortStatEvents.3lib \
+    target=libSMHBAAPI.3lib
+link path=usr/share/man/man3lib/SMHBA_RegisterForTargetEvents.3lib \
+    target=libSMHBAAPI.3lib
+link path=usr/share/man/man3lib/SMHBA_RegisterLibrary.3lib \
+    target=libSMHBAAPI.3lib
+link path=usr/share/man/man3lib/SMHBA_RemoveAllPersistentBindings.3lib \
+    target=libSMHBAAPI.3lib
+link path=usr/share/man/man3lib/SMHBA_RemovePersistentBinding.3lib \
+    target=libSMHBAAPI.3lib
+link path=usr/share/man/man3lib/SMHBA_ScsiInquiry.3lib target=libSMHBAAPI.3lib
+link path=usr/share/man/man3lib/SMHBA_ScsiReadCapacity.3lib \
+    target=libSMHBAAPI.3lib
+link path=usr/share/man/man3lib/SMHBA_ScsiReportLuns.3lib \
+    target=libSMHBAAPI.3lib
+link path=usr/share/man/man3lib/SMHBA_SendECHO.3lib target=libSMHBAAPI.3lib
+link path=usr/share/man/man3lib/SMHBA_SendSMPPassThru.3lib \
+    target=libSMHBAAPI.3lib
+link path=usr/share/man/man3lib/SMHBA_SendTEST.3lib target=libSMHBAAPI.3lib
+link path=usr/share/man/man3lib/SMHBA_SetBindingSupport.3lib \
+    target=libSMHBAAPI.3lib
+link path=usr/share/man/man3lib/SMHBA_SetPersistentBinding.3lib \
+    target=libSMHBAAPI.3lib
+link path=usr/share/man/man3lib/libsmhbaapi.3lib target=libSMHBAAPI.3lib

@@ -9,13 +9,16 @@
 # at http://www.illumos.org/license/CDDL.
 #
 
+#
 # Copyright 2011, Richard Lowe
+# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+#
 
-include ../../Makefile.master
+include		$(SRC)/Makefile.master
 
-MANSECT = 	3picl
+MANSECT= 	3picl
 
-MANFILES =	libpicl.3picl			\
+MANFILES=	libpicl.3picl			\
 	 	picl_find_node.3picl		\
 	 	picl_get_first_prop.3picl	\
 	 	picl_get_frutree_parent.3picl	\
@@ -33,22 +36,20 @@ MANFILES =	libpicl.3picl			\
 	 	picl_wait.3picl			\
 	 	picl_walk_tree_by_class.3picl
 
-MANSOFILES =	picl_get_next_by_col.3picl	\
+MANLINKS=	picl_get_next_by_col.3picl	\
 		picl_get_next_prop.3picl	\
 		picl_get_propval_by_name.3picl	\
 		picl_set_propval_by_name.3picl
 
-MANFILES +=	$(MANSOFILES)
+picl_get_next_prop.3picl	:= LINKSRC = picl_get_first_prop.3picl
 
-picl_get_next_prop.3picl	:= SOSRC = man3picl/picl_get_first_prop.3picl
+picl_get_next_by_col.3picl	:= LINKSRC = picl_get_next_by_row.3picl
 
-picl_get_next_by_col.3picl	:= SOSRC = man3picl/picl_get_next_by_row.3picl
-
-picl_get_propval_by_name.3picl	:= SOSRC = man3picl/picl_get_propval.3picl
-picl_set_propval_by_name.3picl	:= SOSRC = man3picl/picl_set_propval.3picl
+picl_get_propval_by_name.3picl	:= LINKSRC = picl_get_propval.3picl
+picl_set_propval_by_name.3picl	:= LINKSRC = picl_set_propval.3picl
 
 .KEEP_STATE:
 
-include ../Makefile.man
+include		$(SRC)/man/Makefile.man
 
-install: $(ROOTMANFILES)
+install:	$(ROOTMANFILES) $(ROOTMANLINKS)
