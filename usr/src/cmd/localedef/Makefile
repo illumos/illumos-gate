@@ -12,6 +12,7 @@
 #
 # Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2011 EveryCity Ltd. All rights reserved.
+# Copyright 2013 DEY Storage Systems, Inc.
 #
 
 PROG=localedef
@@ -272,40 +273,40 @@ $(ROOTBIN)/%: $(ROOTBIN) %
 locale/%.UTF-8/stamp:		data/%.UTF-8.src UTF-8.cm \
 				UTF-8.ct locale $(PROG)
 	$(SED) '/^LC_CTYPE/,/^END LC_CTYPE/d;$$r UTF-8.ct' $< | \
-		./$(PROG) -U -f UTF-8.cm $(@D)
+		./$(PROG) -U -w data/widths.txt -f UTF-8.cm $(@D)
 	$(TOUCH) $@
 locale/%.ISO8859-1/stamp:	data/%.UTF-8.src 8859-1.cm locale $(PROG)
-	./$(PROG) -U -i $< -f 8859-1.cm $(@D)
+	./$(PROG) -U -w data/widths.txt -i $< -f 8859-1.cm $(@D)
 	$(TOUCH) $@
 locale/%.ISO8859-2/stamp:	data/%.UTF-8.src 8859-2.cm locale $(PROG)
-	./$(PROG) -U -i $< -f 8859-2.cm $(@D)
+	./$(PROG) -U -w data/widths.txt -i $< -f 8859-2.cm $(@D)
 	$(TOUCH) $@
 locale/%.ISO8859-5/stamp:	data/%.UTF-8.src 8859-5.cm locale $(PROG)
-	./$(PROG) -U -i $< -f 8859-5.cm $(@D)
+	./$(PROG) -U -w data/widths.txt -i $< -f 8859-5.cm $(@D)
 	$(TOUCH) $@
 locale/%.ISO8859-7/stamp:	data/%.UTF-8.src 8859-7.cm locale $(PROG)
-	./$(PROG) -U -i $< -f 8859-7.cm $(@D)
+	./$(PROG) -U -w data/widths.txt -i $< -f 8859-7.cm $(@D)
 	$(TOUCH) $@
 locale/%.ISO8859-6/stamp:	data/%.UTF-8.src 8859-6.cm locale $(PROG)
-	./$(PROG) -U -i $< -f 8859-6.cm $(@D)
+	./$(PROG) -U -w data/widths.txt -i $< -f 8859-6.cm $(@D)
 	$(TOUCH) $@
 locale/%.ISO8859-9/stamp:	data/%.UTF-8.src 8859-9.cm locale $(PROG)
-	./$(PROG) -U -i $< -f 8859-9.cm $(@D)
+	./$(PROG) -U -w data/widths.txt -i $< -f 8859-9.cm $(@D)
 	$(TOUCH) $@
 locale/%.ISO8859-11/stamp:	data/%.UTF-8.src 8859-11.cm locale $(PROG)
-	./$(PROG) -U -i $< -f 8859-11.cm $(@D)
+	./$(PROG) -U -w data/widths.txt -i $< -f 8859-11.cm $(@D)
 	$(TOUCH) $@
 locale/%.ISO8859-13/stamp:	data/%.UTF-8.src 8859-13.cm locale $(PROG)
-	./$(PROG) -U -i $< -f 8859-13.cm $(@D)
+	./$(PROG) -U -w data/widths.txt -i $< -f 8859-13.cm $(@D)
 	$(TOUCH) $@
 locale/%.ISO8859-15/stamp:	data/%.UTF-8.src 8859-15.cm locale $(PROG)
-	./$(PROG) -U -i $< -f 8859-15.cm $(@D)
+	./$(PROG) -U -w data/widths.txt -i $< -f 8859-15.cm $(@D)
 	$(TOUCH) $@
 locale/%.KOI8-R/stamp:		data/%.UTF-8.src KOI8-R.cm locale $(PROG)
-	./$(PROG) -U -i $< -f KOI8-R.cm $(@D)
+	./$(PROG) -U -w data/widths.txt -i $< -f KOI8-R.cm $(@D)
 	$(TOUCH) $@
 locale/%.GB18030/stamp:		data/%.UTF-8.src GB18030.cm locale $(PROG)
-	./$(PROG) -U -i $< -f GB18030.cm $(@D)
+	./$(PROG) -U -w data/widths.txt -i $< -f GB18030.cm $(@D)
 	$(TOUCH) $@
 
 locale/%/$(DCOLL):	locale/%/stamp

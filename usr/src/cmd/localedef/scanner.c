@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2013 DEY Storage Systems, Inc.
  */
 
 /*
@@ -168,7 +169,6 @@ static struct token {
 	 */
 	{ T_CHARMAP,		"CHARMAP" },
 	{ T_WIDTH,		"WIDTH" },
-	{ T_WIDTH_DEFAULT,	"WIDTH_DEFAULT" },
 
 	{ -1, NULL },
 };
@@ -193,6 +193,7 @@ static int categories[] = {
 	T_MONETARY,
 	T_NUMERIC,
 	T_TIME,
+	T_WIDTH,
 	0
 };
 
@@ -470,7 +471,7 @@ get_wide(void)
 	}
 
 	mbi = 0;
-	if (category != T_CHARMAP) {
+	if ((category != T_CHARMAP) && (category != T_WIDTH)) {
 		if (check_charmap(wc) < 0) {
 			yyerror(_("no symbolic name for character"));
 			return (T_NULL);
