@@ -76,6 +76,7 @@ SYMBOL_VERSION SUNWprivate {
 	topo_hdl_prominfo;
 	topo_hdl_strdup;
 	topo_hdl_strfree;
+	topo_hdl_strsplit;
 	topo_hdl_zalloc;
 	topo_led_state_name;
 	topo_led_type_name;
@@ -118,6 +119,7 @@ SYMBOL_VERSION SUNWprivate {
 	topo_mod_str2nvl;
 	topo_mod_strdup;
 	topo_mod_strfree;
+	topo_mod_strsplit;
 	topo_mod_unload;
 	topo_mod_unregister;
 	topo_mod_walk_init;

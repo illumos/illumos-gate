@@ -22,6 +22,9 @@
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
+/*
+ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ */
 
 #ifndef _LIBTOPO_H
 #define	_LIBTOPO_H
@@ -389,6 +392,8 @@ extern void topo_hdl_free(topo_hdl_t *, void *, size_t);
 extern int topo_hdl_nvalloc(topo_hdl_t *, nvlist_t **, uint_t);
 extern int topo_hdl_nvdup(topo_hdl_t *, nvlist_t *, nvlist_t **);
 extern char *topo_hdl_strdup(topo_hdl_t *, const char *);
+extern char *topo_hdl_strsplit(topo_hdl_t *, const char *, const char *,
+    char **);
 
 /*
  * Interfaces for converting sensor/indicator types, units, states, etc to
