@@ -606,7 +606,7 @@ typedef struct zone {
 	 * Data and counters used for ZFS fair-share disk IO.
 	 */
 	rctl_qty_t	zone_zfs_io_pri;	/* ZFS IO priority */
-	uint_t		zone_zfs_queued;	/* enqueued count */
+	uint_t		zone_zfs_queued[2];	/* sync I/O enqueued count */
 	uint64_t	zone_zfs_weight;	/* used to prevent starvation */
 	uint64_t	zone_io_util;		/* IO utilization metric */
 	boolean_t	zone_io_util_above_avg;	/* IO util percent > avg. */

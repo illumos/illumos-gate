@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ * Copyright 2013, Joyent, Inc. All rights reserved.
  */
 
 #include <sys/spa.h>
@@ -184,12 +184,12 @@ boolean_t	zfs_zone_schedule_enable = B_TRUE;	/* enable IO sched. */
 /*
  * Threshold for when zio scheduling should kick in.
  *
- * This threshold is based on 1/2 of the zfs_vdev_max_pending value for the
- * number of I/Os that can be pending on a device.  If there are more than a
- * few ops already queued up, beyond those already issued to the vdev, then
- * use scheduling to get the next zio.
+ * This threshold is based on the zfs_vdev_sync_read_max_active value for the
+ * number of I/Os that can be pending on a device.  If there are more than the
+ * max_active ops already queued up, beyond those already issued to the vdev,
+ * then use zone-based scheduling to get the next synchronous zio.
  */
-int		zfs_zone_schedule_thresh = 5;
+uint32_t	zfs_zone_schedule_thresh = 10;
 
 /*
  * Tunables for delay throttling when TxG flush is occurring.
@@ -198,10 +198,11 @@ int		zfs_zone_txg_throttle_scale = 2;
 hrtime_t	zfs_zone_txg_delay_nsec = MSEC2NSEC(20);
 
 typedef struct {
-	int	zq_qdepth;
-	int	zq_priority;
-	int	zq_wt;
-	zoneid_t zq_zoneid;
+	int		zq_qdepth;
+	zio_priority_t	zq_queue;
+	int		zq_priority;
+	int		zq_wt;
+	zoneid_t	zq_zoneid;
 } zone_q_bump_t;
 
 /*
@@ -702,13 +703,12 @@ static int
 get_sched_pri_cb(zone_t *zonep, void *arg)
 {
 	int pri;
+	uint_t cnt;
 	zone_q_bump_t *qbp = arg;
+	zio_priority_t p = qbp->zq_queue;
 
-	extern void __dtrace_probe_zfs__zone__enqueued(uintptr_t, uintptr_t);
-	__dtrace_probe_zfs__zone__enqueued((uintptr_t)(zonep->zone_id),
-	    (uintptr_t)(zonep->zone_zfs_queued));
-
-	if (zonep->zone_zfs_queued == 0) {
+	cnt = zonep->zone_zfs_queued[p];
+	if (cnt == 0) {
 		zonep->zone_zfs_weight = 0;
 		return (0);
 	}
@@ -734,12 +734,12 @@ get_sched_pri_cb(zone_t *zonep, void *arg)
 	 * ahead.  The weight is factored in to help ensure that zones
 	 * which haven't done IO in a while aren't getting starved.
 	 */
-	pri = (qbp->zq_qdepth / zonep->zone_zfs_queued) *
+	pri = (qbp->zq_qdepth / cnt) *
 	    zonep->zone_zfs_io_pri * zonep->zone_zfs_weight;
 
 	/*
 	 * If this zone has a higher priority than what we found so far,
-	 * schedule it next.
+	 * it becomes the new leading contender.
 	 */
 	if (pri > qbp->zq_priority) {
 		qbp->zq_zoneid = zonep->zone_id;
@@ -750,13 +750,14 @@ get_sched_pri_cb(zone_t *zonep, void *arg)
 }
 
 /*
- * See if we need to bump a zone's zio to the head of the queue.
+ * See if we need to bump a zone's zio to the head of the queue. This is only
+ * done on the two synchronous I/O queues.
  *
- * For single-threaded synchronous workloads a zone cannot get more than
- * 1 op into the queue at a time unless the zone is running multiple workloads
+ * For single-threaded synchronous processes a zone cannot get more than
+ * 1 op into the queue at a time unless the zone is running multiple processes
  * in parallel.  This can cause an imbalance in performance if there are zones
- * with many parallel workloads (and ops in the queue) vs. other zones which
- * are doing simple single-threaded workloads, such as interactive tasks in the
+ * with many parallel processes (and ops in the queue) vs. other zones which
+ * are doing simple single-threaded processes, such as interactive tasks in the
  * shell.  These zones can get backed up behind a deep queue and their IO
  * performance will appear to be very poor as a result.  This can make the
  * zone work badly for interactive behavior.
@@ -777,6 +778,47 @@ get_sched_pri_cb(zone_t *zonep, void *arg)
  * In all cases, we fall back to simply pulling the next op off the queue
  * if something should go wrong.
  */
+static zio_t *
+get_next_zio(vdev_queue_class_t *vqc, int qdepth, zio_priority_t p)
+{
+	zone_q_bump_t qbump;
+	zio_t *zp = NULL, *zphead;
+	int cnt = 0;
+
+	/* To avoid problems with int rounding, scale the queue depth by 10 */
+	qbump.zq_qdepth = qdepth * 10;
+	qbump.zq_priority = 0;
+	qbump.zq_zoneid = 0;
+	qbump.zq_queue = p;
+	(void) zone_walk(get_sched_pri_cb, &qbump);
+
+	zphead = avl_first(&vqc->vqc_queued_tree);
+
+	/* Check if the scheduler didn't pick a zone for some reason!? */
+	if (qbump.zq_zoneid != 0) {
+		for (zp = avl_first(&vqc->vqc_queued_tree); zp != NULL;
+		    zp = avl_walk(&vqc->vqc_queued_tree, zp, AVL_AFTER)) {
+			if (zp->io_zoneid == qbump.zq_zoneid)
+				break;
+			cnt++;
+		}
+	}
+
+	if (zp == NULL) {
+		zp = zphead;
+	} else if (zp != zphead) {
+		/*
+		 * Only fire the probe if we actually picked a different zio
+		 * than the one already at the head of the queue.
+		 */
+		extern void __dtrace_probe_zfs__zone__sched__bump(uint_t,
+		    uint_t, int, int);
+		__dtrace_probe_zfs__zone__sched__bump((uint_t)zp->io_zoneid,
+		    (uint_t)cnt, qbump.zq_priority, qbump.zq_wt);
+	}
+
+	return (zp);
+}
 
 /*
  * Add our zone ID to the zio so we can keep track of which zones are doing
@@ -937,18 +979,10 @@ zfs_zone_report_txg_sync(void *dp)
 hrtime_t
 zfs_zone_txg_delay()
 {
-	zone_t	*zonep = curzone;
-	hrtime_t delay = MSEC2NSEC(10);
+	if (curzone->zone_io_util_above_avg)
+		return (zfs_zone_txg_delay_nsec);
 
-	if (zonep->zone_io_util_above_avg)
-		delay = zfs_zone_txg_delay_nsec;
-
-	extern void __dtrace_probe_zfs__zone__txg__delay(uintptr_t, hrtime_t);
-
-	__dtrace_probe_zfs__zone__txg__delay((uintptr_t)(zonep->zone_id),
-	    (hrtime_t)delay);
-
-	return (delay);
+	return (MSEC2NSEC(10));
 }
 
 /*
@@ -1064,17 +1098,25 @@ zfs_zone_zio_done(zio_t *zp)
 void
 zfs_zone_zio_dequeue(zio_t *zp)
 {
+	zio_priority_t p;
 	zone_t	*zonep;
+
+	p = zp->io_priority;
+	if (p != ZIO_PRIORITY_SYNC_READ && p != ZIO_PRIORITY_SYNC_WRITE)
+		return;
+
+	/* We depend on p being defined as either 0 or 1 */
+	ASSERT(p < 2);
 
 	if ((zonep = zone_find_by_id(zp->io_zoneid)) == NULL)
 		return;
 
 	mutex_enter(&zonep->zone_stg_io_lock);
-	ASSERT(zonep->zone_zfs_queued > 0);
-	if (zonep->zone_zfs_queued == 0)
+	ASSERT(zonep->zone_zfs_queued[p] > 0);
+	if (zonep->zone_zfs_queued[p] == 0)
 		cmn_err(CE_WARN, "zfs_zone_zio_dequeue: count==0");
 	else
-		zonep->zone_zfs_queued--;
+		zonep->zone_zfs_queued[p]--;
 	mutex_exit(&zonep->zone_stg_io_lock);
 	zone_rele(zonep);
 }
@@ -1082,30 +1124,89 @@ zfs_zone_zio_dequeue(zio_t *zp)
 void
 zfs_zone_zio_enqueue(zio_t *zp)
 {
+	zio_priority_t p;
 	zone_t	*zonep;
+
+	p = zp->io_priority;
+	if (p != ZIO_PRIORITY_SYNC_READ && p != ZIO_PRIORITY_SYNC_WRITE)
+		return;
+
+	/* We depend on p being defined as either 0 or 1 */
+	ASSERT(p < 2);
 
 	if ((zonep = zone_find_by_id(zp->io_zoneid)) == NULL)
 		return;
 
 	mutex_enter(&zonep->zone_stg_io_lock);
-	zonep->zone_zfs_queued++;
+	zonep->zone_zfs_queued[p]++;
 	mutex_exit(&zonep->zone_stg_io_lock);
 	zone_rele(zonep);
 }
 
 /*
- * Called from vdev_queue_io_to_issue.  This function is where zio's are found
- * at the head of the queue (by avl_first), then pulled off (by
- * vdev_queue_io_remove) and issued.  We do our scheduling here to find the
- * next zio to issue.
+ * Called from vdev_queue_io_to_issue. That function is where zio's are listed
+ * in FIFO order on one of the sync queues, then pulled off (by
+ * vdev_queue_io_remove) and issued.  We potentially do zone-based scheduling
+ * here to find a zone's zio deeper in the sync queue and issue that instead
+ * of simply doing FIFO.
+ *
+ * We only do zone-based zio scheduling for the two synchronous I/O queues
+ * (read & write). These queues are normally serviced in FIFO order but we
+ * may decide to move a zone's zio to the head of the line. A typical I/O
+ * load will be mostly synchronous reads and some asynchronous writes (which
+ * are scheduled differently due to transaction groups). There will also be
+ * some synchronous writes for those apps which want to ensure their data is on
+ * disk. We want to make sure that a zone with a single-threaded app (e.g. the
+ * shell) that is doing synchronous I/O (typically reads) isn't penalized by
+ * other zones which are doing lots of synchronous I/O because they have many
+ * running threads.
  *
  * The vq->vq_lock mutex is held when we're executing this function so we
  * can safely access the "last zone" variable on the queue.
  */
 zio_t *
-zfs_zone_schedule(vdev_queue_t *vq)
+zfs_zone_schedule(vdev_queue_t *vq, zio_priority_t p, avl_index_t idx)
 {
-	return (NULL);
+	vdev_queue_class_t *vqc = &vq->vq_class[p];
+	uint_t cnt;
+	zoneid_t last_zone;
+	zio_t *zio;
+
+	ASSERT(MUTEX_HELD(&vq->vq_lock));
+
+	/* Don't change the order on the LBA ordered queues. */
+	if (p != ZIO_PRIORITY_SYNC_READ && p != ZIO_PRIORITY_SYNC_WRITE)
+		return (avl_nearest(&vqc->vqc_queued_tree, idx, AVL_AFTER));
+
+	/* We depend on p being defined as either 0 or 1 */
+	ASSERT(p < 2);
+
+	cnt = avl_numnodes(&vqc->vqc_queued_tree);
+	last_zone = vq->vq_last_zone_id;
+
+	/*
+	 * If there are only a few zios in the queue then just issue the head.
+	 * If there are more than a few zios already queued up, then use
+	 * scheduling to get the next zio.
+	 */
+	if (!zfs_zone_schedule_enable || cnt < zfs_zone_schedule_thresh)
+		zio = avl_nearest(&vqc->vqc_queued_tree, idx, AVL_AFTER);
+	else
+		zio = get_next_zio(vqc, cnt, p);
+
+	vq->vq_last_zone_id = zio->io_zoneid;
+
+	/*
+	 * Probe with 4 args; the number of IOs in the queue, the zone that
+	 * was last scheduled off this queue, the zone that was associated
+	 * with the next IO that is scheduled, and which queue (priority).
+	 */
+	extern void __dtrace_probe_zfs__zone__sched(uint_t, uint_t, uint_t,
+	    uint_t);
+	__dtrace_probe_zfs__zone__sched((uint_t)cnt, (uint_t)last_zone,
+	    (uint_t)zio->io_zoneid, (uint_t)p);
+
+	return (zio);
 }
 
 #endif

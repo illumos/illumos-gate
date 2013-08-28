@@ -21,7 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright (c) 2011, Joyent, Inc. All rights reserved.
+ * Copyright 2013, Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -628,7 +628,11 @@ again:
 	search.io_timestamp = 0;
 	search.io_offset = vq->vq_last_offset + 1;
 	VERIFY3P(avl_find(&vqc->vqc_queued_tree, &search, &idx), ==, NULL);
+#ifdef _KERNEL
+	zio = zfs_zone_schedule(vq, p, idx);
+#else
 	zio = avl_nearest(&vqc->vqc_queued_tree, idx, AVL_AFTER);
+#endif
 	if (zio == NULL)
 		zio = avl_first(&vqc->vqc_queued_tree);
 	ASSERT3U(zio->io_priority, ==, p);
