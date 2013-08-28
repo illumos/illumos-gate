@@ -176,10 +176,11 @@ ps_lgetxregsize(struct ps_prochandle *P, lwpid_t lwpid, int *xrsize)
 	struct stat statb;
 
 	if (P->state == PS_DEAD) {
-		lwp_info_t *lwp = list_next(&P->core->core_lwp_head);
+		core_info_t *core = P->data;
+		lwp_info_t *lwp = list_next(&core->core_lwp_head);
 		uint_t i;
 
-		for (i = 0; i < P->core->core_nlwp; i++, lwp = list_next(lwp)) {
+		for (i = 0; i < core->core_nlwp; i++, lwp = list_next(lwp)) {
 			if (lwp->lwp_id == lwpid) {
 				if (lwp->lwp_xregs != NULL)
 					*xrsize = sizeof (prxregset_t);

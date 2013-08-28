@@ -118,5 +118,5 @@ install:	$(ROOTETCPROG)
 
 lint:	webnfs.h webnfs_xdr.c webnfs_client.c lint_SRCS
 
-clean:     
+clean:
 	$(RM) $(OBJS) webnfs.x webnfs.h webnfs_xdr.c webnfs_client.c

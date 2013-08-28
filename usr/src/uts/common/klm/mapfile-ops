@@ -1,0 +1,40 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy is of the CDDL is also available via the Internet
+# at http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+#
+
+
+$mapfile_version 2
+
+SYMBOL_SCOPE {
+	global:
+# loadable module linkage
+		_fini;
+		_info;
+		_init;
+# These are all the symbols referenced in ml/modstubs.s
+# If we want to remain a drop-in replacment for the old
+# (closed source) klm, we need to define all of these.
+
+		lm4_frlock;
+		lm4_shrlock;
+		lm_frlock;
+		lm_nlm4_dispatch;
+		lm_nlm4_reclaim;
+		lm_nlm_dispatch;
+		lm_nlm_reclaim;
+		lm_register_lock_locally;
+
+	local:
+		*;
+};

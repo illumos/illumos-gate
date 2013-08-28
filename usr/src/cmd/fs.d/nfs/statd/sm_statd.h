@@ -37,10 +37,13 @@
  * contributors.
  */
 
+/*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright (c) 2012 by Delphix. All rights reserved.
+ */
+
 #ifndef	_SM_STATD_H
 #define	_SM_STATD_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -182,20 +185,27 @@ extern int	create_file(char *name);
 extern void	delete_file(char *name);
 extern void	record_name(char *name, int op);
 extern void	sm_crash(void);
-extern void	sm_notify(stat_chge *ntfp);
 extern void	statd_init();
 extern void	merge_hosts(void);
-extern CLIENT	*create_client(char *, int, int, struct timeval *);
+extern void	merge_ips(void);
+extern CLIENT	*create_client(char *, int, int, char *, struct timeval *);
 extern char	*xmalloc(unsigned);
-extern void	sm_status(sm_name *namep, sm_stat_res *resp);
-extern void	sm_mon(mon *monp, sm_stat_res *resp);
-extern void	sm_unmon(mon_id *monidp, sm_stat *resp);
-extern void	sm_unmon_all(my_id *myidp, sm_stat *resp);
-extern void	sm_simu_crash(void *myidp);
+
+/*
+ * RPC service functions, slightly different here than the
+ * generated ones in sm_inter.h
+ */
+extern void	nsmaddrproc1_reg(reg1args *, reg1res *);
+extern void	sm_stat_svc(sm_name *namep, sm_stat_res *resp);
+extern void	sm_mon_svc(mon *monp, sm_stat_res *resp);
+extern void	sm_unmon_svc(mon_id *monidp, sm_stat *resp);
+extern void	sm_unmon_all_svc(my_id *myidp, sm_stat *resp);
+extern void	sm_simu_crash_svc(void *myidp);
+extern void	sm_notify_svc(stat_chge *ntfp);
+
 extern void	sm_inithash();
 extern void	copydir_from_to(char *from_dir, char *to_dir);
 extern int	str_cmp_unqual_hostname(char *, char *);
-extern void	nsmaddrproc1_reg(reg1args *, reg1res *);
 extern void	record_addr(char *name, sa_family_t family, struct netobj *ah);
 extern int	is_symlink(char *file);
 extern int	create_symlink(char *todir, char *rname, char *lname);

@@ -48,6 +48,7 @@ GENUNIX_SRCS =		\
 	findstack_subr.c \
 	fm.c		\
 	gcore.c		\
+	gcore_isadep.c	\
 	genunix.c	\
 	group.c		\
 	hotplug.c	\

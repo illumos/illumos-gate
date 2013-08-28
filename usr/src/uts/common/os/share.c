@@ -23,6 +23,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ */
+
 #include <sys/types.h>
 #include <sys/sysmacros.h>
 #include <sys/param.h>
@@ -46,6 +50,8 @@ static void print_share(struct shrlock *);
 #endif
 
 static int isreadonly(struct vnode *);
+static void do_cleanshares(struct vnode *, pid_t, int32_t);
+
 
 /*
  * Add the share reservation shr to vp.
@@ -335,6 +341,32 @@ del_share(struct vnode *vp, struct shrlock *shr)
 void
 cleanshares(struct vnode *vp, pid_t pid)
 {
+	do_cleanshares(vp, pid, 0);
+}
+
+/*
+ * Cleanup all remote share reservations that
+ * were made by the given sysid on given vnode.
+ */
+void
+cleanshares_by_sysid(struct vnode *vp, int32_t sysid)
+{
+	if (sysid == 0)
+		return;
+
+	do_cleanshares(vp, 0, sysid);
+}
+
+/*
+ * Cleanup share reservations on given vnode made
+ * by the either given pid or sysid.
+ * If sysid is 0, remove all shares made by given pid,
+ * otherwise all shares made by the given sysid will
+ * be removed.
+ */
+static void
+do_cleanshares(struct vnode *vp, pid_t pid, int32_t sysid)
+{
 	struct shrlock shr;
 
 	if (vp->v_shrlocks == NULL)
@@ -343,7 +375,7 @@ cleanshares(struct vnode *vp, pid_t pid)
 	shr.s_access = 0;
 	shr.s_deny = 0;
 	shr.s_pid = pid;
-	shr.s_sysid = 0;
+	shr.s_sysid = sysid;
 	shr.s_own_len = 0;
 	shr.s_owner = NULL;
 

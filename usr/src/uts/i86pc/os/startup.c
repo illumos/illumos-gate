@@ -2779,9 +2779,9 @@ uuid_to_hostid(const uint8_t *uuid)
 	 * in loadable modules and not available this early in boot.  As we
 	 * don't need the values to be cryptographically strong, we just
 	 * generate 32-bit vaue by xor'ing the various sequences together,
-	 * which ensures that the enire UUID contributes to the hostid.
+	 * which ensures that the entire UUID contributes to the hostid.
 	 */
-	int32_t	id = 0;
+	uint32_t	id = 0;
 
 	/* first check against the blacklist */
 	for (int i = 0; i < (sizeof (smbios_uuid_blacklist) / 16); i++) {
@@ -2795,7 +2795,8 @@ uuid_to_hostid(const uint8_t *uuid)
 	for (int i = 0; i < 16; i++)
 		id ^= ((uuid[i]) << (8 * (i % sizeof (id))));
 
-	return (id);
+	/* Make sure return value is positive */
+	return (id & 0x7fffffff);
 }
 
 static int32_t

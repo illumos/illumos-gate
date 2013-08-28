@@ -73,3 +73,5 @@ CERRWARN += -_gcc=-Wno-parentheses
 CERRWARN += -_gcc=-Wno-type-limits
 
 LINTFLAGS += -erroff=E_EMPTY_TRANSLATION_UNIT
+
+MODSRCS_DIR = ../../../intel/modules/genunix
