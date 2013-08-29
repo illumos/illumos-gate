@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH FILESYSTEM 5 "Aug 24, 2009"
+.TH FILESYSTEM 5 "Aug 26, 2013"
 .SH NAME
 filesystem \- File system organization
 .SH SYNOPSIS
@@ -2044,20 +2044,6 @@ the executable in this directory. See \fBisaexec\fR(3C). An approved
 installation location for bundled Solaris software. The analogous location for
 add-on system software or for applications is
 \fB/opt/\fIpackagename\fR/bin/sparcv9\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/usr/bin/amd64\fR\fR
-.ad
-.sp .6
-.RS 4n
-x86 platform-dependent, user-invoked executables. This directory should not be
-part of a user's \fB$PATH\fR. A wrapper in \fB/usr/bin\fR should invoke the
-executable in this directory. See \fBisaexec\fR(3C). An approved installation
-location for bundled Solaris software. The analogous location for add-on system
-software or for applications is \fB/opt/\fIpackagename\fR/bin/amd64\fR.
 .RE
 
 .sp
