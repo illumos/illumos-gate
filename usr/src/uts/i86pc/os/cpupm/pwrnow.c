@@ -170,6 +170,7 @@ pwrnow_init(cpu_t *cp)
 	    (cpupm_mach_state_t *)cp->cpu_m.mcpu_pm_mach_state;
 	cpu_acpi_handle_t handle = mach_state->ms_acpi_handle;
 	cpu_acpi_pct_t *pct_stat;
+	static int logged = 0;
 
 	PWRNOW_DEBUG(("pwrnow_init: processor %d\n", cp->cpu_id));
 
@@ -177,9 +178,12 @@ pwrnow_init(cpu_t *cp)
 	 * Cache the P-state specific ACPI data.
 	 */
 	if (cpu_acpi_cache_pstate_data(handle) != 0) {
-		cmn_err(CE_NOTE, "!PowerNow! support is being "
-		    "disabled due to errors parsing ACPI P-state objects "
-		    "exported by BIOS.");
+		if (!logged) {
+			cmn_err(CE_NOTE, "!PowerNow! support is being "
+			    "disabled due to errors parsing ACPI P-state "
+			    "objects exported by BIOS.");
+			logged = 1;
+		}
 		pwrnow_fini(cp);
 		return (PWRNOW_RET_NO_PM);
 	}
