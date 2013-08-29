@@ -3888,8 +3888,7 @@ sd_process_sdconf_file(struct sd_lun *un)
 		 */
 		vidptr = config_list[i];
 		vidlen = (int)strlen(vidptr);
-		if ((vidlen == 0) ||
-		    (sd_sdconf_id_match(un, vidptr, vidlen) != SD_SUCCESS)) {
+		if (sd_sdconf_id_match(un, vidptr, vidlen) != SD_SUCCESS) {
 			continue;
 		}
 
@@ -4232,6 +4231,18 @@ sd_set_properties(struct sd_lun *un, char *name, char *value)
 		    "physical block size set to %d\n", un->un_phy_blocksize);
 	}
 
+	if (strcasecmp(name, "retries-victim") == 0) {
+		if (ddi_strtol(value, &endptr, 0, &val) == 0) {
+			un->un_victim_retry_count = val;
+		} else {
+			goto value_invalid;
+		}
+		SD_INFO(SD_LOG_ATTACH_DETACH, un, "sd_set_properties: "
+		    "victim retry count set to %d\n",
+		    un->un_victim_retry_count);
+		return;
+	}
+
 	/*
 	 * Validate the throttle values.
 	 * If any of the numbers are invalid, set everything to defaults.
@@ -4392,9 +4403,6 @@ sd_process_sdconf_table(struct sd_lun *un)
 	    table_index++) {
 		id = sd_disk_table[table_index].device_id;
 		idlen = strlen(id);
-		if (idlen == 0) {
-			continue;
-		}
 
 		/*
 		 * The static configuration table currently does not
@@ -13647,7 +13655,8 @@ sd_init_cdb_limits(struct sd_lun *un)
 
 	un->un_status_len = (int)((un->un_f_arq_enabled == TRUE)
 	    ? sizeof (struct scsi_arq_status) : 1);
-	un->un_cmd_timeout = (ushort_t)sd_io_time;
+	if (!ISCD(un))
+		un->un_cmd_timeout = (ushort_t)sd_io_time;
 	un->un_uscsi_timeout = ((ISCD(un)) ? 2 : 1) * un->un_cmd_timeout;
 }
 
