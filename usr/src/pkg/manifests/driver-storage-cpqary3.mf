@@ -1,45 +1,31 @@
 #
-# CDDL HEADER START
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
 #
-# The contents of this file are subject to the terms of the
-# Common Development and Distribution License (the "License").
-# You may not use this file except in compliance with the License.
-#
-# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or http://www.opensolaris.org/os/licensing.
-# See the License for the specific language governing permissions
-# and limitations under the License.
-#
-# When distributing Covered Code, include this CDDL HEADER in each
-# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
-# If applicable, add the following below this CDDL HEADER, with the
-# fields enclosed by brackets "[]" replaced with your own identifying
-# information: Portions Copyright [yyyy] [name of copyright owner]
-#
-# CDDL HEADER END
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
 #
 
 #
-# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2013 Joyent, Inc.  All rights reserved.
 #
 
-#
-# The default for payload-bearing actions in this package is to appear in the
-# global zone only.  See the include file for greater detail, as well as
-# information about overriding the defaults.
-#
 <include global_zone_only_component>
 set name=pkg.fmri value=pkg:/driver/storage/cpqary3@$(PKGVERS)
-set name=pkg.description value="HP Smart Array HBA Driver 2.2.0.1"
-set name=pkg.summary value="HP Smart Array HBA Driver 2.2.0.1"
+set name=pkg.description value="HP SmartArray RAID Controller Driver"
+set name=pkg.summary value="HP SmartArray RAID Controller Driver"
 set name=info.classification \
     value=org.opensolaris.category.2008:Drivers/Storage
 set name=variant.arch value=i386
 dir path=kernel group=sys
 dir path=kernel/drv group=sys
 dir path=kernel/drv/$(ARCH64) group=sys
-driver name=cpqary3 class=scsi \
-    devlink=type=ddi_pseudo;minor1=cpqary3\tcpqary3\M2 \
+dir path=usr/share/man
+dir path=usr/share/man/man7d
+driver name=cpqary3 class=scsi-self-identifying \
     alias=pci103c,3211 \
     alias=pci103c,3212 \
     alias=pci103c,3223 \
@@ -55,6 +41,13 @@ driver name=cpqary3 class=scsi \
     alias=pci103c,3249 \
     alias=pci103c,324a \
     alias=pci103c,324b \
+    alias=pci103c,3350 \
+    alias=pci103c,3351 \
+    alias=pci103c,3352 \
+    alias=pci103c,3353 \
+    alias=pci103c,3354 \
+    alias=pci103c,3355 \
+    alias=pci103c,3356 \
     alias=pcie11,4070 \
     alias=pcie11,4080 \
     alias=pcie11,4082 \
@@ -63,11 +56,12 @@ driver name=cpqary3 class=scsi \
     alias=pcie11,409a \
     alias=pcie11,409b \
     alias=pcie11,409c \
-    alias=pcie11,409d
+    alias=pcie11,409d \
+    alias=pcie11,409e
 file path=kernel/drv/$(ARCH64)/cpqary3 group=sys
 file path=kernel/drv/cpqary3 group=sys
 file path=kernel/drv/cpqary3.conf group=sys
-legacy pkg=CPQary3 desc="HP Smart Array HBA Driver 2.2.0.1" \
-    name="HP Smart Array HBA Driver 2.2.0.1"
-license cr_Sun license=cr_Sun
-license lic_OSBL license=lic_OSBL
+file path=usr/share/man/man7d/cpqary3.7d
+legacy pkg=CPQary3 desc="HP Smart Array HBA Driver" \
+    name="HP Smart Array HBA Driver"
+license lic_CDDL license=lic_CDDL
