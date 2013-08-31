@@ -696,14 +696,7 @@ smb_node_rename_check(smb_node_t *node)
 		}
 	}
 	smb_llist_exit(&node->n_ofile_list);
-
-	/*
-	 * system-wide share check
-	 */
-	if (nbl_share_conflict(node->vp, NBL_RENAME, NULL))
-		return (NT_STATUS_SHARING_VIOLATION);
-	else
-		return (NT_STATUS_SUCCESS);
+	return (NT_STATUS_SUCCESS);
 }
 
 uint32_t
@@ -740,14 +733,7 @@ smb_node_delete_check(smb_node_t *node)
 		}
 	}
 	smb_llist_exit(&node->n_ofile_list);
-
-	/*
-	 * system-wide share check
-	 */
-	if (nbl_share_conflict(node->vp, NBL_REMOVE, NULL))
-		return (NT_STATUS_SHARING_VIOLATION);
-	else
-		return (NT_STATUS_SUCCESS);
+	return (NT_STATUS_SUCCESS);
 }
 
 /*

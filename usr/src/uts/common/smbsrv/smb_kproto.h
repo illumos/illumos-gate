@@ -43,6 +43,7 @@ extern "C" {
 #include <sys/socketvar.h>
 #include <sys/ksocket.h>
 #include <sys/cred.h>
+#include <sys/nbmlock.h>
 #include <sys/sunddi.h>
 #include <smbsrv/smb.h>
 #include <smbsrv/string.h>
@@ -227,8 +228,7 @@ uint32_t smb_unlock_range(smb_request_t *, smb_node_t *,
 uint32_t smb_lock_range(smb_request_t *, uint64_t, uint64_t, uint32_t,
     uint32_t locktype);
 void smb_lock_range_error(smb_request_t *, uint32_t);
-DWORD smb_range_check(smb_request_t *, smb_node_t *, uint64_t, uint64_t,
-    boolean_t);
+DWORD smb_nbl_conflict(smb_node_t *, uint64_t, uint64_t, nbl_op_t);
 
 void smb_mangle(const char *, ino64_t, char *, size_t);
 int smb_unmangle(smb_node_t *, char *, char *, int, uint32_t);
