@@ -27,11 +27,12 @@
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ */
 
 #ifndef _SYS_FLOCK_H
 #define	_SYS_FLOCK_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/fcntl.h>
@@ -238,6 +239,7 @@ int	flk_check_lock_data(u_offset_t, u_offset_t, offset_t);
 int	flk_has_remote_locks(struct vnode *vp);
 void	flk_set_lockmgr_status(flk_lockmgr_status_t status);
 int	flk_sysid_has_locks(int sysid, int chklck);
+int	flk_has_remote_locks_for_sysid(vnode_t *vp, int);
 void	flk_init_callback(flk_callback_t *,
 		callb_cpr_t *(*)(flk_cb_when_t, void *), void *);
 void	flk_add_callback(flk_callback_t *,

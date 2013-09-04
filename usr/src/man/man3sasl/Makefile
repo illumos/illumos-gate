@@ -9,13 +9,16 @@
 # at http://www.illumos.org/license/CDDL.
 #
 
+#
 # Copyright 2011, Richard Lowe
+# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+#
 
-include ../../Makefile.master
+include		$(SRC)/Makefile.master
 
-MANSECT = 	3sasl
+MANSECT= 	3sasl
 
-MANFILES =	sasl_authorize_t.3sasl			\
+MANFILES=	sasl_authorize_t.3sasl			\
 	 	sasl_auxprop.3sasl			\
 	 	sasl_auxprop_add_plugin.3sasl		\
 	 	sasl_auxprop_getctx.3sasl		\
@@ -69,7 +72,7 @@ MANFILES =	sasl_authorize_t.3sasl			\
 	 	sasl_verifyfile_t.3sasl			\
 	 	sasl_version.3sasl
 
-MANSOFILES =	prop_clear.3sasl	\
+MANLINKS=	prop_clear.3sasl	\
 		prop_dispose.3sasl	\
 		prop_dup.3sasl		\
 		prop_erase.3sasl	\
@@ -82,24 +85,22 @@ MANSOFILES =	prop_clear.3sasl	\
 		prop_setvals.3sasl	\
 		sasl_encodev.3sasl
 
-MANFILES +=	$(MANSOFILES)
+prop_clear.3sasl	:= LINKSRC = sasl_auxprop.3sasl
+prop_dispose.3sasl	:= LINKSRC = sasl_auxprop.3sasl
+prop_dup.3sasl		:= LINKSRC = sasl_auxprop.3sasl
+prop_erase.3sasl	:= LINKSRC = sasl_auxprop.3sasl
+prop_format.3sasl	:= LINKSRC = sasl_auxprop.3sasl
+prop_get.3sasl		:= LINKSRC = sasl_auxprop.3sasl
+prop_getnames.3sasl	:= LINKSRC = sasl_auxprop.3sasl
+prop_new.3sasl		:= LINKSRC = sasl_auxprop.3sasl
+prop_request.3sasl	:= LINKSRC = sasl_auxprop.3sasl
+prop_set.3sasl		:= LINKSRC = sasl_auxprop.3sasl
+prop_setvals.3sasl	:= LINKSRC = sasl_auxprop.3sasl
 
-prop_clear.3sasl	:= SOSRC = man3sasl/sasl_auxprop.3sasl
-prop_dispose.3sasl	:= SOSRC = man3sasl/sasl_auxprop.3sasl
-prop_dup.3sasl		:= SOSRC = man3sasl/sasl_auxprop.3sasl
-prop_erase.3sasl	:= SOSRC = man3sasl/sasl_auxprop.3sasl
-prop_format.3sasl	:= SOSRC = man3sasl/sasl_auxprop.3sasl
-prop_get.3sasl		:= SOSRC = man3sasl/sasl_auxprop.3sasl
-prop_getnames.3sasl	:= SOSRC = man3sasl/sasl_auxprop.3sasl
-prop_new.3sasl		:= SOSRC = man3sasl/sasl_auxprop.3sasl
-prop_request.3sasl	:= SOSRC = man3sasl/sasl_auxprop.3sasl
-prop_set.3sasl		:= SOSRC = man3sasl/sasl_auxprop.3sasl
-prop_setvals.3sasl	:= SOSRC = man3sasl/sasl_auxprop.3sasl
-
-sasl_encodev.3sasl	:= SOSRC = man3sasl/sasl_encode.3sasl
+sasl_encodev.3sasl	:= LINKSRC = sasl_encode.3sasl
 
 .KEEP_STATE:
 
-include ../Makefile.man
+include		$(SRC)/man/Makefile.man
 
-install: $(ROOTMANFILES)
+install:	$(ROOTMANFILES) $(ROOTMANLINKS)

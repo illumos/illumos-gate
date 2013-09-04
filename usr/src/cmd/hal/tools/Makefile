@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 SUBDIR =	sunos	
 
@@ -56,7 +54,7 @@ STORAGE_SHAREDSRCS =	$(STORAGE_SHAREDOBJS:%.o=%.c) $(STORAGE_SHAREDOBJS:%.o=../u
 SRCS =		$(PROGSRCS) $(STORAGE_SHAREDSRCS)
 
 CLOBBERFILES += $(HAL_PROG) $(STORAGE_PROG) $(SCRIPT_BIN) $(SCRIPT_LIB) $(HAL_LIB)
-CLEANFILES += $(STORAGE_SHAREDOBJS) $(STORAGE_OBJS)
+CLEANFILES += $(STORAGE_SHAREDOBJS) $(STORAGE_OBJS) hal-storage-zpool.o
 
 include ../../Makefile.cmd
 include ../Makefile.hal

@@ -9,15 +9,22 @@
 # at http://www.illumos.org/license/CDDL.
 #
 
+#
 # Copyright 2011, Richard Lowe
+# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+#
 
-file path=usr/share/man/man3fstyp/fstyp_fini.3fstyp
 file path=usr/share/man/man3fstyp/fstyp_get_attr.3fstyp
 file path=usr/share/man/man3fstyp/fstyp_ident.3fstyp
 file path=usr/share/man/man3fstyp/fstyp_init.3fstyp
-file path=usr/share/man/man3fstyp/fstyp_mod_dump.3fstyp
-file path=usr/share/man/man3fstyp/fstyp_mod_fini.3fstyp
-file path=usr/share/man/man3fstyp/fstyp_mod_get_attr.3fstyp
-file path=usr/share/man/man3fstyp/fstyp_mod_ident.3fstyp
 file path=usr/share/man/man3fstyp/fstyp_mod_init.3fstyp
 file path=usr/share/man/man3fstyp/fstyp_strerror.3fstyp
+link path=usr/share/man/man3fstyp/fstyp_fini.3fstyp target=fstyp_init.3fstyp
+link path=usr/share/man/man3fstyp/fstyp_mod_dump.3fstyp \
+    target=fstyp_mod_init.3fstyp
+link path=usr/share/man/man3fstyp/fstyp_mod_fini.3fstyp \
+    target=fstyp_mod_init.3fstyp
+link path=usr/share/man/man3fstyp/fstyp_mod_get_attr.3fstyp \
+    target=fstyp_mod_init.3fstyp
+link path=usr/share/man/man3fstyp/fstyp_mod_ident.3fstyp \
+    target=fstyp_mod_init.3fstyp

@@ -29,10 +29,9 @@ include		../../Makefile.fstype
 INCLUDES=	roll_log.h
 SRCS=		roll_log.c
 OBJS=		$(SRCS:%.c=$(MACH)/%.o)
+POFILE=		roll_log.po
 
 CERRWARN +=	-_gcc=-Wno-switch
-
-CLOBBERFILES=	$(OBJS)
 
 .KEEP_STATE:
 
@@ -48,4 +47,4 @@ $(MACH)/%.o:	%.c
 
 lint:	lint_SRCS
 
-clean clobber:
+clean:

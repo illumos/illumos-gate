@@ -9,13 +9,16 @@
 # at http://www.illumos.org/license/CDDL.
 #
 
+#
 # Copyright 2011, Richard Lowe
+# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+#
 
-include ../../Makefile.master
+include		$(SRC)/Makefile.master
 
-MANSECT = 	3picltree
+MANSECT= 	3picltree
 
-MANFILES = 	libpicltree.3picltree			\
+MANFILES= 	libpicltree.3picltree			\
 		picld_log.3picltree			\
 		picld_plugin_register.3picltree		\
 		ptree_add_node.3picltree		\
@@ -42,7 +45,7 @@ MANFILES = 	libpicltree.3picltree			\
 		ptree_update_propval.3picltree		\
 		ptree_walk_tree_by_class.3picltree
 
-MANSOFILES =	ptree_add_row_to_table.3picltree	\
+MANLINKS=	ptree_add_row_to_table.3picltree	\
 		ptree_delete_node.3picltree		\
 		ptree_delete_prop.3picltree		\
 		ptree_destroy_node.3picltree		\
@@ -52,29 +55,24 @@ MANSOFILES =	ptree_add_row_to_table.3picltree	\
 		ptree_get_propval_by_name.3picltree	\
 		ptree_update_propval_by_name.3picltree
 
-MANFILES +=	$(MANSOFILES)
+ptree_delete_node.3picltree		:= LINKSRC = ptree_add_node.3picltree
+ptree_delete_prop.3picltree		:= LINKSRC = ptree_add_prop.3picltree
 
-ptree_delete_node.3picltree		:= SOSRC = man3picltree/ptree_add_node.3picltree
-ptree_delete_prop.3picltree		:= SOSRC = man3picltree/ptree_add_prop.3picltree
+ptree_destroy_node.3picltree		:= LINKSRC = ptree_create_node.3picltree
+ptree_destroy_prop.3picltree		:= LINKSRC = ptree_create_prop.3picltree
 
-ptree_destroy_node.3picltree		:= SOSRC = man3picltree/ptree_create_node.3picltree
-ptree_destroy_prop.3picltree		:= SOSRC = man3picltree/ptree_create_prop.3picltree
+ptree_add_row_to_table.3picltree	:= LINKSRC = ptree_create_table.3picltree
 
-ptree_add_row_to_table.3picltree	:= SOSRC = man3picltree/ptree_create_table.3picltree
+ptree_get_next_prop.3picltree		:= LINKSRC = ptree_get_first_prop.3picltree
 
-ptree_get_next_prop.3picltree		:= SOSRC = man3picltree/ptree_get_first_prop.3picltree
+ptree_get_next_by_col.3picltree		:= LINKSRC = ptree_get_next_by_row.3picltree
 
-ptree_get_next_by_col.3picltree		:= SOSRC = man3picltree/ptree_get_next_by_row.3picltree
+ptree_get_propval_by_name.3picltree	:= LINKSRC = ptree_get_propval.3picltree
 
-ptree_get_propval_by_name.3picltree	:= SOSRC = man3picltree/ptree_get_propval.3picltree
-
-ptree_update_propval_by_name.3picltree	:= SOSRC = man3picltree/ptree_update_propval.3picltree
-
+ptree_update_propval_by_name.3picltree	:= LINKSRC = ptree_update_propval.3picltree
 
 .KEEP_STATE:
 
-include ../Makefile.man
+include		$(SRC)/man/Makefile.man
 
-install: $(ROOTMANFILES)
-
-
+install:	$(ROOTMANFILES) $(ROOTMANLINKS)

@@ -20,8 +20,6 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.	*/
-#
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -66,7 +64,7 @@ $(LIBPROG):	$(OBJS)
 lint:	lint_SRCS
 
 clean:     
-	$(RM) $(OBJS)
+	$(RM) $(LIBPROG).o replica.o
 
 replica.o: ../lib/replica.c 
 	$(COMPILE.c) ../lib/replica.c

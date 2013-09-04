@@ -102,7 +102,7 @@ install: all $(ROOTLDAPLIB) $(ROOTLDAPPROG) $(ROOTMANIFEST) $(ROOTSVCMETHOD)
 check:	$(CHKMANIFEST)
 
 clean:
-	${RM} ${OBJS} ${POFILE} ${POFILES}
+	$(RM) $(OBJS) $(LINTOUT)
 
 $(POFILE): $(POFILES)
 	$(RM) $@

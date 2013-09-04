@@ -564,6 +564,9 @@ kwarnd_handle.c: $(SRC)/cmd/krb5/kwarn/kwarnd_handle.c
 	$(RM) $@
 	$(CP) $(SRC)/cmd/krb5/kwarn/kwarnd_handle.c $@
 
+CLOBBERFILES += kwarnd.h \
+	kwarnd_clnt.c kwarnd_clnt_stubs.c kwarnd_handle.c kwarnd_xdr.c
+
 # So lint.out won't be needlessly recreated
 lint: $(LINTOUT)
 

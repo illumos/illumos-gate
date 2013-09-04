@@ -26,8 +26,6 @@
 #  Use is subject to license terms.
 #
 #	@(#)Makefile	8.15 (Berkeley) 3/29/98
-#	%W% (Sun) %G%
-#	ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 #
@@ -54,7 +52,7 @@ ALL=	sendmail.cf submit.cf
 all: $(ALL)
 
 clean cleandir:
-	$(RM) $(ALL) core
+	$(RM) $(ALL)
 
 depend install: 
 

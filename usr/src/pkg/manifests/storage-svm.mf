@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
 #
 
 #
@@ -143,13 +144,11 @@ file path=usr/share/man/man1m/mdmonitord.1m
 file path=usr/share/man/man1m/medstat.1m
 file path=usr/share/man/man1m/metaclear.1m
 file path=usr/share/man/man1m/metadb.1m
-file path=usr/share/man/man1m/metadetach.1m
 file path=usr/share/man/man1m/metadevadm.1m
 file path=usr/share/man/man1m/metahs.1m
 file path=usr/share/man/man1m/metaimport.1m
 file path=usr/share/man/man1m/metainit.1m
 file path=usr/share/man/man1m/metaoffline.1m
-file path=usr/share/man/man1m/metaonline.1m
 file path=usr/share/man/man1m/metaparam.1m
 file path=usr/share/man/man1m/metarecover.1m
 file path=usr/share/man/man1m/metarename.1m
@@ -163,7 +162,6 @@ file path=usr/share/man/man1m/rpc.mdcommd.1m
 file path=usr/share/man/man1m/rpc.metad.1m
 file path=usr/share/man/man1m/rpc.metamedd.1m
 file path=usr/share/man/man1m/rpc.metamhd.1m
-file path=usr/share/man/man4/md.cf.4
 file path=usr/share/man/man4/md.tab.4
 file path=usr/share/man/man4/mddb.cf.4
 file path=usr/share/man/man4/meddb.4
@@ -185,4 +183,7 @@ link path=usr/sbin/metadevadm target=../../sbin/metadevadm
 link path=usr/sbin/metainit target=../../sbin/metainit
 link path=usr/sbin/metarecover target=../../sbin/metarecover
 link path=usr/sbin/metastat target=../../sbin/metastat
+link path=usr/share/man/man1m/metadetach.1m target=metattach.1m
+link path=usr/share/man/man1m/metaonline.1m target=metaoffline.1m
+link path=usr/share/man/man4/md.cf.4 target=md.tab.4
 link path=usr/snadm/lib/libsvm.so target=./libsvm.so.1

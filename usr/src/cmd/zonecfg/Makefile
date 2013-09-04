@@ -46,6 +46,8 @@ CERRWARN +=	-_gcc=-Wno-unused-label
 CERRWARN +=	-_gcc=-Wno-unused-variable
 CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
 
+CLOBBERFILES += $(PROG).ln
+
 .KEEP_STATE:
 
 all: $(PROG)

@@ -118,7 +118,7 @@ install1: mapfiles closedbins sgs
 
 install2: install1 $(SUBDIRS)
 
-_msg: _msgdirs rootdirs install2 FRC
+_msg: _msgdirs rootdirs FRC
 	@for m in $(MSGSUBDIRS); do \
 		cd $$m; pwd; $(MAKE) _msg; cd ..; \
 	done
@@ -126,7 +126,12 @@ _msg: _msgdirs rootdirs install2 FRC
 mapfiles: bldtools
 	@cd common/mapfiles; pwd; $(MAKE) install
 
-clean clobber: $(SUBDIRS) head pkg
+clean: $(SUBDIRS) head pkg
+clobber: $(SUBDIRS) head pkg clobber_local
+clobber_local:
+	@cd tools; pwd; $(MAKE) clobber
+	@cd common/mapfiles; pwd; $(MAKE) clobber
+	@cd msg; pwd; $(MAKE) clobber
 
 closedbins: bldtools $(ROOTDIRS) FRC
 	@CLOSED_ROOT="$$ON_CLOSED_BINS/root_$(MACH)$${RELEASE_BUILD+-nd}"; \

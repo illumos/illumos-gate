@@ -20,8 +20,6 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -37,6 +35,9 @@ $(LIBPROG):	$(OBJS)
 %.o:		$(FSCOMMONDIR)/%.c
 		$(COMPILE.c) -o $@ $<
 		$(POST_PROCESS_O)
+
+clean:
+	$(RM) $(CLEANFILES)
 
 lint:		lint_SRCS
 

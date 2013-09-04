@@ -76,7 +76,7 @@ CERRWARN += -_gcc=-Wno-empty-body
 # module dependencies
 #
 LDFLAGS += -dy -Nmisc/drmach_acpi
-
+ 
 CLEANFILES +=	$(DR_GENERR)
 CLEANFILES +=	$(DR_IO)/dr_err.c
 
@@ -89,9 +89,11 @@ def:		$(DEF_DEPS)
 
 all:		$(ALL_DEPS)
 
-clean:		$(CLEAN_DEPS)
+# This build only 64-bit, but the lint32 below
+# needs corresponding clean/clobber deps.
+clean:		$(CLEAN_DEPS) clean.debug32
 
-clobber:	$(CLOBBER_DEPS)
+clobber:	$(CLOBBER_DEPS) clobber.debug32
 
 lint:		$(LINT_DEPS)
 
@@ -105,4 +107,3 @@ install:	$(INSTALL_DEPS) $(CONF_INSTALL_DEPS)
 #	Include common targets.
 #
 include $(UTSBASE)/i86pc/Makefile.targ
-

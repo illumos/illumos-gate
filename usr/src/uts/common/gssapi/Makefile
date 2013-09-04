@@ -88,3 +88,5 @@ check:	$(CHECKHDRS)
 
 clean:
 	$(RM) $(DERIVED_FILES)
+
+clobber: clean

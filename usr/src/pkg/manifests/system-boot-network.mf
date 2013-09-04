@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/system/boot/network@$(PKGVERS)
@@ -43,12 +44,9 @@ file path=lib/svc/manifest/network/rarp.xml group=sys mode=0444
 file path=lib/svc/manifest/network/rpc/bootparams.xml group=sys mode=0444
 file path=usr/sbin/in.rarpd mode=0555
 file path=usr/sbin/rpc.bootparamd mode=0555
-file path=usr/share/man/man1m/bootparamd.1m
 file path=usr/share/man/man1m/in.rarpd.1m
-file path=usr/share/man/man1m/rarpd.1m
 file path=usr/share/man/man1m/rpc.bootparamd.1m
 file path=usr/share/man/man4/bootparams.4
-file path=usr/share/man/man7p/RARP.7p
 file path=usr/share/man/man7p/rarp.7p
 legacy pkg=SUNWbsr desc="Boot Server daemons (Root)" \
     name="Boot Server daemons (Root)"
@@ -56,3 +54,6 @@ legacy pkg=SUNWbsu desc="Boot Server daemons (Usr)" \
     name="Boot Server daemons (Usr)"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
+link path=usr/share/man/man1m/bootparamd.1m target=rpc.bootparamd.1m
+link path=usr/share/man/man1m/rarpd.1m target=in.rarpd.1m
+link path=usr/share/man/man7p/RARP.7p target=rarp.7p

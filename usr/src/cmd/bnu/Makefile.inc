@@ -37,8 +37,7 @@ SRCS =		account.c anlwrk.c bnuconvert.c callers.c		\
 		utility.c uucheck.c uucico.c uucleanup.c uucp.c		\
 		uucpdefs.c uucpname.c uudecode.c uuencode.c		\
 		uuglist.c uuname.c uusched.c uustat.c uux.c		\
-		uuxqt.c versys.c xio.c xqt.c				\
-		../chmod/common.c
+		uuxqt.c versys.c xio.c xqt.c
 
 CERRWARN	+= -_gcc=-Wno-parentheses
 CERRWARN	+= -_gcc=-Wno-char-subscripts

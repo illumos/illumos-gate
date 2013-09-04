@@ -19,6 +19,9 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ */
+/*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -66,6 +69,7 @@ struct flock64;
 extern int add_share(struct vnode *, struct shrlock *);
 extern int del_share(struct vnode *, struct shrlock *);
 extern void cleanshares(struct vnode *, pid_t);
+extern void cleanshares_by_sysid(struct vnode *, int32_t);
 extern int shr_has_remote_shares(vnode_t *, int32_t);
 extern int proc_has_nbmand_share_on_vp(vnode_t *, pid_t);
 #endif /* _KERNEL */

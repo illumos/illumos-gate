@@ -51,6 +51,8 @@ CERRWARN +=	-_gcc=-Wno-uninitialized
 CERRWARN +=	-_gcc=-Wno-unused-label
 CERRWARN +=	-_gcc=-Wno-unused-variable
 
+CLOBBERFILES += acl.output
+
 # install this library in the root filesystem
 include ../../Makefile.rootfs
 

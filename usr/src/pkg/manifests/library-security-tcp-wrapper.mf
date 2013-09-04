@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
 #
 
 set name=pkg.fmri \
@@ -47,9 +48,6 @@ file path=usr/share/man/man1m/tcpd.1m
 file path=usr/share/man/man1m/tcpdchk.1m
 file path=usr/share/man/man1m/tcpdmatch.1m
 file path=usr/share/man/man3/hosts_access.3
-file path=usr/share/man/man3/libwrap.3
-file path=usr/share/man/man4/hosts.allow.4
-file path=usr/share/man/man4/hosts.deny.4
 file path=usr/share/man/man4/hosts_access.4
 file path=usr/share/man/man4/hosts_options.4
 legacy pkg=SUNWtcpd \
@@ -57,3 +55,6 @@ legacy pkg=SUNWtcpd \
     name="tcpd - access control facility for internet services"
 license usr/src/cmd/tcpd/THIRDPARTYLICENSE \
     license=usr/src/cmd/tcpd/THIRDPARTYLICENSE
+link path=usr/share/man/man3/libwrap.3 target=hosts_access.3
+link path=usr/share/man/man4/hosts.allow.4 target=hosts_access.4
+link path=usr/share/man/man4/hosts.deny.4 target=hosts_access.4

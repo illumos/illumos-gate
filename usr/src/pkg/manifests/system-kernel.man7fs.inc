@@ -11,7 +11,7 @@
 
 #
 # Copyright 2011, Richard Lowe
-# Copyright 2011 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
 #
 
 file path=usr/share/man/man7fs/ctfs.7fs
@@ -23,8 +23,8 @@ file path=usr/share/man/man7fs/hsfs.7fs
 file path=usr/share/man/man7fs/lofs.7fs
 file path=usr/share/man/man7fs/objfs.7fs
 file path=usr/share/man/man7fs/sharefs.7fs
-file path=usr/share/man/man7fs/stderr.7fs
-file path=usr/share/man/man7fs/stdin.7fs
-file path=usr/share/man/man7fs/stdout.7fs
 file path=usr/share/man/man7fs/tmpfs.7fs
 file path=usr/share/man/man7fs/ufs.7fs
+link path=usr/share/man/man7fs/stderr.7fs target=fd.7fs
+link path=usr/share/man/man7fs/stdin.7fs target=fd.7fs
+link path=usr/share/man/man7fs/stdout.7fs target=fd.7fs

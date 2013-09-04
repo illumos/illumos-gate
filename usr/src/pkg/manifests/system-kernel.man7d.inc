@@ -9,20 +9,18 @@
 # at http://www.illumos.org/license/CDDL.
 #
 
+#
 # Copyright 2011, Richard Lowe
+# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+#
 
-file path=usr/share/man/man7d/allkmem.7d
-file path=usr/share/man/man7d/bscbus.7d
 file path=usr/share/man/man7d/bscv.7d
 file path=usr/share/man/man7d/cpuid.7d
 file path=usr/share/man/man7d/devinfo.7d
 file path=usr/share/man/man7d/gld.7d
-file path=usr/share/man/man7d/i2bsc.7d
 file path=usr/share/man/man7d/ipnet.7d
 file path=usr/share/man/man7d/kmdb.7d
-file path=usr/share/man/man7d/kmem.7d
 file path=usr/share/man/man7d/llc1.7d
-file path=usr/share/man/man7d/lo0.7d
 file path=usr/share/man/man7d/lofi.7d
 file path=usr/share/man/man7d/log.7d
 file path=usr/share/man/man7d/mem.7d
@@ -43,13 +41,18 @@ file path=usr/share/man/man7d/sgen.7d
 file path=usr/share/man/man7d/st.7d
 file path=usr/share/man/man7d/sysmsg.7d
 file path=usr/share/man/man7d/ticlts.7d
-file path=usr/share/man/man7d/ticots.7d
-file path=usr/share/man/man7d/ticotsord.7d
 file path=usr/share/man/man7d/tty.7d
 file path=usr/share/man/man7d/ttymux.7d
 file path=usr/share/man/man7d/tzmon.7d
-file path=usr/share/man/man7d/urandom.7d
 file path=usr/share/man/man7d/virtualkm.7d
 file path=usr/share/man/man7d/vni.7d
 file path=usr/share/man/man7d/wscons.7d
 file path=usr/share/man/man7d/zero.7d
+link path=usr/share/man/man7d/allkmem.7d target=mem.7d
+link path=usr/share/man/man7d/bscbus.7d target=bscv.7d
+link path=usr/share/man/man7d/i2bsc.7d target=bscv.7d
+link path=usr/share/man/man7d/kmem.7d target=mem.7d
+link path=usr/share/man/man7d/lo0.7d target=ipnet.7d
+link path=usr/share/man/man7d/ticots.7d target=ticlts.7d
+link path=usr/share/man/man7d/ticotsord.7d target=ticlts.7d
+link path=usr/share/man/man7d/urandom.7d target=random.7d

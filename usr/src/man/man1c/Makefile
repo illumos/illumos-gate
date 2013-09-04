@@ -9,13 +9,16 @@
 # at http://www.illumos.org/license/CDDL.
 #
 
+#
 # Copyright 2011, Richard Lowe
+# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+#
 
-include ../../Makefile.master
+include		$(SRC)/Makefile.master
 
-MANSECT = 	1c
+MANSECT= 	1c
 
-MANFILES = 	ct.1c		\
+MANFILES= 	ct.1c		\
 		cu.1c		\
 		rup.1c		\
 		uucp.1c		\
@@ -23,25 +26,22 @@ MANFILES = 	ct.1c		\
 		uuglist.1c	\
 		uustat.1c	\
 		uuto.1c		\
-		uux.1c		\
+		uux.1c
 
-MANSOFILES =	uudecode.1c	\
+MANLINKS=	uudecode.1c	\
 		uulog.1c	\
 		uuname.1c	\
 		uupick.1c
 
-MANFILES += $(MANSOFILES)
+uulog.1c	:= LINKSRC = uucp.1c
+uuname.1c	:= LINKSRC = uucp.1c
 
-uulog.1c	:= SOSRC = man1c/uucp.1c
-uuname.1c	:= SOSRC = man1c/uucp.1c
+uudecode.1c	:= LINKSRC = uuencode.1c
 
-uudecode.1c	:= SOSRC = man1c/uuencode.1c
-
-uupick.1c	:= SOSRC = man1c/uuto.1c
-
+uupick.1c	:= LINKSRC = uuto.1c
 
 .KEEP_STATE:
 
-include ../Makefile.man
+include		$(SRC)/man/Makefile.man
 
-install: $(ROOTMANFILES)
+install:	$(ROOTMANFILES) $(ROOTMANLINKS)

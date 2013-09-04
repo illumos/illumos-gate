@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/system/network/routing@$(PKGVERS)
@@ -58,8 +59,6 @@ file path=usr/share/man/man1m/in.ndpd.1m
 file path=usr/share/man/man1m/in.rdisc.1m
 file path=usr/share/man/man1m/in.ripngd.1m
 file path=usr/share/man/man1m/in.routed.1m
-file path=usr/share/man/man1m/rdisc.1m
-file path=usr/share/man/man1m/routed.1m
 file path=usr/share/man/man1m/rtquery.1m
 file path=usr/share/man/man4/gateways.4
 legacy pkg=SUNWroute desc="Network Routing daemons/commands (Usr)" \
@@ -74,3 +73,5 @@ license usr/src/cmd/cmd-inet/usr.sbin/in.routed/THIRDPARTYLICENSE.bsd \
     license=usr/src/cmd/cmd-inet/usr.sbin/in.routed/THIRDPARTYLICENSE.bsd
 license usr/src/cmd/cmd-inet/usr.sbin/in.routed/THIRDPARTYLICENSE.freebsd \
     license=usr/src/cmd/cmd-inet/usr.sbin/in.routed/THIRDPARTYLICENSE.freebsd
+link path=usr/share/man/man1m/rdisc.1m target=in.rdisc.1m
+link path=usr/share/man/man1m/routed.1m target=in.routed.1m

@@ -24,6 +24,11 @@
  * All rights reserved.
  */
 
+/*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright (c) 2012 by Delphix. All rights reserved.
+ */
+
 #include <sys/types.h>
 #include <setjmp.h>
 #include <string.h>
@@ -818,17 +823,17 @@ interpret_nlm_4(flags, type, xid, vers, proc, data, len)
 				procnames_short_4[proc]);
 			line += strlen(line);
 			switch (proc) {
-			case NLMPROC4_TEST:
-			case NLMPROC4_GRANTED:
-			case NLMPROC4_TEST_MSG:
-			case NLMPROC4_GRANTED_MSG:
+			case NLM4_TEST:
+			case NLM4_GRANTED:
+			case NLM4_TEST_MSG:
+			case NLM4_GRANTED_MSG:
 				/* testargs */
 				(void) strcat(line, sum_netobj("OH"));
 				(void) getxdr_bool();	/* Excl */
 				(void) strcat(line, sum_lock4());
 				break;
-			case NLMPROC4_LOCK:
-			case NLMPROC4_LOCK_MSG:
+			case NLM4_LOCK:
+			case NLM4_LOCK_MSG:
 				/* lockargs */
 				(void) strcat(line, sum_netobj("OH"));
 				(void) getxdr_bool();	/* Block */
@@ -836,43 +841,43 @@ interpret_nlm_4(flags, type, xid, vers, proc, data, len)
 				(void) strcat(line, sum_lock4());
 				/* ignore reclaim, state fields */
 				break;
-			case NLMPROC4_CANCEL:
-			case NLMPROC4_CANCEL_MSG:
+			case NLM4_CANCEL:
+			case NLM4_CANCEL_MSG:
 				/* cancargs */
 				(void) strcat(line, sum_netobj("OH"));
 				(void) getxdr_bool();	/* Block */
 				(void) getxdr_bool();	/* Excl */
 				(void) strcat(line, sum_lock4());
 				break;
-			case NLMPROC4_UNLOCK:
-			case NLMPROC4_UNLOCK_MSG:
+			case NLM4_UNLOCK:
+			case NLM4_UNLOCK_MSG:
 				/* unlockargs */
 				(void) strcat(line, sum_netobj("OH"));
 				(void) strcat(line, sum_lock4());
 				break;
-			case NLMPROC4_TEST_RES:
+			case NLM4_TEST_RES:
 				/* testres */
 				(void) strcat(line, sum_netobj("OH"));
 				(void) strcat(line, " ");
 				(void) strcat(line,
 				    nameof_stat4(getxdr_u_long()));
 				break;
-			case NLMPROC4_LOCK_RES:
-			case NLMPROC4_CANCEL_RES:
-			case NLMPROC4_UNLOCK_RES:
-			case NLMPROC4_GRANTED_RES:
+			case NLM4_LOCK_RES:
+			case NLM4_CANCEL_RES:
+			case NLM4_UNLOCK_RES:
+			case NLM4_GRANTED_RES:
 				/* res */
 				(void) strcat(line, sum_netobj("OH"));
 				(void) strcat(line, " ");
 				(void) strcat(line,
 					nameof_stat4(getxdr_u_long()));
 				break;
-			case NLMPROC4_SHARE:
-			case NLMPROC4_UNSHARE:
+			case NLM4_SHARE:
+			case NLM4_UNSHARE:
 				(void) strcat(line, sum_netobj("OH"));
 				(void) strcat(line, sum_share());
 				break;
-			case NLMPROC4_NM_LOCK:
+			case NLM4_NM_LOCK:
 				/* lockargs */
 				skip_netobj();		/* Cookie */
 				(void) getxdr_bool();	/* Block */
@@ -880,7 +885,7 @@ interpret_nlm_4(flags, type, xid, vers, proc, data, len)
 				(void) strcat(line, sum_lock4());
 				/* skip reclaim & state fields */
 				break;
-			case NLMPROC4_FREE_ALL:
+			case NLM4_FREE_ALL:
 				(void) sprintf(line,
 					" %s", sum_notify());
 				break;
@@ -891,33 +896,33 @@ interpret_nlm_4(flags, type, xid, vers, proc, data, len)
 				procnames_short_4[proc]);
 			line += strlen(line);
 			switch (proc) {
-			case NLMPROC4_TEST:
+			case NLM4_TEST:
 				/* testres */
 				(void) strcat(line, sum_netobj("OH"));
 				(void) strcat(line, " ");
 				(void) strcat(line,
 				    nameof_stat4(getxdr_u_long()));
 				break;
-			case NLMPROC4_LOCK:
-			case NLMPROC4_CANCEL:
-			case NLMPROC4_UNLOCK:
-			case NLMPROC4_GRANTED:
-			case NLMPROC4_NM_LOCK:
+			case NLM4_LOCK:
+			case NLM4_CANCEL:
+			case NLM4_UNLOCK:
+			case NLM4_GRANTED:
+			case NLM4_NM_LOCK:
 				/* res */
 				(void) strcat(line, sum_netobj("OH"));
 				(void) strcat(line, " ");
 				(void) strcat(line,
 					nameof_stat4(getxdr_u_long()));
 				break;
-			case NLMPROC4_SHARE:
-			case NLMPROC4_UNSHARE:
+			case NLM4_SHARE:
+			case NLM4_UNSHARE:
 				/* shareres */
 				pl = sum_netobj("OH");
 				i = getxdr_u_long();
 				sprintf(line, "%s %s %ld",
 					pl, nameof_stat4(i), getxdr_long());
 				break;
-			case NLMPROC4_FREE_ALL:
+			case NLM4_FREE_ALL:
 				break;
 			}
 		}
@@ -934,64 +939,64 @@ interpret_nlm_4(flags, type, xid, vers, proc, data, len)
 			proc, procnames_long_4[proc]);
 		if (type == CALL) {
 			switch (proc) {
-			case NLMPROC4_TEST:
-			case NLMPROC4_GRANTED:
-			case NLMPROC4_TEST_MSG:
-			case NLMPROC4_GRANTED_MSG:
+			case NLM4_TEST:
+			case NLM4_GRANTED:
+			case NLM4_TEST_MSG:
+			case NLM4_GRANTED_MSG:
 				show_testargs4();
 				break;
-			case NLMPROC4_LOCK:
-			case NLMPROC4_LOCK_MSG:
-			case NLMPROC4_NM_LOCK:
+			case NLM4_LOCK:
+			case NLM4_LOCK_MSG:
+			case NLM4_NM_LOCK:
 				show_lockargs4();
 				break;
-			case NLMPROC4_CANCEL:
-			case NLMPROC4_CANCEL_MSG:
+			case NLM4_CANCEL:
+			case NLM4_CANCEL_MSG:
 				show_cancargs4();
 				break;
-			case NLMPROC4_UNLOCK:
-			case NLMPROC4_UNLOCK_MSG:
+			case NLM4_UNLOCK:
+			case NLM4_UNLOCK_MSG:
 				show_unlockargs4();
 				break;
-			case NLMPROC4_TEST_RES:
+			case NLM4_TEST_RES:
 				show_testres4();
 				break;
-			case NLMPROC4_LOCK_RES:
-			case NLMPROC4_CANCEL_RES:
-			case NLMPROC4_UNLOCK_RES:
-			case NLMPROC4_GRANTED_RES:
+			case NLM4_LOCK_RES:
+			case NLM4_CANCEL_RES:
+			case NLM4_UNLOCK_RES:
+			case NLM4_GRANTED_RES:
 				show_res4();
 				break;
-			case NLMPROC4_SHARE:
-			case NLMPROC4_UNSHARE:
+			case NLM4_SHARE:
+			case NLM4_UNSHARE:
 				show_shareargs();
 				break;
-			case NLMPROC4_FREE_ALL:
+			case NLM4_FREE_ALL:
 				show_notify();
 				break;
 			}
 		} else {
 			switch (proc) {
-			case NLMPROC4_TEST:
+			case NLM4_TEST:
 				show_testres4();
 				break;
-			case NLMPROC4_LOCK:
-			case NLMPROC4_CANCEL:
-			case NLMPROC4_UNLOCK:
-			case NLMPROC4_GRANTED:
+			case NLM4_LOCK:
+			case NLM4_CANCEL:
+			case NLM4_UNLOCK:
+			case NLM4_GRANTED:
 			case NLM_NM_LOCK:
 				show_res4();
 				break;
-			case NLMPROC4_TEST_MSG:
-			case NLMPROC4_LOCK_MSG:
-			case NLMPROC4_CANCEL_MSG:
-			case NLMPROC4_UNLOCK_MSG:
-			case NLMPROC4_GRANTED_MSG:
-			case NLMPROC4_TEST_RES:
-			case NLMPROC4_LOCK_RES:
-			case NLMPROC4_CANCEL_RES:
-			case NLMPROC4_UNLOCK_RES:
-			case NLMPROC4_GRANTED_RES:
+			case NLM4_TEST_MSG:
+			case NLM4_LOCK_MSG:
+			case NLM4_CANCEL_MSG:
+			case NLM4_UNLOCK_MSG:
+			case NLM4_GRANTED_MSG:
+			case NLM4_TEST_RES:
+			case NLM4_LOCK_RES:
+			case NLM4_CANCEL_RES:
+			case NLM4_UNLOCK_RES:
+			case NLM4_GRANTED_RES:
 				break;
 			case NLM_SHARE:
 			case NLM_UNSHARE:
@@ -1082,16 +1087,16 @@ nameof_stat4(s)
 	ulong_t s;
 {
 	switch ((enum nlm4_stats) s) {
-	case NLM4_GRANTED:	return ("granted");
-	case NLM4_DENIED:	return ("denied");
-	case NLM4_DENIED_NOLOCKS:return ("denied (no locks)");
-	case NLM4_BLOCKED:	return ("blocked");
-	case NLM4_DENIED_GRACE_PERIOD: return ("denied (grace period)");
-	case NLM4_DEADLCK:	return ("deadlock");
-	case NLM4_ROFS:		return ("read-only fs");
-	case NLM4_STALE_FH:	return ("stale fh");
-	case NLM4_FBIG:		return ("file too big");
-	case NLM4_FAILED:	return ("failed");
+	case nlm4_granted:	return ("granted");
+	case nlm4_denied:	return ("denied");
+	case nlm4_denied_nolocks:return ("denied (no locks)");
+	case nlm4_blocked:	return ("blocked");
+	case nlm4_denied_grace_period: return ("denied (grace period)");
+	case nlm4_deadlck:	return ("deadlock");
+	case nlm4_rofs:		return ("read-only fs");
+	case nlm4_stale_fh:	return ("stale fh");
+	case nlm4_fbig:		return ("file too big");
+	case nlm4_failed:	return ("failed");
 	default:		return ("?");
 	}
 }

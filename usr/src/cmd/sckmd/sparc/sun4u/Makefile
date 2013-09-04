@@ -78,7 +78,7 @@ lint:
 	$(LINT) $(LINT_FLAGS) $(CPPFLAGS) $(LINT_SRCS)
 
 clean:
-	$(RM) $(PROG) $(OBJS) *.po $(LINT_FILES) core
+	$(RM) $(PROG) $(OBJS) *.po $(LINT_FILES)
 
 
 include ../../../Makefile.targ

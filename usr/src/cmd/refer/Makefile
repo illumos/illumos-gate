@@ -50,6 +50,8 @@ CERRWARN += -_gcc=-Wno-parentheses
 CERRWARN += -_gcc=-Wno-unused-variable
 CERRWARN += -_gcc=-Wno-uninitialized
 
+CLOBBERFILES += $(PROG3)
+
 addbib.po :=	XGETFLAGS += -a -x addbib.xcl
 
 

@@ -20,6 +20,7 @@
 #
 #
 # Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
 #
 # include global definitions
 include ../Makefile.master
@@ -74,6 +75,7 @@ install		:=	TARGET= install
 install_h	:=	TARGET= install_h
 clean		:=	TARGET= clean
 clobber		:=	TARGET= clobber
+clobber_h	:=	TARGET= clobber
 lint		:=	TARGET= lint
 clean.lint	:=	TARGET= clean.lint
 check		:=	TARGET= check
@@ -135,12 +137,15 @@ COMMON_HDRDIRS= common/avs \
 		common/fs \
 		common/gssapi \
 		common/idmap \
+		common/klm \
 		common/inet \
 		common/inet/ipf/netinet \
 		common/inet/kssl \
 		common/inet/nca \
 		common/inet/sockmods/netpacket \
 		common/io/bpf/net \
+		common/io/fibre-channel/fca/qlc \
+		common/io/lvm/md \
 		common/ipp \
 		common/net \
 		common/netinet \
@@ -161,11 +166,19 @@ $(CLOSED_BUILD)COMMON_HDRDIRS += $(CLOSED)/uts/common/sys
 
 #
 # Subset of COMMON_HDRDIRS in which at least one header is generated
-# at runtime (e.g., rpcgen).  (This is a partial list; there are
-# other directories that should be included and do not yet have the
-# necessary Makefile support.  See 6414855.)
+# at runtime (e.g., rpcgen), and in which "make clean" should run.
+# Other directories should be included here, but do not yet have the
+# necessary Makefile support (make clean).  See 6414855.
 #
-DYNHDRDIRS = common/rpcsvc common/idmap common/sys
+DYNHDRDIRS =	common/avs \
+		common/gssapi \
+		common/idmap \
+		common/io/fibre-channel/fca/qlc \
+		common/io/lvm/md \
+		common/klm \
+		common/rpc \
+		common/rpcsvc \
+		common/sys
 
 sparc_HDRDIRS= sun/sys
 i386_HDRDIRS= i86pc/vm i86xpv/vm
@@ -185,6 +198,7 @@ all_h: FRC
 	@cd common/rpcsvc; pwd; $(MAKE) $@
 	@cd common/gssapi; pwd; $(MAKE) $@
 	@cd common/idmap; pwd; $(MAKE) $@
+	@cd common/klm; pwd; $(MAKE) $@
 
 clean clobber: $($(MACH)_ARCHITECTURES) $(DYNHDRDIRS)
 	@if [ '$(PATCH_BUILD)' != '#' ] ; then \
@@ -192,9 +206,8 @@ clean clobber: $($(MACH)_ARCHITECTURES) $(DYNHDRDIRS)
 		$(RM) $(PMTMO_FILE) ; \
 	fi
 
-EXTRA_CLOBBER_TARGETS= common/avs/ns/rdc
-clobber: $(EXTRA_CLOBBER_TARGETS)
-
+# testing convenience
+clobber_h: $(DYNHDRDIRS)
 
 clean.lint modlist: $($(MACH)_ARCHITECTURES)
 

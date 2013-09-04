@@ -1,0 +1,55 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy is of the CDDL is also available via the Internet
+# at http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+#
+
+
+$mapfile_version 2
+
+SYMBOL_SCOPE {
+	global:
+# loadable module linkage
+		_fini;
+		_info;
+		_init;
+# These are all the symbols referenced in ml/modstubs.s
+# If we want to remain a drop-in replacment for the old
+# (closed source) klm, we need to define all of these.
+		lm_alloc_sysidt;
+		lm_cprresume;
+		lm_cprsuspend;
+		lm_free_config;
+		lm_free_sysidt;
+		lm_get_sysid;
+		lm_global_nlmid;
+		lm_has_sleep;
+		lm_rel_sysid;
+		lm_remove_file_locks;
+		lm_safelock;
+		lm_safemap;
+		lm_set_nlmid_flk;
+		lm_shutdown;
+		lm_svc;
+		lm_sysidt;
+		lm_unexport;
+		lm_vp_active;
+# The following three functions are not mentioned in modstubs.s
+# files, because they are not an entry points to KLM. They
+# are called from klmops only.
+		nlm_frlock;
+		nlm_register_lock_locally;
+		nlm_shrlock;
+
+	local:
+		*;
+};

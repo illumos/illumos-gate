@@ -9,13 +9,16 @@
 # at http://www.illumos.org/license/CDDL.
 #
 
+#
 # Copyright 2011, Richard Lowe
+# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+#
 
-include ../../Makefile.master
+include		$(SRC)/Makefile.master
 
-MANSECT =	3perl
+MANSECT=	3perl
 
-MANFILES =	Exacct.3perl			\
+MANFILES=	Exacct.3perl			\
 	 	Exacct\:\:Catalog.3perl		\
 	 	Exacct\:\:File.3perl		\
 	 	Exacct\:\:Object.3perl		\
@@ -30,7 +33,7 @@ MANFILES =	Exacct.3perl			\
 
 .KEEP_STATE:
 
-include ../Makefile.man
+include		$(SRC)/man/Makefile.man
 
 #
 # When KEEP_STATE is in effect and a target has a colon in the name (like the

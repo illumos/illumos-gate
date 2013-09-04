@@ -9,13 +9,16 @@
 # at http://www.illumos.org/license/CDDL.
 #
 
+#
 # Copyright 2011, Richard Lowe
+# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+#
 
-include ../../Makefile.master
+include		$(SRC)/Makefile.master
 
 MANSECT=	 1b
 
-MANFILES=	basename.1b \
+MANFILES=	basename.1b	\
 		biff.1b		\
 		chown.1b	\
 		df.1b		\
@@ -51,22 +54,18 @@ MANFILES=	basename.1b \
 		whereis.1b	\
 		whoami.1b
 
-MANSOFILES =	Mail.1b		\
+MANLINKS=	Mail.1b		\
 		fasthalt.1b	\
 		reset.1b
 
-MANFILES +=	$(MANSOFILES)
+Mail.1b		:= LINKSRC = mail.1b
 
-Mail.1b		:= SOSRC = man1b/mail.1b
+fasthalt.1b	:= LINKSRC = fastboot.1b
 
-fasthalt.1b	:= SOSRC = man1b/fastboot.1b
-
-reset.1b	:= SOSRC = man1b/tset.1b
+reset.1b	:= LINKSRC = tset.1b
 
 .KEEP_STATE:
 
-include ../Makefile.man
+include		$(SRC)/man/Makefile.man
 
-install: $(ROOTMANFILES)
-
-
+install:	$(ROOTMANFILES) $(ROOTMANLINKS)

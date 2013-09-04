@@ -20,8 +20,6 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -37,3 +35,7 @@ SRCS=		$(LIBPROG).c $(COMMONSRC)
 POFILE= $(LIBPROG).po
 
 CPPFLAGS += -I$(FSCOMMONDIR)
+
+# not $(OBJS) due to ../fslib.o
+CLEANFILES   += $(LIBPROG).o
+CLOBBERFILES += $(LIBPROG) $(POFILE) $(FSTYPE).po

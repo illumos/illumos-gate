@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -33,6 +34,10 @@
  * University Acknowledgment- Portions of this document are derived from
  * software developed by the University of California, Berkeley, and its
  * contributors.
+ */
+
+/*
+ * Copyright (c) 2012 by Delphix. All rights reserved.
  */
 
 #include <stdio.h>
@@ -219,11 +224,13 @@ sm_prog_1(rqstp, transp)
 			local = (char *(*)()) nsmaddrproc1_reg;
 			break;
 
+		case NSMADDRPROC1_UNREG: /* Not impl. */
 		default:
 			svcerr_noproc(transp);
 			return;
 		}
 	} else {
+		/* Must be SM_PROG */
 		switch (rqstp->rq_proc) {
 		case NULLPROC:
 			svc_sendreply(transp, xdr_void, (caddr_t)NULL);
@@ -232,37 +239,37 @@ sm_prog_1(rqstp, transp)
 		case SM_STAT:
 			xdr_argument = xdr_sm_name;
 			xdr_result = xdr_sm_stat_res;
-			local = (char *(*)()) sm_status;
+			local = (char *(*)()) sm_stat_svc;
 			break;
 
 		case SM_MON:
 			xdr_argument = xdr_mon;
 			xdr_result = xdr_sm_stat_res;
-			local = (char *(*)()) sm_mon;
+			local = (char *(*)()) sm_mon_svc;
 			break;
 
 		case SM_UNMON:
 			xdr_argument = xdr_mon_id;
 			xdr_result = xdr_sm_stat;
-			local = (char *(*)()) sm_unmon;
+			local = (char *(*)()) sm_unmon_svc;
 			break;
 
 		case SM_UNMON_ALL:
 			xdr_argument = xdr_my_id;
 			xdr_result = xdr_sm_stat;
-			local = (char *(*)()) sm_unmon_all;
+			local = (char *(*)()) sm_unmon_all_svc;
 			break;
 
 		case SM_SIMU_CRASH:
 			xdr_argument = xdr_void;
 			xdr_result = xdr_void;
-			local = (char *(*)()) sm_simu_crash;
+			local = (char *(*)()) sm_simu_crash_svc;
 			break;
 
 		case SM_NOTIFY:
 			xdr_argument = xdr_stat_chge;
 			xdr_result = xdr_void;
-			local = (char *(*)()) sm_notify;
+			local = (char *(*)()) sm_notify_svc;
 			break;
 
 		default:
@@ -284,8 +291,8 @@ sm_prog_1(rqstp, transp)
 	}
 
 	if (!svc_freeargs(transp, xdr_argument, (caddr_t)&argument)) {
-			syslog(LOG_ERR, "statd: unable to free arguments\n");
-		}
+		syslog(LOG_ERR, "statd: unable to free arguments\n");
+	}
 }
 
 /*
@@ -583,6 +590,9 @@ main(int argc, char *argv[])
 
 	/* Get other aliases from each interface. */
 	merge_hosts();
+
+	/* Get all of the configured IP addresses. */
+	merge_ips();
 
 	/*
 	 * Set to automatic mode such that threads are automatically

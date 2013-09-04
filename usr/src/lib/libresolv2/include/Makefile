@@ -23,8 +23,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 include		../../../Makefile.master
 
@@ -46,6 +44,7 @@ clean:
 	$(RM) $(HDRS) $(TMPHDRS)
 
 clobber: clean
+	$(RM) make_os_version probe_ipv6
 
 # os_version.h and port_ipv6.h should be rebuilt when you change OS
 # revision. Since that's not easily expressed as a dependency, we

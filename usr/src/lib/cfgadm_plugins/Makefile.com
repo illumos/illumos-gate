@@ -70,6 +70,8 @@ LINKED_CFG_DIRS		= $(LINKED_PLATFORMS:%=$(USR_PLAT_DIR)/%/lib/cfgadm)
 
 INS.slink6=	$(RM) -r $@; $(SYMLINK) ../../$(PLATFORM)/lib/$(MODULE) $@
 
+CLOBBERFILES += $(LIBRARY:.a=.po) generic.po
+
 $(LINKED_DIRS):		$(USR_PLAT_DIR)
 	-$(INS.dir)
 

@@ -20,9 +20,9 @@
 #
 
 #
-# Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/system/header@$(PKGVERS)
@@ -1854,179 +1854,92 @@ $(sparc_ONLY)file path=usr/platform/sun4v/include/sys/xc_impl.h
 $(sparc_ONLY)file path=usr/platform/sun4v/include/sys/zsmach.h
 $(sparc_ONLY)file path=usr/platform/sun4v/include/vm/hat_sfmmu.h
 $(sparc_ONLY)file path=usr/platform/sun4v/include/vm/mach_sfmmu.h
-file path=usr/share/man/man3head/acct.3head
 file path=usr/share/man/man3head/acct.h.3head
-file path=usr/share/man/man3head/aio.3head
 file path=usr/share/man/man3head/aio.h.3head
-file path=usr/share/man/man3head/ar.3head
 file path=usr/share/man/man3head/ar.h.3head
-file path=usr/share/man/man3head/archives.3head
 file path=usr/share/man/man3head/archives.h.3head
-file path=usr/share/man/man3head/assert.3head
 file path=usr/share/man/man3head/assert.h.3head
-file path=usr/share/man/man3head/complex.3head
 file path=usr/share/man/man3head/complex.h.3head
-file path=usr/share/man/man3head/cpio.3head
 file path=usr/share/man/man3head/cpio.h.3head
-file path=usr/share/man/man3head/dirent.3head
 file path=usr/share/man/man3head/dirent.h.3head
-file path=usr/share/man/man3head/errno.3head
 file path=usr/share/man/man3head/errno.h.3head
-file path=usr/share/man/man3head/fcntl.3head
 file path=usr/share/man/man3head/fcntl.h.3head
-file path=usr/share/man/man3head/fenv.3head
 file path=usr/share/man/man3head/fenv.h.3head
-file path=usr/share/man/man3head/float.3head
 file path=usr/share/man/man3head/float.h.3head
-file path=usr/share/man/man3head/floatingpoint.3head
 file path=usr/share/man/man3head/floatingpoint.h.3head
-file path=usr/share/man/man3head/fmtmsg.3head
 file path=usr/share/man/man3head/fmtmsg.h.3head
-file path=usr/share/man/man3head/fnmatch.3head
 file path=usr/share/man/man3head/fnmatch.h.3head
-file path=usr/share/man/man3head/ftw.3head
 file path=usr/share/man/man3head/ftw.h.3head
-file path=usr/share/man/man3head/glob.3head
 file path=usr/share/man/man3head/glob.h.3head
-file path=usr/share/man/man3head/grp.3head
 file path=usr/share/man/man3head/grp.h.3head
-file path=usr/share/man/man3head/iconv.3head
 file path=usr/share/man/man3head/iconv.h.3head
-file path=usr/share/man/man3head/if.3head
 file path=usr/share/man/man3head/if.h.3head
-file path=usr/share/man/man3head/in.3head
 file path=usr/share/man/man3head/in.h.3head
-file path=usr/share/man/man3head/inet.3head
 file path=usr/share/man/man3head/inet.h.3head
-file path=usr/share/man/man3head/inttypes.3head
 file path=usr/share/man/man3head/inttypes.h.3head
-file path=usr/share/man/man3head/ipc.3head
 file path=usr/share/man/man3head/ipc.h.3head
-file path=usr/share/man/man3head/iso646.3head
 file path=usr/share/man/man3head/iso646.h.3head
-file path=usr/share/man/man3head/langinfo.3head
 file path=usr/share/man/man3head/langinfo.h.3head
-file path=usr/share/man/man3head/libgen.3head
 file path=usr/share/man/man3head/libgen.h.3head
-file path=usr/share/man/man3head/libintl.3head
 file path=usr/share/man/man3head/libintl.h.3head
-file path=usr/share/man/man3head/limits.3head
 file path=usr/share/man/man3head/limits.h.3head
-file path=usr/share/man/man3head/locale.3head
 file path=usr/share/man/man3head/locale.h.3head
-file path=usr/share/man/man3head/math.3head
 file path=usr/share/man/man3head/math.h.3head
-file path=usr/share/man/man3head/mman.3head
 file path=usr/share/man/man3head/mman.h.3head
-file path=usr/share/man/man3head/monetary.3head
 file path=usr/share/man/man3head/monetary.h.3head
-file path=usr/share/man/man3head/mqueue.3head
 file path=usr/share/man/man3head/mqueue.h.3head
-file path=usr/share/man/man3head/msg.3head
 file path=usr/share/man/man3head/msg.h.3head
-file path=usr/share/man/man3head/ndbm.3head
 file path=usr/share/man/man3head/ndbm.h.3head
-file path=usr/share/man/man3head/netdb.3head
 file path=usr/share/man/man3head/netdb.h.3head
-file path=usr/share/man/man3head/nl_types.3head
 file path=usr/share/man/man3head/nl_types.h.3head
-file path=usr/share/man/man3head/poll.3head
 file path=usr/share/man/man3head/poll.h.3head
-file path=usr/share/man/man3head/pthread.3head
 file path=usr/share/man/man3head/pthread.h.3head
-file path=usr/share/man/man3head/pwd.3head
 file path=usr/share/man/man3head/pwd.h.3head
-file path=usr/share/man/man3head/regex.3head
 file path=usr/share/man/man3head/regex.h.3head
-file path=usr/share/man/man3head/resource.3head
 file path=usr/share/man/man3head/resource.h.3head
-file path=usr/share/man/man3head/sched.3head
 file path=usr/share/man/man3head/sched.h.3head
-file path=usr/share/man/man3head/search.3head
 file path=usr/share/man/man3head/search.h.3head
-file path=usr/share/man/man3head/select.3head
 file path=usr/share/man/man3head/select.h.3head
-file path=usr/share/man/man3head/sem.3head
 file path=usr/share/man/man3head/sem.h.3head
-file path=usr/share/man/man3head/semaphore.3head
 file path=usr/share/man/man3head/semaphore.h.3head
-file path=usr/share/man/man3head/setjmp.3head
 file path=usr/share/man/man3head/setjmp.h.3head
-file path=usr/share/man/man3head/shm.3head
 file path=usr/share/man/man3head/shm.h.3head
-file path=usr/share/man/man3head/siginfo.3head
 file path=usr/share/man/man3head/siginfo.h.3head
-file path=usr/share/man/man3head/signal.3head
 file path=usr/share/man/man3head/signal.h.3head
-file path=usr/share/man/man3head/socket.3head
 file path=usr/share/man/man3head/socket.h.3head
-file path=usr/share/man/man3head/spawn.3head
 file path=usr/share/man/man3head/spawn.h.3head
-file path=usr/share/man/man3head/stat.3head
 file path=usr/share/man/man3head/stat.h.3head
-file path=usr/share/man/man3head/statvfs.3head
 file path=usr/share/man/man3head/statvfs.h.3head
-file path=usr/share/man/man3head/stdbool.3head
 file path=usr/share/man/man3head/stdbool.h.3head
-file path=usr/share/man/man3head/stddef.3head
 file path=usr/share/man/man3head/stddef.h.3head
-file path=usr/share/man/man3head/stdint.3head
 file path=usr/share/man/man3head/stdint.h.3head
-file path=usr/share/man/man3head/stdio.3head
 file path=usr/share/man/man3head/stdio.h.3head
-file path=usr/share/man/man3head/stdlib.3head
 file path=usr/share/man/man3head/stdlib.h.3head
-file path=usr/share/man/man3head/string.3head
 file path=usr/share/man/man3head/string.h.3head
-file path=usr/share/man/man3head/strings.3head
 file path=usr/share/man/man3head/strings.h.3head
-file path=usr/share/man/man3head/stropts.3head
 file path=usr/share/man/man3head/stropts.h.3head
-file path=usr/share/man/man3head/syslog.3head
 file path=usr/share/man/man3head/syslog.h.3head
-file path=usr/share/man/man3head/tar.3head
 file path=usr/share/man/man3head/tar.h.3head
-file path=usr/share/man/man3head/tcp.3head
 file path=usr/share/man/man3head/tcp.h.3head
-file path=usr/share/man/man3head/termios.3head
 file path=usr/share/man/man3head/termios.h.3head
-file path=usr/share/man/man3head/tgmath.3head
 file path=usr/share/man/man3head/tgmath.h.3head
-file path=usr/share/man/man3head/time.3head
 file path=usr/share/man/man3head/time.h.3head
-file path=usr/share/man/man3head/timeb.3head
 file path=usr/share/man/man3head/timeb.h.3head
-file path=usr/share/man/man3head/times.3head
 file path=usr/share/man/man3head/times.h.3head
-file path=usr/share/man/man3head/types.3head
 file path=usr/share/man/man3head/types.h.3head
-file path=usr/share/man/man3head/types32.3head
 file path=usr/share/man/man3head/types32.h.3head
-file path=usr/share/man/man3head/ucontext.3head
 file path=usr/share/man/man3head/ucontext.h.3head
-file path=usr/share/man/man3head/uio.3head
 file path=usr/share/man/man3head/uio.h.3head
-file path=usr/share/man/man3head/ulimit.3head
 file path=usr/share/man/man3head/ulimit.h.3head
-file path=usr/share/man/man3head/un.3head
 file path=usr/share/man/man3head/un.h.3head
-file path=usr/share/man/man3head/unistd.3head
 file path=usr/share/man/man3head/unistd.h.3head
-file path=usr/share/man/man3head/utime.3head
 file path=usr/share/man/man3head/utime.h.3head
-file path=usr/share/man/man3head/utmpx.3head
 file path=usr/share/man/man3head/utmpx.h.3head
-file path=usr/share/man/man3head/utsname.3head
 file path=usr/share/man/man3head/utsname.h.3head
-file path=usr/share/man/man3head/values.3head
 file path=usr/share/man/man3head/values.h.3head
-file path=usr/share/man/man3head/wait.3head
 file path=usr/share/man/man3head/wait.h.3head
-file path=usr/share/man/man3head/wchar.3head
 file path=usr/share/man/man3head/wchar.h.3head
-file path=usr/share/man/man3head/wctype.3head
 file path=usr/share/man/man3head/wctype.h.3head
-file path=usr/share/man/man3head/wordexp.3head
 file path=usr/share/man/man3head/wordexp.h.3head
 file path=usr/share/man/man4/note.4
 file path=usr/share/man/man5/prof.5
@@ -2120,6 +2033,94 @@ $(sparc_ONLY)link path=usr/platform/SUNW,UltraSPARC-IIe-NetraCT-60/include \
     target=../sun4u/include
 $(sparc_ONLY)link path=usr/platform/SUNW,UltraSPARC-IIi-Netract/include \
     target=../sun4u/include
+link path=usr/share/man/man3head/acct.3head target=acct.h.3head
+link path=usr/share/man/man3head/aio.3head target=aio.h.3head
+link path=usr/share/man/man3head/ar.3head target=ar.h.3head
+link path=usr/share/man/man3head/archives.3head target=archives.h.3head
+link path=usr/share/man/man3head/assert.3head target=assert.h.3head
+link path=usr/share/man/man3head/complex.3head target=complex.h.3head
+link path=usr/share/man/man3head/cpio.3head target=cpio.h.3head
+link path=usr/share/man/man3head/dirent.3head target=dirent.h.3head
+link path=usr/share/man/man3head/errno.3head target=errno.h.3head
+link path=usr/share/man/man3head/fcntl.3head target=fcntl.h.3head
+link path=usr/share/man/man3head/fenv.3head target=fenv.h.3head
+link path=usr/share/man/man3head/float.3head target=float.h.3head
+link path=usr/share/man/man3head/floatingpoint.3head \
+    target=floatingpoint.h.3head
+link path=usr/share/man/man3head/fmtmsg.3head target=fmtmsg.h.3head
+link path=usr/share/man/man3head/fnmatch.3head target=fnmatch.h.3head
+link path=usr/share/man/man3head/ftw.3head target=ftw.h.3head
+link path=usr/share/man/man3head/glob.3head target=glob.h.3head
+link path=usr/share/man/man3head/grp.3head target=grp.h.3head
+link path=usr/share/man/man3head/iconv.3head target=iconv.h.3head
+link path=usr/share/man/man3head/if.3head target=if.h.3head
+link path=usr/share/man/man3head/in.3head target=in.h.3head
+link path=usr/share/man/man3head/inet.3head target=inet.h.3head
+link path=usr/share/man/man3head/inttypes.3head target=inttypes.h.3head
+link path=usr/share/man/man3head/ipc.3head target=ipc.h.3head
+link path=usr/share/man/man3head/iso646.3head target=iso646.h.3head
+link path=usr/share/man/man3head/langinfo.3head target=langinfo.h.3head
+link path=usr/share/man/man3head/libgen.3head target=libgen.h.3head
+link path=usr/share/man/man3head/libintl.3head target=libintl.h.3head
+link path=usr/share/man/man3head/limits.3head target=limits.h.3head
+link path=usr/share/man/man3head/locale.3head target=locale.h.3head
+link path=usr/share/man/man3head/math.3head target=math.h.3head
+link path=usr/share/man/man3head/mman.3head target=mman.h.3head
+link path=usr/share/man/man3head/monetary.3head target=monetary.h.3head
+link path=usr/share/man/man3head/mqueue.3head target=mqueue.h.3head
+link path=usr/share/man/man3head/msg.3head target=msg.h.3head
+link path=usr/share/man/man3head/ndbm.3head target=ndbm.h.3head
+link path=usr/share/man/man3head/netdb.3head target=netdb.h.3head
+link path=usr/share/man/man3head/nl_types.3head target=nl_types.h.3head
+link path=usr/share/man/man3head/poll.3head target=poll.h.3head
+link path=usr/share/man/man3head/pthread.3head target=pthread.h.3head
+link path=usr/share/man/man3head/pwd.3head target=pwd.h.3head
+link path=usr/share/man/man3head/regex.3head target=regex.h.3head
+link path=usr/share/man/man3head/resource.3head target=resource.h.3head
+link path=usr/share/man/man3head/sched.3head target=sched.h.3head
+link path=usr/share/man/man3head/search.3head target=search.h.3head
+link path=usr/share/man/man3head/select.3head target=select.h.3head
+link path=usr/share/man/man3head/sem.3head target=sem.h.3head
+link path=usr/share/man/man3head/semaphore.3head target=semaphore.h.3head
+link path=usr/share/man/man3head/setjmp.3head target=setjmp.h.3head
+link path=usr/share/man/man3head/shm.3head target=shm.h.3head
+link path=usr/share/man/man3head/siginfo.3head target=siginfo.h.3head
+link path=usr/share/man/man3head/signal.3head target=signal.h.3head
+link path=usr/share/man/man3head/socket.3head target=socket.h.3head
+link path=usr/share/man/man3head/spawn.3head target=spawn.h.3head
+link path=usr/share/man/man3head/stat.3head target=stat.h.3head
+link path=usr/share/man/man3head/statvfs.3head target=statvfs.h.3head
+link path=usr/share/man/man3head/stdbool.3head target=stdbool.h.3head
+link path=usr/share/man/man3head/stddef.3head target=stddef.h.3head
+link path=usr/share/man/man3head/stdint.3head target=stdint.h.3head
+link path=usr/share/man/man3head/stdio.3head target=stdio.h.3head
+link path=usr/share/man/man3head/stdlib.3head target=stdlib.h.3head
+link path=usr/share/man/man3head/string.3head target=string.h.3head
+link path=usr/share/man/man3head/strings.3head target=strings.h.3head
+link path=usr/share/man/man3head/stropts.3head target=stropts.h.3head
+link path=usr/share/man/man3head/syslog.3head target=syslog.h.3head
+link path=usr/share/man/man3head/tar.3head target=tar.h.3head
+link path=usr/share/man/man3head/tcp.3head target=tcp.h.3head
+link path=usr/share/man/man3head/termios.3head target=termios.h.3head
+link path=usr/share/man/man3head/tgmath.3head target=tgmath.h.3head
+link path=usr/share/man/man3head/time.3head target=time.h.3head
+link path=usr/share/man/man3head/timeb.3head target=timeb.h.3head
+link path=usr/share/man/man3head/times.3head target=times.h.3head
+link path=usr/share/man/man3head/types.3head target=types.h.3head
+link path=usr/share/man/man3head/types32.3head target=types32.h.3head
+link path=usr/share/man/man3head/ucontext.3head target=ucontext.h.3head
+link path=usr/share/man/man3head/uio.3head target=uio.h.3head
+link path=usr/share/man/man3head/ulimit.3head target=ulimit.h.3head
+link path=usr/share/man/man3head/un.3head target=un.h.3head
+link path=usr/share/man/man3head/unistd.3head target=unistd.h.3head
+link path=usr/share/man/man3head/utime.3head target=utime.h.3head
+link path=usr/share/man/man3head/utmpx.3head target=utmpx.h.3head
+link path=usr/share/man/man3head/utsname.3head target=utsname.h.3head
+link path=usr/share/man/man3head/values.3head target=values.h.3head
+link path=usr/share/man/man3head/wait.3head target=wait.h.3head
+link path=usr/share/man/man3head/wchar.3head target=wchar.h.3head
+link path=usr/share/man/man3head/wctype.3head target=wctype.h.3head
+link path=usr/share/man/man3head/wordexp.3head target=wordexp.h.3head
 $(i386_ONLY)link path=usr/share/src/uts/i86pc/sys \
     target=../../../../platform/i86pc/include/sys
 $(i386_ONLY)link path=usr/share/src/uts/i86pc/vm \

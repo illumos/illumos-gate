@@ -49,6 +49,9 @@ LINTFLAGS64 += -erroff=E_STATIC_UNUSED -erroff=E_NAME_DEF_NOT_USED2
 #
 PMAP=
 
+# No msg catalog here.
+POFILE=
+
 OBJS= fstyp.o ud_lib.o
 
 SRCS= $(OBJS:%.o=%.c)
@@ -78,6 +81,4 @@ cstyle:
 	$(CSTYLE) $(SRCS)
 
 clean:     
-	$(RM) $(LIBPROG)
-
-clobber: clean
+	$(RM) $(OBJS)

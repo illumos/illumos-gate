@@ -9,13 +9,16 @@
 # at http://www.illumos.org/license/CDDL.
 #
 
+#
 # Copyright 2011, Richard Lowe
+# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+#
 
-include ../../Makefile.master
+include		$(SRC)/Makefile.master
 
-MANSECT = 	7p
+MANSECT= 	7p
 
-MANFILES = 	arp.7p		\
+MANFILES= 	arp.7p		\
 	 	dlpi.7p		\
 	 	icmp.7p		\
 	 	icmp6.7p	\
@@ -37,41 +40,39 @@ MANFILES = 	arp.7p		\
 	 	tcp.7p		\
 	 	udp.7p
 
-MANSOFILES =	AH.7p	\
-	 	ARP.7p	\
-	 	ESP.7p	\
-	 	ICMP.7p	\
-	 	IP.7p	\
-	 	RARP.7p	\
-	 	SCTP.7p	\
-	 	TCP.7p	\
-	 	UDP.7p	\
+MANLINKS=	AH.7p		\
+		ARP.7p		\
+		ESP.7p		\
+		ICMP.7p		\
+		IP.7p		\
+		RARP.7p		\
+		SCTP.7p		\
+		TCP.7p		\
+		UDP.7p		\
 	 	if.7p
 
-MANFILES +=	$(MANSOFILES)
+ARP.7p		:= LINKSRC = arp.7p
 
-ARP.7p	:= SOSRC = man7p/arp.7p
+ICMP.7p		:= LINKSRC = icmp.7p
 
-ICMP.7p := SOSRC = man7p/icmp.7p
+if.7p		:= LINKSRC = if_tcp.7p
 
-if.7p	:= SOSRC = man7p/if_tcp.7p
+IP.7p		:= LINKSRC = ip.7p
 
-IP.7p	:= SOSRC = man7p/ip.7p
+AH.7p		:= LINKSRC = ipsecah.7p
 
-AH.7p	:= SOSRC = man7p/ipsecah.7p
+ESP.7p		:= LINKSRC = ipsecesp.7p
 
-ESP.7p	:= SOSRC = man7p/ipsecesp.7p
+RARP.7p 	:= LINKSRC = rarp.7p
 
-RARP.7p := SOSRC = man7p/rarp.7p
+SCTP.7p 	:= LINKSRC = sctp.7p
 
-SCTP.7p := SOSRC = man7p/sctp.7p
+TCP.7p		:= LINKSRC = tcp.7p
 
-TCP.7p	:= SOSRC = man7p/tcp.7p
-
-UDP.7p	:= SOSRC = man7p/udp.7p
+UDP.7p		:= LINKSRC = udp.7p
 
 .KEEP_STATE:
 
-include ../Makefile.man
+include		$(SRC)/man/Makefile.man
 
-install: $(ROOTMANFILES)
+install:	$(ROOTMANFILES) $(ROOTMANLINKS)

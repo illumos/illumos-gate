@@ -19,8 +19,6 @@
 # CDDL HEADER END
 #
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -42,7 +40,10 @@ lint	:=	TARGET= lint
 
 .KEEP_STATE:
 
-all clean clobber lint _msg:	$(SUBDIRS)
+all clean lint _msg:	$(SUBDIRS)
+
+clobber: $(SUBDIRS)
+	$(RM) sharectl.po
 
 install: $(SUBDIRS) $(ROOTETCDEFAULTFILES)
 

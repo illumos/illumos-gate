@@ -94,8 +94,7 @@ check: cstyle hdrchk
 clobber: ${SUBDIRS}
 
 clean: ${SUBDIRS}
-	-${RM} *.o *.ln *.i *~ core a.out $(CLEANFILES) \
-		*$(SUFFIX_LINT)
+	$(RM) *.o *.ln *.i *.lint $(CLEANFILES)
 
 catalog: $(POFILE)
 

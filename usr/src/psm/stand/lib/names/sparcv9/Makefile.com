@@ -23,7 +23,6 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # psm/stand/lib/names/sparcv9/Makefile.com
 #
@@ -84,7 +83,7 @@ clean:
 	$(RM) $(OBJS) $(L_OBJS)
 
 clobber: clean
-	$(RM) $(LIBNAMES) $(LINTLIBNAMES) a.out core
+	$(RM) $(LIBNAMES) $(LINTLIBNAMES)
 
 $(LIBNAMES): $(OBJSDIR) .WAIT $(OBJS)
 	$(BUILD.AR) $(OBJS)

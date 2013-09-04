@@ -9,13 +9,16 @@
 # at http://www.illumos.org/license/CDDL.
 #
 
+#
 # Copyright 2011, Richard Lowe
+# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+#
 
-include ../../Makefile.master
+include		$(SRC)/Makefile.master
 
-MANSECT = 	3stmf
+MANSECT= 	3stmf
 
-MANFILES =	stmfAddToHostGroup.3stmf		\
+MANFILES=	stmfAddToHostGroup.3stmf		\
 	 	stmfAddToTargetGroup.3stmf		\
 	 	stmfAddViewEntry.3stmf			\
 	 	stmfClearProviderData.3stmf		\
@@ -57,17 +60,15 @@ MANFILES =	stmfAddToHostGroup.3stmf		\
 	 	stmfSetProviderData.3stmf		\
 	 	stmfSetProviderDataProt.3stmf
 
-MANSOFILES =	stmfGetLuProp.3stmf	\
+MANLINKS=	stmfGetLuProp.3stmf			\
 		stmfModifyLuByFname.3stmf
 
-MANFILES +=	$(MANSOFILES)
+stmfModifyLuByFname.3stmf	:= LINKSRC = stmfModifyLu.3stmf
 
-stmfModifyLuByFname.3stmf	:= SOSRC = man3stmf/stmfModifyLu.3stmf
-
-stmfGetLuProp.3stmf		:= SOSRC = man3stmf/stmfSetLuProp.3stmf
+stmfGetLuProp.3stmf		:= LINKSRC = stmfSetLuProp.3stmf
 
 .KEEP_STATE:
 
-include ../Makefile.man
+include		$(SRC)/man/Makefile.man
 
-install: $(ROOTMANFILES)
+install:	$(ROOTMANFILES) $(ROOTMANLINKS)

@@ -9,37 +9,36 @@
 # at http://www.illumos.org/license/CDDL.
 #
 
+#
 # Copyright 2011, Richard Lowe
+# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+#
 
-include ../../Makefile.master
+include		$(SRC)/Makefile.master
 
-MANSECT = 	3fstyp
+MANSECT= 	3fstyp
 
-MANFILES = 	fstyp_get_attr.3fstyp	\
+MANFILES= 	fstyp_get_attr.3fstyp	\
 		fstyp_ident.3fstyp	\
 		fstyp_init.3fstyp	\
 		fstyp_mod_init.3fstyp	\
 		fstyp_strerror.3fstyp
 
-MANSOFILES =	fstyp_fini.3fstyp		\
+MANLINKS=	fstyp_fini.3fstyp		\
 	 	fstyp_mod_dump.3fstyp		\
 	 	fstyp_mod_fini.3fstyp		\
 	 	fstyp_mod_get_attr.3fstyp	\
 	 	fstyp_mod_ident.3fstyp
 
-MANFILES +=	$(MANSOFILES)
+fstyp_fini.3fstyp		:= LINKSRC = fstyp_init.3fstyp
 
-fstyp_fini.3fstyp		:= SOSRC = man3fstyp/fstyp_init.3fstyp
-
-fstyp_mod_dump.3fstyp		:= SOSRC = man3fstyp/fstyp_mod_init.3fstyp
-fstyp_mod_fini.3fstyp		:= SOSRC = man3fstyp/fstyp_mod_init.3fstyp
-fstyp_mod_get_attr.3fstyp	:= SOSRC = man3fstyp/fstyp_mod_init.3fstyp
-fstyp_mod_ident.3fstyp		:= SOSRC = man3fstyp/fstyp_mod_init.3fstyp
+fstyp_mod_dump.3fstyp		:= LINKSRC = fstyp_mod_init.3fstyp
+fstyp_mod_fini.3fstyp		:= LINKSRC = fstyp_mod_init.3fstyp
+fstyp_mod_get_attr.3fstyp	:= LINKSRC = fstyp_mod_init.3fstyp
+fstyp_mod_ident.3fstyp		:= LINKSRC = fstyp_mod_init.3fstyp
 
 .KEEP_STATE:
 
-include ../Makefile.man
+include		$(SRC)/man/Makefile.man
 
-install: $(ROOTMANFILES)
-
-
+install:	$(ROOTMANFILES) $(ROOTMANLINKS)

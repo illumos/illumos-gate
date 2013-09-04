@@ -48,6 +48,8 @@ all install $(PROG) :=	LDLIBS += -lexpat
 CPPFLAGS +=	$(HAL_DBUS_CPPFLAGS) $(HAL_GLIB_CPPFLAGS) $(HAL_CONFIG_CPPFLAGS)
 C99MODE =	$(C99_ENABLE)
 
+CLOBBERFILES += hald_marshal.c hald_marshal.h
+
 all :=		TARGET= all
 install :=	TARGET= install
 clean :=	TARGET= clean
@@ -77,7 +79,7 @@ $(PROG): $(SUBDIRS) .WAIT $(OBJS_ALL)
 install: all $(ROOTCMD) $(SUBDIRS)
 
 clean: $(SUBDIRS)
-	$(RM) $(OBJS) hald_marshal.c hald_marshal.h
+	$(RM) $(OBJS) $(OBJS_SOL)
 
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)

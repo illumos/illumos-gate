@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/system/library/storage/libmpapi@$(PKGVERS)
@@ -48,7 +49,6 @@ file path=lib/llib-lMPAPI.ln variant.opensolaris.zone=global
 file path=usr/include/mpapi-sun.h
 file path=usr/include/mpapi.h
 file path=usr/share/man/man3lib/libMPAPI.3lib
-file path=usr/share/man/man3lib/libmpapi.3lib
 file path=usr/share/man/man3mpapi/MP_AssignLogicalUnitToTPG.3mpapi
 file path=usr/share/man/man3mpapi/MP_CancelOverridePath.3mpapi
 file path=usr/share/man/man3mpapi/MP_CompareOIDs.3mpapi
@@ -109,4 +109,5 @@ license usr/src/lib/mpapi/libmpapi/THIRDPARTYLICENSE \
 link path=lib/$(ARCH64)/libMPAPI.so target=libMPAPI.so.1 \
     variant.opensolaris.zone=global
 link path=lib/libMPAPI.so target=libMPAPI.so.1 variant.opensolaris.zone=global
+link path=usr/share/man/man3lib/libmpapi.3lib target=libMPAPI.3lib
 depend fmri=system/library/storage/libmpscsi_vhci type=require

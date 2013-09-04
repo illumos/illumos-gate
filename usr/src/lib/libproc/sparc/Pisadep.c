@@ -187,11 +187,12 @@ read_gwin(struct ps_prochandle *P, struct rwindow *rwp, uintptr_t sp)
 	gwin_query_t gq;
 
 	if (P->state == PS_DEAD) {
-		lwp_info_t *lwp = list_next(&P->core->core_lwp_head);
+		core_info_t *core = P->data;
+		lwp_info_t *lwp = list_next(&core->core_lwp_head);
 		uint_t n;
 		int i;
 
-		for (n = 0; n < P->core->core_nlwp; n++, lwp = list_next(lwp)) {
+		for (n = 0; n < core->core_nlwp; n++, lwp = list_next(lwp)) {
 			gwindows_t *gwin = lwp->lwp_gwins;
 
 			if (gwin == NULL)

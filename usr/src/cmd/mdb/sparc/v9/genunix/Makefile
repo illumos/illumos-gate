@@ -50,7 +50,7 @@ include ../../../../Makefile.cmd.64
 include ../../Makefile.sparcv9
 include ../../../Makefile.module
 
-dmod/$(MODULE) := LDLIBS += -lm
+dmod/$(MODULE) := LDLIBS += -lm -lproc
 
 #
 # We are not actually hardwiring some dependency on sun4u, we just need to
@@ -70,3 +70,5 @@ CERRWARN += -_gcc=-Wno-unused-label
 CERRWARN += -_gcc=-Wno-uninitialized
 CERRWARN += -_gcc=-Wno-parentheses
 CERRWARN += -_gcc=-Wno-type-limits
+
+MODSRCS_DIR = ../../../sparc/modules/genunix

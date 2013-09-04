@@ -100,7 +100,7 @@ clean:
 	$(RM) $(OBJS) $(LINTFILES) $(CLEANFILES)
 
 clobber: clean
-	$(RM) $(PROG)
+	$(RM) $(PROG) $(CLOBBERFILES)
 
 %.ln: ../../common/$(MODULE)/%.c
 	$(LINT.c) -c $<

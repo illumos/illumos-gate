@@ -9,26 +9,28 @@
 # at http://www.illumos.org/license/CDDL.
 #
 
+#
 # Copyright 2011, Richard Lowe
+# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+#
 
-include ../../Makefile.master
+include		$(SRC)/Makefile.master
 
-MANSECT = 	3rpc
+MANSECT= 	3rpc
 
-MANFILES = 	rstat.3rpc	\
+MANFILES= 	rstat.3rpc	\
 	 	rusers.3rpc	\
 	 	rwall.3rpc
 
-MANSOFILES =	havedisk.3rpc	\
+MANLINKS=	havedisk.3rpc	\
 		rnusers.3rpc
 
-MANFILES +=	$(MANSOFILES)
+havedisk.3rpc	:= LINKSRC = rstat.3rpc
 
-havedisk.3rpc	:= SOSRC = man3rpc/rstat.3rpc
-rnusers.3rpc	:= SOSRC = man3rpc/rusers.3rpc
+rnusers.3rpc	:= LINKSRC = rusers.3rpc
 
 .KEEP_STATE:
 
-include ../Makefile.man
+include		$(SRC)/man/Makefile.man
 
-install: $(ROOTMANFILES)
+install:	$(ROOTMANFILES) $(ROOTMANLINKS)

@@ -9,11 +9,14 @@
 # at http://www.illumos.org/license/CDDL.
 #
 
+#
 # Copyright 2011, Richard Lowe
+# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+#
 
-include ../../Makefile.master
+include		$(SRC)/Makefile.master
 
-MANSECT = 	1has
+MANSECT= 	1has
 
 MANFILES=	edit.1has	\
 		ex.1has		\
@@ -22,8 +25,8 @@ MANFILES=	edit.1has	\
 
 .KEEP_STATE:
 
-include ../Makefile.man
+include		$(SRC)/man/Makefile.man
 
-ROOTMAN= $(ROOTHASMAN)
+ROOTMAN=	$(ROOTHASMAN)
 
-install: $(ROOTMANFILES)
+install:	$(ROOTMANFILES)

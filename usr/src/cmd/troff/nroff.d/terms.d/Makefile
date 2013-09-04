@@ -1,5 +1,4 @@
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # Copyright (c) 1989 by Sun Microsystems, Inc.
 #
@@ -51,4 +50,7 @@ $(ROOTNTERM)/% :	%
 $(ROOTLNKFILES) :	$$(ROOTLNKDEST)
 			-$(RM) $@; $(LN) $(ROOTLNKDEST) $@
 
-clean clobber lint strip :
+clean lint strip :
+
+clobber:
+	$(RM) $(FILES)

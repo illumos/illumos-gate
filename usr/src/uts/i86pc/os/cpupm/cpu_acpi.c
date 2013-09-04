@@ -441,10 +441,6 @@ cpu_acpi_cache_supported_states(cpu_acpi_handle_t handle,
 		if (astatus == AE_NOT_FOUND) {
 			DTRACE_PROBE3(cpu_acpi__eval__err, int, handle->cs_id,
 			    int, objtype, int, astatus);
-			if (objtype == PSS_OBJ)
-				cmn_err(CE_NOTE, "!cpu_acpi: _PSS package "
-				    "evaluation failed for with status %d for "
-				    "CPU %d.", astatus, handle->cs_id);
 			return (1);
 		}
 		cmn_err(CE_NOTE, "!cpu_acpi: error %d evaluating %s package "
@@ -840,24 +836,18 @@ cpu_acpi_cache_pstate_data(cpu_acpi_handle_t handle)
 	if (cpu_acpi_cache_pct(handle) < 0) {
 		DTRACE_PROBE2(cpu_acpi__cache__err, int, handle->cs_id,
 		    int, PCT_OBJ);
-		cmn_err(CE_NOTE, "!cpu_acpi: error parsing _PCT for "
-		    "CPU %d", handle->cs_id);
 		return (-1);
 	}
 
 	if (cpu_acpi_cache_pstates(handle) != 0) {
 		DTRACE_PROBE2(cpu_acpi__cache__err, int, handle->cs_id,
 		    int, PSS_OBJ);
-		cmn_err(CE_NOTE, "!cpu_acpi: error parsing _PSS for "
-		    "CPU %d", handle->cs_id);
 		return (-1);
 	}
 
 	if (cpu_acpi_cache_psd(handle) < 0) {
 		DTRACE_PROBE2(cpu_acpi__cache__err, int, handle->cs_id,
 		    int, PSD_OBJ);
-		cmn_err(CE_NOTE, "!cpu_acpi: error parsing _PSD for "
-		    "CPU %d", handle->cs_id);
 		return (-1);
 	}
 

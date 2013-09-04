@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/service/network/nis@$(PKGVERS)
@@ -70,17 +71,13 @@ file path=usr/lib/netsvc/yp/ypxfrd mode=0555
 file path=usr/sbin/mknetid mode=0555
 file path=usr/sbin/revnetgroup mode=0555
 file path=usr/share/man/man1m/inityp2l.1m
-file path=usr/share/man/man1m/rexd.1m
 file path=usr/share/man/man1m/rpc.rexd.1m
 file path=usr/share/man/man1m/rpc.yppasswdd.1m
 file path=usr/share/man/man1m/rpc.ypupdated.1m
 file path=usr/share/man/man1m/ypmake.1m
 file path=usr/share/man/man1m/ypmap2src.1m
-file path=usr/share/man/man1m/yppasswdd.1m
 file path=usr/share/man/man1m/yppush.1m
 file path=usr/share/man/man1m/ypserv.1m
-file path=usr/share/man/man1m/ypupdated.1m
-file path=usr/share/man/man1m/ypxfrd.1m
 file path=usr/share/man/man4/NISLDAPmapping.4
 file path=usr/share/man/man4/securenets.4
 file path=usr/share/man/man4/updaters.4
@@ -96,4 +93,8 @@ legacy pkg=SUNWypu desc="NIS Server for Solaris 2.6 and up" \
     name="NIS Server for Solaris (usr)"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
+link path=usr/share/man/man1m/rexd.1m target=rpc.rexd.1m
+link path=usr/share/man/man1m/yppasswdd.1m target=rpc.yppasswdd.1m
+link path=usr/share/man/man1m/ypupdated.1m target=rpc.ypupdated.1m
+link path=usr/share/man/man1m/ypxfrd.1m target=ypserv.1m
 depend fmri=pkg:/developer/build/make type=require

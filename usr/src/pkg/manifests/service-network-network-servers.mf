@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/service/network/network-servers@$(PKGVERS)
@@ -75,8 +76,6 @@ file path=usr/sbin/in.talkd mode=0555
 file path=usr/share/man/man1/finger.1
 file path=usr/share/man/man1/rwho.1
 file path=usr/share/man/man1/talk.1
-file path=usr/share/man/man1m/comsat.1m
-file path=usr/share/man/man1m/fingerd.1m
 file path=usr/share/man/man1m/in.comsat.1m
 file path=usr/share/man/man1m/in.fingerd.1m
 file path=usr/share/man/man1m/in.rexecd.1m
@@ -84,21 +83,11 @@ file path=usr/share/man/man1m/in.rlogind.1m
 file path=usr/share/man/man1m/in.rshd.1m
 file path=usr/share/man/man1m/in.rwhod.1m
 file path=usr/share/man/man1m/in.talkd.1m
-file path=usr/share/man/man1m/rexecd.1m
-file path=usr/share/man/man1m/rlogind.1m
 file path=usr/share/man/man1m/rpc.rstatd.1m
 file path=usr/share/man/man1m/rpc.rusersd.1m
 file path=usr/share/man/man1m/rpc.rwalld.1m
 file path=usr/share/man/man1m/rpc.sprayd.1m
-file path=usr/share/man/man1m/rshd.1m
-file path=usr/share/man/man1m/rstatd.1m
-file path=usr/share/man/man1m/rusersd.1m
-file path=usr/share/man/man1m/rwalld.1m
-file path=usr/share/man/man1m/rwhod.1m
-file path=usr/share/man/man1m/sprayd.1m
-file path=usr/share/man/man1m/talkd.1m
 file path=usr/share/man/man4/hosts.equiv.4
-file path=usr/share/man/man4/rhosts.4
 legacy pkg=SUNWrcmdr desc="Remote Network Server Commands (Root)" \
     name="Remote Network Server Commands (Root)"
 legacy pkg=SUNWrcmds \
@@ -111,3 +100,15 @@ license usr/src/cmd/cmd-inet/usr.sbin/THIRDPARTYLICENSE.comsat \
 license usr/src/cmd/cmd-inet/usr.sbin/THIRDPARTYLICENSE.rlogind \
     license=usr/src/cmd/cmd-inet/usr.sbin/THIRDPARTYLICENSE.rlogind
 link path=etc/rmt target=../usr/sbin/rmt
+link path=usr/share/man/man1m/comsat.1m target=in.comsat.1m
+link path=usr/share/man/man1m/fingerd.1m target=in.fingerd.1m
+link path=usr/share/man/man1m/rexecd.1m target=in.rexecd.1m
+link path=usr/share/man/man1m/rlogind.1m target=in.rlogind.1m
+link path=usr/share/man/man1m/rshd.1m target=in.rshd.1m
+link path=usr/share/man/man1m/rstatd.1m target=rpc.rstatd.1m
+link path=usr/share/man/man1m/rusersd.1m target=rpc.rusersd.1m
+link path=usr/share/man/man1m/rwalld.1m target=rpc.rwalld.1m
+link path=usr/share/man/man1m/rwhod.1m target=in.rwhod.1m
+link path=usr/share/man/man1m/sprayd.1m target=rpc.sprayd.1m
+link path=usr/share/man/man1m/talkd.1m target=in.talkd.1m
+link path=usr/share/man/man4/rhosts.4 target=hosts.equiv.4

@@ -98,6 +98,7 @@ UNIX_DIR	= .
 CLEANFILES	+=		\
 	$(UNIX_O) $(MODSTUBS_O)	\
 	$(OBJS_DIR)/vers.c $(OBJS_DIR)/vers.o \
+	$(OBJS_DIR)/dtracestubs.s \
 	$(DTRACESTUBS_O) $(DTRACESTUBS)
 
 CLEANFILES	+=		\
@@ -112,6 +113,10 @@ CLEANFILES	+=		\
 	$(OBJS_DIR)/fb_swtch_src.o \
 	$(OBJS_DIR)/fb_swtch_src \
 	$(OBJS_DIR)/fb_swtch.s
+
+CLEANFILES	+= \
+	$(ZLIB_OBJS:%.o=$(OBJS_DIR)/%.o) \
+	$(ZLIB_OBJS:%.o=$(OBJS_DIR)/%.ln)
 
 CLOBBERFILES	= $(CLEANFILES) $(UNIX_BIN) $(MULTIBOOT)
 CLEANLINTFILES	+= $(LINT_LIB) $(DBOOT_LINT_LIB) $(DBOOT_LINTS)

@@ -9,7 +9,10 @@
 # at http://www.illumos.org/license/CDDL.
 #
 
+#
 # Copyright 2011, Richard Lowe
+# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+#
 
 file path=usr/share/man/man7m/bufmod.7m
 file path=usr/share/man/man7m/connld.7m
@@ -21,9 +24,9 @@ file path=usr/share/man/man7m/ptem.7m
 file path=usr/share/man/man7m/timod.7m
 file path=usr/share/man/man7m/tirdwr.7m
 file path=usr/share/man/man7m/ttcompat.7m
-file path=usr/share/man/man7m/vuid2ps2.7m
-file path=usr/share/man/man7m/vuid3ps2.7m
-file path=usr/share/man/man7m/vuidm3p.7m
-file path=usr/share/man/man7m/vuidm4p.7m
-file path=usr/share/man/man7m/vuidm5p.7m
 file path=usr/share/man/man7m/vuidmice.7m
+link path=usr/share/man/man7m/vuid2ps2.7m target=vuidmice.7m
+link path=usr/share/man/man7m/vuid3ps2.7m target=vuidmice.7m
+link path=usr/share/man/man7m/vuidm3p.7m target=vuidmice.7m
+link path=usr/share/man/man7m/vuidm4p.7m target=vuidmice.7m
+link path=usr/share/man/man7m/vuidm5p.7m target=vuidmice.7m

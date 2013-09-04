@@ -9,13 +9,16 @@
 # at http://www.illumos.org/license/CDDL.
 #
 
+#
 # Copyright 2011, Richard Lowe
+# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+#
 
-include ../../Makefile.master
+include		$(SRC)/Makefile.master
 
-MANSECT = 	3dlpi
+MANSECT= 	3dlpi
 
-MANFILES = 	dlpi_arptype.3dlpi	\
+MANFILES= 	dlpi_arptype.3dlpi	\
 		dlpi_bind.3dlpi		\
 		dlpi_close.3dlpi	\
 		dlpi_disabnotify.3dlpi	\
@@ -37,19 +40,15 @@ MANFILES = 	dlpi_arptype.3dlpi	\
 		dlpi_unbind.3dlpi	\
 		dlpi_walk.3dlpi
 
-MANSOFILES =	dlpi_disabmulti.3dlpi	\
+MANLINKS=	dlpi_disabmulti.3dlpi	\
 		dlpi_promiscoff.3dlpi
 
-MANFILES +=	$(MANSOFILES)
+dlpi_disabmulti.3dlpi	:= LINKSRC = dlpi_enabmulti.3dlpi
 
-dlpi_disabmulti.3dlpi := SOSRC = man3dlpi/dlpi_enabmulti.3dlpi
-
-dlpi_promiscoff.3dlpi := SOSRC = man3dlpi/dlpi_promiscon.3dlpi
+dlpi_promiscoff.3dlpi	:= LINKSRC = dlpi_promiscon.3dlpi
 
 .KEEP_STATE:
 
-include ../Makefile.man
+include		$(SRC)/man/Makefile.man
 
-install: $(ROOTMANFILES)
-
-
+install:	$(ROOTMANFILES) $(ROOTMANLINKS)

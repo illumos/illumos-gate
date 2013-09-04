@@ -35,12 +35,17 @@ clean :=	TARGET= clean
 clobber :=	TARGET= clobber
 lint :=		TARGET= lint
 
-MSGFILES =	`$(FIND) . -name '*.py' -o -name '*.c'`
+MSGFIND =	$(FIND) . -name '*.py' -o -name '*.c'
+MSGFILES =	$(MSGFIND:sh)
+PYCFIND =	$(FIND) . -name '*.pyc'
+PYCFILES = 	$(PYCFIND:sh)
 POFILE =	pysolaris.po
 
 .KEEP_STATE:
 
-all install clean clobber lint: $(SUBDIRS)
+all install clean lint: $(SUBDIRS)
+clobber: $(SUBDIRS)
+	$(RM) $(POFILE) $(PYCFILES)
 
 $(POFILE):	pofile_MSGFILES
 

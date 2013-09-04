@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/storage/stmf@$(PKGVERS)
@@ -131,7 +132,6 @@ file path=usr/share/man/man3stmf/stmfGetHostGroupList.3stmf
 file path=usr/share/man/man3stmf/stmfGetHostGroupMembers.3stmf
 file path=usr/share/man/man3stmf/stmfGetLogicalUnitList.3stmf
 file path=usr/share/man/man3stmf/stmfGetLogicalUnitProperties.3stmf
-file path=usr/share/man/man3stmf/stmfGetLuProp.3stmf
 file path=usr/share/man/man3stmf/stmfGetLuResource.3stmf
 file path=usr/share/man/man3stmf/stmfGetPersistMethod.3stmf
 file path=usr/share/man/man3stmf/stmfGetProviderData.3stmf
@@ -143,7 +143,6 @@ file path=usr/share/man/man3stmf/stmfGetTargetList.3stmf
 file path=usr/share/man/man3stmf/stmfGetTargetProperties.3stmf
 file path=usr/share/man/man3stmf/stmfGetViewEntryList.3stmf
 file path=usr/share/man/man3stmf/stmfModifyLu.3stmf
-file path=usr/share/man/man3stmf/stmfModifyLuByFname.3stmf
 file path=usr/share/man/man3stmf/stmfOfflineLogicalUnit.3stmf
 file path=usr/share/man/man3stmf/stmfOfflineTarget.3stmf
 file path=usr/share/man/man3stmf/stmfOnlineLogicalUnit.3stmf
@@ -166,3 +165,7 @@ link path=usr/lib/$(ARCH64)/libstmf.so target=libstmf.so.1
 link path=usr/lib/$(ARCH64)/libstmfproxy.so target=libstmfproxy.so.1
 link path=usr/lib/libstmf.so target=libstmf.so.1
 link path=usr/lib/libstmfproxy.so target=libstmfproxy.so.1
+link path=usr/share/man/man3stmf/stmfGetLuProp.3stmf \
+    target=stmfSetLuProp.3stmf
+link path=usr/share/man/man3stmf/stmfModifyLuByFname.3stmf \
+    target=stmfModifyLu.3stmf

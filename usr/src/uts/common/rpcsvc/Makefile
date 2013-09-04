@@ -22,6 +22,8 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2012 by Delphix. All rights reserved.
+#
 # uts/common/rpcsvc/Makefile
 #	This makefile installs system header files that go into
 #	/usr/include/rpcsvc.
@@ -34,7 +36,8 @@ include ../../../Makefile.master
 # Also, the v3 headers have been hacked so that they no longer
 # quite reflect what goes over the wire.
 IDMAP_PROT_X=	idmap_prot.x
-RPCGEN_SRC=	autofs_prot.x sm_inter.x nsm_addr.x $(IDMAP_PROT_X)
+RPCGEN_SRC=	autofs_prot.x nlm_prot.x sm_inter.x nsm_addr.x \
+		$(IDMAP_PROT_X)
 
 DERIVED_HDRS=	$(RPCGEN_SRC:%.x=%.h)
 
@@ -43,6 +46,12 @@ ALLHDRS=	$(RPCGEN_SRC) $(DERIVED_HDRS)
 ROOTDIRS=	$(ROOT)/usr/include/rpcsvc
 
 ROOTHDRS=	$(ALLHDRS:%=$(ROOTDIRS)/%)
+
+RPCGENFLAGS = -C
+idmap_prot.h :=	RPCGENFLAGS += -MN
+nlm_prot.h :=	RPCGENFLAGS += -M
+sm_inter.h :=	RPCGENFLAGS += -M
+nsm_addr.h :=	RPCGENFLAGS += -M
 
 $(ROOTDIRS)/%: %
 	$(INS.file)
@@ -68,7 +77,4 @@ $(ROOTDIRS):
 	$(INS.dir)
 
 %.h: %.x
-	$(RPCGEN) -C -h $< -o $@
-
-idmap_prot.h:	$(IDMAP_PROT_X)
-	$(RPCGEN) -CMNh -o $@ $(IDMAP_PROT_X)
+	$(RPCGEN) $(RPCGENFLAGS) -h $< -o $@

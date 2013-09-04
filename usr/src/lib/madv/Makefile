@@ -23,8 +23,6 @@
 # Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 include	../Makefile.lib
 
@@ -41,7 +39,9 @@ lint :=		TARGET= lint
 
 .KEEP_STATE:
 
-all install clean clobber lint: $(SUBDIRS)
+all install clean lint: $(SUBDIRS)
+clobber: $(SUBDIRS)
+	$(RM) $(POFILE)
 
 $(POFILE):	pofile_MSGFILES
 

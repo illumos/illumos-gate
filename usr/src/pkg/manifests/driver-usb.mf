@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
 #
 
 #
@@ -135,13 +136,11 @@ file path=lib/svc/method/svc-wusb mode=0555
 file path=usr/share/man/man7d/ehci.7d
 file path=usr/share/man/man7d/hid.7d
 file path=usr/share/man/man7d/hubd.7d
-file path=usr/share/man/man7d/hwa1480_fw.7d
 file path=usr/share/man/man7d/hwahc.7d
 file path=usr/share/man/man7d/hwarc.7d
 file path=usr/share/man/man7d/ohci.7d
 file path=usr/share/man/man7d/scsa2usb.7d
 file path=usr/share/man/man7d/uhci.7d
-file path=usr/share/man/man7d/usb.7d
 file path=usr/share/man/man7d/usb_ac.7d
 file path=usr/share/man/man7d/usb_as.7d
 file path=usr/share/man/man7d/usb_ia.7d
@@ -153,55 +152,34 @@ file path=usr/share/man/man7d/wusb_df.7d
 file path=usr/share/man/man7m/usb_ah.7m
 file path=usr/share/man/man7m/usbkbm.7m
 file path=usr/share/man/man7m/usbms.7m
-file path=usr/share/man/man9f/usb_alloc_bulk_req.9f
-file path=usr/share/man/man9f/usb_alloc_ctrl_req.9f
-file path=usr/share/man/man9f/usb_alloc_intr_req.9f
-file path=usr/share/man/man9f/usb_alloc_isoc_req.9f
 file path=usr/share/man/man9f/usb_alloc_request.9f
 file path=usr/share/man/man9f/usb_client_attach.9f
-file path=usr/share/man/man9f/usb_client_detach.9f
 file path=usr/share/man/man9f/usb_clr_feature.9f
 file path=usr/share/man/man9f/usb_create_pm_components.9f
-file path=usr/share/man/man9f/usb_free_bulk_req.9f
-file path=usr/share/man/man9f/usb_free_ctrl_req.9f
-file path=usr/share/man/man9f/usb_free_descr_tree.9f
-file path=usr/share/man/man9f/usb_free_dev_data.9f
-file path=usr/share/man/man9f/usb_free_intr_req.9f
-file path=usr/share/man/man9f/usb_free_isoc_req.9f
 file path=usr/share/man/man9f/usb_get_addr.9f
 file path=usr/share/man/man9f/usb_get_alt_if.9f
 file path=usr/share/man/man9f/usb_get_cfg.9f
 file path=usr/share/man/man9f/usb_get_current_frame_number.9f
 file path=usr/share/man/man9f/usb_get_dev_data.9f
-file path=usr/share/man/man9f/usb_get_if_number.9f
 file path=usr/share/man/man9f/usb_get_max_pkts_per_isoc_request.9f
 file path=usr/share/man/man9f/usb_get_status.9f
 file path=usr/share/man/man9f/usb_get_string_descr.9f
 file path=usr/share/man/man9f/usb_handle_remote_wakeup.9f
 file path=usr/share/man/man9f/usb_lookup_ep_data.9f
-file path=usr/share/man/man9f/usb_owns_device.9f
 file path=usr/share/man/man9f/usb_parse_data.9f
 file path=usr/share/man/man9f/usb_pipe_bulk_xfer.9f
 file path=usr/share/man/man9f/usb_pipe_close.9f
 file path=usr/share/man/man9f/usb_pipe_ctrl_xfer.9f
-file path=usr/share/man/man9f/usb_pipe_ctrl_xfer_wait.9f
 file path=usr/share/man/man9f/usb_pipe_drain_reqs.9f
 file path=usr/share/man/man9f/usb_pipe_get_max_bulk_transfer_size.9f
-file path=usr/share/man/man9f/usb_pipe_get_private.9f
 file path=usr/share/man/man9f/usb_pipe_get_state.9f
 file path=usr/share/man/man9f/usb_pipe_intr_xfer.9f
 file path=usr/share/man/man9f/usb_pipe_isoc_xfer.9f
 file path=usr/share/man/man9f/usb_pipe_open.9f
 file path=usr/share/man/man9f/usb_pipe_reset.9f
 file path=usr/share/man/man9f/usb_pipe_set_private.9f
-file path=usr/share/man/man9f/usb_pipe_stop_intr_polling.9f
-file path=usr/share/man/man9f/usb_pipe_stop_isoc_polling.9f
-file path=usr/share/man/man9f/usb_print_descr_tree.9f
 file path=usr/share/man/man9f/usb_register_hotplug_cbs.9f
 file path=usr/share/man/man9f/usb_reset_device.9f
-file path=usr/share/man/man9f/usb_set_alt_if.9f
-file path=usr/share/man/man9f/usb_set_cfg.9f
-file path=usr/share/man/man9f/usb_unregister_hotplug_cbs.9f
 file path=usr/share/man/man9s/usb_bulk_request.9s
 file path=usr/share/man/man9s/usb_callback_flags.9s
 file path=usr/share/man/man9s/usb_cfg_descr.9s
@@ -224,3 +202,37 @@ license lic_CDDL license=lic_CDDL
 license license_in_headers license=license_in_headers
 license usr/src/uts/common/io/usb/clients/hwa1480_fw/i1480/LICENSE \
     license=usr/src/uts/common/io/usb/clients/hwa1480_fw/i1480/LICENSE
+link path=usr/share/man/man7d/hwa1480_fw.7d target=wusb_df.7d
+link path=usr/share/man/man7d/usb.7d target=usba.7d
+link path=usr/share/man/man9f/usb_alloc_bulk_req.9f \
+    target=usb_alloc_request.9f
+link path=usr/share/man/man9f/usb_alloc_ctrl_req.9f \
+    target=usb_alloc_request.9f
+link path=usr/share/man/man9f/usb_alloc_intr_req.9f \
+    target=usb_alloc_request.9f
+link path=usr/share/man/man9f/usb_alloc_isoc_req.9f \
+    target=usb_alloc_request.9f
+link path=usr/share/man/man9f/usb_client_detach.9f target=usb_client_attach.9f
+link path=usr/share/man/man9f/usb_free_bulk_req.9f target=usb_alloc_request.9f
+link path=usr/share/man/man9f/usb_free_ctrl_req.9f target=usb_alloc_request.9f
+link path=usr/share/man/man9f/usb_free_descr_tree.9f \
+    target=usb_get_dev_data.9f
+link path=usr/share/man/man9f/usb_free_dev_data.9f target=usb_get_dev_data.9f
+link path=usr/share/man/man9f/usb_free_intr_req.9f target=usb_alloc_request.9f
+link path=usr/share/man/man9f/usb_free_isoc_req.9f target=usb_alloc_request.9f
+link path=usr/share/man/man9f/usb_get_if_number.9f target=usb_get_alt_if.9f
+link path=usr/share/man/man9f/usb_owns_device.9f target=usb_get_alt_if.9f
+link path=usr/share/man/man9f/usb_pipe_ctrl_xfer_wait.9f \
+    target=usb_pipe_ctrl_xfer.9f
+link path=usr/share/man/man9f/usb_pipe_get_private.9f \
+    target=usb_pipe_set_private.9f
+link path=usr/share/man/man9f/usb_pipe_stop_intr_polling.9f \
+    target=usb_pipe_intr_xfer.9f
+link path=usr/share/man/man9f/usb_pipe_stop_isoc_polling.9f \
+    target=usb_pipe_isoc_xfer.9f
+link path=usr/share/man/man9f/usb_print_descr_tree.9f \
+    target=usb_get_dev_data.9f
+link path=usr/share/man/man9f/usb_set_alt_if.9f target=usb_get_alt_if.9f
+link path=usr/share/man/man9f/usb_set_cfg.9f target=usb_get_cfg.9f
+link path=usr/share/man/man9f/usb_unregister_hotplug_cbs.9f \
+    target=usb_register_hotplug_cbs.9f

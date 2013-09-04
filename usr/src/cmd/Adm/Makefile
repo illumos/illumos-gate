@@ -80,8 +80,6 @@ $(DIRS):
 
 FRC:
 
-clean:
+clean clobber: $(SUBDIRS)
 
 lint:
-
-clobber:

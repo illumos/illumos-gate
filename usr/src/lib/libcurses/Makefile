@@ -22,8 +22,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 include	../Makefile.lib
 
@@ -114,6 +112,11 @@ screen/term.h:   screen/maketerm.ed
 screen/tmp:
 	rm -rf $@
 	mkdir $@
+
+CLEANFILES += \
+	screen/tmp/keycaps \
+	screen/tmp/term.h.new1 \
+	screen/tmp/term.h.new2
 
 _msg:	$(MSGDOMAIN) .WAIT $(POFILE)
 	$(RM) $(MSGDOMAIN)/$(POFILE)

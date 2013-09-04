@@ -124,7 +124,8 @@ lint:=		TARGET= lint
 _msg:=		TARGET= _msg
 
 CLOBBERFILES +=	$(ROOTFS_PROG) $(PROG)
-CLEANFILES += $(COMMONOBJS) $(K5RLOGINOBJS) $(K5RSHDOBJS) $(TFTPDOBJS)
+CLEANFILES += $(COMMONOBJS) $(K5RLOGINOBJS) $(K5RSHDOBJS) $(TFTPDOBJS) \
+		$(K5TELNETOBJS)
 
 CPPFLAGS +=	-DSYSV -DBSD_COMP -I$(CMDINETCOMMONDIR) -I
 
@@ -229,11 +230,13 @@ FRC:
 
 check:	$(CHKMANIFEST)
 
-clean:	$(SUBDIRS)
-	-$(RM) $(CLEANFILES)
+clean: $(SUBDIRS) clean_local
+clean_local:
+	$(RM) $(CLEANFILES)
 
-clobber: $(SUBDIRS)
-	-$(RM) $(CLEANFILES) $(CLOBBERFILES)
+clobber: $(SUBDIRS) clobber_local
+clobber_local: clean_local
+	$(RM) $(CLOBBERFILES)
 
 lint: $(LINTSUBDIRS)
 	$(LINT.c) 6to4relay.c $(LDLIBS) -lsocket -ldladm

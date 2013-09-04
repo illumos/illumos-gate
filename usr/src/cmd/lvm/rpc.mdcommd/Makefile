@@ -22,8 +22,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 MANIFEST=	mdcomm.xml
 
@@ -55,10 +53,7 @@ $(POFILE): $(POFILES)
 	$(RM) $@
 	cat $(POFILES) > $(POFILE)
 
-clean:	$(SUBDIRS)
-	$(RM) *.po
-
-lint:     $(SUBDIRS)
+clean clobber lint:	$(SUBDIRS)
 
 install:        $(SUBDIRS) $(ROOTMANIFEST)
 

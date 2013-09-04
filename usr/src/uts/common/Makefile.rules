@@ -1392,6 +1392,10 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/kiconv/kiconv_tc/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
+$(OBJS_DIR)/%.o:		$(UTSBASE)/common/klm/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
 $(OBJS_DIR)/%.o:		$(UTSBASE)/common/kmdb/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
@@ -1568,24 +1572,6 @@ BZ2LINT = -erroff=%all -I$(UTSBASE)/common/bzip2
 
 $(LINTS_DIR)/bz2%.ln:		$(COMMONBASE)/bzip2/%.c
 	 @($(LHEAD) $(LINT.c) -C $(LINTS_DIR)/`basename $@ .ln` $(BZ2LINT) $< $(LTAIL))
-
-#
-# SVM
-#
-
-MD_XDR_CSRC	=	$(UTSBASE)/common/io/lvm/md
-MD_XDR_XSRC	=	$(UTSBASE)/common/sys/lvm
-RPCGENFLAGS	+=	-C -M -D_KERNEL -DSYSV
-
-$(MD_XDR_CSRC)/meta_basic_xdr.c:	$(MD_XDR_XSRC)/meta_basic.x
-	$(RPCGEN) $(RPCGENFLAGS) -c -i 100 $(MD_XDR_XSRC)/meta_basic.x | \
-	nawk '{sub(/^#include "(\.\.\/\.\.\/)/,"#include \"\.\.\/\.\.\/\.\.\/\.\.\/"); print $$0}'  | \
-	nawk '{sub(/meta_basic.h/, "md_basic.h"); print $$0}' >$@
-
-$(MD_XDR_CSRC)/metamed_xdr.c:	$(MD_XDR_XSRC)/metamed.x
-	$(RPCGEN) $(RPCGENFLAGS) -c -i 100 $(MD_XDR_XSRC)/metamed.x |  \
-	nawk '{sub(/^#include "(\.\.\/\.\.\/)/,"#include \"\.\.\/\.\.\/\.\.\/\.\.\/"); print $$0}' | \
-	nawk '{sub(/metamed.h/, "mdmed.h"); print $$0}' >$@
 
 #
 #	Section 1b:	Lint `objects'
@@ -2590,6 +2576,9 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/kiconv/kiconv_sc/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/kiconv/kiconv_tc/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/klm/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/kmdb/%.c

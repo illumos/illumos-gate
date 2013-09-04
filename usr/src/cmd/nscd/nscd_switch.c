@@ -205,7 +205,7 @@ getparams(
 	char		*me = "getparams";
 
 	p = &params->p;
-	(void) memset(p, 0, sizeof (*p));
+	(void) memset(params, 0, sizeof (nscd_nsw_params_t));
 	(*initf)(p);
 	params->dbi = -1;
 	params->cfgdbi = -1;
@@ -239,7 +239,6 @@ getparams(
 	 * group_compat?
 	 */
 	if (p->config_name != NULL) {
-
 		n = p->config_name;
 		for (j = 0; j < NSCD_NUM_DB; j++) {
 			dbn = NSCD_NSW_DB_NAME(j);

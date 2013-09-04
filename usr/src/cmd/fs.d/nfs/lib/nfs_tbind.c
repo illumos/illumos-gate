@@ -18,11 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright (c) 1996, 2010, Oracle and/or its affiliates. All rights reserved.
- */
-/*
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright (c) 2012 by Delphix. All rights reserved.
  */
 
 
@@ -1698,9 +1698,9 @@ bind_to_proto(NETSELDECL(proto), char *serv, struct netbuf **addr,
  * to all-ones. The port number part of the mask is zeroes.
  */
 static int
-set_addrmask(fd, nconf, mask)
-	struct netconfig *nconf;
-	struct netbuf *mask;
+set_addrmask(int fd,
+	struct netconfig *nconf,
+	struct netbuf *mask)
 {
 	struct t_info info;
 
@@ -1725,8 +1725,7 @@ set_addrmask(fd, nconf, mask)
 			return (0);
 		}
 
-		syslog(LOG_ERR, "set_addrmask: address size: %ld",
-			info.addr);
+		syslog(LOG_ERR, "set_addrmask: address size: %ld", info.addr);
 		return (-1);
 	}
 
@@ -1743,17 +1742,17 @@ set_addrmask(fd, nconf, mask)
 		 */
 		/* LINTED pointer alignment */
 		((struct sockaddr_in *)mask->buf)->sin_addr.s_addr =
-								(ulong_t)~0;
+		    (ulong_t)~0;
 		/* LINTED pointer alignment */
 		((struct sockaddr_in *)mask->buf)->sin_family =
-								(ushort_t)~0;
+		    (ushort_t)~0;
 	} else if (strcmp(nconf->nc_protofmly, NC_INET6) == 0) {
 		/* LINTED pointer alignment */
 		(void) memset(&((struct sockaddr_in6 *)mask->buf)->sin6_addr,
-			(uchar_t)~0, sizeof (struct in6_addr));
+		    (uchar_t)~0, sizeof (struct in6_addr));
 		/* LINTED pointer alignment */
 		((struct sockaddr_in6 *)mask->buf)->sin6_family =
-								(ushort_t)~0;
+		    (ushort_t)~0;
 	} else {
 
 		/*

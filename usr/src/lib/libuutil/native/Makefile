@@ -23,8 +23,6 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 NOT_NATIVE = $(POUND_SIGN)		# tell Makefile.com we're native
 
@@ -41,7 +39,7 @@ LDLIBS =	$(MY_NATIVE_LDLIBS)
 # We must use the build's avl headers, to match the common avl.c
 #
 AVLHEADERS = sys/avl.h sys/avl_impl.h
-CLOBBERFILES += $(AVLHEADERS)
+CLOBBERFILES += $(AVLHEADERS) $(LIBS)
 
 all: $(LIBS)
 

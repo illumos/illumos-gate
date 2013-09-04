@@ -9,12 +9,14 @@
 # at http://www.illumos.org/license/CDDL.
 #
 
+#
 # Copyright 2011, Richard Lowe
+# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+#
 
 file path=usr/share/man/man3volmgt/media_findname.3volmgt
 file path=usr/share/man/man3volmgt/media_getattr.3volmgt
 file path=usr/share/man/man3volmgt/media_getid.3volmgt
-file path=usr/share/man/man3volmgt/media_setattr.3volmgt
 file path=usr/share/man/man3volmgt/volmgt_acquire.3volmgt
 file path=usr/share/man/man3volmgt/volmgt_check.3volmgt
 file path=usr/share/man/man3volmgt/volmgt_feature_enabled.3volmgt
@@ -23,5 +25,8 @@ file path=usr/share/man/man3volmgt/volmgt_ownspath.3volmgt
 file path=usr/share/man/man3volmgt/volmgt_release.3volmgt
 file path=usr/share/man/man3volmgt/volmgt_root.3volmgt
 file path=usr/share/man/man3volmgt/volmgt_running.3volmgt
-file path=usr/share/man/man3volmgt/volmgt_symdev.3volmgt
 file path=usr/share/man/man3volmgt/volmgt_symname.3volmgt
+link path=usr/share/man/man3volmgt/media_setattr.3volmgt \
+    target=media_getattr.3volmgt
+link path=usr/share/man/man3volmgt/volmgt_symdev.3volmgt \
+    target=volmgt_symname.3volmgt

@@ -47,7 +47,7 @@ $(ROOT_HAL_CONF) :=	FILEMODE = 644
 
 all: $(SUBDIRS) $(HAL_CONF)
 
-clean: $(SUBDIRS)
+clean clobber: $(SUBDIRS)
 
 install: $(SUBDIRS) $(ROOT_HAL_CONF)
 

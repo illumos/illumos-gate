@@ -1,22 +1,45 @@
 '\" te
 .\" Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
 .\" Portions Copyright (c) 2003, Sun Microsystems, Inc.  All Rights Reserved
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
+.\" Portions Copyright 2013 DEY Storage Systems, Inc.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for
+.\" permission to reproduce portions of its copyrighted documentation.
+.\" Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
-.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group,
+.\" have given us permission to reprint portions of their documentation. In
+.\" the following statement, the phrase "this text" refers to portions of the
+.\" system documentation. Portions of this text are reprinted and reproduced
+.\" in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1,
+.\" 2004 Edition, Standard for Information Technology -- Portable Operating
+.\" System Interface (POSIX), The Open Group Base Specifications Issue 6,
+.\" Copyright (C) 2001-2004 by the Institute of Electrical and Electronics
+.\" Engineers, Inc and The Open Group. In the event of any discrepancy between
+.\" these versions and the original IEEE and The Open Group Standard, the
+.\" original IEEE and The Open Group Standard is the referee document. The
+.\" original Standard can be obtained online at
+.\" http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LOCALEDEF 1 "Oct 11, 2004"
+.\" The contents of this file are subject to the terms of the Common
+.\" Development and Distribution License (the "License").  You may not use
+.\" this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or
+.\" http://www.opensolaris.org/os/licensing.  See the License for the specific
+.\" language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and
+.\" include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable,
+.\" add the following below this CDDL HEADER, with the fields enclosed by
+.\" brackets "[]" replaced with your own identifying information:
+.\" Portions Copyright [yyyy] [name of copyright owner]
+.TH LOCALEDEF 1 "Aug 24, 2013"
 .SH NAME
 localedef \- define locale environment
 .SH SYNOPSIS
 .LP
 .nf
-\fBlocaledef\fR [\fB-c\fR] [\fB-C\fR \fIcompiler_options\fR] [\fB-f\fR \fIcharmap\fR]
-     [\fB-i\fR \fIsourcefile\fR] [\fB-L\fR \fIlinker_options\fR] [\fB-m\fR \fImodel\fR]
-     [\fB-u\fR \fIcode_set_name\fR] [\fB-W\fR cc, \fIarg\fR] [\fB-x\fR \fIextensions_file\fR] \fIlocalename\fR
+\fBlocaledef\fR [\fB-c\fR] [\fB-v\fR] [\fB-U\fR\] [\fB-f\fR \fIcharmap\fR] 
+     [\fB-w\fR \fIwidthfile\fR] [\fB-i\fR \fIsourcefile\fR] 
+     [\fB-u\fR \fIcode_set_name\fR] \fIlocalename\fR
 .fi
 
 .SH DESCRIPTION
@@ -107,14 +130,24 @@ Creates permanent output even if warning messages have been issued.
 .sp
 .ne 2
 .na
-\fB\fB-C\fR \fIcompiler_options\fR\fR
+\fB\fB-v\fR\fR
 .ad
 .RS 23n
-Passes the \fIcompiler_options\fR to the C compiler (\fBcc\fR). If more than
-one option is specified, then the options must be enclosed in quotes
-(\fB"\|"\fR).
+Emit verbose debugging output on standard output.
+.RE
+
 .sp
-This is an old option. Use the \fB-W\fR \fBcc\fR,\fIarg\fR option instead.
+.ne 2
+.na
+\fB\fB-U\fR\fR
+.ad
+.RS 23n
+Ignore the presence of character symbols that have no maching character
+definition.  This facilitates the use of a common locale definition file
+to be used across multiple encodings, even when some symbols are not
+present in a given encoding.
+.sp
+Support for this option is an illumos extension.
 .RE
 
 .sp
@@ -133,41 +166,26 @@ present, the default character mapping will be used.
 .sp
 .ne 2
 .na
+\fB\fB-w\fR \fIwidthfile\fR\fR
+.ad
+.RS 23n
+The path name of the file containing character screen width definitions.
+If not supplied, then default screen widths will be assumed, which will
+generally not account for East Asian encodings requiring more than a single
+character cell to display, nor for combining or accent marks that occupy
+no additional screen width.
+.sp
+The support for width files is an illumos extension.
+.RE
+
+.sp
+.ne 2
+.na
 \fB\fB-i\fR \fIsourcefile\fR\fR
 .ad
 .RS 23n
 The path name of a file containing the source definitions. If this option is
 not present, source definitions will be read from standard input.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-L\fR \fIlinker_options\fR\fR
-.ad
-.RS 23n
-Passes the \fIlinker_options\fR to the C compiler (\fBcc\fR) that follows the C
-source filename. If more than one option is specified, then the options must be
-enclosed in quotes (\fB"\|"\fR).
-.sp
-This is an old option. Use the \fB-W\fR \fBcc\fR,\fIarg\fR option instead.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-m\fR \fImodel\fR\fR
-.ad
-.RS 23n
-Specifies whether \fBlocaledef\fR will generate a 64-bit or a 32-bit locale
-object.
-.sp
-Specify \fImodel\fR as \fBilp32\fR to generate a 32-bit locale object. Specify
-\fBlp64\fR to generate a 64-bit locale object. If the \fB-m\fR option is not
-specified, \fBlocaledef\fR generates a 32-bit locale object. And if no other
-options than \fB-c\fR, \fB-f\fR, and \fB-i\fR options are specified and if the
-system running \fBlocaledef\fR supports the 64-bit environment, \fBlocaledef\fR
-additionally generates a 64-bit locale object.
 .RE
 
 .sp
@@ -179,30 +197,6 @@ additionally generates a 64-bit locale object.
 Specifies the name of a codeset used as the target mapping of character symbols
 and collating element symbols whose encoding values are defined in terms of the
 ISO/IEC 10646-1: 2000 standard position constant values. See NOTES.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-W\fR \fBcc\fR,\fIarg\fR\fR
-.ad
-.RS 23n
-Passes \fIarg\fR options to the C compiler. Each argument must be separated
-from the preceding by only a comma. A comma can be part of an argument by
-escaping it withan immediately preceding backslash character; the backslash is
-removed from the resulting argument.
-.sp
-Use this option instead of the \fB-C\fR and \fB-L\fR options.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-x\fR \fIextensions_file\fR\fR
-.ad
-.RS 23n
-Specifies the name of an extension file where various \fBlocaledef\fR options
-are listed. See \fBlocale\fR(5).
 .RE
 
 .SH OPERANDS
@@ -226,78 +220,11 @@ belonging to the same locale can be processed.)
 .SH OUTPUT
 .sp
 .LP
-\fBlocaledef\fR creates a temporary C source file that represents the locale's
-data. \fBlocaledef\fR then calls the C compiler to compile this C source file
-into a shared object.
+\fBlocaledef\fR creates a directory of files that represents the locale's
+data. The contants of this directory should generally be copied into the
+appropriate subdirectory of /usr/lib/locale in order the definitions to
+be visible to programs linked with libc.
 .sp
-.LP
-If the \fB-m\fR \fBilp32\fR option is specified, \fBlocaledef\fR calls the C
-compiler for generating 32-bit objects and generates a 32-bit locale object. If
-the \fB-m\fR \fBlp64\fR option is specified, \fBlocaledef\fR calls the C
-compiler for generating 64-bit objects and generates a 64-bit locale object.
-.sp
-.LP
-If the \fB-m\fR option is not specified, \fBlocaledef\fR calls the C compiler
-for generating 32-bit objects and generates a 32-bit locale object. If no other
-options than \fB-c\fR, \fB-f\fR, and \fB-i\fR options are specified and if the
-system running \fBlocaledef\fR supports the 64-bit environment, \fBlocaledef\fR
-additionally calls the C compiler for generating 64-bit objects and generates a
-64-bit locale object.
-.sp
-.LP
-If no option to the C compiler is explicitly specified using the \fB-W\fR,
-\fB-C\fR, or \fB-L\fR options, \fBlocaledef\fR calls the C compiler with
-appropriate C compiler options to generate a locale object or objects.
-.sp
-.LP
-If the \fB-m\fR \fBilp32\fR option is specified, \fBlocaledef\fR generates a
-32-bit locale object named:
-.sp
-.LP
-\fIlocalename\fR.so.\fIversion_number\fR
-.sp
-.LP
-If the \fB-m\fR \fBlp64\fR option is specified, \fBlocaledef\fR generates a
-64-bit locale object named:
-.sp
-.LP
-\fIlocalename\fR.so.\fIversion_number\fR
-.sp
-.LP
-If the \fB-m\fR option is not specified, \fBlocaledef\fR generates a 32-bit
-locale object named:
-.sp
-.LP
-\fIlocalename\fR.so.\fIversion_number\fR
-.sp
-.LP
-and, if appropriate, generates a 64-bit locale object named:
-.sp
-.LP
-\fI64-bit_architecture_name\fR/\fIlocalename\fR.so.\fIversion_number\fR
-.sp
-.LP
-The shared object for the 32-bit environment must be moved to:
-.sp
-.LP
-\fB/usr/lib/locale/\fR\fIlocalename\fR\fB/\fR\fIlocalename\fR\fB\&.so.\fR\fIver
-sion_number\fR
-.sp
-.LP
-The shared object for the 64-bit environment on SPARC must be moved to:
-.sp
-.LP
-\fB/usr/lib/locale/\fR\fIlocalename\fR\fB/sparcv9/\fR\fIlocalename\fR\fB\&.so.\fR\fIversion_number\fR
-.sp
-.LP
-The shared object for the 64-bit environment on AMD64 must be moved to:
-.sp
-.LP
-\fB/usr/lib/locale/\fIlocalename\fR/amd64/\fIlocalename\fR\&.so.\fIversion_number\fR\fR
-.sp
-.LP
-\fBlocaledef\fR also generates a text file named \fIlocalename\fR that is used
-for information only.
 .SH ENVIRONMENT VARIABLES
 .sp
 .LP
@@ -340,15 +267,6 @@ created.
 .sp
 .ne 2
 .na
-\fB\fB3\fR\fR
-.ad
-.RS 6n
-The capability to create new locales is not supported by the implementation.
-.RE
-
-.sp
-.ne 2
-.na
 \fB\fB>3\fR\fR
 .ad
 .RS 6n
@@ -359,58 +277,15 @@ Warnings or errors occurred and no output was created.
 .LP
 If an error is detected, no permanent output will be created.
 .SH FILES
-.sp
-.ne 2
-.na
-\fB\fB/usr/lib/localedef/extensions/generic_eucbc.x\fR\fR
-.ad
-.sp .6
-.RS 4n
-Describes what a generic \fBEUC\fR locale uses in the system. This file is used
-by default.
-.RE
 
 .sp
 .ne 2
 .na
-\fB\fB/usr/lib/localedef/extensions/single_byte.x\fR\fR
+\fB\fB/usr/lib/locale/\fIlocalename\fR/
 .ad
 .sp .6
 .RS 4n
-Describes a generic single-byte file used in the system.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/usr/lib/locale/\fIlocalename\fR/\fIlocalename\fR.so.\fIversion_number\fR
-\fR\fR
-.ad
-.sp .6
-.RS 4n
-The shared object for the 32-bit environment.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/usr/lib/locale/\fIlocalename\fR/sparcv9/\fIlocalename\fR.so.\fIversion_n
-umber\fR\fR\fR
-.ad
-.sp .6
-.RS 4n
-The shared object for the 64-bit environment on SPARC.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/usr/lib/locale/\fI<localename>\fR/amd64/\fI<localename>\fR\&.so.\fI<vers
-ion_number>\fR\fR\fR
-.ad
-.sp .6
-.RS 4n
-The shared object for the 64-bit environment on AMD64.
+The directory containing locale data.
 .RE
 
 .SH ATTRIBUTES
@@ -446,7 +321,7 @@ specified. The following conditions will cause warning messages to be issued:
 .el o
 If a symbolic name not found in the \fIcharmap\fR file is used for the
 descriptions of the \fBLC_CTYPE\fR or \fBLC_COLLATE\fR categories (for other
-categories, this will be an error conditions).
+categories, this will be an error condition).
 .RE
 .RS +4
 .TP
@@ -475,7 +350,3 @@ codeset represented by the \fB-u\fR option-argument \fIcode_set_name\fR, the
 When conflicts occur between the charmap encoding values specified for symbolic
 names of characters of the portable character set and the character encoding
 values defined by the US-ASCII, the result is unspecified.
-.sp
-.LP
-If a non-printable character in the charmap has a width specified that is not
-\fB-1\fR, \fBlocaledef\fR generates a warning.

@@ -35,6 +35,7 @@ LFLAGS =	-t
 LDLIBS +=	-ll -ltecla -lnwam -lumem
 YFLAGS +=	-d -b nwamcfg_grammar
 CLEANFILES +=	nwamcfg_lex.c nwamcfg_grammar.tab.c nwamcfg_grammar.tab.h
+CLEANFILES +=	$(PROG).ln
 
 CERRWARN +=	-_gcc=-Wno-switch
 CERRWARN +=	-_gcc=-Wno-uninitialized

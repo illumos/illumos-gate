@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
 #
 
 #
@@ -1153,22 +1154,17 @@ $(sparc_ONLY)file path=platform/sun4v/kernel/misc/$(ARCH64)/platmod group=sys \
 $(sparc_ONLY)file path=platform/sun4v/kernel/misc/$(ARCH64)/vis group=sys \
     mode=0755
 $(sparc_ONLY)file path=platform/sun4v/wanboot group=sys reboot-needed=true
-$(i386_ONLY)file path=usr/share/man/man4/isa.4
 $(sparc_ONLY)file path=usr/share/man/man4/sbus.4
 $(i386_ONLY)file path=usr/share/man/man4/sysbus.4
 $(sparc_ONLY)file path=usr/share/man/man7d/bbc_beep.7d
 $(sparc_ONLY)file path=usr/share/man/man7d/ctsmc.7d
 $(sparc_ONLY)file path=usr/share/man/man7d/dr.7d
-$(sparc_ONLY)file path=usr/share/man/man7d/drmach.7d
 $(sparc_ONLY)file path=usr/share/man/man7d/fd.7d
-file path=usr/share/man/man7d/fdc.7d
 $(sparc_ONLY)file path=usr/share/man/man7d/gpio_87317.7d
 $(sparc_ONLY)file path=usr/share/man/man7d/grbeep.7d
 $(sparc_ONLY)file path=usr/share/man/man7d/mc-opl.7d
 $(sparc_ONLY)file path=usr/share/man/man7d/n2rng.7d
 $(sparc_ONLY)file path=usr/share/man/man7d/ncp.7d
-$(sparc_ONLY)file path=usr/share/man/man7d/ngdr.7d
-$(sparc_ONLY)file path=usr/share/man/man7d/ngdrmach.7d
 $(i386_ONLY)file path=usr/share/man/man7d/npe.7d
 $(sparc_ONLY)file path=usr/share/man/man7d/ntwdt.7d
 $(sparc_ONLY)file path=usr/share/man/man7d/oplmsu.7d
@@ -1318,3 +1314,8 @@ $(sparc_ONLY)link path=platform/sun4u/kernel/unix target=$(ARCH64)/unix
 $(sparc_ONLY)link path=platform/sun4v/kernel/cpu/$(ARCH64)/sun4v \
     target=generic
 $(sparc_ONLY)link path=platform/sun4v/kernel/unix target=$(ARCH64)/unix
+$(i386_ONLY)link path=usr/share/man/man4/isa.4 target=sysbus.4
+$(sparc_ONLY)link path=usr/share/man/man7d/drmach.7d target=dr.7d
+link path=usr/share/man/man7d/fdc.7d target=fd.7d
+$(sparc_ONLY)link path=usr/share/man/man7d/ngdr.7d target=dr.7d
+$(sparc_ONLY)link path=usr/share/man/man7d/ngdrmach.7d target=dr.7d

@@ -23,7 +23,6 @@
 # Copyright 1996, 2000-2003 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # Makefile for logical volume management
 #
@@ -67,6 +66,6 @@ lint:
 	${LINT.c} $(LINTFLAGS) ${SRCS}
 
 clean:
-	${RM} ${OBJS} *.o a.out core
+	${RM} ${OBJS} *.o
 
 include $(SRC)/cmd/Makefile.targ
