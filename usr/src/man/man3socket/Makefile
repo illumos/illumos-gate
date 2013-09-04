@@ -238,7 +238,6 @@ sctp_freepaddrs.3socket		:= LINKSRC = sctp_getpaddrs.3socket
 
 sendmsg.3socket			:= LINKSRC = send.3socket
 sendto.3socket			:= LINKSRC = send.3socket
->>>>>>> FETCH_HEAD
 
 .KEEP_STATE:
 

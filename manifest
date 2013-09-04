@@ -2450,6 +2450,11 @@ d usr/gnu/share/man/man1 0755 root bin
 d usr/gnu/share/man/man3 0755 root bin
 d usr/gnu/share/man/man5 0755 root bin
 d usr/gnu/share/man/man7 0755 root bin
+d usr/has 0755 root bin
+d usr/has/man 0755 root bin
+d usr/has/man/man1has 0755 root bin
+f usr/has/man/man1has/edit.1has 0444 root bin
+f usr/has/man/man1has/vi.1has 0444 root bin
 d usr/include 0755 root bin
 f usr/include/aclutils.h 0644 root bin
 f usr/include/aio.h 0644 root bin
