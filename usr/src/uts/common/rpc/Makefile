@@ -89,6 +89,8 @@ all_h: $(DERIVED_FILES)
 clean:
 	$(RM) $(DERIVED_FILES)
 
+clobber: clean
+
 $(RPCDIRS):
 	$(INS.dir)
 

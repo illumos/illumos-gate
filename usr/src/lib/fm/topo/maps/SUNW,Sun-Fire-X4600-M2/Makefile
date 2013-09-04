@@ -37,4 +37,6 @@ SRCDIR = ../SUNW,Sun-Fire-X4600-M2
 PLATFORM = Sun-Fire-X4600-M2
 TOPOBASE = ../i86pc/i86pc-hc-topology.xml
 
+CLOBBERFILES = $(TOPOFILE)
+
 include ../Makefile.map

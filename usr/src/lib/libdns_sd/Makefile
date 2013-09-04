@@ -21,7 +21,6 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 include ../Makefile.lib
 
@@ -40,7 +39,7 @@ lint	:= 	TARGET = lint
 
 all install: install_h $(SUBDIRS) .WAIT java
 
-clean clobber: $(SUBDIRS)
+clean clobber: $(SUBDIRS) java
 
 ROOTHDRDIR=	$(ROOT)/usr/include
 ROOTHDRS=	$(HDR:%=$(ROOTHDRDIR)/%)

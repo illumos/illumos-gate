@@ -9,7 +9,10 @@
 # at http://www.illumos.org/license/CDDL.
 #
 
+#
 # Copyright 2011, Richard Lowe
+# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+#
 
 file path=usr/share/man/man7/Intro.7
-file path=usr/share/man/man7/intro.7
+link path=usr/share/man/man7/intro.7 target=Intro.7

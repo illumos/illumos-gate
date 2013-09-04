@@ -9,20 +9,23 @@
 # at http://www.illumos.org/license/CDDL.
 #
 
+#
 # Copyright 2011, Richard Lowe
+# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+#
 
-include ../../Makefile.master
+include		$(SRC)/Makefile.master
 
-MANSECT = 	3kvm
+MANSECT= 	3kvm
 
-MANFILES = 	kvm_getu.3kvm		\
+MANFILES= 	kvm_getu.3kvm		\
 	 	kvm_kread.3kvm		\
 	 	kvm_nextproc.3kvm	\
 	 	kvm_nlist.3kvm		\
 	 	kvm_open.3kvm		\
 	 	kvm_read.3kvm
 
-MANSOFILES =	kvm_close.3kvm		\
+MANLINKS=	kvm_close.3kvm		\
 		kvm_getcmd.3kvm		\
 		kvm_getproc.3kvm	\
 		kvm_kwrite.3kvm		\
@@ -31,26 +34,21 @@ MANSOFILES =	kvm_close.3kvm		\
 		kvm_uwrite.3kvm		\
 		kvm_write.3kvm
 
-MANFILES +=	$(MANSOFILES)
+kvm_getcmd.3kvm		:= LINKSRC = kvm_getu.3kvm
 
-kvm_getcmd.3kvm		:= SOSRC = man3kvm/kvm_getu.3kvm
+kvm_kwrite.3kvm		:= LINKSRC = kvm_kread.3kvm
+kvm_uread.3kvm		:= LINKSRC = kvm_kread.3kvm
+kvm_uwrite.3kvm		:= LINKSRC = kvm_kread.3kvm
 
-kvm_kwrite.3kvm		:= SOSRC = man3kvm/kvm_kread.3kvm
-kvm_uread.3kvm		:= SOSRC = man3kvm/kvm_kread.3kvm
-kvm_uwrite.3kvm		:= SOSRC = man3kvm/kvm_kread.3kvm
+kvm_getproc.3kvm	:= LINKSRC = kvm_nextproc.3kvm
+kvm_setproc.3kvm	:= LINKSRC = kvm_nextproc.3kvm
 
-kvm_getproc.3kvm	:= SOSRC = man3kvm/kvm_nextproc.3kvm
-kvm_setproc.3kvm	:= SOSRC = man3kvm/kvm_nextproc.3kvm
+kvm_close.3kvm		:= LINKSRC = kvm_open.3kvm
 
-kvm_close.3kvm		:= SOSRC = man3kvm/kvm_open.3kvm
-
-kvm_write.3kvm		:= SOSRC = man3kvm/kvm_read.3kvm
-
+kvm_write.3kvm		:= LINKSRC = kvm_read.3kvm
 
 .KEEP_STATE:
 
-include ../Makefile.man
+include		$(SRC)/man/Makefile.man
 
-install: $(ROOTMANFILES)
-
-
+install:	$(ROOTMANFILES) $(ROOTMANLINKS)

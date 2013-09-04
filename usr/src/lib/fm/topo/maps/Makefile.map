@@ -73,6 +73,7 @@ clean:
 	$(RM) $(TEMPTOPOFILE)
 
 clobber: clean
+	$(RM) $(CLOBBERFILES)
 
 check: $(CHECKHDRS)
 

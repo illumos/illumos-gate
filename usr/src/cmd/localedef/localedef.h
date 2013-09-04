@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2013 DEY Storage Systmes, Inc.
  */
 
 /*
@@ -97,6 +98,8 @@ void add_subst_symbol(char *);
 void init_ctype(void);
 void add_ctype(int);
 void add_ctype_range(int);
+void add_width(int, int);
+void add_width_range(int, int, int);
 void add_caseconv(int, int);
 void dump_ctype(void);
 

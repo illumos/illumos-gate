@@ -30,9 +30,11 @@ include ../Makefile.cmd
 PROGS= projadd projmod projdel
 USRSBINPROGS= $(PROGS:%=$(ROOTUSRSBIN)/%)
 POFILES= $(PROGS:%=%.po)
+
+# No msg catalog here.
 POFILE=
 
-CLOBBERFILES= $(PROGS)
+CLOBBERFILES += $(PROGS)
 
 .KEEP_STATE:
 
@@ -49,7 +51,7 @@ $(MSGDOMAIN):
 	$(INS.dir)
 
 clobber: clean
-	-$(RM) $(PROG) $(CLOBBERFILES)
+	$(RM) $(PROG) $(CLOBBERFILES)
 
 $(ROOTUSRSBIN)/% : %
 	$(INS.file)

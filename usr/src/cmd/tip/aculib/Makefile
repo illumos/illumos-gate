@@ -40,7 +40,7 @@ $(ACULIB): $(OBJS)
 	$(AR) cr $(ACULIB) $(OBJS)
 
 clean:
-	$(RM) $(ACULIB) $(OBJS) core errs
+	$(RM) $(ACULIB) $(OBJS)
 
 lint:
 	$(LINT.c) $(OBJS:%.o=%.c) $(LDLIBS)

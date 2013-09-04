@@ -59,6 +59,8 @@ $(LIBLINKS):
 		$(RM) $(LIBLINKS)
 		$(SYMLINK) $(DYNLIB) $(LIBLINKS)
 
+CLOBBERFILES += $(LIBLINKS)
+
 # include common library targets
 #
 include		$(SRC)/lib/Makefile.targ

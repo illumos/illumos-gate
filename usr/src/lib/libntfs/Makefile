@@ -46,7 +46,9 @@ GREP=	grep
 
 .KEEP_STATE:
 
-all clean clobber delete install package: $(SUBDIRS)
+all clean delete install package: $(SUBDIRS)
+clobber: $(SUBDIRS)
+	$(RM) $(CLOBBERFILES)
 
 all install: THIRDPARTYLICENSE
 

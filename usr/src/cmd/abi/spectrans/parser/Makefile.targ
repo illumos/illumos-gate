@@ -39,7 +39,7 @@ SRCS	=	$(OBJECTS:%.o=../%.c)
 
 LINTFLAGS +=	-xsuF -errtags=yes
 CLEANFILES +=	$(LINTOUT)
-CLOBBERFILES += $(LINTLIB)
+CLOBBERFILES += $(LINTLIB) $(LIBRARY)
 
 CERRWARN	+= -_gcc=-Wno-parentheses
 CERRWARN	+= -_gcc=-Wno-unused-label

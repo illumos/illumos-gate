@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/service/hal@$(PKGVERS)
@@ -171,11 +172,8 @@ file path=usr/sbin/lshal mode=0555
 file path=usr/share/lib/xml/dtd/fdi.dtd.1
 file path=usr/share/man/man1m/hal-device.1m
 file path=usr/share/man/man1m/hal-fdi-validate.1m
-file path=usr/share/man/man1m/hal-find-by-capability.1m
-file path=usr/share/man/man1m/hal-find-by-property.1m
 file path=usr/share/man/man1m/hal-find.1m
 file path=usr/share/man/man1m/hal-get-property.1m
-file path=usr/share/man/man1m/hal-set-property.1m
 file path=usr/share/man/man1m/hald.1m
 file path=usr/share/man/man4/fdi.4
 file path=usr/share/man/man5/hal.5
@@ -196,3 +194,6 @@ link path=usr/lib/libhal-storage.so target=./libhal-storage.so.1.0.0
 link path=usr/lib/libhal-storage.so.1 target=./libhal-storage.so.1.0.0
 link path=usr/lib/libhal.so target=./libhal.so.1.0.0
 link path=usr/lib/libhal.so.1 target=./libhal.so.1.0.0
+link path=usr/share/man/man1m/hal-find-by-capability.1m target=hal-find.1m
+link path=usr/share/man/man1m/hal-find-by-property.1m target=hal-find.1m
+link path=usr/share/man/man1m/hal-set-property.1m target=hal-get-property.1m

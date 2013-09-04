@@ -49,6 +49,10 @@ FILES =		Config Devconfig Devices Dialcodes	\
 
 CLEANFILES =	$(SRCS:%.c=%.o) common.o
 
+# This Makefile overrides the standard POFILES (*.cat)
+# so we have to augment clobber this ugly way.
+CLOBBERFILES +=	$(SRCS:%.c=%.po) common.po
+
 TXTFILES =	README $(FILES)	\
 		dkbreak.c dkdial.c dkerr.c dkminor.c dtnamer.c	\
 		Cvt Install SetUp Teardown dial.c dial.h getopt.c strpbrk.c

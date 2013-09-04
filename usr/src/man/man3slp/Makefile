@@ -9,13 +9,16 @@
 # at http://www.illumos.org/license/CDDL.
 #
 
+#
 # Copyright 2011, Richard Lowe
+# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+#
 
-include ../../Makefile.master
+include		$(SRC)/Makefile.master
 
-MANSECT = 	3slp
+MANSECT= 	3slp
 
-MANFILES = 	SLPClose.3slp			\
+MANFILES= 	SLPClose.3slp			\
 	 	SLPDelAttrs.3slp		\
 	 	SLPDereg.3slp			\
 	 	SLPEscape.3slp			\
@@ -36,8 +39,6 @@ MANFILES = 	SLPClose.3slp			\
 
 .KEEP_STATE:
 
-include ../Makefile.man
+include		$(SRC)/man/Makefile.man
 
-install: $(ROOTMANFILES)
-
-
+install:	$(ROOTMANFILES)

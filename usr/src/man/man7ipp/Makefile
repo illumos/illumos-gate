@@ -9,13 +9,16 @@
 # at http://www.illumos.org/license/CDDL.
 #
 
+#
 # Copyright 2011, Richard Lowe
+# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+#
 
-include ../../Makefile.master
+include		$(SRC)/Makefile.master
 
-MANSECT = 	7ipp
+MANSECT= 	7ipp
 
-MANFILES = 	dlcosmk.7ipp	\
+MANFILES= 	dlcosmk.7ipp	\
 	 	dscpmk.7ipp	\
 	 	flowacct.7ipp	\
 	 	ipgpc.7ipp	\
@@ -25,8 +28,6 @@ MANFILES = 	dlcosmk.7ipp	\
 
 .KEEP_STATE:
 
-include ../Makefile.man
+include		$(SRC)/man/Makefile.man
 
-install: $(ROOTMANFILES)
-
-
+install:	$(ROOTMANFILES)

@@ -113,7 +113,7 @@ clean:
 	$(RM) $(OBJS) $(L_OBJS)
 
 clobber: clean
-	$(RM) $(LIBPROM) $(LINTLIBPROM) a.out core
+	$(RM) $(LIBPROM) $(LINTLIBPROM)
 
 $(LIBPROM): $(OBJSDIR) .WAIT $(OBJS)
 	$(BUILD.AR) $(OBJS)

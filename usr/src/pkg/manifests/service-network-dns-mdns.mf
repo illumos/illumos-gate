@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/service/network/dns/mdns@$(PKGVERS)
@@ -139,7 +140,6 @@ file path=usr/share/lib/java/javadoc/dnssd/api/stylesheet.css group=other
 file path=usr/share/lib/java/javadoc/dnssd/examples/BrowserApp.jar group=sys
 file path=usr/share/lib/java/javadoc/dnssd/examples/SimpleChat.jar group=sys
 file path=usr/share/man/man1m/dns-sd.1m
-file path=usr/share/man/man3dns_sd/DNSServiceAddRecord.3dns_sd
 file path=usr/share/man/man3dns_sd/DNSServiceBrowse.3dns_sd
 file path=usr/share/man/man3dns_sd/DNSServiceConstructFullName.3dns_sd
 file path=usr/share/man/man3dns_sd/DNSServiceCreateConnection.3dns_sd
@@ -150,20 +150,8 @@ file path=usr/share/man/man3dns_sd/DNSServiceReconfirmRecord.3dns_sd
 file path=usr/share/man/man3dns_sd/DNSServiceRefDeallocate.3dns_sd
 file path=usr/share/man/man3dns_sd/DNSServiceRefSockFD.3dns_sd
 file path=usr/share/man/man3dns_sd/DNSServiceRegister.3dns_sd
-file path=usr/share/man/man3dns_sd/DNSServiceRegisterRecord.3dns_sd
-file path=usr/share/man/man3dns_sd/DNSServiceRemoveRecord.3dns_sd
 file path=usr/share/man/man3dns_sd/DNSServiceResolve.3dns_sd
-file path=usr/share/man/man3dns_sd/DNSServiceUpdateRecord.3dns_sd
-file path=usr/share/man/man3dns_sd/TXTRecordContainsKey.3dns_sd
 file path=usr/share/man/man3dns_sd/TXTRecordCreate.3dns_sd
-file path=usr/share/man/man3dns_sd/TXTRecordDeallocate.3dns_sd
-file path=usr/share/man/man3dns_sd/TXTRecordGetBytesPtr.3dns_sd
-file path=usr/share/man/man3dns_sd/TXTRecordGetCount.3dns_sd
-file path=usr/share/man/man3dns_sd/TXTRecordGetItemAtIndex.3dns_sd
-file path=usr/share/man/man3dns_sd/TXTRecordGetLength.3dns_sd
-file path=usr/share/man/man3dns_sd/TXTRecordGetValuePtr.3dns_sd
-file path=usr/share/man/man3dns_sd/TXTRecordRemoveValue.3dns_sd
-file path=usr/share/man/man3dns_sd/TXTRecordSetValue.3dns_sd
 file path=usr/share/man/man3lib/libdns_sd.3lib
 legacy pkg=SUNWdsdr \
     desc="Root components for Multicast DNS daemon and service discovery support" \
@@ -180,3 +168,29 @@ link path=usr/lib/$(ARCH64)/libdns_sd.so target=libdns_sd.so.1
 link path=usr/lib/$(ARCH64)/libjdns_sd.so target=libjdns_sd.so.1
 link path=usr/lib/libdns_sd.so target=libdns_sd.so.1
 link path=usr/lib/libjdns_sd.so target=libjdns_sd.so.1
+link path=usr/share/man/man3dns_sd/DNSServiceAddRecord.3dns_sd \
+    target=DNSServiceCreateConnection.3dns_sd
+link path=usr/share/man/man3dns_sd/DNSServiceRegisterRecord.3dns_sd \
+    target=DNSServiceCreateConnection.3dns_sd
+link path=usr/share/man/man3dns_sd/DNSServiceRemoveRecord.3dns_sd \
+    target=DNSServiceCreateConnection.3dns_sd
+link path=usr/share/man/man3dns_sd/DNSServiceUpdateRecord.3dns_sd \
+    target=DNSServiceCreateConnection.3dns_sd
+link path=usr/share/man/man3dns_sd/TXTRecordContainsKey.3dns_sd \
+    target=TXTRecordCreate.3dns_sd
+link path=usr/share/man/man3dns_sd/TXTRecordDeallocate.3dns_sd \
+    target=TXTRecordCreate.3dns_sd
+link path=usr/share/man/man3dns_sd/TXTRecordGetBytesPtr.3dns_sd \
+    target=TXTRecordCreate.3dns_sd
+link path=usr/share/man/man3dns_sd/TXTRecordGetCount.3dns_sd \
+    target=TXTRecordCreate.3dns_sd
+link path=usr/share/man/man3dns_sd/TXTRecordGetItemAtIndex.3dns_sd \
+    target=TXTRecordCreate.3dns_sd
+link path=usr/share/man/man3dns_sd/TXTRecordGetLength.3dns_sd \
+    target=TXTRecordCreate.3dns_sd
+link path=usr/share/man/man3dns_sd/TXTRecordGetValuePtr.3dns_sd \
+    target=TXTRecordCreate.3dns_sd
+link path=usr/share/man/man3dns_sd/TXTRecordRemoveValue.3dns_sd \
+    target=TXTRecordCreate.3dns_sd
+link path=usr/share/man/man3dns_sd/TXTRecordSetValue.3dns_sd \
+    target=TXTRecordCreate.3dns_sd

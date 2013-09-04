@@ -52,7 +52,7 @@ HDRS=		../include/byteorder.h \
 YFILE=		getdate.y
 YSRC=		getdate.c
 
-CLOBBERFILES=	$(YSRC) $(GLIB) *.ln
+CLOBBERFILES +=	$(LIBS) $(GLIB)
 
 LOBJS=		rmtlib.o myrcmd.o \
 		$(YSRC:%.c=%.o) \

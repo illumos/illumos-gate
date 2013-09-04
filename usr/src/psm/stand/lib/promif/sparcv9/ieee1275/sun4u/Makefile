@@ -96,7 +96,7 @@ clean:
 	$(RM) $(OBJS) $(L_OBJS)
 
 clobber: clean
-	$(RM) $(LIBPLAT) $(LINTLIBPLAT) a.out core
+	$(RM) $(LIBPLAT) $(LINTLIBPLAT)
 
 $(LIBPLAT): $(OBJSDIR) .WAIT $(OBJS)
 	$(BUILD.AR) $(OBJS)

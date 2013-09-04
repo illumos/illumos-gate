@@ -38,6 +38,8 @@ CPPFLAGS += -xCC
 LINTFLAGS += -XCC  -L$(ADJUNCT_PROTO)/usr/lib
 LDLIBS += -ltspi -luuid
 
+CLOBBERFILES = C.ln $(POFILE) $(POFILES)
+
 .KEEP_STATE:
 
 all : $(PROG)

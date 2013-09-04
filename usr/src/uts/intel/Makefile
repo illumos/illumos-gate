@@ -76,6 +76,7 @@ install_h.prereq	:=	TARGET= install_h
 def all install clean clobber modlist: $(KMODS) $(CLOSED_KMODS) \
 	$(SVVS) $(XMODS) $(CLOSED_XMODS) config
 
+clobber: clobber.targ
 
 #
 # Privilege constants
@@ -88,6 +89,8 @@ PRIVS_C = $(SRC)/uts/common/os/priv_const.c
 
 $(PRIVS_C): $(PRIVS_AWK) $(PRIVS_DEF)
 	$(NAWK) -f $(PRIVS_AWK) < $(PRIVS_DEF) cfile=$@
+
+CLOBBERFILES += $(PRIVS_C)
 
 #
 # Prerequisites

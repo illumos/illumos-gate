@@ -39,6 +39,8 @@ CERRWARN +=	-_gcc=-Wno-uninitialized
 
 LDLIBS	+=	-lresolv -lnsl
 
+CLOBBERFILES +=	$(KLPROG)
+
 .KEEP_STATE:
 
 all: $(PROG) $(KLPROG)
@@ -55,6 +57,6 @@ lint:
 	$(LINT.c) $(CSRCS) $(LDLIBS)
 
 clean:
-	$(RM) $(PROG) $(KLPROG)
+	$(RM) $(OBJS)
 
 include ../../../Makefile.targ

@@ -9,13 +9,16 @@
 # at http://www.illumos.org/license/CDDL.
 #
 
+#
 # Copyright 2011, Richard Lowe
+# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+#
 
-include ../../Makefile.master
+include		$(SRC)/Makefile.master
 
-MANSECT = 	3pam
+MANSECT= 	3pam
 
-MANFILES = 	pam.3pam			\
+MANFILES= 	pam.3pam			\
 	 	pam_acct_mgmt.3pam		\
 	 	pam_authenticate.3pam		\
 	 	pam_chauthtok.3pam		\
@@ -36,26 +39,24 @@ MANFILES = 	pam.3pam			\
 	 	pam_start.3pam			\
 	 	pam_strerror.3pam
 
-MANSOFILES =	pam_close_session.3pam	\
-		pam_end.3pam		\
-		pam_get_data.3pam	\
-		pam_get_item.3pam	\
+MANLINKS=	pam_close_session.3pam		\
+		pam_end.3pam			\
+		pam_get_data.3pam		\
+		pam_get_item.3pam		\
 		pam_sm_close_session.3pam
 
-MANFILES +=	$(MANSOFILES)
+pam_close_session.3pam		:= LINKSRC = pam_open_session.3pam
 
-pam_close_session.3pam		:= SOSRC = man3pam/pam_open_session.3pam
+pam_get_data.3pam		:= LINKSRC = pam_set_data.3pam
 
-pam_get_data.3pam		:= SOSRC = man3pam/pam_set_data.3pam
+pam_get_item.3pam		:= LINKSRC = pam_set_item.3pam
 
-pam_get_item.3pam		:= SOSRC = man3pam/pam_set_item.3pam
+pam_sm_close_session.3pam	:= LINKSRC = pam_sm_open_session.3pam
 
-pam_sm_close_session.3pam	:= SOSRC = man3pam/pam_sm_open_session.3pam
-
-pam_end.3pam			:= SOSRC = man3pam/pam_start.3pam
+pam_end.3pam			:= LINKSRC = pam_start.3pam
 
 .KEEP_STATE:
 
-include ../Makefile.man
+include		$(SRC)/man/Makefile.man
 
-install: $(ROOTMANFILES)
+install:	$(ROOTMANFILES) $(ROOTMANLINKS)

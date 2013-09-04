@@ -9,46 +9,49 @@
 # at http://www.illumos.org/license/CDDL.
 #
 
+#
 # Copyright 2011, Richard Lowe
+# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+#
 
-include ../../Makefile.master
+include		$(SRC)/Makefile.master
 
-MANSECT = 	7m
+MANSECT= 	7m
 
-COMMON_MANFILES = 	bufmod.7m	\
-		 	connld.7m	\
-	 	 	ldterm.7m	\
-	 	 	pckt.7m		\
-	 	 	pfmod.7m	\
-	 	 	pipemod.7m	\
-	 	 	ptem.7m		\
-	 	 	sppptun.7m	\
-	 	 	timod.7m	\
-	 	 	tirdwr.7m	\
-	 	 	ttcompat.7m	\
-	 	 	usb_ah.7m	\
-	 	 	usbkbm.7m	\
-	 	 	usbms.7m	\
-	 	 	vuidmice.7m
+_MANFILES = 	bufmod.7m	\
+		connld.7m	\
+		ldterm.7m	\
+		pckt.7m		\
+		pfmod.7m	\
+		pipemod.7m	\
+		ptem.7m		\
+		sppptun.7m	\
+		timod.7m	\
+		tirdwr.7m	\
+		ttcompat.7m	\
+		usb_ah.7m	\
+		usbkbm.7m	\
+		usbms.7m	\
+		vuidmice.7m
 
 sparc_MANFILES=	kb.7m
 
-MANSOFILES =	vuid2ps2.7m	\
+MANLINKS=	vuid2ps2.7m	\
 		vuid3ps2.7m	\
 		vuidm3p.7m	\
 		vuidm4p.7m	\
 		vuidm5p.7m
 
-MANFILES =	$(COMMON_MANFILES) $($(MACH)_MANFILES) $(MANSOFILES)
+MANFILES=	$(_MANFILES) $($(MACH)_MANFILES)
 
-vuid2ps2.7m	:= SOSRC = man7m/vuidmice.7m
-vuid3ps2.7m	:= SOSRC = man7m/vuidmice.7m
-vuidm3p.7m	:= SOSRC = man7m/vuidmice.7m
-vuidm4p.7m	:= SOSRC = man7m/vuidmice.7m
-vuidm5p.7m	:= SOSRC = man7m/vuidmice.7m
+vuid2ps2.7m	:= LINKSRC = vuidmice.7m
+vuid3ps2.7m	:= LINKSRC = vuidmice.7m
+vuidm3p.7m	:= LINKSRC = vuidmice.7m
+vuidm4p.7m	:= LINKSRC = vuidmice.7m
+vuidm5p.7m	:= LINKSRC = vuidmice.7m
 
 .KEEP_STATE:
 
-include ../Makefile.man
+include		$(SRC)/man/Makefile.man
 
-install: $(ROOTMANFILES)
+install:	$(ROOTMANFILES) $(ROOTMANLINKS)

@@ -49,7 +49,9 @@ CP=	cp
 
 .KEEP_STATE:
 
-all lint clean clobber delete install package: $(SUBDIRS)
+all lint clean delete install package: $(SUBDIRS)
+clobber: $(SUBDIRS)
+	$(RM) $(POFILE) $(POFILES)
 
 $(SUBDIRS):	FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
@@ -69,5 +71,3 @@ $(POFILES):
 	$(RM) messages.po
 
 FRC:
-
-include	../../Makefile.targ

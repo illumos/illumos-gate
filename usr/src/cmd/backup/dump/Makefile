@@ -59,7 +59,7 @@ HEADERS=	../../../head/protocols/dumprestore.h \
 	../include/memutils.h \
 	../include/rmt.h dump.h dumpusg.h
 
-CLOBBERFILES=	$(PRODUCT) $(DEBUGPRODUCTS) dumpdates *.ln $(POFILES)
+CLOBBERFILES +=	$(PRODUCT) $(DEBUGPRODUCTS) dumpdates
 
 LOCAL=		.
 GENERAL=	../include

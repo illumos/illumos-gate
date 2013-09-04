@@ -52,6 +52,8 @@ ROOTVARPM = $(PMLOG:%=$(VARPMD)/%)
 
 FILEMODE= 0644
 
+CLOBBERFILES += $(PMLOG)
+
 $(ETCSAFD)/% : %
 	$(INS.file)
 

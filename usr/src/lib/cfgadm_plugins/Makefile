@@ -46,11 +46,11 @@ _msg:=		TARGET= _msg
 
 .KEEP_STATE:
 
-all clean clobber lint: $(SUBDIRS)
+all clean lint: $(SUBDIRS)
 
 install: all $(SUBDIRS)
 
-_msg: $(MSGSUBDIRS)
+_msg clobber: $(MSGSUBDIRS)
 
 $(ALL_SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)

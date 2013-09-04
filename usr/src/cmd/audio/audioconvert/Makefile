@@ -23,8 +23,6 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Makefile for cmd/audio/audioconvert
 
 PROG= audioconvert
@@ -58,8 +56,9 @@ $(PROG):	$(OBJS)
 		$(POST_PROCESS)
 
 clean:
+	$(RM) $(OBJS)
 
-clobber:
+clobber: clean
 	$(RM) $(PROG) $(CLOBBERFILES)
 
 lint:

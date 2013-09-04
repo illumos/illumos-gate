@@ -23,7 +23,6 @@
 # Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # Makefile for logical volume management
 #
@@ -85,10 +84,10 @@ lint:
 	${LINT.c} $(LINTFLAGS) ${LINTSRCS}
 
 clean:
-	${RM} ${OBJS} ${DERIVED_FILES} *.o a.out core metad.x
+	${RM} ${OBJS} ${DERIVED_FILES} *.o
 
 clobber: clean
-	${RM} $(PROG)
+	$(RM) $(PROG) $(CLOBBERFILES)
 
 metad_svc.c: $(SRC)/head/metad.x
 	$(CP) $(SRC)/head/metad.x .

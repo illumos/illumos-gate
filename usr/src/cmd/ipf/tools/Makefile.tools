@@ -22,6 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
 # Copyright (c) 2012, Joyent Inc. All rights reserved.
 #
 
@@ -45,7 +46,7 @@ IPFTEST_OBJS=	ipftest.o ipfzone.o \
 		ip_pool.o radix.o
 
 OBJS=		$(IPF_OBJS) $(IPFS_OBJS) $(IPFSTAT_OBJS) \
-		$(IPMON_OBJS) $(IPNAT_OBJS) $(IPFTEST_OBJS)
+		$(IPMON_OBJS) $(IPNAT_OBJS) $(IPPOOL_OBJS) $(IPFTEST_OBJS)
 
 OBJSL=		$(IPF_OBJS) $(IPFS_OBJS) $(IPFSTAT_OBJS) \
 		$(IPMON_OBJS) $(IPNAT_OBJS)
@@ -71,6 +72,7 @@ ipnat		:=	LDLIBS += -lsocket -lnsl -lkvm -lelf
 ippool		:=	LDLIBS += -lsocket -lnsl -lkvm -lelf
 
 CLEANFILES	+= $(OBJS)
+CLOBBERFILES	+= $(IPFPROG)
 
 ROOTIPF=	$(ROOTLIB)/ipf
 ROOTIPF32=	$(ROOTIPF)/$(MACH32)
@@ -81,6 +83,8 @@ ROOTIPFPROG64=	$(IPFPROG:%=$(ROOTIPF64)/%)
 
 ROOTIPFLINKS=		$(IPFPROG:%=$(ROOTIPF)/%)
 ROOTUSRSBINLINKS=	$(PROG:%=$(ROOTUSRSBIN)/%)
+
+all:
 
 $(ROOTIPF32):
 	$(INS.dir)
@@ -120,6 +124,9 @@ ipf_y.o: ../ipf_y.c $(COMMONIPF)/netinet/ip_fil.h $(COMMONIPF)/ipf.h \
 	sed -e 's/yy/ipf_yy/g' -e 's/y.tab.h/ipf_y.h/' \
 	   ipf.tab.h > ../ipf_y.h
 
+CLEANFILES += ipf.tab.c ipf.tab.h
+CLEANFILES += ../ipf_y.c ../ipf_y.h
+
 ipf_l.o: ../ipf_l.c $(COMMONIPF)/netinet/ip_fil.h $(COMMONIPF)/ipf.h  \
 	 ../ipf_y.h ../ipf_l.h
 	$(COMPILE.c) ../ipf_l.c -o $@
@@ -130,6 +137,9 @@ ipf_l.o: ../ipf_l.c $(COMMONIPF)/netinet/ip_fil.h $(COMMONIPF)/ipf.h  \
 
 ../ipf_l.h: ../lexer.h
 	sed -e 's/yy/ipf_yy/g' ../lexer.h > $@
+
+CLEANFILES += ../ipf_l.c ../ipf_l.h
+
 
 ipfs:	$(IPFS_OBJS)
 	$(LINK.c) -o ipfs $(IPFS_OBJS) $(LDLIBS)
@@ -155,6 +165,9 @@ ipmon_y.o: ../ipmon_y.c $(COMMONIPF)/ipmon.h \
 	sed -e 's/yy/ipmon_yy/g' -e 's/y.tab.h/ipmon_y.h/' \
 	   ipmon.tab.h > ../ipmon_y.h
 
+CLEANFILES += ipmon.tab.c ipmon.tab.h
+CLEANFILES += ../ipmon_y.c ../ipmon_y.h
+
 ipmon_l.o: ../ipmon_l.c $(COMMONIPF)/ipmon.h ../ipmon_y.h ../ipmon_l.h
 	$(COMPILE.c) ../ipmon_l.c -o $@
 
@@ -164,6 +177,8 @@ ipmon_l.o: ../ipmon_l.c $(COMMONIPF)/ipmon.h ../ipmon_y.h ../ipmon_l.h
 
 ../ipmon_l.h: ../lexer.h
 	sed -e 's/yy/ipmon_yy/g' ../lexer.h > $@
+
+CLEANFILES += ../ipmon_l.c ../ipmon_l.h
 
 ipnat:	$(IPNAT_OBJS) $(LIBIPF) $(MAPFILE.NGB)
 	$(LINK.c) -o ipnat $(IPNAT_OBJS) $(LDLIBS)
@@ -181,6 +196,9 @@ ipnat_y.o: ../ipnat_y.c $(COMMONIPF)/netinet/ip_nat.h \
 	sed -e 's/yy/ipnat_yy/g' -e 's/y.tab.h/ipnat_y.h/' \
 	   ipnat.tab.h > ../ipnat_y.h
 
+CLEANFILES += ipnat.tab.c ipnat.tab.h
+CLEANFILES += ../ipnat_y.c ../ipnat_y.h
+
 ipnat_l.o: ../ipnat_l.c $(COMMONIPF)/netinet/ip_nat.h ../ipnat_l.h
 	$(COMPILE.c) ../ipnat_l.c -o $@
 
@@ -190,6 +208,8 @@ ipnat_l.o: ../ipnat_l.c $(COMMONIPF)/netinet/ip_nat.h ../ipnat_l.h
 
 ../ipnat_l.h: ../lexer.h
 	sed -e 's/yy/ipnat_yy/g' ../lexer.h > $@
+
+CLEANFILES += ../ipnat_l.c ../ipnat_l.h
 
 ippool:	$(IPPOOL_OBJS) $(LIBIPF) $(MAPFILE.NGB)
 	$(LINK.c) -o ippool $(IPPOOL_OBJS) $(LDLIBS)
@@ -207,6 +227,9 @@ ippool_y.o: ../ippool_y.c $(COMMONIPF)/netinet/ip_pool.h \
 	sed -e 's/yy/ippool_yy/g' -e 's/y.tab.h/ippool_y.h/' \
 	   ippool.tab.h > ../ippool_y.h
 
+CLEANFILES += ippool.tab.c ippool.tab.h
+CLEANFILES += ../ippool_y.c ../ippool_y.h
+
 ippool_l.o: ../ippool_l.c $(COMMONIPF)/netinet/ip_pool.h ../ippool_l.h
 	$(COMPILE.c) ../ippool_l.c -o $@
 
@@ -216,6 +239,8 @@ ippool_l.o: ../ippool_l.c $(COMMONIPF)/netinet/ip_pool.h ../ippool_l.h
 
 ../ippool_l.h: ../lexer.h
 	sed -e 's/yy/ippool_yy/g' ../lexer.h > $@
+
+CLEANFILES += ../ippool_l.c ../ippool_l.h
 
 ipftest:	$(IPFTEST_OBJS) $(LIBIPF) $(MAPFILE.NGB)
 	$(LINK.c) $(ZIGNORE) -o ipftest $(IPFTEST_OBJS) $(LDLIBS)  

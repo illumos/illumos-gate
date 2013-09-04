@@ -80,7 +80,10 @@ POFILE = ptools.po
 
 .PARALLEL: $(SUBDIRS)
 
-all install clean clobber lint: $(SUBDIRS)
+all install clean lint: $(SUBDIRS)
+clobber: $(SUBDIRS) clobber_local
+clobber_local:
+	$(RM) $(CLOBBERFILES)
 
 $(NEW_SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) PTOOL_TYPE=NEW -f ../Makefile.ptool $(TARGET)

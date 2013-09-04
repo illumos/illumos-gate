@@ -23,7 +23,6 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # Makefile definitions for volume management
 #
@@ -55,13 +54,10 @@ _msg :=		TARGET= catalog
 
 .KEEP_STATE:
 
-all install cstyle lint: $(SUBDIRS)
-
-clean: $(SUBDIRS)
-	$(RM) $(POFILES)
+all install clean cstyle lint: $(SUBDIRS)
 
 clobber: $(SUBDIRS)
-	$(RM) $(POFILE)
+	$(RM) $(CLOBBERFILES)
 
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)

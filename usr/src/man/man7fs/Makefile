@@ -11,15 +11,15 @@
 
 #
 # Copyright 2011, Richard Lowe
-# Copyright 2011 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2012 Joyent, Inc. All rights reserved.
 #
 
-include ../../Makefile.master
+include		$(SRC)/Makefile.master
 
-MANSECT = 	7fs
+MANSECT= 	7fs
 
-MANFILES = 	ctfs.7fs	\
+MANFILES= 	ctfs.7fs	\
 	 	dcfs.7fs	\
 	 	dev.7fs		\
 	 	devfs.7fs	\
@@ -36,18 +36,16 @@ MANFILES = 	ctfs.7fs	\
 	 	udfs.7fs	\
 	 	ufs.7fs
 
-MANSOFILES =	stderr.7fs	\
+MANLINKS=	stderr.7fs	\
 		stdin.7fs	\
 		stdout.7fs
 
-MANFILES +=	$(MANSOFILES)
-
-stderr.7fs	:= SOSRC = man7fs/fd.7fs
-stdin.7fs	:= SOSRC = man7fs/fd.7fs
-stdout.7fs	:= SOSRC = man7fs/fd.7fs
+stderr.7fs	:= LINKSRC = fd.7fs
+stdin.7fs	:= LINKSRC = fd.7fs
+stdout.7fs	:= LINKSRC = fd.7fs
 
 .KEEP_STATE:
 
-include ../Makefile.man
+include		$(SRC)/man/Makefile.man
 
-install: $(ROOTMANFILES)
+install:	$(ROOTMANFILES) $(ROOTMANLINKS)

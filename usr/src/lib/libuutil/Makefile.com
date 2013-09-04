@@ -60,6 +60,7 @@ SRCS =	\
 	../common/uu_strtoint.c
 
 LINTS =		$(OBJECTS:%.o=%.ln)
+CLOBBERFILES += $(LINTS)
 
 SRCDIR =	../common
 $(LINTLIB):=	SRCS = $(SRCDIR)/$(LINTSRC)

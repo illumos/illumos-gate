@@ -134,7 +134,7 @@ install: all $$(ROOTTGTS)
 dmods: install
 
 clean.lint:
-	$(RM) $(LINTFILES)
+	$(RM) $(LINTFILES) $(MODSRCS:.c=.ln)
 
 clean:
 	$(RM) $(MODOBJS) $(KMODOBJS) $(CLEANFILES)

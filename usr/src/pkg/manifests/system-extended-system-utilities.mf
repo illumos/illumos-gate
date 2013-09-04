@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/system/extended-system-utilities@$(PKGVERS)
@@ -178,8 +179,6 @@ file path=usr/share/man/man1/dircmp.1
 file path=usr/share/man/man1/dos2unix.1
 file path=usr/share/man/man1/expand.1
 file path=usr/share/man/man1/factor.1
-file path=usr/share/man/man1/hashcheck.1
-file path=usr/share/man/man1/hashmake.1
 file path=usr/share/man/man1/last.1
 file path=usr/share/man/man1/lastcomm.1
 file path=usr/share/man/man1/lgrpinfo.1
@@ -192,7 +191,6 @@ file path=usr/share/man/man1/news.1
 file path=usr/share/man/man1/nl.1
 file path=usr/share/man/man1/pack.1
 file path=usr/share/man/man1/pargs.1
-file path=usr/share/man/man1/pcat.1
 file path=usr/share/man/man1/plgrp.1
 file path=usr/share/man/man1/pmadvise.1
 file path=usr/share/man/man1/pmap.1
@@ -203,16 +201,11 @@ file path=usr/share/man/man1/ptree.1
 file path=usr/share/man/man1/sdiff.1
 file path=usr/share/man/man1/sort.1
 file path=usr/share/man/man1/spell.1
-file path=usr/share/man/man1/spellin.1
 file path=usr/share/man/man1/split.1
 file path=usr/share/man/man1/tcopy.1
-file path=usr/share/man/man1/uncompress.1
-file path=usr/share/man/man1/unexpand.1
 file path=usr/share/man/man1/units.1
 file path=usr/share/man/man1/unix2dos.1
-file path=usr/share/man/man1/unpack.1
 file path=usr/share/man/man1/yes.1
-file path=usr/share/man/man1/zcat.1
 file path=usr/share/man/man1m/adbgen.1m
 file path=usr/share/man/man1m/dmesg.1m
 file path=usr/share/man/man1m/fsck_pcfs.1m
@@ -277,4 +270,12 @@ link path=usr/proc/bin/ptime target=../../bin/ptime
 link path=usr/proc/bin/ptree target=../../bin/ptree
 link path=usr/proc/bin/pwait target=../../bin/pwait
 link path=usr/proc/bin/pwdx target=../../bin/pwdx
+link path=usr/share/man/man1/hashcheck.1 target=spell.1
+link path=usr/share/man/man1/hashmake.1 target=spell.1
+link path=usr/share/man/man1/pcat.1 target=pack.1
+link path=usr/share/man/man1/spellin.1 target=spell.1
+link path=usr/share/man/man1/uncompress.1 target=compress.1
+link path=usr/share/man/man1/unexpand.1 target=expand.1
+link path=usr/share/man/man1/unpack.1 target=pack.1
+link path=usr/share/man/man1/zcat.1 target=compress.1
 depend fmri=runtime/perl-510 type=require

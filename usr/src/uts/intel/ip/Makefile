@@ -103,7 +103,10 @@ all:		$(ALL_DEPS) $(SISCHECK_DEPS)
 
 clean:		$(CLEAN_DEPS) $(SISCLEAN_DEPS)
 
-clobber:	$(CLOBBER_DEPS) $(SISCLEAN_DEPS)
+# Need to clobber all build types due to ipctf.a
+clobber:	$(CLOBBER_DEPS) $(SISCLEAN_DEPS) \
+		clobber.obj32 clobber.obj64 \
+		clobber.debug32 clobber.debug64
 
 lint:		$(LINT_DEPS)
 

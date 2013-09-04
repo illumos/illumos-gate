@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2013 DEY Storage Systems, Inc.
  */
 
 /*
@@ -49,6 +50,8 @@ category_name(void)
 	switch (get_category()) {
 	case T_CHARMAP:
 		return ("CHARMAP");
+	case T_WIDTH:
+		return ("WIDTH");
 	case T_COLLATE:
 		return ("LC_COLLATE");
 	case T_CTYPE:
@@ -201,8 +204,15 @@ static void
 usage(void)
 {
 	(void) fprintf(stderr,
-	    _("Usage: localedef [-v] [-f charmap] [-i locsrc] [-u encoding] "
-	    "[-v] [-U] localename\n"));
+	    _("Usage: localedef [options] localename\n"));
+	(void) fprintf(stderr, ("[options] are:\n"));
+	(void) fprintf(stderr, ("  -c          : ignore warnings\n"));
+	(void) fprintf(stderr, ("  -v          : verbose output\n"));
+	(void) fprintf(stderr, ("  -U          : ignore undefined symbols\n"));
+	(void) fprintf(stderr, ("  -f charmap  : use given charmap file\n"));
+	(void) fprintf(stderr, ("  -u encoding : assume encoding\n"));
+	(void) fprintf(stderr, ("  -w widths   : use screen widths file\n"));
+	(void) fprintf(stderr, ("  -i locsrc   : source file for locale\n"));
 	exit(4);
 }
 
@@ -212,6 +222,7 @@ main(int argc, char **argv)
 	int c;
 	char *lfname = NULL;
 	char *cfname = NULL;
+	char *wfname = NULL;
 	DIR *dir;
 
 	init_charmap();
@@ -227,7 +238,7 @@ main(int argc, char **argv)
 	(void) setlocale(LC_ALL, "");
 	(void) textdomain(TEXT_DOMAIN);
 
-	while ((c = getopt(argc, argv, "i:cf:u:vU")) != -1) {
+	while ((c = getopt(argc, argv, "w:i:cf:u:vU")) != -1) {
 		switch (c) {
 		case 'v':
 			verbose++;
@@ -247,6 +258,9 @@ main(int argc, char **argv)
 		case 'c':
 			warnok++;
 			break;
+		case 'w':
+			wfname = optarg;
+			break;
 		case '?':
 			usage();
 			break;
@@ -265,6 +279,13 @@ main(int argc, char **argv)
 		if (verbose)
 			(void) printf(_("Loading charmap %s.\n"), cfname);
 		reset_scanner(cfname);
+		(void) yyparse();
+	}
+
+	if (wfname) {
+		if (verbose)
+			(void) printf(_("Loading widths %s.\n"), wfname);
+		reset_scanner(wfname);
 		(void) yyparse();
 	}
 

@@ -9,14 +9,17 @@
 # at http://www.illumos.org/license/CDDL.
 #
 
+#
 # Copyright 2011, Richard Lowe
+# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+#
 
-include ../../Makefile.master
+include		$(SRC)/Makefile.master
 
-MANSECT = 	9e
+MANSECT= 	9e
 
-MANFILES = 	Intro.9e		\
-	 	_fini.9e		\
+MANFILES= 	Intro.9e		\
+		_fini.9e		\
 	 	aread.9e		\
 	 	attach.9e		\
 	 	awrite.9e		\
@@ -65,7 +68,7 @@ MANFILES = 	Intro.9e		\
 	 	tran_tgt_probe.9e	\
 	 	write.9e
 
-MANSOFILES =	_info.9e		\
+MANLINKS=	_info.9e		\
 	 	_init.9e		\
 	 	gldm_get_stats.9e	\
 	 	gldm_intr.9e		\
@@ -77,7 +80,7 @@ MANSOFILES =	_info.9e		\
 	 	gldm_set_promiscuous.9e	\
 	 	gldm_start.9e		\
 	 	gldm_stop.9e		\
-	 	intro.9e		\
+		intro.9e		\
 	 	tran_destroy_pkt.9e	\
 	 	tran_pkt_constructor.9e	\
 	 	tran_pkt_destructor.9e	\
@@ -85,38 +88,34 @@ MANSOFILES =	_info.9e		\
 	 	tran_teardown_pkt.9e	\
 	 	tran_unquiesce.9e
 
-MANFILES +=	$(MANSOFILES)
+intro.9e			:= LINKSRC = Intro.9e
 
-intro.9e		:= SOSRC = man9e/Intro.9e
+_info.9e			:= LINKSRC = _fini.9e
+_init.9e			:= LINKSRC = _fini.9e
 
-_info.9e		:= SOSRC = man9e/_fini.9e
-_init.9e		:= SOSRC = man9e/_fini.9e
+gldm_get_stats.9e		:= LINKSRC = gld.9e
+gldm_intr.9e			:= LINKSRC = gld.9e
+gldm_ioctl.9e			:= LINKSRC = gld.9e
+gldm_reset.9e			:= LINKSRC = gld.9e
+gldm_send.9e			:= LINKSRC = gld.9e
+gldm_set_mac_addr.9e		:= LINKSRC = gld.9e
+gldm_set_multicast.9e		:= LINKSRC = gld.9e
+gldm_set_promiscuous.9e		:= LINKSRC = gld.9e
+gldm_start.9e			:= LINKSRC = gld.9e
+gldm_stop.9e			:= LINKSRC = gld.9e
 
-gldm_get_stats.9e	:= SOSRC = man9e/gld.9e
-gldm_intr.9e		:= SOSRC = man9e/gld.9e
-gldm_ioctl.9e		:= SOSRC = man9e/gld.9e
-gldm_reset.9e		:= SOSRC = man9e/gld.9e
-gldm_send.9e		:= SOSRC = man9e/gld.9e
-gldm_set_mac_addr.9e	:= SOSRC = man9e/gld.9e
-gldm_set_multicast.9e	:= SOSRC = man9e/gld.9e
-gldm_set_promiscuous.9e := SOSRC = man9e/gld.9e
-gldm_start.9e		:= SOSRC = man9e/gld.9e
-gldm_stop.9e		:= SOSRC = man9e/gld.9e
+tran_setcap.9e			:= LINKSRC = tran_getcap.9e
 
-tran_setcap.9e		:= SOSRC = man9e/tran_getcap.9e
+tran_destroy_pkt.9e		:= LINKSRC = tran_init_pkt.9e
 
-tran_destroy_pkt.9e	:= SOSRC = man9e/tran_init_pkt.9e
+tran_unquiesce.9e		:= LINKSRC = tran_quiesce.9e
 
-tran_unquiesce.9e	:= SOSRC = man9e/tran_quiesce.9e
-
-tran_pkt_constructor.9e := SOSRC = man9e/tran_setup_pkt.9e
-tran_pkt_destructor.9e	:= SOSRC = man9e/tran_setup_pkt.9e
-tran_teardown_pkt.9e	:= SOSRC = man9e/tran_setup_pkt.9e
+tran_pkt_constructor.9e		:= LINKSRC = tran_setup_pkt.9e
+tran_pkt_destructor.9e		:= LINKSRC = tran_setup_pkt.9e
+tran_teardown_pkt.9e		:= LINKSRC = tran_setup_pkt.9e
 
 .KEEP_STATE:
 
-include ../Makefile.man
+include		$(SRC)/man/Makefile.man
 
-install: $(ROOTMANFILES)
-
-
+install:	$(ROOTMANFILES) $(ROOTMANLINKS)

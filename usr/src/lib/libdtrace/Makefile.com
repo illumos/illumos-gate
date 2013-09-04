@@ -117,8 +117,9 @@ CLEANFILES += ../common/dt_errtags.c ../common/dt_names.c
 CLEANFILES += ../common/sysevent.sed ../common/sysevent.d
 CLEANFILES += ../common/tcp.sed ../common/tcp.d
 CLEANFILES += ../common/udp.sed ../common/udp.d
+CLEANFILES += $(LIBDAUDITOBJS) $(DRTIOBJS)
 
-CLOBBERFILES += drti.o
+CLOBBERFILES += $(LIBDAUDIT) drti.o
 
 CPPFLAGS += -I../common -I.
 CFLAGS += $(CCVERBOSE) $(C_BIGPICFLAGS)

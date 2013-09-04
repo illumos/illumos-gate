@@ -108,6 +108,8 @@ BASEHDRS=	getxby_door.h
 CHECKHDRS=	$(BASEHDRS:%.h=port/gen/%.check)
 HDRS=		$(BASEHDRS)
 
+CLOBBERFILES += THIRDPARTYLICENSE extract-copyright
+
 # install rules for install_h target
 $(ROOTHDRDIR)/%: port/gen/%
 	$(INS.file)
@@ -237,7 +239,10 @@ lint	:=	TARGET= lint
 $(SUBDIRS): FRC
 	@cd $@; pwd; VERSION='$(VERSION)' $(MAKE) $(TARGET)
 
-clean clobber: $(SUBDIRS)
+clean: $(SUBDIRS)
+clobber: $(SUBDIRS) etc clobber_local
+clobber_local:
+	$(RM) $(CLOBBERFILES)
 
 lint: $(SUBDIRS)
 

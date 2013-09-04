@@ -119,7 +119,7 @@ install: all $(DIRS) $(IBINPROG) $(ISBINPROG) $(ROOTETCDEFAULTFILES) \
 	$(ROOTMANIFEST)
 
 clean:
-	$(RM) $(OBJS)
+	$(RM) $(OBJS) $(OUTSIDE_UTIL_OBJS)
 
 lint: lint_SRCS
 

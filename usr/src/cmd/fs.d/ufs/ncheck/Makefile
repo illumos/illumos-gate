@@ -20,8 +20,6 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright (c) 1989,1996,1997 by Sun Microsystems, Inc.
 # All rights reserved.
 #
@@ -36,10 +34,16 @@ include		../Makefile.roll
 OBJS=		$(LIBPROG).o $(ROLLOBJS)
 SRCS=		$(LIBPROG).c $(ROLLSRCS)
 
+# No msg catalog here.
+POFILE=
+
 $(LIBPROG):	$(OBJS)
 		$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
 		$(POST_PROCESS)
 
 CPPFLAGS +=	-D_LARGEFILE64_SOURCE
+
+clean:
+		$(RM) $(LIBPROG).o
 
 lint:		lint_SRCS

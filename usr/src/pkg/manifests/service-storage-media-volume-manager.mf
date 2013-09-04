@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/service/storage/media-volume-manager@$(PKGVERS)
@@ -52,7 +53,6 @@ file path=usr/bin/volrmmount mode=0555
 file path=usr/lib/rmvolmgr mode=0555
 file path=usr/share/man/man1/rmformat.1
 file path=usr/share/man/man1/rmmount.1
-file path=usr/share/man/man1/rmumount.1
 file path=usr/share/man/man1/volcheck.1
 file path=usr/share/man/man1/volrmmount.1
 file path=usr/share/man/man1m/rmmount.1m
@@ -65,3 +65,4 @@ license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 link path=usr/bin/rmumount target=./rmmount
 link path=usr/sbin/rmmount target=../bin/rmmount
+link path=usr/share/man/man1/rmumount.1 target=rmmount.1

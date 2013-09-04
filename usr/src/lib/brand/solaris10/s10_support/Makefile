@@ -34,7 +34,6 @@ include $(SRC)/cmd/Makefile.cmd
 
 # override the install directory
 ROOTBIN =	$(ROOTBRANDDIR)
-CLOBBERFILES =	$(OBJS) $(ROOTPROGS)
 
 UTSBASE =	$(SRC)/uts
 
@@ -47,7 +46,7 @@ LDLIBS +=	-lzonecfg
 install:	all $(ROOTPROGS)
 
 clean:
-		$(RM) $(PROG) $(OBJS)
+		$(RM) $(OBJS)
 
 lint:		lint_PROG
 

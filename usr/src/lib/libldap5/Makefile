@@ -22,8 +22,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 include			../Makefile.lib
 
@@ -45,7 +43,9 @@ POFILES=        generic.po
 
 .KEEP_STATE:
 
-all clean clobber install: $(SUBDIRS)
+all clean install: $(SUBDIRS)
+clobber: $(SUBDIRS)
+	$(RM) $(CLOBBERFILES)
 
 lint:
 	@ $(ECHO) "usr/src/lib/libldap5 is third-party code that"

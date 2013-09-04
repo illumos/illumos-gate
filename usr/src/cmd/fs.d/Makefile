@@ -45,6 +45,8 @@ SUBDIR2= dev fd pcfs nfs hsfs lxproc proc ctfs udfs ufs tmpfs cachefs \
 SUBDIRS= $(SUBDIR1) $(SUBDIR2)
 I18NDIRS= $(SUBDIR2)
 
+CLEANFILES +=	deffs.o df.o ff.o fsck.o fssnapsup.o \
+		mount.o preenlib.o switchout.o umount.o volcopy.o
 
 all:=		TARGET= all
 install:=	TARGET= install
@@ -185,11 +187,10 @@ $(ROOTUSRSBINFF):	$(ROOTUSRSBIN)/ff
 	-$(RM) $@; $(SYMLINK) ./ff $@
 
 clean: $(SUBDIRS) .WAIT clean_local
-
 clean_local:
+	$(RM) $(CLEANFILES)
 
 clobber: $(SUBDIRS) .WAIT clobber_local
-
 clobber_local:	clean_local
 	$(RM) $(PROG) $(ROOTFS_PROG) $(SPPROG) $(MNTTAB) $(DEFAULTFILES) \
 	$(CLOBBERFILES)

@@ -51,6 +51,7 @@ $(PROG): $(OBJS)
 	$(POST_PROCESS)
 
 clean:
+	$(RM) $(OBJS)
 
 lint:	lint_SRCS
 

@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/service/security/gss@$(PKGVERS)
@@ -49,13 +50,13 @@ file path=etc/gss/qop group=sys original_name=SUNWgssc:etc/gss/qop \
 file path=lib/svc/manifest/network/rpc/gss.xml group=sys mode=0444
 file path=usr/share/man/man4/gsscred.conf.4
 file path=usr/share/man/man4/mech.4
-file path=usr/share/man/man4/qop.4
 file path=usr/share/man/man5/gss_auth_rules.5
 legacy pkg=SUNWgssc \
     desc="Generic Security Service Application Program Interface, Version 2 - config" \
     name="GSSAPI CONFIG V2"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
+link path=usr/share/man/man4/qop.4 target=mech.4
 #
 # These dependencies can be removed once there is a mechanism in place
 # to configure gss plugins, rather than delivering a fully populated

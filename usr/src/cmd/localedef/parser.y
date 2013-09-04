@@ -12,6 +12,7 @@
 
 /*
  * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2013 DEY Storage Systems, Inc.
  */
 
 /*
@@ -52,7 +53,6 @@
 %token		T_COPY
 %token		T_CHARMAP
 %token		T_WIDTH
-%token		T_WIDTH_DEFAULT
 %token		T_CTYPE
 %token		T_ISUPPER
 %token		T_ISLOWER
@@ -219,6 +219,8 @@ category	: charmap
 
 
 charmap		: T_CHARMAP T_NL charmap_list T_END T_CHARMAP T_NL
+		| T_WIDTH T_NL width_list T_END T_WIDTH T_NL
+		;
 
 
 charmap_list	: charmap_list charmap_entry
@@ -234,6 +236,46 @@ charmap_entry	: T_SYMBOL T_CHAR
 		| T_SYMBOL T_ELLIPSIS T_SYMBOL T_CHAR
 		{
 			add_charmap_range($1, $3, $4);
+			scan_to_eol();
+		}
+		| T_NL
+		;
+
+width_list	: width_list width_entry
+		| width_entry
+		;
+
+width_entry	: T_CHAR T_NUMBER T_NL
+		{
+			add_width($1, $2);
+			scan_to_eol();
+		}
+		| T_SYMBOL T_NUMBER T_NL
+		{
+			add_charmap_undefined($1);
+			scan_to_eol();
+		}
+		| T_CHAR T_ELLIPSIS T_CHAR T_NUMBER T_NL
+		{
+			add_width_range($1, $3, $4);
+			scan_to_eol();
+		}
+		| T_SYMBOL T_ELLIPSIS T_SYMBOL T_NUMBER T_NL
+		{
+			add_charmap_undefined($1);
+			add_charmap_undefined($3);
+			scan_to_eol();
+		}
+		| T_CHAR T_ELLIPSIS T_SYMBOL T_NUMBER T_NL
+		{
+			add_width($1, $4);
+			add_charmap_undefined($3);
+			scan_to_eol();
+		}
+		| T_SYMBOL T_ELLIPSIS T_CHAR T_NUMBER T_NL
+		{
+			add_width($3, $4);
+			add_charmap_undefined($1);
 			scan_to_eol();
 		}
 		| T_NL

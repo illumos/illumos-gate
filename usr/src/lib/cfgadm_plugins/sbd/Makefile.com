@@ -84,6 +84,8 @@ $(USR_PSM_LIB_CFG_DIR)/%: % $(USR_PSM_LIB_CFG_DIR)
 $(USR_PSM_LIB_CFG_DIR_64)/%: % $(USR_PSM_LIB_CFG_DIR_64)
 	-$(INS.file)
 
+CLOBBERFILES += ../common/ap_err.c sbdgenerr $(GENERR)
+
 # include library targets
 include ../../../Makefile.targ
 

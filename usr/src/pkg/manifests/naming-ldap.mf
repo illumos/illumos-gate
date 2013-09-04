@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/naming/ldap@$(PKGVERS)
@@ -40,7 +41,6 @@ file path=usr/bin/ldapmodify mode=0555
 file path=usr/bin/ldapmodrdn mode=0555
 file path=usr/bin/ldapsearch mode=0555
 file path=usr/share/man/man1/ldap.1
-file path=usr/share/man/man1/ldapadd.1
 file path=usr/share/man/man1/ldapdelete.1
 file path=usr/share/man/man1/ldapmodify.1
 file path=usr/share/man/man1/ldapmodrdn.1
@@ -55,3 +55,4 @@ legacy pkg=SUNWlldap \
 license cr_Sun license=cr_Sun
 license usr/src/cmd/ldap/THIRDPARTYLICENSE \
     license=usr/src/cmd/ldap/THIRDPARTYLICENSE
+link path=usr/share/man/man1/ldapadd.1 target=ldapmodify.1

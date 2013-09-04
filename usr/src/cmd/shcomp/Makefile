@@ -88,6 +88,9 @@ $(PROG):	$(OBJECTS)
 	$(LINK.c) $(OBJECTS) -o $@ $(LDLIBS)
 	$(POST_PROCESS)
 
-clean lint:
+clean:
+	$(RM) $(OBJECTS)
+
+lint:
 
 include ../Makefile.targ

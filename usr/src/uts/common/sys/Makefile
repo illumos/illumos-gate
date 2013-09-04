@@ -1376,12 +1376,13 @@ usb/usbdevs.h: $(USBDEVS_AWK) $(USBDEVS_DATA)
 	$(NAWK) -f $(USBDEVS_AWK) $(USBDEVS_DATA) -H > $@
 
 LVMDERIVED_H:
-	cd $(SRC)/uts/common/sys/lvm; pwd; $(MAKE)
+	cd $(SRC)/uts/common/sys/lvm; pwd; $(MAKE) all_h
 
 clean:
 	$(RM) $(GENHDRS)
 
-clobber:	clean
+clobber: clean
+	cd $(SRC)/uts/common/sys/lvm; pwd; $(MAKE) clobber
 
 check:	$(CHECKHDRS)
 

@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/compatibility/ucb@$(PKGVERS)
@@ -45,7 +46,6 @@ dir path=usr/ucblib
 dir path=usr/ucblib/$(ARCH64)
 file path=etc/mail/Mail.rc original_name=SUNWscp:etc/mail/Mail.rc \
     preserve=true
-file path=usr/share/man/man1b/Mail.1b
 file path=usr/share/man/man1b/basename.1b
 file path=usr/share/man/man1b/biff.1b
 file path=usr/share/man/man1b/chown.1b
@@ -55,7 +55,6 @@ file path=usr/share/man/man1b/echo.1b
 file path=usr/share/man/man1b/exportfs.1b
 file path=usr/share/man/man1b/expr.1b
 file path=usr/share/man/man1b/fastboot.1b
-file path=usr/share/man/man1b/fasthalt.1b
 file path=usr/share/man/man1b/file.1b
 file path=usr/share/man/man1b/from.1b
 file path=usr/share/man/man1b/groups.1b
@@ -71,7 +70,6 @@ file path=usr/share/man/man1b/mail.1b
 file path=usr/share/man/man1b/mkstr.1b
 file path=usr/share/man/man1b/printenv.1b
 file path=usr/share/man/man1b/ps.1b
-file path=usr/share/man/man1b/reset.1b
 file path=usr/share/man/man1b/rusage.1b
 file path=usr/share/man/man1b/shutdown.1b
 file path=usr/share/man/man1b/stty.1b
@@ -199,6 +197,9 @@ link path=etc/pwck target=../usr/sbin/pwck
 link path=etc/termcap target=../usr/share/lib/termcap
 link path=etc/unlink target=../usr/sbin/unlink
 link path=usr/5bin target=./bin
+link path=usr/share/man/man1b/Mail.1b target=mail.1b
+link path=usr/share/man/man1b/fasthalt.1b target=fastboot.1b
+link path=usr/share/man/man1b/reset.1b target=tset.1b
 link path=usr/ucb/Mail target=../bin/mailx
 link path=usr/ucb/arch target=../bin/arch
 link path=usr/ucb/clear target=../bin/clear

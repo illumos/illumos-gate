@@ -9,27 +9,26 @@
 # at http://www.illumos.org/license/CDDL.
 #
 
+#
 # Copyright 2011, Richard Lowe
+# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+#
 
-include ../../Makefile.master
+include		$(SRC)/Makefile.master
 
-MANSECT = 	3mail
+MANSECT= 	3mail
 
-MANFILES =	maillock.3mail
+MANFILES=	maillock.3mail
 
-MANSOFILES =	mailunlock.3mail	\
-			touchlock.3mail
+MANLINKS=	mailunlock.3mail	\
+		touchlock.3mail
 
-MANFILES +=	$(MANSOFILES)
+mailunlock.3mail	:= LINKSRC = maillock.3mail
 
-mailunlock.3mail	:= SOSRC = man3mail/maillock.3mail
-
-touchlock.3mail		:= SOSRC = man3mail/maillock.3mail
+touchlock.3mail		:= LINKSRC = maillock.3mail
 
 .KEEP_STATE:
 
-include ../Makefile.man
+include		$(SRC)/man/Makefile.man
 
-install: $(ROOTMANFILES)
-
-
+install:	$(ROOTMANFILES) $(ROOTMANLINKS)

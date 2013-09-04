@@ -21,7 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/system/file-system/smb@$(PKGVERS)
@@ -95,7 +95,6 @@ file path=usr/lib/smbfs/smbiod-svc mode=0555
 file path=usr/share/man/man1/smbutil.1
 file path=usr/share/man/man1m/mount_smbfs.1m
 file path=usr/share/man/man1m/smbiod.1m
-file path=usr/share/man/man1m/umount_smbfs.1m
 file path=usr/share/man/man4/nsmbrc.4
 file path=usr/share/man/man5/pam_smbfs_login.5
 file path=usr/share/man/man7fs/smbfs.7fs
@@ -118,5 +117,6 @@ license usr/src/lib/libsmbfs/smb/THIRDPARTYLICENSE.microsoft \
 link path=usr/lib/security/$(ARCH64)/pam_smbfs_login.so \
     target=pam_smbfs_login.so.1
 link path=usr/lib/security/pam_smbfs_login.so target=pam_smbfs_login.so.1
+link path=usr/share/man/man1m/umount_smbfs.1m target=mount_smbfs.1m
 # libsmbfs uses iconv_open() which requires this at run-time.
 depend fmri=system/library/iconv/utf-8 type=require

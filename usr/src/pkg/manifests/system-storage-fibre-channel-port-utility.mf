@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
 #
 
 set name=pkg.fmri \
@@ -49,7 +50,6 @@ file path=lib/svc/method/npivconfig mode=0555 variant.opensolaris.zone=global
 file path=lib/svc/method/svc-fcoei mode=0555 variant.opensolaris.zone=global
 file path=lib/svc/method/svc-fcoet mode=0555 variant.opensolaris.zone=global
 file path=usr/sbin/fcinfo mode=0555
-file path=usr/share/man/man1m/fcadm.1m
 file path=usr/share/man/man1m/fcinfo.1m
 hardlink path=usr/sbin/fcadm target=../../usr/sbin/fcinfo
 legacy pkg=SUNWfcprt desc="Utility for Fibre Channel Host Bus Adapters" \
@@ -59,4 +59,5 @@ legacy pkg=SUNWfcprtr \
     name="Fibre Channel HBA Port NPIV utility (root)"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
+link path=usr/share/man/man1m/fcadm.1m target=fcinfo.1m
 depend fmri=service/storage/fibre-channel/fc-fabric type=require

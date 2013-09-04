@@ -75,7 +75,6 @@ def:		$(DEF_DEPS) $(FWOBJ)
 all:		$(ALL_DEPS)
 
 clean:		$(CLEAN_DEPS)
-		$(RM) $(BINDEST)/$(BINCOPY)
 
 clobber:	$(CLOBBER_DEPS)
 
@@ -104,6 +103,8 @@ WRAPOPT		= $(WRAPTYPE:-32=)
 $(FWOBJ):
 	cp $(BINSRC)/$(ORIGIN_SRC) $(BINDEST)/$(BINCOPY)
 	$(ELFWRAP) $(WRAPOPT) -o $@ $(BINDEST)/$(BINCOPY)
+
+CLOBBERFILES += $(BINDEST)/$(BINCOPY)
 
 #
 #	Include common targets.

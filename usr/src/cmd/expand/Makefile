@@ -23,8 +23,6 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # cmd/expand/Makefile 
 #
 
@@ -37,7 +35,7 @@ include		../Makefile.cmd
 POFILES= expand_cmd.po unexpand.po
 POFILE= expand.po
 
-CLEANFILES += expand_cmd.c
+CLOBBERFILES += expand_cmd.c
 
 .KEEP_STATE:
 

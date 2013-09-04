@@ -42,6 +42,8 @@ CERRWARN += -_gcc=-Wno-implicit-function-declaration
 CERRWARN += -_gcc=-Wno-unused-label
 CERRWARN += -_gcc=-Wno-uninitialized
 
+CLOBBERFILES = $(PROG) loadkeys.c
+
 .KEEP_STATE:
 
 .PARALLEL:	$(SUBDIRS)
@@ -74,7 +76,6 @@ clobber:	$(SUBDIRS)
 	$(RM) $(CLOBBERFILES)
 
 clean:	$(SUBDIRS)
-	$(RM) loadkeys.c
 
 lint:
 	$(LINT.c) dumpkeys.c $(LDLIBS)

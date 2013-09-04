@@ -23,8 +23,6 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 include		$(SRC)/Makefile.master
 
@@ -40,11 +38,13 @@ package:=	TARGET= package
 
 .KEEP_STATE:
 
-clean clobber lint package:
-
 all:		gen
 
 install:	$(SUBDIRS)
+
+clean lint package:
+
+clobber:	gen
 
 $(SUBDIRS):	FRC
 		@cd $@; pwd; $(MAKE) $(TARGET)

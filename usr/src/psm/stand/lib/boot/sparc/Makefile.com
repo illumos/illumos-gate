@@ -22,7 +22,6 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # psm/stand/lib/boot/sparc/Makefile.com
 #
@@ -79,7 +78,7 @@ clean:
 	$(RM) $(OBJS) $(L_OBJS)
 
 clobber: clean
-	$(RM) $(LIBBOOT) $(LINTLIBBOOT) a.out core
+	$(RM) $(LIBBOOT) $(LINTLIBBOOT)
 
 $(LIBBOOT): $(OBJSDIR) .WAIT $(OBJS)
 	$(BUILD.AR) $(OBJS)

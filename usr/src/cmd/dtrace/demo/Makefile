@@ -135,14 +135,18 @@ DEMOFILES = \
 
 MKDEMO	= mkdemo
 CLEANFILES += $(DFILES) $(MKDEMO)
+CLOBBERFILES = $(HTMLFILES)
 
 ROOTDEMODIR = $(ROOT)/usr/demo/dtrace
 ROOTDEMOFILES = $(DEMOFILES:%=$(ROOTDEMODIR)/%)
 
 all:	$(DEMOFILES)
 
-clobber clean:
-	-$(RM) $(CLEANFILES)
+clean:
+	$(RM) $(CLEANFILES)
+
+clobber: clean
+	$(RM) $(CLOBBERFILES)
 
 clean.lint install_h lint:
 

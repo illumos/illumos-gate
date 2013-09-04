@@ -20,8 +20,6 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -32,12 +30,15 @@ DCOPY=		dcopy
 ATTMK=		$(LIBPROG)
 
 OTHERINSTALL=	$(ROOTLIBFSTYPE)/$(DCOPY)
-		
+
 include		../../Makefile.fstype
 include		../Makefile.roll
 
 OBJS=		$(LIBPROG).o $(ROLLOBJS)
 SRCS=		$(LIBPROG).c $(ROLLSRCS)
+
+# No msg catalog here.
+POFILE=
 
 CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-D_LARGEFILE64_SOURCE
@@ -45,6 +46,9 @@ CPPFLAGS +=	-D_LARGEFILE64_SOURCE
 $(LIBPROG):	$(OBJS)
 		$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
 		$(POST_PROCESS)
+
+clean:
+		$(RM) $(LIBPROG).o
 
 lint :=		PROG=$(LIBPROG)
 lint:		lint_PROG

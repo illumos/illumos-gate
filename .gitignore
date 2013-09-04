@@ -1,5 +1,6 @@
+<<<<<<< HEAD
 *.o
-.make.state
+.make.state*
 *.po
 *.so
 *.so.1
@@ -13,8 +14,10 @@
 /on-closed-bins.i386.tar.bz2
 /packages
 /proto
+/webrev
 .make.state
 .build.tstamp
+usr/src/ELF-data.*
 usr/src/check-i386.out
 usr/src/cmd/Adm/sun/motd
 usr/src/cmd/Adm/sun/smbpasswd

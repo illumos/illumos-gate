@@ -9,22 +9,23 @@
 # at http://www.illumos.org/license/CDDL.
 #
 
+#
 # Copyright 2011, Richard Lowe
+# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+#
 
-include ../../Makefile.master
+include		$(SRC)/Makefile.master
 
-MANSECT = 	9
+MANSECT= 	9
 
-MANSOFILES =	intro.9 Intro.9
+MANLINKS=	Intro.9		\
+		intro.9
 
-MANFILES +=	$(MANSOFILES)
-
-intro.9 := SOSRC = man9e/Intro.9e
-Intro.9 := SOSRC = man9e/Intro.9e
+Intro.9		:= LINKSRC = ../man9e/Intro.9e
+intro.9		:= LINKSRC = ../man9e/Intro.9e
 
 .KEEP_STATE:
 
-include ../Makefile.man
+include		$(SRC)/man/Makefile.man
 
-install: $(ROOTMANFILES)
-
+install: 	$(ROOTMANLINKS)

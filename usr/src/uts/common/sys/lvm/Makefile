@@ -20,11 +20,11 @@
 # CDDL HEADER END
 #
 #
-# uts/common/sys/lvm/Makefile
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#
+# uts/common/sys/lvm/Makefile
 #
 #       This makefile derive some .h files via rpcgen
 #
@@ -48,9 +48,12 @@ RPCGENFLAGS	+=	-C -M -D_KERNEL -DSYSV
 
 
 def all install lint modlintlib clean.lint:	$(DERIVED_FILES)
+all_h install_h: $(DERIVED_FILES)
 
-clean clobber:
+clean:
 	$(RM) $(DERIVED_FILES)
+
+clobber: clean
 
 md_basic.h:	meta_basic.x
 	$(RPCGEN) $(RPCGENFLAGS) -h meta_basic.x  | \

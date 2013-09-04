@@ -51,6 +51,7 @@ check:	$(PROG).c
 	$(CSTYLE) -pP $(SRCS:%=%)
 
 clean:
+	$(RM) $(OBJS)
 
 lint: lint_SRCS
 

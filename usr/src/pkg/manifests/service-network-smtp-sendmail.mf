@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
 #
 
 set name=pkg.fmri \
@@ -201,13 +202,9 @@ file path=usr/share/man/man1m/makemap.1m
 file path=usr/share/man/man1m/newaliases.1m
 file path=usr/share/man/man1m/sendmail.1m
 file path=usr/share/man/man1m/smrsh.1m
-file path=usr/share/man/man4/addresses.4
 file path=usr/share/man/man4/alias.4
 file path=usr/share/man/man4/aliases.4
-file path=usr/share/man/man4/forward.4
 file path=usr/share/man/man4/sendmail.4
-file path=usr/share/man/man4/sendmail.cf.4
-file path=usr/share/man/man4/submit.cf.4
 legacy pkg=SUNWsndmr desc="Sendmail Configuration Files" \
     name="Sendmail (root)"
 legacy pkg=SUNWsndmu desc="Sendmail Utilities" name="Sendmail (/usr)"
@@ -231,4 +228,8 @@ link path=usr/lib/libmilter.so target=libmilter.so.1
 link path=usr/lib/mail target=../../etc/mail/cf
 link path=usr/sbin/newaliases target=../lib/sendmail
 link path=usr/sbin/sendmail target=../lib/sendmail
+link path=usr/share/man/man4/addresses.4 target=aliases.4
+link path=usr/share/man/man4/forward.4 target=aliases.4
+link path=usr/share/man/man4/sendmail.cf.4 target=sendmail.4
+link path=usr/share/man/man4/submit.cf.4 target=sendmail.4
 depend fmri=runtime/perl-510 type=require

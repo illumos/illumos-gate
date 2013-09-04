@@ -54,17 +54,13 @@ $(USRLIBIPF)/% : %
 
 .KEEP_STATE:
 
-all:		$(SUBDIRS) 
+all clean clobber lint: $(SUBDIRS)
 
-clean clobber lint: $(SUBDIRS)
+install: all $(SUBDIRS) install_local
 
-install:	all $(SUBDIRS) $(USRLIBIPF) \
-		$(USRLIBIPFLICENCE)
+install_local: $(USRLIBIPF) $(USRLIBIPFLICENCE)
 
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(MFLAGS) $(TARGET)
 
-
 FRC:
-
-include ../../Makefile.targ

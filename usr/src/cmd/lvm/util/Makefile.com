@@ -23,7 +23,6 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # Architecture independent makefile for svm utilities
 #
@@ -87,7 +86,7 @@ include ../../Makefile.lvm
 
 ROOTLIBSVM = $(ROOTLIB)/lvm
 
-CLOBBERFILES += $(ROOTFS_PROG)
+CLOBBERFILES += $(ROOTFS_PROG) $(METACLUST)
 
 ROOTUSRSBINPROG = $(PROG:%=$(ROOTUSRSBIN)/%)
 

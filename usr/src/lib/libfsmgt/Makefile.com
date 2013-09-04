@@ -54,6 +54,10 @@ CPPFLAGS +=	-D_REENTRANT -I$(SRC)/lib/libfsmgt/common \
 CERRWARN	+= -_gcc=-Wno-parentheses
 CERRWARN	+= -_gcc=-Wno-uninitialized
 
+CLOBBERFILES	+= $(SRCDIR)/nfs_sec.c
+CLOBBERFILES	+= $(SRCDIR)/replica.c
+CLOBBERFILES	+= $(SRCDIR)/sharetab.c
+
 .KEEP_STATE:
 
 all: $(LIBS)

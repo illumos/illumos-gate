@@ -9,26 +9,27 @@
 # at http://www.illumos.org/license/CDDL.
 #
 
+#
 # Copyright 2011, Richard Lowe
+# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+#
 
-include ../../Makefile.master
+include		$(SRC)/Makefile.master
 
-MANSECT = 	7
+MANSECT= 	7
 
-MANSOFILES =	intro.7
 
-MANFILES = 	FSS.7	\
-	 	Intro.7 \
-	 	cpr.7	\
-	 	ibmf.7  \
-		$(MANSOFILES)
+MANFILES= 	FSS.7	\
+		Intro.7	\
+		cpr.7	\
+		ibmf.7
 
-intro.7 := SOSRC = man7/Intro.7
+MANLINKS=	intro.7
+
+intro.7		:= LINKSRC = Intro.7
 
 .KEEP_STATE:
 
-include ../Makefile.man
+include		$(SRC)/man/Makefile.man
 
-install: $(ROOTMANFILES)
-
-
+install:	$(ROOTMANFILES) $(ROOTMANLINKS)
