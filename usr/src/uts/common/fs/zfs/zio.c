@@ -22,6 +22,7 @@
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
  * Copyright (c) 2011 Nexenta Systems, Inc. All rights reserved.
+ * Copyright (c) 2013 by Saso Kiselkov. All rights reserved.
  */
 
 #include <sys/zfs_context.h>
@@ -228,6 +229,20 @@ zio_buf_alloc(size_t size)
 }
 
 /*
+ * Same as zio_buf_alloc, but won't sleep in case memory cannot be allocated
+ * and will instead return immediately with a failure.
+ */
+void *
+zio_buf_alloc_canfail(size_t size)
+{
+	size_t c = (size - 1) >> SPA_MINBLOCKSHIFT;
+
+	ASSERT(c < SPA_MAXBLOCKSIZE >> SPA_MINBLOCKSHIFT);
+
+	return (kmem_cache_alloc(zio_buf_cache[c], KM_NOSLEEP | KM_NORMALPRI));
+}
+
+/*
  * Use zio_data_buf_alloc to allocate data.  The data will not appear in a
  * crashdump if the kernel panics.  This exists so that we will limit the amount
  * of ZFS data that shows up in a kernel crashdump.  (Thus reducing the amount
@@ -241,6 +256,21 @@ zio_data_buf_alloc(size_t size)
 	ASSERT(c < SPA_MAXBLOCKSIZE >> SPA_MINBLOCKSHIFT);
 
 	return (kmem_cache_alloc(zio_data_buf_cache[c], KM_PUSHPAGE));
+}
+
+/*
+ * Same as zio_data_buf_alloc, but won't sleep in case memory cannot be
+ * allocated and will instead return immediately with a failure.
+ */
+void *
+zio_data_buf_alloc_canfail(size_t size)
+{
+	size_t c = (size - 1) >> SPA_MINBLOCKSHIFT;
+
+	ASSERT(c < SPA_MAXBLOCKSIZE >> SPA_MINBLOCKSHIFT);
+
+	return (kmem_cache_alloc(zio_data_buf_cache[c],
+	    KM_NOSLEEP | KM_NORMALPRI));
 }
 
 void

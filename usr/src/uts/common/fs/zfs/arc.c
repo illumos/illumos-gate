@@ -280,6 +280,7 @@ typedef struct arc_stats {
 	 * not from the spa we're trying to evict from.
 	 */
 	kstat_named_t arcstat_evict_skip;
+	kstat_named_t arcstat_evict_allocfail;
 	kstat_named_t arcstat_evict_l2_cached;
 	kstat_named_t arcstat_evict_l2_eligible;
 	kstat_named_t arcstat_evict_l2_ineligible;
@@ -346,6 +347,7 @@ static arc_stats_t arc_stats = {
 	{ "recycle_miss",		KSTAT_DATA_UINT64 },
 	{ "mutex_miss",			KSTAT_DATA_UINT64 },
 	{ "evict_skip",			KSTAT_DATA_UINT64 },
+	{ "evict_allocfail",		KSTAT_DATA_UINT64 },
 	{ "evict_l2_cached",		KSTAT_DATA_UINT64 },
 	{ "evict_l2_eligible",		KSTAT_DATA_UINT64 },
 	{ "evict_l2_ineligible",	KSTAT_DATA_UINT64 },
@@ -2513,15 +2515,27 @@ arc_get_data_buf(arc_buf_t *buf)
 	 */
 	if (!arc_evict_needed(type)) {
 		if (type == ARC_BUFC_METADATA) {
-			buf->b_data = zio_buf_alloc(size);
-			arc_space_consume(size, ARC_SPACE_DATA);
+			buf->b_data = zio_buf_alloc_canfail(size);
+			if (buf->b_data != NULL) {
+				arc_space_consume(size, ARC_SPACE_DATA);
+				goto out;
+			}
 		} else {
 			ASSERT(type == ARC_BUFC_DATA);
-			buf->b_data = zio_data_buf_alloc(size);
-			ARCSTAT_INCR(arcstat_data_size, size);
-			atomic_add_64(&arc_size, size);
+			buf->b_data = zio_data_buf_alloc_canfail(size);
+			if (buf->b_data != NULL) {
+				ARCSTAT_INCR(arcstat_data_size, size);
+				atomic_add_64(&arc_size, size);
+				goto out;
+			}
 		}
-		goto out;
+
+		/*
+		 * Memory allocation failed, presumably due to excessive
+		 * fragmentation; we'll bump a counter and drop into the ARC
+		 * eviction case.
+		 */
+		ARCSTAT_BUMP(arcstat_evict_allocfail);
 	}
 
 	/*
