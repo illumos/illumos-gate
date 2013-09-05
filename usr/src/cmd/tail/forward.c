@@ -328,25 +328,31 @@ associate(file_info_t *file, boolean_t assoc, port_event_t *ev)
 		/*
 		 * To assure that we cannot possibly drop a FILE_TRUNC event,
 		 * we have two different PORT_SOURCE_FILE associations with the
-		 * port:  one to get either FILE_MODIFIED or FILE_TRUNC events,
-		 * and another to get only FILE_TRUNC events.  This assures that
-		 * we always have an active association for FILE_TRUNC events.
-		 * (Without the second association, there is a window where a
-		 * file truncation could occur after a port_get() but before
-		 * the port_associate() call to re-associate the object --
-		 * resulting in loss of the truncation event.)
+		 * port:  one to get only FILE_MODIFIED events and another to
+		 * get only FILE_TRUNC events.  This assures that we always
+		 * have an active association for FILE_TRUNC events when the
+		 * seek offset is non-zero.  Note that the association order
+		 * _must_ be FILE_TRUNC followed by FILE_MODIFIED:  if a single
+		 * event induces both a FILE_TRUNC and a FILE_MODIFIED (as
+		 * a VE_CREATE vnode event does), we must process the
+		 * FILE_TRUNC before FILE_MODIFIED -- and the order in which
+		 * these are processed will be the association order.  So
+		 * if we see a FILE_TRUNC, we dissociate/reassociate the
+		 * FILE_MODIFIED association.
 		 */
-		if (ev == NULL || (ev->portev_events & FILE_MODIFIED) ||
-		    !(ev->portev_events & (FILE_MODIFIED | FILE_TRUNC))) {
-			(void) port_associate(port, PORT_SOURCE_FILE,
-			    (uintptr_t)&file->fobj[0],
-			    FILE_MODIFIED | FILE_TRUNC, file);
-		}
-
 		if (ev == NULL || (ev->portev_events & FILE_TRUNC) ||
 		    !(ev->portev_events & (FILE_MODIFIED | FILE_TRUNC))) {
 			(void) port_associate(port, PORT_SOURCE_FILE,
-			    (uintptr_t)&file->fobj[1], FILE_TRUNC, file);
+			    (uintptr_t)&file->fobj[0], FILE_TRUNC, file);
+			(void) port_dissociate(port, PORT_SOURCE_FILE,
+			    (uintptr_t)&file->fobj[1]);
+			ev = NULL;
+		}
+
+		if (ev == NULL || (ev->portev_events & FILE_MODIFIED) ||
+		    !(ev->portev_events & (FILE_MODIFIED | FILE_TRUNC))) {
+			(void) port_associate(port, PORT_SOURCE_FILE,
+			    (uintptr_t)&file->fobj[1], FILE_MODIFIED, file);
 		}
 	} else {
 		for (i = 0; i <= 1; i++) {

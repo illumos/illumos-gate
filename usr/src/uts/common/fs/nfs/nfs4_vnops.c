@@ -32,7 +32,7 @@
  */
 
 /*
- * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  */
 
 #include <sys/param.h>
@@ -3716,6 +3716,8 @@ static int
 nfs4_setattr(vnode_t *vp, struct vattr *vap, int flags, cred_t *cr,
     caller_context_t *ct)
 {
+	int error;
+
 	if (vap->va_mask & AT_NOSET)
 		return (EINVAL);
 
@@ -3731,8 +3733,12 @@ nfs4_setattr(vnode_t *vp, struct vattr *vap, int flags, cred_t *cr,
 	 * to setattr (e.g. basic without chmod) then we will
 	 * need to add a check here before calling the server.
 	 */
+	error = nfs4setattr(vp, vap, flags, cr, NULL);
 
-	return (nfs4setattr(vp, vap, flags, cr, NULL));
+	if (error == 0 && (vap->va_mask & AT_SIZE) && vap->va_size == 0)
+		vnevent_truncate(vp, ct);
+
+	return (error);
 }
 
 /*
@@ -10999,6 +11005,9 @@ nfs4_space(vnode_t *vp, int cmd, struct flock64 *bfp, int flag,
 			va.va_mask = AT_SIZE;
 			va.va_size = bfp->l_start;
 			error = nfs4setattr(vp, &va, 0, cr, NULL);
+
+			if (error == 0 && bfp->l_start == 0)
+				vnevent_truncate(vp, ct);
 		} else
 			error = EINVAL;
 	}

@@ -792,6 +792,10 @@ tmp_setattr(
 		error = tmpnode_trunc(tm, tp, (ulong_t)vap->va_size);
 		rw_exit(&tp->tn_contents);
 		rw_exit(&tp->tn_rwlock);
+
+		if (error == 0 && vap->va_size == 0)
+			vnevent_truncate(vp, ct);
+
 		goto out1;
 	}
 out:
@@ -2368,6 +2372,9 @@ tmp_space(
 		if ((bfp->l_start > MAXOFF_T) || (bfp->l_len > MAXOFF_T))
 			return (EFBIG);
 		error = tmp_freesp(vp, bfp, flag);
+
+		if (error == 0 && bfp->l_start == 0)
+			vnevent_truncate(vp, ct);
 	}
 	return (error);
 }

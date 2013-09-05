@@ -24,8 +24,8 @@ checktest()
 
 	if [[ "$actual" != "$output" ]]; then
 		echo "$CMD: test $test: FAIL"
-		echo -e "$CMD: test $test: expected output:\n$o"
-		echo -e "$CMD: test $test: actual output:\n$a"
+		echo -e "$CMD: test $test: expected output:\n$output"
+		echo -e "$CMD: test $test: actual output:\n$actual"
 	else
 		echo "$CMD: test $test: pass"
 	fi
@@ -177,6 +177,7 @@ checktest "$a" "$o" 19
 # Now we want to do a series of follow tests.
 #
 if [[ $DIR == "" ]]; then
+	export TMPDIR=/var/tmp
 	tdir=$(mktemp -d -t tailtest.XXXXXXXX || exit 1)
 else
 	tdir=$(mktemp -d $DIR/tailtest.XXXXXXXX || exit 1)
@@ -434,7 +435,44 @@ EOF
 	a=`cat $out`
 	checktest "$a" "$o" 27b
 	rm $moved
+
+	#
+	# Verify that -F will deal properly with the file being truncated
+	# not by truncation, but rather via an ftruncate() from logadm.
+	#
+	cat /dev/null > $follow
+	( $PROG -F $follow > $out ) &
+	child=$!
+	echo -e "a\nb\nc\nd\ne\nf" >> $follow
+	logadm -c $follow
+	sleep 2
+	echo -e "g\nh\ni" >> $follow
+	sleep 2
+	kill $child
+	sleep 1
+
+	o=`echo -e "a\nb\nc\nd\ne\nf\ng\nh\ni\n"`
+	a=`cat $out`
+	checktest "$a" "$o" 27c
 fi
+
+#
+# We're now going to test that while we may miss output due to truncations
+# occurring faster than tail can read, we don't ever repeat output.
+#
+cat /dev/null > $follow
+( $PROG -f $follow > $out ) &
+tchild=$!
+( let i=0 ; while true; do echo $i > $follow ; sleep 0.1; let i=i+1 ; done ) &
+child=$!
+sleep 10
+kill $tchild
+kill $child
+
+a=`sort $out | uniq -c | sort -n | tail -1 | awk '{ print $1 }'`
+o=1
+
+checktest "$a" "$o" 28
 
 echo "$CMD: completed"
 

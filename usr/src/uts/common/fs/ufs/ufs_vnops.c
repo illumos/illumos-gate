@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1984, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -2191,6 +2192,9 @@ again:
 			rw_enter(&ip->i_contents, RW_WRITER);
 			goto update_inode;
 		}
+
+		if (error == 0 && vap->va_size)
+			vnevent_truncate(vp, ct);
 	}
 
 	if (ulp) {
@@ -4460,6 +4464,9 @@ ufs_space(struct vnode *vp, int cmd, struct flock64 *bfp, int flag,
 			if (error)
 				return (error);
 			error = ufs_freesp(vp, bfp, flag, cr);
+
+			if (error == 0 && bfp->l_start == 0)
+				vnevent_truncate(vp, ct);
 		} else if (cmd == F_ALLOCSP) {
 			error = ufs_lockfs_begin(ufsvfsp, &ulp,
 			    ULOCKFS_FALLOCATE_MASK);
