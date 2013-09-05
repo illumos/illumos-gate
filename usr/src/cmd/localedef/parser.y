@@ -248,35 +248,29 @@ width_list	: width_list width_entry
 width_entry	: T_CHAR T_NUMBER T_NL
 		{
 			add_width($1, $2);
-			scan_to_eol();
 		}
 		| T_SYMBOL T_NUMBER T_NL
 		{
 			add_charmap_undefined($1);
-			scan_to_eol();
 		}
 		| T_CHAR T_ELLIPSIS T_CHAR T_NUMBER T_NL
 		{
 			add_width_range($1, $3, $4);
-			scan_to_eol();
 		}
 		| T_SYMBOL T_ELLIPSIS T_SYMBOL T_NUMBER T_NL
 		{
 			add_charmap_undefined($1);
 			add_charmap_undefined($3);
-			scan_to_eol();
 		}
 		| T_CHAR T_ELLIPSIS T_SYMBOL T_NUMBER T_NL
 		{
 			add_width($1, $4);
 			add_charmap_undefined($3);
-			scan_to_eol();
 		}
 		| T_SYMBOL T_ELLIPSIS T_CHAR T_NUMBER T_NL
 		{
 			add_width($3, $4);
 			add_charmap_undefined($1);
-			scan_to_eol();
 		}
 		| T_NL
 		;
