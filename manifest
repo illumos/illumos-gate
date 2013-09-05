@@ -579,6 +579,7 @@ f kernel/drv/amd64/cmdk 0755 root sys
 f kernel/drv/amd64/cn 0755 root sys
 f kernel/drv/amd64/conskbd 0755 root sys
 f kernel/drv/amd64/consms 0755 root sys
+f kernel/drv/amd64/cpqary3 0755 root sys
 f kernel/drv/amd64/cpuid 0755 root sys
 f kernel/drv/amd64/cpunex 0755 root sys
 f kernel/drv/amd64/crypto 0755 root sys
@@ -735,6 +736,7 @@ f kernel/drv/cmdk.conf 0644 root sys
 f kernel/drv/cn.conf 0644 root sys
 f kernel/drv/conskbd.conf 0644 root sys
 f kernel/drv/consms.conf 0644 root sys
+f kernel/drv/cpqary3.conf 0644 root sys
 f kernel/drv/cpuid.conf 0644 root sys
 f kernel/drv/crypto.conf 0644 root sys
 f kernel/drv/cryptoadm.conf 0644 root sys
@@ -15909,6 +15911,7 @@ f usr/share/man/man7d/bfe.7d 0444 root bin
 f usr/share/man/man7d/bge.7d 0444 root bin
 f usr/share/man/man7d/chxge.7d 0444 root bin
 f usr/share/man/man7d/cmdk.7d 0444 root bin
+f usr/share/man/man7d/cpqary3.7d 0444 root bin
 f usr/share/man/man7d/devinfo.7d 0444 root bin
 f usr/share/man/man7d/dmfe.7d 0444 root bin
 f usr/share/man/man7d/dnet.7d 0444 root bin
