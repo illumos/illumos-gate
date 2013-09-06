@@ -598,6 +598,7 @@ f kernel/drv/amd64/ehci 0755 root sys
 f kernel/drv/amd64/eibnx 0755 root sys
 f kernel/drv/amd64/fasttrap 0755 root sys
 f kernel/drv/amd64/fbt 0755 root sys
+f kernel/drv/amd64/fm 0755 root sys
 f kernel/drv/amd64/fp 0755 root sys
 f kernel/drv/amd64/heci 0755 root sys
 f kernel/drv/amd64/hid 0755 root sys
@@ -749,6 +750,7 @@ f kernel/drv/ehci.conf 0644 root sys
 f kernel/drv/eibnx.conf 0644 root sys
 f kernel/drv/fasttrap.conf 0644 root sys
 f kernel/drv/fbt.conf 0644 root sys
+f kernel/drv/fm.conf 0644 root sys
 f kernel/drv/fp.conf 0644 root sys
 f kernel/drv/hxge.conf 0644 root sys
 f kernel/drv/icmp.conf 0644 root sys
