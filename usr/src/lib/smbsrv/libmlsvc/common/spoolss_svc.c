@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -326,9 +326,9 @@ spoolss_s_StartDocPrinter(void *arg, ndr_xa_t *mxa)
 	else
 		(void) strlcpy(spfile->sd_printer_name, "printer", MAXPATHLEN);
 
-	spfile->sd_ipaddr = mxa->pipe->np_user.ui_ipaddr;
+	spfile->sd_ipaddr = mxa->pipe->np_user->ui_ipaddr;
 	(void) strlcpy((char *)spfile->sd_username,
-	    mxa->pipe->np_user.ui_account, MAXNAMELEN);
+	    mxa->pipe->np_user->ui_account, MAXNAMELEN);
 	(void) memcpy(&spfile->sd_handle, &param->handle, sizeof (ndr_hdid_t));
 
 	/*

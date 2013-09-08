@@ -21,6 +21,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <uuid/uuid.h>
@@ -211,7 +213,7 @@ ndr_hdalloc(const ndr_xa_t *xa, const void *data)
 	++id.data2;
 
 	bcopy(&id, &hd->nh_id, sizeof (ndr_hdid_t));
-	hd->nh_fid = xa->fid;
+	hd->nh_pipe = xa->pipe;
 	hd->nh_svc = xa->binding->service;
 	hd->nh_data = (void *)data;
 	hd->nh_data_free = NULL;
@@ -290,7 +292,7 @@ ndr_hdlookup(const ndr_xa_t *xa, const ndr_hdid_t *id)
  * Called when a pipe is closed to release any associated handles.
  */
 void
-ndr_hdclose(int fid)
+ndr_hdclose(ndr_pipe_t *pipe)
 {
 	ndr_handle_t *hd;
 	ndr_handle_t **pphd;
@@ -301,7 +303,7 @@ ndr_hdclose(int fid)
 	while (*pphd) {
 		hd = *pphd;
 
-		if (hd->nh_fid == fid) {
+		if (hd->nh_pipe == pipe) {
 			*pphd = hd->nh_next;
 
 			if (hd->nh_data_free)

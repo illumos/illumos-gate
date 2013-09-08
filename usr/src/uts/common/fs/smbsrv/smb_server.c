@@ -404,9 +404,6 @@ smb_server_create(void)
 	cv_init(&sv->sv_cv, NULL, CV_DEFAULT, NULL);
 	cv_init(&sv->sp_info.sp_cv, NULL, CV_DEFAULT, NULL);
 
-	smb_llist_constructor(&sv->sv_opipe_list, sizeof (smb_opipe_t),
-	    offsetof(smb_opipe_t, p_lnd));
-
 	smb_llist_constructor(&sv->sv_event_list, sizeof (smb_event_t),
 	    offsetof(smb_event_t, se_lnd));
 
@@ -426,7 +423,6 @@ smb_server_create(void)
 
 	smb_kdoor_init(sv);
 	smb_kshare_init(sv);
-	smb_opipe_door_init(sv);
 	smb_server_kstat_init(sv);
 
 	smb_threshold_init(&sv->sv_ssetup_ct, SMB_SSETUP_CMD,
@@ -502,10 +498,8 @@ smb_server_delete(void)
 	smb_server_listener_destroy(&sv->sv_tcp_daemon);
 	rw_destroy(&sv->sv_cfg_lock);
 	smb_server_kstat_fini(sv);
-	smb_opipe_door_fini(sv);
 	smb_kshare_fini(sv);
 	smb_kdoor_fini(sv);
-	smb_llist_destructor(&sv->sv_opipe_list);
 	smb_llist_destructor(&sv->sv_event_list);
 
 	kmem_free(sv->sv_disp_stats,
@@ -619,14 +613,9 @@ smb_server_start(smb_ioc_start_t *ioc)
 			cmn_err(CE_WARN, "Cannot open smbd door");
 			break;
 		}
-		if (rc = smb_opipe_door_open(sv, ioc->opipe)) {
-			cmn_err(CE_WARN, "Cannot open opipe door");
-			break;
-		}
 #else	/* _KERNEL */
 		/* Fake kernel does not use the kshare_door */
 		fksmb_kdoor_open(sv, ioc->udoor_func);
-		fksmb_opipe_door_open(sv, ioc->opipe_func);
 #endif	/* _KERNEL */
 
 		if (rc = smb_thread_start(&sv->si_thread_timers))
@@ -1413,7 +1402,6 @@ smb_server_shutdown(smb_server_t *sv)
 	smb_threshold_wake_all(&sv->sv_tcon_ct);
 	smb_threshold_wake_all(&sv->sv_opipe_ct);
 
-	smb_opipe_door_close(sv);
 	smb_kdoor_close(sv);
 #ifdef	_KERNEL
 	smb_kshare_door_fini(sv->sv_lmshrd);

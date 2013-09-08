@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <smbsrv/smb_kproto.h>
@@ -420,7 +421,14 @@ smb_common_read(smb_request_t *sr, smb_rw_param_t *param)
 		break;
 
 	case STYPE_IPC:
+		sr->raw_data.max_bytes = vdb->vdb_uio.uio_resid;
+		top = smb_mbuf_allocate(&vdb->vdb_uio);
+
 		rc = smb_opipe_read(sr, &vdb->vdb_uio);
+
+		sr->raw_data.max_bytes -= vdb->vdb_uio.uio_resid;
+		smb_mbuf_trim(top, sr->raw_data.max_bytes);
+		MBC_ATTACH_MBUF(&sr->raw_data, top);
 		break;
 
 	default:
