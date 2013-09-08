@@ -293,6 +293,8 @@ file path=boot/solaris/filelist.ramdisk group=sys
 file path=boot/solaris/filelist.safe group=sys
 file path=etc/crypto/kcf.conf group=sys \
     original_name=SUNWckr:etc/crypto/kcf.conf preserve=true
+$(i386_ONLY)file path=etc/mach group=sys original_name=SUNWos86r:etc/mach \
+    preserve=true
 file path=etc/name_to_sysnum group=sys \
     original_name=SUNWckr:etc/name_to_sysnum preserve=renameold
 file path=etc/sock2path.d/system%2Fkernel group=sys
@@ -525,8 +527,11 @@ file path=kernel/drv/sad.conf group=sys
 $(i386_ONLY)file path=kernel/drv/scsi_vhci group=sys
 file path=kernel/drv/scsi_vhci.conf group=sys \
     original_name=SUNWckr:kernel/drv/scsi_vhci.conf preserve=true
+$(i386_ONLY)file path=kernel/drv/sd group=sys
 $(sparc_ONLY)file path=kernel/drv/sd.conf group=sys \
     original_name=SUNWckr:kernel/drv/sd.conf preserve=true
+$(i386_ONLY)file path=kernel/drv/sd.conf group=sys \
+    original_name=SUNWos86r:kernel/drv/sd.conf preserve=true
 $(i386_ONLY)file path=kernel/drv/sgen group=sys
 file path=kernel/drv/sgen.conf group=sys \
     original_name=SUNWckr:kernel/drv/sgen.conf preserve=true
