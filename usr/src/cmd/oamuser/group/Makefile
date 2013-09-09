@@ -21,6 +21,8 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2013 RackTop Systems.
+#
 # cmd/oamuser/group/Makefile
 #
 
@@ -34,7 +36,7 @@ SBINPROG=	$(GROUPADD)   $(GROUPDEL)   $(GROUPMOD)
 
 PROG=		$(SBINPROG)
 
-ADD_OBJ=	groupadd.o    add_group.o   gid.o       messages.o
+ADD_OBJ=	groupadd.o    add_group.o   messages.o
 DEL_OBJ=	groupdel.o    del_group.o   messages.o
 MOD_OBJ=	groupmod.o    mod_group.o   messages.o
 
@@ -50,11 +52,10 @@ LINTFLAGS=	-u
 INSSBINPROG=	$(SBINPROG:%=$(ROOTUSRSBIN)/%)
 
 CPPFLAGS=	-I$(HERE) -I$(LOCAL) $(CPPFLAGS.master)
-CERRWARN +=	-_gcc=-Wno-type-limits
 FILEMODE= 	0555
 
 $(GROUPADD) :=	OBJS = $(ADD_OBJ)
-$(GROUPADD) :=	LDLIBS += $(LIBUSRGRP)
+$(GROUPADD) :=	LDLIBS += $(LIBUSRGRP) -lcmdutils
 
 $(GROUPDEL) :=	OBJS = $(DEL_OBJ)
 $(GROUPDEL) :=	LDLIBS += $(LIBUSRGRP)

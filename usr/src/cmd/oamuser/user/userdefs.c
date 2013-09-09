@@ -28,8 +28,9 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 2013 RackTop Systems.
+ */
 
 /*LINTLIBRARY*/
 
@@ -54,7 +55,7 @@
 		(void) fprintf(fptr, "\n"); \
 	}
 
-#define	SKIPWS(ptr)	while (*ptr && *ptr == ' ' || *ptr == '\t') ptr++
+#define	SKIPWS(ptr)	while (*ptr && (*ptr == ' ' || *ptr == '\t')) ptr++
 
 static char *dup_to_nl(char *);
 

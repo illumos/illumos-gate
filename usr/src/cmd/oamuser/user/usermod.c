@@ -26,7 +26,9 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
+/*
+ * Copyright (c) 2013 RackTop Systems.
+ */
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -510,12 +512,13 @@ char **argv;
 		}
 	}
 
-	if (comment)
+	if (comment) {
 		/* ignore comment if comment is not changed */
 		if (strcmp(pstruct->pw_comment, comment))
 			call_pass = 1;
 		else
 			comment = NULL;
+	}
 
 	/* inactive string is a positive integer */
 	if (inactstr) {

@@ -73,6 +73,8 @@ include ../../Makefile.lib
 
 INCS += -I$(SRC)/common/smbsrv
 
+LINTCHECKFLAGS += -erroff=E_INCONS_ARG_DECL2
+
 LDLIBS +=	$(MACH_LDLIBS)
 LDLIBS +=	-lscf -lmd -luuid -lnsl -lpkcs11 -lsec -lsocket -lresolv
 LDLIBS +=	-lidmap -lreparse -lnvpair -lcmdutils -lavl -lc

@@ -24,6 +24,7 @@
 # Copyright 2011 Nexenta Systems, Inc. All rights reserved.
 # Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright 2012 OmniTI Computer Consulting, Inc.  All rights reserved.
+# Copyright (c) 2013 RackTop Systems.
 #
 
 #
@@ -144,6 +145,7 @@ DIRS= \
 	/etc/saf \
 	/etc/sasl	\
 	/etc/sfw \
+	/etc/skel	\
 	/etc/svc \
 	/etc/svc/profile \
 	/etc/svc/profile/site \
