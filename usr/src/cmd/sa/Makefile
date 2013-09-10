@@ -21,6 +21,7 @@
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright (c) 2013 Andrew Stormont.  All rights reserved.
 #
 # cmd/sa/Makefile
 #
@@ -78,12 +79,10 @@ ROOTLIBSHELL=	$(LIBSHELL:%=$(LIBSAD)/%)
 ROOTSYMLINKS=	$(SBINPROG:%=$(ROOTBIN)/%)
 
 # Performance monitoring should not be enabled by default. Hence, these
-# entries are comments. Note the difficulty of inserting a literal #
-# in a makefile.... Wonderful parser here....
-COMMENT_CHAR:sh=          echo \\043
-ENTRY1=		'$(COMMENT_CHAR) 0 * * * 0-6 /usr/lib/sa/sa1'
-ENTRY2=		'$(COMMENT_CHAR) 20,40 8-17 * * 1-5 /usr/lib/sa/sa1'
-ENTRY3=		'$(COMMENT_CHAR) 5 18 * * 1-5 /usr/lib/sa/sa2 -s 8:00 -e 18:01 -i 1200 -A'
+# entries are comments.
+ENTRY1=		'$(POUND_SIGN) 0 * * * 0-6 /usr/lib/sa/sa1'
+ENTRY2=		'$(POUND_SIGN) 20,40 8-17 * * 1-5 /usr/lib/sa/sa1'
+ENTRY3=		'$(POUND_SIGN) 5 18 * * 1-5 /usr/lib/sa/sa2 -s 8:00 -e 18:01 -i 1200 -A'
 
 CLOBBERFILES=	$(PROGS) $(SHELLS)
 
