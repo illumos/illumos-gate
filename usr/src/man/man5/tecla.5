@@ -24,7 +24,7 @@
 .\" or other dealings in this Software without prior written authorization
 .\" of the copyright holder.
 .\" Portions Copyright (c) 2005, Sun Microsystems, Inc. All Rights Reserved.
-.TH TECLA 5 "May 20, 2004"
+.TH TECLA 5 "Sep 10, 2013"
 .SH NAME
 tecla, teclarc \- User interface provided by the tecla library.
 .SH DESCRIPTION
@@ -986,10 +986,10 @@ Entering Repeat Counts section.
 .ad
 .RS 30n
 Terminate and return the current contents of the line, after appending a
-newline character. The newline character is normally '\n', but will be the
+newline character. The newline character is normally '\en', but will be the
 first character of the key sequence that invoked the newline action, if this
 happens to be a printable character. If the action was invoked by the '\n'
-newline character or the '\r' carriage return character, the line is appended
+newline character or the '\er' carriage return character, the line is appended
 to the history buffer.
 .RE
 
@@ -1967,7 +1967,7 @@ end-of-history
 .sp
 .ne 2
 .na
-\fB\fB\n\fR\fR
+\fB\fB\en\fR\fR
 .ad
 .RS 21n
 newline
@@ -1976,7 +1976,7 @@ newline
 .sp
 .ne 2
 .na
-\fB\fB\r\fR\fR
+\fB\fB\er\fR\fR
 .ad
 .RS 21n
 newline
@@ -2237,7 +2237,7 @@ complete-word
 .sp
 .ne 2
 .na
-\fB\fB\r\fR\fR
+\fB\fB\er\fR\fR
 .ad
 .RS 8n
 newline
@@ -2246,7 +2246,7 @@ newline
 .sp
 .ne 2
 .na
-\fB\fB\n\fR\fR
+\fB\fB\en\fR\fR
 .ad
 .RS 8n
 newline
@@ -3526,7 +3526,7 @@ newline
 .sp
 .ne 2
 .na
-\fB\fBM-\n\fR\fR
+\fB\fBM-\en\fR\fR
 .ad
 .RS 21n
 newline

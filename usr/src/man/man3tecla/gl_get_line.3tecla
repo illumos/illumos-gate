@@ -25,7 +25,7 @@
 .\" or other dealings in this Software without prior written authorization
 .\" of the copyright holder.
 .\" Portions Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
-.TH GL_GET_LINE 3TECLA "Nov 28, 2007"
+.TH GL_GET_LINE 3TECLA "Sep 10, 2013"
 .SH NAME
 gl_get_line, new_GetLine, del_GetLine, gl_customize_completion,
 gl_change_terminal, gl_configure_getline, gl_load_history, gl_save_history,
@@ -673,7 +673,7 @@ in the call
 .sp
 .in +2
 .nf
-gl_configure_getline(gl, "edit-mode vi \n nobeep",
+gl_configure_getline(gl, "edit-mode vi \en nobeep",
                      "/usr/share/myapp/teclarc", "~/.teclarc");
 .fi
 .in -2

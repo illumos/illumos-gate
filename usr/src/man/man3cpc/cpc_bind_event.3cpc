@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH CPC_BIND_EVENT 3CPC "Mar 02, 2007"
+.TH CPC_BIND_EVENT 3CPC "Sep 10, 2013"
 .SH NAME
 cpc_bind_event, cpc_take_sample, cpc_rele \- use CPU performance counters on
 lwps
@@ -184,7 +184,7 @@ for (iter = 1; iter <= 20; iter++) {
 
     if (cpc_take_sample(&after) == -1)
         break;
-    (void) printf("%3d: %" PRId64 " %" PRId64 "\n", iter,
+    (void) printf("%3d: %" PRId64 " %" PRId64 "\en", iter,
         after.ce_pic[0] - before.ce_pic[0],
         after.ce_pic[1] - before.ce_pic[1]);
 }
@@ -229,7 +229,7 @@ if (sig != SIGEMT || sip->si_code != EMT_CPCOVF) {
     return;
 }
 
-(void) printf("lwp%d - si_addr %p ucontext: %%pc %p %%sp %p\n",
+(void) printf("lwp%d - si_addr %p ucontext: %%pc %p %%sp %p\en",
     _lwp_self(), (void *)sip->si_addr,
     (void *)uap->uc_mcontext.gregs[PC],
     (void *)uap->uc_mcontext.gregs[USP]);
@@ -237,7 +237,7 @@ if (sig != SIGEMT || sip->si_code != EMT_CPCOVF) {
 if (cpc_take_sample(&sample) == -1)
     error("can't sample: %s", strerror(errno));
 
-(void) printf("0x%" PRIx64 " 0x%" PRIx64 "\n",
+(void) printf("0x%" PRIx64 " 0x%" PRIx64 "\en",
     sample.ce_pic[0], sample.ce_pic[1]);
 (void) fflush(stdout);
 

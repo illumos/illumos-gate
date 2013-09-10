@@ -9,7 +9,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH NM 1 "Oct 10, 2007"
+.TH NM 1 "Sep 10, 2013"
 .SH NAME
 nm \- print name list of an object file
 .SH SYNOPSIS
@@ -691,8 +691,8 @@ respectively:
 .in +2
 .nf
 \fB"%s%s %s %d %d\n",\fR \fIlibrary/object name\fR, \fIname\fR\fB, type,\fR \fIvalue\fR, \e
-     \fBsize "%s%s %s %o %o\n",\fR \fIlibrary/object name\fR, \fIname\fR, \e
-     \fBtype,\fR \fIvalue\fR \fB, size "%s%s %s %x %x\n",\fR \fIlibrary/object name\fR, \fIname\fR, \e
+     \fBsize "%s%s %s %o %o\en",\fR \fIlibrary/object name\fR, \fIname\fR, \e
+     \fBtype,\fR \fIvalue\fR \fB, size "%s%s %s %x %x\en",\fR \fIlibrary/object name\fR, \fIname\fR, \e
      \fBtype,\fR \fIvalue\fR\fB, size\fR
 .fi
 .in -2
@@ -752,7 +752,7 @@ If the corresponding \fIfile\fR operand does not name a library:
 .sp
 .in +2
 .nf
-\fB"%s:\n", \fIfile\fR\fR
+\fB"%s:\en", \fIfile\fR\fR
 .fi
 .in -2
 .sp
@@ -768,7 +768,7 @@ following symbols:
 .sp
 .in +2
 .nf
-\fB"%s[%s]:\n", \fIfile\fR, \fIobject file\fR\fR
+\fB"%s[%s]:\en", \fIfile\fR, \fIobject file\fR\fR
 .fi
 .in -2
 .sp

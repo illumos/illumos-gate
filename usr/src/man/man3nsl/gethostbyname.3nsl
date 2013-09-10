@@ -9,7 +9,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH GETHOSTBYNAME 3NSL "Aug 24, 2007"
+.TH GETHOSTBYNAME 3NSL "Sep 10, 2013"
 .SH NAME
 gethostbyname, gethostbyname_r, gethostbyaddr, gethostbyaddr_r, gethostent,
 gethostent_r, sethostent, endhostent \- get network host entry
@@ -281,7 +281,7 @@ int main(int argc, const char **argv)
          (void) printf("%s\t%s", inet_ntoa(in), hp\(mi>h_name);
 	    for (q = hp->h_aliases; *q != 0; q++)
 	        (void) printf(" %s", *q);
-	    (void) putchar('\n');
+	    (void) putchar('\en');
 	}
 	exit (0);
 }
