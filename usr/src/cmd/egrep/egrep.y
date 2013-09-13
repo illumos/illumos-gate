@@ -32,9 +32,9 @@
 /*	Copyright (c) 1987, 1988 Microsoft Corporation	*/
 /*	  All Rights Reserved	*/
 
-%{
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-%}
+/*
+ * Copyright 2013 Damian Bogel. All rights reserved.
+ */
 
 /*
  * egrep -- print lines containing (or not containing) a regular expression
@@ -60,6 +60,8 @@
 #include <stdlib.h>
 #include <limits.h>
 #include <locale.h>
+
+#define STDIN_FILENAME gettext("(standard input)")
 
 #define BLKSIZE 512	/* size of reported disk blocks */
 #define EBUFSIZ 8192
@@ -110,11 +112,12 @@ int	bflag;
 int	cflag;
 int	eflag;
 int	fflag;
+int	Hflag;
 int	hflag;
 int	iflag;
 int	lflag;
 int	nflag;
-int	sflag;
+int	qflag;
 int	vflag;
 int	nfile;
 long long blkno;
@@ -644,7 +647,7 @@ follow(int v)
 	}
 }
 
-#define USAGE "[ -bchilnsv ] [ -e exp ] [ -f file ] [ strings ] [ file ] ..." 
+#define USAGE "[ -bchHilnsqv ] [ -e exp ] [ -f file ] [ strings ] [ file ] ..."
 
 int
 main(int argc, char **argv)
@@ -660,7 +663,7 @@ main(int argc, char **argv)
 #endif
 	(void) textdomain(TEXT_DOMAIN);
 
-	while((c = getopt(argc, argv, "ybcie:f:hlnvs")) != -1)
+	while((c = getopt(argc, argv, "ybcie:f:Hhlnvsq")) != -1)
 		switch(c) {
 
 		case 'b':
@@ -686,8 +689,15 @@ main(int argc, char **argv)
 			}
 			continue;
 
+		case 'H':
+			if (!lflag) /* H is excluded by l as in GNU grep */
+				Hflag++;
+			hflag = 0; /* H excludes h */
+			continue;
+
 		case 'h':
 			hflag++;
+			Hflag = 0; /* h excludes H */
 			continue;
 
 		case 'y':
@@ -697,14 +707,16 @@ main(int argc, char **argv)
 
 		case 'l':
 			lflag++;
+			Hflag = 0; /* l excludes H */
 			continue;
 
 		case 'n':
 			nflag++;
 			continue;
 
-		case 's':
-			sflag++;
+		case 'q':
+		case 's': /* Solaris: legacy option */
+			qflag++;
 			continue;
 
 		case 'v':
@@ -799,16 +811,16 @@ execute(char *file)
 			return;
 		}
 	} else {
-		file = "<stdin>";
 		f = stdin;
+		file = STDIN_FILENAME;
 	}
 	lnum = 1;
 	tln = 0;
 	if((count = read(fileno(f), buf, EBUFSIZ)) <= 0) {
 		fclose(f);
 
-		if (cflag) {
-			if (nfile>1 && !hflag)
+		if (cflag && !qflag) {
+			if (Hflag || (nfile > 1 && !hflag))
 				fprintf(stdout, "%s:", file);
 			fprintf(stdout, "%lld\n", tln);
 		}
@@ -902,19 +914,19 @@ execute(char *file)
 				break;
 			}
 		}
-		if(succ) {
+		if (succ) {
 			nsucc = 1;
-			if (cflag) tln++;
-			else if (sflag)
-				;	/* ugh */
-			else if (lflag) {
-				printf("%s\n", file);
+			if (lflag || qflag) {
+				if (!qflag)
+					(void) printf("%s\n", file);
 				fclose(f);
 				return;
 			}
-			else {
-				if (nfile > 1 && !hflag) 
-					printf(gettext("%s:"), file);
+			if (cflag) {
+				tln++;
+			} else {
+				if (Hflag || (nfile > 1 && !hflag))
+					printf("%s:", file);
 				if (bflag) {
 					nchars = blkno - (buf + count - ptrend) - 2;
 					if(nlflag)
@@ -944,9 +956,9 @@ execute(char *file)
 			clearg();
 	}
 	fclose(f);
-	if (cflag) {
-		if (nfile > 1 && !hflag)
-			printf(gettext("%s:"), file);
+	if (cflag && !qflag) {
+		if (Hflag || (nfile > 1 && !hflag))
+			printf("%s:", file);
 		printf("%lld\n", tln);
 	}
 }

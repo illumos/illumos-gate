@@ -10,34 +10,34 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH GREP 1 "Feb 26, 2008"
+.TH GREP 1 "May 3, 2013"
 .SH NAME
 grep \- search a file for a pattern
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/bin/grep\fR [\fB-c\fR | \fB-l\fR |\fB-q\fR] [\fB-r\fR | \fB-R\fR] [\fB-bhinsvw\fR]
+\fB/usr/bin/grep\fR [\fB-c\fR | \fB-l\fR |\fB-q\fR] [\fB-r\fR | \fB-R\fR] [\fB-bHhinsvw\fR]
     \fIlimited-regular-expression\fR [\fIfilename\fR]...
 .fi
 
 .LP
 .nf
 \fB/usr/xpg4/bin/grep\fR [\fB-E\fR | \fB-F\fR] [\fB-c\fR | \fB-l\fR | \fB-q\fR] [\fB-r\fR | \fB-R\fR]
-    [\fB-bhinsvwx\fR] \fB-e\fR \fIpattern_list\fR... [\fB-f\fR \fIpattern_file\fR]...
+    [\fB-bHhinsvwx\fR] \fB-e\fR \fIpattern_list\fR... [\fB-f\fR \fIpattern_file\fR]...
     [\fIfile\fR]...
 .fi
 
 .LP
 .nf
 \fB/usr/xpg4/bin/grep\fR [\fB-E\fR | \fB-F\fR] [\fB-c\fR | \fB-l\fR | \fB-q\fR] [\fB-r\fR | \fB-R\fR]
-    [\fB-bhinsvwx\fR] [\fB-e\fR \fIpattern_list\fR]... \fB-f\fR \fIpattern_file\fR...
+    [\fB-bHhinsvwx\fR] [\fB-e\fR \fIpattern_list\fR]... \fB-f\fR \fIpattern_file\fR...
     [\fIfile\fR]...
 .fi
 
 .LP
 .nf
 \fB/usr/xpg4/bin/grep\fR [\fB-E\fR | \fB-F\fR] [\fB-c\fR | \fB-l\fR | \fB-q\fR] [\fB-r\fR | \fB-R\fR]
-    [\fB-bhinsvwx\fR] \fIpattern\fR [\fIfile\fR]...
+    [\fB-bHhinsvwx\fR] \fIpattern\fR [\fIfile\fR]...
 .fi
 
 .SH DESCRIPTION
@@ -93,6 +93,15 @@ useful in locating block numbers by context (first block is 0).
 .ad
 .RS 6n
 Prints only a count of the lines that contain the pattern.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-H\fR\fR
+.ad
+.RS 6n
+Precedes each line by the name of the file containing the matching line.
 .RE
 
 .sp

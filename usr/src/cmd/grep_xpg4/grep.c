@@ -36,6 +36,10 @@
 
 /* Copyright 2012 Nexenta Systems, Inc.  All rights reserved. */
 
+/*
+ * Copyright 2013 Damian Bogel. All rights reserved.
+ */
+
 #include <string.h>
 #include <stdlib.h>
 #include <ctype.h>
@@ -53,6 +57,8 @@
 #include <wctype.h>
 #include <ftw.h>
 #include <sys/param.h>
+
+#define	STDIN_FILENAME gettext("(standard input)")
 
 #define	BSIZE		512		/* Size of block for -b */
 #define	BUFSIZE		8192		/* Input buffer size */
@@ -80,6 +86,7 @@ static uchar_t	egrep = 0;		/* Invoked as egrep */
 static uchar_t	nvflag = 1;		/* Print matching lines */
 static uchar_t	cflag;			/* Count of matches */
 static uchar_t	iflag;			/* Case insensitve matching */
+static uchar_t	Hflag;			/* Precede lines by file name */
 static uchar_t	hflag;			/* Supress printing of filename */
 static uchar_t	lflag;			/* Print file names of matches */
 static uchar_t	nflag;			/* Precede lines by line number */
@@ -155,7 +162,7 @@ main(int argc, char **argv)
 		}
 	}
 
-	while ((c = getopt(argc, argv, "vwchilnrbse:f:qxEFIR")) != EOF) {
+	while ((c = getopt(argc, argv, "vwchHilnrbse:f:qxEFIR")) != EOF) {
 		switch (c) {
 		case 'v':	/* POSIX: negate matches */
 			nvflag = 0;
@@ -216,8 +223,16 @@ main(int argc, char **argv)
 			}
 			*(file_list + n_file - 1) = optarg;
 			break;
+
+		/* based on options order h or H is set as in GNU grep */
 		case 'h':	/* Solaris: supress printing of file name */
 			hflag = 1;
+			Hflag = 0;
+			break;
+		/* Solaris: precede every matching with file name */
+		case 'H':
+			Hflag = 1;
+			hflag = 0;
 			break;
 
 		case 'q':	/* POSIX: quiet: status only */
@@ -294,6 +309,12 @@ main(int argc, char **argv)
 		usage();
 
 	/*
+	 * -l overrides -H like in GNU grep
+	 */
+	if (lflag)
+		Hflag = 0;
+
+	/*
 	 * -c, -l and -q flags are mutually exclusive
 	 * We have -c override -l like in Solaris.
 	 * -q overrides -l & -c programmatically in grep() function.
@@ -346,9 +367,9 @@ main(int argc, char **argv)
 
 	/* Process all files: stdin, or rest of arg list */
 	if (argc < 2) {
-		matched = grep(0, gettext("(standard input)"));
+		matched = grep(0, STDIN_FILENAME);
 	} else {
-		if (argc > 2 && hflag == 0)
+		if (Hflag || (argc > 2 && hflag == 0))
 			outfn = 1;	/* Print filename on match line */
 		for (argv++; *argv != NULL; argv++) {
 			process_path(*argv);
@@ -1112,7 +1133,7 @@ L_next_line:
 				break;
 			}
 			if (!cflag) {
-				if (outfn) {
+				if (Hflag || outfn) {
 					(void) printf("%s:", fn);
 				}
 				if (bflag) {
@@ -1139,7 +1160,7 @@ L_skip_line:
 	}
 
 	if (cflag) {
-		if (outfn) {
+		if (Hflag || outfn) {
 			(void) printf("%s:", fn);
 		}
 		if (!qflag) {
@@ -1158,45 +1179,45 @@ usage(void)
 	if (egrep || fgrep) {
 		(void) fprintf(stderr, gettext("Usage:\t%s"), cmdname);
 		(void) fprintf(stderr,
-		    gettext(" [-c|-l|-q] [-r|-R] [-bhinsvx] "
+		    gettext(" [-c|-l|-q] [-r|-R] [-bhHinsvx] "
 		    "pattern_list [file ...]\n"));
 
 		(void) fprintf(stderr, "\t%s", cmdname);
 		(void) fprintf(stderr,
-		    gettext(" [-c|-l|-q] [-r|-R] [-bhinsvx] "
+		    gettext(" [-c|-l|-q] [-r|-R] [-bhHinsvx] "
 		    "[-e pattern_list]... "
 		    "[-f pattern_file]... [file...]\n"));
 	} else {
 		(void) fprintf(stderr, gettext("Usage:\t%s"), cmdname);
 		(void) fprintf(stderr,
-		    gettext(" [-c|-l|-q] [-r|-R] [-bhinsvwx] "
+		    gettext(" [-c|-l|-q] [-r|-R] [-bhHinsvwx] "
 		    "pattern_list [file ...]\n"));
 
 		(void) fprintf(stderr, "\t%s", cmdname);
 		(void) fprintf(stderr,
-		    gettext(" [-c|-l|-q] [-r|-R] [-bhinsvwx] "
+		    gettext(" [-c|-l|-q] [-r|-R] [-bhHinsvwx] "
 		    "[-e pattern_list]... "
 		    "[-f pattern_file]... [file...]\n"));
 
 		(void) fprintf(stderr, "\t%s", cmdname);
 		(void) fprintf(stderr,
-		    gettext(" -E [-c|-l|-q] [-r|-R] [-bhinsvx] "
+		    gettext(" -E [-c|-l|-q] [-r|-R] [-bhHinsvx] "
 		    "pattern_list [file ...]\n"));
 
 		(void) fprintf(stderr, "\t%s", cmdname);
 		(void) fprintf(stderr,
-		    gettext(" -E [-c|-l|-q] [-r|-R] [-bhinsvx] "
+		    gettext(" -E [-c|-l|-q] [-r|-R] [-bhHinsvx] "
 		    "[-e pattern_list]... "
 		    "[-f pattern_file]... [file...]\n"));
 
 		(void) fprintf(stderr, "\t%s", cmdname);
 		(void) fprintf(stderr,
-		    gettext(" -F [-c|-l|-q] [-r|-R] [-bhinsvx] "
+		    gettext(" -F [-c|-l|-q] [-r|-R] [-bhHinsvx] "
 		    "pattern_list [file ...]\n"));
 
 		(void) fprintf(stderr, "\t%s", cmdname);
 		(void) fprintf(stderr,
-		    gettext(" -F [-c|-l|-q] [-bhinsvx] [-e pattern_list]... "
+		    gettext(" -F [-c|-l|-q] [-bhHinsvx] [-e pattern_list]... "
 		    "[-f pattern_file]... [file...]\n"));
 	}
 	exit(2);

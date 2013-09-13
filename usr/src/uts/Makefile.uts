@@ -23,6 +23,7 @@
 # Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2011 Bayard G. Bell. All rights reserved.
 # Copyright (c) 2011 by Delphix. All rights reserved.
+# Copyright (c) 2013 Andrew Stormont.  All rights reserved.
 #
 
 #
@@ -670,10 +671,8 @@ $(BB_FILES)	:= XAOPT = -xa
 #	kernel which actually gets shipped to customers.  In practice,
 #	$(RELEASE_BUILD) is on for a number of the late beta and fcs builds.
 #
-CODE_COVERAGE=
-$(RELEASE_BUILD)CODE_COVERAGE:sh=	echo \\043
-$(CODE_COVERAGE)$(OBJS_DIR)/unix_bb.o   := CPPFLAGS     += -DKCOV
-$(CODE_COVERAGE)$(OBJS_DIR)/unix_bb.ln  := CPPFLAGS     += -DKCOV
+$(NOT_RELEASE_BUILD)$(OBJS_DIR)/unix_bb.o   := CPPFLAGS     += -DKCOV
+$(NOT_RELEASE_BUILD)$(OBJS_DIR)/unix_bb.ln  := CPPFLAGS     += -DKCOV
 
 #
 #	Do not let unix_bb.o get compiled with -xa!

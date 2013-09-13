@@ -30,7 +30,9 @@
 /*	Copyright (c) 1987, 1988 Microsoft Corporation	*/
 /*	  All Rights Reserved	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2013 Damian Bogel. All rights reserved.
+ */
 
 /*
  * fgrep -- print all lines containing any of a set of keywords
@@ -107,6 +109,7 @@ wchar_t letter();
 	(a == b || iflag && (!MULTI_BYTE || ISASCII(a)) && (a ^ b) == ' ' && \
 	letter(a) == letter(b))
 
+#define	STDIN_FILENAME gettext("(standard input)")
 
 #define	QSIZE 400
 struct words {
@@ -119,8 +122,8 @@ struct words {
 
 FILE *fptr;
 long long lnum;
-int	bflag, cflag, lflag, fflag, nflag, vflag, xflag, eflag, sflag;
-int	hflag, iflag;
+int	bflag, cflag, lflag, fflag, nflag, vflag, xflag, eflag, qflag;
+int	Hflag, hflag, iflag;
 int	retcode = 0;
 int	nfile;
 long long blkno;
@@ -150,14 +153,20 @@ main(int argc, char **argv)
 #endif
 	(void) textdomain(TEXT_DOMAIN);
 
-	while ((c = getopt(argc, argv, "hybcie:f:lnvxs")) != EOF)
+	while ((c = getopt(argc, argv, "Hhybcie:f:lnvxqs")) != EOF)
 		switch (c) {
 
-		case 's':
-			sflag++;
+		case 'q':
+		case 's': /* Solaris: legacy option */
+			qflag++;
+			continue;
+		case 'H':
+			Hflag++;
+			hflag = 0;
 			continue;
 		case 'h':
 			hflag++;
+			Hflag = 0;
 			continue;
 		case 'b':
 			bflag++;
@@ -183,17 +192,17 @@ main(int argc, char **argv)
 			wordf = fopen(optarg, "r");
 			if (wordf == NULL) {
 				(void) fprintf(stderr,
-					gettext("fgrep: can't open %s\n"),
-					optarg);
+				    gettext("fgrep: can't open %s\n"),
+				    optarg);
 				exit(2);
 			}
 
 			if (fstat(fileno(wordf), &file_stat) == 0) {
-			    input_size = file_stat.st_size;
+				input_size = file_stat.st_size;
 			} else {
 				(void) fprintf(stderr,
-					gettext("fgrep: can't fstat %s\n"),
-					optarg);
+				    gettext("fgrep: can't fstat %s\n"),
+				    optarg);
 				exit(2);
 			}
 
@@ -221,8 +230,8 @@ main(int argc, char **argv)
 
 	argc -= optind;
 	if (errflg || ((argc <= 0) && !fflag && !eflag)) {
-		(void) printf(gettext("usage: fgrep [ -bchilnsvx ] "
-			"[ -e exp ] [ -f file ] [ strings ] [ file ] ...\n"));
+		(void) printf(gettext("usage: fgrep [ -bcHhilnqsvx ] "
+		    "[ -e exp ] [ -f file ] [ strings ] [ file ] ...\n"));
 		exit(2);
 	}
 	if (!eflag && !fflag) {
@@ -250,14 +259,14 @@ main(int argc, char **argv)
 	w = (struct words *)calloc(input_size, sizeof (struct words));
 	if (w == NULL) {
 		(void) fprintf(stderr,
-			gettext("fgrep: could not allocate "
-				"memory for wordlist\n"));
+		    gettext("fgrep: could not allocate "
+		    "memory for wordlist\n"));
 		exit(2);
 	}
 
 	getwidth(&WW);
 	if ((WIDTH1 == 0) && (WIDTH2 == 0) &&
-		(WIDTH3 == 0)) {
+	    (WIDTH3 == 0)) {
 		/*
 		 * If non EUC-based locale,
 		 * assume WIDTH1 is 1.
@@ -308,13 +317,13 @@ execute(char *file)
 	if (file) {
 		if ((fptr = fopen(file, "r")) == NULL) {
 			(void) fprintf(stderr,
-				gettext("fgrep: can't open %s\n"), file);
+			    gettext("fgrep: can't open %s\n"), file);
 			retcode = 2;
 			return;
 		}
 	} else {
-		file = "<stdin>";
 		fptr = stdin;
+		file = STDIN_FILENAME;
 	}
 	ccount = 0;
 	failed = 0;
@@ -333,7 +342,7 @@ execute(char *file)
 					/* increase the buffer size */
 					fw_lBufsiz += BUFSIZ;
 					if ((buf = realloc(buf,
-						fw_lBufsiz + BUFSIZ)) == NULL) {
+					    fw_lBufsiz + BUFSIZ)) == NULL) {
 						exit(2); /* out of memory */
 					}
 					nlp = buf;
@@ -341,8 +350,8 @@ execute(char *file)
 				} else {
 					/* shift the buffer down */
 					(void) memmove(buf, nlp,
-						&buf[fw_lBufsiz + BUFSIZ]
-						- nlp);
+					    &buf[fw_lBufsiz + BUFSIZ]
+					    - nlp);
 					p -= nlp - buf;
 					nlp = buf;
 				}
@@ -350,11 +359,11 @@ execute(char *file)
 			}
 			if (p > &buf[fw_lBufsiz]) {
 				if ((ccount = fread(p, sizeof (char),
-					&buf[fw_lBufsiz + BUFSIZ] - p, fptr))
-					<= 0)
+				    &buf[fw_lBufsiz + BUFSIZ] - p, fptr))
+				    <= 0)
 					break;
 			} else if ((ccount = fread(p, sizeof (char),
-				BUFSIZ, fptr)) <= 0)
+			    BUFSIZ, fptr)) <= 0)
 				break;
 			blkno += (long long)ccount;
 		}
@@ -417,14 +426,16 @@ if (p > &buf[fw_lBufsiz]) {
 				goto nomatch;
 succeed:
 			nsucc = 1;
-			if (cflag)
-				tln++;
-			else if (lflag && !sflag) {
-				(void) printf("%s\n", file);
+			if (lflag || qflag) {
+				if (!qflag)
+					(void) printf("%s\n", file);
 				(void) fclose(fptr);
 				return;
-			} else if (!sflag) {
-				if (nfile > 1 && !hflag)
+			}
+			if (cflag) {
+				tln++;
+			} else {
+				if (Hflag || (nfile > 1 && !hflag))
 					(void) printf("%s:", file);
 				if (bflag)
 					(void) printf("%lld:",
@@ -458,8 +469,8 @@ nomatch:
 			}
 	}
 	(void) fclose(fptr);
-	if (cflag) {
-		if ((nfile > 1) && !hflag)
+	if (cflag && !qflag) {
+		if (Hflag || (nfile > 1 && !hflag))
 			(void) printf("%s:", file);
 		(void) printf("%lld\n", tln);
 	}
@@ -481,7 +492,7 @@ getargc(void)
 		if ((b = getc(wordf)) == EOF)
 			return (EOF);
 		cw = ISASCII(c = (wchar_t)b) ? 1 :
-			(ISSET2(c) ? WIDTH2 : (ISSET3(c) ? WIDTH3 : WIDTH1));
+		    (ISSET2(c) ? WIDTH2 : (ISSET3(c) ? WIDTH3 : WIDTH1));
 		while (--cw) {
 			if ((b = getc(wordf)) == EOF)
 				return (EOF);
@@ -495,7 +506,7 @@ getargc(void)
 
 	{
 		cw = ISASCII(c = (unsigned char)*argptr++) ? 1 :
-			(ISSET2(c) ? WIDTH2 : (ISSET3(c) ? WIDTH3 : WIDTH1));
+		    (ISSET2(c) ? WIDTH2 : (ISSET3(c) ? WIDTH3 : WIDTH1));
 
 		while (--cw)
 			c = (c << 7) | ((*argptr++) & 0177);
@@ -614,7 +625,7 @@ cfail(void)
 	struct words *s;
 	s = w;
 	if ((queue = (struct words **)calloc(qsize, sizeof (struct words *)))
-				== NULL) {
+	    == NULL) {
 		perror("fgrep");
 		exit(2);
 	}

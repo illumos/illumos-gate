@@ -24,6 +24,7 @@
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright (c) 2013 Andrew Stormont.  All rights reserved.
 #
 
 #
@@ -177,9 +178,9 @@ DEBUG_DEFS_OBJ64	=
 DEBUG_DEFS_DBG64	= -DDEBUG
 DEBUG_DEFS		= $(DEBUG_DEFS_$(BUILD_TYPE))
 
-DEBUG_COND_OBJ32	:sh = echo \\043
+DEBUG_COND_OBJ32	= $(POUND_SIGN)
 DEBUG_COND_DBG32	=
-DEBUG_COND_OBJ64	:sh = echo \\043
+DEBUG_COND_OBJ64	= $(POUND_SIGN)
 DEBUG_COND_DBG64	=
 IF_DEBUG_OBJ		= $(DEBUG_COND_$(BUILD_TYPE))$(OBJS_DIR)/
 
