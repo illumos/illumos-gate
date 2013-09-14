@@ -26,7 +26,9 @@
 /*
  * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  */
-
+/*
+ * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
+ */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
@@ -75,6 +77,8 @@ static int Rflag = 0;
 
 static int get_adj(char *, struct timeval *);
 static int setdate(struct tm *, char *);
+static void fmt_extensions(char *, size_t,
+    const char *, const struct timespec *);
 
 int
 main(int argc, char **argv)
@@ -82,7 +86,9 @@ main(int argc, char **argv)
 	struct tm *tp, tm;
 	struct timeval tv;
 	char *fmt;
+	char fmtbuf[BUFSIZ];
 	int c, aflag = 0, illflag = 0;
+	struct timespec ts;
 
 	(void) setlocale(LC_ALL, "");
 
@@ -126,7 +132,11 @@ main(int argc, char **argv)
 		exit(1);
 	}
 
-	(void) time(&clock_val);
+	if (clock_gettime(CLOCK_REALTIME, &ts) != 0) {
+		perror(gettext("date: Failed to obtain system time"));
+		exit(1);
+	}
+	clock_val = ts.tv_sec;
 
 	if (aflag) {
 		if (adjtime(&tv, 0) < 0) {
@@ -151,6 +161,8 @@ main(int argc, char **argv)
 	} else
 		fmt = nl_langinfo(_DATE_FMT);
 
+	fmt_extensions(fmtbuf, sizeof (fmtbuf), fmt, &ts);
+
 	if (uflag) {
 		(void) putenv("TZ=GMT0");
 		tzset();
@@ -158,7 +170,7 @@ main(int argc, char **argv)
 	} else
 		tp = localtime(&clock_val);
 	(void) memcpy(&tm, tp, sizeof (struct tm));
-	(void) strftime(buf, BUFSIZ, fmt, &tm);
+	(void) strftime(buf, BUFSIZ, fmtbuf, &tm);
 
 	(void) puts(buf);
 
@@ -351,4 +363,33 @@ get_adj(char *cp, struct timeval *tp)
 		tp->tv_usec *= sign;
 		return (0);
 	}
+}
+
+/*
+ * Extensions that cannot be interpreted by strftime are interpreted here.
+ */
+void
+fmt_extensions(char *fmtbuf, size_t len,
+    const char *fmt, const struct timespec *tsp)
+{
+	const char *p;
+	char *q;
+
+	for (p = fmt, q = fmtbuf; *p != '\0' && q < fmtbuf + len; ++p) {
+		if (*p == '%') {
+			switch (*(p + 1)) {
+			case 'N':
+				++p;
+				q += snprintf(q, len - (q - fmtbuf),
+				    "%09lu", tsp->tv_nsec);
+				continue;
+			}
+		}
+		*q++ = *p;
+	}
+
+	if (q < fmtbuf + len)
+		*q = '\0';
+	else
+		fmtbuf[len - 1] = '\0';
 }

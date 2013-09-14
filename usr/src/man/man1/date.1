@@ -155,6 +155,12 @@ Century (a year divided by 100 and truncated to an integer) as a decimal number
 [00-99].
 .RE
 
+In addition, the nonstandard conversion specification \fB%N\fR is also
+supported, and is converted to the zero-padded number of nanoseconds since the
+last second.  Note that the actual resolution of this number is limited to the
+resolution of the system's \fBCLOCK_REALTIME\fR clock.  See
+\fBclock_gettime\fR(3C).
+
 The string is always terminated with a NEWLINE. An argument containing blanks
 must be quoted; see the EXAMPLES section.
 .RE
