@@ -26,6 +26,10 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
+/*
+ * Copyright (c) 2013 RackTop Systems.
+ */
+
 
 #include	<sys/types.h>
 #include	<stdio.h>
@@ -60,7 +64,7 @@ valid_lgroup(char *list, gid_t gid)
 		grplist = malloc((ngroups_max + 1) * sizeof (gid_t));
 	}
 
-	while (ptr = strtok(((i || n_invalid || dup_prim)? NULL: list), ",")) {
+	while ((ptr = strtok((i || n_invalid || dup_prim)? NULL: list, ","))) {
 
 		switch (valid_group(ptr, &g_ptr, &warning)) {
 		case INVALID:

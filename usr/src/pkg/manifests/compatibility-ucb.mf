@@ -21,7 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/compatibility/ucb@$(PKGVERS)
@@ -37,8 +37,6 @@ dir path=usr/bin
 dir path=usr/lib
 dir path=usr/share/man
 dir path=usr/share/man/man1b
-dir path=usr/share/man/man3libucb
-dir path=usr/share/man/man3ucb
 dir path=usr/ucb
 $(i386_ONLY)dir path=usr/ucb/$(ARCH32)
 dir path=usr/ucb/$(ARCH64)
@@ -81,33 +79,6 @@ file path=usr/share/man/man1b/users.1b
 file path=usr/share/man/man1b/vipw.1b
 file path=usr/share/man/man1b/whereis.1b
 file path=usr/share/man/man1b/whoami.1b
-file path=usr/share/man/man3libucb/libcurses.3libucb
-file path=usr/share/man/man3libucb/libdbm.3libucb
-file path=usr/share/man/man3libucb/librpcsoc.3libucb
-file path=usr/share/man/man3libucb/libtermcap.3libucb
-file path=usr/share/man/man3libucb/libucb.3libucb
-file path=usr/share/man/man3ucb/dbm.3ucb
-file path=usr/share/man/man3ucb/flock.3ucb
-file path=usr/share/man/man3ucb/fopen.3ucb
-file path=usr/share/man/man3ucb/gettimeofday.3ucb
-file path=usr/share/man/man3ucb/mctl.3ucb
-file path=usr/share/man/man3ucb/nice.3ucb
-file path=usr/share/man/man3ucb/nlist.3ucb
-file path=usr/share/man/man3ucb/printf.3ucb
-file path=usr/share/man/man3ucb/psignal.3ucb
-file path=usr/share/man/man3ucb/rand.3ucb
-file path=usr/share/man/man3ucb/readdir.3ucb
-file path=usr/share/man/man3ucb/scandir.3ucb
-file path=usr/share/man/man3ucb/setjmp.3ucb
-file path=usr/share/man/man3ucb/sigblock.3ucb
-file path=usr/share/man/man3ucb/siginterrupt.3ucb
-file path=usr/share/man/man3ucb/signal.3ucb
-file path=usr/share/man/man3ucb/sigstack.3ucb
-file path=usr/share/man/man3ucb/sigvec.3ucb
-file path=usr/share/man/man3ucb/sleep.3ucb
-file path=usr/share/man/man3ucb/syscall.3ucb
-file path=usr/share/man/man3ucb/times.3ucb
-file path=usr/share/man/man3ucb/wait.3ucb
 file path=usr/ucb/basename mode=0755
 file path=usr/ucb/biff mode=0755
 file path=usr/ucb/chown mode=0755

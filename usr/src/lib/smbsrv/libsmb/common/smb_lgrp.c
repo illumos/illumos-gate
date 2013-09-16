@@ -22,6 +22,7 @@
 /*
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2013 RackTop Systems.
  */
 
 #include <stdlib.h>
@@ -38,6 +39,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/param.h>
+#include <libcmdutils.h>
 
 /*
  * Local domain SID (aka machine SID) is not stored in the domain table
@@ -123,7 +125,7 @@
 #define	SMB_LGRP_PGRP_GRPBUFSIZ	5120
 #define	SMB_LGRP_PGRP_GROUP	"/etc/group"
 #define	SMB_LGRP_PGRP_MAXGLEN	9	/* max length of group name */
-#define	SMB_LGRP_PGRP_DEFRID	99	/* max reserved id */
+#define	SMB_LGRP_PGRP_DEFRID	1000	/* lowest cifs created gid */
 
 #define	SMB_LGRP_PGRP_NOTUNIQUE	0
 #define	SMB_LGRP_PGRP_RESERVED	1
@@ -2545,70 +2547,6 @@ smb_lgrp_pgrp_valid_gname(char *group)
 }
 
 /*
- * smb_lgrp_pgrp_valid_gid
- *
- * Check to see that the gid is not a reserved gid
- * -- nobody (60001), noaccess (60002) or nogroup (65534)
- */
-static int
-smb_lgrp_pgrp_valid_gid(gid_t gid)
-{
-	return (gid != 60001 && gid != 60002 && gid != 65534);
-}
-
-/*
- * smb_lgrp_pgrp_findnextgid(void)
- *
- * This method finds the next valid GID.
- * It sorts the used GIDs in decreasing order to return MAXUSED + 1.
- * It then adds one to obtain the next valid GID.
- * On failure, -1 is returned. On success, a valid GID is returned.
- */
-static int
-smb_lgrp_pgrp_findnextgid(void)
-{
-	FILE *fptr;
-	gid_t last, next;
-	int gid;
-
-	if ((fptr = popen("exec sh -c "
-	    "\"getent group|cut -f3 -d:|sort -nr|uniq \" 2>/dev/null",
-	    "r")) == NULL)
-		return (-1);
-
-	if (fscanf(fptr, "%u\n", &next) == EOF) {
-		(void) pclose(fptr);
-		return (SMB_LGRP_PGRP_DEFRID + 1);
-	}
-
-	last = MAXUID;
-	gid = -1;
-	do {
-		if (!smb_lgrp_pgrp_valid_gid(next))
-			continue;
-
-		if (next <= SMB_LGRP_PGRP_DEFRID) {
-			if (last != SMB_LGRP_PGRP_DEFRID + 1)
-				gid = SMB_LGRP_PGRP_DEFRID + 1;
-			break;
-		}
-
-		if ((gid = next + 1) != last) {
-			while (!smb_lgrp_pgrp_valid_gid((gid_t)gid))
-				gid++;
-			if (gid > 0 && gid < last)
-				break;
-		}
-
-		gid = -1;
-		last = next;
-	} while (fscanf(fptr, "%u\n", &next) != EOF);
-
-	(void) pclose(fptr);
-	return (gid);
-}
-
-/*
  * smb_lgrp_pgrp_add
  *
  * Create a posix group with the given name.
@@ -2619,7 +2557,7 @@ smb_lgrp_pgrp_add(char *group)
 {
 	FILE *etcgrp;
 	FILE *etctmp;
-	int o_mask, gret;
+	int o_mask;
 	int newdone = 0;
 	struct stat sb;
 	char buf[SMB_LGRP_PGRP_GRPBUFSIZ];
@@ -2630,9 +2568,8 @@ smb_lgrp_pgrp_add(char *group)
 	if ((rc == SMB_LGRP_PGRP_INVALID) || (rc == SMB_LGRP_PGRP_NOTUNIQUE))
 		return (-1);
 
-	if ((gret = smb_lgrp_pgrp_findnextgid()) < 0)
+	if ((findnextgid(SMB_LGRP_PGRP_DEFRID, MAXUID, &gid)) != 0)
 		return (-1);
-	gid = gret;
 
 	if ((etcgrp = fopen(SMB_LGRP_PGRP_GROUP, "r")) == NULL)
 		return (-1);

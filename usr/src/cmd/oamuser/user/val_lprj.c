@@ -24,7 +24,9 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 2013 RackTop Systems.
+ */
 
 #include	<sys/types.h>
 #include	<stdio.h>
@@ -55,7 +57,7 @@ valid_lproject(char *list)
 	if (!list || !*list)
 		return ((int **)NULL);
 
-	while (ptr = strtok(((i || n_invalid) ? NULL : list), ",")) {
+	while ((ptr = strtok((i || n_invalid) ? NULL : list, ","))) {
 
 		switch (valid_project(ptr, &projent, mybuf, sizeof (mybuf),
 		    &warning)) {

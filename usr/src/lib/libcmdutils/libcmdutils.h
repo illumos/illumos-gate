@@ -22,6 +22,9 @@
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2013 RackTop Systems.
+ */
 
 /*
  * Declarations for the functions in libcmdutils.
@@ -29,8 +32,6 @@
 
 #ifndef	_LIBCMDUTILS_H
 #define	_LIBCMDUTILS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This is a private header file.  Applications should not directly include
@@ -124,6 +125,20 @@ extern int add_tnode(avl_tree_t **, dev_t, ino_t);
  * pointer to NULL upon return.
  */
 extern void destroy_tree(avl_tree_t *);
+
+
+
+		/* user/group id helpers */
+
+/*
+ * Used to get the next available user id in given range.
+ */
+extern int findnextuid(uid_t, uid_t, uid_t *);
+
+/*
+ * Used to get the next available group id in given range.
+ */
+extern int findnextgid(gid_t, gid_t, gid_t *);
 
 #ifdef	__cplusplus
 }

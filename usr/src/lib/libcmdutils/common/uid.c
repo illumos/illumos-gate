@@ -27,92 +27,86 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
+/*
+ * Copyright (c) 2013 RackTop Systems.
+ */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.5 */
-
+#include <errno.h>
 #include <sys/types.h>
 #include <stdio.h>
 #include <userdefs.h>
 #include <pwd.h>
+#include <libcmdutils.h>
 
-#include <sys/param.h>
-#ifndef	MAXUID
-#include <limits.h>
-#ifdef UID_MAX
-#define	MAXUID	UID_MAX
-#else
-#define	MAXUID	60000
-#endif
-#endif
-
-static uid_t getrangeboundid(uid_t start, uid_t stop);
-static int isreserveduid(uid_t uid);
+static int findunuseduid(uid_t start, uid_t stop, uid_t *ret);
+static boolean_t isreserveduid(uid_t uid);
 
 /*
- * Find the highest uid currently in use and return it. If the highest unused
- * uid is MAXUID, then attempt to find a hole in the range. If there are no
- * more unused uids, then return -1.
+ * Find the highest unused uid. If the highest unused uid is "stop",
+ * then attempt to find a hole in the range. Returns 0 on success.
  */
-uid_t
-findnextuid(void)
+int
+findnextuid(uid_t start, uid_t stop, uid_t *ret)
 {
-	uid_t uid = DEFRID + 1;
+	uid_t uid = start;
 	struct passwd *pwd;
-	uchar_t overflow = 0;
+	boolean_t overflow = B_FALSE;
 
 	setpwent();
 	for (pwd = getpwent(); pwd != NULL; pwd = getpwent()) {
 		if (isreserveduid(pwd->pw_uid))		/* Skip reserved IDs */
 			continue;
 		if (pwd->pw_uid >= uid) {
-			if (pwd->pw_uid == MAXUID) {	/* Overflow check */
-				overflow = 1;
+			if (pwd->pw_uid == stop) {	/* Overflow check */
+				overflow = B_TRUE;
 				break;
 			}
 			uid = pwd->pw_uid + 1;
-			while (isreserveduid(uid) &&
-			    uid < MAXUID) {		/* Skip reserved IDs */
-				uid++;
-			}
 		}
 	}
+	if (pwd == NULL && errno != 0) {
+		endpwent();
+		return (-1);
+	}
 	endpwent();
-	if (overflow == 1)				/* Find a hole */
-		return (getrangeboundid(DEFRID + 1, MAXUID));
-	return (uid);
+	if (overflow == B_TRUE)				/* Find a hole */
+		return (findunuseduid(start, stop, ret));
+	while (isreserveduid(uid) && uid < stop)	/* Skip reserved IDs */
+		uid++;
+	*ret = uid;
+	return (0);
 }
 
 /*
- * Check to see that the uid is a reserved uid
+ * Check to see whether the uid is a reserved uid
  * -- nobody, noaccess or nobody4
  */
-static int
+static boolean_t
 isreserveduid(uid_t uid)
 {
 	return (uid == 60001 || uid == 60002 || uid == 65534);
 }
 
-
 /*
- * getrangeboundid() attempts to return the next valid usable id between the
- * supplied upper and lower limits. If these limits exceed the system
- * boundaries of DEFRID +1 and MAXUID (lower and upper bound respectively),
- * then they are ignored and DEFRID + 1 and MAXUID are used.
- *
- * Returns a valid uid_t between DEFRID +1 and MAXUID, -1 is returned on fail
+ * findunuseduid() attempts to return the next valid usable id between the
+ * supplied upper and lower limits. Returns 0 on success.
  */
-static uid_t
-getrangeboundid(uid_t start, uid_t stop)
+static int
+findunuseduid(uid_t start, uid_t stop, uid_t *ret)
 {
-	uid_t low = (start <= DEFRID) ? DEFRID + 1 : start;
-	uid_t high = (stop < MAXUID) ? stop : MAXUID;
 	uid_t uid;
 
-	for (uid = low; uid <= high; uid++) {
+	for (uid = start; uid <= stop; uid++) {
 		if (isreserveduid(uid))
 			continue;
-		if (getpwuid(uid) == NULL)
+		if (getpwuid(uid) == NULL) {
+			if (errno != 0)
+				return (-1);
 			break;
+		}
 	}
-	return ((uid > high) ? -1 : uid);
+	if (uid > stop)
+		return (-1);
+	*ret = uid;
+	return (0);
 }

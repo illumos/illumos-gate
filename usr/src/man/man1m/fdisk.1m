@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH FDISK 1M "Jul 2, 2009"
+.TH FDISK 1M "Sep 10, 2013"
 .SH NAME
 fdisk \- create or modify fixed disk partition table
 .SH SYNOPSIS
@@ -593,7 +593,7 @@ Number of blocks to perform operation on (see \fB-o\fR).
 .RS 4n
 Set the label geometry to the content of the \fIgeom_file\fR. The
 \fIgeom_file\fR contains one specification line. Each line is delimited by a
-new-line character (\fB\n\fR). If the first character of a line is an asterisk
+new-line character (\fB\en\fR). If the first character of a line is an asterisk
 (*), the line is treated as a comment. Each line is composed of entries that
 are position-dependent, are separated by white space, and have the following
 format:
