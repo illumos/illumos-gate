@@ -529,7 +529,6 @@ d kernel 0755 root sys
 d kernel/amd64 0755 root sys
 f kernel/amd64/genunix 0755 root sys
 d kernel/crypto 0755 root sys
-f kernel/crypto/aes 0755 root sys
 d kernel/crypto/amd64 0755 root sys
 f kernel/crypto/amd64/aes 0755 root sys
 f kernel/crypto/amd64/arcfour 0755 root sys
@@ -546,7 +545,6 @@ f kernel/crypto/amd64/swrand 0755 root sys
 d kernel/dacf 0755 root sys
 d kernel/dacf/amd64 0755 root sys
 f kernel/dacf/amd64/net_dacf 0755 root sys
-f kernel/dacf/net_dacf 0755 root sys
 d kernel/drv 0755 root sys
 f kernel/drv/aac.conf 0644 root sys
 f kernel/drv/acpi_drv.conf 0644 root sys
@@ -1723,16 +1721,9 @@ f platform/i86pc/kernel/cpu/amd64/cpu_ms.AuthenticAMD.15 0755 root sys
 f platform/i86pc/kernel/cpu/amd64/cpu_ms.GenuineIntel 0755 root sys
 f platform/i86pc/kernel/cpu/amd64/cpu_ms.GenuineIntel.6.46 0755 root sys
 f platform/i86pc/kernel/cpu/amd64/cpu_ms.GenuineIntel.6.47 0755 root sys
-f platform/i86pc/kernel/cpu/cpu.generic 0755 root sys
-f platform/i86pc/kernel/cpu/cpu_ms.AuthenticAMD 0755 root sys
-f platform/i86pc/kernel/cpu/cpu_ms.AuthenticAMD.15 0755 root sys
-f platform/i86pc/kernel/cpu/cpu_ms.GenuineIntel 0755 root sys
-f platform/i86pc/kernel/cpu/cpu_ms.GenuineIntel.6.46 0755 root sys
-f platform/i86pc/kernel/cpu/cpu_ms.GenuineIntel.6.47 0755 root sys
 d platform/i86pc/kernel/dacf 0755 root sys
 d platform/i86pc/kernel/dacf/amd64 0755 root sys
 f platform/i86pc/kernel/dacf/amd64/consconfig_dacf 0755 root sys
-f platform/i86pc/kernel/dacf/consconfig_dacf 0755 root sys
 d platform/i86pc/kernel/drv 0755 root sys
 f platform/i86pc/kernel/drv/acpippm.conf 0644 root sys
 d platform/i86pc/kernel/drv/amd64 0755 root sys
@@ -2072,51 +2063,8 @@ h usr/bin/i286=usr/bin/sun
 h usr/bin/i386=usr/bin/sun
 h usr/bin/i486=usr/bin/sun
 d usr/bin/i86 0755 root bin
-f usr/bin/i86/amt 0555 root bin
-f usr/bin/i86/cputrack 0555 root bin
-h usr/bin/i86/decrypt=usr/bin/i86/encrypt
-h usr/bin/i86/digest=usr/bin/i86/mac
-f usr/bin/i86/elfdump 0555 root bin
-f usr/bin/i86/encrypt 0555 root bin
-f usr/bin/i86/gcore 0555 root bin
 f usr/bin/i86/ksh93 0555 root bin
-h usr/bin/i86/ksh=usr/bin/i86/ksh93
-f usr/bin/i86/mac 0555 root bin
 f usr/bin/i86/mdb 0555 root bin
-f usr/bin/i86/newtask 4555 root sys
-f usr/bin/i86/nohup 0555 root bin
-f usr/bin/i86/pargs 0555 root bin
-f usr/bin/i86/pcred 0555 root bin
-f usr/bin/i86/pfiles 0555 root bin
-f usr/bin/i86/pflags 0555 root bin
-f usr/bin/i86/pldd 0555 root bin
-f usr/bin/i86/plgrp 0555 root bin
-f usr/bin/i86/plimit 0555 root bin
-f usr/bin/i86/pmadvise 0555 root bin
-f usr/bin/i86/pmap 0555 root bin
-f usr/bin/i86/ppgsz 0555 root bin
-f usr/bin/i86/ppriv 0555 root bin
-f usr/bin/i86/prctl 0555 root bin
-f usr/bin/i86/preap 0555 root bin
-f usr/bin/i86/prstat 0555 root bin
-f usr/bin/i86/prun 0555 root bin
-f usr/bin/i86/ps 0555 root bin
-f usr/bin/i86/psig 0555 root bin
-f usr/bin/i86/pstack 0555 root bin
-f usr/bin/i86/pstop 0555 root bin
-f usr/bin/i86/ptime 0555 root bin
-f usr/bin/i86/ptree 0555 root bin
-f usr/bin/i86/pwait 0555 root bin
-f usr/bin/i86/pwdx 0555 root bin
-h usr/bin/i86/rksh93=usr/bin/i86/ksh93
-h usr/bin/i86/rksh=usr/bin/i86/ksh93
-f usr/bin/i86/savecore 0555 root bin
-f usr/bin/i86/setuname 0555 root bin
-f usr/bin/i86/sort 0555 root bin
-f usr/bin/i86/strings 0555 root bin
-f usr/bin/i86/truss 0555 root bin
-h usr/bin/i86/uptime=usr/bin/i86/w
-f usr/bin/i86/w 4555 root bin
 h usr/bin/i86pc=usr/bin/sun
 f usr/bin/iconv 0555 root bin
 f usr/bin/id 0555 root bin
@@ -4619,7 +4567,6 @@ f usr/kernel/sched/amd64/RT_DPTBL 0755 root sys
 d usr/kernel/socketmod 0755 root sys
 d usr/kernel/socketmod/amd64 0755 root sys
 f usr/kernel/socketmod/amd64/sockpfp 0755 root sys
-f usr/kernel/socketmod/sockpfp 0755 root sys
 d usr/kernel/sys 0755 root sys
 d usr/kernel/sys/amd64 0755 root sys
 f usr/kernel/sys/amd64/acctctl 0755 root sys
@@ -5969,7 +5916,6 @@ f usr/lib/inet/dhcp/svc/ds_SUNWfiles.so.1 0755 root bin
 s usr/lib/inet/dhcp/svc/ds_SUNWfiles.so=ds_SUNWfiles.so.1
 f usr/lib/inet/dsvclockd 0555 root bin
 d usr/lib/inet/i86 0755 root bin
-f usr/lib/inet/i86/in.iked 0555 root bin
 d usr/lib/inet/ilb 0755 root bin
 f usr/lib/inet/ilb/ilb_probe 0555 root bin
 f usr/lib/inet/ilbd 0555 root bin
@@ -6001,7 +5947,6 @@ f usr/lib/ipf/IPFILTER.LICENCE 0644 root bin
 d usr/lib/ipf/amd64 0755 root sys
 f usr/lib/ipf/amd64/ipftest 0555 root bin
 d usr/lib/ipf/i86 0755 root sys
-f usr/lib/ipf/i86/ipftest 0555 root bin
 h usr/lib/ipf/ipftest=usr/lib/isaexec
 d usr/lib/ipqosconf 0755 root bin
 f usr/lib/ipqosconf/dlcosmk.types 0444 root bin
@@ -9689,7 +9634,6 @@ d usr/lib/rcap 0755 root bin
 d usr/lib/rcap/amd64 0755 root bin
 f usr/lib/rcap/amd64/rcapd 0555 root bin
 d usr/lib/rcap/i86 0755 root bin
-f usr/lib/rcap/i86/rcapd 0555 root bin
 h usr/lib/rcap/rcapd=usr/lib/isaexec
 d usr/lib/rcm 0755 root bin
 d usr/lib/rcm/modules 0755 root bin
@@ -10032,7 +9976,6 @@ d usr/lib/zones 0755 root bin
 d usr/lib/zones/amd64 0755 root bin
 f usr/lib/zones/amd64/zoneadmd 0555 root bin
 d usr/lib/zones/i86 0755 root bin
-f usr/lib/zones/i86/zoneadmd 0555 root bin
 h usr/lib/zones/zoneadmd=usr/lib/isaexec
 f usr/lib/zones/zoneshare 0555 root bin
 f usr/lib/zones/zoneunshare 0555 root bin
@@ -10330,29 +10273,6 @@ s usr/sbin/hostconfig=../../sbin/hostconfig
 f usr/sbin/hotplug 0555 root bin
 f usr/sbin/htable 0555 root bin
 d usr/sbin/i86 0755 root bin
-f usr/sbin/i86/add_drv 0555 root sys
-f usr/sbin/i86/dtrace 0555 root bin
-f usr/sbin/i86/intrstat 0555 root bin
-f usr/sbin/i86/ipf 0555 root bin
-f usr/sbin/i86/ipfs 0555 root bin
-f usr/sbin/i86/ipfstat 0555 root bin
-f usr/sbin/i86/ipmon 0555 root bin
-f usr/sbin/i86/ipnat 0555 root bin
-f usr/sbin/i86/ippool 0555 root bin
-f usr/sbin/i86/lockstat 0555 root bin
-f usr/sbin/i86/modinfo 0555 root sys
-f usr/sbin/i86/modload 0555 root sys
-f usr/sbin/i86/modunload 0555 root sys
-f usr/sbin/i86/pbind 0555 root sys
-f usr/sbin/i86/plockstat 0555 root bin
-f usr/sbin/i86/prtconf 2555 root sys
-f usr/sbin/i86/psrset 0555 root sys
-f usr/sbin/i86/rem_drv 0555 root sys
-f usr/sbin/i86/swap 2555 root sys
-f usr/sbin/i86/sysdef 2555 root sys
-f usr/sbin/i86/update_drv 0555 root sys
-f usr/sbin/i86/whodo 4555 root bin
-f usr/sbin/i86/zdb 0555 root bin
 f usr/sbin/idmap 0555 root bin
 f usr/sbin/if_mpadm 0555 root bin
 s usr/sbin/ifconfig=../../sbin/ifconfig
@@ -19574,7 +19494,6 @@ d usr/ucb/amd64 0755 root bin
 f usr/ucb/amd64/ps 0555 root bin
 f usr/ucb/df 0755 root bin
 d usr/ucb/i86 0755 root bin
-f usr/ucb/i86/ps 0555 root bin
 f usr/ucb/ls 0755 root bin
 s usr/ucb/more=../bin/more
 s usr/ucb/page=../bin/more
