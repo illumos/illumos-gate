@@ -23,6 +23,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
+ */
+
 #include <sys/param.h>
 #include <sys/thread.h>
 #include <sys/cmn_err.h>
@@ -62,9 +66,10 @@
  * by incrementing the hold count (i.e. adding 8, aka RW_READ_LOCK).
  *
  * A writer will fail to acquire the lock if any other thread owns it.
- * A reader will fail if the lock is either owned or wanted by a writer.
- * rw_tryenter() returns 0 in these cases; rw_enter() blocks until the
- * lock becomes available.
+ * A reader will fail if the lock is either owned (in the RW_READER and
+ * RW_READER_STARVEWRITER cases) or wanted by a writer (in the RW_READER
+ * case). rw_tryenter() returns 0 in these cases; rw_enter() blocks until
+ * the lock becomes available.
  *
  * When a thread blocks it acquires the rwlock's hashed turnstile lock and
  * attempts to set RW_HAS_WAITERS (and RW_WRITE_WANTED in the writer case)
@@ -136,6 +141,42 @@
  * readers of higher priority.  The situation is mitigated by the fact
  * that writers always inherit priority from blocked readers, and the
  * writer will awaken those readers as soon as it exits the lock.
+ *
+ * Finally, note that this hybrid scheme -- and indeed, any scheme that
+ * satisfies requirement (2) -- has an important consequence:  if a lock is
+ * held as reader and a writer subsequently becomes blocked, any further
+ * readers must be blocked to avoid writer starvation.  This implementation
+ * detail has ramifications for the semantics of rwlocks, as it prohibits
+ * recursively acquiring an rwlock as reader: any writer that wishes to
+ * acquire the lock after the first but before the second acquisition as
+ * reader will block the second acquisition -- resulting in deadlock.  This
+ * itself is not necessarily prohibitive, as it is often straightforward to
+ * prevent a single thread from recursively acquiring an rwlock as reader.
+ * However, a more subtle situation arises when both a traditional mutex and
+ * a reader lock are acquired by two different threads in opposite order.
+ * (That is, one thread first acquires the mutex and then the rwlock as
+ * reader; the other acquires the rwlock as reader and then the mutex.) As
+ * with the single threaded case, this is fine absent a blocked writer: the
+ * thread that acquires the mutex before acquiring the rwlock as reader will
+ * be able to successfully acquire the rwlock -- even as/if the other thread
+ * has the rwlock as reader and is blocked on the held mutex.  However, if
+ * an unrelated writer (that is, a third thread) becomes blocked on the
+ * rwlock after the first thread acquires the rwlock as reader but before
+ * it's able to acquire the mutex, the second thread -- with the mutex held
+ * -- will not be able to acquire the rwlock as reader due to the waiting
+ * writer, deadlocking the three threads.  Unlike the single-threaded
+ * (recursive) rwlock acquisition case, this case can be quite a bit
+ * thornier to fix, especially as there is nothing inherently wrong in the
+ * locking strategy: the deadlock is really induced by requirement (2), not
+ * the consumers of the rwlock.  To permit such consumers, we allow rwlock
+ * acquirers to explicitly opt out of requirement (2) by specifying
+ * RW_READER_STARVEWRITER when acquiring the rwlock.  This (obviously) means
+ * that inifinite readers can starve writers, but it also allows for
+ * multiple readers in the presence of other synchronization primitives
+ * without regard for lock-ordering.  And while certainly odd (and perhaps
+ * unwise), RW_READER_STARVEWRITER can be safely used alongside RW_READER on
+ * the same lock -- RW_READER_STARVEWRITER describes only the act of lock
+ * acquisition with respect to waiting writers, not the lock itself.
  *
  * rw_downgrade() follows the same wakeup policy as an exiting writer.
  *
@@ -213,7 +254,7 @@ rw_locked(rwlock_impl_t *lp, krw_t rw)
 {
 	uintptr_t old = lp->rw_wwwh;
 
-	if (rw == RW_READER)
+	if (rw == RW_READER || rw == RW_READER_STARVEWRITER)
 		return ((old & RW_LOCKED) && !(old & RW_WRITE_LOCKED));
 
 	if (rw == RW_WRITER)
@@ -230,7 +271,7 @@ void (*rw_lock_delay)(uint_t) = NULL;
  * Called from the assembly version if anything complicated is going on.
  * The only semantic difference between calling rw_enter() and calling
  * rw_enter_sleep() directly is that we assume the caller has already done
- * a THREAD_KPRI_REQUEST() in the RW_READER case.
+ * a THREAD_KPRI_REQUEST() in the RW_READER cases.
  */
 void
 rw_enter_sleep(rwlock_impl_t *lp, krw_t rw)
@@ -244,6 +285,10 @@ rw_enter_sleep(rwlock_impl_t *lp, krw_t rw)
 	if (rw == RW_READER) {
 		lock_value = RW_READ_LOCK;
 		lock_busy = RW_WRITE_CLAIMED;
+		lock_wait = RW_HAS_WAITERS;
+	} else if (rw == RW_READER_STARVEWRITER) {
+		lock_value = RW_READ_LOCK;
+		lock_busy = RW_WRITE_LOCKED;
 		lock_wait = RW_HAS_WAITERS;
 	} else {
 		lock_value = RW_WRITE_LOCK(curthread);
@@ -304,7 +349,7 @@ rw_enter_sleep(rwlock_impl_t *lp, krw_t rw)
 		ASSERT(lp->rw_wwwh & RW_LOCKED);
 
 		sleep_time = -gethrtime();
-		if (rw == RW_READER) {
+		if (rw != RW_WRITER) {
 			THREAD_KPRI_RELEASE();
 			CPU_STATS_ADDQ(CPU, sys, rw_rdfails, 1);
 			(void) turnstile_block(ts, TS_READER_Q, lp,
@@ -413,6 +458,24 @@ rw_exit_wakeup(rwlock_impl_t *lp)
 		}
 
 		/*
+		 * This appears to be the final exit of a lock with waiters.
+		 * If we do not have the lock as writer (that is, if this is
+		 * the last exit of a reader with waiting writers), we will
+		 * grab the lock as writer to prevent additional readers.
+		 * (This is required because a reader that is acquiring the
+		 * lock via RW_READER_STARVEWRITER will not observe the
+		 * RW_WRITE_WANTED bit -- and we could therefore be racing
+		 * with such readers here.)
+		 */
+		if (!(old & RW_WRITE_LOCKED)) {
+			new = RW_WRITE_LOCK(curthread) |
+			    RW_HAS_WAITERS | RW_WRITE_WANTED;
+
+			if (casip(&lp->rw_wwwh, old, new) != old)
+				continue;
+		}
+
+		/*
 		 * Perform the final exit of a lock that has waiters.
 		 */
 		ts = turnstile_lookup(lp);
@@ -473,12 +536,13 @@ rw_tryenter(krwlock_t *rwlp, krw_t rw)
 	rwlock_impl_t *lp = (rwlock_impl_t *)rwlp;
 	uintptr_t old;
 
-	if (rw == RW_READER) {
+	if (rw != RW_WRITER) {
 		uint_t backoff = 0;
 		int loop_count = 0;
 		THREAD_KPRI_REQUEST();
 		for (;;) {
-			if ((old = lp->rw_wwwh) & RW_WRITE_CLAIMED) {
+			if ((old = lp->rw_wwwh) & (rw == RW_READER ?
+			    RW_WRITE_CLAIMED : RW_WRITE_LOCKED)) {
 				THREAD_KPRI_RELEASE();
 				return (0);
 			}

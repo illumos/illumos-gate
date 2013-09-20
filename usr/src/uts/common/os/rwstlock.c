@@ -24,7 +24,9 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
+ */
 
 #include <sys/rwstlock.h>
 #include <sys/errno.h>
@@ -38,7 +40,9 @@
  * other than the one that acquired the lock.
  *
  * There is no priority inheritance mechanism for these locks.
- * Writers have priority over readers, so reader starvation is possible.
+ * For RW_READER, writers have priority over readers, so reader starvation
+ * is possible; as with rwlocks, this behavior may be overridden by
+ * specifying RW_READER_STARVEWRITER.
  */
 
 /*
@@ -61,8 +65,9 @@ rwst_enter_common(rwstlock_t *l, krw_t rw, int flags)
 	intptr_t readers;
 
 	mutex_enter(&l->rwst_lock);
-	if (rw == RW_READER) {
-		while (RWST_WRITE_HELD(l) || RWST_WRITE_WANTED(l)) {
+	if (rw == RW_READER || rw == RW_READER_STARVEWRITER) {
+		while (RWST_WRITE_HELD(l) ||
+		    (rw != RW_READER_STARVEWRITER && RWST_WRITE_WANTED(l))) {
 
 			if (flags & RWST_TRYENTER) {
 				mutex_exit(&l->rwst_lock);
@@ -164,7 +169,7 @@ rwst_tryenter(rwstlock_t *l, krw_t rw)
 int
 rwst_lock_held(rwstlock_t *l, krw_t rw)
 {
-	if (rw == RW_READER)
+	if (rw != RW_WRITER)
 		return (RWST_READ_HELD(l));
 	ASSERT(rw == RW_WRITER);
 	return (RWST_WRITE_OWNER(l));

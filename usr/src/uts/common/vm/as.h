@@ -23,6 +23,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T */
 /*	 All Rights Reserved   */
 
@@ -226,7 +230,8 @@ extern struct as kas;		/* kernel's address space */
 /*
  * Macros for address space locking.
  */
-#define	AS_LOCK_ENTER(as, lock, type)		rw_enter((lock), (type))
+#define	AS_LOCK_ENTER(as, lock, type)		\
+	rw_enter((lock), (type) == RW_READER ? RW_READER_STARVEWRITER : (type))
 #define	AS_LOCK_EXIT(as, lock)			rw_exit((lock))
 #define	AS_LOCK_DESTROY(as, lock)		rw_destroy((lock))
 #define	AS_LOCK_TRYENTER(as, lock, type)	rw_tryenter((lock), (type))
