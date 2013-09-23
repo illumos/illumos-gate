@@ -1,61 +1,62 @@
 '\" te
+.\" Copyright 2013 Nexenta Systems, Inc. All rights reserved.
 .\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LOFIADM 1M "Aug 31, 2009"
+.TH LOFIADM 1M "Aug 28, 2013"
 .SH NAME
 lofiadm \- administer files available as block devices through lofi
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/sbin/lofiadm\fR \fB-a\fR \fIfile\fR [\fIdevice\fR]
+\fBlofiadm\fR [\fB-r\fR] \fB-a\fR \fIfile\fR [\fIdevice\fR]
 .fi
 
 .LP
 .nf
-\fB/usr/sbin/lofiadm\fR \fB-c\fR \fIcrypto_algorithm\fR \fB-a\fR \fIfile\fR [\fIdevice\fR]
+\fBlofiadm\fR [\fB-r\fR] \fB-c\fR \fIcrypto_algorithm\fR \fB-a\fR \fIfile\fR [\fIdevice\fR]
 .fi
 
 .LP
 .nf
-\fB/usr/sbin/lofiadm\fR \fB-c\fR \fIcrypto_algorithm\fR \fB-k\fR \fIraw_key_file\fR \fB-a\fR \fIfile\fR [\fIdevice\fR]
+\fBlofiadm\fR [\fB-r\fR] \fB-c\fR \fIcrypto_algorithm\fR \fB-k\fR \fIraw_key_file\fR \fB-a\fR \fIfile\fR [\fIdevice\fR]
 .fi
 
 .LP
 .nf
-\fB/usr/sbin/lofiadm\fR \fB-c\fR \fIcrypto_algorithm\fR \fB-T\fR \fItoken_key\fR \fB-a\fR \fIfile\fR [\fIdevice\fR]
+\fBlofiadm\fR [\fB-r\fR] \fB-c\fR \fIcrypto_algorithm\fR \fB-T\fR \fItoken_key\fR \fB-a\fR \fIfile\fR [\fIdevice\fR]
 .fi
 
 .LP
 .nf
-\fB/usr/sbin/lofiadm\fR \fB-c\fR \fIcrypto_algorithm\fR \fB-T\fR \fItoken_key\fR
+\fBlofiadm\fR [\fB-r\fR] \fB-c\fR \fIcrypto_algorithm\fR \fB-T\fR \fItoken_key\fR
      \fB-k\fR \fIwrapped_key_file\fR \fB-a\fR \fIfile\fR [\fIdevice\fR]
 .fi
 
 .LP
 .nf
-\fB/usr/sbin/lofiadm\fR \fB-c\fR \fIcrypto_algorithm\fR \fB-e\fR \fB-a\fR \fIfile\fR [\fIdevice\fR]
+\fBlofiadm\fR [\fB-r\fR] \fB-c\fR \fIcrypto_algorithm\fR \fB-e\fR \fB-a\fR \fIfile\fR [\fIdevice\fR]
 .fi
 
 .LP
 .nf
-\fB/usr/sbin/lofiadm\fR \fB-C\fR \fIalgorithm\fR [\fB-s\fR \fIsegment_size\fR] \fIfile\fR
+\fBlofiadm\fR \fB-C\fR \fIalgorithm\fR [\fB-s\fR \fIsegment_size\fR] \fIfile\fR
 .fi
 
 .LP
 .nf
-\fB/usr/sbin/lofiadm\fR \fB-d\fR \fIfile\fR | \fIdevice\fR
+\fBlofiadm\fR \fB-d\fR \fIfile\fR | \fIdevice\fR
 .fi
 
 .LP
 .nf
-\fB/usr/sbin/lofiadm\fR \fB-U\fR \fIfile\fR
+\fBlofiadm\fR \fB-U\fR \fIfile\fR
 .fi
 
 .LP
 .nf
-\fB/usr/sbin/lofiadm\fR [ \fIfile\fR | \fIdevice\fR]
+\fBlofiadm\fR [ \fIfile\fR | \fIdevice\fR]
 .fi
 
 .SH DESCRIPTION
@@ -130,6 +131,17 @@ file read/write.
 .RS 4n
 Remove an association by \fIfile\fR or \fIdevice\fR name, if the associated
 block device is not busy, and deallocates the block device.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-r\fR
+.ad
+.sp .6
+.RS 4n
+If the \fB-r\fR option is specified before the \fB-a\fR option, the
+\fIdevice\fR will be opened read-only.
 .RE
 
 .sp
