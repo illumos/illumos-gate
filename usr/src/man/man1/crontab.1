@@ -11,7 +11,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH CRONTAB 1 "Apr 6, 2009"
+.TH CRONTAB 1 "Sep 23, 2013"
 .SH NAME
 crontab \- user crontab file
 .SH SYNOPSIS
@@ -27,7 +27,7 @@ crontab \- user crontab file
 
 .LP
 .nf
-\fB/usr/bin/crontab\fR \fB-l\fR [\fIusername\fR]
+\fB/usr/bin/crontab\fR \fB-l\fR [\fB-g\fR] [\fIusername\fR]
 .fi
 
 .LP
@@ -47,7 +47,7 @@ crontab \- user crontab file
 
 .LP
 .nf
-\fB/usr/xpg4/bin/crontab\fR \fB-l\fR [\fIusername\fR]
+\fB/usr/xpg4/bin/crontab\fR \fB-l\fR [\fB-g\fR] [\fIusername\fR]
 .fi
 
 .LP
@@ -67,7 +67,7 @@ crontab \- user crontab file
 
 .LP
 .nf
-\fB/usr/xpg6/bin/crontab\fR \fB-l\fR [\fIusername\fR]
+\fB/usr/xpg6/bin/crontab\fR \fB-l\fR [\fB-g\fR] [\fIusername\fR]
 .fi
 
 .LP
@@ -92,10 +92,12 @@ If \fBcrontab\fR is invoked with \fIfilename\fR, this overwrites an existing
 Cron supports a merged crontab with entries coming from either the user's
 \fB/var/spool/cron/crontabs\fR file or from the user's
 \fB/etc/cron.d/crontabs\fR file.  The entries in the user's
-\fB/var/spool/cron/crontabs\fR file are meant to be editable whereas those in
-\fB/etc/cron.d/crontabs\fR are meant as system-defined entries which are not
-intended to be customized by the user.  The dual set of crontab entries is only
-of interest to system-defined users such as \fBroot\fR.
+\fB/var/spool/cron/crontabs\fR file are editable whereas those in
+\fB/etc/cron.d/crontabs\fR are system-defined entries which may not
+be customized by the user.  The dual set of crontab entries is only
+of interest to system-defined users such as \fBroot\fR.  Except where
+otherwise explicitly indicated, all variants of the \fBcrontab\fR command
+act only on the editable crontab files found in \fB/var/spool/cron/crontabs\fR.
 .SS "\fBcrontab\fR Access Control"
 .sp
 .LP
@@ -368,8 +370,21 @@ Lists the \fBcrontab\fR file for the invoking user. Only root or a user with
 the \fBsolaris.jobs.admin\fR authorization can specify a username following the
 \fB-l\fR option to list the \fBcrontab\fR file of the specified user.
 .sp
-Entries from both the user's \fB/var/spool/cron/crontabs\fR file and thhe user's
-\fB/etc/cron.d/crontabs\fR file will be merged in the output.
+Entries from the user's \fB/var/spool/cron/crontabs\fR file are listed, unless
+the \fB-g\fR option is given, in which case only entries from the user's
+\fB/etc/cron.d/crontabs\fR file are listed.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-g\fR\fR
+.ad
+.RS 6n
+In conjunction with the \fB-l\fR option, lists the global \fBcrontab\fR file
+for the invoking or specified user (if authorized) instead of the editable
+\fBcrontab\fR file.  This option is not valid unless the \fB-l\fR option is
+also given.
 .RE
 
 .sp

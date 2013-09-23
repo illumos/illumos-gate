@@ -71,7 +71,7 @@
 	"usage:\n"			\
 	"\tcrontab [file]\n"		\
 	"\tcrontab -e [username]\n"	\
-	"\tcrontab -l [username]\n"	\
+	"\tcrontab -l [-g] [username]\n"	\
 	"\tcrontab -r [username]"
 #define	INVALIDUSER	"you are not a valid user (no entry in /etc/passwd)."
 #define	NOTALLOWED	"you are not authorized to use cron.  Sorry."
@@ -120,6 +120,7 @@ main(int argc, char **argv)
 	int	c, r;
 	int	rflag	= 0;
 	int	lflag	= 0;
+	int	gflag	= 0;
 	int	eflag	= 0;
 	int	errflg	= 0;
 	char *pp;
@@ -151,10 +152,13 @@ main(int argc, char **argv)
 		exit(1);
 	}
 
-	while ((c = getopt(argc, argv, "elr")) != EOF)
+	while ((c = getopt(argc, argv, "eglr")) != EOF)
 		switch (c) {
 			case 'e':
 				eflag++;
+				break;
+			case 'g':
+				gflag++;
 				break;
 			case 'l':
 				lflag++;
@@ -168,6 +172,9 @@ main(int argc, char **argv)
 		}
 
 	if (eflag + lflag + rflag > 1)
+		errflg++;
+
+	if (gflag && !lflag)
 		errflg++;
 
 	argc -= optind;
@@ -236,28 +243,27 @@ main(int argc, char **argv)
 		exit(0);
 	}
 	if (lflag) {
-		int sys_done = 0;
 		char sysconf[PATH_MAX];
 
-		if (snprintf(sysconf, sizeof (sysconf), "%s/%s",
-		    SYSCRONDIR, login) < sizeof (sysconf) &&
-		    (fp = fopen(sysconf, "r")) != NULL) {
+		if (gflag) {
+			if (snprintf(sysconf, sizeof (sysconf), "%s/%s",
+			    SYSCRONDIR, login) < sizeof (sysconf) &&
+			    (fp = fopen(sysconf, "r")) != NULL) {
+				while (fgets(line, CTLINESIZE, fp) != NULL)
+					fputs(line, stdout);
+				fclose(fp);
+				exit(0);
+			} else {
+				crabort(BADOPEN);
+			}
+		} else {
+			if ((fp = fopen(cf, "r")) == NULL)
+				crabort(BADOPEN);
 			while (fgets(line, CTLINESIZE, fp) != NULL)
 				fputs(line, stdout);
 			fclose(fp);
-			sys_done = 1;
+			exit(0);
 		}
-
-		if ((fp = fopen(cf, "r")) == NULL) {
-			if (!sys_done)
-				crabort(BADOPEN);
-			else
-				exit(0);
-		}
-		while (fgets(line, CTLINESIZE, fp) != NULL)
-			fputs(line, stdout);
-		fclose(fp);
-		exit(0);
 	}
 	if (eflag) {
 		if ((fp = fopen(cf, "r")) == NULL) {
