@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013 DEY Storage Systems, Inc.
  */
 
 /*
@@ -101,6 +102,7 @@ static priv_set_t *dropprivs;
 static int nocmdchar = 0;
 static int failsafe = 0;
 static char cmdchar = '~';
+static int quiet = 0;
 
 static int pollerr = 0;
 
@@ -147,7 +149,7 @@ static boolean_t forced_login = B_FALSE;
 static void
 usage(void)
 {
-	(void) fprintf(stderr, gettext("usage: %s [ -CES ] [ -e cmdchar ] "
+	(void) fprintf(stderr, gettext("usage: %s [ -QCES ] [ -e cmdchar ] "
 	    "[-l user] zonename [command [args ...] ]\n"), pname);
 	exit(2);
 }
@@ -1749,7 +1751,7 @@ main(int argc, char **argv)
 	(void) getpname(argv[0]);
 	username = get_username();
 
-	while ((arg = getopt(argc, argv, "ECR:Se:l:")) != EOF) {
+	while ((arg = getopt(argc, argv, "ECR:Se:l:Q")) != EOF) {
 		switch (arg) {
 		case 'C':
 			console = 1;
@@ -1768,6 +1770,9 @@ main(int argc, char **argv)
 				exit(2);
 			}
 			zonecfg_set_root(optarg);
+			break;
+		case 'Q':
+			quiet = 1;
 			break;
 		case 'S':
 			failsafe = 1;
@@ -1923,8 +1928,10 @@ main(int argc, char **argv)
 		if (get_console_master(zonename) == -1)
 			return (1);
 
-		(void) printf(gettext("[Connected to zone '%s' console]\n"),
-		    zonename);
+		if (!quiet)
+			(void) printf(
+			    gettext("[Connected to zone '%s' console]\n"),
+			    zonename);
 
 		if (set_tty_rawmode(STDIN_FILENO) == -1) {
 			reset_tty();
@@ -1940,8 +1947,10 @@ main(int argc, char **argv)
 		 */
 		doio(masterfd, -1, masterfd, -1, -1, B_FALSE);
 		reset_tty();
-		(void) printf(gettext("\n[Connection to zone '%s' console "
-		    "closed]\n"), zonename);
+		if (!quiet)
+			(void) printf(
+			    gettext("\n[Connection to zone '%s' console "
+			    "closed]\n"), zonename);
 
 		return (0);
 	}
@@ -2068,8 +2077,9 @@ main(int argc, char **argv)
 		(void) strlcpy(slaveshortname, slavename,
 		    sizeof (slaveshortname));
 
-	(void) printf(gettext("[Connected to zone '%s' %s]\n"), zonename,
-	    slaveshortname);
+	if (!quiet)
+		(void) printf(gettext("[Connected to zone '%s' %s]\n"),
+		    zonename, slaveshortname);
 
 	if (set_tty_rawmode(STDIN_FILENO) == -1) {
 		reset_tty();
@@ -2214,9 +2224,10 @@ main(int argc, char **argv)
 	doio(masterfd, -1, masterfd, -1, -1, B_FALSE);
 
 	reset_tty();
-	(void) fprintf(stderr,
-	    gettext("\n[Connection to zone '%s' %s closed]\n"), zonename,
-	    slaveshortname);
+	if (!quiet)
+		(void) fprintf(stderr,
+		    gettext("\n[Connection to zone '%s' %s closed]\n"),
+		    zonename, slaveshortname);
 
 	if (pollerr != 0) {
 		(void) fprintf(stderr, gettext("Error: connection closed due "
