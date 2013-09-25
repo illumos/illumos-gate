@@ -26,6 +26,9 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
+/*
+ * Copyright (c) 2013 RackTop Systems.
+ */
 
 #include	<sys/types.h>
 #include	<sys/stat.h>
@@ -40,6 +43,7 @@
 #include	<project.h>
 #include	<unistd.h>
 #include	<user_attr.h>
+#include	<libcmdutils.h>
 #include	"users.h"
 #include	"messages.h"
 #include	"userdisp.h"
@@ -82,7 +86,6 @@ extern void dispusrdef();
 
 static void cleanup();
 
-extern uid_t findnextuid(void);
 extern int check_perm(), valid_expire();
 extern int putusrdef(), valid_uid();
 extern int call_passmgmt(), edit_group(), create_home();
@@ -132,8 +135,8 @@ main(argc, argv)
 int argc;
 char *argv[];
 {
-	int ch, ret, mflag = 0, oflag = 0, Dflag = 0, **gidlist;
-	projid_t **projlist;
+	int ch, ret, mflag = 0, oflag = 0, Dflag = 0, **gidlist = NULL;
+	projid_t **projlist = NULL;
 	char *ptr;			/* loc in a str, may be set by strtol */
 	struct group *g_ptr;
 	struct project p_ptr;
@@ -425,7 +428,7 @@ char *argv[];
 
 	} else {
 
-		if ((uid = findnextuid()) < 0) {
+		if (findnextuid(DEFRID+1, MAXUID, &uid) != 0) {
 			errmsg(M_INVALID, "default id", "user id");
 			exit(EX_ID_EXISTS);
 		}
@@ -634,7 +637,7 @@ char *argv[];
 				errmsg(M_UID_USED, uid);
 				exit(EX_ID_EXISTS);
 			} else {
-				if ((uid = findnextuid()) < 0) {
+				if (findnextuid(DEFRID+1, MAXUID, &uid) != 0) {
 					errmsg(M_INVALID, "default id",
 					    "user id");
 					exit(EX_ID_EXISTS);

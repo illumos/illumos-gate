@@ -27,10 +27,12 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 2013 RackTop Systems.
+ */
 
 #include	<sys/types.h>
+#include	<sys/param.h>
 #include	<stdio.h>
 #include	<stdlib.h>
 #include	<ctype.h>
@@ -38,10 +40,10 @@
 #include	<userdefs.h>
 #include	<users.h>
 #include	<errno.h>
+#include	<libcmdutils.h>
 #include	"messages.h"
 
 extern int errmsg();
-extern gid_t findnextgid();
 extern int valid_gid(), add_group();
 
 /*
@@ -136,7 +138,7 @@ main(int argc, char *argv[])
 
 	} else {
 
-		if ((gid = findnextgid()) < 0) {
+		if (findnextgid(DEFRID+1, MAXUID, &gid) != 0) {
 			errmsg(M_GID_INVALID, "default id");
 			exit(EX_ID_EXISTS);
 		}

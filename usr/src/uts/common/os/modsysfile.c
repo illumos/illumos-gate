@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/inttypes.h>
 #include <sys/param.h>
@@ -699,7 +697,7 @@ do_sysfile_cmd(struct _buf *file, const char *cmd)
 				}
 				*cp++ = (char)ch;
 			}
-			*cp++ = ':';
+			*cp++ = ' ';
 			if (isnewline(ch)) {
 				cp--;
 				(void) kobj_ungetc(file);

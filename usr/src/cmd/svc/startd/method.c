@@ -851,7 +851,8 @@ method_run(restarter_inst_t **instp, int type, int *exit_code)
 		if ((pend = strchr(method, ' ')) != NULL)
 			*pend = '\0';
 
-		if (stat64(method, &sbuf) == -1 && errno == ENOENT) {
+		if (*method == '/' && stat64(method, &sbuf) == -1 &&
+		    errno == ENOENT) {
 			log_instance(inst, B_TRUE, "Missing start method (%s), "
 			    "changing state to maintenance.", method);
 			restarter_free_method_context(mcp);

@@ -22,11 +22,12 @@
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
+ */
 
 #ifndef _SYS_SUNLDI_IMPL_H
 #define	_SYS_SUNLDI_IMPL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -141,12 +142,29 @@ typedef struct ldi_ev_callback_impl {
 	list_node_t		lec_list;
 } ldi_ev_callback_impl_t;
 
+/*
+ * Members of "struct ldi_ev_callback_list" are protected by their le_lock
+ * member.  The struct is currently only used once, as a file-level global,
+ * and the locking protocol is currently implemented in ldi_ev_lock() and
+ * ldi_ev_unlock().
+ *
+ * When delivering events to subscribers, ldi_invoke_notify() and
+ * ldi_invoke_finalize() will walk the list of callbacks: le_head.  It is
+ * possible that an invoked callback function will need to unregister an
+ * arbitrary number of callbacks from this list.
+ *
+ * To enable ldi_ev_remove_callbacks() to remove elements from the list
+ * without breaking the walk-in-progress, we store the next element in the
+ * walk direction on the struct as le_walker_next and le_walker_prev.
+ */
 struct ldi_ev_callback_list {
-	kmutex_t	le_lock;
-	kcondvar_t	le_cv;
-	int		le_busy;
-	void		*le_thread;
-	list_t		le_head;
+	kmutex_t		le_lock;
+	kcondvar_t		le_cv;
+	int			le_busy;
+	void			*le_thread;
+	list_t			le_head;
+	ldi_ev_callback_impl_t	*le_walker_next;
+	ldi_ev_callback_impl_t	*le_walker_prev;
 };
 
 int ldi_invoke_notify(dev_info_t *dip, dev_t dev, int spec_type, char *event,

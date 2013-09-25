@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2013 RackTop Systems.
  */
 
 #include <stdio.h>
@@ -180,11 +181,12 @@ getsetdefval(const char *key, char *dflt)
 	int i;
 
 	for (i = 0; i < NKEYS; i++)
-		if (strcmp(keys[i].key, key) == 0)
+		if (strcmp(keys[i].key, key) == 0) {
 			if (keys[i].newvalue != NULL)
 				return (keys[i].newvalue);
 			else
 				return (keys[i].newvalue = dflt);
+		}
 	return (NULL);
 }
 
@@ -194,7 +196,7 @@ getusertype(char *cmdname)
 	static char usertype[MAX_TYPE_LENGTH];
 	char *cmd;
 
-	if (cmd = strrchr(cmdname, '/'))
+	if ((cmd = strrchr(cmdname, '/')))
 		++cmd;
 	else
 		cmd = cmdname;

@@ -18,51 +18,35 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
 #
-#
-# cmd/iscsid/Makefile
-#
-
 PROG= 		iscsid
 MANIFEST=	iscsi-initiator.xml
-SVCMETHOD=	iscsi-initiator	\
-		iscsid
-
-PRODUCT=	$(PROG)
-OBJS=		iscsid.o
-SRCS=		$(OBJS:%.o=./%.c)
-LLOBJS=		$(OBJS:%.o=%.ll)
+SVCMETHOD=	iscsi-initiator	iscsid
 
 include ../Makefile.cmd
 
-CCVERBOSE	=
-LDLIBS += -lnsl
+CFLAGS +=	$(CCVERBOSE)
+LDLIBS +=	-lnsl
 
 ROOTMANIFESTDIR=	$(ROOTSVCNETWORKISCSI)
 $(ROOTSVCNETWORKISCSI)/iscsi-initiator.xml := FILEMODE = 0444
 
 .KEEP_STATE:
 
-$(PROG): $(OBJS)
-	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
-	$(POST_PROCESS)
+LINTFLAGS +=	-erroff=E_BAD_PTR_CAST_ALIGN
 
-LINTFLAGS += -erroff=E_FUNC_HAS_NO_RETURN_STMT
-LINTFLAGS += -erroff=E_BAD_PTR_CAST_ALIGN
+all:		$(PROG)
 
-.PARALLEL: $(OBJS)
-
-all:	$(PROG)
+check:		$(CHKMANIFEST)
 
 clean:
-	$(RM) $(PROG) $(OBJS) $(LLOBJS)
 
-lint:	lint_SRCS
+install: 	all $(ROOTMANIFEST) $(ROOTSVCMETHOD)
 
-install: all $(ROOTMANIFEST) $(ROOTSVCMETHOD)
-
-check: $(CHKMANIFEST)
+lint:		lint_PROG
 
 include ../Makefile.targ

@@ -20,6 +20,7 @@
 #
 #
 # Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2013 RackTop Systems.
 #
 
 #
@@ -42,6 +43,8 @@ SYMBOL_VERSION SUNWprivate_1.1 {
     global:
 	add_tnode;
 	destroy_tree;
+	findnextgid;
+	findnextuid;
 	list_create;
 	list_destroy;
 	list_head;

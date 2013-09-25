@@ -638,7 +638,7 @@ base10 rounding errors.
 .sp
 .in +2
 .nf
-example% printf "%a\n" 2 3.1 NaN
+example% printf "%a\en" 2 3.1 NaN
 .fi
 .in -2
 .sp
@@ -667,7 +667,7 @@ floating-point value.
 .sp
 .in +2
 .nf
-example% x=2 ; printf "%f == %a\n" x x
+example% x=2 ; printf "%f == %a\en" x x
 .fi
 .in -2
 .sp
@@ -693,7 +693,7 @@ The following command will print the EURO unicode symbol (code-point 0x20ac).
 .sp
 .in +2
 .nf
-example% LC_ALL=en_US.UTF-8 printf "\u[20ac]\n"
+example% LC_ALL=en_US.UTF-8 printf "\u[20ac]\en"
 .fi
 .in -2
 .sp
@@ -724,7 +724,7 @@ The following command will print the hexadecimal value of a given character.
 .in +2
 .nf
 example% export LC_ALL=en_US.UTF-8
-example% printf "%x\n" "'<euro>"
+example% printf "%x\en" "'<euro>"
 .fi
 .in -2
 .sp
@@ -751,7 +751,7 @@ produces:
 .sp
 .in +2
 .nf
-example% printf "%d\n" "'A"
+example% printf "%d\en" "'A"
 .fi
 .in -2
 .sp
@@ -802,7 +802,7 @@ For American usage, format could be the string:
 .sp
 .in +2
 .nf
-"%s, %s %d, %d:%.2d\n"
+"%s, %s %d, %d:%.2d\en"
 .fi
 .in -2
 .sp
@@ -826,7 +826,7 @@ Whereas for EU usage, format could be the string:
 .sp
 .in +2
 .nf
-"%1$s, %3$d. %2$s, %4$d:%5$.2d\n"
+"%1$s, %3$d. %2$s, %4$d:%5$.2d\en"
 .fi
 .in -2
 .sp
@@ -838,7 +838,7 @@ Note that the '$' characters must be properly escaped, such as
 .sp
 .in +2
 .nf
-"%1\$s, %3\$d. %2\$s, %4\$d:%5\$.2d\n" in this case
+"%1\$s, %3\$d. %2\$s, %4\$d:%5\$.2d\en" in this case
 .fi
 .in -2
 .sp
@@ -930,7 +930,7 @@ Using format specifiers (characters following '%') which are not listed in the
 \fBprintf\fR(3C) or this manual page will result in undefined behavior.
 .sp
 .LP
-Using escape sequences (the character following a backslash ('\')) which are
+Using escape sequences (the character following a backslash ('\e')) which are
 not listed in the \fBprintf\fR(3C) or this manual page will result in undefined
 behavior.
 .sp

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PAPIJOBSUBMIT 3PAPI "Jan 17, 2007"
+.TH PAPIJOBSUBMIT 3PAPI "Sep 10, 2013"
 .SH NAME
 papiJobSubmit, papiJobSubmitByReference, papiJobValidate, papiJobStreamOpen,
 papiJobStreamWrite, papiJobStreamClose, papiJobQuery, papiJobModify,
@@ -424,7 +424,7 @@ main(int ac, char *av[])
                             PAPI_ENCRYPT_NEVER, NULL);
 
     if (status != PAPI_OK) {
-        printf("papiServiceCreate(%s): %s\n", svc_name ? svc_name :
+        printf("papiServiceCreate(%s): %s\en", svc_name ? svc_name :
                      "NULL", papiStatusString(status));
         papiServiceDestroy(svc);
         exit(1);
@@ -432,7 +432,7 @@ main(int ac, char *av[])
 
     status = papiPrinterListJobs(svc, pname, NULL, 0, 0, &jobs);
     if (status != PAPI_OK) {
-        printf("papiPrinterListJobs(%s): %s\n", pname,
+        printf("papiPrinterListJobs(%s): %s\en", pname,
                     papiStatusString(status));
         papiServiceDestroy(svc);
         exit(1);
@@ -458,7 +458,7 @@ main(int ac, char *av[])
                             size) != PAPI_OK)
                     buffer = realloc(buffer, size += BUFSIZ);
 
-                printf("%s-%d:\n\t%s\n", name, id, buffer);
+                printf("%s-%d:\en\t%s\en", name, id, buffer);
                 free(buffer);
             }
         }
@@ -548,7 +548,7 @@ main(int ac, char *av[])
                             PAPI_ENCRYPT_NEVER, NULL);
 
     if (status != PAPI_OK) {
-        printf("papiServiceCreate(%s): %s\n", svc_name ? svc_name :
+        printf("papiServiceCreate(%s): %s\en", svc_name ? svc_name :
                      "NULL", papiStatusString(status));
         papiServiceDestroy(svc);
         exit(1);
@@ -568,15 +568,15 @@ main(int ac, char *av[])
                                     "printer-name", &name);
             (void) papiAttributeListGetInteger(list, NULL,
                                     "job-id", &id);
-            while (papiAttributeListToString(list, "\n\t", buffer, size)
+            while (papiAttributeListToString(list, "\en\et", buffer, size)
                             != PAPI_OK)
                 buffer = realloc(buffer, size += BUFSIZ);
 
-            printf("%s-%d:\n\t%s\n", name, id, buffer);
+            printf("%s-%d:\en\et%s\n", name, id, buffer);
             free(buffer);
         }
     } else
-        printf("papiJobQuery(%s-%d): %s\n", pname, id,
+        printf("papiJobQuery(%s-%d): %s\en", pname, id,
                     papiStatusString(status));
 
     papiJobFree(job);
@@ -664,7 +664,7 @@ main(int ac, char *av[])
                             PAPI_ENCRYPT_NEVER, NULL);
 
     if (status != PAPI_OK) {
-        printf("papiServiceCreate(%s): %s\n", svc_name ? svc_name :
+        printf("papiServiceCreate(%s): %s\en", svc_name ? svc_name :
                     "NULL", papiStatusString(status));
         papiServiceDestroy(svc);
         exit(1);
@@ -702,11 +702,11 @@ main(int ac, char *av[])
                             != PAPI_OK)
                 buffer = realloc(buffer, size += BUFSIZ);
 
-            printf("%s-%d:\n\t%s\n", name, id, buffer);
+            printf("%s-%d:\en\t%s\en", name, id, buffer);
             free(buffer);
         }
     } else
-        printf("papiJobStream*(%s-%d): %s\n", pname, id,
+        printf("papiJobStream*(%s-%d): %s\en", pname, id,
                     papiStatusString(status));
 
     papiJobFree(job);

@@ -20,6 +20,7 @@
 #
 #
 # Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2013 RackTop Systems.
 #
 # cmd/oamuser/user/Makefile
 #
@@ -42,17 +43,17 @@ SBINPROG=	$(USERADD)   $(USERDEL)   $(USERMOD)
 PROG=		$(SBINPROG)
 PRODUCT=	$(PROG)
 
-ADD_OBJ=	useradd.o     uid.o        homedir.o \
-		groups.o      call_pass.o      userdefs.o   messages.o \
-		val_lgrp.o    funcs.o	       val_lprj.o   proj.o
+ADD_OBJ=	useradd.o     homedir.o        groups.o     call_pass.o \
+		userdefs.o    messages.o       val_lgrp.o   funcs.o \
+		val_lprj.o    proj.o
 
 DEL_OBJ=	userdel.o     call_pass.o      rmfiles.o    isbusy.o \
 		groups.o      messages.o       funcs.o      proj.o
 
-MOD_OBJ=	usermod.o     uid.o            movedir.o    groups.o \
-		rmfiles.o     call_pass.o      isbusy.o     homedir.o \
-		userdefs.o    messages.o       val_lgrp.o   funcs.o \
-		val_lprj.o    proj.o
+MOD_OBJ=	usermod.o     movedir.o        groups.o     rmfiles.o \
+		call_pass.o   isbusy.o         homedir.o    userdefs.o \
+		messages.o    val_lgrp.o       funcs.o      val_lprj.o \
+		proj.o
 
 OBJECTS=	$(ADD_OBJ)     $(DEL_OBJ)    $(MOD_OBJ)
 
@@ -71,9 +72,6 @@ INSSKELFILE=	$(SKELFILE:%=$(ROOTSKEL)/%)
 
 CPPFLAGS=	-I$(HERE) -I$(LOCAL) $(CPPFLAGS.master)
 CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
-CERRWARN +=	-_gcc=-Wno-type-limits
-CERRWARN +=	-_gcc=-Wno-uninitialized
-CERRWARN +=	-_gcc=-Wno-parentheses
 
 $(INSSBINPROG)  := FILEMODE = 0555
 $(INSSYSADMPROG):= FILEMODE = 0500
@@ -81,6 +79,7 @@ $(INSSKELFILE)  := FILEMODE = 0644
 
 $(USERADD) :=	OBJS = $(ADD_OBJ)
 $(USERADD) :=	LIBS = $(LIBUSRGRP)
+$(USERADD) :=	LDLIBS += -lcmdutils
 
 $(USERDEL) :=	OBJS = $(DEL_OBJ)
 $(USERDEL) :=	LIBS = $(LIBUSRGRP)
