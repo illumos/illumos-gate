@@ -20,6 +20,8 @@
  */
 /*
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+ *
+ * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  */
 
 /*
@@ -476,6 +478,11 @@ lofi_open(dev_t *devp, int flag, int otyp, struct cred *credp)
 	if (mark_opened(lsp, otyp) == -1) {
 		mutex_exit(&lofi_lock);
 		return (EINVAL);
+	}
+
+	if (lsp->ls_readonly && (flag & FWRITE)) {
+		mutex_exit(&lofi_lock);
+		return (EROFS);
 	}
 
 	mutex_exit(&lofi_lock);
@@ -1620,11 +1627,13 @@ lofi_access(struct lofi_state *lsp)
  * allow the global zone visibility into NGZ lofi nodes.
  */
 static int
-file_to_lofi_nocheck(char *filename, struct lofi_state **lspp)
+file_to_lofi_nocheck(char *filename, boolean_t readonly,
+    struct lofi_state **lspp)
 {
 	struct lofi_state *lsp;
 	vnode_t *vp = NULL;
 	int err = 0;
+	int rdfiles = 0;
 
 	ASSERT(MUTEX_HELD(&lofi_lock));
 
@@ -1646,11 +1655,29 @@ file_to_lofi_nocheck(char *filename, struct lofi_state **lspp)
 		if (lsp->ls_vp == vp) {
 			if (lspp != NULL)
 				*lspp = lsp;
+			if (lsp->ls_readonly) {
+				rdfiles++;
+				/* Skip if '-r' is specified */
+				if (readonly)
+					continue;
+			}
 			goto out;
 		}
 	}
 
 	err = ENOENT;
+
+	/*
+	 * If a filename is given as an argument for lofi_unmap, we shouldn't
+	 * allow unmap if there are multiple read-only lofi devices associated
+	 * with this file.
+	 */
+	if (lspp != NULL) {
+		if (rdfiles == 1)
+			err = 0;
+		else if (rdfiles > 1)
+			err = EBUSY;
+	}
 
 out:
 	if (vp != NULL)
@@ -1663,13 +1690,13 @@ out:
  * it.
  */
 static int
-file_to_lofi(char *filename, struct lofi_state **lspp)
+file_to_lofi(char *filename, boolean_t readonly, struct lofi_state **lspp)
 {
 	int err = 0;
 
 	ASSERT(MUTEX_HELD(&lofi_lock));
 
-	if ((err = file_to_lofi_nocheck(filename, lspp)) != 0)
+	if ((err = file_to_lofi_nocheck(filename, readonly, lspp)) != 0)
 		return (err);
 
 	if ((err = lofi_access(*lspp)) != 0)
@@ -2122,7 +2149,8 @@ lofi_map_file(dev_t dev, struct lofi_ioctl *ulip, int pickminor,
 	}
 	mutex_exit(&curproc->p_lock);
 
-	if (file_to_lofi_nocheck(klip->li_filename, NULL) == 0) {
+	if (file_to_lofi_nocheck(klip->li_filename, klip->li_readonly,
+	    NULL) == 0) {
 		error = EBUSY;
 		goto err;
 	}
@@ -2243,6 +2271,8 @@ lofi_map_file(dev_t dev, struct lofi_ioctl *ulip, int pickminor,
 	lsp->ls_kstat->ks_lock = &lsp->ls_kstat_lock;
 	kstat_zone_add(lsp->ls_kstat, GLOBAL_ZONEID);
 
+	lsp->ls_readonly = klip->li_readonly;
+
 	if ((error = lofi_init_crypto(lsp, klip)) != 0)
 		goto err;
 
@@ -2343,7 +2373,8 @@ lofi_unmap_file(struct lofi_ioctl *ulip, int byfilename,
 
 	mutex_enter(&lofi_lock);
 	if (byfilename) {
-		if ((err = file_to_lofi(klip->li_filename, &lsp)) != 0) {
+		if ((err = file_to_lofi(klip->li_filename, klip->li_readonly,
+		    &lsp)) != 0) {
 			mutex_exit(&lofi_lock);
 			return (err);
 		}
@@ -2460,6 +2491,8 @@ lofi_get_info(dev_t dev, struct lofi_ioctl *ulip, int which,
 			    sizeof (klip->li_filename));
 		}
 
+		klip->li_readonly = lsp->ls_readonly;
+
 		(void) strlcpy(klip->li_algorithm, lsp->ls_comp_algorithm,
 		    sizeof (klip->li_algorithm));
 		klip->li_crypto_enabled = lsp->ls_crypto_enabled;
@@ -2469,7 +2502,8 @@ lofi_get_info(dev_t dev, struct lofi_ioctl *ulip, int which,
 		return (error);
 	case LOFI_GET_MINOR:
 		mutex_enter(&lofi_lock);
-		error = file_to_lofi(klip->li_filename, &lsp);
+		error = file_to_lofi(klip->li_filename,
+		    klip->li_readonly, &lsp);
 		if (error == 0)
 			klip->li_minor = getminor(lsp->ls_dev);
 		mutex_exit(&lofi_lock);
@@ -2481,7 +2515,8 @@ lofi_get_info(dev_t dev, struct lofi_ioctl *ulip, int which,
 		return (error);
 	case LOFI_CHECK_COMPRESSED:
 		mutex_enter(&lofi_lock);
-		error = file_to_lofi(klip->li_filename, &lsp);
+		error = file_to_lofi(klip->li_filename,
+		    klip->li_readonly, &lsp);
 		if (error != 0) {
 			mutex_exit(&lofi_lock);
 			free_lofi_ioctl(klip);

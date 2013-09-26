@@ -22,6 +22,8 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2012 Joyent, Inc.  All rights reserved.
+ *
+ * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  */
 
 /*
@@ -64,7 +66,7 @@
 #include <blowfish/blowfish_impl.h>
 
 static const char USAGE[] =
-	"Usage: %s -a file [ device ] "
+	"Usage: %s [-r] -a file [ device ] "
 	" [-c aes-128-cbc|aes-192-cbc|aes-256-cbc|des3-cbc|blowfish-cbc]"
 	" [-e] [-k keyfile] [-T [token]:[manuf]:[serial]:key]\n"
 	"       %s -d file | device\n"
@@ -367,9 +369,11 @@ lofi_map_file(int lfd, struct lofi_ioctl li, const char *filename,
 static void
 add_mapping(int lfd, const char *devicename, const char *filename,
     mech_alias_t *cipher, const char *rkey, size_t rksz,
-    boolean_t no_devlink_flag)
+    boolean_t rdonly, boolean_t no_devlink_flag)
 {
 	struct lofi_ioctl li;
+
+	li.li_readonly = rdonly;
 
 	li.li_crypto_enabled = B_FALSE;
 	if (cipher != NULL) {
@@ -501,7 +505,7 @@ print_mappings(int fd)
 	int	minor;
 	int	maxminor;
 	char	path[MAXPATHLEN];
-	char	options[MAXPATHLEN];
+	char	options[MAXPATHLEN] = { 0 };
 
 	li.li_minor = 0;
 	if (ioctl(fd, LOFI_GET_MAXMINOR, &li) == -1) {
@@ -521,6 +525,9 @@ print_mappings(int fd)
 		}
 		(void) snprintf(path, sizeof (path), "/dev/%s/%d",
 		    LOFI_BLOCK_NAME, minor);
+
+		options[0] = '\0';
+
 		/*
 		 * Encrypted lofi and compressed lofi are mutually exclusive.
 		 */
@@ -530,7 +537,17 @@ print_mappings(int fd)
 		else if (li.li_algorithm[0] != '\0')
 			(void) snprintf(options, sizeof (options),
 			    gettext("Compressed(%s)"), li.li_algorithm);
-		else
+		if (li.li_readonly) {
+			if (strlen(options) != 0) {
+				(void) strlcat(options, ",", sizeof (options));
+				(void) strlcat(options, "Readonly",
+				    sizeof (options));
+			} else {
+				(void) snprintf(options, sizeof (options),
+				    gettext("Readonly"));
+			}
+		}
+		if (strlen(options) == 0)
 			(void) snprintf(options, sizeof (options), "-");
 
 		(void) printf(FORMAT, path, li.li_filename, options);
@@ -1793,6 +1810,7 @@ main(int argc, char *argv[])
 	const char *pname;
 	boolean_t errflag = B_FALSE;
 	boolean_t addflag = B_FALSE;
+	boolean_t rdflag = B_FALSE;
 	boolean_t deleteflag = B_FALSE;
 	boolean_t ephflag = B_FALSE;
 	boolean_t compressflag = B_FALSE;
@@ -1813,7 +1831,7 @@ main(int argc, char *argv[])
 	(void) setlocale(LC_ALL, "");
 	(void) textdomain(TEXT_DOMAIN);
 
-	while ((c = getopt(argc, argv, "a:c:Cd:efk:o:s:T:UX")) != EOF) {
+	while ((c = getopt(argc, argv, "a:c:Cd:efk:o:rs:T:UX")) != EOF) {
 		switch (c) {
 		case 'a':
 			addflag = B_TRUE;
@@ -1868,6 +1886,9 @@ main(int argc, char *argv[])
 			need_crypto = B_TRUE;
 			cipher_only = B_FALSE;	/* need to unset cipher_only */
 			break;
+		case 'r':
+			rdflag = B_TRUE;
+			break;
 		case 's':
 			segsize = convert_to_num(optarg);
 			if (segsize < DEV_BSIZE || !ISP2(segsize))
@@ -1905,6 +1926,7 @@ main(int argc, char *argv[])
 	/* Check for mutually exclusive combinations of options */
 	if (errflag ||
 	    (addflag && deleteflag) ||
+	    (rdflag && !addflag) ||
 	    (!addflag && need_crypto) ||
 	    ((compressflag || uncompressflag) && (addflag || deleteflag)))
 		usage(pname);
@@ -2022,7 +2044,7 @@ main(int argc, char *argv[])
 	 */
 	if (addflag)
 		add_mapping(lfd, devicename, filename, cipher, rkey, rksz,
-		    no_devlink_flag);
+		    rdflag, no_devlink_flag);
 	else if (compressflag)
 		lofi_compress(&lfd, filename, compress_index, segsize);
 	else if (uncompressflag)
