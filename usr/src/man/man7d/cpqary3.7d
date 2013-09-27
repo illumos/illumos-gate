@@ -11,7 +11,7 @@
 .\"
 .\" Copyright (C) 2013 Hewlett-Packard Development Company, L.P.
 .\"
-.TH CPQARY3 7D "SunOS 5.11 Last Revised: Aug 26, 2013"
+.TH CPQARY3 7D Aug 26, 2013"
 .SH NAME
 .LP
 cpqary3 - provides disk and SCSI tape support for HP Smart Array controllers
@@ -25,7 +25,7 @@ provides disk and SCSI tape support for the HP Smart Array controllers.
 Please refer to the cpqary3 release notes, for the supported HP Smart Array
 Controllers and Storage boxes.
 .LP
-Each of the controller should be the sole initiator on a SCSI bus. Auto
+Each controller should be the sole initiator on a SCSI bus. Auto
 configuration code determines if the adapter is present at the Configured
 address and what types of devices are attached to it.
 .SH CONFIGURATION
@@ -53,8 +53,8 @@ for targets numbering greater than the default number of targets supported by
 the corresponding target driver.
 .LP
 By default, entries for SCSI target numbers 0 to 15 are present in sd.conf.
-Entries for target numbers 16 and above shall be added in SCSI class in the
-sd.conf file for supporting corresponding logical volumes.
+Entries for target numbers 16 and above must be added to the \&'scsi' class in
+sd.conf to support additional corresponding logical volumes.
 .LP
 If SCSI tape drives are connected to the supported controllers, entries for
 target IDs from 33 to 33+N must be added in the /kernel/drv/st.conf file under
@@ -67,7 +67,7 @@ under 'scsi' class in /kernel/drv/st.conf file. The maximum number of tape
 drives that can be connected to a controller is 28. With 1.90 and later versions
 of cpqary3 driver, if tape drives are connected to Smart Array SAS controllers,
 then target ID entries for tape drives from 65 to 65+N must be added in
-/kernel/drv/st.conf file under scsi class.
+/kernel/drv/st.conf file under the \&'scsi' class.
 .SH FILES
 .PD 0
 .TP 25

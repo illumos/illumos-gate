@@ -26,8 +26,6 @@
 
 /* Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/sysmacros.h>
@@ -39,6 +37,8 @@
 #include <sys/signal.h>
 #include <sys/siginfo.h>
 #include <sys/debug.h>
+
+extern rctl_hndl_t rc_process_sigqueue;
 
 static int
 sigqkill(pid_t pid, sigsend_t *sigsend)
@@ -121,7 +121,7 @@ kill(pid_t pid, int sig)
  */
 int
 sigqueue(pid_t pid, int sig, /* union sigval */ void *value,
-	int si_code, int block)
+    int si_code, int block)
 {
 	int error;
 	sigsend_t v;
@@ -133,8 +133,15 @@ sigqueue(pid_t pid, int sig, /* union sigval */ void *value,
 		return (set_errno(EINVAL));
 
 	if ((sqh = p->p_sigqhdr) == NULL) {
+		rlim64_t sigqsz_max;
+
+		mutex_enter(&p->p_lock);
+		sigqsz_max = rctl_enforced_value(rc_process_sigqueue,
+		    p->p_rctls, p);
+		mutex_exit(&p->p_lock);
+
 		/* Allocate sigqueue pool first time */
-		sqh = sigqhdralloc(sizeof (sigqueue_t), _SIGQUEUE_MAX);
+		sqh = sigqhdralloc(sizeof (sigqueue_t), (uint_t)sigqsz_max);
 		mutex_enter(&p->p_lock);
 		if (p->p_sigqhdr == NULL) {
 			/* hang the pool head on proc */

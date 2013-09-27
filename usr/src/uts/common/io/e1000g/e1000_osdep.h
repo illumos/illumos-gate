@@ -47,6 +47,7 @@ extern "C" {
 #include <sys/atomic.h>
 #include <sys/note.h>
 #include <sys/mutex.h>
+#include <sys/pci_cap.h>
 #include "e1000g_debug.h"
 
 #define	usec_delay(x)		drv_usecwait(x)
@@ -76,6 +77,8 @@ extern "C" {
 
 #define	false		0
 #define	true		1
+#define	FALSE		false
+#define	TRUE		true
 
 #define	CMD_MEM_WRT_INVALIDATE	0x0010	/* BIT_4 */
 #define	PCI_COMMAND_REGISTER	0x04

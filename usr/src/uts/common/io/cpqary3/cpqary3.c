@@ -21,9 +21,6 @@
 
 int cpqary3_attach(dev_info_t *, ddi_attach_cmd_t);
 int cpqary3_detach(dev_info_t *, ddi_detach_cmd_t);
-int cpqary3_getinfo(dev_info_t *, ddi_info_cmd_t, void *, void **);
-int cpqary3_open(dev_t *, int, int, cred_t *);
-int cpqary3_close(dev_t, int, int, cred_t *);
 int cpqary3_ioctl(dev_t, int, intptr_t, int, cred_t *, int *);
 
 /*
@@ -44,7 +41,7 @@ extern cpqary3_driver_info_t gdriver_info;
  * Global Variables Definitions
  */
 
-static char cpqary3_brief[]    =	"HP Smart Array Driver Ver 0.01J";
+static char cpqary3_brief[]    =	"HP Smart Array Driver";
 void *cpqary3_state;
 
 /* HPQaculi Changes */
@@ -116,8 +113,8 @@ ddi_device_acc_attr_t cpqary3_dev_attributes = {
 
 static struct cb_ops cpqary3_cb_ops = {
 	/* HPQacucli Changes */
-	cpqary3_open,
-	cpqary3_close,
+	scsi_hba_open,
+	scsi_hba_close,
 	/* HPQacucli Changes */
 	nodev,			/* cb_strategy */
 	nodev,			/* cb_print */
@@ -144,7 +141,7 @@ static struct cb_ops cpqary3_cb_ops = {
 static struct dev_ops cpqary3_dev_ops = {
 	DEVO_REV,		/* Driver Build Version */
 	0,			/* Driver reference count */
-	cpqary3_getinfo,	/* Get Info */
+	nodev,			/* Get Info */
 	nulldev,		/* Identify not required */
 	nulldev,		/* Probe, obselete for s2.6 and up */
 	cpqary3_attach,		/* Attach routine */
@@ -396,8 +393,8 @@ cpqary3_attach(dev_info_t *dip, ddi_attach_cmd_t attach_cmd)
 	 * Create a minor node for Ioctl interface.
 	 * The nomenclature used will be "cpqary3" immediately followed by
 	 * the current driver instance in the system.
-	 * for e.g.: 	for 0th instance : cpqary30
-	 * 				for 1th instance : cpqary31
+	 * for e.g.: 	for 0th instance : cpqary3,0
+	 * 				for 1st instance : cpqary3,1
 	 */
 
 	(void) sprintf(minor_node_name, "cpqary3,%d", instance);
@@ -410,6 +407,8 @@ cpqary3_attach(dev_info_t *dip, ddi_attach_cmd_t attach_cmd)
 		cleanstatus |= CPQARY3_CREATE_MINOR_NODE;
 	} else {
 		cmn_err(CE_NOTE, "CPQary3 : Failed to create minor node");
+		cpqary3_cleanup(cpqary3p, cleanstatus);
+		return (DDI_FAILURE);
 	}
 
 
@@ -514,59 +513,6 @@ cpqary3_detach(dev_info_t *dip, ddi_detach_cmd_t detach_cmd)
 
 	return (DDI_SUCCESS);
 
-}
-
-int
-cpqary3_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg, void **resultp)
-{
-	cpqary3_t *cp;
-	int inst = MINOR2INST(getminor((dev_t)arg));
-
-	switch (cmd) {
-		case DDI_INFO_DEVT2DEVINFO:
-			cp = (cpqary3_t *)ddi_get_soft_state(cpqary3_state,
-			    inst);
-
-			if (cp == NULL) {
-				*resultp = NULL;
-				return (DDI_FAILURE);
-			}
-			*resultp = cp->dip;
-			return (DDI_SUCCESS);
-		case DDI_INFO_DEVT2INSTANCE:
-			*resultp = (void *)(intptr_t)inst;
-			return (DDI_SUCCESS);
-		default:
-			return (DDI_FAILURE);
-	}
-}
-
-/*
- *	Function	: 	cpary3_open
- *	Description	: 	Wrapper around scsi_hba_open() to allow for
- *				use of getinfo() other than scsi_hba_info().
- *	Called By	: 	external consumers
- *	Parameters	: 	see open(9e)
- *	Return Values	:	see open(9e)
- */
-int
-cpqary3_open(dev_t *dev, int flag, int otype, cred_t *credp)
-{
-	return (scsi_hba_open(dev, flag, otype, credp));
-}
-
-/*
- *	Function	: 	cpary3_close
- *	Description	: 	Wrapper around scsi_hba_close() to allow for
- *				use of getinfo() other than scsi_hba_info().
- *	Called By	: 	external consumers
- *	Parameters	: 	see close(9e)
- *	Return Values	:	see close(9e)
- */
-int
-cpqary3_close(dev_t dev, int flag, int otype, cred_t *credp)
-{
-	return (scsi_hba_close(dev, flag, otype, credp));
 }
 
 /*

@@ -14,7 +14,7 @@
 #
 
 #
-#	Path to the base of the uts directory tree (usually /usr/src/uts).
+#	Path to the base of the uts directory tree
 #
 UTSBASE	= ../..
 

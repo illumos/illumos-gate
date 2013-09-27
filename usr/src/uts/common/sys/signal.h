@@ -300,19 +300,20 @@ typedef struct {
 	u_longlong_t	sn_snid;	/* unique id for notification	*/
 } signotifyq_t;
 
-
 typedef struct sigqhdr {		/* sigqueue pool header		*/
 	sigqueue_t	*sqb_free;	/* free sigq struct list	*/
-	uchar_t		sqb_count;	/* sigq free count		*/
-	uchar_t		sqb_maxcount;	/* sigq max free count		*/
-	ushort_t	sqb_size;	/* size of header+free structs	*/
+	int		sqb_count;	/* sigq free count		*/
+	uint_t		sqb_maxcount;	/* sigq max free count		*/
+	size_t		sqb_size;	/* size of header+free structs	*/
 	uchar_t		sqb_pexited;	/* process has exited		*/
-	uchar_t		sqb_sent;	/* number of sigq sent		*/
+	uint_t		sqb_sent;	/* number of sigq sent		*/
 	kcondvar_t	sqb_cv;		/* waiting for a sigq struct	*/
 	kmutex_t	sqb_lock;	/* lock for sigq pool		*/
 } sigqhdr_t;
 
-#define	_SIGQUEUE_MAX	32
+#define	_SIGQUEUE_SIZE_BASIC		128	/* basic limit */
+#define	_SIGQUEUE_SIZE_PRIVILEGED	512	/* privileged limit */
+
 #define	_SIGNOTIFY_MAX	32
 
 extern	void	setsigact(int, void (*)(int), const k_sigset_t *, int);
