@@ -221,6 +221,8 @@ static struct sctab {
 	/* Large File Summit name (UNIX 98) */
 
 	_PC_FILESIZEBITS,	"FILESIZEBITS",		PATHCONF,  NOFLAGS,
+	_PC_XATTR_ENABLED,	"XATTR_ENABLED",	PATHCONF,  NOFLAGS,
+	_PC_XATTR_EXISTS,	"XATTR_EXISTS",		PATHCONF,  NOFLAGS,
 
 	/* UNIX 03 Additions */
 
@@ -233,6 +235,11 @@ static struct sctab {
 
 	_PC_2_SYMLINKS,		"POSIX2_SYMLINKS",	PATHCONF,  NOFLAGS,
 	_PC_SYMLINK_MAX,	"SYMLINK_MAX",		PATHCONF,  NOFLAGS,
+
+	_PC_ACL_ENABLED,	"ACL_ENABLED",		PATHCONF,  NOFLAGS,
+	_PC_MIN_HOLE_SIZE,	"MIN_HOLE_SIZE",	PATHCONF,  NOFLAGS,
+	_PC_SATTR_ENABLED,	"SATTR_ENABLED",	PATHCONF,  NOFLAGS,
+	_PC_SATTR_EXISTS,	"SATTR_EXISTS",		PATHCONF,  NOFLAGS,
 
 	/* UNIX 08 additions */
 
@@ -826,7 +833,7 @@ getconf(struct sctab *scp, int argc, char *name, char *file)
 			return (usage());
 		errno = 0;
 		len = confstr((int)scp->value, NULL, (size_t)0);
-		if (len == 0)
+		if (len == 0) {
 			if (errno == EINVAL) {
 				(void) fprintf(stderr, gettext(INVAL_ARG),
 				    name);
@@ -836,6 +843,7 @@ getconf(struct sctab *scp, int argc, char *name, char *file)
 				(void) printf("undefined\n");
 				return (0);
 			}
+		}
 		/*
 		 * allocate space to store result of constr() into
 		 */
