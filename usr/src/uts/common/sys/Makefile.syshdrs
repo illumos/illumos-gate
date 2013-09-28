@@ -19,6 +19,7 @@
 # CDDL HEADER END
 #
 # Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2013 Garrett D'Amore <garrett@damore.org>
 #
 
 # Common definitions for open and closed headers.
@@ -101,9 +102,6 @@ iscsit/%.check:		iscsit/%.h
 	$(DOT_H_CHECK)
 
 lvm/%.check:	lvm/%.h
-	$(DOT_H_CHECK)
-
-pcmcia/%.check:	pcmcia/%.h
 	$(DOT_H_CHECK)
 
 scsi/%.check:		scsi/%.h
@@ -219,7 +217,6 @@ ROOTDIRS=			\
 	$(ROOTDIR)/idm		\
 	$(ROOTDIR)/iscsit	\
 	$(ROOTDIR)/lvm		\
-	$(ROOTDIR)/pcmcia	\
 	$(ROOTDIR)/scsi		\
 	$(ROOTDIR)/scsi/conf	\
 	$(ROOTDIR)/scsi/generic	\
@@ -290,8 +287,6 @@ ROOTFSHDRS= $(FSHDRS:%=$(ROOTDIR)/fs/%)
 
 ROOTLVMHDRS= $(ALL_LVMHDRS:%=$(ROOTDIR)/lvm/%)
 
-ROOTPCMCIAHDRS= $(PCMCIAHDRS:%=$(ROOTDIR)/pcmcia/%)
-
 ROOTSCSIHDRS= $(SCSIHDRS:%=$(ROOTDIR)/scsi/%)
 ROOTSATAGENHDRS= $(SATAGENHDRS:%=$(ROOTDIR)/sata/%)
 ROOTSCSICONFHDRS= $(SCSICONFHDRS:%=$(ROOTDIR)/scsi/conf/%)
@@ -342,13 +337,13 @@ ROOTHOTPLUGPCIHDRS= $(HOTPLUGPCIHDRS:%=$(ROOTDIR)/hotplug/pci/%)
 ROOTTSOLHDRS= $(TSOLHDRS:%=$(ROOTDIR)/tsol/%)
 
 sparc_ROOTHDRS=	$(ROOTSDKTPHDRS) $(ROOTSCSICADHDRS) $(ROOTSCSITARGETSHDRS) \
-		$(ROOTUSBHDRS) $(ROOTUSBHUBDHDRS) $(ROOTPCMCIAHDRS) \
+		$(ROOTUSBHDRS) $(ROOTUSBHUBDHDRS) \
 		$(ROOTUSBAUDHDRS) $(ROOTUSBHIDHDRS) $(ROOTUSBMSHDRS) \
 		$(ROOTUSBPRNHDRS) $(ROOTUGENHDRS) $(ROOTUSBVIDHDRS) \
 		$(ROOTUWBHDRS) $(ROOTUWBAHDRS) $(ROOTUSBHWARCHDRS)
 
 i386_ROOTHDRS=	$(ROOTDKTPHDRS) $(ROOTPCHDRS) $(ROOTSCSITARGETSHDRS)	\
-		$(ROOTSCSIVHCIHDRS) $(ROOTPCMCIAHDRS) $(ROOTHOTPLUGHDRS) \
+		$(ROOTSCSIVHCIHDRS) $(ROOTHOTPLUGHDRS) \
 		$(ROOTHOTPLUGPCIHDRS) $(ROOTSATAGENHDRS) \
 		$(ROOTUWBHDRS) $(ROOTUWBAHDRS) $(ROOTUSBHWARCHDRS)
 
@@ -432,9 +427,6 @@ $(ROOTDIR)/ib/adapters/%:	ib/adapters/%
 	$(INS.file)
 
 $(ROOTDIR)/lvm/%: lvm/%
-	$(INS.file)
-
-$(ROOTDIR)/pcmcia/%:		pcmcia/%
 	$(INS.file)
 
 $(ROOTDIR)/scsi/%:		scsi/%

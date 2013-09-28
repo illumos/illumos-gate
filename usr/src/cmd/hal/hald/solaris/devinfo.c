@@ -2,6 +2,7 @@
  *
  * devinfo.c : main file for libdevinfo-based device enumeration
  *
+ * Copyright 2013 Garrett D'Amore <garrett@damore.org>
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  *
  * Licensed under the Academic Free License version 2.1
@@ -131,7 +132,6 @@ static DevinfoDevHandler *devinfo_handlers[] = {
 	&devinfo_cpu_handler,
 	&devinfo_ide_handler,
 	&devinfo_scsi_handler,
-	&devinfo_pcata_handler,
 	&devinfo_blkdev_handler,
 	&devinfo_floppy_handler,
 	&devinfo_usb_handler,

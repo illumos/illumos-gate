@@ -12,6 +12,7 @@
 #
 # Copyright 2011, Richard Lowe
 # Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2013 Garrett D'Amore <garrett@damore.org>
 #
 
 include		$(SRC)/Makefile.master
@@ -93,11 +94,8 @@ _MANFILES=	aac.7d		\
 		nxge.7d		\
 		ohci.7d		\
 		openprom.7d	\
-		pcan.7d		\
-		pcata.7d	\
 		pcic.7d		\
 		pcmcia.7d	\
-		pcwl.7d		\
 		physmem.7d	\
 		pm.7d		\
 		poll.7d		\

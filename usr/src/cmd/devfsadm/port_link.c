@@ -20,6 +20,7 @@
  */
 
 /*
+ * Copyright 2013 Garrett D'Amore <garrett@damore.org>
  * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -144,8 +145,6 @@ static int dialout_create(di_minor_t minor, di_node_t node);
 static int onbrd_dialout_create(di_minor_t minor, di_node_t node);
 static int rsc_port_create(di_minor_t minor, di_node_t node);
 static int lom_port_create(di_minor_t minor, di_node_t node);
-static int pcmcia_port_create(di_minor_t minor, di_node_t node);
-static int pcmcia_dialout_create(di_minor_t minor, di_node_t node);
 static void rm_dangling_port(char *devname);
 static void update_sacadm_db(void);
 static int parse_portno(char *dname);
@@ -170,10 +169,6 @@ static devfsadm_create_t ports_cbt[] = {
 	    TYPE_EXACT | DRV_EXACT, ILEVEL_1, rsc_port_create},
 	{"port", "ddi_serial:lomcon", "su",
 	    TYPE_EXACT | DRV_EXACT, ILEVEL_1, lom_port_create},
-	{"port", "ddi_serial", "pcser",
-	    TYPE_EXACT | DRV_EXACT, ILEVEL_1, pcmcia_port_create},
-	{"port", "ddi_serial:dialout", "pcser",
-	    TYPE_EXACT | DRV_EXACT, ILEVEL_1, pcmcia_dialout_create},
 	{"port", "ddi_serial", NULL,
 	    TYPE_EXACT, ILEVEL_0, serial_port_create},
 	{"port", "ddi_serial:mb", NULL,
@@ -673,78 +668,6 @@ lom_port_create(di_minor_t minor, di_node_t node)
 	/* This is not a LOM node, continue... */
 	di_devfs_path_free(devfspath);
 	return (DEVFSADM_CONTINUE);
-}
-
-/*
- * PCMCIA serial ports
- * Creates links of the form "/dev/term/pcN", where N is the PCMCIA
- * socket # the device is plugged into.
- */
-#define	PCMCIA_MAX_SOCKETS	64
-#define	PCMCIA_SOCKETNO(x)	((x) & (PCMCIA_MAX_SOCKETS - 1))
-
-static int
-pcmcia_port_create(di_minor_t minor, di_node_t node)
-{
-	char l_path[MAXPATHLEN];
-	char  *devfspath;
-	int socket, *intp;
-
-	devfspath = di_devfs_path(node);
-	if (devfspath == NULL) {
-		devfsadm_errprint("%s: di_devfs_path() failed\n", modname);
-		return (DEVFSADM_TERMINATE);
-	}
-
-	if (di_prop_lookup_ints(DDI_DEV_T_ANY, node, "socket", &intp) <= 0) {
-		devfsadm_errprint("%s: failed pcmcia socket lookup\n\t%s\n",
-		    modname, devfspath);
-		di_devfs_path_free(devfspath);
-		return (DEVFSADM_TERMINATE);
-	}
-
-	socket = PCMCIA_SOCKETNO(*intp);
-
-	di_devfs_path_free(devfspath);
-
-	(void) sprintf(l_path, "term/pc%d", socket);
-	(void) devfsadm_mklink(l_path, node, minor, 0);
-
-	return (DEVFSADM_TERMINATE);
-}
-
-/*
- * PCMCIA dialout serial ports
- * Creates links of the form "/dev/cua/pcN", where N is the PCMCIA
- * socket number the device is plugged into.
- */
-static int
-pcmcia_dialout_create(di_minor_t minor, di_node_t node)
-{
-	char l_path[MAXPATHLEN];
-	char  *devfspath;
-	int socket, *intp;
-
-	devfspath = di_devfs_path(node);
-	if (devfspath == NULL) {
-		devfsadm_errprint("%s: di_devfs_path() failed\n", modname);
-		return (DEVFSADM_TERMINATE);
-	}
-
-	if (di_prop_lookup_ints(DDI_DEV_T_ANY, node, "socket", &intp) <= 0) {
-		devfsadm_errprint("%s: failed socket lookup\n\t%s\n",
-		    modname, devfspath);
-		di_devfs_path_free(devfspath);
-		return (DEVFSADM_TERMINATE);
-	}
-
-	socket = PCMCIA_SOCKETNO(*intp);
-
-	di_devfs_path_free(devfspath);
-	(void) sprintf(l_path, "cua/pc%d", socket);
-	(void) devfsadm_mklink(l_path, node, minor, 0);
-
-	return (DEVFSADM_TERMINATE);
 }
 
 
