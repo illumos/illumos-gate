@@ -25,6 +25,7 @@
 # Use is subject to license terms.
 #
 # Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright (c) 2012, Joyent, Inc.  All rights reserved.
 # Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved.
 # Copyright (c) 2013 Gary Mills
 #
@@ -2903,6 +2904,9 @@ $endif
 	thr_wait_mutator;
 	_thr_wait_mutator;
 	__tls_get_addr;
+	_tmem_get_base;
+	_tmem_get_nentries;
+	_tmem_set_cleanup;
 	tpool_create;
 	tpool_dispatch;
 	tpool_destroy;

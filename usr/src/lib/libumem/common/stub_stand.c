@@ -23,6 +23,9 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
+ */
 
 /*
  * Stubs for the standalone to reduce the dependence on external libraries
@@ -124,4 +127,22 @@ int
 issetugid(void)
 {
 	return (1);
+}
+
+int
+_tmem_get_nentries(void)
+{
+	return (0);
+}
+
+uintptr_t
+_tmem_get_base(void)
+{
+	return (0);
+}
+
+/*ARGSUSED*/
+void
+_tmem_set_cleanup(void (*f)(int, void *))
+{
 }

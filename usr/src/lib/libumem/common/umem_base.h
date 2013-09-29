@@ -22,11 +22,12 @@
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
+ */
 
 #ifndef	_UMEM_BASE_H
 #define	_UMEM_BASE_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <umem_impl.h>
 
@@ -75,6 +76,8 @@ extern volatile uint32_t umem_reaping;
 #define	UMEM_REAP_ADDING	0x00000001	/* umem_reap() is active */
 #define	UMEM_REAP_ACTIVE	0x00000002	/* update thread is reaping */
 
+extern uintptr_t umem_tmem_off;
+
 /*
  * umem.c: tunables
  */
@@ -97,6 +100,7 @@ extern size_t umem_lite_minsize;
 extern size_t umem_lite_maxalign;
 extern size_t umem_maxverify;
 extern size_t umem_minfirewall;
+extern size_t umem_ptc_size;
 
 extern uint32_t umem_flags;
 
@@ -138,6 +142,20 @@ extern int umem_create_update_thread(void);
  */
 void umem_setup_envvars(int);
 void umem_process_envvars(void);
+
+/*
+ * umem_genasm.c: private interfaces
+ */
+extern const int umem_genasm_supported;
+extern int umem_genasm(int *, umem_cache_t **, int);
+
+/*
+ * malloc.c: traditional malloc/free interface for genasm
+ */
+extern void *umem_malloc(size_t);
+extern void umem_malloc_free(void *);
+extern void *_malloc(size_t);
+extern void _free(void *);
 
 #ifdef	__cplusplus
 }

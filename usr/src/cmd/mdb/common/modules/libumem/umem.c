@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright 2011 Joyent, Inc.  All rights reserved.
+ * Copyright 2012 Joyent, Inc.  All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
  */
 
@@ -36,6 +36,8 @@
 #include <alloca.h>
 #include <limits.h>
 #include <mdb/mdb_whatis.h>
+#include <thr_uberdata.h>
+#include <stdio.h>
 
 #include "misc.h"
 #include "leaky.h"
@@ -104,12 +106,58 @@ umem_update_variables(void)
 	return (0);
 }
 
+static int
+umem_ptc_walk_init(mdb_walk_state_t *wsp)
+{
+	if (wsp->walk_addr == NULL) {
+		if (mdb_layered_walk("ulwp", wsp) == -1) {
+			mdb_warn("couldn't walk 'ulwp'");
+			return (WALK_ERR);
+		}
+	}
+
+	return (WALK_NEXT);
+}
+
+static int
+umem_ptc_walk_step(mdb_walk_state_t *wsp)
+{
+	uintptr_t this;
+	int rval;
+
+	if (wsp->walk_layer != NULL) {
+		this = (uintptr_t)((ulwp_t *)wsp->walk_layer)->ul_self +
+		    (uintptr_t)wsp->walk_arg;
+	} else {
+		this = wsp->walk_addr + (uintptr_t)wsp->walk_arg;
+	}
+
+	for (;;) {
+		if (mdb_vread(&this, sizeof (void *), this) == -1) {
+			mdb_warn("couldn't read ptc buffer at %p", this);
+			return (WALK_ERR);
+		}
+
+		if (this == NULL)
+			break;
+
+		rval = wsp->walk_callback(this, &this, wsp->walk_cbdata);
+
+		if (rval != WALK_NEXT)
+			return (rval);
+	}
+
+	return (wsp->walk_layer != NULL ? WALK_NEXT : WALK_DONE);
+}
+
 /*ARGSUSED*/
 static int
-umem_init_walkers(uintptr_t addr, const umem_cache_t *c, void *ignored)
+umem_init_walkers(uintptr_t addr, const umem_cache_t *c, int *sizes)
 {
 	mdb_walker_t w;
 	char descr[64];
+	char name[64];
+	int i;
 
 	(void) mdb_snprintf(descr, sizeof (descr),
 	    "walk the %s cache", c->cache_name);
@@ -124,6 +172,45 @@ umem_init_walkers(uintptr_t addr, const umem_cache_t *c, void *ignored)
 	if (mdb_add_walker(&w) == -1)
 		mdb_warn("failed to add %s walker", c->cache_name);
 
+	if (!(c->cache_flags & UMF_PTC))
+		return (WALK_NEXT);
+
+	/*
+	 * For the per-thread cache walker, the address is the offset in the
+	 * tm_roots[] array of the ulwp_t.
+	 */
+	for (i = 0; sizes[i] != 0; i++) {
+		if (sizes[i] == c->cache_bufsize)
+			break;
+	}
+
+	if (sizes[i] == 0) {
+		mdb_warn("cache %s is cached per-thread, but could not find "
+		    "size in umem_alloc_sizes\n", c->cache_name);
+		return (WALK_NEXT);
+	}
+
+	if (i >= NTMEMBASE) {
+		mdb_warn("index for %s (%d) exceeds root slots (%d)\n",
+		    c->cache_name, i, NTMEMBASE);
+		return (WALK_NEXT);
+	}
+
+	(void) mdb_snprintf(name, sizeof (name),
+	    "umem_ptc_%d", c->cache_bufsize);
+	(void) mdb_snprintf(descr, sizeof (descr),
+	    "walk the per-thread cache for %s", c->cache_name);
+
+	w.walk_name = name;
+	w.walk_descr = descr;
+	w.walk_init = umem_ptc_walk_init;
+	w.walk_step = umem_ptc_walk_step;
+	w.walk_fini = NULL;
+	w.walk_init_arg = (void *)offsetof(ulwp_t, ul_tmem.tm_roots[i]);
+
+	if (mdb_add_walker(&w) == -1)
+		mdb_warn("failed to add %s walker", w.walk_name);
+
 	return (WALK_NEXT);
 }
 
@@ -132,6 +219,8 @@ static void
 umem_statechange_cb(void *arg)
 {
 	static int been_ready = 0;
+	GElf_Sym sym;
+	int *sizes;
 
 #ifndef _KMDB
 	leaky_cleanup(1);	/* state changes invalidate leaky state */
@@ -147,7 +236,25 @@ umem_statechange_cb(void *arg)
 		return;
 
 	been_ready = 1;
-	(void) mdb_walk("umem_cache", (mdb_walk_cb_t)umem_init_walkers, NULL);
+
+	/*
+	 * In order to determine the tm_roots offset of any cache that is
+	 * cached per-thread, we need to have the umem_alloc_sizes array.
+	 * Read this, assuring that it is zero-terminated.
+	 */
+	if (umem_lookup_by_name("umem_alloc_sizes", &sym) == -1) {
+		mdb_warn("unable to lookup 'umem_alloc_sizes'");
+		return;
+	}
+
+	sizes = mdb_zalloc(sym.st_size + sizeof (int), UM_SLEEP | UM_GC);
+
+	if (mdb_vread(sizes, sym.st_size, (uintptr_t)sym.st_value) == -1) {
+		mdb_warn("couldn't read 'umem_alloc_sizes'");
+		return;
+	}
+
+	(void) mdb_walk("umem_cache", (mdb_walk_cb_t)umem_init_walkers, sizes);
 }
 
 int
@@ -788,9 +895,9 @@ umem_estimate_allocated(uintptr_t addr, const umem_cache_t *cp)
 	} \
 }
 
-int
+static int
 umem_read_magazines(umem_cache_t *cp, uintptr_t addr,
-    void ***maglistp, size_t *magcntp, size_t *magmaxp, int alloc_flags)
+    void ***maglistp, size_t *magcntp, size_t *magmaxp)
 {
 	umem_magazine_t *ump, *mp;
 	void **maglist = NULL;
@@ -807,7 +914,7 @@ umem_read_magazines(umem_cache_t *cp, uintptr_t addr,
 		*maglistp = NULL;
 		*magcntp = 0;
 		*magmaxp = 0;
-		return (WALK_NEXT);
+		return (0);
 	}
 
 	/*
@@ -828,11 +935,11 @@ umem_read_magazines(umem_cache_t *cp, uintptr_t addr,
 	if (magbsize >= PAGESIZE / 2) {
 		mdb_warn("magazine size for cache %p unreasonable (%x)\n",
 		    addr, magbsize);
-		return (WALK_ERR);
+		return (-1);
 	}
 
-	maglist = mdb_alloc(magmax * sizeof (void *), alloc_flags);
-	mp = mdb_alloc(magbsize, alloc_flags);
+	maglist = mdb_alloc(magmax * sizeof (void *), UM_SLEEP);
+	mp = mdb_alloc(magbsize, UM_SLEEP);
 	if (mp == NULL || maglist == NULL)
 		goto fail;
 
@@ -875,23 +982,80 @@ umem_read_magazines(umem_cache_t *cp, uintptr_t addr,
 
 	dprintf(("magazine layer: %d buffers\n", magcnt));
 
-	if (!(alloc_flags & UM_GC))
-		mdb_free(mp, magbsize);
+	mdb_free(mp, magbsize);
 
 	*maglistp = maglist;
 	*magcntp = magcnt;
 	*magmaxp = magmax;
 
-	return (WALK_NEXT);
+	return (0);
 
 fail:
-	if (!(alloc_flags & UM_GC)) {
-		if (mp)
-			mdb_free(mp, magbsize);
-		if (maglist)
-			mdb_free(maglist, magmax * sizeof (void *));
+	if (mp)
+		mdb_free(mp, magbsize);
+	if (maglist)
+		mdb_free(maglist, magmax * sizeof (void *));
+
+	return (-1);
+}
+
+typedef struct umem_read_ptc_walk {
+	void **urpw_buf;
+	size_t urpw_cnt;
+	size_t urpw_max;
+} umem_read_ptc_walk_t;
+
+/*ARGSUSED*/
+static int
+umem_read_ptc_walk_buf(uintptr_t addr,
+    const void *ignored, umem_read_ptc_walk_t *urpw)
+{
+	if (urpw->urpw_cnt == urpw->urpw_max) {
+		size_t nmax = urpw->urpw_max ? (urpw->urpw_max << 1) : 1;
+		void **new = mdb_zalloc(nmax * sizeof (void *), UM_SLEEP);
+
+		if (nmax > 1) {
+			size_t osize = urpw->urpw_max * sizeof (void *);
+			bcopy(urpw->urpw_buf, new, osize);
+			mdb_free(urpw->urpw_buf, osize);
+		}
+
+		urpw->urpw_buf = new;
+		urpw->urpw_max = nmax;
 	}
-	return (WALK_ERR);
+
+	urpw->urpw_buf[urpw->urpw_cnt++] = (void *)addr;
+
+	return (WALK_NEXT);
+}
+
+static int
+umem_read_ptc(umem_cache_t *cp,
+    void ***buflistp, size_t *bufcntp, size_t *bufmaxp)
+{
+	umem_read_ptc_walk_t urpw;
+	char walk[60];
+	int rval;
+
+	if (!(cp->cache_flags & UMF_PTC))
+		return (0);
+
+	(void) snprintf(walk, sizeof (walk), "umem_ptc_%d", cp->cache_bufsize);
+
+	urpw.urpw_buf = *buflistp;
+	urpw.urpw_cnt = *bufcntp;
+	urpw.urpw_max = *bufmaxp;
+
+	if ((rval = mdb_walk(walk,
+	    (mdb_walk_cb_t)umem_read_ptc_walk_buf, &urpw)) == -1) {
+		mdb_warn("couldn't walk %s", walk);
+	}
+
+	*buflistp = urpw.urpw_buf;
+	*bufcntp = urpw.urpw_cnt;
+	*bufmaxp = urpw.urpw_max;
+
+	return (rval);
 }
 
 static int
@@ -1022,13 +1186,19 @@ umem_walk_init_common(mdb_walk_state_t *wsp, int type)
 	/*
 	 * Read in the contents of the magazine layer
 	 */
-	if (umem_read_magazines(cp, addr, &maglist, &magcnt, &magmax,
-	    UM_SLEEP) == WALK_ERR)
+	if (umem_read_magazines(cp, addr, &maglist, &magcnt, &magmax) != 0)
 		goto out2;
 
 	/*
-	 * We have all of the buffers from the magazines;  if we are walking
-	 * allocated buffers, sort them so we can bsearch them later.
+	 * Read in the contents of the per-thread caches, if any
+	 */
+	if (umem_read_ptc(cp, &maglist, &magcnt, &magmax) != 0)
+		goto out2;
+
+	/*
+	 * We have all of the buffers from the magazines and from the
+	 * per-thread cache (if any);  if we are walking allocated buffers,
+	 * sort them so we can bsearch them later.
 	 */
 	if (type & UM_ALLOCATED)
 		qsort(maglist, magcnt, sizeof (void *), addrcmp);

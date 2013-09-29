@@ -42,6 +42,7 @@ include ../../../../Makefile.cmd
 include ../../../../Makefile.cmd.64
 
 CPPFLAGS += -I$(SRC)/lib/libumem/common
+CPPFLAGS += -I$(SRC)/lib/libc/inc
 CPPFLAGS += -I$(MODSRCS_DIR)
 
 include ../../Makefile.amd64

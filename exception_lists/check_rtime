@@ -63,6 +63,8 @@ SKIP		^usr/lib/sysevent/modules/picl_slm.so$
 # Objects that are allowed to have executable data segments
 EXEC_DATA	^MACH(lib)/ld\.so\.1$
 EXEC_DATA	^lib/libc\.so\.1$	# 6524709, 32-bit, needed for x86 only
+EXEC_DATA	^lib/amd64/libumem\.so\.1$ # ptcumem
+EXEC_DATA	^lib/libumem\.so\.1$	# ptcumem
 EXEC_DATA	^opt/SUNWdtrt/tst/.*/ustack/tst\.helper\.exe$
 EXEC_DATA	^platform/.*/MACH(kernel)/unix$
 EXEC_DATA	^platform/.*/multiboot$

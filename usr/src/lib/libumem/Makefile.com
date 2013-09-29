@@ -22,6 +22,8 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2012, Joyent, Inc.  All rights reserved.
+#
 
 #
 # The build process for libumem is sightly different from that used by other
@@ -65,10 +67,12 @@ SRCS_standalone = $(OBJECTS_standalone:%.o=../common/%.c)
 
 # Architecture-dependent files common to both versions of libumem
 OBJECTS_common_isadep = \
-	asm_subr.o
+	asm_subr.o \
+	umem_genasm.o	
 
 SRCS_common_isadep = \
-	$(ISASRCDIR)/asm_subr.s
+	$(ISASRCDIR)/asm_subr.s \
+	$(ISASRCDIR)/umem_genasm.c
 
 # Architecture-independent files common to both versions  of libumem
 OBJECTS_common_common = \
@@ -140,6 +144,7 @@ DTS_ERRNO=
 STAND_RENAMED_FUNCS= \
 	atomic_add_64 \
 	atomic_add_32_nv \
+	atomic_swap_64 \
 	snprintf \
 	vsnprintf
 

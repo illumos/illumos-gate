@@ -20,6 +20,7 @@
 #
 #
 # Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2012, Joyent, Inc.  All rights reserved.
 #
 
 #
@@ -37,6 +38,17 @@
 #
 
 $mapfile_version 2
+
+$if _x86
+LOAD_SEGMENT umem {
+	FLAGS = READ WRITE EXECUTE;
+	ASSIGN_SECTION {
+		IS_NAME = .text;
+		FILE_BASENAME = asm_subr.o
+	};
+};
+$endif
+
 
 SYMBOL_VERSION SUNW_1.1 {
     global:

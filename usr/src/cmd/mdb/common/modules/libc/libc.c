@@ -23,6 +23,9 @@
  * Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
  */
+/*
+ * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
+ */
 
 #include <sys/mdb_modapi.h>
 #include <mdb/mdb_whatis.h>
@@ -680,6 +683,12 @@ d_ulwp(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    prt_addr((void *)(addr + OFFSET(ul_siginfo)), 1),
 	    prt_addr((void *)(addr + OFFSET(ul_spinlock)), 1),
 	    prt_addr((void *)(addr + OFFSET(ul_fpuenv)), 0));
+
+	HD("tmem.size             &tmem.roots");
+	mdb_printf(OFFSTR "%-21H %s\n",
+	    OFFSET(ul_tmem),
+	    ulwp.ul_tmem.tm_size,
+	    prt_addr((void *)(addr + OFFSET(ul_tmem) + sizeof (size_t)), 0));
 
 	return (DCMD_OK);
 }

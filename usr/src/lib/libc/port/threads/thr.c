@@ -22,6 +22,9 @@
 /*
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
+/*
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ */
 
 #include "lint.h"
 #include "thr_uberdata.h"
@@ -771,6 +774,7 @@ _thrp_exit()
 	}
 	lmutex_unlock(&udp->link_lock);
 
+	tmem_exit();		/* deallocate tmem allocations */
 	tsd_exit();		/* deallocate thread-specific data */
 	tls_exit();		/* deallocate thread-local storage */
 	heldlock_exit();	/* deal with left-over held locks */

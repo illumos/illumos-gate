@@ -23,6 +23,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ */
+
 #include "umem.h"
 #include <libproc.h>
 #include <mdb/mdb_modapi.h>
@@ -34,6 +38,8 @@
 
 #include <umem_impl.h>
 #include <sys/vmem_impl_user.h>
+#include <thr_uberdata.h>
+#include <stdio.h>
 
 #include "umem_pagesize.h"
 
@@ -44,24 +50,33 @@ typedef struct datafmt {
 	char	*fmt;
 } datafmt_t;
 
+static datafmt_t ptcfmt[] = {
+	{ "   ",	"tid",		"---",		"%3u "		},
+	{ " memory",	" cached",	"-------",	"%7lH "		},
+	{ "  %",	"cap",		"---",		"%3u "		},
+	{ "  %",	NULL,		"---",		"%3u "		},
+	{ NULL,		NULL,		NULL,		NULL		}
+};
+
 static datafmt_t umemfmt[] = {
 	{ "cache                    ", "name                     ",
 	"-------------------------", "%-25s "				},
 	{ "   buf",	"  size",	"------",	"%6u "		},
-	{ "   buf",	"in use",	"------",	"%6u "		},
-	{ "   buf",	" total",	"------",	"%6u "		},
-	{ "   memory",	"   in use",	"---------",	"%9u "		},
+	{ "    buf",	" in use",	"-------",	"%7u "		},
+	{ "    buf",	" in ptc",	"-------",	"%7s "		},
+	{ "    buf",	"  total",	"-------",	"%7u "		},
+	{ " memory",	" in use",	"-------",	"%7H "		},
 	{ "    alloc",	"  succeed",	"---------",	"%9u "		},
-	{ "alloc",	" fail",	"-----",	"%5llu "	},
+	{ "alloc",	" fail",	"-----",	"%5llu"		},
 	{ NULL,		NULL,		NULL,		NULL		}
 };
 
 static datafmt_t vmemfmt[] = {
 	{ "vmem                     ", "name                     ",
 	"-------------------------", "%-*s "				},
-	{ "   memory",	"   in use",	"---------",	"%9llu "	},
-	{ "    memory",	"     total",	"----------",	"%10llu "	},
-	{ "   memory",	"   import",	"---------",	"%9llu "	},
+	{ "   memory",	"   in use",	"---------",	"%9H "		},
+	{ "    memory",	"     total",	"----------",	"%10H "		},
+	{ "   memory",	"   import",	"---------",	"%9H "		},
 	{ "    alloc",	"  succeed",	"---------",	"%9llu "	},
 	{ "alloc",	" fail",	"-----",	"%5llu "	},
 	{ NULL,		NULL,		NULL,		NULL		}
@@ -105,14 +120,105 @@ typedef struct umastat_vmem {
 	int kv_fail;
 } umastat_vmem_t;
 
+/*ARGSUSED*/
+static int
+umastat_cache_nptc(uintptr_t addr, const umem_cache_t *cp, int *nptc)
+{
+	if (!(cp->cache_flags & UMF_PTC))
+		return (WALK_NEXT);
+
+	(*nptc)++;
+	return (WALK_NEXT);
+}
+
+/*ARGSUSED*/
+static int
+umastat_cache_hdr(uintptr_t addr, const umem_cache_t *cp, void *ignored)
+{
+	if (!(cp->cache_flags & UMF_PTC))
+		return (WALK_NEXT);
+
+	mdb_printf("%3d ", cp->cache_bufsize);
+	return (WALK_NEXT);
+}
+
+/*ARGSUSED*/
+static int
+umastat_lwp_ptc(uintptr_t addr, void *buf, int *nbufs)
+{
+	(*nbufs)++;
+	return (WALK_NEXT);
+}
+
+/*ARGSUSED*/
+static int
+umastat_lwp_cache(uintptr_t addr, const umem_cache_t *cp, ulwp_t *ulwp)
+{
+	char walk[60];
+	int nbufs = 0;
+
+	if (!(cp->cache_flags & UMF_PTC))
+		return (WALK_NEXT);
+
+	(void) snprintf(walk, sizeof (walk), "umem_ptc_%d", cp->cache_bufsize);
+
+	if (mdb_pwalk(walk, (mdb_walk_cb_t)umastat_lwp_ptc,
+	    &nbufs, (uintptr_t)ulwp->ul_self) == -1) {
+		mdb_warn("unable to walk '%s'", walk);
+		return (WALK_ERR);
+	}
+
+	mdb_printf("%3d ", ulwp->ul_tmem.tm_size ?
+	    (nbufs * cp->cache_bufsize * 100) / ulwp->ul_tmem.tm_size : 0);
+
+	return (WALK_NEXT);
+}
+
+/*ARGSUSED*/
+static int
+umastat_lwp(uintptr_t addr, const ulwp_t *ulwp, void *ignored)
+{
+	size_t size;
+	datafmt_t *dfp = ptcfmt;
+
+	mdb_printf((dfp++)->fmt, ulwp->ul_lwpid);
+	mdb_printf((dfp++)->fmt, ulwp->ul_tmem.tm_size);
+
+	if (umem_readvar(&size, "umem_ptc_size") == -1) {
+		mdb_warn("unable to read 'umem_ptc_size'");
+		return (WALK_ERR);
+	}
+
+	mdb_printf((dfp++)->fmt, (ulwp->ul_tmem.tm_size * 100) / size);
+
+	if (mdb_walk("umem_cache",
+	    (mdb_walk_cb_t)umastat_lwp_cache, (void *)ulwp) == -1) {
+		mdb_warn("can't walk 'umem_cache'");
+		return (WALK_ERR);
+	}
+
+	mdb_printf("\n");
+
+	return (WALK_NEXT);
+}
+
+/*ARGSUSED*/
+static int
+umastat_cache_ptc(uintptr_t addr, const void *ignored, int *nptc)
+{
+	(*nptc)++;
+	return (WALK_NEXT);
+}
+
 static int
 umastat_cache(uintptr_t addr, const umem_cache_t *cp, umastat_vmem_t **kvp)
 {
 	umastat_vmem_t *kv;
 	datafmt_t *dfp = umemfmt;
+	char buf[10];
 	int magsize;
 
-	int avail, alloc, total;
+	int avail, alloc, total, nptc = 0;
 	size_t meminuse = (cp->cache_slab_create - cp->cache_slab_destroy) *
 	    cp->cache_slabsize;
 
@@ -129,6 +235,21 @@ umastat_cache(uintptr_t addr, const umem_cache_t *cp, umastat_vmem_t **kvp)
 	(void) mdb_pwalk("umem_cpu_cache", cpu_alloc, &alloc, addr);
 	(void) mdb_pwalk("umem_cpu_cache", cpu_avail, &avail, addr);
 	(void) mdb_pwalk("umem_slab_partial", slab_avail, &avail, addr);
+
+	if (cp->cache_flags & UMF_PTC) {
+		char walk[60];
+
+		(void) snprintf(walk, sizeof (walk),
+		    "umem_ptc_%d", cp->cache_bufsize);
+
+		if (mdb_walk(walk,
+		    (mdb_walk_cb_t)umastat_cache_ptc, &nptc) == -1) {
+			mdb_warn("unable to walk '%s'", walk);
+			return (WALK_ERR);
+		}
+
+		(void) snprintf(buf, sizeof (buf), "%d", nptc);
+	}
 
 	for (kv = *kvp; kv != NULL; kv = kv->kv_next) {
 		if (kv->kv_addr == (uintptr_t)cp->cache_arena)
@@ -147,6 +268,7 @@ out:
 	mdb_printf((dfp++)->fmt, cp->cache_name);
 	mdb_printf((dfp++)->fmt, cp->cache_bufsize);
 	mdb_printf((dfp++)->fmt, total - avail);
+	mdb_printf((dfp++)->fmt, cp->cache_flags & UMF_PTC ? buf : "-");
 	mdb_printf((dfp++)->fmt, total);
 	mdb_printf((dfp++)->fmt, meminuse);
 	mdb_printf((dfp++)->fmt, alloc);
@@ -165,8 +287,8 @@ umastat_vmem_totals(uintptr_t addr, const vmem_t *v, umastat_vmem_t *kv)
 	if (kv == NULL || kv->kv_alloc == 0)
 		return (WALK_NEXT);
 
-	mdb_printf("Total [%s]%*s %6s %6s %6s %9u %9u %5u\n", v->vm_name,
-	    17 - strlen(v->vm_name), "", "", "", "",
+	mdb_printf("Total [%s]%*s %6s %7s %7s %7s %7H %9u %5u\n", v->vm_name,
+	    17 - strlen(v->vm_name), "", "", "", "", "",
 	    kv->kv_meminuse, kv->kv_alloc, kv->kv_fail);
 
 	return (WALK_NEXT);
@@ -209,20 +331,67 @@ umastat(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	umastat_vmem_t *kv = NULL;
 	datafmt_t *dfp;
+	int nptc = 0, i;
 
 	if (argc != 0)
 		return (DCMD_USAGE);
 
+	/*
+	 * We need to determine if we have any caches that have per-thread
+	 * caching enabled.
+	 */
+	if (mdb_walk("umem_cache",
+	    (mdb_walk_cb_t)umastat_cache_nptc, &nptc) == -1) {
+		mdb_warn("can't walk 'umem_cache'");
+		return (DCMD_ERR);
+	}
+
+	if (nptc) {
+		for (dfp = ptcfmt; dfp->hdr2 != NULL; dfp++)
+			mdb_printf("%s ", dfp->hdr1);
+
+		for (i = 0; i < nptc; i++)
+			mdb_printf("%s ", dfp->hdr1);
+
+		mdb_printf("\n");
+
+		for (dfp = ptcfmt; dfp->hdr2 != NULL; dfp++)
+			mdb_printf("%s ", dfp->hdr2);
+
+		if (mdb_walk("umem_cache",
+		    (mdb_walk_cb_t)umastat_cache_hdr, NULL) == -1) {
+			mdb_warn("can't walk 'umem_cache'");
+			return (DCMD_ERR);
+		}
+
+		mdb_printf("\n");
+
+		for (dfp = ptcfmt; dfp->hdr2 != NULL; dfp++)
+			mdb_printf("%s ", dfp->dashes);
+
+		for (i = 0; i < nptc; i++)
+			mdb_printf("%s ", dfp->dashes);
+
+		mdb_printf("\n");
+
+		if (mdb_walk("ulwp", (mdb_walk_cb_t)umastat_lwp, NULL) == -1) {
+			mdb_warn("can't walk 'ulwp'");
+			return (DCMD_ERR);
+		}
+
+		mdb_printf("\n");
+	}
+
 	for (dfp = umemfmt; dfp->hdr1 != NULL; dfp++)
-		mdb_printf("%s ", dfp->hdr1);
+		mdb_printf("%s%s", dfp == umemfmt ? "" : " ", dfp->hdr1);
 	mdb_printf("\n");
 
 	for (dfp = umemfmt; dfp->hdr1 != NULL; dfp++)
-		mdb_printf("%s ", dfp->hdr2);
+		mdb_printf("%s%s", dfp == umemfmt ? "" : " ", dfp->hdr2);
 	mdb_printf("\n");
 
 	for (dfp = umemfmt; dfp->hdr1 != NULL; dfp++)
-		mdb_printf("%s ", dfp->dashes);
+		mdb_printf("%s%s", dfp == umemfmt ? "" : " ", dfp->dashes);
 	mdb_printf("\n");
 
 	if (mdb_walk("umem_cache", (mdb_walk_cb_t)umastat_cache, &kv) == -1) {
@@ -231,7 +400,7 @@ umastat(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	}
 
 	for (dfp = umemfmt; dfp->hdr1 != NULL; dfp++)
-		mdb_printf("%s ", dfp->dashes);
+		mdb_printf("%s%s", dfp == umemfmt ? "" : " ", dfp->dashes);
 	mdb_printf("\n");
 
 	if (mdb_walk("vmem", (mdb_walk_cb_t)umastat_vmem_totals, kv) == -1) {

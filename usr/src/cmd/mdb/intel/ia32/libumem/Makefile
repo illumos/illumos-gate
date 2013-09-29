@@ -40,6 +40,7 @@ MODSRCS = \
 
 include ../../../../Makefile.cmd
 
+CPPFLAGS += -I$(SRC)/lib/libc/inc
 CPPFLAGS += -I$(SRC)/lib/libumem/common
 CPPFLAGS += -I$(MODSRCS_DIR)
 
