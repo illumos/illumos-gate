@@ -1,9 +1,10 @@
 '\" te
 .\" Copyright (C) 2008, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright (C) 2012, Joyent, Inc. All Rights Reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH NET_PROTOCOL_RELEASE 9F "May 1, 2008"
+.TH NET_PROTOCOL_RELEASE 9F "Mar 5, 2012"
 .SH NAME
 net_protocol_release \- indicate that a reference to a network protocol is no
 longer required
@@ -12,7 +13,7 @@ longer required
 .nf
 #include <sys/neti.h>
 
-\fBint\fR \fBnet_protocol_release\fR(\fBnet_data_t\fR *\fInet\fR);
+\fBint\fR \fBnet_protocol_release\fR(\fBnet_handle_t\fR \fIinfo\fR);
 .fi
 
 .SH INTERFACE LEVEL
@@ -23,7 +24,7 @@ Solaris DDI specific (Solaris DDI).
 .sp
 .ne 2
 .na
-\fB\fInet\fR\fR
+\fB\fIinfo\fR\fR
 .ad
 .RS 7n
 value returned from a successful call to \fBnet_protocol_lookup\fR(9F).
