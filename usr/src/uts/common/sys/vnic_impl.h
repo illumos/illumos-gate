@@ -21,6 +21,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2013 Joyent, Inc.  All rights reserved.
  */
 
 #ifndef	_SYS_VNIC_IMPL_H
@@ -46,8 +47,10 @@ typedef struct vnic_s {
 
 	mac_handle_t		vn_mh;
 	mac_handle_t		vn_lower_mh;
-	mac_client_handle_t	vn_mch;
-	mac_unicast_handle_t	vn_muh;
+	uint_t			vn_nhandles; /* # of secondary mac handles */
+	/* The primary handle is always the first element in the array */
+	mac_client_handle_t	vn_mc_handles[MPT_MAXMACADDR];
+	mac_unicast_handle_t	vn_mu_handles[MPT_MAXMACADDR];
 	uint32_t		vn_margin;
 	int			vn_slot_id;
 	vnic_mac_addr_type_t	vn_addr_type;
@@ -62,6 +65,9 @@ typedef struct vnic_s {
 
 	uint32_t		vn_hcksum_txflags;
 } vnic_t;
+
+#define	vn_mch	vn_mc_handles[0]
+#define	vn_muh	vn_mu_handles[0]
 
 extern int vnic_dev_create(datalink_id_t, datalink_id_t, vnic_mac_addr_type_t *,
     int *, uchar_t *, int *, uint_t, uint16_t, vrid_t, int,

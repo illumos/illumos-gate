@@ -22,6 +22,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2013 Joyent, Inc.  All rights reserved.
  */
 
 /*
@@ -90,9 +91,6 @@ extern boolean_t mac_client_is_vlan_vnic(mac_client_handle_t);
 
 extern void mac_client_poll_enable(mac_client_handle_t);
 extern void mac_client_poll_disable(mac_client_handle_t);
-
-extern int mac_resource_ctl_set(mac_client_handle_t, mac_resource_props_t *);
-extern void mac_resource_ctl_get(mac_client_handle_t, mac_resource_props_t *);
 
 /*
  * Flow-related APIs for MAC clients.

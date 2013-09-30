@@ -66,6 +66,7 @@
 #include <net/if_types.h>
 #include <libinetutil.h>
 #include <pool.h>
+#include <libdlaggr.h>
 
 /*
  * The linkprop get() callback.
@@ -150,20 +151,20 @@ static pd_getf_t	get_zone, get_autopush, get_rate_mod, get_rate,
 			get_flowctl, get_maxbw, get_cpus, get_priority,
 			get_tagmode, get_range, get_stp, get_bridge_forward,
 			get_bridge_pvid, get_protection, get_rxrings,
-			get_txrings, get_cntavail,
+			get_txrings, get_cntavail, get_secondary_macs,
 			get_allowedips, get_allowedcids, get_pool,
 			get_rings_range, get_linkmode_prop,
 			get_promisc_filtered;
 
 static pd_setf_t	set_zone, set_rate, set_powermode, set_radio,
 			set_public_prop, set_resource, set_stp_prop,
-			set_bridge_forward, set_bridge_pvid,
+			set_bridge_forward, set_bridge_pvid, set_secondary_macs,
 			set_promisc_filtered;
 
 static pd_checkf_t	check_zone, check_autopush, check_rate, check_hoplimit,
 			check_encaplim, check_uint32, check_maxbw, check_cpus,
 			check_stp_prop, check_bridge_pvid, check_allowedips,
-			check_allowedcids, check_rings,
+			check_allowedcids, check_secondary_macs, check_rings,
 			check_pool, check_prop;
 
 struct prop_desc {
@@ -368,6 +369,9 @@ static link_attr_t link_attr[] = {
 
 	{ MAC_PROP_VN_PROMISC_FILTERED,	sizeof (boolean_t), "promisc-filtered"},
 
+	{ MAC_PROP_SECONDARY_ADDRS, sizeof (mac_secondary_addr_t),
+	    "secondary-macs"},
+
 	{ MAC_PROP_PRIVATE,	0,			"driver-private"}
 };
 
@@ -453,6 +457,12 @@ static  val_desc_t	dladm_part_linkmode_vals[] = {
 #define	RESET_VAL	((uintptr_t)-1)
 #define	UNSPEC_VAL	((uintptr_t)-2)
 
+/*
+ * For the default, if defaults are not defined for the property,
+ * pd_defval.vd_name should be null. If the driver has to be contacted for the
+ * value, vd_name should be the empty string (""). Otherwise, dladm will
+ * just print whatever is in the table.
+ */
 static prop_desc_t	prop_table[] = {
 	{ "channel",	{ NULL, 0 },
 	    NULL, 0, NULL, NULL,
@@ -515,6 +525,11 @@ static prop_desc_t	prop_table[] = {
 	    link_flow_vals, VALCNT(link_flow_vals),
 	    set_public_prop, NULL, get_flowctl, NULL,
 	    0, DATALINK_CLASS_PHYS, DL_ETHER },
+
+	{ "secondary-macs", { "--", 0 }, NULL, 0,
+	    set_secondary_macs, NULL,
+	    get_secondary_macs, check_secondary_macs, PD_CHECK_ALLOC,
+	    DATALINK_CLASS_VNIC, DL_ETHER },
 
 	{ "adv_10gfdx_cap", { "", 0 },
 	    link_01_vals, VALCNT(link_01_vals),
@@ -2394,7 +2409,7 @@ get_allowedips(dladm_handle_t handle, prop_desc_t *pdp,
 			(void) dladm_ipv4addr2str(&v4addr, prop_val[i]);
 			if (mask != 0) {
 				int len = strlen(prop_val[i]);
-				(void)sprintf(prop_val[i] + len, "/%d",
+				(void) sprintf(prop_val[i] + len, "/%d",
 				    mask_to_nbits(mask));
 			}
 		} else {
@@ -2879,6 +2894,106 @@ fail:
 		free((void *)vdp[i].vd_val);
 		vdp[i].vd_val = NULL;
 	}
+	return (status);
+}
+
+/* ARGSUSED */
+static dladm_status_t
+get_secondary_macs(dladm_handle_t handle, prop_desc_t *pdp,
+    datalink_id_t linkid, char **prop_val, uint_t *val_cnt,
+    datalink_media_t media, uint_t flags, uint_t *perm_flags)
+{
+	mac_secondary_addr_t	sa;
+	dladm_status_t		status;
+	int			i;
+
+	status = i_dladm_get_public_prop(handle, linkid, pdp->pd_name, flags,
+	    perm_flags, &sa, sizeof (sa));
+	if (status != DLADM_STATUS_OK)
+		return (status);
+
+	if (sa.ms_addrcnt == 0) {
+		*val_cnt = 0;
+		return (DLADM_STATUS_OK);
+	}
+	if (sa.ms_addrcnt > *val_cnt)
+		return (DLADM_STATUS_BADVALCNT);
+
+	for (i = 0; i < sa.ms_addrcnt; i++) {
+		(void) dladm_aggr_macaddr2str(
+		    (const unsigned char *)&sa.ms_addrs[i], prop_val[i]);
+	}
+	*val_cnt = sa.ms_addrcnt;
+	return (DLADM_STATUS_OK);
+}
+
+/* ARGSUSED */
+static dladm_status_t
+check_secondary_macs(dladm_handle_t handle, prop_desc_t *pdp,
+    datalink_id_t linkid, char **prop_val, uint_t *val_cntp, uint_t flags,
+    val_desc_t **vdpp, datalink_media_t media)
+{
+	dladm_status_t	status;
+	uchar_t		*addr;
+	uint_t		len = 0;
+	int		i;
+	uint_t		val_cnt = *val_cntp;
+	val_desc_t	*vdp = *vdpp;
+
+	if (val_cnt >= MPT_MAXMACADDR)
+		return (DLADM_STATUS_BADVALCNT);
+
+	for (i = 0; i < val_cnt; i++) {
+		addr = _link_aton(prop_val[i], (int *)&len);
+		if (addr == NULL) {
+			if (len == (uint_t)-1)
+				status = DLADM_STATUS_MACADDRINVAL;
+			else
+				status = DLADM_STATUS_NOMEM;
+			goto fail;
+		}
+
+		vdp[i].vd_val = (uintptr_t)addr;
+	}
+	return (DLADM_STATUS_OK);
+
+fail:
+	for (i = 0; i < val_cnt; i++) {
+		free((void *)vdp[i].vd_val);
+		vdp[i].vd_val = NULL;
+	}
+	return (status);
+}
+
+/* ARGSUSED */
+static dladm_status_t
+set_secondary_macs(dladm_handle_t handle, prop_desc_t *pd, datalink_id_t linkid,
+    val_desc_t *vdp, uint_t val_cnt, uint_t flags, datalink_media_t media)
+{
+	dladm_status_t status;
+	dld_ioc_macprop_t *dip;
+	int i;
+	mac_secondary_addr_t msa;
+
+	dip = i_dladm_buf_alloc_by_name(0, linkid, "secondary-macs", 0,
+	    &status);
+	if (dip == NULL)
+		return (status);
+
+	if (vdp->vd_val == 0) {
+		val_cnt = (uint_t)-1;
+	} else {
+		for (i = 0; i < val_cnt; i++) {
+			bcopy((void *)vdp[i].vd_val, msa.ms_addrs[i],
+			    MAXMACADDRLEN);
+		}
+	}
+	msa.ms_addrcnt = val_cnt;
+	(void) memcpy(dip->pr_val, &msa, dip->pr_valsize);
+
+	status = i_dladm_macprop(handle, dip, B_TRUE);
+
+	free(dip);
 	return (status);
 }
 
@@ -4618,11 +4733,13 @@ dladm_linkprop_is_set(dladm_handle_t handle, datalink_id_t linkid,
 
 	/*
 	 * valcnt is always set to 1 by get_pool(), hence we need to check
-	 * for a non-null string to see if it is set. For protection and
-	 * allowed-ips, we can check either the *propval or the valcnt.
+	 * for a non-null string to see if it is set. For protection,
+	 * secondary-macs and allowed-ips, we can check either the *propval
+	 * or the valcnt.
 	 */
 	if ((strcmp(prop_name, "pool") == 0 ||
 	    strcmp(prop_name, "protection") == 0 ||
+	    strcmp(prop_name, "secondary-macs") == 0 ||
 	    strcmp(prop_name, "allowed-ips") == 0) &&
 	    (strlen(*propvals) != 0)) {
 		*is_set = B_TRUE;
