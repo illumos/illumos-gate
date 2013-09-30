@@ -424,6 +424,8 @@ file path=usr/lib/fm/fmd/ipmitopo mode=0555
 #
 file path=usr/lib/fm/fmd/plugins/cpumem-retire.conf
 file path=usr/lib/fm/fmd/plugins/cpumem-retire.so mode=0555
+file path=usr/lib/fm/fmd/plugins/disk-lights.conf
+file path=usr/lib/fm/fmd/plugins/disk-lights.so mode=0555
 file path=usr/lib/fm/fmd/plugins/disk-monitor.conf
 file path=usr/lib/fm/fmd/plugins/disk-monitor.so mode=0555
 file path=usr/lib/fm/fmd/plugins/disk-transport.conf
@@ -565,6 +567,7 @@ file path=usr/lib/fm/llib-ltopo.ln variant.opensolaris.zone=__NODEFAULT
 file path=usr/lib/fm/topo/maps/xfp-hc-topology.xml mode=0444
 file path=usr/lib/fm/topo/plugins/disk.so mode=0555
 file path=usr/lib/fm/topo/plugins/fac_prov_ipmi.so mode=0555
+file path=usr/lib/fm/topo/plugins/fac_prov_mptsas.so mode=0555
 file path=usr/lib/fm/topo/plugins/ipmi.so mode=0555
 file path=usr/lib/fm/topo/plugins/ses.so mode=0555
 file path=usr/lib/fm/topo/plugins/xfp.so mode=0555
@@ -725,6 +728,9 @@ $(i386_ONLY)file path=usr/platform/i86pc/lib/fm/eft/$(ARCH64).eft mode=0444
 $(i386_ONLY)file path=usr/platform/i86pc/lib/fm/eft/gcpu.eft mode=0444
 $(i386_ONLY)file path=usr/platform/i86pc/lib/fm/eft/gcpu_amd.eft mode=0444
 $(i386_ONLY)file path=usr/platform/i86pc/lib/fm/eft/intel.eft mode=0444
+$(i386_ONLY)file \
+    path=usr/platform/i86pc/lib/fm/topo/maps/Joyent-Compute-Platform-1101-disk-hc-topology.xml \
+    mode=0444
 $(i386_ONLY)file \
     path=usr/platform/i86pc/lib/fm/topo/maps/Netra-X4200-M2-disk-hc-topology.xml \
     mode=0444

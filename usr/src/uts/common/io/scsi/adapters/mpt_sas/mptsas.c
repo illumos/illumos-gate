@@ -6056,10 +6056,7 @@ mptsas_handle_topo_change(mptsas_topo_change_list_t *topo_node,
 
 		mutex_enter(&mpt->m_mutex);
 		ptgt->m_led_status = 0;
-		if (mptsas_flush_led_status(mpt, ptgt) != DDI_SUCCESS) {
-			NDBG14(("mptsas: clear LED for tgt %x failed",
-			    ptgt->m_slot_num));
-		}
+		(void) mptsas_flush_led_status(mpt, ptgt);
 		if (rval == DDI_SUCCESS) {
 			mptsas_tgt_free(&mpt->m_active->m_tgttbl,
 			    ptgt->m_sas_wwn, ptgt->m_phymask);
@@ -11335,8 +11332,8 @@ led_control(mptsas_t *mpt, intptr_t data, int mode)
 static int
 get_disk_info(mptsas_t *mpt, intptr_t data, int mode)
 {
-	int i = 0;
-	int count = 0;
+	uint16_t i = 0;
+	uint16_t count = 0;
 	int ret = 0;
 	mptsas_target_t *ptgt;
 	mptsas_disk_info_t *di;
@@ -11441,7 +11438,6 @@ mptsas_ioctl(dev_t dev, int cmd, intptr_t data, int mode, cred_t *credp,
 	dev_info_t		*dip = NULL;
 	mptsas_phymask_t	phymask = 0;
 	struct devctl_iocdata	*dcp = NULL;
-	uint32_t		slotstatus = 0;
 	char			*addr = NULL;
 	mptsas_target_t		*ptgt = NULL;
 
@@ -11519,10 +11515,7 @@ mptsas_ioctl(dev_t dev, int cmd, intptr_t data, int mode, cred_t *credp,
 				ptgt->m_led_status &=
 				    ~(1 << (MPTSAS_LEDCTL_LED_OK2RM - 1));
 			}
-			if (mptsas_flush_led_status(mpt, ptgt) != DDI_SUCCESS) {
-				NDBG14(("mptsas_ioctl: set LED for tgt %s "
-				    "failed %x", addr, slotstatus));
-			}
+			(void) mptsas_flush_led_status(mpt, ptgt);
 			mutex_exit(&mpt->m_mutex);
 			ndi_dc_freehdl(dcp);
 		}
@@ -14246,10 +14239,7 @@ mptsas_create_virt_lun(dev_info_t *pdip, struct scsi_inquiry *inq, char *guid,
 		if (mdi_rtn == MDI_SUCCESS) {
 			mutex_enter(&mpt->m_mutex);
 			ptgt->m_led_status = 0;
-			if (mptsas_flush_led_status(mpt, ptgt) != DDI_SUCCESS) {
-				NDBG14(("mptsas: clear LED for slot %x "
-				    "failed", ptgt->m_slot_num));
-			}
+			(void) mptsas_flush_led_status(mpt, ptgt);
 			mutex_exit(&mpt->m_mutex);
 		}
 		if (mdi_rtn == MDI_NOT_SUPPORTED) {
@@ -14608,10 +14598,7 @@ phys_create_done:
 		if (ndi_rtn == NDI_SUCCESS) {
 			mutex_enter(&mpt->m_mutex);
 			ptgt->m_led_status = 0;
-			if (mptsas_flush_led_status(mpt, ptgt) != DDI_SUCCESS) {
-				NDBG14(("mptsas: clear LED for tgt %x "
-				    "failed", ptgt->m_slot_num));
-			}
+			(void) mptsas_flush_led_status(mpt, ptgt);
 			mutex_exit(&mpt->m_mutex);
 		}
 
@@ -15529,7 +15516,8 @@ mptsas_flush_led_status(mptsas_t *mpt, mptsas_target_t *ptgt)
 /*
  *  send sep request, use enclosure/slot addressing
  */
-static int mptsas_send_sep(mptsas_t *mpt, mptsas_target_t *ptgt,
+static int
+mptsas_send_sep(mptsas_t *mpt, mptsas_target_t *ptgt,
     uint32_t *status, uint8_t act)
 {
 	Mpi2SepRequest_t	req;
@@ -15538,14 +15526,26 @@ static int mptsas_send_sep(mptsas_t *mpt, mptsas_target_t *ptgt,
 
 	ASSERT(mutex_owned(&mpt->m_mutex));
 
+	/*
+	 * We only support SEP control of directly-attached targets, in which
+	 * case the "SEP" we're talking to is a virtual one contained within
+	 * the HBA itself.  This is necessary because DA targets typically have
+	 * no other mechanism for LED control.  Targets for which a separate
+	 * enclosure service processor exists should be controlled via ses(7d)
+	 * or sgen(7d).  Furthermore, since such requests can time out, they
+	 * should be made in user context rather than in response to
+	 * asynchronous fabric changes.
+	 *
+	 * In addition, we do not support this operation for RAID volumes,
+	 * since there is no slot associated with them.
+	 */
+	if (!(ptgt->m_deviceinfo & DEVINFO_DIRECT_ATTACHED) ||
+	    ptgt->m_phymask == 0) {
+		return (ENOTTY);
+	}
+
 	bzero(&req, sizeof (req));
 	bzero(&rep, sizeof (rep));
-
-	/* Do nothing for RAID volumes */
-	if (ptgt->m_phymask == 0) {
-		NDBG14(("mptsas_send_sep: Skip RAID volumes"));
-		return (DDI_FAILURE);
-	}
 
 	req.Function = MPI2_FUNCTION_SCSI_ENCLOSURE_PROCESSOR;
 	req.Action = act;
@@ -15560,26 +15560,41 @@ static int mptsas_send_sep(mptsas_t *mpt, mptsas_target_t *ptgt,
 	if (ret != 0) {
 		mptsas_log(mpt, CE_NOTE, "mptsas_send_sep: passthru SEP "
 		    "Processor Request message error %d", ret);
-		return (DDI_FAILURE);
+		return (ret);
 	}
 	/* do passthrough success, check the ioc status */
 	if (LE_16(rep.IOCStatus) != MPI2_IOCSTATUS_SUCCESS) {
-		if ((LE_16(rep.IOCStatus) & MPI2_IOCSTATUS_MASK) ==
-		    MPI2_IOCSTATUS_INVALID_FIELD) {
-			mptsas_log(mpt, CE_NOTE, "send sep act %x: Not "
-			    "supported action, loginfo %x", act,
-			    LE_32(rep.IOCLogInfo));
-			return (DDI_FAILURE);
-		}
 		mptsas_log(mpt, CE_NOTE, "send_sep act %x: ioc "
-		    "status:%x", act, LE_16(rep.IOCStatus));
-		return (DDI_FAILURE);
+		    "status:%x loginfo %x", act, LE_16(rep.IOCStatus),
+		    LE_32(rep.IOCLogInfo));
+		switch (LE_16(rep.IOCStatus) & MPI2_IOCSTATUS_MASK) {
+		case MPI2_IOCSTATUS_INVALID_FUNCTION:
+		case MPI2_IOCSTATUS_INVALID_VPID:
+		case MPI2_IOCSTATUS_INVALID_FIELD:
+		case MPI2_IOCSTATUS_INVALID_STATE:
+		case MPI2_IOCSTATUS_OP_STATE_NOT_SUPPORTED:
+		case MPI2_IOCSTATUS_CONFIG_INVALID_ACTION:
+		case MPI2_IOCSTATUS_CONFIG_INVALID_TYPE:
+		case MPI2_IOCSTATUS_CONFIG_INVALID_PAGE:
+		case MPI2_IOCSTATUS_CONFIG_INVALID_DATA:
+		case MPI2_IOCSTATUS_CONFIG_NO_DEFAULTS:
+			return (EINVAL);
+		case MPI2_IOCSTATUS_BUSY:
+			return (EBUSY);
+		case MPI2_IOCSTATUS_INSUFFICIENT_RESOURCES:
+			return (EAGAIN);
+		case MPI2_IOCSTATUS_INVALID_SGL:
+		case MPI2_IOCSTATUS_INTERNAL_ERROR:
+		case MPI2_IOCSTATUS_CONFIG_CANT_COMMIT:
+		default:
+			return (EIO);
+		}
 	}
 	if (act != MPI2_SEP_REQ_ACTION_WRITE_STATUS) {
 		*status = LE_32(rep.SlotStatus);
 	}
 
-	return (DDI_SUCCESS);
+	return (0);
 }
 
 int

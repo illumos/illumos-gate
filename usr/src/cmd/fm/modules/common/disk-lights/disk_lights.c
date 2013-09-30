@@ -259,6 +259,7 @@ dl_trigger_enum(disk_lights_t *dl)
 	    dl->dl_coalesce_interval);
 }
 
+/*ARGSUSED*/
 static void
 disklights_timeout(fmd_hdl_t *hdl, id_t id, void *data)
 {
@@ -274,6 +275,7 @@ disklights_timeout(fmd_hdl_t *hdl, id_t id, void *data)
 	dl->dl_timer = fmd_timer_install(hdl, NULL, NULL, dl->dl_poll_interval);
 }
 
+/*ARGSUSED*/
 static void
 disklights_topo(fmd_hdl_t *hdl, topo_hdl_t *thp)
 {
@@ -282,6 +284,7 @@ disklights_topo(fmd_hdl_t *hdl, topo_hdl_t *thp)
 	dl_trigger_enum(dl);
 }
 
+/*ARGSUSED*/
 static void
 disklights_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
     const char *class)
