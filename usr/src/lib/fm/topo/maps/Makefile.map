@@ -22,11 +22,12 @@
 #
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright (c) 2013, Joyent, Inc. All rights reserved.
 #
 
 .KEEP_STATE:
 .SUFFIXES:
-.SUFFIXES: .xml .xmlgen $(SUFFIXES)
+.SUFFIXES: .xml .xmlgen .xmlgenksh $(SUFFIXES)
 
 MODCLASS = maps
 
@@ -53,6 +54,11 @@ install:= FILEMODE =	0444
 	$(RM) $@ 
 	$(CAT) ../common/xmlgen-header.xml > $@
 	$(PERL) $< >> $@
+
+.xmlgenksh.xml:
+	$(RM) $@
+	$(CAT) ../common/xmlgen-header-new.xml > $@
+	$(KSH93) $< >> $@
 	
 %.xml: ../common/%.xml
 	$(RM) $@

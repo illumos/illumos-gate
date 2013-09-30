@@ -58,8 +58,20 @@ driver name=igb clone_perms="igb 0666 root sys" perms="* 0666 root sys" \
     alias=pciex8086,1516 \
     alias=pciex8086,1518 \
     alias=pciex8086,1521 \
+    alias=pciex8086,1522 \
     alias=pciex8086,1523 \
-    alias=pciex8086,1526
+    alias=pciex8086,1524 \
+    alias=pciex8086,1526 \
+    alias=pciex8086,1526 \
+    alias=pciex8086,1533 \
+    alias=pciex8086,1534 \
+    alias=pciex8086,1535 \
+    alias=pciex8086,1536 \
+    alias=pciex8086,1537 \
+    alias=pciex8086,1538 \
+    alias=pciex8086,1539 \
+    alias=pciex8086,1546 \
+    alias=pciex8086,438
 file path=kernel/drv/$(ARCH64)/igb group=sys
 $(i386_ONLY)file path=kernel/drv/igb group=sys
 file path=kernel/drv/igb.conf group=sys \

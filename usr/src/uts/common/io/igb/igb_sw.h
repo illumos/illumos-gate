@@ -69,8 +69,8 @@ extern "C" {
 #include <sys/fm/protocol.h>
 #include <sys/fm/util.h>
 #include <sys/fm/io/ddi.h>
-#include "igb_api.h"
-#include "igb_82575.h"
+#include "e1000_api.h"
+#include "e1000_82575.h"
 
 
 #define	MODULE_NAME			"igb"	/* module name */

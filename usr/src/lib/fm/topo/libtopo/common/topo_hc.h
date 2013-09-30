@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  */
 
 #ifndef _TOPO_HC_H
@@ -115,6 +116,10 @@ extern "C" {
 
 #define	TOPO_PGROUP_BINDING	"binding"
 #define	TOPO_BINDING_OCCUPANT	"occupant-path"
+#define	TOPO_BINDING_DRIVER	"driver"
+#define	TOPO_BINDING_DEVCTL	"devctl"
+#define	TOPO_BINDING_ENCLOSURE	"enclosure"
+#define	TOPO_BINDING_SLOT	"slot"
 
 #define	TOPO_PGROUP_STORAGE	"storage"
 #define	TOPO_STORAGE_INITIATOR_PORT	"initiator-port"

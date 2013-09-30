@@ -837,3 +837,55 @@ topo_node_walk_init(topo_hdl_t *thp, topo_mod_t *mod, tnode_t *node,
 
 	return (wp);
 }
+
+/*
+ * Walk the direct children of the given node.
+ */
+int
+topo_node_child_walk(topo_hdl_t *thp, tnode_t *pnode, topo_walk_cb_t cb_f,
+    void *arg, int *errp)
+{
+	int ret = TOPO_WALK_TERMINATE;
+	tnode_t *cnode;
+
+	topo_node_hold(pnode);
+
+	/*
+	 * First Child:
+	 */
+	topo_node_lock(pnode);
+	cnode = topo_child_first(pnode);
+	topo_node_unlock(pnode);
+
+	if (cnode == NULL) {
+		*errp = ETOPO_WALK_EMPTY;
+		ret = TOPO_WALK_ERR;
+		goto out;
+	}
+
+	while (cnode != NULL) {
+		int iret;
+
+		/*
+		 * Call the walker callback:
+		 */
+		topo_node_hold(cnode);
+		iret = cb_f(thp, cnode, arg);
+		topo_node_rele(cnode);
+		if (iret != TOPO_WALK_NEXT) {
+			ret = iret;
+			break;
+		}
+
+		/*
+		 * Next child:
+		 */
+		topo_node_lock(pnode);
+		cnode = topo_child_next(pnode, cnode);
+		topo_node_unlock(pnode);
+	}
+
+out:
+	topo_node_rele(pnode);
+	return (ret);
+}

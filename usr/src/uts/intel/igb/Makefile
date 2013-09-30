@@ -40,6 +40,7 @@ UTSBASE = ../..
 #
 MODULE		= igb
 OBJECTS		= $(IGB_OBJS:%=$(OBJS_DIR)/%)
+OBJECTS		+= $(E1000API_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(IGB_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/common/io/igb
@@ -49,8 +50,16 @@ CONF_SRCDIR	= $(UTSBASE)/common/io/igb
 #
 include $(UTSBASE)/intel/Makefile.intel
 
+LINTFLAGS += \
+	-I$(UTSBASE)/common/io/igb \
+	-I$(UTSBASE)/common/io/e1000api
+
 CERRWARN	+= -_gcc=-Wno-switch
 CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= -_cc=-erroff=E_STATEMENT_NOT_REACHED
+
+CFLAGS		+= -I$(UTSBASE)/common/io/e1000api
+CFLAGS		+= -I$(UTSBASE)/common/io/igb
 
 #
 #	Define targets

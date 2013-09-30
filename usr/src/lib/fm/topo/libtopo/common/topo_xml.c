@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  */
 
 #include <libxml/parser.h>
@@ -1376,16 +1377,10 @@ fac_enum_process(topo_mod_t *mp, xmlNodePtr pn, tnode_t *ptn)
 
 		if ((fprov = xmlGetProp(cn, (xmlChar *)Provider)) == NULL)
 			goto fenumdone;
-
-		if (xmlStrcmp(fprov, (xmlChar *)"fac_prov_ipmi") != 0) {
-			topo_dprintf(mp->tm_hdl, TOPO_DBG_XML,
-			    "Invalid provider specified: %s\n", fprov);
-			goto fenumdone;
-		}
-
 		/*
-		 * Invoke enum entry point in fac provider which will cause the
-		 * facility enumeration node method to be registered.
+		 * Invoke enum entry point in facility provider which will
+		 * cause the facility enumeration node method to be
+		 * registered.
 		 */
 		if (fac_enum_run(mp, ptn, (const char *)fprov) != 0) {
 			topo_dprintf(mp->tm_hdl, TOPO_DBG_ERR,
@@ -1440,12 +1435,6 @@ fac_process(topo_mod_t *mp, xmlNodePtr pn, tf_rdata_t *rd, tnode_t *ptn)
 		    xmlStrcmp(ftype, (xmlChar *)Indicator) != 0)
 			goto facdone;
 
-		if (xmlStrcmp(provider, (xmlChar *)"fac_prov_ipmi") != 0) {
-			topo_dprintf(mp->tm_hdl, TOPO_DBG_XML, "fac_process: "
-			    "Invalid provider attr value: %s\n", provider);
-			goto facdone;
-		}
-
 		if ((ntn = topo_node_facbind(mp, ptn, (char *)fname,
 		    (char *)ftype)) == NULL)
 			goto facdone;
@@ -1463,8 +1452,9 @@ fac_process(topo_mod_t *mp, xmlNodePtr pn, tf_rdata_t *rd, tnode_t *ptn)
 			}
 		}
 		/*
-		 * Invoke enum entry point in fac_prov_ipmi module, which will
-		 * cause the provider methods to be registered on this node
+		 * Invoke enum entry point in the facility provider module,
+		 * which will cause the provider methods to be registered on
+		 * this node
 		 */
 		if (fac_enum_run(mp, ntn, (const char *)provider) != 0) {
 			topo_dprintf(mp->tm_hdl, TOPO_DBG_ERR, "fac_process: "

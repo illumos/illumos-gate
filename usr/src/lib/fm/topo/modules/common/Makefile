@@ -23,11 +23,11 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 SUBDIRS =		\
 	disk		\
 	fac_prov_ipmi	\
+	fac_prov_mptsas	\
 	ipmi		\
 	ses		\
 	xfp

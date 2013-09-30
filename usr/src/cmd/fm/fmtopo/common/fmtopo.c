@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  */
 
 
@@ -597,30 +598,29 @@ set_prop(topo_hdl_t *thp, tnode_t *node, nvlist_t *fmri, struct prop_args *pp)
 {
 	int ret, err = 0;
 	topo_type_t type;
-	nvlist_t *nvl, *f = NULL;
+	nvlist_t *nvl = NULL;
 	char *end;
 
 	if (pp->prop == NULL || pp->type == NULL || pp->value == NULL)
-		return;
+		goto out;
 
 	if ((type = str2type(pp->type)) == TOPO_TYPE_INVALID) {
 		(void) fprintf(stderr, "%s: invalid property type %s for %s\n",
 		    g_pname, pp->type, pp->prop);
-		return;
+		goto out;
 	}
 
 	if (nvlist_alloc(&nvl, NV_UNIQUE_NAME, 0) != 0) {
 		(void) fprintf(stderr, "%s: nvlist allocation failed for "
 		    "%s=%s:%s\n", g_pname, pp->prop, pp->type, pp->value);
-		return;
+		goto out;
 	}
 	ret = nvlist_add_string(nvl, TOPO_PROP_VAL_NAME, pp->prop);
 	ret |= nvlist_add_uint32(nvl, TOPO_PROP_VAL_TYPE, type);
 	if (ret != 0) {
 		(void) fprintf(stderr, "%s: invalid property type %s for %s\n",
 		    g_pname, pp->type, pp->prop);
-		nvlist_free(nvl);
-		return;
+		goto out;
 	}
 
 	errno = 0;
@@ -681,13 +681,17 @@ set_prop(topo_hdl_t *thp, tnode_t *node, nvlist_t *fmri, struct prop_args *pp)
 		}
 		case TOPO_TYPE_FMRI:
 		{
-			if ((ret = topo_fmri_str2nvl(thp, pp->value, &f, &err))
-			    < 0)
+			nvlist_t *val = NULL;
+
+			if ((ret = topo_fmri_str2nvl(thp, pp->value, &val,
+			    &err)) < 0)
 				break;
 
 			if ((ret = nvlist_add_nvlist(nvl, TOPO_PROP_VAL_VAL,
-			    f)) != 0)
+			    val)) != 0)
 				err = ETOPO_PROP_NVL;
+
+			nvlist_free(val);
 			break;
 		}
 		default:
@@ -697,60 +701,54 @@ set_prop(topo_hdl_t *thp, tnode_t *node, nvlist_t *fmri, struct prop_args *pp)
 	if (ret != 0) {
 		(void) fprintf(stderr, "%s: unable to set property value for "
 		    "%s: %s\n", g_pname, pp->prop,  topo_strerror(err));
-		nvlist_free(nvl);
-		return;
+		goto out;
 	}
 
 	if (node != NULL) {
-		if (topo_prop_setprop(node, pp->group, nvl, TOPO_PROP_MUTABLE,
-		    f, &ret) < 0) {
+		if ((ret = topo_prop_setprop(node, pp->group, nvl,
+		    TOPO_PROP_MUTABLE, nvl, &err)) < 0) {
 			(void) fprintf(stderr, "%s: unable to set property "
 			    "value for " "%s=%s:%s: %s\n", g_pname, pp->prop,
-			    pp->type, pp->value, topo_strerror(ret));
-			nvlist_free(nvl);
-			nvlist_free(f);
-			return;
+			    pp->type, pp->value, topo_strerror(err));
+			goto out;
 		}
 	} else {
-		if (topo_fmri_setprop(thp, fmri,  pp->group, nvl,
-		    TOPO_PROP_MUTABLE, f, &ret) < 0) {
+		if ((ret = topo_fmri_setprop(thp, fmri,  pp->group, nvl,
+		    TOPO_PROP_MUTABLE, nvl, &err)) < 0) {
 			(void) fprintf(stderr, "%s: unable to set property "
 			    "value for " "%s=%s:%s: %s\n", g_pname, pp->prop,
-			    pp->type, pp->value, topo_strerror(ret));
-			nvlist_free(nvl);
-			nvlist_free(f);
-			return;
+			    pp->type, pp->value, topo_strerror(err));
+			goto out;
 		}
 	}
 
 	nvlist_free(nvl);
+	nvl = NULL;
 
 	/*
 	 * Now, get the property back for printing
 	 */
 	if (node != NULL) {
-		if (topo_prop_getprop(node, pp->group, pp->prop, f, &nvl,
-		    &err) < 0) {
+		if ((ret = topo_prop_getprop(node, pp->group, pp->prop, NULL,
+		    &nvl, &err)) < 0) {
 			(void) fprintf(stderr, "%s: failed to get %s.%s: %s\n",
 			    g_pname, pp->group, pp->prop, topo_strerror(err));
-			nvlist_free(f);
-			return;
+			goto out;
 		}
 	} else {
-		if (topo_fmri_getprop(thp, fmri, pp->group, pp->prop,
-		    f, &nvl, &err) < 0) {
+		if ((ret = topo_fmri_getprop(thp, fmri, pp->group, pp->prop,
+		    NULL, &nvl, &err)) < 0) {
 			(void) fprintf(stderr, "%s: failed to get %s.%s: %s\n",
 			    g_pname, pp->group, pp->prop, topo_strerror(err));
-			nvlist_free(f);
-			return;
+			goto out;
 		}
 	}
 
 	print_pgroup(thp, node, pp->group, NULL, NULL, 0);
 	print_prop_nameval(thp, node, nvl);
-	nvlist_free(nvl);
 
-	nvlist_free(f);
+out:
+	nvlist_free(nvl);
 }
 
 static void

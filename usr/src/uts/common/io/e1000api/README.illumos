@@ -1,0 +1,124 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright (c) 2013 Joyent, Inc.  All rights reserved.
+#
+
+Historically e1000g and igb were maintained by two different teams at Sun and
+thus while they used identical common code from Intel, they each only ever used
+portions of it and were not kept in sync with one another. To help make
+maintenance and the adding of new devices easier in illumos, we have gone
+through and made it so that igb and e1000g rely on the same set of common code;
+however, this code is not in its own module, each has its own copy of the code
+compiled into it for various reasons which will be laid out below.
+
+As part of the interface with the common code, the driver is required to define
+an e1000_osdep.h. Currently each version of the driver defines its *own* version
+of this header file in their own driver specific directory. However, the code
+that implements this is different in each directory, specifically e1000g_osdep.c
+and igb_osdep.c. It's important that they have different names and not be called
+the same thing due to how the uts makefiles work.
+
+Deviations from the common FreeBSD code:
+
+We have a few differences from the common version of the FreeBSD code that exist
+so that we can both gather firmware information and that have workarounds for
+older chipsets. While, we would like to get that to be synced up and common, it
+is not currently.
+
+Energy Efficient Ethernet (EEE) is not enabled by default. This technology was
+introduced with the I350 family of parts in the igb driver. However, there have
+been issues seen with it in the wild and thus we opt to disable it by default
+until tests have proven that there are no longer problems.
+
+To help make that easier, we've documented here what these extra definitions
+are. DO NOT just blindly copy over new common code. There is more work that
+needs to be done in terms of changed interfaces and expectations for the
+drivers.
+
+# e1000_defines.h
+
+In e1000_defines.h we add the following three definitions which are not
+currently present. These definitions allow us to attach firware revisions and
+other information to the devinfo tree.
+
+#define		NVM_VERSION			0x0005
+#define		NVM_OEM_OFFSET_0		6
+#define		NVM_OEM_OFFSET_1		7
+
+# Workarounds for the 82541 and 82547
+
+There are various workarounds in place for the 82541 and 82547 due to errata
+that exist for these devices. This has traditionally been a part of the common
+code. Until this can get merged into the common code completely, we've spearted
+out the changes that are the actual C functions into
+uts/common/io/e1000g/e1000g_workarounds.c. However, this alone is not
+sufficient. You must make sure that in e1000_hw.h that the struc
+e1000_dev_spec_82541 actually looks like the following:
+
+struct e1000_dev_spec_82541 {
+	enum e1000_dsp_config dsp_config;
+	enum e1000_ffe_config ffe_config;
+	u32 tx_fifo_head;
+	u32 tx_fifo_start;
+	u32 tx_fifo_size;
+	u16 dsp_reset_counter;
+	u16 spd_default;
+	bool phy_init_script;
+	bool ttl_workaround;
+};
+
+Similarly in e1000_82541.h you must make sure the following macros and external
+function declarations are present:
+
+#define	E1000_FIFO_MULTIPLIER			0x80
+#define	E1000_FIFO_HDR_SIZE			0x10
+#define	E1000_FIFO_GRANULARITY			0x10
+#define	E1000_FIFO_PAD_82547			0x3E0
+#define	E1000_ERR_FIFO_WRAP			8
+
+#define	DSP_RESET_ENABLE			0x0
+#define	DSP_RESET_DISABLE			0x2
+#define	E1000_MAX_DSP_RESETS			10
+
+#define	E1000_ROUNDUP(size, unit)	(((size) + (unit) - 1) & ~((unit) - 1))
+
+s32 e1000_fifo_workaround_82547(struct e1000_hw *hw, u16 length);
+void e1000_update_tx_fifo_head_82547(struct e1000_hw *hw, u32 length);
+void e1000_set_ttl_workaround_state_82541(struct e1000_hw *hw, bool state);
+bool e1000_ttl_workaround_enabled_82541(struct e1000_hw *hw);
+s32 e1000_igp_ttl_workaround_82547(struct e1000_hw *hw);
+
+# EEE
+
+By default we disable all support for EEE. To cause this to happen you must
+make the following change in e1000_82575.c's init_mac_params.
+
+From:
+ 394         /* Enable EEE default settings for EEE supported devices */
+ 395         if (mac->type >= e1000_i350)
+ 396                 dev_spec->eee_disable = FALSE;
+To:
+ 394         /* Enable EEE default settings for EEE supported devices */
+ 395         if (mac->type >= e1000_i350)
+ 396                 dev_spec->eee_disable = TRUE;
+
+Future work:
+
+The next step here is to take the osdep portions and merge them. That would
+allow us to build one common misc module e1000api that both igb and e1000g
+depend on rather than building separate copies of the common code into each
+driver. Another potential option which may prove to have less value is to take
+all of the gld and ddi logic and have one driver export that leaving e1000g and
+igb as small stubs which depend on that. Note however, that the latter is not
+how our upstream is currently structuring their igb and em (FreeBSD's e1000g)
+drivers.

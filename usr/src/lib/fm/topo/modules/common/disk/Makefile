@@ -22,14 +22,15 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 MODULE = disk
 CLASS = common
 
-MODULESRCS = disk.c disk_common.c
+MODULESRCS = disk.c disk_common.c disk_mptsas.c
 
 include ../../Makefile.plugin
+
+CPPFLAGS += -I$(SRC)/uts/common
 
 LDLIBS += -ldevinfo -ldevid -lcfgadm -ldiskstatus
 

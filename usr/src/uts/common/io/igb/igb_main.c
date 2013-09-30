@@ -31,7 +31,7 @@
 #include "igb_sw.h"
 
 static char ident[] = "Intel 1Gb Ethernet";
-static char igb_version[] = "igb 1.1.18";
+static char igb_version[] = "igb 2.3.8-ish";
 
 /*
  * Local function protoypes
@@ -309,6 +309,30 @@ static adapter_info_t igb_i350_cap = {
 	IGB_FLAG_NEED_CTX_IDX),
 
 	0xffe00000		/* mask for RXDCTL register */
+};
+
+static adapter_info_t igb_i210_cap = {
+	/* limits */
+	4,		/* maximum number of rx queues */
+	1,		/* minimum number of rx queues */
+	4,		/* default number of rx queues */
+	4,		/* maximum number of tx queues */
+	1,		/* minimum number of tx queues */
+	4,		/* default number of tx queues */
+	65535,		/* maximum interrupt throttle rate */
+	0,		/* minimum interrupt throttle rate */
+	200,		/* default interrupt throttle rate */
+
+	/* function pointers */
+	igb_enable_adapter_interrupts_82580,
+	igb_setup_msix_82580,
+
+	/* capabilities */
+	(IGB_FLAG_HAS_DCA |	/* capability flags */
+	IGB_FLAG_VMDQ_POOL |
+	IGB_FLAG_NEED_CTX_IDX),
+
+	0xfff00000		/* mask for RXDCTL register */
 };
 
 /*
@@ -872,6 +896,10 @@ igb_identify_hardware(igb_t *igb)
 	case e1000_i350:
 		igb->capab = &igb_i350_cap;
 		break;
+	case e1000_i210:
+	case e1000_i211:
+		igb->capab = &igb_i210_cap;
+		break;
 	default:
 		return (IGB_FAILURE);
 	}
@@ -1210,7 +1238,9 @@ igb_init_mac_address(igb_t *igb)
 	/*
 	 * NVM validation
 	 */
-	if (e1000_validate_nvm_checksum(hw) < 0) {
+	if (((igb->hw.mac.type != e1000_i210) &&
+	    (igb->hw.mac.type != e1000_i211)) &&
+	    (e1000_validate_nvm_checksum(hw) < 0)) {
 		/*
 		 * Some PCI-E parts fail the first check due to
 		 * the link being in sleep state.  Call it again,
@@ -1253,9 +1283,10 @@ igb_init_adapter(igb_t *igb)
 {
 	struct e1000_hw *hw = &igb->hw;
 	uint32_t pba;
-	uint32_t high_water;
 	int oemid[2];
 	uint16_t nvmword;
+	uint32_t hwm;
+	uint32_t default_mtu;
 	u8 pbanum[E1000_PBANUM_LENGTH];
 	char eepromver[5];	/* f.ff */
 	int i;
@@ -1273,41 +1304,77 @@ igb_init_adapter(igb_t *igb)
 	}
 
 	/*
-	 * Setup flow control
-	 *
-	 * These parameters set thresholds for the adapter's generation(Tx)
-	 * and response(Rx) to Ethernet PAUSE frames.  These are just threshold
-	 * settings.  Flow control is enabled or disabled in the configuration
-	 * file.
-	 * High-water mark is set down from the top of the rx fifo (not
-	 * sensitive to max_frame_size) and low-water is set just below
-	 * high-water mark.
-	 * The high water mark must be low enough to fit one full frame above
-	 * it in the rx FIFO.  Should be the lower of:
-	 * 90% of the Rx FIFO size, or the full Rx FIFO size minus one full
-	 * frame.
+	 * Packet Buffer Allocation (PBA)
+	 * Writing PBA sets the receive portion of the buffer
+	 * the remainder is used for the transmit buffer.
 	 */
-	/*
-	 * The default setting of PBA is correct for 82575 and other supported
-	 * adapters do not have the E1000_PBA register, so PBA value is only
-	 * used for calculation here and is never written to the adapter.
-	 */
-	if (hw->mac.type == e1000_82575) {
+	switch (hw->mac.type) {
+	case e1000_82575:
+		pba = E1000_PBA_32K;
+		break;
+	case e1000_82576:
+		pba = E1000_READ_REG(hw, E1000_RXPBS);
+		pba &= E1000_RXPBS_SIZE_MASK_82576;
+		break;
+	case e1000_82580:
+	case e1000_i350:
+		pba = E1000_READ_REG(hw, E1000_RXPBS);
+		pba = e1000_rxpbs_adjust_82580(pba);
+		break;
+	case e1000_i210:
+	case e1000_i211:
 		pba = E1000_PBA_34K;
-	} else {
-		pba = E1000_PBA_64K;
+	default:
+		break;
 	}
 
-	high_water = min(((pba << 10) * 9 / 10),
-	    ((pba << 10) - igb->max_frame_size));
+	/* Special needs in case of Jumbo frames */
+	default_mtu = igb_get_prop(igb, PROP_DEFAULT_MTU,
+	    MIN_MTU, MAX_MTU, DEFAULT_MTU);
+	if ((hw->mac.type == e1000_82575) && (default_mtu > ETHERMTU)) {
+		u32 tx_space, min_tx, min_rx;
+		pba = E1000_READ_REG(hw, E1000_PBA);
+		tx_space = pba >> 16;
+		pba &= 0xffff;
+		min_tx = (igb->max_frame_size +
+		    sizeof (struct e1000_tx_desc) - ETHERNET_FCS_SIZE) * 2;
+		min_tx = roundup(min_tx, 1024);
+		min_tx >>= 10;
+		min_rx = igb->max_frame_size;
+		min_rx = roundup(min_rx, 1024);
+		min_rx >>= 10;
+		if (tx_space < min_tx &&
+		    ((min_tx - tx_space) < pba)) {
+			pba = pba - (min_tx - tx_space);
+			/*
+			 * if short on rx space, rx wins
+			 * and must trump tx adjustment
+			 */
+			if (pba < min_rx)
+				pba = min_rx;
+		}
+		E1000_WRITE_REG(hw, E1000_PBA, pba);
+	}
 
-	if (hw->mac.type == e1000_82575) {
-		/* 8-byte granularity */
-		hw->fc.high_water = high_water & 0xFFF8;
+	DEBUGOUT1("igb_init: pba=%dK", pba);
+
+	/*
+	 * These parameters control the automatic generation (Tx) and
+	 * response (Rx) to Ethernet PAUSE frames.
+	 * - High water mark should allow for at least two frames to be
+	 *   received after sending an XOFF.
+	 * - Low water mark works best when it is very near the high water mark.
+	 *   This allows the receiver to restart by sending XON when it has
+	 *   drained a bit.
+	 */
+	hwm = min(((pba << 10) * 9 / 10),
+	    ((pba << 10) - 2 * igb->max_frame_size));
+
+	if (hw->mac.type < e1000_82576) {
+		hw->fc.high_water = hwm & 0xFFF8;  /* 8-byte granularity */
 		hw->fc.low_water = hw->fc.high_water - 8;
 	} else {
-		/* 16-byte granularity */
-		hw->fc.high_water = high_water & 0xFFF0;
+		hw->fc.high_water = hwm & 0xFFF0;  /* 16-byte granularity */
 		hw->fc.low_water = hw->fc.high_water - 16;
 	}
 

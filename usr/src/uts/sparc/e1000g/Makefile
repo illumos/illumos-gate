@@ -40,6 +40,7 @@ UTSBASE	= ../..
 #
 MODULE		= e1000g
 OBJECTS		= $(E1000G_OBJS:%=$(OBJS_DIR)/%)
+OBJECTS		+= $(E1000API_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(E1000G_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/common/io/e1000g
@@ -56,16 +57,23 @@ ALL_TARGET	= $(BINARY) $(SRC_CONFFILE)
 LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 
+LINTFLAGS  += \
+	-I$(UTSBASE)/common/io/e1000g \
+	-I$(UTSBASE)/common/io/e1000api
+
+
 CERRWARN	+= -_gcc=-Wno-uninitialized
 CERRWARN	+= -_gcc=-Wno-parentheses
 CERRWARN	+= -_gcc=-Wno-switch
 CERRWARN	+= -_gcc=-Wno-unused-label
 CERRWARN	+= -_gcc=-Wno-unused-variable
+CERRWARN	+= -_cc=-erroff=E_STATEMENT_NOT_REACHED
 
 #
 #	Override defaults
 #
-INC_PATH	+= -I$(CONF_SRCDIR)
+INC_PATH	+= -I$(CONF_SRCDIR) -I$(UTSBASE)/common/io/e1000api
+
 
 #
 # lint pass one enforcement

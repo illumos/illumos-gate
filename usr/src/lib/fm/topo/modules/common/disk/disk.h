@@ -22,6 +22,9 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
+/*
+ * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
+ */
 
 #ifndef _DISK_H
 #define	_DISK_H
@@ -54,6 +57,15 @@ extern "C" {
  */
 #define	TOPO_PGROUP_BINDING		"binding"
 #define	TOPO_BINDING_OCCUPANT		"occupant-path"
+#define	TOPO_BINDING_DRIVER		"driver"
+
+/*
+ * The binding group required in platform specific xml that describes 'bay'
+ * nodes containing disks attached to an HBA using the 'mpt_sas' driver.
+ */
+#define	TOPO_BINDING_DEVCTL		"devctl"
+#define	TOPO_BINDING_ENCLOSURE		"enclosure"
+#define	TOPO_BINDING_SLOT		"slot"
 
 /*
  * device node information.

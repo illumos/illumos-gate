@@ -714,7 +714,7 @@ def verify_user(user, logger):
     p = Popen(testcmd)
     p.wait()
     if p.returncode is not 0:
-        logger.info("Warning: user '%s' cannot use paswordless sudo.", user)
+        logger.info("Warning: user '%s' cannot use passwordless sudo.", user)
         return False
     else:
         Cmd.verified_users.append(user)

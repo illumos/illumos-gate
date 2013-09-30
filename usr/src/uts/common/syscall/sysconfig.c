@@ -47,6 +47,8 @@
 #include <sys/zone.h>
 #include <sys/vm_usage.h>
 
+extern rctl_hndl_t rc_process_sigqueue;
+
 long
 sysconfig(int which)
 {
@@ -140,7 +142,17 @@ sysconfig(int which)
 		return (_SEM_VALUE_MAX);
 
 	case _CONFIG_SIGQUEUE_MAX:
-		return (_SIGQUEUE_MAX);
+		/*
+		 * Maximum number of outstanding queued signals.
+		 */
+		{
+			rlim64_t sigqsz_max;
+			mutex_enter(&curproc->p_lock);
+			sigqsz_max = rctl_enforced_value(rc_process_sigqueue,
+			    curproc->p_rctls, curproc);
+			mutex_exit(&curproc->p_lock);
+			return ((uint_t)sigqsz_max);
+		}
 
 	case _CONFIG_SIGRT_MIN:
 		return (_SIGRTMIN);

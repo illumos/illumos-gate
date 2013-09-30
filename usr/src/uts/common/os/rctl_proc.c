@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/cmn_err.h>
 #include <sys/sysmacros.h>
@@ -32,6 +30,8 @@
 #include <sys/rctl.h>
 #include <sys/rctl_impl.h>
 #include <sys/port_kernel.h>
+#include <sys/signal.h>
+#include <sys/var.h>
 
 #include <sys/vmparam.h>
 #include <sys/machparam.h>
@@ -65,6 +65,7 @@ rctl_hndl_t rc_process_msgtql;
 rctl_hndl_t rc_process_semmsl;
 rctl_hndl_t rc_process_semopm;
 rctl_hndl_t rc_process_portev;
+rctl_hndl_t rc_process_sigqueue;
 
 /*
  * process.max-cpu-time / RLIMIT_CPU
@@ -288,7 +289,7 @@ rctlproc_default_init(struct proc *initp, rctl_alloc_gp_t *gp)
  *   here as the native and ILP32 infinite values for each resource control.
  */
 void
-rctlproc_init()
+rctlproc_init(void)
 {
 	rctl_set_t *set;
 	rctl_alloc_gp_t *gp;
@@ -367,6 +368,20 @@ rctlproc_init()
 	    PORT_MAX_EVENTS, PORT_MAX_EVENTS, &rctl_absolute_ops);
 	rctl_add_default_limit("process.max-port-events", PORT_DEFAULT_EVENTS,
 	    RCPRIV_PRIVILEGED, RCTL_LOCAL_DENY);
+
+	/*
+	 * We set the upper limit to the maximum number of user processes to
+	 * make it theoretically possible to deliver all SIGCHILD signals on
+	 * child termination, but at least to 8k.
+	 */
+	rc_process_sigqueue = rctl_register("process.max-sigqueue-size",
+	    RCENTITY_PROCESS, RCTL_GLOBAL_LOWERABLE | RCTL_GLOBAL_DENY_ALWAYS |
+	    RCTL_GLOBAL_COUNT, MAX(v.v_maxup, 8192), MAX(v.v_maxup, 8192),
+	    &rctl_absolute_ops);
+	rctl_add_default_limit("process.max-sigqueue-size",
+	    _SIGQUEUE_SIZE_BASIC, RCPRIV_BASIC, RCTL_LOCAL_DENY);
+	rctl_add_default_limit("process.max-sigqueue-size",
+	    _SIGQUEUE_SIZE_PRIVILEGED, RCPRIV_PRIVILEGED, RCTL_LOCAL_DENY);
 
 	/*
 	 * Place minimal set of controls on "sched" process for inheritance by

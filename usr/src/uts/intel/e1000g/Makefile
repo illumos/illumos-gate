@@ -40,6 +40,7 @@ UTSBASE = ../..
 #
 MODULE		= e1000g
 OBJECTS		= $(E1000G_OBJS:%=$(OBJS_DIR)/%)
+OBJECTS		+= $(E1000API_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(E1000G_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/common/io/e1000g
@@ -52,7 +53,12 @@ include $(UTSBASE)/intel/Makefile.intel
 CFLAGS += -D_KERNEL -Di386   -DNEWSTAT -DNOMUT -DRCVWORKAROUND \
 	  -DINTEL_IP \
 	  -DPAXSON  -DBAY_CITY \
-	  -DTANAX_WORKAROUND -I$(UTSBASE)/common/io/e1000g
+	  -DTANAX_WORKAROUND -I$(UTSBASE)/common/io/e1000g \
+	  -I$(UTSBASE)/common/io/e1000api
+
+LINTFLAGS += \
+	-I$(UTSBASE)/common/io/e1000g \
+	-I$(UTSBASE)/common/io/e1000api
 
 CFLAGS_CPP_COMMENTS = -xCC
 
@@ -63,6 +69,7 @@ CERRWARN	+= -_gcc=-Wno-parentheses
 CERRWARN	+= -_gcc=-Wno-switch
 CERRWARN	+= -_gcc=-Wno-unused-label
 CERRWARN	+= -_gcc=-Wno-unused-variable
+CERRWARN	+= -_cc=-erroff=E_STATEMENT_NOT_REACHED
 
 #
 #	Define targets

@@ -20,8 +20,9 @@
  */
 /*
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+ *
+ * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  */
-
 
 #ifndef	_SYS_LOFI_H
 #define	_SYS_LOFI_H
@@ -128,6 +129,7 @@ struct lofi_ioctl {
 	uint32_t 	li_minor;
 	boolean_t	li_force;
 	boolean_t	li_cleanup;
+	boolean_t	li_readonly;
 	char	li_filename[MAXPATHLEN];
 
 	/* the following fields are required for compression support */
@@ -223,6 +225,7 @@ struct lofi_state {
 	uint32_t	ls_lyr_open_count;
 	int		ls_openflag;
 	boolean_t	ls_cleanup;	/* cleanup on close */
+	boolean_t	ls_readonly;
 	taskq_t		*ls_taskq;
 	kstat_t		*ls_kstat;
 	kmutex_t	ls_kstat_lock;

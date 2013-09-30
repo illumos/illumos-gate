@@ -1,0 +1,89 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright (C) 2013 Hewlett-Packard Development Company, L.P.
+.\"
+.TH CPQARY3 7D Aug 26, 2013"
+.SH NAME
+.LP
+cpqary3 - provides disk and SCSI tape support for HP Smart Array controllers
+.LP
+.SH DESCRIPTION
+.LP
+The cpqary3 module provides low-level interface routines between the common
+disk I/O subsystem and the HP SMART Array controllers. The cpqary3 driver
+provides disk and SCSI tape support for the HP Smart Array controllers.
+.LP
+Please refer to the cpqary3 release notes, for the supported HP Smart Array
+Controllers and Storage boxes.
+.LP
+Each controller should be the sole initiator on a SCSI bus. Auto
+configuration code determines if the adapter is present at the Configured
+address and what types of devices are attached to it.
+.SH CONFIGURATION
+Use the Array Configuration Utility to configure the controllers. Each
+controller can support up to 32 logical volumes. In addition, each controller
+supports up to a maximum of 28 connected SCSI tape drives.
+With 1.90 and later versions of cpqary3 driver, HP Smart Array SAS controllers,
+having Firmware Revision 5.10 or later, will support 64 logical drives. This
+firmware also supports Dual Domian Multipath configurations.
+.LP
+The driver attempts to initialize itself in accordance with the information
+found in the configuration file, /kernel/drv/cpqary3.conf.
+.LP
+New component - hmaeventd which logs the storage events onto console and to the
+Integrated Management Log is made a part of HPQhma 5.0.0 package, which is not
+part of the operating system.  Therefore, by default, notify on event
+functionality is disabled in the driver from 2.1.0 onwards.  Storage event
+logging may be enabled in the driver by modifying cpqary3.conf to set the
+cpqary3_noe property to "on".  Modification of driver properties requires
+reloading the driver, which in most cases will occur only following a reboot of
+the system.
+.LP
+The target driver's configuration file shall need entries if support is needed
+for targets numbering greater than the default number of targets supported by
+the corresponding target driver.
+.LP
+By default, entries for SCSI target numbers 0 to 15 are present in sd.conf.
+Entries for target numbers 16 and above must be added to the \&'scsi' class in
+sd.conf to support additional corresponding logical volumes.
+.LP
+If SCSI tape drives are connected to the supported controllers, entries for
+target IDs from 33 to 33+N must be added in the /kernel/drv/st.conf file under
+\&'scsi' class, where N is the total number of SCSI tape drives connected to the
+controller with largest number of tape drives connected to it, in the existing
+configuration. For example, two supported controller, c1 and c2 are present in
+the system. If controller c1 has two (2) tape drives and controller c2 has five
+(5) tape drives connected, then entries for target IDs 33 thru 38 are required
+under 'scsi' class in /kernel/drv/st.conf file. The maximum number of tape
+drives that can be connected to a controller is 28. With 1.90 and later versions
+of cpqary3 driver, if tape drives are connected to Smart Array SAS controllers,
+then target ID entries for tape drives from 65 to 65+N must be added in
+/kernel/drv/st.conf file under the \&'scsi' class.
+.SH FILES
+.PD 0
+.TP 25
+.B /kernel/drv/cpqary3.conf
+- configuration file for CPQary3
+.PD
+.SH "SEE ALSO"
+.BR driver.conf (4),
+.BR sd (7D),
+.BR st (7D)
+.LP
+.SH NOTES
+.LP
+The Smart Array controllers supported by the current version of the
+cpqary3 driver do not support 'format unit' SCSI command. Hence, selecting
+\&'format' option under 'format' utility main menu is not supported. In addition,
+the 'repair' option under 'format' utility main menu is not supported as this
+operation is not applicable to Logical volumes connected to the supported Smart
+Array controllers.

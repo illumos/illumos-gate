@@ -26,9 +26,24 @@
  * Use is subject to license terms of the CDDL.
  */
 
-#include "igb_osdep.h"
-#include "igb_api.h"
+#include "e1000_osdep.h"
+#include "e1000_api.h"
 
+void
+e1000_pci_set_mwi(struct e1000_hw *hw)
+{
+	uint16_t val = hw->bus.pci_cmd_word | CMD_MEM_WRT_INVALIDATE;
+
+	e1000_write_pci_cfg(hw, PCI_COMMAND_REGISTER, &val);
+}
+
+void
+e1000_pci_clear_mwi(struct e1000_hw *hw)
+{
+	uint16_t val = hw->bus.pci_cmd_word & ~CMD_MEM_WRT_INVALIDATE;
+
+	e1000_write_pci_cfg(hw, PCI_COMMAND_REGISTER, &val);
+}
 
 void
 e1000_write_pci_cfg(struct e1000_hw *hw, uint32_t reg, uint16_t *value)
