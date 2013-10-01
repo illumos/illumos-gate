@@ -996,6 +996,8 @@ read_heap_array(uintptr_t addr, uintptr_t **retp, size_t *lenp, int flags)
 
 	if (mdb_vread(*retp, len * sizeof (uintptr_t),
 	    addr + V8_OFF_FIXEDARRAY_DATA) == -1) {
+		*retp = NULL;
+
 		if (!(flags & UM_GC))
 			mdb_free(*retp, len * sizeof (uintptr_t));
 
