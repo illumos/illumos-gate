@@ -1455,18 +1455,31 @@ typedef struct mdb_vdev {
 	vdev_stat_t vdev_stat;
 } mdb_vdev_t;
 
+typedef struct mdb_space_map_phys_t {
+	uint64_t smp_alloc;
+} mdb_space_map_phys_t;
+
+typedef struct mdb_space_map {
+	uint64_t sm_size;
+	uint64_t sm_alloc;
+	uintptr_t sm_phys;
+} mdb_space_map_t;
+
+typedef struct mdb_range_tree {
+	uint64_t rt_space;
+} mdb_range_tree_t;
+
 typedef struct mdb_metaslab {
-	space_map_t ms_allocmap[TXG_SIZE];
-	space_map_t ms_freemap[TXG_SIZE];
-	space_map_t ms_map;
-	space_map_obj_t ms_smo;
-	space_map_obj_t ms_smo_syncing;
+	uintptr_t ms_alloctree[TXG_SIZE];
+	uintptr_t ms_freetree[TXG_SIZE];
+	uintptr_t ms_tree;
+	uintptr_t ms_sm;
 } mdb_metaslab_t;
 
 typedef struct space_data {
-	uint64_t ms_allocmap[TXG_SIZE];
-	uint64_t ms_freemap[TXG_SIZE];
-	uint64_t ms_map;
+	uint64_t ms_alloctree[TXG_SIZE];
+	uint64_t ms_freetree[TXG_SIZE];
+	uint64_t ms_tree;
 	uint64_t avail;
 	uint64_t nowavail;
 } space_data_t;
@@ -1477,26 +1490,40 @@ space_cb(uintptr_t addr, const void *unknown, void *arg)
 {
 	space_data_t *sd = arg;
 	mdb_metaslab_t ms;
+	mdb_range_tree_t rt;
+	mdb_space_map_t sm;
+	mdb_space_map_phys_t smp = { 0 };
+	int i;
 
-	if (GETMEMB(addr, "metaslab", ms_allocmap, ms.ms_allocmap) ||
-	    GETMEMB(addr, "metaslab", ms_freemap, ms.ms_freemap) ||
-	    GETMEMB(addr, "metaslab", ms_map, ms.ms_map) ||
-	    GETMEMB(addr, "metaslab", ms_smo, ms.ms_smo) ||
-	    GETMEMB(addr, "metaslab", ms_smo_syncing, ms.ms_smo_syncing)) {
+	if (mdb_ctf_vread(&ms, "metaslab_t", "mdb_metaslab_t",
+	    addr, 0) == -1)
 		return (WALK_ERR);
+
+	for (i = 0; i < TXG_SIZE; i++) {
+
+		if (mdb_ctf_vread(&rt, "range_tree_t",
+		    "mdb_range_tree_t", ms.ms_alloctree[i], 0) == -1)
+		sd->ms_alloctree[i] += rt.rt_space;
+
+		if (mdb_ctf_vread(&rt, "range_tree_t",
+		    "mdb_range_tree_t", ms.ms_freetree[i], 0) == -1)
+		sd->ms_freetree[i] += rt.rt_space;
 	}
 
-	sd->ms_allocmap[0] += ms.ms_allocmap[0].sm_space;
-	sd->ms_allocmap[1] += ms.ms_allocmap[1].sm_space;
-	sd->ms_allocmap[2] += ms.ms_allocmap[2].sm_space;
-	sd->ms_allocmap[3] += ms.ms_allocmap[3].sm_space;
-	sd->ms_freemap[0] += ms.ms_freemap[0].sm_space;
-	sd->ms_freemap[1] += ms.ms_freemap[1].sm_space;
-	sd->ms_freemap[2] += ms.ms_freemap[2].sm_space;
-	sd->ms_freemap[3] += ms.ms_freemap[3].sm_space;
-	sd->ms_map += ms.ms_map.sm_space;
-	sd->avail += ms.ms_map.sm_size - ms.ms_smo.smo_alloc;
-	sd->nowavail += ms.ms_map.sm_size - ms.ms_smo_syncing.smo_alloc;
+	if (mdb_ctf_vread(&rt, "range_tree_t",
+	    "mdb_range_tree_t", ms.ms_tree, 0) == -1 ||
+	    mdb_ctf_vread(&sm, "space_map_t",
+	    "mdb_space_map_t", ms.ms_sm, 0) == -1)
+		return (WALK_ERR);
+
+	if (sm.sm_phys != NULL) {
+		(void) mdb_ctf_vread(&smp, "space_map_phys_t",
+		    "mdb_space_map_phys_t", sm.sm_phys, 0);
+	}
+
+	sd->ms_tree += rt.rt_space;
+	sd->avail += sm.sm_size - sm.sm_alloc;
+	sd->nowavail += sm.sm_size - smp.smp_alloc;
 
 	return (WALK_NEXT);
 }
@@ -1572,16 +1599,16 @@ spa_space(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	}
 
 	mdb_printf("ms_allocmap = %llu%s %llu%s %llu%s %llu%s\n",
-	    sd.ms_allocmap[0] >> shift, suffix,
-	    sd.ms_allocmap[1] >> shift, suffix,
-	    sd.ms_allocmap[2] >> shift, suffix,
-	    sd.ms_allocmap[3] >> shift, suffix);
+	    sd.ms_alloctree[0] >> shift, suffix,
+	    sd.ms_alloctree[1] >> shift, suffix,
+	    sd.ms_alloctree[2] >> shift, suffix,
+	    sd.ms_alloctree[3] >> shift, suffix);
 	mdb_printf("ms_freemap = %llu%s %llu%s %llu%s %llu%s\n",
-	    sd.ms_freemap[0] >> shift, suffix,
-	    sd.ms_freemap[1] >> shift, suffix,
-	    sd.ms_freemap[2] >> shift, suffix,
-	    sd.ms_freemap[3] >> shift, suffix);
-	mdb_printf("ms_map = %llu%s\n", sd.ms_map >> shift, suffix);
+	    sd.ms_freetree[0] >> shift, suffix,
+	    sd.ms_freetree[1] >> shift, suffix,
+	    sd.ms_freetree[2] >> shift, suffix,
+	    sd.ms_freetree[3] >> shift, suffix);
+	mdb_printf("ms_tree = %llu%s\n", sd.ms_tree >> shift, suffix);
 	mdb_printf("last synced avail = %llu%s\n", sd.avail >> shift, suffix);
 	mdb_printf("current syncing avail = %llu%s\n",
 	    sd.nowavail >> shift, suffix);
