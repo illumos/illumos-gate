@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ * Copyright 2013, Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -761,7 +761,8 @@ header_kstat_update(kstat_t *header_ksp, int rw)
 
 	zoneid = getzoneid();
 	for (e = avl_first(t); e != NULL; e = avl_walk(t, e, AVL_AFTER)) {
-		if (kstat_zone_find((kstat_t *)e, zoneid)) {
+		if (kstat_zone_find((kstat_t *)e, zoneid) &&
+		    (e->e_ks.ks_flags & KSTAT_FLAG_INVALID) == 0) {
 			nkstats++;
 		}
 	}
@@ -791,7 +792,8 @@ header_kstat_snapshot(kstat_t *header_ksp, void *buf, int rw)
 
 	zoneid = getzoneid();
 	for (e = avl_first(t); e != NULL; e = avl_walk(t, e, AVL_AFTER)) {
-		if (kstat_zone_find((kstat_t *)e, zoneid)) {
+		if (kstat_zone_find((kstat_t *)e, zoneid) &&
+		    (e->e_ks.ks_flags & KSTAT_FLAG_INVALID) == 0) {
 			bcopy(&e->e_ks, buf, sizeof (kstat_t));
 			buf = (char *)buf + sizeof (kstat_t);
 		}
