@@ -67,7 +67,6 @@ SRCS += \
 	mdb_memio.c \
 	mdb_modapi.c \
 	mdb_module.c \
-	mdb_module_dump.c \
 	mdb_module_load.c \
 	mdb_nm.c \
 	mdb_nv.c \
