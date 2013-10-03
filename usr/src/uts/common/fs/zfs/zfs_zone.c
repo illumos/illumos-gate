@@ -1,25 +1,91 @@
 /*
- * CDDL HEADER START
+ * This file and its contents are supplied under the terms of the
+ * Common Development and Distribution License ("CDDL"), version 1.0.
+ * You may only use this file in accordance with the terms of version
+ * 1.0 of the CDDL.
  *
- * The contents of this file are subject to the terms of the
- * Common Development and Distribution License (the "License").
- * You may not use this file except in compliance with the License.
- *
- * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or http://www.opensolaris.org/os/licensing.
- * See the License for the specific language governing permissions
- * and limitations under the License.
- *
- * When distributing Covered Code, include this CDDL HEADER in each
- * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
- * If applicable, add the following below this CDDL HEADER, with the
- * fields enclosed by brackets "[]" replaced with your own identifying
- * information: Portions Copyright [yyyy] [name of copyright owner]
- *
- * CDDL HEADER END
+ * A full copy of the text of the CDDL should have accompanied this
+ * source.  A copy of the CDDL is also available via the Internet at
+ * http://www.illumos.org/license/CDDL.
  */
+
 /*
  * Copyright 2013, Joyent, Inc. All rights reserved.
+ */
+
+/*
+ * The ZFS/Zone I/O throttle and scheduler attempts to ensure fair access to
+ * ZFS I/O resources for each zone.
+ *
+ * I/O contention can be major pain point on a multi-tenant system. A single
+ * zone can issue a stream of I/O operations, usually synchronous writes, which
+ * disrupt I/O performance for all other zones. This problem is further
+ * exacerbated by ZFS, which buffers all asynchronous writes in a single TXG,
+ * a set of blocks which are atomically synced to disk. The process of
+ * syncing a TXG can occupy all of a device's I/O bandwidth, thereby starving
+ * out any pending read operations.
+ *
+ * There are two facets to this capability; the throttle and the scheduler.
+ *
+ * Throttle
+ *
+ * The requirements on the throttle are:
+ *
+ *     1) Ensure consistent and predictable I/O latency across all zones.
+ *     2) Sequential and random workloads have very different characteristics,
+ *        so it is a non-starter to track IOPS or throughput.
+ *     3) A zone should be able to use the full disk bandwidth if no other zone
+ *        is actively using the disk.
+ *
+ * The throttle has two components: one to track and account for each zone's
+ * I/O requests, and another to throttle each zone's operations when it
+ * exceeds its fair share of disk I/O. When the throttle detects that a zone is
+ * consuming more than is appropriate, each read or write system call is
+ * delayed by up to 100 microseconds, which we've found is sufficient to allow
+ * other zones to interleave I/O requests during those delays.
+ *
+ * Note: The throttle will delay each logical I/O (as opposed to the physical
+ * I/O which will likely be issued asynchronously), so it may be easier to
+ * think of the I/O throttle delaying each read/write syscall instead of the
+ * actual I/O operation. For each zone, the throttle tracks an ongoing average
+ * of read and write operations performed to determine the overall I/O
+ * utilization for each zone.
+ *
+ * The throttle calculates a I/O utilization metric for each zone using the
+ * following formula:
+ *
+ *     (# of read syscalls) x (Average read latency) +
+ *     (# of write syscalls) x (Average write latency)
+ *
+ * Once each zone has its utilization metric, the I/O throttle will compare I/O
+ * utilization across all zones, and if a zone has a higher-than-average I/O
+ * utilization, system calls from that zone are throttled. That is, if one
+ * zone has a much higher utilization, that zone's delay is increased by 5
+ * microseconds, up to a maximum of 100 microseconds. Conversely, if a zone is
+ * already throttled and has a lower utilization than average, its delay will
+ * be lowered by 5 microseconds.
+ *
+ * The throttle calculation is driven by IO activity, but since IO does not
+ * happen at fixed intervals, timestamps are used to track when the last update
+ * was made and to drive recalculation.
+ *
+ * The throttle recalculates each zone's I/O usage and throttle delay (if any)
+ * on the zfs_zone_adjust_time interval. Overall I/O latency is maintained as
+ * a decayed average which is updated on the zfs_zone_sys_avg_cycle interval.
+ *
+ * Scheduler
+ *
+ * The I/O scheduler manages the vdev queues – the queues of pending I/Os to
+ * issue to the disks. It only makes scheduling decisions for the two
+ * synchronous I/O queues (read & write).
+ *
+ * The scheduler maintains how many I/Os in the queue are from each zone, and
+ * if one zone has a disproportionately large number of I/Os in the queue, the
+ * scheduler will allow certain I/Os from the underutilized zones to be "bumped"
+ * and pulled from the middle of the queue. This bump allows zones with a small
+ * number of I/Os (so small they may not even be taken into account by the
+ * throttle) to complete quickly instead of waiting behind dozens of I/Os from
+ * other zones.
  */
 
 #include <sys/spa.h>
@@ -100,10 +166,8 @@ zfs_zone_txg_delay()
  * over the previous window.
  */
 boolean_t	zfs_zone_delay_enable = B_TRUE;	/* enable IO throttle */
-uint16_t	zfs_zone_delay_step = 5;	/* amount to change delay */
-uint16_t	zfs_zone_delay_ceiling = 100;	/* longest possible delay */
-
-hrtime_t	zfs_zone_last_checked = 0;
+uint16_t	zfs_zone_delay_step = 5;	/* usec amnt to change delay */
+uint16_t	zfs_zone_delay_ceiling = 100;	/* usec delay max */
 
 boolean_t	zfs_zone_priority_enable = B_TRUE;  /* enable IO priority */
 
@@ -120,7 +184,6 @@ boolean_t	zfs_zone_priority_enable = B_TRUE;  /* enable IO priority */
  * throttler from exacerbating the imbalance.
  */
 uint_t		zfs_zone_rw_lat_limit = 10;
-
 
 /*
  * The I/O throttle will only start delaying zones when it detects disk
@@ -140,6 +203,10 @@ uint_t		zfs_zone_util_threshold = 80;
 uint_t 		zfs_zone_sys_avg_cycle = 1000000;	/* 1 s */
 uint_t 		zfs_zone_cycle_time = 2000000;		/* 2 s */
 
+/*
+ * How often the I/O throttle will reevaluate each zone's utilization, in
+ * microseconds. Default is 1/4 sec.
+ */
 uint_t 		zfs_zone_adjust_time = 250000;		/* 250 ms */
 
 typedef struct {
@@ -163,22 +230,31 @@ static sys_lat_cycle_t	rd_lat;
 static sys_lat_cycle_t	wr_lat;
 
 /*
- * Some basic disk stats to determine disk utilization.
+ * Some basic disk stats to determine disk utilization. The utilization info
+ * for all disks on the system is aggregated into these values.
+ *
+ * Overall disk utilization for the current cycle is calculated as:
+ *
+ * ((zfs_disk_rtime - zfs_disk_last_rtime) * 100)
+ * ----------------------------------------------
+ *    ((now - zfs_zone_last_checked) * 1000);
  */
-kmutex_t	zfs_disk_lock;
-uint_t		zfs_disk_rcnt;
-hrtime_t	zfs_disk_rtime = 0;
-hrtime_t	zfs_disk_rlastupdate = 0;
+kmutex_t	zfs_disk_lock;		/* protects the following: */
+uint_t		zfs_disk_rcnt;		/* Number of outstanding IOs */
+hrtime_t	zfs_disk_rtime = 0; /* cummulative sum of time performing IO */
+hrtime_t	zfs_disk_rlastupdate = 0; /* time last IO dispatched */
 
-hrtime_t	zfs_disk_last_rtime = 0;
+hrtime_t	zfs_disk_last_rtime = 0; /* prev. cycle's zfs_disk_rtime val */
+/* time that we last updated per-zone throttle info */
+hrtime_t	zfs_zone_last_checked = 0;
 
 /*
- * Data used to keep track of how often txg flush is running.
+ * Data used to keep track of how often txg sync is running.
  */
 extern int	zfs_txg_timeout;
 static uint_t	txg_last_check;
 static uint_t	txg_cnt;
-static uint_t	txg_flush_rate;
+static uint_t	txg_sync_rate;
 
 boolean_t	zfs_zone_schedule_enable = B_TRUE;	/* enable IO sched. */
 /*
@@ -192,7 +268,19 @@ boolean_t	zfs_zone_schedule_enable = B_TRUE;	/* enable IO sched. */
 uint32_t	zfs_zone_schedule_thresh = 10;
 
 /*
- * Tunables for delay throttling when TxG flush is occurring.
+ * On each pass of the scheduler we increment the zone's weight (up to this
+ * maximum). The weight is used by the scheduler to prevent starvation so
+ * that zones which haven't been able to do any IO over many iterations
+ * will max out thier weight to this value.
+ */
+#define	SCHED_WEIGHT_MAX	20
+
+/*
+ * Tunables for delay throttling when TXG sync is occurring.
+ *
+ * If the zone is performing a write and we're doing above normal TXG syncing,
+ * then throttle for longer than normal. The zone's wait time is multiplied
+ * by the scale (zfs_zone_txg_throttle_scale).
  */
 int		zfs_zone_txg_throttle_scale = 2;
 hrtime_t	zfs_zone_txg_delay_nsec = MSEC2NSEC(20);
@@ -214,6 +302,9 @@ typedef struct {
 /*
  * Keep track of the zone's ZFS IOPs.
  *
+ * See the comment on the zfs_zone_io_throttle function for which/how IOPs are
+ * accounted for.
+ *
  * If the number of ops is >1 then we can just use that value.  However,
  * if the number of ops is <2 then we might have a zone which is trying to do
  * IO but is not able to get any ops through the system.  We don't want to lose
@@ -226,8 +317,8 @@ typedef struct {
  * historical count by the proper number of additional cycles in which no IO was
  * performed.
  *
- * Return true if we actually computed a new historical count.
- * If we're still within an active cycle there is nothing to do, return false.
+ * Return a time delta indicating how far into the current cycle we are or 0
+ * if the last IO was more than a cycle ago.
  */
 static hrtime_t
 compute_historical_zone_cnt(hrtime_t unow, sys_zio_cntr_t *cp)
@@ -318,16 +409,15 @@ add_zone_iop(zone_t *zonep, hrtime_t unow, zfs_zone_iop_type_t op)
  *
  * Each cycle (zfs_zone_sys_avg_cycle) we want to update the decayed average.
  * However, since this calculation is driven by IO activity and since IO does
- * not happen
- *
- * at fixed intervals, we use a timestamp to see when the last update was made.
- * If it was more than one cycle ago, then we need to decay the average by the
- * proper number of additional cycles in which no IO was performed.
+ * not happen at fixed intervals, we use a timestamp to see when the last
+ * update was made. If it was more than one cycle ago, then we need to decay
+ * the average by the proper number of additional cycles in which no IO was
+ * performed.
  *
  * Return true if we actually computed a new system average.
  * If we're still within an active cycle there is nothing to do, return false.
  */
-static int
+static boolean_t
 compute_new_sys_avg(hrtime_t unow, sys_lat_cycle_t *cp)
 {
 	hrtime_t delta;
@@ -339,7 +429,7 @@ compute_new_sys_avg(hrtime_t unow, sys_lat_cycle_t *cp)
 	 */
 	delta = unow - cp->cycle_start;
 	if (delta < zfs_zone_sys_avg_cycle)
-		return (0);
+		return (B_FALSE);
 
 	/* A previous cycle is past, compute a new system average. */
 
@@ -373,7 +463,7 @@ compute_new_sys_avg(hrtime_t unow, sys_lat_cycle_t *cp)
 	cp->cycle_cnt = 0;
 	cp->cycle_lat = 0;
 
-	return (1);
+	return (B_TRUE);
 }
 
 static void
@@ -440,13 +530,10 @@ calc_avg_lat(hrtime_t unow, sys_lat_cycle_t *cp)
 		 * We're within a cycle; weight the current activity higher
 		 * compared to the historical data and use that.
 		 */
-		extern void __dtrace_probe_zfs__zone__calc__wt__avg(uintptr_t,
-		    uintptr_t, uintptr_t);
-
-		__dtrace_probe_zfs__zone__calc__wt__avg(
-		    (uintptr_t)cp->sys_avg_lat,
-		    (uintptr_t)cp->cycle_lat,
-		    (uintptr_t)cp->cycle_cnt);
+		DTRACE_PROBE3(zfs__zone__calc__wt__avg,
+		    uintptr_t, cp->sys_avg_lat,
+		    uintptr_t, cp->cycle_lat,
+		    uintptr_t, cp->cycle_cnt);
 
 		return ((cp->sys_avg_lat + (cp->cycle_lat * 8)) /
 		    (1 + (cp->cycle_cnt * 8)));
@@ -481,11 +568,8 @@ get_zone_io_cnt(hrtime_t unow, zone_t *zonep, uint_t *rops, uint_t *wops,
 	*wops = calc_zone_cnt(unow, &zonep->zone_wr_ops);
 	*lwops = calc_zone_cnt(unow, &zonep->zone_lwr_ops);
 
-	extern void __dtrace_probe_zfs__zone__io__cnt(uintptr_t,
-	    uintptr_t, uintptr_t, uintptr_t);
-
-	__dtrace_probe_zfs__zone__io__cnt((uintptr_t)zonep->zone_id,
-	    (uintptr_t)(*rops), (uintptr_t)*wops, (uintptr_t)*lwops);
+	DTRACE_PROBE4(zfs__zone__io__cnt, uintptr_t, zonep->zone_id,
+	    uintptr_t, *rops, uintptr_t, *wops, uintptr_t, *lwops);
 
 	return (*rops | *wops | *lwops);
 }
@@ -510,11 +594,8 @@ get_sys_avg_lat(hrtime_t unow, uint_t *rlat, uint_t *wlat)
 	if (*wlat == 0)
 		*wlat = 1000;
 
-	extern void __dtrace_probe_zfs__zone__sys__avg__lat(uintptr_t,
-	    uintptr_t);
-
-	__dtrace_probe_zfs__zone__sys__avg__lat((uintptr_t)(*rlat),
-	    (uintptr_t)*wlat);
+	DTRACE_PROBE2(zfs__zone__sys__avg__lat, uintptr_t, *rlat,
+	    uintptr_t, *wlat);
 }
 
 /*
@@ -552,12 +633,9 @@ zfs_zone_wait_adjust_calculate_cb(zone_t *zonep, void *arg)
 	 *	arg4: calculated utilization given read and write ops
 	 *	arg5: I/O priority assigned to this zone
 	 */
-	extern void __dtrace_probe_zfs__zone__utilization(
-	    uint_t, uint_t, uint_t, uint_t, uint_t, uint_t);
-
-	__dtrace_probe_zfs__zone__utilization((uint_t)(zonep->zone_id),
-	    (uint_t)rops, (uint_t)wops, (uint_t)lwops,
-	    (uint_t)zonep->zone_io_util, (uint_t)zonep->zone_zfs_io_pri);
+	DTRACE_PROBE6(zfs__zone__utilization, uint_t, zonep->zone_id,
+	    uint_t, rops, uint_t, wops, uint_t, lwops,
+	    uint_t, zonep->zone_io_util, uint_t, zonep->zone_zfs_io_pri);
 
 	return (0);
 }
@@ -623,13 +701,9 @@ zfs_zone_wait_adjust_delay_cb(zone_t *zonep, void *arg)
 	 *	arg3: calculated fair I/O utilization
 	 *	arg4: actual I/O utilization
 	 */
-	extern void __dtrace_probe_zfs__zone__throttle(
-	    uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t);
-
-	__dtrace_probe_zfs__zone__throttle(
-	    (uintptr_t)zonep->zone_id, (uintptr_t)delay,
-	    (uintptr_t)zonep->zone_io_delay, (uintptr_t)fairutil,
-	    (uintptr_t)zonep->zone_io_util);
+	DTRACE_PROBE5(zfs__zone__throttle, uintptr_t, zonep->zone_id,
+	    uintptr_t, delay, uintptr_t, zonep->zone_io_delay,
+	    uintptr_t, fairutil, uintptr_t, zonep->zone_io_util);
 
 	return (0);
 }
@@ -639,7 +713,7 @@ zfs_zone_wait_adjust_delay_cb(zone_t *zonep, void *arg)
  * each zone appropriately.
  */
 static void
-zfs_zone_wait_adjust(hrtime_t unow)
+zfs_zone_wait_adjust(hrtime_t unow, hrtime_t last_checked)
 {
 	zoneio_stats_t stats;
 
@@ -659,12 +733,12 @@ zfs_zone_wait_adjust(hrtime_t unow)
 	/*
 	 * Calculate disk utilization for the most recent period.
 	 */
-	if (zfs_disk_last_rtime == 0 || unow - zfs_zone_last_checked <= 0) {
+	if (zfs_disk_last_rtime == 0 || unow - last_checked <= 0) {
 		stats.zi_diskutil = 0;
 	} else {
 		stats.zi_diskutil =
 		    ((zfs_disk_rtime - zfs_disk_last_rtime) * 100) /
-		    ((unow - zfs_zone_last_checked) * 1000);
+		    ((unow - last_checked) * 1000);
 	}
 	zfs_disk_last_rtime = zfs_disk_rtime;
 
@@ -680,15 +754,10 @@ zfs_zone_wait_adjust(hrtime_t unow)
 	 *	arg4: total I/O priority of all active zones
 	 *	arg5: calculated disk utilization
 	 */
-	extern void __dtrace_probe_zfs__zone__stats(
-	    uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t);
-
-	__dtrace_probe_zfs__zone__stats((uintptr_t)(stats.zi_avgrlat),
-	    (uintptr_t)(stats.zi_avgwlat),
-	    (uintptr_t)(stats.zi_active),
-	    (uintptr_t)(stats.zi_totutil),
-	    (uintptr_t)(stats.zi_totpri),
-	    (uintptr_t)(stats.zi_diskutil));
+	DTRACE_PROBE6(zfs__zone__stats, uintptr_t, stats.zi_avgrlat,
+	    uintptr_t, stats.zi_avgwlat, uintptr_t, stats.zi_active,
+	    uintptr_t, stats.zi_totutil, uintptr_t, stats.zi_totpri,
+	    uintptr_t, stats.zi_diskutil);
 
 	(void) zone_walk(zfs_zone_wait_adjust_delay_cb, &stats);
 }
@@ -720,7 +789,7 @@ get_sched_pri_cb(zone_t *zonep, void *arg)
 	 * done any IO over several iterations will see their weight max
 	 * out.
 	 */
-	if (zonep->zone_zfs_weight < 20)
+	if (zonep->zone_zfs_weight < SCHED_WEIGHT_MAX)
 		zonep->zone_zfs_weight++;
 
 	/*
@@ -751,7 +820,9 @@ get_sched_pri_cb(zone_t *zonep, void *arg)
 
 /*
  * See if we need to bump a zone's zio to the head of the queue. This is only
- * done on the two synchronous I/O queues.
+ * done on the two synchronous I/O queues (see the block comment on the
+ * zfs_zone_schedule function). We get the correct vdev_queue_class_t and
+ * queue depth from our caller.
  *
  * For single-threaded synchronous processes a zone cannot get more than
  * 1 op into the queue at a time unless the zone is running multiple processes
@@ -811,10 +882,8 @@ get_next_zio(vdev_queue_class_t *vqc, int qdepth, zio_priority_t p)
 		 * Only fire the probe if we actually picked a different zio
 		 * than the one already at the head of the queue.
 		 */
-		extern void __dtrace_probe_zfs__zone__sched__bump(uint_t,
-		    uint_t, int, int);
-		__dtrace_probe_zfs__zone__sched__bump((uint_t)zp->io_zoneid,
-		    (uint_t)cnt, qbump.zq_priority, qbump.zq_wt);
+		DTRACE_PROBE4(zfs__zone__sched__bump, uint_t, zp->io_zoneid,
+		    uint_t, cnt, int, qbump.zq_priority, int, qbump.zq_wt);
 	}
 
 	return (zp);
@@ -863,7 +932,7 @@ zfs_zone_zio_init(zio_t *zp)
  * that are performed at a low level via zfs_zone_zio_start.
  *
  * Without this, it can look like a non-global zone never writes (case 1).
- * Depending on when the TXG is flushed, the counts may be in the same sample
+ * Depending on when the TXG is synced, the counts may be in the same sample
  * bucket or in a different one.
  *
  * Tracking read operations is simpler due to their synchronous semantics.  The
@@ -874,7 +943,7 @@ void
 zfs_zone_io_throttle(zfs_zone_iop_type_t type)
 {
 	zone_t *zonep = curzone;
-	hrtime_t unow;
+	hrtime_t unow, last_checked;
 	uint16_t wait;
 
 	unow = GET_USEC_TIME;
@@ -905,18 +974,19 @@ zfs_zone_io_throttle(zfs_zone_iop_type_t type)
 	 * of our data to track each zone's IO, so the algorithm may make
 	 * incorrect throttling decisions until the data is refreshed.
 	 */
-	if ((unow - zfs_zone_last_checked) > zfs_zone_adjust_time) {
-		zfs_zone_wait_adjust(unow);
+	last_checked = zfs_zone_last_checked;
+	if ((unow - last_checked) > zfs_zone_adjust_time) {
 		zfs_zone_last_checked = unow;
+		zfs_zone_wait_adjust(unow, last_checked);
 	}
 
 	if ((wait = zonep->zone_io_delay) > 0) {
 		/*
-		 * If this is a write and we're doing above normal TxG
-		 * flushing, then throttle for longer than normal.
+		 * If this is a write and we're doing above normal TXG
+		 * syncing, then throttle for longer than normal.
 		 */
 		if (type == ZFS_ZONE_IOP_LOGICAL_WRITE &&
-		    (txg_cnt > 1 || txg_flush_rate > 1))
+		    (txg_cnt > 1 || txg_sync_rate > 1))
 			wait *= zfs_zone_txg_throttle_scale;
 
 		/*
@@ -926,11 +996,8 @@ zfs_zone_io_throttle(zfs_zone_iop_type_t type)
 		 *	arg1: type of IO operation
 		 *	arg2: time to delay (in us)
 		 */
-		extern void __dtrace_probe_zfs__zone__wait(
-		    uintptr_t, uintptr_t, uintptr_t);
-
-		__dtrace_probe_zfs__zone__wait((uintptr_t)(zonep->zone_id),
-		    (uintptr_t)type, (uintptr_t)wait);
+		DTRACE_PROBE3(zfs__zone__wait, uintptr_t, zonep->zone_id,
+		    uintptr_t, type, uintptr_t, wait);
 
 		drv_usecwait(wait);
 
@@ -946,17 +1013,17 @@ zfs_zone_io_throttle(zfs_zone_iop_type_t type)
 /*
  * XXX Ignore the pool pointer parameter for now.
  *
- * Keep track to see if the TxG flush rate is running above the expected rate.
- * If so, this implies that we are filling TxG's at a high rate due to a heavy
+ * Keep track to see if the TXG sync rate is running above the expected rate.
+ * If so, this implies that we are filling TXG's at a high rate due to a heavy
  * write workload.  We use this as input into the zone throttle.
  *
  * This function is called every 5 seconds (zfs_txg_timeout) under a normal
- * write load.  In this case, the flush rate is going to be 1.  When there
- * is a heavy write load, TxG's fill up fast and the sync thread will write
- * the TxG more frequently (perhaps once a second).  In this case the rate
- * will be > 1.  The flush rate is a lagging indicator since it can be up
+ * write load.  In this case, the sync rate is going to be 1.  When there
+ * is a heavy write load, TXG's fill up fast and the sync thread will write
+ * the TXG more frequently (perhaps once a second).  In this case the rate
+ * will be > 1.  The sync rate is a lagging indicator since it can be up
  * to 5 seconds old.  We use the txg_cnt to keep track of the rate in the
- * current 5 second interval and txg_flush_rate to keep track of the previous
+ * current 5 second interval and txg_sync_rate to keep track of the previous
  * 5 second interval.  In that way we don't have a period (1 or more seconds)
  * where the txg_cnt == 0 and we cut back on throttling even though the rate
  * is still high.
@@ -970,7 +1037,7 @@ zfs_zone_report_txg_sync(void *dp)
 	txg_cnt++;
 	now = (uint_t)(gethrtime() / NANOSEC);
 	if ((now - txg_last_check) >= zfs_txg_timeout) {
-		txg_flush_rate = txg_cnt / 2;
+		txg_sync_rate = txg_cnt / 2;
 		txg_cnt = 0;
 		txg_last_check = now;
 	}
@@ -986,7 +1053,7 @@ zfs_zone_txg_delay()
 }
 
 /*
- * Called from zio_vdev_io_start when an IO hits the end of the zio pipeline
+ * Called from vdev_disk_io_start when an IO hits the end of the zio pipeline
  * and is issued.
  * Keep track of start time for latency calculation in zfs_zone_zio_done.
  */
@@ -1024,7 +1091,7 @@ zfs_zone_zio_start(zio_t *zp)
 }
 
 /*
- * Called from vdev_queue_io_done when an IO completes.
+ * Called from vdev_disk_io_done when an IO completes.
  * Increment our counter for zone ops.
  * Calculate the IO latency avg. for this zone.
  */
@@ -1056,7 +1123,7 @@ zfs_zone_zio_done(zio_t *zp)
 		zonep->zone_zfs_rwstats.nread += zp->io_size;
 
 		zonep->zone_zfs_stats->zz_waittime.value.ui64 +=
-		    zp->io_dispatched - zp->io_start;
+		    zp->io_dispatched - zp->io_timestamp;
 
 		kstat_runq_exit(&zonep->zone_zfs_rwstats);
 	} else {
@@ -1088,11 +1155,8 @@ zfs_zone_zio_done(zio_t *zp)
 	 *	arg1: type of I/O operation
 	 *	arg2: I/O latency (in us)
 	 */
-	extern void __dtrace_probe_zfs__zone__latency(
-	    uintptr_t, uintptr_t, uintptr_t);
-
-	__dtrace_probe_zfs__zone__latency((uintptr_t)(zp->io_zoneid),
-	    (uintptr_t)(zp->io_type), (uintptr_t)(udelta));
+	DTRACE_PROBE3(zfs__zone__latency, uintptr_t, zp->io_zoneid,
+	    uintptr_t, zp->io_type, uintptr_t, udelta);
 }
 
 void
@@ -1201,10 +1265,8 @@ zfs_zone_schedule(vdev_queue_t *vq, zio_priority_t p, avl_index_t idx)
 	 * was last scheduled off this queue, the zone that was associated
 	 * with the next IO that is scheduled, and which queue (priority).
 	 */
-	extern void __dtrace_probe_zfs__zone__sched(uint_t, uint_t, uint_t,
-	    uint_t);
-	__dtrace_probe_zfs__zone__sched((uint_t)cnt, (uint_t)last_zone,
-	    (uint_t)zio->io_zoneid, (uint_t)p);
+	DTRACE_PROBE4(zfs__zone__sched, uint_t, cnt, uint_t, last_zone,
+	    uint_t, zio->io_zoneid, uint_t, p);
 
 	return (zio);
 }

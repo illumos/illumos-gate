@@ -613,8 +613,8 @@ typedef struct zone {
 	uint16_t	zone_io_delay;		/* IO delay on logical r/w */
 	kmutex_t	zone_stg_io_lock;	/* protects IO window data */
 	sys_zio_cntr_t	zone_rd_ops;		/* Counters for ZFS reads, */
-	sys_zio_cntr_t	zone_wr_ops;		/* writes and logical writes. */
-	sys_zio_cntr_t	zone_lwr_ops;
+	sys_zio_cntr_t	zone_wr_ops;		/* writes and */
+	sys_zio_cntr_t	zone_lwr_ops;		/* logical writes. */
 
 	/*
 	 * kstats and counters for VFS ops and bytes.

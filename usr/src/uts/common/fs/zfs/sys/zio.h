@@ -407,7 +407,8 @@ struct zio {
 	const zio_vsd_ops_t *io_vsd_ops;
 
 	uint64_t	io_offset;
-	hrtime_t	io_timestamp;
+	hrtime_t	io_timestamp;	/* time I/O entered zio pipeline */
+	hrtime_t	io_dispatched;	/* time I/O was dispatched to disk */
 	avl_node_t	io_queue_node;
 
 	/* Internal pipeline state */
@@ -436,8 +437,6 @@ struct zio {
 	uint64_t	io_ena;
 
 	zoneid_t	io_zoneid;	/* zone which originated this I/O */
-	hrtime_t	io_start;	/* time I/O entered zio pipeline */
-	hrtime_t	io_dispatched;	/* time I/O was dispatched to disk */
 	/* Taskq dispatching state */
 	taskq_ent_t	io_tqent;
 };
