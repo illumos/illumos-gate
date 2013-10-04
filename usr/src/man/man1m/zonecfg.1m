@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\" See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ZONECFG 1M "Jun 27, 2013"
+.TH ZONECFG 1M "Oct 4, 2013"
 .SH NAME
 zonecfg \- set up zone configuration
 .SH SYNOPSIS
@@ -1372,18 +1372,21 @@ which is currently being added or modified.
 .sp
 .ne 2
 .na
-\fB\fBremove\fR \fIresource-type\fR\fB{\fR\fIproperty-name\fR\fB=\fR\fIproperty
--value\fR\fB}\fR(global scope)\fR
+\fB\fBremove\fR [\fR\fB-F\fR\fB] \fIresource-type\fR\fB [\fR\fIproperty-name\fR\fB=\fR\fIproperty-value\fR\fB]* \fR(global scope)\fR
+.br
+\fB\fBremove\fR \fR\fIproperty-name\fR\fB \fR\fIproperty-value\fR\fB \fR(resource scope)\fR
 .ad
 .sp .6
 .RS 4n
 In the global scope, removes the specified resource. The \fB[]\fR syntax means
-0 or more of whatever is inside the square braces. If you want only to remove a
+0 or more property name-value pairs. If you want to only remove a
 single instance of the resource, you must specify enough property name-value
 pairs for the resource to be uniquely identified. If no property name-value
 pairs are specified, all instances will be removed. If there is more than one
-pair is specified, a confirmation is required, unless you use the \fB-F\fR
-option.
+pair specified, a confirmation is required, unless you use the \fB-F\fR
+option. Likewise, the \fB-F\fR option can be used to remove a resource that
+does not exist (that is, no error will occur). In the resource scope, remove
+the specified name-value pair.
 .RE
 
 .sp
