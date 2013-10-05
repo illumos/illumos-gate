@@ -607,7 +607,7 @@ proto_promiscon_req(dld_str_t *dsp, mblk_t *mp)
 
 	default:
 		dl_err = DL_NOTSUPPORTED;
-		goto failed;
+		goto failed2;
 	}
 
 	if ((promisc_saved == 0) && (err = dls_active_set(dsp)) != 0) {
@@ -694,6 +694,7 @@ proto_promiscoff_req(dld_str_t *dsp, mblk_t *mp)
 
 	default:
 		dl_err = DL_NOTSUPPORTED;
+		mac_perim_exit(mph);
 		goto failed;
 	}
 
