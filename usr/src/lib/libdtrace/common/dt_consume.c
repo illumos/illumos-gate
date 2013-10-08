@@ -1078,8 +1078,8 @@ dt_print_ustack(dtrace_hdl_t *dtp, FILE *fp, const char *format,
 				    "%s`%s", dt_basename(objname), name);
 			}
 		} else if (str != NULL && str[0] != '\0' && str[0] != '@' &&
-		    (P != NULL && ((map = Paddr_to_map(P, pc[i])) == NULL ||
-		    (map->pr_mflags & MA_WRITE)))) {
+		    (P == NULL || (map = Paddr_to_map(P, pc[i])) == NULL ||
+		    map->pr_mflags & MA_WRITE)) {
 			/*
 			 * If the current string pointer in the string table
 			 * does not point to an empty string _and_ the program
@@ -1091,7 +1091,10 @@ dt_print_ustack(dtrace_hdl_t *dtp, FILE *fp, const char *format,
 			 * identify.  If we have a string for a program
 			 * counter that falls in a segment that isn't
 			 * writable, we assume that we have fallen into this
-			 * case and we refuse to use the string.
+			 * case and we refuse to use the string.  Finally,
+			 * note that if we could not grab the process (e.g.,
+			 * because it exited), the information from the helper
+			 * is better than nothing.
 			 */
 			(void) snprintf(c, sizeof (c), "%s", str);
 		} else {
