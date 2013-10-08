@@ -21,50 +21,13 @@
 #
 # Copyright (c) 2013 Gary Mills
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
-PROG=		error
-
-include 	../../../Makefile.cmd
-
-OBJS=		errormain.o errorinput.o errorpi.o errorsubr.o \
-		errorfilter.o errortouch.o
-
-SRCS=		$(OBJS:%.o=../common/%.c)
-
-INCLIST=	-I../common
-DEFLIST=	-DELF
-CPPFLAGS=	$(INCLIST) $(DEFLIST) $(CPPFLAGS.master)
-CFLAGS +=	$(CCVERBOSE)
-C99MODE=	$(C99_ENABLE)
-
-CERRWARN +=	-_gcc=-Wno-uninitialized
-CERRWARN +=	-_gcc=-Wno-parentheses
-
-CLEANFILES +=	$(LINTOUT)
-
-%.o:		../common/%.c
-		$(COMPILE.c) $<
+include ../Makefile.com
+include ../../Makefile.lib.64
 
 .KEEP_STATE:
 
-all:		$(PROG)
-
-$(PROG):	$(OBJS)
-		$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
-		$(POST_PROCESS)
-
-install:	all $(ROOTPROG) $(ROOTCCSBINLINK)
-
-clean:
-		$(RM) $(OBJS) $(CLEANFILES)
-
-lint:		$(LINTOUT)
-
-$(LINTOUT):	$(SRCS)
-		perl ../../tools/lint_hdr.pl $(PROG)	> $(LINTOUT)
-		$(LINT.c) $(SRCS) $(LDLIBS)		2>&1 | tee -a $(LINTOUT)
-
-include		../../../Makefile.targ
+install: all $(ROOTLIBS64)

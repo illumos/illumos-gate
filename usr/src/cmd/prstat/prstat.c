@@ -20,6 +20,8 @@
  */
 
 /*
+ * Copyright (c) 2013 Gary Mills
+ *
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
@@ -75,6 +77,10 @@
 #include <curses.h>
 #include <term.h>
 
+#define	LOGIN_WIDTH	8
+#define	ZONE_WIDTH	28
+#define	PROJECT_WIDTH	28
+
 #define	PSINFO_HEADER_PROC \
 "   PID USERNAME  SIZE   RSS STATE  PRI NICE      TIME  CPU PROCESS/NLWP       "
 #define	PSINFO_HEADER_PROC_LGRP \
@@ -108,8 +114,8 @@
 #define	PSINFO_LINE_LGRP \
 "%6d %-8s %5s %5s %-6s %3s  %3s %9s %3.3s%% %4d %-.16s/%d"
 #define	USAGE_LINE \
-"%6d %-8s %3.3s %3.3s %3.3s %3.3s %3.3s %3.3s %3.3s %3.3s %3.3s %3.3s %3.3s "\
-"%3.3s %-.12s/%d"
+"%6d %-8s %3.3s %3.3s %3.3s %3.3s %3.3s %3.3s %3.3s %3.3s %3.3s %3.3s "\
+"%3.3s %3.3s %-.12s/%d"
 #define	USER_LINE \
 "%6d %-8s %5.5s %5.5s   %3.3s%% %9s %3.3s%%"
 #define	TASK_LINE \
@@ -446,16 +452,23 @@ list_print(list_t *list)
 				mem = (100 * id->id_pctmem) / total_mem;
 			else
 				mem = id->id_pctmem;
-			if (list->l_type == LT_USERS)
-				pwd_getname(id->id_uid, pname, LOGNAME_MAX + 1,
-				    opts.o_outpmode & OPT_NORESOLVE);
-			else if (list->l_type == LT_ZONES)
+			if (list->l_type == LT_USERS) {
+				pwd_getname(id->id_uid, pname, sizeof (pname),
+				    opts.o_outpmode & OPT_NORESOLVE,
+				    opts.o_outpmode & (OPT_TERMCAP|OPT_TRUNC),
+				    LOGIN_WIDTH);
+			} else if (list->l_type == LT_ZONES) {
 				getzonename(id->id_zoneid, zonename,
-				    ZONENAME_MAX);
-			else
+				    sizeof (zonename),
+				    opts.o_outpmode & (OPT_TERMCAP|OPT_TRUNC),
+				    ZONE_WIDTH);
+			} else {
 				getprojname(id->id_projid, projname,
-				    PROJNAME_MAX,
-				    opts.o_outpmode & OPT_NORESOLVE);
+				    sizeof (projname),
+				    opts.o_outpmode & OPT_NORESOLVE,
+				    opts.o_outpmode & (OPT_TERMCAP|OPT_TRUNC),
+				    PROJECT_WIDTH);
+			}
 			Format_size(psize, id->id_size, 6);
 			Format_size(prssize, id->id_rssize, 6);
 			Format_pct(pmem, mem, 4);
@@ -488,8 +501,10 @@ list_print(list_t *list)
 			else
 				lwpid = lwp->li_info.pr_nlwp +
 				    lwp->li_info.pr_nzomb;
-			pwd_getname(lwp->li_info.pr_uid, pname, LOGNAME_MAX + 1,
-			    opts.o_outpmode & OPT_NORESOLVE);
+			pwd_getname(lwp->li_info.pr_uid, pname, sizeof (pname),
+			    opts.o_outpmode & OPT_NORESOLVE,
+			    opts.o_outpmode & (OPT_TERMCAP|OPT_TRUNC),
+			    LOGIN_WIDTH);
 			if (opts.o_outpmode & OPT_PSINFO) {
 				Format_size(psize, lwp->li_info.pr_size, 6);
 				Format_size(prssize, lwp->li_info.pr_rssize, 6);
@@ -522,14 +537,15 @@ list_print(list_t *list)
 				if (opts.o_outpmode & OPT_LGRP) {
 					(void) printf(PSINFO_LINE_LGRP,
 					    (int)lwp->li_info.pr_pid, pname,
-					    psize, prssize, pstate, ppri, pnice,
-					    ptime, pcpu,
+					    psize, prssize, pstate,
+					    ppri, pnice, ptime, pcpu,
 					    (int)lwp->li_info.pr_lwp.pr_lgrp,
 					    lwp->li_info.pr_fname, lwpid);
 				} else {
 					(void) printf(PSINFO_LINE,
 					    (int)lwp->li_info.pr_pid, pname,
-					    psize, prssize, pstate, ppri, pnice,
+					    psize, prssize,
+					    pstate, ppri, pnice,
 					    ptime, pcpu,
 					    lwp->li_info.pr_fname, lwpid);
 				}
@@ -1364,7 +1380,7 @@ main(int argc, char **argv)
 	pagesize = sysconf(_SC_PAGESIZE);
 
 	while ((opt = getopt(argc, argv,
-	    "vcd:HmarRLtu:U:n:p:C:P:h:s:S:j:k:TJz:Z")) != (int)EOF) {
+	    "vcd:HmarRLtu:U:n:p:C:P:h:s:S:j:k:TJWz:Z")) != (int)EOF) {
 		switch (opt) {
 		case 'r':
 			opts.o_outpmode |= OPT_NORESOLVE;
@@ -1460,6 +1476,9 @@ main(int argc, char **argv)
 			break;
 		case 'L':
 			opts.o_outpmode |= OPT_LWPS;
+			break;
+		case 'W':
+			opts.o_outpmode |= OPT_TRUNC;
 			break;
 		case 'z':
 			if ((p = strtok(optarg, ", ")) == NULL)

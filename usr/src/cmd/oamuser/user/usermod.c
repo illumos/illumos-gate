@@ -19,6 +19,8 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright (c) 2013 Gary Mills
+ *
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -370,6 +372,12 @@ char **argv;
 			errmsg(M_USED, new_logname);
 			exit(EX_NAME_EXISTS);
 			/*NOTREACHED*/
+
+		case LONGNAME:
+			errmsg(M_TOO_LONG, new_logname);
+			exit(EX_BADARG);
+			/*NOTREACHED*/
+
 		default:
 			call_pass = 1;
 			break;

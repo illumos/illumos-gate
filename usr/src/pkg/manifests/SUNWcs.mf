@@ -22,6 +22,7 @@
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+# Copyright (c) 2013 Gary Mills
 #
 
 <include SUNWcs.man1.inc>
@@ -346,6 +347,7 @@ file path=etc/default/passwd group=sys preserve=true
 file path=etc/default/su group=sys preserve=true
 file path=etc/default/syslogd group=sys preserve=true
 file path=etc/default/tar group=sys preserve=true
+file path=etc/default/useradd group=sys preserve=true
 file path=etc/default/utmpd group=sys preserve=true
 file path=etc/dev/reserved_devnames group=sys preserve=true
 file path=etc/device.tab group=root mode=0444 preserve=true

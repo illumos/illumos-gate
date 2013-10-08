@@ -19,6 +19,8 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright (c) 2013 Gary Mills
+ *
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
@@ -35,6 +37,7 @@
 #include <errno.h>
 #include <zone.h>
 #include <libzonecfg.h>
+#include <wchar.h>
 
 #include "prstat.h"
 #include "prutil.h"
@@ -59,14 +62,28 @@ pwd_getid(char *name)
 }
 
 void
-pwd_getname(uid_t uid, char *name, int length, int noresolve)
+pwd_getname(uid_t uid, char *name, size_t length, int noresolve,
+    int trunc, size_t width)
 {
 	struct passwd *pwd;
+	size_t n;
 
 	if (noresolve || (pwd = getpwuid(uid)) == NULL) {
-		(void) snprintf(name, length, "%u", uid);
+		n = snprintf(NULL, 0, "%u", uid);
+		if (trunc && n > width)
+			(void) snprintf(name, length, "%.*u%c",
+			    width - 1, uid, '*');
+		else
+			(void) snprintf(name, length, "%u", uid);
 	} else {
-		(void) snprintf(name, length, "%s", pwd->pw_name);
+		n = mbstowcs(NULL, pwd->pw_name, 0);
+		if (n == (size_t)-1)
+			(void) snprintf(name, length, "%s", "ERROR");
+		else if (trunc && n > width)
+			(void) snprintf(name, length, "%.*s%c",
+			    width - 1, pwd->pw_name, '*');
+		else
+			(void) snprintf(name, length, "%s", pwd->pw_name);
 	}
 }
 

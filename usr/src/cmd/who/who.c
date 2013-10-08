@@ -23,11 +23,11 @@
 
 
 /*
+ * Copyright (c) 2013 Gary Mills
+ *
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *	This program analyzes information found in /var/adm/utmpx
@@ -100,18 +100,14 @@ static void dump(void);
 static struct	utmpx *utmpp;	/* pointer for getutxent()	*/
 
 /*
- * utmpx defines wider fields for user and line.  For compatibility of output,
- * we are limiting these to the old maximums in utmp. Define UTMPX_NAMELEN
- * to use the full lengths.
+ * Use the full lengths from utmpx for user and line.
  */
-#ifndef UTMPX_NAMELEN
-/* XXX - utmp - fix name length */
-#define	NMAX	(_POSIX_LOGIN_NAME_MAX - 1)
-#define	LMAX	12
-#else /* UTMPX_NAMELEN */
 #define	NMAX	(sizeof (utmpp->ut_user))
 #define	LMAX	(sizeof (utmpp->ut_line))
-#endif
+
+/* Print minimum field widths. */
+#define	LOGIN_WIDTH	8
+#define	LINE_WIDTH	12
 
 static char	comment[BUFSIZ]; /* holds inittab comment	*/
 static char	errmsg[BUFSIZ];	/* used in snprintf for errors	*/
@@ -168,7 +164,8 @@ main(int argc, char **argv)
 	/*
 	 *	Strip off path name of this command
 	 */
-	for (i = strlen(argv[0]); i >= 0 && argv[0][i] != '/'; --i);
+	for (i = strlen(argv[0]); i >= 0 && argv[0][i] != '/'; --i)
+		;
 	if (i >= 0)
 		argv[0] += i+1;
 	program = argv[0];
@@ -243,7 +240,7 @@ main(int argc, char **argv)
 			if (number < 1) {
 				(void) fprintf(stderr, gettext(
 				    "%s: Number of users per line must "
-					"be at least 1\n"), program);
+				    "be at least 1\n"), program);
 				exit(1);
 			}
 			break;
@@ -348,16 +345,16 @@ main(int argc, char **argv)
 		(void) fprintf(stderr, gettext("t\ttime changes\n"));
 		(void) fprintf(stderr, gettext(
 		    "T\tstatus of tty (+ writable, - not writable, "
-			"? hung)\n"));
+		    "? hung)\n"));
 		(void) fprintf(stderr, gettext("u\tuseful information\n"));
 		(void) fprintf(stderr,
 		    gettext("m\tinformation only about current terminal\n"));
 		(void) fprintf(stderr, gettext(
 		    "am i\tinformation about current terminal "
-			"(same as -m)\n"));
+		    "(same as -m)\n"));
 		(void) fprintf(stderr, gettext(
 		    "am I\tinformation about current terminal "
-			"(same as -m)\n"));
+		    "(same as -m)\n"));
 		exit(1);
 	}
 
@@ -393,7 +390,7 @@ main(int argc, char **argv)
 	 */
 	if (justme == 1 || (argc == 3 && strcmp(argv[1], "am") == 0 &&
 	    ((argv[2][0] == 'i' || argv[2][0] == 'I') &&
-		argv[2][1] == '\0'))) {
+	    argv[2][1] == '\0'))) {
 		justme = 1;
 		myname = nameval;
 		(void) cuserid(myname);
@@ -509,7 +506,7 @@ dump()
 		 */
 		if (((totlusrs - 1) % number) == 0 && totlusrs > 1)
 			(void) printf("\n");
-		(void) printf("%-*s ", NMAX, user);
+		(void) printf("%-*.*s ", LOGIN_WIDTH, NMAX, user);
 		return;
 	}
 
@@ -565,7 +562,8 @@ dump()
 	/*
 	 *	Print the TERSE portion of the output
 	 */
-	(void) printf("%-*s %c %-12s %s", NMAX, user, w, device, time_buf);
+	(void) printf("%-*.*s %c %-12s %s", LOGIN_WIDTH, NMAX, user,
+	    w, device, time_buf);
 
 	if (!terse) {
 		/*
@@ -626,7 +624,8 @@ dump()
 			 */
 			while ((rc = strncmp(utmpp->ut_id, iinit,
 			    strcspn(iinit, ":"))) != 0) {
-				for (; *iinit != '\n'; iinit++);
+				for (; *iinit != '\n'; iinit++)
+					;
 				iinit++;
 
 				/*
@@ -646,10 +645,12 @@ dump()
 				 *	We found our entry
 				 */
 				for (iinit++; *iinit != '#' &&
-					 *iinit != '\n'; iinit++);
+				    *iinit != '\n'; iinit++)
+					;
 				if (*iinit == '#') {
 					for (iinit++; *iinit == ' ' ||
-						 *iinit == '\t'; iinit++);
+					    *iinit == '\t'; iinit++)
+						;
 					for (rc = 0; *iinit != '\n'; iinit++)
 						comment[rc++] = *iinit;
 					comment[rc] = '\0';
@@ -733,7 +734,7 @@ process()
 				if (strncmp(myname, utmpp->ut_user,
 				    sizeof (utmpp->ut_user)) == 0 &&
 				    strncmp(mytty, utmpp->ut_line,
-					sizeof (utmpp->ut_line)) == 0 &&
+				    sizeof (utmpp->ut_line)) == 0 &&
 				    utmpp->ut_type == USER_PROCESS) {
 					/*
 					 * we have have found ourselves
@@ -756,7 +757,8 @@ process()
 #ifdef	XPG4
 				if (utmpp->ut_type == LOGIN_PROCESS) {
 					if ((utmpp->ut_line[0] == '\0') ||
-					(strcmp(utmpp->ut_user, "LOGIN") != 0))
+					    (strcmp(utmpp->ut_user,
+					    "LOGIN") != 0))
 						continue;
 				}
 #endif	/* XPG4 */
@@ -765,7 +767,7 @@ process()
 		} else {
 			(void) fprintf(stderr,
 			    gettext("%s: Error --- entry has ut_type "
-				"of %d\n"), program, utmpp->ut_type);
+			    "of %d\n"), program, utmpp->ut_type);
 			(void) fprintf(stderr,
 			    gettext(" when maximum is %d\n"), UTMAXTYPE);
 		}

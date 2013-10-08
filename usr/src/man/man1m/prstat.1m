@@ -1,18 +1,19 @@
 '\" te
+.\" Copyright (c) 2013 Gary Mills
 .\" Copyright (c) 2006, 2009 Sun Microsystems, Inc. All Rights Reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PRSTAT 1M "Jun 25, 2009"
+.TH PRSTAT 1M "Apr 15, 2013"
 .SH NAME
 prstat \- report active process statistics
 .SH SYNOPSIS
 .LP
 .nf
-\fBprstat\fR [\fB-acHJLmRrtTv\fR] [\fB-d\fR u | d] [\fB-C\fR \fIpsrsetlist\fR] [\fB-h\fR \fIlgrplist\fR]
+\fBprstat\fR [\fB-acHJLmRrtTvWZ\fR] [\fB-d\fR u | d] [\fB-C\fR \fIpsrsetlist\fR] [\fB-h\fR \fIlgrplist\fR]
      [\fB-j\fR \fIprojlist\fR] [\fB-k\fR \fItasklist\fR] [\fB-n\fR \fIntop\fR[,\fInbottom\fR]]
      [\fB-p\fR \fIpidlist\fR] [\fB-P\fR \fIcpulist\fR] [\fB-s\fR \fIkey\fR | \fB-S\fR \fIkey\fR ]
-     [\fB-u\fR \fIeuidlist\fR] [\fB-U\fR \fIuidlist\fR] [\fB-z\fR \fIzoneidlist\fR] [\fB-Z\fR]
+     [\fB-u\fR \fIeuidlist\fR] [\fB-U\fR \fIuidlist\fR] [\fB-z\fR \fIzoneidlist\fR]
      [\fIinterval\fR [\fIcount\fR]]
 .fi
 
@@ -56,6 +57,7 @@ displays separate reports about processes and users at the same time.
 .sp .6
 .RS 4n
 Print new reports below previous reports instead of overprinting them.
+Long names are not truncated in this mode.
 .RE
 
 .sp
@@ -128,6 +130,8 @@ project \fBID\fR. See \fBproject\fR(4).
 .RS 4n
 Report information about processes and projects. In this mode \fBprstat\fR
 displays separate reports about processes and projects at the same time.
+A trailing asterisk marks a long name that has been truncated
+to fit the column.
 .RE
 
 .sp
@@ -364,6 +368,19 @@ with the \fB-\fR sign.
 .sp
 .ne 2
 .na
+\fB\fB-W\fR\fR
+.ad
+.sp .6
+.RS 4n
+Truncate long names even when \fBprstat\fR would normally print them
+in full.
+A trailing asterisk marks a long name that has been truncated
+to fit the column.
+.RE
+
+.sp
+.ne 2
+.na
 \fB\fB-z\fR \fIzoneidlist\fR\fR
 .ad
 .sp .6
@@ -382,6 +399,8 @@ can be specified as either a zone name or a numerical zone ID. See
 .RS 4n
 Report information about processes and zones. In this mode, \fBprstat\fR
 displays separate reports about processes and zones at the same time.
+A trailing asterisk marks a long name that has been truncated
+to fit the column.
 .RE
 
 .SH OUTPUT
@@ -407,6 +426,8 @@ The process \fBID\fR of the process.
 .sp .6
 .RS 4n
 The real user (login) name or real user \fBID\fR.
+A trailing asterisk marks a long name that has been truncated
+to fit the column.
 .RE
 
 .sp

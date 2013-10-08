@@ -26,6 +26,8 @@
 #
 # Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved.
+# Copyright (c) 2013 Gary Mills
+#
 
 #
 # MAPFILE HEADER START
@@ -89,6 +91,13 @@ $endif
 $if _x86 && _ELF64
 $add amd64
 $endif
+
+SYMBOL_VERSION ILLUMOS_0.6 {	# Illumos additions
+    protected:
+	getloginx;
+	getloginx_r;
+	__posix_getloginx_r;
+} ILLUMOS_0.5;
 
 SYMBOL_VERSION ILLUMOS_0.5 {	# common C++ ABI exit handlers
     protected:

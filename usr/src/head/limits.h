@@ -20,6 +20,8 @@
  */
 
 /*
+ * Copyright (c) 2013 Gary Mills
+ *
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -30,8 +32,6 @@
 
 #ifndef _LIMITS_H
 #define	_LIMITS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.34  */
 
 #include <sys/feature_tests.h>
 #include <sys/isa_defs.h>
@@ -290,7 +290,16 @@ extern long _sysconf(int);	/* System Private interface to sysconf() */
 
 #endif /* CLK_TCK */
 
+#ifdef	__USE_LEGACY_LOGNAME__
 #define	LOGNAME_MAX	8	/* max # of characters in a login name */
+#else	/* __USE_LEGACY_LOGNAME__ */
+#define	LOGNAME_MAX	32	/* max # of characters in a login name */
+				/* Increased for illumos */
+#endif	/* __USE_LEGACY_LOGNAME__ */
+#define	LOGIN_NAME_MAX	(LOGNAME_MAX + 1)	/* max buffer size */
+#define	LOGNAME_MAX_TRAD	8		/* traditional length */
+#define	LOGIN_NAME_MAX_TRAD	(LOGNAME_MAX_TRAD + 1)	/* and size */
+
 #define	TTYNAME_MAX	128	/* max # of characters in a tty name */
 
 #endif	/* if defined(__EXTENSIONS__) || (!defined(_STRICT_STDC) ... */

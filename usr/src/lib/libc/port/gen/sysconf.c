@@ -20,6 +20,8 @@
  */
 
 /*
+ * Copyright (c) 2013 Gary Mills
+ *
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -372,7 +374,7 @@ sysconf(int name)
 			return ((long)NSS_BUFLEN_PASSWD);
 
 		case _SC_LOGIN_NAME_MAX:
-			return ((long)(LOGNAME_MAX + 1));
+			return ((long)(LOGIN_NAME_MAX));
 
 		case _SC_THREAD_KEYS_MAX:
 			return (-1L);

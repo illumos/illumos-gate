@@ -19,6 +19,8 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright (c) 2013 Gary Mills
+ *
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
@@ -50,8 +52,8 @@ extern void *Malloc(size_t);
 extern void *Zalloc(size_t);
 extern int Setrlimit();
 extern void Priocntl(char *);
-extern void getprojname(projid_t, char *, int, int);
-extern void getzonename(projid_t, char *, int);
+extern void getprojname(projid_t, char *, size_t, int, int, size_t);
+extern void getzonename(projid_t, char *, size_t, int, size_t);
 extern void stripfname(char *);
 
 #ifdef	__cplusplus

@@ -21,50 +21,37 @@
 #
 # Copyright (c) 2013 Gary Mills
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
-PROG=		error
+LIBRARY = getloginx.a
+VERS = .1
 
-include 	../../../Makefile.cmd
+OBJECTS = getloginx.o
 
-OBJS=		errormain.o errorinput.o errorpi.o errorsubr.o \
-		errorfilter.o errortouch.o
+# include library definitions
+include ../../Makefile.lib
 
-SRCS=		$(OBJS:%.o=../common/%.c)
+SRCDIR = ../common
 
-INCLIST=	-I../common
-DEFLIST=	-DELF
-CPPFLAGS=	$(INCLIST) $(DEFLIST) $(CPPFLAGS.master)
-CFLAGS +=	$(CCVERBOSE)
-C99MODE=	$(C99_ENABLE)
-
-CERRWARN +=	-_gcc=-Wno-uninitialized
-CERRWARN +=	-_gcc=-Wno-parentheses
-
-CLEANFILES +=	$(LINTOUT)
-
-%.o:		../common/%.c
-		$(COMPILE.c) $<
+LIBS = $(DYNLIB)
+LDLIBS += -lc
+CFLAGS += $(CCVERBOSE)
+CFLAGS64 += $(CCVERBOSE)
+CPPFLAGS += -I../common -I../../common/inc -D_REENTRANT
+DYNFLAGS += $(ZINTERPOSE)
 
 .KEEP_STATE:
 
-all:		$(PROG)
+all: $(LIBS)
 
-$(PROG):	$(OBJS)
-		$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
-		$(POST_PROCESS)
+lint:
+	$(LINT.c) $(SRCS) $(LDLIBS)
 
-install:	all $(ROOTPROG) $(ROOTCCSBINLINK)
+# include library targets
+include ../../Makefile.targ
 
-clean:
-		$(RM) $(OBJS) $(CLEANFILES)
-
-lint:		$(LINTOUT)
-
-$(LINTOUT):	$(SRCS)
-		perl ../../tools/lint_hdr.pl $(PROG)	> $(LINTOUT)
-		$(LINT.c) $(SRCS) $(LDLIBS)		2>&1 | tee -a $(LINTOUT)
-
-include		../../../Makefile.targ
+pics/%.o: ../common/%.c
+	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)

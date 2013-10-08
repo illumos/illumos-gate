@@ -20,6 +20,8 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright (c) 2013 Gary Mills
+ *
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -39,8 +41,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * last
  */
@@ -58,13 +58,16 @@
 #include <ctype.h>
 
 /*
- * NMAX, LMAX and HMAX are set to these values for now. They
- * should be much higher because of the max allowed limit in
- * utmpx.h
+ * Use the full lengths from utmpx for NMAX, LMAX and HMAX .
  */
-#define	NMAX	8
-#define	LMAX	12
+#define	NMAX	(sizeof (((struct utmpx *)0)->ut_user))
+#define	LMAX	(sizeof (((struct utmpx *)0)->ut_line))
 #define	HMAX	(sizeof (((struct utmpx *)0)->ut_host))
+
+/* Print minimum field widths. */
+#define	LOGIN_WIDTH	8
+#define	LINE_WIDTH	12
+
 #define	SECDAY	(24*60*60)
 #define	CHUNK_SIZE 256
 
@@ -254,9 +257,9 @@ next_word:
 			if (want(bp, &ut_host, &ut_user)) {
 				for (i = 0; i <= lines; i++) {
 				if (i == lines)
-				    reallocate_buffer();
+					reallocate_buffer();
 				if (ttnames[i] == NULL) {
-				    memory_alloc(i);
+					memory_alloc(i);
 					/*
 					 * LMAX+HMAX+NMAX+3 bytes have been
 					 * allocated for ttnames[i].
@@ -266,13 +269,13 @@ next_word:
 					 * truncate it to fit ttnames[i].
 					 */
 					(void) strlcpy(ttnames[i], bp->ut_line,
-						LMAX+1);
+					    LMAX+1);
 					(void) strlcpy(ttnames[i]+LMAX+1,
-						ut_host, HMAX+1);
+					    ut_host, HMAX+1);
 					(void) strlcpy(ttnames[i]+LMAX+HMAX+2,
-						ut_user, NMAX+1);
+					    ut_user, NMAX+1);
 						record_time(&otime, &print,
-							i, bp);
+						    i, bp);
 						break;
 					} else if (linehostnameq(ttnames[i],
 					    bp->ut_line, ut_host, ut_user)) {
@@ -290,14 +293,14 @@ next_word:
 
 				ct = ctime(&bp->ut_xtime);
 				(void) printf(gettext("%-*.*s  %-*.*s "),
-				    NMAX, NMAX, bp->ut_name,
-				    LMAX, LMAX, bp->ut_line);
+				    LOGIN_WIDTH, NMAX, bp->ut_name,
+				    LINE_WIDTH, LMAX, bp->ut_line);
 				hostf_len = strlen(bp->ut_host);
 				(void) snprintf(hostf, sizeof (hostf),
 				    "%-*.*s", hostf_len, hostf_len,
 				    bp->ut_host);
 				fpos = snprintf(timef, sizeof (timef),
-					"%10.10s %5.5s ",
+				    "%10.10s %5.5s ",
 				    ct, 11 + ct);
 				if (!lineq(bp->ut_line, "system boot") &&
 				    !lineq(bp->ut_line, "system down")) {
@@ -307,7 +310,7 @@ next_word:
 	if (fpos < sizeof (timef)) {
 		/* timef still has room */
 		(void) snprintf(timef + fpos, sizeof (timef) - fpos,
-			gettext("  still logged in"));
+		    gettext("  still logged in"));
 	}
 
 					} else {
@@ -331,7 +334,7 @@ next_word:
 	if (fpos < sizeof (timef)) {
 		/* timef still has room */
 		chrcnt = snprintf(timef + fpos, sizeof (timef) - fpos,
-			gettext("- %s"), crmsg);
+		    gettext("- %s"), crmsg);
 		fpos += chrcnt;
 	}
 
@@ -340,7 +343,7 @@ next_word:
 	if (fpos < sizeof (timef)) {
 		/* timef still has room */
 		chrcnt = snprintf(timef + fpos, sizeof (timef) - fpos,
-			gettext("- %5.5s"), ctime(&otime) + 11);
+		    gettext("- %5.5s"), ctime(&otime) + 11);
 		fpos += chrcnt;
 	}
 
@@ -351,7 +354,7 @@ next_word:
 	if (fpos < sizeof (timef)) {
 		/* timef still has room */
 		(void) snprintf(timef + fpos, sizeof (timef) - fpos,
-			gettext("  (%5.5s)"), asctime(gmtime(&delta)) + 11);
+		    gettext("  (%5.5s)"), asctime(gmtime(&delta)) + 11);
 	}
 
 					} else {
@@ -359,7 +362,7 @@ next_word:
 	if (fpos < sizeof (timef)) {
 		/* timef still has room */
 		(void) snprintf(timef + fpos, sizeof (timef) - fpos,
-			gettext(" (%ld+%5.5s)"), delta / SECDAY,
+		    gettext(" (%ld+%5.5s)"), delta / SECDAY,
 		    asctime(gmtime(&delta)) + 11);
 	}
 
@@ -418,8 +421,8 @@ reallocate_buffer()
 		(void) fprintf(stderr, gettext("Out of memory \n"));
 		exit(2);
 	} else {
-	    ttnames = tmpttnames;
-	    logouts = tmplogouts;
+		ttnames = tmpttnames;
+		logouts = tmplogouts;
 	}
 	for (j = lines-CHUNK_SIZE; j < lines; j++) {
 		ttnames[j] = NULL;

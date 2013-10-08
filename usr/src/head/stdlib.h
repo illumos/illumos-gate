@@ -20,6 +20,8 @@
  */
 
 /*
+ * Copyright (c) 2013 Gary Mills
+ *
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -225,7 +227,20 @@ extern char *qfcvt(long double, int, int *, int *);
 extern char *qgcvt(long double, int, char *);
 extern char *getcwd(char *, size_t);
 extern const char *getexecname(void);
+
+#ifndef	__GETLOGIN_DEFINED	/* Avoid duplicate in unistd.h */
+#define	__GETLOGIN_DEFINED
+#ifndef	__USE_LEGACY_LOGNAME__
+#ifdef	__PRAGMA_REDEFINE_EXTNAME
+#pragma	redefine_extname getlogin getloginx
+#else	/* __PRAGMA_REDEFINE_EXTNAME */
+extern char *getloginx(void);
+#define	getlogin	getloginx
+#endif	/* __PRAGMA_REDEFINE_EXTNAME */
+#endif	/* __USE_LEGACY_LOGNAME__ */
 extern char *getlogin(void);
+#endif	/* __GETLOGIN_DEFINED */
+
 extern int getopt(int, char *const *, const char *);
 extern char *optarg;
 extern int optind, opterr, optopt;
@@ -333,7 +348,20 @@ extern char *qfcvt();
 extern char *qgcvt();
 extern char *getcwd();
 extern char *getexecname();
+
+#ifndef	__GETLOGIN_DEFINED	/* Avoid duplicate in unistd.h */
+#define	__GETLOGIN_DEFINED
+#ifndef	__USE_LEGACY_LOGNAME__
+#ifdef	__PRAGMA_REDEFINE_EXTNAME
+#pragma	redefine_extname getlogin getloginx
+#else	/* __PRAGMA_REDEFINE_EXTNAME */
+extern char *getloginx();
+#define	getlogin	getloginx
+#endif	/* __PRAGMA_REDEFINE_EXTNAME */
+#endif	/* __USE_LEGACY_LOGNAME__ */
 extern char *getlogin();
+#endif	/* __GETLOGIN_DEFINED */
+
 extern int getopt();
 extern char *optarg;
 extern int optind, opterr, optopt;
