@@ -66,6 +66,9 @@
 #define	getlogint_r	getlogin_r
 #define	__posix_getlogint_r	__posix_getlogin_r
 #endif	/* __PRAGMA_REDEFINE_EXTNAME */
+extern char *getlogint(void);
+extern char *getlogint_r(char *, int);
+extern int __posix_getlogint_r(char *, int);
 
 /*
  * Use the full length of a login name.
