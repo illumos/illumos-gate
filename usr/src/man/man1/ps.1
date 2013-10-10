@@ -2,6 +2,7 @@
 .\" Copyright 1989 AT&T
 .\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved
 .\" Copyright (c) 2012, Joyent, Inc. All Rights Reserved
+.\" Copyright (c) 2013 Gary Mills
 .\" Portions Copyright (c) 1992, X/Open Company Limited All Rights Reserved
 .\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at  http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text
@@ -11,13 +12,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PS 1 "Aug 16, 2009"
+.TH PS 1 "Apr 16, 2013"
 .SH NAME
 ps \- report process status
 .SH SYNOPSIS
 .LP
 .nf
-\fBps\fR [\fB-aAcdefjHlLPyZ\fR] [\fB-g\fR \fIgrplist\fR] [\fB-h\fR \fIlgrplist\fR]
+\fBps\fR [\fB-aAcdefjHlLPWyZ\fR] [\fB-g\fR \fIgrplist\fR] [\fB-h\fR \fIlgrplist\fR]
      [\fB-n\fR \fInamelist\fR] [\fB-o\fR \fIformat\fR]... [\fB-p\fR \fIproclist\fR]
      [\fB-s\fR \fIsidlist\fR] [\fB-t\fR \fIterm\fR] [\fB-u\fR \fIuidlist\fR] [\fB-U\fR \fIuidlist\fR]
      [\fB-G\fR \fIgidlist\fR] [\fB-z\fR \fIzonelist\fR]
@@ -261,6 +262,18 @@ form of a blank- or comma-separated list.
 .sp
 .ne 2
 .na
+\fB\fB-W\fR\fR
+.ad
+.RS 15n
+Truncate long names even when \fBps\fR would normally print them
+in full.
+A trailing asterisk marks a long name that has been truncated
+to fit the column.
+.RE
+
+.sp
+.ne 2
+.na
 \fB\fB-y\fR\fR
 .ad
 .RS 15n
@@ -405,6 +418,8 @@ Zombie state: process terminated and parent not waiting.
 .RS 14n
 The effective user \fBID\fR number of the process (the login name is printed
 under the \fB-f\fR option).
+A trailing asterisk marks a long name that has been truncated
+to fit the column.
 .RE
 
 .sp
@@ -612,8 +627,9 @@ text. The fields specified are written in the order specified on the command
 line, and should be arranged in columns in the output. The field widths are
 selected by the system to be at least as wide as the header text (default or
 overridden value). If the header text is null, such as \fB-o\fR \fIuser=,\fR
-the field width is at least as wide as the default header text. If all header
-text fields are null, no header line is written.
+the field width is at least as wide as the default header text.
+Long names are not truncated in this mode.
+If all header text fields are null, no header line is written.
 .sp
 .LP
 The following names are recognized in the POSIX locale:

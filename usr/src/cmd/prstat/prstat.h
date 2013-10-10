@@ -20,6 +20,8 @@
  */
 
 /*
+ * Copyright (c) 2013 Gary Mills
+ *
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
@@ -73,6 +75,7 @@ extern "C" {
 #define	OPT_UDATE	0x20000		/* print unix timestamp */
 #define	OPT_DDATE	0x40000		/* print timestamp in date(1) format */
 #define	OPT_NORESOLVE	0x80000		/* no nsswitch lookups */
+#define	OPT_TRUNC	0x100000	/* truncate long names */
 
 /*
  * Flags to keep track of process or lwp status

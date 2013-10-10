@@ -19,6 +19,8 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright (c) 2013 Gary Mills
+ *
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
@@ -70,7 +72,7 @@ typedef struct plwp {		/* linked list of pointers to lwps */
 	struct plwp	*l_next;
 } plwp_t;
 
-extern void pwd_getname(uid_t, char *, int, int);
+extern void pwd_getname(uid_t, char *, size_t, int, int, size_t);
 extern void add_uid(uidtbl_t *, char *);
 extern int has_uid(uidtbl_t *, uid_t);
 extern void add_element(table_t *, long);

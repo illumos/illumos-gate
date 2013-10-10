@@ -19,6 +19,8 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright (c) 2013 Gary Mills
+ *
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -45,6 +47,7 @@
 #define	UNIQUE		2	/* is unique */
 #define	TOOBIG		3	/* number too big */
 #define	INVALID		4
+#define	LONGNAME	5	/* string too long */
 
 /*
  * Note: constraints checking for warning (release 2.6),

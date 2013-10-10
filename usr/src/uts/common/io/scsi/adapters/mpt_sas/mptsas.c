@@ -2619,13 +2619,10 @@ mptsas_alloc_post_queue(mptsas_t *mpt)
 static void
 mptsas_alloc_reply_args(mptsas_t *mpt)
 {
-	if (mpt->m_replyh_args != NULL) {
-		kmem_free(mpt->m_replyh_args, sizeof (m_replyh_arg_t)
-		    * mpt->m_max_replies);
-		mpt->m_replyh_args = NULL;
+	if (mpt->m_replyh_args == NULL) {
+		mpt->m_replyh_args = kmem_zalloc(sizeof (m_replyh_arg_t) *
+		    mpt->m_max_replies, KM_SLEEP);
 	}
-	mpt->m_replyh_args = kmem_zalloc(sizeof (m_replyh_arg_t) *
-	    mpt->m_max_replies, KM_SLEEP);
 }
 
 static int
@@ -4827,6 +4824,12 @@ mptsas_handle_address_reply(mptsas_t *mpt,
 			 */
 			NDBG20(("send mptsas_handle_event_sync success"));
 		}
+
+		if (mpt->m_in_reset) {
+			NDBG20(("dropping event received during reset"));
+			return;
+		}
+
 		if ((ddi_taskq_dispatch(mpt->m_event_taskq, mptsas_handle_event,
 		    (void *)args, DDI_NOSLEEP)) != DDI_SUCCESS) {
 			mptsas_log(mpt, CE_WARN, "No memory available"
@@ -5764,8 +5767,14 @@ find_parent:
 handle_topo_change:
 
 		mutex_enter(&mpt->m_mutex);
-
-		mptsas_handle_topo_change(topo_node, parent);
+		/*
+		 * If HBA is being reset, don't perform operations depending
+		 * on the IOC. We must free the topo list, however.
+		 */
+		if (!mpt->m_in_reset)
+			mptsas_handle_topo_change(topo_node, parent);
+		else
+			NDBG20(("skipping topo change received during reset"));
 		save_node = topo_node;
 		topo_node = topo_node->next;
 		ASSERT(save_node);
@@ -6989,6 +6998,14 @@ mptsas_handle_event(void *args)
 	mpt = replyh_arg->mpt;
 
 	mutex_enter(&mpt->m_mutex);
+	/*
+	 * If HBA is being reset, drop incoming event.
+	 */
+	if (mpt->m_in_reset) {
+		NDBG20(("dropping event received prior to reset"));
+		mutex_exit(&mpt->m_mutex);
+		return;
+	}
 
 	eventreply = (pMpi2EventNotificationReply_t)
 	    (mpt->m_reply_frame + (rfm - mpt->m_reply_frame_dma_addr));
@@ -8703,6 +8720,14 @@ mptsas_flush_hba(mptsas_t *mpt)
 		mutex_enter(&mpt->m_tx_waitq_mutex);
 	}
 	mutex_exit(&mpt->m_tx_waitq_mutex);
+
+	/*
+	 * Drain the taskqs prior to reallocating resources.
+	 */
+	mutex_exit(&mpt->m_mutex);
+	ddi_taskq_wait(mpt->m_event_taskq);
+	ddi_taskq_wait(mpt->m_dr_taskq);
+	mutex_enter(&mpt->m_mutex);
 }
 
 /*

@@ -19,6 +19,8 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright (c) 2013 Gary Mills
+ *
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
@@ -106,7 +108,7 @@ void
 Usage()
 {
 	(void) fprintf(stderr, gettext(
-	    "Usage:\tprstat [-acHJLmrRtTvZ] [-u euidlist] [-U uidlist]\n"
+	    "Usage:\tprstat [-acHJLmrRtTvWZ] [-u euidlist] [-U uidlist]\n"
 	    "\t[-p pidlist] [-P cpulist] [-C psrsetlist] [-h lgrouplist]\n"
 	    "\t[-j projidlist] [-k taskidlist] [-z zoneidlist]\n"
 	    "\t[-s key | -S key] [-n nprocs[,nusers]] [-d d|u]\n"
@@ -278,26 +280,45 @@ Priocntl(char *class)
 }
 
 void
-getprojname(projid_t projid, char *str, int len, int noresolve)
+getprojname(projid_t projid, char *str, size_t len, int noresolve,
+    int trunc, size_t width)
 {
 	struct project proj;
+	size_t n;
 
 	if (noresolve || getprojbyid(projid, &proj, projbuf, PROJECT_BUFSZ) ==
-	    NULL)
+	    NULL) {
 		(void) snprintf(str, len, "%-6d", (int)projid);
-	else
-		(void) snprintf(str, len, "%-28s", proj.pj_name);
+	} else {
+		n = mbstowcs(NULL, proj.pj_name, 0);
+		if (n == (size_t)-1)
+			(void) snprintf(str, len, "%-28s", "ERROR");
+		else if (trunc && n > width)
+			(void) snprintf(str, len, "%.*s%c", width - 1,
+			    proj.pj_name, '*');
+		else
+			(void) snprintf(str, len, "%-28s", proj.pj_name);
+	}
 }
 
 void
-getzonename(zoneid_t zoneid, char *str, int len)
+getzonename(zoneid_t zoneid, char *str, size_t len, int trunc, size_t width)
 {
 	char zone_name[ZONENAME_MAX];
+	size_t n;
 
-	if (getzonenamebyid(zoneid, zone_name, sizeof (zone_name)) < 0)
+	if (getzonenamebyid(zoneid, zone_name, sizeof (zone_name)) < 0) {
 		(void) snprintf(str, len, "%-6d", (int)zoneid);
-	else
-		(void) snprintf(str, len, "%-28s", zone_name);
+	} else {
+		n = mbstowcs(NULL, zone_name, 0);
+		if (n == (size_t)-1)
+			(void) snprintf(str, len, "%-28s", "ERROR");
+		else if (trunc && n > width)
+			(void) snprintf(str, len, "%.*s%c", width - 1,
+			    zone_name, '*');
+		else
+			(void) snprintf(str, len, "%-28s", zone_name);
+	}
 }
 
 /*

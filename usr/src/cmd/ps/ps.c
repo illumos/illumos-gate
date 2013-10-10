@@ -20,6 +20,8 @@
  */
 
 /*
+ * Copyright (c) 2013 Gary Mills
+ *
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -76,7 +78,8 @@
  */
 #define	ARGSIZ ZONENAME_MAX
 
-#define	MAXUGNAME 10	/* max chars in a user/group name or printed u/g id */
+/* Max chars in a user/group name or printed u/g id */
+#define	MAXUGNAME (LOGNAME_MAX+2)
 
 /* Structure for storing user or group info */
 struct ugdata {
@@ -224,6 +227,7 @@ static	int	aflg;
 static	int	dflg;
 static	int	Lflg;
 static	int	Pflg;
+static	int	Wflg;
 static	int	yflg;
 static	int	pflg;
 static	int	fflg;
@@ -424,7 +428,7 @@ stdmain(int argc, char **argv)
 
 	fname[F_STIME].width = fname[F_STIME].minwidth = len;
 
-	while ((c = getopt(argc, argv, "jlfceAadLPyZHh:t:p:g:u:U:G:n:s:o:z:"))
+	while ((c = getopt(argc, argv, "jlfceAadLPWyZHh:t:p:g:u:U:G:n:s:o:z:"))
 	    != EOF)
 		switch (c) {
 		case 'H':		/* Show home lgroups */
@@ -517,6 +521,9 @@ stdmain(int argc, char **argv)
 			break;
 		case 'P':	/* show bound processor */
 			Pflg++;
+			break;
+		case 'W':	/* truncate long names */
+			Wflg++;
 			break;
 		case 'y':	/* omit F & ADDR, report RSS & SZ in Kby */
 			yflg++;
@@ -1057,7 +1064,7 @@ usage(void)		/* print usage message and quit */
 	int pos = 80, i = 0;
 
 	static char usage1[] =
-	    "ps [ -aAdefHlcjLPyZ ] [ -o format ] [ -t termlist ]";
+	    "ps [ -aAdefHlcjLPWyZ ] [ -o format ] [ -t termlist ]";
 	static char usage2[] =
 	    "\t[ -u userlist ] [ -U userlist ] [ -G grouplist ]";
 	static char usage3[] =
@@ -1395,19 +1402,50 @@ prcom(psinfo_t *psinfo, char *ttyp)
 	if (Zflg) {						/* ZONE */
 		if (getzonenamebyid(psinfo->pr_zoneid, zonename,
 		    sizeof (zonename)) < 0) {
-			(void) printf(" %7.7d ", ((int)psinfo->pr_zoneid));
+			if (snprintf(NULL, 0, "%d",
+			    ((int)psinfo->pr_zoneid)) > 7)
+				(void) printf(" %6.6d%c ",
+				    ((int)psinfo->pr_zoneid), '*');
+			else
+				(void) printf(" %7.7d ",
+				    ((int)psinfo->pr_zoneid));
 		} else {
-			(void) printf("%8.8s ", zonename);
+			size_t nw;
+
+			nw = mbstowcs(NULL, zonename, 0);
+			if (nw == (size_t)-1)
+				(void) printf("%8.8s ", "ERROR");
+			else if (nw > 8)
+				(void) wprintf(L"%7.7s%c ", zonename, '*');
+			else
+				(void) wprintf(L"%8.8s ", zonename);
 		}
 	}
 
 	if (fflg) {						/* UID */
-		if ((pwd = getpwuid(psinfo->pr_euid)) != NULL)
-			(void) printf("%8.8s ", pwd->pw_name);
-		else
-			(void) printf(" %7.7u ", psinfo->pr_euid);
+		if ((pwd = getpwuid(psinfo->pr_euid)) != NULL) {
+			size_t nw;
+
+			nw = mbstowcs(NULL, pwd->pw_name, 0);
+			if (nw == (size_t)-1)
+				(void) printf("%8.8s ", "ERROR");
+			else if (nw > 8)
+				(void) wprintf(L"%7.7s%c ", pwd->pw_name, '*');
+			else
+				(void) wprintf(L"%8.8s ", pwd->pw_name);
+		} else {
+			if (snprintf(NULL, 0, "%u",
+			    (psinfo->pr_euid)) > 7)
+				(void) printf(" %6.6u%c ", psinfo->pr_euid,
+				    '*');
+			else
+				(void) printf(" %7.7u ", psinfo->pr_euid);
+		}
 	} else if (lflg) {
-		(void) printf("%6u ", psinfo->pr_euid);
+		if (snprintf(NULL, 0, "%u", (psinfo->pr_euid)) > 6)
+			(void) printf("%5.5u%c ", psinfo->pr_euid, '*');
+		else
+			(void) printf("%6u ", psinfo->pr_euid);
 	}
 	(void) printf("%*d", pidwidth, (int)psinfo->pr_pid); /* PID */
 	if (lflg || fflg)
@@ -1628,16 +1666,48 @@ print_field(psinfo_t *psinfo, struct field *f, const char *ttyp)
 
 	switch (f->fname) {
 	case F_RUSER:
-		if ((pwd = getpwuid(psinfo->pr_uid)) != NULL)
-			(void) printf("%*s", width, pwd->pw_name);
-		else
-			(void) printf("%*u", width, psinfo->pr_uid);
+		if ((pwd = getpwuid(psinfo->pr_uid)) != NULL) {
+			size_t nw;
+
+			nw = mbstowcs(NULL, pwd->pw_name, 0);
+			if (nw == (size_t)-1)
+				(void) printf("%*s ", width, "ERROR");
+			else if (Wflg && nw > width)
+				(void) wprintf(L"%.*s%c", width - 1,
+				    pwd->pw_name, '*');
+			else
+				(void) wprintf(L"%*s", width, pwd->pw_name);
+		} else {
+			if (Wflg && snprintf(NULL, 0, "%u",
+			    (psinfo->pr_uid)) > width)
+
+				(void) printf("%*u%c", width - 1,
+				    psinfo->pr_uid, '*');
+			else
+				(void) printf("%*u", width, psinfo->pr_uid);
+		}
 		break;
 	case F_USER:
-		if ((pwd = getpwuid(psinfo->pr_euid)) != NULL)
-			(void) printf("%*s", width, pwd->pw_name);
-		else
-			(void) printf("%*u", width, psinfo->pr_euid);
+		if ((pwd = getpwuid(psinfo->pr_euid)) != NULL) {
+			size_t nw;
+
+			nw = mbstowcs(NULL, pwd->pw_name, 0);
+			if (nw == (size_t)-1)
+				(void) printf("%*s ", width, "ERROR");
+			else if (Wflg && nw > width)
+				(void) wprintf(L"%.*s%c", width - 1,
+				    pwd->pw_name, '*');
+			else
+				(void) wprintf(L"%*s", width, pwd->pw_name);
+		} else {
+			if (Wflg && snprintf(NULL, 0, "%u",
+			    (psinfo->pr_euid)) > width)
+
+				(void) printf("%*u%c", width - 1,
+				    psinfo->pr_euid, '*');
+			else
+				(void) printf("%*u", width, psinfo->pr_euid);
+		}
 		break;
 	case F_RGROUP:
 		if ((grp = getgrgid(psinfo->pr_gid)) != NULL)
@@ -1879,13 +1949,30 @@ print_field(psinfo_t *psinfo, struct field *f, const char *ttyp)
 			char proj_buf[PROJECT_BUFSZ];
 
 			if ((getprojbyid(psinfo->pr_projid, &cproj,
-			    (void *)&proj_buf, PROJECT_BUFSZ)) == NULL)
-				(void) printf("%*d", width,
-				    (int)psinfo->pr_projid);
-			else
-				(void) printf("%*s", width,
-				    (cproj.pj_name != NULL) ?
-				    cproj.pj_name : "---");
+			    (void *)&proj_buf, PROJECT_BUFSZ)) == NULL) {
+				if (Wflg && snprintf(NULL, 0, "%d",
+				    ((int)psinfo->pr_projid)) > width)
+					(void) printf("%.*d%c", width - 1,
+					    ((int)psinfo->pr_projid), '*');
+				else
+					(void) printf("%*d", width,
+					    (int)psinfo->pr_projid);
+			} else {
+				size_t nw;
+
+				if (cproj.pj_name != NULL)
+					nw = mbstowcs(NULL, cproj.pj_name, 0);
+				if (cproj.pj_name == NULL)
+					(void) printf("%*s ", width, "---");
+				else if (nw == (size_t)-1)
+					(void) printf("%*s ", width, "ERROR");
+				else if (Wflg && nw > width)
+					(void) wprintf(L"%.*s%c", width - 1,
+					    cproj.pj_name, '*');
+				else
+					(void) wprintf(L"%*s", width,
+					    cproj.pj_name);
+			}
 		}
 		break;
 	case F_PSET:
@@ -1903,10 +1990,24 @@ print_field(psinfo_t *psinfo, struct field *f, const char *ttyp)
 
 			if (getzonenamebyid(psinfo->pr_zoneid, zonename,
 			    sizeof (zonename)) < 0) {
-				(void) printf("%*d", width,
-				    ((int)psinfo->pr_zoneid));
+				if (Wflg && snprintf(NULL, 0, "%d",
+				    ((int)psinfo->pr_zoneid)) > width)
+					(void) printf("%.*d%c", width - 1,
+					    ((int)psinfo->pr_zoneid), '*');
+				else
+					(void) printf("%*d", width,
+					    (int)psinfo->pr_zoneid);
 			} else {
-				(void) printf("%*s", width, zonename);
+				size_t nw;
+
+				nw = mbstowcs(NULL, zonename, 0);
+				if (nw == (size_t)-1)
+					(void) printf("%*s ", width, "ERROR");
+				else if (Wflg && nw > width)
+					(void) wprintf(L"%.*s%c", width - 1,
+					    zonename, '*');
+				else
+					(void) wprintf(L"%*s", width, zonename);
 			}
 		}
 		break;
@@ -2181,9 +2282,23 @@ przom(psinfo_t *psinfo)
 	if (Zflg) {
 		if (getzonenamebyid(psinfo->pr_zoneid, zonename,
 		    sizeof (zonename)) < 0) {
-			(void) printf(" %7.7d ", ((int)psinfo->pr_zoneid));
+			if (snprintf(NULL, 0, "%d",
+			    ((int)psinfo->pr_zoneid)) > 7)
+				(void) printf(" %6.6d%c ",
+				    ((int)psinfo->pr_zoneid), '*');
+			else
+				(void) printf(" %7.7d ",
+				    ((int)psinfo->pr_zoneid));
 		} else {
-			(void) printf("%8.8s ", zonename);
+			size_t nw;
+
+			nw = mbstowcs(NULL, zonename, 0);
+			if (nw == (size_t)-1)
+				(void) printf("%8.8s ", "ERROR");
+			else if (nw > 8)
+				(void) wprintf(L"%7.7s%c ", zonename, '*');
+			else
+				(void) wprintf(L"%8.8s ", zonename);
 		}
 	}
 	if (Hflg) {
@@ -2191,12 +2306,30 @@ przom(psinfo_t *psinfo)
 		(void) printf(" %6d", (int)psinfo->pr_lwp.pr_lgrp); /* LGRP */
 	}
 	if (fflg) {
-		if ((pwd = getpwuid(psinfo->pr_euid)) != NULL)
-			(void) printf("%8.8s ", pwd->pw_name);
+		if ((pwd = getpwuid(psinfo->pr_euid)) != NULL) {
+			size_t nw;
+
+			nw = mbstowcs(NULL, pwd->pw_name, 0);
+			if (nw == (size_t)-1)
+				(void) printf("%8.8s ", "ERROR");
+			else if (nw > 8)
+				(void) wprintf(L"%7.7s%c ", pwd->pw_name, '*');
+			else
+				(void) wprintf(L"%8.8s ", pwd->pw_name);
+		} else {
+			if (snprintf(NULL, 0, "%u",
+			    (psinfo->pr_euid)) > 7)
+				(void) printf(" %6.6u%c ", psinfo->pr_euid,
+				    '*');
+			else
+				(void) printf(" %7.7u ", psinfo->pr_euid);
+		}
+	} else if (lflg) {
+		if (snprintf(NULL, 0, "%u", (psinfo->pr_euid)) > 6)
+			(void) printf("%5.5u%c ", psinfo->pr_euid, '*');
 		else
-			(void) printf(" %7.7u ", psinfo->pr_euid);
-	} else if (lflg)
-		(void) printf("%6u ", psinfo->pr_euid);
+			(void) printf("%6u ", psinfo->pr_euid);
+	}
 
 	(void) printf("%*d", pidwidth, (int)psinfo->pr_pid);	/* PID */
 	if (lflg || fflg)

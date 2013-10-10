@@ -457,6 +457,14 @@ spa_deadman(void *arg)
 {
 	spa_t *spa = arg;
 
+	/*
+	 * Disable the deadman timer if the pool is suspended.
+	 */
+	if (spa_suspended(spa)) {
+		VERIFY(cyclic_reprogram(spa->spa_deadman_cycid, CY_INFINITY));
+		return;
+	}
+
 	zfs_dbgmsg("slow spa_sync: started %llu seconds ago, calls %llu",
 	    (gethrtime() - spa->spa_sync_starttime) / NANOSEC,
 	    ++spa->spa_deadman_calls);
@@ -1025,7 +1033,7 @@ spa_vdev_config_exit(spa_t *spa, vdev_t *vd, uint64_t txg, int error, char *tag)
 		txg_wait_synced(spa->spa_dsl_pool, txg);
 
 	if (vd != NULL) {
-		ASSERT(!vd->vdev_detached || vd->vdev_dtl_smo.smo_object == 0);
+		ASSERT(!vd->vdev_detached || vd->vdev_dtl_sm == NULL);
 		spa_config_enter(spa, SCL_ALL, spa, RW_WRITER);
 		vdev_free(vd);
 		spa_config_exit(spa, SCL_ALL, spa);
@@ -1135,15 +1143,17 @@ spa_vdev_state_exit(spa_t *spa, vdev_t *vd, int error)
 void
 spa_activate_mos_feature(spa_t *spa, const char *feature)
 {
-	(void) nvlist_add_boolean(spa->spa_label_features, feature);
-	vdev_config_dirty(spa->spa_root_vdev);
+	if (!nvlist_exists(spa->spa_label_features, feature)) {
+		fnvlist_add_boolean(spa->spa_label_features, feature);
+		vdev_config_dirty(spa->spa_root_vdev);
+	}
 }
 
 void
 spa_deactivate_mos_feature(spa_t *spa, const char *feature)
 {
-	(void) nvlist_remove_all(spa->spa_label_features, feature);
-	vdev_config_dirty(spa->spa_root_vdev);
+	if (nvlist_remove_all(spa->spa_label_features, feature) == 0)
+		vdev_config_dirty(spa->spa_root_vdev);
 }
 
 /*
@@ -1702,7 +1712,7 @@ spa_init(int mode)
 
 	refcount_init();
 	unique_init();
-	space_map_init();
+	range_tree_init();
 	zio_init();
 	dmu_init();
 	zil_init();
@@ -1725,7 +1735,7 @@ spa_fini(void)
 	zil_fini();
 	dmu_fini();
 	zio_fini();
-	space_map_fini();
+	range_tree_fini();
 	unique_fini();
 	refcount_fini();
 

@@ -21,9 +21,12 @@
 #
 # Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2013 RackTop Systems.
+# Copyright (c) 2013 Gary Mills
 #
 # cmd/oamuser/user/Makefile
 #
+
+DEFAULTFILES= useradd.dfl
 
 include ../../Makefile.cmd
 
@@ -101,7 +104,8 @@ $(USERADD):	$(ADD_OBJ)
 $(USERMOD):	$(MOD_OBJ)
 $(USERDEL):	$(DEL_OBJ)
 
-install:	all .WAIT $(ROOTSKEL) $(INSSBINPROG) $(INSSKELFILE)
+install:	all $(ROOTETCDEFAULTFILES) .WAIT \
+			$(ROOTSKEL) $(INSSBINPROG) $(INSSKELFILE)
 		$(RM) $(ROOTUSRSBIN)/$(ROLEADD)
 		$(LN) $(ROOTUSRSBIN)/$(USERADD) $(ROOTUSRSBIN)/$(ROLEADD)
 		$(RM) $(ROOTUSRSBIN)/$(ROLEDEL)

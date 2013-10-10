@@ -20,6 +20,8 @@
  */
 
 /*
+ * Copyright (c) 2013 Gary Mills
+ *
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -350,7 +352,20 @@ extern int gethostname(char *, size_t);
 #elif  !defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__)
 extern int gethostname(char *, int);
 #endif
+
+#ifndef	__GETLOGIN_DEFINED	/* Avoid duplicate in stdlib.h */
+#define	__GETLOGIN_DEFINED
+#ifndef	__USE_LEGACY_LOGNAME__
+#ifdef	__PRAGMA_REDEFINE_EXTNAME
+#pragma	redefine_extname getlogin getloginx
+#else	/* __PRAGMA_REDEFINE_EXTNAME */
+extern char *getloginx(void);
+#define	getlogin	getloginx
+#endif	/* __PRAGMA_REDEFINE_EXTNAME */
+#endif	/* __USE_LEGACY_LOGNAME__ */
 extern char *getlogin(void);
+#endif	/* __GETLOGIN_DEFINED */
+
 #if defined(_XPG4) || defined(__EXTENSIONS__)
 extern int  getopt(int, char *const *, const char *);
 extern char *optarg;
@@ -681,7 +696,20 @@ extern long gethostid();
 #if !defined(__XOPEN_OR_POSIX) || defined(_XPG4_2) || defined(__EXTENSIONS__)
 extern int gethostname();
 #endif
+
+#ifndef __GETLOGIN_DEFINED	/* Avoid duplicate in stdlib.h */
+#define	__GETLOGIN_DEFINED
+#ifndef __USE_LEGACY_LOGNAME__
+#ifdef __PRAGMA_REDEFINE_EXTNAME
+#pragma	redefine_extname getlogin	getloginx
+#else	/* __PRAGMA_REDEFINE_EXTNAME */
+extern char *getloginx();
+#define	getlogin	getloginx
+#endif	/* __PRAGMA_REDEFINE_EXTNAME */
+#endif	/* __USE_LEGACY_LOGNAME__ */
 extern char *getlogin();
+#endif	/* __GETLOGIN_DEFINED */
+
 #if defined(_XPG4) || defined(__EXTENSIONS__)
 extern int  getopt();
 extern char *optarg;
@@ -939,20 +967,24 @@ extern int lockf64();
 
 #if	(_POSIX_C_SOURCE - 0 >= 199506L) || defined(_POSIX_PTHREAD_SEMANTICS)
 
+#ifndef	__USE_LEGACY_LOGNAME__
+#ifdef	__PRAGMA_REDEFINE_EXTNAME
+#pragma	redefine_extname getlogin_r __posix_getloginx_r
+extern int getlogin_r(char *, int);
+#else	/* __PRAGMA_REDEFINE_EXTNAME */
+extern int __posix_getloginx_r(char *, int);
+#define	getlogin_r	__posix_getloginx_r
+#endif	/* __PRAGMA_REDEFINE_EXTNAME */
+#else	/* __USE_LEGACY_LOGNAME__ */
 #ifdef __PRAGMA_REDEFINE_EXTNAME
 #pragma redefine_extname getlogin_r __posix_getlogin_r
-#pragma redefine_extname ttyname_r __posix_ttyname_r
 extern int getlogin_r(char *, int);
-extern int ttyname_r(int, char *, size_t);
 #else  /* __PRAGMA_REDEFINE_EXTNAME */
-
 extern int __posix_getlogin_r(char *, int);
-extern int __posix_ttyname_r(int, char *, size_t);
 
 #ifdef __lint
 
 #define	getlogin_r	__posix_getlogin_r
-#define	ttyname_r	__posix_ttyname_r
 
 #else /* !__lint */
 
@@ -961,6 +993,23 @@ getlogin_r(char *__name, int __len)
 {
 	return (__posix_getlogin_r(__name, __len));
 }
+
+#endif /* !__lint */
+#endif /* __PRAGMA_REDEFINE_EXTNAME */
+#endif	/* __USE_LEGACY_LOGNAME__ */
+
+#ifdef __PRAGMA_REDEFINE_EXTNAME
+#pragma redefine_extname ttyname_r __posix_ttyname_r
+extern int ttyname_r(int, char *, size_t);
+#else  /* __PRAGMA_REDEFINE_EXTNAME */
+extern int __posix_ttyname_r(int, char *, size_t);
+
+#ifdef __lint
+
+#define	ttyname_r	__posix_ttyname_r
+
+#else /* !__lint */
+
 static int
 ttyname_r(int __fildes, char *__buf, size_t __size)
 {
@@ -972,7 +1021,16 @@ ttyname_r(int __fildes, char *__buf, size_t __size)
 
 #else  /* (_POSIX_C_SOURCE - 0 >= 199506L) || ... */
 
+#ifndef	__USE_LEGACY_LOGNAME__
+#ifdef	__PRAGMA_REDEFINE_EXTNAME
+#pragma	redefine_extname getlogin_r getloginx_r
+#else	/* __PRAGMA_REDEFINE_EXTNAME */
+extern char *getloginx_r(char *, int);
+#define	getlogin_r	getloginx_r
+#endif	/* __PRAGMA_REDEFINE_EXTNAME */
+#endif	/* __USE_LEGACY_LOGNAME__ */
 extern char *getlogin_r(char *, int);
+
 extern char *ttyname_r(int, char *, int);
 
 #endif /* (_POSIX_C_SOURCE - 0 >= 199506L) || ... */
@@ -981,20 +1039,24 @@ extern char *ttyname_r(int, char *, int);
 
 #if (_POSIX_C_SOURCE - 0 >= 199506L) || defined(_POSIX_PTHREAD_SEMANTICS)
 
+#ifndef	__USE_LEGACY_LOGNAME__
+#ifdef	__PRAGMA_REDEFINE_EXTNAME
+#pragma	redefine_extname getlogin_r __posix_getloginx_r
+extern int getlogin_r();
+#else	/* __PRAGMA_REDEFINE_EXTNAME */
+extern int __posix_getloginx_r();
+#define	getlogin_r	__posix_getloginx_r
+#endif	/* __PRAGMA_REDEFINE_EXTNAME */
+#else	/* __USE_LEGACY_LOGNAME__ */
 #ifdef __PRAGMA_REDEFINE_EXTNAME
 #pragma redefine_extname getlogin_r __posix_getlogin_r
-#pragma redefine_extname ttyname_r __posix_ttyname_r
 extern int getlogin_r();
-extern int ttyname_r();
 #else  /* __PRAGMA_REDEFINE_EXTNAME */
-
 extern int __posix_getlogin_r();
-extern int __posix_ttyname_r();
 
 #ifdef	__lint
 
 #define	getlogin_r	__posix_getlogin_r
-#define	ttyname_r	__posix_ttyname_r
 
 #else /* !__lint */
 
@@ -1005,7 +1067,23 @@ getlogin_r(__name, __len)
 {
 	return (__posix_getlogin_r(__name, __len));
 }
-static int
+#endif /* !__lint */
+#endif /* __PRAGMA_REDEFINE_EXTNAME */
+#endif	/* __USE_LEGACY_LOGNAME__ */
+
+#ifdef __PRAGMA_REDEFINE_EXTNAME
+#pragma redefine_extname ttyname_r __posix_ttyname_r
+extern int ttyname_r();
+#else  /* __PRAGMA_REDEFINE_EXTNAME */
+
+extern int __posix_ttyname_r();
+
+#ifdef	__lint
+
+#define	ttyname_r	__posix_ttyname_r
+
+#else /* !__lint */
+
 ttyname_r(__fildes, __buf, __size)
 	int __fildes;
 	char *__buf;
@@ -1018,7 +1096,16 @@ ttyname_r(__fildes, __buf, __size)
 
 #else  /* (_POSIX_C_SOURCE - 0 >= 199506L) || ... */
 
+#ifndef __USE_LEGACY_LOGNAME__
+#ifdef __PRAGMA_REDEFINE_EXTNAME
+#pragma	redefine_extname getlogin_r	getloginx_r
+#else	/* __PRAGMA_REDEFINE_EXTNAME */
+extern char *getloginx_r();
+#define	getlogin_r	getloginx_r
+#endif	/* __PRAGMA_REDEFINE_EXTNAME */
+#endif	/* __USE_LEGACY_LOGNAME__ */
 extern char *getlogin_r();
+
 extern char *ttyname_r();
 
 #endif /* (_POSIX_C_SOURCE - 0 >= 199506L) || ... */

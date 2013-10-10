@@ -20,6 +20,8 @@
  */
 
 /*
+ * Copyright (c) 2013 Gary Mills
+ *
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -139,6 +141,7 @@
 #define	FALSE	0
 #define	FAILURE	-1
 
+#define	UT_USER_SZ	32	/* Size of a utmpx ut_user field */
 #define	UT_LINE_SZ	32	/* Size of a utmpx ut_line field */
 
 /*
@@ -1603,11 +1606,11 @@ getcmd(struct CMD_LINE *cmd, char *shcmd)
 		for (proceed = TRUE, ptr = shcmd, state = ID, lastc = '\0';
 		    proceed && c != EOF;
 		    lastc = c, c = fgetc(fp_inittab)) {
-		    /* If we're not in the FAILURE state and haven't	*/
-		    /* yet reached the shell command field, process	*/
-		    /* the line, otherwise just look for a real end	*/
-		    /* of line.						*/
-		    if (state != FAILURE && state != COMMAND) {
+			/* If we're not in the FAILURE state and haven't */
+			/* yet reached the shell command field, process	 */
+			/* the line, otherwise just look for a real end	 */
+			/* of line.					 */
+			if (state != FAILURE && state != COMMAND) {
 			/*
 			 * Squeeze out spaces and tabs.
 			 */
@@ -1643,9 +1646,9 @@ getcmd(struct CMD_LINE *cmd, char *shcmd)
 			 * to the next field.
 			 */
 			if (c == ':') {
-			    switch (state) {
+				switch (state) {
 
-			    case ID :
+				case ID :
 				/*
 				 * Check to see that there are only
 				 * 1 to 4 characters for the id.
@@ -1659,7 +1662,7 @@ getcmd(struct CMD_LINE *cmd, char *shcmd)
 				}
 				break;
 
-			    case LEVELS :
+				case LEVELS :
 				/*
 				 * Build a mask for all the levels for
 				 * which this command will be legal.
@@ -1680,7 +1683,7 @@ getcmd(struct CMD_LINE *cmd, char *shcmd)
 				}
 				break;
 
-			    case ACTION :
+				case ACTION :
 				/*
 				 * Null terminate the string in shcmd buffer and
 				 * then try to match against legal actions.  If
@@ -1691,27 +1694,30 @@ getcmd(struct CMD_LINE *cmd, char *shcmd)
 				if (ptr == shcmd) {
 					if (isdigit(cmd->c_id[0]) &&
 					    (cmd->c_id[1] == '\0' ||
-						isdigit(cmd->c_id[1])) &&
+					    isdigit(cmd->c_id[1])) &&
 					    (cmd->c_id[2] == '\0' ||
-						isdigit(cmd->c_id[2])) &&
+					    isdigit(cmd->c_id[2])) &&
 					    (cmd->c_id[3] == '\0' ||
-						isdigit(cmd->c_id[3])))
-						    cmd->c_action = M_RESPAWN;
+					    isdigit(cmd->c_id[3])))
+						cmd->c_action = M_RESPAWN;
 					else
-						    cmd->c_action = M_OFF;
+						cmd->c_action = M_OFF;
 				} else {
-				    for (cmd->c_action = 0, i = 0, *ptr = '\0';
-				    i < sizeof (actions)/sizeof (char *);
-				    i++) {
+					for (cmd->c_action = 0, i = 0,
+					    *ptr = '\0';
+					    i <
+					    sizeof (actions)/sizeof (char *);
+					    i++) {
 					if (strcmp(shcmd, actions[i]) == 0) {
-					    if ((cmd->c_levels & MASKSU) &&
-						!(act_masks[i] & su_acts))
-						    cmd->c_action = 0;
-					    else
-						cmd->c_action = act_masks[i];
-					    break;
+						if ((cmd->c_levels & MASKSU) &&
+						    !(act_masks[i] & su_acts))
+							cmd->c_action = 0;
+						else
+							cmd->c_action =
+							    act_masks[i];
+						break;
 					}
-				    }
+					}
 				}
 
 				/*
@@ -1726,38 +1732,38 @@ getcmd(struct CMD_LINE *cmd, char *shcmd)
 				}
 				ptr = shcmd + EXEC;
 				break;
-			    }
-			    continue;
+				}
+				continue;
 			}
-		    }
+		}
 
-		    /* If the character is a '\n', then this is the end of a */
-		    /* line.  If the '\n' wasn't preceded by a backslash, */
-		    /* it is also the end of an inittab command.  If it was */
-		    /* preceded by a backslash then the next line is a */
-		    /* continuation.  Note that the continuation '\n' falls */
-		    /* through and is treated like other characters and is */
-		    /* stored in the shell command line. */
-		    if (c == '\n' && lastc != '\\') {
-				proceed = FALSE;
-				*ptr = '\0';
-				break;
-		    }
+		/* If the character is a '\n', then this is the end of a */
+		/* line.  If the '\n' wasn't preceded by a backslash, */
+		/* it is also the end of an inittab command.  If it was */
+		/* preceded by a backslash then the next line is a */
+		/* continuation.  Note that the continuation '\n' falls */
+		/* through and is treated like other characters and is */
+		/* stored in the shell command line. */
+		if (c == '\n' && lastc != '\\') {
+			proceed = FALSE;
+			*ptr = '\0';
+			break;
+		}
 
-		    /* For all other characters just stuff them into the */
-		    /* command as long as there aren't too many of them. */
-		    /* Make sure there is room for a terminating '\0' also. */
-		    if (ptr >= shcmd + MAXCMDL - 1)
+		/* For all other characters just stuff them into the */
+		/* command as long as there aren't too many of them. */
+		/* Make sure there is room for a terminating '\0' also. */
+		if (ptr >= shcmd + MAXCMDL - 1)
 			state = FAILURE;
-		    else
+		else
 			*ptr++ = (char)c;
 
-		    /* If the character we just stored was a quoted	*/
-		    /* backslash, then change "c" to '\0', so that this	*/
-		    /* backslash will not cause a subsequent '\n' to appear */
-		    /* quoted.  In otherwords '\' '\' '\n' is the real end */
-		    /* of a command, while '\' '\n' is a continuation. */
-		    if (c == '\\' && lastc == '\\')
+		/* If the character we just stored was a quoted	*/
+		/* backslash, then change "c" to '\0', so that this	*/
+		/* backslash will not cause a subsequent '\n' to appear */
+		/* quoted.  In otherwords '\' '\' '\n' is the real end */
+		/* of a command, while '\' '\n' is a continuation. */
+		if (c == '\\' && lastc == '\\')
 			c = '\0';
 		}
 
@@ -2110,7 +2116,9 @@ boot_init()
 "Command\n\"%s\"\n failed to execute.  errno = %d (exec of shell failed)\n",
 					    cmd.c_command, errno);
 					exit(1);
-				} else while (waitproc(process) == FAILURE);
+				} else
+					while (waitproc(process) == FAILURE)
+						;
 				process->p_flags = 0;
 				st_write();
 			}
@@ -2808,8 +2816,7 @@ static char *
 prog_name(char *string)
 {
 	char	*ptr, *ptr2;
-	/* XXX - utmp - fix name length */
-	static char word[_POSIX_LOGIN_NAME_MAX];
+	static char word[UT_USER_SZ + 1];
 
 	/*
 	 * Search for the first word skipping leading spaces and tabs.
@@ -2844,8 +2851,7 @@ prog_name(char *string)
 	 * Copy out up to the size of the "ut_user" array into "word",
 	 * null terminate it and return a pointer to it.
 	 */
-	/* XXX - utmp - fix name length */
-	for (ptr2 = &word[0]; ptr2 < &word[_POSIX_LOGIN_NAME_MAX - 1] &&
+	for (ptr2 = &word[0]; ptr2 < &word[UT_USER_SZ] &&
 	    ptr < string; /* CSTYLED */)
 		*ptr2++ = *ptr++;
 
@@ -2897,22 +2903,22 @@ get_ioctl_syscon()
 		    IOCTLSYSCON);
 	} else {
 
-	    i = fscanf(fp,
+		i = fscanf(fp,
 	    "%x:%x:%x:%x:%x:%x:%x:%x:%x:%x:%x:%x:%x:%x:%x:%x:%x:%x:%x:%x:%x:%x",
-		&iflags, &oflags, &cflags, &lflags,
-		&cc[0], &cc[1], &cc[2], &cc[3], &cc[4], &cc[5], &cc[6],
-		&cc[7], &cc[8], &cc[9], &cc[10], &cc[11], &cc[12], &cc[13],
-		&cc[14], &cc[15], &cc[16], &cc[17]);
+		    &iflags, &oflags, &cflags, &lflags,
+		    &cc[0], &cc[1], &cc[2], &cc[3], &cc[4], &cc[5], &cc[6],
+		    &cc[7], &cc[8], &cc[9], &cc[10], &cc[11], &cc[12], &cc[13],
+		    &cc[14], &cc[15], &cc[16], &cc[17]);
 
-	    if (i == 22) {
-		stored_syscon_termios.c_iflag = iflags;
-		stored_syscon_termios.c_oflag = oflags;
-		stored_syscon_termios.c_cflag = cflags;
-		stored_syscon_termios.c_lflag = lflags;
-		for (i = 0; i < 18; i++)
-			stored_syscon_termios.c_cc[i] = (char)cc[i];
-		valid_format = 1;
-	    } else if (i == 13) {
+		if (i == 22) {
+			stored_syscon_termios.c_iflag = iflags;
+			stored_syscon_termios.c_oflag = oflags;
+			stored_syscon_termios.c_cflag = cflags;
+			stored_syscon_termios.c_lflag = lflags;
+			for (i = 0; i < 18; i++)
+				stored_syscon_termios.c_cc[i] = (char)cc[i];
+			valid_format = 1;
+		} else if (i == 13) {
 		rewind(fp);
 		i = fscanf(fp, "%x:%x:%x:%x:%x:%x:%x:%x:%x:%x:%x:%x:%x",
 		    &iflags, &oflags, &cflags, &lflags, &ldisc, &cc[0], &cc[1],
@@ -2929,12 +2935,12 @@ get_ioctl_syscon()
 		for (i = 0; i < 8; i++)
 			stored_syscon_termios.c_cc[i] = (char)cc[i];
 		valid_format = 1;
-	    }
-	    (void) fclose(fp);
+		}
+		(void) fclose(fp);
 
-	    /* If the file is badly formatted, use the default settings. */
-	    if (!valid_format)
-		stored_syscon_termios = dflt_termios;
+		/* If the file is badly formatted, use the default settings. */
+		if (!valid_format)
+			stored_syscon_termios = dflt_termios;
 	}
 
 	/* If the file had a bad format, rewrite it later. */
@@ -3807,7 +3813,8 @@ increase_proc_table_size()
 	 */
 	do
 		ptr = realloc(g_state, g_state_sz + delta);
-	while (ptr == NULL && errno == EAGAIN);
+	while (ptr == NULL && errno == EAGAIN)
+		;
 
 	if (ptr != NULL) {
 		/* ensure that the new part is initialized to zero */
@@ -3914,13 +3921,15 @@ st_init()
 	/* Get the size of the file. */
 	do
 		ret = fstat(st_fd, &stb);
-	while (ret == -1 && errno == EINTR);
+	while (ret == -1 && errno == EINTR)
+		;
 	if (ret == -1)
 		goto new_state;
 
 	do
 		g_state = malloc(stb.st_size);
-	while (g_state == NULL && errno == EAGAIN);
+	while (g_state == NULL && errno == EAGAIN)
+		;
 	if (g_state == NULL)
 		goto new_state;
 
@@ -3966,7 +3975,8 @@ new_state:
 	    ((init_num_proc - 1) * sizeof (struct PROC_TABLE));
 	do
 		g_state = calloc(1, g_state_sz);
-	while (g_state == NULL && errno == EAGAIN);
+	while (g_state == NULL && errno == EAGAIN)
+		;
 	if (g_state == NULL) {
 		/* Fatal error! */
 		exit(errno);
@@ -4074,7 +4084,8 @@ contract_make_template(uint_t info, uint_t critical, uint_t fatal,
 
 	do
 		fd = open64(CTFS_ROOT "/process/template", O_RDWR);
-	while (fd < 0 && errno == EINTR);
+	while (fd < 0 && errno == EINTR)
+		;
 	if (fd < 0) {
 		console(B_TRUE, "Couldn't create process template: %s.\n",
 		    strerror(errno));
@@ -4171,7 +4182,8 @@ contracts_init()
 	 */
 	do
 		fd = open64(CTFS_ROOT "/process/pbundle", O_RDONLY);
-	while (fd < 0 && errno == EINTR);
+	while (fd < 0 && errno == EINTR)
+		;
 	if (fd < 0) {
 		console(B_TRUE,
 		    "Couldn't open process pbundle: %s.  Core smf(5) services "
@@ -4204,7 +4216,8 @@ contract_getfile(ctid_t id, const char *name, int oflag)
 
 	do
 		fd = contract_open(id, "process", name, oflag);
-	while (fd < 0 && errno == EINTR);
+	while (fd < 0 && errno == EINTR)
+		;
 
 	if (fd < 0)
 		console(B_TRUE, "Couldn't open %s for contract %ld: %s.\n",
