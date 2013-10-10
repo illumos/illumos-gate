@@ -2753,7 +2753,6 @@ $endif
 	getvmusage;
 	__getwchar_xpg5;
 	__getwc_xpg5;
-	getxlogin;
 	gtty;
 	__idmap_flush_kcache;
 	__idmap_reg;
