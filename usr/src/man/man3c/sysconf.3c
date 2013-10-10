@@ -1,4 +1,5 @@
 '\" te
+.\" Copyright (c) 2013 Gary Mills
 .\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved.
 .\" Portions Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
 .\" Copyright 1989 AT&T
@@ -9,7 +10,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SYSCONF 3C "Mar 26, 2008"
+.TH SYSCONF 3C "Apr 16, 2013"
 .SH NAME
 sysconf \- get configurable system variables
 .SH SYNOPSIS
@@ -142,7 +143,7 @@ _SC_JOB_CONTROL         _POSIX_JOB_CONTROL         Job control
                                                    supported?
 _SC_LINE_MAX            LINE_MAX                   Max length of input
                                                    line
-_SC_LOGIN_NAME_MAX      LOGNAME_MAX + 1            Max length of login
+_SC_LOGIN_NAME_MAX      LOGIN_NAME_MAX             Max length of login
                                                    name
 _SC_LOGNAME_MAX         LOGNAME_MAX
 _SC_MAPPED_FILES        _POSIX_MAPPED_FILES        Supports Memory

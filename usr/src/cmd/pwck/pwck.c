@@ -19,6 +19,8 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright (c) 2013 Gary Mills
+ *
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -26,8 +28,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -41,6 +41,7 @@
 #include <locale.h>
 #include <errno.h>
 #include <unistd.h>
+#include <limits.h>
 
 #define	ERROR1	"Too many/few fields"
 #define	ERROR2	"Bad character(s) in logname"
@@ -149,9 +150,9 @@ main(int argc, char **argv)
 
 		for (i = 0; buf[i] != ':'; i++) {
 			if (!isalnum(buf[i]) &&
-				buf[i] != '_' &&
-				buf[i] != '-' &&
-				buf[i] != '.')
+			    buf[i] != '_' &&
+			    buf[i] != '-' &&
+			    buf[i] != '.')
 				badc++;
 			else if (islower(buf[i]))
 				lc++;
@@ -163,7 +164,7 @@ main(int argc, char **argv)
 
 		/* Check for valid number of characters in logname */
 
-		if (i <= 0 || i > 8)
+		if (i <= 0 || i > LOGNAME_MAX)
 			error(ERROR3);
 
 		/* Check that UID is numeric and <= MAXUID */

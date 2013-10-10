@@ -273,7 +273,7 @@ main(int argc, char *argv[])
 	argc -= optind;
 
 	if (argc < 1) {
-		if ((usrname = getxlogin()) == NULL) {
+		if ((usrname = getlogin()) == NULL) {
 			struct passwd *pass = getpwuid(uid);
 			if (pass != NULL)
 				usrname = pass->pw_name;

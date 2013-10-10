@@ -23,6 +23,7 @@
 # Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2012 OmniTI Computer Consulting, Inc.  All rights reserved.
+# Copyright (c) 2013 Gary Mills
 #
 
 <include system-library.man3.inc>
@@ -316,6 +317,7 @@ file path=lib/nss_files.so.1
 file path=lib/nss_nis.so.1
 file path=lib/nss_user.so.1
 file path=usr/lib/$(ARCH64)/0@0.so.1
+file path=usr/lib/$(ARCH64)/getloginx.so.1
 file path=usr/lib/$(ARCH64)/libadutils.so.1
 file path=usr/lib/$(ARCH64)/libast.so.1
 file path=usr/lib/$(ARCH64)/libbsdmalloc.so.1
@@ -384,6 +386,7 @@ file path=usr/lib/cfgadm/scsi.so.1
 file path=usr/lib/cfgadm/shp.so.1
 file path=usr/lib/cfgadm/usb.so.1
 file path=usr/lib/extendedFILE.so.1
+file path=usr/lib/getloginx.so.1
 file path=usr/lib/lib.b mode=0444
 file path=usr/lib/libadutils.so.1
 file path=usr/lib/libast.so.1

@@ -20,6 +20,8 @@
  */
 
 /*
+ * Copyright (c) 2013 Gary Mills
+ *
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -27,12 +29,8 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-/*
- * Copyright (c) 2013 Joyent, Inc.  All rights reserved.
- */
-
-#pragma weak _getlogin = getlogin
-#pragma weak _getlogin_r = getlogin_r
+#pragma weak _getlogin = getloginx
+#pragma weak _getlogin_r = getloginx_r
 
 #include "lint.h"
 #include <sys/types.h>
@@ -50,41 +48,66 @@
 #include <mtlib.h>
 #include "tsd.h"
 
-/*
- * XXX - _POSIX_LOGIN_NAME_MAX limits the length of a login name.  The utmpx
- * interface provides for a 32 character login name, but for the sake of
- * compatibility, we are still using the old utmp-imposed limit.
- *
- * If you want the full name, use the Consolidation Private getxlogin().
- */
+/* Revert the renames done in unistd.h */
+#ifdef	__PRAGMA_REDEFINE_EXTNAME
+#pragma	redefine_extname	getlogint	getlogin
+#pragma	redefine_extname	getlogint_r	getlogin_r
+#pragma	redefine_extname	__posix_getlogint_r	__posix_getlogin_r
+#else	/* __PRAGMA_REDEFINE_EXTNAME */
+#ifdef	getlogin
+#undef	getlogin
+#endif	/* getlogin */
+#ifdef	getlogin_r
+#undef	getlogin_r
+#endif	/* getlogin_r */
+#ifdef	__posix_getlogin_r
+#undef	__posix_getlogin_r
+#endif	/* __posix_getlogin_r */
+#define	getlogint	getlogin
+#define	getlogint_r	getlogin_r
+#define	__posix_getlogint_r	__posix_getlogin_r
+#endif	/* __PRAGMA_REDEFINE_EXTNAME */
+extern char *getlogint(void);
+extern char *getlogint_r(char *, int);
+extern int __posix_getlogint_r(char *, int);
 
-static int
-generic_getlogin(char *answer, int namelen, boolean_t truncate)
+/*
+ * Use the full length of a login name.
+ * The utmpx interface provides for a 32 character login name.
+ */
+#define	NMAX	(sizeof (((struct utmpx *)0)->ut_user))
+
+/*
+ * Common function
+ */
+static char *
+getl_r_common(char *answer, size_t namelen, size_t maxlen)
 {
 	int		uf;
 	off64_t		me;
 	struct futmpx	ubuf;
 
 	if ((me = (off64_t)ttyslot()) < 0)
-		return (-1);
+		return (NULL);
 	if ((uf = open64(UTMPX_FILE, 0)) < 0)
-		return (-1);
+		return (NULL);
 	(void) lseek64(uf, me * sizeof (ubuf), SEEK_SET);
 	if (read(uf, &ubuf, sizeof (ubuf)) != sizeof (ubuf)) {
 		(void) close(uf);
-		return (-1);
+		return (NULL);
 	}
 	(void) close(uf);
 	if (ubuf.ut_user[0] == '\0')
-		return (-1);
-	if (strnlen(ubuf.ut_user, sizeof (ubuf.ut_user)) >= namelen &&
-	    !truncate) {
-		errno = ERANGE;
-		return (-1);
-	}
-	(void) strlcpy(answer, ubuf.ut_user, namelen);
+		return (NULL);
 
-	return (0);
+	/* Insufficient buffer size */
+	if (namelen < strnlen(&ubuf.ut_user[0], maxlen)) {
+		errno = ERANGE;
+		return (NULL);
+	}
+	(void) strncpy(&answer[0], &ubuf.ut_user[0], maxlen);
+	answer[maxlen] = '\0';
+	return (&answer[0]);
 }
 
 /*
@@ -92,17 +115,9 @@ generic_getlogin(char *answer, int namelen, boolean_t truncate)
  * It was implemented by Solaris 2.3.
  */
 char *
-getlogin_r(char *answer, int namelen)
+getlogint_r(char *answer, int namelen)
 {
-	if (namelen < _POSIX_LOGIN_NAME_MAX) {
-		errno = ERANGE;
-		return (NULL);
-	}
-
-	if (generic_getlogin(answer, _POSIX_LOGIN_NAME_MAX, B_TRUE) == 0)
-		return (answer);
-
-	return (NULL);
+	return (getl_r_common(answer, (size_t)namelen, LOGNAME_MAX_TRAD));
 }
 
 /*
@@ -110,13 +125,13 @@ getlogin_r(char *answer, int namelen)
  * User gets it via static getlogin_r from the header file.
  */
 int
-__posix_getlogin_r(char *name, int namelen)
+__posix_getlogint_r(char *name, int namelen)
 {
 	int nerrno = 0;
 	int oerrno = errno;
 
 	errno = 0;
-	if (getlogin_r(name, namelen) != 0) {
+	if (getl_r_common(name, (size_t)namelen, LOGNAME_MAX_TRAD) == NULL) {
 		if (errno == 0)
 			nerrno = EINVAL;
 		else
@@ -127,30 +142,57 @@ __posix_getlogin_r(char *name, int namelen)
 }
 
 char *
-getlogin(void)
+getlogint(void)
 {
-	struct futmpx fu;
-	char *answer = tsdalloc(_T_LOGIN,
-	    MAX(sizeof (fu.ut_user), _POSIX_LOGIN_NAME_MAX), NULL);
+	char *answer = tsdalloc(_T_LOGIN, LOGIN_NAME_MAX_TRAD, NULL);
 
 	if (answer == NULL)
 		return (NULL);
-	return (getlogin_r(answer, _POSIX_LOGIN_NAME_MAX));
+	return (getl_r_common(answer, LOGIN_NAME_MAX_TRAD, LOGNAME_MAX_TRAD));
 }
 
+/*
+ * POSIX.1c Draft-6 version of the function getlogin_r.
+ * It was implemented by Solaris 2.3.
+ * For extended login names, selected by redefine_extname in unistd.h.
+ */
 char *
-getxlogin(void)
+getloginx_r(char *answer, int namelen)
 {
-	struct futmpx fu;
-	char *answer = tsdalloc(_T_LOGIN,
-	    MAX(sizeof (fu.ut_user), _POSIX_LOGIN_NAME_MAX), NULL);
+	return (getl_r_common(answer, (size_t)namelen, NMAX));
+}
+
+/*
+ * POSIX.1c standard version of the function getlogin_r.
+ * User gets it via static getlogin_r from the header file.
+ * For extended login names, selected by redefine_extname in unistd.h.
+ */
+int
+__posix_getloginx_r(char *name, int namelen)
+{
+	int nerrno = 0;
+	int oerrno = errno;
+
+	errno = 0;
+	if (getl_r_common(name, (size_t)namelen, NMAX) == NULL) {
+		if (errno == 0)
+			nerrno = EINVAL;
+		else
+			nerrno = errno;
+	}
+	errno = oerrno;
+	return (nerrno);
+}
+
+/*
+ * For extended login names, selected by redefine_extname in unistd.h.
+ */
+char *
+getloginx(void)
+{
+	char *answer = tsdalloc(_T_LOGIN, LOGIN_NAME_MAX, NULL);
 
 	if (answer == NULL)
 		return (NULL);
-
-	if (generic_getlogin(answer,
-	    MAX(sizeof (fu.ut_user), _POSIX_LOGIN_NAME_MAX), B_FALSE) != 0)
-		return (NULL);
-
-	return (answer);
+	return (getl_r_common(answer, LOGIN_NAME_MAX, NMAX));
 }

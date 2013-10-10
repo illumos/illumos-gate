@@ -20,15 +20,14 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright (c) 2013 Gary Mills
+ *
  * Copyright (c) 1997, by Sun Microsystems, Inc.
  * All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.3 */
 
 /*LINTLIBRARY*/
 
@@ -37,7 +36,11 @@
 #include	<ctype.h>
 #include	<userdefs.h>
 #include	<users.h>
+#include	<deflt.h>
 #include	<limits.h>
+
+/* Defaults file */
+#define	DEFAULT_USERADD "/etc/default/useradd"
 
 /*
  * validate string given as login name.
@@ -49,6 +52,7 @@ valid_login(char *login, struct passwd **pptr, int *warning)
 	char *ptr = login;
 	int bad1char, badc, clower, len;
 	char c;
+	char action;
 
 	len = 0; clower = 0; badc = 0; bad1char = 0;
 	*warning = 0;
@@ -68,12 +72,34 @@ valid_login(char *login, struct passwd **pptr, int *warning)
 			clower++;
 	}
 
-	/*
-	 * XXX length checking causes some operational/compatibility problem.
-	 * This has to be revisited in the future as ARC/standards issue.
-	 */
+	action = 'w';
+	if (defopen(DEFAULT_USERADD) == 0) {
+		char *defptr;
+
+		if ((defptr = defread("EXCEED_TRAD=")) != NULL) {
+			char let = tolower(*defptr);
+
+			switch (let) {
+			case 'w':	/* warning */
+			case 'e':	/* error */
+			case 's':	/* silent */
+				action = let;
+				break;
+			}
+		}
+		(void) defopen((char *)NULL);
+	}
+
 	if (len > LOGNAME_MAX)
-		*warning = *warning | WARN_NAME_TOO_LONG;
+		return (LONGNAME);
+
+	if (len > LOGNAME_MAX_TRAD) {
+		if (action == 'w')
+			*warning = *warning | WARN_NAME_TOO_LONG;
+		else if (action == 'e')
+			return (LONGNAME);
+	}
+
 	if (clower == 0)
 		*warning = *warning | WARN_NO_LOWERCHAR;
 	if (badc != 0)

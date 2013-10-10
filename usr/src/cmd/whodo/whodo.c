@@ -19,6 +19,8 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright (c) 2013 Gary Mills
+ *
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -68,19 +70,14 @@
 #include <priv_utils.h>
 
 /*
- * utmpx defines wider fields for user and line.  For compatibility of output,
- * we are limiting these to the old maximums in utmp. Define UTMPX_NAMELEN
- * to use the full lengths.
+ * Use the full lengths from utmpx for user and line.
  */
-#ifndef UTMPX_NAMELEN
-/* XXX - utmp - fix name length */
-#define	NMAX		(_POSIX_LOGIN_NAME_MAX - 1)
-#define	LMAX		12
-#else /* UTMPX_NAMELEN */
-static struct utmpx dummy;
-#define	NMAX	(sizeof (dummy.ut_user))
-#define	LMAX	(sizeof (dummy.ut_line))
-#endif /* UTMPX_NAMELEN */
+#define	NMAX	(sizeof (((struct utmpx *)0)->ut_user))
+#define	LMAX	(sizeof (((struct utmpx *)0)->ut_line))
+
+/* Print minimum field widths. */
+#define	LOGIN_WIDTH	8
+#define	LINE_WIDTH	12
 
 #define	DIV60(t)	((t+30)/60)    /* x/60 rounded */
 
@@ -473,10 +470,12 @@ retry:
 			continue;	/* we're looking for somebody else */
 		if (lflag) {	/* -l flag format (w command) */
 			/* print login name of the user */
-			(void) printf("%-*.*s ", NMAX, NMAX, ut->ut_name);
+			(void) printf("%-*.*s ", LOGIN_WIDTH, (int)NMAX,
+			    ut->ut_name);
 
 			/* print tty user is on */
-			(void) printf("%-*.*s", LMAX, LMAX, ut->ut_line);
+			(void) printf("%-*.*s", LINE_WIDTH, (int)LMAX,
+			    ut->ut_line);
 
 			/* print when the user logged in */
 			tim = ut->ut_xtime;
@@ -494,8 +493,9 @@ retry:
 			tim = ut->ut_xtime;
 			tm = localtime(&tim);
 			(void) printf("\n%-*.*s %-*.*s %2.1d:%2.2d\n",
-			    LMAX, LMAX, ut->ut_line,
-			    NMAX, NMAX, ut->ut_name, tm->tm_hour, tm->tm_min);
+			    LINE_WIDTH, (int)LMAX, ut->ut_line,
+			    LOGIN_WIDTH, (int)NMAX, ut->ut_name, tm->tm_hour,
+			    tm->tm_min);
 			showproc(findhash((pid_t)ut->ut_pid));
 		}
 	}
@@ -520,10 +520,11 @@ showproc(struct uproc *up)
 	/* print the data for this process */
 	if (up->p_state == ZOMBIE)
 		(void) printf("    %-*.*s %5d %4.1ld:%2.2ld %s\n",
-		    LMAX, LMAX, "  ?", (int)up->p_upid, 0L, 0L, "<defunct>");
+		    LINE_WIDTH, (int)LMAX, "  ?", (int)up->p_upid, 0L, 0L,
+		    "<defunct>");
 	else if (up->p_state != NONE) {
 		(void) printf("    %-*.*s %5d %4.1ld:%2.2ld %s\n",
-		    LMAX, LMAX, getty(up->p_ttyd), (int)up->p_upid,
+		    LINE_WIDTH, (int)LMAX, getty(up->p_ttyd), (int)up->p_upid,
 		    up->p_time / 60L, up->p_time % 60L,
 		    up->p_comm);
 	}

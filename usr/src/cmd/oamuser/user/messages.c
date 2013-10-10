@@ -23,11 +23,11 @@
 
 
 /*
+ * Copyright (c) 2013 Gary Mills
+ *
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.6 */
 
 char *errmsgs[] = {
 	"WARNING: uid %ld is reserved.\n",
@@ -99,6 +99,7 @@ char *errmsgs[] = {
 	"WARNING: gid %ld is reserved.\n",
 	"ERROR: Failed to read /etc/group file due to invalid entry or"
 	    " read error.\n",
+	"ERROR: %s is too long.  Choose another.\n",
 };
 
 int lasterrmsg = sizeof (errmsgs) / sizeof (char *);

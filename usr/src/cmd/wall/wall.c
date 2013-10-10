@@ -31,6 +31,8 @@
 
 /*
  * Copyright 2012 Joyent, Inc. All rights reserved.
+ *
+ * Copyright (c) 2013 Gary Mills
  */
 
 #include <signal.h>
@@ -60,18 +62,10 @@
 #include <sys/ctfs.h>
 
 /*
- * utmpx defines wider fields for user and line.  For compatibility of output,
- * we are limiting these to the old maximums in utmp. Define UTMPX_NAMELEN
- * to use the full lengths.
+ * Use the full lengths from utmpx for user and line.
  */
-#ifndef UTMPX_NAMELEN
-/* XXX - utmp -fix name length */
-#define	NMAX	(_POSIX_LOGIN_NAME_MAX - 1)
-#define	LMAX	12
-#else /* UTMPX_NAMELEN */
-#define	NMAX	(sizeof (((struct utmpx *)0)->ut_user)
-#define	LMAX	(sizeof (((struct utmpx *)0)->ut_line)
-#endif /* UTMPX_NAMELEN */
+#define	NMAX	(sizeof (((struct utmpx *)0)->ut_user))
+#define	LMAX	(sizeof (((struct utmpx *)0)->ut_line))
 
 static char	mesg[3000];
 static char	*infile;
@@ -82,7 +76,7 @@ static char	line[MAXNAMLEN+1] = "???";
 static char	systm[MAXNAMLEN+1];
 static time_t	tloc;
 static struct	utsname utsn;
-static char	who[9]	= "???";
+static char	who[NMAX+1]	= "???";
 static char	time_buf[50];
 #define	DATE_FMT	"%a %b %e %H:%M:%S"
 
@@ -226,7 +220,8 @@ main(int argc, char *argv[])
 				    MAXNAMLEN + 1);
 				if (rsystm[0] != '\0') {
 					(void) strcpy(systm, rsystm);
-					(void) strncpy(rwho, who, 9);
+					(void) strncpy(rwho, who,
+					    sizeof (who));
 					(void) strcpy(line, "rpc.rwalld");
 				}
 			}
@@ -428,7 +423,7 @@ sendmes(struct utmpx *p, zoneid_t zid)
 		(void) fprintf(f, " to group %s", grpname);
 	(void) fprintf(f, "...\n");
 #ifdef DEBUG
-	(void) fprintf(f, "DEBUG: To %.8s on %s\n", p->ut_user, s);
+	(void) fprintf(f, "DEBUG: To %.*s on %s\n", NMAX, p->ut_user, s);
 #endif
 	i = strlen(mesg);
 	for (bp = mesg; --i >= 0; bp++) {
@@ -470,13 +465,11 @@ static int
 chkgrp(char *name)
 {
 	int i;
-	char *p;
+	char user[NMAX + 1];
 
+	(void) strlcpy(user, name, sizeof (user));
 	for (i = 0; pgrp->gr_mem[i] && pgrp->gr_mem[i][0]; i++) {
-		for (p = name; *p && *p != ' '; p++)
-		;
-		*p = 0;
-		if (strncmp(name, pgrp->gr_mem[i], 8) == 0)
+		if (strcmp(user, pgrp->gr_mem[i]) == 0)
 			return (1);
 	}
 

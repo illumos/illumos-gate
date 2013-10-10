@@ -19,6 +19,8 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright (c) 2013 Gary Mills
+ *
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -69,19 +71,15 @@
 #include <priv_utils.h>
 
 /*
- * utmpx defines wider fields for user and line.  For compatibility of output,
- * we are limiting these to the old maximums in utmp. Define UTMPX_NAMELEN
- * to use the full lengths.
+ * Use the full lengths from utmpx for user and line.
  */
-#ifndef UTMPX_NAMELEN
-/* XXX - utmp - fix name length */
-#define	NMAX		(_POSIX_LOGIN_NAME_MAX - 1)
-#define	LMAX		12
-#else	/* UTMPX_NAMELEN */
 static struct utmpx dummy;
 #define	NMAX		(sizeof (dummy.ut_user))
 #define	LMAX		(sizeof (dummy.ut_line))
-#endif /* UTMPX_NAMELEN */
+
+/* Print minimum field widths. */
+#define	LOGIN_WIDTH	8
+#define	LINE_WIDTH	12
 
 #define	DIV60(t)	((t+30)/60)	/* x/60 rounded */
 
@@ -483,17 +481,18 @@ retry:
 			continue;	/* we're looking for somebody else */
 
 		/* print login name of the user */
-		PRINTF(("%-*.*s ", NMAX, NMAX, ut->ut_name));
+		PRINTF(("%-*.*s ", LOGIN_WIDTH, NMAX, ut->ut_name));
 
 		/* print tty user is on */
 		if (lflag) {
-			PRINTF(("%-*.*s", LMAX, LMAX, ut->ut_line));
+			PRINTF(("%-*.*s", LINE_WIDTH, LMAX, ut->ut_line));
 		} else {
 			if (ut->ut_line[0] == 'p' && ut->ut_line[1] == 't' &&
 			    ut->ut_line[2] == 's' && ut->ut_line[3] == '/') {
 				PRINTF(("%-*.3s", LMAX, &ut->ut_line[4]));
 			} else {
-				PRINTF(("%-*.*s", LMAX, LMAX, ut->ut_line));
+				PRINTF(("%-*.*s", LINE_WIDTH, LMAX,
+				    ut->ut_line));
 			}
 		}
 

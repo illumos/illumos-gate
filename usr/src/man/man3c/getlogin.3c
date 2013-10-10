@@ -1,4 +1,5 @@
 '\" te
+.\" Copyright (c) 2013 Gary Mills
 .\" Copyright (c) 2004 Sun Microsystems, Inc.  All Rights Reserved.
 .\" Copyright 1989 AT&T
 .\" Portions Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
@@ -9,7 +10,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH GETLOGIN 3C "May 18, 2004"
+.TH GETLOGIN 3C "May 25, 2013"
 .SH NAME
 getlogin, getlogin_r \- get login name
 .SH SYNOPSIS
@@ -42,6 +43,28 @@ locate the correct password file entry when the same user \fBID\fR is shared by
 several login names.
 .sp
 .LP
+The login name plus the terminating null byte can be up to 33 characters
+in length.
+Newly-compiled programs should use the \fBLOGIN_NAME_MAX\fR symbol,
+defined in <\fBlimits.h\fR>, to size the buffer.
+Older programs that call \fBgetlogin()\fR  expect only the legacy
+9-character length.
+These automatically link to a version of the \fBgetlogin()\fR functions that
+truncates longer login names.
+It's also possible to compile new programs that link to truncating versions
+of these functions by defining \fB__USE_LEGACY_LOGNAME__\fR in the
+compile environment.
+.sp
+.LP
+Some older programs will correctly handle long login names returned
+by the \fBgetlogin()\fR function.
+For this case, the user compatibility library
+\fB/usr/lib/getloginx.so.1\fR redirects to a version of the \fBgetlogin()\fR
+function that returns the long name.
+This library should be added to such an application
+at runtime using \fBLD_PRELOAD\fR.
+.sp
+.LP
 If \fBgetlogin()\fR is called within a process that is not attached to a
 terminal, it returns a null pointer. The correct procedure for determining the
 login name is to call \fBcuserid\fR(3C), or to call \fBgetlogin()\fR and if it
@@ -51,7 +74,7 @@ fails to call \fBgetpwuid\fR(3C).
 The \fBgetlogin_r()\fR function has the same functionality as \fBgetlogin()\fR
 except that the caller must supply a buffer \fIname\fR with length
 \fInamelen\fR to store the result.  The \fIname\fR buffer must be at least
-\fB_POSIX_LOGIN_NAME_MAX\fR bytes in size (defined in <\fBlimits.h\fR>). The
+\fBLOGIN_NAME_MAX\fR bytes in size (defined in <\fBlimits.h\fR>). The
 POSIX version (see \fBstandards\fR(5)) of \fBgetlogin_r()\fR takes a
 \fInamesize\fR parameter of type \fBsize_t\fR.
 .SH RETURN VALUES
@@ -149,6 +172,24 @@ returns the name associated with the real user ID of the process.
 .ad
 .RS 18n
 user access and administration information
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/usr/lib/getloginx.so.1\fR\fR
+.ad
+.RS 18n
+A compatibility library that returns long login names to older applications.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/usr/lib/64/getloginx.so.1\fR\fR
+.ad
+.RS 18n
+A 64-bit compatibility library to return long login names.
 .RE
 
 .SH ATTRIBUTES
