@@ -1922,13 +1922,13 @@ nlm_slock_wait(struct nlm_globals *g,
 
 	/*
 	 * If the granted message arrived before we got here,
-	 * nw->nw_state will be GRANTED - in that case, don't sleep.
+	 * nslp->nsl_state will be NLM_SL_GRANTED - in that case don't sleep.
 	 */
 	cv_res = 1;
 	timeo_ticks = ddi_get_lbolt() + SEC_TO_TICK(timeo_secs);
 
 	mutex_enter(&g->lock);
-	if (nslp->nsl_state == NLM_SL_BLOCKED) {
+	while (nslp->nsl_state == NLM_SL_BLOCKED && cv_res > 0) {
 		cv_res = cv_timedwait_sig(&nslp->nsl_cond,
 		    &g->lock, timeo_ticks);
 	}
@@ -1944,7 +1944,7 @@ nlm_slock_wait(struct nlm_globals *g,
 	}
 
 	if (cv_res <= 0) {
-		/* We was woken up either by timeout or interrupt */
+		/* We were woken up either by timeout or by interrupt */
 		error = (cv_res < 0) ? ETIMEDOUT : EINTR;
 
 		/*
@@ -1954,7 +1954,7 @@ nlm_slock_wait(struct nlm_globals *g,
 		 */
 		if (nslp->nsl_state == NLM_SL_GRANTED)
 			error = 0;
-	} else { /* awaken via cv_signal or didn't block */
+	} else { /* Awaken via cv_signal()/cv_broadcast() or didn't block */
 		error = 0;
 		VERIFY(nslp->nsl_state == NLM_SL_GRANTED);
 	}
