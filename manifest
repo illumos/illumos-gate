@@ -650,10 +650,8 @@ f kernel/drv/amd64/oce 0755 root sys
 f kernel/drv/amd64/ohci 0755 root sys
 f kernel/drv/amd64/openeepr 0755 root sys
 f kernel/drv/amd64/options 0755 root sys
-f kernel/drv/amd64/pcata 0755 root sys
 f kernel/drv/amd64/pci_pci 0755 root sys
 f kernel/drv/amd64/pcieb 0755 root sys
-f kernel/drv/amd64/pcser 0755 root sys
 f kernel/drv/amd64/physmem 0755 root sys
 f kernel/drv/amd64/pmcs 0755 root sys
 f kernel/drv/amd64/poll 0755 root sys
@@ -4026,14 +4024,7 @@ f usr/include/sys/pci_tools.h 0644 root bin
 f usr/include/sys/pcic_reg.h 0644 root bin
 f usr/include/sys/pcic_var.h 0644 root bin
 f usr/include/sys/pcie.h 0644 root bin
-d usr/include/sys/pcmcia 0755 root bin
 f usr/include/sys/pcmcia.h 0644 root bin
-f usr/include/sys/pcmcia/pcata.h 0644 root bin
-f usr/include/sys/pcmcia/pcser_conf.h 0644 root bin
-f usr/include/sys/pcmcia/pcser_io.h 0644 root bin
-f usr/include/sys/pcmcia/pcser_manuspec.h 0644 root bin
-f usr/include/sys/pcmcia/pcser_reg.h 0644 root bin
-f usr/include/sys/pcmcia/pcser_var.h 0644 root bin
 f usr/include/sys/pctypes.h 0644 root bin
 f usr/include/sys/pfmod.h 0644 root bin
 f usr/include/sys/pg.h 0644 root bin
@@ -9906,12 +9897,10 @@ d usr/lib/smedia 0755 root bin
 d usr/lib/smedia/amd64 0755 root bin
 f usr/lib/smedia/amd64/sm_blkdev.so.1 0555 root bin
 f usr/lib/smedia/amd64/sm_fd.so.1 0555 root bin
-f usr/lib/smedia/amd64/sm_pcata.so.1 0555 root bin
 f usr/lib/smedia/amd64/sm_scsi.so.1 0555 root bin
 f usr/lib/smedia/rpc.smserverd 0555 root bin
 f usr/lib/smedia/sm_blkdev.so.1 0555 root bin
 f usr/lib/smedia/sm_fd.so.1 0555 root bin
-f usr/lib/smedia/sm_pcata.so.1 0555 root bin
 f usr/lib/smedia/sm_scsi.so.1 0555 root bin
 f usr/lib/smrsh 0555 root bin
 f usr/lib/sndrd 0555 root bin
@@ -18015,7 +18004,6 @@ f usr/share/man/man7d/nv_sata.7d 0444 root bin
 f usr/share/man/man7d/nxge.7d 0444 root bin
 f usr/share/man/man7d/ohci.7d 0444 root bin
 f usr/share/man/man7d/openprom.7d 0444 root bin
-f usr/share/man/man7d/pcata.7d 0444 root bin
 f usr/share/man/man7d/pcn.7d 0444 root bin
 f usr/share/man/man7d/physmem.7d 0444 root bin
 f usr/share/man/man7d/pm.7d 0444 root bin

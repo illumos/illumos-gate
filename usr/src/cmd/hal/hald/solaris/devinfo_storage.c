@@ -3,6 +3,7 @@
  * devinfo_storage.c : storage devices
  *
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013 Garrett D'Amore <garrett@damore.org>
  *
  * Licensed under the Academic Free License version 2.1
  *
@@ -60,8 +61,6 @@ static HalDevice *devinfo_ide_device_add(HalDevice *parent, di_node_t node, char
 static HalDevice *devinfo_ide_storage_add(HalDevice *parent, di_node_t node, char *devfs_path);
 HalDevice *devinfo_scsi_add(HalDevice *parent, di_node_t node, char *devfs_path, char *device_type);
 static HalDevice *devinfo_scsi_storage_add(HalDevice *parent, di_node_t node, char *devfs_path);
-HalDevice *devinfo_pcata_add(HalDevice *parent, di_node_t node, char *devfs_path, char *device_type);
-static HalDevice *devinfo_pcata_storage_add(HalDevice *parent, di_node_t node, char *devfs_path);
 HalDevice *devinfo_blkdev_add(HalDevice *parent, di_node_t node, char *devfs_path, char *device_type);
 static HalDevice *devinfo_blkdev_storage_add(HalDevice *parent, di_node_t node, char *devfs_path);
 HalDevice *devinfo_floppy_add(HalDevice *parent, di_node_t node, char *devfs_path, char *device_type);
@@ -97,14 +96,6 @@ DevinfoDevHandler devinfo_ide_handler = {
 };
 DevinfoDevHandler devinfo_scsi_handler = {
         devinfo_scsi_add,
-	NULL,
-	NULL,
-	NULL,
-	NULL,
-        NULL
-};
-DevinfoDevHandler devinfo_pcata_handler = {
-        devinfo_pcata_add,
 	NULL,
 	NULL,
 	NULL,
@@ -373,73 +364,6 @@ devinfo_scsi_dtype2str(int dtype)
 		return ("scsi");
         }
 
-}
-
-/* PCMCIA */
-
-HalDevice *
-devinfo_pcata_add(HalDevice *parent, di_node_t node, char *devfs_path, char *device_type)
-{
-	int	*i;
-	char	*driver_name;
-	HalDevice *d;
-	char	udi[HAL_PATH_MAX];
-
-	driver_name = di_driver_name (node);
-	if ((driver_name == NULL) || (strcmp (driver_name, "pcata") != 0)) {
-		return (NULL);
-	}
-
-	d = hal_device_new ();
-
-	devinfo_set_default_properties (d, parent, node, devfs_path);
-	hal_device_property_set_string (d, "info.subsystem", "pcmcia");
-
-        hal_util_compute_udi (hald_get_gdl (), udi, sizeof (udi),
-                "%s/%s%d", hal_device_get_udi (parent), di_node_name(node), di_instance (node));
-        hal_device_set_udi (d, udi);
-        hal_device_property_set_string (d, "info.udi", udi);
-        hal_device_property_set_string (d, "info.product", "PCMCIA Disk");
-
-        devinfo_add_enqueue (d, devfs_path, &devinfo_pcata_handler);
-
-        return (devinfo_pcata_storage_add (d, node, devfs_path));
-}
-
-static HalDevice *
-devinfo_pcata_storage_add(HalDevice *parent, di_node_t node, char *devfs_path)
-{
-	HalDevice *d;
-	char	*driver_name;
-	int	*i;
-	char	*s;
-	char	udi[HAL_PATH_MAX];
-
-	d = hal_device_new ();
-
-	devinfo_set_default_properties (d, parent, node, devfs_path);
-	hal_device_property_set_string (d, "info.category", "storage");
-
-	hal_util_compute_udi (hald_get_gdl (), udi, sizeof (udi),
-		"%s/sd%d", hal_device_get_udi (parent), di_instance (node));
-	hal_device_set_udi (d, udi);
-	hal_device_property_set_string (d, "info.udi", udi);
-
-	hal_device_add_capability (d, "storage");
-
-	hal_device_property_set_int (d, "storage.lun", 0);
-	hal_device_property_set_bool (d, "storage.hotpluggable", TRUE);
-	hal_device_property_set_bool (d, "storage.removable", FALSE);
-	hal_device_property_set_bool (d, "storage.requires_eject", FALSE);
-	hal_device_property_set_bool (d, "storage.media_check_enabled", TRUE);
-       	hal_device_property_set_string (d, "storage.drive_type", "disk");
-	hal_device_property_set_bool (d, "storage.requires_eject", FALSE);
-
-	hal_device_add_capability (d, "block");
-
-	devinfo_storage_minors (d, node, devfs_path, FALSE);
-
-	return (d);
 }
 
 /* blkdev */

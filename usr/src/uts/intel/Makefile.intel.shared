@@ -293,8 +293,6 @@ DRV_KMODS	+= pci_pci
 DRV_KMODS	+= pcic
 DRV_KMODS	+= pcieb
 DRV_KMODS	+= physmem
-DRV_KMODS	+= pcan
-DRV_KMODS	+= pcwl
 DRV_KMODS	+= pit_beep
 DRV_KMODS	+= pm
 DRV_KMODS	+= poll
@@ -460,9 +458,7 @@ DRV_KMODS	+= iscsi
 #	PCMCIA specific module(s)
 #
 DRV_KMODS	+= pcs
-DRV_KMODS	+= pcata
 MISC_KMODS	+= cardbus
-$(CLOSED_BUILD)CLOSED_DRV_KMODS	+= pcser
 
 #
 #	SCSI Enclosure Services driver

@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2013 Garrett D'Amore <garrett@damore.org>
 #
 
 set name=pkg.fmri value=pkg:/service/storage/removable-media@$(PKGVERS)
@@ -48,12 +49,10 @@ file path=usr/lib/llib-lsmedia
 file path=usr/lib/llib-lsmedia.ln
 file path=usr/lib/smedia/$(ARCH64)/sm_blkdev.so.1 mode=0555
 file path=usr/lib/smedia/$(ARCH64)/sm_fd.so.1 mode=0555
-file path=usr/lib/smedia/$(ARCH64)/sm_pcata.so.1 mode=0555
 file path=usr/lib/smedia/$(ARCH64)/sm_scsi.so.1 mode=0555
 file path=usr/lib/smedia/rpc.smserverd mode=0555
 file path=usr/lib/smedia/sm_blkdev.so.1 mode=0555
 file path=usr/lib/smedia/sm_fd.so.1 mode=0555
-file path=usr/lib/smedia/sm_pcata.so.1 mode=0555
 file path=usr/lib/smedia/sm_scsi.so.1 mode=0555
 file path=usr/share/man/man1m/rpc.smserverd.1m
 legacy pkg=SUNWsmedia desc="Storage media management library" \
