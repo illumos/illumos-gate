@@ -105,11 +105,6 @@ include $(UTSTREE)/sun4u/opl/Makefile.files
 include $(UTSTREE)/sun4u/Makefile.sun4u
 
 #
-#	Define closed modules (must come after Makefile.sun4u for CLOSED_BUILD).
-#
-$(CLOSED_BUILD)CLOSED_OPL_KMODS = scfd
-
-#
 #	Everybody needs to know how to build modstubs.o and to locate unix.o
 #
 UNIX_DIR	= $(UTSBASE)/$(PLATFORM)/opl/unix

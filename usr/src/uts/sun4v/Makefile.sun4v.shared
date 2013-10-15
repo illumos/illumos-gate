@@ -358,11 +358,6 @@ DRV_KMODS	+= vnet
 DRV_KMODS	+= vnex
 DRV_KMODS	+= vsw
 
-$(CLOSED_BUILD)CLOSED_DRV_KMODS	+= bmc
-$(CLOSED_BUILD)CLOSED_DRV_KMODS	+= memtest
-$(CLOSED_BUILD)CLOSED_DRV_KMODS	+= ncp
-$(CLOSED_BUILD)CLOSED_DRV_KMODS	+= n2cp
-
 #
 #	Exec Class Modules (/kernel/exec):
 #
@@ -422,10 +417,6 @@ CRYPTO_KMODS	+= arcfour
 #	generic-unix module (/kernel/genunix):
 #
 GENUNIX_KMODS	+= genunix
-
-#	'User' "Modules" excluded from the Full Kernel lint target:
-#
-$(CLOSED_BUILD)CLOSED_NLMISC_KMODS	+= forthdebug
 
 #
 #	Modules eXcluded from the product:

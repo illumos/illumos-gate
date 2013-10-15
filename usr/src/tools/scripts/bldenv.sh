@@ -345,14 +345,6 @@ if [[ "${SUNWSPRO}" != "" ]]; then
 	export PATH="${SUNWSPRO}/bin:$PATH" 
 fi 
 
-if [[ -z "$CLOSED_IS_PRESENT" ]]; then
-	if [[ -d $SRC/../closed ]]; then
-		export CLOSED_IS_PRESENT="yes"
-	else
-		export CLOSED_IS_PRESENT="no"
-	fi
-fi
-
 TOOLS="${SRC}/tools"
 TOOLS_PROTO="${TOOLS}/proto/root_${MACH}-nd" ; export TOOLS_PROTO
 
@@ -418,19 +410,10 @@ fi
 
 [[ "$MULTI_PROTO" == "yes" ]] && export ROOT="${ROOT}${SUFFIX}"
 
-export TONICBUILD="#"
-
 if "${flags.O}" ; then 
-	if [[ "$CLOSED_IS_PRESENT" != "yes" ]]; then
-		print "OpenSolaris closed binary generation requires "
-		print "closed tree"
-		exit 1
-	fi
-	print "Generating OpenSolaris deliverables"
-	# We only need CLOSEDROOT in the env for convenience. Makefile.master
-	# figures out what it needs when it matters.
-	export CLOSEDROOT="${ROOT}-closed"
-	export TONICBUILD=""
+	print "OpenSolaris closed binary generation requires "
+	print "closed tree"
+	exit 1
 fi
 
 ENVLDLIBS1="-L$ROOT/lib -L$ROOT/usr/lib"

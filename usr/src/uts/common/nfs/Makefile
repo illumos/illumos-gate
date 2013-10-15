@@ -35,21 +35,13 @@ HDRS=	export.h	lm.h						\
 	nfs4_kprot.h	nfs4_db_impl.h	nfs4_idmap_impl.h \
 	nfsid_map.h	auth.h		nfs_cmd.h
 
-$(CLOSED_BUILD)CLOSEDHDRS=	lm_impl.h	lm_nlm.h	lm_server.h
-
-ALLHDRS= $(HDRS) $(CLOSEDHDRS)
-
 ROOTDIRS= $(ROOT)/usr/include/nfs
 
-ROOTHDRS= $(ALLHDRS:%=$(ROOTDIRS)/%)
+ROOTHDRS= $(HDRS:%=$(ROOTDIRS)/%)
 
-CHECKHDRS= $(HDRS:%.h=%.check) \
-	$(CLOSEDHDRS:%.h=$(CLOSED)/uts/common/nfs/%.check)
+CHECKHDRS= $(HDRS:%.h=%.check)
 
 $(ROOTDIRS)/%: %
-	$(INS.file)
-
-$(ROOTDIRS)/%: $(CLOSED)/uts/common/nfs/%
 	$(INS.file)
 
 .KEEP_STATE:

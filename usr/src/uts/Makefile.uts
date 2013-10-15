@@ -588,11 +588,6 @@ include $(SRC)/Makefile.psm
 #	while the replacement of the SUNW,SPARCstation-10,SX directory by
 #	a symbolic link is being propagated.
 #
-# IMPORTANT:: if you change any of these INS.mumble rules, then you MUST also
-# change the corresponding override definitions in $CLOSED/Makefile.tonic.
-# If you do not do this, then the closedbins build for the OpenSolaris
-# community will break. PS, the gatekeepers will be upset too.
-#
 INS.slink1= $(RM) -r $@; $(SYMLINK) $(PLATFORM) $@
 INS.slink2= $(RM) -r $@; $(SYMLINK) ../$(PLATFORM)/$(@F) $@
 INS.slink3= $(RM) -r $@; $(SYMLINK) $(IMPLEMENTED_PLATFORM) $@
@@ -631,19 +626,12 @@ KMODS = $(GENUNIX_KMODS) $(PARALLEL_KMODS)
 
 $(PARALLEL_KMODS): $(GENUNIX_KMODS)
 
-$(CLOSED_BUILD)CLOSED_KMODS = $(CLOSED_DRV_KMODS) $(CLOSED_TOD_KMODS) \
-	$(CLOSED_MISC_KMODS) $(CLOSED_CPU_KMODS) \
-	$(CLOSED_NLMISC_KMODS) $(CLOSED_DRV_KMODS_$(CLASS))
-
 LINT_KMODS = $(DRV_KMODS) $(EXEC_KMODS) $(FS_KMODS) $(SCHED_KMODS) \
 	  $(TOD_KMODS) $(STRMOD_KMODS) $(SYS_KMODS) $(MISC_KMODS) \
 	  $(MACH_KMODS) $(GSS_KMODS) $(DACF_KMODS) $(IPP_KMODS) \
 	  $(CRYPTO_KMODS) $(PCBE_KMODS) \
 	  $(DRV_KMODS_$(CLASS)) $(MISC_KMODS_$(CLASS)) $(MAC_KMODS) \
 	  $(BRAND_KMODS) $(KICONV_KMODS) $(SOCKET_KMODS)
-
-$(CLOSED_BUILD)CLOSED_LINT_KMODS = $(CLOSED_DRV_KMODS) $(CLOSED_TOD_KMODS) \
-	  $(CLOSED_MISC_KMODS) $(CLOSED_DRV_KMODS_$(CLASS))
 
 THIS_YEAR:sh=	/bin/date +%Y
 $(OBJS_DIR)/logsubr.o	:= CPPFLAGS += -DTHIS_YEAR=$(THIS_YEAR)

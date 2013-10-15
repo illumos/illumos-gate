@@ -64,8 +64,6 @@ XRDIRS += 	$(STANDLIBDIR) $(STANDSYSDIRS) $(PROMDIRS) $(NAMESDIRS)
 XRINCCOMP = B!sun4u O!sfmmu O!sparc/v7 O!sparc/v9 B!sparc B!sun B!common
 XRINC_TMP = $(XRINCCOMP:B!%=$(UTSDIR)/%)
 XRINCDIRS = $(XRINC_TMP:O!%=$(UTSDIR)/%)
-$(CLOSED_BUILD)XRINC_TMP = $(XRINCCOMP:B!%=$(UTSDIR)/% $(UTSCLOSED)/%)
-$(CLOSED_BUILD)XRINCDIRS = $(XRINC_TMP:O!%=$(UTSDIR)/%)
 
 cscope.out tags: FRC
 	$(XREF) -x $@

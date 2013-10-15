@@ -127,7 +127,6 @@ TEST		= test
 SCSI_FILES = $(SCSI_OBJS:%.o=-l ../scsi/%.ll)
 
 WARLOCK_TARGETS =  warlock_alone warlock_with_esp warlock_with_fas
-$(CLOSED_BUILD)WARLOCK_TARGETS += warlock_with_isp warlock_with_glm
 
 warlock: $(WARLOCK_TARGETS)
 
@@ -147,18 +146,6 @@ warlock_with_fas: $(WLCMD_DIR)/st_with_fas.wlcmd $(WARLOCK_OUT) scsi_files \
 		$(SCSI_FILES)  \
 		-l ../warlock/ddi_dki_impl.ll
 
-warlock_with_isp: $(WLCMD_DIR)/st_with_isp.wlcmd $(WARLOCK_OUT) scsi_files \
-	isp_files warlock_ddi.files
-	$(WARLOCK) -c $(WLCMD_DIR)/st_with_isp.wlcmd \
-		$(WARLOCK_OUT) $(CLOSED)/uts/sparc/isp/isp $(SCSI_FILES)  \
-		-l ../warlock/ddi_dki_impl.ll
-
-warlock_with_glm: $(WLCMD_DIR)/st_with_glm.wlcmd $(WARLOCK_OUT) scsi_files \
-	glm_files warlock_ddi.files
-	$(WARLOCK) -c $(WLCMD_DIR)/st_with_glm.wlcmd \
-		$(WARLOCK_OUT) $(CLOSED)/uts/sparc/glm/glm $(SCSI_FILES) \
-		-l ../warlock/ddi_dki_impl.ll
-
 scsi_files:
 	@cd ../scsi; pwd; $(MAKE) warlock
 
@@ -167,12 +154,6 @@ esp_files:
 
 fas_files:
 	@cd ../fas; pwd; $(MAKE) warlock
-
-isp_files:
-	@cd $(CLOSED)/uts/sparc/isp; pwd; $(MAKE) warlock
-
-glm_files:
-	@cd $(CLOSED)/uts/sparc/glm; pwd; $(MAKE) warlock
 
 st.ok: $(WLCMD_DIR)/st.wlcmd st.ll st_conf.ll  scsi_files warlock_ddi.files
 	$(WARLOCK) -c $(WLCMD_DIR)/st.wlcmd $(WARLOCK_OUT) $(SCSI_FILES) \

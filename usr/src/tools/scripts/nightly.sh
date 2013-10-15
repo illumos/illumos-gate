@@ -294,8 +294,7 @@ function copy_source {
 }
 
 #
-# Mercurial-specific copy code for copy_source().  Handles the
-# combined open and closed trees.
+# Mercurial-specific copy code for copy_source().
 #
 # Returns 0 for success, non-zero for failure.
 #
@@ -304,59 +303,12 @@ function copy_source {
 function copy_source_mercurial {
 	typeset dest=$1
 	typeset srcroot=$2
-	typeset open_top closed_top
 
-	case $srcroot in
-	usr)
-		open_top=usr
-		if [[ "$CLOSED_IS_PRESENT" = yes ]]; then
-			closed_top=usr/closed
-		fi
-		;;
-	usr/closed*)
-		if [[ "$CLOSED_IS_PRESENT" = no ]]; then
-			printf "can't copy %s: closed tree not present.\n" \
-			    "$srcroot" | tee -a $mail_msg_file >> $LOGFILE
-			return 1
-		fi
-		closed_top="$srcroot"
-		;;
-	*)
-		open_top="$srcroot"
-		;;
-	esac		
-
-	if [[ -n "$open_top" ]]; then
-		hg locate -I "$open_top" | cpio -pd "$dest" >>$LOGFILE 2>&1
-		if (( $? != 0 )) ; then
-		    printf "cpio failed for %s\n" "$dest" |
-			tee -a $mail_msg_file >> $LOGFILE
-		    return 1
-		fi
-	fi
-
-	if [[ -n "$closed_top" ]]; then
-		mkdir -p "$dest/usr/closed" || return 1
-		if [[ "$closed_top" = usr/closed ]]; then
-			(cd usr/closed; hg locate |
-			    cpio -pd "$dest/usr/closed") >>$LOGFILE 2>&1
-			if (( $? != 0 )) ; then
-			    printf "cpio failed for %s/usr/closed\n" \
-				"$dest" | tee -a $mail_msg_file >> $LOGFILE
-			    return 1
-			fi
-		else
-			# copy subtree of usr/closed
-			closed_top=${closed_top#usr/closed/}
-			(cd usr/closed; hg locate -I "$closed_top" |
-			    cpio -pd "$dest/usr/closed") >>$LOGFILE 2>&1
-			if (( $? != 0 )) ; then
-			    printf "cpio failed for %s/usr/closed/%s\n" \
-				"$dest" "$closed_top" |
-				tee -a $mail_msg_file >> $LOGFILE
-			    return 1
-			fi
-		fi
+	hg locate -I "$srcroot" | cpio -pd "$dest" >>$LOGFILE 2>&1
+	if (( $? != 0 )) ; then
+	    printf "cpio failed for %s\n" "$dest" |
+		tee -a $mail_msg_file >> $LOGFILE
+	    return 1
 	fi
 
 	return 0
@@ -893,29 +845,12 @@ function staffer {
 
 #
 # Verify that the closed tree is present if it needs to be.
-# Sets CLOSED_IS_PRESENT for future use.
 #
 function check_closed_tree {
-	if [ -z "$CLOSED_IS_PRESENT" ]; then
-		if [ -d $CODEMGR_WS/usr/closed ]; then
-			CLOSED_IS_PRESENT="yes"
-		else
-			CLOSED_IS_PRESENT="no"
-		fi
-		export CLOSED_IS_PRESENT
-	fi
-	if [[ "$CLOSED_IS_PRESENT" = no && ! -d "$ON_CLOSED_BINS" ]]; then
-		#
-		# If it's an old (pre-split) tree or an empty
-		# workspace, don't complain.
-		#
-		if grep -s CLOSED_BUILD $SRC/Makefile.master > /dev/null; then
-			echo "If the closed sources are not present," \
-			    "ON_CLOSED_BINS"
-			echo "must point to the closed binaries tree."
-			build_ok=n
-			exit 1
-		fi
+	if [[ ! -d "$ON_CLOSED_BINS" ]]; then
+		echo "ON_CLOSED_BINS must point to the closed binaries tree."
+		build_ok=n
+		exit 1
 	fi
 }
 
@@ -1264,13 +1199,6 @@ if [ "$BRINGOVER_FILES" = "" ]; then
 	BRINGOVER_FILES="usr"
 fi
 
-#
-# If the closed sources are not present, the closed binaries must be
-# present for the build to succeed.  If there's no pointer to the
-# closed binaries, flag that now, rather than forcing the user to wait
-# a couple hours (or more) to find out.
-#
-orig_closed_is_present="$CLOSED_IS_PRESENT"
 check_closed_tree
 
 #
@@ -1283,18 +1211,6 @@ while getopts +ABCDdFfGIilMmNnOoPpRrS:TtUuWwXxz FLAG $NIGHTLY_OPTIONS
 do
 	case $FLAG in
 	  A )	A_FLAG=y
-		#
-		# If ELF_DATA_BASELINE_DIR is not defined, and we are on SWAN
-		# (based on CLOSED_IS_PRESENT), then refuse to run. The value
-		# of ELF version checking is greatly enhanced by including
-		# the baseline gate comparison.
-		if [ "$CLOSED_IS_PRESENT" = 'yes' -a \
-		     "$ELF_DATA_BASELINE_DIR" = '' ]; then
-			echo "ELF_DATA_BASELINE_DIR must be set if the A" \
-			    "flag is present in\nNIGHTLY_OPTIONS and closed" \
-			    "sources are present. Update environment file."
-			exit 1;
-		fi
 		;;
 	  B )	D_FLAG=y
 		;; # old version of D
@@ -1401,13 +1317,7 @@ export PATH
 
 # roots of source trees, both relative to $SRC and absolute.
 relsrcdirs="."
-if [[ -d $CODEMGR_WS/usr/closed && "$CLOSED_IS_PRESENT" != no ]]; then
-	relsrcdirs="$relsrcdirs ../closed"
-fi
-abssrcdirs=""
-for d in $relsrcdirs; do
-	abssrcdirs="$abssrcdirs $SRC/$d"
-done
+abssrcdirs="$SRC"
 
 unset CH
 if [ "$o_FLAG" = "y" ]; then
@@ -1472,12 +1382,6 @@ EOF
 fi
 export PATH
 export MAKE
-
-if [[ "$O_FLAG" = y ]]; then
-	export TONICBUILD=""
-else
-	export TONICBUILD="#"
-fi
 
 if [ "${SUNWSPRO}" != "" ]; then
 	PATH="${SUNWSPRO}/bin:$PATH"
@@ -2155,25 +2059,6 @@ type bringover_mercurial > /dev/null 2>&1 || function bringover_mercurial {
 		touch $TMPDIR/new_repository
 	fi
 
-	#
-	# If the user set CLOSED_BRINGOVER_WS and didn't set CLOSED_IS_PRESENT
-	# to "no," then we'll want to initialise the closed repository
-	#
-	# We use $orig_closed_is_present instead of $CLOSED_IS_PRESENT,
-	# because for newly-created source trees, the latter will be "no"
-	# until after the bringover completes.
-	#
-	if [[ "$orig_closed_is_present" != "no" && \
-	    -n "$CLOSED_BRINGOVER_WS" && \
-	    ! -d $CODEMGR_WS/usr/closed/.hg ]]; then
-		staffer mkdir -p $CODEMGR_WS/usr/closed
-		staffer hg init $CODEMGR_WS/usr/closed
-		staffer echo "[paths]" > $CODEMGR_WS/usr/closed/.hg/hgrc
-		staffer echo "default=$CLOSED_BRINGOVER_WS" >> $CODEMGR_WS/usr/closed/.hg/hgrc
-		touch $TMPDIR/new_closed
-		export CLOSED_IS_PRESENT=yes
-	fi
-
 	typeset -x HGMERGE="/bin/false"
 
 	#
@@ -2272,69 +2157,6 @@ type bringover_mercurial > /dev/null 2>&1 || function bringover_mercurial {
 	printf "\n"
 
 	#
-	# We only want to update usr/closed if it exists, and we haven't been
-	# told not to via $CLOSED_IS_PRESENT, and we actually know where to
-	# pull from ($CLOSED_BRINGOVER_WS).
-	#
-	if [[ $CLOSED_IS_PRESENT = yes && \
-	    -d $CODEMGR_WS/usr/closed/.hg && \
-	    -n $CLOSED_BRINGOVER_WS ]]; then
-
-		HG_SOURCE=$CLOSED_BRINGOVER_WS
-		if [ ! -f $TMPDIR/new_closed ]; then
-			HG_SOURCE=$TMPDIR/closed_bundle.hg
-			staffer hg --cwd $CODEMGR_WS/usr/closed incoming \
-			    --bundle $HG_SOURCE -v $CLOSED_BRINGOVER_WS \
-			    > $TMPDIR/incoming_closed.out
-
-			#
-			# If there are no incoming changesets, then incoming will
-			# fail, and there will be no bundle file.  Reset the source,
-			# to allow the remaining logic to complete with no false
-			# negatives.  (Unlike incoming, pull will return success
-			# for the no-change case.)
-			#
-			if (( $? != 0 )); then
-				HG_SOURCE=$CLOSED_BRINGOVER_WS
-			fi
-		fi
-
-		staffer hg --cwd $CODEMGR_WS/usr/closed pull -u \
-			$HG_SOURCE > $TMPDIR/pull_closed.out 2>&1
-		if (( $? != 0 )); then
-			printf "closed pull failed as follows:\n\n"
-			cat $TMPDIR/pull_closed.out
-			if grep "^merging.*failed" $TMPDIR/pull_closed.out \
-			    > /dev/null 2>&1; then
-				printf "$mergefailmsg"
-			fi
-			touch $TMPDIR/bringover_failed
-			return
-		fi
-
-		if grep "not updating" $TMPDIR/pull_closed.out > /dev/null 2>&1; then
-			staffer hg --cwd $CODEMGR_WS/usr/closed merge \
-			    >> $TMPDIR/pull_closed.out 2>&1
-			if (( $? != 0 )); then
-				printf "closed merge failed as follows:\n\n"
-				cat $TMPDIR/pull_closed.out
-				if grep "^merging.*failed" $TMPDIR/pull_closed.out > /dev/null 2>&1; then
-					printf "$mergefailmsg"
-				fi
-				touch $TMPDIR/bringover_failed
-				return
-			fi
-		fi
-
-		printf "updated %s with the following results:\n" \
-		    "$CODEMGR_WS/usr/closed"
-		cat $TMPDIR/pull_closed.out
-		if grep "^merging" $TMPDIR/pull_closed.out > /dev/null 2>&1; then
-			printf "$mergepassmsg"
-		fi
-	fi
-
-	#
 	# Per-changeset output is neither useful nor manageable for a
 	# newly-created repository.
 	#
@@ -2431,18 +2253,13 @@ if [ "$n_FLAG" = "n" ]; then
 
 	run_hook POST_BRINGOVER
 
-	#
-	# Possible transition from pre-split workspace to split
-	# workspace.  See if the bringover changed anything.
-	#
-	CLOSED_IS_PRESENT="$orig_closed_is_present"
 	check_closed_tree
 
 else
 	echo "\n==== No bringover to $CODEMGR_WS ====\n" >> $LOGFILE
 fi
 
-if [[ "$O_FLAG" = y && "$CLOSED_IS_PRESENT" != "yes" ]]; then
+if [[ "$O_FLAG" = y ]]; then
 	build_ok=n
 	echo "OpenSolaris binary deliverables need usr/closed." \
 	    | tee -a "$mail_msg_file" >> $LOGFILE
@@ -2622,7 +2439,6 @@ fi
 
 if [ "$SO_FLAG" = "y" -a "$build_ok" = y ]; then
 	SRC=$OPEN_SRCDIR/usr/src
-	export CLOSED_IS_PRESENT=no
 fi
 
 if is_source_build && [ $build_ok = y ] ; then
