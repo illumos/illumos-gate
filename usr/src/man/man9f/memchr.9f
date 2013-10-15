@@ -9,7 +9,7 @@ memchr, memcmp, memcpy, memmove, memset \- Memory operations
 .SH SYNOPSIS
 .LP
 .nf
-#include <sys/ddi.h>
+#include <sys/sunddi.h>
 
 
 
