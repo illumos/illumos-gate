@@ -230,126 +230,6 @@ function rename_files {
 	done
 }
 
-#
-# Copy some or all of the source tree.
-#
-# Returns 0 for success, non-zero for failure.
-#
-# usage: copy_source CODEMGR_WS DESTDIR LABEL SRCROOT
-#
-function copy_source {
-	WS=$1
-	DEST=$2
-	label=$3
-	srcroot=$4
-
-	printf "\n==== Creating %s source from %s (%s) ====\n\n" \
-	    "$DEST" "$WS" "$label" | tee -a $mail_msg_file >> $LOGFILE
-
-	printf "cleaning out %s\n" "$DEST." >> $LOGFILE
-	rm -rf "$DEST" >> $LOGFILE 2>&1
-
-	printf "creating %s\n" "$DEST." >> $LOGFILE
-	mkdir -p "$DEST" 2>> $LOGFILE
-
-	if (( $? != 0 )) ; then
-		printf "failed to create %s\n" "$DEST" |
-		    tee -a $mail_msg_file >> $LOGFILE
-		build_ok=n
-		return 1
-	fi
-	cd "$WS"
-
-	printf "populating %s\n" "$DEST." >> $LOGFILE
-
-	case "$SCM_TYPE" in
-	teamware)
-		find $srcroot -name 's\.*' -a -type f -print | \
-		    sed -e 's,SCCS\/s.,,' | \
-		    grep -v '/\.del-*' | \
-		    cpio -pd $DEST >>$LOGFILE 2>&1
-		if (( $? != 0 )) ; then
-		    printf "cpio failed for %s\n" "$DEST" |
-			tee -a $mail_msg_file >> $LOGFILE
-		    build_ok=n
-		    return 1
-		fi
-		;;
-	mercurial)
-		copy_source_mercurial $DEST $srcroot
-		if (( $? != 0 )) ; then
-		    build_ok=n
-		    return 1
-		fi
-		;;
-	*)
-		build_ok=n
-		echo "Tree copy is not supported for workspace type" \
-		    "$SCM_TYPE" | tee -a $mail_msg_file >> $LOGFILE
-		return 1
-		;;
-	esac
-
-	return 0
-}
-
-#
-# Mercurial-specific copy code for copy_source().
-#
-# Returns 0 for success, non-zero for failure.
-#
-# usage: copy_source_mercurial destdir srcroot
-#
-function copy_source_mercurial {
-	typeset dest=$1
-	typeset srcroot=$2
-
-	hg locate -I "$srcroot" | cpio -pd "$dest" >>$LOGFILE 2>&1
-	if (( $? != 0 )) ; then
-	    printf "cpio failed for %s\n" "$dest" |
-		tee -a $mail_msg_file >> $LOGFILE
-	    return 1
-	fi
-
-	return 0
-}
-
-#
-# function to create (but not build) the export/crypt source tree.
-# usage: set_up_source_build CODEMGR_WS DESTDIR MAKE_TARGET
-# Sets SRC to the modified source tree, for use by the caller when it
-# builds the tree.
-#
-function set_up_source_build {
-	WS=$1
-	DEST=$2
-	MAKETARG=$3
-
-	copy_source $WS $DEST $MAKETARG usr
-	if (( $? != 0 )); then
-	    echo "\nCould not copy source tree for source build." |
-		tee -a $mail_msg_file >> $LOGFILE
-	    build_ok=n
-	    return
-	fi
-
-	SRC=${DEST}/usr/src
-
-	cd $SRC
-	rm -f ${MAKETARG}.out
-	echo "making ${MAKETARG} in ${SRC}." >> $LOGFILE
-	/bin/time $MAKE -e ${MAKETARG} 2>&1 | \
-	    tee -a $SRC/${MAKETARG}.out >> $LOGFILE
-	echo "\n==== ${MAKETARG} build errors ====\n" >> $mail_msg_file
-	egrep ":" $SRC/${MAKETARG}.out | \
-		egrep -e "(^${MAKE}:|[ 	]error[: 	\n])" | \
-		egrep -v "Ignoring unknown host" | \
-		egrep -v "warning" >> $mail_msg_file
-
-	echo "clearing state files." >> $LOGFILE
-	find . -name '.make*' -exec rm -f {} \;
-}
-
 # Return library search directive as function of given root.
 function myldlibs {
 	echo "-L$1/lib -L$1/usr/lib"
@@ -381,11 +261,6 @@ function build {
 
 	ORIGROOT=$ROOT
 	[ $MULTIPROTO = no ] || export ROOT=$ROOT$SUFFIX
-
-	if [[ "$O_FLAG" = y ]]; then
-		echo "\nSetting CLOSEDROOT= ${ROOT}-closed\n" >> $LOGFILE
-		export CLOSEDROOT=${ROOT}-closed
-	fi
 
 	export ENVLDLIBS1=`myldlibs $ROOT`
 	export ENVCPPFLAGS1=`myheaders $ROOT`
@@ -909,18 +784,13 @@ if [ "$TEAMWARE" = "" ]; then
 	export TEAMWARE
 fi
 
-USAGE='Usage: nightly [-in] [+t] [-V VERS ] [ -S E|D|H|O ] <env_file>
+USAGE='Usage: nightly [-in] [+t] [-V VERS ] <env_file>
 
 Where:
 	-i	Fast incremental options (no clobber, lint, check)
 	-n      Do not do a bringover
 	+t	Use the build tools in $ONBLD_TOOLS/bin
 	-V VERS set the build version string to VERS
-	-S	Build a variant of the source product
-		E - build exportable source
-		D - build domestic source (exportable + crypt)
-		H - build hybrid source (binaries + deleted source)
-		O - build (only) open source
 
 	<env_file>  file in Bourne shell syntax that sets and exports
 	variables that configure the operation of this script and many of
@@ -938,7 +808,6 @@ NIGHTLY_OPTIONS variable in the <env_file> as follows:
 	-I	integration engineer default group of options (-ampu)
 	-M	do not run pmodes (safe file permission checker)
 	-N	do not run protocmp
-	-O	generate OpenSolaris deliverables
 	-R	default group of options for building a release (-mp)
 	-U	update proto area in the parent
 	-V VERS set the build version string to VERS
@@ -958,11 +827,6 @@ NIGHTLY_OPTIONS variable in the <env_file> as follows:
 	-w	report on differences between previous and current proto areas
 	-z	compress cpio archives with gzip
 	-W	Do not report warnings (freeware gate ONLY)
-	-S	Build a variant of the source product
-		E - build exportable source
-		D - build domestic source (exportable + crypt)
-		H - build hybrid source (binaries + deleted source)
-		O - build (only) open source
 '
 #
 #	A log file will be generated under the name $LOGFILE
@@ -982,7 +846,6 @@ M_FLAG=n
 m_FLAG=n
 N_FLAG=n
 n_FLAG=n
-O_FLAG=n
 o_FLAG=n
 P_FLAG=n
 p_FLAG=n
@@ -995,59 +858,22 @@ V_FLAG=n
 W_FLAG=n
 w_FLAG=n
 X_FLAG=n
-SD_FLAG=n
-SE_FLAG=n
-SH_FLAG=n
-SO_FLAG=n
 #
 XMOD_OPT=
 #
 build_ok=y
 
-function is_source_build {
-	[ "$SE_FLAG" = "y" -o "$SD_FLAG" = "y" -o \
-	    "$SH_FLAG" = "y" -o "$SO_FLAG" = "y" ]
-	return $?
-}
-
 #
 # examine arguments
 #
 
-#
-# single function for setting -S flag and doing error checking.
-# usage: set_S_flag <type>
-# where <type> is the source build type ("E", "D", ...).
-#
-function set_S_flag {
-	if is_source_build; then
-		echo "Can only build one source variant at a time."
-		exit 1
-	fi
-	if [ "$1" = "E" ]; then
-		SE_FLAG=y
-	elif [ "$1" = "D" ]; then
-		SD_FLAG=y
-	elif [ "$1" = "H" ]; then
-		SH_FLAG=y
-	elif [ "$1" = "O" ]; then
-		SO_FLAG=y
-	else
-		echo "$USAGE"
-		exit 1
-	fi
-}
-
 OPTIND=1
-while getopts +inS:tV: FLAG
+while getopts +intV: FLAG
 do
 	case $FLAG in
 	  i )	i_FLAG=y; i_CMD_LINE_FLAG=y
 		;;
 	  n )	n_FLAG=y
-		;;
-	  S )
-		set_S_flag $OPTARG
 		;;
 	 +t )	t_FLAG=n
 		;;
@@ -1207,7 +1033,7 @@ check_closed_tree
 #
 NIGHTLY_OPTIONS=-${NIGHTLY_OPTIONS#-}
 OPTIND=1
-while getopts +ABCDdFfGIilMmNnOoPpRrS:TtUuWwXxz FLAG $NIGHTLY_OPTIONS
+while getopts +ABCDdFfGIilMmNnoPpRrTtUuWwXxz FLAG $NIGHTLY_OPTIONS
 do
 	case $FLAG in
 	  A )	A_FLAG=y
@@ -1240,8 +1066,6 @@ do
 		;;
 	  n )	n_FLAG=y
 		;;
-	  O )	O_FLAG=y
-		;;
 	  o )	o_FLAG=y
 		;;
 	  P )	P_FLAG=y
@@ -1252,9 +1076,6 @@ do
 		p_FLAG=y
 		;;
 	  r )	r_FLAG=y
-		;;
-	  S )
-		set_S_flag $OPTARG
 		;;
 	  T )	T_FLAG=y
 		;; # obsolete
@@ -1445,23 +1266,6 @@ if [ "$X_FLAG" = "y" ]; then
                 echo "$IA32_IHV_WS: not found"
                 args_ok=n
         fi
-fi
-
-# Append source version
-if [ "$SE_FLAG" = "y" ]; then
-	VERSION="${VERSION}:EXPORT"
-fi
-
-if [ "$SD_FLAG" = "y" ]; then
-	VERSION="${VERSION}:DOMESTIC"
-fi
-
-if [ "$SH_FLAG" = "y" ]; then
-	VERSION="${VERSION}:MODIFIED_SOURCE_PRODUCT"
-fi
-
-if [ "$SO_FLAG" = "y" ]; then
-	VERSION="${VERSION}:OPEN_ONLY"
 fi
 
 TMPDIR="/tmp/nightly.tmpdir.$$"
@@ -1699,11 +1503,6 @@ function allprotos {
 		roots="$roots $ROOT-nd"
 	fi
 
-	if [[ $O_FLAG = y ]]; then
-		roots="$roots $ROOT-closed"
-		[ $MULTI_PROTO = yes ] && roots="$roots $ROOT-nd-closed"
-	fi
-
 	echo $roots
 }
 
@@ -1783,43 +1582,18 @@ if [ "$T_FLAG" = "y" ]; then
 	obsolete_build TRACE | tee -a $mail_msg_file >> $LOGFILE
 fi
 
-if is_source_build; then
-	if [ "$i_FLAG" = "y" -o "$i_CMD_LINE_FLAG" = "y" ]; then
-		echo "WARNING: the -S flags do not support incremental" \
-		    "builds; forcing clobber\n" | tee -a $mail_msg_file >> $LOGFILE
-		i_FLAG=n
-		i_CMD_LINE_FLAG=n
-	fi
-	if [ "$N_FLAG" = "n" ]; then
-		echo "WARNING: the -S flags do not support protocmp;" \
-		    "protocmp disabled\n" | \
-		    tee -a $mail_msg_file >> $LOGFILE
-		N_FLAG=y
-	fi
-	if [ "$l_FLAG" = "y" ]; then
-		echo "WARNING: the -S flags do not support lint;" \
-		    "lint disabled\n" | tee -a $mail_msg_file >> $LOGFILE
-		l_FLAG=n
-	fi
-	if [ "$C_FLAG" = "y" ]; then
-		echo "WARNING: the -S flags do not support cstyle;" \
-		    "cstyle check disabled\n" | tee -a $mail_msg_file >> $LOGFILE
-		C_FLAG=n
-	fi
-else
-	if [ "$N_FLAG" = "y" ]; then
-		if [ "$p_FLAG" = "y" ]; then
-			cat <<EOF | tee -a $mail_msg_file >> $LOGFILE
+if [ "$N_FLAG" = "y" ]; then
+	if [ "$p_FLAG" = "y" ]; then
+		cat <<EOF | tee -a $mail_msg_file >> $LOGFILE
 WARNING: the p option (create packages) is set, but so is the N option (do
          not run protocmp); this is dangerous; you should unset the N option
 EOF
-		else
-			cat <<EOF | tee -a $mail_msg_file >> $LOGFILE
+	else
+		cat <<EOF | tee -a $mail_msg_file >> $LOGFILE
 Warning: the N option (do not run protocmp) is set; it probably shouldn't be
 EOF
-		fi
-		echo "" | tee -a $mail_msg_file >> $LOGFILE
 	fi
+	echo "" | tee -a $mail_msg_file >> $LOGFILE
 fi
 
 if [ "$D_FLAG" = "n" -a "$l_FLAG" = "y" ]; then
@@ -1874,8 +1648,6 @@ if [ "$t_FLAG" = "n" ]; then
 		    tee -a $mail_msg_file >> $LOGFILE
 	fi
 fi
-
-[ "$O_FLAG" = y ] && MULTI_PROTO=yes
 
 case $MULTI_PROTO in
 yes|no)	;;
@@ -1992,7 +1764,7 @@ if [ "$i_FLAG" = "n" -a -d "$SRC" ]; then
 		egrep -v "Ignoring unknown host" \
 		>> $mail_msg_file
 
-	if [[ "$t_FLAG" = "y" || "$O_FLAG" = "y" ]]; then
+	if [[ "$t_FLAG" = "y" ]]; then
 		echo "\n==== Make tools clobber at `date` ====\n" >> $LOGFILE
 		cd ${TOOLS}
 		rm -f ${TOOLS}/clobber-${MACH}.out
@@ -2259,13 +2031,6 @@ else
 	echo "\n==== No bringover to $CODEMGR_WS ====\n" >> $LOGFILE
 fi
 
-if [[ "$O_FLAG" = y ]]; then
-	build_ok=n
-	echo "OpenSolaris binary deliverables need usr/closed." \
-	    | tee -a "$mail_msg_file" >> $LOGFILE
-	exit 1
-fi
-
 # Safeguards
 [[ -v CODEMGR_WS ]] || fatal_error "Error: Variable CODEMGR_WS not set."
 [[ -d "${CODEMGR_WS}" ]] || fatal_error "Error: ${CODEMGR_WS} is not a directory."
@@ -2340,7 +2105,7 @@ fi
 #
 # Build and use the workspace's tools if requested
 #
-if [[ "$t_FLAG" = "y" || "$O_FLAG" = y ]]; then
+if [[ "$t_FLAG" = "y" ]]; then
 	set_non_debug_build_flags
 
 	build_tools ${TOOLS_PROTO}
@@ -2356,111 +2121,14 @@ if [ "$X_FLAG" = "y" ]; then
 	copy_ihv_proto
 fi
 
-if [ "$i_FLAG" = "y" -a "$SH_FLAG" = "y" ]; then
-	echo "\n==== NOT Building base OS-Net source ====\n" | \
-	    tee -a $LOGFILE >> $mail_msg_file
-else
-	# timestamp the start of the normal build; the findunref tool uses it.
-	touch $SRC/.build.tstamp
+# timestamp the start of the normal build; the findunref tool uses it.
+touch $SRC/.build.tstamp
 
-	normal_build
-fi
-
-#
-# Generate the THIRDPARTYLICENSE files if needed.  This is done after
-# the build, so that dynamically-created license files are there.
-# It's done before findunref to help identify license files that need
-# to be added to tools/opensolaris/license-list.
-#
-if [ "$O_FLAG" = y -a "$build_ok" = y ]; then
-	echo "\n==== Generating THIRDPARTYLICENSE files ====\n" |
-	    tee -a "$mail_msg_file" >> "$LOGFILE"
-
-	if [ -d $ROOT/licenses/usr ]; then
-		( cd $ROOT/licenses ; \
-		    mktpl $SRC/pkg/license-list ) >> "$LOGFILE" 2>&1
-		if (( $? != 0 )) ; then
-			echo "Couldn't create THIRDPARTYLICENSE files" |
-			    tee -a "$mail_msg_file" >> "$LOGFILE"
-		fi
-	else
-		echo "No licenses found under $ROOT/licenses" |
-		    tee -a "$mail_msg_file" >> "$LOGFILE"
-	fi
-fi
+normal_build
 
 ORIG_SRC=$SRC
 BINARCHIVE=${CODEMGR_WS}/bin-${MACH}.cpio.Z
 
-if [ "$SE_FLAG" = "y" -o "$SD_FLAG" = "y" -o "$SH_FLAG" = "y" ]; then
-	save_binaries
-fi
-
-
-# EXPORT_SRC comes after CRYPT_SRC since a domestic build will need
-# $SRC pointing to the export_source usr/src.
-
-if [ "$SE_FLAG" = "y" -o "$SD_FLAG" = "y" -o "$SH_FLAG" = "y" ]; then
-	if [ "$SD_FLAG" = "y" -a $build_ok = y ]; then
-	    set_up_source_build ${CODEMGR_WS} ${CRYPT_SRC} CRYPT_SRC
-	fi
-
-	if [ $build_ok = y ]; then
-	    set_up_source_build ${CODEMGR_WS} ${EXPORT_SRC} EXPORT_SRC
-	fi
-fi
-
-if [ "$SD_FLAG" = "y" -a $build_ok = y ]; then
-	# drop the crypt files in place.
-	cd ${EXPORT_SRC}
-	echo "\nextracting crypt_files.cpio.Z onto export_source.\n" \
-	    >> ${LOGFILE}
-	zcat ${CODEMGR_WS}/crypt_files.cpio.Z | \
-	    cpio -idmucvB 2>/dev/null >> ${LOGFILE}
-	if [ "$?" = "0" ]; then
-		echo "\n==== DOMESTIC extraction succeeded ====\n" \
-		    >> $mail_msg_file
-	else
-		echo "\n==== DOMESTIC extraction failed ====\n" \
-		    >> $mail_msg_file
-	fi
-
-fi
-
-if [ "$SO_FLAG" = "y" -a "$build_ok" = y ]; then
-	#
-	# Copy the open sources into their own tree.
-	# If copy_source fails, it will have already generated an
-	# error message and set build_ok=n, so we don't need to worry
-	# about that here.
-	#
-	copy_source $CODEMGR_WS $OPEN_SRCDIR OPEN_SOURCE usr/src
-fi
-
-if [ "$SO_FLAG" = "y" -a "$build_ok" = y ]; then
-	SRC=$OPEN_SRCDIR/usr/src
-fi
-
-if is_source_build && [ $build_ok = y ] ; then
-	# remove proto area(s) here, since we don't clobber
-	rm -rf `allprotos`
-	if [ "$t_FLAG" = "y" ]; then
-		set_non_debug_build_flags
-		ORIG_TOOLS=$TOOLS
-		#
-		# SRC was set earlier to point to the source build
-		# source tree (e.g., $EXPORT_SRC).
-		#
-		TOOLS=${SRC}/tools
-		TOOLS_PROTO=${TOOLS}/${TOOLS_PROTO_REL}; export TOOLS_PROTO
-		build_tools ${TOOLS_PROTO}
-		if [[ $? != 0 ]]; then
-			use_tools ${TOOLS_PROTO}
-		fi
-	fi
-
-	normal_build
-fi
 
 #
 # There are several checks that need to look at the proto area, but
@@ -2835,53 +2503,6 @@ fi
 # Generate the OpenSolaris deliverables if requested.  Some of these
 # steps need to come after findunref and are commented below.
 #
-
-# If we are doing an OpenSolaris _source_ build (-S O) then we do
-# not have usr/closed available to us to generate closedbins from,
-# so skip this part.
-if [ "$SO_FLAG" = n -a "$O_FLAG" = y -a "$build_ok" = y ]; then
-	echo "\n==== Generating OpenSolaris tarballs ====\n" | \
-	    tee -a $mail_msg_file >> $LOGFILE
-
-	cd $CODEMGR_WS
-
-	#
-	# This step grovels through the package manifests, so it
-	# must come after findunref.
-	#
-	# We assume no DEBUG vs non-DEBUG package content variation
-	# here; if that changes, then the "make all" in $SRC/pkg will
-	# need to be moved into the conditionals and repeated for each
-	# different build.
-	#
-	echo "Generating closed binaries tarball(s)..." >> $LOGFILE
-	closed_basename=on-closed-bins
-	if [ "$D_FLAG" = y ]; then
-		bindrop "$closed_basename" >>"$LOGFILE" 2>&1
-		if (( $? != 0 )) ; then
-			echo "Couldn't create DEBUG closed binaries." |
-			    tee -a $mail_msg_file >> $LOGFILE
-			build_ok=n
-		fi
-	fi
-	if [ "$F_FLAG" = n ]; then
-		bindrop -n "$closed_basename-nd" >>"$LOGFILE" 2>&1
-		if (( $? != 0 )) ; then
-			echo "Couldn't create non-DEBUG closed binaries." |
-			    tee -a $mail_msg_file >> $LOGFILE
-			build_ok=n
-		fi
-	fi
-
-	echo "Generating README.opensolaris..." >> $LOGFILE
-	cat $SRC/tools/opensolaris/README.opensolaris.tmpl | \
-	    mkreadme_osol $CODEMGR_WS/README.opensolaris >> $LOGFILE 2>&1
-	if (( $? != 0 )) ; then
-		echo "Couldn't create README.opensolaris." |
-		    tee -a $mail_msg_file >> $LOGFILE
-		build_ok=n
-	fi
-fi
 
 # Verify that the usual lists of files, such as exception lists,
 # contain only valid references to files.  If the build has failed,
