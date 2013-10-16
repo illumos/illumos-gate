@@ -24,6 +24,9 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ */
 
 /*
  * nfs security related library routines.
@@ -68,6 +71,7 @@ static struct sc_data sc_service[] = {
 	NULL,		SC_FAILURE
 };
 
+static mutex_t matching_lock = DEFAULTMUTEX;
 static char *gettoken(char *, int);
 extern	int atoi(const char *str);
 
@@ -354,15 +358,15 @@ nfs_get_qop_name(seconfig_t *entryp)
 {
 	char	*tok;	/* holds a token from the line */
 	char	*secname, *gss_qop = NULL; /* pointer to a secmode name */
-	static	mutex_t matching_lock = DEFAULTMUTEX;
 	char	line[BUFSIZ];	/* holds each line of NFSSEC_CONF */
 	FILE	*fp;		/* file stream for NFSSEC_CONF */
 
+	(void) mutex_lock(&matching_lock);
 	if ((fp = fopen(NFSSEC_CONF, "r")) == NULL) {
+		(void) mutex_unlock(&matching_lock);
 		return (NULL);
 	}
 
-	(void) mutex_lock(&matching_lock);
 	while (fgets(line, BUFSIZ, fp)) {
 		if (!(blank(line) || comment(line))) {
 			if ((secname = gettoken(line, FALSE)) == NULL) {
@@ -389,8 +393,8 @@ nfs_get_qop_name(seconfig_t *entryp)
 		}
 	}
 err:
-	(void) mutex_unlock(&matching_lock);
 	(void) fclose(fp);
+	(void) mutex_unlock(&matching_lock);
 	return (gss_qop);
 }
 
@@ -698,18 +702,18 @@ static int
 get_seconfig(int whichway, char *name, int num,
 		rpc_gss_service_t service, seconfig_t *entryp)
 {
-	static	mutex_t matching_lock = DEFAULTMUTEX;
 	char	line[BUFSIZ];	/* holds each line of NFSSEC_CONF */
 	FILE	*fp;		/* file stream for NFSSEC_CONF */
 
 	if ((whichway == GETBYNAME) && (name == NULL))
 		return (SC_NOTFOUND);
 
+	(void) mutex_lock(&matching_lock);
 	if ((fp = fopen(NFSSEC_CONF, "r")) == NULL) {
+		(void) mutex_unlock(&matching_lock);
 		return (SC_OPENFAIL);
 	}
 
-	(void) mutex_lock(&matching_lock);
 	while (fgets(line, BUFSIZ, fp)) {
 		if (!(blank(line) || comment(line))) {
 			switch (whichway) {
@@ -730,13 +734,13 @@ get_seconfig(int whichway, char *name, int num,
 			}
 		}
 	}
-	(void) mutex_unlock(&matching_lock);
 	(void) fclose(fp);
+	(void) mutex_unlock(&matching_lock);
 	return (SC_NOTFOUND);
 
 found:
-	(void) mutex_unlock(&matching_lock);
 	(void) fclose(fp);
+	(void) mutex_unlock(&matching_lock);
 	(void) get_rpcnum(entryp);
 	return (SC_NOERROR);
 }

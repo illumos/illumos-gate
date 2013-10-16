@@ -19,7 +19,7 @@
  * CDDL HEADER END
  *
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -31,6 +31,7 @@
  */
 
 #include <stdio.h>
+#include <stdio_ext.h>
 #include <stdlib.h>
 #include <ctype.h>
 #include <sys/types.h>
@@ -49,6 +50,7 @@
 #include <sys/systeminfo.h>
 #include <sys/utsname.h>
 #include <sys/wait.h>
+#include <sys/resource.h>
 #include <signal.h>
 #include <locale.h>
 #include <unistd.h>
@@ -364,6 +366,7 @@ main(int argc, char *argv[])
 	long	thr_flags = (THR_NEW_LWP|THR_DAEMON);
 	char defval[4];
 	int defvers, ret, bufsz;
+	struct rlimit rl;
 
 	int	pipe_fd = -1;
 
@@ -389,6 +392,16 @@ main(int argc, char *argv[])
 		    argv[0]);
 		exit(1);
 	}
+
+	if (getrlimit(RLIMIT_NOFILE, &rl) != 0) {
+		syslog(LOG_ERR, "getrlimit failed");
+	} else {
+		rl.rlim_cur = rl.rlim_max;
+		if (setrlimit(RLIMIT_NOFILE, &rl) != 0)
+			syslog(LOG_ERR, "setrlimit failed");
+	}
+
+	(void) enable_extended_FILE_stdio(-1, -1);
 
 	maxthreads = 0;
 
