@@ -22,6 +22,7 @@
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2013 Joyent, Inc.  All rights reserved.
  */
 
 /* Portions Copyright 2007 Jeremy Teo */
@@ -3589,18 +3590,6 @@ top:
 		}
 	}
 
-	vnevent_rename_src(ZTOV(szp), sdvp, snm, ct);
-	if (tzp)
-		vnevent_rename_dest(ZTOV(tzp), tdvp, tnm, ct);
-
-	/*
-	 * notify the target directory if it is not the same
-	 * as source directory.
-	 */
-	if (tdvp != sdvp) {
-		vnevent_rename_dest_dir(tdvp, ct);
-	}
-
 	tx = dmu_tx_create(zfsvfs->z_os);
 	dmu_tx_hold_sa(tx, szp->z_sa_hdl, B_FALSE);
 	dmu_tx_hold_sa(tx, sdzp->z_sa_hdl, B_FALSE);
@@ -3641,8 +3630,12 @@ top:
 		return (error);
 	}
 
-	if (tzp)	/* Attempt to remove the existing target */
+	if (tzp) {
+		/* Attempt to remove the existing target */
 		error = zfs_link_destroy(tdl, tzp, tx, zflg, NULL);
+		if (error == 0)
+			vnevent_rename_dest(ZTOV(tzp), tdvp, tnm, ct);
+	}
 
 	if (error == 0) {
 		error = zfs_link_create(tdl, szp, tx, ZRENAMING);
@@ -3684,6 +3677,13 @@ top:
 	}
 
 	dmu_tx_commit(tx);
+
+	if (error == 0) {
+		vnevent_rename_src(ZTOV(szp), sdvp, snm, ct);
+		/* notify the target dir if it is not the same as source dir */
+		if (tdvp != sdvp)
+			vnevent_rename_dest_dir(tdvp, ct);
+	}
 out:
 	if (zl != NULL)
 		zfs_rename_unlock(&zl);
