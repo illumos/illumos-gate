@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2013 Pluribus Networks, Inc.
  */
 
 /*
@@ -258,13 +259,23 @@ pci_msi_configure(dev_info_t *rdip, int type, int count, int inum,
 		ddi_put32(msix_p->msix_tbl_hdl,
 		    (uint32_t *)(off + PCI_MSIX_DATA_OFFSET), data);
 
-		ddi_put64(msix_p->msix_tbl_hdl,
-		    (uint64_t *)(off + PCI_MSIX_LOWER_ADDR_OFFSET), addr);
+		/*
+		 * Note that the spec only requires 32-bit accesses
+		 * to be supported.  Apparently some chipsets don't
+		 * support 64-bit accesses.
+		 */
+		ddi_put32(msix_p->msix_tbl_hdl,
+		    (uint32_t *)(off + PCI_MSIX_LOWER_ADDR_OFFSET), addr);
+		ddi_put32(msix_p->msix_tbl_hdl,
+		    (uint32_t *)(off + PCI_MSIX_UPPER_ADDR_OFFSET),
+		    addr >> 32);
 
 		DDI_INTR_NEXDBG((CE_CONT, "pci_msi_configure: "
-		    "msix_addr 0x%" PRIx64 " msix_data 0x%x\n",
-		    ddi_get64(msix_p->msix_tbl_hdl,
-		    (uint64_t *)(off + PCI_MSIX_LOWER_ADDR_OFFSET)),
+		    "msix_addr 0x%x.%x msix_data 0x%x\n",
+		    ddi_get32(msix_p->msix_tbl_hdl,
+		    (uint32_t *)(off + PCI_MSIX_UPPER_ADDR_OFFSET)),
+		    ddi_get32(msix_p->msix_tbl_hdl,
+		    (uint32_t *)(off + PCI_MSIX_LOWER_ADDR_OFFSET)),
 		    ddi_get32(msix_p->msix_tbl_hdl,
 		    (uint32_t *)(off + PCI_MSIX_DATA_OFFSET))));
 	}
@@ -325,8 +336,15 @@ pci_msi_unconfigure(dev_info_t *rdip, int type, int inum)
 		ddi_put32(msix_p->msix_tbl_hdl,
 		    (uint32_t *)(off + PCI_MSIX_DATA_OFFSET), 0);
 
-		ddi_put64(msix_p->msix_tbl_hdl,
-		    (uint64_t *)(off + PCI_MSIX_LOWER_ADDR_OFFSET), 0);
+		/*
+		 * Note that the spec only requires 32-bit accesses
+		 * to be supported.  Apparently some chipsets don't
+		 * support 64-bit accesses.
+		 */
+		ddi_put32(msix_p->msix_tbl_hdl,
+		    (uint32_t *)(off + PCI_MSIX_LOWER_ADDR_OFFSET), 0);
+		ddi_put32(msix_p->msix_tbl_hdl,
+		    (uint32_t *)(off + PCI_MSIX_UPPER_ADDR_OFFSET), 0);
 	}
 
 	pci_config_teardown(&h);
@@ -954,9 +972,16 @@ pci_msix_dup(dev_info_t *rdip, int org_inum, int dup_inum)
 	off = (uintptr_t)msix_p->msix_tbl_addr +
 	    (org_inum * PCI_MSIX_VECTOR_SIZE);
 
-	/* For the MSI-X number passed in, get the "data" and "addr" fields */
-	addr = ddi_get64(msix_p->msix_tbl_hdl,
-	    (uint64_t *)(off + PCI_MSIX_LOWER_ADDR_OFFSET));
+	/*
+	 * For the MSI-X number passed in, get the "data" and "addr" fields.
+	 *
+	 * Note that the spec only requires 32-bit accesses to be supported.
+	 * Apparently some chipsets don't support 64-bit accesses.
+	 */
+	addr = ddi_get32(msix_p->msix_tbl_hdl,
+	    (uint32_t *)(off + PCI_MSIX_UPPER_ADDR_OFFSET));
+	addr = (addr << 32) | ddi_get32(msix_p->msix_tbl_hdl,
+	    (uint32_t *)(off + PCI_MSIX_LOWER_ADDR_OFFSET));
 
 	data = ddi_get32(msix_p->msix_tbl_hdl,
 	    (uint32_t *)(off + PCI_MSIX_DATA_OFFSET));
