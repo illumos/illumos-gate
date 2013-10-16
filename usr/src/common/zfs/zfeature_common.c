@@ -153,9 +153,9 @@ zpool_feature_init(void)
 	zfeature_register(SPA_FEATURE_LZ4_COMPRESS,
 	    "org.illumos:lz4_compress", "lz4_compress",
 	    "LZ4 compression algorithm support.", B_FALSE, B_FALSE, NULL);
-	zfeature_register(SPA_FEATURE_FS_SS_LIMIT,
-	    "com.joyent:filesystem_limits", "filesystem_limits",
-	    "Filesystem and snapshot limits.", B_TRUE, B_FALSE, NULL);
+	zfeature_register(SPA_FEATURE_FS_SS_LIMIT_OBS,
+	    "com.joyent:filesystem_limits", "obsolete_fs_limits",
+	    "Obsolete fs and ss limits.", B_TRUE, B_FALSE, NULL);
 	zfeature_register(SPA_FEATURE_MULTI_VDEV_CRASH_DUMP,
 	    "com.joyent:multi_vdev_crash_dump", "multi_vdev_crash_dump",
 	    "Crash dumps to multiple vdev pools.", B_FALSE, B_FALSE, NULL);
