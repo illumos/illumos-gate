@@ -184,8 +184,9 @@ sub print_stats {
 	    $etime;
 
 	# Calculate average service time
-	my $read_t = $r_tps > 0 ? $r_actv * (1000 / $r_tps) : 0.0;
-	my $writ_t = $w_tps > 0 ? $w_actv * (1000 / $w_tps) : 0.0;
+	# multiply by 1000 to convert to usecs for conssistency with del_t
+	my $read_t = ($r_tps > 0 ? $r_actv * (1000 / $r_tps) : 0.0) * 1000;
+	my $writ_t = ($w_tps > 0 ? $w_actv * (1000 / $w_tps) : 0.0) * 1000;
 
 	# Calculate I/O throttle delay metrics
 	my $delays = $data->{'delay_cnt'} - $old->{'delay_cnt'};
