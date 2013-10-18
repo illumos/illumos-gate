@@ -50,7 +50,7 @@ typedef enum {
 typedef enum {
 	RW_WRITER,
 	RW_READER,
-	RW_READER_STARVEWRITER,
+	RW_READER_STARVEWRITER
 } krw_t;
 
 typedef struct _krwlock {
