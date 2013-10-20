@@ -3789,7 +3789,10 @@ zsched(void *arg)
 			mutex_enter(&zone_status_lock);
 			zone_status_set(zone, ZONE_IS_SHUTTING_DOWN);
 			mutex_exit(&zone_status_lock);
+		} else {
+			zone->zone_boot_time = gethrestime_sec();
 		}
+
 		pool_unlock();
 	}
 

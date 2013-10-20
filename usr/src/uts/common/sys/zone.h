@@ -490,6 +490,9 @@ typedef struct zone {
 	hrtime_t	zone_pool_mod;	/* last pool bind modification time */
 	/* zone_psetid is protected by cpu_lock */
 	psetid_t	zone_psetid;	/* pset the zone is bound to */
+
+	time_t		zone_boot_time;	/* Similar to boot_time */
+
 	/*
 	 * The following two can be read without holding any locks.  They are
 	 * updated under cpu_lock.
