@@ -2009,7 +2009,10 @@ file path=opt/SUNWdtrt/tst/common/usdt/tst.linkpriv.ksh mode=0444
 file path=opt/SUNWdtrt/tst/common/usdt/tst.linkunpriv.ksh mode=0444
 file path=opt/SUNWdtrt/tst/common/usdt/tst.multiple.ksh mode=0444
 file path=opt/SUNWdtrt/tst/common/usdt/tst.multiple.ksh.out mode=0444
+file path=opt/SUNWdtrt/tst/common/usdt/tst.multiprov.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/usdt/tst.multiprov.ksh.out mode=0444
 file path=opt/SUNWdtrt/tst/common/usdt/tst.nodtrace.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/usdt/tst.noprobes.ksh mode=0444
 file path=opt/SUNWdtrt/tst/common/usdt/tst.noreap.ksh mode=0444
 file path=opt/SUNWdtrt/tst/common/usdt/tst.noreapring.ksh mode=0444
 file path=opt/SUNWdtrt/tst/common/usdt/tst.onlyenabled.ksh mode=0444
