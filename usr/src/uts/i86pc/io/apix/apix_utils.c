@@ -28,6 +28,7 @@
  */
 /*
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2013 Pluribus Networks, Inc.
  */
 
 #include <sys/processor.h>
@@ -364,8 +365,11 @@ apix_pci_msi_enable_vector(apix_vector_t *vecp, dev_info_t *dip, int type,
 
 		ddi_put32(msix_p->msix_tbl_hdl,
 		    (uint32_t *)(off + PCI_MSIX_DATA_OFFSET), msi_data);
-		ddi_put64(msix_p->msix_tbl_hdl,
-		    (uint64_t *)(off + PCI_MSIX_LOWER_ADDR_OFFSET), msi_addr);
+		ddi_put32(msix_p->msix_tbl_hdl,
+		    (uint32_t *)(off + PCI_MSIX_LOWER_ADDR_OFFSET), msi_addr);
+		ddi_put32(msix_p->msix_tbl_hdl,
+		    (uint32_t *)(off + PCI_MSIX_UPPER_ADDR_OFFSET),
+		    msi_addr >> 32);
 	}
 }
 

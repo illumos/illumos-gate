@@ -30,6 +30,6 @@
 #
 
 <include global_zone_only_component>
-set name=pkg.fmri value=pkg:/driver/storage/pcata@0.5.11,5.11-0.148
+set name=pkg.fmri value=pkg:/driver/storage/pcata@$(PKGVERS)
 set name=pkg.obsolete value=true
 set name=variant.arch value=$(ARCH)
