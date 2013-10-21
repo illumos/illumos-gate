@@ -44,7 +44,6 @@ case "$MACH" in
 	usbftdi	-1	0	ldterm ttcompat
 	ipsecesp -1	0	ipsecesp
 	ipsecah	-1	0	ipsecah
-	pcser	0	255	ldterm ttcompat
 " > iu.ap
 	;;
   "sparc" )
@@ -77,7 +76,6 @@ case "$MACH" in
 	ipsecesp -1	0	ipsecesp
 	ipsecah	-1	0	ipsecah
 	oplmsu	0	0	ldterm ttcompat
-	pcser	0	255	ldterm ttcompat
 " >iu.ap
 	;;
   * )

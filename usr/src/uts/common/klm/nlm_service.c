@@ -26,8 +26,8 @@
  */
 
 /*
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -388,7 +388,7 @@ nlm_do_test(nlm4_testargs *argp, nlm4_testres *resp,
 
 out:
 	/*
-	 * If we have a callback funtion, use that to
+	 * If we have a callback function, use that to
 	 * deliver the response via another RPC call.
 	 */
 	if (cb != NULL && rpcp != NULL)
@@ -805,7 +805,7 @@ nlm_do_cancel(nlm4_cancargs *argp, nlm4_res *resp,
 
 out:
 	/*
-	 * If we have a callback funtion, use that to
+	 * If we have a callback function, use that to
 	 * deliver the response via another RPC call.
 	 */
 	if (cb != NULL && rpcp != NULL)
@@ -890,7 +890,7 @@ nlm_do_unlock(nlm4_unlockargs *argp, nlm4_res *resp,
 	DTRACE_PROBE1(unlock__res, int, error);
 out:
 	/*
-	 * If we have a callback funtion, use that to
+	 * If we have a callback function, use that to
 	 * deliver the response via another RPC call.
 	 */
 	if (cb != NULL && rpcp != NULL)
@@ -962,7 +962,7 @@ nlm_do_granted(nlm4_testargs *argp, nlm4_res *resp,
 
 out:
 	/*
-	 * If we have a callback funtion, use that to
+	 * If we have a callback function, use that to
 	 * deliver the response via another RPC call.
 	 */
 	if (cb != NULL && rpcp != NULL)

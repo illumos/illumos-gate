@@ -23,6 +23,7 @@
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2013 Garrett D'Amore <garrett@damore.org>
 #
 
 set name=pkg.fmri value=pkg:/system/header@$(PKGVERS)
@@ -102,7 +103,6 @@ dir path=usr/include/sys/ib/mgt
 dir path=usr/include/sys/ib/mgt/ibmf
 dir path=usr/include/sys/iso
 dir path=usr/include/sys/lvm
-dir path=usr/include/sys/pcmcia
 dir path=usr/include/sys/proc
 dir path=usr/include/sys/rsm
 $(i386_ONLY)dir path=usr/include/sys/sata group=sys
@@ -1284,12 +1284,6 @@ $(i386_ONLY)file path=usr/include/sys/pcic_reg.h
 $(i386_ONLY)file path=usr/include/sys/pcic_var.h
 file path=usr/include/sys/pcie.h
 file path=usr/include/sys/pcmcia.h
-file path=usr/include/sys/pcmcia/pcata.h
-file path=usr/include/sys/pcmcia/pcser_conf.h
-file path=usr/include/sys/pcmcia/pcser_io.h
-file path=usr/include/sys/pcmcia/pcser_manuspec.h
-file path=usr/include/sys/pcmcia/pcser_reg.h
-file path=usr/include/sys/pcmcia/pcser_var.h
 file path=usr/include/sys/pctypes.h
 file path=usr/include/sys/pfmod.h
 file path=usr/include/sys/pg.h

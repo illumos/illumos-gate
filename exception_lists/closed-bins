@@ -20,6 +20,8 @@
 ./kernel/drv/amd64/iprb
 ./kernel/drv/pcn
 ./kernel/drv/amd64/pcn
+./kernel/drv/pcser
+./kernel/drv/amd64/pcser
 ./kernel/misc/klmmod
 ./kernel/misc/amd64/klmmod
 ./kernel/misc/klmops
@@ -34,13 +36,14 @@
 ./usr/has
 ./usr/has/bin
 ./usr/has/bin/patch
+./usr/include/sys/pcmcia
 ./usr/kernel
 ./usr/kernel/strmod
 ./usr/kernel/strmod/amd64
 ./usr/kernel/strmod/sparcv9
 ./usr/kernel/drv
-./usr/kenrel/drv/amd64
-./usr/kenrel/drv/sparcv9
+./usr/kernel/drv/amd64
+./usr/kernel/drv/sparcv9
 ./usr/kernel/drv/amd64/llc2
 ./usr/kernel/drv/sparcv9/llc2
 ./usr/kernel/drv/llc2.conf

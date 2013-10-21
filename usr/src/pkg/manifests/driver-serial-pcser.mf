@@ -30,23 +30,5 @@
 #
 <include global_zone_only_component>
 set name=pkg.fmri value=pkg:/driver/serial/pcser@$(PKGVERS)
-set name=pkg.description value="PCMCIA serial card driver"
-set name=pkg.summary value="PCMCIA serial card driver"
-set name=info.classification \
-    value="org.opensolaris.category.2008:Drivers/Other Peripherals"
+set name=pkg.obsolete value=true
 set name=variant.arch value=$(ARCH)
-dir path=kernel group=sys
-dir path=kernel/drv group=sys
-dir path=kernel/drv/$(ARCH64) group=sys
-driver name=pcser perms="* 0666 uucp uucp" \
-    alias=pccard,Intel_MODEM_2400+_iNC110US_A- \
-    alias=pccard,serial \
-    alias=pccard102,2 \
-    alias=pccard102,5
-file path=kernel/drv/$(ARCH64)/pcser group=sys
-$(i386_ONLY)file path=kernel/drv/pcser group=sys
-legacy pkg=SUNWpcser desc="PCMCIA serial card driver" \
-    name="PCMCIA serial card driver"
-license cr_Sun license=cr_Sun
-license lic_OSBL license=lic_OSBL
-license lic_OSBL_preamble license=lic_OSBL_preamble

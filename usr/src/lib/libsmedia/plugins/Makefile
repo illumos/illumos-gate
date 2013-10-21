@@ -20,6 +20,7 @@
 #
 #
 # Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2013 Garrett D'Amore <garrett@damore.org>
 #
 # lib/libsmedia/plugins/Makefile
 
@@ -27,8 +28,7 @@
 SUBDIRS = \
 	blkdev \
 	scsi \
-	floppy \
-	pcata
+	floppy
 
 def             :=      TARGET= def
 all             :=      TARGET= all

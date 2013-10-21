@@ -21,6 +21,7 @@
 #
 # Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2013, Joyent, Inc. All rights reserved.
+# Copyright 2013 Garrett D'Amore <garrett@damore.org>
 #
 
 include $(SRC)/uts/Makefile.uts
@@ -889,14 +890,6 @@ FSHDRS=				\
 	zfs.h			\
 	zut.h
 
-PCMCIAHDRS=		\
-	pcata.h		\
-	pcser_conf.h	\
-	pcser_io.h	\
-	pcser_reg.h	\
-	pcser_manuspec.h \
-	pcser_var.h
-
 SCSIHDRS=		\
 	scsi.h		\
 	scsi_address.h	\
@@ -1190,7 +1183,6 @@ CHECKHDRS=						\
 	$(FMIOHDRS:%.h=fm/io/%.check)			\
 	$(FSHDRS:%.h=fs/%.check)			\
 	$(LVMHDRS:%.h=lvm/%.check)			\
-	$(PCMCIAHDRS:%.h=pcmcia/%.check)		\
 	$(SCSIHDRS:%.h=scsi/%.check)			\
 	$(SCSIADHDRS:%.h=scsi/adapters/%.check)		\
 	$(SCSICONFHDRS:%.h=scsi/conf/%.check)		\
@@ -1260,7 +1252,6 @@ CHECKHDRS=						\
 	$(ROOTHERMONHDRS)	\
 	$(ROOTMLNXHDRS)		\
 	$(ROOTLVMHDRS)		\
-	$(ROOTPCMCIAHDRS)	\
 	$(ROOTSCSIHDRS)		\
 	$(ROOTSCSIADHDRS)	\
 	$(ROOTSCSICONFHDRS)	\
@@ -1330,7 +1321,6 @@ install_h:			\
 	$(ROOTHERMONHDRS)	\
 	$(ROOTMLNXHDRS)		\
 	$(ROOTLVMHDRS)		\
-	$(ROOTPCMCIAHDRS)	\
 	$(ROOTSCSIHDRS)		\
 	$(ROOTSCSIADHDRS)	\
 	$(ROOTSCSIISCSIHDRS)	\

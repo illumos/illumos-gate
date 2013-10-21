@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013 Pluribus Networks, Inc.
  */
 
 /*
@@ -136,8 +137,11 @@ apic_pci_msi_enable_vector(apic_irq_t *irq_ptr, int type, int inum, int vector,
 
 		ddi_put32(msix_p->msix_tbl_hdl,
 		    (uint32_t *)(off + PCI_MSIX_DATA_OFFSET), msi_data);
-		ddi_put64(msix_p->msix_tbl_hdl,
-		    (uint64_t *)(off + PCI_MSIX_LOWER_ADDR_OFFSET), msi_addr);
+		ddi_put32(msix_p->msix_tbl_hdl,
+		    (uint32_t *)(off + PCI_MSIX_LOWER_ADDR_OFFSET), msi_addr);
+		ddi_put32(msix_p->msix_tbl_hdl,
+		    (uint32_t *)(off + PCI_MSIX_UPPER_ADDR_OFFSET),
+		    msi_addr >> 32);
 	}
 }
 

@@ -1071,12 +1071,12 @@ audit_symbind(Rt_map *rlmp, Rt_map *dlmp, Sym *sym, uint_t ndx, Addr value,
 		nsym.st_value = _audit_symbind(auditors->ad_list,
 		    rlmp, dlmp, &nsym, ndx, flags, &called);
 
-	if ((AUDITORS(rlmp) && AUDITORS(rlmp)->ad_flags & LML_TFLG_AUD_SYMBIND))
+	if (AUDITORS(rlmp) && (AUDITORS(rlmp)->ad_flags & LML_TFLG_AUD_SYMBIND))
 		nsym.st_value = _audit_symbind(AUDITORS(rlmp)->ad_list,
 		    rlmp, dlmp, &nsym, ndx, flags, &called);
 
-	if (dlmp != rlmp && (AUDITORS(dlmp) &&
-	    (AUDITORS(dlmp)->ad_flags & LML_TFLG_AUD_SYMBIND))) {
+	if (dlmp != rlmp && AUDITORS(dlmp) &&
+	    (AUDITORS(dlmp)->ad_flags & LML_TFLG_AUD_SYMBIND)) {
 		nsym.st_value = _audit_symbind(AUDITORS(dlmp)->ad_list,
 		    rlmp, dlmp, &nsym, ndx, flags, &called);
 	}
