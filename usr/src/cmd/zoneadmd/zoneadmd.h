@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2012, Joyent Inc. All rights reserved.
+ * Copyright (c) 2013, Joyent Inc. All rights reserved.
  */
 
 #ifndef	_ZONEADMD_H
@@ -152,6 +152,7 @@ extern void resolve_lofs(zlog_t *zlogp, char *path, size_t pathlen);
  */
 extern int init_console(zlog_t *);
 extern void serve_console(zlog_t *);
+extern void zcons_statechanged();
 
 /*
  * Memory capping thread creation.
