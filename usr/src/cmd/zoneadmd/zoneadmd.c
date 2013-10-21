@@ -1597,6 +1597,7 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 			rval = zone_ready(zlogp, Z_MNT_BOOT, zstate);
 			if (rval == 0)
 				eventstream_write(Z_EVT_ZONE_READIED);
+			zcons_statechanged();
 			break;
 		case Z_BOOT:
 		case Z_FORCEBOOT:
@@ -1607,6 +1608,7 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 				    zstate);
 			}
 			audit_put_record(zlogp, uc, rval, "boot");
+			zcons_statechanged();
 			if (rval != 0) {
 				bringup_failure_recovery = B_TRUE;
 				(void) zone_halt(zlogp, B_FALSE, B_FALSE,
@@ -1729,6 +1731,7 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 			eventstream_write(Z_EVT_ZONE_BOOTING);
 			rval = zone_bootup(zlogp, zargp->bootbuf, zstate);
 			audit_put_record(zlogp, uc, rval, "boot");
+			zcons_statechanged();
 			if (rval != 0) {
 				bringup_failure_recovery = B_TRUE;
 				(void) zone_halt(zlogp, B_FALSE, B_TRUE,
@@ -1743,6 +1746,7 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 			if ((rval = zone_halt(zlogp, B_FALSE, B_FALSE, zstate))
 			    != 0)
 				break;
+			zcons_statechanged();
 			eventstream_write(Z_EVT_ZONE_HALTED);
 			break;
 		case Z_SHUTDOWN:
@@ -1790,7 +1794,9 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 			if ((rval = zone_halt(zlogp, B_FALSE, B_TRUE, zstate))
 			    != 0)
 				break;
-			if ((rval = zone_ready(zlogp, Z_MNT_BOOT, zstate)) == 0)
+			zcons_statechanged();
+			if ((rval = zone_ready(zlogp, Z_MNT_BOOT, zstate,
+			    debug)) == 0)
 				eventstream_write(Z_EVT_ZONE_READIED);
 			else
 				eventstream_write(Z_EVT_ZONE_HALTED);
@@ -1815,6 +1821,7 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 			    != 0)
 				break;
 			eventstream_write(Z_EVT_ZONE_HALTED);
+			zcons_statechanged();
 			break;
 		case Z_REBOOT:
 			(void) strlcpy(boot_args, zargp->bootbuf,
@@ -1826,8 +1833,9 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 				boot_args[0] = '\0';
 				break;
 			}
-			if ((rval = zone_ready(zlogp, Z_MNT_BOOT, zstate))
-			    != 0) {
+			zcons_statechanged();
+			if ((rval = zone_ready(zlogp, Z_MNT_BOOT, zstate,
+			    debug)) != 0) {
 				eventstream_write(Z_EVT_ZONE_BOOTFAILED);
 				boot_args[0] = '\0';
 				break;

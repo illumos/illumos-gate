@@ -155,6 +155,7 @@ extern void resolve_lofs(zlog_t *zlogp, char *path, size_t pathlen);
  */
 extern int init_console(zlog_t *);
 extern void serve_console(zlog_t *);
+extern void zcons_statechanged();
 
 /*
  * Memory capping thread creation.
