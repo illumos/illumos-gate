@@ -124,16 +124,6 @@ int zfs_delay_min_dirty_percent = 60;
  */
 uint64_t zfs_delay_scale = 1000 * 1000 * 1000 / 2000;
 
-
-/*
- * XXX someday maybe turn these into #defines, and you have to tune it on a
- * per-pool basis using zfs.conf.
- */
-
-
-hrtime_t zfs_throttle_delay = MSEC2NSEC(10);
-hrtime_t zfs_throttle_resolution = MSEC2NSEC(10);
-
 int
 dsl_pool_open_special_dir(dsl_pool_t *dp, const char *name, dsl_dir_t **ddp)
 {

@@ -26,6 +26,7 @@
  */
 
 #include <sys/zfs_context.h>
+#include <sys/zfs_zone.h>
 #include <sys/spa_impl.h>
 #include <sys/refcount.h>
 #include <sys/vdev_disk.h>
@@ -601,6 +602,8 @@ vdev_disk_io_start(zio_t *zio)
 	bp->b_lblkno = lbtodb(zio->io_offset);
 	bp->b_bufsize = zio->io_size;
 	bp->b_iodone = (int (*)())vdev_disk_io_intr;
+
+	zfs_zone_zio_start(zio);
 
 	/* ldi_strategy() will return non-zero only on programming errors */
 	VERIFY(ldi_strategy(dvd->vd_lh, bp) == 0);

@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
+ * Copyright 2013 Joyent, Inc. All rights reserved.
  */
 
 #ifndef _SYS_VDEV_IMPL_H
@@ -114,6 +115,7 @@ struct vdev_queue {
 	vdev_queue_class_t vq_class[ZIO_PRIORITY_NUM_QUEUEABLE];
 	avl_tree_t	vq_active_tree;
 	uint64_t	vq_last_offset;
+	zoneid_t	vq_last_zone_id;
 	hrtime_t	vq_io_complete_ts; /* time last i/o completed */
 	kmutex_t	vq_lock;
 };

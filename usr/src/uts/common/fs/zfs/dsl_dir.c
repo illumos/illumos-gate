@@ -22,6 +22,7 @@
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
  * Copyright (c) 2013 Martin Matuska. All rights reserved.
+ * Copyright 2013 Joyent, Inc. All rights reserved.
  */
 
 #include <sys/dmu.h>
@@ -39,6 +40,7 @@
 #include <sys/zio.h>
 #include <sys/arc.h>
 #include <sys/sunddi.h>
+#include <sys/zfs_zone.h>
 #include "zfs_namecheck.h"
 
 static uint64_t dsl_dir_space_towrite(dsl_dir_t *dd);
@@ -747,7 +749,7 @@ dsl_dir_tempreserve_space(dsl_dir_t *dd, uint64_t lsize, uint64_t asize,
 			 * locks are held.
 			 */
 			txg_delay(dd->dd_pool, tx->tx_txg,
-			    MSEC2NSEC(10), MSEC2NSEC(10));
+			    zfs_zone_txg_delay(), MSEC2NSEC(10));
 			err = SET_ERROR(ERESTART);
 		}
 	}

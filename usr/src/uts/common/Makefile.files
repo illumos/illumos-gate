@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2012 Joyent, Inc.  All rights reserved.
 # Copyright (c) 2012 Nexenta Systems, Inc. All rights reserved.
 # Copyright (c) 2013 by Delphix. All rights reserved.
 # Copyright (c) 2013 by Saso Kiselkov. All rights reserved.
@@ -1396,6 +1397,7 @@ ZFS_COMMON_OBJS +=		\
 	zfs_fuid.o		\
 	zfs_sa.o		\
 	zfs_znode.o		\
+	zfs_zone.o		\
 	zil.o			\
 	zio.o			\
 	zio_checksum.o		\

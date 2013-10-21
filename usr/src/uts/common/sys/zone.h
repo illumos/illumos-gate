@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013 Joyent, Inc. All rights reserved.
  */
 
 #ifndef _SYS_ZONE_H
@@ -377,6 +378,12 @@ typedef struct zone_kstat {
 
 struct cpucap;
 
+typedef struct {
+	hrtime_t	cycle_start;
+	uint_t		cycle_cnt;
+	hrtime_t	zone_avg_cnt;
+} sys_zio_cntr_t;
+
 typedef struct zone {
 	/*
 	 * zone_name is never modified once set.
@@ -517,6 +524,21 @@ typedef struct zone {
 	list_t		zone_dl_list;
 	netstack_t	*zone_netstack;
 	struct cpucap	*zone_cpucap;	/* CPU caps data */
+
+	/*
+	 * Data and counters used for ZFS fair-share disk IO.
+	 */
+	rctl_qty_t	zone_zfs_io_pri;	/* ZFS IO priority */
+	uint_t		zone_zfs_queued[2];	/* sync I/O enqueued count */
+	uint64_t	zone_zfs_weight;	/* used to prevent starvation */
+	uint64_t	zone_io_util;		/* IO utilization metric */
+	boolean_t	zone_io_util_above_avg;	/* IO util percent > avg. */
+	uint16_t	zone_io_delay;		/* IO delay on logical r/w */
+	kmutex_t	zone_stg_io_lock;	/* protects IO window data */
+	sys_zio_cntr_t	zone_rd_ops;		/* Counters for ZFS reads, */
+	sys_zio_cntr_t	zone_wr_ops;		/* writes and */
+	sys_zio_cntr_t	zone_lwr_ops;		/* logical writes. */
+
 	/*
 	 * Solaris Auditing per-zone audit context
 	 */
