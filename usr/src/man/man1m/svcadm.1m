@@ -84,8 +84,10 @@ service instance.
 For subcommands taking one or more operands, if the operand specifies a service
 (instead of a service instance), and that service has only a single instance,
 \fBsvcadm\fR operates on that instance. If an abbreviated \fIFMRI\fR (a fault
-management resource identifier) or pattern matches more than one service, a
-warning message is displayed and that operand is ignored. See \fBsmf\fR(5).
+management resource identifier) matches more than one service or instance, a
+warning message is displayed and that operand is ignored.
+If a pattern matches more than one service or instance, the subcommand is
+applied to all matches. See \fBsmf\fR(5).
 .sp
 .LP
 In the case that the service has more than one instance, \fBsvcadm\fR return a

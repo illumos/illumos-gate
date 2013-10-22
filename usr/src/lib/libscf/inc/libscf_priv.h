@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013, Joyent, Inc. All rights reserved.
  */
 
 #ifndef	_LIBSCF_PRIV_H
@@ -267,6 +268,11 @@ int scf_set_count_property(scf_transaction_t *, char *, uint64_t, boolean_t);
  *				else return instances. Must be used in
  *				conjunction with SCF_WALK_SERVICE.
  *
+ * 	SCF_WALK_UNIPARTIAL	Can be combined with SCF_WALK_MULTIPLE
+ * 				so that an error is returned if a partial
+ *				fmri matches multiple instances, unless
+ *				a wildcard match is also used.
+ *
  * If no arguments are given, then all instances in the service graph are
  * walked.
  *
@@ -284,6 +290,7 @@ int scf_set_count_property(scf_transaction_t *, char *, uint64_t, boolean_t);
 #define	SCF_WALK_PROPERTY	0x08
 #define	SCF_WALK_NOINSTANCE	0x10
 #define	SCF_WALK_EXPLICIT	0x20
+#define	SCF_WALK_UNIPARTIAL	0x40
 
 /*
  * The default locations of the repository dbs
