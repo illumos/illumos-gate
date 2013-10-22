@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright (c) 2011, Joyent, Inc. All rights reserved.
+ * Copyright 2013, Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -62,6 +62,8 @@
  */
 #define	EXIT_SVC_FAILURE	3
 #define	EXIT_DEP_FAILURE	4
+
+#define	WALK_FLAGS	(SCF_WALK_UNIPARTIAL | SCF_WALK_MULTIPLE)
 
 /*
  * How long we will wait (in seconds) for a service to change state
@@ -2187,16 +2189,16 @@ main(int argc, char *argv[])
 		 * squelch output the second time we walk fmris; we saw
 		 * the errors the first time.
 		 */
-		if ((err = scf_walk_fmri(h, argc, argv, 0, set_fmri_enabled,
-		    (void *)flags, &error, uu_warn)) != 0) {
+		if ((err = scf_walk_fmri(h, argc, argv, WALK_FLAGS,
+		    set_fmri_enabled, (void *)flags, &error, uu_warn)) != 0) {
 
 			uu_warn(gettext("failed to iterate over "
 			    "instances: %s\n"), scf_strerror(err));
 			exit_status = UU_EXIT_FATAL;
 
 		} else if (wait && exit_status == 0 &&
-		    (err = scf_walk_fmri(h, argc, argv, 0, wait_fmri_enabled,
-		    (void *)flags, &error, quiet)) != 0) {
+		    (err = scf_walk_fmri(h, argc, argv, WALK_FLAGS,
+		    wait_fmri_enabled, (void *)flags, &error, quiet)) != 0) {
 
 			uu_warn(gettext("failed to iterate over "
 			    "instances: %s\n"), scf_strerror(err));
@@ -2237,16 +2239,17 @@ main(int argc, char *argv[])
 		 * squelch output the second time we walk fmris; we saw
 		 * the errors the first time.
 		 */
-		if ((err = scf_walk_fmri(h, argc, argv, 0, set_fmri_enabled,
-		    (void *)flags, &exit_status, uu_warn)) != 0) {
+		if ((err = scf_walk_fmri(h, argc, argv, WALK_FLAGS,
+		    set_fmri_enabled, (void *)flags, &exit_status,
+		    uu_warn)) != 0) {
 
 			uu_warn(gettext("failed to iterate over "
 			    "instances: %s\n"), scf_strerror(err));
 			exit_status = UU_EXIT_FATAL;
 
 		} else if (wait && exit_status == 0 &&
-		    (err = scf_walk_fmri(h, argc, argv, 0, wait_fmri_disabled,
-		    (void *)flags, &error, quiet)) != 0) {
+		    (err = scf_walk_fmri(h, argc, argv, WALK_FLAGS,
+		    wait_fmri_disabled, (void *)flags, &error, quiet)) != 0) {
 
 			uu_warn(gettext("failed to iterate over "
 			    "instances: %s\n"), scf_strerror(err));
@@ -2262,9 +2265,10 @@ main(int argc, char *argv[])
 		if (optind >= argc)
 			usage();
 
-		if ((err = scf_walk_fmri(h, argc - optind, argv + optind, 0,
-		    set_fmri_action, (void *)SCF_PROPERTY_RESTART,
-		    &exit_status, uu_warn)) != 0) {
+		if ((err = scf_walk_fmri(h, argc - optind, argv + optind,
+		    WALK_FLAGS, set_fmri_action,
+		    (void *)SCF_PROPERTY_RESTART, &exit_status,
+		    uu_warn)) != 0) {
 			uu_warn(gettext("failed to iterate over "
 			    "instances: %s\n"), scf_strerror(err));
 			exit_status = UU_EXIT_FATAL;
@@ -2276,9 +2280,10 @@ main(int argc, char *argv[])
 		if (optind >= argc)
 			usage();
 
-		if ((err = scf_walk_fmri(h, argc - optind, argv + optind, 0,
-		    set_fmri_action, (void *)SCF_PROPERTY_REFRESH,
-		    &exit_status, uu_warn)) != 0) {
+		if ((err = scf_walk_fmri(h, argc - optind, argv + optind,
+		    WALK_FLAGS, set_fmri_action,
+		    (void *)SCF_PROPERTY_REFRESH, &exit_status,
+		    uu_warn)) != 0) {
 			uu_warn(gettext("failed to iterate over "
 			    "instances: %s\n"), scf_strerror(scf_error()));
 			exit_status = UU_EXIT_FATAL;
@@ -2319,8 +2324,8 @@ main(int argc, char *argv[])
 		}
 
 		if ((err = scf_walk_fmri(h, argc - optind - 1,
-		    argv + optind + 1, 0, callback, NULL, &exit_status,
-		    uu_warn)) != 0) {
+		    argv + optind + 1, WALK_FLAGS, callback, NULL,
+		    &exit_status, uu_warn)) != 0) {
 			uu_warn(gettext("failed to iterate over "
 			    "instances: %s\n"),
 			    scf_strerror(err));
@@ -2333,8 +2338,9 @@ main(int argc, char *argv[])
 		if (optind >= argc)
 			usage();
 
-		if ((err = scf_walk_fmri(h, argc - optind, argv + optind, 0,
-		    clear_instance, NULL, &exit_status, uu_warn)) != 0) {
+		if ((err = scf_walk_fmri(h, argc - optind, argv + optind,
+		    WALK_FLAGS, clear_instance, NULL, &exit_status,
+		    uu_warn)) != 0) {
 			uu_warn(gettext("failed to iterate over "
 			    "instances: %s\n"), scf_strerror(err));
 			exit_status = UU_EXIT_FATAL;
