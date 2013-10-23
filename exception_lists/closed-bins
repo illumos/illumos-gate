@@ -22,6 +22,7 @@
 ./kernel/drv/amd64/pcn
 ./kernel/drv/pcser
 ./kernel/drv/amd64/pcser
+./kernel/drv/sparcv9/pcser
 ./kernel/misc/klmmod
 ./kernel/misc/amd64/klmmod
 ./kernel/misc/klmops
