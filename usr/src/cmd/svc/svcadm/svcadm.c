@@ -73,7 +73,7 @@
 
 #ifndef NDEBUG
 #define	bad_error(func, err)	{					\
-	uu_warn("%s:%d: %s() failed with unexpected error %d.\n",	\
+	pr_warn("%s:%d: %s() failed with unexpected error %d.\n",	\
 	    __FILE__, __LINE__, (func), (err));				\
 	abort();							\
 }
@@ -101,6 +101,7 @@ static const char *emsg_no_service;
 static int exit_status = 0;
 static int verbose = 0;
 static char *scratch_fmri;
+static char *g_zonename = NULL;
 
 static struct ht_elt **visited;
 
@@ -108,6 +109,7 @@ void do_scfdie(int lineno) __NORETURN;
 static void usage_milestone(void) __NORETURN;
 static void set_astring_prop(const char *, const char *, const char *,
     uint32_t, const char *, const char *);
+static void pr_warn(const char *format, ...);
 
 /*
  * Visitors from synch.c, needed for enable -s and disable -s.
@@ -147,7 +149,7 @@ static void
 usage()
 {
 	(void) fprintf(stderr, gettext(
-	"Usage: %1$s [-v] [-z zone] [cmd [args ... ]]\n\n"
+	"Usage: %1$s [-v] [-Z | -z zone] [cmd [args ... ]]\n\n"
 	"\t%1$s enable [-rst] <service> ...\t- enable and online service(s)\n"
 	"\t%1$s disable [-st] <service> ...\t- disable and offline service(s)\n"
 	"\t%1$s restart <service> ...\t\t- restart specified service(s)\n"
@@ -2073,6 +2075,31 @@ validate_milestone(const char *milestone)
 	/* NOTREACHED */
 }
 
+/*PRINTFLIKE1*/
+static void
+pr_warn(const char *format, ...)
+{
+	const char *pname = uu_getpname();
+	va_list alist;
+
+	va_start(alist, format);
+
+	if (pname != NULL)
+		(void) fprintf(stderr, "%s", pname);
+
+	if (g_zonename != NULL)
+		(void) fprintf(stderr, " (%s)", g_zonename);
+
+	(void) fprintf(stderr, ": ");
+
+	(void) vfprintf(stderr, format, alist);
+
+	if (strrchr(format, '\n') == NULL)
+		(void) fprintf(stderr, ": %s\n", strerror(errno));
+
+	va_end(alist);
+}
+
 /*ARGSUSED*/
 static void
 quiet(const char *fmt, ...)
@@ -2086,6 +2113,13 @@ main(int argc, char *argv[])
 	int o;
 	int err;
 	int sw_back;
+	boolean_t do_zones = B_FALSE;
+	boolean_t do_a_zone = B_FALSE;
+	char zonename[ZONENAME_MAX];
+	uint_t nzents = 0, zent = 0;
+	zoneid_t *zids = NULL;
+	int orig_optind, orig_argc;
+	char **orig_argv;
 
 	(void) setlocale(LC_ALL, "");
 	(void) textdomain(TEXT_DOMAIN);
@@ -2104,47 +2138,64 @@ main(int argc, char *argv[])
 	if (scratch_fmri == NULL)
 		uu_die(emsg_nomem);
 
-	h = scf_handle_create(SCF_VERSION);
-	if (h == NULL)
-		scfdie();
-
-	while ((o = getopt(argc, argv, "vz:")) != -1) {
+	while ((o = getopt(argc, argv, "vZz:")) != -1) {
 		switch (o) {
 		case 'v':
 			verbose = 1;
 			break;
 
-		case 'z': {
-			scf_value_t *zone;
-
+		case 'z':
 			if (getzoneid() != GLOBAL_ZONEID)
 				uu_die(gettext("svcadm -z may only be used "
 				    "from the global zone\n"));
+			if (do_zones)
+				usage();
 
-			if ((zone = scf_value_create(h)) == NULL)
-				scfdie();
-
-			if (scf_value_set_astring(zone, optarg) != SCF_SUCCESS)
-				scfdie();
-
-			if (scf_handle_decorate(h, "zone", zone) != SCF_SUCCESS)
-				uu_die(gettext("invalid zone '%s'\n"), optarg);
-
-			scf_value_destroy(zone);
+			(void) strlcpy(zonename, optarg, sizeof (zonename));
+			do_a_zone = B_TRUE;
 			break;
-		}
+
+		case 'Z':
+			if (getzoneid() != GLOBAL_ZONEID)
+				uu_die(gettext("svcadm -Z may only be used "
+				    "from the global zone\n"));
+			if (do_a_zone)
+				usage();
+
+			do_zones = B_TRUE;
+			break;
 
 		default:
 			usage();
 		}
 	}
 
-	if (scf_handle_bind(h) == -1)
-		uu_die(gettext("Couldn't bind to configuration repository: "
-		    "%s.\n"), scf_strerror(scf_error()));
+	while (do_zones) {
+		uint_t found;
 
-	if (optind >= argc)
-		usage();
+		if (zone_list(NULL, &nzents) != 0)
+			uu_die(gettext("could not get number of zones"));
+
+		if ((zids = malloc(nzents * sizeof (zoneid_t))) == NULL) {
+			uu_die(gettext("could not allocate array for "
+			    "%d zone IDs"), nzents);
+		}
+
+		found = nzents;
+
+		if (zone_list(zids, &found) != 0)
+			uu_die(gettext("could not get zone list"));
+
+		/*
+		 * If the number of zones has not changed between our calls to
+		 * zone_list(), we're done -- otherwise, we must free our array
+		 * of zone IDs and take another lap.
+		 */
+		if (found == nzents)
+			break;
+
+		free(zids);
+	}
 
 	emsg_permission_denied = gettext("%s: Permission denied.\n");
 	emsg_nomem = gettext("Out of memory.\n");
@@ -2155,6 +2206,79 @@ main(int argc, char *argv[])
 	emsg_prop_perm_denied = gettext("%s: Couldn't modify \"%s/%s\" "
 	    "property (permission denied).\n");
 	emsg_no_service = gettext("No such service \"%s\".\n");
+
+	orig_optind = optind;
+	orig_argc = argc;
+	orig_argv = argv;
+
+again:
+	h = scf_handle_create(SCF_VERSION);
+	if (h == NULL)
+		scfdie();
+
+	if (do_zones) {
+		zone_status_t status;
+
+		if (zone_getattr(zids[zent], ZONE_ATTR_STATUS, &status,
+		    sizeof (status)) < 0 || status != ZONE_IS_RUNNING) {
+			/*
+			 * If this zone is not running or we cannot
+			 * get its status, we do not want to attempt
+			 * to bind an SCF handle to it, lest we
+			 * accidentally interfere with a zone that
+			 * is not yet running by looking up a door
+			 * to its svc.configd (which could potentially
+			 * block a mount with an EBUSY).
+			 */
+			zent++;
+			goto nextzone;
+		}
+
+		if (getzonenamebyid(zids[zent++], zonename,
+		    sizeof (zonename)) < 0) {
+			uu_warn(gettext("could not get name for "
+			    "zone %d; ignoring"), zids[zent - 1]);
+			goto nextzone;
+		}
+
+		g_zonename = zonename;
+	}
+
+	if (do_a_zone || do_zones) {
+		scf_value_t *zone;
+
+		if ((zone = scf_value_create(h)) == NULL)
+			scfdie();
+
+		if (scf_value_set_astring(zone, zonename) != SCF_SUCCESS)
+			scfdie();
+
+		if (scf_handle_decorate(h, "zone", zone) != SCF_SUCCESS) {
+			if (do_a_zone) {
+				uu_die(gettext("invalid zone '%s'\n"), optarg);
+			} else {
+				scf_value_destroy(zone);
+				goto nextzone;
+			}
+		}
+
+		scf_value_destroy(zone);
+	}
+
+	if (scf_handle_bind(h) == -1) {
+		if (do_zones)
+			goto nextzone;
+
+		uu_die(gettext("Couldn't bind to configuration repository: "
+		    "%s.\n"), scf_strerror(scf_error()));
+	}
+
+	optind = orig_optind;
+	argc = orig_argc;
+	argv = orig_argv;
+
+	if (optind >= argc)
+		usage();
 
 	if (strcmp(argv[optind], "enable") == 0) {
 		int flags = SET_ENABLED;
@@ -2190,9 +2314,9 @@ main(int argc, char *argv[])
 		 * the errors the first time.
 		 */
 		if ((err = scf_walk_fmri(h, argc, argv, WALK_FLAGS,
-		    set_fmri_enabled, (void *)flags, &error, uu_warn)) != 0) {
+		    set_fmri_enabled, (void *)flags, &error, pr_warn)) != 0) {
 
-			uu_warn(gettext("failed to iterate over "
+			pr_warn(gettext("failed to iterate over "
 			    "instances: %s\n"), scf_strerror(err));
 			exit_status = UU_EXIT_FATAL;
 
@@ -2200,7 +2324,7 @@ main(int argc, char *argv[])
 		    (err = scf_walk_fmri(h, argc, argv, WALK_FLAGS,
 		    wait_fmri_enabled, (void *)flags, &error, quiet)) != 0) {
 
-			uu_warn(gettext("failed to iterate over "
+			pr_warn(gettext("failed to iterate over "
 			    "instances: %s\n"), scf_strerror(err));
 			exit_status = UU_EXIT_FATAL;
 		}
@@ -2241,9 +2365,9 @@ main(int argc, char *argv[])
 		 */
 		if ((err = scf_walk_fmri(h, argc, argv, WALK_FLAGS,
 		    set_fmri_enabled, (void *)flags, &exit_status,
-		    uu_warn)) != 0) {
+		    pr_warn)) != 0) {
 
-			uu_warn(gettext("failed to iterate over "
+			pr_warn(gettext("failed to iterate over "
 			    "instances: %s\n"), scf_strerror(err));
 			exit_status = UU_EXIT_FATAL;
 
@@ -2251,7 +2375,7 @@ main(int argc, char *argv[])
 		    (err = scf_walk_fmri(h, argc, argv, WALK_FLAGS,
 		    wait_fmri_disabled, (void *)flags, &error, quiet)) != 0) {
 
-			uu_warn(gettext("failed to iterate over "
+			pr_warn(gettext("failed to iterate over "
 			    "instances: %s\n"), scf_strerror(err));
 			exit_status = UU_EXIT_FATAL;
 		}
@@ -2268,8 +2392,8 @@ main(int argc, char *argv[])
 		if ((err = scf_walk_fmri(h, argc - optind, argv + optind,
 		    WALK_FLAGS, set_fmri_action,
 		    (void *)SCF_PROPERTY_RESTART, &exit_status,
-		    uu_warn)) != 0) {
-			uu_warn(gettext("failed to iterate over "
+		    pr_warn)) != 0) {
+			pr_warn(gettext("failed to iterate over "
 			    "instances: %s\n"), scf_strerror(err));
 			exit_status = UU_EXIT_FATAL;
 		}
@@ -2283,8 +2407,8 @@ main(int argc, char *argv[])
 		if ((err = scf_walk_fmri(h, argc - optind, argv + optind,
 		    WALK_FLAGS, set_fmri_action,
 		    (void *)SCF_PROPERTY_REFRESH, &exit_status,
-		    uu_warn)) != 0) {
-			uu_warn(gettext("failed to iterate over "
+		    pr_warn)) != 0) {
+			pr_warn(gettext("failed to iterate over "
 			    "instances: %s\n"), scf_strerror(scf_error()));
 			exit_status = UU_EXIT_FATAL;
 		}
@@ -2325,8 +2449,8 @@ main(int argc, char *argv[])
 
 		if ((err = scf_walk_fmri(h, argc - optind - 1,
 		    argv + optind + 1, WALK_FLAGS, callback, NULL,
-		    &exit_status, uu_warn)) != 0) {
-			uu_warn(gettext("failed to iterate over "
+		    &exit_status, pr_warn)) != 0) {
+			pr_warn(gettext("failed to iterate over "
 			    "instances: %s\n"),
 			    scf_strerror(err));
 			exit_status = UU_EXIT_FATAL;
@@ -2340,8 +2464,8 @@ main(int argc, char *argv[])
 
 		if ((err = scf_walk_fmri(h, argc - optind, argv + optind,
 		    WALK_FLAGS, clear_instance, NULL, &exit_status,
-		    uu_warn)) != 0) {
-			uu_warn(gettext("failed to iterate over "
+		    pr_warn)) != 0) {
+			pr_warn(gettext("failed to iterate over "
 			    "instances: %s\n"), scf_strerror(err));
 			exit_status = UU_EXIT_FATAL;
 		}
@@ -2397,7 +2521,7 @@ main(int argc, char *argv[])
 				break;
 			}
 
-			uu_warn("failed to backup repository: %s\n", reason);
+			pr_warn("failed to backup repository: %s\n", reason);
 			exit_status = UU_EXIT_FATAL;
 		}
 	} else if (strcmp(argv[optind], "_smf_repository_switch") == 0) {
@@ -2451,7 +2575,7 @@ main(int argc, char *argv[])
 				/* NOTREACHED */
 			}
 
-			uu_warn("failed to switch repository: %s\n", reason);
+			pr_warn("failed to switch repository: %s\n", reason);
 			exit_status = UU_EXIT_FATAL;
 		}
 	} else {
@@ -2460,7 +2584,10 @@ main(int argc, char *argv[])
 
 	if (scf_handle_unbind(h) == -1)
 		scfdie();
+nextzone:
 	scf_handle_destroy(h);
+	if (do_zones && zent < nzents)
+		goto again;
 
 	return (exit_status);
 }

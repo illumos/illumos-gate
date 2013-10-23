@@ -9,32 +9,32 @@ svcadm \- manipulate service instances
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/sbin/svcadm\fR [\fB-v\fR] [\fB-z\fR \fIzone\fR] enable [\fB-rst\fR] {\fIFMRI\fR | \fIpattern\fR}...
+\fB/usr/sbin/svcadm\fR [\fB-v\fR] [\fB-Z\fR | \fB-z\fR \fIzone\fR] enable [\fB-rst\fR] {\fIFMRI\fR | \fIpattern\fR}...
 .fi
 
 .LP
 .nf
-\fB/usr/sbin/svcadm\fR [\fB-v\fR] [\fB-z\fR \fIzone\fR] disable [\fB-st\fR] {\fIFMRI\fR | \fIpattern\fR}...
+\fB/usr/sbin/svcadm\fR [\fB-v\fR] [\fB-Z\fR | \fB-z\fR \fIzone\fR] disable [\fB-st\fR] {\fIFMRI\fR | \fIpattern\fR}...
 .fi
 
 .LP
 .nf
-\fB/usr/sbin/svcadm\fR [\fB-v\fR] [\fB-z\fR \fIzone\fR] restart {\fIFMRI\fR | \fIpattern\fR}...
+\fB/usr/sbin/svcadm\fR [\fB-v\fR] [\fB-Z\fR | \fB-z\fR \fIzone\fR] restart {\fIFMRI\fR | \fIpattern\fR}...
 .fi
 
 .LP
 .nf
-\fB/usr/sbin/svcadm\fR [\fB-v\fR] [\fB-z\fR \fIzone\fR] refresh {\fIFMRI\fR | \fIpattern\fR}...
+\fB/usr/sbin/svcadm\fR [\fB-v\fR] [\fB-Z\fR | \fB-z\fR \fIzone\fR] refresh {\fIFMRI\fR | \fIpattern\fR}...
 .fi
 
 .LP
 .nf
-\fB/usr/sbin/svcadm\fR [\fB-v\fR] [\fB-z\fR \fIzone\fR] clear {\fIFMRI\fR | \fIpattern\fR}...
+\fB/usr/sbin/svcadm\fR [\fB-v\fR] [\fB-Z\fR | \fB-z\fR \fIzone\fR] clear {\fIFMRI\fR | \fIpattern\fR}...
 .fi
 
 .LP
 .nf
-\fB/usr/sbin/svcadm\fR [\fB-v\fR] [\fB-z\fR \fIzone\fR] mark [\fB-It\fR] \fIinstance_state\fR
+\fB/usr/sbin/svcadm\fR [\fB-v\fR] [\fB-Z\fR | \fB-z\fR \fIzone\fR] mark [\fB-It\fR] \fIinstance_state\fR
      {\fIFMRI\fR | \fIpattern\fR}...
 .fi
 
@@ -61,6 +61,16 @@ The following options are supported:
 .ad
 .RS 20n
 Print actions verbosely to standard output.
+.RE
+
+.sp
+.ne 2
+.na
+\fB-Z\fR
+.ad
+.RS 20n
+Administer services in all zones.  This option is only applicable
+from the global zone, see \fBzones\fR(5).
 .RE
 
 .sp
