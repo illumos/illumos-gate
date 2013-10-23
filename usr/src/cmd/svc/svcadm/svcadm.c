@@ -102,6 +102,8 @@ static int exit_status = 0;
 static int verbose = 0;
 static char *scratch_fmri;
 static char *g_zonename = NULL;
+static char svcstate[80];
+static boolean_t svcsearch = B_FALSE;
 
 static struct ht_elt **visited;
 
@@ -149,13 +151,14 @@ static void
 usage()
 {
 	(void) fprintf(stderr, gettext(
-	"Usage: %1$s [-v] [-Z | -z zone] [cmd [args ... ]]\n\n"
-	"\t%1$s enable [-rst] <service> ...\t- enable and online service(s)\n"
-	"\t%1$s disable [-st] <service> ...\t- disable and offline service(s)\n"
-	"\t%1$s restart <service> ...\t\t- restart specified service(s)\n"
-	"\t%1$s refresh <service> ...\t\t- re-read service configuration\n"
-	"\t%1$s mark [-It] <state> <service> ...\t- set maintenance state\n"
-	"\t%1$s clear <service> ...\t\t- clear maintenance state\n"
+	"Usage: %1$s [-S <state>] [-v] [-Z | -z zone] [cmd [args ... ]]\n\n"
+	"\t%1$s enable [-rst] [<service> ...]\t- enable and online service(s)\n"
+	"\t%1$s disable [-st] [<service> ...]\t- disable and offline "
+	"service(s)\n"
+	"\t%1$s restart [<service> ...]\t\t- restart specified service(s)\n"
+	"\t%1$s refresh [<service> ...]\t\t- re-read service configuration\n"
+	"\t%1$s mark [-It] <state> [<service> ...] - set maintenance state\n"
+	"\t%1$s clear [<service> ...]\t\t- clear maintenance state\n"
 	"\t%1$s milestone [-d] <milestone>\t- advance to a service milestone\n"
 	"\n\t"
 	"Services can be specified using an FMRI, abbreviation, or fnmatch(5)\n"
@@ -1687,6 +1690,15 @@ set_fmri_enabled(void *data, scf_walkinfo_t *wip)
 	assert(wip->inst != NULL);
 	assert(wip->pg == NULL);
 
+	if (svcsearch) {
+		char state[MAX_SCF_STATE_STRING_SZ];
+
+		if (inst_get_state(wip->inst, state, wip->fmri, NULL) != 0)
+			return (0);
+		if (strcmp(state, svcstate) != 0)
+			return (0);
+	}
+
 	if (flags & SET_RECURSIVE) {
 		char *fmri_buf = malloc(max_scf_fmri_sz);
 		if (fmri_buf == NULL)
@@ -1863,6 +1875,9 @@ clear_instance(void *data, scf_walkinfo_t *wip)
 	if (inst_get_state(wip->inst, state, wip->fmri, NULL) != 0)
 		return (0);
 
+	if (svcsearch && strcmp(state, svcstate) != 0)
+		return (0);
+
 	if (strcmp(state, SCF_STATE_STRING_MAINT) == 0) {
 		set_inst_action(wip->fmri, wip->inst, SCF_PROPERTY_MAINT_OFF);
 	} else if (strcmp(state, SCF_STATE_STRING_DEGRADED) ==
@@ -1882,6 +1897,15 @@ static int
 set_fmri_action(void *action, scf_walkinfo_t *wip)
 {
 	assert(wip->inst != NULL && wip->pg == NULL);
+
+	if (svcsearch) {
+		char state[MAX_SCF_STATE_STRING_SZ];
+
+		if (inst_get_state(wip->inst, state, wip->fmri, NULL) != 0)
+			return (0);
+		if (strcmp(state, svcstate) != 0)
+			return (0);
+	}
 
 	set_inst_action(wip->fmri, wip->inst, action);
 
@@ -1905,6 +1929,9 @@ force_degraded(void *data, scf_walkinfo_t *wip)
 		return (0);
 	}
 
+	if (svcsearch && strcmp(state, svcstate) != 0)
+		return (0);
+
 	if (strcmp(state, SCF_STATE_STRING_ONLINE) != 0) {
 		uu_warn(gettext("Instance \"%s\" is not online.\n"), wip->fmri);
 		exit_status = 1;
@@ -1922,6 +1949,15 @@ force_maintenance(void *data, scf_walkinfo_t *wip)
 {
 	int flags = (int)data;
 	const char *prop;
+
+	if (svcsearch) {
+		char state[MAX_SCF_STATE_STRING_SZ];
+
+		if (inst_get_state(wip->inst, state, wip->fmri, NULL) != 0)
+			return (0);
+		if (strcmp(state, svcstate) != 0)
+			return (0);
+	}
 
 	if (flags & MARK_IMMEDIATE) {
 		prop = (flags & MARK_TEMPORARY) ?
@@ -2138,8 +2174,13 @@ main(int argc, char *argv[])
 	if (scratch_fmri == NULL)
 		uu_die(emsg_nomem);
 
-	while ((o = getopt(argc, argv, "vZz:")) != -1) {
+	while ((o = getopt(argc, argv, "S:vZz:")) != -1) {
 		switch (o) {
+		case 'S':
+			(void) strlcpy(svcstate, optarg, sizeof (svcstate));
+			svcsearch = B_TRUE;
+			break;
+
 		case 'v':
 			verbose = 1;
 			break;
@@ -2304,7 +2345,10 @@ again:
 		argc -= optind;
 		argv += optind;
 
-		if (argc <= 0)
+		if (argc == 0 && !svcsearch)
+			usage();
+
+		if (argc > 0 && svcsearch)
 			usage();
 
 		/*
@@ -2354,7 +2398,10 @@ again:
 		argc -= optind;
 		argv += optind;
 
-		if (argc <= 0)
+		if (argc == 0 && !svcsearch)
+			usage();
+
+		if (argc > 0 && svcsearch)
 			usage();
 
 		/*
@@ -2385,13 +2432,17 @@ again:
 
 	} else if (strcmp(argv[optind], "restart") == 0) {
 		++optind;
+		argc -= optind;
+		argv += optind;
 
-		if (optind >= argc)
+		if (argc == 0 && !svcsearch)
 			usage();
 
-		if ((err = scf_walk_fmri(h, argc - optind, argv + optind,
-		    WALK_FLAGS, set_fmri_action,
-		    (void *)SCF_PROPERTY_RESTART, &exit_status,
+		if (argc > 0 && svcsearch)
+			usage();
+
+		if ((err = scf_walk_fmri(h, argc, argv, WALK_FLAGS,
+		    set_fmri_action, (void *)SCF_PROPERTY_RESTART, &exit_status,
 		    pr_warn)) != 0) {
 			pr_warn(gettext("failed to iterate over "
 			    "instances: %s\n"), scf_strerror(err));
@@ -2400,13 +2451,17 @@ again:
 
 	} else if (strcmp(argv[optind], "refresh") == 0) {
 		++optind;
+		argc -= optind;
+		argv += optind;
 
-		if (optind >= argc)
+		if (argc == 0 && !svcsearch)
 			usage();
 
-		if ((err = scf_walk_fmri(h, argc - optind, argv + optind,
-		    WALK_FLAGS, set_fmri_action,
-		    (void *)SCF_PROPERTY_REFRESH, &exit_status,
+		if (argc > 0 && svcsearch)
+			usage();
+
+		if ((err = scf_walk_fmri(h, argc, argv, WALK_FLAGS,
+		    set_fmri_action, (void *)SCF_PROPERTY_REFRESH, &exit_status,
 		    pr_warn)) != 0) {
 			pr_warn(gettext("failed to iterate over "
 			    "instances: %s\n"), scf_strerror(scf_error()));
@@ -2447,9 +2502,18 @@ again:
 			usage();
 		}
 
-		if ((err = scf_walk_fmri(h, argc - optind - 1,
-		    argv + optind + 1, WALK_FLAGS, callback, NULL,
-		    &exit_status, pr_warn)) != 0) {
+		optind++;
+		argc -= optind;
+		argv += optind;
+
+		if (argc == 0 && !svcsearch)
+			usage();
+
+		if (argc > 0 && svcsearch)
+			usage();
+
+		if ((err = scf_walk_fmri(h, argc, argv, WALK_FLAGS, callback,
+		    NULL, &exit_status, pr_warn)) != 0) {
 			pr_warn(gettext("failed to iterate over "
 			    "instances: %s\n"),
 			    scf_strerror(err));
@@ -2458,13 +2522,24 @@ again:
 
 	} else if (strcmp(argv[optind], "clear") == 0) {
 		++optind;
+		argc -= optind;
+		argv += optind;
 
-		if (optind >= argc)
+		if (argc == 0 && !svcsearch)
 			usage();
 
-		if ((err = scf_walk_fmri(h, argc - optind, argv + optind,
-		    WALK_FLAGS, clear_instance, NULL, &exit_status,
-		    pr_warn)) != 0) {
+		if (svcsearch) {
+			if (argc > 0)
+				usage();
+			if (strcmp(svcstate, SCF_STATE_STRING_MAINT) != 0 &&
+			    strcmp(svcstate, SCF_STATE_STRING_DEGRADED) != 0)
+				uu_die(gettext("State must be '%s' or '%s'\n"),
+				    SCF_STATE_STRING_MAINT,
+				    SCF_STATE_STRING_DEGRADED);
+		}
+
+		if ((err = scf_walk_fmri(h, argc, argv, WALK_FLAGS,
+		    clear_instance, NULL, &exit_status, pr_warn)) != 0) {
 			pr_warn(gettext("failed to iterate over "
 			    "instances: %s\n"), scf_strerror(err));
 			exit_status = UU_EXIT_FATAL;
