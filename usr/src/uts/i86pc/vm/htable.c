@@ -426,24 +426,147 @@ htable_adjust_reserve()
 	}
 }
 
+/*
+ * Search the active htables for one to steal. Start at a different hash
+ * bucket every time to help spread the pain of stealing
+ */
+static void
+htable_steal_active(hat_t *hat, uint_t cnt, uint_t threshold,
+    uint_t *stolen, htable_t **list)
+{
+	static uint_t	h_seed = 0;
+	htable_t	*higher, *ht;
+	uint_t		h, e, h_start;
+	uintptr_t	va;
+	x86pte_t	pte;
+
+	h = h_start = h_seed++ % hat->hat_num_hash;
+	do {
+		higher = NULL;
+		HTABLE_ENTER(h);
+		for (ht = hat->hat_ht_hash[h]; ht; ht = ht->ht_next) {
+
+			/*
+			 * Can we rule out reaping?
+			 */
+			if (ht->ht_busy != 0 ||
+			    (ht->ht_flags & HTABLE_SHARED_PFN) ||
+			    ht->ht_level > 0 || ht->ht_valid_cnt > threshold ||
+			    ht->ht_lock_cnt != 0)
+				continue;
+
+			/*
+			 * Increment busy so the htable can't disappear. We
+			 * drop the htable mutex to avoid deadlocks with
+			 * hat_pageunload() and the hment mutex while we
+			 * call hat_pte_unmap()
+			 */
+			++ht->ht_busy;
+			HTABLE_EXIT(h);
+
+			/*
+			 * Try stealing.
+			 * - unload and invalidate all PTEs
+			 */
+			for (e = 0, va = ht->ht_vaddr;
+			    e < HTABLE_NUM_PTES(ht) && ht->ht_valid_cnt > 0 &&
+			    ht->ht_busy == 1 && ht->ht_lock_cnt == 0;
+			    ++e, va += MMU_PAGESIZE) {
+				pte = x86pte_get(ht, e);
+				if (!PTE_ISVALID(pte))
+					continue;
+				hat_pte_unmap(ht, e, HAT_UNLOAD, pte, NULL);
+			}
+
+			/*
+			 * Reacquire htable lock. If we didn't remove all
+			 * mappings in the table, or another thread added a new
+			 * mapping behind us, give up on this table.
+			 */
+			HTABLE_ENTER(h);
+			if (ht->ht_busy != 1 || ht->ht_valid_cnt != 0 ||
+			    ht->ht_lock_cnt != 0) {
+				--ht->ht_busy;
+				continue;
+			}
+
+			/*
+			 * Steal it and unlink the page table.
+			 */
+			higher = ht->ht_parent;
+			unlink_ptp(higher, ht, ht->ht_vaddr);
+
+			/*
+			 * remove from the hash list
+			 */
+			if (ht->ht_next)
+				ht->ht_next->ht_prev = ht->ht_prev;
+
+			if (ht->ht_prev) {
+				ht->ht_prev->ht_next = ht->ht_next;
+			} else {
+				ASSERT(hat->hat_ht_hash[h] == ht);
+				hat->hat_ht_hash[h] = ht->ht_next;
+			}
+
+			/*
+			 * Break to outer loop to release the
+			 * higher (ht_parent) pagetable. This
+			 * spreads out the pain caused by
+			 * pagefaults.
+			 */
+			ht->ht_next = *list;
+			*list = ht;
+			++*stolen;
+			break;
+		}
+		HTABLE_EXIT(h);
+		if (higher != NULL)
+			htable_release(higher);
+		if (++h == hat->hat_num_hash)
+			h = 0;
+	} while (*stolen < cnt && h != h_start);
+}
 
 /*
- * This routine steals htables from user processes for htable_alloc() or
- * for htable_reap().
+ * Move hat to the end of the kas list
+ */
+static void
+move_victim(hat_t *hat)
+{
+	ASSERT(MUTEX_HELD(&hat_list_lock));
+
+	/* unlink victim hat */
+	if (hat->hat_prev)
+		hat->hat_prev->hat_next = hat->hat_next;
+	else
+		kas.a_hat->hat_next = hat->hat_next;
+
+	if (hat->hat_next)
+		hat->hat_next->hat_prev = hat->hat_prev;
+	else
+		kas.a_hat->hat_prev = hat->hat_prev;
+	/* relink at end of hat list */
+	hat->hat_next = NULL;
+	hat->hat_prev = kas.a_hat->hat_prev;
+	if (hat->hat_prev)
+		hat->hat_prev->hat_next = hat;
+	else
+		kas.a_hat->hat_next = hat;
+
+	kas.a_hat->hat_prev = hat;
+}
+
+/*
+ * This routine steals htables from user processes.  Called by htable_reap
+ * (reap=TRUE) or htable_alloc (reap=FALSE).
  */
 static htable_t *
-htable_steal(uint_t cnt)
+htable_steal(uint_t cnt, boolean_t reap)
 {
 	hat_t		*hat = kas.a_hat;	/* list starts with khat */
 	htable_t	*list = NULL;
 	htable_t	*ht;
-	htable_t	*higher;
-	uint_t		h;
-	uint_t		h_start;
-	static uint_t	h_seed = 0;
-	uint_t		e;
-	uintptr_t	va;
-	x86pte_t	pte;
 	uint_t		stolen = 0;
 	uint_t		pass;
 	uint_t		threshold;
@@ -463,19 +586,12 @@ htable_steal(uint_t cnt)
 	atomic_inc_32(&htable_dont_cache);
 	for (pass = 0; pass <= htable_steal_passes && stolen < cnt; ++pass) {
 		threshold = pass * mmu.ptes_per_table / htable_steal_passes;
-		hat = kas.a_hat;
+
+		mutex_enter(&hat_list_lock);
+
+		/* skip the first hat (kernel) */
+		hat = kas.a_hat->hat_next;
 		for (;;) {
-
-			/*
-			 * Clear the victim flag and move to next hat
-			 */
-			mutex_enter(&hat_list_lock);
-			if (hat != kas.a_hat) {
-				hat->hat_flags &= ~HAT_VICTIM;
-				cv_broadcast(&hat_list_cv);
-			}
-			hat = hat->hat_next;
-
 			/*
 			 * Skip any hat that is already being stolen from.
 			 *
@@ -493,54 +609,12 @@ htable_steal(uint_t cnt)
 			    (HAT_VICTIM | HAT_SHARED | HAT_FREEING)) != 0)
 				hat = hat->hat_next;
 
-			if (hat == NULL) {
-				mutex_exit(&hat_list_lock);
+			if (hat == NULL)
 				break;
-			}
 
 			/*
-			 * Are we finished?
-			 */
-			if (stolen == cnt) {
-				/*
-				 * Try to spread the pain of stealing,
-				 * move victim HAT to the end of the HAT list.
-				 */
-				if (pass >= 1 && cnt == 1 &&
-				    kas.a_hat->hat_prev != hat) {
-
-					/* unlink victim hat */
-					if (hat->hat_prev)
-						hat->hat_prev->hat_next =
-						    hat->hat_next;
-					else
-						kas.a_hat->hat_next =
-						    hat->hat_next;
-					if (hat->hat_next)
-						hat->hat_next->hat_prev =
-						    hat->hat_prev;
-					else
-						kas.a_hat->hat_prev =
-						    hat->hat_prev;
-
-
-					/* relink at end of hat list */
-					hat->hat_next = NULL;
-					hat->hat_prev = kas.a_hat->hat_prev;
-					if (hat->hat_prev)
-						hat->hat_prev->hat_next = hat;
-					else
-						kas.a_hat->hat_next = hat;
-					kas.a_hat->hat_prev = hat;
-
-				}
-
-				mutex_exit(&hat_list_lock);
-				break;
-			}
-
-			/*
-			 * Mark the HAT as a stealing victim.
+			 * Mark the HAT as a stealing victim so that it is
+			 * not freed from under us, e.g. in as_free()
 			 */
 			hat->hat_flags |= HAT_VICTIM;
 			mutex_exit(&hat_list_lock);
@@ -559,116 +633,72 @@ htable_steal(uint_t cnt)
 			hat_exit(hat);
 
 			/*
-			 * Don't steal on first pass.
+			 * Don't steal active htables on first pass.
 			 */
-			if (pass == 0 || stolen == cnt)
-				continue;
+			if (pass != 0 && (stolen < cnt))
+				htable_steal_active(hat, cnt, threshold,
+				    &stolen, &list);
 
 			/*
-			 * Search the active htables for one to steal.
-			 * Start at a different hash bucket every time to
-			 * help spread the pain of stealing.
+			 * do synchronous teardown for the reap case so that
+			 * we can forget hat; at this time, hat is
+			 * guaranteed to be around because HAT_VICTIM is set
+			 * (see htable_free() for similar code)
 			 */
-			h = h_start = h_seed++ % hat->hat_num_hash;
-			do {
-				higher = NULL;
-				HTABLE_ENTER(h);
-				for (ht = hat->hat_ht_hash[h]; ht;
-				    ht = ht->ht_next) {
-
-					/*
-					 * Can we rule out reaping?
-					 */
-					if (ht->ht_busy != 0 ||
-					    (ht->ht_flags & HTABLE_SHARED_PFN)||
-					    ht->ht_level > 0 ||
-					    ht->ht_valid_cnt > threshold ||
-					    ht->ht_lock_cnt != 0)
-						continue;
-
-					/*
-					 * Increment busy so the htable can't
-					 * disappear. We drop the htable mutex
-					 * to avoid deadlocks with
-					 * hat_pageunload() and the hment mutex
-					 * while we call hat_pte_unmap()
-					 */
-					++ht->ht_busy;
-					HTABLE_EXIT(h);
-
-					/*
-					 * Try stealing.
-					 * - unload and invalidate all PTEs
-					 */
-					for (e = 0, va = ht->ht_vaddr;
-					    e < HTABLE_NUM_PTES(ht) &&
-					    ht->ht_valid_cnt > 0 &&
-					    ht->ht_busy == 1 &&
-					    ht->ht_lock_cnt == 0;
-					    ++e, va += MMU_PAGESIZE) {
-						pte = x86pte_get(ht, e);
-						if (!PTE_ISVALID(pte))
-							continue;
-						hat_pte_unmap(ht, e,
-						    HAT_UNLOAD, pte, NULL);
-					}
-
-					/*
-					 * Reacquire htable lock. If we didn't
-					 * remove all mappings in the table,
-					 * or another thread added a new mapping
-					 * behind us, give up on this table.
-					 */
-					HTABLE_ENTER(h);
-					if (ht->ht_busy != 1 ||
-					    ht->ht_valid_cnt != 0 ||
-					    ht->ht_lock_cnt != 0) {
-						--ht->ht_busy;
-						continue;
-					}
-
-					/*
-					 * Steal it and unlink the page table.
-					 */
-					higher = ht->ht_parent;
-					unlink_ptp(higher, ht, ht->ht_vaddr);
-
-					/*
-					 * remove from the hash list
-					 */
-					if (ht->ht_next)
-						ht->ht_next->ht_prev =
-						    ht->ht_prev;
-
-					if (ht->ht_prev) {
-						ht->ht_prev->ht_next =
-						    ht->ht_next;
-					} else {
-						ASSERT(hat->hat_ht_hash[h] ==
-						    ht);
-						hat->hat_ht_hash[h] =
-						    ht->ht_next;
-					}
-
-					/*
-					 * Break to outer loop to release the
-					 * higher (ht_parent) pagetable. This
-					 * spreads out the pain caused by
-					 * pagefaults.
-					 */
-					ht->ht_next = list;
-					list = ht;
-					++stolen;
-					break;
+			for (ht = list; (ht) && (reap); ht = ht->ht_next) {
+				if (ht->ht_hat == NULL)
+					continue;
+				ASSERT(ht->ht_hat == hat);
+#if defined(__xpv) && defined(__amd64)
+				if (!(ht->ht_flags & HTABLE_VLP) &&
+				    ht->ht_level == mmu.max_level) {
+					ptable_free(hat->hat_user_ptable);
+					hat->hat_user_ptable = PFN_INVALID;
 				}
-				HTABLE_EXIT(h);
-				if (higher != NULL)
-					htable_release(higher);
-				if (++h == hat->hat_num_hash)
-					h = 0;
-			} while (stolen < cnt && h != h_start);
+#endif
+				/*
+				 * forget the hat
+				 */
+				ht->ht_hat = NULL;
+			}
+
+			mutex_enter(&hat_list_lock);
+
+			/*
+			 * Are we finished?
+			 */
+			if (stolen == cnt) {
+				/*
+				 * Try to spread the pain of stealing,
+				 * move victim HAT to the end of the HAT list.
+				 */
+				if (pass >= 1 && cnt == 1 &&
+				    kas.a_hat->hat_prev != hat)
+					move_victim(hat);
+				/*
+				 * We are finished
+				 */
+			}
+
+			/*
+			 * Clear the victim flag, hat can go away now (once
+			 * the lock is dropped)
+			 */
+			if (hat->hat_flags & HAT_VICTIM) {
+				ASSERT(hat != kas.a_hat);
+				hat->hat_flags &= ~HAT_VICTIM;
+				cv_broadcast(&hat_list_cv);
+			}
+
+			/* move on to the next hat */
+			hat = hat->hat_next;
 		}
+
+		mutex_exit(&hat_list_lock);
+
 	}
+	ASSERT(!MUTEX_HELD(&hat_list_lock));
+
 	atomic_dec_32(&htable_dont_cache);
 	return (list);
 }
@@ -696,16 +726,22 @@ htable_reap(void *handle)
 	reap_cnt = MAX(MIN(physmem / 20, active_ptables / 20), 10);
 
 	/*
+	 * Note: htable_dont_cache should be set at the time of
+	 * invoking htable_free()
+	 */
+	atomic_inc_32(&htable_dont_cache);
+	/*
 	 * Let htable_steal() do the work, we just call htable_free()
 	 */
 	XPV_DISALLOW_MIGRATE();
-	list = htable_steal(reap_cnt);
+	list = htable_steal(reap_cnt, B_TRUE);
 	XPV_ALLOW_MIGRATE();
 	while ((ht = list) != NULL) {
 		list = ht->ht_next;
 		HATSTAT_INC(hs_reaped);
 		htable_free(ht);
 	}
+	atomic_dec_32(&htable_dont_cache);
 
 	/*
 	 * Free up excess reserves
@@ -801,7 +837,7 @@ htable_alloc(
 	 */
 	while (ht == NULL && can_steal_post_boot) {
 		kmem_reap();
-		ht = htable_steal(1);
+		ht = htable_steal(1, B_FALSE);
 		HATSTAT_INC(hs_steals);
 
 		/*
@@ -846,7 +882,7 @@ htable_alloc(
 			hat->hat_user_ptable = ptable_alloc((uintptr_t)ht + 1);
 			if (hat->hat_user_ptable != PFN_INVALID)
 				break;
-			stolen = htable_steal(1);
+			stolen = htable_steal(1, B_FALSE);
 			if (stolen == NULL)
 				panic("2nd steal ptable failed\n");
 			htable_free(stolen);
@@ -948,7 +984,7 @@ htable_free(htable_t *ht)
 	} else if (!(ht->ht_flags & HTABLE_VLP)) {
 		ptable_free(ht->ht_pfn);
 #if defined(__amd64) && defined(__xpv)
-		if (ht->ht_level == mmu.max_level) {
+		if (ht->ht_level == mmu.max_level && hat != NULL) {
 			ptable_free(hat->hat_user_ptable);
 			hat->hat_user_ptable = PFN_INVALID;
 		}
