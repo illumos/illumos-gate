@@ -92,6 +92,12 @@ $if _x86 && _ELF64
 $add amd64
 $endif
 
+SYMBOL_VERSION ILLUMOS_0.7 {	# Illumos additions
+    protected:
+	_glob_ext;
+	_globfree_ext;
+} ILLUMOS_0.6;
+
 SYMBOL_VERSION ILLUMOS_0.6 {	# Illumos additions
     protected:
 	getloginx;
