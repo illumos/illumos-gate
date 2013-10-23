@@ -9,33 +9,38 @@ svcadm \- manipulate service instances
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/sbin/svcadm\fR [\fB-v\fR] [\fB-Z\fR | \fB-z\fR \fIzone\fR] enable [\fB-rst\fR] {\fIFMRI\fR | \fIpattern\fR}...
+\fB/usr/sbin/svcadm\fR [\fB-S state\fR] [\fB-v\fR] [\fB-Z\fR | \fB-z\fR \fIzone\fR] enable [\fB-rst\fR]
+     [{\fIFMRI\fR | \fIpattern\fR}...]
 .fi
 
 .LP
 .nf
-\fB/usr/sbin/svcadm\fR [\fB-v\fR] [\fB-Z\fR | \fB-z\fR \fIzone\fR] disable [\fB-st\fR] {\fIFMRI\fR | \fIpattern\fR}...
+\fB/usr/sbin/svcadm\fR [\fB-S state\fR] [\fB-v\fR] [\fB-Z\fR | \fB-z\fR \fIzone\fR] disable [\fB-s\fR]
+     [{\fIFMRI\fR | \fIpattern\fR}...]
 .fi
 
 .LP
 .nf
-\fB/usr/sbin/svcadm\fR [\fB-v\fR] [\fB-Z\fR | \fB-z\fR \fIzone\fR] restart {\fIFMRI\fR | \fIpattern\fR}...
+\fB/usr/sbin/svcadm\fR [\fB-S state\fR] [\fB-v\fR] [\fB-Z\fR | \fB-z\fR \fIzone\fR] restart
+     [{\fIFMRI\fR | \fIpattern\fR}...]
 .fi
 
 .LP
 .nf
-\fB/usr/sbin/svcadm\fR [\fB-v\fR] [\fB-Z\fR | \fB-z\fR \fIzone\fR] refresh {\fIFMRI\fR | \fIpattern\fR}...
+\fB/usr/sbin/svcadm\fR [\fB-S state\fR] [\fB-v\fR] [\fB-Z\fR | \fB-z\fR \fIzone\fR] refresh
+     [{\fIFMRI\fR | \fIpattern\fR}...]
 .fi
 
 .LP
 .nf
-\fB/usr/sbin/svcadm\fR [\fB-v\fR] [\fB-Z\fR | \fB-z\fR \fIzone\fR] clear {\fIFMRI\fR | \fIpattern\fR}...
+\fB/usr/sbin/svcadm\fR [\fB-S state\fR] [\fB-v\fR] [\fB-Z\fR | \fB-z\fR \fIzone\fR] clear
+     [{\fIFMRI\fR | \fIpattern\fR}...]
 .fi
 
 .LP
 .nf
-\fB/usr/sbin/svcadm\fR [\fB-v\fR] [\fB-Z\fR | \fB-z\fR \fIzone\fR] mark [\fB-It\fR] \fIinstance_state\fR
-     {\fIFMRI\fR | \fIpattern\fR}...
+\fB/usr/sbin/svcadm\fR [\fB-S state\fR] [\fB-v\fR] [\fB-Z\fR | \fB-z\fR \fIzone\fR] mark [\fB-It] \fIinstance_state\fR
+     [{\fIFMRI\fR | \fIpattern\fR}...]
 .fi
 
 .LP
@@ -54,6 +59,17 @@ restarter is \fBsvc.startd\fR (see \fBsvc.startd\fR(1M)).
 .sp
 .LP
 The following options are supported:
+.sp
+.ne 2
+.na
+\fB-S\fR \fIstate\fR
+.ad
+.RS 20n
+For the subcommands which normally operate on explicit \fIFMRI\fRs or an
+\fIFMRI\fR pattern, the \fB-S\fR option can be used to select all \fIFMRI\fRs
+in the given state.
+.RE
+
 .sp
 .ne 2
 .na
