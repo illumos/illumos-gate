@@ -331,8 +331,8 @@ str2chr(Lm_list *lml, int ndx, int argc, char **argv, char *arg, int c,
 			optind += 1;
 			return (c);
 		}
-
-	} else if (strncmp(arg, opt, optsz) == 0) {
+	} else if ((strcmp(arg, opt) == 0) ||
+	    ((arg[optsz] == '=') && strncmp(arg, opt, optsz) == 0)) {
 		/*
 		 * Otherwise, compare the option name, which may be
 		 * concatenated with the option argument.
@@ -353,7 +353,6 @@ str2chr(Lm_list *lml, int ndx, int argc, char **argv, char *arg, int c,
 			optind++;
 		} else {
 			/*
-			 * Optarg concatenated to option (no white space).
 			 * GNU option/option argument pairs can be represented
 			 * with a "=" separator.  If this is the case, remove
 			 * the separator.
