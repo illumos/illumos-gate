@@ -301,9 +301,9 @@ str2chr_wrap_cb(int c)
 }
 
 /*
- * Determine whether this string, possibly with an associated option, should be
- * translated to an option character.  If so, update the optind and optarg
- * as described for short options in getopt(3c).
+ * Determine whether this string, possibly with an associated option, should
+ * be translated to an option character.  If so, update the optind and optarg
+ * and optopt as described for short options in getopt(3c).
  *
  * entry:
  *	lml - Link map list for debug messages
@@ -329,6 +329,7 @@ str2chr(Lm_list *lml, int ndx, int argc, char **argv, char *arg, int c,
 		if (strcmp(arg, opt) == 0) {
 			DBG_CALL(Dbg_args_str2chr(lml, ndx, opt, c));
 			optind += 1;
+			optopt = c;
 			return (c);
 		}
 	} else if ((strcmp(arg, opt) == 0) ||
@@ -345,8 +346,15 @@ str2chr(Lm_list *lml, int ndx, int argc, char **argv, char *arg, int c,
 			 * Make sure an optarg is available, and if not return
 			 * a failure to prevent any fall-through to the generic
 			 * getopt() processing.
+			 *
+			 * Since we'll be completely failing this option we
+			 * don't want to update optopt with the translation,
+			 * but also need to set it to _something_.  Setting it
+			 * to the '-' of the argument causes us to behave
+			 * correctly.
 			 */
 			if ((++optind + 1) > argc) {
+				optopt = arg[0];
 				return ('?');
 			}
 			optarg = argv[optind];
@@ -360,14 +368,16 @@ str2chr(Lm_list *lml, int ndx, int argc, char **argv, char *arg, int c,
 			optarg = &arg[optsz];
 			optind++;
 			if (*optarg == '=') {
-				if (*(++optarg) == '\0')
+				if (*(++optarg) == '\0') {
+					optopt = arg[0];
 					return ('?');
+				}
 			}
 		}
 
 		if (cbfunc != NULL)
 			c = (*cbfunc)(c);
-
+		optopt = c;
 		return (c);
 	}
 	return (0);
