@@ -33,10 +33,6 @@ MSGSUBDIRS=	dsvclockd ilbd in.dhcpd inetd ncaconfd vrrpd wanboot
 include ../../Makefile.cmd
 include ./Makefile.lib
 
-$(CLOSED_BUILD)SUBDIRS += \
-	$(CLOSED)/cmd/cmd-inet/usr.lib/ike-certutils \
-	$(CLOSED)/cmd/cmd-inet/usr.lib/in.iked
-
 POFILES=	dsvclockd/dsvclockd.po in.dhcpd/in.dhcpd.po \
 		inetd/inetd.po ncaconfd/ncaconfd.po vrrpd/vrrpd.po \
 		wanboot/wanboot.po

@@ -238,12 +238,6 @@ DRV_KMODS	+= bridge trill
 DRV_KMODS	+= bpf
 DRV_KMODS	+= dca
 
-$(CLOSED_BUILD)CLOSED_DRV_KMODS	+= glm
-$(CLOSED_BUILD)CLOSED_DRV_KMODS	+= isp
-$(CLOSED_BUILD)CLOSED_DRV_KMODS	+= mpt
-$(CLOSED_BUILD)CLOSED_DRV_KMODS += qus
-$(CLOSED_BUILD)CLOSED_DRV_KMODS	+= se
-
 #
 #       Hardware Drivers in common space
 #
@@ -267,7 +261,6 @@ DRV_KMODS	+= igb
 DRV_KMODS	+= ixgbe
 DRV_KMODS	+= vr
 DRV_KMODS	+= mr_sas
-$(CLOSED_BUILD)CLOSED_DRV_KMODS	+= ixgb
 DRV_KMODS	+= yge
 
 #
@@ -323,10 +316,6 @@ DRV_KMODS	+= oce
 DRV_KMODS	+= srpt
 DRV_KMODS	+= pmcs
 DRV_KMODS	+= pmcs8001fw
-
-$(CLOSED_BUILD)CLOSED_DRV_KMODS	+= ifp
-$(CLOSED_BUILD)CLOSED_DRV_KMODS	+= uata
-$(CLOSED_BUILD)CLOSED_DRV_KMODS	+= usbser_edge
 
 #
 #	I/O framework test drivers
@@ -434,10 +423,6 @@ MISC_KMODS	+= mii
 
 MISC_KMODS	+= klmmod klmops
 
-$(CLOSED_BUILD)CLOSED_MISC_KMODS	+= scsi_vhci_f_asym_lsi
-$(CLOSED_BUILD)CLOSED_MISC_KMODS	+= scsi_vhci_f_asym_emc
-$(CLOSED_BUILD)CLOSED_MISC_KMODS	+= scsi_vhci_f_sym_emc
-
 #
 #	Software Cryptographic Providers (/kernel/crypto):
 #
@@ -476,15 +461,10 @@ DACF_KMODS	+= consconfig_dacf
 #
 SVVS_KMODS	+= lmodb lmode lmodr lmodt svvslo tidg tivc tmux
 
-$(CLOSED_BUILD)SVVS		+= svvs
-
 #
 #	Modules eXcluded from the product:
 #
 XMODS		+=
-$(CLOSED_BUILD)CLOSED_XMODS =		\
-	sdpib		\
-	wsdrv
 
 #
 #	'Dacf' Modules (/kernel/dacf):

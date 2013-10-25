@@ -372,17 +372,6 @@ DRV_KMODS	+= ncall nsctl sdbc nskern sv
 DRV_KMODS	+= ii rdc rdcsrv rdcstub 
 DRV_KMODS	+= iptun
 
-$(CLOSED_BUILD)CLOSED_DRV_KMODS		+= bmc
-$(CLOSED_BUILD)CLOSED_DRV_KMODS		+= glm
-$(CLOSED_BUILD)CLOSED_DRV_KMODS		+= intel_nhmex
-$(CLOSED_BUILD)CLOSED_DRV_KMODS		+= cpqary3
-$(CLOSED_BUILD)CLOSED_DRV_KMODS		+= marvell88sx
-$(CLOSED_BUILD)CLOSED_DRV_KMODS		+= bcm_sata
-$(CLOSED_BUILD)CLOSED_DRV_KMODS		+= memtest
-$(CLOSED_BUILD)CLOSED_DRV_KMODS		+= mpt
-$(CLOSED_BUILD)CLOSED_DRV_KMODS		+= atiatom
-$(CLOSED_BUILD)CLOSED_DRV_KMODS		+= acpi_toshiba
-
 #
 # Common code drivers
 #
@@ -407,7 +396,6 @@ DRV_KMODS	+= ipmi
 DRV_KMODS	+= iprb
 DRV_KMODS	+= ixgbe
 DRV_KMODS	+= vr
-$(CLOSED_BUILD)CLOSED_DRV_KMODS	+= ixgb
 
 #
 # Virtio drivers
@@ -491,8 +479,6 @@ DRV_KMODS	+= usbftdi
 DRV_KMODS	+= wusb_df
 DRV_KMODS	+= wusb_ca
 DRV_KMODS	+= usbecm
-
-$(CLOSED_BUILD)CLOSED_DRV_KMODS	+= usbser_edge
 
 #
 #	1394 modules
@@ -658,10 +644,6 @@ MISC_KMODS	+= uwba
 
 MISC_KMODS	+= klmmod klmops
 
-$(CLOSED_BUILD)CLOSED_MISC_KMODS	+= scsi_vhci_f_asym_lsi
-$(CLOSED_BUILD)CLOSED_MISC_KMODS	+= scsi_vhci_f_asym_emc
-$(CLOSED_BUILD)CLOSED_MISC_KMODS	+= scsi_vhci_f_sym_emc
-
 #
 #	Software Cryptographic Providers (/kernel/crypto):
 #
@@ -693,26 +675,8 @@ IPP_KMODS	+= tswtclmt
 GENUNIX_KMODS	+= genunix
 
 #
-#	SVVS Testing Modules (/kernel/strmod):
-#
-#	These are streams and driver modules which are not to be
-#	delivered with a released system. However, during development
-#	it is convenient to build and install the SVVS kernel modules.
-#
-SVVS_KMODS	+= lmodb lmode lmodr lmodt svvslo tidg tivc tmux
-
-$(CLOSED_BUILD)SVVS		+= svvs
-
-#
 #	Modules eXcluded from the product:
 #
-$(CLOSED_BUILD)CLOSED_XMODS =		\
-	adpu320		\
-	bnx		\
-	bnxe		\
-	lsimega		\
-	sdpib
-
 
 #
 #	'Dacf' Modules (/kernel/dacf):

@@ -365,14 +365,6 @@ fi
 
 osbld_flag=0
 
-if [[ ! -v CLOSED_IS_PRESENT ]]; then
-        if [[ -d $SRC/../closed ]]; then
-                export CLOSED_IS_PRESENT="yes"
-        else
-                export CLOSED_IS_PRESENT="no"
-        fi
-fi
-
 if [[ -z "$ONBLD_DIR" ]]; then
 	ONBLD_DIR=$(/bin/dirname $(whence $0))
 fi

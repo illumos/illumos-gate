@@ -65,9 +65,6 @@ SUN4_HDRS=			\
 	xc_impl.h		\
 	zsmach.h
 
-$(CLOSED_BUILD)CLOSED_SUN4_HDRS=	\
-	memtestio.h
-
 HDRS=	\
 	cheetahregs.h		\
 	cpr_impl.h		\
@@ -99,20 +96,9 @@ HDRS=	\
 	todmostek.h		\
 	traptrace.h
 
-$(CLOSED_BUILD)CLOSED_HDRS=	\
-	memtestio_ch.h		\
-	memtestio_chp.h		\
-	memtestio_ja.h		\
-	memtestio_jg.h		\
-	memtestio_oc.h		\
-	memtestio_pn.h		\
-	memtestio_sf.h		\
-	memtestio_sr.h		\
-	memtestio_u.h
-
 I2CHDRS =	clients/max1617.h misc/i2c_svc.h clients/i2c_client.h	\
 		clients/hpc3130.h clients/lm75.h	\
-		clients/pcf8591.h clients/ssc050.h $(CLOSED_I2CHDRS)
+		clients/pcf8591.h clients/ssc050.h
 
 I2C_DIRS=	clients misc
 USR_PSM_ISYS_I2C_ROOT=	$(USR_PSM_ISYS_DIR)/i2c
@@ -127,10 +113,8 @@ MONHDRS=
 USR_PSM_MON_DIR=	$(USR_PSM_ISYS_DIR)/mon
 
 ROOTHDRS=		$(HDRS:%=$(USR_PSM_ISYS_DIR)/%)
-$(CLOSED_BUILD)ROOTHDRS += $(CLOSED_HDRS:%=$(USR_PSM_ISYS_DIR)/%)
 
 SUN4_ROOTHDRS=		$(SUN4_HDRS:%=$(USR_PSM_ISYS_DIR)/%)
-$(CLOSED_BUILD)SUN4_ROOTHDRS += $(CLOSED_SUN4_HDRS:%=$(USR_PSM_ISYS_DIR)/%)
 
 ROOTMONHDRS=		$(MONHDRS:%=$(USR_PSM_MON_DIR)/%)
 
@@ -143,10 +127,6 @@ LINKDEST=		../../../../platform/$(PLATFORM)/include/sys
 CHECKHDRS=		$(HDRS:%.h=%.check) \
 			$(MONHDRS:%.h=mon/%.check) \
 			$(SUN4_HDRS:%.h=%.cmncheck)
-
-$(CLOSED_BUILD)CHECKHDRS += $(CLOSED_HDRS:%.h=$(CLOSED)/uts/sun4u/sys/%.check)
-$(CLOSED_BUILD)CHECKHDRS += \
-		$(CLOSED_I2CHDRS:%.h=$(CLOSED)/uts/sun4u/sys/i2c/%.check)
 
 .KEEP_STATE:
 
@@ -167,12 +147,6 @@ $(USR_PSM_MON_DIR):	$(USR_PSM_ISYS_DIR)
 
 $(USR_PSM_ISYS_I2C_DIRS):
 	$(INS.dir)
-
-$(USR_PSM_ISYS_DIR)/%:	$(CLOSED)/uts/sun4u/sys/% $(USR_PSM_ISYS_DIR)
-	$(INS.file)
-
-$(USR_PSM_ISYS_DIR)/%:	$(CLOSED)/uts/sun4/sys/% $(USR_PSM_ISYS_DIR)
-	$(INS.file)
 
 $(USR_PSM_ISYS_DIR)/%:	../../sfmmu/sys/% $(USR_PSM_ISYS_DIR)
 	$(INS.file)

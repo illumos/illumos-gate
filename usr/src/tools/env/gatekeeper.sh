@@ -70,12 +70,6 @@ CLONE_WS="ssh://anonhg@onnv.sfbay.sun.com//export/onnv-clone";	export CLONE_WS
 CLOSED_CLONE_WS="${CLONE_WS}/usr/closed"
 export CLOSED_CLONE_WS
 
-# This flag controls whether to build the closed source.  If
-# undefined, nightly(1) and bldenv(1) will set it according to whether
-# the closed source tree is present.  CLOSED_IS_PRESENT="no" means not
-# building the closed sources.
-# CLOSED_IS_PRESENT="yes";		export CLOSED_IS_PRESENT
-
 # The bringover, if any, is done as STAFFER.
 # Set STAFFER to your own login as gatekeeper or integration engineer.
 # The point is to use group "staff" and avoid referencing the parent

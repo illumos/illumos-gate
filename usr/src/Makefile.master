@@ -48,11 +48,6 @@ NATIVE_ADJUNCT=	/usr
 # identification strings. Enabling RELEASE_BUILD automatically enables
 # INTERNAL_RELEASE_BUILD.
 #
-# CLOSED_BUILD controls whether we try to build files under
-# usr/closed.  ("" means to build closed code, "#" means don't try to
-# build it.)  Skipping the closed code implies doing an export release
-# build.
-#
 # STRIP_COMMENTS toggles comment section striping. Generally the same setting
 # as INTERNAL_RELEASE_BUILD.
 #
@@ -81,10 +76,6 @@ $(RELEASE_BUILD)NOT_RELEASE_BUILD=	$(POUND_SIGN)
 $(RELEASE_BUILD)INTERNAL_RELEASE_BUILD=
 PATCH_BUILD=				$(POUND_SIGN)
 
-# If CLOSED_IS_PRESENT is not set, assume the closed tree is present.
-CLOSED_BUILD_1=	$(CLOSED_IS_PRESENT:yes=)
-CLOSED_BUILD=	$(CLOSED_BUILD_1:no=$(POUND_SIGN))
-
 # SPARC_BLD is '#' for an Intel build.
 # INTEL_BLD is '#' for a Sparc build.
 SPARC_BLD_1=    $(MACH:i386=$(POUND_SIGN))
@@ -93,16 +84,6 @@ INTEL_BLD_1=    $(MACH:sparc=$(POUND_SIGN))
 INTEL_BLD=      $(INTEL_BLD_1:i386=)
 
 STRIP_COMMENTS=	$(INTERNAL_RELEASE_BUILD)
-
-# Are we building tonic closedbins? Unless you have used the
-# -O flag to nightly or bldenv, leave the definition of TONICBUILD
-# as $(POUND_SIGN).
-#
-# IF YOU CHANGE CLOSEDROOT, you MUST change install.bin
-# to match the new definition.
-TONICBUILD=     $(POUND_SIGN)
-$(TONICBUILD)CLOSEDROOT= $(ROOT)-closed
-
 
 # The variables below control the compilers used during the build.
 # There are a number of permutations.
@@ -249,12 +230,6 @@ MANIFEST_CHECK=	\
 	SVCCFG_CONFIGD_PATH=$(SRC)/cmd/svc/configd/svc.configd-native \
 	$(SRC)/cmd/svc/svccfg/svccfg-native validate $<
 
-#
-# IMPORTANT:: If you change any of INS.file, INS.dir, INS.rename,
-# INS.link or INS.symlink here, then you must also change the
-# corresponding override definitions in $CLOSED/Makefile.tonic.
-# If you do not do this, then the closedbins build for the OpenSolaris
-# community will break. PS, the gatekeepers will be upset too.
 INS.file=	$(RM) $@; $(INS) -s -m $(FILEMODE) -f $(@D) $<
 INS.dir=	$(INS) -s -d -m $(DIRMODE) $@
 # installs and renames at once

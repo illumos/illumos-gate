@@ -33,7 +33,6 @@ _MANFILES=	aac.7d		\
 		bscv.7d		\
 		chxge.7d	\
 		console.7d	\
-		cpqary3.7d	\
 		cpuid.7d	\
 		dca.7d		\
 		dcam1394.7d	\
@@ -207,6 +206,7 @@ i386_MANFILES=	ahci.7d		\
 		bcm_sata.7d	\
 		bfe.7d		\
 		cmdk.7d		\
+		cpqary3.7d	\
 		dnet.7d		\
 		ecpp.7d		\
 		heci.7d		\

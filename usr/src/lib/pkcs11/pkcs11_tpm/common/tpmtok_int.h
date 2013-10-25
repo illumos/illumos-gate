@@ -566,7 +566,6 @@ void CreateXProcLock(void *);
 int XProcLock(void *);
 int XProcUnLock(void *);
 
-void _init(void);
 void loginit();
 void logterm();
 void logit(int, char *, ...);

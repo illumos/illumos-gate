@@ -37,7 +37,6 @@ CERRWARN += -_gcc=-Wno-parentheses
 $(ROOTONBLDMAN1FILES) := FILEMODE=      644
 
 EXCEPTION_SRC= common open
-$(CLOSED_BUILD)EXCEPTION_SRC += closed
 EXCEPTION_LISTS=	$(EXCEPTION_SRC:%=exception_list.%)
 
 CLOBBERFILES += exception_list

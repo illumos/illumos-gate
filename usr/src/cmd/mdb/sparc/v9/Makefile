@@ -22,7 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 include ../../Makefile.common
 
@@ -31,11 +30,6 @@ MODULES = \
 	$(COMMON_MODULES_KVM) \
 	intr \
 	ssd
-
-$(CLOSED_BUILD)MODULES += \
-	$(CLOSED_COMMON_MODULES_KVM:%=$(CLOSED)/cmd/mdb/sparc/v9/%)
-$(CLOSED_BUILD)MODULES += \
-	$(CLOSED)/cmd/mdb/sparc/v9/isp
 
 #
 # a "$(MODULES): kmdb" rule would seem to do the trick but, for some reason,

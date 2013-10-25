@@ -45,7 +45,6 @@ static int suppress = 0;
 static void usage(void);
 static void file_copy(char *src_file, char *dest_file);
 static void chown_file(const char *file, const char *group, const char *owner);
-static void formclosed(char *root, char *closedroot);
 static char *find_basename(const char *str);
 static int creatdir(char *fn);
 
@@ -54,7 +53,7 @@ void
 usage(void)
 {
 	(void) fprintf(stderr,
-	    "usage: install [-sdO][-m mode][-g group][-u owner] "
+	    "usage: install [-sd][-m mode][-g group][-u owner] "
 	    "-f dir file ...\n");
 }
 
@@ -125,23 +124,6 @@ chown_file(const char *file, const char *group, const char *owner)
 }
 
 
-void
-formclosed(char *root, char *closedroot)
-{
-	int wholelen, residlen;
-	char *temp;
-
-	wholelen = strlen(root);
-	temp = strstr(strstr(root, "proto/root_"), "/");
-	temp++;
-	temp = strstr(temp, "/");
-	residlen = strlen(temp);
-	(void) strlcpy(closedroot, root, wholelen - residlen + 1);
-	(void) strlcat(closedroot, "-closed", MAXPATHLEN);
-	(void) strlcat(closedroot, temp, MAXPATHLEN);
-}
-
-
 char *
 find_basename(const char *str)
 {
@@ -183,12 +165,9 @@ main(int argc, char **argv)
 	char	*ins_file = NULL;
 	int	mode = -1;
 	char	dest_file[MAXPATHLEN];
-	char    shadow_dest[MAXPATHLEN];
-	char	shadow_dirb[MAXPATHLEN];
-	int	tonic = 0;
 	int	rv = 0;
 
-	while ((c = getopt(argc, argv, "f:sm:du:g:O")) != EOF) {
+	while ((c = getopt(argc, argv, "f:sm:du:g:")) != EOF) {
 		switch (c) {
 		case 'f':
 			dirb = optarg;
@@ -207,9 +186,6 @@ main(int argc, char **argv)
 			break;
 		case 's':
 			suppress = 1;
-			break;
-		case 'O':
-			tonic = 1;
 			break;
 		case '?':
 			errflg++;
@@ -237,18 +213,6 @@ main(int argc, char **argv)
 		ins_file = argv[c];
 
 		if (dirflg) {
-			if (tonic) {
-				formclosed(ins_file, shadow_dest);
-				rv = creatdir(shadow_dest);
-				if (rv) {
-					(void) fprintf(stderr,
-					    "install: tonic creatdir "
-					    "%s (%d): (%s)\n",
-					    shadow_dest, errno,
-					    strerror(errno));
-					return (rv);
-				}
-			}
 			rv = creatdir(ins_file);
 			if (rv) {
 				(void) fprintf(stderr,
@@ -262,38 +226,11 @@ main(int argc, char **argv)
 			(void) strcat(strcat(strcpy(dest_file, dirb), "/"),
 			    find_basename(ins_file));
 			file_copy(ins_file, dest_file);
-
-			if (tonic) {
-				formclosed(dirb, shadow_dirb);
-				/*
-				 * The standard directories in the proto
-				 * area are created as part of "make setup",
-				 * but that doesn't create them in the
-				 * closed proto area. So if the target
-				 * directory doesn't exist, we need to
-				 * create it now.
-				 */
-				rv = creatdir(shadow_dirb);
-				if (rv) {
-					(void) fprintf(stderr,
-					    "install: tonic creatdir(f) "
-					    "%s (%d): %s\n",
-					    shadow_dirb, errno,
-					    strerror(errno));
-					return (rv);
-				}
-				(void) strcat(strcat(strcpy(shadow_dest,
-				    shadow_dirb), "/"),
-				    find_basename(ins_file));
-				file_copy(ins_file, shadow_dest);
-			}
 		}
 
-		if (group || owner) {
+		if (group || owner)
 			chown_file(dest_file, group, owner);
-			if (tonic)
-				chown_file(shadow_dest, group, owner);
-		}
+
 		if (mode != -1) {
 			(void) umask(0);
 			if (chmod(dest_file, mode) == -1) {
@@ -302,16 +239,6 @@ main(int argc, char **argv)
 				    "(%d): %s\n",
 				    dest_file, mode, errno, strerror(errno));
 				return (1);
-			}
-			if (tonic) {
-				if (chmod(shadow_dest, mode) == -1) {
-					(void) fprintf(stderr,
-					    "install: tonic chmod of %s "
-					    "to mode %o failed (%d): %s\n",
-					    shadow_dest, mode,
-					    errno, strerror(errno));
-					return (1);
-				}
 			}
 		}
 	}
