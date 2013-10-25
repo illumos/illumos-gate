@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -1572,6 +1572,22 @@ event_from_tty(scf_handle_t *h, restarter_inst_t *rip)
 	return (ret);
 }
 
+static boolean_t
+restart_dump(scf_handle_t *h, restarter_inst_t *rip)
+{
+	scf_instance_t *inst;
+	boolean_t ret = B_FALSE;
+
+	if (libscf_fmri_get_instance(h, rip->ri_i.i_fmri, &inst))
+		return (-1);
+
+	if (restarter_inst_dump(inst) == 1)
+		ret = B_TRUE;
+
+	scf_instance_destroy(inst);
+	return (ret);
+}
+
 static void
 maintain_instance(scf_handle_t *h, restarter_inst_t *rip, int immediate,
     restarter_str_t reason)
@@ -1865,8 +1881,14 @@ again:
 				 * Stop the instance.  If it can be restarted,
 				 * the graph engine will send a new event.
 				 */
-				if (stop_instance(h, inst, RSTOP_RESTART) == 0)
+				if (restart_dump(h, inst)) {
+					(void) contract_kill(
+					    inst->ri_i.i_primary_ctid, SIGABRT,
+					    inst->ri_i.i_fmri);
+				} else if (stop_instance(h, inst,
+				    RSTOP_RESTART) == 0) {
 					reset_start_times(inst);
+				}
 			}
 			break;
 

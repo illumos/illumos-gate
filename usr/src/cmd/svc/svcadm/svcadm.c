@@ -155,7 +155,7 @@ usage()
 	"\t%1$s enable [-rst] [<service> ...]\t- enable and online service(s)\n"
 	"\t%1$s disable [-st] [<service> ...]\t- disable and offline "
 	"service(s)\n"
-	"\t%1$s restart [<service> ...]\t\t- restart specified service(s)\n"
+	"\t%1$s restart [-d] [<service> ...]\t- restart specified service(s)\n"
 	"\t%1$s refresh [<service> ...]\t\t- re-read service configuration\n"
 	"\t%1$s mark [-It] <state> [<service> ...] - set maintenance state\n"
 	"\t%1$s clear [<service> ...]\t\t- clear maintenance state\n"
@@ -2431,7 +2431,20 @@ again:
 			exit_status = error;
 
 	} else if (strcmp(argv[optind], "restart") == 0) {
+		boolean_t do_dump = B_FALSE;
+
 		++optind;
+
+		while ((o = getopt(argc, argv, "d")) != -1) {
+			if (o == 'd')
+				do_dump = B_TRUE;
+			else if (o == '?')
+				usage();
+			else {
+				assert(0);
+				abort();
+			}
+		}
 		argc -= optind;
 		argv += optind;
 
@@ -2440,6 +2453,16 @@ again:
 
 		if (argc > 0 && svcsearch)
 			usage();
+
+		if (do_dump) {
+			if ((err = scf_walk_fmri(h, argc, argv, WALK_FLAGS,
+			    set_fmri_action, (void *)SCF_PROPERTY_DODUMP,
+			    &exit_status, pr_warn)) != 0) {
+				pr_warn(gettext("failed to iterate over "
+				    "instances: %s\n"), scf_strerror(err));
+				exit_status = UU_EXIT_FATAL;
+			}
+		}
 
 		if ((err = scf_walk_fmri(h, argc, argv, WALK_FLAGS,
 		    set_fmri_action, (void *)SCF_PROPERTY_RESTART, &exit_status,
