@@ -28,8 +28,10 @@
 #
 
 PROG=	zonename
+OBJS=	zonename.o
 
 include	../Makefile.cmd
+include ../Makefile.ctf
 
 LDLIBS +=	-lzonecfg
 
@@ -37,12 +39,20 @@ LDLIBS +=	-lzonecfg
 
 all: $(PROG)
 
+$(PROG): $(OBJS)
+	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
+	$(POST_PROCESS)
+
 install: all $(ROOTSBINPROG)
 	$(RM) $(ROOTPROG)
 	$(SYMLINK) ../../sbin/$(PROG) $(ROOTPROG)
 
 check:	$(PROG).c
 	$(CSTYLE) -pP $(PROG).c
+
+%.o: %.c
+	$(COMPILE.c) $<
+	$(POST_PROCESS_O)
 
 clean:
 

@@ -27,6 +27,7 @@ PROG=	zonecfg
 OBJS=	zonecfg.o zonecfg_lex.o zonecfg_grammar.tab.o
 
 include ../Makefile.cmd
+include ../Makefile.ctf
 
 # zonecfg has a name clash with main() and libl.so.1.  However, zonecfg must
 # still export a number of "yy*" (libl) interfaces.  Reduce all other symbols

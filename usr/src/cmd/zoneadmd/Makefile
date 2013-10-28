@@ -26,6 +26,7 @@
 PROG= zoneadmd
 
 include ../Makefile.cmd
+include ../Makefile.ctf
 
 $(64ONLY)SUBDIRS= $(MACH)
 $(BUILD64)SUBDIRS += $(MACH64)

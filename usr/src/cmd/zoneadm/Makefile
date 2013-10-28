@@ -30,6 +30,7 @@ MANIFEST=	zones.xml resource-mgmt.xml
 SVCMETHOD=	svc-zones svc-resource-mgmt
 
 include ../Makefile.cmd
+include ../Makefile.ctf
 
 ROOTUSRSBINSCRIPTS=     $(SCRIPTS:%=$(ROOTUSRSBIN)/%)
 ROOTMANIFESTDIR=        $(ROOTSVCSYSTEM)
