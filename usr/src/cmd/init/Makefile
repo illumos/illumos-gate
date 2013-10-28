@@ -25,11 +25,13 @@
 #
 
 PROG= init 
+OBJS= init.o
 ROOTFS_PROG= $(PROG)
 
 DEFAULTFILES= init.dfl
 
 include ../Makefile.cmd
+include ../Makefile.ctf
 
 LDLIBS += -lpam -lbsm -lcontract -lscf
 CERRWARN += -_gcc=-Wno-parentheses
@@ -40,6 +42,10 @@ CLOBBERFILES= $(STATIC)
 .KEEP_STATE:
 
 all: $(ROOTFS_PROG)
+
+$(ROOTFS_PROG): $(OBJS)
+	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
+	$(POST_PROCESS)
 
 install: all $(ROOTETCDEFAULTFILES) $(ROOTSBINPROG)
 	$(RM) $(ROOTETCPROG)
@@ -57,5 +63,9 @@ test:
 clean:
 
 lint:	lint_PROG
+
+%.o: %.c
+	$(COMPILE.c) $<
+	$(POST_PROCESS_O)
 
 include ../Makefile.targ
