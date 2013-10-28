@@ -2116,7 +2116,8 @@ mdb_ctf_synthetics_from_file(const char *file)
 	}
 
 	if ((fp = mdb_ctf_open(file, &ret)) == NULL) {
-		mdb_warn("failed to parse ctf data in %s", file);
+		mdb_warn("failed to parse ctf data in %s: %s\n", file,
+		    ctf_errmsg(ret));
 		return (1);
 	}
 
