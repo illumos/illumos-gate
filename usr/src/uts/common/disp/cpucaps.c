@@ -22,7 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2011, 2012 Joyent, Inc.  All rights reserved.
+ * Copyright 2013 Joyent, Inc.  All rights reserved.
  */
 
 #include <sys/disp.h>
@@ -377,6 +377,13 @@ cap_disable(list_t *l, cpucap_t *cap)
 	ASSERT(CAP_ENABLED(cap));
 
 	waitq_block(&cap->cap_waitq);
+
+	/* do this first to avoid race with cap_kstat_update */
+	if (cap->cap_kstat != NULL) {
+		kstat_delete(cap->cap_kstat);
+		cap->cap_kstat = NULL;
+	}
+
 	list_remove(l, cap);
 	if (list_is_empty(&capped_projects) && list_is_empty(&capped_zones)) {
 		cpucaps_enabled = B_FALSE;
@@ -385,11 +392,6 @@ cap_disable(list_t *l, cpucap_t *cap)
 	cap->cap_value = cap->cap_chk_value = 0;
 	cap->cap_project = NULL;
 	cap->cap_zone = NULL;
-	if (cap->cap_kstat != NULL) {
-		kstat_delete(cap->cap_kstat);
-		cap->cap_kstat = NULL;
-	}
-
 }
 
 /*
@@ -1357,6 +1359,7 @@ cpucaps_enforce(kthread_t *t)
 
 /*
  * Convert internal cap statistics into values exported by cap kstat.
+ * Note that the kstat is held throughout this function but caps_lock is not.
  */
 static int
 cap_kstat_update(kstat_t *ksp, int rw)
