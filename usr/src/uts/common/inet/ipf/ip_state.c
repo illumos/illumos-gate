@@ -1285,6 +1285,7 @@ u_int flags;
 		switch (ic->icmp_type)
 		{
 		case ICMP_ECHO :
+		case ICMP_ECHOREPLY :
 		case ICMP_TSTAMP :
 		case ICMP_IREQ :
 		case ICMP_MASKREQ :
