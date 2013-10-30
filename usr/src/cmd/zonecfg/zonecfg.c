@@ -126,7 +126,7 @@ extern int lex_lineno;
 #define	SHELP_REMOVE	"remove [-F] <resource-type> " \
 	"[ <property-name>=<property-value> ]*\n" \
 	"\t(global scope)\n" \
-	"remove <property-name> <property-value>\n" \
+	"remove [-F] <property-name> <property-value>\n" \
 	"\t(resource scope)"
 #define	SHELP_REVERT	"revert [-F]"
 #define	SHELP_SELECT	"select <resource-type> { <property-name>=" \
@@ -3602,6 +3602,25 @@ remove_property(cmd_t *cmd)
 	struct zone_rctlvaltab *rctlvaltab;
 	struct zone_res_attrtab *np;
 	complex_property_ptr_t cx;
+	int arg;
+	boolean_t force = B_FALSE;
+	boolean_t arg_err = B_FALSE;
+
+	optind = 0;
+	while ((arg = getopt(cmd->cmd_argc, cmd->cmd_argv, "F")) != EOF) {
+		switch (arg) {
+		case 'F':
+			force = B_TRUE;
+			break;
+		default:
+			arg_err = B_TRUE;
+			break;
+		}
+	}
+	if (arg_err) {
+		saw_error = B_TRUE;
+		return;
+	}
 
 	res_type = resource_scope;
 	prop_type = cmd->cmd_prop_name[0];
@@ -3643,7 +3662,7 @@ remove_property(cmd_t *cmd)
 			prop_id = pp->pv_simple;
 			err = zonecfg_remove_fs_option(&in_progress_fstab,
 			    prop_id);
-			if (err != Z_OK)
+			if (err != Z_OK && !force)
 				zone_perror(pt_to_str(prop_type), err, B_TRUE);
 		} else {
 			list_property_ptr_t list;
@@ -3655,7 +3674,7 @@ remove_property(cmd_t *cmd)
 					break;
 				err = zonecfg_remove_fs_option(
 				    &in_progress_fstab, prop_id);
-				if (err != Z_OK)
+				if (err != Z_OK && !force)
 					zone_perror(pt_to_str(prop_type), err,
 					    B_TRUE);
 			}
@@ -3708,7 +3727,7 @@ remove_property(cmd_t *cmd)
 			err = zonecfg_remove_res_attr(
 			    &(in_progress_devtab.zone_dev_attrp), np);
 		}
-		if (err != Z_OK)
+		if (err != Z_OK && !force)
 			zone_perror(pt_to_str(prop_type), err, B_TRUE);
 		return;
 	case RT_RCTL:
@@ -3759,7 +3778,7 @@ remove_property(cmd_t *cmd)
 		rctlvaltab->zone_rctlval_next = NULL;
 		err = zonecfg_remove_rctl_value(&in_progress_rctltab,
 		    rctlvaltab);
-		if (err != Z_OK)
+		if (err != Z_OK && !force)
 			zone_perror(pt_to_str(prop_type), err, B_TRUE);
 		zonecfg_free_rctl_value_list(rctlvaltab);
 		return;

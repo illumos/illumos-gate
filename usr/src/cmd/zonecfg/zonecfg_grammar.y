@@ -754,6 +754,19 @@ remove_command: REMOVE
 		$$->cmd_prop_name[0] = $2;
 		$$->cmd_property_ptr[0] = &property[0];
 	}
+	| REMOVE TOKEN property_name property_value
+	{
+		if (($$ = alloc_cmd()) == NULL)
+			YYERROR;
+		cmd = $$;
+		$$->cmd_handler = &remove_func;
+		$$->cmd_argc = 1;
+		$$->cmd_argv[0] = claim_token($2);
+		$$->cmd_argv[1] = NULL;
+		$$->cmd_prop_nv_pairs = 1;
+		$$->cmd_prop_name[0] = $3;
+		$$->cmd_property_ptr[0] = &property[0];
+	}
 	| REMOVE resource_type property_name EQUAL property_value
 	{
 		if (($$ = alloc_cmd()) == NULL)
