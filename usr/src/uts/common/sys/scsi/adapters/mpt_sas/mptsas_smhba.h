@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  */
 
 /*
@@ -63,8 +64,10 @@ extern "C" {
  */
 int mptsas_smhba_setup(mptsas_t *);
 void mptsas_smhba_show_phy_info(mptsas_t *);
-void mptsas_smhba_set_phy_props(mptsas_t *mpt, char *iport, dev_info_t *dip,
-    uint8_t phy_nums, uint16_t *attached_devhdl);
+void mptsas_smhba_set_all_phy_props(mptsas_t *mpt, dev_info_t *dip,
+    uint8_t phy_nums, mptsas_phymask_t phy_mask, uint16_t *attached_devhdl);
+void mptsas_smhba_set_one_phy_props(mptsas_t *mpt, dev_info_t *dip,
+    uint8_t phy_id, uint16_t *attached_devhdl);
 void mptsas_smhba_log_sysevent(mptsas_t *mpt, char *subclass, char *etype,
     smhba_info_t *phyp);
 void

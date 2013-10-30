@@ -871,8 +871,8 @@ mptsas_iport_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		    "prop update failed");
 		return (DDI_FAILURE);
 	}
-	mptsas_smhba_set_phy_props(mpt,
-	    iport, dip, numphys, &attached_devhdl);
+	mptsas_smhba_set_all_phy_props(mpt, dip, numphys, phy_mask,
+	    &attached_devhdl);
 
 	mutex_enter(&mpt->m_mutex);
 	page_address = (MPI2_SAS_DEVICE_PGAD_FORM_HANDLE &
@@ -5953,9 +5953,14 @@ mptsas_handle_topo_change(mptsas_topo_change_list_t *topo_node,
 					return;
 				}
 				mutex_exit(&mpt->m_mutex);
-				mptsas_smhba_set_phy_props(mpt,
-				    ddi_get_name_addr(parent), parent,
-				    1, &attached_devhdl);
+
+				/*
+				 * topo_node->un.physport is really the PHY#
+				 * for direct attached devices
+				 */
+				mptsas_smhba_set_one_phy_props(mpt, parent,
+				    topo_node->un.physport, &attached_devhdl);
+
 				if (ddi_prop_update_int(DDI_DEV_T_NONE, parent,
 				    MPTSAS_VIRTUAL_PORT, 0) !=
 				    DDI_PROP_SUCCESS) {
@@ -14899,8 +14904,8 @@ mptsas_online_smp(dev_info_t *pdip, mptsas_smp_t *smp_node,
 		}
 		mutex_exit(&mpt->m_mutex);
 
-		mptsas_smhba_set_phy_props(mpt, iport, pdip,
-		    numphys, &attached_devhdl);
+		mptsas_smhba_set_all_phy_props(mpt, pdip, numphys, phy_mask,
+		    &attached_devhdl);
 
 		if (ddi_prop_update_int(DDI_DEV_T_NONE, pdip,
 		    MPTSAS_NUM_PHYS, numphys) !=
