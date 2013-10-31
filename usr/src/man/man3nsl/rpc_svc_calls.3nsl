@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH RPC_SVC_CALLS 3NSL "Jan 26, 2004"
+.TH RPC_SVC_CALLS 3NSL "Oct 28, 2013"
 .SH NAME
 rpc_svc_calls, svc_dg_enablecache, svc_done, svc_exit, svc_fdset, svc_freeargs,
 svc_getargs, svc_getreq_common, svc_getreq_poll, svc_getreqset,
@@ -208,7 +208,7 @@ and is considered obsolete. Use of \fBsvc_pollfd\fR is recommended instead.
 .LP
 The \fBsvc_pollfd\fR global variable points to an array of \fBpollfd_t\fR
 structures that reflect the \fBRPC\fR server's read file descriptor array. This
-is only of interest if service service implementors do not call \fBsvc_run()\fR
+is only of interest if service implementors do not call \fBsvc_run()\fR
 but rather do their own asynchronous event processing. This variable is
 read-only, and it may change after calls to \fBsvc_getreg_poll()\fR or any
 creation routines. Do no pass its address to \fBpoll\fR(2). Instead, pass the
