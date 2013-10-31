@@ -415,9 +415,10 @@ link_by_id(datalink_id_t linkid, zoneid_t zoneid)
 	dlmgmt_link_t link, *linkp;
 
 	link.ll_linkid = linkid;
-	linkp = avl_find(&dlmgmt_id_avl, &link, NULL);
+	if ((linkp = avl_find(&dlmgmt_id_avl, &link, NULL)) == NULL)
+		return (NULL);
 	if (zoneid != GLOBAL_ZONEID && linkp->ll_zoneid != zoneid)
-		linkp = NULL;
+		return (NULL);
 	return (linkp);
 }
 
