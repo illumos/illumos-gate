@@ -19,8 +19,9 @@
 .\" CDDL HEADER END
 .\"
 .\" Copyright (c) 2012, Joyent, Inc. All Rights Reserved
+.\" Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
 .\"
-.TH IMPI 7D "Apr 21, 2012"
+.TH IPMI 7D "Oct 31, 2013"
 .SH NAME
 ipmi \- OpenIPMI compatible IPMI interface driver
 .SH SYNOPSIS
@@ -36,7 +37,7 @@ The \fBipmi\fR device is a character special file that provides access to the
 Intelligent Platform Management Interface for the system.  For more
 information on \fBIPMI\fR and to obtain a copy of the \fBIPMI\fR
 specification and implementation guidelines, refer to
-http://\fIhttp://www.intel.com/design/servers/ipmi/\fR.
+http://www.intel.com/design/servers/ipmi/.
 The driver is adapted from the FreeBSD driver which is in turn adapted from
 the Linux driver, however, not all features described in the standard are
 supported. The current implementation depends on the \fBsmbios\fR(7d) to
