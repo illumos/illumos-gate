@@ -27,7 +27,6 @@
 include $(SRC)/Makefile.master
 
 COMMON_SUBDIRS=	$(MACH)
-$(CLOSED_BUILD)COMMON_SUBDIRS += $(CLOSED)/cmd/fwflash/plugins 
 
 SUBDIRS=	$(COMMON_SUBDIRS)
 

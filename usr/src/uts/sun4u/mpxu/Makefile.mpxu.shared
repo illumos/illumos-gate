@@ -83,10 +83,9 @@ include $(UTSTREE)/sun4u/mpxu/Makefile.files
 include $(UTSTREE)/sun4u/Makefile.sun4u
 
 #
-#	Define modules (must come after Makefile.sun4u, for CLOSED_BUILD).
+#	Define modules (must come after Makefile.sun4u).
 #
 MPXU_KMODS	= tsalarm
-$(CLOSED_BUILD)CLOSED_MPXU_KMODS	= platmod ntwdt
 
 MODSTUBS_DIR	= $(UNIX_DIR)
 LINTS_DIR	= $(OBJS_DIR)

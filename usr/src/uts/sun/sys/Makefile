@@ -43,12 +43,6 @@ SCSIADHDRS= \
 fascmd.h	fasdma.h \
 fasreg.h	fasvar.h	ifpio.h		sfvar.h
 
-CLOSED_SCSIAD = $(CLOSED)/uts/sun/sys/scsi/adapters
-
-CLOSED_SCSIADHDRS= \
-ifpcmd.h	ifpmail.h	ifpreg.h	ifpvar.h \
-ispcmd.h	ispmail.h	ispreg.h	ispvar.h
-
 SCSITARGHDRS= \
 
 ROOTDIR=	$(ROOT)/usr/include/sys
@@ -58,11 +52,8 @@ ROOTDIRS=	$(ROOTDIR) \
 		$(ROOTDIR)/scsi/targets
 
 ROOTHDRS= $(HDRS:%=$(ROOTDIR)/%)
-$(CLOSED_BUILD)ROOTHDRS += $(CLOSED_HDRS:%=$(ROOTDIR)/%)
 ROOTFCHDRS= $(FCHDRS:%=$(ROOTDIR)/fc4/%)
 ROOTSCSIADHDRS= $(SCSIADHDRS:%=$(ROOTDIR)/scsi/adapters/%)
-$(CLOSED_BUILD)ROOTSCSIADHDRS += \
-	$(CLOSED_SCSIADHDRS:%=$(ROOTDIR)/scsi/adapters/%)
 ROOTSCSITARGHDRS= $(SCSITARGHDRS:%=$(ROOTDIR)/scsi/targets/%)
 
 
@@ -70,16 +61,10 @@ ROOTSCSITARGHDRS= $(SCSITARGHDRS:%=$(ROOTDIR)/scsi/targets/%)
 $(ROOTDIR)/%: %
 	$(INS.file)
 
-$(ROOTDIR)/%: $(CLOSED)/uts/sun/sys/%
-	$(INS.file)
-
 $(ROOTDIR)/audio/%: audio/%
 	$(INS.file)
 
 $(ROOTDIR)/scsi/adapters/%: scsi/adapters/%
-	$(INS.file)
-
-$(ROOTDIR)/scsi/adapters/%: $(CLOSED_SCSIAD)/%
 	$(INS.file)
 
 $(ROOTDIR)/scsi/targets/%: scsi/targets/%
@@ -101,10 +86,6 @@ CHECKHDRS= \
 	$(FCHDRS:%.h=fc4/%.check) \
 	$(SCSIADHDRS:%.h=scsi/adapters/%.check) \
 	$(SCSITARGHDRS:%.h=scsi/targets/%.check)
-
-$(CLOSED_BUILD)CHECKHDRS += \
-	$(CLOSED_HDRS:%.h=$(CLOSED)/uts/sun/sys/%.check) \
-	$(CLOSED_SCSIADHDRS:%.h=$(CLOSED_SCSIAD)/%.check)
 
 # headers which won't quite meet the standards...
 #

@@ -1241,8 +1241,6 @@ C_GetAttributeValue(CK_SESSION_HANDLE hSession,
 CK_RV
 C_GetFunctionList(CK_FUNCTION_LIST_PTR_PTR ppFunctionList)
 {
-	_init();
-
 	PK11_Functions.version.major = VERSION_MAJOR;
 	PK11_Functions.version.minor = VERSION_MINOR;
 	PK11_Functions.C_Initialize = C_Initialize;

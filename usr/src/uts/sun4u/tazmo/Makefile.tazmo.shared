@@ -23,8 +23,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 #	Global definitions for sun4u implementation specific modules.
 #
 
@@ -72,7 +70,7 @@ include $(UTSBASE)/sun4u/tazmo/Makefile.files
 include $(UTSTREE)/sun4u/Makefile.sun4u
 
 #
-#	Define modules (must come after Makefile.sun4u, for CLOSED_BUILD).
+#	Define modules (must come after Makefile.sun4u).
 #
 TAZMO_KMODS	= platmod
 TAZMO_KMODS	+= envctrl

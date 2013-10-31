@@ -156,7 +156,7 @@ include $(UTSTREE)/common/Makefile.files
 #
 include $(UTSBASE)/Makefile.uts
 
-# These come after Makefile.uts (for CLOSED_BUILD).
+# These come after Makefile.uts.
 IMPLEMENTATIONS		 = tazmo 
 IMPLEMENTATIONS		+= starfire 
 IMPLEMENTATIONS		+= javelin 
@@ -185,9 +185,6 @@ IMPLEMENTATIONS		+= lw8
 IMPLEMENTATIONS		+= makaha 
 IMPLEMENTATIONS		+= opl 
 IMPLEMENTATIONS		+= lw2plus 
-
-$(CLOSED_BUILD)CLOSED_IMPLEMENTATIONS	= chalupa 
-$(CLOSED_BUILD)CLOSED_IMPLEMENTATIONS	+= ents 
 
 #
 #	machine specific optimization, override default in Makefile.master
@@ -398,12 +395,6 @@ DRV_KMODS	+= nxge
 DRV_KMODS	+= i2bsc 
 DRV_KMODS	+= mem_cache
 
-$(CLOSED_BUILD)CLOSED_DRV_KMODS	+= ctsmc
-$(CLOSED_BUILD)CLOSED_DRV_KMODS	+= m1535ppm
-$(CLOSED_BUILD)CLOSED_DRV_KMODS	+= memtest
-$(CLOSED_BUILD)CLOSED_DRV_KMODS	+= mi2cv
-$(CLOSED_BUILD)CLOSED_DRV_KMODS	+= smbus_ara
-
 #
 #	Exec Class Modules (/kernel/exec):
 #
@@ -460,7 +451,6 @@ GENUNIX_KMODS	+= genunix
 
 #	'User' "Modules" excluded from the Full Kernel lint target:
 #
-$(CLOSED_BUILD)CLOSED_NLMISC_KMODS	+= forthdebug
 
 #
 #	Modules eXcluded from the product:
@@ -478,8 +468,6 @@ CPU_KMODS	+= cheetah cheetahplus jalapeno serrano spitfire hummingbird
 TOD_KMODS	+= todds1287 todds1337 todmostek todstarfire 
 TOD_KMODS	+= todm5819 todblade todbq4802 todsg todopl
 TOD_KMODS	+= todm5819p_rmc todstarcat 
-
-$(CLOSED_BUILD)CLOSED_TOD_KMODS	+= todm5823
 
 #
 #	Performance Counter BackEnd Modules (/usr/kernel/pcbe):

@@ -42,33 +42,6 @@ function usage
     exit 2
 }
 
-function is_source_build
-{
-	"${flags.s.e}" || "${flags.s.d}" || "${flags.s.h}" || "${flags.s.o}"
-	return $?
-}
-
-#
-# single function for setting -S flag and doing error checking.
-# usage: set_S_flag <type>
-# where <type> is the source build type ("E", "D", ...).
-#
-function set_S_flag
-{
-	if is_source_build; then
-		print 'Can only build one source variant at a time.'
-		exit 1
-	fi
-	
-	case "$1" in
-		"E") flags.s.e=true ;;
-		"D") flags.s.d=true ;;
-		"H") flags.s.h=true ;;
-		"O") flags.s.o=true ;;
-		*)   usage ;;
-	esac
-}
-
 typeset -r USAGE=$'+
 [-?\n@(#)\$Id: bldenv (OS/Net) 2008-04-06 \$\n]
 [-author?OS/Net community <tools-discuss@opensolaris.org>]
@@ -89,16 +62,6 @@ typeset -r USAGE=$'+
     like clobber, install and _msg, which otherwise require digging
     through large build logs to figure out what is being
     done.]
-[+?bldenv is also useful if you run into build issues with the
-    source product or when generating OpenSolaris deliverables.
-    If a source product build is flagged, the environment is set
-    up for building the indicated source product tree, which is
-    assumed to have already been created. If the OpenSolaris
-    deliverables flag (-O) is set in NIGHTLY_OPTIONS, the
-    environment is set up for building just the open source.
-    This includes using an alternate proto area, as well as
-    using the closed binaries in $CODEMGR_WS/closed.skel (which
-    is assumed to already exist).]
 [+?By default, bldenv will invoke the shell specified in
     $SHELL. If $SHELL is not set or is invalid, csh will be
     used.]
@@ -108,14 +71,6 @@ typeset -r USAGE=$'+
 [d?set up environment for doing DEBUG builds (default is non-DEBUG)]
 [t?set up environment to use the tools in usr/src/tools (this is the
     default, use +t to use the tools from /opt/onbld)]
-[S]:[option?Build a variant of the source product.
-The value of \aoption\a must be one of the following:]{
-       [+E?build the exportable source variant of the source product.]
-       [+D?build the domestic  source  (exportable + crypt) variant of
-           the source product.]
-       [+H?build hybrid source (binaries + deleted source).]
-       [+O?simulate an OpenSolaris (open source only) build.]
-}
 
 <env_file> [command]
 
@@ -188,7 +143,6 @@ while getopts -a "${progname}" "${USAGE}" OPT ; do
 	  +d)	flags.d=false SUFFIX="-nd" ;;
 	  t)	flags.t=true  ;;
 	  +t)	flags.t=false ;;
-	  S)	set_S_flag "$OPTARG" ;;
 	  \?)	usage ;;
     esac
 done
@@ -273,16 +227,13 @@ shift
 # must match the getopts in nightly.sh
 OPTIND=1
 NIGHTLY_OPTIONS="-${NIGHTLY_OPTIONS#-}"
-while getopts '+0AaBCDdFfGIilMmNnOopRrS:tUuWwXxz' FLAG "$NIGHTLY_OPTIONS"
+while getopts '+0AaBCDdFfGIilMmNnopRrtUuWwXxz' FLAG "$NIGHTLY_OPTIONS"
 do
 	case "$FLAG" in
-	  O)    flags.O=true  ;;
-	  +O)   flags.O=false ;;
 	  o)	flags.o=true  ;;
 	  +o)	flags.o=false ;;
 	  t)	flags.t=true  ;;
 	  +t)	flags.t=false ;;
-	  S)	set_S_flag "$OPTARG" ;;
 	  *)	;;
 	esac
 done
@@ -313,45 +264,14 @@ else
 	unset EXTRA_CFLAGS
 fi
 
-[[ "${flags.O}" == "true" ]] && export MULTI_PROTO="yes"
-
 # update build-type variables
 PKGARCHIVE="${PKGARCHIVE}${SUFFIX}"
-
-# Append source version
-if "${flags.s.e}" ; then
-        VERSION+=":EXPORT"
-	SRC="${EXPORT_SRC}/usr/src"
-fi
- 
-if "${flags.s.d}" ; then
-        VERSION+=":DOMESTIC"
-	SRC="${EXPORT_SRC}/usr/src"
-fi
-
-if "${flags.s.h}" ; then
-        VERSION+=":HYBRID"
-	SRC="${EXPORT_SRC}/usr/src"
-fi
- 
-if "${flags.s.o}" ; then
-        VERSION+=":OPEN_ONLY"
-	SRC="${OPEN_SRCDIR}/usr/src"
-fi
 
 # 	Set PATH for a build
 PATH="/opt/onbld/bin:/opt/onbld/bin/${MACH}:/opt/SUNWspro/bin:/usr/ccs/bin:/usr/bin:/usr/sbin:/usr/ucb:/usr/etc:/usr/openwin/bin:/usr/sfw/bin:/opt/sfw/bin:."
 if [[ "${SUNWSPRO}" != "" ]]; then 
 	export PATH="${SUNWSPRO}/bin:$PATH" 
 fi 
-
-if [[ -z "$CLOSED_IS_PRESENT" ]]; then
-	if [[ -d $SRC/../closed ]]; then
-		export CLOSED_IS_PRESENT="yes"
-	else
-		export CLOSED_IS_PRESENT="no"
-	fi
-fi
 
 TOOLS="${SRC}/tools"
 TOOLS_PROTO="${TOOLS}/proto/root_${MACH}-nd" ; export TOOLS_PROTO
@@ -417,21 +337,6 @@ if [[ "$MULTI_PROTO" != "yes" && "$MULTI_PROTO" != "no" ]]; then
 fi
 
 [[ "$MULTI_PROTO" == "yes" ]] && export ROOT="${ROOT}${SUFFIX}"
-
-export TONICBUILD="#"
-
-if "${flags.O}" ; then 
-	if [[ "$CLOSED_IS_PRESENT" != "yes" ]]; then
-		print "OpenSolaris closed binary generation requires "
-		print "closed tree"
-		exit 1
-	fi
-	print "Generating OpenSolaris deliverables"
-	# We only need CLOSEDROOT in the env for convenience. Makefile.master
-	# figures out what it needs when it matters.
-	export CLOSEDROOT="${ROOT}-closed"
-	export TONICBUILD=""
-fi
 
 ENVLDLIBS1="-L$ROOT/lib -L$ROOT/usr/lib"
 ENVCPPFLAGS1="-I$ROOT/usr/include"

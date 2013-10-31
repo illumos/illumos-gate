@@ -135,8 +135,6 @@ SCSI_FILES = $(SCSI_OBJS:%.o=-l ../scsi/%.ll)
 CMLB_FILES = $(CMLB_OBJS:%.o=-l ../cmlb/%.ll)
 
 WARLOCK_TARGETS = warlock_alone warlock_with_esp warlock_with_fas
-$(CLOSED_BUILD)WARLOCK_TARGETS += warlock_with_isp warlock_with_glm \
-	warlock_with_uata warlock_with_mpt
 
 warlock: $(WARLOCK_TARGETS)
 
@@ -166,34 +164,6 @@ warlock_with_fas: $(WLCMD_DIR)/sd_with_fas.wlcmd $(WARLOCK_OUT) scsi_files \
 		$(SCSI_FILES) $(CMLB_FILES) \
 		-l ../warlock/ddi_dki_impl.ll
 
-warlock_with_isp: $(WLCMD_DIR)/sd_with_isp.wlcmd $(WARLOCK_OUT) scsi_files \
-	isp_files warlock_ddi.files cmlb_files
-	$(WARLOCK) -c $(WLCMD_DIR)/sd_with_isp.wlcmd \
-		$(WARLOCK_OUT) $(CLOSED)/uts/sparc/isp/isp $(SCSI_FILES) \
-		$(CMLB_FILES) \
-		-l ../warlock/ddi_dki_impl.ll
-
-warlock_with_glm: $(WLCMD_DIR)/sd_with_glm.wlcmd $(WARLOCK_OUT) scsi_files \
-	glm_files warlock_ddi.files cmlb_files
-	$(WARLOCK) -c $(WLCMD_DIR)/sd_with_glm.wlcmd \
-		$(WARLOCK_OUT) $(CLOSED)/uts/sparc/glm/glm $(SCSI_FILES) \
-		$(CMLB_FILES) \
-		-l ../warlock/ddi_dki_impl.ll
-
-warlock_with_uata: $(WLCMD_DIR)/sd_with_uata.wlcmd $(WARLOCK_OUT) scsi_files \
-	uata_files warlock_ddi.files cmlb_files
-	$(WARLOCK) -c $(WLCMD_DIR)/sd_with_uata.wlcmd \
-		$(WARLOCK_OUT) $(CLOSED)/uts/sparc/uata/*.ll $(SCSI_FILES) \
-		$(CMLB_FILES) \
-		-l ../warlock/ddi_dki_impl.ll
-
-warlock_with_mpt: $(WLCMD_DIR)/sd_with_mpt.wlcmd $(WARLOCK_OUT) scsi_files \
-	mpt_files warlock_ddi.files cmlb_files
-	$(WARLOCK) -c $(WLCMD_DIR)/sd_with_mpt.wlcmd \
-		$(WARLOCK_OUT) $(CLOSED)/uts/sparc/mpt/*.ll $(SCSI_FILES)  \
-		$(CMLB_FILES) \
-		-l ../warlock/ddi_dki_impl.ll
-
 cmlb_files:
 	@cd ../cmlb; pwd; $(MAKE) warlock
 
@@ -206,18 +176,6 @@ esp_files:
 
 fas_files:
 	@cd ../fas; pwd; $(MAKE) warlock
-
-isp_files:
-	@cd $(CLOSED)/uts/sparc/isp; pwd; $(MAKE) warlock
-
-glm_files:
-	@cd $(CLOSED)/uts/sparc/glm; pwd; $(MAKE) warlock
-
-uata_files:
-	@cd $(CLOSED)/uts/sparc/uata; pwd; $(MAKE) warlock
-
-mpt_files:
-	@cd $(CLOSED)/uts/sparc/mpt; pwd; $(MAKE) warlock
 
 warlock_ddi.files:
 	@cd ../warlock; pwd; $(MAKE) warlock

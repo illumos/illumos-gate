@@ -23,8 +23,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 #	Global definitions for sun4u implementation specific modules.
 #
 
@@ -68,10 +66,9 @@ include $(UTSTREE)/sun4u/sunfire/Makefile.files
 include $(UTSTREE)/sun4u/Makefile.sun4u
 
 #
-#	Define modules (must come after Makefile.sun4u for CLOSED_BUILD).
+#	Define modules (must come after Makefile.sun4u).
 #
 SUNFIRE_KMODS			= ac central environ fhc simmstat sysctrl sram
-$(CLOSED_BUILD)CLOSED_SUNFIRE_KMODS	= platmod
 
 #
 # For now, disable these lint checks; maintainers should endeavor

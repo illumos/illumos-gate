@@ -117,7 +117,6 @@ TEST		= test
 SCSI_FILES	= $(SCSI_OBJS:%.o=-l ../scsi/%.ll)
 
 WARLOCK_TARGETS	= $(WARLOCK_OK)
-$(CLOSED_BUILD)WARLOCK_TARGETS += warlock_with_glm
 
 warlock: $(WARLOCK_TARGETS)
 
@@ -134,19 +133,6 @@ $(WARLOCK_OK): $(WLCMD_DIR)/$(MODULE).wlcmd $(WARLOCK_OUT)
 
 %.ll: $(UTSBASE)/common/io/scsi/targets/%.c
 	$(WLCC) $(CPPFLAGS) -o $@ $<
-
-warlock_with_glm: $(WLCMD_DIR)/ses_with_glm.wlcmd $(WARLOCK_OUT) glm_files
-	@cd ../warlock; $(MAKE) warlock
-	@cd ../scsi; $(MAKE) warlock
-	@cd $(CLOSED)/uts/intel/glm; $(MAKE) warlock;
-	$(WARLOCK) -c $(WLCMD_DIR)/ses_with_glm.wlcmd ses.ll \
-		$(CLOSED)/uts/intel/glm/*.ll \
-	        $(SCSI_FILES) \
-		../warlock/scsi.ll \
-		-l ../warlock/ddi_dki_impl.ll 
-
-glm_files:
-	@cd $(CLOSED)/uts/intel/glm; pwd; $(MAKE) warlock
 
 warlock_ddi.files:
 	@cd ../warlock; pwd; $(MAKE) warlock

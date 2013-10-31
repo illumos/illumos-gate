@@ -231,31 +231,7 @@ Integration engineer default group of options (-mpu)
 Default group of options for building a release (-mp)
 
 .LP
-.B Source Build options
-.TP 10
-.B \-S E | D | H
-Build the Export, Domestic, or Hybrid source product. Only Export and
-Domestic are truly buildable at this time.
-.TP 10
-.B \-S O
-Simulate an OpenSolaris build on a full tree.  This can be used by
-internal developers to ensure that they haven't broken the build for
-external developers.
-.LP
-Source build options only make sense for a full internal tree (open
-and closed source).  Only one source build option can be specified at
-a time.
-
-.LP
 .B Miscellaneous options
-.TP 10
-.B \-O
-generate deliverables for OpenSolaris.  Tarballs containing signed
-cryptographic binaries and binaries
-of closed-source components are put in $CODEMGR_WS.  (The
-cryptographic tarballs are copies of the
-ones that are put in the parent directory of
-$PKGARCHIVE.)
 .TP 10
 .B \-V VERS
 set the build version string to VERS, overriding VERSION
@@ -350,10 +326,6 @@ targets.  It should be expressed in terms of $CODEMGR_WS.
 If $MULTI_PROTO is "no", $ROOT may contain a DEBUG or non-DEBUG
 build.  If $MULTI_PROTO is "yes", $ROOT contains the DEBUG build and
 $ROOT-nd contains the non-DEBUG build.
-.LP
-For OpenSolaris deliveries (\fB\-O\fR), $ROOT-closed contains a parallel
-proto area containing the DEBUG build of just usr/closed components, and
-$ROOT-nd-closed contains the non-DEBUG equivalent.
 .RE
 .LP
 .B TOOLS_ROOT
@@ -532,12 +504,6 @@ corresponding variable for Mercurial or Subversion, which are assumed
 to be installed in the default path.
 .RE
 .LP
-.B OPEN_SRCDIR
-.RS 5
-The open source tree is copied to this directory when simulating an
-OpenSolaris build (\fB\-S O\fR).  It defaults to $CODEMGR_WS/open_src.
-.LP
-.RE
 .B ON_CLOSED_BINS
 .RS 5
 OpenSolaris builds do not contain the closed source tree.  Instead,
@@ -583,9 +549,7 @@ If "no" (the default),
 .I nightly
 will reuse $ROOT for both the DEBUG and non-DEBUG builds.  If "yes",
 the DEBUG build will go in $ROOT and the non-DEBUG build will go in
-$ROOT-nd.  Other values will be treated as "no".  Use of the
-.B \-O
-flag forces MULTI_PROTO to "yes".
+$ROOT-nd.  Other values will be treated as "no".
 .RE
 .LP
 .SH NIGHTLY HOOK ENVIRONMENT VARIABLES

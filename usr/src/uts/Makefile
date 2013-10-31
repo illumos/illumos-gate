@@ -160,10 +160,6 @@ COMMON_HDRDIRS= common/avs \
 		common/vm
 
 
-# These aren't the only headers in closed.  But the other directories
-# are simple enough that they can be driven from the src tree.
-$(CLOSED_BUILD)COMMON_HDRDIRS += $(CLOSED)/uts/common/sys
-
 #
 # Subset of COMMON_HDRDIRS in which at least one header is generated
 # at runtime (e.g., rpcgen), and in which "make clean" should run.
@@ -218,16 +214,8 @@ clean.lint modlist: $($(MACH)_ARCHITECTURES)
 # the user will be interested in), it's historically been set to
 # mirror the $(XRDIRS) list, and that works kinda sorta okay.
 #
-# We need to manually prune usr/closed/uts/{i86xpv|sfmmu|i86pc} since
-# none of them exist.
-#
-SHARED_XRDIRS = $(sparc_ARCHITECTURES) $(i386_ARCHITECTURES) sun4 sfmmu	\
+XRDIRS = $(sparc_ARCHITECTURES) $(i386_ARCHITECTURES) sun4 sfmmu	\
 	sun common
-CLOSED_XRDIRS = $(SHARED_XRDIRS:%=% ../../closed/uts/%)
-XRDIRS = $(SHARED_XRDIRS)
-CLOSED_XRDIRS_XEN = $(CLOSED_XRDIRS:../../closed/uts/i86xpv=)
-CLOSED_XRDIRS_1 = $(CLOSED_XRDIRS_XEN:../../closed/uts/i86pc=)
-$(CLOSED_BUILD)XRDIRS = $(CLOSED_XRDIRS_1:../../closed/uts/sfmmu=)
 
 XRINCDIRS = $(XRDIRS)
 

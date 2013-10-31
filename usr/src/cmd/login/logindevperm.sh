@@ -59,7 +59,6 @@ cat <<EOM
 # console	mode	devices
 #
 /dev/vt/console_user	0600	/dev/mouse:/dev/kbd
-/dev/vt/console_user	0600	/dev/mouse:/dev/kbd
 /dev/vt/console_user	0600	/dev/sound/*		# audio devices
 /dev/vt/console_user	0600	/dev/fbs/*		# frame buffers
 /dev/vt/console_user	0600	/dev/dri/*		# dri devices

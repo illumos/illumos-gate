@@ -287,3 +287,24 @@ MCAMD_OBJS	+= \
 	mcamd_dimmcfg.o \
 	mcamd_subr.o \
 	mcamd_pcicfg.o
+
+#
+# Intel Nehalem memory controller module
+#
+INTEL_NHM_OBJS += \
+	nhm_init.o \
+	mem_addr.o \
+	intel_nhmdrv.o \
+	nhm_pci_cfg.o \
+	dimm_topo.o \
+	intel_nhm.o
+
+#
+# Intel 5000/5100/5400/7300 chipset memory controller hub (MCH) module
+#
+INTEL_NB5000_OBJS += \
+	intel_nb5000.o \
+	intel_nbdrv.o \
+	dimm_addr.o \
+	nb_pci_cfg.o \
+	nb5000_init.o

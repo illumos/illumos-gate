@@ -29,7 +29,6 @@
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
 #
 UTSBASE = ../..
-UTSCLOSED = ../../../../closed/uts
 
 #
 #       Define the module and object file sets.
@@ -43,22 +42,6 @@ CONF_SRCDIR	= $(UTSBASE)/intel/io/intel_nhm
 #       Include common rules.
 #
 include $(UTSBASE)/intel/Makefile.intel
-
-#
-# The list of object files is defined here, rather than in Makefile.files,
-# because the "$(CLOSED_BUILD)" macro has not been defined at the time
-# Makefile.files is processed.
-#
-INTEL_NHM_OBJS += \
-	nhm_init.o \
-	mem_addr.o \
-	intel_nhmdrv.o \
-	nhm_pci_cfg.o \
-	dimm_topo.o \
-	intel_nhm.o
-
-$(CLOSED_BUILD)INTEL_NHM_OBJS += \
-	nhm_dimm_addr.o
 
 OBJECTS		= $(INTEL_NHM_OBJS:%=$(OBJS_DIR)/%)
 LINTS           = $(INTEL_NHM_OBJS:%.o=$(LINTS_DIR)/%.ln)
@@ -100,4 +83,3 @@ install:        $(INSTALL_DEPS)
 #       Include common targets.
 #
 include ../Makefile.targ
-$(CLOSED_BUILD)include $(UTSCLOSED)/intel/Makefile.rules

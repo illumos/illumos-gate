@@ -138,7 +138,6 @@ SCSI_FILES = $(SCSI_OBJS:%.o=-l ../scsi/%.ll)
 CMLB_FILES = $(CMLB_OBJS:%.o=-l ../cmlb/%.ll)
 
 WARLOCK_TARGETS = warlock_alone
-$(CLOSED_BUILD)WARLOCK_TARGETS += warlock_with_mpt warlock_with_glm
 
 warlock: $(WARLOCK_TARGETS)
 
@@ -153,28 +152,6 @@ $(WARLOCK_OK):	$(WLCMD_DIR)/sd.wlcmd $(WARLOCK_OUT) scsi_files \
 
 %.ll: $(UTSBASE)/common/io/scsi/targets/%.c
 	$(WLCC) $(CPPFLAGS) -DDEBUG -o $@ $<
-
-warlock_with_glm: $(WLCMD_DIR)/sd_with_glm.wlcmd $(WARLOCK_OUT) scsi_files \
-	glm_files warlock_ddi.files cmlb_files
-	$(WARLOCK) -c $(WLCMD_DIR)/sd_with_glm.wlcmd \
-		$(WARLOCK_OUT) \
-		$(CLOSED)/uts/intel/glm/*.ll \
-		 $(SCSI_FILES) $(CMLB_FILES) \
-		-l ../warlock/ddi_dki_impl.ll
-
-warlock_with_mpt: $(WLCMD_DIR)/sd_with_mpt.wlcmd $(WARLOCK_OUT) scsi_files \
-	mpt_files warlock_ddi.files cmlb_files
-	$(WARLOCK) -c $(WLCMD_DIR)/sd_with_mpt.wlcmd \
-		$(WARLOCK_OUT) \
-		$(CLOSED)/uts/intel/mpt/*.ll \
-		$(SCSI_FILES) $(CMLB_FILES) \
-		-l ../warlock/ddi_dki_impl.ll
-
-glm_files:
-	@cd $(CLOSED)/uts/intel/glm; pwd; $(MAKE) warlock
-
-mpt_files:
-	@cd $(CLOSED)/uts/intel/mpt; pwd; $(MAKE) warlock
 
 cmlb_files:
 	@cd ../cmlb; pwd; $(MAKE) warlock

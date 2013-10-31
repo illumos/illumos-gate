@@ -22,8 +22,6 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # cmd/tsol/Makefile
 #
 
@@ -57,12 +55,6 @@ MSGSUBDIRS =		\
 	tnctl		\
 	tnd		\
 	getzonepath
-
-$(CLOSED_BUILD)SUBDIRS += $(CLOSED)/cmd/tsol/chk_encodings \
-	$(CLOSED)/cmd/tsol/labeld
-
-$(CLOSED_BUILD)CLOSED_MSGSUBDIRS = $(CLOSED)/cmd/tsol/chk_encodings \
-	$(CLOSED)/cmd/tsol/labeld
 
 #
 # for messaging catalog

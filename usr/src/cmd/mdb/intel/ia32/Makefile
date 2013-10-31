@@ -28,9 +28,6 @@ include ../../Makefile.common
 MODULES = $(COMMON_MODULES_PROC) $(COMMON_MODULES_PROC_32BIT) \
     $(COMMON_MODULES_KVM) uhci
 
-$(CLOSED_BUILD)MODULES += \
-	$(CLOSED_COMMON_MODULES_KVM:%=$(CLOSED)/cmd/mdb/intel/ia32/%)
-
 SUBDIRS = mdb mdb_ks kmdb libstandctf libstand .WAIT $(MODULES)
 
 include ../../Makefile.subdirs

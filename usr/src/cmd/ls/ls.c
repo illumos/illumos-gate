@@ -1030,6 +1030,9 @@ main(int argc, char *argv[])
 		argv[optind] = dotp;
 	}
 
+	if (colorflg)
+		ls_color_init();
+
 	for (i = 0; i < (amino ? amino : 1); i++) {
 
 		/*
@@ -1096,9 +1099,6 @@ main(int argc, char *argv[])
 		if (flist[i]->ltype == 'd' && dflg == 0 || fflg)
 			break;
 	}
-
-	if (colorflg)
-		ls_color_init();
 
 	pem(&flist[0], &flist[i], 0);
 	for (; i < nargs; i++) {

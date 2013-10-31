@@ -732,13 +732,9 @@ function copy_kmdb {
 	fi
 
 	srctrees=$SRC
-	if [[ -d $SRC/../closed && "$CLOSED_IS_PRESENT" != no ]]; then
-		srctrees="$srctrees $SRC/../closed"
-	else
-		if [ -z "$ON_CRYPTO_BINS" ]; then
-			echo "Warning: ON_CRYPTO_BINS not set; pre-signed" \
-			    "crypto not provided."
-		fi
+	if [ -z "$ON_CRYPTO_BINS" ]; then
+		echo "Warning: ON_CRYPTO_BINS not set; pre-signed" \
+		    "crypto not provided."
 	fi
 	if [[ $WANT64 = "yes" ]] ; then
 		# kmdbmod for sparc and x86 are built and installed

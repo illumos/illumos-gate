@@ -41,23 +41,10 @@ $(LICROOT)/usr/src/%: $(CODEMGR_WS)/usr/src/%
 	$(PKGDEBUG)$(INS.file)
 
 #
-# For license files in the closed source tree, the desired action
-# depends on the type of build.
+# A build without closed source relies on closed-bins extraction to stage
+# the license file and does nothing here.
 #
-# 1. For a normal build, with closed source present, simply copy the
-#    file into the license staging directory.
-#
-# 2. For a Tonic build, copy the file into both open and closed
-#    license staging directories.
-#
-# 3. For a build without closed source, rely on closed-bins extraction
-#    to stage the license file, and do nothing here.
-#
-$(TONICBUILD)INS= install -O
-$(LICROOT)/usr/closed/%: $(CLOSED_BUILD) $(CODEMGR_WS)/usr/closed/%
-	$(CLOSED_BUILD)$(PKGDEBUG) \
+$(LICROOT)/usr/closed/%:
 	if [ ! -d $(@D) ]; then \
 		mkdir -p $(@D); \
 	fi; \
-	$(TONICBUILD) $(RM) $(@:$(ROOT)/%=$(CLOSEDROOT)/%)
-	$(CLOSED_BUILD)$(PKGDEBUG)$(INS.file)

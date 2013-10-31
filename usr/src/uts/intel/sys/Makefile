@@ -90,9 +90,6 @@ HDRS	=			\
 	x86_archext.h		\
 	xen_errno.h
 
-CLOSEDHDRS = \
-	memtest.h
-
 ROOTDIR=	$(ROOT)/usr/include/sys
 SCSIDIR=	$(ROOTDIR)/scsi
 SCSIDIRS=	$(SCSIDIR) $(SCSIDIR)/conf $(SCSIDIR)/generic \
@@ -101,18 +98,12 @@ ROOTFSDIR=	$(ROOTDIR)/fs
 ROOTDIRS=	$(ROOTDIR) $(ROOTFSDIR)
 
 ROOTHDRS= $(HDRS:%=$(ROOTDIR)/%)
-$(CLOSED_BUILD)ROOTHDRS += $(CLOSEDHDRS:%=$(ROOTDIR)/%)
 
 CHECKHDRS= 			\
 	$(HDRS:%.h=%.check)
 
-$(CLOSED_BUILD)CHECKHDRS += $(CLOSEDHDRS:%.h=$(CLOSED)/uts/intel/sys/%.check)
-
 # install rules
 $(ROOTDIR)/%: %
-	$(INS.file)
-
-$(ROOTDIR)/%:	$(CLOSED)/uts/intel/sys/%
 	$(INS.file)
 
 .KEEP_STATE:

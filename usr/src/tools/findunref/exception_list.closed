@@ -68,10 +68,3 @@
 ./usr/closed/uts/common/io/bnx/tcp_ctx.h
 ./usr/closed/uts/common/io/bnx/toe_ctx.h
 ./usr/closed/uts/common/io/bnx/bnxdbg.c
-
-#
-# Ignore Makefile.tonic - not used unless we're running an
-# OpenSolaris closedbins delivery build
-#
-./usr/closed/Makefile.tonic
-

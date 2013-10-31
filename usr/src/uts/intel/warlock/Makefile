@@ -81,16 +81,11 @@ warlock.usb:
 	@cd ../usbsacm; $(MAKE) clean; $(MAKE) warlock
 	@cd ../usbecm; $(MAKE) clean; $(MAKE) warlock
 	@cd ../usbskel; $(MAKE) clean; $(MAKE) warlock
-$(CLOSED_BUILD)	@cd $(CLOSED)/uts/intel/usbser_edge; \
-		$(MAKE) clean; $(MAKE) warlock
 
 warlock.scsi:
 	@cd ../sd; $(MAKE) clean; $(MAKE) warlock
 	@cd ../ses; $(MAKE) clean; $(MAKE) warlock
 	@cd ../st; $(MAKE) clean; $(MAKE) warlock
-$(CLOSED_BUILD)	@cd $(CLOSED)/uts/intel/glm; $(MAKE) clean; $(MAKE) warlock
-$(CLOSED_BUILD)	@cd $(CLOSED)/uts/intel/mpt; $(MAKE) clean; $(MAKE) warlock
-
 
 warlock.1394:
 	@cd ../s1394; $(MAKE) clean; $(MAKE) warlock
@@ -107,17 +102,12 @@ warlock.ib:
 	@cd ../ibtl; $(MAKE) clean; $(MAKE) warlock
 	@cd ../ibcm; $(MAKE) clean; $(MAKE) warlock
 	@cd ../ibd; $(MAKE) clean; $(MAKE) warlock
-$(CLOSED_BUILD)	@cd $(CLOSED)/uts/intel/tavor; $(MAKE) clean; $(MAKE) warlock
-$(CLOSED_BUILD)	@cd $(CLOSED)/uts/intel/hermon; $(MAKE) clean; $(MAKE) warlock
-$(CLOSED_BUILD)	@cd $(CLOSED)/uts/intel/daplt; $(MAKE) clean; $(MAKE) warlock
 
 warlock.sata:
 	@cd ../sata; $(MAKE) clean; $(MAKE) warlock
 	@cd ../si3124; $(MAKE) clean; $(MAKE) warlock
 	@cd ../nv_sata; $(MAKE) clean; $(MAKE) warlock
 	@cd ../ahci; $(MAKE) clean; $(MAKE) warlock
-$(CLOSED_BUILD)	@cd $(CLOSED)/uts/intel/marvell88sx; \
-		$(MAKE) clean; $(MAKE) warlock
 
 warlock.wc:
 	@cd ../wc; $(MAKE) clean; $(MAKE) warlock

@@ -22,16 +22,10 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # lib/raidcfg_plugins/Makefile
 #
 
 include $(SRC)/Makefile.master
-
-CLOSED_PLUGIN = $(CLOSED)/lib/raidcfg_plugins/
-
-$(CLOSED_BUILD)COMMON_SUBDIRS += $(CLOSED_PLUGIN)/mpt
 
 SUBDIRS= $(COMMON_SUBDIRS) $($(MACH)_SUBDIRS)
 

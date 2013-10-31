@@ -65,9 +65,6 @@ SUN4_HDRS=			\
 	xc_impl.h		\
 	zsmach.h
 
-CLOSED_SUN4_HDRS=			\
-	memtestio.h
-
 HDRS=	\
 	ds_pri.h		\
 	ds_snmp.h		\
@@ -92,18 +89,9 @@ HDRS=	\
 	traptrace.h		\
 	vlds.h
 
-CLOSED_HDRS=	\
-	memtestio_kt.h		\
-	memtestio_ni.h		\
-	memtestio_n2.h		\
-	memtestio_v.h		\
-	memtestio_vf.h
-
 ROOTHDRS=		$(HDRS:%=$(USR_PSM_ISYS_DIR)/%)
-$(CLOSED_BUILD)ROOTHDRS += $(CLOSED_HDRS:%=$(USR_PSM_ISYS_DIR)/%)
 
 SUN4_ROOTHDRS=		$(SUN4_HDRS:%=$(USR_PSM_ISYS_DIR)/%)
-$(CLOSED_BUILD)SUN4_ROOTHDRS += $(CLOSED_SUN4_HDRS:%=$(USR_PSM_ISYS_DIR)/%)
 
 ROOTDIR=		$(ROOT)/usr/share/src
 ROOTDIRS=		$(ROOTDIR)/uts $(ROOTDIR)/uts/$(PLATFORM)
@@ -113,10 +101,6 @@ LINKDEST=		../../../../platform/$(PLATFORM)/include/sys
 
 CHECKHDRS=		$(HDRS:%.h=%.check) \
 			$(SUN4_HDRS:%.h=%.cmncheck)
-
-$(CLOSED_BUILD)CHECKHDRS +=			\
-	$(CLOSED_HDRS:%.h=%.check)		\
-	$(CLOSED_SUN4_HDRS:%.h=%.cmncheck)
 
 .KEEP_STATE:
 
@@ -137,12 +121,6 @@ $(USR_PSM_ISYS_DIR)/%:	../../sfmmu/sys/% $(USR_PSM_ISYS_DIR)
 $(USR_PSM_ISYS_DIR)/%:	../../sun4/sys/% $(USR_PSM_ISYS_DIR)
 	$(INS.file)
 
-$(USR_PSM_ISYS_DIR)/%:	$(CLOSED)/uts/sun4/sys/% $(USR_PSM_ISYS_DIR)
-	$(INS.file)
-
-$(USR_PSM_ISYS_DIR)/%:	$(CLOSED)/uts/sun4v/sys/% $(USR_PSM_ISYS_DIR)
-	$(INS.file)
-
 $(ROOTDIRS):
 	$(INS.dir)
 
@@ -155,11 +133,7 @@ mon/%.check:	mon/%.h
 
 %.check:	../../sfmmu/sys/%.h
 	$(DOT_H_CHECK)
-%.check:	$(CLOSED)/uts/sun4v/sys/%.h
-	$(DOT_H_CHECK)
 %.cmncheck:	../../sun4/sys/%.h
-	$(DOT_H_CHECK)
-%.cmncheck:	$(CLOSED)/uts/sun4/sys/%.h
 	$(DOT_H_CHECK)
 
 FRC:
