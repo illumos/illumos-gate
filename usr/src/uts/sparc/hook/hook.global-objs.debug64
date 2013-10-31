@@ -27,3 +27,4 @@ modlinkage
 modlmisc
 hook_stack_lock
 hook_stacks
+hook_hintvalue_none
