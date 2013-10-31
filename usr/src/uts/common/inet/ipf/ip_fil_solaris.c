@@ -5,7 +5,7 @@
  *
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  *
- * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
  */
 
 #if !defined(lint)
@@ -105,6 +105,52 @@ u_long		*ip_forwarding = NULL;
 
 vmem_t	*ipf_minor;	/* minor number arena */
 void 	*ipf_state;	/* DDI state */
+
+/*
+ * GZ and per-zone stacks:
+ *
+ * For each non-global zone, we create two ipf stacks: the per-zone stack and
+ * the GZ-controlled stack.  The per-zone stack can be controlled and observed
+ * from inside the zone or from the global zone.  The GZ-controlled stack can
+ * only be controlled and observed from the global zone (though the rules
+ * still only affect that non-global zone).
+ *
+ * The two hooks are always arranged so that the GZ-controlled stack is always
+ * "outermost" with respect to the zone.  The traffic flow then looks like
+ * this:
+ *
+ * Inbound:
+ *
+ *     nic ---> [ GZ-controlled rules ] ---> [ per-zone rules ] ---> zone
+ *
+ * Outbound:
+ *
+ *     nic <--- [ GZ-controlled rules ] <--- [ per-zone rules ] <--- zone
+ */
+
+/* IPv4 hook names */
+char *hook4_nicevents = 	"ipfilter_hook4_nicevents";
+char *hook4_nicevents_gz = 	"ipfilter_hook4_nicevents_gz";
+char *hook4_in = 		"ipfilter_hook4_in";
+char *hook4_in_gz = 		"ipfilter_hook4_in_gz";
+char *hook4_out = 		"ipfilter_hook4_out";
+char *hook4_out_gz = 		"ipfilter_hook4_out_gz";
+char *hook4_loop_in = 		"ipfilter_hook4_loop_in";
+char *hook4_loop_in_gz = 	"ipfilter_hook4_loop_in_gz";
+char *hook4_loop_out = 		"ipfilter_hook4_loop_out";
+char *hook4_loop_out_gz = 	"ipfilter_hook4_loop_out_gz";
+
+/* IPv6 hook names */
+char *hook6_nicevents = 	"ipfilter_hook6_nicevents";
+char *hook6_nicevents_gz = 	"ipfilter_hook6_nicevents_gz";
+char *hook6_in = 		"ipfilter_hook6_in";
+char *hook6_in_gz = 		"ipfilter_hook6_in_gz";
+char *hook6_out = 		"ipfilter_hook6_out";
+char *hook6_out_gz = 		"ipfilter_hook6_out_gz";
+char *hook6_loop_in = 		"ipfilter_hook6_loop_in";
+char *hook6_loop_in_gz = 	"ipfilter_hook6_loop_in_gz";
+char *hook6_loop_out = 		"ipfilter_hook6_loop_out";
+char *hook6_loop_out_gz = 	"ipfilter_hook6_loop_out_gz";
 
 /* ------------------------------------------------------------------------ */
 /* Function:    ipldetach                                                   */
@@ -274,16 +320,35 @@ ipf_stack_t *ifs;
 	if (fr_initialise(ifs) < 0)
 		return -1;
 
-	HOOK_INIT(ifs->ifs_ipfhook4_nicevents, ipf_nic_event_v4,
-		  "ipfilter_hook4_nicevents", ifs);
-	HOOK_INIT(ifs->ifs_ipfhook4_in, ipf_hook4_in,
-		  "ipfilter_hook4_in", ifs);
-	HOOK_INIT(ifs->ifs_ipfhook4_out, ipf_hook4_out,
-		  "ipfilter_hook4_out", ifs);
-	HOOK_INIT(ifs->ifs_ipfhook4_loop_in, ipf_hook4_loop_in,
-		  "ipfilter_hook4_loop_in", ifs);
-	HOOK_INIT(ifs->ifs_ipfhook4_loop_out, ipf_hook4_loop_out,
-		  "ipfilter_hook4_loop_out", ifs);
+	/*
+	 * For incoming packets, we want the GZ hooks to run before the
+	 * per-zone hooks, regardless of what order they're are installed.
+	 */
+#define HOOK_INIT_GZ_BEFORE(x, fn, n, gzn, a)			\
+	HOOK_INIT(x, fn, ifs->ifs_gz ? gzn : n, ifs);		\
+	(x)->h_hint = ifs->ifs_gz ? HH_BEFORE : HH_AFTER;	\
+	(x)->h_hintvalue = (uintptr_t) (ifs->ifs_gz ? n : gzn);
+
+	HOOK_INIT_GZ_BEFORE(ifs->ifs_ipfhook4_nicevents, ipf_nic_event_v4,
+		  hook4_nicevents, hook4_nicevents_gz, ifs);
+	HOOK_INIT_GZ_BEFORE(ifs->ifs_ipfhook4_in, ipf_hook4_in,
+		  hook4_in, hook4_in_gz, ifs);
+	HOOK_INIT_GZ_BEFORE(ifs->ifs_ipfhook4_loop_in, ipf_hook4_loop_in,
+		  hook4_loop_in, hook4_loop_in_gz, ifs);
+
+	/*
+	 * For outgoing packets, we want the GZ hooks to run after the
+	 * per-zone hooks, regardless of what order they're are installed.
+	 */
+#define HOOK_INIT_GZ_AFTER(x, fn, n, gzn, a)			\
+	HOOK_INIT(x, fn, ifs->ifs_gz ? gzn : n, ifs);		\
+	(x)->h_hint = ifs->ifs_gz ? HH_AFTER : HH_BEFORE;	\
+	(x)->h_hintvalue = (uintptr_t) (ifs->ifs_gz ? n : gzn);
+
+	HOOK_INIT_GZ_AFTER(ifs->ifs_ipfhook4_out, ipf_hook4_out,
+		  hook4_out, hook4_out_gz, ifs);
+	HOOK_INIT_GZ_AFTER(ifs->ifs_ipfhook4_loop_out, ipf_hook4_loop_out,
+		  hook4_loop_out, hook4_loop_out_gz, ifs);
 
 	/*
 	 * If we hold this lock over all of the net_hook_register calls, we
@@ -328,6 +393,7 @@ ipf_stack_t *ifs;
 		if (!ifs->ifs_hook4_loopback_out)
 			goto hookup_failed;
 	}
+
 	/*
 	 * Add IPv6 hooks
 	 */
@@ -335,16 +401,16 @@ ipf_stack_t *ifs;
 	if (ifs->ifs_ipf_ipv6 == NULL)
 		goto hookup_failed;
 
-	HOOK_INIT(ifs->ifs_ipfhook6_nicevents, ipf_nic_event_v6,
-		  "ipfilter_hook6_nicevents", ifs);
-	HOOK_INIT(ifs->ifs_ipfhook6_in, ipf_hook6_in,
-		  "ipfilter_hook6_in", ifs);
-	HOOK_INIT(ifs->ifs_ipfhook6_out, ipf_hook6_out,
-		  "ipfilter_hook6_out", ifs);
-	HOOK_INIT(ifs->ifs_ipfhook6_loop_in, ipf_hook6_loop_in,
-		  "ipfilter_hook6_loop_in", ifs);
-	HOOK_INIT(ifs->ifs_ipfhook6_loop_out, ipf_hook6_loop_out,
-		  "ipfilter_hook6_loop_out", ifs);
+	HOOK_INIT_GZ_BEFORE(ifs->ifs_ipfhook6_nicevents, ipf_nic_event_v6,
+		  hook6_nicevents, hook6_nicevents_gz, ifs);
+	HOOK_INIT_GZ_BEFORE(ifs->ifs_ipfhook6_in, ipf_hook6_in,
+		  hook6_in, hook6_in_gz, ifs);
+	HOOK_INIT_GZ_BEFORE(ifs->ifs_ipfhook6_loop_in, ipf_hook6_loop_in,
+		  hook6_loop_in, hook6_loop_in_gz, ifs);
+	HOOK_INIT_GZ_AFTER(ifs->ifs_ipfhook6_out, ipf_hook6_out,
+		  hook6_out, hook6_out_gz, ifs);
+	HOOK_INIT_GZ_AFTER(ifs->ifs_ipfhook6_loop_out, ipf_hook6_loop_out,
+		  hook6_loop_out, hook6_loop_out_gz, ifs);
 
 	ifs->ifs_hook6_nic_events = (net_hook_register(ifs->ifs_ipf_ipv6,
 	    NH_NIC_EVENTS, ifs->ifs_ipfhook6_nicevents) == 0);
@@ -526,6 +592,7 @@ int *rp;
 	ipf_stack_t *ifs;
 	zoneid_t zid;
 	ipf_devstate_t *isp;
+	boolean_t gz_stack;
 
 #ifdef	IPFDEBUG
 	cmn_err(CE_CONT, "iplioctl(%x,%x,%x,%d,%x,%d)\n",
@@ -534,9 +601,8 @@ int *rp;
 	unit = getminor(dev);
 
 	isp = ddi_get_soft_state(ipf_state, unit);
-	if (isp == NULL) {
+	if (isp == NULL)
 		return ENXIO;
-	}
 	unit = isp->ipfs_minor;
 
 	zid = crgetzoneid(cp);
@@ -546,16 +612,38 @@ int *rp;
 		return EACCES;
 	}
 
-	if (zid == GLOBAL_ZONEID)
-		zid = isp->ipfs_zoneid;
+	/*
+	 * If we're in the GZ, determine if we're acting on a zone's stack,
+	 * and whether or not that stack is the GZ-controlled or in-zone
+	 * one.  See the "GZ and per-zone stacks" note at the top of this
+	 * file.
+	 */
+	if (zid == GLOBAL_ZONEID && (isp->ipfs_zoneid != -1)) {
+		/* Global zone, and we've set the zoneid for this fd already */
+
+		if (zid == isp->ipfs_zoneid) {
+			/* There's only a per-zone stack for the GZ */
+			gz_stack = B_FALSE;
+		} else {
+			gz_stack = isp->ipfs_gz;
+		}
+
+                zid = isp->ipfs_zoneid;
+	} else {
+		/*
+		 * Non-global zone or GZ without having set a zoneid: act on
+		 * the per-zone stack of the zone that this ioctl originated
+		 * from.
+		 */
+		gz_stack = B_FALSE;
+	}
 
         /*
 	 * ipf_find_stack returns with a read lock on ifs_ipf_global
 	 */
-	ifs = ipf_find_stack(zid);
-	if (ifs == NULL) {
+	ifs = ipf_find_stack(zid, gz_stack);
+	if (ifs == NULL)
 		return ENXIO;
-	}
 
 	if (ifs->ifs_fr_running <= 0) {
 		if (unit != IPL_LOGIPF) {
@@ -896,7 +984,7 @@ cred_t *cred;
 	VERIFY(isp != NULL);
 
 	isp->ipfs_minor = min;
-	isp->ipfs_zoneid = GLOBAL_ZONEID;
+	isp->ipfs_zoneid = -1;
 
 	return 0;
 }
@@ -941,26 +1029,48 @@ cred_t *cp;
 	minor_t unit;
 	zoneid_t zid;
 	ipf_devstate_t *isp;
+	boolean_t gz_stack;
 
 	unit = getminor(dev);
 	isp = ddi_get_soft_state(ipf_state, unit);
-	if (isp == NULL) {
+	if (isp == NULL)
 		return ENXIO;
-	}
 	unit = isp->ipfs_minor;
 
 	zid = crgetzoneid(cp);
-	if (zid == GLOBAL_ZONEID) {
-		zid = isp->ipfs_zoneid;
+
+	/*
+	 * If we're in the GZ, determine if we're acting on a zone's stack,
+	 * and whether or not that stack is the GZ-controlled or in-zone
+	 * one.  See the "GZ and per-zone stacks" note at the top of this
+	 * file.
+	 */
+	if (zid == GLOBAL_ZONEID && (isp->ipfs_zoneid != -1)) {
+		/* Global zone, and we've set the zoneid for this fd already */
+
+		if (zid == isp->ipfs_zoneid) {
+			/* There's only a per-zone stack for the GZ */
+			gz_stack = B_FALSE;
+		} else {
+			gz_stack = isp->ipfs_gz;
+		}
+
+                zid = isp->ipfs_zoneid;
+	} else {
+		/*
+		 * Non-global zone or GZ without having set a zoneid: act on
+		 * the per-zone stack of the zone that this ioctl originated
+		 * from.
+		 */
+		gz_stack = B_FALSE;
 	}
 
         /*
 	 * ipf_find_stack returns with a read lock on ifs_ipf_global
 	 */
-	ifs = ipf_find_stack(zid);
-	if (ifs == NULL) {
+	ifs = ipf_find_stack(zid, gz_stack);
+	if (ifs == NULL)
 		return ENXIO;
-	}
 
 # ifdef	IPFDEBUG
 	cmn_err(CE_CONT, "iplread(%x,%x,%x)\n", dev, uio, cp);
@@ -1000,26 +1110,48 @@ cred_t *cp;
 	minor_t unit;
 	zoneid_t zid;
 	ipf_devstate_t *isp;
+	boolean_t gz_stack;
 
 	unit = getminor(dev);
 	isp = ddi_get_soft_state(ipf_state, unit);
-	if (isp == NULL) {
+	if (isp == NULL)
 		return ENXIO;
-	}
 	unit = isp->ipfs_minor;
 
         /*
 	 * ipf_find_stack returns with a read lock on ifs_ipf_global
 	 */
 	zid = crgetzoneid(cp);
-	if (zid == GLOBAL_ZONEID) {
-		zid = isp->ipfs_zoneid;
+
+	/*
+	 * If we're in the GZ, determine if we're acting on a zone's stack,
+	 * and whether or not that stack is the GZ-controlled or in-zone
+	 * one.  See the "GZ and per-zone stacks" note at the top of this
+	 * file.
+	 */
+	if (zid == GLOBAL_ZONEID && (isp->ipfs_zoneid != -1)) {
+		/* Global zone, and we've set the zoneid for this fd already */
+
+		if (zid == isp->ipfs_zoneid) {
+			/* There's only a per-zone stack for the GZ */
+			gz_stack = B_FALSE;
+		} else {
+			gz_stack = isp->ipfs_gz;
+		}
+
+                zid = isp->ipfs_zoneid;
+	} else {
+		/*
+		 * Non-global zone or GZ without having set a zoneid: act on
+		 * the per-zone stack of the zone that this ioctl originated
+		 * from.
+		 */
+		gz_stack = B_FALSE;
 	}
 
-	ifs = ipf_find_stack(zid);
-	if (ifs == NULL) {
+	ifs = ipf_find_stack(zid, gz_stack);
+	if (ifs == NULL)
 		return ENXIO;
-	}
 
 #ifdef	IPFDEBUG
 	cmn_err(CE_CONT, "iplwrite(%x,%x,%x)\n", dev, uio, cp);
@@ -2117,7 +2249,6 @@ int ipf_hook6(hook_data_t info, int out, int loopback, void *arg)
 	fw->hpe_mb = qpi.qpi_m;
 	fw->hpe_hdr = qpi.qpi_data;
 	return rval;
-
 }
 
 

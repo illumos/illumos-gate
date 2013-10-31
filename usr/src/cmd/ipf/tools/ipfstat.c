@@ -6,7 +6,7 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
  */
 
 #ifdef __FreeBSD__
@@ -184,7 +184,7 @@ char *name;
 	fprintf(stderr, "       %s -t [-C] ", name);
 #endif
 #ifdef	SOLARIS
-	fprintf(stderr, "[-z zonename] ");
+	fprintf(stderr, "[-G|-z zonename] ");
 #endif
 	fprintf(stderr, "[-D destination address] [-P protocol] [-S source address] [-T refresh time]\n");
 	exit(1);
@@ -216,9 +216,9 @@ char *argv[];
 	u_32_t frf;
 
 #ifdef	USE_INET6
-	options = "6aACdfghIilnostvD:M:N:P:RS:T:z:";
+	options = "6aACdfgG:hIilnostvD:M:N:P:RS:T:z:";
 #else
-	options = "aACdfghIilnostvD:M:N:P:RS:T:z:";
+	options = "aACdfgG:hIilnostvD:M:N:P:RS:T:z:";
 #endif
 
 	saddr.in4.s_addr = INADDR_ANY; 	/* default any v4 source addr */
@@ -232,13 +232,20 @@ char *argv[];
 	opterr = 0;
 
 	/*
-	 * Parse these three arguments now lest there be any buffer overflows
+	 * Parse these four arguments now lest there be any buffer overflows
 	 * in the parsing of the rest.
 	 */
 	myoptind = optind;
 	while ((c = getopt(argc, argv, options)) != -1) {
 		switch (c)
 		{
+		case 'G' :
+#if SOLARIS
+			setzonename_global(optarg);
+#else
+			usage(argv[0]);
+#endif
+			break;
 		case 'M' :
 			memf = optarg;
 			live_kernel = 0;
@@ -252,7 +259,6 @@ char *argv[];
 			setzonename(optarg);
 #else
 			usage(argv[0]);
-			break;
 #endif
 			break;
 		}
@@ -326,6 +332,8 @@ char *argv[];
 			break;
 		case 'g' :
 			opts |= OPT_GROUPS;
+			break;
+		case 'G' :
 			break;
 		case 'h' :
 			opts |= OPT_HITS;

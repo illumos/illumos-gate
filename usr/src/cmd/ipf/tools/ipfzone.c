@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012 Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2013 Joyent, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * See the IPFILTER.LICENCE file for details on licensing.
@@ -17,7 +17,8 @@
 #include "ipfzone.h"
 
 static ipfzoneobj_t	ipzo;
-static int	do_setzone = 0;
+static boolean_t	do_setzone = 0;
+static int		num_setzones = 0;
 
 extern int	errno;
 extern int	optind;
@@ -30,11 +31,17 @@ extern char	*optarg;
 void
 getzonearg(int argc, char *argv[], const char *optstr)
 {
+	int c;
+
 	/*
-	 * Let getopt figure out if the last argument belongs to a flag or is
+	 * getopt is also used here to set optind so that we can
+	 * determine if the last argument belongs to a flag or is
 	 * actually a zonename.
 	 */
-	while (getopt(argc, argv, optstr) != -1) { }
+	while ((c = getopt(argc, argv, optstr)) != -1) {
+		if (c == 'G')
+			ipzo.ipfz_gz = 1;
+	}
 
 	if (optind < argc)
 		setzonename(argv[optind]);
@@ -55,6 +62,9 @@ getzoneopt(int argc, char *argv[], const char *optstr)
 	int c;
 
 	while ((c = getopt(argc, argv, optstr)) != -1) {
+		if (c == 'G')
+			setzonename_global(optarg);
+
 		if (c == 'z')
 			setzonename(optarg);
 	}
@@ -73,7 +83,19 @@ void
 setzonename(const char *zonename)
 {
 	memcpy(ipzo.ipfz_zonename, zonename, sizeof (ipzo.ipfz_zonename));
-	do_setzone = 1;
+	do_setzone = B_TRUE;
+	num_setzones++;
+}
+
+/*
+ * Set the zonename in ipfo, and the gz flag to indicate that we want to
+ * act on the GZ-controlled stack
+ */
+void
+setzonename_global(const char *zonename)
+{
+	setzonename(zonename);
+	ipzo.ipfz_gz = 1;
 }
 
 /*
@@ -84,6 +106,12 @@ setzone(int fd)
 {
 	if (!do_setzone)
 		return (0);
+
+	if (num_setzones > 1) {
+		(void) fprintf(stderr,
+		    "Only one of -G and -z may be set\n");
+		return (-1);
+	}
 
 	if (ioctl(fd, SIOCIPFZONESET, &ipzo) == -1) {
 		switch (errno) {

@@ -2,14 +2,14 @@
 .\" To view license terms, attribution, and copyright for IP Filter, the default path is /usr/lib/ipf/IPFILTER.LICENCE. If the Solaris operating environment has been installed anywhere other than the default, modify the given path to access the file at the installed
 .\" location.
 .\" Portions Copyright (c) 2009, Sun Microsystems Inc. All Rights Reserved.
-.\" Portions Copyright (c) 2012, Joyent, Inc. All Rights Reserved.
-.TH IPF 1M "Nov 26, 2012"
+.\" Portions Copyright (c) 2013, Joyent, Inc. All Rights Reserved.
+.TH IPF 1M "Oct 30, 2013"
 .SH NAME
 ipf \- alter packet filtering lists for IP packet input and output
 .SH SYNOPSIS
 .LP
 .nf
-\fBipf\fR [\fB-6AdDEInoPRrsvVyzZ\fR] [\fB-l\fR block | pass | nomatch]
+\fBipf\fR [\fB-6AdDEGInoPRrsvVyzZ\fR] [\fB-l\fR block | pass | nomatch]
      [\fB-T\fR \fIoptionlist\fR] [\fB-F\fR i | o | a | s | S] \fB-f\fR \fIfilename\fR
      [\fB-f\fR \fIfilename\fR...] [\fIzonename\fR]
 .fi
@@ -258,6 +258,17 @@ packet filter rule lists.
 .sp
 .ne 2
 .na
+\fB\fB-G\fR\fR
+.ad
+.sp .6
+.RS 4n
+Make changes to the Global Zone-controlled ipfilter for the zone given as an
+argument. See the \fBZONES\fR section for more information.
+.RE
+
+.sp
+.ne 2
+.na
 \fB\fB-I\fR\fR
 .ad
 .sp .6
@@ -463,10 +474,18 @@ affect fragment or state statistics.
 .SH ZONES
 .sp
 .LP
+Each non-global zone has two ipfilter instances: the in-zone ipfilter, which
+can be controlled from both the zone itself and the global zone, and the
+Global Zone-controlled (GZ-controlled) instance, which can only be controlled
+from the Global Zone. The non-global zone is not able to observe or control
+the GZ-controlled ipfilter.
+
 ipf optionally takes a zone name as an argument, which will change the
 ipfilter settings for that zone, rather than the current one. The zonename
 option is only available in the Global Zone. Using it in any other zone will
-return an error.
+return an error. If the \fB-G\fR option is specified with this argument, the
+Global Zone-controlled ipfilter is operated on. If \fB-G\fR is not specified,
+the in-zone ipfilter is operated on.
 
 .SH FILES
 .sp

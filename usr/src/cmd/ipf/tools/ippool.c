@@ -6,7 +6,7 @@
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -78,7 +78,7 @@ void usage(prog)
 char *prog;
 {
 #if SOLARIS
-	const char *zoneopt = "[-z zonename] ";
+	const char *zoneopt = "[-G|-z zonename] ";
 #else
 	const char *zoneopt = "";
 #endif
@@ -156,13 +156,19 @@ char *argv[];
 	role = IPL_LOGIPF;
 	bzero((char *)&node, sizeof(node));
 
-	while ((c = getopt(argc, argv, "di:m:no:Rvz:")) != -1)
+	while ((c = getopt(argc, argv, "di:G:m:no:Rvz:")) != -1)
 		switch (c)
 		{
 		case 'd' :
 			opts |= OPT_DEBUG;
 			ippool_yydebug++;
 			break;
+		case 'G' :
+#if SOLARIS
+			setzonename_global(optarg);
+#else
+			usage(argv[0]);
+#endif
 		case 'i' :
 			s = strchr(optarg, '/');
 			if (s == NULL)
@@ -197,6 +203,13 @@ char *argv[];
 			break;
 		case 'v' :
 			opts |= OPT_VERBOSE;
+			break;
+		case 'z' :
+#if SOLARIS
+			setzonename(optarg);
+#else
+			usage(argv[0]);
+#endif
 			break;
 		}
 
@@ -235,13 +248,19 @@ char *argv[];
 	bzero((char *)&iph, sizeof(iph));
 	bzero((char *)&pool, sizeof(pool));
 
-	while ((c = getopt(argc, argv, "dm:no:RS:t:vz:")) != -1)
+	while ((c = getopt(argc, argv, "dG:m:no:RS:t:vz:")) != -1)
 		switch (c)
 		{
 		case 'd' :
 			opts |= OPT_DEBUG;
 			ippool_yydebug++;
 			break;
+		case 'G' :
+#if SOLARIS
+			setzonename_global(optarg);
+#else
+			usage(argv[0]);
+#endif
 		case 'm' :
 			poolname = optarg;
 			break;
@@ -270,6 +289,13 @@ char *argv[];
 			break;
 		case 'v' :
 			opts |= OPT_VERBOSE;
+			break;
+		case 'z' :
+#if SOLARIS
+			setzonename(optarg);
+#else
+			usage(argv[0]);
+#endif
 			break;
 		}
 
@@ -324,12 +350,19 @@ char *argv[], *infile;
 
 	infile = optarg;
 
-	while ((c = getopt(argc, argv, "dnRuvz:")) != -1)
+	while ((c = getopt(argc, argv, "dG:nRuvz:")) != -1)
 		switch (c)
 		{
 		case 'd' :
 			opts |= OPT_DEBUG;
 			ippool_yydebug++;
+			break;
+		case 'G' :
+#if SOLARIS
+			setzonename_global(optarg);
+#else
+			usage(argv[0]);
+#endif
 			break;
 		case 'n' :
 			opts |= OPT_DONOTHING;
@@ -394,11 +427,18 @@ char *argv[];
 	poolname = NULL;
 	role = IPL_LOGALL;
 
-	while ((c = getopt(argc, argv, "dm:M:N:o:Rt:vz:")) != -1)
+	while ((c = getopt(argc, argv, "dG:m:M:N:o:Rt:vz:")) != -1)
 		switch (c)
 		{
 		case 'd' :
 			opts |= OPT_DEBUG;
+			break;
+		case 'G' :
+#if SOLARIS
+			setzonename_global(optarg);
+#else
+			usage(argv[0]);
+#endif
 			break;
 		case 'm' :
 			poolname = optarg;
@@ -657,11 +697,18 @@ char *argv[];
 
 	bzero((char *)&op, sizeof(op));
 
-	while ((c = getopt(argc, argv, "dM:N:o:t:vz:")) != -1)
+	while ((c = getopt(argc, argv, "dG:M:N:o:t:vz:")) != -1)
 		switch (c)
 		{
 		case 'd' :
 			opts |= OPT_DEBUG;
+			break;
+		case 'G' :
+#if SOLARIS
+			setzonename_global(optarg);
+#else
+			usage(argv[0]);
+#endif
 			break;
 		case 'M' :
 			live_kernel = 0;
@@ -695,6 +742,7 @@ char *argv[];
 #else
 			usage(argv[0]);
 #endif
+			break;
 		}
 
 	if (opts & OPT_DEBUG)

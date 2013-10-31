@@ -6,7 +6,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
  */
 
 #ifdef	__FreeBSD__
@@ -92,7 +92,7 @@ char	*progname;
 void usage()
 {
 #if SOLARIS
-	const char *zoneopt = "[-z zonename] ";
+	const char *zoneopt = "[-G|-z zonename] ";
 #else
 	const char *zoneopt = "";
 #endif
@@ -230,7 +230,7 @@ char *argv[];
 	char *dirname = NULL, *filename = NULL, *ifs = NULL;
 
 	progname = argv[0];
-	while ((c = getopt(argc, argv, "d:f:lNnSRruvWwz:")) != -1)
+	while ((c = getopt(argc, argv, "d:f:G:lNnSRruvWwz:")) != -1)
 		switch (c)
 		{
 		case 'd' :
@@ -245,6 +245,11 @@ char *argv[];
 			else
 				usage();
 			break;
+#if SOLARIS
+		case 'G' :
+			setzonename_global(optarg);
+			break;
+#endif
 		case 'i' :
 			ifs = optarg;
 			set = 1;

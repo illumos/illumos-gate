@@ -6,7 +6,7 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
  */
 
 #ifdef	__FreeBSD__
@@ -68,7 +68,7 @@ static	ioctlfunc_t	iocfunctions[IPL_LOGSIZE] = { ioctl, ioctl, ioctl,
 
 static void usage()
 {
-	fprintf(stderr, "usage: ipf [-6AdDEInoPrRsvVyzZ] %s %s %s",
+	fprintf(stderr, "usage: ipf [-6AdDEGInoPrRsvVyzZ] %s %s %s",
 		"[-l block|pass|nomatch|state|nat]", "[-cc] [-F i|o|a|s|S|u]",
 		"[-f filename] [-T <tuneopts>]");
 #if SOLARIS
@@ -85,7 +85,7 @@ int argc;
 char *argv[];
 {
 	int c;
-	const char *optstr = "6Ac:dDEf:F:Il:noPrRsT:vVyzZ";
+	const char *optstr = "6Ac:dDEf:F:GIl:noPrRsT:vVyzZ";
 
 	if (argc < 2)
 		usage();

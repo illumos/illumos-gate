@@ -8,7 +8,7 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
  */
 
 #include <stdio.h>
@@ -103,7 +103,7 @@ char *name;
 {
 	fprintf(stderr, "Usage: %s [-CdFhlnrRsv] [-f filename]", name);
 #if SOLARIS
-	fprintf(stderr, " [-z zonename]\n");
+	fprintf(stderr, " [-G|-z zonename]\n");
 #else
 	fprintf(stderr, "\n");
 #endif
@@ -128,7 +128,7 @@ char *argv[];
 	kernel = NULL;
 	mode = O_RDWR;
 
-	while ((c = getopt(argc, argv, "CdFf:hlM:N:nrRsvz:")) != -1)
+	while ((c = getopt(argc, argv, "CdFf:G:hlM:N:nrRsvz:")) != -1)
 		switch (c)
 		{
 		case 'C' :
@@ -143,6 +143,11 @@ char *argv[];
 		case 'F' :
 			opts |= OPT_FLUSH;
 			break;
+#if SOLARIS
+		case 'G' :
+			setzonename_global(optarg);
+			break;
+#endif
 		case 'h' :
 			opts |=OPT_HITS;
 			break;

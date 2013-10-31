@@ -2,14 +2,14 @@
 .\" To view license terms, attribution, and copyright for IP Filter, the default path is /usr/lib/ipf/IPFILTER.LICENCE. If the Solaris operating environment has been installed anywhere other than the default, modify the given path to access the file at the installed
 .\" location.
 .\" Portions Copyright (c) 2008, Sun Microsystems Inc. All Rights Reserved.
-.\" Portions Copyright (c) 2012, Joyent, Inc. All Rights Reserved.
-.TH IPNAT 1M "Nov 26, 2012"
+.\" Portions Copyright (c) 2013, Joyent, Inc. All Rights Reserved.
+.TH IPNAT 1M "Oct 30, 2013"
 .SH NAME
 ipnat \- user interface to the NAT subsystem
 .SH SYNOPSIS
 .LP
 .nf
-\fBipnat\fR [\fB-CdFhlnRrsv\fR] [\fB-z\fR \fIzonename\fR] \fB-f\fR \fIfilename\fR
+\fBipnat\fR [\fB-CdFhlnRrsv\fR] [\fB-G\fR | \fB-z\fR \fIzonename\fR] \fB-f\fR \fIfilename\fR
 .fi
 
 .SH DESCRIPTION
@@ -147,9 +147,21 @@ active rules/table entries.
 \fB\fB-z\fR\fR
 .ad
 .RS 15n
-Operate on the IP NAT for the specified zone. If this option is not
-specified, the current zone is used. This command is only available in the
-Global Zone.
+Operate on the in-zone IP NAT for the specified zone. If neither this option
+nor \fB-G\fR is specified, the current zone is used. This command is only
+available in the Global Zone. See \fBZONES\fR in \fBipf\fR(1m) for more
+information.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-G\fR\fR
+.ad
+.RS 15n
+Operate on the global zone controlled IP NAT for the specified zone. If
+neither this option nor \fB-z\fR is specified, the current zone is used. This
+command is only available in the Global Zone. See \fBZONES\fR in \fBipf\fR(1m)for more information.
 .RE
 
 .SH FILES

@@ -6,7 +6,7 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
  */
 
 
@@ -1346,7 +1346,7 @@ static void usage(prog)
 char *prog;
 {
 #if SOLARIS
-	const char *zoneopt = " [-z zonename]";
+	const char *zoneopt = " [-G|-z zonename]";
 #else
 	const char *zoneopt = "";
 #endif
@@ -1461,7 +1461,7 @@ char *argv[];
 	char	buf[DEFAULT_IPFLOGSIZE], *iplfile[3], *s;
 	extern	int	optind;
 	extern	char	*optarg;
-	const	char	*optstr = "?abB:C:Df:FhnN:o:O:pP:sS:tvxXz:";
+	const	char	*optstr = "?abB:C:Df:G:FhnN:o:O:pP:sS:tvxXz:";
 
 	fd[0] = fd[1] = fd[2] = -1;
 	fdt[0] = fdt[1] = fdt[2] = -1;
@@ -1509,6 +1509,10 @@ char *argv[];
 			flushlogs(iplfile[1], log);
 			flushlogs(iplfile[2], log);
 			break;
+#if SOLARIS
+		case 'G' :
+			break;
+#endif
 		case 'n' :
 			opts |= OPT_RESOLVE;
 			break;

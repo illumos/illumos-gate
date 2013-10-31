@@ -136,6 +136,9 @@ struct file;
 # endif
 #endif
 #include "netinet/ipl.h"
+#if defined(SOLARIS) && defined(_KERNEL)
+#include <sys/sunddi.h>
+#endif
 /* END OF INCLUDES */
 
 #if !defined(lint)
@@ -5719,10 +5722,18 @@ void *data;
 	if (error != 0)
 		return EFAULT;
 
+	if (memchr(ipfzo.ipfz_zonename, NULL, ZONENAME_MAX) == NULL)
+		return EFAULT;
+
 	if ((zone = zone_find_by_name(ipfzo.ipfz_zonename)) == NULL)
 		return ENODEV;
 
+	/*
+	 * Store the zone ID that to control, and whether it's the
+	 * GZ-controlled stack that's wanted
+	 */
 	idsp->ipfs_zoneid = zone->zone_id;
+	idsp->ipfs_gz = (ipfzo.ipfz_gz == 1) ? B_TRUE : B_FALSE;
 	zone_rele(zone);
 
 	return error;

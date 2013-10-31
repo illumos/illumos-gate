@@ -8,7 +8,7 @@
  *
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  *
- * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
  */
 
 #ifndef	__IP_FIL_H__
@@ -1176,13 +1176,15 @@ typedef	struct	ipfobj	{
 #include <sys/zone.h>
 
 typedef	struct	ipfzoneobj	{
-	char	ipfz_zonename[ZONENAME_MAX];
+	u_32_t		ipfz_gz;			/* GZ stack */
+	char		ipfz_zonename[ZONENAME_MAX];	/* zone to act on */
 } ipfzoneobj_t;
 
 #if defined(_KERNEL)
 typedef	struct	ipf_devstate	{
 	zoneid_t	ipfs_zoneid;
 	minor_t		ipfs_minor;
+	boolean_t	ipfs_gz;
 } ipf_devstate_t;
 #endif
 
@@ -1375,7 +1377,7 @@ extern	void	ipfilterattach __P((int));
 extern	int	ipl_enable __P((void));
 extern	int	ipl_disable __P((void));
 # ifdef MENTAT
-extern	ipf_stack_t *ipf_find_stack(const zoneid_t zone);
+extern	ipf_stack_t *ipf_find_stack(const zoneid_t zone, boolean_t gz);
 extern	int	fr_check __P((struct ip *, int, void *, int, void *,
 			      mblk_t **, ipf_stack_t *));
 #  if SOLARIS

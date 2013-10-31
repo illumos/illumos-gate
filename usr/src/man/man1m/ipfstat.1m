@@ -2,8 +2,8 @@
 .\" To view license terms, attribution, and copyright for IP Filter, the default path is /usr/lib/ipf/IPFILTER.LICENCE. If the Solaris operating environment has been installed anywhere other than the default, modify the given path to access the file at the installed
 .\" location.
 .\" Portions Copyright (c) 2008, Sun Microsystems Inc. All Rights Reserved.
-.\" Portions Copyright (c) 2012, Joyent, Inc. All Rights Reserved.
-.TH IPFSTAT 1M "Nov 26, 2012"
+.\" Portions Copyright (c) 2013, Joyent, Inc. All Rights Reserved.
+.TH IPFSTAT 1M "Oct 30, 2013"
 .SH NAME
 ipfstat \- reports on packet filter statistics and filter list
 .SH SYNOPSIS
@@ -15,7 +15,7 @@ ipfstat \- reports on packet filter statistics and filter list
 .LP
 .nf
 \fBipfstat\fR [\fB-C\fR] [\fB-D\fR \fIaddrport\fR] [\fB-P\fR \fIprotocol\fR] [\fB-S\fR \fIaddrport\fR]
-     [\fB-T\fR \fIrefreshtime\fR] [\fB-z\fR \fIzonename\fR]
+     [\fB-T\fR \fIrefreshtime\fR] [\fB-G\fR | \fB-z\fR \fIzonename\fR]
 .fi
 
 .SH DESCRIPTION
@@ -358,8 +358,22 @@ Turn verbose mode on. Displays additional debugging information.
 \fB\fB-z\fR\fR
 .ad
 .RS 18n
-Report statistics for the specified zone. If this option is not specified,
-the current zone is used. This command is only available in the Global Zone.
+Report the in-zone statistics for the specified zone. If neither this option
+nor \fB-G\fR is specified, the current zone is used. This command is only
+available in the Global Zone. See \fBZONES\fR in \fBipf\fR(1m) for more
+information.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-G\fR\fR
+.ad
+.RS 18n
+Report the global zone controlled statistics for the specified zone. If
+neither this option nor \fB-z\fR is specified, the current zone is used. This
+command is only available in the Global Zone. See \fBZONES\fR in \fBipf\fR(1m)
+for more information.
 .RE
 
 .SH FILES
