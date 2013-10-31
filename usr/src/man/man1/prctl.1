@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PRCTL 1 "Aug 25, 2009"
+.TH PRCTL 1 "Oct 30, 2013"
 .SH NAME
 prctl \- get or set the resource controls of running processes, tasks, and
 projects
@@ -27,11 +27,6 @@ the     specified entity.
 See \fBresource_controls\fR(5) for a description of the resource controls
 supported in the current release of the Solaris operating system.
 .SH OPTIONS
-.sp
-.LP
-If none of the \fB-s\fR, \fB-r\fR, \fB-x\fR, \fB-v\fR, \fB-d\fR, or \fB-e\fR
-options are specified, the invocation is considered a get operation. Otherwise,
-it is considered a modify operation.
 .sp
 .LP
 The following options are supported:
@@ -239,8 +234,9 @@ privilege. The matching criteria are discussed more fully in \fBsetrctl\fR(2).
 
 .sp
 .LP
-If none of the \fB-d\fR, \fB-e\fR, \fB-v\fR, or \fB-x\fR options is specified,
-the invocation is considered a get operation.
+If none of the \fB-s\fR, \fB-r\fR, \fB-x\fR, \fB-v\fR, \fB-d\fR, or \fB-e\fR
+options are specified, the invocation is considered a get operation. Otherwise,
+it is considered a modify operation.
 .SH OPERANDS
 .sp
 .LP
