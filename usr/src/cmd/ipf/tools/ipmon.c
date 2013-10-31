@@ -1511,6 +1511,7 @@ char *argv[];
 			break;
 #if SOLARIS
 		case 'G' :
+			/* Already handled by getzoneopt() above */
 			break;
 #endif
 		case 'n' :
@@ -1567,6 +1568,7 @@ char *argv[];
 			break;
 #if SOLARIS
 		case 'z' :
+			/* Already handled by getzoneopt() above */
 			break;
 #endif
 		default :

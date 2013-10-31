@@ -5722,7 +5722,7 @@ void *data;
 	if (error != 0)
 		return EFAULT;
 
-	if (memchr(ipfzo.ipfz_zonename, NULL, ZONENAME_MAX) == NULL)
+	if (memchr(ipfzo.ipfz_zonename, '\0', ZONENAME_MAX) == NULL)
 		return EFAULT;
 
 	if ((zone = zone_find_by_name(ipfzo.ipfz_zonename)) == NULL)

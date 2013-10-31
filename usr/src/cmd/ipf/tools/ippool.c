@@ -169,6 +169,7 @@ char *argv[];
 #else
 			usage(argv[0]);
 #endif
+			break;
 		case 'i' :
 			s = strchr(optarg, '/');
 			if (s == NULL)
