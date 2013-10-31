@@ -31,7 +31,7 @@
 #include <errno.h>
 #include <pwd.h>
 
-/* extern int errno = 0; */
+#define	EXECSHELL	"/usr/xpg4/bin/sh"
 
 int
 main(int argc, char *argv[])
@@ -68,8 +68,8 @@ main(int argc, char *argv[])
 		return (errno);
 	}
 
-	if (execl("/usr/xpg4/bin/sh", "sh",  "-c", cmds, (char *)0) != 0) {
-		perror("execl");
+	if (execl(EXECSHELL, "sh",  "-c", cmds, (char *)NULL) != 0) {
+		perror("execl: " EXECSHELL);
 		return (errno);
 	}
 
