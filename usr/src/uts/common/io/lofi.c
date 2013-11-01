@@ -475,14 +475,14 @@ lofi_open(dev_t *devp, int flag, int otyp, struct cred *credp)
 		return (ENXIO);
 	}
 
-	if (mark_opened(lsp, otyp) == -1) {
-		mutex_exit(&lofi_lock);
-		return (EINVAL);
-	}
-
 	if (lsp->ls_readonly && (flag & FWRITE)) {
 		mutex_exit(&lofi_lock);
 		return (EROFS);
+	}
+
+	if (mark_opened(lsp, otyp) == -1) {
+		mutex_exit(&lofi_lock);
+		return (EINVAL);
 	}
 
 	mutex_exit(&lofi_lock);
