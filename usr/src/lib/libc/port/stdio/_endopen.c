@@ -55,7 +55,7 @@
 FILE *
 _endopen(const char *name, const char *type, FILE *iop, int largefile)
 {
-	int oflag, fd, fflag, eflag, plusflag;
+	int oflag, fd, fflag, eflag, plusflag, xflag;
 	const char *echr;
 
 	if (iop == NULL)
@@ -80,6 +80,7 @@ _endopen(const char *name, const char *type, FILE *iop, int largefile)
 
 	plusflag = 0;
 	eflag = 0;
+	xflag = 0;
 	for (echr = type + 1; *echr != '\0'; echr++) {
 		switch (*echr) {
 		/* UNIX ignores 'b' and treats text and binary the same */
@@ -91,6 +92,9 @@ _endopen(const char *name, const char *type, FILE *iop, int largefile)
 		case 'e':
 			eflag = 1;
 			break;
+		case 'x':
+			xflag = 1;
+			break;
 		}
 	}
 	if (eflag) {
@@ -100,6 +104,9 @@ _endopen(const char *name, const char *type, FILE *iop, int largefile)
 	if (plusflag) {
 		oflag = (oflag & ~(O_RDONLY | O_WRONLY)) | O_RDWR;
 		fflag = _IORW;
+	}
+	if (xflag) {
+		oflag |= O_EXCL;
 	}
 
 	/* select small or large file open based on flag */
