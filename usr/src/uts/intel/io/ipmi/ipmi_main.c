@@ -170,6 +170,7 @@ ipmi_open(dev_t *devp, int flag, int otyp, cred_t *cred)
 	dev->ipmi_lun = IPMI_BMC_SMS_LUN;
 	*devp = makedevice(getmajor(*devp), minor);
 	dev->ipmi_dev = *devp;
+	cv_init(&dev->ipmi_cv, NULL, CV_DEFAULT, NULL);
 
 	list_insert_head(&dev_list, dev);
 
@@ -198,6 +199,10 @@ ipmi_close(dev_t dev, int flag, int otyp, cred_t *cred)
 		}
 		req = next;
 	}
+
+	dp->ipmi_status |= IPMI_CLOSING;
+	while (dp->ipmi_status & IPMI_BUSY)
+		cv_wait(&dp->ipmi_cv, &sc->ipmi_lock);
 	IPMI_UNLOCK(sc);
 
 	/* remove any requests in queue of stuff completed */
@@ -208,6 +213,7 @@ ipmi_close(dev_t dev, int flag, int otyp, cred_t *cred)
 
 	list_remove(&dev_list, dp);
 	id_free(minor_ids, getminor(dev));
+	cv_destroy(&dp->ipmi_cv);
 	kmem_free(dp->ipmi_pollhead, sizeof (pollhead_t));
 	kmem_free(dp, sizeof (ipmi_device_t));
 
@@ -287,17 +293,6 @@ ipmi_ioctl(dev_t dv, int cmd, intptr_t data, int flags, cred_t *cr, int *rvalp)
 
 	switch (cmd) {
 	case IPMICTL_SEND_COMMAND:
-		IPMI_LOCK(sc);
-		/* clear out old stuff in queue of stuff done */
-		while ((kreq = TAILQ_FIRST(&dev->ipmi_completed_requests))
-		    != NULL) {
-			TAILQ_REMOVE(&dev->ipmi_completed_requests, kreq,
-			    ir_link);
-			dev->ipmi_requests--;
-			ipmi_free_request(kreq);
-		}
-		IPMI_UNLOCK(sc);
-
 		/* Check that we didn't get a ridiculous length */
 		if (req.msg.data_len > IPMI_MAX_RX)
 			return (EINVAL);
