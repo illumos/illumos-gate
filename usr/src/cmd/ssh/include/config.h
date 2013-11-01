@@ -4,6 +4,7 @@
 
 /*
  * Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2013 Gary Mills
  */
 
 #ifndef	_CONFIG_H
@@ -379,10 +380,10 @@ extern "C" {
 /* #undef BROKEN_SAVED_UIDS */
 
 /* Define if your system glob() function has the GLOB_ALTDIRFUNC extension */
-/* #undef GLOB_HAS_ALTDIRFUNC */
+#define	GLOB_HAS_ALTDIRFUNC	1
 
 /* Define if your system glob() function has gl_matchc options in glob_t */
-/* #undef GLOB_HAS_GL_MATCHC */
+#define	GLOB_HAS_GL_MATCHC	1
 
 /*
  * Define in your struct dirent expects you to allocate extra space for
