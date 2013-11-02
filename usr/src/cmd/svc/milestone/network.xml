@@ -54,6 +54,14 @@
 		<service_fmri value='svc:/network/physical' />
 	</dependency>
 
+	<dependency
+		name='routing-setup'
+		grouping='require_all'
+		restart_on='none'
+		type='service'>
+		<service_fmri value='svc:/network/routing-setup' />
+	</dependency>
+
 	<exec_method
 		type='method'
 		name='start'

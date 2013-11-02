@@ -40,11 +40,19 @@
 
 	<!-- loopback/physical network configuration is required -->
 	<dependency
-		name='network'
-		grouping='optional_all'
+		name='loopback'
+		grouping='require_all'
 		restart_on='none'
 		type='service'>
-		<service_fmri value='svc:/milestone/network' />
+		<service_fmri value='svc:/network/loopback' />
+	</dependency>
+
+	<dependency
+		name='physical'
+		grouping='require_all'
+		restart_on='none'
+		type='service'>
+		<service_fmri value='svc:/network/physical' />
 	</dependency>
 
 	<!-- usr filesystem required to run routing-related commands -->
