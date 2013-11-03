@@ -22,11 +22,12 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/proc.h>
+#include <sys/cpuvar.h>
+#include <sys/disp.h>
 
 /*
  * Install process context ops for the current process.
@@ -70,6 +71,7 @@ removepctx(
 	struct pctxop *pctx, *prev_pctx;
 
 	prev_pctx = NULL;
+	kpreempt_disable();
 	for (pctx = p->p_pctx; pctx != NULL; pctx = pctx->next) {
 		if (pctx->save_op == save && pctx->restore_op == restore &&
 		    pctx->fork_op == fork &&
@@ -82,10 +84,12 @@ removepctx(
 			if (pctx->free_op != NULL)
 				(pctx->free_op)(pctx->arg, 0);
 			kmem_free(pctx, sizeof (struct pctxop));
+			kpreempt_enable();
 			return (1);
 		}
 		prev_pctx = pctx;
 	}
+	kpreempt_enable();
 	return (0);
 }
 
@@ -146,10 +150,12 @@ freepctx(proc_t *p, int isexec)
 {
 	struct pctxop *pctx;
 
+	kpreempt_disable();
 	while ((pctx = p->p_pctx) != NULL) {
 		p->p_pctx = pctx->next;
 		if (pctx->free_op != NULL)
 			(pctx->free_op)(pctx->arg, isexec);
 		kmem_free(pctx, sizeof (struct pctxop));
 	}
+	kpreempt_enable();
 }
