@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -1092,6 +1093,7 @@ removectx(
 	 */
 	mutex_enter(&t->t_ctx_lock);
 	prev_ctx = NULL;
+	kpreempt_disable();
 	for (ctx = t->t_ctx; ctx != NULL; ctx = ctx->next) {
 		if (ctx->save_op == save && ctx->restore_op == restore &&
 		    ctx->fork_op == fork && ctx->lwp_create_op == lwp_create &&
@@ -1105,11 +1107,13 @@ removectx(
 			if (ctx->free_op != NULL)
 				(ctx->free_op)(ctx->arg, 0);
 			kmem_free(ctx, sizeof (struct ctxop));
+			kpreempt_enable();
 			return (1);
 		}
 		prev_ctx = ctx;
 	}
 	mutex_exit(&t->t_ctx_lock);
+	kpreempt_enable();
 
 	return (0);
 }
@@ -1187,12 +1191,14 @@ freectx(kthread_t *t, int isexec)
 {
 	struct ctxop *ctx;
 
+	kpreempt_disable();
 	while ((ctx = t->t_ctx) != NULL) {
 		t->t_ctx = ctx->next;
 		if (ctx->free_op != NULL)
 			(ctx->free_op)(ctx->arg, isexec);
 		kmem_free(ctx, sizeof (struct ctxop));
 	}
+	kpreempt_enable();
 }
 
 /*
@@ -1209,12 +1215,14 @@ freectx_ctx(struct ctxop *ctx)
 
 	ASSERT(ctx != NULL);
 
+	kpreempt_disable();
 	do {
 		nctx = ctx->next;
 		if (ctx->free_op != NULL)
 			(ctx->free_op)(ctx->arg, 0);
 		kmem_free(ctx, sizeof (struct ctxop));
 	} while ((ctx = nctx) != NULL);
+	kpreempt_enable();
 }
 
 /*
