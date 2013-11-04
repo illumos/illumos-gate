@@ -1109,6 +1109,12 @@ ipd_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	if (cmd != DDI_DETACH)
 		return (DDI_FAILURE);
 
+	mutex_enter(&ipd_nactive_lock);
+	if (ipd_nactive > 0) {
+		mutex_exit(&ipd_nactive_lock);
+		return (EBUSY);
+	}
+	mutex_exit(&ipd_nactive_lock);
 	ASSERT(dip == ipd_devi);
 	ddi_remove_minor_node(dip, NULL);
 	ipd_devi = NULL;
