@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  */
 /*
  * This file contains SM-HBA support for MPT SAS driver
@@ -58,6 +59,11 @@
  * SM - HBA statics
  */
 extern char *mptsas_driver_rev;
+
+static void mptsas_smhba_create_phy_props(nvlist_t **, smhba_info_t *, uint8_t,
+    uint16_t *);
+static void mptsas_smhba_update_phy_props(mptsas_t *, dev_info_t *, nvlist_t **,
+    uint8_t);
 
 static void
 mptsas_smhba_add_hba_prop(mptsas_t *mpt, data_type_t dt,
@@ -116,79 +122,48 @@ mptsas_smhba_show_phy_info(mptsas_t *mpt)
 	}
 }
 
-void
-mptsas_smhba_set_phy_props(mptsas_t *mpt, char *iport, dev_info_t *dip,
-    uint8_t phy_nums, uint16_t *attached_devhdl)
+static void
+mptsas_smhba_create_phy_props(nvlist_t **phy_props, smhba_info_t *pSmhba,
+    uint8_t phy_id, uint16_t *attached_devhdl)
 {
-	int		i;
-	int		j = 0;
+	(void) nvlist_alloc(phy_props, NV_UNIQUE_NAME, KM_SLEEP);
+	(void) nvlist_add_uint8(*phy_props, SAS_PHY_ID, phy_id);
+	(void) nvlist_add_uint8(*phy_props, "phyState",
+	    (pSmhba->negotiated_link_rate & 0x0f));
+	(void) nvlist_add_int8(*phy_props, SAS_NEG_LINK_RATE,
+	    (pSmhba->negotiated_link_rate & 0x0f));
+	(void) nvlist_add_int8(*phy_props, SAS_PROG_MIN_LINK_RATE,
+	    (pSmhba->programmed_link_rate & 0x0f));
+	(void) nvlist_add_int8(*phy_props, SAS_HW_MIN_LINK_RATE,
+	    (pSmhba->hw_link_rate & 0x0f));
+	(void) nvlist_add_int8(*phy_props, SAS_PROG_MAX_LINK_RATE,
+	    ((pSmhba->programmed_link_rate & 0xf0) >> 4));
+	(void) nvlist_add_int8(*phy_props, SAS_HW_MAX_LINK_RATE,
+	    ((pSmhba->hw_link_rate & 0xf0) >> 4));
+
+	if (pSmhba->attached_devhdl && (attached_devhdl != NULL))
+		*attached_devhdl = pSmhba->attached_devhdl;
+}
+
+static void
+mptsas_smhba_update_phy_props(mptsas_t *mpt, dev_info_t *dip,
+    nvlist_t **phy_props, uint8_t phy_nums)
+{
 	int		rval;
 	size_t		packed_size;
 	char		*packed_data = NULL;
-	char		phymask[MPTSAS_MAX_PHYS];
-	nvlist_t	**phy_props;
 	nvlist_t	*nvl;
-	smhba_info_t	*pSmhba = NULL;
 
-	if (phy_nums == 0) {
-		return;
-	}
-	if (nvlist_alloc(&nvl, NV_UNIQUE_NAME, 0) != 0) {
+	if (nvlist_alloc(&nvl, NV_UNIQUE_NAME, KM_SLEEP) != 0) {
 		mptsas_log(mpt, CE_WARN, "%s: nvlist_alloc() failed", __func__);
-	}
-
-	phy_props = kmem_zalloc(sizeof (nvlist_t *) * phy_nums,
-	    KM_SLEEP);
-
-	for (i = 0; i < mpt->m_num_phys; i++) {
-
-		bzero(phymask, sizeof (phymask));
-		(void) sprintf(phymask, "%x", mpt->m_phy_info[i].phy_mask);
-		if (strcmp(phymask, iport) == 0) {
-			pSmhba = &mpt->m_phy_info[i].smhba_info;
-			(void) nvlist_alloc(&phy_props[j], NV_UNIQUE_NAME, 0);
-			(void) nvlist_add_uint8(phy_props[j], SAS_PHY_ID, i);
-			(void) nvlist_add_uint8(phy_props[j],
-			    "phyState",
-			    (pSmhba->negotiated_link_rate
-			    & 0x0f));
-			(void) nvlist_add_int8(phy_props[j],
-			    SAS_NEG_LINK_RATE,
-			    (pSmhba->negotiated_link_rate
-			    & 0x0f));
-			(void) nvlist_add_int8(phy_props[j],
-			    SAS_PROG_MIN_LINK_RATE,
-			    (pSmhba->programmed_link_rate
-			    & 0x0f));
-			(void) nvlist_add_int8(phy_props[j],
-			    SAS_HW_MIN_LINK_RATE,
-			    (pSmhba->hw_link_rate
-			    & 0x0f));
-			(void) nvlist_add_int8(phy_props[j],
-			    SAS_PROG_MAX_LINK_RATE,
-			    ((pSmhba->programmed_link_rate
-			    & 0xf0) >> 4));
-			(void) nvlist_add_int8(phy_props[j],
-			    SAS_HW_MAX_LINK_RATE,
-			    ((pSmhba->hw_link_rate
-			    & 0xf0) >> 4));
-
-			j++;
-
-			if (pSmhba->attached_devhdl &&
-			    (attached_devhdl != NULL)) {
-				*attached_devhdl =
-				    pSmhba->attached_devhdl;
-			}
-		}
+		return;
 	}
 
 	rval = nvlist_add_nvlist_array(nvl, SAS_PHY_INFO_NVL, phy_props,
 	    phy_nums);
 	if (rval) {
 		mptsas_log(mpt, CE_WARN,
-		    " nv list array add failed, return value %d.",
-		    rval);
+		    " nv list array add failed, return value %d.", rval);
 		goto exit;
 	}
 	(void) nvlist_size(nvl, &packed_size, NV_ENCODE_NATIVE);
@@ -200,15 +175,52 @@ mptsas_smhba_set_phy_props(mptsas_t *mpt, char *iport, dev_info_t *dip,
 	    SAS_PHY_INFO, (uchar_t *)packed_data, packed_size);
 
 exit:
-	for (i = 0; i < phy_nums && phy_props[i] != NULL; i++) {
-		nvlist_free(phy_props[i]);
-	}
 	nvlist_free(nvl);
-	kmem_free(phy_props, sizeof (nvlist_t *) * phy_nums);
 
 	if (packed_data != NULL) {
 		kmem_free(packed_data, packed_size);
 	}
+}
+
+void
+mptsas_smhba_set_one_phy_props(mptsas_t *mpt, dev_info_t *dip, uint8_t phy_id,
+    uint16_t *attached_devhdl)
+{
+	nvlist_t	*phy_props;
+
+	ASSERT(phy_id < mpt->m_num_phys);
+
+	mptsas_smhba_create_phy_props(&phy_props,
+	    &mpt->m_phy_info[phy_id].smhba_info, phy_id, attached_devhdl);
+
+	mptsas_smhba_update_phy_props(mpt, dip, &phy_props, 1);
+
+	nvlist_free(phy_props);
+}
+
+void
+mptsas_smhba_set_all_phy_props(mptsas_t *mpt, dev_info_t *dip, uint8_t phy_nums,
+    mptsas_phymask_t phy_mask, uint16_t *attached_devhdl)
+{
+	int		i, j;
+	nvlist_t	**phy_props;
+
+	if (phy_nums == 0)
+		return;
+
+	phy_props = kmem_zalloc(sizeof (nvlist_t *) * phy_nums, KM_SLEEP);
+
+	for (i = 0, j = 0; i < mpt->m_num_phys && j < phy_nums; i++)
+		if (phy_mask == mpt->m_phy_info[i].phy_mask)
+			mptsas_smhba_create_phy_props(&phy_props[j++],
+			    &mpt->m_phy_info[i].smhba_info, i, attached_devhdl);
+
+	mptsas_smhba_update_phy_props(mpt, dip, phy_props, j);
+
+	for (i = 0; i < j && phy_props[i] != NULL; i++)
+		nvlist_free(phy_props[i]);
+
+	kmem_free(phy_props, sizeof (nvlist_t *) * phy_nums);
 }
 
 /*

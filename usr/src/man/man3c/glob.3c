@@ -1,8 +1,42 @@
 '\" te
-.\" Copyright (c) 1992, X/Open Company Limited. All Rights Reserved.  Portions Copyright (c) 2003, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright (c) 1992, X/Open Company Limited. All Rights Reserved.
+.\" Portions Copyright (c) 2003, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Portions Copyright (c) 2013, Gary Mills
 .\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"
+.\" $OpenBSD: glob.3,v 1.30 2012/01/20 07:09:42 tedu Exp $
+.\"
+.\" Copyright (c) 1989, 1991, 1993, 1994
+.\" The Regents of the University of California.  All rights reserved.
+.\"
+.\" This code is derived from software contributed to Berkeley by
+.\" Guido van Rossum.
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that the following conditions
+.\" are met:
+.\" 1. Redistributions of source code must retain the above copyright
+.\"    notice, this list of conditions and the following disclaimer.
+.\" 2. Redistributions in binary form must reproduce the above copyright
+.\"    notice, this list of conditions and the following disclaimer in the
+.\"    documentation and/or other materials provided with the distribution.
+.\" 3. Neither the name of the University nor the names of its contributors
+.\"    may be used to endorse or promote products derived from this software
+.\"    without specific prior written permission.
+.\"
+.\" THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+.\" ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\" IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+.\" ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+.\" FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\" DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+.\" OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+.\" HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+.\" LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+.\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+.\" SUCH DAMAGE.
+.\"
 .\"  This notice shall appear on any product containing this material.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
@@ -58,12 +92,12 @@ includes at least the following members:
 .sp
 .in +2
 .nf
-size_t   gl_pathc;     /* count of paths matched by */
+size_t   gl_pathc;     /* Total count of paths matched by */
                        /* pattern */
-char     **gl_pathv;   /* pointer to list of matched */
-                       /* path names */
-size_t   gl_offs;      /* slots to reserve at beginning */
-                       /* of gl_pathv */
+char     **gl_pathv;   /* List of matched path names */
+size_t   gl_offs;      /* # of slots reserved in gl_pathv */
+int      gl_matchc;    /* Count of paths matching pattern. */
+int      gl_flags;     /* Copy of flags parameter to glob. */
 .fi
 .in -2
 
@@ -164,6 +198,116 @@ path names returned is unspecified.
 .RE
 
 .sp
+.ne 2
+.na
+\fB\fBGLOB_ALTDIRFUNC\fR\fR
+.ad
+.RS 17n
+The following additional fields in the \fIpglob\fR structure
+have been initialized with alternate functions for
+\fBglob()\fR to use to open, read, and close directories and
+to get stat information on names found in those directories:
+.sp
+.nf
+void *(*gl_opendir)(const char *);
+struct dirent *(*gl_readdir)(void *);
+void (*gl_closedir)(void *);
+int (*gl_lstat)(const char *, struct stat *);
+int (*gl_stat)(const char *, struct stat *);
+.fi
+.sp
+This extension is provided to allow programs such as
+\fBufsrestore\fR(1M) to provide globbing from directories stored
+on tape.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBGLOB_BRACE\fR\fR
+.ad
+.RS 17n
+Pre-process the pattern string to expand `{pat,pat,...}'
+strings like \fBcsh\fR(1).  The pattern `{}' is left unexpanded
+for historical reasons.  (\fBcsh\fR(1) does the same thing
+to ease typing of \fBfind\fR(1) patterns.)
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBGLOB_MAGCHAR\fR\fR
+.ad
+.RS 17n
+Set by the \fBglob()\fR function if the pattern included globbing
+characters.  See the description of the usage of
+the \fBgl_matchc\fR structure member for more details.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBGLOB_NOMAGIC\fR\fR
+.ad
+.RS 17n
+Is the same as \fBGLOB_NOCHECK\fR but it only appends the
+pattern if it does not contain any of the special characters
+`*', `?', or `['.  \fBGLOB_NOMAGIC\fR is provided to
+simplify implementing the historic \fBcsh\fR(1) globbing behavior
+and should probably not be used anywhere else.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBGLOB_QUOTE\fR\fR
+.ad
+.RS 17n
+This option has no effect and is included for backwards
+compatibility with older sources.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBGLOB_TILDE\fR\fR
+.ad
+.RS 17n
+Expand patterns that start with `~' to user name home
+directories.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBGLOB_LIMIT\fR\fR
+.ad
+.RS 17n
+Limit the amount of memory used by matches to \fIARG_MAX\fR.
+This option should be set for programs that can be coerced
+to a denial of service attack via patterns that
+expand to a very large number of matches, such as a long
+string of `*/../*/..'.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBGLOB_KEEPSTAT\fR\fR
+.ad
+.RS 17n
+Retain a copy of the \fBstat\fR(2) information retrieved for
+matching paths in the gl_statv array:
+.sp
+.nf
+struct stat **gl_statv;
+.fi
+.sp
+This option may be used to avoid \fBlstat\fR(2) lookups in
+cases where they are expensive.
+.RE
+
+.sp
 .LP
 The \fBGLOB_APPEND\fR flag can be used to append a new set of path names to
 those found in a previous call to \fBglob()\fR. The following rules apply when
@@ -237,9 +381,80 @@ set by the \fBopendir\fR(3C), \fBreaddir\fR(3C) or \fBstat\fR(2) functions.
 (Other values may be used to report other errors not explicitly documented for
 those functions.)
 .RE
+
 .sp
 .LP
-The following constants are defined as error return values for \fBglob()\fR:
+If \fB(\fR\fI*errfunc\fR\fB)\fR is called and returns non-zero, or if the
+\fBGLOB_ERR\fR flag is set in \fIflags\fR, \fBglob()\fR stops the scan and
+returns \fBGLOB_ABORTED\fR after setting \fIgl_pathc\fR and \fIgl_pathv\fR in
+\fIpglob\fR to reflect the paths already scanned. If \fBGLOB_ERR\fR is not set
+and either \fIerrfunc\fR is a \fINULL\fR pointer or
+\fB(\fR\fI*errfunc\fR\fB)\fR returns 0, the error is ignored.
+.SH RETURN VALUES
+.sp
+.LP
+On successful completion, \fBglob()\fR returns zero.
+In addition the fields of pglob contain the values described below:
+
+.sp
+.ne 2
+.na
+\fB\fBgl_pathc\fR\fR
+.ad
+.RS 16n
+Contains the total number of matched pathnames so far.
+This includes other matches from previous invocations of
+\fBglob()\fR if \fBGLOB_APPEND\fR was specified.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBgl_matchc\fR\fR
+.ad
+.RS 16n
+Contains the number of matched pathnames in the current
+invocation of \fBglob()\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBgl_flags\fR\fR
+.ad
+.RS 16n
+Contains a copy of the flags parameter with the bit
+\fBGLOB_MAGCHAR\fR set if pattern contained any of the special
+characters `*', `?', or `[', cleared if not.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBgl_pathv\fR\fR
+.ad
+.RS 16n
+Contains a pointer to a null-terminated list of matched
+pathnames.  However, if \fBgl_pathc\fR is zero, the contents of
+\fBgl_pathv\fR are undefined.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBgl_statv\fR\fR
+.ad
+.RS 16n
+If the \fBGLOB_KEEPSTAT\fR flag was set, \fBgl_statv\fR contains a
+pointer to a null-terminated list of matched \fBstat\fR(2)
+objects corresponding to the paths in \fBgl_pathc\fR.
+.RE
+
+.sp
+.LP
+If \fBglob()\fR terminates due to an error, it sets \fBerrno\fR and
+returns one of the following non-zero constants. defined in <\fBglob.h\fR>:
+
 .sp
 .ne 2
 .na
@@ -263,48 +478,25 @@ not set in flags.
 .sp
 .ne 2
 .na
-\fB\fBGLOG_NOSPACE\fR\fR
+\fB\fBGLOB_NOSPACE\fR\fR
 .ad
 .RS 16n
 An attempt to allocate memory failed.
 .RE
 
 .sp
-.LP
-If \fB(\fR\fI*errfunc\fR\fB)\fR is called and returns non-zero, or if the
-\fBGLOB_ERR\fR flag is set in \fIflags\fR, \fBglob()\fR stops the scan and
-returns \fBGLOB_ABORTED\fR after setting \fIgl_pathc\fR and \fIgl_pathv\fR in
-\fIpglob\fR to reflect the paths already scanned. If \fBGLOB_ERR\fR is not set
-and either \fIerrfunc\fR is a \fINULL\fR pointer or
-\fB(\fR\fI*errfunc\fR\fB)\fR returns 0, the error is ignored.
-.SH RETURN VALUES
-.sp
-.LP
-The following values are returned by \fBglob()\fR:
-.sp
 .ne 2
 .na
-\fB\fB0\fR\fR
+\fB\fBGLOB_NOSYS\fR\fR
 .ad
-.RS 12n
-Successful completion. The argument \fIpglob\(mi>\fR\fBgl_pathc\fR returns the
-number of matched path names and the argument \fIpglob\(mi>\fR\fBgl_pathv\fR
-contains a pointer to a null-terminated list of matched and sorted path names.
-However, if \fIpglob\(mi>\fR\fBgl_pathc\fR is 0, the content of
-\fIpglob\(mi>\fR\fBgl_pathv\fR is undefined.
+.RS 16n
+The requested function is not supported by this version of
+\fBglob()\fR.
 .RE
 
-.sp
-.ne 2
-.na
-\fB\fBnon-zero\fR\fR
-.ad
-.RS 12n
-An error has occurred. Non-zero constants are defined in <\fBglob.h\fR>. The
-arguments \fIpglob\(mi>\fR\fBgl_pathc\fR and \fIpglob\(mi>\fR\fBgl_pathv\fR are
-still set as defined above.
-.RE
-
+.LP
+The arguments \fIpglob\(mi>\fR\fBgl_pathc\fR and \fIpglob\(mi>\fR\fBgl_pathv\fR are still set as
+specified above.
 .sp
 .LP
 The \fBglobfree()\fR function returns no value.
