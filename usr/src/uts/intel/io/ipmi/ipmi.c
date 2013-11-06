@@ -103,22 +103,28 @@ ipmi_complete_request(struct ipmi_softc *sc, struct ipmi_request *req)
 
 	IPMI_LOCK_ASSERT(sc);
 
-	/*
-	 * Anonymous requests (from inside the driver) always have a
-	 * waiter that we awaken.
-	 */
 	if (req->ir_status == IRS_CANCELED) {
 		ASSERT(req->ir_owner == NULL);
 		ipmi_free_request(req);
 		return;
 	}
-	req->ir_status = IRS_COMPLETED;
-	cv_signal(&req->ir_cv);
 
-	if (req->ir_owner != NULL) {
+	req->ir_status = IRS_COMPLETED;
+
+	/*
+	 * Anonymous requests (from inside the driver) always have a
+	 * waiter that we awaken.
+	 */
+	if (req->ir_owner == NULL) {
+		cv_signal(&req->ir_cv);
+	} else {
 		dev = req->ir_owner;
 		TAILQ_INSERT_TAIL(&dev->ipmi_completed_requests, req, ir_link);
 		pollwakeup(dev->ipmi_pollhead, POLLIN | POLLRDNORM);
+
+		dev->ipmi_status &= ~IPMI_BUSY;
+		if (dev->ipmi_status & IPMI_CLOSING)
+			cv_signal(&dev->ipmi_cv);
 	}
 }
 
@@ -193,6 +199,10 @@ ipmi_dequeue_request(struct ipmi_softc *sc)
 	req = TAILQ_FIRST(&sc->ipmi_pending_requests);
 	TAILQ_REMOVE(&sc->ipmi_pending_requests, req, ir_link);
 	req->ir_status = IRS_PROCESSED;
+
+	if (req->ir_owner != NULL)
+		req->ir_owner->ipmi_status |= IPMI_BUSY;
+
 	return (req);
 }
 

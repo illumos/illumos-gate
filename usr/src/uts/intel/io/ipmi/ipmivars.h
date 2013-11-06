@@ -79,6 +79,8 @@ struct ipmi_request {
 #define	SMIC_FLAGS			2
 
 struct ipmi_softc;
+#define	IPMI_BUSY	0x1
+#define	IPMI_CLOSING	0x2
 
 /* Per file descriptor data. */
 typedef struct ipmi_device {
@@ -89,6 +91,8 @@ typedef struct ipmi_device {
 	uchar_t			ipmi_lun;
 	dev_t			ipmi_dev;
 	list_node_t		ipmi_node;	/* list link for open devs */
+	int			ipmi_status;
+	kcondvar_t		ipmi_cv;
 } ipmi_device_t;
 
 struct ipmi_softc {
