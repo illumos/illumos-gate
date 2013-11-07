@@ -939,7 +939,7 @@ pr_control32(int32_t cmd, arg32_t *argp, prnode_t *pnp, cred_t *cr)
 
 	case PCREAD:	/* read from the address space */
 	case PCWRITE:	/* write to the address space */
-		if (PROCESS_NOT_32BIT(p))
+		if (PROCESS_NOT_32BIT(p) || (pnp->pr_flags & PR_OFFMAX))
 			error = EOVERFLOW;
 		else {
 			enum uio_rw rw = (cmd == PCREAD)? UIO_READ : UIO_WRITE;
