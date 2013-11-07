@@ -1579,9 +1579,7 @@ smb_set_proto_prop(sa_property_t prop)
 static char *
 smb_get_status(void)
 {
-	char *state = NULL;
-	state = smf_get_state(SMBD_DEFAULT_INSTANCE_FMRI);
-	return (state != NULL ? state : "-");
+	return (smf_get_state(SMBD_DEFAULT_INSTANCE_FMRI));
 }
 
 /*

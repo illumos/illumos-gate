@@ -683,9 +683,7 @@ smbfs_set_proto_prop(sa_property_t prop)
 static char *
 smbfs_get_status()
 {
-	char *state = "enabled";
-	state = smf_get_state(SMBC_DEFAULT_INSTANCE_FMRI);
-	return (state != NULL ? state : strdup("-"));
+	return (smf_get_state(SMBC_DEFAULT_INSTANCE_FMRI));
 }
 
 /*
