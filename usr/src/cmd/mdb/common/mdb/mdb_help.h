@@ -22,12 +22,13 @@
 /*
  * Copyright (c) 1998-1999 by Sun Microsystems, Inc.
  * All rights reserved.
+ * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
  */
 
 #ifndef	_MDB_HELP_H
 #define	_MDB_HELP_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#include <mdb/mdb_tab.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -40,6 +41,7 @@ extern int cmd_dcmds(uintptr_t, uint_t, int, const mdb_arg_t *);
 extern int cmd_walkers(uintptr_t, uint_t, int, const mdb_arg_t *);
 extern int cmd_formats(uintptr_t, uint_t, int, const mdb_arg_t *);
 extern int cmd_help(uintptr_t, uint_t, int, const mdb_arg_t *);
+extern int cmd_help_tab(mdb_tab_cookie_t *, uint_t, int, const mdb_arg_t *);
 extern int cmd_which(uintptr_t, uint_t, int, const mdb_arg_t *);
 
 #endif	/* _MDB */
