@@ -1581,7 +1581,7 @@ smb_get_status(void)
 {
 	char *state = NULL;
 	state = smf_get_state(SMBD_DEFAULT_INSTANCE_FMRI);
-	return (state != NULL ? state : "-");
+	return (state != NULL ? state : strdup("-"));
 }
 
 /*
