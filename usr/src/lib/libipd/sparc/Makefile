@@ -10,8 +10,9 @@
 #
 
 #
-# Copyright (c) 2012 Joyent, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright 2012 Joyent, Inc.  All rights reserved.
 #
 
-name="ipd" parent="pseudo" instance=0;
+include ../Makefile.com
+
+install: all $(ROOTLIBS) $(ROOTLINKS) $(ROOTLINT)

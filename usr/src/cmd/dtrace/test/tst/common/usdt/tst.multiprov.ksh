@@ -64,7 +64,7 @@ provider $oogle {
 };
 EOF
 
-	gcc -m32 -c $oogle.c
+	cc -c $oogle.c
 
 	if [ $? -ne 0 ]; then
 		print -u2 "failed to compile $oogle.c"
@@ -87,7 +87,7 @@ echo "}" >> test.c
 
 echo 'END{printa("%-10s %@d\\n", @)}' >> test.d
 
-gcc -m32 -o test test.c $objs
+cc -o test test.c $objs
 
 if [ $? -ne 0 ]; then
 	print -u2 "failed to compile test.c"
