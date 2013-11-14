@@ -205,7 +205,7 @@ smb_tree_connect(smb_request_t *sr)
 	}
 
 	tree = smb_tree_connect_core(sr);
-	smb_threshold_exit(&sv->sv_tcon_ct, sv);
+	smb_threshold_exit(&sv->sv_tcon_ct);
 	return (tree);
 }
 

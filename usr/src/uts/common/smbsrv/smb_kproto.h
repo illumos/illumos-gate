@@ -69,7 +69,6 @@ extern	int smb_opipe_threshold;
 extern	int smb_ssetup_timeout;
 extern	int smb_tcon_timeout;
 extern	int smb_opipe_timeout;
-extern	int smb_threshold_debug;
 extern const uint32_t smb_vop_dosattr_settable;
 
 /* Thread priorities - see smb_init.c */
@@ -855,11 +854,13 @@ void smb_avl_release(smb_avl_t *, void *);
 void smb_avl_iterinit(smb_avl_t *, smb_avl_cursor_t *);
 void *smb_avl_iterate(smb_avl_t *, smb_avl_cursor_t *);
 
-void smb_threshold_init(smb_cmd_threshold_t *, smb_server_t *,
-    char *, int, int);
+void smb_threshold_init(smb_cmd_threshold_t *,
+    char *, uint_t, uint_t);
 void smb_threshold_fini(smb_cmd_threshold_t *);
 int smb_threshold_enter(smb_cmd_threshold_t *);
-void smb_threshold_exit(smb_cmd_threshold_t *, smb_server_t *);
+void smb_threshold_exit(smb_cmd_threshold_t *);
+void smb_threshold_wake_all(smb_cmd_threshold_t *);
+
 #ifdef	__cplusplus
 }
 #endif

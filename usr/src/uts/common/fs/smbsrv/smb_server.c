@@ -432,15 +432,15 @@ smb_server_create(void)
 	smb_opipe_door_init(sv);
 	smb_server_kstat_init(sv);
 
+	smb_threshold_init(&sv->sv_ssetup_ct, SMB_SSETUP_CMD,
+	    smb_ssetup_threshold, smb_ssetup_timeout);
+	smb_threshold_init(&sv->sv_tcon_ct, SMB_TCON_CMD,
+	    smb_tcon_threshold, smb_tcon_timeout);
+	smb_threshold_init(&sv->sv_opipe_ct, SMB_OPIPE_CMD,
+	    smb_opipe_threshold, smb_opipe_timeout);
+
 	smb_llist_insert_tail(&smb_servers, sv);
 	smb_llist_exit(&smb_servers);
-
-	smb_threshold_init(&sv->sv_ssetup_ct, sv, SMB_SSETUP_CMD,
-	    smb_ssetup_threshold, smb_ssetup_timeout);
-	smb_threshold_init(&sv->sv_tcon_ct, sv, SMB_TCON_CMD,
-	    smb_tcon_threshold, smb_tcon_timeout);
-	smb_threshold_init(&sv->sv_opipe_ct, sv, SMB_OPIPE_CMD,
-	    smb_opipe_threshold, smb_opipe_timeout);
 
 	return (0);
 }
@@ -460,10 +460,6 @@ smb_server_delete(void)
 	rc = smb_server_lookup(&sv);
 	if (rc != 0)
 		return (rc);
-
-	smb_threshold_fini(&sv->sv_ssetup_ct);
-	smb_threshold_fini(&sv->sv_tcon_ct);
-	smb_threshold_fini(&sv->sv_opipe_ct);
 
 	mutex_enter(&sv->sv_mutex);
 	switch (sv->sv_state) {
@@ -500,6 +496,10 @@ smb_server_delete(void)
 	smb_llist_enter(&smb_servers, RW_WRITER);
 	smb_llist_remove(&smb_servers, sv);
 	smb_llist_exit(&smb_servers);
+
+	smb_threshold_fini(&sv->sv_ssetup_ct);
+	smb_threshold_fini(&sv->sv_tcon_ct);
+	smb_threshold_fini(&sv->sv_opipe_ct);
 
 	smb_server_listener_destroy(&sv->sv_nbt_daemon);
 	smb_server_listener_destroy(&sv->sv_tcp_daemon);
@@ -1384,15 +1384,29 @@ smb_server_shutdown(smb_server_t *sv)
 {
 	SMB_SERVER_VALID(sv);
 
-	smb_opipe_door_close(sv);
+	/*
+	 * Stop the listeners first, so we don't get any more
+	 * new work while we're trying to shut down.
+	 */
+	smb_server_listener_stop(&sv->sv_nbt_daemon);
+	smb_server_listener_stop(&sv->sv_tcp_daemon);
 	smb_thread_stop(&sv->si_thread_timers);
+
+	/*
+	 * Wake up any threads we might have blocked.
+	 * Must precede kdoor_close etc. because those will
+	 * wait for such threads to get out.
+	 */
+	smb_event_cancel(sv, 0);
+	smb_threshold_wake_all(&sv->sv_ssetup_ct);
+	smb_threshold_wake_all(&sv->sv_tcon_ct);
+	smb_threshold_wake_all(&sv->sv_opipe_ct);
+
+	smb_opipe_door_close(sv);
 	smb_kdoor_close(sv);
 	smb_kshare_door_fini(sv->sv_lmshrd);
 	sv->sv_lmshrd = NULL;
 	smb_export_stop(sv);
-
-	smb_server_listener_stop(&sv->sv_nbt_daemon);
-	smb_server_listener_stop(&sv->sv_tcp_daemon);
 
 	if (sv->sv_session != NULL) {
 		/*
@@ -2008,6 +2022,7 @@ smb_event_wait(smb_event_t *event)
 {
 	int	seconds = 1;
 	int	ticks;
+	int	err;
 
 	if (event == NULL)
 		return (EINVAL);
@@ -2037,11 +2052,12 @@ smb_event_wait(smb_event_t *event)
 		++event->se_waittime;
 	}
 
+	err = event->se_errno;
 	event->se_waittime = 0;
 	event->se_notified = B_FALSE;
 	cv_signal(&event->se_cv);
 	mutex_exit(&event->se_mutex);
-	return (event->se_errno);
+	return (err);
 }
 
 /*

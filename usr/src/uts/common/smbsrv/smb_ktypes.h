@@ -1805,10 +1805,9 @@ typedef struct smb_cmd_threshold {
 	kmutex_t		ct_mutex;
 	volatile uint32_t	ct_active_cnt;
 	volatile uint32_t	ct_blocked_cnt;
-	volatile uint32_t	ct_error_cnt;
 	uint32_t		ct_threshold;
-	struct smb_event	*ct_event;
-	uint32_t		ct_event_id;
+	uint32_t		ct_timeout; /* milliseconds */
+	kcondvar_t		ct_cond;
 } smb_cmd_threshold_t;
 
 typedef struct {

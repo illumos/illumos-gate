@@ -380,7 +380,7 @@ smb_open_subr(smb_request_t *sr)
 		if ((status = smb_opipe_open(sr)) != NT_STATUS_SUCCESS)
 			smbsr_error(sr, status, 0, 0);
 
-		smb_threshold_exit(&sv->sv_opipe_ct, sv);
+		smb_threshold_exit(&sv->sv_opipe_ct);
 		return (status);
 
 	default:

@@ -2247,109 +2247,77 @@ smb_srqueue_update(smb_srqueue_t *srq, smb_kstat_utilization_t *kd)
 }
 
 void
-smb_threshold_init(smb_cmd_threshold_t *ct, smb_server_t *sv, char *cmd,
-    int threshold, int timeout)
+smb_threshold_init(smb_cmd_threshold_t *ct, char *cmd,
+    uint_t threshold, uint_t timeout)
 {
 	bzero(ct, sizeof (smb_cmd_threshold_t));
 	mutex_init(&ct->ct_mutex, NULL, MUTEX_DEFAULT, NULL);
+	cv_init(&ct->ct_cond, NULL, CV_DEFAULT, NULL);
+
 	ct->ct_cmd = cmd;
 	ct->ct_threshold = threshold;
-	ct->ct_event = smb_event_create(sv, timeout);
-	ct->ct_event_id = smb_event_txid(ct->ct_event);
-
-	if (smb_threshold_debug) {
-		cmn_err(CE_NOTE, "smb_threshold_init[%s]: threshold (%d), "
-		    "timeout (%d)", cmd, threshold, timeout);
-	}
+	ct->ct_timeout = timeout;
 }
 
-/*
- * This function must be called prior to SMB_SERVER_STATE_STOPPING state
- * so that ct_event can be successfully removed from the event list.
- * It should not be called when the server mutex is held or when the
- * server is removed from the server list.
- */
 void
 smb_threshold_fini(smb_cmd_threshold_t *ct)
 {
-	smb_event_destroy(ct->ct_event);
+	cv_destroy(&ct->ct_cond);
 	mutex_destroy(&ct->ct_mutex);
-	bzero(ct, sizeof (smb_cmd_threshold_t));
 }
 
 /*
- * This threshold mechanism can be used to limit the number of simultaneous
- * requests, which serves to limit the stress that can be applied to the
- * service and also allows the service to respond to requests before the
- * client times out and reports that the server is not responding,
- *
- * If the number of requests exceeds the threshold, new requests will be
- * stalled until the number drops back to the threshold.  Stalled requests
- * will be notified as appropriate, in which case 0 will be returned.
- * If the timeout expires before the request is notified, a non-zero errno
- * value will be returned.
- *
- * To avoid a flood of messages, the message rate is throttled as well.
+ * This threshold mechanism is used to limit the number of simultaneous
+ * named pipe connections, concurrent authentication conversations, etc.
+ * Requests that would take us over the threshold wait until either the
+ * resources are available (return zero) or timeout (return error).
  */
 int
 smb_threshold_enter(smb_cmd_threshold_t *ct)
 {
-	int	rc;
+	clock_t	time, rem;
 
+	time = MSEC_TO_TICK(ct->ct_timeout) + ddi_get_lbolt();
 	mutex_enter(&ct->ct_mutex);
-	if (ct->ct_active_cnt >= ct->ct_threshold && ct->ct_event != NULL) {
-		atomic_inc_32(&ct->ct_blocked_cnt);
 
-		if (smb_threshold_debug) {
-			cmn_err(CE_NOTE, "smb_threshold_enter[%s]: blocked "
-			    "(blocked ops: %u, inflight ops: %u)",
-			    ct->ct_cmd, ct->ct_blocked_cnt, ct->ct_active_cnt);
-		}
-
-		mutex_exit(&ct->ct_mutex);
-
-		if ((rc = smb_event_wait(ct->ct_event)) != 0) {
-			if (rc == ECANCELED)
-				return (rc);
-
-			mutex_enter(&ct->ct_mutex);
-			if (ct->ct_active_cnt >= ct->ct_threshold) {
-
-				if ((ct->ct_error_cnt %
-				    SMB_THRESHOLD_REPORT_THROTTLE) == 0) {
-					cmn_err(CE_NOTE, "%s: server busy: "
-					    "threshold %d exceeded)",
-					    ct->ct_cmd, ct->ct_threshold);
-				}
-
-				atomic_inc_32(&ct->ct_error_cnt);
-				mutex_exit(&ct->ct_mutex);
-				return (rc);
-			}
-
+	while (ct->ct_threshold != 0 &&
+	    ct->ct_threshold <= ct->ct_active_cnt) {
+		ct->ct_blocked_cnt++;
+		rem = cv_timedwait(&ct->ct_cond, &ct->ct_mutex, time);
+		ct->ct_blocked_cnt--;
+		if (rem < 0) {
 			mutex_exit(&ct->ct_mutex);
-
-		}
-
-		mutex_enter(&ct->ct_mutex);
-		atomic_dec_32(&ct->ct_blocked_cnt);
-		if (smb_threshold_debug) {
-			cmn_err(CE_NOTE, "smb_threshold_enter[%s]: resumed "
-			    "(blocked ops: %u, inflight ops: %u)", ct->ct_cmd,
-			    ct->ct_blocked_cnt, ct->ct_active_cnt);
+			return (ETIME);
 		}
 	}
+	if (ct->ct_threshold == 0) {
+		mutex_exit(&ct->ct_mutex);
+		return (ECANCELED);
+	}
 
-	atomic_inc_32(&ct->ct_active_cnt);
+	ASSERT3U(ct->ct_active_cnt, <, ct->ct_threshold);
+	ct->ct_active_cnt++;
+
 	mutex_exit(&ct->ct_mutex);
 	return (0);
 }
 
 void
-smb_threshold_exit(smb_cmd_threshold_t *ct, smb_server_t *sv)
+smb_threshold_exit(smb_cmd_threshold_t *ct)
 {
 	mutex_enter(&ct->ct_mutex);
-	atomic_dec_32(&ct->ct_active_cnt);
+	ASSERT3U(ct->ct_active_cnt, >, 0);
+	ct->ct_active_cnt--;
+	if (ct->ct_blocked_cnt)
+		cv_signal(&ct->ct_cond);
 	mutex_exit(&ct->ct_mutex);
-	smb_event_notify(sv, ct->ct_event_id);
+}
+
+void
+smb_threshold_wake_all(smb_cmd_threshold_t *ct)
+{
+	mutex_enter(&ct->ct_mutex);
+	ct->ct_threshold = 0;
+	cv_broadcast(&ct->ct_cond);
+	mutex_exit(&ct->ct_mutex);
 }

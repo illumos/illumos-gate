@@ -236,7 +236,7 @@ smb_authenticate(smb_request_t *sr, smb_arg_sessionsetup_t *sinfo,
 	}
 
 	rc = smb_authenticate_core(sr, sinfo, session_key);
-	smb_threshold_exit(&sv->sv_ssetup_ct, sv);
+	smb_threshold_exit(&sv->sv_ssetup_ct);
 	return (rc);
 }
 

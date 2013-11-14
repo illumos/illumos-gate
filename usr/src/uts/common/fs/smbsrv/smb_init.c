@@ -91,8 +91,6 @@ int	smb_ssetup_timeout = (30 * 1000);
 int	smb_tcon_timeout = (30 * 1000);
 int	smb_opipe_timeout = (30 * 1000);
 
-int	smb_threshold_debug = 0;
-
 /*
  * Thread priorities used in smbsrv.  Our threads spend most of their time
  * blocked on various conditions.  However, if the system gets heavy load,
