@@ -2870,7 +2870,6 @@ typedef struct list_cbdata {
 	boolean_t	cb_first;
 	boolean_t	cb_literal;
 	boolean_t	cb_scripted;
-	boolean_t	cb_literal;
 	zprop_list_t	*cb_proplist;
 } list_cbdata_t;
 
@@ -3028,9 +3027,6 @@ zfs_do_list(int argc, char **argv)
 	/* check options */
 	while ((c = getopt(argc, argv, "HS:d:o:prs:t:")) != -1) {
 		switch (c) {
-		case 'p':
-			cb.cb_literal = B_TRUE;
-			break;
 		case 'o':
 			fields = optarg;
 			break;
