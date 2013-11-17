@@ -997,6 +997,7 @@ create_disk(char *deviceid, char *kernel_name, struct search_args *args)
 
 	diskp->cd_rom = 0;
 	diskp->rpm = 0;
+	diskp->solid_state = -1;
 	type = di_minor_nodetype(args->minor);
 
 	prod_id = get_str_prop(PROD_ID_PROP, args->node);

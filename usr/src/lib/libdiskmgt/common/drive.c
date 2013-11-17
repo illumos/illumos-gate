@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <fcntl.h>
 #include <libdevinfo.h>
 #include <stdio.h>
@@ -350,6 +348,7 @@ static int		get_io_kstats(kstat_ctl_t *kc, char *diskname,
 static int		get_kstat_vals(kstat_t *ksp, nvlist_t *stats);
 static char		*get_err_attr_name(char *kstat_name);
 static int		get_rpm(disk_t *dp, int fd);
+static int		get_solidstate(disk_t *dp, int fd);
 static int		update_stat64(nvlist_t *stats, char *attr,
 			    uint64_t value);
 static int		update_stat32(nvlist_t *stats, char *attr,
@@ -943,6 +942,16 @@ get_attrs(disk_t *diskp, int fd, char *opath, nvlist_t *attrs)
 	    }
 	}
 
+	if (diskp->solid_state < 0) {
+		diskp->solid_state = get_solidstate(diskp, fd);
+	}
+
+	if (diskp->solid_state > 0) {
+		if (nvlist_add_boolean(attrs, DM_SOLIDSTATE) != 0) {
+			return (ENOMEM);
+		}
+	}
+
 	return (0);
 }
 
@@ -1195,6 +1204,31 @@ get_rpm(disk_t *dp, int fd)
 	}
 
 	return (rpm);
+}
+
+static int
+get_solidstate(disk_t *dp, int fd)
+{
+	int	opened_here = 0;
+	int	solid_state = -1;
+
+	/* We may have already opened the device. */
+	if (fd < 0) {
+		fd = drive_open_disk(dp, NULL, 0);
+		opened_here = 1;
+	}
+
+	if (fd >= 0) {
+		if (ioctl(fd, DKIOCSOLIDSTATE, &solid_state) < 0) {
+			solid_state = -1;
+		}
+	}
+
+	if (opened_here) {
+		(void) close(fd);
+	}
+
+	return (solid_state);
 }
 
 /*

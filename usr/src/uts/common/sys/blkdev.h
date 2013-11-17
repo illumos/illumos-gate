@@ -19,6 +19,7 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
@@ -116,6 +117,7 @@ struct bd_media {
 	uint64_t		m_nblks;
 	uint32_t		m_blksize;
 	boolean_t		m_readonly;
+	boolean_t		m_solidstate;
 };
 
 #define	BD_INFO_FLAG_REMOVABLE		(1U << 0)
