@@ -251,6 +251,7 @@ DRV_KMODS	+= intel_nb5000
 DRV_KMODS	+= intel_nhm
 DRV_KMODS	+= ip
 DRV_KMODS	+= ip6
+DRV_KMODS	+= ipd
 DRV_KMODS	+= ipf
 DRV_KMODS       += ipnet
 DRV_KMODS	+= ippctl

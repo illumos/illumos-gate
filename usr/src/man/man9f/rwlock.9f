@@ -1,9 +1,10 @@
 '\" te
 .\"  Copyright (c) 2006 Sun Microsystems, Inc. All Rights Reserved
+.\" Copyright (c) 2013, Joyent, Inc. All rights reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH RWLOCK 9F "Jan 16, 2006"
+.TH RWLOCK 9F "Sep 19, 2013"
 .SH NAME
 rwlock, rw_init, rw_destroy, rw_enter, rw_exit, rw_tryenter, rw_downgrade,
 rw_tryupgrade, rw_read_locked \- readers/writer lock functions
@@ -100,9 +101,11 @@ Type-specific argument for initialization function.
 \fB\fIenter_type\fR\fR
 .ad
 .RS 14n
-One of the values \fBRW_READER\fR or \fBRW_WRITER\fR, indicating whether the
-lock is to be acquired non-exclusively (\fBRW_READER\fR) or exclusively
-(\fBRW_WRITER\fR).
+One of the values \fBRW_WRITER\fR, \fBRW_READER\fR or
+\fBRW_READER_STARVEWRITER\fR, indicating whether the
+lock is to be acquired exclusively (\fBRW_WRITER\fR), non-exclusively
+(\fBRW_READER\fR) or non-exclusively without regard to any threads
+that may be blocked on exclusive access (\fBRW_READER_STARVEWRITER\fR).
 .RE
 
 .SH DESCRIPTION
@@ -111,7 +114,7 @@ lock is to be acquired non-exclusively (\fBRW_READER\fR) or exclusively
 A multiple-readers, single-writer lock is represented by the \fBkrwlock_t\fR
 data type. This type of lock will allow many threads to have simultaneous
 read-only access to an object. Only one thread may have write access at any one
-time. An object which is searched more frequently than it is changed is a good
+time. An object that is searched more frequently than it is changed is a good
 candidate for a readers/writer lock.
 .sp
 .LP
@@ -137,17 +140,29 @@ destroyed.
 .sp
 .LP
 The \fBrw_enter()\fR function acquires the lock, and blocks if necessary. If
-\fIenter_type\fR is \fBRW_READER\fR, the caller blocks if there is a writer or
-a thread attempting to enter for writing. If \fIenter_type\fR is
-\fBRW_WRITER\fR, the caller blocks if any thread holds the lock.
+\fIenter_type\fR is \fBRW_WRITER\fR, the caller blocks if any thread holds 
+the lock. If \fIenter_type\fR is \fBRW_READER\fR, the caller blocks if there
+is a writer or a thread attempting to enter for writing. If \fIenter_type\fR
+is \fBRW_READER_STARVEWRITER\fR, the caller blocks only if there is a writer;
+if the lock is held for reading and a thread is blocked attempting to enter
+for writing, the caller will acquire the lock as a reader instead of
+blocking on the pending writer.
+
 .sp
 .LP
-NOTE: It is a programming error for any thread to acquire an rwlock it already
-holds, even as a reader. Doing so can deadlock the system: if thread R acquires
-the lock as a reader, then thread W tries to acquire the lock as a writer, W
-will set write-wanted and block. When R tries to get its second read hold on
-the lock, it will honor the write-wanted bit and block waiting for W; but W
-cannot run until R drops the lock. Thus threads R and W deadlock.
+NOTE: It is a programming error for any thread to acquire an rwlock as
+\fBRW_READER\fR that it already holds. Doing so can deadlock the system: if
+thread R acquires the lock as \fBRW_READER\fR, then thread W tries to acquire
+the lock as a writer, W will set write-wanted and block. When R tries to get
+its second read hold on the lock, it will honor the write-wanted bit and block
+waiting for W; but W cannot run until R drops the lock. Thus threads R and W
+deadlock.  To opt out of this behavior -- that is, to safely allow a lock to
+be grabbed recursively as a reader -- the lock should be acquired as
+\fBRW_READER_STARVEWRITER\fR, which will allow R to get its second read hold
+without regard for the write-wanted bit set by W.  Note that the
+\fBRW_READER_STARVEWRITER\fR behavior will starve writers in the presence of
+infinite readers; it should be used with care, and only where the default
+\fBRW_READER\fR behavior is unacceptable.
 .sp
 .LP
 The \fBrw_exit()\fR function releases the lock and may wake up one or more
@@ -159,12 +174,12 @@ The \fBrw_tryenter()\fR function attempts to enter the lock, like
 successfully entered, and zero otherwise.
 .sp
 .LP
-A thread which holds the lock exclusively (entered with \fBRW_WRITER\fR), may
+A thread that holds the lock exclusively (entered with \fBRW_WRITER\fR), may
 call \fBrw_downgrade()\fR to convert to holding the lock non-exclusively (as if
 entered with \fBRW_READER\fR). One or more waiting readers may be unblocked.
 .sp
 .LP
-The \fBrw_tryupgrade()\fR function can be called by a thread which holds the
+The \fBrw_tryupgrade()\fR function can be called by a thread that holds the
 lock for reading to attempt to convert to holding it for writing. This upgrade
 can only succeed if no other thread is holding the lock and no other thread is
 blocked waiting to acquire the lock for writing.

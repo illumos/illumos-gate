@@ -10,7 +10,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH OPEN 2 "Jun 16, 2008"
+.TH OPEN 2 "Nov 16, 2013"
 .SH NAME
 open, openat \- open a file
 .SH SYNOPSIS
@@ -132,12 +132,9 @@ performed on the file-mode bits and the corresponding bits in the complement of
 the process's file mode creation mask. Thus, all bits set in the process's file
 mode creation mask (see \fBumask\fR(2)) are correspondingly cleared in the
 file's permission mask. The "save text image after execution bit" of the mode
-is cleared (see \fBchmod\fR(2)). \fBO_SYNC\fR Write I/O operations on the file
-descriptor complete as defined by synchronized I/O file integrity completion
-(see \fBfcntl.h\fR(3HEAD) definition of \fBO_SYNC\fR.) When bits other than the
-file permission bits are set, the effect is unspecified. The \fImode\fR
-argument does not affect whether the file is open for reading, writing or for
-both.
+is cleared (see \fBchmod\fR(2)). When bits other than the file permission bits
+are set, the effect is unspecified. The \fImode\fR argument does not affect
+whether the file is open for reading, writing or for both.
 .RE
 
 .sp
@@ -304,7 +301,8 @@ file integrity completion.
 .sp .6
 .RS 4n
 Write I/O operations on the file descriptor complete as defined by synchronized
-I/O file integrity completion.
+I/O file integrity completion (see \fBfcntl.h\fR(3HEAD) definition of
+\fBO_SYNC\fR).
 .RE
 
 .sp

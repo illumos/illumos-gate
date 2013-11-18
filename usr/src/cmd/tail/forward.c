@@ -31,9 +31,7 @@
  */
 
 /*
- * Solaris porting notes:  the original FreeBSD version made use of the
- *                         BSD kqueue event notification framework; this
- *                         was changed to use usleep()
+ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  */
 
 #include <sys/param.h>
@@ -53,6 +51,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <unistd.h>
 
 #include "extern.h"
@@ -63,9 +62,11 @@ static void set_events(file_info_t *files);
 
 /* defines for inner loop actions */
 #define	USE_SLEEP	0
+#define	USE_PORT	1
 #define	ADD_EVENTS	2
 
-int action = USE_SLEEP;
+int port;
+int action = USE_PORT;
 
 static const file_info_t *last;
 
@@ -261,6 +262,107 @@ show(file_info_t *file)
 }
 
 static void
+associate(file_info_t *file, boolean_t assoc, port_event_t *ev)
+{
+	char buf[64], *name;
+	int i;
+
+	if (action != USE_PORT || file->fp == NULL)
+		return;
+
+	if (!S_ISREG(file->st.st_mode)) {
+		/*
+		 * For FIFOs, we use PORT_SOURCE_FD as our port event source.
+		 */
+		if (assoc) {
+			(void) port_associate(port, PORT_SOURCE_FD,
+			    fileno(file->fp), POLLIN, file);
+		} else {
+			(void) port_dissociate(port, PORT_SOURCE_FD,
+			    fileno(file->fp));
+		}
+
+		return;
+	}
+
+	bzero(&file->fobj, sizeof (file->fobj));
+
+	if (!Fflag) {
+		/*
+		 * PORT_SOURCE_FILE only allows us to specify a file name, not
+		 * a file descriptor.  If we are following a specific file (as
+		 * opposed to a file name) and we were to specify the name of
+		 * the file to port_associate() and that file were moved
+		 * aside, we would not be able to reassociate an event because
+		 * we would not know a name that would resolve to the new file
+		 * (indeed, there might not be such a name -- the file may
+		 * have been unlinked).  But there _is_ a name that we know
+		 * maps to the file and doesn't change: the name of the
+		 * representation of the open file descriptor in /proc.  We
+		 * therefore associate with this name (and the underlying
+		 * file), not the name of the file as specified at the command
+		 * line.  This also has the (desirable) side-effect of
+		 * insulating against FILE_RENAME_FROM and FILE_RENAME_TO
+		 * events that we need to ignore to assure that we don't lose
+		 * FILE_TRUNC events.
+		 */
+		(void) snprintf(buf,
+		    sizeof (buf), "/proc/self/fd/%d", fileno(file->fp));
+		name = buf;
+	} else {
+		name = file->file_name;
+	}
+
+	/*
+	 * Note that portfs uses the address of the specified file_obj_t to
+	 * tag an association; if one creates a different association with a
+	 * (different) file_obj_t that happens to be at the same address,
+	 * the first association will be implicitly removed.  To assure that
+	 * each association has a disjoint file_obj_t, we allocate the memory
+	 * for each in the file_info, not on the stack.
+	 */
+	file->fobj[0].fo_name = name;
+	file->fobj[1].fo_name = name;
+
+	if (assoc) {
+		/*
+		 * To assure that we cannot possibly drop a FILE_TRUNC event,
+		 * we have two different PORT_SOURCE_FILE associations with the
+		 * port:  one to get only FILE_MODIFIED events and another to
+		 * get only FILE_TRUNC events.  This assures that we always
+		 * have an active association for FILE_TRUNC events when the
+		 * seek offset is non-zero.  Note that the association order
+		 * _must_ be FILE_TRUNC followed by FILE_MODIFIED:  if a single
+		 * event induces both a FILE_TRUNC and a FILE_MODIFIED (as
+		 * a VE_CREATE vnode event does), we must process the
+		 * FILE_TRUNC before FILE_MODIFIED -- and the order in which
+		 * these are processed will be the association order.  So
+		 * if we see a FILE_TRUNC, we dissociate/reassociate the
+		 * FILE_MODIFIED association.
+		 */
+		if (ev == NULL || (ev->portev_events & FILE_TRUNC) ||
+		    !(ev->portev_events & (FILE_MODIFIED | FILE_TRUNC))) {
+			(void) port_associate(port, PORT_SOURCE_FILE,
+			    (uintptr_t)&file->fobj[0], FILE_TRUNC, file);
+			(void) port_dissociate(port, PORT_SOURCE_FILE,
+			    (uintptr_t)&file->fobj[1]);
+			ev = NULL;
+		}
+
+		if (ev == NULL || (ev->portev_events & FILE_MODIFIED) ||
+		    !(ev->portev_events & (FILE_MODIFIED | FILE_TRUNC))) {
+			(void) port_associate(port, PORT_SOURCE_FILE,
+			    (uintptr_t)&file->fobj[1], FILE_MODIFIED, file);
+		}
+	} else {
+		for (i = 0; i <= 1; i++) {
+			(void) port_dissociate(port, PORT_SOURCE_FILE,
+			    (uintptr_t)&file->fobj[i]);
+		}
+	}
+}
+
+static void
 set_events(file_info_t *files)
 {
 	int i;
@@ -271,6 +373,8 @@ set_events(file_info_t *files)
 			continue;
 
 		(void) fstat(fileno(file->fp), &file->st);
+
+		associate(file, B_TRUE, NULL);
 	}
 }
 
@@ -284,6 +388,8 @@ follow(file_info_t *files, enum STYLE style, off_t off)
 	int active, ev_change, i, n = -1;
 	struct stat sb2;
 	file_info_t *file;
+	struct timespec ts;
+	port_event_t ev;
 
 	/* Position each of the files */
 
@@ -307,6 +413,12 @@ follow(file_info_t *files, enum STYLE style, off_t off)
 		return;
 
 	last = --file;
+
+	if (action == USE_PORT &&
+	    (stat("/proc/self/fd", &sb2) == -1 || !S_ISDIR(sb2.st_mode) ||
+	    (port = port_create()) == -1))
+		action = USE_SLEEP;
+
 	set_events(files);
 
 	for (;;) {
@@ -341,12 +453,13 @@ follow(file_info_t *files, enum STYLE style, off_t off)
 				    sb2.st_dev != file->st.st_dev ||
 				    sb2.st_nlink == 0) {
 					(void) show(file);
+					associate(file, B_FALSE, NULL);
 					file->fp = freopen(file->file_name, "r",
 					    file->fp);
-					if (file->fp != NULL)
+					if (file->fp != NULL) {
 						(void) memcpy(&file->st, &sb2,
 						    sizeof (struct stat));
-					else if (errno != ENOENT)
+					} else if (errno != ENOENT)
 						ierr(file->file_name);
 					ev_change++;
 				}
@@ -361,6 +474,26 @@ follow(file_info_t *files, enum STYLE style, off_t off)
 			set_events(files);
 
 		switch (action) {
+		case USE_PORT:
+			ts.tv_sec = 1;
+			ts.tv_nsec = 0;
+
+			/*
+			 * In the -F case we set a timeout to ensure that
+			 * we re-stat the file at least once every second.
+			 */
+			n = port_get(port, &ev, Fflag ? &ts : NULL);
+
+			if (n == 0) {
+				file = (file_info_t *)ev.portev_user;
+				associate(file, B_TRUE, &ev);
+
+				if (ev.portev_events & FILE_TRUNC)
+					(void) fseek(file->fp, 0, SEEK_SET);
+			}
+
+			break;
+
 		case USE_SLEEP:
 			(void) usleep(250000);
 			break;

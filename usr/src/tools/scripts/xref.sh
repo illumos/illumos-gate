@@ -28,11 +28,10 @@
 
 ONBLDDIR=$(dirname $(whence $0))
 
-PATH=/usr/bin:/usr/ccs/bin:${BUILD_TOOLS:-/opt}/teamware/bin:$ONBLDDIR
-export PATH
 PROG=`basename $0`
 XREFMK=`dirname $0`/xref.mk
 XRMAKEFILE=Makefile export XRMAKEFILE
+MAKE="dmake -m serial"
 
 #
 # The CSCOPEOPTIONS variable can cause problems if it's set in the environment
@@ -163,7 +162,7 @@ if [ -z "$xrefs" ]; then
 	# Disable etags if we can't find it.
 	#
 	xrefs="cscope ctags"
-	make -e -f $XREFMK xref.etags.check 2>/dev/null 1>&2 && \
+	$MAKE -e -f $XREFMK xref.etags.check 2>/dev/null 1>&2 && \
 	    xrefs="$xrefs etags"
 else
 	oldifs=$IFS
@@ -219,7 +218,7 @@ for dir in $dirs; do
 	# to purge any crud that may be lying around from previous aborted runs.
 	#
 	if [ -z "$clobber" ]; then
-		make -e -f $XREFMK xref.clean > /dev/null
+		$MAKE -e -f $XREFMK xref.clean > /dev/null
 	fi
 
 	#
@@ -228,7 +227,7 @@ for dir in $dirs; do
 	if [ -z "$noflg" -a -z "$clobber" ]; then
 		SECONDS=0
     		info "$reldir: finding flg-related source files"
-		make -e -f $XREFMK xref.flg > /dev/null
+		$MAKE -e -f $XREFMK xref.flg > /dev/null
 		if [ $? -ne 0 ]; then
 			warn "$reldir: unable to find flg-related source files"
 		else
@@ -248,19 +247,19 @@ for dir in $dirs; do
 	for xref in $xrefs; do
 		if [ -n "$clobber" ]; then
 			info "$reldir: clobbering $xref cross-reference"
-			make -e -f $XREFMK xref.${xref}.clobber > /dev/null ||
+			$MAKE -e -f $XREFMK xref.${xref}.clobber > /dev/null ||
  			    warn "$reldir: cannot clobber $xref cross-reference"
 			continue
 		fi
 
 		SECONDS=0
 		info "$reldir: building $xref cross-reference"
-		make -e -f $XREFMK xref.${xref} > /dev/null ||
+		$MAKE -e -f $XREFMK xref.${xref} > /dev/null ||
 		    fail "$reldir: cannot build $xref cross-reference"
 		timeinfo "$reldir: built $xref cross-reference"
  	done
 
-	make -e -f $XREFMK xref.clean > /dev/null ||
+	$MAKE -e -f $XREFMK xref.clean > /dev/null ||
 	    warn "$reldir: cannot clean up temporary files"
 	cd - > /dev/null
 done

@@ -1,9 +1,10 @@
 '\" te
 .\"  Copyright (c) 2008 Sun Microsystems, Inc. All Rights Reserved
+.\"  Copyright (c) 2012 Joyent, Inc. All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH HOOK_T 9S "May 1, 2008"
+.TH HOOK_T 9S "Mar 5, 2012"
 .SH NAME
 hook_t \- callback structure for subscribing to netinfo events
 .SH SYNOPSIS
@@ -37,6 +38,16 @@ typedef int (*hook_func_t)(net_event_t token, hook_data_t info,
               void *);
 .fi
 .in -2
+
+.SS "CALLBACK RETURN VALUES"
+.sp
+.LP
+The value returned by the \fBhook_func_t\fR function indicates whether or not
+the packet should still be considered valid. If the callback function has
+modified the packet in such a way that it should no longer be processed or
+considered valid, e.g. called \fBfreemsg\fR(9F), then the callback should return
+\fB1\fR. Otherwise it should return \fB0\fR.
+.sp
 
 .SS "HINT TYPES"
 .sp

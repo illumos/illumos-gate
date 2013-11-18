@@ -23,6 +23,10 @@
  */
 
 /*
+ * Copyright 2012 Joyent, Inc.  All rights reserved.
+ */
+
+/*
  * Squeues: General purpose serialization mechanism
  * ------------------------------------------------
  *
@@ -120,6 +124,8 @@
 #include <sys/sdt.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
+#include <sys/stack.h>
+#include <sys/archsystm.h>
 
 #include <inet/ipclassifier.h>
 #include <inet/udp_impl.h>
@@ -141,6 +147,9 @@ int squeue_workerwait_ms = 0;
 /* The values above converted to ticks or nano seconds */
 static int squeue_drain_ns = 0;
 static int squeue_workerwait_tick = 0;
+
+uintptr_t squeue_drain_stack_needed = 10240;
+uint_t squeue_drain_stack_toodeep;
 
 #define	MAX_BYTES_TO_PICKUP	150000
 
@@ -711,6 +720,20 @@ squeue_drain(squeue_t *sqp, uint_t proc_type, hrtime_t expire)
 	boolean_t	did_wakeup = B_FALSE;
 	boolean_t	sq_poll_capable;
 	ip_recv_attr_t	*ira, iras;
+
+	/*
+	 * Before doing any work, check our stack depth; if we're not a
+	 * worker thread for this squeue and we're beginning to get tight on
+	 * on stack, kick the worker, bump a counter and return.
+	 */
+	if (proc_type != SQS_WORKER && STACK_BIAS + (uintptr_t)getfp() -
+	    (uintptr_t)curthread->t_stkbase < squeue_drain_stack_needed) {
+		ASSERT(mutex_owned(&sqp->sq_lock));
+		sqp->sq_awaken = ddi_get_lbolt();
+		cv_signal(&sqp->sq_worker_cv);
+		squeue_drain_stack_toodeep++;
+		return;
+	}
 
 	sq_poll_capable = (sqp->sq_state & SQS_POLL_CAPAB) != 0;
 again:

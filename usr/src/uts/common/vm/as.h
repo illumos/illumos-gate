@@ -23,6 +23,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T */
 /*	 All Rights Reserved   */
 
@@ -224,12 +228,24 @@ enum as_cbdelete_rc {
 extern struct as kas;		/* kernel's address space */
 
 /*
- * Macros for address space locking.
+ * Macros for address space locking.  Note that we use RW_READER_STARVEWRITER
+ * whenever we acquire the address space lock as reader to assure that it can
+ * be used without regard to lock order in conjunction with filesystem locks.
+ * This allows filesystems to safely induce user-level page faults with
+ * filesystem locks held while concurrently allowing filesystem entry points
+ * acquiring those same locks to be called with the address space lock held as
+ * reader.  RW_READER_STARVEWRITER thus prevents reader/reader+RW_WRITE_WANTED
+ * deadlocks in the style of fop_write()+as_fault()/as_*()+fop_putpage() and
+ * fop_read()+as_fault()/as_*()+fop_getpage().  (See the Big Theory Statement
+ * in rwlock.c for more information on the semantics of and motivation behind
+ * RW_READER_STARVEWRITER.)
  */
-#define	AS_LOCK_ENTER(as, lock, type)		rw_enter((lock), (type))
+#define	AS_LOCK_ENTER(as, lock, type)		rw_enter((lock), \
+	(type) == RW_READER ? RW_READER_STARVEWRITER : (type))
 #define	AS_LOCK_EXIT(as, lock)			rw_exit((lock))
 #define	AS_LOCK_DESTROY(as, lock)		rw_destroy((lock))
-#define	AS_LOCK_TRYENTER(as, lock, type)	rw_tryenter((lock), (type))
+#define	AS_LOCK_TRYENTER(as, lock, type)	rw_tryenter((lock), \
+	(type) == RW_READER ? RW_READER_STARVEWRITER : (type))
 
 /*
  * Macros to test lock states.

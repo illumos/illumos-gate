@@ -93,7 +93,7 @@ sortbib:=	POBJS= sortbib.o
 
 .PARALLEL: $(OBJS)
 
-all:		$(PROG) $(PROG3) $(OTXTS) $(SUBDIRS)
+all:		$(PROG) $(PROG3) $(OTXTS)
 
 $(PROG1) $(PROG3): $$(POBJS)
 		$(LINK.c) -o $@ $(POBJS) $(LDFLAGS) $(LDLIBS)

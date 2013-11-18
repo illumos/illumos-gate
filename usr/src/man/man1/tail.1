@@ -23,12 +23,12 @@ tail \- deliver the last part of a file
 
 .LP
 .nf
-\fB/usr/bin/tail\fR [\(+- \fInumber\fR [lbcf]] [\fIfile\fR]
+\fB/usr/bin/tail\fR [\(+- \fInumber\fR [lbcfF]] [\fIfile\fR]
 .fi
 
 .LP
 .nf
-\fB/usr/bin/tail\fR [\fB-lbcf\fR] [\fIfile\fR]
+\fB/usr/bin/tail\fR [\fB-lbcfF\fR] [\fIfile\fR]
 .fi
 
 .LP
@@ -92,11 +92,24 @@ Units of bytes.
 \fB\fB-f\fR \fR
 .ad
 .RS 7n
-Follow. If the input-file is not a pipe, the program does not terminate after
-the line of the input-file has been copied, but enters an endless loop, wherein
-it sleeps for a second and then attempts to read and copy further records from
-the input-file. Thus it can be used to monitor the growth of a file that is
-being written by some other process.
+Follow. If the input-file is not a pipe, \fBtail\fR does not terminate after
+the last line of the input-file has been copied, but enters an endless loop,
+wherein it watches the file for modifications and attempts to read and copy
+further records from the input-file. Thus it can be used to monitor the growth
+of a file that is being written by some other process. If the watched file is
+truncated \fBtail\fR will begin reading records from the start of the file.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-F\fR \fR
+.ad
+.RS 7n
+Follow named file. Operates as with \fB-f\fR, except that if the file is moved
+(e.g. if a watched log file is rotated) \fBtail\fR will close the original file
+and begin reading records from the start of the file with the specified name
+if and when that file is recreated.
 .RE
 
 .sp

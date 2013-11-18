@@ -28,6 +28,10 @@
  *	All rights reserved.
  */
 
+/*
+ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ */
+
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/systm.h>
@@ -1327,7 +1331,12 @@ nfs3_setattr(vnode_t *vp, struct vattr *vap, int flags, cred_t *cr,
 	if (error)
 		return (error);
 
-	return (nfs3setattr(vp, vap, flags, cr));
+	error = nfs3setattr(vp, vap, flags, cr);
+
+	if (error == 0 && (vap->va_mask & AT_SIZE) && vap->va_size == 0)
+		vnevent_truncate(vp, ct);
+
+	return (error);
 }
 
 static int
@@ -2298,6 +2307,12 @@ top:
 						vattr.va_mask = AT_SIZE;
 						error = nfs3setattr(vp,
 						    &vattr, 0, cr);
+
+						/*
+						 * Existing file was truncated;
+						 * emit a create event.
+						 */
+						vnevent_create(vp, ct);
 					}
 				}
 			}
@@ -2306,12 +2321,9 @@ top:
 		if (error) {
 			VN_RELE(vp);
 		} else {
-			/*
-			 * existing file got truncated, notify.
-			 */
-			vnevent_create(vp, ct);
 			*vpp = vp;
 		}
+
 		return (error);
 	}
 
@@ -5514,6 +5526,9 @@ nfs3_space(vnode_t *vp, int cmd, struct flock64 *bfp, int flag,
 			va.va_mask = AT_SIZE;
 			va.va_size = bfp->l_start;
 			error = nfs3setattr(vp, &va, 0, cr);
+
+			if (error == 0 && bfp->l_start == 0)
+				vnevent_truncate(vp, ct);
 		} else
 			error = EINVAL;
 	}

@@ -254,6 +254,8 @@ sqset_lock
 squeue_cache
 squeue_drain_ms
 squeue_drain_ns
+squeue_drain_stack_needed
+squeue_drain_stack_toodeep
 squeue_workerwait_ms
 squeue_workerwait_tick
 tcp_acceptor_rinit

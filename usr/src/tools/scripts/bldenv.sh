@@ -273,6 +273,13 @@ if [[ "${SUNWSPRO}" != "" ]]; then
 	export PATH="${SUNWSPRO}/bin:$PATH" 
 fi 
 
+if [[ -x "${MAKE}" ]]; then
+	export PATH="$(dirname -- "${MAKE}"):$PATH"
+else
+	print "\$MAKE points to garbage"
+	exit 1	
+fi
+
 TOOLS="${SRC}/tools"
 TOOLS_PROTO="${TOOLS}/proto/root_${MACH}-nd" ; export TOOLS_PROTO
 

@@ -578,17 +578,16 @@ sdev_access(struct vnode *vp, int mode, int flags, struct cred *cr,
 	struct sdev_node	*dv = VTOSDEV(vp);
 	int ret = 0;
 
+	rw_enter(&dv->sdev_contents, RW_READER);
 	ASSERT(dv->sdev_attr || dv->sdev_attrvp);
-
 	if (dv->sdev_attrvp) {
 		ret = VOP_ACCESS(dv->sdev_attrvp, mode, flags, cr, ct);
 	} else if (dv->sdev_attr) {
-		rw_enter(&dv->sdev_contents, RW_READER);
 		ret = sdev_unlocked_access(dv, mode, cr);
 		if (ret)
 			ret = EACCES;
-		rw_exit(&dv->sdev_contents);
 	}
+	rw_exit(&dv->sdev_contents);
 
 	return (ret);
 }

@@ -23,6 +23,10 @@
  * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
+/*
+ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ */
+
 #include <sys/types.h>
 #include <sys/t_lock.h>
 #include <sys/param.h>
@@ -564,6 +568,9 @@ udf_setattr(
 		if (error = ud_itrunc(ip, vap->va_size, 0, cr)) {
 			goto update_inode;
 		}
+
+		if (vap->va_size == 0)
+			vnevent_truncate(vp, ct);
 	}
 	/*
 	 * Change file access or modified times.
@@ -1621,6 +1628,9 @@ udf_space(
 		error =  EINVAL;
 	} else if ((error = convoff(vp, bfp, 0, offset)) == 0) {
 		error = ud_freesp(vp, bfp, flag, cr);
+
+		if (error == 0 && bfp->l_start == 0)
+			vnevent_truncate(vp, ct);
 	}
 
 	return (error);

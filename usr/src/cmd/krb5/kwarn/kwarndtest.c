@@ -1,9 +1,9 @@
 /*
  * Copyright 1995-2002 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2013 Nexenta Systems. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Test client for kwarnd.  This program is not shipped on the binary
@@ -95,8 +95,7 @@ do_kwarndtest(char *buf)
 
 	if (argc == 0) {
 		usage();
-		/*LINTED*/
-		FREE(argv_array, (argc+1)*sizeof (char *));
+		FREE(argv, (argc+1)*sizeof (char *));
 		return (0);
 	}
 
@@ -116,7 +115,7 @@ do_kwarndtest(char *buf)
 	    strcmp(cmd, "add") == 0) {
 		_kwarnd_add_warning(argc, argv);
 	} else if (strcmp(cmd, "kwarn_del_warning") == 0 ||
-		strcmp(cmd, "delete") == 0) {
+	    strcmp(cmd, "delete") == 0) {
 		_kwarnd_del_warning(argc, argv);
 	} else if (strcmp(cmd, "exit") == 0) {
 		printf(gettext("\n"));
@@ -159,10 +158,10 @@ _kwarnd_add_warning(int argc, char **argv)
 	if (status == 0) {
 		printf(gettext("\nadd of credential\n\n"));
 		printf(gettext("warning message successful for \"%s\"\n\n"),
-			argv[0]);
+		    argv[0]);
 	} else {
 		printf(gettext("server ret err (octal) %o (%s)\n"),
-			status, gettext("add warning error"));
+		    status, gettext("add warning error"));
 	}
 
 	return;
@@ -183,11 +182,11 @@ _kwarnd_del_warning(int argc, char **argv)
 
 	if (status == 0) {
 		printf(gettext("delete of principal warning message"
-				"for %s successful"),
-			argv[0]);
+		    "for %s successful"),
+		    argv[0]);
 	} else {
 		printf(gettext("delete of principal %s unsuccessful\n\n"),
-			argv[0]);
+		    argv[0]);
 	}
 }
 
@@ -195,7 +194,7 @@ static void
 instructs(void)
 {
 	fprintf(stderr,
-		gettext(
+	    gettext(
 "\nThis program will test kwarnd.  kwarnd must be running as root. Enter\n"
 "the desired command and the principal to be added/deleted. If adding a\n"
 "principal, also include the expiration time in seconds.\n"));
@@ -205,10 +204,10 @@ static void
 usage(void)
 {
 	fprintf(stderr,
-		gettext(
-		"\nusage:\t[kwarn_add_warning | add] (principal) (exptime)\n"
-		"\t[kwarn_del_warning | delete] (principal)\n"
-		"\texit\n\n"));
+	    gettext(
+	    "\nusage:\t[kwarn_add_warning | add] (principal) (exptime)\n"
+	    "\t[kwarn_del_warning | delete] (principal)\n"
+	    "\texit\n\n"));
 }
 
 /* Copied from parse_argv(), then modified */

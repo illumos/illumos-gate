@@ -931,8 +931,6 @@ getproc(proc_t **cpp, pid_t pid, uint_t flags)
 	zone_t		*zone;
 	int		rctlfail = 0;
 
-	if (!page_mem_avail(tune.t_minarmem))
-		return (-1);
 	if (zone_status_get(curproc->p_zone) >= ZONE_IS_SHUTTING_DOWN)
 		return (-1);	/* no point in starting new processes */
 

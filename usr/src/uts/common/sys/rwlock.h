@@ -23,10 +23,12 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
+ */
+
 #ifndef _SYS_RWLOCK_H
 #define	_SYS_RWLOCK_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Public interface to readers/writer locks.  See rwlock(9F) for details.
@@ -47,7 +49,8 @@ typedef enum {
 
 typedef enum {
 	RW_WRITER,
-	RW_READER
+	RW_READER,
+	RW_READER_STARVEWRITER
 } krw_t;
 
 typedef struct _krwlock {
