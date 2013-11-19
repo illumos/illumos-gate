@@ -22,10 +22,11 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- */
-/*
+ *
  * Copyright (c) 2010, Intel Corporation.
  * All rights reserved.
+ *
+ * Copyright 2013 Joyent, Inc.  All rights reserved.
  */
 
 /*
@@ -66,6 +67,7 @@
 #include <sys/kobj.h>
 #include <sys/kobj_lex.h>
 #include <sys/pci_cfgspace_impl.h>
+#include <sys/fastboot_impl.h>
 #include "acpi_fw.h"
 
 static int have_console = 0;	/* set once primitive console is initialized */
@@ -664,7 +666,7 @@ boot_prop_finish(void)
 	}
 done:
 	if (fd >= 0)
-		BRD_CLOSE(bfs_ops, fd);
+		(void) BRD_CLOSE(bfs_ops, fd);
 
 	/*
 	 * Check if we have to limit the boot time allocator
@@ -1164,10 +1166,12 @@ build_boot_properties(void)
 	int name_len;
 	char *value;
 	int value_len;
-	struct boot_modules *bm;
+	struct boot_modules *bm, *rdbm;
 	char *propbuf;
 	int quoted = 0;
 	int boot_arg_len;
+	uint_t i, midx;
+	char modid[32];
 #ifndef __xpv
 	static int stdout_val = 0;
 	uchar_t boot_device;
@@ -1185,9 +1189,40 @@ build_boot_properties(void)
 	DBG((uintptr_t)propbuf);
 	if (xbootp->bi_module_cnt > 0) {
 		bm = xbootp->bi_modules;
-		bsetprop64("ramdisk_start", (uint64_t)(uintptr_t)bm->bm_addr);
-		bsetprop64("ramdisk_end", (uint64_t)(uintptr_t)bm->bm_addr +
-		    bm->bm_size);
+		rdbm = NULL;
+		for (midx = i = 0; i < xbootp->bi_module_cnt; i++) {
+			if (bm[i].bm_type == BMT_ROOTFS) {
+				rdbm = &bm[i];
+				continue;
+			}
+			if (bm[i].bm_type == BMT_HASH || bm[i].bm_name == NULL)
+				continue;
+
+			(void) snprintf(modid, sizeof (modid),
+			    "module-name-%u", midx);
+			bsetprops(modid, (char *)bm[i].bm_name);
+			(void) snprintf(modid, sizeof (modid),
+			    "module-addr-%u", midx);
+			bsetprop64(modid, (uint64_t)(uintptr_t)bm[i].bm_addr);
+			(void) snprintf(modid, sizeof (modid),
+			    "module-size-%u", midx);
+			bsetprop64(modid, (uint64_t)bm[i].bm_size);
+			++midx;
+		}
+		if (rdbm != NULL) {
+			bsetprop64("ramdisk_start",
+			    (uint64_t)(uintptr_t)rdbm->bm_addr);
+			bsetprop64("ramdisk_end",
+			    (uint64_t)(uintptr_t)rdbm->bm_addr + rdbm->bm_size);
+		}
+	}
+
+	/*
+	 * If there are any boot time modules or hashes present, then disable
+	 * fast reboot.
+	 */
+	if (xbootp->bi_module_cnt > 1) {
+		fastreboot_disable(FBNS_BOOTMOD);
 	}
 
 	DBG_MSG("Parsing command line for boot properties\n");
