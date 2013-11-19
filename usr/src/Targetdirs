@@ -203,6 +203,7 @@ DIRS= \
 	/root  \
 	/sbin  \
 	/system \
+	/system/boot \
 	/system/contract \
 	/system/object \
 	/tmp \

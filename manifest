@@ -1850,6 +1850,7 @@ f sbin/zfs 0555 root bin
 f sbin/zonename 0555 root bin
 f sbin/zpool 0555 root bin
 d system 0755 root root
+d system/boot 0755 root root
 d system/contract 0555 root root
 d system/object 0555 root root
 d tmp 1777 root root
