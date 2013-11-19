@@ -91,7 +91,7 @@ static int mptsas_get_raid_wwid(mptsas_t *mpt, mptsas_raidvol_t *raidvol);
 
 extern int mptsas_check_dma_handle(ddi_dma_handle_t handle);
 extern int mptsas_check_acc_handle(ddi_acc_handle_t handle);
-extern mptsas_target_t *mptsas_tgt_alloc(mptsas_hash_table_t *, uint16_t,
+extern mptsas_target_t *mptsas_tgt_alloc(mptsas_t *, uint16_t,
     uint64_t, uint32_t, mptsas_phymask_t, uint8_t);
 
 static int
@@ -110,7 +110,6 @@ mptsas_raidconf_page_0_cb(mptsas_t *mpt, caddr_t page_memp,
 	uint16_t elementtype, voldevhandle;
 	uint16_t etype_vol, etype_pd, etype_hs;
 	uint16_t etype_oce;
-	mptsas_slots_t *slots = mpt->m_active;
 	m_raidconfig_t *raidconfig;
 	uint64_t raidwwn;
 	uint32_t native;
@@ -148,8 +147,8 @@ mptsas_raidconf_page_0_cb(mptsas_t *mpt, caddr_t page_memp,
 	 * Point to the right config in the structure.
 	 * Increment the number of valid RAID configs.
 	 */
-	raidconfig = &slots->m_raidconfig[configindex];
-	slots->m_num_raid_configs++;
+	raidconfig = &mpt->m_raidconfig[configindex];
+	mpt->m_num_raid_configs++;
 
 	/*
 	 * Set the native flag if this is not a foreign
@@ -216,7 +215,7 @@ mptsas_raidconf_page_0_cb(mptsas_t *mpt, caddr_t page_memp,
 			/*
 			 * RAID uses phymask of 0.
 			 */
-			ptgt = mptsas_tgt_alloc(&slots->m_tgttbl,
+			ptgt = mptsas_tgt_alloc(mpt,
 			    voldevhandle, raidwwn, 0, 0, 0);
 
 			raidconfig->m_raidvol[vol].m_raidtgt =
@@ -258,15 +257,14 @@ mptsas_get_raid_info(mptsas_t *mpt)
 	int rval = DDI_SUCCESS;
 	uint32_t confignum, pageaddress;
 	uint8_t configindex;
-	mptsas_slots_t *slots = mpt->m_active;
 
 	ASSERT(mutex_owned(&mpt->m_mutex));
 
 	/*
 	 * Clear all RAID info before starting.
 	 */
-	bzero(slots->m_raidconfig, sizeof (slots->m_raidconfig));
-	slots->m_num_raid_configs = 0;
+	bzero(mpt->m_raidconfig, sizeof (mpt->m_raidconfig));
+	mpt->m_num_raid_configs = 0;
 
 	configindex = 0;
 	confignum = 0xff;
@@ -586,10 +584,10 @@ mptsas_raid_action_system_shutdown(mptsas_t *mpt)
 	 * supports IR and make sure there is a valid volume for the request.
 	 */
 	if (mpt->m_ir_capable) {
-		for (config = 0; (config < slots->m_num_raid_configs) &&
+		for (config = 0; (config < mpt->m_num_raid_configs) &&
 		    (!ir_active); config++) {
 			for (vol = 0; vol < MPTSAS_MAX_RAIDVOLS; vol++) {
-				if (slots->m_raidconfig[config].m_raidvol[vol].
+				if (mpt->m_raidconfig[config].m_raidvol[vol].
 				    m_israid) {
 					ir_active = TRUE;
 					break;
@@ -758,12 +756,11 @@ int
 mptsas_delete_volume(mptsas_t *mpt, uint16_t volid)
 {
 	int		config, i = 0, vol = (-1);
-	mptsas_slots_t	*slots = mpt->m_active;
 
-	for (config = 0; (config < slots->m_num_raid_configs) && (vol != i);
+	for (config = 0; (config < mpt->m_num_raid_configs) && (vol != i);
 	    config++) {
 		for (i = 0; i < MPTSAS_MAX_RAIDVOLS; i++) {
-			if (slots->m_raidconfig[config].m_raidvol[i].
+			if (mpt->m_raidconfig[config].m_raidvol[i].
 			    m_raidhandle == volid) {
 				vol = i;
 				break;
@@ -777,11 +774,11 @@ mptsas_delete_volume(mptsas_t *mpt, uint16_t volid)
 		return (-1);
 	}
 
-	slots->m_raidconfig[config].m_raidvol[vol].m_israid = 0;
-	slots->m_raidconfig[config].m_raidvol[vol].m_ndisks = 0;
+	mpt->m_raidconfig[config].m_raidvol[vol].m_israid = 0;
+	mpt->m_raidconfig[config].m_raidvol[vol].m_ndisks = 0;
 	for (i = 0; i < MPTSAS_MAX_DISKS_IN_VOL; i++) {
-		slots->m_raidconfig[config].m_raidvol[vol].m_disknum[i] = 0;
-		slots->m_raidconfig[config].m_raidvol[vol].m_devhdl[i] = 0;
+		mpt->m_raidconfig[config].m_raidvol[vol].m_disknum[i] = 0;
+		mpt->m_raidconfig[config].m_raidvol[vol].m_devhdl[i] = 0;
 	}
 
 	return (0);

@@ -59,6 +59,7 @@
 #include <sys/isa_defs.h>
 #include <sys/sunmdi.h>
 #include <sys/mdi_impldefs.h>
+#include <sys/scsi/adapters/mpt_sas/mptsas_hash.h>
 #include <sys/scsi/adapters/mpt_sas/mptsas_ioctl.h>
 #include <sys/scsi/adapters/mpt_sas/mpi/mpi2_tool.h>
 #include <sys/scsi/adapters/mpt_sas/mpi/mpi2_cnfg.h>
@@ -88,6 +89,15 @@ typedef uint16_t		mptsas_phymask_t;
 
 #define	MPTSAS_INVALID_DEVHDL	0xffff
 #define	MPTSAS_SATA_GUID	"sata-guid"
+
+/*
+ * Hash table sizes for SMP targets (i.e., expanders) and ordinary SSP/STP
+ * targets.  There's no need to go overboard here, as the ordinary paths for
+ * I/O do not normally require hashed target lookups.  These should be good
+ * enough and then some for any fabric within the hardware's capabilities.
+ */
+#define	MPTSAS_SMP_BUCKET_COUNT		23
+#define	MPTSAS_TARGET_BUCKET_COUNT	97
 
 /*
  * MPT HW defines
@@ -185,14 +195,15 @@ typedef	struct NcrTableIndirect {	/* Table Indirect entries */
 #define	MPTSAS_RAID_WWID(wwid) \
 	((wwid & 0x0FFFFFFFFFFFFFFF) | 0x3000000000000000)
 
+typedef struct mptsas_target_addr {
+	uint64_t mta_wwn;
+	mptsas_phymask_t mta_phymask;
+} mptsas_target_addr_t;
+
 typedef	struct mptsas_target {
-		uint64_t		m_sas_wwn;	/* hash key1 */
-		mptsas_phymask_t	m_phymask;	/* hash key2 */
-		/*
-		 * m_dr_flag is a flag for DR, make sure the member
-		 * take the place of dr_flag of mptsas_hash_data.
-		 */
-		uint8_t			m_dr_flag;	/* dr_flag */
+		mptsas_target_addr_t	m_addr;
+		refhash_link_t		m_link;
+		uint8_t			m_dr_flag;
 		uint16_t		m_devhdl;
 		uint32_t		m_deviceinfo;
 		uint8_t			m_phynum;
@@ -214,22 +225,13 @@ typedef	struct mptsas_target {
 } mptsas_target_t;
 
 typedef struct mptsas_smp {
-	uint64_t	m_sasaddr;	/* hash key1 */
-	mptsas_phymask_t m_phymask;	/* hash key2 */
-	uint8_t		reserved1;
-	uint16_t	m_devhdl;
-	uint32_t	m_deviceinfo;
-	uint16_t	m_pdevhdl;
-	uint32_t	m_pdevinfo;
+	mptsas_target_addr_t	m_addr;
+	refhash_link_t		m_link;
+	uint16_t		m_devhdl;
+	uint32_t		m_deviceinfo;
+	uint16_t		m_pdevhdl;
+	uint32_t		m_pdevinfo;
 } mptsas_smp_t;
-
-typedef struct mptsas_hash_data {
-	uint64_t	key1;
-	mptsas_phymask_t key2;
-	uint8_t		dr_flag;
-	uint16_t	devhdl;
-	uint32_t	device_info;
-} mptsas_hash_data_t;
 
 typedef struct mptsas_cache_frames {
 	ddi_dma_handle_t m_dma_hdl;
@@ -445,17 +447,24 @@ typedef struct mptsas_raidconfig {
 } m_raidconfig_t;
 
 /*
- * Structure to hold active outstanding cmds.  Also, keep
- * timeout on a per target basis.
+ * Track outstanding commands.  The index into the m_slot array is the SMID
+ * (system message ID) of the outstanding command.  SMID 0 is reserved by the
+ * software/firmware protocol and is never used for any command we generate;
+ * as such, the assertion m_slot[0] == NULL is universally true.  The last
+ * entry in the array is slot number MPTSAS_TM_SLOT(mpt) and is used ONLY for
+ * task management commands.  No normal SCSI or ATA command will ever occupy
+ * that slot.  Finally, the relationship m_slot[X]->cmd_slot == X holds at any
+ * time that a consistent view of the target array is obtainable.
+ *
+ * As such, m_n_normal is the maximum number of slots available to ordinary
+ * commands, and the relationship:
+ * mpt->m_active->m_n_normal == mpt->m_max_requests - 2
+ * always holds after initialisation.
  */
 typedef struct mptsas_slots {
-	mptsas_hash_table_t	m_tgttbl;
-	mptsas_hash_table_t	m_smptbl;
-	m_raidconfig_t		m_raidconfig[MPTSAS_MAX_RAIDCONFIGS];
-	uint8_t			m_num_raid_configs;
-	uint16_t		m_tags;
-	size_t			m_size;
-	uint16_t		m_n_slots;
+	size_t			m_size;		/* size of struct, bytes */
+	uint_t			m_n_normal;	/* see above */
+	uint_t			m_rotor;	/* next slot idx to consider */
 	mptsas_cmd_t		*m_slot[1];
 } mptsas_slots_t;
 
@@ -672,6 +681,12 @@ typedef struct mptsas {
 	 * soft state flags
 	 */
 	uint_t		m_softstate;
+
+	refhash_t	*m_targets;
+	refhash_t	*m_smp_targets;
+
+	m_raidconfig_t	m_raidconfig[MPTSAS_MAX_RAIDCONFIGS];
+	uint8_t		m_num_raid_configs;
 
 	struct mptsas_slots *m_active;	/* outstanding cmds */
 
