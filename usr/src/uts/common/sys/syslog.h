@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2013 Gary Mills
  * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -19,8 +20,6 @@
 #ifndef	_SYS_SYSLOG_H
 #define	_SYS_SYSLOG_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -37,9 +36,13 @@ extern "C" {
 #define	LOG_LPR		(6<<3)	/* line printer subsystem */
 #define	LOG_NEWS	(7<<3)	/* netnews subsystem */
 #define	LOG_UUCP	(8<<3)	/* uucp subsystem */
+#define	LOG_ALTCRON	(9<<3)	/* BSD cron/at subsystem */
+#define	LOG_AUTHPRIV	(10<<3)	/* BSD security/authorization messages */
+#define	LOG_FTP		(11<<3)	/* file transfer subsystem */
+#define	LOG_NTP		(12<<3)	/* network time subsystem */
 #define	LOG_AUDIT	(13<<3) /* audit subsystem */
+#define	LOG_CONSOLE	(14<<3) /* BSD console messages */
 #define	LOG_CRON	(15<<3)	/* cron/at subsystem */
-	/* other codes through 15 reserved for system use */
 #define	LOG_LOCAL0	(16<<3)	/* reserved for local use */
 #define	LOG_LOCAL1	(17<<3)	/* reserved for local use */
 #define	LOG_LOCAL2	(18<<3)	/* reserved for local use */

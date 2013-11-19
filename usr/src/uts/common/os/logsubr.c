@@ -20,6 +20,7 @@
  */
 
 /*
+ * Copyright (c) 2013 Gary Mills
  * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -73,8 +74,8 @@ static char log_pri[LOG_PRIMASK + 1][LOG_PRISIZE] = {
 static char log_fac[LOG_NFACILITIES + 1][LOG_FACSIZE] = {
 	"kern",		"user",		"mail",		"daemon",
 	"auth",		"syslog",	"lpr",		"news",
-	"uucp",		"resv9",	"resv10",	"resv11",
-	"resv12",	"audit",	"resv14",	"cron",
+	"uucp",		"altcron",	"authpriv",	"ftp",
+	"ntp",		"audit",	"console",	"cron",
 	"local0",	"local1",	"local2",	"local3",
 	"local4",	"local5",	"local6",	"local7",
 	"unknown"
