@@ -21,7 +21,7 @@
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  *
- * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <sys/cpuvar.h>
@@ -2171,6 +2171,18 @@ void
 iscsit_deferred_dispatch(idm_pdu_t *rx_pdu)
 {
 	iscsit_conn_t *ict = rx_pdu->isp_ic->ic_handle;
+
+	/*
+	 * If this isn't a login packet, we need a session.  Otherwise
+	 * this is a protocol error (perhaps one IDM should've caught?).
+	 */
+	if (IDM_PDU_OPCODE(rx_pdu) != ISCSI_OP_LOGIN_CMD &&
+	    ict->ict_sess == NULL) {
+		DTRACE_PROBE2(iscsi__idm__deferred__no__session,
+		    iscsit_conn_t *, ict, idm_pdu_t *, rx_pdu);
+		idm_pdu_complete(rx_pdu, IDM_STATUS_FAIL);
+		return;
+	}
 
 	/*
 	 * If the connection has been lost then ignore new PDU's

@@ -26,6 +26,10 @@
  */
 
 /*
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ */
+
+/*
  * GPL Disclaimer
  *
  * For the avoidance of doubt, except that if any license choice other
@@ -203,6 +207,7 @@ pt_display_setup(boolean_t resized)
 	if (event_lines > 0) {
 		sw[SW_EVENTS] = subwin(stdscr, event_lines, win_cols, pos_y, 0);
 	} else {
+		pt_display_cleanup();
 		(void) printf("\n\nPowerTOP cannot run in such a small "
 		    "terminal window, please resize it.\n\n");
 		exit(EXIT_FAILURE);
