@@ -1130,6 +1130,10 @@ file path=opt/SUNWdtrt/tst/common/pid/tst.ret1.d mode=0444
 file path=opt/SUNWdtrt/tst/common/pid/tst.ret1.exe mode=0555
 file path=opt/SUNWdtrt/tst/common/pid/tst.ret2.d mode=0444
 file path=opt/SUNWdtrt/tst/common/pid/tst.ret2.exe mode=0555
+file path=opt/SUNWdtrt/tst/common/pid/tst.utf8probefunc.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/pid/tst.utf8probefunc.ksh.out mode=0444
+file path=opt/SUNWdtrt/tst/common/pid/tst.utf8probemod.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/pid/tst.utf8probemod.ksh.out mode=0444
 file path=opt/SUNWdtrt/tst/common/pid/tst.vfork.d mode=0444
 file path=opt/SUNWdtrt/tst/common/pid/tst.vfork.exe mode=0555
 file path=opt/SUNWdtrt/tst/common/pid/tst.weak1.d mode=0444
