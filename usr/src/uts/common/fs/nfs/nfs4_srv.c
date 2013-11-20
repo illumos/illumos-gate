@@ -20,8 +20,8 @@
  */
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -7925,6 +7925,22 @@ out:
 	    OPEN_DOWNGRADE4res *, resp);
 }
 
+static void *
+memstr(const void *s1, const char *s2, size_t n)
+{
+	size_t l = strlen(s2);
+	char *p = (char *)s1;
+
+	while (n >= l) {
+		if (bcmp(p, s2, l) == 0)
+			return (p);
+		p++;
+		n--;
+	}
+
+	return (NULL);
+}
+
 /*
  * The logic behind this function is detailed in the NFSv4 RFC in the
  * SETCLIENTID operation description under IMPLEMENTATION.  Refer to
@@ -7957,8 +7973,8 @@ retry:
 	/*
 	 * Record if it is a Solaris client that cannot handle referrals.
 	 */
-	if (strstr(args->client.id_val, "Solaris") &&
-	    !strstr(args->client.id_val, "+referrals")) {
+	if (memstr(args->client.id_val, "Solaris", args->client.id_len) &&
+	    !memstr(args->client.id_val, "+referrals", args->client.id_len)) {
 		/* Add a "yes, it's downrev" record */
 		create = TRUE;
 		ci = rfs4_find_clntip(args->client.cl_addr, &create);
