@@ -579,7 +579,6 @@ port_fop_femuninstall(vnode_t *vp)
 		 */
 		(void) fem_uninstall(vp, (fem_t *)pvp->pvp_femp, vp);
 		pvp->pvp_femp = NULL;
-		mutex_exit(&pvp->pvp_mutex);
 
 
 		/*
@@ -602,9 +601,8 @@ port_fop_femuninstall(vnode_t *vp)
 		} else {
 			mutex_exit(mtx);
 		}
-	} else {
-		mutex_exit(&pvp->pvp_mutex);
 	}
+	mutex_exit(&pvp->pvp_mutex);
 	return (ret);
 }
 
