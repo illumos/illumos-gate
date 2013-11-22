@@ -554,6 +554,11 @@ sdev_setsecattr(struct vnode *vp, struct vsecattr *vsap, int flags,
 	return (error);
 }
 
+/*
+ * There are two different unlocked routines. This one is not static as it is
+ * used as part of the secpolicy_vnode_setattr calls in sdev_subr.c. Because it
+ * is used in that function it has to have a specific signature.
+ */
 int
 sdev_unlocked_access(void *vdv, int mode, struct cred *cr)
 {
@@ -572,13 +577,11 @@ sdev_unlocked_access(void *vdv, int mode, struct cred *cr)
 }
 
 static int
-sdev_access(struct vnode *vp, int mode, int flags, struct cred *cr,
+sdev_self_access(sdev_node_t *dv, int mode, int flags, struct cred *cr,
     caller_context_t *ct)
 {
-	struct sdev_node	*dv = VTOSDEV(vp);
-	int ret = 0;
+	int ret;
 
-	rw_enter(&dv->sdev_contents, RW_READER);
 	ASSERT(dv->sdev_attr || dv->sdev_attrvp);
 	if (dv->sdev_attrvp) {
 		ret = VOP_ACCESS(dv->sdev_attrvp, mode, flags, cr, ct);
@@ -587,6 +590,19 @@ sdev_access(struct vnode *vp, int mode, int flags, struct cred *cr,
 		if (ret)
 			ret = EACCES;
 	}
+
+	return (ret);
+}
+
+static int
+sdev_access(struct vnode *vp, int mode, int flags, struct cred *cr,
+    caller_context_t *ct)
+{
+	struct sdev_node *dv = VTOSDEV(vp);
+	int ret;
+
+	rw_enter(&dv->sdev_contents, RW_READER);
+	ret = sdev_self_access(dv, mode, flags, cr, ct);
 	rw_exit(&dv->sdev_contents);
 
 	return (ret);
@@ -772,7 +788,7 @@ sdev_remove(struct vnode *dvp, char *nm, struct cred *cred,
 	}
 
 	/* execute access is required to search the directory */
-	if ((error = VOP_ACCESS(dvp, VEXEC, 0, cred, ct)) != 0) {
+	if ((error = sdev_self_access(parent, VEXEC, 0, cred, ct)) != 0) {
 		rw_exit(&parent->sdev_contents);
 		return (error);
 	}
@@ -793,7 +809,7 @@ sdev_remove(struct vnode *dvp, char *nm, struct cred *cred,
 	}
 
 	/* write access is required to remove an entry */
-	if ((error = VOP_ACCESS(dvp, VWRITE, 0, cred, ct)) != 0) {
+	if ((error = sdev_self_access(parent, VWRITE, 0, cred, ct)) != 0) {
 		rw_exit(&parent->sdev_contents);
 		VN_RELE(vp);
 		return (error);
