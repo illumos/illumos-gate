@@ -22,7 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
  */
 
 #include <sys/param.h>
@@ -206,7 +206,6 @@ void
 netstack_unregister(int moduleid)
 {
 	netstack_t *ns;
-	boolean_t created = B_FALSE;
 
 	ASSERT(moduleid >= 0 && moduleid < NS_MAX);
 
@@ -222,6 +221,7 @@ netstack_unregister(int moduleid)
 	 * instances can use this module.
 	 */
 	for (ns = netstack_head; ns != NULL; ns = ns->netstack_next) {
+		boolean_t created = B_FALSE;
 		nm_state_t *nms = &ns->netstack_m_state[moduleid];
 
 		mutex_enter(&ns->netstack_lock);
