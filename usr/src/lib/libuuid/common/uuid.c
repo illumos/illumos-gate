@@ -22,6 +22,7 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2012 Milan Jurik. All rights reserved.
+ * Copyright 2013 Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -73,6 +74,16 @@ static	uuid_node_t	node_id_cache;
 static	int		node_init;
 static	int		file_type;
 static	int		fd;
+
+/*
+ * The urandmtx mutex prevents multiple opens of /dev/urandom and protects the
+ * cache.
+ */
+#define	RCACHE_SIZE	65535
+static	mutex_t		urandmtx;
+static	int		fd_urand = -1;
+static	char		rcache[RCACHE_SIZE];
+static	char		*rcachep = rcache;
 
 /*
  * misc routines
@@ -312,42 +323,77 @@ uuid_print(struct uuid u)
 }
 
 /*
+ * Only called with urandmtx held.
+ * Fills/refills the cache of randomness. We know that our allocations of
+ * randomness are always much less than the total size of the cache.
+ * Tries to use /dev/urandom random number generator - if that fails for some
+ * reason, it retries MAX_RETRY times then sets rcachep to NULL so we no
+ * longer use the cache.
+ */
+static void
+load_cache()
+{
+	int i, retries = 0;
+	int nbytes = RCACHE_SIZE;
+	char *buf = rcache;
+
+	while (nbytes > 0) {
+		i = read(fd_urand, buf, nbytes);
+		if ((i < 0) && (errno == EINTR)) {
+			continue;
+		}
+		if (i <= 0) {
+			if (retries++ == MAX_RETRY)
+				break;
+			continue;
+		}
+		nbytes -= i;
+		buf += i;
+		retries = 0;
+	}
+	if (nbytes == 0)
+		rcachep = rcache;
+	else
+		rcachep = NULL;
+}
+
+/*
  * Fills buf with random numbers - nbytes is the number of bytes
- * to fill-in. Tries to use /dev/urandom random number generator-
- * if that fails for some reason, it retries MAX_RETRY times. If
- * it still fails then it uses srand48(3C)
+ * to fill-in. Tries to use cached data from the /dev/urandom random number
+ * generator - if that fails for some reason, it uses srand48(3C)
  */
 static void
 fill_random_bytes(uchar_t *buf, int nbytes)
 {
-	int i, fd, retries = 0;
+	int i;
 
-	fd = open(URANDOM_PATH, O_RDONLY);
-	if (fd >= 0) {
-		while (nbytes > 0) {
-			i = read(fd, buf, nbytes);
-			if ((i < 0) && (errno == EINTR)) {
-				continue;
-			}
-			if (i <= 0) {
-				if (retries++ == MAX_RETRY)
-					break;
-				continue;
-			}
-			nbytes -= i;
-			buf += i;
-			retries = 0;
+	if (fd_urand == -1) {
+		(void) mutex_lock(&urandmtx);
+		/* check again now that we have the mutex */
+		if (fd_urand == -1) {
+			if ((fd_urand = open(URANDOM_PATH, O_RDONLY)) >= 0)
+				load_cache();
 		}
-		if (nbytes == 0) {
-			(void) close(fd);
+		(void) mutex_unlock(&urandmtx);
+	}
+	if (fd_urand >= 0 && rcachep != NULL) {
+		int cnt;
+
+		(void) mutex_lock(&urandmtx);
+		if (rcachep != NULL &&
+		    (rcachep + nbytes) >= (rcache + RCACHE_SIZE))
+			load_cache();
+
+		if (rcachep != NULL) {
+			for (cnt = 0; cnt < nbytes; cnt++)
+				*buf++ = *rcachep++;
+			(void) mutex_unlock(&urandmtx);
 			return;
 		}
+		(void) mutex_unlock(&urandmtx);
 	}
 	for (i = 0; i < nbytes; i++) {
 		*buf++ = get_random() & 0xFF;
-	}
-	if (fd >= 0) {
-		(void) close(fd);
 	}
 }
 
@@ -490,14 +536,19 @@ uuid_generate_time(uuid_t uu)
 void
 uuid_generate(uuid_t uu)
 {
-	int fd;
-
 	if (uu == NULL) {
 		return;
 	}
-	fd = open(URANDOM_PATH, O_RDONLY);
-	if (fd >= 0) {
-		(void) close(fd);
+	if (fd_urand == -1) {
+		(void) mutex_lock(&urandmtx);
+		/* check again now that we have the mutex */
+		if (fd_urand == -1) {
+			if ((fd_urand = open(URANDOM_PATH, O_RDONLY)) >= 0)
+				load_cache();
+		}
+		(void) mutex_unlock(&urandmtx);
+	}
+	if (fd_urand >= 0) {
 		uuid_generate_random(uu);
 	} else {
 		(void) uuid_generate_time(uu);
