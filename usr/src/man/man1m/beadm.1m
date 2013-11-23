@@ -1,6 +1,6 @@
 '\" te
 .\" Copyright 2013 Nexenta Systems, Inc. All rights reserved.
-.TH BEADM 1M "Jul 25, 2013"
+.TH BEADM 1M "Nov 11, 2013"
 .SH NAME
 beadm \- utility for managing zfs boot environments
 .SH SYNOPSIS
@@ -29,7 +29,7 @@ beadm \- utility for managing zfs boot environments
 
 .LP
 .nf
-\fBbeadm\fR \fBmount\fR [\fB-v\fR] \fIbeName\fR \fImountpoint\fR
+\fBbeadm\fR \fBmount\fR [\fB-s\fR \fBro\fR|\fBrw\fR] [\fB-v\fR] \fIbeName\fR \fImountpoint\fR
 .fi
 
 .LP
@@ -407,12 +407,21 @@ Verbose mode. Displays verbose error messages from \fBbeadm\fR.
 .sp
 .ne 2
 .na
-\fBbeadm\fR \fBmount\fR [\fB-v\fR] \fIbeName\fR \fImountpoint\fR
+\fBbeadm\fR \fBmount\fR [\fB-s\fR \fBro\fR|\fBrw\fR] [\fB-v\fR] \fIbeName\fR \fImountpoint\fR
 .ad
 .sp .6
 .RS 4n
 Mounts a boot environment named beName at mountpoint.  mountpoint must be an
 already existing empty directory.
+.sp
+.ne 2
+.na
+\fB-s\fR \fBro\fR|\fBrw\fR
+.ad
+.sp .6
+.RS 4n
+Mount the shared filesystems of the BE in read-only or read-write mode.
+.RE
 .sp
 .ne 2
 .na

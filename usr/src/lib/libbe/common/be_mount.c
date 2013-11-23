@@ -382,12 +382,8 @@ _be_mount(char *be_name, char **altroot, int flags)
 	if (getzoneid() == GLOBAL_ZONEID &&
 	    !(flags & BE_MOUNT_FLAG_NO_ZONES) &&
 	    be_get_uuid(bt.obe_root_ds, &uu) == BE_SUCCESS) {
-		if ((ret = be_mount_zones(zhp, &md)) != BE_SUCCESS) {
-			(void) _be_unmount(bt.obe_name, 0);
-			if (gen_tmp_altroot)
-				free(tmp_altroot);
-			ZFS_CLOSE(zhp);
-			return (ret);
+		if (be_mount_zones(zhp, &md) != BE_SUCCESS) {
+			ret = BE_ERR_NO_MOUNTED_ZONE;
 		}
 	}
 
@@ -397,10 +393,14 @@ _be_mount(char *be_name, char **altroot, int flags)
 	 * If a NULL altroot was passed in, pass the generated altroot
 	 * back to the caller in altroot.
 	 */
-	if (gen_tmp_altroot)
-		*altroot = tmp_altroot;
+	if (gen_tmp_altroot) {
+		if (ret == BE_SUCCESS || ret == BE_ERR_NO_MOUNTED_ZONE)
+			*altroot = tmp_altroot;
+		else
+			free(tmp_altroot);
+	}
 
-	return (BE_SUCCESS);
+	return (ret);
 }
 
 /*
@@ -1712,10 +1712,7 @@ loopback_mount_shared_fs(zfs_handle_t *zhp, be_mount_data_t *md)
 /*
  * Function:	loopback_mount_zonepath
  * Description:	This function loopback mounts a zonepath into the altroot
- *		area of the BE being mounted.  Since these are shared file
- *		systems, they are expected to be already mounted for the
- *		current BE, and this function just loopback mounts them into
- *		the BE mountpoint.
+ *		area of the BE being mounted.
  * Parameters:
  *		zonepath - pointer to zone path in the current BE
  *		md - be_mount_data_t pointer
