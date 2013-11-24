@@ -365,7 +365,7 @@ load_cache()
 static void
 fill_random_bytes(uchar_t *buf, int nbytes)
 {
-	int i, retries = 0;
+	int i;
 
 	if (fd_urand == -1) {
 		mutex_lock(&urandmtx);
