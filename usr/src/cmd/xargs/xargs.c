@@ -129,7 +129,7 @@ static char	**mav;		/* modified argv, after parsing		*/
 static int	n_inserts;	/* # of insertions.			*/
 
 /* our usage message:							*/
-#define	USAGEMSG "Usage: xargs: [-t] [-p] [-e[eofstr]] [-E eofstr] "\
+#define	USAGEMSG "Usage: xargs: [-t] [-p] [-0] [-e[eofstr]] [-E eofstr] "\
 	"[-I replstr] [-i[replstr]] [-L #] [-l[#]] [-n # [-x]] [-s size] "\
 	"[cmd [args ...]]\n"
 
@@ -1020,6 +1020,7 @@ process_special:
 			case 'p' :
 			case 't' :
 			case 'x' :
+			case '0' :
 				break;
 
 			case '-' :
