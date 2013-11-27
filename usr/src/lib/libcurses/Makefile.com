@@ -156,7 +156,7 @@ LDLIBS += -lc
 
 CPPFLAGS += -I../screen -I../../common/inc
 
-ED = ed
+ED = LANG=C ed
 RM = rm -f
 
 #
