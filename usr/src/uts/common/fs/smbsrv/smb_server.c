@@ -1072,7 +1072,6 @@ smb_server_disconnect_share(smb_llist_t *ll, const char *sharename)
 		switch (session->s_state) {
 		case SMB_SESSION_STATE_NEGOTIATED:
 		case SMB_SESSION_STATE_OPLOCK_BREAKING:
-		case SMB_SESSION_STATE_WRITE_RAW_ACTIVE:
 			smb_session_disconnect_share(session, sharename);
 			break;
 		default:
@@ -1913,20 +1912,6 @@ smb_server_store_cfg(smb_server_t *sv, smb_ioc_cfg_t *ioc)
 	    sizeof (sv->sv_cfg.skc_hostname));
 	(void) strlcpy(sv->sv_cfg.skc_system_comment, ioc->system_comment,
 	    sizeof (sv->sv_cfg.skc_system_comment));
-
-	if (sv->sv_cfg.skc_oplock_enable && smb_raw_mode) {
-		/*
-		 * Note that these two optional protocol features
-		 * (oplocks, raw_mode) have unfortunate interactions.
-		 * Since raw_mode is only wanted by ancient clients,
-		 * we just turn it off (that's what MS recommends).
-		 * Leave some evidence in the log if someone has
-		 * patched smb_raw_mode to enable it.
-		 */
-		cmn_err(CE_NOTE,
-		    "Raw mode enabled: Disabling opportunistic locks");
-		sv->sv_cfg.skc_oplock_enable = 0;
-	}
 }
 
 static int

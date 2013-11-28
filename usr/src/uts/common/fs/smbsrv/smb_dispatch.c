@@ -194,12 +194,10 @@ smb_disp_table[SMB_COM_NUM] = {
 	{ "Invalid", SMB_SDT_OPS(invalid), 0x17, 0 },		/* 0x17 023 */
 	{ "Invalid", SMB_SDT_OPS(invalid), 0x18, 0 },		/* 0x18 024 */
 	{ "Invalid", SMB_SDT_OPS(invalid), 0x19, 0 },		/* 0x19 025 */
-	{ "SmbReadRaw", SMB_SDT_OPS(read_raw),			/* 0x1A 026 */
-	    0x1A, LANMAN1_0 },
+	{ "SmbReadRaw", SMB_SDT_OPS(invalid), 0x1A, 0 },	/* 0x1A 026 */
 	{ "Invalid", SMB_SDT_OPS(invalid), 0x1B, 0 },		/* 0x1B 027 */
 	{ "Invalid", SMB_SDT_OPS(invalid), 0x1C, 0 },		/* 0x1C 028 */
-	{ "SmbWriteRaw", SMB_SDT_OPS(write_raw),		/* 0x1D 029 */
-	    0x1D, LANMAN1_0 },
+	{ "SmbWriteRaw", SMB_SDT_OPS(invalid), 0x1D, 0 },	/* 0x1D 029 */
 	{ "Invalid", SMB_SDT_OPS(invalid), 0x1E, 0 },		/* 0x1E 030 */
 	{ "Invalid", SMB_SDT_OPS(invalid), 0x1F, 0 },		/* 0x1F 031 */
 	{ "Invalid", SMB_SDT_OPS(invalid), 0x20, 0 },		/* 0x20 032 */
@@ -712,8 +710,7 @@ andx_more:
 	 * Otherwise we let the read raw handler to deal with it.
 	 */
 	smb_rwx_rwenter(&session->s_lock, RW_READER);
-	if ((session->s_state == SMB_SESSION_STATE_OPLOCK_BREAKING) &&
-	    (sr->smb_com != SMB_COM_READ_RAW)) {
+	if (session->s_state == SMB_SESSION_STATE_OPLOCK_BREAKING) {
 		(void) smb_rwx_rwupgrade(&session->s_lock);
 		if (session->s_state == SMB_SESSION_STATE_OPLOCK_BREAKING)
 			session->s_state = SMB_SESSION_STATE_NEGOTIATED;
@@ -732,22 +729,6 @@ andx_more:
 
 	atomic_add_64(&sds->sdt_txb,
 	    (int64_t)(sr->reply.chain_offset - sr->sr_txb));
-
-	if (sdrc != SDRC_SUCCESS) {
-		/*
-		 * Handle errors from raw write.
-		 */
-		smb_rwx_rwenter(&session->s_lock, RW_WRITER);
-		if (session->s_state == SMB_SESSION_STATE_WRITE_RAW_ACTIVE) {
-			/*
-			 * Set state so that the netbios session
-			 * daemon will start accepting data again.
-			 */
-			session->s_write_raw_status = 0;
-			session->s_state = SMB_SESSION_STATE_NEGOTIATED;
-		}
-		smb_rwx_rwexit(&session->s_lock);
-	}
 
 	switch (sdrc) {
 	case SDRC_SUCCESS:

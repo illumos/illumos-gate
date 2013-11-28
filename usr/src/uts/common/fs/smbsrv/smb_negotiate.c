@@ -313,7 +313,9 @@ smb_com_negotiate(smb_request_t *sr)
 
 	/*
 	 * UNICODE support is required for long share names,
-	 * long file names and streams.
+	 * long file names and streams.  Note: CAP_RAW_MODE
+	 * is not supported because it does nothing to help
+	 * modern clients and causes nasty complications.
 	 */
 	negprot->ni_capabilities = CAP_LARGE_FILES
 	    | CAP_UNICODE
@@ -326,11 +328,6 @@ smb_com_negotiate(smb_request_t *sr)
 	    | CAP_LARGE_READX
 	    | CAP_LARGE_WRITEX
 	    | CAP_DFS;
-
-	if (smb_raw_mode) {
-		negprot->ni_capabilities |= CAP_RAW_MODE;
-		rawmode = 3;
-	}
 
 	if (smb_cap_passthru)
 		negprot->ni_capabilities |= CAP_INFOLEVEL_PASSTHRU;

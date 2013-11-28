@@ -470,8 +470,6 @@ smb_session_disconnect(smb_session_t *session)
 	case SMB_SESSION_STATE_ESTABLISHED:
 	case SMB_SESSION_STATE_NEGOTIATED:
 	case SMB_SESSION_STATE_OPLOCK_BREAKING:
-	case SMB_SESSION_STATE_WRITE_RAW_ACTIVE:
-	case SMB_SESSION_STATE_READ_RAW_ACTIVE:
 		smb_soshutdown(session->sock);
 		session->s_state = SMB_SESSION_STATE_DISCONNECTED;
 		_NOTE(FALLTHRU)
@@ -493,7 +491,6 @@ smb_session_disconnect(smb_session_t *session)
  *	4	Unable to read SMB header
  *	5	Invalid SMB header (bad magic number)
  *	6	Unable to read SMB data
- *	2x	Write raw failed
  */
 static int
 smb_session_message(smb_session_t *session)
@@ -576,16 +573,6 @@ smb_session_message(smb_session_t *session)
 
 		DTRACE_PROBE1(session__receive__smb, smb_request_t *, sr);
 
-		/*
-		 * If this is a raw write, hand off the request.  The handler
-		 * will retrieve the remaining raw data and process the request.
-		 */
-		if (SMB_IS_WRITERAW(sr)) {
-			rc = smb_handle_write_raw(session, sr);
-			if (rc == 0)
-				continue;
-			return (rc);
-		}
 		if (sr->session->signing.flags & SMB_SIGNING_ENABLED) {
 			if (SMB_IS_NT_CANCEL(sr)) {
 				sr->session->signing.seqnum++;
@@ -654,9 +641,6 @@ smb_session_create(ksocket_t new_so, uint16_t port, smb_server_t *sv,
 	smb_llist_constructor(&session->s_xa_list, sizeof (smb_xa_t),
 	    offsetof(smb_xa_t, xa_lnd));
 
-	list_create(&session->s_oplock_brkreqs, sizeof (mbuf_chain_t),
-	    offsetof(mbuf_chain_t, mbc_lnd));
-
 	smb_net_txl_constructor(&session->s_txlst);
 
 	smb_rwx_init(&session->s_lock);
@@ -709,7 +693,6 @@ smb_session_create(ksocket_t new_so, uint16_t port, smb_server_t *sv,
 void
 smb_session_delete(smb_session_t *session)
 {
-	mbuf_chain_t	*mbc;
 
 	ASSERT(session->s_magic == SMB_SESSION_MAGIC);
 
@@ -717,13 +700,6 @@ smb_session_delete(smb_session_t *session)
 
 	smb_rwx_destroy(&session->s_lock);
 	smb_net_txl_destructor(&session->s_txlst);
-
-	while ((mbc = list_head(&session->s_oplock_brkreqs)) != NULL) {
-		SMB_MBC_VALID(mbc);
-		list_remove(&session->s_oplock_brkreqs, mbc);
-		smb_mbc_free(mbc);
-	}
-	list_destroy(&session->s_oplock_brkreqs);
 
 	smb_slist_destructor(&session->s_req_list);
 	smb_llist_destructor(&session->s_tree_list);
@@ -1456,14 +1432,9 @@ smb_session_oplock_break(smb_session_t *session,
 	switch (session->s_state) {
 	case SMB_SESSION_STATE_NEGOTIATED:
 	case SMB_SESSION_STATE_OPLOCK_BREAKING:
-	case SMB_SESSION_STATE_WRITE_RAW_ACTIVE:
 		session->s_state = SMB_SESSION_STATE_OPLOCK_BREAKING;
 		(void) smb_session_send(session, 0, mbc);
 		smb_mbc_free(mbc);
-		break;
-
-	case SMB_SESSION_STATE_READ_RAW_ACTIVE:
-		list_insert_tail(&session->s_oplock_brkreqs, mbc);
 		break;
 
 	case SMB_SESSION_STATE_DISCONNECTED:

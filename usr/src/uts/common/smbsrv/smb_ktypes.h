@@ -883,8 +883,6 @@ typedef enum {
 	SMB_SESSION_STATE_ESTABLISHED,
 	SMB_SESSION_STATE_NEGOTIATED,
 	SMB_SESSION_STATE_OPLOCK_BREAKING,
-	SMB_SESSION_STATE_WRITE_RAW_ACTIVE,
-	SMB_SESSION_STATE_READ_RAW_ACTIVE,
 	SMB_SESSION_STATE_TERMINATED,
 	SMB_SESSION_STATE_SENTINEL
 } smb_session_state_t;
@@ -896,7 +894,6 @@ typedef struct smb_session {
 	uint64_t		s_kid;
 	smb_session_state_t	s_state;
 	uint32_t		s_flags;
-	int			s_write_raw_status;
 	taskqid_t		s_receiver_tqid;
 	kthread_t		*s_thread;
 	kt_did_t		s_ktdid;
@@ -945,7 +942,6 @@ typedef struct smb_session {
 	uchar_t			*outpipe_data;
 	int			outpipe_datalen;
 	int			outpipe_cookie;
-	list_t			s_oplock_brkreqs;
 	smb_srqueue_t		*s_srqueue;
 } smb_session_t;
 
@@ -1680,9 +1676,6 @@ typedef struct smb_request {
 
 #define	SMB_READ_COMMAND(hdr) \
 	(((smb_hdr_t *)(hdr))->command)
-
-#define	SMB_IS_WRITERAW(rd_sr) \
-	(SMB_READ_COMMAND((rd_sr)->sr_request_buf) == SMB_COM_WRITE_RAW)
 
 #define	SMB_IS_NT_CANCEL(rd_sr) \
 	(SMB_READ_COMMAND((rd_sr)->sr_request_buf) == SMB_COM_NT_CANCEL)
