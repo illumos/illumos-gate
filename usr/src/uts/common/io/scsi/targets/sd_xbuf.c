@@ -53,7 +53,6 @@
 static int xbuf_iostart(ddi_xbuf_attr_t xap);
 static void xbuf_dispatch(ddi_xbuf_attr_t xap);
 static void xbuf_restart_callback(void *arg);
-static void xbuf_enqueue(struct buf *bp, ddi_xbuf_attr_t xap);
 static int xbuf_brk_done(struct buf *bp);
 
 
@@ -106,9 +105,9 @@ _NOTE(DATA_READABLE_WITHOUT_LOCK(xbuf_brk::off))
 /* ARGSUSED */
 DDII ddi_xbuf_attr_t
 ddi_xbuf_attr_create(size_t xsize,
-	void (*xa_strategy)(struct buf *bp, ddi_xbuf_t xp, void *attr_arg),
-	void *attr_arg, uint32_t active_limit, uint32_t reserve_limit,
-	major_t major, int flags)
+    void (*xa_strategy)(struct buf *bp, ddi_xbuf_t xp, void *attr_arg),
+    void *attr_arg, uint32_t active_limit, uint32_t reserve_limit,
+    major_t major, int flags)
 {
 	ddi_xbuf_attr_t	xap;
 
