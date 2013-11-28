@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <smbsrv/smb_kproto.h>
@@ -203,14 +203,14 @@ static void smb_name83(const char *, char *, size_t);
 smb_sdrc_t
 smb_pre_search(smb_request_t *sr)
 {
-	DTRACE_SMB_1(op__Search__start, smb_request_t *, sr);
+	DTRACE_SMB_START(op__Search, smb_request_t *, sr);
 	return (SDRC_SUCCESS);
 }
 
 void
 smb_post_search(smb_request_t *sr)
 {
-	DTRACE_SMB_1(op__Search__done, smb_request_t *, sr);
+	DTRACE_SMB_DONE(op__Search, smb_request_t *, sr);
 }
 
 smb_sdrc_t
@@ -394,14 +394,14 @@ smb_com_search(smb_request_t *sr)
 smb_sdrc_t
 smb_pre_find(smb_request_t *sr)
 {
-	DTRACE_SMB_1(op__Find__start, smb_request_t *, sr);
+	DTRACE_SMB_START(op__Find, smb_request_t *, sr);
 	return (SDRC_SUCCESS);
 }
 
 void
 smb_post_find(smb_request_t *sr)
 {
-	DTRACE_SMB_1(op__Find__done, smb_request_t *, sr);
+	DTRACE_SMB_DONE(op__Find, smb_request_t *, sr);
 }
 
 smb_sdrc_t
@@ -547,14 +547,14 @@ smb_com_find(smb_request_t *sr)
 smb_sdrc_t
 smb_pre_find_close(smb_request_t *sr)
 {
-	DTRACE_SMB_1(op__FindClose__start, smb_request_t *, sr);
+	DTRACE_SMB_START(op__FindClose, smb_request_t *, sr);
 	return (SDRC_SUCCESS);
 }
 
 void
 smb_post_find_close(smb_request_t *sr)
 {
-	DTRACE_SMB_1(op__FindClose__done, smb_request_t *, sr);
+	DTRACE_SMB_DONE(op__FindClose, smb_request_t *, sr);
 }
 
 smb_sdrc_t
@@ -613,14 +613,14 @@ smb_com_find_close(smb_request_t *sr)
 smb_sdrc_t
 smb_pre_find_unique(smb_request_t *sr)
 {
-	DTRACE_SMB_1(op__FindUnique__start, smb_request_t *, sr);
+	DTRACE_SMB_START(op__FindUnique, smb_request_t *, sr);
 	return (SDRC_SUCCESS);
 }
 
 void
 smb_post_find_unique(smb_request_t *sr)
 {
-	DTRACE_SMB_1(op__FindUnique__done, smb_request_t *, sr);
+	DTRACE_SMB_DONE(op__FindUnique, smb_request_t *, sr);
 }
 
 smb_sdrc_t

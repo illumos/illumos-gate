@@ -22,7 +22,7 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 
@@ -989,14 +989,14 @@ smb_trans2_find_mbc_encode(smb_request_t *sr, smb_xa_t *xa,
 smb_sdrc_t
 smb_pre_find_close2(smb_request_t *sr)
 {
-	DTRACE_SMB_1(op__FindClose2__start, smb_request_t *, sr);
+	DTRACE_SMB_START(op__FindClose2, smb_request_t *, sr);
 	return (SDRC_SUCCESS);
 }
 
 void
 smb_post_find_close2(smb_request_t *sr)
 {
-	DTRACE_SMB_1(op__FindClose2__done, smb_request_t *, sr);
+	DTRACE_SMB_DONE(op__FindClose2, smb_request_t *, sr);
 }
 
 smb_sdrc_t

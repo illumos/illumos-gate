@@ -48,14 +48,14 @@
 smb_sdrc_t
 smb_pre_nt_cancel(smb_request_t *sr)
 {
-	DTRACE_SMB_1(op__NtCancel__start, smb_request_t *, sr);
+	DTRACE_SMB_START(op__NtCancel, smb_request_t *, sr);
 	return (SDRC_SUCCESS);
 }
 
 void
 smb_post_nt_cancel(smb_request_t *sr)
 {
-	DTRACE_SMB_1(op__NtCancel__done, smb_request_t *, sr);
+	DTRACE_SMB_DONE(op__NtCancel, smb_request_t *, sr);
 }
 
 /*

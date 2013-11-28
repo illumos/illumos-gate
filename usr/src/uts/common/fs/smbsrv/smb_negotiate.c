@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -280,6 +280,9 @@ uint32_t smb1srv_capabilities =
  * result of bypassing the normal dispatch mechanism.
  *
  * The caller always frees this request.
+ *
+ * Return value is 0 for success, and anything else will
+ * terminate the reader thread (drop the connection).
  */
 int
 smb1_newrq_negotiate(smb_request_t *sr)
@@ -382,8 +385,7 @@ smb_pre_negotiate(smb_request_t *sr)
 		}
 	}
 
-	DTRACE_SMB_2(op__Negotiate__start, smb_request_t *, sr,
-	    smb_arg_negotiate_t, negprot);
+	DTRACE_SMB_START(op__Negotiate, smb_request_t *, sr);
 
 	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 }
@@ -393,8 +395,7 @@ smb_post_negotiate(smb_request_t *sr)
 {
 	smb_arg_negotiate_t	*negprot = sr->sr_negprot;
 
-	DTRACE_SMB_2(op__Negotiate__done, smb_request_t *, sr,
-	    smb_arg_negotiate_t, negprot);
+	DTRACE_SMB_DONE(op__Negotiate, smb_request_t *, sr);
 
 	bzero(negprot, sizeof (smb_arg_negotiate_t));
 }

@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -189,8 +189,7 @@ done:
 		    sr->session->ip_addr_str);
 	}
 
-	DTRACE_SMB_2(op__SessionSetupX__start, smb_request_t *, sr,
-	    smb_arg_sessionsetup_t, sinfo);
+	DTRACE_SMB_START(op__SessionSetupX, smb_request_t *, sr);
 	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 }
 
@@ -199,8 +198,7 @@ smb_post_session_setup_andx(smb_request_t *sr)
 {
 	smb_arg_sessionsetup_t	*sinfo = sr->sr_ssetup;
 
-	DTRACE_SMB_2(op__SessionSetupX__done, smb_request_t *, sr,
-	    smb_arg_sessionsetup_t, sinfo);
+	DTRACE_SMB_DONE(op__SessionSetupX, smb_request_t *, sr);
 
 	if (sinfo->ssi_lmpwd != NULL)
 		bzero(sinfo->ssi_lmpwd, sinfo->ssi_lmpwlen);

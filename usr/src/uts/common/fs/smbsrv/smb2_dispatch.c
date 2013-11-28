@@ -755,10 +755,17 @@ cmd_done:
 		cmn_err(CE_NOTE, "handler for %u returned 0x%x",
 		    sr->smb2_cmd_code, rc);
 #endif
-		/* FALLTHROUGH */
+		sr->smb2_status = NT_STATUS_INTERNAL_ERROR;
+		break;
 	case SDRC_ERROR:
+		/*
+		 * Many command handlers return SDRC_ERROR for any
+		 * problems decoding the request, and don't bother
+		 * setting smb2_status.  For those cases, the best
+		 * status return would be "invalid parameter".
+		 */
 		if (sr->smb2_status == 0)
-			sr->smb2_status = NT_STATUS_INTERNAL_ERROR;
+			sr->smb2_status = NT_STATUS_INVALID_PARAMETER;
 		break;
 	case SDRC_DROP_VC:
 		disconnect = B_TRUE;

@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <smbsrv/smb_kproto.h>
@@ -227,8 +227,7 @@ smb_pre_open(smb_request_t *sr)
 	if (rc == 0)
 		rc = smbsr_decode_data(sr, "%S", sr, &op->fqi.fq_path.pn_path);
 
-	DTRACE_SMB_2(op__Open__start, smb_request_t *, sr,
-	    struct open_param *, op);
+	DTRACE_SMB_START(op__Open, smb_request_t *, sr); /* arg.open */
 
 	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 }
@@ -236,7 +235,7 @@ smb_pre_open(smb_request_t *sr)
 void
 smb_post_open(smb_request_t *sr)
 {
-	DTRACE_SMB_1(op__Open__done, smb_request_t *, sr);
+	DTRACE_SMB_DONE(op__Open, smb_request_t *, sr);
 }
 
 smb_sdrc_t
@@ -367,8 +366,7 @@ smb_pre_open_andx(smb_request_t *sr)
 		op->create_disposition = smb_ofun_to_crdisposition(op->ofun);
 	}
 
-	DTRACE_SMB_2(op__OpenX__start, smb_request_t *, sr,
-	    struct open_param *, op);
+	DTRACE_SMB_START(op__OpenX, smb_request_t *, sr); /* arg.open */
 
 	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 }
@@ -376,7 +374,7 @@ smb_pre_open_andx(smb_request_t *sr)
 void
 smb_post_open_andx(smb_request_t *sr)
 {
-	DTRACE_SMB_1(op__OpenX__done, smb_request_t *, sr);
+	DTRACE_SMB_DONE(op__OpenX, smb_request_t *, sr);
 }
 
 smb_sdrc_t

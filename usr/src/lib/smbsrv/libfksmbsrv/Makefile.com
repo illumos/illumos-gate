@@ -31,7 +31,6 @@ VERS =		.1
 
 OBJS_LOCAL = \
 		fksmb_cred.o \
-		fksmb_dt.o \
 		fksmb_fem.o \
 		fksmb_idmap.o \
 		fksmb_init.o \
@@ -178,6 +177,11 @@ OBJS_MISC = \
 		smb_status2winerr.o \
 		xattr_common.o
 
+# This one can't be in OBJECTS, as it has to depend on
+# all of those for the COMPILE.d rule (which processes
+# all those objects collecting probe instances).
+DTRACE_OBJS = fksmb_dt.o
+
 OBJECTS = \
 	$(OBJS_LOCAL) \
 	$(OBJS_FS_SMBSRV) \
@@ -233,16 +237,16 @@ pics/acl_common.o:	   $(SRC)/common/acl/acl_common.c
 	$(COMPILE.c) -o $@ $(SRC)/common/acl/acl_common.c
 	$(POST_PROCESS_O)
 
-pics/smb_status2winerr.o:  $(SRC)/common/smbclnt/smb_status2winerr.c
-	$(COMPILE.c) -o $@ $(SRC)/common/smbclnt/smb_status2winerr.c
-	$(POST_PROCESS_O)
-
 pics/pathname.o:	   $(SRC)/uts/common/fs/pathname.c
 	$(COMPILE.c) -o $@ $(SRC)/uts/common/fs/pathname.c
 	$(POST_PROCESS_O)
 
 pics/refstr.o:		   $(SRC)/uts/common/os/refstr.c
 	$(COMPILE.c) -o $@ $(SRC)/uts/common/os/refstr.c
+	$(POST_PROCESS_O)
+
+pics/smb_status2winerr.o:  $(SRC)/common/smbclnt/smb_status2winerr.c
+	$(COMPILE.c) -o $@ $(SRC)/common/smbclnt/smb_status2winerr.c
 	$(POST_PROCESS_O)
 
 pics/xattr_common.o:	   $(SRC)/common/xattr/xattr_common.c
@@ -255,3 +259,12 @@ pics/xattr_common.o:	   $(SRC)/common/xattr/xattr_common.c
 
 include ../../Makefile.targ
 include ../../../Makefile.targ
+
+EXTPICS= $(DTRACE_OBJS:%=pics/%)
+CLEANFILES += $(EXTPICS)
+
+$(OBJS) $(PICS) : ../common/fksmb_dt.h
+
+pics/fksmb_dt.o: ../common/fksmb_dt.d $(PICS)
+	$(COMPILE.d) -C -s ../common/fksmb_dt.d -o $@ $(PICS)
+	$(POST_PROCESS_O)

@@ -42,10 +42,14 @@ smb2_newrq_cancel(smb_request_t *sr)
 	if (sr->smb2_next_command != 0)
 		return (EINVAL);
 
+	DTRACE_SMB2_START(op__Cancel, smb_request_t *, sr);
+
 	if (sr->smb2_hdr_flags & SMB2_FLAGS_ASYNC_COMMAND)
 		smb2_cancel_async(sr);
 	else
 		smb2_cancel_sync(sr);
+
+	DTRACE_SMB2_DONE(op__Cancel, smb_request_t *, sr);
 
 	return (0);
 }
@@ -65,11 +69,15 @@ smb2_cancel(smb_request_t *sr)
 	if (sr->smb2_cmd_hdr != 0 || sr->smb2_next_command != 0)
 		return (SDRC_DROP_VC);
 
+	DTRACE_SMB2_START(op__Cancel, smb_request_t *, sr);
+
 	if (sr->smb2_hdr_flags & SMB2_FLAGS_ASYNC_COMMAND) {
 		smb2_cancel_async(sr);
 	} else {
 		smb2_cancel_sync(sr);
 	}
+
+	DTRACE_SMB2_DONE(op__Cancel, smb_request_t *, sr);
 
 	return (SDRC_NO_REPLY);
 }

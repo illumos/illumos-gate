@@ -22,7 +22,7 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <smbsrv/smb_kproto.h>
@@ -39,14 +39,14 @@
 smb_sdrc_t
 smb_pre_echo(smb_request_t *sr)
 {
-	DTRACE_SMB_1(op__Echo__start, smb_request_t *, sr);
+	DTRACE_SMB_START(op__Echo, smb_request_t *, sr);
 	return (SDRC_SUCCESS);
 }
 
 void
 smb_post_echo(smb_request_t *sr)
 {
-	DTRACE_SMB_1(op__Echo__done, smb_request_t *, sr);
+	DTRACE_SMB_DONE(op__Echo, smb_request_t *, sr);
 }
 
 static unsigned short smb_max_echo = 10;

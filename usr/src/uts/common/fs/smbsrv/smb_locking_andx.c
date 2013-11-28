@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -221,14 +221,14 @@ int smb_lock_max_elem = 1024;
 smb_sdrc_t
 smb_pre_locking_andx(smb_request_t *sr)
 {
-	DTRACE_SMB_1(op__LockingX__start, smb_request_t *, sr);
+	DTRACE_SMB_START(op__LockingX, smb_request_t *, sr);
 	return (SDRC_SUCCESS);
 }
 
 void
 smb_post_locking_andx(smb_request_t *sr)
 {
-	DTRACE_SMB_1(op__LockingX__done, smb_request_t *, sr);
+	DTRACE_SMB_DONE(op__LockingX, smb_request_t *, sr);
 }
 
 struct lreq {

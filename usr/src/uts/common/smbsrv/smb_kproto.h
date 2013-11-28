@@ -55,52 +55,6 @@ extern "C" {
 #include <smbsrv/smb_ktypes.h>
 #include <smbsrv/smb_ioctl.h>
 
-/*
- * DTrace SDT probes have different signatures in userland than they do in
- * kernel.  If we're compiling for user mode (libfksmbsrv) define them as
- * either no-op (for the SMB dtrace provider) or libfksmbsrv functions for
- * the other SDT probe sites.
- */
-#ifndef	_KERNEL
-
-extern void smb_dtrace1(const char *f, const char *n,
-			const char *t1, long v1);
-extern void smb_dtrace2(const char *f, const char *n,
-			const char *t1, long v1,
-			const char *t2, long v2);
-extern void smb_dtrace3(const char *f, const char *n,
-			const char *t1, long v1,
-			const char *t2, long v2,
-			const char *t3, long v3);
-
-/*
- * These are for the SMB dtrace proivder, which for a user-mode build
- * are largely redundant with the fbt probes so make these no-ops.
- */
-#undef	DTRACE_SMB_1
-#define	DTRACE_SMB_1(n, a, b)			((void)b)
-#undef	DTRACE_SMB_2
-#define	DTRACE_SMB_2(n, a, b, c, d)		((void)b, (void)d)
-
-/*
- * These are for the other (specialized) dtrace SDT probes sprinkled
- * through the smbsrv code.  In libfksmbsrv map these to functions.
- */
-
-#undef	DTRACE_PROBE1
-#define	DTRACE_PROBE1(n, a, b) \
-	smb_dtrace1(__func__, #n, #a, (long)b)
-
-#undef	DTRACE_PROBE2
-#define	DTRACE_PROBE2(n, a, b, c, d) \
-	smb_dtrace2(__func__, #n, #a, (long)b, #c, (long)d)
-
-#undef	DTRACE_PROBE3
-#define	DTRACE_PROBE3(n, a, b, c, d, e, f) \
-	smb_dtrace3(__func__, #n, #a, (long)b, #c, (long)d, #e, (long)f)
-
-#endif	/* _KERNEL */
-
 extern	int smb_maxbufsize;
 extern	int smb_flush_required;
 extern	int smb_dirsymlink_enable;
@@ -109,7 +63,6 @@ extern	int smb_oplock_timeout;
 extern	int smb_oplock_min_timeout;
 extern	int smb_shortnames;
 extern	int smb_sign_debug;
-extern	int smb_raw_mode;
 extern	uint_t smb_audit_flags;
 extern	int smb_ssetup_threshold;
 extern	int smb_tcon_threshold;
@@ -793,9 +746,6 @@ smb_xa_t *smb_xa_find(smb_session_t *session, uint32_t pid, uint16_t mid);
 struct mbuf *smb_mbuf_get(uchar_t *buf, int nbytes);
 struct mbuf *smb_mbuf_allocate(struct uio *uio);
 void smb_mbuf_trim(struct mbuf *mhead, int nbytes);
-
-void smb_check_status(void);
-int smb_handle_write_raw(smb_session_t *session, smb_request_t *sr);
 
 int32_t smb_time_gmt_to_local(smb_request_t *, int32_t);
 int32_t smb_time_local_to_gmt(smb_request_t *, int32_t);

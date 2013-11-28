@@ -55,14 +55,14 @@ static smb_sdrc_t smb_trans2_dispatch(smb_request_t *, smb_xa_t *);
 smb_sdrc_t
 smb_pre_transaction(smb_request_t *sr)
 {
-	DTRACE_SMB_1(op__Transaction__start, smb_request_t *, sr);
+	DTRACE_SMB_START(op__Transaction, smb_request_t *, sr);
 	return (SDRC_SUCCESS);
 }
 
 void
 smb_post_transaction(smb_request_t *sr)
 {
-	DTRACE_SMB_1(op__Transaction__done, smb_request_t *, sr);
+	DTRACE_SMB_DONE(op__Transaction, smb_request_t *, sr);
 }
 
 smb_sdrc_t
@@ -156,14 +156,14 @@ smb_com_transaction(smb_request_t *sr)
 smb_sdrc_t
 smb_pre_transaction_secondary(smb_request_t *sr)
 {
-	DTRACE_SMB_1(op__TransactionSecondary__start, smb_request_t *, sr);
+	DTRACE_SMB_START(op__TransactionSecondary, smb_request_t *, sr);
 	return (SDRC_SUCCESS);
 }
 
 void
 smb_post_transaction_secondary(smb_request_t *sr)
 {
-	DTRACE_SMB_1(op__TransactionSecondary__done, smb_request_t *, sr);
+	DTRACE_SMB_DONE(op__TransactionSecondary, smb_request_t *, sr);
 }
 
 smb_sdrc_t
@@ -254,14 +254,14 @@ smb_com_transaction_secondary(smb_request_t *sr)
 smb_sdrc_t
 smb_pre_ioctl(smb_request_t *sr)
 {
-	DTRACE_SMB_1(op__Ioctl__start, smb_request_t *, sr);
+	DTRACE_SMB_START(op__Ioctl, smb_request_t *, sr);
 	return (SDRC_SUCCESS);
 }
 
 void
 smb_post_ioctl(smb_request_t *sr)
 {
-	DTRACE_SMB_1(op__Ioctl__done, smb_request_t *, sr);
+	DTRACE_SMB_DONE(op__Ioctl, smb_request_t *, sr);
 }
 
 smb_sdrc_t
@@ -285,14 +285,14 @@ smb_com_ioctl(smb_request_t *sr)
 smb_sdrc_t
 smb_pre_transaction2(smb_request_t *sr)
 {
-	DTRACE_SMB_1(op__Transaction2__start, smb_request_t *, sr);
+	DTRACE_SMB_START(op__Transaction2, smb_request_t *, sr);
 	return (SDRC_SUCCESS);
 }
 
 void
 smb_post_transaction2(smb_request_t *sr)
 {
-	DTRACE_SMB_1(op__Transaction2__done, smb_request_t *, sr);
+	DTRACE_SMB_DONE(op__Transaction2, smb_request_t *, sr);
 }
 
 smb_sdrc_t
@@ -368,14 +368,14 @@ smb_com_transaction2(struct smb_request *sr)
 smb_sdrc_t
 smb_pre_transaction2_secondary(smb_request_t *sr)
 {
-	DTRACE_SMB_1(op__Transaction2Secondary__start, smb_request_t *, sr);
+	DTRACE_SMB_START(op__Transaction2Secondary, smb_request_t *, sr);
 	return (SDRC_SUCCESS);
 }
 
 void
 smb_post_transaction2_secondary(smb_request_t *sr)
 {
-	DTRACE_SMB_1(op__Transaction2Secondary__done, smb_request_t *, sr);
+	DTRACE_SMB_DONE(op__Transaction2Secondary, smb_request_t *, sr);
 }
 
 smb_sdrc_t
@@ -558,14 +558,14 @@ smb_nt_trans_dispatch(struct smb_request *sr, struct smb_xa *xa)
 smb_sdrc_t
 smb_pre_nt_transact(smb_request_t *sr)
 {
-	DTRACE_SMB_1(op__NtTransact__start, smb_request_t *, sr);
+	DTRACE_SMB_START(op__NtTransact, smb_request_t *, sr);
 	return (SDRC_SUCCESS);
 }
 
 void
 smb_post_nt_transact(smb_request_t *sr)
 {
-	DTRACE_SMB_1(op__NtTransact__done, smb_request_t *, sr);
+	DTRACE_SMB_DONE(op__NtTransact, smb_request_t *, sr);
 }
 
 smb_sdrc_t
@@ -644,14 +644,14 @@ smb_com_nt_transact(struct smb_request *sr)
 smb_sdrc_t
 smb_pre_nt_transact_secondary(smb_request_t *sr)
 {
-	DTRACE_SMB_1(op__NtTransactSecondary__start, smb_request_t *, sr);
+	DTRACE_SMB_START(op__NtTransactSecondary, smb_request_t *, sr);
 	return (SDRC_SUCCESS);
 }
 
 void
 smb_post_nt_transact_secondary(smb_request_t *sr)
 {
-	DTRACE_SMB_1(op__NtTransactSecondary__done, smb_request_t *, sr);
+	DTRACE_SMB_DONE(op__NtTransactSecondary, smb_request_t *, sr);
 }
 
 smb_sdrc_t

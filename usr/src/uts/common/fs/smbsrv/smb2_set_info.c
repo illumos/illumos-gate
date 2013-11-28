@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -32,13 +32,12 @@ smb2_set_info(smb_request_t *sr)
 	smb2fid_t smb2fid;
 	uint32_t status;
 	uint8_t InfoType, InfoClass;
-	smb_sdrc_t sdrc = SDRC_SUCCESS;
 	int rc = 0;
 
 	bzero(&sinfo, sizeof (sinfo));
 
 	/*
-	 * SMB2 Set Info request
+	 * Decode SMB2 Set Info request
 	 */
 	rc = smb_mbc_decodef(
 	    &sr->smb_data, "wbblw..lqq",
@@ -51,22 +50,8 @@ smb2_set_info(smb_request_t *sr)
 	    &AddlInfo,			/* l */
 	    &smb2fid.persistent,	/* q */
 	    &smb2fid.temporal);		/* q */
-	if (rc || StructSize != 33) {
-		sdrc = SDRC_ERROR;
-		return (sdrc);
-	}
-
-	if (iBufLength > smb2_max_trans) {
-		status = NT_STATUS_INVALID_PARAMETER;
-		goto errout;
-	}
-
-	status = smb2sr_lookup_fid(sr, &smb2fid);
-	if (status)
-		goto errout;
-
-	sinfo.si_node = sr->fid_ofile->f_node;
-	sr->user_cr = sr->fid_ofile->f_cr;
+	if (rc || StructSize != 33)
+		return (SDRC_ERROR);
 
 	/*
 	 * If there's an input buffer, setup a shadow.
@@ -75,13 +60,26 @@ smb2_set_info(smb_request_t *sr)
 		rc = MBC_SHADOW_CHAIN(&sinfo.si_data, &sr->smb_data,
 		    sr->smb2_cmd_hdr + iBufOffset, iBufLength);
 		if (rc) {
-			status = NT_STATUS_INVALID_PARAMETER;
-			goto errout;
+			return (SDRC_ERROR);
 		}
 	}
 
 	/* No output data. */
 	sr->raw_data.max_bytes = 0;
+
+	status = smb2sr_lookup_fid(sr, &smb2fid);
+	DTRACE_SMB2_START(op__SetInfo, smb_request_t *, sr);
+
+	if (status)
+		goto errout;
+
+	if (iBufLength > smb2_max_trans) {
+		status = NT_STATUS_INVALID_PARAMETER;
+		goto errout;
+	}
+
+	sinfo.si_node = sr->fid_ofile->f_node;
+	sr->user_cr = sr->fid_ofile->f_cr;
 
 	switch (InfoType) {
 	case SMB2_0_INFO_FILE:
@@ -101,20 +99,21 @@ smb2_set_info(smb_request_t *sr)
 		break;
 	}
 
+errout:
+	sr->smb2_status = status;
+	DTRACE_SMB2_DONE(op__SetInfo, smb_request_t *, sr);
+
 	if (status) {
-	errout:
 		smb2sr_put_error(sr, status);
-		return (sdrc);
+		return (SDRC_SUCCESS);
 	}
 
 	/*
 	 * SMB2 Query Info reply
 	 */
-	rc = smb_mbc_encodef(
+	(void) smb_mbc_encodef(
 	    &sr->reply, "w..",
 	    2);	/* StructSize */	/* w */
-	if (rc)
-		sdrc = SDRC_ERROR;
 
-	return (sdrc);
+	return (SDRC_SUCCESS);
 }

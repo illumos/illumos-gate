@@ -676,6 +676,9 @@ smb_session_reader(smb_session_t *session)
  * the new request for the session taskq, or smb_request_free it
  * (in case we've decided to drop this connection).  In this
  * (special) new request handler, we always free the request.
+ *
+ * Return value is 0 for success, and anything else will
+ * terminate the reader thread (drop the connection).
  */
 static int
 smbsr_newrq_initial(smb_request_t *sr)

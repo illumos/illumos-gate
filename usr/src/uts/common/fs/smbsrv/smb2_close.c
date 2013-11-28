@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -46,12 +46,16 @@ smb2_close(smb_request_t *sr)
 	if (StructSize != 24)
 		return (SDRC_ERROR);
 
+	/*
+	 * Want FID lookup before the start probe.
+	 */
 	status = smb2sr_lookup_fid(sr, &smb2fid);
-	if (status) {
-		smb2sr_put_error(sr, status);
-		return (SDRC_SUCCESS);
-	}
 	of = sr->fid_ofile;
+
+	DTRACE_SMB2_START(op__Close, smb_request_t *, sr);
+
+	if (status)
+		goto errout; /* Bad FID */
 
 	bzero(&attr, sizeof (attr));
 	if (Flags & SMB2_CLOSE_FLAG_POSTQUERY_ATTRIB) {
@@ -68,6 +72,15 @@ smb2_close(smb_request_t *sr)
 	}
 
 	smb_ofile_close(of, 0);
+
+errout:
+	sr->smb2_status = status;
+	DTRACE_SMB2_DONE(op__Close, smb_request_t *, sr);
+
+	if (status) {
+		smb2sr_put_error(sr, status);
+		return (SDRC_SUCCESS);
+	}
 
 	/*
 	 * SMB2 Close reply

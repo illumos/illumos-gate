@@ -22,7 +22,7 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <smbsrv/smb_kproto.h>
@@ -59,8 +59,7 @@ smb_pre_create_directory(smb_request_t *sr)
 	rc = smbsr_decode_data(sr, "%S", sr,
 	    &sr->arg.dirop.fqi.fq_path.pn_path);
 
-	DTRACE_SMB_2(op__CreateDirectory__start, smb_request_t *, sr,
-	    struct dirop *, &sr->arg.dirop);
+	DTRACE_SMB_START(op__CreateDirectory, smb_request_t *, sr);
 
 	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 }
@@ -68,7 +67,7 @@ smb_pre_create_directory(smb_request_t *sr)
 void
 smb_post_create_directory(smb_request_t *sr)
 {
-	DTRACE_SMB_1(op__CreateDirectory__done, smb_request_t *, sr);
+	DTRACE_SMB_DONE(op__CreateDirectory, smb_request_t *, sr);
 }
 
 smb_sdrc_t
@@ -206,8 +205,7 @@ smb_pre_delete_directory(smb_request_t *sr)
 	rc = smbsr_decode_data(sr, "%S", sr,
 	    &sr->arg.dirop.fqi.fq_path.pn_path);
 
-	DTRACE_SMB_2(op__DeleteDirectory__start, smb_request_t *, sr,
-	    struct dirop *, &sr->arg.dirop);
+	DTRACE_SMB_START(op__DeleteDirectory, smb_request_t *, sr);
 
 	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 }
@@ -215,7 +213,7 @@ smb_pre_delete_directory(smb_request_t *sr)
 void
 smb_post_delete_directory(smb_request_t *sr)
 {
-	DTRACE_SMB_1(op__DeleteDirectory__done, smb_request_t *, sr);
+	DTRACE_SMB_DONE(op__DeleteDirectory, smb_request_t *, sr);
 }
 
 smb_sdrc_t
@@ -361,8 +359,7 @@ smb_pre_check_directory(smb_request_t *sr)
 	rc = smbsr_decode_data(sr, "%S", sr,
 	    &sr->arg.dirop.fqi.fq_path.pn_path);
 
-	DTRACE_SMB_2(op__CheckDirectory__start, smb_request_t *, sr,
-	    struct dirop *, &sr->arg.dirop);
+	DTRACE_SMB_START(op__CheckDirectory, smb_request_t *, sr);
 
 	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 }
@@ -370,7 +367,7 @@ smb_pre_check_directory(smb_request_t *sr)
 void
 smb_post_check_directory(smb_request_t *sr)
 {
-	DTRACE_SMB_1(op__CheckDirectory__done, smb_request_t *, sr);
+	DTRACE_SMB_DONE(op__CheckDirectory, smb_request_t *, sr);
 }
 
 smb_sdrc_t

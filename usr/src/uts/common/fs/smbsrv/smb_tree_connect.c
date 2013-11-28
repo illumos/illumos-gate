@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2016 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <smbsrv/smb_kproto.h>
@@ -100,8 +100,7 @@ smb_pre_tree_connect(smb_request_t *sr)
 	tcon->flags = 0;
 	tcon->optional_support = 0;
 
-	DTRACE_SMB_2(op__TreeConnect__start, smb_request_t *, sr,
-	    smb_arg_tcon_t *, tcon);
+	DTRACE_SMB_START(op__TreeConnect, smb_request_t *, sr);
 
 	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 }
@@ -109,7 +108,7 @@ smb_pre_tree_connect(smb_request_t *sr)
 void
 smb_post_tree_connect(smb_request_t *sr)
 {
-	DTRACE_SMB_1(op__TreeConnect__done, smb_request_t *, sr);
+	DTRACE_SMB_DONE(op__TreeConnect, smb_request_t *, sr);
 }
 
 smb_sdrc_t
@@ -291,8 +290,7 @@ smb_pre_tree_connect_andx(smb_request_t *sr)
 
 	tcon->optional_support = 0;
 
-	DTRACE_SMB_2(op__TreeConnectX__start, smb_request_t *, sr,
-	    smb_arg_tcon_t *, tcon);
+	DTRACE_SMB_START(op__TreeConnectX, smb_request_t *, sr);
 
 	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 }
@@ -300,7 +298,7 @@ smb_pre_tree_connect_andx(smb_request_t *sr)
 void
 smb_post_tree_connect_andx(smb_request_t *sr)
 {
-	DTRACE_SMB_1(op__TreeConnectX__done, smb_request_t *, sr);
+	DTRACE_SMB_DONE(op__TreeConnectX, smb_request_t *, sr);
 }
 
 smb_sdrc_t
@@ -416,14 +414,14 @@ smb_pre_tree_disconnect(smb_request_t *sr)
 	sr->uid_user = smb_session_lookup_uid(sr->session, sr->smb_uid);
 	sr->tid_tree = smb_session_lookup_tree(sr->session, sr->smb_tid);
 
-	DTRACE_SMB_1(op__TreeDisconnect__start, smb_request_t *, sr);
+	DTRACE_SMB_START(op__TreeDisconnect, smb_request_t *, sr);
 	return (SDRC_SUCCESS);
 }
 
 void
 smb_post_tree_disconnect(smb_request_t *sr)
 {
-	DTRACE_SMB_1(op__TreeDisconnect__done, smb_request_t *, sr);
+	DTRACE_SMB_DONE(op__TreeDisconnect, smb_request_t *, sr);
 }
 
 /*

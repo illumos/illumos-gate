@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2019 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -23,6 +23,7 @@
 smb_sdrc_t
 smb2_read(smb_request_t *sr)
 {
+	smb_rw_param_t *param = NULL;
 	smb_ofile_t *of = NULL;
 	smb_vdb_t *vdb = NULL;
 	struct mbuf *m = NULL;
@@ -63,22 +64,35 @@ smb2_read(smb_request_t *sr)
 	if (StructSize != 49)
 		return (SDRC_ERROR);
 
+	/*
+	 * Setup an smb_rw_param_t which contains the VDB we need.
+	 * This is automatically free'd.
+	 */
+	param = smb_srm_zalloc(sr, sizeof (*param));
+	param->rw_offset = Offset;
+	param->rw_count = Length;
+	/* Note that the dtrace provider uses sr->arg.rw */
+	sr->arg.rw = param;
+
+	/*
+	 * Want FID lookup before the start probe.
+	 */
 	status = smb2sr_lookup_fid(sr, &smb2fid);
-	if (status) {
-		smb2sr_put_error(sr, status);
-		return (SDRC_SUCCESS);
-	}
 	of = sr->fid_ofile;
 
+	DTRACE_SMB2_START(op__Read, smb_request_t *, sr); /* arg.rw */
+
+	if (status)
+		goto errout; /* Bad FID */
+
 	if (Length > smb2_max_rwsize) {
-		smb2sr_put_error(sr, NT_STATUS_INVALID_PARAMETER);
-		return (SDRC_SUCCESS);
+		status = NT_STATUS_INVALID_PARAMETER;
+		goto errout;
 	}
 	if (MinCount > Length)
 		MinCount = Length;
 
-	/* This is automatically free'd. */
-	vdb = smb_srm_zalloc(sr, sizeof (*vdb));
+	vdb = &param->rw_vdb;
 	vdb->vdb_tag = 0;
 	vdb->vdb_uio.uio_iov = &vdb->vdb_iovec[0];
 	vdb->vdb_uio.uio_iovcnt = MAX_IOVEC;
@@ -111,6 +125,7 @@ smb2_read(smb_request_t *sr)
 		rc = EACCES;
 		break;
 	}
+	status = smb_errno2status(rc);
 
 	/* How much data we moved. */
 	XferCount = Length - vdb->vdb_uio.uio_resid;
@@ -124,8 +139,11 @@ smb2_read(smb_request_t *sr)
 	 * the returned data so that if m was allocated,
 	 * it will be free'd via sr->raw_data cleanup.
 	 */
-	if (rc) {
-		smb2sr_put_errno(sr, rc);
+errout:
+	sr->smb2_status = status;
+	DTRACE_SMB2_DONE(op__Read, smb_request_t *, sr); /* arg.rw */
+	if (status) {
+		smb2sr_put_error(sr, status);
 		return (SDRC_SUCCESS);
 	}
 
@@ -142,8 +160,10 @@ smb2_read(smb_request_t *sr)
 	    0, /* DataRemaining */	/* l */
 	    0, /* reserved */		/* l */
 	    &sr->raw_data);		/* C */
-	if (rc)
+	if (rc) {
+		sr->smb2_status = NT_STATUS_INTERNAL_ERROR;
 		return (SDRC_ERROR);
+	}
 
 	mutex_enter(&of->f_mutex);
 	of->f_seek_pos = Offset + XferCount;
