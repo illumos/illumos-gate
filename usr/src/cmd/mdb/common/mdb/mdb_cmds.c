@@ -27,6 +27,7 @@
 /*
  * Copyright (c) 2012 by Delphix. All rights reserved.
  * Copyright (c) 2013 Joyent, Inc. All rights reserved.
+ * Copyright (c) 2013 Josef 'Jeff' Sipek <jeffpc@josefsipek.net>
  */
 
 #include <sys/elf.h>
@@ -1563,11 +1564,6 @@ showrev_addversion(void *vers_nv, const mdb_map_t *ignored, const char *object)
 	if (version == NULL)
 		version = "Unknown";
 
-	/*
-	 * The hash table implementation in OVERLOAD mode limits the version
-	 * name to 31 characters because we cannot specify an external name.
-	 * The full version name is available via the ::objects dcmd if needed.
-	 */
 	(void) mdb_nv_insert(vers_nv, version, NULL, (uintptr_t)objname,
 	    MDB_NV_OVERLOAD);
 

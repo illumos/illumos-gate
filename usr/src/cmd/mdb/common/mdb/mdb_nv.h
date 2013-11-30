@@ -23,11 +23,12 @@
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2013 Josef 'Jeff' Sipek <jeffpc@josefsipek.net>
+ */
 
 #ifndef	_MDB_NV_H
 #define	_MDB_NV_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 
@@ -37,6 +38,11 @@ extern "C" {
 
 #ifdef _MDB
 
+/*
+ * There used to be a cap (MDB_NV_NAMELEN bytes including null) on the
+ * length of variable names stored in-line.  This cap is no longer there,
+ * however parts of mdb use the constant to sanitize input.
+ */
 #define	MDB_NV_NAMELEN	31	/* Max variable name length including null */
 
 /*
@@ -74,8 +80,8 @@ typedef struct mdb_nv_disc {
  * we make a few simple space optimizations:
  *
  * A variable's name can be a pointer to external storage (v_ename and
- * MDB_NV_EXTNAME set), or it can be stored locally (MDB_NV_NAMELEN - 1
- * bytes of storage are allocated immediately after v_lname[0]).
+ * MDB_NV_EXTNAME set), or it can be stored locally (bytes of storage are
+ * allocated immediately after v_lname[0]).
  *
  * A variable may have multiple definitions (v_ndef chain), but this feature
  * is mutually exclusive with MDB_NV_EXTNAME in order to save space.
