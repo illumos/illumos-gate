@@ -2077,7 +2077,7 @@ spa_walk_step(mdb_walk_state_t *wsp)
 static int
 zio_walk_init(mdb_walk_state_t *wsp)
 {
-	wsp->walk_data = &wsp->walk_addr;
+	wsp->walk_data = (void *)wsp->walk_addr;
 
 	if (mdb_layered_walk("zio_cache", wsp) == -1) {
 		mdb_warn("failed to walk 'zio_cache'\n");
@@ -2091,13 +2091,13 @@ static int
 zio_walk_step(mdb_walk_state_t *wsp)
 {
 	mdb_zio_t zio;
-	uintptr_t *spap = wsp->walk_data;
+	uintptr_t spa = (uintptr_t)wsp->walk_data;
 
 	if (mdb_ctf_vread(&zio, ZFS_STRUCT "zio", "mdb_zio_t",
 	    wsp->walk_addr, 0) == -1)
 		return (WALK_ERR);
 
-	if (*spap != 0 && *spap != zio.io_spa)
+	if (spa != 0 && spa != zio.io_spa)
 		return (WALK_NEXT);
 
 	return (wsp->walk_callback(wsp->walk_addr, &zio, wsp->walk_cbdata));
@@ -2112,13 +2112,13 @@ static int
 zio_walk_root_step(mdb_walk_state_t *wsp)
 {
 	mdb_zio_t zio;
-	uintptr_t *spap = wsp->walk_data;
+	uintptr_t spa = (uintptr_t)wsp->walk_data;
 
 	if (mdb_ctf_vread(&zio, ZFS_STRUCT "zio", "mdb_zio_t",
 	    wsp->walk_addr, 0) == -1)
 		return (WALK_ERR);
 
-	if (*spap != 0 && *spap != zio.io_spa)
+	if (spa != 0 && spa != zio.io_spa)
 		return (WALK_NEXT);
 
 	/* If the parent list is not empty, ignore */
