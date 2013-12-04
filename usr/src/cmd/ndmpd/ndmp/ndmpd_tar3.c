@@ -3221,10 +3221,22 @@ ndmpd_dar_tar_v3(ndmpd_session_t *session, ndmpd_module_params_t *params,
 		}
 
 		if (tm_tar_ops.tm_getdir != NULL) {
+			char errbuf[256];
+
 			err = (tm_tar_ops.tm_getdir)(cmds, cmds->tcs_command,
 			    nlp->nlp_jstat, &rn, 1, 1, sels, &excl, flags,
 			    dar_index, nlp->nlp_backup_path,
 			    session->hardlink_q);
+			/*
+			 * If the fatal error from tm_getdir looks like an
+			 * errno code, we send the error description to DMA.
+			 */
+			if (err > 0 && strerror_r(err, errbuf,
+			    sizeof (errbuf)) == 0) {
+				MOD_LOGV3(params, NDMP_LOG_ERROR,
+				    "Fatal error during the restore: %s\n",
+				    errbuf);
+			}
 		}
 
 		cmds->tcs_writer_count--;
@@ -3581,10 +3593,23 @@ ndmpd_rs_sar_tar_v3(ndmpd_session_t *session, ndmpd_module_params_t *params,
 		cmds->tcs_command->tc_ref++;
 		cmds->tcs_writer_count++;
 
-		if (tm_tar_ops.tm_getdir != NULL)
+		if (tm_tar_ops.tm_getdir != NULL) {
+			char errbuf[256];
+
 			err = (tm_tar_ops.tm_getdir)(cmds, cmds->tcs_command,
 			    nlp->nlp_jstat, &rn, 1, 1, sels, &excl, flags, 0,
 			    nlp->nlp_backup_path, session->hardlink_q);
+			/*
+			 * If the fatal error from tm_getdir looks like an
+			 * errno code, we send the error description to DMA.
+			 */
+			if (err > 0 && strerror_r(err, errbuf,
+			    sizeof (errbuf)) == 0) {
+				MOD_LOGV3(params, NDMP_LOG_ERROR,
+				    "Fatal error during the restore: %s\n",
+				    errbuf);
+			}
+		}
 
 		cmds->tcs_writer_count--;
 		cmds->tcs_command->tc_ref--;

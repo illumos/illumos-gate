@@ -1269,6 +1269,10 @@ be_do_mount(int argc, char **argv)
 		(void) fprintf(stderr, _("You have insufficient privileges to "
 		    "execute this command.\n"));
 		break;
+	case BE_ERR_NO_MOUNTED_ZONE:
+		(void) fprintf(stderr, _("Mounted on '%s'.\nUnable to mount "
+		    "one of %s's zone BE's.\n"), mountpoint, obe_name);
+		break;
 	default:
 		(void) fprintf(stderr, _("Unable to mount %s.\n"), obe_name);
 		(void) fprintf(stderr, "%s\n", be_err_to_str(err));
