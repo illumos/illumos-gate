@@ -22,6 +22,7 @@
 /*
  * Copyright 1999-2002 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
  */
 
 /*
@@ -29,8 +30,6 @@
  * All Rights Reserved
  *
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <unistd.h>
@@ -130,6 +129,8 @@ sttyparse(int argc, char *argv[], int term, struct termio *ocb,
 					cb->c_cc[VWERASE] = gct(*++argv, term);
 				else if (eq("lnext") && --argc)
 					cb->c_cc[VLNEXT] = gct(*++argv, term);
+				else if (eq("status") && --argc)
+					cb->c_cc[VSTATUS] = gct(*++argv, term);
 			}
 			if (match)
 				continue;
@@ -137,7 +138,7 @@ sttyparse(int argc, char *argv[], int term, struct termio *ocb,
 				cb->c_cc[VERASE] = CERASE;
 				cb->c_cc[VKILL] = CKILL;
 			} else if (eq("line") &&
-				    !(term & TERMIOS) && --argc) {
+			    !(term & TERMIOS) && --argc) {
 				ocb->c_line = atoi(*++argv);
 				continue;
 			} else if (eq("raw")) {
@@ -153,6 +154,7 @@ sttyparse(int argc, char *argv[], int term, struct termio *ocb,
 				cb->c_cc[VINTR] = CINTR;
 				cb->c_cc[VEOF] = CEOF;
 				cb->c_cc[VEOL] = CNUL;
+				cb->c_cc[VSTATUS] = CSTATUS;
 				/* SWTCH purposely not set */
 #ifdef EUC
 			} else if (eq("defeucw")) {
@@ -173,7 +175,7 @@ sttyparse(int argc, char *argv[], int term, struct termio *ocb,
 				    (unsigned char)(wp->_scrw3 & 0177);
 
 				(void) memcpy((void *)kcswp, (const void *)cswp,
-						sizeof (ldterm_cs_data_user_t));
+				    sizeof (ldterm_cs_data_user_t));
 #endif /* EUC */
 			} else if ((term & TERMIOS) && eq("ospeed") && --argc) {
 				s_arg = *++argv;
@@ -224,7 +226,7 @@ sttyparse(int argc, char *argv[], int term, struct termio *ocb,
 				cb->c_iflag |= imodes[i].set;
 #ifdef EUC
 				if (wp->_multibyte &&
-				(eq("-raw") || eq("cooked") || eq("sane")))
+				    (eq("-raw") || eq("cooked") || eq("sane")))
 					cb->c_iflag &= ~ISTRIP;
 #endif /* EUC */
 			}
@@ -251,7 +253,8 @@ sttyparse(int argc, char *argv[], int term, struct termio *ocb,
 				cb->c_cflag |= cmodes[i].set;
 #ifdef EUC
 				if (wp->_multibyte &&
-				(eq("-raw") || eq("cooked") || eq("sane"))) {
+				    (eq("-raw") || eq("cooked") ||
+				    eq("sane"))) {
 					cb->c_cflag &= ~(CS7|PARENB);
 					cb->c_cflag |= CS8;
 				}
@@ -477,7 +480,7 @@ set_ttymode(int fd, int term, struct termio *termio, struct termios *termios,
 		cmd.ic_dp = (char *)kcswp;
 		if (ioctl(fd, I_STR, &cmd) != 0) {
 			(void) fprintf(stderr, gettext(
-				"stty: can't set codeset width.\n"));
+			    "stty: can't set codeset width.\n"));
 			return (-1);
 		}
 	} else if (term & EUCW) {
@@ -487,7 +490,7 @@ set_ttymode(int fd, int term, struct termio *termio, struct termios *termios,
 		cmd.ic_dp = (char *)kwp;
 		if (ioctl(fd, I_STR, &cmd) != 0) {
 			(void) fprintf(stderr, gettext(
-				"stty: can't set EUC codeset width.\n"));
+			    "stty: can't set EUC codeset width.\n"));
 			return (-1);
 		}
 	}
@@ -545,7 +548,7 @@ parse_encoded(struct termios *cb
 		r = strdup(s_arg);
 		if (r == (char *)NULL) {
 			(void) fprintf(stderr, gettext(
-				"no more memory - try again later\n"));
+			    "no more memory - try again later\n"));
 			return (0);
 		}
 		t = strtok(r, ":");
@@ -601,7 +604,7 @@ parse_encoded(struct termios *cb
 			s[0] = *t++;
 			s[1] = *t++;
 			ecswp.locale_name[i] = (char)strtol(s, (char **)NULL,
-								16);
+			    16);
 		}
 		if (i >= MAXNAMELEN) {
 			free((void *)r);
@@ -625,7 +628,7 @@ parse_encoded(struct termios *cb
 
 		/* We got the 'ecswp' all filled up now; let's copy. */
 		(void) memcpy((void *)kcswp, (const void *)&ecswp,
-				sizeof (ldterm_cs_data_user_t));
+		    sizeof (ldterm_cs_data_user_t));
 	}
 #endif /* EUC */
 

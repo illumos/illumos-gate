@@ -27,10 +27,8 @@
 /*	  All Rights Reserved  	*/
 
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 typedef struct alert_node	ALERT;
-typedef struct cstat_node	CSTATUS;
+typedef struct cstat_node	CLSTATUS;
 typedef struct exec_node	EXEC;
 typedef struct form_node	_FORM;
 typedef struct fstat_node	FSTATUS;

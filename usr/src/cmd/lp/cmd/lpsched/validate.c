@@ -27,7 +27,6 @@
 /*	  All Rights Reserved  	*/
 
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /* SVr4.0 1.11.1.10	*/
 /* EMACS_MODES: !fill, lnumb, !overwrite, !nodelete, !picture */
 
@@ -76,7 +75,7 @@ _validate(RSTATUS *prs, PSTATUS *pps, PSTATUS *stop_pps, char **prefixp,
 
 	register FSTATUS	*pfs		= 0;
 
-	register CSTATUS	*pcs		= 0;
+	register CLSTATUS	*pcs		= 0;
 
 	CANDIDATE		*arena		= 0,
 				single;

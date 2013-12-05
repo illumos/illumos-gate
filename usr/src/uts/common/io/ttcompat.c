@@ -1177,6 +1177,7 @@ from_compat(compat_state_t *csp, struct termios *termiosp)
 	FROM_COMPAT_CHAR(termiosp->c_cc[VDISCARD], csp->t_flushc);
 	FROM_COMPAT_CHAR(termiosp->c_cc[VWERASE], csp->t_werasc);
 	FROM_COMPAT_CHAR(termiosp->c_cc[VLNEXT], csp->t_lnextc);
+	termiosp->c_cc[VSTATUS] = 0;
 	if (csp->t_flags & O_TANDEM)
 		termiosp->c_iflag |= IXOFF;
 	if (csp->t_flags & O_LCASE) {

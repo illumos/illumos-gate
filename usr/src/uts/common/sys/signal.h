@@ -158,8 +158,8 @@ struct sigaction32 {
  * use of these symbols by applications is injurious
  *	to binary compatibility
  */
-#define	NSIG	73	/* valid signals range from 1 to NSIG-1 */
-#define	MAXSIG	72	/* size of u_signal[], NSIG-1 <= MAXSIG */
+#define	NSIG	74	/* valid signals range from 1 to NSIG-1 */
+#define	MAXSIG	73	/* size of u_signal[], NSIG-1 <= MAXSIG */
 #endif /* defined(__EXTENSIONS__) || !defined(_XPG4_2) */
 
 #define	MINSIGSTKSZ	2048

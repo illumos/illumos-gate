@@ -162,7 +162,8 @@ extern pid_t tcgetsid();
 #define	VDISCARD	13
 #define	VWERASE		14
 #define	VLNEXT		15
-/* 16 thru 19 reserved for future use */
+#define	VSTATUS		16
+/* 17 through 19 reserved for future use */
 
 /*
  * control characters form Xenix termio.h
@@ -194,6 +195,7 @@ extern pid_t tcgetsid();
 #define	CFLUSH	CTRL('o')
 #define	CWERASE	CTRL('w')
 #define	CLNEXT	CTRL('v')
+#define	CSTATUS	CTRL('t')
 #endif /* !defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__) */
 
 

@@ -27,8 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /* EMACS_MODES: !fill, lnumb, !overwrite, !nodelete, !picture */
 
 #include "unistd.h"
@@ -271,7 +269,7 @@ new_pstatus(PRINTER *p)
 }
 
 void
-free_cstatus(CSTATUS *csp)
+free_cstatus(CLSTATUS *csp)
 {
 	if (csp != NULL) {
 		if (csp->rej_reason != NULL)
@@ -282,10 +280,10 @@ free_cstatus(CSTATUS *csp)
 	}
 }
 
-CSTATUS *
+CLSTATUS *
 new_cstatus(CLASS *c)
 {
-	CSTATUS *result = calloc(1, sizeof (*result));
+	CLSTATUS *result = calloc(1, sizeof (*result));
 	
 	if (result != NULL) {
 		if (c != NULL)
@@ -502,10 +500,10 @@ search_fptable(register char *paper)
 	return (ps); 
 }
 
-CSTATUS *
+CLSTATUS *
 search_cstatus(register char *name)
 { 
-	CSTATUS	*ps = NULL;
+	CLSTATUS	*ps = NULL;
 
 	if (name != NULL) {
 		if (CStatus != NULL) {

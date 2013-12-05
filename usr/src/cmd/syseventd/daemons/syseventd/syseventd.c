@@ -238,6 +238,7 @@ flt_handler(int sig)
 		case SIGXRES:
 		case SIGJVM1:
 		case SIGJVM2:
+		case SIGINFO:
 			/* No need to abort */
 			break;
 		default:

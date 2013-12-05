@@ -27,8 +27,6 @@
 /*	  All Rights Reserved  	*/
 
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "lpsched.h"
 #include "stdarg.h"
 
@@ -294,7 +292,7 @@ cancel_alert(int type, ...)
 static int
 dest_equivalent_printer(char *dest, char *printer)
 {
-	CSTATUS *		pc;
+	CLSTATUS *		pc;
 
 	return (
 		STREQU(dest, printer)

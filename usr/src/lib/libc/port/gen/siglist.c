@@ -111,6 +111,7 @@ static const char *_sys_siglist_data[NSIG] = {
 		"Resource Control Exceeded",		/* SIGXRES	*/
 		"Reserved for JVM 1",			/* SIGJVM1	*/
 		"Reserved for JVM 2",			/* SIGJVM2	*/
+		"Information Request",			/* SIGINFO	*/
 		"First Realtime Signal",		/* SIGRTMIN	*/
 		"Second Realtime Signal",		/* SIGRTMIN+1	*/
 		"Third Realtime Signal",		/* SIGRTMIN+2	*/

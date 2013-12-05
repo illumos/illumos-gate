@@ -22,6 +22,7 @@
 /*
  * Copyright 1999-2002 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
  */
 
 /*
@@ -29,8 +30,6 @@
  * All Rights Reserved
  *
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <ctype.h>
@@ -115,7 +114,7 @@ main(int argc, char *argv[])
 			if (read(fd, (void *)&cswp, sizeof (cswp)) <
 			    sizeof (cswp)) {
 				(void) fprintf(stderr, gettext(
-					"cannot read entier %s file\n"), tmps);
+				    "cannot read entire %s file\n"), tmps);
 				exit(2);
 			}
 
@@ -173,14 +172,14 @@ main(int argc, char *argv[])
 			return (0);
 		default:
 			(void) fprintf(stderr, gettext(
-				"usage: stty [-a| -g]\n"));
+			    "usage: stty [-a| -g]\n"));
 			(void) fprintf(stderr, gettext(
-				"       stty [modes]\n"));
+			    "       stty [modes]\n"));
 			return (2);
 	}
 
 	if ((argc == 3) && (argv[1][0] == '-') && (argv[1][2] == '\0') &&
-	(argv[2][0] == '-') && (argv[2][1] == '-') && (argv[2][2] == '\0'))
+	    (argv[2][0] == '-') && (argv[2][1] == '-') && (argv[2][2] == '\0'))
 	switch (argv[1][1]) {
 	case 'a':
 		pramodes();
@@ -190,13 +189,13 @@ main(int argc, char *argv[])
 		return (0);
 	default:
 		(void) fprintf(stderr, gettext(
-			"usage: stty [-a| -g]\n"));
+		    "usage: stty [-a| -g]\n"));
 		(void) fprintf(stderr, gettext(
-			"       stty [modes]\n"));
+		    "       stty [modes]\n"));
 		return (2);
 	}
 	if ((argc >= 3) && (argv[1][0] == '-') && (argv[1][1] == '-') &&
-		(argv[1][2] == '\0')) {
+	    (argv[1][2] == '\0')) {
 		/* ignore -- */
 		--argc;
 		++argv;
@@ -211,8 +210,9 @@ main(int argc, char *argv[])
 		for (i = 0; not_supported[i]; i++) {
 			if (strcmp(not_supported[i], s) == 0) {
 				(void) fprintf(stderr,
-				gettext(
-			"mode not supported on this device: %s\n"), s_arg);
+				    gettext(
+				    "mode not supported on this device: %s\n"),
+				    s_arg);
 				exit(2);
 			}
 		}
@@ -306,11 +306,11 @@ prmodes(void)				/* print modes, no options, argc is 1 */
 		if (ocb.c_line != 0)
 			(void) printf(gettext("line = %d; "), ocb.c_line);
 		if (term & WINDOW) {
+			(void) printf(gettext("rows = %d; columns = %d;"),
+			    winsize.ws_row, winsize.ws_col);
 			(void) printf(gettext(
-		"rows = %d; columns = %d;"), winsize.ws_row, winsize.ws_col);
-			(void) printf(gettext(
-				" ypixels = %d; xpixels = %d;\n"),
-				winsize.ws_ypixel, winsize.ws_xpixel);
+			    " ypixels = %d; xpixels = %d;\n"),
+			    winsize.ws_ypixel, winsize.ws_xpixel);
 		}
 		if ((cb.c_lflag&ICANON) == 0)
 			(void) printf(gettext("min = %d; time = %d;\n"),
@@ -348,6 +348,8 @@ prmodes(void)				/* print modes, no options, argc is 1 */
 				pit(cb.c_cc[VWERASE], "werase", "; ");
 			if (cb.c_cc[VLNEXT] != CLNEXT)
 				pit(cb.c_cc[VLNEXT], "lnext", "; ");
+			if (cb.c_cc[VSTATUS] != CSTATUS)
+				pit(cb.c_cc[VSTATUS], "status", "; ");
 		}
 		if (pitt) (void) printf("\n");
 		m = cb.c_iflag;
@@ -453,41 +455,41 @@ prmodes(void)				/* print modes, no options, argc is 1 */
 		m = termiox.x_cflag;
 		switch (m & XMTCLK) {
 			case XCIBRG: (void)printf("xcibrg ");
-				    break;
+					break;
 			case XCTSET: (void)printf("xctset ");
-				    break;
+					break;
 			case XCRSET: (void)printf("xcrset ");
 		}
 
 		switch (m & RCVCLK) {
 			case RCIBRG: (void)printf("rcibrg ");
-				    break;
+					break;
 			case RCTSET: (void)printf("rctset ");
-				    break;
+					break;
 			case RCRSET: (void)printf("rcrset ");
 		}
 
 		switch (m & TSETCLK) {
 			case TSETCOFF: (void)printf("tsetcoff ");
-				    break;
+					break;
 			case TSETCRBRG: (void)printf("tsetcrbrg ");
-				    break;
+					break;
 			case TSETCTBRG: (void)printf("tsetctbrg ");
-				    break;
+					break;
 			case TSETCTSET: (void)printf("tsetctset ");
-				    break;
+					break;
 			case TSETCRSET: (void)printf("tsetcrset ");
 		}
 
 		switch (m & RSETCLK) {
 			case RSETCOFF: (void)printf("rsetcoff ");
-				    break;
+					break;
 			case RSETCRBRG: (void)printf("rsetcrbrg ");
-				    break;
+					break;
 			case RSETCTBRG: (void)printf("rsetctbrg ");
-				    break;
+					break;
 			case RSETCTSET: (void)printf("rsetctset ");
-				    break;
+					break;
 			case RSETCRSET: (void)printf("rsetcrset ");
 		}
 		(void) printf("\n");
@@ -512,10 +514,10 @@ pramodes(void)				/* print all modes, -a option */
 		(void) printf("\n");
 		if (term & WINDOW) {
 			(void) printf(gettext("rows = %d; columns = %d;"),
-				winsize.ws_row, winsize.ws_col);
+			    winsize.ws_row, winsize.ws_col);
 			(void) printf(gettext(
-				" ypixels = %d; xpixels = %d;\n"),
-				winsize.ws_ypixel, winsize.ws_xpixel);
+			    " ypixels = %d; xpixels = %d;\n"),
+			    winsize.ws_ypixel, winsize.ws_xpixel);
 		}
 #ifdef EUC
 		if ((term & CSIW) && kcswp.locale_name[0]) {
@@ -529,15 +531,15 @@ pramodes(void)				/* print all modes, -a option */
 		 */
 		if ((term & EUCW) && kwp.eucw[0]) {
 			(void) printf("eucw %d:%d:%d:%d, ", kwp.eucw[0],
-				kwp.eucw[1], kwp.eucw[2], kwp.eucw[3]);
+			    kwp.eucw[1], kwp.eucw[2], kwp.eucw[3]);
 			(void) printf("scrw %d:%d:%d:%d\n", kwp.scrw[0],
-				kwp.scrw[1], kwp.scrw[2], kwp.scrw[3]);
+			    kwp.scrw[1], kwp.scrw[2], kwp.scrw[3]);
 		} else
 			(void) printf("eucw ?, scrw ?\n");
 #endif /* EUC */
 		if ((cb.c_lflag&ICANON) == 0)
 			(void) printf(gettext("min = %d; time = %d;\n"),
-				cb.c_cc[VMIN], cb.c_cc[VTIME]);
+			    cb.c_cc[VMIN], cb.c_cc[VTIME]);
 		pit(cb.c_cc[VINTR], "intr", "; ");
 		pit(cb.c_cc[VQUIT], "quit", "; ");
 		pit(cb.c_cc[VERASE], "erase", "; ");
@@ -555,6 +557,7 @@ pramodes(void)				/* print all modes, -a option */
 			pit(cb.c_cc[VDISCARD], "flush", "; ");
 			pit(cb.c_cc[VWERASE], "werase", "; ");
 			pit(cb.c_cc[VLNEXT], "lnext", ";\n");
+			pit(cb.c_cc[VSTATUS], "status", ";\n");
 		}
 	} else
 		pit((unsigned)stio.tab, "ctab", "\n");
@@ -644,41 +647,41 @@ pramodes(void)				/* print all modes, -a option */
 		m = termiox.x_cflag;
 		switch (m & XMTCLK) {
 			case XCIBRG: (void)printf("xcibrg ");
-				    break;
+					break;
 			case XCTSET: (void)printf("xctset ");
-				    break;
+					break;
 			case XCRSET: (void)printf("xcrset ");
 		}
 
 		switch (m & RCVCLK) {
 			case RCIBRG: (void)printf("rcibrg ");
-				    break;
+					break;
 			case RCTSET: (void)printf("rctset ");
-				    break;
+					break;
 			case RCRSET: (void)printf("rcrset ");
 		}
 
 		switch (m & TSETCLK) {
 			case TSETCOFF: (void)printf("tsetcoff ");
-				    break;
+					break;
 			case TSETCRBRG: (void)printf("tsetcrbrg ");
-				    break;
+					break;
 			case TSETCTBRG: (void)printf("tsetctbrg ");
-				    break;
+					break;
 			case TSETCTSET: (void)printf("tsetctset ");
-				    break;
+					break;
 			case TSETCRSET: (void)printf("tsetcrset ");
 		}
 
 		switch (m & RSETCLK) {
 			case RSETCOFF: (void)printf("rsetcoff ");
-				    break;
+					break;
 			case RSETCRBRG: (void)printf("rsetcrbrg ");
-				    break;
+					break;
 			case RSETCTBRG: (void)printf("rsetctbrg ");
-				    break;
+					break;
 			case RSETCTSET: (void)printf("rsetctset ");
-				    break;
+					break;
 			case RSETCRSET: (void)printf("rsetcrset ");
 		}
 		(void) printf("\n");
@@ -693,7 +696,7 @@ pit(unsigned char what, char *itsname, char *sep)
 	pitt++;
 	(void) printf("%s", itsname);
 	if ((term & TERMIOS) && what == _POSIX_VDISABLE ||
-			!(term & TERMIOS) && what == 0200) {
+	    !(term & TERMIOS) && what == 0200) {
 		(void) printf(" = <undef>%s", sep);
 		return;
 	}
@@ -753,7 +756,7 @@ prencode(void)		/* another stty cmd, used for -g option */
 	 * output, control, and line discipline modes.
 	 */
 	(void) printf("%x:%x:%x:%x", cb.c_iflag, cb.c_oflag, cb.c_cflag,
-		cb.c_lflag);
+	    cb.c_lflag);
 
 	/* Print the control character fields. */
 	if (term & TERMIOS)
@@ -771,7 +774,7 @@ prencode(void)		/* another stty cmd, used for -g option */
 		 * structure.
 		 */
 		(void) printf(":%x:%x:%x:", kcswp.version, kcswp.codeset_type,
-				kcswp.csinfo_num);
+		    kcswp.csinfo_num);
 		if (*kcswp.locale_name == '\0') {
 			(void) printf("00");
 		} else {
@@ -780,10 +783,10 @@ prencode(void)		/* another stty cmd, used for -g option */
 		}
 		for (i = 0; i < LDTERM_CS_MAX_CODESETS; i++)
 			(void) printf(":%x:%x:%x:%x",
-				kcswp.eucpc_data[i].byte_length,
-				kcswp.eucpc_data[i].screen_width,
-				kcswp.eucpc_data[i].msb_start,
-				kcswp.eucpc_data[i].msb_end);
+			    kcswp.eucpc_data[i].byte_length,
+			    kcswp.eucpc_data[i].screen_width,
+			    kcswp.eucpc_data[i].msb_start,
+			    kcswp.eucpc_data[i].msb_end);
 	} else {
 #endif /* EUC */
 		for (i = 0; i < last; i++)
