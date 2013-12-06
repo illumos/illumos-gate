@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  */
 
 /*
@@ -58,19 +59,20 @@
 
 
 #define	PM_EXACT_OR_CHILD(m)	((m) == PM_EXACT || (m) == PM_CHILD)
+#define	ERROR_IS_FATAL(err)	((err) == ENOSPC || (err) == EDQUOT)
 
 typedef boolean_t name_match_fp_t(char *s, char *t);
 
-static void set_acl(char *name,
-    tlm_acls_t *acls);
-static long restore_file(int *fp,
+static int set_acl(char *name, tlm_acls_t *acls);
+static int restore_file(int *fp,
     char *real_name,
     long size,
     longlong_t huge_size,
     tlm_acls_t *,
     boolean_t want_this_file,
     tlm_cmd_t *,
-    tlm_job_stats_t *);
+    tlm_job_stats_t *,
+    long *);
 static long restore_xattr_hdr(int *fp,
     char *name,
     char *fname,
@@ -185,7 +187,7 @@ dtree_pop(cstack_t *stp)
 	if (err)
 		return (-1);
 
-	set_acl(sp->se_name, &sp->se_acls);
+	err = set_acl(sp->se_name, &sp->se_acls);
 
 	free(sp->se_name);
 	free(sp);
@@ -240,6 +242,9 @@ rs_darhl_new_name(struct rs_name_maker *rnp, char *name, char **sels, int *pos,
 
 /*
  * Main dir restore function for tar
+ *
+ * If this function returns non-zero return value it means that fatal error
+ * was encountered.
  */
 int
 tar_getdir(tlm_commands_t *commands,
@@ -277,7 +282,6 @@ tar_getdir(tlm_commands_t *commands,
 					 * selections list
 					 */
 	int	nzerohdr;		/* the number of empty tar headers */
-	boolean_t break_flg;		/* exit the while loop */
 	int	rv;
 	long nm_end, lnk_end;
 	char	*name, *nmp;
@@ -344,9 +348,8 @@ tar_getdir(tlm_commands_t *commands,
 	 */
 	rv = 0;
 	nzerohdr = 0;
-	break_flg = FALSE;
 	while (commands->tcs_writer != TLM_ABORT &&
-	    local_commands->tc_writer != TLM_STOP) {
+	    local_commands->tc_writer != TLM_STOP && rv == 0) {
 		tlm_tar_hdr_t fake_tar_hdr;
 		char	*file_name;
 		char	*link_name;
@@ -378,12 +381,6 @@ tar_getdir(tlm_commands_t *commands,
 
 		/* used to make up hardlink_tmp_name */
 		static int hardlink_tmp_idx = 0;
-
-		if (break_flg) {
-			NDMP_LOG(LOG_DEBUG,
-			    "Exiting writer thread drive %d", drv);
-			break;
-		}
 
 		if (multi_volume) {
 			NDMP_LOG(LOG_DEBUG, "multi_volume %c %d",
@@ -563,6 +560,10 @@ tar_getdir(tlm_commands_t *commands,
 						erc = create_hard_link(
 						    hardlink_target, nmp,
 						    acls, job_stats);
+						if (ERROR_IS_FATAL(erc)) {
+							rv = erc;
+							continue;
+						}
 						if (erc == 0) {
 							(void)
 							    tlm_entry_restored(
@@ -643,14 +644,13 @@ tar_getdir(tlm_commands_t *commands,
 				if (DAR && (tar_hdr->th_linkflag == LF_LINK)) {
 					nmp = rs_darhl_new_name(rnp, name,
 					    sels, &pos, longname);
-
-					if (nmp) {
-						want_this_file = TRUE;
-						mchtype = PM_EXACT;
-					} else {
-						break_flg = TRUE;
-						break;
+					if (nmp == NULL) {
+						rv = ENOMEM;
+						continue;
 					}
+
+					want_this_file = TRUE;
+					mchtype = PM_EXACT;
 				}
 			} else {
 				nmp = rs_new_name(rnp, name, pos, longname);
@@ -699,9 +699,11 @@ tar_getdir(tlm_commands_t *commands,
 				}
 			}
 
-			size_left = restore_file(&fp, nmp, file_size,
+			rv = restore_file(&fp, nmp, file_size,
 			    huge_size, acls, want_this_file, local_commands,
-			    job_stats);
+			    job_stats, &size_left);
+			if (rv != 0)
+				continue;
 
 			/*
 			 * In the case of non-DAR, we have to record the first
@@ -733,23 +735,22 @@ tar_getdir(tlm_commands_t *commands,
 			 * of the restored directory
 			 */
 			while (nmp && ((bkpath = dtree_peek(stp)) != NULL)) {
+				int erc;
+
 				if (strstr(nmp, bkpath))
 					break;
 
-				(void) dtree_pop(stp);
+				erc = dtree_pop(stp);
+				if (ERROR_IS_FATAL(erc)) {
+					rv = erc;
+					break;
+				}
 			}
+			if (rv != 0)
+				continue;
 
 			NDMP_LOG(LOG_DEBUG, "sizeleft %s %d, %lld", longname,
 			    size_left, huge_size);
-
-			if (size_left == -TLM_STOP) {
-				break_flg = TRUE;
-				rv = -1;
-				commands->tcs_reader = TLM_ABORT;
-				NDMP_LOG(LOG_DEBUG, "restoring [%s] failed",
-				    longname);
-				break;
-			}
 
 			if (want_this_file) {
 				job_stats->js_bytes_total += file_size;
@@ -814,6 +815,10 @@ tar_getdir(tlm_commands_t *commands,
 				if (nmp) {
 					erc = create_sym_link(nmp, link_name,
 					    acls, job_stats);
+					if (ERROR_IS_FATAL(erc)) {
+						rv = erc;
+						continue;
+					}
 					if (erc == 0 &&
 					    PM_EXACT_OR_CHILD(mchtype))
 						(void) tlm_entry_restored(
@@ -837,6 +842,10 @@ tar_getdir(tlm_commands_t *commands,
 					(void) strlcpy(parentlnk, nmp,
 					    strlen(nmp));
 					erc = create_directory(nmp, job_stats);
+					if (ERROR_IS_FATAL(erc)) {
+						rv = erc;
+						continue;
+					}
 					if (erc == 0 &&
 					    PM_EXACT_OR_CHILD(mchtype))
 						(void) tlm_entry_restored(
@@ -848,10 +857,18 @@ tar_getdir(tlm_commands_t *commands,
 					 */
 					while ((bkpath = dtree_peek(stp))
 					    != NULL) {
+						int rc;
+
 						if (strstr(nmp, bkpath))
 							break;
-						(void) dtree_pop(stp);
+						rc = dtree_pop(stp);
+						if (ERROR_IS_FATAL(rc)) {
+							rv = rc;
+							break;
+						}
 					}
+					if (rv != 0)
+						continue;
 
 					(void) dtree_push(stp, nmp, acls);
 					name[0] = 0;
@@ -879,6 +896,10 @@ tar_getdir(tlm_commands_t *commands,
 					    th_dev.th_devmajor),
 					    oct_atoi(tar_hdr->th_shared.
 					    th_dev.th_devminor), job_stats);
+					if (ERROR_IS_FATAL(erc)) {
+						rv = erc;
+						continue;
+					}
 					if (erc == 0 &&
 					    PM_EXACT_OR_CHILD(mchtype))
 						(void) tlm_entry_restored(
@@ -945,6 +966,8 @@ tar_getdir(tlm_commands_t *commands,
 	/*
 	 * tear down
 	 */
+	if (rv != 0)
+		commands->tcs_reader = TLM_ABORT;
 	if (fp != 0) {
 		(void) close(fp);
 	}
@@ -1085,7 +1108,7 @@ make_dirs(char *dir)
 					    " creating directory %s",
 					    errno, dir);
 					*cp = c;
-					return (-1);
+					return (errno);
 				}
 
 			*cp = c;
@@ -1125,8 +1148,11 @@ mkbasedir(char *path)
 
 /*
  * read the file off the tape back onto disk
+ *
+ * If the function returns a non-zero return code, it means that fatal error
+ * was encountered and restore should terminate immediately.
  */
-static long
+static int
 restore_file(int *fp,
     char *real_name,
     long size,
@@ -1134,10 +1160,13 @@ restore_file(int *fp,
     tlm_acls_t *acls,
     boolean_t want_this_file,
     tlm_cmd_t *local_commands,
-    tlm_job_stats_t *job_stats)
+    tlm_job_stats_t *job_stats,
+    long *size_left)
 {
 	struct stat64	attr;
+	int	ret, rv;
 
+	*size_left = 0;
 	if (!real_name) {
 		if (want_this_file) {
 			NDMP_LOG(LOG_DEBUG, "No file name but wanted!");
@@ -1163,13 +1192,16 @@ restore_file(int *fp,
 	 */
 
 	if (*fp == 0 && want_this_file) {
-		int	erc_stat;
 
-		if (mkbasedir(real_name) < 0)
+		ret = mkbasedir(real_name);
+		if (ret != 0) {
 			job_stats->js_errors++;
+			if (ERROR_IS_FATAL(ret))
+				return (ret);
+		}
 
-		erc_stat = stat64(real_name, (struct stat64 *)&attr);
-		if (erc_stat < 0) {
+		ret = stat64(real_name, (struct stat64 *)&attr);
+		if (ret < 0) {
 			/*EMPTY*/
 			/* new file */
 		} else if (acls->acl_overwrite) {
@@ -1196,18 +1228,17 @@ restore_file(int *fp,
 			    S_IRUSR | S_IWUSR);
 			if (*fp == -1) {
 				NDMP_LOG(LOG_ERR,
-				    "Could not open %s for restore.",
-				    real_name);
-				NDMP_LOG(LOG_DEBUG,
-				    "fp=%d err=%d ", *fp, errno);
+				    "Could not open %s for restore: %d",
+				    real_name, errno);
 				job_stats->js_errors++;
 				want_this_file = FALSE;
 				/*
-				 * we cannot return here,
-				 * the file is still on
-				 * the tape and must be
-				 * skipped over.
+				 * In case of non-fatal error we cannot return
+				 * here, because the file is still on the tape
+				 * and must be skipped over.
 				 */
+				if (ERROR_IS_FATAL(errno))
+					return (errno);
 			}
 		}
 		(void) strlcpy(local_commands->tc_file_name, real_name,
@@ -1222,6 +1253,7 @@ restore_file(int *fp,
 	/*
 	 * work
 	 */
+	rv = 0;
 	while (size > 0 && local_commands->tc_writer == TLM_RESTORE_RUN) {
 		int	actual_size;
 		int	error;
@@ -1244,21 +1276,37 @@ restore_file(int *fp,
 
 			/* no more data for this file for now */
 			job_stats->js_bytes_in_file = 0;
-
-			return (size);
+			*size_left = size;
+			return (0);
 		} else if (error) {
 			NDMP_LOG(LOG_DEBUG, "Error %d in file [%s]",
 			    error, local_commands->tc_file_name);
 			break;
-		} else {
-			write_size = min(size, actual_size);
-			if (want_this_file) {
-				write_size = write(*fp, rec, write_size);
-				NS_ADD(wdisk, write_size);
-				NS_INC(wfile);
-			}
-			size -= write_size;
 		}
+
+		write_size = min(size, actual_size);
+		if (want_this_file) {
+			ret = write(*fp, rec, write_size);
+			if (ret < 0) {
+				NDMP_LOG(LOG_ERR,
+				    "Write error %d for file [%s]", errno,
+				    local_commands->tc_file_name);
+				job_stats->js_errors++;
+				if (ERROR_IS_FATAL(errno)) {
+					rv = errno;
+					break;
+				}
+			} else {
+				NS_ADD(wdisk, ret);
+				NS_INC(wfile);
+				if (ret < write_size) {
+					NDMP_LOG(LOG_ERR,
+					    "Partial write for file [%s]",
+					    local_commands->tc_file_name);
+				}
+			}
+		}
+		size -= write_size;
 	}
 
 	/* no more data for this file for now */
@@ -1270,9 +1318,13 @@ restore_file(int *fp,
 	if (*fp != 0 && huge_size <= 0) {
 		(void) close(*fp);
 		*fp = 0;
-		set_acl(real_name, acls);
+		if (rv == 0) {
+			ret = set_acl(real_name, acls);
+			if (ERROR_IS_FATAL(ret))
+				return (ret);
+		}
 	}
-	return (0);
+	return (rv);
 }
 
 /*
@@ -1793,7 +1845,7 @@ get_long_name(int lib,
 /*
  * create a new directory
  */
-static	int
+static int
 create_directory(char *dir, tlm_job_stats_t *job_stats)
 {
 	struct stat64 attr;
@@ -1814,12 +1866,12 @@ create_directory(char *dir, tlm_job_stats_t *job_stats)
 		if (temp == '/' || temp == 0) {
 			*p = 0;
 			if (stat64(dir, &attr) < 0) {
-				erc = mkdir(dir, 0777);
-				if (erc < 0) {
+				if (mkdir(dir, 0777) != 0 && errno != EEXIST) {
+					erc = errno;
 					job_stats->js_errors++;
 					NDMP_LOG(LOG_DEBUG,
-					    "Could not create directory %s",
-					    dir);
+					    "Could not create directory %s: %d",
+					    dir, errno);
 					break;
 				}
 			}
@@ -1840,27 +1892,23 @@ create_hard_link(char *name_old, char *name_new,
 {
 	int erc;
 
-	if (mkbasedir(name_new)) {
-		NDMP_LOG(LOG_DEBUG, "faile to make base dir for [%s]",
-		    name_new);
+	erc = mkbasedir(name_new);
+	if (erc != 0)
+		return (erc);
 
-		return (-1);
-	}
-
-	erc = link(name_old, name_new);
-
-	/* Nothing to do if the destination already exists */
-	if (erc && (errno == EEXIST))
-		return (0);
+	if (link(name_old, name_new) != 0)
+		erc = errno;
 
 	if (erc) {
+		/* Nothing to do if the destination already exists */
+		if (erc == EEXIST)
+			return (0);
 		job_stats->js_errors++;
 		NDMP_LOG(LOG_DEBUG, "error %d (errno %d) hardlink [%s] to [%s]",
 		    erc, errno, name_new, name_old);
-	} else {
-		set_acl(name_new, acls);
+		return (erc);
 	}
-	return (erc);
+	return (set_acl(name_new, acls));
 }
 
 /*
@@ -1874,18 +1922,19 @@ create_sym_link(char *dst, char *target, tlm_acls_t *acls,
 	int erc;
 	struct stat64 *st;
 
-	if (mkbasedir(dst) < 0)
-		return (-1);
+	erc = mkbasedir(dst);
+	if (erc != 0)
+		return (erc);
 
 	st = &acls->acl_attr;
-	erc = symlink(target, dst);
-	if (erc) {
+	if (symlink(target, dst) != 0) {
+		erc = errno;
 		job_stats->js_errors++;
-		NDMP_LOG(LOG_DEBUG, "error %d (errno %d) softlink [%s] to [%s]",
-		    erc, errno, dst, target);
+		NDMP_LOG(LOG_DEBUG, "error %d softlink [%s] to [%s]",
+		    errno, dst, target);
 	} else {
 		st->st_mode |= S_IFLNK;
-		set_acl(dst, acls);
+		erc = set_acl(dst, acls);
 	}
 
 	return (erc);
@@ -1900,7 +1949,6 @@ create_special(char flag, char *name, tlm_acls_t *acls, int major, int minor,
 {
 	dev_t dev;
 	mode_t mode;
-	int erc;
 
 	switch (flag) {
 	case LF_CHR:
@@ -1925,15 +1973,13 @@ create_special(char flag, char *name, tlm_acls_t *acls, int major, int minor,
 		if (errno == ENOTDIR)
 			(void) unlink(name);
 	}
-	erc = mknod(name, 0777 | mode, dev);
-	if (erc) {
+	if (mknod(name, 0777 | mode, dev) != 0) {
 		job_stats->js_errors++;
-		NDMP_LOG(LOG_DEBUG, "error %d (errno %d) mknod [%s] major"
-		    " %d minor %d", erc, errno, name, major, minor);
-	} else {
-		set_acl(name, acls);
+		NDMP_LOG(LOG_DEBUG, "error %d mknod [%s] major"
+		    " %d minor %d", errno, name, major, minor);
+		return (errno);
 	}
-	return (erc);
+	return (set_acl(name, acls));
 }
 
 /*
@@ -2032,7 +2078,7 @@ ndmp_set_eprivs_all(void)
 /*
  * Set the standard attributes of the file
  */
-static void
+static int
 set_attr(char *name, tlm_acls_t *acls)
 {
 	struct utimbuf tbuf;
@@ -2042,10 +2088,11 @@ set_attr(char *name, tlm_acls_t *acls)
 	gid_t gid;
 	struct passwd *pwd;
 	struct group *grp;
+	int erc = 0;
 
 
 	if (!name || !acls)
-		return;
+		return (0);
 
 	st = &acls->acl_attr;
 	NDMP_LOG(LOG_DEBUG, "set_attr: %s uid %d gid %d uname %s gname %s "
@@ -2066,9 +2113,12 @@ set_attr(char *name, tlm_acls_t *acls)
 		gid = grp->gr_gid;
 	}
 
-	if (lchown(name, uid, gid))
+	erc = lchown(name, uid, gid);
+	if (erc != 0) {
+		erc = errno;
 		NDMP_LOG(LOG_ERR,
 		    "Could not set uid or/and gid for file %s.", name);
+	}
 
 	if ((st->st_mode & (S_ISUID | S_ISGID)) != 0) {
 		/*
@@ -2085,9 +2135,12 @@ set_attr(char *name, tlm_acls_t *acls)
 	}
 
 	if (!S_ISLNK(st->st_mode)) {
-		if (chmod(name, st->st_mode))
+		erc = chmod(name, st->st_mode);
+		if (erc != 0) {
+			erc = errno;
 			NDMP_LOG(LOG_ERR, "Could not set correct file"
-			    " permission for file %s.", name);
+			    " permission for file %s: %d", name, errno);
+		}
 
 		tbuf.modtime = st->st_mtime;
 		tbuf.actime = st->st_atime;
@@ -2104,12 +2157,14 @@ set_attr(char *name, tlm_acls_t *acls)
 			NDMP_LOG(LOG_ERR,
 			    "Could not set least required privileges.");
 	}
+
+	return (erc);
 }
 
 /*
  * Set the ACL info for the file
  */
-static void
+static int
 set_acl(char *name, tlm_acls_t *acls)
 {
 	int erc;
@@ -2117,32 +2172,37 @@ set_acl(char *name, tlm_acls_t *acls)
 
 	if (name)
 		NDMP_LOG(LOG_DEBUG, "set_acl: %s", name);
-	if (acls != 0) {
-		/* Need a place to save real modification time */
+	if (acls == NULL)
+		return (0);
 
-		set_attr(name, acls);
+	/* Need a place to save real modification time */
 
-		if (!acls->acl_non_trivial) {
-			(void) memset(acls, 0, sizeof (tlm_acls_t));
-			NDMP_LOG(LOG_DEBUG, "set_acl: skipping trivial");
-			return;
-		}
+	erc = set_attr(name, acls);
+	if (ERROR_IS_FATAL(erc))
+		return (erc);
 
-		erc = acl_fromtext(acls->acl_info.attr_info, &aclp);
-		if (erc != 0) {
-			NDMP_LOG(LOG_DEBUG,
-			    "TAPE RESTORE> acl_fromtext errno %d", erc);
-		}
-		if (aclp) {
-			erc = acl_set(name, aclp);
-			if (erc < 0) {
-				NDMP_LOG(LOG_DEBUG,
-				    "TAPE RESTORE> acl_set errno %d", errno);
-			}
-			acl_free(aclp);
-		}
+	if (!acls->acl_non_trivial) {
 		(void) memset(acls, 0, sizeof (tlm_acls_t));
+		NDMP_LOG(LOG_DEBUG, "set_acl: skipping trivial");
+		return (erc);
 	}
+
+	erc = acl_fromtext(acls->acl_info.attr_info, &aclp);
+	if (erc != 0) {
+		NDMP_LOG(LOG_DEBUG,
+		    "TAPE RESTORE> acl_fromtext errno %d", erc);
+	}
+	if (aclp) {
+		erc = acl_set(name, aclp);
+		if (erc < 0) {
+			erc = errno;
+			NDMP_LOG(LOG_DEBUG,
+			    "TAPE RESTORE> acl_set errno %d", errno);
+		}
+		acl_free(aclp);
+	}
+	(void) memset(acls, 0, sizeof (tlm_acls_t));
+	return (erc);
 }
 
 /*

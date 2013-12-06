@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2013 by Delphix. All rights reserved.
  * Copyright (c) 2012 Joyent, Inc. All rights reserved.
+ * Copyright (c) 2013 Josef 'Jeff' Sipek <jeffpc@josefsipek.net>
  */
 /*
  * This file contains all of the interfaces for mdb's tab completion engine.
@@ -394,11 +395,8 @@ mdb_tab_size(mdb_tab_cookie_t *mcp)
 void
 mdb_tab_insert(mdb_tab_cookie_t *mcp, const char *name)
 {
-	size_t len, matches, index;
-	uint_t flags;
+	size_t matches, index;
 	mdb_var_t *v;
-	char *n;
-	const char *nvn;
 
 	/*
 	 * If we have a match set, then we want to verify that we actually match
@@ -412,34 +410,15 @@ mdb_tab_insert(mdb_tab_cookie_t *mcp, const char *name)
 	if (v != NULL)
 		return;
 
-	/*
-	 * Names that we get passed in may be longer than MDB_NV_NAMELEN which
-	 * is currently 31 including the null terminator. If that is the case,
-	 * then we're going to take care of allocating a string and holding it
-	 * for our caller. Note that we don't need to free it, because we're
-	 * allocating this with UM_GC.
-	 */
-	flags = 0;
-	len = strlen(name);
-	if (len > MDB_NV_NAMELEN - 1) {
-		n = mdb_alloc(len + 1, UM_SLEEP | UM_GC);
-		(void) strcpy(n, name);
-		nvn = n;
-		flags |= MDB_NV_EXTNAME;
-	} else {
-		nvn = name;
-	}
-	flags |= MDB_NV_RDONLY;
-
-	(void) mdb_nv_insert(&mcp->mtc_nv, nvn, NULL, 0, flags);
+	(void) mdb_nv_insert(&mcp->mtc_nv, name, NULL, 0, MDB_NV_RDONLY);
 
 	matches = mdb_tab_size(mcp);
 	if (matches == 1) {
-		(void) strlcpy(mcp->mtc_match, nvn, MDB_SYM_NAMLEN);
+		(void) strlcpy(mcp->mtc_match, name, MDB_SYM_NAMLEN);
 	} else {
 		index = 0;
 		while (mcp->mtc_match[index] &&
-		    mcp->mtc_match[index] == nvn[index])
+		    mcp->mtc_match[index] == name[index])
 			index++;
 
 		mcp->mtc_match[index] = '\0';

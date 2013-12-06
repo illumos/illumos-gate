@@ -23,8 +23,9 @@
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 2013 Josef 'Jeff' Sipek <jeffpc@josefsipek.net>
+ */
 
 #include <mdb/mdb_debug.h>
 #include <mdb/mdb_string.h>
@@ -38,7 +39,7 @@
 
 #define	NV_SIZE(v) \
 	(((v)->v_flags & MDB_NV_EXTNAME) ? sizeof (mdb_var_t) : \
-	sizeof (mdb_var_t) + MDB_NV_NAMELEN - 1)
+	sizeof (mdb_var_t) + strlen((v)->v_lname))
 
 #define	NV_HASHSZ	211
 
@@ -66,20 +67,28 @@ static mdb_var_t *
 nv_var_alloc(const char *name, const mdb_nv_disc_t *disc,
 	uintmax_t value, uint_t flags, uint_t um_flags, mdb_var_t *next)
 {
-	size_t nbytes = (flags & MDB_NV_EXTNAME) ? sizeof (mdb_var_t) :
-	    (sizeof (mdb_var_t) + MDB_NV_NAMELEN - 1);
+	size_t nbytes;
+	mdb_var_t *v;
 
-	mdb_var_t *v = mdb_alloc(nbytes, um_flags);
+	if (flags & MDB_NV_EXTNAME)
+		nbytes = sizeof (mdb_var_t);
+	else
+		nbytes = sizeof (mdb_var_t) + strlen(name);
+
+	v = mdb_alloc(nbytes, um_flags);
 
 	if (v == NULL)
 		return (NULL);
 
 	if (flags & MDB_NV_EXTNAME) {
 		v->v_ename = name;
-		v->v_lname[0] = 0;
+		v->v_lname[0] = '\0';
 	} else {
-		(void) strncpy(v->v_lname, name, MDB_NV_NAMELEN - 1);
-		v->v_lname[MDB_NV_NAMELEN - 1] = '\0';
+		/*
+		 * We don't overflow here since the mdb_var_t itself has
+		 * room for the trailing \0.
+		 */
+		(void) strcpy(v->v_lname, name);
 		v->v_ename = NULL;
 	}
 

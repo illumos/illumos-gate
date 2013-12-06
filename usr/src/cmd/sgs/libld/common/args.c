@@ -1679,8 +1679,19 @@ parseopt_pass1(Ofl_desc *ofl, int argc, char **argv, int *usage)
 
 		case '?':
 			DBG_CALL(Dbg_args_option(ofl->ofl_lml, ndx, c, NULL));
-			eprintf(ofl->ofl_lml, ERR_FATAL,
-			    MSG_INTL(MSG_ARG_UNKNOWN), optopt);
+			/*
+			 * If the option character is '-', we're looking at a
+			 * long option which couldn't be translated, display a
+			 * more useful error.
+			 */
+			if (optopt == '-') {
+				eprintf(ofl->ofl_lml, ERR_FATAL,
+				    MSG_INTL(MSG_ARG_LONG_UNKNOWN),
+				    argv[optind-1]);
+			} else {
+				eprintf(ofl->ofl_lml, ERR_FATAL,
+				    MSG_INTL(MSG_ARG_UNKNOWN), optopt);
+			}
 			(*usage)++;
 			break;
 

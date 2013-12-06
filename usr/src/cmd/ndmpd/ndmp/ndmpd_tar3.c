@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  */
 
 /*
@@ -3220,10 +3221,22 @@ ndmpd_dar_tar_v3(ndmpd_session_t *session, ndmpd_module_params_t *params,
 		}
 
 		if (tm_tar_ops.tm_getdir != NULL) {
+			char errbuf[256];
+
 			err = (tm_tar_ops.tm_getdir)(cmds, cmds->tcs_command,
 			    nlp->nlp_jstat, &rn, 1, 1, sels, &excl, flags,
 			    dar_index, nlp->nlp_backup_path,
 			    session->hardlink_q);
+			/*
+			 * If the fatal error from tm_getdir looks like an
+			 * errno code, we send the error description to DMA.
+			 */
+			if (err > 0 && strerror_r(err, errbuf,
+			    sizeof (errbuf)) == 0) {
+				MOD_LOGV3(params, NDMP_LOG_ERROR,
+				    "Fatal error during the restore: %s\n",
+				    errbuf);
+			}
 		}
 
 		cmds->tcs_writer_count--;
@@ -3580,10 +3593,23 @@ ndmpd_rs_sar_tar_v3(ndmpd_session_t *session, ndmpd_module_params_t *params,
 		cmds->tcs_command->tc_ref++;
 		cmds->tcs_writer_count++;
 
-		if (tm_tar_ops.tm_getdir != NULL)
+		if (tm_tar_ops.tm_getdir != NULL) {
+			char errbuf[256];
+
 			err = (tm_tar_ops.tm_getdir)(cmds, cmds->tcs_command,
 			    nlp->nlp_jstat, &rn, 1, 1, sels, &excl, flags, 0,
 			    nlp->nlp_backup_path, session->hardlink_q);
+			/*
+			 * If the fatal error from tm_getdir looks like an
+			 * errno code, we send the error description to DMA.
+			 */
+			if (err > 0 && strerror_r(err, errbuf,
+			    sizeof (errbuf)) == 0) {
+				MOD_LOGV3(params, NDMP_LOG_ERROR,
+				    "Fatal error during the restore: %s\n",
+				    errbuf);
+			}
+		}
 
 		cmds->tcs_writer_count--;
 		cmds->tcs_command->tc_ref--;
@@ -3661,31 +3687,25 @@ ndmp_error
 ndmp_backup_get_params_v3(ndmpd_session_t *session,
     ndmpd_module_params_t *params)
 {
-	ndmp_error rv;
 	ndmp_lbr_params_t *nlp;
 
 	if (!session || !params)
 		return (NDMP_ILLEGAL_ARGS_ERR);
 
-	rv = NDMP_NO_ERR;
 	nlp = ndmp_get_nlp(session);
 	if (!nlp) {
 		MOD_LOGV3(params, NDMP_LOG_ERROR,
 		    "Internal error: NULL nlp.\n");
-		rv = NDMP_ILLEGAL_ARGS_ERR;
+		return (NDMP_ILLEGAL_ARGS_ERR);
 	} else {
-		if (!(nlp->nlp_backup_path = get_backup_path_v3(params)))
-			rv = NDMP_FILE_NOT_FOUND_ERR;
-		else if (!is_valid_backup_dir_v3(params, nlp->nlp_backup_path))
-			rv = NDMP_ILLEGAL_ARGS_ERR;
+		if (!(nlp->nlp_backup_path = get_backup_path_v3(params)) ||
+		    !is_valid_backup_dir_v3(params, nlp->nlp_backup_path))
+		return (NDMP_ILLEGAL_ARGS_ERR);
 	}
 
 	nlp->nlp_backup_path = get_absolute_path(nlp->nlp_backup_path);
 	if (!nlp->nlp_backup_path)
-		rv = NDMP_FILE_NOT_FOUND_ERR;
-
-	if (rv != NDMP_NO_ERR)
-		return (rv);
+		return (NDMP_ILLEGAL_ARGS_ERR);
 
 	if (fs_is_chkpntvol(nlp->nlp_backup_path) ||
 	    fs_is_rdonly(nlp->nlp_backup_path) ||
@@ -3715,9 +3735,7 @@ ndmp_backup_get_params_v3(ndmpd_session_t *session,
 	get_exc_env_v3(params, nlp);
 	get_inc_env_v3(params, nlp);
 	get_direct_env_v3(params, nlp);
-	rv = get_backup_level_v3(params, nlp);
-
-	return (rv);
+	return (get_backup_level_v3(params, nlp));
 }
 
 

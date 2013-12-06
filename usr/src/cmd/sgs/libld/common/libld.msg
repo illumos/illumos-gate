@@ -932,6 +932,7 @@
 @ MSG_ARG_UNSUPPORTED	"option %s is no longer supported; ignored"
 @ MSG_MARG_ONLY		"option %s can only be used with a %s"
 @ MSG_ARG_UNKNOWN	"unrecognized option '-%c'"
+@ MSG_ARG_LONG_UNKNOWN	"unrecognized option '%s'"
 @ MSG_ARG_USEHELP	"use the -z help option for usage information"
 
 

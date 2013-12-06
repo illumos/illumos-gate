@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  *
  * logadm/main.c -- main routines for logadm
  *
@@ -37,6 +38,7 @@
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <sys/filio.h>
+#include <sys/sysmacros.h>
 #include <time.h>
 #include <utime.h>
 #include "err.h"
@@ -828,7 +830,7 @@ rotateto(struct fn *fnp, struct opts *opts, int n, struct fn *recentlog,
 	fn_free(dirname);
 
 	/* do the rename */
-	if (opts_count(opts, "c") != NULL) {
+	if (n == 0 && opts_count(opts, "c") != NULL) {
 		docopytruncate(opts, fn_s(fnp), fn_s(newfile));
 	} else if (n == 0 && opts_count(opts, "M")) {
 		struct fn *rawcmd = fn_new(opts_optarg(opts, "M"));
@@ -1100,10 +1102,12 @@ docmd(struct opts *opts, const char *msg, const char *cmd,
 static void
 docopytruncate(struct opts *opts, const char *file, const char *file_copy)
 {
-	int fi, fo, len;
-	char buf[4096];
+	int fi, fo;
+	char buf[128 * 1024];
 	struct stat s;
 	struct utimbuf times;
+	off_t written = 0, rem, last = 0, thresh = 1024 * 1024;
+	ssize_t len;
 
 	/* print info if necessary */
 	if (opts_count(opts, "vn") != NULL) {
@@ -1129,13 +1133,84 @@ docopytruncate(struct opts *opts, const char *file, const char *file_copy)
 	}
 
 	/* create new file for copy destination with correct attributes */
-	if ((fo = open(file_copy, O_CREAT|O_APPEND|O_WRONLY, s.st_mode)) < 0) {
+	if ((fo = open(file_copy, O_CREAT|O_TRUNC|O_WRONLY, s.st_mode)) < 0) {
 		err(EF_SYS, "cannot create file: %s", file_copy);
 		(void) close(fi);
 		return;
 	}
 
 	(void) fchown(fo, s.st_uid, s.st_gid);
+
+	/*
+	 * Now we'll loop, reading the log file and writing it to our copy
+	 * until the bytes remaining are beneath our atomicity threshold -- at
+	 * which point we'll lock the file and copy the remainder atomically.
+	 * The body of this loop is non-atomic with respect to writers, the
+	 * rationale being that total atomicity (that is, locking the file for
+	 * the entire duration of the copy) comes at too great a cost for a
+	 * large log file, as the writer (i.e., the daemon whose log is being
+	 * rolled) can be blocked for an unacceptable duration.  (For one
+	 * particularly loquacious daemon, this period was observed to be
+	 * several minutes in length -- a time so long that it induced
+	 * additional failures in dependent components.)  Note that this means
+	 * that if the log file is not always appended to -- if it is opened
+	 * without O_APPEND or otherwise truncated outside of logadm -- this
+	 * will result in our log snapshot being incorrect.  But of course, in
+	 * either of these cases, the use of logadm at all is itself
+	 * suspect...
+	 */
+	do {
+		if (fstat(fi, &s) < 0) {
+			err(EF_SYS, "cannot stat: %s", file);
+			(void) close(fi);
+			(void) close(fo);
+			(void) remove(file_copy);
+			return;
+		}
+
+		if ((rem = s.st_size - written) < thresh) {
+			if (rem >= 0)
+				break;
+
+			/*
+			 * If the file became smaller, something fishy is going
+			 * on; we'll truncate our copy, reset our seek offset
+			 * and break into the atomic copy.
+			 */
+			(void) ftruncate(fo, 0);
+			(void) lseek(fo, 0, SEEK_SET);
+			(void) lseek(fi, 0, SEEK_SET);
+			break;
+		}
+
+		if (written != 0 && rem > last) {
+			/*
+			 * We're falling behind -- this file is getting bigger
+			 * faster than we're able to write it; break out and
+			 * lock the file to block the writer.
+			 */
+			break;
+		}
+
+		last = rem;
+
+		while (rem > 0) {
+			if ((len = read(fi, buf, MIN(sizeof (buf), rem))) <= 0)
+				break;
+
+			if (write(fo, buf, len) == len) {
+				rem -= len;
+				written += len;
+				continue;
+			}
+
+			err(EF_SYS, "cannot write into file %s", file_copy);
+			(void) close(fi);
+			(void) close(fo);
+			(void) remove(file_copy);
+			return;
+		}
+	} while (len >= 0);
 
 	/* lock log file so that nobody can write into it before we are done */
 	if (fchmod(fi, s.st_mode|S_ISGID) < 0)
