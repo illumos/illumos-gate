@@ -378,7 +378,7 @@ lx_futex(uintptr_t addr, int cmd, int val, uintptr_t lx_timeout,
 	memid_t memid, requeue_memid;
 	timestruc_t timeout;
 	timestruc_t *tptr = NULL;
-	int requeue_threads;
+	int requeue_threads = NULL;
 	int *requeue_cmp = NULL;
 	int rval = 0;
 

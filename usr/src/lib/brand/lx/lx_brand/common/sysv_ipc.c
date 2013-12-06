@@ -71,7 +71,7 @@ slot_to_id(int type, int slot)
 {
 	uint_t nids, max;
 	int *idbuf = NULL;
-	int r;
+	int r = 0;
 
 	nids = 0;
 	for (;;) {

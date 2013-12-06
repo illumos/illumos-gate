@@ -696,14 +696,14 @@ lx_elfexec(struct vnode *vp, struct execa *uap, struct uarg *args,
 	 * We will exec the brand library, and map in the linux linker and the
 	 * linux executable.
 	 */
-	if (error = lookupname(LX_LIB_PATH, UIO_SYSSPACE, FOLLOW, NULLVPP,
-	    &nvp)) {
+	if ((error = lookupname(LX_LIB_PATH, UIO_SYSSPACE, FOLLOW, NULLVPP,
+	    &nvp))) {
 		uprintf("%s: not found.", LX_LIB);
 		return (error);
 	}
 
-	if (error = elfexec(nvp, uap, args, idata, level + 1, execsz, setid,
-	    exec_file, cred, brand_action)) {
+	if ((error = elfexec(nvp, uap, args, idata, level + 1, execsz, setid,
+	    exec_file, cred, brand_action))) {
 		VN_RELE(nvp);
 		return (error);
 	}
@@ -711,9 +711,9 @@ lx_elfexec(struct vnode *vp, struct execa *uap, struct uarg *args,
 
 	bzero(&env, sizeof (env));
 
-	if (error = mapexec_brand(vp, args, &ehdr, &uphdr_vaddr, &voffset,
+	if ((error = mapexec_brand(vp, args, &ehdr, &uphdr_vaddr, &voffset,
 	    exec_file, &interp, &env.ex_bssbase, &env.ex_brkbase,
-	    &env.ex_brksize, NULL))
+	    &env.ex_brksize, NULL)))
 		return (error);
 
 	/*
@@ -743,13 +743,13 @@ lx_elfexec(struct vnode *vp, struct execa *uap, struct uarg *args,
 		 * store relevant information about it in the aux vector, where
 		 * the brand library can find it.
 		 */
-		if (error = lookupname(LX_LINKER, UIO_SYSSPACE, FOLLOW, NULLVPP,
-		    &nvp)) {
+		if ((error = lookupname(LX_LINKER, UIO_SYSSPACE, FOLLOW, NULLVPP,
+		    &nvp))) {
 			uprintf("%s: not found.", LX_LINKER);
 			return (error);
 		}
-		if (error = mapexec_brand(nvp, args, &ehdr, &uphdr_vaddr,
-		    &voffset, exec_file, &interp, NULL, NULL, NULL, NULL)) {
+		if ((error = mapexec_brand(nvp, args, &ehdr, &uphdr_vaddr,
+		    &voffset, exec_file, &interp, NULL, NULL, NULL, NULL))) {
 			VN_RELE(nvp);
 			return (error);
 		}

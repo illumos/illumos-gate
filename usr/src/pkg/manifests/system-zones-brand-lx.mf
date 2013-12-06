@@ -29,14 +29,13 @@
 # non-global.  The files, directories, links, and hardlinks, however,
 # will only be installed into the global zone.
 #
-<include hollow_zone_pkg>
+<include global_zone_only_component>
 set name=pkg.fmri value=pkg:/system/zones/brand/lx@$(PKGVERS)
 set name=pkg.description value="Support for the 'lx' Brand"
 set name=pkg.summary value="lx Brand"
 set name=info.classification \
     value="org.opensolaris.category.2008:Applications/System Utilities"
 set name=variant.arch value=i386
-set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=etc group=sys
 dir path=etc/zones group=sys
 dir path=usr group=sys
@@ -110,16 +109,18 @@ file path=usr/lib/devfsadm/linkmod/SUNW_lx_link_$(ARCH).so group=sys
 file path=usr/lib/lx_brand.so.1
 hardlink path=usr/kernel/dtrace/$(ARCH64)/lx_systrace \
     target=../../../kernel/drv/$(ARCH64)/lx_systrace
-hardlink path=usr/kernel/dtrace/lx_systrace target=../../kernel/drv/lx_systrace
+hardlink path=usr/kernel/dtrace/lx_systrace \
+    target=../../kernel/drv/lx_systrace
 legacy pkg=SUNWlxr arch=$(ARCH) category=system \
     desc="Support for the 'lx' Brand" \
-    hotline="Please contact your local service provider" name="lx Brand (Root)" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+    hotline="Please contact your local service provider" \
+    name="lx Brand (Root)" vendor="Sun Microsystems, Inc." \
+    version=11.11,REV=2009.11.11
 legacy pkg=SUNWlxu arch=$(ARCH) category=system \
     desc="Support for the 'lx' Brand" \
-    hotline="Please contact your local service provider" name="lx Brand (Usr)" \
-    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+    hotline="Please contact your local service provider" \
+    name="lx Brand (Usr)" vendor="Sun Microsystems, Inc." \
+    version=11.11,REV=2009.11.11
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 link path=usr/lib/brand/lx/64 target=$(ARCH64)
-

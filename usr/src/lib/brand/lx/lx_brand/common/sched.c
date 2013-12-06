@@ -253,7 +253,7 @@ lx_sched_setaffinity(uintptr_t pid, uintptr_t len, uintptr_t maskp)
 	ulong_t		*lmask;
 	pid_t		s_pid;
 	lwpid_t		s_tid;
-	processorid_t	cpuid;
+	processorid_t	cpuid = NULL;
 
 	if ((pid_t)pid < 0)
 		return (-EINVAL);

@@ -64,9 +64,9 @@ lx_setresuid(l_uid_t ruid, l_uid_t euid, l_uid_t suid)
 	cred_t	*cr, *newcr;
 	zoneid_t zoneid = getzoneid();
 
-	if ((ruid != -1 && (ruid < 0 || ruid > MAXUID)) ||
-	    (euid != -1 && (euid < 0 || euid > MAXUID)) ||
-	    (suid != -1 && (suid < 0 || suid > MAXUID))) {
+	if ((ruid != -1 && (ruid > MAXUID)) ||
+	    (euid != -1 && (euid > MAXUID)) ||
+	    (suid != -1 && (suid > MAXUID))) {
 		error = EINVAL;
 		goto done;
 	}
@@ -197,9 +197,9 @@ lx_setresgid(l_gid_t rgid, l_gid_t egid, l_gid_t sgid)
 	int	do_nocd = 0;
 	cred_t	*cr, *newcr;
 
-	if ((rgid != -1 && (rgid < 0 || rgid > MAXUID)) ||
-	    (egid != -1 && (egid < 0 || egid > MAXUID)) ||
-	    (sgid != -1 && (sgid < 0 || sgid > MAXUID))) {
+	if ((rgid != -1 && (rgid > MAXUID)) ||
+	    (egid != -1 && (egid > MAXUID)) ||
+	    (sgid != -1 && (sgid > MAXUID))) {
 		error = EINVAL;
 		goto done;
 	}

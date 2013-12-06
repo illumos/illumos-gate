@@ -1355,7 +1355,6 @@ err_prop_remove:
 err_unlock:
 	mutex_exit(&lxa_lock);
 
-err:
 	if (lxa_zs != NULL) {
 		strfree(lxa_zs->lxa_zs_zonename);
 		kmem_free(lxa_zs, sizeof (*lxa_zs));
@@ -1463,7 +1462,6 @@ lxa_zone_unreg(intptr_t arg, int mode)
 err_unlock:
 	mutex_exit(&lxa_lock);
 
-err:
 	if (pval != NULL)
 		ddi_prop_free(pval);
 	if (idev_name != NULL)

@@ -143,7 +143,7 @@ lx_sched_setscheduler(l_pid_t pid, int policy, struct lx_sched_param *param)
 	if (pid < 0)
 		return (set_errno(ESRCH));
 
-	if (rv = sched_setprocset(&procset, pid))
+	if ((rv = sched_setprocset(&procset, pid)))
 		return (rv);
 
 	if (copyin(param, &sched_param, sizeof (sched_param)))
@@ -239,7 +239,7 @@ lx_sched_getscheduler(l_pid_t pid)
 	if (pid < 0)
 		return (set_errno(ESRCH));
 
-	if (rv = sched_setprocset(&procset, pid))
+	if ((rv = sched_setprocset(&procset, pid)))
 		return (rv);
 
 	/*
@@ -287,7 +287,7 @@ lx_sched_setparam(l_pid_t pid, struct lx_sched_param *param)
 	if (pid < 0)
 		return (set_errno(ESRCH));
 
-	if (rv = sched_setprocset(&procset, pid))
+	if ((rv = sched_setprocset(&procset, pid)))
 		return (rv);
 
 	if (copyin(param, &sched_param, sizeof (sched_param)))
@@ -383,7 +383,7 @@ lx_sched_getparam(l_pid_t pid, struct lx_sched_param *param)
 	if (pid < 0)
 		return (set_errno(ESRCH));
 
-	if (rv = sched_setprocset(&procset, pid))
+	if ((rv = sched_setprocset(&procset, pid)))
 		return (rv);
 
 	/*
@@ -442,7 +442,7 @@ lx_sched_rr_get_interval(l_pid_t pid, struct timespec *ival)
 	if (pid < 0)
 		return (set_errno(ESRCH));
 
-	if (rv = sched_setprocset(&procset, pid))
+	if ((rv = sched_setprocset(&procset, pid)))
 		return (rv);
 
 	/*

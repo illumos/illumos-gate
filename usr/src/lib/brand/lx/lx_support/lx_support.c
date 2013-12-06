@@ -438,7 +438,7 @@ static int
 lxs_verify(char *xmlfile)
 {
 	zone_dochandle_t	handle;
-	struct zone_fstab	fstab;
+/*	struct zone_fstab	fstab; */
 	struct zone_dstab	dstab;
 	struct zone_devtab	devtab;
 	boolean_t		audio, restart;

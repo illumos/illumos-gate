@@ -293,7 +293,7 @@ lxt_door_mkfifo()
 static void
 lxt_door_init()
 {
-	char		*fifo1_path = NULL, *fifo2_path;
+	char		*fifo1_path = NULL, *fifo2_path = NULL;
 	char		fifo1_path_native[MAXPATHLEN];
 	int		fifo1_rd = -1, fifo1_wr = -1;
 	int		fifo2_rd = -1, fifo2_wr = -1;
@@ -754,7 +754,7 @@ lxt_vsyslog(int priority, const char *message, va_list va)
 	lxt_syslog_arg_t	*data;
 	lxt_server_arg_t	*request;
 	psinfo_t		p;
-	char			procfile[PRFNSZ], *buf, *estr;
+	char			procfile[PRFNSZ], *buf = NULL, *estr;
 	int			buf_len, buf_i, estr_len, request_size, procfd;
 	int			i, key, err_count = 0, tok_count = 0;
 	int			errno_backup = errno;

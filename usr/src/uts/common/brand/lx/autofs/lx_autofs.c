@@ -376,8 +376,8 @@ i_fifo_lookup(pid_t pgrp, int fd, file_t **fpp_wr, file_t **fpp_rd)
 {
 	proc_t		*prp;
 	uf_info_t	*fip;
-	uf_entry_t	*ufp_wr, *ufp_rd;
-	file_t		*fp_wr, *fp_rd;
+	uf_entry_t	*ufp_wr, *ufp_rd = NULL;
+	file_t		*fp_wr, *fp_rd = NULL;
 	vnode_t		*vp_wr, *vp_rd;
 	int		i;
 
@@ -542,8 +542,8 @@ i_fifo_verify_rd(lx_autofs_vfs_t *data)
 {
 	proc_t		*prp;
 	uf_info_t	*fip;
-	uf_entry_t	*ufp_rd;
-	file_t		*fp_rd;
+	uf_entry_t	*ufp_rd = NULL;
+	file_t		*fp_rd =  NULL;
 	vnode_t		*vp_rd;
 	int		i;
 

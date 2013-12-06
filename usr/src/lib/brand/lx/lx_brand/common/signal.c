@@ -1485,7 +1485,7 @@ lx_sigaction(uintptr_t lx_sig, uintptr_t actp, uintptr_t oactp)
 		sap->lxsa_restorer = osp->lxsa_restorer;
 	}
 
-	if (val = lx_sigaction_common(lx_sig, sap, osap))
+	if ((val = lx_sigaction_common(lx_sig, sap, osap)))
 		return (val);
 
 	/*

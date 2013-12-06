@@ -1213,8 +1213,8 @@ lx_getsockopt(ulong_t *args)
 	    optname <= 0 || optname >= (ltos_proto_opts[level].maxentries))
 		return (-ENOPROTOOPT);
 
-	if ((level == LX_SOL_SOCKET) && (optname == LX_SO_PASSCRED) ||
-	    (level == IPPROTO_TCP) && (optname == LX_TCP_CORK)) {
+	if (((level == LX_SOL_SOCKET) && (optname == LX_SO_PASSCRED)) ||
+	    ((level == IPPROTO_TCP) && (optname == LX_TCP_CORK))) {
 		/*
 		 * Linux sets LX_SO_PASSCRED when it wants to send credentials
 		 * over a socket. Since we do not support it, it is never set
@@ -1382,7 +1382,7 @@ lx_recvmsg(ulong_t *args)
 	int sockfd = (int)args[0];
 	struct lx_msghdr msg;
 	struct lx_msghdr *msgp = (struct lx_msghdr *)args[1];
-	struct cmsghdr *cmsg;
+	struct cmsghdr *cmsg = NULL;
 	int flags = (int)args[2];
 	int r, err;
 

@@ -516,7 +516,7 @@ int
 lx_setgroups(uintptr_t p1, uintptr_t p2)
 {
 	int ng = (int)p1;
-	gid_t *glist;
+	gid_t *glist = NULL;
 	int i, r;
 
 	lx_debug("\tlx_setgroups(%d, 0x%p", ng, p2);

@@ -272,7 +272,8 @@ _netdir_getbyaddr(struct netconfig *netconfigp, struct netbuf *nbp)
 	struct servent		p2s_result;
 	struct hostent		a2h_result;
 	char			*a2h_buf = NULL, *p2s_buf = NULL;
-	int			h_errno, r_count, i;
+	int			h_errno, i;
+	int			r_count = 0;
 	int			a2h_count = 0, p2s_count = 0;
 
 	lxt_debug("_netdir_getbyaddr: request recieved\n");

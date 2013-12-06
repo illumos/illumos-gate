@@ -415,7 +415,7 @@ lx_elf_props32(struct ps_prochandle *php, uint32_t addr, psaddr_t *data_addr)
 	int		i;
 	uint32_t	min = (uint32_t)-1;
 	uint32_t	max = 0;
-	size_t		sz;
+	size_t		sz = NULL;
 
 	if (ps_pread(php, addr, &ehdr, sizeof (ehdr)) != PS_OK) {
 		ps_plog("lx_elf_props: Couldn't read ELF header at 0x%p",

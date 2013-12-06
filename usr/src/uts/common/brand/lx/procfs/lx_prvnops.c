@@ -530,7 +530,7 @@ lxpr_read(vnode_t *vp, uio_t *uiop, int ioflag, cred_t *cr,
 	lxpr_uiobuf_t *uiobuf = lxpr_uiobuf_new(uiop);
 	int error;
 
-	ASSERT(type >= 0 && type < LXPR_NFILES);
+	ASSERT(type < LXPR_NFILES);
 
 	lxpr_read_function[type](lxpnp, uiobuf);
 
@@ -2213,7 +2213,7 @@ lxpr_lookup(vnode_t *dp, char *comp, vnode_t **vpp, pathname_t *pathp,
 	int error;
 
 	ASSERT(dp->v_type == VDIR);
-	ASSERT(type >= 0 && type < LXPR_NFILES);
+	ASSERT(type < LXPR_NFILES);
 
 	/*
 	 * we should never get here because the lookup
@@ -2486,7 +2486,7 @@ lxpr_readdir(vnode_t *dp, uio_t *uiop, cred_t *cr, int *eofp,
 	int error;
 
 	ASSERT(dp->v_type == VDIR);
-	ASSERT(type >= 0 && type < LXPR_NFILES);
+	ASSERT(type < LXPR_NFILES);
 
 	/*
 	 * we should never get here because the readdir
@@ -2613,7 +2613,7 @@ lxpr_readdir_common(lxpr_node_t *lxpnp, uio_t *uiop, int *eofp,
 		 * So we set uiop->uio_offset separately, ignoring what
 		 * uiomove() does.
 		 */
-		if (error = uiomove((caddr_t)dirent, reclen, UIO_READ, uiop)) {
+		if ((error = uiomove((caddr_t)dirent, reclen, UIO_READ, uiop))) {
 			return (error);
 		}
 
@@ -2754,7 +2754,7 @@ lxpr_readdir_procdir(lxpr_node_t *lxpnp, uio_t *uiop, int *eofp)
 		 * So we set uiop->uio_offset separately, in the
 		 * increment of this for loop, ignoring what uiomove() does.
 		 */
-		if (error = uiomove((caddr_t)dirent, reclen, UIO_READ, uiop))
+		if ((error = uiomove((caddr_t)dirent, reclen, UIO_READ, uiop)))
 			return (error);
 
 next:
@@ -2890,7 +2890,7 @@ lxpr_readdir_fddir(lxpr_node_t *lxpnp, uio_t *uiop, int *eofp)
 			goto out;
 		}
 
-		if (error = uiomove((caddr_t)dirent, reclen, UIO_READ, uiop))
+		if ((error = uiomove((caddr_t)dirent, reclen, UIO_READ, uiop)))
 			goto out;
 	}
 

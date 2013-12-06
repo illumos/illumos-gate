@@ -53,7 +53,5 @@ lx_brk(caddr_t nva)
 		 */
 		lwp->lwp_errno = 0;
 	}
-
-out:
 	return ((long)(p->p_brkbase + p->p_brksize));
 }

@@ -667,6 +667,9 @@ lx_linkat(uintptr_t ext1, uintptr_t p1, uintptr_t ext2, uintptr_t p2,
 	/* LINTED [set but not used in function] */
 	int flag = p3;
 
+	if (flag != p3)
+		return (flag); // workaround.
+
 	ret = getpathat(atfd1, p1, pathbuf1, sizeof (pathbuf1));
 	if (ret < 0)
 		return (ret);
@@ -732,6 +735,9 @@ lx_fchmodat(uintptr_t ext1, uintptr_t p1, uintptr_t p2, uintptr_t p3)
 	 */
 	/* LINTED [set but not used in function] */
 	int flag = p3;
+
+        if (flag != p3)
+                return (flag); // workaround.
 
 	ret = getpathat(atfd, p1, pathbuf, sizeof (pathbuf));
 	if (ret < 0)

@@ -753,11 +753,11 @@ setup_watchpoints(pid_t pid, uintptr_t *debugreg)
 	int dr7 = debugreg[7];
 	int lrw;
 	int fd;
-	size_t size;
+	size_t size = NULL;
 	prwatch_t prwatch[4];
 	int nwatch;
 	int i;
-	int wflags;
+	int wflags = NULL;
 	int error;
 	struct {
 		long req;
@@ -1900,7 +1900,7 @@ set_dr6(pid_t pid, siginfo_t *infop)
 	uintptr_t *debugreg;
 	uintptr_t addr;
 	uintptr_t base;
-	size_t size;
+	size_t size = NULL;
 	int dr7;
 	int lrw;
 	int i;

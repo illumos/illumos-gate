@@ -66,7 +66,7 @@ static struct lx_pid *
 lx_pid_remove_hash(pid_t pid, id_t tid)
 {
 	struct lx_pid **hpp;
-	struct lx_pid *lpidp;
+	struct lx_pid *lpidp = NULL;
 
 	ASSERT(MUTEX_HELD(&hash_lock));
 

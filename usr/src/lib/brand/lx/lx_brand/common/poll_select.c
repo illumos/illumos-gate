@@ -59,7 +59,7 @@ lx_select(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 	struct timeval tv, *tvp = NULL;
 	int fd_set_len = howmany(nfds, 8);
 	int r;
-	hrtime_t start, end;
+	hrtime_t start = NULL, end;
 
 	lx_debug("\tselect(%d, 0x%p, x%p, 0x%p. 0x%p, 0x%p)",
 	    nfds, rfdsp, wfdsp, efdsp, tvp);

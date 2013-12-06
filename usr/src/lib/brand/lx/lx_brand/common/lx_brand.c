@@ -106,7 +106,7 @@ struct lx_locale_ending {
 #define	l2s_locale(lname, sname) \
 	{(lname), (sname), sizeof ((lname)) - 1, sizeof ((sname)) - 1}
 
-static struct lx_locale_ending lx_locales[] = {
+/*static struct lx_locale_ending lx_locales[] = {
 	l2s_locale(".utf8",	 ".UTF-8"),
 	l2s_locale(".utf8@euro", ".UTF-8"),
 	l2s_locale("@euro",	 ".ISO8859-15"),
@@ -117,7 +117,7 @@ static struct lx_locale_ending lx_locales[] = {
 	l2s_locale(".gb18030",	 ".GB18030"),
 	l2s_locale(".gbk",	 ".GBK"),
 	l2s_locale("@cyrillic",	 ".ISO8859-5")
-};
+};*/
 
 #define	MAXLOCALENAMELEN	30
 #if !defined(TEXT_DOMAIN)		/* should be defined by cc -D */
@@ -442,13 +442,13 @@ lx_emulate(lx_regs_t *rp)
 
 	if (s->sy_callc == NULL) {
 		lx_unsupported(gettext("unimplemented syscall #%d (%s): %s\n"),
-		    syscall_num, s->sy_name, nosys_msgs[s->sy_flags]);
+		    syscall_num, s->sy_name, nosys_msgs[(int)s->sy_flags]);
 		ret = -stol_errno[ENOTSUP];
 		goto out;
 	}
 
 	if (lx_debug_enabled != 0) {
-		const char *fmt;
+		const char *fmt = NULL;
 
 		switch (s->sy_narg) {
 		case 0:
@@ -564,7 +564,7 @@ out:
 }
 
 /* Transform the Linux locale name to make it look like a Solaris locale name */
-static const char *
+/* static const char *
 lx_translate_locale(char *translated_name_mem, int mem_size)
 {
 	char *loc;
@@ -580,7 +580,7 @@ lx_translate_locale(char *translated_name_mem, int mem_size)
 
 	len = strlen(loc);
 
-	/* replace the end of the locale name if it's a known pattern */
+	// replace the end of the locale name if it's a known pattern 
 	for (i = 0; i < sizeof (lx_locales) / sizeof (struct lx_locale_ending);
 	    i++) {
 		if (len <= lx_locales[i].le_size)
@@ -588,11 +588,11 @@ lx_translate_locale(char *translated_name_mem, int mem_size)
 
 		if (strncmp(loc + len - lx_locales[i].le_size,
 		    lx_locales[i].linux_end, lx_locales[i].le_size))
-			continue; /* don't match */
+			continue; // don't match 
 
 		if (len - lx_locales[i].le_size + lx_locales[i].se_size
 		    >= mem_size)
-			return ("C"); /* size too small for the new name */
+			return ("C"); // size too small for the new name 
 
 		(void) strlcpy(translated_name_mem + len -
 		    lx_locales[i].le_size, lx_locales[i].solaris_end,
@@ -601,9 +601,9 @@ lx_translate_locale(char *translated_name_mem, int mem_size)
 		return ((const char *)translated_name_mem);
 	}
 
-	/* no match */
+	// no match 
 	return ("");
-}
+} */
 
 static void
 lx_close_fh(FILE *file)
@@ -637,8 +637,9 @@ lx_init(int argc, char *argv[], char *envp[])
 	int		*p, err;
 	lx_elf_data_t	edp;
 	lx_brand_registration_t reg;
-	char 		locale_translated_name[MAXLOCALENAMELEN];
+/*	char 		locale_translated_name[MAXLOCALENAMELEN]; */
 	static lx_tsd_t lx_tsd;
+
 
 	/* Look up the PID that serves as init for this zone */
 	if ((err = lx_lpid_to_spid(1, &zoneinit_pid)) < 0)
