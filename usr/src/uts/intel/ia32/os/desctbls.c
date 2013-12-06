@@ -161,7 +161,7 @@ struct interposing_handler {
  * The brand infrastructure interposes on two handlers, and we use one as a
  * NULL signpost.
  */
-static struct interposing_handler brand_tbl[2];
+static struct interposing_handler brand_tbl[3];
 
 /*
  * software prototypes for default local descriptor table
@@ -976,6 +976,12 @@ init_idt_common(gate_desc_t *idt)
 	set_gatesegd(&idt[T_MCE], &mcetrap, KCS_SEL, SDT_SYSIGT, TRP_KPL, 0);
 	set_gatesegd(&idt[T_SIMDFPE], &xmtrap, KCS_SEL, SDT_SYSIGT, TRP_KPL, 0);
 
+ 	/*
+	 * install "int80" handler at, well, 0x80.
+	 */
+	set_gatesegd(&idt0[T_INT80], &sys_int80, KCS_SEL, SDT_SYSIGT, TRP_UPL,
+	    0);
+
 	/*
 	 * install fast trap handler at 210.
 	 */
@@ -1001,21 +1007,27 @@ init_idt_common(gate_desc_t *idt)
 	    SDT_SYSIGT, TRP_UPL, 0);
 
 	/*
-	 * Prepare interposing descriptor for the syscall handler
-	 * and cache copy of the default descriptor.
+-	 * Prepare interposing descriptors for the branded "int80"
+-	 * and syscall handlers and cache copies of the default
+-	 * descriptors.
 	 */
-	brand_tbl[0].ih_inum = T_SYSCALLINT;
-	brand_tbl[0].ih_default_desc = idt0[T_SYSCALLINT];
+	brand_tbl[0].ih_inum = T_INT80;
+	brand_tbl[0].ih_default_desc = idt0[T_INT80];
+	set_gatesegd(&(brand_tbl[0].ih_interp_desc), &brand_sys_int80, KCS_SEL,
+	    SDT_SYSIGT, TRP_UPL, 0);
+
+	brand_tbl[1].ih_inum = T_SYSCALLINT;
+	brand_tbl[1].ih_default_desc = idt0[T_SYSCALLINT];
 
 #if defined(__amd64)
-	set_gatesegd(&(brand_tbl[0].ih_interp_desc), &brand_sys_syscall_int,
+	set_gatesegd(&(brand_tbl[1].ih_interp_desc), &brand_sys_syscall_int,
 	    KCS_SEL, SDT_SYSIGT, TRP_UPL, 0);
 #elif defined(__i386)
-	set_gatesegd(&(brand_tbl[0].ih_interp_desc), &brand_sys_call,
+	set_gatesegd(&(brand_tbl[1].ih_interp_desc), &brand_sys_call,
 	    KCS_SEL, SDT_SYSIGT, TRP_UPL, 0);
 #endif	/* __i386 */
 
-	brand_tbl[1].ih_inum = 0;
+	brand_tbl[2].ih_inum = 0;
 }
 
 #if defined(__xpv)

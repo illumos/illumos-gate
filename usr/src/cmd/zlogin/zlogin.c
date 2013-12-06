@@ -2191,8 +2191,18 @@ main(int argc, char **argv)
 		/*
 		 * In failsafe mode, we don't use login(1), so don't try
 		 * setting up a utmpx entry.
-		 */
-		if (!failsafe)
+		 *
+		 * A branded zone may have very different utmpx semantics.
+		 * At the moment, we only have two brand types:
+		 * Solaris-like (native, sn1) and Linux.  In the Solaris
+		 * case, we know exactly how to do the necessary utmpx
+		 * setup.  Fortunately for us, the Linux /bin/login is
+		 * prepared to deal with a non-initialized utmpx entry, so
+		 * we can simply skip it.  If future brands don't fall into
+		 * either category, we'll have to add a per-brand utmpx
+		 * setup hook.
+ 		 */
+		if (!failsafe && (strcmp(zonebrand, "lx") != 0))
 			if (setup_utmpx(slaveshortname) == -1)
 				return (1);
 

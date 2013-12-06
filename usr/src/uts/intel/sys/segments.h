@@ -683,6 +683,8 @@ extern void _start(), cmnint();
 extern void achktrap(), mcetrap();
 extern void xmtrap();
 extern void fasttrap();
+extern void sys_int80();
+extern void brand_sys_int80();
 extern void dtrace_ret();
 
 #if !defined(__amd64)
