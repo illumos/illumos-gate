@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright (c) 2013 by Delphix. All rights reserved.
 #
 # This file defines the current capabilities of GRUB over and above that
 # supported by the standard distribution
@@ -29,7 +29,7 @@
 # GRUB necessitating that the boot blocks be reinstalled for that fix or
 # enhancement to take effect.
 #
-VERSION=22
+VERSION=23
 dboot
 xVM
 zfs
