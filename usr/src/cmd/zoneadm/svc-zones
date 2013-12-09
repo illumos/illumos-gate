@@ -31,7 +31,7 @@
 shutdown_zones()
 {
 	zoneadm list -p | nawk -F: '{
-		if ($2 != "global") {
+		if (($5 != "lx") && ($2 != "global")) {
 			print $2
 		}
 	}'

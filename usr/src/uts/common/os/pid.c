@@ -112,6 +112,18 @@ pid_lookup(pid_t pid)
 	return (pidp);
 }
 
+struct pid *
+pid_find(pid_t pid)
+{
+	struct pid *pidp;
+
+	mutex_enter(&pidlinklock);
+	pidp = pid_lookup(pid);
+	mutex_exit(&pidlinklock);
+
+	return (pidp);
+}
+
 void
 pid_setmin(void)
 {

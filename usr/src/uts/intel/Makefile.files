@@ -99,6 +99,14 @@ GENUNIX_OBJS +=		\
 #
 CORE_OBJS +=		\
 	prmachdep.o
+ 
+LX_PROC_OBJS +=	\
+	lx_prsubr.o	\
+	lx_prvfsops.o	\
+	lx_prvnops.o
+
+LX_AUTOFS_OBJS +=	\
+	lx_autofs.o
 
 #
 #	ZFS file system module
@@ -262,6 +270,23 @@ IOMMULIB_OBJS = iommulib.o
 #
 SN1_BRAND_OBJS	=	sn1_brand.o sn1_brand_asm.o
 S10_BRAND_OBJS	=	s10_brand.o s10_brand_asm.o
+LX_BRAND_OBJS  =		\
+	lx_brand.o		\
+	lx_brand_asm.o		\
+	lx_brk.o		\
+	lx_clone.o		\
+	lx_futex.o		\
+	lx_getpid.o		\
+	lx_id.o			\
+	lx_kill.o		\
+	lx_misc.o		\
+	lx_modify_ldt.o		\
+	lx_pid.o		\
+	lx_sched.o		\
+	lx_signum.o		\
+	lx_syscall.o		\
+	lx_sysinfo.o		\
+	lx_thread_area.o
 
 #
 #	special files

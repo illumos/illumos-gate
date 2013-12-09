@@ -631,6 +631,36 @@ _sysenter_done:
 	sysexit
 	SET_SIZE(sys_sysenter)
 	SET_SIZE(brand_sys_sysenter)
+#endif	/* __lint */
+
+#if defined(__lint)
+/*
+ * System call via an int80.  This entry point is only used by the Linux
+ * application environment.  Unlike the sysenter path, there is no default
+ * action to take if no callback is registered for this process.
+ */
+void
+sys_int80()
+{}
+
+#else	/* __lint */
+
+	ENTRY_NP(brand_sys_int80)
+	BRAND_CALLBACK(BRAND_CB_INT80)
+
+	ALTENTRY(sys_int80)
+	/*
+	 * We hit an int80, but this process isn't of a brand with an int80
+	 * handler.  Bad process!  Make it look as if the INT failed.
+	 * Modify %eip to point before the INT, push the expected error
+	 * code and fake a GP fault.
+	 * 
+	 */
+	subl	$2, (%esp)	/* int insn 2-bytes */
+	pushl	$_CONST(_MUL(T_INT80, GATE_DESC_SIZE) + 2)
+	jmp	gptrap			/ GP fault
+	SET_SIZE(sys_int80)
+	SET_SIZE(brand_sys_int80)
 
 /*
  * Declare a uintptr_t which covers the entire pc range of syscall

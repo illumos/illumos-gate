@@ -632,6 +632,8 @@ getuserpc()
 static greg_t
 fix_segreg(greg_t sr, int iscs, model_t datamodel)
 {
+	kthread_t *t = curthread;
+	
 	switch (sr &= 0xffff) {
 
 	case 0:
@@ -665,6 +667,19 @@ fix_segreg(greg_t sr, int iscs, model_t datamodel)
 		return (sr);
 	default:
 		break;
+	}
+
+ 	/*
+	 * Allow this process's brand to do any necessary segment register
+	 * manipulation.
+	 */
+	if (PROC_IS_BRANDED(t->t_procp) && BRMOP(t->t_procp)->b_fixsegreg) {
+		greg_t bsr = BRMOP(t->t_procp)->b_fixsegreg(sr, datamodel);
+
+		if (bsr == 0 && iscs == IS_CS)
+			return (0 | SEL_UPL);
+		else
+			return (bsr);
 	}
 
 	/*
