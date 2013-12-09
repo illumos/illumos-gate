@@ -167,7 +167,7 @@ int ipldetach(ifs)
 ipf_stack_t *ifs;
 {
 
-	ASSERT(rw_read_locked(&ifs->ifs_ipf_global.ipf_lk) == 0);
+	ASSERT(RW_WRITE_HELD(&ifs->ifs_ipf_global.ipf_lk));
 
 #if SOLARIS2 < 10
 
@@ -295,7 +295,7 @@ ipf_stack_t *ifs;
 	cmn_err(CE_CONT, "iplattach()\n");
 #endif
 
-	ASSERT(rw_read_locked(&ifs->ifs_ipf_global.ipf_lk) == 0);
+	ASSERT(RW_WRITE_HELD(&ifs->ifs_ipf_global.ipf_lk));
 	ifs->ifs_fr_flags = IPF_LOGGING;
 #ifdef _KERNEL
 	ifs->ifs_fr_update_ipid = 0;
@@ -1163,8 +1163,10 @@ cred_t *cp;
 	}
 
 #ifdef	IPFILTER_SYNC
-	if (getminor(dev) == IPL_LOGSYNC)
+	if (getminor(dev) == IPL_LOGSYNC) {
+		RWLOCK_EXIT(&ifs->ifs_ipf_global);
 		return ipfsync_write(uio);
+	}
 #endif /* IPFILTER_SYNC */
 	dev = dev;	/* LINT */
 	uio = uio;	/* LINT */

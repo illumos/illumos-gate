@@ -579,6 +579,7 @@ ipf_stack_t *ifs;
 		 */
 		RWLOCK_EXIT(&ifs->ifs_ipf_global);
 		if (!cv_wait_sig(&ifs->ifs_iplwait, &ifs->ifs_ipl_mutex.ipf_lk)) {
+			READ_ENTER(&ifs->ifs_ipf_global);
 			MUTEX_EXIT(&ifs->ifs_ipl_mutex);
 			return EINTR;
 		}
