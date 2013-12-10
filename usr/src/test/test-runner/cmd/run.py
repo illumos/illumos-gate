@@ -12,7 +12,7 @@
 #
 
 #
-# Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright (c) 2013 by Delphix. All rights reserved.
 #
 
 import ConfigParser
@@ -234,7 +234,8 @@ class Cmd(object):
         if logger is None:
             return
 
-        user = ' (run as %s)' % self.user if len(self.user) else ''
+        logname = getpwuid(os.getuid()).pw_name
+        user = ' (run as %s)' % (self.user if len(self.user) else logname)
         msga = 'Test: %s%s ' % (self.pathname, user)
         msgb = '[%s] [%s]' % (self.result.runtime, self.result.result)
         pad = ' ' * (80 - (len(msga) + len(msgb)))

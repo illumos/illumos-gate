@@ -1,4 +1,5 @@
 #
+#
 # This file and its contents are supplied under the terms of the
 # Common Development and Distribution License ("CDDL"), version 1.0.
 # You may only use this file in accordance with the terms of version
@@ -10,7 +11,7 @@
 #
 
 #
-# Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright (c) 2013 by Delphix. All rights reserved.
 #
 
 .PARALLEL: $(SUBDIRS)
@@ -18,8 +19,59 @@
 SUBDIRS = acl \
 	atime \
 	bootfs \
+	cache \
+	cachefile \
+	clean_mirror \
 	cli_root \
+	cli_user \
+	compression \
+	ctime \
+	delegate \
+	devices \
+	exec \
+	features \
+	grow_pool \
+	grow_replicas \
+	history \
+	inheritance \
+	interop \
+	inuse \
+	large_files \
+	largest_pool \
+	link_count \
+	mdb \
+	migration \
+	mmap \
+	mount \
+	mv_files \
+	nestedfs \
+	no_space \
 	nopwrite \
-	truncate
+	online_offline \
+	pool_names \
+	poolversion \
+	privilege \
+	quota \
+	redundancy \
+	refquota \
+	refreserv \
+	rename_dirs \
+	replacement \
+	reservation \
+	rootpool \
+	rsend \
+	scrub_mirror \
+	slog \
+	snapshot \
+	snapused \
+	sparse \
+	threadsappend \
+	truncate \
+	userquota \
+	utils_test \
+	write_dirs \
+	xattr \
+	zvol
+
 
 include $(SRC)/test/Makefile.com
