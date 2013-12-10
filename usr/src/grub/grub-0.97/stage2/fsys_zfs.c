@@ -330,7 +330,7 @@ zio_read_gang(blkptr_t *bp, dva_t *dva, void *buf, char *stack)
 	}
 
 	for (i = 0; i < SPA_GBH_NBLKPTRS; i++) {
-		if (zio_gb->zg_blkptr[i].blk_birth == 0)
+		if (BP_IS_HOLE(&zio_gb->zg_blkptr[i]))
 			continue;
 
 		if (zio_read_data(&zio_gb->zg_blkptr[i], buf, stack))
@@ -966,6 +966,7 @@ get_default_bootfsobj(dnode_phys_t *mosmdn, uint64_t *obj, char *stack)
  */
 static const char *spa_feature_names[] = {
 	"org.illumos:lz4_compress",
+	"com.delphix:hole_birth",
 	"com.delphix:extensible_dataset",
 	NULL
 };

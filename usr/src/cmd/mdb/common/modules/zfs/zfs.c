@@ -378,7 +378,8 @@ blkptr(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	enum_lookup(compress, sizeof (compress), compress_enum,
 	    BP_GET_COMPRESS(bp), "ZIO_COMPRESS_");
 
-	SPRINTF_BLKPTR(mdb_snprintf, '\n', buf, bp, type, checksum, compress);
+	SNPRINTF_BLKPTR(mdb_snprintf, '\n', buf, sizeof (buf), bp, type,
+	    checksum, compress);
 
 	mdb_printf("%s\n", buf);
 
