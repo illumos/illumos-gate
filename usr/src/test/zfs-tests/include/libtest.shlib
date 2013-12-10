@@ -25,7 +25,7 @@
 #
 
 #
-# Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright (c) 2013 by Delphix. All rights reserved.
 #
 
 . ${STF_TOOLS}/contrib/include/logapi.shlib
@@ -2568,4 +2568,20 @@ function is_te_enabled
 	else
 		return 0
 	fi
+}
+
+# Utility function to determine if a system has multiple cpus.
+function is_mp
+{
+	(($(psrinfo -p) > 1))
+}
+
+# Run the given command as the user provided.
+function user_run
+{
+	typeset user=$1
+	shift
+
+	eval \$SU \$user -c \"$@\" > /tmp/out 2>/tmp/err
+	return $?
 }

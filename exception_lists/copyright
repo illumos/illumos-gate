@@ -334,6 +334,8 @@ usr/src/lib/krb5/ss/std_rqs.c
 usr/src/lib/krb5/ss/utils.c
 usr/src/lib/librstp/common/*.[ch]
 usr/src/lib/librstp/common/[CRT]*
+usr/src/test/zfs-tests/tests/functional/history/*Z
+usr/src/test/zfs-tests/tests/functional/history/*txt
 usr/src/uts/intel/nsmb/ioc_check.ref
 usr/src/uts/intel/os/splashimage.xpm
 usr/src/uts/common/gssapi/mechs/krb5/crypto/block_size.c

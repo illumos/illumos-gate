@@ -25,6 +25,10 @@
 # Use is subject to license terms.
 #
 
+#
+# Copyright (c) 2013 by Delphix. All rights reserved.
+#
+
 . $STF_SUITE/include/libtest.shlib
 . $STF_SUITE/tests/functional/cli_root/zpool_get/zpool_get.cfg
 
@@ -81,7 +85,7 @@ i=$(( $i + 1 ))
 COUNT=$($WC /tmp/values.$$ | $AWK '{print $1}')
 if [ $i -ne $COUNT ]
 then
-	log_fail "Length of output $COUNT was not equal to number of props + 1."
+	log_fail "Found zpool features not in the zpool_get test config."
 fi
 
 
