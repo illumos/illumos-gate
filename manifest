@@ -4952,6 +4952,9 @@ f usr/lib/amd64/libvrrpadm.so.1 0755 root bin
 s usr/lib/amd64/libvrrpadm.so=libvrrpadm.so.1
 s usr/lib/amd64/libw.so.1=../../../lib/amd64/libw.so.1
 s usr/lib/amd64/libw.so=../../../lib/amd64/libw.so.1
+f usr/lib/amd64/libwrap.so.1.0 0755 root bin
+s usr/lib/amd64/libwrap.so.1=libwrap.so.1.0
+s usr/lib/amd64/libwrap.so=libwrap.so.1.0
 s usr/lib/amd64/libxnet.so.1=../../../lib/amd64/libxnet.so.1
 s usr/lib/amd64/libxnet.so=../../../lib/amd64/libxnet.so.1
 f usr/lib/amd64/liby.so.1 0755 root bin

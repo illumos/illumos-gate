@@ -38,9 +38,10 @@ include ../../Makefile.lib
 LIBS =		$(DYNLIB) $(LINTLIB)
 SONAME =	$(LIBRARY:.a=.so)$(MAJOR)
 ROOTLINKS +=	$(ROOTLIBDIR)/$(LIBLINKS)$(MAJOR)
+ROOTLINKS64 +=	$(ROOTLIBDIR64)/$(LIBLINKS)$(MAJOR)
 $(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
 
-MAPFILES =	../mapfile
+MAPFILES =	../mapfile-vers
 
 LDLIBS +=	-lsocket -lnsl -lc
 
@@ -67,6 +68,9 @@ lint: lintcheck
 
 $(ROOTLIBDIR)/$(LIBLINKS)$(MAJOR): $(ROOTLIBDIR)/$(LIBLINKS)$(VERS)
 	$(INS.liblink)
+
+$(ROOTLIBDIR64)/$(LIBLINKS)$(MAJOR): $(ROOTLIBDIR64)/$(LIBLINKS)$(VERS)
+	$(INS.liblink64)
 
 include ../../Makefile.targ
 

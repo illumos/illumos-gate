@@ -231,6 +231,7 @@ file path=usr/lib/$(ARCH64)/llib-lsldap.ln
 file path=usr/lib/$(ARCH64)/llib-lsmbios.ln
 $(sparc_ONLY)file path=usr/lib/$(ARCH64)/llib-lv12n.ln
 file path=usr/lib/$(ARCH64)/llib-lvolmgt.ln
+file path=usr/lib/$(ARCH64)/llib-lwrap.ln
 file path=usr/lib/$(ARCH64)/llib-lzoneinfo.ln
 file path=usr/lib/$(ARCH64)/values-Xa.o
 file path=usr/lib/$(ARCH64)/values-Xc.o
