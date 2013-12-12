@@ -247,6 +247,8 @@ int zfs_flags = 0;
  * zfs_recover can be set to nonzero to attempt to recover from
  * otherwise-fatal errors, typically caused by on-disk corruption.  When
  * set, calls to zfs_panic_recover() will turn into warning messages.
+ * This should only be used as a last resort, as it typically results
+ * in leaked space, or worse.
  */
 int zfs_recover = 0;
 
@@ -438,7 +440,7 @@ spa_lookup(const char *name)
 	 * If it's a full dataset name, figure out the pool name and
 	 * just use that.
 	 */
-	cp = strpbrk(search.spa_name, "/@");
+	cp = strpbrk(search.spa_name, "/@#");
 	if (cp != NULL)
 		*cp = '\0';
 
