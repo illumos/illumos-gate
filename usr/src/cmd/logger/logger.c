@@ -19,6 +19,7 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright (c) 2013 Gary Mills
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -36,7 +37,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <unistd.h>
@@ -85,8 +85,13 @@ static struct code	FacNames[] = {
 	"lpr",		LOG_LPR,
 	"news",		LOG_NEWS,
 	"uucp",		LOG_UUCP,
-	"cron",		LOG_CRON,
+	"altcron",	LOG_ALTCRON,
+	"authpriv",	LOG_AUTHPRIV,
+	"ftp",		LOG_FTP,
+	"ntp",		LOG_NTP,
 	"audit",	LOG_AUDIT,
+	"console",	LOG_CONSOLE,
+	"cron",		LOG_CRON,
 	"local0",	LOG_LOCAL0,
 	"local1",	LOG_LOCAL1,
 	"local2",	LOG_LOCAL2,
@@ -140,21 +145,21 @@ main(int argc, char **argv)
 	while ((opt = getopt(argc, argv, "it:p:f:")) != EOF)
 		switch (opt) {
 
-		    case 't':		/* tag */
+		case 't':		/* tag */
 			tag = optarg;
 			break;
 
-		    case 'p':		/* priority */
+		case 'p':		/* priority */
 			pri = pencode(optarg);
 			break;
 
-		    case 'i':		/* log process id also */
+		case 'i':		/* log process id also */
 			logflags |= LOG_PID;
 			pid_len = sprintf(tmp, "%ld", (long)getpid());
 			pid_len = (pid_len <= 0) ? 0 : pid_len +2;
 			break;
 
-		    case 'f':		/* file to log */
+		case 'f':		/* file to log */
 			if (strcmp(optarg, "-") == 0)
 				break;
 			infile = optarg;
@@ -165,7 +170,7 @@ main(int argc, char **argv)
 			}
 			break;
 
-		    default:
+		default:
 			usage();
 		}
 
@@ -359,6 +364,6 @@ usage(void)
 	(void) fprintf(stderr, gettext(
 	    "Usage:\tlogger string\n"
 	    "\tlogger [-i] [-f filename] [-p priority] [-t tag] "
-		"[message] ...\n"));
+	    "[message] ...\n"));
 	exit(1);
 }
