@@ -22,6 +22,7 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2012 Milan Jurik. All rights reserved.
+ * Copyright (c) 2013 Gary Mills
  */
 
 /*
@@ -155,7 +156,12 @@ static struct code	FacNames[] = {
 	"lpr",		LOG_LPR,
 	"news",		LOG_NEWS,
 	"uucp",		LOG_UUCP,
+	"altcron",	LOG_ALTCRON,
+	"authpriv",	LOG_AUTHPRIV,
+	"ftp",		LOG_FTP,
+	"ntp",		LOG_NTP,
 	"audit",	LOG_AUDIT,
+	"console",	LOG_CONSOLE,
 	"cron",		LOG_CRON,
 	"local0",	LOG_LOCAL0,
 	"local1",	LOG_LOCAL1,
@@ -617,12 +623,10 @@ sys_poll(void *ap)
 	DPRINT1(1, "sys_poll(%u): sys_thread started\n", mythreadno);
 
 	/*
-	 * Try to process as many messages as we can without blocking on poll.
-	 * We count such "initial" messages with sys_init_msg_count and
-	 * enqueue them without the SYNC_FILE flag.  When no more data is
-	 * waiting on the local log device, we set timeout to INFTIM,
-	 * clear sys_init_msg_count, and generate a flush message to sync
-	 * the previously counted initial messages out to disk.
+	 * Process messages, blocking on poll because timeout is set
+	 * to INFTIM.  When poll returns with a message, call getkmsg
+	 * to pull up one message from the log driver and enqueue it
+	 * with the sync flag set.
 	 */
 
 	sys_init_msg_count = 0;
@@ -695,7 +699,7 @@ getkmsg(int timeout)
 		lastline = &dat.buf[dat.len];
 		*lastline = '\0';
 
-		DPRINT2(5, "sys_poll:(%u): getmsg: dat.len = %d\n",
+		DPRINT2(5, "getkmsg:(%u): getmsg: dat.len = %d\n",
 		    mythreadno, dat.len);
 		buflen = strlen(buf);
 		len = findnl_bkwd(buf, buflen);

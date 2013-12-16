@@ -24,8 +24,49 @@
 
 $mapfile_version 2
 
-SYMBOL_SCOPE {
+SYMBOL_VERSION ILLUMOS_0.1 {
 	global:
 		allow_severity		{ FLAGS = NODIRECT; };
+		clean_exit;
 		deny_severity		{ FLAGS = NODIRECT; };
+		dot_quad_addr;
+		dry_run;
+		eval_client;
+		eval_hostaddr;
+		eval_hostinfo;
+		eval_hostname;
+		eval_server;
+		eval_user;
+		fromhost;
+		hosts_access;
+		hosts_access_verbose;
+		hosts_allow_table;
+		hosts_ctl;
+		hosts_deny_table;
+		numeric_addr;
+		paranoid;
+		percent_m;
+		percent_x;
+		process_options;
+		refuse;
+		request_init;
+		request_set;
+		rfc931;
+		rfc931_timeout;
+		shell_cmd;
+		skip_ipv6_addrs;
+		sock_host;
+		sock_hostaddr;
+		sock_hostname;
+		sockgen_simplify;
+		split_at;
+		tcpd_buf;
+		tcpd_context;
+		tcpd_gethostbyname;
+		tcpd_warn;
+		tli_host;
+		unknown;
+		xgets;
+	local:
+		*;
 };

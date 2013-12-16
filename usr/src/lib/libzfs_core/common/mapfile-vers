@@ -41,10 +41,13 @@ SYMBOL_VERSION ILLUMOS_0.1 {
 
 	libzfs_core_fini;
 	libzfs_core_init;
+	lzc_bookmark;
 	lzc_clone;
 	lzc_create;
+	lzc_destroy_bookmarks;
 	lzc_destroy_snaps;
 	lzc_exists;
+	lzc_get_bookmarks;
 	lzc_get_holds;
 	lzc_hold;
 	lzc_receive;

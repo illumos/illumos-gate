@@ -20,7 +20,7 @@
 #
 # Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2011 Nexenta Systems, Inc. All rights reserved.
-# Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright (c) 2013 by Delphix. All rights reserved.
 #
 # MAPFILE HEADER START
 #
@@ -62,6 +62,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	spa_feature_table;
 	zfs_allocatable_devs;
 	zfs_asprintf;
+	zfs_bookmark_exists;
 	zfs_clone;
 	zfs_close;
 	zfs_create;
@@ -85,6 +86,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	zfs_is_shared;
 	zfs_is_shared_nfs;
 	zfs_is_shared_smb;
+	zfs_iter_bookmarks;
 	zfs_iter_children;
 	zfs_iter_dependents;
 	zfs_iter_filesystems;
@@ -134,6 +136,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	zfs_rollback;
 	zfs_save_arguments;
 	zfs_send;
+	zfs_send_one;
 	zfs_share;
 	zfs_shareall;
 	zfs_share_nfs;
@@ -147,6 +150,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	zfs_snapshot_nvl;
 	zfs_spa_version;
 	zfs_spa_version_map;
+	zfs_standard_error;
 	zfs_type_to_name;
 	zfs_unmount;
 	zfs_unmountall;

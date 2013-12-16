@@ -3,8 +3,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
  /*
   * tli_host() determines the type of transport (connected, connectionless),
   * the transport address of a client host, and the transport address of a
@@ -49,8 +47,6 @@ static char sccsid[] = "@(#) tli.c 1.15 97/03/21 19:27:25";
 
 extern char *nc_sperror();
 extern int errno;
-extern char *sys_errlist[];
-extern int sys_nerr;
 extern int t_errno;
 extern char *t_errlist[];
 extern int t_nerr;
@@ -320,18 +316,14 @@ static char *tli_error()
 
     if (t_errno != TSYSERR) {
 	if (t_errno < 0 || t_errno >= t_nerr) {
-	    sprintf(buf, "Unknown TLI error %d", t_errno);
+	    snprintf(buf, sizeof (buf), "Unknown TLI error %d", t_errno);
 	    return (buf);
 	} else {
 	    return (t_errlist[t_errno]);
 	}
     } else {
-	if (errno < 0 || errno >= sys_nerr) {
-	    sprintf(buf, "Unknown UNIX error %d", errno);
-	    return (buf);
-	} else {
-	    return (sys_errlist[errno]);
-	}
+	STRN_CPY(buf, strerror(errno), sizeof (buf));
+	return (buf);
     }
 }
 
