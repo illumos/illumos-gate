@@ -7596,7 +7596,7 @@ sata_txlt_apt_completion(sata_pkt_t *sata_pkt)
 			*scsipkt->pkt_scbp = STATUS_CHECK;
 			sata_fill_ata_return_desc(sata_pkt,
 			    KEY_RECOVERABLE_ERROR,
-			    SD_SCSI_ASC_ATP_INFO_AVAIL, 0);
+			    SD_SCSI_ASC_APT_INFO_AVAIL, 0x1d);
 		}
 
 		if (spx->txlt_tmp_buf != NULL) {

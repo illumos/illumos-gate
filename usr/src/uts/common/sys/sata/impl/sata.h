@@ -521,7 +521,7 @@ struct sata_apt_sense_data {
  * usr/src/uts/common/sys/scsi/generic/sense.h
  */
 #define	SD_SCSI_ASC_NO_ADD_SENSE			0x00
-#define	SD_SCSI_ASC_ATP_INFO_AVAIL			0x00
+#define	SD_SCSI_ASC_APT_INFO_AVAIL			0x00
 #define	SD_SCSI_ASC_LU_NOT_READY			0x04
 #define	SD_SCSI_ASC_LU_NOT_RESPONSE			0x05
 #define	SD_SCSI_ASC_WRITE_ERR				0x0c
