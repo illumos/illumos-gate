@@ -5737,6 +5737,7 @@ fallback:	return (ddi_prop_op(dev, dip, prop_op, mod_flags,
 				tgattr.media_is_solid_state = B_FALSE;
 			*((uint32_t *)buffer) =
 			    tgattr.media_is_solid_state ? 1 : 0;
+			break;
 		}
 		return (DDI_PROP_SUCCESS);
 	}
