@@ -328,7 +328,7 @@ PKGLISTS= \
 #
 #		repository metadata (catalogs and search indices)
 #			|
-#			| pkg.depotd
+#			| pkgrepo refresh
 #			|
 #		published packages
 #		 |		|
@@ -393,10 +393,8 @@ $(PDIR)/gendeps: $(DEP_SYNTH_PKGS) $(DEP_PKGS)
 install: $(ALL_TARGETS) repository-metadata
 
 repository-metadata: publish_pkgs
-	@print "Creating repository metadata"
 	$(PKGDEBUG)for r in $(REPOS); do \
-		/usr/lib/pkg.depotd -d $(PKGDEST)/repo.$$r \
-			--add-content --exit-ready; \
+		pkgrepo refresh -s $(PKGDEST)/repo.$$r; \
 	done
 
 #
