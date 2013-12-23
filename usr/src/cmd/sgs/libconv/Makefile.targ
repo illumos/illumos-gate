@@ -68,8 +68,7 @@ $(SGSMSG):	FRC
 
 vernote.s:	bld_vernote $(README_REVISION) $(ONLDREADME)
 		./bld_vernote \
-			-R `perl $(README_REVISION) $(VERNOTE_DEBUG) \
-				$(ONLDREADME)` \
+			-R `perl $(README_REVISION) $(ONLDREADME)` \
 			-r "$(RELEASE)" -o $@
 
 bld_vernote:	../common/bld_vernote.ksh

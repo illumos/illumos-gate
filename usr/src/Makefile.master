@@ -44,13 +44,6 @@ NATIVE_ADJUNCT=	/usr
 # RELEASE_BUILD should be cleared for final release builds.
 # NOT_RELEASE_BUILD is exactly what the name implies.
 #
-# INTERNAL_RELEASE_BUILD is a subset of RELEASE_BUILD. It mostly controls
-# identification strings. Enabling RELEASE_BUILD automatically enables
-# INTERNAL_RELEASE_BUILD.
-#
-# STRIP_COMMENTS toggles comment section striping. Generally the same setting
-# as INTERNAL_RELEASE_BUILD.
-#
 # __GNUC toggles the building of ON components using gcc and related tools.
 # Normally set to `#', set it to `' to do gcc build.
 #
@@ -70,10 +63,8 @@ PRE_POUND=				pre\#
 POUND_SIGN=				$(PRE_POUND:pre\%=%)
 
 NOT_RELEASE_BUILD=
-INTERNAL_RELEASE_BUILD=			$(POUND_SIGN)
 RELEASE_BUILD=				$(POUND_SIGN)
 $(RELEASE_BUILD)NOT_RELEASE_BUILD=	$(POUND_SIGN)
-$(RELEASE_BUILD)INTERNAL_RELEASE_BUILD=
 PATCH_BUILD=				$(POUND_SIGN)
 
 # SPARC_BLD is '#' for an Intel build.
@@ -82,8 +73,6 @@ SPARC_BLD_1=    $(MACH:i386=$(POUND_SIGN))
 SPARC_BLD=      $(SPARC_BLD_1:sparc=)
 INTEL_BLD_1=    $(MACH:sparc=$(POUND_SIGN))
 INTEL_BLD=      $(INTEL_BLD_1:i386=)
-
-STRIP_COMMENTS=	$(INTERNAL_RELEASE_BUILD)
 
 # The variables below control the compilers used during the build.
 # There are a number of permutations.
@@ -968,8 +957,7 @@ PATCH_DATE=	$(RELEASE_DATE)
 RELEASE_CM=	"@($(POUND_SIGN))SunOS $(RELEASE) $(PATCHID) $(PATCH_DATE)"
 DEV_CM=		"@($(POUND_SIGN))SunOS Internal Development: non-nightly build"
 
-PROCESS_COMMENT=		   @?${MCS} -c -a $(RELEASE_CM) -a $(DEV_CM)
-$(STRIP_COMMENTS)PROCESS_COMMENT=  @?${MCS} -d -a $(RELEASE_CM) -a $(DEV_CM)
+PROCESS_COMMENT=  @?${MCS} -d -a $(RELEASE_CM) -a $(DEV_CM)
 $(RELEASE_BUILD)PROCESS_COMMENT=   @?${MCS} -d -a $(RELEASE_CM)
 
 STRIP_STABS=			   :
