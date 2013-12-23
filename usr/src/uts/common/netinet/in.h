@@ -1174,7 +1174,7 @@ typedef struct {
 } in_prefix_t;
 
 
-#if !defined(_XPG4_2) || defined(__EXTENSIONS__)
+#if !defined(_XPG4_2) || defined(_XPG6) || defined(__EXTENSIONS__)
 /*
  * IPv6 options
  */
@@ -1194,6 +1194,19 @@ typedef struct {
 					/* argument type: struct ipv6_mreq */
 #define	IPV6_LEAVE_GROUP	0xa	/* leave an IPv6 multicast group */
 					/* argument type: struct ipv6_mreq */
+
+/*
+ * Other XPG6 constants.
+ */
+#define	INET_ADDRSTRLEN		16	/* max len IPv4 addr in ascii dotted */
+					/* decimal notation. */
+#define	INET6_ADDRSTRLEN	46	/* max len of IPv6 addr in ascii */
+					/* standard colon-hex notation. */
+
+#endif /* !defined(_XPG4_2) || defined(_XPG6) || defined(__EXTENSIONS__) */
+
+#if !defined(_XPG4_2) || defined(__EXTENSIONS__)
+
 /*
  * IPV6_ADD_MEMBERSHIP and IPV6_DROP_MEMBERSHIP are being kept
  * for backward compatibility. They have the same meaning as IPV6_JOIN_GROUP
@@ -1289,10 +1302,6 @@ typedef struct {
 /*
  * Miscellaneous IPv6 constants.
  */
-#define	INET_ADDRSTRLEN		16	/* max len IPv4 addr in ascii dotted */
-					/* decimal notation. */
-#define	INET6_ADDRSTRLEN	46	/* max len of IPv6 addr in ascii */
-					/* standard colon-hex notation. */
 #define	IPV6_PAD1_OPT		0	/* pad byte in IPv6 extension hdrs */
 
 #endif /* !defined(_XPG4_2) || defined(__EXTENSIONS__) */
@@ -1300,7 +1309,7 @@ typedef struct {
 /*
  * Extern declarations for pre-defined global const variables
  */
-#if !defined(_XPG4_2) || defined(__EXTENSIONS__)
+#if !defined(_XPG4_2) || defined(_XPG6) || defined(__EXTENSIONS__)
 #ifndef _KERNEL
 #ifdef __STDC__
 extern const struct in6_addr in6addr_any;
@@ -1310,7 +1319,7 @@ extern struct in6_addr in6addr_any;
 extern struct in6_addr in6addr_loopback;
 #endif
 #endif
-#endif /* !defined(_XPG4_2) || defined(__EXTENSIONS__) */
+#endif /* !defined(_XPG4_2) || defined(_XPG6) || defined(__EXTENSIONS__) */
 
 #ifdef	__cplusplus
 }
