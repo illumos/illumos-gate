@@ -1,9 +1,10 @@
 '\" te
+.\" Copyright (c) 2013 Gary Mills
 .\"  Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH W 1 "Mar 19, 2004"
+.TH W 1 "Dec 15, 2013"
 .SH NAME
 w \- display information about currently logged-in users
 .SH SYNOPSIS
@@ -22,12 +23,17 @@ system, and the average number of jobs in the run queue over the last 1, 5 and
 15 minutes.
 .sp
 .LP
-The fields displayed are: the user's login name, the name of the tty the user
-is on, the time of day the user logged on (in \fIhours:minutes\fR), the idle
-time\(emthat is, the number of minutes since the user last typed anything (in
-\fIhours:minutes\fR), the \fBCPU\fR time used by all processes and their
-children on that terminal (in \fIminutes:seconds\fR), the \fBCPU\fR time used
-by the currently active processes (in \fIminutes:seconds\fR), and the name and
+The fields displayed are: the user's login name,
+the name of the tty the user is on,
+the time of day the user logged on (in ISO time format, weekday name
+and \fIhours:minutes\fR, or ISO date format), the idle
+time\(emthat is, the number of minutes since the user last typed anything
+(in \fIhours:minutes:seconds\fR),
+the \fBCPU\fR time used by all processes and their
+children on that terminal (in \fIhours:minutes:seconds\fR),
+the \fBCPU\fR time used
+by the currently active processes (in \fIhours:minutes:seconds\fR),
+and the name and
 arguments of the current process.
 .SH OPTIONS
 .sp

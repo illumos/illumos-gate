@@ -1,10 +1,11 @@
 '\" te
+.\" Copyright (c) 2013 Gary Mills
 .\" Copyright (c) 2001 Sun Microsystems, Inc. All Rights Reserved.
 .\" Copyright 1989 AT&T
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH WHODO 1M "Jun 18, 2003"
+.TH WHODO 1M "Dec 15, 2013"
 .SH NAME
 whodo \- who is doing what
 .SH SYNOPSIS
@@ -48,13 +49,16 @@ Suppress the heading.
 .ad
 .RS 6n
 Produce a long form of output. The fields displayed are: the user's login name,
-the name of the tty the user is on, the time of day the user logged in (in
-\fIhours\fR\fB:\fR\fIminutes\fR), the idle time \(em that is, the time since
-the user last typed anything (in \fIhours\fR\fB:\fR\fIminutes\fR), the CPU time
-used by all processes and their children on that terminal (in
-\fIminutes\fR\fB:\fR\fIseconds\fR), the CPU time used by the currently active
-processes (in \fIminutes\fR\fB:\fR\fIseconds\fR), and the name and arguments of
-the current process.
+the name of the tty the user is on, the time of day the user logged in
+(in ISO time format, weekday name and \fIhours\fR\fB:\fR\fIminutes\fR,
+or ISO date format),
+the idle time \(em that is, the time since the user last typed anything
+(in \fIhours\fR\fB:\fR\fIminutes\fR\fB:\fR\fIseconds\fR),
+the CPU time used by all processes and their children on that terminal
+(in \fIhours\fR\fB:\fR\fIminutes\fR\fB:\fR\fIseconds\fR),
+the CPU time used by the currently active processes
+(in \fIhours\fR\fB:\fR\fIminutes\fR\fB:\fR\fIseconds\fR),
+and the name and arguments of the current process.
 .RE
 
 .SH EXAMPLES

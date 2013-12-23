@@ -518,6 +518,7 @@ static struct scsi_asq_key_strings extended_sense_list[] = {
 	0x00, 0x1A, "rewind operation in progress",
 	0x00, 0x1B, "set capacity operation in progress",
 	0x00, 0x1C, "verify operation in progress",
+	0x00, 0x1D, "ATA passthrough information available",
 	0x01, 0x00, "no index/sector signal",
 	0x02, 0x00, "no seek complete",
 	0x03, 0x00, "peripheral device write fault",
