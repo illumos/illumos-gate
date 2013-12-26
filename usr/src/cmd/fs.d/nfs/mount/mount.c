@@ -2104,7 +2104,7 @@ get_fh(struct nfs_args *args, char *fshost, char *fspath, int *versp,
 	}
 
 	while ((cl = clnt_create_vers(fshost, MOUNTPROG, &outvers,
-	    vers_min, vers_to_try, "datagram_v")) == NULL) {
+	    vers_min, vers_to_try, NULL)) == NULL) {
 		if (rpc_createerr.cf_stat == RPC_UNKNOWNHOST) {
 			pr_err(gettext("%s: %s\n"), fshost,
 			    clnt_spcreateerror(""));
