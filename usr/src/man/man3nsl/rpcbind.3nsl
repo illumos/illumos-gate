@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH RPCBIND 3NSL "Feb 20, 1998"
+.TH RPCBIND 3NSL "Dec 27, 2013"
 .SH NAME
 rpcbind, rpcb_getmaps, rpcb_getaddr, rpcb_gettime, rpcb_rmtcall, rpcb_set,
 rpcb_unset \- library routines for RPC bind service
@@ -14,7 +14,7 @@ rpcb_unset \- library routines for RPC bind service
 
 
 
-\fBstruct rpcblist *\fR\fBrpcb_getmaps\fR(\fBconst struct netconfig *\fR\fInnetconf\fR,
+\fBstruct rpcblist *\fR\fBrpcb_getmaps\fR(\fBconst struct netconfig *\fR\fInetconf\fR,
      \fBconst char *\fR\fIhost\fR);
 .fi
 
@@ -36,7 +36,7 @@ rpcb_unset \- library routines for RPC bind service
      \fBconst char *\fR\fIhost\fR, \fBconst rpcprog_t\fR \fIprognum\fR,
      \fBconst rpcvers_t\fR \fIversnum\fR, \fBconst rpcproc_t\fR \fIprocnum\fR,
      \fBconst xdrproc_t\fR \fIinproc\fR, \fBconst caddr_t\fR \fIin\fR,
-     \fBconst xdrproc_t\fR \fIoutproc\fR \fBcaddr_t\fR \fIout\fR,,
+     \fBconst xdrproc_t\fR \fIoutproc\fR \fBcaddr_t\fR \fIout\fR,
      \fBconst struct timeval\fR \fItout\fR, \fBstruct netbuf  *\fR\fIsvcaddr\fR);
 .fi
 
