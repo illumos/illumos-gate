@@ -1641,8 +1641,20 @@ mp_startup_common(boolean_t boot)
 	 * We need to get TSC on this proc synced (i.e., any delta
 	 * from cpu0 accounted for) as soon as we can, because many
 	 * many things use gethrtime/pc_gethrestime, including
-	 * interrupts, cmn_err, etc.
+	 * interrupts, cmn_err, etc.  Before we can do that, we want to
+	 * clear TSC if we're on a buggy Sandy/Ivy Bridge CPU, so do that
+	 * right away.
 	 */
+	bzero(new_x86_featureset, BT_SIZEOFMAP(NUM_X86_FEATURES));
+	cpuid_pass1(cp, new_x86_featureset);
+
+	if (boot && get_hwenv() == HW_NATIVE &&
+	    cpuid_getvendor(CPU) == X86_VENDOR_Intel &&
+	    cpuid_getfamily(CPU) == 6 &&
+	    (cpuid_getmodel(CPU) == 0x2d || cpuid_getmodel(CPU) == 0x3e) &&
+	    is_x86_feature(new_x86_featureset, X86FSET_TSC)) {
+		(void) wrmsr(REG_TSC, 0UL);
+	}
 
 	/* Let the control CPU continue into tsc_sync_master() */
 	mp_startup_signal(&procset_slave, cp->cpu_id);
@@ -1659,9 +1671,6 @@ mp_startup_common(boolean_t boot)
 	 * before swtch() overwrites it.
 	 */
 	(void) (*ap_mlsetup)();
-
-	bzero(new_x86_featureset, BT_SIZEOFMAP(NUM_X86_FEATURES));
-	cpuid_pass1(cp, new_x86_featureset);
 
 #ifndef __xpv
 	/*
