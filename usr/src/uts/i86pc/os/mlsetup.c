@@ -200,6 +200,21 @@ mlsetup(struct regs *rp)
 		xen_hvm_init();
 
 	/*
+	 * Before we do anything with the TSCs, we need to work around
+	 * Intel erratum BT81.  On some Sandy Bridge CPUs, warm reset does not
+	 * clear the TSC.  If we are on such a CPU, we will clear TSC ourselves
+	 * here.  Other CPUs will clear it when we boot them later, and the
+	 * resulting skew will be handled by tsc_sync_master()/_slave();
+	 * note that such skew already exists and has to be handled anyway.
+	 */
+	if ((get_hwenv() & HW_XEN_HVM) == 0 &&
+	    cpuid_getvendor(CPU) == X86_VENDOR_Intel &&
+	    cpuid_getfamily(CPU) == 6 && cpuid_getmodel(CPU) == 0x2d &&
+	    is_x86_feature(x86_featureset, X86FSET_TSC)) {
+		(void) wrmsr(REG_TSC, 0UL);
+	}
+
+	/*
 	 * Patch the tsc_read routine with appropriate set of instructions,
 	 * depending on the processor family and architecure, to read the
 	 * time-stamp counter while ensuring no out-of-order execution.
