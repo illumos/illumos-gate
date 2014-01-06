@@ -1,4 +1,3 @@
-#
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
@@ -19,14 +18,700 @@
 # CDDL HEADER END
 #
 
+# Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2012 Nexenta Systems, Inc. All rights reserved.
+# Copyright (c) 2013 Andrew Stormont.  All rights reserved.
+
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+#	This makefile contains the common definitions for all intel
+#	implementation architecture independent modules.
 #
 
-UTSTREE=$(UTSBASE)
+#
+#	Machine type (implementation architecture):
+#
+PLATFORM	 = i86pc
 
-include $(UTSBASE)/intel/Makefile.intel.shared
+#
+#	Everybody needs to know how to build modstubs.o and to locate unix.o.
+#	Note that unix.o must currently be selected from among the possible
+#	"implementation architectures". Note further, that unix.o is only
+#	used as an optional error check for undefines so (theoretically)
+#	any "implementation architectures" could be used. We choose i86pc
+#	because it is the reference port.
+#
+UNIX_DIR	 = $(UTSBASE)/i86pc/unix
+GENLIB_DIR	 = $(UTSBASE)/intel/genunix
+IPDRV_DIR	 = $(UTSBASE)/intel/ip
+MODSTUBS_DIR	 = $(UNIX_DIR)
+DSF_DIR		 = $(UTSBASE)/$(PLATFORM)/genassym
+LINTS_DIR	 = $(OBJS_DIR)
+LINT_LIB_DIR	 = $(UTSBASE)/intel/lint-libs/$(OBJS_DIR)
+
+UNIX_O		 = $(UNIX_DIR)/$(OBJS_DIR)/unix.o
+GENLIB		 = $(GENLIB_DIR)/$(OBJS_DIR)/libgenunix.so
+MODSTUBS_O	 = $(MODSTUBS_DIR)/$(OBJS_DIR)/modstubs.o
+LINT_LIB	 = $(UTSBASE)/i86pc/lint-libs/$(OBJS_DIR)/llib-lunix.ln
+GEN_LINT_LIB	 = $(UTSBASE)/intel/lint-libs/$(OBJS_DIR)/llib-lgenunix.ln
+
+#
+#	Include the makefiles which define build rule templates, the
+#	collection of files per module, and a few specific flags. Note
+#	that order is significant, just as with an include path. The
+#	first build rule template which matches the files name will be
+#	used. By including these in order from most machine dependent
+#	to most machine independent, we allow a machine dependent file
+#	to be used in preference over a machine independent version
+#	(Such as a machine specific optimization, which preserves the
+#	interfaces.)
+#
+include $(UTSBASE)/intel/Makefile.files
+include $(UTSBASE)/common/Makefile.files
+
+#
+# ----- TRANSITIONAL SECTION --------------------------------------------------
+#
+
+#
+#	Not everything which *should* be a module is a module yet. The
+#	following is a list of such objects which are currently part of
+#	genunix but which might someday become kmods.  This must be
+#	defined before we include Makefile.uts, or else genunix's build
+#	won't be as parallel as we might like.
+#
+NOT_YET_KMODS	 = $(OLDPTY_OBJS) $(PTY_OBJS) $(VCONS_CONF_OBJS) $(MOD_OBJS)
+
+#
+# ----- END OF TRANSITIONAL SECTION -------------------------------------------
+#
+#	Include machine independent rules. Note that this does not imply
+#	that the resulting module from rules in Makefile.uts is	machine
+#	independent. Only that the build rules are machine independent.
+#
+include $(UTSBASE)/Makefile.uts
+
+#
+#	The following must be defined for all implementations:
+#
+MODSTUBS		= $(UTSBASE)/intel/ia32/ml/modstubs.s
+
+#
+#	Define supported builds
+#
+DEF_BUILDS		= $(DEF_BUILDS64) $(DEF_BUILDS32)
+ALL_BUILDS		= $(ALL_BUILDS64) $(ALL_BUILDS32)
+
+#
+#	x86 or amd64 inline templates
+#
+INLINES_32		= $(UTSBASE)/intel/ia32/ml/ia32.il
+INLINES_64		= $(UTSBASE)/intel/amd64/ml/amd64.il
+INLINES			+= $(INLINES_$(CLASS))
+
+#
+#	kernel-specific optimizations; override default in Makefile.master
+#
+
+CFLAGS_XARCH_32		= $(i386_CFLAGS)
+CFLAGS_XARCH_64		= $(amd64_CFLAGS)
+CFLAGS_XARCH		= $(CFLAGS_XARCH_$(CLASS))
+
+COPTFLAG_32		= $(COPTFLAG)
+COPTFLAG_64		= $(COPTFLAG64)
+COPTIMIZE		= $(COPTFLAG_$(CLASS))
+
+CFLAGS			= $(CFLAGS_XARCH)
+CFLAGS			+= $(COPTIMIZE)
+CFLAGS			+= $(INLINES) -D_ASM_INLINES
+CFLAGS			+= $(CCMODE)
+CFLAGS			+= $(SPACEFLAG)
+CFLAGS			+= $(CCUNBOUND)
+CFLAGS			+= $(CFLAGS_uts)
+CFLAGS			+= -xstrconst
+
+ASFLAGS_XARCH_32	= $(i386_ASFLAGS)
+ASFLAGS_XARCH_64	= $(amd64_ASFLAGS)
+ASFLAGS_XARCH		= $(ASFLAGS_XARCH_$(CLASS))
+
+ASFLAGS			+= $(ASFLAGS_XARCH)
+
+#
+#	Define the base directory for installation.
+#
+BASE_INS_DIR	= $(ROOT)
+
+#
+#	Debugging level
+#
+#	Special knowledge of which special debugging options affect which
+#	file is used to optimize the build if these flags are changed.
+#
+DEBUG_DEFS_OBJ32	=
+DEBUG_DEFS_DBG32	= -DDEBUG
+DEBUG_DEFS_OBJ64	=
+DEBUG_DEFS_DBG64	= -DDEBUG
+DEBUG_DEFS		= $(DEBUG_DEFS_$(BUILD_TYPE))
+
+DEBUG_COND_OBJ32	= $(POUND_SIGN)
+DEBUG_COND_DBG32	=
+DEBUG_COND_OBJ64	= $(POUND_SIGN)
+DEBUG_COND_DBG64	=
+IF_DEBUG_OBJ		= $(DEBUG_COND_$(BUILD_TYPE))$(OBJS_DIR)/
+
+$(IF_DEBUG_OBJ)syscall.o	:=	DEBUG_DEFS	+= -DSYSCALLTRACE
+$(IF_DEBUG_OBJ)clock.o		:=	DEBUG_DEFS	+= -DKSLICE=1
+
+#
+#	Collect the preprocessor definitions to be associated with *all*
+#	files.
+#
+ALL_DEFS	 = $(DEBUG_DEFS) $(OPTION_DEFS)
+
+#
+#	The kernels modules which are "implementation architecture"
+#	specific for this machine are enumerated below. Note that most
+#	of these modules must exist (in one form or another) for each
+#	architecture.
+#
+#	Common Drivers (usually pseudo drivers) (/kernel/drv)
+#	DRV_KMODS are built both 32-bit and 64-bit
+#	DRV_KMODS_32 are built only 32-bit
+#	DRV_KMODS_64 are built only 64-bit
+#
+DRV_KMODS	+= aac
+DRV_KMODS	+= aggr
+DRV_KMODS	+= ahci
+DRV_KMODS	+= amd64_gart
+DRV_KMODS	+= amr
+DRV_KMODS	+= agpgart
+DRV_KMODS	+= srn
+DRV_KMODS	+= agptarget
+DRV_KMODS       += arn
+DRV_KMODS	+= arp
+DRV_KMODS	+= asy
+DRV_KMODS	+= ata
+DRV_KMODS	+= ath
+DRV_KMODS	+= atu
+DRV_KMODS	+= audio
+DRV_KMODS	+= audio1575
+DRV_KMODS	+= audio810
+DRV_KMODS	+= audiocmi
+DRV_KMODS	+= audiocmihd
+DRV_KMODS	+= audioemu10k
+DRV_KMODS	+= audioens
+DRV_KMODS	+= audiohd
+DRV_KMODS	+= audioixp
+DRV_KMODS	+= audiols
+DRV_KMODS	+= audiop16x
+DRV_KMODS	+= audiopci
+DRV_KMODS	+= audiosolo
+DRV_KMODS	+= audiots
+DRV_KMODS	+= audiovia823x
+DRV_KMODS_32	+= audiovia97
+DRV_KMODS	+= bl 
+DRV_KMODS	+= blkdev
+DRV_KMODS	+= bge
+DRV_KMODS	+= bofi
+DRV_KMODS	+= bpf
+DRV_KMODS	+= bridge
+DRV_KMODS	+= bscbus
+DRV_KMODS	+= bscv
+DRV_KMODS	+= chxge
+DRV_KMODS	+= cxgbe
+DRV_KMODS	+= ntxn
+DRV_KMODS	+= myri10ge
+DRV_KMODS	+= clone
+DRV_KMODS	+= cmdk
+DRV_KMODS	+= cn
+DRV_KMODS	+= conskbd
+DRV_KMODS	+= consms
+DRV_KMODS	+= cpqary3
+DRV_KMODS	+= cpuid
+DRV_KMODS	+= cpunex
+DRV_KMODS	+= crypto
+DRV_KMODS	+= cryptoadm
+DRV_KMODS	+= dca
+DRV_KMODS	+= devinfo
+DRV_KMODS	+= dld
+DRV_KMODS	+= dlpistub
+DRV_KMODS_32	+= dnet
+DRV_KMODS	+= dump
+DRV_KMODS	+= ecpp
+DRV_KMODS	+= emlxs
+DRV_KMODS	+= fd
+DRV_KMODS	+= fdc
+DRV_KMODS	+= fm
+DRV_KMODS	+= fssnap
+DRV_KMODS	+= hxge
+DRV_KMODS	+= i8042
+DRV_KMODS	+= i915
+DRV_KMODS	+= icmp
+DRV_KMODS	+= icmp6
+DRV_KMODS	+= intel_nb5000
+DRV_KMODS	+= intel_nhm
+DRV_KMODS	+= ip
+DRV_KMODS	+= ip6
+DRV_KMODS	+= ipd
+DRV_KMODS	+= ipf
+DRV_KMODS       += ipnet
+DRV_KMODS	+= ippctl
+DRV_KMODS	+= ipsecah
+DRV_KMODS	+= ipsecesp
+DRV_KMODS	+= ipw
+DRV_KMODS	+= iwh
+DRV_KMODS	+= iwi
+DRV_KMODS	+= iwk
+DRV_KMODS	+= iwp
+DRV_KMODS	+= iwscn
+DRV_KMODS	+= kb8042
+DRV_KMODS	+= keysock
+DRV_KMODS	+= kssl
+DRV_KMODS	+= kstat
+DRV_KMODS	+= ksyms
+DRV_KMODS	+= kmdb
+DRV_KMODS	+= llc1
+DRV_KMODS	+= lofi
+DRV_KMODS	+= log
+DRV_KMODS	+= logindmux
+DRV_KMODS	+= mega_sas
+DRV_KMODS	+= mc-amd
+DRV_KMODS	+= mm
+DRV_KMODS	+= mouse8042
+DRV_KMODS	+= mpt_sas
+DRV_KMODS	+= mr_sas
+DRV_KMODS	+= mwl 
+DRV_KMODS	+= nca
+DRV_KMODS	+= nsmb
+DRV_KMODS	+= nulldriver
+DRV_KMODS	+= nv_sata
+DRV_KMODS	+= nxge
+DRV_KMODS	+= oce
+DRV_KMODS	+= openeepr
+DRV_KMODS	+= pci_pci
+DRV_KMODS	+= pcic
+DRV_KMODS	+= pcieb
+DRV_KMODS	+= physmem
+DRV_KMODS	+= pit_beep
+DRV_KMODS	+= pm
+DRV_KMODS	+= poll
+DRV_KMODS	+= pool
+DRV_KMODS	+= power
+DRV_KMODS	+= pseudo
+DRV_KMODS	+= ptc
+DRV_KMODS	+= ptm
+DRV_KMODS	+= pts
+DRV_KMODS	+= ptsl
+DRV_KMODS	+= qlge
+DRV_KMODS	+= radeon
+DRV_KMODS	+= ral
+DRV_KMODS	+= ramdisk
+DRV_KMODS	+= random
+DRV_KMODS	+= rds
+DRV_KMODS	+= rdsv3
+DRV_KMODS	+= rpcib
+DRV_KMODS	+= rsm
+DRV_KMODS	+= rts
+DRV_KMODS	+= rtw
+DRV_KMODS	+= rum
+DRV_KMODS	+= rwd
+DRV_KMODS	+= rwn
+DRV_KMODS	+= sad
+DRV_KMODS	+= sd
+DRV_KMODS	+= sdhost
+DRV_KMODS	+= sgen
+DRV_KMODS	+= si3124
+DRV_KMODS	+= smbios
+DRV_KMODS	+= softmac
+DRV_KMODS	+= spdsock
+DRV_KMODS	+= smbsrv
+DRV_KMODS	+= smp
+DRV_KMODS	+= sppp
+DRV_KMODS	+= sppptun
+DRV_KMODS	+= srpt
+DRV_KMODS	+= st
+DRV_KMODS	+= sy
+DRV_KMODS	+= sysevent
+DRV_KMODS	+= sysmsg
+DRV_KMODS	+= tcp
+DRV_KMODS	+= tcp6
+DRV_KMODS	+= tl
+DRV_KMODS	+= tnf
+DRV_KMODS	+= tpm
+DRV_KMODS	+= trill
+DRV_KMODS	+= udp
+DRV_KMODS	+= udp6
+DRV_KMODS	+= ucode
+DRV_KMODS	+= ural
+DRV_KMODS	+= uath
+DRV_KMODS	+= urtw
+DRV_KMODS	+= vgatext
+DRV_KMODS	+= heci
+DRV_KMODS	+= vnic
+DRV_KMODS	+= vscan
+DRV_KMODS	+= wc
+DRV_KMODS	+= winlock
+DRV_KMODS	+= wpi
+DRV_KMODS	+= xge
+DRV_KMODS	+= yge
+DRV_KMODS	+= zcons
+DRV_KMODS	+= zyd
+DRV_KMODS	+= simnet
+DRV_KMODS	+= stmf
+DRV_KMODS	+= stmf_sbd
+DRV_KMODS	+= fct
+DRV_KMODS	+= fcoe
+DRV_KMODS	+= fcoet
+DRV_KMODS	+= fcoei
+DRV_KMODS	+= qlt
+DRV_KMODS	+= iscsit
+DRV_KMODS	+= pppt
+DRV_KMODS	+= ncall nsctl sdbc nskern sv
+DRV_KMODS	+= ii rdc rdcsrv rdcstub 
+DRV_KMODS	+= iptun
+
+#
+# Common code drivers
+#
+
+DRV_KMODS	+= afe
+DRV_KMODS	+= atge
+DRV_KMODS	+= bfe
+DRV_KMODS	+= dmfe
+DRV_KMODS	+= e1000g
+DRV_KMODS	+= efe
+DRV_KMODS	+= elxl
+DRV_KMODS	+= hme
+DRV_KMODS	+= mxfe
+DRV_KMODS	+= nge
+DRV_KMODS	+= pcn
+DRV_KMODS	+= rge
+DRV_KMODS	+= rtls
+DRV_KMODS	+= sfe
+DRV_KMODS	+= amd8111s
+DRV_KMODS	+= igb
+DRV_KMODS	+= ipmi
+DRV_KMODS	+= iprb
+DRV_KMODS	+= ixgbe
+DRV_KMODS	+= vr
+
+#
+# Virtio drivers
+#
+
+# Virtio core
+DRV_KMODS	+= virtio
+
+# Virtio block driver
+DRV_KMODS	+= vioblk
+
+#
+#	DTrace and DTrace Providers
+#
+DRV_KMODS	+= dtrace
+DRV_KMODS	+= fbt
+DRV_KMODS	+= lockstat
+DRV_KMODS	+= profile
+DRV_KMODS	+= sdt
+DRV_KMODS	+= systrace
+DRV_KMODS	+= fasttrap
+DRV_KMODS	+= dcpc
+
+#
+#	I/O framework test drivers
+#
+DRV_KMODS	+= pshot
+DRV_KMODS	+= gen_drv
+DRV_KMODS	+= tvhci tphci tclient
+DRV_KMODS	+= emul64
+
+#
+#	Machine Specific Driver Modules (/kernel/drv):
+#
+DRV_KMODS	+= options
+DRV_KMODS	+= scsi_vhci
+DRV_KMODS	+= pmcs
+DRV_KMODS	+= pmcs8001fw
+DRV_KMODS	+= arcmsr
+DRV_KMODS	+= fcp
+DRV_KMODS	+= fcip
+DRV_KMODS	+= fcsm
+DRV_KMODS	+= fp
+DRV_KMODS	+= qlc
+DRV_KMODS	+= iscsi
+
+#
+#	PCMCIA specific module(s)
+#
+DRV_KMODS	+= pcs
+MISC_KMODS	+= cardbus
+
+#
+#	SCSI Enclosure Services driver
+#
+DRV_KMODS	+= ses
+
+#
+#	USB specific modules
+#
+DRV_KMODS	+= hid
+DRV_KMODS	+= hwarc hwahc
+DRV_KMODS	+= hubd
+DRV_KMODS	+= uhci
+DRV_KMODS	+= ehci
+DRV_KMODS	+= ohci
+DRV_KMODS	+= usb_mid
+DRV_KMODS	+= usb_ia
+DRV_KMODS	+= scsa2usb
+DRV_KMODS	+= usbprn
+DRV_KMODS	+= ugen
+DRV_KMODS	+= usbser
+DRV_KMODS	+= usbsacm
+DRV_KMODS	+= usbsksp
+DRV_KMODS	+= usbsprl
+DRV_KMODS	+= usb_ac
+DRV_KMODS	+= usb_as
+DRV_KMODS	+= usbskel
+DRV_KMODS	+= usbvc
+DRV_KMODS	+= usbftdi
+DRV_KMODS	+= wusb_df
+DRV_KMODS	+= wusb_ca
+DRV_KMODS	+= usbecm
+
+#
+#	1394 modules
+#
+MISC_KMODS	+= s1394 sbp2
+DRV_KMODS	+= hci1394 scsa1394
+DRV_KMODS	+= av1394
+DRV_KMODS	+= dcam1394
+
+#
+#	InfiniBand pseudo drivers
+#
+DRV_KMODS	+= ib ibp eibnx eoib rdsib sdp iser daplt hermon tavor sol_ucma sol_uverbs
+DRV_KMODS	+= sol_umad 
+
+#
+#	LVM modules
+#
+DRV_KMODS	+= md
+MISC_KMODS	+= md_stripe md_hotspares md_mirror md_raid md_trans md_notify
+MISC_KMODS	+= md_sp
+
+#
+#	Brand modules
+#
+BRAND_KMODS	+= sn1_brand s10_brand
+
+#
+#	Exec Class Modules (/kernel/exec):
+#
+EXEC_KMODS	+= elfexec intpexec shbinexec javaexec
+
+#
+#	Scheduling Class Modules (/kernel/sched):
+#
+SCHED_KMODS	+= IA RT TS RT_DPTBL TS_DPTBL FSS FX FX_DPTBL SDC
+
+#
+#	File System Modules (/kernel/fs):
+#
+FS_KMODS	+= autofs cachefs ctfs dcfs dev devfs fdfs fifofs hsfs lofs
+FS_KMODS	+= mntfs namefs nfs objfs zfs zut
+FS_KMODS	+= pcfs procfs sockfs specfs tmpfs udfs ufs sharefs
+FS_KMODS	+= smbfs
+
+#
+#	Streams Modules (/kernel/strmod):
+#
+STRMOD_KMODS	+= bufmod connld dedump ldterm pckt pfmod pipemod
+STRMOD_KMODS	+= ptem redirmod rpcmod rlmod telmod timod
+STRMOD_KMODS	+= spppasyn spppcomp
+STRMOD_KMODS	+= tirdwr ttcompat
+STRMOD_KMODS	+= usbkbm
+STRMOD_KMODS	+= usbms
+STRMOD_KMODS	+= usbwcm
+STRMOD_KMODS	+= usb_ah
+STRMOD_KMODS	+= drcompat
+STRMOD_KMODS	+= cryptmod
+STRMOD_KMODS	+= vuid2ps2
+STRMOD_KMODS	+= vuid3ps2
+STRMOD_KMODS	+= vuidm3p
+STRMOD_KMODS	+= vuidm4p
+STRMOD_KMODS	+= vuidm5p
+
+#
+#	'System' Modules (/kernel/sys):
+#
+SYS_KMODS	+= c2audit
+SYS_KMODS	+= doorfs
+SYS_KMODS	+= exacctsys
+SYS_KMODS	+= inst_sync
+SYS_KMODS	+= kaio
+SYS_KMODS	+= msgsys
+SYS_KMODS	+= pipe
+SYS_KMODS	+= portfs
+SYS_KMODS	+= pset
+SYS_KMODS	+= semsys
+SYS_KMODS	+= shmsys
+SYS_KMODS	+= sysacct
+SYS_KMODS	+= acctctl
+
+#
+#	'Misc' Modules (/kernel/misc)
+#	MISC_KMODS are built both 32-bit and 64-bit
+#	MISC_KMODS_32 are built only 32-bit
+#	MISC_KMODS_64 are built only 64-bit
+#
+MISC_KMODS	+= ac97
+MISC_KMODS	+= acpica
+MISC_KMODS	+= agpmaster
+MISC_KMODS	+= bignum
+MISC_KMODS	+= bootdev
+MISC_KMODS	+= busra
+MISC_KMODS	+= cmlb
+MISC_KMODS	+= consconfig
+MISC_KMODS	+= ctf
+MISC_KMODS	+= dadk
+MISC_KMODS	+= dcopy
+MISC_KMODS	+= dls
+MISC_KMODS	+= drm
+MISC_KMODS	+= fssnap_if
+MISC_KMODS	+= gda
+MISC_KMODS	+= gld
+MISC_KMODS	+= hidparser
+MISC_KMODS	+= hook
+MISC_KMODS	+= hpcsvc
+MISC_KMODS	+= ibcm
+MISC_KMODS	+= ibdm
+MISC_KMODS	+= ibdma
+MISC_KMODS	+= ibmf
+MISC_KMODS	+= ibtl
+MISC_KMODS	+= idm
+MISC_KMODS	+= idmap
+MISC_KMODS	+= iommulib
+MISC_KMODS	+= ipc
+MISC_KMODS	+= kbtrans
+MISC_KMODS	+= kcf
+MISC_KMODS	+= kgssapi
+MISC_KMODS	+= kmech_dummy
+MISC_KMODS	+= kmech_krb5
+MISC_KMODS	+= ksocket
+MISC_KMODS	+= mac
+MISC_KMODS	+= mii
+MISC_KMODS	+= mwlfw
+MISC_KMODS	+= net80211
+MISC_KMODS	+= nfs_dlboot
+MISC_KMODS	+= nfssrv
+MISC_KMODS	+= neti
+MISC_KMODS	+= pci_autoconfig
+MISC_KMODS	+= pcicfg
+MISC_KMODS	+= pcihp
+MISC_KMODS	+= pcmcia
+MISC_KMODS	+= rpcsec
+MISC_KMODS	+= rpcsec_gss
+MISC_KMODS	+= rsmops
+MISC_KMODS	+= sata
+MISC_KMODS	+= scsi
+MISC_KMODS	+= sda
+MISC_KMODS	+= sol_ofs
+MISC_KMODS	+= spuni
+MISC_KMODS	+= strategy
+MISC_KMODS	+= strplumb
+MISC_KMODS	+= tem
+MISC_KMODS	+= tlimod
+MISC_KMODS	+= usba usba10 usbs49_fw
+MISC_KMODS	+= scsi_vhci_f_sym_hds
+MISC_KMODS	+= scsi_vhci_f_sym
+MISC_KMODS	+= scsi_vhci_f_tpgs
+MISC_KMODS	+= scsi_vhci_f_asym_sun
+MISC_KMODS	+= scsi_vhci_f_tape
+MISC_KMODS	+= scsi_vhci_f_tpgs_tape
+MISC_KMODS	+= fctl
+MISC_KMODS	+= emlxs_fw
+MISC_KMODS	+= qlc_fw_2200
+MISC_KMODS	+= qlc_fw_2300
+MISC_KMODS	+= qlc_fw_2400
+MISC_KMODS	+= qlc_fw_2500
+MISC_KMODS	+= qlc_fw_6322
+MISC_KMODS	+= qlc_fw_8100
+MISC_KMODS	+= hwa1480_fw
+MISC_KMODS	+= uathfw
+MISC_KMODS	+= uwba
+
+MISC_KMODS	+= klmmod klmops
+
+#
+#	Software Cryptographic Providers (/kernel/crypto):
+#
+CRYPTO_KMODS	+= aes
+CRYPTO_KMODS	+= arcfour
+CRYPTO_KMODS	+= blowfish
+CRYPTO_KMODS	+= des
+CRYPTO_KMODS	+= ecc
+CRYPTO_KMODS	+= md4
+CRYPTO_KMODS	+= md5
+CRYPTO_KMODS	+= rsa
+CRYPTO_KMODS	+= sha1
+CRYPTO_KMODS	+= sha2
+CRYPTO_KMODS	+= swrand
+
+#
+#	IP Policy Modules (/kernel/ipp)
+#
+IPP_KMODS	+= dlcosmk
+IPP_KMODS	+= flowacct
+IPP_KMODS	+= ipgpc
+IPP_KMODS	+= dscpmk
+IPP_KMODS	+= tokenmt
+IPP_KMODS	+= tswtclmt
+
+#
+#	generic-unix module (/kernel/genunix):
+#
+GENUNIX_KMODS	+= genunix
+
+#
+#	Modules eXcluded from the product:
+#
+
+#
+#	'Dacf' Modules (/kernel/dacf):
+#
+
+#
+#	Performance Counter BackEnd modules (/usr/kernel/pcbe)
+#
+PCBE_KMODS	+= p123_pcbe p4_pcbe opteron_pcbe core_pcbe
+
+#
+#	MAC-Type Plugin Modules (/kernel/mac)
+#
+MAC_KMODS	+= mac_6to4
+MAC_KMODS	+= mac_ether
+MAC_KMODS	+= mac_ipv4
+MAC_KMODS	+= mac_ipv6
+MAC_KMODS	+= mac_wifi
+MAC_KMODS	+= mac_ib
+
+#
+# socketmod (kernel/socketmod)
+#
+SOCKET_KMODS	+= sockpfp
+SOCKET_KMODS	+= socksctp
+SOCKET_KMODS    += socksdp
+SOCKET_KMODS	+= sockrds
+SOCKET_KMODS	+= ksslf
+
+#
+#	kiconv modules (/kernel/kiconv):
+#
+KICONV_KMODS	+= kiconv_emea kiconv_ja kiconv_ko kiconv_sc kiconv_tc
+
+#
+#	'Dacf' Modules (/kernel/dacf):
+#
+DACF_KMODS	+= net_dacf
 
 #
 # Ensure that the variable member of the cpu_t (cpu_m) is defined

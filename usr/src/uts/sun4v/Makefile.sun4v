@@ -1,9 +1,9 @@
+#
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -18,12 +18,422 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+
+#
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright (c) 2013 Andrew Stormont.  All rights reserved.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+#	This makefile contains the common definitions for the sun4v unix
+#	and all sun4v implementation architecture dependent modules.
 #
 
-UTSTREE=$(UTSBASE)
+#
+#	Machine type (implementation architecture):
+#
+PLATFORM	 = sun4v
+LINKED_PLATFORMS += SUNW,Sun-Fire-T1000
+LINKED_PLATFORMS += SUNW,SPARC-Enterprise-T5120
+LINKED_PLATFORMS += SUNW,SPARC-Enterprise-T5220
+LINKED_PLATFORMS += SUNW,T5140
+LINKED_PLATFORMS += SUNW,T5240
+LINKED_PLATFORMS += SUNW,T5440
+LINKED_PLATFORMS += SUNW,SPARC-Enterprise-T1000
+LINKED_PLATFORMS += SUNW,Sun-Blade-T6300
+LINKED_PLATFORMS += SUNW,Sun-Blade-T6320
+LINKED_PLATFORMS += SUNW,Netra-CP3260
+LINKED_PLATFORMS += SUNW,Netra-T5220
+LINKED_PLATFORMS += SUNW,USBRDT-5240
+LINKED_PLATFORMS += SUNW,Netra-T5440
+LINKED_PLATFORMS += SUNW,Sun-Blade-T6340
+PROMIF		 = ieee1275
+PSMBASE		 = $(UTSBASE)/../psm
 
-include $(UTSBASE)/sun4v/Makefile.sun4v.shared
+#
+#	uname -m value
+#
+UNAME_M		= $(PLATFORM)
+
+#
+# Definitions for the platform-specific /platform directories.
+#
+# PLATFORMS designates those sun4v machines which have no platform
+# specific code.
+#
+# IMPLEMENTATIONS is used to designate sun4v machines which have
+# platform specific modules.  All code specific to a given implementation
+# resides in the appropriately named subdirectory.   This requires
+# these platforms to have their own Makefiles to define ROOT_PLAT_DIRS,
+# USR_PLAT_DIRS, etc.
+# The number of IMPLEMENTATIONS should not grow!
+#
+# So if we had an implementation named 'foo', we would need the following
+# Makefiles in the foo subdirectory:
+#
+#	sun4v/foo/Makefile
+#	sun4v/foo/Makefile.foo
+#	sun4v/foo/Makefile.targ
+#
+
+#
+# all PLATFORMS that do not belong in the $(IMPLEMENTATIONS) list.
+# This list should be empty.  A platform without platform modules
+# is a plain, generic sun4v platform.
+#
+#IMPLEMENTED_PLATFORM	=
+#PLATFORMS                = $(IMPLEMENTED_PLATFORM)
+
+IMPLEMENTATIONS		= ontario montoya huron maramba
+
+#ROOT_PLAT_DIRS		= $(PLATFORMS:%=$(ROOT_PLAT_DIR)/%)
+#USR_PLAT_DIRS		= $(PLATFORMS:%=$(USR_PLAT_DIR)/%)
+
+#USR_DESKTOP_DIR		= $(USR_PLAT_DIR)/$(IMPLEMENTED_PLATFORM)
+#USR_DESKTOP_INC_DIR	= $(USR_DESKTOP_DIR)/include
+#USR_DESKTOP_SBIN_DIR	= $(USR_DESKTOP_DIR)/sbin
+#USR_DESKTOP_LIB_DIR	= $(USR_DESKTOP_DIR)/lib
+
+#
+#	Define supported builds
+#
+DEF_BUILDS	= $(DEF_BUILDS64)
+ALL_BUILDS	= $(ALL_BUILDS64)
+
+#
+#	Everybody needs to know how to build modstubs.o and to locate unix.o
+#
+UNIX_DIR	 = $(UTSBASE)/$(PLATFORM)/unix
+GENLIB_DIR	 = $(UTSBASE)/$(PLATFORM)/genunix
+MODSTUBS_DIR	 = $(UNIX_DIR)
+DSF_DIR		 = $(UTSBASE)/$(PLATFORM)/genassym
+LINTS_DIR	 = $(OBJS_DIR)
+LINT_LIB_DIR	 = $(UTSBASE)/$(PLATFORM)/lint-libs/$(OBJS_DIR)
+
+DTRACESTUBS_O	 = $(OBJS_DIR)/dtracestubs.o
+DTRACESTUBS	 = $(OBJS_DIR)/libdtracestubs.so
+
+UNIX_O		 = $(UNIX_DIR)/$(OBJS_DIR)/unix.o
+MODSTUBS_O	 = $(MODSTUBS_DIR)/$(OBJS_DIR)/modstubs.o
+GENLIB	 	 = $(GENLIB_DIR)/$(OBJS_DIR)/libgenunix.so
+
+LINT_LIB	 = $(LINT_LIB_DIR)/llib-lunix.ln
+GEN_LINT_LIB	 = $(LINT_LIB_DIR)/llib-lgenunix.ln
+
+LINT64_DIRS	 = $(LINT64_BUILDS:%=$(UTSBASE)/$(PLATFORM)/lint-libs/%)
+LINT64_FILES	 = $(LINT64_DIRS:%=%/llib-l$(MODULE).ln)
+
+#
+#	cpu and platform modules need to know how to build their own symcheck module
+#
+PLATMOD		 = platmod
+PLATLIB		 = $(PLAT_DIR)/$(OBJS_DIR)/libplatmod.so
+
+CPUNAME		 = cpu
+CPULIB		 = $(CPU_DIR)/$(OBJS_DIR)/libcpu.so
+
+SYM_MOD		 = $(OBJS_DIR)/unix.sym
+
+#
+#	Include the makefiles which define build rule templates, the
+#	collection of files per module, and a few specific flags. Note
+#	that order is significant, just as with an include path. The
+#	first build rule template which matches the files name will be
+#	used. By including these in order from most machine dependent
+#	to most machine independent, we allow a machine dependent file
+#	to be used in preference over a machine independent version
+#	(Such as a machine specific optimization, which preserves the
+#	interfaces.)
+#
+include $(UTSBASE)/sun4/Makefile.files
+include $(UTSBASE)/$(PLATFORM)/Makefile.files
+include $(UTSBASE)/sfmmu/Makefile.files
+include $(UTSBASE)/sparc/v9/Makefile.files
+include $(UTSBASE)/sparc/Makefile.files
+include $(UTSBASE)/sun/Makefile.files
+include $(SRC)/psm/promif/$(PROMIF)/common/Makefile.files
+include $(SRC)/psm/promif/$(PROMIF)/$(PLATFORM)/Makefile.files
+include $(UTSBASE)/common/Makefile.files
+
+#
+#	Include machine independent rules. Note that this does not imply
+#	that the resulting module from rules in Makefile.uts is	machine
+#	independent. Only that the build rules are machine independent.
+#
+include $(UTSBASE)/Makefile.uts
+
+CTFMERGE_GUDIR	= sun4v
+
+#
+#	machine specific optimization, override default in Makefile.master
+#
+CC_XARCH	= -m64 -xarch=sparcvis
+AS_XARCH	= -xarch=v9v
+COPTIMIZE	= -xO3
+CCMODE		= -Xa
+
+CFLAGS		= -xchip=ultra $(CCABS32) $(CCREGSYM)
+CFLAGS		+= $(CC_XARCH)
+CFLAGS		+= $(COPTIMIZE)
+CFLAGS		+= $(EXTRA_CFLAGS)
+CFLAGS		+= $(XAOPT)
+CFLAGS		+= $(INLINES) -D_ASM_INLINES
+CFLAGS		+= $(CCMODE)
+CFLAGS		+= $(SPACEFLAG)
+CFLAGS		+= $(CERRWARN)
+CFLAGS		+= $(CTF_FLAGS_$(CLASS))
+CFLAGS		+= $(C99MODE)
+CFLAGS		+= $(CCUNBOUND)
+CFLAGS		+= $(CCNOAUTOINLINE)
+CFLAGS		+= $(CCSTATICSYM)
+CFLAGS		+= $(CC32BITCALLERS)
+CFLAGS		+= $(IROPTFLAG)
+CFLAGS		+= $(CGLOBALSTATIC)
+CFLAGS		+= -xregs=no%float
+CFLAGS		+= -xstrconst
+CFLAGS		+= $(CSOURCEDEBUGFLAGS)
+CFLAGS		+= $(CUSERFLAGS)
+
+CPPFLAGS	+= -DGLREG
+
+ASFLAGS		+= $(AS_XARCH) -DGLREG
+
+AS_INC_PATH	+= -I$(DSF_DIR)/$(OBJS_DIR)
+
+LINT_KMODS	+= $(GENUNIX_KMODS)
+
+LINT_DEFS	= -m64
+
+#
+#	The following must be defined for all implementations:
+#
+#	MAPFILE:		ld mapfile for the build of kernel/unix.
+#	MODSTUBS:		Module stubs source file.
+#	GENCONST_SRC:		genconst.c
+#	OFFSETS:		offsets.in
+#	PLATFORM_OFFSETS:	Platform specific mach_offsets.in
+#	FDOFFSETS:		fd_offsets.in
+#
+MAPFILE		 = $(UTSBASE)/sun4/conf/Mapfile
+MODSTUBS	 = $(UTSBASE)/sparc/ml/modstubs.s
+GENCONST_SRC	 = $(UTSBASE)/sun4/ml/genconst.c
+OFFSETS		 = $(UTSBASE)/sun4/ml/offsets.in
+PLATFORM_OFFSETS = $(UTSBASE)/sun4v/ml/mach_offsets.in
+FDOFFSETS 	 = $(UTSBASE)/sun/io/fd_offsets.in
+
+#
+#	Define the actual specific platforms
+#
+
+MACHINE_DEFS	= -D$(PLATFORM) -D_MACHDEP -DSFMMU
+MACHINE_DEFS	+= -DMAX_MEM_NODES=8
+
+#
+#	Software workarounds for hardware "features"
+#
+
+include $(UTSBASE)/$(PLATFORM)/Makefile.workarounds
+
+#
+#	Debugging level
+#
+#	Special knowledge of which special debugging options effect which
+#	file is used to optimize the build if these flags are changed.
+#
+#	XXX: The above could possibly be done for more flags and files, but
+#	     is left as an experiment to the interested reader. Be forewarned,
+#	     that excessive use could lead to maintenance difficulties.
+#
+#	Note: kslice can be enabled for the sun4v, but is disabled by default
+#	      in all cases.
+#
+
+DEBUG_DEFS_OBJ64	=
+DEBUG_DEFS_DBG64	= -DDEBUG
+DEBUG_DEFS		= $(DEBUG_DEFS_$(BUILD_TYPE))
+
+DEBUG_COND_OBJ64	= $(POUND_SIGN)
+DEBUG_COND_DBG64	=
+IF_DEBUG_OBJ		= $(DEBUG_COND_$(BUILD_TYPE))$(OBJS_DIR)/
+
+$(IF_DEBUG_OBJ)trap.o		:=	DEBUG_DEFS	+= -DTRAPDEBUG
+$(IF_DEBUG_OBJ)mach_trap.o	:=	DEBUG_DEFS	+= -DTRAPDEBUG
+$(IF_DEBUG_OBJ)syscall_trap.o	:=	DEBUG_DEFS	+= -DSYSCALLTRACE
+$(IF_DEBUG_OBJ)clock.o		:=	DEBUG_DEFS	+= -DKSLICE=0
+
+IF_TRAPTRACE_OBJ = $(IF_DEBUG_OBJ)
+# comment this out for a non-debug kernel with TRAPTRACE
+#IF_TRAPTRACE_OBJ = $(OBJS_DIR)/
+
+$(IF_TRAPTRACE_OBJ)mach_locore.o	:=	DEBUG_DEFS	+= -DTRAPTRACE
+$(IF_TRAPTRACE_OBJ)mlsetup.o		:=	DEBUG_DEFS	+= -DTRAPTRACE
+$(IF_TRAPTRACE_OBJ)syscall_trap.o 	:=	DEBUG_DEFS	+= -DTRAPTRACE
+$(IF_TRAPTRACE_OBJ)startup.o		:=	DEBUG_DEFS	+= -DTRAPTRACE
+$(IF_TRAPTRACE_OBJ)mach_startup.o	:=	DEBUG_DEFS	+= -DTRAPTRACE
+$(IF_TRAPTRACE_OBJ)mp_startup.o		:=	DEBUG_DEFS	+= -DTRAPTRACE
+$(IF_TRAPTRACE_OBJ)cpu_states.o		:=	DEBUG_DEFS	+= -DTRAPTRACE
+$(IF_TRAPTRACE_OBJ)mach_cpu_states.o	:=	DEBUG_DEFS	+= -DTRAPTRACE
+$(IF_TRAPTRACE_OBJ)interrupt.o		:=	DEBUG_DEFS	+= -DTRAPTRACE
+$(IF_TRAPTRACE_OBJ)mach_interrupt.o	:=	DEBUG_DEFS	+= -DTRAPTRACE
+$(IF_TRAPTRACE_OBJ)sfmmu_asm.o		:=	DEBUG_DEFS	+= -DTRAPTRACE
+$(IF_TRAPTRACE_OBJ)trap_table.o		:=	DEBUG_DEFS	+= -DTRAPTRACE
+$(IF_TRAPTRACE_OBJ)xc.o			:=	DEBUG_DEFS	+= -DTRAPTRACE
+$(IF_TRAPTRACE_OBJ)mach_xc.o		:=	DEBUG_DEFS	+= -DTRAPTRACE
+$(IF_TRAPTRACE_OBJ)wbuf.o		:=	DEBUG_DEFS	+= -DTRAPTRACE
+$(IF_TRAPTRACE_OBJ)trap.o		:=	DEBUG_DEFS	+= -DTRAPTRACE
+$(IF_TRAPTRACE_OBJ)mach_trap.o		:=	DEBUG_DEFS	+= -DTRAPTRACE
+$(IF_TRAPTRACE_OBJ)x_call.o		:=	DEBUG_DEFS	+= -DTRAPTRACE
+
+# Comment these out if you don't want dispatcher lock statistics.
+
+#$(IF_DEBUG_OBJ)lock_prim.o	:= DEBUG_DEFS	+= -DDISP_LOCK_STATS
+#$(IF_DEBUG_OBJ)disp.o		:= DEBUG_DEFS	+= -DDISP_LOCK_STATS
+
+# Comment these out if you don't want dispatcher debugging
+
+#$(IF_DEBUG_OBJ)lock_prim.o	:= DEBUG_DEFS	+= -DDISP_DEBUG
+
+#
+#	Collect the preprocessor definitions to be associated with *all*
+#	files.
+#
+ALL_DEFS	 = $(MACHINE_DEFS) $(WORKAROUND_DEFS) $(DEBUG_DEFS) \
+		   $(OPTION_DEFS)
+GENCONST_DEFS	 = $(MACHINE_DEFS) $(OPTION_DEFS)
+
+#
+# ----- TRANSITIONAL SECTION --------------------------------------------------
+#
+
+#
+#	Not everything which *should* be a module is a module yet. The
+#	following is a list of such objects which are currently part of
+#	the base kernel but should soon become kmods.
+#
+MACH_NOT_YET_KMODS	 = $(AUTOCONF_OBJS)
+
+#
+# ----- END OF TRANSITIONAL SECTION -------------------------------------------
+#
+
+#
+#	The kernels modules which are "implementation architecture"
+#	specific for this machine are enumerated below. Note that most
+#	of these modules must exist (in one form or another) for each
+#	architecture.
+#
+#	Common Drivers (usually pseudo drivers) (/kernel/drv):
+#
+
+#
+#	Machine Specific Driver Modules (/kernel/drv):
+#
+DRV_KMODS	+= bge
+DRV_KMODS	+= cnex
+DRV_KMODS	+= cpc
+DRV_KMODS	+= drctl
+DRV_KMODS	+= ds_pri
+DRV_KMODS	+= ds_snmp
+DRV_KMODS	+= ebus
+DRV_KMODS	+= fpc
+DRV_KMODS	+= glvc
+DRV_KMODS	+= mdesc
+DRV_KMODS	+= niumx
+DRV_KMODS	+= ntwdt
+DRV_KMODS	+= nxge
+DRV_KMODS	+= n2piupc
+DRV_KMODS	+= iospc
+DRV_KMODS	+= n2rng
+DRV_KMODS	+= px
+DRV_KMODS	+= qcn
+DRV_KMODS	+= rootnex
+DRV_KMODS       += su
+DRV_KMODS	+= tpm
+DRV_KMODS	+= trapstat
+DRV_KMODS	+= vcc
+DRV_KMODS	+= vdc
+DRV_KMODS	+= vds
+DRV_KMODS	+= vldc
+DRV_KMODS	+= vlds
+DRV_KMODS	+= vnet
+DRV_KMODS	+= vnex
+DRV_KMODS	+= vsw
+
+#
+#	Exec Class Modules (/kernel/exec):
+#
+EXEC_KMODS	+=
+
+#
+#	Scheduling Class Modules (/kernel/sched):
+#
+SCHED_KMODS	+=
+
+#
+#	File System Modules (/kernel/fs):
+#
+FS_KMODS	+=
+
+#
+#	Streams Modules (/kernel/strmod):
+#
+# STRMOD_KMODS	+= kb
+
+#
+#	'System' Modules (/kernel/sys):
+#
+SYS_KMODS	+=
+
+#
+#	'User' Modules (/kernel/misc):
+#
+MISC_KMODS	+= bootdev
+MISC_KMODS	+= dr_cpu
+MISC_KMODS	+= dr_io
+MISC_KMODS	+= dr_mem
+MISC_KMODS	+= ds
+MISC_KMODS	+= fault_iso
+MISC_KMODS	+= ldc
+MISC_KMODS	+= obpsym
+MISC_KMODS	+= platmod
+MISC_KMODS	+= platsvc
+MISC_KMODS	+= vis
+MISC_KMODS	+= pcie
+
+#	md5 optimized for Niagara
+#
+MISC_KMODS	+= md5
+
+#
+#	Brand modules
+#
+BRAND_KMODS	+= sn1_brand s10_brand
+
+#
+#	Software Cryptographic Providers (/kernel/crypto):
+#
+CRYPTO_KMODS	+= arcfour
+
+#
+#	generic-unix module (/kernel/genunix):
+#
+GENUNIX_KMODS	+= genunix
+
+#
+#	Modules eXcluded from the product:
+#
+XMODS		+=
+
+#
+#	cpu modules
+#
+CPU_KMODS	+= generic niagara niagara2 vfalls kt
+
+LINT_CPU_KMODS	+= generic
+
+#
+#	Performance Counter BackEnd Modules (/usr/kernel/pcbe):
+#
+PCBE_KMODS	+= niagara_pcbe
+PCBE_KMODS	+= niagara2_pcbe
+PCBE_KMODS	+= vfalls_pcbe
+PCBE_KMODS	+= kt_pcbe

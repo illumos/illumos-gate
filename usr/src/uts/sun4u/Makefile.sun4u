@@ -1,9 +1,9 @@
+#
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -18,12 +18,459 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+
+#
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright (c) 2013 Andrew Stormont.  All rights reserved.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+#	This makefile contains the common definitions for the sun4u unix
+#	and all sun4u implementation architecture dependent modules.
 #
 
-UTSTREE=$(UTSBASE)
+#
+#	Machine type (implementation architecture):
+#
+PLATFORM	 = sun4u
+PROMIF		 = ieee1275
+PSMBASE		 = $(UTSBASE)/../psm
 
-include $(UTSBASE)/sun4u/Makefile.sun4u.shared
+#
+#	uname -m value
+#
+UNAME_M		= $(PLATFORM)
+
+#
+# Definitions for the platform-specific /platform directories.
+#
+# PLATFORMS designates those sun4u machines which have no platform
+# specific code.
+#
+# IMPLEMENTATIONS is used to designate sun4u machines which do have
+# platform specific modules (perhaps including their own unix).  All
+# code specific to a given implementation resides in the appropriately
+# named subdirectory.   This requires these platforms to have their
+# own Makefiles to define ROOT_PLAT_DIRS, USR_PLAT_DIRS, etc.
+#
+# So if we had an implementation named 'foo', we would need the following
+# Makefiles in the foo subdirectory:
+#
+#	sun4u/foo/Makefile
+#	sun4u/foo/Makefile.foo
+#	sun4u/foo/Makefile.targ
+#
+
+#
+# /usr/platform/$(IMPLEMENTED_PLATFORM) is created as a directory that
+# all the $(LINKED_PLATFORMS) link to.
+#
+IMPLEMENTED_PLATFORM	= SUNW,Ultra-2
+
+LINKED_PLATFORMS	+= SUNW,Ultra-30
+LINKED_PLATFORMS	+= SUNW,Ultra-60
+
+#
+# all PLATFORMS that do not belong in the $(IMPLEMENTATIONS) list
+# ie. all desktop platforms
+#
+PLATFORMS                = $(IMPLEMENTED_PLATFORM)
+PLATFORMS               += $(LINKED_PLATFORMS)
+
+ROOT_PLAT_DIRS		= $(PLATFORMS:%=$(ROOT_PLAT_DIR)/%)
+USR_PLAT_DIRS		= $(PLATFORMS:%=$(USR_PLAT_DIR)/%)
+
+USR_DESKTOP_DIR		= $(USR_PLAT_DIR)/$(IMPLEMENTED_PLATFORM)
+USR_DESKTOP_INC_DIR	= $(USR_DESKTOP_DIR)/include
+USR_DESKTOP_SBIN_DIR	= $(USR_DESKTOP_DIR)/sbin
+USR_DESKTOP_LIB_DIR	= $(USR_DESKTOP_DIR)/lib
+
+#
+# Welcome to SPARC V9.
+#
+
+#
+#	Define supported builds
+#
+DEF_BUILDS	= $(DEF_BUILDS64)
+ALL_BUILDS	= $(ALL_BUILDS64)
+
+#
+#	Everybody needs to know how to build modstubs.o and to locate unix.o
+#
+UNIX_DIR	 = $(UTSBASE)/$(PLATFORM)/unix
+GENLIB_DIR	 = $(UTSBASE)/$(PLATFORM)/genunix
+MODSTUBS_DIR	 = $(UNIX_DIR)
+DSF_DIR		 = $(UTSBASE)/$(PLATFORM)/genassym
+LINTS_DIR	 = $(OBJS_DIR)
+LINT_LIB_DIR	 = $(UTSBASE)/$(PLATFORM)/lint-libs/$(OBJS_DIR)
+ 
+DTRACESTUBS_O	 = $(OBJS_DIR)/dtracestubs.o
+DTRACESTUBS	 = $(OBJS_DIR)/libdtracestubs.so
+
+UNIX_O		 = $(UNIX_DIR)/$(OBJS_DIR)/unix.o
+MODSTUBS_O	 = $(MODSTUBS_DIR)/$(OBJS_DIR)/modstubs.o
+GENLIB	 	 = $(GENLIB_DIR)/$(OBJS_DIR)/libgenunix.so
+
+LINT_LIB	 = $(LINT_LIB_DIR)/llib-lunix.ln
+GEN_LINT_LIB	 = $(LINT_LIB_DIR)/llib-lgenunix.ln
+
+LINT64_DIRS	 = $(LINT64_BUILDS:%=$(UTSBASE)/$(PLATFORM)/lint-libs/%)
+LINT64_FILES	 = $(LINT64_DIRS:%=%/llib-l$(MODULE).ln)
+
+#
+#	cpu and platform modules need to know how to build their own symcheck module
+#
+PLATMOD		 = platmod
+PLATLIB		 = $(PLAT_DIR)/$(OBJS_DIR)/libplatmod.so
+
+CPUNAME		 = cpu
+CPULIB		 = $(CPU_DIR)/$(OBJS_DIR)/libcpu.so
+
+SYM_MOD		 = $(OBJS_DIR)/unix.sym
+
+#
+#	Include the makefiles which define build rule templates, the
+#	collection of files per module, and a few specific flags. Note
+#	that order is significant, just as with an include path. The
+#	first build rule template which matches the files name will be
+#	used. By including these in order from most machine dependent
+#	to most machine independent, we allow a machine dependent file
+#	to be used in preference over a machine independent version
+#	(Such as a machine specific optimization, which preserves the
+#	interfaces.)
+#
+include $(UTSBASE)/sun4/Makefile.files
+include $(UTSBASE)/$(PLATFORM)/Makefile.files
+include $(UTSBASE)/sfmmu/Makefile.files
+include $(UTSBASE)/sparc/v9/Makefile.files
+include $(UTSBASE)/sparc/Makefile.files
+include $(UTSBASE)/sun/Makefile.files
+include $(SRC)/psm/promif/$(PROMIF)/common/Makefile.files
+include $(SRC)/psm/promif/$(PROMIF)/$(PLATFORM)/Makefile.files
+include $(UTSBASE)/common/Makefile.files
+
+#
+#	Include machine independent rules. Note that this does not imply
+#	that the resulting module from rules in Makefile.uts is	machine
+#	independent. Only that the build rules are machine independent.
+#
+include $(UTSBASE)/Makefile.uts
+
+# These come after Makefile.uts.
+IMPLEMENTATIONS		 = tazmo 
+IMPLEMENTATIONS		+= starfire 
+IMPLEMENTATIONS		+= javelin 
+IMPLEMENTATIONS		+= darwin 
+IMPLEMENTATIONS		+= quasar 
+IMPLEMENTATIONS		+= grover 
+IMPLEMENTATIONS		+= enchilada 
+IMPLEMENTATIONS		+= taco 
+IMPLEMENTATIONS		+= mpxu 
+IMPLEMENTATIONS		+= excalibur 
+IMPLEMENTATIONS		+= montecarlo 
+IMPLEMENTATIONS		+= serengeti 
+IMPLEMENTATIONS		+= littleneck 
+IMPLEMENTATIONS		+= starcat 
+IMPLEMENTATIONS		+= daktari 
+IMPLEMENTATIONS		+= cherrystone 
+IMPLEMENTATIONS		+= fjlite 
+IMPLEMENTATIONS		+= snowbird 
+IMPLEMENTATIONS		+= schumacher 
+IMPLEMENTATIONS		+= blade 
+IMPLEMENTATIONS		+= boston 
+IMPLEMENTATIONS		+= seattle 
+IMPLEMENTATIONS		+= chicago 
+IMPLEMENTATIONS		+= sunfire 
+IMPLEMENTATIONS		+= lw8 
+IMPLEMENTATIONS		+= makaha 
+IMPLEMENTATIONS		+= opl 
+IMPLEMENTATIONS		+= lw2plus 
+
+#
+#	machine specific optimization, override default in Makefile.master
+#
+CC_XARCH	= -m64 -xarch=sparcvis
+AS_XARCH	= -xarch=v9a
+COPTIMIZE	= -xO3
+CCMODE		= -Xa
+
+CFLAGS		= -xchip=ultra $(CCABS32) $(CCREGSYM)
+CFLAGS		+= $(CC_XARCH)
+CFLAGS		+= $(COPTIMIZE)
+CFLAGS		+= $(EXTRA_CFLAGS)
+CFLAGS		+= $(XAOPT)
+CFLAGS		+= $(INLINES) -D_ASM_INLINES
+CFLAGS		+= $(CCMODE)
+CFLAGS		+= $(SPACEFLAG)
+CFLAGS		+= $(CERRWARN)
+CFLAGS		+= $(CTF_FLAGS_$(CLASS))
+CFLAGS		+= $(C99MODE)
+CFLAGS		+= $(CCUNBOUND)
+CFLAGS		+= $(CCNOAUTOINLINE)
+CFLAGS		+= $(CCSTATICSYM)
+CFLAGS		+= $(CC32BITCALLERS)
+CFLAGS		+= $(IROPTFLAG)
+CFLAGS		+= $(CGLOBALSTATIC)
+CFLAGS		+= -xregs=no%float
+CFLAGS		+= -xstrconst
+CFLAGS		+= $(CSOURCEDEBUGFLAGS)
+CFLAGS		+= $(CUSERFLAGS)
+
+ASFLAGS		+= $(AS_XARCH)
+
+AS_INC_PATH	+= -I$(DSF_DIR)/$(OBJS_DIR)
+
+LINT_KMODS	+= $(GENUNIX_KMODS)
+
+LINT_DEFS = -m64
+
+#
+#	The following must be defined for all implementations:
+#
+#	MAPFILE:		ld mapfile for the build of kernel/unix.
+#	MODSTUBS:		Module stubs source file.
+#	GENCONST_SRC:		genconst.c
+#	OFFSETS:		offsets.in
+#	PLATFORM_OFFSETS:	Platform specific mach_offsets.in
+#	FDOFFSETS:		fd_offsets.in
+#
+MAPFILE		 = $(UTSBASE)/sun4/conf/Mapfile
+MODSTUBS	 = $(UTSBASE)/sparc/ml/modstubs.s
+GENCONST_SRC	 = $(UTSBASE)/sun4/ml/genconst.c
+OFFSETS		 = $(UTSBASE)/sun4/ml/offsets.in
+PLATFORM_OFFSETS = $(UTSBASE)/sun4u/ml/mach_offsets.in
+FDOFFSETS 	 = $(UTSBASE)/sun/io/fd_offsets.in
+
+#
+#	Define the actual specific platforms
+#
+
+MACHINE_DEFS	= -D$(PLATFORM) -D_MACHDEP -DSFMMU
+
+#
+#	Software workarounds for hardware "features"
+#
+
+include $(UTSBASE)/$(PLATFORM)/Makefile.workarounds
+
+#
+#	Debugging level
+#
+#	Special knowledge of which special debugging options effect which
+#	file is used to optimize the build if these flags are changed.
+#
+#	XXX: The above could possibly be done for more flags and files, but
+#	     is left as an experiment to the interested reader. Be forewarned,
+#	     that excessive use could lead to maintenance difficulties.
+#
+#	Note: kslice can be enabled for the sun4u, but is disabled by default
+#	      in all cases.
+#
+
+DEBUG_DEFS_OBJ64	=
+DEBUG_DEFS_DBG64	= -DDEBUG
+DEBUG_DEFS		= $(DEBUG_DEFS_$(BUILD_TYPE))
+
+DEBUG_COND_OBJ64	= $(POUND_SIGN)
+DEBUG_COND_DBG64	= 
+IF_DEBUG_OBJ		= $(DEBUG_COND_$(BUILD_TYPE))$(OBJS_DIR)/
+
+$(IF_DEBUG_OBJ)trap.o		:=	DEBUG_DEFS	+= -DTRAPDEBUG
+$(IF_DEBUG_OBJ)mach_trap.o	:=	DEBUG_DEFS	+= -DTRAPDEBUG
+$(IF_DEBUG_OBJ)syscall_trap.o	:=	DEBUG_DEFS	+= -DSYSCALLTRACE
+$(IF_DEBUG_OBJ)clock.o		:=	DEBUG_DEFS	+= -DKSLICE=0
+
+IF_TRAPTRACE_OBJ = $(IF_DEBUG_OBJ)
+# comment this out for a non-debug kernel with TRAPTRACE
+#IF_TRAPTRACE_OBJ = $(OBJS_DIR)/
+
+$(IF_TRAPTRACE_OBJ)mach_locore.o	:=	DEBUG_DEFS	+= -DTRAPTRACE
+$(IF_TRAPTRACE_OBJ)mlsetup.o		:=	DEBUG_DEFS	+= -DTRAPTRACE
+$(IF_TRAPTRACE_OBJ)syscall_trap.o 	:=	DEBUG_DEFS	+= -DTRAPTRACE
+$(IF_TRAPTRACE_OBJ)startup.o		:=	DEBUG_DEFS	+= -DTRAPTRACE
+$(IF_TRAPTRACE_OBJ)mach_startup.o	:=	DEBUG_DEFS	+= -DTRAPTRACE
+$(IF_TRAPTRACE_OBJ)mp_startup.o		:=	DEBUG_DEFS	+= -DTRAPTRACE
+$(IF_TRAPTRACE_OBJ)cpu_states.o		:=	DEBUG_DEFS	+= -DTRAPTRACE
+$(IF_TRAPTRACE_OBJ)mach_cpu_states.o	:=	DEBUG_DEFS	+= -DTRAPTRACE
+$(IF_TRAPTRACE_OBJ)interrupt.o		:=	DEBUG_DEFS	+= -DTRAPTRACE
+$(IF_TRAPTRACE_OBJ)mach_interrupt.o	:=	DEBUG_DEFS	+= -DTRAPTRACE
+$(IF_TRAPTRACE_OBJ)sfmmu_asm.o		:=	DEBUG_DEFS	+= -DTRAPTRACE
+$(IF_TRAPTRACE_OBJ)trap_table.o		:=	DEBUG_DEFS	+= -DTRAPTRACE
+$(IF_TRAPTRACE_OBJ)xc.o			:=	DEBUG_DEFS	+= -DTRAPTRACE
+$(IF_TRAPTRACE_OBJ)mach_xc.o		:=	DEBUG_DEFS	+= -DTRAPTRACE
+$(IF_TRAPTRACE_OBJ)wbuf.o		:=	DEBUG_DEFS	+= -DTRAPTRACE
+$(IF_TRAPTRACE_OBJ)trap.o		:=	DEBUG_DEFS	+= -DTRAPTRACE
+$(IF_TRAPTRACE_OBJ)mach_trap.o		:=	DEBUG_DEFS	+= -DTRAPTRACE
+$(IF_TRAPTRACE_OBJ)x_call.o		:=	DEBUG_DEFS	+= -DTRAPTRACE
+$(IF_TRAPTRACE_OBJ)spitfire_asm.o	:=	DEBUG_DEFS	+= -DTRAPTRACE
+$(IF_TRAPTRACE_OBJ)us3_common_asm.o	:=	DEBUG_DEFS	+= -DTRAPTRACE
+$(IF_TRAPTRACE_OBJ)us3_cheetah_asm.o	:=	DEBUG_DEFS	+= -DTRAPTRACE
+$(IF_TRAPTRACE_OBJ)us3_cheetahplus_asm.o :=	DEBUG_DEFS	+= -DTRAPTRACE
+$(IF_TRAPTRACE_OBJ)us3_jalapeno_asm.o	:=	DEBUG_DEFS	+= -DTRAPTRACE
+$(IF_TRAPTRACE_OBJ)opl_olympus_asm.o	:=	DEBUG_DEFS	+= -DTRAPTRACE
+
+# Comment these out if you don't want dispatcher lock statistics.
+
+#$(IF_DEBUG_OBJ)lock_prim.o	:= DEBUG_DEFS	+= -DDISP_LOCK_STATS
+#$(IF_DEBUG_OBJ)disp.o		:= DEBUG_DEFS	+= -DDISP_LOCK_STATS
+
+# Comment these out if you don't want dispatcher debugging 
+
+#$(IF_DEBUG_OBJ)lock_prim.o	:= DEBUG_DEFS	+= -DDISP_DEBUG
+
+#
+#	Collect the preprocessor definitions to be associated with *all*
+#	files.
+#
+ALL_DEFS	 = $(MACHINE_DEFS) $(WORKAROUND_DEFS) $(DEBUG_DEFS) \
+		   $(OPTION_DEFS)
+GENCONST_DEFS	 = $(MACHINE_DEFS) $(OPTION_DEFS)
+
+#
+# ----- TRANSITIONAL SECTION --------------------------------------------------
+#
+
+#
+#	Not everything which *should* be a module is a module yet. The
+#	following is a list of such objects which are currently part of
+#	the base kernel but should soon become kmods.
+#
+MACH_NOT_YET_KMODS	 = $(AUTOCONF_OBJS)
+
+#
+# ----- END OF TRANSITIONAL SECTION -------------------------------------------
+#
+
+#
+#	The kernels modules which are "implementation architecture"
+#	specific for this machine are enumerated below. Note that most
+#	of these modules must exist (in one form or another) for each
+#	architecture.
+#
+#	Common Drivers (usually pseudo drivers) (/kernel/drv):
+#
+
+#
+#	Machine Specific Driver Modules (/kernel/drv):
+#
+#	XXX: How many of these are really machine specific?
+#
+DRV_KMODS	+= bbc_beep
+DRV_KMODS	+= cpc
+DRV_KMODS	+= fd
+DRV_KMODS	+= rootnex sbusmem upa64s zs zsh
+DRV_KMODS	+= sbus
+DRV_KMODS	+= pcisch pcipsy simba
+DRV_KMODS	+= px
+DRV_KMODS	+= ebus
+DRV_KMODS	+= su
+DRV_KMODS	+= tod
+DRV_KMODS	+= power
+DRV_KMODS	+= epic
+DRV_KMODS	+= grbeep
+DRV_KMODS	+= pcf8584 max1617 seeprom tda8444 pca9556
+DRV_KMODS	+= ics951601 adm1031
+DRV_KMODS	+= lm75 ltc1427 pcf8591 pcf8574 ssc050 ssc100
+DRV_KMODS	+= pic16f819
+DRV_KMODS	+= pic16f747
+DRV_KMODS	+= adm1026
+DRV_KMODS	+= us
+DRV_KMODS	+= ppm schppm jbusppm
+DRV_KMODS	+= mc-us3
+DRV_KMODS	+= mc-us3i
+DRV_KMODS       += smbus
+DRV_KMODS	+= db21554
+DRV_KMODS	+= gpio_87317
+DRV_KMODS	+= isadma
+DRV_KMODS	+= sbbc
+DRV_KMODS	+= pmubus
+DRV_KMODS	+= pmugpio
+DRV_KMODS	+= pmc
+DRV_KMODS	+= trapstat
+DRV_KMODS	+= rmc_comm
+DRV_KMODS	+= rmcadm
+DRV_KMODS	+= rmclomv
+DRV_KMODS	+= sf
+DRV_KMODS	+= nxge
+DRV_KMODS	+= i2bsc 
+DRV_KMODS	+= mem_cache
+
+#
+#	Exec Class Modules (/kernel/exec):
+#
+EXEC_KMODS	+=
+
+#
+#	Scheduling Class Modules (/kernel/sched):
+#
+SCHED_KMODS	+=
+
+#
+#	File System Modules (/kernel/fs):
+#
+FS_KMODS	+=
+
+#
+#	Streams Modules (/kernel/strmod):
+#
+STRMOD_KMODS	+= kb
+
+#
+#	'System' Modules (/kernel/sys):
+#
+SYS_KMODS	+=
+
+#
+#	'User' Modules (/kernel/misc):
+#
+MISC_KMODS	+= bignum
+MISC_KMODS	+= obpsym bootdev vis cpr platmod md5 sha1 i2c_svc
+MISC_KMODS	+= sbd
+
+MISC_KMODS	+= opl_cfg
+MISC_KMODS	+= zuluvm
+MISC_KMODS	+= gptwo_cpu gptwocfg
+MISC_KMODS	+= pcie
+
+#
+#	Brand modules
+#
+BRAND_KMODS	+= sn1_brand s10_brand
+
+#
+#	Software Cryptographic Providers (/kernel/crypto):
+#
+CRYPTO_KMODS	+= aes
+CRYPTO_KMODS	+= arcfour
+CRYPTO_KMODS	+= des
+
+#
+#	generic-unix module (/kernel/genunix):
+#
+GENUNIX_KMODS	+= genunix
+
+#	'User' "Modules" excluded from the Full Kernel lint target:
+#
+
+#
+#	Modules eXcluded from the product:
+#
+XMODS		+=
+
+#
+#	cpu modules
+#
+CPU_KMODS	+= cheetah cheetahplus jalapeno serrano spitfire hummingbird
+
+#
+#	sun4u 'TOD' Modules (/platform/.../kernel/tod):
+#
+TOD_KMODS	+= todds1287 todds1337 todmostek todstarfire 
+TOD_KMODS	+= todm5819 todblade todbq4802 todsg todopl
+TOD_KMODS	+= todm5819p_rmc todstarcat 
+
+#
+#	Performance Counter BackEnd Modules (/usr/kernel/pcbe):
+#
+PCBE_KMODS	+= us234_pcbe
+PCBE_KMODS	+= opl_pcbe

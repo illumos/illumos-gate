@@ -1,3 +1,4 @@
+#
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
@@ -18,12 +19,24 @@
 #
 # CDDL HEADER END
 #
+#
+# uts/intel/Makefile.targ
+#
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+#	This Makefile defines the set of all required, target containing
+# included Makefiles for the intel "implementation architecture".
 #
 
-UTSTREE=$(UTSBASE)
+#
+#	Targets for all implementations:
+#
+include $(UTSBASE)/Makefile.targ
 
-include $(UTSBASE)/intel/Makefile.targ.shared
+#
+#	Target set for intel (order is not important, as it is with the
+# isomorphic Makefile.files set).
+#
+include $(UTSBASE)/intel/Makefile.rules
+include $(UTSBASE)/common/Makefile.rules

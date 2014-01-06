@@ -1,9 +1,9 @@
+#
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -18,12 +18,81 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+#
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+#     This makefile contains the common definitions for the
+#     sun4u MonteCarlo system dependent modules.
 #
 
-UTSTREE=$(UTSBASE)
+#
+# Define directories.
+#
+ROOT_MONTECARLO_DIR		= $(ROOT_PLAT_DIR)/SUNW,UltraSPARC-IIi-Netract
+ROOT_MONTECARLO_MOD_DIR		= $(ROOT_MONTECARLO_DIR)/kernel
 
-include $(UTSBASE)/sun4u/montecarlo/Makefile.montecarlo.shared
+ROOT_MONTECARLO_KERN_DIR_32	= $(ROOT_MONTECARLO_MOD_DIR)
+ROOT_MONTECARLO_KERN_DIR_64	= $(ROOT_MONTECARLO_MOD_DIR)/$(SUBDIR64)
+ROOT_MONTECARLO_DRV_DIR_32	= $(ROOT_MONTECARLO_MOD_DIR)/drv
+ROOT_MONTECARLO_DACF_DIR_32	= $(ROOT_MONTECARLO_MOD_DIR)/dacf
+ROOT_MONTECARLO_DACF_DIR_64	= $(ROOT_MONTECARLO_MOD_DIR)/dacf/$(SUBDIR64)
+ROOT_MONTECARLO_DRV_DIR_64	= $(ROOT_MONTECARLO_MOD_DIR)/drv/$(SUBDIR64)
+ROOT_MONTECARLO_MISC_DIR_32	= $(ROOT_MONTECARLO_MOD_DIR)/misc
+ROOT_MONTECARLO_MISC_DIR_64	= $(ROOT_MONTECARLO_MOD_DIR)/misc/$(SUBDIR64)
+
+ROOT_MONTECARLO_KERN_DIR	= $(ROOT_MONTECARLO_KERN_DIR_$(CLASS))
+ROOT_MONTECARLO_MISC_DIR	= $(ROOT_MONTECARLO_MISC_DIR_$(CLASS))
+ROOT_MONTECARLO_DRV_DIR		= $(ROOT_MONTECARLO_DRV_DIR_$(CLASS))
+ROOT_MONTECARLO_DACF_DIR	= $(ROOT_MONTECARLO_DACF_DIR_$(CLASS))
+
+ROOT_PLAT_MOD_DIRS	+= $(ROOT_MONTECARLO_MOD_DIR)
+ROOT_PLAT_MISC_DIRS	+= $(ROOT_MONTECARLO_MISC_DIR)
+ROOT_PLAT_MISC_DIRS_32	+= $(ROOT_MONTECARLO_MISC_DIR_32)
+ROOT_PLAT_DRV_DIRS	= $(ROOT_MONTECARLO_DRV_DIR)
+ROOT_PLAT_DACF_DIRS	= $(ROOT_MONTECARLO_DACF_DIR)
+
+USR_MONTECARLO_DIR	= $(USR_PLAT_DIR)/SUNW,UltraSPARC-IIi-Netract
+USR_MONTECARLO_INC_DIR	= $(USR_MONTECARLO_DIR)/include
+USR_MONTECARLO_SBIN_DIR	= $(USR_MONTECARLO_DIR)/sbin
+USR_MONTECARLO_LIB_DIR	= $(USR_MONTECARLO_DIR)/lib
+USR_MONTECARLO_ISYS_DIR	= $(USR_MONTECARLO_INC_DIR)/sys
+
+MONTECARLO_LINT_LIB_DIR= $(UTSBASE)/$(PLATFORM)/montecarlo/lint-libs/$(OBJS_DIR)
+
+#
+# Define objects.
+#
+
+include $(UTSBASE)/sun4u/montecarlo/Makefile.files
+
+#
+#	Include common rules.
+#
+include $(UTSBASE)/sun4u/Makefile.sun4u
+
+#
+# Define modules
+#
+MONTECARLO_KMODS = acebus pcf8574_nct pcf8591_nct scsb ttymux_dacf
+
+#
+# we need the official MONTECARLO name here, and for the sun4u/montecarlo
+# directory and Makefile.montecarlo
+# for now we'll use montecarlo for workspace file/dir names
+# and NORDICA_CP1500 for conditional code compiles, since that's our current
+# test platform
+#
+MACHINE_DEFS    += -DNORDICA_CP1500
+
+#
+# For now, disable these lint checks; maintainers should endeavor
+# to investigate and remove these for maximum lint coverage.
+# Please do not carry these forward to new Makefiles.
+#
+LINTTAGS	+= -erroff=E_SUSPICIOUS_COMPARISON
+LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
+LINTTAGS	+= -erroff=E_SUPPRESSION_DIRECTIVE_UNUSED
+LINTTAGS	+= -erroff=E_STATIC_UNUSED
+LINTTAGS	+= -erroff=E_PTRDIFF_OVERFLOW
+LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV

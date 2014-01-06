@@ -23,7 +23,6 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 KERNEL MAKEFILE STRUCTURE
 -------------------------
@@ -151,10 +150,6 @@ uts/sun4c/unix.static/Makefile
 	not. This makefile may be copied to additional parallel directories
 	to build multiple configurations. This configuration is roughly
 	equivalent to the GENERIC kernel of SunOS 4.x.
-
-uts/*/Makefile.?.shared
-	These denote Makefile contents which are shared between open and
-	closed builds.
 
 The Makefiles are verbosely commented. It is desired that they should
 stay this way.
