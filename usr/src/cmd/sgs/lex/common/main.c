@@ -19,6 +19,8 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright (c) 2014 Gary Mills
+ *
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -72,7 +74,8 @@ main(int argc, char **argv)
 {
 	int i;
 	int c;
-	char *path = NULL, *bpath = NULL;
+	char *apath = NULL;
+	char *ypath;
 	char pathbuf[PATH_MAX];
 	Boolean eoption = 0, woption = 0;
 
@@ -105,9 +108,13 @@ main(int argc, char **argv)
 					"lex: -Q should be followed by [y/n]");
 				break;
 			case 'Y':
-				path = (char *)malloc(strlen(optarg) +
+				apath = (char *)malloc(strlen(optarg) +
 				    sizeof ("/nceucform") + 1);
-				path = strcpy(path, optarg);
+				if (apath == NULL)
+					error("No available memory "
+					    "for directory name.");
+				else
+					apath = strcpy(apath, optarg);
 				break;
 			case 'c':
 				ratfor = FALSE;
@@ -135,7 +142,8 @@ main(int argc, char **argv)
 				break;
 			default:
 				(void) fprintf(stderr,
-				"Usage: lex [-ewctvnVY] [-Q(y/n)] [file]\n");
+				"Usage: lex [-ewctvnV] [-Y directory] "
+				"[-Q(y/n)] [file]\n");
 				exit(1);
 		}
 	}
@@ -248,29 +256,31 @@ main(int argc, char **argv)
 	if (handleeuc) {
 		if (ratfor)
 			error("Ratfor is not supported by -w or -e option.");
-		bpath = EUCNAME;
+		ypath = EUCNAME;
 	}
 	else
-		bpath = ratfor ? RATNAME : CNAME;
+		ypath = ratfor ? RATNAME : CNAME;
 
-	if (path == NULL) {
-		path = pathbuf;
-		(void) lex_construct_path(pathbuf, sizeof (pathbuf), bpath, 1);
-		fother = fopen(path, "r");
+	if (apath == NULL) {
+		(void) lex_construct_path(pathbuf, sizeof (pathbuf), ypath, 1);
+		fother = fopen(pathbuf, "r");
 		if (fother == NULL) {
 			(void) lex_construct_path(pathbuf, sizeof (pathbuf),
-			    bpath, 0);
-			fother = fopen(path, "r");
+			    ypath, 0);
+			fother = fopen(pathbuf, "r");
 		}
 	} else {
-		fother = fopen(path, "r");
+		apath = strcat(apath, "/");
+		ypath = strcat(apath, ypath);
+		fother = fopen(ypath, "r");
 	}
 	if (fother == NULL)
-		error("Lex driver missing, file %s", path);
+		error("Lex driver missing, file %s", ypath);
 	while ((i = getc(fother)) != EOF)
 		(void) putc((char)i, fout);
 	(void) fclose(fother);
 	(void) fclose(fout);
+	free(apath);
 	if (report == 1)
 		statistics();
 	(void) fclose(stdout);

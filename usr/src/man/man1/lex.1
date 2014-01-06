@@ -1,4 +1,5 @@
 '\" te
+.\" Copyright (c) 2014 Gary Mills
 .\"  Copyright (c) 1992, X/Open Company Limited  All Rights Reserved  Portions Copyright (c) 1997, Sun Microsystems, Inc.  All Rights Reserved
 .\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
@@ -7,13 +8,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LEX 1 "Aug 22, 1997"
+.TH LEX 1 "Jan 1, 2014"
 .SH NAME
 lex \- generate programs for lexical tasks
 .SH SYNOPSIS
 .LP
 .nf
-\fBlex\fR [\fB-cntv\fR] [\fB-e\fR | \fB-w\fR] [\fB-V\fR \fB-Q\fR [y | n]] [\fIfile\fR]...
+\fBlex\fR [\fB-cntv\fR] [\fB-e\fR | \fB-w\fR] [\fB-V\fR \fB-Q\fR [y | n]] [\fB-Y\fR \fIdirectory\fR]] [\fIfile\fR]...
 .fi
 
 .SH DESCRIPTION
@@ -110,6 +111,16 @@ Prints out version information on standard error.
 Prints out version information to output file \fBlex.yy.c\fR by using
 \fB-Qy\fR. The \fB-Qn\fR option does not print out version information and is
 the default.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB\fR\fB-Y\fR \fBdirectory\fR \fR
+.ad
+.RS 12n
+Designates an alternate directory that contains the driver files
+used by \fBlex\fR.
 .RE
 
 .SH OPERANDS

@@ -2007,7 +2007,7 @@ cmd_dis(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			if (opt_a)
 				mdb_printf("%-#32p%8T%s\n", addr, buf);
 			else if (opt_b)
-				mdb_printf("%-#10p%-#32a%8T%s\n",
+				mdb_printf("%-#?p  %-#32a%8T%s\n",
 				    addr, addr, buf);
 			else
 				mdb_printf("%-#32a%8T%s\n", addr, buf);
@@ -2031,7 +2031,7 @@ cmd_dis(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			if (opt_a)
 				mdb_printf("%-#32p%8T%s\n", oaddr, buf);
 			else if (opt_b)
-				mdb_printf("%-#10p%-#32a%8T%s\n",
+				mdb_printf("%-#?p  %-#32a%8T%s\n",
 				    oaddr, oaddr, buf);
 			else
 				mdb_printf("%-#32a%8T%s\n", oaddr, buf);
@@ -2046,7 +2046,7 @@ cmd_dis(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		if (opt_a)
 			mdb_printf("%-#32p%8T%s%", addr, buf);
 		else if (opt_b)
-			mdb_printf("%-#10p%-#32a%8T%s", addr, addr, buf);
+			mdb_printf("%-#?p  %-#32a%8T%s", addr, addr, buf);
 		else
 			mdb_printf("%-#32a%8T%s%", addr, buf);
 		mdb_printf("%</b>\n");
@@ -2059,7 +2059,7 @@ cmd_dis(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			if (opt_a)
 				mdb_printf("%-#32p%8T%s\n", addr, buf);
 			else if (opt_b)
-				mdb_printf("%-#10p%-#32a%8T%s\n",
+				mdb_printf("%-#?p  %-#32a%8T%s\n",
 				    addr, addr, buf);
 			else
 				mdb_printf("%-#32a%8T%s\n", addr, buf);
