@@ -1499,13 +1499,26 @@ apic_intrmap_init(int apic_mode)
 {
 	int suppress_brdcst_eoi = 0;
 
+	/*
+	 * Intel Software Developer's Manual 3A, 10.12.7:
+	 *
+	 * Routing of device interrupts to local APIC units operating in
+	 * x2APIC mode requires use of the interrupt-remapping architecture
+	 * specified in the Intel Virtualization Technology for Directed
+	 * I/O, Revision 1.3.  Because of this, BIOS must enumerate support
+	 * for and software must enable this interrupt remapping with
+	 * Extended Interrupt Mode Enabled before it enabling x2APIC mode in
+	 * the local APIC units.
+	 *
+	 *
+	 * In other words, to use the APIC in x2APIC mode, we need interrupt
+	 * remapping.  Since we don't start up the IOMMU by default, we
+	 * won't be able to do any interrupt remapping and therefore have to
+	 * use the APIC in traditional 'local APIC' mode with memory mapped
+	 * I/O.
+	 */
+
 	if (psm_vt_ops != NULL) {
-		/*
-		 * Since X2APIC requires the use of interrupt remapping
-		 * (though this is not documented explicitly in the Intel
-		 * documentation (yet)), initialize interrupt remapping
-		 * support before initializing the X2APIC unit.
-		 */
 		if (((apic_intrmap_ops_t *)psm_vt_ops)->
 		    apic_intrmap_init(apic_mode) == DDI_SUCCESS) {
 
