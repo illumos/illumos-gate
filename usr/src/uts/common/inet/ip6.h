@@ -18,9 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef	_INET_IP6_H
@@ -224,10 +226,6 @@ extern const in6_addr_t	ipv6_unspecified_group;
 /*
  * FUNCTION PROTOTYPES
  */
-
-extern void	convert2ascii(char *buf, const in6_addr_t *addr);
-extern char	*inet_ntop(int, const void *, char *, int);
-extern int	inet_pton(int, char *, void *);
 extern void	icmp_param_problem_nexthdr_v6(mblk_t *, boolean_t,
     ip_recv_attr_t *);
 extern void	icmp_pkt2big_v6(mblk_t *, uint32_t, boolean_t,

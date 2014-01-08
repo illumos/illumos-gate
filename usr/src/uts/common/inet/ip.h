@@ -20,9 +20,10 @@
  */
 
 /*
+ * Copyright (c) 1990 Mentat Inc.
  * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012, Joyent, Inc. All rights reserved.
- * Copyright (c) 1990 Mentat Inc.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef	_INET_IP_H
@@ -3709,6 +3710,15 @@ extern mblk_t	*ip_recv_attr_to_mblk(ip_recv_attr_t *);
 extern boolean_t ip_recv_attr_from_mblk(mblk_t *, ip_recv_attr_t *);
 extern mblk_t	*ip_recv_attr_free_mblk(mblk_t *);
 extern boolean_t ip_recv_attr_is_mblk(mblk_t *);
+
+#ifdef __PRAGMA_REDEFINE_EXTNAME
+#pragma redefine_extname inet_pton _inet_pton
+#else /* __PRAGMA_REDEFINE_EXTNAME */
+#define	inet_pton _inet_pton
+#endif /* __PRAGMA_REDEFINE_EXTNAME */
+
+extern char	*inet_ntop(int, const void *, char *, int);
+extern int	inet_pton(int, char *, void *);
 
 /*
  * Squeue tags. Tags only need to be unique when the callback function is the

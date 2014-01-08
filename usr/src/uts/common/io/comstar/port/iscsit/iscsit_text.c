@@ -125,43 +125,24 @@ iscsit_text_reject(idm_pdu_t *req_pdu, uint8_t reason_code)
  * Add individual <TargetAddress=ipaddr> tuple to the nvlist
  */
 static void
-iscsit_add_portal(struct sockaddr_storage *ss, int flip_v6, int tag,
-    nvlist_t *nv_resp)
+iscsit_add_portal(struct sockaddr_storage *ss, int tag, nvlist_t *nv_resp)
 {
 	char ipaddr[IPADDRSTRLEN];	/* ip address string */
 	char ta_value[PORTALSTRLEN];	/* target address value */
 	struct sockaddr_in *sin;
-	struct in_addr *in;
 	struct sockaddr_in6 *sin6;
-	struct in6_addr *in6, flip_in6;
 
 	switch (ss->ss_family) {
 	case AF_INET:
 		sin = (struct sockaddr_in *)ss;
-		in = &sin->sin_addr;
-		iscsit_v4_ntop(in, ipaddr, sizeof (ipaddr));
+		iscsit_v4_ntop(&sin->sin_addr, ipaddr, sizeof (ipaddr));
 		(void) snprintf(ta_value, sizeof (ta_value), "%s:%d,%d",
 		    ipaddr, ntohs(sin->sin_port), tag);
 		break;
 	case AF_INET6:
 		sin6 = (struct sockaddr_in6 *)ss;
-		in6 = &sin6->sin6_addr;
-		if (flip_v6) {
-			uint16_t *v6_field_i = (uint16_t *)in6;
-			uint16_t *v6_field_o = (uint16_t *)&flip_in6;
-			int i;
-
-			/*
-			 * Ugh. The iSCSI config data is stored in host
-			 * order while the addresses retrieved from the
-			 * stack come back in network order. inet_ntop
-			 * expects network order.
-			 */
-			for (i = 0; i < 8; i++)
-				*v6_field_o++ = htons(*v6_field_i++);
-			in6 = &flip_in6;
-		}
-		(void) inet_ntop(AF_INET6, in6, ipaddr, sizeof (ipaddr));
+		(void) inet_ntop(AF_INET6, &sin6->sin6_addr, ipaddr,
+		    sizeof (ipaddr));
 		(void) snprintf(ta_value, sizeof (ta_value), "[%s]:%d,%d",
 		    ipaddr, ntohs(sin6->sin6_port), tag);
 		break;
@@ -238,10 +219,9 @@ iscsit_add_default_portals(iscsit_conn_t *ict, idm_addr_list_t *ipaddr_p,
 			}
 			/*
 			 * Add portal to the response list.
-			 * Do not byte swap v6 address.
 			 * By convention, the default portal group tag == 1
 			 */
-			iscsit_add_portal(&ss, 0, 1, nv_resp);
+			iscsit_add_portal(&ss, 1, nv_resp);
 		}
 	}
 }
@@ -290,11 +270,8 @@ iscsit_add_portals(iscsit_conn_t *ict, iscsit_tpgt_t *tpg_list,
 					continue;
 				break;
 			}
-			/*
-			 * Add portal to the response list.
-			 * Need to byte swap v6 address.
-			 */
-			iscsit_add_portal(ss, 1, tpg_list->tpgt_tag, nv_resp);
+			/* Add portal to the response list */
+			iscsit_add_portal(ss, tpg_list->tpgt_tag, nv_resp);
 		}
 	}
 }

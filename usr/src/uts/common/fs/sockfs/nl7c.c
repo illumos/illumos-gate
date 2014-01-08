@@ -18,9 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -50,6 +52,7 @@
 #include <sys/strsun.h>
 #include <sys/strsubr.h>
 #include <inet/common.h>
+#include <inet/ip.h>
 #include <inet/led.h>
 #include <inet/mi.h>
 #include <netinet/in.h>
@@ -76,9 +79,6 @@ boolean_t	nl7c_logd_cycle = B_TRUE;
 /*
  * Some externs:
  */
-
-extern int	inet_pton(int, char *, void *);
-
 extern void	nl7c_uri_init(void);
 extern boolean_t nl7c_logd_init(int, caddr_t *);
 extern void	nl7c_nca_init(void);
@@ -332,7 +332,6 @@ inet_atob(char *s, nl7c_addr_t *p)
 		p->family = AF_INET6;
 	} else {
 		p->family = AF_INET;
-		p->addr.v4 = ntohl(p->addr.v4);
 	}
 	return (0);
 }

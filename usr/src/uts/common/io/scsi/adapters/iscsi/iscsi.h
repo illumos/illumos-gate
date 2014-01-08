@@ -18,9 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2000 by Cisco Systems, Inc.  All rights reserved.
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _ISCSI_H
@@ -54,6 +56,7 @@ extern "C" {
 #include <sys/idm/idm.h>
 #include <sys/idm/idm_conn_sm.h>
 #include <nvfile.h>
+#include <inet/ip.h>
 
 #ifndef MIN
 #define	MIN(a, b) ((a) < (b) ? (a) : (b))
@@ -1403,12 +1406,6 @@ void iscsi_client_release_service(iscsi_hba_t *ihp);
 
 extern void bcopy(const void *s1, void *s2, size_t n);
 extern void bzero(void *s, size_t n);
-/*
- * Here we need a contract for inet_ntop() and inet_pton()
- * in uts/common/inet/ip/inet_ntop.c
- */
-extern char *inet_ntop(int af, const void *addr, char *buf, int addrlen);
-extern int inet_pton(int af, char *inp, void *outp);
 
 #ifdef __cplusplus
 }
