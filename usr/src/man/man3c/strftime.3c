@@ -1,4 +1,5 @@
 '\" te
+.\" Copyright (c) 2014 Gary Mills
 .\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved.
 .\" Copyright 1989 AT&T
 .\" Portions Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
@@ -9,7 +10,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH STRFTIME 3C "Sep 5, 2006"
+.TH STRFTIME 3C "Jan 3, 2014"
 .SH NAME
 strftime, cftime, ascftime \- convert date and time to string
 .SH SYNOPSIS
@@ -50,7 +51,7 @@ that overlap, the behavior is undefined. For \fBstrftime()\fR, no more than
 .LP
 If \fIformat\fR is \fB(char *)0\fR, then the locale's default format is used.
 For \fBstrftime()\fR the default format is the same as \fB%c\fR; for
-\fBcftime()\fR and \fBascftime()\fR the default format is the same as \fB%C\fR.
+\fBcftime()\fR and \fBascftime()\fR the default format is the same as \fB%+\fR.
 \fBcftime()\fR and \fBascftime()\fR first try to use the value of the
 environment variable \fBCFTIME\fR, and if that is undefined or empty, the
 default format is used.
@@ -107,59 +108,24 @@ Locale's abbreviated month name.
 Locale's full month name.
 .RE
 
-.SS "Default"
 .sp
 .ne 2
 .na
 \fB\fB%c\fR\fR
 .ad
 .RS 6n
-Locale's appropriate date and time represented as:
-.sp
-.in +2
-.nf
-%a %b %d %H:%M:%S %Y
-.fi
-.in -2
-
-This is the default behavior as well as standard-conforming behavior for
-standards first supported by releases prior to Solaris 2.4. See
-\fBstandards\fR(5).
-.RE
-
-.SS "Standard conforming"
-.sp
-.ne 2
-.na
-\fB\fB%c\fR\fR
-.ad
-.RS 6n
-Locale's appropriate date and time represented as:
+Locale's appropriate date and time representation.
+In the C locale, this format is:
 .sp
 .in +2
 .nf
 %a %b %e %H:%M:%S %Y
 .fi
 .in -2
-
-This is standard-conforming behavior for standards first supported by Solaris
-2.4 through Solaris 10.
+.sp
+Other locales may have different locale-specific formats.
 .RE
 
-.SS "Default"
-.sp
-.ne 2
-.na
-\fB\fB%C\fR\fR
-.ad
-.RS 6n
-Locale's date and time representation as produced by \fBdate\fR(1).
-.sp
-This is the default behavior as well as standard-conforming behavior for
-standards first supported by releases prior to Solaris 2.4.
-.RE
-
-.SS "Standard conforming"
 .sp
 .ne 2
 .na
@@ -168,9 +134,6 @@ standards first supported by releases prior to Solaris 2.4.
 .RS 6n
 Century number (the year divided by 100 and truncated to an integer as a
 decimal number [01,99]).
-.sp
-This is standard-conforming behavior for standards first supported by Solaris
-2.4 through Solaris 10.
 .RE
 
 .sp
@@ -339,6 +302,15 @@ Time as \fB%H\fR:\fB%M\fR.
 .sp
 .ne 2
 .na
+\fB\fB%s\fR\fR
+.ad
+.RS 6n
+Seconds since 00:00:00 UTC, January 1, 1970.
+.RE
+
+.sp
+.ne 2
+.na
 \fB\fB%S\fR\fR
 .ad
 .RS 6n
@@ -382,6 +354,15 @@ below.
 .RS 6n
 Week number of year as a decimal number [00,53], with Sunday as the first day
 of week 1.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB%v\fR\fR
+.ad
+.RS 6n
+Date as \fB%e\fR-\fB%b\fR-\fB%Y\fR.
 .RE
 
 .sp
@@ -473,6 +454,15 @@ is negative, no characters are returned.
 .ad
 .RS 6n
 Time zone name or abbreviation, or no bytes if no time zone information exists.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB%+\fR\fR
+.ad
+.RS 6n
+Locale's date and time representation as produced by \fBdate\fR(1).
 .RE
 
 .sp
@@ -788,3 +778,9 @@ This change was based on the XPG4 specification.
 If using the \fB%Z\fR specifier and \fBzoneinfo\fR timezones and if the input
 date is outside the range 20:45:52 UTC, December  13, 1901 to 03:14:07 UTC,
 January 19, 2038, the timezone name may not be correct.
+.sp
+.LP
+The conversion specification for \fB%+\fR was added in illumos.
+It is not part of any standard, although it is available on a number
+of other platforms.
+Its use is discouraged for conforming applications.

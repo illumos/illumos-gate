@@ -108,7 +108,7 @@ notefile=""
 release=""
 revision=""
 
-while getopts DR:o:r: c
+while getopts R:o:r: c
 do
 	case $c in
 	o)

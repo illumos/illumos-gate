@@ -7,7 +7,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH T_BIND 3NSL "May 7, 1998"
+.TH T_BIND 3NSL "Dec 27, 2013"
 .SH NAME
 t_bind \- bind an address to a transport endpoint
 .SH SYNOPSIS
@@ -28,7 +28,7 @@ This routine is part of the \fBXTI\fR interfaces that evolved from the
 \fBTLI\fR interfaces. \fBXTI\fR represents the future evolution of these
 interfaces. However, \fBTLI\fR interfaces are supported for compatibility. When
 using a \fBTLI\fR routine that has the same name as an \fBXTI\fR routine, the
-\fBtiuser.h\fRheader file must be used.  Refer to the  \fBTLI\fR
+\fBtiuser.h\fR header file must be used.  Refer to the  \fBTLI\fR
 \fBCOMPATIBILITY\fR section for a description of differences between the two
 interfaces.
 .sp
@@ -110,7 +110,7 @@ requirement on transport providers; see \fBWARNINGS\fR below. On return, the
 .sp
 .LP
 If \fIfd\fR refers to a connection-mode service, this function allows more than
-one transport endpoint to be bound to the same protocol address.  but it is not
+one transport endpoint to be bound to the same protocol address.  It is not
 possible to bind more than one protocol address to the same transport endpoint.
 However, the transport provider must also support this capability. If a user
 binds more than one transport endpoint to the same protocol address, only one

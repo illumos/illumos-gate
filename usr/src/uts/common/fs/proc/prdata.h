@@ -185,6 +185,7 @@ typedef struct prnode {
 #define	PR_INVAL	0x01		/* vnode is invalidated */
 #define	PR_ISSELF	0x02		/* vnode is a self-open */
 #define	PR_AOUT		0x04		/* vnode is for an a.out path */
+#define	PR_OFFMAX	0x08		/* vnode is a large file open */
 
 /*
  * Conversion macros.

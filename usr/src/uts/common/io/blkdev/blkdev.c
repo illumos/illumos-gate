@@ -85,6 +85,7 @@ struct bd {
 	kstat_io_t	*d_kiop;
 
 	boolean_t	d_rdonly;
+	boolean_t	d_ssd;
 	boolean_t	d_removable;
 	boolean_t	d_hotpluggable;
 	boolean_t	d_use_dma;
@@ -1118,6 +1119,14 @@ bd_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *credp, int *rvalp)
 		}
 		return (0);
 	}
+	case DKIOCSOLIDSTATE: {
+		int i;
+		i = bd->d_ssd ? 1 : 0;
+		if (ddi_copyout(&i, ptr, sizeof (i), flag)) {
+			return (EFAULT);
+		}
+		return (0);
+	}
 	case DKIOCSTATE: {
 		enum dkio_state	state;
 		if (ddi_copyin(ptr, &state, sizeof (state), flag)) {
@@ -1261,6 +1270,7 @@ bd_tg_getinfo(dev_info_t *dip, int cmd, void *arg, void *tg_cookie)
 		bd_update_state(bd);
 		((tg_attribute_t *)arg)->media_is_writable =
 		    bd->d_rdonly ? B_FALSE : B_TRUE;
+		((tg_attribute_t *)arg)->media_is_solid_state = bd->d_ssd;
 		return (0);
 
 	default:
@@ -1376,6 +1386,7 @@ bd_update_state(bd_t *bd)
 				bd->d_blkshift = ddi_ffs(media.m_blksize) - 1;
 				bd->d_numblks = media.m_nblks;
 				bd->d_rdonly = media.m_readonly;
+				bd->d_ssd = media.m_solidstate;
 				state = DKIO_INSERTED;
 			}
 

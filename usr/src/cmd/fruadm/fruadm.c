@@ -20,6 +20,8 @@
  */
 
 /*
+ * Copyright (c) 2014 Gary Mills
+ *
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -172,7 +174,7 @@ displayBinary(unsigned char *data, size_t length, fru_elemdef_t *def)
 			char buffer[PATH_MAX];
 			time_t time;
 			time = (time_t)lldata;
-			(void) strftime(buffer, PATH_MAX, "%C",
+			(void) strftime(buffer, PATH_MAX, "%+",
 			    localtime(&time));
 			(void) printf("%s", buffer);
 			return;

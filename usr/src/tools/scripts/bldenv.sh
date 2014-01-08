@@ -248,8 +248,6 @@ BASEWSDIR=$(basename -- "${CODEMGR_WS}")
 DEV_CM="\"@(#)SunOS Internal Development: $LOGNAME $BUILD_DATE [$BASEWSDIR]\""
 export DEV_CM RELEASE_DATE POUND_SIGN
 
-export INTERNAL_RELEASE_BUILD=
-
 print 'Build type   is  \c'
 if ${flags.d} ; then
 	print 'DEBUG'

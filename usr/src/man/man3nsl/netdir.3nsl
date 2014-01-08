@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH NETDIR 3NSL "Jan 28, 2005"
+.TH NETDIR 3NSL "Dec 25, 2013"
 .SH NAME
 netdir, netdir_getbyname, netdir_getbyaddr, netdir_free, netdir_options,
 taddr2uaddr, uaddr2taddr, netdir_perror, netdir_sperror, netdir_mergeaddr \-
@@ -33,7 +33,7 @@ generic transport name-to-address translation
 .LP
 .nf
 \fBint\fR \fBnetdir_options\fR(\fBstruct netconfig  *\fR\fIconfig\fR, \fBint\fR \fIoption\fR, \fBint\fR \fIfildes\fR,
-     \fBchar *\fR\fIpoint_to_args\fR);
+     \fBchar *\fR\fIpointer_to_args\fR);
 .fi
 
 .LP
@@ -190,6 +190,7 @@ and option management. \fIfildes\fR is the associated file descriptor.
 \fBnetdir_options()\fR function for the transport specified in \fIconfig\fR.
 Currently four values are defined for \fIoption\fR:
 .br
+
 .in +2
 \fBND_SET_BROADCAST\fR
 .in -2
@@ -204,25 +205,6 @@ Currently four values are defined for \fIoption\fR:
 .br
 .in +2
 \fBND_MERGEADDR\fR
-.in -2
-.sp
-.LP
-The \fBtaddr2uaddr()\fR and \fBuaddr2taddr()\fR functions support translation
-between universal addresses and \fBTLI\fR type \fBnetbufs\fR. The
-\fBtaddr2uaddr()\fR function takes a \fBstruct\fR \fBnetbuf\fR data structure
-and returns a pointer to a string that contains the universal address. It
-returns \fINULL\fR if the conversion is not possible. This is not a fatal
-condition as some transports do not support a universal address form.
-.sp
-.LP
-The \fBuaddr2taddr()\fR function is the reverse of the \fBtaddr2uaddr()\fR
-function. It returns the \fBstruct netbuf\fR data structure for the given
-universal address.
-.sp
-.LP
-If a transport provider does not support an option, \fBnetdir_options\fR
-returns \fB-1\fR and the error message can be printed through
-\fBnetdir_perror()\fR or \fBnetdir_sperror()\fR.
 .sp
 .LP
 The specific actions of each option follow.
@@ -279,9 +261,9 @@ has the following members:
 .sp
 .in +2
 .nf
-\fBchar\fR \fIs_uaddr;\fR    /* server's universal address */
-\fBchar\fR \fIc_uaddr;\fR    /* client's universal address */
-\fBchar\fR \fIm_uaddr;\fR    /* the result */
+\fBchar\fR \fIs_uaddr;\fR  /* server's universal address */
+\fBchar\fR \fIc_uaddr;\fR  /* client's universal address */
+\fBchar\fR \fIm_uaddr;\fR  /* the result */
 .fi
 .in -2
 
@@ -289,8 +271,27 @@ If \fBs_uaddr\fR is an address such as \fB0.0.0.0.1.12\fR, and the call is
 successful \fBm_uaddr\fR is set to an address such as \fB192.11.109.89.1.12\fR.
 For most transports, \fBm_uaddr\fR is identical to \fBs_uaddr\fR.
 .RE
+.sp
+.LP
+If a transport provider does not support an option, \fBnetdir_options\fR
+returns \fB-1\fR and the error message can be printed through
+\fBnetdir_perror()\fR or \fBnetdir_sperror()\fR.
 
-.SH RETURN VALUES
+.in -2
+.sp
+.LP
+The \fBtaddr2uaddr()\fR and \fBuaddr2taddr()\fR functions support translation
+between universal addresses and \fBTLI\fR type \fBnetbufs\fR. The
+\fBtaddr2uaddr()\fR function takes a \fBstruct\fR \fBnetbuf\fR data structure
+and returns a pointer to a string that contains the universal address. It
+returns \fINULL\fR if the conversion is not possible. This is not a fatal
+condition as some transports do not support a universal address form.
+.sp
+.LP
+The \fBuaddr2taddr()\fR function is the reverse of the \fBtaddr2uaddr()\fR
+function. It returns the \fBstruct netbuf\fR data structure for the given
+universal address.
+
 .sp
 .LP
 The \fBnetdir_perror()\fR function prints an error message in standard output
@@ -300,11 +301,13 @@ is preceded by the string given as an argument.
 .LP
 The \fBnetdir_sperror()\fR function returns a string with an error message that
 states the cause of a name-to-address mapping failure.
+
+.SH RETURN VALUES
 .sp
 .LP
 The \fBnetdir_sperror()\fR function returns a pointer to a buffer which
 contains the error message string. The buffer is overwritten on each call. In
-multithreaded applications, thise buffer is implemented as thread-specific
+multithreaded applications, this buffer is implemented as thread-specific
 data.
 .sp
 .LP

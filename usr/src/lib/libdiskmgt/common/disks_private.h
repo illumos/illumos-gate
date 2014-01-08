@@ -26,8 +26,6 @@
 #ifndef _DISKS_PRIVATE_H
 #define	_DISKS_PRIVATE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -109,6 +107,7 @@ typedef struct disk {
 	int		rpm;
 	int		wide;
 	int		cd_rom;
+	int		solid_state;
 } disk_t;
 
 typedef struct descriptor {

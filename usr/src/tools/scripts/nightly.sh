@@ -759,14 +759,12 @@ function do_wsdiff {
 #
 
 function set_non_debug_build_flags {
-	export INTERNAL_RELEASE_BUILD ; INTERNAL_RELEASE_BUILD=
 	export RELEASE_BUILD ; RELEASE_BUILD=
 	unset EXTRA_OPTIONS
 	unset EXTRA_CFLAGS
 }
 
 function set_debug_build_flags {
-	export INTERNAL_RELEASE_BUILD ; INTERNAL_RELEASE_BUILD=
 	unset RELEASE_BUILD
 	unset EXTRA_OPTIONS
 	unset EXTRA_CFLAGS

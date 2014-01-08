@@ -24,16 +24,12 @@
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 echo_file usr/src/uts/sparc/Makefile
 echo_file usr/src/uts/sparc/Makefile.files
 echo_file usr/src/uts/sparc/Makefile.rules
 echo_file usr/src/uts/sparc/Makefile.sparc
-echo_file usr/src/uts/sparc/Makefile.sparc.shared
 echo_file usr/src/uts/sparc/Makefile.targ
-echo_file usr/src/uts/sparc/Makefile.targ.shared
 
 echo_file usr/src/uts/sun/Makefile.files
 echo_file usr/src/uts/sun/Makefile.rules

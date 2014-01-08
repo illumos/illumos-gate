@@ -65,10 +65,6 @@ extern "C" {
 #include <sys/stat.h>
 #include <sys/param.h>
 
-#if !defined(_LP64) && _FILE_OFFSET_BITS == 64
-#error	"Cannot use procfs in the large file compilation environment"
-#endif
-
 /*
  * System call interfaces for /proc.
  */

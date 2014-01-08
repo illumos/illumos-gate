@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -207,6 +208,7 @@ sda_mem_bd_mediainfo(void *arg, bd_media_t *media)
 	media->m_nblks = slot->s_nblks;
 	media->m_blksize = slot->s_blksz;
 	media->m_readonly = slot->s_flags & SLOTF_WRITABLE ? B_FALSE : B_TRUE;
+	media->m_solidstate = B_TRUE;
 	sda_slot_exit(slot);
 	return (0);
 }

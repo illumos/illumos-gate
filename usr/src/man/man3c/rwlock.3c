@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH RWLOCK 3C "May 14, 1998"
+.TH RWLOCK 3C "Dec 19, 2013"
 .SH NAME
 rwlock, rwlock_init, rwlock_destroy, rw_rdlock, rw_wrlock, rw_tryrdlock,
 rw_trywrlock, rw_unlock \- multiple readers, single writer locks
@@ -14,7 +14,7 @@ cc -mt [ \fIflag\fR... ] \fIfile\fR...[ \fIlibrary\fR... ]
 
 #include <synch.h>
 
-\fBint\fR \fBrwlock_init\fR(\fBrwlock_t *\fR\fIrwlp\fR, \fBint\fR \fItype\fR, \fBvoid *\fR \fIarg\fR);
+\fBint\fR \fBrwlock_init\fR(\fBrwlock_t *\fR\fIrwlp\fR, \fBint\fR \fItype\fR, \fBvoid *\fR\fIarg\fR);
 .fi
 
 .LP
@@ -63,9 +63,9 @@ purpose.
 .sp
 .LP
 Additionally, readers/writer locks must be initialized prior to use.
-\fBrwlock_init()\fR The readers/writer lock pointed to by \fIrwlp\fR is
+The readers/writer lock pointed to by \fIrwlp\fR is
 initialized by  \fBrwlock_init()\fR. A readers/writer lock is capable of having
-several types of behavior, which is specified by \fBtype\fR. \fIarg\fR is
+several types of behavior, which is specified by \fItype\fR. \fIarg\fR is
 currently not used, although a future type may define  new behavior parameters
 by way of  \fIarg\fR.
 .sp
@@ -99,7 +99,7 @@ The readers/writer lock can synchronize  threads in this process, only.
 .sp
 .LP
 Additionally, readers/writer locks can be initialized by allocation  in zeroed
-memory. A \fBtype\fR of \fBUSYNC_THREAD\fR is assumed in this case. Multiple
+memory. A \fItype\fR of \fBUSYNC_THREAD\fR is assumed in this case. Multiple
 threads must not simultaneously initialize the same  readers/writer lock. And a
 readers/writer lock must not be re-initialized while in use by other threads.
 .sp
@@ -158,7 +158,7 @@ calling thread blocks until the write lock is freed. Multiple threads may
 simultaneously hold a read lock on a  readers/writer lock.
 .sp
 .LP
-\fBrw_tryrdlock()\fR trys to get a read lock on the readers/writer lock pointed
+\fBrw_tryrdlock()\fR tries to get a read lock on the readers/writer lock pointed
 to by \fIrwlp\fR. If the readers/writer lock is locked for writing, it returns
 an error; otherwise, the read lock is acquired.
 .sp
@@ -170,7 +170,7 @@ freed. At any given time, only one thread may have a write lock on a
 readers/writer lock.
 .sp
 .LP
-\fBrw_trywrlock()\fR trys to get a write lock on the readers/writer lock
+\fBrw_trywrlock()\fR tries to get a write lock on the readers/writer lock
 pointed to by \fIrwlp\fR. If the readers/writer lock is currently locked for
 reading or writing, it returns an error.
 .sp
@@ -178,7 +178,7 @@ reading or writing, it returns an error.
 \fBrw_unlock()\fR unlocks a readers/writer lock pointed to by  \fIrwlp\fR, if
 the readers/writer lock is locked and the calling thread holds the lock for
 either reading or writing. One of the other threads that is waiting for the
-readers/writer  lock to be freed will be unblocked, provided there is other
+readers/writer  lock to be freed will be unblocked, provided there are other
 waiting threads. If the calling thread does not hold the lock for either
 reading or writing, no error status is returned, and the program's behavior is
 unknown.
@@ -197,7 +197,7 @@ The \fBrwlock_init()\fR function will fail if:
 \fB\fBEINVAL\fR \fR
 .ad
 .RS 11n
-\fBtype\fR is invalid.
+\fItype\fR is invalid.
 .RE
 
 .sp
@@ -209,7 +209,7 @@ The  \fBrw_tryrdlock()\fR or \fBrw_trywrlock()\fR functions will fail if:
 \fB\fBEBUSY\fR \fR
 .ad
 .RS 10n
-The reader or writer lock pointed to by \fIrwlp\fR was already locked.
+The readers/writer lock pointed to by \fIrwlp\fR was already locked.
 .RE
 
 .sp

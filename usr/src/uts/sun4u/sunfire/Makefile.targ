@@ -20,12 +20,60 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+
+#
+#	Common targets for sun4u implementation specific modules.
 #
 
-UTSTREE=$(UTSBASE)
+.KEEP_STATE:
 
-include $(UTSBASE)/sun4u/sunfire/Makefile.targ.shared
+#
+# Rules for implementation subdirectories.
+#
+$(ROOT_SUNFIRE_DIR): $(ROOT_PLAT_DIR)
+	-$(INS.dir)
+
+$(ROOT_SUNFIRE_MOD_DIR): $(ROOT_SUNFIRE_DIR)
+	-$(INS.dir)
+
+$(ROOT_SUNFIRE_MISC_DIR_32): $(ROOT_SUNFIRE_MOD_DIR)
+	-$(INS.dir)
+
+$(ROOT_SUNFIRE_MISC_DIR_64): $(ROOT_SUNFIRE_MISC_DIR_32)
+	-$(INS.dir)
+
+$(ROOT_SUNFIRE_DRV_DIR_32): $(ROOT_SUNFIRE_MOD_DIR)
+	-$(INS.dir)
+
+$(ROOT_SUNFIRE_DRV_DIR_64): $(ROOT_SUNFIRE_DRV_DIR_32)
+	-$(INS.dir)
+
+$(USR_SUNFIRE_DIR): $(USR_PLAT_DIR)
+	-$(INS.dir)
+
+$(USR_SUNFIRE_INC_DIR):		$(USR_SUNFIRE_DIR) $(USR_PSM_INCL_DIR)
+	$(INS.slink4)
+
+$(USR_SUNFIRE_ISYS_DIR): $(USR_SUNFIRE_INC_DIR)
+	$(INS.dir)
+
+$(USR_SUNFIRE_SBIN_DIR):	$(USR_SUNFIRE_DIR) $(USR_PSM_SBIN_DIR)
+	$(INS.slink5)
+
+$(USR_SUNFIRE_LIB_DIR):		$(USR_SUNFIRE_DIR) $(USR_PSM_LIB_DIR)
+	-$(INS.dir)
+
+$(ROOT_SUNFIRE_MISC_DIR)/%: $(OBJS_DIR)/% $(ROOT_SUNFIRE_MISC_DIR) FRC
+	$(INS.file)
+
+$(ROOT_SUNFIRE_DRV_DIR)/%: $(OBJS_DIR)/% $(ROOT_SUNFIRE_DRV_DIR) FRC
+	$(INS.file)
+
+#
+#	Include common targets.
+#
+include $(UTSBASE)/sun4u/sunfire/Makefile.rules
+include $(UTSBASE)/sun4u/Makefile.targ

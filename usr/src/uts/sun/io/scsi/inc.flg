@@ -74,9 +74,7 @@ echo_file  usr/src/uts/sparc/Makefile
 echo_file  usr/src/uts/sparc/Makefile.files
 echo_file  usr/src/uts/sparc/Makefile.rules
 echo_file  usr/src/uts/sparc/Makefile.sparc
-echo_file  usr/src/uts/sparc/Makefile.sparc.shared
 echo_file  usr/src/uts/sparc/Makefile.targ
-echo_file  usr/src/uts/sparc/Makefile.targ.shared
 echo_file  usr/src/uts/sparc/ml/sparc.il
 echo_file  usr/src/uts/sparc/req.flg
 echo_file  usr/src/uts/sun/Makefile.files

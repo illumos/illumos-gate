@@ -20,14 +20,14 @@
  */
 
 /*
+ * Copyright (c) 2014 Gary Mills
+ *
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  */
 
 /* $Id: attribute.c 157 2006-04-26 15:07:55Z ktou $ */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*LINTLIBRARY*/
 
@@ -957,7 +957,7 @@ papiAttributeToString(papi_attribute_t *attribute, char *delim,
 			if (tm != NULL) {
 				char string[64];
 
-				strftime(string, sizeof (string), "%C", tm);
+				strftime(string, sizeof (string), "%c", tm);
 				rc = strlcat(buffer, string, buflen);
 			}}
 			break;

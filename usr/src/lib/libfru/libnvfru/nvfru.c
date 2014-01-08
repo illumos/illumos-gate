@@ -20,6 +20,8 @@
  */
 
 /*
+ * Copyright (c) 2014 Gary Mills
+ *
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -73,7 +75,7 @@ convert_field(const uint8_t *field, const fru_regdef_t *def, const char *path,
 			}
 			(void) memcpy(&timefield, field, sizeof (timefield));
 			timefield = BE_32(timefield);
-			if (strftime(timestring, sizeof (timestring), "%C",
+			if (strftime(timestring, sizeof (timestring), "%c",
 			    localtime(&timefield)) == 0) {
 				/* buffer too small */
 				return;

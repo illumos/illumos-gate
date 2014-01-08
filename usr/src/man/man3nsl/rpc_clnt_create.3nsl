@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH RPC_CLNT_CREATE 3NSL "Jul 23, 2009"
+.TH RPC_CLNT_CREATE 3NSL "Dec 16, 2013"
 .SH NAME
 rpc_clnt_create, clnt_control, clnt_create, clnt_create_timed,
 clnt_create_vers, clnt_create_vers_timed, clnt_destroy, clnt_dg_create,
@@ -110,7 +110,7 @@ of CLIENT handles
 
 .LP
 .nf
-\fBstruct rpc_createerr\fR \fBrpc_createerr\fR
+\fBstruct rpc_createerr\fR \fBrpc_createerr\fR;
 .fi
 
 .LP
@@ -131,8 +131,8 @@ requested service, and then sends a reply.
 .LP
 These routines are MT-Safe. In the case of multithreaded applications, the
 \fB-mt\fR option must be specified on the command line at compilation time.
-When the \fB-mt\fR option is specified, \fBrpc_createerr()\fR becomes a macro
-that enables each thread to have its own \fBrpc_createerr()\fR. See
+When the \fB-mt\fR option is specified, \fBrpc_createerr\fR becomes a macro
+that enables each thread to have its own \fBrpc_createerr\fR. See
 \fBthreads\fR(5).
 .SS "Routines"
 .sp
@@ -518,7 +518,7 @@ the remote \fBrpcbind\fR service for this information.
 .sp
 .ne 2
 .na
-\fB\fBrpc_createerr()\fR\fR
+\fB\fBrpc_createerr\fR\fR
 .ad
 .sp .6
 .RS 4n

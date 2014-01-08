@@ -26,6 +26,7 @@
  * Copyright (c) 2011 Bayard G. Bell.  All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
  */
 /*
  * Copyright 2011 cyril.galibern@opensvc.com
@@ -18116,12 +18117,21 @@ sd_sense_key_recoverable_error(struct sd_lun *un,
 {
 	struct sd_sense_info	si;
 	uint8_t asc = scsi_sense_asc(sense_datap);
+	uint8_t ascq = scsi_sense_ascq(sense_datap);
 
 	ASSERT(un != NULL);
 	ASSERT(mutex_owned(SD_MUTEX(un)));
 	ASSERT(bp != NULL);
 	ASSERT(xp != NULL);
 	ASSERT(pktp != NULL);
+
+	/*
+	 * 0x00, 0x1D: ATA PASSTHROUGH INFORMATION AVAILABLE
+	 */
+	if (asc == 0x00 && ascq == 0x1D) {
+		sd_return_command(un, bp);
+		return;
+	}
 
 	/*
 	 * 0x5D: FAILURE PREDICTION THRESHOLD EXCEEDED
@@ -22323,6 +22333,7 @@ sdioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cred_p, int *rval_p)
 		case DKIOCINFO:
 		case DKIOCGMEDIAINFO:
 		case DKIOCGMEDIAINFOEXT:
+		case DKIOCSOLIDSTATE:
 		case MHIOCENFAILFAST:
 		case MHIOCSTATUS:
 		case MHIOCTKOWN:
@@ -22508,6 +22519,16 @@ skip_ready_valid:
 	case DKIOCREMOVABLE:
 		SD_TRACE(SD_LOG_IOCTL, un, "DKIOCREMOVABLE\n");
 		i = un->un_f_has_removable_media ? 1 : 0;
+		if (ddi_copyout(&i, (void *)arg, sizeof (int), flag) != 0) {
+			err = EFAULT;
+		} else {
+			err = 0;
+		}
+		break;
+
+	case DKIOCSOLIDSTATE:
+		SD_TRACE(SD_LOG_IOCTL, un, "DKIOCSOLIDSTATE\n");
+		i = un->un_f_is_solid_state ? 1 : 0;
 		if (ddi_copyout(&i, (void *)arg, sizeof (int), flag) != 0) {
 			err = EFAULT;
 		} else {
@@ -31404,8 +31425,10 @@ sd_ssc_ereport_post(sd_ssc_t *ssc, enum sd_driver_assessment drv_assess)
 		 * If we got here, we have a completed command, and we need
 		 * to further investigate the sense data to see what kind
 		 * of ereport we should post.
-		 * Post ereport.io.scsi.cmd.disk.dev.rqs.merr
-		 * if sense-key == 0x3.
+		 * No ereport is needed if sense-key is KEY_RECOVERABLE_ERROR
+		 * and asc/ascq is "ATA PASS-THROUGH INFORMATION AVAILABLE".
+		 * Post ereport.io.scsi.cmd.disk.dev.rqs.merr if sense-key is
+		 * KEY_MEDIUM_ERROR.
 		 * Post ereport.io.scsi.cmd.disk.dev.rqs.derr otherwise.
 		 * driver-assessment will be set based on the parameter
 		 * drv_assess.
@@ -31414,11 +31437,16 @@ sd_ssc_ereport_post(sd_ssc_t *ssc, enum sd_driver_assessment drv_assess)
 			/*
 			 * Here we have sense data available.
 			 */
-			uint8_t sense_key;
-			sense_key = scsi_sense_key(sensep);
-			if (sense_key == 0x3) {
+			uint8_t sense_key = scsi_sense_key(sensep);
+			uint8_t sense_asc = scsi_sense_asc(sensep);
+			uint8_t sense_ascq = scsi_sense_ascq(sensep);
+
+			if (sense_key == KEY_RECOVERABLE_ERROR &&
+			    sense_asc == 0x00 && sense_ascq == 0x1d)
+				return;
+
+			if (sense_key == KEY_MEDIUM_ERROR) {
 				/*
-				 * sense-key == 0x3(medium error),
 				 * driver-assessment should be "fatal" if
 				 * drv_assess is SD_FM_DRV_FATAL.
 				 */
@@ -31464,55 +31492,55 @@ sd_ssc_ereport_post(sd_ssc_t *ssc, enum sd_driver_assessment drv_assess)
 				    DATA_TYPE_UINT64,
 				    ssc->ssc_uscsi_info->ui_lba,
 				    NULL);
-				} else {
-					/*
-					 * if sense-key == 0x4(hardware
-					 * error), driver-assessment should
-					 * be "fatal" if drv_assess is
-					 * SD_FM_DRV_FATAL.
-					 */
-					scsi_fm_ereport_post(un->un_sd,
-					    uscsi_path_instance, NULL,
-					    "cmd.disk.dev.rqs.derr",
-					    uscsi_ena, devid,
-					    NULL, DDI_NOSLEEP, NULL,
-					    FM_VERSION,
-					    DATA_TYPE_UINT8, FM_EREPORT_VERS0,
-					    DEVID_IF_KNOWN(devid),
-					    "driver-assessment",
-					    DATA_TYPE_STRING,
-					    drv_assess == SD_FM_DRV_FATAL ?
-					    (sense_key == 0x4 ?
-					    "fatal" : "fail") : assessment,
-					    "op-code",
-					    DATA_TYPE_UINT8, op_code,
-					    "cdb",
-					    DATA_TYPE_UINT8_ARRAY, cdblen,
-					    ssc->ssc_uscsi_cmd->uscsi_cdb,
-					    "pkt-reason",
-					    DATA_TYPE_UINT8, uscsi_pkt_reason,
-					    "pkt-state",
-					    DATA_TYPE_UINT8, uscsi_pkt_state,
-					    "pkt-stats",
-					    DATA_TYPE_UINT32,
-					    uscsi_pkt_statistics,
-					    "stat-code",
-					    DATA_TYPE_UINT8,
-					    ssc->ssc_uscsi_cmd->uscsi_status,
-					    "key",
-					    DATA_TYPE_UINT8,
-					    scsi_sense_key(sensep),
-					    "asc",
-					    DATA_TYPE_UINT8,
-					    scsi_sense_asc(sensep),
-					    "ascq",
-					    DATA_TYPE_UINT8,
-					    scsi_sense_ascq(sensep),
-					    "sense-data",
-					    DATA_TYPE_UINT8_ARRAY,
-					    senlen, sensep,
-					    NULL);
-				}
+			} else {
+				/*
+				 * if sense-key == 0x4(hardware
+				 * error), driver-assessment should
+				 * be "fatal" if drv_assess is
+				 * SD_FM_DRV_FATAL.
+				 */
+				scsi_fm_ereport_post(un->un_sd,
+				    uscsi_path_instance, NULL,
+				    "cmd.disk.dev.rqs.derr",
+				    uscsi_ena, devid,
+				    NULL, DDI_NOSLEEP, NULL,
+				    FM_VERSION,
+				    DATA_TYPE_UINT8, FM_EREPORT_VERS0,
+				    DEVID_IF_KNOWN(devid),
+				    "driver-assessment",
+				    DATA_TYPE_STRING,
+				    drv_assess == SD_FM_DRV_FATAL ?
+				    (sense_key == 0x4 ?
+				    "fatal" : "fail") : assessment,
+				    "op-code",
+				    DATA_TYPE_UINT8, op_code,
+				    "cdb",
+				    DATA_TYPE_UINT8_ARRAY, cdblen,
+				    ssc->ssc_uscsi_cmd->uscsi_cdb,
+				    "pkt-reason",
+				    DATA_TYPE_UINT8, uscsi_pkt_reason,
+				    "pkt-state",
+				    DATA_TYPE_UINT8, uscsi_pkt_state,
+				    "pkt-stats",
+				    DATA_TYPE_UINT32,
+				    uscsi_pkt_statistics,
+				    "stat-code",
+				    DATA_TYPE_UINT8,
+				    ssc->ssc_uscsi_cmd->uscsi_status,
+				    "key",
+				    DATA_TYPE_UINT8,
+				    scsi_sense_key(sensep),
+				    "asc",
+				    DATA_TYPE_UINT8,
+				    scsi_sense_asc(sensep),
+				    "ascq",
+				    DATA_TYPE_UINT8,
+				    scsi_sense_ascq(sensep),
+				    "sense-data",
+				    DATA_TYPE_UINT8_ARRAY,
+				    senlen, sensep,
+				    NULL);
+			}
 		} else {
 			/*
 			 * For stat_code == STATUS_GOOD, this is not a

@@ -20,14 +20,14 @@
  */
 
 /*
+ * Copyright (c) 2014 Gary Mills
+ *
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This routine converts time as follows.  The epoch is 0000  Jan  1
@@ -91,7 +91,7 @@ ascftime(char *buf, const char *format, const struct tm *tm)
 	/* Set format string, if not already set */
 	if (format == NULL || *format == '\0')
 		if (((format = getenv("CFTIME")) == 0) || *format == 0)
-			format =  "%C";
+			format =  "%+";
 
 	return ((int)strftime(buf, LONG_MAX, format, tm));
 }

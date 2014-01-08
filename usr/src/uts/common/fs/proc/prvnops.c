@@ -340,6 +340,15 @@ propen(vnode_t **vpp, int flag, cred_t *cr, caller_context_t *ct)
 	}
 
 	/*
+	 * If this is a large file open, indicate that in our flags -- some
+	 * procfs structures are not off_t-neutral (e.g., priovec_t), and
+	 * the open will need to be differentiated where 32-bit processes
+	 * pass these structures across the user/kernel boundary.
+	 */
+	if (flag & FOFFMAX)
+		pnp->pr_flags |= PR_OFFMAX;
+
+	/*
 	 * Do file-specific things.
 	 */
 	switch (type) {

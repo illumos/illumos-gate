@@ -1,3 +1,4 @@
+#
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
@@ -17,12 +18,163 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+#
+#	Global definitions for sun4u opl implementation specific modules.
+#
+# uts/sun4u/opl/Makefile.opl
 #
 
-UTSTREE=$(UTSBASE)
+#
+#	Define directories.
+#
+#
+#
+ROOT_OPL_DIR	= $(ROOT_PLAT_DIR)/SUNW,SPARC-Enterprise
+ROOT_OPL_MOD_DIR	= $(ROOT_OPL_DIR)/kernel
+ROOT_OPL_KERN_DIR_32 = $(ROOT_OPL_MOD_DIR)
+ROOT_OPL_KERN_DIR_64 = $(ROOT_OPL_MOD_DIR)/$(SUBDIR64)
+ROOT_OPL_MISC_DIR_32 = $(ROOT_OPL_MOD_DIR)/misc
+ROOT_OPL_MISC_DIR_64 = $(ROOT_OPL_MOD_DIR)/misc/$(SUBDIR64)
+ROOT_OPL_DRV_DIR_32 = $(ROOT_OPL_MOD_DIR)/drv
+ROOT_OPL_DRV_DIR_64 = $(ROOT_OPL_MOD_DIR)/drv/$(SUBDIR64)
+ROOT_OPL_CPU_DIR_32 = $(ROOT_OPL_MOD_DIR)/cpu
+ROOT_OPL_CPU_DIR_64 = $(ROOT_OPL_MOD_DIR)/cpu/$(SUBDIR64)
+ROOT_OPL_CRYPTO_DIR_32 = $(ROOT_OPL_MOD_DIR)/crypto
+ROOT_OPL_CRYPTO_DIR_64 = $(ROOT_OPL_MOD_DIR)/crypto/$(SUBDIR64)
 
-include $(UTSBASE)/sun4u/opl/Makefile.opl.shared
+ROOT_OPL_KERN_DIR	= $(ROOT_OPL_KERN_DIR_$(CLASS))
+ROOT_OPL_MISC_DIR	= $(ROOT_OPL_MISC_DIR_$(CLASS))
+ROOT_OPL_DRV_DIR	= $(ROOT_OPL_DRV_DIR_$(CLASS))
+ROOT_OPL_CPU_DIR	= $(ROOT_OPL_CPU_DIR_$(CLASS))
+ROOT_OPL_CRYPTO_DIR	= $(ROOT_OPL_CRYPTO_DIR_$(CLASS))
+
+ROOT_PLAT_MOD_DIRS	+= $(ROOT_OPL_MOD_DIR)
+ROOT_PLAT_MISC_DIRS_32	+= $(ROOT_OPL_MISC_DIR_32)
+
+USR_OPL_DIR		= $(USR_PLAT_DIR)/SUNW,SPARC-Enterprise
+USR_OPL_LIB_DIR		= $(USR_OPL_DIR)/lib
+USR_OPL_SBIN_DIR	= $(USR_OPL_DIR)/sbin
+USR_OPL_SBIN_PRTDIAG	= $(USR_OPL_SBIN_DIR)/prtdiag
+USR_OPL_SBIN_FRUADM	= $(USR_OPL_SBIN_DIR)/fruadm
+USR_OPL_INC_DIR		= $(USR_OPL_DIR)/include
+USR_OPL_ISYS_DIR	= $(USR_OPL_INC_DIR)/sys
+
+OPL_LINT_LIB_DIR	= $(UTSBASE)/$(PLATFORM)/opl/lint-libs/$(OBJS_DIR)
+OPLMSU_OPTION		= options
+
+#
+#	Define modules.
+#
+OPL_KMODS	= platmod
+OPL_KMODS	+= dm2s
+OPL_KMODS	+= oplkmdrv
+OPL_KMODS	+= pcicmu
+OPL_KMODS	+= oplpanel
+OPL_KMODS	+= dr .WAIT drmach
+OPL_KMODS	+= oplmsu
+OPL_KMODS	+= mc-opl
+
+#
+#	CPU modules.
+#
+OPL_CPU_KMODS += olympus_c
+
+#	Links to OPL crypto modules
+#
+OPL_CRYPTO_LINKS	= aes
+
+#
+#	Include the makefiles which define build rule templates, the
+#	collection of files per module, and a few specific flags. Note
+#	that order is significant, just as with an include path. The
+#	first build rule template which matches the files name will be
+#	used. By including these in order from most machine dependent
+#	to most machine independent, we allow a machine dependent file
+#	to be used in preference over a machine independent version
+#	(Such as a machine specific optimization, which preserves the
+#	interfaces.)
+#
+include $(UTSBASE)/sun4u/ngdr/Makefile.files
+include $(UTSBASE)/sun4u/opl/Makefile.files
+
+#
+#	Include common rules.
+#
+include $(UTSBASE)/sun4u/Makefile.sun4u
+
+#
+#	Everybody needs to know how to build modstubs.o and to locate unix.o
+#
+UNIX_DIR	= $(UTSBASE)/$(PLATFORM)/opl/unix
+MODSTUBS_DIR	= $(UNIX_DIR)
+DSF_DIR		= $(UTSBASE)/$(PLATFORM)/opl/genassym
+LINTS_DIR	= $(OBJS_DIR)
+LINT_LIB_DIR	= $(UTSBASE)/$(PLATFORM)/opl/lint-libs/$(OBJS_DIR)
+
+UNIX_O		= $(UNIX_DIR)/$(OBJS_DIR)/unix.o
+
+LINT_LIB	= $(LINT_LIB_DIR)/llib-lunix.ln
+
+#
+#	Define the actual specific platforms
+#
+MACHINE_DEFS	= -D$(PLATFORM) -D_MACHDEP -DSFMMU -DMP
+MACHINE_DEFS	+= -D_CPU_SIGNATURE
+
+#
+# Maximum CPUID  =   01111 11 01 1 = 0x1FB (507)
+# Maximum CHIPID = 1 01111 11 00 0 = 0x5F8 (1528)
+#
+MACHINE_DEFS	+= -DNCPU=512
+MACHINE_DEFS	+= -DMAX_CPU_CHIPID=1529
+MACHINE_DEFS	+= -DMAX_UPA=256
+MACHINE_DEFS	+= -DIGN_SIZE=8
+MACHINE_DEFS	+= -DMAX_MEM_NODES=16
+#
+# UTSB_PHYS will enable user TSB physical access for TL>0
+#
+MACHINE_DEFS	+= -DUTSB_PHYS
+MACHINE_DEFS	+= -D_OPL
+MACHINE_DEFS    += -DOLYMPUS_SHARED_FTLB
+MACHINE_DEFS	+= -D_CMP_NO_ERROR_STEERING -D_HW_MEMSCRUB_SUPPORT
+MACHINE_DEFS	+= -DDO_CORELEVEL_LOADBAL
+MACHINE_DEFS	+= -DITLB_32M_256M_SUPPORT
+#
+# OLYMPUS C cross-call erratas.
+#  - revision A can only deliver one xcall at a time.
+#  - revision B can dispatch xcalls to 31 (IDSR_BN_SETS) CPUs at a time,
+#    but it can not send more xcalls until all the pending xcalls are
+#    dispatched. In other words, all previous 31 xcall slots must be
+#    in non-busy state before further xcalls can be issued.
+MACHINE_DEFS += -DOLYMPUS_C_REV_A_ERRATA_XCALL
+MACHINE_DEFS += -DOLYMPUS_C_REV_B_ERRATA_XCALL
+#
+# OLYMPUS C Spurious interrupts
+# - When an UE is detected in a interrupt packet, 
+#   Olympus-C takes an interrupt_vector_trap (TT=0x60) while
+#   ASI_INTR_RECIEVE.BUSY is set to zero to indicate the existence
+#   of the error. Software will see this as a spurious interrupt since
+#   the interrupt busy bit is set to zero. SW will still need to
+#   explicitly clear the interrupt busy bit to reset the HW state.
+#   Failure to do so will result in the processor continuously taking
+#   an interrupt vector trap when PSTATE.IE is reset to one.
+#   Note that UE in interrupt packet is reported to the SP and handled
+#   accordingly. For the domain, the system should panic as it is not
+#   recoverable.
+MACHINE_DEFS += -DCLEAR_INTR_BUSYBIT_ON_SPURIOUS
+
+#
+# For now, disable these lint checks; maintainers should endeavor
+# to investigate and remove these for maximum lint coverage.
+# Please do not carry these forward to new Makefiles.
+#
+LINTTAGS	+= -erroff=E_SUSPICIOUS_COMPARISON
+LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
+LINTTAGS	+= -erroff=E_SUPPRESSION_DIRECTIVE_UNUSED
+LINTTAGS	+= -erroff=E_STATIC_UNUSED
+LINTTAGS	+= -erroff=E_PTRDIFF_OVERFLOW
+LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
+
+.KEEP_STATE:

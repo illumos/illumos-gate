@@ -147,6 +147,7 @@ typedef enum {
 #define	DM_PRODUCT_ID		"product_id"
 #define	DM_REMOVABLE		"removable"	/* also in media */
 #define	DM_RPM			"rpm"
+#define	DM_SOLIDSTATE		"solid_state"
 #define	DM_STATUS		"status"
 #define	DM_SYNC_SPEED		"sync_speed"
 #define	DM_TEMPERATURE		"temperature"
