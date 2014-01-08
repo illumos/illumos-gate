@@ -23,9 +23,61 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+#	Global definitions for sun4u implementation specific modules.
 #
 
-UTSTREE=$(UTSBASE)
+#
+#	Define the name of this implementation.
+#
 
-include $(UTSBASE)/sun4u/sunfire/Makefile.sunfire.shared
+#
+#	Define directories.
+#
+ROOT_SUNFIRE_DIR	= $(ROOT_PLAT_DIR)/SUNW,Ultra-Enterprise
+ROOT_SUNFIRE_MOD_DIR	= $(ROOT_SUNFIRE_DIR)/kernel
+
+ROOT_SUNFIRE_DRV_DIR_32	= $(ROOT_SUNFIRE_MOD_DIR)/drv
+ROOT_SUNFIRE_DRV_DIR_64	= $(ROOT_SUNFIRE_MOD_DIR)/drv/$(SUBDIR64)
+ROOT_SUNFIRE_DRV_DIR	= $(ROOT_SUNFIRE_DRV_DIR_$(CLASS))
+ROOT_PLAT_DRV_DIRS	= $(ROOT_SUNFIRE_DRV_DIR)
+
+ROOT_SUNFIRE_MISC_DIR_32	= $(ROOT_SUNFIRE_MOD_DIR)/misc
+ROOT_SUNFIRE_MISC_DIR_64	= $(ROOT_SUNFIRE_MOD_DIR)/misc/$(SUBDIR64)
+ROOT_SUNFIRE_MISC_DIR	= $(ROOT_SUNFIRE_MISC_DIR_$(CLASS))
+
+USR_SUNFIRE_DIR		= $(USR_PLAT_DIR)/SUNW,Ultra-Enterprise
+USR_SUNFIRE_INC_DIR	= $(USR_SUNFIRE_DIR)/include
+USR_SUNFIRE_ISYS_DIR	= $(USR_SUNFIRE_INC_DIR)/sys
+USR_SUNFIRE_SBIN_DIR	= $(USR_SUNFIRE_DIR)/sbin
+USR_SUNFIRE_LIB_DIR	= $(USR_SUNFIRE_DIR)/lib
+
+SUNFIRE_LINT_LIB_DIR= $(UTSBASE)/$(PLATFORM)/sunfire/lint-libs/$(OBJS_DIR)
+
+#
+# Define objects.
+#
+SUNFIRE_OBJS	= sunfire.o
+
+include $(UTSBASE)/sun4u/sunfire/Makefile.files
+
+#
+#	Include common rules.
+#
+include $(UTSBASE)/sun4u/Makefile.sun4u
+
+#
+#	Define modules (must come after Makefile.sun4u).
+#
+SUNFIRE_KMODS			= ac central environ fhc simmstat sysctrl sram
+
+#
+# For now, disable these lint checks; maintainers should endeavor
+# to investigate and remove these for maximum lint coverage.
+# Please do not carry these forward to new Makefiles.
+#
+LINTTAGS	+= -erroff=E_SUSPICIOUS_COMPARISON
+LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
+LINTTAGS	+= -erroff=E_SUPPRESSION_DIRECTIVE_UNUSED
+LINTTAGS	+= -erroff=E_STATIC_UNUSED
+LINTTAGS	+= -erroff=E_PTRDIFF_OVERFLOW
+LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV

@@ -21,17 +21,13 @@
 # CDDL HEADER END
 #
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 echo_file usr/src/uts/intel/Makefile
 echo_file usr/src/uts/intel/Makefile.files
 echo_file usr/src/uts/intel/Makefile.intel
-echo_file usr/src/uts/intel/Makefile.intel.shared
 echo_file usr/src/uts/intel/Makefile.rules
 echo_file usr/src/uts/intel/Makefile.targ
-echo_file usr/src/uts/intel/Makefile.targ.shared
 echo_file usr/src/uts/common/Makefile.files
 echo_file usr/src/uts/common/Makefile.rules

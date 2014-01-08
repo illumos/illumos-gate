@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -19,12 +18,108 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
-UTSTREE=$(UTSBASE)
+#
+#	Global definitions for sun4u implementation specific modules.
+#
 
-include $(UTSBASE)/sun4u/mpxu/Makefile.mpxu.shared
+#
+#	Define the name of this implementation.
+#
+
+#
+#	Define directories.
+#
+ROOT_MPXU_DIR	= $(ROOT_PLAT_DIR)/SUNW,Sun-Fire-V240
+ROOT_MPXU_MOD_DIR	= $(ROOT_MPXU_DIR)/kernel
+
+ROOT_MPXU_DRV_DIR_32	= $(ROOT_MPXU_MOD_DIR)/drv
+ROOT_MPXU_DRV_DIR_64	= $(ROOT_MPXU_MOD_DIR)/drv/$(SUBDIR64)
+ROOT_MPXU_DRV_DIR	= $(ROOT_MPXU_DRV_DIR_$(CLASS))
+
+ROOT_MPXU_MISC_DIR_32	= $(ROOT_MPXU_MOD_DIR)/misc
+ROOT_MPXU_MISC_DIR_64	= $(ROOT_MPXU_MOD_DIR)/misc/$(SUBDIR64)
+ROOT_MPXU_MISC_DIR	= $(ROOT_MPXU_MISC_DIR_$(CLASS))
+
+ROOT_MPXU_CRYPTO_DIR_32	= $(ROOT_MPXU_MOD_DIR)/crypto
+ROOT_MPXU_CRYPTO_DIR_64	= $(ROOT_MPXU_MOD_DIR)/crypto/$(SUBDIR64)
+ROOT_MPXU_CRYPTO_DIR	= $(ROOT_MPXU_CRYPTO_DIR_$(CLASS))
+
+USR_MPXU_DIR		= $(USR_PLAT_DIR)/SUNW,Sun-Fire-V240
+USR_MPXU_INC_DIR	= $(USR_MPXU_DIR)/include
+USR_MPXU_ISYS_DIR	= $(USR_MPXU_INC_DIR)/sys
+USR_MPXU_SBIN_DIR	= $(USR_MPXU_DIR)/sbin
+USR_MPXU_SBIN_PRTDIAG	= $(USR_MPXU_SBIN_DIR)/prtdiag
+USR_MPXU_SBIN_FRUADM	= $(USR_MPXU_SBIN_DIR)/fruadm
+USR_MPXU_LIB_DIR	= $(USR_MPXU_DIR)/lib
+
+MPXU_LINT_LIB_DIR	= $(UTSBASE)/$(PLATFORM)/mpxu/lint-libs/$(OBJS_DIR)
+
+#
+# Links to UltraSparc III crypto modules
+#
+MPXU_CRYPTO_LINKS	= aes
+
+#
+#       Include the makefiles which define build rule templates, the
+#       collection of files per module, and a few specific flags. Note
+#       that order is significant, just as with an include path. The
+#       first build rule template which matches the files name will be
+#       used. By including these in order from most machine dependent
+#       to most machine independent, we allow a machine dependent file
+#       to be used in preference over a machine independent version
+#       (Such as a machine specific optimization, which preserves the
+#       interfaces.)
+#
+
+include $(UTSBASE)/sun4u/mpxu/Makefile.files
+#
+#	Include common rules.
+#
+
+include $(UTSBASE)/sun4u/Makefile.sun4u
+
+#
+#	Define modules (must come after Makefile.sun4u).
+#
+MPXU_KMODS	= tsalarm
+
+MODSTUBS_DIR	= $(UNIX_DIR)
+LINTS_DIR	= $(OBJS_DIR)
+LINT_LIB_DIR	= $(UTSBASE)/$(PLATFORM)/mpxu/lint-libs/$(OBJS_DIR)
+
+#
+#       Define the actual specific platforms
+#
+MACHINE_DEFS	= -D$(PLATFORM) -D_MACHDEP -DSFMMU -DMP
+
+#
+#	Define platform specific values
+#
+#MACHINE_DEFS	+= -DNCPU=554
+#MACHINE_DEFS	+= -DMAX_UPA=1024
+#MACHINE_DEFS	+= -DIGN_SIZE=10
+# Max IOSRAM TOC major version number supported
+#MACHINE_DEFS	+= -DMAX_IOSRAM_TOC_VER=0x1
+
+#       Define for inline pre-processing since
+#       cpp not smart about v9 yet.
+#
+CPP_DEFS_32   =
+CPP_DEFS_64   = -D__sparcv9
+CPP_DEFS      = $(CPP_DEFS_$(CLASS))
+
+#
+# For now, disable these lint checks; maintainers should endeavor
+# to investigate and remove these for maximum lint coverage.
+# Please do not carry these forward to new Makefiles.
+#
+LINTTAGS	+= -erroff=E_SUSPICIOUS_COMPARISON
+LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
+LINTTAGS	+= -erroff=E_SUPPRESSION_DIRECTIVE_UNUSED
+LINTTAGS	+= -erroff=E_STATIC_UNUSED
+LINTTAGS	+= -erroff=E_PTRDIFF_OVERFLOW
+LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV

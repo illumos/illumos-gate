@@ -1,9 +1,9 @@
+#
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -18,12 +18,70 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+#
+# uts/sun4u/tazmo/Makefile.impl
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+#	Global definitions for sun4u implementation specific modules.
 #
 
-UTSTREE=$(UTSBASE)
+#
+#	Define directories.
+#
+ROOT_TAZMO_DIR		= $(ROOT_PLAT_DIR)/SUNW,Ultra-4
+ROOT_TAZMO_MOD_DIR	= $(ROOT_TAZMO_DIR)/kernel
 
-include $(UTSBASE)/sun4u/tazmo/Makefile.tazmo.shared
+ROOT_TAZMO_KERN_DIR_32	= $(ROOT_TAZMO_MOD_DIR)
+ROOT_TAZMO_KERN_DIR_64	= $(ROOT_TAZMO_MOD_DIR)/$(SUBDIR64)
+ROOT_TAZMO_DRV_DIR_32	= $(ROOT_TAZMO_MOD_DIR)/drv
+ROOT_TAZMO_DRV_DIR_64	= $(ROOT_TAZMO_MOD_DIR)/drv/$(SUBDIR64)
+ROOT_TAZMO_MISC_DIR_32	= $(ROOT_TAZMO_MOD_DIR)/misc
+ROOT_TAZMO_MISC_DIR_64	= $(ROOT_TAZMO_MOD_DIR)/misc/$(SUBDIR64)
+
+ROOT_TAZMO_KERN_DIR	= $(ROOT_TAZMO_KERN_DIR_$(CLASS))
+ROOT_TAZMO_MISC_DIR	= $(ROOT_TAZMO_MISC_DIR_$(CLASS))
+ROOT_TAZMO_DRV_DIR	= $(ROOT_TAZMO_DRV_DIR_$(CLASS))
+
+ROOT_PLAT_MOD_DIRS	+= $(ROOT_TAZMO_MOD_DIR)
+ROOT_PLAT_MISC_DIRS	+= $(ROOT_TAZMO_MISC_DIR)
+ROOT_PLAT_MISC_DIRS_32	+= $(ROOT_TAZMO_MISC_DIR_32)
+ROOT_PLAT_DRV_DIRS	= $(ROOT_TAZMO_DRV_DIR)
+
+USR_TAZMO_DIR		= $(USR_PLAT_DIR)/SUNW,Ultra-4
+USR_TAZMO_LINKED_DIR	= $(USR_PLAT_DIR)/$(LINKED_PLATFORM)
+USR_TAZMO_INC_DIR	= $(USR_TAZMO_DIR)/include
+USR_TAZMO_ISYS_DIR	= $(USR_TAZMO_INC_DIR)/sys
+USR_TAZMO_SBIN_DIR	= $(USR_TAZMO_DIR)/sbin
+USR_TAZMO_LIB_DIR	= $(USR_TAZMO_DIR)/lib
+
+TAZMO_LINT_LIB_DIR= $(UTSBASE)/$(PLATFORM)/tazmo/lint-libs/$(OBJS_DIR)
+
+#
+# Define objects.
+#
+TAZMO_OBJS	= tazmo.o
+
+include $(UTSBASE)/sun4u/tazmo/Makefile.files
+
+#
+#	Include common rules.
+#
+include $(UTSBASE)/sun4u/Makefile.sun4u
+
+#
+#	Define modules (must come after Makefile.sun4u).
+#
+TAZMO_KMODS	= platmod
+TAZMO_KMODS	+= envctrl
+
+#
+# For now, disable these lint checks; maintainers should endeavor
+# to investigate and remove these for maximum lint coverage.
+# Please do not carry these forward to new Makefiles.
+#
+LINTTAGS	+= -erroff=E_PTRDIFF_OVERFLOW
+LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
+LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
+LINTTAGS	+= -erroff=E_SUSPICIOUS_COMPARISON
+

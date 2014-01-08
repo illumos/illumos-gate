@@ -112,16 +112,10 @@ $(LINTS_DIR)/modstubs.ln:	$(MODSTUBS)
 #
 # Build environment information is only contained in the comment section.
 #
-# The version string, normally the variable VERSION, is set to display
-# environmental information temporarily while in development because
-# it provides a little more useful information.
-#
-VERSION_STRING	= ($(ECHO) $$LOGNAME [\`basename $$CODEMGR_WS\`] \\\c; date +%D)
-$(INTERNAL_RELEASE_BUILD)VERSION_STRING = $(ECHO) $(PATCHID)
 
 $(OBJS_DIR)/vers.o: $(OBJECTS)
 	$(COMPILE.c) -DUTS_RELEASE=\"`$(ECHO) $(RELEASE) | sed -e 's/ /_/g'`\" \
-	    -DUTS_VERSION=\"`$(VERSION_STRING) | sed -e 's/ /_/g'`\" \
+	    -DUTS_VERSION=\"`$(ECHO) $(PATCHID) | sed -e 's/ /_/g'`\" \
 	    -DUTS_PLATFORM=\"$(UNAME_M)\" -o $@ $(SRC)/uts/common/os/vers.c
 	$(CTFCONVERT_O)
 	$(POST_PROCESS_O)

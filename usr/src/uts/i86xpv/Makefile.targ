@@ -1,3 +1,4 @@
+#
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
@@ -17,12 +18,25 @@
 #
 # CDDL HEADER END
 #
+
+#
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+#	This Makefile defines the set of all required, target containing
+# included Makefiles for the i86xpv "implementation architecture".
 #
 
-UTSTREE=$(UTSBASE)
+#
+#	Targets for all implementations:
+#
+include $(UTSBASE)/Makefile.targ
 
-include $(UTSBASE)/i86xpv/Makefile.targ.shared
+#
+#	Target set for i86xpv (order is not important, as it is with the
+# isomorphic Makefile.files set).
+#
+include $(UTSBASE)/i86xpv/Makefile.rules
+include $(UTSBASE)/intel/Makefile.rules
+include $(UTSBASE)/common/Makefile.rules
+
