@@ -24,6 +24,7 @@
  *
  * Copyright 2013 Joshua M. Clulow <josh@sysmgr.org>
  * Copyright 2013 Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2014 Gary Mills
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -551,7 +552,7 @@ begin:
 		} else {
 			ne_time = next_event->time - t;
 #ifdef DEBUG
-			cftime(timebuf, "%C", &next_event->time);
+			cftime(timebuf, "%+", &next_event->time);
 			(void) fprintf(stderr, "next_time=%ld %s\n",
 			    next_event->time, timebuf);
 #endif
@@ -625,7 +626,7 @@ begin:
 				    next_time(next_event, (time_t)0);
 			}
 #ifdef DEBUG
-			cftime(timebuf, "%C", &next_event->time);
+			cftime(timebuf, "%+", &next_event->time);
 			(void) fprintf(stderr,
 			    "pushing back cron event %s at %ld (%s)\n",
 			    next_event->cmd, next_event->time, timebuf);
@@ -1350,7 +1351,7 @@ again:
 		}
 		cte_valid();
 #ifdef DEBUG
-		cftime(timebuf, "%C", &e->time);
+		cftime(timebuf, "%+", &e->time);
 		(void) fprintf(stderr, "inserting cron event %s at %ld (%s)\n",
 		    e->cmd, e->time, timebuf);
 #endif
