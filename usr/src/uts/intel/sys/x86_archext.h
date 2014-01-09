@@ -655,9 +655,6 @@ extern uint_t x86_vendor;
 extern uint_t x86_clflush_size;
 
 extern uint_t pentiumpro_bug4046376;
-extern uint_t pentiumpro_bug4064495;
-
-extern uint_t enable486;
 
 extern const char CyrixInstead[];
 

@@ -120,7 +120,6 @@ uint_t x86_type = X86_TYPE_OTHER;
 uint_t x86_clflush_size = 0;
 
 uint_t pentiumpro_bug4046376;
-uint_t pentiumpro_bug4064495;
 
 uchar_t x86_featureset[BT_SIZEOFMAP(NUM_X86_FEATURES)];
 
@@ -213,8 +212,6 @@ print_x86_featureset(void *featureset)
 		}
 	}
 }
-
-uint_t enable486;
 
 static size_t xsave_state_size = 0;
 uint64_t xsave_bv_all = (XFEATURE_LEGACY_FP | XFEATURE_SSE);
@@ -1033,7 +1030,6 @@ cpuid_pass1(cpu_t *cpu, uchar_t *featureset)
 		else if (IS_LEGACY_P6(cpi)) {
 			x86_type = X86_TYPE_P6;
 			pentiumpro_bug4046376 = 1;
-			pentiumpro_bug4064495 = 1;
 			/*
 			 * Clear the SEP bit when it was set erroneously
 			 */
