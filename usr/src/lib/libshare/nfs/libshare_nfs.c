@@ -21,9 +21,7 @@
 
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
- */
-/*
- * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -2399,6 +2397,14 @@ struct proto_option_defs {
 	{"nfsd_device",
 	    "device", PROTO_OPT_NFSD_DEVICE,
 	    OPT_TYPE_STRING, NULL, SVC_NFSD, 0, 0},
+#define	PROTO_OPT_MOUNTD_LISTEN_BACKLOG		15
+	{"mountd_listen_backlog",
+	    "mountd_listen_backlog", PROTO_OPT_MOUNTD_LISTEN_BACKLOG,
+	    OPT_TYPE_NUMBER, 64, SVC_NFSD|SVC_MOUNTD, 1, INT32_MAX},
+#define	PROTO_OPT_MOUNTD_MAX_THREADS		16
+	{"mountd_max_threads",
+	    "mountd_max_threads", PROTO_OPT_MOUNTD_MAX_THREADS,
+	    OPT_TYPE_NUMBER, 16, SVC_NFSD|SVC_MOUNTD, 1, INT32_MAX},
 	{NULL}
 };
 

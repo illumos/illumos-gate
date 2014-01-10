@@ -22,6 +22,9 @@
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
 /* All Rights Reserved */
 /*
@@ -38,8 +41,6 @@
 
 #ifndef _RPC_RPC_COM_H
 #define	_RPC_RPC_COM_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <rpc/types.h>
@@ -119,6 +120,10 @@ bool_t rpc_control();
 
 /* set inter record timeout for COTS RPC */
 #define	RPC_SVC_IRTIMEOUT_SET	15
+
+/* private interface for maximum number of outstanding connection indications */
+#define	__RPC_SVC_LSTNBKLOG_SET	16	/* set listen backlog */
+#define	__RPC_SVC_LSTNBKLOG_GET	17	/* get listen backlog */
 
 #endif /* !_KERNEL */
 

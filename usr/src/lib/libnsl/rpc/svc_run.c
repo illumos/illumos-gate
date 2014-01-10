@@ -23,6 +23,9 @@
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ */
 
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
 /* All Rights Reserved */
@@ -31,8 +34,6 @@
  * 4.3 BSD under license from the Regents of the University of
  * California.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This is the rpc server side idle loop
@@ -96,6 +97,11 @@ int __rpc_irtimeout = 35;
  * wildcard addr.
  */
 bool_t __rpc_tp_exclbind = FALSE;
+
+/*
+ * Maximum number of outstanding connection indications (listen backlog).
+ */
+static int __svc_lstnbklog = 64;	/* Chosen Arbitrarily */
 
 /*
  * XXX - eventually, all mutexes and their initializations static
@@ -310,7 +316,7 @@ alloc_pollset(int npollfds)
 			svc_pollset_allocd += POLLSET_EXTEND;
 		} while (npollfds > svc_pollset_allocd);
 		tmp = realloc(svc_pollset,
-				sizeof (pollfd_t) * svc_pollset_allocd);
+		    sizeof (pollfd_t) * svc_pollset_allocd);
 		if (tmp == NULL) {
 			syslog(LOG_ERR, "alloc_pollset: out of memory");
 			return (-1);
@@ -345,7 +351,7 @@ _svc_run(void)
 		if (alloc_pollset(svc_npollfds) == -1)
 			break;
 		npollfds = __rpc_compress_pollfd(svc_max_pollfd,
-			svc_pollfd, svc_pollset);
+		    svc_pollfd, svc_pollset);
 		(void) rw_unlock(&svc_fd_lock);
 		if (npollfds == 0)
 			break;	/* None waiting, hence return */
@@ -457,7 +463,7 @@ continue_with_locks:
 			 */
 			(void) rw_rdlock(&svc_fd_lock);
 			if (svc_npollfds == 0 ||
-					alloc_pollset(svc_npollfds + 1) == -1) {
+			    alloc_pollset(svc_npollfds + 1) == -1) {
 				(void) rw_unlock(&svc_fd_lock);
 				svc_polling = FALSE;
 				svc_thr_total--;
@@ -471,7 +477,7 @@ continue_with_locks:
 			}
 
 			npollfds = __rpc_compress_pollfd(svc_max_pollfd,
-					svc_pollfd, svc_pollset);
+			    svc_pollfd, svc_pollset);
 			(void) rw_unlock(&svc_fd_lock);
 
 			if (npollfds == 0) {
@@ -491,12 +497,12 @@ continue_with_locks:
 				}
 
 				while (svc_npollfds_set == 0 &&
-					svc_pollfds == 0 &&
-					svc_total_pending == 0 &&
-							!svc_exit_done) {
+				    svc_pollfds == 0 &&
+				    svc_total_pending == 0 &&
+				    !svc_exit_done) {
 					svc_waiters++;
 					(void) cond_wait(&svc_thr_fdwait,
-								&svc_mutex);
+					    &svc_mutex);
 					svc_waiters--;
 				}
 
@@ -616,9 +622,9 @@ continue_with_locks:
 		 *	(svc_thr_max - svc_thr_total).
 		 */
 		if (svc_thr_total < svc_thr_max &&
-			    svc_mt_mode == RPC_SVC_MT_AUTO && !svc_exit_done) {
+		    svc_mt_mode == RPC_SVC_MT_AUTO && !svc_exit_done) {
 			n_new = 1 + 1 + svc_pollfds + svc_total_pending -
-					(svc_thr_total - svc_thr_active);
+			    (svc_thr_total - svc_thr_active);
 			if (n_new > (svc_thr_max - svc_thr_total))
 				n_new = svc_thr_max - svc_thr_total;
 			if (n_new > 0)
@@ -677,7 +683,7 @@ continue_with_locks:
 
 			msg->rm_call.cb_cred.oa_base = cred_area;
 			msg->rm_call.cb_verf.oa_base =
-						&(cred_area[MAX_AUTH_BYTES]);
+			    &(cred_area[MAX_AUTH_BYTES]);
 			r->rq_clntcred = &(cred_area[2 * MAX_AUTH_BYTES]);
 
 			/*
@@ -717,10 +723,10 @@ continue_with_locks:
 					 * there's some immediate work.
 					 */
 					if (!main_thread &&
-						    svc_pollfds <= 0 &&
-						    svc_total_pending <= 0 &&
-						    (svc_polling ||
-							svc_waiters > 0)) {
+					    svc_pollfds <= 0 &&
+					    svc_total_pending <= 0 &&
+					    (svc_polling ||
+					    svc_waiters > 0)) {
 						svc_thr_total--;
 						if (svc_thr_total ==
 						    svc_waiters) {
@@ -770,17 +776,17 @@ create_pipe(void)
 {
 	if (pipe(svc_pipe) == -1) {
 		syslog(LOG_ERR, dgettext(__nsl_dom,
-				"RPC: svc could not create pipe - exiting"));
+		    "RPC: svc could not create pipe - exiting"));
 		exit(1);
 	}
 	if (fcntl(svc_pipe[0], F_SETFL, O_NONBLOCK) == -1) {
 		syslog(LOG_ERR, dgettext(__nsl_dom,
-					"RPC: svc pipe error - exiting"));
+		    "RPC: svc pipe error - exiting"));
 		exit(1);
 	}
 	if (fcntl(svc_pipe[1], F_SETFL, O_NONBLOCK) == -1) {
 		syslog(LOG_ERR, dgettext(__nsl_dom,
-					"RPC: svc pipe error - exiting"));
+		    "RPC: svc pipe error - exiting"));
 		exit(1);
 	}
 }
@@ -812,8 +818,7 @@ select_next_pollfd(int *fd, int *pollfdIndex)
 	assert(MUTEX_HELD(&svc_thr_mutex));
 	assert(MUTEX_HELD(&svc_mutex));
 
-	for (i = svc_next_pollfd; svc_pollfds > 0 && i < svc_polled;
-							i++) {
+	for (i = svc_next_pollfd; svc_pollfds > 0 && i < svc_polled; i++) {
 		if (svc_pollset[i].revents) {
 			svc_pollfds--;
 			/*
@@ -907,7 +912,7 @@ _svc_done_private(SVCXPRT *xprt)
 	if (svc_failed(xprt) || svc_defunct(xprt)) {
 /* LINTED pointer alignment */
 		svc_flags(parent) |= (svc_flags(xprt) &
-				(SVC_FAILED | SVC_DEFUNCT));
+		    (SVC_FAILED | SVC_DEFUNCT));
 /* LINTED pointer alignment */
 		if (SVCEXT(parent)->refcnt == 0)
 			_svc_destroy_private(xprt);
@@ -962,7 +967,7 @@ svc_args_done(SVCXPRT *xprt)
 
 /* LINTED pointer alignment */
 	if (svc_type(xprt) == SVC_CONNECTION &&
-				(stat = SVC_STAT(xprt)) != XPRT_IDLE) {
+	    (stat = SVC_STAT(xprt)) != XPRT_IDLE) {
 		if (stat == XPRT_MOREREQS) {
 			(void) mutex_lock(&svc_mutex);
 			svc_pending_fds[svc_last_pending++] = xprt->xp_fd;
@@ -1039,7 +1044,7 @@ rpc_control(int op, void *info)
 	case RPC_SVC_MTMODE_SET:
 		tmp = *((int *)info);
 		if (tmp != RPC_SVC_MT_NONE && tmp != RPC_SVC_MT_AUTO &&
-						tmp != RPC_SVC_MT_USER)
+		    tmp != RPC_SVC_MT_USER)
 			return (FALSE);
 		if (svc_mt_mode != RPC_SVC_MT_NONE && svc_mt_mode != tmp)
 			return (FALSE);
@@ -1108,6 +1113,17 @@ rpc_control(int op, void *info)
 			return (TRUE);
 		}
 		return (FALSE);
+
+	case __RPC_SVC_LSTNBKLOG_SET:
+		tmp = *(int *)info;
+		if (tmp > 0) {
+			__svc_lstnbklog = tmp;
+			return (TRUE);
+		}
+		return (FALSE);
+	case __RPC_SVC_LSTNBKLOG_GET:
+		*(int *)info = __svc_lstnbklog;
+		return (TRUE);
 
 	default:
 		return (FALSE);
