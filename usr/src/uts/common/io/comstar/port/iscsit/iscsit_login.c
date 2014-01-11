@@ -18,9 +18,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/cpuvar.h>
@@ -1237,7 +1238,7 @@ initial_params_done:
  *    0 - address not mapable
  */
 
-static int
+int
 iscsit_is_v4_mapped(struct sockaddr_storage *sa, struct sockaddr_storage *v4sa)
 {
 	struct sockaddr_in *sin;

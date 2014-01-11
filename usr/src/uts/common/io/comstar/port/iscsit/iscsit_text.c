@@ -18,11 +18,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- */
-/*
- * Copyright 2011, Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/cpuvar.h>
@@ -60,7 +59,8 @@ iscsit_text_cmd_fini(iscsit_conn_t *ict);
  * leading zeros which the win2k initiator interprets as octal.
  */
 
-static void iscsit_v4_ntop(struct in_addr *in, char a[], int size)
+static void
+iscsit_v4_ntop(struct in_addr *in, char a[], int size)
 {
 	unsigned char *p = (unsigned char *) in;
 
@@ -469,7 +469,6 @@ iscsit_pdu_op_text_cmd(iscsit_conn_t *ict, idm_pdu_t *rx_pdu)
 	char *textbuf;
 	int textbuflen;
 	int validlen;
-	iscsit_tgt_t *target, *next_target;
 	int rc;
 
 	flags =  th_req->flags;
@@ -537,61 +536,78 @@ iscsit_pdu_op_text_cmd(iscsit_conn_t *ict, idm_pdu_t *rx_pdu)
 	if (textbuflen >= strlen(kv_pair) &&
 	    strcmp(kv_pair, textbuf) == 0 &&
 	    ict->ict_op.op_discovery_session == B_TRUE) {
-		idm_addr_list_t *ipaddr_p;
-		int ipsize;
-
 		/*
 		 * Most common case of SendTargets=All during discovery.
 		 */
-		/*
-		 * Create an nvlist for response.
-		 */
+		idm_addr_list_t *ipaddr_p;
+		iscsit_tgt_t *tgt, *ntgt;
+		int ipsize;
+
+
+		/* Create an nvlist for response */
 		if (nvlist_alloc(&nv_resp, 0, KM_SLEEP) != 0) {
 			iscsit_text_reject(rx_pdu,
 			    ISCSI_REJECT_CMD_NOT_SUPPORTED);
 			return;
 		}
 
-		/*
-		 * get the list of local interface addresses
-		 */
-
+		/* Get the list of local interface addresses */
 		ipsize = idm_get_ipaddr(&ipaddr_p);
 
-		/*
-		 * Add all the targets to the response list.
-		 */
+		/* Add targets to the response list */
 		ISCSIT_GLOBAL_LOCK(RW_READER);
-		for (target = avl_first(&iscsit_global.global_target_list);
-		    target != NULL;
-		    target = next_target) {
-			char *key, *value;
+		for (tgt = avl_first(&iscsit_global.global_target_list);
+		    tgt != NULL; tgt = ntgt) {
+			struct sockaddr_storage v4sa, *sa;
 			iscsit_tgt_state_t state;
+			iscsit_portal_t *portal;
+			iscsit_tpgt_t *tpgt;
 
-			next_target = AVL_NEXT(
-			    &iscsit_global.global_target_list, target);
+			ntgt = AVL_NEXT(&iscsit_global.global_target_list, tgt);
 
-			/* only report online and onlining targets */
-			state = target->target_state;
+			/* Only report online and onlining targets */
+			state = tgt->target_state;
 			if (state != TS_ONLINING && state != TS_ONLINE &&
 			    state != TS_STMF_ONLINE)
 				continue;
 
-			key = "TargetName";
-			value = target->target_name;
-			if (nvlist_add_string(nv_resp, key, value) == 0) {
-				/* add the portal groups bound to this target */
-				iscsit_add_tpgs(ict, target, ipaddr_p, nv_resp);
+			/*
+			 * Report target if:
+			 * - it is bound to default TPG
+			 * - one of the addresses of TPGs the target is bound
+			 *   to matches incoming connection dst address
+			 */
+			sa = &ict->ict_ic->ic_laddr;
+			mutex_enter(&tgt->target_mutex);
+			tpgt = avl_first(&tgt->target_tpgt_list);
+			if (!(IS_DEFAULT_TPGT(tpgt))) {
+				portal = iscsit_tgt_lookup_portal(tgt, sa,
+				    &tpgt);
+				if (portal == NULL &&
+				    iscsit_is_v4_mapped(sa, &v4sa)) {
+					portal = iscsit_tgt_lookup_portal(tgt,
+					    &v4sa, &tpgt);
+				}
+				if (portal == NULL) {
+					mutex_exit(&tgt->target_mutex);
+					continue;
+				}
+				iscsit_portal_rele(portal);
+				iscsit_tpgt_rele(tpgt);
+			}
+			mutex_exit(&tgt->target_mutex);
+
+			if (nvlist_add_string(nv_resp, "TargetName",
+			    tgt->target_name) == 0) {
+				/* Add the portal groups bound to this target */
+				iscsit_add_tpgs(ict, tgt, ipaddr_p, nv_resp);
 			}
 		}
 		ISCSIT_GLOBAL_UNLOCK();
-		if (ipsize > 0) {
+		if (ipsize > 0)
 			kmem_free(ipaddr_p, ipsize);
-		}
 
-		/*
-		 * Convert the response nvlist into an idm text buffer.
-		 */
+		/* Convert the response nvlist into an idm text buffer */
 		textbuf = 0;
 		textbuflen = 0;
 		validlen = 0;
