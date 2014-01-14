@@ -492,8 +492,12 @@ interpret_pmap_4(flags, type, xid, vers, proc, data, len)
 					sum_rpcblist());
 				break;
 			case RPCBPROC_GETTIME:
-				(void) sprintf(line, "%s",
-					getxdr_date());
+				{
+					time_t sec = getxdr_long();
+					struct tm *tmp = gmtime(&sec);
+					(void) strftime(line, MAXLINE,
+					    "%d-%h-%y %T GMT", tmp);
+				}
 				break;
 			case RPCBPROC_GETADDRLIST:
 				(void) sprintf(line, "%s",
@@ -583,7 +587,14 @@ interpret_pmap_4(flags, type, xid, vers, proc, data, len)
 				}
 				break;
 			case RPCBPROC_GETTIME:
-				(void) showxdr_date("Time = %s");
+				{
+					int pos = getxdr_pos();
+					time_t sec = getxdr_long();
+					struct tm *tmp = gmtime(&sec);
+					(void) strftime(get_line(pos,
+					    getxdr_pos()), MAXLINE,
+					    "Time = %d-%h-%y %T GMT", tmp);
+				}
 				break;
 			case RPCBPROC_UADDR2TADDR:
 				break;
