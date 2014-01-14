@@ -1652,3 +1652,4 @@ Bugid   Risk Synopsis
 4003	dldump() can't deal with extended sections
 4227	ld --library-path is translated to -l-path, not -L
 4270	ld(1) argument error reporting is still pretty bad
+4383	libelf can't write extended sections when ELF_F_LAYOUT

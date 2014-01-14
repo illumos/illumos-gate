@@ -150,7 +150,7 @@ refresh_nlm_rpc(struct nlm_host *hostp, nlm_rpc_t *rpcp)
 		 * on.
 		 */
 		if (clnt_control(rpcp->nr_handle, CLSET_NODELAYONERR,
-		    (char *)&clset)) {
+		    (char *)&clset) == FALSE) {
 			NLM_ERR("Unable to set CLSET_NODELAYONERR\n");
 		}
 	} else {
