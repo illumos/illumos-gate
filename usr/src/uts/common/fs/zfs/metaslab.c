@@ -62,6 +62,11 @@ uint64_t metaslab_gang_bang = SPA_MAXBLOCKSIZE + 1;	/* force gang blocks */
 int zfs_condense_pct = 200;
 
 /*
+ * Never condense any space map.  This is for debugging/recovery only.
+ */
+int zfs_condense_never = 0;
+
+/*
  * This value defines the number of allowed allocation failures per vdev.
  * If a device reaches this threshold in a given txg then we consider skipping
  * allocations on that device. The value of zfs_mg_alloc_failures is computed
@@ -1287,6 +1292,9 @@ metaslab_should_condense(metaslab_t *msp)
 
 	ASSERT(MUTEX_HELD(&msp->ms_lock));
 	ASSERT(msp->ms_loaded);
+
+	if (zfs_condense_never != 0)
+		return (B_FALSE);
 
 	/*
 	 * Use the ms_size_tree range tree, which is ordered by size, to
