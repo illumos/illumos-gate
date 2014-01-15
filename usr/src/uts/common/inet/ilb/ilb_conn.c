@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2014 Joyent, Inc.  All rights reserved.
  */
 
 #include <sys/sysmacros.h>
@@ -365,6 +366,7 @@ ilb_conn_hash_fini(ilb_stack_t *ilbs)
 {
 	uint32_t i;
 	ilb_conn_t *connp;
+	ilb_conn_hash_t *hash;
 
 	if (ilbs->ilbs_c2s_conn_hash == NULL) {
 		ASSERT(ilbs->ilbs_s2c_conn_hash == NULL);
@@ -388,10 +390,10 @@ ilb_conn_hash_fini(ilb_stack_t *ilbs)
 	ilbs->ilbs_conn_taskq = NULL;
 
 	/* Then remove all the conns. */
+	hash = ilbs->ilbs_s2c_conn_hash;
 	for (i = 0; i < ilbs->ilbs_conn_hash_size; i++) {
-		while ((connp = ilbs->ilbs_s2c_conn_hash->ilb_connp) != NULL) {
-			ilbs->ilbs_s2c_conn_hash->ilb_connp =
-			    connp->conn_s2c_next;
+		while ((connp = hash[i].ilb_connp) != NULL) {
+			hash[i].ilb_connp = connp->conn_s2c_next;
 			ILB_SERVER_REFRELE(connp->conn_server);
 			if (connp->conn_rule_cache.topo == ILB_TOPO_IMPL_NAT) {
 				ilb_nat_src_entry_t *ent;
