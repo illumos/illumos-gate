@@ -282,12 +282,13 @@ conf_scan(const char *fname, char *buf, int buflen, int timescan)
 			opts = opts_parse(opts, Args, OPTF_CONF);
 			if (!timescan || cp == NULL) {
 				/*
-				 * If we're doing timescan and have what looks
-				 * like an orphaned entry (cp == NULL) then we
-				 * also have to track in this case. See the
+				 * If we're not doing timescan, we track this
+				 * entry.  If we are doing timescan and have
+				 * what looks like an orphaned entry (cp ==
+				 * NULL) then we also have to track. See the
 				 * comment in rotatelog. We need to allow for
-				 * the case where the logname is not the same
-				 * as the log file name.
+				 * the case where the logname is not the same as
+				 * the log file name.
 				 */
 				fillconflist(lineno, entry, opts, comment, 0);
 			}

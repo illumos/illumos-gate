@@ -20,11 +20,9 @@
 
 #include "libnvpair.h"
 
-#define	FPRINTF(fp, ...)				\
-	do {						\
-		if (fprintf(fp, __VA_ARGS__) < 0)	\
-			return (-1);			\
-	} while (0)
+#define	FPRINTF(fp, ...)			\
+	if (fprintf(fp, __VA_ARGS__) < 0)	\
+		return (-1)			\
 
 /*
  * When formatting a string for JSON output we must escape certain characters,
@@ -83,13 +81,13 @@ nvlist_print_json_string(FILE *fp, const char *input)
 				 * characters in the Basic Multilingual Plane
 				 * as JSON-escaped multibyte characters.
 				 */
-				FPRINTF(fp, "\\u%04x", 0xffff & c);
+				FPRINTF(fp, "\\u%04x", (int)(0xffff & c));
 			} else if (c >= 0x20 && c <= 0x7f) {
 				/*
 				 * Render other 7-bit ASCII characters directly
 				 * and drop other, unrepresentable characters.
 				 */
-				FPRINTF(fp, "%c", 0xff & c);
+				FPRINTF(fp, "%c", (int)(0xff & c));
 			}
 			break;
 		}
@@ -189,19 +187,21 @@ nvlist_print_json(FILE *fp, nvlist_t *nvl)
 		}
 
 		case DATA_TYPE_INT64: {
-			FPRINTF(fp, "%lld", fnvpair_value_int64(curr));
+			FPRINTF(fp, "%lld",
+			    (long long)fnvpair_value_int64(curr));
 			break;
 		}
 
 		case DATA_TYPE_UINT64: {
-			FPRINTF(fp, "%llu", fnvpair_value_uint64(curr));
+			FPRINTF(fp, "%llu",
+			    (unsigned long long)fnvpair_value_uint64(curr));
 			break;
 		}
 
 		case DATA_TYPE_HRTIME: {
 			hrtime_t val;
 			VERIFY0(nvpair_value_hrtime(curr, &val));
-			FPRINTF(fp, "%llu", val);
+			FPRINTF(fp, "%llu", (unsigned long long)val);
 			break;
 		}
 
@@ -370,7 +370,8 @@ nvlist_print_json(FILE *fp, nvlist_t *nvl)
 			for (i = 0; i < valsz; i++) {
 				if (i > 0)
 					FPRINTF(fp, ",");
-				FPRINTF(fp, "%llu", val[i]);
+				FPRINTF(fp, "%llu",
+				    (unsigned long long)val[i]);
 			}
 			FPRINTF(fp, "]");
 			break;
@@ -384,7 +385,7 @@ nvlist_print_json(FILE *fp, nvlist_t *nvl)
 			for (i = 0; i < valsz; i++) {
 				if (i > 0)
 					FPRINTF(fp, ",");
-				FPRINTF(fp, "%lld", val[i]);
+				FPRINTF(fp, "%lld", (long long)val[i]);
 			}
 			FPRINTF(fp, "]");
 			break;

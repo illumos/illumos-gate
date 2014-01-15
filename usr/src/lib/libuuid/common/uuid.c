@@ -368,18 +368,18 @@ fill_random_bytes(uchar_t *buf, int nbytes)
 	int i;
 
 	if (fd_urand == -1) {
-		mutex_lock(&urandmtx);
+		(void) mutex_lock(&urandmtx);
 		/* check again now that we have the mutex */
 		if (fd_urand == -1) {
 			if ((fd_urand = open(URANDOM_PATH, O_RDONLY)) >= 0)
 				load_cache();
 		}
-		mutex_unlock(&urandmtx);
+		(void) mutex_unlock(&urandmtx);
 	}
 	if (fd_urand >= 0 && rcachep != NULL) {
 		int cnt;
 
-		mutex_lock(&urandmtx);
+		(void) mutex_lock(&urandmtx);
 		if (rcachep != NULL &&
 		    (rcachep + nbytes) >= (rcache + RCACHE_SIZE))
 			load_cache();
@@ -387,10 +387,10 @@ fill_random_bytes(uchar_t *buf, int nbytes)
 		if (rcachep != NULL) {
 			for (cnt = 0; cnt < nbytes; cnt++)
 				*buf++ = *rcachep++;
-			mutex_unlock(&urandmtx);
+			(void) mutex_unlock(&urandmtx);
 			return;
 		}
-		mutex_unlock(&urandmtx);
+		(void) mutex_unlock(&urandmtx);
 	}
 	for (i = 0; i < nbytes; i++) {
 		*buf++ = get_random() & 0xFF;
@@ -540,13 +540,13 @@ uuid_generate(uuid_t uu)
 		return;
 	}
 	if (fd_urand == -1) {
-		mutex_lock(&urandmtx);
+		(void) mutex_lock(&urandmtx);
 		/* check again now that we have the mutex */
 		if (fd_urand == -1) {
 			if ((fd_urand = open(URANDOM_PATH, O_RDONLY)) >= 0)
 				load_cache();
 		}
-		mutex_unlock(&urandmtx);
+		(void) mutex_unlock(&urandmtx);
 	}
 	if (fd_urand >= 0) {
 		uuid_generate_random(uu);
