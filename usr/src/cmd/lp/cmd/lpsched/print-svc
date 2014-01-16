@@ -1,0 +1,167 @@
+#!/sbin/sh
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#
+
+. /lib/svc/share/smf_include.sh
+. /lib/svc/share/ipf_include.sh
+
+# SERVICE = parent service name
+SERVICE=`echo $SMF_FMRI | /usr/bin/cut -f1,2 -d":"`
+
+case "$1" in
+'start')
+
+isopts=`/usr/sbin/svccfg <<-EOF
+	select $SMF_FMRI
+	listpg cmd_opts
+
+	EOF`
+
+if [ "$isopts" ] ; then
+
+#called by /usr/lib/lpsched; use cmd_opts properties only
+
+	num_notifiers=`/bin/svcprop -p cmd_opts/num_notifiers $SMF_FMRI`
+
+	if [ "$num_notifiers" != "" ] ; then
+		OPTS="$OPTS -n $num_notifiers" 
+	fi
+
+	num_filters=`/bin/svcprop -p cmd_opts/num_filters $SMF_FMRI`
+
+	if [ "$num_filters" != "" ]  ; then
+		OPTS="$OPTS -f $num_filters"
+	fi
+
+	fd_limit=`/bin/svcprop -p cmd_opts/fd_limit $SMF_FMRI`
+
+	if [ "$fd_limit" != "" ]  ; then
+		OPTS="$OPTS -p $fd_limit"
+	fi
+
+	reserved_fds=`/bin/svcprop -p cmd_opts/reserved_fds $SMF_FMRI`
+
+	if [ "$reserved_fds" != "" ] ; then
+		OPTS="$OPTS -r $reserved_fds"
+	fi
+
+# clear out cmd_opts property group
+
+	svccfg <<-EOF
+	select $SMF_FMRI
+	delpg cmd_opts
+
+	EOF
+
+else
+
+# We are here through enable; use lpsched properties
+# Check for saved properties
+
+	num_notifiers=`/bin/svcprop -p lpsched/num_notifiers $SERVICE`
+	if [ "$num_notifiers" != "" ] && [ "$num_notifiers" != "0" ] ; then
+		OPTS="$OPTS -n $num_notifiers"
+	fi
+
+	num_filters=`/bin/svcprop -p lpsched/num_filters $SERVICE`
+	if [ "$num_filters" != "" ] && [ "$num_filters" != "0" ] ; then
+		OPTS="$OPTS -f $num_filters"
+	fi
+
+	fd_limit=`/bin/svcprop -p lpsched/fd_limit $SERVICE`
+	if [ "$fd_limit" != "" ]  && [ "$fd_limit" != "0" ]; then
+		OPTS="$OPTS -p $fd_limit"
+	fi
+
+	reserved_fds=`/bin/svcprop -p lpsched/reserved_fds $SERVICE`
+	if [ "$reserved_fds" != "" ] && [ "$reserved_fds" != "0" ] ; then
+		OPTS="$OPTS -r $reserved_fds"
+	fi
+fi
+
+# set temporary or permanent properties from OPTS
+
+	[ -f /usr/lib/lp/local/lpsched ] || exit $SMF_EXIT_ERR_CONFIG
+
+	/usr/lib/lp/local/lpsched ${OPTS}
+
+	;;
+
+'stop')
+	[ -f /usr/lib/lp/local/lpshut ] || exit $SMF_EXIT_ERR_CONFIG
+
+	/usr/lib/lp/local/lpshut
+	;;
+
+'ipfilter')
+	FMRI=$2
+	IPP_FMRI="svc:/application/print/ipp-listener:default"
+	RFC1179_FMRI="svc:/application/print/rfc1179:default"
+	IPP_CONF=/etc/apache/httpd-standalone-ipp.conf
+	ip="any"
+
+	policy=`get_policy $FMRI`
+
+	file=`fmri_to_file $RFC1179_FMRI $IPF_SUFFIX`
+	echo "# $RFC1179_FMRI" >$file
+        service_is_enabled ${RFC1179_FMRI}
+        if [ $? -eq 0 ]; then
+		rfc_name=`svcprop -p inetd/name ${RFC1179_FMRI} 2>/dev/null`
+		rfc_proto=`svcprop -p inetd/proto ${RFC1179_FMRI} 2>/dev/null | \
+		    sed 's/6/ /'`
+		rfc_port=`$SERVINFO -p -t -s $rfc_name`
+		generate_rules $FMRI $policy $rfc_proto $ip $rfc_port $file
+        fi
+
+	file=`fmri_to_file $IPP_FMRI $IPF_SUFFIX`
+	echo "# $IPP_FMRI" >$file
+        service_is_enabled ${IPP_FMRI}
+        if [ $? -eq 0 ]; then
+		#
+		# If Listen directives are used, it's possibie to listen on 
+		# more than one ports. Process the Port directives only when Listen
+		# directives don't exist.
+		#
+		ipp_ports=`grep '^[ \t]*[^# ]*Listen' ${IPP_CONF} | awk '{print $2}'`
+
+		if [ -z "$ipp_ports" ]; then
+			ipp_ports=`grep '^[ \t]*[^# ]*Port' ${IPP_CONF} | \
+			    awk '{print $2}' | tail -1`
+		fi
+
+		for port in $ipp_ports; do
+			generate_rules $FMRI $policy "tcp" $ip $port $file
+		done
+	fi
+
+	;;
+
+*)
+	echo "Usage: $0 { start | stop }"
+	exit 1
+	;;
+esac
+exit $SMF_EXIT_OK

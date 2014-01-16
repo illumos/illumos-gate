@@ -26,3 +26,4 @@
 set name=pkg.fmri value=pkg:/SUNWps@0.5.11,5.11-0.133
 set name=pkg.renamed value=true
 set name=variant.arch value=$(ARCH)
+depend fmri=pkg:/print/lp@0.5.11,5.11-0.133 type=require

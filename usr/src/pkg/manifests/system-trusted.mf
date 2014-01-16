@@ -51,6 +51,10 @@ dir path=usr/lib/help/auths/locale/C
 dir path=usr/lib/help/profiles
 dir path=usr/lib/help/profiles/locale
 dir path=usr/lib/help/profiles/locale/C
+dir path=usr/lib/lp group=lp
+dir path=usr/lib/lp/bin group=lp
+dir path=usr/lib/lp/model group=lp
+dir path=usr/lib/lp/postscript group=lp
 dir path=usr/lib/zones
 dir path=usr/sbin
 dir path=usr/share/man
@@ -98,6 +102,16 @@ file path=usr/lib/help/profiles/locale/C/RtInfoSec.html
 file path=usr/lib/help/profiles/locale/C/RtObjectLabelMngmnt.html
 file path=usr/lib/help/profiles/locale/C/RtOutsideAccred.html
 file path=usr/lib/labeld mode=0555
+file path=usr/lib/lp/bin/lp.tsol_separator group=lp mode=0555
+file path=usr/lib/lp/model/tsol_netstandard group=lp mode=0555
+file path=usr/lib/lp/model/tsol_netstandard_foomatic group=lp mode=0555
+file path=usr/lib/lp/model/tsol_standard group=lp mode=0555
+file path=usr/lib/lp/model/tsol_standard_foomatic group=lp mode=0555
+file path=usr/lib/lp/postscript/tsol_banner.ps group=lp mode=0555
+file path=usr/lib/lp/postscript/tsol_separator.ps group=lp mode=0555 \
+    original_name=SUNWts:usr/lib/lp/postscript/tsol_separator.ps \
+    preserve=renamenew
+file path=usr/lib/lp/postscript/tsol_trailer.ps group=lp mode=0555
 file path=usr/lib/lslabels group=sys mode=0555
 file path=usr/lib/zones/zoneshare group=sys mode=0555
 file path=usr/lib/zones/zoneunshare group=sys mode=0555
