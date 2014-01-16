@@ -32,8 +32,6 @@ include ../../Makefile.cmd
 CFLAGS += $(CCVERBOSE)
 CFLAGS64 += $(CCVERBOSE)
 
-CPPFLAGS += -DEMBED_CONFIGS -I$(ADJUNCT_PROTO)/usr/include/glib-2.0 \
-	-I$(ADJUNCT_PROTO)/usr/lib/glib-2.0/include
 CERRWARN += -_gcc=-Wno-uninitialized
 
 CPPFLAGS += -DEMBED_CONFIGS -I$(ADJUNCT_PROTO)/usr/include/glib-2.0 \

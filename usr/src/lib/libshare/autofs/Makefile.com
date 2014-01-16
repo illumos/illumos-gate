@@ -46,8 +46,6 @@ LDLIBS +=	-lshare -lscf -lumem -lc -lxml2
 
 #add nfs/lib directory as part of the include path
 CFLAGS +=	$(CCVERBOSE)
-CPPFLAGS +=	-D_REENTRANT -I$(AUTOFSSMFLIB_DIR) \
-			-I$(ADJUNCT_PROTO)/usr/include/libxml2
 CERRWARN +=	-_gcc=-Wno-switch
 CERRWARN +=	-_gcc=-Wno-unused-variable
 CERRWARN +=	-_gcc=-Wno-uninitialized
