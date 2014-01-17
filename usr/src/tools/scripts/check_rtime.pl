@@ -54,7 +54,7 @@
 
 
 # Define all global variables (required for strict)
-use vars  qw($Prog $Env $Ena64 $Tmpdir $Gnuc);
+use vars  qw($Prog $Env $Ena64 $Tmpdir);
 use vars  qw($LddNoU $Conf32 $Conf64);
 use vars  qw(%opt);
 use vars  qw($ErrFH $ErrTtl $InfoFH $InfoTtl $OutCnt1 $OutCnt2);
@@ -433,11 +433,6 @@ sub ProcFile {
 		}
 		# Look for any unused search paths.
 		if ($Line =~ /unused search path=/) {
-			# Note, skip this comparison for __GNUC builds, as the
-			# gnu compilers insert numerous unused search paths.
-			if ($Gnuc == 1) {
-				next;
-			}
 			next if defined($EXRE_unused_rpath) &&
 			    ($Line =~ $EXRE_unused_rpath);
 
@@ -1080,10 +1075,6 @@ if ((getopts('D:d:E:e:f:I:imosvw:', \%opt) == 0) ||
 die "$Prog: -D and -d options are mutually exclusive\n" if ($opt{D} && $opt{d});
 
 $Tmpdir = "/tmp" if (!($Tmpdir = $ENV{TMPDIR}) || (! -d $Tmpdir));
-
-# Determine whether this is a __GNUC build.  If so, unused search path
-# processing is disabled.
-$Gnuc = defined $ENV{__GNUC} ? 1 : 0;
 
 # If -w, change working directory to given location
 !$opt{w} || chdir($opt{w}) || die "$Prog: can't cd to $opt{w}";
