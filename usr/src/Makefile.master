@@ -80,7 +80,7 @@ INTEL_BLD=      $(INTEL_BLD_1:i386=)
 # __GNUC and __SUNC control (and indicate) the primary compiler.  Whichever
 # one is not POUND_SIGN is the primary, with the other as the shadow.  They
 # may also be used to control entirely compiler-specific Makefile assignments.
-# __SUNC and Sun Studio are the default.
+# __GNUC and GCC are the default.
 #
 # __GNUC64 indicates that the 64bit build should use the GNU C compiler.
 # There is no Sun C analogue.
@@ -90,8 +90,8 @@ INTEL_BLD=      $(INTEL_BLD_1:i386=)
 # used.  They also allow compiler-version specific Makefile fragments.
 #
 
-__GNUC=			$(POUND_SIGN)
-$(__GNUC)__SUNC=	$(POUND_SIGN)
+__SUNC=			$(POUND_SIGN)
+$(__SUNC)__GNUC=	$(POUND_SIGN)
 __GNUC64=		$(__GNUC)
 
 # CLOSED is the root of the tree that contains source which isn't released
