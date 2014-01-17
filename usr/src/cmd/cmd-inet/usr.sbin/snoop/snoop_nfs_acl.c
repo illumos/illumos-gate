@@ -22,6 +22,9 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ */
 
 #include <sys/types.h>
 #include <sys/errno.h>
@@ -211,7 +214,7 @@ interpret_nfs_acl2(int flags, int type, int xid, int vers, int proc,
 			case ACLPROC2_GETACL:
 				fh = sum_nfsfh();
 				mask = getxdr_u_long();
-				(void) sprintf(line, "%s mask=%lu", fh, mask);
+				(void) sprintf(line, "%s mask=0x%lx", fh, mask);
 				break;
 			case ACLPROC2_SETACL:
 				(void) sprintf(line, sum_nfsfh());
@@ -305,7 +308,7 @@ interpret_nfs_acl3(int flags, int type, int xid, int vers, int proc,
 			case ACLPROC3_GETACL:
 				fh = sum_nfsfh3();
 				mask = getxdr_u_long();
-				(void) sprintf(line, "%s mask=%lu", fh, mask);
+				(void) sprintf(line, "%s mask=0x%lx", fh, mask);
 				break;
 			case ACLPROC3_SETACL:
 				(void) sprintf(line, sum_nfsfh3());
@@ -380,7 +383,7 @@ interpret_nfs_acl4(int flags, int type, int xid, int vers, int proc,
 			case ACLPROC4_GETACL:
 				fh = sum_nfsfh3();
 				mask = getxdr_u_long();
-				(void) sprintf(line, "%s mask=%lu", fh, mask);
+				(void) sprintf(line, "%s mask=0x%lx", fh, mask);
 				break;
 			case ACLPROC4_SETACL:
 				(void) sprintf(line, sum_nfsfh3());

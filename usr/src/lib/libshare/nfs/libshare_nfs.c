@@ -3009,9 +3009,7 @@ nfs_set_proto_prop(sa_property_t prop)
 static char *
 nfs_get_status()
 {
-	char *state;
-	state = smf_get_state(NFSD);
-	return (state != NULL ? state : strdup("-"));
+	return (smf_get_state(NFSD));
 }
 
 /*

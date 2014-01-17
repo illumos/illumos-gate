@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  */
 
 #ifndef	_FMDUMP_H
@@ -53,6 +54,7 @@ enum {
 	FMDUMP_VERB2,
 	FMDUMP_PRETTY,
 	FMDUMP_MSG,
+	FMDUMP_JSON,
 	FMDUMP_NFMTS
 };
 
@@ -100,6 +102,8 @@ extern char *fmdump_nvl2str(nvlist_t *nvl);
 
 extern int fmdump_render_nvlist(nvlist_prtctl_t, void *, nvlist_t *,
     const char *, nvlist_t *);
+
+extern int fmdump_print_json(fmd_log_t *, const fmd_log_record_t *, FILE *);
 
 #ifdef	__cplusplus
 }

@@ -594,7 +594,5 @@ autofs_features(void)
 static char *
 autofs_get_status(void)
 {
-	char *state = NULL;
-	state = smf_get_state(AUTOFS_DEFAULT_FMRI);
-	return (state != NULL ? state : "-");
+	return (smf_get_state(AUTOFS_DEFAULT_FMRI));
 }

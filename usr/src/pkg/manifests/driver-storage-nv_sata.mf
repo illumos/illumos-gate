@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 #
 
 #
@@ -31,8 +32,9 @@
 <include global_zone_only_component>
 set name=pkg.fmri value=pkg:/driver/storage/nv_sata@$(PKGVERS)
 set name=pkg.description \
-    value="Nvidia ck804 pro / mcp55 pro combo SATA driver"
-set name=pkg.summary value="Nvidia ck804 pro / mcp55 pro combo SATA driver"
+    value="NVIDIA CK804/MCP04/MCP51/MCP55/MCP61 SATA controller driver"
+set name=pkg.summary \
+    value="NVIDIA CK804/MCP04/MCP51/MCP55/MCP61 SATA controller driver"
 set name=info.classification value=org.opensolaris.category.2008:Drivers/Ports
 set name=variant.arch value=i386
 dir path=kernel group=sys
@@ -43,7 +45,12 @@ dir path=usr/share/man/man7d
 driver name=nv_sata class=scsi-self-identifying perms="* 0644 root sys" \
     alias=pci10de,266 \
     alias=pci10de,267 \
+    alias=pci10de,36 \
+    alias=pci10de,37e \
     alias=pci10de,37f \
+    alias=pci10de,3e \
+    alias=pci10de,3f6 \
+    alias=pci10de,3f7 \
     alias=pci10de,54 \
     alias=pci10de,55
 file path=kernel/drv/$(ARCH64)/nv_sata group=sys

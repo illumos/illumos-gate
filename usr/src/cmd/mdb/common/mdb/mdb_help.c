@@ -22,6 +22,7 @@
 /*
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
  */
 
 #include <mdb/mdb_modapi.h>
@@ -251,6 +252,23 @@ cmd_help(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	return (DCMD_OK);
 }
+
+int
+cmd_help_tab(mdb_tab_cookie_t *mcp, uint_t flags, int argc,
+    const mdb_arg_t *argv)
+{
+	if (argc == 0 && !(flags & DCMD_TAB_SPACE))
+		return (0);
+
+	if (argc > 1)
+		return (0);
+
+	if (argc == 0)
+		return (mdb_tab_complete_dcmd(mcp, NULL));
+	else
+		return (mdb_tab_complete_dcmd(mcp, argv[0].a_un.a_str));
+}
+
 
 static int
 print_dcmd_def(mdb_var_t *v, void *private)

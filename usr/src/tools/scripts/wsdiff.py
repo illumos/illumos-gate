@@ -1344,7 +1344,7 @@ def main() :
 			error("failed to open log file: " + log)
 			sys.exit(1)
 
-		dateTimeStr= "# %d/%d/%d at %d:%d:%d" % time.localtime()[:6]
+		dateTimeStr= "# %04d-%02d-%02d at %02d:%02d:%02d" % time.localtime()[:6]
 		v_info("# This file was produced by wsdiff")
 		v_info(dateTimeStr)
 

@@ -23,8 +23,9 @@
  * Copyright (c) 1991, 1999 by Sun Microsystems, Inc.
  * All rights reserved.
  */
-
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SunOS	*/
+/*
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ */
 
 #include <sys/types.h>
 #include <sys/errno.h>
@@ -114,8 +115,7 @@ interpret_pmap_2(flags, type, xid, vers, proc, data, len)
 			iprog = getxdr_u_long();
 			ivers = getxdr_u_long();
 			iproc = getxdr_u_long();
-			stash_callit(xid, pi_frame,
-				iprog, ivers, iproc);
+			stash_callit(xid, pi_frame, iprog, ivers, iproc);
 		} else {
 			x = find_callit(xid);
 		}
@@ -129,9 +129,8 @@ interpret_pmap_2(flags, type, xid, vers, proc, data, len)
 		line = get_sum_line();
 
 		if (type == CALL) {
-			(void) sprintf(line,
-				"PORTMAP C %s",
-				procnames_short_2[proc]);
+			(void) sprintf(line, "PORTMAP C %s",
+			    procnames_short_2[proc]);
 			line += strlen(line);
 			switch (proc) {
 			case PMAPPROC_GETPORT:
@@ -139,22 +138,24 @@ interpret_pmap_2(flags, type, xid, vers, proc, data, len)
 				ivers = getxdr_u_long();
 				proto = getxdr_u_long();
 				(void) sprintf(line,
-					" prog=%d (%s) vers=%d proto=%s",
-					iprog, nameof_prog(iprog),
-					ivers,
-					getproto(proto));
+				    " prog=%d (%s) vers=%d proto=%s",
+				    iprog, nameof_prog(iprog),
+				    ivers,
+				    getproto(proto));
 				break;
 			case PMAPPROC_CALLIT:
-				(void) getxdr_u_long(); /* length */
 				(void) sprintf(line,
-					" prog=%s vers=%d proc=%d",
-					nameof_prog(iprog),
-					ivers, iproc);
-				data += 16; /* prog+ver+proc+len */
-				len -= 16;
-				protoprint(flags, type, xid,
-					iprog, ivers, iproc,
-					data, len);
+				    " prog=%s vers=%d proc=%d",
+				    nameof_prog(iprog),
+				    ivers, iproc);
+				if (flags & F_ALLSUM) {
+					(void) getxdr_u_long(); /* length */
+					data += 16; /* prog+ver+proc+len */
+					len -= 16;
+					protoprint(flags, type, xid,
+					    iprog, ivers, iproc,
+					    data, len);
+				}
 				break;
 			default:
 				break;
@@ -162,29 +163,29 @@ interpret_pmap_2(flags, type, xid, vers, proc, data, len)
 			check_retransmit(line, xid);
 		} else {
 			(void) sprintf(line, "PORTMAP R %s ",
-				procnames_short_2[proc]);
+			    procnames_short_2[proc]);
 			line += strlen(line);
 			switch (proc) {
 			case PMAPPROC_GETPORT:
 				port = getxdr_u_long();
-				(void) sprintf(line, "port=%d",
-					port);
+				(void) sprintf(line, "port=%d", port);
 				break;
 			case PMAPPROC_DUMP:
-				(void) sprintf(line, "%s",
-					sum_pmaplist());
+				(void) sprintf(line, "%s", sum_pmaplist());
 				break;
 			case PMAPPROC_CALLIT:
 				port = getxdr_u_long();
 				ilen = getxdr_u_long();
 				(void) sprintf(line, "port=%d len=%d",
-					port, ilen);
-				if (x != NULL) {
+				    port, ilen);
+				if (flags & F_ALLSUM && x != NULL) {
+					data += 8; /* port+len */
+					len -= 8;
 					protoprint(flags, type, xid,
-						x->xid_prog,
-						x->xid_vers,
-						x->xid_proc,
-						data, len);
+					    x->xid_prog,
+					    x->xid_vers,
+					    x->xid_proc,
+					    data, len);
 				}
 				break;
 			default:
@@ -211,33 +212,32 @@ interpret_pmap_2(flags, type, xid, vers, proc, data, len)
 			case PMAPPROC_GETPORT:
 				iprog = getxdr_u_long();
 				(void) sprintf(get_line(0, 0),
-					"Program = %d (%s)",
-					iprog, nameof_prog(iprog));
+				    "Program = %d (%s)",
+				    iprog, nameof_prog(iprog));
 				(void) showxdr_u_long("Version = %d");
 				proto = getxdr_u_long();
 				(void) sprintf(get_line(0, 0),
-					"Protocol = %d (%s)",
-					proto, getproto(proto));
+				    "Protocol = %d (%s)",
+				    proto, getproto(proto));
 				break;
 			case PMAPPROC_DUMP:
 				break;
 			case PMAPPROC_CALLIT:
 				(void) sprintf(get_line(0, 0),
-					"Program = %d (%s)",
-					iprog, nameof_prog(iprog));
+				    "Program = %d (%s)",
+				    iprog, nameof_prog(iprog));
 				(void) sprintf(get_line(0, 0),
-					"Version = %d", ivers);
+				    "Version = %d", ivers);
 				(void) sprintf(get_line(0, 0),
-					"Proc    = %d", iproc);
-				(void) showxdr_u_long(
-					"Callit data = %d bytes");
+				    "Proc    = %d", iproc);
+				(void) showxdr_u_long("Callit data = %d bytes");
 				show_trailer();
 				trailer_done = 1;
 				data += 16; /* prog+ver+proc+len */
 				len -= 16;
 				protoprint(flags, type, xid,
-					iprog, ivers, iproc,
-					data, len);
+				    iprog, ivers, iproc,
+				    data, len);
 				break;
 			}
 		} else {
@@ -259,10 +259,10 @@ interpret_pmap_2(flags, type, xid, vers, proc, data, len)
 				trailer_done = 1;
 				if (x != NULL) {
 					protoprint(flags, type, xid,
-						x->xid_prog,
-						x->xid_vers,
-						x->xid_proc,
-						data, len);
+					    x->xid_prog,
+					    x->xid_vers,
+					    x->xid_proc,
+					    data, len);
 				}
 				break;
 			}
@@ -303,13 +303,12 @@ show_pmaplist()
 
 	if (setjmp(xdr_err)) {
 		(void) sprintf(get_line(0, 0),
-			" %d+ maps. (Frame is incomplete)",
-			maps);
+		    " %d+ maps. (Frame is incomplete)",
+		    maps);
 		return;
 	}
 
-	(void) sprintf(get_line(0, 0),
-		" Program Version Protocol   Port");
+	(void) sprintf(get_line(0, 0), " Program Version Protocol   Port");
 
 	while (getxdr_u_long()) {
 		prog  = getxdr_u_long();
@@ -317,8 +316,8 @@ show_pmaplist()
 		proto = getxdr_u_long();
 		port  = getxdr_u_long();
 		(void) sprintf(get_line(0, 0),
-			"%8d%8d%9d%7d  %s",
-			prog, vers, proto, port, nameof_prog(prog));
+		    "%8d%8d%9d%7d  %s",
+		    prog, vers, proto, port, nameof_prog(prog));
 		maps++;
 	}
 
@@ -377,6 +376,7 @@ static char *procnames_long_4[] = {
 	"Get statistics",			/* 12 */
 };
 
+#define	MAXPROC_3		8
 #define	MAXPROC_4		12
 #define	RPCBPROC_NULL		0
 
@@ -394,10 +394,10 @@ interpret_pmap_4(flags, type, xid, vers, proc, data, len)
 	struct cache_struct *x, *find_callit();
 	int trailer_done = 0;
 
-	if (proc < 0 || proc > MAXPROC_4)
+	if (proc < 0 || proc > MAXPROC_4 || (vers == 3 && proc > MAXPROC_3))
 		return;
 
-	if (proc == RPCBPROC_BCAST) {
+	if (proc == RPCBPROC_BCAST || proc == RPCBPROC_INDIRECT) {
 		if (type == CALL) {
 			iprog = getxdr_u_long();
 			ivers = getxdr_u_long();
@@ -436,16 +436,18 @@ interpret_pmap_4(flags, type, xid, vers, proc, data, len)
 				break;
 			case RPCBPROC_BCAST:
 			case RPCBPROC_INDIRECT:
-				(void) getxdr_u_long(); /* length */
 				(void) sprintf(line,
 					" prog=%s vers=%d proc=%d",
 					nameof_prog(iprog),
 					ivers, iproc);
-				data += 16; /* prog+ver+proc+len */
-				len -= 16;
-				protoprint(flags, type, xid,
-					iprog, ivers, iproc,
-					data, len);
+				if (flags & F_ALLSUM) {
+					(void) getxdr_u_long(); /* length */
+					data += 16; /* prog+ver+proc+len */
+					len -= 16;
+					protoprint(flags, type, xid,
+						iprog, ivers, iproc,
+						data, len);
+				}
 				break;
 			default:
 				break;
@@ -453,6 +455,8 @@ interpret_pmap_4(flags, type, xid, vers, proc, data, len)
 
 			check_retransmit(line, xid);
 		} else {
+			int pos;
+
 			(void) sprintf(line, "RPCBIND R %s ",
 				procnames_short_4[proc]);
 			line += strlen(line);
@@ -467,13 +471,15 @@ interpret_pmap_4(flags, type, xid, vers, proc, data, len)
 				break;
 			case RPCBPROC_BCAST:
 			case RPCBPROC_INDIRECT:
+				pos = getxdr_pos();
 				(void) getxdr_string(buff1, MAXSTRINGLEN);
 				ilen = getxdr_u_long();
 				(void) sprintf(line, "Uaddr=%s len=%d",
 					buff1, ilen);
-				data += 16; /* prog+ver+proc+len */
-				len -= 16;
-				if (x != NULL) {
+				if (flags & F_ALLSUM && x != NULL) {
+					pos = getxdr_pos() - pos;
+					data += pos; /* uaddr+len */
+					len -= pos;
 					protoprint(flags, type, xid,
 						x->xid_prog,
 						x->xid_vers,
@@ -486,8 +492,12 @@ interpret_pmap_4(flags, type, xid, vers, proc, data, len)
 					sum_rpcblist());
 				break;
 			case RPCBPROC_GETTIME:
-				(void) sprintf(line, "%s",
-					getxdr_date());
+				{
+					time_t sec = getxdr_long();
+					struct tm *tmp = gmtime(&sec);
+					(void) strftime(line, MAXLINE,
+					    "%d-%h-%y %T GMT", tmp);
+				}
 				break;
 			case RPCBPROC_GETADDRLIST:
 				(void) sprintf(line, "%s",
@@ -577,7 +587,14 @@ interpret_pmap_4(flags, type, xid, vers, proc, data, len)
 				}
 				break;
 			case RPCBPROC_GETTIME:
-				(void) showxdr_date("Time = %s");
+				{
+					int pos = getxdr_pos();
+					time_t sec = getxdr_long();
+					struct tm *tmp = gmtime(&sec);
+					(void) strftime(get_line(pos,
+					    getxdr_pos()), MAXLINE,
+					    "Time = %d-%h-%y %T GMT", tmp);
+				}
 				break;
 			case RPCBPROC_UADDR2TADDR:
 				break;
@@ -625,14 +642,14 @@ show_rpcblist()
 
 	if (setjmp(xdr_err)) {
 		(void) sprintf(get_line(0, 0),
-			" %d+ maps. (Frame is incomplete)",
-			maps);
+		    " %d+ maps. (Frame is incomplete)",
+		    maps);
 		return;
 	}
 
 	show_space();
 	(void) sprintf(get_line(0, 0),
-		" Program Vers Netid        Uaddr              Owner");
+	    " Program Vers Netid        Uaddr              Owner");
 
 	while (getxdr_u_long()) {
 		prog  = getxdr_u_long();
@@ -641,10 +658,10 @@ show_rpcblist()
 		(void) getxdr_string(uaddr, MAXSTRINGLEN);
 		(void) getxdr_string(owner, MAXSTRINGLEN);
 		(void) sprintf(get_line(0, 0),
-			"%8d%5d %-12s %-18s %-10s (%s)",
-			prog, vers,
-			netid, uaddr, owner,
-			nameof_prog(prog));
+		    "%8d%5d %-12s %-18s %-10s (%s)",
+		    prog, vers,
+		    netid, uaddr, owner,
+		    nameof_prog(prog));
 		maps++;
 	}
 
@@ -687,14 +704,14 @@ show_rpcb_entry_list()
 
 	if (setjmp(xdr_err)) {
 		(void) sprintf(get_line(0, 0),
-			" %d+ maps. (Frame is incomplete)",
-			maps);
+		    " %d+ maps. (Frame is incomplete)",
+		    maps);
 		return;
 	}
 
 	show_space();
 	(void) sprintf(get_line(0, 0),
-		" Maddr      Netid        Semantics Protofmly Proto");
+	    " Maddr      Netid        Semantics Protofmly Proto");
 
 	while (getxdr_u_long()) {
 		(void) getxdr_string(maddr, MAXSTRINGLEN);
@@ -703,10 +720,10 @@ show_rpcb_entry_list()
 		(void) getxdr_string(protofmly, MAXSTRINGLEN);
 		(void) getxdr_string(proto, MAXSTRINGLEN);
 		(void) sprintf(get_line(0, 0),
-			"%-12s %-12s %-8s %-8s %-8s",
-			maddr, netid,
-			semantics_strs[sem],
-			protofmly, proto);
+		    "%-12s %-12s %-8s %-8s %-8s",
+		    maddr, netid,
+		    semantics_strs[sem],
+		    protofmly, proto);
 		maps++;
 	}
 

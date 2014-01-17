@@ -343,7 +343,8 @@ tab_complete_dcmd(mdb_var_t *v, void *arg)
 int
 mdb_tab_complete_dcmd(mdb_tab_cookie_t *mcp, const char *dcmd)
 {
-	mdb_tab_setmbase(mcp, dcmd);
+	if (dcmd != NULL)
+		mdb_tab_setmbase(mcp, dcmd);
 	mdb_nv_sort_iter(&mdb.m_dcmds, tab_complete_dcmd, mcp,
 	    UM_GC | UM_SLEEP);
 	return (0);

@@ -347,7 +347,7 @@ _elf_upd_usr(Elf * elf)
 	Ehdr *		eh = elf->ed_ehdr;
 	unsigned	ver = eh->e_version;
 	register char	*p = (char *)eh->e_ident;
-
+	size_t		scncnt;
 
 	/*
 	 * Ehdr and Phdr table go first
@@ -384,11 +384,11 @@ _elf_upd_usr(Elf * elf)
 	 * Allow null buffers for NOBITS.
 	 */
 
-	if ((s = elf->ed_hdscn) == 0)
+	if ((s = elf->ed_hdscn) == 0) {
 		eh->e_shnum = 0;
-	else {
-		eh->e_shnum = 1;
-		*(Shdr*)s->s_shdr = _elf_snode_init.sb_shdr;
+		scncnt = 0;
+	} else {
+		scncnt = 1;
 		s = s->s_next;
 	}
 	for (; s != 0; s = s->s_next) {
@@ -399,7 +399,7 @@ _elf_upd_usr(Elf * elf)
 		if ((s->s_myflags & SF_READY) == 0)
 			(void) _elfxx_cookscn(s);
 
-		++eh->e_shnum;
+		++scncnt;
 		sz = 0;
 		for (d = s->s_hdnode; d != 0; d = d->db_next) {
 			if ((fsz = elf_fsize(d->db_data.d_type, 1,
@@ -425,13 +425,22 @@ _elf_upd_usr(Elf * elf)
 	/*
 	 * Shdr table last.  Comment above for phnum/phoff applies here.
 	 */
-	if (eh->e_shnum != 0)
+	if (scncnt != 0) {
 		/* LINTED */
 		eh->e_shentsize = (Half)elf_fsize(ELF_T_SHDR, 1, ver);
-	else
+		if (scncnt < SHN_LORESERVE) {
+			eh->e_shnum = scncnt;
+		} else {
+			Shdr *sh;
+			sh = (Shdr *)elf->ed_hdscn->s_shdr;
+			sh->sh_size = scncnt;
+			eh->e_shnum = 0;
+		}
+	} else {
 		eh->e_shentsize = 0;
+	}
 
-	if ((sz = eh->e_shoff + eh->e_shentsize * eh->e_shnum) > hi)
+	if ((sz = eh->e_shoff + eh->e_shentsize * scncnt) > hi)
 		hi = sz;
 
 #ifdef TEST_SIZE

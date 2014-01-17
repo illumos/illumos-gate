@@ -2063,44 +2063,18 @@ parse_member(printarg_t *pap, const char *str, mdb_ctf_id_t id,
 	return (0);
 }
 
-int
-cmd_print_tab(mdb_tab_cookie_t *mcp, uint_t flags, int argc,
+static int
+cmd_print_tab_common(mdb_tab_cookie_t *mcp, uint_t flags, int argc,
     const mdb_arg_t *argv)
 {
 	char tn[MDB_SYM_NAMLEN];
 	char member[64];
-	int i, dummy, delim, kind;
+	int delim, kind;
 	int ret = 0;
 	mdb_ctf_id_t id, rid;
 	mdb_ctf_arinfo_t ar;
 	char *start, *end;
 	ulong_t dul;
-
-	/*
-	 * This getopts is only here to make the tab completion work better when
-	 * including options in the ::print arguments. None of the values should
-	 * be used. This should only be updated with additional arguments, if
-	 * they are added to cmd_print.
-	 */
-	i = mdb_getopts(argc, argv,
-	    'a', MDB_OPT_SETBITS, PA_SHOWADDR, &dummy,
-	    'C', MDB_OPT_SETBITS, TRUE, &dummy,
-	    'c', MDB_OPT_UINTPTR, &dummy,
-	    'd', MDB_OPT_SETBITS, PA_INTDEC, &dummy,
-	    'h', MDB_OPT_SETBITS, PA_SHOWHOLES, &dummy,
-	    'i', MDB_OPT_SETBITS, TRUE, &dummy,
-	    'L', MDB_OPT_SETBITS, TRUE, &dummy,
-	    'l', MDB_OPT_UINTPTR, &dummy,
-	    'n', MDB_OPT_SETBITS, PA_NOSYMBOLIC, &dummy,
-	    'p', MDB_OPT_SETBITS, TRUE, &dummy,
-	    's', MDB_OPT_UINTPTR, &dummy,
-	    'T', MDB_OPT_SETBITS, PA_SHOWTYPE | PA_SHOWBASETYPE, &dummy,
-	    't', MDB_OPT_SETBITS, PA_SHOWTYPE, &dummy,
-	    'x', MDB_OPT_SETBITS, PA_INTHEX, &dummy,
-	    NULL);
-
-	argc -= i;
-	argv += i;
 
 	if (argc == 0 && !(flags & DCMD_TAB_SPACE))
 		return (0);
@@ -2225,6 +2199,41 @@ cmd_print_tab(mdb_tab_cookie_t *mcp, uint_t flags, int argc,
 	 * already have in rid.
 	 */
 	return (mdb_tab_complete_member_by_id(mcp, rid, member));
+}
+
+int
+cmd_print_tab(mdb_tab_cookie_t *mcp, uint_t flags, int argc,
+    const mdb_arg_t *argv)
+{
+	int i, dummy;
+
+	/*
+	 * This getopts is only here to make the tab completion work better when
+	 * including options in the ::print arguments. None of the values should
+	 * be used. This should only be updated with additional arguments, if
+	 * they are added to cmd_print.
+	 */
+	i = mdb_getopts(argc, argv,
+	    'a', MDB_OPT_SETBITS, PA_SHOWADDR, &dummy,
+	    'C', MDB_OPT_SETBITS, TRUE, &dummy,
+	    'c', MDB_OPT_UINTPTR, &dummy,
+	    'd', MDB_OPT_SETBITS, PA_INTDEC, &dummy,
+	    'h', MDB_OPT_SETBITS, PA_SHOWHOLES, &dummy,
+	    'i', MDB_OPT_SETBITS, TRUE, &dummy,
+	    'L', MDB_OPT_SETBITS, TRUE, &dummy,
+	    'l', MDB_OPT_UINTPTR, &dummy,
+	    'n', MDB_OPT_SETBITS, PA_NOSYMBOLIC, &dummy,
+	    'p', MDB_OPT_SETBITS, TRUE, &dummy,
+	    's', MDB_OPT_UINTPTR, &dummy,
+	    'T', MDB_OPT_SETBITS, PA_SHOWTYPE | PA_SHOWBASETYPE, &dummy,
+	    't', MDB_OPT_SETBITS, PA_SHOWTYPE, &dummy,
+	    'x', MDB_OPT_SETBITS, PA_INTHEX, &dummy,
+	    NULL);
+
+	argc -= i;
+	argv += i;
+
+	return (cmd_print_tab_common(mcp, flags, argc, argv));
 }
 
 /*
@@ -2816,6 +2825,52 @@ enum {
 	PRINTF_WIDTH,			/* processing width */
 	PRINTF_QUES			/* processed '?', expecting format */
 };
+
+int
+cmd_printf_tab(mdb_tab_cookie_t *mcp, uint_t flags, int argc,
+    const mdb_arg_t *argv)
+{
+	int ii;
+	char *f;
+
+	/*
+	 * If argc doesn't have more than what should be the format string,
+	 * ignore it.
+	 */
+	if (argc <= 1)
+		return (0);
+
+	/*
+	 * Because we aren't leveraging the lex and yacc engine, we have to
+	 * manually walk the arguments to find both the first and last
+	 * open/close quote of the format string.
+	 */
+	f = strchr(argv[0].a_un.a_str, '"');
+	if (f == NULL)
+		return (0);
+
+	f = strchr(f + 1, '"');
+	if (f != NULL) {
+		ii = 0;
+	} else {
+		for (ii = 1; ii < argc; ii++) {
+			if (argv[ii].a_type != MDB_TYPE_STRING)
+				continue;
+			f = strchr(argv[ii].a_un.a_str, '"');
+			if (f != NULL)
+				break;
+		}
+		/* Never found */
+		if (ii == argc)
+			return (0);
+	}
+
+	ii++;
+	argc -= ii;
+	argv += ii;
+
+	return (cmd_print_tab_common(mcp, flags, argc, argv));
+}
 
 int
 cmd_printf(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)

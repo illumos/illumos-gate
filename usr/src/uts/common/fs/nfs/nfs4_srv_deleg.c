@@ -18,9 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/systm.h>
@@ -117,23 +119,7 @@ uaddr2sockaddr(int af, char *ua, void *ap, in_port_t *pp)
 				}
 				port += c;
 
-
-				/* reset to network order */
-				if (af == AF_INET) {
-					*(uint32_t *)ap =
-					    htonl(*(uint32_t *)ap);
-					*pp = htons(port);
-				} else {
-					int ix;
-					uint16_t *sap;
-
-					for (sap = ap, ix = 0; ix <
-					    sizeof (struct in6_addr) /
-					    sizeof (uint16_t); ix++)
-						sap[ix] = htons(sap[ix]);
-
-					*pp = htons(port);
-				}
+				*pp = htons(port);
 
 				ua[k] = '.';
 				return (0);

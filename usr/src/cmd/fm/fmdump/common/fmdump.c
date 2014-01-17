@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  */
 
 #include <alloca.h>
@@ -193,7 +194,8 @@ static const char *synopsis =
 	"\t-m  display human-readable messages (only for fault logs)\n"
 	"\t-v  set verbose mode: display additional event detail\n"
 	"\t-V  set very verbose mode: display complete event contents\n"
-	"\t-p  Used with -V: apply some output prettification\n    "
+	"\t-p  Used with -V: apply some output prettification\n"
+	"\t-j  Used with -V: emit JSON-formatted output\n    "
     "Selection filters:\n"
 	"\t-c  select events that match the specified class\n"
 	"\t-t  select events that occurred after the specified time\n"
@@ -1027,7 +1029,7 @@ pipeline_thr(void *arg)
 static int
 aggregate(char **ifiles, int n_ifiles, int opt_f,
     fmd_log_filter_t *fv, uint_t fc,
-    int opt_v, int opt_V, int opt_p)
+    int opt_v, int opt_V, int opt_p, int opt_j)
 {
 	struct fmdump_pipeline *pipeline, *pl;
 	struct fmdump_srlzer srlzer;
@@ -1074,7 +1076,8 @@ aggregate(char **ifiles, int n_ifiles, int opt_f,
 	}
 
 	if (opt_V)
-		fmt = opt_p ? FMDUMP_PRETTY : FMDUMP_VERB2;
+		fmt = opt_p ? FMDUMP_PRETTY : opt_j ? FMDUMP_JSON :
+		    FMDUMP_VERB2;
 	else if (opt_v)
 		fmt = FMDUMP_VERB1;
 	else
@@ -1152,7 +1155,7 @@ int
 main(int argc, char *argv[])
 {
 	int opt_a = 0, opt_e = 0, opt_f = 0, opt_H = 0, opt_m = 0, opt_p = 0;
-	int opt_u = 0, opt_v = 0, opt_V = 0;
+	int opt_u = 0, opt_v = 0, opt_V = 0, opt_j = 0;
 	int opt_i = 0, opt_I = 0;
 	int opt_A = 0;
 	char **ifiles = NULL;
@@ -1187,7 +1190,7 @@ main(int argc, char *argv[])
 
 	while (optind < argc) {
 		while ((c =
-		    getopt(argc, argv, "Aac:efHiImn:O:pR:t:T:u:vV")) != EOF) {
+		    getopt(argc, argv, "Aac:efHiIjmn:O:pR:t:T:u:vV")) != EOF) {
 			switch (c) {
 			case 'A':
 				opt_A++;
@@ -1221,6 +1224,11 @@ main(int argc, char *argv[])
 					return (usage(stderr));
 				opt_I++;
 				break;
+			case 'j':
+				if (opt_p)
+					return (usage(stderr));
+				opt_j++;
+				break;
 			case 'm':
 				opt_m++;
 				break;
@@ -1229,6 +1237,8 @@ main(int argc, char *argv[])
 				iflags |= FMD_LOG_XITER_OFFS;
 				break;
 			case 'p':
+				if (opt_j)
+					return (usage(stderr));
 				opt_p++;
 				break;
 			case 'R':
@@ -1309,7 +1319,7 @@ main(int argc, char *argv[])
 
 		rc = aggregate(ifiles, n_ifiles, opt_f,
 		    allfv, allfc,
-		    opt_v, opt_V, opt_p);
+		    opt_v, opt_V, opt_p, opt_j);
 
 		cleanup(ifiles, n_ifiles);
 		return (rc);
@@ -1400,7 +1410,8 @@ main(int argc, char *argv[])
 
 	if (opt_V) {
 		arg.da_fmt =
-		    &ops->do_formats[opt_p ? FMDUMP_PRETTY : FMDUMP_VERB2];
+		    &ops->do_formats[opt_p ? FMDUMP_PRETTY :
+		    opt_j ? FMDUMP_JSON : FMDUMP_VERB2];
 		iflags |= FMD_LOG_XITER_REFS;
 	} else if (opt_v) {
 		arg.da_fmt = &ops->do_formats[FMDUMP_VERB1];

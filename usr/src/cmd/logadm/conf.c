@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013, Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -173,8 +174,7 @@ nexttok(char **ptrptr)
  *	returns: 0: error, 1: ok, 3: -P option found
  */
 static int
-conf_scan(const char *fname, char *buf, int buflen, int timescan,
-    struct opts *cliopts)
+conf_scan(const char *fname, char *buf, int buflen, int timescan)
 {
 	int ret = 1;
 	int lineno = 0;
@@ -275,17 +275,21 @@ conf_scan(const char *fname, char *buf, int buflen, int timescan,
 			if (timescan) {
 				/* append to config options */
 				cp = lut_lookup(Conflut, entry);
-				if (cp == NULL) {
-					/* orphaned entry */
-					if (opts_count(cliopts, "v"))
-						err(EF_FILE, "stale timestamp "
-						    "for %s", entry);
-					LOCAL_ERR_BREAK;
+				if (cp != NULL) {
+					opts = cp->cf_opts;
 				}
-				opts = cp->cf_opts;
 			}
 			opts = opts_parse(opts, Args, OPTF_CONF);
-			if (!timescan) {
+			if (!timescan || cp == NULL) {
+				/*
+				 * If we're not doing timescan, we track this
+				 * entry.  If we are doing timescan and have
+				 * what looks like an orphaned entry (cp ==
+				 * NULL) then we also have to track. See the
+				 * comment in rotatelog. We need to allow for
+				 * the case where the logname is not the same as
+				 * the log file name.
+				 */
 				fillconflist(lineno, entry, opts, comment, 0);
 			}
 		LOCAL_ERR_END }
@@ -405,7 +409,7 @@ conf_open(const char *cfname, const char *tfname, struct opts *cliopts)
 	    PROT_READ | PROT_WRITE, MAP_PRIVATE, Conffd, 0)) == (char *)-1)
 		err(EF_SYS, "mmap on %s", Confname);
 
-	ret = conf_scan(Confname, Confbuf, Conflen, 0, cliopts);
+	ret = conf_scan(Confname, Confbuf, Conflen, 0);
 	if (ret == 3 && !Singlefile && Canchange == CHG_BOTH) {
 		/*
 		 * arrange to transfer any timestamps
@@ -419,7 +423,7 @@ conf_open(const char *cfname, const char *tfname, struct opts *cliopts)
 		    PROT_READ | PROT_WRITE, MAP_PRIVATE,
 		    Timesfd, 0)) == (char *)-1)
 			err(EF_SYS, "mmap on %s", Timesname);
-		ret &= conf_scan(Timesname, Timesbuf, Timeslen, 1, cliopts);
+		ret &= conf_scan(Timesname, Timesbuf, Timeslen, 1);
 	}
 
 	/*

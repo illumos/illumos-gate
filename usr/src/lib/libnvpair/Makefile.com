@@ -23,6 +23,7 @@
 # Use is subject to license terms.
 #
 # Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright (c) 2013, Joyent, Inc. All rights reserved.
 #
 
 LIBRARY=	libnvpair.a
@@ -32,13 +33,15 @@ OBJECTS=	libnvpair.o \
 		nvpair_alloc_system.o \
 		nvpair_alloc_fixed.o \
 		nvpair.o \
-		fnvpair.o
+		fnvpair.o \
+		nvpair_json.o
 
 include ../../Makefile.lib
 include ../../Makefile.rootfs
 
 SRCS=		../libnvpair.c \
 		../nvpair_alloc_system.c \
+		../nvpair_json.c \
 		$(SRC)/common/nvpair/nvpair_alloc_fixed.c \
 		$(SRC)/common/nvpair/nvpair.c \
 		$(SRC)/common/nvpair/fnvpair.c
@@ -54,7 +57,13 @@ LINTFLAGS64 +=	-erroff=E_BAD_PTR_CAST_ALIGN
 
 # turn off warning caused by lint bug: not understanding SCNi8 "hhi"
 LINTFLAGS +=	-erroff=E_BAD_FORMAT_STR2
+LINTFLAGS +=	-erroff=E_INVALID_TOKEN_IN_DEFINE_MACRO
+LINTFLAGS +=	-erroff=E_RET_INT_IMPLICITLY
+LINTFLAGS +=	-erroff=E_FUNC_USED_VAR_ARG2
 LINTFLAGS64 +=	-erroff=E_BAD_FORMAT_STR2
+LINTFLAGS64 +=	-erroff=E_INVALID_TOKEN_IN_DEFINE_MACRO
+LINTFLAGS64 +=	-erroff=E_RET_INT_IMPLICITLY
+LINTFLAGS64 +=	-erroff=E_FUNC_USED_VAR_ARG2
 
 CERRWARN +=	-_gcc=-Wno-type-limits
 CERRWARN +=	-_gcc=-Wno-parentheses
@@ -62,6 +71,9 @@ CERRWARN +=	-_gcc=-Wno-uninitialized
 
 CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-D_REENTRANT
+
+C99MODE=	-xc99=%all
+C99LMODE=	-Xc99=%all
 
 $(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
 

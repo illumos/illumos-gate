@@ -18,8 +18,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/time.h>
@@ -29,6 +31,7 @@
 #include <sys/types.h>
 #include <sys/sunddi.h>
 #include <sys/socket.h>
+#include <inet/ip.h>
 #include <inet/tcp.h>
 #else
 #include <stdio.h>
@@ -161,14 +164,6 @@ it_common_convert_sa(char *arg, struct sockaddr_storage *buf,
 		    (void *)&(sin->sin_addr.s_addr)) != 1) {
 			return (NULL);
 		}
-		/*
-		 * intet_pton does not seem to convert to network
-		 * order in kernel. This is a workaround until the
-		 * inet_pton works or we have our own inet_pton function.
-		 */
-#ifdef _KERNEL
-		sin->sin_addr.s_addr = ntohl((uint32_t)sin->sin_addr.s_addr);
-#endif
 		sin->sin_port = htons(tmp_port);
 	} else {
 		sin6 = (struct sockaddr_in6 *)sa;

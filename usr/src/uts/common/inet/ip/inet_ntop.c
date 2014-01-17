@@ -19,12 +19,12 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/cmn_err.h>
@@ -259,12 +259,14 @@ str2inet_addr(char *cp, ipaddr_t *addrp)
  * inet_pton: This function takes string format IPv4 or IPv6 address and
  * converts it to binary form. The format of this function corresponds to
  * inet_pton() in the socket library.
- * It returns 0 for invalid IPv4 and IPv6 address
- *            1 when successfully converts ascii to binary
- *            -1 when af is not AF_INET or AF_INET6
+ *
+ * Return values:
+ *  0 invalid IPv4 or IPv6 address
+ *  1 successful conversion
+ * -1 af is not AF_INET or AF_INET6
  */
 int
-inet_pton(int af, char *inp, void *outp)
+__inet_pton(int af, char *inp, void *outp, int compat)
 {
 	int i;
 	long byte;
@@ -272,7 +274,13 @@ inet_pton(int af, char *inp, void *outp)
 
 	switch (af) {
 	case AF_INET:
-		return (str2inet_addr(inp, (ipaddr_t *)outp));
+		if (str2inet_addr(inp, (ipaddr_t *)outp) != 0) {
+			if (!compat)
+				*(uint32_t *)outp = htonl(*(uint32_t *)outp);
+			return (1);
+		} else {
+			return (0);
+		}
 	case AF_INET6: {
 		union v6buf_u {
 			uint16_t v6words_u[8];
@@ -316,7 +324,11 @@ inet_pton(int af, char *inp, void *outp)
 			if (byte < 0 || byte > 0x0ffff) {
 				return (0);
 			}
-			v6buf.v6words_u[i] = (uint16_t)byte;
+			if (compat) {
+				v6buf.v6words_u[i] = (uint16_t)byte;
+			} else {
+				v6buf.v6words_u[i] = htons((uint16_t)byte);
+			}
 			if (*end == NULL || i == 7) {
 				inp = end;
 				break;
@@ -387,4 +399,23 @@ inet_pton(int af, char *inp, void *outp)
 	}
 	}	/* switch */
 	return (-1);	/* return -1 for default case */
+}
+
+/*
+ * Provide fixed inet_pton() implementation.
+ */
+int
+_inet_pton(int af, char *inp, void *outp)
+{
+	return (__inet_pton(af, inp, outp, 0));
+}
+
+/*
+ * Provide broken inet_pton() implementation by default for binary
+ * compatibility.
+ */
+int
+inet_pton(int af, char *inp, void *outp)
+{
+	return (__inet_pton(af, inp, outp, 1));
 }

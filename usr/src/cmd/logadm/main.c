@@ -648,7 +648,7 @@ rotatelog(struct fn *fnp, struct opts *opts)
 			 * last rotation is recorded as argument to -P,
 			 * but if logname isn't the same as log file name
 			 * then the timestamp would be recorded on a
-			 * separate line in the conf file.  so if we
+			 * separate line in the timestamp file.  so if we
 			 * haven't seen a -P already, we check to see if
 			 * it is part of a specific entry for the log
 			 * file name.  this handles the case where the
@@ -657,7 +657,7 @@ rotatelog(struct fn *fnp, struct opts *opts)
 			 * which expands to multiple file names.  if one
 			 * of the file names is "/var/apache/logs/access_log"
 			 * the the -P will be attached to a line with that
-			 * logname in the conf file.
+			 * logname in the timestamp file.
 			 */
 			if (opts_count(opts, "P")) {
 				off_t last = opts_optarg_int(opts, "P");

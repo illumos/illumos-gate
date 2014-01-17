@@ -18,11 +18,15 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2000 by Cisco Systems, Inc.  All rights reserved.
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- *
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ */
+
+/*
  * iSCSI Software Initiator
  */
 
@@ -243,8 +247,6 @@ kgetipnodebyname(
 	getipnodebyname_req_t	*req;
 	getipnodebyname_cnf_t	*cnf;
 	struct hostent		*hptr;
-	int			i;
-	uint16_t		*swap;
 
 
 	buffer_size = msg_size + hostent_size + sizeof (mybuffer_t);
@@ -312,17 +314,7 @@ kgetipnodebyname(
 		if (inet_pton(af, (char *)name, cnf) == 1) {
 			/*
 			 * inet_pton converted the string successfully.
-			 * reset to network order.  swaps based on nfs code
 			 */
-			if (af == AF_INET) {
-				*((uint32_t *)cnf) = htonl(*((uint32_t *)cnf));
-			} else {
-				for (swap = ((void *)cnf), i = 0;
-				    i < hptr->h_length / sizeof (uint16_t);
-				    i++) {
-					swap[i] = htons(swap[i]);
-				}
-			}
 			hptr->h_addrtype = af;
 			hptr->h_addr_list = (char **)((char *)hptr +
 			    sizeof (struct hostent));
