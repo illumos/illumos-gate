@@ -2239,41 +2239,6 @@ cmd_print_tab(mdb_tab_cookie_t *mcp, uint_t flags, int argc,
 	return (cmd_print_tab_common(mcp, flags, argc, argv));
 }
 
-int
-cmd_print_tab(mdb_tab_cookie_t *mcp, uint_t flags, int argc,
-    const mdb_arg_t *argv)
-{
-	int i, dummy;
-
-	/*
-	 * This getopts is only here to make the tab completion work better when
-	 * including options in the ::print arguments. None of the values should
-	 * be used. This should only be updated with additional arguments, if
-	 * they are added to cmd_print.
-	 */
-	i = mdb_getopts(argc, argv,
-	    'a', MDB_OPT_SETBITS, PA_SHOWADDR, &dummy,
-	    'C', MDB_OPT_SETBITS, TRUE, &dummy,
-	    'c', MDB_OPT_UINTPTR, &dummy,
-	    'd', MDB_OPT_SETBITS, PA_INTDEC, &dummy,
-	    'h', MDB_OPT_SETBITS, PA_SHOWHOLES, &dummy,
-	    'i', MDB_OPT_SETBITS, TRUE, &dummy,
-	    'L', MDB_OPT_SETBITS, TRUE, &dummy,
-	    'l', MDB_OPT_UINTPTR, &dummy,
-	    'n', MDB_OPT_SETBITS, PA_NOSYMBOLIC, &dummy,
-	    'p', MDB_OPT_SETBITS, TRUE, &dummy,
-	    's', MDB_OPT_UINTPTR, &dummy,
-	    'T', MDB_OPT_SETBITS, PA_SHOWTYPE | PA_SHOWBASETYPE, &dummy,
-	    't', MDB_OPT_SETBITS, PA_SHOWTYPE, &dummy,
-	    'x', MDB_OPT_SETBITS, PA_INTHEX, &dummy,
-	    NULL);
-
-	argc -= i;
-	argv += i;
-
-	return (cmd_print_tab_common(mcp, flags, argc, argv));
-}
-
 /*
  * Recursively descend a print a given data structure.  We create a struct of
  * the relevant print arguments and then call mdb_ctf_type_visit() to do the
