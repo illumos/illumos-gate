@@ -2959,7 +2959,7 @@ const mdb_dcmd_t mdb_dcmd_builtins[] = {
 	{ "print", "?[-aCdhiLptx] [-c lim] [-l lim] [type] [member|offset ...]",
 	    "print the contents of a data structure", cmd_print, print_help,
 	    cmd_print_tab },
-	{ "printf", "?[format] [type] [member ... ]", "print and format the "
+	{ "printf", "?format type member ...", "print and format the "
 	    "member(s) of a data structure", cmd_printf, printf_help,
 	    cmd_printf_tab },
 	{ "regs", NULL, "print general purpose registers", cmd_notsup },

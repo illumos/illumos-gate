@@ -18,9 +18,12 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
+
 #ifndef _ISCSIT_H_
 #define	_ISCSIT_H_
 
@@ -624,6 +627,9 @@ iscsit_login_sm_event(iscsit_conn_t *ic, iscsit_login_event_t event,
 void
 iscsit_login_sm_event_locked(iscsit_conn_t *ic, iscsit_login_event_t event,
     idm_pdu_t *pdu);
+
+int
+iscsit_is_v4_mapped(struct sockaddr_storage *sa, struct sockaddr_storage *v4sa);
 
 void
 iscsit_send_async_event(iscsit_conn_t *ict, uint8_t async_event);
