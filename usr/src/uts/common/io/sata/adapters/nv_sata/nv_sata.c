@@ -21,12 +21,13 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
  *
- * nv_sata is a combo SATA HBA driver for ck804/mcp5x (mcp5x = mcp55/mcp51)
- * based chipsets.
+ * nv_sata is a combo SATA HBA driver for CK804/MCP04 (ck804) and
+ * MCP55/MCP51/MCP61 (mcp5x) based chipsets.
  *
  * NCQ
  * ---
@@ -312,7 +313,7 @@ extern struct mod_ops mod_driverops;
 
 static  struct modldrv modldrv = {
 	&mod_driverops,	/* driverops */
-	"Nvidia ck804/mcp51/mcp55 HBA",
+	"NVIDIA CK804/MCP04/MCP51/MCP55/MCP61 HBA",
 	&nv_dev_ops,	/* driver ops */
 };
 
@@ -599,11 +600,14 @@ nv_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		attach_state |= ATTACH_PROGRESS_STATEP_ALLOC;
 
 		if (pci_config_setup(dip, &pci_conf_handle) == DDI_SUCCESS) {
+			nvc->nvc_devid = pci_config_get16(pci_conf_handle,
+			    PCI_CONF_DEVID);
 			nvc->nvc_revid = pci_config_get8(pci_conf_handle,
 			    PCI_CONF_REVID);
 			NVLOG(NVDBG_INIT, nvc, NULL,
-			    "inst %d: silicon revid is %x nv_debug_flags=%x",
-			    inst, nvc->nvc_revid, nv_debug_flags);
+			    "inst %d: devid is %x silicon revid is %x"
+			    " nv_debug_flags=%x", inst, nvc->nvc_devid,
+			    nvc->nvc_revid, nv_debug_flags);
 		} else {
 			break;
 		}
@@ -2494,7 +2498,7 @@ nv_reset(nv_port_t *nvp, char *reason)
 
 
 /*
- * Initialize register handling specific to mcp51/mcp55
+ * Initialize register handling specific to mcp51/mcp55/mcp61
  */
 /* ARGSUSED */
 static void
@@ -2549,12 +2553,14 @@ mcp5x_reg_init(nv_ctl_t *nvc, ddi_acc_handle_t pci_conf_handle)
 	 * Enable DMA to take advantage of that.
 	 *
 	 */
-	if (nvc->nvc_revid >= 0xa3) {
+	if ((nvc->nvc_devid > 0x37f) ||
+	    ((nvc->nvc_devid == 0x37f) && (nvc->nvc_revid >= 0xa3))) {
 		if (nv_sata_40bit_dma == B_TRUE) {
 			uint32_t reg32;
 			NVLOG(NVDBG_INIT, nvp->nvp_ctlp, nvp,
-			    "rev id is %X.  40-bit DMA addressing"
-			    " enabled", nvc->nvc_revid);
+			    "devid is %X revid is %X. 40-bit DMA"
+			    " addressing enabled", nvc->nvc_devid,
+			    nvc->nvc_revid);
 			nvc->dma_40bit = B_TRUE;
 
 			reg32 = pci_config_get32(pci_conf_handle,
@@ -2579,8 +2585,9 @@ mcp5x_reg_init(nv_ctl_t *nvc, ddi_acc_handle_t pci_conf_handle)
 			    "40-bit DMA disabled by nv_sata_40bit_dma", NULL);
 		}
 	} else {
-		nv_cmn_err(CE_NOTE, nvp->nvp_ctlp, nvp, "rev id is %X and is "
-		    "not capable of 40-bit DMA addressing", nvc->nvc_revid);
+		nv_cmn_err(CE_NOTE, nvp->nvp_ctlp, nvp, "devid is %X revid is"
+		    " %X. Not capable of 40-bit DMA addressing",
+		    nvc->nvc_devid, nvc->nvc_revid);
 	}
 }
 
@@ -2642,7 +2649,7 @@ nv_init_ctl(nv_ctl_t *nvc, ddi_acc_handle_t pci_conf_handle)
 {
 	struct sata_hba_tran stran;
 	nv_port_t *nvp;
-	int j, ck804;
+	int j;
 	uchar_t *cmd_addr, *ctl_addr, *bm_addr;
 	ddi_acc_handle_t bar5_hdl = nvc->nvc_bar_hdl[5];
 	uchar_t *bar5  = nvc->nvc_bar_addr[5];
@@ -2651,10 +2658,7 @@ nv_init_ctl(nv_ctl_t *nvc, ddi_acc_handle_t pci_conf_handle)
 
 	NVLOG(NVDBG_INIT, nvc, NULL, "nv_init_ctl entered", NULL);
 
-	ck804 = B_TRUE;
-#ifdef SGPIO_SUPPORT
 	nvc->nvc_mcp5x_flag = B_FALSE;
-#endif
 
 	/*
 	 * Need to set bit 2 to 1 at config offset 0x50
@@ -2685,7 +2689,6 @@ nv_init_ctl(nv_ctl_t *nvc, ddi_acc_handle_t pci_conf_handle)
 		    (uint8_t *)(bar5 + NV_BAR5_TRAN_LEN_CH_X));
 
 		if (reg8 != j) {
-			ck804 = B_FALSE;
 			nvc->nvc_mcp5x_flag = B_TRUE;
 			break;
 		}
@@ -2693,13 +2696,15 @@ nv_init_ctl(nv_ctl_t *nvc, ddi_acc_handle_t pci_conf_handle)
 
 	nv_put8(bar5_hdl, (uint8_t *)(bar5 + NV_BAR5_TRAN_LEN_CH_X), reg8_save);
 
-	if (ck804 == B_TRUE) {
-		NVLOG(NVDBG_INIT, nvc, NULL, "controller is CK804", NULL);
+	if (nvc->nvc_mcp5x_flag == B_FALSE) {
+		NVLOG(NVDBG_INIT, nvc, NULL, "controller is CK804/MCP04",
+		    NULL);
 		nvc->nvc_interrupt = ck804_intr;
 		nvc->nvc_reg_init = ck804_reg_init;
 		nvc->nvc_set_intr = ck804_set_intr;
 	} else {
-		NVLOG(NVDBG_INIT, nvc, NULL, "controller is MCP51/MCP55", NULL);
+		NVLOG(NVDBG_INIT, nvc, NULL, "controller is MCP51/MCP55/MCP61",
+		    NULL);
 		nvc->nvc_interrupt = mcp5x_intr;
 		nvc->nvc_reg_init = mcp5x_reg_init;
 		nvc->nvc_set_intr = mcp5x_set_intr;
