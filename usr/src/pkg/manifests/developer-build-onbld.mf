@@ -81,7 +81,6 @@ $(sparc_ONLY)file path=opt/onbld/bin/$(ARCH)/stabs mode=0555
 $(sparc_ONLY)file path=opt/onbld/bin/$(ARCH)/tokenize mode=0555
 $(sparc_ONLY)file path=opt/onbld/bin/$(ARCH)/tokenize.exe mode=0555
 file path=opt/onbld/bin/Install mode=0555
-file path=opt/onbld/bin/bindrop mode=0555
 file path=opt/onbld/bin/bldenv mode=0555
 file path=opt/onbld/bin/bringovercheck mode=0555
 file path=opt/onbld/bin/build_cscope mode=0555
@@ -90,7 +89,6 @@ file path=opt/onbld/bin/check_rtime mode=0555
 file path=opt/onbld/bin/checkpaths mode=0555
 file path=opt/onbld/bin/checkproto mode=0555
 file path=opt/onbld/bin/copyrightchk mode=0555
-file path=opt/onbld/bin/cryptodrop mode=0555
 file path=opt/onbld/bin/cstyle mode=0555
 file path=opt/onbld/bin/ctfcvtptbl mode=0555
 file path=opt/onbld/bin/ctffindmod mode=0555
@@ -110,8 +108,6 @@ file path=opt/onbld/bin/interface_cmp mode=0555
 file path=opt/onbld/bin/jstyle mode=0555
 file path=opt/onbld/bin/make_pkg_db mode=0555
 file path=opt/onbld/bin/mapfilechk mode=0555
-file path=opt/onbld/bin/mkreadme_osol mode=0555
-file path=opt/onbld/bin/mktpl mode=0555
 file path=opt/onbld/bin/nightly mode=0555
 file path=opt/onbld/bin/onu mode=0555
 file path=opt/onbld/bin/protocmp.terse mode=0555
