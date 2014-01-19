@@ -103,11 +103,12 @@ typedef struct nv_ctl {
 	 */
 	void		(*nvc_set_intr)(nv_port_t *nvp, int flag);
 	int		nvc_state;	/* state flags of ctrl see below */
+	uint16_t	nvc_devid;	/* PCI devid of device */
 	uint8_t		nvc_revid;	/* PCI revid of device */
 	boolean_t	dma_40bit;	/* 40bit DMA support */
+	boolean_t	nvc_mcp5x_flag;	/* is the controller MCP51/MCP55 */
 
 #ifdef SGPIO_SUPPORT
-	int		nvc_mcp5x_flag;	/* is the controller MCP51/MCP55 */
 	uint8_t		nvc_ctlr_num;	/* controller number within the part */
 	uint32_t	nvc_sgp_csr;	/* SGPIO CSR i/o address */
 	volatile nv_sgp_cb_t *nvc_sgp_cbp; /* SGPIO Control Block */
