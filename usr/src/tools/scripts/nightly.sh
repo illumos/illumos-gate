@@ -199,8 +199,9 @@ function build {
 		egrep -e "(^${MAKE}:|[ 	]error[: 	\n])" | \
 		egrep -v "Ignoring unknown host" | \
 		egrep -v "cc .* -o error " | \
-		egrep -v "warning" >> $mail_msg_file
-	if [ "$?" = "0" ]; then
+		egrep -v "warning" | tee $TMPDIR/build_errs${SUFFIX} \
+		>> $mail_msg_file
+	if [[ -s $TMPDIR/build_errs${SUFFIX} ]]; then
 		build_ok=n
 		this_build_ok=n
 	fi
@@ -218,7 +219,11 @@ function build {
 		| egrep -v "parameter <PSTAMP> set to" \
 		| egrep -v "Ignoring unknown host" \
 		| egrep -v "redefining segment flags attribute for" \
-		>> $mail_msg_file
+		| tee $TMPDIR/build_warnings${SUFFIX} >> $mail_msg_file
+	if [[ -s $TMPDIR/build_warnings${SUFFIX} ]]; then
+		build_ok=n
+		this_build_ok=n
+	fi
 
 	echo "\n==== Ended OS-Net source build at `date` ($LABEL) ====\n" \
 		>> $LOGFILE
@@ -333,8 +338,12 @@ function build {
 			egrep "${MAKE}|ERROR|WARNING" $SRC/pkg/${INSTALLOG}.out | \
 				grep ':' | \
 				grep -v PSTAMP | \
-				egrep -v "Ignoring unknown host" \
-				>> $mail_msg_file
+				egrep -v "Ignoring unknown host" | \
+				tee $TMPDIR/package >> $mail_msg_file
+			if [[ -s $TMPDIR/package ]]; then
+				build_extras_ok=n
+				this_build_ok=n
+			fi
 		else
 			#
 			# Handle it gracefully if -p was set but there so
@@ -395,10 +404,15 @@ function dolint {
 
 	/bin/time $MAKE -ek lint 2>&1 | \
 	    tee -a $LINTOUT >> $LOGFILE
+
 	echo "\n==== '$MAKE lint' of $base ERRORS ====\n" >> $mail_msg_file
+
 	grep "$MAKE:" $LINTOUT |
-		egrep -v "Ignoring unknown host" \
-		>> $mail_msg_file
+		egrep -v "Ignoring unknown host" | \
+		tee $TMPDIR/lint_errs >> $mail_msg_file
+	if [[ -s $TMPDIR/lint_errs ]]; then
+		build_extras_ok=n
+	fi
 
 	echo "\n==== Ended '$MAKE lint' of $base at `date` ====\n" >> $LOGFILE
 
@@ -420,13 +434,17 @@ function dolint {
 	if [ ! -f ${LINTNOISE}.ref ]; then
 		cp ${LINTNOISE}.out ${LINTNOISE}.ref
 	fi
+
 	if [ "$dodiff" != "n" ]; then
 		echo "\n==== lint warnings $base ====\n" \
 			>>$mail_msg_file
 		# should be none, though there are a few that were filtered out
 		# above
 		egrep -i '(warning|lint):' ${LINTNOISE}.out \
-			| sort | uniq >> $mail_msg_file
+			| sort | uniq | tee $TMPDIR/lint_warns >> $mail_msg_file
+		if [[ -s $TMPDIR/lint_warns ]]; then
+			build_extras_ok=n
+		fi
 		echo "\n==== lint noise differences $base ====\n" \
 			>> $mail_msg_file
 		diff ${LINTNOISE}.ref ${LINTNOISE}.out \
@@ -459,8 +477,12 @@ function build_tools {
 	egrep ":" ${TOOLS}/${INSTALLOG}.out |
 		egrep -e "(${MAKE}:|[ 	]error[: 	\n])" | \
 		egrep -v "Ignoring unknown host" | \
-		egrep -v warning >> $mail_msg_file
-	return $?
+		egrep -v warning | tee $TMPDIR/tools_errors >> $mail_msg_file
+
+	if [[ -s $TMPDIR/tools_errors ]]; then
+		return 1
+	fi
+	return 0
 }
 
 #
@@ -668,15 +690,17 @@ U_FLAG=n
 u_FLAG=n
 V_FLAG=n
 w_FLAG=n
+W_FLAG=n
 #
 build_ok=y
+build_extras_ok=y
 
 #
 # examine arguments
 #
 
 OPTIND=1
-while getopts +intV: FLAG
+while getopts +intV:W FLAG
 do
 	case $FLAG in
 	  i )	i_FLAG=y; i_CMD_LINE_FLAG=y
@@ -687,6 +711,8 @@ do
 		;;
 	  V )	V_FLAG=y
 		V_ARG="$OPTARG"
+		;;
+	  W )   W_FLAG=y
 		;;
 	 \? )	echo "$USAGE"
 		exit 1
@@ -834,7 +860,7 @@ check_closed_bins
 #
 NIGHTLY_OPTIONS=-${NIGHTLY_OPTIONS#-}
 OPTIND=1
-while getopts +ABCDdFfGIilMmNnpRrtUuw FLAG $NIGHTLY_OPTIONS
+while getopts +ABCDdFfGIilMmNnpRrtUuwW FLAG $NIGHTLY_OPTIONS
 do
 	case $FLAG in
 	  A )	A_FLAG=y
@@ -890,6 +916,8 @@ do
 	  u )	u_FLAG=y
 		;;
 	  w )	w_FLAG=y
+		;;
+	  W )   W_FLAG=y
 		;;
 	 \? )	echo "$USAGE"
 		exit 1
@@ -1150,6 +1178,11 @@ function logshuffle {
 	    		state=Failed
 			;;
 	esac
+
+	if [[ $state != "Interrupted" && $build_extras_ok != "y" ]]; then
+		state=Failed
+	fi
+
 	NIGHTLY_STATUS=$state
 	export NIGHTLY_STATUS
 
@@ -1495,8 +1528,12 @@ if [ "$i_FLAG" = "n" -a -d "$SRC" ]; then
 	$MAKE -ek clobber 2>&1 | tee -a $SRC/clobber-${MACH}.out >> $LOGFILE
 	echo "\n==== Make clobber ERRORS ====\n" >> $mail_msg_file
 	grep "$MAKE:" $SRC/clobber-${MACH}.out |
-		egrep -v "Ignoring unknown host" \
-		>> $mail_msg_file
+		egrep -v "Ignoring unknown host" | \
+		tee $TMPDIR/clobber_errs >> $mail_msg_file
+
+	if [[ -s $TMPDIR/clobber_errs ]]; then
+		build_extras_ok=n
+	fi
 
 	if [[ "$t_FLAG" = "y" ]]; then
 		echo "\n==== Make tools clobber at `date` ====\n" >> $LOGFILE
@@ -1508,6 +1545,9 @@ if [ "$i_FLAG" = "n" -a -d "$SRC" ]; then
 			>> $mail_msg_file
 		grep "$MAKE:" ${TOOLS}/clobber-${MACH}.out \
 			>> $mail_msg_file
+		if (( $? == 0 )); then
+			build_extras_ok=n
+		fi
 		rm -rf ${TOOLS_PROTO}
 		mkdir -p ${TOOLS_PROTO}
 	fi
@@ -1778,7 +1818,9 @@ if [[ "$t_FLAG" = "y" ]]; then
 	set_non_debug_build_flags
 
 	build_tools ${TOOLS_PROTO}
-	if [[ $? != 0  && "$t_FLAG" = y ]]; then
+	if (( $? != 0 )); then
+		build_ok=n
+	else
 		use_tools $TOOLS_PROTO
 	fi
 fi
@@ -1836,9 +1878,11 @@ if [ "$build_ok" = "y" ]; then
 	if [ "$N_FLAG" != "y" -a -d $SRC/pkg ]; then
 		echo "\n==== Validating manifests against proto area ====\n" \
 		    >> $mail_msg_file
-		( cd $SRC/pkg ; $MAKE -e protocmp ROOT="$checkroot" ) \
-		    >> $mail_msg_file
-
+		( cd $SRC/pkg ; $MAKE -e protocmp ROOT="$checkroot" ) | \
+		    tee $TMPDIR/protocmp_noise >> $mail_msg_file
+		if [[ -s $TMPDIR/protocmp_noise ]]; then
+			build_extras_ok=n
+		fi
 	fi
 
 	if [ "$N_FLAG" != "y" -a -f "$REF_PROTO_LIST" ]; then
@@ -1859,7 +1903,8 @@ if [ "$build_ok" = "y" ]; then
 	fi
 fi
 
-if [ "$u_FLAG" = "y"  -a "$build_ok" = "y" ]; then
+if [[ "$u_FLAG" == "y" && "$build_ok" == "y" && \
+    "$build_extras_ok" == "y" ]]; then
 	staffer cp $ATLOG/proto_list_${MACH} \
 		$PARENT_WS/usr/src/proto_list_${MACH}
 fi
@@ -1904,7 +1949,7 @@ fi
 #
 # ELF verification: ABI (-A) and runtime (-r) checks
 #
-if [[ ($build_ok = y) && ( ($A_FLAG = y) || ($r_FLAG = y) ) ]]; then
+if [[ ($build_ok = y) && (($A_FLAG = y) || ($r_FLAG = y)) ]]; then
 	# Directory ELF-data.$MACH holds the files produced by these tests.
 	elf_ddir=$SRC/ELF-data.$MACH
 
@@ -1931,7 +1976,8 @@ if [[ ($build_ok = y) && ( ($A_FLAG = y) || ($r_FLAG = y) ) ]]; then
 			-i interface -E interface.err
 		if [[ -s $elf_ddir/interface.err ]]; then
 			tee -a $LOGFILE < $elf_ddir/interface.err \
-				>> $mail_msg_file
+			    >> $mail_msg_file
+			build_extras_ok=n
 		fi
 
 		# If ELF_DATA_BASELINE_DIR is defined, compare the new interface
@@ -1953,6 +1999,7 @@ if [[ ($build_ok = y) && ( ($A_FLAG = y) || ($r_FLAG = y) ) ]]; then
 					tee -a $LOGFILE < \
 					    $elf_ddir/interface.cmp \
 					    >> $mail_msg_file
+					build_extras_ok=n
 				fi
 			else
 			       	echo "baseline not available. comparison" \
@@ -1977,6 +2024,9 @@ if [[ ($build_ok = y) && ( ($A_FLAG = y) || ($r_FLAG = y) ) ]]; then
 		check_rtime -i -m -v $rtime_sflag -o -w $elf_ddir \
 			-D object_list  -f object_list -E runtime.err \
 			-I runtime.attr.raw
+		if (( $? != 0 )); then
+			build_extras_ok=n
+		fi
 
 		# check_rtime -I output needs to be sorted in order to 
 		# compare it to that from previous builds.
@@ -1987,6 +2037,7 @@ if [[ ($build_ok = y) && ( ($A_FLAG = y) || ($r_FLAG = y) ) ]]; then
 		if [[ -s $elf_ddir/runtime.err ]]; then
 			tee -a $LOGFILE < $elf_ddir/runtime.err \
 				>> $mail_msg_file
+			build_extras_ok=n
 		fi
 
 		# If there is an ELF-data directory from a previous build,
@@ -2060,7 +2111,11 @@ if [ "$i_CMD_LINE_FLAG" = "n" -a "$C_FLAG" = "y" ]; then
 
 	grep ":" $SRC/check-${MACH}.out |
 		egrep -v "Ignoring unknown host" | \
-		sort | uniq >> $mail_msg_file
+		sort | uniq | tee $TMPDIR/check_errors >> $mail_msg_file
+
+	if [[ -s $TMPDIR/check_errors ]]; then
+		build_extras_ok=n
+	fi
 else
 	echo "\n==== No '$MAKE check' ====\n" >> $LOGFILE
 fi
@@ -2099,7 +2154,11 @@ if [ "$CHECK_PATHS" = y -a "$N_FLAG" != y ]; then
 		>>$mail_msg_file
 	arg=-b
 	[ "$build_ok" = y ] && arg=
-	checkpaths $arg $checkroot 2>&1 | tee -a $LOGFILE >>$mail_msg_file
+	checkpaths $arg $checkroot > $SRC/checkpaths.out 2>&1
+	if [[ -s $SRC/checkpaths.out ]]; then
+		tee -a $LOGFILE < $SRC/checkpaths.out >> $mail_msg_file
+		build_extras_ok=n
+	fi
 fi
 
 if [ "$M_FLAG" != "y" -a "$build_ok" = y ]; then
@@ -2182,7 +2241,10 @@ fi
 # (whichever exit we hit here will trigger the "cleanup" trap which
 # optionally sends mail on completion).
 #
-if [ "$build_ok" = "y" ]; then
-	exit 0
+if [[ "$build_ok" == "y" ]]; then
+	if [[ "$W_FLAG" == "y" || "$build_extras_ok" == "y" ]]; then
+		exit 0
+	fi
 fi
+
 exit 1
