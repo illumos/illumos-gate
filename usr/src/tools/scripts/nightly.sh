@@ -46,8 +46,7 @@
 #
 #	For example: LINTDIRS="$SRC/uts n $SRC/stand y $SRC/psm y"
 #
-# OPTHOME and TEAMWARE may be set in the environment to override /opt
-# and /opt/teamware defaults.
+# OPTHOME  may be set in the environment to override /opt
 #
 
 #
@@ -97,10 +96,6 @@ function normal_build {
 		set_non_debug_build_flags
 		CODESIGN_USER="$crypto_signer" \
 		    build "non-DEBUG" "$suffix-nd" "-nd" "$MULTI_PROTO"
-		if [ "$build_ok" = "y" -a "$X_FLAG" = "y" -a \
-		    "$p_FLAG" = "y" ]; then
-			copy_ihv_pkgs non-DEBUG -nd
-		fi
 	else
 		echo "\n==== No non-DEBUG $open_only build ====\n" >> "$LOGFILE"
 	fi
@@ -113,10 +108,6 @@ function normal_build {
 		set_debug_build_flags
 		CODESIGN_USER="$crypto_signer" \
 		    build "DEBUG" "$suffix" "" "$MULTI_PROTO"
-		if [ "$build_ok" = "y" -a "$X_FLAG" = "y" -a \
-		    "$p_FLAG" = "y" ]; then
-			copy_ihv_pkgs DEBUG ""
-		fi
 	else
 		echo "\n==== No DEBUG $open_only build ====\n" >> "$LOGFILE"
 	fi
@@ -154,80 +145,6 @@ function run_hook {
 			exit 1
 		fi
 	fi
-}
-
-#
-# usage: filelist DESTDIR PATTERN
-#
-function filelist {
-	DEST=$1
-	PATTERN=$2
-	cd ${DEST}
-}
-
-# function to save off binaries after a full build for later
-# restoration
-function save_binaries {
-	# save off list of binaries
-	echo "\n==== Saving binaries from build at `date` ====\n" | \
-	    tee -a $mail_msg_file >> $LOGFILE
-	rm -f ${BINARCHIVE}
-	cd ${CODEMGR_WS}
-	filelist ${CODEMGR_WS} '^preserve:' >> $LOGFILE
-	filelist ${CODEMGR_WS} '^preserve:' | \
-	    cpio -ocB 2>/dev/null | compress \
-	    > ${BINARCHIVE}
-}
-
-# delete files
-# usage: hybridize_files DESTDIR MAKE_TARGET
-function hybridize_files {
-	DEST=$1
-	MAKETARG=$2
-
-	echo "\n==== Hybridizing files at `date` ====\n" | \
-	    tee -a $mail_msg_file >> $LOGFILE
-	for i in `filelist ${DEST} '^delete:'`
-	do
-		echo "removing ${i}." | tee -a $mail_msg_file >> $LOGFILE
-		rm -rf "${i}"
-	done
-	for i in `filelist ${DEST} '^hybridize:' `
-	do
-		echo "hybridizing ${i}." | tee -a $mail_msg_file >> $LOGFILE
-		rm -f ${i}+
-		sed -e "/^# HYBRID DELETE START/,/^# HYBRID DELETE END/d" \
-		    < ${i} > ${i}+
-		mv ${i}+ ${i}
-	done
-}
-
-# restore binaries into the proper source tree.
-# usage: restore_binaries DESTDIR MAKE_TARGET
-function restore_binaries {
-	DEST=$1
-	MAKETARG=$2
-
-	echo "\n==== Restoring binaries to ${MAKETARG} at `date` ====\n" | \
-	    tee -a $mail_msg_file >> $LOGFILE
-	cd ${DEST}
-	zcat ${BINARCHIVE} | \
-	    cpio -idmucvB 2>/dev/null | tee -a $mail_msg_file >> ${LOGFILE}
-}
-
-# rename files we save binaries of
-# usage: rename_files DESTDIR MAKE_TARGET
-function rename_files {
-	DEST=$1
-	MAKETARG=$2
-	echo "\n==== Renaming source files in ${MAKETARG} at `date` ====\n" | \
-	    tee -a $mail_msg_file >> $LOGFILE
-	for i in `filelist ${DEST} '^rename:'`
-	do
-		echo ${i} | tee -a $mail_msg_file >> ${LOGFILE}
-		rm -f ${i}.export
-		mv ${i} ${i}.export
-	done
 }
 
 # Return library search directive as function of given root.
@@ -277,12 +194,6 @@ function build {
 	/bin/time $MAKE -e install 2>&1 | \
 	    tee -a $SRC/${INSTALLOG}.out >> $LOGFILE
 
-	if [[ "$SCM_TYPE" = teamware ]]; then
-		echo "\n==== SCCS Noise ($LABEL) ====\n" >> $mail_msg_file
-		egrep 'sccs(check:| *get)' $SRC/${INSTALLOG}.out >> \
-			$mail_msg_file
-	fi
-
 	echo "\n==== Build errors ($LABEL) ====\n" >> $mail_msg_file
 	egrep ":" $SRC/${INSTALLOG}.out |
 		egrep -e "(^${MAKE}:|[ 	]error[: 	\n])" | \
@@ -300,16 +211,14 @@ function build {
 		this_build_ok=n
 	fi
 
-	if [ "$W_FLAG" = "n" ]; then
-		echo "\n==== Build warnings ($LABEL) ====\n" >>$mail_msg_file
-		egrep -i warning: $SRC/${INSTALLOG}.out \
-			| egrep -v '^tic:' \
-			| egrep -v "symbol (\`|')timezone' has differing types:" \
-		        | egrep -v "parameter <PSTAMP> set to" \
-			| egrep -v "Ignoring unknown host" \
-			| egrep -v "redefining segment flags attribute for" \
-			>> $mail_msg_file
-	fi
+	echo "\n==== Build warnings ($LABEL) ====\n" >>$mail_msg_file
+	egrep -i warning: $SRC/${INSTALLOG}.out \
+		| egrep -v '^tic:' \
+		| egrep -v "symbol (\`|')timezone' has differing types:" \
+		| egrep -v "parameter <PSTAMP> set to" \
+		| egrep -v "Ignoring unknown host" \
+		| egrep -v "redefining segment flags attribute for" \
+		>> $mail_msg_file
 
 	echo "\n==== Ended OS-Net source build at `date` ($LABEL) ====\n" \
 		>> $LOGFILE
@@ -317,7 +226,7 @@ function build {
 	echo "\n==== Elapsed build time ($LABEL) ====\n" >>$mail_msg_file
 	tail -3  $SRC/${INSTALLOG}.out >>$mail_msg_file
 
-	if [ "$i_FLAG" = "n" -a "$W_FLAG" = "n" ]; then
+	if [ "$i_FLAG" = "n" ]; then
 		rm -f $SRC/${NOISE}.ref
 		if [ -f $SRC/${NOISE}.out ]; then
 			mv $SRC/${NOISE}.out $SRC/${NOISE}.ref
@@ -406,41 +315,30 @@ function build {
 	#	Building Packages
 	#
 	if [ "$p_FLAG" = "y" -a "$this_build_ok" = "y" ]; then
-		if [ -d $SRC/pkg -o -d $SRC/pkgdefs ]; then
+		if [ -d $SRC/pkg ]; then
 			echo "\n==== Creating $LABEL packages at `date` ====\n" \
 				>> $LOGFILE
 			echo "Clearing out $PKGARCHIVE ..." >> $LOGFILE
 			rm -rf $PKGARCHIVE >> "$LOGFILE" 2>&1
 			mkdir -p $PKGARCHIVE >> "$LOGFILE" 2>&1
 
-			for d in pkg pkgdefs; do
-				if [ ! -f "$SRC/$d/Makefile" ]; then
-					continue
-				fi
-				rm -f $SRC/$d/${INSTALLOG}.out
-				cd $SRC/$d
-				/bin/time $MAKE -e install 2>&1 | \
-					tee -a $SRC/$d/${INSTALLOG}.out >> $LOGFILE
-			done
+			rm -f $SRC/pkg/${INSTALLOG}.out
+			cd $SRC/pkg
+			/bin/time $MAKE -e install 2>&1 | \
+			    tee -a $SRC/pkg/${INSTALLOG}.out >> $LOGFILE
 
 			echo "\n==== package build errors ($LABEL) ====\n" \
 				>> $mail_msg_file
 
-			for d in pkg pkgdefs; do
-				if [ ! -f "$SRC/$d/Makefile" ]; then
-					continue
-				fi
-
-				egrep "${MAKE}|ERROR|WARNING" $SRC/$d/${INSTALLOG}.out | \
-					grep ':' | \
-					grep -v PSTAMP | \
-					egrep -v "Ignoring unknown host" \
-					>> $mail_msg_file
-			done
+			egrep "${MAKE}|ERROR|WARNING" $SRC/pkg/${INSTALLOG}.out | \
+				grep ':' | \
+				grep -v PSTAMP | \
+				egrep -v "Ignoring unknown host" \
+				>> $mail_msg_file
 		else
 			#
-			# Handle it gracefully if -p was set but there are
-			# neither pkg nor pkgdefs directories.
+			# Handle it gracefully if -p was set but there so
+			# no pkg directory.
 			#
 			echo "\n==== No $LABEL packages to build ====\n" \
 				>> $LOGFILE
@@ -533,75 +431,6 @@ function dolint {
 			>> $mail_msg_file
 		diff ${LINTNOISE}.ref ${LINTNOISE}.out \
 			>> $mail_msg_file
-	fi
-}
-
-# Install proto area from IHV build
-
-function copy_ihv_proto {
-
-	echo "\n==== Installing IHV proto area ====\n" \
-		>> $LOGFILE
-	if [ -d "$IA32_IHV_ROOT" ]; then
-		if [ ! -d "$ROOT" ]; then
-			echo "mkdir -p $ROOT" >> $LOGFILE
-			mkdir -p $ROOT
-		fi
-		echo "copying $IA32_IHV_ROOT to $ROOT\n" >> $LOGFILE
-		cd $IA32_IHV_ROOT
-		tar cf - . | (cd $ROOT; umask 0; tar xpf - ) 2>&1 >> $LOGFILE
-	else
-		echo "$IA32_IHV_ROOT: not found" >> $LOGFILE
-	fi
-
-	if [ "$MULTI_PROTO" = yes ]; then
-		if [ ! -d "$ROOT-nd" ]; then
-			echo "mkdir -p $ROOT-nd" >> $LOGFILE
-			mkdir -p $ROOT-nd
-		fi
-		# If there's a non-DEBUG version of the IHV proto area,
-		# copy it, but copy something if there's not.
-		if [ -d "$IA32_IHV_ROOT-nd" ]; then
-			echo "copying $IA32_IHV_ROOT-nd to $ROOT-nd\n" >> $LOGFILE
-			cd $IA32_IHV_ROOT-nd
-		elif [ -d "$IA32_IHV_ROOT" ]; then
-			echo "copying $IA32_IHV_ROOT to $ROOT-nd\n" >> $LOGFILE
-			cd $IA32_IHV_ROOT
-		else
-			echo "$IA32_IHV_ROOT{-nd,}: not found" >> $LOGFILE
-			return
-		fi
-		tar cf - . | (cd $ROOT-nd; umask 0; tar xpf - ) 2>&1 >> $LOGFILE
-	fi
-}
-
-# Install IHV packages in PKGARCHIVE
-# usage: copy_ihv_pkgs LABEL SUFFIX
-function copy_ihv_pkgs {
-	LABEL=$1
-	SUFFIX=$2
-	# always use non-DEBUG IHV packages
-	IA32_IHV_PKGS=${IA32_IHV_PKGS_ORIG}-nd
-	PKGARCHIVE=${PKGARCHIVE_ORIG}${SUFFIX}
-
-	echo "\n==== Installing IHV packages from $IA32_IHV_PKGS ($LABEL) ====\n" \
-		>> $LOGFILE
-	if [ -d "$IA32_IHV_PKGS" ]; then
-		cd $IA32_IHV_PKGS
-		tar cf - * | \
-		   (cd $PKGARCHIVE; umask 0; tar xpf - ) 2>&1 >> $LOGFILE
-	else
-		echo "$IA32_IHV_PKGS: not found" >> $LOGFILE
-	fi
-
-	echo "\n==== Installing IHV packages from $IA32_IHV_BINARY_PKGS ($LABEL) ====\n" \
-		>> $LOGFILE
-	if [ -d "$IA32_IHV_BINARY_PKGS" ]; then
-		cd $IA32_IHV_BINARY_PKGS
-		tar cf - * | \
-		    (cd $PKGARCHIVE; umask 0; tar xpf - ) 2>&1 >> $LOGFILE
-	else
-		echo "$IA32_IHV_BINARY_PKGS: not found" >> $LOGFILE
 	fi
 }
 
@@ -719,18 +548,14 @@ function staffer {
 }
 
 #
-# Verify that the closed tree is present if it needs to be.
+# Verify that the closed bins are present
 #
-function check_closed_tree {
+function check_closed_bins {
 	if [[ ! -d "$ON_CLOSED_BINS" ]]; then
 		echo "ON_CLOSED_BINS must point to the closed binaries tree."
 		build_ok=n
 		exit 1
 	fi
-}
-
-function obsolete_build {
-    	echo "WARNING: Obsolete $1 build requested; request will be ignored"
 }
 
 #
@@ -777,10 +602,6 @@ if [ "$OPTHOME" = "" ]; then
 	OPTHOME=/opt
 	export OPTHOME
 fi
-if [ "$TEAMWARE" = "" ]; then
-	TEAMWARE=$OPTHOME/teamware
-	export TEAMWARE
-fi
 
 USAGE='Usage: nightly [-in] [+t] [-V VERS ] <env_file>
 
@@ -809,13 +630,11 @@ NIGHTLY_OPTIONS variable in the <env_file> as follows:
 	-R	default group of options for building a release (-mp)
 	-U	update proto area in the parent
 	-V VERS set the build version string to VERS
-	-X	copy x86 IHV proto area
 	-f	find unreferenced files
 	-i	do an incremental build (no "make clobber")
 	-l	do "make lint" in $LINTDIRS (default: $SRC y)
 	-m	send mail to $MAILTO at end of build
 	-n      do not do a bringover
-	-o	build using root privileges to set OWNER/GROUP (old style)
 	-p	create packages
 	-r	check ELF runtime attributes in the proto area
 	-t	build and use the tools in $SRC/tools (default setting)
@@ -823,8 +642,6 @@ NIGHTLY_OPTIONS variable in the <env_file> as follows:
 	-u	update proto_list_$MACH and friends in the parent workspace;
 		when used with -f, also build an unrefmaster.out in the parent
 	-w	report on differences between previous and current proto areas
-	-z	compress cpio archives with gzip
-	-W	Do not report warnings (freeware gate ONLY)
 '
 #
 #	A log file will be generated under the name $LOGFILE
@@ -844,20 +661,13 @@ M_FLAG=n
 m_FLAG=n
 N_FLAG=n
 n_FLAG=n
-o_FLAG=n
-P_FLAG=n
 p_FLAG=n
 r_FLAG=n
-T_FLAG=n
 t_FLAG=y
 U_FLAG=n
 u_FLAG=n
 V_FLAG=n
-W_FLAG=n
 w_FLAG=n
-X_FLAG=n
-#
-XMOD_OPT=
 #
 build_ok=y
 
@@ -1010,20 +820,13 @@ if [ "$BRINGOVER_WS" = "" ]; then
 fi
 
 #
-# If CLOSED_BRINGOVER_WS was not specified, let it default to CLOSED_CLONE_WS
-#
-if [ "$CLOSED_BRINGOVER_WS" = "" ]; then
-	CLOSED_BRINGOVER_WS=$CLOSED_CLONE_WS
-fi
-
-#
 # If BRINGOVER_FILES was not specified, default to usr
 #
 if [ "$BRINGOVER_FILES" = "" ]; then
 	BRINGOVER_FILES="usr"
 fi
 
-check_closed_tree
+check_closed_bins
 
 #
 # Note: changes to the option letters here should also be applied to the
@@ -1031,7 +834,7 @@ check_closed_tree
 #
 NIGHTLY_OPTIONS=-${NIGHTLY_OPTIONS#-}
 OPTIND=1
-while getopts +ABCDdFfGIilMmNnoPpRrTtUuWwXxz FLAG $NIGHTLY_OPTIONS
+while getopts +ABCDdFfGIilMmNnpRrtUuw FLAG $NIGHTLY_OPTIONS
 do
 	case $FLAG in
 	  A )	A_FLAG=y
@@ -1064,10 +867,6 @@ do
 		;;
 	  n )	n_FLAG=y
 		;;
-	  o )	o_FLAG=y
-		;;
-	  P )	P_FLAG=y
-		;; # obsolete
 	  p )	p_FLAG=y
 		;;
 	  R )	m_FLAG=y
@@ -1075,8 +874,6 @@ do
 		;;
 	  r )	r_FLAG=y
 		;;
-	  T )	T_FLAG=y
-		;; # obsolete
 	 +t )	t_FLAG=n
 		;;
 	  U )   if [ -z "${PARENT_ROOT}" ]; then
@@ -1092,18 +889,7 @@ do
 		;;
 	  u )	u_FLAG=y
 		;;
-	  W )	W_FLAG=y
-		;;
-
 	  w )	w_FLAG=y
-		;;
-	  X )	# now that we no longer need realmode builds, just
-		# copy IHV packages.  only meaningful on x86.
-		if [ "$MACH" = "i386" ]; then
-			X_FLAG=y
-		fi
-		;;
-	  x )	XMOD_OPT="-x"
 		;;
 	 \? )	echo "$USAGE"
 		exit 1
@@ -1112,11 +898,6 @@ do
 done
 
 if [ $ISUSER -ne 0 ]; then
-	if [ "$o_FLAG" = "y" ]; then
-		echo "Old-style build requires root permission."
-		exit 1
-	fi
-
 	# Set default value for STAFFER, if needed.
 	if [ -z "$STAFFER" -o "$STAFFER" = "nobody" ]; then
 		STAFFER=`/usr/xpg4/bin/id -un`
@@ -1130,7 +911,7 @@ if [ -z "$MAILTO" -o "$MAILTO" = "nobody" ]; then
 fi
 
 PATH="$OPTHOME/onbld/bin:$OPTHOME/onbld/bin/${MACH}:/usr/ccs/bin"
-PATH="$PATH:$OPTHOME/SUNWspro/bin:$TEAMWARE/bin:/usr/bin:/usr/sbin:/usr/ucb"
+PATH="$PATH:$OPTHOME/SUNWspro/bin:/usr/bin:/usr/sbin:/usr/ucb"
 PATH="$PATH:/usr/openwin/bin:/usr/sfw/bin:/opt/sfw/bin:."
 export PATH
 
@@ -1138,17 +919,7 @@ export PATH
 relsrcdirs="."
 abssrcdirs="$SRC"
 
-unset CH
-if [ "$o_FLAG" = "y" ]; then
-# root invoked old-style build -- make sure it works as it always has
-# by exporting 'CH'.  The current Makefile.master doesn't use this, but
-# the old ones still do.
-	PROTOCMPTERSE="protocmp.terse"
-	CH=
-	export CH
-else
-	PROTOCMPTERSE="protocmp.terse -gu"
-fi
+PROTOCMPTERSE="protocmp.terse -gu"
 POUND_SIGN="#"
 # have we set RELEASE_DATE in our env file?
 if [ -z "$RELEASE_DATE" ]; then
@@ -1159,9 +930,9 @@ BASEWSDIR=$(basename $CODEMGR_WS)
 DEV_CM="\"@(#)SunOS Internal Development: $LOGNAME $BUILD_DATE [$BASEWSDIR]\""
 
 # we export POUND_SIGN, RELEASE_DATE and DEV_CM to speed up the build process
-# by avoiding repeated shell invocations to evaluate Makefile.master definitions.
-# we export o_FLAG and X_FLAG for use by makebfu, and by usr/src/pkg/Makefile
-export o_FLAG X_FLAG POUND_SIGN RELEASE_DATE DEV_CM
+# by avoiding repeated shell invocations to evaluate Makefile.master
+# definitions.
+export POUND_SIGN RELEASE_DATE DEV_CM
 
 maketype="distributed"
 if [[ -z "$MAKE" ]]; then
@@ -1196,9 +967,8 @@ if [ "$CHECK_DMAKE" = "y" -a \
 	echo "  ${DMAKE_VERSION}"
 	cat <<EOF
 
-This version may not be safe for use.  Either set TEAMWARE to a better
-path or (if you really want to use this version of dmake anyway), add
-the following to your environment to disable this check:
+This version may not be safe for use, if you really want to use this version
+anyway add the following to your environment to disable this check:
 
   CHECK_DMAKE=n
 EOF
@@ -1247,28 +1017,6 @@ fi
 #
 if [ "$V_FLAG" = "y" ]; then
 	VERSION=$V_ARG
-fi
-
-#
-# Check for IHV root for copying ihv proto area
-#
-if [ "$X_FLAG" = "y" ]; then
-        if [ "$IA32_IHV_ROOT" = "" ]; then
-		echo "IA32_IHV_ROOT: must be set for copying ihv proto"
-		args_ok=n
-        fi
-        if [ ! -d "$IA32_IHV_ROOT" ]; then
-                echo "$IA32_IHV_ROOT: not found"
-                args_ok=n
-        fi
-        if [ "$IA32_IHV_WS" = "" ]; then
-		echo "IA32_IHV_WS: must be set for copying ihv proto"
-		args_ok=n
-        fi
-        if [ ! -d "$IA32_IHV_WS" ]; then
-                echo "$IA32_IHV_WS: not found"
-                args_ok=n
-        fi
 fi
 
 TMPDIR="/tmp/nightly.tmpdir.$$"
@@ -1344,7 +1092,6 @@ export ENVLDLIBS3 ENVCPPFLAGS1 ENVCPPFLAGS2 ENVCPPFLAGS3 ENVCPPFLAGS4 \
 	ENVLDLIBS1 ENVLDLIBS2 PARENT_ROOT
 
 PKGARCHIVE_ORIG=$PKGARCHIVE
-IA32_IHV_PKGS_ORIG=$IA32_IHV_PKGS
 
 #
 # Juggle the logs and optionally send mail on completion.
@@ -1577,14 +1324,6 @@ env >> $LOGFILE
 
 echo "\n==== Nightly argument issues ====\n" | tee -a $mail_msg_file >> $LOGFILE
 
-if [ "$P_FLAG" = "y" ]; then
-	obsolete_build GPROF | tee -a $mail_msg_file >> $LOGFILE
-fi
-
-if [ "$T_FLAG" = "y" ]; then
-	obsolete_build TRACE | tee -a $mail_msg_file >> $LOGFILE
-fi
-
 if [ "$N_FLAG" = "y" ]; then
 	if [ "$p_FLAG" = "y" ]; then
 		cat <<EOF | tee -a $mail_msg_file >> $LOGFILE
@@ -1693,20 +1432,12 @@ function parent_wstype {
 	    | read scm_type junk
 	if [[ -z "$scm_type" || "$scm_type" == unknown ]]; then
 		# Probe BRINGOVER_WS to determine its type
-		if [[ $BRINGOVER_WS == svn*://* ]]; then
-			scm_type="subversion"
-		elif [[ $BRINGOVER_WS == file://* ]] &&
-		    egrep -s "This is a Subversion repository" \
-		    ${BRINGOVER_WS#file://}/README.txt 2> /dev/null; then
-			scm_type="subversion"
-		elif [[ $BRINGOVER_WS == ssh://* ]]; then
+		if [[ $BRINGOVER_WS == ssh://* ]]; then
 			scm_type="mercurial"
 		elif [[ $BRINGOVER_WS == http://* ]] && \
 		    wget -q -O- --save-headers "$BRINGOVER_WS/?cmd=heads" | \
 		    egrep -s "application/mercurial" 2> /dev/null; then
 			scm_type="mercurial"
-		elif svn info $BRINGOVER_WS > /dev/null 2>&1; then
-			scm_type="subversion"
 		else
 			scm_type="none"
 		fi
@@ -1714,7 +1445,7 @@ function parent_wstype {
 
 	# fold both unsupported and unrecognized results into "none"
 	case "$scm_type" in
-	none|subversion|teamware|mercurial)
+	mercurial)
 		;;
 	*)	scm_type=none
 		;;
@@ -1733,7 +1464,7 @@ function child_wstype {
 	fi
 
 	case "$scm_type" in
-	none|subversion|git|teamware|mercurial)
+	none|git|mercurial)
 		;;
 	*)	scm_type=none
 		;;
@@ -1800,28 +1531,6 @@ if [ "$i_FLAG" = "n" -a -d "$SRC" ]; then
 else
 	echo "\n==== No clobber at `date` ====\n" >> $LOGFILE
 fi
-
-type bringover_teamware > /dev/null 2>&1 || function bringover_teamware {
-	# sleep on the parent workspace's lock
-	while egrep -s write $BRINGOVER_WS/Codemgr_wsdata/locks
-	do
-		sleep 120
-	done
-
-	if [[ -z $BRINGOVER ]]; then
-		BRINGOVER=$TEAMWARE/bin/bringover
-	fi
-
-	staffer $BRINGOVER -c "nightly update" -p $BRINGOVER_WS \
-	    -w $CODEMGR_WS $BRINGOVER_FILES < /dev/null 2>&1 ||
-		touch $TMPDIR/bringover_failed
-
-        staffer bringovercheck $CODEMGR_WS >$TMPDIR/bringovercheck.out 2>&1
-	if [ -s $TMPDIR/bringovercheck.out ]; then
-		echo "\n==== POST-BRINGOVER CLEANUP NOISE ====\n"
-		cat $TMPDIR/bringovercheck.out
-	fi
-}
 
 type bringover_mercurial > /dev/null 2>&1 || function bringover_mercurial {
 	typeset -x PATH=$PATH
@@ -1941,49 +1650,6 @@ type bringover_mercurial > /dev/null 2>&1 || function bringover_mercurial {
 
 	printf "\nadded the following changesets to open repository:\n"
 	cat $TMPDIR/incoming_open.out
-
-	#
-	# The closed repository could have been newly created, even though
-	# the open one previously existed...
-	#
-	if [ -f $TMPDIR/new_closed ]; then
-		return
-	fi
-
-	if [ -f $TMPDIR/incoming_closed.out ]; then
-		printf "\nadded the following changesets to closed repository:\n"
-		cat $TMPDIR/incoming_closed.out
-	fi
-}
-
-type bringover_subversion > /dev/null 2>&1 || function bringover_subversion {
-	typeset -x PATH=$PATH
-
-	if [[ ! -d $CODEMGR_WS/.svn ]]; then
-		staffer svn checkout $BRINGOVER_WS $CODEMGR_WS ||
-			touch $TMPDIR/bringover_failed
-	else
-		typeset root
-		root=$(staffer svn info $CODEMGR_WS |
-			nawk '/^Repository Root:/ {print $NF}')
-		if [[ $root != $BRINGOVER_WS ]]; then
-			# We fail here because there's no way to update
-			# from a named repo.
-			cat <<-EOF
-			\$BRINGOVER_WS doesn't match repository root:
-			  \$BRINGOVER_WS:  $BRINGOVER_WS
-			  Repository root: $root
-			EOF
-			touch $TMPDIR/bringover_failed
-		else
-			# If a conflict happens, svn still exits 0.
-			staffer svn update $CODEMGR_WS | tee $TMPDIR/pull.out ||
-				touch $TMPDIR/bringover_failed
-			if grep "^C" $TMPDIR/pull.out > /dev/null 2>&1; then
-				touch $TMPDIR/bringover_failed
-			fi
-		fi
-	fi
 }
 
 type bringover_none > /dev/null 2>&1 || function bringover_none {
@@ -2028,7 +1694,7 @@ if [ "$n_FLAG" = "n" ]; then
 
 	run_hook POST_BRINGOVER
 
-	check_closed_tree
+	check_closed_bins
 
 else
 	echo "\n==== No bringover to $CODEMGR_WS ====\n" >> $LOGFILE
@@ -2117,13 +1783,6 @@ if [[ "$t_FLAG" = "y" ]]; then
 	fi
 fi
 
-#
-# copy ihv proto area in addition to the build itself
-#
-if [ "$X_FLAG" = "y" ]; then
-	copy_ihv_proto
-fi
-
 # timestamp the start of the normal build; the findunref tool uses it.
 touch $SRC/.build.tstamp
 
@@ -2155,13 +1814,6 @@ if [ "$build_ok" = "y" ]; then
 
 		E1=
 		f1=
-		if [ -d "$SRC/pkgdefs" ]; then
-			f1="$SRC/pkgdefs/etc/exception_list_$MACH"
-			if [ "$X_FLAG" = "y" ]; then
-				f1="$f1 $IA32_IHV_WS/usr/src/pkgdefs/etc/exception_list_$MACH"
-			fi
-		fi
-
 		for f in $f1; do
 			if [ -f "$f" ]; then
 				E1="$E1 -e $f"
@@ -2179,68 +1831,6 @@ if [ "$build_ok" = "y" ]; then
 				E2="$E2 -e $f"
 			fi
 		done
-
-		if [ -f "$REF_PROTO_LIST" ]; then
-			#
-			# For builds that copy the IHV proto area (-X), add the
-			# IHV proto list to the reference list if the reference
-			# was built without -X.
-			#
-			# For builds that don't copy the IHV proto area, add the
-			# IHV proto list to the build's proto list if the
-			# reference was built with -X.
-			#
-			# Use the presence of the first file entry of the cached
-			# IHV proto list in the reference list to determine
-			# whether it was built with -X or not.
-			#
-			IHV_REF_PROTO_LIST=$SRC/pkg/proto_list_ihv_$MACH
-			grepfor=$(nawk '$1 == "f" { print $2; exit }' \
-				$IHV_REF_PROTO_LIST 2> /dev/null)
-			if [ $? = 0 -a -n "$grepfor" ]; then
-				if [ "$X_FLAG" = "y" ]; then
-					grep -w "$grepfor" \
-						$REF_PROTO_LIST > /dev/null
-					if [ ! "$?" = "0" ]; then
-						REF_IHV_PROTO="-d $IHV_REF_PROTO_LIST"
-					fi
-				else
-					grep -w "$grepfor" \
-						$REF_PROTO_LIST > /dev/null
-					if [ "$?" = "0" ]; then
-						IHV_PROTO_LIST="$IHV_REF_PROTO_LIST"
-					fi
-				fi
-			fi
-		fi
-	fi
-
-	if [ "$N_FLAG" != "y" -a -f $SRC/pkgdefs/Makefile ]; then
-		echo "\n==== Impact on SVr4 packages ====\n" >> $mail_msg_file
-		#
-		# Compare the build's proto list with current package
-		# definitions to audit the quality of package
-		# definitions and makefile install targets. Use the
-		# current exception list.
-		#
-		PKGDEFS_LIST=""
-		for d in $abssrcdirs; do
-			if [ -d $d/pkgdefs ]; then
-				PKGDEFS_LIST="$PKGDEFS_LIST -d $d/pkgdefs"
-			fi
-		done
-		if [ "$X_FLAG" = "y" -a \
-		    -d $IA32_IHV_WS/usr/src/pkgdefs ]; then
-			PKGDEFS_LIST="$PKGDEFS_LIST -d $IA32_IHV_WS/usr/src/pkgdefs"
-		fi
-		$PROTOCMPTERSE \
-		    "Files missing from the proto area:" \
-		    "Files missing from packages:" \
-		    "Inconsistencies between pkgdefs and proto area:" \
-		    ${E1} \
-		    ${PKGDEFS_LIST} \
-		    $ATLOG/proto_list_${MACH} \
-		    >> $mail_msg_file
 	fi
 
 	if [ "$N_FLAG" != "y" -a -d $SRC/pkg ]; then
@@ -2264,9 +1854,7 @@ if [ "$build_ok" = "y" ]; then
 			"Files that changed between yesterday and today:" \
 			${ELIST} \
 			-d $REF_PROTO_LIST \
-			$REF_IHV_PROTO \
 			$ATLOG/proto_list_${MACH} \
-			$IHV_PROTO_LIST \
 			>> $mail_msg_file
 	fi
 fi
@@ -2502,11 +2090,6 @@ if [ "$f_FLAG" = "y" -a "$build_ok" = "y" ]; then
 	diff $SRC/unref-${MACH}.ref $SRC/unref-${MACH}.out >>$mail_msg_file
 fi
 
-#
-# Generate the OpenSolaris deliverables if requested.  Some of these
-# steps need to come after findunref and are commented below.
-#
-
 # Verify that the usual lists of files, such as exception lists,
 # contain only valid references to files.  If the build has failed,
 # then don't check the proto area.
@@ -2523,23 +2106,12 @@ if [ "$M_FLAG" != "y" -a "$build_ok" = y ]; then
 	echo "\n==== Impact on file permissions ====\n" \
 		>> $mail_msg_file
 
-	abspkgdefs=
 	abspkg=
 	for d in $abssrcdirs; do
-		if [ -d "$d/pkgdefs" ]; then
-			abspkgdefs="$abspkgdefs $d"
-		fi
 		if [ -d "$d/pkg" ]; then
 			abspkg="$abspkg $d"
 		fi
 	done
-
-	if [ -n "$abspkgdefs" ]; then
-		pmodes -qvdP \
-		    `find $abspkgdefs -name pkginfo.tmpl -print -o \
-		    -name .del\* -prune | sed -e 's:/pkginfo.tmpl$::' | \
-		    sort -u` >> $mail_msg_file
-	fi
 
 	if [ -n "$abspkg" ]; then
 		for d in "$abspkg"; do
