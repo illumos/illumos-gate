@@ -37,6 +37,7 @@
  */
 /* Copyright (c) 2007, The Storage Networking Industry Association. */
 /* Copyright (c) 1996, 1997 PDC, Network Appliance. All Rights Reserved */
+/* Copyright 2014 Nexenta Systems, Inc.  All rights reserved.  */
 
 #ifndef _NDMPD_H
 #define	_NDMPD_H
@@ -310,9 +311,6 @@ typedef struct ndmpd_session_tape_desc {
 	int td_sid;
 	int td_lun;
 	char td_adapter_name[SCSI_MAX_NAME];
-	ulong_t td_eom_seen:1,
-		td_io_err:1,
-		td_write:1;
 } ndmpd_session_tape_desc_t;
 
 typedef struct ndmpd_session_mover_desc {
@@ -798,7 +796,6 @@ extern int ndmpd_remote_read_v3(ndmpd_session_t *,
     char *,
     ulong_t);
 extern int ndmpd_mover_wait_v3(ndmpd_session_t *);
-extern void ndmpd_write_eom(int);
 
 
 /*
@@ -1022,6 +1019,9 @@ extern int ndmp_restore_extract_params(ndmpd_session_t *,
 extern int ndmp_tar_reader(ndmp_tar_reader_arg_t *);
 
 extern int tape_open(char *, int);
+extern int tape_is_at_bot(ndmpd_session_t *);
+extern int tape_is_at_bof(ndmpd_session_t *);
+extern void fm_dance(ndmpd_session_t *);
 
 extern void ndmp_session_ref(ndmpd_session_t *);
 extern void ndmp_session_unref(ndmpd_session_t *);
