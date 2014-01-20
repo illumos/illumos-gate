@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2014, OmniTI Computer Consulting, Inc. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -209,12 +210,7 @@ extern "C" {
 #define	SIOCTMYSITE	_IOWR('i', 146, struct sioc_addrreq)
 							/* In this site? */
 
-/* 147 and 148 were SIOC*TUNPARAM ioctls.  Feel free to re-use. */
-
-#define	SIOCFIPSECONFIG	_IOW('i',  149, 0)		/* Flush Policy  */
-#define	SIOCSIPSECONFIG	_IOW('i',  150, 0)		/* Set Policy */
-#define	SIOCDIPSECONFIG	_IOW('i',  151, 0)		/* Delete Policy */
-#define	SIOCLIPSECONFIG	_IOW('i',  152, 0)		/* List Policy */
+/* 147-152 were SIOC*{TUNPARAM,IPSECONFIG} ioctls.  Feel free to re-use. */
 
 /*
  * 153 can be reused (was consolidation-private SIOCLIFFAILOVER).

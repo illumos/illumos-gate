@@ -23,6 +23,7 @@
  * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 1990 Mentat Inc.
  * Copyright (c) 2012 Joyent, Inc. All rights reserved.
+ * Copyright (c) 2014, OmniTI Computer Consulting, Inc. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -1027,11 +1028,12 @@ ip_ioctl_cmd_t ip_ndx_ioctl_table[] = {
 			MISC_CMD, ip_sioctl_tmysite, NULL },
 	/* 147 */ { IPI_DONTCARE, 0, 0, 0, NULL, NULL },
 	/* 148 */ { IPI_DONTCARE, 0, 0, 0, NULL, NULL },
-	/* IPSECioctls handled in ip_sioctl_copyin_setup itself */
-	/* 149 */ { SIOCFIPSECONFIG, 0, IPI_PRIV, MISC_CMD, NULL, NULL },
-	/* 150 */ { SIOCSIPSECONFIG, 0, IPI_PRIV, MISC_CMD, NULL, NULL },
-	/* 151 */ { SIOCDIPSECONFIG, 0, IPI_PRIV, MISC_CMD, NULL, NULL },
-	/* 152 */ { SIOCLIPSECONFIG, 0, IPI_PRIV, MISC_CMD, NULL, NULL },
+
+	/* Old *IPSECONFIG ioctls are now deprecated, now see spdsock.c */
+	/* 149 */ { IPI_DONTCARE, 0, 0, 0, NULL, NULL },
+	/* 150 */ { IPI_DONTCARE, 0, 0, 0, NULL, NULL },
+	/* 151 */ { IPI_DONTCARE, 0, 0, 0, NULL, NULL },
+	/* 152 */ { IPI_DONTCARE, 0, 0, 0, NULL, NULL },
 
 	/* 153 */ { IPI_DONTCARE, 0, 0, 0, NULL, NULL },
 

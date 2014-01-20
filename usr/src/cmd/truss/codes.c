@@ -24,7 +24,7 @@
  * Copyright (c) 2013 by Delphix. All rights reserved.
  * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2012, Joyent, Inc. All rights reserved.
- * Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved.
+ * Copyright (c) 2014, OmniTI Computer Consulting, Inc. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -854,10 +854,6 @@ const struct ioc {
 	{ (uint_t)SIOCTMYADDR,		"SIOCTMYADDR",	"sioc_addrreq" },
 	{ (uint_t)SIOCTONLINK,		"SIOCTONLINK",	"sioc_addrreq" },
 	{ (uint_t)SIOCTMYSITE,		"SIOCTMYSITE",	"sioc_addrreq" },
-	{ (uint_t)SIOCFIPSECONFIG,	"SIOCFIPSECONFIG",	NULL },
-	{ (uint_t)SIOCSIPSECONFIG,	"SIOCSIPSECONFIG",	NULL },
-	{ (uint_t)SIOCDIPSECONFIG,	"SIOCDIPSECONFIG",	NULL },
-	{ (uint_t)SIOCLIPSECONFIG,	"SIOCLIPSECONFIG",	NULL },
 	{ (uint_t)SIOCGLIFBINDING,	"SIOCGLIFBINDING",	"lifreq" },
 	{ (uint_t)SIOCSLIFGROUPNAME,	"SIOCSLIFGROUPNAME",	"lifreq" },
 	{ (uint_t)SIOCGLIFGROUPNAME,	"SIOCGLIFGROUPNAME",	"lifreq" },
