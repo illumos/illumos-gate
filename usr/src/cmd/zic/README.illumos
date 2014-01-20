@@ -1,0 +1,72 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright (c) 2014 Joyent, Inc.  All rights reserved.
+#
+
+How to update the TZ database information.
+
+Welcome! You've probably heard that some aspect of time has changed and
+you're wondering what to do. The first thing to do is to grab the latest
+version of the time database which can currently be found at:
+
+http://www.iana.org/time-zones
+
+You'll need the data tarball. Most data files are used in the gate
+directly; however, a few have slightly different names. The following
+commands assume that you're inside of the directory you extracted the
+time zone files.
+
+$ cp africa antarctica asia australasia backward etcetera europe \
+northamerica pacificnew southamerica systemv $CODEMGR_WS/usr/src/cmd/zic
+
+Next you need to copy the country tab and the zone tab files. These have
+different names in our source tree.
+
+$ cp iso3166.tab $CODEMGR_WS/usr/src/cmd/zic/country.tab
+$ cp zone.tab $CODEMGR_WS/usr/src/cmd/zic/zone.tab.txt
+
+Now, you need to manaully fix up the zone_sun.tab. zone_sun.tab has
+additional different zone names that the original does not. As things
+are changed and removed, or coordinates updated, the same should be done
+in zone_sun.tab. The simplest way known to deal with it today is
+something like the following:
+
+$ cd $CODEMGR_WS/usr/src/cmd/zic
+$ vimdiff zone.tab.txt zone_sun.tab
+
+And as you see things that show up as egregiously different, do a 'git
+diff zone.tab.txt' and see what changed and fix zone_sun.tab
+appropriately. Usually this means deleting removed entries and adding
+new ones.
+
+After that's done, you'll need to go through the more agonizing process of
+packaging. To do this, you'll want to look through the differences that have
+occurred in zone.tab.txt and backward. The contents of backward describe
+hardlinks that need to exist in packaging. Specifically, if you have a line in
+the form of:
+
+LINK	Beleriand	Gondolin
+
+That instructs that Gondolin should be hardlinked to Beleriand. In ips parlance
+that'd be:
+
+hardlink path=usr/share/lib/zoneinfo/Beleriand target=./Gondolin
+
+The differences in zone.tab.txt describe the additions and removals of various
+file entries. If you're not friends with protocmp yet, this should help you out.
+Once both of those are done, you'll need to update the version of the package
+itself in the manifest. IANA releases these as <year><letter>, eg. 2013i.
+Instead, you need to encode that letter to its spot in the alphabet. So 2013i
+would become 2013.9.
+
+Once packaging is all done, then you should be all set.
