@@ -12,7 +12,8 @@
 .\" brackets "[]" replaced with your own identifying information:
 .\" Portions Copyright [yyyy] [name of copyright owner]
 .\" Copyright 2013 DEY Storage Systems, Inc.
-.TH ZLOGIN 1 "Sep 8, 2013"
+.\" Copyright (c) 2014 Gary Mills
+.TH ZLOGIN 1 "Jan 22, 2014"
 .SH NAME
 zlogin \- enter a zone
 .SH SYNOPSIS
@@ -23,7 +24,7 @@ zlogin \- enter a zone
 
 .LP
 .nf
-\fBzlogin\fR [\fB-EQS\fR] [\fB-e\fR \fIc\fR] [\fB-l\fR \fIusername\fR] \fIzonename\fR \fIutility\fR
+\fBzlogin\fR [\fB-nEQS\fR] [\fB-e\fR \fIc\fR] [\fB-l\fR \fIusername\fR] \fIzonename\fR \fIutility\fR
      [\fIargument\fR]...
 .fi
 
@@ -121,6 +122,17 @@ login by using the escape sequence character.
 Specifies a different \fIusername\fR for the zone login. If you do not use this
 option, the zone username used is "root". This option is invalid if the
 \fB-C\fR option is specified.
+.RE
+
+.sp
+.ne 2
+.na
+\fB-n\fR
+.ad
+.RS 15n
+Redirect the input of \fBzlogin\fR to \fB/dev/null\fR.
+This option is useful when the command running in the local zone
+and the shell which invokes \fBzlogin\fR both read from standard input.
 .RE
 
 .sp
