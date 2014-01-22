@@ -21,6 +21,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
  */
 
 /* Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -35,8 +36,6 @@
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Standard Streams Terminal Line Discipline module.
@@ -1355,6 +1354,17 @@ ldtermrput(queue_t *q, mblk_t *mp)
 					    (c == tp->t_modes.c_cc[VDSUSP])) {
 						ldterm_dosig(q, SIGTSTP, c,
 						    M_SIG, 0);
+						continue;
+					}
+
+					/*
+					 * Consumers do not expect the ^T to be
+					 * echoed out when we generate a
+					 * VSTATUS.
+					 */
+					if (c == tp->t_modes.c_cc[VSTATUS]) {
+						ldterm_dosig(q, SIGINFO, '\0',
+						    M_PCSIG, FLUSHRW);
 						continue;
 					}
 				}

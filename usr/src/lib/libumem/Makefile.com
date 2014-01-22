@@ -119,8 +119,6 @@ MAPFILE_SUPPLEMENTAL = $(MAPFILE_SUPPLEMENTAL_$(CURTYPE))
 
 LDLIBS +=	-lc
 
-DYNFLAGS += -Wl,-Plibumem_trampoline.so.1
-
 LDFLAGS_standalone = $(ZNOVERSION) $(BREDUCE) -M../common/mapfile-vers \
 	-M$(MAPFILE_SUPPLEMENTAL) -dy -r
 LDFLAGS = $(LDFLAGS_$(CURTYPE))
@@ -146,6 +144,7 @@ DTS_ERRNO=
 STAND_RENAMED_FUNCS= \
 	atomic_add_64 \
 	atomic_add_32_nv \
+	atomic_swap_64 \
 	snprintf \
 	vsnprintf
 

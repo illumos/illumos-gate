@@ -1225,8 +1225,6 @@ f lib/amd64/libtsol.so.2 0755 root bin
 s lib/amd64/libtsol.so=libtsol.so.2
 f lib/amd64/libumem.so.1 0755 root bin
 s lib/amd64/libumem.so=libumem.so.1
-f lib/amd64/libumem_trampoline.so.1 0755 root bin
-s lib/amd64/libumem_trampoline.so=libumem_trampoline.so.1
 f lib/amd64/libuuid.so.1 0755 root bin
 s lib/amd64/libuuid.so=libuuid.so.1
 f lib/amd64/libuutil.so.1 0755 root bin
@@ -1421,8 +1419,6 @@ f lib/libtsol.so.2 0755 root bin
 s lib/libtsol.so=libtsol.so.2
 f lib/libumem.so.1 0755 root bin
 s lib/libumem.so=libumem.so.1
-f lib/libumem_trampoline.so.1 0755 root bin
-s lib/libumem_trampoline.so=libumem_trampoline.so.1
 f lib/libuuid.so.1 0755 root bin
 s lib/libuuid.so=libuuid.so.1
 f lib/libuutil.so.1 0755 root bin
@@ -4941,8 +4937,6 @@ s usr/lib/amd64/libtsol.so.2=../../../lib/amd64/libtsol.so.2
 s usr/lib/amd64/libtsol.so=../../../lib/amd64/libtsol.so.2
 s usr/lib/amd64/libumem.so.1=../../../lib/amd64/libumem.so.1
 s usr/lib/amd64/libumem.so=../../../lib/amd64/libumem.so.1
-s usr/lib/amd64/libumem_trampoline.so.1=../../../lib/amd64/libumem_trampoline.so.1
-s usr/lib/amd64/libumem_trampoline.so=../../../lib/amd64/libumem_trampoline.so.1
 s usr/lib/amd64/libuuid.so.1=../../../lib/amd64/libuuid.so.1
 s usr/lib/amd64/libuuid.so=../../../lib/amd64/libuuid.so.1
 s usr/lib/amd64/libuutil.so.1=../../../lib/amd64/libuutil.so.1
@@ -6376,8 +6370,6 @@ s usr/lib/libtsol.so.2=../../lib/libtsol.so.2
 s usr/lib/libtsol.so=../../lib/libtsol.so.2
 s usr/lib/libumem.so.1=../../lib/libumem.so.1
 s usr/lib/libumem.so=../../lib/libumem.so.1
-s usr/lib/libumem_trampoline.so.1=../../lib/libumem_trampoline.so.1
-s usr/lib/libumem_trampoline.so=../../lib/libumem_trampoline.so.1
 f usr/lib/libunistat.so.1 0755 root bin
 s usr/lib/libunistat.so=libunistat.so.1
 s usr/lib/libuuid.so.1=../../lib/libuuid.so.1

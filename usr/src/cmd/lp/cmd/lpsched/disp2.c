@@ -28,8 +28,6 @@
 /*	  All Rights Reserved  	*/
 
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include	"dispatch.h"
 #include <syslog.h>
 #include <time.h>
@@ -371,7 +369,7 @@ s_load_class(char *m, MESG *md)
 	char			*class;
 	ushort			status;
 	register CLASS		*pc;
-	register CSTATUS	*pcs;
+	register CLSTATUS	*pcs;
 
 	(void) getmessage(m, S_LOAD_CLASS, &class);
 	syslog(LOG_DEBUG, "s_load_class(%s)", (class ? class : "NULL"));
@@ -449,7 +447,7 @@ s_load_class(char *m, MESG *md)
  */
 
 static void
-_unload_class(CSTATUS *pcs)
+_unload_class(CLSTATUS *pcs)
 {
 	freeclass (pcs->class);
 	if (pcs->rej_reason != NULL)
@@ -465,7 +463,7 @@ s_unload_class(char *m, MESG *md)
 	char			*class;
 	ushort			status;
 	RSTATUS 		*prs;
-	register CSTATUS	*pcs;
+	register CLSTATUS	*pcs;
 
 	(void) getmessage(m, S_UNLOAD_CLASS, &class);
 	syslog(LOG_DEBUG, "s_unload_class(%s)", (class ? class : "NULL"));
@@ -535,7 +533,7 @@ void
 s_inquire_class(char *m, MESG *md)
 {
 	char			*class;
-	register CSTATUS	*pcs;
+	register CLSTATUS	*pcs;
 
 	(void) getmessage(m, S_INQUIRE_CLASS, &class);
 	syslog(LOG_DEBUG, "s_inquire_class(%s)", (class ? class : "NULL"));

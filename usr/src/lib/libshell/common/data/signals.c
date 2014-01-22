@@ -104,6 +104,9 @@ const struct shtable2 shtab_signals[] =
 #endif /* SIGGRANT */
 	"HUP",		VAL(SIGHUP,SH_SIGDONE),				S("Hangup"),
 	"ILL",		VAL(SIGILL,SH_SIGDONE),				S("Illegal instruction"),
+#ifdef SIGINFO
+	"INFO",		VAL(SIGINFO,SH_SIGIGNORE), 			S("Information request"),
+#endif /*SIGINFO */
 #ifdef JOBS
 	"INT",		VAL(SIGINT,SH_SIGINTERACTIVE),			S("Interrupt"),
 #else

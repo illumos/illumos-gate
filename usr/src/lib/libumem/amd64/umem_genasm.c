@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2012 Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2013 Joyent, Inc.  All rights reserved.
  */
 
 /*
@@ -69,18 +69,18 @@
 #include <umem_impl.h>
 #include "umem_base.h"
 
-int umem_genasm_supported = 1;
-uintptr_t umem_genasm_mptr;
-uintptr_t umem_genasm_msize;
-uintptr_t umem_genasm_fptr;
-uintptr_t umem_genasm_fsize;
-static uintptr_t umem_genasm_omptr;
-static uintptr_t umem_genasm_ofptr;
+const int umem_genasm_supported = 1;
+static uintptr_t umem_genasm_mptr = (uintptr_t)&_malloc;
+static size_t umem_genasm_msize = 576;
+static uintptr_t umem_genasm_fptr = (uintptr_t)&_free;
+static size_t umem_genasm_fsize = 576;
+static uintptr_t umem_genasm_omptr = (uintptr_t)umem_malloc;
+static uintptr_t umem_genasm_ofptr = (uintptr_t)umem_malloc_free;
 
 #define	UMEM_GENASM_MAX64	(UINT32_MAX / sizeof (uintptr_t))
 #define	PTC_JMPADDR(dest, src)	(dest - (src + 4))
 #define	PTC_ROOT_SIZE	sizeof (uintptr_t)
-#define	MULTINOP	 0x0000441f0f
+#define	MULTINOP	0x0000441f0f
 
 /*
  * void *ptcmalloc(size_t orig_size);
@@ -550,11 +550,10 @@ umem_genasm(int *cp, umem_cache_t **caches, int nc)
 	int nents, i;
 	uint8_t *mptr;
 	uint8_t *fptr;
-	uint32_t *ptr;
 	uint64_t v, *vptr;
 
-	mptr = (void *)((uintptr_t)&umem_genasm_mptr + 5);
-	fptr = (void *)((uintptr_t)&umem_genasm_fptr + 5);
+	mptr = (void *)((uintptr_t)umem_genasm_mptr + 5);
+	fptr = (void *)((uintptr_t)umem_genasm_fptr + 5);
 	if (umem_genasm_mptr == 0 || umem_genasm_msize == 0 ||
 	    umem_genasm_fptr == 0 || umem_genasm_fsize == 0)
 		return (1);
@@ -563,7 +562,7 @@ umem_genasm(int *cp, umem_cache_t **caches, int nc)
 	 * The total number of caches that we can service is the minimum of:
 	 *  o the amount supported by libc
 	 *  o the total number of umem caches
-	 *  o we use a single byte addl, so its MAX_UINT32 / sizeof (uintptr_t).
+	 *  o we use a single byte addl, so it's MAX_UINT32 / sizeof (uintptr_t)
 	 *    For 64-bit, this is MAX_UINT32 >> 3, a lot.
 	 */
 	nents = _tmem_get_nentries();
@@ -578,29 +577,23 @@ umem_genasm(int *cp, umem_cache_t **caches, int nc)
 	if (nents == 0 || umem_ptc_size == 0)
 		return (0);
 
-	/* Grab the original malloc and free locations */
-	ptr = (void *)(mptr - 4);
-	umem_genasm_omptr = *ptr + (uintptr_t)mptr;
-	ptr = (void *)(fptr - 4);
-	umem_genasm_ofptr = *ptr + (uintptr_t)fptr;
-
 	/* Take into account the jump */
-	if (genasm_malloc(mptr, umem_genasm_fsize - 5, nents, cp) != 0)
+	if (genasm_malloc(mptr, umem_genasm_msize, nents, cp) != 0)
 		return (1);
 
-	if (genasm_free(fptr, umem_genasm_fsize - 5, nents, cp) != 0)
+	if (genasm_free(fptr, umem_genasm_fsize, nents, cp) != 0)
 		return (1);
+
 
 	/* nop out the jump with a multibyte jump */
-	vptr = (void *)&umem_genasm_mptr;
+	vptr = (void *)umem_genasm_mptr;
 	v = MULTINOP;
 	v |= *vptr & (0xffffffULL << 40);
 	(void) atomic_swap_64(vptr, v);
-	vptr = (void *)&umem_genasm_fptr;
+	vptr = (void *)umem_genasm_fptr;
 	v = MULTINOP;
 	v |= *vptr & (0xffffffULL << 40);
 	(void) atomic_swap_64(vptr, v);
-
 
 	for (i = 0; i < nents; i++)
 		caches[i]->cache_flags |= UMF_PTC;

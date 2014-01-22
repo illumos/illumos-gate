@@ -25,7 +25,7 @@
  */
 
 /*
- * Copyright (c) 2012 Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2014 Joyent, Inc.  All rights reserved.
  */
 
 /*
@@ -411,6 +411,13 @@
  * entry in a given root's list will be able to satisfy the same requests as the
  * corresponding cache.
  *
+ * The choice of sixteen roots is based on where we believe we get the biggest
+ * bang for our buck. The per-thread caches will cache up to 256 byte and 448
+ * byte allocations on ILP32 and LP64 respectively. Generally applications plan
+ * more carefully how they do larger allocations than smaller ones. Therefore
+ * sixteen roots is a reasonable compromise between the amount of additional
+ * overhead per thread, and the likelihood of a program to benefit from it.
+ *
  * The maximum amount of memory that can be cached in each thread is determined
  * by the perthread_cache UMEM_OPTION. It corresponds to the umem_ptc_size
  * value. The default value for this is currently 1 MB. Once umem_init() has
@@ -476,29 +483,18 @@
  * -----------------------------------------------
  *
  * The last piece of this puzzle is how we actually jam ptcmalloc() into the
- * PLT.  The dyanmic linker has support for global and local audit libraries.
- * For the full explanation of audit libraries consult the Linkers and Libraries
- * guide or the linker source. A local auditer can attach to a single library
- * and interpose on all of the relocations that come in from and leave to that
- * same library. To facilitate our work, we have created a local audit library
- * for libumem that is called libumem_trampoline and is located in
- * lib/libumem_trampoline/.
+ * PLT.  To handle this, we have defined two functions, _malloc and _free and
+ * used a special mapfile directive to place them into the a readable,
+ * writeable, and executable segment.  Next we use a standard #pragma weak for
+ * malloc and free and direct them to those symbols. By default, those symbols
+ * have text defined as nops for our generated functions and when they're
+ * invoked, they jump to the default malloc and free functions.
  *
- * When any resolution is done to malloc(), the audit library allows us to
- * replace the address with an address that it specifies. There are two 4k
- * sections in the libumem_trampoline's bss which we use as the stomping grounds
- * for ptcmalloc and ptcfree. When the audit library audits the malloc and free
- * functions from libumem, it encodes their address and sets its buffers to
- * contain a simple trampoline which consists of a jmp instruction and a four
- * byte offset to the original malloc and free. libumem_trampoline's mapfile
- * explicitly makes its bss rwx instead of rw to support this.
- *
- * When umem_genasm() is called, it uses a similar mechanism to get the address
- * and size of the trampoline libraries malloc (mbuf) and free (fbuf) buffers.
- * After validating that the size will be able to contain all of the
- * instructions, it starts laying out ptcmalloc and ptcfree at mbuf[4] and
- * fbuf[4]. Once both have been successfully generated, umem_genasm() stores a
- * single five byte nop over the original jump.
+ * When umem_genasm() is called, it goes through and generates new malloc() and
+ * free() functions in the text provided for by _malloc and _free just after the
+ * jump. Once both have been successfully generated, umem_genasm() nops over the
+ * original jump so that we now call into the genasm versions of these
+ * functions.
  *
  * 8.3 umem_genasm()
  * -----------------
@@ -547,12 +543,11 @@
  *	o. umem_genasm_fsize: The size in bytes of the above buffer
  *
  * Finally, to enable the generated assembly we need to remove the previous jump
- * to the actual malloc that exists at the start of these buffers. This is a
- * five byte region. We could zero out the jump offset to be a jmp +0, but
- * using nops can be faster. We specifically use a single five byte nop which is
- * faster. The opcode for the five byte nop is 0x 0f 1f 44 00 00. On x86,
- * remember integers are little endian, so it will be written the other way
- * around.
+ * to the actual malloc that exists at the start of these buffers. On x86, this
+ * is a five byte region. We could zero out the jump offset to be a jmp +0, but
+ * using nops can be faster. We specifically use a single five byte nop on x86
+ * as it is faster. When porting ptcumem to other architectures, the various
+ * opcode changes and options should be analyzed.
  *
  * 8.4 Interface with libc.so
  * --------------------------
@@ -560,7 +555,7 @@
  * The tmem_t structure as described in the beginning of section 8, is part of a
  * private interface with libc. There are three functions that exist to cover
  * this. They are not documented in man pages or header files. They are in the
- * SUNWprivate part of libc's makefile.
+ * SUNWprivate part of libc's mapfile.
  *
  *	o. _tmem_get_base(void)
  *

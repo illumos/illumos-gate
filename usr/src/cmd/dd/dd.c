@@ -24,6 +24,7 @@
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2012, Josef 'Jeff' Sipek <jeffpc@31bits.net>. All rights reserved.
+ * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -44,6 +45,9 @@
 #include	<stdlib.h>
 #include	<locale.h>
 #include	<string.h>
+#include	<sys/time.h>
+#include	<errno.h>
+#include	<strings.h>
 
 /* The BIG parameter is machine dependent.  It should be a long integer	*/
 /* constant that can be used by the number parser to check the validity	*/
@@ -102,7 +106,8 @@
 	"	   [iseek=n] [oseek=n] [seek=n] [count=n] [conv=[ascii]\n"\
 	"	   [,ebcdic][,ibm][,asciib][,ebcdicb][,ibmb]\n"\
 	"	   [,block|unblock][,lcase|ucase][,swab]\n"\
-	"	   [,noerror][,notrunc][,sync]]\n"
+	"	   [,noerror][,notrunc][,sync]]\n"\
+	"	   [oflag=[dsync][sync]]\n"
 
 /* Global references */
 
@@ -127,6 +132,7 @@ static unsigned cbc;	/* number of bytes in the conversion buffer */
 static int	ibf;	/* input file descriptor */
 static int	obf;	/* output file descriptor */
 static int	cflag;	/* conversion option flags */
+static int	oflag;	/* output flag options */
 static int	skipf;	/* if skipf == 1, skip rest of input line */
 static unsigned long long	nifr;	/* count of full input records */
 static unsigned long long	nipr;	/* count of partial input records */
@@ -148,6 +154,10 @@ static char		*ifile;		/* input file name pointer */
 static char		*ofile;		/* output file name pointer */
 static unsigned char	*ibuf;		/* input buffer pointer */
 static unsigned char	*obuf;		/* output buffer pointer */
+
+static hrtime_t		startt;		/* hrtime copy started */
+static unsigned long long	obytes;	/* output bytes */
+static sig_atomic_t	nstats;		/* do we need to output stats */
 
 /* This is an EBCDIC to ASCII conversion table	*/
 /* from a proposed BTL standard April 16, 1979	*/
@@ -461,6 +471,12 @@ static unsigned char *atoe = svr4_atoe;
 static unsigned char *etoa = svr4_etoa;
 static unsigned char *atoibm = svr4_atoibm;
 
+/*ARGSUSED*/
+static void
+siginfo_handler(int sig, siginfo_t *sip, void *ucp)
+{
+	nstats = 1;
+}
 
 int
 main(int argc, char **argv)
@@ -471,6 +487,7 @@ main(int argc, char **argv)
 	int conv;		/* conversion option code */
 	int trunc;		/* whether output file is truncated */
 	struct stat file_stat;
+	struct sigaction sact;
 
 	/* Set option defaults */
 
@@ -657,6 +674,32 @@ main(int argc, char **argv)
 			}
 			continue;
 		}
+		if (match("oflag="))
+		{
+			for (;;)
+			{
+				if (match(","))
+				{	
+					continue;
+				}
+				if (*string == '\0')
+				{
+					break;
+				}
+				if (match("dsync"))
+				{
+					oflag |= O_DSYNC;
+					continue;
+				}
+				if (match("sync"))
+				{
+					oflag |= O_SYNC;
+					continue;
+				}
+				goto badarg;
+			}
+			continue;
+		}
 		badarg:
 		(void) fprintf(stderr, "dd: %s \"%s\"\n",
 			gettext("bad argument:"), string);
@@ -787,13 +830,12 @@ main(int argc, char **argv)
 	{
 		ibf = open(ifile, 0);
 	}
-#ifndef STANDALONE
 	else
 	{
 		ifile = "";
 		ibf = dup(0);
 	}
-#endif
+
 	if (ibf == -1)
 	{
 		(void) fprintf(stderr, "dd: %s: ", ifile);
@@ -807,11 +849,11 @@ main(int argc, char **argv)
 	if (ofile)
 	{
 		if (trunc == 0)	/* do not truncate output file */
-			obf = open(ofile, (O_WRONLY|O_CREAT),
+			obf = open(ofile, (O_WRONLY|O_CREAT|oflag),
 			(S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH));
 		else if (oseekn && (trunc == 1))
 		{
-			obf = open(ofile, O_WRONLY|O_CREAT,
+			obf = open(ofile, O_WRONLY|O_CREAT|oflag,
 			(S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH));
 			if (obf == -1)
 			{
@@ -829,16 +871,15 @@ main(int argc, char **argv)
 			}
 		}
 		else
-			obf = creat(ofile,
+			obf = open(ofile, O_WRONLY|O_CREAT|O_TRUNC|oflag,
 			(S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH));
 	}
-#ifndef STANDALONE
 	else
 	{
 		ofile = "";
 		obf = dup(1);
 	}
-#endif
+
 	if (obf == -1)
 	{
 		(void) fprintf(stderr, "dd: %s: ", ofile);
@@ -871,14 +912,33 @@ main(int argc, char **argv)
 		exit(2);
 	}
 
-	/* Enable a statistics message on SIGINT */
+	/*
+	 * Enable a statistics message when we terminate on SIGINT
+	 * Also enable it to be queried via SIGINFO and SIGUSR1
+	 */
 
-#ifndef STANDALONE
 	if (signal(SIGINT, SIG_IGN) != SIG_IGN)
 	{
 		(void) signal(SIGINT, term);
 	}
-#endif
+
+	bzero(&sact, sizeof (struct sigaction));
+	sact.sa_flags = SA_SIGINFO;
+	sact.sa_sigaction = siginfo_handler;
+	(void) sigemptyset(&sact.sa_mask);
+	if (sigaction(SIGINFO, &sact, NULL) != 0) {
+		(void) fprintf(stderr, "dd: %s: %s\n",
+		    gettext("failed to enable siginfo handler"),
+		    gettext(strerror(errno)));
+		exit(2);
+	}
+	if (sigaction(SIGUSR1, &sact, NULL) != 0) {
+		(void) fprintf(stderr, "dd: %s: %s\n",
+		    gettext("failed to enable sigusr1 handler"),
+		    gettext(strerror(errno)));
+		exit(2);
+	}
+
 	/* Skip input blocks */
 
 	while (skip)
@@ -939,8 +999,16 @@ main(int argc, char **argv)
 
 	/* Read and convert input blocks until end of file(s) */
 
+	/* Grab our start time for siginfo purposes */
+	startt = gethrtime();
+
 	for (;;)
 	{
+		if (nstats != 0) {
+			stats();
+			nstats = 0;
+		}
+
 		if ((count == 0) || (nifr+nipr < count))
 		{
 		/* If proceed on error is enabled, zero the input buffer */
@@ -1772,6 +1840,7 @@ static unsigned char
 		}
 		obc -= oc;
 		op = obuf;
+		obytes += bc;
 
 		/* If any data in the conversion buffer, move it into */
 		/* the output buffer */
@@ -1820,10 +1889,24 @@ int c;
 static void
 stats()
 {
+	hrtime_t delta = gethrtime() - startt;
+	double secs = delta * 1e-9;
+
 	(void) fprintf(stderr, gettext("%llu+%llu records in\n"), nifr, nipr);
 	(void) fprintf(stderr, gettext("%llu+%llu records out\n"), nofr, nopr);
 	if (ntrunc) {
 		(void) fprintf(stderr,
 			gettext("%llu truncated record(s)\n"), ntrunc);
 	}
+
+	/*
+	 * If we got here before we started copying somehow, don't bother
+	 * printing the rest.
+	 */
+	if (startt == 0)
+		return;
+
+	(void) fprintf(stderr,
+	    gettext("%llu bytes transferred in %.6f secs (%.0f bytes/sec)\n"),
+	    obytes, secs, obytes / secs);
 }

@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <unistd.h>
 #include <errno.h>
 #include <string.h>
@@ -50,8 +48,17 @@ typedef struct malloc_data {
 	uint32_t malloc_stat; /* = UMEM_MALLOC_ENCODE(state, malloc_size) */
 } malloc_data_t;
 
+/*
+ * Because we do not support ptcumem on non-x86 today, we have to create these
+ * weak aliases.
+ */
+#ifndef _x86
+#pragma weak malloc = umem_malloc
+#pragma weak free = umem_malloc_free
+#endif /* !_x86 */
+
 void *
-malloc(size_t size_arg)
+umem_malloc(size_t size_arg)
 {
 #ifdef _LP64
 	uint32_t high_size = 0;
@@ -369,7 +376,7 @@ process_memalign:
 }
 
 void
-free(void *buf)
+umem_malloc_free(void *buf)
 {
 	if (buf == NULL)
 		return;

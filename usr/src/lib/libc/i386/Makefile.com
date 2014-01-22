@@ -20,6 +20,7 @@
 #
 #
 # Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2013, Joyent, Inc.  All rights reserved.
 # Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved.
 # Copyright (c) 2012, Joyent, Inc. All rights reserved.
 #
@@ -1179,6 +1180,7 @@ TIL=				\
 	thread_pool.o		\
 	tls.o			\
 	tsd.o			\
+	tmem.o			\
 	unwind.o
 
 THREADS_INLINES = $(LIBCBASE)/threads/i386.il

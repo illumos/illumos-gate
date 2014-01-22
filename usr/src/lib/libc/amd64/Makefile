@@ -1121,6 +1121,7 @@ TIL=				\
 	thread_pool.o		\
 	thrp_unwind.o		\
 	tls.o			\
+	tmem.o			\
 	tsd.o
 
 $(TIL:%=pics/%) := CFLAGS64 += $(LIBCBASE)/threads/amd64.il

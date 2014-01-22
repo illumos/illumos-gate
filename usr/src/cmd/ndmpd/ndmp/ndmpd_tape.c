@@ -2,7 +2,6 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
 /*
  * BSD 3 Clause License
  *
@@ -38,6 +37,7 @@
  */
 /* Copyright (c) 2007, The Storage Networking Industry Association. */
 /* Copyright (c) 1996, 1997 PDC, Network Appliance. All Rights Reserved */
+/* Copyright 2014 Nexenta Systems, Inc.  All rights reserved. */
 
 #include <sys/param.h>
 #include <fcntl.h>
@@ -63,6 +63,29 @@ static void common_tape_close(ndmp_connection_t *connection);
  */
 int ndmp_tape_open_retries = 5;
 int ndmp_tape_open_delay = 1000;
+
+/*
+ * A few words about EOT (end-of-tape) and EOM handling on tapes with SVR4
+ * semantic:
+ *
+ * We adhere to terminology as used in st driver.  EOT means end of recorded
+ * data on a tape. This is different from EOM (somewhere referred to as LEOT)
+ * which is the end of tape medium. EOT is meaningful only for reads while EOM
+ * is meaningful only for writes. It's not possible to read after EOT (fails
+ * with EIO), but it's possible to write data after EOM. EOM returned by st
+ * driver on modern tape drives is just indication that the physical end of
+ * tape medium is nearing and that writer should write just the necessary
+ * minimum and stop writing. When physical end of tape is reached all writes
+ * return EIO. If EOM is crossed during read operation then st driver doesn't
+ * bother to report it to client and that's alright because reads don't care
+ * where medium physically ends but they care about meaningful data recorded on
+ * the tape and as long as there are such data reads should continue to work.
+ *
+ * When reading EOT is signalled by st driver by two empty consecutive reads
+ * (with FSF done between them).  When writing EOM is signalled by empty write
+ * (a write which writes zero bytes). Following writes succeed until physical
+ * end of tape is reached in which case EIO is returned.
+ */
 
 /*
  * ************************************************************************
@@ -196,7 +219,6 @@ ndmpd_tape_open_v2(ndmp_connection_t *connection, void *body)
 	session->ns_tape.td_lun = lun;
 	(void) strlcpy(session->ns_tape.td_adapter_name, adptnm, SCSI_MAX_NAME);
 	session->ns_tape.td_record_count = 0;
-	session->ns_tape.td_eom_seen = FALSE;
 
 	NDMP_LOG(LOG_DEBUG, "Tape is opened fd: %d", session->ns_tape.td_fd);
 
@@ -389,6 +411,7 @@ ndmpd_tape_mtio_v2(ndmp_connection_t *connection, void *body)
 
 		do {
 			NS_UPD(twait, trun);
+			errno = 0;
 			rc = ioctl(session->ns_tape.td_fd, MTIOCTOP, &tapeop);
 			NS_UPD(trun, twait);
 			NDMP_LOG(LOG_DEBUG,
@@ -445,104 +468,6 @@ ndmpd_tape_mtio_v2(ndmp_connection_t *connection, void *body)
 
 
 /*
- * ndmpd_tape_write_v2
- *
- * This handler handles tape_write requests.
- * This interface is a non-buffered interface. Each write request
- * maps directly to a write to the tape device. It is the responsibility
- * of the NDMP client to pad the data to the desired record size.
- * It is the responsibility of the NDMP client to ensure that the
- * length is a multiple of the tape block size if the tape device
- * is in fixed block mode.
- *
- * Parameters:
- *   connection (input) - connection handle.
- *   body       (input) - request message body.
- *
- * Returns:
- *   void
- */
-void
-ndmpd_tape_write_v2(ndmp_connection_t *connection, void *body)
-{
-	ndmp_tape_write_request *request = (ndmp_tape_write_request *) body;
-	ndmp_tape_write_reply reply;
-	ndmpd_session_t *session = ndmp_get_client_data(connection);
-	ssize_t n;
-
-	reply.count = 0;
-
-	if (session->ns_tape.td_fd == -1) {
-		NDMP_LOG(LOG_ERR, "Tape device is not open.");
-		reply.error = NDMP_DEV_NOT_OPEN_ERR;
-		ndmp_send_reply(connection, (void *) &reply,
-		    "sending tape_write reply");
-		return;
-	}
-	if (session->ns_tape.td_mode == NDMP_TAPE_READ_MODE) {
-		NDMP_LOG(LOG_INFO, "Tape device opened in read-only mode");
-		reply.error = NDMP_PERMISSION_ERR;
-		ndmp_send_reply(connection, (void *) &reply,
-		    "sending tape_write reply");
-		return;
-	}
-	if (request->data_out.data_out_len == 0) {
-		reply.error = NDMP_NO_ERR;
-		ndmp_send_reply(connection, (void *) &reply,
-		    "sending tape_write reply");
-		return;
-	}
-
-	if (session->ns_tape.td_eom_seen) {
-		/*
-		 * Refer to the comment at the top of this file for
-		 * Mammoth2 tape drives.
-		 */
-		NDMP_LOG(LOG_DEBUG, "eom_seen");
-		ndmpd_write_eom(session->ns_tape.td_fd);
-
-		session->ns_tape.td_eom_seen = FALSE;
-		reply.error = NDMP_EOM_ERR;
-		ndmp_send_reply(connection, (void *) &reply,
-		    "sending tape_write reply");
-		return;
-	}
-
-	n = write(session->ns_tape.td_fd, request->data_out.data_out_val,
-	    request->data_out.data_out_len);
-	if (n >= 0) {
-		session->ns_tape.td_write = 1;
-		NS_ADD(wtape, n);
-	}
-	if (n == 0) {
-		NDMP_LOG(LOG_DEBUG, "n == 0");
-		reply.error = NDMP_EOM_ERR;
-		session->ns_tape.td_eom_seen = FALSE;
-	} else if (n < 0) {
-		NDMP_LOG(LOG_ERR, "Tape write error: %m.");
-		reply.error = NDMP_IO_ERR;
-	} else {
-		reply.count = n;
-		reply.error = NDMP_NO_ERR;
-
-		/*
-		 * a logical end of tape will return number of bytes written
-		 * less than rquested, and one more request to write will
-		 * give 0, and then no-space
-		 */
-		if (n < request->data_out.data_out_len) {
-			NDMP_LOG(LOG_DEBUG, "LEOT: n: %d", n);
-			session->ns_tape.td_eom_seen = TRUE;
-		} else {
-			session->ns_tape.td_eom_seen = FALSE;
-		}
-	}
-	ndmp_send_reply(connection, &reply,
-	    "sending tape_write reply");
-}
-
-
-/*
  * ndmpd_tape_read_v2
  *
  * This handler handles tape_read requests.
@@ -593,8 +518,6 @@ ndmpd_tape_read_v2(ndmp_connection_t *connection, void *body)
 		return;
 	}
 
-	session->ns_tape.td_eom_seen = FALSE;
-
 	unbuffered_read(session, buf, request->count, &reply);
 
 	ndmp_send_reply(connection, (void *) &reply, "sending tape_read reply");
@@ -631,7 +554,6 @@ ndmpd_tape_execute_cdb_v2(ndmp_connection_t *connection, void *body)
 		ndmp_send_reply(connection, (void *) &reply,
 		    "sending tape_execute_cdb reply");
 	} else {
-		session->ns_tape.td_eom_seen = FALSE;
 		ndmp_execute_cdb(session, session->ns_tape.td_adapter_name,
 		    session->ns_tape.td_sid, session->ns_tape.td_lun,
 		    (ndmp_execute_cdb_request *)request);
@@ -752,32 +674,92 @@ ndmpd_tape_get_state_v3(ndmp_connection_t *connection, void *body)
 	    "sending tape_get_state reply");
 }
 
+/*
+ * tape_is_at_bot
+ *
+ * Returns 1 if tape is at BOT, 0 on error or not at BOT.
+ *
+ */
+int
+tape_is_at_bot(ndmpd_session_t *session)
+{
+	struct mtget mtstatus;
+
+	if (ioctl(session->ns_tape.td_fd, MTIOCGET, &mtstatus) == 0 &&
+	    mtstatus.mt_fileno == 0 && mtstatus.mt_blkno == 0)
+		return (1);
+
+	return (0);
+}
+
+/*
+ * If we are at the beginning of a file (block # is zero) and read returns
+ * zero bytes then this has to be end of recorded data on the tape. Repeated
+ * reads at EOT return EIO. In both cases (zero read and EIO read) this
+ * function should be used to test if we are at EOT.
+ *
+ * Returns 1 if tape is at BOF, 0 on error or not at BOF.
+ */
+int
+tape_is_at_bof(ndmpd_session_t *session)
+{
+	struct mtget mtstatus;
+
+	if ((ioctl(session->ns_tape.td_fd, MTIOCGET, &mtstatus) == 0) &&
+	    (mtstatus.mt_fileno > 0) && (mtstatus.mt_blkno == 0))
+		return (1);
+
+	return (0);
+}
+
+/*
+ * Skips forward over a file mark and then back before the file mark. Why is
+ * this needed? There are two reasons for it:
+ *
+ * 1) Because NDMPv4 spec requires that when EOF is encountered, the tape
+ * position should remain on BOT side of the file mark. When st driver reaches
+ * end of file get-position mtioctl reports position before file mark, however
+ * the file mark has already been read and the real position is thus after the
+ * file mark (real position as reported for example by uscsi commands). Thus we
+ * need to do FSF, which does nothing but only updates file & block counter in
+ * st driver and then BSF, which sets the position before the file mark. Thus
+ * current position as reported by scsi and mtioctl will be in sync.
+ *
+ * 2) st driver returns EIO for repeated reads at EOF while according to NDMP
+ * spec we should continue to return zero bytes until FSF is done. By skipping
+ * forward and backward, st driver will return zero bytes for the next read
+ * again and we don't need to specifically handle this case.
+ */
+void
+fm_dance(ndmpd_session_t *session)
+{
+	(void) ndmp_mtioctl(session->ns_tape.td_fd, MTFSF, 1);
+	(void) ndmp_mtioctl(session->ns_tape.td_fd, MTBSF, 1);
+}
 
 /*
  * ndmpd_tape_write_v3
  *
- * This handler handles tape_write requests.
- * This interface is a non-buffered interface. Each write request
- * maps directly to a write to the tape device. It is the responsibility
- * of the NDMP client to pad the data to the desired record size.
- * It is the responsibility of the NDMP client to ensure that the
- * length is a multiple of the tape block size if the tape device
- * is in fixed block mode.
+ * This handler handles tape_write requests.  This interface is a non-buffered
+ * interface. Each write request maps directly to a write to the tape device.
+ * It is the responsibility of the NDMP client to pad the data to the desired
+ * record size.  It is the responsibility of the NDMP client to ensure that the
+ * length is a multiple of the tape block size if the tape device is in fixed
+ * block mode.
+ *
+ * A logical end of tape will return number of bytes written less than
+ * requested, and one more request to write will give 0 and NDMP_EOM_ERR,
+ * followed by NDMP_NO_ERR until NDMP_IO_ERR when physical end of tape is
+ * reached.
  *
  * Parameters:
  *   connection (input) - connection handle.
  *   body       (input) - request message body.
- *
- * Returns:
- *   void
  */
-void
-ndmpd_tape_write_v3(ndmp_connection_t *connection, void *body)
-{
-	ndmp_tape_write_request *request = (ndmp_tape_write_request *) body;
-	ndmp_tape_write_reply reply;
-	ndmpd_session_t *session = ndmp_get_client_data(connection);
-	ssize_t n;
+void ndmpd_tape_write_v3(ndmp_connection_t *connection, void *body) {
+	ndmp_tape_write_request *request = (ndmp_tape_write_request *)body;
+	ndmp_tape_write_reply reply; ndmpd_session_t *session =
+		ndmp_get_client_data(connection); ssize_t n;
 
 	reply.count = 0;
 
@@ -816,65 +798,48 @@ ndmpd_tape_write_v3(ndmp_connection_t *connection, void *body)
 		return;
 	}
 
-	/*
-	 * Refer to the comment at the top of this file for
-	 * Mammoth2 tape drives.
-	 */
-	if (session->ns_tape.td_eom_seen) {
-		NDMP_LOG(LOG_DEBUG, "eom_seen");
-		ndmpd_write_eom(session->ns_tape.td_fd);
-		session->ns_tape.td_eom_seen = FALSE;
-		reply.error = NDMP_EOM_ERR;
-		ndmp_send_reply(connection, (void *) &reply,
-		    "sending tape_write reply");
-		return;
-	}
-
 	n = write(session->ns_tape.td_fd, request->data_out.data_out_val,
 	    request->data_out.data_out_len);
 
-	session->ns_tape.td_eom_seen = FALSE;
-	if (n >= 0) {
-		session->ns_tape.td_write = 1;
-		NS_ADD(wtape, n);
-	}
-	if (n == 0) {
-		NDMP_LOG(LOG_INFO, "EOM detected");
-		reply.error = NDMP_EOM_ERR;
-		session->ns_tape.td_eom_seen = TRUE;
-	} else if (n < 0) {
+	if (n < 0) {
 		NDMP_LOG(LOG_ERR, "Tape write error: %m.");
 		reply.error = NDMP_IO_ERR;
+	} else if (n == 0) {
+		NDMP_LOG(LOG_INFO, "EOM detected");
+		reply.error = NDMP_EOM_ERR;
 	} else {
+		NS_ADD(wtape, n);
 		reply.count = n;
 		reply.error = NDMP_NO_ERR;
+
+		if (n < request->data_out.data_out_len)
+			NDMP_LOG(LOG_DEBUG,
+				"EOM is coming (partial write of %d bytes)", n);
 	}
 
 	ndmp_send_reply(connection, (void *) &reply,
 	    "sending tape_write reply");
 }
 
-
 /*
  * ndmpd_tape_read_v3
  *
- * This handler handles tape_read requests.
- * This interface is a non-buffered interface. Each read request
- * maps directly to a read to the tape device. It is the responsibility
- * of the NDMP client to issue read requests with a length that is at
- * least as large as the record size used write the tape. The tape driver
- * always reads a full record. Data is discarded if the read request is
- * smaller than the record size.
- * It is the responsibility of the NDMP client to ensure that the
- * length is a multiple of the tape block size if the tape device
- * is in fixed block mode.
+ * This handler handles tape_read requests.  This interface is a non-buffered
+ * interface. Each read request maps directly to a read to the tape device. It
+ * is the responsibility of the NDMP client to issue read requests with a
+ * length that is at least as large as the record size used write the tape. The
+ * tape driver always reads a full record. Data is discarded if the read
+ * request is smaller than the record size.  It is the responsibility of the
+ * NDMP client to ensure that the length is a multiple of the tape block size
+ * if the tape device is in fixed block mode.
+ *
+ * A logical end of tape will return less bytes than requested, and one more
+ * request to read will give 0 and NDMP_EOM_ERR.  All subsequent reads will
+ * return NDMP_EOM_ERR until the tape is repositioned.
  *
  * Parameters:
  *   connection (input) - connection handle.
  *   body       (input) - request message body.
- *
- * Returns:
- *   void
  */
 void
 ndmpd_tape_read_v3(ndmp_connection_t *connection, void *body)
@@ -883,7 +848,7 @@ ndmpd_tape_read_v3(ndmp_connection_t *connection, void *body)
 	ndmp_tape_read_reply reply;
 	ndmpd_session_t *session = ndmp_get_client_data(connection);
 	char *buf;
-	int n, len;
+	int n;
 
 	reply.data_in.data_in_len = 0;
 
@@ -921,7 +886,6 @@ ndmpd_tape_read_v3(ndmp_connection_t *connection, void *body)
 		    "sending tape_read reply");
 		return;
 	}
-	session->ns_tape.td_eom_seen = FALSE;
 
 	n = read(session->ns_tape.td_fd, buf, request->count);
 	if (n < 0) {
@@ -931,51 +895,41 @@ ndmpd_tape_read_v3(ndmp_connection_t *connection, void *body)
 		 */
 		if (errno == ENOSPC) {
 			reply.error = NDMP_EOF_ERR;
+		}
+		/*
+		 * If at beginning of file and read fails with EIO, then it's
+		 * repeated attempt to read at EOT.
+		 */
+		else if (errno == EIO && tape_is_at_bof(session)) {
+			NDMP_LOG(LOG_DEBUG, "Repeated read at EOT");
+			reply.error = NDMP_EOM_ERR;
+		}
+		/*
+		 * According to NDMPv4 spec preferred error code when
+		 * trying to read from blank tape is NDMP_EOM_ERR.
+		 */
+		else if (errno == EIO && tape_is_at_bot(session)) {
+			NDMP_LOG(LOG_ERR, "Blank tape detected, returning EOM");
+			reply.error = NDMP_EOM_ERR;
 		} else {
 			NDMP_LOG(LOG_ERR, "Tape read error: %m.");
 			reply.error = NDMP_IO_ERR;
 		}
 	} else if (n == 0) {
-		(void) ndmp_mtioctl(session->ns_tape.td_fd, MTFSF, 1);
-
-		len = strlen(NDMP_EOM_MAGIC);
-		(void) memset(buf, 0, len);
-		n = read(session->ns_tape.td_fd, buf, len);
-		buf[len] = '\0';
-
-		NDMP_LOG(LOG_DEBUG, "Checking EOM: nread %d [%s]", n, buf);
-
-		if (strncmp(buf, NDMP_EOM_MAGIC, len) == 0) {
+		if (tape_is_at_bof(session)) {
+			NDMP_LOG(LOG_DEBUG, "EOT detected");
 			reply.error = NDMP_EOM_ERR;
-			NDMP_LOG(LOG_DEBUG, "NDMP_EOM_ERR");
 		} else {
+			/* reposition the tape to BOT side of FM */
+			fm_dance(session);
+			NDMP_LOG(LOG_DEBUG, "EOF detected");
 			reply.error = NDMP_EOF_ERR;
-			NDMP_LOG(LOG_DEBUG, "NDMP_EOF_ERR");
 		}
-		if (n > 0)
-			(void) ndmp_mtioctl(session->ns_tape.td_fd, MTBSR, 1);
 	} else {
-		/*
-		 * Symantec fix for import phase
-		 *
-		 * As import process from symantec skips filemarks
-		 * they can come across to NDMP_EOM_MAGIC and treat
-		 * it as data. This fix prevents the magic to be
-		 * sent to the client and the read will return zero bytes
-		 * and set the NDMP_EOM_ERR error. The tape should
-		 * be positioned at the EOT side of the file mark.
-		 */
-		len = strlen(NDMP_EOM_MAGIC);
-		if (n == len && strncmp(buf, NDMP_EOM_MAGIC, len) == 0) {
-			reply.error = NDMP_EOM_ERR;
-			(void) ndmp_mtioctl(session->ns_tape.td_fd, MTFSF, 1);
-			NDMP_LOG(LOG_DEBUG, "NDMP_EOM_ERR");
-		} else {
-			session->ns_tape.td_pos += n;
-			reply.data_in.data_in_len = n;
-			reply.data_in.data_in_val = buf;
-			reply.error = NDMP_NO_ERR;
-		}
+		session->ns_tape.td_pos += n;
+		reply.data_in.data_in_len = n;
+		reply.data_in.data_in_val = buf;
+		reply.error = NDMP_NO_ERR;
 		NS_ADD(rtape, n);
 	}
 
@@ -1058,20 +1012,16 @@ ndmpd_tape_get_state_v4(ndmp_connection_t *connection, void *body)
 	if (dtp.bsize == 0)
 		reply.blockno = mtstatus.mt_blkno;
 	else
-		reply.blockno = mtstatus.mt_blkno *
+		reply.blockno = mtstatus.mt_blkno /
 		    (session->ns_mover.md_record_size / dtp.bsize);
 
-	reply.total_space = long_long_to_quad(0); /* not supported */
-	reply.space_remain = long_long_to_quad(0); /* not supported */
-
+	reply.total_space = long_long_to_quad(0LL); /* not supported */
+	reply.space_remain = long_long_to_quad(0LL); /* not supported */
 	reply.soft_errors = 0;
-	reply.total_space = long_long_to_quad(0LL);
-	reply.space_remain = long_long_to_quad(0LL);
 	reply.unsupported = NDMP_TAPE_STATE_SOFT_ERRORS_INVALID |
 	    NDMP_TAPE_STATE_TOTAL_SPACE_INVALID |
 	    NDMP_TAPE_STATE_SPACE_REMAIN_INVALID |
 	    NDMP_TAPE_STATE_PARTITION_INVALID;
-
 
 	NDMP_LOG(LOG_DEBUG, "f 0x%x, fnum %d, bsize %d, bno: %d",
 	    reply.flags, reply.file_num, reply.block_size, reply.blockno);
@@ -1366,7 +1316,6 @@ common_tape_open(ndmp_connection_t *connection, char *devname, int ndmpmode)
 	session->ns_tape.td_lun = lun;
 	(void) strlcpy(session->ns_tape.td_adapter_name, adptnm, SCSI_MAX_NAME);
 	session->ns_tape.td_record_count = 0;
-	session->ns_tape.td_eom_seen = FALSE;
 
 	NDMP_LOG(LOG_DEBUG, "Tape is opened fd: %d", session->ns_tape.td_fd);
 
@@ -1397,11 +1346,9 @@ common_tape_close(ndmp_connection_t *connection)
 	session->ns_tape.td_fd = -1;
 	session->ns_tape.td_sid = 0;
 	session->ns_tape.td_lun = 0;
-	session->ns_tape.td_write = 0;
 	(void) memset(session->ns_tape.td_adapter_name, 0,
 	    sizeof (session->ns_tape.td_adapter_name));
 	session->ns_tape.td_record_count = 0;
-	session->ns_tape.td_eom_seen = FALSE;
 
 	reply.error = NDMP_NO_ERR;
 	ndmp_send_reply(connection, (void *) &reply,

@@ -9,8 +9,6 @@
  * specifies the terms and conditions for redistribution.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/signal.h>
@@ -54,7 +52,7 @@ static struct termios default_termios = {
 		CFLUSH,
 		CWERASE,
 		CLNEXT,
-		0		/* nonexistent STATUS */
+		CSTATUS
 	}
 };
 
@@ -423,7 +421,7 @@ allocfailure:
 	return (ioctlrespsize);
 }
 
-#define	NFIELDS	20	/* 16 control characters + 4 sets of modes */
+#define	NFIELDS	21	/* 16 control characters + 4 sets of modes */
 
 /*
  * Init routine run from main at boot time.
