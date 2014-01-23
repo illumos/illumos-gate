@@ -235,6 +235,7 @@ klist_head(list_t *lp, uintptr_t klp)
 static uintptr_t
 klist_next(list_t *lp, uintptr_t klp, void *op)
 {
+	/* LINTED E_BAD_PTR_CAST_ALIG */
 	struct list_node *np = (struct list_node *)(((char *)op) +
 	    lp->list_offset);
 
@@ -276,6 +277,7 @@ krefhash_next(uintptr_t khp, void *op)
 	void *rp;
 
 	mdb_vread(&mh, sizeof (mh), khp);
+	/* LINTED E_BAD_PTR_CAST_ALIG */
 	lp = (refhash_link_t *)(((char *)(op)) + mh.rh_link_off);
 	ml = *lp;
 	while ((klp = klist_next(&mh.rh_objs,

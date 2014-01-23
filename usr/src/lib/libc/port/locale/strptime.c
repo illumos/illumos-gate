@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2014 Gary Mills
  * Copyright 2011, Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 1994 Powerdog Industries.  All rights reserved.
  *
@@ -215,9 +216,6 @@ label:
 				tm->tm_sec = i;
 			}
 
-			if (isspace(*buf))
-				while (*ptr != 0 && !isspace(*ptr))
-					ptr++;
 			break;
 
 		case 'H':
@@ -249,9 +247,6 @@ label:
 
 			tm->tm_hour = i;
 
-			if (isspace(*buf))
-				while (*ptr != 0 && !isspace(*ptr))
-					ptr++;
 			break;
 
 		case 'p':
@@ -319,9 +314,6 @@ label:
 			if (i > 53)
 				return (NULL);
 
-			if (isspace(*buf))
-				while (*ptr != 0 && !isspace(*ptr))
-					ptr++;
 			break;
 
 		case 'w':
@@ -334,11 +326,9 @@ label:
 
 			tm->tm_wday = i;
 
-			if (isspace(*buf))
-				while (*ptr != 0 && !isspace(*ptr))
-					ptr++;
 			break;
 
+		case 'd':
 		case 'e':
 			/*
 			 * The %e format has a space before single digits
@@ -346,8 +336,6 @@ label:
 			 */
 			if (isspace(*buf))
 				buf++;
-			/* FALLTHROUGH */
-		case 'd':
 			/*
 			 * The %e specifier is explicitly documented as not
 			 * being zero-padded but there is no harm in allowing
@@ -370,9 +358,6 @@ label:
 
 			tm->tm_mday = i;
 
-			if (isspace(*buf))
-				while (*ptr != 0 && !isspace(*ptr))
-					ptr++;
 			break;
 
 		case 'B':
@@ -417,9 +402,6 @@ label:
 
 			tm->tm_mon = i - 1;
 
-			if (isspace(*buf))
-				while (*ptr != NULL && !isspace(*ptr))
-					ptr++;
 			break;
 
 		case 's':
@@ -465,9 +447,6 @@ label:
 
 			tm->tm_year = i;
 
-			if (isspace(*buf))
-				while (*ptr != 0 && !isspace(*ptr))
-					ptr++;
 			break;
 
 		case 'Z':
@@ -520,6 +499,11 @@ label:
 			tm->tm_min -= sign * (i % 100);
 			*flagsp |= F_GMT;
 			}
+			break;
+		case 'n':
+		case 't':
+			while (isspace(*buf))
+				buf++;
 			break;
 		}
 	}
