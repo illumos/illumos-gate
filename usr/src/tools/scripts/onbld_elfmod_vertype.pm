@@ -43,8 +43,8 @@ package onbld_elfmod_vertype;
 # fall into the following categories:
 #
 #	NUMBERED:	A public version that follows the standard numbering
-#			convention of a known prefix (e.g. SUNW_), followed
-#			by 2 or 3 dot separated numeric values:
+#			convention of a known prefix (e.g. ILLUMOS_),
+#			followed by 2 or 3 dot separated numeric values:
 #
 #				<PREFIX>major.minor[.micro]
 #
@@ -101,16 +101,16 @@ use strict;
 sub Category {
 	my ($Ver, $Soname) = @_;
 
-	# For Solaris and related products, the SUNW_ prefix is
-	# used for numbered public versions.
-	if ($Ver =~ /^(SUNW_)(\d+)\.(\d+)(\.(\d+))?/) {
+	# For illumos, the SUNW_ or ILLUMOS_ prefix is used for numbered
+	# public versions.
+	if ($Ver =~ /^((?:SUNW|ILLUMOS)_)(\d+)\.(\d+)(\.(\d+))?/) {
 		return ('NUMBERED', 3, $1, $2, $3, $5) if defined($5);
 		return ('NUMBERED', 2, $1, $2, $3);
 	}
 
 	# Well known plain versions. In Solaris, these names were used
 	# to tag symbols that come from the SVR4 underpinnings to Solaris.
-	# Later Sun-specific additions are all tagged SUNW_xxx.
+	# Later additions are all in the NUMBERED form.
 	return ('PLAIN')
 	    if (($Ver =~ /^SYSVABI_1.[23]$/) || ($Ver =~ /^SISCD_2.3[ab]*$/));
 
@@ -119,12 +119,12 @@ sub Category {
 	return ('SONAME')
 	    if ($Ver eq $Soname) && ($Soname ne '');
 
-	# The Solaris convention is to use SUNWprivate to indicate
-	# private versions. SUNWprivate can have a numeric suffix, but
-	# the number is not significant for ELF versioning other than
-	# being part of a unique name.
+	# The convention is to use SUNWprivate and ILLUMOSprivate to indicate
+	# private versions. They may have a numeric suffix, but the
+	# number is not significant for ELF versioning other than being part
+	# of a unique name.
 	return ('PRIVATE')
-	    if ($Ver =~ /^SUNWprivate(_[0-9.]+)?$/);
+	    if ($Ver =~ /^(SUNW|ILLUMOS)private(_[0-9.]+)?$/);
 
 	# Anything else is a version we don't recognize.
 	return ('UNKNOWN');
