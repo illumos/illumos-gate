@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2013 DEY Storage Systems, Inc.
+ * Copyright (c) 2014 Gary Mills
  */
 
 /*
@@ -60,6 +61,7 @@
 #include <alloca.h>
 #include <assert.h>
 #include <ctype.h>
+#include <paths.h>
 #include <door.h>
 #include <errno.h>
 #include <nss_dbdefs.h>
@@ -149,7 +151,7 @@ static boolean_t forced_login = B_FALSE;
 static void
 usage(void)
 {
-	(void) fprintf(stderr, gettext("usage: %s [ -QCES ] [ -e cmdchar ] "
+	(void) fprintf(stderr, gettext("usage: %s [ -nQCES ] [ -e cmdchar ] "
 	    "[-l user] zonename [command [args ...] ]\n"), pname);
 	exit(2);
 }
@@ -1729,6 +1731,7 @@ main(int argc, char **argv)
 	zone_state_t st;
 	char *login = "root";
 	int lflag = 0;
+	int nflag = 0;
 	char *zonename = NULL;
 	char **proc_args = NULL;
 	char **new_args, **new_env;
@@ -1751,7 +1754,7 @@ main(int argc, char **argv)
 	(void) getpname(argv[0]);
 	username = get_username();
 
-	while ((arg = getopt(argc, argv, "ECR:Se:l:Q")) != EOF) {
+	while ((arg = getopt(argc, argv, "nECR:Se:l:Q")) != EOF) {
 		switch (arg) {
 		case 'C':
 			console = 1;
@@ -1784,24 +1787,40 @@ main(int argc, char **argv)
 			login = optarg;
 			lflag = 1;
 			break;
+		case 'n':
+			nflag = 1;
+			break;
 		default:
 			usage();
 		}
 	}
 
-	if (console != 0 && lflag != 0) {
-		zerror(gettext("-l may not be specified for console login"));
-		usage();
-	}
+	if (console != 0) {
 
-	if (console != 0 && failsafe != 0) {
-		zerror(gettext("-S may not be specified for console login"));
-		usage();
-	}
+		if (lflag != 0) {
+			zerror(gettext(
+			    "-l may not be specified for console login"));
+			usage();
+		}
 
-	if (console != 0 && zonecfg_in_alt_root()) {
-		zerror(gettext("-R may not be specified for console login"));
-		exit(2);
+		if (nflag != 0) {
+			zerror(gettext(
+			    "-n may not be specified for console login"));
+			usage();
+		}
+
+		if (failsafe != 0) {
+			zerror(gettext(
+			    "-S may not be specified for console login"));
+			usage();
+		}
+
+		if (zonecfg_in_alt_root()) {
+			zerror(gettext(
+			    "-R may not be specified for console login"));
+			exit(2);
+		}
+
 	}
 
 	if (failsafe != 0 && lflag != 0) {
@@ -1814,6 +1833,11 @@ main(int argc, char **argv)
 		 * zone name, no process name; this should be an interactive
 		 * as long as STDIN is really a tty.
 		 */
+		if (nflag != 0) {
+			zerror(gettext(
+			    "-n may not be specified for interactive login"));
+			usage();
+		}
 		if (isatty(STDIN_FILENO))
 			interactive = 1;
 		zonename = argv[optind];
@@ -2043,9 +2067,27 @@ main(int argc, char **argv)
 		return (1);
 	}
 
-	if (!interactive)
+	if (!interactive) {
+		if (nflag) {
+			int nfd;
+
+			if ((nfd = open(_PATH_DEVNULL, O_RDONLY)) < 0) {
+				zperror(gettext("failed to open null device"));
+				return (1);
+			}
+			if (nfd != STDIN_FILENO) {
+				if (dup2(nfd, STDIN_FILENO) < 0) {
+					zperror(gettext(
+					    "failed to dup2 null device"));
+					return (1);
+				}
+				(void) close(nfd);
+			}
+			/* /dev/null is now standard input */
+		}
 		return (noninteractive_login(zonename, user_cmd, zoneid,
 		    new_args, new_env));
+	}
 
 	if (zonecfg_in_alt_root()) {
 		zerror(gettext("cannot use interactive login with scratch "

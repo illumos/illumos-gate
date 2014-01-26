@@ -278,8 +278,6 @@ ndmpd_mover_abort_v2(ndmp_connection_t *connection, void *body)
 	    "sending mover_abort reply");
 
 	ndmpd_mover_error(session, NDMP_MOVER_HALT_ABORTED);
-
-	nlp_event_nw(session);
 	ndmp_stop_buffer_worker(session);
 }
 
@@ -682,6 +680,7 @@ ndmpd_mover_continue_v3(ndmp_connection_t *connection, void *body)
 {
 	ndmp_mover_continue_reply reply;
 	ndmpd_session_t *session = ndmp_get_client_data(connection);
+	ndmp_lbr_params_t *nlp = ndmp_get_nlp(session);
 	int ret;
 
 	(void) memset((void*)&reply, 0, sizeof (reply));
@@ -746,8 +745,11 @@ ndmpd_mover_continue_v3(ndmp_connection_t *connection, void *body)
 		}
 	}
 
+	(void) mutex_lock(&nlp->nlp_mtx);
 	session->ns_mover.md_state = NDMP_MOVER_STATE_ACTIVE;
 	session->ns_mover.md_pause_reason = NDMP_MOVER_PAUSE_NA;
+	(void) cond_broadcast(&nlp->nlp_cv);
+	(void) mutex_unlock(&nlp->nlp_mtx);
 
 	reply.error = NDMP_NO_ERR;
 	ndmp_send_reply(connection, (void *) &reply,
@@ -1577,27 +1579,8 @@ ndmpd_local_read(ndmpd_session_t *session, char *data, ulong_t length)
 			 * Wait until the state is changed by
 			 * an abort or continue request.
 			 */
-			nlp_ref_nw(session);
-			for (; ; ) {
-				nlp_wait_nw(session);
-
-				if (session->ns_eof == TRUE) {
-					nlp_unref_nw(session);
-					return (1);
-				}
-
-				switch (session->ns_mover.md_state) {
-				case NDMP_MOVER_STATE_ACTIVE:
-					break;
-
-				case NDMP_MOVER_STATE_PAUSED:
-					continue;
-
-				default:
-					nlp_unref_nw(session);
-					return (-1);
-				}
-			}
+			if (ndmp_wait_for_mover(session) != 0)
+				return (1);
 		}
 		len = length - count;
 
@@ -1864,6 +1847,12 @@ ndmpd_mover_init(ndmpd_session_t *session)
 void
 ndmpd_mover_shut_down(ndmpd_session_t *session)
 {
+	ndmp_lbr_params_t *nlp;
+
+	if ((nlp = ndmp_get_nlp(session)) == NULL)
+		return;
+
+	(void) mutex_lock(&nlp->nlp_mtx);
 	if (session->ns_mover.md_listen_sock != -1) {
 		NDMP_LOG(LOG_DEBUG, "mover.listen_sock: %d",
 		    session->ns_mover.md_listen_sock);
@@ -1880,6 +1869,8 @@ ndmpd_mover_shut_down(ndmpd_session_t *session)
 		(void) close(session->ns_mover.md_sock);
 		session->ns_mover.md_sock = -1;
 	}
+	(void) cond_broadcast(&nlp->nlp_cv);
+	(void) mutex_unlock(&nlp->nlp_mtx);
 }
 
 
@@ -2377,45 +2368,7 @@ change_tape(ndmpd_session_t *session)
 	 * Wait for until the state is changed by
 	 * an abort or continue request.
 	 */
-	nlp_ref_nw(session);
-	for (; ; ) {
-		NDMP_LOG(LOG_DEBUG, "calling nlp_wait_nw()");
-
-		nlp_wait_nw(session);
-
-		if (nlp_event_rv_get(session) < 0) {
-			nlp_unref_nw(session);
-			return (-1);
-		}
-
-		if (session->ns_eof == TRUE) {
-			NDMP_LOG(LOG_DEBUG, "session->ns_eof == TRUE");
-			nlp_unref_nw(session);
-			return (-1);
-		}
-
-		switch (session->ns_mover.md_state) {
-		case NDMP_MOVER_STATE_ACTIVE:
-			NDMP_LOG(LOG_DEBUG,
-			    "mover.state: NDMP_MOVER_STATE_ACTIVE");
-
-			nlp_unref_nw(session);
-			session->ns_tape.td_record_count = 0;
-			return (0);
-
-		case NDMP_MOVER_STATE_PAUSED:
-			NDMP_LOG(LOG_DEBUG,
-			    "mover.state: NDMP_MOVER_STATE_PAUSED");
-			continue;
-
-		default:
-			NDMP_LOG(LOG_DEBUG, "default");
-			nlp_unref_nw(session);
-			return (-1);
-		}
-	}
-
-	/* nlp_unref_nw(session); - statement never reached */
+	return (ndmp_wait_for_mover(session));
 }
 
 
@@ -3289,63 +3242,6 @@ is_writer_running_v3(ndmpd_session_t *session)
 
 
 /*
- * ndmpd_mover_wait_v3
- *
- * Take the mover state to PAUSED state
- *
- * Parameters:
- *   session (input) - session pointer.
- *
- * Returns:
- *   0: on success
- *  -1: otherwise
- */
-int
-ndmpd_mover_wait_v3(ndmpd_session_t *session)
-{
-	int rv = 0;
-
-	nlp_ref_nw(session);
-	for (; ; ) {
-		nlp_wait_nw(session);
-
-		if (nlp_event_rv_get(session) < 0) {
-			rv = -1;
-			break;
-		}
-		if (session->ns_eof) {
-			NDMP_LOG(LOG_DEBUG, "session->ns_eof");
-			rv = -1;
-			break;
-		}
-		if (session->ns_data.dd_abort) {
-			NDMP_LOG(LOG_DEBUG, "data.abort");
-			rv = -1;
-			break;
-		}
-		if (session->ns_mover.md_state == NDMP_MOVER_STATE_ACTIVE) {
-			NDMP_LOG(LOG_DEBUG,
-			    "mover.state: NDMP_MOVER_STATE_ACTIVE");
-			session->ns_tape.td_record_count = 0;
-			rv = 0;
-			break;
-		} else if (session->ns_mover.md_state ==
-		    NDMP_MOVER_STATE_PAUSED) {
-			NDMP_LOG(LOG_DEBUG,
-			    "mover.state: NDMP_MOVER_STATE_PAUSED");
-		} else {
-			NDMP_LOG(LOG_DEBUG, "default");
-			rv = -1;
-			break;
-		}
-	}
-
-	session->ns_mover.md_pause_reason = NDMP_MOVER_PAUSE_NA;
-	nlp_unref_nw(session);
-	return (rv);
-}
-
-/*
  * ndmpd_mover_error_send
  *
  * This function sends the notify message to the client.
@@ -3412,6 +3308,8 @@ ndmpd_mover_error_send_v4(ndmpd_session_t *session,
 void
 ndmpd_mover_error(ndmpd_session_t *session, ndmp_mover_halt_reason reason)
 {
+	ndmp_lbr_params_t *nlp = ndmp_get_nlp(session);
+
 	if (session->ns_mover.md_state == NDMP_MOVER_STATE_HALTED ||
 	    (session->ns_protocol_version > NDMPV2 &&
 	    session->ns_mover.md_state == NDMP_MOVER_STATE_IDLE))
@@ -3430,6 +3328,7 @@ ndmpd_mover_error(ndmpd_session_t *session, ndmp_mover_halt_reason reason)
 			    "Error sending notify_mover_halted request");
 	}
 
+	(void) mutex_lock(&nlp->nlp_mtx);
 	if (session->ns_mover.md_listen_sock != -1) {
 		(void) ndmpd_remove_file_handler(session,
 		    session->ns_mover.md_listen_sock);
@@ -3445,6 +3344,8 @@ ndmpd_mover_error(ndmpd_session_t *session, ndmp_mover_halt_reason reason)
 
 	session->ns_mover.md_state = NDMP_MOVER_STATE_HALTED;
 	session->ns_mover.md_halt_reason = reason;
+	(void) cond_broadcast(&nlp->nlp_cv);
+	(void) mutex_unlock(&nlp->nlp_mtx);
 }
 
 
@@ -3522,7 +3423,7 @@ mover_pause_v3(ndmpd_session_t *session, ndmp_mover_pause_reason reason)
 	} else {
 		if (session->ns_mover.md_data_addr.addr_type ==
 		    NDMP_ADDR_LOCAL) {
-			rv = ndmpd_mover_wait_v3(session);
+			rv = ndmp_wait_for_mover(session);
 		} else {
 			NDMP_LOG(LOG_DEBUG, "Invalid address type %d",
 			    session->ns_mover.md_data_addr.addr_type);
