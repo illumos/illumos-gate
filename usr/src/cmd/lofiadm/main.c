@@ -24,6 +24,7 @@
  * Copyright 2012 Joyent, Inc.  All rights reserved.
  *
  * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
+ * Copyright (c) 2014 Gary Mills
  */
 
 /*
@@ -150,7 +151,7 @@ lofi_compress_info_t lofi_compress_table[LOFI_COMPRESS_FUNCTIONS] = {
 #define	KILOBYTE		1024
 #define	MEGABYTE		(KILOBYTE * KILOBYTE)
 #define	GIGABYTE		(KILOBYTE * MEGABYTE)
-#define	LIBZ			"libz.so"
+#define	LIBZ			"libz.so.1"
 
 static void
 usage(const char *pname)
@@ -168,7 +169,7 @@ gzip_compress(void *src, size_t srclen, void *dst, size_t *dstlen, int level)
 
 	/*
 	 * The first time we are called, attempt to dlopen()
-	 * libz.so and get a pointer to the compress2() function
+	 * libz.so.1 and get a pointer to the compress2() function
 	 */
 	if (compress2p == NULL) {
 		if ((libz_hdl = openlib(LIBZ)) == NULL)
