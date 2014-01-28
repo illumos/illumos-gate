@@ -19,7 +19,7 @@
  * CDDL HEADER END
  *
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2012 Joyent, Inc. All rights reserved.
  */
 
@@ -311,6 +311,9 @@ do_logging_queue(logging_data *lq)
 		/* add entry to mount list */
 		if (lq->ld_rpath)
 			mntlist_new(host, lq->ld_rpath);
+
+		if (lq->ld_host != host)
+			netdir_free(clnames, ND_HOSTSERVLIST);
 
 		lq->ld_next = lq_clean;
 		lq_clean = lq;

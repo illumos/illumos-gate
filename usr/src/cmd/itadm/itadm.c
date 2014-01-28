@@ -119,7 +119,7 @@ static char m_ini[] = "itadm modify-initiator [-s] [-S chap-secret-path] \
 
 static char l_ini[] = "itadm list-initiator [-v] initiator-node-name";
 
-static char d_ini[] = "itadm delete-inititator initiator-node-name";
+static char d_ini[] = "itadm delete-initiator initiator-node-name";
 
 static char m_def[] = "itadm modify-defaults [-a radius|chap|none] \
 [-r IP-address[:port]] [-d] [-D radius-secret-path] [-i enable|disable] \
