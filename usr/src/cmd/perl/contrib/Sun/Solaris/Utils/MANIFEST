@@ -1,4 +1,0 @@
-Makefile.PL
-Utils.pm
-Utils.xs
-t/gmatch.t

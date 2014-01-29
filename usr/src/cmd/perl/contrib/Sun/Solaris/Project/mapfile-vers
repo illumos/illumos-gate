@@ -1,0 +1,36 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+#
+# Copyright (c) 2014 Racktop Systems.
+#
+
+$mapfile_version 2
+
+SYMBOL_SCOPE {
+    global:
+	boot_Sun__Solaris__Project;
+	XS_Sun__Solaris__Project_activeprojects;
+	XS_Sun__Solaris__Project_endprojent;
+	XS_Sun__Solaris__Project_fgetprojent;
+	XS_Sun__Solaris__Project_getdefaultproj;
+	XS_Sun__Solaris__Project_getprojbyid;
+	XS_Sun__Solaris__Project_getprojbyname;
+	XS_Sun__Solaris__Project_getprojent;
+	XS_Sun__Solaris__Project_getprojid;
+	XS_Sun__Solaris__Project_getprojidbyname;
+	XS_Sun__Solaris__Project_inproj;
+	XS_Sun__Solaris__Project_pool_exists;
+	XS_Sun__Solaris__Project_rctl_get_info;
+	XS_Sun__Solaris__Project_setproject;
+	XS_Sun__Solaris__Project_setprojent;
+    local:
+	*;
+};

@@ -22,6 +22,7 @@
 #
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright (c) 2014 Racktop Systems.
 #
 
 #
@@ -30,7 +31,7 @@
 #
 
 
-require 5.8.4;
+require 5.0010;
 use strict;
 use warnings;
 use Carp;

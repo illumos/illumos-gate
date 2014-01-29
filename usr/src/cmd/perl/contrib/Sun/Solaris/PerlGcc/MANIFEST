@@ -1,7 +1,0 @@
-Changes
-Makefile.PL
-MANIFEST
-perlgcc.PL
-pod/perlgcc.pod
-config/5.8.4/5.11/sparc/Config.pm
-config/5.8.4/5.11/i386/Config.pm

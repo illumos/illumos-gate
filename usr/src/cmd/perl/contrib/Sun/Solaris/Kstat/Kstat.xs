@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2014 Racktop Systems.
  */
 
 /*
@@ -894,7 +895,6 @@ apply_to_ties(SV *self, ATTCb_t cb, void *arg)
 {
 	HV	*hash1;
 	HE	*entry1;
-	long	s;
 	int	ret;
 
 	hash1 = (HV *)SvRV(self);
@@ -902,7 +902,7 @@ apply_to_ties(SV *self, ATTCb_t cb, void *arg)
 	ret = 1;
 
 	/* Iterate over each module */
-	while (entry1 = hv_iternext(hash1)) {
+	while ((entry1 = hv_iternext(hash1))) {
 		HV *hash2;
 		HE *entry2;
 
@@ -910,7 +910,7 @@ apply_to_ties(SV *self, ATTCb_t cb, void *arg)
 		hv_iterinit(hash2);
 
 		/* Iterate over each module:instance */
-		while (entry2 = hv_iternext(hash2)) {
+		while ((entry2 = hv_iternext(hash2))) {
 			HV *hash3;
 			HE *entry3;
 
@@ -918,10 +918,9 @@ apply_to_ties(SV *self, ATTCb_t cb, void *arg)
 			hv_iterinit(hash3);
 
 			/* Iterate over each module:instance:name */
-			while (entry3 = hv_iternext(hash3)) {
+			while ((entry3 = hv_iternext(hash3))) {
 				HV    *hash4;
 				MAGIC *mg;
-				HV    *tie;
 
 				/* Get the tie */
 				hash4 = (HV *)SvRV(hv_iterval(hash3, entry3));
@@ -976,7 +975,7 @@ prune_invalid(SV *self, AV *del)
 	ret = 0;
 
 	/* Iterate over each module */
-	while (entry1 = hv_iternext(hash1)) {
+	while ((entry1 = hv_iternext(hash1))) {
 		HV *hash2;
 		HE *entry2;
 
@@ -985,7 +984,7 @@ prune_invalid(SV *self, AV *del)
 		hv_iterinit(hash2);
 
 		/* Iterate over each module:instance */
-		while (entry2 = hv_iternext(hash2)) {
+		while ((entry2 = hv_iternext(hash2))) {
 			HV *hash3;
 			HE *entry3;
 
@@ -994,7 +993,7 @@ prune_invalid(SV *self, AV *del)
 			hv_iterinit(hash3);
 
 			/* Iterate over each module:instance:name */
-			while (entry3 = hv_iternext(hash3)) {
+			while ((entry3 = hv_iternext(hash3))) {
 				HV    *hash4;
 				MAGIC *mg;
 				HV    *tie;
@@ -1084,7 +1083,7 @@ save_named(HV *self, kstat_t *kp, int strip_str)
 			break;
 		default:
 			PERL_ASSERTMSG(0, "kstat_read: invalid data type");
-			break;
+			continue;
 		}
 		hv_store(self, knp->name, strlen(knp->name), value, 0);
 	}
@@ -1625,7 +1624,7 @@ PPCODE:
 	self = SvRV(self);
 	read_kstats((HV *)self, FALSE);
 	hv_iterinit((HV *)self);
-	if (he = hv_iternext((HV *)self)) {
+	if ((he = hv_iternext((HV *)self))) {
 		EXTEND(SP, 1);
 		PUSHs(hv_iterkeysv(he));
 	}
@@ -1642,7 +1641,7 @@ PREINIT:
 	HE *he;
 PPCODE:
 	self = SvRV(self);
-	if (he = hv_iternext((HV *)self)) {
+	if ((he = hv_iternext((HV *)self))) {
 		EXTEND(SP, 1);
 		PUSHs(hv_iterkeysv(he));
 	}
