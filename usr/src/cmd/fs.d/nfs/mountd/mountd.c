@@ -288,7 +288,6 @@ remove_head_of_queue(void)
 static void
 do_logging_queue(logging_data *lq)
 {
-	logging_data	*lq_clean = NULL;
 	int		cleared = 0;
 	char		*host;
 
@@ -314,20 +313,12 @@ do_logging_queue(logging_data *lq)
 		if (lq->ld_host != host)
 			netdir_free(clnames, ND_HOSTSERVLIST);
 
-		lq->ld_next = lq_clean;
-		lq_clean = lq;
+		free_logging_data(lq);
+		cleared++;
 
 		(void) mutex_lock(&logging_queue_lock);
 		lq = remove_head_of_queue();
 		(void) mutex_unlock(&logging_queue_lock);
-	}
-
-	while (lq_clean) {
-		lq = lq_clean;
-		lq_clean = lq->ld_next;
-
-		free_logging_data(lq);
-		cleared++;
 	}
 
 	DTRACE_PROBE1(mountd, logging_cleared, cleared);
