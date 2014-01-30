@@ -2454,7 +2454,7 @@ e1000g_init_unicst(struct e1000g *Adapter)
 		 * According to the datasheet, we need to check a few of the
 		 * bits set in the FWSM register. If the value is zero,
 		 * everything is available. If the value is 1, none of the
-		 * additional registers are availabl.e If the value is 2-7, only
+		 * additional registers are available. If the value is 2-7, only
 		 * that number are available.
 		 */
 		if (hw->mac.type == e1000_pch_lpt) {
