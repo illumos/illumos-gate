@@ -400,7 +400,6 @@ file path=usr/share/lib/zoneinfo/Europe/Brussels
 file path=usr/share/lib/zoneinfo/Europe/Bucharest
 file path=usr/share/lib/zoneinfo/Europe/Budapest
 file path=usr/share/lib/zoneinfo/Europe/Busingen
-file path=usr/share/lib/zoneinfo/Europe/Chisinau
 file path=usr/share/lib/zoneinfo/Europe/Copenhagen
 file path=usr/share/lib/zoneinfo/Europe/Dublin
 file path=usr/share/lib/zoneinfo/Europe/Gibraltar
@@ -625,6 +624,7 @@ hardlink path=usr/share/lib/zoneinfo/Etc/Universal target=../Etc/UTC
 hardlink path=usr/share/lib/zoneinfo/Etc/Zulu target=../Etc/UTC
 hardlink path=usr/share/lib/zoneinfo/Europe/Belfast target=../Europe/London
 hardlink path=usr/share/lib/zoneinfo/Europe/Bratislava target=../Europe/Prague
+hardlink path=usr/share/lib/zoneinfo/Europe/Chisinau target=../Europe/Tiraspol
 hardlink path=usr/share/lib/zoneinfo/Europe/Guernsey target=../Europe/London
 hardlink path=usr/share/lib/zoneinfo/Europe/Isle_of_Man \
     target=../Europe/London
@@ -639,7 +639,6 @@ hardlink path=usr/share/lib/zoneinfo/Europe/Podgorica \
 hardlink path=usr/share/lib/zoneinfo/Europe/San_Marino target=../Europe/Rome
 hardlink path=usr/share/lib/zoneinfo/Europe/Sarajevo target=../Europe/Belgrade
 hardlink path=usr/share/lib/zoneinfo/Europe/Skopje target=../Europe/Belgrade
-hardlink path=usr/share/lib/zoneinfo/Europe/Tiraspol target=../Europe/Chisinau
 hardlink path=usr/share/lib/zoneinfo/Europe/Vatican target=../Europe/Rome
 hardlink path=usr/share/lib/zoneinfo/Europe/Zagreb target=../Europe/Belgrade
 hardlink path=usr/share/lib/zoneinfo/GB target=Europe/London
