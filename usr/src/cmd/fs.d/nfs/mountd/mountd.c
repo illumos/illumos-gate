@@ -352,6 +352,7 @@ main(int argc, char *argv[])
 {
 	int	pid;
 	int	c;
+	int	rpc_svc_fdunlim = 1;
 	int	rpc_svc_mode = RPC_SVC_MT_AUTO;
 	int	maxthreads;
 	int	maxrecsz = RPC_MAXDATASIZE;
@@ -504,6 +505,13 @@ main(int argc, char *argv[])
 	}
 
 	audit_mountd_setup();	/* BSM */
+
+	/*
+	 * Set number of file descriptors to unlimited
+	 */
+	if (!rpc_control(RPC_SVC_USE_POLLFD, &rpc_svc_fdunlim)) {
+		syslog(LOG_INFO, "unable to set number of FDs to unlimited");
+	}
 
 	/*
 	 * Tell RPC that we want automatic thread mode.
