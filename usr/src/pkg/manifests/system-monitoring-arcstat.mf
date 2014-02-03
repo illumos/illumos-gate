@@ -1,0 +1,27 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy is of the CDDL is also available via the Internet
+# at http://www.illumos.org/license/CDDL.
+#
+
+# Copyright 2014 Adam Stevko.  All rights reserved.
+
+set name=pkg.fmri value=pkg:/system/monitoring/arcstat@$(PKGVERS)
+set name=pkg.summary \
+    value="arcstat displays various ZFS ARC and L2ARC statistics"
+set name=info.classification \
+    value="org.opensolaris.category.2008:Applications/System Utilities"
+set name=variant.arch value=$(ARCH)
+dir path=usr group=sys
+dir path=usr/bin
+dir path=usr/share
+dir path=usr/share/man
+dir path=usr/share/man/man1m
+file path=usr/bin/arcstat mode=0555
+file path=usr/share/man/man1m/arcstat.1m
+license lic_CDDL license=lic_CDDL

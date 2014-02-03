@@ -27,7 +27,7 @@
 
 include ../Makefile.cmd
 
-SUBDIRS=	iostat mpstat vmstat fsstat kstat
+SUBDIRS=	arcstat iostat mpstat vmstat fsstat kstat
 
 all :=		TARGET = all
 install :=	TARGET = install
