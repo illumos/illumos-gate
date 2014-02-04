@@ -19,6 +19,9 @@
 # CDDL HEADER END
 #
 
+#
+# Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+#
 # Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2012 by Delphix. All rights reserved.
 
@@ -396,6 +399,9 @@ COMMON_SUBDIRS = \
 	lib/libkstat \
 	lib/liblgrp \
 	lib/liblm \
+	lib/libm \
+	lib/libm1 \
+	lib/libmvec \
 	lib/libmalloc \
 	lib/libmapmalloc \
 	lib/libmapid \

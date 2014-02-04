@@ -1,0 +1,46 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+#
+
+pics/%.o: $(LIBMDIR)/$(TARGETMACH)/src/%.$(ASSUFFIX)
+	$(COMPILE.s) -o $@ $<
+	$(POST_PROCESS_O)
+
+pics/%.o: $(SRCDIR)/C/%.c $(LM_IL)
+	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)
+
+pics/%.o: $(SRCDIR)/$(LDBLDIR)/%.c $(LM_IL)
+	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)
+
+pics/%.o: $(SRCDIR)/R/%.c $(LM_IL)
+	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)
+
+pics/%.o: $(SRCDIR)/complex/%.c $(LM_IL)
+	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)
+
+pics/%.o: $(SRCDIR)/m9x/%.c $(LM_IL) $(m9x_IL)
+	$(COMPILE.c) $(m9x_IL) -o $@ $<
+	$(POST_PROCESS_O)
+
+$(ROOTLIBDIR): $(ROOTFS_LIBDIR)
+	$(INS.dir)
+
+$(ROOTLIBDIR64): $(ROOTFS_LIBDIR64)
+	$(INS.dir)
+
+include $(SRC)/lib/Makefile.targ

@@ -1,0 +1,160 @@
+'\" te
+.\" Copyright (c) 2001, the Institute of Electrical and Electronics Engineers, Inc. and The Open Group. All Rights Reserved.
+.\" Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
+.\" Portions Copyright (c) 2006, Sun Microsystems, Inc. All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH nextafter 3M "12 Jul 2006" "SunOS 5.11" "Mathematical Library Functions"
+.SH NAME
+nextafter, nextafterf, nextafterl, nexttoward, nexttowardf, nexttowardl \- next
+representable double-precision floating-point number
+.SH SYNOPSIS
+.LP
+.nf
+c99 [ \fIflag\fR... ] \fIfile\fR... \fB-lm\fR [ \fIlibrary\fR... ]
+#include <math.h>
+
+\fBdouble\fR \fBnextafter\fR(\fBdouble\fR \fIx\fR, \fBdouble\fR \fIy\fR);
+.fi
+
+.LP
+.nf
+\fBfloat\fR \fBnextafterf\fR(\fBfloat\fR \fIx\fR, \fBfloat\fR \fIy\fR);
+.fi
+
+.LP
+.nf
+\fBlong double\fR \fBnextafterl\fR(\fBlong double\fR \fIx\fR, \fBlong double\fR \fIy\fR);
+.fi
+
+.LP
+.nf
+\fBdouble\fR \fBnexttoward\fR(\fBdouble\fR \fIx\fR, \fBlong double\fR \fIy\fR);
+.fi
+
+.LP
+.nf
+\fBfloat\fR \fBnexttowardf\fR(\fBfloat\fR \fIx\fR, \fBlong double\fR \fIy\fR);
+.fi
+
+.LP
+.nf
+\fBlong double\fR \fBnexttowardl\fR(\fBlong double\fR \fIx\fR, \fBlong double\fR \fIy\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBnextafter()\fR, \fBnextafterf()\fR, and \fBnextafterl()\fR functions
+compute the next representable floating-point value following \fIx\fR in the
+direction of \fIy\fR. Thus, if \fIy\fR is less than \fIx\fR, \fBnextafter()\fR
+returns the largest representable floating-point number less than \fIx\fR. The
+\fBnextafter()\fR, \fBnextafterf()\fR, and \fBnextafterl()\fR functions return
+\fIy\fR if \fIx\fR equals \fIy\fR.
+.sp
+.LP
+The \fBnexttoward()\fR, \fBnexttowardf()\fR, and \fBnexttowardl()\fR functions
+are equivalent to the corresponding \fBnextafter()\fR functions, except that
+the second parameter has type \fBlong double\fR and the functions return
+\fIy\fR converted to the type of the function if \fIx\fR equals \fIy\fR.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, these functions return the next representable
+floating-point value following \fIx\fR in the direction of \fIy\fR.
+.sp
+.LP
+If \fIx\fR == \fIy\fR, \fIy\fR (of the type \fIx\fR) is returned.
+.sp
+.LP
+If \fIx\fR is finite and the correct function value would overflow, a range
+error occurs and \(+-\fBHUGE_VAL\fR, \(+-\fBHUGE_VALF\fR, and
+\(+-\fBHUGE_VALL\fR (with the same sign as \fIx\fR) is returned as appropriate
+for the return type of the function.
+.sp
+.LP
+If \fIx\fR or \fIy\fR is NaN, a NaN is returned.
+.sp
+.LP
+If \fIx\fR != \fIy\fR and the correct function value is subnormal, zero, or
+underflows, a range error occurs and either the correct function value (if
+representable) or 0.0 is returned.
+.SH ERRORS
+.sp
+.LP
+These functions will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fBRange Error\fR
+.ad
+.RS 15n
+.rt  
+The correct value overflows.
+.sp
+If the integer expression (\fBmath_errhandling\fR & \fBMATH_ERREXCEPT\fR) is
+non-zero, the overflow floating-point exception is raised.
+.sp
+The \fBnextafter()\fR function sets \fBerrno\fR to \fBERANGE\fR if the correct
+value would overflow.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBRange Error\fR
+.ad
+.RS 15n
+.rt  
+The correct value underflows.
+.sp
+If the integer expression (\fBmath_errhandling\fR & \fBMATH_ERREXCEPT\fR) is
+non-zero, the underflow floating-point exception is raised.
+.RE
+
+.SH USAGE
+.sp
+.LP
+An application wanting to check for exceptions should call
+\fBfeclearexcept\fR(\fBFE_ALL_EXCEPT\fR) before calling these functions. On
+return, if \fBfetestexcept\fR(\fBFE_INVALID\fR | \fBFE_DIVBYZERO\fR |
+\fBFE_OVERFLOW\fR | \fBFE_UNDERFLOW\fR) is non-zero, an exception has been
+raised. An application should either examine the return value or check the
+floating point exception flags to detect exceptions.
+.sp
+.LP
+An application can also set \fBerrno\fR to 0 before calling \fBnextafter()\fR.
+On return, if \fBerrno\fR is non-zero, an error has occurred. The
+\fBnextafterf()\fR, \fBnextafterl()\fR. \fBnexttoward()\fR,
+\fBnexttowardf()\fR, and \fBnexttowardl()\fR functions do not set \fBerrno\fR.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBfeclearexcept\fR(3M), \fBfetestexcept\fR(3M), \fBmath.h\fR(3HEAD),
+\fBattributes\fR(5), \fBstandards\fR(5)

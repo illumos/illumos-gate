@@ -1,0 +1,134 @@
+'\" te
+.\" Copyright (c) 2001, the Institute of Electrical and Electronics Engineers, Inc. and The Open Group. All Rights Reserved.
+.\" Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
+.\" Portions Copyright (c) 2006, Sun Microsystems, Inc. All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH log1p 3M "12 Jul 2006" "SunOS 5.11" "Mathematical Library Functions"
+.SH NAME
+log1p, log1pf, log1pl \- compute natural logarithm
+.SH SYNOPSIS
+.LP
+.nf
+c99 [ \fIflag\fR... ] \fIfile\fR... \fB-lm\fR [ \fIlibrary\fR... ]
+#include <math.h>
+
+\fBdouble\fR \fBlog1p\fR(\fBdouble\fR \fIx\fR);
+.fi
+
+.LP
+.nf
+\fBfloat\fR \fBlog1pf\fR(\fBfloat\fR \fIx\fR);
+.fi
+
+.LP
+.nf
+\fBlong double\fR \fBlog1pl\fR(\fBlong double\fR \fIx\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+These functions compute log(e)(1.0 + \fIx\fR).
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, these functions return the natural logarithm of 1.0
++ \fIx\fR.
+.sp
+.LP
+If \fIx\fR is \(mi1, a pole error occurs and \fBlog1p()\fR, \fBlog1pf()\fR, and
+\fBlog1pl()\fR return \(mi\fBHUGE_VAL\fR, \(mi\fBHUGE_VALF\fR, and
+\(mi\fBHUGE_VALL\fR, respectively.
+.sp
+.LP
+For finite values of \fIx\fR that are less than \(mi1, or if \fIx\fR is
+\(miInf, a domain error occurs and a NaN is returned.
+.sp
+.LP
+If \fIx\fR is NaN, a NaN is returned.
+.sp
+.LP
+If \fIx\fR is \(+-0 or +Inf, \fIx\fR is returned.
+.sp
+.LP
+For exceptional cases, \fBmatherr\fR(3M) tabulates the values to be returned by
+\fBlog1p()\fR as specified by SVID3 and XPG3.
+.SH ERRORS
+.sp
+.LP
+These functions will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fBDomain Error\fR
+.ad
+.RS 16n
+.rt  
+The finite value of \fIx\fR is less than \(mi1, or \fIx\fR is -Inf.
+.sp
+If the integer expression (\fBmath_errhandling\fR & \fBMATH_ERREXCEPT\fR) is
+non-zero, the invalid floating-point exception is raised.
+.sp
+The \fBlog1p()\fR function sets \fBerrno\fR to \fBEDOM\fR if the value of
+\fIx\fR is less than \(mi1.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBPole Error\fR
+.ad
+.RS 16n
+.rt  
+The value of \fIx\fR is \(mi1.
+.sp
+If the integer expression (\fBmath_errhandling\fR & \fBMATH_ERREXCEPT\fR) is
+non-zero, the divide-by-zero floating-point exception is raised.
+.RE
+
+.SH USAGE
+.sp
+.LP
+An application wanting to check for exceptions should call
+\fBfeclearexcept\fR(\fBFE_ALL_EXCEPT\fR) before calling these functions. On
+return, if \fBfetestexcept\fR(\fBFE_INVALID\fR | \fBFE_DIVBYZERO\fR |
+\fBFE_OVERFLOW\fR | \fBFE_UNDERFLOW\fR) is non-zero, an exception has been
+raised. An application should either examine the return value or check the
+floating point exception flags to detect exceptions.
+.sp
+.LP
+An application can also set \fBerrno\fR to 0 before calling \fBlog1p()\fR. On
+return, if \fBerrno\fR is non-zero, an error has occurred. The \fBlog1pf()\fR
+and \fBlog1pl()\fR functions do not set \fBerrno\fR.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBfeclearexcept\fR(3M), \fBfetestexcept\fR(3M), \fBlog\fR(3M),
+\fBmath.h\fR(3HEAD), \fBmatherr\fR(3M), \fBattributes\fR(5), \fBstandards\fR(5)

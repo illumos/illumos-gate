@@ -1,0 +1,119 @@
+'\" te
+.\" Copyright (c) 2001, the Institute of Electrical and Electronics Engineers, Inc. and The Open Group. All Rights Reserved.
+.\" Portions Copyright (c) 2006, Sun Microsystems, Inc. All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH llrint 3M "12 Jul 2006" "SunOS 5.11" "Mathematical Library Functions"
+.SH NAME
+llrint, llrintf, llrintl \- round to nearest integer value using current
+rounding direction
+.SH SYNOPSIS
+.LP
+.nf
+c99 [ \fIflag\fR... ] \fIfile\fR... \fB-lm\fR [ \fIlibrary\fR... ]
+#include <math.h>
+
+\fBlong long\fR \fBllrint\fR(\fBdouble\fR \fIx\fR);
+.fi
+
+.LP
+.nf
+\fBlong long\fR \fBllrintf\fR(\fBfloat\fR \fIx\fR);
+.fi
+
+.LP
+.nf
+\fBlong long\fR \fBllrintl\fR(\fBlong double\fR \fIx\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+These functions round their argument to the nearest integer value, rounding
+according to the current rounding direction.
+.SH RETURN VALUES
+.sp
+.LP
+ Upon successful completion, these functions return the rounded integer value.
+.sp
+.LP
+If \fIx\fR is NaN, a domain error occurs and an unspecified value is returned.
+.sp
+.LP
+If \fIx\fR is +Inf, a domain error occurs and an unspecified value is returned.
+.sp
+.LP
+If \fIx\fR is -Inf, a domain error occurs and an unspecified value is returned.
+.sp
+.LP
+If the correct value is positive and too large to represent as a \fBlong
+long\fR, a domain error occurs and an unspecified value is returned.
+.sp
+.LP
+ If the correct value is negative and too large to represent as a \fBlong
+long\fR, a domain error occurs and an unspecified value is returned.
+.SH ERRORS
+.sp
+.LP
+These functions will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fBDomain Error\fR
+.ad
+.RS 16n
+.rt  
+The \fIx\fR argument is NaN or \(+-Inf, or the correct value is not
+representable as an integer.
+.sp
+If the integer expression (\fBmath_errhandling\fR & \fBMATH_ERREXCEPT\fR) is
+non-zero, then the invalid floating-point exception will be raised.
+.RE
+
+.SH USAGE
+.sp
+.LP
+An application wanting to check for exceptions should call
+\fBfeclearexcept\fR(\fBFE_ALL_EXCEPT\fR) before calling these functions. On
+return, if \fBfetestexcept\fR(\fBFE_INVALID\fR | \fBFE_DIVBYZERO\fR |
+\fBFE_OVERFLOW\fR | \fBFE_UNDERFLOW\fR) is non-zero, an exception has been
+raised. An application should either examine the return value or check the
+floating point exception flags to detect exceptions.
+.sp
+.LP
+These functions provide floating-to-integer conversions. They round according
+to the current rounding direction. If the rounded value is outside the range of
+the return type, the numeric result is unspecified and the invalid
+floating-point exception is raised. When they raise no other floating-point
+exception and the result differs from the argument, they raise the inexact
+floating-point exception.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBfeclearexcept\fR(3M), \fBfetestexcept\fR(3M), \fBlrint\fR(3M),
+\fBmath.h\fR(3HEAD), \fBattributes\fR(5), \fBstandards\fR(5)

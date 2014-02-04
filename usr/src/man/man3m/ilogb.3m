@@ -1,0 +1,123 @@
+'\" te
+.\" Copyright (c) 2001, the Institute of Electrical and Electronics Engineers, Inc. and The Open Group. All Rights Reserved.
+.\" Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
+.\" Portions Copyright (c) 2006, Sun Microsystems, Inc. All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ilogb 3M "12 Jul 2006" "SunOS 5.11" "Mathematical Library Functions"
+.SH NAME
+ilogb, ilogbf, ilogbl \- return an unbiased exponent
+.SH SYNOPSIS
+.LP
+.nf
+c99 [ \fIflag\fR... ] \fIfile\fR... \fB-lm\fR [ \fIlibrary\fR... ]
+#include <math.h>
+
+\fBint\fR \fBilogb\fR(\fBdouble\fR \fIx\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBilogbf\fR(\fBfloat\fR \fIx\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBilogbl\fR(\fBlong double\fR \fIx\fR);
+.fi
+
+.LP
+.nf
+cc [ \fIflag\fR... ] \fIfile\fR... \fB-lm\fR [ \fIlibrary\fR... ]
+#include <math.h>
+
+\fBint\fR \fBilogb\fR(\fBdouble\fR \fIx\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBilogbf\fR(\fBfloat\fR \fIx\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBilogbl\fR(\fBlong double\fR \fIx\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+These functions return the exponent part of their argument \fIx\fR.  Formally,
+the return value is the integral part of  \fBlog\fR(r)| \fIx\fR | as a signed
+integral value, for non-zero \fIx\fR, where \fIr\fR is the radix of the
+machine's floating point arithmetic, which is the value of \fBFLT_RADIX\fR
+defined in <\fBfloat.h\fR>.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, these functions return the exponent part of \fIx\fR
+as a signed integer value. They are equivalent to calling the corresponding
+\fBlogb\fR(3M) function and casting the returned value to type \fBint\fR.
+.sp
+.LP
+If \fIx\fR is 0, the value \fBFP_ILOGB0\fR is returned. For SUSv3-conforming
+applications compiled with the \fBc99\fR compiler driver (see
+\fBstandards\fR(5)), a domain error occurs.
+.sp
+.LP
+If \fIx\fR is \(+-Inf, the value \fBINT_MAX\fR is returned. For
+SUSv3-conforming applications compiled with the \fBc99\fR compiler driver, a
+domain error occurs.
+.sp
+.LP
+If \fIx\fR is NaN, the value \fBFP_ILOGBNAN\fR is returned. For
+SUSv3-conforming applications compiled with the \fBc99\fR compiler driver, a
+domain error occurs.
+.SH ERRORS
+.sp
+.LP
+These functions will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fBDomain Error\fR
+.ad
+.RS 16n
+.rt  
+The \fIx\fR argument is zero, NaN, or \(+-Inf.
+.sp
+If the integer expression (\fBmath_errhandling\fR & \fBMATH_ERREXCEPT\fR) is
+non-zero, then the invalid floating-point exception is raised.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBfeclearexcept\fR(3M), \fBfetestexcept\fR(3M), \fBlimits.h\fR(3HEAD),
+\fBlogb\fR(3M), \fBmath.h\fR(3HEAD), \fBscalb\fR(3M), \fBattributes\fR(5),
+\fBstandards\fR(5)
