@@ -21,8 +21,8 @@
 
 /*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T		*/
@@ -90,8 +90,8 @@ struct lm_svc_args lmargs = {
 	/* fd, n_fmly, n_proto, n_rdev (below) */
 	.debug = 0,
 	.timout = 5 * 60,
-	.grace = 60,
-	.retransmittimeout = 15
+	.grace = 90,
+	.retransmittimeout = 5
 };
 int max_servers = 20;
 
@@ -172,20 +172,6 @@ main(int ac, char *av[])
 	 * command line options so the options override SMF values.
 	 */
 
-	/* How long to keep idle connections. */
-	propname = "conn_idle_timeout"; /* also -t */
-	ret = nfs_smf_get_iprop(propname, &val,
-	    DEFAULT_INSTANCE, SCF_TYPE_INTEGER, LOCKD);
-	if (ret == SA_OK) {
-		if (val <= 0)
-			fprintf(stderr, gettext(
-			    "Invalid %s from SMF"), propname);
-		else
-			lmargs.timout = val;
-	}
-
-	/* Note: debug_level can only be set by args. */
-
 	/* How long to wait for clients to re-establish locks. */
 	propname = "grace_period"; /* also -g */
 	ret = nfs_smf_get_iprop(propname, &val,
@@ -196,9 +182,12 @@ main(int ac, char *av[])
 			    "Invalid %s from SMF"), propname);
 		else
 			lmargs.grace = val;
+	} else {
+		syslog(LOG_ERR, "Reading of %s from SMF failed, using default "
+		    "value", propname);
 	}
 
-	propname = "listen_backlog"; /* also -l */
+	propname = "lockd_listen_backlog"; /* also -l */
 	ret = nfs_smf_get_iprop(propname, &val,
 	    DEFAULT_INSTANCE, SCF_TYPE_INTEGER, LOCKD);
 	if (ret == SA_OK) {
@@ -207,20 +196,12 @@ main(int ac, char *av[])
 			    "Invalid %s from SMF"), propname);
 		else
 			listen_backlog = val;
+	} else {
+		syslog(LOG_ERR, "Reading of %s from SMF failed, using default "
+		    "value", propname);
 	}
 
-	propname = "max_connections"; /* also -c */
-	ret = nfs_smf_get_iprop(propname, &val,
-	    DEFAULT_INSTANCE, SCF_TYPE_INTEGER, LOCKD);
-	if (ret == SA_OK) {
-		if (val <= 0)
-			fprintf(stderr, gettext(
-			    "Invalid %s from SMF"), propname);
-		else
-			max_conns_allowed = val;
-	}
-
-	propname = "max_servers"; /* also argv[1] */
+	propname = "lockd_servers"; /* also argv[1] */
 	ret = nfs_smf_get_iprop(propname, &val,
 	    DEFAULT_INSTANCE, SCF_TYPE_INTEGER, LOCKD);
 	if (ret == SA_OK) {
@@ -229,9 +210,12 @@ main(int ac, char *av[])
 			    "Invalid %s from SMF"), propname);
 		else
 			max_servers = val;
+	} else {
+		syslog(LOG_ERR, "Reading of %s from SMF failed, using default "
+		    "value", propname);
 	}
 
-	propname = "retrans_timeout"; /* also -r */
+	propname = "lockd_retransmit_timeout"; /* also -t */
 	ret = nfs_smf_get_iprop(propname, &val,
 	    DEFAULT_INSTANCE, SCF_TYPE_INTEGER, LOCKD);
 	if (ret == SA_OK) {
@@ -240,10 +224,12 @@ main(int ac, char *av[])
 			    "Invalid %s from SMF"), propname);
 		else
 			lmargs.retransmittimeout = val;
+	} else {
+		syslog(LOG_ERR, "Reading of %s from SMF failed, using default "
+		    "value", propname);
 	}
 
-
-	while ((c = getopt(ac, av, "c:d:g:l:r:t:")) != EOF)
+	while ((c = getopt(ac, av, "c:d:g:l:t:")) != EOF)
 		switch (c) {
 		case 'c': /* max_connections */
 			if ((val = atoi(optarg)) <= 0)
@@ -267,16 +253,10 @@ main(int ac, char *av[])
 			listen_backlog = val;
 			break;
 
-		case 'r': /* retrans_timeout */
+		case 't': /* retrans_timeout */
 			if ((val = atoi(optarg)) <= 0)
 				goto badval;
 			lmargs.retransmittimeout = val;
-			break;
-
-		case 't': /* conn_idle_timeout */
-			if ((val = atoi(optarg)) <= 0)
-				goto badval;
-			lmargs.timout = val;
 			break;
 
 		badval:
@@ -543,8 +523,7 @@ usage(void)
 	(void) fprintf(stderr, "\t-d debug_level\n");
 	(void) fprintf(stderr, "\t-g grace_period\n");
 	(void) fprintf(stderr, "\t-l listen_backlog\n");
-	(void) fprintf(stderr, "\t-r retrans_timeout\n");
-	(void) fprintf(stderr, "\t-t conn_idle_timeout\n");
+	(void) fprintf(stderr, "\t-t retransmit_timeout\n");
 
 	exit(1);
 }
