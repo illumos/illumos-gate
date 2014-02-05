@@ -748,10 +748,6 @@ usr/lib/amd64/libfakekernel.so.1		i386
 usr/lib/sparcv9/libfakekernel.so		sparc
 usr/lib/sparcv9/libfakekernel.so.1		sparc
 #
-# Private/Internal dtrace scripts of smbsrv. Do not ship.
-#
-usr/lib/smbsrv/dtrace
-#
 # Private/Internal libraries of smbsrv. Do not ship.
 #
 usr/lib/mdb/proc/libfksmbsrv.so
