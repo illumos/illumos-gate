@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 /*
  * Copyright 1993 OpenVision Technologies, Inc., All Rights Reserved.
@@ -41,7 +42,6 @@
  * list of service routines.
  *
  */
-
 
 #include "mt.h"
 #include "rpc_mt.h"
@@ -115,7 +115,6 @@ static void add_pollfd(int fd, short events);
 static void remove_pollfd(int fd);
 static void __svc_remove_input_of_fd(int fd);
 
-
 /*
  * Data used to handle reactor:
  * 	- one file descriptor we listen to,
@@ -135,7 +134,6 @@ typedef struct {
 } _svc_user_link;
 
 typedef struct _svc_user_fd_node {
-	/* The lnk field must be the first field. */
 	_svc_user_link lnk;
 	svc_input_id_t id;
 	int	    fd;
@@ -145,19 +143,13 @@ typedef struct _svc_user_fd_node {
 } _svc_user_fd_node;
 
 typedef struct _svc_user_fd_head {
-	/* The lnk field must be the first field. */
-	_svc_user_link lnk;
+	struct _svc_user_fd_node *list;
 	unsigned int mask;    /* logical OR of all sub-masks */
 } _svc_user_fd_head;
 
 
-/* Define some macros to manage the linked list. */
-#define	LIST_ISEMPTY(l) ((_svc_user_fd_node *) &(l.lnk) == l.lnk.next)
-#define	LIST_CLR(l) \
-	(l.lnk.previous = l.lnk.next = (_svc_user_fd_node *) &(l.lnk))
-
 /* Array of defined reactor - indexed on file descriptor */
-static _svc_user_fd_head *svc_userfds  = NULL;
+static _svc_user_fd_head *svc_userfds = NULL;
 
 /* current size of file descriptor */
 static int svc_nuserfds = 0;
@@ -237,18 +229,21 @@ _svc_attribute_new_id(_svc_user_fd_node *node)
 		/* Allocate new entries */
 		int L_inOldSize = svc_nmgtuserfds;
 		int i;
+		_svc_management_user_fd *tmp;
 
 		svc_nmgtuserfds += USER_FD_INCREMENT;
 
-		user_fd_mgt_array = (_svc_management_user_fd *)
-		    realloc(user_fd_mgt_array, svc_nmgtuserfds
-			* sizeof (_svc_management_user_fd));
+		tmp = realloc(user_fd_mgt_array,
+		    svc_nmgtuserfds * sizeof (_svc_management_user_fd));
 
-		if (user_fd_mgt_array == NULL) {
+		if (tmp == NULL) {
 			syslog(LOG_ERR, "_svc_attribute_new_id: out of memory");
+			svc_nmgtuserfds = L_inOldSize;
 			errno = ENOMEM;
 			return ((svc_input_id_t)-1);
 		}
+
+		user_fd_mgt_array = tmp;
 
 		for (i = svc_nmgtuserfds - 1; i >= L_inOldSize; i--)
 			_svc_free_id((svc_input_id_t)i);
@@ -287,7 +282,7 @@ __svc_getreq_user(struct pollfd *pfd)
 		return;
 	}
 
-	node = svc_userfds[fd].lnk.next;
+	node = svc_userfds[fd].list;
 
 	/* check if at least one mask fits */
 	if (0 == (revents & svc_userfds[fd].mask)) {
@@ -295,8 +290,7 @@ __svc_getreq_user(struct pollfd *pfd)
 		return;
 	}
 
-	while ((svc_userfds[fd].mask != 0) &&
-	    ((_svc_user_link *)node != &(svc_userfds[fd].lnk))) {
+	while ((svc_userfds[fd].mask != 0) && (node != NULL)) {
 		/*
 		 * If one of the received events maps the ones the node listens
 		 * to
@@ -360,12 +354,12 @@ __destroy_userfd(void)
 		for (one_fd = 0; one_fd < svc_nuserfds; one_fd++) {
 			_svc_user_fd_node *node;
 
-			node = svc_userfds[one_fd].lnk.next;
-			while ((_svc_user_link *) node
-			    != (_svc_user_link *) &(svc_userfds[one_fd])) {
+			node = svc_userfds[one_fd].list;
+			while (node != NULL) {
+				_svc_user_fd_node *tmp = node;
 				_svc_free_id(node->id);
 				node = node->lnk.next;
-				free(node->lnk.previous);
+				free(tmp);
 			}
 		}
 
@@ -386,20 +380,20 @@ __destroy_userfd(void)
 static void
 __svc_remove_input_of_fd(int fd)
 {
-	_svc_user_fd_node *one_node;
+	_svc_user_fd_node **pnode;
+	_svc_user_fd_node *tmp;
 
 	if ((fd < 0) || (fd >= svc_nuserfds))
 		return;
 
-	one_node = svc_userfds[fd].lnk.next;
-	while ((_svc_user_link *) one_node
-	    != (_svc_user_link *) &(svc_userfds[fd].lnk)) {
-		_svc_free_id(one_node->id);
-		one_node = one_node->lnk.next;
-		free(one_node->lnk.previous);
+	pnode = &svc_userfds[fd].list;
+	while ((tmp = *pnode) != NULL) {
+		*pnode = tmp->lnk.next;
+
+		_svc_free_id(tmp->id);
+		free(tmp);
 	}
 
-	LIST_CLR(svc_userfds[fd]);
 	svc_userfds[fd].mask = 0;
 }
 
@@ -440,22 +434,25 @@ svc_add_input(int user_fd, unsigned int events,
 	if (user_fd >= svc_nuserfds) {
 		int oldSize = svc_nuserfds;
 		int i;
+		_svc_user_fd_head *tmp;
 
 		svc_nuserfds = (user_fd + 1) + USER_FD_INCREMENT;
 
-		svc_userfds = (_svc_user_fd_head *)
-		    realloc(svc_userfds,
-			svc_nuserfds * sizeof (_svc_user_fd_head));
+		tmp = realloc(svc_userfds,
+		    svc_nuserfds * sizeof (_svc_user_fd_head));
 
-		if (svc_userfds == NULL) {
+		if (tmp == NULL) {
 			syslog(LOG_ERR, "svc_add_input: out of memory");
+			svc_nuserfds = oldSize;
 			errno = ENOMEM;
 			(void) mutex_unlock(&svc_userfds_lock);
 			return ((svc_input_id_t)-1);
 		}
 
+		svc_userfds = tmp;
+
 		for (i = oldSize; i < svc_nuserfds; i++) {
-			LIST_CLR(svc_userfds[i]);
+			svc_userfds[i].list = NULL;
 			svc_userfds[i].mask = 0;
 		}
 	}
@@ -474,16 +471,19 @@ svc_add_input(int user_fd, unsigned int events,
 	new_node->callback	= user_callback;
 	new_node->cookie	= cookie;
 
-	(void) _svc_attribute_new_id(new_node);
+	if (_svc_attribute_new_id(new_node) == -1) {
+		(void) mutex_unlock(&svc_userfds_lock);
+		free(new_node);
+		return ((svc_input_id_t)-1);
+	}
 
 	/* Add the new element at the beginning of the list. */
-	if (LIST_ISEMPTY(svc_userfds[user_fd])) {
-		svc_userfds[user_fd].lnk.previous = new_node;
-	}
-	new_node->lnk.next = svc_userfds[user_fd].lnk.next;
-	new_node->lnk.previous = (_svc_user_fd_node *)&(svc_userfds[user_fd]);
+	if (svc_userfds[user_fd].list != NULL)
+		svc_userfds[user_fd].list->lnk.previous = new_node;
+	new_node->lnk.next = svc_userfds[user_fd].list;
+	new_node->lnk.previous = NULL;
 
-	svc_userfds[user_fd].lnk.next = new_node;
+	svc_userfds[user_fd].list = new_node;
 
 	/* refresh global mask for this file desciptor */
 	svc_userfds[user_fd].mask |= events;
@@ -494,7 +494,6 @@ svc_add_input(int user_fd, unsigned int events,
 	(void) mutex_unlock(&svc_userfds_lock);
 	return (new_node->id);
 }
-
 
 int
 svc_remove_input(svc_input_id_t id)
@@ -522,25 +521,31 @@ svc_remove_input(svc_input_id_t id)
 	previous	= node->lnk.previous;
 	fd		= node->fd; /* caching optim */
 
-	    /* Remove this node from the list. */
-	previous->lnk.next = next;
-	next->lnk.previous = previous;
+	/* Remove this node from the list. */
+	if (previous != NULL) {
+		previous->lnk.next = next;
+	} else {
+		assert(svc_userfds[fd].list == node);
+		svc_userfds[fd].list = next;
+	}
+	if (next != NULL)
+		next->lnk.previous = previous;
 
-	    /* Remove the node flags from the global mask */
+	/* Remove the node flags from the global mask */
 	svc_userfds[fd].mask ^= node->events;
 
 	free(node);
 	if (svc_userfds[fd].mask == 0) {
-		LIST_CLR(svc_userfds[fd]);
-		assert(LIST_ISEMPTY(svc_userfds[fd]));
+		assert(svc_userfds[fd].list == NULL);
 		remove_pollfd(fd);
+	} else {
+		assert(svc_userfds[fd].list != NULL);
 	}
 	/* <=> CLEAN NEEDED TO SHRINK MEMORY USAGE */
 
 	(void) mutex_unlock(&svc_userfds_lock);
 	return (0);
 }
-
 
 /*
  * Provides default service-side functions for authentication flavors
@@ -614,7 +619,7 @@ add_pollfd(int fd, short events)
 			svc_pollfd_allocd += POLLFD_EXTEND;
 		} while (svc_max_pollfd > svc_pollfd_allocd);
 		tmp = realloc(svc_pollfd,
-					sizeof (pollfd_t) * svc_pollfd_allocd);
+		    sizeof (pollfd_t) * svc_pollfd_allocd);
 		if (tmp != NULL) {
 			svc_pollfd = tmp;
 			for (; i < svc_pollfd_allocd; i++)
@@ -713,12 +718,12 @@ delete_pollfd(int fd)
 {
 	remove_pollfd(fd);
 	if (pollfd_shrinking && svc_max_pollfd <
-			(svc_pollfd_allocd - POLLFD_SHRINK)) {
+	    (svc_pollfd_allocd - POLLFD_SHRINK)) {
 		do {
 			svc_pollfd_allocd -= POLLFD_SHRINK;
 		} while (svc_max_pollfd < (svc_pollfd_allocd - POLLFD_SHRINK));
 		svc_pollfd = realloc(svc_pollfd,
-				sizeof (pollfd_t) * svc_pollfd_allocd);
+		    sizeof (pollfd_t) * svc_pollfd_allocd);
 		if (svc_pollfd == NULL) {
 			syslog(LOG_ERR, "delete_pollfd: out of memory");
 			_exit(1);
@@ -768,7 +773,7 @@ xprt_register(const SVCXPRT *xprt)
 
 		/* time to expand svc_xprts */
 		tmp_xprts = realloc(svc_xports,
-			sizeof (SVCXPRT *) * (nsvc_xports + FD_INCREMENT));
+		    sizeof (SVCXPRT *) * (nsvc_xports + FD_INCREMENT));
 		if (tmp_xprts == NULL) {
 			syslog(LOG_ERR, "xprt_register : out of memory.");
 			_exit(1);
@@ -776,7 +781,7 @@ xprt_register(const SVCXPRT *xprt)
 
 		svc_xports = tmp_xprts;
 		(void) memset(&svc_xports[nsvc_xports], 0,
-					sizeof (SVCXPRT *) * FD_INCREMENT);
+		    sizeof (SVCXPRT *) * FD_INCREMENT);
 		nsvc_xports += FD_INCREMENT;
 	}
 
@@ -866,7 +871,7 @@ svc_reg(const SVCXPRT *xprt, const rpcprog_t prog, const rpcvers_t vers,
 		netid = strdup(nconf->nc_netid);
 		flag = 1;
 	} else if ((tnconf = __rpcfd_to_nconf(xprt->xp_fd, xprt->xp_type))
-			!= NULL) {
+	    != NULL) {
 		netid = strdup(tnconf->nc_netid);
 		flag = 1;
 		freenetconfigent(tnconf);
@@ -973,7 +978,7 @@ svc_register(SVCXPRT *xprt, rpcprog_t prog, rpcvers_t vers,
 		netid = strdup(xprt->xp_netid);
 		flag = 1;
 	} else if ((ioctl(xprt->xp_fd, I_FIND, "timod") > 0) && ((nconf =
-	__rpcfd_to_nconf(xprt->xp_fd, xprt->xp_type)) != NULL)) {
+	    __rpcfd_to_nconf(xprt->xp_fd, xprt->xp_type)) != NULL)) {
 		/* fill in missing netid field in SVCXPRT */
 		netid = strdup(nconf->nc_netid);
 		flag = 1;
@@ -1070,9 +1075,9 @@ svc_find(rpcprog_t prog, rpcvers_t vers, struct svc_callout **prev, char *netid)
 	p = NULL_SVC;
 	for (s = svc_head; s != NULL_SVC; s = s->sc_next) {
 		if (((s->sc_prog == prog) && (s->sc_vers == vers)) &&
-			((netid == NULL) || (s->sc_netid == NULL) ||
-			(strcmp(netid, s->sc_netid) == 0)))
-				break;
+		    ((netid == NULL) || (s->sc_netid == NULL) ||
+		    (strcmp(netid, s->sc_netid) == 0)))
+			break;
 		p = s;
 	}
 	*prev = p;
@@ -1423,7 +1428,7 @@ _svc_prog_dispatch(SVCXPRT *xprt, struct rpc_msg *msg, struct svc_req *r)
 		bool_t no_dispatch;
 
 		if ((why = __gss_authenticate(r, msg,
-			&no_dispatch)) != AUTH_OK) {
+		    &no_dispatch)) != AUTH_OK) {
 			svcerr_auth(xprt, why);
 			return (0);
 		}
@@ -1442,7 +1447,7 @@ _svc_prog_dispatch(SVCXPRT *xprt, struct rpc_msg *msg, struct svc_req *r)
 				if ((xprt->xp_netid == NULL) ||
 				    (s->sc_netid == NULL) ||
 				    (strcmp(xprt->xp_netid,
-					    s->sc_netid) == 0)) {
+				    s->sc_netid) == 0)) {
 					disp_fn = (*s->sc_dispatch);
 					(void) rw_unlock(&svc_lock);
 					disp_fn(r, xprt);
@@ -1701,7 +1706,7 @@ __svc_dupcache_init(void *condition, int basis, char **xprt_cache)
 	if (*xprt_cache != NULL) { /* do only once per xprt */
 		(void) mutex_unlock(&initdc_lock);
 		syslog(LOG_ERR,
-			"__svc_dupcache_init: multiply defined dup cache");
+		    "__svc_dupcache_init: multiply defined dup cache");
 		return (FALSE);
 	}
 
@@ -1711,7 +1716,7 @@ __svc_dupcache_init(void *condition, int basis, char **xprt_cache)
 		if (dc == NULL) {
 			(void) mutex_unlock(&initdc_lock);
 			syslog(LOG_ERR,
-				"__svc_dupcache_init: memory alloc failed");
+			    "__svc_dupcache_init: memory alloc failed");
 			return (FALSE);
 		}
 		(void) rwlock_init(&(dc->dc_lock), USYNC_THREAD, NULL);
@@ -1724,12 +1729,12 @@ __svc_dupcache_init(void *condition, int basis, char **xprt_cache)
 		dc->dc_basis = basis;
 		dc->dc_mru = NULL;
 		dc->dc_hashtbl = malloc(dc->dc_buckets *
-						sizeof (struct dupreq *));
+		    sizeof (struct dupreq *));
 		if (dc->dc_hashtbl == NULL) {
 			free(dc);
 			(void) mutex_unlock(&initdc_lock);
 			syslog(LOG_ERR,
-				"__svc_dupcache_init: memory alloc failed");
+			    "__svc_dupcache_init: memory alloc failed");
 			return (FALSE);
 		}
 		for (i = 0; i < DUPCACHE_BUCKETS; i++)
@@ -1739,7 +1744,7 @@ __svc_dupcache_init(void *condition, int basis, char **xprt_cache)
 	default:
 		(void) mutex_unlock(&initdc_lock);
 		syslog(LOG_ERR,
-			"__svc_dupcache_init: undefined dup cache basis");
+		    "__svc_dupcache_init: undefined dup cache basis");
 		return (FALSE);
 	}
 
@@ -1782,14 +1787,14 @@ __svc_dup(struct svc_req *req, caddr_t *resp_buf, uint_t *resp_bufsz,
 	drhash = drxid % dc->dc_buckets;
 
 	if ((rc = __svc_dupcache_check(req, resp_buf, resp_bufsz, dc, drxid,
-			drhash)) != DUP_NEW)
+	    drhash)) != DUP_NEW)
 		return (rc);
 
 	if ((dr = __svc_dupcache_victim(dc, timenow)) == NULL)
 		return (DUP_ERROR);
 
 	if ((rc = __svc_dupcache_enter(req, dr, dc, drxid, drhash, timenow))
-			== DUP_ERROR)
+	    == DUP_ERROR)
 		return (rc);
 
 	return (DUP_NEW);
@@ -1819,14 +1824,13 @@ __svc_dupcache_check(struct svc_req *req, caddr_t *resp_buf, uint_t *resp_bufsz,
 		    dr->dr_prog == req->rq_prog &&
 		    dr->dr_vers == req->rq_vers &&
 		    dr->dr_addr.len == req->rq_xprt->xp_rtaddr.len &&
-		    memcmp(dr->dr_addr.buf,
-				req->rq_xprt->xp_rtaddr.buf,
-				dr->dr_addr.len) == 0) { /* entry found */
+		    memcmp(dr->dr_addr.buf, req->rq_xprt->xp_rtaddr.buf,
+		    dr->dr_addr.len) == 0) { /* entry found */
 			if (dr->dr_hash != drhash) {
 				/* sanity check */
 				(void) rw_unlock((&dc->dc_lock));
 				syslog(LOG_ERR,
-					"\n__svc_dupdone: hashing error");
+				    "\n__svc_dupdone: hashing error");
 				return (DUP_ERROR);
 			}
 
@@ -1839,9 +1843,9 @@ __svc_dupcache_check(struct svc_req *req, caddr_t *resp_buf, uint_t *resp_bufsz,
 			 * in results.
 			 */
 			if (((dr->dr_status == DUP_DONE) ||
-				(dr->dr_status == DUP_DROP)) &&
-				resp_buf != NULL &&
-				dr->dr_resp.buf != NULL) {
+			    (dr->dr_status == DUP_DROP)) &&
+			    resp_buf != NULL &&
+			    dr->dr_resp.buf != NULL) {
 				*resp_buf = malloc(dr->dr_resp.len);
 				if (*resp_buf == NULL) {
 					syslog(LOG_ERR,
@@ -1851,7 +1855,7 @@ __svc_dupcache_check(struct svc_req *req, caddr_t *resp_buf, uint_t *resp_bufsz,
 				}
 				(void) memset(*resp_buf, 0, dr->dr_resp.len);
 				(void) memcpy(*resp_buf, dr->dr_resp.buf,
-					dr->dr_resp.len);
+				    dr->dr_resp.len);
 				*resp_bufsz = dr->dr_resp.len;
 			} else {
 				/* no result */
@@ -1890,17 +1894,17 @@ __svc_dupcache_victim(struct dupcache *dc, time_t timenow)
 		 */
 		(void) rw_wrlock(&(dc->dc_lock));
 		while ((dc->dc_mru) && (dr = dc->dc_mru->dr_next) &&
-				((timenow - dr->dr_time) > dc->dc_time)) {
+		    ((timenow - dr->dr_time) > dc->dc_time)) {
 			/* clean and then free the entry */
 			if (dr->dr_status != DUP_DONE &&
-				dr->dr_status != DUP_DROP) {
+			    dr->dr_status != DUP_DROP) {
 				/*
 				 * The LRU list can't contain an
 				 * entry where the status is other than
 				 * DUP_DONE or DUP_DROP.
 				 */
 				syslog(LOG_ERR,
-					"__svc_dupcache_victim: bad victim");
+				    "__svc_dupcache_victim: bad victim");
 #ifdef DUP_DEBUG
 				/*
 				 * Need to hold the reader/writers lock to
@@ -1948,14 +1952,14 @@ __svc_dupcache_victim(struct dupcache *dc, time_t timenow)
 		 */
 		if ((dr = malloc(sizeof (*dr))) == NULL) {
 			syslog(LOG_ERR,
-				"__svc_dupcache_victim: malloc failed");
+			    "__svc_dupcache_victim: malloc failed");
 			return (NULL);
 		}
 		(void) memset(dr, 0, sizeof (*dr));
 		return (dr);
 	default:
 		syslog(LOG_ERR,
-			"__svc_dupcache_victim: undefined dup cache_basis");
+		    "__svc_dupcache_victim: undefined dup cache_basis");
 		return (NULL);
 	}
 }
@@ -1982,7 +1986,7 @@ __svc_dupcache_enter(struct svc_req *req, struct dupreq *dr,
 	}
 	(void) memset(dr->dr_addr.buf, 0, dr->dr_addr.len);
 	(void) memcpy(dr->dr_addr.buf, req->rq_xprt->xp_rtaddr.buf,
-							dr->dr_addr.len);
+	    dr->dr_addr.len);
 	dr->dr_resp.buf = NULL;
 	dr->dr_resp.maxlen = 0;
 	dr->dr_resp.len = 0;
@@ -2038,7 +2042,7 @@ __svc_dupdone(struct svc_req *req, caddr_t resp_buf, uint_t resp_bufsz,
 
 	/* update the status of the entry and result buffers, if required */
 	if ((rc = __svc_dupcache_update(req, resp_buf, resp_bufsz, status,
-			dc, drxid, drhash)) == DUP_ERROR) {
+	    dc, drxid, drhash)) == DUP_ERROR) {
 		syslog(LOG_ERR, "__svc_dupdone: cache entry error");
 		return (DUP_ERROR);
 	}
@@ -2069,9 +2073,8 @@ __svc_dupcache_update(struct svc_req *req, caddr_t resp_buf, uint_t resp_bufsz,
 		    dr->dr_prog == req->rq_prog &&
 		    dr->dr_vers == req->rq_vers &&
 		    dr->dr_addr.len == req->rq_xprt->xp_rtaddr.len &&
-		    memcmp(dr->dr_addr.buf,
-				req->rq_xprt->xp_rtaddr.buf,
-				dr->dr_addr.len) == 0) { /* entry found */
+		    memcmp(dr->dr_addr.buf, req->rq_xprt->xp_rtaddr.buf,
+		    dr->dr_addr.len) == 0) { /* entry found */
 			if (dr->dr_hash != drhash) {
 				/* sanity check */
 				(void) rw_unlock(&(dc->dc_lock));
@@ -2083,15 +2086,15 @@ __svc_dupcache_update(struct svc_req *req, caddr_t resp_buf, uint_t resp_bufsz,
 			/* store the results if bufer is not NULL */
 			if (resp_buf != NULL) {
 				if ((dr->dr_resp.buf =
-						malloc(resp_bufsz)) == NULL) {
+				    malloc(resp_bufsz)) == NULL) {
 					(void) rw_unlock(&(dc->dc_lock));
 					syslog(LOG_ERR,
-						"__svc_dupdone: malloc failed");
+					    "__svc_dupdone: malloc failed");
 					return (DUP_ERROR);
 				}
 				(void) memset(dr->dr_resp.buf, 0, resp_bufsz);
 				(void) memcpy(dr->dr_resp.buf, resp_buf,
-					(uint_t)resp_bufsz);
+				    (uint_t)resp_bufsz);
 				dr->dr_resp.len = resp_bufsz;
 			}
 
@@ -2146,9 +2149,9 @@ __svc_dupcache_debug(struct dupcache *dc)
 				bval = TRUE;
 			}
 			fprintf(stderr, "\txid: %u status: %d time: %ld",
-				dr->dr_xid, dr->dr_status, dr->dr_time);
+			    dr->dr_xid, dr->dr_status, dr->dr_time);
 			fprintf(stderr, " dr: %x chain: %x prevchain: %x\n",
-				dr, dr->dr_chain, dr->dr_prevchain);
+			    dr, dr->dr_chain, dr->dr_prevchain);
 			dr = dr->dr_chain;
 		}
 	}
@@ -2158,15 +2161,15 @@ __svc_dupcache_debug(struct dupcache *dc)
 		dr = dc->dc_mru->dr_next;	/* lru */
 		while (dr != dc->dc_mru) {
 			fprintf(stderr, "\txid: %u status : %d time : %ld",
-				dr->dr_xid, dr->dr_status, dr->dr_time);
+			    dr->dr_xid, dr->dr_status, dr->dr_time);
 			fprintf(stderr, " dr: %x next: %x prev: %x\n",
-				dr, dr->dr_next, dr->dr_prev);
+			    dr, dr->dr_next, dr->dr_prev);
 			dr = dr->dr_next;
 		}
 		fprintf(stderr, "\txid: %u status: %d time: %ld",
-			dr->dr_xid, dr->dr_status, dr->dr_time);
-		fprintf(stderr, " dr: %x next: %x prev: %x\n", dr,
-			dr->dr_next, dr->dr_prev);
+		    dr->dr_xid, dr->dr_status, dr->dr_time);
+		fprintf(stderr, " dr: %x next: %x prev: %x\n",
+		    dr, dr->dr_next, dr->dr_prev);
 	}
 }
 #endif /* DUP_DEBUG */
