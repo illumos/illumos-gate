@@ -26,8 +26,8 @@
  */
 
 /*
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -1608,7 +1608,7 @@ out:
 /*
  * Find or create an NLM host for the given name and address.
  *
- * The remote host is determined by all of: name, netidd, address.
+ * The remote host is determined by all of: name, netid, address.
  * Note that the netid is whatever nlm_svc_add_ep() gave to
  * svc_tli_kcreate() for the service binding.  If any of these
  * are different, allocate a new host (new sysid).
@@ -1658,7 +1658,7 @@ nlm_host_findcreate(struct nlm_globals *g, char *name,
 		avl_insert(&g->nlm_hosts_tree, host, where);
 
 		/*
-		 * Insert host ot the hosts hash table that is
+		 * Insert host to the hosts hash table that is
 		 * used to lookup host by sysid.
 		 */
 		VERIFY(mod_hash_insert(g->nlm_hosts_hash,
@@ -1669,8 +1669,15 @@ nlm_host_findcreate(struct nlm_globals *g, char *name,
 	mutex_exit(&g->lock);
 
 out:
-	if (newhost != NULL)
+	if (newhost != NULL) {
+		/*
+		 * We do not need the preallocated nlm_host
+		 * so decrement the reference counter
+		 * and destroy it.
+		 */
+		newhost->nh_refs--;
 		nlm_host_destroy(newhost);
+	}
 
 	return (host);
 }
