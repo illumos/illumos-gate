@@ -271,7 +271,7 @@ metaslab_compare(const void *x1, const void *x2)
 
 /*
  * Update the allocatable flag and the metaslab group's capacity.
- * The allocatable flag is set to true if the capacity is below
+ * The allocatable flag is set to true if the capacity is above
  * the zfs_mg_noalloc_threshold. If a metaslab group transitions
  * from allocatable to non-allocatable or vice versa then the metaslab
  * group's class is updated to reflect the transition.
