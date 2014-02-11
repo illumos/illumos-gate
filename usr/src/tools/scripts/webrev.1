@@ -22,7 +22,7 @@
 .\" Use is subject to license terms.
 .\"
 .\"
-.TH webrev 1 "6 Dec 2010"
+.TH webrev 1 "7 Feb 2014"
 .SH NAME
 webrev \- Generate HTML codereview materials
 .SH SYNOPSIS
@@ -46,29 +46,18 @@ webrev \- Generate HTML codereview materials
 .B -w
 .I wx-file
 
-.B webrev 
-[
-.I common-options
-]
-.B -l
-.I arguments to 'putback'
-
-See OPTIONS for common-options.  
-Note that the -l option is only applicable to TeamWare workspaces.
-
 .SH DESCRIPTION
 .B webrev
 builds a set of HTML files suitable for performing code review of
 source changes in a web browser.
-It supports Mercurial, Git, Subversion and Teamware repositories.
+It supports Mercurial, Git and Subversion repositories.
 At its most basic, usage is:
 .nf
         $ webrev
 .fi
 
 In which case \fBwebrev\fR attempts to figure out the list of files
-for review (note that when using Teamware \fBputback\fR, this may take
-a long time; see the -l option).  If that fails, or if more control
+for review.  If that fails, or if more control
 over the set of files is needed, a \fIfile list\fR may be specified.
 \fBwebrev\fR also attempts to deduce a
 .I basis for comparison
@@ -151,25 +140,6 @@ makes use of
 .BR which_scm (1)
 to determine the SCM in use for a given workspace.
 
-.SS TeamWare
-In the case of TeamWare \fBwebrev\fR will use the output of "workspace
-name" to discover the workspace root, if not otherwise specified.
-.PP
-\fBwebrev\fR will attempt to use a 
-.BR wx (1) 
-active list in
-\fBCODEMGR_WS/wx/active\fR.
-To direct \fBwebrev\fR to determine the file list from the output of
-.BR putback "(1),"
-use the -l option.  (Note that \fBwebrev\fR may also elect to use
-\fBputback\fR if it cannot determine the file list from
-.BR wx "(1))."
-The -l option indicates that subsequent arguments should be
-treated as arguments to
-.BR putback "(1)."
-This can be used to prune the set of files which putback examines,
-or to reference a teamware flp (file list program).
-
 .SS Mercurial
 In the case of Mercurial \fBwebrev\fR will attempt to use the output
 from the
@@ -236,14 +206,6 @@ Include the specified file into the index.html file which is generated
 as part of the webrev.  This allows a snippet of XHTML to be added by
 the webrev author. User content is contained by a <div> tag and
 the markup should validate as XHTML 1.0 Transitional.
-.TP 10
-.BI "-l " putback-args
-Extract the file list from the output of 
-.I putback -n.
-Any arguments supplied will be passed to 
-.BR putback "(1)."
-See SCM INTERACTIONS.  For more information about file
-lists, see FILE LIST.  This argument should appear last.
 .TP 10
 .BI "-N"
 Suppress all comments from all output forms html, txt and pdf.
@@ -468,8 +430,6 @@ For the nested directory case it is necessary to specify the full target:
 This will remove just the \fIbugfix.onnv\fR directory.
 
 .SH SEE ALSO
-.BR putback "(1),"
-.BR workspace "(1),"
 .BR hg "(1),"
 .BR git "(1),"
 .BR ssh_config "(4),"

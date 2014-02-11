@@ -1926,6 +1926,7 @@ retry:
 		}
 
 		if (e.error == EAGAIN) {
+			open_stream_rele(osp, rp);
 			nfs4_end_op(mi, vp, NULL, &recov_state, TRUE);
 			goto retry;
 		}
