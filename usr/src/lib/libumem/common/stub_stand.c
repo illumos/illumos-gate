@@ -146,11 +146,3 @@ void
 _tmem_set_cleanup(void (*f)(int, void *))
 {
 }
-
-uint64_t
-atomic_swap_64(volatile uint64_t *t, uint64_t v)
-{
-	uint64_t old = *t;
-	*t = v;
-	return (old);
-}

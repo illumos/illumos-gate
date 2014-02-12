@@ -37,6 +37,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 /* Copyright (c) 1996, 1997 PDC, Network Appliance. All Rights Reserved */
+/*
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ */
 
 #include <sys/note.h>
 #include "ndmpd.h"
@@ -348,7 +351,7 @@ ndmp_handler_t ndmp_msghdl_tab[] = {
 				NDMP_TAPE_WRITE,
 				AUTH_REQUIRED,
 				{
-					HANDL(tape_write, 2, 2),
+					HANDL(tape_write, 3, 2),
 					HANDL(tape_write, 3, 3),
 					HANDL(tape_write, 3, 4),
 				}

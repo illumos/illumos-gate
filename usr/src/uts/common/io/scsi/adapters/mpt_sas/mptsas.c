@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
- * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2014, Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -96,6 +96,7 @@
 #include <sys/scsi/adapters/mpt_sas/mptsas_var.h>
 #include <sys/scsi/adapters/mpt_sas/mptsas_ioctl.h>
 #include <sys/scsi/adapters/mpt_sas/mptsas_smhba.h>
+#include <sys/scsi/adapters/mpt_sas/mptsas_hash.h>
 #include <sys/raidioctl.h>
 
 #include <sys/fs/dv_node.h>	/* devfs_clean */
@@ -335,12 +336,12 @@ static int mptsas_parse_address(char *name, uint64_t *wwid, uint8_t *phy,
     int *lun);
 static int mptsas_parse_smp_name(char *name, uint64_t *wwn);
 
-static mptsas_target_t *mptsas_phy_to_tgt(mptsas_t *mpt, int phymask,
-    uint8_t phy);
-static mptsas_target_t *mptsas_wwid_to_ptgt(mptsas_t *mpt, int phymask,
-    uint64_t wwid);
-static mptsas_smp_t *mptsas_wwid_to_psmp(mptsas_t *mpt, int phymask,
-    uint64_t wwid);
+static mptsas_target_t *mptsas_phy_to_tgt(mptsas_t *mpt,
+    mptsas_phymask_t phymask, uint8_t phy);
+static mptsas_target_t *mptsas_wwid_to_ptgt(mptsas_t *mpt,
+    mptsas_phymask_t phymask, uint64_t wwid);
+static mptsas_smp_t *mptsas_wwid_to_psmp(mptsas_t *mpt,
+    mptsas_phymask_t phymask, uint64_t wwid);
 
 static int mptsas_inquiry(mptsas_t *mpt, mptsas_target_t *ptgt, int lun,
     uchar_t page, unsigned char *buf, int len, int *rlen, uchar_t evpd);
@@ -406,23 +407,9 @@ static void mptsas_record_event(void *args);
 static int mptsas_reg_access(mptsas_t *mpt, mptsas_reg_access_t *data,
     int mode);
 
-static void mptsas_hash_init(mptsas_hash_table_t *hashtab);
-static void mptsas_hash_uninit(mptsas_hash_table_t *hashtab, size_t datalen);
-static void mptsas_hash_add(mptsas_hash_table_t *hashtab, void *data);
-static void * mptsas_hash_rem(mptsas_hash_table_t *hashtab, uint64_t key1,
-    mptsas_phymask_t key2);
-static void * mptsas_hash_search(mptsas_hash_table_t *hashtab, uint64_t key1,
-    mptsas_phymask_t key2);
-static void * mptsas_hash_traverse(mptsas_hash_table_t *hashtab, int pos);
-
-mptsas_target_t *mptsas_tgt_alloc(mptsas_hash_table_t *, uint16_t, uint64_t,
+mptsas_target_t *mptsas_tgt_alloc(mptsas_t *, uint16_t, uint64_t,
     uint32_t, mptsas_phymask_t, uint8_t);
-static mptsas_smp_t *mptsas_smp_alloc(mptsas_hash_table_t *hashtab,
-    mptsas_smp_t *data);
-static void mptsas_smp_free(mptsas_hash_table_t *hashtab, uint64_t wwid,
-    mptsas_phymask_t phymask);
-static void mptsas_tgt_free(mptsas_hash_table_t *, uint64_t, mptsas_phymask_t);
-static void * mptsas_search_by_devhdl(mptsas_hash_table_t *, uint16_t);
+static mptsas_smp_t *mptsas_smp_alloc(mptsas_t *, mptsas_smp_t *);
 static int mptsas_online_smp(dev_info_t *pdip, mptsas_smp_t *smp_node,
     dev_info_t **smp_dip);
 
@@ -694,6 +681,101 @@ _info(struct modinfo *modinfop)
 	return (mod_info(&modlinkage, modinfop));
 }
 
+static int
+mptsas_target_eval_devhdl(const void *op, void *arg)
+{
+	uint16_t dh = *(uint16_t *)arg;
+	const mptsas_target_t *tp = op;
+
+	return ((int)tp->m_devhdl - (int)dh);
+}
+
+static int
+mptsas_target_eval_slot(const void *op, void *arg)
+{
+	mptsas_led_control_t *lcp = arg;
+	const mptsas_target_t *tp = op;
+
+	if (tp->m_enclosure != lcp->Enclosure)
+		return ((int)tp->m_enclosure - (int)lcp->Enclosure);
+
+	return ((int)tp->m_slot_num - (int)lcp->Slot);
+}
+
+static int
+mptsas_target_eval_nowwn(const void *op, void *arg)
+{
+	uint8_t phy = *(uint8_t *)arg;
+	const mptsas_target_t *tp = op;
+
+	if (tp->m_addr.mta_wwn != 0)
+		return (-1);
+
+	return ((int)tp->m_phynum - (int)phy);
+}
+
+static int
+mptsas_smp_eval_devhdl(const void *op, void *arg)
+{
+	uint16_t dh = *(uint16_t *)arg;
+	const mptsas_smp_t *sp = op;
+
+	return ((int)sp->m_devhdl - (int)dh);
+}
+
+static uint64_t
+mptsas_target_addr_hash(const void *tp)
+{
+	const mptsas_target_addr_t *tap = tp;
+
+	return ((tap->mta_wwn & 0xffffffffffffULL) |
+	    ((uint64_t)tap->mta_phymask << 48));
+}
+
+static int
+mptsas_target_addr_cmp(const void *a, const void *b)
+{
+	const mptsas_target_addr_t *aap = a;
+	const mptsas_target_addr_t *bap = b;
+
+	if (aap->mta_wwn < bap->mta_wwn)
+		return (-1);
+	if (aap->mta_wwn > bap->mta_wwn)
+		return (1);
+	return ((int)bap->mta_phymask - (int)aap->mta_phymask);
+}
+
+static void
+mptsas_target_free(void *op)
+{
+	kmem_free(op, sizeof (mptsas_target_t));
+}
+
+static void
+mptsas_smp_free(void *op)
+{
+	kmem_free(op, sizeof (mptsas_smp_t));
+}
+
+static void
+mptsas_destroy_hashes(mptsas_t *mpt)
+{
+	mptsas_target_t *tp;
+	mptsas_smp_t *sp;
+
+	for (tp = refhash_first(mpt->m_targets); tp != NULL;
+	    tp = refhash_next(mpt->m_targets, tp)) {
+		refhash_remove(mpt->m_targets, tp);
+	}
+	for (sp = refhash_first(mpt->m_smp_targets); sp != NULL;
+	    sp = refhash_next(mpt->m_smp_targets, sp)) {
+		refhash_remove(mpt->m_smp_targets, sp);
+	}
+	refhash_destroy(mpt->m_targets);
+	refhash_destroy(mpt->m_smp_targets);
+	mpt->m_targets = NULL;
+	mpt->m_smp_targets = NULL;
+}
 
 static int
 mptsas_iport_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
@@ -1403,11 +1485,12 @@ fail:
 			mptsas_hba_teardown(mpt);
 		}
 
+		if (mpt->m_targets)
+			refhash_destroy(mpt->m_targets);
+		if (mpt->m_smp_targets)
+			refhash_destroy(mpt->m_smp_targets);
+
 		if (mpt->m_active) {
-			mptsas_hash_uninit(&mpt->m_active->m_smptbl,
-			    sizeof (mptsas_smp_t));
-			mptsas_hash_uninit(&mpt->m_active->m_tgttbl,
-			    sizeof (mptsas_target_t));
 			mptsas_free_active_slots(mpt);
 		}
 		if (intr_added) {
@@ -1840,12 +1923,12 @@ mptsas_do_detach(dev_info_t *dip)
 	 */
 	mptsas_destroy_phy_stats(mpt);
 
+	mptsas_destroy_hashes(mpt);
+
 	/*
 	 * Delete nt_active.
 	 */
 	mutex_enter(&mpt->m_mutex);
-	mptsas_hash_uninit(&mpt->m_active->m_tgttbl, sizeof (mptsas_target_t));
-	mptsas_hash_uninit(&mpt->m_active->m_smptbl, sizeof (mptsas_smp_t));
 	mptsas_free_active_slots(mpt);
 	mutex_exit(&mpt->m_mutex);
 
@@ -2103,7 +2186,11 @@ mptsas_smp_setup(mptsas_t *mpt)
 	/*
 	 * Initialize smp hash table
 	 */
-	mptsas_hash_init(&mpt->m_active->m_smptbl);
+	mpt->m_smp_targets = refhash_create(MPTSAS_SMP_BUCKET_COUNT,
+	    mptsas_target_addr_hash, mptsas_target_addr_cmp,
+	    mptsas_smp_free, sizeof (mptsas_smp_t),
+	    offsetof(mptsas_smp_t, m_link), offsetof(mptsas_smp_t, m_addr),
+	    KM_SLEEP);
 	mpt->m_smp_devhdl = 0xFFFF;
 
 	return (TRUE);
@@ -2746,8 +2833,9 @@ mptsas_scsi_tgt_init(dev_info_t *hba_dip, dev_info_t *tgt_dip,
 	mptsas_tgt_private_t	*tgt_private = NULL;
 	mptsas_target_t		*ptgt = NULL;
 	char			*psas_wwn = NULL;
-	int			phymask = 0;
+	mptsas_phymask_t	phymask = 0;
 	uint64_t		sas_wwn = 0;
+	mptsas_target_addr_t	addr;
 	mpt = SDEV2MPT(sd);
 
 	ASSERT(scsi_hba_iport_unit_address(hba_dip) != 0);
@@ -2763,7 +2851,7 @@ mptsas_scsi_tgt_init(dev_info_t *hba_dip, dev_info_t *tgt_dip,
 	/*
 	 * phymask is 0 means the virtual port for RAID
 	 */
-	phymask = ddi_prop_get_int(DDI_DEV_T_ANY, hba_dip, 0,
+	phymask = (mptsas_phymask_t)ddi_prop_get_int(DDI_DEV_T_ANY, hba_dip, 0,
 	    "phymask", 0);
 	if (mdi_component_is_client(tgt_dip, NULL) == MDI_SUCCESS) {
 		if ((pip = (void *)(sd->sd_private)) == NULL) {
@@ -2801,9 +2889,12 @@ mptsas_scsi_tgt_init(dev_info_t *hba_dip, dev_info_t *tgt_dip,
 			sas_wwn = 0;
 		}
 	}
+
 	ASSERT((sas_wwn != 0) || (phymask != 0));
+	addr.mta_wwn = sas_wwn;
+	addr.mta_phymask = phymask;
 	mutex_enter(&mpt->m_mutex);
-	ptgt = mptsas_hash_search(&mpt->m_active->m_tgttbl, sas_wwn, phymask);
+	ptgt = refhash_lookup(mpt->m_targets, &addr);
 	mutex_exit(&mpt->m_mutex);
 	if (ptgt == NULL) {
 		mptsas_log(mpt, CE_WARN, "!tgt_init: target doesn't exist or "
@@ -3234,79 +3325,63 @@ mptsas_accept_pkt(mptsas_t *mpt, mptsas_cmd_t *cmd)
 int
 mptsas_save_cmd(mptsas_t *mpt, mptsas_cmd_t *cmd)
 {
-	mptsas_slots_t	*slots;
-	int		slot;
-	mptsas_target_t	*ptgt = cmd->cmd_tgt_addr;
+	mptsas_slots_t *slots = mpt->m_active;
+	uint_t slot, start_rotor;
+	mptsas_target_t *ptgt = cmd->cmd_tgt_addr;
 
-	ASSERT(mutex_owned(&mpt->m_mutex));
-	slots = mpt->m_active;
+	ASSERT(MUTEX_HELD(&mpt->m_mutex));
 
 	/*
 	 * Account for reserved TM request slot and reserved SMID of 0.
 	 */
-	ASSERT(slots->m_n_slots == (mpt->m_max_requests - 2));
+	ASSERT(slots->m_n_normal == (mpt->m_max_requests - 2));
 
 	/*
-	 * m_tags is equivalent to the SMID when sending requests.  Since the
-	 * SMID cannot be 0, start out at one if rolling over past the size
-	 * of the request queue depth.  Also, don't use the last SMID, which is
-	 * reserved for TM requests.
+	 * Find the next available slot, beginning at m_rotor.  If no slot is
+	 * available, we'll return FALSE to indicate that.  This mechanism
+	 * considers only the normal slots, not the reserved slot 0 nor the
+	 * task management slot m_n_normal + 1.  The rotor is left to point to
+	 * the normal slot after the one we select, unless we select the last
+	 * normal slot in which case it returns to slot 1.
 	 */
-	slot = (slots->m_tags)++;
-	if (slots->m_tags > slots->m_n_slots) {
-		slots->m_tags = 1;
+	start_rotor = slots->m_rotor;
+	do {
+		slot = slots->m_rotor++;
+		if (slots->m_rotor > slots->m_n_normal)
+			slots->m_rotor = 1;
+
+		if (slots->m_rotor == start_rotor)
+			break;
+	} while (slots->m_slot[slot] != NULL);
+
+	if (slots->m_slot[slot] != NULL)
+		return (FALSE);
+
+	ASSERT(slot != 0 && slot <= slots->m_n_normal);
+
+	cmd->cmd_slot = slot;
+	slots->m_slot[slot] = cmd;
+	mpt->m_ncmds++;
+
+	/*
+	 * only increment per target ncmds if this is not a
+	 * command that has no target associated with it (i.e. a
+	 * event acknoledgment)
+	 */
+	if ((cmd->cmd_flags & CFLAG_CMDIOC) == 0) {
+		ptgt->m_t_ncmds++;
 	}
+	cmd->cmd_active_timeout = cmd->cmd_pkt->pkt_time;
 
-alloc_tag:
-	/* Validate tag, should never fail. */
-	if (slots->m_slot[slot] == NULL) {
-		/*
-		 * Make sure SMID is not using reserved value of 0
-		 * and the TM request slot.
-		 */
-		ASSERT((slot > 0) && (slot <= slots->m_n_slots));
-		cmd->cmd_slot = slot;
-		slots->m_slot[slot] = cmd;
-		mpt->m_ncmds++;
-
-		/*
-		 * only increment per target ncmds if this is not a
-		 * command that has no target associated with it (i.e. a
-		 * event acknoledgment)
-		 */
-		if ((cmd->cmd_flags & CFLAG_CMDIOC) == 0) {
-			ptgt->m_t_ncmds++;
-		}
-		cmd->cmd_active_timeout = cmd->cmd_pkt->pkt_time;
-
-		/*
-		 * If initial timout is less than or equal to one tick, bump
-		 * the timeout by a tick so that command doesn't timeout before
-		 * its allotted time.
-		 */
-		if (cmd->cmd_active_timeout <= mptsas_scsi_watchdog_tick) {
-			cmd->cmd_active_timeout += mptsas_scsi_watchdog_tick;
-		}
-		return (TRUE);
-	} else {
-		int i;
-
-		/*
-		 * If slot in use, scan until a free one is found. Don't use 0
-		 * or final slot, which is reserved for TM requests.
-		 */
-		for (i = 0; i < slots->m_n_slots; i++) {
-			slot = slots->m_tags;
-			if (++(slots->m_tags) > slots->m_n_slots) {
-				slots->m_tags = 1;
-			}
-			if (slots->m_slot[slot] == NULL) {
-				NDBG22(("found free slot %d", slot));
-				goto alloc_tag;
-			}
-		}
+	/*
+	 * If initial timout is less than or equal to one tick, bump
+	 * the timeout by a tick so that command doesn't timeout before
+	 * its allotted time.
+	 */
+	if (cmd->cmd_active_timeout <= mptsas_scsi_watchdog_tick) {
+		cmd->cmd_active_timeout += mptsas_scsi_watchdog_tick;
 	}
-	return (FALSE);
+	return (TRUE);
 }
 
 /*
@@ -4647,7 +4722,7 @@ mptsas_handle_scsi_io_success(mptsas_t *mpt,
 	 * check on the SMID.  The final slot is used for TM requests, which
 	 * would not come into this reply handler.
 	 */
-	if ((SMID == 0) || (SMID > slots->m_n_slots)) {
+	if ((SMID == 0) || (SMID > slots->m_n_normal)) {
 		mptsas_log(mpt, CE_WARN, "?Received invalid SMID of %d\n",
 		    SMID);
 		ddi_fm_service_impact(mpt->m_dip, DDI_SERVICE_UNAFFECTED);
@@ -4750,7 +4825,7 @@ mptsas_handle_address_reply(mptsas_t *mpt,
 		 * This could be a TM reply, which use the last allocated SMID,
 		 * so allow for that.
 		 */
-		if ((SMID == 0) || (SMID > (slots->m_n_slots + 1))) {
+		if ((SMID == 0) || (SMID > (slots->m_n_normal + 1))) {
 			mptsas_log(mpt, CE_WARN, "?Received invalid SMID of "
 			    "%d\n", SMID);
 			ddi_fm_service_impact(mpt->m_dip,
@@ -5067,7 +5142,7 @@ mptsas_check_scsi_io_error(mptsas_t *mpt, pMpi2SCSIIOReply_t reply,
 			}
 			topo_node->mpt = mpt;
 			topo_node->event = MPTSAS_DR_EVENT_RECONFIG_TARGET;
-			topo_node->un.phymask = ptgt->m_phymask;
+			topo_node->un.phymask = ptgt->m_addr.mta_phymask;
 			topo_node->devhdl = ptgt->m_devhdl;
 			topo_node->object = (void *)ptgt;
 			topo_node->flags = MPTSAS_TOPO_FLAG_LUN_ASSOCIATED;
@@ -5133,13 +5208,9 @@ mptsas_check_scsi_io_error(mptsas_t *mpt, pMpi2SCSIIOReply_t reply,
 			/*
 			 * set throttles to drain
 			 */
-			ptgt = (mptsas_target_t *)mptsas_hash_traverse(
-			    &mpt->m_active->m_tgttbl, MPTSAS_HASH_FIRST);
-			while (ptgt != NULL) {
+			for (ptgt = refhash_first(mpt->m_targets); ptgt != NULL;
+			    ptgt = refhash_next(mpt->m_targets, ptgt)) {
 				mptsas_set_throttle(mpt, ptgt, DRAIN_THROTTLE);
-
-				ptgt = (mptsas_target_t *)mptsas_hash_traverse(
-				    &mpt->m_active->m_tgttbl, MPTSAS_HASH_NEXT);
 			}
 
 			/*
@@ -5830,8 +5901,8 @@ mptsas_handle_topo_change(mptsas_topo_change_list_t *topo_node,
 			 * Get latest RAID info.
 			 */
 			(void) mptsas_get_raid_info(mpt);
-			ptgt = mptsas_search_by_devhdl(
-			    &mpt->m_active->m_tgttbl, topo_node->devhdl);
+			ptgt = refhash_linear_search(mpt->m_targets,
+			    mptsas_target_eval_devhdl, &topo_node->devhdl);
 			if (ptgt == NULL)
 				break;
 		} else {
@@ -5880,7 +5951,7 @@ mptsas_handle_topo_change(mptsas_topo_change_list_t *topo_node,
 		flags = topo_node->flags;
 
 		if (flags == MPTSAS_TOPO_FLAG_RAID_PHYSDRV_ASSOCIATED) {
-			phymask = ptgt->m_phymask;
+			phymask = ptgt->m_addr.mta_phymask;
 			phy_mask_name = kmem_zalloc(MPTSAS_MAX_PHYS, KM_SLEEP);
 			(void) sprintf(phy_mask_name, "%x", phymask);
 			parent = scsi_hba_iport_find(mpt->m_dip,
@@ -5919,7 +5990,7 @@ mptsas_handle_topo_change(mptsas_topo_change_list_t *topo_node,
 				bzero(attached_wwnstr,
 				    sizeof (attached_wwnstr));
 				(void) sprintf(attached_wwnstr, "w%016"PRIx64,
-				    ptgt->m_sas_wwn);
+				    ptgt->m_addr.mta_wwn);
 				if (ddi_prop_update_string(DDI_DEV_T_NONE,
 				    parent,
 				    SCSI_ADDR_PROP_ATTACHED_PORT,
@@ -5977,18 +6048,18 @@ mptsas_handle_topo_change(mptsas_topo_change_list_t *topo_node,
 
 		NDBG20(("mptsas%d handle_topo_change to online devhdl:%x, "
 		    "phymask:%x.", mpt->m_instance, ptgt->m_devhdl,
-		    ptgt->m_phymask));
+		    ptgt->m_addr.mta_phymask));
 		break;
 	}
 	case MPTSAS_DR_EVENT_OFFLINE_TARGET:
 	{
-		mptsas_hash_table_t *tgttbl = &mpt->m_active->m_tgttbl;
 		devhdl = topo_node->devhdl;
-		ptgt = mptsas_search_by_devhdl(tgttbl, devhdl);
+		ptgt = refhash_linear_search(mpt->m_targets,
+		    mptsas_target_eval_devhdl, &devhdl);
 		if (ptgt == NULL)
 			break;
 
-		sas_wwn = ptgt->m_sas_wwn;
+		sas_wwn = ptgt->m_addr.mta_wwn;
 		phy = ptgt->m_phynum;
 
 		addr = kmem_zalloc(SCSI_MAXNAMELEN, KM_SLEEP);
@@ -6016,8 +6087,8 @@ mptsas_handle_topo_change(mptsas_topo_change_list_t *topo_node,
 		if (rval) {
 			NDBG20(("mptsas%d handle_topo_change to reset target "
 			    "before offline devhdl:%x, phymask:%x, rval:%x",
-			    mpt->m_instance, ptgt->m_devhdl, ptgt->m_phymask,
-			    rval));
+			    mpt->m_instance, ptgt->m_devhdl,
+			    ptgt->m_addr.mta_phymask, rval));
 		}
 
 		mutex_exit(&mpt->m_mutex);
@@ -6029,7 +6100,7 @@ mptsas_handle_topo_change(mptsas_topo_change_list_t *topo_node,
 		ndi_devi_exit(scsi_vhci_dip, circ);
 		NDBG20(("mptsas%d handle_topo_change to offline devhdl:%x, "
 		    "phymask:%x, rval:%x", mpt->m_instance,
-		    ptgt->m_devhdl, ptgt->m_phymask, rval));
+		    ptgt->m_devhdl, ptgt->m_addr.mta_phymask, rval));
 
 		kmem_free(addr, SCSI_MAXNAMELEN);
 
@@ -6072,8 +6143,7 @@ mptsas_handle_topo_change(mptsas_topo_change_list_t *topo_node,
 		ptgt->m_led_status = 0;
 		(void) mptsas_flush_led_status(mpt, ptgt);
 		if (rval == DDI_SUCCESS) {
-			mptsas_tgt_free(&mpt->m_active->m_tgttbl,
-			    ptgt->m_sas_wwn, ptgt->m_phymask);
+			refhash_remove(mpt->m_targets, ptgt);
 			ptgt = NULL;
 		} else {
 			/*
@@ -6130,7 +6200,6 @@ mptsas_handle_topo_change(mptsas_topo_change_list_t *topo_node,
 	{
 		mptsas_smp_t smp;
 		dev_info_t *smpdip;
-		mptsas_hash_table_t *smptbl = &mpt->m_active->m_smptbl;
 
 		devhdl = topo_node->devhdl;
 
@@ -6143,7 +6212,7 @@ mptsas_handle_topo_change(mptsas_topo_change_list_t *topo_node,
 			return;
 		}
 
-		psmp = mptsas_smp_alloc(smptbl, &smp);
+		psmp = mptsas_smp_alloc(mpt, &smp);
 		if (psmp == NULL) {
 			return;
 		}
@@ -6158,11 +6227,11 @@ mptsas_handle_topo_change(mptsas_topo_change_list_t *topo_node,
 	}
 	case MPTSAS_DR_EVENT_OFFLINE_SMP:
 	{
-		mptsas_hash_table_t *smptbl = &mpt->m_active->m_smptbl;
 		devhdl = topo_node->devhdl;
 		uint32_t dev_info;
 
-		psmp = mptsas_search_by_devhdl(smptbl, devhdl);
+		psmp = refhash_linear_search(mpt->m_smp_targets,
+		    mptsas_smp_eval_devhdl, &devhdl);
 		if (psmp == NULL)
 			break;
 		/*
@@ -6218,8 +6287,7 @@ mptsas_handle_topo_change(mptsas_topo_change_list_t *topo_node,
 		NDBG20(("mptsas%d handle_topo_change to remove devhdl:%x, "
 		    "rval:%x", mpt->m_instance, psmp->m_devhdl, rval));
 		if (rval == DDI_SUCCESS) {
-			mptsas_smp_free(smptbl, psmp->m_sasaddr,
-			    psmp->m_phymask);
+			refhash_remove(mpt->m_smp_targets, psmp);
 		} else {
 			psmp->m_devhdl = MPTSAS_INVALID_DEVHDL;
 		}
@@ -6378,14 +6446,10 @@ mptsas_handle_event_sync(void *args)
 		mptsas_topo_change_list_t	*topo_node = NULL;
 		mptsas_target_t			*ptgt;
 		mptsas_smp_t			*psmp;
-		mptsas_hash_table_t		*tgttbl, *smptbl;
 		uint8_t				flags = 0, exp_flag;
 		smhba_info_t			*pSmhba = NULL;
 
 		NDBG20(("mptsas_handle_event_sync: SAS topology change"));
-
-		tgttbl = &mpt->m_active->m_tgttbl;
-		smptbl = &mpt->m_active->m_smptbl;
 
 		sas_topo_change_list = (pMpi2EventDataSasTopologyChangeList_t)
 		    eventreply->EventData;
@@ -6432,8 +6496,8 @@ mptsas_handle_event_sync(void *args)
 			case MPI2_EVENT_SAS_TOPO_ES_NOT_RESPONDING:
 				(void) sprintf(string, " not responding, "
 				    "removed");
-				psmp = mptsas_search_by_devhdl(smptbl,
-				    expd_handle);
+				psmp = refhash_linear_search(mpt->m_smp_targets,
+				    mptsas_smp_eval_devhdl, &expd_handle);
 				if (psmp == NULL)
 					break;
 
@@ -6441,7 +6505,8 @@ mptsas_handle_event_sync(void *args)
 				    sizeof (mptsas_topo_change_list_t),
 				    KM_SLEEP);
 				topo_node->mpt = mpt;
-				topo_node->un.phymask = psmp->m_phymask;
+				topo_node->un.phymask =
+				    psmp->m_addr.mta_phymask;
 				topo_node->event = MPTSAS_DR_EVENT_OFFLINE_SMP;
 				topo_node->devhdl = expd_handle;
 				topo_node->flags = flags;
@@ -6592,8 +6657,8 @@ mptsas_handle_event_sync(void *args)
 				 * Before the device is really offline from
 				 * from system.
 				 */
-				ptgt = mptsas_search_by_devhdl(tgttbl,
-				    dev_handle);
+				ptgt = refhash_linear_search(mpt->m_targets,
+				    mptsas_target_eval_devhdl, &dev_handle);
 				/*
 				 * If ptgt is NULL here, it means that the
 				 * DevHandle is not in the hash table.  This is
@@ -6645,7 +6710,8 @@ mptsas_handle_event_sync(void *args)
 				    sizeof (mptsas_topo_change_list_t),
 				    KM_SLEEP);
 				topo_node->mpt = mpt;
-				topo_node->un.phymask = ptgt->m_phymask;
+				topo_node->un.phymask =
+				    ptgt->m_addr.mta_phymask;
 				topo_node->event =
 				    MPTSAS_DR_EVENT_OFFLINE_TARGET;
 				topo_node->devhdl = dev_handle;
@@ -6805,7 +6871,6 @@ mptsas_handle_event_sync(void *args)
 		mptsas_topo_change_list_t		*topo_tail = NULL;
 		mptsas_topo_change_list_t		*topo_node = NULL;
 		mptsas_target_t				*ptgt;
-		mptsas_hash_table_t			*tgttbl;
 		uint8_t					num_entries, i, reason;
 		uint16_t				volhandle, diskhandle;
 
@@ -6813,8 +6878,6 @@ mptsas_handle_event_sync(void *args)
 		    eventreply->EventData;
 		num_entries = ddi_get8(mpt->m_acc_reply_frame_hdl,
 		    &irChangeList->NumElements);
-
-		tgttbl = &mpt->m_active->m_tgttbl;
 
 		NDBG20(("mptsas%d IR_CONFIGURATION_CHANGE_LIST event received",
 		    mpt->m_instance));
@@ -6859,8 +6922,8 @@ mptsas_handle_event_sync(void *args)
 			{
 				NDBG20(("mptsas %d volume deleted\n",
 				    mpt->m_instance));
-				ptgt = mptsas_search_by_devhdl(tgttbl,
-				    volhandle);
+				ptgt = refhash_linear_search(mpt->m_targets,
+				    mptsas_target_eval_devhdl, &volhandle);
 				if (ptgt == NULL)
 					break;
 
@@ -6880,7 +6943,8 @@ mptsas_handle_event_sync(void *args)
 				    sizeof (mptsas_topo_change_list_t),
 				    KM_SLEEP);
 				topo_node->mpt = mpt;
-				topo_node->un.phymask = ptgt->m_phymask;
+				topo_node->un.phymask =
+				    ptgt->m_addr.mta_phymask;
 				topo_node->event =
 				    MPTSAS_DR_EVENT_OFFLINE_TARGET;
 				topo_node->devhdl = volhandle;
@@ -6898,8 +6962,8 @@ mptsas_handle_event_sync(void *args)
 			case MPI2_EVENT_IR_CHANGE_RC_PD_CREATED:
 			case MPI2_EVENT_IR_CHANGE_RC_HIDE:
 			{
-				ptgt = mptsas_search_by_devhdl(tgttbl,
-				    diskhandle);
+				ptgt = refhash_linear_search(mpt->m_targets,
+				    mptsas_target_eval_devhdl, &diskhandle);
 				if (ptgt == NULL)
 					break;
 
@@ -6914,7 +6978,8 @@ mptsas_handle_event_sync(void *args)
 				    sizeof (mptsas_topo_change_list_t),
 				    KM_SLEEP);
 				topo_node->mpt = mpt;
-				topo_node->un.phymask = ptgt->m_phymask;
+				topo_node->un.phymask =
+				    ptgt->m_addr.mta_phymask;
 				topo_node->event =
 				    MPTSAS_DR_EVENT_OFFLINE_TARGET;
 				topo_node->devhdl = diskhandle;
@@ -7339,7 +7404,6 @@ mptsas_handle_event(void *args)
 		uint16_t			devhandle;
 		uint32_t			state;
 		int				config, vol;
-		mptsas_slots_t			*slots = mpt->m_active;
 		uint8_t				found = FALSE;
 
 		irVolume = (pMpi2EventDataIrVolume_t)eventreply->EventData;
@@ -7356,10 +7420,10 @@ mptsas_handle_event(void *args)
 		 * just exit the event.
 		 */
 		(void) mptsas_get_raid_info(mpt);
-		for (config = 0; (config < slots->m_num_raid_configs) &&
+		for (config = 0; (config < mpt->m_num_raid_configs) &&
 		    (!found); config++) {
 			for (vol = 0; vol < MPTSAS_MAX_RAIDVOLS; vol++) {
-				if (slots->m_raidconfig[config].m_raidvol[vol].
+				if (mpt->m_raidconfig[config].m_raidvol[vol].
 				    m_raidhandle == devhandle) {
 					found = TRUE;
 					break;
@@ -7374,7 +7438,7 @@ mptsas_handle_event(void *args)
 		case MPI2_EVENT_IR_VOLUME_RC_SETTINGS_CHANGED:
 		{
 			uint32_t i;
-			slots->m_raidconfig[config].m_raidvol[vol].m_settings =
+			mpt->m_raidconfig[config].m_raidvol[vol].m_settings =
 			    state;
 
 			i = state & MPI2_RAIDVOL0_SETTING_MASK_WRITE_CACHING;
@@ -7397,7 +7461,7 @@ mptsas_handle_event(void *args)
 		}
 		case MPI2_EVENT_IR_VOLUME_RC_STATE_CHANGED:
 		{
-			slots->m_raidconfig[config].m_raidvol[vol].m_state =
+			mpt->m_raidconfig[config].m_raidvol[vol].m_state =
 			    (uint8_t)state;
 
 			mptsas_log(mpt, CE_NOTE,
@@ -7419,7 +7483,7 @@ mptsas_handle_event(void *args)
 		}
 		case MPI2_EVENT_IR_VOLUME_RC_STATUS_FLAGS_CHANGED:
 		{
-			slots->m_raidconfig[config].m_raidvol[vol].
+			mpt->m_raidconfig[config].m_raidvol[vol].
 			    m_statusflags = state;
 
 			mptsas_log(mpt, CE_NOTE,
@@ -7568,18 +7632,14 @@ mptsas_restart_cmd(void *arg)
 
 	mpt->m_restart_cmd_timeid = 0;
 
-	ptgt = (mptsas_target_t *)mptsas_hash_traverse(&mpt->m_active->m_tgttbl,
-	    MPTSAS_HASH_FIRST);
-	while (ptgt != NULL) {
+	for (ptgt = refhash_first(mpt->m_targets); ptgt != NULL;
+	    ptgt = refhash_next(mpt->m_targets, ptgt)) {
 		if (ptgt->m_reset_delay == 0) {
 			if (ptgt->m_t_throttle == QFULL_THROTTLE) {
 				mptsas_set_throttle(mpt, ptgt,
 				    MAX_THROTTLE);
 			}
 		}
-
-		ptgt = (mptsas_target_t *)mptsas_hash_traverse(
-		    &mpt->m_active->m_tgttbl, MPTSAS_HASH_NEXT);
 	}
 	mptsas_restart_hba(mpt);
 	mutex_exit(&mpt->m_mutex);
@@ -7651,14 +7711,14 @@ mptsas_remove_cmd(mptsas_t *mpt, mptsas_cmd_t *cmd)
 	 * If no duplicates, we have to scan through tag que and
 	 * find the longest timeout value and use it.  This is
 	 * going to take a while...
-	 * Add 1 to m_n_slots to account for TM request.
+	 * Add 1 to m_n_normal to account for TM request.
 	 */
 	if (cmd->cmd_pkt->pkt_time == ptgt->m_timebase) {
 		if (--(ptgt->m_dups) == 0) {
 			if (ptgt->m_t_ncmds) {
 				mptsas_cmd_t *ssp;
 				uint_t n = 0;
-				ushort_t nslots = (slots->m_n_slots + 1);
+				ushort_t nslots = (slots->m_n_normal + 1);
 				ushort_t i;
 				/*
 				 * This crude check assumes we don't do
@@ -8417,7 +8477,6 @@ mptsas_do_scsi_reset(mptsas_t *mpt, uint16_t devhdl)
 {
 	int		rval = FALSE;
 	uint8_t		config, disk;
-	mptsas_slots_t	*slots = mpt->m_active;
 
 	ASSERT(mutex_owned(&mpt->m_mutex));
 
@@ -8432,9 +8491,9 @@ mptsas_do_scsi_reset(mptsas_t *mpt, uint16_t devhdl)
 	 * Phys Disk list of DevHandles.  If the target's DevHandle is in this
 	 * list, then don't reset this target.
 	 */
-	for (config = 0; config < slots->m_num_raid_configs; config++) {
+	for (config = 0; config < mpt->m_num_raid_configs; config++) {
 		for (disk = 0; disk < MPTSAS_MAX_DISKS_IN_CONFIG; disk++) {
-			if (devhdl == slots->m_raidconfig[config].
+			if (devhdl == mpt->m_raidconfig[config].
 			    m_physdisk_devhdl[disk]) {
 				return (TRUE);
 			}
@@ -8530,7 +8589,7 @@ mptsas_flush_target(mptsas_t *mpt, ushort_t target, int lun, uint8_t tasktype)
 	 * and target/lun for abort task set.
 	 * Account for TM requests, which use the last SMID.
 	 */
-	for (slot = 0; slot <= mpt->m_active->m_n_slots; slot++) {
+	for (slot = 0; slot <= mpt->m_active->m_n_normal; slot++) {
 		if ((cmd = slots->m_slot[slot]) == NULL)
 			continue;
 		reason = CMD_RESET;
@@ -8662,7 +8721,7 @@ mptsas_flush_hba(mptsas_t *mpt)
 	 * sure all commands have been flushed.
 	 * Account for TM request, which use the last SMID.
 	 */
-	for (slot = 0; slot <= mpt->m_active->m_n_slots; slot++) {
+	for (slot = 0; slot <= mpt->m_active->m_n_normal; slot++) {
 		if ((cmd = slots->m_slot[slot]) == NULL)
 			continue;
 
@@ -8777,15 +8836,13 @@ mptsas_setup_bus_reset_delay(mptsas_t *mpt)
 {
 	mptsas_target_t	*ptgt = NULL;
 
+	ASSERT(MUTEX_HELD(&mpt->m_mutex));
+
 	NDBG22(("mptsas_setup_bus_reset_delay"));
-	ptgt = (mptsas_target_t *)mptsas_hash_traverse(&mpt->m_active->m_tgttbl,
-	    MPTSAS_HASH_FIRST);
-	while (ptgt != NULL) {
+	for (ptgt = refhash_first(mpt->m_targets); ptgt != NULL;
+	    ptgt = refhash_next(mpt->m_targets, ptgt)) {
 		mptsas_set_throttle(mpt, ptgt, HOLD_THROTTLE);
 		ptgt->m_reset_delay = mpt->m_scsi_reset_delay;
-
-		ptgt = (mptsas_target_t *)mptsas_hash_traverse(
-		    &mpt->m_active->m_tgttbl, MPTSAS_HASH_NEXT);
 	}
 
 	mptsas_start_watch_reset_delay();
@@ -8837,9 +8894,8 @@ mptsas_watch_reset_delay_subr(mptsas_t *mpt)
 
 	ASSERT(mutex_owned(&mpt->m_mutex));
 
-	ptgt = (mptsas_target_t *)mptsas_hash_traverse(&mpt->m_active->m_tgttbl,
-	    MPTSAS_HASH_FIRST);
-	while (ptgt != NULL) {
+	for (ptgt = refhash_first(mpt->m_targets); ptgt != NULL;
+	    ptgt = refhash_next(mpt->m_targets, ptgt)) {
 		if (ptgt->m_reset_delay != 0) {
 			ptgt->m_reset_delay -=
 			    MPTSAS_WATCH_RESET_DELAY_TICK;
@@ -8852,9 +8908,6 @@ mptsas_watch_reset_delay_subr(mptsas_t *mpt)
 				done = -1;
 			}
 		}
-
-		ptgt = (mptsas_target_t *)mptsas_hash_traverse(
-		    &mpt->m_active->m_tgttbl, MPTSAS_HASH_NEXT);
 	}
 
 	if (restart > 0) {
@@ -9158,7 +9211,6 @@ mptsas_alloc_active_slots(mptsas_t *mpt, int flag)
 	mptsas_slots_t	*old_active = mpt->m_active;
 	mptsas_slots_t	*new_active;
 	size_t		size;
-	int		rval = -1, i;
 
 	/*
 	 * if there are active commands, then we cannot
@@ -9170,31 +9222,21 @@ mptsas_alloc_active_slots(mptsas_t *mpt, int flag)
 	new_active = kmem_zalloc(size, flag);
 	if (new_active == NULL) {
 		NDBG1(("new active alloc failed"));
-		return (rval);
+		return (-1);
 	}
 	/*
 	 * Since SMID 0 is reserved and the TM slot is reserved, the
 	 * number of slots that can be used at any one time is
 	 * m_max_requests - 2.
 	 */
-	new_active->m_n_slots = (mpt->m_max_requests - 2);
+	new_active->m_n_normal = (mpt->m_max_requests - 2);
 	new_active->m_size = size;
-	new_active->m_tags = 1;
-	if (old_active) {
-		new_active->m_tgttbl = old_active->m_tgttbl;
-		new_active->m_smptbl = old_active->m_smptbl;
-		new_active->m_num_raid_configs =
-		    old_active->m_num_raid_configs;
-		for (i = 0; i < new_active->m_num_raid_configs; i++) {
-			new_active->m_raidconfig[i] =
-			    old_active->m_raidconfig[i];
-		}
+	new_active->m_rotor = 1;
+	if (old_active)
 		mptsas_free_active_slots(mpt);
-	}
 	mpt->m_active = new_active;
-	rval = 0;
 
-	return (rval);
+	return (0);
 }
 
 static void
@@ -9339,6 +9381,8 @@ mptsas_watchsubr(mptsas_t *mpt)
 	mptsas_cmd_t	*cmd;
 	mptsas_target_t	*ptgt = NULL;
 
+	ASSERT(MUTEX_HELD(&mpt->m_mutex));
+
 	NDBG30(("mptsas_watchsubr: mpt=0x%p", (void *)mpt));
 
 #ifdef MPTSAS_TEST
@@ -9351,7 +9395,7 @@ mptsas_watchsubr(mptsas_t *mpt)
 	 * Check for commands stuck in active slot
 	 * Account for TM requests, which use the last SMID.
 	 */
-	for (i = 0; i <= mpt->m_active->m_n_slots; i++) {
+	for (i = 0; i <= mpt->m_active->m_n_normal; i++) {
 		if ((cmd = mpt->m_active->m_slot[i]) != NULL) {
 			if ((cmd->cmd_flags & CFLAG_CMDIOC) == 0) {
 				cmd->cmd_active_timeout -=
@@ -9385,9 +9429,8 @@ mptsas_watchsubr(mptsas_t *mpt)
 		}
 	}
 
-	ptgt = (mptsas_target_t *)mptsas_hash_traverse(&mpt->m_active->m_tgttbl,
-	    MPTSAS_HASH_FIRST);
-	while (ptgt != NULL) {
+	for (ptgt = refhash_first(mpt->m_targets); ptgt != NULL;
+	    ptgt = refhash_next(mpt->m_targets, ptgt)) {
 		/*
 		 * If we were draining due to a qfull condition,
 		 * go back to full throttle.
@@ -9406,8 +9449,6 @@ mptsas_watchsubr(mptsas_t *mpt)
 			    mptsas_scsi_watchdog_tick) {
 				ptgt->m_timebase +=
 				    mptsas_scsi_watchdog_tick;
-				ptgt = (mptsas_target_t *)mptsas_hash_traverse(
-				    &mpt->m_active->m_tgttbl, MPTSAS_HASH_NEXT);
 				continue;
 			}
 
@@ -9415,8 +9456,6 @@ mptsas_watchsubr(mptsas_t *mpt)
 
 			if (ptgt->m_timeout < 0) {
 				mptsas_cmd_timeout(mpt, ptgt->m_devhdl);
-				ptgt = (mptsas_target_t *)mptsas_hash_traverse(
-				    &mpt->m_active->m_tgttbl, MPTSAS_HASH_NEXT);
 				continue;
 			}
 
@@ -9427,9 +9466,6 @@ mptsas_watchsubr(mptsas_t *mpt)
 				    DRAIN_THROTTLE);
 			}
 		}
-
-		ptgt = (mptsas_target_t *)mptsas_hash_traverse(
-		    &mpt->m_active->m_tgttbl, MPTSAS_HASH_NEXT);
 	}
 }
 
@@ -9493,13 +9529,9 @@ mptsas_quiesce_bus(mptsas_t *mpt)
 	mutex_enter(&mpt->m_mutex);
 
 	/* Set all the throttles to zero */
-	ptgt = (mptsas_target_t *)mptsas_hash_traverse(&mpt->m_active->m_tgttbl,
-	    MPTSAS_HASH_FIRST);
-	while (ptgt != NULL) {
+	for (ptgt = refhash_first(mpt->m_targets); ptgt != NULL;
+	    ptgt = refhash_next(mpt->m_targets, ptgt)) {
 		mptsas_set_throttle(mpt, ptgt, HOLD_THROTTLE);
-
-		ptgt = (mptsas_target_t *)mptsas_hash_traverse(
-		    &mpt->m_active->m_tgttbl, MPTSAS_HASH_NEXT);
 	}
 
 	/* If there are any outstanding commands in the queue */
@@ -9512,13 +9544,9 @@ mptsas_quiesce_bus(mptsas_t *mpt)
 			 * Quiesce has been interrupted
 			 */
 			mpt->m_softstate &= ~MPTSAS_SS_DRAINING;
-			ptgt = (mptsas_target_t *)mptsas_hash_traverse(
-			    &mpt->m_active->m_tgttbl, MPTSAS_HASH_FIRST);
-			while (ptgt != NULL) {
+			for (ptgt = refhash_first(mpt->m_targets); ptgt != NULL;
+			    ptgt = refhash_next(mpt->m_targets, ptgt)) {
 				mptsas_set_throttle(mpt, ptgt, MAX_THROTTLE);
-
-				ptgt = (mptsas_target_t *)mptsas_hash_traverse(
-				    &mpt->m_active->m_tgttbl, MPTSAS_HASH_NEXT);
 			}
 			mptsas_restart_hba(mpt);
 			if (mpt->m_quiesce_timeid != 0) {
@@ -9553,13 +9581,9 @@ mptsas_unquiesce_bus(mptsas_t *mpt)
 	NDBG28(("mptsas_unquiesce_bus"));
 	mutex_enter(&mpt->m_mutex);
 	mpt->m_softstate &= ~MPTSAS_SS_QUIESCED;
-	ptgt = (mptsas_target_t *)mptsas_hash_traverse(&mpt->m_active->m_tgttbl,
-	    MPTSAS_HASH_FIRST);
-	while (ptgt != NULL) {
+	for (ptgt = refhash_first(mpt->m_targets); ptgt != NULL;
+	    ptgt = refhash_next(mpt->m_targets, ptgt)) {
 		mptsas_set_throttle(mpt, ptgt, MAX_THROTTLE);
-
-		ptgt = (mptsas_target_t *)mptsas_hash_traverse(
-		    &mpt->m_active->m_tgttbl, MPTSAS_HASH_NEXT);
 	}
 	mptsas_restart_hba(mpt);
 	mutex_exit(&mpt->m_mutex);
@@ -9583,13 +9607,9 @@ mptsas_ncmds_checkdrain(void *arg)
 			 * The throttle may have been reset because
 			 * of a SCSI bus reset
 			 */
-			ptgt = (mptsas_target_t *)mptsas_hash_traverse(
-			    &mpt->m_active->m_tgttbl, MPTSAS_HASH_FIRST);
-			while (ptgt != NULL) {
+			for (ptgt = refhash_first(mpt->m_targets); ptgt != NULL;
+			    ptgt = refhash_next(mpt->m_targets, ptgt)) {
 				mptsas_set_throttle(mpt, ptgt, HOLD_THROTTLE);
-
-				ptgt = (mptsas_target_t *)mptsas_hash_traverse(
-				    &mpt->m_active->m_tgttbl, MPTSAS_HASH_NEXT);
 			}
 
 			mpt->m_quiesce_timeid = timeout(mptsas_ncmds_checkdrain,
@@ -11321,16 +11341,8 @@ led_control(mptsas_t *mpt, intptr_t data, int mode)
 
 	/* Locate the target we're interrogating... */
 	mutex_enter(&mpt->m_mutex);
-	ptgt = (mptsas_target_t *)mptsas_hash_traverse(&mpt->m_active->m_tgttbl,
-	    MPTSAS_HASH_FIRST);
-	while (ptgt != NULL) {
-		if (ptgt->m_enclosure == lc.Enclosure &&
-		    ptgt->m_slot_num == lc.Slot) {
-			break;
-		}
-		ptgt = (mptsas_target_t *)mptsas_hash_traverse(
-		    &mpt->m_active->m_tgttbl, MPTSAS_HASH_NEXT);
-	}
+	ptgt = refhash_linear_search(mpt->m_targets,
+	    mptsas_target_eval_slot, &lc);
 	if (ptgt == NULL) {
 		/* We could not find a target for that enclosure/slot. */
 		mutex_exit(&mpt->m_mutex);
@@ -11381,12 +11393,9 @@ get_disk_info(mptsas_t *mpt, intptr_t data, int mode)
 
 	/* Find out how many targets there are. */
 	mutex_enter(&mpt->m_mutex);
-	ptgt = (mptsas_target_t *)mptsas_hash_traverse(&mpt->m_active->m_tgttbl,
-	    MPTSAS_HASH_FIRST);
-	while (ptgt != NULL) {
+	for (ptgt = refhash_first(mpt->m_targets); ptgt != NULL;
+	    ptgt = refhash_next(mpt->m_targets, ptgt)) {
 		count++;
-		ptgt = (mptsas_target_t *)mptsas_hash_traverse(
-		    &mpt->m_active->m_tgttbl, MPTSAS_HASH_NEXT);
 	}
 	mutex_exit(&mpt->m_mutex);
 
@@ -11411,14 +11420,14 @@ get_disk_info(mptsas_t *mpt, intptr_t data, int mode)
 	di = kmem_zalloc(count * sizeof (mptsas_disk_info_t), KM_SLEEP);
 
 	mutex_enter(&mpt->m_mutex);
-	ptgt = (mptsas_target_t *)mptsas_hash_traverse(&mpt->m_active->m_tgttbl,
-	    MPTSAS_HASH_FIRST);
-	while (ptgt != NULL) {
+	for (ptgt = refhash_first(mpt->m_targets); ptgt != NULL;
+	    ptgt = refhash_next(mpt->m_targets, ptgt)) {
 		if (i >= count) {
 			/*
 			 * The number of targets changed while we weren't
 			 * looking, so give up.
 			 */
+			refhash_rele(mpt->m_targets, ptgt);
 			mutex_exit(&mpt->m_mutex);
 			kmem_free(di, count * sizeof (mptsas_disk_info_t));
 			return (EAGAIN);
@@ -11426,10 +11435,7 @@ get_disk_info(mptsas_t *mpt, intptr_t data, int mode)
 		di[i].Instance = mpt->m_instance;
 		di[i].Enclosure = ptgt->m_enclosure;
 		di[i].Slot = ptgt->m_slot_num;
-		di[i].SasAddress = ptgt->m_sas_wwn;
-
-		ptgt = (mptsas_target_t *)mptsas_hash_traverse(
-		    &mpt->m_active->m_tgttbl, MPTSAS_HASH_NEXT);
+		di[i].SasAddress = ptgt->m_addr.mta_wwn;
 		i++;
 	}
 	mutex_exit(&mpt->m_mutex);
@@ -11735,13 +11741,9 @@ mptsas_restart_ioc(mptsas_t *mpt)
 	/*
 	 * Set all throttles to HOLD
 	 */
-	ptgt = (mptsas_target_t *)mptsas_hash_traverse(&mpt->m_active->m_tgttbl,
-	    MPTSAS_HASH_FIRST);
-	while (ptgt != NULL) {
+	for (ptgt = refhash_first(mpt->m_targets); ptgt != NULL;
+	    ptgt = refhash_next(mpt->m_targets, ptgt)) {
 		mptsas_set_throttle(mpt, ptgt, HOLD_THROTTLE);
-
-		ptgt = (mptsas_target_t *)mptsas_hash_traverse(
-		    &mpt->m_active->m_tgttbl, MPTSAS_HASH_NEXT);
 	}
 
 	/*
@@ -11777,13 +11779,9 @@ mptsas_restart_ioc(mptsas_t *mpt)
 	/*
 	 * Reset the throttles
 	 */
-	ptgt = (mptsas_target_t *)mptsas_hash_traverse(&mpt->m_active->m_tgttbl,
-	    MPTSAS_HASH_FIRST);
-	while (ptgt != NULL) {
+	for (ptgt = refhash_first(mpt->m_targets); ptgt != NULL;
+	    ptgt = refhash_next(mpt->m_targets, ptgt)) {
 		mptsas_set_throttle(mpt, ptgt, MAX_THROTTLE);
-
-		ptgt = (mptsas_target_t *)mptsas_hash_traverse(
-		    &mpt->m_active->m_tgttbl, MPTSAS_HASH_NEXT);
 	}
 
 	mptsas_doneq_empty(mpt);
@@ -11848,6 +11846,12 @@ mptsas_init_chip(mptsas_t *mpt, int first_time)
 		mptsas_log(mpt, CE_WARN, "mptsas_ioc_get_facts failed");
 		goto fail;
 	}
+
+	mpt->m_targets = refhash_create(MPTSAS_TARGET_BUCKET_COUNT,
+	    mptsas_target_addr_hash, mptsas_target_addr_cmp,
+	    mptsas_target_free, sizeof (mptsas_target_t),
+	    offsetof(mptsas_target_t, m_link),
+	    offsetof(mptsas_target_t, m_addr), KM_SLEEP);
 
 	if (mptsas_alloc_active_slots(mpt, KM_SLEEP)) {
 		goto fail;
@@ -12487,7 +12491,6 @@ mptsas_get_target_device_info(mptsas_t *mpt, uint32_t page_address,
 	uint64_t	sas_wwn;
 	mptsas_phymask_t phymask;
 	uint8_t		physport, phynum, config, disk;
-	mptsas_slots_t	*slots = mpt->m_active;
 	uint64_t	devicename;
 	uint16_t	pdev_hdl;
 	mptsas_target_t	*tmp_tgt = NULL;
@@ -12514,9 +12517,9 @@ mptsas_get_target_device_info(mptsas_t *mpt, uint32_t page_address,
 	 * Check if the dev handle is for a Phys Disk. If so, set return value
 	 * and exit.  Don't add Phys Disks to hash.
 	 */
-	for (config = 0; config < slots->m_num_raid_configs; config++) {
+	for (config = 0; config < mpt->m_num_raid_configs; config++) {
 		for (disk = 0; disk < MPTSAS_MAX_DISKS_IN_CONFIG; disk++) {
-			if (*dev_handle == slots->m_raidconfig[config].
+			if (*dev_handle == mpt->m_raidconfig[config].
 			    m_physdisk_devhdl[disk]) {
 				rval = DEV_INFO_PHYS_DISK;
 				return (rval);
@@ -12526,7 +12529,7 @@ mptsas_get_target_device_info(mptsas_t *mpt, uint32_t page_address,
 
 	/*
 	 * Get SATA Device Name from SAS device page0 for
-	 * sata device, if device name doesn't exist, set m_sas_wwn to
+	 * sata device, if device name doesn't exist, set mta_wwn to
 	 * 0 for direct attached SATA. For the device behind the expander
 	 * we still can use STP address assigned by expander.
 	 */
@@ -12553,7 +12556,7 @@ mptsas_get_target_device_info(mptsas_t *mpt, uint32_t page_address,
 	}
 
 	phymask = mptsas_physport_to_phymask(mpt, physport);
-	*pptgt = mptsas_tgt_alloc(&slots->m_tgttbl, *dev_handle, sas_wwn,
+	*pptgt = mptsas_tgt_alloc(mpt, *dev_handle, sas_wwn,
 	    dev_info, phymask, phynum);
 	if (*pptgt == NULL) {
 		mptsas_log(mpt, CE_WARN, "Failed to allocated target"
@@ -12983,7 +12986,7 @@ mptsas_config_one_addr(dev_info_t *pdip, uint64_t sasaddr, int lun,
 		 * possible?
 		 * tgt_private->t_private != ptgt
 		 */
-		if (sasaddr != ptgt->m_sas_wwn) {
+		if (sasaddr != ptgt->m_addr.mta_wwn) {
 			/*
 			 * The device has changed although the devhdl is the
 			 * same (Enclosure mapping mode, change drive on the
@@ -13012,13 +13015,13 @@ mptsas_config_one_phy(dev_info_t *pdip, uint8_t phy, int lun,
 {
 	int		rval;
 	mptsas_t	*mpt = DIP2MPT(pdip);
-	int		phymask;
+	mptsas_phymask_t phymask;
 	mptsas_target_t	*ptgt = NULL;
 
 	/*
 	 * Get the physical port associated to the iport
 	 */
-	phymask = ddi_prop_get_int(DDI_DEV_T_ANY, pdip, 0,
+	phymask = (mptsas_phymask_t)ddi_prop_get_int(DDI_DEV_T_ANY, pdip, 0,
 	    "phymask", 0);
 
 	ptgt = mptsas_phy_to_tgt(mpt, phymask, phy);
@@ -13105,7 +13108,7 @@ mptsas_config_luns(dev_info_t *pdip, mptsas_target_t *ptgt)
 	uint32_t		dev_info = 0;
 
 	mutex_enter(&mpt->m_mutex);
-	sas_wwn = ptgt->m_sas_wwn;
+	sas_wwn = ptgt->m_addr.mta_wwn;
 	phy = ptgt->m_phynum;
 	dev_info = ptgt->m_deviceinfo;
 	mutex_exit(&mpt->m_mutex);
@@ -13220,7 +13223,8 @@ mptsas_config_raid(dev_info_t *pdip, uint16_t target, dev_info_t **dip)
 	mptsas_target_t		*ptgt = NULL;
 
 	mutex_enter(&mpt->m_mutex);
-	ptgt = mptsas_search_by_devhdl(&mpt->m_active->m_tgttbl, target);
+	ptgt = refhash_linear_search(mpt->m_targets,
+	    mptsas_target_eval_devhdl, &target);
 	mutex_exit(&mpt->m_mutex);
 	if (ptgt == NULL) {
 		mptsas_log(mpt, CE_WARN, "Volume with VolDevHandle of 0x%x "
@@ -13253,18 +13257,17 @@ mptsas_config_all_viport(dev_info_t *pdip)
 	int		config, vol;
 	int		target;
 	dev_info_t	*lundip = NULL;
-	mptsas_slots_t	*slots = mpt->m_active;
 
 	/*
 	 * Get latest RAID info and search for any Volume DevHandles.  If any
 	 * are found, configure the volume.
 	 */
 	mutex_enter(&mpt->m_mutex);
-	for (config = 0; config < slots->m_num_raid_configs; config++) {
+	for (config = 0; config < mpt->m_num_raid_configs; config++) {
 		for (vol = 0; vol < MPTSAS_MAX_RAIDVOLS; vol++) {
-			if (slots->m_raidconfig[config].m_raidvol[vol].m_israid
+			if (mpt->m_raidconfig[config].m_raidvol[vol].m_israid
 			    == 1) {
-				target = slots->m_raidconfig[config].
+				target = mpt->m_raidconfig[config].
 				    m_raidvol[vol].m_raidhandle;
 				mutex_exit(&mpt->m_mutex);
 				(void) mptsas_config_raid(pdip, target,
@@ -13292,7 +13295,7 @@ mptsas_offline_missed_luns(dev_info_t *pdip, uint16_t *repluns,
 	mptsas_t	*mpt = DIP2MPT(pdip);
 
 	mutex_enter(&mpt->m_mutex);
-	wwid = ptgt->m_sas_wwn;
+	wwid = ptgt->m_addr.mta_wwn;
 	mutex_exit(&mpt->m_mutex);
 
 	child = ddi_get_child(pdip);
@@ -13396,7 +13399,7 @@ mptsas_update_hashtab(struct mptsas *mpt)
 			break;
 		}
 		mpt->m_smp_devhdl = dev_handle = smp_node.m_devhdl;
-		(void) mptsas_smp_alloc(&mpt->m_active->m_smptbl, &smp_node);
+		(void) mptsas_smp_alloc(mpt, &smp_node);
 	}
 
 	/*
@@ -13428,24 +13431,13 @@ mptsas_update_hashtab(struct mptsas *mpt)
 }
 
 void
-mptsas_invalid_hashtab(mptsas_hash_table_t *hashtab)
-{
-	mptsas_hash_data_t *data;
-	data = mptsas_hash_traverse(hashtab, MPTSAS_HASH_FIRST);
-	while (data != NULL) {
-		data->devhdl = MPTSAS_INVALID_DEVHDL;
-		data->device_info = 0;
-		/*
-		 * For tgttbl, clear dr_flag.
-		 */
-		data->dr_flag = MPTSAS_DR_INACTIVE;
-		data = mptsas_hash_traverse(hashtab, MPTSAS_HASH_NEXT);
-	}
-}
-
-void
 mptsas_update_driver_data(struct mptsas *mpt)
 {
+	mptsas_target_t *tp;
+	mptsas_smp_t *sp;
+
+	ASSERT(MUTEX_HELD(&mpt->m_mutex));
+
 	/*
 	 * TODO after hard reset, update the driver data structures
 	 * 1. update port/phymask mapping table mpt->m_phy_info
@@ -13456,9 +13448,24 @@ mptsas_update_driver_data(struct mptsas *mpt)
 	mptsas_update_phymask(mpt);
 	/*
 	 * Invalid the existing entries
+	 *
+	 * XXX - It seems like we should just delete everything here.  We are
+	 * holding the lock and are about to refresh all the targets in both
+	 * hashes anyway.  Given the path we're in, what outstanding async
+	 * event could possibly be trying to reference one of these things
+	 * without taking the lock, and how would that be useful anyway?
 	 */
-	mptsas_invalid_hashtab(&mpt->m_active->m_tgttbl);
-	mptsas_invalid_hashtab(&mpt->m_active->m_smptbl);
+	for (tp = refhash_first(mpt->m_targets); tp != NULL;
+	    tp = refhash_next(mpt->m_targets, tp)) {
+		tp->m_devhdl = MPTSAS_INVALID_DEVHDL;
+		tp->m_deviceinfo = 0;
+		tp->m_dr_flag = MPTSAS_DR_INACTIVE;
+	}
+	for (sp = refhash_first(mpt->m_smp_targets); sp != NULL;
+	    sp = refhash_next(mpt->m_smp_targets, sp)) {
+		sp->m_devhdl = MPTSAS_INVALID_DEVHDL;
+		sp->m_deviceinfo = 0;
+	}
 	mpt->m_done_traverse_dev = 0;
 	mpt->m_done_traverse_smp = 0;
 	mpt->m_dev_handle = mpt->m_smp_devhdl = MPTSAS_INVALID_DEVHDL;
@@ -13495,32 +13502,25 @@ mptsas_config_all(dev_info_t *pdip)
 		mptsas_update_hashtab(mpt);
 	}
 
-	psmp = (mptsas_smp_t *)mptsas_hash_traverse(&mpt->m_active->m_smptbl,
-	    MPTSAS_HASH_FIRST);
-	while (psmp != NULL) {
-		phy_mask = psmp->m_phymask;
+	for (psmp = refhash_first(mpt->m_smp_targets); psmp != NULL;
+	    psmp = refhash_next(mpt->m_smp_targets, psmp)) {
+		phy_mask = psmp->m_addr.mta_phymask;
 		if (phy_mask == phymask) {
 			smpdip = NULL;
 			mutex_exit(&mpt->m_mutex);
 			(void) mptsas_online_smp(pdip, psmp, &smpdip);
 			mutex_enter(&mpt->m_mutex);
 		}
-		psmp = (mptsas_smp_t *)mptsas_hash_traverse(
-		    &mpt->m_active->m_smptbl, MPTSAS_HASH_NEXT);
 	}
 
-	ptgt = (mptsas_target_t *)mptsas_hash_traverse(&mpt->m_active->m_tgttbl,
-	    MPTSAS_HASH_FIRST);
-	while (ptgt != NULL) {
-		phy_mask = ptgt->m_phymask;
+	for (ptgt = refhash_first(mpt->m_targets); ptgt != NULL;
+	    ptgt = refhash_next(mpt->m_targets, ptgt)) {
+		phy_mask = ptgt->m_addr.mta_phymask;
 		if (phy_mask == phymask) {
 			mutex_exit(&mpt->m_mutex);
 			(void) mptsas_config_target(pdip, ptgt);
 			mutex_enter(&mpt->m_mutex);
 		}
-
-		ptgt = (mptsas_target_t *)mptsas_hash_traverse(
-		    &mpt->m_active->m_tgttbl, MPTSAS_HASH_NEXT);
 	}
 	mutex_exit(&mpt->m_mutex);
 }
@@ -13702,7 +13702,7 @@ mptsas_offline_smp(dev_info_t *pdip, mptsas_smp_t *smp_node, uint_t flags)
 	char		wwn_str[MPTSAS_WWN_STRLEN];
 	dev_info_t	*cdip;
 
-	(void) sprintf(wwn_str, "%"PRIx64, smp_node->m_sasaddr);
+	(void) sprintf(wwn_str, "%"PRIx64, smp_node->m_addr.mta_wwn);
 
 	cdip = mptsas_find_smp_child(pdip, wwn_str);
 
@@ -13982,7 +13982,7 @@ mptsas_create_virt_lun(dev_info_t *pdip, struct scsi_inquiry *inq, char *guid,
 
 	mutex_enter(&mpt->m_mutex);
 	target = ptgt->m_devhdl;
-	sas_wwn = ptgt->m_sas_wwn;
+	sas_wwn = ptgt->m_addr.mta_wwn;
 	devinfo = ptgt->m_deviceinfo;
 	phy = ptgt->m_phynum;
 	mutex_exit(&mpt->m_mutex);
@@ -14331,7 +14331,7 @@ mptsas_create_phys_lun(dev_info_t *pdip, struct scsi_inquiry *inq,
 
 	mutex_enter(&mpt->m_mutex);
 	target = ptgt->m_devhdl;
-	sas_wwn = ptgt->m_sas_wwn;
+	sas_wwn = ptgt->m_addr.mta_wwn;
 	devinfo = ptgt->m_deviceinfo;
 	phy = ptgt->m_phynum;
 	mutex_exit(&mpt->m_mutex);
@@ -14450,7 +14450,7 @@ mptsas_create_phys_lun(dev_info_t *pdip, struct scsi_inquiry *inq,
 		 * The following code is to set properties for SM-HBA support,
 		 * it doesn't apply to RAID volumes
 		 */
-		if (ptgt->m_phymask == 0)
+		if (ptgt->m_addr.mta_phymask == 0)
 			goto phys_raid_lun;
 
 		mutex_enter(&mpt->m_mutex);
@@ -14604,7 +14604,7 @@ phys_raid_lun:
 		/*
 		 * Create the phy-num property for non-raid disk
 		 */
-		if (ptgt->m_phymask != 0) {
+		if (ptgt->m_addr.mta_phymask != 0) {
 			if (ndi_prop_update_int(DDI_DEV_T_NONE,
 			    *lun_dip, "phy-num", ptgt->m_phynum) !=
 			    DDI_PROP_SUCCESS) {
@@ -14726,13 +14726,13 @@ mptsas_online_smp(dev_info_t *pdip, mptsas_smp_t *smp_node,
 	uint16_t	attached_devhdl;
 	uint16_t	bay_num, enclosure;
 
-	(void) sprintf(wwn_str, "%"PRIx64, smp_node->m_sasaddr);
+	(void) sprintf(wwn_str, "%"PRIx64, smp_node->m_addr.mta_wwn);
 
 	/*
 	 * Probe smp device, prevent the node of removed device from being
 	 * configured succesfully
 	 */
-	if (mptsas_probe_smp(pdip, smp_node->m_sasaddr) != NDI_SUCCESS) {
+	if (mptsas_probe_smp(pdip, smp_node->m_addr.mta_wwn) != NDI_SUCCESS) {
 		return (DDI_FAILURE);
 	}
 
@@ -14760,7 +14760,7 @@ mptsas_online_smp(dev_info_t *pdip, mptsas_smp_t *smp_node,
 			ndi_rtn = NDI_FAILURE;
 			goto smp_create_done;
 		}
-		(void) sprintf(wwn_str, "w%"PRIx64, smp_node->m_sasaddr);
+		(void) sprintf(wwn_str, "w%"PRIx64, smp_node->m_addr.mta_wwn);
 		if (ndi_prop_update_string(DDI_DEV_T_NONE,
 		    *smp_dip, SCSI_ADDR_PROP_TARGET_PORT, wwn_str) !=
 		    DDI_PROP_SUCCESS) {
@@ -15044,7 +15044,7 @@ static int mptsas_smp_start(struct smp_pkt *smp_pkt)
  * untill we get a match. If failed, return NULL
  */
 static mptsas_target_t *
-mptsas_phy_to_tgt(mptsas_t *mpt, int phymask, uint8_t phy)
+mptsas_phy_to_tgt(mptsas_t *mpt, mptsas_phymask_t phymask, uint8_t phy)
 {
 	int		i, j = 0;
 	int		rval = 0;
@@ -15076,16 +15076,11 @@ mptsas_phy_to_tgt(mptsas_t *mpt, int phymask, uint8_t phy)
 
 	mutex_enter(&mpt->m_mutex);
 
-	ptgt = (mptsas_target_t *)mptsas_hash_traverse(&mpt->m_active->m_tgttbl,
-	    MPTSAS_HASH_FIRST);
-	while (ptgt != NULL) {
-			if ((ptgt->m_sas_wwn == 0) && (ptgt->m_phynum == phy)) {
-			mutex_exit(&mpt->m_mutex);
-			return (ptgt);
-		}
-
-		ptgt = (mptsas_target_t *)mptsas_hash_traverse(
-		    &mpt->m_active->m_tgttbl, MPTSAS_HASH_NEXT);
+	ptgt = refhash_linear_search(mpt->m_targets, mptsas_target_eval_nowwn,
+	    &phy);
+	if (ptgt != NULL) {
+		mutex_exit(&mpt->m_mutex);
+		return (ptgt);
 	}
 
 	if (mpt->m_done_traverse_dev) {
@@ -15111,7 +15106,7 @@ mptsas_phy_to_tgt(mptsas_t *mpt, int phymask, uint8_t phy)
 		}
 		mpt->m_dev_handle = cur_handle;
 
-		if ((ptgt->m_sas_wwn == 0) && (ptgt->m_phynum == phy)) {
+		if ((ptgt->m_addr.mta_wwn == 0) && (ptgt->m_phynum == phy)) {
 			break;
 		}
 	}
@@ -15121,23 +15116,25 @@ mptsas_phy_to_tgt(mptsas_t *mpt, int phymask, uint8_t phy)
 }
 
 /*
- * The ptgt->m_sas_wwn contains the wwid for each disk.
+ * The ptgt->m_addr.mta_wwn contains the wwid for each disk.
  * For Raid volumes, we need to check m_raidvol[x].m_raidwwid
  * If we didn't get a match, we need to get sas page0 for each device, and
  * untill we get a match
  * If failed, return NULL
  */
 static mptsas_target_t *
-mptsas_wwid_to_ptgt(mptsas_t *mpt, int phymask, uint64_t wwid)
+mptsas_wwid_to_ptgt(mptsas_t *mpt, mptsas_phymask_t phymask, uint64_t wwid)
 {
 	int		rval = 0;
 	uint16_t	cur_handle;
 	uint32_t	page_address;
 	mptsas_target_t	*tmp_tgt = NULL;
+	mptsas_target_addr_t addr;
 
+	addr.mta_wwn = wwid;
+	addr.mta_phymask = phymask;
 	mutex_enter(&mpt->m_mutex);
-	tmp_tgt = (struct mptsas_target *)mptsas_hash_search(
-	    &mpt->m_active->m_tgttbl, wwid, phymask);
+	tmp_tgt = refhash_lookup(mpt->m_targets, &addr);
 	if (tmp_tgt != NULL) {
 		mutex_exit(&mpt->m_mutex);
 		return (tmp_tgt);
@@ -15149,8 +15146,7 @@ mptsas_wwid_to_ptgt(mptsas_t *mpt, int phymask, uint64_t wwid)
 		 */
 		rval = mptsas_get_raid_info(mpt);
 		if (rval) {
-			tmp_tgt = (struct mptsas_target *)mptsas_hash_search(
-			    &mpt->m_active->m_tgttbl, wwid, phymask);
+			tmp_tgt = refhash_lookup(mpt->m_targets, &addr);
 		}
 		mutex_exit(&mpt->m_mutex);
 		return (tmp_tgt);
@@ -15163,7 +15159,7 @@ mptsas_wwid_to_ptgt(mptsas_t *mpt, int phymask, uint64_t wwid)
 
 	/* If didn't get a match, come here */
 	cur_handle = mpt->m_dev_handle;
-	for (; ; ) {
+	for (;;) {
 		tmp_tgt = NULL;
 		page_address = (MPI2_SAS_DEVICE_PGAD_FORM_GET_NEXT_HANDLE &
 		    MPI2_SAS_DEVICE_PGAD_FORM_MASK) | cur_handle;
@@ -15179,8 +15175,9 @@ mptsas_wwid_to_ptgt(mptsas_t *mpt, int phymask, uint64_t wwid)
 			continue;
 		}
 		mpt->m_dev_handle = cur_handle;
-		if ((tmp_tgt->m_sas_wwn) && (tmp_tgt->m_sas_wwn == wwid) &&
-		    (tmp_tgt->m_phymask == phymask)) {
+		if ((tmp_tgt->m_addr.mta_wwn) &&
+		    (tmp_tgt->m_addr.mta_wwn == wwid) &&
+		    (tmp_tgt->m_addr.mta_phymask == phymask)) {
 			break;
 		}
 	}
@@ -15190,16 +15187,18 @@ mptsas_wwid_to_ptgt(mptsas_t *mpt, int phymask, uint64_t wwid)
 }
 
 static mptsas_smp_t *
-mptsas_wwid_to_psmp(mptsas_t *mpt, int phymask, uint64_t wwid)
+mptsas_wwid_to_psmp(mptsas_t *mpt, mptsas_phymask_t phymask, uint64_t wwid)
 {
 	int		rval = 0;
 	uint16_t	cur_handle;
 	uint32_t	page_address;
 	mptsas_smp_t	smp_node, *psmp = NULL;
+	mptsas_target_addr_t addr;
 
+	addr.mta_wwn = wwid;
+	addr.mta_phymask = phymask;
 	mutex_enter(&mpt->m_mutex);
-	psmp = (struct mptsas_smp *)mptsas_hash_search(&mpt->m_active->m_smptbl,
-	    wwid, phymask);
+	psmp = refhash_lookup(mpt->m_smp_targets, &addr);
 	if (psmp != NULL) {
 		mutex_exit(&mpt->m_mutex);
 		return (psmp);
@@ -15212,7 +15211,7 @@ mptsas_wwid_to_psmp(mptsas_t *mpt, int phymask, uint64_t wwid)
 
 	/* If didn't get a match, come here */
 	cur_handle = mpt->m_smp_devhdl;
-	for (; ; ) {
+	for (;;) {
 		psmp = NULL;
 		page_address = (MPI2_SAS_EXPAND_PGAD_FORM_GET_NEXT_HNDL &
 		    MPI2_SAS_EXPAND_PGAD_FORM_MASK) | (uint32_t)cur_handle;
@@ -15222,10 +15221,10 @@ mptsas_wwid_to_psmp(mptsas_t *mpt, int phymask, uint64_t wwid)
 			break;
 		}
 		mpt->m_smp_devhdl = cur_handle = smp_node.m_devhdl;
-		psmp = mptsas_smp_alloc(&mpt->m_active->m_smptbl, &smp_node);
+		psmp = mptsas_smp_alloc(mpt, &smp_node);
 		ASSERT(psmp);
-		if ((psmp->m_sasaddr) && (psmp->m_sasaddr == wwid) &&
-		    (psmp->m_phymask == phymask)) {
+		if ((psmp->m_addr.mta_wwn) && (psmp->m_addr.mta_wwn == wwid) &&
+		    (psmp->m_addr.mta_phymask == phymask)) {
 			break;
 		}
 	}
@@ -15234,38 +15233,20 @@ mptsas_wwid_to_psmp(mptsas_t *mpt, int phymask, uint64_t wwid)
 	return (psmp);
 }
 
-/* helper functions using hash */
-
-/*
- * Can't have duplicate entries for same devhdl,
- * if there are invalid entries, the devhdl should be set to 0xffff
- */
-static void *
-mptsas_search_by_devhdl(mptsas_hash_table_t *hashtab, uint16_t devhdl)
-{
-	mptsas_hash_data_t *data;
-
-	data = mptsas_hash_traverse(hashtab, MPTSAS_HASH_FIRST);
-	while (data != NULL) {
-		if (data->devhdl == devhdl) {
-			break;
-		}
-		data = mptsas_hash_traverse(hashtab, MPTSAS_HASH_NEXT);
-	}
-	return (data);
-}
-
 mptsas_target_t *
-mptsas_tgt_alloc(mptsas_hash_table_t *hashtab, uint16_t devhdl, uint64_t wwid,
+mptsas_tgt_alloc(mptsas_t *mpt, uint16_t devhdl, uint64_t wwid,
     uint32_t devinfo, mptsas_phymask_t phymask, uint8_t phynum)
 {
 	mptsas_target_t *tmp_tgt = NULL;
+	mptsas_target_addr_t addr;
 
-	tmp_tgt = mptsas_hash_search(hashtab, wwid, phymask);
+	addr.mta_wwn = wwid;
+	addr.mta_phymask = phymask;
+	tmp_tgt = refhash_lookup(mpt->m_targets, &addr);
 	if (tmp_tgt != NULL) {
 		NDBG20(("Hash item already exist"));
 		tmp_tgt->m_deviceinfo = devinfo;
-		tmp_tgt->m_devhdl = devhdl;
+		tmp_tgt->m_devhdl = devhdl;	/* XXX - duplicate? */
 		return (tmp_tgt);
 	}
 	tmp_tgt = kmem_zalloc(sizeof (struct mptsas_target), KM_SLEEP);
@@ -15274,9 +15255,9 @@ mptsas_tgt_alloc(mptsas_hash_table_t *hashtab, uint16_t devhdl, uint64_t wwid,
 		return (NULL);
 	}
 	tmp_tgt->m_devhdl = devhdl;
-	tmp_tgt->m_sas_wwn = wwid;
+	tmp_tgt->m_addr.mta_wwn = wwid;
 	tmp_tgt->m_deviceinfo = devinfo;
-	tmp_tgt->m_phymask = phymask;
+	tmp_tgt->m_addr.mta_phymask = phymask;
 	tmp_tgt->m_phynum = phynum;
 	/* Initialized the tgt structure */
 	tmp_tgt->m_qfull_retries = QFULL_RETRIES;
@@ -15284,207 +15265,29 @@ mptsas_tgt_alloc(mptsas_hash_table_t *hashtab, uint16_t devhdl, uint64_t wwid,
 	    drv_usectohz(QFULL_RETRY_INTERVAL * 1000);
 	tmp_tgt->m_t_throttle = MAX_THROTTLE;
 
-	mptsas_hash_add(hashtab, tmp_tgt);
+	refhash_insert(mpt->m_targets, tmp_tgt);
 
 	return (tmp_tgt);
 }
 
-static void
-mptsas_tgt_free(mptsas_hash_table_t *hashtab, uint64_t wwid,
-    mptsas_phymask_t phymask)
-{
-	mptsas_target_t *tmp_tgt;
-	tmp_tgt = mptsas_hash_rem(hashtab, wwid, phymask);
-	if (tmp_tgt == NULL) {
-		cmn_err(CE_WARN, "Tgt not found, nothing to free");
-	} else {
-		kmem_free(tmp_tgt, sizeof (struct mptsas_target));
-	}
-}
-
-/*
- * Return the entry in the hash table
- */
 static mptsas_smp_t *
-mptsas_smp_alloc(mptsas_hash_table_t *hashtab, mptsas_smp_t *data)
+mptsas_smp_alloc(mptsas_t *mpt, mptsas_smp_t *data)
 {
-	uint64_t key1 = data->m_sasaddr;
-	mptsas_phymask_t key2 = data->m_phymask;
+	mptsas_target_addr_t addr;
 	mptsas_smp_t *ret_data;
 
-	ret_data = mptsas_hash_search(hashtab, key1, key2);
+	addr.mta_wwn = data->m_addr.mta_wwn;
+	addr.mta_phymask = data->m_addr.mta_phymask;
+	ret_data = refhash_lookup(mpt->m_smp_targets, &addr);
 	if (ret_data != NULL) {
-		bcopy(data, ret_data, sizeof (mptsas_smp_t));
+		bcopy(data, ret_data, sizeof (mptsas_smp_t)); /* XXX - dupl */
 		return (ret_data);
 	}
 
 	ret_data = kmem_alloc(sizeof (mptsas_smp_t), KM_SLEEP);
 	bcopy(data, ret_data, sizeof (mptsas_smp_t));
-	mptsas_hash_add(hashtab, ret_data);
+	refhash_insert(mpt->m_smp_targets, ret_data);
 	return (ret_data);
-}
-
-static void
-mptsas_smp_free(mptsas_hash_table_t *hashtab, uint64_t wwid,
-    mptsas_phymask_t phymask)
-{
-	mptsas_smp_t *tmp_smp;
-	tmp_smp = mptsas_hash_rem(hashtab, wwid, phymask);
-	if (tmp_smp == NULL) {
-		cmn_err(CE_WARN, "Smp element not found, nothing to free");
-	} else {
-		kmem_free(tmp_smp, sizeof (struct mptsas_smp));
-	}
-}
-
-/*
- * Hash operation functions
- * key1 is the sas_wwn, key2 is the phymask
- */
-static void
-mptsas_hash_init(mptsas_hash_table_t *hashtab)
-{
-	if (hashtab == NULL) {
-		return;
-	}
-	bzero(hashtab->head, sizeof (mptsas_hash_node_t) *
-	    MPTSAS_HASH_ARRAY_SIZE);
-	hashtab->cur = NULL;
-	hashtab->line = 0;
-}
-
-static void
-mptsas_hash_uninit(mptsas_hash_table_t *hashtab, size_t datalen)
-{
-	uint16_t line = 0;
-	mptsas_hash_node_t *cur = NULL, *last = NULL;
-
-	if (hashtab == NULL) {
-		return;
-	}
-	for (line = 0; line < MPTSAS_HASH_ARRAY_SIZE; line++) {
-		cur = hashtab->head[line];
-		while (cur != NULL) {
-			last = cur;
-			cur = cur->next;
-			kmem_free(last->data, datalen);
-			kmem_free(last, sizeof (mptsas_hash_node_t));
-		}
-	}
-}
-
-/*
- * You must guarantee the element doesn't exist in the hash table
- * before you call mptsas_hash_add()
- */
-static void
-mptsas_hash_add(mptsas_hash_table_t *hashtab, void *data)
-{
-	uint64_t key1 = ((mptsas_hash_data_t *)data)->key1;
-	mptsas_phymask_t key2 = ((mptsas_hash_data_t *)data)->key2;
-	mptsas_hash_node_t **head = NULL;
-	mptsas_hash_node_t *node = NULL;
-
-	if (hashtab == NULL) {
-		return;
-	}
-	ASSERT(mptsas_hash_search(hashtab, key1, key2) == NULL);
-	node = kmem_zalloc(sizeof (mptsas_hash_node_t), KM_NOSLEEP);
-	node->data = data;
-
-	head = &(hashtab->head[key1 % MPTSAS_HASH_ARRAY_SIZE]);
-	if (*head == NULL) {
-		*head = node;
-	} else {
-		node->next = *head;
-		*head = node;
-	}
-}
-
-static void *
-mptsas_hash_rem(mptsas_hash_table_t *hashtab, uint64_t key1,
-    mptsas_phymask_t key2)
-{
-	mptsas_hash_node_t **head = NULL;
-	mptsas_hash_node_t *last = NULL, *cur = NULL;
-	mptsas_hash_data_t *data;
-	if (hashtab == NULL) {
-		return (NULL);
-	}
-	head = &(hashtab->head[key1 % MPTSAS_HASH_ARRAY_SIZE]);
-	cur = *head;
-	while (cur != NULL) {
-		data = cur->data;
-		if ((data->key1 == key1) && (data->key2 == key2)) {
-			if (last == NULL) {
-				(*head) = cur->next;
-			} else {
-				last->next = cur->next;
-			}
-			kmem_free(cur, sizeof (mptsas_hash_node_t));
-			return (data);
-		} else {
-			last = cur;
-			cur = cur->next;
-		}
-	}
-	return (NULL);
-}
-
-static void *
-mptsas_hash_search(mptsas_hash_table_t *hashtab, uint64_t key1,
-    mptsas_phymask_t key2)
-{
-	mptsas_hash_node_t *cur = NULL;
-	mptsas_hash_data_t *data;
-	if (hashtab == NULL) {
-		return (NULL);
-	}
-	cur = hashtab->head[key1 % MPTSAS_HASH_ARRAY_SIZE];
-	while (cur != NULL) {
-		data = cur->data;
-		if ((data->key1 == key1) && (data->key2 == key2)) {
-			return (data);
-		} else {
-			cur = cur->next;
-		}
-	}
-	return (NULL);
-}
-
-static void *
-mptsas_hash_traverse(mptsas_hash_table_t *hashtab, int pos)
-{
-	mptsas_hash_node_t *this = NULL;
-
-	if (hashtab == NULL) {
-		return (NULL);
-	}
-
-	if (pos == MPTSAS_HASH_FIRST) {
-		hashtab->line = 0;
-		hashtab->cur = NULL;
-		this = hashtab->head[0];
-	} else {
-		if (hashtab->cur == NULL) {
-			return (NULL);
-		} else {
-			this = hashtab->cur->next;
-		}
-	}
-
-	while (this == NULL) {
-		hashtab->line++;
-		if (hashtab->line >= MPTSAS_HASH_ARRAY_SIZE) {
-			/* the traverse reaches the end */
-			hashtab->cur = NULL;
-			return (NULL);
-		} else {
-			this = hashtab->head[hashtab->line];
-		}
-	}
-	hashtab->cur = this;
-	return (this->data);
 }
 
 /*
@@ -15570,7 +15373,7 @@ mptsas_send_sep(mptsas_t *mpt, mptsas_target_t *ptgt,
 	 * since there is no slot associated with them.
 	 */
 	if (!(ptgt->m_deviceinfo & DEVINFO_DIRECT_ATTACHED) ||
-	    ptgt->m_phymask == 0) {
+	    ptgt->m_addr.mta_phymask == 0) {
 		return (ENOTTY);
 	}
 

@@ -22,6 +22,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -76,7 +77,7 @@ const k_sigset_t ignoredefault =
 	|sigmask(SIGWINCH)|sigmask(SIGURG)|sigmask(SIGWAITING)),
 	(sigmask(SIGLWP)|sigmask(SIGCANCEL)|sigmask(SIGFREEZE)
 	|sigmask(SIGTHAW)|sigmask(SIGXRES)|sigmask(SIGJVM1)
-	|sigmask(SIGJVM2)), 0};
+	|sigmask(SIGJVM2)|sigmask(SIGINFO)), 0};
 
 const k_sigset_t stopdefault =
 	{(sigmask(SIGSTOP)|sigmask(SIGTSTP)|sigmask(SIGTTOU)|sigmask(SIGTTIN)),

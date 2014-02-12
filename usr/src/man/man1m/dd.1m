@@ -1,4 +1,5 @@
 '\" te
+.\" Copyright (c) 2014, Joyent, Inc.  All rights Reserved.
 .\" Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
 .\" Copyright 1989 AT&T
 .\" Portions Copyright (c) 1995, Sun Microsystems, Inc.  All Rights Reserved
@@ -9,7 +10,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DD 1M "Sep 16, 1996"
+.TH DD 1M "Jan 04, 2014"
 .SH NAME
 dd \- convert and copy a file
 .SH SYNOPSIS
@@ -381,9 +382,40 @@ bytes. (If either \fBblock\fR or \fBunblock\fR is also specified, appends
 .RE
 
 .sp
+.ne 2
+.na
+\fB\fBoflag=\fR\fIvalue\fR[\fB,\fR\fIvalue\fR.\|.\|.\|]\fR
+.ad
+.sp .6
+Where \fIvalue\fRs are comma-separated symbols from the following list which
+affect the behavior of writing the output file:
+.sp
+.ne 2
+.na
+\fB\fBdsync\fR\fR
+.ad
+.RS 11n
+The output file is opened with the \fBO_DSYNC\fR flag set. All data writes will
+be synchronous. For more information on \fBO_DSYNC\fR see \fBfcntl.h\fR(3HEAD).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBsync\fR\fR
+.ad
+.RS 11n
+The output file is opened with the \fBO_SYNC\fR flag set. All data and metadata
+writes will be synchronous. For more information on \fBO_SYNC\fR see
+\fBfcntl.h\fR(3HEAD).
+.RE
+
+.RE
+
+.sp
 .LP
-If operands other than \fBconv=\fR are specified more than once, the last
-specified \fBoperand=\fR\fIvalue\fR is used.
+If operands other than \fBconv=\fR and \fBoflag=\fR are specified more than once,
+the last specified \fBoperand=\fR\fIvalue\fR is used.
 .sp
 .LP
 For the \fBbs=\fR, \fBcbs=\fR, \fBibs=\fR, and \fBobs=\fR operands, the
@@ -451,6 +483,20 @@ separated by \fBx\fR, specifying the product of the indicated values.
 .sp
 .LP
 All of the operands will be processed before any input is read.
+.SH SIGNALS
+.sp
+.LP
+When \fBdd\fR receives either SIGINFO or SIGUSR1, \fBdd\fR will emit the current
+input and output block counts, total bytes written, total time elapsed, and the
+number of bytes per second to standard error. This is the same information
+format that \fBdd\fR emits when it successfully completes. Users may send
+SIGINFO via their terminal. The default character is ^T, see \fBstty\fR(1) for
+more information.
+.sp
+.LP
+For \fBSIGINT\fR, \fBdd\fR writes status information to standard error before
+exiting. \fBdd\fR takes the standard action for all other signals.
+
 .SH USAGE
 .sp
 .LP
@@ -569,8 +615,8 @@ Interface Stability	Standard
 .SH SEE ALSO
 .sp
 .LP
-\fBcp\fR(1), \fBsed\fR(1), \fBtr\fR(1), \fBattributes\fR(5), \fBenviron\fR(5),
-\fBlargefile\fR(5), \fBstandards\fR(5)
+\fBcp\fR(1), \fBsed\fR(1), \fBtr\fR(1), \fBfcntl.h\fR(3HEAD),
+\fBattributes\fR(5), \fBenviron\fR(5), \fBlargefile\fR(5), \fBstandards\fR(5)
 .SH DIAGNOSTICS
 .sp
 .ne 2
@@ -601,7 +647,3 @@ from the pipe at the time.
 When using \fBdd\fR to copy files to a tape device, the file size must be a
 multiple of the device sector size (for example, 512 Kbyte).  To  copy files of
 arbitrary size to a tape device, use  \fBtar\fR(1) or  \fBcpio\fR(1).
-.sp
-.LP
-For \fBSIGINT\fR, \fBdd\fR writes status information to standard error before
-exiting. It takes the standard action for all other signals.

@@ -23,7 +23,7 @@
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
- * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2014, Joyent, Inc. All rights reserved.
  */
 
 #ifndef _THR_UBERDATA_H
@@ -494,7 +494,8 @@ typedef struct {
  * As part of per-thread caching libumem (ptcumem), we add a small amount to the
  * thread's uberdata to facilitate it. The tm_roots are the roots of linked
  * lists which is used by libumem to chain together allocations. tm_size is used
- * to track the total amount of data stored across those linked lists.
+ * to track the total amount of data stored across those linked lists. For more
+ * information, see libumem's big theory statement.
  */
 #define	NTMEMBASE	16
 

@@ -171,6 +171,7 @@ static const struct siginfolist _sys_siginfolist_data[NSIG-1] = {
 	0,		0,			/* SIGXRES */
 	0,		0,			/* SIGJVM1 */
 	0,		0,			/* SIGJVM2 */
+	0,		0,			/* SIGINFO */
 	0,		0,			/* SIGRTMIN */
 	0,		0,			/* SIGRTMIN+1 */
 	0,		0,			/* SIGRTMIN+2 */

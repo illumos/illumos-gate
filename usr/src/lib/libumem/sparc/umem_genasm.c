@@ -28,7 +28,7 @@
  * statement in lib/libumem/common/umem.c, particularly section eight.
  */
 
-int umem_genasm_supported = 0;
+const int umem_genasm_supported = 0;
 
 /*ARGSUSED*/
 int

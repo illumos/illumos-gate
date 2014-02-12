@@ -1,5 +1,6 @@
 '\" te
 .\" Copyright (c) 2005, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright (c) 2014, Joyent, Inc.  All Rights Reserved.
 .\" Copyright 1989 AT&T
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
@@ -456,6 +457,18 @@ arrives, or the condition is cleared by a program.
 .sp
 .ne 2
 .na
+\fB\fBSTATUS\fR\fR
+.ad
+.RS 11n
+(Control-t or \fBASCII DC4\fR) generates a \fBSIGINFO\fR signal. Processes with
+a handler will output status information when they receive \fBSIGINFO\fR, for
+example, \fBdd(1)\fR. If a process does not have a \fBSIGINFO\fR handler, the
+signal will be ignored.
+.RE
+
+.sp
+.ne 2
+.na
 \fB\fBLNEXT\fR\fR
 .ad
 .RS 11n
@@ -465,13 +478,13 @@ allows characters to be input that would otherwise be interpreted by the system
 (for example \fBKILL, QUIT\fR).  The character values for \fBINTR\fR,
 \fBQUIT\fR, \fBERASE\fR, \fBWERASE\fR, \fBKILL\fR, \fBREPRINT\fR, \fBEOF\fR,
 \fBEOL\fR, \fBEOL2\fR, \fBSWTCH\fR, \fBSUSP\fR, \fBDSUSP\fR, \fBSTOP\fR,
-\fBSTART\fR, \fBDISCARD\fR, and \fBLNEXT\fR may be changed to suit individual
-tastes. If the value of a special control character is _POSIX_VDISABLE (0), the
-function of that special control character is disabled. The \fBERASE\fR,
-\fBKILL\fR, and \fBEOF\fR characters may be escaped by a preceding backslash
-(\e) character, in which case no special function is done. Any of the special
-characters may be preceded by the \fBLNEXT\fR character, in which case no
-special function is done.
+\fBSTART\fR, \fBDISCARD\fR, \fBSTATUS\fR, and \fBLNEXT\fR may be changed to suit
+individual tastes. If the value of a special control character is
+_POSIX_VDISABLE (0), the function of that special control character is disabled.
+The \fBERASE\fR, \fBKILL\fR, and \fBEOF\fR characters may be escaped by a
+preceding backslash (\e) character, in which case no special function is done.
+Any of the special characters may be preceded by the \fBLNEXT\fR character, in
+which case no special function is done.
 .RE
 
 .SS "Modem Disconnect"
@@ -565,7 +578,9 @@ _
 _
 15	VLNEXT	SYN
 _
-16-19	Reserved	
+16	VSTATUS	DC4
+_
+17-19	Reserved	
 .TE
 
 .SS "Input Modes"
@@ -1856,9 +1871,9 @@ with code 177 octal, is echoed as ^ \fB?\fR.
 .sp
 .LP
 If  \fBNOFLSH\fR is set, the normal flush of the input and output queues
-associated with the \fBINTR\fR, \fBQUIT\fR, and \fBSUSP\fR characters is not
-done.  This bit should be set when restarting system calls that read from or
-write to a terminal (see  \fBsigaction\fR(2)\|).
+associated with the \fBINTR\fR, \fBQUIT\fR, \fBSTATUS\fR, and \fBSUSP\fR
+characters is not done.  This bit should be set when restarting system calls
+that read from or write to a terminal (see  \fBsigaction\fR(2)\|).
 .sp
 .LP
 If  \fBTOSTOP\fR and \fBIEXTEN\fR are set, the signal  \fBSIGTTOU\fR is sent to

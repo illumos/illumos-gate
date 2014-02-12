@@ -37,6 +37,7 @@
  */
 /* Copyright (c) 2007, The Storage Networking Industry Association. */
 /* Copyright (c) 1996, 1997 PDC, Network Appliance. All Rights Reserved */
+/* Copyright 2014 Nexenta Systems, Inc. All rights reserved. */
 
 #include <sys/types.h>
 #include <stdlib.h>
@@ -295,38 +296,7 @@ ndmpd_api_seek_v2(void *cookie, u_longlong_t offset, u_longlong_t length)
 	 * Wait for the client to either do the seek and send a continue
 	 * request or send an abort request.
 	 */
-	nlp_ref_nw(session);
-	for (; ; ) {
-		nlp_wait_nw(session);
-
-		if (nlp_event_rv_get(session) < 0) {
-			nlp_unref_nw(session);
-			return (-1);
-		}
-
-		if (session->ns_eof == TRUE) {
-			nlp_unref_nw(session);
-			return (-1);
-		}
-
-		switch (session->ns_mover.md_state) {
-		case NDMP_MOVER_STATE_ACTIVE:
-			/*
-			 * There is a bug in the original SDK code which
-			 * causes to fall in an infinite loop after the
-			 * break.
-			 */
-			nlp_unref_nw(session);
-			break;
-
-		case NDMP_MOVER_STATE_PAUSED:
-			continue;
-
-		default:
-			nlp_unref_nw(session);
-			return (-1);
-		}
-	}
+	return (ndmp_wait_for_mover(session));
 }
 
 
@@ -725,7 +695,7 @@ ndmpd_api_seek_v3(void *cookie, u_longlong_t offset, u_longlong_t length)
 	 * Wait for the client to either do the seek and send a continue
 	 * request or send an abort request.
 	 */
-	err = ndmpd_mover_wait_v3(session);
+	err = ndmp_wait_for_mover(session);
 
 	/*
 	 * If we needed a client intervention, then we should be able to

@@ -37,6 +37,7 @@
  */
 /* Copyright (c) 2007, The Storage Networking Industry Association. */
 /* Copyright (c) 1996, 1997 PDC, Network Appliance. All Rights Reserved */
+/* Copyright 2014 Nexenta Systems, Inc. All rights reserved. */
 
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -2001,12 +2002,14 @@ ndmpd_tar_restore_abort(void *module_cookie)
 
 	nlp = (ndmp_lbr_params_t *)module_cookie;
 	if (nlp != NULL && nlp->nlp_session != NULL) {
+		(void) mutex_lock(&nlp->nlp_mtx);
 		if (nlp->nlp_session->ns_data.dd_mover.addr_type ==
 		    NDMP_ADDR_TCP && nlp->nlp_session->ns_data.dd_sock != -1) {
 			(void) close(nlp->nlp_session->ns_data.dd_sock);
 			nlp->nlp_session->ns_data.dd_sock = -1;
 		}
-		nlp_event_nw(nlp->nlp_session);
+		(void) cond_broadcast(&nlp->nlp_cv);
+		(void) mutex_unlock(&nlp->nlp_mtx);
 		ndmp_stop_writer_thread(nlp->nlp_session);
 	}
 

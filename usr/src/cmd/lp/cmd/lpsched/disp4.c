@@ -27,8 +27,6 @@
 /*	  All Rights Reserved  	*/
 
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "time.h"
 #include "dispatch.h"
 #include <syslog.h>
@@ -44,7 +42,7 @@ s_accept_dest(char *m, MESG *md)
 	char			*destination;
 	ushort			status;
 	register PSTATUS	*pps;
-	register CSTATUS	*pcs;
+	register CLSTATUS	*pcs;
 
 	getmessage (m, S_ACCEPT_DEST, &destination);
 	syslog(LOG_DEBUG, "s_accept_dest(%s)",
@@ -94,7 +92,7 @@ s_reject_dest(char *m, MESG *md)
 				*reason;
 	ushort			status;
 	register PSTATUS	*pps;
-	register CSTATUS	*pcs;
+	register CLSTATUS	*pcs;
 
 
 	getmessage (m, S_REJECT_DEST, &destination, &reason);

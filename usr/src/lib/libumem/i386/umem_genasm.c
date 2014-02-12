@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2012 Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2014 Joyent, Inc.  All rights reserved.
  */
 
 /*
@@ -29,7 +29,7 @@
  * implementations in libumem's malloc.c.
  *
  * What follows is the i386 implementation of the thread caching automatic
- * assembly generation. With i386 a function only has three registers its
+ * assembly generation. With i386 a function only has three registers it's
  * allowed to change without restoring them: eax, ecx, and edx. All others have
  * to be preserved. Since the set of registers we have available is so small, we
  * have to make use of esi, ebx, and edi and save their original values to the
@@ -67,14 +67,13 @@
 
 #include <atomic.h>
 
-int umem_genasm_supported = 1;
-uintptr_t umem_genasm_mptr;
-size_t umem_genasm_msize;
-uintptr_t umem_genasm_fptr;
-size_t umem_genasm_fsize;
-static uintptr_t umem_genasm_omptr;
-static uintptr_t umem_genasm_ofptr;
-
+const int umem_genasm_supported = 1;
+static uintptr_t umem_genasm_mptr = (uintptr_t)&_malloc;
+static size_t umem_genasm_msize = 512;
+static uintptr_t umem_genasm_fptr = (uintptr_t)&_free;
+static size_t umem_genasm_fsize = 512;
+static uintptr_t umem_genasm_omptr = (uintptr_t)umem_malloc;
+static uintptr_t umem_genasm_ofptr = (uintptr_t)umem_malloc_free;
 /*
  * The maximum number of caches we can support. We use a single byte addl so
  * this is 255 (UINT8_MAX) / sizeof (uintptr_t). In this case 63
@@ -83,7 +82,7 @@ static uintptr_t umem_genasm_ofptr;
 
 #define	PTC_JMPADDR(dest, src)	(dest - (src + 4))
 #define	PTC_ROOT_SIZE	sizeof (uintptr_t)
-#define	MULTINOP	 0x0000441f0f
+#define	MULTINOP	0x0000441f0f
 
 /*
  * void *ptcmalloc(size_t orig_size);
@@ -114,7 +113,7 @@ static const uint8_t malinit[] = {
 	0x0f, 0x82, 0x00, 0x00, 0x00, 0x00, 	/* jc +$JMP (errout) */
 	0x81, 0xfe, 0x00, 0x00, 0x00, 0x00, 	/* cmpl sizeof ($C0), %esi */
 	0x0f, 0x87, 0x00, 0x00, 0x00, 0x00,	/* ja +$JMP (errout) */
-	0x65, 0x8b, 0x0d, 0x00, 0x0, 0x00, 0x00, 	/* movl %gs:0x0,%ecx */
+	0x65, 0x8b, 0x0d, 0x00, 0x00, 0x00, 0x00, 	/* movl %gs:0x0,%ecx */
 	0x81, 0xc1, 0x00, 0x00,	0x00, 0x00, 	/* addl $OFF, %ecx */
 	0x8d, 0x51, 0x04			/* leal 0x4(%ecx), %edx */
 };
@@ -543,11 +542,10 @@ umem_genasm(int *alloc_sizes, umem_cache_t **caches, int ncaches)
 	int nents, i;
 	uint8_t *mptr;
 	uint8_t *fptr;
-	uint32_t *ptr;
 	uint64_t v, *vptr;
 
-	mptr = (void *)((uintptr_t)&umem_genasm_mptr + 5);
-	fptr = (void *)((uintptr_t)&umem_genasm_fptr + 5);
+	mptr = (void *)((uintptr_t)umem_genasm_mptr + 5);
+	fptr = (void *)((uintptr_t)umem_genasm_fptr + 5);
 	if (umem_genasm_mptr == 0 || umem_genasm_msize == 0 ||
 	    umem_genasm_fptr == 0 || umem_genasm_fsize == 0)
 		return (1);
@@ -556,7 +554,7 @@ umem_genasm(int *alloc_sizes, umem_cache_t **caches, int ncaches)
 	 * The total number of caches that we can service is the minimum of:
 	 *  o the amount supported by libc
 	 *  o the total number of umem caches
-	 *  o we use a single byte addl, so its 255 / sizeof (uintptr_t). For
+	 *  o we use a single byte addl, so it's 255 / sizeof (uintptr_t). For
 	 *    32-bit, this is 63.
 	 */
 	nents = _tmem_get_nentries();
@@ -571,27 +569,21 @@ umem_genasm(int *alloc_sizes, umem_cache_t **caches, int ncaches)
 	if (nents == 0 || umem_ptc_size == 0)
 		return (0);
 
-	/* Grab the original malloc and free locations */
-	ptr = (void *)(mptr - 4);
-	umem_genasm_omptr = *ptr + (uintptr_t)mptr;
-	ptr = (void *)(fptr - 4);
-	umem_genasm_ofptr = *ptr + (uintptr_t)fptr;
-
 	/* Take into account the jump */
-	if (genasm_malloc(mptr, umem_genasm_fsize - 5, nents,
+	if (genasm_malloc(mptr, umem_genasm_msize, nents,
 	    alloc_sizes) != 0)
 		return (1);
 
-	if (genasm_free(fptr, umem_genasm_fsize - 5, nents,
+	if (genasm_free(fptr, umem_genasm_fsize, nents,
 	    alloc_sizes) != 0)
 		return (1);
 
 	/* nop out the jump with a multibyte jump */
-	vptr = (void *)&umem_genasm_mptr;
+	vptr = (void *)umem_genasm_mptr;
 	v = MULTINOP;
 	v |= *vptr & (0xffffffULL << 40);
 	(void) atomic_swap_64(vptr, v);
-	vptr = (void *)&umem_genasm_fptr;
+	vptr = (void *)umem_genasm_fptr;
 	v = MULTINOP;
 	v |= *vptr & (0xffffffULL << 40);
 	(void) atomic_swap_64(vptr, v);

@@ -28,8 +28,6 @@
 /*	  All Rights Reserved  	*/
 
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "stdio.h"
 #include "sys/types.h"
 #include "memory.h"
@@ -59,7 +57,7 @@
  **/
 
 /*
- * These are the fields in the PSTATUS and CSTATUS files,
+ * These are the fields in the PSTATUS and CLSTATUS files,
  * found in the SYSTEM directory.
  */
 
@@ -336,7 +334,7 @@ extern void		list_remove(void ***, void *);
 
 extern RSTATUS	*new_rstatus(REQUEST *, SECURE *);
 extern PSTATUS	*new_pstatus(PRINTER *);
-extern CSTATUS	*new_cstatus(CLASS *);
+extern CLSTATUS	*new_cstatus(CLASS *);
 extern FSTATUS	*new_fstatus(_FORM *f);
 extern PWSTATUS	*new_pwstatus(PWHEEL *p);
 extern ALERT	*new_alert(char *fmt, int i);
@@ -348,11 +346,11 @@ extern void	free_exec(EXEC *);
 extern void	free_alert(ALERT *);
 extern void	free_pwstatus(PWSTATUS *);
 extern void	free_fstatus(FSTATUS *);
-extern void	free_cstatus(CSTATUS *);
+extern void	free_cstatus(CLSTATUS *);
 extern void	free_pstatus(PSTATUS *);
 extern void	free_rstatus(RSTATUS *);
 
-extern CSTATUS	*search_cstatus ( char * );
+extern CLSTATUS	*search_cstatus ( char * );
 extern FSTATUS	*search_fptable(register char *);
 extern FSTATUS	*search_fstatus ( char * );
 extern PSTATUS	*search_pstatus ( char * );
@@ -370,7 +368,7 @@ extern char		*pwheel_in_question;
  ** External tables, lists:
  **/
 
-extern CSTATUS		**CStatus;	/* Status of classes       */
+extern CLSTATUS		**CStatus;	/* Status of classes       */
 extern PSTATUS		**PStatus;	/* Status of printers      */
 extern FSTATUS		**FStatus;	/* Status of forms	   */
 extern PWSTATUS		**PWStatus;	/* Status of print wheels  */

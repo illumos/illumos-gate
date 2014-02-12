@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file is used to verify that the standalone's external dependencies
  * haven't changed in a way that'll break things that use it.
@@ -34,6 +32,7 @@
 void __umem_assert_failed(void) {}
 void atomic_add_64(void) {}
 void atomic_add_32_nv(void) {}
+void atomic_swap_64(void) {}
 void dladdr1(void) {}
 void bcopy(void) {}
 void bzero(void) {}

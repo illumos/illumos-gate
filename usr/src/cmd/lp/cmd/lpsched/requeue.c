@@ -28,7 +28,6 @@
 /*	  All Rights Reserved  	*/
 
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /* EMACS_MODES: !fill, lnumb, !overwrite, !nodelete, !picture */
 
 #include "lpsched.h"
@@ -68,7 +67,7 @@ void
 queue_attract(PSTATUS *pps, int (*qchk_p)(RSTATUS *), int attract_just_one)
 {
 	register RSTATUS	*prs;
-	register CSTATUS	*pcs;
+	register CLSTATUS	*pcs;
 	int			called_schedule	= 0;
 
 

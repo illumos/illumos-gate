@@ -35,8 +35,6 @@
 #ifndef _SYS_TTYCHARS_H
 #define	_SYS_TTYCHARS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -83,6 +81,7 @@ struct ttychars {
 #define	CFLUSH	CTRL('o')
 #define	CWERASE	CTRL('w')
 #define	CLNEXT	CTRL('v')
+#define	CSTATUS CTRL('t')
 
 #endif /* _SYS_TERMIOS_H */
 

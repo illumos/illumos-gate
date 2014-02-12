@@ -11,10 +11,11 @@
 
 #
 # Copyright 2011 Nexenta Systems, Inc. All rights reserved.
+# Copyright (c) 2014 Joyent, Inc. All rights reserved.
 #
 
 set name=pkg.fmri \
-    value=pkg:/system/data/zoneinfo@2011.13,$(PKGVERS_BUILTON)-$(PKGVERS_BRANCH)
+    value=pkg:/system/data/zoneinfo@2013.9,$(PKGVERS_BUILTON)-$(PKGVERS_BRANCH)
 set name=pkg.description value="timezone information"
 set name=pkg.summary value="Timezone Information"
 set name=info.classification value=org.opensolaris.category.2008:System/Core
@@ -137,6 +138,7 @@ file path=usr/share/lib/zoneinfo/America/Cayman
 file path=usr/share/lib/zoneinfo/America/Chicago
 file path=usr/share/lib/zoneinfo/America/Chihuahua
 file path=usr/share/lib/zoneinfo/America/Costa_Rica
+file path=usr/share/lib/zoneinfo/America/Creston
 file path=usr/share/lib/zoneinfo/America/Cuiaba
 file path=usr/share/lib/zoneinfo/America/Curacao
 file path=usr/share/lib/zoneinfo/America/Danmarkshavn
@@ -288,6 +290,7 @@ file path=usr/share/lib/zoneinfo/Asia/Kamchatka
 file path=usr/share/lib/zoneinfo/Asia/Karachi
 file path=usr/share/lib/zoneinfo/Asia/Kashgar
 file path=usr/share/lib/zoneinfo/Asia/Kathmandu
+file path=usr/share/lib/zoneinfo/Asia/Khandyga
 file path=usr/share/lib/zoneinfo/Asia/Kolkata
 file path=usr/share/lib/zoneinfo/Asia/Krasnoyarsk
 file path=usr/share/lib/zoneinfo/Asia/Kuala_Lumpur
@@ -326,6 +329,7 @@ file path=usr/share/lib/zoneinfo/Asia/Thimphu
 file path=usr/share/lib/zoneinfo/Asia/Tokyo
 file path=usr/share/lib/zoneinfo/Asia/Ulaanbaatar
 file path=usr/share/lib/zoneinfo/Asia/Urumqi
+file path=usr/share/lib/zoneinfo/Asia/Ust-Nera
 file path=usr/share/lib/zoneinfo/Asia/Vientiane
 file path=usr/share/lib/zoneinfo/Asia/Vladivostok
 file path=usr/share/lib/zoneinfo/Asia/Yakutsk
@@ -395,7 +399,7 @@ file path=usr/share/lib/zoneinfo/Europe/Berlin
 file path=usr/share/lib/zoneinfo/Europe/Brussels
 file path=usr/share/lib/zoneinfo/Europe/Bucharest
 file path=usr/share/lib/zoneinfo/Europe/Budapest
-file path=usr/share/lib/zoneinfo/Europe/Chisinau
+file path=usr/share/lib/zoneinfo/Europe/Busingen
 file path=usr/share/lib/zoneinfo/Europe/Copenhagen
 file path=usr/share/lib/zoneinfo/Europe/Dublin
 file path=usr/share/lib/zoneinfo/Europe/Gibraltar
@@ -547,9 +551,9 @@ hardlink path=usr/share/lib/zoneinfo/America/Shiprock target=../America/Denver
 hardlink path=usr/share/lib/zoneinfo/America/St_Barthelemy \
     target=../America/Guadeloupe
 hardlink path=usr/share/lib/zoneinfo/America/Virgin \
-    target=../America/St_Thomas
+    target=../America/Port_of_Spain
 hardlink path=usr/share/lib/zoneinfo/Antarctica/South_Pole \
-    target=../Antarctica/McMurdo
+    target=../Pacific/Auckland
 hardlink path=usr/share/lib/zoneinfo/Arctic/Longyearbyen target=../Europe/Oslo
 hardlink path=usr/share/lib/zoneinfo/Asia/Ashkhabad target=../Asia/Ashgabat
 hardlink path=usr/share/lib/zoneinfo/Asia/Calcutta target=../Asia/Kolkata
@@ -620,6 +624,7 @@ hardlink path=usr/share/lib/zoneinfo/Etc/Universal target=../Etc/UTC
 hardlink path=usr/share/lib/zoneinfo/Etc/Zulu target=../Etc/UTC
 hardlink path=usr/share/lib/zoneinfo/Europe/Belfast target=../Europe/London
 hardlink path=usr/share/lib/zoneinfo/Europe/Bratislava target=../Europe/Prague
+hardlink path=usr/share/lib/zoneinfo/Europe/Chisinau target=../Europe/Tiraspol
 hardlink path=usr/share/lib/zoneinfo/Europe/Guernsey target=../Europe/London
 hardlink path=usr/share/lib/zoneinfo/Europe/Isle_of_Man \
     target=../Europe/London

@@ -22,6 +22,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
  */
 
 /*	Copyright (c) 1988 AT&T	*/
@@ -84,6 +85,7 @@ static signame_t signames[] = {
 	{ "XRES", 	SIGXRES },
 	{ "JVM1",	SIGJVM1 },
 	{ "JVM2",	SIGJVM2 },
+	{ "INFO",	SIGINFO },
 	{ "RTMIN",	_SIGRTMIN },
 	{ "RTMIN+1",	_SIGRTMIN+1 },
 	{ "RTMIN+2",	_SIGRTMIN+2 },

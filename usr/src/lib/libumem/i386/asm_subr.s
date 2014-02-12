@@ -24,9 +24,31 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/asm_linkage.h>
+
+#define	NOP4	\
+	nop;	\
+	nop;	\
+	nop;	\
+	nop;
+
+#define NOP16	\
+	NOP4	\
+	NOP4	\
+	NOP4	\
+	NOP4
+
+#define	NOP64	\
+	NOP16	\
+	NOP16	\
+	NOP16	\
+	NOP16
+
+#define	NOP256	\
+	NOP64	\
+	NOP64	\
+	NOP64	\
+	NOP64
 
 #if defined(lint)
 
@@ -69,4 +91,25 @@ _breakpoint(void)
 	SET_SIZE(_breakpoint)
 #endif
 
+	ENTRY(_malloc)
+	jmp umem_malloc;
+	NOP256
+	NOP256
+#if defined(__amd64)
+	NOP64
+#endif
+	SET_SIZE(_malloc)
+
+	ENTRY(_free)
+	jmp umem_malloc_free;
+	NOP256
+	NOP256
+#if defined(__amd64)
+	NOP64
+#endif
+	SET_SIZE(_free)
+
+	ANSI_PRAGMA_WEAK2(malloc,_malloc,function)
+	ANSI_PRAGMA_WEAK2(free,_free,function)
+	
 #endif	/* lint */

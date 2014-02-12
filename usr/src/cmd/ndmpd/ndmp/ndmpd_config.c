@@ -37,6 +37,7 @@
  */
 /* Copyright (c) 2007, The Storage Networking Industry Association. */
 /* Copyright (c) 1996, 1997 PDC, Network Appliance. All Rights Reserved */
+/* Copyright 2014 Nexenta Systems, Inc.  All rights reserved. */
 
 #include <dirent.h>
 #include <errno.h>
@@ -530,8 +531,8 @@ void
 ndmpd_config_get_fs_info_v3(ndmp_connection_t *connection, void *body)
 {
 	ndmp_config_get_fs_info_reply_v3 reply;
-	ndmp_fs_info_v3 *fsip, *fsip_save; /* FS info pointer */
-	int i, nmnt, fd;
+	ndmp_fs_info_v3 *fsip = NULL, *fsip_save = NULL; /* FS info pointer */
+	int len = 0, nmnt, fd;
 	int log_dev_len;
 	FILE *fp = NULL;
 	struct mnttab mt, *fs;
@@ -544,45 +545,36 @@ ndmpd_config_get_fs_info_v3(ndmp_connection_t *connection, void *body)
 	if ((fd = open(MNTTAB, O_RDONLY)) == -1) {
 		NDMP_LOG(LOG_ERR, "File mnttab open error: %m.");
 		reply.error = NDMP_UNDEFINED_ERR;
-		ndmp_send_reply(connection, (void *)&reply,
-		    "sending ndmp_config_get_fs_info reply");
-		return;
+		goto send_reply;
 	}
 
 	/* nothing was found, send an empty reply */
 	if (ioctl(fd, MNTIOC_NMNTS, &nmnt) != 0 || nmnt <= 0) {
-		NDMP_LOG(LOG_ERR, "No file system found.");
-		ndmp_send_reply(connection, (void *)&reply,
-		    "sending ndmp_config_get_fs_info reply");
 		(void) close(fd);
-		return;
+		NDMP_LOG(LOG_ERR, "No file system found.");
+		goto send_reply;
 	}
-	(void) close(fd);
 
-	fp = fopen(MNTTAB, "r");
+	fp = fdopen(fd, "r");
 	if (!fp) {
+		(void) close(fd);
 		NDMP_LOG(LOG_ERR, "File mnttab open error: %m.");
 		reply.error = NDMP_UNDEFINED_ERR;
-		ndmp_send_reply(connection, (void *)&reply,
-		    "sending ndmp_config_get_fs_info reply");
-		return;
+		goto send_reply;
 	}
 
 	fsip_save = fsip = ndmp_malloc(sizeof (ndmp_fs_info_v3) * nmnt);
 	if (!fsip) {
 		(void) fclose(fp);
 		reply.error = NDMP_NO_MEM_ERR;
-		ndmp_send_reply(connection, (void *)&reply,
-		    "error sending ndmp_config_get_fs_info reply");
-		return;
+		goto send_reply;
 	}
 
 	/*
 	 * Re-read the directory and set up file system information.
 	 */
-	i = 0;
 	rewind(fp);
-	while (i < nmnt && (getmntent(fp, &mt) == 0))
+	while (len < nmnt && (getmntent(fp, &mt) == 0))
 
 	{
 		fs = &mt;
@@ -593,9 +585,9 @@ ndmpd_config_get_fs_info_v3(ndmp_connection_t *connection, void *body)
 		fsip->fs_logical_device = ndmp_malloc(log_dev_len);
 		fsip->fs_type = ndmp_malloc(MNTTYPE_LEN);
 		if (!fsip->fs_logical_device || !fsip->fs_type) {
-			reply.error = NDMP_NO_MEM_ERR;
 			free(fsip->fs_logical_device);
 			free(fsip->fs_type);
+			reply.error = NDMP_NO_MEM_ERR;
 			break;
 		}
 		(void) snprintf(fsip->fs_type, MNTTYPE_LEN, "%s",
@@ -631,6 +623,8 @@ ndmpd_config_get_fs_info_v3(ndmp_connection_t *connection, void *body)
 		}
 		save = envp = ndmp_malloc(sizeof (ndmp_pval) * V3_N_FS_ENVS);
 		if (!envp) {
+			free(fsip->fs_logical_device);
+			free(fsip->fs_type);
 			reply.error = NDMP_NO_MEM_ERR;
 			break;
 		}
@@ -647,29 +641,27 @@ ndmpd_config_get_fs_info_v3(ndmp_connection_t *connection, void *body)
 		}
 
 		fsip->fs_env.fs_env_len = envp - save;
-		i++;
+		len++;
 		fsip++;
 	}
 	(void) fclose(fp);
+
+send_reply:
 	if (reply.error == NDMP_NO_ERR) {
-		reply.fs_info.fs_info_len = i;
+		reply.fs_info.fs_info_len = len;
 		reply.fs_info.fs_info_val = fsip_save;
-	} else {
-		reply.fs_info.fs_info_len = 0;
-		reply.fs_info.fs_info_val = NULL;
 	}
 	ndmp_send_reply(connection, (void *)&reply,
 	    "error sending ndmp_config_get_fs_info reply");
 
-	fsip = fsip_save;
-	while (--i >= 0) {
+	while (fsip > fsip_save) {
+		fsip--;
 		free(fsip->fs_logical_device);
 		free(fsip->fs_env.fs_env_val);
 		free(fsip->fs_type);
-		fsip++;
 	}
 
-	free(fsip_save);
+	free(fsip);
 }
 
 

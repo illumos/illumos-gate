@@ -28,12 +28,10 @@
 /*	  All Rights Reserved  	*/
 
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "lpsched.h"
 #include <syslog.h>
 
-CSTATUS		**CStatus = NULL;		/* Status of same          */
+CLSTATUS	**CStatus = NULL;		/* Status of same          */
 PSTATUS		**PStatus = NULL;		/* Status of same          */
 FSTATUS		**FStatus = NULL;		/* status of same	   */
 PWSTATUS	**PWStatus = NULL;		/* Status of same          */ 

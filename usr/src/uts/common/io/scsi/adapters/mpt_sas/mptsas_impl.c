@@ -1522,7 +1522,7 @@ mptsas_get_sas_expander_page0(mptsas_t *mpt, uint32_t page_address,
 	    MPI2_CONFIG_ACTION_PAGE_READ_CURRENT,
 	    MPI2_CONFIG_EXTPAGETYPE_SAS_EXPANDER, 0, page_address,
 	    mptsas_sasexpdpage_0_cb, page_address, &info->m_devhdl,
-	    &info->m_sasaddr, &info->m_phymask, &info->m_pdevhdl);
+	    &info->m_addr.mta_wwn, &info->m_addr.mta_phymask, &info->m_pdevhdl);
 
 	return (rval);
 }

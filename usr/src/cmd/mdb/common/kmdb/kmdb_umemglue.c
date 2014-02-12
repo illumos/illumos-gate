@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <mdb/mdb_debug.h>
 #include <mdb/mdb_err.h>
 #include <mdb/mdb_io.h>
@@ -99,6 +97,14 @@ void
 umem_atomic_add_64(uint64_t *target, int64_t delta)
 {
 	*target = *target + delta;
+}
+
+uint64_t
+umem_atomic_swap_64(volatile uint64_t *t, uint64_t v)
+{
+	uint64_t old = *t;
+	*t = v;
+	return (old);
 }
 
 /*

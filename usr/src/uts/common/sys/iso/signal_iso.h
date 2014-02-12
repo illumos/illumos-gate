@@ -91,10 +91,11 @@ extern "C" {
 #define	SIGXRES	38	/* resource control exceeded */
 #define	SIGJVM1	39	/* reserved signal for Java Virtual Machine */
 #define	SIGJVM2	40	/* reserved signal for Java Virtual Machine */
+#define	SIGINFO	41	/* information request */
 
 /* insert new signals here, and move _SIGRTM* appropriately */
-#define	_SIGRTMIN 41	/* first (highest-priority) realtime signal */
-#define	_SIGRTMAX 72	/* last (lowest-priority) realtime signal */
+#define	_SIGRTMIN 42	/* first (highest-priority) realtime signal */
+#define	_SIGRTMAX 73	/* last (lowest-priority) realtime signal */
 extern long _sysconf(int);	/* System Private interface to sysconf() */
 #define	SIGRTMIN ((int)_sysconf(_SC_SIGRT_MIN))	/* first realtime signal */
 #define	SIGRTMAX ((int)_sysconf(_SC_SIGRT_MAX))	/* last realtime signal */

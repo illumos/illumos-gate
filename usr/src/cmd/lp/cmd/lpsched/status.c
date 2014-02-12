@@ -27,8 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "stdlib.h"
 #include "string.h"
 #include "unistd.h"
@@ -337,7 +335,7 @@ load_fault_status(void)
 static void
 load_cstatus(void)
 {
-	CSTATUS			*pcs;
+	CLSTATUS			*pcs;
 	char			*rej_reason,
 				buf[BUFSIZ],
 				*name,
@@ -666,7 +664,7 @@ dump_cstatus(void)
 	}
 
 	for (i = 0; CStatus != NULL && CStatus[i] != NULL; i++) {
-		CSTATUS	*pcs = CStatus[i];
+		CLSTATUS	*pcs = CStatus[i];
 
 		if (pcs->class->name)
 			for (f = 0; f < CST_MAX; f++) switch (f) {
