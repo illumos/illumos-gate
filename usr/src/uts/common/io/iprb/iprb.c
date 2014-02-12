@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -1313,9 +1313,12 @@ iprb_m_stop(void *arg)
 	} else {
 		mac_link_update(ip->mach, LINK_STATE_DOWN);
 	}
+
+	ddi_periodic_delete(ip->perh);
+	ip->perh = 0;
+
 	mutex_enter(&ip->rulock);
 	mutex_enter(&ip->culock);
-	ddi_periodic_delete(ip->perh);
 
 	if (!ip->suspended) {
 		iprb_update_stats(ip);
