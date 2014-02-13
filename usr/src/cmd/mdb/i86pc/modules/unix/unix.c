@@ -860,6 +860,7 @@ x86_featureset_cmd(uintptr_t addr, uint_t flags, int argc,
 	}
 
 	for (ii = 0; ii < NUM_X86_FEATURES; ii++) {
+		/* LINTED */
 		if (!BT_TEST((ulong_t *)fset, ii))
 			continue;
 

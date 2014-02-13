@@ -877,7 +877,6 @@ build_trustfile(const char *path, void *truststorepath)
 	 * Merge the two stacks of pkcs12 certs.
 	 */
 	for (i = 0; i < sk_X509_num(i_anchors); i++) {
-		/* LINTED */
 		x = sk_X509_delete(i_anchors, i);
 		(void) sk_X509_push(o_anchors, x);
 	}
@@ -1090,7 +1089,6 @@ get_hostnames(const char *path, void *nvl)
 	p12 = NULL;
 
 	for (i = 0; i < sk_X509_num(certs); i++) {
-		/* LINTED */
 		x = sk_X509_value(certs, i);
 		if (!one_name(sunw_issuer_attrs(x, buf, sizeof (buf) - 1),
 		    nvl)) {

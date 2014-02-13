@@ -38,7 +38,10 @@ ROOTLIBDIR64 =	$(ROOT)/usr/lib/fs/smbfs/$(MACH64)
 LIBSRCS = $(LIBOBJS:%.o=$(SRCDIR)/%.c)
 
 LIBS =		$(DYNLIB)
-LDLIBS +=	-lshare -lscf -lumem -luuid -lc -lxml2 -lsmbfs
+LDLIBS +=	-lshare -lscf -lumem -luuid -lc -lsmbfs
+
+# libxml2 has no lint library, so we can only use it when building
+$(DYNLIB) := LDLIBS += -lxml2
 
 CFLAGS +=	$(CCVERBOSE)
 CERRWARN +=	-_gcc=-Wno-switch

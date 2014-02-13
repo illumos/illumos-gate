@@ -36,7 +36,10 @@ include ../Makefile.ssh-common
 
 FILEMODE= 04555
 
-LDLIBS += $(SSH_COMMON_LDLIBS) -lsocket -lnsl -lz -lcrypto
+LDLIBS += $(SSH_COMMON_LDLIBS) -lsocket -lnsl
+
+# There's no lint library for zlib or libcrypto, so only include these for build
+$(PROG) :=     LDLIBS += -lz -lcrypto
 
 POFILE_DIR= ..
 

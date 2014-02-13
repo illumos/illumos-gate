@@ -32,7 +32,10 @@ SRCS	= $(OBJS:.o=.c)
 include ../../Makefile.cmd
 include ../Makefile.ssh-common
 
-LDLIBS += $(SSH_COMMON_LDLIBS) -lsocket -lnsl -lz -lcrypto
+LDLIBS += $(SSH_COMMON_LDLIBS) -lsocket -lnsl
+
+# libcrypto and libz have no lint library, so we can only use it when building
+$(PROG) := LDLIBS += -lcrypto -lz
 
 POFILE_DIR= ..
 

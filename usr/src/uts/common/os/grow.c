@@ -499,7 +499,9 @@ int
 choose_addr(struct as *as, caddr_t *addrp, size_t len, offset_t off,
     int vacalign, uint_t flags)
 {
+#if defined(__amd64)
 	proc_t *p = curproc;
+#endif
 	caddr_t basep = (caddr_t)(uintptr_t)((uintptr_t)*addrp & PAGEMASK);
 	size_t lenp;
 

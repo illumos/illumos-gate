@@ -110,7 +110,6 @@ get_cert_chain(PKG_ERR *err, X509 *cert, STACK_OF(X509) *clcerts,
 
 	/* add all ca certs into the store */
 	for (i = 0; i < sk_X509_num(cas); i++) {
-		/* LINTED pointer cast may result in improper alignment */
 		ca_cert = sk_X509_value(cas, i);
 		if (X509_STORE_add_cert(ca_store, ca_cert) == 0) {
 			pkgerr_add(err, PKGERR_NOMEM, gettext(ERR_MEM));

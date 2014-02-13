@@ -71,13 +71,13 @@ include ../Makefile.ssh-common
 
 LDLIBS += $(SSH_COMMON_LDLIBS) -lsocket \
 	-lnsl \
-	-lz \
 	-lpam \
 	-lbsm \
 	-lwrap \
-	-lcrypto \
 	-lgss \
 	-lcontract
+# There's no lint library for zlib or libcrypto, so only include these for build
+$(PROG) :=     LDLIBS += -lz -lcrypto
 MAPFILES = $(MAPFILE.INT) $(MAPFILE.NGB)
 LDFLAGS += $(MAPFILES:%=-M%)
 

@@ -36,7 +36,10 @@ MSGFILES=$(SRCS:%.c=%.i)
 
 CPPFLAGS += -xCC
 LINTFLAGS += -XCC  -L$(ADJUNCT_PROTO)/usr/lib
-LDLIBS += -ltspi -luuid
+LDLIBS += -luuid
+
+# libtspi has no lint library, so we can only include this while building
+$(PROG) := LDLIBS += -ltspi
 
 CLOBBERFILES = C.ln $(POFILE) $(POFILES)
 

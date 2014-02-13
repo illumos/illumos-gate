@@ -27,14 +27,6 @@
  * CUPS support for the SMB and SPOOLSS print services.
  */
 
-#ifndef HAVE_CUPS
-void smbd_load_printers(void) { return; }
-void smbd_cups_init(void) { return; }
-void smbd_cups_fini(void) { return; }
-void smbd_spool_start(void) { return; }
-void smbd_spool_stop(void) { return; }
-#else
-
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <strings.h>
@@ -48,6 +40,7 @@ void smbd_spool_stop(void) { return; }
 #include <smbsrv/smb_share.h>
 #include "smbd.h"
 
+#ifdef	HAVE_CUPS
 #include <cups/cups.h>
 
 #define	SMB_SPOOL_WAIT			2
@@ -521,4 +514,47 @@ smbd_print_share_comment(smb_share_t *si, cups_dest_t *dest)
 
 	(void) strlcpy(si->shr_cmnt, comment, SMB_SHARE_CMNT_MAX);
 }
-#endif
+
+#else	/* HAVE_CUPS */
+
+/*
+ * If not HAVE_CUPS, just provide a few "stubs".
+ */
+
+int
+smbd_cups_init(void)
+{
+	return (ENOENT);
+}
+
+void
+smbd_cups_fini(void)
+{
+}
+
+void
+smbd_load_printers(void)
+{
+}
+
+void
+smbd_spool_init(void)
+{
+}
+
+void
+smbd_spool_fini(void)
+{
+}
+
+void
+smbd_spool_start(void)
+{
+}
+
+void
+smbd_spool_stop(void)
+{
+}
+
+#endif 	/* HAVE_CUPS */

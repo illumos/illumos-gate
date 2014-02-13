@@ -37,8 +37,11 @@ LIBSRCS =	$(LIBOBJS:%.o=$(SRCDIR)/%.c)
 lintcheck := SRCS = $(LIBSRCS)
 
 LIBS =		$(DYNLIB) $(LINTLIB)
-LDLIBS +=	-lc -lnsl -lscf -lzfs -luuid -lxml2 -lnvpair
+LDLIBS +=	-lc -lnsl -lscf -lzfs -luuid -lnvpair
 $(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
+
+# libxml2 has no lint library, so we can only use it when building
+$(DYNLIB) := LDLIBS += -lxml2
 
 #add nfs/lib directory as part of the include path
 CFLAGS +=	$(CCVERBOSE)
