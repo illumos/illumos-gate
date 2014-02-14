@@ -512,6 +512,7 @@ typedef struct ndmpd_session {
 	/*
 	 * NDMP V4 related data
 	 */
+	boolean_t ns_get_ext_list;
 	boolean_t ns_set_ext_list;
 
 	/* handling of hardlink, hardlink queue head */
