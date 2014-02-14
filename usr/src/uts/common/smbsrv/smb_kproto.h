@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -476,7 +476,7 @@ int smb_node_getattr(smb_request_t *, smb_node_t *, cred_t *,
     smb_ofile_t *, smb_attr_t *);
 int smb_node_setattr(smb_request_t *, smb_node_t *, cred_t *,
     smb_ofile_t *, smb_attr_t *);
-int smb_node_set_delete_on_close(smb_node_t *, cred_t *, uint32_t);
+uint32_t smb_node_set_delete_on_close(smb_node_t *, cred_t *, uint32_t);
 void smb_node_reset_delete_on_close(smb_node_t *);
 boolean_t smb_node_file_is_readonly(smb_node_t *);
 int smb_node_getpath(smb_node_t *, vnode_t *, char *, uint32_t);
