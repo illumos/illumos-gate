@@ -11,11 +11,13 @@
 
 #
 # Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright 2014, OmniTI Computer Consulting, Inc. All rights reserved.
 #
 
 include $(SRC)/Makefile.master
 
 SRCS = delphix.run \
+	omnios.run \
 	openindiana.run
 
 ROOTOPTPKG = $(ROOT)/opt/os-tests
