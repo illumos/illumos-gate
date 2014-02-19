@@ -22,6 +22,7 @@
  * Copyright (C) 4Front Technologies 1996-2008.
  *
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -836,11 +837,13 @@ auimpl_engine_close(audio_stream_t *sp)
 {
 	audio_engine_t	*e = sp->s_engine;
 	audio_dev_t	*d;
+	ddi_periodic_t	ep;
 
 	if (e == NULL)
 		return;
 
 	d = e->e_dev;
+	ep = 0;
 
 	mutex_enter(&d->d_lock);
 	while (d->d_suspended) {
@@ -852,12 +855,15 @@ auimpl_engine_close(audio_stream_t *sp)
 	list_remove(&e->e_streams, sp);
 	if (list_is_empty(&e->e_streams)) {
 		ENG_STOP(e);
-		ddi_periodic_delete(e->e_periodic);
+		ep = e->e_periodic;
 		e->e_periodic = 0;
 		e->e_flags &= ENGINE_DRIVER_FLAGS;
 		ENG_CLOSE(e);
 	}
 	mutex_exit(&e->e_lock);
+
+	if (ep != 0)
+		ddi_periodic_delete(ep);
 
 	cv_broadcast(&d->d_cv);
 	mutex_exit(&d->d_lock);
