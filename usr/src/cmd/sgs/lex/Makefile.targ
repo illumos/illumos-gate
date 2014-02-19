@@ -102,4 +102,4 @@ $(LINTPOUT): $(SRCS)
 	$(LINT.c) $(LIBSRCS)  $(LDLIBS)		2>&1 | tee -a $(LINTPOUT)
 
 $(LINTLIB): $(LINTSRCS)
-	$(LINT.c) -o $(LIBNAME) $(LINTSRCS)
+	$(LINT.c) -o $(LIBNAME) $(LINTSRCS) > $(LINTOUT) 2>&1
