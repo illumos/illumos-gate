@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2013 Joyent, Inc.  All rights reserved.
+ * Copyright 2014 Joyent, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -1257,7 +1257,9 @@ hyprlofs_getpage(vnode_t *vp, offset_t off, size_t len, uint_t *protp,
     page_t *pl[], size_t plsz, struct seg *seg, caddr_t addr, enum seg_rw rw,
     cred_t *cr, caller_context_t *ct)
 {
-	ASSERT(VTOHLN(vp)->hln_looped == 1);
+	/* return EACCES to be consistent with mmap */
+	if (VTOHLN(vp)->hln_looped != 1)
+		return (EACCES);
 	return (VOP_GETPAGE(REALVP(vp), off, len, protp, pl, plsz, seg, addr,
 	    rw, cr, ct));
 }
@@ -1266,7 +1268,9 @@ int
 hyprlofs_putpage(vnode_t *vp, offset_t off, size_t len, int flags,
     cred_t *cr, caller_context_t *ct)
 {
-	ASSERT(VTOHLN(vp)->hln_looped == 1);
+	/* return EACCES to be consistent with mmap */
+	if (VTOHLN(vp)->hln_looped != 1)
+		return (EACCES);
 	return (VOP_PUTPAGE(REALVP(vp), off, len, flags, cr, ct));
 }
 
@@ -1275,7 +1279,9 @@ hyprlofs_map(vnode_t *vp, offset_t off, struct as *as, caddr_t *addrp,
     size_t len, uchar_t prot, uchar_t maxprot, uint_t flags, cred_t *cr,
     caller_context_t *ct)
 {
-	ASSERT(VTOHLN(vp)->hln_looped == 1);
+	/* return EACCES to be consistent with mmap */
+	if (VTOHLN(vp)->hln_looped != 1)
+		return (EACCES);
 	return (VOP_MAP(REALVP(vp), off, as, addrp, len, prot, maxprot, flags,
 	    cr, ct));
 }
@@ -1285,7 +1291,9 @@ hyprlofs_addmap(vnode_t *vp, offset_t off, struct as *as, caddr_t addr,
     size_t len, uchar_t prot, uchar_t maxprot, uint_t flags, cred_t *cr,
     caller_context_t *ct)
 {
-	ASSERT(VTOHLN(vp)->hln_looped == 1);
+	/* return EACCES to be consistent with mmap */
+	if (VTOHLN(vp)->hln_looped != 1)
+		return (EACCES);
 	return (VOP_ADDMAP(REALVP(vp), off, as, addr, len, prot, maxprot,
 	    flags, cr, ct));
 }
@@ -1295,7 +1303,9 @@ hyprlofs_delmap(vnode_t *vp, offset_t off, struct as *as, caddr_t addr,
     size_t len, uint_t prot, uint_t maxprot, uint_t flags, cred_t *cr,
     caller_context_t *ct)
 {
-	ASSERT(VTOHLN(vp)->hln_looped == 1);
+	/* return EACCES to be consistent with mmap */
+	if (VTOHLN(vp)->hln_looped != 1)
+		return (EACCES);
 	return (VOP_DELMAP(REALVP(vp), off, as, addr, len, prot, maxprot,
 	    flags, cr, ct));
 }
@@ -1304,7 +1314,9 @@ static int
 hyprlofs_space(vnode_t *vp, int cmd, struct flock64 *bfp, int flag,
     offset_t offset, cred_t *cr, caller_context_t *ct)
 {
-	ASSERT(VTOHLN(vp)->hln_looped == 1);
+	/* return EACCES to be consistent with mmap */
+	if (VTOHLN(vp)->hln_looped != 1)
+		return (EACCES);
 	return (VOP_SPACE(REALVP(vp), cmd, bfp, flag, offset, cr, ct));
 }
 
