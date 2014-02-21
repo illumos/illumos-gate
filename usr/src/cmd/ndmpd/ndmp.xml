@@ -2,6 +2,7 @@
 <!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
 <!--
 Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+Copyright 2014 Nexenta Systems, Inc. All rights reserved.
 
 NOTE:  This service manifest is not editable; its contents will
 be overwritten by package or patch operations, including
@@ -131,8 +132,8 @@ POSSIBILITY OF SUCH DAMAGE.
 		<propval name='fh-inode' type='boolean' value='false' />
 		<propval name='include-lmtime' type='boolean' value='false' />
 		<propval name='restore-fullpath' type='boolean' value='false' />
-		<propval name='socket-css' type='integer' value='65' />
-		<propval name='socket-crs' type='integer' value='80' />
+		<propval name='socket-css' type='integer' value='60' />
+		<propval name='socket-crs' type='integer' value='60' />
 		<propval name='mover-recordsize' type='integer' value='60' />
 		<propval name='restore-wildcard-enable' type='boolean' value='false' />
 		<propval name='tcp-port' type='integer' value='10000' />

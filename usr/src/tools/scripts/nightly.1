@@ -19,7 +19,7 @@
 .\" "Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
 .\" "Copyright 2012 Joshua M. Clulow <josh@sysmgr.org>
 .\" "
-.TH nightly 1 "6 July 2010"
+.TH nightly 1 "Jan 28, 2014"
 .SH NAME
 .I nightly
 \- build an OS-Net consolidation overnight
@@ -146,10 +146,6 @@ pass
 Suppress the bringover so that the build will start immediately with
 current source code
 .TP
-.B \-o
-Do an "old style" (pre-S10) build using root privileges to set OWNER
-and GROUP from the Makefiles.
-.TP
 .B \-p
 Create packages for regular install
 .TP
@@ -209,9 +205,6 @@ Do "make lint" in $LINTDIRS (default: $SRC n)
 Do not run protocmp or checkpaths (note: this option is not
 recommended, especially in conjunction with the \-p option)
 .TP
-.B \-W
-Do not report warnings (for freeware gate ONLY)
-.TP
 .B \-w
 Report which proto area objects differ between this and the last build.
 See wsdiff(1) for details. Note that the proto areas used for comparison
@@ -235,14 +228,6 @@ Default group of options for building a release (-mp)
 .TP 10
 .B \-V VERS
 set the build version string to VERS, overriding VERSION
-.TP
-.B \-X
-Copies the proto area and packages from the IHV and IHV-bin gates into the
-nightly proto and package areas.  This is only available on i386.  See
-.B REALMODE ENVIRONMENT VARIABLES
-and
-.B BUILDING THE IHV WORKSPACE
-below.
 
 .LP
 .SH ENVIRONMENT VARIABLES
@@ -278,35 +263,12 @@ will fetch sources to either populate or update your workspace;
 it defaults to $CLONE_WS.
 .RE
 .LP
-.B CLOSED_BRINGOVER_WS
-.RS 5
-A full Mercurial workspace has two repositories: one for open source
-and one for closed source.  If this variable is non-null, 
-.I nightly
-will pull from the repository that it names to get the closed source.
-It defaults to $CLOSED_CLONE_WS.
-.LP
-If $CODEMGR_WS already exists and contains only the open repository,
-.I nightly
-will ignore this variable; you'll need to pull the closed repository
-by hand if you want it.
-.RE
-.LP
 .B CLONE_WS
 .RS 5
 This is the workspace from which
 .I nightly
 will fetch sources by default.  This is
 often distinct from the parent, particularly if the parent is a gate.
-.RE
-.LP
-.B CLOSED_CLONE_WS
-.RS 5
-This is the default closed-source Mercurial repository that 
-.I nightly
-might pull from (see
-.B CLOSED_BRINGOVER_WS
-for details).
 .RE
 .LP
 .B SRC
@@ -504,22 +466,8 @@ the developer downloads a closed binaries tree and unpacks it.
 tells nightly
 where to find these closed binaries, so that it can add them into the
 build.
-.LP
 .RE
-.B ON_CRYPTO_BINS
-.RS 5
-This is the path to a compressed tarball that contains debug
-cryptographic binaries that have been signed to allow execution
-outside of Sun, e.g., $PARENT_WS/packages/$MACH/on-crypto.$MACH.bz2.
-.I nightly
-will automatically adjust the path for non-debug builds.  This tarball
-is needed if the closed-source tree is not present.  Also, it is
-usually needed when generating OpenSolaris deliverables from a project
-workspace.  This is because most projects do not have access to the
-necessary key and certificate that would let them sign their own
-cryptographic binaries.
 .LP
-.RE
 .B CHECK_PATHS
 .RS 5
 Normally, nightly runs the 'checkpaths' script to check for
@@ -587,41 +535,6 @@ This is reserved for per-build-machine customizations, and runs
 immedately after POST_NIGHTLY.
 .RE
 .LP
-.SH REALMODE ENVIRONMENT VARIABLES
-.LP
-The following environment variables referenced by
-.I nightly
-are only required when the -X option is used.
-.LP
-.RE
-.B IA32_IHV_WS
-.RS 5
-Reference to the IHV workspace containing IHV driver binaries.
-The IHV workspace must be fully built before starting the ON realmode build.
-.LP
-.RE
-.B IA32_IHV_ROOT
-.RS 5
-Reference to the IHV workspace proto area.
-The IHV workspace must be fully built before starting the ON realmode build.
-.LP
-.RE
-.B IA32_IHV_PKGS
-.RS 5
-Reference to the IHV workspace packages.  If this is empty or the directory
-is non-existent, then nightly will skip copying the packages.
-.LP
-.RE
-.B IA32_IHV_BINARY_PKGS
-.RS 5
-Reference to binary-only IHV packages.  If this is empty or the directory
-is non-existent, then nightly will skip copying the packages.
-.LP
-.RE
-.B SPARC_RM_PKGARCHIVE
-.RS 5
-Destination for sparc realmode package SUNWrmodu.
-Yes, this sparc package really is built on x86.
 .SH FILES
 .LP
 .RS 5
@@ -631,18 +544,6 @@ Yes, this sparc package really is built on x86.
 If present, nightly executes this file just prior to executing the
 .I env
 file.  
-.SH BUILDING THE IHV WORKSPACE
-.LP
-The IHV workspace can be built with
-.I nightly.
-The recommended options are:
-.LP
-.RS 5
-NIGHTLY_OPTIONS="-pmWN"
-.RE
-.LP
-None of the realmode environment variables needed for ON realmode builds
-are required to build the IHV workspace.
 .SH EXAMPLES
 .LP
 Start with the example file in usr/src/tools/env/developer.sh
