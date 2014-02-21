@@ -496,6 +496,8 @@ void e1000_rlpml_set_vf(struct e1000_hw *, u16);
 s32 e1000_promisc_set_vf(struct e1000_hw *, enum e1000_promisc_type type);
 u16 e1000_rxpbs_adjust_82580(u32 data);
 s32 e1000_set_eee_i350(struct e1000_hw *);
+s32 e1000_set_eee_i354(struct e1000_hw *);
+s32 e1000_get_eee_status_i354(struct e1000_hw *, bool *);
 
 /* I2C SDA and SCL timing parameters for standard mode */
 #define E1000_I2C_T_HD_STA	4
