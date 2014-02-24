@@ -23,6 +23,10 @@
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
+/*
+ * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
+ */
+
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -903,7 +907,7 @@ int
 so_poll(struct sonode *so, short events, int anyyet, short *reventsp,
     struct pollhead **phpp)
 {
-	int state = so->so_state;
+	int state = so->so_state, mask;
 	*reventsp = 0;
 
 	/*
@@ -966,6 +970,22 @@ so_poll(struct sonode *so, short events, int anyyet, short *reventsp,
 		if ((state & SS_OOBPEND) != 0) {
 			*reventsp |= (POLLRDBAND | POLLPRI) & events;
 		}
+
+		/*
+		 * If the socket has become disconnected, we set POLLHUP.
+		 * Note that if we are in this state, we will have set POLLIN
+		 * (SO_HAVE_DATA() is true on a disconnected socket), but not
+		 * POLLOUT (SS_ISCONNECTED is false).  This is in keeping with
+		 * the semantics of POLLHUP, which is defined to be mutually
+		 * exclusive with respect to POLLOUT but not POLLIN.  We are
+		 * therefore setting POLLHUP primarily for the benefit of
+		 * those not polling on POLLIN, as they have no other way of
+		 * knowing that the socket has been disconnected.
+		 */
+		mask = SS_SENTLASTREADSIG | SS_SENTLASTWRITESIG;
+
+		if ((state & (mask | SS_ISCONNECTED)) == mask)
+			*reventsp |= POLLHUP;
 	}
 
 	if (!*reventsp && !anyyet) {
@@ -1022,7 +1042,13 @@ so_disconnected(sock_upper_handle_t sock_handle, sock_connid_t id, int error)
 	boolean_t connect_failed;
 
 	mutex_enter(&so->so_lock);
-	connect_failed = so->so_state & SS_ISCONNECTED;
+
+	/*
+	 * If we aren't currently connected, then this isn't a disconnect but
+	 * rather a failure to connect.
+	 */
+	connect_failed = !(so->so_state & SS_ISCONNECTED);
+
 	so->so_proto_connid = id;
 	soisdisconnected(so, error);
 	so_notify_disconnected(so, connect_failed, error);
