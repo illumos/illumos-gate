@@ -1,9 +1,10 @@
 '\" te
+.\" Copyright 2014 Nexenta Systems, Inc. All rights reserved.
 .\" Copyright (c) 2009 Sun Microsystems, Inc. All Rights Reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ZONEADM 1M "Feb 13, 2009"
+.TH ZONEADM 1M "Oct 30, 2013"
 .SH NAME
 zoneadm \- administer zones
 .SH SYNOPSIS
@@ -257,17 +258,6 @@ The source zone must be halted before this subcommand can be used.
 .RS 4n
 Halt the specified zones. \fBhalt\fR bypasses running the shutdown scripts
 inside the zone. It also removes run time resources of the zone.
-.sp
-Use:
-.sp
-.in +2
-.nf
-zlogin \fIzone\fR shutdown
-.fi
-.in -2
-.sp
-
-to cleanly shutdown the zone by running the shutdown scripts.
 .RE
 
 .sp
@@ -428,12 +418,26 @@ in the zone.
 .sp
 .ne 2
 .na
-\fB\fBreboot\fR\fR
+\fB\fBreboot\fR\ [\fB--\fR \fIboot_options\fR]]\fR
 .ad
 .sp .6
 .RS 4n
 Restart the zones. This is equivalent to a \fBhalt\fR \fBboot\fR sequence. This
-subcommand fails if the specified zones are not active.
+subcommand fails if the specified zones are not active. See \fIboot\fR subcommand
+for the boot options.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBshutdown\fR [\fB-r\fR [\fB--\fR \fIboot_options\fR]]\fR
+.ad
+.sp .6
+.RS 4n
+Gracefully shutdown the specified zone. This subcommand waits for all zone
+processes to finish; the default timeout is SCF_PROPERTY_TIMEOUT value from
+the SMF service system/zones. If the \fB-r\fR option is specified, reboot the
+zone. See \fIboot\fR subcommand for the boot options.
 .RE
 
 .sp

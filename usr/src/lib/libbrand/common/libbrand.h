@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc. All rights reserved.
  */
 
 #ifndef	_LIBBRAND_H
@@ -53,6 +54,8 @@ extern int brand_get_brandname(brand_handle_t, char *, size_t);
 extern int brand_get_clone(brand_handle_t, const char *, const char *,
     char *, size_t);
 extern int brand_get_detach(brand_handle_t, const char *, const char *,
+    char *, size_t);
+extern int brand_get_shutdown(brand_handle_t, const char *, const char *,
     char *, size_t);
 extern int brand_get_halt(brand_handle_t, const char *, const char *,
     char *, size_t);

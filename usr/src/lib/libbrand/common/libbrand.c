@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <assert.h>
@@ -71,6 +72,7 @@
 #define	DTD_ELEM_PREUNINSTALL	((const xmlChar *) "preuninstall")
 #define	DTD_ELEM_PRIVILEGE	((const xmlChar *) "privilege")
 #define	DTD_ELEM_QUERY		((const xmlChar *) "query")
+#define	DTD_ELEM_SHUTDOWN	((const xmlChar *) "shutdown")
 #define	DTD_ELEM_SYMLINK	((const xmlChar *) "symlink")
 #define	DTD_ELEM_SYSBOOT	((const xmlChar *) "sysboot")
 #define	DTD_ELEM_UNINSTALL	((const xmlChar *) "uninstall")
@@ -499,6 +501,15 @@ brand_get_halt(brand_handle_t bh, const char *zonename,
 	struct brand_handle *bhp = (struct brand_handle *)bh;
 	return (brand_get_value(bhp, zonename, zonepath, NULL, NULL,
 	    buf, len, DTD_ELEM_HALT, B_TRUE, B_TRUE));
+}
+
+int
+brand_get_shutdown(brand_handle_t bh, const char *zonename,
+    const char *zonepath, char *buf, size_t len)
+{
+	struct brand_handle *bhp = (struct brand_handle *)bh;
+	return (brand_get_value(bhp, zonename, zonepath, NULL, NULL,
+	    buf, len, DTD_ELEM_SHUTDOWN, B_TRUE, B_TRUE));
 }
 
 int

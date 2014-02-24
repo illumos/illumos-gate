@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc. All rights reserved.
  */
 
 /*
@@ -130,6 +131,7 @@ struct cmd {
 #define	SHELP_BOOT	"boot [-- boot_arguments]"
 #define	SHELP_HALT	"halt"
 #define	SHELP_READY	"ready"
+#define	SHELP_SHUTDOWN	"shutdown [-r [-- boot_arguments]]"
 #define	SHELP_REBOOT	"reboot [-- boot_arguments]"
 #define	SHELP_LIST	"list [-cipv]"
 #define	SHELP_VERIFY	"verify"
@@ -152,6 +154,7 @@ static int cleanup_zonepath(char *, boolean_t);
 static int help_func(int argc, char *argv[]);
 static int ready_func(int argc, char *argv[]);
 static int boot_func(int argc, char *argv[]);
+static int shutdown_func(int argc, char *argv[]);
 static int halt_func(int argc, char *argv[]);
 static int reboot_func(int argc, char *argv[]);
 static int list_func(int argc, char *argv[]);
@@ -179,6 +182,7 @@ static struct cmd cmdtab[] = {
 	{ CMD_BOOT,		"boot",		SHELP_BOOT,	boot_func },
 	{ CMD_HALT,		"halt",		SHELP_HALT,	halt_func },
 	{ CMD_READY,		"ready",	SHELP_READY,	ready_func },
+	{ CMD_SHUTDOWN,		"shutdown",	SHELP_SHUTDOWN,	shutdown_func },
 	{ CMD_REBOOT,		"reboot",	SHELP_REBOOT,	reboot_func },
 	{ CMD_LIST,		"list",		SHELP_LIST,	list_func },
 	{ CMD_VERIFY,		"verify",	SHELP_VERIFY,	verify_func },
@@ -232,6 +236,10 @@ long_help(int cmd_num)
 	case CMD_READY:
 		return (gettext("Prepares a zone for running applications but "
 		    "does not start any user\n\tprocesses in the zone."));
+	case CMD_SHUTDOWN:
+		return (gettext("Gracefully shutdown the zone or reboot if "
+		    "the '-r' option is specified.\n\t"
+		    "See zoneadm(1m) for valid boot arguments."));
 	case CMD_REBOOT:
 		return (gettext("Restarts the zone (equivalent to a halt / "
 		    "boot sequence).\n\tFails if the zone is not active.  "
@@ -1534,6 +1542,7 @@ auth_check(char *user, char *zone, int cmd_num)
 	case CMD_BOOT:
 	case CMD_HALT:
 	case CMD_READY:
+	case CMD_SHUTDOWN:
 	case CMD_REBOOT:
 	case CMD_SYSBOOT:
 	case CMD_VERIFY:
@@ -1595,6 +1604,10 @@ sanity_check(char *zone, int cmd_num, boolean_t running,
 		case CMD_HALT:
 			zerror(gettext("use %s to %s this zone."), "halt(1M)",
 			    cmd_to_str(cmd_num));
+			break;
+		case CMD_SHUTDOWN:
+			zerror(gettext("use %s to %s this zone."),
+			    "shutdown(1M)", cmd_to_str(cmd_num));
 			break;
 		case CMD_REBOOT:
 			zerror(gettext("use %s to %s this zone."),
@@ -1823,6 +1836,75 @@ halt_func(int argc, char *argv[])
 	zarg.cmd = Z_HALT;
 	return ((zonecfg_call_zoneadmd(target_zone, &zarg, locale,
 	    B_TRUE) == 0) ?  Z_OK : Z_ERR);
+}
+
+static int
+shutdown_func(int argc, char *argv[])
+{
+	zone_cmd_arg_t zarg;
+	int arg;
+	boolean_t reboot = B_FALSE;
+
+	zarg.cmd = Z_SHUTDOWN;
+
+	if (zonecfg_in_alt_root()) {
+		zerror(gettext("cannot shut down zone in alternate root"));
+		return (Z_ERR);
+	}
+
+	optind = 0;
+	while ((arg = getopt(argc, argv, "?r")) != EOF) {
+		switch (arg) {
+		case '?':
+			sub_usage(SHELP_SHUTDOWN, CMD_SHUTDOWN);
+			return (optopt == '?' ? Z_OK : Z_USAGE);
+		case 'r':
+			reboot = B_TRUE;
+			break;
+		default:
+			sub_usage(SHELP_SHUTDOWN, CMD_SHUTDOWN);
+			return (Z_USAGE);
+		}
+	}
+
+	zarg.bootbuf[0] = '\0';
+	for (; optind < argc; optind++) {
+		if (strlcat(zarg.bootbuf, argv[optind],
+		    sizeof (zarg.bootbuf)) >= sizeof (zarg.bootbuf)) {
+			zerror(gettext("Boot argument list too long"));
+			return (Z_ERR);
+		}
+		if (optind < argc - 1)
+			if (strlcat(zarg.bootbuf, " ", sizeof (zarg.bootbuf)) >=
+			    sizeof (zarg.bootbuf)) {
+				zerror(gettext("Boot argument list too long"));
+				return (Z_ERR);
+			}
+	}
+
+	/*
+	 * zoneadmd should be the one to decide whether or not to proceed,
+	 * so even though it seems that the third parameter below should
+	 * perhaps be B_TRUE, it really shouldn't be.
+	 */
+	if (sanity_check(target_zone, CMD_SHUTDOWN, B_TRUE, B_FALSE, B_FALSE)
+	    != Z_OK)
+		return (Z_ERR);
+
+	if (zonecfg_call_zoneadmd(target_zone, &zarg, locale, B_TRUE) != Z_OK)
+		return (Z_ERR);
+
+	if (reboot) {
+		if (sanity_check(target_zone, CMD_BOOT, B_FALSE, B_FALSE,
+		    B_FALSE) != Z_OK)
+			return (Z_ERR);
+
+		zarg.cmd = Z_BOOT;
+		if (zonecfg_call_zoneadmd(target_zone, &zarg, locale,
+		    B_TRUE) != Z_OK)
+			return (Z_ERR);
+	}
+	return (Z_OK);
 }
 
 static int
