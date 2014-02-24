@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2014 OmniTI Computer Consulting, Inc. All rights reserved.
  */
 
 /*
@@ -309,6 +310,7 @@ mptsas_access_config_page(mptsas_t *mpt, uint8_t action, uint8_t page_type,
 	uint16_t		iocstatus = 0;
 	uint32_t		iocloginfo;
 	caddr_t			page_memp;
+	boolean_t		free_dma = B_FALSE;
 
 	va_start(ap, callback);
 	ASSERT(mutex_owned(&mpt->m_mutex));
@@ -465,8 +467,12 @@ mptsas_access_config_page(mptsas_t *mpt, uint8_t action, uint8_t page_type,
 	if (mptsas_dma_addr_create(mpt, attrs,
 	    &cmd->cmd_dmahandle, &accessp, &page_memp,
 	    len, &cookie) == FALSE) {
+		rval = DDI_FAILURE;
 		goto page_done;
 	}
+	/* NOW we can safely call mptsas_dma_addr_destroy(). */
+	free_dma = B_TRUE;
+
 	cmd->cmd_dma_addr = cookie.dmac_laddress;
 	bzero(page_memp, len);
 
@@ -584,7 +590,8 @@ page_done:
 		    mpt->m_free_index);
 	}
 
-	mptsas_dma_addr_destroy(&cmd->cmd_dmahandle, &accessp);
+	if (free_dma)
+		mptsas_dma_addr_destroy(&cmd->cmd_dmahandle, &accessp);
 
 	if (cmd && (cmd->cmd_flags & CFLAG_PREPARED)) {
 		mptsas_remove_cmd(mpt, cmd);
@@ -1857,6 +1864,7 @@ mptsas_get_sas_io_unit_page_hndshk(mptsas_t *mpt)
 	uint32_t		reply_size = 256; /* Big enough for any page */
 	uint_t			state;
 	int			rval = DDI_FAILURE;
+	boolean_t		free_recv = B_FALSE, free_page = B_FALSE;
 
 	/*
 	 * Initialize our "state machine".  This is a bit convoluted,
@@ -1883,6 +1891,8 @@ mptsas_get_sas_io_unit_page_hndshk(mptsas_t *mpt)
 		    "mptsas_get_sas_io_unit_page_hndshk: recv dma failed");
 		goto cleanup;
 	}
+	/* Now safe to call mptsas_dma_addr_destroy(recv_dma_handle). */
+	free_recv = B_TRUE;
 
 	page_dma_attrs = mpt->m_msg_dma_attr;
 	page_dma_attrs.dma_attr_sgllen = 1;
@@ -1895,6 +1905,8 @@ mptsas_get_sas_io_unit_page_hndshk(mptsas_t *mpt)
 		    "mptsas_get_sas_io_unit_page_hndshk: page dma failed");
 		goto cleanup;
 	}
+	/* Now safe to call mptsas_dma_addr_destroy(page_dma_handle). */
+	free_page = B_TRUE;
 
 	/*
 	 * Now we cycle through the state machine.  Here's what happens:
@@ -2130,8 +2142,10 @@ mptsas_get_sas_io_unit_page_hndshk(mptsas_t *mpt)
 	}
 
 cleanup:
-	mptsas_dma_addr_destroy(&recv_dma_handle, &recv_accessp);
-	mptsas_dma_addr_destroy(&page_dma_handle, &page_accessp);
+	if (free_recv)
+		mptsas_dma_addr_destroy(&recv_dma_handle, &recv_accessp);
+	if (free_page)
+		mptsas_dma_addr_destroy(&page_dma_handle, &page_accessp);
 	if (rval != DDI_SUCCESS) {
 		mptsas_fm_ereport(mpt, DDI_FM_DEVICE_NO_RESPONSE);
 		ddi_fm_service_impact(mpt->m_dip, DDI_SERVICE_LOST);
@@ -2159,6 +2173,7 @@ mptsas_get_manufacture_page5(mptsas_t *mpt)
 	uint32_t			flagslength;
 	int				rval = DDI_SUCCESS;
 	uint_t				iocstatus;
+	boolean_t		free_recv = B_FALSE, free_page = B_FALSE;
 
 	MPTSAS_DISABLE_INTR(mpt);
 
@@ -2179,8 +2194,11 @@ mptsas_get_manufacture_page5(mptsas_t *mpt)
 	if (mptsas_dma_addr_create(mpt, recv_dma_attrs,
 	    &recv_dma_handle, &recv_accessp, &recv_memp,
 	    (sizeof (MPI2_CONFIG_REPLY)), NULL) == FALSE) {
+		rval = DDI_FAILURE;
 		goto done;
 	}
+	/* Now safe to call mptsas_dma_addr_destroy(recv_dma_handle). */
+	free_recv = B_TRUE;
 
 	bzero(recv_memp, sizeof (MPI2_CONFIG_REPLY));
 	configreply = (pMpi2ConfigReply_t)recv_memp;
@@ -2213,8 +2231,12 @@ mptsas_get_manufacture_page5(mptsas_t *mpt)
 	if (mptsas_dma_addr_create(mpt, page_dma_attrs, &page_dma_handle,
 	    &page_accessp, &page_memp, (sizeof (MPI2_CONFIG_PAGE_MAN_5)),
 	    &page_cookie) == FALSE) {
+		rval = DDI_FAILURE;
 		goto done;
 	}
+	/* Now safe to call mptsas_dma_addr_destroy(page_dma_handle). */
+	free_page = B_TRUE;
+
 	bzero(page_memp, sizeof (MPI2_CONFIG_PAGE_MAN_5));
 	m5 = (pMpi2ManufacturingPage5_t)page_memp;
 
@@ -2303,8 +2325,10 @@ done:
 	/*
 	 * free up memory
 	 */
-	mptsas_dma_addr_destroy(&recv_dma_handle, &recv_accessp);
-	mptsas_dma_addr_destroy(&page_dma_handle, &page_accessp);
+	if (free_recv)
+		mptsas_dma_addr_destroy(&recv_dma_handle, &recv_accessp);
+	if (free_page)
+		mptsas_dma_addr_destroy(&page_dma_handle, &page_accessp);
 	MPTSAS_ENABLE_INTR(mpt);
 
 	return (rval);
@@ -2525,6 +2549,7 @@ mptsas_get_manufacture_page0(mptsas_t *mpt)
 	int				rval = DDI_SUCCESS;
 	uint_t				iocstatus;
 	uint8_t				i = 0;
+	boolean_t		free_recv = B_FALSE, free_page = B_FALSE;
 
 	MPTSAS_DISABLE_INTR(mpt);
 
@@ -2545,8 +2570,12 @@ mptsas_get_manufacture_page0(mptsas_t *mpt)
 	if (mptsas_dma_addr_create(mpt, recv_dma_attrs, &recv_dma_handle,
 	    &recv_accessp, &recv_memp, (sizeof (MPI2_CONFIG_REPLY)),
 	    NULL) == FALSE) {
+		rval = DDI_FAILURE;
 		goto done;
 	}
+	/* Now safe to call mptsas_dma_addr_destroy(recv_dma_handle). */
+	free_recv = B_TRUE;
+
 	bzero(recv_memp, sizeof (MPI2_CONFIG_REPLY));
 	configreply = (pMpi2ConfigReply_t)recv_memp;
 	recv_numbytes = sizeof (MPI2_CONFIG_REPLY);
@@ -2578,8 +2607,12 @@ mptsas_get_manufacture_page0(mptsas_t *mpt)
 	if (mptsas_dma_addr_create(mpt, page_dma_attrs, &page_dma_handle,
 	    &page_accessp, &page_memp, (sizeof (MPI2_CONFIG_PAGE_MAN_0)),
 	    &page_cookie) == FALSE) {
+		rval = DDI_FAILURE;
 		goto done;
 	}
+	/* Now safe to call mptsas_dma_addr_destroy(page_dma_handle). */
+	free_page = B_TRUE;
+
 	bzero(page_memp, sizeof (MPI2_CONFIG_PAGE_MAN_0));
 	m0 = (pMpi2ManufacturingPage0_t)page_memp;
 
@@ -2673,8 +2706,10 @@ done:
 	/*
 	 * free up memory
 	 */
-	mptsas_dma_addr_destroy(&recv_dma_handle, &recv_accessp);
-	mptsas_dma_addr_destroy(&page_dma_handle, &page_accessp);
+	if (free_recv)
+		mptsas_dma_addr_destroy(&recv_dma_handle, &recv_accessp);
+	if (free_page)
+		mptsas_dma_addr_destroy(&page_dma_handle, &page_accessp);
 	MPTSAS_ENABLE_INTR(mpt);
 
 	return (rval);

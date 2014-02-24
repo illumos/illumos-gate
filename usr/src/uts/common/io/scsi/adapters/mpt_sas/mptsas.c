@@ -23,6 +23,7 @@
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2014, Joyent, Inc. All rights reserved.
+ * Copyright 2014 OmniTI Computer Consulting, Inc. All rights reserved.
  */
 
 /*
@@ -2021,6 +2022,7 @@ mptsas_alloc_handshake_msg(mptsas_t *mpt, size_t alloc_size)
 {
 	ddi_dma_attr_t	task_dma_attrs;
 
+	mpt->m_hshk_dma_size = 0;
 	task_dma_attrs = mpt->m_msg_dma_attr;
 	task_dma_attrs.dma_attr_sgllen = 1;
 	task_dma_attrs.dma_attr_granular = (uint32_t)(alloc_size);
@@ -2039,6 +2041,8 @@ mptsas_alloc_handshake_msg(mptsas_t *mpt, size_t alloc_size)
 static void
 mptsas_free_handshake_msg(mptsas_t *mpt)
 {
+	if (mpt->m_hshk_dma_size == 0)
+		return;
 	mptsas_dma_addr_destroy(&mpt->m_hshk_dma_hdl, &mpt->m_hshk_acc_hdl);
 	mpt->m_hshk_dma_size = 0;
 }
@@ -15444,7 +15448,6 @@ mptsas_dma_addr_create(mptsas_t *mpt, ddi_dma_attr_t dma_attr,
 
 	if (ddi_dma_alloc_handle(mpt->m_dip, &dma_attr, DDI_DMA_SLEEP,
 	    NULL, dma_hdp) != DDI_SUCCESS) {
-		dma_hdp = NULL;
 		return (FALSE);
 	}
 
@@ -15452,7 +15455,6 @@ mptsas_dma_addr_create(mptsas_t *mpt, ddi_dma_attr_t dma_attr,
 	    DDI_DMA_CONSISTENT, DDI_DMA_SLEEP, NULL, dma_memp, &alloc_len,
 	    acc_hdp) != DDI_SUCCESS) {
 		ddi_dma_free_handle(dma_hdp);
-		dma_hdp = NULL;
 		return (FALSE);
 	}
 
@@ -15461,7 +15463,6 @@ mptsas_dma_addr_create(mptsas_t *mpt, ddi_dma_attr_t dma_attr,
 	    cookiep, &ncookie) != DDI_DMA_MAPPED) {
 		(void) ddi_dma_mem_free(acc_hdp);
 		ddi_dma_free_handle(dma_hdp);
-		dma_hdp = NULL;
 		return (FALSE);
 	}
 
@@ -15477,5 +15478,4 @@ mptsas_dma_addr_destroy(ddi_dma_handle_t *dma_hdp, ddi_acc_handle_t *acc_hdp)
 	(void) ddi_dma_unbind_handle(*dma_hdp);
 	(void) ddi_dma_mem_free(acc_hdp);
 	ddi_dma_free_handle(dma_hdp);
-	dma_hdp = NULL;
 }
