@@ -67,6 +67,7 @@ typedef struct pathname {
 #define	pn_pathleft(pnp)	((pnp)->pn_pathlen)
 
 extern void	pn_alloc(struct pathname *);
+extern void	pn_alloc_sz(struct pathname *, size_t);
 extern int	pn_get(char *, enum uio_seg, struct pathname *);
 extern int	pn_get_buf(char *, enum uio_seg, struct pathname *,
 			void *, size_t);

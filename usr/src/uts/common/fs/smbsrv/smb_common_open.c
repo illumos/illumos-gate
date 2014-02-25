@@ -396,7 +396,7 @@ smb_open_subr(smb_request_t *sr)
 	if (!smb_pathname_validate(sr, pn))
 		return (sr->smb_error.status);
 
-	if (strlen(pn->pn_path) >= MAXPATHLEN) {
+	if (strlen(pn->pn_path) >= SMB_MAXPATHLEN) {
 		smbsr_error(sr, 0, ERRSRV, ERRfilespecs);
 		return (NT_STATUS_NAME_TOO_LONG);
 	}

@@ -121,6 +121,12 @@ int smb_fsop_frlock(smb_node_t *, smb_lock_t *, boolean_t, cred_t *);
 #define	SMB_ABE			0x00000008
 #define	SMB_CASE_SENSITIVE	0x00000010
 
+/*
+ * Increased MAXPATHLEN for SMB.  Essentially, we want to allow a
+ * share path up to MAXPATHLEN plus a relative path of MAXPATHLEN.
+ */
+#define	SMB_MAXPATHLEN	(2 * MAXPATHLEN)
+
 #ifdef	__cplusplus
 }
 #endif
