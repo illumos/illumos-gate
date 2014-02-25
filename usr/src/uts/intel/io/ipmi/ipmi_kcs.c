@@ -27,7 +27,7 @@
 /* $FreeBSD: src/sys/dev/ipmi/ipmi_kcs.c,v 1.3 2008/08/28 02:11:04 jhb */
 
 /*
- * Copyright 2012, Joyent, Inc.  All rights reserved.
+ * Copyright 2013, Joyent, Inc.  All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
@@ -195,7 +195,7 @@ kcs_start_write(struct ipmi_softc *sc)
 		status = kcs_wait_for_ibf(sc, 0);
 		if (KCS_STATUS_STATE(status) == KCS_STATUS_STATE_WRITE)
 			break;
-		delay(1000000);
+		delay(drv_usectohz(1000000));
 	}
 
 	if (KCS_STATUS_STATE(status) != KCS_STATUS_STATE_WRITE)
