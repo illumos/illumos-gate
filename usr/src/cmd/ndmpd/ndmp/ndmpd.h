@@ -512,6 +512,7 @@ typedef struct ndmpd_session {
 	/*
 	 * NDMP V4 related data
 	 */
+	boolean_t ns_get_ext_list;
 	boolean_t ns_set_ext_list;
 
 	/* handling of hardlink, hardlink queue head */
@@ -895,9 +896,7 @@ extern int ndmp_mtioctl(int, int, int);
 extern u_longlong_t quad_to_long_long(ndmp_u_quad);
 extern ndmp_u_quad long_long_to_quad(u_longlong_t);
 
-extern void ndmp_set_socket_nodelay(int);
-extern void ndmp_set_socket_snd_buf(int, int);
-extern void ndmp_set_socket_rcv_buf(int, int);
+extern void set_socket_options(int sock);
 
 extern long ndmp_buffer_get_size(ndmpd_session_t *);
 extern int ndmp_lbr_init(ndmpd_session_t *);

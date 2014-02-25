@@ -88,15 +88,30 @@ static void mover_data_read_v3(void *cookie, int fd, ulong_t mode);
 static void accept_connection(void *cookie, int fd, ulong_t mode);
 static void mover_data_write_v3(void *cookie, int fd, ulong_t mode);
 static void accept_connection_v3(void *cookie, int fd, ulong_t mode);
-static ndmp_error mover_connect_sock_v3(ndmpd_session_t *session,
+static ndmp_error mover_connect_sock(ndmpd_session_t *session,
     ndmp_mover_mode mode, ulong_t addr, ushort_t port);
 static boolean_t is_writer_running(ndmpd_session_t *session);
+static int set_socket_nonblock(int sock);
 
 
 int ndmp_max_mover_recsize = MAX_MOVER_RECSIZE; /* patchable */
 
 #define	TAPE_READ_ERR		-1
 #define	TAPE_NO_WRITER_ERR	-2
+
+/*
+ * Set non-blocking mode for socket.
+ */
+static int
+set_socket_nonblock(int sock)
+{
+	int flags;
+
+	flags = fcntl(sock, F_GETFL, 0);
+	if (flags < 0)
+		return (0);
+	return (fcntl(sock, F_SETFL, flags|O_NONBLOCK) == 0);
+}
 
 /*
  * ************************************************************************
@@ -1069,7 +1084,7 @@ ndmpd_mover_connect_v3(ndmp_connection_t *connection, void *body)
 		break;
 
 	case NDMP_ADDR_TCP:
-		reply.error = mover_connect_sock_v3(session, request->mode,
+		reply.error = mover_connect_sock(session, request->mode,
 		    request->addr.tcp_ip_v3, request->addr.tcp_port_v3);
 		break;
 
@@ -1326,7 +1341,7 @@ ndmpd_mover_connect_v4(ndmp_connection_t *connection, void *body)
 		break;
 
 	case NDMP_ADDR_TCP:
-		reply.error = mover_connect_sock_v3(session, request->mode,
+		reply.error = mover_connect_sock(session, request->mode,
 		    request->addr.tcp_ip_v4(0), request->addr.tcp_port_v4(0));
 		break;
 
@@ -1906,7 +1921,6 @@ ndmpd_mover_connect(ndmpd_session_t *session, ndmp_mover_mode mover_mode)
 	ndmp_mover_addr *mover = &session->ns_data.dd_mover;
 	struct sockaddr_in sin;
 	int sock = -1;
-	int flag = 1;
 
 	if (mover->addr_type == NDMP_ADDR_TCP) {
 		if (mover->ndmp_mover_addr_u.addr.ip_addr) {
@@ -1946,17 +1960,7 @@ ndmpd_mover_connect(ndmpd_session_t *session, ndmp_mover_mode mover_mode)
 				(void) close(sock);
 				return (NDMP_IO_ERR);
 			}
-
-			if (ndmp_sbs > 0)
-				ndmp_set_socket_snd_buf(sock,
-				    ndmp_sbs * KILOBYTE);
-			if (ndmp_rbs > 0)
-				ndmp_set_socket_rcv_buf(sock,
-				    ndmp_rbs * KILOBYTE);
-
-			ndmp_set_socket_nodelay(sock);
-			(void) setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, &flag,
-			    sizeof (flag));
+			set_socket_options(sock);
 		} else {
 			if ((session->ns_mover.md_state !=
 			    NDMP_MOVER_STATE_ACTIVE) ||
@@ -2179,7 +2183,6 @@ create_listen_socket_v2(ndmpd_session_t *session, ulong_t *addr, ushort_t *port)
 	return (0);
 }
 
-
 /*
  * accept_connection
  *
@@ -2202,7 +2205,6 @@ accept_connection(void *cookie, int fd, ulong_t mode)
 	ndmpd_session_t *session = (ndmpd_session_t *)cookie;
 	struct sockaddr_in from;
 	int from_len;
-	int flag = 1;
 
 	from_len = sizeof (from);
 	session->ns_mover.md_sock = accept(fd, (struct sockaddr *)&from,
@@ -2217,12 +2219,7 @@ accept_connection(void *cookie, int fd, ulong_t mode)
 		ndmpd_mover_error(session, NDMP_MOVER_HALT_CONNECT_ERROR);
 		return;
 	}
-
-	(void) setsockopt(session->ns_mover.md_sock, SOL_SOCKET, SO_KEEPALIVE,
-	    &flag, sizeof (flag));
-	ndmp_set_socket_nodelay(session->ns_mover.md_sock);
-	ndmp_set_socket_rcv_buf(session->ns_mover.md_sock, 60 * KILOBYTE);
-	ndmp_set_socket_snd_buf(session->ns_mover.md_sock, 60 * KILOBYTE);
+	set_socket_options(session->ns_mover.md_sock);
 
 	NDMP_LOG(LOG_DEBUG, "sock fd: %d", session->ns_mover.md_sock);
 
@@ -3703,11 +3700,21 @@ mover_data_read_v3(void *cookie, int fd, ulong_t mode)
 	 * connection has been closed.
 	 */
 	if (n <= 0) {
-		if (n < 0 && errno == EWOULDBLOCK) {
-			NDMP_LOG(LOG_DEBUG, "n %d errno %d", n, errno);
-			return;
+		if (n == 0) {
+			NDMP_LOG(LOG_DEBUG, "Data connection closed");
+			ndmpd_mover_error(session,
+			    NDMP_MOVER_HALT_CONNECT_CLOSED);
+		} else {
+			/* Socket is non-blocking, perhaps there are no data */
+			if (errno == EAGAIN) {
+				NDMP_LOG(LOG_ERR, "No data to read");
+				return;
+			}
+
+			NDMP_LOG(LOG_ERR, "Failed to read from socket: %m");
+			ndmpd_mover_error(session,
+			    NDMP_MOVER_HALT_INTERNAL_ERROR);
 		}
-		NDMP_LOG(LOG_DEBUG, "n %d errno %d", n, errno);
 
 		/* Save the index since mover_tape_flush_v3 resets it. */
 		index = session->ns_mover.md_w_index;
@@ -3717,13 +3724,6 @@ mover_data_read_v3(void *cookie, int fd, ulong_t mode)
 			session->ns_mover.md_data_written += index;
 			session->ns_mover.md_record_num++;
 		}
-
-		if (n == 0)
-			ndmpd_mover_error(session,
-			    NDMP_MOVER_HALT_CONNECT_CLOSED);
-		else
-			ndmpd_mover_error(session,
-			    NDMP_MOVER_HALT_INTERNAL_ERROR);
 
 		return;
 	}
@@ -3984,12 +3984,12 @@ mover_data_write_v3(void *cookie, int fd, ulong_t mode)
 	    &session->ns_mover.md_buf[session->ns_mover.md_r_index], len);
 
 	if (n < 0) {
-		if (errno == EWOULDBLOCK) {
-			NDMP_LOG(LOG_DEBUG, "n %d errno %d", n, errno);
+		/* Socket is non-blocking, perhaps the write queue is full */
+		if (errno == EAGAIN) {
+			NDMP_LOG(LOG_ERR, "Cannot write to socket");
 			return;
 		}
-
-		NDMP_LOG(LOG_DEBUG, "n %d errno %d", n, errno);
+		NDMP_LOG(LOG_ERR, "Failed to write to socket: %m");
 		ndmpd_mover_error(session, NDMP_MOVER_HALT_CONNECT_CLOSED);
 		return;
 	}
@@ -4046,7 +4046,6 @@ accept_connection_v3(void *cookie, int fd, ulong_t mode)
 	ndmpd_session_t *session = (ndmpd_session_t *)cookie;
 	int from_len;
 	struct sockaddr_in from;
-	int flag = 1;
 
 	from_len = sizeof (from);
 	session->ns_mover.md_sock = accept(fd, (struct sockaddr *)&from,
@@ -4071,19 +4070,21 @@ accept_connection_v3(void *cookie, int fd, ulong_t mode)
 	session->ns_mover.md_data_addr.tcp_ip_v3 = from.sin_addr.s_addr;
 	session->ns_mover.md_data_addr.tcp_port_v3 = ntohs(from.sin_port);
 
-	/*
-	 * Set the parameter of the new socket.
-	 */
-	(void) setsockopt(session->ns_mover.md_sock, SOL_SOCKET, SO_KEEPALIVE,
-	    &flag, sizeof (flag));
+	/* Set the parameter of the new socket */
+	set_socket_options(session->ns_mover.md_sock);
 
-	ndmp_set_socket_nodelay(session->ns_mover.md_sock);
-	if (ndmp_sbs > 0)
-		ndmp_set_socket_snd_buf(session->ns_mover.md_sock,
-		    ndmp_sbs*KILOBYTE);
-	if (ndmp_rbs > 0)
-		ndmp_set_socket_rcv_buf(session->ns_mover.md_sock,
-		    ndmp_rbs*KILOBYTE);
+	/*
+	 * Backup/restore is handled by a callback called from main event loop,
+	 * which reads/writes data to md_sock socket. IO on socket must be
+	 * non-blocking, otherwise ndmpd would be unable to process other
+	 * incoming requests.
+	 */
+	if (!set_socket_nonblock(session->ns_mover.md_sock)) {
+		NDMP_LOG(LOG_ERR, "Could not set non-blocking mode "
+		    "on socket: %m");
+		ndmpd_mover_error(session, NDMP_MOVER_HALT_INTERNAL_ERROR);
+		return;
+	}
 
 	NDMP_LOG(LOG_DEBUG, "sock fd: %d", session->ns_mover.md_sock);
 
@@ -4148,7 +4149,7 @@ create_listen_socket_v3(ndmpd_session_t *session, ulong_t *addr, ushort_t *port)
 
 
 /*
- * mover_connect_sock_v3
+ * mover_connect_sock
  *
  * Connect the mover to the specified address
  *
@@ -4162,7 +4163,7 @@ create_listen_socket_v3(ndmpd_session_t *session, ulong_t *addr, ushort_t *port)
  *   error code.
  */
 static ndmp_error
-mover_connect_sock_v3(ndmpd_session_t *session, ndmp_mover_mode mode,
+mover_connect_sock(ndmpd_session_t *session, ndmp_mover_mode mode,
     ulong_t addr, ushort_t port)
 {
 	int sock;
@@ -4170,6 +4171,19 @@ mover_connect_sock_v3(ndmpd_session_t *session, ndmp_mover_mode mode,
 	sock = ndmp_connect_sock_v3(addr, port);
 	if (sock < 0)
 		return (NDMP_CONNECT_ERR);
+
+	/*
+	 * Backup/restore is handled by a callback called from main event loop,
+	 * which reads/writes data to md_sock socket. IO on socket must be
+	 * non-blocking, otherwise ndmpd would be unable to process other
+	 * incoming requests.
+	 */
+	if (!set_socket_nonblock(sock)) {
+		NDMP_LOG(LOG_ERR, "Could not set non-blocking mode "
+		    "on socket: %m");
+		(void) close(sock);
+		return (NDMP_CONNECT_ERR);
+	}
 
 	if (mode == NDMP_MOVER_MODE_READ) {
 		if (ndmpd_add_file_handler(session, (void*)session, sock,

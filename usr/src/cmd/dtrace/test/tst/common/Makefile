@@ -26,6 +26,12 @@
 
 #
 # Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright (c) 2013, Joyent, Inc. All rights reserved.
+#
+
+#
+# WARNING: Do not include Makefile.ctf here. That will cause tests to
+# break.
 #
 
 include $(SRC)/Makefile.master
@@ -70,6 +76,50 @@ nfs/tst.call3.exe: nfs/tst.call3.o nfs/$(RPCSVCOBJS)
 
 pid/tst.gcc.exe: pid/tst.gcc.c
 	$(GCC) -o pid/tst.gcc.exe pid/tst.gcc.c $(LDFLAGS)
+	$(POST_PROCESS) ; $(STRIP_STABS)
+
+json/tst.usdt.o: json/usdt.h
+
+json/usdt.h: json/usdt.d
+	$(DTRACE) -h -s json/usdt.d -o json/usdt.h
+
+json/usdt.o: json/usdt.d json/tst.usdt.o
+	$(COMPILE.d) -o json/usdt.o -s json/usdt.d json/tst.usdt.o
+
+json/tst.usdt.exe: json/tst.usdt.o json/usdt.o
+	$(LINK.c) -o json/tst.usdt.exe json/tst.usdt.o json/usdt.o $(LDLIBS)
+	$(POST_PROCESS) ; $(STRIP_STABS)
+
+#
+# Tests that use the next three programs rely on the binaries having
+# valid CTF data.
+#
+uctf/tst.aouttype.exe: uctf/tst.aouttype.c
+	$(COMPILE.c) $(CTF_FLAGS) -o uctf/tst.aouttype.o uctf/tst.aouttype.c
+	$(CTFCONVERT) -i -L VERSION uctf/tst.aouttype.o
+	$(LINK.c) -o uctf/tst.aouttype.exe uctf/tst.aouttype.o $(LDLIBS)
+	$(CTFMERGE) -L VERSION -o $@ uctf/tst.aouttype.o
+	$(POST_PROCESS) ; $(STRIP_STABS)
+
+uctf/tst.chasestrings.exe: uctf/tst.chasestrings.c
+	$(COMPILE.c) $(CTF_FLAGS) -o uctf/tst.chasestrings.o uctf/tst.chasestrings.c
+	$(CTFCONVERT) -i -L VERSION uctf/tst.chasestrings.o
+	$(LINK.c) -o uctf/tst.chasestrings.exe uctf/tst.chasestrings.o $(LDLIBS)
+	$(CTFMERGE) -L VERSION -o $@ uctf/tst.chasestrings.o
+	$(POST_PROCESS) ; $(STRIP_STABS)
+
+uctf/tst.printtype.exe: uctf/tst.printtype.c
+	$(COMPILE.c) $(CTF_FLAGS) -o uctf/tst.printtype.o uctf/tst.printtype.c
+	$(CTFCONVERT) -i -L VERSION uctf/tst.printtype.o
+	$(LINK.c) -o uctf/tst.printtype.exe uctf/tst.printtype.o $(LDLIBS)
+	$(CTFMERGE) -L VERSION -o $@ uctf/tst.printtype.o
+	$(POST_PROCESS) ; $(STRIP_STABS)
+
+#
+# This program should never have any ctf data in it.
+#
+uctf/tst.libtype.exe:
+	$(LINK.c) -o uctf/tst.libtype.exe uctf/tst.libtype.c $(LDLIBS)
 	$(POST_PROCESS) ; $(STRIP_STABS)
 
 usdt/tst.args.exe: usdt/tst.args.o usdt/args.o

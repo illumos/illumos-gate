@@ -116,7 +116,7 @@ CANTREAD(curcpu, cpu_info)
  * We cannot assert one thing or another about the variable "root":  for those
  * with only dtrace_proc, it will be readable in the global but not readable in
  * the non-global.
- */ 
+ */
 MIGHTREADVAR(root)
 
 CANREADVAR(cpu)

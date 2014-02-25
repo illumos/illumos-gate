@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*	Copyright (c) 1988 AT&T */
@@ -122,7 +123,7 @@ svc_create(void (*dispatch)(), const rpcprog_t prognum, const rpcvers_t versnum,
 	if (__rpc_try_doors(nettype, &try_others)) {
 		if (svc_door_create(dispatch, prognum, versnum, 0) == NULL)
 			(void) syslog(LOG_ERR,
-				"svc_create: could not register over doors");
+			    "svc_create: could not register over doors");
 		else
 			num++;
 	}
@@ -139,10 +140,11 @@ svc_create(void (*dispatch)(), const rpcprog_t prognum, const rpcvers_t versnum,
 				/* Found an old one, use it */
 				(void) rpcb_unset(prognum, versnum, nconf);
 				if (svc_reg(l->xprt, prognum, versnum,
-					dispatch, nconf) == FALSE)
-					(void) syslog(LOG_ERR,
-		"svc_create: could not register prog %d vers %d on %s",
-					prognum, versnum, nconf->nc_netid);
+				    dispatch, nconf) == FALSE)
+					(void) syslog(LOG_ERR, "svc_create: "
+					    "could not register prog %d vers "
+					    "%d on %s",
+					    prognum, versnum, nconf->nc_netid);
 				else
 					num++;
 				break;
@@ -154,9 +156,9 @@ svc_create(void (*dispatch)(), const rpcprog_t prognum, const rpcvers_t versnum,
 			xprt = svc_tp_create(dispatch, prognum, versnum, nconf);
 			if (xprt) {
 				if (!__svc_add_to_xlist(&_svc_xprtlist, xprt,
-							&xprtlist_lock)) {
+				    &xprtlist_lock)) {
 					(void) syslog(LOG_ERR,
-						"svc_create: no memory");
+					    "svc_create: no memory");
 					return (0);
 				}
 				num++;
@@ -184,9 +186,8 @@ svc_tp_create(void (*dispatch)(), const rpcprog_t prognum,
 	boolean_t anon_mlp = B_FALSE;
 
 	if (nconf == NULL) {
-		(void) syslog(LOG_ERR,
-	"svc_tp_create: invalid netconfig structure for prog %d vers %d",
-				prognum, versnum);
+		(void) syslog(LOG_ERR, "svc_tp_create: invalid netconfig "
+		    "structure for prog %d vers %d", prognum, versnum);
 		return (NULL);
 	}
 
@@ -200,8 +201,8 @@ svc_tp_create(void (*dispatch)(), const rpcprog_t prognum,
 	(void) rpcb_unset(prognum, versnum, (struct netconfig *)nconf);
 	if (svc_reg(xprt, prognum, versnum, dispatch, nconf) == FALSE) {
 		(void) syslog(LOG_ERR,
-		"svc_tp_create: Could not register prog %d vers %d on %s",
-				prognum, versnum, nconf->nc_netid);
+		    "svc_tp_create: Could not register prog %d vers %d on %s",
+		    prognum, versnum, nconf->nc_netid);
 		SVC_DESTROY(xprt);
 		return (NULL);
 	}
@@ -247,10 +248,9 @@ svc_tli_create_common(const int ofd, const struct netconfig *nconf,
 			char errorstr[100];
 
 			__tli_sys_strerror(errorstr, sizeof (errorstr),
-					t_errno, errno);
-			(void) syslog(LOG_ERR,
-			"svc_tli_create: could not open connection for %s: %s",
-					nconf->nc_netid, errorstr);
+			    t_errno, errno);
+			(void) syslog(LOG_ERR, "svc_tli_create: could not open "
+			    "connection for %s: %s", nconf->nc_netid, errorstr);
 			return (NULL);
 		}
 		madefd = TRUE;
@@ -263,52 +263,52 @@ svc_tli_create_common(const int ofd, const struct netconfig *nconf,
 			char errorstr[100];
 
 			__tli_sys_strerror(errorstr, sizeof (errorstr),
-					t_errno, errno);
+			    t_errno, errno);
 			(void) syslog(LOG_ERR,
-		"svc_tli_create: could not do t_sync: %s",
-					errorstr);
+			    "svc_tli_create: could not do t_sync: %s",
+			    errorstr);
 			return (NULL);
 		}
 		if (t_getinfo(fd, &tinfo) == -1) {
 			char errorstr[100];
 
 			__tli_sys_strerror(errorstr, sizeof (errorstr),
-					t_errno, errno);
-			(void) syslog(LOG_ERR,
-		"svc_tli_create: could not get transport information: %s",
-				    errorstr);
+			    t_errno, errno);
+			(void) syslog(LOG_ERR, "svc_tli_create: could not get "
+			    "transport information: %s", errorstr);
 			return (NULL);
 		}
 		/* Enable options of returning the ip's for udp */
 		if (nconf) {
-		    int ret = 0;
-		    if (strcmp(nconf->nc_netid, "udp6") == 0) {
-			ret = __rpc_tli_set_options(fd, IPPROTO_IPV6,
-					IPV6_RECVPKTINFO, 1);
-			if (ret < 0) {
-			    char errorstr[100];
+			int ret = 0;
+			if (strcmp(nconf->nc_netid, "udp6") == 0) {
+				ret = __rpc_tli_set_options(fd, IPPROTO_IPV6,
+				    IPV6_RECVPKTINFO, 1);
+				if (ret < 0) {
+					char errorstr[100];
 
-			    __tli_sys_strerror(errorstr, sizeof (errorstr),
-					t_errno, errno);
-			    (void) syslog(LOG_ERR,
-				"svc_tli_create: IPV6_RECVPKTINFO(1): %s",
-					errorstr);
-			    return (NULL);
-			}
-		    } else if (strcmp(nconf->nc_netid, "udp") == 0) {
-			ret = __rpc_tli_set_options(fd, IPPROTO_IP,
-					IP_RECVDSTADDR, 1);
-			if (ret < 0) {
-			    char errorstr[100];
+					__tli_sys_strerror(errorstr,
+					    sizeof (errorstr), t_errno, errno);
+					(void) syslog(LOG_ERR,
+					    "svc_tli_create: "
+					    "IPV6_RECVPKTINFO(1): %s",
+					    errorstr);
+					return (NULL);
+				}
+			} else if (strcmp(nconf->nc_netid, "udp") == 0) {
+				ret = __rpc_tli_set_options(fd, IPPROTO_IP,
+				    IP_RECVDSTADDR, 1);
+				if (ret < 0) {
+					char errorstr[100];
 
-			    __tli_sys_strerror(errorstr, sizeof (errorstr),
-					t_errno, errno);
-			    (void) syslog(LOG_ERR,
-				"svc_tli_create: IP_RECVDSTADDR(1): %s",
-					errorstr);
-			    return (NULL);
+					__tli_sys_strerror(errorstr,
+					    sizeof (errorstr), t_errno, errno);
+					(void) syslog(LOG_ERR,
+					    "svc_tli_create: "
+					    "IP_RECVDSTADDR(1): %s", errorstr);
+					return (NULL);
+				}
 			}
-		    }
 		}
 	}
 
@@ -363,15 +363,14 @@ svc_tli_create_common(const int ofd, const struct netconfig *nconf,
 			}
 		}
 		if (bindaddr) {
-			if (t_bind(fd, (struct t_bind *)bindaddr,
-								tres) == -1) {
+			if (t_bind(fd, (struct t_bind *)bindaddr, tres) == -1) {
 				char errorstr[100];
 
 				__tli_sys_strerror(errorstr, sizeof (errorstr),
-						t_errno, errno);
+				    t_errno, errno);
 				(void) syslog(LOG_ERR,
-					"svc_tli_create: could not bind: %s",
-					    errorstr);
+				    "svc_tli_create: could not bind: %s",
+				    errorstr);
 				goto freedata;
 			}
 			/*
@@ -379,58 +378,64 @@ svc_tli_create_common(const int ofd, const struct netconfig *nconf,
 			 * was non-zero
 			 */
 			if (bindaddr->addr.len &&
-				(memcmp(bindaddr->addr.buf, tres->addr.buf,
-					(int)tres->addr.len) != 0)) {
-				(void) syslog(LOG_ERR,
-		"svc_tli_create: could not bind to requested address: %s",
-						"address mismatch");
+			    (memcmp(bindaddr->addr.buf, tres->addr.buf,
+			    (int)tres->addr.len) != 0)) {
+				(void) syslog(LOG_ERR, "svc_tli_create: could "
+				    "not bind to requested address: address "
+				    "mismatch");
 				goto freedata;
 			}
 		} else {
-			tres->qlen = 64; /* Chosen Arbitrarily */
+			if (rpc_control(__RPC_SVC_LSTNBKLOG_GET, &tres->qlen)
+			    == FALSE) {
+				syslog(LOG_ERR,
+				    "svc_tli_create: can't get listen backlog");
+				goto freedata;
+			}
 			tres->addr.len = 0;
 			if (t_bind(fd, tres, tres) == -1) {
 				char errorstr[100];
 
 				__tli_sys_strerror(errorstr, sizeof (errorstr),
-						t_errno, errno);
+				    t_errno, errno);
 				(void) syslog(LOG_ERR,
-					"svc_tli_create: could not bind: %s",
-						errorstr);
+				    "svc_tli_create: could not bind: %s",
+				    errorstr);
 				goto freedata;
 			}
 		}
 
 		/* Enable options of returning the ip's for udp */
 		if (nconf) {
-		    int ret = 0;
-		    if (strcmp(nconf->nc_netid, "udp6") == 0) {
-			ret = __rpc_tli_set_options(fd, IPPROTO_IPV6,
-					IPV6_RECVPKTINFO, 1);
-			if (ret < 0) {
-			    char errorstr[100];
+			int ret = 0;
+			if (strcmp(nconf->nc_netid, "udp6") == 0) {
+				ret = __rpc_tli_set_options(fd, IPPROTO_IPV6,
+				    IPV6_RECVPKTINFO, 1);
+				if (ret < 0) {
+					char errorstr[100];
 
-			    __tli_sys_strerror(errorstr, sizeof (errorstr),
-					t_errno, errno);
-			    (void) syslog(LOG_ERR,
-				"svc_tli_create: IPV6_RECVPKTINFO(2): %s",
-					errorstr);
-			    goto freedata;
-			}
-		    } else if (strcmp(nconf->nc_netid, "udp") == 0) {
-			ret = __rpc_tli_set_options(fd, IPPROTO_IP,
-					IP_RECVDSTADDR, 1);
-			if (ret < 0) {
-			    char errorstr[100];
+					__tli_sys_strerror(errorstr,
+					    sizeof (errorstr), t_errno, errno);
+					(void) syslog(LOG_ERR,
+					    "svc_tli_create: "
+					    "IPV6_RECVPKTINFO(2): %s",
+					    errorstr);
+					goto freedata;
+				}
+			} else if (strcmp(nconf->nc_netid, "udp") == 0) {
+				ret = __rpc_tli_set_options(fd, IPPROTO_IP,
+				    IP_RECVDSTADDR, 1);
+				if (ret < 0) {
+					char errorstr[100];
 
-			    __tli_sys_strerror(errorstr, sizeof (errorstr),
-					t_errno, errno);
-			    (void) syslog(LOG_ERR,
-				"svc_tli_create: IP_RECVDSTADDR(2): %s",
-					errorstr);
-			    goto freedata;
+					__tli_sys_strerror(errorstr,
+					    sizeof (errorstr), t_errno, errno);
+					(void) syslog(LOG_ERR,
+					    "svc_tli_create: "
+					    "IP_RECVDSTADDR(2): %s", errorstr);
+					goto freedata;
+				}
 			}
-		    }
 		}
 		break;
 
@@ -444,7 +449,7 @@ svc_tli_create_common(const int ofd, const struct netconfig *nconf,
 			}
 			tres->addr.len = bindaddr->addr.len;
 			(void) memcpy(tres->addr.buf, bindaddr->addr.buf,
-					(int)tres->addr.len);
+			    (int)tres->addr.len);
 		} else
 			if (t_getname(fd, &(tres->addr), LOCALNAME) == -1)
 				tres->addr.len = 0;
@@ -452,9 +457,8 @@ svc_tli_create_common(const int ofd, const struct netconfig *nconf,
 	case T_INREL:
 		(void) t_rcvrel(fd);
 		(void) t_sndrel(fd);
-		(void) syslog(LOG_ERR,
-			"svc_tli_create: other side wants to\
-release connection");
+		(void) syslog(LOG_ERR, "svc_tli_create: other side wants to "
+		    "release connection");
 		goto freedata;
 
 	case T_INCON:
@@ -483,15 +487,15 @@ release connection");
 		case T_COTS:
 			if (state == T_DATAXFER)
 				xprt = svc_fd_create_private(fd, sendsz,
-						recvsz);
+				    recvsz);
 			else
 				xprt = svc_vc_create_private(fd, sendsz,
-						recvsz);
+				    recvsz);
 			if (!nconf || !xprt)
 				break;
 			if ((tinfo.servtype == T_COTS_ORD) &&
-				(state != T_DATAXFER) &&
-				(strcmp(nconf->nc_protofmly, "inet") == 0))
+			    (state != T_DATAXFER) &&
+			    (strcmp(nconf->nc_protofmly, "inet") == 0))
 				(void) __svc_vc_setflag(xprt, TRUE);
 			break;
 		case T_CLTS:

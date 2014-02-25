@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc. All rights reserved.
  */
 
 /*
@@ -99,6 +100,7 @@
 #include <sys/ctfs.h>
 #include <libdladm.h>
 #include <sys/dls_mgmt.h>
+#include <libscf.h>
 
 #include <libzonecfg.h>
 #include <zonestat_impl.h>
@@ -112,6 +114,7 @@ char brand_name[MAXNAMELEN];
 boolean_t zone_isnative;
 boolean_t zone_iscluster;
 boolean_t zone_islabeled;
+boolean_t shutdown_in_progress;
 static zoneid_t zone_id;
 dladm_handle_t dld_handle = NULL;
 
@@ -144,7 +147,8 @@ z_cmd_name(zone_cmd_t zcmd)
 	/* This list needs to match the enum in sys/zone.h */
 	static const char *zcmdstr[] = {
 		"ready", "boot", "forceboot", "reboot", "halt",
-		"note_uninstalling", "mount", "forcemount", "unmount"
+		"note_uninstalling", "mount", "forcemount", "unmount",
+		"shutdown"
 	};
 
 	if (zcmd >= sizeof (zcmdstr) / sizeof (*zcmdstr))
@@ -986,6 +990,133 @@ zone_halt(zlog_t *zlogp, boolean_t unmount_cmd, boolean_t rebooting, int zstate)
 	return (0);
 }
 
+static int
+zone_graceful_shutdown(zlog_t *zlogp)
+{
+	zoneid_t zoneid;
+	pid_t child;
+	char cmdbuf[MAXPATHLEN];
+	brand_handle_t bh = NULL;
+	char zpath[MAXPATHLEN];
+	ctid_t ct;
+	int tmpl_fd;
+	int child_status;
+
+	if (shutdown_in_progress) {
+		zerror(zlogp, B_FALSE, "shutdown already in progress");
+		return (-1);
+	}
+
+	if ((zoneid = getzoneidbyname(zone_name)) == -1) {
+		zerror(zlogp, B_TRUE, "unable to get zoneid");
+		return (-1);
+	}
+
+	/* Get a handle to the brand info for this zone */
+	if ((bh = brand_open(brand_name)) == NULL) {
+		zerror(zlogp, B_FALSE, "unable to determine zone brand");
+		return (-1);
+	}
+
+	if (zone_get_zonepath(zone_name, zpath, sizeof (zpath)) != Z_OK) {
+		zerror(zlogp, B_FALSE, "unable to determine zone path");
+		brand_close(bh);
+		return (-1);
+	}
+
+	/*
+	 * If there is a brand 'shutdown' callback, execute it now to give the
+	 * brand a chance to cleanup any custom configuration.
+	 */
+	(void) strcpy(cmdbuf, EXEC_PREFIX);
+	if (brand_get_shutdown(bh, zone_name, zpath, cmdbuf + EXEC_LEN,
+	    sizeof (cmdbuf) - EXEC_LEN) != 0 || strlen(cmdbuf) <= EXEC_LEN) {
+		(void) strcat(cmdbuf, SHUTDOWN_DEFAULT);
+	}
+	brand_close(bh);
+
+	if ((tmpl_fd = init_template()) == -1) {
+		zerror(zlogp, B_TRUE, "failed to create contract");
+		return (-1);
+	}
+
+	if ((child = fork()) == -1) {
+		(void) ct_tmpl_clear(tmpl_fd);
+		(void) close(tmpl_fd);
+		zerror(zlogp, B_TRUE, "failed to fork");
+		return (-1);
+	} else if (child == 0) {
+		(void) ct_tmpl_clear(tmpl_fd);
+		if (zone_enter(zoneid) == -1) {
+			_exit(errno);
+		}
+		_exit(execl("/bin/sh", "sh", "-c", cmdbuf, (char *)NULL));
+	}
+
+	if (contract_latest(&ct) == -1)
+		ct = -1;
+	(void) ct_tmpl_clear(tmpl_fd);
+	(void) close(tmpl_fd);
+
+	if (waitpid(child, &child_status, 0) != child) {
+		/* unexpected: we must have been signalled */
+		(void) contract_abandon_id(ct);
+		return (-1);
+	}
+
+	(void) contract_abandon_id(ct);
+	if (WEXITSTATUS(child_status) != 0) {
+		errno = WEXITSTATUS(child_status);
+		zerror(zlogp, B_FALSE, "unable to shutdown zone");
+		return (-1);
+	}
+
+	shutdown_in_progress = B_TRUE;
+
+	return (0);
+}
+
+static int
+zone_wait_shutdown(zlog_t *zlogp)
+{
+	zone_state_t zstate;
+	uint64_t *tm = NULL;
+	scf_simple_prop_t *prop = NULL;
+	int timeout;
+	int tries;
+	int rc = -1;
+
+	/* Get default stop timeout from SMF framework */
+	timeout = SHUTDOWN_WAIT;
+	if ((prop = scf_simple_prop_get(NULL, SHUTDOWN_FMRI, "stop",
+	    SCF_PROPERTY_TIMEOUT)) != NULL) {
+		if ((tm = scf_simple_prop_next_count(prop)) != NULL) {
+			if (tm != 0)
+				timeout = *tm;
+		}
+		scf_simple_prop_free(prop);
+	}
+
+	/* allow time for zone to shutdown cleanly */
+	for (tries = 0; tries < timeout; tries ++) {
+		(void) sleep(1);
+		if (zone_get_state(zone_name, &zstate) == Z_OK &&
+		    zstate == ZONE_STATE_INSTALLED) {
+			rc = 0;
+			break;
+		}
+	}
+
+	if (rc != 0)
+		zerror(zlogp, B_FALSE, "unable to shutdown zone");
+
+	shutdown_in_progress = B_FALSE;
+
+	return (rc);
+}
+
+
+
 /*
  * Generate AUE_zone_state for a command that boots a zone.
  */
@@ -1061,6 +1192,7 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 	size_t rlen = getpagesize(); /* conservative */
 	fs_callback_t cb;
 	brand_handle_t bh;
+	boolean_t wait_shut = B_FALSE;
 
 	/* LINTED E_BAD_PTR_CAST_ALIGN */
 	zargp = (zone_cmd_arg_t *)args;
@@ -1137,8 +1269,9 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 	 * Check for validity of command.
 	 */
 	if (cmd != Z_READY && cmd != Z_BOOT && cmd != Z_FORCEBOOT &&
-	    cmd != Z_REBOOT && cmd != Z_HALT && cmd != Z_NOTE_UNINSTALLING &&
-	    cmd != Z_MOUNT && cmd != Z_FORCEMOUNT && cmd != Z_UNMOUNT) {
+	    cmd != Z_REBOOT && cmd != Z_SHUTDOWN && cmd != Z_HALT &&
+	    cmd != Z_NOTE_UNINSTALLING && cmd != Z_MOUNT &&
+	    cmd != Z_FORCEMOUNT && cmd != Z_UNMOUNT) {
 		zerror(&logsys, B_FALSE, "invalid command %d", (int)cmd);
 		goto out;
 	}
@@ -1224,6 +1357,7 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 				eventstream_write(Z_EVT_ZONE_BOOTFAILED);
 			}
 			break;
+		case Z_SHUTDOWN:
 		case Z_HALT:
 			if (kernelcall)	/* Invalid; can't happen */
 				abort();
@@ -1354,6 +1488,7 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 				break;
 			eventstream_write(Z_EVT_ZONE_HALTED);
 			break;
+		case Z_SHUTDOWN:
 		case Z_REBOOT:
 		case Z_NOTE_UNINSTALLING:
 		case Z_MOUNT:
@@ -1444,6 +1579,11 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 			}
 			boot_args[0] = '\0';
 			break;
+		case Z_SHUTDOWN:
+			if ((rval = zone_graceful_shutdown(zlogp)) == 0) {
+				wait_shut = B_TRUE;
+			}
+			break;
 		case Z_NOTE_UNINSTALLING:
 		case Z_MOUNT:
 		case Z_UNMOUNT:
@@ -1467,6 +1607,11 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 
 out:
 	(void) mutex_unlock(&lock);
+
+	/* Wait for the Z_SHUTDOWN commands to complete */
+	if (wait_shut)
+		rval = zone_wait_shutdown(zlogp);
+
 	if (kernelcall) {
 		rvalp = NULL;
 		rlen = 0;

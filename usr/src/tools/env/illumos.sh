@@ -32,6 +32,7 @@
 #       DEBUG build only (-D, -F)
 #       do not bringover from the parent (-n)
 #       runs 'make check' (-C)
+#       checks for new interfaces in libraries (-A)
 #       runs lint in usr/src (-l plus the LINTDIRS variable)
 #       sends mail on completion (-m and the MAILTO variable)
 #       creates packages for PIT/RE (-p)
@@ -43,7 +44,7 @@
 # - This script is only interpreted by ksh93 and explicitly allows the
 #   use of ksh93 language extensions.
 #
-export NIGHTLY_OPTIONS='-FnCDlmprt'
+export NIGHTLY_OPTIONS='-FnCDAlmprt'
 
 #
 # -- PLEASE READ THIS --

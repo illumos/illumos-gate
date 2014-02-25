@@ -23,12 +23,12 @@
 
  CDDL HEADER END
 
-    ident	"%Z%%M%	%I%	%E% SMI"
-
     NOTE:  This service manifest is not editable; its contents will
     be overwritten by package or patch operations, including
     operating system upgrade.  Make customizations in a different
     file.
+
+ Copyright 2014 Nexenta Systems, Inc. All rights reserved.
 -->
 
 <service_bundle type='manifest' name='SUNWzoner:zones'>
@@ -64,10 +64,9 @@
 	<!--
 	    The stop method reads the timeout_seconds property and
 	    spends 3/4 of the allotted time waiting for zones to
-	    cleanly shut down (by running 'init 0' in each one).  If
-	    some zones don't shutdown after the 3/4 time has elapsed,
-	    the method spends the remaining 1/4 trying to more forcibly
-	    halt the zones
+	    cleanly shut down. If some zones don't shutdown after
+	    the 3/4 time has elapsed, the method spends the remaining
+	    1/4 trying to more forcibly halt the zones
 	-->
 	<exec_method
 		type='method'

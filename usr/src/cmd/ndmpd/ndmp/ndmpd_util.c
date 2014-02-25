@@ -40,7 +40,6 @@
 /* Copyright 2014 Nexenta Systems, Inc. All rights reserved. */
 
 #include <sys/types.h>
-#include <sys/socket.h>
 #include <assert.h>
 #include <ctype.h>
 #include <errno.h>
@@ -64,15 +63,6 @@
 #include <sys/scsi/impl/uscsi.h>
 #include <sys/scsi/scsi.h>
 #include "tlm.h"
-
-/*
- * Patchable socket buffer sizes in kilobytes.
- * ssb: send buffer size.
- * rsb: receive buffer size.
- */
-int ndmp_sbs = 60;
-int ndmp_rbs = 60;
-
 
 /*
  * Force to backup all the intermediate directories leading to an object
@@ -933,44 +923,36 @@ long_long_to_quad(u_longlong_t ull)
 	return (q);
 }
 
-
-/*
- * ndmp_set_socket_nodelay
- *
- * Set the TCP socket option to nodelay mode
- */
 void
-ndmp_set_socket_nodelay(int sock)
+set_socket_options(int sock)
 {
-	int flag = 1;
+	int val;
 
-	(void) setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, &flag, sizeof (flag));
-}
+	/* set send buffer size */
+	val = atoi((const char *)ndmpd_get_prop_default(NDMP_SOCKET_CSS, "60"));
+	if (val <= 0)
+		val = 60;
+	val <<= 10; /* convert the value from kilobytes to bytes */
+	if (setsockopt(sock, SOL_SOCKET, SO_SNDBUF, &val, sizeof (val)) < 0)
+		NDMP_LOG(LOG_ERR, "SO_SNDBUF failed: %m");
 
+	/* set receive buffer size */
+	val = atoi((const char *)ndmpd_get_prop_default(NDMP_SOCKET_CRS, "60"));
+	if (val <= 0)
+		val = 60;
+	val <<= 10; /* convert the value from kilobytes to bytes */
+	if (setsockopt(sock, SOL_SOCKET, SO_RCVBUF, &val, sizeof (val)) < 0)
+		NDMP_LOG(LOG_ERR, "SO_RCVBUF failed: %m");
 
-/*
- * ndmp_set_socket_snd_buf
- *
- * Set the socket send buffer size
- */
-void
-ndmp_set_socket_snd_buf(int sock, int size)
-{
-	if (setsockopt(sock, SOL_SOCKET, SO_SNDBUF, &size, sizeof (size)) < 0)
-		NDMP_LOG(LOG_DEBUG, "SO_SNDBUF failed errno=%d", errno);
-}
+	/* don't wait to group tcp data */
+	val = 1;
+	if (setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, &val, sizeof (val)) != 0)
+		NDMP_LOG(LOG_ERR, "TCP_NODELAY failed: %m");
 
-
-/*
- * ndmp_set_socket_rcv_buf
- *
- * Set the socket receive buffer size
- */
-void
-ndmp_set_socket_rcv_buf(int sock, int size)
-{
-	if (setsockopt(sock, SOL_SOCKET, SO_RCVBUF, &size, sizeof (size)) < 0)
-		NDMP_LOG(LOG_DEBUG, "SO_RCVBUF failed errno=%d", errno);
+	/* tcp keep-alive */
+	val = 1;
+	if (setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, &val, sizeof (val)) != 0)
+		NDMP_LOG(LOG_ERR, "SO_KEEPALIVE failed: %m");
 }
 
 /*
@@ -1950,7 +1932,6 @@ ndmp_connect_sock_v3(ulong_t addr, ushort_t port)
 {
 	int sock;
 	struct sockaddr_in sin;
-	int flag = 1;
 
 	NDMP_LOG(LOG_DEBUG, "addr %s:%d", inet_ntoa(IN_ADDR(addr)), port);
 
@@ -1967,19 +1948,11 @@ ndmp_connect_sock_v3(ulong_t addr, ushort_t port)
 	if (connect(sock, (struct sockaddr *)&sin, sizeof (sin)) < 0) {
 		NDMP_LOG(LOG_DEBUG, "Connect error: %m");
 		(void) close(sock);
-		sock = -1;
-	} else {
-		if (ndmp_sbs > 0)
-			ndmp_set_socket_snd_buf(sock, ndmp_sbs*KILOBYTE);
-		if (ndmp_rbs > 0)
-			ndmp_set_socket_rcv_buf(sock, ndmp_rbs*KILOBYTE);
-
-		ndmp_set_socket_nodelay(sock);
-		(void) setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, &flag,
-		    sizeof (flag));
-
-		NDMP_LOG(LOG_DEBUG, "sock %d", sock);
+		return (-1);
 	}
+
+	set_socket_options(sock);
+	NDMP_LOG(LOG_DEBUG, "sock %d", sock);
 
 	return (sock);
 }

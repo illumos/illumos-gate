@@ -29,6 +29,7 @@
  * RFCs 3315, 3319, 3646, 3898, 4075, 4242, 4280, 4580, 4649, and 4704.
  */
 
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -631,7 +632,7 @@ show_options(const uint8_t *data, int len)
 				(void) snprintf(get_line(0, 0),
 				    get_line_remain(),
 				    "  Hardware Type = %u (%s)", val16,
-				    arp_htype(type));
+				    arp_htype(val16));
 			}
 			if (type == DHCPV6_DUID_LLT) {
 				time_t timevalue;

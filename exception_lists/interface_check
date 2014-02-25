@@ -63,7 +63,10 @@ PLUGIN		^usr/lib/sysevent/modules
 PLUGIN		^usr/perl5/5\.[^\\]*/lib
 PLUGIN		^usr/platform
 PLUGIN		^usr/sadm/lib/wbem
-
+# We unfortunately can't use MACH() here, since .../64/ is literal, and not a
+# link to to amd64 or sparcv9
+PLUGIN		^usr/lib/dtrace/libdtrace_forceload\.so$
+PLUGIN		^usr/lib/dtrace/64/libdtrace_forceload\.so$
 
 # sbcp is a special case, and not a plugin. However, it does not have a
 # versioned name, and does not contain versioning, so the PLUGIN exemptions fit.

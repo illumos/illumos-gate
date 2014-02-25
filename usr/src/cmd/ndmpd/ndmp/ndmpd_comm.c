@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -266,11 +267,10 @@ int
 ndmp_run(ulong_t port, ndmp_con_handler_func_t con_handler_func)
 {
 	int ns;
-	int on, tmp;
+	int on;
 	int server_socket;
 	unsigned int ipaddr;
 	struct sockaddr_in sin;
-	int flag = 1;
 	ndmpd_worker_arg_t *argp;
 
 	sin.sin_family = AF_INET;
@@ -303,30 +303,8 @@ ndmp_run(ulong_t port, ndmp_con_handler_func_t con_handler_func)
 			NDMP_LOG(LOG_DEBUG, "tcp_accept error: %m");
 			continue;
 		}
-
 		NDMP_LOG(LOG_DEBUG, "connection fd: %d", ns);
-
-		/*
-		 * 'css' and 'crs' in the following env variables stand for:
-		 * 'connection send size' and 'connection receive size'.
-		 */
-		tmp = atoi((const char *)ndmpd_get_prop_default(NDMP_SOCKET_CSS,
-		    "65"));
-		if (tmp <= 0)
-			tmp = 65;
-		NDMP_LOG(LOG_DEBUG, "css: %d_KB", tmp);
-		ndmp_set_socket_snd_buf(ns, tmp * KILOBYTE);
-
-		tmp = atoi((const char *)ndmpd_get_prop_default(NDMP_SOCKET_CRS,
-		    "80"));
-		if (tmp <= 0)
-			tmp = 80;
-		NDMP_LOG(LOG_DEBUG, "crs: %d_KB", tmp);
-		ndmp_set_socket_rcv_buf(ns, tmp * KILOBYTE);
-
-		ndmp_set_socket_nodelay(ns);
-		(void) setsockopt(ns, SOL_SOCKET, SO_KEEPALIVE, &flag,
-		    sizeof (flag));
+		set_socket_options(ns);
 
 		if ((argp = ndmp_malloc(sizeof (ndmpd_worker_arg_t))) != NULL) {
 			argp->nw_sock = ns;

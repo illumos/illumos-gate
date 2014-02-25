@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013 Joyent, Inc. All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc. All rights reserved.
  */
 
 #ifndef _SYS_ZONE_H
@@ -232,7 +232,7 @@ typedef enum {
  */
 typedef enum zone_cmd {
 	Z_READY, Z_BOOT, Z_FORCEBOOT, Z_REBOOT, Z_HALT, Z_NOTE_UNINSTALLING,
-	Z_MOUNT, Z_FORCEMOUNT, Z_UNMOUNT
+	Z_MOUNT, Z_FORCEMOUNT, Z_UNMOUNT, Z_SHUTDOWN
 } zone_cmd_t;
 
 /*

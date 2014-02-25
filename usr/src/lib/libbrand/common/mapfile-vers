@@ -20,6 +20,7 @@
 #
 #
 # Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2014 Nexenta Systems, Inc. All rights reserved.
 #
 
 #
@@ -66,6 +67,7 @@ SYMBOL_VERSION SUNWprivate {
 	brand_get_preuninstall;
 	brand_get_query;
 	brand_get_sysboot;
+	brand_get_shutdown;
 	brand_get_uninstall;
 	brand_get_user_cmd;
 	brand_get_validatesnap;

@@ -347,6 +347,22 @@ logging_svc(void *arg)
 	return (NULL);
 }
 
+static int
+convert_int(int *val, char *str)
+{
+	long lval;
+
+	if (str == NULL || !isdigit(*str))
+		return (-1);
+
+	lval = strtol(str, &str, 10);
+	if (*str != '\0' || lval > INT_MAX)
+		return (-2);
+
+	*val = (int)lval;
+	return (0);
+}
+
 int
 main(int argc, char *argv[])
 {
@@ -354,7 +370,6 @@ main(int argc, char *argv[])
 	int	c;
 	int	rpc_svc_fdunlim = 1;
 	int	rpc_svc_mode = RPC_SVC_MT_AUTO;
-	int	maxthreads;
 	int	maxrecsz = RPC_MAXDATASIZE;
 	bool_t	exclbind = TRUE;
 	bool_t	can_do_mlp;
@@ -362,6 +377,9 @@ main(int argc, char *argv[])
 	char defval[4];
 	int defvers, ret, bufsz;
 	struct rlimit rl;
+	int listen_backlog = 0;
+	int max_threads = 0;
+	int tmp;
 
 	int	pipe_fd = -1;
 
@@ -398,7 +416,12 @@ main(int argc, char *argv[])
 
 	(void) enable_extended_FILE_stdio(-1, -1);
 
-	maxthreads = 0;
+	ret = nfs_smf_get_iprop("mountd_max_threads", &max_threads,
+	    DEFAULT_INSTANCE, SCF_TYPE_INTEGER, NFSD);
+	if (ret != SA_OK) {
+		syslog(LOG_ERR, "Reading of mountd_max_threads from SMF "
+		    "failed, using default value");
+	}
 
 	while ((c = getopt(argc, argv, "vrm:")) != EOF) {
 		switch (c) {
@@ -409,14 +432,17 @@ main(int argc, char *argv[])
 			rejecting = 1;
 			break;
 		case 'm':
-			maxthreads = atoi(optarg);
-			if (maxthreads < 1) {
-				(void) fprintf(stderr,
-	"%s: must specify positive maximum threads count, using default\n",
+			if (convert_int(&tmp, optarg) != 0 || tmp < 1) {
+				(void) fprintf(stderr, "%s: invalid "
+				    "max_threads option, using defaults\n",
 				    argv[0]);
-				maxthreads = 0;
+				break;
 			}
+			max_threads = tmp;
 			break;
+		default:
+			fprintf(stderr, "usage: mountd [-v] [-r]\n");
+			exit(1);
 		}
 	}
 
@@ -451,13 +477,20 @@ main(int argc, char *argv[])
 		}
 	}
 
+	ret = nfs_smf_get_iprop("mountd_listen_backlog", &listen_backlog,
+	    DEFAULT_INSTANCE, SCF_TYPE_INTEGER, NFSD);
+	if (ret != SA_OK) {
+		syslog(LOG_ERR, "Reading of mountd_listen_backlog from SMF "
+		    "failed, using default value");
+	}
+
 	/*
 	 * Sanity check versions,
 	 * even though we may get versions > MOUNTVERS3, we still need
 	 * to start nfsauth service, so continue on regardless of values.
 	 */
 	if (mount_vers_min > mount_vers_max) {
-		fprintf(stderr, "server_versmin > server_versmax");
+		fprintf(stderr, "server_versmin > server_versmax\n");
 		mount_vers_max = mount_vers_min;
 	}
 	(void) setlocale(LC_ALL, "");
@@ -482,7 +515,7 @@ main(int argc, char *argv[])
 	 * If we coredump it'll be in /core
 	 */
 	if (chdir("/") < 0)
-		fprintf(stderr, "chdir /: %s", strerror(errno));
+		fprintf(stderr, "chdir /: %s\n", strerror(errno));
 
 	openlog("mountd", LOG_PID, LOG_DAEMON);
 
@@ -496,7 +529,7 @@ main(int argc, char *argv[])
 	case 0:
 		break;
 	case -1:
-		fprintf(stderr, "error locking for %s: %s", MOUNTD,
+		fprintf(stderr, "error locking for %s: %s\n", MOUNTD,
 		    strerror(errno));
 		exit(2);
 	default:
@@ -518,7 +551,7 @@ main(int argc, char *argv[])
 	 * A new thread will be spawned for each request.
 	 */
 	if (!rpc_control(RPC_SVC_MTMODE_SET, &rpc_svc_mode)) {
-		fprintf(stderr, "unable to set automatic MT mode");
+		fprintf(stderr, "unable to set automatic MT mode\n");
 		exit(1);
 	}
 
@@ -527,7 +560,7 @@ main(int argc, char *argv[])
 	 * connection oriented transports.
 	 */
 	if (!rpc_control(RPC_SVC_CONNMAXREC_SET, &maxrecsz)) {
-		fprintf(stderr, "unable to set RPC max record size");
+		fprintf(stderr, "unable to set RPC max record size\n");
 	}
 
 	/*
@@ -535,15 +568,25 @@ main(int argc, char *argv[])
 	 * from being hijacked by a bind to a more specific addr.
 	 */
 	if (!rpc_control(__RPC_SVC_EXCLBIND_SET, &exclbind)) {
-		fprintf(stderr, "warning: unable to set udp/tcp EXCLBIND");
+		fprintf(stderr, "warning: unable to set udp/tcp EXCLBIND\n");
 	}
 
 	/*
-	 * If the -m argument was specified, then set the
+	 * Set the maximum number of outstanding connection
+	 * indications (listen backlog) to the value specified.
+	 */
+	if (listen_backlog > 0 && !rpc_control(__RPC_SVC_LSTNBKLOG_SET,
+	    &listen_backlog)) {
+		fprintf(stderr, "unable to set listen backlog\n");
+		exit(1);
+	}
+
+	/*
+	 * If max_threads was specified, then set the
 	 * maximum number of threads to the value specified.
 	 */
-	if (maxthreads > 0 && !rpc_control(RPC_SVC_THRMAX_SET, &maxthreads)) {
-		fprintf(stderr, "unable to set maxthreads");
+	if (max_threads > 0 && !rpc_control(RPC_SVC_THRMAX_SET, &max_threads)) {
+		fprintf(stderr, "unable to set max_threads\n");
 		exit(1);
 	}
 
@@ -562,7 +605,8 @@ main(int argc, char *argv[])
 	 * traffic) _and_ a doors server (for kernel upcalls).
 	 */
 	if (thr_create(NULL, 0, nfsauth_svc, 0, thr_flags, &nfsauth_thread)) {
-		fprintf(stderr, gettext("Failed to create NFSAUTH svc thread"));
+		fprintf(stderr,
+		    gettext("Failed to create NFSAUTH svc thread\n"));
 		exit(2);
 	}
 
@@ -595,12 +639,12 @@ main(int argc, char *argv[])
 	if (mount_vers_max >= MOUNTVERS) {
 		if (svc_create(mnt, MOUNTPROG, MOUNTVERS, "datagram_v") == 0) {
 			fprintf(stderr,
-			    "couldn't register datagram_v MOUNTVERS");
+			    "couldn't register datagram_v MOUNTVERS\n");
 			exit(1);
 		}
 		if (svc_create(mnt, MOUNTPROG, MOUNTVERS, "circuit_v") == 0) {
 			fprintf(stderr,
-			    "couldn't register circuit_v MOUNTVERS");
+			    "couldn't register circuit_v MOUNTVERS\n");
 			exit(1);
 		}
 	}
@@ -609,13 +653,13 @@ main(int argc, char *argv[])
 		if (svc_create(mnt, MOUNTPROG, MOUNTVERS_POSIX,
 		    "datagram_v") == 0) {
 			fprintf(stderr,
-			    "couldn't register datagram_v MOUNTVERS_POSIX");
+			    "couldn't register datagram_v MOUNTVERS_POSIX\n");
 			exit(1);
 		}
 		if (svc_create(mnt, MOUNTPROG, MOUNTVERS_POSIX,
 		    "circuit_v") == 0) {
 			fprintf(stderr,
-			    "couldn't register circuit_v MOUNTVERS_POSIX");
+			    "couldn't register circuit_v MOUNTVERS_POSIX\n");
 			exit(1);
 		}
 	}
@@ -623,12 +667,12 @@ main(int argc, char *argv[])
 	if (mount_vers_max >= MOUNTVERS3) {
 		if (svc_create(mnt, MOUNTPROG, MOUNTVERS3, "datagram_v") == 0) {
 			fprintf(stderr,
-			    "couldn't register datagram_v MOUNTVERS3");
+			    "couldn't register datagram_v MOUNTVERS3\n");
 			exit(1);
 		}
 		if (svc_create(mnt, MOUNTPROG, MOUNTVERS3, "circuit_v") == 0) {
 			fprintf(stderr,
-			    "couldn't register circuit_v MOUNTVERS3");
+			    "couldn't register circuit_v MOUNTVERS3\n");
 			exit(1);
 		}
 	}

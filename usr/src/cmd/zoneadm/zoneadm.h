@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2014 Nexenta Systems, Inc. All rights reserved.
  */
 
 #ifndef _ZONEADM_H
@@ -33,20 +34,21 @@
 #define	CMD_BOOT	1
 #define	CMD_HALT	2
 #define	CMD_READY	3
-#define	CMD_REBOOT	4
-#define	CMD_LIST	5
-#define	CMD_VERIFY	6
-#define	CMD_INSTALL	7
-#define	CMD_UNINSTALL	8
-#define	CMD_MOUNT	9
-#define	CMD_UNMOUNT	10
-#define	CMD_CLONE	11
-#define	CMD_MOVE	12
-#define	CMD_DETACH	13
-#define	CMD_ATTACH	14
-#define	CMD_MARK	15
-#define	CMD_APPLY	16
-#define	CMD_SYSBOOT	17
+#define	CMD_SHUTDOWN	4
+#define	CMD_REBOOT	5
+#define	CMD_LIST	6
+#define	CMD_VERIFY	7
+#define	CMD_INSTALL	8
+#define	CMD_UNINSTALL	9
+#define	CMD_MOUNT	10
+#define	CMD_UNMOUNT	11
+#define	CMD_CLONE	12
+#define	CMD_MOVE	13
+#define	CMD_DETACH	14
+#define	CMD_ATTACH	15
+#define	CMD_MARK	16
+#define	CMD_APPLY	17
+#define	CMD_SYSBOOT	18
 
 #define	CMD_MIN		CMD_HELP
 #define	CMD_MAX		CMD_SYSBOOT

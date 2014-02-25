@@ -23,6 +23,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2014 Nexenta Systems, Inc. All rights reserved.
 #
 
 PROG= zoneadmd
@@ -43,7 +44,7 @@ CERRWARN += -_gcc=-Wno-uninitialized
 
 LDLIBS += -lsocket -lzonecfg -lnsl -ldevinfo -ldevice -lnvpair \
 	-lgen -lbsm -lcontract -lzfs -luuid -lbrand -ldladm -ltsnet -ltsol \
-	-linetutil
+	-linetutil -lscf
 XGETFLAGS += -a -x zoneadmd.xcl
 
 .KEEP_STATE:

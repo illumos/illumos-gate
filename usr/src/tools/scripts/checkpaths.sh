@@ -114,17 +114,9 @@ fi
 
 if [ -f $SRC/tools/opensolaris/license-list ]; then
 	sed -e 's/$/.descrip/' < $SRC/tools/opensolaris/license-list | \
-		validate_paths -n SRC/tools/opensolaris/license-list \
-		    -e ^usr/closed
+		validate_paths -n SRC/tools/opensolaris/license-list
 fi
 
-# Finally, make sure the that (req|inc).flg files are in good shape.
-# If SCCS files are not expected to be present, though, then don't
-# check them.
-if [ ! -d "$CODEMGR_WS/Codemgr_wsdata" ]; then
-	f_flg='-f'
-fi
-
-validate_flg $f_flg -e ^usr/closed/
+validate_flg -f
 
 exit 0

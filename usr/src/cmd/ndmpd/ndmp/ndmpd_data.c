@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -1251,7 +1252,6 @@ data_accept_connection_v3(void *cookie, int fd, ulong_t mode)
 	ndmpd_session_t *session = (ndmpd_session_t *)cookie;
 	int from_len;
 	struct sockaddr_in from;
-	int flag = 1;
 
 	from_len = sizeof (from);
 	session->ns_data.dd_sock = accept(fd, (struct sockaddr *)&from,
@@ -1279,18 +1279,8 @@ data_accept_connection_v3(void *cookie, int fd, ulong_t mode)
 	session->ns_data.dd_data_addr.tcp_ip_v3 = from.sin_addr.s_addr;
 	session->ns_data.dd_data_addr.tcp_port_v3 = ntohs(from.sin_port);
 
-	/*
-	 * Set the parameter of the new socket.
-	 */
-	(void) setsockopt(session->ns_data.dd_sock, SOL_SOCKET, SO_KEEPALIVE,
-	    &flag, sizeof (flag));
-	ndmp_set_socket_nodelay(session->ns_data.dd_sock);
-	if (ndmp_sbs > 0)
-		ndmp_set_socket_snd_buf(session->ns_data.dd_sock,
-		    ndmp_sbs * KILOBYTE);
-	if (ndmp_rbs > 0)
-		ndmp_set_socket_rcv_buf(session->ns_data.dd_sock,
-		    ndmp_rbs * KILOBYTE);
+	/* Set the parameter of the new socket */
+	set_socket_options(session->ns_data.dd_sock);
 
 	session->ns_data.dd_state = NDMP_DATA_STATE_CONNECTED;
 }

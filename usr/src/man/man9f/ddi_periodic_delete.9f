@@ -1,10 +1,11 @@
 '\" te
+.\" Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
 .\" Copyright 2013, Joyent, Inc. All Rights Reserved.
 .\"  Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DDI_PERIODIC_DELETE 9F "Jul 23, 2013"
+.TH DDI_PERIODIC_DELETE 9F "Feb 12, 2014"
 .SH NAME
 ddi_periodic_delete \- cancel periodic function invocation requests
 .SH SYNOPSIS
@@ -45,8 +46,13 @@ context routine, such as the \fBdetach\fR(9E) entry point of a module.
 .LP
 If the callback function is already executing (for instance, on another CPU)
 when the request is cancelled, \fBddi_periodic_delete()\fR will block until
-it finishes executing and is completely unregistered.  The callback will not
-be invoked again after the call to \fBddi_periodic_delete()\fR returns.
+it finishes executing and is completely unregistered.  Because of this, locks
+acquired by the callback function must not be held across the call to
+\fBddi_periodic_delete()\fR or a deadlock may result.
+.sp
+.LP
+The callback will not be invoked again after the call to
+\fBddi_periodic_delete()\fR returns.
 .SH CONTEXT
 .sp
 .LP
