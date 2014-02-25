@@ -53,6 +53,7 @@ FRAMEHTML='<?xml version="1.0"?>
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">\n'
 
 STDHEAD='<meta http-equiv="cache-control" content="no-cache"></meta>
+<meta http-equiv="Content-Type" content="text/xhtml;charset=utf-8"></meta>
 <meta http-equiv="Pragma" content="no-cache"></meta>
 <meta http-equiv="Expires" content="-1"></meta>
 <!--
