@@ -10,11 +10,35 @@
 #
 
 #
-# Copyright (c) 2012 by Delphix. All rights reserved.
-# Copyright 2014 Garrett D'Amore <garrett@damore.org>
+# Copyright (c) 2013 by Delphix. All rights reserved.
 # Copyright 2014 Nexenta Systems, Inc. All rights reserved.
 #
 
-SUBDIRS = dis dladm iconv libnvpair_json printf xargs grep_xpg4
+.PARALLEL: $(SUBDIRS)
+
+include $(SRC)/cmd/Makefile.cmd
+include $(SRC)/test/Makefile.com
+
+ROOTOPTPKG = $(ROOT)/opt/util-tests
+TESTDIR = $(ROOTOPTPKG)/tests
+
+PROGS = grep_test
+
+CMDS = $(PROGS:%=$(TESTDIR)/%)
+$(CMDS) := FILEMODE = 0555
+
+all lint clean clobber:
+
+install: $(CMDS)
+
+$(CMDS): $(TESTDIR)
+
+$(TESTDIR):
+	$(INS.dir)
+
+$(TESTDIR)/%: %.ksh
+	$(INS.rename)
+
+SUBDIRS = files
 
 include $(SRC)/test/Makefile.com

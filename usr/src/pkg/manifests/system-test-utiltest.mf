@@ -12,6 +12,7 @@
 #
 # Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright 2014, OmniTI Computer Consulting, Inc. All rights reserved.
+# Copyright 2014 Nexenta Systems, Inc. All rights reserved.
 # Copyright 2017 Joyent, Inc.
 #
 
@@ -28,6 +29,7 @@ dir path=opt/util-tests/tests
 dir path=opt/util-tests/tests/dis
 dir path=opt/util-tests/tests/dis/i386
 dir path=opt/util-tests/tests/dis/sparc
+dir path=opt/util-tests/tests/files
 dir path=opt/util-tests/tests/libnvpair_json
 file path=opt/util-tests/README mode=0444
 file path=opt/util-tests/bin/print_json mode=0555
@@ -153,6 +155,78 @@ file path=opt/util-tests/tests/dis/i386/tst.vmx.out mode=0555
 file path=opt/util-tests/tests/dis/i386/tst.vmx.s mode=0555
 file path=opt/util-tests/tests/dis/sparc/tst.regs.out mode=0555
 file path=opt/util-tests/tests/dis/sparc/tst.regs.s mode=0555
+file path=opt/util-tests/tests/files/gout0 mode=0444
+file path=opt/util-tests/tests/files/gout1 mode=0444
+file path=opt/util-tests/tests/files/gout10 mode=0444
+file path=opt/util-tests/tests/files/gout11 mode=0444
+file path=opt/util-tests/tests/files/gout12 mode=0444
+file path=opt/util-tests/tests/files/gout13 mode=0444
+file path=opt/util-tests/tests/files/gout14 mode=0444
+file path=opt/util-tests/tests/files/gout15 mode=0444
+file path=opt/util-tests/tests/files/gout16 mode=0444
+file path=opt/util-tests/tests/files/gout17 mode=0444
+file path=opt/util-tests/tests/files/gout18 mode=0444
+file path=opt/util-tests/tests/files/gout19 mode=0444
+file path=opt/util-tests/tests/files/gout2 mode=0444
+file path=opt/util-tests/tests/files/gout20 mode=0444
+file path=opt/util-tests/tests/files/gout21 mode=0444
+file path=opt/util-tests/tests/files/gout22 mode=0444
+file path=opt/util-tests/tests/files/gout23 mode=0444
+file path=opt/util-tests/tests/files/gout24 mode=0444
+file path=opt/util-tests/tests/files/gout25 mode=0444
+file path=opt/util-tests/tests/files/gout26 mode=0444
+file path=opt/util-tests/tests/files/gout27 mode=0444
+file path=opt/util-tests/tests/files/gout28 mode=0444
+file path=opt/util-tests/tests/files/gout29 mode=0444
+file path=opt/util-tests/tests/files/gout3 mode=0444
+file path=opt/util-tests/tests/files/gout30 mode=0444
+file path=opt/util-tests/tests/files/gout31 mode=0444
+file path=opt/util-tests/tests/files/gout32 mode=0444
+file path=opt/util-tests/tests/files/gout33 mode=0444
+file path=opt/util-tests/tests/files/gout34 mode=0444
+file path=opt/util-tests/tests/files/gout35 mode=0444
+file path=opt/util-tests/tests/files/gout36 mode=0444
+file path=opt/util-tests/tests/files/gout37 mode=0444
+file path=opt/util-tests/tests/files/gout38 mode=0444
+file path=opt/util-tests/tests/files/gout39 mode=0444
+file path=opt/util-tests/tests/files/gout4 mode=0444
+file path=opt/util-tests/tests/files/gout40 mode=0444
+file path=opt/util-tests/tests/files/gout41 mode=0444
+file path=opt/util-tests/tests/files/gout42 mode=0444
+file path=opt/util-tests/tests/files/gout43 mode=0444
+file path=opt/util-tests/tests/files/gout44 mode=0444
+file path=opt/util-tests/tests/files/gout45 mode=0444
+file path=opt/util-tests/tests/files/gout46 mode=0444
+file path=opt/util-tests/tests/files/gout47 mode=0444
+file path=opt/util-tests/tests/files/gout48 mode=0444
+file path=opt/util-tests/tests/files/gout49 mode=0444
+file path=opt/util-tests/tests/files/gout5 mode=0444
+file path=opt/util-tests/tests/files/gout50 mode=0444
+file path=opt/util-tests/tests/files/gout51 mode=0444
+file path=opt/util-tests/tests/files/gout52 mode=0444
+file path=opt/util-tests/tests/files/gout53 mode=0444
+file path=opt/util-tests/tests/files/gout54 mode=0444
+file path=opt/util-tests/tests/files/gout55 mode=0444
+file path=opt/util-tests/tests/files/gout56 mode=0444
+file path=opt/util-tests/tests/files/gout57 mode=0444
+file path=opt/util-tests/tests/files/gout58 mode=0444
+file path=opt/util-tests/tests/files/gout59 mode=0444
+file path=opt/util-tests/tests/files/gout6 mode=0444
+file path=opt/util-tests/tests/files/gout60 mode=0444
+file path=opt/util-tests/tests/files/gout61 mode=0444
+file path=opt/util-tests/tests/files/gout62 mode=0444
+file path=opt/util-tests/tests/files/gout7 mode=0444
+file path=opt/util-tests/tests/files/gout8 mode=0444
+file path=opt/util-tests/tests/files/gout9 mode=0444
+file path=opt/util-tests/tests/files/test0 mode=0444
+file path=opt/util-tests/tests/files/test1 mode=0444
+file path=opt/util-tests/tests/files/test2 mode=0444
+file path=opt/util-tests/tests/files/test3 mode=0444
+file path=opt/util-tests/tests/files/test4 mode=0444
+file path=opt/util-tests/tests/files/test5 mode=0444
+file path=opt/util-tests/tests/files/test6 mode=0444
+file path=opt/util-tests/tests/files/test7 mode=0444
+file path=opt/util-tests/tests/grep_test mode=0555
 file path=opt/util-tests/tests/iconv_test mode=0555
 file path=opt/util-tests/tests/libnvpair_json/json_00_blank mode=0555
 file path=opt/util-tests/tests/libnvpair_json/json_01_boolean mode=0555
