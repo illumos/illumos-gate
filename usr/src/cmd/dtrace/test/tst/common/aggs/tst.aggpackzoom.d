@@ -13,6 +13,7 @@
  * Copyright (c) 2013 Joyent, Inc.  All rights reserved.
  */
 
+#pragma D option encoding=ascii
 #pragma D option quiet
 
 tick-1ms

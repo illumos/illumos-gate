@@ -696,14 +696,14 @@ static int
 dt_print_packed(dtrace_hdl_t *dtp, FILE *fp,
     long double datum, long double total)
 {
-	static boolean_t utf8_checked = 0;
+	static boolean_t utf8_checked = B_FALSE;
 	static boolean_t utf8;
 	char *ascii = "__xxxxXX";
 	char *neg = "vvvvVV";
 	unsigned int len;
 	long double val;
 
-	while (!utf8_checked) {
+	if (!utf8_checked) {
 		char *term;
 
 		/*
@@ -713,22 +713,18 @@ dt_print_packed(dtrace_hdl_t *dtp, FILE *fp,
 		 */
 		utf8_checked = B_TRUE;
 
-		if (dtp->dt_encoding == DT_ENCODING_ASCII)
-			break;
-
-		if (dtp->dt_encoding == DT_ENCODING_UTF8) {
+		if (dtp->dt_encoding == DT_ENCODING_ASCII) {
+			utf8 = B_FALSE;
+		} else if (dtp->dt_encoding == DT_ENCODING_UTF8) {
 			utf8 = B_TRUE;
-			break;
-		}
-
-		if ((term = getenv("TERM")) != NULL &&
+		} else if ((term = getenv("TERM")) != NULL &&
 		    (strcmp(term, "sun") == 0 ||
 		    strcmp(term, "sun-color") == 0) ||
 		    strcmp(term, "dumb") == 0) {
-			break;
+			utf8 = B_FALSE;
+		} else {
+			utf8 = B_TRUE;
 		}
-
-		utf8 = B_TRUE;
 	}
 
 	if (datum == 0)

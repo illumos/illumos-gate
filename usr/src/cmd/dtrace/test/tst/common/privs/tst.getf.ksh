@@ -82,7 +82,7 @@ BEGIN
 	trace(this->fp->f_vnode);
 	printf("\nable to successfully read this->fp from prior clause!");
 }
-	
+
 BEGIN
 {
 	exit(0);

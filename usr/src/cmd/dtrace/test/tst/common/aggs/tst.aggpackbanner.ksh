@@ -17,7 +17,7 @@ let width=8
 
 function outputchar
 {
-	banner $3 | awk -v line=$1 -v pos=$2 -v width=$width '{ \
+	banner $3 | /bin/nawk -v line=$1 -v pos=$2 -v width=$width '{ \
 		for (i = 1; i <= length($0); i++) { \
 			if (substr($0, i, 1) == " ") \
 				continue; \
@@ -35,7 +35,7 @@ function outputstr
 	printf "#pragma D option aggpack\n#pragma D option aggsortkey\n"
 
 	printf "BEGIN\n{\n"
-	for c in `echo "$1" | awk '{ \
+	for c in `echo "$1" | /bin/nawk '{ \
 		for (i = 1; i <= length($0); i++) { \
 			c = substr($0, i, 1); \
 			printf("%s\n", c == " " ? "space" : \
