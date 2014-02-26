@@ -35,7 +35,7 @@ OBJS= zoneadmd.o zcons.o vplat.o mcap.o
 CFLAGS += $(CCVERBOSE)
 LDLIBS += -lsocket -lzonecfg -lnsl -ldevinfo -ldevice -lnvpair \
 	-lgen -lbsm -lcontract -lzfs -luuid -lbrand -ldladm -ltsnet -ltsol \
-	-linetutil -lproc
+	-linetutil -lproc -lscf
 
 .KEEP_STATE:
 

@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2013, Joyent Inc. All rights reserved.
  */
 
@@ -58,6 +59,10 @@ extern "C" {
 
 #define	CLUSTER_BRAND_NAME	"cluster"
 #define	LABELED_BRAND_NAME	"labeled"
+
+#define	SHUTDOWN_WAIT		60
+#define	SHUTDOWN_DEFAULT	"/sbin/init 0"
+#define	SHUTDOWN_FMRI	"svc:/system/zones:default"
 
 /* 0755 is the default directory mode. */
 #define	DEFAULT_DIR_MODE \
