@@ -11746,6 +11746,7 @@ f usr/share/man/man1m/Intro.1m 0444 root bin
 f usr/share/man/man1m/acctadm.1m 0444 root bin
 f usr/share/man/man1m/add_drv.1m 0444 root bin
 f usr/share/man/man1m/addbadsec.1m 0444 root bin
+f usr/share/man/man1m/arcstat.1m 0444 root bin
 f usr/share/man/man1m/arp.1m 0444 root bin
 f usr/share/man/man1m/audit.1m 0444 root bin
 f usr/share/man/man1m/audit_warn.1m 0444 root bin
