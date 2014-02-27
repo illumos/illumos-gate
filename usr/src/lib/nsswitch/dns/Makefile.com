@@ -22,8 +22,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # lib/nsswitch/dns/Makefile.com
 
 LIBRARY =	libnss_dns.a
@@ -46,5 +44,5 @@ CPPFLAGS +=	-DNSS_DNS_LIBRESOLV=\"libresolv.so.2\"
 
 LINTFLAGS +=	-erroff=E_GLOBAL_COULD_BE_STATIC2
 
-LDLIBS +=	-lnsl
+LDLIBS +=	-lnsl -lsocket
 DYNLIB1 =	nss_dns.so$(VERS)
