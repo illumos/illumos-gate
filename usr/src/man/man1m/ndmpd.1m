@@ -1,15 +1,16 @@
 '\" te
 .\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved
+.\" Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing. See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH NDMPD 1M "Apr 27, 2009"
+.TH NDMPD 1M "Feb 24, 2014"
 .SH NAME
 ndmpd \- Network Data Management Protocol daemon
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/lib/ndmp/ndmpd\fR [\fB-d\fR]
+\fB/usr/lib/ndmp/ndmpd\fR [\fB-df\fR]
 .fi
 
 .SH DESCRIPTION
@@ -21,21 +22,29 @@ protocol used for backup and recovery. The \fBndmpd\fR daemon enables users to
 manage data backup and recovery using Data Management Application (DMA)
 clients. The NDMP protocol is used to coordinate data movement and control
 between a DMA and an NDMP server or between two NDMP servers.
-.sp
-.LP
-By default, \fBndmpd\fR is disabled.
+
 .SH OPTIONS
 .sp
 .LP
-The following option is supported:
+The following options are supported:
 .sp
 .ne 2
 .na
 \fB\fB-d\fR\fR
 .ad
-.sp .6
 .RS 4n
-Debugging mode; log file will be created.
+Enables debugging mode. Overrides ndmpd/debug-mode smf(5) property.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-f\fR\fR
+.ad
+.RS 4n
+Tells NDMP server not to detach from terminal and to run in foreground. Log
+messages will be printed to standard error output in addition to ndmp log
+file.
 .RE
 
 .SH EXIT STATUS
@@ -51,7 +60,7 @@ Successful completion.
 .sp
 .ne 2
 .na
-\fB\fB1\fR\fR
+\fB\fB95\fR\fR
 .ad
 .RS 5n
 An error occurred that prevented the \fBndmpd\fR daemon from initializing, such
@@ -61,10 +70,10 @@ as failure to fork a process, mutex initialization.
 .sp
 .ne 2
 .na
-\fB\fB2\fR\fR
+\fB\fB96\fR\fR
 .ad
 .RS 5n
-Invalid command-line options were specified.
+Configuration problem or invalid command line options.
 .RE
 
 .SH FILES
@@ -81,12 +90,11 @@ Network data management protocol server binary.
 .sp
 .ne 2
 .na
-\fB\fB/var/ndmp/ndmp.log\fR\fR
+\fB\fB/var/log/ndmp/ndmplog.0\fR\fR
 .ad
 .sp .6
 .RS 4n
-Network data management protocol log messages file. This file is deleted upon
-reboot.
+Network data management protocol log messages file.
 .RE
 
 .sp

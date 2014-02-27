@@ -2,6 +2,7 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2012 Milan Jurik. All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -208,8 +209,6 @@ ndmp_smf_get_pg_name(ndmp_scfhandle_t *h, char *pname, char **pgname)
 		scf_property_destroy(prop);
 		return (0);
 	}
-	scf_value_destroy(value);
-	scf_property_destroy(prop);
 	return (-1);
 }
 

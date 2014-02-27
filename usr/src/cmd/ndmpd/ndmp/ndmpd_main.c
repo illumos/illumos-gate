@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -74,11 +75,14 @@ mod_init()
 	ndmp_plugin_t *(*plugin_init)(int);
 
 	ndmp_pl = NULL;
-	if ((plname = ndmpd_get_prop(NDMP_PLUGIN_PATH)) == NULL)
+
+	plname = ndmpd_get_prop(NDMP_PLUGIN_PATH);
+	if (plname == NULL || *plname == '\0')
 		return (0);
 
 	if ((mod_plp = dlopen(plname, RTLD_LOCAL | RTLD_NOW)) == NULL) {
-		syslog(LOG_ERR, "Error loading the plug-in %s", plname);
+		NDMP_LOG(LOG_ERR, "Error loading the plug-in %s: %s",
+		    plname, dlerror());
 		return (0);
 	}
 
@@ -88,7 +92,7 @@ mod_init()
 		return (0);
 	}
 	if ((ndmp_pl = plugin_init(NDMP_PLUGIN_VERSION)) == NULL) {
-		syslog(LOG_ERR, "Error loading the plug-in %s", plname);
+		NDMP_LOG(LOG_ERR, "Error loading the plug-in %s", plname);
 		return (-1);
 	}
 	return (0);
@@ -115,10 +119,8 @@ mod_fini()
 }
 
 static void
-daemonize_init(char *arg)
+set_privileges(void)
 {
-	sigset_t set, oset;
-	pid_t pid;
 	priv_set_t *pset = priv_allocset();
 
 	/*
@@ -144,10 +146,17 @@ daemonize_init(char *arg)
 	}
 
 	if (pset == NULL || setppriv(PRIV_SET, PRIV_EFFECTIVE, pset) != 0) {
-		syslog(LOG_ERR, "Failed to set least required privileges to "
-		    "the service.");
+		(void) fprintf(stderr,
+		    "Failed to set least required privileges to the service\n");
 	}
 	priv_freeset(pset);
+}
+
+static void
+daemonize_init(void)
+{
+	sigset_t set, oset;
+	pid_t pid;
 
 	/*
 	 * Block all signals prior to the fork and leave them blocked in the
@@ -160,8 +169,8 @@ daemonize_init(char *arg)
 	(void) sigprocmask(SIG_BLOCK, &set, &oset);
 
 	if ((pid = fork()) == -1) {
-		openlog(arg, LOG_PID | LOG_NDELAY, LOG_DAEMON);
-		syslog(LOG_ERR, "Failed to start process in background.");
+		(void) fprintf(stderr,
+		    "Failed to start process in background.\n");
 		exit(SMF_EXIT_ERR_CONFIG);
 	}
 
@@ -172,20 +181,6 @@ daemonize_init(char *arg)
 	(void) setsid();
 	(void) sigprocmask(SIG_SETMASK, &oset, NULL);
 	(void) chdir("/");
-	(void) umask(0);
-}
-
-static void
-daemonize_fini(void)
-{
-	int fd;
-
-	if ((fd = open("/dev/null", O_RDWR)) >= 0) {
-		(void) fcntl(fd, F_DUP2FD, STDIN_FILENO);
-		(void) fcntl(fd, F_DUP2FD, STDOUT_FILENO);
-		(void) fcntl(fd, F_DUP2FD, STDERR_FILENO);
-		(void) close(fd);
-	}
 }
 
 /*
@@ -203,12 +198,12 @@ daemonize_fini(void)
 int
 main(int argc, char *argv[])
 {
-	char c;
 	struct sigaction act;
 	sigset_t set;
-	void *arg = 0;
-
-	openlog(argv[0], LOG_PID | LOG_NDELAY, LOG_DAEMON);
+	char c;
+	void *arg = NULL;
+	boolean_t run_in_foreground = B_FALSE;
+	boolean_t override_debug = B_FALSE;
 
 	/*
 	 * Check for existing ndmpd door server (make sure ndmpd is not already
@@ -216,49 +211,45 @@ main(int argc, char *argv[])
 	 */
 	if (ndmp_door_check()) {
 		/* ndmpd is already running, exit. */
+		(void) fprintf(stderr, "ndmpd is already running.\n");
 		return (0);
-	}
-
-	/* load ENVs */
-	if (ndmpd_load_prop()) {
-		syslog(LOG_ERR,
-		    "%s SMF properties initialization failed.", argv[0]);
-		exit(SMF_EXIT_ERR_CONFIG);
 	}
 
 	/* Global zone check */
 	if (getzoneid() != GLOBAL_ZONEID) {
-		syslog(LOG_ERR, "Local zone not supported.");
+		(void) fprintf(stderr, "Non-global zone not supported.\n");
 		exit(SMF_EXIT_ERR_FATAL);
 	}
 
 	/* Trusted Solaris check */
 	if (is_system_labeled()) {
-		syslog(LOG_ERR, "Trusted Solaris not supported.");
+		(void) fprintf(stderr, "Trusted Solaris not supported.\n");
 		exit(SMF_EXIT_ERR_FATAL);
 	}
 
-	opterr = 0;
-	while ((c = getopt(argc, argv, ":d")) != -1) {
-		switch (c) {
-		case 'd':
-			(void) set_debug_level(TRUE);
-			break;
-		default:
-			syslog(LOG_ERR, "%s: Invalid option -%c.",
-			    argv[0], optopt);
-			syslog(LOG_ERR, "Usage: %s [-d]", argv[0]);
-			exit(SMF_EXIT_ERR_CONFIG);
-		}
-
+	/* load SMF configuration */
+	if (ndmpd_load_prop()) {
+		(void) fprintf(stderr,
+		    "SMF properties initialization failed.\n");
+		exit(SMF_EXIT_ERR_CONFIG);
 	}
 
-	closelog();
-	/*
-	 * close any open file descriptors which are greater
-	 * than STDERR_FILENO
-	 */
-	closefrom(STDERR_FILENO + 1);
+	opterr = 0;
+	while ((c = getopt(argc, argv, "df")) != -1) {
+		switch (c) {
+		case 'd':
+			override_debug = B_TRUE;
+			break;
+		case 'f':
+			run_in_foreground = B_TRUE;
+			break;
+		default:
+			(void) fprintf(stderr, "%s: Invalid option -%c.\n",
+			    argv[0], optopt);
+			(void) fprintf(stderr, "Usage: %s [-df]\n", argv[0]);
+			exit(SMF_EXIT_ERR_CONFIG);
+		}
+	}
 
 	/* set up signal handler */
 	(void) sigfillset(&set);
@@ -278,31 +269,41 @@ main(int argc, char *argv[])
 	(void) sigdelset(&set, SIGUSR1);
 	(void) sigdelset(&set, SIGPIPE);
 
-	(void) daemonize_init(argv[0]);
-
+	set_privileges();
+	(void) umask(077);
 	openlog(argv[0], LOG_PID | LOG_NDELAY, LOG_DAEMON);
-	(void) mutex_init(&log_lock, 0, NULL);
+
+	/*
+	 * Open log file before we detach from terminal in case that open
+	 * fails and error message is printed to stderr.
+	 */
+	if (ndmp_log_open_file(run_in_foreground, override_debug) != 0)
+		exit(SMF_EXIT_ERR_FATAL);
+
+	if (!run_in_foreground)
+		daemonize_init();
+
 	(void) mutex_init(&ndmpd_zfs_fd_lock, 0, NULL);
 
 	if (mod_init() != 0) {
-		syslog(LOG_ERR, "Failed to load the plugin module.");
+		NDMP_LOG(LOG_ERR, "Failed to load the plugin module.");
 		exit(SMF_EXIT_ERR_CONFIG);
 	}
 
 	/* libzfs init */
 	if ((zlibh = libzfs_init()) == NULL) {
-		syslog(LOG_ERR, "Failed to initialize ZFS library.");
+		NDMP_LOG(LOG_ERR, "Failed to initialize ZFS library.");
 		exit(SMF_EXIT_ERR_CONFIG);
 	}
 
 	/* initialize and start the door server */
 	if (ndmp_door_init()) {
-		syslog(LOG_ERR, "Can not start ndmpd door server.");
+		NDMP_LOG(LOG_ERR, "Can not start ndmpd door server.");
 		exit(SMF_EXIT_ERR_CONFIG);
 	}
 
 	if (tlm_init() == -1) {
-		syslog(LOG_ERR, "Failed to initialize tape manager.");
+		NDMP_LOG(LOG_ERR, "Failed to initialize tape manager.");
 		exit(SMF_EXIT_ERR_CONFIG);
 	}
 
@@ -326,7 +327,7 @@ main(int argc, char *argv[])
 		case SIGHUP:
 			/* Refresh SMF properties */
 			if (ndmpd_load_prop())
-				syslog(LOG_ERR,
+				NDMP_LOG(LOG_ERR,
 				    "Service properties initialization "
 				    "failed.");
 			break;
@@ -343,11 +344,11 @@ main(int argc, char *argv[])
 	}
 
 	(void) mutex_destroy(&ndmpd_zfs_fd_lock);
-	(void) mutex_destroy(&log_lock);
 	libzfs_fini(zlibh);
 	mod_fini();
 	ndmp_door_fini();
-	daemonize_fini();
+	ndmp_log_close_file();
+
 	return (SMF_EXIT_OK);
 }
 
