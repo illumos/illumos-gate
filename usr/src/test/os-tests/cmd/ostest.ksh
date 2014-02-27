@@ -13,6 +13,7 @@
 
 #
 # Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright 2014, OmniTI Computer Consulting, Inc. All rights reserved.
 #
 
 export OS_TESTS="/opt/os-tests"
@@ -31,6 +32,8 @@ function find_runfile
 		distro=delphix
 	elif [[ 0 -ne $(grep -c OpenIndiana /etc/release 2>/dev/null) ]]; then
 		distro=openindiana
+	elif [[ 0 -ne $(grep -c OmniOS /etc/release 2>/dev/null) ]]; then
+		distro=omnios
 	fi
 
 	[[ -n $distro ]] && echo $OS_TESTS/runfiles/$distro.run

@@ -11,6 +11,7 @@
 
 #
 # Copyright (c) 2013 by Delphix. All rights reserved.
+# Copyright 2014, OmniTI Computer Consulting, Inc. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/system/test/zfstest@$(PKGVERS)
@@ -159,6 +160,7 @@ file path=opt/zfs-tests/include/libtest.shlib mode=0555
 file path=opt/zfs-tests/include/math.shlib mode=0555
 file path=opt/zfs-tests/include/properties.shlib mode=0555
 file path=opt/zfs-tests/runfiles/delphix.run mode=0444
+file path=opt/zfs-tests/runfiles/omnios.run mode=0444
 file path=opt/zfs-tests/runfiles/openindiana.run mode=0444
 file path=opt/zfs-tests/tests/functional/acl/acl.cfg mode=0555
 file path=opt/zfs-tests/tests/functional/acl/acl_common.kshlib mode=0555
