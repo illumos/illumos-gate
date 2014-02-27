@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 1984, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2014, Joyent, Inc. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -3370,7 +3370,7 @@ ufs_rename(
 	struct vnode *tvp = NULL;	/* target vnode, if it exists */
 	struct vnode *realvp;
 	struct ufsvfs *ufsvfsp;
-	struct ulockfs *ulp;
+	struct ulockfs *ulp = NULL;
 	struct ufs_slot slot;
 	timestruc_t now;
 	int error;
@@ -3388,10 +3388,13 @@ ufs_rename(
 	if (VOP_REALVP(tdvp, &realvp, ct) == 0)
 		tdvp = realvp;
 
+	/* Must do this before taking locks in case of DNLC miss */
+	terr = ufs_eventlookup(tdvp, tnm, cr, &tvp);
+
 retry_rename:
 	error = ufs_lockfs_begin(ufsvfsp, &ulp, ULOCKFS_RENAME_MASK);
 	if (error)
-		goto out;
+		goto unlock;
 
 	if (ulp)
 		TRANS_BEGIN_CSYNC(ufsvfsp, issync, TOP_RENAME,
@@ -3673,8 +3676,6 @@ retry_firstlock:
 		}
 	}
 
-	terr = ufs_eventlookup(tdvp, tnm, cr, &tvp);
-
 	/*
 	 * Link source to the target.
 	 */
@@ -3720,17 +3721,17 @@ errout:
 		rw_exit(&sdp->i_rwlock);
 	}
 
+unlock:
 	if (tvp != NULL)
 		VN_RELE(tvp);
-	VN_RELE(ITOV(sip));
+	if (sip != NULL)
+		VN_RELE(ITOV(sip));
 
-unlock:
 	if (ulp) {
 		TRANS_END_CSYNC(ufsvfsp, error, issync, TOP_RENAME, trans_size);
 		ufs_lockfs_end(ulp);
 	}
 
-out:
 	return (error);
 }
 
