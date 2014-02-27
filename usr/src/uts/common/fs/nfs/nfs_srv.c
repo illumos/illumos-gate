@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -159,7 +160,7 @@ rfs_setattr(struct nfssaargs *args, struct nfsattrstat *ns,
 		return;
 	}
 
-	if (rdonly(exi, req) || vn_is_readonly(vp)) {
+	if (rdonly(exi, vp, req)) {
 		VN_RELE(vp);
 		ns->ns_status = NFSERR_ROFS;
 		return;
@@ -934,7 +935,7 @@ rfs_write_sync(struct nfswriteargs *wa, struct nfsattrstat *ns,
 		return;
 	}
 
-	if (rdonly(exi, req)) {
+	if (rdonly(exi, vp, req)) {
 		VN_RELE(vp);
 		ns->ns_status = NFSERR_ROFS;
 		return;
@@ -1414,7 +1415,7 @@ rfs_write(struct nfswriteargs *wa, struct nfsattrstat *ns,
 	off = rp->wa->wa_offset;
 	len = (uint_t)0;
 	do {
-		if (rdonly(exi, rp->req)) {
+		if (rdonly(exi, vp, rp->req)) {
 			rp->ns->ns_status = NFSERR_ROFS;
 			t_flag = curthread->t_flag & T_WOULDBLOCK;
 			rp->thread->t_flag |= t_flag;
@@ -1786,7 +1787,7 @@ rfs_create(struct nfscreatargs *args, struct nfsdiropres *dr,
 	}
 
 	if (!lookup_ok) {
-		if (rdonly(exi, req)) {
+		if (rdonly(exi, dvp, req)) {
 			error = EROFS;
 		} else if (va.va_type != VREG && va.va_type != VFIFO &&
 		    va.va_type != VSOCK && secpolicy_sys_devices(cr) != 0) {
@@ -1955,7 +1956,7 @@ rfs_remove(struct nfsdiropargs *da, enum nfsstat *status,
 		return;
 	}
 
-	if (rdonly(exi, req)) {
+	if (rdonly(exi, vp, req)) {
 		VN_RELE(vp);
 		*status = NFSERR_ROFS;
 		return;
@@ -2082,7 +2083,7 @@ rfs_rename(struct nfsrnmargs *args, enum nfsstat *status,
 		return;
 	}
 
-	if (rdonly(exi, req)) {
+	if (rdonly(exi, tovp, req)) {
 		VN_RELE(tovp);
 		VN_RELE(fromvp);
 		*status = NFSERR_ROFS;
@@ -2225,7 +2226,7 @@ rfs_link(struct nfslinkargs *args, enum nfsstat *status,
 		return;
 	}
 
-	if (rdonly(exi, req)) {
+	if (rdonly(exi, tovp, req)) {
 		VN_RELE(tovp);
 		VN_RELE(fromvp);
 		*status = NFSERR_ROFS;
@@ -2283,7 +2284,7 @@ rfs_symlink(struct nfsslargs *args, enum nfsstat *status,
 		return;
 	}
 
-	if (rdonly(exi, req)) {
+	if (rdonly(exi, vp, req)) {
 		VN_RELE(vp);
 		*status = NFSERR_ROFS;
 		return;
@@ -2374,7 +2375,7 @@ rfs_mkdir(struct nfscreatargs *args, struct nfsdiropres *dr,
 		return;
 	}
 
-	if (rdonly(exi, req)) {
+	if (rdonly(exi, vp, req)) {
 		VN_RELE(vp);
 		dr->dr_status = NFSERR_ROFS;
 		return;
@@ -2448,7 +2449,6 @@ rfs_rmdir(struct nfsdiropargs *da, enum nfsstat *status,
 	int error;
 	vnode_t *vp;
 
-
 	/*
 	 * Disallow NULL paths
 	 */
@@ -2463,14 +2463,14 @@ rfs_rmdir(struct nfsdiropargs *da, enum nfsstat *status,
 		return;
 	}
 
-	if (rdonly(exi, req)) {
+	if (rdonly(exi, vp, req)) {
 		VN_RELE(vp);
 		*status = NFSERR_ROFS;
 		return;
 	}
 
 	/*
-	 * VOP_RMDIR now takes a new third argument (the current
+	 * VOP_RMDIR takes a third argument (the current
 	 * directory of the process).  That's because someone
 	 * wants to return EINVAL if one tries to remove ".".
 	 * Of course, NFS servers have no idea what their

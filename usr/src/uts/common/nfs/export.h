@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -532,7 +533,9 @@ typedef struct exp_visible exp_visible_t;
  * Note:  this macro should be as fast as possible since it's called
  * on each NFS modification request.
  */
-#define	rdonly(exi, req)  (nfsauth_access(exi, req) & NFSAUTH_RO)
+#define	rdonly(exi, vp, req) \
+	(vn_is_readonly(vp) || \
+	    (nfsauth_access(exi, req) & NFSAUTH_RO))
 #define	rdonly4(exi, vp, req)  \
 	(vn_is_readonly(vp) || \
 	    (nfsauth4_access(exi, vp, req) & (NFSAUTH_RO | NFSAUTH_LIMITED)))
