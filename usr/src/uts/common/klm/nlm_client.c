@@ -28,6 +28,7 @@
 /*
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright (c) 2014, Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -618,6 +619,23 @@ nlm_register_lock_locally(struct vnode *vp, struct nlm_host *hostp,
     struct flock64 *flk, int flags, u_offset_t offset)
 {
 	int sysid = 0;
+
+	if (hostp == NULL) {
+		mntinfo_t *mi;
+		servinfo_t *sv;
+		const char *netid;
+		struct nlm_globals *g;
+
+		mi = VTOMI(vp);
+		sv = mi->mi_curr_serv;
+		netid = nlm_knc_to_netid(sv->sv_knconf);
+
+		if (netid != NULL) {
+			g = zone_getspecific(nlm_zone_key, curzone);
+			hostp = nlm_host_findcreate(g, sv->sv_hostname,
+			    netid, &sv->sv_addr);
+		}
+	}
 
 	if (hostp != NULL) {
 		sysid = hostp->nh_sysid | LM_SYSID_CLIENT;
