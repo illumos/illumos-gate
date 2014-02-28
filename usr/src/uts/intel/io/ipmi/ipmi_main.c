@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2012, Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
@@ -65,6 +65,7 @@ static struct ipmi_softc	softc;
 static struct ipmi_softc	*sc = &softc;
 static list_t			dev_list;
 static id_space_t		*minor_ids;
+static kmutex_t			dev_list_lock;
 
 #define	PTRIN(p)	((void *)(uintptr_t)(p))
 #define	PTROUT(p)	((uintptr_t)(p))
@@ -130,10 +131,14 @@ lookup_ipmidev_by_dev(dev_t dev)
 {
 	ipmi_device_t	*p;
 
+	mutex_enter(&dev_list_lock);
 	for (p = list_head(&dev_list); p; p = list_next(&dev_list, p)) {
-		if (dev == p->ipmi_dev)
+		if (dev == p->ipmi_dev) {
+			mutex_exit(&dev_list_lock);
 			return (p);
+		}
 	}
+	mutex_exit(&dev_list_lock);
 	return (NULL);
 }
 
@@ -172,7 +177,9 @@ ipmi_open(dev_t *devp, int flag, int otyp, cred_t *cred)
 	dev->ipmi_dev = *devp;
 	cv_init(&dev->ipmi_cv, NULL, CV_DEFAULT, NULL);
 
+	mutex_enter(&dev_list_lock);
 	list_insert_head(&dev_list, dev);
+	mutex_exit(&dev_list_lock);
 
 	return (0);
 }
@@ -211,7 +218,9 @@ ipmi_close(dev_t dev, int flag, int otyp, cred_t *cred)
 		ipmi_free_request(req);
 	}
 
+	mutex_enter(&dev_list_lock);
 	list_remove(&dev_list, dp);
+	mutex_exit(&dev_list_lock);
 	id_free(minor_ids, getminor(dev));
 	cv_destroy(&dp->ipmi_cv);
 	kmem_free(dp->ipmi_pollhead, sizeof (pollhead_t));
@@ -489,6 +498,7 @@ ipmi_cleanup(dev_info_t *dip)
 	ddi_remove_minor_node(dip, NULL);
 	ipmi_dip = NULL;
 
+	mutex_destroy(&dev_list_lock);
 	list_destroy(&dev_list);
 	id_space_destroy(minor_ids);
 
@@ -536,6 +546,7 @@ ipmi_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	list_create(&dev_list, sizeof (ipmi_device_t),
 	    offsetof(ipmi_device_t, ipmi_node));
+	mutex_init(&dev_list_lock, NULL, MUTEX_DRIVER, NULL);
 
 	/* Create ID space for open devs.  ID 0 is reserved. */
 	minor_ids = id_space_create("ipmi_id_space", 1, 128);
@@ -559,8 +570,12 @@ ipmi_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	if (ipmi_found == B_FALSE)
 		return (DDI_SUCCESS);
 
-	if (!list_is_empty(&dev_list))
+	mutex_enter(&dev_list_lock);
+	if (!list_is_empty(&dev_list)) {
+		mutex_exit(&dev_list_lock);
 		return (DDI_FAILURE);
+	}
+	mutex_exit(&dev_list_lock);
 
 	ipmi_cleanup(dip);
 

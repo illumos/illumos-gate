@@ -464,7 +464,6 @@ mptsas_get_raid_wwid(mptsas_t *mpt, mptsas_raidvol_t *raidvol)
 		raidvol->m_raidwwid = sas_wwn;
 	}
 
-done:
 	return (rval);
 }
 

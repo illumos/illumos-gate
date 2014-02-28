@@ -34,6 +34,7 @@ _MANFILES=	6to4relay.1m		\
 		add_allocatable.1m	\
 		add_drv.1m		\
 		addbadsec.1m		\
+		arcstat.1m		\
 		arp.1m			\
 		atohexlabel.1m		\
 		audit.1m		\
