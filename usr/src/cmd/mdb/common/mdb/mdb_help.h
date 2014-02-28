@@ -36,7 +36,6 @@ extern "C" {
 
 #ifdef _MDB
 
-
 extern int cmd_dmods(uintptr_t, uint_t, int, const mdb_arg_t *);
 extern int cmd_dcmds(uintptr_t, uint_t, int, const mdb_arg_t *);
 extern int cmd_walkers(uintptr_t, uint_t, int, const mdb_arg_t *);
