@@ -6,7 +6,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Copyright 2013 Joyent, Inc.  All rights reserved.
+ * Copyright 2014 Joyent, Inc.  All rights reserved.
  */
 
 #ifndef	__IPF_STACK_H__
@@ -43,6 +43,7 @@
 struct ipf_stack {
 	struct ipf_stack	*ifs_next;
 	struct ipf_stack	**ifs_pnext;
+	struct ipf_stack	*ifs_pgz;
 	netid_t			ifs_netid;
 	zoneid_t		ifs_zone;
 	boolean_t		ifs_gz;

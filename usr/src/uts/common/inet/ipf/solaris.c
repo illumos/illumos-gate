@@ -6,7 +6,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
  */
 
 /*
@@ -414,7 +414,8 @@ dev_info_t *dip;
  * Initialize things for IPF for each stack instance
  */
 static void *
-ipf_stack_create_one(const netid_t id, const zoneid_t zid, boolean_t from_gz)
+ipf_stack_create_one(const netid_t id, const zoneid_t zid, boolean_t from_gz,
+    ipf_stack_t *ifs_gz)
 {
 	ipf_stack_t	*ifs;
 
@@ -446,6 +447,8 @@ ipf_stack_create_one(const netid_t id, const zoneid_t zid, boolean_t from_gz)
 	ifs->ifs_netid = id;
 	ifs->ifs_zone = zid;
 	ifs->ifs_gz = from_gz;
+	ifs->ifs_pgz = ifs_gz;
+
 	ipf_kstat_init(ifs, from_gz);
 
 #ifdef IPFDEBUG
@@ -477,7 +480,7 @@ ipf_stack_create_one(const netid_t id, const zoneid_t zid, boolean_t from_gz)
 static void *
 ipf_stack_create(const netid_t id)
 {
-	ipf_stack_t	*ifs;
+	ipf_stack_t	*ifs = NULL;
 	zoneid_t	zid = net_getzoneidbynetid(id);
 
 	/*
@@ -488,9 +491,9 @@ ipf_stack_create(const netid_t id)
 	 * zone.
 	 */
 	if (zid != GLOBAL_ZONEID)
-		ipf_stack_create_one(id, zid, B_TRUE);
+		ifs = ipf_stack_create_one(id, zid, B_TRUE, NULL);
 
-	return ipf_stack_create_one(id, zid, B_FALSE);
+	return ipf_stack_create_one(id, zid, B_FALSE, ifs);
 }
 
 /*
@@ -559,7 +562,8 @@ static int ipf_detach_check_all()
 
 
 /*
- * Destroy things for ipf for one stack.
+ * Remove ipf kstats for both the per-zone ipf stack and the
+ * GZ-controlled stack for the same zone, if it exists.
  */
 /* ARGSUSED */
 static void
@@ -567,6 +571,15 @@ ipf_stack_shutdown(const netid_t id, void *arg)
 {
 	ipf_stack_t *ifs = (ipf_stack_t *)arg;
 
+	/*
+	 * The GZ-controlled stack
+	 */
+	if (ifs->ifs_pgz != NULL)
+		ipf_kstat_fini(ifs->ifs_pgz);
+
+	/*
+	 * The per-zone stack
+	 */
 	ipf_kstat_fini(ifs);
 }
 
@@ -574,15 +587,13 @@ ipf_stack_shutdown(const netid_t id, void *arg)
 /*
  * Destroy things for ipf for one stack.
  */
-/* ARGSUSED */
 static void
-ipf_stack_destroy(const netid_t id, void *arg)
+ipf_stack_destroy_one(const netid_t id, ipf_stack_t *ifs)
 {
-	ipf_stack_t *ifs = (ipf_stack_t *)arg;
 	timeout_id_t tid;
 
 #ifdef IPFDEBUG
-	(void) printf("ipf_stack_destroy(%p)\n", (void *)ifs);
+	(void) printf("ipf_stack_destroy_one(%p)\n", (void *)ifs);
 #endif
 
 	/*
@@ -610,7 +621,7 @@ ipf_stack_destroy(const netid_t id, void *arg)
 
 	WRITE_ENTER(&ifs->ifs_ipf_global);
 	if (ipldetach(ifs) != 0) {
-		printf("ipf_stack_destroy: ipldetach failed\n");
+		printf("ipf_stack_destroy_one: ipldetach failed\n");
 	}
 
 	ipftuneable_free(ifs);
@@ -621,6 +632,29 @@ ipf_stack_destroy(const netid_t id, void *arg)
 	RW_DESTROY(&ifs->ifs_ipf_global);
 
 	KFREE(ifs);
+}
+
+
+/*
+ * Destroy things for ipf for both the per-zone ipf stack and the
+ * GZ-controlled stack for the same zone, if it exists.
+ */
+/* ARGSUSED */
+static void
+ipf_stack_destroy(const netid_t id, void *arg)
+{
+	ipf_stack_t *ifs = (ipf_stack_t *)arg;
+
+	/*
+	 * The GZ-controlled stack
+	 */
+	if (ifs->ifs_pgz != NULL)
+		ipf_stack_destroy_one(id, ifs->ifs_pgz);
+
+	/*
+	 * The per-zone stack
+	 */
+	ipf_stack_destroy_one(id, ifs);
 }
 
 
