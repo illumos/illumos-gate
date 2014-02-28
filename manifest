@@ -708,6 +708,7 @@ f kernel/drv/amd64/usbskel 0755 root sys
 f kernel/drv/amd64/usbsksp 0755 root sys
 f kernel/drv/amd64/usbsprl 0755 root sys
 f kernel/drv/amd64/vgatext 0755 root sys
+f kernel/drv/amd64/vioblk 0755 root sys
 f kernel/drv/amd64/vmxnet 0755 root sys
 f kernel/drv/amd64/vnic 0755 root sys
 f kernel/drv/amd64/vr 0755 root sys
@@ -1008,6 +1009,7 @@ f kernel/misc/amd64/usba 0755 root sys
 f kernel/misc/amd64/usba10 0755 root sys
 f kernel/misc/amd64/usbs49_fw 0755 root sys
 f kernel/misc/amd64/usbser 0755 root sys
+f kernel/misc/amd64/virtio 0755 root sys
 d kernel/misc/kgss 0755 root sys
 d kernel/misc/kgss/amd64 0755 root sys
 f kernel/misc/kgss/amd64/kmech_krb5 0755 root sys
