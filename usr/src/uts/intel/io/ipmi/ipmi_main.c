@@ -500,7 +500,6 @@ ipmi_cleanup(dev_info_t *dip)
 
 	mutex_destroy(&dev_list_lock);
 	list_destroy(&dev_list);
-	mutex_destroy(&dev_list_lock);
 	id_space_destroy(minor_ids);
 
 	sc->ipmi_detaching = 0;
