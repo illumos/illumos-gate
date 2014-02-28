@@ -498,6 +498,7 @@ ipmi_cleanup(dev_info_t *dip)
 	ddi_remove_minor_node(dip, NULL);
 	ipmi_dip = NULL;
 
+	mutex_destroy(&dev_list_lock);
 	list_destroy(&dev_list);
 	mutex_destroy(&dev_list_lock);
 	id_space_destroy(minor_ids);
