@@ -77,9 +77,11 @@ association, or print information about the current associations.
 Encryption and compression options are mutually exclusive on the command line.
 Further, an encrypted file cannot be compressed later, nor can a compressed
 file be encrypted later.
+
+In the global zone, \fBlofiadm\fR can be used on both the global
+zone devices and all devices owned by other non-global zones on the system.
 .sp
 .LP
-The \fBlofi\fR driver is not available and will not work inside a zone.
 .SH OPTIONS
 .sp
 .LP
@@ -251,6 +253,10 @@ restrictions apply (such as restricted root access over \fBNFS\fR). The file is
 held open until the association is removed. It is not actually accessed until
 the block device is used, so it will never be written to if the block device is
 only opened read-only.
+
+Note that the filename may appear as "?" if it is not possible to resolve the
+path in the current context (for example, if it's an NFS path in a non-global
+zone).
 .RE
 
 .sp
