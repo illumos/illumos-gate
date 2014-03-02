@@ -2900,14 +2900,39 @@ static struct builtin builtin_min_mem64 =
 static int
 kernel_dollar_func (char *arg, int flags)
 {
-  char newarg[MAX_CMDLINE];	/* everything boils down to MAX_CMDLINE */
+  int err;
+  char newarg[MAX_CMDLINE];
 
+  /*
+   * We're going to expand the arguments twice.  The first expansion, which
+   * occurs without the benefit of knowing the ZFS object ID of the filesystem
+   * we're booting from (if we're booting from ZFS, of course), must be
+   * sufficient to find and read the kernel.  The second expansion will
+   * then overwrite the command line actually set in the multiboot header with
+   * the newly-expanded one.  Since $ZFS-BOOTFS expands differently after
+   * zfs_open() has been called (kernel_func() -> load_image() -> grub_open() ->
+   * zfs_open()), we need to do the second expansion so that the kernel is
+   * given the right object ID argument.  Note that the pointer to the
+   * command line set in the multiboot header is always MB_CMDLINE_BUF.
+   */
   grub_printf("loading '%s' ...\n", arg);
-  expand_string(arg, newarg, MAX_CMDLINE);
+  if ((err = expand_string(arg, newarg, MAX_CMDLINE)) != 0) {
+    errnum = err;
+    return (1);
+  }
 
-  grub_printf("loading '%s' ...\n", newarg);
+  if ((err = kernel_func(newarg, flags)) != 0)
+    return (err);
 
-  return (kernel_func(newarg, flags));
+  mb_cmdline = (char *)MB_CMDLINE_BUF;
+  if ((err = expand_string(arg, mb_cmdline, MAX_CMDLINE)) != 0) {
+    errnum = err;
+    return (1);
+  }
+
+  grub_printf("loading '%s' ...\n", mb_cmdline);
+  mb_cmdline += grub_strlen(mb_cmdline) + 1;
+  return (0);
 }
 
 static struct builtin builtin_kernel_dollar =
@@ -3140,14 +3165,27 @@ static struct builtin builtin_module =
 static int
 module_dollar_func (char *arg, int flags)
 {
-   char newarg[MAX_CMDLINE];    /* everything boils down to MAX_CMDLINE */
-   char *cmdline_sav;
+  char newarg[MAX_CMDLINE];
+  char *cmdline_sav = mb_cmdline;
+  int err;
 
-   grub_printf("loading '%s' ...\n", arg);
-   expand_string(arg, newarg, MAX_CMDLINE);
-   grub_printf("loading '%s' ...\n", newarg);
+  grub_printf("loading '%s' ...\n", arg);
+  if ((err = expand_string(arg, newarg, MAX_CMDLINE)) != 0) {
+    errnum = err;
+    return (1);
+  }
 
-   return (module_func(newarg, flags));
+  if ((err = module_func(newarg, flags)) != 0)
+    return (err);
+
+  if ((err = expand_string(arg, cmdline_sav, MAX_CMDLINE)) != 0) {
+    errnum = err;
+    return (1);
+  }
+
+  grub_printf("loading '%s' ...\n", cmdline_sav);
+  mb_cmdline += grub_strlen(cmdline_sav) + 1;
+  return (0);
 }
 
 static struct builtin builtin_module_dollar =
