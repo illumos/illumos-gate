@@ -38,6 +38,9 @@
  */
 /* Copyright (c) 2007, The Storage Networking Industry Association. */
 /* Copyright (c) 1996, 1997 PDC, Network Appliance. All Rights Reserved */
+/*
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ */
 
 #include <errno.h>
 #include <limits.h>
@@ -56,12 +59,14 @@
 #include "ndmpd.h"
 #include "ndmpd_common.h"
 
+#define	LOG_PATH	"/var/log/ndmp"
 #define	LOG_FNAME	"ndmplog.%d"
 #define	LOG_FILE_CNT	5
 #define	LOG_FILE_SIZE	4 * 1024 * 1024
 #define	LOG_SIZE_INT	256
 
-static boolean_t debug_level = 0;
+static boolean_t debug = B_FALSE;
+static boolean_t log_to_stderr = B_FALSE;
 static FILE *logfp;
 static int ndmp_synclog = 1;
 
@@ -72,8 +77,7 @@ static int ndmp_synclog = 1;
  * that must be written to the log file.  The following mutex is used
  * to allow only one thread to write into the log file.
  */
-mutex_t log_lock;
-mutex_t idx_lock;
+static mutex_t log_lock;
 
 static char *priority_str[] = {
 	"EMERGENCY",
@@ -100,7 +104,7 @@ mk_pathname(char *fname, char *path, int idx)
 	char *fmt;
 	int len;
 
-	len = strlen(path);
+	len = strnlen(path, PATH_MAX);
 	fmt = (path[len - 1] == '/') ? "%s%s" : "%s/%s";
 
 	/* LINTED variable format specifier */
@@ -120,24 +124,16 @@ mk_pathname(char *fname, char *path, int idx)
 static int
 openlogfile(char *fname, char *mode)
 {
-	int rv;
+	assert(fname != NULL && *fname != '\0' &&
+	    mode != NULL && *mode != '\0');
 
-	if (fname == NULL || *fname == '\0' || mode == NULL || *mode == '\0')
+	if ((logfp = fopen(fname, mode)) == NULL) {
+		perror("Error opening logfile");
 		return (-1);
-
-	(void) mutex_lock(&log_lock);
-	rv = 0;
-	if (logfp != NULL) {
-		NDMP_LOG(LOG_DEBUG, "Log file already opened.");
-		rv = -1;
-	} else if ((logfp = fopen(fname, mode)) == NULL) {
-		syslog(LOG_ERR, "Error opening logfile %s, %m.", fname);
-		syslog(LOG_ERR, "Using system log for logging.");
-		rv = -1;
 	}
+	(void) mutex_init(&log_lock, 0, NULL);
 
-	(void) mutex_unlock(&log_lock);
-	return (rv);
+	return (0);
 }
 
 
@@ -192,26 +188,35 @@ log_append(char *msg)
 /*
  * ndmp_log_openfile
  *
- * Open the log file either for append or write mode.
+ * Open the log file either for append or write mode. This function should
+ * be called while ndmpd is still running single-threaded and in foreground.
  */
 int
-ndmp_log_open_file(void)
+ndmp_log_open_file(boolean_t to_stderr, boolean_t override_debug)
 {
-	char *fname, *mode;
+	char *fname, *mode, *lpath;
 	char oldfname[PATH_MAX];
-	char *lpath;
 	struct stat64 st;
 	int i;
 
-	/* Create the debug path if doesn't exist */
+	log_to_stderr = to_stderr;
+
+	/* read debug property if it isn't overriden by cmd line option */
+	if (override_debug)
+		debug = B_TRUE;
+	else
+		debug = ndmpd_get_prop_yorn(NDMP_DEBUG_MODE) ? B_TRUE : B_FALSE;
+
+	/* Create the debug path if it doesn't exist */
 	lpath = ndmpd_get_prop(NDMP_DEBUG_PATH);
 	if ((lpath == NULL) || (*lpath == NULL))
-		lpath = "/var/ndmp";
+		lpath = LOG_PATH;
 
 	if (stat64(lpath, &st) < 0) {
 		if (mkdirp(lpath, 0755) < 0) {
-			NDMP_LOG(LOG_ERR, "Could not create log path %s: %m.",
-			    lpath);
+			(void) fprintf(stderr,
+			    "Could not create log path %s: %s\n",
+			    lpath, strerror(errno));
 			lpath = "/var";
 		}
 	}
@@ -224,7 +229,7 @@ ndmp_log_open_file(void)
 	 * and if the last file {logfilename}.5 exist, it will be overwritten
 	 * with {logfilename}.4.
 	 */
-	if (get_debug_level()) {
+	if (debug) {
 		i = LOG_FILE_CNT - 1;
 		while (i >= 0) {
 			fname = mk_pathname(LOG_FNAME, lpath, i);
@@ -236,9 +241,9 @@ ndmp_log_open_file(void)
 
 			fname = mk_pathname(LOG_FNAME, lpath, i + 1);
 			if (rename(oldfname, fname))
-				syslog(LOG_DEBUG,
-				    "Could not rename from %s to %s",
-				    oldfname, fname);
+				(void) fprintf(stderr,
+				    "Could not rename %s to %s: %s\n",
+				    oldfname, fname, strerror(errno));
 			i--;
 		}
 	}
@@ -248,7 +253,7 @@ ndmp_log_open_file(void)
 	/*
 	 * Append only if debug is not enable.
 	 */
-	if (get_debug_level())
+	if (debug)
 		mode = "w";
 	else
 		mode = "a";
@@ -264,49 +269,11 @@ ndmp_log_open_file(void)
 void
 ndmp_log_close_file(void)
 {
-	(void) mutex_lock(&log_lock);
 	if (logfp != NULL) {
 		(void) fclose(logfp);
 		logfp = NULL;
 	}
-	(void) mutex_unlock(&log_lock);
-}
-
-/*
- * set_debug_level
- *
- * Sets the current debug level.
- * Parameters:
- *   level (input) - new debug level.
- *
- * Returns:
- *   old debug level.
- */
-boolean_t
-set_debug_level(boolean_t level)
-{
-	boolean_t old = debug_level;
-
-	debug_level = level;
-	return (old);
-}
-
-
-/*
- * get_debug_level
- *
- * Returns the current debug level.
- *
- * Parameters:
- *   None.
- *
- * Returns:
- *   debug level.
- */
-boolean_t
-get_debug_level(void)
-{
-	return (debug_level);
+	(void) mutex_destroy(&log_lock);
 }
 
 void
@@ -320,7 +287,7 @@ ndmp_log(ulong_t priority, char *ndmp_log_info, char *fmt, ...)
 	char buf[PATH_MAX+KILOBYTE];
 	char *errstr;
 
-	if ((priority == LOG_DEBUG) && (debug_level == FALSE))
+	if ((priority == LOG_DEBUG) && !debug)
 		return;
 
 	(void) mutex_lock(&log_lock);
@@ -378,6 +345,10 @@ ndmp_log(ulong_t priority, char *ndmp_log_info, char *fmt, ...)
 
 	if (logfp != NULL)
 		log_append(ndmp_log_buf);
+
+	/* if ndmpd is running in foreground print log message to stderr */
+	if (log_to_stderr)
+		(void) fprintf(stderr, "%s\n", ndmp_log_buf);
 
 	(void) mutex_unlock(&log_lock);
 }

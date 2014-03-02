@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -90,6 +91,7 @@ ndmpd_cfg_param_t ndmpd_cfg_table[] =
 	{"overwrite-quarantine",	"",	0, NDMP_CF_NOTINIT},
 	{"zfs-force-override",		"",	0, NDMP_CF_NOTINIT},
 	{"drive-type",			"",	0, NDMP_CF_NOTINIT},
+	{"debug-mode",			"",	0, NDMP_CF_NOTINIT},
 };
 
 /*

@@ -117,8 +117,9 @@ POSSIBILITY OF SUCH DAMAGE.
 
 	<property_group name='ndmpd' type='application'>
 		<stability value='Evolving' />
-		<propval name='debug-path' type='astring' value='/var/ndmp' />
-		<propval name='plugin-path' type='astring' value='/var/ndmp' />
+		<propval name='debug-mode' type='boolean' value='false' />
+		<propval name='debug-path' type='astring' value='/var/log/ndmp' />
+		<propval name='plugin-path' type='astring' value='' />
 		<propval name='dump-pathnode' type='boolean' value='false' />
 		<propval name='tar-pathnode' type='boolean' value='false' />
 		<propval name='ignore-ctime' type='boolean' value='false' />

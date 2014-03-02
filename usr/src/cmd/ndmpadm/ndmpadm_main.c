@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -105,7 +106,8 @@ static char *prop_table[] = {
 	"restore-quarantine",
 	"overwrite-quarantine",
 	"zfs-force-override",
-	"drive-type"
+	"drive-type",
+	"debug-mode"
 };
 
 #define	NDMPADM_NPROP	(sizeof (prop_table) / sizeof (prop_table[0]))
