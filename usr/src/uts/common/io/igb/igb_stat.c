@@ -24,6 +24,9 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2014 Pluribus Networks Inc.
+ */
 
 #include "igb_sw.h"
 
@@ -53,7 +56,6 @@ igb_update_stats(kstat_t *ks, int rw)
 	/*
 	 * Basic information.
 	 */
-	igb_ks->link_speed.value.ui64 = igb->link_speed;
 	igb_ks->reset_count.value.ui64 = igb->reset_count;
 	igb_ks->dout_sync.value.ui64 = igb->dout_sync;
 
@@ -119,7 +121,6 @@ igb_update_stats(kstat_t *ks, int rw)
 	val_high = E1000_READ_REG(hw, E1000_GOTCH);
 	igb_ks->got.value.ui64 += (uint64_t)val_high << 32 | (uint64_t)val_low;
 #endif
-
 	igb_ks->symerrs.value.ui64 += E1000_READ_REG(hw, E1000_SYMERRS);
 	igb_ks->mpc.value.ui64 += E1000_READ_REG(hw, E1000_MPC);
 	igb_ks->rlec.value.ui64 += E1000_READ_REG(hw, E1000_RLEC);
@@ -172,8 +173,6 @@ igb_init_stats(igb_t *igb)
 	/*
 	 * Initialize all the statistics.
 	 */
-	kstat_named_init(&igb_ks->link_speed, "link_speed",
-	    KSTAT_DATA_UINT64);
 	kstat_named_init(&igb_ks->reset_count, "reset_count",
 	    KSTAT_DATA_UINT64);
 	kstat_named_init(&igb_ks->dout_sync, "DMA_out_sync",

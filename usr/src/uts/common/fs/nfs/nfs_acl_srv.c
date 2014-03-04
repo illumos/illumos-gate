@@ -22,7 +22,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/param.h>
@@ -203,7 +203,7 @@ acl2_setacl(SETACL2args *args, SETACL2res *resp, struct exportinfo *exi,
 		return;
 	}
 
-	if (rdonly(exi, req) || vn_is_readonly(vp)) {
+	if (rdonly(exi, vp, req)) {
 		VN_RELE(vp);
 		resp->status = NFSERR_ROFS;
 		return;
@@ -304,7 +304,7 @@ acl2_access(ACCESS2args *args, ACCESS2res *resp, struct exportinfo *exi,
 	 * Special files are interpreted by the client, so the underlying
 	 * permissions are sent back to the client for interpretation.
 	 */
-	if (rdonly(exi, req) && (vp->v_type == VREG || vp->v_type == VDIR))
+	if (rdonly(exi, vp, req) && (vp->v_type == VREG || vp->v_type == VDIR))
 		checkwriteperm = 0;
 	else
 		checkwriteperm = 1;
@@ -577,7 +577,7 @@ acl3_setacl(SETACL3args *args, SETACL3res *resp, struct exportinfo *exi,
 	va.va_mask = AT_ALL;
 	vap = rfs4_delegated_getattr(vp, &va, 0, cr) ? NULL : &va;
 
-	if (rdonly(exi, req) || vn_is_readonly(vp)) {
+	if (rdonly(exi, vp, req)) {
 		resp->status = NFS3ERR_ROFS;
 		goto out1;
 	}

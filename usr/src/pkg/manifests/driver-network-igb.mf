@@ -22,6 +22,7 @@
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2012, Nexenta Systems, Inc. All rights reserved.
+# Copyright 2014 Pluribus Networks Inc.
 #
 
 #
@@ -70,6 +71,9 @@ driver name=igb clone_perms="igb 0666 root sys" perms="* 0666 root sys" \
     alias=pciex8086,1538 \
     alias=pciex8086,1539 \
     alias=pciex8086,1546 \
+    alias=pciex8086,1f40 \
+    alias=pciex8086,1f41 \
+    alias=pciex8086,1f45 \
     alias=pciex8086,438
 file path=kernel/drv/$(ARCH64)/igb group=sys
 $(i386_ONLY)file path=kernel/drv/igb group=sys
