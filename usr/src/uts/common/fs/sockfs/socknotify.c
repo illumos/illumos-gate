@@ -23,6 +23,10 @@
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
+/*
+ * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
+ */
+
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -103,6 +107,7 @@ so_notify_disconnecting(struct sonode *so)
 		if (sigev != 0)
 			socket_sendsig(so, sigev);
 		mutex_exit(&so->so_lock);
+
 		if (pollev != 0)
 			pollwakeup(&so->so_poll_list, pollev);
 	}
@@ -137,6 +142,16 @@ so_notify_disconnected(struct sonode *so, boolean_t connfailed, int error)
 		if (sigev != 0)
 			socket_sendsig(so, sigev);
 		mutex_exit(&so->so_lock);
+
+		/*
+		 * If we're here because the socket has become disconnected,
+		 * we explicitly set POLLHUP.  At the same time, we also clear
+		 * POLLOUT, as POLLOUT and POLLHUP are defined to be mutually
+		 * exclusive with respect to one another.
+		 */
+		if (!connfailed)
+			pollev = (pollev | POLLHUP) & ~POLLOUT;
+
 		if (pollev != 0)
 			pollwakeup(&so->so_poll_list, pollev);
 	}

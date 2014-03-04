@@ -972,8 +972,6 @@ extern void ndmp_door_fini(void);
 extern boolean_t ndmp_door_check(void);
 
 extern int ndmp_get_max_tok_seq(void);
-extern boolean_t set_debug_level(boolean_t);
-extern boolean_t get_debug_level(void);
 
 extern int get_zfsvolname(char *, int, char *);
 extern int ndmp_create_snapshot(char *, char *);

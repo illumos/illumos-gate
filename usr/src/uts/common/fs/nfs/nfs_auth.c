@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1995, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/param.h>
@@ -611,7 +612,6 @@ nfsauth_refresh_thread(void)
 	refreshq_auth_node_t	*ran;
 
 	struct exportinfo	*exi;
-	struct auth_cache	*p;
 
 	int			access;
 	bool_t			retrieval;
@@ -640,9 +640,20 @@ nfsauth_refresh_thread(void)
 
 		exi = ren->ren_exi;
 		ASSERT(exi != NULL);
-		rw_enter(&exi->exi_cache_lock, RW_READER);
 
+		/*
+		 * Since the ren was removed from the refreshq_queue above,
+		 * this is the only thread aware about the ren existence, so we
+		 * have the exclusive ownership of it and we do not need to
+		 * protect it by any lock.
+		 */
 		while ((ran = list_remove_head(&ren->ren_authlist))) {
+
+			struct auth_cache *p = ran->ran_auth;
+
+			ASSERT(p != NULL);
+			kmem_free(ran, sizeof (refreshq_auth_node_t));
+
 			/*
 			 * We are shutting down. No need to refresh
 			 * entries which are about to be nuked.
@@ -650,14 +661,8 @@ nfsauth_refresh_thread(void)
 			 * So just throw them away until we are done
 			 * with this exi node...
 			 */
-			if (refreshq_thread_state !=
-			    REFRESHQ_THREAD_RUNNING) {
-				kmem_free(ran, sizeof (refreshq_auth_node_t));
+			if (refreshq_thread_state != REFRESHQ_THREAD_RUNNING)
 				continue;
-			}
-
-			p = ran->ran_auth;
-			ASSERT(p != NULL);
 
 			mutex_enter(&p->auth_lock);
 
@@ -679,7 +684,6 @@ nfsauth_refresh_thread(void)
 				} else
 					mutex_exit(&p->auth_lock);
 
-				kmem_free(ran, sizeof (refreshq_auth_node_t));
 				continue;
 			}
 
@@ -712,41 +716,25 @@ nfsauth_refresh_thread(void)
 			kmem_free(p->auth_netid, strlen(p->auth_netid) + 1);
 			p->auth_netid = NULL;
 
-			/*
-			 * We got an error, so do not reset the
-			 * time. This will cause the next access
-			 * check for the client to reschedule this
-			 * node.
-			 */
-			if (retrieval == FALSE) {
-				mutex_enter(&p->auth_lock);
-				if (p->auth_state == NFS_AUTH_INVALID) {
-					mutex_exit(&p->auth_lock);
-					nfsauth_remove_dead_entry(p);
-				} else {
-					p->auth_state = NFS_AUTH_FRESH;
-					mutex_exit(&p->auth_lock);
-				}
-
-				kmem_free(ran, sizeof (refreshq_auth_node_t));
-				continue;
-			}
-
 			mutex_enter(&p->auth_lock);
 			if (p->auth_state == NFS_AUTH_INVALID) {
 				mutex_exit(&p->auth_lock);
 				nfsauth_remove_dead_entry(p);
 			} else {
-				p->auth_access = access;
-				p->auth_freshness = gethrestime_sec();
+				/*
+				 * If we got an error, do not reset the
+				 * time. This will cause the next access
+				 * check for the client to reschedule this
+				 * node.
+				 */
+				if (retrieval == TRUE) {
+					p->auth_access = access;
+					p->auth_freshness = gethrestime_sec();
+				}
 				p->auth_state = NFS_AUTH_FRESH;
 				mutex_exit(&p->auth_lock);
 			}
-
-			kmem_free(ran, sizeof (refreshq_auth_node_t));
 		}
-
-		rw_exit(&exi->exi_cache_lock);
 
 		list_destroy(&ren->ren_authlist);
 		exi_rele(ren->ren_exi);

@@ -20,8 +20,8 @@
  */
 /*
  * Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -224,7 +224,7 @@ rfs3_setattr(SETATTR3args *args, SETATTR3res *resp, struct exportinfo *exi,
 
 	bvap = &bva;
 
-	if (rdonly(exi, req) || vn_is_readonly(vp)) {
+	if (rdonly(exi, vp, req)) {
 		resp->status = NFS3ERR_ROFS;
 		goto out1;
 	}
@@ -605,7 +605,7 @@ rfs3_access(ACCESS3args *args, ACCESS3res *resp, struct exportinfo *exi,
 	 * Special files are interpreted by the client, so the underlying
 	 * permissions are sent back to the client for interpretation.
 	 */
-	if (rdonly(exi, req) && (vp->v_type == VREG || vp->v_type == VDIR))
+	if (rdonly(exi, vp, req) && (vp->v_type == VREG || vp->v_type == VDIR))
 		checkwriteperm = 0;
 	else
 		checkwriteperm = 1;
@@ -1347,7 +1347,7 @@ rfs3_write(WRITE3args *args, WRITE3res *resp, struct exportinfo *exi,
 		goto err1;
 	}
 
-	if (rdonly(exi, req)) {
+	if (rdonly(exi, vp, req)) {
 		resp->status = NFS3ERR_ROFS;
 		goto err1;
 	}
@@ -1553,7 +1553,7 @@ rfs3_create(CREATE3args *args, CREATE3res *resp, struct exportinfo *exi,
 		goto out1;
 	}
 
-	if (rdonly(exi, req)) {
+	if (rdonly(exi, dvp, req)) {
 		resp->status = NFS3ERR_ROFS;
 		goto out1;
 	}
@@ -1910,7 +1910,7 @@ rfs3_mkdir(MKDIR3args *args, MKDIR3res *resp, struct exportinfo *exi,
 		goto out1;
 	}
 
-	if (rdonly(exi, req)) {
+	if (rdonly(exi, dvp, req)) {
 		resp->status = NFS3ERR_ROFS;
 		goto out1;
 	}
@@ -2059,7 +2059,7 @@ rfs3_symlink(SYMLINK3args *args, SYMLINK3res *resp, struct exportinfo *exi,
 		goto err1;
 	}
 
-	if (rdonly(exi, req)) {
+	if (rdonly(exi, dvp, req)) {
 		resp->status = NFS3ERR_ROFS;
 		goto err1;
 	}
@@ -2235,7 +2235,7 @@ rfs3_mknod(MKNOD3args *args, MKNOD3res *resp, struct exportinfo *exi,
 		goto out1;
 	}
 
-	if (rdonly(exi, req)) {
+	if (rdonly(exi, dvp, req)) {
 		resp->status = NFS3ERR_ROFS;
 		goto out1;
 	}
@@ -2432,7 +2432,7 @@ rfs3_remove(REMOVE3args *args, REMOVE3res *resp, struct exportinfo *exi,
 		goto err1;
 	}
 
-	if (rdonly(exi, req)) {
+	if (rdonly(exi, vp, req)) {
 		resp->status = NFS3ERR_ROFS;
 		goto err1;
 	}
@@ -2576,7 +2576,7 @@ rfs3_rmdir(RMDIR3args *args, RMDIR3res *resp, struct exportinfo *exi,
 		goto err1;
 	}
 
-	if (rdonly(exi, req)) {
+	if (rdonly(exi, vp, req)) {
 		resp->status = NFS3ERR_ROFS;
 		goto err1;
 	}
@@ -2756,7 +2756,7 @@ rfs3_rename(RENAME3args *args, RENAME3res *resp, struct exportinfo *exi,
 		goto err1;
 	}
 
-	if (rdonly(exi, req)) {
+	if (rdonly(exi, tvp, req)) {
 		resp->status = NFS3ERR_ROFS;
 		goto err1;
 	}
@@ -2980,7 +2980,7 @@ rfs3_link(LINK3args *args, LINK3res *resp, struct exportinfo *exi,
 		goto out1;
 	}
 
-	if (rdonly(exi, req)) {
+	if (rdonly(exi, dvp, req)) {
 		resp->status = NFS3ERR_ROFS;
 		goto out1;
 	}
@@ -4050,7 +4050,7 @@ rfs3_commit(COMMIT3args *args, COMMIT3res *resp, struct exportinfo *exi,
 
 	bvap = &bva;
 
-	if (rdonly(exi, req)) {
+	if (rdonly(exi, vp, req)) {
 		resp->status = NFS3ERR_ROFS;
 		goto out1;
 	}

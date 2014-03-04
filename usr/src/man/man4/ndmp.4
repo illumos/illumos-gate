@@ -1,9 +1,10 @@
 '\" te
 .\" Copyright (C) 2009, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH NDMP 4 "Mar 3, 2009"
+.TH NDMP 4 "Feb 24, 2014"
 .SH NAME
 ndmp \- configuration properties for Solaris Network Data Management Protocol
 (NDMP) server
@@ -42,20 +43,19 @@ Set the Direct Access Recovery mode. Acceptable values are \fByes\fR or
 .sp
 .ne 2
 .na
-\fB\fBdebug-level\fR\fR
+\fB\fBdebug-path\fR\fR
 .ad
 .RS 24n
-Set the debug level. The debug-level can be set to either \fB0\fR (off) or
-\fB1\fR (on). The default is \fB0\fR.
+The path to which to save the debug log. The default is \fB/var/log/ndmp\fR.
 .RE
 
 .sp
 .ne 2
 .na
-\fB\fBdebug-path\fR\fR
+\fB\fBdebug-mode\fR\fR
 .ad
 .RS 24n
-The path to which to save the debug log. The default is \fB/var/ndmp\fR.
+Enable or disable debug log messages.
 .RE
 
 .sp

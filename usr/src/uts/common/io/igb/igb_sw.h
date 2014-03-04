@@ -25,6 +25,7 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2014 Pluribus Networks Inc.
  */
 
 #ifndef	_IGB_SW_H
@@ -648,6 +649,34 @@ typedef struct igb {
 	 */
 	kstat_t			*igb_ks;
 
+	/*
+	 * Backing store for MAC stats.  These are reported via GLDv3, instead
+	 * of via our private kstat structure.
+	 */
+	uint64_t		stat_tor;	/* rbytes */
+	uint64_t		stat_tpr;	/* rpackets */
+	uint64_t		stat_tot;	/* obytes */
+	uint64_t		stat_tpt;	/* opackets */
+	uint64_t		stat_colc;	/* collisions */
+	uint64_t		stat_mcc;	/* multi colls */
+	uint64_t		stat_scc;	/* single colls */
+	uint64_t		stat_ecol;	/* excessive colls */
+	uint64_t		stat_latecol;	/* late colls */
+	uint64_t		stat_bptc;	/* xmit bcast */
+	uint64_t		stat_mptc;	/* xmit bcast */
+	uint64_t		stat_bprc;	/* recv bcast */
+	uint64_t		stat_mprc;	/* recv mcast */
+	uint64_t		stat_rnbc;	/* recv nobuf */
+	uint64_t		stat_roc;	/* recv toolong */
+	uint64_t		stat_sec;	/* sqe errors */
+	uint64_t		stat_dc;	/* defer */
+	uint64_t		stat_algnerrc;	/* align errors */
+	uint64_t		stat_crcerrs;	/* crc errors */
+	uint64_t		stat_cexterr;	/* carrier extension errors */
+	uint64_t		stat_ruc;	/* recv tooshort */
+	uint64_t		stat_rjc;	/* recv jabber */
+	uint64_t		stat_rxerrc;	/* recv errors */
+
 	uint32_t		param_en_1000fdx_cap:1,
 				param_en_1000hdx_cap:1,
 				param_en_100t4_cap:1,
@@ -701,7 +730,6 @@ typedef struct igb {
 
 typedef struct igb_stat {
 
-	kstat_named_t link_speed;	/* Link Speed */
 	kstat_named_t reset_count;	/* Reset Count */
 	kstat_named_t dout_sync;	/* DMA out of sync */
 #ifdef IGB_DEBUG
@@ -732,39 +760,16 @@ typedef struct igb_stat {
 	kstat_named_t ptc1023;	/* Packets Xmitted (512-1023b) */
 	kstat_named_t ptc1522;	/* Packets Xmitted (1024-1522b */
 #endif
-	kstat_named_t crcerrs;	/* CRC Error Count */
 	kstat_named_t symerrs;	/* Symbol Error Count */
 	kstat_named_t mpc;	/* Missed Packet Count */
-	kstat_named_t scc;	/* Single Collision Count */
-	kstat_named_t ecol;	/* Excessive Collision Count */
-	kstat_named_t mcc;	/* Multiple Collision Count */
-	kstat_named_t latecol;	/* Late Collision Count */
-	kstat_named_t colc;	/* Collision Count */
-	kstat_named_t dc;	/* Defer Count */
-	kstat_named_t sec;	/* Sequence Error Count */
 	kstat_named_t rlec;	/* Receive Length Error Count */
 	kstat_named_t xonrxc;	/* XON Received Count */
 	kstat_named_t xontxc;	/* XON Xmitted Count */
 	kstat_named_t xoffrxc;	/* XOFF Received Count */
 	kstat_named_t xofftxc;	/* Xoff Xmitted Count */
 	kstat_named_t fcruc;	/* Unknown Flow Conrol Packet Rcvd Count */
-	kstat_named_t bprc;	/* Broadcasts Pkts Received Count */
-	kstat_named_t mprc;	/* Multicast Pkts Received Count */
-	kstat_named_t rnbc;	/* Receive No Buffers Count */
-	kstat_named_t ruc;	/* Receive Undersize Count */
 	kstat_named_t rfc;	/* Receive Frag Count */
-	kstat_named_t roc;	/* Receive Oversize Count */
-	kstat_named_t rjc;	/* Receive Jabber Count */
-	kstat_named_t tor;	/* Total Octets Recvd Count */
-	kstat_named_t tot;	/* Total Octets Xmted Count */
-	kstat_named_t tpr;	/* Total Packets Received */
-	kstat_named_t tpt;	/* Total Packets Xmitted */
-	kstat_named_t mptc;	/* Multicast Packets Xmited Count */
-	kstat_named_t bptc;	/* Broadcast Packets Xmited Count */
-	kstat_named_t algnerrc;	/* Alignment Error count */
-	kstat_named_t rxerrc;	/* Rx Error Count */
 	kstat_named_t tncrs;	/* Transmit with no CRS */
-	kstat_named_t cexterr;	/* Carrier Extension Error count */
 	kstat_named_t tsctc;	/* TCP seg contexts xmit count */
 	kstat_named_t tsctfc;	/* TCP seg contexts xmit fail count */
 } igb_stat_t;

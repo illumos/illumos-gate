@@ -767,10 +767,6 @@ ndmpd_main(void)
 	char *propval;
 
 	ndmp_load_params();
-	if (ndmp_log_open_file() != 0) {
-		NDMP_LOG(LOG_ERR,
-		    "Could not open log file properly.");
-	}
 
 	/*
 	 * Find ndmp port number to be used. If ndmpd is run as command line
@@ -789,8 +785,6 @@ ndmpd_main(void)
 
 	if (ndmp_run(ndmp_port, connection_handler) == -1)
 		perror("ndmp_run ERROR");
-
-	ndmp_log_close_file();
 }
 
 /*

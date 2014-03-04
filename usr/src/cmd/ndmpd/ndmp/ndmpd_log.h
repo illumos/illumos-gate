@@ -38,6 +38,9 @@
  */
 /* Copyright (c) 2007, The Storage Networking Industry Association. */
 /* Copyright (c) 1996, 1997 PDC, Network Appliance. All Rights Reserved */
+/*
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ */
 
 #ifndef _NDMPD_LOG_H
 #define	_NDMPD_LOG_H
@@ -51,9 +54,7 @@ typedef void log_func_t(ulong_t, char *, ...);
 extern log_func_t log_debug;
 extern log_func_t log_error;
 
-extern boolean_t set_debug_level(boolean_t);
-extern boolean_t get_debug_level(void);
-extern int ndmp_log_open_file(void);
+extern int ndmp_log_open_file(boolean_t, boolean_t);
 extern void ndmp_log_close_file(void);
 
 #endif	/* _NDMPD_LOG_H */
