@@ -24,6 +24,7 @@
  * Copyright (c) 2011, Joyent Inc. All rights reserved.
  * Copyright (c) 2011 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
+ * Copyright 2014, OmniTI Computer Consulting, Inc. All rights reserved.
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
@@ -1583,8 +1584,11 @@ tcp_connect_ipv4(tcp_t *tcp, ipaddr_t *dstaddrp, in_port_t dstport,
 
 	/* Handle __sin6_src_id if socket not bound to an IP address */
 	if (srcid != 0 && connp->conn_laddr_v4 == INADDR_ANY) {
-		ip_srcid_find_id(srcid, &connp->conn_laddr_v6,
-		    IPCL_ZONEID(connp), tcps->tcps_netstack);
+		if (!ip_srcid_find_id(srcid, &connp->conn_laddr_v6,
+		    IPCL_ZONEID(connp), B_TRUE, tcps->tcps_netstack)) {
+			/* Mismatch - conn_laddr_v6 would be v6 address. */
+			return (EADDRNOTAVAIL);
+		}
 		connp->conn_saddr_v6 = connp->conn_laddr_v6;
 	}
 
@@ -1665,8 +1669,11 @@ tcp_connect_ipv6(tcp_t *tcp, in6_addr_t *dstaddrp, in_port_t dstport,
 
 	/* Handle __sin6_src_id if socket not bound to an IP address */
 	if (srcid != 0 && IN6_IS_ADDR_UNSPECIFIED(&connp->conn_laddr_v6)) {
-		ip_srcid_find_id(srcid, &connp->conn_laddr_v6,
-		    IPCL_ZONEID(connp), tcps->tcps_netstack);
+		if (!ip_srcid_find_id(srcid, &connp->conn_laddr_v6,
+		    IPCL_ZONEID(connp), B_FALSE, tcps->tcps_netstack)) {
+			/* Mismatch - conn_laddr_v6 would be v4-mapped. */
+			return (EADDRNOTAVAIL);
+		}
 		connp->conn_saddr_v6 = connp->conn_laddr_v6;
 	}
 
