@@ -322,7 +322,8 @@ lxpr_sigmap[NSIG] = {
 	-1,			/* 38:  illumos SIGXRES */
 	-1,			/* 39:  illumos SIGJVM1 */
 	-1,			/* 40:  illumos SIGJVM2 */
-	LX_SIGRTMIN,		/* 41:  illumos _SIGRTMIN */
+	-1,			/* 41:  illumos SIGINFO */
+	LX_SIGRTMIN,		/* 42:  illumos _SIGRTMIN */
 	LX_SIGRTMIN + 1,
 	LX_SIGRTMIN + 2,
 	LX_SIGRTMIN + 3,
@@ -353,7 +354,7 @@ lxpr_sigmap[NSIG] = {
 	LX_SIGRTMIN + 28,
 	LX_SIGRTMIN + 29,
 	LX_SIGRTMIN + 30,
-	LX_SIGRTMAX,
+	LX_SIGRTMAX
 };
 
 /*
