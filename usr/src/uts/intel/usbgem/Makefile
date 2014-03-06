@@ -45,6 +45,9 @@ CPPFLAGS	+= \
 CERRWARN	+= -_gcc=-Wno-uninitialized
 CERRWARN	+= -_gcc=-Wno-parentheses
 CERRWARN	+= -_gcc=-Wno-switch
+CERRWARN	+= -_gcc=-Wno-unused-variable
+CERRWARN	+= -_gcc=-Wno-unused-label
+CERRWARN	+= -_gcc=-Wno-unused-function
 
 LDFLAGS		+= -dy -N misc/mac -N drv/ip -N misc/usba
 
