@@ -21,6 +21,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2014, OmniTI Computer Consulting, Inc. All rights reserved.
  */
 
 /*
@@ -223,14 +225,22 @@ ip_srcid_find_addr(const in6_addr_t *addr, zoneid_t zoneid,
 /*
  * Map from a source id to an address.
  * If the id is unknown return the unspecified address.
+ *
+ * For known IDs, check if the returned address is v4mapped or not, and
+ * return B_TRUE if it matches the desired v4mapped state or not.  This
+ * prevents a broken app from requesting (via __sin6_src_id) a v4mapped
+ * address for a v6 destination, or vice versa.
+ *
+ * "addr" will not be set if we return B_FALSE.
  */
-void
+boolean_t
 ip_srcid_find_id(uint_t id, in6_addr_t *addr, zoneid_t zoneid,
-    netstack_t *ns)
+    boolean_t v4mapped, netstack_t *ns)
 {
 	srcid_map_t	**smpp;
 	srcid_map_t	*smp;
 	ip_stack_t	*ipst = ns->netstack_ip;
+	boolean_t	rc;
 
 	rw_enter(&ipst->ips_srcid_lock, RW_READER);
 	smpp = srcid_lookup_id(id, ipst);
@@ -239,11 +249,24 @@ ip_srcid_find_id(uint_t id, in6_addr_t *addr, zoneid_t zoneid,
 		/* Not preset */
 		ip1dbg(("ip_srcid_find_id: unknown %u or in wrong zone\n", id));
 		*addr = ipv6_all_zeros;
+		rc = B_TRUE;
 	} else {
 		ASSERT(smp->sm_refcnt != 0);
-		*addr = smp->sm_addr;
+		/*
+		 * The caller tells us if it expects a v4mapped address.
+		 * Use it, along with the property of "addr" to set the rc.
+		 */
+		if (IN6_IS_ADDR_V4MAPPED(&smp->sm_addr))
+			rc = v4mapped;	/* We want a v4mapped address. */
+		else
+			rc = !v4mapped; /* We don't want a v4mapped address. */
+
+		if (rc)
+			*addr = smp->sm_addr;
+
 	}
 	rw_exit(&ipst->ips_srcid_lock);
+	return (rc);
 }
 
 /* Assign the next available ID */

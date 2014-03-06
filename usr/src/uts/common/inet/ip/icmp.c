@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
+ * Copyright 2014, OmniTI Computer Consulting, Inc. All rights reserved.
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
@@ -768,8 +769,12 @@ rawip_do_connect(conn_t *connp, const struct sockaddr *sa, socklen_t len,
 			scopeid = sin6->sin6_scope_id;
 		srcid = sin6->__sin6_src_id;
 		if (srcid != 0 && IN6_IS_ADDR_UNSPECIFIED(&v6src)) {
-			ip_srcid_find_id(srcid, &v6src, IPCL_ZONEID(connp),
-			    connp->conn_netstack);
+			/* Due to check above, we know sin6_addr is v6-only. */
+			if (!ip_srcid_find_id(srcid, &v6src, IPCL_ZONEID(connp),
+			    B_FALSE, connp->conn_netstack)) {
+				/* Mismatch - v6src would be v4mapped. */
+				return (EADDRNOTAVAIL);
+			}
 		}
 		break;
 	}
@@ -3337,7 +3342,6 @@ icmp_output_ancillary(conn_t *connp, sin_t *sin, sin6_t *sin6, mblk_t *mp,
 	in6_addr_t	v6nexthop;
 	in_port_t	dstport;
 	uint32_t	flowinfo;
-	uint_t		srcid;
 	int		is_absreq_failure = 0;
 	conn_opt_arg_t	coas, *coa;
 
@@ -3440,6 +3444,9 @@ icmp_output_ancillary(conn_t *connp, sin_t *sin, sin6_t *sin6, mblk_t *mp,
 		ixa->ixa_flags &= ~IXAF_SCOPEID_SET;
 		ixa->ixa_flags |= IXAF_IS_IPV4;
 	} else if (sin6 != NULL) {
+		boolean_t v4mapped;
+		uint_t srcid;
+
 		v6dst = sin6->sin6_addr;
 		dstport = sin6->sin6_port;
 		flowinfo = sin6->sin6_flowinfo;
@@ -3450,14 +3457,20 @@ icmp_output_ancillary(conn_t *connp, sin_t *sin, sin6_t *sin6, mblk_t *mp,
 		} else {
 			ixa->ixa_flags &= ~IXAF_SCOPEID_SET;
 		}
-		if (srcid != 0 && IN6_IS_ADDR_UNSPECIFIED(&v6src)) {
-			ip_srcid_find_id(srcid, &v6src, IPCL_ZONEID(connp),
-			    connp->conn_netstack);
-		}
-		if (IN6_IS_ADDR_V4MAPPED(&v6dst))
+		v4mapped = IN6_IS_ADDR_V4MAPPED(&v6dst);
+		if (v4mapped)
 			ixa->ixa_flags |= IXAF_IS_IPV4;
 		else
 			ixa->ixa_flags &= ~IXAF_IS_IPV4;
+		if (srcid != 0 && IN6_IS_ADDR_UNSPECIFIED(&v6src)) {
+			if (ip_srcid_find_id(srcid, &v6src, IPCL_ZONEID(connp),
+			    v4mapped, connp->conn_netstack)) {
+				/* Mismatched v4mapped/v6 specified by srcid. */
+				mutex_exit(&connp->conn_lock);
+				error = EADDRNOTAVAIL;
+				goto failed;	/* Does freemsg() and mib. */
+			}
+		}
 	} else {
 		/* Connected case */
 		v6dst = connp->conn_faddr_v6;
@@ -4419,14 +4432,13 @@ icmp_output_newdst(conn_t *connp, mblk_t *data_mp, sin_t *sin, sin6_t *sin6,
 		IN6_IPADDR_TO_V4MAPPED(sin->sin_addr.s_addr, &v6dst);
 		dstport = sin->sin_port;
 		flowinfo = 0;
+		/* Don't bother with ip_srcid_find_id(), but indicate anyway. */
 		srcid = 0;
 		ixa->ixa_flags &= ~IXAF_SCOPEID_SET;
-		if (srcid != 0 && V4_PART_OF_V6(&v6src) == INADDR_ANY) {
-			ip_srcid_find_id(srcid, &v6src, IPCL_ZONEID(connp),
-			    connp->conn_netstack);
-		}
 		ixa->ixa_flags |= IXAF_IS_IPV4;
 	} else {
+		boolean_t v4mapped;
+
 		v6dst = sin6->sin6_addr;
 		dstport = sin6->sin6_port;
 		flowinfo = sin6->sin6_flowinfo;
@@ -4437,14 +4449,20 @@ icmp_output_newdst(conn_t *connp, mblk_t *data_mp, sin_t *sin, sin6_t *sin6,
 		} else {
 			ixa->ixa_flags &= ~IXAF_SCOPEID_SET;
 		}
-		if (srcid != 0 && IN6_IS_ADDR_UNSPECIFIED(&v6src)) {
-			ip_srcid_find_id(srcid, &v6src, IPCL_ZONEID(connp),
-			    connp->conn_netstack);
-		}
-		if (IN6_IS_ADDR_V4MAPPED(&v6dst))
+		v4mapped = IN6_IS_ADDR_V4MAPPED(&v6dst);
+		if (v4mapped)
 			ixa->ixa_flags |= IXAF_IS_IPV4;
 		else
 			ixa->ixa_flags &= ~IXAF_IS_IPV4;
+		if (srcid != 0 && IN6_IS_ADDR_UNSPECIFIED(&v6src)) {
+			if (ip_srcid_find_id(srcid, &v6src, IPCL_ZONEID(connp),
+			    v4mapped, connp->conn_netstack)) {
+				/* Mismatched v4mapped/v6 specified by srcid. */
+				mutex_exit(&connp->conn_lock);
+				error = EADDRNOTAVAIL;
+				goto ud_error;
+			}
+		}
 	}
 	/* Handle IP_PKTINFO/IPV6_PKTINFO setting source address. */
 	if (connp->conn_xmit_ipp.ipp_fields & IPPF_ADDR) {
