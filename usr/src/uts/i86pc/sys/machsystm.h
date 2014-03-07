@@ -230,6 +230,7 @@ extern uint64_t plat_dr_physmax;
 extern page_t *page_get_high_mfn(mfn_t);
 #endif
 
+extern hrtime_t tsc_gethrtime_tick_delta(void);
 
 #endif /* _KERNEL */
 

@@ -236,6 +236,19 @@ tsc_gethrtime_delta(void)
 	return (hrt);
 }
 
+hrtime_t
+tsc_gethrtime_tick_delta(void)
+{
+	hrtime_t hrt;
+	ulong_t flags;
+
+	flags = clear_int_flag();
+	hrt = tsc_sync_tick_delta[CPU->cpu_id];
+	restore_int_flag(flags);
+
+	return (hrt);
+}
+
 /*
  * This is similar to the above, but it cannot actually spin on hres_lock.
  * As a result, it caches all of the variables it needs; if the variables
