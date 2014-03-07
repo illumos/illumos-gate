@@ -22,8 +22,8 @@
  * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2011 Bayard G. Bell. All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2012 Joyent, Inc. All rights reserved.
- * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -128,6 +128,8 @@ _init(void)
 		 * initialization work.
 		 */
 		nfs_srvfini();
+
+		return (status);
 	}
 
 	/*

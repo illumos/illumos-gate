@@ -256,7 +256,7 @@ ip_srcid_find_id(uint_t id, in6_addr_t *addr, zoneid_t zoneid,
 		 * The caller tells us if it expects a v4mapped address.
 		 * Use it, along with the property of "addr" to set the rc.
 		 */
-		if (IN6_IS_ADDR_V4MAPPED(addr))
+		if (IN6_IS_ADDR_V4MAPPED(&smp->sm_addr))
 			rc = v4mapped;	/* We want a v4mapped address. */
 		else
 			rc = !v4mapped; /* We don't want a v4mapped address. */
