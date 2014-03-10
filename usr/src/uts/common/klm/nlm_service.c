@@ -28,6 +28,7 @@
 /*
  * Copyright (c) 2012 by Delphix. All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2014 Joyent, Inc.  All rights reserved.
  */
 
 /*
@@ -159,6 +160,33 @@ nlm_init_flock(struct flock64 *fl, struct nlm4_lock *nl,
 }
 
 /*
+ * Convert an fhandle into a vnode.
+ * Uses the file id (fh_len + fh_data) in the fhandle to get the vnode.
+ * WARNING: users of this routine must do a VN_RELE on the vnode when they
+ * are done with it.
+ * This is just like nfs_fhtovp() but without the exportinfo argument.
+ */
+static vnode_t *
+lm_fhtovp(fhandle3_t *fh)
+{
+	vfs_t *vfsp;
+	vnode_t *vp;
+	int error;
+
+	vfsp = getvfs(&fh->_fh3_fsid);
+	if (vfsp == NULL)
+		return (NULL);
+
+	/* LINTED E_BAD_PTR_CAST_ALIGN */
+	error = VFS_VGET(vfsp, &vp, (fid_t *)&(fh->_fh3_len));
+	VFS_RELE(vfsp);
+	if (error || vp == NULL)
+		return (NULL);
+
+	return (vp);
+}
+
+/*
  * Gets vnode from client's filehandle
  * NOTE: Holds vnode, it _must_ be explicitly
  * released by VN_RELE().
@@ -166,19 +194,28 @@ nlm_init_flock(struct flock64 *fl, struct nlm4_lock *nl,
 static vnode_t *
 nlm_fh_to_vp(struct netobj *fh)
 {
-	fhandle_t *fhp;
+	fhandle3_t *fhp;
 
 	/*
 	 * Get a vnode pointer for the given NFS file handle.
-	 * Note that it could be an NFSv2 for NFSv3 handle,
+	 * Note that it could be an NFSv2 or NFSv3 handle,
 	 * which means the size might vary.  (don't copy)
 	 */
-	if (fh->n_len < sizeof (*fhp))
+	if (fh->n_len < sizeof (fhandle_t))
 		return (NULL);
 
 	/* We know this is aligned (kmem_alloc) */
 	/* LINTED E_BAD_PTR_CAST_ALIGN */
-	fhp = (fhandle_t *)fh->n_bytes;
+	fhp = (fhandle3_t *)fh->n_bytes;
+
+	/*
+	 * See the comment for NFS_FH3MAXDATA in uts/common/nfs/nfs.h for
+	 * converting fhandles. Check the NFSv3 file handle size. The lockmgr
+	 * is not used for NFS v4.
+	 */
+	if (fhp->_fh3_len > NFS_FH3MAXDATA || fhp->_fh3_len == 0)
+		return (NULL);
+
 	return (lm_fhtovp(fhp));
 }
 
