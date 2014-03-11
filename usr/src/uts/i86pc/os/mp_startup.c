@@ -1642,15 +1642,16 @@ mp_startup_common(boolean_t boot)
 	 * from cpu0 accounted for) as soon as we can, because many
 	 * many things use gethrtime/pc_gethrestime, including
 	 * interrupts, cmn_err, etc.  Before we can do that, we want to
-	 * clear TSC if we're on a buggy Sandy Bridge Xeon CPU, so do that
+	 * clear TSC if we're on a buggy Sandy/Ivy Bridge CPU, so do that
 	 * right away.
 	 */
 	bzero(new_x86_featureset, BT_SIZEOFMAP(NUM_X86_FEATURES));
 	cpuid_pass1(cp, new_x86_featureset);
 
-	if (boot && (get_hwenv() & HW_XEN_HVM) == 0 &&
+	if (boot && get_hwenv() == HW_NATIVE &&
 	    cpuid_getvendor(CPU) == X86_VENDOR_Intel &&
-	    cpuid_getfamily(CPU) == 6 && cpuid_getmodel(CPU) == 0x2d &&
+	    cpuid_getfamily(CPU) == 6 &&
+	    (cpuid_getmodel(CPU) == 0x2d || cpuid_getmodel(CPU) == 0x3e) &&
 	    is_x86_feature(new_x86_featureset, X86FSET_TSC)) {
 		(void) wrmsr(REG_TSC, 0UL);
 	}
