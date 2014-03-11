@@ -143,10 +143,6 @@ uchar_t apic_vectortoipl[APIC_AVAIL_VECTOR / APIC_VECTOR_PER_IPL] = {
 uchar_t	apic_ipltopri[MAXIPL + 1];	/* unix ipl to apic pri	*/
 	/* The taskpri to be programmed into apic to mask given ipl */
 
-#if defined(__amd64)
-static unsigned char dummy_cpu_pri[MAXIPL + 1];
-#endif
-
 /*
  * Correlation of the hardware vector to the IPL in use, initialized
  * from apic_vectortoipl[] in apic_init().  The final IPLs may not correlate
@@ -300,12 +296,11 @@ apic_init(void)
 		/* fill up any empty ipltopri slots */
 		apic_ipltopri[j] = (i << APIC_IPL_SHIFT) + APIC_BASE_VECT;
 	apic_init_common();
-#if defined(__amd64)
-	CPU->cpu_pri_data = dummy_cpu_pri;
-#else
+
+#if !defined(__amd64)
 	if (cpuid_have_cr8access(CPU))
 		apic_have_32bit_cr8 = 1;
-#endif	/* __amd64 */
+#endif
 }
 
 static void
