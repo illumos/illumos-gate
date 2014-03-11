@@ -571,23 +571,9 @@ apic_intr_enter(int ipl, int *vectorp)
 		nipl = apic_ipls[vector];
 
 		*vectorp = apic_vector_to_irq[vector + APIC_BASE_VECT];
-		if (apic_mode == LOCAL_APIC) {
-#if defined(__amd64)
-			setcr8((ulong_t)(apic_ipltopri[nipl] >>
-			    APIC_IPL_SHIFT));
-#else
-			if (apic_have_32bit_cr8)
-				setcr8((ulong_t)(apic_ipltopri[nipl] >>
-				    APIC_IPL_SHIFT));
-			else
-				LOCAL_APIC_WRITE_REG(APIC_TASK_REG,
-				    (uint32_t)apic_ipltopri[nipl]);
-#endif
-			LOCAL_APIC_WRITE_REG(APIC_EOI_REG, 0);
-		} else {
-			X2APIC_WRITE(APIC_TASK_REG, apic_ipltopri[nipl]);
-			X2APIC_WRITE(APIC_EOI_REG, 0);
-		}
+
+		apic_reg_ops->apic_write_task_reg(apic_ipltopri[nipl]);
+		apic_reg_ops->apic_send_eoi(0);
 
 		return (nipl);
 	}
@@ -618,20 +604,7 @@ apic_intr_enter(int ipl, int *vectorp)
 	nipl = apic_ipls[vector];
 	*vectorp = irq = apic_vector_to_irq[vector + APIC_BASE_VECT];
 
-	if (apic_mode == LOCAL_APIC) {
-#if defined(__amd64)
-		setcr8((ulong_t)(apic_ipltopri[nipl] >> APIC_IPL_SHIFT));
-#else
-		if (apic_have_32bit_cr8)
-			setcr8((ulong_t)(apic_ipltopri[nipl] >>
-			    APIC_IPL_SHIFT));
-		else
-			LOCAL_APIC_WRITE_REG(APIC_TASK_REG,
-			    (uint32_t)apic_ipltopri[nipl]);
-#endif
-	} else {
-		X2APIC_WRITE(APIC_TASK_REG, apic_ipltopri[nipl]);
-	}
+	apic_reg_ops->apic_write_task_reg(apic_ipltopri[nipl]);
 
 	cpu_infop->aci_current[nipl] = (uchar_t)irq;
 	cpu_infop->aci_curipl = (uchar_t)nipl;
@@ -643,11 +616,7 @@ apic_intr_enter(int ipl, int *vectorp)
 	 * cache usage. So, we leave it as is.
 	 */
 	if (!apic_level_intr[irq]) {
-		if (apic_mode == LOCAL_APIC) {
-			LOCAL_APIC_WRITE_REG(APIC_EOI_REG, 0);
-		} else {
-			X2APIC_WRITE(APIC_EOI_REG, 0);
-		}
+		apic_reg_ops->apic_send_eoi(0);
 	}
 
 #ifdef	DEBUG
@@ -687,14 +656,7 @@ apic_intr_exit(int prev_ipl, int irq)
 {
 	apic_cpus_info_t *cpu_infop;
 
-#if defined(__amd64)
-	setcr8((ulong_t)(apic_ipltopri[prev_ipl] >> APIC_IPL_SHIFT));
-#else
-	if (apic_have_32bit_cr8)
-		setcr8((ulong_t)(apic_ipltopri[prev_ipl] >> APIC_IPL_SHIFT));
-	else
-		apicadr[APIC_TASK_REG] = apic_ipltopri[prev_ipl];
-#endif
+	apic_reg_ops->apic_write_task_reg(apic_ipltopri[prev_ipl]);
 
 	APIC_INTR_EXIT();
 }
@@ -729,14 +691,7 @@ psm_intr_exit_fn(void)
 static void
 apic_setspl(int ipl)
 {
-#if defined(__amd64)
-	setcr8((ulong_t)(apic_ipltopri[ipl] >> APIC_IPL_SHIFT));
-#else
-	if (apic_have_32bit_cr8)
-		setcr8((ulong_t)(apic_ipltopri[ipl] >> APIC_IPL_SHIFT));
-	else
-		apicadr[APIC_TASK_REG] = apic_ipltopri[ipl];
-#endif
+	apic_reg_ops->apic_write_task_reg(apic_ipltopri[ipl]);
 
 	/* interrupts at ipl above this cannot be in progress */
 	apic_cpus[psm_get_cpu_id()].aci_ISR_in_progress &= (2 << ipl) - 1;
