@@ -2,7 +2,7 @@
 <!DOCTYPE topology SYSTEM "/usr/share/lib/xml/dtd/topology.dtd.1">
 <!--
 Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
-Copyright (c) 2013, Joyent, Inc. All rights reserved.
+Copyright (c) 2014, Joyent, Inc. All rights reserved.
 
  CDDL HEADER START
 
@@ -152,7 +152,7 @@ Copyright (c) 2013, Joyent, Inc. All rights reserved.
        </range>
     </set>
 
-    <set type='product' setlist='Joyent-Compute-Platform-1101|Joyent-Compute-Platform-1102'>
+    <set type='product' setlist='Joyent-Compute-Platform-1101|Joyent-Compute-Platform-1102|Joyent-Compute-Platform-2101|Joyent-Compute-Platform-2102'>
        <range name='psu' min='0' max='1'>
           <enum-method name='ipmi' version='1' />
        </range>
