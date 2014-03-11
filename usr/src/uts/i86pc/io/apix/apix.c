@@ -371,9 +371,6 @@ apix_init()
 
 	apix_softinit();
 #if defined(__amd64)
-	/*
-	 * Make cpu-specific interrupt info point to cr8pri vector
-	 */
 	CPU->cpu_pri_data = dummy_cpu_pri;
 #else
 	if (cpuid_have_cr8access(CPU))

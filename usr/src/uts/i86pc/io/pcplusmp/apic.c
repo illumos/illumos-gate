@@ -144,7 +144,7 @@ uchar_t	apic_ipltopri[MAXIPL + 1];	/* unix ipl to apic pri	*/
 	/* The taskpri to be programmed into apic to mask given ipl */
 
 #if defined(__amd64)
-uchar_t	apic_cr8pri[MAXIPL + 1];	/* unix ipl to cr8 pri	*/
+static unsigned char dummy_cpu_pri[MAXIPL + 1];
 #endif
 
 /*
@@ -301,12 +301,7 @@ apic_init(void)
 		apic_ipltopri[j] = (i << APIC_IPL_SHIFT) + APIC_BASE_VECT;
 	apic_init_common();
 #if defined(__amd64)
-	/*
-	 * Make cpu-specific interrupt info point to cr8pri vector
-	 */
-	for (i = 0; i <= MAXIPL; i++)
-		apic_cr8pri[i] = apic_ipltopri[i] >> APIC_IPL_SHIFT;
-	CPU->cpu_pri_data = apic_cr8pri;
+	CPU->cpu_pri_data = dummy_cpu_pri;
 #else
 	if (cpuid_have_cr8access(CPU))
 		apic_have_32bit_cr8 = 1;
@@ -698,7 +693,7 @@ apic_intr_exit(int prev_ipl, int irq)
 	apic_cpus_info_t *cpu_infop;
 
 #if defined(__amd64)
-	setcr8((ulong_t)apic_cr8pri[prev_ipl]);
+	setcr8((ulong_t)(apic_ipltopri[prev_ipl] >> APIC_IPL_SHIFT));
 #else
 	if (apic_have_32bit_cr8)
 		setcr8((ulong_t)(apic_ipltopri[prev_ipl] >> APIC_IPL_SHIFT));
@@ -740,7 +735,7 @@ static void
 apic_setspl(int ipl)
 {
 #if defined(__amd64)
-	setcr8((ulong_t)apic_cr8pri[ipl]);
+	setcr8((ulong_t)(apic_ipltopri[ipl] >> APIC_IPL_SHIFT));
 #else
 	if (apic_have_32bit_cr8)
 		setcr8((ulong_t)(apic_ipltopri[ipl] >> APIC_IPL_SHIFT));
