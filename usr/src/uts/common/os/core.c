@@ -555,8 +555,10 @@ expand_string(const char *pat, char *fp, int size, cred_t *cr)
 			return (ENAMETOOLONG);
 		(void) strcpy(fp, s);
 		/* strip trailing "/root/" from non-GZ zonepath string */
-		if (c == 'Z' && len > 6)
+		if (c == 'Z' && len > 6) {
 			len -= 6;
+			ASSERT(strncmp(fp + len, "/root/", 6) == 0);
+		}
 		fp += len;
 	}
 
