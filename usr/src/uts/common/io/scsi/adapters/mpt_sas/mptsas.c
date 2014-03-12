@@ -15274,6 +15274,15 @@ mptsas_tgt_alloc(mptsas_t *mpt, uint16_t devhdl, uint64_t wwid,
 	return (tmp_tgt);
 }
 
+static void
+mptsas_smp_target_copy(mptsas_smp_t *src, mptsas_smp_t *dst)
+{
+	dst->m_devhdl = src->m_devhdl;
+	dst->m_deviceinfo = src->m_deviceinfo;
+	dst->m_pdevhdl = src->m_pdevhdl;
+	dst->m_pdevinfo = src->m_pdevinfo;
+}
+
 static mptsas_smp_t *
 mptsas_smp_alloc(mptsas_t *mpt, mptsas_smp_t *data)
 {
@@ -15283,8 +15292,14 @@ mptsas_smp_alloc(mptsas_t *mpt, mptsas_smp_t *data)
 	addr.mta_wwn = data->m_addr.mta_wwn;
 	addr.mta_phymask = data->m_addr.mta_phymask;
 	ret_data = refhash_lookup(mpt->m_smp_targets, &addr);
+	/*
+	 * If there's already a matching SMP target, update its fields
+	 * in place.  Since the address is not changing, it's safe to do
+	 * this.  We cannot just bcopy() here because the structure we've
+	 * been given has invalid hash links.
+	 */
 	if (ret_data != NULL) {
-		bcopy(data, ret_data, sizeof (mptsas_smp_t)); /* XXX - dupl */
+		mptsas_smp_target_copy(data, ret_data);
 		return (ret_data);
 	}
 
