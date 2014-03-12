@@ -55,7 +55,7 @@ def.prereq	:=	TARGET= def
 all		:=	TARGET= all
 all.prereq	:=	TARGET= all
 install		:=	TARGET= install
-install.prereq	:=	TARGET= all
+install.prereq	:=	TARGET= install
 install_h	:=	TARGET= install_h
 install_h.prere	:=	TARGET= install_h
 clean		:=	TARGET= clean
