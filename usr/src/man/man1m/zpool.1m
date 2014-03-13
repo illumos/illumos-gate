@@ -15,7 +15,7 @@
 .\" CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your
 .\" own identifying information:
 .\" Portions Copyright [yyyy] [name of copyright owner]
-.TH ZPOOL 1M "Mar 16, 2012"
+.TH ZPOOL 1M "Mar 6, 2014"
 .SH NAME
 zpool \- configures ZFS storage pools
 .SH SYNOPSIS
@@ -78,23 +78,23 @@ zpool \- configures ZFS storage pools
 .LP
 .nf
 \fBzpool import\fR [\fB-o \fImntopts\fR\fR] [\fB-o\fR \fIproperty=value\fR] ... [\fB-d\fR \fIdir\fR | \fB-c\fR \fIcachefile\fR]
-     [\fB-D\fR] [\fB-f\fR] [\fB-R\fR \fIroot\fR] \fB-a\fR
+     [\fB-D\fR] [\fB-f\fR] [\fB-m\fR] [\fB-N\fR] [\fB-R\fR \fIroot\fR] [\fB-F\fR [\fB-n\fR]] \fB-a\fR
 .fi
 
 .LP
 .nf
 \fBzpool import\fR [\fB-o \fImntopts\fR\fR] [\fB-o\fR \fIproperty=value\fR] ... [\fB-d\fR \fIdir\fR | \fB-c\fR \fIcachefile\fR]
-     [\fB-D\fR] [\fB-f\fR] [\fB-R\fR \fIroot\fR] \fIpool\fR |\fIid\fR [\fInewpool\fR]
+     [\fB-D\fR] [\fB-f\fR] [\fB-m\fR] [\fB-R\fR \fIroot\fR] [\fB-F\fR [\fB-n\fR]] \fIpool\fR |\fIid\fR [\fInewpool\fR]
 .fi
 
 .LP
 .nf
-\fBzpool iostat\fR [\fB-T\fR u | d ] [\fB-v\fR] [\fIpool\fR] ... [\fIinterval\fR[\fIcount\fR]]
+\fBzpool iostat\fR [\fB-T\fR \fBu\fR | \fBd\fR ] [\fB-v\fR] [\fIpool\fR] ... [\fIinterval\fR[\fIcount\fR]]
 .fi
 
 .LP
 .nf
-\fBzpool list\fR [\fB-Hvp\fR] [\fB-o\fR \fIproperty\fR[,...]] [\fIpool\fR] ...
+\fBzpool list\fR [\fB-T\fR \fBu\fR | \fBd\fR ] [\fB-Hvp\fR] [\fB-o\fR \fIproperty\fR[,...]] [\fIpool\fR] ... [\fIinterval\fR[\fIcount\fR]]
 .fi
 
 .LP
@@ -139,7 +139,7 @@ zpool \- configures ZFS storage pools
 
 .LP
 .nf
-\fBzpool status\fR [\fB-xv\fR] [\fIpool\fR] ...
+\fBzpool status\fR [\fB-xvD\fR] [\fB-T\fR \fBu\fR | \fBd\fR ] [\fIpool\fR] ... [\fIinterval\fR [\fIcount\fR]]
 .fi
 
 .LP
@@ -670,6 +670,20 @@ is valid only while the system is up. Setting \fBaltroot\fR defaults to using
 
 .sp
 .LP
+The following property can be set only at import time:
+.sp
+.ne 2
+.na
+\fB\fBreadonly\fR=\fBon\fR | \fBoff\fR\fR
+.ad
+.sp .6
+.RS 4n
+If set to \fBon\fR, the pool will be imported in read-only mode. This
+property can also be referred to by its shortened column name, \fBrdonly\fR.
+.RE
+
+.sp
+.LP
 The following properties can be set at creation time and import time, and later
 changed with the \fBzpool set\fR command:
 .sp
@@ -746,6 +760,19 @@ exported or destroyed, the file is removed.
 A text string consisting of printable ASCII characters that will be stored
 such that it is available even if the pool becomes faulted.  An administrator
 can provide additional information about a pool using this property.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBdedupditto\fR=\fB\fInumber\fR\fR
+.ad
+.sp .6
+.RS 4n
+Threshold for the number of block ditto copies. If the reference count for a
+deduplicated block increases above this number, a new ditto copy of this block
+is automatically stored. The default setting is 0 which causes no ditto copies
+to be created for deduplicated blocks. The miniumum legal nonzero setting is 100.
 .RE
 
 .sp
@@ -1246,7 +1273,7 @@ Lists destroyed pools only.
 .na
 \fB\fBzpool import\fR [\fB-o\fR \fImntopts\fR] [ \fB-o\fR
 \fIproperty\fR=\fIvalue\fR] ... [\fB-d\fR \fIdir\fR | \fB-c\fR \fIcachefile\fR]
-[\fB-D\fR] [\fB-f\fR] [\fB-R\fR \fIroot\fR] \fB-a\fR\fR
+[\fB-D\fR] [\fB-f\fR] [\fB-m\fR] [\fB-R\fR \fIroot\fR] [\fB-F\fR [\fB-n\fR]] \fB-a\fR\fR
 .ad
 .sp .6
 .RS 4n
@@ -1318,10 +1345,33 @@ Forces import, even if the pool appears to be potentially active.
 .sp
 .ne 2
 .na
+\fB\fB-F\fR\fR
+.ad
+.RS 21n
+Recovery mode for a non-importable pool. Attempt to return the pool to an importable
+state by discarding the last few transactions. Not all damaged pools can be recovered
+by using this option. If successful, the data from the discarded transactions is
+irretrievably lost. This option is ignored if the pool is importable or already
+imported.
+.RE
+
+.sp
+.ne 2
+.na
 \fB\fB-a\fR\fR
 .ad
 .RS 21n
 Searches for and imports all pools found.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-m\fR\fR
+.ad
+.RS 21n
+Allows a pool to import when there is a missing log device. Recent transactions
+can be lost because the log device will be discarded.
 .RE
 
 .sp
@@ -1334,6 +1384,26 @@ Sets the "\fBcachefile\fR" property to "\fBnone\fR" and the "\fIaltroot\fR"
 property to "\fIroot\fR".
 .RE
 
+.sp
+.ne 2
+.na
+\fB\fB-N\fR\fR
+.ad
+.RS 21n
+Import the pool without mounting any file systems.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-n\fR\fR
+.ad
+.RS 21n
+Used with the \fB-F\fR recovery option. Determines whether a non-importable pool can be made
+importable again, but does not actually perform the pool recovery. For more details about pool
+recovery mode, see the \fB-F\fR option, above.
+.RE
+
 .RE
 
 .sp
@@ -1341,7 +1411,7 @@ property to "\fIroot\fR".
 .na
 \fB\fBzpool import\fR [\fB-o\fR \fImntopts\fR] [ \fB-o\fR
 \fIproperty\fR=\fIvalue\fR] ... [\fB-d\fR \fIdir\fR | \fB-c\fR \fIcachefile\fR]
-[\fB-D\fR] [\fB-f\fR] [\fB-R\fR \fIroot\fR] \fIpool\fR | \fIid\fR
+[\fB-D\fR] [\fB-f\fR] [\fB-m\fR] [\fB-R\fR \fIroot\fR] [\fB-F\fR [\fB-n\fR]] \fIpool\fR | \fIid\fR
 [\fInewpool\fR]\fR
 .ad
 .sp .6
@@ -1424,12 +1494,48 @@ Forces import, even if the pool appears to be potentially active.
 .sp
 .ne 2
 .na
+\fB\fB-F\fR\fR
+.ad
+.sp .6
+.RS 4n
+Recovery mode for a non-importable pool. Attempt to return the pool to an importable
+state by discarding the last few transactions. Not all damaged pools can be recovered
+by using this option. If successful, the data from the discarded transactions is
+irretrievably lost. This option is ignored if the pool is importable or already imported.
+.RE
+
+.sp
+.ne 2
+.na
 \fB\fB-R\fR \fIroot\fR\fR
 .ad
 .sp .6
 .RS 4n
 Sets the "\fBcachefile\fR" property to "\fBnone\fR" and the "\fIaltroot\fR"
 property to "\fIroot\fR".
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-n\fR\fR
+.ad
+.sp .6
+.RS 4n
+Used with the \fB-F\fR recovery option. Determines whether a non-importable pool can be made
+importable again, but does not actually perform the pool recovery. For more details about pool
+recovery mode, see the \fB-F\fR option, above.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-m\fR\fR
+.ad
+.sp .6
+.RS 4n
+Allows a pool to import when there is a missing log device. Recent transactions
+can be lost because the log device will be discarded.
 .RE
 
 .RE
@@ -1475,12 +1581,28 @@ the pool, in addition to the pool-wide statistics.
 .sp
 .ne 2
 .na
-\fB\fBzpool list\fR [\fB-Hvp\fR] [\fB-o\fR \fIprops\fR[,...]] [\fIpool\fR] ...\fR
+\fB\fBzpool list\fR [\fB-T\fR \fBu\fR | \fBd\fR] [\fB-Hvp\fR] [\fB-o\fR \fIprops\fR[,...]] [\fIpool\fR] ...
+[\fIinterval\fR[\fIcount\fR]]\fR
 .ad
 .sp .6
 .RS 4n
-Lists the given pools along with a health status and space usage. When given no
-arguments, all pools in the system are listed.
+Lists the given pools along with a health status and space usage. If no \fIpools\fR are specified,
+all pools in the system are listed. When given an \fIinterval\fR, the information is printed every
+\fIinterval\fR seconds until \fBCtrl-C\fR is pressed. If \fIcount\fR is specified, the command exits
+after \fIcount\fR reports are printed.
+.sp
+.ne 2
+.na
+\fB\fB-T\fR \fBu\fR | \fBd\fR\fR
+.ad
+.RS 12n
+Display a time stamp.
+.sp
+Specify \fBu\fR for a printed representation of the internal representation of
+time. See \fBtime\fR(2). Specify \fBd\fR for standard date format. See
+\fBdate\fR(1).
+.RE
+
 .sp
 .ne 2
 .na
@@ -1688,7 +1810,7 @@ more information on what properties can be set and acceptable values.
 .sp
 .ne 2
 .na
-\fB\fBzpool status\fR [\fB-xv\fR] [\fIpool\fR] ...\fR
+\fBzpool status\fR [\fB-xvD\fR] [\fB-T\fR \fBu\fR | \fBd\fR ] [\fIpool\fR] ... [\fIinterval\fR [\fIcount\fR]]
 .ad
 .sp .6
 .RS 4n
@@ -1722,6 +1844,29 @@ Displays verbose data error information, printing out a complete list of all
 data errors since the last complete pool scrub.
 .RE
 
+.sp
+.ne 2
+.na
+\fB\fB-D\fR\fR
+.ad
+.RS 6n
+Display a histogram of deduplication statistics, showing the allocated (physically present on disk) and
+referenced (logically referenced in the pool) block counts and sizes by reference count.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-T\fR \fBu\fR | \fBd\fR\fR
+.ad
+.RS 12n
+Display a time stamp.
+.sp
+Specify \fBu\fR for a printed representation of the internal representation of
+time. See \fBtime\fR(2). Specify \fBd\fR for standard date format. See
+\fBdate\fR(1).
+.RE
+
 .RE
 
 .sp
@@ -1745,7 +1890,7 @@ to enable all features on all pools.
 .sp .6
 .RS 4n
 Displays legacy \fBZFS\fR versions supported by the current software. See
-\fBzfs-features\fR(5) for a description of feature flags features supported
+\fBzpool-features\fR(5) for a description of feature flags features supported
 by the current software.
 .RE
 
@@ -1758,7 +1903,7 @@ by the current software.
 .RS 4n
 Enables all supported features on the given pool. Once this is done, the
 pool will no longer be accessible on systems that do not support feature
-flags. See \fBzfs-features\fR(5) for details on compatability with systems
+flags. See \fBzpool-features\fR(5) for details on compatibility with systems
 that support feature flags, but do not support all features enabled on the
 pool.
 .sp
@@ -2098,7 +2243,7 @@ The command to remove the mirrored log \fBmirror-2\fR is:
 .LP
 The following command dipslays the detailed information for the \fIdata\fR
 pool. This pool is comprised of a single \fIraidz\fR vdev where one of its
-devices increased its capacity by 1GB. In this example, the pool will not 
+devices increased its capacity by 1GB. In this example, the pool will not
 be able to utilized this extra capacity until all the devices under the
 \fIraidz\fR vdev have been expanded.
 
