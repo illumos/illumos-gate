@@ -28,8 +28,6 @@
 
 /* Copyright (c) 1981 Regents of the University of California */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "ex.h"
 #include "ex_argv.h"
 #include "ex_temp.h"
@@ -241,8 +239,6 @@ main(int ac, char *av[])
 	ruptible = signal(SIGINT, SIG_IGN) == SIG_DFL;
 	if (signal(SIGTERM, SIG_IGN) == SIG_DFL)
 		signal(SIGTERM, onhup);
-	if (signal(SIGEMT, SIG_IGN) == SIG_DFL)
-		signal(SIGEMT, onemt);
 	signal(SIGILL, oncore);
 	signal(SIGTRAP, oncore);
 	signal(SIGIOT, oncore);
