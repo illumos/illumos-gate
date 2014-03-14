@@ -20,7 +20,7 @@
  */
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Copyright 2013, Joyent, Inc.  All rights reserved.
+ * Copyright 2014, Joyent, Inc.  All rights reserved.
  */
 
 /*
@@ -36,10 +36,12 @@
  * down (zone to process to page), looking at zone processes, to determine
  * what to try to pageout to get the zone under its memory cap.
  *
- * The code uses the vm_getusage syscall to determine the zone's rss and
- * checks that against the zone's zone.max-physical-memory rctl.  Once the
- * zone goes over its cap, then this thread will work through the zone's
- * /proc process list, Pgrab-bing each process and stepping through the
+ * The code uses the fast, cheap, but potentially very inaccurate sum of the
+ * rss values from psinfo_t to first approximate the zone's rss and will
+ * fallback to the vm_getusage syscall to determine the zone's rss if needed.
+ * It then checks the rss against the zone's zone.max-physical-memory rctl.
+ * Once the zone goes over its cap, then this thread will work through the
+ * zone's /proc process list, Pgrab-bing each process and stepping through the
  * address space segments attempting to use pr_memcntl(...MS_INVALCURPROC...)
  * to pageout pages, until the zone is again under its cap.
  *
@@ -122,6 +124,16 @@
 #define	TUNE_CMD	"phys-mcap-cmd"
 #define	TUNE_NVMU	"phys-mcap-no-vmusage"
 #define	TUNE_NPAGE	"phys-mcap-no-pageout"
+
+/*
+ * These are only used in get_mem_info but global. We always need scale_rss and
+ * prev_fast_rss to be persistent but we also have the other two global so we
+ * can easily see these with mdb.
+ */
+uint64_t	scale_rss = 0;
+uint64_t	prev_fast_rss = 0;
+uint64_t	fast_rss = 0;
+uint64_t	accurate_rss = 0;
 
 static char	zonename[ZONENAME_MAX];
 static char	zonepath[MAXPATHLEN];
@@ -558,7 +570,7 @@ get_mem_info(int age)
 {
 	uint64_t		n = 1;
 	zsd_vmusage64_t		buf;
-	uint64_t		zone_rss;
+	uint64_t		tmp_rss;
 	DIR			*pdir = NULL;
 	struct dirent		*dent;
 
@@ -568,6 +580,10 @@ get_mem_info(int age)
 	 * counting some memory and overestimating how much is being used, but
 	 * as long as that's not over the cap, then we don't need do the
 	 * expensive calculation.
+	 *
+	 * If we have to do the expensive calculation, we remember the scaling
+	 * factor so that we can try to use that on subsequent iterations for
+	 * the fast rss.
 	 */
 	if (shutting_down)
 		return (0);
@@ -575,7 +591,8 @@ get_mem_info(int age)
 	if ((pdir = opendir(zoneproc)) == NULL)
 		return (0);
 
-	zone_rss = 0;
+	accurate_rss = 0;
+	fast_rss = 0;
 	while (!shutting_down && (dent = readdir(pdir)) != NULL) {
 		pid_t		pid;
 		int		psfd;
@@ -603,7 +620,7 @@ get_mem_info(int age)
 			(void) close(psfd);
 		}
 
-		zone_rss += rss;
+		fast_rss += rss;
 	}
 
 	(void) closedir(pdir);
@@ -611,14 +628,29 @@ get_mem_info(int age)
 	if (shutting_down)
 		return (0);
 
-	debug("fast rss %lluKB\n", zone_rss);
-	if (zone_rss <= zone_rss_cap || skip_vmusage) {
+	debug("fast rss: %lluKB, scale: %llu, prev: %lluKB\n", fast_rss,
+	    scale_rss, prev_fast_rss);
+
+	/* see if we can get by with a scaled fast rss */
+	tmp_rss = fast_rss;
+	if (scale_rss > 1 && prev_fast_rss > 0) {
+		/*
+		 * Only scale the fast value if it hasn't ballooned too much
+		 * to trust.
+		 */
+		if (fast_rss / prev_fast_rss < 2) {
+			fast_rss /= scale_rss;
+			debug("scaled fast rss: %lluKB\n", fast_rss);
+		}
+	}
+
+	if (fast_rss <= zone_rss_cap || skip_vmusage) {
 		uint64_t zone_rss_bytes;
 
-		zone_rss_bytes = zone_rss * 1024;
+		zone_rss_bytes = fast_rss * 1024;
 		/* Use the zone's approx. RSS in the kernel */
 		(void) zone_setattr(zid, ZONE_ATTR_RSS, &zone_rss_bytes, 0);
-		return (zone_rss);
+		return (fast_rss);
 	}
 
 	buf.vmu_id = zid;
@@ -644,8 +676,17 @@ get_mem_info(int age)
 		return (0);
 	}
 
-	zone_rss = buf.vmu_rss_all / 1024;
-	return (zone_rss);
+	accurate_rss = buf.vmu_rss_all / 1024;
+
+	/* calculate scaling factor to use for fast_rss from now on */
+	if (accurate_rss > 0) {
+		scale_rss = fast_rss / accurate_rss;
+		debug("scaling factor: %llu\n", scale_rss);
+		/* remember the fast rss when we had to get the accurate rss */
+		prev_fast_rss = tmp_rss;
+	}
+
+	return (accurate_rss);
 }
 
 /*
