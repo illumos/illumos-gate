@@ -37,7 +37,6 @@ include ../Makefile.cmd
 
 XPG4EXOBJS += values-xpg4.o
 CFLAGS += $(CCVERBOSE)
-CERRWARN += -_gcc=-Wno-parentheses
 # XPG4
 $(XPG4) := CFLAGS += -D_XOPEN_SOURCE -I$(SRC)/lib/libc/inc
 

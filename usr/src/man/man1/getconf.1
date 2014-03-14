@@ -10,7 +10,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH GETCONF 1 "Jan 16, 2013"
+.TH GETCONF 1 "Sep 27, 2013"
 .SH NAME
 getconf \- get configuration values
 .SH SYNOPSIS
@@ -408,9 +408,11 @@ supported:
 .TS
 l l l
 l l l .
-LINK_MAX	NAME_MAX	_POSIX_CHOWN_RESTRICTED
-MAX_CANON	PATH_MAX	_POSIX_NO_TRUNC
-MAX_INPUT	PIPE_BUF	_POSIX_VDISABLE
+ACL_ENABLED	NAME_MAX	XATTR_ENABLED
+LINK_MAX	PATH_MAX	XATTR_EXISTS
+MAX_CANON	PIPE_BUF	_POSIX_CHOWN_RESTRICTED
+MAX_INPUT	SATTR_ENABLED	_POSIX_NO_TRUNC
+MIN_HOLE_SIZE	SATTR_EXISTS	_POSIX_VDISABLE
 .TE
 
 .sp

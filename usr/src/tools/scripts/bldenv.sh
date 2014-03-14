@@ -155,6 +155,8 @@ fi
 
 # force locale to C
 export \
+	LANG=C \
+	LC_ALL=C \
 	LC_COLLATE=C \
 	LC_CTYPE=C \
 	LC_MESSAGES=C \

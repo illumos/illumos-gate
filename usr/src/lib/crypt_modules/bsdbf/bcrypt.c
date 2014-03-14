@@ -3,8 +3,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*	$OpenBSD: bcrypt.c,v 1.16 2002/02/19 19:39:36 millert Exp $	*/
 
 /*
@@ -37,7 +35,8 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-/* This password hashing algorithm was designed by David Mazieres
+/*
+ * This password hashing algorithm was designed by David Mazieres
  * <dm@lcs.mit.edu> and works as follows:
  *
  * 1. state := InitState ()
@@ -65,15 +64,17 @@
 
 extern uint32_t arc4random();
 
-/* This implementation is adaptable to current computing power.
+/*
+ * This implementation is adaptable to current computing power.
  * You can have up to 2^31 rounds which should be enough for some
  * time to come.
  */
 
-#define BCRYPT_VERSION '2'
-#define BCRYPT_MAXSALT 16	/* Precomputation is just so nice */
-#define BCRYPT_BLOCKS 6		/* Ciphertext blocks */
-#define BCRYPT_MINROUNDS 16	/* we have log2(rounds) in salt */
+#define	BCRYPT_VERSION	'2'
+#define	BCRYPT_MAXSALT	16		/* Precomputation is just so nice */
+#define	BCRYPT_BLOCKS	6		/* Ciphertext blocks */
+#define	BCRYPT_MINLOGROUNDS	4	/* we have log2(rounds) in salt */
+#define	BCRYPT_MAXLOGROUNDS	31
 
 char   *bcrypt_gensalt(uint8_t);
 
@@ -104,7 +105,7 @@ static uint8_t index_64[128] =
 	41, 42, 43, 44, 45, 46, 47, 48, 49, 50,
 	51, 52, 53, 255, 255, 255, 255, 255
 };
-#define CHAR64(c)  ( (c) > 127 ? 255 : index_64[(c)])
+#define	CHAR64(c)	((c) > 127 ? 255 : index_64[(c)])
 
 static void
 decode_base64(uint8_t *buffer, uint16_t len, uint8_t *data)
@@ -151,11 +152,12 @@ encode_salt(char *salt, uint8_t *csalt, uint16_t clen, uint8_t logr)
 
 	(void) snprintf(salt + 4, 4, "%2.2u$", logr);
 
-	encode_base64((uint8_t *) salt + 7, csalt, clen);
+	encode_base64((uint8_t *)salt + 7, csalt, clen);
 }
-/* Generates a salt for this version of crypt.
-   Since versions may change. Keeping this here
-   seems sensible.
+/*
+ * Generates a salt for this version of crypt.
+ * Since versions may change. Keeping this here
+ * seems sensible.
  */
 
 char *
@@ -172,14 +174,18 @@ bcrypt_gensalt(uint8_t log_rounds)
 		seed = seed >> 8;
 	}
 
-	if (log_rounds < 4)
-		log_rounds = 4;
+	if (log_rounds < BCRYPT_MINLOGROUNDS)
+		log_rounds = BCRYPT_MINLOGROUNDS;
+	else if (log_rounds > BCRYPT_MAXLOGROUNDS)
+		log_rounds = BCRYPT_MAXLOGROUNDS;
 
 	encode_salt(gsalt, csalt, BCRYPT_MAXSALT, log_rounds);
-	return gsalt;
+	return (gsalt);
 }
-/* We handle $Vers$log2(NumRounds)$salt+passwd$
-   i.e. $2$04$iwouldntknowwhattosayetKdJ6iFtacBqJdKe6aW7ou */
+/*
+ * We handle $Vers$log2(NumRounds)$salt+passwd$
+ *  i.e. $2$04$iwouldntknowwhattosayetKdJ6iFtacBqJdKe6aW7ou
+ */
 
 char   *
 bcrypt(key, salt)
@@ -189,68 +195,89 @@ bcrypt(key, salt)
 	blf_ctx state;
 	uint32_t rounds, i, k;
 	uint16_t j;
-	uint8_t key_len, salt_len, logr, minor;
+	size_t key_len;
+	uint8_t salt_len, logr, minor;
 	uint8_t ciphertext[4 * BCRYPT_BLOCKS] = "OrpheanBeholderScryDoubt";
 	uint8_t csalt[BCRYPT_MAXSALT];
 	uint32_t cdata[BCRYPT_BLOCKS];
+	char arounds[3];
 
 	/* Discard "$" identifier */
 	salt++;
 
 	if (*salt > BCRYPT_VERSION) {
 		/* How do I handle errors ? Return ':' */
-		return error;
+		return (error);
 	}
 
 	/* Check for minor versions */
 	if (salt[1] != '$') {
-		 switch (salt[1]) {
-		 case 'a':
-			 /* 'ab' should not yield the same as 'abab' */
-			 minor = salt[1];
-			 salt++;
-			 break;
-		 default:
-			 return error;
-		 }
+		switch (salt[1]) {
+		    case 'a': /* 'ab' should not yield the same as 'abab' */
+		    case 'b': /* cap input length at 72 bytes */
+			minor = salt[1];
+			salt++;
+			break;
+		    default:
+			return (error);
+		}
 	} else
-		 minor = 0;
+		minor = 0;
 
 	/* Discard version + "$" identifier */
 	salt += 2;
 
 	if (salt[2] != '$')
 		/* Out of sync with passwd entry */
-		return error;
+		return (error);
 
+	(void) memcpy(arounds, salt, sizeof (arounds));
+	if (arounds[sizeof (arounds) - 1] != '$')
+		return (error);
+	if ((logr = atoi(arounds)) < BCRYPT_MINLOGROUNDS ||
+	    logr > BCRYPT_MAXLOGROUNDS)
+		return (error);
 	/* Computer power doesn't increase linear, 2^x should be fine */
-	if ((rounds = (uint32_t) 1 << (logr = atoi(salt))) < BCRYPT_MINROUNDS)
-		return error;
+	rounds = 1U << logr;
 
 	/* Discard num rounds + "$" identifier */
 	salt += 3;
 
 	if (strlen(salt) * 3 / 4 < BCRYPT_MAXSALT)
-		return error;
+		return (error);
 
 	/* We dont want the base64 salt but the raw data */
-	decode_base64(csalt, BCRYPT_MAXSALT, (uint8_t *) salt);
+	decode_base64(csalt, BCRYPT_MAXSALT, (uint8_t *)salt);
 	salt_len = BCRYPT_MAXSALT;
-	key_len = strlen(key) + (minor >= 'a' ? 1 : 0);
+	if (minor <= 'a')
+		key_len = (uint8_t)(strlen(key) + (minor >= 'a' ? 1 : 0));
+	else {
+		/*
+		 * strlen() returns a size_t, but the function calls
+		 * below result in implicit casts to a narrower integer
+		 * type, so cap key_len at the actual maximum supported
+		 * length here to avoid integer wraparound
+		 */
+		key_len = strlen(key);
+		if (key_len > 72)
+			key_len = 72;
+		key_len++; /* include the NUL */
+	}
 
 	/* Setting up S-Boxes and Subkeys */
 	Blowfish_initstate(&state);
 	Blowfish_expandstate(&state, csalt, salt_len,
-	    (uint8_t *) key, key_len);
+	    (uint8_t *)key, key_len);
 	for (k = 0; k < rounds; k++) {
-		Blowfish_expand0state(&state, (uint8_t *) key, key_len);
+		Blowfish_expand0state(&state, (uint8_t *)key, key_len);
 		Blowfish_expand0state(&state, csalt, salt_len);
 	}
 
 	/* This can be precomputed later */
 	j = 0;
 	for (i = 0; i < BCRYPT_BLOCKS; i++)
-		cdata[i] = Blowfish_stream2word(ciphertext, 4 * BCRYPT_BLOCKS, &j);
+		cdata[i] = Blowfish_stream2word(ciphertext,
+		    4 * BCRYPT_BLOCKS, &j);
 
 	/* Now do the encryption */
 	for (k = 0; k < 64; k++)
@@ -276,10 +303,10 @@ bcrypt(key, salt)
 
 	(void) snprintf(encrypted + i, 4, "%2.2u$", logr);
 
-	encode_base64((uint8_t *) encrypted + i + 3, csalt, BCRYPT_MAXSALT);
-	encode_base64((uint8_t *) encrypted + strlen(encrypted), ciphertext,
+	encode_base64((uint8_t *)encrypted + i + 3, csalt, BCRYPT_MAXSALT);
+	encode_base64((uint8_t *)encrypted + strlen(encrypted), ciphertext,
 	    4 * BCRYPT_BLOCKS - 1);
-	return encrypted;
+	return (encrypted);
 }
 
 static void
