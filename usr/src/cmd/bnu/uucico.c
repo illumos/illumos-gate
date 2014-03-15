@@ -19,6 +19,9 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore
+ */
+/*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -917,7 +920,7 @@ setTZ()
 	int		i;
 	extern int	fclose(), strncmp();
 
-	if ( (tzfp = fopen("/etc/TIMEZONE","r")) == (FILE *)NULL )
+	if ( (tzfp = fopen("/etc/default/init","r")) == (FILE *)NULL )
 		return;
 	while ( (bp = fgets(buf,LINELEN,tzfp)) != (char *)NULL ) {
 		while ( isspace(*bp) )

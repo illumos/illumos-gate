@@ -20,6 +20,7 @@
 # CDDL HEADER END
 #
 # Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2014 Garrett D'Amore
 #
 #
 
@@ -444,7 +445,7 @@ initialize() {
 		locale="C"
 	fi
 	print "system_locale=$locale" >> ${SYSIDCFG}
-	timezone=$(grep "^TZ" /etc/TIMEZONE|cut -d "=" -f2)
+	timezone=$(grep "^TZ" /etc/default/init|cut -d "=" -f2)
 	print "timezone=$timezone" >> ${SYSIDCFG}
 	print "terminal=vt100" >> ${SYSIDCFG}
 	rootpwd=$(grep "^root:" /etc/shadow|cut -d : -f2)
