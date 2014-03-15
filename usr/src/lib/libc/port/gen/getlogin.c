@@ -85,6 +85,7 @@ getl_r_common(char *answer, size_t namelen, size_t maxlen)
 	int		uf;
 	off64_t		me;
 	struct futmpx	ubuf;
+	size_t		ulen;
 
 	if ((me = (off64_t)ttyslot()) < 0)
 		return (NULL);
@@ -100,13 +101,22 @@ getl_r_common(char *answer, size_t namelen, size_t maxlen)
 		return (NULL);
 
 	/* Insufficient buffer size */
-	if (namelen < strnlen(&ubuf.ut_user[0], maxlen)) {
+	ulen = strnlen(ubuf.ut_user, maxlen);
+	if (namelen <= ulen) {
 		errno = ERANGE;
 		return (NULL);
 	}
-	(void) strncpy(&answer[0], &ubuf.ut_user[0], maxlen);
-	answer[maxlen] = '\0';
-	return (&answer[0]);
+
+	/*
+	 * While the interface to getlogin_r says that a user should supply a
+	 * buffer with at least LOGIN_NAME_MAX bytes, we shouldn't assume they
+	 * have, especially since we've been supplied with its actual size.
+	 * Doing otherwise is just asking us to corrupt memory (and has in the
+	 * past).
+	 */
+	(void) strncpy(answer, ubuf.ut_user, ulen);
+	answer[ulen] = '\0';
+	return (answer);
 }
 
 /*
