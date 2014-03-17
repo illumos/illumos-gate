@@ -97,7 +97,7 @@ address. This means that as long as the two sockets are not both bound to
 can be bound to the same port.
 .sp
 .LP
- If an application does not want to allow another socket  using the
+If an application does not want to allow another socket  using the
 \fBSO_REUSEADDR\fR option to bind to a port its socket is bound to, the
 application can set the socket level option \fBSO_EXCLBIND\fR on a socket. The
 option values of 0 and 1 mean enabling and disabling the option respectively.

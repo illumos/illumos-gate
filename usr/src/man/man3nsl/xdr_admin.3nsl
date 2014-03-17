@@ -31,7 +31,7 @@ four.
 .sp
 .ne 2
 .na
-\fB\fBbool_t xdr_control( XDR *\fR\fIxdrs\fR\fB, int\fR\fI req\fR\fB, void
+\fB\fBbool_t xdr_control(XDR *\fR\fIxdrs\fR\fB, int\fR\fI req\fR\fB, void
 *\fR\fIinfo\fR\fB);\fR\fR
 .ad
 .sp .6
