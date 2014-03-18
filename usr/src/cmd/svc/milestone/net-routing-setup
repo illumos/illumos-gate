@@ -160,8 +160,8 @@ fi
 # however, as persistent daemon state is now controlled by SMF.
 #
 ipv4_routing_set=`/usr/bin/svcprop -p routeadm/ipv4-routing-set $SMF_FMRI`
-if [ -z "$defrouters" ] && \
-    [ `/usr/bin/bootparams | grep "^smartos"` != "" ]; then
+smartos_param=`/usr/bin/bootparams | grep "^smartos"`
+if [ -z "$defrouters" ] && [ "$smartos_param" != "" ]; then
 	#
 	# Set default value for ipv4-routing to enabled.  If routeadm -e/-d
 	# has not yet been run by the administrator, we apply this default.
@@ -211,6 +211,16 @@ fi
 if [ -f /etc/inet/static_routes ]; then
 	echo "Adding persistent routes:"
 	/usr/bin/egrep -v "^(#|$)" /etc/inet/static_routes | while read line; do
+		/usr/sbin/route add $line
+	done
+fi
+
+#
+# Read /etc/inet/static_routes.vmadm and add each route.
+#
+if [ -f /etc/inet/static_routes.vmadm ]; then
+	echo "Adding vmadm persistent routes:"
+	/usr/bin/egrep -v "^(#|$)" /etc/inet/static_routes.vmadm | while read line; do
 		/usr/sbin/route add $line
 	done
 fi
