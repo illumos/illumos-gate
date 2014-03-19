@@ -163,7 +163,7 @@ ip_squeue_create(pri_t pri)
 {
 	squeue_t *sqp;
 
-	sqp = squeue_create(ip_squeue_worker_wait, pri);
+	sqp = squeue_create(ip_squeue_worker_wait, pri, B_TRUE);
 	ASSERT(sqp != NULL);
 	if (ip_squeue_create_callback != NULL)
 		ip_squeue_create_callback(sqp);

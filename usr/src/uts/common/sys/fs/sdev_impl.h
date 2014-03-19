@@ -35,6 +35,7 @@ extern "C" {
 #include <sys/vfs_opreg.h>
 #include <sys/list.h>
 #include <sys/nvpair.h>
+#include <sys/fs/sdev_plugin.h>
 
 /*
  * sdev_nodes are the file-system specific part of the
@@ -126,6 +127,21 @@ typedef struct sdev_local_data {
 	struct sdev_dprof sdev_lprof;	/* profile for multi-inst */
 } sdev_local_data_t;
 
+/* sdev_flags */
+typedef enum sdev_flags {
+	SDEV_BUILD =		0x0001,	/* directory cache out-of-date */
+	SDEV_GLOBAL =		0x0002,	/* global /dev nodes */
+	SDEV_PERSIST =		0x0004,	/* backing store persisted node */
+	SDEV_NO_NCACHE = 	0x0008,	/* do not include in neg. cache */
+	SDEV_DYNAMIC =		0x0010,	/* special-purpose vnode ops */
+					/* (ex: pts) */
+	SDEV_VTOR =		0x0020,	/* validate sdev_nodes during search */
+	SDEV_ATTR_INVALID =	0x0040,	/* invalid node attributes, */
+					/* need update */
+	SDEV_SUBDIR =		0x0080,	/* match all subdirs under here */
+	SDEV_ZONED =		0x0100	/* zoned subdir */
+} sdev_flags_t;
+
 /*
  * /dev filesystem sdev_node defines
  */
@@ -148,7 +164,7 @@ typedef struct sdev_node {
 	ino64_t		sdev_ino;	/* inode */
 	uint_t		sdev_nlink;	/* link count */
 	int		sdev_state;	/* state of this node */
-	int		sdev_flags;	/* flags bit */
+	sdev_flags_t	sdev_flags;	/* flags bit */
 
 	kmutex_t	sdev_lookup_lock; /* node creation synch lock */
 	kcondvar_t	sdev_lookup_cv;	/* node creation sync cv */
@@ -159,7 +175,7 @@ typedef struct sdev_node {
 		struct sdev_global_data	sdev_globaldata;
 		struct sdev_local_data	sdev_localdata;
 	} sdev_instance_data;
-
+	list_node_t	sdev_plist;	/* link on plugin list */
 	void		*sdev_private;
 } sdev_node_t;
 
@@ -190,28 +206,10 @@ typedef enum {
 	SDEV_READY
 } sdev_node_state_t;
 
-/* sdev_flags */
-#define	SDEV_BUILD		0x0001	/* directory cache out-of-date */
-#define	SDEV_GLOBAL		0x0002	/* global /dev nodes */
-#define	SDEV_PERSIST		0x0004	/* backing store persisted node */
-#define	SDEV_NO_NCACHE		0x0008	/* do not include in neg. cache */
-#define	SDEV_DYNAMIC		0x0010	/* special-purpose vnode ops */
-					/* (ex: pts) */
-#define	SDEV_VTOR		0x0020	/* validate sdev_nodes during search */
-#define	SDEV_ATTR_INVALID	0x0040	/* invalid node attributes, */
-					/* need update */
-#define	SDEV_SUBDIR		0x0080	/* match all subdirs under here */
-#define	SDEV_ZONED		0x0100  /* zoned subdir */
-
 /* sdev_lookup_flags */
 #define	SDEV_LOOKUP	0x0001	/* node creation in progress */
 #define	SDEV_READDIR	0x0002	/* VDIR readdir in progress */
 #define	SDEV_LGWAITING	0x0004	/* waiting for devfsadm completion */
-
-#define	SDEV_VTOR_INVALID	-1
-#define	SDEV_VTOR_SKIP		0
-#define	SDEV_VTOR_VALID		1
-#define	SDEV_VTOR_STALE		2
 
 /* convenient macros */
 #define	SDEV_IS_GLOBAL(dv)	\
@@ -364,8 +362,13 @@ extern void sdev_devfsadmd_thread(struct sdev_node *, struct sdev_node *,
 extern int devname_profile_update(char *, size_t);
 extern struct sdev_data *sdev_find_mntinfo(char *);
 void sdev_mntinfo_rele(struct sdev_data *);
+typedef void (*sdev_mnt_walk_f)(struct sdev_node *, void *);
+void sdev_mnt_walk(sdev_mnt_walk_f, void *);
 extern struct vnodeops *devpts_getvnodeops(void);
 extern struct vnodeops *devvt_getvnodeops(void);
+extern void sdev_plugin_nodeready(struct sdev_node *);
+extern int sdev_plugin_init(void);
+extern int sdev_plugin_fini(void);
 
 /*
  * boot states - warning, the ordering here is significant
@@ -510,6 +513,23 @@ extern void sdev_nc_path_exists(sdev_nc_list_t *, char *);
 extern void sdev_modctl_dump_files(void);
 
 /*
+ * plugin and legacy vtab stuff
+ */
+/* directory dependent vop table */
+typedef struct sdev_vop_table {
+	char *vt_name;				/* subdirectory name */
+	const fs_operation_def_t *vt_service;	/* vnodeops table */
+	struct vnodeops **vt_global_vops;	/* global container for vop */
+	int (*vt_vtor)(struct sdev_node *);	/* validate sdev_node */
+	int vt_flags;
+} sdev_vop_table_t;
+
+extern struct sdev_vop_table vtab[];
+extern struct vnodeops *sdev_get_vop(struct sdev_node *);
+extern void sdev_set_no_negcache(struct sdev_node *);
+extern void *sdev_get_vtor(struct sdev_node *dv);
+
+/*
  * globals
  */
 extern kmutex_t sdev_lock;
@@ -522,6 +542,7 @@ extern struct vnodeops		*devipnet_vnodeops;
 extern struct vnodeops		*devvt_vnodeops;
 extern struct sdev_data *sdev_origins; /* mount info for global /dev instance */
 extern struct vnodeops		*devzvol_vnodeops;
+extern int			sdev_vnodeops_tbl_size;
 
 extern const fs_operation_def_t	sdev_vnodeops_tbl[];
 extern const fs_operation_def_t	devpts_vnodeops_tbl[];

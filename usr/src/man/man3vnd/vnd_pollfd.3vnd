@@ -1,0 +1,155 @@
+'\" te
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright (c) 2014, Joyent, Inc.  All rights reserved.
+.\"
+.TH VND_POLLFD 3VND "Feb 21, 2014"
+
+.SH NAME
+
+vnd_pollfd \- get file descriptor for polling
+
+.SH SYNOPSIS
+
+.LP
+.nf
+cc [ flag... ] file... -lvnd [ library... ]
+#include <libvnd.h>
+
+int vnd_pollfd(vnd_handle_t *vhp);
+.fi
+
+.SH DESCRIPTION
+.LP
+The vnd_pollfd() function returns an integer id which corresponds to
+the file descriptor that represents the underlying device that is
+associated with the vnd handle vhp. This file descriptor is suitable
+for use with port_associate(3C) and similar polling techniques such as
+poll(2). Use of the file descriptor outside of these uses may cause
+undocumented behavior from the rest of the library.
+
+.LP
+The file descriptor in question is still managed by libvnd. The caller
+must not call close(2) on it. Once vnd_close(3VND) has been called,
+any further use of the file descriptor is undefined behavior.
+
+
+.SH RETURN VALUES
+.LP
+The function returns the integer id of the file descriptor that
+corresponds to the underlying vnd device.
+
+.SH EXAMPLES
+
+.LP
+Example 1   Use event ports for vnd notifications
+.sp
+.LP
+The following sample C program shows how to use the vnd_pollfd
+function with event ports to be notified whenever there is data
+available to be read. This program assumes that a vnd device named
+"vnd0" exists in the current zone. For an example of creating the
+device, see Example 1 in vnd_create(3VND).
+
+.sp
+.in +2
+.nf
+#include <libvnd.h>
+#include <port.h>
+#include <sys/types.h>
+#include <unistd.h>
+#include <fcntl.h>
+
+int
+main(void)
+{
+	vnd_handle_t *vhp;
+	vnd_errno_t vnderr;
+	int port, syserr, vfd, ret;
+
+	port = port_create();
+	if (port < 0) {
+		perror("port_create");
+		return (1);	
+	}
+
+	vhp = vnd_open(NULL, "vnd0", &vnderr, &syserr);
+	if (vhp == NULL) {
+		if (vnderr == VND_E_SYS)
+			(void) fprintf(stderr, "failed to open device: %s",
+			    vnd_strsyserror(syserr));
+		else
+			(void) fprintf(stderr, "failed to open device: %s",
+			    vnd_strerror(vnderr));
+		(void) close(port);
+		return (1);
+	}
+
+	vfd = vnd_pollfd(vhp);
+	if (fcntl(vfd, F_SETFL, O_NONBLOCK) != 0) {
+		perror("fcntl");
+		vnd_close(vhp);
+		(void) close(port);
+		return (1);
+	}
+
+	if (port_associate(port, PORT_SOURCE_FD, vfd, POLLIN, NULL) != 0) {
+		perror("port_associate");
+		vnd_close(vhp);
+		(void) close(port);
+		return (1);
+	}
+
+	for (;;) {
+		port_event_t pe;
+
+
+		if (port_get(port, &pe, NULL) != 0) {
+			if (errno == EINTR)
+				continue;
+			perror("port_get");
+			vnd_close(vhp);
+			(void) close(port);
+			return (1);
+		}
+
+		/*
+		 * Read the data with vnd_frameio_read(3VND) and
+		 * optionally break out of the loop or continue to the
+		 * next iteration and reassociate vfd with the event
+		 * port.
+		 */
+	}	
+}
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See attributes(5) for descriptions of the following attributes:
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Stability	Committed
+_
+MT-Level	See "THREADING" in libvnd(3LIB)
+.TE
+
+.SH SEE ALSO
+
+close(2), poll(2), port_create(3C), libvnd(3LIB), vnd_close(3VND)

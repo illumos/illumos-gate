@@ -41,10 +41,12 @@ MANFILES= 	dlpi_arptype.3dlpi	\
 		dlpi_walk.3dlpi
 
 MANLINKS=	dlpi_disabmulti.3dlpi	\
+		dlpi_open_zone.3dlpi	\
 		dlpi_promiscoff.3dlpi
 
 dlpi_disabmulti.3dlpi	:= LINKSRC = dlpi_enabmulti.3dlpi
 
+dlpi_open_zone.3dlpi	:= LINKSRC = man3dlpi/dlpi_open.3dlpi
 dlpi_promiscoff.3dlpi	:= LINKSRC = dlpi_promiscon.3dlpi
 
 .KEEP_STATE:

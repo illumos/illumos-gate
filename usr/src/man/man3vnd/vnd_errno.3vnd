@@ -1,0 +1,170 @@
+'\" te
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright (c) 2014, Joyent, Inc.  All rights reserved.
+.\"
+.TH VND_ERRNO 3VND "Feb 21, 2014"
+
+.SH NAME
+
+vnd_errno, vnd_syserrno, vnd_strerror, vnd_strsyserror \- obtain and
+translate vnd errors
+
+
+.SH SYNOPSIS
+
+.LP
+.nf
+cc [ flag... ] file... -lvnd [ library... ]
+#include <libvnd.h>
+
+uint32_t vnd_errno(vnd_handle_t *vhp);
+
+const char *vnd_strerror(vnd_errno_t err);
+
+int vnd_syserrno(vnd_handle_t *vhp);
+
+const char *vnd_strsyserror(int syserr);
+.fi
+
+.SH DESCRIPTION
+
+.LP
+The libvnd(3LIB) library supports a complementary array of errors that
+give more specific error information than the traditional set of
+system errors available via errno(3C). When an error occurs, consumers
+should call the vnd_errno function first and check its value. If the
+value of the vnd_errno_t is VND_E_SYS, then the system errno should be
+checked. If the vnd_errno_t is not VND_E_SYS, then the contents of the
+system errno returned from vnd_syserrno are undefined. Both the vnd
+and system errors are only valid for a given handle after a libvnd
+library function returned an error and before another libvnd library
+function is called on the same handle. The act of making an additional
+function call with the same vnd_handle_t invalidates any prior vnd or
+system error numbers. For the full list of valid vnd errors see
+libvnd(3LIB). For the full list of valid system errors, see Intro(2).
+
+.LP
+The vnd_errno and vnd_syserrno functions retrieve the most recent vnd
+and syserr error number respectively from a vnd handle vhp.
+
+.LP
+The vnd_strerror function translates a vnd_errno_t err to a
+corresponding string and returns a pointer to that constant string.
+
+.LP
+The vnd_syserrno function is analogous to the vnd_strerror function,
+except that it translates a system error back to a string.
+
+
+.SH RETURN VALUES
+
+.LP
+The vnd_errno function returns a vnd_errno_t which contains the vnd
+error information.
+
+.LP
+The vnd_syserror function returns an integer which contains the system
+error information. These values are the same as those returned by
+errno(3C).
+
+.LP
+The vnd_strerror function returns a pointer to a constant string. If
+the error passed in is unknown, the string "unknown error" is
+returned.
+
+.LP
+The vnd_strsyserror function returns a pointer to the translated
+constant string. If an unknown error number is passed, it returns the
+string "Unknown error". If an error occurs, it returns a NULL pointer.
+
+.SH EXAMPLES
+
+.LP
+Example 1  Obtaining errors from a vnd_handle_t
+
+.sp
+.LP
+The following sample C function, which can be incorporated into a larger
+program, shows how to obtain the vnd and system errors from a
+vnd_handle_t after a vnd interface on a handle failed.
+
+.sp
+.in +2
+.nf
+#include <libvnd.h>
+
+static void
+print_errnos(vnd_handle_t *vhp)
+{
+	vnd_errno_t vnderr;
+	int syserr;
+
+	vnderr = vnd_errno(vhp);
+	syserr = vnd_syserrno(vhp);
+
+	(void) printf("vnd err: %d, sys err: %d\n",
+	    vnderr, syserr);
+}
+.fi
+.in -2
+
+.LP
+Example 2   A perror-like function
+
+.sp
+.LP
+The following sample C function which can be incorporated into a
+larger program shows how to write a perror-like function to print
+out error messages for a vnd device.
+
+.sp
+.in +2
+.nf
+#include <libvnd.h>
+
+static void
+sample_perror(const char *msg, vnd_error_t vnderr, int syserr)
+{
+	(void) fprintf(stderr, "%s: %s", msg,
+	    vnderr != VND_E_SYS ? vnd_strerror(vnderr) :
+	    vnd_strsyserror(syserr));
+}
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See attributes(5) for descriptions of the following attributes:
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Stability	Committed
+_
+MT-Level	See below
+.TE
+
+.LP
+The MT-Level of the functions vnd_strerror and vnd_strsyserror is
+MT-Safe. See "THREADING" in libvnd(3LIB) for a discussion of the
+MT-Level of vnd_errno and vnd_syserrno.
+
+
+.SH SEE ALSO
+
+Intro(2), errno(3C), libvnd(3LIB), attributes(5)

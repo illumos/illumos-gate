@@ -23,7 +23,7 @@
  */
 
 /*
- * Copyright 2012 Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2014 Joyent, Inc.  All rights reserved.
  */
 
 /*
@@ -60,6 +60,10 @@
  * squeue mapping is never changed and all future packets for that
  * connection are processed on that squeue. The connection ("conn") to
  * squeue mapping is stored in "conn_t" member "conn_sqp".
+ *
+ * If the squeue is not related to TCP/IP, then the value of sqp->sq_isip is
+ * false and it will not have an associated conn_t, which means many aspects of
+ * the system, such as polling and swtiching squeues will not be used.
  *
  * Since the processing of the connection cuts across multiple layers
  * but still allows packets for different connnection to be processed on
@@ -244,7 +248,7 @@ squeue_init(void)
 
 /* ARGSUSED */
 squeue_t *
-squeue_create(clock_t wait, pri_t pri)
+squeue_create(clock_t wait, pri_t pri, boolean_t isip)
 {
 	squeue_t *sqp = kmem_cache_alloc(squeue_cache, KM_SLEEP);
 
@@ -260,8 +264,33 @@ squeue_create(clock_t wait, pri_t pri)
 
 	sqp->sq_enter = squeue_enter;
 	sqp->sq_drain = squeue_drain;
+	sqp->sq_isip = isip;
 
 	return (sqp);
+}
+
+/*
+ * We need to kill the threads and then clean up. We should VERIFY that
+ * polling is disabled so we don't have to worry about disassociating from
+ * MAC/IP/etc.
+ */
+void
+squeue_destroy(squeue_t *sqp)
+{
+	kt_did_t worker, poll;
+	mutex_enter(&sqp->sq_lock);
+	VERIFY(!(sqp->sq_state & (SQS_POLL_THR_QUIESCED |
+	    SQS_POLL_QUIESCE_DONE | SQS_PAUSE | SQS_EXIT)));
+	worker = sqp->sq_worker->t_did;
+	poll = sqp->sq_poll_thr->t_did;
+	sqp->sq_state |= SQS_EXIT;
+	cv_signal(&sqp->sq_poll_cv);
+	cv_signal(&sqp->sq_worker_cv);
+	mutex_exit(&sqp->sq_lock);
+
+	thread_join(poll);
+	thread_join(worker);
+	kmem_cache_free(squeue_cache, sqp);
 }
 
 /*
@@ -475,18 +504,21 @@ squeue_enter(squeue_t *sqp, mblk_t *mp, mblk_t *tail, uint32_t cnt,
 			 * Handle squeue switching. More details in the
 			 * block comment at the top of the file
 			 */
-			if (connp->conn_sqp == sqp) {
+			if (sqp->sq_isip == B_FALSE || connp->conn_sqp == sqp) {
 				SQUEUE_DBG_SET(sqp, mp, proc, connp,
 				    tag);
-				connp->conn_on_sqp = B_TRUE;
+				if (sqp->sq_isip == B_TRUE)
+					connp->conn_on_sqp = B_TRUE;
 				DTRACE_PROBE3(squeue__proc__start, squeue_t *,
 				    sqp, mblk_t *, mp, conn_t *, connp);
 				(*proc)(connp, mp, sqp, ira);
 				DTRACE_PROBE2(squeue__proc__end, squeue_t *,
 				    sqp, conn_t *, connp);
-				connp->conn_on_sqp = B_FALSE;
+				if (sqp->sq_isip == B_TRUE) {
+					connp->conn_on_sqp = B_FALSE;
+					CONN_DEC_REF(connp);
+				}
 				SQUEUE_DBG_CLEAR(sqp);
-				CONN_DEC_REF(connp);
 			} else {
 				SQUEUE_ENTER_ONE(connp->conn_sqp, mp, proc,
 				    connp, ira, SQ_FILL, SQTAG_SQUEUE_CHANGE);
@@ -513,7 +545,7 @@ squeue_enter(squeue_t *sqp, mblk_t *mp, mblk_t *tail, uint32_t cnt,
 				return;
 			}
 		} else {
-			if (ira != NULL) {
+			if (sqp->sq_isip == B_TRUE && ira != NULL) {
 				mblk_t	*attrmp;
 
 				ASSERT(cnt == 1);
@@ -587,7 +619,8 @@ squeue_enter(squeue_t *sqp, mblk_t *mp, mblk_t *tail, uint32_t cnt,
 		if (!(sqp->sq_state & SQS_REENTER) &&
 		    (process_flag != SQ_FILL) && (sqp->sq_first == NULL) &&
 		    (sqp->sq_run == curthread) && (cnt == 1) &&
-		    (connp->conn_on_sqp == B_FALSE)) {
+		    (sqp->sq_isip == B_FALSE ||
+		    connp->conn_on_sqp == B_FALSE)) {
 			sqp->sq_state |= SQS_REENTER;
 			mutex_exit(&sqp->sq_lock);
 
@@ -602,15 +635,21 @@ squeue_enter(squeue_t *sqp, mblk_t *mp, mblk_t *tail, uint32_t cnt,
 			 * Handle squeue switching. More details in the
 			 * block comment at the top of the file
 			 */
-			if (connp->conn_sqp == sqp) {
-				connp->conn_on_sqp = B_TRUE;
+			if (sqp->sq_isip == B_FALSE || connp->conn_sqp == sqp) {
+				SQUEUE_DBG_SET(sqp, mp, proc, connp,
+				    tag);
+				if (sqp->sq_isip == B_TRUE)
+					connp->conn_on_sqp = B_TRUE;
 				DTRACE_PROBE3(squeue__proc__start, squeue_t *,
 				    sqp, mblk_t *, mp, conn_t *, connp);
 				(*proc)(connp, mp, sqp, ira);
 				DTRACE_PROBE2(squeue__proc__end, squeue_t *,
 				    sqp, conn_t *, connp);
-				connp->conn_on_sqp = B_FALSE;
-				CONN_DEC_REF(connp);
+				if (sqp->sq_isip == B_TRUE) {
+					connp->conn_on_sqp = B_FALSE;
+					CONN_DEC_REF(connp);
+				}
+				SQUEUE_DBG_CLEAR(sqp);
 			} else {
 				SQUEUE_ENTER_ONE(connp->conn_sqp, mp, proc,
 				    connp, ira, SQ_FILL, SQTAG_SQUEUE_CHANGE);
@@ -631,7 +670,7 @@ squeue_enter(squeue_t *sqp, mblk_t *mp, mblk_t *tail, uint32_t cnt,
 #ifdef DEBUG
 		mp->b_tag = tag;
 #endif
-		if (ira != NULL) {
+		if (sqp->sq_isip && ira != NULL) {
 			mblk_t	*attrmp;
 
 			ASSERT(cnt == 1);
@@ -779,7 +818,7 @@ again:
 		mp->b_prev = NULL;
 
 		/* Is there an ip_recv_attr_t to handle? */
-		if (ip_recv_attr_is_mblk(mp)) {
+		if (sqp->sq_isip == B_TRUE && ip_recv_attr_is_mblk(mp)) {
 			mblk_t	*attrmp = mp;
 
 			ASSERT(attrmp->b_cont != NULL);
@@ -804,20 +843,25 @@ again:
 
 
 		/*
-		 * Handle squeue switching. More details in the
-		 * block comment at the top of the file
+		 * Handle squeue switching. More details in the block comment at
+		 * the top of the file. non-IP squeues cannot switch, as there
+		 * is no conn_t.
 		 */
-		if (connp->conn_sqp == sqp) {
+		if (sqp->sq_isip == B_FALSE || connp->conn_sqp == sqp) {
 			SQUEUE_DBG_SET(sqp, mp, proc, connp,
 			    mp->b_tag);
-			connp->conn_on_sqp = B_TRUE;
+			if (sqp->sq_isip == B_TRUE)
+				connp->conn_on_sqp = B_TRUE;
 			DTRACE_PROBE3(squeue__proc__start, squeue_t *,
 			    sqp, mblk_t *, mp, conn_t *, connp);
 			(*proc)(connp, mp, sqp, ira);
 			DTRACE_PROBE2(squeue__proc__end, squeue_t *,
 			    sqp, conn_t *, connp);
-			connp->conn_on_sqp = B_FALSE;
-			CONN_DEC_REF(connp);
+			if (sqp->sq_isip == B_TRUE) {
+				connp->conn_on_sqp = B_FALSE;
+				CONN_DEC_REF(connp);
+			}
+			SQUEUE_DBG_CLEAR(sqp);
 		} else {
 			SQUEUE_ENTER_ONE(connp->conn_sqp, mp, proc, connp, ira,
 			    SQ_FILL, SQTAG_SQUEUE_CHANGE);
@@ -1051,6 +1095,11 @@ squeue_polling_thread(squeue_t *sqp)
 		cv_wait(async, lock);
 		CALLB_CPR_SAFE_END(&cprinfo, lock);
 
+		if (sqp->sq_state & SQS_EXIT) {
+			mutex_exit(lock);
+			thread_exit();
+		}
+
 		ctl_state = sqp->sq_state & (SQS_POLL_THR_CONTROL |
 		    SQS_POLL_THR_QUIESCED);
 		if (ctl_state != 0) {
@@ -1075,6 +1124,9 @@ squeue_polling_thread(squeue_t *sqp)
 		ASSERT((sqp->sq_state &
 		    (SQS_PROC|SQS_POLLING|SQS_GET_PKTS)) ==
 		    (SQS_PROC|SQS_POLLING|SQS_GET_PKTS));
+
+		/* Only IP related squeues should reach this point */
+		VERIFY(sqp->sq_isip == B_TRUE);
 
 poll_again:
 		sq_rx_ring = sqp->sq_rx_ring;
@@ -1205,6 +1257,7 @@ squeue_worker_thr_control(squeue_t *sqp)
 	ill_rx_ring_t	*rx_ring;
 
 	ASSERT(MUTEX_HELD(&sqp->sq_lock));
+	VERIFY(sqp->sq_isip == B_TRUE);
 
 	if (sqp->sq_state & SQS_POLL_RESTART) {
 		/* Restart implies a previous quiesce. */
@@ -1316,6 +1369,11 @@ squeue_worker(squeue_t *sqp)
 
 	for (;;) {
 		for (;;) {
+			if (sqp->sq_state & SQS_EXIT) {
+				mutex_exit(lock);
+				thread_exit();
+			}
+
 			/*
 			 * If the poll thread has handed control to us
 			 * we need to break out of the wait.
@@ -1412,6 +1470,7 @@ squeue_synch_enter(conn_t *connp, mblk_t *use_mp)
 
 again:
 	sqp = connp->conn_sqp;
+	VERIFY(sqp->sq_isip == B_TRUE);
 
 	mutex_enter(&sqp->sq_lock);
 	if (sqp->sq_first == NULL && !(sqp->sq_state & SQS_PROC)) {
@@ -1487,6 +1546,7 @@ void
 squeue_synch_exit(conn_t *connp)
 {
 	squeue_t *sqp = connp->conn_sqp;
+	VERIFY(sqp->sq_isip == B_TRUE);
 
 	mutex_enter(&sqp->sq_lock);
 	if (sqp->sq_run == curthread) {

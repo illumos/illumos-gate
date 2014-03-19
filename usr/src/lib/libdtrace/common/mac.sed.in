@@ -1,0 +1,45 @@
+/*
+ * This file and its contents are supplied under the terms of the
+ * Common Development and Distribution License ("CDDL"), version 1.0.
+ * You may only use this file in accordance with the terms of version
+ * 1.0 of the CDDL.
+ *
+ * A full copy of the text of the CDDL should have accompanied this
+ * source.  A copy of the CDDL is also available via the Internet at
+ * http://www.illumos.org/license/CDDL.
+ */
+
+/*
+ * Copyright (c) 2014 Joyent, Inc.  All rights reserved.
+ */
+
+
+/*
+ * This file is a sed script which is first preprocessed by cpp or cc -E to
+ * define a set of sed directives which replace #define tokens with their
+ * values.  After preprocessing, the sed script is run over vnd.d.in to
+ * replace the #define tokens listed below to create the finished vnd.d.
+ * Refer to the rules in libdtrace/Makefile.com for more information.
+ */
+
+#include <sys/ethernet.h>
+
+#define	SED_REPLACE(x)	s/#x/x/g
+
+SED_REPLACE(ETHERTYPE_PUP)
+SED_REPLACE(ETHERTYPE_802_MIN)
+SED_REPLACE(ETHERTYPE_IP)
+SED_REPLACE(ETHERTYPE_ARP)
+SED_REPLACE(ETHERTYPE_REVARP)
+SED_REPLACE(ETHERTYPE_AT)
+SED_REPLACE(ETHERTYPE_AARP)
+SED_REPLACE(ETHERTYPE_VLAN)
+SED_REPLACE(ETHERTYPE_IPV6)
+SED_REPLACE(ETHERTYPE_SLOW)
+SED_REPLACE(ETHERTYPE_PPPOED)
+SED_REPLACE(ETHERTYPE_PPPOES)
+SED_REPLACE(ETHERTYPE_EAPOL)
+SED_REPLACE(ETHERTYPE_RSN_PREAUTH)
+SED_REPLACE(ETHERTYPE_TRILL)
+SED_REPLACE(ETHERTYPE_FCOE)
+SED_REPLACE(ETHERTYPE_MAX)

@@ -93,6 +93,7 @@ enum {
 	DLPI_ENOTENOTSUP,	/* DLPI notification not supported by link */
 	DLPI_ENOTEIDINVAL,	/* invalid DLPI notification id */
 	DLPI_EIPNETINFONOTSUP,	/* DLPI_IPNETINFO not supported */
+	DLPI_EZONENAMEINVAL,	/* invalid zone name */
 	DLPI_ERRMAX		/* Highest + 1 libdlpi error code */
 };
 
@@ -184,6 +185,7 @@ typedef boolean_t dlpi_walkfunc_t(const char *, void *);
 
 extern void dlpi_walk(dlpi_walkfunc_t *, void *, uint_t);
 extern int dlpi_open(const char *, dlpi_handle_t *, uint_t);
+extern int dlpi_open_zone(const char *, const char *, dlpi_handle_t *, uint_t);
 extern void dlpi_close(dlpi_handle_t);
 extern int dlpi_info(dlpi_handle_t, dlpi_info_t *, uint_t);
 extern int dlpi_bind(dlpi_handle_t, uint_t, uint_t *);

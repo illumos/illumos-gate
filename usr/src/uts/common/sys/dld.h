@@ -353,6 +353,7 @@ typedef struct dld_hwgrpinfo {
  */
 typedef	int	(*dld_capab_func_t)(void *, uint_t, void *, uint_t);
 
+#define	DI_DIRECT_RAW	0x1
 /*
  * Direct Tx/Rx capability.
  */
@@ -377,6 +378,9 @@ typedef struct dld_capab_direct_s {
 	/* flow control "can I put on a ring" callback */
 	uintptr_t	di_tx_fctl_df; /* canput-like callback */
 	void		*di_tx_fctl_dh;
+
+	/* flags that control our behavior */
+	uint_t		di_flags;
 } dld_capab_direct_t;
 
 /*

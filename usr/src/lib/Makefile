@@ -157,7 +157,8 @@ SUBDIRS += \
 	librdc		\
 	libinstzones	\
 	libpkg		\
-	libpcidb
+	libpcidb	\
+	libvnd
 
 SUBDIRS += \
 	passwdutil	\
@@ -463,6 +464,7 @@ HDRSUBDIRS=		\
 	libumem		\
 	libunistat	\
 	libuutil	\
+	libvnd		\
 	libwanboot	\
 	libwanbootutil	\
 	libwrap		\

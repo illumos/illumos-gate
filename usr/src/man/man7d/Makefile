@@ -142,6 +142,7 @@ _MANFILES=	aac.7d		\
 		virtualkm.7d	\
 		vni.7d		\
 		vr.7d		\
+		vnd.7d		\
 		wscons.7d	\
 		wusb_ca.7d	\
 		wusb_df.7d	\

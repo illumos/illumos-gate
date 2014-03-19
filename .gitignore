@@ -88,6 +88,8 @@ usr/src/cmd/allocate/sr0
 usr/src/cmd/allocate/st0
 obj32
 obj64
+debug32
+debug64
 usr/src/cmd/allocate/st1
 usr/src/cmd/allocate/st_clean
 usr/src/cmd/amt/amd64/amt

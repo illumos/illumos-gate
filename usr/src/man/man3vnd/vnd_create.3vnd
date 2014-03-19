@@ -1,0 +1,280 @@
+'\" te
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright (c) 2014, Joyent, Inc.  All rights reserved.
+.\"
+.TH VND_CREATE 3VND "Feb 21, 2014"
+
+.SH NAME
+
+vnd_create, vnd_open, vnd_unlink, vnd_close \- create, open, and destroy
+vnd devices
+
+.SH SYNOPSIS
+
+.LP
+.nf
+cc [ flag... ] file... -lvnd [ library... ]
+#include <libvnd.h>
+
+vnd_handle_t *vnd_create(const char *zonename, const char *datalink,
+    const char *linkname, vnd_errno_t *vnderr, int *syserr);
+
+vnd_handle_t *vnd_open(const char *zonename, const char *linkname,
+    vnd_errno_t *vnderr, int *syserr);
+
+int vnd_unlink(vnd_handle_t *vhp);
+
+void vnd_close(vnd_handle_t *vhp);
+.fi
+
+
+.SH DESCRIPTION
+.LP
+These functions create vnd devices, obtain handles to extant vnd
+devices, and close handles to vnd devices, for use with the rest of
+libvnd(3LIB).
+
+.LP
+The vnd_create function creates a new vnd device in the zone specified
+by zonename. The zone name argument may be null, in which case the
+caller's current zone is used instead. The vnd device and data link it
+is created over must both be in the same zone. The datalink argument
+indicates the name of the DLPI data link to create the vnd device over.
+The linkname argument indicates the name of the new vnd device.  The
+linkname argument must be less than VND_NAMELEN characters long,
+excluding the null terminator. It should be an alphanumeric string.  The
+only non-alphanumeric characters allowed are ':', '-', and \'_'.
+Neither the datalink argument nor linkname argument may be NULL. A
+handle to the created device is returned to the caller. Once the
+vnd_create function returns, the device can be subsequently opened with
+a call to vnd_open. The named device persists until a call to vnd_unlink
+or the containing zone is halted. Creating a vnd device requires
+PRIV_SYS_NET_CONFIG as well as PRIV_RAWACCESS. The arguments vnderr and
+syserr are used to obtain errors in the cases where the call to
+vnd_create fails. Both arguments may be NULL pointers, in which case the
+more detailed error information is discarded.
+
+.LP
+The vnd_open function opens an existing vnd device and returns a
+unique handle to that device. The vnd device to open is specified by
+both zonename and linkname. The zonename argument specifies what zone
+to look for the vnd device in. The linkname specifies the name of the
+link. The zonename argument may be NULL. If it is, the current zone is
+used. Similar to vnd_create, the integer values pointed to by the
+arguments vnderr and syserr will be filled in with additional error
+information in the cases where a call to vnd_open fails. Both
+arguments may be NULL to indicate that the error information is not
+requested, though this is not recommended.
+
+.LP
+The vnd_unlink function unlinks the vnd device specified by the vnd
+handle vhp. This unlink is similar to the use of unlink in a file
+system. After a call to unlink, the vnd device will no longer be
+accessible by callers to vnd_open and the name will be available for
+use in vnd_create. However, the device will continue to exist until
+all handles to the device have been closed.
+
+.LP
+The vnd_close function relinquishes the vnd device referenced by the
+handle vhp. After a call to vnd_close, the handle is invalidated and
+must not be used by the consumer again. The act of calling vnd_close
+on a handle does not remove the device. The device is persisted as
+long as vnd_unlink has not been called on the device or the containing
+zone has not been destroyed.
+
+.SH RETURN VALUES
+
+.LP
+Upon successful completion, the functions vnd_create and vnd_open
+return a pointer to a vnd_handle_t. This handle is used for all
+subsequent library operations. If either function fails, then a NULL
+pointer is returned and more detailed error information is filled into
+the integers pointed to by vnderr and syserr. The vnderr and syserr
+correspond to the values that would normally be returned by a call to
+vnd_errno(3VND) and vnd_syserrno(3VND). For the full list of possible
+errors see libvnd(3LIB).
+
+.LP
+The vnd_unlink function returns zero on success and -1 on failure. On
+failure, the vnd and system errnos are updated and available through
+the vnd_errno(3VND) and vnd_syserrno(3VND) functions.
+
+.LP
+The vnd_close function does not return any values nor does it set
+vnderr or syserr. The handle passed to vnd_close can no longer be
+used.
+
+.SH EXAMPLES
+.LP
+Example 1  Creating a device
+.sp
+.LP
+
+The following sample C program shows how to create a vnd device over
+an existing datalink named "net0" that other applications can open
+and use as "vnd0".
+
+.sp
+.in +2
+.nf
+#include <libvnd.h>
+#include <stdio.h>
+
+int
+main(void)
+{
+	vnd_handle_t *vhp;
+	vnd_errno_t vnderr;
+	int syserr;
+
+	/* Errors are considered fatal */
+	vhp = vnd_create(NULL, "net0", "vnd0", &vnderr, &syserr);
+
+	if (vhp == NULL) {
+		if (vnderr == VND_E_SYS)
+			(void) fprintf(stderr, "failed to create device: %s",
+			    vnd_strsyserror(syserr));
+		else
+			(void) fprintf(stderr, "failed to create device: %s",
+			    vnd_strerror(vnderr));
+		return (1);
+	}
+
+	(void) printf("successfully created vnd0\n");
+	vnd_close(vhp);	
+	return (0);
+}
+.fi
+.in -2
+
+.LP
+Example 2  Opening an existing device in another zone
+.sp
+.LP
+
+The following sample C program opens the device named "vnd1" in the zone
+named "turin" for further use.
+
+.sp
+.in +2
+.nf
+#include <libvnd.h>
+#include <stdio.h>
+
+int
+main(void)
+{
+	vnd_handle_t *vhp;
+	vnd_errno_t vnderr;
+	int syserr, ret;
+
+	vhp = vnd_open("turin", "vnd1", &vnderr, &syserr);
+	if (vhp != NULL) {
+		if (vnderr == VND_E_SYS)
+			(void) fprintf(stderr, "failed to open device: %s",
+			    vnd_strsyserror(syserr));
+		else
+			(void) fprintf(stderr, "failed to open device: %s",
+			    vnd_strerror(vnderr));
+		return (1);
+	}
+
+	/*
+	 * Use the device vnd1 with the handle vhp with any of
+	 * the other interfaces documented in libvnd(3LIB) here.
+	 *
+	 * After an arbitrary amount of code, the program will
+	 * set the variable ret with the exit code for the
+	 * program and should execute the following code before
+	 * returning.
+	 */
+	vnd_close(vhp);
+	return (ret);
+}
+.fi
+.in -2
+
+
+.LP
+Example 3  Removing a device
+.sp
+.LP
+
+The following sample C program removes a vnd device named vnd0. This
+program makes it so no additional programs can access the device.
+However, if anyone is actively using it, it will still exist,
+similar to calling unlink(2).
+
+.sp
+.in +2
+.nf
+#include <libvnd.h>
+#include <stdio.h>
+
+int
+main(void)
+{
+	vnd_handle_t *vhp;
+	vnd_errno_t vnderr;
+	int syserr, ret;
+
+	vhp = vnd_open(NULL, "vnd0", &vnderr, &syserr);
+	if (vhp != NULL) {
+		if (vnderr == VND_E_SYS)
+			(void) fprintf(stderr, "failed to open device: %s",
+			    vnd_strsyserror(syserr));
+		else
+			(void) fprintf(stderr, "failed to open device: %s",
+			    vnd_strerror(vnderr));
+		return (1);
+	}
+
+	if (vnd_unlink(vhp) != 0) {
+		if (vnderr == VND_E_SYS)
+			(void) fprintf(stderr, "failed to unlink device: %s",
+			    vnd_strsyserror(syserr));
+		else
+			(void) fprintf(stderr, "failed to unlink device: %s",
+			    vnd_strerror(vnderr));
+		ret = 1;
+	} else {
+		(void) printf("successfully unlinked vnd0!\n");
+		ret = 0;
+	}
+
+	vnd_close(vhp);
+	return (ret);
+}
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See attributes(5) for descriptions of the following attributes:
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Stability	Committed
+_
+MT-Level	See "THREADING" in libvnd(3LIB)
+.TE
+
+.SH SEE ALSO
+
+libvnd(3LIB), vnd_errno(3VND), vnd_syserrno(3VND), attributes(5), privileges(5)

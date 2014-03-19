@@ -21,7 +21,7 @@
 
 #
 # Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright (c) 2012 Joyent, Inc.  All rights reserved.
+# Copyright (c) 2014 Joyent, Inc.  All rights reserved.
 # Copyright (c) 2012 Nexenta Systems, Inc. All rights reserved.
 # Copyright (c) 2013 by Delphix. All rights reserved.
 # Copyright (c) 2013 by Saso Kiselkov. All rights reserved.
@@ -674,6 +674,10 @@ NET80211_OBJS += net80211.o net80211_proto.o net80211_input.o \
 
 VNIC_OBJS +=	vnic_ctl.o vnic_dev.o
 
+VND_OBJS +=	vnd.o frameio.o
+
+GSQUEUE_OBJS +=	gsqueue.o
+
 SIMNET_OBJS +=	simnet.o
 
 IB_OBJS +=	ibnex.o ibnex_ioctl.o ibnex_hca.o
@@ -1129,8 +1133,7 @@ DEVFS_OBJS +=	devfs_subr.o	devfs_vfsops.o	devfs_vnops.o
 DEV_OBJS  +=	sdev_subr.o	sdev_vfsops.o	sdev_vnops.o	\
 		sdev_ptsops.o	sdev_zvolops.o	sdev_comm.o	\
 		sdev_profile.o	sdev_ncache.o	sdev_netops.o	\
-		sdev_ipnetops.o	\
-		sdev_vtops.o
+		sdev_ipnetops.o	sdev_vtops.o	sdev_plugin.o
 
 CTFS_OBJS +=	ctfs_all.o ctfs_cdir.o ctfs_ctl.o ctfs_event.o \
 		ctfs_latest.o ctfs_root.o ctfs_sym.o ctfs_tdir.o ctfs_tmpl.o

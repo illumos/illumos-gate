@@ -714,6 +714,7 @@ f kernel/drv/amd64/urf 0755 root sys
 f kernel/drv/amd64/vgatext 0755 root sys
 f kernel/drv/amd64/vioblk 0755 root sys
 f kernel/drv/amd64/vmxnet 0755 root sys
+f kernel/drv/amd64/vnd 0755 root sys
 f kernel/drv/amd64/vnic 0755 root sys
 f kernel/drv/amd64/vr 0755 root sys
 f kernel/drv/amd64/vscan 0755 root sys
@@ -835,6 +836,7 @@ f kernel/drv/usbftdi.conf 0644 root sys
 f kernel/drv/usbser_edge.conf 0644 root sys
 f kernel/drv/usbskel.conf 0644 root sys
 f kernel/drv/vmxnet.conf 0644 root sys
+f kernel/drv/vnd.conf 0644 root sys
 f kernel/drv/vnic.conf 0644 root sys
 f kernel/drv/vscan.conf 0644 root sys
 f kernel/drv/wc.conf 0644 root sys
@@ -967,6 +969,7 @@ f kernel/misc/amd64/fctl 0755 root sys
 f kernel/misc/amd64/fssnap_if 0755 root sys
 f kernel/misc/amd64/gda 0755 root sys
 f kernel/misc/amd64/gld 0755 root sys
+f kernel/misc/amd64/gsqueue 0755 root sys
 f kernel/misc/amd64/hidparser 0755 root sys
 f kernel/misc/amd64/hook 0755 root sys
 f kernel/misc/amd64/hpcsvc 0755 root sys
@@ -2341,6 +2344,7 @@ h usr/bin/vedit=usr/bin/edit
 f usr/bin/vfsstat 0555 root bin
 f usr/bin/vgrind 0555 root bin
 f usr/bin/vmstat 0555 root bin
+f usr/bin/vndstat 0555 root bin
 h usr/bin/w=usr/lib/isaexec
 h usr/bin/wait=usr/bin/alias
 h usr/bin/wc=usr/bin/alias
@@ -2880,6 +2884,7 @@ f usr/include/libsysevent_impl.h 0644 root bin
 f usr/include/libtecla.h 0644 root bin
 f usr/include/libuutil.h 0644 root bin
 f usr/include/libuutil_impl.h 0644 root bin
+f usr/include/libvnd.h 0644 root bin
 f usr/include/libvrrpadm.h 0644 root bin
 f usr/include/libvscan.h 0644 root bin
 f usr/include/libw.h 0644 root bin
@@ -3618,6 +3623,7 @@ f usr/include/sys/fm/util.h 0644 root bin
 f usr/include/sys/fork.h 0644 root bin
 f usr/include/sys/fp.h 0644 root bin
 f usr/include/sys/frame.h 0644 root bin
+f usr/include/sys/frameio.h 0644 root bin
 d usr/include/sys/fs 0755 root bin
 f usr/include/sys/fs/autofs.h 0644 root bin
 f usr/include/sys/fs/cachefs_dir.h 0644 root bin
@@ -4404,6 +4410,7 @@ f usr/include/sys/vmem_impl.h 0644 root bin
 f usr/include/sys/vmem_impl_user.h 0644 root bin
 f usr/include/sys/vmparam.h 0644 root bin
 f usr/include/sys/vmsystm.h 0644 root bin
+f usr/include/sys/vnd.h 0644 root bin
 f usr/include/sys/vnic.h 0644 root bin
 f usr/include/sys/vnic_impl.h 0644 root bin
 f usr/include/sys/vnode.h 0644 root bin
@@ -4951,6 +4958,8 @@ s usr/lib/amd64/libuuid.so.1=../../../lib/amd64/libuuid.so.1
 s usr/lib/amd64/libuuid.so=../../../lib/amd64/libuuid.so.1
 s usr/lib/amd64/libuutil.so.1=../../../lib/amd64/libuutil.so.1
 s usr/lib/amd64/libuutil.so=../../../lib/amd64/libuutil.so.1
+f usr/lib/amd64/libvnd.so.1 0755 root bin
+s usr/lib/amd64/libvnd.so=libvnd.so.1
 f usr/lib/amd64/libvolmgt.so.1 0755 root bin
 s usr/lib/amd64/libvolmgt.so=libvolmgt.so.1
 f usr/lib/amd64/libvrrpadm.so.1 0755 root bin
@@ -5112,6 +5121,7 @@ f usr/lib/dtrace/io.d 0644 root bin
 f usr/lib/dtrace/ip.d 0644 root bin
 f usr/lib/dtrace/iscsit.d 0644 root bin
 f usr/lib/dtrace/libdtrace_forceload.so 0644 root bin
+f usr/lib/dtrace/mac.d 0644 root bin
 f usr/lib/dtrace/net.d 0644 root bin
 f usr/lib/dtrace/nfs.d 0644 root bin
 f usr/lib/dtrace/procfs.d 0644 root bin
@@ -5124,6 +5134,7 @@ f usr/lib/dtrace/sysevent.d 0644 root bin
 f usr/lib/dtrace/tcp.d 0644 root bin
 f usr/lib/dtrace/udp.d 0644 root bin
 f usr/lib/dtrace/unistd.d 0644 root bin
+f usr/lib/dtrace/vnd.d 0644 root bin
 d usr/lib/elfedit 0755 root bin
 s usr/lib/elfedit/32=.
 s usr/lib/elfedit/64=amd64
@@ -6386,6 +6397,8 @@ s usr/lib/libuuid.so.1=../../lib/libuuid.so.1
 s usr/lib/libuuid.so=../../lib/libuuid.so.1
 s usr/lib/libuutil.so.1=../../lib/libuutil.so.1
 s usr/lib/libuutil.so=../../lib/libuutil.so.1
+f usr/lib/libvnd.so.1 0755 root bin
+s usr/lib/libvnd.so=libvnd.so.1
 f usr/lib/libvolmgt.so.1 0755 root bin
 s usr/lib/libvolmgt.so=libvolmgt.so.1
 f usr/lib/libvrrpadm.so.1 0755 root bin
@@ -10500,6 +10513,7 @@ h usr/sbin/update_drv=usr/lib/isaexec
 h usr/sbin/useradd=usr/sbin/roleadd
 h usr/sbin/userdel=usr/sbin/roledel
 h usr/sbin/usermod=usr/sbin/rolemod
+f usr/sbin/vndadm 0555 root bin
 f usr/sbin/volcopy 0555 root bin
 f usr/sbin/vrrpadm 0555 root bin
 f usr/sbin/wall 2555 root tty
@@ -12166,6 +12180,8 @@ f usr/share/man/man1m/userdel.1m 0444 root bin
 f usr/share/man/man1m/usermod.1m 0444 root bin
 f usr/share/man/man1m/utmpd.1m 0444 root bin
 f usr/share/man/man1m/vmstat.1m 0444 root bin
+f usr/share/man/man1m/vndadm.1m 0444 root bin
+f usr/share/man/man1m/vndstat.1m 0444 root bin
 f usr/share/man/man1m/volcopy.1m 0444 root bin
 f usr/share/man/man1m/volcopy_ufs.1m 0444 root bin
 f usr/share/man/man1m/wall.1m 0444 root bin
@@ -14664,6 +14680,7 @@ f usr/share/man/man3dlpi/dlpi_info.3dlpi 0444 root bin
 f usr/share/man/man3dlpi/dlpi_linkname.3dlpi 0444 root bin
 f usr/share/man/man3dlpi/dlpi_mactype.3dlpi 0444 root bin
 f usr/share/man/man3dlpi/dlpi_open.3dlpi 0444 root bin
+s usr/share/man/man3dlpi/dlpi_open_zone.3dlpi=dlpi_open.3dlpi 
 s usr/share/man/man3dlpi/dlpi_promiscoff.3dlpi=dlpi_promiscon.3dlpi
 f usr/share/man/man3dlpi/dlpi_promiscon.3dlpi 0444 root bin
 f usr/share/man/man3dlpi/dlpi_recv.3dlpi 0444 root bin
@@ -15535,6 +15552,7 @@ f usr/share/man/man3lib/libtnfctl.3lib 0444 root bin
 f usr/share/man/man3lib/libtsalarm.3lib 0444 root bin
 f usr/share/man/man3lib/libumem.3lib 0444 root bin
 f usr/share/man/man3lib/libuuid.3lib 0444 root bin
+f usr/share/man/man3lib/libvnd.3lib 0444 root bin
 f usr/share/man/man3lib/libvolmgt.3lib 0444 root bin
 f usr/share/man/man3lib/libw.3lib 0444 root bin
 f usr/share/man/man3lib/libxnet.3lib 0444 root bin
@@ -17164,6 +17182,27 @@ s usr/share/man/man3uuid/uuid_is_null.3uuid=uuid_clear.3uuid
 s usr/share/man/man3uuid/uuid_parse.3uuid=uuid_clear.3uuid
 s usr/share/man/man3uuid/uuid_time.3uuid=uuid_clear.3uuid
 s usr/share/man/man3uuid/uuid_unparse.3uuid=uuid_clear.3uuid
+d usr/share/man/man3vnd 0755 root bin
+s usr/share/man/man3vnd/frameio_t.3vnd=vnd_frameio_read.3vnd
+s usr/share/man/man3vnd/framevec_t.3vnd=vnd_frameio_read.3vnd
+s usr/share/man/man3vnd/vnd_close.3vnd=vnd_create.3vnd
+f usr/share/man/man3vnd/vnd_create.3vnd 0444 root bin
+f usr/share/man/man3vnd/vnd_errno.3vnd 0444 root bin
+f usr/share/man/man3vnd/vnd_frameio_read.3vnd 0444 root bin
+s usr/share/man/man3vnd/vnd_frameio_write.3vnd=vnd_frameio_read.3vnd
+s usr/share/man/man3vnd/vnd_open.3vnd=vnd_create.3vnd
+f usr/share/man/man3vnd/vnd_pollfd.3vnd 0444 root bin
+f usr/share/man/man3vnd/vnd_prop_get.3vnd 0444 root bin
+f usr/share/man/man3vnd/vnd_prop_iter.3vnd 0444 root bin
+s usr/share/man/man3vnd/vnd_prop_iter_f.3vnd=vnd_prop_iter.3vnd
+s usr/share/man/man3vnd/vnd_prop_set.3vnd=vnd_prop_get.3vnd
+f usr/share/man/man3vnd/vnd_prop_writeable.3vnd 0444 root bin
+s usr/share/man/man3vnd/vnd_strerror.3vnd=vnd_errno.3vnd
+s usr/share/man/man3vnd/vnd_strsyserror.3vnd=vnd_errno.3vnd
+s usr/share/man/man3vnd/vnd_syserrno.3vnd=vnd_errno.3vnd
+s usr/share/man/man3vnd/vnd_unlink.3vnd=vnd_create.3vnd
+f usr/share/man/man3vnd/vnd_walk.3vnd 0444 root bin
+s usr/share/man/man3vnd/vnd_walk_cb_f.3vnd=vnd_walk.3vnd
 d usr/share/man/man3volmgt 0755 root bin
 f usr/share/man/man3volmgt/media_findname.3volmgt 0444 root bin
 f usr/share/man/man3volmgt/media_getattr.3volmgt 0444 root bin
@@ -18111,6 +18150,7 @@ f usr/share/man/man7d/uwba.7d 0444 root bin
 f usr/share/man/man7d/virtualkm.7d 0444 root bin
 f usr/share/man/man7d/vni.7d 0444 root bin
 f usr/share/man/man7d/vr.7d 0444 root bin
+f usr/share/man/man7d/vnd.7d 0444 root bin
 f usr/share/man/man7d/wscons.7d 0444 root bin
 f usr/share/man/man7d/wusb_ca.7d 0444 root bin
 f usr/share/man/man7d/wusb_df.7d 0444 root bin

@@ -121,6 +121,7 @@ main(int argc, char **argv)
 	char *output_area;
 	int nbytes;
 	char *datalink = NULL;
+	char *zonename = NULL;
 	dlpi_handle_t dh;
 
 	names[0] = '\0';
@@ -227,7 +228,7 @@ main(int argc, char **argv)
 	}
 	(void) setvbuf(stdout, NULL, _IOLBF, BUFSIZ);
 
-	while ((c = getopt(argc, argv, "at:CPDSi:o:Nn:s:d:I:vVp:f:c:x:U?rqz"))
+	while ((c = getopt(argc, argv, "at:CPDSi:o:Nn:s:d:I:vVp:f:c:x:U?rqz:Z"))
 	    != EOF) {
 		switch (c) {
 		case 'a':
@@ -348,8 +349,11 @@ main(int argc, char **argv)
 		case 'U':
 			Uflg = B_TRUE;
 			break;
-#ifdef	DEBUG
 		case 'z':
+			zonename = optarg;
+			break;
+#ifdef	DEBUG
+		case 'Z':
 			zflg = B_TRUE;
 			break;
 #endif	/* DEBUG */
@@ -371,7 +375,7 @@ main(int argc, char **argv)
 	 * requested was chosen, but that's too hard.
 	 */
 	if (!icapfile) {
-		use_kern_pf = open_datalink(&dh, datalink);
+		use_kern_pf = open_datalink(&dh, datalink, zonename);
 	} else {
 		use_kern_pf = B_FALSE;
 		cap_open_read(icapfile);

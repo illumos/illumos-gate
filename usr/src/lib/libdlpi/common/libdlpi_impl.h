@@ -28,6 +28,7 @@
 
 #include <libdlpi.h>
 #include <sys/sysmacros.h>
+#include <sys/zone.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -112,6 +113,8 @@ typedef struct dlpi_impl_s {
 					/* full linkname including PPA */
 	char		dli_provider[DLPI_LINKNAME_MAX];
 					/* only provider name */
+	char		dli_zonename[ZONENAME_MAX];
+					/* optionally specified zone */
 	t_uscalar_t	dli_style;	/* style 1 or 2 */
 	uint_t		dli_saplen;	/* bound SAP length */
 	uint_t		dli_sap;	/* bound SAP value */

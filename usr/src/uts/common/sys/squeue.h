@@ -29,6 +29,17 @@
 extern "C" {
 #endif
 
+/*
+ * Originally in illumos, we had an IP-centric view of the serialization queue
+ * abstraction. While that has useful properties, the implementation of squeues
+ * hardcodes various parts of the implementation of IP into it which makes it
+ * unsuitable for other consumers. To enable them, we created another interface,
+ * but opted not to port all of the functionality that IP uses in the form of
+ * ip_squeue.c As other consumers need the functionality that IP has in squeues,
+ * then we'll come up with more genericized methods and add that functionality
+ * to <sys/gsqueue.h>. Please do not continue to use this header.
+ */
+
 #include <sys/types.h>
 #include <sys/processor.h>
 #include <sys/stream.h>
@@ -76,12 +87,13 @@ typedef enum {
 
 struct ip_recv_attr_s;
 extern void squeue_init(void);
-extern squeue_t *squeue_create(clock_t, pri_t);
+extern squeue_t *squeue_create(clock_t, pri_t, boolean_t);
 extern void squeue_bind(squeue_t *, processorid_t);
 extern void squeue_unbind(squeue_t *);
 extern void squeue_enter(squeue_t *, mblk_t *, mblk_t *,
     uint32_t, struct ip_recv_attr_s *, int, uint8_t);
 extern uintptr_t *squeue_getprivate(squeue_t *, sqprivate_t);
+extern void squeue_destroy(squeue_t *);
 
 struct conn_s;
 extern int squeue_synch_enter(struct conn_s *, mblk_t *);

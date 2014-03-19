@@ -24,7 +24,7 @@
 #
 
 #
-# Copyright (c) 2012 Joyent, Inc.  All rights reserved.
+# Copyright (c) 2014 Joyent, Inc.  All rights reserved.
 # Copyright (c) 2012 Nexenta Systems, Inc. All rights reserved.
 # Copyright 2013 Garrett D'Amore <garrett@damore.org>
 #
@@ -1125,6 +1125,10 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/sdcard/targets/sdcard/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
+$(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/gsqueue/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
 $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/sfe/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
@@ -1134,6 +1138,10 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/simnet/%.c
 	$(CTFCONVERT_O)
 
 $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/softmac/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/vnd/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 

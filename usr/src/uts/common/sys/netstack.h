@@ -81,7 +81,8 @@ typedef id_t	netstackid_t;
 #define	NS_IPSECESP	16
 #define	NS_IPNET	17
 #define	NS_ILB		18
-#define	NS_MAX		(NS_ILB+1)
+#define	NS_VND		19
+#define	NS_MAX		(NS_VND+1)
 
 /*
  * State maintained for each module which tracks the state of

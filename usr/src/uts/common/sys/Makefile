@@ -243,6 +243,7 @@ CHKHDRS=			\
 	flock.h			\
 	flock_impl.h		\
 	fork.h			\
+	frameio.h		\
 	fss.h			\
 	fsspriocntl.h		\
 	fsid.h			\
@@ -635,6 +636,8 @@ CHKHDRS=			\
 	vmem.h			\
 	vmem_impl.h		\
 	vmsystm.h		\
+	vnd.h			\
+	vnd_errno.h		\
 	vnic.h			\
 	vnic_impl.h		\
 	vnode.h			\
@@ -852,7 +855,6 @@ FSHDRS=				\
 	cachefs_log.h		\
 	decomp.h		\
 	dv_node.h		\
-	sdev_impl.h		\
 	fifonode.h		\
 	hsfs_isospec.h		\
 	hsfs_node.h		\
@@ -870,6 +872,8 @@ FSHDRS=				\
 	pc_label.h		\
 	pc_node.h		\
 	pxfs_ki.h		\
+	sdev_impl.h		\
+	sdev_plugin.h		\
 	snode.h			\
 	swapnode.h		\
 	tmp.h			\

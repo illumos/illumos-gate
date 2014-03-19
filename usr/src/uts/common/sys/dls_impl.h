@@ -62,6 +62,7 @@ struct dls_link_s {				/* Protected by */
 	uint_t			dl_zone_ref;
 	link_tagmode_t		dl_tagmode;		/* atomic */
 	uint_t			dl_nonip_cnt;		/* SL */
+	uint_t			dl_exclusive;		/* SL */
 };
 
 typedef struct dls_head_s {
@@ -128,6 +129,7 @@ extern void		dls_mgmt_init(void);
 extern void		dls_mgmt_fini(void);
 
 extern int		dls_mgmt_get_phydev(datalink_id_t, dev_t *);
+extern int		dls_exclusive_set(dld_str_t *, boolean_t);
 
 #ifdef	__cplusplus
 }

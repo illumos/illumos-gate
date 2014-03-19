@@ -182,7 +182,7 @@ extern void cap_open_read(const char *);
 extern void cap_open_write(const char *);
 extern void cap_read(int, int, int, void (*)(), int);
 extern void cap_close(void);
-extern boolean_t open_datalink(dlpi_handle_t *, const char *);
+extern boolean_t open_datalink(dlpi_handle_t *, const char *, const char *);
 extern void init_datalink(dlpi_handle_t, ulong_t, ulong_t, struct timeval *,
     struct Pf_ext_packetfilt *);
 extern void net_read(dlpi_handle_t, size_t, int, void (*)(), int);

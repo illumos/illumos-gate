@@ -13,7 +13,7 @@
 # Copyright 2011, Richard Lowe
 # Copyright (c) 2012, Joyent, Inc.  All rights reserved.
 # Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
-# Copyright (c) 2012 Joyent, Inc. All rights reserved.
+# Copyright (c) 2014 Joyent, Inc. All rights reserved.
 #
 
 include	$(SRC)//Makefile.master
@@ -566,6 +566,8 @@ _MANFILES=	6to4relay.1m		\
 		uusched.1m		\
 		uuxqt.1m		\
 		vmstat.1m		\
+		vndadm.1m		\
+		vndstat.1m		\
 		volcopy.1m		\
 		volcopy_ufs.1m		\
 		vscanadm.1m		\

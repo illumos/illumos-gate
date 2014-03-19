@@ -542,6 +542,27 @@ dls_mgmt_get_linkid(const char *link, datalink_id_t *linkid)
 	return (err);
 }
 
+int
+dls_mgmt_get_linkid_in_zone(const char *link, datalink_id_t *linkid,
+    zoneid_t zid)
+{
+	dlmgmt_door_getlinkid_t		getlinkid;
+	dlmgmt_getlinkid_retval_t	retval;
+	int				err;
+
+	ASSERT(getzoneid() == GLOBAL_ZONEID || zid == getzoneid());
+	getlinkid.ld_cmd = DLMGMT_CMD_GETLINKID;
+	(void) strlcpy(getlinkid.ld_link, link, MAXLINKNAMELEN);
+	getlinkid.ld_zoneid = zid;
+
+	if ((err = i_dls_mgmt_upcall(&getlinkid, sizeof (getlinkid), &retval,
+	    sizeof (retval))) == 0) {
+		*linkid = retval.lr_linkid;
+	}
+	return (err);
+}
+
+
 datalink_id_t
 dls_mgmt_get_next(datalink_id_t linkid, datalink_class_t class,
     datalink_media_t dmedia, uint32_t flags)
@@ -1209,7 +1230,7 @@ dls_devnet_rele(dls_devnet_t *ddp)
 }
 
 static int
-dls_devnet_hold_by_name(const char *link, dls_devnet_t **ddpp)
+dls_devnet_hold_by_name(const char *link, dls_devnet_t **ddpp, zoneid_t zid)
 {
 	char			drv[MAXLINKNAMELEN];
 	uint_t			ppa;
@@ -1219,7 +1240,7 @@ dls_devnet_hold_by_name(const char *link, dls_devnet_t **ddpp)
 	dls_dev_handle_t	ddh;
 	int			err;
 
-	if ((err = dls_mgmt_get_linkid(link, &linkid)) == 0)
+	if ((err = dls_mgmt_get_linkid_in_zone(link, &linkid, zid)) == 0)
 		return (dls_devnet_hold(linkid, ddpp));
 
 	/*
@@ -1662,15 +1683,19 @@ dls_devnet_islinkvisible(datalink_id_t linkid, zoneid_t zoneid)
  * Access a vanity naming node.
  */
 int
-dls_devnet_open(const char *link, dls_dl_handle_t *dhp, dev_t *devp)
+dls_devnet_open_in_zone(const char *link, dls_dl_handle_t *dhp, dev_t *devp,
+    zoneid_t zid)
 {
 	dls_devnet_t	*ddp;
 	dls_link_t	*dlp;
-	zoneid_t	zid = getzoneid();
+	zoneid_t	czid = getzoneid();
 	int		err;
 	mac_perim_handle_t	mph;
 
-	if ((err = dls_devnet_hold_by_name(link, &ddp)) != 0)
+	if (czid != GLOBAL_ZONEID && czid != zid)
+		return (ENOENT);
+
+	if ((err = dls_devnet_hold_by_name(link, &ddp, zid)) != 0)
 		return (err);
 
 	dls_devnet_prop_task_wait(ddp);
@@ -1701,6 +1726,12 @@ dls_devnet_open(const char *link, dls_dl_handle_t *dhp, dev_t *devp)
 	*dhp = ddp;
 	*devp = dls_link_dev(dlp);
 	return (0);
+}
+
+int
+dls_devnet_open(const char *link, dls_dl_handle_t *dhp, dev_t *devp)
+{
+	return (dls_devnet_open_in_zone(link, dhp, devp, getzoneid()));
 }
 
 /*

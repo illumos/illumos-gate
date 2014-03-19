@@ -1,9 +1,10 @@
 '\" te
 .\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved
+.\" Copyright (c) 2014, Joyent, Inc.  All rights reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DLPI_OPEN 3DLPI "Nov 17, 2008"
+.TH DLPI_OPEN 3DLPI "Feb 24, 2014"
 .SH NAME
 dlpi_open \- open DLPI link
 .SH SYNOPSIS
@@ -14,6 +15,9 @@ dlpi_open \- open DLPI link
 
 \fBint\fR \fBdlpi_open\fR(\fBconst char *\fR\fIlinkname\fR, \fBdlpi_handle_t *\fR\fIdhp\fR,
      \fBuint_t\fR \fIflags\fR);
+
+\fBint\fR \fBdlpi_open_zone\fR(\fBconst char *\fR\fIlinkname\fR, \fBconst char *\fR
+     \fIzonename\fR, \fBdlpi_handle_t *\fR\fIdhp\fR, \fBuint_t\fR \fIflags\fR);
 .fi
 
 .SH DESCRIPTION
@@ -114,6 +118,18 @@ value ensures that \fBDLPI_ETIMEDOUT\fR is returned from a \fBlibdlpi\fR
 operation only in the event that the \fBDLPI\fR link becomes unresponsive. The
 timeout value can be changed with \fBdlpi_set_timeout\fR(3DLPI), although this
 should seldom be necessary.
+
+.sp
+.LP
+The \fBdlpi_open_zone()\fR function behaves as \fBdlpi_open()\fR, except that it
+looks for the link specified by \fBlinkname\fR in the specified zone
+\fBzonename\fR as opposed to the current zone. This function is only meaningful
+from the global zone. Instead of scanning \fB/dev/net\fR, \fBdlpi_open_zone()\fR
+scans \fB/dev/net/zone/<\fIzonename\fR> for the data link and
+\fB/dev/ipnet/zone/<\fIzonename\fR> when DLPI_DEVIPNET is present in
+\fBflags\fR. If a NULL or empty string is passed into \fBdlpi_open_zone()\fR, it
+will behave as though \fBdlpi_open\fR has been called.
+
 .SH RETURN VALUES
 .sp
 .LP
@@ -124,7 +140,7 @@ section is returned.
 .SH ERRORS
 .sp
 .LP
-The \fBdlpi_open()\fR function will fail if:
+The \fBdlpi_open()\fR and \fBdlpi_open_zone()\fR function will fail if:
 .sp
 .ne 2
 .na
@@ -194,6 +210,17 @@ DLPI operation failed
 .LP
 See \fBattributes\fR(5) for description of the following attributes:
 .sp
+
+.LP
+The \fBdlpi_open_zone()\fR function will fail if:
+.sp
+.ne 2
+.na
+\fB\fBDLPI_EZONENAMEINVAL\fR\fR
+.ad
+.RS 25n
+Invalid \fIzonename\fR argument
+.RE
 
 .sp
 .TS
