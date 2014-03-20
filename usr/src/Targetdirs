@@ -53,6 +53,9 @@ i386_DIRS=			\
 	/boot/grub/bin		\
 	/platform/i86pc		\
 	/lib/libmvec		\
+	/usr/lib/brand/lx \
+	/usr/lib/brand/lx/amd64 \
+	/usr/lib/brand/lx/distros \
 	/usr/lib/xen		\
 	/usr/lib/xen/bin
 
@@ -509,6 +512,9 @@ SYM.DIRS= \
 	/usr/ucblib/32 \
 	/var/ld/32
 
+i386_SYM.DIRS64= \
+	/usr/lib/brand/lx/64
+
 sparc_SYM.DIRS64=
 
 SYM.DIRS64= \
@@ -624,6 +630,7 @@ $(BUILD64) $(ROOT)/lib/crypto/64:=	LINKDEST=$(MACH64)
 $(BUILD64) $(ROOT)/lib/secure/64:=	LINKDEST=$(MACH64)
 $(BUILD64) $(ROOT)/usr/lib/64:=		LINKDEST=$(MACH64)
 $(BUILD64) $(ROOT)/usr/lib/elfedit/64:=	LINKDEST=$(MACH64)
+$(BUILD64) $(ROOT)/usr/lib/brand/lx/64:=	LINKDEST=$(MACH64)
 $(BUILD64) $(ROOT)/usr/lib/brand/sn1/64:=	LINKDEST=$(MACH64)
 $(BUILD64) $(ROOT)/usr/lib/brand/solaris10/64:=	LINKDEST=$(MACH64)
 $(BUILD64) $(ROOT)/usr/lib/lwp/64:=	LINKDEST=$(MACH64)

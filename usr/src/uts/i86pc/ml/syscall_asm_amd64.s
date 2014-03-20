@@ -1159,6 +1159,48 @@ sys_sysenter()
 	SET_SIZE(brand_sys_sysenter)
 
 #endif	/* __lint */
+ 
+#if defined(__lint)
+/*
+ * System call via an int80.  This entry point is only used by the Linux
+ * application environment.  Unlike the other entry points, there is no
+ * default action to take if no callback is registered for this process.
+ */
+void
+sys_int80()
+{}
+
+#else	/* __lint */
+
+	ENTRY_NP(brand_sys_int80)
+	SWAPGS				/* kernel gsbase */
+	XPV_TRAP_POP
+	BRAND_CALLBACK(BRAND_CB_INT80, BRAND_URET_FROM_INTR_STACK())
+	SWAPGS				/* user gsbase */
+	jmp	nopop_int80
+
+	ENTRY_NP(sys_int80)
+	/*
+	 * We hit an int80, but this process isn't of a brand with an int80
+	 * handler.  Bad process!  Make it look as if the INT failed.
+	 * Modify %rip to point before the INT, push the expected error
+	 * code and fake a GP fault. Note on 64-bit hypervisor we need
+	 * to undo the XPV_TRAP_POP and push rcx and r11 back on the stack
+	 * because gptrap will pop them again with its own XPV_TRAP_POP.
+	 */
+	XPV_TRAP_POP
+nopop_int80:
+	subq	$2, (%rsp)	/* int insn 2-bytes */
+	pushq	$_CONST(_MUL(T_INT80, GATE_DESC_SIZE) + 2)
+#if defined(__xpv)
+	push	%r11
+	push	%rcx
+#endif
+	jmp	gptrap			/ GP fault
+	SET_SIZE(sys_int80)
+	SET_SIZE(brand_sys_int80)
+#endif	/* __lint */
+
 
 /*
  * This is the destination of the "int $T_SYSCALLINT" interrupt gate, used by
