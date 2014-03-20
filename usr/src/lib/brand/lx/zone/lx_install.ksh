@@ -498,7 +498,6 @@ int_code=$ZONE_SUBPROC_FATAL
 log "Installation started for zone \"$zonename\" `/usr/bin/date`"
 
 if [[ -n $gtaropts ]]; then
-	check_cmd /usr/sfw/bin/gtar $branddir/lx_init_zone
 
 	screenlog "$install_zone" "$zonename" "$zoneroot"
 	screenlog "$install_from" "$install_src"
