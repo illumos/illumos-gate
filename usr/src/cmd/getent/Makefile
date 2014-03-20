@@ -20,6 +20,7 @@
 #
 
 #
+# Copyright (c) 2014 Gary Mills
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -41,6 +42,7 @@ OBJECTS= \
 	dogetproject.o	\
 	dogetproto.o	\
 	dogetpw.o	\
+	dogetsp.o	\
 	dogetserv.o	\
 	getent.o
 
