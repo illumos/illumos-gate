@@ -1002,13 +1002,14 @@ reverse_bytes(char *buf, size_t len)
 
 /* CTID */
 #define	CTID_COLUMN_WIDTH		6
+#define	CTID_COLUMN_BUFSIZE		20	/* max ctid_t + space + \0 */
 
 static void
 sprint_ctid(char **buf, scf_walkinfo_t *wip)
 {
 	int r;
 	uint64_t c;
-	size_t newsize = (*buf ? strlen(*buf) : 0) + CTID_COLUMN_WIDTH + 2;
+	size_t newsize = (*buf ? strlen(*buf) : 0) + CTID_COLUMN_BUFSIZE;
 	char *newbuf = safe_malloc(newsize);
 	int restarter_spec;
 
