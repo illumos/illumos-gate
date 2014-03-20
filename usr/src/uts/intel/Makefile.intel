@@ -42,6 +42,7 @@ PLATFORM	 = i86pc
 #
 UNIX_DIR	 = $(UTSBASE)/i86pc/unix
 GENLIB_DIR	 = $(UTSBASE)/intel/genunix
+GENASSYM_DIR	 = $(UTSBASE)/intel/genassym
 IPDRV_DIR	 = $(UTSBASE)/intel/ip
 MODSTUBS_DIR	 = $(UNIX_DIR)
 DSF_DIR		 = $(UTSBASE)/$(PLATFORM)/genassym
@@ -134,6 +135,7 @@ ASFLAGS_XARCH_64	= $(amd64_ASFLAGS)
 ASFLAGS_XARCH		= $(ASFLAGS_XARCH_$(CLASS))
 
 ASFLAGS			+= $(ASFLAGS_XARCH)
+AS_INC_PATH		+= -I$(GENASSYM_DIR)/$(OBJS_DIR)
 
 #
 #	Define the base directory for installation.
@@ -513,7 +515,9 @@ MISC_KMODS	+= md_sp
 #
 #	Brand modules
 #
-BRAND_KMODS	+= sn1_brand sngl_brand s10_brand
+BRAND_KMODS	+= sn1_brand sngl_brand s10_brand lx_brand
+DRV_KMODS	+= lx_systrace lx_ptm lx_audio
+STRMOD_KMODS	+= ldlinux 
 
 #
 #	Exec Class Modules (/kernel/exec):
@@ -529,7 +533,7 @@ SCHED_KMODS	+= IA RT TS RT_DPTBL TS_DPTBL FSS FX FX_DPTBL SDC
 #	File System Modules (/kernel/fs):
 #
 FS_KMODS	+= autofs cachefs ctfs dcfs dev devfs fdfs fifofs hsfs hyprlofs
-FS_KMODS	+= lofs lxprocfs mntfs namefs nfs objfs zfs zut
+FS_KMODS	+= lofs lx_afs lx_proc lxprocfs mntfs namefs nfs objfs zfs zut
 FS_KMODS	+= pcfs procfs sockfs specfs tmpfs udfs ufs sharefs
 FS_KMODS	+= smbfs
 

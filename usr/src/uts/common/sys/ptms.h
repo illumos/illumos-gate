@@ -126,6 +126,12 @@ extern void ptms_logp(char *, uintptr_t);
 #define	DDBGP(a, b)
 #endif
 
+typedef struct __ptmptsopencb_arg *ptmptsopencb_arg_t;
+typedef struct ptmptsopencb {
+	boolean_t		(*ppocb_func)(ptmptsopencb_arg_t);
+	ptmptsopencb_arg_t	ppocb_arg;
+} ptmptsopencb_t;
+
 #endif /* _KERNEL */
 
 typedef struct pt_own {
@@ -156,6 +162,19 @@ typedef struct pt_own {
 #define	PTSSTTY		(('P'<<8)|3)	/* set tty flag */
 #define	ZONEPT		(('P'<<8)|4)	/* set zone of master/slave pair */
 #define	OWNERPT		(('P'<<8)|5)	/* set owner/group for slave device */
+
+#ifdef _KERNEL
+/*
+ * kernel ioctl commands
+ *
+ * PTMPTSOPENCB: Returns a callback function pointer and opaque argument.
+ *	      The return value of the callback function when it's invoked
+ *	      with the opaque argument passed to it will indicate if the
+ *	      pts slave device is currently open.
+ */
+#define	PTMPTSOPENCB	(('P'<<8)|6)	/* check if the slave is open */
+
+#endif /* _KERNEL */
 
 #ifdef	__cplusplus
 }

@@ -4517,6 +4517,7 @@ f usr/include/zone.h 0644 root bin
 d usr/kernel 0755 root sys
 d usr/kernel/brand 0755 root sys
 d usr/kernel/brand/amd64 0755 root sys
+f usr/kernel/brand/amd64/lx_brand 0755 root sys
 f usr/kernel/brand/amd64/sngl_brand 0755 root sys
 d usr/kernel/drv 0755 root sys
 d usr/kernel/drv/amd64 0755 root sys
@@ -4528,6 +4529,9 @@ f usr/kernel/drv/amd64/ipmi 0755 root sys
 f usr/kernel/drv/amd64/kstat 0755 root sys
 f usr/kernel/drv/amd64/ksyms 0755 root sys
 f usr/kernel/drv/amd64/logindmux 0755 root sys
+f usr/kernel/drv/amd64/lx_audio 0755 root sys
+f usr/kernel/drv/amd64/lx_ptm 0755 root sys
+f usr/kernel/drv/amd64/lx_systrace 0755 root sys
 f usr/kernel/drv/amd64/nsmb 0755 root sys
 f usr/kernel/drv/amd64/pm 0755 root sys
 f usr/kernel/drv/amd64/pool 0755 root sys
@@ -4545,6 +4549,9 @@ f usr/kernel/drv/ipmi.conf 0644 root sys
 f usr/kernel/drv/kstat.conf 0644 root sys
 f usr/kernel/drv/ksyms.conf 0644 root sys
 f usr/kernel/drv/logindmux.conf 0644 root sys
+f usr/kernel/drv/lx_audio.conf 0644 root sys
+f usr/kernel/drv/lx_ptm.conf 0644 root sys
+f usr/kernel/drv/lx_systrace.conf 0644 root sys
 f usr/kernel/drv/nsmb.conf 0644 root sys
 f usr/kernel/drv/pm.conf 0644 root sys
 f usr/kernel/drv/pool.conf 0644 root sys
@@ -4556,6 +4563,8 @@ f usr/kernel/drv/sppptun.conf 0644 root sys
 d usr/kernel/fs 0755 root sys
 d usr/kernel/fs/amd64 0755 root sys
 f usr/kernel/fs/amd64/fdfs 0755 root sys
+f usr/kernel/fs/amd64/lx_afs 0755 root sys
+f usr/kernel/fs/amd64/lx_proc 0755 root sys
 f usr/kernel/fs/amd64/pcfs 0755 root sys
 f usr/kernel/fs/amd64/smbfs 0755 root sys
 d usr/kernel/kmdb 0755 root sys
@@ -4572,6 +4581,9 @@ f usr/kernel/sched/amd64/RT_DPTBL 0755 root sys
 d usr/kernel/socketmod 0755 root sys
 d usr/kernel/socketmod/amd64 0755 root sys
 f usr/kernel/socketmod/amd64/sockpfp 0755 root sys
+d usr/kernel/strmod 0755 root sys
+d usr/kernel/strmod/amd64 0755 root sys
+f usr/kernel/strmod/amd64/ldlinux 0755 root sys
 d usr/kernel/sys 0755 root sys
 d usr/kernel/sys/amd64 0755 root sys
 f usr/kernel/sys/amd64/acctctl 0755 root sys
@@ -5017,6 +5029,37 @@ f usr/lib/audit/audit_record_attr 0444 root bin
 d usr/lib/autofs 0755 root sys
 f usr/lib/autofs/automountd 0555 root bin
 d usr/lib/brand 0755 root bin
+d usr/lib/brand/lx 0755 root bin
+s usr/lib/brand/lx/64=amd64
+d usr/lib/brand/lx/amd64 0755 root bin
+f usr/lib/brand/lx/amd64/lx_librtld_db.so.1 0755 root root
+f usr/lib/brand/lx/amd64/lx_nametoaddr.so.1 0755 root root
+f usr/lib/brand/lx/amd64/lx_thunk.so.1 0755 root root
+f usr/lib/brand/lx/config.xml 0444 root root
+d usr/lib/brand/lx/distros 0755 root bin
+f usr/lib/brand/lx/distros/centos35.distro 0444 root root
+f usr/lib/brand/lx/distros/centos36.distro 0444 root root
+f usr/lib/brand/lx/distros/centos37.distro 0444 root root
+f usr/lib/brand/lx/distros/centos38.distro 0444 root root
+f usr/lib/brand/lx/distros/rhel35.distro 0444 root root
+f usr/lib/brand/lx/distros/rhel36.distro 0444 root root
+f usr/lib/brand/lx/distros/rhel37.distro 0444 root root
+f usr/lib/brand/lx/distros/rhel38.distro 0444 root root
+f usr/lib/brand/lx/distros/rhel_centos_common 0444 root root
+f usr/lib/brand/lx/etc_default_nfs 0444 root root
+f usr/lib/brand/lx/etc_netconfig 0444 root root
+f usr/lib/brand/lx/lx_distro_install 0755 root root
+f usr/lib/brand/lx/lx_init_zone 0755 root root
+f usr/lib/brand/lx/lx_install 0755 root root
+f usr/lib/brand/lx/lx_librtld_db.so.1 0755 root root
+f usr/lib/brand/lx/lx_lockd 0755 root root
+f usr/lib/brand/lx/lx_nametoaddr.so.1 0755 root root
+f usr/lib/brand/lx/lx_native 0755 root root
+f usr/lib/brand/lx/lx_statd 0755 root root
+f usr/lib/brand/lx/lx_support 0755 root root
+f usr/lib/brand/lx/lx_thunk 0755 root root
+f usr/lib/brand/lx/lx_thunk.so.1 0755 root root
+f usr/lib/brand/lx/platform.xml 0444 root root
 d usr/lib/brand/shared 0755 root sys
 f usr/lib/brand/shared/common.ksh 0444 root bin
 f usr/lib/brand/shared/query 0755 root bin
@@ -5095,6 +5138,7 @@ f usr/lib/devfsadm/linkmod/SUNW_dtrace_link.so 0755 root sys
 f usr/lib/devfsadm/linkmod/SUNW_fssnap_link.so 0755 root sys
 f usr/lib/devfsadm/linkmod/SUNW_ieee1394_link.so 0755 root sys
 f usr/lib/devfsadm/linkmod/SUNW_lofi_link.so 0755 root sys
+f usr/lib/devfsadm/linkmod/SUNW_lx_link_i386.so 0755 root sys
 f usr/lib/devfsadm/linkmod/SUNW_misc_link.so 0755 root sys
 f usr/lib/devfsadm/linkmod/SUNW_misc_link_i386.so 0755 root sys
 f usr/lib/devfsadm/linkmod/SUNW_port_link.so 0755 root sys
@@ -9432,6 +9476,7 @@ s usr/lib/lwp/amd64/libthread.so.1=../../amd64/libthread.so.1
 s usr/lib/lwp/amd64/libthread_db.so.1=../../amd64/libthread_db.so.1
 s usr/lib/lwp/libthread.so.1=../libthread.so.1
 s usr/lib/lwp/libthread_db.so.1=../libthread_db.so.1
+f usr/lib/lx_brand.so.1 0755 root sys
 f usr/lib/madv.so.1 0755 root bin
 f usr/lib/mail.local 0555 root bin
 f usr/lib/makekey 0555 root bin

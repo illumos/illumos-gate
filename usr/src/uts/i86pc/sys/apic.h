@@ -380,7 +380,7 @@ struct apic_io_intr {
 /* special or reserve vectors */
 #define	APIC_CHECK_RESERVE_VECTORS(v) \
 	(((v) == T_FASTTRAP) || ((v) == APIC_SPUR_INTR) || \
-	((v) == T_SYSCALLINT) || ((v) == T_DTRACE_RET))
+	((v) == T_SYSCALLINT) || ((v) == T_DTRACE_RET) || ((v) == 0x80))
 
 /* cmos shutdown code for BIOS						*/
 #define	BIOS_SHUTDOWN		0x0a

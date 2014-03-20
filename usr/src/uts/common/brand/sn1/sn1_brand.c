@@ -94,9 +94,11 @@ struct brand_mach_ops sn1_mops = {
 
 struct brand_mach_ops sn1_mops = {
 	sn1_brand_sysenter_callback,
+	NULL,
 	sn1_brand_int91_callback,
 	sn1_brand_syscall_callback,
-	sn1_brand_syscall32_callback
+	sn1_brand_syscall32_callback,
+	NULL
 };
 
 #else	/* ! __amd64 */
@@ -104,7 +106,9 @@ struct brand_mach_ops sn1_mops = {
 struct brand_mach_ops sn1_mops = {
 	sn1_brand_sysenter_callback,
 	NULL,
+	NULL,
 	sn1_brand_syscall_callback,
+	NULL,
 	NULL
 };
 #endif	/* __amd64 */
