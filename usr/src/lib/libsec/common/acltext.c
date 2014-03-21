@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*LINTLIBRARY*/
@@ -125,7 +126,6 @@ getsidname(uid_t who, boolean_t user, char **sidp, boolean_t noresolve)
 	int error = IDMAP_ERR_NORESULT;
 	int len;
 	char *domain = NULL;
-	char *name = NULL;
 
 	*sidp = NULL;
 
@@ -136,10 +136,10 @@ getsidname(uid_t who, boolean_t user, char **sidp, boolean_t noresolve)
 	if (!noresolve) {
 		if (user)
 			error = idmap_getwinnamebyuid(who,
-			    IDMAP_REQ_FLG_USE_CACHE, &name, &domain);
+			    IDMAP_REQ_FLG_USE_CACHE, sidp, NULL);
 		else
 			error = idmap_getwinnamebygid(who,
-			    IDMAP_REQ_FLG_USE_CACHE, &name, &domain);
+			    IDMAP_REQ_FLG_USE_CACHE, sidp, NULL);
 	}
 	if (error != IDMAP_SUCCESS) {
 		if (idmap_get_create(&get_hdl) == IDMAP_SUCCESS) {
@@ -165,18 +165,10 @@ getsidname(uid_t who, boolean_t user, char **sidp, boolean_t noresolve)
 		}
 		if (get_hdl)
 			idmap_get_destroy(get_hdl);
-	} else {
-		int len;
-
-		len = snprintf(NULL, 0, "%s@%s", name, domain);
-		if (*sidp = malloc(len + 1))
-			(void) snprintf(*sidp, len + 1, "%s@%s", name, domain);
 	}
 
-	if (name)
-		free(name);
-	if (domain)
-		free(domain);
+	free(domain);
+
 	return (*sidp ? 0 : 1);
 }
 
