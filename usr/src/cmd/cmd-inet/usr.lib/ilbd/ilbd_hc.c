@@ -285,6 +285,7 @@ ilbd_create_hc(const ilb_hc_info_t *hc_info, int ev_port,
 		    ILB_STATUS_OK) {
 			ilbd_audit_hc_event(NULL, hc_info, ILBD_CREATE_HC,
 			    ret, ucredp);
+			list_destroy(&hc->ihc_rules);
 			free(hc);
 			return (ret);
 		}
@@ -345,6 +346,7 @@ ilbd_destroy_hc(const char *hc_name, const struct passwd *ps,
 	}
 
 	list_remove(&ilbd_hc_list, hc);
+	list_destroy(&hc->ihc_rules);
 	free(hc);
 	ilbd_audit_hc_event(hc_name, NULL, ILBD_DESTROY_HC, ret, ucredp);
 	return (ret);
@@ -845,6 +847,7 @@ ilbd_hc_associate_rule(const ilbd_rule_t *rule, int ev_port)
 		    ev_port)) != ILB_STATUS_OK) {
 			/* Remove all previously added servers */
 			ilbd_hc_srv_rem_all(hc_rule);
+			list_destroy(&hc_rule->hcr_servers);
 			free(hc_rule);
 			return (ret);
 		}
@@ -881,6 +884,8 @@ ilbd_hc_dissociate_rule(const ilbd_rule_t *rule)
 	ilbd_hc_srv_rem_all(hc_rule);
 	list_remove(&hc->ihc_rules, hc_rule);
 	hc->ihc_rule_cnt--;
+	list_destroy(&hc_rule->hcr_servers);
+	free(hc_rule);
 	return (ILB_STATUS_OK);
 }
 

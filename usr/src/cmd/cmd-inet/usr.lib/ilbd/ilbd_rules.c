@@ -1036,7 +1036,7 @@ i_update_ksrv_rules(char *name, ilbd_sg_t *sg, ilbd_rule_t *rl)
 	for (i = 0; srvp != NULL; srvp = list_next(&sg->isg_srvlist, srvp)) {
 		rc = adjust_srv_info_cmd(&kcmd, i);
 		if (rc != ILB_STATUS_OK)
-			return (rc);
+			goto rollback_kcmd;
 
 		ILB_SGSRV_2_KSRV(&srvp->isv_srv, &kcmd->servers[i]);
 		/*
@@ -1048,6 +1048,7 @@ i_update_ksrv_rules(char *name, ilbd_sg_t *sg, ilbd_rule_t *rl)
 		}
 		i++;
 	}
+	assert(kcmd != NULL);
 
 	kcmd->cmd = ILB_ADD_SERVERS;
 	kcmd->num_servers = i;
@@ -1055,7 +1056,7 @@ i_update_ksrv_rules(char *name, ilbd_sg_t *sg, ilbd_rule_t *rl)
 
 	rc = do_ioctl(kcmd, 0);
 	if (rc != ILB_STATUS_OK)
-		return (rc);
+		goto rollback_kcmd;
 
 	for (i = 0; i < kcmd->num_servers; i++) {
 		int e;
@@ -1071,11 +1072,13 @@ i_update_ksrv_rules(char *name, ilbd_sg_t *sg, ilbd_rule_t *rl)
 			 */
 			kcmd->cmd = ILB_DEL_SERVERS;
 			(void) do_ioctl(kcmd, 0);
-			return (rc);
+			goto rollback_kcmd;
 		}
 	}
 
-	return (ILB_STATUS_OK);
+rollback_kcmd:
+	free(kcmd);
+	return (rc);
 }
 
 /* convert a struct in6_addr to valstr */
