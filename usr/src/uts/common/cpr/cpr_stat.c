@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright (c) 2014 Gary Mills
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/ddi.h>
@@ -71,9 +70,9 @@ cpr_stat_event_start(char *name, cpr_time_t *ctp)
 
 	cep->ce_ntests |= CE_START_MASK;
 	cep->ce_sec.stime = cep->ce_sec.etime = tv.tv_sec;
-	cep->ce_sec.ltime = cep->ce_sec.ltime = 0;
+	cep->ce_sec.ltime = 0;
 	cep->ce_msec.stime = cep->ce_msec.etime = tv.tv_nsec / 100000000;
-	cep->ce_msec.ltime = cep->ce_msec.ltime = 0;
+	cep->ce_msec.ltime = 0;
 }
 
 void

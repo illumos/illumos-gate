@@ -136,6 +136,8 @@ ilbd_free_cli(ilbd_client_t *cli)
 		ilbd_show_sticky_cleanup();
 	if (cli->cli_saved_reply != NULL)
 		free(cli->cli_saved_reply);
+	if (cli->cli_peer_ucredp != NULL)
+		ucred_free(cli->cli_peer_ucredp);
 	free(cli->cli_pw_buf);
 	free(cli);
 }
@@ -589,7 +591,7 @@ new_req(int ev_port, int listener, void *ev_obj)
 	int		sa_len;
 	int		new_sd;
 	int		sflags;
-	ilbd_client_t	*cli;
+	ilbd_client_t	*cli = NULL;
 	int		res;
 	uid_t		uid;
 
@@ -621,24 +623,19 @@ new_req(int ev_port, int listener, void *ev_obj)
 	res = getpeerucred(new_sd, &cli->cli_peer_ucredp);
 	if (res == -1) {
 		logperror("new_req: getpeerucred failed");
-		free(cli);
 		goto clean_up;
 	}
 	if ((uid = ucred_getruid(cli->cli_peer_ucredp)) == (uid_t)-1) {
 		logperror("new_req: ucred_getruid failed");
-		free(cli);
 		goto clean_up;
 	}
 	cli->cli_pw_bufsz = (size_t)sysconf(_SC_GETPW_R_SIZE_MAX);
 	if ((cli->cli_pw_buf = malloc(cli->cli_pw_bufsz)) == NULL) {
-		free(cli);
 		logerr("new_req: malloc(cli_pw_buf)");
 		goto clean_up;
 	}
 	if (getpwuid_r(uid, &cli->cli_pw, cli->cli_pw_buf,
 	    cli->cli_pw_bufsz) == NULL) {
-		free(cli->cli_pw_buf);
-		free(cli);
 		logperror("new_req: invalid user");
 		goto clean_up;
 	}
@@ -650,9 +647,13 @@ new_req(int ev_port, int listener, void *ev_obj)
 	if (port_associate(ev_port, PORT_SOURCE_FD, new_sd, POLLRDNORM,
 	    cli) == -1) {
 		logperror("new_req: port_associate(cli) failed");
-		free(cli->cli_pw_buf);
-		free(cli);
 clean_up:
+		if (cli != NULL) {
+			if (cli->cli_peer_ucredp != NULL)
+				ucred_free(cli->cli_peer_ucredp);
+			free(cli->cli_pw_buf);
+			free(cli);
+		}
 		(void) close(new_sd);
 	}
 
