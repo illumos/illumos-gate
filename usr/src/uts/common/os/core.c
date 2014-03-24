@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011, Joyent Inc. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -534,6 +535,10 @@ expand_string(const char *pat, char *fp, int size, cred_t *cr)
 		case 'z':
 			s = p->p_zone->zone_name;
 			break;
+		case 'Z':
+			/* This is zonepath + "/root/", except for GZ */
+			s = p->p_zone->zone_rootpath;
+			break;
 		case '%':
 			(void) strcpy((s = buf), "%");
 			break;
@@ -548,6 +553,11 @@ expand_string(const char *pat, char *fp, int size, cred_t *cr)
 		if ((size -= len) <= 0)
 			return (ENAMETOOLONG);
 		(void) strcpy(fp, s);
+		/* strip trailing "/root/" from non-GZ zonepath string */
+		if (c == 'Z' && len > 6) {
+			len -= 6;
+			ASSERT(strncmp(fp + len, "/root/", 6) == 0);
+		}
 		fp += len;
 	}
 

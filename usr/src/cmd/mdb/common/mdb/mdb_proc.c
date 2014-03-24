@@ -2173,11 +2173,20 @@ static const mdb_walker_t pt_walkers[] = {
 	{ NULL }
 };
 
+static int
+pt_agent_check(boolean_t *agent, const lwpstatus_t *psp)
+{
+	if (psp->pr_flags & PR_AGENT)
+		*agent = B_TRUE;
+
+	return (0);
+}
 
 static void
 pt_activate_common(mdb_tgt_t *t)
 {
 	pt_data_t *pt = t->t_data;
+	boolean_t hasagent = B_FALSE;
 	GElf_Sym sym;
 
 	/*
@@ -2191,13 +2200,23 @@ pt_activate_common(mdb_tgt_t *t)
 		    "library information will not be available\n");
 	}
 
-	/*
-	 * If we have a libproc handle and libthread is loaded, attempt to load
-	 * and initialize the corresponding libthread_db.  If this fails, fall
-	 * back to our native LWP implementation and issue a warning.
-	 */
-	if (t->t_pshandle != NULL && Pstate(t->t_pshandle) != PS_IDLE)
+	if (t->t_pshandle != NULL) {
+		(void) Plwp_iter(t->t_pshandle,
+		    (proc_lwp_f *)pt_agent_check, &hasagent);
+	}
+
+	if (hasagent) {
+		mdb_warn("agent lwp detected; forcing "
+		    "lwp thread model (use ::tmodel to change)\n");
+	} else if (t->t_pshandle != NULL && Pstate(t->t_pshandle) != PS_IDLE) {
+		/*
+		 * If we have a libproc handle and we do not have an agent LWP,
+		 * look for the correct thread debugging library.  (If we have
+		 * an agent LWP, we leave the model as the raw LWP model to
+		 * allow the agent LWP to be visible to the debugger.)
+		 */
 		(void) Pobject_iter(t->t_pshandle, (proc_map_f *)thr_check, t);
+	}
 
 	/*
 	 * If there's a global object named '_mdb_abort_info', assuming we're

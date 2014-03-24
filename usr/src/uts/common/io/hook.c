@@ -21,6 +21,8 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2013 Joyent, Inc.  All rights reserved.
  */
 #include <sys/param.h>
 #include <sys/types.h>
@@ -48,6 +50,8 @@ static struct modlinkage modlinkage = {
 	&modlmisc,				/* ml_linkage */
 	NULL
 };
+
+static const char *hook_hintvalue_none = "<none>";
 
 /*
  * How it works.
@@ -521,7 +525,7 @@ hook_stack_init(netstackid_t stackid, netstack_t *ns)
  * all of the data structures and sets the flag(s) there? The answer is
  * that it is expected that this will happen when the zone shutdown calls
  * the shutdown callbacks for other modules that they will initiate the
- * free'ing and shutdown of the hooks themselves. 
+ * free'ing and shutdown of the hooks themselves.
  */
 /*ARGSUSED*/
 static void
@@ -807,7 +811,7 @@ hook_run(hook_family_int_t *hfi, hook_event_token_t token, hook_data_t info)
 
 	/*
 	 * If we consider that this function is only called from within the
-	 * stack while an instance is currently active, 
+	 * stack while an instance is currently active,
 	 */
 	CVW_ENTER_READ(&hfi->hfi_lock);
 
@@ -2326,7 +2330,7 @@ hook_init_kstats(hook_family_int_t *hfi, hook_event_int_t *hei, hook_int_t *hi)
 		{ "version",			KSTAT_DATA_INT32 },
 		{ "flags",			KSTAT_DATA_UINT32 },
 		{ "hint",			KSTAT_DATA_INT32 },
-		{ "hint_value",			KSTAT_DATA_UINT64 },
+		{ "hint_value",			KSTAT_DATA_STRING },
 		{ "position",			KSTAT_DATA_INT32 },
 		{ "hook_hits",			KSTAT_DATA_UINT64 }
 	};
@@ -2359,11 +2363,12 @@ hook_init_kstats(hook_family_int_t *hfi, hook_event_int_t *hei, hook_int_t *hi)
 	switch (hi->hi_hook.h_hint) {
 	case HH_BEFORE :
 	case HH_AFTER :
-		hi->hi_kstats.hook_hintvalue.data_type = KSTAT_DATA_STRING;
-		hi->hi_kstats.hook_hintvalue.value.ui64 =
-		    hi->hi_hook.h_hintvalue;
+		kstat_named_setstr(&(hi->hi_kstats.hook_hintvalue),
+		    (const char *)hi->hi_hook.h_hintvalue);
 		break;
 	default :
+		kstat_named_setstr(&(hi->hi_kstats.hook_hintvalue),
+		    hook_hintvalue_none);
 		break;
 	}
 
@@ -2371,6 +2376,8 @@ hook_init_kstats(hook_family_int_t *hfi, hook_event_int_t *hei, hook_int_t *hi)
 		hi->hi_kstatp->ks_data = (void *)&hi->hi_kstats;
 		hi->hi_kstatp->ks_private =
 		    (void *)(uintptr_t)hks->hks_netstackid;
+		hi->hi_kstatp->ks_data_size +=
+		    KSTAT_NAMED_STR_BUFLEN(&(hi->hi_kstats.hook_hintvalue)) + 1;
 
 		kstat_install(hi->hi_kstatp);
 	}

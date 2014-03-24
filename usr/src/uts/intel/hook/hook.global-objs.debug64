@@ -22,8 +22,11 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2013 Joyent, Inc. All rights reserved
+#
 
 modlinkage
 modlmisc
 hook_stack_lock
 hook_stacks
+hook_hintvalue_none

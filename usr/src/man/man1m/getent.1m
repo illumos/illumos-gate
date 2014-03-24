@@ -1,9 +1,10 @@
 '\" te
+.\" Copyright (c) 2014 Gary Mills
 .\" Copyright (C) 1999, Sun Microsystems, Inc. All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH GETENT 1M "Mar 26, 2007"
+.TH GETENT 1M "Mar 14, 2014"
 .SH NAME
 getent \- get entries from administrative database
 .SH SYNOPSIS
@@ -21,10 +22,10 @@ sources that are specified for the \fIdatabase\fR in \fB/etc/nsswitch.conf\fR.
 .sp
 .LP
 \fIdatabase\fR is the name of the database to be examined. This can be
-\fBpasswd\fR, \fBgroup\fR, \fBhosts\fR, \fBipnodes\fR, \fBservices\fR,
+\fBpasswd\fR, \fBshadow\fR, \fBgroup\fR, \fBhosts\fR, \fBipnodes\fR, \fBservices\fR,
 \fBprotocols\fR, \fBethers\fR, \fBproject\fR, \fBnetworks\fR, or
 \fBnetmasks\fR. For each of these databases, \fBgetent\fR uses the appropriate
-library routines described in \fBgetpwnam\fR(3C), \fBgetgrnam\fR(3C),
+library routines described in \fBgetpwnam\fR(3C), \fBgetspnam\fR(3C), \fBgetgrnam\fR(3C),
 \fBgethostbyaddr\fR(3NSL), \fBgethostbyname\fR(3NSL),
 \fBgetipnodebyaddr\fR(3SOCKET), \fBgetipnodebyname\fR(3SOCKET),
 \fBgetservbyname\fR(3SOCKET), \fBgetprotobyname\fR(3SOCKET),
@@ -41,7 +42,7 @@ database. For example, it can be a \fIusername\fR or \fInumeric-uid\fR for
 .LP
 \fBgetent\fR prints out the database entries that match each of the supplied
 keys, one per line, in the format of the matching administrative file:
-\fBpasswd\fR(4), \fBgroup\fR(4), \fBproject\fR(4), \fBhosts\fR(4),
+\fBpasswd\fR(4), \fBshadow\fR(4), \fBgroup\fR(4), \fBproject\fR(4), \fBhosts\fR(4),
 \fBservices\fR(4), \fBprotocols\fR(4), \fBethers\fR(3SOCKET),
 \fBnetworks\fR(4), or \fBnetmasks\fR(4). If no key is given, all entries
 returned by the corresponding enumeration library routine, for example,
@@ -146,6 +147,15 @@ name service switch configuration file
 .ad
 .RS 22n
 password file
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/etc/shadow\fR\fR
+.ad
+.RS 22n
+shadowed password file
 .RE
 
 .sp

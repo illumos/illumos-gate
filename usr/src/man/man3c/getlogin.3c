@@ -10,7 +10,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH GETLOGIN 3C "May 25, 2013"
+.TH GETLOGIN 3C "Mar 15, 2014"
 .SH NAME
 getlogin, getlogin_r \- get login name
 .SH SYNOPSIS
@@ -71,12 +71,17 @@ login name is to call \fBcuserid\fR(3C), or to call \fBgetlogin()\fR and if it
 fails to call \fBgetpwuid\fR(3C).
 .sp
 .LP
+
 The \fBgetlogin_r()\fR function has the same functionality as \fBgetlogin()\fR
-except that the caller must supply a buffer \fIname\fR with length
-\fInamelen\fR to store the result.  The \fIname\fR buffer must be at least
-\fBLOGIN_NAME_MAX\fR bytes in size (defined in <\fBlimits.h\fR>). The
-POSIX version (see \fBstandards\fR(5)) of \fBgetlogin_r()\fR takes a
-\fInamesize\fR parameter of type \fBsize_t\fR.
+except that the caller must supply a buffer \fIname\fR with length \fInamelen\fR
+to store the result.  The \fIname\fR buffer should be at least
+\fBLOGIN_NAME_MAX\fR bytes in size (defined in <\fBlimits.h\fR>). The POSIX
+version (see \fBstandards\fR(5)) of \fBgetlogin_r()\fR takes a \fInamesize\fR
+parameter of type \fBsize_t\fR. If the size of the supplied buffer is less than
+the size of \fBLOGIN_NAME_MAX\fR and the name, including the null
+terminator, does not fit inside the buffer, than an error will be generated.
+Otherwise, the buffer \fIname\fR will be updated with the login name.
+
 .SH RETURN VALUES
 .sp
 .LP

@@ -387,16 +387,23 @@ Plofspath(const char *path, char *s, size_t n)
 			 * lofs resolution loop.  Use resolvepath() to make
 			 * sure there are no consecutive or trailing '/'s
 			 * in the path.
+			 *
+			 * However, we need to be careful to handle the case of
+			 * a lofs mounted file under a lofs mounted file system.
+			 * In this case, we just keep going.
 			 */
+
 			(void) strlcpy(tmp2, special, sizeof (tmp2) - 1);
 			(void) strlcat(tmp2, "/", sizeof (tmp2) - 1);
 			(void) strlcat(tmp2, &p[1], sizeof (tmp2) - 1);
-			(void) strlcpy(tmp, tmp2, sizeof (tmp) - 1);
-			if ((rv = resolvepath(tmp, tmp, sizeof (tmp) - 1)) >= 0)
-				tmp[rv] = '\0';
-			p = &tmp[strlen(tmp)];
-			p[1] = '\0';
-			continue;
+			if ((rv = resolvepath(tmp2, tmp2, sizeof (tmp2) - 1)) >=
+			    0) {
+				tmp2[rv] = '\0';
+				(void) strlcpy(tmp, tmp2, sizeof (tmp) - 1);
+				p = &tmp[strlen(tmp)];
+				p[1] = '\0';
+				continue;
+			}
 		}
 
 		/* No lofs mount found */

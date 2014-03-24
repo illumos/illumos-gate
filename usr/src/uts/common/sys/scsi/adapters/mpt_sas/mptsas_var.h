@@ -224,6 +224,10 @@ typedef	struct mptsas_target {
 
 } mptsas_target_t;
 
+/*
+ * If you change this structure, be sure that mptsas_smp_target_copy()
+ * does the right thing.
+ */
 typedef struct mptsas_smp {
 	mptsas_target_addr_t	m_addr;
 	refhash_link_t		m_link;

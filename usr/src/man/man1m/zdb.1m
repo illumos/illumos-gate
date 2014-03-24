@@ -13,7 +13,7 @@
 .\" Copyright 2012, Richard Lowe.
 .\" Copyright (c) 2012 by Delphix. All rights reserved.
 .\"
-.TH "ZDB" "1M" "February 15, 2012" "" ""
+.TH "ZDB" "1M" "March 6, 2014" "" ""
 
 .SH "NAME"
 \fBzdb\fR - Display zpool debugging and consistency information
@@ -133,6 +133,12 @@ compression ratio (compress), inflation due to the zfs copies property
 If specified twice, display a histogram of deduplication statistics, showing
 the allocated (physically present on disk) and referenced (logically
 referenced in the pool) block counts and sizes by reference count.
+.sp
+If specified a third time, display the statistics independently for each deduplication table.
+.sp
+If specified a fourth time, dump the contents of the deduplication tables describing duplicate blocks.
+.sp
+If specified a fifth time, also dump the contents of the deduplication tables describing unique blocks.
 .RE
 
 .sp
@@ -460,8 +466,7 @@ Dataset rpool/swap [ZVOL], ID 59, cr_txg 356, 486M, 2 objects
 .sp
 
 .LP
-\fBExample 3 \fRDisplay basic information about object 0 in
-'rpool/export/home'
+\fBExample 3 \fRDisplay basic information about object 0 in 'rpool/export/home'
 .sp
 .in +2
 .nf

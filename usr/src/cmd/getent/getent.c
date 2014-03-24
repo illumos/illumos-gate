@@ -20,11 +20,10 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright (c) 2014 Gary Mills
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -42,6 +41,7 @@ struct table {
 
 static struct table t[] = {
 	{ "passwd",	dogetpw },
+	{ "shadow",	dogetsp },
 	{ "group",	dogetgr },
 	{ "hosts",	dogethost },
 	{ "ipnodes",	dogetipnodes },
@@ -82,7 +82,7 @@ main(int argc, const char **argv)
 			switch (rc) {
 			case EXC_SYNTAX:
 				(void) fprintf(stderr,
-					gettext("Syntax error\n"));
+				    gettext("Syntax error\n"));
 				break;
 			case EXC_ENUM_NOT_SUPPORTED:
 				(void) fprintf(stderr,

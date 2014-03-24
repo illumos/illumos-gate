@@ -507,7 +507,9 @@ get_mac_addr(const char *str, int *ierrnop, uint16_t *hwret, int hwtype,
 				}
 			}
 		} else {
-			if (dlpi_info(dh, &dlinfo, 0) != DLPI_SUCCESS) {
+			if (dlpi_bind(dh, DLPI_ANY_SAP, NULL) !=
+			    DLPI_SUCCESS || dlpi_info(dh, &dlinfo, 0) !=
+			    DLPI_SUCCESS) {
 				dlpi_close(dh);
 				goto failed;
 			}

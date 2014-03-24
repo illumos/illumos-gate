@@ -737,6 +737,8 @@ ISUSER=$?;	export ISUSER
 
 #
 # force locale to C
+LANG=C;		export LANG
+LC_ALL=C;	export LC_ALL
 LC_COLLATE=C;	export LC_COLLATE
 LC_CTYPE=C;	export LC_CTYPE
 LC_MESSAGES=C;	export LC_MESSAGES

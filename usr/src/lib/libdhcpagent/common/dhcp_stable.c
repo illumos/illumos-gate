@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This module reads and writes the stable identifier values, DUID and IAID.
  */
@@ -143,6 +141,7 @@ make_stable_duid(const char *physintf, size_t *duidlen)
 	 */
 
 	if (dlpi_open(physintf, &dh, 0) == DLPI_SUCCESS &&
+	    dlpi_bind(dh, DLPI_ANY_SAP, NULL) == DLPI_SUCCESS &&
 	    dlpi_info(dh, &dlinfo, 0) == DLPI_SUCCESS &&
 	    (len = dlinfo.di_physaddrlen) > 0 &&
 	    (arptype = dlpi_arptype(dlinfo.di_mactype) != 0)) {
