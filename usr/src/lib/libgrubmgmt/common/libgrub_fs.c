@@ -161,7 +161,8 @@ get_zfs_root(zfs_handle_t *zfh, grub_fs_t *fs, grub_root_t *root)
 	    sizeof (root->gr_physpath))) == 0 &&
 	    (ret = zpool_get_prop(zph, ZPOOL_PROP_BOOTFS,
 	    root->gr_fs[GRBM_ZFS_BOOTFS].gfs_dev,
-	    sizeof (root->gr_fs[GRBM_ZFS_BOOTFS].gfs_dev), NULL)) == 0) {
+	    sizeof (root->gr_fs[GRBM_ZFS_BOOTFS].gfs_dev), NULL,
+	    B_FALSE)) == 0) {
 
 		(void) strlcpy(root->gr_fs[GRBM_ZFS_TOPFS].gfs_dev, name,
 		    sizeof (root->gr_fs[GRBM_ZFS_TOPFS].gfs_dev));
