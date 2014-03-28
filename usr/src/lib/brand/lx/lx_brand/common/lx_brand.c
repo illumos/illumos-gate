@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2014 Joyent, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -35,6 +36,7 @@
 #include <sys/systm.h>
 #include <sys/auxv.h>
 #include <sys/frame.h>
+#include <zone.h>
 #include <sys/brand.h>
 
 #include <assert.h>
@@ -91,7 +93,7 @@ static int stol_errno[] = {
 	115, 116
 };
 
-char lx_release[128];
+char lx_release[LX_VERS_MAX];
 
 /*
  * Map a linux locale ending string to the solaris equivalent.
@@ -618,12 +620,9 @@ lx_init(int argc, char *argv[], char *envp[])
 
 	r = getenv("LX_RELEASE");
 	if (r == NULL) {
-		if (lx_get_kern_version() == LX_KERN_2_6)
-			(void) strlcpy(lx_release, LX_UNAME_RELEASE_2_6,
-			    sizeof (lx_release));
-		else
-			(void) strlcpy(lx_release, LX_UNAME_RELEASE_2_4,
-			    sizeof (lx_release));
+		if (zone_getattr(getzoneid(), LX_KERN_VERSION_NUM, lx_release,
+		    sizeof (lx_release)) != sizeof (lx_release))
+			(void) strlcpy(lx_release, "2.4.21", LX_VERS_MAX);
 	} else {
 		(void) strlcpy(lx_release, r, 128);
 	}

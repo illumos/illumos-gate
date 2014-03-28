@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2014 Joyent, Inc.  All rights reserved.
  */
 
 #ifndef _SYS_LX_H
@@ -39,7 +40,7 @@
 extern "C" {
 #endif
 
-extern char lx_release[128];
+extern char lx_release[LX_VERS_MAX];
 extern pid_t zoneinit_pid;
 
 /*
@@ -124,8 +125,6 @@ extern int lx_lpid_to_spid(pid_t, pid_t *);
 
 extern int lx_ptrace_wait(siginfo_t *);
 extern void lx_ptrace_fork(void);
-
-extern int lx_get_kern_version(void);
 
 extern int lx_check_alloca(size_t);
 #define	SAFE_ALLOCA(sz)	(lx_check_alloca(sz) ? alloca(sz) : NULL)

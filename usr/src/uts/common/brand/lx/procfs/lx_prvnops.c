@@ -21,6 +21,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2014 Joyent, Inc.  All rights reserved.
  */
 
 /*
@@ -1543,10 +1544,8 @@ static void
 lxpr_read_version(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
 	char *vers;
-	if (lx_get_zone_kern_version(LXPTOZ(lxpnp)) <= LX_KERN_2_4)
-		vers = LX_UNAME_RELEASE_2_4;
-	else
-		vers = LX_UNAME_RELEASE_2_6;
+
+	vers = lx_get_zone_kern_version(LXPTOZ(lxpnp));
 
 	lxpr_uiobuf_printf(uiobuf,
 	    "%s version %s (%s version %d.%d.%d) "
@@ -1594,7 +1593,7 @@ lxpr_read_stat(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	ulong_t pswitch_cum = 0;
 	ulong_t forks_cum = 0;
 	hrtime_t msnsecs[NCMSTATES];
-	int lx_kern_version = lx_get_zone_kern_version(LXPTOZ(lxpnp));
+	char *lx_kern_version = lx_get_zone_kern_version(LXPTOZ(lxpnp));
 	/* temporary variable since scalehrtime modifies data in place */
 	hrtime_t tmptime;
 
@@ -1627,7 +1626,7 @@ lxpr_read_stat(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 		pgswapin_cum += CPU_STATS(cp, vm.pgswapin);
 		pgswapout_cum += CPU_STATS(cp, vm.pgswapout);
 
-		if (lx_kern_version >= LX_KERN_2_6) {
+		if (strncmp(lx_kern_version, "2.4", 3) != 0) {
 			cpu_nrunnable_cum += cp->cpu_disp->disp_nrunnable;
 			w_io_cum += CPU_STATS(cp, sys.iowait);
 			for (i = 0; i < NCMSTATES; i++) {
@@ -1650,7 +1649,7 @@ lxpr_read_stat(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 			cp = cp->cpu_next;
 	} while (cp != cpstart);
 
-	if (lx_kern_version >= LX_KERN_2_6) {
+	if (strncmp(lx_kern_version, "2.4", 3) != 0) {
 		lxpr_uiobuf_printf(uiobuf,
 		    "cpu %ld %ld %ld %ld %ld %ld %ld\n",
 		    user_cum, 0, sys_cum, idle_cum, 0, irq_cum, 0);
@@ -1683,7 +1682,7 @@ lxpr_read_stat(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 		sys_ticks  = NSEC_TO_TICK(msnsecs[CMS_SYSTEM]);
 		user_ticks = NSEC_TO_TICK(msnsecs[CMS_USER]);
 
-		if (lx_kern_version >= LX_KERN_2_6) {
+		if (strncmp(lx_kern_version, "2.4", 3) != 0) {
 			for (i = 0; i < NCMSTATES; i++) {
 				tmptime = cp->cpu_intracct[i];
 				scalehrtime(&tmptime);
@@ -1709,7 +1708,7 @@ lxpr_read_stat(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 
 	mutex_exit(&cpu_lock);
 
-	if (lx_kern_version >= LX_KERN_2_6) {
+	if (strncmp(lx_kern_version, "2.4", 3) != 0) {
 		lxpr_uiobuf_printf(uiobuf,
 		    "page %lu %lu\n"
 		    "swap %lu %lu\n"
