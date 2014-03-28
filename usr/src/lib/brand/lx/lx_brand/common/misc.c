@@ -217,27 +217,6 @@ lx_getcwd(uintptr_t p1, uintptr_t p2)
 }
 
 int
-lx_get_kern_version(void)
-{
-	/*
-	 * Since this function is called quite often, and zone_getattr is slow,
-	 * we cache the kernel version in kvers_cache. -1 signifies that no
-	 * value has yet been cached.
-	 */
-	static int kvers_cache = -1;
-	/* dummy variable for use in zone_getattr */
-	int kvers;
-
-	if (kvers_cache != -1)
-		return (kvers_cache);
-	if (zone_getattr(getzoneid(), LX_KERN_VERSION_NUM, &kvers, sizeof (int))
-	    != sizeof (int))
-		return (kvers_cache = LX_KERN_2_4);
-	else
-		return (kvers_cache = kvers);
-}
-
-int
 lx_uname(uintptr_t p1)
 {
 	struct lx_utsname *un = (struct lx_utsname *)p1;

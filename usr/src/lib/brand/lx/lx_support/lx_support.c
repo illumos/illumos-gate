@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2014 Joyent, Inc.  All rights reserved.
  */
 
 /*
@@ -350,7 +351,6 @@ lxs_boot()
 	zone_dochandle_t zdh;
 	boolean_t	audio, restart;
 	char		*idev, *odev, *kvers;
-	int		kversnum;
 
 	lxs_make_initctl();
 	lxs_remove_autofsck();
@@ -381,14 +381,18 @@ lxs_boot()
 	    sizeof (boolean_t)) == -1)
 		lxs_err(gettext("error setting zone's restart_init property"));
 
-	if ((kvers != NULL) && (strcmp(kvers, "2.6") == 0))
-		kversnum = LX_KERN_2_6;
-	else
-		kversnum = LX_KERN_2_4;
+	if (kvers != NULL) {
+		/* Backward compatability with incomplete version attr */
+		if (strcmp(kvers, "2.4") == 0) {
+			kvers = "2.4.21";
+		} else if (strcmp(kvers, "2.6") == 0) {
+			kvers = "2.6.18";
+		}
 
-	if (zone_setattr(zoneid, LX_KERN_VERSION_NUM, &kversnum,
-	    sizeof (int)) < 0)
-		lxs_err(gettext("unable to set kernel version"));
+		if (zone_setattr(zoneid, LX_KERN_VERSION_NUM, kvers,
+		    strlen(kvers)) < 0)
+			lxs_err(gettext("unable to set kernel version"));
+	}
 
 	return (0);
 }
@@ -517,7 +521,10 @@ lxs_verify(char *xmlfile)
 			    "audio-outputdev");
 	}
 	if (kvers) {
-		if ((strcmp(kvers, "2.4")) != 0 && (strcmp(kvers, "2.6") != 0))
+		if (strlen(kvers) > (LX_VERS_MAX - 1) ||
+		    (strncmp(kvers, "2.4", 3) != 0 &&
+		    strncmp(kvers, "2.6", 3) != 0 &&
+		    strncmp(kvers, "3.", 2) != 0))
 			lxs_err(gettext("invalid value for zone attribute: %s"),
 			    "kernel-version");
 	}

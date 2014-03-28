@@ -21,6 +21,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2014 Joyent, Inc.  All rights reserved.
  */
 
 #ifndef _LX_BRAND_H
@@ -57,9 +58,6 @@ extern "C" {
 #define	LX_NSYSCALLS_2_4	270
 #define	LX_NSYSCALLS_2_6	317
 #define	LX_NSYSCALLS	LX_NSYSCALLS_2_6
-
-#define	LX_KERN_2_4	0
-#define	LX_KERN_2_6	1
 
 /*
  * brand(2) subcommands
@@ -169,6 +167,9 @@ typedef struct lx_proc_data {
 #define	LX_AFF_ULONGS	(LX_NCPU / (8 * sizeof (ulong_t)))
 typedef ulong_t lx_affmask_t[LX_AFF_ULONGS];
 
+/* Max. length of kernel version string */
+#define	LX_VERS_MAX	16
+
 #ifdef	_KERNEL
 
 /*
@@ -202,7 +203,7 @@ typedef struct lx_lwp_data {
 
 /* brand specific data */
 typedef struct lx_zone_data {
-	int lxzd_kernel_version;
+	char lxzd_kernel_version[LX_VERS_MAX];
 	int lxzd_max_syscall;
 } lx_zone_data_t;
 
@@ -216,8 +217,7 @@ void	lx_brand_int80_callback(void);
 int64_t	lx_emulate_syscall(int, uintptr_t, uintptr_t, uintptr_t, uintptr_t,
 	uintptr_t, uintptr_t);
 
-extern int lx_get_zone_kern_version(zone_t *);
-extern int lx_get_kern_version(void);
+extern char *lx_get_zone_kern_version(zone_t *);
 
 extern int lx_debug;
 #define	lx_print	if (lx_debug) printf

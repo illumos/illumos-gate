@@ -22,6 +22,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2014 Joyent, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -63,8 +64,7 @@ int	lx_getattr(zone_t *, int, void *, size_t *);
 int	lx_setattr(zone_t *, int, void *, size_t);
 int	lx_brandsys(int, int64_t *, uintptr_t, uintptr_t, uintptr_t,
 		uintptr_t, uintptr_t, uintptr_t);
-int	lx_get_kern_version(void);
-void	lx_set_kern_version(zone_t *, int);
+void	lx_set_kern_version(zone_t *, char *);
 void	lx_copy_procdata(proc_t *, proc_t *);
 
 extern void lx_setrval(klwp_t *, int, int);
@@ -187,6 +187,7 @@ lx_setattr(zone_t *zone, int attr, void *buf, size_t bufsize)
 {
 	boolean_t val;
 	int num;
+	char vers[LX_VERS_MAX];
 
 	if (attr == LX_ATTR_RESTART_INIT) {
 		if (bufsize > sizeof (boolean_t))
@@ -198,11 +199,12 @@ lx_setattr(zone_t *zone, int attr, void *buf, size_t bufsize)
 		zone->zone_restart_init = val;
 		return (0);
 	} else if (attr == LX_KERN_VERSION_NUM) {
-		if (bufsize > sizeof (int))
+		if (bufsize > (LX_VERS_MAX - 1))
 			return (ERANGE);
-		if (copyin(buf, &num, sizeof (num)) != 0)
+		bzero(vers, LX_VERS_MAX);
+		if (copyin(buf, &vers, bufsize) != 0)
 			return (EFAULT);
-		lx_set_kern_version(zone, num);
+		lx_set_kern_version(zone, vers);
 		return (0);
 	}
 	return (EINVAL);
@@ -212,7 +214,6 @@ lx_setattr(zone_t *zone, int attr, void *buf, size_t bufsize)
 int
 lx_getattr(zone_t *zone, int attr, void *buf, size_t *bufsize)
 {
-	int num;
 	if (attr == LX_ATTR_RESTART_INIT) {
 		if (*bufsize < sizeof (boolean_t))
 			return (ERANGE);
@@ -222,12 +223,12 @@ lx_getattr(zone_t *zone, int attr, void *buf, size_t *bufsize)
 		*bufsize = sizeof (boolean_t);
 		return (0);
 	} else if (attr == LX_KERN_VERSION_NUM) {
-		if (*bufsize < sizeof (int))
+		if (*bufsize < LX_VERS_MAX)
 			return (ERANGE);
-		num = lx_get_kern_version();
-		if (copyout(&num, buf, sizeof (int)) != 0)
+		if (copyout(lx_get_zone_kern_version(curzone), buf,
+		    LX_VERS_MAX) != 0)
 			return (EFAULT);
-		*bufsize = sizeof (int);
+		*bufsize = LX_VERS_MAX;
 		return (0);
 	}
 	return (-EINVAL);
@@ -360,10 +361,10 @@ lx_init_brand_data(zone_t *zone)
 	ASSERT(zone->zone_brand_data == NULL);
 	data = (lx_zone_data_t *)kmem_zalloc(sizeof (lx_zone_data_t), KM_SLEEP);
 	/*
-	 * Set the default lxzd_kernel_version to LX_KERN_2_4.
+	 * Set the default lxzd_kernel_version to 2.4.
 	 * This can be changed by a call to setattr() during zone boot.
 	 */
-	data->lxzd_kernel_version = LX_KERN_2_4;
+	(void) strlcpy(data->lxzd_kernel_version, "2.4.21", LX_VERS_MAX);
 	data->lxzd_max_syscall = LX_NSYSCALLS_2_4;
 	zone->zone_brand_data = data;
 }
@@ -609,25 +610,19 @@ lx_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 	return (EINVAL);
 }
 
-int
+char *
 lx_get_zone_kern_version(zone_t *zone)
 {
 	return (((lx_zone_data_t *)zone->zone_brand_data)->lxzd_kernel_version);
 }
 
-int
-lx_get_kern_version()
-{
-	return (lx_get_zone_kern_version(curzone));
-}
-
 void
-lx_set_kern_version(zone_t *zone, int vers)
+lx_set_kern_version(zone_t *zone, char *vers)
 {
 	lx_zone_data_t *lxzd = (lx_zone_data_t *)zone->zone_brand_data;
 
-	lxzd->lxzd_kernel_version = vers;
-	if (vers == LX_KERN_2_6)
+	(void) strlcpy(lxzd->lxzd_kernel_version, vers, LX_VERS_MAX);
+	if (strncmp(vers, "2.4", 3) != 0)
 		lxzd->lxzd_max_syscall = LX_NSYSCALLS_2_6;
 }
 
@@ -833,10 +828,10 @@ lx_elfexec(struct vnode *vp, struct execa *uap, struct uarg *args,
 	phdr_auxv32[0].a_un.a_val = edp->ed_phdr;
 
 	/*
-	 * Linux 2.6 programs such as ps will print an error message if the
-	 * following aux entry is missing
+	 * Linux 2.6 (or greater) programs such as ps will print an error message
+	 * if the following aux entry is missing
 	 */
-	if (lx_get_kern_version() >= LX_KERN_2_6) {
+	if (strncmp(lx_get_zone_kern_version(curzone), "2.4", 3) != 0) {
 		phdr_auxv32[1].a_type = AT_CLKTCK;
 		phdr_auxv32[1].a_un.a_val = hz;
 	}

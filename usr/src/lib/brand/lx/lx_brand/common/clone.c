@@ -22,9 +22,8 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2014 Joyent, Inc.  All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <assert.h>
 #include <errno.h>
@@ -372,14 +371,14 @@ lx_clone(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 	 *
 	 * CLONE_THREAD and CLONE_DETACHED must both be either set or cleared
 	 * in kernel 2.4 and prior.
-	 * In kernel 2.6 CLONE_DETACHED was dropped completely, so we no
-	 * longer have this requirement.
+	 * In kernel 2.6 (and later) CLONE_DETACHED was dropped completely, so
+	 * we no longer have this requirement.
 	 */
 
 	if (flags & CLONE_TD) {
 		if (!(flags & LX_CLONE_SIGHAND))
 			return (-EINVAL);
-		if ((lx_get_kern_version() <= LX_KERN_2_4) &&
+		if (strncmp(lx_release, "2.4", 3) == 0 &&
 		    (flags & CLONE_TD) != CLONE_TD)
 			return (-EINVAL);
 	}
