@@ -1,9 +1,24 @@
-'\" te
+'\" t
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.\"
 .\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
-.\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
-.\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ITADM 1M "Aug 4, 2009"
+.\" Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+.\"
+.TH ITADM 1M "Mar 27, 2014"
 .SH NAME
 itadm \- administer iSCSI targets
 .SH SYNOPSIS
@@ -30,7 +45,7 @@ itadm \- administer iSCSI targets
 
 .LP
 .nf
-\fBitadm\fR list-target [\fB-v\fR,\fB--verbose\fR] [\fItarget_node_name\fR]
+\fBitadm\fR list-target [\fB-p\fR,\fB--parsable\fR] [\fB-v\fR,\fB--verbose\fR] [\fItarget_node_name\fR]
 .fi
 
 .LP
@@ -40,7 +55,7 @@ itadm \- administer iSCSI targets
 
 .LP
 .nf
-\fBitadm\fR list-tpg [\fB-v\fR,\fB--verbose\fR] [\fItpg_name\fR]
+\fBitadm\fR list-tpg [\fB-p\fR,\fB--parsable\fR] [\fB-v\fR,\fB--verbose\fR] [\fItpg_name\fR]
 .fi
 
 .LP
@@ -62,7 +77,7 @@ itadm \- administer iSCSI targets
 
 .LP
 .nf
-\fBitadm\fR list-initiator [\fB-v\fR,\fB--verbose\fR] \fIinitiator_node_name\fR
+\fBitadm\fR list-initiator [\fB-p\fR,\fB--parsable\fR] [\fB-v\fR,\fB--verbose\fR] \fIinitiator_node_name\fR
 .fi
 
 .LP
@@ -80,11 +95,10 @@ itadm \- administer iSCSI targets
 
 .LP
 .nf
-\fBitadm\fR list-defaults
+\fBitadm\fR list-defaults [\fB-p\fR,\fB--parsable\fR]
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBitadm\fR command manages Internet SCSI (iSCSI) target nodes within the
 SCSI Target Mode Framework described in \fBstmfadm\fR(1M) and
@@ -100,7 +114,6 @@ below. In addition to its subcommands, \fBitadm\fR has a help command, which
 displays the utility's usage information. The help command is invoked with the
 \fB-?\fR option.
 .SS "iSCSI Target Portal Groups"
-.sp
 .LP
 An iSCSI Target Network Portal is an IP address and TCP port that can be used
 by an initiator node to connect to an iSCSI target. A collection of  these
@@ -118,7 +131,6 @@ for the "default" target portal group that is used when no explicit Target
 Portal Groups are set on the target. The portal for the default TPG matches
 requests from all network interfaces on port  3260.
 .SS "iSCSI Initiator Node Contexts"
-.sp
 .LP
 Certain operations such as authentication by means of Challenge Handshake
 Authentication Protocol (CHAP) require parameters associated with a remote
@@ -135,7 +147,6 @@ eui.02004567A425678D
 .sp
 
 .SS "Specifying IP Addresses"
-.sp
 .LP
 A number of \fBitadm\fR subcommands require that you specify one or more IP
 addresses with optional port numbers. For IPv4, use standard dotted decimal
@@ -153,11 +164,9 @@ example specifications.
 .sp
 
 .SH SUB-COMMANDS
-.sp
 .LP
 The following are the \fBitadm\fR subcommands with their options.
 .SS "\fBitadm create-target\fR"
-.sp
 .in +2
 .nf
 itadm create-target [-a,--auth-method radius | chap | none | default]
@@ -263,7 +272,6 @@ initiator can use to access a specific target or the keyword \fBdefault\fR.  If
 .RE
 
 .SS "\fBitadm modify-target\fR"
-.sp
 .in +2
 .nf
 itadm modify-target [\fB-a\fR,\fB--auth-method\fR radius | chap | none | default]
@@ -352,10 +360,9 @@ As described under the \fBcreate-target\fR subcommand, above.
 .RE
 
 .SS "\fBitadm list-target\fR"
-.sp
 .in +2
 .nf
-itadm list-target [\fB-v\fR,\fB--verbose\fR] [\fItarget_node_name\fR]
+itadm list-target [\fB-p\fR,\fB--parsable\fR] [\fB-v\fR,\fB--verbose\fR] [\fItarget_node_name\fR]
 .fi
 .in -2
 .sp
@@ -363,7 +370,19 @@ itadm list-target [\fB-v\fR,\fB--verbose\fR] [\fItarget_node_name\fR]
 .sp
 .LP
 List information about the configured targets. If \fItarget_node_name\fR is
-specified, list only the information for that target. Option is as follows.
+specified, list only the information for that target. Options are as follows.
+
+.sp
+.ne 2
+.na
+\fB\fB-p\fR,\fB--parsable\fR\fR
+.ad
+.sp .6
+.RS 4n
+Used for scripting mode. Do not print headers and separate fields by a single
+tab instead of arbitrary white space.
+.RE
+
 .sp
 .ne 2
 .na
@@ -375,7 +394,6 @@ Verbose mode.
 .RE
 
 .SS "\fBitadm delete-target\fR"
-.sp
 .in +2
 .nf
 itadm delete-target [\fB-f\fR,\fB--force\fR] \fItarget_node_name\fR
@@ -399,7 +417,6 @@ target before deleting it.
 .RE
 
 .SS "\fBitadm create-tpg\fR"
-.sp
 .in +2
 .nf
 itadm create-tpg \fItpg_name\fR \fIIP-address\fR[:\fIport\fR]...
@@ -418,10 +435,9 @@ brackets.
 .LP
 This subcommand has no options.
 .SS "\fBitadm list-tpg\fR"
-.sp
 .in +2
 .nf
-itadm list-tpg [\fB-v\fR,\fB--verbose\fR] [\fItpg_name\fR]
+itadm list-tpg [\fB-p\fR,\fB--parsable\fR] [\fB-v\fR,\fB--verbose\fR] [\fItpg_name\fR]
 .fi
 .in -2
 .sp
@@ -430,7 +446,19 @@ itadm list-tpg [\fB-v\fR,\fB--verbose\fR] [\fItpg_name\fR]
 .LP
 List information about the configured target portal group. If \fItpg_name\fR is
 specified then list only the information about the target portal group
-associated with that \fItpg_name\fR. Option is as follows.
+associated with that \fItpg_name\fR. Options are as follows.
+
+.sp
+.ne 2
+.na
+\fB\fB-p\fR,\fB--parsable\fR\fR
+.ad
+.sp .6
+.RS 4n
+Used for scripting mode. Do not print headers and separate fields by a single
+tab instead of arbitrary white space.
+.RE
+
 .sp
 .ne 2
 .na
@@ -442,7 +470,6 @@ Verbose mode.
 .RE
 
 .SS "\fBitadm delete-tpg\fR"
-.sp
 .in +2
 .nf
 itadm delete-tpg  [\fB-f\fR,\fB--force\fR] \fItpg_name\fR
@@ -466,7 +493,6 @@ unless this option is specified.
 .RE
 
 .SS "\fBitadm create-initiator\fR"
-.sp
 .in +2
 .nf
 itadm create-initiator [\fB-s\fR,\fB--chap-secret\fR] [\fB-S\fR,\fB--chap-secret-file\fR \fIpath\fR]
@@ -511,7 +537,6 @@ If no value is specified then the initiator node name is used as the username.
 .RE
 
 .SS "\fBitadm modify-initiator\fR"
-.sp
 .in +2
 .nf
 itadm modify-initiator [\fB-s\fR,\fB--chap-secret\fR] [\fB-S\fR,\fB--chap-secret-file\fR \fIpath\fR]
@@ -556,7 +581,6 @@ If no value is specified then the initiator node name is used as the username.
 .RE
 
 .SS "\fBitadm delete-initiator\fR"
-.sp
 .in +2
 .nf
 itadm delete-initiator \fIinitiator_node_name\fR
@@ -569,10 +593,9 @@ itadm delete-initiator \fIinitiator_node_name\fR
 Delete parameters associated with the remote initiator named
 \fIinitiator_node_name\fR. This subcommand has no options.
 .SS "\fBitadm list-initiator\fR"
-.sp
 .in +2
 .nf
-\fBitadm\fR list-initiator [\fB-v\fR,\fB--verbose\fR] \fIinitiator_node_name\fR
+\fBitadm\fR list-initiator [\fB-p\fR,\fB--parsable\fR] [\fB-v\fR,\fB--verbose\fR] \fIinitiator_node_name\fR
 .fi
 .in -2
 .sp
@@ -580,7 +603,19 @@ Delete parameters associated with the remote initiator named
 .sp
 .LP
 List parameters associated with the initiator named \fIinitiator_node_name\fR.
-Option is as follows.
+Options are as follows.
+
+.sp
+.ne 2
+.na
+\fB\fB-p\fR,\fB--parsable\fR\fR
+.ad
+.sp .6
+.RS 4n
+Used for scripting mode. Do not print headers and separate fields by a single
+tab instead of arbitrary white space.
+.RE
+
 .sp
 .ne 2
 .na
@@ -592,7 +627,6 @@ Verbose mode.
 .RE
 
 .SS "\fBitadm modify-defaults\fR"
-.sp
 .in +2
 .nf
 itadm modify-defaults [\fB-a\fR,\fB--auth-method\fR radius | chap | none]
@@ -683,17 +717,28 @@ authentication.
 .RE
 
 .SS "\fBitadm list-defaults\fR"
-.sp
 .in +2
 .nf
-itadm list-defaults
+itadm list-defaults [\fB-p\fR,\fB--parsable\fR]
 .fi
 .in -2
 .sp
 
 .sp
 .LP
-List information about the default properties. This subcommand has no options.
+List information about the default properties. Option is as follows.
+
+.sp
+.ne 2
+.na
+\fB\fB-p\fR,\fB--parsable\fR\fR
+.ad
+.sp .6
+.RS 4n
+Used for scripting mode. Do not print headers and separate fields by a single
+tab instead of arbitrary white space.
+.RE
+
 .SH EXAMPLES
 .LP
 \fBExample 1 \fRCreating a Target
@@ -922,7 +967,6 @@ iqn.1986-03.com.sun:02:2cb0c526-c05a-e279-e396-a367006f4227  online   1
 .sp
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -938,6 +982,5 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBiscsiadm\fR(1M), \fBstmfadm\fR(1M), \fBlibstmf\fR(3LIB), \fBattributes\fR(5)
