@@ -1,16 +1,17 @@
 '\" te
 .\" Copyright 1989 AT&T
 .\" Copyright (C) 2006, Sun Microsystems, Inc. All Rights Reserved
+.\" Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH RPCBIND 1M "Aug 1, 2006"
+.TH RPCBIND 1M "Jan 9, 2014"
 .SH NAME
 rpcbind \- universal addresses to RPC program number mapper
 .SH SYNOPSIS
 .LP
 .nf
-\fBrpcbind\fR [\fB-d\fR] [\fB-w\fR]
+\fBrpcbind\fR [\fB-d\fR] [\fB-w\fR] [\fB-l\fR \fIlisten_backlog\fR]
 .fi
 
 .SH DESCRIPTION
@@ -107,7 +108,7 @@ by Sun, intrarelease incompatibilities are not uncommon. See
 \fB\fBverbose_logging\fR\fR
 .ad
 .RS 22n
-Specifies whether the TCP wrappers facility logs all calls orjust the denied
+Specifies whether the TCP wrappers facility logs all calls or just the denied
 calls. The default is \fBfalse\fR. This option has no effect if TCP wrappers
 are not enabled.
 .RE
@@ -120,10 +121,36 @@ are not enabled.
 .RS 22n
 Specifies whether \fBrpcbind\fR allows indirect calls at all. By default,
 \fBrpcbind\fR allows most indirect calls, except to a number of standard
-services(\fBkeyserv\fR, \fBautomount\fR, \fBmount\fR, \fBnfs\fR, \fBrquota\fR,
+services (\fBkeyserv\fR, \fBautomount\fR, \fBmount\fR, \fBnfs\fR, \fBrquota\fR,
 and selected NIS and \fBrpcbind\fR procedures). Setting \fBallow_indirect\fR to
 \fBfalse\fR causes all indirect calls to be dropped. The default is \fBtrue\fR.
 NIS broadcast clients rely on this functionality on NIS servers.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBlisten_backlog\fR\fR
+.ad
+.RS 22n
+Set connection queue length for \fBrpcbind\fR over a connection-oriented
+transport. The default value is 64 entries. Modification of this property will
+take effect only after the \fBrpcbind\fR restart.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBmax_threads\fR\fR
+.ad
+.RS 22n
+Maximum number of worker threads spawn by \fBrpcbind\fR. The default value
+is 72. The indirect \fBRPC\fR calls facility might cause a worker thread to
+block for some time waiting for a response from the indirectly called \fBRPC\fR
+service. To maintain basic \fBrpcbind\fR functionality, up to eight worker
+threads are always reserved, and will never be used for indirect \fBRPC\fR calls.
+Setting \fBmax_threads\fR to less than 9 effectively disables the indirect
+calls.
 .RE
 
 .SH OPTIONS
@@ -154,6 +181,15 @@ Do a warm start. If \fBrpcbind\fR aborts or terminates on \fBSIGINT\fR or
 \fBrpcbind\fR with the \fB-w\fR option instructs it to look for these files and
 start operation with the registrations found in them. This allows \fBrpcbind\fR
 to resume operation without requiring all \fBRPC\fR services to be restarted.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-l\fR\fR \fI\fIlisten_backlog\fR\fR
+.ad
+.RS 6n
+This can be used to override \fBconfig/listen_backlog\fR SMF property.
 .RE
 
 .SH EXAMPLES
@@ -220,8 +256,7 @@ TCP wrappers is External.
 .sp
 .LP
 For information on the TCP wrappers facility, see the \fBhosts_access(4)\fR man
-page, delivered as part of the Solaris operating environment in
-\fB/usr/sfw/man\fR and available in the \fBSUNWtcpd\fR package.
+page available in the \fBSUNWtcpd\fR package.
 .SH NOTES
 .sp
 .LP
@@ -230,7 +265,7 @@ being written.
 .sp
 .LP
 All \fBRPC\fR servers are restarted if the following occurs: \fBrpcbind\fR
-crashes (or is killed with \fBSIGKILL)\fR and is unable to to write the
+crashes (or is killed with \fBSIGKILL)\fR and is unable to write the
 warm-start files; \fBrpcbind\fR is started without the \fB-w\fR option after a
 graceful termination. Otherwise, the warm start files are not found by
 \fBrpcbind\fR.

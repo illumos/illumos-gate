@@ -22,6 +22,8 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+#
 
 PROG=		rpcbind
 MANIFEST=	bind.xml
@@ -41,11 +43,7 @@ ROOTMANIFESTDIR=	$(ROOTSVCNETWORKRPC)
 
 CPPFLAGS= -I. -DPORTMAP $(CPPFLAGS.master)
 CPPFLAGS += -D_REENTRANT
-CERRWARN += -_gcc=-Wno-implicit-function-declaration
-CERRWARN += -_gcc=-Wno-unused-variable
-CERRWARN += -_gcc=-Wno-uninitialized
-CERRWARN += -_gcc=-Wno-parentheses
-CERRWARN += -_gcc=-Wno-unused-label
+$(RELEASE_BUILD)CPPFLAGS += -DNDEBUG
 LDLIBS += -lsocket -lnsl -lwrap -lscf
 
 .KEEP_STATE:

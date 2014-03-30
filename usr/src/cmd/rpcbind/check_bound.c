@@ -22,6 +22,9 @@
  * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ */
 
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
 /* All Rights Reserved */
@@ -34,8 +37,6 @@
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * check_bound.c
@@ -56,9 +57,13 @@
 #include <errno.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <thread.h>
+#include <synch.h>
+#include <syslog.h>
 
 struct fdlist {
 	int fd;
+	mutex_t fd_lock;	/* protects fd */
 	struct netconfig *nconf;
 	struct fdlist *next;
 	int check_binding;
@@ -72,11 +77,12 @@ static char *nullstring = "";
  * Returns 1 if the given address is bound for the given addr & transport
  * For all error cases, we assume that the address is bound
  * Returns 0 for success.
+ *
+ * fdl: My FD list
+ * uaddr: the universal address
  */
 static bool_t
-check_bound(fdl, uaddr)
-	struct fdlist *fdl;	/* My FD list */
-	char *uaddr;		/* the universal address */
+check_bound(struct fdlist *fdl, char *uaddr)
 {
 	int fd;
 	struct netbuf *na;
@@ -90,22 +96,22 @@ check_bound(fdl, uaddr)
 	if (!na)
 		return (TRUE); /* punt, should never happen */
 
-	fd = fdl->fd;
 	taddr.addr = *na;
 	taddr.qlen = 1;
+	(void) mutex_lock(&fdl->fd_lock);
+	fd = fdl->fd;
 	baddr = (struct t_bind *)t_alloc(fd, T_BIND, T_ADDR);
 	if (baddr == NULL) {
+		(void) mutex_unlock(&fdl->fd_lock);
 		netdir_free((char *)na, ND_ADDR);
 		return (TRUE);
 	}
 	if (t_bind(fd, &taddr, baddr) != 0) {
+		(void) mutex_unlock(&fdl->fd_lock);
 		netdir_free((char *)na, ND_ADDR);
 		(void) t_free((char *)baddr, T_BIND);
 		return (TRUE);
 	}
-	ans = memcmp(taddr.addr.buf, baddr->addr.buf, baddr->addr.len);
-	netdir_free((char *)na, ND_ADDR);
-	(void) t_free((char *)baddr, T_BIND);
 	if (t_unbind(fd) != 0) {
 		/* Bad fd. Purge this fd */
 		(void) t_close(fd);
@@ -113,6 +119,10 @@ check_bound(fdl, uaddr)
 		if (fdl->fd == -1)
 			fdl->check_binding = FALSE;
 	}
+	(void) mutex_unlock(&fdl->fd_lock);
+	ans = memcmp(taddr.addr.buf, baddr->addr.buf, baddr->addr.len);
+	netdir_free((char *)na, ND_ADDR);
+	(void) t_free((char *)baddr, T_BIND);
 	return (ans == 0 ? FALSE : TRUE);
 }
 
@@ -127,15 +137,13 @@ check_bound(fdl, uaddr)
  *	1. Is it possible for t_bind to fail in the case where
  *		we bind to an already bound address and have any
  *		other error number besides TNOADDR.
- *	2. If a address is specified in bind addr, can I bind to
+ *	2. If an address is specified in bind addr, can I bind to
  *		the same address.
  *	3. If NULL is specified in bind addr, can I bind to the
  *		address to which the fd finally got bound.
  */
 int
-add_bndlist(nconf, taddr, baddr)
-	struct netconfig *nconf;
-	struct t_bind *taddr, *baddr;
+add_bndlist(struct netconfig *nconf, struct t_bind *taddr, struct t_bind *baddr)
 {
 	int fd;
 	struct fdlist *fdl;
@@ -152,6 +160,7 @@ add_bndlist(nconf, taddr, baddr)
 		syslog(LOG_ERR, "no memory!");
 		return (-1);
 	}
+	(void) mutex_init(&fdl->fd_lock, USYNC_THREAD, NULL);
 	fdl->nconf = newnconf;
 	fdl->next = NULL;
 	if (fdhead == NULL) {
@@ -196,17 +205,14 @@ add_bndlist(nconf, taddr, baddr)
 		/* Perhaps condition #1 */
 		if (debugging) {
 			fprintf(stderr, "%s: add_bndlist cannot bind (1): %s",
-				nconf->nc_netid, t_errlist[t_errno]);
+			    nconf->nc_netid, t_errlist[t_errno]);
 		}
 		goto not_bound;
 	}
 
 	/* Condition #2 */
 	if (!memcmp(taddr->addr.buf, baddr->addr.buf,
-		(int)baddr->addr.len)) {
-#ifdef BIND_DEBUG
-		fprintf(stderr, "Condition #2\n");
-#endif
+	    (int)baddr->addr.len)) {
 		goto not_bound;
 	}
 
@@ -229,7 +235,7 @@ add_bndlist(nconf, taddr, baddr)
 	if (t_bind(fdl->fd, &tmpaddr, taddr) != 0) {
 		if (debugging) {
 			fprintf(stderr, "%s: add_bndlist cannot bind (2): %s",
-				nconf->nc_netid, t_errlist[t_errno]);
+			    nconf->nc_netid, t_errlist[t_errno]);
 		}
 		goto error;
 	}
@@ -237,8 +243,8 @@ add_bndlist(nconf, taddr, baddr)
 	if ((fd = t_open(nconf->nc_device, O_RDWR, &tinfo)) < 0) {
 		if (debugging) {
 			fprintf(stderr,
-				"%s: add_bndlist cannot open connection: %s",
-				nconf->nc_netid, t_errlist[t_errno]);
+			    "%s: add_bndlist cannot open connection: %s",
+			    nconf->nc_netid, t_errlist[t_errno]);
 		}
 		goto error;
 	}
@@ -253,32 +259,27 @@ add_bndlist(nconf, taddr, baddr)
 			 * we'll just assume we can't do bind checking with
 			 * this transport.
 			 */
+			t_close(fd);
 			goto not_bound;
 		}
 		if (debugging) {
 			fprintf(stderr, "%s: add_bndlist cannot bind (3): %s",
-				nconf->nc_netid, t_errlist[t_errno]);
+			    nconf->nc_netid, t_errlist[t_errno]);
 		}
 		t_close(fd);
 		goto error;
 	}
 	t_close(fd);
 	if (!memcmp(taddr->addr.buf, baddr->addr.buf,
-		(int)baddr->addr.len)) {
+	    (int)baddr->addr.len)) {
 		switch (tinfo.servtype) {
 		case T_COTS:
 		case T_COTS_ORD:
 			if (baddr->qlen == 1) {
-#ifdef BIND_DEBUG
-				fprintf(stderr, "Condition #3\n");
-#endif
 				goto not_bound;
 			}
 			break;
 		case T_CLTS:
-#ifdef BIND_DEBUG
-			fprintf(stderr, "Condition #3\n");
-#endif
 			goto not_bound;
 		default:
 			goto error;
@@ -301,9 +302,7 @@ error:
 }
 
 bool_t
-is_bound(netid, uaddr)
-	char *netid;
-	char *uaddr;
+is_bound(char *netid, char *uaddr)
 {
 	struct fdlist *fdl;
 
@@ -325,11 +324,7 @@ is_bound(netid, uaddr)
  * Returns the merged address otherwise.
  */
 char *
-mergeaddr(xprt, netid, uaddr, saddr)
-	SVCXPRT *xprt;
-	char *netid;
-	char *uaddr;
-	char *saddr;
+mergeaddr(SVCXPRT *xprt, char *netid, char *uaddr, char *saddr)
 {
 	struct fdlist *fdl;
 	struct nd_mergearg ma;
@@ -356,37 +351,22 @@ mergeaddr(xprt, netid, uaddr, saddr)
 		ma.c_uaddr = taddr2uaddr(fdl->nconf, svc_getrpccaller(xprt));
 		if (ma.c_uaddr == NULL) {
 			syslog(LOG_ERR, "taddr2uaddr failed for %s: %s",
-				fdl->nconf->nc_netid, netdir_sperror());
+			    fdl->nconf->nc_netid, netdir_sperror());
 			return (NULL);
 		}
 
 	}
-#ifdef ND_DEBUG
-	if (saddr == NULL) {
-		fprintf(stderr, "mergeaddr: client uaddr = %s\n", ma.c_uaddr);
-	} else {
-		fprintf(stderr, "mergeaddr: contact uaddr = %s\n", ma.c_uaddr);
-	}
-#endif
 
-	/* Not an  INET adaress? */
+	/* Not an INET address? */
 	if ((strcmp(fdl->nconf->nc_protofmly, NC_INET) != 0) &&
-		(strcmp(fdl->nconf->nc_protofmly, NC_INET6) != 0)) {
+	    (strcmp(fdl->nconf->nc_protofmly, NC_INET6) != 0)) {
 		ma.s_uaddr = uaddr;
-#ifdef ND_DEBUG
-		fprintf(stderr, "mergeaddr: Call to the original"
-			" ND_MERGEADDR interface\n");
-#endif
 		stat = netdir_options(fdl->nconf, ND_MERGEADDR, 0, (char *)&ma);
 	}
 	/* Inet address, but no xp_ltaddr */
 	else if ((ma.s_uaddr = taddr2uaddr(fdl->nconf,
-				&(xprt)->xp_ltaddr)) == NULL) {
+	    &(xprt)->xp_ltaddr)) == NULL) {
 		ma.s_uaddr = uaddr;
-#ifdef ND_DEBUG
-		fprintf(stderr, "mergeaddr: Call to the original"
-			" ND_MERGEADDR interface\n");
-#endif
 		stat = netdir_options(fdl->nconf, ND_MERGEADDR, 0, (char *)&ma);
 	} else {
 		/*
@@ -418,24 +398,16 @@ mergeaddr(xprt, netid, uaddr, saddr)
 		strcat(ma.m_uaddr, uport);
 		free(ma.s_uaddr);
 		stat = 0;
-
-#ifdef ND_DEBUG
-		fprintf(stderr, "mergeaddr: Just return the address which was"
-			" used for contacting us\n");
-#endif
 	}
 	if (saddr == NULL) {
 		free(ma.c_uaddr);
 	}
 	if (stat) {
 		syslog(LOG_ERR, "netdir_merge failed for %s: %s",
-			fdl->nconf->nc_netid, netdir_sperror());
+		    fdl->nconf->nc_netid, netdir_sperror());
 		return (NULL);
 	}
-#ifdef ND_DEBUG
-	fprintf(stderr, "mergeaddr: uaddr = %s, merged uaddr = %s\n",
-				uaddr, ma.m_uaddr);
-#endif
+
 	return (ma.m_uaddr);
 }
 
@@ -444,8 +416,7 @@ mergeaddr(xprt, netid, uaddr, saddr)
  * structure should not be freed.
  */
 struct netconfig *
-rpcbind_get_conf(netid)
-	char *netid;
+rpcbind_get_conf(char *netid)
 {
 	struct fdlist *fdl;
 
@@ -456,16 +427,3 @@ rpcbind_get_conf(netid)
 		return (NULL);
 	return (fdl->nconf);
 }
-
-#ifdef BIND_DEBUG
-syslog(a, msg, b, c, d)
-	int a;
-	char *msg;
-	caddr_t b, c, d;
-{
-	char buf[1024];
-
-	sprintf(buf, msg, b, c, d);
-	fprintf(stderr, "Syslog: %s\n", buf);
-}
-#endif

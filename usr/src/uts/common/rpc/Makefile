@@ -24,6 +24,10 @@
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms. 
 #
+# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+#
+
+#
 # uts/common/rpc/Makefile
 #
 # include global definitions
@@ -101,12 +105,12 @@ key_prot.h: key_prot.x
 	$(RPCGEN) -C -h key_prot.x > $@
 
 pmap_prot.h: pmap_prot.x
-	$(RPCGEN) -h pmap_prot.x > $@
+	$(RPCGEN) -M -h pmap_prot.x > $@
 
 rpc_sztypes.h: rpc_sztypes.x
 	$(RPCGEN) -C -h rpc_sztypes.x > $@
 
 rpcb_prot.h: rpcb_prot.x
-	$(RPCGEN) -h rpcb_prot.x > $@
+	$(RPCGEN) -M -h rpcb_prot.x > $@
 
 check:	$(CHECKHDRS)
