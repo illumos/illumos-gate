@@ -21,6 +21,9 @@
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
 /* All Rights Reserved */
 /*
@@ -41,15 +44,11 @@
 #ifndef _RPCBIND_H
 #define	_RPCBIND_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef PORTMAP
 #include <rpc/pmap_prot.h>
 #endif
 #include <rpc/rpcb_prot.h>
-#include <signal.h>
-
-#include <tcpd.h>
+#include <synch.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -57,13 +56,14 @@ extern "C" {
 
 extern int debugging;
 extern int doabort;
+extern rwlock_t list_rbl_lock;	/* Protects list_rbl */
 extern rpcblist_ptr list_rbl;	/* A list of version 3 & 4 rpcbind services */
 extern char *loopback_dg;	/* CLTS loopback transport, for set/unset */
 extern char *loopback_vc;	/* COTS loopback transport, for set/unset */
 extern char *loopback_vc_ord;	/* COTS_ORD loopback transport, for set/unset */
-extern volatile sig_atomic_t sigrefresh; /* Did we receive a SIGHUP recently? */
 
 #ifdef PORTMAP
+extern rwlock_t list_pml_lock;	/* Protects list_pml */
 extern pmaplist *list_pml;	/* A list of version 2 rpcbind services */
 extern char *udptrans;		/* Name of UDP transport */
 extern char *tcptrans;		/* Name of TCP transport */
@@ -71,19 +71,21 @@ extern char *udp_uaddr;		/* Universal UDP address */
 extern char *tcp_uaddr;		/* Universal TCP address */
 #endif
 
-extern char *mergeaddr();
-extern int add_bndlist();
-extern int create_rmtcall_fd();
-extern bool_t is_bound();
-extern void my_svc_run();
-extern void rpcb_check_init(void);
+char *mergeaddr(SVCXPRT *, char *, char *, char *);
+int add_bndlist(struct netconfig *, struct t_bind *, struct t_bind *);
+int create_rmtcall_fd(struct netconfig *);
+bool_t is_bound(char *, char *);
+void set_rpcb_rmtcalls_max(int);
 
 /* TCP wrapper functions and variables. */
-extern boolean_t localxprt(SVCXPRT *, boolean_t);
-extern void qsyslog(int pri, const char *fmt, ...);
-extern boolean_t rpcb_check(SVCXPRT *, rpcproc_t, boolean_t);
-extern void rpcb_log(boolean_t, SVCXPRT *, rpcproc_t, rpcprog_t, boolean_t);
-extern boolean_t allow_indirect, wrap_enabled, verboselog, local_only;
+boolean_t localxprt(SVCXPRT *, boolean_t);
+void qsyslog(int pri, const char *fmt, ...);
+boolean_t rpcb_check(SVCXPRT *, rpcproc_t, boolean_t);
+void rpcb_log(boolean_t, SVCXPRT *, rpcproc_t, rpcprog_t, boolean_t);
+extern volatile boolean_t allow_indirect;
+extern volatile boolean_t wrap_enabled;
+extern volatile boolean_t verboselog;
+extern volatile boolean_t local_only;
 
 #define	svc_getgencaller(transp) \
 	((struct sockaddr_gen *)svc_getrpccaller((transp))->buf)
@@ -111,30 +113,52 @@ extern boolean_t allow_indirect, wrap_enabled, verboselog, local_only;
 	if (wrap_enabled) \
 	    rpcb_log(ans, (xprt), (proc), (prog), B_TRUE)
 
-extern bool_t map_set(), map_unset();
+bool_t map_set(RPCB *, char *);
+bool_t map_unset(RPCB *, char *);
 
 /* Statistics gathering functions */
-extern void rpcbs_procinfo();
-extern void rpcbs_set();
-extern void rpcbs_unset();
-extern void rpcbs_getaddr();
-extern void rpcbs_rmtcall();
-extern rpcb_stat_byvers *rpcbproc_getstat();
+void rpcbs_procinfo(int, rpcproc_t);
+void rpcbs_set(int, bool_t);
+void rpcbs_unset(int, bool_t);
+void rpcbs_getaddr(int, rpcprog_t, rpcvers_t, char *, char *);
+void rpcbs_rmtcall(int, rpcproc_t, rpcprog_t, rpcvers_t, rpcproc_t, char *,
+    rpcblist_ptr);
+bool_t rpcbproc_getstat(void *, rpcb_stat_byvers **);
+bool_t xdr_rpcb_stat_byvers_ptr(XDR *, rpcb_stat_byvers **);
 
-extern struct netconfig *rpcbind_get_conf();
-extern void rpcbind_abort() __NORETURN;
+struct netconfig *rpcbind_get_conf();
+void rpcbind_abort() __NORETURN;
+
+#ifdef PORTMAP
+void pmap_service(struct svc_req *, SVCXPRT *xprt);
+#endif
+void rpcb_service_3(struct svc_req *, SVCXPRT *xprt);
+void rpcb_service_4(struct svc_req *, SVCXPRT *xprt);
+void read_warmstart(void);
+void write_warmstart(void);
+int Is_ipv6present(void);
+
+extern zoneid_t myzone;
 
 /* Common functions shared between versions */
-extern void rpcbproc_callit_com();
-extern bool_t *rpcbproc_set_com();
-extern bool_t *rpcbproc_unset_com();
-extern ulong_t *rpcbproc_gettime_com();
-extern struct netbuf *rpcbproc_uaddr2taddr_com();
-extern char **rpcbproc_taddr2uaddr_com();
-extern char **rpcbproc_getaddr_com();
-extern void delete_prog();
+void rpcbproc_callit_com(struct svc_req *, SVCXPRT *, ulong_t, int);
+bool_t rpcbproc_set_com(RPCB *, bool_t *, struct svc_req *, int);
+bool_t rpcbproc_unset_com(RPCB *, bool_t *, struct svc_req *, int);
+bool_t rpcbproc_gettime_com(void *, ulong_t *);
+bool_t rpcbproc_uaddr2taddr_com(char **, struct netbuf *, struct svc_req *);
+bool_t rpcbproc_taddr2uaddr_com(struct netbuf *, char **, struct svc_req *);
+bool_t rpcbproc_getaddr_com(RPCB *, char **, struct svc_req *, ulong_t);
+void delete_prog(rpcprog_t);
+bool_t rpcbproc_dump_com(void *, rpcblist_ptr **);
+char *getowner(SVCXPRT *, char *);
 
-extern uid_t rpcb_caller_uid(SVCXPRT *);
+int del_pmaplist(RPCB *);
+void delete_rbl(rpcblist_ptr);
+
+uid_t rpcb_caller_uid(SVCXPRT *);
+
+/* XDR functions */
+bool_t xdr_rpcblist_ptr_ptr(XDR *, rpcblist_ptr **);
 
 /* For different getaddr semantics */
 #define	RPCB_ALLVERS 0

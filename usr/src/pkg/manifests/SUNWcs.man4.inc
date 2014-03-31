@@ -15,7 +15,6 @@
 #
 
 file path=usr/share/man/man4/Intro.4
-file path=usr/share/man/man4/TIMEZONE.4
 file path=usr/share/man/man4/audit.log.4
 file path=usr/share/man/man4/audit_class.4
 file path=usr/share/man/man4/audit_control.4
@@ -49,6 +48,7 @@ file path=usr/share/man/man4/ike.config.4
 file path=usr/share/man/man4/ike.preshared.4
 file path=usr/share/man/man4/inet_type.4
 file path=usr/share/man/man4/inetd.conf.4
+file path=usr/share/man/man4/init.4
 file path=usr/share/man/man4/init.d.4
 file path=usr/share/man/man4/inittab.4
 file path=usr/share/man/man4/ipaddrsel.conf.4

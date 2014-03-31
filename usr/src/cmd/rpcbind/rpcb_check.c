@@ -45,8 +45,9 @@
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -62,6 +63,9 @@
 #include <rpc/rpc.h>
 #include <rpc/pmap_prot.h>
 #include <rpc/rpcb_prot.h>
+#include <thread.h>
+#include <synch.h>
+#include <tcpd.h>
 
 #include "rpcbind.h"
 
@@ -72,17 +76,46 @@
 int allow_severity = LOG_INFO;
 int deny_severity = LOG_WARNING;
 
-extern int hosts_ctl();
+static mutex_t hosts_ctl_lock = DEFAULTMUTEX;
 
 /*
  * "inet_ntoa/inet_pton" for struct sockaddr_gen
  */
 static const char *
-sgen_toa(struct sockaddr_gen *addr)
+sgen_toa(struct sockaddr_gen *addr, char *buf, size_t bufsize)
 {
-	static char buf[INET6_ADDRSTRLEN];
-	return (inet_ntop(SGFAM(addr), SGADDRP(addr), buf, sizeof (buf)));
+	return (inet_ntop(SGFAM(addr), SGADDRP(addr), buf, bufsize));
 }
+
+struct proc_map {
+	rpcproc_t code;
+	const char *proc;
+};
+
+static const struct proc_map pmapmap[] = {
+	PMAPPROC_CALLIT,	"callit",
+	PMAPPROC_DUMP,		"dump",
+	PMAPPROC_GETPORT,	"getport",
+	PMAPPROC_SET,		"set",
+	PMAPPROC_UNSET,		"unset",
+	NULLPROC,		"null",
+};
+
+static const struct proc_map rpcbmap[] = {
+	RPCBPROC_SET,		"set",
+	RPCBPROC_UNSET,		"unset",
+	RPCBPROC_GETADDR,	"getaddr",
+	RPCBPROC_DUMP,		"dump",
+	RPCBPROC_CALLIT,	"callit",
+	RPCBPROC_GETTIME,	"gettime",
+	RPCBPROC_UADDR2TADDR,	"uaddr2taddr",
+	RPCBPROC_TADDR2UADDR,	"taddr2uaddr",
+	RPCBPROC_GETVERSADDR,	"getversaddr",
+	RPCBPROC_INDIRECT,	"indirect",
+	RPCBPROC_GETADDRLIST,	"getaddrlist",
+	RPCBPROC_GETSTAT,	"getstat",
+	NULLPROC,		"null",
+};
 
 /*
  * find_procname - map rpcb/pmap procedure number to name
@@ -90,37 +123,8 @@ sgen_toa(struct sockaddr_gen *addr)
 static const char *
 find_procname(rpcproc_t procnum, boolean_t pm)
 {
-	static char procbuf[6 + 3 * sizeof (ulong_t)];
-	struct proc_map {
-		rpcproc_t code;
-		const char *proc;
-	};
-	static struct proc_map pmapmap[] = {
-		PMAPPROC_CALLIT,	"callit",
-		PMAPPROC_DUMP,		"dump",
-		PMAPPROC_GETPORT,	"getport",
-		PMAPPROC_SET,		"set",
-		PMAPPROC_UNSET,		"unset",
-		NULLPROC,		"null",
-	};
-	static struct proc_map rpcbmap[] = {
-		RPCBPROC_SET,		"set",
-		RPCBPROC_UNSET,		"unset",
-		RPCBPROC_GETADDR,	"getaddr",
-		RPCBPROC_DUMP,		"dump",
-		RPCBPROC_CALLIT,	"callit",
-		RPCBPROC_GETTIME,	"gettime",
-		RPCBPROC_UADDR2TADDR,	"uaddr2taddr",
-		RPCBPROC_TADDR2UADDR,	"taddr2uaddr",
-		RPCBPROC_GETVERSADDR,	"getversaddr",
-		RPCBPROC_INDIRECT,	"indirect",
-		RPCBPROC_GETADDRLIST,	"getaddrlist",
-		RPCBPROC_GETSTAT,	"getstat",
-		NULLPROC,		"null",
-	};
-
 	int nitems, i;
-	struct proc_map *procp;
+	const struct proc_map *procp;
 
 	if (pm) {
 		procp = pmapmap;
@@ -134,30 +138,7 @@ find_procname(rpcproc_t procnum, boolean_t pm)
 		if (procp[i].code == procnum)
 			return (procp[i].proc);
 	}
-	(void) snprintf(procbuf, sizeof (procbuf), "%s-%lu",
-		pm ? "pmap" : "rpcb", (ulong_t)procnum);
-	return (procbuf);
-}
-
-/*
- * find_progname - map rpc program number to name.
- */
-static const char *
-find_progname(rpcprog_t prognum)
-{
-	static char progbuf[1 + 3 * sizeof (ulong_t)];
-
-	if (prognum == 0)
-		return ("");
-
-	/*
-	 * The original code contained a call to "getrpcbynumber()";
-	 * this call was removed because it may cause a call to a
-	 * nameservice.
-	 */
-
-	(void) snprintf(progbuf, sizeof (progbuf), "%lu", (ulong_t)prognum);
-	return (progbuf);
+	return (NULL);
 }
 
 /*
@@ -171,6 +152,8 @@ rpcb_log(boolean_t verdict, SVCXPRT *transp, rpcproc_t proc, rpcprog_t prog,
 	const char *client = "unknown";
 	char *uaddr;
 	char buf[BUFSIZ];
+	char toabuf[INET6_ADDRSTRLEN];
+	const char *procname;
 
 	/*
 	 * Transform the transport address into something printable.
@@ -180,7 +163,8 @@ rpcb_log(boolean_t verdict, SVCXPRT *transp, rpcproc_t proc, rpcprog_t prog,
 		    "unknown transport (rpcbind_get_conf failed)");
 	} else if (strcmp(conf->nc_protofmly, "inet") == 0 ||
 	    strcmp(conf->nc_protofmly, "inet6") == 0) {
-		client = sgen_toa(svc_getgencaller(transp));
+		client = sgen_toa(svc_getgencaller(transp), toabuf,
+		    sizeof (toabuf));
 	} else if ((uaddr = taddr2uaddr(conf, &(transp->xp_rtaddr))) == NULL) {
 		syslog(LOG_WARNING, "unknown address (taddr2uaddr failed)");
 	} else {
@@ -189,9 +173,17 @@ rpcb_log(boolean_t verdict, SVCXPRT *transp, rpcproc_t proc, rpcprog_t prog,
 		free(uaddr);
 		client = buf;
 	}
-	qsyslog(verdict ? allow_severity : deny_severity,
-	    "%sconnect from %s to %s(%s)", verdict ? "" : "refused ",
-	    client, find_procname(proc, pm), find_progname(prog));
+
+	if ((procname = find_procname(proc, pm)) == NULL) {
+		qsyslog(verdict ? allow_severity : deny_severity,
+		    "%sconnect from %s to %s-%lu(%lu)",
+		    verdict ? "" : "refused ", client, pm ? "pmap" : "rpcb",
+		    (ulong_t)proc, (ulong_t)prog);
+	} else {
+		qsyslog(verdict ? allow_severity : deny_severity,
+		    "%sconnect from %s to %s(%lu)", verdict ? "" : "refused ",
+		    client, procname, (ulong_t)prog);
+	}
 }
 
 /*
@@ -216,15 +208,24 @@ rpcb_check(SVCXPRT *transp, rpcproc_t procnum, boolean_t ispmap)
 		res = B_FALSE;
 	} else if (strcmp(conf->nc_protofmly, "inet") == 0 ||
 	    strcmp(conf->nc_protofmly, "inet6") == 0) {
-		const char *addr_string = sgen_toa(svc_getgencaller(transp));
+		if (!localxprt(transp, ispmap)) {
+			if (local_only) {
+				res = B_FALSE;
+			} else {
+				char buf[INET6_ADDRSTRLEN];
+				const char *addr_string =
+				    sgen_toa(svc_getgencaller(transp), buf,
+				    sizeof (buf));
 
-		if (!localxprt(transp, ispmap) &&
-		    (local_only ||
-		    hosts_ctl("rpcbind", addr_string, addr_string, "") == 0)) {
-			res = B_FALSE;
+				(void) mutex_lock(&hosts_ctl_lock);
+				if (hosts_ctl("rpcbind", addr_string,
+				    addr_string, "") == 0)
+					res = B_FALSE;
+				(void) mutex_unlock(&hosts_ctl_lock);
+			}
 		}
 	}
-out:
+
 	if (!res)
 		svcerr_auth(transp, AUTH_FAILED);
 

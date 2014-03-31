@@ -2213,7 +2213,7 @@ establish_user_environment(char **renvp)
 
 	/*
 	 * There are three places to get timezone info.  init.c sets
-	 * TZ if the file /etc/TIMEZONE contains a value for TZ.
+	 * TZ if the file /etc/default/init contains a value for TZ.
 	 * login.c looks in the file /etc/default/login for a
 	 * variable called TIMEZONE being set.  If TIMEZONE has a
 	 *  value, TZ is set to that value; no environment variable
@@ -2221,15 +2221,15 @@ establish_user_environment(char **renvp)
 	 * work to set TZ, then the library routines  will default
 	 * to using the file /usr/lib/locale/TZ/localtime.
 	 *
-	 * There is a priority set up here.  If /etc/TIMEZONE has
+	 * There is a priority set up here.  If /etc/default/init has
 	 * a value for TZ, that value remains top priority.  If the
 	 * file /etc/default/login has TIMEZONE set, that has second
 	 * highest priority not overriding the value of TZ in
-	 * /etc/TIMEZONE.  The reason for this priority is that the
-	 * file /etc/TIMEZONE is supposed to be sourced by
+	 * /etc/default/init.  The reason for this priority is that the
+	 * file /etc/default/init is supposed to be sourced by
 	 * /etc/profile.  We are doing the "sourcing" prematurely in
 	 * init.c.  Additionally, a login C shell doesn't source the
-	 * file /etc/profile thus not sourcing /etc/TIMEZONE thus not
+	 * file /etc/profile thus not sourcing /etc/default/init thus not
 	 * allowing an adminstrator to globally set TZ for all users
 	 */
 	if (Def_tz != NULL)	/* Is there a TZ from defaults/login? */

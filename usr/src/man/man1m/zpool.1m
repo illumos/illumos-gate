@@ -62,7 +62,7 @@ zpool \- configures ZFS storage pools
 
 .LP
 .nf
-\fBzpool get\fR [\fB-p\fR] "\fIall\fR" | \fIproperty\fR[,...] \fIpool\fR ...
+\fBzpool get\fR [\fB-Hp\fR] [\fB-o \fR\fIfield\fR[,...]] "\fIall\fR" | \fIproperty\fR[,...] \fIpool\fR ...
 .fi
 
 .LP
@@ -94,7 +94,7 @@ zpool \- configures ZFS storage pools
 
 .LP
 .nf
-\fBzpool list\fR [\fB-T\fR \fBu\fR | \fBd\fR ] [\fB-Hvp\fR] [\fB-o\fR \fIproperty\fR[,...]] [\fIpool\fR] ... [\fIinterval\fR[\fIcount\fR]]
+\fBzpool list\fR [\fB-T\fR \fBu\fR | \fBd\fR ] [\fB-Hpv\fR] [\fB-o\fR \fIproperty\fR[,...]] [\fIpool\fR] ... [\fIinterval\fR[\fIcount\fR]]
 .fi
 
 .LP
@@ -1152,7 +1152,8 @@ is currently being used. This may lead to potential data corruption.
 .sp
 .ne 2
 .na
-\fB\fBzpool get\fR [\fB-p\fR] "\fIall\fR" | \fIproperty\fR[,...] \fIpool\fR ...\fR
+\fB\fBzpool get\fR [\fB-Hp\fR] [\fB-o \fR\fIfield\fR[,...]]  "\fIall\fR" | \fIproperty\fR[,...]
+\fIpool\fR ...\fR
 .ad
 .sp .6
 .RS 4n
@@ -1162,7 +1163,7 @@ the following fields:
 .sp
 .in +2
 .nf
-       name          Name of storage pool
+        name          Name of storage pool
         property      Property name
         value         Property value
         source        Property source, either 'default' or 'local'.
@@ -1176,12 +1177,31 @@ properties.
 .sp
 .ne 2
 .na
+\fB\fB-H\fR\fR
+.ad
+.RS 12n
+Scripted mode. Do not display headers, and separate fields by a single tab
+instead of arbitrary space.
+.RE
+
+.sp
+.ne 2
+.na
 \fB\fB-p\fR\fR
 .ad
 .RS 6n
-Display numbers in parseable (exact) values.
+Display numbers in parsable (exact) values.
 .RE
 
+.sp
+.ne 2
+.na
+\fB\fB-o\fR \fIfield\fR\fR
+.ad
+.RS 6n
+A comma-separated list of columns to display. \fBname,property,value,source\fR
+is the default value.
+.RE
 .RE
 
 .sp
@@ -1611,6 +1631,15 @@ time. See \fBtime\fR(2). Specify \fBd\fR for standard date format. See
 .RS 12n
 Scripted mode. Do not display headers, and separate fields by a single tab
 instead of arbitrary space.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-p\fR\fR
+.ad
+.RS 12n
+Display numbers in parsable (exact) values.
 .RE
 
 .sp

@@ -24,8 +24,6 @@
 #ifndef	_AMD64_CPU
 #define	_AMD64_CPU
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

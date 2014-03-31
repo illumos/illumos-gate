@@ -161,7 +161,7 @@ static m_label_t *zlabel = NULL;
 static m_label_t *zid_label = NULL;
 static priv_set_t *zprivs = NULL;
 
-static char *DFLT_FS_ALLOWED = "hsfs,smbfs,nfs,nfs3,nfs4,nfsdyn";
+static const char *DFLT_FS_ALLOWED = "hsfs,smbfs,nfs,nfs3,nfs4,nfsdyn";
 
 /* from libsocket, not in any header file */
 extern int getnetmaskbyaddr(struct in_addr, struct in_addr *);

@@ -23,6 +23,9 @@
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
 /* All Rights Reserved */
 /*
@@ -34,8 +37,6 @@
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * rpcb_svc.c
@@ -60,23 +61,30 @@
  * every transport that it waits on.
  */
 void
-rpcb_service_3(rqstp, transp)
-	register struct svc_req *rqstp;
-	register SVCXPRT *transp;
+rpcb_service_3(struct svc_req *rqstp, SVCXPRT *transp)
 {
 	union {
-		RPCB rpcbproc_set_3_arg;
-		RPCB rpcbproc_unset_3_arg;
-		RPCB rpcbproc_getaddr_3_arg;
-		struct rpcb_rmtcallargs rpcbproc_callit_3_arg;
+		rpcb rpcbproc_set_3_arg;
+		rpcb rpcbproc_unset_3_arg;
+		rpcb rpcbproc_getaddr_3_arg;
+		rpcb_rmtcallargs rpcbproc_callit_3_arg;
 		char *rpcbproc_uaddr2taddr_3_arg;
 		struct netbuf rpcbproc_taddr2uaddr_3_arg;
 	} argument;
-	char *result;
-	bool_t (*xdr_argument)(), (*xdr_result)();
-	char *(*local)();
+	union {
+		bool_t rpcbproc_set_3_res;
+		bool_t rpcbproc_unset_3_res;
+		char *rpcbproc_getaddr_3_res;
+		rpcblist_ptr *rpcbproc_dump_3_res;
+		ulong_t rpcbproc_gettime_3_res;
+		struct netbuf rpcbproc_uaddr2taddr_3_res;
+		char *rpcbproc_taddr2uaddr_3_res;
+	} result;
+	bool_t retval;
+	xdrproc_t xdr_argument, xdr_result;
+	bool_t (*local)();
 
-	rpcbs_procinfo((ulong_t)RPCBVERS_3_STAT, rqstp->rq_proc);
+	rpcbs_procinfo(RPCBVERS_3_STAT, rqstp->rq_proc);
 
 	RPCB_CHECK(transp, rqstp->rq_proc);
 
@@ -85,9 +93,6 @@ rpcb_service_3(rqstp, transp)
 		/*
 		 * Null proc call
 		 */
-#ifdef RPCBIND_DEBUG
-		fprintf(stderr, "RPCBPROC_NULL\n");
-#endif
 		(void) svc_sendreply(transp, (xdrproc_t)xdr_void, (char *)NULL);
 		return;
 
@@ -97,21 +102,21 @@ rpcb_service_3(rqstp, transp)
 		 * loopback transports (for security reasons)
 		 */
 		if (strcasecmp(transp->xp_netid, loopback_dg) &&
-			strcasecmp(transp->xp_netid, loopback_vc) &&
-			strcasecmp(transp->xp_netid, loopback_vc_ord)) {
+		    strcasecmp(transp->xp_netid, loopback_vc) &&
+		    strcasecmp(transp->xp_netid, loopback_vc_ord)) {
 			char *uaddr;
 
 			uaddr = taddr2uaddr(rpcbind_get_conf(transp->xp_netid),
-					svc_getrpccaller(transp));
+			    svc_getrpccaller(transp));
 			syslog(LOG_ERR, "non-local attempt to set from %s",
-				uaddr);
+			    uaddr == NULL ? "<unknown>" : uaddr);
 			free(uaddr);
 			svcerr_weakauth(transp);
 			return;
 		}
 		xdr_argument = xdr_rpcb;
 		xdr_result = xdr_bool;
-		local = (char *(*)()) rpcbproc_set_com;
+		local = (bool_t (*)()) rpcbproc_set_com;
 		break;
 
 	case RPCBPROC_UNSET:
@@ -120,36 +125,33 @@ rpcb_service_3(rqstp, transp)
 		 * loopback transports (for security reasons)
 		 */
 		if (strcasecmp(transp->xp_netid, loopback_dg) &&
-			strcasecmp(transp->xp_netid, loopback_vc) &&
-			strcasecmp(transp->xp_netid, loopback_vc_ord)) {
+		    strcasecmp(transp->xp_netid, loopback_vc) &&
+		    strcasecmp(transp->xp_netid, loopback_vc_ord)) {
 			char *uaddr;
 
 			uaddr = taddr2uaddr(rpcbind_get_conf(transp->xp_netid),
-					svc_getrpccaller(transp));
+			    svc_getrpccaller(transp));
 			syslog(LOG_ERR, "non-local attempt to unset from %s",
-				uaddr);
+			    uaddr == NULL ? "<unknown>" : uaddr);
 			free(uaddr);
 			svcerr_weakauth(transp);
 			return;
 		}
 		xdr_argument = xdr_rpcb;
 		xdr_result = xdr_bool;
-		local = (char *(*)()) rpcbproc_unset_com;
+		local = (bool_t (*)()) rpcbproc_unset_com;
 		break;
 
 	case RPCBPROC_GETADDR:
 		xdr_argument = xdr_rpcb;
 		xdr_result = xdr_wrapstring;
-		local = (char *(*)()) rpcbproc_getaddr_3;
+		local = (bool_t (*)()) rpcbproc_getaddr_com;
 		break;
 
 	case RPCBPROC_DUMP:
-#ifdef RPCBIND_DEBUG
-		fprintf(stderr, "RPCBPROC_DUMP\n");
-#endif
 		xdr_argument = xdr_void;
-		xdr_result = xdr_rpcblist_ptr;
-		local = (char *(*)()) rpcbproc_dump_3;
+		xdr_result = xdr_rpcblist_ptr_ptr;
+		local = (bool_t (*)()) rpcbproc_dump_com;
 		break;
 
 	case RPCBPROC_CALLIT:
@@ -157,30 +159,21 @@ rpcb_service_3(rqstp, transp)
 		return;
 
 	case RPCBPROC_GETTIME:
-#ifdef RPCBIND_DEBUG
-		fprintf(stderr, "RPCBPROC_GETTIME\n");
-#endif
 		xdr_argument = xdr_void;
 		xdr_result = xdr_u_long;
-		local = (char *(*)()) rpcbproc_gettime_com;
+		local = (bool_t (*)()) rpcbproc_gettime_com;
 		break;
 
 	case RPCBPROC_UADDR2TADDR:
-#ifdef RPCBIND_DEBUG
-		fprintf(stderr, "RPCBPROC_UADDR2TADDR\n");
-#endif
 		xdr_argument = xdr_wrapstring;
 		xdr_result = xdr_netbuf;
-		local = (char *(*)()) rpcbproc_uaddr2taddr_com;
+		local = (bool_t (*)()) rpcbproc_uaddr2taddr_com;
 		break;
 
 	case RPCBPROC_TADDR2UADDR:
-#ifdef RPCBIND_DEBUG
-		fprintf(stderr, "RPCBPROC_TADDR2UADDR\n");
-#endif
 		xdr_argument = xdr_netbuf;
 		xdr_result = xdr_wrapstring;
-		local = (char *(*)()) rpcbproc_taddr2uaddr_com;
+		local = (bool_t (*)()) rpcbproc_taddr2uaddr_com;
 		break;
 
 	default:
@@ -188,16 +181,14 @@ rpcb_service_3(rqstp, transp)
 		return;
 	}
 	(void) memset((char *)&argument, 0, sizeof (argument));
-	if (!svc_getargs(transp, (xdrproc_t)xdr_argument,
-				(char *)&argument)) {
+	if (!svc_getargs(transp, xdr_argument, (char *)&argument)) {
 		svcerr_decode(transp);
 		if (debugging)
 			(void) fprintf(stderr, "rpcbind: could not decode\n");
 		return;
 	}
-	result = (*local)(&argument, rqstp, transp, RPCBVERS);
-	if (result != NULL && !svc_sendreply(transp, (xdrproc_t)xdr_result,
-						result)) {
+	retval = (*local)(&argument, &result, rqstp, RPCBVERS);
+	if (retval > 0 && !svc_sendreply(transp, xdr_result, (char *)&result)) {
 		svcerr_systemerr(transp);
 		if (debugging) {
 			(void) fprintf(stderr, "rpcbind: svc_sendreply\n");
@@ -206,8 +197,7 @@ rpcb_service_3(rqstp, transp)
 			}
 		}
 	}
-	if (!svc_freeargs(transp, (xdrproc_t)xdr_argument, (char *)
-				&argument)) {
+	if (!svc_freeargs(transp, xdr_argument, (char *)&argument)) {
 		if (debugging) {
 			(void) fprintf(stderr, "unable to free arguments\n");
 			if (doabort) {
@@ -215,39 +205,6 @@ rpcb_service_3(rqstp, transp)
 			}
 		}
 	}
-}
 
-/*
- * Lookup the mapping for a program, version and return its
- * address. Assuming that the caller wants the address of the
- * server running on the transport on which the request came.
- *
- * We also try to resolve the universal address in terms of
- * address of the caller.
- */
-/* ARGSUSED */
-char **
-rpcbproc_getaddr_3(regp, rqstp, transp)
-	RPCB *regp;
-	struct svc_req *rqstp;	/* Not used here */
-	SVCXPRT *transp;
-{
-#ifdef RPCBIND_DEBUG
-	char *uaddr;
-
-	uaddr = taddr2uaddr(rpcbind_get_conf(transp->xp_netid),
-			    svc_getrpccaller(transp));
-	fprintf(stderr, "RPCB_GETADDR request for (%lu, %lu, %s) from %s : ",
-		regp->r_prog, regp->r_vers, transp->xp_netid, uaddr);
-	free(uaddr);
-#endif
-	return (rpcbproc_getaddr_com(regp, rqstp, transp, RPCBVERS,
-					(ulong_t)RPCB_ALLVERS));
-}
-
-/* ARGSUSED */
-rpcblist_ptr *
-rpcbproc_dump_3()
-{
-	return ((rpcblist_ptr *)&list_rbl);
+	xdr_free(xdr_result, (char *)&result);
 }

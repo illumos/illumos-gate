@@ -21,7 +21,7 @@
 #include <term.h>
 #include <expand.h>
 
-#define MENU_ROWS 7
+#define MENU_ROWS 12
 
 grub_jmp_buf restart_env;
 
