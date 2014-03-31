@@ -24,6 +24,10 @@
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ */
+
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
 /* All Rights Reserved */
 /*
@@ -31,8 +35,6 @@
  * 4.3 BSD under license from the Regents of the University of
  * California.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Implements a connectionless client side RPC.
@@ -163,7 +165,7 @@ clnt_dg_create(const int fd, struct netbuf *svcaddr, const rpcprog_t program,
 	 */
 	if (tinfo.servtype == T_CLTS)
 		(void) __rpc_tli_set_options(fd, SOL_SOCKET, SO_DGRAM_ERRIND,
-					    1);
+		    1);
 	/*
 	 * Find the receive and the send size
 	 */
@@ -211,11 +213,9 @@ clnt_dg_create(const int fd, struct netbuf *svcaddr, const rpcprog_t program,
 	}
 	cu->cu_xdrpos = XDR_GETPOS(&(cu->cu_outxdrs));
 	XDR_DESTROY(&(cu->cu_outxdrs));
-	xdrmem_create(&(cu->cu_outxdrs), cu->cu_outbuf_start, ssz,
-								XDR_ENCODE);
+	xdrmem_create(&(cu->cu_outxdrs), cu->cu_outbuf_start, ssz, XDR_ENCODE);
 /* LINTED pointer alignment */
-	tr_data = (struct t_unitdata *)t_alloc(fd,
-				T_UNITDATA, T_ADDR | T_OPT);
+	tr_data = (struct t_unitdata *)t_alloc(fd, T_UNITDATA, T_ADDR | T_OPT);
 	if (tr_data == NULL) {
 		goto err1;
 	}
@@ -309,9 +309,9 @@ call_again:
 
 	if (cl->cl_auth->ah_cred.oa_flavor != RPCSEC_GSS) {
 		if ((!XDR_PUTBYTES(xdrs, cu->cu_outbuf, cu->cu_xdrpos)) ||
-				(!XDR_PUTINT32(xdrs, (int32_t *)&proc)) ||
-				(!AUTH_MARSHALL(cl->cl_auth, xdrs)) ||
-				(!xargs(xdrs, argsp))) {
+		    (!XDR_PUTINT32(xdrs, (int32_t *)&proc)) ||
+		    (!AUTH_MARSHALL(cl->cl_auth, xdrs)) ||
+		    (!xargs(xdrs, argsp))) {
 			rpc_fd_unlock(dgtbl, cu->cu_fd);
 			return (rpc_callerr.re_status = RPC_CANTENCODEARGS);
 		}
@@ -367,7 +367,7 @@ send_again:
 	}
 
 	if (poll_time.tv_sec < 0 || (poll_time.tv_sec == 0 &&
-					poll_time.tv_usec == 0)) {
+	    poll_time.tv_usec == 0)) {
 		/*
 		 * this could happen if time_waited >= timeout
 		 */
@@ -376,8 +376,8 @@ send_again:
 	}
 
 	if (poll_time.tv_sec > retransmit_time.tv_sec ||
-			(poll_time.tv_sec == retransmit_time.tv_sec &&
-				poll_time.tv_usec > retransmit_time.tv_usec))
+	    (poll_time.tv_sec == retransmit_time.tv_sec &&
+	    poll_time.tv_usec > retransmit_time.tv_usec))
 		poll_time = retransmit_time;
 
 
@@ -386,7 +386,7 @@ send_again:
 		(void) gettimeofday(&startime, NULL);
 
 		switch (poll(&cu->pfdp, 1,
-				__rpc_timeval_to_msec(&poll_time))) {
+		    __rpc_timeval_to_msec(&poll_time))) {
 		case -1:
 			if (errno != EINTR && errno != EAGAIN) {
 				rpc_callerr.re_errno = errno;
@@ -403,7 +403,7 @@ send_again:
 timeout:			(void) gettimeofday(&curtime, NULL);
 			time_waited.tv_sec += curtime.tv_sec - startime.tv_sec;
 			time_waited.tv_usec += curtime.tv_usec -
-							startime.tv_usec;
+			    startime.tv_usec;
 			while (time_waited.tv_usec >= 1000000) {
 				time_waited.tv_usec -= 1000000;
 				time_waited.tv_sec++;
@@ -431,8 +431,7 @@ timeout:			(void) gettimeofday(&curtime, NULL);
 			 * if there's time left to poll, poll again
 			 */
 			if (poll_time.tv_sec > 0 ||
-					(poll_time.tv_sec == 0 &&
-						poll_time.tv_usec > 0))
+			    (poll_time.tv_sec == 0 && poll_time.tv_usec > 0))
 				continue;
 
 			/*
@@ -440,8 +439,8 @@ timeout:			(void) gettimeofday(&curtime, NULL);
 			 * otherwise, return timeout error
 			 */
 			if (time_waited.tv_sec < timeout.tv_sec ||
-				(time_waited.tv_sec == timeout.tv_sec &&
-				    time_waited.tv_usec < timeout.tv_usec)) {
+			    (time_waited.tv_sec == timeout.tv_sec &&
+			    time_waited.tv_usec < timeout.tv_usec)) {
 				/*
 				 * update retransmit_time
 				 */
@@ -453,16 +452,16 @@ timeout:			(void) gettimeofday(&curtime, NULL);
 				}
 				if (retransmit_time.tv_sec >= RPC_MAX_BACKOFF) {
 					retransmit_time.tv_sec =
-							RPC_MAX_BACKOFF;
+					    RPC_MAX_BACKOFF;
 					retransmit_time.tv_usec = 0;
 				}
 				/*
 				 * redo AUTH_MARSHAL if AUTH_DES or RPCSEC_GSS.
 				 */
 				if (cl->cl_auth->ah_cred.oa_flavor ==
-					AUTH_DES ||
-					cl->cl_auth->ah_cred.oa_flavor ==
-					RPCSEC_GSS)
+				    AUTH_DES ||
+				    cl->cl_auth->ah_cred.oa_flavor ==
+				    RPCSEC_GSS)
 					goto call_again;
 				else
 					goto send_again;
@@ -537,8 +536,8 @@ timeout:			(void) gettimeofday(&curtime, NULL);
 		/* see if reply transaction id matches sent id */
 		/* LINTED pointer alignment */
 		if (*((uint32_t *)(cu->cu_inbuf)) !=
-				/* LINTED pointer alignment */
-				*((uint32_t *)(cu->cu_outbuf)))
+		    /* LINTED pointer alignment */
+		    *((uint32_t *)(cu->cu_outbuf)))
 			goto timeout;
 		/* we now assume we have the proper reply */
 		break;
@@ -549,32 +548,34 @@ timeout:			(void) gettimeofday(&curtime, NULL);
 	 */
 
 	xdrmem_create(&reply_xdrs, cu->cu_inbuf,
-		(uint_t)cu->cu_tr_data->udata.len, XDR_DECODE);
+	    (uint_t)cu->cu_tr_data->udata.len, XDR_DECODE);
 	ok = xdr_replymsg(&reply_xdrs, &reply_msg);
 	/* XDR_DESTROY(&reply_xdrs);	save a few cycles on noop destroy */
 	if (ok) {
 		if ((reply_msg.rm_reply.rp_stat == MSG_ACCEPTED) &&
-			(reply_msg.acpted_rply.ar_stat == SUCCESS))
+		    (reply_msg.acpted_rply.ar_stat == SUCCESS))
 			rpc_callerr.re_status = RPC_SUCCESS;
 		else
 			__seterr_reply(&reply_msg, &(rpc_callerr));
 
 		if (rpc_callerr.re_status == RPC_SUCCESS) {
 			if (!AUTH_VALIDATE(cl->cl_auth,
-					    &reply_msg.acpted_rply.ar_verf)) {
+			    &reply_msg.acpted_rply.ar_verf)) {
 				rpc_callerr.re_status = RPC_AUTHERROR;
 				rpc_callerr.re_why = AUTH_INVALIDRESP;
 			} else if (cl->cl_auth->ah_cred.oa_flavor !=
-								RPCSEC_GSS) {
+			    RPCSEC_GSS) {
 				if (!(*xresults)(&reply_xdrs, resultsp)) {
-				    if (rpc_callerr.re_status == RPC_SUCCESS)
-					rpc_callerr.re_status =
-							RPC_CANTDECODERES;
+					if (rpc_callerr.re_status ==
+					    RPC_SUCCESS)
+						rpc_callerr.re_status =
+						    RPC_CANTDECODERES;
 				}
 			} else if (!__rpc_gss_unwrap(cl->cl_auth, &reply_xdrs,
-						xresults, resultsp)) {
+			    xresults, resultsp)) {
 				if (rpc_callerr.re_status == RPC_SUCCESS)
-				    rpc_callerr.re_status = RPC_CANTDECODERES;
+					rpc_callerr.re_status =
+					    RPC_CANTDECODERES;
 			}
 		}		/* end successful completion */
 		/*
@@ -599,10 +600,10 @@ timeout:			(void) gettimeofday(&curtime, NULL);
 		/* end of unsuccessful completion */
 		/* free verifier */
 		if (reply_msg.rm_reply.rp_stat == MSG_ACCEPTED &&
-				reply_msg.acpted_rply.ar_verf.oa_base != NULL) {
+		    reply_msg.acpted_rply.ar_verf.oa_base != NULL) {
 			xdrs->x_op = XDR_FREE;
 			(void) xdr_opaque_auth(xdrs,
-					&(reply_msg.acpted_rply.ar_verf));
+			    &(reply_msg.acpted_rply.ar_verf));
 		}
 	}	/* end of valid reply message */
 	else {
@@ -646,9 +647,9 @@ clnt_dg_send(CLIENT *cl, rpcproc_t proc, xdrproc_t xargs, caddr_t argsp)
 
 	if (cl->cl_auth->ah_cred.oa_flavor != RPCSEC_GSS) {
 		if ((!XDR_PUTBYTES(xdrs, cu->cu_outbuf, cu->cu_xdrpos)) ||
-				(!XDR_PUTINT32(xdrs, (int32_t *)&proc)) ||
-				(!AUTH_MARSHALL(cl->cl_auth, xdrs)) ||
-				(!xargs(xdrs, argsp))) {
+		    (!XDR_PUTINT32(xdrs, (int32_t *)&proc)) ||
+		    (!AUTH_MARSHALL(cl->cl_auth, xdrs)) ||
+		    (!xargs(xdrs, argsp))) {
 			rpc_fd_unlock(dgtbl, cu->cu_fd);
 			return (rpc_callerr.re_status = RPC_CANTENCODEARGS);
 		}
@@ -716,7 +717,7 @@ clnt_dg_control(CLIENT *cl, int request, char *info)
 	struct netbuf *addr;
 	if (rpc_fd_lock(dgtbl, cu->cu_fd)) {
 		rpc_fd_unlock(dgtbl, cu->cu_fd);
-		return (RPC_FAILED);
+		return (FALSE);
 	}
 
 	switch (request) {
@@ -814,14 +815,14 @@ clnt_dg_control(CLIENT *cl, int request, char *info)
 		 */
 /* LINTED pointer alignment */
 		*(uint32_t *)info = ntohl(*(uint32_t *)(cu->cu_outbuf +
-						    4 * BYTES_PER_XDR_UNIT));
+		    4 * BYTES_PER_XDR_UNIT));
 		break;
 
 	case CLSET_VERS:
 /* LINTED pointer alignment */
 		*(uint32_t *)(cu->cu_outbuf + 4 * BYTES_PER_XDR_UNIT) =
 /* LINTED pointer alignment */
-			htonl(*(uint32_t *)info);
+		    htonl(*(uint32_t *)info);
 		break;
 
 	case CLGET_PROG:
@@ -833,14 +834,14 @@ clnt_dg_control(CLIENT *cl, int request, char *info)
 		 */
 /* LINTED pointer alignment */
 		*(uint32_t *)info = ntohl(*(uint32_t *)(cu->cu_outbuf +
-						    3 * BYTES_PER_XDR_UNIT));
+		    3 * BYTES_PER_XDR_UNIT));
 		break;
 
 	case CLSET_PROG:
 /* LINTED pointer alignment */
 		*(uint32_t *)(cu->cu_outbuf + 3 * BYTES_PER_XDR_UNIT) =
 /* LINTED pointer alignment */
-			htonl(*(uint32_t *)info);
+		    htonl(*(uint32_t *)info);
 		break;
 
 	default:
@@ -903,7 +904,7 @@ static bool_t
 time_not_ok(struct timeval *t)
 {
 	return (t->tv_sec < -1 || t->tv_sec > 100000000 ||
-		t->tv_usec < -1 || t->tv_usec > 1000000);
+	    t->tv_usec < -1 || t->tv_usec > 1000000);
 }
 
 /*
@@ -920,8 +921,7 @@ _rcv_unitdata_err(struct cu_data *cu)
 
 	old = t_errno;
 	/* LINTED pointer cast */
-	uderr = (struct t_uderr *)
-		t_alloc(cu->cu_fd, T_UDERROR, T_ADDR);
+	uderr = (struct t_uderr *)t_alloc(cu->cu_fd, T_UDERROR, T_ADDR);
 
 	if (t_rcvuderr(cu->cu_fd, uderr) == 0) {
 		if (uderr == NULL)
