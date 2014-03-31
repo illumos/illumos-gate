@@ -21,9 +21,8 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2014 Joyent, Inc.  All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/systm.h>
@@ -128,8 +127,15 @@ long
 lx_set_tid_address(int *tidp)
 {
 	struct lx_lwp_data *lwpd = ttolxlwp(curthread);
+	long rv;
 
 	lwpd->br_clear_ctidp = tidp;
 
-	return (lwpd->br_pid);
+	if (curproc->p_pid == curproc->p_zone->zone_proc_initpid) {
+		rv = 1;
+	} else {
+		rv = lwpd->br_pid;
+	}
+
+	return (rv);
 }
