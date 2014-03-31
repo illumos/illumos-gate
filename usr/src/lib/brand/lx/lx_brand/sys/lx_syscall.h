@@ -240,6 +240,10 @@ extern int lx_sched_setscheduler(uintptr_t, uintptr_t, uintptr_t);
 extern int lx_sched_get_priority_min(uintptr_t);
 extern int lx_sched_get_priority_max(uintptr_t);
 
+extern int lx_xattr2(uintptr_t, uintptr_t);
+extern int lx_xattr3(uintptr_t, uintptr_t, uintptr_t);
+extern int lx_xattr4(uintptr_t, uintptr_t, uintptr_t, uintptr_t);
+
 extern int lx_keyctl(void);
 
 extern int lx_ipc(uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t);

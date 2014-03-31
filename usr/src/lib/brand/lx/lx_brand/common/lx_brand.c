@@ -1142,15 +1142,15 @@ static struct lx_sysent sysents[] = {
 	{"setxattr",	NULL,		NOSYS_NO_EQUIV,	0},	/* 226 */
 	{"lsetxattr",	NULL,		NOSYS_NO_EQUIV,	0},	/* 227 */
 	{"fsetxattr",	NULL,		NOSYS_NO_EQUIV,	0},	/* 228 */
-	{"getxattr",	NULL,		NOSYS_NO_EQUIV,	0},	/* 229 */
-	{"lgetxattr",	NULL,		NOSYS_NO_EQUIV,	0},	/* 230 */
-	{"fgetxattr",	NULL,		NOSYS_NO_EQUIV,	0},	/* 231 */
-	{"listxattr",	NULL,		NOSYS_NO_EQUIV,	0},	/* 232 */
-	{"llistxattr",	NULL,		NOSYS_NO_EQUIV,	0},	/* 233 */
-	{"flistxattr",	NULL,		NOSYS_NO_EQUIV,	0},	/* 234 */
-	{"removexattr",	NULL,		NOSYS_NO_EQUIV,	0},	/* 235 */
-	{"lremovexattr", NULL,		NOSYS_NO_EQUIV,	0},	/* 236 */
-	{"fremovexattr", NULL,		NOSYS_NO_EQUIV,	0},	/* 237 */
+	{"getxattr",	lx_xattr4,	0,		4},	/* 229 */
+	{"lgetxattr",	lx_xattr4,	0,		4},	/* 230 */
+	{"fgetxattr",	lx_xattr4,	0,		4},	/* 231 */
+	{"listxattr",	lx_xattr3,	0,		3},	/* 232 */
+	{"llistxattr",	lx_xattr3,	0,		3},	/* 233 */
+	{"flistxattr",	lx_xattr3,	0,		3},	/* 234 */
+	{"removexattr",	lx_xattr2,	0,		2},	/* 235 */
+	{"lremovexattr", lx_xattr2,	0,		2},	/* 236 */
+	{"fremovexattr", lx_xattr2,	0,		2},	/* 237 */
 	{"tkill",	lx_tkill,	0,		2},	/* 238 */
 	{"sendfile64",	lx_sendfile64,	0,		4},	/* 239 */
 	{"futex",	lx_futex,	EBP_HAS_ARG6,	6},	/* 240 */
