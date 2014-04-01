@@ -186,7 +186,6 @@ int
 lx_setattr(zone_t *zone, int attr, void *buf, size_t bufsize)
 {
 	boolean_t val;
-	int num;
 	char vers[LX_VERS_MAX];
 
 	if (attr == LX_ATTR_RESTART_INIT) {
