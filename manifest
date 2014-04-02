@@ -5050,6 +5050,8 @@ f usr/lib/brand/lx/etc_default_nfs 0444 root root
 f usr/lib/brand/lx/etc_netconfig 0444 root root
 f usr/lib/brand/lx/lx_distro_install 0755 root root
 f usr/lib/brand/lx/lx_init_zone 0755 root root
+f usr/lib/brand/lx/lx_init_zone_debian 0755 root root
+f usr/lib/brand/lx/lx_init_zone_redhat 0755 root root
 f usr/lib/brand/lx/lx_install 0755 root root
 f usr/lib/brand/lx/lx_librtld_db.so.1 0755 root root
 f usr/lib/brand/lx/lx_lockd 0755 root root
