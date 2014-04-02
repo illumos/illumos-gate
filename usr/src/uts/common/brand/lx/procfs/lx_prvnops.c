@@ -260,16 +260,17 @@ lxpr_open(vnode_t **vpp, int flag, cred_t *cr, caller_context_t *ct)
 		return (EROFS);
 
 	/*
-	 * If we are opening an underlying file only allow regular files
-	 * reject the open for anything but a regular file.
+	 * If we are opening an underlying file only allow regular files,
+	 * fifos or sockets; reject the open for anything else.
 	 * Just do it if we are opening the current or root directory.
 	 */
 	if (lxpnp->lxpr_realvp != NULL) {
 		rvp = lxpnp->lxpr_realvp;
 
-		if (type == LXPR_PID_FD_FD && rvp->v_type != VREG)
+		if (type == LXPR_PID_FD_FD && rvp->v_type != VREG &&
+		    rvp->v_type != VFIFO && rvp->v_type != VSOCK) {
 			error = EACCES;
-		else {
+		} else {
 			/*
 			 * Need to hold rvp since VOP_OPEN() may release it.
 			 */
@@ -1926,7 +1927,7 @@ lxpr_read_cpuinfo(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 		lxpr_uiobuf_printf(uiobuf, "cache size\t: %u KB\n",
 		    getl2cacheinfo(cp, NULL, NULL, NULL) / 1024);
 
-		if (is_x86_feature(x86_featureset, X86FSET_HTT)) { 
+		if (is_x86_feature(x86_featureset, X86FSET_HTT)) {
 			/*
 			 * 'siblings' is used for HT-style threads
 			 */
@@ -2070,7 +2071,7 @@ lxpr_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 
 		/*
 		 * if it's a file in lx /proc/pid/fd/xx then set its
-		 * mode and keep it looking like a symlink
+		 * mode and keep it looking like a symlink, fifo or socket
 		 */
 		if (type == LXPR_PID_FD_FD) {
 			vap->va_mode = lxpnp->lxpr_mode;
@@ -2393,6 +2394,16 @@ lxpr_lookup_fddir(vnode_t *dp, char *comp)
 		 */
 		lxpnp->lxpr_realvp = vp;
 		VN_HOLD(lxpnp->lxpr_realvp);
+		if (lxpnp->lxpr_realvp->v_type == VFIFO ||
+		    lxpnp->lxpr_realvp->v_type == VSOCK) {
+			/*
+			 * lxpr_getnode initially sets the type to be VLNK for
+			 * the LXPR_PID_FD_FD option, but that would break fifo
+			 * and socket file descriptors.
+			 */
+			dp = LXPTOV(lxpnp);
+			dp->v_type = lxpnp->lxpr_realvp->v_type;
+		}
 	}
 
 	dp = LXPTOV(lxpnp);
@@ -2612,7 +2623,8 @@ lxpr_readdir_common(lxpr_node_t *lxpnp, uio_t *uiop, int *eofp,
 		 * So we set uiop->uio_offset separately, ignoring what
 		 * uiomove() does.
 		 */
-		if ((error = uiomove((caddr_t)dirent, reclen, UIO_READ, uiop))) {
+		if ((error = uiomove((caddr_t)dirent, reclen, UIO_READ,
+		    uiop))) {
 			return (error);
 		}
 
