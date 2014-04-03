@@ -108,6 +108,7 @@
 	<device match="udp" />
 	<device match="udp6" />
 	<device match="urandom" />
+	<device match="vnd/*" />
 	<device match="zero" />
 	<device match="zfs" />
 	<device match="zvol/dsk/%P/%z/*" />

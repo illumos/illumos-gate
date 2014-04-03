@@ -4411,6 +4411,7 @@ f usr/include/sys/vmem_impl_user.h 0644 root bin
 f usr/include/sys/vmparam.h 0644 root bin
 f usr/include/sys/vmsystm.h 0644 root bin
 f usr/include/sys/vnd.h 0644 root bin
+f usr/include/sys/vnd_errno.h 0644 root bin
 f usr/include/sys/vnic.h 0644 root bin
 f usr/include/sys/vnic_impl.h 0644 root bin
 f usr/include/sys/vnode.h 0644 root bin
