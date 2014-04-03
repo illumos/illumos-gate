@@ -22,9 +22,8 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2014 Joyent, Inc.  All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * wait() family of functions.
@@ -84,8 +83,11 @@
  * Convert between Linux options and Solaris options, returning -1 if any
  * invalid flags are found.
  */
-#define	LX_WNOHANG	0x1
-#define	LX_WUNTRACED	0x2
+#define	LX_WNOHANG	0x00000001
+#define	LX_WUNTRACED	0x00000002
+#define	LX_WEXITED	0x00000004
+#define	LX_WCONTINUED	0x00000008
+#define	LX_WNOWAIT	0x01000000
 
 #define	LX_WNOTHREAD	0x20000000
 #define	LX_WALL		0x40000000
@@ -100,8 +102,9 @@ ltos_options(uintptr_t options)
 {
 	int newoptions = 0;
 
-	if (((options) & ~(LX_WNOHANG | LX_WUNTRACED | LX_WNOTHREAD |
-	    LX_WALL | LX_WCLONE)) != 0) {
+	if (((options) & ~(LX_WNOHANG | LX_WUNTRACED | LX_WEXITED |
+	    LX_WCONTINUED | LX_WNOWAIT | LX_WNOTHREAD | LX_WALL |
+	    LX_WCLONE)) != 0) {
 		return (-1);
 	}
 	/* XXX implement LX_WNOTHREAD, LX_WALL, LX_WCLONE */
@@ -110,6 +113,12 @@ ltos_options(uintptr_t options)
 		newoptions |= WNOHANG;
 	if (options & LX_WUNTRACED)
 		newoptions |= WUNTRACED;
+	if (options & LX_WEXITED)
+		newoptions |= WEXITED;
+	if (options & LX_WCONTINUED)
+		newoptions |= WCONTINUED;
+	if (options & LX_WNOWAIT)
+		newoptions |= WNOWAIT;
 
 	return (newoptions);
 }
