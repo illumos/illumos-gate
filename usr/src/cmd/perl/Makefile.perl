@@ -14,7 +14,7 @@
 
 include $(SRC)/lib/Makefile.lib
 
-PERL_VERSION = 5.12.0
+PERL_VERSION = 5.12
 
 PERL_ARCH = i86pc-solaris-64int
 $(SPARC_BLD)PERL_ARCH = sun4-solaris-64int
