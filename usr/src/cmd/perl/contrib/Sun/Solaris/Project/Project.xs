@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 1999, 2007, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2014 Racktop Systems.
  */
 /*
  * Project.xs contains XS wrappers for the project database maniplulation
@@ -160,7 +161,7 @@ PREINIT:
 	char		buf[PROJECT_BUFSZ];
 PPCODE:
 	PUTBACK;
-	if (projp = getprojent(&proj, buf, sizeof (buf))) {
+	if ((projp = getprojent(&proj, buf, sizeof (buf)))) {
 		XSRETURN(pushret_project(projp));
 	} else {
 		XSRETURN_EMPTY;
@@ -180,7 +181,7 @@ PREINIT:
 	char		buf[PROJECT_BUFSZ];
 PPCODE:
 	PUTBACK;
-	if (projp = getprojbyname(name, &proj, buf, sizeof (buf))) {
+	if ((projp = getprojbyname(name, &proj, buf, sizeof (buf)))) {
 		XSRETURN(pushret_project(projp));
 	} else {
 		XSRETURN_EMPTY;
@@ -194,7 +195,7 @@ PREINIT:
 	char		buf[PROJECT_BUFSZ];
 PPCODE:
 	PUTBACK;
-	if (projp = getprojbyid(id, &proj, buf, sizeof (buf))) {
+	if ((projp = getprojbyid(id, &proj, buf, sizeof (buf)))) {
 		XSRETURN(pushret_project(projp));
 	} else {
 		XSRETURN_EMPTY;
@@ -208,7 +209,7 @@ PREINIT:
 	char		buf[PROJECT_BUFSZ];
 PPCODE:
 	PUTBACK;
-	if (projp = getdefaultproj(user, &proj, buf, sizeof (buf))) {
+	if ((projp = getdefaultproj(user, &proj, buf, sizeof (buf)))) {
 		XSRETURN(pushret_project(projp));
 	} else {
 		XSRETURN_EMPTY;
@@ -222,7 +223,7 @@ PREINIT:
 	char		buf[PROJECT_BUFSZ];
 PPCODE:
 	PUTBACK;
-	if (projp = fgetprojent(fh, &proj, buf, sizeof (buf))) {
+	if ((projp = fgetprojent(fh, &proj, buf, sizeof (buf)))) {
 		XSRETURN(pushret_project(projp));
 	} else {
 		XSRETURN_EMPTY;
@@ -236,6 +237,8 @@ PREINIT:
 	char	buf[PROJECT_BUFSZ];
 CODE:
 	RETVAL = inproj(user, proj, buf, sizeof (buf));
+OUTPUT:
+	RETVAL
 
 
 int
@@ -268,7 +271,7 @@ PREINIT:
 	rctlblk_t *tmp = NULL;
 	rctl_priv_t priv;
 	rctl_qty_t value;
-	int flags;
+	int flags = 0;
 	int ret;
 	int err = 0;
 	char string[24];	/* 24 will always hold a uint64_t */

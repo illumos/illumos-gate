@@ -1,5 +1,6 @@
 #
 # Copyright (c) 1999, 2008, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2014 Racktop Systems.
 #
 
 #
@@ -8,7 +9,7 @@
 # files.
 #
 ################################################################################
-require 5.8.4;
+require 5.0010;
 
 use strict;
 use warnings;

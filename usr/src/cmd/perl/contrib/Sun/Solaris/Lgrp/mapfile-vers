@@ -1,0 +1,39 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+#
+# Copyright (c) 2014 Racktop Systems.
+#
+
+$mapfile_version 2
+
+SYMBOL_SCOPE {
+    global:
+	boot_Sun__Solaris__Lgrp;
+	XS_Sun__Solaris__Lgrp_lgrp_affinity_get;
+	XS_Sun__Solaris__Lgrp_lgrp_affinity_set;
+	XS_Sun__Solaris__Lgrp_lgrp_children;
+	XS_Sun__Solaris__Lgrp_lgrp_cookie_stale;
+	XS_Sun__Solaris__Lgrp_lgrp_cpus;
+	XS_Sun__Solaris__Lgrp_lgrp_fini;
+	XS_Sun__Solaris__Lgrp_lgrp_home;
+	XS_Sun__Solaris__Lgrp_lgrp_init;
+	XS_Sun__Solaris__Lgrp_lgrp_latency;
+	XS_Sun__Solaris__Lgrp_lgrp_latency_cookie;
+	XS_Sun__Solaris__Lgrp_lgrp_mem_size;
+	XS_Sun__Solaris__Lgrp_lgrp_nlgrps;
+	XS_Sun__Solaris__Lgrp_lgrp_parents;
+	XS_Sun__Solaris__Lgrp_lgrp_resources;
+	XS_Sun__Solaris__Lgrp_lgrp_root;
+	XS_Sun__Solaris__Lgrp_lgrp_version;
+	XS_Sun__Solaris__Lgrp_lgrp_view;
+    local:
+	*;
+};

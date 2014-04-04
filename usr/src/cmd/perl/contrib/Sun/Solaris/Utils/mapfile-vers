@@ -1,0 +1,28 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+#
+# Copyright (c) 2014 Racktop Systems.
+#
+
+$mapfile_version 2
+
+SYMBOL_SCOPE {
+    global:
+	boot_Sun__Solaris__Utils;
+	XS_Sun__Solaris__Utils_bindtextdomain;
+	XS_Sun__Solaris__Utils_dcgettext;
+	XS_Sun__Solaris__Utils_dgettext;
+	XS_Sun__Solaris__Utils_gettext;
+	XS_Sun__Solaris__Utils_gmatch;
+	XS_Sun__Solaris__Utils_textdomain;
+    local:
+	*;
+};
