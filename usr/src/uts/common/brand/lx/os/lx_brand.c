@@ -22,7 +22,10 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2014 Joyent, Inc.  All rights reserved.
+ */
+
+/*
+ * Copyright (c) 2014, Joyent, Inc. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -663,13 +666,14 @@ lx_elfexec(struct vnode *vp, struct execa *uap, struct uarg *args,
 	vnode_t		*nvp;
 	auxv32_t	phdr_auxv32[3] = {
 	    { AT_SUN_BRAND_LX_PHDR, 0 },
-	    { AT_SUN_BRAND_AUX2, 0 },
+	    { AT_SUN_BRAND_LX_INTERP, 0 },
 	    { AT_SUN_BRAND_AUX3, 0 }
 	};
 	Elf32_Ehdr	ehdr;
 	Elf32_Addr	uphdr_vaddr;
 	intptr_t	voffset;
 	int		interp;
+	uintptr_t	ldaddr = NULL;
 	int		i;
 	struct execenv	env;
 	struct user	*up = PTOU(ttoproc(curthread));
@@ -707,7 +711,7 @@ lx_elfexec(struct vnode *vp, struct execa *uap, struct uarg *args,
 
 	if ((error = mapexec_brand(vp, args, &ehdr, &uphdr_vaddr, &voffset,
 	    exec_file, &interp, &env.ex_bssbase, &env.ex_brkbase,
-	    &env.ex_brksize, NULL)))
+	    &env.ex_brksize, NULL, NULL)))
 		return (error);
 
 	/*
@@ -737,13 +741,14 @@ lx_elfexec(struct vnode *vp, struct execa *uap, struct uarg *args,
 		 * store relevant information about it in the aux vector, where
 		 * the brand library can find it.
 		 */
-		if ((error = lookupname(LX_LINKER, UIO_SYSSPACE, FOLLOW, NULLVPP,
-		    &nvp))) {
+		if ((error = lookupname(LX_LINKER, UIO_SYSSPACE, FOLLOW,
+		    NULLVPP, &nvp))) {
 			uprintf("%s: not found.", LX_LINKER);
 			return (error);
 		}
 		if ((error = mapexec_brand(nvp, args, &ehdr, &uphdr_vaddr,
-		    &voffset, exec_file, &interp, NULL, NULL, NULL, NULL))) {
+		    &voffset, exec_file, &interp, NULL, NULL, NULL, NULL,
+		    &ldaddr))) {
 			VN_RELE(nvp);
 			return (error);
 		}
@@ -825,14 +830,15 @@ lx_elfexec(struct vnode *vp, struct execa *uap, struct uarg *args,
 	 * what's on the process stack.
 	 */
 	phdr_auxv32[0].a_un.a_val = edp->ed_phdr;
+	phdr_auxv32[1].a_un.a_val = ldaddr;
 
 	/*
-	 * Linux 2.6 (or greater) programs such as ps will print an error message
-	 * if the following aux entry is missing
+	 * Linux 2.6 (or greater) programs such as ps will print an error
+	 * message if the following aux entry is missing
 	 */
 	if (strncmp(lx_get_zone_kern_version(curzone), "2.4", 3) != 0) {
-		phdr_auxv32[1].a_type = AT_CLKTCK;
-		phdr_auxv32[1].a_un.a_val = hz;
+		phdr_auxv32[2].a_type = AT_CLKTCK;
+		phdr_auxv32[2].a_un.a_val = hz;
 	}
 
 	if (copyout(&phdr_auxv32, args->auxp_brand,
@@ -857,8 +863,12 @@ lx_elfexec(struct vnode *vp, struct execa *uap, struct uarg *args,
 	for (i = 0; i < __KERN_NAUXV_IMPL; i++) {
 		if (up->u_auxv[i].a_type == AT_ENTRY)
 			up->u_auxv[i].a_un.a_val = edp->ed_entry;
+
 		if (up->u_auxv[i].a_type == AT_SUN_BRAND_LX_PHDR)
 			up->u_auxv[i].a_un.a_val = edp->ed_phdr;
+
+		if (up->u_auxv[i].a_type == AT_SUN_BRAND_LX_INTERP)
+			up->u_auxv[i].a_un.a_val = ldaddr;
 	}
 
 	return (0);

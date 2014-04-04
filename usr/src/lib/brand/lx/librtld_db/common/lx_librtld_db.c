@@ -23,7 +23,9 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 2014, Joyent, Inc. All rights reserved.
+ */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -58,8 +60,8 @@
 #endif /* M_DATA */
 
 /*
- * For 32-bit versions of this library, this file get's compiled once.
- * For 64-bit versions of this library, this file get's compiled twice,
+ * For 32-bit versions of this library, this file gets compiled once.
+ * For 64-bit versions of this library, this file gets compiled twice,
  * once with _ELF64 defined and once without.  The expectation is that
  * the 64-bit version of the library can properly deal with both 32-bit
  * and 64-bit elf files, hence in the 64-bit library there are two copies
@@ -69,12 +71,12 @@
  * that point to objects in another processes address space, since these
  * pointers may not match the current processes pointer width.  Basically,
  * we should avoid using data types that change size between 32 and 64 bit
- * modes like: long, void *, uintprt_t, caddr_t, psaddr_t, size_t, etc.
+ * modes like: long, void *, uintptr_t, caddr_t, psaddr_t, size_t, etc.
  * Instead we should declare all pointers as uint32_t.  Then when we
  * are compiled to deal with 64-bit targets we'll re-define uint32_t
  * to be a uint64_t.
  *
- * Finally, one last importante note.  All the 64-bit elf file code
+ * Finally, one last important note.  All the 64-bit elf file code
  * is never used and can't be tested.  This is because we don't actually
  * support 64-bit Linux processes yet.  The reason that we have it here
  * is because we want to support debugging 32-bit elf targets with the
@@ -294,9 +296,13 @@ lx_ldb_init32(rd_agent_t *rap, struct ps_prochandle *php)
 {
 	lx_rd_t		*lx_rd;
 	uint32_t	addr, phdr_addr, dyn_addr;
+	uint32_t	symtab, strtab, offs;
+	uint32_t	vaddr, memsz;
+	caddr_t		mem;
 	Elf32_Dyn	*dyn;
-	Elf32_Phdr	phdr, *ph, *phdrs;
+	Elf32_Phdr	phdr, *ph, *dph, *phdrs;
 	Elf32_Ehdr	ehdr;
+	Elf32_Sym	*sym;
 	int		i, dyn_count;
 
 	lx_rd = calloc(sizeof (lx_rd_t), 1);
@@ -322,7 +328,7 @@ lx_ldb_init32(rd_agent_t *rap, struct ps_prochandle *php)
 		return (NULL);
 	}
 
-	/* The ELF headher should be before the program header in memory */
+	/* The ELF header should be before the program header in memory */
 	lx_rd->lr_exec = addr = phdr_addr - phdr.p_offset;
 	if (ps_pread(php, addr, &ehdr, sizeof (ehdr)) != PS_OK) {
 		ps_plog("lx_ldb_init: couldn't read ehdr at 0x%p",
@@ -393,12 +399,199 @@ lx_ldb_init32(rd_agent_t *rap, struct ps_prochandle *php)
 	free(phdrs);
 	free(dyn);
 
-	if (lx_rd->lr_rdebug == 0) {
-		ps_plog("lx_ldb_init: no DT_DEBUG found in exe");
+	if (lx_rd->lr_rdebug != 0) {
+		ps_plog("lx_ldb_init: found DT_DEBUG: 0x%p", lx_rd->lr_rdebug);
+		return ((rd_helper_data_t)lx_rd);
+	}
+
+	ps_plog("lx_ldb_init: no DT_DEBUG found in exe; looking for r_debug");
+
+	/*
+	 * If we didn't find DT_DEBUG, we're going to employ the same fallback
+	 * as gdb:  pawing through the dynamic linker's symbol table looking
+	 * for the r_debug symbol.
+	 */
+	addr = lx_ldb_getauxval32(php, AT_SUN_BRAND_LX_INTERP);
+
+	if (addr == (uint32_t)-1) {
+		ps_plog("lx_ldb_init: no interpreter; failing");
 		free(lx_rd);
 		return (NULL);
 	}
-	ps_plog("lx_ldb_init: found DT_DEBUG: 0x%p", lx_rd->lr_rdebug);
+
+	ps_plog("lx_ldb_init: reading interp ehdr at 0x%p", addr);
+
+	if (ps_pread(php, addr, &ehdr, sizeof (ehdr)) != PS_OK) {
+		ps_plog("lx_ldb_init: couldn't read interp ehdr at 0x%p", addr);
+		free(lx_rd);
+		return (NULL);
+	}
+
+	if (ehdr.e_type != ET_DYN) {
+		ps_plog("lx_ldb_init: interp ehdr not of type ET_DYN");
+		free(lx_rd);
+		return (NULL);
+	}
+
+	phdr_addr = addr + ehdr.e_phoff;
+
+	if ((phdrs = malloc(ehdr.e_phnum * ehdr.e_phentsize)) == NULL) {
+		ps_plog("lx_ldb_init: couldn't alloc interp phdrs memory");
+		free(lx_rd);
+		return (NULL);
+	}
+
+	if (ps_pread(php, phdr_addr, phdrs,
+	    ehdr.e_phnum * ehdr.e_phentsize) != PS_OK) {
+		ps_plog("lx_ldb_init: couldn't read interp phdrs at 0x%p",
+		    phdr_addr);
+		free(lx_rd);
+		free(phdrs);
+		return (NULL);
+	}
+
+	ps_plog("lx_ldb_init: read %d interp phdrs at: 0x%p",
+	    ehdr.e_phnum, phdr_addr);
+
+	vaddr = (uint32_t)-1;
+	memsz = 0;
+
+	for (i = 0, ph = phdrs, dph = NULL; i < ehdr.e_phnum; i++,
+	    /*LINTED */
+	    ph = (Elf32_Phdr *)((char *)ph + ehdr.e_phentsize)) {
+		/*
+		 * Keep track of our lowest PT_LOAD address, as this segment
+		 * contains the DT_SYMTAB and DT_STRTAB.
+		 */
+		if (ph->p_type == PT_LOAD && ph->p_vaddr < vaddr) {
+			vaddr = ph->p_vaddr;
+			memsz = ph->p_memsz;
+		}
+
+		if (ph->p_type == PT_DYNAMIC)
+			dph = ph;
+	}
+
+	if (vaddr == (uint32_t)-1 || memsz == 0) {
+		ps_plog("lx_ldb_init: no PT_LOAD section in interp");
+		free(lx_rd);
+		free(phdrs);
+		return (NULL);
+	}
+
+	ps_plog("lx_ldb_init: found interp PT_LOAD to be %d bytes at 0x%p",
+	    memsz, vaddr);
+
+	if ((ph = dph) == NULL) {
+		ps_plog("lx_ldb_init: no PT_DYNAMIC in interp");
+		free(lx_rd);
+		free(phdrs);
+		return (NULL);
+	}
+
+	ps_plog("lx_ldb_init: found interp PT_DYNAMIC phdr[%d] at: 0x%p",
+	    i, (phdr_addr + ((char *)ph - (char *)phdrs)));
+
+	if ((dyn = malloc(ph->p_filesz)) == NULL) {
+		ps_plog("lx_ldb_init: couldn't alloc for interp PT_DYNAMIC");
+		free(lx_rd);
+		free(phdrs);
+		return (NULL);
+	}
+
+	dyn_addr = addr + ph->p_offset;
+	dyn_count = ph->p_filesz / sizeof (Elf32_Dyn);
+
+	if (ps_pread(php, dyn_addr, dyn, ph->p_filesz) != PS_OK) {
+		ps_plog("lx_ldb_init: couldn't read interp dynamic at 0x%p",
+		    dyn_addr);
+		free(lx_rd);
+		free(phdrs);
+		free(dyn);
+		return (NULL);
+	}
+
+	free(phdrs);
+
+	ps_plog("lx_ldb_init: read %d interp dynamic headers at: 0x%p",
+	    dyn_count, dyn_addr);
+
+	/*
+	 * As noted in lx_ldb_get_dyns32(), in Linux, the PT_DYNAMIC table
+	 * is adjusted to represent absolute addresses instead of offsets.
+	 * This is not true for the interpreter, however -- where the values
+	 * will be represented as offsets from the lowest PT_LOAD p_vaddr.
+	 */
+	symtab = strtab = (uint32_t)-1;
+
+	for (i = 0; i < dyn_count; i++) {
+		if (dyn[i].d_tag == DT_STRTAB)
+			strtab = dyn[i].d_un.d_ptr - vaddr;
+
+		if (dyn[i].d_tag == DT_SYMTAB)
+			symtab = dyn[i].d_un.d_ptr - vaddr;
+	}
+
+	free(dyn);
+
+	if (strtab == (uint32_t)-1 || strtab > memsz) {
+		ps_plog("lx_ldb_init: didn't find valid interp strtab");
+		free(lx_rd);
+		return (NULL);
+	}
+
+	if (symtab == (uint32_t)-1 || symtab > memsz) {
+		ps_plog("lx_ldb_init: didn't find valid interp symtab");
+		free(lx_rd);
+		return (NULL);
+	}
+
+	ps_plog("lx_ldb_init: strtab is 0x%x, symtab is 0x%x",
+	    addr + strtab, addr + symtab);
+
+	if ((mem = malloc(memsz)) == NULL) {
+		ps_plog("lx_ldb_init: couldn't allocate interp "
+		    "buffer of 0x%p bytes", memsz);
+		free(lx_rd);
+		return (NULL);
+	}
+
+	if (ps_pread(php, addr, mem, memsz) != PS_OK) {
+		ps_plog("lx_ldb_init: couldn't read interp at 0x%p", addr);
+		free(lx_rd);
+		free(mem);
+		return (NULL);
+	}
+
+	/*
+	 * We make an assumption that is made elsewhere in the Linux linker:
+	 * that the DT_SYMTAB immediately precedes the DT_STRTAB.
+	 */
+	for (offs = symtab; offs < strtab; offs += sizeof (Elf32_Sym)) {
+		sym = (Elf32_Sym *)&mem[offs];
+
+		if (sym->st_name > memsz) {
+			ps_plog("lx_ldb_init: invalid st_name at sym 0x%p",
+			    addr + offs);
+		}
+
+		ps_plog("lx_ldb_init: found interp symbol %s",
+		    &mem[strtab + sym->st_name]);
+
+		if (strcmp(&mem[strtab + sym->st_name], "_r_debug") == 0)
+			break;
+	}
+
+	if (offs >= strtab) {
+		ps_plog("lx_ldb_init: no _r_debug found in interpreter");
+		free(mem);
+		free(lx_rd);
+		return (NULL);
+	}
+
+	lx_rd->lr_rdebug = (sym->st_value - vaddr) + addr;
+	ps_plog("lx_ldb_init: found _r_debug at 0x%p", lx_rd->lr_rdebug);
+	free(mem);
 
 	return ((rd_helper_data_t)lx_rd);
 }
