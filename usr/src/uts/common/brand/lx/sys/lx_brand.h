@@ -21,7 +21,10 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2014 Joyent, Inc.  All rights reserved.
+ */
+
+/*
+ * Copyright (c) 2014, Joyent, Inc. All rights reserved.
  */
 
 #ifndef _LX_BRAND_H
@@ -81,8 +84,12 @@ extern "C" {
 #define	LX_ATTR_RESTART_INIT	ZONE_ATTR_BRAND_ATTRS
 #define	LX_KERN_VERSION_NUM	(ZONE_ATTR_BRAND_ATTRS + 1)
 
-/* Aux vector containing phdr of linux executable, used by lx_librtld_db */
+/*
+ * Aux vector containing phdr of Linux executable and ehdr of interpreter
+ * (if any), both of which are used by lx_librtld_db to ascertain r_debug.
+ */
 #define	AT_SUN_BRAND_LX_PHDR	AT_SUN_BRAND_AUX1
+#define	AT_SUN_BRAND_LX_INTERP	AT_SUN_BRAND_AUX2
 
 /* Aux vector containing hz value */
 #define	AT_CLKTCK	17

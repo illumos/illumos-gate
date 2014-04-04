@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2014, Joyent, Inc. All rights reserved.
  */
 
 #include <sys/kmem.h>
@@ -725,7 +726,7 @@ brand_solaris_elfexec(vnode_t *vp, execa_t *uap, uarg_t *args,
 	if (args->to_model == DATAMODEL_NATIVE) {
 		err = mapexec_brand(vp, args, &ehdr, &uphdr_vaddr,
 		    &voffset, exec_file, &interp, &env.ex_bssbase,
-		    &env.ex_brkbase, &env.ex_brksize, NULL);
+		    &env.ex_brkbase, &env.ex_brksize, NULL, NULL);
 	}
 #if defined(_LP64)
 	else {
@@ -733,7 +734,7 @@ brand_solaris_elfexec(vnode_t *vp, execa_t *uap, uarg_t *args,
 		Elf32_Addr uphdr_vaddr32;
 		err = mapexec32_brand(vp, args, &ehdr32, &uphdr_vaddr32,
 		    &voffset, exec_file, &interp, &env.ex_bssbase,
-		    &env.ex_brkbase, &env.ex_brksize, NULL);
+		    &env.ex_brkbase, &env.ex_brksize, NULL, NULL);
 		Ehdr32to64(&ehdr32, &ehdr);
 
 		if (uphdr_vaddr32 == (Elf32_Addr)-1)
@@ -786,7 +787,7 @@ brand_solaris_elfexec(vnode_t *vp, execa_t *uap, uarg_t *args,
 		if (args->to_model == DATAMODEL_NATIVE) {
 			err = mapexec_brand(nvp, args, &ehdr,
 			    &uphdr_vaddr, &voffset, exec_file, &interp,
-			    NULL, NULL, NULL, &lddata);
+			    NULL, NULL, NULL, &lddata, NULL);
 		}
 #if defined(_LP64)
 		else {
@@ -794,7 +795,7 @@ brand_solaris_elfexec(vnode_t *vp, execa_t *uap, uarg_t *args,
 			Elf32_Addr uphdr_vaddr32;
 			err = mapexec32_brand(nvp, args, &ehdr32,
 			    &uphdr_vaddr32, &voffset, exec_file, &interp,
-			    NULL, NULL, NULL, &lddata);
+			    NULL, NULL, NULL, &lddata, NULL);
 			Ehdr32to64(&ehdr32, &ehdr);
 
 			if (uphdr_vaddr32 == (Elf32_Addr)-1)

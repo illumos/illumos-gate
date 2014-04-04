@@ -26,7 +26,7 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 /*
- * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2014, Joyent, Inc. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -168,7 +168,7 @@ dtrace_safe_phdr(Phdr *phdrp, struct uarg *args, uintptr_t base)
 int
 mapexec_brand(vnode_t *vp, uarg_t *args, Ehdr *ehdr, Addr *uphdr_vaddr,
     intptr_t *voffset, caddr_t exec_file, int *interp, caddr_t *bssbase,
-    caddr_t *brkbase, size_t *brksize, uintptr_t *lddatap)
+    caddr_t *brkbase, size_t *brksize, uintptr_t *lddatap, uintptr_t *minaddrp)
 {
 	size_t		len;
 	struct vattr	vat;
@@ -186,6 +186,9 @@ mapexec_brand(vnode_t *vp, uarg_t *args, Ehdr *ehdr, Addr *uphdr_vaddr,
 
 	if (lddatap != NULL)
 		*lddatap = NULL;
+
+	if (minaddrp != NULL)
+		*minaddrp = NULL;
 
 	if (error = execpermissions(vp, &vat, args)) {
 		uprintf("%s: Cannot execute %s\n", exec_file, args->pathname);
@@ -215,6 +218,9 @@ mapexec_brand(vnode_t *vp, uarg_t *args, Ehdr *ehdr, Addr *uphdr_vaddr,
 		kmem_free(phdrbase, phdrsize);
 		return (error);
 	}
+
+	if (minaddrp != NULL)
+		*minaddrp = minaddr;
 
 	/*
 	 * Inform our caller if the executable needs an interpreter.
@@ -1226,6 +1232,7 @@ mapelfexec(
 	} else {
 		*voffset = 0;
 	}
+
 	phdr = (Phdr *)phdrbase;
 	for (i = nphdrs; i > 0; i--) {
 		switch (phdr->p_type) {
