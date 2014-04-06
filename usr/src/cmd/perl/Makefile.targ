@@ -18,6 +18,9 @@ $(PERLEXT):= LDLIBS += -lc
 # Allow for undefined symbols satisfied by perl
 $(PERLEXT):= ZDEFS =
 
+$(ROOTPERLEXT) := FILEMODE = 0555
+$(ROOTPERLMOD) := FILEMODE = 0444
+
 $(MACH):
 	$(INS.dir)
 
