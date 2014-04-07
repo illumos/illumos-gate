@@ -22,6 +22,8 @@ MAPFILES = mapfile-vers
 
 include $(SRC)/cmd/perl/Makefile.targ
 
+.KEEP_STATE:
+
 all: $(PERLEXT) $(PERLMOD)
 
 install: $(ROOTPERLEXT) $(ROOTPERLMOD)

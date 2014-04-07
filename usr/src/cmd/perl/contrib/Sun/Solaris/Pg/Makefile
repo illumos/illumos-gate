@@ -21,6 +21,8 @@ ROOTPERLMODDIR = $(ROOTPERLDIR)/lib/Sun/Solaris
 
 include $(SRC)/cmd/perl/Makefile.targ
 
+.KEEP_STATE:
+
 all: $(PERLMOD)
 
 install: $(ROOTPERLMOD)
