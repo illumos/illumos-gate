@@ -22,6 +22,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2014 Joyent, Inc.  All rights reserved.
  */
 
 #include <errno.h>
@@ -120,6 +121,17 @@
 #define	LX_PTRACE_GETFPXREGS	18
 #define	LX_PTRACE_SETFPXREGS	19
 #define	LX_PTRACE_SYSCALL	24
+#define	LX_PTRACE_SETOPTIONS	0x4200
+
+/* Options for LX_PTRACE_SETOPTIONS */
+#define	LX_PTRACE_O_TRACESYSGOOD	0x0001
+#define	LX_PTRACE_O_TRACEFORK		0x0002
+#define	LX_PTRACE_O_TRACEVFORK		0x0004
+#define	LX_PTRACE_O_TRACECLONE		0x0008
+#define	LX_PTRACE_O_TRACEEXEC		0x0010
+#define	LX_PTRACE_O_TRACEVFORKDONE	0x0020
+#define	LX_PTRACE_O_TRACEEXIT		0x0040
+#define	LX_PTRACE_O_TRACESECCOMP	0x0080
 
 /*
  * This corresponds to the user_i387_struct Linux structure.
@@ -1672,6 +1684,42 @@ ptrace_syscall(pid_t lxpid, pid_t pid, lwpid_t lwpid, int sig)
 	return (ptrace_cont(lxpid, pid, lwpid, sig, 0));
 }
 
+static int
+ptrace_setoptions(pid_t pid, int options)
+{
+	int fd;
+	int error;
+	pstatus_t status;
+
+	/* XXX currently error if unsupported option */
+	if (options & ~(LX_PTRACE_O_TRACEEXEC | LX_PTRACE_O_TRACEFORK))
+		return (-EINVAL);
+
+	/*
+	 * TRACEEXEC and TRACEFORK are similar to ptrace_traceme except that it
+	 * stops the next time the child forks or execs
+	 */
+	if ((error = get_status(pid, &status)) != 0)
+		return (error);
+
+	if ((fd = open_procfile(pid, O_WRONLY, "ctl")) < 0)
+		return (-errno);
+
+	error = 0;
+
+	/* XXX Implement correct emulation for TRACEFORK and TREACEEXEC */
+	/*
+	 * if (options & LX_PTRACE_O_TRACEFORK) {
+	 * }
+	 *
+	 * if (options & LX_PTRACE_O_TRACEEXEC) {
+	 * }
+	 */
+
+	(void) close(fd);
+	return (error);
+}
+
 int
 lx_ptrace(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4)
 {
@@ -1735,6 +1783,9 @@ lx_ptrace(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4)
 
 	case LX_PTRACE_SYSCALL:
 		return (ptrace_syscall(lxpid, pid, lwpid, (int)p4));
+
+	case LX_PTRACE_SETOPTIONS:
+		return (ptrace_setoptions(pid, (int)p4));
 
 	default:
 		return (-EINVAL);

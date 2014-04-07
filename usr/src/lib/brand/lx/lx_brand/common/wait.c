@@ -29,10 +29,8 @@
  * wait() family of functions.
  *
  * The first minor difference between the Linux and Solaris family of wait()
- * calls is that the values for WNOHANG and WUNTRACED are different.  Solaris
- * also has additional options (WCONTINUED, WNOWAIT) which should be flagged as
- * invalid on Linux. Thankfully, the exit status values are identical between
- * the two implementations.
+ * calls is that the values for WNOHANG and WUNTRACED are different. Thankfully,
+ * the exit status values are identical between the two implementations.
  *
  * Things get very different and very complicated when we introduce the Linux
  * threading model.  Under linux, both threads and child processes are
@@ -119,6 +117,9 @@ ltos_options(uintptr_t options)
 		newoptions |= WCONTINUED;
 	if (options & LX_WNOWAIT)
 		newoptions |= WNOWAIT;
+
+	/* The trapped option is implicit on Linux */
+	newoptions |= WTRAPPED;
 
 	return (newoptions);
 }
