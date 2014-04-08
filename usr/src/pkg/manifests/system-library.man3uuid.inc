@@ -12,6 +12,7 @@
 #
 # Copyright 2011, Richard Lowe
 # Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2014 Andrew Stormont.
 #
 
 file path=usr/share/man/man3uuid/uuid_clear.3uuid
@@ -26,3 +27,7 @@ link path=usr/share/man/man3uuid/uuid_is_null.3uuid target=uuid_clear.3uuid
 link path=usr/share/man/man3uuid/uuid_parse.3uuid target=uuid_clear.3uuid
 link path=usr/share/man/man3uuid/uuid_time.3uuid target=uuid_clear.3uuid
 link path=usr/share/man/man3uuid/uuid_unparse.3uuid target=uuid_clear.3uuid
+link path=usr/share/man/man3uuid/uuid_unparse_lower.3uuid \
+    target=uuid_clear.3uuid
+link path=usr/share/man/man3uuid/uuid_unparse_upper.3uuid \
+    target=uuid_clear.3uuid

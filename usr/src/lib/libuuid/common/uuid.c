@@ -23,6 +23,7 @@
  * Use is subject to license terms.
  * Copyright 2012 Milan Jurik. All rights reserved.
  * Copyright 2013 Joyent, Inc. All rights reserved.
+ * Copyright 2014 Andrew Stormont.
  */
 
 /*
@@ -578,8 +579,8 @@ uuid_clear(uuid_t uu)
  * binary format into a 36-byte string (plus trailing null char)
  * and stores this value in the character string pointed to by out.
  */
-void
-uuid_unparse(uuid_t uu, char *out)
+static void
+uuid_unparse_common(uuid_t uu, char *out, boolean_t upper)
 {
 	struct uuid 	uuid;
 	uint16_t	clock_seq;
@@ -591,24 +592,42 @@ uuid_unparse(uuid_t uu, char *out)
 		return;
 	}
 
-	/* XXX user should have allocated enough memory */
-	/*
-	 * if (strlen(out) < UUID_PRINTABLE_STRING_LENGTH) {
-	 * return;
-	 * }
-	 */
 	string_to_struct(&uuid, uu);
 	clock_seq = uuid.clock_seq_hi_and_reserved;
 	clock_seq = (clock_seq  << 8) | uuid.clock_seq_low;
 	for (i = 0; i < 6; i++) {
-		(void) sprintf(&etheraddr[index++], "%.2x", uuid.node_addr[i]);
+		(void) sprintf(&etheraddr[index++], upper ? "%.2X" : "%.2x",
+		    uuid.node_addr[i]);
 		index++;
 	}
 	etheraddr[index] = '\0';
 
-	(void) snprintf(out, 25, "%08x-%04x-%04x-%04x-",
+	(void) snprintf(out, 25,
+	    upper ? "%08X-%04X-%04X-%04X-" : "%08x-%04x-%04x-%04x-",
 	    uuid.time_low, uuid.time_mid, uuid.time_hi_and_version, clock_seq);
 	(void) strlcat(out, etheraddr, UUID_PRINTABLE_STRING_LENGTH);
+}
+
+void
+uuid_unparse_upper(uuid_t uu, char *out)
+{
+	uuid_unparse_common(uu, out, B_TRUE);
+}
+
+void
+uuid_unparse_lower(uuid_t uu, char *out)
+{
+	uuid_unparse_common(uu, out, B_FALSE);
+}
+
+void
+uuid_unparse(uuid_t uu, char *out)
+{
+	/*
+	 * Historically uuid_unparse on Solaris returns lower case,
+	 * for compatibility we preserve this behaviour.
+	 */
+	uuid_unparse_common(uu, out, B_FALSE);
 }
 
 /*
