@@ -78,14 +78,6 @@ extern uint32_t cpuid_feature_edx_include;
 extern uint32_t cpuid_feature_edx_exclude;
 
 /*
- * Dummy spl priority masks
- */
-static unsigned char dummy_cpu_pri[MAXIPL + 1] = {
-	0xf, 0xf, 0xf, 0xf, 0xf, 0xf, 0xf, 0xf,
-	0xf, 0xf, 0xf, 0xf, 0xf, 0xf, 0xf, 0xf, 0xf
-};
-
-/*
  * Set console mode
  */
 static void
@@ -128,13 +120,6 @@ mlsetup(struct regs *rp)
 	 */
 	cpu[0]->cpu_m.mcpu_vcpu_info = &HYPERVISOR_shared_info->vcpu_info[0];
 #endif
-
-	/*
-	 * Set up dummy cpu_pri_data values till psm spl code is
-	 * installed.  This allows splx() to work on amd64.
-	 */
-
-	cpu[0]->cpu_pri_data = dummy_cpu_pri;
 
 	/*
 	 * check if we've got special bits to clear or set
