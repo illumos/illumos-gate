@@ -21,7 +21,6 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <shared.h>
 #include <term.h>
@@ -68,6 +67,22 @@ struct term_entry term_table[] =
       serial_setcolorstate,
       0,
       0,
+      0,
+      0
+    },
+    {
+      "composite",
+      TERM_NEED_INIT,
+      24,
+      composite_putchar,
+      composite_checkkey,
+      composite_getkey,
+      serial_getxy,
+      composite_gotoxy,
+      composite_cls,
+      composite_setcolorstate,
+      console_setcolor,
+      console_setcursor,
       0,
       0
     },
@@ -1047,10 +1062,10 @@ grub_strncat (char *s1, const char *s2, int n)
 
   while (i < n && (s1[i++] = *(s2++)) != 0);
 
-  s1[n - 1] = 0;
-
-  if (i >= n)
+  if (i >= n) {
+    s1[n - 1] = 0;
     return 0;
+  }
 
   s1[i] = 0;
 

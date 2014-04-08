@@ -19,6 +19,9 @@
 
 #include <shared.h>
 #include <term.h>
+#include <expand.h>
+
+#define MENU_ROWS 12
 
 grub_jmp_buf restart_env;
 
@@ -237,6 +240,7 @@ run_menu (char *menu_entries, char *config_entries, int num_entries,
   int c, time1, time2 = -1, first_entry = 0;
   char *cur_entry = 0;
   struct term_entry *prev_term = NULL;
+  const char *console = NULL;
 
   /*
    *  Main loop for menu UI.
@@ -247,7 +251,7 @@ restart:
      invariant for TERM_DUMB: first_entry == 0  */
   if (! (current_term->flags & TERM_DUMB))
     {
-      while (entryno > 11)
+      while (entryno > MENU_ROWS - 1)
 	{
 	  first_entry++;
 	  entryno--;
@@ -306,7 +310,7 @@ restart:
       if (current_term->flags & TERM_DUMB)
 	print_entries_raw (num_entries, first_entry, menu_entries);
       else
-	print_border (3, 12);
+	print_border (3, MENU_ROWS);
 
       grub_printf ("\n\
       Use the %c and %c keys to select which entry is highlighted.\n",
@@ -332,10 +336,20 @@ restart:
       selected line, or escape to go back to the main menu.");
 	}
 
+      /* The selected OS console is special; if it's in use, tell the user. */
+      console = get_variable("os_console");
+      if (console != NULL) {
+	printf("\n\n      Selected OS console device is '%s'."
+	    "\n      To change OS console device, enter command-line mode"
+	    "\n      and use 'variable os_console <dev>', then Esc to return."
+	    "\n      Valid <dev> values are: ttya, ttyb, ttyc, ttyd, vga",
+	    console);
+      }
+
       if (current_term->flags & TERM_DUMB)
 	grub_printf ("\n\nThe selected entry is %d ", entryno);
       else
-	print_entries (3, 12, first_entry, entryno, menu_entries);
+	print_entries (3, MENU_ROWS, first_entry, entryno, menu_entries);
     }
 
   /* XX using RT clock now, need to initialize value */
@@ -425,7 +439,7 @@ restart:
 		  else if (first_entry > 0)
 		    {
 		      first_entry--;
-		      print_entries (3, 12, first_entry, entryno,
+		      print_entries (3, MENU_ROWS, first_entry, entryno,
 				     menu_entries);
 		    }
 		}
@@ -437,7 +451,7 @@ restart:
 		entryno++;
 	      else
 		{
-		  if (entryno < 11)
+		  if (entryno < MENU_ROWS - 1)
 		    {
 		      print_entry (4 + entryno, 0,
 				   get_entry (menu_entries,
@@ -449,17 +463,17 @@ restart:
 					      first_entry + entryno,
 					      0));
 		  }
-		else if (num_entries > 12 + first_entry)
+		else if (num_entries > MENU_ROWS + first_entry)
 		  {
 		    first_entry++;
-		    print_entries (3, 12, first_entry, entryno, menu_entries);
+		    print_entries (3, MENU_ROWS, first_entry, entryno, menu_entries);
 		  }
 		}
 	    }
 	  else if (c == 7)
 	    {
 	      /* Page Up */
-	      first_entry -= 12;
+	      first_entry -= MENU_ROWS;
 	      if (first_entry < 0)
 		{
 		  entryno += first_entry;
@@ -467,20 +481,20 @@ restart:
 		  if (entryno < 0)
 		    entryno = 0;
 		}
-	      print_entries (3, 12, first_entry, entryno, menu_entries);
+	      print_entries (3, MENU_ROWS, first_entry, entryno, menu_entries);
 	    }
 	  else if (c == 3)
 	    {
 	      /* Page Down */
-	      first_entry += 12;
+	      first_entry += MENU_ROWS;
 	      if (first_entry + entryno + 1 >= num_entries)
 		{
-		  first_entry = num_entries - 12;
+		  first_entry = num_entries - MENU_ROWS;
 		  if (first_entry < 0)
 		    first_entry = 0;
 		  entryno = num_entries - first_entry - 1;
 		}
-	      print_entries (3, 12, first_entry, entryno, menu_entries);
+	      print_entries (3, MENU_ROWS, first_entry, entryno, menu_entries);
 	    }
 
 	  if (config_entries)
@@ -503,7 +517,8 @@ restart:
 		    {
 		      /* But `o' differs from `O', since it may causes
 			 the menu screen to scroll up.  */
-		      if (entryno < 11 || (current_term->flags & TERM_DUMB))
+		      if (entryno < MENU_ROWS - 1 ||
+			  (current_term->flags & TERM_DUMB))
 			entryno++;
 		      else
 			first_entry++;
@@ -541,7 +556,7 @@ restart:
 
 		      if (entryno >= num_entries)
 			entryno--;
-		      if (first_entry && num_entries < 12 + first_entry)
+		      if (first_entry && num_entries < MENU_ROWS + first_entry)
 			first_entry--;
 		    }
 
@@ -553,7 +568,7 @@ restart:
 		      grub_printf ("\n");
 		    }
 		  else
-		    print_entries (3, 12, first_entry, entryno, menu_entries);
+		    print_entries (3, MENU_ROWS, first_entry, entryno, menu_entries);
 		}
 
 	      cur_entry = menu_entries;

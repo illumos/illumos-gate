@@ -25,6 +25,8 @@
     Use is subject to license terms.
     Copyright 2012 OmniTI Computer Consulting, Inc.  All rights reserved.
 
+    Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+
     Service manifest for rpcbind
 
     NOTE:  This service manifest is not editable; its contents will
@@ -177,6 +179,16 @@
 		<!-- to configure rpc/bind -->
 		<propval name='value_authorization' type='astring'
 			value='solaris.smf.value.rpc.bind' />
+
+		<propval
+			name='listen_backlog'
+			type='integer'
+			value='64' />
+
+		<propval
+			name='max_threads'
+			type='integer'
+			value='72' />
 	</property_group>
 
 	<!-- Authorization -->

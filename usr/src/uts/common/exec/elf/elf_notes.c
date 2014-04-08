@@ -26,7 +26,7 @@
 
 /*
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
- * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2014, Joyent, Inc. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -405,9 +405,12 @@ write_elfnotes(proc_t *p, int sig, vnode_t *vp, offset_t offset,
 		error = elfnote(vp, &offset, NT_FDINFO,
 		    sizeof (fdinfo), &fdinfo, rlimit, credp);
 		if (error) {
+			VN_RELE(vroot);
 			goto done;
 		}
 	}
+
+	VN_RELE(vroot);
 
 #if defined(__i386) || defined(__i386_COMPAT)
 	mutex_enter(&p->p_ldtlock);

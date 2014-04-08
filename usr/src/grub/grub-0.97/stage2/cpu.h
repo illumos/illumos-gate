@@ -24,11 +24,11 @@
 #ifndef	_AMD64_CPU
 #define	_AMD64_CPU
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
+
+#include <shared.h>
 
 typedef unsigned int    uint_t;
 typedef unsigned long ulong_t;
@@ -36,11 +36,6 @@ typedef unsigned long ulong_t;
 #define BITX(u, h, l)   (((u) >> (l)) & ((1lu << ((h) - (l) + 1lu)) - 1lu))
 
 #include <controlregs.h>
-
-#define CB 0x0001
-
-extern void amd64_flush_tlb(void);
-extern void amd64_flush_tlbentry(caddr_t);
 
 extern ulong_t amd64_get_cr2(void);
 extern ulong_t amd64_get_cr0(void);

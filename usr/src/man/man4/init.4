@@ -1,16 +1,16 @@
 '\" te
+.\" Copyright 2014 Garrett D'Amore
 .\" Copyright (c) 2003, Sun Microsystems, Inc. All Rights Reserved.
 .\" Copyright 1989 AT&T
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH TIMEZONE 4 "Jun 26, 2003"
+.TH init 4 "Mar 15, 2014"
 .SH NAME
-TIMEZONE \- set default system time zone and locale
+init \- set default system time zone and locale
 .SH SYNOPSIS
 .LP
 .nf
-\fB/etc/TIMEZONE\fR
 \fB/etc/default/init\fR
 .fi
 
@@ -23,7 +23,9 @@ locale-related environment variables \fBLANG\fR, \fBLC_COLLATE\fR,
 \fBLC_TIME\fR.
 .sp
 .LP
-\fB/etc/TIMEZONE\fR is a symbolic link to \fB/etc/default/init\fR.
+\fB/etc/TIMEZONE\fR is a symbolic link to \fB/etc/default/init\fR.  This
+link exists for compatibility with legacy software, is obsolete, and may
+be removed in a future release. 
 .sp
 .LP
 The number of environment variables that can be set from

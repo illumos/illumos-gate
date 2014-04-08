@@ -22,6 +22,9 @@
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
 /* All Rights Reserved */
 /*
@@ -35,9 +38,59 @@
  */
 
 /*
- * rpcbind.c
- * Implements the program, version to address mapping for rpc.
+ * This is an implementation of RCPBIND according the RFC 1833: Binding
+ * Protocols for ONC RPC Version 2.  The RFC specifies three versions of the
+ * binding protocol:
  *
+ * 1) RPCBIND Version 3 (Section 2.2.1 of the RFC)
+ * 2) RPCBIND, Version 4 (Section 2.2.2 of the RFC)
+ * 3) Port Mapper Program Protocol (Section 3 of the RFC)
+ *
+ * Where the "Port Mapper Program Protocol" is refered as Version 2 of the
+ * binding protocol.  The implementation of the Version 2 of the binding
+ * protocol is compiled in only in a case the PORTMAP macro is defined (by
+ * default it is defined).
+ *
+ * The implementation is based on top of the networking services library -
+ * libnsl(3lib) and uses Automatic MT mode (see rcp_control(3nsl) and
+ * svc_run(3nsl) for more details).
+ *
+ * Usually, when a thread handles an RPCBIND procedure (one that arrived from a
+ * client), it obtains the data for the response internally, and immediately
+ * sends the response back to the client.  The only exception to this rule are
+ * remote (aka indirect) RPC calls, for example RPCBPROC_INDIRECT.  Such
+ * procedures are designed to forward the RPC request from the client to some
+ * other RPC service specified by the client, wait for the result, and forward
+ * the result back to the client.  This is implemented in rpcbproc_callit_com().
+ *
+ * The response from the other (remote) RPC service is handled in
+ * handle_reply(), where the thread waiting in rpcbproc_callit_com() is woken
+ * up to finish the handling and to send (forward) the response back to the
+ * client.
+ *
+ * The thread implementing the indirect RPC call might be blocked in the
+ * rpcbproc_callit_com() waiting for the response from the other RPC service
+ * for very long time.  During this time the thread is unable to handle other
+ * RPCBIND requests.  To avoid a case when all threads are waiting in
+ * rpcbproc_callit_com() and there is no free thread able to handle other
+ * RPCBIND requests, the implementation has reserved eight threads to never be
+ * used for the remote RPC calls.  The number of active remote RPC calls is in
+ * rpcb_rmtcalls, the upper limit of such calls is in rpcb_rmtcalls_max.
+ *
+ * In addition to the worker threads described above, there are two other
+ * threads.  The logthread() thread is responsible for asynchronous logging to
+ * syslog.  The terminate() thread is signal handler responsible for reload of
+ * the rpcbind configuration (on SIGHUP), or for gracefully shutting down
+ * rpcbind (otherwise).
+ *
+ * There are two global lists used for holding the information about the
+ * registered services: list_rbl is for Version 3 and 4 of the binding
+ * protocol, and list_pml is for Version 2.  To protect these lists, two global
+ * readers/writer locks are defined and heavily used across the rpcbind
+ * implementation: list_rbl_lock protecting list_rbl, and list_pml_lock,
+ * protecting list_pml.
+ *
+ * The defined locking order is: list_rbl_lock first, list_pml_lock second.
  */
 
 #include <dlfcn.h>
@@ -74,20 +127,14 @@
 #include <priv_utils.h>
 #include <libscf.h>
 #include <sys/ccompile.h>
+#include <zone.h>
+#include <ctype.h>
+#include <limits.h>
+#include <assert.h>
 
-#ifdef PORTMAP
-extern void pmap_service(struct svc_req *, SVCXPRT *xprt);
-#endif
-extern void rpcb_service_3(struct svc_req *, SVCXPRT *xprt);
-extern void rpcb_service_4(struct svc_req *, SVCXPRT *xprt);
-extern void read_warmstart(void);
-extern void write_warmstart(void);
-extern int Is_ipv6present(void);
+static sigset_t sigwaitset;
 
-#define	MAX_FILEDESC_LIMIT	1023
-
-static void terminate(int);
-static void note_refresh(int);
+static void terminate(void);
 static void detachfromtty(void);
 static void parseargs(int, char *[]);
 static void rbllist_add(ulong_t, ulong_t, struct netconfig *, struct netbuf *);
@@ -99,32 +146,42 @@ static int setopt_reuseaddr(int);
 static int setopt_anon_mlp(int);
 static int setup_callit(int);
 
+static void rpcb_check_init(void);
+
 /* Global variables */
-#ifdef ND_DEBUG
-int debugging = 1;	/* Tell me what's going on */
-#else
 int debugging = 0;	/* Tell me what's going on */
-#endif
 static int ipv6flag = 0;
 int doabort = 0;	/* When debugging, do an abort on errors */
-static int listen_backlog = 64;
+static int listen_backlog;
+static const int reserved_threads = 8;
+
+/*
+ * list_rbl_lock protects list_rbl
+ * lock order: list_rbl_lock, list_pml_lock
+ */
+rwlock_t list_rbl_lock = DEFAULTRWLOCK;
 rpcblist_ptr list_rbl;	/* A list of version 3/4 rpcbind services */
+
 char *loopback_dg;	/* Datagram loopback transport, for set and unset */
 char *loopback_vc;	/* COTS loopback transport, for set and unset */
 char *loopback_vc_ord;	/* COTS_ORD loopback transport, for set and unset */
 
-boolean_t verboselog = B_FALSE;
-boolean_t wrap_enabled = B_FALSE;
-boolean_t allow_indirect = B_TRUE;
-boolean_t local_only = B_FALSE;
-
-volatile sig_atomic_t sigrefresh;
+volatile boolean_t verboselog = B_FALSE;
+volatile boolean_t wrap_enabled = B_FALSE;
+volatile boolean_t allow_indirect = B_TRUE;
+volatile boolean_t local_only = B_TRUE;
 
 /* Local Variable */
 static int warmstart = 0;	/* Grab a old copy of registrations */
 
 #ifdef PORTMAP
+/*
+ * list_pml_lock protects list_pml
+ * lock order: list_rbl_lock, list_pml_lock
+ */
+rwlock_t list_pml_lock = DEFAULTRWLOCK;
 PMAPLIST *list_pml;	/* A list of version 2 rpcbind services */
+
 char *udptrans;		/* Name of UDP transport */
 char *tcptrans;		/* Name of TCP transport */
 char *udp_uaddr;	/* Universal UDP address */
@@ -135,25 +192,42 @@ static char superuser[] = "superuser";
 
 static const char daemon_dir[] = DAEMON_DIR;
 
+static void
+block_signals(void)
+{
+	(void) sigemptyset(&sigwaitset);
+	(void) sigaddset(&sigwaitset, SIGINT);
+	(void) sigaddset(&sigwaitset, SIGTERM);
+	(void) sigaddset(&sigwaitset, SIGQUIT);
+	(void) sigaddset(&sigwaitset, SIGHUP);
+	(void) sigprocmask(SIG_BLOCK, &sigwaitset, NULL);
+
+	/* ignore other signals that could get sent */
+	(void) signal(SIGUSR1, SIG_IGN);
+	(void) signal(SIGUSR2, SIG_IGN);
+}
+
 int
 main(int argc, char *argv[])
 {
 	struct netconfig *nconf;
 	void *nc_handle;	/* Net config handle */
 	struct rlimit rl;
+	int rpc_svc_fdunlim = 1;
+	int rpc_svc_mode = RPC_SVC_MT_AUTO;
 	int maxrecsz = RPC_MAXDATASIZE;
 	boolean_t can_do_mlp;
 
+	block_signals();
+
 	parseargs(argc, argv);
 
-	getrlimit(RLIMIT_NOFILE, &rl);
-
-	if (rl.rlim_cur < MAX_FILEDESC_LIMIT) {
-		if (rl.rlim_max <= MAX_FILEDESC_LIMIT)
-			rl.rlim_cur = rl.rlim_max;
-		else
-			rl.rlim_cur = MAX_FILEDESC_LIMIT;
-		setrlimit(RLIMIT_NOFILE, &rl);
+	if (getrlimit(RLIMIT_NOFILE, &rl) != 0) {
+		syslog(LOG_ERR, "getrlimit failed");
+	} else {
+		rl.rlim_cur = rl.rlim_max;
+		if (setrlimit(RLIMIT_NOFILE, &rl) != 0)
+			syslog(LOG_ERR, "setrlimit failed");
 	}
 	(void) enable_extended_FILE_stdio(-1, -1);
 
@@ -181,6 +255,24 @@ main(int argc, char *argv[])
 		exit(1);
 	}
 
+	myzone = getzoneid();
+
+	/*
+	 * Set number of file descriptors to unlimited
+	 */
+	if (!rpc_control(RPC_SVC_USE_POLLFD, &rpc_svc_fdunlim)) {
+		syslog(LOG_INFO, "unable to set number of FD to unlimited");
+	}
+
+	/*
+	 * Tell RPC that we want automatic thread mode.
+	 * A new thread will be spawned for each request.
+	 */
+	if (!rpc_control(RPC_SVC_MTMODE_SET, &rpc_svc_mode)) {
+		syslog(LOG_ERR, "unable to set automatic MT mode");
+		exit(1);
+	}
+
 	/*
 	 * Enable non-blocking mode and maximum record size checks for
 	 * connection oriented transports.
@@ -188,19 +280,6 @@ main(int argc, char *argv[])
 	if (!rpc_control(RPC_SVC_CONNMAXREC_SET, &maxrecsz)) {
 		syslog(LOG_INFO, "unable to set RPC max record size");
 	}
-
-	nc_handle = setnetconfig(); 	/* open netconfig file */
-	if (nc_handle == NULL) {
-		syslog(LOG_ERR, "could not read /etc/netconfig");
-		exit(1);
-	}
-	loopback_dg = "";
-	loopback_vc = "";
-	loopback_vc_ord = "";
-#ifdef PORTMAP
-	udptrans = "";
-	tcptrans = "";
-#endif
 
 	{
 		/*
@@ -213,18 +292,32 @@ main(int argc, char *argv[])
 
 		trouble = check_netconfig();
 		if (trouble) {
-			syslog(LOG_ERR,
-	"%s: found %d errors with network configuration files. Exiting.",
-			    argv[0], trouble);
-			fprintf(stderr,
-	"%s: found %d errors with network configuration files. Exiting.\n",
+			syslog(LOG_ERR, "%s: found %d errors with network "
+			    "configuration files. Exiting.", argv[0], trouble);
+			fprintf(stderr, "%s: found %d errors with network "
+			    "configuration files. Exiting.\n",
 			    argv[0], trouble);
 			exit(1);
 		}
 	}
+
+	loopback_dg = "";
+	loopback_vc = "";
+	loopback_vc_ord = "";
+#ifdef PORTMAP
+	udptrans = "";
+	tcptrans = "";
+#endif
+
 	ipv6flag = Is_ipv6present();
 	rpcb_check_init();
-	while (nconf = getnetconfig(nc_handle)) {
+
+	nc_handle = setnetconfig(); 	/* open netconfig file */
+	if (nc_handle == NULL) {
+		syslog(LOG_ERR, "could not read /etc/netconfig");
+		exit(1);
+	}
+	while ((nconf = getnetconfig(nc_handle)) != NULL) {
 		if (nconf->nc_flag & NC_VISIBLE)
 			init_transport(nconf);
 	}
@@ -236,17 +329,16 @@ main(int argc, char *argv[])
 		exit(1);
 	}
 
-	/* catch the usual termination signals for graceful exit */
-	(void) signal(SIGINT, terminate);
-	(void) signal(SIGTERM, terminate);
-	(void) signal(SIGQUIT, terminate);
-	/* ignore others that could get sent */
-	(void) sigset(SIGHUP, note_refresh);
-	(void) signal(SIGUSR1, SIG_IGN);
-	(void) signal(SIGUSR2, SIG_IGN);
 	if (warmstart) {
 		read_warmstart();
 	}
+
+	/* Create terminate signal handler for graceful exit */
+	if (thr_create(NULL, 0, (void *(*)(void *))terminate, NULL, 0, NULL)) {
+		syslog(LOG_ERR, "Failed to create terminate thread");
+		exit(1);
+	}
+
 	if (debugging) {
 		printf("rpcbind debugging enabled.");
 		if (doabort) {
@@ -262,7 +354,7 @@ main(int argc, char *argv[])
 	__fini_daemon_priv(PRIV_PROC_EXEC, PRIV_PROC_SESSION,
 	    PRIV_FILE_LINK_ANY, PRIV_PROC_INFO, (char *)NULL);
 
-	my_svc_run();
+	svc_run();
 	syslog(LOG_ERR, "svc_run returned unexpectedly");
 	rpcbind_abort();
 	/* NOTREACHED */
@@ -291,7 +383,7 @@ check_netconfig(void)
 		syslog(LOG_ALERT, "setnetconfig() failed:  %s", nc_sperror());
 		return (1);
 	}
-	while (np = getnetconfig(nc)) {
+	while ((np = getnetconfig(nc)) != NULL) {
 		if ((np->nc_flag & NC_VISIBLE) == 0)
 			continue;
 		if (debugging)
@@ -330,21 +422,23 @@ check_netconfig(void)
 
 				dlerrstr = dlerror();
 				if (debugging) {
-					fprintf(stderr,
-	"\tnetid %s: dlopen of name-to-address library %s failed\ndlerror: %s",
+					fprintf(stderr, "\tnetid %s: dlopen of "
+					    "name-to-address library %s "
+					    "failed\ndlerror: %s",
 					    np->nc_netid, libname,
 					    dlerrstr ? dlerrstr : "");
 				}
-				syslog(LOG_ERR,
-	"netid %s:  dlopen of name-to-address library %s failed",
+				syslog(LOG_ERR, "netid %s:  dlopen of "
+				    "name-to-address library %s failed",
 				    np->nc_netid, libname);
 				if (dlerrstr)
 					syslog(LOG_ERR, "%s", dlerrstr);
 				busted++;
 			} else {
 				if (debugging)
-					fprintf(stderr,
-	"\tdlopen of name-to-address library %s succeeded\n", libname);
+					fprintf(stderr, "\tdlopen of "
+					    "name-to-address library %s "
+					    "succeeded\n", libname);
 				(void) dlclose(dlcookie);
 			}
 		}
@@ -405,7 +499,6 @@ init_transport(struct netconfig *nconf)
 	SVCXPRT	*my_xprt;
 	struct nd_addrlist *nas;
 	struct nd_hostserv hs;
-	int status;	/* bound checking ? */
 	static int msgprt = 0;
 
 	if ((nconf->nc_semantics != NC_TPI_CLTS) &&
@@ -415,22 +508,11 @@ init_transport(struct netconfig *nconf)
 
 	if ((strcmp(nconf->nc_protofmly, NC_INET6) == 0) && !ipv6flag) {
 		if (!msgprt)
-			syslog(LOG_DEBUG,
-"/etc/netconfig has IPv6 entries but IPv6 is not configured");
+			syslog(LOG_DEBUG, "/etc/netconfig has IPv6 entries but "
+			    "IPv6 is not configured");
 		msgprt++;
 		return (1);
 	}
-#ifdef ND_DEBUG
-	{
-	int i;
-	char **s;
-
-	(void) fprintf(stderr, "%s: %d lookup routines :\n",
-	    nconf->nc_netid, nconf->nc_nlookups);
-	for (i = 0, s = nconf->nc_lookups; i < nconf->nc_nlookups; i++, s++)
-		fprintf(stderr, "[%d] - %s\n", i, *s);
-	}
-#endif
 
 	if ((fd = t_open(nconf->nc_device, O_RDWR, NULL)) < 0) {
 		syslog(LOG_ERR, "%s: cannot open connection: %s",
@@ -470,16 +552,6 @@ init_transport(struct netconfig *nconf)
 	/* Copy the address */
 	taddr->addr.len = nas->n_addrs->len;
 	memcpy(taddr->addr.buf, nas->n_addrs->buf, (int)nas->n_addrs->len);
-#ifdef ND_DEBUG
-	{
-	/* for debugging print out our universal address */
-	char *uaddr;
-
-	uaddr = taddr2uaddr(nconf, nas->n_addrs);
-	(void) fprintf(stderr, "rpcbind : my address is %s\n", uaddr);
-	(void) free(uaddr);
-	}
-#endif
 	netdir_free((char *)nas, ND_ADDRLIST);
 
 	if (nconf->nc_semantics == NC_TPI_CLTS)
@@ -493,9 +565,6 @@ init_transport(struct netconfig *nconf)
 		 * so that we can bind to our preferred address even if
 		 * previous connections are in FIN_WAIT state
 		 */
-#ifdef ND_DEBUG
-		fprintf(stdout, "Setting SO_REUSEADDR.\n");
-#endif
 		if (setopt_reuseaddr(fd) == -1) {
 			syslog(LOG_ERR, "Couldn't set SO_REUSEADDR option");
 		}
@@ -507,14 +576,18 @@ init_transport(struct netconfig *nconf)
 		goto error;
 	}
 
+	if (nconf->nc_semantics != NC_TPI_CLTS && taddr->qlen != baddr->qlen)
+		syslog(LOG_NOTICE, "%s: unable to set listen backlog to %d "
+		    "(negotiated: %d)", nconf->nc_netid, taddr->qlen,
+		    baddr->qlen);
 
 	if (memcmp(taddr->addr.buf, baddr->addr.buf, (int)baddr->addr.len)) {
 		syslog(LOG_ERR, "%s: address in use", nconf->nc_netid);
 		goto error;
 	}
 
-	my_xprt = (SVCXPRT *)svc_tli_create(fd, nconf, baddr, 0, 0);
-	if (my_xprt == (SVCXPRT *)NULL) {
+	my_xprt = svc_tli_create(fd, nconf, baddr, 0, 0);
+	if (my_xprt == NULL) {
 		syslog(LOG_ERR, "%s: could not create service",
 		    nconf->nc_netid);
 		goto error;
@@ -525,13 +598,13 @@ init_transport(struct netconfig *nconf)
 	if ((strcmp(nconf->nc_protofmly, NC_INET6) == 0) &&
 	    (strcmp(nconf->nc_proto, NC_UDP) == 0)) {
 		if (setup_callit(fd) < 0) {
-			syslog(LOG_ERR, "Unable to join IPv6 multicast group \
-for rpc broadcast %s", RPCB_MULTICAST_ADDR);
+			syslog(LOG_ERR, "Unable to join IPv6 multicast group "
+			    "for rpc broadcast %s", RPCB_MULTICAST_ADDR);
 		}
 	}
 
 	if (strcmp(nconf->nc_proto, NC_TCP) == 0) {
-			svc_control(my_xprt, SVCSET_KEEPALIVE, (void *) TRUE);
+		svc_control(my_xprt, SVCSET_KEEPALIVE, (void *) TRUE);
 	}
 
 #ifdef PORTMAP
@@ -549,8 +622,8 @@ for rpc broadcast %s", RPCB_MULTICAST_ADDR);
 			    nconf->nc_netid);
 			goto error;
 		}
-		pml = (PMAPLIST *)malloc((uint_t)sizeof (PMAPLIST));
-		if (pml == (PMAPLIST *)NULL) {
+		pml = malloc(sizeof (PMAPLIST));
+		if (pml == NULL) {
 			syslog(LOG_ERR, "no memory!");
 			exit(1);
 		}
@@ -586,8 +659,8 @@ for rpc broadcast %s", RPCB_MULTICAST_ADDR);
 		list_pml = pml;
 
 		/* Add version 3 information */
-		pml = (PMAPLIST *)malloc((uint_t)sizeof (PMAPLIST));
-		if (pml == (PMAPLIST *)NULL) {
+		pml = malloc(sizeof (PMAPLIST));
+		if (pml == NULL) {
 			syslog(LOG_ERR, "no memory!");
 			exit(1);
 		}
@@ -597,8 +670,8 @@ for rpc broadcast %s", RPCB_MULTICAST_ADDR);
 		list_pml = pml;
 
 		/* Add version 4 information */
-		pml = (PMAPLIST *)malloc((uint_t)sizeof (PMAPLIST));
-		if (pml == (PMAPLIST *)NULL) {
+		pml = malloc(sizeof (PMAPLIST));
+		if (pml == NULL) {
 			syslog(LOG_ERR, "no memory!");
 			exit(1);
 		}
@@ -638,36 +711,14 @@ for rpc broadcast %s", RPCB_MULTICAST_ADDR);
 	}
 
 	/* decide if bound checking works for this transport */
-	status = add_bndlist(nconf, taddr, baddr);
-#ifdef BIND_DEBUG
-	if (status < 0) {
-		fprintf(stderr, "Error in finding bind status for %s\n",
-		    nconf->nc_netid);
-	} else if (status == 0) {
-		fprintf(stderr, "check binding for %s\n",
-		    nconf->nc_netid);
-	} else if (status > 0) {
-		fprintf(stderr, "No check binding for %s\n",
-		    nconf->nc_netid);
-	}
-#endif
+	(void) add_bndlist(nconf, taddr, baddr);
+
 	/*
 	 * rmtcall only supported on CLTS transports for now.
-	 * only needed when we are allowing indirect calls
 	 */
-	if (allow_indirect && nconf->nc_semantics == NC_TPI_CLTS) {
-		status = create_rmtcall_fd(nconf);
+	if (nconf->nc_semantics == NC_TPI_CLTS)
+		(void) create_rmtcall_fd(nconf);
 
-#ifdef BIND_DEBUG
-		if (status < 0) {
-			fprintf(stderr, "Could not create rmtcall fd for %s\n",
-			    nconf->nc_netid);
-		} else {
-			fprintf(stderr, "rmtcall fd for %s is %d\n",
-			    nconf->nc_netid, status);
-		}
-#endif
-	}
 	(void) t_free((char *)taddr, T_BIND);
 	(void) t_free((char *)baddr, T_BIND);
 	return (0);
@@ -680,12 +731,12 @@ error:
 
 static void
 rbllist_add(ulong_t prog, ulong_t vers, struct netconfig *nconf,
-	struct netbuf *addr)
+    struct netbuf *addr)
 {
 	rpcblist_ptr rbl;
 
-	rbl = (rpcblist_ptr)malloc((uint_t)sizeof (rpcblist));
-	if (rbl == (rpcblist_ptr)NULL) {
+	rbl = malloc(sizeof (rpcblist));
+	if (rbl == NULL) {
 		syslog(LOG_ERR, "no memory!");
 		exit(1);
 	}
@@ -694,34 +745,62 @@ rbllist_add(ulong_t prog, ulong_t vers, struct netconfig *nconf,
 	rbl->rpcb_map.r_vers = vers;
 	rbl->rpcb_map.r_netid = strdup(nconf->nc_netid);
 	rbl->rpcb_map.r_addr = taddr2uaddr(nconf, addr);
+	if (rbl->rpcb_map.r_addr == NULL)
+		rbl->rpcb_map.r_addr = strdup("");
 	rbl->rpcb_map.r_owner = strdup(superuser);
+
+	if (rbl->rpcb_map.r_netid == NULL || rbl->rpcb_map.r_addr == NULL ||
+	    rbl->rpcb_map.r_owner == NULL) {
+		syslog(LOG_ERR, "no memory!");
+		exit(1);
+	}
+
 	rbl->rpcb_next = list_rbl;	/* Attach to global list */
 	list_rbl = rbl;
 }
 
 /*
- * Catch the signal and die
+ * Catch the signal and die, if not SIGHUP
  */
-/* ARGSUSED */
 static void
-terminate(int sig)
+terminate(void)
 {
-	syslog(LOG_ERR, "rpcbind terminating on signal.");
-	write_warmstart();	/* Dump yourself */
-	exit(2);
-}
+	int sig;
 
-/* ARGSUSED */
-static void
-note_refresh(int sig)
-{
-	sigrefresh = 1;
+	for (;;) {
+		sig = sigwait(&sigwaitset);
+		if (sig == SIGHUP) {
+			rpcb_check_init();
+			continue;
+		}
+		if (sig != -1 || errno != EINTR)
+			break;
+	}
+
+	syslog(LOG_ERR, "rpcbind terminating on signal %d.", sig);
+
+	rw_wrlock(&list_rbl_lock);
+#ifdef PORTMAP
+	rw_wrlock(&list_pml_lock);
+#endif
+	write_warmstart();	/* Dump yourself */
+
+	exit(2);
 }
 
 void
 rpcbind_abort(void)
 {
+	/*
+	 * We need to hold write locks to make sure
+	 * write_warmstart() is executed exactly once
+	 */
+	rw_wrlock(&list_rbl_lock);
+#ifdef PORTMAP
+	rw_wrlock(&list_pml_lock);
+#endif
 	write_warmstart();	/* Dump yourself */
+
 	abort();
 }
 
@@ -749,12 +828,32 @@ detachfromtty(void)
 	dup(0);
 }
 
+static int
+convert_int(int *val, char *str)
+{
+	long lval;
+
+	if (str == NULL || !isdigit(*str))
+		return (-1);
+
+	lval = strtol(str, &str, 10);
+	if (*str != '\0' || lval > INT_MAX)
+		return (-2);
+
+	*val = (int)lval;
+	return (0);
+}
+
+static int get_smf_iprop(const char *, int, int, int);
+
 /* get command line options */
 static void
 parseargs(int argc, char *argv[])
 {
 	int c;
 	int tmp;
+
+	listen_backlog = get_smf_iprop("listen_backlog", 64, 1, INT_MAX);
 
 	while ((c = getopt(argc, argv, "dwal:")) != EOF) {
 		switch (c) {
@@ -770,15 +869,17 @@ parseargs(int argc, char *argv[])
 			break;
 
 		case 'l':
-			if (sscanf(optarg, "%d", &tmp)) {
-				if (tmp > listen_backlog) {
-					listen_backlog = tmp;
-				}
+			if (convert_int(&tmp, optarg) != 0 || tmp < 1) {
+				(void) fprintf(stderr, "%s: invalid "
+				    "listen_backlog option, using defaults\n",
+				    argv[0]);
+				break;
 			}
+			listen_backlog = tmp;
 			break;
 		default:	/* error */
 			fprintf(stderr,
-			"usage: rpcbind [-d] [-w] [-l listen_backlog]\n");
+			    "usage: rpcbind [-d] [-w] [-l listen_backlog]\n");
 			exit(1);
 		}
 	}
@@ -930,11 +1031,11 @@ static mutex_t logmutex = DEFAULTMUTEX;
 static cond_t logcond = DEFAULTCV;
 static int logcount = 0;
 
-/*ARGSUSED*/
+/* ARGSUSED */
 static void * __NORETURN
 logthread(void *arg)
 {
-	while (1) {
+	for (;;) {
 		logmsg *msg;
 		(void) mutex_lock(&logmutex);
 		while ((msg = loghead) == NULL)
@@ -961,7 +1062,7 @@ get_smf_prop(const char *var, boolean_t def_val)
 	boolean_t res = def_val;
 
 	prop = scf_simple_prop_get(NULL, NULL, "config", var);
-	if (prop) {
+	if (prop != NULL) {
 		if ((val = scf_simple_prop_next_boolean(prop)) != NULL)
 			res = (*val == 0) ? B_FALSE : B_TRUE;
 		scf_simple_prop_free(prop);
@@ -976,26 +1077,83 @@ get_smf_prop(const char *var, boolean_t def_val)
 	return (res);
 }
 
+static int
+get_smf_iprop(const char *var, int def_val, int min, int max)
+{
+	scf_simple_prop_t *prop;
+	int64_t *val;
+	int res = def_val;
+
+	prop = scf_simple_prop_get(NULL, NULL, "config", var);
+	if (prop != NULL) {
+		if ((val = scf_simple_prop_next_integer(prop)) != NULL) {
+			if (*val < min || *val > max)
+				syslog(LOG_ALERT, "value for config/%s out of "
+				    "range. Using default %d", var, def_val);
+			else
+				res = (int)*val;
+		}
+		scf_simple_prop_free(prop);
+	}
+
+	if (prop == NULL || val == NULL) {
+		syslog(LOG_ALERT, "no value for config/%s (%s). "
+		    "Using default %d", var, scf_strerror(scf_error()),
+		    def_val);
+	}
+
+	return (res);
+}
+
 /*
  * Initialize: read the configuration parameters from SMF.
  * This function must be idempotent because it can be called from the
- * main poll() loop in my_svc_run().
+ * signal handler.
  */
-void
+static void
 rpcb_check_init(void)
 {
 	thread_t tid;
+	int max_threads;
 	static int thr_running;
 
 	wrap_enabled = get_smf_prop("enable_tcpwrappers", B_FALSE);
 	verboselog = get_smf_prop("verbose_logging", B_FALSE);
 	allow_indirect = get_smf_prop("allow_indirect", B_TRUE);
-	local_only = get_smf_prop("local_only", B_FALSE);
+	local_only = get_smf_prop("local_only", B_TRUE);
 
 	if (wrap_enabled && !thr_running) {
 		(void) thr_create(NULL, 0, logthread, NULL, THR_DETACHED, &tid);
 		thr_running = 1;
 	}
+
+	/*
+	 * Set the maximum number of threads.
+	 */
+	max_threads = get_smf_iprop("max_threads", 72, 1, INT_MAX);
+	if (!rpc_control(RPC_SVC_THRMAX_SET, &max_threads)) {
+		int tmp;
+
+		/*
+		 * The following rpc_control() call cannot fail
+		 */
+		if (!rpc_control(RPC_SVC_THRMAX_GET, &tmp))
+			assert(0);
+
+		if (tmp != max_threads) {
+			syslog(LOG_ERR, "setting max_threads to %d failed, "
+			    "using %d worker threads", max_threads, tmp);
+			max_threads = tmp;
+		}
+	}
+
+	/*
+	 * Set rpcb_rmtcalls_max.
+	 */
+	if (max_threads < reserved_threads)
+		set_rpcb_rmtcalls_max(0);
+	else
+		set_rpcb_rmtcalls_max(max_threads - reserved_threads);
 }
 
 /*
@@ -1007,7 +1165,6 @@ void
 qsyslog(int pri, const char *fmt, ...)
 {
 	logmsg *msg = malloc(sizeof (*msg));
-	int oldcount;
 	va_list ap;
 
 	if (msg == NULL)
@@ -1022,15 +1179,15 @@ qsyslog(int pri, const char *fmt, ...)
 	msg->log_next = NULL;
 
 	(void) mutex_lock(&logmutex);
-	oldcount = logcount;
 	if (logcount < MAXLOG) {
+		if (logcount == 0)
+			(void) cond_signal(&logcond);
 		logcount++;
 		*logtailp = msg;
 		logtailp = &msg->log_next;
+		(void) mutex_unlock(&logmutex);
 	} else {
+		(void) mutex_unlock(&logmutex);
 		free(msg);
 	}
-	(void) mutex_unlock(&logmutex);
-	if (oldcount == 0)
-		(void) cond_signal(&logcond);
 }

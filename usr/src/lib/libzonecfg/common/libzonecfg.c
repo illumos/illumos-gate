@@ -2322,7 +2322,7 @@ zonecfg_valid_fs_allowed(const char *fsallowedp)
 	while (*cp != '\0') {
 		p = cp;
 		while (*p != '\0' && *p != ',') {
-			if (!isalnum(*p))
+			if (!isalnum(*p) && *p != '-')
 				return (Z_INVALID_PROPERTY);
 			p++;
 		}

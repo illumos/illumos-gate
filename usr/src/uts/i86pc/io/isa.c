@@ -120,6 +120,8 @@ static struct regspec asy_regs[] = {
 
 /* Serial port interrupt vectors for COM1 to COM4. */
 static int asy_intrs[] = {0x4, 0x3, 0x4, 0x3};
+/* Bitfield indicating which interrupts are overridden by eeprom config */
+static uchar_t asy_intr_override = 0;
 
 /*
  *      Local data
@@ -255,9 +257,29 @@ int
 _init(void)
 {
 	int	err;
+	char tty_irq_param[9] = "ttyX-irq";
+	char *tty_irq;
+	int i;
 
 	if ((err = mod_install(&modlinkage)) != 0)
 		return (err);
+
+	/* Check if any tty irqs are overridden by eeprom config */
+	for (i = 0; i < num_BIOS_serial; i++) {
+		tty_irq_param[3] = 'a' + i;
+		if (ddi_prop_lookup_string(DDI_DEV_T_ANY, ddi_root_node(),
+		    DDI_PROP_DONTPASS, tty_irq_param, &tty_irq)
+		    == DDI_PROP_SUCCESS) {
+			long data;
+
+			if (ddi_strtol(tty_irq, NULL, 0, &data) == 0) {
+				asy_intrs[i] = (int)data;
+				asy_intr_override |= 1<<i;
+			}
+
+			ddi_prop_free(tty_irq);
+		}
+	}
 
 	impl_bus_add_probe(isa_enumerate);
 	return (0);
@@ -1328,8 +1350,15 @@ enumerate_BIOS_serial(dev_info_t *isa_dip)
 			 */
 			ddi_prop_free(tmpregs);
 
-			if (found)
+			if (found) {
+				if (asy_intr_override & 1<<i) {
+					(void) ndi_prop_update_int(
+					    DDI_DEV_T_NONE, xdip,
+					    "interrupts", asy_intrs[i]);
+				}
+
 				break;
+			}
 		}
 
 		/* If not found, then add it */

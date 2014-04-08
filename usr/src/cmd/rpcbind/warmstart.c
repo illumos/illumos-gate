@@ -26,8 +26,9 @@
  * Copyright 1990,2002-2003 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ */
 
 #include <stdio.h>
 #include <errno.h>
@@ -43,6 +44,7 @@
 #include <syslog.h>
 #include <unistd.h>
 #include <rpcsvc/daemon_utils.h>
+#include <assert.h>
 
 /* These files keep the pmap_list and rpcb_list in XDR format */
 static const char rpcbfile[] = DAEMON_DIR "/rpcbind.file";
@@ -50,13 +52,8 @@ static const char rpcbfile[] = DAEMON_DIR "/rpcbind.file";
 static const char pmapfile[] = DAEMON_DIR "/portmap.file";
 #endif
 
-
-static bool_t write_struct();
-static bool_t read_struct();
-
-FILE *
-open_tmp_file(filename)
-	char *filename;
+static FILE *
+open_tmp_file(const char *filename)
 {
 	int fd;
 	FILE *fp;
@@ -86,10 +83,7 @@ open_tmp_file(filename)
 }
 
 static bool_t
-write_struct(filename, structproc, list)
-	char *filename;
-	xdrproc_t structproc;
-	void *list;
+write_struct(const char *filename, xdrproc_t structproc, void *list)
 {
 	FILE *fp;
 	XDR xdrs;
@@ -103,7 +97,7 @@ write_struct(filename, structproc, list)
 		fp = open_tmp_file(filename);
 		if (fp == NULL) {
 			syslog(LOG_ERR,
-				"cannot open file = %s for writing", filename);
+			    "cannot open file = %s for writing", filename);
 			syslog(LOG_ERR, "cannot save any registration");
 			return (FALSE);
 		}
@@ -111,6 +105,7 @@ write_struct(filename, structproc, list)
 	xdrstdio_create(&xdrs, fp, XDR_ENCODE);
 
 	if (structproc(&xdrs, list) == FALSE) {
+		XDR_DESTROY(&xdrs);
 		syslog(LOG_ERR, "rpcbind: xdr_%s: failed", filename);
 		fclose(fp);
 		return (FALSE);
@@ -121,10 +116,7 @@ write_struct(filename, structproc, list)
 }
 
 static bool_t
-read_struct(filename, structproc, list)
-	char *filename;
-	xdrproc_t structproc;
-	void *list;
+read_struct(const char *filename, xdrproc_t structproc, void *list)
 {
 	int fd;
 	FILE *fp = NULL;
@@ -134,19 +126,19 @@ read_struct(filename, structproc, list)
 	fd = open(filename, O_RDONLY, 0600);
 	if (fd == -1) {
 		fprintf(stderr,
-		"rpcbind: cannot open file = %s for reading\n", filename);
+		    "rpcbind: cannot open file = %s for reading\n", filename);
 		goto error;
 	}
 	fp = fdopen(fd, "r");
 	if (fp == NULL) {
 		close(fd);
 		fprintf(stderr,
-		"rpcbind: cannot open file = %s for reading\n", filename);
+		    "rpcbind: cannot open file = %s for reading\n", filename);
 		goto error;
 	}
 	if (fstat(fd, &sbuf_fstat) != 0) {
 		fprintf(stderr,
-		"rpcbind: cannot stat file = %s for reading\n", filename);
+		    "rpcbind: cannot stat file = %s for reading\n", filename);
 		goto error;
 	}
 	if (sbuf_fstat.st_uid != DAEMON_UID ||
@@ -154,9 +146,8 @@ read_struct(filename, structproc, list)
 	    (sbuf_fstat.st_mode & S_IRWXG) ||
 	    (sbuf_fstat.st_mode & S_IRWXO) ||
 	    (sbuf_fstat.st_nlink != 1)) {
-		fprintf(stderr,
-		"rpcbind: invalid permissions on file = %s for reading\n",
-			filename);
+		fprintf(stderr, "rpcbind: invalid permissions on file = %s for "
+		    "reading\n", filename);
 		goto error;
 	}
 	/*
@@ -167,7 +158,7 @@ read_struct(filename, structproc, list)
 	 */
 	if (lstat(filename, &sbuf_lstat) != 0) {
 		fprintf(stderr,
-		"rpcbind: cannot lstat file = %s for reading\n", filename);
+		    "rpcbind: cannot lstat file = %s for reading\n", filename);
 		goto error;
 	}
 	if (sbuf_lstat.st_uid != DAEMON_UID ||
@@ -177,14 +168,14 @@ read_struct(filename, structproc, list)
 	    (sbuf_lstat.st_nlink != 1) ||
 	    (sbuf_fstat.st_dev != sbuf_lstat.st_dev) ||
 	    (sbuf_fstat.st_ino != sbuf_lstat.st_ino)) {
-		fprintf(stderr,
-		"rpcbind: invalid lstat permissions on file = %s for reading\n",
-			filename);
+		fprintf(stderr, "rpcbind: invalid lstat permissions on file = "
+		    "%s for reading\n", filename);
 		goto error;
 	}
 	xdrstdio_create(&xdrs, fp, XDR_DECODE);
 
 	if (structproc(&xdrs, list) == FALSE) {
+		XDR_DESTROY(&xdrs);
 		fprintf(stderr, "rpcbind: xdr_%s: failed\n", filename);
 		goto error;
 	}
@@ -192,7 +183,8 @@ read_struct(filename, structproc, list)
 	fclose(fp);
 	return (TRUE);
 
-error:	fprintf(stderr, "rpcbind: will start from scratch\n");
+error:
+	fprintf(stderr, "rpcbind: will start from scratch\n");
 	if (fp != NULL)
 		fclose(fp);
 	return (FALSE);
@@ -201,8 +193,10 @@ error:	fprintf(stderr, "rpcbind: will start from scratch\n");
 void
 write_warmstart(void)
 {
+	assert(RW_WRITE_HELD(&list_rbl_lock));
 	(void) write_struct(rpcbfile, xdr_rpcblist_ptr, &list_rbl);
 #ifdef PORTMAP
+	assert(RW_WRITE_HELD(&list_pml_lock));
 	(void) write_struct(pmapfile, xdr_pmaplist_ptr, &list_pml);
 #endif
 
@@ -215,18 +209,17 @@ read_warmstart(void)
 #ifdef PORTMAP
 	pmaplist_ptr tmp_pmapl = NULL;
 #endif
-	int ok1, ok2 = TRUE;
 
-	ok1 = read_struct(rpcbfile, xdr_rpcblist_ptr, &tmp_rpcbl);
-	if (ok1 == FALSE)
+	if (read_struct(rpcbfile, xdr_rpcblist_ptr, &tmp_rpcbl) == FALSE)
 		return;
+
 #ifdef PORTMAP
-	ok2 = read_struct(pmapfile, xdr_pmaplist_ptr, &tmp_pmapl);
-#endif
-	if (ok2 == FALSE) {
+	if (read_struct(pmapfile, xdr_pmaplist_ptr, &tmp_pmapl) == FALSE) {
 		xdr_free((xdrproc_t)xdr_rpcblist_ptr, (char *)&tmp_rpcbl);
 		return;
 	}
+#endif
+
 	xdr_free((xdrproc_t)xdr_rpcblist_ptr, (char *)&list_rbl);
 	list_rbl = tmp_rpcbl;
 #ifdef PORTMAP

@@ -21,14 +21,15 @@
  */
 
 /*
+ * Copyright 2014 Garrett D'Amore
+ */
+/*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Network Listener Process
@@ -157,7 +158,7 @@ static char *usage     = "Usage: listen [ -m minor_prefix ] network_device";
 static char *nopmtag   = "Fatal error: Unable to get PMTAG from environment";
 static char tzenv[BUFSIZ];
 
-#define TIMEZONE	"/etc/TIMEZONE"
+#define TZFILE	"/etc/default/init"
 #define TZSTR	"TZ="
 
 void	check_sac_mesg();	/* routine to process messages from sac */
@@ -300,7 +301,7 @@ main(int argc, char **argv)
  */
 
 	if (getenv("TZ") == NULL) {
-		fp = fopen(TIMEZONE, "r");
+		fp = fopen(TZFILE, "r");
 		if (fp) {
 			while (fgets(tzenv, BUFSIZ, fp)) {
 				if (tzenv[strlen(tzenv) - 1] == '\n')
@@ -313,7 +314,8 @@ main(int argc, char **argv)
 			fclose(fp);
 		}
 		else {
-			sprintf(scratch, "couldn't open %s, default to GMT", TIMEZONE);
+			sprintf(scratch, "couldn't open %s, default to GMT",
+			    TZFILE);
 			logmessage(scratch);
 		}
 	}
@@ -1571,8 +1573,8 @@ char *s;
 		delim = *p++;
 		for (;;) {
 			if (*p == '\0') {
-				/* etc/TIMEZONE ill-formed, go without TZ */
-				sprintf(scratch, "%s ill-formed", TIMEZONE);
+				/* etc/default/init ill-formed, go without TZ */
+				sprintf(scratch, "%s ill-formed", TZFILE);
 				logmessage(scratch);
 				strcpy(s, "TZ=");
 				return(s);

@@ -23,6 +23,9 @@
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
 /* All Rights Reserved */
 /*
@@ -35,53 +38,46 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * pmap_svc.c
  * The server procedure for the version 2 portmaper.
  * All the portmapper related interface from the portmap side.
  */
 
+#include <rpc/rpc.h>
+#include <tcpd.h>
+
+#include "rpcbind.h"
+
 #ifdef PORTMAP
 #include <stdio.h>
 #include <alloca.h>
 #include <ucred.h>
-#include <rpc/rpc.h>
 #include <rpc/pmap_prot.h>
 #include <rpc/rpcb_prot.h>
-#include "rpcbind.h"
+#include <assert.h>
 
-#ifdef RPCBIND_DEBUG
-#include <netdir.h>
-#endif
-
-static PMAPLIST *find_service_pmap();
-static bool_t pmapproc_change();
-static bool_t pmapproc_getport();
-static bool_t pmapproc_dump();
+static bool_t pmapproc_change(struct svc_req *, SVCXPRT *, unsigned long);
+static bool_t pmapproc_getport(struct svc_req *, SVCXPRT *);
+static bool_t pmapproc_dump(struct svc_req *, SVCXPRT *);
 
 /*
  * Called for all the version 2 inquiries.
  */
 void
-pmap_service(rqstp, xprt)
-	register struct svc_req *rqstp;
-	register SVCXPRT *xprt;
+pmap_service(struct svc_req *rqstp, SVCXPRT *xprt)
 {
 	rpcbs_procinfo(RPCBVERS_2_STAT, rqstp->rq_proc);
+
 	switch (rqstp->rq_proc) {
 	case PMAPPROC_NULL:
 		/*
 		 * Null proc call
 		 */
-#ifdef RPCBIND_DEBUG
-		fprintf(stderr, "PMAPPROC_NULL\n");
-#endif
 		PMAP_CHECK(xprt, rqstp->rq_proc);
 
 		if ((!svc_sendreply(xprt, (xdrproc_t)xdr_void, NULL)) &&
-			debugging) {
+		    debugging) {
 			if (doabort) {
 				rpcbind_abort();
 			}
@@ -114,9 +110,6 @@ pmap_service(rqstp, xprt)
 		/*
 		 * Return the current set of mapped program, version
 		 */
-#ifdef RPCBIND_DEBUG
-		fprintf(stderr, "PMAPPROC_DUMP\n");
-#endif
 		PMAP_CHECK(xprt, rqstp->rq_proc);
 		pmapproc_dump(rqstp, xprt);
 		break;
@@ -149,52 +142,40 @@ pmap_service(rqstp, xprt)
  * use those program version numbers.
  */
 static PMAPLIST *
-find_service_pmap(prog, vers, prot)
-	ulong_t prog;
-	ulong_t vers;
-	ulong_t prot;
+find_service_pmap(rpcprog_t prog, rpcvers_t vers, rpcprot_t prot)
 {
-	register PMAPLIST *hit = NULL;
-	register PMAPLIST *pml;
+	PMAPLIST *hit = NULL;
+	PMAPLIST *pml;
+
+	assert(RW_LOCK_HELD(&list_pml_lock));
 
 	for (pml = list_pml; pml != NULL; pml = pml->pml_next) {
 		if ((pml->pml_map.pm_prog != prog) ||
-			(pml->pml_map.pm_prot != prot))
+		    (pml->pml_map.pm_prot != prot))
 			continue;
 		hit = pml;
 		if (pml->pml_map.pm_vers == vers)
 			break;
 	}
+
 	return (hit);
 }
 
-extern char *getowner(SVCXPRT *xprt, char *);
-
-/*ARGSUSED*/
+/* ARGSUSED */
 static bool_t
-pmapproc_change(rqstp, xprt, op)
-	struct svc_req *rqstp;
-	register SVCXPRT *xprt;
-	unsigned long op;
+pmapproc_change(struct svc_req *rqstp, SVCXPRT *xprt, unsigned long op)
 {
 	PMAP reg;
 	RPCB rpcbreg;
 	int ans;
 	struct sockaddr_in *who;
-	extern bool_t map_set(), map_unset();
 	char owner[64];
 
 	if (!svc_getargs(xprt, (xdrproc_t)xdr_pmap, (char *)&reg)) {
 		svcerr_decode(xprt);
 		return (FALSE);
 	}
-	who = svc_getcaller(xprt);
-
-#ifdef RPCBIND_DEBUG
-	fprintf(stderr, "%s request for (%lu, %lu) : ",
-		op == PMAPPROC_SET ? "PMAP_SET" : "PMAP_UNSET",
-		reg.pm_prog, reg.pm_vers);
-#endif
+	who = (struct sockaddr_in *)svc_getrpccaller(xprt)->buf;
 
 	/* Don't allow unset/set from remote. */
 	if (!localxprt(xprt, B_TRUE)) {
@@ -216,7 +197,7 @@ pmapproc_change(rqstp, xprt, op)
 		char buf[32];
 
 		sprintf(buf, "0.0.0.0.%d.%d", (reg.pm_port >> 8) & 0xff,
-			reg.pm_port & 0xff);
+		    reg.pm_port & 0xff);
 		rpcbreg.r_addr = buf;
 		if (reg.pm_prot == IPPROTO_UDP) {
 			rpcbreg.r_netid = udptrans;
@@ -249,9 +230,6 @@ done_change:
 			rpcbind_abort();
 		}
 	}
-#ifdef RPCBIND_DEBUG
-	fprintf(stderr, "%s\n", ans == TRUE ? "succeeded" : "failed");
-#endif
 	if (op == PMAPPROC_SET)
 		rpcbs_set(RPCBVERS_2_STAT, ans);
 	else
@@ -261,16 +239,12 @@ done_change:
 
 /* ARGSUSED */
 static bool_t
-pmapproc_getport(rqstp, xprt)
-	struct svc_req *rqstp;
-	register SVCXPRT *xprt;
+pmapproc_getport(struct svc_req *rqstp, SVCXPRT *xprt)
 {
 	PMAP reg;
 	int port = 0;
 	PMAPLIST *fnd;
-#ifdef RPCBIND_DEBUG
-	char *uaddr;
-#endif
+	bool_t rbl_locked = FALSE;
 
 	if (!svc_getargs(xprt, (xdrproc_t)xdr_pmap, (char *)&reg)) {
 		svcerr_decode(xprt);
@@ -278,14 +252,8 @@ pmapproc_getport(rqstp, xprt)
 	}
 	PMAP_CHECK_RET(xprt, rqstp->rq_proc, FALSE);
 
-#ifdef RPCBIND_DEBUG
-	uaddr =  taddr2uaddr(rpcbind_get_conf(xprt->xp_netid),
-			    svc_getrpccaller(xprt));
-	fprintf(stderr, "PMAP_GETPORT request for (%lu, %lu, %s) from %s :",
-		reg.pm_prog, reg.pm_vers,
-		reg.pm_prot == IPPROTO_UDP ? "udp" : "tcp", uaddr);
-	free(uaddr);
-#endif
+	(void) rw_rdlock(&list_pml_lock);
+retry:
 	fnd = find_service_pmap(reg.pm_prog, reg.pm_vers, reg.pm_prot);
 	if (fnd) {
 		char serveuaddr[32], *ua;
@@ -300,58 +268,74 @@ pmapproc_getport(rqstp, xprt)
 			netid = tcptrans;
 		}
 		if (ua == NULL) {
+			(void) rw_unlock(&list_pml_lock);
+			if (rbl_locked)
+				(void) rw_unlock(&list_rbl_lock);
 			goto sendreply;
 		}
 		if (sscanf(ua, "%d.%d.%d.%d.%d.%d", &h1, &h2, &h3,
-				&h4, &p1, &p2) == 6) {
+		    &h4, &p1, &p2) == 6) {
 			p1 = (fnd->pml_map.pm_port >> 8) & 0xff;
 			p2 = (fnd->pml_map.pm_port) & 0xff;
 			sprintf(serveuaddr, "%d.%d.%d.%d.%d.%d",
-				h1, h2, h3, h4, p1, p2);
+			    h1, h2, h3, h4, p1, p2);
 			if (is_bound(netid, serveuaddr)) {
 				port = fnd->pml_map.pm_port;
 			} else { /* this service is dead; delete it */
+				if (!rbl_locked) {
+					(void) rw_unlock(&list_pml_lock);
+					(void) rw_wrlock(&list_rbl_lock);
+					(void) rw_wrlock(&list_pml_lock);
+					rbl_locked = TRUE;
+					goto retry;
+				}
 				delete_prog(reg.pm_prog);
 			}
 		}
 	}
+	(void) rw_unlock(&list_pml_lock);
+	if (rbl_locked)
+		(void) rw_unlock(&list_rbl_lock);
+
 sendreply:
 	if ((!svc_sendreply(xprt, (xdrproc_t)xdr_long, (caddr_t)&port)) &&
-			debugging) {
+	    debugging) {
 		(void) fprintf(stderr, "portmap: svc_sendreply\n");
 		if (doabort) {
 			rpcbind_abort();
 		}
 	}
-#ifdef RPCBIND_DEBUG
-	fprintf(stderr, "port = %d\n", port);
-#endif
 	rpcbs_getaddr(RPCBVERS_2_STAT, reg.pm_prog, reg.pm_vers,
-		reg.pm_prot == IPPROTO_UDP ? udptrans : tcptrans,
-		port ? udptrans : "");
+	    reg.pm_prot == IPPROTO_UDP ? udptrans : tcptrans,
+	    port ? udptrans : "");
 
 	return (TRUE);
 }
 
 /* ARGSUSED */
 static bool_t
-pmapproc_dump(rqstp, xprt)
-	struct svc_req *rqstp;
-	register SVCXPRT *xprt;
+pmapproc_dump(struct svc_req *rqstp, SVCXPRT *xprt)
 {
 	if (!svc_getargs(xprt, (xdrproc_t)xdr_void, NULL)) {
 		svcerr_decode(xprt);
 		return (FALSE);
 	}
+
+	(void) rw_rdlock(&list_pml_lock);
 	if ((!svc_sendreply(xprt, (xdrproc_t)xdr_pmaplist_ptr,
-			(caddr_t)&list_pml)) && debugging) {
+	    (caddr_t)&list_pml)) && debugging) {
+		(void) rw_unlock(&list_pml_lock);
 		(void) fprintf(stderr, "portmap: svc_sendreply\n");
 		if (doabort) {
 			rpcbind_abort();
 		}
+	} else {
+		(void) rw_unlock(&list_pml_lock);
 	}
+
 	return (TRUE);
 }
+#endif /* PORTMAP */
 
 /*
  * Is the transport local?  The original rpcbind code tried to
@@ -385,4 +369,3 @@ localxprt(SVCXPRT *transp, boolean_t forceipv4)
 	 */
 	return (rpcb_caller_uid(transp) != -1);
 }
-#endif /* PORTMAP */

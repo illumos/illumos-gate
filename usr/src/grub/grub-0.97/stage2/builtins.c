@@ -49,6 +49,7 @@
 #endif
 
 #include <cpu.h>
+#include <expand.h>
 
 /* The type of kernel loaded.  */
 kernel_t kernel_type;
@@ -86,7 +87,7 @@ static int configfile_func (char *arg, int flags);
 static void solaris_config_file (void);
 #endif
 
-static unsigned int min_mem64 = 0;
+unsigned int min_mem64 = 0;
 
 #if defined(__sun) && !defined(GRUB_UTIL)
 extern void __enable_execute_stack (void *);
@@ -2791,117 +2792,6 @@ static struct builtin builtin_ioprobe =
 };
 
 
-/*
- * To boot from a ZFS root filesystem, the kernel$ or module$ commands
- * must include "-B $ZFS-BOOTFS" to expand to the zfs-bootfs, bootpath,
- * and diskdevid boot property values for passing to the kernel:
- *
- * e.g.
- * kernel$ /platform/i86pc/kernel/$ISADIR/unix -B $ZFS-BOOTFS,console=ttya
- *
- * $ZFS-BOOTFS is expanded to
- *
- *    zfs-bootfs=<rootpool-name/zfs-rootfilesystem-object-num>,
- *    bootpath=<device phys path>,
- *    diskdevid=<device id>
- *
- * if both bootpath and diskdevid can be found.
- * e.g
- *    zfs-bootfs=rpool/85,
- *    bootpath="/pci@0,0/pci1022,7450@a/pci17c2,10@4/sd@0,0:a",
- *    diskdevid="id1,sd@SSEAGATE_ST336607LC______3JA0LNHE0000741326W6/a"
- */
-static int
-expand_dollar_bootfs(char *in, char *out)
-{
-	char *token, *tmpout = out;
-	int outlen, blen;
-	int postcomma = 0;
-
-	/* no op if this is not zfs */
-	if (is_zfs_mount == 0)
-		return (0);
-
-	if (current_bootpath[0] == '\0' && current_devid[0] == '\0') {
-		errnum = ERR_NO_BOOTPATH;
-		return (1);
-	}
-
-	outlen = strlen(in);
-	blen = current_bootfs_obj == 0 ? strlen(current_rootpool) :
-	    strlen(current_rootpool) + 11;
-
-	out[0] = '\0';
-	while (token = strstr(in, "$ZFS-BOOTFS")) {
-
-		if ((outlen += blen) >= MAX_CMDLINE) {
-			errnum = ERR_WONT_FIT;
-			return (1);
-		}
-
-		token[0] = '\0';	
-		grub_sprintf(tmpout, "%s", in);
-		token[0] = '$';
-		in = token + 11; /* skip over $ZFS-BOOTFS */
-		tmpout = out + strlen(out);
-
-		/* Note: %u only fits 32 bit integer; */ 
-		if (current_bootfs_obj > 0)
-			grub_sprintf(tmpout, "zfs-bootfs=%s/%u",
-			    current_rootpool, current_bootfs_obj);
-		else
-			grub_sprintf(tmpout, "zfs-bootfs=%s",
-			    current_rootpool);
-		tmpout = out + strlen(out); 
-	}
-
-	/*
-	 * Check to see if 'zfs-bootfs' was explicitly specified on the command
-	 * line so that we can insert the 'bootpath' property.
-	 */
-	if ((tmpout == out) && (token = strstr(in, "zfs-bootfs")) != NULL) {
-		token[0] = '\0';
-		grub_strcpy(tmpout, in);
-		token[0] = 'z';
-		in = token;
-
-		tmpout = out + strlen(out);
-		postcomma = 1;
-	}
-
-	/*
-	 * Set the 'bootpath' property if a ZFS dataset was specified, either
-	 * through '$ZFS-BOOTFS' or an explicit 'zfs-bootfs' setting.
-	 */
-	if (tmpout != out) {
-		if (current_bootpath[0] != '\0') {
-			if ((outlen += 12 + strlen(current_bootpath))
-			    >= MAX_CMDLINE) {
-				errnum = ERR_WONT_FIT;
-				return (1);
-			}
-			grub_sprintf(tmpout,
-			    postcomma ? "bootpath=\"%s\"," : ",bootpath=\"%s\"",
-			    current_bootpath);
-			tmpout = out + strlen(out);
-		}
-
-		if (current_devid[0] != '\0') {
-			if ((outlen += 13 + strlen(current_devid))
-			    >= MAX_CMDLINE) {
-				errnum = ERR_WONT_FIT;
-				return (1);
-			}
-			grub_sprintf(tmpout,
-			    postcomma ? "diskdevid=\"%s\"," : ",diskdevid=\"%s\"",
-			    current_devid);
-		}
-	}
-
-	strncat(out, in, MAX_CMDLINE);
-	return (0);
-}
-
 /* kernel */
 static int
 kernel_func (char *arg, int flags)
@@ -3007,288 +2897,41 @@ static struct builtin builtin_min_mem64 =
 	"even on 64-bit capable hardware."
 };
 
-int
-check_min_mem64()
-{
-	if (min_mem64 == 0)
-		return (1);
-
-	if ((mbi.mem_upper / 10240) * 11 >= min_mem64)
-		return (1);
-
-	return (0);
-}
-
-static int detect_target_operating_mode();
-
-int
-amd64_config_cpu(void)
-{
-        struct amd64_cpuid_regs __vcr, *vcr = &__vcr;
-        uint32_t maxeax;
-        uint32_t max_maxeax = 0x100;
-        char vendor[13];
-        int isamd64 = 0;
-        uint32_t stdfeatures = 0, xtdfeatures = 0;
-        uint64_t efer;
-
-        /*
-         * This check may seem silly, but if the C preprocesor symbol __amd64
-         * is #defined during compilation, something that may outwardly seem
-         * like a good idea, uts/common/sys/isa_defs.h will #define _LP64,
-         * which will cause uts/common/sys/int_types.h to typedef uint64_t as
-         * an unsigned long - which is only 4 bytes in size when using a 32-bit
-         * compiler.
-         *
-         * If that happens, all the page table translation routines will fail
-         * horribly, so check the size of uint64_t just to insure some degree
-         * of sanity in future operations.
-         */
-        /*LINTED [sizeof result is invarient]*/
-        if (sizeof (uint64_t) != 8)
-                prom_panic("grub compiled improperly, unable to boot "
-                    "64-bit AMD64 executables");
-
-        /*
-         * If the CPU doesn't support the CPUID instruction, it's definitely
-         * not an AMD64.
-         */
-        if (amd64_cpuid_supported() == 0)
-                return (0);
-
-        amd64_cpuid_insn(0, vcr);
-
-        maxeax = vcr->r_eax;
-        {
-                /*LINTED [vendor string from cpuid data]*/
-                uint32_t *iptr = (uint32_t *)vendor;
-
-                *iptr++ = vcr->r_ebx;
-                *iptr++ = vcr->r_edx;
-                *iptr++ = vcr->r_ecx;
-
-                vendor[12] = '\0';
-        }
-
-        if (maxeax > max_maxeax) {
-                grub_printf("cpu: warning, maxeax was 0x%x -> 0x%x\n",
-                    maxeax, max_maxeax);
-                maxeax = max_maxeax;
-        }
-
-        if (maxeax < 1)
-                return (0);     /* no additional functions, not an AMD64 */
-        else {
-                uint_t family, model, step;
-
-                amd64_cpuid_insn(1, vcr);
-
-                /*
-                 * All AMD64/IA32e processors technically SHOULD report
-                 * themselves as being in family 0xf, but for some reason
-                 * Simics doesn't, and this may change in the future, so
-                 * don't error out if it's not true.
-                 */
-                if ((family = BITX(vcr->r_eax, 11, 8)) == 0xf)
-                        family += BITX(vcr->r_eax, 27, 20);
-
-                if ((model = BITX(vcr->r_eax, 7, 4)) == 0xf)
-                        model += BITX(vcr->r_eax, 19, 16) << 4;
-                step = BITX(vcr->r_eax, 3, 0);
-
-                grub_printf("cpu: '%s' family %d model %d step %d\n",
-                    vendor, family, model, step);
-                stdfeatures = vcr->r_edx;
-        }
-
-        amd64_cpuid_insn(0x80000000, vcr);
-
-        if (vcr->r_eax & 0x80000000) {
-                uint32_t xmaxeax = vcr->r_eax;
-                const uint32_t max_xmaxeax = 0x80000100;
-
-                if (xmaxeax > max_xmaxeax) {
-                        grub_printf("amd64: warning, xmaxeax was "
-			    "0x%x -> 0x%x\n", xmaxeax, max_xmaxeax);
-                        xmaxeax = max_xmaxeax;
-                }
-
-                if (xmaxeax >= 0x80000001) {
-                        amd64_cpuid_insn(0x80000001, vcr);
-                        xtdfeatures = vcr->r_edx;
-                }
-        }
-
-        if (BITX(xtdfeatures, 29, 29))          /* long mode */
-                isamd64++;
-        else
-                grub_printf("amd64: CPU does NOT support long mode\n");
-
-        if (!BITX(stdfeatures, 0, 0)) {
-                grub_printf("amd64: CPU does NOT support FPU\n");
-                isamd64--;
-        }
-
-        if (!BITX(stdfeatures, 4, 4)) {
-                grub_printf("amd64: CPU does NOT support TSC\n");
-                isamd64--;
-        }
-
-        if (!BITX(stdfeatures, 5, 5)) {
-                grub_printf("amd64: CPU does NOT support MSRs\n");
-                isamd64--;
-        }
-
-        if (!BITX(stdfeatures, 6, 6)) {
-                grub_printf("amd64: CPU does NOT support PAE\n");
-                isamd64--;
-        }
-
-        if (!BITX(stdfeatures, 8, 8)) {
-                grub_printf("amd64: CPU does NOT support CX8\n");
-                isamd64--;
-        }
-
-        if (!BITX(stdfeatures, 13, 13)) {
-                grub_printf("amd64: CPU does NOT support PGE\n");
-                isamd64--;
-        }
-
-        if (!BITX(stdfeatures, 19, 19)) {
-                grub_printf("amd64: CPU does NOT support CLFSH\n");
-                isamd64--;
-        }
-
-        if (!BITX(stdfeatures, 23, 23)) {
-                grub_printf("amd64: CPU does NOT support MMX\n");
-                isamd64--;
-        }
-
-        if (!BITX(stdfeatures, 24, 24)) {
-                grub_printf("amd64: CPU does NOT support FXSR\n");
-                isamd64--;
-        }
-
-        if (!BITX(stdfeatures, 25, 25)) {
-                grub_printf("amd64: CPU does NOT support SSE\n");
-                isamd64--;
-        }
-
-        if (!BITX(stdfeatures, 26, 26)) {
-                grub_printf("amd64: CPU does NOT support SSE2\n");
-                isamd64--;
-        }
-
-        if (isamd64 < 1) {
-                grub_printf("amd64: CPU does not support amd64 executables.\n");
-                return (0);
-        }
-
-        amd64_rdmsr(MSR_AMD_EFER, &efer);
-        if (efer & AMD_EFER_SCE)
-                grub_printf("amd64: EFER_SCE (syscall/sysret) already "
-		    "enabled\n");
-        if (efer & AMD_EFER_NXE)
-                grub_printf("amd64: EFER_NXE (no-exec prot) already enabled\n");
-        if (efer & AMD_EFER_LME)
-                grub_printf("amd64: EFER_LME (long mode) already enabled\n");
-
-        return (detect_target_operating_mode());
-}
-
-static int
-detect_target_operating_mode()
-{
-        int ret, ah;
-
-	ah = get_target_operating_mode();
-
-        ah = ah >> 8;
-
-	/* XXX still need to pass back the return from the call  */
-	ret = 0;
-
-        if (ah == 0x86 && (ret & CB) != 0) {
-                grub_printf("[BIOS 'Detect Target Operating Mode' "
-                    "callback unsupported on this platform]\n");
-                return (1);     /* unsupported, ignore */
-        }
-
-        if (ah == 0x0 && (ret & CB) == 0) {
-                grub_printf("[BIOS accepted mixed-mode target setting!]\n");
-                return (1);     /* told the bios what we're up to */
-        }
-
-        if (ah == 0 && ret & CB) {
-                grub_printf("fatal: BIOS reports this machine CANNOT run in "
-		    "mixed 32/64-bit mode!\n");
-                return (0);
-        }
-
-        grub_printf("warning: BIOS Detect Target Operating Mode callback "
-            "confused.\n         %%ax >> 8 = 0x%x, carry = %d\n", ah,
-            ret & CB ? 1 : 0);
-
-        return (1);
-}
-
-
-int
-isamd64()
-{
-	static int ret = -1;
-
-	if (ret == -1)
-		ret = amd64_config_cpu();
-
-	return (ret);
-}
-
-static void
-expand_arch (char *arg, char *newarg)
-{
-  char *index;
-
-  newarg[0] = '\0';
-
-  while ((index = strstr(arg, "$ISADIR")) != NULL) {
-
-    index[0] = '\0';
-    strncat(newarg, arg, MAX_CMDLINE);
-    index[0] = '$';
-
-    if (isamd64() && check_min_mem64())
-      strncat(newarg, "amd64", MAX_CMDLINE);
-
-    arg = index + 7;
-  }
-
-  strncat(newarg, arg, MAX_CMDLINE);
-  return;
-}
-
-/* kernel$ */
 static int
 kernel_dollar_func (char *arg, int flags)
 {
-  char newarg[MAX_CMDLINE];	/* everything boils down to MAX_CMDLINE */
+  int err;
+  char newarg[MAX_CMDLINE];
 
+  /*
+   * We're going to expand the arguments twice.  The first expansion, which
+   * occurs without the benefit of knowing the ZFS object ID of the filesystem
+   * we're booting from (if we're booting from ZFS, of course), must be
+   * sufficient to find and read the kernel.  The second expansion will
+   * then overwrite the command line actually set in the multiboot header with
+   * the newly-expanded one.  Since $ZFS-BOOTFS expands differently after
+   * zfs_open() has been called (kernel_func() -> load_image() -> grub_open() ->
+   * zfs_open()), we need to do the second expansion so that the kernel is
+   * given the right object ID argument.  Note that the pointer to the
+   * command line set in the multiboot header is always MB_CMDLINE_BUF.
+   */
   grub_printf("loading '%s' ...\n", arg);
-  expand_arch(arg, newarg);
-
-  if (kernel_func(newarg, flags))
-	return (1);
-
-  mb_cmdline = (char *)MB_CMDLINE_BUF;
-  if (expand_dollar_bootfs(newarg, mb_cmdline)) {
-	grub_printf("cannot expand $ZFS-BOOTFS for dataset %s\n",
-	    current_bootfs);
-	return (1);
+  if ((err = expand_string(arg, newarg, MAX_CMDLINE)) != 0) {
+    errnum = err;
+    return (1);
   }
 
-  grub_printf("'%s' is loaded\n", mb_cmdline);
-  mb_cmdline += grub_strlen(mb_cmdline) + 1;
+  if ((err = kernel_func(newarg, flags)) != 0)
+    return (err);
 
+  mb_cmdline = (char *)MB_CMDLINE_BUF;
+  if ((err = expand_string(arg, mb_cmdline, MAX_CMDLINE)) != 0) {
+    errnum = err;
+    return (1);
+  }
+
+  grub_printf("loading '%s' ...\n", mb_cmdline);
+  mb_cmdline += grub_strlen(mb_cmdline) + 1;
   return (0);
 }
 
@@ -3298,7 +2941,8 @@ static struct builtin builtin_kernel_dollar =
   kernel_dollar_func,
   BUILTIN_CMDLINE | BUILTIN_HELP_LIST,
   "kernel$ [--no-mem-option] [--type=TYPE] FILE [ARG ...]",
-  " Just like kernel, but with $ISADIR expansion."
+  " Just like kernel, but with variable expansion, including the legacy"
+  " (and nonconforming) variables $ISADIR and $ZFS-BOOTFS."
 };
 
 
@@ -3521,25 +3165,26 @@ static struct builtin builtin_module =
 static int
 module_dollar_func (char *arg, int flags)
 {
-  char newarg[MAX_CMDLINE];	/* everything boils down to MAX_CMDLINE */
-  char *cmdline_sav;
+  char newarg[MAX_CMDLINE];
+  char *cmdline_sav = mb_cmdline;
+  int err;
 
   grub_printf("loading '%s' ...\n", arg);
-  expand_arch(arg, newarg);
-
-  cmdline_sav = (char *)mb_cmdline;
-  if (module_func(newarg, flags))
-	return (1);
-
-  if (expand_dollar_bootfs(newarg, cmdline_sav)) {
-	grub_printf("cannot expand $ZFS-BOOTFS for dataset %s\n",
-	    current_bootfs);
-	return (1);
+  if ((err = expand_string(arg, newarg, MAX_CMDLINE)) != 0) {
+    errnum = err;
+    return (1);
   }
 
-  grub_printf("'%s' is loaded\n", (char *)cmdline_sav);
-  mb_cmdline += grub_strlen(cmdline_sav) + 1;
+  if ((err = module_func(newarg, flags)) != 0)
+    return (err);
 
+  if ((err = expand_string(arg, cmdline_sav, MAX_CMDLINE)) != 0) {
+    errnum = err;
+    return (1);
+  }
+
+  grub_printf("loading '%s' ...\n", cmdline_sav);
+  mb_cmdline += grub_strlen(cmdline_sav) + 1;
   return (0);
 }
 
@@ -4850,15 +4495,15 @@ setup_func (char *arg, int flags)
 	{
 	  char tmp[16];
 	  grub_sprintf (tmp, ",%d", (partition >> 16) & 0xFF);
-	  grub_strncat (device, tmp, 256);
+	  grub_strncat (device, tmp, sizeof (device));
 	}
       if ((partition & 0x00FF00) != 0x00FF00)
 	{
 	  char tmp[16];
 	  grub_sprintf (tmp, ",%c", 'a' + ((partition >> 8) & 0xFF));
-	  grub_strncat (device, tmp, 256);
+	  grub_strncat (device, tmp, sizeof (device));
 	}
-      grub_strncat (device, ")", 256);
+      grub_strncat (device, ")", sizeof (device));
     }
   
   int embed_stage1_5 (char *stage1_5, int drive, int partition)
@@ -5289,11 +4934,14 @@ static struct builtin builtin_terminal =
   "terminal",
   terminal_func,
   BUILTIN_MENU | BUILTIN_CMDLINE | BUILTIN_HELP_LIST,
-  "terminal [--dumb] [--no-echo] [--no-edit] [--timeout=SECS] [--lines=LINES] [--silent] [console] [serial] [hercules] [graphics]",
+  "terminal [--dumb] [--no-echo] [--no-edit] [--timeout=SECS] [--lines=LINES] [--silent] [console] [serial] [hercules] [graphics] [composite]",
   "Select a terminal. When multiple terminals are specified, wait until"
   " you push any key to continue. If both console and serial are specified,"
   " the terminal to which you input a key first will be selected. If no"
-  " argument is specified, print current setting. The option --dumb"
+  " argument is specified, print current setting. To accomodate systems"
+  " where console redirection may or may not be present, the composite"
+  " console will direct output to the serial and BIOS consoles, and accept"
+  " input from either one, without requiring selection. The option --dumb"
   " specifies that your terminal is dumb, otherwise, vt100-compatibility"
   " is assumed. If you specify --no-echo, input characters won't be echoed."
   " If you specify --no-edit, the BASH-like editing feature will be disabled."
@@ -5815,6 +5463,54 @@ static struct builtin builtin_vbeprobe =
   "Probe VBE information. If the mode number MODE is specified, show only"
   " the information about only the mode."
 };
+
+static int
+variable_func(char *arg, int flags)
+{
+	char name[EV_NAMELEN];
+	char *val;
+	int err;
+
+	if (*arg == '\0') {
+		dump_variables();
+		return (0);
+	}
+
+	if ((val = grub_strchr(arg, ' ')) != NULL) {
+		if (val - arg >= sizeof (name)) {
+			errnum = ERR_WONT_FIT;
+			return (1);
+		}
+		(void) grub_memcpy(name, arg, (val - arg));
+		name[val - arg] = '\0';
+		val = skip_to(0, arg);
+	} else {
+		if (grub_strlen(arg) >= sizeof (name)) {
+			errnum = ERR_WONT_FIT;
+			return (1);
+		}
+		(void) grub_strcpy(name, arg);
+	}
+
+	if ((err = set_variable(name, val)) != 0) {
+		errnum = err;
+		return (1);
+	}
+
+	return (0);
+}
+
+static struct builtin builtin_variable =
+{
+  "variable",
+  variable_func,
+  BUILTIN_CMDLINE | BUILTIN_MENU | BUILTIN_SCRIPT | BUILTIN_HELP_LIST,
+  "variable NAME [VALUE]",
+  "Set the variable NAME to VALUE, or to the empty string if no value is"
+  " given. NAME must contain no spaces. There is no quoting mechanism"
+  " and nested variable references are not allowed. Variable values may"
+  " be substituted into the kernel$ and module$ commands using ${NAME}."
+};
   
 
 /* The table of builtin commands. Sorted in dictionary order.  */
@@ -5922,6 +5618,7 @@ struct builtin *builtin_table[] =
   &builtin_title,
   &builtin_unhide,
   &builtin_uppermem,
+  &builtin_variable,
   &builtin_vbeprobe,
   &builtin_verbose,
   0

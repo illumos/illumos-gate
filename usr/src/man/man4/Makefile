@@ -21,7 +21,6 @@ MANSECT= 	4
 
 _MANFILES=	Intro.4				\
 		NISLDAPmapping.4		\
-		TIMEZONE.4			\
 		a.out.4				\
 		admin.4				\
 		alias.4				\
@@ -93,6 +92,7 @@ _MANFILES=	Intro.4				\
 		ike.preshared.4			\
 		inet_type.4			\
 		inetd.conf.4			\
+		init.4				\
 		init.d.4			\
 		inittab.4			\
 		ipaddrsel.conf.4		\

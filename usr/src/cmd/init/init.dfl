@@ -22,12 +22,8 @@
 #
 # CDDL HEADER END
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-# This file is /etc/default/init.  /etc/TIMEZONE is a symlink to this file.
-# This file looks like a shell script, but it is not.  To maintain
-# compatibility with old versions of /etc/TIMEZONE, some shell constructs
-# (i.e., export commands) are allowed in this file, but are ignored.
+# This file is /etc/default/init.
+# This file looks like a shell script, but it is not.
 #
 # Lines of this file should be of the form VAR=value, where VAR is one of
 # TZ, LANG, CMASK, or any of the LC_* environment variables.  value may

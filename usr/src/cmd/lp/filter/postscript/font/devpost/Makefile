@@ -20,9 +20,8 @@
 # CDDL HEADER END
 #
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright (c) 1989 by Sun Microsystems, Inc.
+# Copyright 2014 Garrett D'Amore
 #
 # cmd/lp/filter/postscript/font/devpost/Makefile
 #
@@ -30,8 +29,8 @@
 include			../../../../Makefile.lp
 
 FONTFILES =		AB AI AR AX BI CB CI CO	\
-			CW CX GR HB HI HX Hb Hi	\
-			Hr Hx KB KI KR KX NB NI	\
+			CW CX GR HB HI HX JB JI	\
+			JR JX KB KI KR KX NB NI	\
 			NR NX PA PB PI PX S1 VB	\
 			VI VR VX ZD ZI B  H  I	\
 			R  S	
@@ -45,7 +44,7 @@ FONTLNK1OUTS =		$(FONTLNK1:%=%.out)
 FONTLNK2OUTS =		$(FONTLNK2:%=%.out)
 FONTOUTS =		$(FONTFILES:%=%.out) $(DESCFILE:%=%.out)
 
-SUBDIRS =		charlib
+SUBDIRS =		charlib fontmaps
 
 NATIVEMAKEDEV =		../native/makedev
 
@@ -84,7 +83,7 @@ $(FONTLNK1OUTS) :	H.out
 $(FONTLNK2OUTS) :	HI.out
 			@$(RM) $@; $(LN) HI.out $@
 
-$(ROOTDEVPOST)/% :	%
+$(ROOTDEVPOST)/% :	% $(ROOTDEVPOST)
 			$(INS.file)
 
 clean strip lint :	$(SUBDIRS)

@@ -22,6 +22,7 @@
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  *
  * Copyright 2011, 2012 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2013 Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -50,7 +51,7 @@ static vfsdef_t vfw4 = {
 	VFSDEF_VERSION,
 	"nfs4",
 	nfs4init,
-	VSW_CANREMOUNT|VSW_NOTZONESAFE|VSW_STATS|VSW_ZMOUNT,
+	VSW_CANREMOUNT|VSW_NOTZONESAFE|VSW_STATS,
 	NULL
 };
 
