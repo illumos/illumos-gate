@@ -271,6 +271,13 @@ lxpr_open(vnode_t **vpp, int flag, cred_t *cr, caller_context_t *ct)
 		    rvp->v_type != VFIFO && rvp->v_type != VSOCK) {
 			error = EACCES;
 		} else {
+			if (type == LXPR_PID_FD_FD && rvp->v_type == VFIFO) {
+				/*
+				 * Need to open fifo nonblocking since the
+				 * other end might already be closed.
+				 */
+				flag |= FNONBLOCK;
+			}
 			/*
 			 * Need to hold rvp since VOP_OPEN() may release it.
 			 */
@@ -2075,7 +2082,7 @@ lxpr_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 		 */
 		if (type == LXPR_PID_FD_FD) {
 			vap->va_mode = lxpnp->lxpr_mode;
-			vap->va_type = vp->v_type;
+			vap->va_type = lxpnp->lxpr_realvp->v_type;
 			vap->va_size = 0;
 			vap->va_nlink = 1;
 		}
@@ -2394,15 +2401,16 @@ lxpr_lookup_fddir(vnode_t *dp, char *comp)
 		 */
 		lxpnp->lxpr_realvp = vp;
 		VN_HOLD(lxpnp->lxpr_realvp);
-		if (lxpnp->lxpr_realvp->v_type == VFIFO ||
-		    lxpnp->lxpr_realvp->v_type == VSOCK) {
+		if (lxpnp->lxpr_realvp->v_type == VFIFO) {
 			/*
 			 * lxpr_getnode initially sets the type to be VLNK for
-			 * the LXPR_PID_FD_FD option, but that would break fifo
-			 * and socket file descriptors.
+			 * the LXPR_PID_FD_FD option, but that breaks fifo
+			 * file descriptors (which are unlinked named pipes).
+			 * We set this as a regular file so that open.2 comes
+			 * into lxpr_open so we can do more work.
 			 */
 			dp = LXPTOV(lxpnp);
-			dp->v_type = lxpnp->lxpr_realvp->v_type;
+			dp->v_type = VREG;
 		}
 	}
 
