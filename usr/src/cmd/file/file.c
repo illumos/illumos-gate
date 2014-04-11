@@ -205,6 +205,7 @@ main(int argc, char **argv)
 	char	*p;
 	int	ch;
 	FILE	*fl;
+	int	bflg = 0;
 	int	cflg = 0;
 	int	eflg = 0;
 	int	fflg = 0;
@@ -218,12 +219,16 @@ main(int argc, char **argv)
 #endif
 	(void) textdomain(TEXT_DOMAIN);
 
-	while ((ch = getopt(argc, argv, "M:cdf:him:")) != EOF) {
+	while ((ch = getopt(argc, argv, "M:bcdf:him:")) != EOF) {
 		switch (ch) {
 
 		case 'M':
 			add_to_mlist(optarg, !dflg);
 			M_flg++;
+			break;
+
+		case 'b':
+			bflg++;
 			break;
 
 		case 'c':
@@ -288,7 +293,7 @@ main(int argc, char **argv)
 	if (iflg && (dflg || mflg || M_flg)) {
 		usage();
 	}
-	if (iflg && cflg) {
+	if ((iflg && cflg) || (cflg && bflg)) {
 		usage();
 	}
 
@@ -409,7 +414,9 @@ main(int argc, char **argv)
 				p[l - 1] = '\0';
 		} else
 			p = argv[optind];
-		prf(p);				/* print "file_name:<tab>" */
+
+		if (!bflg)
+			prf(p);		/* print "file_name:<tab>" */
 
 		if (type(p))
 			tret = 1;
@@ -1645,10 +1652,10 @@ static void
 usage(void)
 {
 	(void) fprintf(stderr, gettext(
-	    "usage: file [-dh] [-M mfile] [-m mfile] [-f ffile] file ...\n"
-	    "       file [-dh] [-M mfile] [-m mfile] -f ffile\n"
-	    "       file -i [-h] [-f ffile] file ...\n"
-	    "       file -i [-h] -f ffile\n"
+	    "usage: file [-bdh] [-M mfile] [-m mfile] [-f ffile] file ...\n"
+	    "       file [-bdh] [-M mfile] [-m mfile] -f ffile\n"
+	    "       file -i [-bh] [-f ffile] file ...\n"
+	    "       file -i [-bh] -f ffile\n"
 	    "       file -c [-d] [-M mfile] [-m mfile]\n"));
 	exit(2);
 }
