@@ -833,6 +833,7 @@ sdev_nodedestroy(struct sdev_node *dv, uint_t flags)
 	(void) memset((void *)&dv->sdev_instance_data, 0,
 	    sizeof (dv->sdev_instance_data));
 	vn_invalid(SDEVTOV(dv));
+	dv->sdev_private = NULL;
 	kmem_cache_free(sdev_node_cache, dv);
 }
 
