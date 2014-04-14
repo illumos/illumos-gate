@@ -1,13 +1,15 @@
 '\" te
 .\" Copyright (c) 2006, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 2014 Andrew Stormont.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH UUID_CLEAR 3UUID "Jan 16, 2006"
+.TH UUID_CLEAR 3UUID "Apr 9, 2014"
 .SH NAME
 uuid_clear, uuid_compare, uuid_copy, uuid_generate, uuid_generate_random,
-uuid_generate_time, uuid_is_null, uuid_parse, uuid_time, uuid_unparse \-
-universally unique identifier (UUID) operations
+uuid_generate_time, uuid_is_null, uuid_parse, uuid_time, uuid_unparse,
+uuid_unparse_lower, uuid_unparse_upper \- universally unique identifier (UUID)
+operations
 .SH SYNOPSIS
 .LP
 .nf
@@ -60,6 +62,16 @@ cc [ \fIflag \&.\|.\|.\fR ] \fIfile\fR\&.\|.\|. \fB-luuid\fR [ \fIlibrary \&.\|.
 .LP
 .nf
 \fBvoid\fR \fBuuid_unparse\fR(\fBuuid_t\fR \fIuu\fR, \fBchar *\fR\fIout\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBuuid_unparse_lower\fR(\fBuuid_t\fR \fIuu\fR, \fBchar *\fR\fIout\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBuuid_unparse_upper\fR(\fBuuid_t\fR \fIuu\fR, \fBchar *\fR\fIout\fR);
 .fi
 
 .SH DESCRIPTION
@@ -121,11 +133,18 @@ seconds and microseconds since the epoch is also stored in the location pointed
 to by \fBret_tv\fR (see \fBgettimeofday\fR(3C)).
 .sp
 .LP
-The \fBuuid_unparse()\fR function converts the specified UUID \fIuu\fR from the
-internal binary format to a string of the length defined in the \fBuuid.h\fR
-macro, \fBUUID_PRINTABLE_STRING_LENGTH\fR, which includes the trailing null
-character. The resulting value is stored in the character string pointed to by
-\fIout\fR.
+The \fBuuid_unparse()\fR and \fBuuid_unparse_lower()\fR functions convert the
+specified UUID \fIuu\fR from the internal binary format to a lower case string
+of the length defined in the \fBuuid.h\fR macro,
+\fBUUID_PRINTABLE_STRING_LENGTH\fR, which includes the trailing null character.
+The resulting value is stored in the character string pointed to by \fIout\fR.
+.sp
+.LP
+The \fBuuid_unparse_upper()\fR function converts the specified UUID \fIuu\fR
+from the internal binary format to a upper case string of the length defined in
+the \fBuuid.h\fR macro, \fBUUID_PRINTABLE_STRING_LENGTH\fR, which includes the
+trailing null character. The resulting value is stored in the character string
+pointed to by \fIout\fR.
 .SH ATTRIBUTES
 .sp
 .LP
