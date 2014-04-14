@@ -145,6 +145,8 @@ lx_exit(uintptr_t p1)
 	lx_tsd->lxtsd_exit = LX_EXIT;
 	lx_tsd->lxtsd_exit_status = status;
 
+	lx_ptrace_stop_if_option(LX_PTRACE_O_TRACEEXIT);
+
 	/*
 	 * Block all signals in the exit context to avoid taking any signals
 	 * (to the degree possible) while exiting.
@@ -453,6 +455,7 @@ lx_clone(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 		if (cldstk)
 			lx_setup_clone(rp->lxr_gs, (void *)rp->lxr_eip, cldstk);
 
+		lx_ptrace_stop_if_option(LX_PTRACE_O_TRACECLONE);
 		return (0);
 	}
 
@@ -540,6 +543,9 @@ lx_clone(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 
 		rval = clone_res;
 	}
+
+	if (rval == 0)
+		lx_ptrace_stop_if_option(LX_PTRACE_O_TRACECLONE);
 
 	return (rval);
 }

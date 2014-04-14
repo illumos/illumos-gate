@@ -123,16 +123,6 @@
 #define	LX_PTRACE_SYSCALL	24
 #define	LX_PTRACE_SETOPTIONS	0x4200
 
-/* Options for LX_PTRACE_SETOPTIONS */
-#define	LX_PTRACE_O_TRACESYSGOOD	0x0001
-#define	LX_PTRACE_O_TRACEFORK		0x0002
-#define	LX_PTRACE_O_TRACEVFORK		0x0004
-#define	LX_PTRACE_O_TRACECLONE		0x0008
-#define	LX_PTRACE_O_TRACEEXEC		0x0010
-#define	LX_PTRACE_O_TRACEVFORKDONE	0x0020
-#define	LX_PTRACE_O_TRACEEXIT		0x0040
-#define	LX_PTRACE_O_TRACESECCOMP	0x0080
-
 /*
  * This corresponds to the user_i387_struct Linux structure.
  */
@@ -827,19 +817,28 @@ setup_watchpoints(pid_t pid, uintptr_t *debugreg)
 
 /*
  * Returns TRUE if the process is traced, FALSE otherwise.  This is only true
- * if the process is currently stopped, and has been traced using PTRACE_TRACEME
- * or PTRACE_ATTACH.
+ * if the process is currently stopped, and has been traced using
+ * PTRACE_TRACEME, PTRACE_ATTACH or one of the Linux-specific trace options.
  */
 static int
 is_traced(pid_t pid)
 {
 	ptrace_monitor_map_t *p;
 	pstatus_t status;
+	uint_t curr_opts;
+
+	/*
+	 * First get the stop options since that is an indication that the
+	 * process is being traced.
+	 */
+	if (syscall(SYS_brand, B_PTRACE_EXT_OPTS, B_PTRACE_EXT_OPTS_GET, pid,
+	    &curr_opts) != 0)
+		return (0);
 
 	if (get_status(pid, &status) != 0)
 		return (0);
 
-	if ((status.pr_flags & PR_PTRACE) &&
+	if ((status.pr_flags & PR_PTRACE || curr_opts != 0) &&
 	    (status.pr_ppid == getpid()) &&
 	    (status.pr_lwp.pr_flags & PR_ISTOP))
 		return (1);
@@ -1687,37 +1686,62 @@ ptrace_syscall(pid_t lxpid, pid_t pid, lwpid_t lwpid, int sig)
 static int
 ptrace_setoptions(pid_t pid, int options)
 {
-	int fd;
-	int error;
-	pstatus_t status;
-
-	/* XXX currently error if unsupported option */
-	if (options & ~(LX_PTRACE_O_TRACEEXEC | LX_PTRACE_O_TRACEFORK))
-		return (-EINVAL);
+	int ret;
 
 	/*
-	 * TRACEEXEC and TRACEFORK are similar to ptrace_traceme except that it
-	 * stops the next time the child forks or execs
+	 * If we're setting the TRACEEXEC option for a process, its PR_PTRACE
+	 * option might also be set. We clear it so that the process doesn't
+	 * stop twice on exec.
 	 */
-	if ((error = get_status(pid, &status)) != 0)
-		return (error);
+	if (options & LX_PTRACE_O_TRACEEXEC) {
+		int fd;
+		int error;
+		long ctl[2];
+		pstatus_t status;
 
-	if ((fd = open_procfile(pid, O_WRONLY, "ctl")) < 0)
-		return (-errno);
+		if ((ret = get_status(pid, &status)) != 0)
+			return (ret);
 
-	error = 0;
+		if ((fd = open_procfile(pid, O_WRONLY, "ctl")) < 0)
+			return (-errno);
 
-	/* XXX Implement correct emulation for TRACEFORK and TREACEEXEC */
-	/*
-	 * if (options & LX_PTRACE_O_TRACEFORK) {
-	 * }
-	 *
-	 * if (options & LX_PTRACE_O_TRACEEXEC) {
-	 * }
-	 */
+		ctl[0] = PCUNSET;
+		ctl[1] = PR_PTRACE;
+		error = 0;
+		if (write(fd, ctl, sizeof (ctl)) != sizeof (ctl) ||
+		    ptrace_trace_common(fd) != 0)
+			error = -errno;
 
-	(void) close(fd);
-	return (error);
+		(void) close(fd);
+
+		if (error != 0)
+			return (error);
+	}
+
+	ret = syscall(SYS_brand, B_PTRACE_EXT_OPTS, B_PTRACE_EXT_OPTS_SET, pid,
+	    options);
+
+	return (-ret);
+}
+
+void
+lx_ptrace_stop_if_option(int option)
+{
+	pid_t pid;
+	uint_t curr_opts;
+
+	pid = getpid();
+	if (pid == 1)
+		pid = zoneinit_pid;
+
+	/* first we have to see if the stop option is set for this process */
+	if (syscall(SYS_brand, B_PTRACE_EXT_OPTS, B_PTRACE_EXT_OPTS_GET, pid,
+	    &curr_opts) != 0)
+		return;
+
+	/* if the option is set, this brand call will stop us */
+	if (curr_opts & option)
+		(void) syscall(SYS_brand, B_PTRACE_STOP_FOR_OPT, option);
 }
 
 int
@@ -1996,9 +2020,12 @@ set_dr6(pid_t pid, siginfo_t *infop)
 }
 
 /*
- * This is called from the emulation of the wait4 and waitpid system call to
- * take into account the monitor processes which we spawn to observe other
- * processes from ptrace_attach().
+ * This is called from the emulation of the wait4, waitpid and waitid system
+ * calls to take into account:
+ *  - the monitor processes which we spawn to observe other processes from
+ *    ptrace_attach().
+ *  - the extended si_status result we can get when extended ptrace options
+ *    are enabled.
  */
 int
 lx_ptrace_wait(siginfo_t *infop)
@@ -2027,13 +2054,28 @@ lx_ptrace_wait(siginfo_t *infop)
 	}
 	(void) mutex_unlock(&ptrace_map_mtx);
 
-	/*
-	 * If the traced process got a SIGWAITING, we must be in the middle
-	 * of a clone(2) with CLONE_PTRACE set.
-	 */
-	if (infop->si_code == CLD_TRAPPED && infop->si_status == SIGWAITING) {
-		ptrace_catch_fork(pid, 0);
-		return (-1);
+	if (infop->si_code == CLD_TRAPPED) {
+		/*
+		 * If the traced process got a SIGWAITING, we must be in the
+		 * middle of a clone(2) with CLONE_PTRACE set.
+		 */
+		if (infop->si_status == SIGWAITING) {
+			ptrace_catch_fork(pid, 0);
+			return (-1);
+		}
+
+		/*
+		 * If the traced process got a SIGTRAP then Linux ptrace
+		 * options might have been set, so setup the extended
+		 * si_status to contain the (possible) event.
+		 */
+		if (infop->si_status == SIGTRAP) {
+			uint_t event;
+
+			if (syscall(SYS_brand, B_PTRACE_EXT_OPTS,
+			    B_PTRACE_EXT_OPTS_EVT, pid, &event) == 0)
+				infop->si_status |= event;
+		}
 	}
 
 	if (get_status(pid, &status) == 0 &&
