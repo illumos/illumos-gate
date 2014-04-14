@@ -331,6 +331,118 @@ lx_ptrace_fire(void)
 	}
 }
 
+/*
+ * Supports Linux PTRACE_SETOPTIONS handling which is similar to PTRACE_TRACEME
+ * but return an event in the second byte of si_status.
+ */
+static int
+lx_ptrace_ext_opts(int cmd, pid_t pid, uintptr_t val, int64_t *rval)
+{
+	proc_t *p;
+	klwp_t *lwp;
+	lx_proc_data_t *lpdp;
+	uint_t ret;
+
+	if (cmd != B_PTRACE_EXT_OPTS_SET && cmd != B_PTRACE_EXT_OPTS_GET &&
+	    cmd != B_PTRACE_EXT_OPTS_EVT)
+		return (set_errno(EINVAL));
+
+	if ((p = sprlock(pid)) == NULL)
+		return (ESRCH);
+
+	if (priv_proc_cred_perm(curproc->p_cred, p, NULL, VWRITE) != 0) {
+		sprunlock(p);
+		return (EPERM);
+	}
+
+	if ((lpdp = p->p_brand_data) == NULL) {
+		sprunlock(p);
+		return (ESRCH);
+	}
+
+	if (cmd == B_PTRACE_EXT_OPTS_SET) {
+		lpdp->l_ptrace_opts = (uint_t)val;
+
+	} else if (cmd == B_PTRACE_EXT_OPTS_GET) {
+		ret = lpdp->l_ptrace_opts;
+
+	} else /* B_PTRACE_EXT_OPTS_EVT */ {
+		ret = lpdp->l_ptrace_event;
+		lpdp->l_ptrace_event = 0;
+	}
+
+	sprunlock(p);
+
+	if (cmd != B_PTRACE_EXT_OPTS_SET) {
+		if (copyout(&ret, (void *)val, sizeof (uint_t)) != 0)
+			return (EFAULT);
+	}
+
+	*rval = 0;
+	return (0);
+}
+
+/*
+ * Used to support Linux PTRACE_SETOPTIONS handling and similar to
+ * PTRACE_TRACEME. We signal ourselves to stop on return from this syscall and
+ * setup the event reason so the emulation can pull this out when someone
+ * 'waits' on this process.
+ */
+static void
+lx_ptrace_stop_for_option(int option)
+{
+	proc_t *p = ttoproc(curthread);
+	lx_proc_data_t *lpdp;
+
+	psignal(p, SIGTRAP);
+
+	if ((lpdp = p->p_brand_data) == NULL) {
+		/* this should never happen but just let the process stop */
+		return;
+	}
+
+	/* Track the event as the reason for stopping */
+	switch (option) {
+	case LX_PTRACE_O_TRACEFORK:
+		lpdp->l_ptrace_event = LX_PTRACE_EVENT_FORK;
+		break;
+	case LX_PTRACE_O_TRACEVFORK:
+		lpdp->l_ptrace_event = LX_PTRACE_EVENT_VFORK;
+		break;
+	case LX_PTRACE_O_TRACECLONE:
+		lpdp->l_ptrace_event = LX_PTRACE_EVENT_CLONE;
+		break;
+	case LX_PTRACE_O_TRACEEXEC:
+		lpdp->l_ptrace_event = LX_PTRACE_EVENT_EXEC;
+		break;
+	case LX_PTRACE_O_TRACEVFORKDONE:
+		lpdp->l_ptrace_event = LX_PTRACE_EVENT_VFORK_DONE;
+		break;
+	case LX_PTRACE_O_TRACEEXIT:
+		lpdp->l_ptrace_event = LX_PTRACE_EVENT_EXIT;
+		break;
+	case LX_PTRACE_O_TRACESECCOMP:
+		lpdp->l_ptrace_event = LX_PTRACE_EVENT_SECCOMP;
+		break;
+	}
+
+	/*
+	 * If (p_proc_flag & P_PR_PTRACE) were set, then in stop() we would set:
+	 *	p->p_wcode = CLD_TRAPPED
+	 *	p->p_wdata = SIGTRAP
+	 * However, when using the extended ptrace options we disable
+	 * P_PR_PTRACE so that we don't stop twice on exec when
+	 * LX_PTRACE_O_TRACEEXEC is set. We could ensure P_PR_PTRACE is set
+	 * when using extended options but then we would stop on exec even when
+	 * LX_PTRACE_O_TRACEEXEC is not set, so that is clearly broken. Thus,
+	 * we have to set p_wcode and p_wdata ourselves so that waitid will
+	 * do the right thing for this process. We still rely on stop() to do
+	 * all of the other processing needed for our signal.
+	 */
+	p->p_wdata = SIGTRAP;
+	p->p_wcode = CLD_TRAPPED;
+}
+
 void
 lx_brand_systrace_enable(void)
 {
@@ -500,6 +612,15 @@ lx_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 		}
 		return (*rval = 0);
 
+	/*
+	 * The B_TRUSS_POINT subcommand is used so that we can make a no-op
+	 * syscall for debugging purposes (dtracing) from within the user-level
+	 * emulation.
+	 */
+	case B_TRUSS_POINT:
+		*rval = 0;
+		return (0);
+
 	case B_LPID_TO_SPAIR:
 		/*
 		 * Given a Linux pid as arg1, return the Solaris pid in arg2 and
@@ -593,6 +714,17 @@ lx_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 		 * arg3 is the address of the affinity mask.
 		 */
 		return (lx_sched_affinity(cmd, arg1, arg2, arg3, rval));
+
+	case B_PTRACE_EXT_OPTS:
+		/*
+		 * Set or get the ptrace extended options or get the event
+		 * reason for the stop.
+		 */
+		return (lx_ptrace_ext_opts((int)arg1, (pid_t)arg2, arg3, rval));
+
+	case B_PTRACE_STOP_FOR_OPT:
+		lx_ptrace_stop_for_option((int)arg1);
+		return (0);
 
 	default:
 		linux_call = cmd - B_EMULATE_SYSCALL;

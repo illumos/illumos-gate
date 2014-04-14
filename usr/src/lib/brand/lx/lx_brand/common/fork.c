@@ -22,9 +22,8 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2014 Joyent, Inc.  All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <errno.h>
 #include <unistd.h>
@@ -43,8 +42,11 @@ lx_fork(void)
 {
 	int ret = fork1();
 
-	if (ret == 0 && lx_is_rpm)
-		(void) sleep(lx_rpm_delay);
+	if (ret == 0) {
+		if (lx_is_rpm)
+			(void) sleep(lx_rpm_delay);
+		lx_ptrace_stop_if_option(LX_PTRACE_O_TRACEFORK);
+	}
 
 	return (ret == -1 ? -errno : ret);
 }
@@ -60,6 +62,10 @@ int
 lx_vfork(void)
 {
 	int ret = fork1();
+
+	if (ret == 0) {
+		lx_ptrace_stop_if_option(LX_PTRACE_O_TRACEVFORK);
+	}
 
 	return (ret == -1 ? -errno : ret);
 }

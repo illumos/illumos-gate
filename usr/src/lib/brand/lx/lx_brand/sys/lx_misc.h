@@ -99,6 +99,33 @@ extern boolean_t lx_is_rpm;
 #define	LX_RUSAGE_CHILDREN	(-1)
 
 /*
+ * Based on code from brand_misc.h, but use of that is incompatible with the
+ * lx brand.
+ *
+ * These macros invoke a brandsys subcommand, B_TRUSS_POINT, which makes it
+ * easy to debug with DTrace.
+ */
+#define	B_TRUSS_POINT	6
+
+#define	B_TRACE_POINT_5(a0, a1, a2, a3, a4) \
+	(void) syscall(SYS_brand, B_TRUSS_POINT, (a0), (a1), (a2), (a3), (a4))
+
+#define	B_TRACE_POINT_4(a0, a1, a2, a3) \
+	B_TRACE_POINT_5((a0), (a1), (a2), (a3), 0)
+
+#define	B_TRACE_POINT_3(a0, a1, a2) \
+	B_TRACE_POINT_5((a0), (a1), (a2), 0, 0)
+
+#define	B_TRACE_POINT_2(a0, a1) \
+	B_TRACE_POINT_5((a0), (a1), 0, 0, 0)
+
+#define	B_TRACE_POINT_1(a0) \
+	B_TRACE_POINT_5((a0), 0, 0, 0, 0)
+
+#define	B_TRACE_POINT_0() \
+	B_TRACE_POINT_5(0, 0, 0, 0, 0)
+
+/*
  * normally we never want to write to stderr or stdout because it's unsafe
  * to make assumptions about the underlying file descriptors.  to protect
  * against writes to these file descriptors we go ahead and close them
@@ -125,6 +152,7 @@ extern int lx_lpid_to_spid(pid_t, pid_t *);
 
 extern int lx_ptrace_wait(siginfo_t *);
 extern void lx_ptrace_fork(void);
+extern void lx_ptrace_stop_if_option(int);
 
 extern int lx_check_alloca(size_t);
 #define	SAFE_ALLOCA(sz)	(lx_check_alloca(sz) ? alloca(sz) : NULL)

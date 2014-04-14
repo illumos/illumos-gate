@@ -75,8 +75,36 @@ extern "C" {
 #define	B_PTRACE_SYSCALL	131
 #define	B_SET_AFFINITY_MASK	132
 #define	B_GET_AFFINITY_MASK	133
+#define	B_PTRACE_EXT_OPTS	134
+#define	B_PTRACE_STOP_FOR_OPT	135
 
 #define	B_EMULATE_SYSCALL	192
+
+/* B_PTRACE_EXT_OPTS subcommands */
+#define	 B_PTRACE_EXT_OPTS_SET	1
+#define	 B_PTRACE_EXT_OPTS_GET	2
+#define	 B_PTRACE_EXT_OPTS_EVT	3
+
+/*
+ * Support for Linux PTRACE_SETOPTIONS handling.
+ */
+#define	LX_PTRACE_O_TRACESYSGOOD	0x0001
+#define	LX_PTRACE_O_TRACEFORK		0x0002
+#define	LX_PTRACE_O_TRACEVFORK		0x0004
+#define	LX_PTRACE_O_TRACECLONE		0x0008
+#define	LX_PTRACE_O_TRACEEXEC		0x0010
+#define	LX_PTRACE_O_TRACEVFORKDONE	0x0020
+#define	LX_PTRACE_O_TRACEEXIT		0x0040
+#define	LX_PTRACE_O_TRACESECCOMP	0x0080
+
+/* siginfo si_status for traced events */
+#define	LX_PTRACE_EVENT_FORK		0x100
+#define	LX_PTRACE_EVENT_VFORK		0x200
+#define	LX_PTRACE_EVENT_CLONE		0x300
+#define	LX_PTRACE_EVENT_EXEC		0x400
+#define	LX_PTRACE_EVENT_VFORK_DONE	0x500
+#define	LX_PTRACE_EVENT_EXIT		0x600
+#define	LX_PTRACE_EVENT_SECCOMP		0x700
 
 #define	LX_VERSION_1		1
 #define	LX_VERSION		LX_VERSION_1
@@ -160,6 +188,8 @@ typedef struct lx_proc_data {
 	void (*l_sigrestorer[MAXSIG])(void); /* array of sigrestorer fns */
 	pid_t l_ppid;		/* pid of originating parent proc */
 	uint64_t l_ptrace;	/* process being observed with ptrace */
+	uint_t l_ptrace_opts;	/* process's extended ptrace options */
+	uint_t l_ptrace_event;	/* extended ptrace option trap event */
 	lx_elf_data_t l_elf_data; /* ELF data for linux executable */
 } lx_proc_data_t;
 

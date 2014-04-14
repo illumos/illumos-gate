@@ -275,7 +275,7 @@ int
 lx_waitid(uintptr_t idtype, uintptr_t id, uintptr_t infop, uintptr_t opt)
 {
 	int rval, options;
-	siginfo_t s_infop = {0};
+	siginfo_t s_info = {0};
 	if ((options = ltos_options(opt)) == -1)
 		return (-1);
 	switch (idtype) {
@@ -291,8 +291,12 @@ lx_waitid(uintptr_t idtype, uintptr_t id, uintptr_t infop, uintptr_t opt)
 	default:
 		return (-EINVAL);
 	}
-	if ((rval = lx_waitid_helper(idtype, (id_t)id, &s_infop, options)) < 0)
+	if ((rval = lx_waitid_helper(idtype, (id_t)id, &s_info, options)) < 0)
 		return (rval);
 
-	return (stol_siginfo(&s_infop, (lx_siginfo_t *)infop));
+	/* If the WNOHANG flag was specified and no child was found return 0. */
+	if ((options & WNOHANG) && s_info.si_pid == 0)
+		return (0);
+
+	return (stol_siginfo(&s_info, (lx_siginfo_t *)infop));
 }
