@@ -339,7 +339,6 @@ static int
 lx_ptrace_ext_opts(int cmd, pid_t pid, uintptr_t val, int64_t *rval)
 {
 	proc_t *p;
-	klwp_t *lwp;
 	lx_proc_data_t *lpdp;
 	uint_t ret;
 
