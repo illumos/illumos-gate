@@ -1720,10 +1720,11 @@ ptrace_setoptions(pid_t pid, int options)
 			error = -errno;
 	}
 
-	/* since we're doing option tracing now, turn off signal traps */
+	/* since we're doing option tracing now, only catch sigtrap */
 	if (error == 0) {
 		ctl.cmd = PCSTRACE;
 		premptyset(&ctl.arg.signals);
+		praddset(&ctl.arg.signals, SIGTRAP);
 		size = sizeof (long) + sizeof (sigset_t);
 		if (write(fd, &ctl, size) != size)
 			error = -errno;
