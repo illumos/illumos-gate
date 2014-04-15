@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -502,7 +502,7 @@ vnic_dev_create(datalink_id_t vnic_id, datalink_id_t linkid,
 		    &mac->m_max_sdu);
 	} else {
 		vnic->vn_margin = VLAN_TAGSZ;
-		mac->m_min_sdu = ANCHOR_VNIC_MIN_MTU;
+		mac->m_min_sdu = 1;
 		mac->m_max_sdu = ANCHOR_VNIC_MAX_MTU;
 	}
 
