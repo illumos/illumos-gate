@@ -1687,6 +1687,25 @@ static int
 ptrace_setoptions(pid_t pid, int options)
 {
 	int ret;
+	int fd;
+	int error = 0;
+	struct {
+		long cmd;
+		union {
+			long flags;
+			sigset_t signals;
+			fltset_t faults;
+		} arg;
+	} ctl;
+	size_t size;
+	pstatus_t status;
+
+	if ((ret = get_status(pid, &status)) != 0)
+		return (ret);
+
+	if ((fd = open_procfile(pid, O_WRONLY, "ctl")) < 0)
+		return (-errno);
+
 
 	/*
 	 * If we're setting the TRACEEXEC option for a process, its PR_PTRACE
@@ -1694,29 +1713,26 @@ ptrace_setoptions(pid_t pid, int options)
 	 * stop twice on exec.
 	 */
 	if (options & LX_PTRACE_O_TRACEEXEC) {
-		int fd;
-		int error;
-		long ctl[2];
-		pstatus_t status;
-
-		if ((ret = get_status(pid, &status)) != 0)
-			return (ret);
-
-		if ((fd = open_procfile(pid, O_WRONLY, "ctl")) < 0)
-			return (-errno);
-
-		ctl[0] = PCUNSET;
-		ctl[1] = PR_PTRACE;
-		error = 0;
-		if (write(fd, ctl, sizeof (ctl)) != sizeof (ctl) ||
-		    ptrace_trace_common(fd) != 0)
+		ctl.cmd = PCUNSET;
+		ctl.arg.flags = PR_PTRACE;
+		size = sizeof (long) + sizeof (long);
+		if (write(fd, &ctl, size) != size)
 			error = -errno;
-
-		(void) close(fd);
-
-		if (error != 0)
-			return (error);
 	}
+
+	/* since we're doing option tracing now, turn off signal traps */
+	if (error == 0) {
+		ctl.cmd = PCSTRACE;
+		premptyset(&ctl.arg.signals);
+		size = sizeof (long) + sizeof (sigset_t);
+		if (write(fd, &ctl, size) != size)
+			error = -errno;
+	}
+
+	(void) close(fd);
+
+	if (error != 0)
+		return (error);
 
 	ret = syscall(SYS_brand, B_PTRACE_EXT_OPTS, B_PTRACE_EXT_OPTS_SET, pid,
 	    options);
