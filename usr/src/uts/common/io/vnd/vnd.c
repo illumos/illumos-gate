@@ -964,7 +964,7 @@ typedef vnd_mac_cookie_t (*vnd_dld_tx_t)(void *, mblk_t *, uint64_t, uint16_t);
 typedef void *(*vnd_dld_set_fcb_t)(void *, void (*)(void *, vnd_mac_cookie_t),
     void *);
 /* DLD Direct function to see if flow controlled still */
-typedef int (*vnd_dld_is_fc_t)(void *, uint_t, void *, uint_t);
+typedef int (*vnd_dld_is_fc_t)(void *, vnd_mac_cookie_t);
 
 /*
  * The vnd_str_capab_t is always protected by the vnd_str_t it's a member of.
@@ -1054,6 +1054,7 @@ typedef struct vnd_str {
 	t_uscalar_t	vns_minwrite;		/* L */
 	t_uscalar_t	vns_maxwrite;		/* L */
 	hrtime_t	vns_fclatch;		/* L */
+	hrtime_t	vns_fcupdate;		/* L */
 	kstat_t		*vns_kstat;		/* E */
 	gsqueue_t	*vns_squeue;		/* E */
 	mblk_t		vns_drainblk;		/* E + X */
@@ -2110,6 +2111,23 @@ vnd_mac_input(vnd_str_t *vsp, mac_resource_t *wtf, mblk_t *mp_chain,
 
 }
 
+static void
+vnd_mac_flow_control_stat(vnd_str_t *vsp, hrtime_t diff)
+{
+	VND_STAT_INC(vsp, vks_nmacflow, 1);
+	VND_STAT_INC(vsp, vks_tmacflow, diff);
+	if (diff >= VND_LATENCY_1MS)
+		VND_STAT_INC(vsp, vks_mac_flow_1ms, 1);
+	if (diff >= VND_LATENCY_10MS)
+		VND_STAT_INC(vsp, vks_mac_flow_10ms, 1);
+	if (diff >= VND_LATENCY_100MS)
+		VND_STAT_INC(vsp, vks_mac_flow_100ms, 1);
+	if (diff >= VND_LATENCY_1S)
+		VND_STAT_INC(vsp, vks_mac_flow_1s, 1);
+	if (diff >= VND_LATENCY_10S)
+		VND_STAT_INC(vsp, vks_mac_flow_10s, 1);
+}
+
 /*
  * This is a callback from MAC that indicates that we are allowed to send
  * packets again.
@@ -2118,14 +2136,28 @@ static void
 vnd_mac_flow_control(void *arg, vnd_mac_cookie_t cookie)
 {
 	vnd_str_t *vsp = arg;
-	hrtime_t diff;
+	hrtime_t now, diff;
 
 	mutex_enter(&vsp->vns_lock);
+	now = gethrtime();
+
+	/*
+	 * Check for the case that we beat vnd_squeue_tx_one to the punch.
+	 * There's also an additional case here that we got notified because
+	 * we're sharing a device that ran out of tx descriptors, even though it
+	 * wasn't because of us.
+	 */
+	if (!(vsp->vns_flags & VNS_F_FLOW_CONTROLLED)) {
+		vsp->vns_fcupdate = now;
+		mutex_exit(&vsp->vns_lock);
+		return;
+	}
+
 	ASSERT(vsp->vns_flags & VNS_F_FLOW_CONTROLLED);
 	ASSERT(vsp->vns_caps.vsc_fc_cookie == cookie);
 	vsp->vns_flags &= ~VNS_F_FLOW_CONTROLLED;
 	vsp->vns_caps.vsc_fc_cookie = NULL;
-	diff = gethrtime() - vsp->vns_fclatch;
+	diff = now - vsp->vns_fclatch;
 	vsp->vns_fclatch = 0;
 	DTRACE_VND3(flow__resumed, vnd_str_t *, vsp, uint64_t,
 	    vsp->vns_dq_write.vdq_cur, uintptr_t, cookie);
@@ -2140,19 +2172,6 @@ vnd_mac_flow_control(void *arg, vnd_mac_cookie_t cookie)
 		    VND_SQUEUE_TAG_MAC_FLOW_CONTROL);
 	}
 	mutex_exit(&vsp->vns_lock);
-
-	VND_STAT_INC(vsp, vks_nmacflow, 1);
-	VND_STAT_INC(vsp, vks_tmacflow, diff);
-	if (diff >= VND_LATENCY_1MS)
-		VND_STAT_INC(vsp, vks_mac_flow_1ms, 1);
-	if (diff >= VND_LATENCY_10MS)
-		VND_STAT_INC(vsp, vks_mac_flow_10ms, 1);
-	if (diff >= VND_LATENCY_100MS)
-		VND_STAT_INC(vsp, vks_mac_flow_100ms, 1);
-	if (diff >= VND_LATENCY_1S)
-		VND_STAT_INC(vsp, vks_mac_flow_1s, 1);
-	if (diff >= VND_LATENCY_10S)
-		VND_STAT_INC(vsp, vks_mac_flow_10s, 1);
 }
 
 static void
@@ -3297,6 +3316,7 @@ vnd_s_close(queue_t *q, int flag, cred_t *credp)
 static vnd_mac_cookie_t
 vnd_squeue_tx_one(vnd_str_t *vsp, mblk_t *mp)
 {
+	hrtime_t txtime;
 	vnd_mac_cookie_t vc;
 
 	VND_STAT_INC(vsp, vks_opackets, 1);
@@ -3304,13 +3324,49 @@ vnd_squeue_tx_one(vnd_str_t *vsp, mblk_t *mp)
 	DTRACE_VND5(send, mblk_t *, mp, void *, NULL, void *, NULL,
 	    vnd_str_t *, vsp, mblk_t *, mp);
 	/* Actually tx now */
+	txtime = gethrtime();
 	vc = vsp->vns_caps.vsc_tx_f(vsp->vns_caps.vsc_tx_hdl,
 	    mp, 0, MAC_DROP_ON_NO_DESC);
+
+	/*
+	 * We need to check two different conditions before we immediately set
+	 * the flow control lock. The first thing that we need to do is verify
+	 * that this is an instance of hard flow control, so to say. The flow
+	 * control callbacks won't always fire in cases where we still get a
+	 * cookie returned. The explicit check for flow control will guarantee
+	 * us that we'll get a subsequent notification callback.
+	 *
+	 * The second case comes about because we do not hold the
+	 * vnd_str_t`vns_lock across calls to tx, we need to determine if a flow
+	 * control notification already came across for us in a different thread
+	 * calling vnd_mac_flow_control(). To deal with this, we record a
+	 * timestamp every time that we change the flow control state. We grab
+	 * txtime here before we transmit because that guarantees that the
+	 * hrtime_t of the call to vnd_mac_flow_control() will be after txtime.
+	 *
+	 * If the flow control notification beat us to the punch, the value of
+	 * vns_fcupdate will be larger than the value of txtime, and we should
+	 * just record the statistics. However, if we didn't beat it to the
+	 * punch (txtime > vns_fcupdate), then we know that it's safe to wait
+	 * for a notification.
+	 */
 	if (vc != NULL) {
+		hrtime_t diff;
+
+		if (vsp->vns_caps.vsc_is_fc_f(vsp->vns_caps.vsc_is_fc_hdl,
+		    vc) == 0)
+			return (NULL);
 		mutex_enter(&vsp->vns_lock);
+		diff = vsp->vns_fcupdate - txtime;
+		if (diff > 0) {
+			mutex_exit(&vsp->vns_lock);
+			vnd_mac_flow_control_stat(vsp, diff);
+			return (NULL);
+		}
 		vsp->vns_flags |= VNS_F_FLOW_CONTROLLED;
 		vsp->vns_caps.vsc_fc_cookie = vc;
-		vsp->vns_fclatch = gethrtime();
+		vsp->vns_fclatch = txtime;
+		vsp->vns_fcupdate = txtime;
 		DTRACE_VND3(flow__blocked, vnd_str_t *, vsp,
 		    uint64_t, vsp->vns_dq_write.vdq_cur, uintptr_t, vc);
 		mutex_exit(&vsp->vns_lock);
