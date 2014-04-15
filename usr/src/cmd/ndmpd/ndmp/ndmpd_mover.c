@@ -763,6 +763,8 @@ ndmpd_mover_continue_v3(ndmp_connection_t *connection, void *body)
 	(void) mutex_lock(&nlp->nlp_mtx);
 	session->ns_mover.md_state = NDMP_MOVER_STATE_ACTIVE;
 	session->ns_mover.md_pause_reason = NDMP_MOVER_PAUSE_NA;
+	/* The tape has been likely exchanged, reset tape block counter */
+	session->ns_tape.td_record_count = 0;
 	(void) cond_broadcast(&nlp->nlp_cv);
 	(void) mutex_unlock(&nlp->nlp_mtx);
 
