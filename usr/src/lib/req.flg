@@ -23,14 +23,12 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 echo_file usr/src/lib/Makefile.lib
 echo_file usr/src/lib/Makefile.targ
 echo_file usr/src/lib/Makefile.mach
 echo_file usr/src/lib/Makefile.lib.64
 echo_file usr/src/lib/Makefile.rootfs
-find_files "s.*" usr/src/lib/common
+find_files "s.*" usr/src/lib/crt
 find_files "s.*" usr/src/common/mapfiles
 exec_file usr/src/cmd/req.flg

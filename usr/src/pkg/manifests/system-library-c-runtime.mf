@@ -1,0 +1,57 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+# Copyright 2016, Richard Lowe.
+set name=pkg.fmri value=pkg:/system/library/c-runtime@$(PKGVERS)
+set name=pkg.description value="C runtime objects"
+set name=pkg.summary value="C Runtime"
+set name=info.classification value=org.opensolaris.category.2008:Development/C
+set name=variant.arch value=$(ARCH)
+file path=usr/lib/$(ARCH64)/crt1.o
+file path=usr/lib/$(ARCH64)/crti.o
+file path=usr/lib/$(ARCH64)/crtn.o
+file path=usr/lib/$(ARCH64)/values-Xa.o
+file path=usr/lib/$(ARCH64)/values-Xc.o
+file path=usr/lib/$(ARCH64)/values-Xs.o
+file path=usr/lib/$(ARCH64)/values-Xt.o
+file path=usr/lib/$(ARCH64)/values-xpg4.o
+file path=usr/lib/$(ARCH64)/values-xpg6.o
+file path=usr/lib/crt1.o
+file path=usr/lib/crti.o
+file path=usr/lib/crtn.o
+file path=usr/lib/values-Xa.o
+file path=usr/lib/values-Xc.o
+file path=usr/lib/values-Xs.o
+file path=usr/lib/values-Xt.o
+file path=usr/lib/values-xpg4.o
+file path=usr/lib/values-xpg6.o
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL
+link path=usr/ccs/lib/$(ARCH64)/values-Xa.o \
+    target=../../../lib/$(ARCH64)/values-Xa.o
+link path=usr/ccs/lib/$(ARCH64)/values-Xc.o \
+    target=../../../lib/$(ARCH64)/values-Xc.o
+link path=usr/ccs/lib/$(ARCH64)/values-Xs.o \
+    target=../../../lib/$(ARCH64)/values-Xs.o
+link path=usr/ccs/lib/$(ARCH64)/values-Xt.o \
+    target=../../../lib/$(ARCH64)/values-Xt.o
+link path=usr/ccs/lib/$(ARCH64)/values-xpg4.o \
+    target=../../../lib/$(ARCH64)/values-xpg4.o
+link path=usr/ccs/lib/$(ARCH64)/values-xpg6.o \
+    target=../../../lib/$(ARCH64)/values-xpg6.o
+link path=usr/ccs/lib/values-Xa.o target=../../lib/values-Xa.o
+link path=usr/ccs/lib/values-Xc.o target=../../lib/values-Xc.o
+link path=usr/ccs/lib/values-Xs.o target=../../lib/values-Xs.o
+link path=usr/ccs/lib/values-Xt.o target=../../lib/values-Xt.o
+link path=usr/ccs/lib/values-xpg4.o target=../../lib/values-xpg4.o
+link path=usr/ccs/lib/values-xpg6.o target=../../lib/values-xpg6.o
+$(i386_ONLY)link path=usr/lib/$(ARCH64)/gcrt1.o target=crt1.o
+$(i386_ONLY)link path=usr/lib/gcrt1.o target=crt1.o

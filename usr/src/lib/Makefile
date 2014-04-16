@@ -44,7 +44,7 @@ include ../Makefile.master
 
 # Build libc and its dependencies
 SUBDIRS=			\
-	common			\
+	crt			\
 	../cmd/sgs/libconv	\
 	../cmd/sgs/libdl	\
 	libc			\
@@ -549,8 +549,8 @@ _msg:			$(MSGSUBDIRS:%=%-nodepend) .WAIT _dc
 _dc:			$(DCSUBDIRS:%=%-nodepend)
 
 # Library interdependencies are called out explicitly here.
-../cmd/sgs/libconv: common
-../cmd/sgs/libdl: common
+../cmd/sgs/libconv: crt
+../cmd/sgs/libdl: crt
 libc:		../cmd/sgs/libconv ../cmd/sgs/libdl
 
 libm:		libc

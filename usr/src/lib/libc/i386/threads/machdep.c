@@ -36,8 +36,8 @@
  * well:
  *
  *  - lib/libc/i386/gen/makectxt.c
- *  - lib/common/i386/crti.s
- *  - lib/common/i386/crt1.s
+ *  - lib/crt/i386/crti.s
+ *  - lib/crt/i386/crt1.s
  */
 #undef	STACK_ALIGN
 #define	STACK_ALIGN	16
@@ -86,7 +86,7 @@ setup_top_frame(void *stk, size_t stksize, ulwp_t *ulwp)
 
 int
 setup_context(ucontext_t *ucp, void *(*func)(ulwp_t *),
-	ulwp_t *ulwp, caddr_t stk, size_t stksize)
+    ulwp_t *ulwp, caddr_t stk, size_t stksize)
 {
 	static int initialized;
 	static greg_t fs, es, ds, cs, ss;
@@ -210,10 +210,10 @@ setgregs(ulwp_t *ulwp, gregset_t rs)
 
 int
 __csigsetjmp(greg_t cs, greg_t ss, greg_t gs,
-	greg_t fs, greg_t es, greg_t ds,
-	greg_t edi, greg_t esi, greg_t ebp, greg_t esp,
-	greg_t ebx, greg_t edx, greg_t ecx, greg_t eax, greg_t eip,
-	sigjmp_buf env, int savemask)
+    greg_t fs, greg_t es, greg_t ds,
+    greg_t edi, greg_t esi, greg_t ebp, greg_t esp,
+    greg_t ebx, greg_t edx, greg_t ecx, greg_t eax, greg_t eip,
+    sigjmp_buf env, int savemask)
 {
 	ucontext_t *ucp = (ucontext_t *)env;
 	ulwp_t *self = curthread;

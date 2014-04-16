@@ -2,8 +2,9 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License (the "License").
- * You may not use this file except in compliance with the License.
+ * Common Development and Distribution License, Version 1.0 only
+ * (the "License").  You may not use this file except in compliance
+ * with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,11 +20,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2001 by Sun Microsystems, Inc.
+ * All rights reserved.
  */
-
-	.file	"crti.s"
 
 /*
  * These crt*.o modules are provided as the bare minimum required
@@ -34,25 +33,22 @@
  *
  * For further details - see bug#4433015
  */
+	.file	"crtn.s"
 
 /*
- * _init function prologue
+ * _init function epilogue
  */
 	.section	.init,"ax"
-	.globl	_init
-	.type	_init,@function
-	.align	16
-_init:
-	pushq	%rbp
-	movq	%rsp, %rbp
+
+	popl	%ebx
+	leave
+	ret
 
 /*
- * _fini function prologue
+ * _fini function epilogue
  */
 	.section	.fini,"ax"
-	.globl	_fini
-	.type	_fini,@function
-	.align	16
-_fini:	
-	pushq	%rbp
-	movq	%rsp, %rbp
+
+	popl	%ebx
+	leave
+	ret

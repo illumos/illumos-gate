@@ -26,8 +26,7 @@
 #
 
 set name=pkg.fmri value=pkg:/developer/library/lint@$(PKGVERS)
-set name=pkg.description \
-    value="lint libraries and startup objects for software development"
+set name=pkg.description value="lint libraries for software development"
 set name=pkg.summary value="Lint Libraries"
 set name=info.classification value=org.opensolaris.category.2008:Development/C
 set name=variant.arch value=$(ARCH)
@@ -200,10 +199,6 @@ file path=lib/llib-luuid
 file path=lib/llib-luuid.ln
 file path=lib/llib-lxnet
 file path=lib/llib-lxnet.ln
-$(i386_ONLY)file path=usr/lib/$(ARCH64)/crt1.o
-file path=usr/lib/$(ARCH64)/crti.o
-file path=usr/lib/$(ARCH64)/crtn.o
-$(i386_ONLY)file path=usr/lib/$(ARCH64)/gcrt1.o
 file path=usr/lib/$(ARCH64)/llib-lads.ln
 file path=usr/lib/$(ARCH64)/llib-ladutils.ln
 file path=usr/lib/$(ARCH64)/llib-lbsdmalloc.ln
@@ -243,16 +238,6 @@ $(sparc_ONLY)file path=usr/lib/$(ARCH64)/llib-lv12n.ln
 file path=usr/lib/$(ARCH64)/llib-lvolmgt.ln
 file path=usr/lib/$(ARCH64)/llib-lwrap.ln
 file path=usr/lib/$(ARCH64)/llib-lzoneinfo.ln
-file path=usr/lib/$(ARCH64)/values-Xa.o
-file path=usr/lib/$(ARCH64)/values-Xc.o
-file path=usr/lib/$(ARCH64)/values-Xs.o
-file path=usr/lib/$(ARCH64)/values-Xt.o
-file path=usr/lib/$(ARCH64)/values-xpg4.o
-file path=usr/lib/$(ARCH64)/values-xpg6.o
-$(i386_ONLY)file path=usr/lib/crt1.o
-file path=usr/lib/crti.o
-file path=usr/lib/crtn.o
-$(i386_ONLY)file path=usr/lib/gcrt1.o
 file path=usr/lib/llib-lads
 file path=usr/lib/llib-lads.ln
 file path=usr/lib/llib-ladutils
@@ -339,12 +324,6 @@ file path=usr/lib/scsi/llib-lses
 file path=usr/lib/scsi/llib-lses.ln
 file path=usr/lib/scsi/llib-lsmp
 file path=usr/lib/scsi/llib-lsmp.ln
-file path=usr/lib/values-Xa.o
-file path=usr/lib/values-Xc.o
-file path=usr/lib/values-Xs.o
-file path=usr/lib/values-Xt.o
-file path=usr/lib/values-xpg4.o
-file path=usr/lib/values-xpg6.o
 file path=usr/xpg4/lib/$(ARCH64)/llib-lcurses.ln
 file path=usr/xpg4/lib/llib-lcurses
 file path=usr/xpg4/lib/llib-lcurses.ln
@@ -379,18 +358,6 @@ link path=usr/ccs/lib/$(ARCH64)/llib-ltermlib.ln \
     target=../../../../lib/$(ARCH64)/llib-lcurses.ln
 link path=usr/ccs/lib/$(ARCH64)/llib-ly.ln \
     target=../../../lib/$(ARCH64)/llib-ly.ln
-link path=usr/ccs/lib/$(ARCH64)/values-Xa.o \
-    target=../../../lib/$(ARCH64)/values-Xa.o
-link path=usr/ccs/lib/$(ARCH64)/values-Xc.o \
-    target=../../../lib/$(ARCH64)/values-Xc.o
-link path=usr/ccs/lib/$(ARCH64)/values-Xs.o \
-    target=../../../lib/$(ARCH64)/values-Xs.o
-link path=usr/ccs/lib/$(ARCH64)/values-Xt.o \
-    target=../../../lib/$(ARCH64)/values-Xt.o
-link path=usr/ccs/lib/$(ARCH64)/values-xpg4.o \
-    target=../../../lib/$(ARCH64)/values-xpg4.o
-link path=usr/ccs/lib/$(ARCH64)/values-xpg6.o \
-    target=../../../lib/$(ARCH64)/values-xpg6.o
 link path=usr/ccs/lib/llib-lcurses target=../../../lib/llib-lcurses
 link path=usr/ccs/lib/llib-lcurses.ln target=../../../lib/llib-lcurses.ln
 link path=usr/ccs/lib/llib-lform target=../../lib/llib-lform
@@ -405,12 +372,6 @@ link path=usr/ccs/lib/llib-ltermcap target=../../../lib/llib-ltermcap
 link path=usr/ccs/lib/llib-ltermcap.ln target=../../../lib/llib-ltermcap.ln
 link path=usr/ccs/lib/llib-ltermlib target=../../../lib/llib-lcurses
 link path=usr/ccs/lib/llib-ltermlib.ln target=../../../lib/llib-lcurses.ln
-link path=usr/ccs/lib/values-Xa.o target=../../lib/values-Xa.o
-link path=usr/ccs/lib/values-Xc.o target=../../lib/values-Xc.o
-link path=usr/ccs/lib/values-Xs.o target=../../lib/values-Xs.o
-link path=usr/ccs/lib/values-Xt.o target=../../lib/values-Xt.o
-link path=usr/ccs/lib/values-xpg4.o target=../../lib/values-xpg4.o
-link path=usr/ccs/lib/values-xpg6.o target=../../lib/values-xpg6.o
 link path=usr/lib/$(ARCH64)/llib-ladm.ln \
     target=../../../lib/$(ARCH64)/llib-ladm.ln
 link path=usr/lib/$(ARCH64)/llib-laio.ln \
@@ -585,3 +546,5 @@ link path=usr/lib/llib-luuid target=../../lib/llib-luuid
 link path=usr/lib/llib-luuid.ln target=../../lib/llib-luuid.ln
 link path=usr/lib/llib-lxnet target=../../lib/llib-lxnet
 link path=usr/lib/llib-lxnet.ln target=../../lib/llib-lxnet.ln
+# Used to be incorrectly in this package, pull it in for compatibility
+depend fmri=system/library/c-runtime type=group

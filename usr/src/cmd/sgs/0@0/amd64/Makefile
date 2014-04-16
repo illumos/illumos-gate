@@ -23,10 +23,8 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
-CRTSRCS =	$(SRC)/lib/common/amd64
+CRTSRCS =	$(SRC)/lib/crt/amd64
 
 include		$(SRC)/cmd/sgs/0@0/Makefile.com
 

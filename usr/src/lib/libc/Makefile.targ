@@ -270,7 +270,7 @@ pics/%.o: $(LIBCBASE)/../port/sys/%.c
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
 
-pics/%.o: $(LIBCBASE)/../../common/common/%.c
+pics/%.o: $(LIBCBASE)/../../crt/common/%.c
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
 
