@@ -37,6 +37,7 @@
 #include <sys/machsystm.h>
 #include <sys/kdi.h>
 #include <sys/cpu_module.h>
+#include <sys/secflags.h>
 
 #include <vm/hat_sfmmu.h>
 
@@ -364,6 +365,13 @@ valid_va_range(caddr_t *basep, size_t *lenp, size_t minlen, int dir)
 }
 
 /*
+ * Default to forbidding the first 64k of address space.  This protects most
+ * reasonably sized structures from dereferences through NULL:
+ *     ((foo_t *)0)->bar
+ */
+uintptr_t forbidden_null_mapping_sz = 0x10000;
+
+/*
  * Determine whether [addr, addr+len] with protections `prot' are valid
  * for a user address space.
  */
@@ -375,6 +383,10 @@ valid_usr_range(caddr_t addr, size_t len, uint_t prot, struct as *as,
 	caddr_t eaddr = addr + len;
 
 	if (eaddr <= addr || addr >= userlimit || eaddr > userlimit)
+		return (RANGE_BADADDR);
+
+	if ((addr <= (caddr_t)forbidden_null_mapping_sz) &&
+	    secflag_enabled(as->a_proc, PROC_SEC_FORBIDNULLMAP))
 		return (RANGE_BADADDR);
 
 	/*

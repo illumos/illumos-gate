@@ -2346,3 +2346,32 @@ privilege_token(pr_context_t *context)
 	/* privilege: */
 	return (pa_adr_string(context, returnstat, 1));
 }
+
+/*
+ * -----------------------------------------------------------------------
+ * secflags_token()	: Process privilege token and display contents
+ * return codes 	: -1 - error
+ *			:  0 - successful
+ * NOTE: At the time of call, the secflags token id has been retrieved
+ *
+ * Format of secflags token:
+ *	secflags token id	adr_char
+ *	secflag set name	adr_string
+ *	secflags 		adr_string
+ * -----------------------------------------------------------------------
+ */
+int
+secflags_token(pr_context_t *context)
+{
+	int	returnstat;
+
+	/* Set name */
+	returnstat = process_tag(context, TAG_SETTYPE, 0, 0);
+
+	/* Done with attributes; force end of token open */
+	if (returnstat == 0)
+		returnstat = finish_open_tag(context);
+
+	/* set */
+	return (pa_adr_string(context, returnstat, 1));
+}

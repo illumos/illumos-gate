@@ -112,6 +112,7 @@ static const ps_ops_t P_idle_ops = {
 	.pop_pwrite	= Pwrite_idle,
 	.pop_cred	= (pop_cred_t)Pidle_int,
 	.pop_priv	= Ppriv_idle,
+	.pop_secflags	= (pop_secflags_t)Pidle_int,
 	.pop_psinfo	= (pop_psinfo_t)Pidle_voidp,
 	.pop_platform	= (pop_platform_t)Pidle_voidp,
 	.pop_uname	= (pop_uname_t)Pidle_int,

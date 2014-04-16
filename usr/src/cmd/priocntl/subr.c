@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
@@ -72,8 +70,7 @@ int	a1, a2, a3, a4, a5;
 
 /*
  * Structure defining idtypes known to the priocntl command
- * along with the corresponding names and a liberal guess
- * of the max number of procs sharing any given ID of that type.
+ * along with the corresponding names
  * The idtype values themselves are defined in <sys/procset.h>.
  */
 static struct idtypes {

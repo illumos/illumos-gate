@@ -176,6 +176,7 @@ solaris.smf.value.inetd:::Change values of SMF Inetd configuration paramaters::h
 solaris.smf.value.ipsec:::Change Values of SMF IPsec Properties::help=SmfValueIPsec.html
 solaris.smf.value.mdns:::Change Values of MDNS Service Properties::help=SmfValueMDNS.html
 solaris.smf.value.nwam:::Change Values of SMF Network Auto-Magic Properties::help=SmfValueNWAM.html
+solaris.smf.value.process-security:::Change Values of Process Security properties::help=SmfValueProcSec.html
 solaris.smf.value.smb:::Change Values of SMB Service Properties::help=SmfValueSMB.html
 solaris.smf.read.smb:::Read permission for protected SMF SMB Service Properties::help=AuthReadSMB.html
 solaris.smf.value.smtp-notify:::Change values of Email Event Notification Agent properties::

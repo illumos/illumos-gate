@@ -1,5 +1,6 @@
 nosys			0
 rexit			1
+psecflags		2
 read			3
 write			4
 open			5

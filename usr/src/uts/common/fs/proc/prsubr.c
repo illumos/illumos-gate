@@ -3352,7 +3352,7 @@ pr_free_watched_pages(proc_t *p)
  */
 static int
 set_watched_page(proc_t *p, caddr_t vaddr, caddr_t eaddr,
-	ulong_t flags, ulong_t oflags)
+    ulong_t flags, ulong_t oflags)
 {
 	struct as *as = p->p_as;
 	avl_tree_t *pwp_tree;
@@ -3837,7 +3837,7 @@ pr_getsegsize(struct seg *seg, int reserved)
 
 uint_t
 pr_getprot(struct seg *seg, int reserved, void **tmp,
-	caddr_t *saddrp, caddr_t *naddrp, caddr_t eaddr)
+    caddr_t *saddrp, caddr_t *naddrp, caddr_t eaddr)
 {
 	struct as *as = seg->s_as;
 
@@ -4153,6 +4153,18 @@ prgetcred(proc_t *p, prcred_t *pcrp)
 	mutex_enter(&p->p_crlock);
 	cred2prcred(p->p_cred, pcrp);
 	mutex_exit(&p->p_crlock);
+}
+
+void
+prgetsecflags(proc_t *p, prsecflags_t *psfp)
+{
+	ASSERT(psfp != NULL);
+
+	psfp->pr_version = PRSECFLAGS_VERSION_CURRENT;
+	psfp->pr_lower = p->p_secflags.psf_lower;
+	psfp->pr_upper = p->p_secflags.psf_upper;
+	psfp->pr_effective = p->p_secflags.psf_effective;
+	psfp->pr_inherit = p->p_secflags.psf_inherit;
 }
 
 /*

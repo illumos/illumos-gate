@@ -28,8 +28,12 @@
 
 
 #include <stddef.h>
-#include <sys/types.h>
 #include <libnvpair.h>
+
+#ifndef NATIVE_BUILD
+#include <sys/secflags.h>
+#endif	/* NATIVE_BUILD */
+#include <sys/types.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -197,6 +201,26 @@ typedef enum scf_tmpl_error_type {
 typedef struct scf_tmpl_error scf_tmpl_error_t;
 
 /*
+ * This unfortunately needs to be public, because consumers of librestart must
+ * deal with it
+ */
+typedef struct {
+#ifndef NATIVE_BUILD
+	secflagdelta_t ss_default;
+	secflagdelta_t ss_lower;
+	secflagdelta_t ss_upper;
+#else
+	/*
+	 * This is never used, but is necessary for bootstrapping.
+	 * Not even the size matters.
+	 */
+	void *ss_default;
+	void *ss_lower;
+	void *ss_upper;
+#endif /* NATIVE_BUILD */
+} scf_secflags_t;
+
+/*
  * scf_tmpl_strerror() human readable flag
  */
 #define	SCF_TMPL_STRERROR_HUMAN	0x1
@@ -328,6 +352,7 @@ typedef struct scf_tmpl_error scf_tmpl_error_t;
 #define	SCF_PROPERTY_RESTART_INTERVAL	((const char *)"restart_interval")
 #define	SCF_PROPERTY_RESTART_ON		((const char *)"restart_on")
 #define	SCF_PROPERTY_RESTORE		((const char *)"restore")
+#define	SCF_PROPERTY_SECFLAGS		((const char *)"security_flags")
 #define	SCF_PROPERTY_SINGLE_INSTANCE	((const char *)"single_instance")
 #define	SCF_PROPERTY_START_METHOD_TIMESTAMP	\
 	((const char *)"start_method_timestamp")

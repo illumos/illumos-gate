@@ -1357,6 +1357,7 @@
 @ MSG_ARG_CYU		"-YU"
 @ MSG_ARG_Z		"-z"
 @ MSG_ARG_ZDEFNODEF	"-z[defs|nodefs]"
+@ MSG_ARG_ZASLR		"-zaslr"
 @ MSG_ARG_ZGUIDE	"-zguidance"
 @ MSG_ARG_ZNODEF	"-znodefs"
 @ MSG_ARG_ZNOINTERP	"-znointerp"
@@ -1373,6 +1374,7 @@
 
 @ MSG_ARG_ABSEXEC	"absexec"
 @ MSG_ARG_ALTEXEC64	"altexec64"
+@ MSG_ARG_ASLR		"aslr"
 @ MSG_ARG_NOCOMPSTRTAB	"nocompstrtab"
 @ MSG_ARG_GROUPPERM	"groupperm"
 @ MSG_ARG_NOGROUPPERM	"nogroupperm"
@@ -1472,6 +1474,9 @@
 @ MSG_ARG_T_WRAP	"-wrap"
 @ MSG_ARG_T_OPAR	"("
 @ MSG_ARG_T_CPAR	")"
+
+@ MSG_ARG_ENABLED	"enabled"
+@ MSG_ARG_DISABLED	"disabled"
 
 # -z guidance=item strings
 @ MSG_ARG_GUIDE_DELIM		",: \t"

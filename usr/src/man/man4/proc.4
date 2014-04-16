@@ -5,11 +5,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PROC 4 "Mar 31, 2013"
+.TH PROC 4 "Jun 6, 2016"
 .SH NAME
 proc \- /proc, the process file system
 .SH DESCRIPTION
-.sp
 .LP
 \fB/proc\fR is a file system that provides access to the state of each process
 and light-weight process (lwp) in the system. The name of each entry in the
@@ -174,7 +173,6 @@ To help deal with system data structures that are read from 32-bit processes, a
 explicit 32-bit fixed-width data structures (like \fBcstruct stat32\fR) visible
 to the 64-bit program. See \fBtypes32.h\fR(3HEAD).
 .SH DIRECTORY STRUCTURE
-.sp
 .LP
 At the top level, the directory \fB/proc\fR contains entries each of which
 names an existing process in the system. These entries are themselves
@@ -201,7 +199,6 @@ structures may grow by the addition of elements at the end in future releases
 of the system and it is not legitimate for a program to assume that they will
 not.
 .SH STRUCTURE OF \fB/proc/\fR\fIpid\fR
-.sp
 .LP
 A given directory \fB/proc/\fR\fIpid\fR contains the following entries. A
 process can use the invisible alias \fB/proc/self\fR if it wishes to open one
@@ -209,13 +206,11 @@ of its own \fB/proc\fR files (invisible in the sense that the name ``self''
 does not appear in a directory listing of \fB/proc\fR obtained from
 \fBls\fR(1), \fBgetdents\fR(2), or \fBreaddir\fR(3C)).
 .SS "contracts"
-.sp
 .LP
 A directory containing references to the contracts held by the process. Each
 entry is a symlink to the contract's directory under \fB/system/contract\fR.
 See \fBcontract\fR(4).
 .SS "as"
-.sp
 .LP
 Contains the address-space image of the process; it can be opened for both
 reading and writing. \fBlseek\fR(2) is used to position the file at the virtual
@@ -223,7 +218,6 @@ address of interest and then the address space can be examined or changed
 through \fBread\fR(2) or \fBwrite\fR(2) (or by using \fBpread\fR(2) or
 \fBpwrite\fR(2) for the combined operation).
 .SS "ctl"
-.sp
 .LP
 A write-only file to which structured messages are written directing the system
 to change some aspect of the process's state or control its behavior in some
@@ -235,7 +229,6 @@ message is immediately reflected in the state of the process visible through
 appropriate status and information files. The types of control messages are
 described in detail later. See \fBCONTROL MESSAGES\fR.
 .SS "status"
-.sp
 .LP
 Contains state information about the process and the representative lwp. The
 file contains a \fBpstatus\fR structure which contains an embedded
@@ -864,7 +857,6 @@ registers.
 .LP
 If the lwp is not stopped, all register values are undefined.
 .SS "psinfo"
-.sp
 .LP
 Contains miscellaneous information about the process and the representative lwp
 needed by the \fBps\fR(1) command. \fBpsinfo\fR remains accessible after a
@@ -983,7 +975,6 @@ maximum value is 1/N, where N is the number of \fBCPU\fRs.
 \fBpr_contract\fR is the id of the process contract of which the process is a
 member. See \fBcontract\fR(4) and \fBprocess\fR(4).
 .SS "cred"
-.sp
 .LP
 Contains a description of the credentials associated with the process:
 .sp
@@ -1010,7 +1001,6 @@ length; the \fBcred\fR file contains all of the supplementary groups.
 \fBpr_ngroups\fR indicates the number of supplementary groups. (See also the
 \fBPCSCRED\fR and \fBPCSCREDX\fR control operations.)
 .SS "priv"
-.sp
 .LP
 Contains a description of the privileges associated with the process:
 .sp
@@ -1043,8 +1033,27 @@ which is followed by additional information about the process state
 .LP
 The full size of the structure can be computed using
 \fBPRIV_PRPRIV_SIZE\fR(\fBprpriv_t *\fR).
-.SS "sigact"
+.SS "secflags"
+.LP
+This file contains the security-flags of the process.  It contains a
+description of the security flags associated with the process.
 .sp
+.in +2
+.nf
+typedef struct prsecflags {
+	uint32_t pr_version;		/* ABI Versioning of this structure */
+	secflagset_t pr_effective;	/* Effective flags */
+	secflagset_t pr_inherit;	/* Inheritable flags */
+	secflagset_t pr_lower;		/* Lower flags */
+	secflagset_t pr_upper;		/* Upper flags */
+} prsecflags_t;
+.in -2
+
+.sp
+.LP
+The \fBpr_version\fR field is a version number for the structure, currently
+\fBPRSECFLAGS_VERSION_1\fR.
+.SS "sigact"
 .LP
 Contains an array of \fBsigaction structures\fR describing the current
 dispositions of all signals associated with the traced process (see
@@ -1052,14 +1061,12 @@ dispositions of all signals associated with the traced process (see
 that the action for signal number \fIn\fR appears in position \fIn\fR-1 of the
 array.
 .SS "auxv"
-.sp
 .LP
 Contains the initial values of the process's aux vector in an array of
 \fBauxv_t\fR structures (see \fB<sys/auxv.h>\fR). The values are those that
 were passed by the operating system as startup information to the dynamic
 linker.
 .SS "ldt"
-.sp
 .LP
 This file exists only on x86-based machines. It is non-empty only if the
 process has established a local descriptor table (\fBLDT\fR). If non-empty, the
@@ -1067,7 +1074,6 @@ file contains the array of currently active \fBLDT\fR entries in an array of
 elements of type \fBstruct ssd\fR, defined in \fB<sys/sysi86.h>\fR, one element
 for each active \fBLDT\fR entry.
 .SS "map, xmap"
-.sp
 .LP
 Contain information about the virtual address map of the process. The map file
 contains an array of \fBprmap\fR structures while the xmap file contains an
@@ -1235,7 +1241,6 @@ translation for the mapping. \fBpr_hatpagesize\fR may be different than
 \fBpr_pagesize.\fR The possible values are hardware architecture specific, and
 may change over a mapping's lifetime.
 .SS "rmap"
-.sp
 .LP
 Contains information about the reserved address ranges of the process. The file
 contains an array of \fBprmap\fR structures, as defined above for the \fBmap\fR
@@ -1246,21 +1251,18 @@ not use any part of it for the new mapping. Examples of such reservations
 include the address ranges reserved for the process stack and the individual
 thread stacks of a multi-threaded process.
 .SS "cwd"
-.sp
 .LP
 A symbolic link to the process's current working directory. See \fBchdir\fR(2).
 A \fBreadlink\fR(2) of \fB/proc/\fIpid\fR/cwd\fR yields a null string. However,
 it can be opened, listed, and searched as a directory, and can be the target of
 \fBchdir\fR(2).
 .SS "root"
-.sp
 .LP
 A symbolic link to the process's root directory.
 \fB/proc/\fR\fIpid\fR\fB/root\fR can differ from the system root directory if
 the process or one of its ancestors executed \fBchroot\fR(2) as super user. It
 has the same semantics as \fB/proc/\fR\fIpid\fR\fB/cwd\fR.
 .SS "fd"
-.sp
 .LP
 A directory containing references to the open files of the process. Each entry
 is a decimal number corresponding to an open file descriptor in the process.
@@ -1274,7 +1276,6 @@ directory, it can be accessed with the same semantics as
 \fB/proc/\fIpid\fR/cwd\fR. An attempt to open any other type of entry fails
 with \fBEACCES\fR.
 .SS "object"
-.sp
 .LP
 A directory containing read-only files with names corresponding to the
 \fBpr_mapname\fR entries in the \fBmap\fR and \fBpagedata\fR files. Opening
@@ -1287,7 +1288,6 @@ The \fBobject\fR directory makes it possible for a controlling process to gain
 access to the object file and any shared libraries (and consequently the symbol
 tables) without having to know the actual path names of the executable files.
 .SS "path"
-.sp
 .LP
 A directory containing symbolic links to files opened by the process. The
 directory includes one entry for \fBcwd\fR and \fBroot\fR. The directory also
@@ -1299,7 +1299,6 @@ namespace (such as \fBFIFO\fRs and sockets), but can also happen for regular
 files. For the file descriptor entries, the path may be different from the one
 used by the process to open the file.
 .SS "pagedata"
-.sp
 .LP
 Opening the page data file enables tracking of address space references and
 modifications on a per-page basis.
@@ -1381,13 +1380,11 @@ to a system-imposed limit per traced process. A read of one does not affect the
 data being collected by the system for the others. An open of the page data
 file will fail with \fBENOMEM\fR if the system-imposed limit would be exceeded.
 .SS "watch"
-.sp
 .LP
 Contains an array of \fBprwatch\fR structures, one for each watched area
 established by the \fBPCWATCH\fR control operation. See \fBPCWATCH\fR for
 details.
 .SS "usage"
-.sp
 .LP
 Contains process usage information described by a \fBprusage\fR structure which
 contains at least the following fields:
@@ -1434,7 +1431,6 @@ previously an estimate, if microstate accounting were not enabled, the current
 information is now never an estimate represents time the process has spent in
 various states.
 .SS "lstatus"
-.sp
 .LP
 Contains a \fBprheader\fR structure followed by an array of \fBlwpstatus\fR
 structures, one for each active lwp in the process (see also
@@ -1459,13 +1455,11 @@ file header to index through the array. These comments apply to all \fB/proc\fR
 files that include a \fBprheader\fR structure (\fBlpsinfo\fR and \fBlusage\fR,
 below).
 .SS "lpsinfo"
-.sp
 .LP
 Contains a \fBprheader\fR structure followed by an array of \fBlwpsinfo\fR
 structures, one for eachactive and zombie lwp in the process. See also
 \fB/proc/\fR\fIpid\fR\fB/lwp/\fR\fIlwpid\fR/\fBlwpsinfo\fR, below.
 .SS "lusage"
-.sp
 .LP
 Contains a \fBprheader\fR structure followed by an array of \fBprusage\fR
 structures, one for each active lwp in the process, plus an additional element
@@ -1476,43 +1470,36 @@ summation over all these structures is the definition of the process usage
 information obtained from the \fBusage\fR file. (See also
 \fB/proc/\fR\fIpid\fR\fB/lwp/\fR\fIlwpid\fR/\fBlwpusage\fR, below.)
 .SS "lwp"
-.sp
 .LP
 A directory containing entries each of which names an active or zombie lwp
 within the process. These entries are themselves directories containing
 additional files as described below. Only the \fBlwpsinfo\fR file exists in the
 directory of a zombie lwp.
 .SH STRUCTURE OF \fB/proc/\fR\fIpid\fR\fB/lwp/\fR\fIlwpid\fR
-.sp
 .LP
 A given directory \fB/proc/\fR\fIpid\fR\fB/lwp/\fR\fIlwpid\fR contains the
 following entries:
 .SS "lwpctl"
-.sp
 .LP
 Write-only control file. The messages written to this file affect the specific
 lwp rather than the representative lwp, as is the case for the process's
 \fBctl\fR file.
 .SS "lwpstatus"
-.sp
 .LP
 lwp-specific state information. This file contains the \fBlwpstatus\fR
 structure for the specific lwp as described above for the representative lwp in
 the process's \fBstatus\fR file.
 .SS "lwpsinfo"
-.sp
 .LP
 lwp-specific \fBps\fR(1) information. This file contains the \fBlwpsinfo\fR
 structure for the specific lwp as described above for the representative lwp in
 the process's \fBpsinfo\fR file. The \fBlwpsinfo\fR file remains accessible
 after an lwp becomes a zombie.
 .SS "lwpusage"
-.sp
 .LP
 This file contains the \fBprusage\fR structure for the specific lwp as
 described above for the process's \fBusage\fR file.
 .SS "gwindows"
-.sp
 .LP
 This file exists only on SPARC based machines. If it is non-empty, it contains
 a \fBgwindows_t\fR structure, defined in \fB<sys/regset.h>\fR, with the values
@@ -1523,7 +1510,6 @@ pointer is improperly aligned. If the lwp is not stopped or if there are no
 register windows that could not be stored on the stack, the file is empty (the
 usual case).
 .SS "xregs"
-.sp
 .LP
 Extra state registers. The extra state register set is architecture dependent;
 this file is empty if the system does not support extra state registers. If the
@@ -1532,7 +1518,6 @@ file is non-empty, it contains an architecture dependent structure of type
 extra state registers. If the lwp is not stopped, all register values are
 undefined. See also the \fBPCSXREG\fR control operation, below.
 .SS "asrs"
-.sp
 .LP
 This file exists only for 64-bit SPARC V9 processes. It contains an
 \fBasrset_t\fR structure, defined in <\fBsys/regset.h\fR>, containing the
@@ -1540,7 +1525,6 @@ values of the lwp's platform-dependent ancillary state registers. If the lwp is
 not stopped, all register values are undefined. See also the \fBPCSASRS\fR
 control operation, below.
 .SS "spymaster"
-.sp
 .LP
 For an agent lwp (see \fBPCAGENT\fR), this file contains a \fBpsinfo_t\fR
 structure that corresponds to the process that created the agent lwp at the
@@ -1549,7 +1533,6 @@ the \fBpsinfo\fR file, with one modification: the \fBpr_time\fR field does not
 correspond to the CPU time for the process, but rather to the creation time of
 the agent lwp.
 .SS "templates"
-.sp
 .LP
 A directory which contains references to the active templates for the lwp,
 named by the contract type. Changes made to an active template descriptor do
@@ -1557,7 +1540,6 @@ not affect the original template which was activated, though they do affect the
 active template. It is not possible to activate an active template descriptor.
 See \fBcontract\fR(4).
 .SH CONTROL MESSAGES
-.sp
 .LP
 Process state changes are effected through messages written to a process's
 \fBctl\fR file or to an individual lwp's \fBlwpctl\fR file. All control
@@ -1577,7 +1559,6 @@ Descriptions of the allowable control messages follow. In all cases, writing a
 message to a control file for a process or lwp that has terminated elicits the
 error \fBENOENT\fR.
 .SS "PCSTOP PCDSTOP PCWSTOP PCTWSTOP"
-.sp
 .LP
 When applied to the process control file, \fBPCSTOP\fR directs all lwps to stop
 and waits for them to stop, \fBPCDSTOP\fR directs all lwps to stop without
@@ -1626,7 +1607,6 @@ level, has no user-level address space visible through \fB/proc\fR, and cannot
 be stopped. Applying one of these operations to a system process or any of its
 lwps elicits the error \fBEBUSY\fR.
 .SS "PCRUN"
-.sp
 .LP
 Make an lwp runnable again after a stop. This operation takes a \fBlong\fR
 operand containing zero or more of the following flags:
@@ -1707,7 +1687,6 @@ event of interest, the representative lwp is marked \fBPR_REQUESTED\fR. If, as
 a consequence, all lwps are in the \fBPR_REQUESTED\fR or \fBPR_SUSPENDED\fR
 stop state, all lwps showing \fBPR_REQUESTED\fR are made runnable.
 .SS "PCSTRACE"
-.sp
 .LP
 Define a set of signals to be traced in the process. The receipt of one of
 these signals by an lwp causes the lwp to stop. The set of signals is defined
@@ -1720,11 +1699,9 @@ sent to the lwp, the signal is not received and does not cause a stop until it
 is removed from the held signal set, either by the lwp itself or by setting the
 held signal set with \fBPCSHOLD\fR.
 .SS "PCCSIG"
-.sp
 .LP
 The current signal, if any, is cleared from the specific or representative lwp.
 .SS "PCSSIG"
-.sp
 .LP
 The current signal and its associated signal information for the specific or
 representative lwp are set according to the contents of the operand
@@ -1736,7 +1713,6 @@ and an additional \fBPR_SIGNALLED\fR stop does not intervene even if the signal
 is traced. Setting the current signal to \fBSIGKILL\fR terminates the process
 immediately.
 .SS "PCKILL"
-.sp
 .LP
 If applied to the process control file, a signal is sent to the process with
 semantics identical to those of \fBkill\fR(2). If applied to an lwp control
@@ -1744,7 +1720,6 @@ file, a directed signal is sent to the specific lwp. The signal is named in a
 \fBlong\fR operand contained in the message. Sending \fBSIGKILL\fR terminates
 the process immediately.
 .SS "PCUNKILL"
-.sp
 .LP
 A signal is deleted, that is, it is removed from the set of pending signals. If
 applied to the process control file, the signal is deleted from the process's
@@ -1753,14 +1728,12 @@ the lwp's pending signals. The current signal (if any) is unaffected. The
 signal is named in a \fBlong\fR operand in the control message. It is an error
 (\fBEINVAL\fR) to attempt to delete \fBSIGKILL\fR.
 .SS "PCSHOLD"
-.sp
 .LP
 Set the set of held signals for the specific or representative lwp (signals
 whose delivery will be blocked if sent to the lwp). The set of signals is
 specified with a \fBsigset_t\fR operand. \fBSIGKILL\fR and \fBSIGSTOP\fR cannot
 be held; if specified, they are silently ignored.
 .SS "PCSFAULT"
-.sp
 .LP
 Define a set of hardware faults to be traced in the process. On incurring one
 of these faults, an lwp stops. The set is defined via the operand
@@ -1885,12 +1858,10 @@ no signal is posted. The \fBpr_info\fR field in the \fBlwpstatus\fR structure
 identifies the signal to be sent and contains machine-specific information
 about the fault.
 .SS "PCCFAULT"
-.sp
 .LP
 The current fault, if any, is cleared; the associated signal will not be sent
 to the specific or representative lwp.
 .SS "PCSENTRY PCSEXIT"
-.sp
 .LP
 These control operations instruct the process's lwps to stop on entry to or
 exit from specified system calls. The set of system calls to be traced is
@@ -1911,7 +1882,6 @@ instructed to go directly to system call exit by specifying the \fBPRSABORT\fR
 flag in a \fBPCRUN\fR control message. Unless exit from the system call is
 being traced, the lwp returns to user level showing \fBEINTR\fR.
 .SS "PCWATCH"
-.sp
 .LP
 Set or clear a watched area in the controlled process from a \fBprwatch\fR
 structure operand:
@@ -2060,7 +2030,6 @@ process's inherit-on-fork mode, \fBPR_FORK\fR, is set (see \fBPCSET\fR, below).
 All watched areas are cancelled when the traced process performs a successful
 \fBexec\fR(2).
 .SS "PCSET PCUNSET"
-.sp
 .LP
 \fBPCSET\fR sets one or more modes of operation for the traced process.
 \fBPCUNSET\fR unsets these modes. The modes to be set or unset are specified by
@@ -2176,7 +2145,6 @@ or to apply these operations to a system process. The current modes are
 reported in the \fBpr_flags\fR field of \fB/proc/\fR\fIpid\fR\fB/status\fR and
 \fB/proc/\fR\fIpid\fR\fB/lwp/\fR\fIlwp\fR\fB/lwpstatus\fR.
 .SS "PCSREG"
-.sp
 .LP
 Set the general registers for the specific or representative lwp according to
 the operand \fBprgregset_t\fR structure.
@@ -2195,7 +2163,6 @@ overflow-bit.
 \fBPCSREG\fR fails with \fBEBUSY\fR if the lwp is not stopped on an event of
 interest.
 .SS "PCSVADDR"
-.sp
 .LP
 Set the address at which execution will resume for the specific or
 representative lwp from the operand \fBlong\fR. On SPARC based systems, both
@@ -2203,7 +2170,6 @@ representative lwp from the operand \fBlong\fR. On SPARC based systems, both
 address. On x86-based systems, only %eip is set. \fBPCSVADDR\fR fails with
 \fBEBUSY\fR if the lwp is not stopped on an event of interest.
 .SS "PCSFPREG"
-.sp
 .LP
 Set the floating-point registers for the specific or representative lwp
 according to the operand \fBprfpregset_t\fR structure. An error (\fBEINVAL\fR)
@@ -2212,7 +2178,6 @@ floating-point hardware and the system does not emulate floating-point machine
 instructions). \fBPCSFPREG\fR fails with \fBEBUSY\fR if the lwp is not stopped
 on an event of interest.
 .SS "PCSXREG"
-.sp
 .LP
 Set the extra state registers for the specific or representative lwp according
 to the architecture-dependent operand \fBprxregset_t\fR structure. An error
@@ -2220,7 +2185,6 @@ to the architecture-dependent operand \fBprxregset_t\fR structure. An error
 registers. \fBPCSXREG\fR fails with \fBEBUSY\fR if the lwp is not stopped on an
 event of interest.
 .SS "PCSASRS"
-.sp
 .LP
 Set the ancillary state registers for the specific or representative lwp
 according to the SPARC V9 platform-dependent operand \fBasrset_t\fR structure.
@@ -2230,7 +2194,6 @@ state registers are privileged registers that cannot be modified. Only those
 that can be modified are set; all others are silently ignored. \fBPCSASRS\fR
 fails with \fBEBUSY\fR if the lwp is not stopped on an event of interest.
 .SS "PCAGENT"
-.sp
 .LP
 Create an agent lwp in the controlled process with register values from the
 operand \fBprgregset_t\fR structure (see \fBPCSREG\fR, above). The agent lwp is
@@ -2291,7 +2254,6 @@ agent lwp.
 Symbolic constants for system call trap numbers like \fBSYS_lwp_exit\fR and
 \fBSYS_lwp_create\fR can be found in the header file <\fBsys/syscall.h\fR>.
 .SS "PCREAD PCWRITE"
-.sp
 .LP
 Read or write the target process's address space via a \fBpriovec\fR structure
 operand:
@@ -2318,7 +2280,6 @@ space, or when stepping over a breakpointed instruction. Unlike \fBpread\fR(2)
 and \fBpwrite\fR(2), no provision is made for partial reads or writes; if the
 operation cannot be performed completely, it fails with \fBEIO\fR.
 .SS "PCNICE"
-.sp
 .LP
 The traced process's \fBnice\fR(2) value is incremented by the amount in the
 operand \fBlong\fR. Only a process with the {\fBPRIV_PROC_PRIOCNTL\fR}
@@ -2326,7 +2287,6 @@ privilege asserted in its effective set can better a process's priority in this
 way, but any user may lower the priority. This operation is not meaningful for
 all scheduling classes.
 .SS "PCSCRED"
-.sp
 .LP
 Set the target process credentials to the values contained in the
 \fBprcred_t\fR structure operand (see \fB/proc/\fR\fIpid\fR\fB/cred\fR). The
@@ -2336,13 +2296,11 @@ set. The target process's supplementary groups are not changed; the
 ignored. Only the privileged processes can perform this operation; for all
 others it fails with \fBEPERM\fR.
 .SS "PCSCREDX"
-.sp
 .LP
 Operates like \fBPCSCRED\fR but also sets the supplementary groups; the length
 of the data written with this control operation should be "sizeof
 (\fBprcred_t\fR) + sizeof (\fBgid_t)\fR * (#groups - 1)".
 .SS "PCSPRIV"
-.sp
 .LP
 Set the target process privilege to the values contained in the \fBprpriv_t\fR
 operand (see \fB/proc/pid/priv\fR). The effective, permitted, inheritable, and
@@ -2360,7 +2318,6 @@ of the sets in the target process.
 If any of the above restrictions are not met, \fBEPERM\fR is returned. If the
 structure written is improperly formatted, \fBEINVAL\fR is returned.
 .SH PROGRAMMING NOTES
-.sp
 .LP
 For security reasons, except for the \fBpsinfo\fR, \fBusage\fR, \fBlpsinfo\fR,
 \fBlusage\fR, \fBlwpsinfo\fR, and \fBlwpusage\fR files, which are
@@ -2419,7 +2376,6 @@ descriptor has become invalid. \fBPOLLNVAL\fR is returned immediately if
 to a system process (see \fBPCSTOP\fR). The requested events may be empty to
 wait simply for termination.
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/proc\fR\fR
@@ -2820,7 +2776,6 @@ For an agent LWP, the controlling process
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBls\fR(1), \fBps\fR(1), \fBchroot\fR(1M), \fBalarm\fR(2), \fBbrk\fR(2),
 \fBchdir\fR(2), \fBchroot\fR(2), \fBclose\fR(2), \fBcreat\fR(2), \fBdup\fR(2),
@@ -2834,9 +2789,8 @@ For an agent LWP, the controlling process
 \fBsiginfo.h\fR(3HEAD), \fBsignal.h\fR(3HEAD), \fBthr_create\fR(3C),
 \fBthr_join\fR(3C), \fBtypes32.h\fR(3HEAD), \fBucontext.h\fR(3HEAD),
 \fBwait\fR(3C), \fBcontract\fR(4), \fBcore\fR(4), \fBprocess\fR(4),
-\fBlfcompile\fR(5), \fBprivileges\fR(5)
+\fBlfcompile\fR(5), \fBprivileges\fR(5), \fBsecurity-flags\fR(5)
 .SH DIAGNOSTICS
-.sp
 .LP
 Errors that can occur in addition to the errors normally associated with file
 system access:
@@ -2991,14 +2945,12 @@ restrictions. See \fBprivileges\fR(5).
 .RE
 
 .SH NOTES
-.sp
 .LP
 Descriptions of structures in this document include only interesting structure
 elements, not filler and padding fields, and may show elements out of order for
 descriptive clarity. The actual structure definitions are contained in
 \fB<procfs.h>\fR\&.
 .SH BUGS
-.sp
 .LP
 Because the old \fBioctl\fR(2)-based version of \fB/proc\fR is currently
 supported for binary compatibility with old applications, the top-level

@@ -820,7 +820,8 @@ typedef	Elf64_Word	Elf64_Capchain;
 #define	NT_ZONENAME	21	/* string from getzonenamebyid(3C)	*/
 #define	NT_FDINFO	22	/* open fd info 			*/
 #define	NT_SPYMASTER	23	/* psinfo_t for agent LWP spymaster	*/
-#define	NT_NUM		23
+#define	NT_SECFLAGS	24	/* process security-flags */
+#define	NT_NUM		24
 
 
 #ifdef _KERNEL

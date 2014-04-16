@@ -984,7 +984,7 @@ Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 	    <external opt="none"/>
 	</entry>
     </event>
-
+    
     <event id="AUE_pool_import" header="0" idNo="45" omit="JNI">
     	<program>hald</program>
 	<entry id="subject">
@@ -2608,6 +2608,8 @@ Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
     <token id="fmri">
     </token>
     <token id="groups">
+    </token>
+    <token id="secflags">
     </token>
     <!--
     	the iport token take a single argument of type uint16_t

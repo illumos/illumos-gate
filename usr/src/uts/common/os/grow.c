@@ -62,10 +62,16 @@
 int use_brk_lpg = 1;
 int use_stk_lpg = 1;
 
+/*
+ * If set, we will not randomize mappings where the 'addr' argument is
+ * non-NULL and not an alignment.
+ */
+int aslr_respect_mmap_hint = 1;
+
 static int brk_lpg(caddr_t nva);
 static int grow_lpg(caddr_t sp);
 
-int
+intptr_t
 brk(caddr_t nva)
 {
 	int error;
@@ -77,6 +83,17 @@ brk(caddr_t nva)
 	 * and p_brkpageszc.
 	 */
 	as_rangelock(p->p_as);
+
+	/*
+	 * As a special case to aid the implementation of sbrk(3C), if given a
+	 * new brk of 0, return the current brk.  We'll hide this in brk(3C).
+	 */
+	if (nva == 0) {
+		intptr_t base = (intptr_t)(p->p_brkbase + p->p_brksize);
+		as_rangeunlock(p->p_as);
+		return (base);
+	}
+
 	if (use_brk_lpg && (p->p_flag & SAUTOLPG) != 0) {
 		error = brk_lpg(nva);
 	} else {
@@ -490,10 +507,10 @@ grow_internal(caddr_t sp, uint_t growszc)
 }
 
 /*
- * Find address for user to map.
- * If MAP_FIXED is not specified, we can pick any address we want, but we will
- * first try the value in *addrp if it is non-NULL.  Thus this is implementing
- * a way to try and get a preferred address.
+ * Find address for user to map.  If MAP_FIXED is not specified, we can pick
+ * any address we want, but we will first try the value in *addrp if it is
+ * non-NULL and _MAP_RANDOMIZE is not set.  Thus this is implementing a way to
+ * try and get a preferred address.
  */
 int
 choose_addr(struct as *as, caddr_t *addrp, size_t len, offset_t off,
@@ -506,7 +523,8 @@ choose_addr(struct as *as, caddr_t *addrp, size_t len, offset_t off,
 	if (flags & MAP_FIXED) {
 		(void) as_unmap(as, *addrp, len);
 		return (0);
-	} else if (basep != NULL && ((flags & MAP_ALIGN) == 0) &&
+	} else if (basep != NULL &&
+	    ((flags & (MAP_ALIGN | _MAP_RANDOMIZE)) == 0) &&
 	    !as_gap(as, len, &basep, &lenp, 0, *addrp)) {
 		/* User supplied address was available */
 		*addrp = basep;
@@ -587,6 +605,9 @@ zmap(struct as *as, caddr_t *addrp, size_t len, uint_t uprot, int flags,
 	return (as_map(as, *addrp, len, segvn_create, &vn_a));
 }
 
+#define	RANDOMIZABLE_MAPPING(addr, flags) (((flags & MAP_FIXED) == 0) && \
+	!(((flags & MAP_ALIGN) == 0) && (addr != 0) && aslr_respect_mmap_hint))
+
 static int
 smmap_common(caddr_t *addrp, size_t len,
     int prot, int flags, struct file *fp, offset_t pos)
@@ -612,6 +633,19 @@ smmap_common(caddr_t *addrp, size_t len,
 		return (EINVAL);
 	}
 
+	if ((flags & (MAP_FIXED | _MAP_RANDOMIZE)) ==
+	    (MAP_FIXED | _MAP_RANDOMIZE)) {
+		return (EINVAL);
+	}
+
+	/*
+	 * If it's not a fixed allocation and mmap ASLR is enabled, randomize
+	 * it.
+	 */
+	if (RANDOMIZABLE_MAPPING(*addrp, flags) &&
+	    secflag_enabled(curproc, PROC_SEC_ASLR))
+		flags |= _MAP_RANDOMIZE;
+
 #if defined(__sparc)
 	/*
 	 * See if this is an "old mmap call".  If so, remember this
@@ -630,7 +664,6 @@ smmap_common(caddr_t *addrp, size_t len,
 
 
 	if (flags & MAP_ALIGN) {
-
 		if (flags & MAP_FIXED)
 			return (EINVAL);
 

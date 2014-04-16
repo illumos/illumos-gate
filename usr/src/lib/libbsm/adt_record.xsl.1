@@ -283,6 +283,14 @@
 	<xsl:value-of select="."/>
 </xsl:template>
 
+<xsl:template match="secflags">
+	<BR/>
+	<I>SECFLAGS: </I>
+	<I> set-type: </I><xsl:value-of select="@set-type"/>
+	<BR/>
+	<xsl:value-of select="."/>
+</xsl:template>
+
 <xsl:template match="sensitivity_label">
 	<BR/>
 	<I>SENSITIVITY_LABEL: </I>   <xsl:value-of select="."/>

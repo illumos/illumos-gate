@@ -142,10 +142,16 @@
 <!ATTLIST admin     	user		CDATA #REQUIRED
                     	auths		CDATA #REQUIRED>
 
+<!ELEMENT security-flags 	EMPTY>
+
+<!ATTLIST security-flags     	default		CDATA ""
+			lower		CDATA ""
+			upper		CDATA "">
+
 <!ELEMENT zone		(filesystem | inherited-pkg-dir | network | device |
 			deleted-device | rctl | attr | dataset | package |
 			patch | dev-perm | tmp_pool | pset |
-			mcap | admin)*>
+			mcap | admin | security-flags)*>
 
 <!ATTLIST zone		name		CDATA #REQUIRED
 			zonepath	CDATA #REQUIRED

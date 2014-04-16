@@ -241,6 +241,7 @@ COMSYSOBJS=			\
 	processor_bind.o	\
 	processor_info.o	\
 	profil.o		\
+	psecflagsset.o		\
 	putmsg.o		\
 	putpmsg.o		\
 	pwrite.o		\
@@ -493,6 +494,7 @@ PORTGEN=			\
 	priocntl.o		\
 	privlib.o		\
 	priv_str_xlate.o	\
+	psecflags.o		\
 	psiginfo.o		\
 	psignal.o		\
 	pt.o			\
@@ -806,6 +808,9 @@ RTOBJS=				\
 	shm.o			\
 	sigev_thread.o
 
+SECFLAGSOBJS=			\
+	secflags.o
+
 TPOOLOBJS=			\
 	thread_pool.o
 
@@ -958,6 +963,7 @@ MOSTOBJS=			\
 	$(PORTSYS64)		\
 	$(AIOOBJS)		\
 	$(RTOBJS)		\
+	$(SECFLAGSOBJS)		\
 	$(TPOOLOBJS)		\
 	$(THREADSOBJS)		\
 	$(THREADSMACHOBJS)	\
@@ -1086,6 +1092,7 @@ SRCS=							\
 	$(PORTSYS:%.o=$(LIBCDIR)/port/sys/%.c)			\
 	$(AIOOBJS:%.o=$(LIBCDIR)/port/aio/%.c)			\
 	$(RTOBJS:%.o=$(LIBCDIR)/port/rt/%.c)			\
+	$(SECFLAGSOBJS:%.o=$(SRC)/common/secflags/%.c)		\
 	$(TPOOLOBJS:%.o=$(LIBCDIR)/port/tpool/%.c)		\
 	$(THREADSOBJS:%.o=$(LIBCDIR)/port/threads/%.c)		\
 	$(THREADSMACHOBJS:%.o=threads/%.c)		\

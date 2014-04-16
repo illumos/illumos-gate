@@ -28,6 +28,7 @@ file path=usr/share/man/man5/iconv_unicode.5
 file path=usr/share/man/man5/privileges.5
 file path=usr/share/man/man5/rbac.5
 file path=usr/share/man/man5/resource_controls.5
+file path=usr/share/man/man5/security-flags.5
 file path=usr/share/man/man5/smf.5
 file path=usr/share/man/man5/smf_bootstrap.5
 file path=usr/share/man/man5/smf_method.5

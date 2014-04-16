@@ -132,6 +132,7 @@ int secpolicy_proc_access(const cred_t *);
 int secpolicy_proc_excl_open(const cred_t *);
 int secpolicy_proc_owner(const cred_t *, const cred_t *, int);
 int secpolicy_proc_zone(const cred_t *);
+int secpolicy_psecflags(const cred_t *, struct proc *, struct proc *);
 int secpolicy_pset(const cred_t *);
 int secpolicy_rctlsys(const cred_t *, boolean_t);
 int secpolicy_resource(const cred_t *);

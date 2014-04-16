@@ -119,6 +119,7 @@ init_tokens(void)
 	table_initx(AUT_LABEL, "sensitivity label", "sensitivity_label",
 	    label_token, T_ELEMENT);
 	table_init(AUT_PRIV, "privilege", privilege_token, T_EXTENDED);
+	table_init(AUT_SECFLAGS, "secflags", secflags_token, T_EXTENDED);
 	table_initx(AUT_UPRIV, "use of privilege", "use_of_privilege",
 	    useofpriv_token, T_EXTENDED);
 	table_init(AUT_LIAISON, "liaison", liaison_token, T_ELEMENT);

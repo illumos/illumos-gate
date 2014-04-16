@@ -23,7 +23,6 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -120,7 +119,7 @@ sl_extract_as_word(const char *data, int do_swap, const sl_field_t *fdesc)
 
 /*
  * Extract the given integer field, and return its value, cast
- * to Word. Note that this operation must not be used on values
+ * to Lword. Note that this operation must not be used on values
  * that can be negative, as information can be lost.
  */
 Lword

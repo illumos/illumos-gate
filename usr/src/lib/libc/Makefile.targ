@@ -290,6 +290,10 @@ $(DTRACEOBJS:%=pics/%): $(SRC)/common/dtrace/$$(@F:.o=.c)
 	$(COMPILE.c) -o $@ $(SRC)/common/dtrace/$(@F:.o=.c)
 	$(POST_PROCESS_O)
 
+$(SECFLAGSOBJS:%=pics/%): $(SRC)/common/secflags/$$(@F:.o=.c)
+	$(COMPILE.c) -o $@ $(SRC)/common/secflags/$(@F:.o=.c)
+	$(POST_PROCESS_O)
+
 $(UNICODEOBJS:%=pics/%): $(SRC)/common/unicode/$$(@F:.o=.c)
 	$(COMPILE.c) -o $@ $(SRC)/common/unicode/$(@F:.o=.c)
 	$(POST_PROCESS_O)

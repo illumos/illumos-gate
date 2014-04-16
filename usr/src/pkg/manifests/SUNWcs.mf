@@ -553,6 +553,7 @@ file path=lib/svc/manifest/system/logadm-upgrade.xml group=sys mode=0444
 file path=lib/svc/manifest/system/manifest-import.xml group=sys mode=0444
 file path=lib/svc/manifest/system/name-service-cache.xml group=sys mode=0444
 file path=lib/svc/manifest/system/pfexecd.xml group=sys mode=0444
+file path=lib/svc/manifest/system/process-security.xml group=sys mode=0444
 file path=lib/svc/manifest/system/rbac.xml group=sys mode=0444
 file path=lib/svc/manifest/system/rmtmpfiles.xml group=sys mode=0444
 file path=lib/svc/manifest/system/sac.xml group=sys mode=0444
@@ -1085,6 +1086,7 @@ file path=usr/lib/help/auths/locale/C/SmfValueMDNS.html
 file path=usr/lib/help/auths/locale/C/SmfValueNADD.html
 file path=usr/lib/help/auths/locale/C/SmfValueNDMP.html
 file path=usr/lib/help/auths/locale/C/SmfValueNWAM.html
+file path=usr/lib/help/auths/locale/C/SmfValueProcSec.html
 file path=usr/lib/help/auths/locale/C/SmfValueRouting.html
 file path=usr/lib/help/auths/locale/C/SmfValueSMB.html
 file path=usr/lib/help/auths/locale/C/SmfValueVscan.html

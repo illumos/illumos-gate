@@ -1,0 +1,115 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\" Copyright 2015, Richard Lowe.
+.\"
+.TH "SECURITY-FLAGS" "5" "June 6, 2016"
+.SH "NAME"
+\fBsecurity-flags\fR - process security flags
+.SH "DESCRIPTION"
+Each process on an illumos system has an associated set of security-flags
+which describe additional per-process security and exploit mitigation
+features which are enabled for that process.
+.P
+There are four sets of these flags for each process, the effective set
+(abbreviated \fIE\fR) are the set which currently apply to the process and are
+immutable. The inheritable set (abbreviated \fII\fR) are the flags which will
+become effective the next time the process calls one of the \fBexec(2)\fR
+family of functions, and will be inherited as both the effective and
+inheritable sets by any child processes. The upper set (abbreviated \fIU\fR)
+specify the maximal flags that a process can have in its inheritable set.  The
+lower set (abbreviated \fIL\fR) specify the minimal amount of flags that a
+process must have in its inheritable set.  The inheritable set may be changed
+at any time, subject to permissions and the lower and upper sets.
+.P
+To change the security-flags of a process one must have both permissions
+equivalent to those required to send a signal to the process and have the
+\fBPRIV_PROC_SECFLAGS\fR privilege.
+.P
+Currently available features are:
+
+.sp
+.ne 2
+.na
+Address Space Layout Randomisation (\fBASLR\fR)
+.ad
+.RS 11n
+The base addresses of the stack, heap and shared library (including
+\fBld.so\fR) mappings are randomised, the bases of mapped regions other than
+those using \fBMAP_FIXED\fR are randomised.
+.P
+Currently, executable base addresses are \fInot\fR randomised, due to which
+the mitigation provided by this feature is currently limited.
+.P
+This flag may also be enabled by the presence of the \fBDT_SUNW_ASLR\fR
+dynamic tag in the \fB.dynamic\fR section of the executable file. If this
+tag has a value of 1, ASLR will be enabled. If the flag has a value of
+\fB0\fR ASLR will be disabled. If the tag is not present, the value of the
+ASLR flag will be inherited as normal.
+.RE
+
+.sp
+.ne 2
+.na
+Forbid mappings at NULL (\fBFORBIDNULLMAP\fR)
+.ad
+.RS 11n
+Mappings with an address of 0 are forbidden, and return EINVAL rather than
+being honored.
+.RE
+
+.sp
+.ne 2
+.na
+Make the userspace stack non-executable (\fBNOEXECSTACK\fR)
+.ad
+.RS 11n
+The stack will be mapped without executable permission, and attempts to
+execute it will fault.
+.RE
+
+System default security-flags are configured via properties on the
+\fBsvc:/system/process-security\fR service, which contains a boolean property
+per-flag in the \fBdefault\fR, \fBlower\fR and \fBupper\fR, property groups.
+The value indicates the setting of the flag, flags with no value take their
+defaults.  For example, to enable ASLR by default you would execute the
+following commands:
+.sp
+.in +2
+.nf
+# svccfg -s svc:/system/process-security setprop default/aslr = true
+.fi
+.in -2
+.sp
+.P
+To restore the setting to the defaults you would execute:
+.sp
+.in +2
+.nf
+# svccfg -s svc:/system/process-security delpropvalue default/aslr true
+.fi
+.in -2
+.sp
+.P
+This can be done by any user with the \fBsolaris.smf.value.process-security\fR
+authorization.
+.P
+Since security-flags are strictly inherited, this will not take effect until
+the system or zone is next booted.
+
+.SH "SEE ALSO"
+.BR psecflags (1),
+.BR svccfg (1M),
+.BR brk (2),
+.BR exec (2),
+.BR mmap (2),
+.BR mmapobj (2),
+.BR privileges (5),
+.BR rbac (5)

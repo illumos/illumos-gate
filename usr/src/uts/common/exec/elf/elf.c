@@ -42,6 +42,7 @@
 #include <sys/kmem.h>
 #include <sys/proc.h>
 #include <sys/pathname.h>
+#include <sys/policy.h>
 #include <sys/cmn_err.h>
 #include <sys/systm.h>
 #include <sys/elf.h>
@@ -65,8 +66,10 @@
 #include "elf_impl.h"
 #include <sys/sdt.h>
 #include <sys/siginfo.h>
+#include <sys/random.h>
 
 extern int at_flags;
+extern volatile size_t aslr_max_brk_skew;
 
 #define	ORIGIN_STR	"ORIGIN"
 #define	ORIGIN_STR_SIZE	6
@@ -158,6 +161,41 @@ dtrace_safe_phdr(Phdr *phdrp, struct uarg *args, uintptr_t base)
 		return (-1);
 
 	args->thrptr = phdrp->p_vaddr + base;
+
+	return (0);
+}
+
+static int
+handle_secflag_dt(proc_t *p, uint_t dt, uint_t val)
+{
+	uint_t flag;
+
+	switch (dt) {
+	case DT_SUNW_ASLR:
+		flag = PROC_SEC_ASLR;
+		break;
+	default:
+		return (EINVAL);
+	}
+
+	if (val == 0) {
+		if (secflag_isset(p->p_secflags.psf_lower, flag))
+			return (EPERM);
+		if ((secpolicy_psecflags(CRED(), p, p) != 0) &&
+		    secflag_isset(p->p_secflags.psf_inherit, flag))
+			return (EPERM);
+
+		secflag_clear(&p->p_secflags.psf_effective, flag);
+	} else {
+		if (!secflag_isset(p->p_secflags.psf_upper, flag))
+			return (EPERM);
+
+		if ((secpolicy_psecflags(CRED(), p, p) != 0) &&
+		    !secflag_isset(p->p_secflags.psf_inherit, flag))
+			return (EPERM);
+
+		secflag_set(&p->p_secflags.psf_effective, flag);
+	}
 
 	return (0);
 }
@@ -255,7 +293,8 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 	ssize_t		resid;
 	int		fd = -1;
 	intptr_t	voffset;
-	Phdr		*dyphdr = NULL;
+	Phdr		*intphdr = NULL;
+	Phdr		*dynamicphdr = NULL;
 	Phdr		*stphdr = NULL;
 	Phdr		*uphdr = NULL;
 	Phdr		*junk = NULL;
@@ -269,9 +308,10 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 	Phdr		*capphdr = NULL;
 	Cap		*cap = NULL;
 	ssize_t		capsize;
+	Dyn		*dyn = NULL;
 	int		hasu = 0;
 	int		hasauxv = 0;
-	int		hasdy = 0;
+	int		hasintp = 0;
 	int		branded = 0;
 
 	struct proc *p = ttoproc(curthread);
@@ -370,7 +410,7 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 	for (i = nphdrs; i > 0; i--) {
 		switch (phdrp->p_type) {
 		case PT_INTERP:
-			hasauxv = hasdy = 1;
+			hasauxv = hasintp = 1;
 			break;
 		case PT_PHDR:
 			hasu = 1;
@@ -389,6 +429,9 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 			break;
 		case PT_SUNWCAP:
 			capphdr = phdrp;
+			break;
+		case PT_DYNAMIC:
+			dynamicphdr = phdrp;
 			break;
 		}
 		phdrp = (Phdr *)((caddr_t)phdrp + hsize);
@@ -432,7 +475,7 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 		 *
 		 * total == 9
 		 */
-		if (hasdy && hasu) {
+		if (hasintp && hasu) {
 			/*
 			 * Has PT_INTERP & PT_PHDR - the auxvectors that
 			 * will be built are:
@@ -446,7 +489,7 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 			 * total = 5
 			 */
 			args->auxsize = (9 + 5) * sizeof (aux_entry_t);
-		} else if (hasdy) {
+		} else if (hasintp) {
 			/*
 			 * Has PT_INTERP but no PT_PHDR
 			 *
@@ -477,6 +520,50 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 		 * the the brandname and 3 for the brand specific aux vectors.
 		 */
 		args->auxsize += 4 * sizeof (aux_entry_t);
+	}
+
+	/* If the binary has an explicit ASLR flag, it must be honoured */
+	if ((dynamicphdr != NULL) &&
+	    (dynamicphdr->p_filesz > 0)) {
+		Dyn *dp;
+		off_t i = 0;
+
+#define	DYN_STRIDE	100
+		for (i = 0; i < dynamicphdr->p_filesz;
+		    i += sizeof (*dyn) * DYN_STRIDE) {
+			int ndyns = (dynamicphdr->p_filesz - i) / sizeof (*dyn);
+			size_t dynsize;
+
+			ndyns = MIN(DYN_STRIDE, ndyns);
+			dynsize = ndyns * sizeof (*dyn);
+
+			dyn = kmem_alloc(dynsize, KM_SLEEP);
+
+			if ((error = vn_rdwr(UIO_READ, vp, (caddr_t)dyn,
+			    dynsize, (offset_t)(dynamicphdr->p_offset + i),
+			    UIO_SYSSPACE, 0, (rlim64_t)0,
+			    CRED(), &resid)) != 0) {
+				uprintf("%s: cannot read .dynamic section\n",
+				    exec_file);
+				goto out;
+			}
+
+			for (dp = dyn; dp < (dyn + ndyns); dp++) {
+				if (dp->d_tag == DT_SUNW_ASLR) {
+					if ((error = handle_secflag_dt(p,
+					    DT_SUNW_ASLR,
+					    dp->d_un.d_val)) != 0) {
+						uprintf("%s: error setting "
+						    "security-flag from "
+						    "DT_SUNW_ASLR: %d\n",
+						    exec_file, error);
+						goto out;
+					}
+				}
+			}
+
+			kmem_free(dyn, dynsize);
+		}
 	}
 
 	/* Hardware/Software capabilities */
@@ -529,12 +616,12 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 
 	dtrphdr = NULL;
 
-	if ((error = mapelfexec(vp, ehdrp, nphdrs, phdrbase, &uphdr, &dyphdr,
+	if ((error = mapelfexec(vp, ehdrp, nphdrs, phdrbase, &uphdr, &intphdr,
 	    &stphdr, &dtrphdr, dataphdrp, &bssbase, &brkbase, &voffset, NULL,
 	    len, execsz, &brksize)) != 0)
 		goto bad;
 
-	if (uphdr != NULL && dyphdr == NULL)
+	if (uphdr != NULL && intphdr == NULL)
 		goto bad;
 
 	if (dtrphdr != NULL && dtrace_safe_phdr(dtrphdr, args, voffset) != 0) {
@@ -542,13 +629,13 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 		goto bad;
 	}
 
-	if (dyphdr != NULL) {
+	if (intphdr != NULL) {
 		size_t		len;
 		uintptr_t	lddata;
 		char		*p;
 		struct vnode	*nvp;
 
-		dlnsize = dyphdr->p_filesz;
+		dlnsize = intphdr->p_filesz;
 
 		if (dlnsize > MAXPATHLEN || dlnsize <= 0)
 			goto bad;
@@ -556,8 +643,8 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 		/*
 		 * Read in "interpreter" pathname.
 		 */
-		if ((error = vn_rdwr(UIO_READ, vp, dlnp, dyphdr->p_filesz,
-		    (offset_t)dyphdr->p_offset, UIO_SYSSPACE, 0, (rlim64_t)0,
+		if ((error = vn_rdwr(UIO_READ, vp, dlnp, intphdr->p_filesz,
+		    (offset_t)intphdr->p_offset, UIO_SYSSPACE, 0, (rlim64_t)0,
 		    CRED(), &resid)) != 0) {
 			uprintf("%s: Cannot obtain interpreter pathname\n",
 			    exec_file);
@@ -775,6 +862,7 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 		    ((char *)&aux->a_type -
 		    (char *)bigwad->elfargs));
 		ADDAUX(aux, AT_SUN_AUXFLAGS, auxf);
+
 		/*
 		 * Hardware capability flag word (performance hints)
 		 * Used for choosing faster library routines.
@@ -1184,7 +1272,7 @@ mapelfexec(
 	int nphdrs,
 	caddr_t phdrbase,
 	Phdr **uphdr,
-	Phdr **dyphdr,
+	Phdr **intphdr,
 	Phdr **stphdr,
 	Phdr **dtphdr,
 	Phdr *dataphdrp,
@@ -1208,11 +1296,15 @@ mapelfexec(
 	extern int use_brk_lpg;
 
 	if (ehdr->e_type == ET_DYN) {
+		secflagset_t flags = 0;
 		/*
 		 * Obtain the virtual address of a hole in the
 		 * address space to map the "interpreter".
 		 */
-		map_addr(&addr, len, (offset_t)0, 1, 0);
+		if (secflag_enabled(curproc, PROC_SEC_ASLR))
+			flags |= _MAP_RANDOMIZE;
+
+		map_addr(&addr, len, (offset_t)0, 1, flags);
 		if (addr == NULL)
 			return (ENOMEM);
 		*voffset = (intptr_t)addr;
@@ -1239,7 +1331,7 @@ mapelfexec(
 	for (i = nphdrs; i > 0; i--) {
 		switch (phdr->p_type) {
 		case PT_LOAD:
-			if ((*dyphdr != NULL) && (*uphdr == NULL))
+			if ((*intphdr != NULL) && (*uphdr == NULL))
 				return (0);
 
 			ptload = 1;
@@ -1294,6 +1386,13 @@ mapelfexec(
 				uint_t	szc = curproc->p_brkpageszc;
 				size_t pgsz = page_get_pagesize(szc);
 				caddr_t ebss = addr + phdr->p_memsz;
+				/*
+				 * If we need extra space to keep the BSS an
+				 * integral number of pages in size, some of
+				 * that space may fall beyond p_brkbase, so we
+				 * need to set p_brksize to account for it
+				 * being (logically) part of the brk.
+				 */
 				size_t extra_zfodsz;
 
 				ASSERT(pgsz > PAGESIZE);
@@ -1326,7 +1425,7 @@ mapelfexec(
 		case PT_INTERP:
 			if (ptload)
 				goto bad;
-			*dyphdr = phdr;
+			*intphdr = phdr;
 			break;
 
 		case PT_SHLIB:
@@ -1358,6 +1457,31 @@ mapelfexec(
 	if (minaddr != NULL) {
 		ASSERT(mintmp != (caddr_t)-1);
 		*minaddr = (intptr_t)mintmp;
+	}
+
+	if (brkbase != NULL && secflag_enabled(curproc, PROC_SEC_ASLR)) {
+		size_t off;
+		uintptr_t base = (uintptr_t)*brkbase;
+		uintptr_t oend = base + *brksize;
+
+		ASSERT(ISP2(aslr_max_brk_skew));
+
+		(void) random_get_pseudo_bytes((uint8_t *)&off, sizeof (off));
+		base += P2PHASE(off, aslr_max_brk_skew);
+		base = P2ROUNDUP(base, PAGESIZE);
+		*brkbase = (caddr_t)base;
+		/*
+		 * Above, we set *brksize to account for the possibility we
+		 * had to grow the 'brk' in padding out the BSS to a page
+		 * boundary.
+		 *
+		 * We now need to adjust that based on where we now are
+		 * actually putting the brk.
+		 */
+		if (oend > base)
+			*brksize = oend - base;
+		else
+			*brksize = 0;
 	}
 
 	return (0);

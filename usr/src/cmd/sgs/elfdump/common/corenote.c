@@ -34,6 +34,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <sys/corectl.h>
+#include <procfs.h>
 #include <msg.h>
 #include <_elfdump.h>
 #include <struct_layout.h>
@@ -166,7 +167,7 @@ extract_as_word(note_state_t *state, const sl_field_t *fdesc)
 {
 	return (sl_extract_as_word(state->ns_data, state->ns_swap, fdesc));
 }
-static Word
+static Lword
 extract_as_lword(note_state_t *state, const sl_field_t *fdesc)
 {
 	return (sl_extract_as_lword(state->ns_data, state->ns_swap, fdesc));
@@ -436,6 +437,7 @@ dump_auxv(note_state_t *state, const char *title)
 		Conv_cap_val_hw2_buf_t		hw2;
 		Conv_cnote_auxv_af_buf_t	auxv_af;
 		Conv_ehdr_flags_buf_t		ehdr_flags;
+		Conv_secflags_buf_t		secflags;
 		Conv_inv_buf_t			inv;
 	} conv_buf;
 	sl_fmtbuf_t	buf;
@@ -827,6 +829,46 @@ dump_timestruc(note_state_t *state, const char *title)
 	indent_exit(state);
 }
 
+/*
+ * Output information from prsecflags_t structure.
+ */
+static void
+dump_secflags(note_state_t *state, const char *title)
+{
+	const sl_prsecflags_layout_t *layout = state->ns_arch->prsecflags;
+	Conv_secflags_buf_t inv;
+	Lword lw;
+	Word w;
+
+	indent_enter(state, title, &layout->pr_version);
+
+	w = extract_as_word(state, &layout->pr_version);
+
+	if (w != PRSECFLAGS_VERSION_1) {
+		PRINT_DEC(MSG_INTL(MSG_NOTE_BAD_SECFLAGS_VER), pr_version);
+		dump_hex_bytes(state->ns_data, state->ns_len, state->ns_indent,
+		    4, 3);
+	} else {
+		PRINT_DEC(MSG_ORIG(MSG_CNOTE_T_PR_VERSION), pr_version);
+		lw = extract_as_lword(state, &layout->pr_effective);
+		print_str(state, MSG_ORIG(MSG_CNOTE_T_PR_EFFECTIVE),
+		    conv_prsecflags(lw, 0, &inv));
+
+		lw = extract_as_lword(state, &layout->pr_inherit);
+		print_str(state, MSG_ORIG(MSG_CNOTE_T_PR_INHERIT),
+		    conv_prsecflags(lw, 0, &inv));
+
+		lw = extract_as_lword(state, &layout->pr_lower);
+		print_str(state, MSG_ORIG(MSG_CNOTE_T_PR_LOWER),
+		    conv_prsecflags(lw, 0, &inv));
+
+		lw = extract_as_lword(state, &layout->pr_upper);
+		print_str(state, MSG_ORIG(MSG_CNOTE_T_PR_UPPER),
+		    conv_prsecflags(lw, 0, &inv));
+	}
+
+	indent_exit(state);
+}
 
 /*
  * Output information from utsname structure.
@@ -1097,6 +1139,7 @@ dump_pstatus(note_state_t *state, const char *title)
 	state->ns_vcol += 5;
 	state->ns_t2col += 5;
 	state->ns_v2col += 5;
+
 	PRINT_SUBTYPE(MSG_ORIG(MSG_CNOTE_T_PR_LWP), pr_lwp, dump_lwpstatus);
 	state->ns_vcol -= 5;
 	state->ns_t2col -= 5;
@@ -1856,6 +1899,13 @@ corenote(Half mach, int do_swap, Word type,
 		state.ns_t2col = 45;
 		state.ns_v2col = 58;
 		dump_psinfo(&state, MSG_ORIG(MSG_CNOTE_DESC_PSINFO_T));
+		return (CORENOTE_R_OK);
+
+	case NT_SECFLAGS:
+		state.ns_vcol = 23;
+		state.ns_t2col = 41;
+		state.ns_v2col = 54;
+		dump_secflags(&state, MSG_ORIG(MSG_CNOTE_DESC_PRSECFLAGS_T));
 		return (CORENOTE_R_OK);
 	}
 

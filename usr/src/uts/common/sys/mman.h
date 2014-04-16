@@ -83,7 +83,10 @@ extern "C" {
 /* other flags to mmap (or-ed in to MAP_SHARED or MAP_PRIVATE) */
 #define	MAP_FILE	0		/* map from file (default) */
 #define	MAP_FIXED	0x10		/* user assigns address */
+/* Not implemented */
+#define	MAP_RENAME	0x20		/* rename private pages to file */
 #define	MAP_NORESERVE	0x40		/* don't reserve needed swap area */
+/* Note that 0x80 is _MAP_LOW32, defined below */
 #define	MAP_ANON	0x100		/* map anonymous pages directly */
 #define	MAP_ANONYMOUS	MAP_ANON	/* (source compatibility) */
 #define	MAP_ALIGN	0x200		/* addr specifies alignment */
@@ -92,10 +95,8 @@ extern "C" {
 
 #ifdef _KERNEL
 #define	_MAP_TEXTREPL	0x1000
+#define	_MAP_RANDOMIZE	0x2000
 #endif /* _KERNEL */
-
-/* these flags not yet implemented */
-#define	MAP_RENAME	0x20		/* rename private pages to file */
 
 #if	(_POSIX_C_SOURCE <= 2) && !defined(_XPG4_2)
 /* these flags are used by memcntl */

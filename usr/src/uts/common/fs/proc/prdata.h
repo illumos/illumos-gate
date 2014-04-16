@@ -152,6 +152,7 @@ typedef enum prnodetype {
 	PR_PATH,		/* /proc/<pid>/path/xxx			*/
 	PR_CTDIR,		/* /proc/<pid>/contracts		*/
 	PR_CT,			/* /proc/<pid>/contracts/<ctid>		*/
+	PR_SECFLAGS,		/* /proc/<pid>/secflags			*/
 	PR_PIDFILE,		/* old process file			*/
 	PR_LWPIDFILE,		/* old lwp file				*/
 	PR_OPAGEDATA,		/* old page data file			*/

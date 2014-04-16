@@ -75,6 +75,7 @@
 	<privilege set="default" name="proc_audit" />
 	<privilege set="default" name="proc_lock_memory" />
 	<privilege set="default" name="proc_owner" />
+	<privilege set="default" name="proc_secflags" />
 	<privilege set="default" name="proc_setid" />
 	<privilege set="default" name="proc_taskid" />
 	<privilege set="default" name="sys_acct" />

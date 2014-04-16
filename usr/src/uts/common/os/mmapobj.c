@@ -68,8 +68,9 @@
  *
  * Having mmapobj interpret and map objects will allow the kernel to make the
  * best decision for where to place the mappings for said objects.  Thus, we
- * can make optimizations inside of the kernel for specific platforms or
- * cache mapping information to make mapping objects faster.
+ * can make optimizations inside of the kernel for specific platforms or cache
+ * mapping information to make mapping objects faster.  The cache is ignored
+ * if ASLR is enabled.
  *
  * The lib_va_hash will be one such optimization.  For each ELF object that
  * mmapobj is asked to interpret, we will attempt to cache the information
@@ -718,7 +719,7 @@ mmapobj_lookup_start_addr(struct lib_va *lvp)
  */
 static caddr_t
 mmapobj_alloc_start_addr(struct lib_va **lvpp, size_t len, int use_lib_va,
-    size_t align, vattr_t *vap)
+    int randomize, size_t align, vattr_t *vap)
 {
 	proc_t *p = curproc;
 	struct as *as = p->p_as;
@@ -733,6 +734,7 @@ mmapobj_alloc_start_addr(struct lib_va **lvpp, size_t len, int use_lib_va,
 	size_t lib_va_len;
 
 	ASSERT(lvpp != NULL);
+	ASSERT((randomize & use_lib_va) != 1);
 
 	MOBJ_STAT_ADD(alloc_start);
 	model = get_udatamodel();
@@ -748,6 +750,10 @@ mmapobj_alloc_start_addr(struct lib_va **lvpp, size_t len, int use_lib_va,
 	if (align > 1) {
 		ma_flags |= MAP_ALIGN;
 	}
+
+	if (randomize != 0)
+		ma_flags |= _MAP_RANDOMIZE;
+
 	if (use_lib_va) {
 		/*
 		 * The first time through, we need to setup the lib_va arenas.
@@ -861,7 +867,14 @@ nolibva:
 	 * If we don't have an expected base address, or the one that we want
 	 * to use is not available or acceptable, go get an acceptable
 	 * address range.
+	 *
+	 * If ASLR is enabled, we should never have used the cache, and should
+	 * also start our real work here, in the consequent of the next
+	 * condition.
 	 */
+	if (randomize != 0)
+		ASSERT(base == NULL);
+
 	if (base == NULL || as_gap(as, len, &base, &len, 0, NULL) ||
 	    valid_usr_range(base, len, PROT_ALL, as, as->a_userlimit) !=
 	    RANGE_OKAY || OVERLAPS_STACK(base + len, p)) {
@@ -1525,7 +1538,7 @@ check_exec_addrs(int loadable, mmapobj_result_t *mrp, caddr_t start_addr)
  * Return 0 on success or error on failure.
  */
 static int
-process_phdr(Ehdr *ehdrp, caddr_t phdrbase, int nphdrs, mmapobj_result_t *mrp,
+process_phdrs(Ehdr *ehdrp, caddr_t phdrbase, int nphdrs, mmapobj_result_t *mrp,
     vnode_t *vp, uint_t *num_mapped, size_t padding, cred_t *fcred)
 {
 	int i;
@@ -1581,7 +1594,7 @@ process_phdr(Ehdr *ehdrp, caddr_t phdrbase, int nphdrs, mmapobj_result_t *mrp,
 		}
 	}
 
-	if (padding != 0) {
+	if ((padding != 0) || secflag_enabled(curproc, PROC_SEC_ASLR)) {
 		use_lib_va = 0;
 	}
 	if (e_type == ET_DYN) {
@@ -1591,7 +1604,8 @@ process_phdr(Ehdr *ehdrp, caddr_t phdrbase, int nphdrs, mmapobj_result_t *mrp,
 			return (error);
 		}
 		/* Check to see if we already have a description for this lib */
-		lvp = lib_va_find(&vattr);
+		if (!secflag_enabled(curproc, PROC_SEC_ASLR))
+			lvp = lib_va_find(&vattr);
 
 		if (lvp != NULL) {
 			MOBJ_STAT_ADD(lvp_found);
@@ -1701,7 +1715,9 @@ process_phdr(Ehdr *ehdrp, caddr_t phdrbase, int nphdrs, mmapobj_result_t *mrp,
 		 */
 		ASSERT(lvp ? use_lib_va == 0 : 1);
 		start_addr = mmapobj_alloc_start_addr(&lvp, len,
-		    use_lib_va, align, &vattr);
+		    use_lib_va,
+		    secflag_enabled(curproc, PROC_SEC_ASLR),
+		    align, &vattr);
 		if (start_addr == NULL) {
 			if (lvp) {
 				lib_va_release(lvp);
@@ -2026,7 +2042,7 @@ doelfwork(Ehdr *ehdrp, vnode_t *vp, mmapobj_result_t *mrp,
 	}
 
 	/* Now process the phdr's */
-	error = process_phdr(ehdrp, phbasep, nphdrs, mrp, vp, num_mapped,
+	error = process_phdrs(ehdrp, phbasep, nphdrs, mrp, vp, num_mapped,
 	    padding, fcred);
 	kmem_free(phbasep, phsizep);
 	return (error);
@@ -2312,7 +2328,8 @@ mmapobj_map_interpret(vnode_t *vp, mmapobj_result_t *mrp,
 	 * for this library.  This is the fast path and only used for
 	 * ET_DYN ELF files (dynamic libraries).
 	 */
-	if (padding == 0 && (lvp = lib_va_find(&vattr)) != NULL) {
+	if (padding == 0 && !secflag_enabled(curproc, PROC_SEC_ASLR) &&
+	    ((lvp = lib_va_find(&vattr)) != NULL)) {
 		int num_segs;
 
 		model = get_udatamodel();

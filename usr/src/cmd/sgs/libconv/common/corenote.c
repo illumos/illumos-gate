@@ -37,6 +37,7 @@
 #include	<stdio.h>
 #include	<procfs.h>
 #include	<sys/corectl.h>
+#include	<sys/secflags.h>
 #include	<string.h>
 #include	<_conv.h>
 #include	<corenote_msg.h>
@@ -57,9 +58,9 @@ conv_cnote_type(Word type, Conv_fmt_flags_t fmt_flags,
 		MSG_NT_LWPSINFO,	MSG_NT_PRPRIV,
 		MSG_NT_PRPRIVINFO,	MSG_NT_CONTENT,
 		MSG_NT_ZONENAME,	MSG_NT_FDINFO,
-		MSG_NT_SPYMASTER
+		MSG_NT_SPYMASTER,	MSG_NT_SECFLAGS
 	};
-#if NT_NUM != NT_SPYMASTER
+#if NT_NUM != NT_SECFLAGS
 #error "NT_NUM has grown. Update core note types[]"
 #endif
 	static const conv_ds_msg_t ds_types = {
@@ -109,7 +110,7 @@ conv_cnote_auxv_type(Word type, Conv_fmt_flags_t fmt_flags,
 		MSG_AUXV_AT_SUN_LDDATA,		MSG_AUXV_AT_SUN_AUXFLAGS,
 		MSG_AUXV_AT_SUN_EMULATOR,	MSG_AUXV_AT_SUN_BRANDNAME,
 		MSG_AUXV_AT_SUN_BRAND_AUX1,	MSG_AUXV_AT_SUN_BRAND_AUX2,
-		MSG_AUXV_AT_SUN_BRAND_AUX3,	MSG_AUXV_AT_SUN_HWCAP2
+		MSG_AUXV_AT_SUN_BRAND_AUX3,	MSG_AUXV_AT_SUN_HWCAP2,
 	};
 	static const conv_ds_msg_t ds_types_2014_2023 = {
 	    CONV_DS_MSG_INIT(2014, types_2014_2023) };
@@ -2581,4 +2582,58 @@ conv_cnote_filemode(uint32_t mode, Conv_fmt_flags_t fmt_flags,
 
 	(void) conv_expn_field(&arg, vda, fmt_flags);
 	return (buf);
+}
+
+
+#define	PROCSECFLGSZ	CONV_EXPN_FIELD_DEF_PREFIX_SIZE +		\
+	MSG_ASLR_SIZE		+ CONV_EXPN_FIELD_DEF_SEP_SIZE +	\
+	MSG_FORBIDNULLMAP_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE +	\
+	MSG_NOEXECSTACK_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE +	\
+	CONV_INV_BUFSIZE	+ CONV_EXPN_FIELD_DEF_SUFFIX_SIZE
+
+/*
+ * Ensure that Conv_cnote_pr_secflags_buf_t is large enough:
+ *
+ * PROCSECFLGSZ is the real minimum size of the buffer required by
+ * conv_prsecflags(). However, Conv_cnote_pr_secflags_buf_t uses
+ * CONV_CNOTE_PSECFLAGS_FLAG_BUFSIZE to set the buffer size. We do things this
+ * way because the definition of PROCSECFLGSZ uses information that is not
+ * available in the environment of other programs that include the conv.h
+ * header file.
+ */
+#if (CONV_PRSECFLAGS_BUFSIZE != PROCSECFLGSZ) && !defined(__lint)
+#define	REPORT_BUFSIZE PROCSECFLGSZ
+#include "report_bufsize.h"
+#error "CONV_PRSECFLAGS_BUFSIZE does not match PROCSECFLGSZ"
+#endif
+
+const char *
+conv_prsecflags(secflagset_t flags, Conv_fmt_flags_t fmt_flags,
+    Conv_secflags_buf_t *secflags_buf)
+{
+	/*
+	 * The values are initialized later, based on position in this array
+	 */
+	static Val_desc vda[] = {
+		{ 0, MSG_ASLR },
+		{ 0, MSG_FORBIDNULLMAP },
+		{ 0, MSG_NOEXECSTACK },
+		{ 0, 0 }
+	};
+	static CONV_EXPN_FIELD_ARG conv_arg = {
+	    NULL, sizeof (secflags_buf->buf)
+	};
+	int i;
+
+	for (i = 0; vda[i].v_msg != 0; i++)
+		vda[i].v_val = secflag_to_bit(i);
+
+	if (flags == 0)
+		return (MSG_ORIG(MSG_GBL_ZERO));
+
+	conv_arg.buf = secflags_buf->buf;
+	conv_arg.oflags = conv_arg.rflags = flags;
+	(void) conv_expn_field(&conv_arg, vda, fmt_flags);
+
+	return ((const char *)secflags_buf->buf);
 }

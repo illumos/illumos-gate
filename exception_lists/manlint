@@ -12,3 +12,8 @@
 # Copyright 2016 Toomas Soome <tsoome@me.com>
 #
 usr/src/boot/*
+# Not actually a manual page
+usr/src/cmd/svc/dtd/service_bundle.dtd.1
+usr/src/lib/libbsm/adt_record.dtd.1
+usr/src/lib/libbsm/adt_record.xsl.1
+usr/src/lib/libzonecfg/dtd/zonecfg.dtd.1

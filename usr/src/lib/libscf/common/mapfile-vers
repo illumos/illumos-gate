@@ -328,6 +328,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	scf_get_boot_config_ovr;
 	scf_is_fastboot_default;
 	scf_fastreboot_default_set_transient;
+	scf_default_secflags;
 	_check_services;
 	_scf_handle_create_and_bind;
 	_smf_refresh_all_instances;

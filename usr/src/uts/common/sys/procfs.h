@@ -64,6 +64,7 @@ extern "C" {
 #include <sys/priv.h>
 #include <sys/stat.h>
 #include <sys/param.h>
+#include <sys/secflags.h>
 
 /*
  * System call interfaces for /proc.
@@ -397,6 +398,17 @@ typedef struct prpriv {
 	uint32_t	pr_infosize;		/* size of supplementary data */
 	priv_chunk_t	pr_sets[1];		/* array of sets */
 } prpriv_t;
+
+#define	PRSECFLAGS_VERSION_1		1
+#define	PRSECFLAGS_VERSION_CURRENT	PRSECFLAGS_VERSION_1
+typedef struct prsecflags {
+	uint32_t pr_version;
+	char pr_pad[4];
+	secflagset_t pr_effective;
+	secflagset_t pr_inherit;
+	secflagset_t pr_lower;
+	secflagset_t pr_upper;
+} prsecflags_t;
 
 /*
  * Watchpoint interface.  PCWATCH and /proc/<pid>/watch

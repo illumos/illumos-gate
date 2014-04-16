@@ -77,6 +77,7 @@
 #include <netinet/in.h>
 #include <sys/ddi.h>
 #include <sys/port_impl.h>
+#include <sys/secflags.h>
 
 static au_event_t	aui_fchownat(au_event_t);
 static au_event_t	aui_fchmodat(au_event_t);
@@ -101,6 +102,7 @@ static au_event_t	aui_privsys(au_event_t);
 static au_event_t	aui_forksys(au_event_t);
 static au_event_t	aui_labelsys(au_event_t);
 static au_event_t	aui_setpgrp(au_event_t);
+
 
 static void	aus_exit(struct t_audit_data *);
 static void	aus_open(struct t_audit_data *);
@@ -204,7 +206,7 @@ aui_null,	AUE_NULL,	aus_null,	/* 0 unused (indirect) */
 		auf_null,	0,
 aui_null,	AUE_EXIT,	aus_exit,	/* 1 exit */
 		auf_null,	S2E_NPT,
-aui_null,	AUE_NULL,	aus_null,	/* 2 (loadable) was forkall */
+aui_null,	AUE_PSECFLAGS,	aus_null,	/* 2 psecflags */
 		auf_null,	0,
 aui_null,	AUE_READ,	aus_null,	/* 3 read */
 		auf_read,	S2E_PUB,
@@ -742,6 +744,7 @@ aus_exit(struct t_audit_data *tad)
 	rval = (uint32_t)uap->rval;
 	au_uwrite(au_to_arg32(1, "exit status", rval));
 }
+
 
 /* acct start function */
 /*ARGSUSED*/

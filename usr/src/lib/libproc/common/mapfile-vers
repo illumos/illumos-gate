@@ -212,6 +212,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	proc_get_cred;
 	proc_get_priv;
 	proc_get_psinfo;
+        proc_get_secflags;
 	proc_get_status;
 	proc_initstdio;
 	proc_lwp_in_set;
@@ -278,6 +279,8 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	ps_ptread		{ FLAGS = NODYNSORT };	# Alias of ps_pread
 	ps_ptwrite		{ FLAGS = NODYNSORT };	# Alias of ps_pwrite
 	ps_pwrite;
+	Psecflags;
+        Psecflags_free;
 	Pstack_iter;
 	Pstate;
 	Pstatus;
