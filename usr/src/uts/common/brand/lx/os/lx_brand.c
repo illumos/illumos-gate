@@ -391,7 +391,6 @@ static void
 lx_ptrace_stop_for_option(int option)
 {
 	proc_t *p = ttoproc(curthread);
-	proc_t *pp = p->p_parent;
 	sigqueue_t *sqp;
 	lx_proc_data_t *lpdp;
 
