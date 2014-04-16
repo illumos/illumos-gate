@@ -391,12 +391,12 @@ static void
 lx_ptrace_stop_for_option(int option)
 {
 	proc_t *p = ttoproc(curthread);
+	proc_t *pp = p->p_parent;
+	sigqueue_t *sqp;
 	lx_proc_data_t *lpdp;
 
-	psignal(p, SIGTRAP);
-
 	if ((lpdp = p->p_brand_data) == NULL) {
-		/* this should never happen but just let the process stop */
+		/* this should never happen but just to be safe */
 		return;
 	}
 
@@ -425,6 +425,19 @@ lx_ptrace_stop_for_option(int option)
 		break;
 	}
 
+	/* Post the required signal to ourselves so that we stop. */
+	psignal(p, SIGTRAP);
+
+	/*
+	 * Since we're stopping, we need to post the SIGCHLD to the parent.
+	 * The code in sigcld expects the following two process values to be
+	 * setup specifically before it can send the signal, so do that here.
+	 */
+	sqp = kmem_zalloc(sizeof (sigqueue_t), KM_SLEEP);
+	p->p_wdata = SIGTRAP;
+	p->p_wcode = CLD_STOPPED;
+	sigcld(p, sqp);
+
 	/*
 	 * If (p_proc_flag & P_PR_PTRACE) were set, then in stop() we would set:
 	 *	p->p_wcode = CLD_TRAPPED
@@ -438,7 +451,6 @@ lx_ptrace_stop_for_option(int option)
 	 * do the right thing for this process. We still rely on stop() to do
 	 * all of the other processing needed for our signal.
 	 */
-	p->p_wdata = SIGTRAP;
 	p->p_wcode = CLD_TRAPPED;
 }
 
