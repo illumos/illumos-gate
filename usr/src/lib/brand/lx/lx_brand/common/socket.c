@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2014 Joyent, Inc. All rights reserved.
  */
 
 #include <unistd.h>
@@ -426,9 +427,9 @@ convert_sockaddr(struct sockaddr *addr, socklen_t *len,
 
 static int
 convert_sock_args(int in_dom, int in_type, int in_protocol, int *out_dom,
-    int *out_type)
+    int *out_type, int *out_options)
 {
-	int domain, type;
+	int domain, type, options;
 
 	if (in_dom < 0 || in_type < 0 || in_protocol < 0)
 		return (-EINVAL);
@@ -439,7 +440,7 @@ convert_sock_args(int in_dom, int in_type, int in_protocol, int *out_dom,
 	if (domain == AF_INVAL)
 		return (-EINVAL);
 
-	type = LTOS_SOCKTYPE(in_type);
+	type = LTOS_SOCKTYPE(in_type & LX_SOCK_TYPE_MASK);
 	if (type == SOCK_NOTSUPPORTED)
 		return (-ESOCKTNOSUPPORT);
 	if (type == SOCK_INVAL)
@@ -452,8 +453,15 @@ convert_sock_args(int in_dom, int in_type, int in_protocol, int *out_dom,
 	if (type == SOCK_RAW && in_protocol == IPPROTO_IP)
 		return (-ESOCKTNOSUPPORT);
 
+	options = 0;
+	if (in_type & LX_SOCK_NONBLOCK)
+		options |= SOCK_NONBLOCK;
+	if (in_type & LX_SOCK_CLOEXEC)
+		options |= SOCK_CLOEXEC;
+
 	*out_dom = domain;
 	*out_type = type;
+	*out_options = options;
 	return (0);
 }
 
@@ -512,12 +520,13 @@ lx_socket(ulong_t *args)
 {
 	int domain;
 	int type;
+	int options;
 	int protocol = (int)args[2];
 	int fd;
 	int err;
 
 	err = convert_sock_args((int)args[0], (int)args[1], protocol,
-	    &domain, &type);
+	    &domain, &type, &options);
 	if (err != 0)
 		return (err);
 
@@ -542,7 +551,7 @@ lx_socket(ulong_t *args)
 		protocol = 0;
 	}
 
-	fd = socket(domain, type, protocol);
+	fd = socket(domain, type | options, protocol);
 	if (fd >= 0)
 		return (fd);
 
@@ -833,19 +842,20 @@ lx_socketpair(ulong_t *args)
 {
 	int domain;
 	int type;
+	int options;
 	int protocol = (int)args[2];
 	int *sv = (int *)args[3];
 	int fds[2];
 	int r;
 
 	r = convert_sock_args((int)args[0], (int)args[1], protocol,
-	    &domain, &type);
+	    &domain, &type, &options);
 	if (r != 0)
 		return (r);
 
 	lx_debug("\tsocketpair(%d, %d, %d, 0x%p)", domain, type, protocol, sv);
 
-	r = socketpair(domain, type, protocol, fds);
+	r = socketpair(domain, type | options, protocol, fds);
 
 	if (r == 0) {
 		if (uucopy(fds, sv, sizeof (fds)) != 0) {
