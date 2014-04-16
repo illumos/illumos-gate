@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright (c) 2014 by Delphix. All rights reserved.
  */
 
 /*
@@ -2843,6 +2844,43 @@ highbit(ulong_t i)
 	incl	%eax
 	ret
 	SET_SIZE(highbit)
+
+#endif	/* __i386 */
+#endif	/* __lint */
+
+#if defined(__lint)
+
+/*ARGSUSED*/
+int
+highbit64(uint64_t i)
+{ return (0); }
+
+#else	/* __lint */
+
+#if defined(__amd64)
+
+	ENTRY(highbit64)
+	movl	$-1, %eax
+	bsrq	%rdi, %rax
+	incl	%eax
+	ret
+	SET_SIZE(highbit64)
+
+#elif defined(__i386)
+
+	ENTRY(highbit64)
+	bsrl	8(%esp), %eax
+	jz	.lowbit
+	addl	$32, %eax
+	jmp	.done
+
+.lowbit:
+	movl	$-1, %eax
+	bsrl	4(%esp), %eax
+.done:
+	incl	%eax
+	ret
+	SET_SIZE(highbit64)
 
 #endif	/* __i386 */
 #endif	/* __lint */

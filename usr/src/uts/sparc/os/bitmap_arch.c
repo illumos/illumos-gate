@@ -23,13 +23,48 @@
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+/*
+ * Copyright (c) 2014 by Delphix. All rights reserved.
+ */
 
 /*
  * Architecture specific definition for bitmap related routines.
  * These may be implemented using ISA specific instructions.
  */
 #include <sys/bitmap.h>
+
+/*
+ * Find highest one bit set.
+ *	Returns bit number + 1 of highest bit that is set, otherwise returns 0.
+ */
+int
+highbit64(uint64_t i)
+{
+	int h = 1;
+
+	if (i == 0)
+		return (0);
+	if (i & 0xffffffff00000000ULL) {
+		h += 32; i >>= 32;
+	}
+	if (i & 0xffff0000) {
+		h += 16; i >>= 16;
+	}
+	if (i & 0xff00) {
+		h += 8; i >>= 8;
+	}
+	if (i & 0xf0) {
+		h += 4; i >>= 4;
+	}
+	if (i & 0xc) {
+		h += 2; i >>= 2;
+	}
+	if (i & 0x2) {
+		h += 1;
+	}
+	return (h);
+}
 
 /*
  * Find highest one bit set.
