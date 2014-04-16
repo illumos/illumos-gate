@@ -21,12 +21,11 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.	All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2014 Joyent, Inc. All rights reserved.
  */
 
 #ifndef _SYS_LX_SOCKET_H
 #define	_SYS_LX_SOCKET_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -86,6 +85,19 @@ extern "C" {
 #define	LX_SOCK_SEQPACKET	5  /* Sequenced packet stream */
 #define	LX_SOCK_PACKET		10 /* Linux specific */
 #define	LX_SOCK_MAX		11
+
+/*
+ * The Linux socket type can be or-ed with other flags (e.g. SOCK_CLOEXEC).
+ */
+#define	LX_SOCK_TYPE_MASK	0xf
+
+/*
+ * Linux flags for socket, socketpair and accept4. These are or-ed into the
+ * socket type value. In the Linux net.h header these come from fcntl.h (note
+ * that they are in octal in the Linux header).
+ */
+#define	LX_SOCK_CLOEXEC		0x80000
+#define	LX_SOCK_NONBLOCK	0x800
 
 #define	SOCK_NOTSUPPORTED	-1
 #define	SOCK_INVAL		-2
