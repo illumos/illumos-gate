@@ -21,9 +21,8 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2014 Joyent, Inc.  All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/asm_linkage.h>
 #include <sys/regset.h>
@@ -127,11 +126,13 @@ lx_sigreturn_tolibc(uintptr_t sp)
 	ENTRY_NP(lx_handler_trace_table)
 	TJMP256
 	TJMP64
+	TJMP64
 	SET_SIZE(lx_handler_trace_table)
 
 	.align	16
 	ENTRY_NP(lx_handler_table)
 	JMP256
+	JMP64
 	JMP64
 	SET_SIZE(lx_handler_table)
 
