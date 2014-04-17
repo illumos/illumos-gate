@@ -1233,4 +1233,39 @@ static struct lx_sysent sysents[] = {
 	{"tee",		NULL,		NOSYS_NULL,	0},	/* 315 */
 	{"vmsplice",	NULL,		NOSYS_NULL,	0},	/* 316 */
 	{"move_pages",	NULL,		NOSYS_NULL,	0},	/* 317 */
+	{"getcpu",	NULL,		NOSYS_NULL,	0},	/* 318 */
+	{"epoll_pwait",	NULL,		NOSYS_NULL,	0},	/* 319 */
+	{"utimensat",	NULL,		NOSYS_NULL,	0},	/* 320 */
+	{"signalfd",	NULL,		NOSYS_NULL,	0},	/* 321 */
+	{"timerfd_create", NULL,	NOSYS_NULL,	0},	/* 322 */
+	{"eventfd",	NULL,		NOSYS_NULL,	0},	/* 323 */
+	{"fallocate",	NULL,		NOSYS_NULL,	0},	/* 324 */
+	{"timerfd_settime", NULL,	NOSYS_NULL,	0},	/* 325 */
+	{"timerfd_gettime", NULL,	NOSYS_NULL,	0},	/* 326 */
+	{"signalfd4",	NULL,		NOSYS_NULL,	0},	/* 327 */
+	{"eventfd2",	NULL,		NOSYS_NULL,	0},	/* 328 */
+	{"epoll_create1", NULL,		NOSYS_NULL,	0},	/* 329 */
+	{"dup3",	NULL,		NOSYS_NULL,	0},	/* 330 */
+	{"pipe2",	NULL,		NOSYS_NULL,	0},	/* 331 */
+	{"inotify_init1", NULL,		NOSYS_NULL,	0},	/* 332 */
+	{"preadv",	NULL,		NOSYS_NULL,	0},	/* 333 */
+	{"pwritev",	NULL,		NOSYS_NULL,	0},	/* 334 */
+	{"rt_tgsigqueueinfo", NULL,	NOSYS_NULL,	0},	/* 335 */
+	{"perf_event_open", NULL,	NOSYS_NULL,	0},	/* 336 */
+	{"recvmmsg",	NULL,		NOSYS_NULL,	0},	/* 337 */
+	{"fanotify_init", NULL,		NOSYS_NULL,	0},	/* 338 */
+	{"fanotify_mark", NULL,		NOSYS_NULL,	0},	/* 339 */
+	{"prlimit64",	NULL,		NOSYS_NULL,	0},	/* 340 */
+	{"name_to_handle_at", NULL,	NOSYS_NULL,	0},	/* 341 */
+	{"open_by_handle_at", NULL,	NOSYS_NULL,	0},	/* 342 */
+	{"clock_adjtime", NULL,		NOSYS_NULL,	0},	/* 343 */
+	{"syncfs",	NULL,		NOSYS_NULL,	0},	/* 344 */
+	{"sendmmsg",	NULL,		NOSYS_NULL,	0},	/* 345 */
+	{"setns",	NULL,		NOSYS_NULL,	0},	/* 346 */
+	{"process_vm_readv", NULL,	NOSYS_NULL,	0},	/* 347 */
+	{"process_vm_writev", NULL,	NOSYS_NULL,	0},	/* 348 */
+	{"kcmp",	NULL,		NOSYS_NULL,	0},	/* 349 */
+	{"finit_module", NULL,		NOSYS_NULL,	0},	/* 350 */
+	{"sched_setattr", NULL,		NOSYS_NULL,	0},	/* 351 */
+	{"sched_getattr", NULL,		NOSYS_NULL,	0},	/* 352 */
 };

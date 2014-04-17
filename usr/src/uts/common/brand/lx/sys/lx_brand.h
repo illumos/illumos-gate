@@ -59,7 +59,7 @@ extern "C" {
 #define	LX_LIB_PATH	LIB_PATH LX_LIB
 
 #define	LX_NSYSCALLS_2_4	270
-#define	LX_NSYSCALLS_2_6	317
+#define	LX_NSYSCALLS_2_6	352
 #define	LX_NSYSCALLS	LX_NSYSCALLS_2_6
 
 /*
