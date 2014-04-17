@@ -60,6 +60,18 @@
 #define	ABST_PRFX "/tmp/.ABSK_"
 #define	ABST_PRFX_LEN 11
 
+/*
+ * This string is used as the name of our emulated netlink socket which is
+ * really a unix socket in /tmp.
+ */
+#define	NETLINK_NAME "/tmp/.LX_Netlink_Sock"
+
+typedef enum {
+	lxa_none,
+	lxa_abstract,
+	lxa_netlink
+} lx_addr_type_t;
+
 static int lx_socket(ulong_t *);
 static int lx_bind(ulong_t *);
 static int lx_connect(ulong_t *);
@@ -247,6 +259,16 @@ static const lx_proto_opts_t ltos_proto_opts[IPPROTO_TAB_SIZE] = {
 #define	LX_TO_SOL	1
 #define	SOL_TO_LX	2
 
+#define	LX_AF_NETLINK			16
+#define	LX_NETLINK_KOBJECT_UEVENT	15
+
+typedef struct {
+	sa_family_t	nl_family;
+	unsigned short	nl_pad;
+	uint32_t	nl_pid;
+	uint32_t	nl_groups;
+} lx_sockaddr_nl_t;
+
 static int
 convert_cmsgs(int direction, struct lx_msghdr *msg, char *caller)
 {
@@ -292,9 +314,55 @@ convert_cmsgs(int direction, struct lx_msghdr *msg, char *caller)
 }
 
 /*
+ * We may need a different size socket address vs. the one passed in.
+ */
+static int
+calc_addr_size(struct sockaddr *a, int in_len, lx_addr_type_t *type)
+{
+	struct sockaddr name;
+	boolean_t abst_sock;
+	boolean_t netlink_sock;
+	int nlen;
+
+	if (uucopy(a, &name, sizeof (struct sockaddr)) != 0)
+		return (-errno);
+
+	/*
+	 * Handle Linux abstract sockets, which are UNIX sockets whose path
+	 * begins with a NULL character.
+	 */
+	abst_sock = (name.sa_family == AF_UNIX) && (name.sa_data[0] == '\0');
+
+	/*
+	 * Handle Linux netlink sockets which we emulate using UNIX sockets.
+	 */
+	netlink_sock = (name.sa_family == LX_AF_NETLINK);
+
+	/*
+	 * Convert_sockaddr will expand the socket path if it is abstract, so
+	 * we need to allocate extra memory for it. It will also generate
+	 * a UNIX socket address for netlinks.
+	 */
+
+	nlen = in_len;
+	if (abst_sock) {
+		nlen += ABST_PRFX_LEN;
+		*type = lxa_abstract;
+	} else if (netlink_sock) {
+		nlen = sizeof (struct sockaddr_un);
+		*type = lxa_netlink;
+	} else {
+		*type = lxa_none;
+	}
+
+	return (nlen);
+}
+
+/*
  * If inaddr is an abstract namespace unix socket, this function expects addr
  * to have enough memory to hold the expanded socket name, ie it must be of
- * size *len + ABST_PRFX_LEN.
+ * size *len + ABST_PRFX_LEN. If inaddr is a netlink socket then we expect
+ * addr to have enough memory to hold an UNIX socket address.
  */
 static int
 convert_sockaddr(struct sockaddr *addr, socklen_t *len,
@@ -417,6 +485,19 @@ convert_sockaddr(struct sockaddr *addr, socklen_t *len,
 			}
 			break;
 
+		case AF_ROUTE:
+			/*
+			 * We got a Linux netlink sockaddr_nl struct as input
+			 * but we're really going to setup a unix sockaddr_un
+			 * address for emulation. We depend on the caller to
+			 * have pre-allocated enough space for this ahead of
+			 * time.
+			 */
+			*len = sizeof (struct sockaddr_un);
+			bcopy(NETLINK_NAME, addr->sa_data,
+			    sizeof (NETLINK_NAME));
+			family = AF_UNIX;
+			break;
 		default:
 			*len = inlen;
 	}
@@ -537,6 +618,10 @@ lx_socket(ulong_t *args)
 		return (-EAFNOSUPPORT);
 
 	/*
+	 * AF_NETLINK Handling
+	 *
+	 * The AF_NETLINK address family gets mapped to AF_ROUTE.
+	 *
 	 * Clients of the auditing subsystem used by CentOS 4 and 5 expect to
 	 * be able to create AF_ROUTE SOCK_RAW sockets to communicate with the
 	 * auditing daemons. Failure to create these sockets will cause login,
@@ -544,9 +629,16 @@ lx_socket(ulong_t *args)
 	 * programs into working, we convert the socket domain and type to
 	 * something that we do support. Then when sendto is called on these
 	 * sockets, we return an error code. See lx_sendto.
+	 *
+	 * We have a similar issue with the newer startup code (e.g. mountall)
+	 * which wants to setup a netlink socket to receive from udev (protocol
+	 * NETLINK_KOBJECT_UEVENT). These apps basically poll on the socket
+	 * looking for udev events, which will never happen in our case, so we
+	 * let this go through and fail if the app tries to write.
 	 */
-	if (domain == AF_ROUTE && type == SOCK_RAW) {
-		domain = AF_INET;
+	if (domain == AF_ROUTE &&
+	    (type == SOCK_RAW || protocol == LX_NETLINK_KOBJECT_UEVENT)) {
+		domain = AF_UNIX;
 		type = SOCK_STREAM;
 		protocol = 0;
 	}
@@ -566,29 +658,18 @@ lx_bind(ulong_t *args)
 {
 	int sockfd = (int)args[0];
 	struct stat64 statbuf;
-	struct sockaddr *name, oldname;
+	struct sockaddr *name;
 	socklen_t len;
 	int r, r2, ret, tmperrno;
-	int abst_sock;
+	int nlen;
+	lx_addr_type_t type;
 	struct stat sb;
 
-	if (uucopy((struct sockaddr *)args[1], &oldname,
-	    sizeof (struct sockaddr)) != 0)
-		return (-errno);
+	if ((nlen = calc_addr_size((struct sockaddr *)args[1], (int)args[2],
+	    &type)) < 0)
+		return (nlen);
 
-	/*
-	 * Handle Linux abstract sockets, which are UNIX sockets whose path
-	 * begins with a NULL character.
-	 */
-	abst_sock = (oldname.sa_family == AF_UNIX) &&
-	    (oldname.sa_data[0] == '\0');
-
-	/*
-	 * convert_sockaddr will expand the socket path if it is abstract, so
-	 * we need to allocate extra memory for it now.
-	 */
-	if ((name = SAFE_ALLOCA((socklen_t)args[2] +
-	    abst_sock * ABST_PRFX_LEN)) == NULL)
+	if ((name = SAFE_ALLOCA(nlen)) == NULL)
 		return (-EINVAL);
 
 	if ((r = convert_sockaddr(name, &len, (struct sockaddr *)args[1],
@@ -598,7 +679,7 @@ lx_bind(ulong_t *args)
 	/*
 	 * Linux abstract namespace unix sockets are simply socket that do not
 	 * exist on the filesystem. We emulate them by changing their paths
-	 * in covert_sockaddr so that they point real files names on the
+	 * in convert_sockaddr so that they point real files names on the
 	 * filesystem. Because in Linux they do not exist on the filesystem
 	 * applications do not have to worry about deleting files, however in
 	 * our filesystem based emulation we do. To solve this problem, we first
@@ -608,7 +689,7 @@ lx_bind(ulong_t *args)
 	 * we assume it is not in use and remove the file, then continue on
 	 * as if the file never existed.
 	 */
-	if (abst_sock && stat(name->sa_data, &sb) == 0 &&
+	if (type == lxa_abstract && stat(name->sa_data, &sb) == 0 &&
 	    S_ISSOCK(sb.st_mode)) {
 		if ((r2 = socket(AF_UNIX, SOCK_STREAM, 0)) < 0)
 			return (-ENOSR);
@@ -647,6 +728,13 @@ lx_bind(ulong_t *args)
 	    (!S_ISSOCK(statbuf.st_mode))))
 		return (-EADDRINUSE);
 
+	/*
+	 * Now that the dummy netlink socket is setup, remove it to prevent
+	 * future name collisions.
+	 */
+	if (type == lxa_netlink && r >= 0)
+		(void) unlink(name->sa_data);
+
 	return ((r < 0) ? -errno : r);
 }
 
@@ -654,26 +742,17 @@ static int
 lx_connect(ulong_t *args)
 {
 	int sockfd = (int)args[0];
-	struct sockaddr *name, oldname;
+	struct sockaddr *name;
 	socklen_t len;
 	int r;
-	int abst_sock;
+	int nlen;
+	lx_addr_type_t type;
 
-	if (uucopy((struct sockaddr *)args[1], &oldname,
-	    sizeof (struct sockaddr)) != 0)
-		return (-errno);
+	if ((nlen = calc_addr_size((struct sockaddr *)args[1], (int)args[2],
+	    &type)) < 0)
+		return (nlen);
 
-
-	/* Handle Linux abstract sockets */
-	abst_sock = (oldname.sa_family == AF_UNIX) &&
-	    (oldname.sa_data[0] == '\0');
-
-	/*
-	 * convert_sockaddr will expand the socket path, if it is abstract, so
-	 * we need to allocate extra memory for it now.
-	 */
-	if ((name = SAFE_ALLOCA((socklen_t)args[2] +
-	    abst_sock * ABST_PRFX_LEN)) == NULL)
+	if ((name = SAFE_ALLOCA(nlen)) == NULL)
 		return (-EINVAL);
 
 	if ((r = convert_sockaddr(name, &len, (struct sockaddr *)args[1],
@@ -784,8 +863,37 @@ lx_getsockname(ulong_t *args)
 		bzero(name, namelen);
 	}
 
-	if ((getsockname(sockfd, name, &namelen)) < 0)
+	if (getsockname(sockfd, name, &namelen) < 0)
 		return (-errno);
+
+	/*
+	 * The caller might be asking for the name for an AF_NETLINK socket
+	 * which we're emulating as a unix socket. Check if that is the case
+	 * and if so, construct a made up name for this socket.
+	 */
+	if (namelen_orig < namelen && name->sa_family == AF_UNIX &&
+	    namelen_orig == sizeof (lx_sockaddr_nl_t)) {
+		struct sockaddr *tname;
+		socklen_t tlen = sizeof (struct sockaddr_un);
+
+		if ((tname = SAFE_ALLOCA(tlen)) != NULL) {
+			bzero(tname, tlen);
+			if (getsockname(sockfd, tname, &tlen) >= 0 &&
+			    strcmp(tname->sa_data, NETLINK_NAME) == 0) {
+				/*
+				 * This is indeed our netlink socket, make the
+				 * name look correct.
+				 */
+				lx_sockaddr_nl_t *p =
+				    (lx_sockaddr_nl_t *)(void *)name;
+
+				bzero(name, namelen_orig);
+				p->nl_family = LX_AF_NETLINK;
+				p->nl_pid = getpid();
+				namelen = namelen_orig;
+			}
+		}
+	}
 
 	/*
 	 * If the name that getsockname() want's to return is larger
@@ -974,29 +1082,21 @@ lx_sendto(ulong_t *args)
 	void *buf = (void *)args[1];
 	size_t len = (size_t)args[2];
 	int flags = (int)args[3];
-	struct sockaddr *to = NULL, oldto;
+	struct sockaddr *to = NULL;
 	socklen_t tolen = 0;
 	ssize_t r;
-	int abst_sock;
+	int nlen;
+	lx_addr_type_t type;
 
 	int nosigpipe = flags & LX_MSG_NOSIGNAL;
 	struct sigaction newact, oact;
 
 	if ((args[4] != NULL) && (args[5] > 0)) {
-		if (uucopy((struct sockaddr *)args[4], &oldto,
-		    sizeof (struct sockaddr)) != 0)
-			return (-errno);
+		if ((nlen = calc_addr_size((struct sockaddr *)args[4],
+		    (int)args[5], &type)) < 0)
+			return (nlen);
 
-		/* Handle Linux abstract sockets */
-		abst_sock = (oldto.sa_family == AF_UNIX) &&
-		    (oldto.sa_data[0] == '\0');
-
-		/*
-		 * convert_sockaddr will expand the socket path, if it is
-		 * abstract, so we need to allocate extra memory for it now.
-		 */
-		if ((to = SAFE_ALLOCA(args[5] + abst_sock * ABST_PRFX_LEN))
-		    == NULL)
+		if ((to = SAFE_ALLOCA(nlen)) == NULL)
 			return (-EINVAL);
 
 		if ((r = convert_sockaddr(to, &tolen,
@@ -1010,8 +1110,11 @@ lx_sendto(ulong_t *args)
 
 	flags = convert_sockflags(flags);
 
-	/* return this error to make auditing subsystem happy */
-	if (to && to->sa_family == AF_ROUTE) {
+	/*
+	 * Return this error if we try to write to our emulated netlink
+	 * socket. This makes the auditing subsystem happy.
+	 */
+	if (to && type == lxa_netlink) {
 		return (-ECONNREFUSED);
 	}
 
