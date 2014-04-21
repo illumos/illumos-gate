@@ -25,6 +25,7 @@
 
 /*
  * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2013, 2014 by Delphix. All rights reserved.
  */
 
 #include <sys/modctl.h>
@@ -329,16 +330,17 @@ sdt_getarg(void *arg, dtrace_id_t id, void *parg, int argno, int aframes)
 			 * In the case of amd64, we will use the pointer to the
 			 * regs structure that was pushed when we took the
 			 * trap.  To get this structure, we must increment
-			 * beyond the frame structure.  If the argument that
-			 * we're seeking is passed on the stack, we'll pull
-			 * the true stack pointer out of the saved registers
-			 * and decrement our argument by the number of
-			 * arguments passed in registers; if the argument
+			 * beyond the frame structure, the calling RIP, and
+			 * padding stored in dtrace_invop().  If the argument
+			 * that we're seeking is passed on the stack, we'll
+			 * pull the true stack pointer out of the saved
+			 * registers and decrement our argument by the number
+			 * of arguments passed in registers; if the argument
 			 * we're seeking is passed in regsiters, we can just
 			 * load it directly.
 			 */
 			struct regs *rp = (struct regs *)((uintptr_t)&fp[1] +
-			    sizeof (uintptr_t));
+			    sizeof (uintptr_t) * 2);
 
 			if (argno <= inreg) {
 				stack = (uintptr_t *)&rp->r_rdi;
