@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2013, 2014 by Delphix. All rights reserved.
  */
 
 /*
@@ -394,9 +395,10 @@ ud_kernel:
 	movq	REGOFF_RAX(%rsp), %rdx
 	pushq	(%rsi)
 	movq	%rsp, %rsi
+	subq	$8, %rsp
 	call	dtrace_invop
 	ALTENTRY(dtrace_invop_callsite)
-	addq	$8, %rsp
+	addq	$16, %rsp
 	cmpl	$DTRACE_INVOP_PUSHL_EBP, %eax
 	je	ud_push
 	cmpl	$DTRACE_INVOP_LEAVE, %eax
