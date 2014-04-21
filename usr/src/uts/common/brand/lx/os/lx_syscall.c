@@ -22,9 +22,8 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2014 Joyent, Inc.  All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/kmem.h>
 #include <sys/errno.h>
@@ -390,6 +389,41 @@ lx_sysent_t lx_sysent[] =
 	LX_NOSYS("tee"),
 	LX_NOSYS("vmsplice"),
 	LX_NOSYS("move_pages"),
+	LX_NOSYS("getcpu"),
+	LX_NOSYS("epoll_pwait"),
+	LX_NOSYS("utimensat"),					/* 320 */
+	LX_NOSYS("signalfd"),
+	LX_NOSYS("timerfd_create"),
+	LX_NOSYS("eventfd"),
+	LX_NOSYS("fallocate"),
+	LX_NOSYS("timerfd_settime"),
+	LX_NOSYS("timerfd_gettime"),
+	LX_NOSYS("signalfd4"),
+	LX_NOSYS("eventfd2"),
+	LX_NOSYS("epoll_create1"),
+	LX_NOSYS("dup3"),					/* 330 */
+	LX_NOSYS("pipe2"),
+	LX_NOSYS("inotify_init1"),
+	LX_NOSYS("preadv"),
+	LX_NOSYS("pwritev"),
+	LX_NOSYS("rt_tgsigqueueinfo"),
+	LX_NOSYS("perf_event_open"),
+	LX_NOSYS("recvmmsg"),
+	LX_NOSYS("fanotify_init"),
+	LX_NOSYS("fanotify_mark"),
+	LX_NOSYS("prlimit64"),					/* 340 */
+	LX_NOSYS("name_to_handle_at"),
+	LX_NOSYS("open_by_handle_at"),
+	LX_NOSYS("clock_adjtime"),
+	LX_NOSYS("syncfs"),
+	LX_NOSYS("sendmmsg"),
+	LX_NOSYS("setns"),
+	LX_NOSYS("process_vm_readv"),
+	LX_NOSYS("process_vm_writev"),
+	LX_NOSYS("kcmp"),
+	LX_NOSYS("finit_module"),				/* 350 */
+	LX_NOSYS("sched_setattr"),
+	LX_NOSYS("sched_getattr"),
 	NULL	/* NULL-termination is required for lx_systrace */
 };
 
