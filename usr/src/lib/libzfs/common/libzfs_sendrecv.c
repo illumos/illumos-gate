@@ -3513,7 +3513,7 @@ zfs_setup_cmdline_props(libzfs_handle_t *hdl, zfs_type_t type,
 		 * the send stream contains, for instance, a child ZVOL and
 		 * we're trying to receive it with "-o atime=on"
 		 */
-		if (!zfs_prop_valid_for_type(prop, type) &&
+		if (!zfs_prop_valid_for_type(prop, type, B_FALSE) &&
 		    !zfs_prop_user(name)) {
 			if (recursive)
 				continue;

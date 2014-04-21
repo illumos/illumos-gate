@@ -509,7 +509,7 @@ mapping_cb(int prop, void *cb)
 	JNIEnv *env = map->env;
 	zjni_ArrayList_t *list = map->list;
 
-	if (zfs_prop_valid_for_type(prop, map->type)) {
+	if (zfs_prop_valid_for_type(prop, map->type, B_FALSE)) {
 		/* Add name of property to list */
 		jstring propName = (*env)->NewStringUTF(env,
 		    zfs_prop_to_name(prop));
