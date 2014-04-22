@@ -1102,8 +1102,6 @@
 @ MSG_UTL_DYN		"dynamically triggered"
 @ MSG_UTL_DONE		"done"
 
-@ MSG_UTL_NOINIT	"warning: calling %s whose init has not completed"
-
 @ MSG_UTL_DBNOTIFY	"notify debugger: event: %s state: %s"
 
 @ MSG_UTL_SCC_TITLE	"  cycle detected - sorting cyclic dependencies in %s"

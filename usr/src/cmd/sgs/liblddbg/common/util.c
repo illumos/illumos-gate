@@ -66,19 +66,6 @@ Dbg_util_call_init(Rt_map *lmp, int flag)
 }
 
 void
-Dbg_util_no_init(Rt_map *lmp)
-{
-	Lm_list	*lml = LIST(lmp);
-
-	if (DBG_NOTCLASS(DBG_C_INIT))
-		return;
-
-	Dbg_util_nl(lml, DBG_NL_STD);
-	dbg_print(lml, MSG_INTL(MSG_UTL_NOINIT), NAME(lmp));
-	Dbg_util_nl(lml, DBG_NL_STD);
-}
-
-void
 Dbg_util_intoolate(Rt_map *lmp)
 {
 	Lm_list	*lml = LIST(lmp);

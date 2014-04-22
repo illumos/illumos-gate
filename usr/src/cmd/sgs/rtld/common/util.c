@@ -623,15 +623,21 @@ is_dep_init(Rt_map *dlmp, Rt_map *clmp)
 	if ((dlmp == clmp) || (rtld_flags & RT_FL_INITFIRST))
 		return;
 
+	rt_mutex_lock(&dlmp->rt_lock);
+	while ((FLAGS(dlmp) &
+	    (FLG_RT_RELOCED | FLG_RT_INITCALL | FLG_RT_INITDONE)) ==
+	    (FLG_RT_RELOCED | FLG_RT_INITCALL)) {
+		leave(LIST(dlmp), 0);
+		(void) _lwp_cond_wait(&dlmp->rt_cv, (mutex_t *)&dlmp->rt_lock);
+		rt_mutex_unlock(&dlmp->rt_lock);
+		(void) enter(0);
+		rt_mutex_lock(&dlmp->rt_lock);
+	}
+	rt_mutex_unlock(&dlmp->rt_lock);
+
 	if ((FLAGS(dlmp) & (FLG_RT_RELOCED | FLG_RT_INITDONE)) ==
 	    (FLG_RT_RELOCED | FLG_RT_INITDONE))
 		return;
-
-	if ((FLAGS(dlmp) & (FLG_RT_RELOCED | FLG_RT_INITCALL)) ==
-	    (FLG_RT_RELOCED | FLG_RT_INITCALL)) {
-		DBG_CALL(Dbg_util_no_init(dlmp));
-		return;
-	}
 
 	if ((tobj = calloc(2, sizeof (Rt_map *))) != NULL) {
 		tobj[0] = dlmp;
@@ -748,7 +754,10 @@ call_init(Rt_map **tobj, int flag)
 		 * signifies that a .fini must be called should it exist.
 		 * Clear the sort field for use in later .fini processing.
 		 */
+		rt_mutex_lock(&lmp->rt_lock);
 		FLAGS(lmp) |= FLG_RT_INITDONE;
+		_lwp_cond_broadcast(&lmp->rt_cv);
+		rt_mutex_unlock(&lmp->rt_lock);
 		SORTVAL(lmp) = -1;
 
 		/*

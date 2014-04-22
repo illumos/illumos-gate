@@ -719,6 +719,8 @@ struct rt_map {
 	Capchain	*rt_capchain;	/* capabilities chain data */
 	uint_t		rt_cntl;	/* link-map control list we belong to */
 	uint_t		rt_aflags;	/* auditor flags, see LML_TFLG_AUD_ */
+	Rt_cond		rt_cv;		/* for waiting on flags changes */
+	Rt_lock		rt_lock;	/* for coordinating flags changes */
 					/* address of _init */
 	void		(*rt_init)(void);
 					/* address of _fini */
