@@ -1654,3 +1654,4 @@ Bugid   Risk Synopsis
 4270	ld(1) argument error reporting is still pretty bad
 4383	libelf can't write extended sections when ELF_F_LAYOUT
 4959	completely discarded merged string sections will corrupt output objects
+4996	rtld _init race leads to incorrect symbol values

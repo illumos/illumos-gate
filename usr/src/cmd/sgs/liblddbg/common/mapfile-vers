@@ -490,8 +490,6 @@ SYMBOL_VERSION SUNWprivate_4.83 {
 		Dbg64_util_intoolate;
 		Dbg32_util_nl;
 		Dbg64_util_nl;
-		Dbg32_util_no_init;
-		Dbg64_util_no_init;
 		Dbg32_util_scc_entry;
 		Dbg64_util_scc_entry;
 		Dbg32_util_scc_title;

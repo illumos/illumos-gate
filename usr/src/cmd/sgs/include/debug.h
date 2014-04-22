@@ -502,7 +502,6 @@ extern	void		Dbg_help(void);
 #define	Dbg_util_intoolate	Dbg64_util_intoolate
 #define	Dbg_util_lcinterface	Dbg64_util_lcinterface
 #define	Dbg_util_nl		Dbg64_util_nl
-#define	Dbg_util_no_init	Dbg64_util_no_init
 #define	Dbg_util_scc_entry	Dbg64_util_scc_entry
 #define	Dbg_util_scc_title	Dbg64_util_scc_title
 #define	Dbg_util_str		Dbg64_util_str
@@ -736,7 +735,6 @@ extern	void		Dbg_help(void);
 #define	Dbg_util_intoolate	Dbg32_util_intoolate
 #define	Dbg_util_lcinterface	Dbg32_util_lcinterface
 #define	Dbg_util_nl		Dbg32_util_nl
-#define	Dbg_util_no_init	Dbg32_util_no_init
 #define	Dbg_util_scc_entry	Dbg32_util_scc_entry
 #define	Dbg_util_scc_title	Dbg32_util_scc_title
 #define	Dbg_util_str		Dbg32_util_str
@@ -1051,7 +1049,6 @@ extern	void	Dbg_util_edge_out(Rt_map *, Rt_map *);
 extern	void	Dbg_util_intoolate(Rt_map *);
 extern	void	Dbg_util_lcinterface(Rt_map *, int, char *);
 extern	void	Dbg_util_nl(Lm_list *, int);
-extern	void	Dbg_util_no_init(Rt_map *);
 extern	void	Dbg_util_scc_entry(Rt_map *, uint_t);
 extern	void	Dbg_util_scc_title(Lm_list *, int);
 extern	void	Dbg_util_str(Lm_list *, const char *);
