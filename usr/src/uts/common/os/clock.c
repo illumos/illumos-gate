@@ -328,7 +328,7 @@ static int lgrp_ticks;		/* counter to schedule lgrp load calcs */
 #define	TOD_JUMP_THRESHOLD	(TOD_REF_FREQ / 2)
 #define	TOD_FILTER_N		4
 #define	TOD_FILTER_SETTLE	(4 * TOD_FILTER_N)
-static int tod_faulted = TOD_NOFAULT;
+static enum tod_fault_type tod_faulted = TOD_NOFAULT;
 
 static int tod_status_flag = 0;		/* used by tod_validate() */
 
