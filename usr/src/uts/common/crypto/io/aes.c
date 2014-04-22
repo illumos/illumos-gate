@@ -57,17 +57,6 @@ static struct modlinkage modlinkage = {
 };
 
 /*
- * The following definitions are to keep EXPORT_SRC happy.
- */
-#ifndef AES_MIN_KEY_BYTES
-#define	AES_MIN_KEY_BYTES		0
-#endif
-
-#ifndef AES_MAX_KEY_BYTES
-#define	AES_MAX_KEY_BYTES		0
-#endif
-
-/*
  * Mechanism info structure passed to KCF during registration.
  */
 static crypto_mech_info_t aes_mech_info_tab[] = {
