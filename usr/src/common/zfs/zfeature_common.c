@@ -170,9 +170,7 @@ zpool_feature_init(void)
 	    "org.illumos:lz4_compress", "lz4_compress",
 	    "LZ4 compression algorithm support.", B_FALSE, B_FALSE,
 	    B_FALSE, NULL);
-	zfeature_register(SPA_FEATURE_FS_SS_LIMIT_OBS,
-	    "com.joyent:filesystem_limits", "obsolete_fs_limits",
-	    "Obsolete fs and ss limits.", B_TRUE, B_FALSE, B_FALSE, NULL);
+
 	zfeature_register(SPA_FEATURE_MULTI_VDEV_CRASH_DUMP,
 	    "com.joyent:multi_vdev_crash_dump", "multi_vdev_crash_dump",
 	    "Crash dumps to multiple vdev pools.", B_FALSE, B_FALSE,
@@ -208,4 +206,13 @@ zpool_feature_init(void)
 	    "com.delphix:bookmarks", "bookmarks",
 	    "\"zfs bookmark\" command",
 	    B_TRUE, B_FALSE, B_FALSE, bookmarks_deps);
+
+	static const spa_feature_t filesystem_limits_deps[] = {
+	    SPA_FEATURE_EXTENSIBLE_DATASET,
+	    SPA_FEATURE_NONE
+	};
+	zfeature_register(SPA_FEATURE_FS_SS_LIMIT,
+	    "com.joyent:filesystem_limits", "filesystem_limits",
+	    "Filesystem and snapshot limits.", B_TRUE, B_FALSE, B_FALSE,
+	    filesystem_limits_deps);
 }
