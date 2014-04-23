@@ -377,7 +377,7 @@ i_so_notify_last_rx(struct sonode *so, int *pollev, int *sigev)
 		so->so_state |= SS_SENTLASTREADSIG;
 		so->so_pollev &= ~SO_POLLEV_IN;
 
-		*pollev |= POLLIN|POLLRDNORM;
+		*pollev |= POLLIN|POLLRDNORM|POLLRDHUP;
 		*sigev |= SOCKETSIG_READ;
 
 		return (1);

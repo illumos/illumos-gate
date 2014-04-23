@@ -13,6 +13,7 @@
 # Copyright 2011, Richard Lowe
 # Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2013, OmniTI Computer Consulting, Inc. All rights reserved.
+# Copyright (c) 2014, Joyent, Inc.  All rights reserved.
 #
 
 include		$(SRC)/Makefile.master
@@ -106,6 +107,9 @@ MANFILES= 	__fbufsize.3c					\
 	 	enable_extended_FILE_stdio.3c			\
 	 	encrypt.3c					\
 	 	end.3c						\
+	 	epoll_create.3c					\
+	 	epoll_ctl.3c					\
+	 	epoll_wait.3c					\
 	 	err.3c						\
 	 	euclen.3c					\
 	 	exit.3c						\
@@ -706,6 +710,8 @@ MANLINKS=	FD_CLR.3c				\
 	 	endusershell.3c				\
 	 	endutent.3c				\
 	 	endutxent.3c				\
+	 	epoll_create1.3c			\
+	 	epoll_pwait.3c				\
 	 	erand48.3c				\
 	 	errno.3c				\
 	 	errx.3c					\
@@ -1434,6 +1440,9 @@ _end.3c					:= LINKSRC = end.3c
 _etext.3c				:= LINKSRC = end.3c
 edata.3c				:= LINKSRC = end.3c
 etext.3c				:= LINKSRC = end.3c
+
+epoll_create1.3c			:= LINKSRC = epoll_create.3c
+epoll_pwait.3c				:= LINKSRC = epoll_wait.3c
 
 errx.3c					:= LINKSRC = err.3c
 verr.3c					:= LINKSRC = err.3c

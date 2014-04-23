@@ -25,6 +25,7 @@
 
 /*
  * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright (c) 2014, Joyent, Inc. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -45,6 +46,8 @@
 #include <sys/devpoll.h>
 #include <sys/rctl.h>
 #include <sys/resource.h>
+#include <sys/schedctl.h>
+#include <sys/epoll.h>
 
 #define	RESERVED	1
 
@@ -237,7 +240,8 @@ dpinfo(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg, void **result)
  *	 stale entries!
  */
 static int
-dp_pcache_poll(pollfd_t *pfdp, pollcache_t *pcp, nfds_t nfds, int *fdcntp)
+dp_pcache_poll(dp_entry_t *dpep, void *dpbuf,
+    pollcache_t *pcp, nfds_t nfds, int *fdcntp)
 {
 	int		start, ostart, end;
 	int		fdcnt, fd;
@@ -247,7 +251,10 @@ dp_pcache_poll(pollfd_t *pfdp, pollcache_t *pcp, nfds_t nfds, int *fdcntp)
 	boolean_t	no_wrap;
 	pollhead_t	*php;
 	polldat_t	*pdp;
+	pollfd_t	*pfdp;
+	epoll_event_t	*epoll;
 	int		error = 0;
+	short		mask = POLLRDHUP | POLLWRNORM | POLLWRBAND;
 
 	ASSERT(MUTEX_HELD(&pcp->pc_lock));
 	if (pcp->pc_bitmap == NULL) {
@@ -256,6 +263,14 @@ dp_pcache_poll(pollfd_t *pfdp, pollcache_t *pcp, nfds_t nfds, int *fdcntp)
 		 * has been cached.
 		 */
 		return (error);
+	}
+
+	if (dpep->dpe_flag & DP_ISEPOLLCOMPAT) {
+		pfdp = NULL;
+		epoll = (epoll_event_t *)dpbuf;
+	} else {
+		pfdp = (pollfd_t *)dpbuf;
+		epoll = NULL;
 	}
 retry:
 	start = ostart = pcp->pc_mapstart;
@@ -316,11 +331,32 @@ repoll:
 				 * polling a closed fd. Hope this will remind
 				 * user to do a POLLREMOVE.
 				 */
-				pfdp[fdcnt].fd = fd;
-				pfdp[fdcnt].revents = POLLNVAL;
-				fdcnt++;
+				if (pfdp != NULL) {
+					pfdp[fdcnt].fd = fd;
+					pfdp[fdcnt].revents = POLLNVAL;
+					fdcnt++;
+					continue;
+				}
+
+				/*
+				 * In the epoll compatibility case, we actually
+				 * perform the implicit removal to remain
+				 * closer to the epoll semantics.
+				 */
+				ASSERT(epoll != NULL);
+
+				pdp->pd_fp = NULL;
+				pdp->pd_events = 0;
+
+				if (php != NULL) {
+					pollhead_delete(php, pdp);
+					pdp->pd_php = NULL;
+				}
+
+				BT_CLEAR(pcp->pc_bitmap, fd);
 				continue;
 			}
+
 			if (fp != pdp->pd_fp) {
 				/*
 				 * user is polling on a cached fd which was
@@ -376,9 +412,59 @@ repoll:
 			}
 
 			if (revent != 0) {
-				pfdp[fdcnt].fd = fd;
-				pfdp[fdcnt].events = pdp->pd_events;
-				pfdp[fdcnt].revents = revent;
+				if (pfdp != NULL) {
+					pfdp[fdcnt].fd = fd;
+					pfdp[fdcnt].events = pdp->pd_events;
+					pfdp[fdcnt].revents = revent;
+				} else {
+					epoll_event_t *ep = &epoll[fdcnt];
+
+					ASSERT(epoll != NULL);
+					ep->data.u64 = pdp->pd_epolldata;
+
+					/*
+					 * If any of the event bits are set for
+					 * which poll and epoll representations
+					 * differ, swizzle in the native epoll
+					 * values.
+					 */
+					if (revent & mask) {
+						ep->events = (revent & ~mask) |
+						    ((revent & POLLRDHUP) ?
+						    EPOLLRDHUP : 0) |
+						    ((revent & POLLWRNORM) ?
+						    EPOLLWRNORM : 0) |
+						    ((revent & POLLWRBAND) ?
+						    EPOLLWRBAND : 0);
+					} else {
+						ep->events = revent;
+					}
+				}
+
+				/*
+				 * If POLLET is set, clear the bit in the
+				 * bitmap -- which effectively latches the
+				 * edge on a pollwakeup() from the driver.
+				 */
+				if (pdp->pd_events & POLLET)
+					BT_CLEAR(pcp->pc_bitmap, fd);
+
+				/*
+				 * If POLLONESHOT is set, perform the implicit
+				 * POLLREMOVE.
+				 */
+				if (pdp->pd_events & POLLONESHOT) {
+					pdp->pd_fp = NULL;
+					pdp->pd_events = 0;
+
+					if (php != NULL) {
+						pollhead_delete(php, pdp);
+						pdp->pd_php = NULL;
+					}
+
+					BT_CLEAR(pcp->pc_bitmap, fd);
+				}
+
 				fdcnt++;
 			} else if (php != NULL) {
 				/*
@@ -392,7 +478,7 @@ repoll:
 				 * in bitmap.
 				 */
 				if ((pdp->pd_php != NULL) &&
-				    ((pcp->pc_flag & T_POLLWAKE) == 0)) {
+				    ((pcp->pc_flag & PC_POLLWAKE) == 0)) {
 					BT_CLEAR(pcp->pc_bitmap, fd);
 				}
 				if (pdp->pd_php == NULL) {
@@ -499,7 +585,9 @@ dpwrite(dev_t dev, struct uio *uiop, cred_t *credp)
 	dp_entry_t	*dpep;
 	pollcache_t	*pcp;
 	pollfd_t	*pollfdp, *pfdp;
-	int		error;
+	dvpoll_epollfd_t *epfdp;
+	uintptr_t	limit;
+	int		error, size;
 	ssize_t		uiosize;
 	nfds_t		pollfdnum;
 	struct pollhead	*php = NULL;
@@ -515,11 +603,18 @@ dpwrite(dev_t dev, struct uio *uiop, cred_t *credp)
 	ASSERT(dpep != NULL);
 	mutex_exit(&devpoll_lock);
 	pcp = dpep->dpe_pcache;
-	if (curproc->p_pid != pcp->pc_pid) {
+
+	if (curproc->p_pid != pcp->pc_pid)
 		return (EACCES);
+
+	if (dpep->dpe_flag & DP_ISEPOLLCOMPAT) {
+		size = sizeof (dvpoll_epollfd_t);
+	} else {
+		size = sizeof (pollfd_t);
 	}
+
 	uiosize = uiop->uio_resid;
-	pollfdnum = uiosize / sizeof (pollfd_t);
+	pollfdnum = uiosize / size;
 	mutex_enter(&curproc->p_lock);
 	if (pollfdnum > (uint_t)rctl_enforced_value(
 	    rctlproc_legacy[RLIMIT_NOFILE], curproc->p_rctls, curproc)) {
@@ -534,6 +629,7 @@ dpwrite(dev_t dev, struct uio *uiop, cred_t *credp)
 	 * each polled fd to the cached set.
 	 */
 	pollfdp = kmem_alloc(uiosize, KM_SLEEP);
+	limit = (uintptr_t)pollfdp + (pollfdnum * size);
 
 	/*
 	 * Although /dev/poll uses the write(2) interface to cache fds, it's
@@ -555,9 +651,27 @@ dpwrite(dev_t dev, struct uio *uiop, cred_t *credp)
 	mutex_enter(&dpep->dpe_lock);
 	dpep->dpe_writerwait++;
 	while (dpep->dpe_refcnt != 0) {
+		/*
+		 * We need to do a bit of a dance here:  we need to drop
+		 * our dpe_lock and grab the pc_lock to broadcast the pc_cv to
+		 * kick any DP_POLL/DP_PPOLL sleepers.
+		 */
+		mutex_exit(&dpep->dpe_lock);
+		mutex_enter(&pcp->pc_lock);
+		pcp->pc_flag |= PC_WRITEWANTED;
+		cv_broadcast(&pcp->pc_cv);
+		mutex_exit(&pcp->pc_lock);
+		mutex_enter(&dpep->dpe_lock);
+
+		if (dpep->dpe_refcnt == 0)
+			break;
+
 		if (!cv_wait_sig_swap(&dpep->dpe_cv, &dpep->dpe_lock)) {
 			dpep->dpe_writerwait--;
 			mutex_exit(&dpep->dpe_lock);
+			mutex_enter(&pcp->pc_lock);
+			pcp->pc_flag &= ~PC_WRITEWANTED;
+			mutex_exit(&pcp->pc_lock);
 			kmem_free(pollfdp, uiosize);
 			return (set_errno(EINTR));
 		}
@@ -565,13 +679,17 @@ dpwrite(dev_t dev, struct uio *uiop, cred_t *credp)
 	dpep->dpe_writerwait--;
 	dpep->dpe_flag |= DP_WRITER_PRESENT;
 	dpep->dpe_refcnt++;
+
 	mutex_exit(&dpep->dpe_lock);
 
 	mutex_enter(&pcp->pc_lock);
+	pcp->pc_flag &= ~PC_WRITEWANTED;
+
 	if (pcp->pc_bitmap == NULL) {
 		pcache_create(pcp, pollfdnum);
 	}
-	for (pfdp = pollfdp; pfdp < pollfdp + pollfdnum; pfdp++) {
+	for (pfdp = pollfdp; (uintptr_t)pfdp < limit;
+	    pfdp = (pollfd_t *)((uintptr_t)pfdp + size)) {
 		fd = pfdp->fd;
 		if ((uint_t)fd >= P_FINFO(curproc)->fi_nfiles)
 			continue;
@@ -580,9 +698,27 @@ dpwrite(dev_t dev, struct uio *uiop, cred_t *credp)
 			if (pdp == NULL) {
 				pdp = pcache_alloc_fd(0);
 				pdp->pd_fd = fd;
+
+				if (dpep->dpe_flag & DP_ISEPOLLCOMPAT) {
+					/* LINTED pointer alignment */
+					epfdp = (dvpoll_epollfd_t *)pfdp;
+					pdp->pd_epolldata = epfdp->dpep_data;
+				}
+
 				pdp->pd_pcache = pcp;
 				pcache_insert_fd(pcp, pdp, pollfdnum);
+			} else {
+				if ((dpep->dpe_flag & DP_ISEPOLLCOMPAT) &&
+				    pdp->pd_fp != NULL) {
+					/*
+					 * epoll semantics demand that we error
+					 * out in this case.
+					 */
+					error = EEXIST;
+					break;
+				}
 			}
+
 			ASSERT(pdp->pd_fd == fd);
 			ASSERT(pdp->pd_pcache == pcp);
 			if (fd >= pcp->pc_mapsize) {
@@ -665,7 +801,17 @@ dpwrite(dev_t dev, struct uio *uiop, cred_t *credp)
 			}
 			releasef(fd);
 		} else {
-			if (pdp == NULL) {
+			if (pdp == NULL || pdp->pd_fp == NULL) {
+				if (dpep->dpe_flag & DP_ISEPOLLCOMPAT) {
+					/*
+					 * As with the add case (above), epoll
+					 * semantics demand that we error out
+					 * in this case.
+					 */
+					error = ENOENT;
+					break;
+				}
+
 				continue;
 			}
 			ASSERT(pdp->pd_fd == fd);
@@ -690,6 +836,17 @@ dpwrite(dev_t dev, struct uio *uiop, cred_t *credp)
 	return (error);
 }
 
+#define	DP_SIGMASK_RESTORE(ksetp) {					\
+	if (ksetp != NULL) {						\
+		mutex_enter(&p->p_lock);				\
+		if (lwp->lwp_cursig == 0) {				\
+			t->t_hold = lwp->lwp_sigoldmask;		\
+			t->t_flag &= ~T_TOMASK;				\
+		}							\
+		mutex_exit(&p->p_lock);					\
+	}								\
+}
+
 /*ARGSUSED*/
 static int
 dpioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
@@ -701,7 +858,7 @@ dpioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 	int		error = 0;
 	STRUCT_DECL(dvpoll, dvpoll);
 
-	if (cmd == DP_POLL) {
+	if (cmd == DP_POLL || cmd == DP_PPOLL) {
 		/* do this now, before we sleep on DP_WRITER_PRESENT */
 		now = gethrtime();
 	}
@@ -717,6 +874,27 @@ dpioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 		return (EACCES);
 
 	mutex_enter(&dpep->dpe_lock);
+
+	if (cmd == DP_EPOLLCOMPAT) {
+		if (dpep->dpe_refcnt != 0) {
+			/*
+			 * We can't turn on epoll compatibility while there
+			 * are outstanding operations.
+			 */
+			mutex_exit(&dpep->dpe_lock);
+			return (EBUSY);
+		}
+
+		/*
+		 * epoll compatibility is a one-way street: there's no way
+		 * to turn it off for a particular open.
+		 */
+		dpep->dpe_flag |= DP_ISEPOLLCOMPAT;
+		mutex_exit(&dpep->dpe_lock);
+
+		return (0);
+	}
+
 	while ((dpep->dpe_flag & DP_WRITER_PRESENT) ||
 	    (dpep->dpe_writerwait != 0)) {
 		if (!cv_wait_sig_swap(&dpep->dpe_cv, &dpep->dpe_lock)) {
@@ -729,15 +907,36 @@ dpioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 
 	switch (cmd) {
 	case	DP_POLL:
+	case	DP_PPOLL:
 	{
 		pollstate_t	*ps;
 		nfds_t		nfds;
 		int		fdcnt = 0;
+		size_t		size, fdsize, dpsize;
 		hrtime_t	deadline = 0;
+		k_sigset_t	*ksetp = NULL;
+		k_sigset_t	kset;
+		sigset_t	set;
+		kthread_t	*t = curthread;
+		klwp_t		*lwp = ttolwp(t);
+		struct proc	*p = ttoproc(curthread);
 
 		STRUCT_INIT(dvpoll, mode);
-		error = copyin((caddr_t)arg, STRUCT_BUF(dvpoll),
-		    STRUCT_SIZE(dvpoll));
+
+		/*
+		 * The dp_setp member is only required/consumed for DP_PPOLL,
+		 * which otherwise uses the same structure as DP_POLL.
+		 */
+		if (cmd == DP_POLL) {
+			dpsize = (uintptr_t)STRUCT_FADDR(dvpoll, dp_setp) -
+			    (uintptr_t)STRUCT_FADDR(dvpoll, dp_fds);
+		} else {
+			ASSERT(cmd == DP_PPOLL);
+			dpsize = STRUCT_SIZE(dvpoll);
+		}
+
+		error = copyin((caddr_t)arg, STRUCT_BUF(dvpoll), dpsize);
+
 		if (error) {
 			DP_REFRELE(dpep);
 			return (EFAULT);
@@ -755,6 +954,52 @@ dpioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 			deadline += now;
 		}
 
+		if (cmd == DP_PPOLL) {
+			void *setp = STRUCT_FGETP(dvpoll, dp_setp);
+
+			if (setp != NULL) {
+				if (copyin(setp, &set, sizeof (set))) {
+					DP_REFRELE(dpep);
+					return (EFAULT);
+				}
+
+				sigutok(&set, &kset);
+				ksetp = &kset;
+
+				mutex_enter(&p->p_lock);
+				schedctl_finish_sigblock(t);
+				lwp->lwp_sigoldmask = t->t_hold;
+				t->t_hold = *ksetp;
+				t->t_flag |= T_TOMASK;
+
+				/*
+				 * Like ppoll() with a non-NULL sigset, we'll
+				 * call cv_reltimedwait_sig() just to check for
+				 * signals.  This call will return immediately
+				 * with either 0 (signalled) or -1 (no signal).
+				 * There are some conditions whereby we can
+				 * get 0 from cv_reltimedwait_sig() without
+				 * a true signal (e.g., a directed stop), so
+				 * we restore our signal mask in the unlikely
+				 * event that lwp_cursig is 0.
+				 */
+				if (!cv_reltimedwait_sig(&t->t_delay_cv,
+				    &p->p_lock, 0, TR_CLOCK_TICK)) {
+					if (lwp->lwp_cursig == 0) {
+						t->t_hold = lwp->lwp_sigoldmask;
+						t->t_flag &= ~T_TOMASK;
+					}
+
+					mutex_exit(&p->p_lock);
+
+					DP_REFRELE(dpep);
+					return (EINTR);
+				}
+
+				mutex_exit(&p->p_lock);
+			}
+		}
+
 		if ((nfds = STRUCT_FGET(dvpoll, dp_nfds)) == 0) {
 			/*
 			 * We are just using DP_POLL to sleep, so
@@ -762,15 +1007,27 @@ dpioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 			 * Do not check for signals if we have a zero timeout.
 			 */
 			DP_REFRELE(dpep);
-			if (deadline == 0)
+			if (deadline == 0) {
+				DP_SIGMASK_RESTORE(ksetp);
 				return (0);
+			}
+
 			mutex_enter(&curthread->t_delay_lock);
 			while ((error =
 			    cv_timedwait_sig_hrtime(&curthread->t_delay_cv,
 			    &curthread->t_delay_lock, deadline)) > 0)
 				continue;
 			mutex_exit(&curthread->t_delay_lock);
+
+			DP_SIGMASK_RESTORE(ksetp);
+
 			return (error == 0 ? EINTR : 0);
+		}
+
+		if (dpep->dpe_flag & DP_ISEPOLLCOMPAT) {
+			size = nfds * (fdsize = sizeof (epoll_event_t));
+		} else {
+			size = nfds * (fdsize = sizeof (pollfd_t));
 		}
 
 		/*
@@ -782,8 +1039,7 @@ dpioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 			curthread->t_pollstate = pollstate_create();
 			ps = curthread->t_pollstate;
 		}
-		if (ps->ps_dpbufsize < nfds) {
-			struct proc *p = ttoproc(curthread);
+		if (ps->ps_dpbufsize < size) {
 			/*
 			 * The maximum size should be no large than
 			 * current maximum open file count.
@@ -792,27 +1048,28 @@ dpioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 			if (nfds > p->p_fno_ctl) {
 				mutex_exit(&p->p_lock);
 				DP_REFRELE(dpep);
+				DP_SIGMASK_RESTORE(ksetp);
 				return (EINVAL);
 			}
 			mutex_exit(&p->p_lock);
-			kmem_free(ps->ps_dpbuf, sizeof (pollfd_t) *
-			    ps->ps_dpbufsize);
-			ps->ps_dpbuf = kmem_zalloc(sizeof (pollfd_t) *
-			    nfds, KM_SLEEP);
-			ps->ps_dpbufsize = nfds;
+			kmem_free(ps->ps_dpbuf, ps->ps_dpbufsize);
+			ps->ps_dpbuf = kmem_zalloc(size, KM_SLEEP);
+			ps->ps_dpbufsize = size;
 		}
 
 		mutex_enter(&pcp->pc_lock);
 		for (;;) {
-			pcp->pc_flag = 0;
-			error = dp_pcache_poll(ps->ps_dpbuf, pcp, nfds, &fdcnt);
+			pcp->pc_flag &= ~PC_POLLWAKE;
+
+			error = dp_pcache_poll(dpep, ps->ps_dpbuf,
+			    pcp, nfds, &fdcnt);
 			if (fdcnt > 0 || error != 0)
 				break;
 
 			/*
 			 * A pollwake has happened since we polled cache.
 			 */
-			if (pcp->pc_flag & T_POLLWAKE)
+			if (pcp->pc_flag & PC_POLLWAKE)
 				continue;
 
 			/*
@@ -822,8 +1079,40 @@ dpioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 				/* immediate timeout; do not check signals */
 				break;
 			}
-			error = cv_timedwait_sig_hrtime(&pcp->pc_cv,
-			    &pcp->pc_lock, deadline);
+
+			if (!(pcp->pc_flag & PC_WRITEWANTED)) {
+				error = cv_timedwait_sig_hrtime(&pcp->pc_cv,
+				    &pcp->pc_lock, deadline);
+			} else {
+				error = 1;
+			}
+
+			if (error > 0 && (pcp->pc_flag & PC_WRITEWANTED)) {
+				/*
+				 * We've been kicked off of our cv because a
+				 * writer wants in.  We're going to drop our
+				 * reference count and then wait until the
+				 * writer is gone -- at which point we'll
+				 * reacquire the pc_lock and call into
+				 * dp_pcache_poll() to get the updated state.
+				 */
+				mutex_exit(&pcp->pc_lock);
+
+				mutex_enter(&dpep->dpe_lock);
+				dpep->dpe_refcnt--;
+				cv_broadcast(&dpep->dpe_cv);
+
+				while ((dpep->dpe_flag & DP_WRITER_PRESENT) ||
+				    (dpep->dpe_writerwait != 0)) {
+					error = cv_wait_sig_swap(&dpep->dpe_cv,
+					    &dpep->dpe_lock);
+				}
+
+				dpep->dpe_refcnt++;
+				mutex_exit(&dpep->dpe_lock);
+				mutex_enter(&pcp->pc_lock);
+			}
+
 			/*
 			 * If we were awakened by a signal or timeout
 			 * then break the loop, else poll again.
@@ -837,9 +1126,11 @@ dpioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 		}
 		mutex_exit(&pcp->pc_lock);
 
+		DP_SIGMASK_RESTORE(ksetp);
+
 		if (error == 0 && fdcnt > 0) {
-			if (copyout(ps->ps_dpbuf, STRUCT_FGETP(dvpoll,
-			    dp_fds), sizeof (pollfd_t) * fdcnt)) {
+			if (copyout(ps->ps_dpbuf,
+			    STRUCT_FGETP(dvpoll, dp_fds), fdcnt * fdsize)) {
 				DP_REFRELE(dpep);
 				return (EFAULT);
 			}

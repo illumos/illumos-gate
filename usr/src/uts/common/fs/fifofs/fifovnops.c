@@ -27,7 +27,9 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
+ */
 
 /*
  * FIFOFS file system vnode operations.  This file system
@@ -1832,17 +1834,16 @@ fifo_poll(vnode_t *vp, short events, int anyyet, short *reventsp,
 	}
 
 	/*
-	 * if we happened to get something, return
+	 * if we happened to get something and we're not edge-triggered, return
 	 */
-
-	if ((*reventsp = (short)retevents) != 0) {
+	if ((*reventsp = (short)retevents) != 0 && !(events & POLLET)) {
 		mutex_exit(&fnp->fn_lock->flk_lock);
 		return (0);
 	}
 
 	/*
-	 * If poll() has not found any events yet, set up event cell
-	 * to wake up the poll if a requested event occurs on this
+	 * If poll() has not found any events yet or we're edge-triggered, set
+	 * up event cell to wake up the poll if a requested event occurs on this
 	 * pipe/fifo.
 	 */
 	if (!anyyet) {

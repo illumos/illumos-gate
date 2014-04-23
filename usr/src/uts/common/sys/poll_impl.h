@@ -24,10 +24,12 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright (c) 2014, Joyent, Inc. All rights reserved.
+ */
+
 #ifndef _SYS_POLL_IMPL_H
 #define	_SYS_POLL_IMPL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Caching Poll Subsystem:
@@ -160,6 +162,7 @@ typedef struct polldat {
 	int		pd_nsets;	/* num of xref sets, used by poll(2) */
 	xref_t		*pd_ref;	/* ptr to xref info, 1 for each set */
 	struct port_kevent *pd_portev;	/* associated port event struct */
+	uint64_t	pd_epolldata;	/* epoll data, if any */
 } polldat_t;
 
 /*
@@ -187,7 +190,8 @@ typedef struct pollcache {
 } pollcache_t;
 
 /* pc_flag */
-#define	T_POLLWAKE	0x02	/* pollwakeup() occurred */
+#define	PC_POLLWAKE	0x02	/* pollwakeup() occurred */
+#define	PC_WRITEWANTED	0x04	/* writer wishes to modify the pollcache_t */
 
 #if defined(_KERNEL)
 /*

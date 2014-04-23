@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright (c) 2013, Joyent, Inc. All rights reserved.
+# Copyright (c) 2014, Joyent, Inc. All rights reserved.
 #
 # This lists all the files that illumos-joyent delivers as part of a build.
 # Keep this sorted as by LC_ALL=C sort -u -k2.
@@ -3553,6 +3553,7 @@ f usr/include/sys/emul64.h 0644 root bin
 f usr/include/sys/emul64cmd.h 0644 root bin
 f usr/include/sys/emul64var.h 0644 root bin
 f usr/include/sys/epm.h 0644 root bin
+f usr/include/sys/epoll.h 0644 root bin
 f usr/include/sys/errno.h 0644 root bin
 f usr/include/sys/errorq.h 0644 root bin
 f usr/include/sys/errorq_impl.h 0644 root bin
@@ -12786,6 +12787,11 @@ s usr/share/man/man3c/endspent.3c=getspnam.3c
 s usr/share/man/man3c/endusershell.3c=getusershell.3c
 s usr/share/man/man3c/endutent.3c=getutent.3c
 s usr/share/man/man3c/endutxent.3c=getutxent.3c
+f usr/share/man/man3c/epoll_create.3c 0444 root bin
+s usr/share/man/man3c/epoll_create1.3c=epoll_create.3c
+f usr/share/man/man3c/epoll_ctl.3c 0444 root bin
+s usr/share/man/man3c/epoll_pwait.3c=epoll_wait.3c
+f usr/share/man/man3c/epoll_wait.3c 0444 root bin
 s usr/share/man/man3c/erand48.3c=drand48.3c
 f usr/share/man/man3c/err.3c 0444 root bin
 s usr/share/man/man3c/errno.3c=perror.3c
@@ -17951,6 +17957,7 @@ f usr/share/man/man5/device_clean.5 0444 root bin
 f usr/share/man/man5/dhcp.5 0444 root bin
 f usr/share/man/man5/dhcp_modules.5 0444 root bin
 f usr/share/man/man5/environ.5 0444 root bin
+f usr/share/man/man5/epoll.5 0444 root bin
 f usr/share/man/man5/eqnchar.5 0444 root bin
 f usr/share/man/man5/extendedFILE.5 0444 root bin
 f usr/share/man/man5/filesystem.5 0444 root bin

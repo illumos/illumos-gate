@@ -73,15 +73,6 @@ Pointer to \fBpollfd\fR structure.
 
 .SH DESCRIPTION
 .LP
-Note -
-.sp
-.RS 2
-The \fB/dev/poll\fR device, associated driver and corresponding manpages may be
-removed in a future Solaris release. For similar functionality in the event
-ports framework, see \fBport_create\fR(3C).
-.RE
-.sp
-.LP
 The  \fB/dev/poll\fR driver is a special driver that enables you to monitor
 multiple sets  of polled file descriptors. By using the  \fB/dev/poll\fR
 driver, you can efficiently poll large numbers of file descriptors. Access to
