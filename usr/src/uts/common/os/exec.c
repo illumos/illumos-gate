@@ -97,6 +97,7 @@ uint_t auxv_hwcap32_2 = 0;	/* 32-bit version of auxv_hwcap2 */
 #endif
 
 #define	PSUIDFLAGS		(SNOCD|SUGID)
+#define	RANDOM_LEN	16	/* 16 bytes for AT_RANDOM aux entry */
 
 /*
  * exece() - system call wrapper around exec_common()
@@ -1498,6 +1499,27 @@ stk_add(uarg_t *args, const char *sp, enum uio_seg segflg)
 	return (0);
 }
 
+/*
+ * Add a fixed size byte array to the stack (only from kernel space).
+ */
+static int
+stk_byte_add(uarg_t *args, const uint8_t *sp, size_t len)
+{
+	int error;
+
+	if (STK_AVAIL(args) < sizeof (int))
+		return (E2BIG);
+	*--args->stk_offp = args->stk_strp - args->stk_base;
+
+	if (len > STK_AVAIL(args))
+		return (E2BIG);
+	bcopy(sp, args->stk_strp, len);
+
+	args->stk_strp += len;
+
+	return (0);
+}
+
 static int
 stk_getptr(uarg_t *args, char *src, char **dst)
 {
@@ -1534,6 +1556,9 @@ stk_copyin(execa_t *uap, uarg_t *args, intpdata_t *intp, void **auxvpp)
 	size_t size, pad;
 	char *argv = (char *)uap->argp;
 	char *envp = (char *)uap->envp;
+	uint32_t rvals;
+	uint8_t *rtp;
+	uint8_t rdata[RANDOM_LEN];
 
 	/*
 	 * Copy interpreter's name and argument to argv[0] and argv[1].
@@ -1604,7 +1629,7 @@ stk_copyin(execa_t *uap, uarg_t *args, intpdata_t *intp, void **auxvpp)
 
 	/*
 	 * Add AT_SUN_PLATFORM, AT_SUN_EXECNAME, AT_SUN_BRANDNAME, and
-	 * AT_SUN_EMULATOR strings to the stack.
+	 * AT_SUN_EMULATOR strings, as well as AT_RANDOM array, to the stack.
 	 */
 	if (auxvpp != NULL && *auxvpp != NULL) {
 		if ((error = stk_add(args, platform, UIO_SYSSPACE)) != 0)
@@ -1616,6 +1641,28 @@ stk_copyin(execa_t *uap, uarg_t *args, intpdata_t *intp, void **auxvpp)
 			return (error);
 		if (args->emulator != NULL &&
 		    (error = stk_add(args, args->emulator, UIO_SYSSPACE)) != 0)
+			return (error);
+
+		/*
+		 * For the AT_RANDOM aux vector we provide 16 bytes of random
+		 * data. However, we don't want to depend on
+		 * kcf_rnd_get_pseudo_bytes for early processes, so just jumble
+		 * some bits from hrtime to get some (pseudo)randomness.
+		 */
+		rvals = (uint32_t)gethrtime();
+		rtp = (uint8_t *)&rvals;
+		rdata[0] = rdata[11] = *rtp++;
+		rdata[1] = rdata[15] = *rtp++;
+		rdata[2] = rdata[9] = *rtp++;
+		rdata[3] = rdata[12] = *rtp;
+
+		rtp = (uint8_t *)&rvals;
+		rdata[4] = rdata[8] = ~(*rtp++);
+		rdata[5] = rdata[14] = ~(*rtp++);
+		rdata[6] = rdata[13] = ~(*rtp++);
+		rdata[7] = rdata[10] = ~(*rtp);
+
+		if ((error = stk_byte_add(args, rdata, sizeof (rdata))) != 0)
 			return (error);
 	}
 
@@ -1723,7 +1770,7 @@ stk_copyout(uarg_t *args, char *usrstack, void **auxvpp, user_t *up)
 	/*
 	 * Fill in the aux vector now that we know the user stack addresses
 	 * for the AT_SUN_PLATFORM, AT_SUN_EXECNAME, AT_SUN_BRANDNAME and
-	 * AT_SUN_EMULATOR strings.
+	 * AT_SUN_EMULATOR strings, as well as the AT_RANDOM array.
 	 */
 	if (auxvpp != NULL && *auxvpp != NULL) {
 		if (args->to_model == DATAMODEL_NATIVE) {
@@ -1736,6 +1783,7 @@ stk_copyout(uarg_t *args, char *usrstack, void **auxvpp, user_t *up)
 			if (args->emulator != NULL)
 				ADDAUX(*a,
 				    AT_SUN_EMULATOR, (long)&ustrp[*--offp])
+			ADDAUX(*a, AT_RANDOM, (long)&ustrp[*--offp])
 		} else {
 			auxv32_t **a = (auxv32_t **)auxvpp;
 			ADDAUX(*a,
@@ -1748,6 +1796,7 @@ stk_copyout(uarg_t *args, char *usrstack, void **auxvpp, user_t *up)
 			if (args->emulator != NULL)
 				ADDAUX(*a, AT_SUN_EMULATOR,
 				    (int)(uintptr_t)&ustrp[*--offp])
+			ADDAUX(*a, AT_RANDOM, (int)(uintptr_t)&ustrp[*--offp])
 		}
 	}
 

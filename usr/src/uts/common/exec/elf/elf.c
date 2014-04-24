@@ -423,6 +423,7 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 		 *	AT_BASE
 		 *	AT_FLAGS
 		 *	AT_PAGESZ
+		 *	AT_RANDOM
 		 *	AT_SUN_LDSECURE
 		 *	AT_SUN_HWCAP
 		 *	AT_SUN_HWCAP2
@@ -430,7 +431,7 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 		 *	AT_SUN_EXECNAME
 		 *	AT_NULL
 		 *
-		 * total == 9
+		 * total == 10
 		 */
 		if (hasdy && hasu) {
 			/*
@@ -445,7 +446,7 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 			 *
 			 * total = 5
 			 */
-			args->auxsize = (9 + 5) * sizeof (aux_entry_t);
+			args->auxsize = (10 + 5) * sizeof (aux_entry_t);
 		} else if (hasdy) {
 			/*
 			 * Has PT_INTERP but no PT_PHDR
@@ -455,9 +456,9 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 			 *
 			 * total = 2
 			 */
-			args->auxsize = (9 + 2) * sizeof (aux_entry_t);
+			args->auxsize = (10 + 2) * sizeof (aux_entry_t);
 		} else {
-			args->auxsize = 9 * sizeof (aux_entry_t);
+			args->auxsize = 10 * sizeof (aux_entry_t);
 		}
 	} else {
 		args->auxsize = 0;
@@ -723,7 +724,8 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 	if (hasauxv) {
 		int auxf = AF_SUN_HWCAPVERIFY;
 		/*
-		 * Note: AT_SUN_PLATFORM was filled in via exec_args()
+		 * Note: AT_SUN_PLATFORM and AT_RANDOM were filled in via
+		 * exec_args()
 		 */
 		ADDAUX(aux, AT_BASE, voffset)
 		ADDAUX(aux, AT_FLAGS, at_flags)
