@@ -54,18 +54,12 @@ static uint64_t hpet_read_gen_config(hpet_info_t *hip);
 static uint64_t hpet_read_gen_intrpt_stat(hpet_info_t *hip);
 static uint64_t hpet_read_timer_N_config(hpet_info_t *hip, uint_t n);
 static hpet_TN_conf_cap_t hpet_convert_timer_N_config(uint64_t conf);
-/* LINTED E_STATIC_UNUSED */
-static uint64_t hpet_read_timer_N_comp(hpet_info_t *hip, uint_t n);
-/* LINTED E_STATIC_UNUSED */
-static void hpet_write_gen_cap(hpet_info_t *hip, uint64_t l);
 static void hpet_write_gen_config(hpet_info_t *hip, uint64_t l);
 static void hpet_write_gen_intrpt_stat(hpet_info_t *hip, uint64_t l);
 static void hpet_write_timer_N_config(hpet_info_t *hip, uint_t n, uint64_t l);
 static void hpet_write_timer_N_comp(hpet_info_t *hip, uint_t n, uint64_t l);
 static void hpet_disable_timer(hpet_info_t *hip, uint32_t timer_n);
 static void hpet_enable_timer(hpet_info_t *hip, uint32_t timer_n);
-/* LINTED E_STATIC_UNUSED */
-static void hpet_write_main_counter_value(hpet_info_t *hip, uint64_t l);
 static int hpet_get_IOAPIC_intr_capable_timer(hpet_info_t *hip);
 static int hpet_timer_available(uint32_t allocated_timers, uint32_t n);
 static void hpet_timer_alloc(uint32_t *allocated_timers, uint32_t n);
@@ -526,17 +520,6 @@ hpet_convert_timer_N_config(uint64_t conf)
 }
 
 static uint64_t
-hpet_read_timer_N_comp(hpet_info_t *hip, uint_t n)
-{
-	if (hip->timer_n_config[n].size_cap == 1)
-		return (*(uint64_t *)
-		    HPET_TIMER_N_COMP_ADDRESS(hip->logical_address, n));
-	else
-		return (*(uint32_t *)
-		    HPET_TIMER_N_COMP_ADDRESS(hip->logical_address, n));
-}
-
-static uint64_t
 hpet_read_main_counter_value(hpet_info_t *hip)
 {
 	uint64_t	value;
@@ -568,12 +551,6 @@ hpet_read_main_counter_value(hpet_info_t *hip)
 	value = ((uint64_t)high1 << 32) | low;
 	hip->main_counter_value = value;
 	return (value);
-}
-
-static void
-hpet_write_gen_cap(hpet_info_t *hip, uint64_t l)
-{
-	*(uint64_t *)HPET_GEN_CAP_ADDRESS(hip->logical_address) = l;
 }
 
 static void
@@ -623,28 +600,6 @@ hpet_enable_timer(hpet_info_t *hip, uint32_t timer_n)
 	l = hpet_read_timer_N_config(hip, timer_n);
 	l |= HPET_TIMER_N_INT_ENB_CNF_BIT;
 	hpet_write_timer_N_config(hip, timer_n, l);
-}
-
-static void
-hpet_write_main_counter_value(hpet_info_t *hip, uint64_t l)
-{
-	uint32_t	*address;
-
-	/*
-	 * HPET spec 1.0a states main counter register should be halted before
-	 * it is written to.
-	 */
-	ASSERT(!(hpet_read_gen_config(hip) & HPET_GCFR_ENABLE_CNF));
-
-	if (hip->gen_cap.count_size_cap == 1) {
-		*(uint64_t *)HPET_MAIN_COUNTER_ADDRESS(hip->logical_address)
-		    = l;
-	} else {
-		address = (uint32_t *)HPET_MAIN_COUNTER_ADDRESS(
-		    hip->logical_address);
-
-		address[0] = (uint32_t)(l & 0xFFFFFFFF);
-	}
 }
 
 /*

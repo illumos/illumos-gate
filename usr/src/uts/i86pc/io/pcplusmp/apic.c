@@ -215,14 +215,6 @@ static struct	psm_info apic_psm_info = {
 
 static void *apic_hdlp;
 
-/*
- * apic_let_idle_redistribute can have the following values:
- * 0 - If clock decremented it from 1 to 0, clock has to call redistribute.
- * apic_redistribute_lock prevents multiple idle cpus from redistributing
- */
-int	apic_num_idle_redistributions = 0;
-static	int apic_let_idle_redistribute = 0;
-
 /* to gather intr data and redistribute */
 static void apic_redistribute_compute(void);
 
@@ -798,7 +790,7 @@ apic_get_ipivect(int ipl, int type)
 	int irq;
 
 	if ((irq = apic_allocate_irq(APIC_VECTOR(ipl))) != -1) {
-		if (vector = apic_allocate_vector(ipl, irq, 1)) {
+		if ((vector = apic_allocate_vector(ipl, irq, 1))) {
 			apic_irq_table[irq]->airq_mps_intr_index =
 			    RESERVE_INDEX;
 			apic_irq_table[irq]->airq_vector = vector;
