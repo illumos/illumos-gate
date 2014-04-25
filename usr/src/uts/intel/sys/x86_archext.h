@@ -31,6 +31,7 @@
  * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  * Copyright 2012 Jens Elkner <jel+illumos@cs.uni-magdeburg.de>
  * Copyright 2012 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
+ * Copyright 2014 Josef 'Jeff' Sipek <jeffpc@josefsipek.net>
  */
 
 #ifndef _SYS_X86_ARCHEXT_H
@@ -116,6 +117,7 @@ extern "C" {
 #define	CPUID_INTC_ECX_DCA	0x00040000	/* direct cache access */
 #define	CPUID_INTC_ECX_SSE4_1	0x00080000	/* SSE4.1 insns */
 #define	CPUID_INTC_ECX_SSE4_2	0x00100000	/* SSE4.2 insns */
+#define	CPUID_INTC_ECX_X2APIC	0x00200000	/* x2APIC */
 #define	CPUID_INTC_ECX_MOVBE	0x00400000	/* MOVBE insn */
 #define	CPUID_INTC_ECX_POPCNT	0x00800000	/* POPCNT insn */
 #define	CPUID_INTC_ECX_AES	0x02000000	/* AES insns */
@@ -130,7 +132,7 @@ extern "C" {
 	"\20"							\
 	"\37rdrand\36f16c\35avx\34osxsav\33xsave"		\
 	"\32aes"						\
-	"\30popcnt\27movbe\25sse4.2\24sse4.1\23dca"		\
+	"\30popcnt\27movbe\26x2apic\25sse4.2\24sse4.1\23dca"	\
 	"\20\17etprd\16cx16\13cid\12ssse3\11tm2"		\
 	"\10est\7smx\6vmx\5dscpl\4mon\2pclmulqdq\1sse3"
 
@@ -346,7 +348,7 @@ extern "C" {
 #define	X86FSET_PGE		4
 #define	X86FSET_DE		5
 #define	X86FSET_CMOV		6
-#define	X86FSET_MMX 		7
+#define	X86FSET_MMX		7
 #define	X86FSET_MCA		8
 #define	X86FSET_PAE		9
 #define	X86FSET_CX8		10
@@ -379,6 +381,7 @@ extern "C" {
 #define	X86FSET_TOPOEXT		37
 #define	X86FSET_F16C		38
 #define	X86FSET_RDRAND		39
+#define	X86FSET_X2APIC		40
 
 /*
  * flags to patch tsc_read routine.
@@ -639,7 +642,7 @@ extern "C" {
 
 #if defined(_KERNEL) || defined(_KMEMUSER)
 
-#define	NUM_X86_FEATURES	40
+#define	NUM_X86_FEATURES	41
 extern uchar_t x86_featureset[];
 
 extern void free_x86_featureset(void *featureset);

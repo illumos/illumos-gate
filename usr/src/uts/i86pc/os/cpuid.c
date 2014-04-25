@@ -22,6 +22,7 @@
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2011 by Delphix. All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2014 Josef "Jeff" Sipek <jeffpc@josefsipek.net>
  */
 /*
  * Copyright (c) 2010, Intel Corporation.
@@ -163,7 +164,8 @@ static char *x86_feature_names[NUM_X86_FEATURES] = {
 	"svm",
 	"topoext",
 	"f16c",
-	"rdrand"
+	"rdrand",
+	"x2apic",
 };
 
 boolean_t
@@ -1310,6 +1312,9 @@ cpuid_pass1(cpu_t *cpu, uchar_t *featureset)
 					    X86FSET_F16C);
 			}
 		}
+	}
+	if (cp->cp_ecx & CPUID_INTC_ECX_X2APIC) {
+		add_x86_feature(featureset, X86FSET_X2APIC);
 	}
 	if (cp->cp_edx & CPUID_INTC_EDX_DE) {
 		add_x86_feature(featureset, X86FSET_DE);
