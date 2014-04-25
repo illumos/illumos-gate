@@ -947,7 +947,7 @@ static struct lx_sysent sysents[] = {
 	{"utime",	lx_utime,	0,		2},	/* 30 */
 	{"stty",	NULL,		NOSYS_OBSOLETE,	0},	/* 31 */
 	{"gtty",	NULL,		NOSYS_OBSOLETE,	0},	/* 32 */
-	{"access",	access,		SYS_PASSTHRU,	2},	/* 33 */
+	{"access",	lx_access,	0,		2},	/* 33 */
 	{"nice",	nice,		SYS_PASSTHRU,	1},	/* 34 */
 	{"ftime",	NULL,		NOSYS_OBSOLETE,	0},	/* 35 */
 	{"sync",	lx_sync, 	0, 		0},	/* 36 */
