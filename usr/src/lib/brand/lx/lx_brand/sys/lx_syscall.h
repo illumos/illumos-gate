@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2014 Joyent, Inc.  All rights reserved.
  */
 
 #ifndef _SYS_LX_SYSCALL_H
@@ -50,6 +51,7 @@ extern int lx_linkat(uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t);
 extern int lx_symlinkat(uintptr_t, uintptr_t, uintptr_t);
 extern int lx_readlinkat(uintptr_t, uintptr_t, uintptr_t, uintptr_t);
 extern int lx_fchmodat(uintptr_t, uintptr_t, uintptr_t, uintptr_t);
+extern int lx_access(uintptr_t, uintptr_t);
 extern int lx_faccessat(uintptr_t, uintptr_t, uintptr_t, uintptr_t);
 
 extern int lx_stat(uintptr_t, uintptr_t);

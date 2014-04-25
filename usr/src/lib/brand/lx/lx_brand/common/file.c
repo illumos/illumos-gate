@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2014 Joyent, Inc.  All rights reserved.
  */
 
 #include <sys/fstyp.h>
@@ -530,6 +531,58 @@ lx_sysfs(uintptr_t p1, uintptr_t p2, uintptr_t p3)
 	return (-EINVAL);
 }
 
+/*
+ * For Illumos, access() does this:
+ *    If the process has appropriate privileges, an implementation may indicate
+ *    success for X_OK even if none of the execute file permission bits are set.
+ *
+ * But for Linux, access() does this:
+ *    If the calling process is privileged (i.e., its real UID is zero), then
+ *    an X_OK check is successful for a regular file if execute permission is
+ *    enabled for any of the file owner, group, or other.
+ *
+ * Linux used to behave more like Illumos on older kernels:
+ *    In  kernel  2.4 (and earlier) there is some strangeness in the handling
+ *    of X_OK tests for superuser.  If all categories of  execute  permission
+ *    are  disabled for a nondirectory file, then the only access() test that
+ *    returns -1 is when mode is specified as just X_OK; if R_OK or  W_OK  is
+ *    also  specified in mode, then access() returns 0 for such files.  Early
+ *    2.6 kernels (up to and including 2.6.3) also behaved in the same way as
+ *    kernel 2.4.
+ *
+ * So we need to handle the case where a privileged process is checking for
+ * X_OK but none of the execute bits are set on the file. We'll keep the old
+ * 2.4 behavior for 2.4 emulation but use the new behavior for any other
+ * kernel rev. (since 2.6.3 is uninteresting, no relevant distros use that).
+ */
+int
+lx_access(uintptr_t p1, uintptr_t p2)
+{
+	char *path = (char *)p1;
+	int mode = (mode_t)p2;
+	int ret;
+
+	ret = access(path, mode);
+
+	if (ret == 0 && (mode & X_OK) && strncmp(lx_release, "2.4", 3) != 0 &&
+	    getuid() == 0) {
+		/* check for incorrect execute success */
+		struct stat64 sb;
+
+		if (stat64(path, &sb) < 0)
+			return (-errno);
+
+		if ((sb.st_mode & S_IFMT) == S_IFREG &&
+		    !(sb.st_mode & (S_IXUSR | S_IXGRP | S_IXOTH))) {
+			/* no execute bits are set in the mode */
+			return (-EACCES);
+		}
+	}
+
+	return (ret ? -errno : 0);
+
+}
+
 int
 lx_faccessat(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4)
 {
@@ -736,8 +789,8 @@ lx_fchmodat(uintptr_t ext1, uintptr_t p1, uintptr_t p2, uintptr_t p3)
 	/* LINTED [set but not used in function] */
 	int flag = p3;
 
-        if (flag != p3)
-                return (flag); /* workaround */
+	if (flag != p3)
+		return (flag); /* workaround */
 
 	ret = getpathat(atfd, p1, pathbuf, sizeof (pathbuf));
 	if (ret < 0)
