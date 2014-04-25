@@ -103,10 +103,12 @@ extern "C" {
 #define	APIC_DIVIDE_REG		0xf8
 
 /* Various mode for local APIC. Modes are mutually exclusive  */
-#define	APIC_IS_DISABLED	0x0
-#define	APIC_MODE_NOTSET	0x1
-#define	LOCAL_APIC		0x2
-#define	LOCAL_X2APIC		0x3
+typedef enum apic_mode {
+	APIC_IS_DISABLED = 0,
+	APIC_MODE_NOTSET,
+	LOCAL_APIC,
+	LOCAL_X2APIC
+} apic_mode_t;
 
 /* x2APIC SELF IPI Register */
 #define	X2APIC_SELF_IPI		0xFC
@@ -865,7 +867,7 @@ extern int apic_sci_vect;
 extern int apic_hpet_vect;
 extern uchar_t apic_ipls[];
 extern apic_reg_ops_t *apic_reg_ops;
-extern int apic_mode;
+extern apic_mode_t apic_mode;
 extern void x2apic_update_psm();
 extern void apic_change_ops();
 extern void apic_common_send_ipi(int, int);

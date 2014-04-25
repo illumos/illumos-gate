@@ -61,7 +61,7 @@ static void local_x2apic_write_int_cmd(uint32_t cpu_id, uint32_t cmd1);
  * -----------------------------------------------------------
  */
 int	x2apic_enable = 1;
-int 	apic_mode = LOCAL_APIC;		/* Default mode is Local APIC */
+apic_mode_t apic_mode = LOCAL_APIC;	/* Default mode is Local APIC */
 
 /* Uses MMIO (Memory Mapped IO) */
 static apic_reg_ops_t local_apic_regs_ops = {
