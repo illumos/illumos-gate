@@ -219,6 +219,7 @@ DRV_KMODS	+= spdsock
 DRV_KMODS	+= tcp tcp6 tl tnf ttymux udp udp6 wc winlock zcons
 DRV_KMODS	+= ippctl
 DRV_KMODS	+= dld
+DRV_KMODS	+= ipd
 DRV_KMODS	+= ipf
 DRV_KMODS	+= rpcib
 DRV_KMODS	+= dlpistub

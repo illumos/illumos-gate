@@ -37,7 +37,6 @@
 #include <limits.h>
 #include <mdb/mdb_whatis.h>
 #include <thr_uberdata.h>
-#include <stdio.h>
 
 #include "misc.h"
 #include "leaky.h"
@@ -1040,7 +1039,8 @@ umem_read_ptc(umem_cache_t *cp,
 	if (!(cp->cache_flags & UMF_PTC))
 		return (0);
 
-	(void) snprintf(walk, sizeof (walk), "umem_ptc_%d", cp->cache_bufsize);
+	(void) mdb_snprintf(walk, sizeof (walk), "umem_ptc_%d",
+	    cp->cache_bufsize);
 
 	urpw.urpw_buf = *buflistp;
 	urpw.urpw_cnt = *bufcntp;

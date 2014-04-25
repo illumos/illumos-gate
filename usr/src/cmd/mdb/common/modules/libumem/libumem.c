@@ -39,7 +39,6 @@
 #include <umem_impl.h>
 #include <sys/vmem_impl_user.h>
 #include <thr_uberdata.h>
-#include <stdio.h>
 
 #include "umem_pagesize.h"
 
@@ -160,7 +159,8 @@ umastat_lwp_cache(uintptr_t addr, const umem_cache_t *cp, ulwp_t *ulwp)
 	if (!(cp->cache_flags & UMF_PTC))
 		return (WALK_NEXT);
 
-	(void) snprintf(walk, sizeof (walk), "umem_ptc_%d", cp->cache_bufsize);
+	(void) mdb_snprintf(walk, sizeof (walk), "umem_ptc_%d",
+	    cp->cache_bufsize);
 
 	if (mdb_pwalk(walk, (mdb_walk_cb_t)umastat_lwp_ptc,
 	    &nbufs, (uintptr_t)ulwp->ul_self) == -1) {
@@ -239,7 +239,7 @@ umastat_cache(uintptr_t addr, const umem_cache_t *cp, umastat_vmem_t **kvp)
 	if (cp->cache_flags & UMF_PTC) {
 		char walk[60];
 
-		(void) snprintf(walk, sizeof (walk),
+		(void) mdb_snprintf(walk, sizeof (walk),
 		    "umem_ptc_%d", cp->cache_bufsize);
 
 		if (mdb_walk(walk,
@@ -248,7 +248,7 @@ umastat_cache(uintptr_t addr, const umem_cache_t *cp, umastat_vmem_t **kvp)
 			return (WALK_ERR);
 		}
 
-		(void) snprintf(buf, sizeof (buf), "%d", nptc);
+		(void) mdb_snprintf(buf, sizeof (buf), "%d", nptc);
 	}
 
 	for (kv = *kvp; kv != NULL; kv = kv->kv_next) {
