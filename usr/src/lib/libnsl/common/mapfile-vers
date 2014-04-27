@@ -20,7 +20,7 @@
 #
 #
 # Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2011 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
 #
 
 #
@@ -467,8 +467,8 @@ $endif
 
 SYMBOL_VERSION SUNWprivate_1.5 {
     global:
-	inet_matchaddr;
 	clnt_create_service_timed;
+	inet_matchaddr;
 } SUNWprivate_1.4;
 
 SYMBOL_VERSION SUNWprivate_1.4 {
@@ -663,9 +663,6 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	svc_get_local_cred;
 	_svc_getreqset_proc;
 	__svc_get_svcauth;
-	__svc_nisplus_enable_timestamps;
-	__svc_nisplus_fdcleanup_hack;
-	__svc_nisplus_purge_since;
 	__svc_set_proc_cleanup_cb;
 	__svc_vc_dup;
 	__svc_vc_dupcache_init;

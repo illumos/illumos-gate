@@ -23,7 +23,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  */
 
 
@@ -836,9 +836,6 @@ int rpc_reg(rpcprog_t prognum, rpcvers_t versnum, rpcproc_t procnum,
 /* svc_vc.c */
 SVCXPRT *svc_vc_create(int fd, uint_t sendsize, uint_t recvsize);
 SVCXPRT *svc_fd_create(int fd, uint_t sendsize, uint_t recvsize);
-void __svc_nisplus_fdcleanup_hack(void);
-void __svc_nisplus_enable_timestamps(void);
-void __svc_nisplus_purge_since(long since);
 bool_t __svc_vc_dupcache_init(SVCXPRT *xprt, void *condition, int basis);
 int __svc_vc_dup(struct svc_req *req, caddr_t *resp_buf, uint_t *resp_bufsz);
 int __svc_vc_dupdone(struct svc_req *req, caddr_t resp_buf, uint_t resp_bufsz,
