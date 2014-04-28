@@ -157,7 +157,6 @@ COMMON_SUBDIRS=		\
 	filesync	\
 	fgrep		\
 	file		\
-	filebench	\
 	find		\
 	flowadm		\
 	flowstat	\
