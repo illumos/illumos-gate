@@ -10,12 +10,27 @@
 #
 
 #
-# Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
+# Copyright (c) 2012 by Delphix. All rights reserved.
 #
 
-.PARALLEL: $(SUBDIRS)
+include $(SRC)/Makefile.master
 
-SUBDIRS = os-tests test-runner util-tests zfs-tests
+READMES = README
 
-include Makefile.com
+ROOTOPTPKG = $(ROOT)/opt/util-tests
+
+FILES = $(READMES:%=$(ROOTOPTPKG)/%)
+$(FILES) := FILEMODE = 0444
+
+all: $(READMES)
+
+install: $(ROOTOPTPKG) $(FILES)
+
+clean lint clobber:
+
+$(ROOTOPTPKG):
+	$(INS.dir)
+
+$(ROOTOPTPKG)/%: %
+	$(INS.file)

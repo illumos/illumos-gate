@@ -11,11 +11,30 @@
 
 #
 # Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright 2014, OmniTI Computer Consulting, Inc. All rights reserved.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 #
 
-.PARALLEL: $(SUBDIRS)
+include $(SRC)/Makefile.master
 
-SUBDIRS = os-tests test-runner util-tests zfs-tests
+SRCS = default.run
 
-include Makefile.com
+ROOTOPTPKG = $(ROOT)/opt/util-tests
+RUNFILES = $(ROOTOPTPKG)/runfiles
+
+CMDS = $(SRCS:%=$(RUNFILES)/%)
+$(CMDS) := FILEMODE = 0444
+
+all: $(SRCS)
+
+install: $(CMDS)
+
+clean lint clobber:
+
+$(CMDS): $(RUNFILES) $(SRCS)
+
+$(RUNFILES):
+	$(INS.dir)
+
+$(RUNFILES)/%: %
+	$(INS.file)

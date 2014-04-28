@@ -1,16 +1,38 @@
 '\" te
+.\" Copyright 2014 Garrett D'Amore <garrett@damore.org>
 .\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved
 .\" Copyright 1992, X/Open Company Limited All Rights Reserved
 .\" Portions Copyright (c) 1982-2007 AT&T Knowledge Ventures
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at  http://www.opengroup.org/bookstore/.
-.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text
-.\" are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical
-.\" and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
-.\"  This notice shall appear on any product containing this material.
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
-.\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
-.\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PRINTF 1 "Aug 11, 2009"
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for
+.\" permission to reproduce portions of its copyrighted documentation.
+.\" Original documentation from The Open Group can be obtained online at
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group,
+.\" have given us permission to reprint portions of their documentation. In the
+.\" following statement, the phrase "this text" refers to portions of the
+.\" system documentation. Portions of this text are reprinted and reproduced in
+.\" electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004
+.\" Edition, Standard for Information Technology -- Portable Operating System
+.\" Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright
+.\" (C) 2001-2004 by the Institute of Electrical and Electronics Engineers,
+.\" Inc and The Open Group. In the event of any discrepancy between these
+.\" versions and the original IEEE and The Open Group Standard, the original
+.\" IEEE and The Open Group Standard is the referee document. The original
+.\" Standard can be obtained online at
+.\" http://www.opengroup.org/unix/online.html.
+.\" This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common
+.\" Development and Distribution License (the "License").  You may not use this
+.\" file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or
+.\" http://www.opensolaris.org/os/licensing.  See the License for the specific
+.\" language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and
+.\" include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable,
+.\" add the following below this CDDL HEADER, with the fields enclosed by
+.\" brackets "[]" replaced with your own identifying information:
+.\" Portions Copyright [yyyy] [name of copyright owner]
+.TH PRINTF 1 "May 11, 2014"
 .SH NAME
 printf \- write formatted output
 .SH SYNOPSIS
@@ -90,6 +112,28 @@ with zeros not specified by the \fIformat\fR operand.
 .TP
 .ie t \(bu
 .el o
+The argument used for the conversion character (or width or precision
+parameters, see below) may be taken from the \fIn\fRnth argument instead
+of the next unused argument, by specifying \fIn\fR\fB$\fR immediately following
+the \fB%\fR character, or the \fB*\fR character (for width or precision
+arguments).
+If \fIn\fR\fB$\fR appears in any conversions in the format string,
+then it must be used for all conversions, including any variable width or
+precision specifiers.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The special character \fB*\fR may be used instead of a string of decimal digits
+to indicate a minimum field width or a precision.  In this case the next
+available argument is used (or the \fIn\fRth if the form \fIn\fR\fB$\fR is
+used), treating its value as a decimal string. 
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
 An additional conversion character, \fBb\fR, is supported as follows. The
 argument is taken to be a string that can contain backslash-escape sequences.
 The following backslash-escape sequences are supported:
@@ -130,7 +174,15 @@ appropriate type for the conversion as specified below. The \fIformat\fR
 operand is reused as often as necessary to satisfy the argument operands. Any
 extra \fBc\fR or \fBs\fR conversion specifications are evaluated as if a null
 string argument were supplied; other extra conversion specifications are
-evaluated as if a zero argument were supplied. If the \fIformat\fR operand
+evaluated as if a zero argument were supplied.
+.sp
+When there are more argument operands than format specifiers, and the
+format includes \fIn\fR\fB$\fR position indicators, then the format is
+reprocessed from the beginning as above, but with the argument list starting
+from the next argument after the highest \fIn\fRth argument previously
+encountered.
+.sp
+If the \fIformat\fR operand
 contains no conversion specifications and \fIargument\fR operands are present,
 the results are unspecified. If a character sequence in the \fIformat\fR
 operand begins with a \fB%\fR character, but does not form a valid conversion
@@ -386,8 +438,8 @@ element \fIname\fR.
 .TP
 .ie t \(bu
 .el o
-The escape sequence \fB\ex{hex}\fRexpands to the character corresponding to the
-hexadecimal value \fBhex\fR.
+The escape sequence \fB\ex{hex}\fR expands to the character corresponding to
+the hexadecimal value \fBhex\fR.
 .RE
 .RS +4
 .TP
@@ -431,6 +483,13 @@ empty strings were supplied, numeric conversions are treated as if \fB0\fR was
 supplied, and time conversions are treated as if \fBnow\fR was supplied.
 .sp
 .LP
+When there are more argument operands than format specifiers, and the
+format includes \fIn\fR\fB$\fR position indicators, then the format is
+reprocessed from the beginning as above, but with the argument list starting
+from the next argument after the highest \fIn\fRth argument previously
+encountered.
+.sp
+.LP
 \fB/usr/bin/printf\fR is equivalent to \fBksh93\fR's \fBprintf\fR built-in and
 \fBprint -f\fR, which allows additional options to be specified.
 .SH USAGE
@@ -442,9 +501,6 @@ based, makes no special provision for dealing with multi-byte characters when
 using the \fB%c\fR conversion specification. Applications should be extremely
 cautious using either of these features when there are multi-byte characters in
 the character set.
-.sp
-.LP
-Field widths and precisions cannot be specified as \fB*\fR.
 .sp
 .LP
 The \fB%b\fR conversion specification is not part of the ISO C standard; it has
@@ -838,7 +894,7 @@ Note that the '$' characters must be properly escaped, such as
 .sp
 .in +2
 .nf
-"%1\$s, %3\$d. %2\$s, %4\$d:%5\$.2d\en" in this case
+"%1\e$s, %3\e$d. %2\e$s, %4\e$d:%5\e$.2d\en" in this case
 .fi
 .in -2
 .sp
