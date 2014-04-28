@@ -7,28 +7,28 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH FILE 1 "Sep 10, 2013"
+.TH FILE 1 "Apr 11, 2014"
 .SH NAME
 file \- determine file type
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/bin/file\fR [\fB-dh\fR] [\fB-m\fR \fImfile\fR] [\fB-M\fR \fIMfile\fR] [\fB-f\fR \fIffile\fR] \fIfile\fR...
+\fB/usr/bin/file\fR [\fB-bdh\fR] [\fB-m\fR \fImfile\fR] [\fB-M\fR \fIMfile\fR] [\fB-f\fR \fIffile\fR] \fIfile\fR...
 .fi
 
 .LP
 .nf
-\fB/usr/bin/file\fR [\fB-dh\fR] [\fB-m\fR \fImfile\fR] [\fB-M\fR \fIMfile\fR] \fB-f\fR \fIffile\fR
+\fB/usr/bin/file\fR [\fB-bdh\fR] [\fB-m\fR \fImfile\fR] [\fB-M\fR \fIMfile\fR] \fB-f\fR \fIffile\fR
 .fi
 
 .LP
 .nf
-\fB/usr/bin/file\fR \fB-i\fR [\fB-h\fR] [\fB-f\fR \fIffile\fR] \fIfile\fR...
+\fB/usr/bin/file\fR \fB-i\fR [\fB-bh\fR] [\fB-f\fR \fIffile\fR] \fIfile\fR...
 .fi
 
 .LP
 .nf
-\fB/usr/bin/file\fR \fB-i\fR [\fB-h\fR] \fB-f\fR \fIffile\fR
+\fB/usr/bin/file\fR \fB-i\fR [\fB-bh\fR] \fB-f\fR \fIffile\fR
 .fi
 
 .LP
@@ -38,22 +38,22 @@ file \- determine file type
 
 .LP
 .nf
-\fB/usr/xpg4/bin/file\fR [\fB-dh\fR] [\fB-m\fR \fImfile\fR] [\fB-M\fR \fIMfile\fR] [\fB-f\fR \fIffile\fR] \fIfile\fR...
+\fB/usr/xpg4/bin/file\fR [\fB-bdh\fR] [\fB-m\fR \fImfile\fR] [\fB-M\fR \fIMfile\fR] [\fB-f\fR \fIffile\fR] \fIfile\fR...
 .fi
 
 .LP
 .nf
-\fB/usr/xpg4/bin/file\fR [\fB-dh\fR] [\fB-m\fR \fImfile\fR] [\fB-M\fR \fIMfile\fR] \fB-f\fR \fIffile\fR
+\fB/usr/xpg4/bin/file\fR [\fB-bdh\fR] [\fB-m\fR \fImfile\fR] [\fB-M\fR \fIMfile\fR] \fB-f\fR \fIffile\fR
 .fi
 
 .LP
 .nf
-\fB/usr/xpg4/bin/file\fR \fB-i\fR [\fB-h\fR] [\fB-f\fR \fIffile\fR] \fIfile\fR...
+\fB/usr/xpg4/bin/file\fR \fB-i\fR [\fB-bh\fR] [\fB-f\fR \fIffile\fR] \fIfile\fR...
 .fi
 
 .LP
 .nf
-\fB/usr/xpg4/bin/file\fR \fB-i\fR [\fB-h\fR] \fB-f\fR \fIffile\fR
+\fB/usr/xpg4/bin/file\fR \fB-i\fR [\fB-bh\fR] \fB-f\fR \fIffile\fR
 .fi
 
 .LP
@@ -103,6 +103,15 @@ be determined.
 .sp
 .LP
 The following options are supported:
+.sp
+.ne 2
+.na
+\fB\fB-b\fR\fR
+.ad
+.RS 12n
+Be brief, do not print leading filename.
+.RE
+
 .sp
 .ne 2
 .na
