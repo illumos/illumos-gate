@@ -23,7 +23,9 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
+ */
 
 #include <sys/types.h>
 #include <sys/systm.h>
@@ -81,6 +83,64 @@
  *	Wake up val1 processes that are waiting on futex1.  The call
  *	returns the number of blocked threads that were woken up.
  *
+ * FUTEX_WAKE_OP
+ *
+ *	The implementation of a conditional variable in terms of futexes
+ *	actually uses two futexes:  one to assure sequential access and one to
+ *	represent the condition variable.  This implementation gives rise to a
+ *	particular performance problem whereby a thread is awoken on the futex
+ *	that represents the condition variable only to have to (potentially)
+ *	immediately wait on the futex that protects the condition variable.
+ *	(Do not confuse the futex that serves to protect the condition variable
+ *	with the pthread_mutex_t associated with pthread_cond_t -- which
+ *	represents a third futex.)  To (over)solve this problem, FUTEX_WAKE_OP
+ *	was invented, which performs an atomic compare-and-exchange on a
+ *	second address in a specified fashion (that is, with a specified
+ *	operation).  Here are the possible operations (OPARG is defined
+ *	to be 12 bit value embedded in the operation):
+ *
+ *	- FUTEX_OP_SET: Sets the value at the second address to OPARG
+ *	- FUTEX_OP_ADD: Adds the value to OPARG
+ *	- FUTEX_OP_OR: OR's the value with OPARG
+ *	- FUTEX_OP_ANDN: Performs a negated AND of the value with OPARG
+ *	- FUTEX_OP_XOR: XOR's the value with OPARG
+ *
+ *	After this compare-and-exchange on the second address, a FUTEX_WAKE is
+ *	performed on the first address and -- if the compare-and-exchange
+ *	matches a specified result based on a specified comparison operation --
+ *	a FUTEX_WAKE is performed on the second address.  Here are the possible
+ *	comparison operations:
+ *
+ *	- FUTEX_OP_CMP_EQ: If old value is CMPARG, wake
+ *	- FUTEX_OP_CMP_NE: If old value is not equal to CMPARG, wake
+ *	- FUTEX_OP_CMP_LT: If old value is less than CMPARG, wake
+ *	- FUTEX_OP_CMP_LE: If old value is less than or equal to CMPARG, wake
+ *	- FUTEX_OP_CMP_GT: If old value is greater than CMPARG, wake
+ *	- FUTEX_OP_CMP_GE: If old value is greater than or equal to CMPARG, wake
+ *
+ *	As a practical matter, the only way that this is used (or, some might
+ *	argue, is usable) is by the implementation of pthread_cond_signal(),
+ *	which uses FUTEX_WAKE_OP to -- in a single system call -- unlock the
+ *	futex that protects the condition variable and wake the futex that
+ *	represents the condition variable.  The second wake-up is conditional
+ *	because the futex that protects the condition variable (rather than the
+ *	one that represents it) may or may not have waiters.  Given that this
+ *	is the use case, FUTEX_WAKE_OP is falsely generic: despite allowing for
+ *	five different kinds of operations and six different kinds of
+ *	comparision operations, in practice only one is used.  (Namely, setting
+ *	to 0 and waking if the old value is greater than 1 -- which denotes
+ *	that waiters are present and the wakeup should be performed.) Moreover,
+ *	because FUTEX_WAKE_OP does not (and cannot) optimize anything in the
+ *	case that the pthread_mutex_t associated with the pthread_cond_t is
+ *	held at the time of a pthread_cond_signal(), this entire mechanism is
+ *	essentially for naught in this case.  As one can imagine (and can
+ *	verify on just about any source base that uses pthread_cond_signal()),
+ *	it is overwhelmingly the common case that the lock associated with the
+ *	pthread_cond_t is held at the time of pthread_cond_signal(), assuring
+ *	that the problem that all of this complexity was designed to solve
+ *	isn't, in fact, solved because the signalled thread simply wakes up
+ *	only to block again on the held mutex.  Cue a slow clap!
+ *
  * FUTEX_CMP_REQUEUE
  *
  *	If the value stored in futex1 matches that passed in in val2, wake
@@ -105,7 +165,9 @@
  * FUTEX_FD
  *
  *	Return a file descriptor, which can be used to refer to the futex.
- *	We don't support this operation.
+ *	This operation was broken by design, and was blessedly removed in
+ *	Linux 2.6.26 ("because it was inherently racy"); it should go without
+ *	saying that we don't support this operation.
  */
 
 /*
@@ -261,6 +323,159 @@ futex_wake(memid_t *memid, int wake_threads)
 	return (ret);
 }
 
+static int
+futex_wake_op_execute(int32_t *addr, int32_t val3)
+{
+	int32_t op = FUTEX_OP_OP(val3);
+	int32_t cmp = FUTEX_OP_CMP(val3);
+	int32_t cmparg = FUTEX_OP_CMPARG(val3);
+	int32_t oparg, oldval, newval;
+	label_t ljb;
+	int rval;
+
+	if ((uintptr_t)addr >= KERNELBASE)
+		return (set_errno(EFAULT));
+
+	if (on_fault(&ljb))
+		return (set_errno(EFAULT));
+
+	oparg = FUTEX_OP_OPARG(val3);
+
+	do {
+		oldval = *addr;
+		newval = oparg;
+
+		switch (op) {
+		case FUTEX_OP_SET:
+			break;
+
+		case FUTEX_OP_ADD:
+			newval += oparg;
+			break;
+
+		case FUTEX_OP_OR:
+			newval |= oparg;
+			break;
+
+		case FUTEX_OP_ANDN:
+			newval &= ~oparg;
+			break;
+
+		case FUTEX_OP_XOR:
+			newval ^= oparg;
+			break;
+
+		default:
+			no_fault();
+			return (set_errno(EINVAL));
+		}
+	} while (cas32((uint32_t *)addr, oldval, newval) != oldval);
+
+	no_fault();
+
+	switch (cmp) {
+	case FUTEX_OP_CMP_EQ:
+		rval = (oldval == cmparg);
+		break;
+
+	case FUTEX_OP_CMP_NE:
+		rval = (oldval != cmparg);
+		break;
+
+	case FUTEX_OP_CMP_LT:
+		rval = (oldval < cmparg);
+		break;
+
+	case FUTEX_OP_CMP_LE:
+		rval = (oldval <= cmparg);
+		break;
+
+	case FUTEX_OP_CMP_GT:
+		rval = (oldval > cmparg);
+		break;
+
+	case FUTEX_OP_CMP_GE:
+		rval = (oldval >= cmparg);
+		break;
+
+	default:
+		return (set_errno(EINVAL));
+	}
+
+	return (rval);
+}
+
+static int
+futex_wake_op(memid_t *memid, caddr_t addr2, memid_t *memid2,
+    int wake_threads, int wake_threads2, int val3)
+{
+	kmutex_t *l1, *l2;
+	int ret = 0, ret2 = 0, wake;
+	fwaiter_t *fwp, *next;
+	int index1, index2;
+
+	index1 = HASH_FUNC(memid);
+	index2 = HASH_FUNC(memid2);
+
+	if (index1 == index2) {
+		l1 = &futex_hash_lock[index1];
+		l2 = NULL;
+	} else if (index1 < index2) {
+		l1 = &futex_hash_lock[index1];
+		l2 = &futex_hash_lock[index2];
+	} else {
+		l1 = &futex_hash_lock[index2];
+		l2 = &futex_hash_lock[index1];
+	}
+
+	mutex_enter(l1);
+	if (l2 != NULL)
+		mutex_enter(l2);
+
+	/* LINTED: alignment */
+	if ((wake = futex_wake_op_execute((int32_t *)addr2, val3)) < 0)
+		goto out;
+
+	for (fwp = futex_hash[index1]; fwp; fwp = next) {
+		next = fwp->fw_next;
+		if (!MEMID_EQUAL(&fwp->fw_memid, memid))
+			continue;
+
+		futex_hashout(fwp);
+		if (ret++ < wake_threads) {
+			fwp->fw_woken = 1;
+			cv_signal(&fwp->fw_cv);
+		} else {
+			break;
+		}
+	}
+
+	if (!wake)
+		goto out;
+
+	for (fwp = futex_hash[index2]; fwp; fwp = next) {
+		next = fwp->fw_next;
+		if (!MEMID_EQUAL(&fwp->fw_memid, memid2))
+			continue;
+
+		futex_hashout(fwp);
+		if (ret2++ < wake_threads2) {
+			fwp->fw_woken = 1;
+			cv_signal(&fwp->fw_cv);
+		} else {
+			break;
+		}
+	}
+
+	ret += ret2;
+out:
+	if (l2 != NULL)
+		mutex_exit(l2);
+	mutex_exit(l1);
+
+	return (ret);
+}
+
 /*
  * Wake up to wake_threads waiting on the futex at memid.  If there are
  * more than that many threads waiting, requeue the remaining threads on
@@ -371,16 +586,17 @@ get_timeout(void *lx_timeout, timestruc_t *timeout)
 }
 
 long
-lx_futex(uintptr_t addr, int cmd, int val, uintptr_t lx_timeout,
-	uintptr_t addr2, int val2)
+lx_futex(uintptr_t addr, int op, int val, uintptr_t lx_timeout,
+	uintptr_t addr2, int val3)
 {
 	struct as *as = curproc->p_as;
-	memid_t memid, requeue_memid;
+	memid_t memid, memid2;
 	timestruc_t timeout;
 	timestruc_t *tptr = NULL;
-	int requeue_threads = NULL;
-	int *requeue_cmp = NULL;
+	int val2 = NULL;
 	int rval = 0;
+	int cmd = op & FUTEX_CMD_MASK;
+	int private = op & FUTEX_PRIVATE_FLAG;
 
 	/* must be aligned on int boundary */
 	if (addr & 0x3)
@@ -390,6 +606,32 @@ lx_futex(uintptr_t addr, int cmd, int val, uintptr_t lx_timeout,
 	if (cmd < 0 || cmd > FUTEX_MAX_CMD)
 		return (set_errno(EINVAL));
 
+	if (cmd == FUTEX_FD) {
+		/*
+		 * FUTEX_FD was sentenced to death for grievous crimes of
+		 * semantics against humanity; it has been ripped out of Linux
+		 * and will never be supported by us.
+		 */
+		return (set_errno(ENOSYS));
+	}
+
+	switch (cmd) {
+	case FUTEX_LOCK_PI:
+	case FUTEX_UNLOCK_PI:
+	case FUTEX_TRYLOCK_PI:
+	case FUTEX_WAIT_BITSET:
+	case FUTEX_WAKE_BITSET:
+	case FUTEX_WAIT_REQUEUE_PI:
+	case FUTEX_CMP_REQUEUE_PI:
+		/*
+		 * These are operations that we don't currently support, but
+		 * may well need to in the future.  For now, callers need to
+		 * deal with these being missing -- but if and as that changes,
+		 * they may well need to be implemented.
+		 */
+		return (set_errno(ENOSYS));
+	}
+
 	/* Copy in the timeout structure from userspace. */
 	if (cmd == FUTEX_WAIT && lx_timeout != NULL) {
 		rval = get_timeout((timespec_t *)lx_timeout, &timeout);
@@ -398,31 +640,47 @@ lx_futex(uintptr_t addr, int cmd, int val, uintptr_t lx_timeout,
 		tptr = &timeout;
 	}
 
-	if (cmd == FUTEX_REQUEUE || cmd == FUTEX_CMP_REQUEUE) {
-		if (cmd == FUTEX_CMP_REQUEUE)
-			requeue_cmp = &val2;
-
+	switch (cmd) {
+	case FUTEX_REQUEUE:
+	case FUTEX_CMP_REQUEUE:
+	case FUTEX_WAKE_OP:
 		/*
-		 * lx_timeout is nominally a pointer to a userspace
-		 * address.  For these two commands, it actually contains
-		 * an integer which indicates the maximum number of threads
-		 * to requeue.  This is horrible, and I'm sorry.
+		 * lx_timeout is nominally a pointer to a userspace address.
+		 * For several commands, however, it actually contains
+		 * an additional interage parameter.  This is horrible, and
+		 * the people who did this to us should be sorry.
 		 */
-		requeue_threads = (int)lx_timeout;
+		val2 = (int)lx_timeout;
 	}
 
 	/*
 	 * Translate the process-specific, user-space futex virtual
-	 * address(es) to universal memid.
+	 * address(es) to a universal memid.  If the private bit is set, we
+	 * can just use our as plus the virtual address, saving quite a bit
+	 * of effort.
 	 */
-	rval = as_getmemid(as, (void *)addr, &memid);
-	if (rval != 0)
-		return (set_errno(rval));
-
-	if (cmd == FUTEX_REQUEUE || cmd == FUTEX_CMP_REQUEUE) {
-		rval = as_getmemid(as, (void *)addr2, &requeue_memid);
-		if (rval)
+	if (private) {
+		memid.val[0] = (uintptr_t)as;
+		memid.val[1] = (uintptr_t)addr;
+	} else {
+		rval = as_getmemid(as, (void *)addr, &memid);
+		if (rval != 0)
 			return (set_errno(rval));
+	}
+
+	if (cmd == FUTEX_REQUEUE || cmd == FUTEX_CMP_REQUEUE ||
+	    cmd == FUTEX_WAKE_OP) {
+		if (addr2 & 0x3)
+			return (set_errno(EINVAL));
+
+		if (private) {
+			memid2.val[0] = (uintptr_t)as;
+			memid2.val[1] = (uintptr_t)addr2;
+		} else {
+			rval = as_getmemid(as, (void *)addr2, &memid2);
+			if (rval)
+				return (set_errno(rval));
+		}
 	}
 
 	switch (cmd) {
@@ -434,10 +692,15 @@ lx_futex(uintptr_t addr, int cmd, int val, uintptr_t lx_timeout,
 		rval = futex_wake(&memid, val);
 		break;
 
+	case FUTEX_WAKE_OP:
+		rval = futex_wake_op(&memid, (void *)addr2, &memid2,
+		    val, val2, val3);
+		break;
+
 	case FUTEX_CMP_REQUEUE:
 	case FUTEX_REQUEUE:
-		rval = futex_requeue(&memid, &requeue_memid, val,
-		    requeue_threads, (void *)addr2, requeue_cmp);
+		rval = futex_requeue(&memid, &memid2, val,
+		    val2, (void *)addr2, &val3);
 
 		break;
 	}
