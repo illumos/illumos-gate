@@ -553,7 +553,7 @@ apic_delspl_common(int irqno, int ipl, int min_ipl, int max_ipl)
 	if ((irqptr->airq_ipl != max_ipl) && (max_ipl != PSM_INVALID_IPL) &&
 	    !ioapic_mask_workaround[irqptr->airq_ioapicindex]) {
 		apic_irq_t	*irqp;
-		if (vector = apic_allocate_vector(max_ipl, irqno, 1)) {
+		if ((vector = apic_allocate_vector(max_ipl, irqno, 1))) {
 			apic_mark_vector(irqheadptr->airq_vector, vector);
 			irqp = irqheadptr;
 			while (irqp) {

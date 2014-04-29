@@ -63,9 +63,6 @@ $(NOT_RELEASE_BUILD)DEBUG_DEFS	+= $(DEBUG_FLGS)
 LDFLAGS		+= -dy -N misc/acpica
 
 CERRWARN	+= -_gcc=-Wno-uninitialized
-CERRWARN	+= -_gcc=-Wno-unused-variable
-CERRWARN	+= -_gcc=-Wno-unused-function
-CERRWARN	+= -_gcc=-Wno-empty-body
 
 #
 #	Default build targets.
