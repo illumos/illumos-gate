@@ -559,11 +559,13 @@ dpopen(dev_t *devp, int flag, int otyp, cred_t *credp)
 	/*
 	 * allocate a pollcache skeleton here. Delay allocating bitmap
 	 * structures until dpwrite() time, since we don't know the
-	 * optimal size yet.
+	 * optimal size yet.  We also delay setting the pid until either
+	 * dpwrite() or attempt to poll on the instance, allowing parents
+	 * to create instances of /dev/poll for their children.
 	 */
 	pcp = pcache_alloc();
 	dpep->dpe_pcache = pcp;
-	pcp->pc_pid = curproc->p_pid;
+	pcp->pc_pid = -1;
 	*devp = makedevice(getmajor(*devp), minordev);  /* clone the driver */
 	mutex_enter(&devpoll_lock);
 	ASSERT(minordev < dptblsize);
@@ -604,8 +606,12 @@ dpwrite(dev_t dev, struct uio *uiop, cred_t *credp)
 	mutex_exit(&devpoll_lock);
 	pcp = dpep->dpe_pcache;
 
-	if (curproc->p_pid != pcp->pc_pid)
-		return (EACCES);
+	if (curproc->p_pid != pcp->pc_pid) {
+		if (pcp->pc_pid != -1)
+			return (EACCES);
+
+		pcp->pc_pid = curproc->p_pid;
+	}
 
 	if (dpep->dpe_flag & DP_ISEPOLLCOMPAT) {
 		size = sizeof (dvpoll_epollfd_t);
@@ -870,8 +876,6 @@ dpioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 	mutex_exit(&devpoll_lock);
 	ASSERT(dpep != NULL);
 	pcp = dpep->dpe_pcache;
-	if (curproc->p_pid != pcp->pc_pid)
-		return (EACCES);
 
 	mutex_enter(&dpep->dpe_lock);
 
@@ -893,6 +897,13 @@ dpioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 		mutex_exit(&dpep->dpe_lock);
 
 		return (0);
+	}
+
+	if (curproc->p_pid != pcp->pc_pid) {
+		if (pcp->pc_pid != -1)
+			return (EACCES);
+
+		pcp->pc_pid = curproc->p_pid;
 	}
 
 	while ((dpep->dpe_flag & DP_WRITER_PRESENT) ||
