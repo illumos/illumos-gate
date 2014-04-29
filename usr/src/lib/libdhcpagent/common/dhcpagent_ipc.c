@@ -994,7 +994,7 @@ dhcp_ipc_timed_read(int fd, void *buffer, unsigned int length, int *msec)
 
 		if (*msec != -1) {
 			end = gethrtime();
-			*msec -= (end - start) / (NANOSEC / MILLISEC);
+			*msec -= NSEC2MSEC(end - start);
 			if (*msec < 0)
 				*msec = 0;
 		}

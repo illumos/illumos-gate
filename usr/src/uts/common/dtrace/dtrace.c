@@ -139,7 +139,7 @@ dtrace_optval_t dtrace_ustackframes_default = 20;
 dtrace_optval_t dtrace_jstackframes_default = 50;
 dtrace_optval_t dtrace_jstackstrsize_default = 512;
 int		dtrace_msgdsize_max = 128;
-hrtime_t	dtrace_chill_max = 500 * (NANOSEC / MILLISEC);	/* 500 ms */
+hrtime_t	dtrace_chill_max = MSEC2NSEC(500);		/* 500 ms */
 hrtime_t	dtrace_chill_interval = NANOSEC;		/* 1000 ms */
 int		dtrace_devdepth_max = 32;
 int		dtrace_err_verbose;

@@ -237,9 +237,8 @@ stop_init_reboot(dhcp_smach_t *dsmp, unsigned int n_requests)
 	if (dsmp->dsm_isv6) {
 		uint_t nowabs, maxabs;
 
-		nowabs = gethrtime() / (NANOSEC / MILLISEC);
-		maxabs = dsmp->dsm_neg_hrtime / (NANOSEC / MILLISEC) +
-		    DHCPV6_CNF_MAX_RD;
+		nowabs = NSEC2MSEC(gethrtime());
+		maxabs = NSEC2MSEC(dsmp->dsm_neg_hrtime) + DHCPV6_CNF_MAX_RD;
 		if (nowabs < maxabs) {
 			/* Cap the timer based on the maximum */
 			if (nowabs + dsmp->dsm_send_timeout > maxabs)

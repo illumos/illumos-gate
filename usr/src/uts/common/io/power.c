@@ -116,7 +116,7 @@ static char 	hasEPIC = B_FALSE;
 static void *power_state;
 static int power_inst = -1;
 
-static hrtime_t	power_button_debounce = NANOSEC/MILLISEC*10;
+static hrtime_t	power_button_debounce = MSEC2NSEC(10);
 static hrtime_t power_button_abort_interval = 1.5 * NANOSEC;
 static int	power_button_abort_presses = 3;
 static int	power_button_abort_enable = 1;

@@ -281,8 +281,8 @@ print_unformatted_stats(void)
 		    col->col_src_stat.lcols_max_rss, col->col_rsslimit,
 		    (col->col_src_stat.lcols_proc_in -
 		    col->col_old_stat.lcols_proc_out), DELTA(lcols_proc_out),
-		    DELTA(lcols_scan_count), DELTA(lcols_scan_time_complete) /
-		    (NANOSEC / MILLISEC));
+		    DELTA(lcols_scan_count),
+		    NSEC2MSEC(DELTA(lcols_scan_time_complete)));
 		col->col_old_stat = col->col_src_stat;
 
 		col = col->col_next;

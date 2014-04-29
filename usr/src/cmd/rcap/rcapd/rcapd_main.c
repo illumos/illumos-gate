@@ -1045,8 +1045,8 @@ simple_report_collection_cb(lcollection_t *lcol, void *arg)
 	    (unsigned long long)lcol->lcol_rss_cap,
 	    (unsigned long long)(lcol->lcol_stat.lcols_proc_in -
 	    lcol->lcol_stat.lcols_proc_out), DELTA(lcols_proc_out),
-	    DELTA(lcols_scan_count), DELTA(lcols_scan_time_complete) / (NANOSEC
-	    / MILLISEC));
+	    DELTA(lcols_scan_count),
+	    NSEC2MSEC(DELTA(lcols_scan_time_complete)));
 
 #undef DELTA
 
