@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2014, Joyent, Inc. All rights reserved.
  * Copyright 2014 OmniTI Computer Consulting, Inc. All rights reserved.
  */
@@ -240,7 +240,7 @@ static void mptsas_sge_setup(mptsas_t *mpt, mptsas_cmd_t *cmd,
 
 static void mptsas_watch(void *arg);
 static void mptsas_watchsubr(mptsas_t *mpt);
-static void mptsas_cmd_timeout(mptsas_t *mpt, uint16_t devhdl);
+static void mptsas_cmd_timeout(mptsas_t *mpt, mptsas_target_t *ptgt);
 
 static void mptsas_start_passthru(mptsas_t *mpt, mptsas_cmd_t *cmd);
 static int mptsas_do_passthru(mptsas_t *mpt, uint8_t *request, uint8_t *reply,
@@ -3373,17 +3373,17 @@ mptsas_save_cmd(mptsas_t *mpt, mptsas_cmd_t *cmd)
 	 * event acknoledgment)
 	 */
 	if ((cmd->cmd_flags & CFLAG_CMDIOC) == 0) {
+		/*
+		 * Expiration time is set in mptsas_start_cmd
+		 */
 		ptgt->m_t_ncmds++;
-	}
-	cmd->cmd_active_timeout = cmd->cmd_pkt->pkt_time;
-
-	/*
-	 * If initial timout is less than or equal to one tick, bump
-	 * the timeout by a tick so that command doesn't timeout before
-	 * its allotted time.
-	 */
-	if (cmd->cmd_active_timeout <= mptsas_scsi_watchdog_tick) {
-		cmd->cmd_active_timeout += mptsas_scsi_watchdog_tick;
+		cmd->cmd_active_expiration = 0;
+	} else {
+		/*
+		 * Initialize expiration time for passthrough commands,
+		 */
+		cmd->cmd_active_expiration = gethrtime() +
+		    (hrtime_t)cmd->cmd_pkt->pkt_time * NANOSEC;
 	}
 	return (TRUE);
 }
@@ -4847,9 +4847,8 @@ mptsas_handle_address_reply(mptsas_t *mpt,
 			    "reply in slot %d", SMID);
 			return;
 		}
-		if ((cmd->cmd_flags & CFLAG_PASSTHRU) ||
-		    (cmd->cmd_flags & CFLAG_CONFIG) ||
-		    (cmd->cmd_flags & CFLAG_FW_DIAG)) {
+		if ((cmd->cmd_flags &
+		    (CFLAG_PASSTHRU | CFLAG_CONFIG | CFLAG_FW_DIAG))) {
 			cmd->cmd_rfm = reply_addr;
 			cmd->cmd_flags |= CFLAG_FINISHED;
 			cv_broadcast(&mpt->m_passthru_cv);
@@ -5016,6 +5015,9 @@ mptsas_check_scsi_io_error(mptsas_t *mpt, pMpi2SCSIIOReply_t reply,
 	struct buf		*bp;
 	mptsas_target_t		*ptgt = cmd->cmd_tgt_addr;
 	uint8_t			*sensedata = NULL;
+	uint64_t		sas_wwn;
+	uint8_t			phy;
+	char			wwn_str[MPTSAS_WWN_STRLEN];
 
 	if ((cmd->cmd_flags & (CFLAG_SCBEXTERN | CFLAG_EXTARQBUFVALID)) ==
 	    (CFLAG_SCBEXTERN | CFLAG_EXTARQBUFVALID)) {
@@ -5033,12 +5035,19 @@ mptsas_check_scsi_io_error(mptsas_t *mpt, pMpi2SCSIIOReply_t reply,
 	    &reply->ResponseInfo);
 
 	if (ioc_status & MPI2_IOCSTATUS_FLAG_LOG_INFO_AVAILABLE) {
+		sas_wwn = ptgt->m_addr.mta_wwn;
+		phy = ptgt->m_phynum;
+		if (sas_wwn == 0) {
+			(void) sprintf(wwn_str, "p%x", phy);
+		} else {
+			(void) sprintf(wwn_str, "w%016"PRIx64, sas_wwn);
+		}
 		loginfo = ddi_get32(mpt->m_acc_reply_frame_hdl,
 		    &reply->IOCLogInfo);
 		mptsas_log(mpt, CE_NOTE,
-		    "?Log info 0x%x received for target %d.\n"
+		    "?Log info 0x%x received for target %d %s.\n"
 		    "\tscsi_status=0x%x, ioc_status=0x%x, scsi_state=0x%x",
-		    loginfo, Tgt(cmd), scsi_status, ioc_status,
+		    loginfo, Tgt(cmd), wwn_str, scsi_status, ioc_status,
 		    scsi_state);
 	}
 
@@ -5193,8 +5202,18 @@ mptsas_check_scsi_io_error(mptsas_t *mpt, pMpi2SCSIIOReply_t reply,
 			}
 			break;
 		case MPI2_IOCSTATUS_SCSI_TASK_TERMINATED:
-			mptsas_set_pkt_reason(mpt,
-			    cmd, CMD_RESET, STAT_BUS_RESET);
+			if (cmd->cmd_active_expiration <= gethrtime()) {
+				/*
+				 * When timeout requested, propagate
+				 * proper reason and statistics to
+				 * target drivers.
+				 */
+				mptsas_set_pkt_reason(mpt, cmd, CMD_TIMEOUT,
+				    STAT_BUS_RESET | STAT_TIMEOUT);
+			} else {
+				mptsas_set_pkt_reason(mpt, cmd, CMD_RESET,
+				    STAT_BUS_RESET);
+			}
 			break;
 		case MPI2_IOCSTATUS_SCSI_IOC_TERMINATED:
 		case MPI2_IOCSTATUS_SCSI_EXT_TERMINATED:
@@ -7654,7 +7673,6 @@ mptsas_remove_cmd(mptsas_t *mpt, mptsas_cmd_t *cmd)
 {
 	int		slot;
 	mptsas_slots_t	*slots = mpt->m_active;
-	int		t;
 	mptsas_target_t	*ptgt = cmd->cmd_tgt_addr;
 
 	ASSERT(cmd != NULL);
@@ -7668,7 +7686,6 @@ mptsas_remove_cmd(mptsas_t *mpt, mptsas_cmd_t *cmd)
 		return;
 	}
 
-	t = Tgt(cmd);
 	slot = cmd->cmd_slot;
 
 	/*
@@ -7693,8 +7710,16 @@ mptsas_remove_cmd(mptsas_t *mpt, mptsas_cmd_t *cmd)
 			    ((cmd->cmd_pkt_flags & FLAG_TAGMASK) == 0)) {
 				mptsas_set_throttle(mpt, ptgt, MAX_THROTTLE);
 			}
-		}
 
+			/*
+			 * Remove this command from the active queue.
+			 */
+			if (cmd->cmd_active_expiration != 0) {
+				TAILQ_REMOVE(&ptgt->m_active_cmdq, cmd,
+				    cmd_active_link);
+				cmd->cmd_active_expiration = 0;
+			}
+		}
 	}
 
 	/*
@@ -7704,50 +7729,6 @@ mptsas_remove_cmd(mptsas_t *mpt, mptsas_cmd_t *cmd)
 		mptsas_return_to_pool(mpt, cmd);
 		return;
 	}
-
-	/*
-	 * Figure out what to set tag Q timeout for...
-	 *
-	 * Optimize: If we have duplicate's of same timeout
-	 * we're using, then we'll use it again until we run
-	 * out of duplicates.  This should be the normal case
-	 * for block and raw I/O.
-	 * If no duplicates, we have to scan through tag que and
-	 * find the longest timeout value and use it.  This is
-	 * going to take a while...
-	 * Add 1 to m_n_normal to account for TM request.
-	 */
-	if (cmd->cmd_pkt->pkt_time == ptgt->m_timebase) {
-		if (--(ptgt->m_dups) == 0) {
-			if (ptgt->m_t_ncmds) {
-				mptsas_cmd_t *ssp;
-				uint_t n = 0;
-				ushort_t nslots = (slots->m_n_normal + 1);
-				ushort_t i;
-				/*
-				 * This crude check assumes we don't do
-				 * this too often which seems reasonable
-				 * for block and raw I/O.
-				 */
-				for (i = 0; i < nslots; i++) {
-					ssp = slots->m_slot[i];
-					if (ssp && (Tgt(ssp) == t) &&
-					    (ssp->cmd_pkt->pkt_time > n)) {
-						n = ssp->cmd_pkt->pkt_time;
-						ptgt->m_dups = 1;
-					} else if (ssp && (Tgt(ssp) == t) &&
-					    (ssp->cmd_pkt->pkt_time == n)) {
-						ptgt->m_dups++;
-					}
-				}
-				ptgt->m_timebase = n;
-			} else {
-				ptgt->m_dups = 0;
-				ptgt->m_timebase = 0;
-			}
-		}
-	}
-	ptgt->m_timeout = ptgt->m_timebase;
 
 	ASSERT(cmd != slots->m_slot[cmd->cmd_slot]);
 }
@@ -7903,7 +7884,6 @@ mptsas_start_cmd(mptsas_t *mpt, mptsas_cmd_t *cmd)
 {
 	struct scsi_pkt		*pkt = CMD2PKT(cmd);
 	uint32_t		control = 0;
-	int			n;
 	caddr_t			mem;
 	pMpi2SCSIIORequest_t	io_request;
 	ddi_dma_handle_t	dma_hdl = mpt->m_dma_req_frame_hdl;
@@ -7911,6 +7891,7 @@ mptsas_start_cmd(mptsas_t *mpt, mptsas_cmd_t *cmd)
 	mptsas_target_t		*ptgt = cmd->cmd_tgt_addr;
 	uint16_t		SMID, io_flags = 0;
 	uint32_t		request_desc_low, request_desc_high;
+	mptsas_cmd_t		*c;
 
 	NDBG1(("mptsas_start_cmd: cmd=0x%p", (void *)cmd));
 
@@ -8040,37 +8021,44 @@ mptsas_start_cmd(mptsas_t *mpt, mptsas_cmd_t *cmd)
 	/*
 	 * Start timeout.
 	 */
+	cmd->cmd_active_expiration =
+	    gethrtime() + (hrtime_t)pkt->pkt_time * NANOSEC;
 #ifdef MPTSAS_TEST
 	/*
-	 * Temporarily set timebase = 0;  needed for
-	 * timeout torture test.
+	 * Force timeouts to happen immediately.
 	 */
-	if (mptsas_test_timeouts) {
-		ptgt->m_timebase = 0;
-	}
+	if (mptsas_test_timeouts)
+		cmd->cmd_active_expiration = gethrtime();
 #endif
-	n = pkt->pkt_time - ptgt->m_timebase;
-
-	if (n == 0) {
-		(ptgt->m_dups)++;
-		ptgt->m_timeout = ptgt->m_timebase;
-	} else if (n > 0) {
-		ptgt->m_timeout =
-		    ptgt->m_timebase = pkt->pkt_time;
-		ptgt->m_dups = 1;
-	} else if (n < 0) {
-		ptgt->m_timeout = ptgt->m_timebase;
+	c = TAILQ_FIRST(&ptgt->m_active_cmdq);
+	if (c == NULL ||
+	    c->cmd_active_expiration < cmd->cmd_active_expiration) {
+		/*
+		 * Common case is that this is the last pending expiration
+		 * (or queue is empty). Insert at head of the queue.
+		 */
+		TAILQ_INSERT_HEAD(&ptgt->m_active_cmdq, cmd, cmd_active_link);
+	} else {
+		/*
+		 * Queue is not empty and first element expires later than
+		 * this command. Search for element expiring sooner.
+		 */
+		while ((c = TAILQ_NEXT(c, cmd_active_link)) != NULL) {
+			if (c->cmd_active_expiration <
+			    cmd->cmd_active_expiration) {
+				TAILQ_INSERT_BEFORE(c, cmd, cmd_active_link);
+				break;
+			}
+		}
+		if (c == NULL) {
+			/*
+			 * No element found expiring sooner, append to
+			 * non-empty queue.
+			 */
+			TAILQ_INSERT_TAIL(&ptgt->m_active_cmdq, cmd,
+			    cmd_active_link);
+		}
 	}
-#ifdef MPTSAS_TEST
-	/*
-	 * Set back to a number higher than
-	 * mptsas_scsi_watchdog_tick
-	 * so timeouts will happen in mptsas_watchsubr
-	 */
-	if (mptsas_test_timeouts) {
-		ptgt->m_timebase = 60;
-	}
-#endif
 
 	if ((mptsas_check_dma_handle(dma_hdl) != DDI_SUCCESS) ||
 	    (mptsas_check_acc_handle(acc_hdl) != DDI_SUCCESS)) {
@@ -8584,8 +8572,11 @@ mptsas_flush_target(mptsas_t *mpt, ushort_t target, int lun, uint8_t tasktype)
 	int		slot;
 	uchar_t		reason;
 	uint_t		stat;
+	hrtime_t	timestamp;
 
 	NDBG25(("mptsas_flush_target: target=%d lun=%d", target, lun));
+
+	timestamp = gethrtime();
 
 	/*
 	 * Make sure the I/O Controller has flushed all cmds
@@ -8601,6 +8592,15 @@ mptsas_flush_target(mptsas_t *mpt, ushort_t target, int lun, uint8_t tasktype)
 		switch (tasktype) {
 		case MPI2_SCSITASKMGMT_TASKTYPE_TARGET_RESET:
 			if (Tgt(cmd) == target) {
+				if (cmd->cmd_active_expiration <= timestamp) {
+					/*
+					 * When timeout requested, propagate
+					 * proper reason and statistics to
+					 * target drivers.
+					 */
+					reason = CMD_TIMEOUT;
+					stat |= STAT_TIMEOUT;
+				}
 				NDBG25(("mptsas_flush_target discovered non-"
 				    "NULL cmd in slot %d, tasktype 0x%x", slot,
 				    tasktype));
@@ -8740,9 +8740,8 @@ mptsas_flush_hba(mptsas_t *mpt)
 			 */
 			mptsas_set_pkt_reason(mpt, cmd, CMD_RESET,
 			    STAT_BUS_RESET);
-			if ((cmd->cmd_flags & CFLAG_PASSTHRU) ||
-			    (cmd->cmd_flags & CFLAG_CONFIG) ||
-			    (cmd->cmd_flags & CFLAG_FW_DIAG)) {
+			if ((cmd->cmd_flags &
+			    (CFLAG_PASSTHRU | CFLAG_CONFIG | CFLAG_FW_DIAG))) {
 				cmd->cmd_flags |= CFLAG_FINISHED;
 				cv_broadcast(&mpt->m_passthru_cv);
 				cv_broadcast(&mpt->m_config_cv);
@@ -9384,6 +9383,7 @@ mptsas_watchsubr(mptsas_t *mpt)
 	int		i;
 	mptsas_cmd_t	*cmd;
 	mptsas_target_t	*ptgt = NULL;
+	hrtime_t	timestamp = gethrtime();
 
 	ASSERT(MUTEX_HELD(&mpt->m_mutex));
 
@@ -9401,10 +9401,8 @@ mptsas_watchsubr(mptsas_t *mpt)
 	 */
 	for (i = 0; i <= mpt->m_active->m_n_normal; i++) {
 		if ((cmd = mpt->m_active->m_slot[i]) != NULL) {
-			if ((cmd->cmd_flags & CFLAG_CMDIOC) == 0) {
-				cmd->cmd_active_timeout -=
-				    mptsas_scsi_watchdog_tick;
-				if (cmd->cmd_active_timeout <= 0) {
+			if (cmd->cmd_active_expiration <= timestamp) {
+				if ((cmd->cmd_flags & CFLAG_CMDIOC) == 0) {
 					/*
 					 * There seems to be a command stuck
 					 * in the active slot.  Drain throttle.
@@ -9412,14 +9410,9 @@ mptsas_watchsubr(mptsas_t *mpt)
 					mptsas_set_throttle(mpt,
 					    cmd->cmd_tgt_addr,
 					    DRAIN_THROTTLE);
-				}
-			}
-			if ((cmd->cmd_flags & CFLAG_PASSTHRU) ||
-			    (cmd->cmd_flags & CFLAG_CONFIG) ||
-			    (cmd->cmd_flags & CFLAG_FW_DIAG)) {
-				cmd->cmd_active_timeout -=
-				    mptsas_scsi_watchdog_tick;
-				if (cmd->cmd_active_timeout <= 0) {
+				} else if (cmd->cmd_flags &
+				    (CFLAG_PASSTHRU | CFLAG_CONFIG |
+				    CFLAG_FW_DIAG)) {
 					/*
 					 * passthrough command timeout
 					 */
@@ -9446,29 +9439,42 @@ mptsas_watchsubr(mptsas_t *mpt)
 			mptsas_restart_hba(mpt);
 		}
 
-		if ((ptgt->m_t_ncmds > 0) &&
-		    (ptgt->m_timebase)) {
+		cmd = TAILQ_LAST(&ptgt->m_active_cmdq, mptsas_active_cmdq);
+		if (cmd == NULL)
+			continue;
 
-			if (ptgt->m_timebase <=
-			    mptsas_scsi_watchdog_tick) {
-				ptgt->m_timebase +=
-				    mptsas_scsi_watchdog_tick;
+		if (cmd->cmd_active_expiration <= timestamp) {
+			/*
+			 * Earliest command timeout expired. Drain throttle.
+			 */
+			mptsas_set_throttle(mpt, ptgt, DRAIN_THROTTLE);
+
+			/*
+			 * Check for remaining commands.
+			 */
+			cmd = TAILQ_FIRST(&ptgt->m_active_cmdq);
+			if (cmd->cmd_active_expiration > timestamp) {
+				/*
+				 * Wait for remaining commands to complete or
+				 * time out.
+				 */
+				NDBG23(("command timed out, pending drain"));
 				continue;
 			}
 
-			ptgt->m_timeout -= mptsas_scsi_watchdog_tick;
+			/*
+			 * All command timeouts expired.
+			 */
+			mptsas_log(mpt, CE_NOTE, "Timeout of %d seconds "
+			    "expired with %d commands on target %d lun %d.",
+			    cmd->cmd_pkt->pkt_time, ptgt->m_t_ncmds,
+			    ptgt->m_devhdl, Lun(cmd));
 
-			if (ptgt->m_timeout < 0) {
-				mptsas_cmd_timeout(mpt, ptgt->m_devhdl);
-				continue;
-			}
-
-			if ((ptgt->m_timeout) <=
-			    mptsas_scsi_watchdog_tick) {
-				NDBG23(("pending timeout"));
-				mptsas_set_throttle(mpt, ptgt,
-				    DRAIN_THROTTLE);
-			}
+			mptsas_cmd_timeout(mpt, ptgt);
+		} else if (cmd->cmd_active_expiration <=
+		    timestamp + (hrtime_t)mptsas_scsi_watchdog_tick * NANOSEC) {
+			NDBG23(("pending timeout"));
+			mptsas_set_throttle(mpt, ptgt, DRAIN_THROTTLE);
 		}
 	}
 }
@@ -9477,16 +9483,28 @@ mptsas_watchsubr(mptsas_t *mpt)
  * timeout recovery
  */
 static void
-mptsas_cmd_timeout(mptsas_t *mpt, uint16_t devhdl)
+mptsas_cmd_timeout(mptsas_t *mpt, mptsas_target_t *ptgt)
 {
+	uint16_t	devhdl;
+	uint64_t	sas_wwn;
+	uint8_t		phy;
+	char		wwn_str[MPTSAS_WWN_STRLEN];
+
+	devhdl = ptgt->m_devhdl;
+	sas_wwn = ptgt->m_addr.mta_wwn;
+	phy = ptgt->m_phynum;
+	if (sas_wwn == 0) {
+		(void) sprintf(wwn_str, "p%x", phy);
+	} else {
+		(void) sprintf(wwn_str, "w%016"PRIx64, sas_wwn);
+	}
 
 	NDBG29(("mptsas_cmd_timeout: target=%d", devhdl));
 	mptsas_log(mpt, CE_WARN, "Disconnected command timeout for "
-	    "Target %d", devhdl);
+	    "target %d %s.", devhdl, wwn_str);
 
 	/*
-	 * If the current target is not the target passed in,
-	 * try to reset that target.
+	 * Abort all outstanding commands on the device.
 	 */
 	NDBG29(("mptsas_cmd_timeout: device reset"));
 	if (mptsas_do_scsi_reset(mpt, devhdl) != TRUE) {
@@ -15268,6 +15286,7 @@ mptsas_tgt_alloc(mptsas_t *mpt, uint16_t devhdl, uint64_t wwid,
 	tmp_tgt->m_qfull_retry_interval =
 	    drv_usectohz(QFULL_RETRY_INTERVAL * 1000);
 	tmp_tgt->m_t_throttle = MAX_THROTTLE;
+	TAILQ_INIT(&tmp_tgt->m_active_cmdq);
 
 	refhash_insert(mpt->m_targets, tmp_tgt);
 
