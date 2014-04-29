@@ -113,8 +113,7 @@ int
 epoll_ctl(int epfd, int op, int fd, struct epoll_event *event)
 {
 	dvpoll_epollfd_t epoll[2];
-	uint32_t events = event->events;
-	uint32_t ev;
+	uint32_t events, ev = 0;
 	int i = 0;
 
 	epoll[i].dpep_pollfd.fd = fd;
@@ -139,6 +138,7 @@ epoll_ctl(int epfd, int op, int fd, struct epoll_event *event)
 		 * events for which our values differ from their epoll(7)
 		 * equivalents.
 		 */
+		events = event->events;
 		ev = events & ~(EPOLLIGNORED | EPOLLSWIZZLED);
 
 		if (events & EPOLLRDHUP)
