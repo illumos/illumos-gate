@@ -1261,6 +1261,7 @@ void
 create_mcap_thread(zlog_t *zlogp, zoneid_t id)
 {
 	int		res;
+	char		brandname[MAXNAMELEN];
 
 	shutting_down = 0;
 	zid = id;
@@ -1268,7 +1269,20 @@ create_mcap_thread(zlog_t *zlogp, zoneid_t id)
 
 	if (zone_get_zonepath(zonename, zonepath, sizeof (zonepath)) != 0)
 		zerror(zlogp, B_FALSE, "zone %s missing zonepath", zonename);
-	(void) snprintf(zoneproc, sizeof (zoneproc), "%s/root/proc", zonepath);
+
+	brandname[0] = '\0';
+	if (zone_get_brand(zonename, brandname, sizeof (brandname)) != 0)
+		zerror(zlogp, B_FALSE, "zone %s missing brand", zonename);
+
+	/* all but the lx brand currently use /proc */
+	if (strcmp(brandname, "lx") == 0) {
+		(void) snprintf(zoneproc, sizeof (zoneproc),
+		    "%s/root/native/proc", zonepath);
+	} else {
+		(void) snprintf(zoneproc, sizeof (zoneproc), "%s/root/proc",
+		    zonepath);
+	}
+
 	(void) snprintf(debug_log, sizeof (debug_log), "%s/mcap_debug.log",
 	    zonepath);
 
