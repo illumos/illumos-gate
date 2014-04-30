@@ -347,13 +347,6 @@ apix_get_intr_handler(int cpu, short vec)
 	return ((uintptr_t)(apix_vector->v_autovect));
 }
 
-#if defined(__amd64)
-static unsigned char dummy_cpu_pri[MAXIPL + 1] = {
-	0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0
-};
-#endif
-
 static void
 apix_init()
 {
@@ -370,15 +363,11 @@ apix_init()
 	psm_get_ioapicid = apic_get_ioapicid;
 
 	apix_softinit();
-#if defined(__amd64)
-	/*
-	 * Make cpu-specific interrupt info point to cr8pri vector
-	 */
-	CPU->cpu_pri_data = dummy_cpu_pri;
-#else
+
+#if !defined(__amd64)
 	if (cpuid_have_cr8access(CPU))
 		apic_have_32bit_cr8 = 1;
-#endif	/* __amd64 */
+#endif
 
 	/*
 	 * Initialize IRM pool parameters

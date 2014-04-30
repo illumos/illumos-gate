@@ -62,7 +62,6 @@ extern int vcpu_on_pcpu(processorid_t);
  * Note:  This is kinda kludgy but seems to be the best
  * of our alternatives.
  */
-typedef void *cpu_pri_lev_t;
 
 struct cpuid_info;
 struct cpu_ucode_info;
@@ -91,9 +90,6 @@ struct	machcpu {
 
 	int		mcpu_nodeid;		/* node-id */
 	int		mcpu_pri;		/* CPU priority */
-	cpu_pri_lev_t	mcpu_pri_data;		/* ptr to machine dependent */
-						/* data for setting priority */
-						/* level */
 
 	struct hat	*mcpu_current_hat; /* cpu's current hat */
 
@@ -165,7 +161,6 @@ struct	machcpu {
 
 #define	cpu_nodeid cpu_m.mcpu_nodeid
 #define	cpu_pri cpu_m.mcpu_pri
-#define	cpu_pri_data cpu_m.mcpu_pri_data
 #define	cpu_current_hat cpu_m.mcpu_current_hat
 #define	cpu_hat_info cpu_m.mcpu_hat_info
 #define	cpu_ppaddr_mutex cpu_m.mcpu_ppaddr_mutex

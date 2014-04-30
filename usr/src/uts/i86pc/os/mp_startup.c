@@ -412,11 +412,6 @@ mp_cpu_configure_common(int cpun, boolean_t boot)
 	}
 
 	/*
-	 * Get interrupt priority data from cpu 0.
-	 */
-	cp->cpu_pri_data = CPU->cpu_pri_data;
-
-	/*
 	 * alloc space for cpuid info
 	 */
 	cpuid_alloc_space(cp);

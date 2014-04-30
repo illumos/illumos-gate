@@ -29,8 +29,6 @@
 #ifndef _SYS_VM_MACHPARAM_H
 #define	_SYS_VM_MACHPARAM_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -52,14 +50,6 @@ extern "C" {
  */
 #define	MAXSSIZ		(0x7ffff000)	/* max stack size limit */
 #define	DFLSSIZ		(8*1024*1024)	/* initial stack size limit */
-
-/*
- * DSIZE_LIMIT and SSIZE_LIMIT exist to work-around an SVVS bug (1094085),
- * and should be removed from the kernel (1094089)
- */
-
-#define	DSIZE_LIMIT	(USERLIMIT-USRTEXT)	/* physical data limit */
-#define	SSIZE_LIMIT	(0x7fffffff)	/* physical stack limit */
 
 /*
  * Minimum allowable virtual address space to be used

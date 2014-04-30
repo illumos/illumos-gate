@@ -1,12 +1,13 @@
 #
 # Copyright (c) 2002, 2008, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2014 Racktop Systems.
 #
 
 #
 # Task.pm provides the bootstrap for the Sun::Solaris::Task module.
 #
 
-require 5.8.4;
+require 5.0010;
 use strict;
 use warnings;
 

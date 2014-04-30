@@ -1134,12 +1134,8 @@ ndmp_wait_for_mover(ndmpd_session_t *session)
 	}
 	(void) mutex_unlock(&nlp->nlp_mtx);
 
-	if (session->ns_mover.md_state == NDMP_MOVER_STATE_ACTIVE) {
-		session->ns_tape.td_record_count = 0;
-		return (0);
-	}
-
-	return (-1);
+	return ((session->ns_mover.md_state == NDMP_MOVER_STATE_ACTIVE) ?
+	    0 : -1);
 }
 
 /*

@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2013, Joyent, Inc. All rights reserved.
- * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright (c) 2012, 2014 by Delphix. All rights reserved.
  */
 
 /*
@@ -139,7 +139,7 @@ dtrace_optval_t dtrace_ustackframes_default = 20;
 dtrace_optval_t dtrace_jstackframes_default = 50;
 dtrace_optval_t dtrace_jstackstrsize_default = 512;
 int		dtrace_msgdsize_max = 128;
-hrtime_t	dtrace_chill_max = 500 * (NANOSEC / MILLISEC);	/* 500 ms */
+hrtime_t	dtrace_chill_max = MSEC2NSEC(500);		/* 500 ms */
 hrtime_t	dtrace_chill_interval = NANOSEC;		/* 1000 ms */
 int		dtrace_devdepth_max = 32;
 int		dtrace_err_verbose;
@@ -6682,7 +6682,8 @@ dtrace_probe(dtrace_id_t id, uintptr_t arg0, uintptr_t arg1,
 		return;
 	}
 
-	now = dtrace_gethrtime();
+	now = mstate.dtms_timestamp = dtrace_gethrtime();
+	mstate.dtms_present |= DTRACE_MSTATE_TIMESTAMP;
 	vtime = dtrace_vtime_references != 0;
 
 	if (vtime && curthread->t_dtrace_start)

@@ -22,6 +22,9 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2014 Josef 'Jeff' Sipek <jeffpc@josefsipek.net>
+ */
 
 #include <sys/cpuvar.h>
 #include <sys/psm.h>
@@ -61,7 +64,7 @@ static void local_x2apic_write_int_cmd(uint32_t cpu_id, uint32_t cmd1);
  * -----------------------------------------------------------
  */
 int	x2apic_enable = 1;
-int 	apic_mode = LOCAL_APIC;		/* Default mode is Local APIC */
+apic_mode_t apic_mode = LOCAL_APIC;	/* Default mode is Local APIC */
 
 /* Uses MMIO (Memory Mapped IO) */
 static apic_reg_ops_t local_apic_regs_ops = {
@@ -94,7 +97,6 @@ apic_reg_ops_t *apic_reg_ops = &local_apic_regs_ops;
 void apic_send_EOI();
 void apic_send_directed_EOI(uint32_t irq);
 
-#define	X2APIC_CPUID_BIT	21
 #define	X2APIC_ENABLE_BIT	10
 
 /*
@@ -233,15 +235,10 @@ apic_send_directed_EOI(uint32_t irq)
 int
 apic_detect_x2apic(void)
 {
-	struct cpuid_regs cp;
-
 	if (x2apic_enable == 0)
 		return (0);
 
-	cp.cp_eax = 1;
-	(void) __cpuid_insn(&cp);
-
-	return ((cp.cp_ecx & (0x1 << X2APIC_CPUID_BIT)) ? 1 : 0);
+	return (is_x86_feature(x86_featureset, X86FSET_X2APIC));
 }
 
 void

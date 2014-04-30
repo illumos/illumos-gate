@@ -3,8 +3,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * The contents of this file are subject to the Netscape Public
  * License Version 1.1 (the "License"); you may not use this file
@@ -317,7 +315,7 @@ nsldapi_os_connect_with_to(LBER_SOCKET sockfd, struct sockaddr *saptr,
 					    (msec % MILLISEC);
 #ifdef _SOLARIS_SDK
 			start_time = gethrtime();
-			tv_time = (hrtime_t)msec * (NANOSEC / MILLISEC);
+			tv_time = MSEC2NSEC(msec);
 #else
 			start_time = (long)time(NULL);
 #endif

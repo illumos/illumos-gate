@@ -28,8 +28,6 @@
 #ifndef _SYS_VM_MACHPARAM_H
 #define	_SYS_VM_MACHPARAM_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -69,16 +67,6 @@ extern "C" {
 #define	MAXSSIZ		(USRSTACK - 1024*1024)
 #endif /* __amd64 */
 #define	DFLSSIZ		(8*1024*1024 + ((USRSTACK) & 0x3FFFFF))
-
-/*
- * The following are limits beyond which the hard or soft limits for stack
- * and data cannot be increased. These may be viewed as fundamental
- * characteristics of the system. Note: a bug in SVVS requires that the
- * default hard limit be increasable, so the default hard limit must be
- * less than these physical limits.
- */
-#define	DSIZE_LIMIT	(USERLIMIT-USRTEXT)	/* physical data limit */
-#define	SSIZE_LIMIT	(USRSTACK)		/* physical stack limit */
 
 /*
  * Size of the kernel segkmem system pte table.  This virtual

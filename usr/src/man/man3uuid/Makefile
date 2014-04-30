@@ -12,6 +12,7 @@
 #
 # Copyright 2011, Richard Lowe
 # Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2014 Andrew Stormont.
 #
 
 include		$(SRC)/Makefile.master
@@ -28,7 +29,9 @@ MANLINKS=	uuid_compare.3uuid		\
 		uuid_is_null.3uuid		\
 		uuid_parse.3uuid		\
 		uuid_time.3uuid			\
-		uuid_unparse.3uuid
+		uuid_unparse.3uuid		\
+		uuid_unparse_lower.3uuid	\
+		uuid_unparse_upper.3uuid
 
 uuid_compare.3uuid		:= LINKSRC = uuid_clear.3uuid
 uuid_copy.3uuid			:= LINKSRC = uuid_clear.3uuid
@@ -39,6 +42,8 @@ uuid_is_null.3uuid		:= LINKSRC = uuid_clear.3uuid
 uuid_parse.3uuid		:= LINKSRC = uuid_clear.3uuid
 uuid_time.3uuid			:= LINKSRC = uuid_clear.3uuid
 uuid_unparse.3uuid		:= LINKSRC = uuid_clear.3uuid
+uuid_unparse_lower.3uuid	:= LINKSRC = uuid_clear.3uuid
+uuid_unparse_upper.3uuid	:= LINKSRC = uuid_clear.3uuid
 
 .KEEP_STATE:
 

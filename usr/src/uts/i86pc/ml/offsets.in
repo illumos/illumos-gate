@@ -223,13 +223,9 @@ cpu
 	cpu_m.mcpu_tss		CPU_TSS
 	cpu_m.mcpu_softinfo	CPU_SOFTINFO
 	cpu_m.mcpu_pri		CPU_PRI
-	cpu_m.mcpu_pri_data	CPU_PRI_DATA
 #if defined(__xpv)
 	cpu_m.mcpu_vcpu_info	CPU_VCPU_INFO
 #endif
-
-machcpu
-	mcpu_pri_data	MCPU_PRI_DATA
 
 standard_pic
 	c_curmask

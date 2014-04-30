@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <mdb/mdb_modapi.h>
 #include <mdb/mdb_ctf.h>
 
@@ -258,7 +256,7 @@ request_log(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		else if (dursec <= 9999)
 			mdb_snprintf(durstr, sizeof (durstr),
 			    "%lld.%03lld",
-			    dursec, durnsec / (NANOSEC / MILLISEC));
+			    dursec, NSEC2MSEC(durnsec));
 		else
 			mdb_snprintf(durstr, sizeof (durstr),
 			    "%lld", dursec);
@@ -282,7 +280,7 @@ request_log(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		else if (dursec <= 99999999ULL)
 			mdb_snprintf(stampstr, sizeof (stampstr),
 			    "-%lld.%03lld",
-			    dursec, durnsec / (NANOSEC / MILLISEC));
+			    dursec, NSEC2MSEC(durnsec));
 		else
 			mdb_snprintf(stampstr, sizeof (stampstr),
 			    "-%lld", dursec);

@@ -18,8 +18,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 #include <stdlib.h>
 #include <stdio.h>
@@ -83,6 +85,7 @@ static struct option itadm_long[] = {
 	{"isns",		required_argument,	NULL, 'i'},
 	{"isns-server",		required_argument,	NULL, 'I'},
 	{"node-name",		required_argument,	NULL, 'n'},
+	{"parsable",		no_argument,		NULL, 'p'},
 	{"radius-secret",	no_argument,		NULL, 'd'},
 	{"radius-secret-file",	required_argument,	NULL, 'D'},
 	{"radius-server",	required_argument,	NULL, 'r'},
@@ -92,40 +95,54 @@ static struct option itadm_long[] = {
 	{NULL, 0, NULL, 0}
 };
 
-char c_tgt[] = "itadm create-target [-a radius|chap|none|default] [-s] \
-[-S chap-secret-path] [-u chap-username] [-n target-node-name] \
-[-l alias] [-t tpg-name[,tpg-name,...]]";
+char c_tgt[] =
+"	create-target	[-a radius|chap|none|default] [-s]\n"
+"			[-S <chap-secret-path>] [-u <chap-user-name>]\n"
+"			[-n <target-node-name>] [-l <alias>]\n"
+"			[-t <tpg-name>[,<tpg-name>]...]";
 
-static char m_tgt[] = "itadm modify-target [-a radius|chap|none|default] [-s] \
-[-S chap-secret-path] [-u chap-username] [-n new-target-node-name] \
-[-l alias] [-t tpg-name[,tpg-name,...]] target-node-name";
+static char m_tgt[] =
+"	modify-target	[-a radius|chap|none|default] [-s]\n"
+"			[-S <chap-secret-path>] [-u <chap-username>]\n"
+"			[-n <new-target-node-name>] [-l <alias>]\n"
+"			[-t <tpg-name>[,<tpg-name>]...] <target-node-name>";
 
-static char d_tgt[] = "itadm delete-target [-f] target-node-name";
+static char d_tgt[] =
+"	delete-target	[-f] <target-node-name>";
 
-static char l_tgt[] = "itadm list-target [-v] [target-node-name]";
+static char l_tgt[] =
+"	list-target	[-pv] [<target-node-name>]";
 
-static char c_tpg[] = "itadm create-tpg tpg-name IP-address[:port] \
-[IP-address[:port]] [...]";
+static char c_tpg[] =
+"	create-tpg	<tpg-name> <IP-address>[:<port>]...";
 
-static char l_tpg[] = "itadm list-tpg [-v] [tpg-name]";
+static char l_tpg[] =
+"	list-tpg	[-pv] [<tpg-name>]";
 
-static char d_tpg[] = "itadm delete-tpg [-f] tpg-name";
+static char d_tpg[] =
+"	delete-tpg	[-f] <tpg-name>";
 
-static char c_ini[] = "itadm create-initiator [-s] [-S chap-secret-path] \
-[-u chap-username] initiator-node-name";
+static char c_ini[] =
+"	create-initiator [-s] [-S <chap-secret-path>]\n"
+"			[-u <chap-username>] <initiator-node-name>";
 
-static char m_ini[] = "itadm modify-initiator [-s] [-S chap-secret-path] \
-[-u chap-username] initiator-node-name";
+static char m_ini[] =
+"	modify-initiator [-s] [-S <chap-secret-path>]\n"
+"			[-u <chap-username>] <initiator-node-name>";
 
-static char l_ini[] = "itadm list-initiator [-v] initiator-node-name";
+static char l_ini[] =
+"	list-initiator	[-pv] [<initiator-node-name>]";
 
-static char d_ini[] = "itadm delete-initiator initiator-node-name";
+static char d_ini[] =
+"	delete-initiator <initiator-node-name>";
 
-static char m_def[] = "itadm modify-defaults [-a radius|chap|none] \
-[-r IP-address[:port]] [-d] [-D radius-secret-path] [-i enable|disable] \
-[-I IP-address[:port][,IP-adddress[:port]]]";
+static char m_def[] =
+"	modify-defaults	[-a radius|chap|none] [-r <IP-address>[:<port>]] [-d]\n"
+"			[-D <radius-secret-path>] [-i enable|disable]\n"
+"			[-I <IP-address>[:<port>][,<IP-adddress>[:<port>]]...]";
 
-static char l_def[] = "itadm list-defaults";
+static char l_def[] =
+"	list-defaults	[-p]";
 
 
 /* keep the order of this enum in the same order as the 'subcmds' struct */
@@ -156,16 +173,16 @@ static itadm_subcmds_t	subcmds[] = {
 	{"create-target", ":a:sS:u:n:l:t:h?", c_tgt},
 	{"modify-target", ":a:sS:u:n:l:t:h?", m_tgt},
 	{"delete-target", ":fh?", d_tgt},
-	{"list-target", ":vh?", l_tgt},
+	{"list-target", ":hpv?", l_tgt},
 	{"create-tpg", ":h?", c_tpg},
 	{"delete-tpg", ":fh?", d_tpg},
-	{"list-tpg", ":vh?", l_tpg},
+	{"list-tpg", ":hpv?", l_tpg},
 	{"create-initiator", ":sS:u:h?", c_ini},
 	{"modify-initiator", ":sS:u:h?", m_ini},
-	{"list-initiator", ":vh?", l_ini},
+	{"list-initiator", ":hpv?", l_ini},
 	{"delete-initiator", ":h?", d_ini},
 	{"modify-defaults", ":a:r:dD:i:I:h?", m_def},
-	{"list-defaults", ":h?", l_def},
+	{"list-defaults", ":hp?", l_def},
 	{NULL, ":h?", NULL},
 };
 
@@ -237,7 +254,7 @@ main(int argc, char *argv[])
 	int		itind = 0;
 	nvlist_t	*proplist = NULL;
 	boolean_t	verbose = B_FALSE;
-	boolean_t	scripting = B_FALSE;
+	boolean_t	script = B_FALSE;
 	boolean_t	tbool;
 	char		*targetname = NULL;
 	char		*propname;
@@ -364,6 +381,9 @@ main(int argc, char *argv[])
 				if (targetname == NULL) {
 					ret = ENOMEM;
 				}
+				break;
+			case 'p':
+				script = B_TRUE;
 				break;
 			case 'r':
 				ret = nvlist_add_string(proplist,
@@ -557,7 +577,7 @@ main(int argc, char *argv[])
 			ret = delete_target(objp, force);
 			break;
 		case LIST_TGT:
-			ret = list_target(objp, verbose, scripting);
+			ret = list_target(objp, verbose, script);
 			break;
 		case CREATE_TPG:
 			ret = create_tpg(objp, newargc - 1, &(newargv[1]));
@@ -566,7 +586,7 @@ main(int argc, char *argv[])
 			ret = delete_tpg(objp, force);
 			break;
 		case LIST_TPG:
-			ret = list_tpg(objp, verbose, scripting);
+			ret = list_tpg(objp, verbose, script);
 			break;
 		case CREATE_INI:
 			ret = modify_initiator(objp, proplist, B_TRUE);
@@ -575,7 +595,7 @@ main(int argc, char *argv[])
 			ret = modify_initiator(objp, proplist, B_FALSE);
 			break;
 		case LIST_INI:
-			ret = list_initiator(objp, verbose, scripting);
+			ret = list_initiator(objp, verbose, script);
 			break;
 		case DELETE_INI:
 			ret = delete_initiator(objp);
@@ -584,7 +604,7 @@ main(int argc, char *argv[])
 			ret = modify_defaults(proplist);
 			break;
 		case LIST_DEF:
-			ret = list_defaults(scripting);
+			ret = list_defaults(script);
 			break;
 		default:
 			ret = 1;
@@ -601,15 +621,17 @@ main(int argc, char *argv[])
 
 usage_error:
 	if (subcmds[idx].name) {
-		(void) printf("%s\n", gettext(subcmds[idx].usemsg));
+		(void) printf("%s\n%s\n", gettext("usage:"),
+		    gettext(subcmds[idx].usemsg));
 	} else {
 		/* overall usage */
-		(void) printf("%s\n\n", gettext("itadm usage:"));
+		(void) printf("%s\n",
+		    gettext("usage: itadm <subcommand> <args> ..."));
 		for (idx = 0; subcmds[idx].name != NULL; idx++) {
 			if (!subcmds[idx].usemsg) {
 				continue;
 			}
-			(void) printf("\t%s\n", gettext(subcmds[idx].usemsg));
+			(void) printf("%s\n", gettext(subcmds[idx].usemsg));
 		}
 	}
 

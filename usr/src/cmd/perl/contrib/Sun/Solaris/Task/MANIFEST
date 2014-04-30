@@ -1,8 +1,0 @@
-Changes
-Makefile.PL
-MANIFEST
-pod/Task.pod
-README
-Task.pm
-Task.xs
-typemap

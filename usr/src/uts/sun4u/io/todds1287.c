@@ -158,7 +158,7 @@ static int	instance = -1;
 /* Driver Tunables */
 static int	ds1287_interrupt_priority = 15;
 static int	ds1287_softint_priority = 2;
-static hrtime_t power_button_debounce = NANOSEC/MILLISEC*10;
+static hrtime_t power_button_debounce = MSEC2NSEC(10);
 static hrtime_t power_button_abort_interval = 1.5 * NANOSEC;
 static int	power_button_abort_presses = 3;
 static int	power_button_abort_enable = 1;

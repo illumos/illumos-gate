@@ -750,7 +750,7 @@ dpioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 			 * to absolute nanoseconds.  They must wait for at
 			 * least a tick.
 			 */
-			deadline = deadline * NANOSEC / MILLISEC;
+			deadline = MSEC2NSEC(deadline);
 			deadline = MAX(deadline, nsec_per_tick);
 			deadline += now;
 		}

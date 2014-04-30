@@ -24,7 +24,9 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 2013, 2014 by Delphix. All rights reserved.
+ */
 
 #include <sys/dtrace_impl.h>
 #include <sys/stack.h>
@@ -433,7 +435,7 @@ dtrace_getarg(int arg, int aframes)
 			 * use the pointer that it passed to the stack as the
 			 * second argument to dtrace_invop() as the pointer to
 			 * the stack.  When using this stack, we must step
-			 * beyond the EIP/RIP that was pushed when the trap was
+			 * beyond the EIP that was pushed when the trap was
 			 * taken -- hence the "+ 1" below.
 			 */
 			stack = ((uintptr_t **)&fp[1])[1] + 1;
@@ -442,17 +444,17 @@ dtrace_getarg(int arg, int aframes)
 			 * In the case of amd64, we will use the pointer to the
 			 * regs structure that was pushed when we took the
 			 * trap.  To get this structure, we must increment
-			 * beyond the frame structure, and then again beyond
-			 * the calling RIP stored in dtrace_invop().  If the
-			 * argument that we're seeking is passed on the stack,
-			 * we'll pull the true stack pointer out of the saved
+			 * beyond the frame structure, the calling RIP, and
+			 * padding stored in dtrace_invop().  If the argument
+			 * that we're seeking is passed on the stack, we'll
+			 * pull the true stack pointer out of the saved
 			 * registers and decrement our argument by the number
 			 * of arguments passed in registers; if the argument
 			 * we're seeking is passed in regsiters, we can just
 			 * load it directly.
 			 */
 			struct regs *rp = (struct regs *)((uintptr_t)&fp[1] +
-			    sizeof (uintptr_t));
+			    sizeof (uintptr_t) * 2);
 
 			if (arg <= inreg) {
 				stack = (uintptr_t *)&rp->r_rdi;

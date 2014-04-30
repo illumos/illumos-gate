@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  */
 
@@ -56,6 +56,7 @@
 #define	_SYS_SCSI_ADAPTERS_MPTVAR_H
 
 #include <sys/byteorder.h>
+#include <sys/queue.h>
 #include <sys/isa_defs.h>
 #include <sys/sunmdi.h>
 #include <sys/mdi_impldefs.h>
@@ -200,6 +201,9 @@ typedef struct mptsas_target_addr {
 	mptsas_phymask_t mta_phymask;
 } mptsas_target_addr_t;
 
+TAILQ_HEAD(mptsas_active_cmdq, mptsas_cmd);
+typedef struct mptsas_active_cmdq mptsas_active_cmdq_t;
+
 typedef	struct mptsas_target {
 		mptsas_target_addr_t	m_addr;
 		refhash_link_t		m_link;
@@ -208,8 +212,7 @@ typedef	struct mptsas_target {
 		uint32_t		m_deviceinfo;
 		uint8_t			m_phynum;
 		uint32_t		m_dups;
-		int32_t			m_timeout;
-		int32_t			m_timebase;
+		mptsas_active_cmdq_t	m_active_cmdq;
 		int32_t			m_t_throttle;
 		int32_t			m_t_ncmds;
 		int32_t			m_reset_delay;
@@ -265,8 +268,9 @@ typedef struct	mptsas_cmd {
 
 	int			cmd_pkt_flags;
 
-	/* timer for command in active slot */
-	int			cmd_active_timeout;
+	/* pending expiration time for command in active slot */
+	hrtime_t		cmd_active_expiration;
+	TAILQ_ENTRY(mptsas_cmd)	cmd_active_link;
 
 	struct scsi_pkt		*cmd_pkt;
 	struct scsi_arq_status	cmd_scb;
@@ -1169,7 +1173,7 @@ _NOTE(DATA_READABLE_WITHOUT_LOCK(mptsas::m_instance))
  */
 #define	DEFAULT_SCSI_OPTIONS	SCSI_OPTIONS_DR
 #define	DEFAULT_TAG_AGE_LIMIT	2
-#define	DEFAULT_WD_TICK		10
+#define	DEFAULT_WD_TICK		1
 
 /*
  * invalid hostid.

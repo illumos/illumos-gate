@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2013 by Delphix. All rights reserved.
+ * Copyright (c) 2011, 2014 by Delphix. All rights reserved.
  * Copyright (c) 2011 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2013 Joyent, Inc. All rights reserved.
  */
@@ -63,7 +63,6 @@ kmem_cache_t *zio_data_buf_cache[SPA_MAXBLOCKSIZE >> SPA_MINBLOCKSHIFT];
 #ifdef _KERNEL
 extern vmem_t *zio_alloc_arena;
 #endif
-extern int zfs_mg_alloc_failures;
 
 /*
  * The following actions directly effect the spa's sync-to-convergence logic.
@@ -169,13 +168,6 @@ zio_init(void)
 		if (zio_data_buf_cache[c - 1] == NULL)
 			zio_data_buf_cache[c - 1] = zio_data_buf_cache[c];
 	}
-
-	/*
-	 * The zio write taskqs have 1 thread per cpu, allow 1/2 of the taskqs
-	 * to fail 3 times per txg or 8 failures, whichever is greater.
-	 */
-	if (zfs_mg_alloc_failures == 0)
-		zfs_mg_alloc_failures = MAX((3 * max_ncpus / 2), 8);
 
 	zio_inject_init();
 }
@@ -1266,7 +1258,7 @@ zio_execute(zio_t *zio)
 		}
 
 		zio->io_stage = stage;
-		rv = zio_pipeline[highbit(stage) - 1](zio);
+		rv = zio_pipeline[highbit64(stage) - 1](zio);
 
 		if (rv == ZIO_PIPELINE_STOP)
 			return;

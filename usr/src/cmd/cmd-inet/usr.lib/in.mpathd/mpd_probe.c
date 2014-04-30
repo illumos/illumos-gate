@@ -2726,7 +2726,7 @@ own_address(struct in6_addr addr)
 static int
 ns2ms(int64_t ns)
 {
-	return (ns / (NANOSEC / MILLISEC));
+	return (NSEC2MSEC(ns));
 }
 
 static int64_t

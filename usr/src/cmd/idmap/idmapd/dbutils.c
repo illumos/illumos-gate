@@ -356,7 +356,7 @@ idmap_sqlite_busy_handler(void *arg, const char *table_name, int count)
 	}
 	busy->total += delay;
 	rqtp.tv_sec = 0;
-	rqtp.tv_nsec = delay * (NANOSEC / MILLISEC);
+	rqtp.tv_nsec = MSEC2NSEC(delay);
 	(void) nanosleep(&rqtp, NULL);
 	return (1);
 }

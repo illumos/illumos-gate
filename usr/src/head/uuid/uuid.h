@@ -24,10 +24,12 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2014 Andrew Stormont.
+ */
+
 #ifndef	_UUID_H
 #define	_UUID_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -65,6 +67,8 @@ extern void uuid_generate_time(uuid_t);
 extern void uuid_copy(uuid_t, uuid_t);
 extern void uuid_clear(uuid_t);
 extern void uuid_unparse(uuid_t, char *);
+extern void uuid_unparse_lower(uuid_t, char *);
+extern void uuid_unparse_upper(uuid_t, char *);
 extern int uuid_compare(uuid_t, uuid_t);
 extern int uuid_is_null(uuid_t);
 extern int uuid_parse(char *, uuid_t);

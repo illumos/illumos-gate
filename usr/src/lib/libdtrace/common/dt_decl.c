@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2013 by Delphix. All rights reserved.
+ * Copyright (c) 2012, 2014 by Delphix. All rights reserved.
  * Copyright (c) 2013 Joyent, Inc. All rights reserved.
  */
 
@@ -265,6 +265,26 @@ dt_decl_attr(ushort_t attr)
 		ddp = dt_decl_push(dt_decl_alloc(CTF_K_UNKNOWN, NULL));
 		ddp->dd_attr = attr;
 		return (ddp);
+	}
+
+	if ((attr & DT_DA_LONG) && (ddp->dd_attr & DT_DA_LONGLONG)) {
+		xyerror(D_DECL_COMBO, "the attribute 'long' may only "
+		    "be used at most twice in a declaration");
+	}
+
+	if ((attr & DT_DA_SHORT) && (ddp->dd_attr & DT_DA_SHORT)) {
+		xyerror(D_DECL_COMBO, "the attribute 'short' may only be "
+		    "used at most once in a declaration");
+	}
+
+	if ((attr & DT_DA_SIGNED) && (ddp->dd_attr & DT_DA_SIGNED)) {
+		xyerror(D_DECL_COMBO, "the attribute 'signed' may only be "
+		    "used at most once in a declaration");
+	}
+
+	if ((attr & DT_DA_UNSIGNED) && (ddp->dd_attr & DT_DA_UNSIGNED)) {
+		xyerror(D_DECL_COMBO, "the attribute 'unsigned' may only be "
+		    "used at most once in a declaration");
 	}
 
 	if (attr == DT_DA_LONG && (ddp->dd_attr & DT_DA_LONG)) {

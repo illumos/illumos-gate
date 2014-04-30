@@ -153,7 +153,7 @@ enum {
 };
 
 #define	IPMPSTAT_NCOL	80
-#define	NS2FLOATMS(ns)	((float)(ns) / (NANOSEC / MILLISEC))
+#define	NS2FLOATMS(ns)	(NSEC2MSEC((float)(ns)))
 #define	MS2FLOATSEC(ms)	((float)(ms) / 1000)
 
 static const char	*progname;

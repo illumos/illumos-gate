@@ -20,6 +20,7 @@
 #
 #
 # Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2014 Andrew Stormont.
 #
 
 #
@@ -37,6 +38,12 @@
 #
 
 $mapfile_version 2
+
+SYMBOL_VERSION ILLUMOS_0.1 {
+    global:
+	uuid_unparse_lower;
+	uuid_unparse_upper;
+} SUNW_1.1;
 
 SYMBOL_VERSION SUNW_1.1 {
     global:

@@ -11,6 +11,7 @@
 
 #
 # Copyright 2012 Joyent, Inc.  All rights reserved.
+# Copyright (c) 2014 Igor Kozhukhov <ikozhukhov@gmail.com>
 # Use is subject to license terms.
 #
 
@@ -22,7 +23,7 @@ LINTS		= $(IPD_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/common/inet/ipd
 
-include $(UTSBASE)/intel/Makefile.intel
+include $(UTSBASE)/sparc/Makefile.sparc
 
 ALL_TARGET	= $(BINARY) $(SRC_CONFILE)
 LINT_TARGET	= $(MODULE).lint
@@ -48,4 +49,4 @@ clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 
-include $(UTSBASE)/intel/Makefile.targ
+include $(UTSBASE)/sparc/Makefile.targ

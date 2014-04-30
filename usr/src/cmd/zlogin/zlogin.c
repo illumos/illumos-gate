@@ -22,6 +22,7 @@
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2013 DEY Storage Systems, Inc.
  * Copyright (c) 2014 Gary Mills
+ * Copyright 2014 Nexenta Systems, Inc. All rights reserved.
  */
 
 /*
@@ -554,9 +555,7 @@ static void
 sig_forward(int s)
 {
 	if (child_pid != -1) {
-		pid_t pgid = getpgid(child_pid);
-		if (pgid != -1)
-			(void) sigsend(P_PGID, pgid, s);
+		(void) sigsend(P_PGID, child_pid, s);
 	}
 }
 
@@ -672,7 +671,7 @@ retry:
 
 				/* sleep for 10 milliseconds */
 				rqtp.tv_sec = 0;
-				rqtp.tv_nsec = 10 * (NANOSEC / MILLISEC);
+				rqtp.tv_nsec = MSEC2NSEC(10);
 				(void) nanosleep(&rqtp, NULL);
 				if (!dead)
 					goto retry;
