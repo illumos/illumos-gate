@@ -95,7 +95,7 @@ insert_timer(iu_tq_t *tq, iu_timer_node_t *node, uint64_t msec)
 	 * is the last item on the list, which are very different cases).
 	 */
 
-	node->iutn_abs_timeout = gethrtime() + (msec * (NANOSEC / MILLISEC));
+	node->iutn_abs_timeout = gethrtime() + MSEC2NSEC(msec);
 
 	if (tq->iutq_head != NULL &&
 	    tq->iutq_head->iutn_abs_timeout < node->iutn_abs_timeout)

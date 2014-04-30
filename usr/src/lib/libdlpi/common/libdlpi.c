@@ -1383,7 +1383,7 @@ i_dlpi_strgetmsg(dlpi_impl_t *dip, int msec, dlpi_msg_t *dlreplyp,
 
 	for (;;) {
 		if (!infinite)
-			start = gethrtime() / (NANOSEC / MILLISEC);
+			start = NSEC2MSEC(gethrtime());
 
 		switch (poll(&pfd, 1, msec)) {
 		default:
@@ -1499,7 +1499,7 @@ i_dlpi_strgetmsg(dlpi_impl_t *dip, int msec, dlpi_msg_t *dlreplyp,
 		}
 update_timer:
 		if (!infinite) {
-			current = gethrtime() / (NANOSEC / MILLISEC);
+			current = NSEC2MSEC(gethrtime());
 			msec -= (current - start);
 
 			if (msec <= 0)

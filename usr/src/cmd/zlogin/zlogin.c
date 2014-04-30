@@ -671,7 +671,7 @@ retry:
 
 				/* sleep for 10 milliseconds */
 				rqtp.tv_sec = 0;
-				rqtp.tv_nsec = 10 * (NANOSEC / MILLISEC);
+				rqtp.tv_nsec = MSEC2NSEC(10);
 				(void) nanosleep(&rqtp, NULL);
 				if (!dead)
 					goto retry;
