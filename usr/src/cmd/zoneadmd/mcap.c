@@ -120,10 +120,19 @@
  *    phys-mcap-no-pageout
  *	type: boolean
  *	true disables pageout when over
+ *    phys-mcap-no-pf-throttle
+ *	type: boolean
+ *	true disables page fault throttling when over
  */
 #define	TUNE_CMD	"phys-mcap-cmd"
 #define	TUNE_NVMU	"phys-mcap-no-vmusage"
 #define	TUNE_NPAGE	"phys-mcap-no-pageout"
+#define	TUNE_NPFTHROT	"phys-mcap-no-pf-throttle"
+
+#define	NSEC_INTERIM	4	/* num secs to pause between large mappings */
+#define	SMALL_MAPPING	10240	/* 10MB in KB */
+#define	LARGE_MAPPING	102400	/* 100MB in KB */
+#define	VRYLRG_MAPPING	512000	/* 500MB in KB */
 
 /*
  * These are only used in get_mem_info but global. We always need scale_rss and
@@ -149,6 +158,9 @@ static uint64_t zone_rss_cap;		/* RSS cap(KB) */
 static char	over_cmd[2 * BUFSIZ];	/* same size as zone_attr_value */
 static boolean_t skip_vmusage = B_FALSE;
 static boolean_t skip_pageout = B_FALSE;
+static boolean_t skip_pf_throttle = B_FALSE;
+
+static int64_t check_suspend();
 
 /*
  * Structure to hold current state about a process address space that we're
@@ -157,7 +169,7 @@ static boolean_t skip_pageout = B_FALSE;
 typedef struct {
 	int pr_curr;		/* the # of the mapping we're working on */
 	int pr_nmap;		/* number of mappings in address space */
-	prxmap_t *pr_xmapp;	/* process's xmap array */
+	prmap_t *pr_mapp;	/* process's map array */
 } proc_map_t;
 
 typedef struct zsd_vmusage64 {
@@ -311,19 +323,19 @@ control_proc(pid_t pid)
 /*
  * Get the next mapping.
  */
-static prxmap_t *
+static prmap_t *
 nextmapping(proc_map_t *pmp)
 {
-	if (pmp->pr_xmapp == NULL || pmp->pr_curr >= pmp->pr_nmap)
+	if (pmp->pr_mapp == NULL || pmp->pr_curr >= pmp->pr_nmap)
 		return (NULL);
 
-	return (&pmp->pr_xmapp[pmp->pr_curr++]);
+	return (&pmp->pr_mapp[pmp->pr_curr++]);
 }
 
 /*
  * Initialize the proc_map_t to access the first mapping of an address space.
  */
-static prxmap_t *
+static prmap_t *
 init_map(proc_map_t *pmp, pid_t pid)
 {
 	int fd;
@@ -334,7 +346,7 @@ init_map(proc_map_t *pmp, pid_t pid)
 	bzero(pmp, sizeof (proc_map_t));
 	pmp->pr_nmap = -1;
 
-	(void) snprintf(pathbuf, sizeof (pathbuf), "%s/%d/xmap", zoneproc, pid);
+	(void) snprintf(pathbuf, sizeof (pathbuf), "%s/%d/map", zoneproc, pid);
 	if ((fd = open(pathbuf, O_RDONLY, 0)) < 0)
 		return (NULL);
 
@@ -343,16 +355,16 @@ redo:
 	if (fstat(fd, &st) != 0)
 		goto done;
 
-	if ((pmp->pr_xmapp = malloc(st.st_size)) == NULL) {
+	if ((pmp->pr_mapp = malloc(st.st_size)) == NULL) {
 		debug("cannot malloc() %ld bytes for xmap", st.st_size);
 		goto done;
 	}
-	(void) bzero(pmp->pr_xmapp, st.st_size);
+	(void) bzero(pmp->pr_mapp, st.st_size);
 
 	errno = 0;
-	if ((res = read(fd, pmp->pr_xmapp, st.st_size)) != st.st_size) {
-		free(pmp->pr_xmapp);
-		pmp->pr_xmapp = NULL;
+	if ((res = pread(fd, pmp->pr_mapp, st.st_size, 0)) != st.st_size) {
+		free(pmp->pr_mapp);
+		pmp->pr_mapp = NULL;
 		if (res > 0 || errno == E2BIG) {
 			goto redo;
 		} else {
@@ -361,7 +373,8 @@ redo:
 		}
 	}
 
-	pmp->pr_nmap = st.st_size / sizeof (prxmap_t);
+	pmp->pr_nmap = st.st_size / sizeof (prmap_t);
+
 done:
 	(void) close(fd);
 	return (nextmapping(pmp));
@@ -372,23 +385,20 @@ done:
  * return nonzero if not all of the pages may are pageable, for any reason.
  */
 static int
-pageout_mapping(struct ps_prochandle *Pr, prxmap_t *pmp)
+pageout_mapping(struct ps_prochandle *Pr, prmap_t *pmp, uintptr_t start,
+    size_t sz)
 {
 	int res;
 
-	/*
-	 * We particularly want to avoid the pr_memcntl on anonymous mappings
-	 * which show 0 since that will pull them back off of the free list
-	 * and increase the zone's RSS, even though the process itself has
-	 * them freed up.
-	 */
-	if (pmp->pr_mflags & MA_ANON && pmp->pr_anon == 0)
-		return (0);
-	else if (pmp->pr_mflags & MA_ISM || pmp->pr_mflags & MA_SHM)
+	if (pmp->pr_mflags & MA_ISM || pmp->pr_mflags & MA_SHM)
 		return (0);
 
+	/*
+	 * See the description of the B_INVAL and B_INVALCURONLY flags in
+	 * sys/buf.h for a discussion of how MS_INVALCURPROC is handled.
+	 */
 	errno = 0;
-	res = pr_memcntl(Pr, (caddr_t)pmp->pr_vaddr, pmp->pr_size, MC_SYNC,
+	res = pr_memcntl(Pr, (caddr_t)start, sz, MC_SYNC,
 	    (caddr_t)(MS_ASYNC | MS_INVALCURPROC), 0, 0);
 
 	/*
@@ -402,26 +412,6 @@ pageout_mapping(struct ps_prochandle *Pr, prxmap_t *pmp)
 }
 
 /*
- * Compute the delta of the process RSS since the last call.  If the
- * psinfo cannot be obtained, no error is returned; its up to the caller to
- * detect the process termination via other means.
- */
-static int64_t
-rss_delta(int64_t *old_rss, int psfd)
-{
-	int64_t		d_rss = 0;
-	psinfo_t	psinfo;
-
-	if (pread(psfd, &psinfo, sizeof (psinfo_t), 0) == sizeof (psinfo_t)) {
-		d_rss = (int64_t)psinfo.pr_rssize - *old_rss;
-		*old_rss = (int64_t)psinfo.pr_rssize;
-	}
-
-	return (d_rss);
-}
-
-
-/*
  * Work through a process paging out mappings until the whole address space was
  * examined or the excess is < 0.  Return our estimate of the updated excess.
  */
@@ -429,14 +419,12 @@ static int64_t
 pageout_process(pid_t pid, int64_t excess)
 {
 	int			psfd;
-	prxmap_t		*pxmap;
+	prmap_t			*pmap;
 	proc_map_t		cur;
 	struct ps_prochandle	*ph = NULL;
-	int			unpageable_mappings;
-	int64_t			sum_d_rss, sum_att, d_rss;
+	int64_t			sum_att, d_rss;
 	int64_t			old_rss;
 	psinfo_t		psinfo;
-	int			incr_rss_check = 0;
 	char			pathbuf[MAXPATHLEN];
 
 	(void) snprintf(pathbuf, sizeof (pathbuf), "%s/%d/psinfo", zoneproc,
@@ -444,7 +432,7 @@ pageout_process(pid_t pid, int64_t excess)
 	if ((psfd = open(pathbuf, O_RDONLY, 0000)) < 0)
 		return (excess);
 
-	cur.pr_xmapp = NULL;
+	cur.pr_mapp = NULL;
 
 	if (pread(psfd, &psinfo, sizeof (psinfo), 0) != sizeof (psinfo))
 		goto done;
@@ -466,93 +454,220 @@ pageout_process(pid_t pid, int64_t excess)
 	}
 
 	/* Get segment residency information. */
-	pxmap = init_map(&cur, pid);
+	pmap = init_map(&cur, pid);
 
 	/* Skip process if it has no mappings. */
-	if (pxmap == NULL) {
-		debug("%ld: xmap unreadable; ignoring\n", pid);
+	if (pmap == NULL) {
+		debug("%ld: map unreadable; ignoring\n", pid);
 		goto done;
 	}
 
 	debug("pid %ld: nmap %d sz %dKB rss %lldKB %s\n",
 	    pid, cur.pr_nmap, psinfo.pr_size, old_rss, psinfo.pr_psargs);
 
-	/* Take control of the process. */
-	if ((ph = control_proc(pid)) == NULL) {
-		debug("%ld: cannot control\n", pid);
-		goto done;
-	}
-
-	/*
-	 * If the process RSS is not enough to erase the excess then no need
-	 * to incrementally check the RSS delta after each pageout attempt.
-	 * Instead check it after we've tried all of the segements.
-	 */
-	if (excess - old_rss < 0)
-		incr_rss_check = 1;
-
 	/*
 	 * Within the process's address space, attempt to page out mappings.
 	 */
-	sum_att = sum_d_rss = 0;
-	unpageable_mappings = 0;
-	while (excess > 0 && pxmap != NULL && !shutting_down) {
-		/* Try to page out the mapping. */
-		if (pageout_mapping(ph, pxmap) < 0) {
-			debug("pid %ld: exited or unpageable\n", pid);
-			break;
-		}
-
-		/* attempted is the size of the mapping */
-		sum_att += pxmap->pr_size / 1024;
+	sum_att = 0;
+	while (excess > 0 && pmap != NULL && !shutting_down) {
+		int64_t		msize;
 
 		/*
-		 * This processes RSS is potentially enough to clear the
-		 * excess so check as we go along to see if we can stop
-		 * paging out partway through the process.
+		 * For a typical process, there will be some quantity of fairly
+		 * small mappings (a few pages up to a few MB). These are for
+		 * libraries, program text, heap allocations, etc. Thus, each
+		 * one of these mappings will only contribute a small amount
+		 * toward the goal of reducing the zone's RSS.
+		 *
+		 * However, in some cases a process might have one or more
+		 * large (100s of MB or N GB) mappings (e.g. DB files). Each
+		 * one of these will go a long way toward reducing the RSS. For
+		 * these processes, stopping the process while we invalidate
+		 * several of the large mappings can have a noticeable impact
+		 * on the process execution. In addition, after we get under
+		 * the cap then once we resume invalidation, we want to try to
+		 * pickup where we left off within the process so that all its
+		 * mappings are treated equally.
+		 *
+		 * To handle this second case, we use a cutoff. If invalidating
+		 * a "large" mapping, then we pause after that to reduce
+		 * disruption of the process. If we get under the zone's cap,
+		 * while in the middle of this process, we suspend invalidation
+		 * in this code so that we can resume on this process later
+		 * if we go over the cap again (although this process might be
+		 * gone by that time).
 		 */
-		if (incr_rss_check) {
-			d_rss = rss_delta(&old_rss, psfd);
 
+		if (ph == NULL) {
 			/*
-			 * If this pageout attempt was unsuccessful (the
-			 * resident portion was not affected), then note it was
-			 * unpageable. Mappings are unpageable when none of the
-			 * pages paged out, such as when they are locked, or
-			 * involved in asynchronous I/O.
+			 * (re)take control of the process. Due to the agent
+			 * lwp, this stops the process.
 			 */
-			if (d_rss >= 0) {
-				unpageable_mappings++;
-			} else {
-				excess += d_rss;
-				sum_d_rss += d_rss;
+			if ((ph = control_proc(pid)) == NULL) {
+				/* the process might have exited */
+				debug("%ld: cannot take control\n", pid);
+				excess -= old_rss;
+				goto done;
 			}
 		}
 
-		pxmap = nextmapping(&cur);
-	}
+		msize = pmap->pr_size / 1024;
+		sum_att += msize;
 
-	if (!incr_rss_check) {
-		d_rss = rss_delta(&old_rss, psfd);
-		if (d_rss < 0) {
-			excess += d_rss;
-			sum_d_rss += d_rss;
+		/* Try to page out the mapping. */
+		if (msize > VRYLRG_MAPPING) {
+			/*
+			 * For a very large mapping, invalidate it in chunks
+			 * and let the process run in-between.
+			 */
+			uintptr_t addr;
+			int64_t sz;
+			int64_t amnt = VRYLRG_MAPPING * 1024;
+
+			addr = pmap->pr_vaddr;
+			sz = pmap->pr_size;
+
+			while (sz > 0) {
+				if (pageout_mapping(ph, pmap, addr, amnt) < 0) {
+					debug("pid %ld: mapping unpageable\n",
+					    pid);
+				}
+
+				addr += amnt;
+				sz -= amnt;
+
+				if (sz > 0) {
+					/*
+					 * If there is more to invalidate then
+					 * since we just tried to invalidate a
+					 * large mapping, release the process
+					 * and wait a bit to give the process
+					 * a chance to do some work.
+					 */
+					Pdestroy_agent(ph);
+					(void) Prelease(ph, 0);
+					ph = NULL;
+
+					(void) sleep_shutdown(NSEC_INTERIM);
+					if (shutting_down)
+						goto done;
+
+					if ((ph = control_proc(pid)) == NULL) {
+						/* the proc might have exited */
+						debug("%ld: cannot retake "
+						    "control\n", pid);
+						excess -= old_rss;
+						goto done;
+					}
+				}
+
+				if (sz < amnt)
+					amnt = sz;
+			}
+		} else {
+			/* invalidate the whole mapping at once */
+			if (pageout_mapping(ph, pmap, pmap->pr_vaddr,
+			    pmap->pr_size) < 0) {
+				debug("pid %ld: mapping unpageable\n", pid);
+			}
 		}
+
+		if (msize > LARGE_MAPPING) {
+			/*
+			 * Since we just tried to invalidate a large mapping,
+			 * release the process and wait a bit to give the
+			 * process a chance to do some work. We retake control
+			 * at the top of the loop.
+			 */
+			Pdestroy_agent(ph);
+			(void) Prelease(ph, 0);
+			ph = NULL;
+
+			(void) sleep_shutdown(NSEC_INTERIM);
+			if (shutting_down)
+				goto done;
+		}
+
+		if (msize > SMALL_MAPPING) {
+			/*
+			 * This mapping is not "small" so we re-check the
+			 * process rss and get the delta.
+			 */
+			if (pread(psfd, &psinfo, sizeof (psinfo), 0)
+			    != sizeof (psinfo)) {
+				excess -= old_rss;
+				goto done;
+			}
+
+			d_rss = (int64_t)psinfo.pr_rssize - old_rss;
+			old_rss = (int64_t)psinfo.pr_rssize;
+
+			debug("pid %ld: interim d_rss %lldKB rss %lldKB "
+			    "ex %lldKB\n", pid, d_rss,
+			    (int64_t)psinfo.pr_rssize, (excess + d_rss));
+		} else {
+			/*
+			 * For smaller mappings, we just pretend that the
+			 * invalidation was successful and reduce the excess.
+			 * We'll re-check the excess once we think we reduced
+			 * the rss enough or after we hit a larger mapping.
+			 */
+			d_rss = -msize;
+			old_rss -= msize;
+		}
+
+		/* usually d_rss should be negative or 0 if nothing paged out */
+		excess += d_rss;
+
+		if (excess <= 0) {
+			if (ph != NULL) {
+				Pdestroy_agent(ph);
+				(void) Prelease(ph, 0);
+				ph = NULL;
+			}
+
+			debug("pid %ld (partial): atmpt %lluKB excess %lldKB\n",
+			    pid, (unsigned long long)sum_att,
+			    (long long)excess);
+
+			/*
+			 * If we're actually under, this will suspend checking
+			 * in the middle of this process's address space.
+			 *
+			 */
+			excess = check_suspend();
+			if (shutting_down)
+				goto done;
+
+			/* since we likely suspended, re-get current rss */
+			if (pread(psfd, &psinfo, sizeof (psinfo), 0)
+			    != sizeof (psinfo)) {
+				excess -= old_rss;
+				goto done;
+			}
+
+			old_rss = (int64_t)psinfo.pr_rssize;
+
+			debug("pid %ld: resume pageout; excess %lld\n", pid,
+			    (long long)excess);
+			sum_att = 0;
+		}
+
+		pmap = nextmapping(&cur);
 	}
 
-	debug("pid %ld: unp %d att %lluKB drss %lldKB excess %lldKB\n",
-	    pid, unpageable_mappings, (unsigned long long)sum_att,
-	    (unsigned long long)sum_d_rss, (long long)excess);
+	debug("pid %ld: atmpt %lluKB excess %lldKB\n",
+	    pid, (unsigned long long)sum_att, (long long)excess);
 
 done:
-	/* If a process was grabbed, release it, destroying its agent. */
+	/* If a process is grabbed, release it, destroying its agent. */
 	if (ph != NULL) {
 		Pdestroy_agent(ph);
 		(void) Prelease(ph, 0);
 	}
 
-	if (cur.pr_xmapp != NULL)
-		free(cur.pr_xmapp);
+	if (cur.pr_mapp != NULL)
+		free(cur.pr_mapp);
 
 	(void) close(psfd);
 
@@ -566,7 +681,7 @@ done:
  * Get the zone's RSS data.
  */
 static uint64_t
-get_mem_info(int age)
+get_mem_info()
 {
 	uint64_t		n = 1;
 	zsd_vmusage64_t		buf;
@@ -655,8 +770,9 @@ get_mem_info(int age)
 
 	buf.vmu_id = zid;
 
-	if (syscall(SYS_rusagesys, _RUSAGESYS_GETVMUSAGE, VMUSAGE_A_ZONE,
-	    age, (uintptr_t)&buf, (uintptr_t)&n) != 0) {
+	/* get accurate usage (cached data may be up to 5 seconds old) */
+	if (syscall(SYS_rusagesys, _RUSAGESYS_GETVMUSAGE, VMUSAGE_A_ZONE, 5,
+	    (uintptr_t)&buf, (uintptr_t)&n) != 0) {
 		debug("vmusage failed\n");
 		(void) sleep_shutdown(1);
 		return (0);
@@ -681,11 +797,13 @@ get_mem_info(int age)
 	/* calculate scaling factor to use for fast_rss from now on */
 	if (accurate_rss > 0) {
 		scale_rss = fast_rss / accurate_rss;
-		debug("scaling factor: %llu\n", scale_rss);
+		debug("new scaling factor: %llu\n", scale_rss);
 		/* remember the fast rss when we had to get the accurate rss */
 		prev_fast_rss = tmp_rss;
 	}
 
+	debug("accurate rss: %lluKB, scale: %llu, prev: %lluKB\n", accurate_rss,
+	    scale_rss, prev_fast_rss);
 	return (accurate_rss);
 }
 
@@ -765,17 +883,13 @@ get_zone_cap()
  * the excess when the zone is over the cap.  The rest of the time this
  * function will sleep, periodically waking up to check the current rss.
  *
- * The age parameter is used to tell us how old the cached rss data can be.
- * When first starting up, the cached data can be older, but after we
- * start paging out, we want current data.
- *
  * Depending on the percentage of penetration of the zone's rss into the
- * cap we sleep for longer or shorter amounts and accept older cached
- * vmusage data.  This reduces the impact of this work on the system, which
- * is important considering that each zone will be monitoring its rss.
+ * cap we sleep for longer or shorter amounts. This reduces the impact of this
+ * work on the system, which is important considering that each zone will be
+ * monitoring its rss.
  */
 static int64_t
-check_suspend(int age, boolean_t new_cycle)
+check_suspend()
 {
 	static hrtime_t last_cap_read = 0;
 	static uint64_t addon;
@@ -831,6 +945,7 @@ check_suspend(int age, boolean_t new_cycle)
 			debug("%s: %s\n", TUNE_CMD, over_cmd);
 			debug("%s: %d\n", TUNE_NVMU, skip_vmusage);
 			debug("%s: %d\n", TUNE_NPAGE, skip_pageout);
+			debug("%s: %d\n", TUNE_NPFTHROT, skip_pf_throttle);
 			debug("current cap %lluKB lo %lluKB hi %lluKB\n",
 			    zone_rss_cap, lo_thresh, hi_thresh);
 		}
@@ -842,7 +957,7 @@ check_suspend(int age, boolean_t new_cycle)
 			continue;
 		}
 
-		zone_rss = get_mem_info(age);
+		zone_rss = get_mem_info();
 
 		/* calculate excess */
 		new_excess = zone_rss - zone_rss_cap;
@@ -871,15 +986,12 @@ check_suspend(int age, boolean_t new_cycle)
 		prev_zone_rss = zone_rss;
 
 		if (new_excess > 0) {
-			if (new_cycle) {
-				uint64_t n = 1;
+			uint64_t n = 1;
 
-				/* Increment "nover" kstat. */
-				(void) zone_setattr(zid, ZONE_ATTR_PMCAP_NOVER,
-				    &n, 0);
-			}
+			/* Increment "nover" kstat. */
+			(void) zone_setattr(zid, ZONE_ATTR_PMCAP_NOVER, &n, 0);
 
-			if (!skip_pageout) {
+			if (!skip_pf_throttle) {
 				/*
 				 * Tell the kernel to start throttling page
 				 * faults by some number of usecs to help us
@@ -931,13 +1043,10 @@ check_suspend(int age, boolean_t new_cycle)
 
 		if (zone_rss <= lo_thresh) {
 			sleep_time = 120;
-			age = 15;
 		} else if (zone_rss <= hi_thresh) {
 			sleep_time = 60;
-			age = 10;
 		} else {
 			sleep_time = 30;
-			age = 5;
 		}
 
 		debug("sleep %d seconds\n", sleep_time);
@@ -970,6 +1079,7 @@ get_mcap_tunables()
 	over_cmd[0] = '\0';
 	skip_vmusage = B_FALSE;
 	skip_pageout = B_FALSE;
+	skip_pf_throttle = B_FALSE;
 
 	if (zonecfg_setattrent(handle) != Z_OK)
 		goto done;
@@ -983,6 +1093,9 @@ get_mcap_tunables()
 		} else if (strcmp(TUNE_NPAGE, attr.zone_attr_name) == 0) {
 			if (strcmp("true", attr.zone_attr_value) == 0)
 				skip_pageout = B_TRUE;
+		} else if (strcmp(TUNE_NPFTHROT, attr.zone_attr_name) == 0) {
+			if (strcmp("true", attr.zone_attr_value) == 0)
+				skip_pf_throttle = B_TRUE;
 		}
 	}
 	(void) zonecfg_endattrent(handle);
@@ -1046,7 +1159,6 @@ static void
 mcap_zone()
 {
 	DIR *pdir = NULL;
-	int age = 10;	/* initial cached vmusage can be 10 secs. old */
 	int64_t excess;
 
 	debug("thread startup\n");
@@ -1094,17 +1206,9 @@ mcap_zone()
 		struct dirent *dirent;
 
 		/* Wait until we've gone over the cap. */
-		excess = check_suspend(age, B_TRUE);
+		excess = check_suspend();
 
 		debug("starting to scan, excess %lldk\n", (long long)excess);
-
-		/*
-		 * After the initial startup, we want the age of the cached
-		 * vmusage to be only 1 second old since we are checking
-		 * the current state after we've gone over the cap and have
-		 * paged out some processes.
-		 */
-		age = 1;
 
 		if (over_cmd[0] != '\0') {
 			uint64_t zone_rss;	/* total RSS(KB) */
@@ -1112,7 +1216,7 @@ mcap_zone()
 			debug("run phys_mcap_cmd: %s\n", over_cmd);
 			run_over_cmd();
 
-			zone_rss = get_mem_info(0);
+			zone_rss = get_mem_info();
 			excess = zone_rss - zone_rss_cap;
 			debug("rss %lluKB, cap %lluKB, excess %lldKB\n",
 			    zone_rss, zone_rss_cap, excess);
@@ -1140,7 +1244,7 @@ mcap_zone()
 				debug("apparently under; excess %lld\n",
 				    (long long)excess);
 				/* Double check the current excess */
-				excess = check_suspend(1, B_FALSE);
+				excess = check_suspend();
 			}
 		}
 
