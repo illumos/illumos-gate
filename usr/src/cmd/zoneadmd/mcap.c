@@ -1257,6 +1257,9 @@ mcap_zone()
 
 		debug("process pass done; excess %lld\n", (long long)excess);
 		rewinddir(pdir);
+
+		if (skip_pageout)
+			(void) sleep_shutdown(120);
 	}
 
 	if (pdir != NULL)
