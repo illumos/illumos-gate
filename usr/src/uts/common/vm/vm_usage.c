@@ -22,7 +22,10 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2011, 2012, Joyent, Inc.  All rights reserved.
+ */
+
+/*
+ * Copyright (c) 2014, Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -920,6 +923,8 @@ vmu_amp_update_incore_bounds(avl_tree_t *tree, struct anon_map *amp,
 			next = AVL_NEXT(tree, next);
 			continue;
 		}
+
+		ASSERT(next->vmb_type == VMUSAGE_BOUND_UNKNOWN);
 		bound_type = next->vmb_type;
 		index = next->vmb_start;
 		while (index <= next->vmb_end) {
@@ -952,8 +957,10 @@ vmu_amp_update_incore_bounds(avl_tree_t *tree, struct anon_map *amp,
 			} else {
 				page_type = VMUSAGE_BOUND_NOT_INCORE;
 			}
+
 			if (bound_type == VMUSAGE_BOUND_UNKNOWN) {
 				next->vmb_type = page_type;
+				bound_type = page_type;
 			} else if (next->vmb_type != page_type) {
 				/*
 				 * If current bound type does not match page
@@ -1014,6 +1021,7 @@ vmu_vnode_update_incore_bounds(avl_tree_t *tree, vnode_t *vnode,
 			continue;
 		}
 
+		ASSERT(next->vmb_type == VMUSAGE_BOUND_UNKNOWN);
 		bound_type = next->vmb_type;
 		index = next->vmb_start;
 		while (index <= next->vmb_end) {
@@ -1042,8 +1050,10 @@ vmu_vnode_update_incore_bounds(avl_tree_t *tree, vnode_t *vnode,
 			} else {
 				page_type = VMUSAGE_BOUND_NOT_INCORE;
 			}
+
 			if (bound_type == VMUSAGE_BOUND_UNKNOWN) {
 				next->vmb_type = page_type;
+				bound_type = page_type;
 			} else if (next->vmb_type != page_type) {
 				/*
 				 * If current bound type does not match page
