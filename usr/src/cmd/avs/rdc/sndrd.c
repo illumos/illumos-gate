@@ -23,6 +23,9 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ */
 
 /*
  * Network SNDR/ncall-ip server - based on nfsd
@@ -228,10 +231,9 @@ rdc_transport_open(struct netconfig *nconf)
 	fd = t_open(nconf->nc_device, O_RDWR, (struct t_info *)NULL);
 	if (fd == -1)  {
 		if (t_errno == TSYSERR && errno == EMFILE &&
-				(nofile_increase(0) == 0)) {
+		    (nofile_increase(0) == 0)) {
 			/* Try again with a higher NOFILE limit. */
-			fd = t_open(nconf->nc_device, O_RDWR,
-				(struct t_info *)NULL);
+			fd = t_open(nconf->nc_device, O_RDWR, NULL);
 		}
 		if (fd == -1) {
 			if (t_errno == TSYSERR) {
@@ -276,11 +278,11 @@ rdc_transport_open(struct netconfig *nconf)
 			if (t_close(fd) == -1) {
 				if (t_errno == TSYSERR) {
 					syslog(LOG_ERR,
-						"t_close failed on %d: %m", fd);
+					    "t_close failed on %d: %m", fd);
 				} else {
 					syslog(LOG_ERR,
-						"t_close failed on %d: %s",
-						fd, t_errlist[t_errno]);
+					    "t_close failed on %d: %s",
+					    fd, t_errlist[t_errno]);
 				}
 			}
 			return (-1);
@@ -296,11 +298,11 @@ rdc_transport_open(struct netconfig *nconf)
 			if (t_close(fd) == -1) {
 				if (t_errno == TSYSERR) {
 					syslog(LOG_ERR,
-						"t_close failed on %d: %m", fd);
+					    "t_close failed on %d: %m", fd);
 				} else {
 					syslog(LOG_ERR,
-						"t_close failed on %d: %s",
-						fd, t_errlist[t_errno]);
+					    "t_close failed on %d: %s",
+					    fd, t_errlist[t_errno]);
 				}
 			}
 			return (-1);
@@ -374,12 +376,12 @@ do_one(char *provider, char *proto, struct protob *protobp0,
 
 	if (sock == -1) {
 		if ((Is_ipv6present() &&
-		(strcmp(provider, "/dev/tcp6") == 0)) ||
-		(!Is_ipv6present() && (strcmp(provider, "/dev/tcp") == 0)))
+		    (strcmp(provider, "/dev/tcp6") == 0)) ||
+		    (!Is_ipv6present() && (strcmp(provider, "/dev/tcp") == 0)))
 			(void) syslog(LOG_ERR,
 			    "Cannot establish %s service over %s: transport "
-				"setup problem.",
-				protobp0->serv, provider ? provider : proto);
+			    "setup problem.",
+			    protobp0->serv, provider ? provider : proto);
 		return;
 	}
 
@@ -406,9 +408,9 @@ do_one(char *provider, char *proto, struct protob *protobp0,
 		 * svc() doesn't block, it returns success or failure.
 		 */
 		if ((*svc)(sock, addrmask, retnconf) < 0) {
-			(void) syslog(LOG_ERR,
-"Cannot establish %s service over <file desc. %d, protocol %s> : %m. Exiting",
-				protobp0->serv, sock, retnconf->nc_proto);
+			(void) syslog(LOG_ERR, "Cannot establish %s service "
+			    "over <file desc. %d, protocol %s> : %m. Exiting",
+			    protobp0->serv, sock, retnconf->nc_proto);
 			exit(1);
 		}
 	}
@@ -438,8 +440,7 @@ do_all(struct protob *protobp,
 		if ((nconf->nc_flag & NC_VISIBLE) &&
 		    strcmp(nconf->nc_protofmly, "loopback") != 0 &&
 		    OK_TPI_TYPE(nconf))
-			do_one(nconf->nc_device, nconf->nc_proto,
-				protobp, svc);
+			do_one(nconf->nc_device, nconf->nc_proto, protobp, svc);
 	}
 	(void) endnetconfig(nc);
 	return (0);
@@ -742,7 +743,7 @@ poll_for_action(void)
 			 */
 			switch (errno) {
 			case EINTR:
-			    continue;
+				continue;
 
 			case EAGAIN:
 			case ENOMEM:
@@ -848,9 +849,9 @@ add_to_poll_list(int fd, struct netconfig *nconf)
 		 */
 		if (tpa) {
 			(void) memcpy((void *)poll_array, (void *)tpa,
-				num_fds * sizeof (struct pollfd));
+			    num_fds * sizeof (struct pollfd));
 			(void) memcpy((void *)conn_polled, (void *)tnp,
-				num_fds * sizeof (struct conn_entry));
+			    num_fds * sizeof (struct conn_entry));
 			free((void *)tpa);
 			free((void *)tnp);
 		}
@@ -1061,19 +1062,19 @@ cots_listen_event(int fd, int conn_index)
 	struct netbuf addrmask;
 	int ret = 0;
 
-	conn_head = (struct conn_ind *)0;
+	conn_head = NULL;
 	(void) conn_get(fd, nconf, &conn_head);
 
 	while ((conn = conn_head) != NULL) {
 		conn_head = conn->conn_next;
 		if (conn_head == conn)
-			conn_head = (struct conn_ind *)0;
+			conn_head = NULL;
 		else {
 			conn_head->conn_prev = conn->conn_prev;
 			conn->conn_prev->conn_next = conn_head;
 		}
 		call = conn->conn_call;
-		free((char *)conn);
+		free(conn);
 
 		/*
 		 * If we have already accepted the maximum number of
@@ -1100,8 +1101,7 @@ cots_listen_event(int fd, int conn_index)
 		}
 
 		/* Bind to a generic address/port for the accepting stream. */
-		if (t_bind(new_fd, (struct t_bind *)NULL,
-		    (struct t_bind *)NULL) == -1) {
+		if (t_bind(new_fd, NULL, NULL) == -1) {
 			rdcd_log_tli_error("t_bind", new_fd, nconf);
 			call->udata.len = 0;
 			(void) t_snddis(fd, call);
@@ -1122,19 +1122,10 @@ cots_listen_event(int fd, int conn_index)
 			while (event = t_look(fd)) {
 				switch (event) {
 				case T_LISTEN:
-#ifdef DEBUG
-					(void) printf(
-"cots_listen_event(%s): T_LISTEN during accept processing\n", nconf->nc_proto);
-#endif
 					(void) conn_get(fd, nconf, &conn_head);
 					continue;
 
 				case T_DISCONNECT:
-#ifdef DEBUG
-					(void) printf(
-	"cots_listen_event(%s): T_DISCONNECT during accept processing\n",
-						nconf->nc_proto);
-#endif
 					(void) discon_get(fd, nconf,
 					    &conn_head);
 					continue;
@@ -1156,16 +1147,19 @@ cots_listen_event(int fd, int conn_index)
 		if (set_addrmask(new_fd, nconf, &addrmask) < 0) {
 			(void) syslog(LOG_ERR, "Cannot set address mask for %s",
 			    nconf->nc_netid);
-			return;
+			(void) t_snddis(new_fd, NULL);
+			(void) t_free((char *)call, T_CALL);
+			(void) t_close(new_fd);
+			continue;
 		}
 
-		/* Tell KRPC about the new stream. */
+		/* Tell kRPC about the new stream. */
 		ret = (*Mysvc)(new_fd, addrmask, nconf);
 		if (ret < 0) {
 			syslog(LOG_ERR,
 			    "unable to register with kernel rpc: %m");
 			free(addrmask.buf);
-			(void) t_snddis(new_fd, (struct t_call *)0);
+			(void) t_snddis(new_fd, NULL);
 			(void) t_free((char *)call, T_CALL);
 			(void) t_close(new_fd);
 			goto do_next_conn;
@@ -1201,18 +1195,10 @@ do_poll_cots_action(int fd, int conn_index)
 	while (event = t_look(fd)) {
 		switch (event) {
 		case T_LISTEN:
-#ifdef DEBUG
-	(void) printf("do_poll_cots_action(%s, %d): T_LISTEN event\n",
-	    nconf->nc_proto, fd);
-#endif
 			cots_listen_event(fd, conn_index);
 			break;
 
 		case T_DATA:
-#ifdef DEBUG
-	(void) printf("do_poll_cots_action(%d, %s): T_DATA event\n",
-		fd, nconf->nc_proto);
-#endif
 			/*
 			 * Receive a private notification from CONS rpcmod.
 			 */
@@ -1234,10 +1220,6 @@ do_poll_cots_action(int fd, int conn_index)
 				 * hung connections from continuing to consume
 				 * resources.
 				 */
-#ifdef DEBUG
-(void) printf("do_poll_cots_action(%s, %d): ", nconf->nc_proto, fd);
-(void) printf("initiating orderly release of idle connection\n");
-#endif
 				if (nconf->nc_semantics == NC_TPI_COTS ||
 				    connent->closing != 0) {
 					(void) t_snddis(fd, (struct t_call *)0);
@@ -1261,10 +1243,6 @@ do_poll_cots_action(int fd, int conn_index)
 			break;
 
 		case T_ORDREL:
-#ifdef DEBUG
-	(void) printf("do_poll_cots_action(%s, %d): T_ORDREL event\n",
-		nconf->nc_proto, fd);
-#endif
 			/* Perform an orderly release. */
 			if (t_rcvrel(fd) == 0) {
 				/* T_ORDREL on listen fd's should be ignored */
@@ -1289,10 +1267,6 @@ do_poll_cots_action(int fd, int conn_index)
 			}
 
 		case T_DISCONNECT:
-#ifdef DEBUG
-(void) printf("do_poll_cots_action(%s, %d): T_DISCONNECT event\n",
-nconf->nc_proto, fd);
-#endif
 			if (t_rcvdis(fd, (struct t_discon *)NULL) == -1)
 				rdcd_log_tli_error("t_rcvdis", fd, nconf);
 
@@ -1307,11 +1281,11 @@ nconf->nc_proto, fd);
 		case T_ERROR:
 		default:
 			if (event == T_ERROR || t_errno == TSYSERR) {
-			    if ((errorstr = strerror(errno)) == NULL) {
-				(void) snprintf(buf, sizeof (buf),
-				    "Unknown error num %d", errno);
-				errorstr = (const char *)buf;
-			    }
+				if ((errorstr = strerror(errno)) == NULL) {
+					(void) snprintf(buf, sizeof (buf),
+					    "Unknown error num %d", errno);
+					errorstr = (const char *)buf;
+				}
 			} else if (event == -1)
 				errorstr = t_strerror(t_errno);
 			else
@@ -1403,13 +1377,14 @@ do_poll_clts_action(int fd, int conn_index)
 				 */
 				error = errno;
 				(void) syslog(LOG_ERR,
-	"t_alloc(file descriptor %d/transport %s, T_UNITDATA) failed: %m",
-					fd, nconf->nc_proto);
+				    "t_alloc(file descriptor %d/transport %s, "
+				    "T_UNITDATA) failed: %m",
+				    fd, nconf->nc_proto);
 				return (error);
 			}
-			(void) syslog(LOG_ERR,
-"t_alloc(file descriptor %d/transport %s, T_UNITDATA) failed TLI error %d",
-					fd, nconf->nc_proto, t_errno);
+			(void) syslog(LOG_ERR, "t_alloc(file descriptor %d/"
+			    "transport %s, T_UNITDATA) failed TLI error %d",
+			    fd, nconf->nc_proto, t_errno);
 			goto flush_it;
 		}
 	}
@@ -1433,9 +1408,9 @@ try_again:
 
 	ret = t_rcvudata(fd, unitdata, &flags);
 	if (ret == 0 || t_errno == TBUFOVFLW) {
-		(void) syslog(LOG_WARNING,
-"t_rcvudata(file descriptor %d/transport %s) got unexpected data, %d bytes",
-			fd, nconf->nc_proto, unitdata->udata.len);
+		(void) syslog(LOG_WARNING, "t_rcvudata(file descriptor %d/"
+		    "transport %s) got unexpected data, %d bytes",
+		    fd, nconf->nc_proto, unitdata->udata.len);
 
 		/*
 		 * Even though we don't expect any data, in case we do,
@@ -1460,15 +1435,15 @@ try_again:
 		 */
 		error = errno;
 		(void) syslog(LOG_ERR,
-			"t_rcvudata(file descriptor %d/transport %s) %m",
-			fd, nconf->nc_proto);
+		    "t_rcvudata(file descriptor %d/transport %s) %m",
+		    fd, nconf->nc_proto);
 		return (error);
 	case TLOOK:
 		break;
 	default:
 		(void) syslog(LOG_ERR,
-		"t_rcvudata(file descriptor %d/transport %s) TLI error %d",
-			fd, nconf->nc_proto, t_errno);
+		    "t_rcvudata(file descriptor %d/transport %s) TLI error %d",
+		    fd, nconf->nc_proto, t_errno);
 		goto flush_it;
 	}
 
@@ -1489,20 +1464,20 @@ try_again:
 			 */
 			error = errno;
 			(void) syslog(LOG_ERR,
-				"t_look(file descriptor %d/transport %s) %m",
-				fd, nconf->nc_proto);
+			    "t_look(file descriptor %d/transport %s) %m",
+			    fd, nconf->nc_proto);
 			return (error);
 		}
 		(void) syslog(LOG_ERR,
-			"t_look(file descriptor %d/transport %s) TLI error %d",
-			fd, nconf->nc_proto, t_errno);
+		    "t_look(file descriptor %d/transport %s) TLI error %d",
+		    fd, nconf->nc_proto, t_errno);
 		goto flush_it;
 	case T_UDERR:
 		break;
 	default:
-		(void) syslog(LOG_WARNING,
-	"t_look(file descriptor %d/transport %s) returned %d not T_UDERR (%d)",
-			fd, nconf->nc_proto, ret, T_UDERR);
+		(void) syslog(LOG_WARNING, "t_look(file descriptor %d/"
+		    "transport %s) returned %d not T_UDERR (%d)",
+		    fd, nconf->nc_proto, ret, T_UDERR);
 	}
 
 	if (uderr == NULL) {
@@ -1518,13 +1493,14 @@ try_again:
 				 */
 				error = errno;
 				(void) syslog(LOG_ERR,
-	"t_alloc(file descriptor %d/transport %s, T_UDERROR) failed: %m",
-					fd, nconf->nc_proto);
+				    "t_alloc(file descriptor %d/transport %s, "
+				    "T_UDERROR) failed: %m",
+				    fd, nconf->nc_proto);
 				return (error);
 			}
-			(void) syslog(LOG_ERR,
-"t_alloc(file descriptor %d/transport %s, T_UDERROR) failed TLI error: %d",
-				fd, nconf->nc_proto, t_errno);
+			(void) syslog(LOG_ERR, "t_alloc(file descriptor %d/"
+			    "transport %s, T_UDERROR) failed TLI error: %d",
+			    fd, nconf->nc_proto, t_errno);
 			goto flush_it;
 		}
 	}
@@ -1602,13 +1578,13 @@ try_again:
 		 */
 		error = errno;
 		(void) syslog(LOG_ERR,
-			"t_rcvuderr(file descriptor %d/transport %s) %m",
-			fd, nconf->nc_proto);
+		    "t_rcvuderr(file descriptor %d/transport %s) %m",
+		    fd, nconf->nc_proto);
 		return (error);
 	default:
 		(void) syslog(LOG_ERR,
-		"t_rcvuderr(file descriptor %d/transport %s) TLI error %d",
-			fd, nconf->nc_proto, t_errno);
+		    "t_rcvuderr(file descriptor %d/transport %s) TLI error %d",
+		    fd, nconf->nc_proto, t_errno);
 		goto flush_it;
 	}
 
@@ -1620,8 +1596,8 @@ flush_it:
 	 * nonblocking mode.
 	 */
 	(void) syslog(LOG_ERR,
-	"Flushing one input message from <file descriptor %d/transport %s>",
-		fd, nconf->nc_proto);
+	    "Flushing one input message from <file descriptor %d/transport %s>",
+	    fd, nconf->nc_proto);
 
 	/*
 	 * Read and discard the message. Do this this until there is
@@ -1807,9 +1783,9 @@ rdcd_bindit(struct netconfig *nconf, struct netbuf **addr,
 
 		if (t_optmgmt(fd, &req, &resp) < 0 ||
 		    resp.flags != T_SUCCESS) {
-			syslog(LOG_ERR,
-	"couldn't set NODELAY option for proto %s: t_errno = %d, %m",
-				nconf->nc_proto, t_errno);
+			syslog(LOG_ERR, "couldn't set NODELAY option for "
+			    "proto %s: t_errno = %d, %m", nconf->nc_proto,
+			    t_errno);
 		}
 	}
 
@@ -1883,8 +1859,7 @@ set_addrmask(int fd, struct netconfig *nconf, struct netbuf *mask)
 	}
 	mask->len = mask->maxlen = info.addr;
 	if (info.addr <= 0) {
-		syslog(LOG_ERR, "set_addrmask: address size: %ld",
-			info.addr);
+		syslog(LOG_ERR, "set_addrmask: address size: %ld", info.addr);
 		return (-1);
 	}
 

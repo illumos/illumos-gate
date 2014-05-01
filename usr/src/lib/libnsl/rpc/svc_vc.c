@@ -77,7 +77,6 @@ extern SVCXPRT	**svc_xports;
 extern int	__td_setnodelay(int);
 extern bool_t	__xdrrec_getbytes_nonblock(XDR *, enum xprt_stat *);
 extern bool_t	__xdrrec_set_conn_nonblock(XDR *, uint32_t);
-extern int	_t_do_ioctl(int, char *, int, int, int *);
 extern int	__rpc_legal_connmaxrec(int);
 /* Structure used to initialize SVC_XP_AUTH(xprt).svc_ah_ops. */
 extern struct svc_auth_ops svc_auth_any_ops;
@@ -90,7 +89,6 @@ static bool_t		svc_vc_nonblock(SVCXPRT *, SVCXPRT *);
 static int		read_vc(SVCXPRT *, caddr_t, int);
 static int		write_vc(SVCXPRT *, caddr_t, int);
 static SVCXPRT		*makefd_xprt(int, uint_t, uint_t, t_scalar_t, char *);
-static bool_t		fd_is_dead(int);
 static void		update_nonblock_timestamps(SVCXPRT *);
 
 struct cf_rendezvous { /* kept in xprt->xp_p1 for rendezvouser */
@@ -126,9 +124,6 @@ extern int __xdrrec_setfirst(XDR *);
 extern int __xdrrec_resetfirst(XDR *);
 extern int __is_xdrrec_first(XDR *);
 
-void __svc_nisplus_enable_timestamps(void);
-void __svc_timeout_nonblock_xprt(void);
-
 /*
  * This is intended as a performance improvement on the old string handling
  * stuff by read only moving data into the  text segment.
@@ -153,14 +148,6 @@ static const char no_mem_str[] = "out of memory";
 static const char no_tinfo_str[] = "could not get transport information";
 static const char no_fcntl_getfl_str[] = "could not get status flags and modes";
 static const char no_nonblock_str[] = "could not set transport non-blocking";
-
-/*
- *  Records a timestamp when data comes in on a descriptor.  This is
- *  only used if timestamps are enabled with __svc_nisplus_enable_timestamps().
- */
-static long *timestamps;
-static int ntimestamps; /* keep track how many timestamps */
-static mutex_t timestamp_lock = DEFAULTMUTEX;
 
 /*
  * Used to determine whether the time-out logic should be executed.
@@ -1192,12 +1179,6 @@ _svc_vc_destroy_private(SVCXPRT *xprt, bool_t lock_not_held)
 	__xprt_unregister_private(xprt, lock_not_held);
 	(void) t_close(xprt->xp_fd);
 
-	(void) mutex_lock(&timestamp_lock);
-	if (timestamps && xprt->xp_fd < ntimestamps) {
-		timestamps[xprt->xp_fd] = 0;
-	}
-	(void) mutex_unlock(&timestamp_lock);
-
 	if (svc_mt_mode != RPC_SVC_MT_NONE) {
 		svc_xprt_destroy(xprt);
 	} else {
@@ -1285,42 +1266,10 @@ rendezvous_control(SVCXPRT *xprt, const uint_t rq, void *in)
 /*
  * All read operations timeout after 35 seconds.
  * A timeout is fatal for the connection.
- * update_timestamps() is used by nisplus operations,
  * update_nonblock_timestamps() is used for nonblocked
  * connection fds.
  */
 #define	WAIT_PER_TRY	35000	/* milliseconds */
-
-static void
-update_timestamps(int fd)
-{
-	(void) mutex_lock(&timestamp_lock);
-	if (timestamps) {
-		struct timeval tv;
-
-		(void) gettimeofday(&tv, NULL);
-		while (fd >= ntimestamps) {
-			long *tmp_timestamps = timestamps;
-
-			/* allocate more timestamps */
-			tmp_timestamps = realloc(timestamps, sizeof (long) *
-			    (ntimestamps + FD_INCREMENT));
-			if (tmp_timestamps == NULL) {
-				(void) mutex_unlock(&timestamp_lock);
-				syslog(LOG_ERR,
-				    "update_timestamps: out of memory");
-				return;
-			}
-
-			timestamps = tmp_timestamps;
-			(void) memset(&timestamps[ntimestamps], 0,
-			    sizeof (long) * FD_INCREMENT);
-			ntimestamps += FD_INCREMENT;
-		}
-		timestamps[fd] = tv.tv_sec;
-	}
-	(void) mutex_unlock(&timestamp_lock);
-}
 
 static  void
 update_nonblock_timestamps(SVCXPRT *xprt_conn)
@@ -1371,7 +1320,6 @@ read_vc(SVCXPRT *xprt, caddr_t buf, int len)
 		 */
 		if ((len = t_rcvnonblock(xprt, buf, len)) >= 0) {
 			if (len > 0) {
-				update_timestamps(fd);
 				update_nonblock_timestamps(xprt);
 			}
 			return (len);
@@ -1401,7 +1349,6 @@ read_vc(SVCXPRT *xprt, caddr_t buf, int len)
 	}
 	(void) __xdrrec_resetfirst(xdrs);
 	if ((len = t_rcvall(fd, buf, len)) > 0) {
-		update_timestamps(fd);
 		return (len);
 	}
 
@@ -1862,142 +1809,6 @@ svc_vc_rendezvous_ops(void)
 	}
 	(void) mutex_unlock(&ops_lock);
 	return (&ops);
-}
-
-/*
- * PRIVATE RPC INTERFACE
- *
- * This is a hack to let NIS+ clean up connections that have already been
- * closed.  This problem arises because rpc.nisd forks a child to handle
- * existing connections when it does checkpointing.  The child may close
- * some of these connections.  But the descriptors still stay open in the
- * parent, and because TLI descriptors don't support persistent EOF
- * condition (like sockets do), the parent will never detect that these
- * descriptors are dead.
- *
- * The following internal procedure __svc_nisplus_fdcleanup_hack() - should
- * be removed as soon as rpc.nisd is rearchitected to do the right thing.
- * This procedure should not find its way into any header files.
- *
- * This procedure should be called only when rpc.nisd knows that there
- * are no children servicing clients.
- */
-
-static bool_t
-fd_is_dead(int fd)
-{
-	struct T_info_ack inforeq;
-	int retval;
-
-	inforeq.PRIM_type = T_INFO_REQ;
-	if (!_t_do_ioctl(fd, (caddr_t)&inforeq, sizeof (struct T_info_req),
-	    TI_GETINFO, &retval))
-		return (TRUE);
-	if (retval != (int)sizeof (struct T_info_ack))
-		return (TRUE);
-
-	switch (inforeq.CURRENT_state) {
-	case TS_UNBND:
-	case TS_IDLE:
-		return (TRUE);
-	default:
-		break;
-	}
-	return (FALSE);
-}
-
-void
-__svc_nisplus_fdcleanup_hack(void)
-{
-	SVCXPRT *xprt;
-	SVCXPRT *dead_xprt[CLEANUP_SIZE];
-	int i, fd_idx = 0, dead_idx = 0;
-
-	if (svc_xports == NULL)
-		return;
-	for (;;) {
-		(void) rw_wrlock(&svc_fd_lock);
-		for (dead_idx = 0; fd_idx < svc_max_pollfd; fd_idx++) {
-			if ((xprt = svc_xports[fd_idx]) == NULL)
-				continue;
-/* LINTED pointer alignment */
-			if (svc_type(xprt) != SVC_CONNECTION)
-				continue;
-			if (fd_is_dead(fd_idx)) {
-				dead_xprt[dead_idx++] = xprt;
-				if (dead_idx >= CLEANUP_SIZE)
-					break;
-			}
-		}
-
-		for (i = 0; i < dead_idx; i++) {
-			/* Still holding svc_fd_lock */
-			_svc_vc_destroy_private(dead_xprt[i], FALSE);
-		}
-		(void) rw_unlock(&svc_fd_lock);
-		if (fd_idx++ >= svc_max_pollfd)
-			return;
-	}
-}
-
-void
-__svc_nisplus_enable_timestamps(void)
-{
-	(void) mutex_lock(&timestamp_lock);
-	if (!timestamps) {
-		timestamps = calloc(FD_INCREMENT, sizeof (long));
-		if (timestamps != NULL)
-			ntimestamps = FD_INCREMENT;
-		else {
-			(void) mutex_unlock(&timestamp_lock);
-			syslog(LOG_ERR, "__svc_nisplus_enable_timestamps: "
-			    "out of memory");
-			return;
-		}
-	}
-	(void) mutex_unlock(&timestamp_lock);
-}
-
-void
-__svc_nisplus_purge_since(long since)
-{
-	SVCXPRT *xprt;
-	SVCXPRT *dead_xprt[CLEANUP_SIZE];
-	int i, fd_idx = 0, dead_idx = 0;
-
-	if (svc_xports == NULL)
-		return;
-	for (;;) {
-		(void) rw_wrlock(&svc_fd_lock);
-		(void) mutex_lock(&timestamp_lock);
-		for (dead_idx = 0; fd_idx < svc_max_pollfd; fd_idx++) {
-			if ((xprt = svc_xports[fd_idx]) == NULL) {
-				continue;
-			}
-			/* LINTED pointer cast */
-			if (svc_type(xprt) != SVC_CONNECTION) {
-				continue;
-			}
-			if (fd_idx >= ntimestamps) {
-				break;
-			}
-			if (timestamps[fd_idx] &&
-			    timestamps[fd_idx] < since) {
-				dead_xprt[dead_idx++] = xprt;
-				if (dead_idx >= CLEANUP_SIZE)
-					break;
-			}
-		}
-		(void) mutex_unlock(&timestamp_lock);
-
-		for (i = 0; i < dead_idx; i++) {
-			/* Still holding svc_fd_lock */
-			_svc_vc_destroy_private(dead_xprt[i], FALSE);
-		}
-		(void) rw_unlock(&svc_fd_lock);
-		if (fd_idx++ >= svc_max_pollfd)
-			return;
-	}
 }
 
 /*

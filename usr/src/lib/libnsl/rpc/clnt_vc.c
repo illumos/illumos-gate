@@ -240,7 +240,9 @@ _clnt_vc_create_timed(int fd, struct netbuf *svcaddr, rpcprog_t prog,
 	int flag;
 
 	cl = malloc(sizeof (*cl));
-	ct = malloc(sizeof (*ct));
+	if ((ct = malloc(sizeof (*ct))) != NULL)
+		ct->ct_addr.buf = NULL;
+
 	if ((cl == NULL) || (ct == NULL)) {
 		(void) syslog(LOG_ERR, clnt_vc_errstr,
 		    clnt_vc_str, __no_mem_str);
@@ -249,7 +251,6 @@ _clnt_vc_create_timed(int fd, struct netbuf *svcaddr, rpcprog_t prog,
 		rpc_createerr.cf_error.re_terrno = 0;
 		goto err;
 	}
-	ct->ct_addr.buf = NULL;
 
 	/*
 	 * The only use of vctbl_lock is for serializing the creation of
@@ -366,14 +367,12 @@ _clnt_vc_create_timed(int fd, struct netbuf *svcaddr, rpcprog_t prog,
 	return (cl);
 
 err:
-	if (cl) {
-		if (ct) {
-			if (ct->ct_addr.len)
-				free(ct->ct_addr.buf);
-			free(ct);
-		}
-		free(cl);
+	if (ct) {
+		free(ct->ct_addr.buf);
+		free(ct);
 	}
+	free(cl);
+
 	return (NULL);
 }
 

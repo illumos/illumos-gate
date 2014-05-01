@@ -23,6 +23,9 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ */
 
 /*
  * svc_door.c, Server side for doors IPC based RPC.
@@ -171,7 +174,7 @@ make_tmp_dir(void)
 			return (FALSE);
 	}
 	return ((statbuf.st_mode & S_IFMT) == S_IFDIR &&
-					(statbuf.st_mode & 01777) == 01777);
+	    (statbuf.st_mode & 01777) == 01777);
 }
 
 static void
@@ -198,7 +201,7 @@ svc_door_dispatch(SVCXPRT *xprt, struct rpc_msg *msg, struct svc_req *r)
 	}
 
 	if (su->call_info.prognum == r->rq_prog && su->call_info.versnum ==
-							r->rq_vers) {
+	    r->rq_vers) {
 		(*su->call_info.dispatch)(r, xprt);
 		return;
 	}
@@ -209,7 +212,7 @@ svc_door_dispatch(SVCXPRT *xprt, struct rpc_msg *msg, struct svc_req *r)
 	 */
 	if (su->call_info.prognum == r->rq_prog)
 		svcerr_progvers(xprt, su->call_info.versnum,
-			su->call_info.versnum);
+		    su->call_info.versnum);
 	else
 		svcerr_noprog(xprt);
 }
@@ -245,7 +248,7 @@ door_server(void *cookie, char *argp, size_t arg_size,
 	(void) mutex_lock(&svc_door_mutex);
 	if ((xprt = get_xprt_copy(parent, result_buf)) == NULL) {
 		(void) syslog(LOG_ERR,
-				"door_server: memory allocation failure");
+		    "door_server: memory allocation failure");
 		(void) mutex_unlock(&svc_door_mutex);
 		(void) door_return(NULL, 0, NULL, 0);
 		/*NOTREACHED*/
@@ -322,7 +325,7 @@ svc_door_create(void (*dispatch)(), const rpcprog_t prognum,
 
 	if (!make_tmp_dir()) {
 		(void) syslog(LOG_ERR, "svc_door_create: cannot open %s",
-				RPC_DOOR_DIR);
+		    RPC_DOOR_DIR);
 		(void) mutex_unlock(&svc_door_mutex);
 		return (NULL);
 	}
@@ -335,7 +338,7 @@ svc_door_create(void (*dispatch)(), const rpcprog_t prognum,
 	svc_flags(xprt) |= SVC_DOOR;
 
 	(void) sprintf(rendezvous, RPC_DOOR_RENDEZVOUS, (int)prognum,
-								(int)versnum);
+	    (int)versnum);
 	mask = umask(0);
 	fd =  open(rendezvous, O_WRONLY|O_CREAT|O_EXCL|O_TRUNC, 0644);
 	(void) umask(mask);
@@ -343,24 +346,24 @@ svc_door_create(void (*dispatch)(), const rpcprog_t prognum,
 		if (errno == EEXIST) {
 			if (unlink(rendezvous) < 0) {
 				(void) syslog(LOG_ERR,
-					"svc_door_create: %s %s:%m", rendezvous,
-					"exists and could not be removed");
+				    "svc_door_create: %s %s:%m", rendezvous,
+				    "exists and could not be removed");
 				goto freedata;
 			}
 			mask = umask(0);
-			fd =  open(rendezvous, O_WRONLY|O_CREAT|O_EXCL|
-						O_TRUNC, 0644);
+			fd =  open(rendezvous, O_WRONLY | O_CREAT | O_EXCL |
+			    O_TRUNC, 0644);
 			(void) umask(mask);
 			if (fd < 0) {
 				(void) syslog(LOG_ERR,
-					"svc_door_create: %s %s:%m",
-					"could not create", rendezvous);
+				    "svc_door_create: %s %s:%m",
+				    "could not create", rendezvous);
 				goto freedata;
 			}
 		} else {
 			(void) syslog(LOG_ERR,
-				"svc_door_create: could not create %s:%m",
-				rendezvous);
+			    "svc_door_create: could not create %s:%m",
+			    rendezvous);
 			goto freedata;
 		}
 	}
@@ -368,15 +371,15 @@ svc_door_create(void (*dispatch)(), const rpcprog_t prognum,
 	did = door_create(door_server, (void *)xprt, DOOR_REFUSE_DESC);
 	if (did < 0) {
 		(void) syslog(LOG_ERR,
-				"svc_door_create: door_create failed: %m");
+		    "svc_door_create: door_create failed: %m");
 		goto freedata;
 	}
 
 	if (fattach(did, rendezvous) < 0) {
 		if (errno != EBUSY || fdetach(rendezvous) < 0 ||
-					fattach(did, rendezvous) < 0) {
+		    fattach(did, rendezvous) < 0) {
 			(void) syslog(LOG_ERR,
-				"svc_door_create: fattach failed: %m");
+			    "svc_door_create: fattach failed: %m");
 			goto freedata;
 		}
 	}
@@ -554,7 +557,7 @@ return_xprt_copy(SVCXPRT *xprt)
 		svc_flags(parent) |= SVC_DEFUNCT;
 		/* LINTED pointer cast */
 		if (SVCEXT(parent)->refcnt == 0)
-			svc_door_destroy(xprt);
+			svc_door_destroy_pvt(xprt);
 	}
 	(void) mutex_unlock(&svc_door_mutex);
 	return (len);
