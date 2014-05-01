@@ -161,6 +161,7 @@ static boolean_t skip_pageout = B_FALSE;
 static boolean_t skip_pf_throttle = B_FALSE;
 
 static int64_t check_suspend();
+static void get_mcap_tunables();
 
 /*
  * Structure to hold current state about a process address space that we're
@@ -941,6 +942,12 @@ check_suspend()
 			lo_thresh = (uint64_t)(zone_rss_cap * .8);
 			hi_thresh = (uint64_t)(zone_rss_cap * .9);
 			addon = (uint64_t)(zone_rss_cap * 0.05);
+
+			/*
+			 * We allow the memory cap tunables to be changed on
+			 * the fly.
+			 */
+			get_mcap_tunables();
 
 			debug("%s: %s\n", TUNE_CMD, over_cmd);
 			debug("%s: %d\n", TUNE_NVMU, skip_vmusage);
