@@ -302,6 +302,11 @@ control_proc(pid_t pid)
 	if ((ph = Pgrab(pid, 0, &res)) == NULL)
 		return (NULL);
 
+	if (Psetflags(ph, PR_RLC) != 0) {
+		(void) Prelease(ph, 0);
+		return (NULL);
+	}
+
 	if (Pcreate_agent(ph) != 0) {
 		(void) Prelease(ph, 0);
 		return (NULL);
