@@ -21,8 +21,8 @@
 
 /*
  * Copyright (c) 1996, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 
@@ -1313,19 +1313,19 @@ cots_listen_event(int fd, int conn_index)
 	char *clnt_uaddr = NULL;
 	struct nd_hostservlist *clnt_serv = NULL;
 
-	conn_head = (struct conn_ind *)0;
+	conn_head = NULL;
 	(void) conn_get(fd, nconf, &conn_head);
 
 	while ((conn = conn_head) != NULL) {
 		conn_head = conn->conn_next;
 		if (conn_head == conn)
-			conn_head = (struct conn_ind *)0;
+			conn_head = NULL;
 		else {
 			conn_head->conn_prev = conn->conn_prev;
 			conn->conn_prev->conn_next = conn_head;
 		}
 		call = conn->conn_call;
-		free((char *)conn);
+		free(conn);
 
 		/*
 		 * If we have already accepted the maximum number of
@@ -1352,8 +1352,7 @@ cots_listen_event(int fd, int conn_index)
 		}
 
 		/* Bind to a generic address/port for the accepting stream. */
-		if (t_bind(new_fd, (struct t_bind *)NULL,
-		    (struct t_bind *)NULL) == -1) {
+		if (t_bind(new_fd, NULL, NULL) == -1) {
 			nfslib_log_tli_error("t_bind", new_fd, nconf);
 			call->udata.len = 0;
 			(void) t_snddis(fd, call);
@@ -1408,10 +1407,13 @@ cots_listen_event(int fd, int conn_index)
 			(void) syslog(LOG_ERR,
 			    "Cannot set address mask for %s",
 			    nconf->nc_netid);
-			return;
+			(void) t_snddis(new_fd, NULL);
+			(void) t_free((char *)call, T_CALL);
+			(void) t_close(new_fd);
+			continue;
 		}
 
-		/* Tell KRPC about the new stream. */
+		/* Tell kRPC about the new stream. */
 		if (Mysvc4 != NULL)
 			ret = (*Mysvc4)(new_fd, &addrmask, nconf,
 			    NFS4_KRPC_START, &call->addr);
@@ -1441,13 +1443,17 @@ cots_listen_event(int fd, int conn_index)
 				if (clnt)
 					syslog(LOG_ERR,
 "unable to register new connection: client %s has dropped connection", clnt);
-				if (clnt_serv)
+				if (clnt_serv) {
 					netdir_free(clnt_serv, ND_HOSTSERVLIST);
-				if (clnt_uaddr)
+					clnt_serv = NULL;
+				}
+				if (clnt_uaddr) {
 					free(clnt_uaddr);
+					clnt_uaddr = NULL;
+				}
 			}
 			free(addrmask.buf);
-			(void) t_snddis(new_fd, (struct t_call *)0);
+			(void) t_snddis(new_fd, NULL);
 			(void) t_free((char *)call, T_CALL);
 			(void) t_close(new_fd);
 			goto do_next_conn;

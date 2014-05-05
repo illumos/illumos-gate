@@ -3463,7 +3463,7 @@ icmp_output_ancillary(conn_t *connp, sin_t *sin, sin6_t *sin6, mblk_t *mp,
 		else
 			ixa->ixa_flags &= ~IXAF_IS_IPV4;
 		if (srcid != 0 && IN6_IS_ADDR_UNSPECIFIED(&v6src)) {
-			if (ip_srcid_find_id(srcid, &v6src, IPCL_ZONEID(connp),
+			if (!ip_srcid_find_id(srcid, &v6src, IPCL_ZONEID(connp),
 			    v4mapped, connp->conn_netstack)) {
 				/* Mismatched v4mapped/v6 specified by srcid. */
 				mutex_exit(&connp->conn_lock);
@@ -4455,7 +4455,7 @@ icmp_output_newdst(conn_t *connp, mblk_t *data_mp, sin_t *sin, sin6_t *sin6,
 		else
 			ixa->ixa_flags &= ~IXAF_IS_IPV4;
 		if (srcid != 0 && IN6_IS_ADDR_UNSPECIFIED(&v6src)) {
-			if (ip_srcid_find_id(srcid, &v6src, IPCL_ZONEID(connp),
+			if (!ip_srcid_find_id(srcid, &v6src, IPCL_ZONEID(connp),
 			    v4mapped, connp->conn_netstack)) {
 				/* Mismatched v4mapped/v6 specified by srcid. */
 				mutex_exit(&connp->conn_lock);

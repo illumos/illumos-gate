@@ -132,7 +132,6 @@ MANFILES=	acctcom.1			\
 	 	fdformat.1			\
 	 	fgrep.1				\
 	 	file.1				\
-	 	filebench.1			\
 	 	filesync.1			\
 	 	find.1				\
 	 	finger.1			\
