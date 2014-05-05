@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -5729,6 +5730,8 @@ verify_func(cmd_t *cmd)
 	char brand[MAXNAMELEN];
 	char hostidp[HW_HOSTID_LEN];
 	char fsallowedp[ZONE_FS_ALLOWED_MAX];
+	priv_set_t *privs;
+	char *privname = NULL;
 	int err, ret_val = Z_OK, arg;
 	int pset_res;
 	boolean_t save = B_FALSE;
@@ -5795,6 +5798,18 @@ verify_func(cmd_t *cmd)
 		ret_val = Z_REQD_RESOURCE_MISSING;
 		saw_error = B_TRUE;
 	}
+
+	if ((privs = priv_allocset()) == NULL) {
+		zerr(gettext("%s: priv_allocset failed"), zone);
+		return;
+	}
+	if (zonecfg_get_privset(handle, privs, &privname) != Z_OK) {
+		zerr(gettext("%s: invalid privilege: %s"), zone, privname);
+		priv_freeset(privs);
+		free(privname);
+		return;
+	}
+	priv_freeset(privs);
 
 	if (zonecfg_get_hostid(handle, hostidp,
 	    sizeof (hostidp)) == Z_INVALID_PROPERTY) {
