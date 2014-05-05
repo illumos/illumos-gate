@@ -2733,7 +2733,7 @@ udp_output_ancillary(conn_t *connp, sin_t *sin, sin6_t *sin6, mblk_t *mp,
 		else
 			ixa->ixa_flags &= ~IXAF_IS_IPV4;
 		if (srcid != 0 && IN6_IS_ADDR_UNSPECIFIED(&v6src)) {
-			if (ip_srcid_find_id(srcid, &v6src, IPCL_ZONEID(connp),
+			if (!ip_srcid_find_id(srcid, &v6src, IPCL_ZONEID(connp),
 			    v4mapped, connp->conn_netstack)) {
 				/* Mismatch - v4mapped/v6 specified by srcid. */
 				mutex_exit(&connp->conn_lock);
@@ -3754,7 +3754,7 @@ udp_output_newdst(conn_t *connp, mblk_t *data_mp, sin_t *sin, sin6_t *sin6,
 		else
 			ixa->ixa_flags &= ~IXAF_IS_IPV4;
 		if (srcid != 0 && IN6_IS_ADDR_UNSPECIFIED(&v6src)) {
-			if (ip_srcid_find_id(srcid, &v6src, IPCL_ZONEID(connp),
+			if (!ip_srcid_find_id(srcid, &v6src, IPCL_ZONEID(connp),
 			    v4mapped, connp->conn_netstack)) {
 				/* Mismatched v4mapped/v6 specified by srcid. */
 				mutex_exit(&connp->conn_lock);
@@ -5571,7 +5571,7 @@ udp_do_connect(conn_t *connp, const struct sockaddr *sa, socklen_t len,
 		srcid = sin6->__sin6_src_id;
 		v4mapped = IN6_IS_ADDR_V4MAPPED(&v6dst);
 		if (srcid != 0 && IN6_IS_ADDR_UNSPECIFIED(&v6src)) {
-			if (ip_srcid_find_id(srcid, &v6src, IPCL_ZONEID(connp),
+			if (!ip_srcid_find_id(srcid, &v6src, IPCL_ZONEID(connp),
 			    v4mapped, connp->conn_netstack)) {
 				/* Mismatch v4mapped/v6 specified by srcid. */
 				return (EADDRNOTAVAIL);
