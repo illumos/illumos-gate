@@ -254,7 +254,7 @@ dp_pcache_poll(dp_entry_t *dpep, void *dpbuf,
 	pollfd_t	*pfdp;
 	epoll_event_t	*epoll;
 	int		error = 0;
-	short		mask = POLLRDHUP | POLLWRNORM | POLLWRBAND;
+	short		mask = POLLRDHUP | POLLWRBAND;
 
 	ASSERT(MUTEX_HELD(&pcp->pc_lock));
 	if (pcp->pc_bitmap == NULL) {
@@ -432,12 +432,22 @@ repoll:
 						ep->events = (revent & ~mask) |
 						    ((revent & POLLRDHUP) ?
 						    EPOLLRDHUP : 0) |
-						    ((revent & POLLWRNORM) ?
-						    EPOLLWRNORM : 0) |
 						    ((revent & POLLWRBAND) ?
 						    EPOLLWRBAND : 0);
 					} else {
 						ep->events = revent;
+					}
+
+					/*
+					 * We define POLLWRNORM to be POLLOUT,
+					 * but epoll has separate definitions
+					 * for them; if POLLOUT is set and the
+					 * user has asked for EPOLLWRNORM, set
+					 * that as well.
+					 */
+					if ((revent & POLLOUT) &&
+					    (pdp->pd_events & EPOLLWRNORM)) {
+						ep->events |= EPOLLWRNORM;
 					}
 				}
 
@@ -561,7 +571,9 @@ dpopen(dev_t *devp, int flag, int otyp, cred_t *credp)
 	 * structures until dpwrite() time, since we don't know the
 	 * optimal size yet.  We also delay setting the pid until either
 	 * dpwrite() or attempt to poll on the instance, allowing parents
-	 * to create instances of /dev/poll for their children.
+	 * to create instances of /dev/poll for their children.  (In the
+	 * epoll compatibility case, this check isn't performed to maintain
+	 * semantic compatibility.)
 	 */
 	pcp = pcache_alloc();
 	dpep->dpe_pcache = pcp;
@@ -606,7 +618,8 @@ dpwrite(dev_t dev, struct uio *uiop, cred_t *credp)
 	mutex_exit(&devpoll_lock);
 	pcp = dpep->dpe_pcache;
 
-	if (curproc->p_pid != pcp->pc_pid) {
+	if (!(dpep->dpe_flag & DP_ISEPOLLCOMPAT) &&
+	    curproc->p_pid != pcp->pc_pid) {
 		if (pcp->pc_pid != -1)
 			return (EACCES);
 
@@ -899,7 +912,8 @@ dpioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 		return (0);
 	}
 
-	if (curproc->p_pid != pcp->pc_pid) {
+	if (!(dpep->dpe_flag & DP_ISEPOLLCOMPAT) &&
+	    curproc->p_pid != pcp->pc_pid) {
 		if (pcp->pc_pid != -1)
 			return (EACCES);
 
