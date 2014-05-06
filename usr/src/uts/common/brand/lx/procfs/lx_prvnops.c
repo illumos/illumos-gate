@@ -119,6 +119,7 @@ static void lxpr_read_version(lxpr_node_t *, lxpr_uiobuf_t *);
 
 static void lxpr_read_pid_cmdline(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_pid_maps(lxpr_node_t *, lxpr_uiobuf_t *);
+static void lxpr_read_pid_mountinfo(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_pid_stat(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_pid_statm(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_pid_status(lxpr_node_t *, lxpr_uiobuf_t *);
@@ -206,6 +207,7 @@ static lxpr_dirent_t piddir[] = {
 	{ LXPR_PID_EXE,		"exe" },
 	{ LXPR_PID_MAPS,	"maps" },
 	{ LXPR_PID_MEM,		"mem" },
+	{ LXPR_PID_MOUNTINFO,	"mountinfo" },
 	{ LXPR_PID_ROOTDIR,	"root" },
 	{ LXPR_PID_STAT,	"stat" },
 	{ LXPR_PID_STATM,	"statm" },
@@ -361,6 +363,7 @@ static void (*lxpr_read_function[LXPR_NFILES])() = {
 	lxpr_read_invalid,		/* /proc/<pid>/exe	*/
 	lxpr_read_pid_maps,		/* /proc/<pid>/maps	*/
 	lxpr_read_empty,		/* /proc/<pid>/mem	*/
+	lxpr_read_pid_mountinfo,	/* /proc/<pid>/mountinfo */
 	lxpr_read_invalid,		/* /proc/<pid>/root	*/
 	lxpr_read_pid_stat,		/* /proc/<pid>/stat	*/
 	lxpr_read_pid_statm,		/* /proc/<pid>/statm	*/
@@ -418,6 +421,7 @@ static vnode_t *(*lxpr_lookup_function[LXPR_NFILES])() = {
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/exe	*/
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/maps	*/
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/mem	*/
+	lxpr_lookup_not_a_dir,		/* /proc/<pid>/mountinfo */
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/root	*/
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/stat	*/
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/statm	*/
@@ -475,6 +479,7 @@ static int (*lxpr_readdir_function[LXPR_NFILES])() = {
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/exe	*/
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/maps	*/
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/mem	*/
+	lxpr_readdir_not_a_dir,		/* /proc/<pid>/mountinfo */
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/root	*/
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/stat	*/
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/statm	*/
@@ -744,6 +749,170 @@ lxpr_read_pid_maps(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	}
 
 	kmem_free(buf, buflen);
+}
+
+/*
+ * lxpr_read_pid_mountinfo(): information about process mount points. e.g.:
+ *    14 19 0:13 / /sys rw,nosuid,nodev,noexec,relatime - sysfs sysfs rw
+ * mntid parid devnums root mntpnt mntopts - fstype mntsrc superopts
+ *
+ * We have to make up several of these fields.
+ */
+static void
+lxpr_read_pid_mountinfo(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
+{
+	struct vfs *vfsp;
+	struct vfs *vfslist;
+	zone_t *zone = LXPTOZ(lxpnp);
+	struct print_data {
+		refstr_t *vfs_mntpt;
+		refstr_t *vfs_resource;
+		uint_t vfs_flag;
+		int vfs_fstype;
+		dev_t vfs_dev;
+		struct print_data *next;
+	} *print_head = NULL;
+	struct print_data **print_tail = &print_head;
+	struct print_data *printp;
+	int root_id = 15;	/* use a made-up value */
+	int mnt_id;
+
+	ASSERT(lxpnp->lxpr_type == LXPR_PID_MMOUNTINFO);
+
+	vfs_list_read_lock();
+
+	/* root is the top-level, it does not appear in this output */
+	if (zone == global_zone) {
+		vfsp = vfslist = rootvfs;
+	} else {
+		vfsp = vfslist = zone->zone_vfslist;
+		/*
+		 * If the zone has a root entry, it will be the first in
+		 * the list.  If it doesn't, we conjure one up.
+		 */
+		if (vfslist == NULL || strcmp(refstr_value(vfsp->vfs_mntpt),
+		    zone->zone_rootpath) != 0) {
+			struct vfs *tvfsp;
+			/*
+			 * The root of the zone is not a mount point.  The vfs
+			 * we want to report is that of the zone's root vnode.
+			 */
+			tvfsp = zone->zone_rootvp->v_vfsp;
+
+			lxpr_uiobuf_printf(uiobuf,
+			    "%d 1 %d:%d / / %s - %s / %s\n",
+			    root_id,
+			    major(tvfsp->vfs_dev), minor(vfsp->vfs_dev),
+			    tvfsp->vfs_flag & VFS_RDONLY ? "ro" : "rw",
+			    vfssw[tvfsp->vfs_fstype].vsw_name,
+			    tvfsp->vfs_flag & VFS_RDONLY ? "ro" : "rw");
+
+		}
+		if (vfslist == NULL) {
+			vfs_list_unlock();
+			return;
+		}
+	}
+
+	/*
+	 * Later on we have to do a lookupname, which can end up causing
+	 * another vfs_list_read_lock() to be called. Which can lead to a
+	 * deadlock. To avoid this, we extract the data we need into a local
+	 * list, then we can run this list without holding vfs_list_read_lock()
+	 * We keep the list in the same order as the vfs_list
+	 */
+	do {
+		/* Skip mounts we shouldn't show */
+		if (vfsp->vfs_flag & VFS_NOMNTTAB) {
+			goto nextfs;
+		}
+
+		printp = kmem_alloc(sizeof (*printp), KM_SLEEP);
+		refstr_hold(vfsp->vfs_mntpt);
+		printp->vfs_mntpt = vfsp->vfs_mntpt;
+		refstr_hold(vfsp->vfs_resource);
+		printp->vfs_resource = vfsp->vfs_resource;
+		printp->vfs_flag = vfsp->vfs_flag;
+		printp->vfs_fstype = vfsp->vfs_fstype;
+		printp->vfs_dev = vfsp->vfs_dev;
+		printp->next = NULL;
+
+		*print_tail = printp;
+		print_tail = &printp->next;
+
+nextfs:
+		vfsp = (zone == global_zone) ?
+		    vfsp->vfs_next : vfsp->vfs_zone_next;
+
+	} while (vfsp != vfslist);
+
+	vfs_list_unlock();
+
+	mnt_id = root_id + 1;
+
+	/*
+	 * now we can run through what we've extracted without holding
+	 * vfs_list_read_lock()
+	 */
+	printp = print_head;
+	while (printp != NULL) {
+		struct print_data *printp_next;
+		const char *resource;
+		char *mntpt;
+		struct vnode *vp;
+		int error;
+
+		mntpt = (char *)refstr_value(printp->vfs_mntpt);
+		resource = refstr_value(printp->vfs_resource);
+
+		if (mntpt != NULL && mntpt[0] != '\0')
+			mntpt = ZONE_PATH_TRANSLATE(mntpt, zone);
+		else
+			mntpt = "-";
+
+		error = lookupname(mntpt, UIO_SYSSPACE, FOLLOW, NULLVPP, &vp);
+
+		if (error != 0)
+			goto nextp;
+
+		if (!(vp->v_flag & VROOT)) {
+			VN_RELE(vp);
+			goto nextp;
+		}
+		VN_RELE(vp);
+
+		if (resource != NULL && resource[0] != '\0') {
+			if (resource[0] == '/') {
+				resource = ZONE_PATH_VISIBLE(resource, zone) ?
+				    ZONE_PATH_TRANSLATE(resource, zone) : mntpt;
+			}
+		} else {
+			resource = "none";
+		}
+
+		/*
+		 * XXX parent ID is not tracked correctly here. Currently we
+		 * always assume the parent ID is the root ID.
+		 */
+		lxpr_uiobuf_printf(uiobuf,
+		    "%d %d %d:%d / %s %s - %s %s %s\n",
+		    mnt_id, root_id,
+		    major(printp->vfs_dev), minor(printp->vfs_dev),
+		    mntpt,
+		    printp->vfs_flag & VFS_RDONLY ? "ro" : "rw",
+		    vfssw[printp->vfs_fstype].vsw_name,
+		    resource,
+		    printp->vfs_flag & VFS_RDONLY ? "ro" : "rw");
+
+nextp:
+		printp_next = printp->next;
+		refstr_rele(printp->vfs_mntpt);
+		refstr_rele(printp->vfs_resource);
+		kmem_free(printp, sizeof (*printp));
+		printp = printp_next;
+
+		mnt_id++;
+	}
 }
 
 /*

@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2014 Joyent, Inc.  All rights reserved.
  */
 
 #ifndef	_LXPROC_H
@@ -108,6 +109,7 @@ typedef enum lxpr_nodetype {
 	LXPR_PID_EXE,		/* /proc/<pid>/exe	*/
 	LXPR_PID_MAPS,		/* /proc/<pid>/maps	*/
 	LXPR_PID_MEM,		/* /proc/<pid>/mem	*/
+	LXPR_PID_MOUNTINFO,	/* /proc/<pid>/mountinfo */
 	LXPR_PID_ROOTDIR,	/* /proc/<pid>/root	*/
 	LXPR_PID_STAT,		/* /proc/<pid>/stat	*/
 	LXPR_PID_STATM,		/* /proc/<pid>/statm	*/
