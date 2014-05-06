@@ -25,16 +25,23 @@
  */
 
 /*
- * lxpr_vnops.c:  Vnode operations for the lx /proc file system
+ * lxproc -- a loosely Linux-compatible /proc
  *
- * Assumptions and Gotchas:
- *
- * In order to preserve Solaris' security policy. This file system's
- * functionality does not override Solaris' security policies even if
- * that means breaking Linux compatibility.
- *
- * Linux has no concept of lwps so we only implement procs here as in the
- * old /proc interface.
+ * The aspiration here is to provide something that sufficiently approximates
+ * the Linux /proc implementation for purposes of offering some compatibility
+ * for simple Linux /proc readers (e.g., ps/top/htop).  However, it is not
+ * intended to exactly mimic Linux semantics; when choosing between offering
+ * compatibility and telling the truth, we emphatically pick the truth.  A
+ * particular glaring example of this is the Linux notion of "tasks" (that is,
+ * threads), which -- due to historical misadventures on Linux -- allocate their
+ * identifiers from the process identifier space.  (That is, each thread has in
+ * effect a pid.)  Some Linux /proc readers have come to depend on this
+ * attribute, and become confused when threads appear with proper identifiers,
+ * so we simply opt for the pre-2.6 behavior, and do not present the tasks
+ * directory at all.  Similarly, when choosing between offering compatibility
+ * and remaining consistent with our broader security model, we (obviously)
+ * choose security over compatibility.  In short, this is meant to be a best
+ * effort -- no more.
  */
 
 #include <sys/cpupart.h>
@@ -59,7 +66,7 @@
 #include <sys/pghw.h>
 #include <sys/vfs_opreg.h>
 
-/* Dependent on the Solaris procfs */
+/* Dependent on procfs */
 extern kthread_t *prchoose(proc_t *);
 
 #include "lx_proc.h"
@@ -242,6 +249,115 @@ static lxpr_dirent_t netdir[] = {
 };
 
 #define	NETDIRFILES	(sizeof (netdir) / sizeof (netdir[0]))
+
+/*
+ * These are the major signal number differences between Linux and native:
+ *
+ * 	====================================
+ * 	| Number | Linux      | Native     |
+ * 	| ====== | =========  | ========== |
+ *	|    7   | SIGBUS     | SIGEMT     |
+ *	|   10   | SIGUSR1    | SIGBUS     |
+ *	|   12   | SIGUSR2    | SIGSYS     |
+ *	|   16   | SIGSTKFLT  | SIGUSR1    |
+ *	|   17   | SIGCHLD    | SIGUSR2    |
+ * 	|   18   | SIGCONT    | SIGCHLD    |
+ *	|   19   | SIGSTOP    | SIGPWR     |
+ * 	|   20   | SIGTSTP    | SIGWINCH   |
+ * 	|   21   | SIGTTIN    | SIGURG     |
+ * 	|   22   | SIGTTOU    | SIGPOLL    |
+ *	|   23   | SIGURG     | SIGSTOP    |
+ * 	|   24   | SIGXCPU    | SIGTSTP    |
+ *	|   25   | SIGXFSZ    | SIGCONT    |
+ *	|   26   | SIGVTALARM | SIGTTIN    |
+ *	|   27   | SIGPROF    | SIGTTOU    |
+ *	|   28   | SIGWINCH   | SIGVTALARM |
+ *	|   29   | SIGPOLL    | SIGPROF    |
+ *	|   30   | SIGPWR     | SIGXCPU    |
+ *	|   31   | SIGSYS     | SIGXFSZ    |
+ * 	====================================
+ *
+ * Not every Linux signal maps to a native signal, nor does every native
+ * signal map to a Linux counterpart. However, when signals do map, the
+ * mapping is unique.
+ */
+static int
+lxpr_sigmap[NSIG] = {
+	0,
+	LX_SIGHUP,
+	LX_SIGINT,
+	LX_SIGQUIT,
+	LX_SIGILL,
+	LX_SIGTRAP,
+	LX_SIGABRT,
+	LX_SIGSTKFLT,
+	LX_SIGFPE,
+	LX_SIGKILL,
+	LX_SIGBUS,
+	LX_SIGSEGV,
+	LX_SIGSYS,
+	LX_SIGPIPE,
+	LX_SIGALRM,
+	LX_SIGTERM,
+	LX_SIGUSR1,
+	LX_SIGUSR2,
+	LX_SIGCHLD,
+	LX_SIGPWR,
+	LX_SIGWINCH,
+	LX_SIGURG,
+	LX_SIGPOLL,
+	LX_SIGSTOP,
+	LX_SIGTSTP,
+	LX_SIGCONT,
+	LX_SIGTTIN,
+	LX_SIGTTOU,
+	LX_SIGVTALRM,
+	LX_SIGPROF,
+	LX_SIGXCPU,
+	LX_SIGXFSZ,
+	-1,			/* 32:  illumos SIGWAITING */
+	-1,			/* 33:  illumos SIGLWP */
+	-1,			/* 34:  illumos SIGFREEZE */
+	-1,			/* 35:  illumos SIGTHAW */
+	-1,			/* 36:  illumos SIGCANCEL */
+	-1,			/* 37:  illumos SIGLOST */
+	-1,			/* 38:  illumos SIGXRES */
+	-1,			/* 39:  illumos SIGJVM1 */
+	-1,			/* 40:  illumos SIGJVM2 */
+	-1,			/* 41:  illumos SIGINFO */
+	LX_SIGRTMIN,		/* 42:  illumos _SIGRTMIN */
+	LX_SIGRTMIN + 1,
+	LX_SIGRTMIN + 2,
+	LX_SIGRTMIN + 3,
+	LX_SIGRTMIN + 4,
+	LX_SIGRTMIN + 5,
+	LX_SIGRTMIN + 6,
+	LX_SIGRTMIN + 7,
+	LX_SIGRTMIN + 8,
+	LX_SIGRTMIN + 9,
+	LX_SIGRTMIN + 10,
+	LX_SIGRTMIN + 11,
+	LX_SIGRTMIN + 12,
+	LX_SIGRTMIN + 13,
+	LX_SIGRTMIN + 14,
+	LX_SIGRTMIN + 15,
+	LX_SIGRTMIN + 16,
+	LX_SIGRTMIN + 17,
+	LX_SIGRTMIN + 18,
+	LX_SIGRTMIN + 19,
+	LX_SIGRTMIN + 20,
+	LX_SIGRTMIN + 21,
+	LX_SIGRTMIN + 22,
+	LX_SIGRTMIN + 23,
+	LX_SIGRTMIN + 24,
+	LX_SIGRTMIN + 25,
+	LX_SIGRTMIN + 26,
+	LX_SIGRTMIN + 27,
+	LX_SIGRTMIN + 28,
+	LX_SIGRTMIN + 29,
+	LX_SIGRTMIN + 30,
+	LX_SIGRTMAX
+};
 
 /*
  * lxpr_open(): Vnode operation for VOP_OPEN()
@@ -554,7 +670,6 @@ lxpr_read(vnode_t *vp, uio_t *uiop, int ioflag, cred_t *cr,
 	return (error);
 }
 
-
 /*
  * lxpr_read_invalid(), lxpr_read_isdir(), lxpr_read_empty()
  *
@@ -588,20 +703,18 @@ lxpr_read_empty(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 /*
  * lxpr_read_pid_cmdline():
  *
- * This is not precisely compatible with linux:
- *
- * The linux cmdline returns argv with the correct separation
- * using \0 between the arguments, we cannot do that without
- * copying the real argv from the correct process context.
- * This is too difficult to attempt so we pretend that the
- * entire cmdline is just argv[0]. This is good enough for
- * ps to display correctly, but might cause some other things
- * not to work correctly.
+ * This is not precisely compatible with Linux: the Linux cmdline returns argv
+ * with the correct separation using \0 between the arguments, but we cannot do
+ * that without copying the real argv from the correct process context.  This
+ * is too difficult to attempt so we pretend that the entire cmdline is just
+ * argv[0]. This is good enough for ps and htop to display correctly, but might
+ * cause some other things not to work correctly.
  */
 static void
 lxpr_read_pid_cmdline(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
 	proc_t *p;
+	char *buf;
 
 	ASSERT(lxpnp->lxpr_type == LXPR_PID_CMDLINE);
 
@@ -611,16 +724,11 @@ lxpr_read_pid_cmdline(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 		return;
 	}
 
-	if (PTOU(p)->u_argv != 0) {
-		char *buff = PTOU(p)->u_psargs;
-		int len = strlen(buff);
-		lxpr_unlock(p);
-		lxpr_uiobuf_write(uiobuf, buff, len+1);
-	} else {
-		lxpr_unlock(p);
-	}
-}
+	buf = PTOU(p)->u_argv != 0 ? PTOU(p)->u_psargs : PTOU(p)->u_comm;
 
+	lxpr_uiobuf_write(uiobuf, buf, strlen(buf) + 1);
+	lxpr_unlock(p);
+}
 
 /*
  * lxpr_read_pid_maps(): memory map file
@@ -716,7 +824,7 @@ lxpr_read_pid_maps(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 
 		int maj = 0;
 		int min = 0;
-		int inode = 0;
+		u_longlong_t inode = 0;
 
 		*buf = '\0';
 		if (pbuf->vp != NULL) {
@@ -733,12 +841,12 @@ lxpr_read_pid_maps(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 
 		if (*buf != '\0') {
 			lxpr_uiobuf_printf(uiobuf,
-			    "%08x-%08x %s %08x %02d:%03d %d %s\n",
+			    "%08x-%08x %s %08x %02d:%03d %lld %s\n",
 			    pbuf->saddr, pbuf->eaddr, pbuf->prot, pbuf->offset,
 			    maj, min, inode, buf);
 		} else {
 			lxpr_uiobuf_printf(uiobuf,
-			    "%08x-%08x %s %08x %02d:%03d %d\n",
+			    "%08x-%08x %s %08x %02d:%03d %lld\n",
 			    pbuf->saddr, pbuf->eaddr, pbuf->prot, pbuf->offset,
 			    maj, min, inode);
 		}
@@ -1052,7 +1160,7 @@ lxpr_read_pid_status(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	    "Groups:\t",
 	    up->u_comm,
 	    status,
-	    pid, /* thread group id - same as pid until we map lwps to procs */
+	    pid, /* thread group id - same as pid */
 	    pid,
 	    ppid,
 	    0,
@@ -1101,7 +1209,7 @@ lxpr_read_pid_status(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	sigemptyset(&handle);
 
 	for (i = 1; i < NSIG; i++) {
-		lx_sig = stol_signo[i];
+		lx_sig = lxpr_sigmap[i];
 
 		if ((lx_sig > 0) && (lx_sig < LX_NSIG)) {
 			if (sigismember(&p->p_sig, i))
@@ -1179,8 +1287,8 @@ lxpr_read_pid_stat(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 		 * Make sure not to reference parent PIDs that reside outside
 		 * the zone
 		 */
-		ppid = ((p->p_flag & SZONETOP)
-		    ? curproc->p_zone->zone_zsched->p_pid : p->p_ppid);
+		ppid = ((p->p_flag & SZONETOP) ?
+		    curproc->p_zone->zone_zsched->p_pid : p->p_ppid);
 
 		/*
 		 * Convert ppid to the Linux default of 1 if our parent is the
@@ -1194,7 +1302,6 @@ lxpr_read_pid_stat(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 		mutex_enter(&p->p_splock);
 		mutex_enter(&p->p_sessp->s_lock);
 		spid = p->p_sessp->s_sid;
-		/* XXBRAND psdev = DEV_TO_LXDEV(p->p_sessp->s_dev, VCHR); */
 		psdev = p->p_sessp->s_dev;
 		if (p->p_sessp->s_cred)
 			psgid = crgetgid(p->p_sessp->s_cred);
@@ -1224,9 +1331,9 @@ lxpr_read_pid_stat(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 		if (CL_DONICE(t, NULL, 0, &nice) != 0)
 			nice = 0;
 
-		pri = v.v_maxsyspri - t->t_pri;
+		pri = t->t_pri;
 		wchan = t->t_wchan;
-		cpu = t->t_cpu->cpu_seqid;
+		cpu = t->t_cpu->cpu_id;
 		thread_unlock(t);
 	} else {
 		/* Only zombies have no threads */
@@ -1248,9 +1355,9 @@ lxpr_read_pid_stat(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	    "%d (%s) %c %d %d %d %d %d "
 	    "%lu %lu %lu %lu %lu "
 	    "%lu %lu %ld %ld "
-	    "%d %d "
-	    "0 "
-	    "%ld %lu "
+	    "%d %d %d "
+	    "%lu "
+	    "%lu "
 	    "%lu %ld %llu "
 	    "%lu %lu %u "
 	    "%lu %lu "
@@ -1260,15 +1367,12 @@ lxpr_read_pid_stat(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	    "%d "
 	    "%d"
 	    "\n",
-	    pid,
-	    PTOU(p)->u_comm,
-	    stat,
-	    ppid, pgpid,
-	    spid, psdev, psgid,
+	    pid, PTOU(p)->u_comm, stat, ppid, pgpid, spid, psdev, psgid,
 	    0l, 0l, 0l, 0l, 0l, /* flags, minflt, cminflt, majflt, cmajflt */
 	    p->p_utime, p->p_stime, p->p_cutime, p->p_cstime,
-	    pri, nice,
-	    0l, PTOU(p)->u_ticks, /* ticks till next SIGALARM, start time */
+	    pri, nice, p->p_lwpcnt,
+	    0l, /* itrealvalue (time before next SIGALRM) */
+	    PTOU(p)->u_ticks,
 	    vsize, rss, p->p_vmem_ctl,
 	    0l, 0l, USRSTACK, /* startcode, endcode, startstack */
 	    0l, 0l, /* kstkesp, kstkeip */
@@ -1298,8 +1402,9 @@ lxpr_read_net_dev(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	    " colls carrier compressed\n");
 
 	/*
-	 * XXX: data about each interface should go here, but we'll wait to
-	 * see if anybody wants to use it.
+	 * Data about each interface should go here, but that shouldn't be added
+	 * unless there is an lxproc reader that actually makes use of it (and
+	 * doesn't need anything else that we refuse to provide)...
 	 */
 }
 
@@ -1401,7 +1506,7 @@ lxpr_read_net_unix(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 
 /*
  * lxpr_read_kmsg(): read the contents of the kernel message queue. We
- * translate this into the reception of console messages for this lx zone; each
+ * translate this into the reception of console messages for this zone; each
  * read copies out a single zone console message, or blocks until the next one
  * is produced.
  */
@@ -1429,9 +1534,8 @@ lxpr_read_kmsg(lxpr_node_t *lxpnp, struct lxpr_uiobuf *uiobuf)
 }
 
 /*
- * lxpr_read_loadavg(): read the contents of the "loadavg" file.
- *
- * Just enough for uptime to work
+ * lxpr_read_loadavg(): read the contents of the "loadavg" file.  We do just
+ * enough for uptime and other simple lxproc readers to work
  */
 extern int nthread;
 
@@ -1447,6 +1551,7 @@ lxpr_read_loadavg(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	int loadavg[3];
 	int *loadbuf;
 	cpupart_t *cp;
+	zone_t *zone = LXPTOZ(lxpnp);
 
 	uint_t nrunnable = 0;
 	rctl_qty_t nlwps;
@@ -1469,26 +1574,23 @@ lxpr_read_loadavg(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 		nrunnable = cp->cp_nrunning + cp->cp_nrunnable;
 		(void) cpupart_get_loadavg(psetid, &loadavg[0], 3);
 		loadbuf = &loadavg[0];
-
-		/*
-		 * We'll report the total number of lwps in the zone for the
-		 * "nproc" parameter of /proc/loadavg; good enough for lx.
-		 */
-		nlwps = curproc->p_zone->zone_nlwps;
 	} else {
 		cp = cp_list_head;
 		do {
 			nrunnable += cp->cp_nrunning + cp->cp_nrunnable;
 		} while ((cp = cp->cp_next) != cp_list_head);
 
-		loadbuf = &avenrun[0];
-
-		/*
-		 * This will report kernel threads as well as user lwps, but it
-		 * should be good enough for lx consumers.
-		 */
-		nlwps = nthread;
+		loadbuf = zone == global_zone ?
+		    &avenrun[0] : zone->zone_avenrun;
 	}
+
+	/*
+	 * If we're in the non-global zone, we'll report the total number of
+	 * LWPs in the zone for the "nproc" parameter of /proc/loadavg,
+	 * otherwise will just use nthread (which will include kernel threads,
+	 * but should be good enough for lxproc).
+	 */
+	nlwps = zone == global_zone ? nthread : zone->zone_nlwps;
 
 	mutex_exit(&cpu_lock);
 
@@ -1513,12 +1615,29 @@ lxpr_read_loadavg(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 static void
 lxpr_read_meminfo(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
-	long total_mem = physmem * PAGESIZE;
-	long free_mem = freemem * PAGESIZE;
-	long total_swap = k_anoninfo.ani_max * PAGESIZE;
-	long used_swap = k_anoninfo.ani_phys_resv * PAGESIZE;
+	zone_t *zone = LXPTOZ(lxpnp);
+	int global = zone == global_zone;
+	long total_mem, free_mem, total_swap, used_swap;
 
 	ASSERT(lxpnp->lxpr_type == LXPR_MEMINFO);
+
+	if (global || zone->zone_phys_mem_ctl == UINT64_MAX) {
+		total_mem = physmem * PAGESIZE;
+		free_mem = freemem * PAGESIZE;
+	} else {
+		total_mem = zone->zone_phys_mem_ctl;
+		free_mem = zone->zone_phys_mem_ctl - zone->zone_phys_mem;
+	}
+
+	if (global || zone->zone_max_swap_ctl == UINT64_MAX) {
+		total_swap = k_anoninfo.ani_max * PAGESIZE;
+		used_swap = k_anoninfo.ani_phys_resv * PAGESIZE;
+	} else {
+		mutex_enter(&zone->zone_mem_lock);
+		total_swap = zone->zone_max_swap_ctl;
+		used_swap = zone->zone_max_swap;
+		mutex_exit(&zone->zone_mem_lock);
+	}
 
 	lxpr_uiobuf_printf(uiobuf,
 	    "        total:     used:    free:  shared: buffers:  cached:\n"
@@ -1586,8 +1705,7 @@ lxpr_read_mounts(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 		 * If the zone has a root entry, it will be the first in
 		 * the list.  If it doesn't, we conjure one up.
 		 */
-		if (vfslist == NULL ||
-		    strcmp(refstr_value(vfsp->vfs_mntpt),
+		if (vfslist == NULL || strcmp(refstr_value(vfsp->vfs_mntpt),
 		    zone->zone_rootpath) != 0) {
 			struct vfs *tvfsp;
 			/*
@@ -1743,13 +1861,11 @@ lxpr_read_version(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	    "00:00:00 00/00/00");
 }
 
-
 /*
  * lxpr_read_stat(): read the contents of the "stat" file.
  *
  */
 /* ARGSUSED */
-
 static void
 lxpr_read_stat(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -1780,7 +1896,7 @@ lxpr_read_stat(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	pools_enabled = pool_pset_enabled();
 
 	/* Calculate cumulative stats */
-	cp = cpstart = CPU;
+	cp = cpstart = CPU->cpu_part->cp_cpulist;
 	do {
 		int i;
 
@@ -1859,13 +1975,13 @@ lxpr_read_stat(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 		sys_ticks  = NSEC_TO_TICK(msnsecs[CMS_SYSTEM]);
 		user_ticks = NSEC_TO_TICK(msnsecs[CMS_USER]);
 
-		if (strncmp(lx_kern_version, "2.4", 3) != 0) {
-			for (i = 0; i < NCMSTATES; i++) {
-				tmptime = cp->cpu_intracct[i];
-				scalehrtime(&tmptime);
-				irq_ticks += NSEC_TO_TICK(tmptime);
-			}
+		for (i = 0; i < NCMSTATES; i++) {
+			tmptime = cp->cpu_intracct[i];
+			scalehrtime(&tmptime);
+			irq_ticks += NSEC_TO_TICK(tmptime);
+		}
 
+		if (strncmp(lx_kern_version, "2.4", 3) != 0) {
 			lxpr_uiobuf_printf(uiobuf,
 			    "cpu%d %ld %ld %ld %ld %ld %ld %ld\n",
 			    cp->cpu_id, user_ticks, 0, sys_ticks, idle_ticks,
@@ -1919,7 +2035,6 @@ lxpr_read_stat(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 		    forks_cum);
 	}
 }
-
 
 /*
  * lxpr_read_uptime(): read the contents of the "uptime" file.
@@ -2209,8 +2324,6 @@ lxpr_read_fd(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	lxpr_uiobuf_seterr(uiobuf, EFAULT);
 }
 
-
-
 /*
  * lxpr_getattr(): Vnode operation for VOP_GETATTR()
  */
@@ -2291,7 +2404,6 @@ lxpr_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 	return (0);
 }
 
-
 /*
  * lxpr_access(): Vnode operation for VOP_ACCESS()
  */
@@ -2344,11 +2456,9 @@ lxpr_access(vnode_t *vp, int mode, int flags, cred_t *cr, caller_context_t *ct)
 		return (0);
 
 	/*
-	 * Access check is based on only
-	 * one of owner, group, public.
-	 * If not owner, then check group.
-	 * If not a member of the group, then
-	 * check public access.
+	 * Access check is based on only one of owner, group, public.  If not
+	 * owner, then check group.  If not a member of the group, then check
+	 * public access.
 	 */
 	if (crgetuid(cr) != lxpnp->lxpr_uid) {
 		shift += 3;
@@ -2364,16 +2474,12 @@ lxpr_access(vnode_t *vp, int mode, int flags, cred_t *cr, caller_context_t *ct)
 	return (EACCES);
 }
 
-
-
-
 /* ARGSUSED */
 static vnode_t *
 lxpr_lookup_not_a_dir(vnode_t *dp, char *comp)
 {
 	return (NULL);
 }
-
 
 /*
  * lxpr_lookup(): Vnode operation for VOP_LOOKUP()
@@ -2407,8 +2513,7 @@ lxpr_lookup(vnode_t *dp, char *comp, vnode_t **vpp, pathname_t *pathp,
 	}
 
 	/*
-	 * Just return the parent vnode
-	 * if thats where we are trying to go
+	 * Just return the parent vnode if that's where we are trying to go.
 	 */
 	if (strcmp(comp, "..") == 0) {
 		VN_HOLD(lxpnp->lxpr_parent);
@@ -2417,9 +2522,8 @@ lxpr_lookup(vnode_t *dp, char *comp, vnode_t **vpp, pathname_t *pathp,
 	}
 
 	/*
-	 * Special handling for directory searches
-	 * Note: null component name is synonym for
-	 * current directory being searched.
+	 * Special handling for directory searches.  Note: null component name
+	 * denotes that the current directory is being searched.
 	 */
 	if ((dp->v_type == VDIR) && (*comp == '\0' || strcmp(comp, ".") == 0)) {
 		VN_HOLD(dp);
@@ -2452,7 +2556,6 @@ lxpr_lookup_common(vnode_t *dp, char *comp, proc_t *p,
 	return (NULL);
 }
 
-
 static vnode_t *
 lxpr_lookup_piddir(vnode_t *dp, char *comp)
 {
@@ -2470,7 +2573,6 @@ lxpr_lookup_piddir(vnode_t *dp, char *comp)
 
 	return (dp);
 }
-
 
 /*
  * Lookup one of the process's open files.
@@ -2529,15 +2631,16 @@ lxpr_lookup_fddir(vnode_t *dp, char *comp)
 	lxpnp = lxpr_getnode(dp, LXPR_PID_FD_FD, p, fd);
 
 	/*
+	 * Drop p_lock, but keep the process P_PR_LOCK'd to prevent it from
+	 * going away while we dereference into fi_list.
+	 */
+	mutex_exit(&p->p_lock);
+
+	/*
 	 * get open file info
 	 */
 	fip = (&(p)->p_user.u_finfo);
 	mutex_enter(&fip->fi_lock);
-
-	/*
-	 * got the fd data so now done with this proc
-	 */
-	lxpr_unlock(p);
 
 	if (fd < fip->fi_nfiles) {
 		UF_ENTER(ufp, fip, fd);
@@ -2549,6 +2652,8 @@ lxpr_lookup_fddir(vnode_t *dp, char *comp)
 		if (fip->fi_list[fd].uf_file == NULL) {
 			mutex_exit(&fip->fi_lock);
 			UF_EXIT(ufp);
+			mutex_enter(&p->p_lock);
+			lxpr_unlock(p);
 			lxpr_freenode(lxpnp);
 			return (NULL);
 		}
@@ -2560,13 +2665,14 @@ lxpr_lookup_fddir(vnode_t *dp, char *comp)
 	mutex_exit(&fip->fi_lock);
 
 	if (vp == NULL) {
+		mutex_enter(&p->p_lock);
+		lxpr_unlock(p);
 		lxpr_freenode(lxpnp);
 		return (NULL);
 	} else {
 		/*
-		 * Fill in the lxpr_node so future references will
-		 * be able to find the underlying vnode.
-		 * The vnode is held on the realvp.
+		 * Fill in the lxpr_node so future references will be able to
+		 * find the underlying vnode. The vnode is held on the realvp.
 		 */
 		lxpnp->lxpr_realvp = vp;
 		VN_HOLD(lxpnp->lxpr_realvp);
@@ -2583,12 +2689,13 @@ lxpr_lookup_fddir(vnode_t *dp, char *comp)
 		}
 	}
 
+	mutex_enter(&p->p_lock);
+	lxpr_unlock(p);
 	dp = LXPTOV(lxpnp);
 	ASSERT(dp != NULL);
 
 	return (dp);
 }
-
 
 static vnode_t *
 lxpr_lookup_netdir(vnode_t *dp, char *comp)
@@ -2600,18 +2707,16 @@ lxpr_lookup_netdir(vnode_t *dp, char *comp)
 	return (dp);
 }
 
-
 static vnode_t *
 lxpr_lookup_procdir(vnode_t *dp, char *comp)
 {
 	ASSERT(VTOLXP(dp)->lxpr_type == LXPR_PROCDIR);
 
 	/*
-	 * We know all the names of files & dirs in our
-	 * file system structure except those that are pid names.
-	 * These change as pids are created/deleted etc.
-	 * So just look for a number as the first char to see if we
-	 * are we doing pid lookups?
+	 * We know all the names of files & dirs in our file system structure
+	 * except those that are pid names.  These change as pids are created/
+	 * deleted etc., so we just look for a number as the first char to see
+	 * if we are we doing pid lookups.
 	 *
 	 * Don't need to check for "self" as it is implemented as a symlink
 	 */
@@ -2622,11 +2727,11 @@ lxpr_lookup_procdir(vnode_t *dp, char *comp)
 		int c;
 
 		while ((c = *comp++) != '\0')
-			pid = 10*pid + c - '0';
+			pid = 10 * pid + c - '0';
 
 		/*
-		 * Can't continue if the process is still loading
-		 * or it doesn't really exist yet (or maybe it just died!)
+		 * Can't continue if the process is still loading or it doesn't
+		 * really exist yet (or maybe it just died!)
 		 */
 		p = lxpr_lock(pid);
 		if (p == NULL)
@@ -2648,15 +2753,11 @@ lxpr_lookup_procdir(vnode_t *dp, char *comp)
 		ASSERT(dp != NULL);
 
 		return (dp);
-
 	}
 
 	/* Lookup fixed names */
 	return (lxpr_lookup_common(dp, comp, NULL, lx_procdir, PROCDIRFILES));
 }
-
-
-
 
 /*
  * lxpr_readdir(): Vnode operation for VOP_READDIR()
@@ -2702,7 +2803,6 @@ lxpr_readdir(vnode_t *dp, uio_t *uiop, cred_t *cr, int *eofp,
 
 	return (lxpr_readdir_function[lxpnp->lxpr_type](lxpnp, uiop, eofp));
 }
-
 
 /* ARGSUSED */
 static int
@@ -2792,18 +2892,15 @@ lxpr_readdir_common(lxpr_node_t *lxpnp, uio_t *uiop, int *eofp,
 		}
 
 		/*
-		 * uiomove() updates both uiop->uio_resid and
-		 * uiop->uio_offset by the same amount.  But we want
-		 * uiop->uio_offset to change in increments
-		 * of LXPR_SDSIZE, which is different from the number of bytes
-		 * being returned to the user.
-		 * So we set uiop->uio_offset separately, ignoring what
-		 * uiomove() does.
+		 * uiomove() updates both uiop->uio_resid and uiop->uio_offset
+		 * by the same amount.  But we want uiop->uio_offset to change
+		 * in increments of LXPR_SDSIZE, which is different from the
+		 * number of bytes being returned to the user.  So we set
+		 * uiop->uio_offset separately, ignoring what uiomove() does.
 		 */
 		if ((error = uiomove((caddr_t)dirent, reclen, UIO_READ,
-		    uiop))) {
+		    uiop)) != 0)
 			return (error);
-		}
 
 		uiop->uio_offset = uoffset + LXPR_SDSIZE;
 	}
@@ -2837,14 +2934,12 @@ lxpr_readdir_procdir(lxpr_node_t *lxpnp, uio_t *uiop, int *eofp)
 	zoneid = LXPTOZ(lxpnp)->zone_id;
 
 	/*
-	 * We return directory entries in the order:
-	 * "." and ".." then the unique lx procfs files, then the
-	 * directories corresponding to the running processes.
-	 *
-	 * This is a good order because it allows us to more easily
-	 * keep track of where we are betwen calls to getdents().
-	 * If the number of processes changes between calls then we
-	 * can't lose track of where we are in the lx procfs files.
+	 * We return directory entries in the order: "." and ".." then the
+	 * unique lxproc files, then the directories corresponding to the
+	 * running processes.  We have defined this as the ordering because
+	 * it allows us to more easily keep track of where we are betwen calls
+	 * to getdents().  If the number of processes changes between calls
+	 * then we can't lose track of where we are in the lxproc files.
 	 */
 
 	/* Do the fixed entries */
@@ -2934,29 +3029,27 @@ lxpr_readdir_procdir(lxpr_node_t *lxpnp, uio_t *uiop, int *eofp)
 		}
 
 		/*
-		 * uiomove() updates both uiop->uio_resid and
-		 * uiop->uio_offset by the same amount.  But we want
-		 * uiop->uio_offset to change in increments
-		 * of LXPR_SDSIZE, which is different from the number of bytes
-		 * being returned to the user.
-		 * So we set uiop->uio_offset separately, in the
-		 * increment of this for loop, ignoring what uiomove() does.
+		 * uiomove() updates both uiop->uio_resid and uiop->uio_offset
+		 * by the same amount.  But we want uiop->uio_offset to change
+		 * in increments of LXPR_SDSIZE, which is different from the
+		 * number of bytes being returned to the user.  So we set
+		 * uiop->uio_offset separately, in the increment of this for
+		 * the loop, ignoring what uiomove() does.
 		 */
-		if ((error = uiomove((caddr_t)dirent, reclen, UIO_READ, uiop)))
+		if ((error = uiomove((caddr_t)dirent, reclen, UIO_READ,
+		    uiop)) != 0)
 			return (error);
-
 next:
 		uiop->uio_offset = uoffset + LXPR_SDSIZE;
 	}
 
-	if (eofp)
-		*eofp =
-		    (uiop->uio_offset >=
+	if (eofp != NULL) {
+		*eofp = (uiop->uio_offset >=
 		    ((v.v_proc + PROCDIRFILES + 2) * LXPR_SDSIZE)) ? 1 : 0;
+	}
 
 	return (0);
 }
-
 
 static int
 lxpr_readdir_piddir(lxpr_node_t *lxpnp, uio_t *uiop, int *eofp)
@@ -2980,14 +3073,12 @@ lxpr_readdir_piddir(lxpr_node_t *lxpnp, uio_t *uiop, int *eofp)
 	return (lxpr_readdir_common(lxpnp, uiop, eofp, piddir, PIDDIRFILES));
 }
 
-
 static int
 lxpr_readdir_netdir(lxpr_node_t *lxpnp, uio_t *uiop, int *eofp)
 {
 	ASSERT(lxpnp->lxpr_type == LXPR_NETDIR);
 	return (lxpr_readdir_common(lxpnp, uiop, eofp, netdir, NETDIRFILES));
 }
-
 
 static int
 lxpr_readdir_fddir(lxpr_node_t *lxpnp, uio_t *uiop, int *eofp)
@@ -3001,9 +3092,8 @@ lxpr_readdir_fddir(lxpr_node_t *lxpnp, uio_t *uiop, int *eofp)
 	int error;
 	int ceof;
 	proc_t *p;
-	int fddirsize;
+	int fddirsize = -1;
 	uf_info_t *fip;
-
 
 	ASSERT(lxpnp->lxpr_type == LXPR_PID_FDDIR);
 
@@ -3014,23 +3104,28 @@ lxpr_readdir_fddir(lxpr_node_t *lxpnp, uio_t *uiop, int *eofp)
 	if (p == NULL)
 		return (ENOENT);
 
-	/* Get open file info */
-	fip = (&(p)->p_user.u_finfo);
-
 	if ((p->p_stat == SZOMB) || (p->p_flag & SSYS) || (p->p_as == &kas))
 		fddirsize = 0;
-	else
-		fddirsize = fip->fi_nfiles;
 
+	/*
+	 * Drop p_lock, but keep the process P_PR_LOCK'd to prevent it from
+	 * going away while we iterate over its fi_list.
+	 */
+	mutex_exit(&p->p_lock);
+
+	/* Get open file info */
+	fip = (&(p)->p_user.u_finfo);
 	mutex_enter(&fip->fi_lock);
-	lxpr_unlock(p);
+
+	if (fddirsize == -1)
+		fddirsize = fip->fi_nfiles;
 
 	/* Do the fixed entries (in this case just "." & "..") */
 	error = lxpr_readdir_common(lxpnp, uiop, &ceof, 0, 0);
 
 	/* Finished if we got an error or if we couldn't do all the table */
 	if (error != 0 || ceof == 0)
-		return (error);
+		goto out;
 
 	/* clear out the dirent buffer */
 	bzero(bp, sizeof (bp));
@@ -3078,16 +3173,20 @@ lxpr_readdir_fddir(lxpr_node_t *lxpnp, uio_t *uiop, int *eofp)
 			goto out;
 		}
 
-		if ((error = uiomove((caddr_t)dirent, reclen, UIO_READ, uiop)))
+		if ((error = uiomove((caddr_t)dirent, reclen, UIO_READ,
+		    uiop)) != 0)
 			goto out;
 	}
 
-	if (eofp)
+	if (eofp != NULL) {
 		*eofp =
 		    (uiop->uio_offset >= ((fddirsize+2) * LXPR_SDSIZE)) ? 1 : 0;
+	}
 
 out:
 	mutex_exit(&fip->fi_lock);
+	mutex_enter(&p->p_lock);
+	lxpr_unlock(p);
 	return (error);
 }
 
@@ -3120,11 +3219,6 @@ lxpr_readlink(vnode_t *vp, uio_t *uiop, cred_t *cr, caller_context_t *ct)
 		switch (lxpnp->lxpr_type) {
 		case LXPR_SELF:
 			/*
-			 * Don't need to check result as every possible int
-			 * will fit within MAXPATHLEN bytes
-			 */
-
-			/*
 			 * Convert pid to the Linux default of 1 if we're the
 			 * zone's init process
 			 */
@@ -3132,6 +3226,10 @@ lxpr_readlink(vnode_t *vp, uio_t *uiop, cred_t *cr, caller_context_t *ct)
 			    curproc->p_zone->zone_proc_initpid)
 			    ? curproc->p_pid : 1);
 
+			/*
+			 * Don't need to check result as every possible int
+			 * will fit within MAXPATHLEN bytes.
+			 */
 			(void) snprintf(bp, buflen, "%d", pid);
 			break;
 		case LXPR_PID_CURDIR:
@@ -3151,7 +3249,6 @@ lxpr_readlink(vnode_t *vp, uio_t *uiop, cred_t *cr, caller_context_t *ct)
 	return (uiomove(bp, strlen(bp), UIO_READ, uiop));
 }
 
-
 /*
  * lxpr_inactive(): Vnode operation for VOP_INACTIVE()
  * Vnode is no longer referenced, deallocate the file
@@ -3164,7 +3261,6 @@ lxpr_inactive(vnode_t *vp, cred_t *cr, caller_context_t *ct)
 	lxpr_freenode(VTOLXP(vp));
 }
 
-
 /*
  * lxpr_sync(): Vnode operation for VOP_SYNC()
  */
@@ -3172,12 +3268,10 @@ static int
 lxpr_sync()
 {
 	/*
-	 * nothing to sync but this
-	 * function must never fail
+	 * Nothing to sync but this function must never fail
 	 */
 	return (0);
 }
-
 
 /*
  * lxpr_cmp(): Vnode operation for VOP_CMP()
@@ -3188,16 +3282,19 @@ lxpr_cmp(vnode_t *vp1, vnode_t *vp2, caller_context_t *ct)
 	vnode_t *rvp;
 
 	while (vn_matchops(vp1, lxpr_vnodeops) &&
-	    (rvp = VTOLXP(vp1)->lxpr_realvp) != NULL)
+	    (rvp = VTOLXP(vp1)->lxpr_realvp) != NULL) {
 		vp1 = rvp;
+	}
+
 	while (vn_matchops(vp2, lxpr_vnodeops) &&
-	    (rvp = VTOLXP(vp2)->lxpr_realvp) != NULL)
+	    (rvp = VTOLXP(vp2)->lxpr_realvp) != NULL) {
 		vp2 = rvp;
+	}
+
 	if (vn_matchops(vp1, lxpr_vnodeops) || vn_matchops(vp2, lxpr_vnodeops))
 		return (vp1 == vp2);
 	return (VOP_CMP(vp1, vp2, ct));
 }
-
 
 /*
  * lxpr_realvp(): Vnode operation for VOP_REALVP()
