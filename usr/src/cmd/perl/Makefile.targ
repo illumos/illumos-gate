@@ -10,6 +10,7 @@
 #
 #
 # Copyright (c) 2014 Racktop Systems.
+# Copyright 2014, OmniTI Computer Consulting, Inc. All rights reserved.
 #
 
 # Link against libc as perl solaris specs
@@ -21,6 +22,10 @@ $(PERLEXT):= ZDEFS =
 $(ROOTPERLEXT) := FILEMODE = 0555
 $(ROOTPERLMOD) := FILEMODE = 0444
 
+# CFLAGS for perl, specifically.
+PCFLAGS= -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64 -DPERL_USE_SAFE_PUTENV \
+	-D_TS_ERRNO
+
 $(MACH):
 	$(INS.dir)
 
@@ -28,7 +33,7 @@ $(PERLEXT): $(MACH)/$(MODULE).o
 	$(BUILD.SO) $(MACH)/$(MODULE).o
 
 $(MACH)/$(MODULE).o: $(MACH)/$(MODULE).c
-	$(COMPILE.c) $(C_PICFLAGS) -I$(PERLINCDIR) $< -o $@
+	$(COMPILE.c) $(PCFLAGS) $(C_PICFLAGS) -I$(PERLINCDIR) $< -o $@
 
 $(MACH)/$(MODULE).c: $(MACH) $(MODULE).xs 
 	$(PERLDIR)/bin/xsubpp $(XSUBPPFLAGS) $(MODULE).xs >$@
