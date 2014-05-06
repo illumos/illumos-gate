@@ -21,9 +21,8 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2014 Joyent, Inc.  All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * lxprsubr.c: Various functions for the /lxproc vnodeops.
@@ -40,8 +39,8 @@
 
 #define	LXPRCACHE_NAME "lxpr_cache"
 
-static int lxpr_node_constructor(void*, void*, int);
-static void lxpr_node_destructor(void*, void*);
+static int lxpr_node_constructor(void *, void *, int);
+static void lxpr_node_destructor(void *, void *);
 
 static kmem_cache_t *lxpr_node_cache;
 
@@ -54,18 +53,19 @@ struct lxpr_uiobuf {
 	int error;
 };
 
-#define	BUFSIZE 4000
+int lx_pr_bufsize = 4000;
 
 struct lxpr_uiobuf *
 lxpr_uiobuf_new(uio_t *uiop)
 {
 	/* Allocate memory for both lxpr_uiobuf and output buffer */
+	int bufsize = lx_pr_bufsize;
 	struct lxpr_uiobuf *uiobuf =
-	    kmem_alloc(sizeof (struct lxpr_uiobuf) + BUFSIZE, KM_SLEEP);
+	    kmem_alloc(sizeof (struct lxpr_uiobuf) + bufsize, KM_SLEEP);
 
 	uiobuf->uiop = uiop;
 	uiobuf->buffer = (char *)&uiobuf[1];
-	uiobuf->buffsize = BUFSIZE;
+	uiobuf->buffsize = bufsize;
 	uiobuf->pos = uiobuf->buffer;
 	uiobuf->beg = 0;
 	uiobuf->error = 0;
@@ -85,7 +85,7 @@ lxpr_uiobuf_free(struct lxpr_uiobuf *uiobuf)
 void
 lxpr_uiobuf_seek(struct lxpr_uiobuf *uiobuf, offset_t offset)
 {
-	uiobuf->uiop->uio_offset = offset;
+	uiobuf->uiop->uio_offset = (off_t)offset;
 }
 
 void
@@ -102,15 +102,14 @@ lxpr_uiobuf_flush(struct lxpr_uiobuf *uiobuf)
 	off_t off = uiobuf->uiop->uio_offset;
 	caddr_t uaddr = uiobuf->buffer;
 	size_t beg = uiobuf->beg;
-
-	size_t size = uiobuf->pos - uaddr;
+	size_t size = (uintptr_t)uiobuf->pos - (uintptr_t)uaddr;
 
 	if (uiobuf->error == 0 && uiobuf->uiop->uio_resid != 0) {
 		ASSERT(off >= beg);
 
-		if (beg+size > off && off >= 0)
+		if (beg + size > off && off >= 0)
 			uiobuf->error =
-			    uiomove(uaddr+(off-beg), size-(off-beg),
+			    uiomove(uaddr + (off - beg), size - (off - beg),
 			    UIO_READ, uiobuf->uiop);
 
 		uiobuf->beg += size;
@@ -126,8 +125,8 @@ lxpr_uiobuf_write(struct lxpr_uiobuf *uiobuf, const char *buf, size_t size)
 {
 	/* While we can still carry on */
 	while (uiobuf->error == 0 && uiobuf->uiop->uio_resid != 0) {
-		uint_t remain
-		    = uiobuf->buffsize-(uiobuf->pos-uiobuf->buffer);
+		uintptr_t remain = (uintptr_t)uiobuf->buffsize -
+		    ((uintptr_t)uiobuf->pos - (uintptr_t)uiobuf->buffer);
 
 		/* Enough space in buffer? */
 		if (remain >= size) {
@@ -146,6 +145,7 @@ lxpr_uiobuf_write(struct lxpr_uiobuf *uiobuf, const char *buf, size_t size)
 }
 
 #define	TYPBUFFSIZE 256
+
 void
 lxpr_uiobuf_printf(struct lxpr_uiobuf *uiobuf, const char *fmt, ...)
 {
@@ -169,7 +169,7 @@ lxpr_uiobuf_printf(struct lxpr_uiobuf *uiobuf, const char *fmt, ...)
 	}
 
 	/* Not enough space in pre-allocated buffer */
-	buffer = kmem_alloc(len+1, KM_SLEEP);
+	buffer = kmem_alloc(len + 1, KM_SLEEP);
 
 	/*
 	 * We know we allocated the correct amount of space
@@ -207,6 +207,7 @@ lxpr_lock(pid_t pid)
 			mutex_exit(&pidlock);
 			return (NULL);
 		}
+
 		/*
 		 * p_lock is persistent, but p itself is not -- it could
 		 * vanish during cv_wait().  Load p->p_lock now so we can
@@ -217,12 +218,21 @@ lxpr_lock(pid_t pid)
 
 		mutex_exit(&pidlock);
 
+		if (p->p_flag & SEXITING) {
+			/*
+			 * This process is exiting -- let it go.
+			 */
+			mutex_exit(mp);
+			return (NULL);
+		}
+
 		if (!(p->p_proc_flag & P_PR_LOCK))
 			break;
 
 		cv_wait(&pr_pid_cv[p->p_slot], mp);
 		mutex_exit(mp);
 	}
+
 	p->p_proc_flag |= P_PR_LOCK;
 	THREAD_KPRI_REQUEST();
 	return (p);
