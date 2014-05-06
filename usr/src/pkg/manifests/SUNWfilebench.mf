@@ -25,5 +25,6 @@
 
 set name=pkg.fmri value=pkg:/SUNWfilebench@0.5.11,5.11-0.133
 set name=pkg.renamed value=true
+set name=org.opensolaris.noincorp value=true
 set name=variant.arch value=$(ARCH)
 depend fmri=pkg:/benchmark/filebench@0.5.11,5.11-0.133 type=require
