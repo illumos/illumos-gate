@@ -21,7 +21,8 @@
 
 /*
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
+ * Copyright 2012 Garrett D'Amore <garrett@damore.org>
+ * Copyright 2014 Pluribus Networks, Inc.
  */
 
 /*
@@ -65,6 +66,7 @@
 #include <sys/mach_intr.h>
 #include <vm/hat_i86.h>
 #include <sys/x86_archext.h>
+#include <sys/avl.h>
 
 /*
  * DDI Boot Configuration
@@ -105,14 +107,20 @@ static int kmem_override_cache_attrs(caddr_t, size_t, uint_t);
 extern void immu_init(void);
 #endif
 
-#define	CTGENTRIES	15
+/*
+ * We use an AVL tree to store contiguous address allocations made with the
+ * kalloca() routine, so that we can return the size to free with kfreea().
+ * Note that in the future it would be vastly faster if we could eliminate
+ * this lookup by insisting that all callers keep track of their own sizes,
+ * just as for kmem_alloc().
+ */
+struct ctgas {
+	avl_node_t ctg_link;
+	void *ctg_addr;
+	size_t ctg_size;
+};
 
-static struct ctgas {
-	struct ctgas	*ctg_next;
-	int		ctg_index;
-	void		*ctg_addr[CTGENTRIES];
-	size_t		ctg_size[CTGENTRIES];
-} ctglist;
+static avl_tree_t ctgtree;
 
 static kmutex_t		ctgmutex;
 #define	CTGLOCK()	mutex_enter(&ctgmutex)
@@ -1198,6 +1206,15 @@ kmem_override_cache_attrs(caddr_t kva, size_t size, uint_t order)
 	return (0);
 }
 
+static int
+ctgcompare(const void *a1, const void *a2)
+{
+	/* we just want to compare virtual addresses */
+	a1 = ((struct ctgas *)a1)->ctg_addr;
+	a2 = ((struct ctgas *)a2)->ctg_addr;
+	return (a1 == a2 ? 0 : (a1 < a2 ? -1 : 1));
+}
+
 void
 ka_init(void)
 {
@@ -1237,6 +1254,10 @@ ka_init(void)
 		if (io_arena_params[a].io_initial || a == kmem_io_idx)
 			kmem_io_init(a);
 	}
+
+	/* initialize ctgtree */
+	avl_create(&ctgtree, ctgcompare, sizeof (struct ctgas),
+	    offsetof(struct ctgas, ctg_link));
 }
 
 /*
@@ -1245,24 +1266,14 @@ ka_init(void)
 static void *
 putctgas(void *addr, size_t size)
 {
-	struct ctgas	*ctgp = &ctglist;
-	int		i;
-
-	CTGLOCK();
-	do {
-		if ((i = ctgp->ctg_index) < CTGENTRIES) {
-			ctgp->ctg_addr[i] = addr;
-			ctgp->ctg_size[i] = size;
-			ctgp->ctg_index++;
-			break;
-		}
-		if (!ctgp->ctg_next)
-			ctgp->ctg_next = kmem_zalloc(sizeof (struct ctgas),
-			    KM_NOSLEEP);
-		ctgp = ctgp->ctg_next;
-	} while (ctgp);
-
-	CTGUNLOCK();
+	struct ctgas    *ctgp;
+	if ((ctgp = kmem_zalloc(sizeof (*ctgp), KM_NOSLEEP)) != NULL) {
+		ctgp->ctg_addr = addr;
+		ctgp->ctg_size = size;
+		CTGLOCK();
+		avl_add(&ctgtree, ctgp);
+		CTGUNLOCK();
+	}
 	return (ctgp);
 }
 
@@ -1272,32 +1283,23 @@ putctgas(void *addr, size_t size)
 static size_t
 getctgsz(void *addr)
 {
-	struct ctgas	*ctgp = &ctglist;
-	int		i, j;
-	size_t		sz;
+	struct ctgas    *ctgp;
+	struct ctgas    find;
+	size_t		sz = 0;
 
-	ASSERT(addr);
+	find.ctg_addr = addr;
 	CTGLOCK();
+	if ((ctgp = avl_find(&ctgtree, &find, NULL)) != NULL) {
+		avl_remove(&ctgtree, ctgp);
+	}
+	CTGUNLOCK();
 
-	while (ctgp) {
-		for (i = 0; i < ctgp->ctg_index; i++) {
-			if (addr != ctgp->ctg_addr[i])
-				continue;
-
-			sz = ctgp->ctg_size[i];
-			j = --ctgp->ctg_index;
-			if (i != j) {
-				ctgp->ctg_size[i] = ctgp->ctg_size[j];
-				ctgp->ctg_addr[i] = ctgp->ctg_addr[j];
-			}
-			CTGUNLOCK();
-			return (sz);
-		}
-		ctgp = ctgp->ctg_next;
+	if (ctgp != NULL) {
+		sz = ctgp->ctg_size;
+		kmem_free(ctgp, sizeof (*ctgp));
 	}
 
-	CTGUNLOCK();
-	return (0);
+	return (sz);
 }
 
 /*
