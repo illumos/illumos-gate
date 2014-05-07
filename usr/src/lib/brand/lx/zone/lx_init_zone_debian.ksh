@@ -165,6 +165,7 @@ unsupported_services="
 	hwclockfirst.sh
 	mountdevsubfs.sh
 	mountkernfs.sh
+	mtab.sh
 	networking
 	umountfs
 "
@@ -192,5 +193,26 @@ for file in $unsupported_services; do
 		done
 	fi
 done
+
+#
+# udev isn't usable within the zone
+#
+if [[ -e "sbin/udevd" ]]; then
+    if mv -f "sbin/udevd" "sbin/udevd.$tag"; then
+        log "    + Moved \"sbin/udevd\" to \"sbin/udevd.$tag\""
+    fi
+fi
+
+#
+# Fix mountall
+#
+tmpfile=etc/init.d/mountall.$$
+sed 's/mount_run/# disabled for lx brand: &/
+     s/mount_shm/# disabled for lx brand: &/
+     s/mount_tmp/# disabled for lx brand: &/
+     s/pidof \/sbin\/init/false/
+    ' etc/init.d/mountall.sh > $tmpfile
+mv -f $tmpfile etc/init.d/mountall.sh
+chmod +x etc/init.d/mountall.sh
 
 # Hand control back to lx_init_zone
