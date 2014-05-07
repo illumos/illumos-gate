@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -749,7 +750,7 @@ hubd_can_suspend(hubd_t *hubd)
 	 * Don't go to lower power if haven't been at full power for enough
 	 * time to let hotplug thread kickoff.
 	 */
-	if (ddi_get_time() < (hubpm->hubp_time_at_full_power +
+	if (gethrtime() < (hubpm->hubp_time_at_full_power +
 	    hubpm->hubp_min_pm_threshold)) {
 
 		return (USB_FAILURE);
@@ -1720,7 +1721,7 @@ hubd_pwrlvl3(hubd_t *hubd)
 		ASSERT(rval == USB_SUCCESS);
 		hubd->h_dev_state = USB_DEV_ONLINE;
 		hubpm->hubp_current_power = USB_DEV_OS_FULL_PWR;
-		hubpm->hubp_time_at_full_power = ddi_get_time();
+		hubpm->hubp_time_at_full_power = gethrtime();
 		hubd_start_polling(hubd, 0);
 
 		/* FALLTHRU */
@@ -3712,7 +3713,7 @@ hubd_hotplug_thread(void *arg)
 
 			/* mark the root hub as full power */
 			hubpm->hubp_current_power = USB_DEV_OS_FULL_PWR;
-			hubpm->hubp_time_at_full_power = ddi_get_time();
+			hubpm->hubp_time_at_full_power = gethrtime();
 			mutex_exit(HUBD_MUTEX(hubd));
 
 			USB_DPRINTF_L4(DPRINT_MASK_HOTPLUG, hubd->h_log_handle,
@@ -7273,8 +7274,8 @@ hubd_create_pm_components(dev_info_t *dip, hubd_t *hubd)
 	hubpm->hubp_hubd = hubd;
 	hubpm->hubp_pm_capabilities = 0;
 	hubpm->hubp_current_power = USB_DEV_OS_FULL_PWR;
-	hubpm->hubp_time_at_full_power = ddi_get_time();
-	hubpm->hubp_min_pm_threshold = hubdi_min_pm_threshold;
+	hubpm->hubp_time_at_full_power = gethrtime();
+	hubpm->hubp_min_pm_threshold = hubdi_min_pm_threshold * NANOSEC;
 
 	/* alloc memory to save power states of children */
 	hubpm->hubp_child_pwrstate = (uint8_t *)
@@ -8709,7 +8710,7 @@ hubd_reset_thread(void *arg)
 
 		/* mark the root hub as full power */
 		hubpm->hubp_current_power = USB_DEV_OS_FULL_PWR;
-		hubpm->hubp_time_at_full_power = ddi_get_time();
+		hubpm->hubp_time_at_full_power = gethrtime();
 		mutex_exit(HUBD_MUTEX(hubd));
 
 		USB_DPRINTF_L3(DPRINT_MASK_HOTPLUG, hubd->h_log_handle,
