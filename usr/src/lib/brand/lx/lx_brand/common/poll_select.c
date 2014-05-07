@@ -24,7 +24,9 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 2014, Joyent, Inc. All rights reserved.
+ */
 
 #include <assert.h>
 #include <unistd.h>
@@ -61,8 +63,7 @@ lx_select(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 	int r;
 	hrtime_t start = NULL, end;
 
-	lx_debug("\tselect(%d, 0x%p, x%p, 0x%p. 0x%p, 0x%p)",
-	    nfds, rfdsp, wfdsp, efdsp, tvp);
+	lx_debug("\tselect(%d, 0x%p, 0x%p, 0x%p, 0x%p)", p1, p2, p3, p4, p5);
 
 	if (nfds > 0) {
 		if (p2 != NULL) {

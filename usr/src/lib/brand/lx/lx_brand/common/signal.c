@@ -24,7 +24,9 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 2014, Joyent, Inc. All rights reserved.
+ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -48,6 +50,9 @@
 #include <stdio.h>
 #include <libintl.h>
 #include <ieeefp.h>
+
+extern int pselect_large_fdset(int nfds, fd_set *in0, fd_set *out0, fd_set *ex0,
+	const timespec_t *tsp, const sigset_t *sp);
 
 /*
  * Delivering signals to a Linux process is complicated by differences in
@@ -1711,4 +1716,105 @@ lx_siginit(void)
 
 	lx_debug("interposition handler setup for SIGPWR");
 	return (0);
+}
+
+/*
+ * This code stongly resemebles lx_select(), but is here to be able to take
+ * advantage of the Linux signal helper routines.
+ */
+int
+lx_pselect6(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
+	uintptr_t p5, uintptr_t p6)
+{
+	int nfds = (int)p1;
+	fd_set *rfdsp = NULL;
+	fd_set *wfdsp = NULL;
+	fd_set *efdsp = NULL;
+	timespec_t ts, *tsp = NULL;
+	int fd_set_len = howmany(nfds, 8);
+	int r;
+	sigset_t sigset, *sp = NULL;
+
+	lx_debug("\tpselect6(%d, 0x%p, 0x%p, 0x%p, 0x%p, 0x%p)",
+	    p1, p2, p3, p4, p4, p6);
+
+	if (nfds > 0) {
+		if (p2 != NULL) {
+			rfdsp = SAFE_ALLOCA(fd_set_len);
+			if (rfdsp == NULL)
+				return (-ENOMEM);
+			if (uucopy((void *)p2, rfdsp, fd_set_len) != 0)
+				return (-errno);
+		}
+		if (p3 != NULL) {
+			wfdsp = SAFE_ALLOCA(fd_set_len);
+			if (wfdsp == NULL)
+				return (-ENOMEM);
+			if (uucopy((void *)p3, wfdsp, fd_set_len) != 0)
+				return (-errno);
+		}
+		if (p4 != NULL) {
+			efdsp = SAFE_ALLOCA(fd_set_len);
+			if (efdsp == NULL)
+				return (-ENOMEM);
+			if (uucopy((void *)p4, efdsp, fd_set_len) != 0)
+				return (-errno);
+		}
+	}
+
+	if (p5 != NULL) {
+		if (uucopy((void *)p5, &ts, sizeof (ts)) != 0)
+			return (-errno);
+
+		tsp = &ts;
+	}
+
+	if (p6 != NULL) {
+		/*
+		 * To force the number of arguments to be no more than six,
+		 * Linux bundles both the sigset and the size into a structure
+		 * that becomes the sixth argument.
+		 */
+		struct {
+			lx_sigset_t *addr;
+			size_t size;
+		} lx_sigset;
+
+		if (uucopy((void *)p6, &lx_sigset, sizeof (lx_sigset)) != 0)
+			return (-errno);
+
+		/*
+		 * Yes, that's right:  Linux forces a size to be passed only
+		 * so it can check that it's the size of a sigset_t.
+		 */
+		if (lx_sigset.size != sizeof (lx_sigset_t))
+			return (-EINVAL);
+
+		if ((r = ltos_sigset(lx_sigset.addr, &sigset)) != 0)
+			return (r);
+
+		sp = &sigset;
+	}
+
+	if (nfds >= FD_SETSIZE)
+		r = pselect_large_fdset(nfds, rfdsp, wfdsp, efdsp, tsp, sp);
+	else
+		r = pselect(nfds, rfdsp, wfdsp, efdsp, tsp, sp);
+
+	if (r < 0)
+		return (-errno);
+
+	/*
+	 * For pselect6(), we don't honor the strange Linux select() semantics
+	 * with respect to the timestruc parameter because glibc ignores it
+	 * anyway -- just copy out the fd pointers and return.
+	 */
+	if ((rfdsp != NULL) && (uucopy(rfdsp, (void *)p2, fd_set_len) != 0))
+		return (-errno);
+	if ((wfdsp != NULL) && (uucopy(wfdsp, (void *)p3, fd_set_len) != 0))
+		return (-errno);
+	if ((efdsp != NULL) && (uucopy(efdsp, (void *)p4, fd_set_len) != 0))
+		return (-errno);
+
+	return (r);
 }

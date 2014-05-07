@@ -22,7 +22,10 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2014 Joyent, Inc.  All rights reserved.
+ */
+
+/*
+ * Copyright (c) 2014, Joyent, Inc. All rights reserved.
  */
 
 #ifndef _SYS_LX_SYSCALL_H
@@ -80,6 +83,8 @@ extern int lx_pwrite64(uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t);
 
 extern int lx_socketcall(uintptr_t, uintptr_t);
 extern int lx_select(uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t);
+extern int lx_pselect6(uintptr_t, uintptr_t, uintptr_t, uintptr_t,
+    uintptr_t, uintptr_t);
 extern int lx_poll(uintptr_t, uintptr_t, uintptr_t);
 extern int lx_oldgetrlimit(uintptr_t, uintptr_t);
 extern int lx_getrlimit(uintptr_t, uintptr_t);
