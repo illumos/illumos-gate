@@ -22,7 +22,10 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2014 Joyent, Inc.  All rights reserved.
+ */
+
+/*
+ * Copyright (c) 2014, Joyent, Inc. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -1224,7 +1227,7 @@ static struct lx_sysent sysents[] = {
 	{"readlinkat",	lx_readlinkat,	0,		4},	/* 305 */
 	{"fchmodat",	lx_fchmodat,	0,		4},	/* 306 */
 	{"faccessat",	lx_faccessat,	0,		4},	/* 307 */
-	{"pselect6",	NULL,		NOSYS_NULL,	0},	/* 308 */
+	{"pselect6",	lx_pselect6,	EBP_HAS_ARG6,	6},	/* 308 */
 	{"ppoll",	NULL,		NOSYS_NULL,	0},	/* 309 */
 	{"unshare",	NULL,		NOSYS_NULL,	0},	/* 310 */
 	{"set_robust_list", NULL,	NOSYS_NULL,	0},	/* 311 */
