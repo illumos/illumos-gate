@@ -25,7 +25,7 @@
 /*
  * Copyright (c) 2011 Bayard G. Bell.  All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
  */
 /*
@@ -6541,9 +6541,8 @@ sd_pm_state_change(struct sd_lun *un, int level, int flag)
 static void
 sd_pm_idletimeout_handler(void *arg)
 {
+	const hrtime_t idletime = sd_pm_idletime * NANOSEC;
 	struct sd_lun *un = arg;
-
-	time_t	now;
 
 	mutex_enter(&sd_detach_mutex);
 	if (un->un_detach_count != 0) {
@@ -6553,14 +6552,13 @@ sd_pm_idletimeout_handler(void *arg)
 	}
 	mutex_exit(&sd_detach_mutex);
 
-	now = ddi_get_time();
 	/*
 	 * Grab both mutexes, in the proper order, since we're accessing
 	 * both PM and softstate variables.
 	 */
 	mutex_enter(SD_MUTEX(un));
 	mutex_enter(&un->un_pm_mutex);
-	if (((now - un->un_pm_idle_time) > sd_pm_idletime) &&
+	if (((gethrtime() - un->un_pm_idle_time) > idletime) &&
 	    (un->un_ncmds_in_driver == 0) && (un->un_pm_count == 0)) {
 		/*
 		 * Update the chain types.
@@ -12461,7 +12459,7 @@ sd_buf_iodone(int index, struct sd_lun *un, struct buf *bp)
 		 * This is for lowering the overhead, and therefore improving
 		 * performance per I/O operation.
 		 */
-		un->un_pm_idle_time = ddi_get_time();
+		un->un_pm_idle_time = gethrtime();
 
 		un->un_ncmds_in_driver--;
 		ASSERT(un->un_ncmds_in_driver >= 0);
@@ -12511,7 +12509,7 @@ sd_uscsi_iodone(int index, struct sd_lun *un, struct buf *bp)
 	 * This is for lowering the overhead, and therefore improving
 	 * performance per I/O operation.
 	 */
-	un->un_pm_idle_time = ddi_get_time();
+	un->un_pm_idle_time = gethrtime();
 
 	un->un_ncmds_in_driver--;
 	ASSERT(un->un_ncmds_in_driver >= 0);

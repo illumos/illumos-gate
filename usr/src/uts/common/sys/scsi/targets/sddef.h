@@ -23,6 +23,7 @@
  */
 /*
  * Copyright 2011 cyril.galibern@opensvc.com
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef	_SYS_SCSI_TARGETS_SDDEF_H
@@ -516,7 +517,7 @@ struct sd_lun {
 
 	timeout_id_t	un_retry_timeid;
 
-	time_t		un_pm_idle_time;
+	hrtime_t	un_pm_idle_time;
 	timeout_id_t	un_pm_idle_timeid;
 
 	/*
