@@ -22,6 +22,9 @@
 /*
  * Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
  */
+/*
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ */
 
 #ifndef	_SYS_SCSI_ADAPTERS_SCSI_VHCI_H
 #define	_SYS_SCSI_ADAPTERS_SCSI_VHCI_H
@@ -65,7 +68,7 @@ extern "C" {
 #define	TRAN2HBAPRIVATE(tran)	((struct scsi_vhci *)(tran)->tran_hba_private)
 #define	VHCI_INIT_WAIT_TIMEOUT	60000000
 #define	VHCI_FOWATCH_INTERVAL	1000000		/* in usecs */
-#define	VHCI_EXTFO_TIMEOUT	3*60		/* 3 minutes */
+#define	VHCI_EXTFO_TIMEOUT	(3 * 60 * NANOSEC)	/* 3 minutes in nsec */
 
 #define	SCBP_C(pkt)	((*(pkt)->pkt_scbp) & STATUS_MASK)
 
@@ -316,7 +319,7 @@ typedef struct scsi_vhci_lun {
 	 * is still comng up
 	 */
 	int			svl_waiting_for_activepath;
-	time_t			svl_wfa_time;
+	hrtime_t		svl_wfa_time;
 
 	/*
 	 * to keep the failover status in order to return the
@@ -462,7 +465,7 @@ typedef struct scsi_vhci_priv {
  */
 typedef struct scsi_vhci_swarg {
 	scsi_vhci_priv_t	*svs_svp;
-	time_t			svs_tos;	/* time of submission */
+	hrtime_t		svs_tos;	/* time of submission */
 	mdi_pathinfo_t		*svs_pi;	/* pathinfo being "watched" */
 	int			svs_release_lun;
 	int			svs_done;
