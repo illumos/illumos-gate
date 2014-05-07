@@ -885,7 +885,7 @@ lxpr_read_pid_mountinfo(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	int root_id = 15;	/* use a made-up value */
 	int mnt_id;
 
-	ASSERT(lxpnp->lxpr_type == LXPR_PID_MMOUNTINFO);
+	ASSERT(lxpnp->lxpr_type == LXPR_PID_MOUNTINFO);
 
 	vfs_list_read_lock();
 
