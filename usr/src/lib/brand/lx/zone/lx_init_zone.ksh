@@ -271,7 +271,7 @@ log "Modifying \"$install_root/etc/fstab\"..."
 mv -f etc/fstab etc/fstab.$tag 2>/dev/null
 
 cat > etc/fstab <<- EOF
-	none		/			ufs	defaults	1 1
+	none		/			zfs	defaults	1 1
 	proc		/proc			proc	defaults	0 0
 EOF
 

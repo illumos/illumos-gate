@@ -73,6 +73,7 @@
 	<device match="brand/lx/mixer" name="mixer" />
 
 	<!-- Symlinks to create under /dev -->
+	<symlink source="shm" target="/run/shm" />
 	<symlink source="fd" target="../proc/self/fd" />
 	<symlink source="log" target="/var/run/syslog" />
 	<symlink source="stderr" target="../proc/self/fd/2" />
