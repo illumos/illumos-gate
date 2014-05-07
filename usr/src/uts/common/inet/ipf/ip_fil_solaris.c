@@ -1292,44 +1292,6 @@ int dst;
 #include <stdio.h>
 #endif
 
-#define	NULLADDR_RATE_LIMIT 10	/* 10 seconds */
-
-
-/*
- * Print out warning message at rate-limited speed.
- */
-static void rate_limit_message(ipf_stack_t *ifs,
-			       int rate, const char *message, ...)
-{
-	static time_t last_time = 0;
-	time_t now;
-	va_list args;
-	char msg_buf[256];
-	int  need_printed = 0;
-
-	now = ddi_get_time();
-
-	/* make sure, no multiple entries */
-	ASSERT(MUTEX_NOT_HELD(&(ifs->ifs_ipf_rw.ipf_lk)));
-	MUTEX_ENTER(&ifs->ifs_ipf_rw);
-	if (now - last_time >= rate) {
-		need_printed = 1;
-		last_time = now;
-	}
-	MUTEX_EXIT(&ifs->ifs_ipf_rw);
-
-	if (need_printed) {
-		va_start(args, message);
-		(void)vsnprintf(msg_buf, 255, message, args);
-		va_end(args);
-#ifdef _KERNEL
-		cmn_err(CE_WARN, msg_buf);
-#else
-		fprintf(std_err, msg_buf);
-#endif
-	}
-}
-
 /*
  * Return the first IP Address associated with an interface
  * For IPv6, we walk through the list of logical interfaces and return
