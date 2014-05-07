@@ -25,4 +25,5 @@
 
 set name=pkg.fmri value=pkg:/benchmark/filebench@$(PKGVERS)
 set name=pkg.obsolete value=true
+set name=org.opensolaris.noincorp value=true
 set name=variant.arch value=$(ARCH)

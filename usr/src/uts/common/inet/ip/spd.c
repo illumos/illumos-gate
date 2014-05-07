@@ -1073,8 +1073,7 @@ ipsec_rl_strlog(netstack_t *ns, short mid, short sid, char level, ushort_t sl,
 
 	if (ipst->ips_ipsec_policy_log_interval) {
 		if (ipss->ipsec_policy_failure_last +
-		    ((hrtime_t)ipst->ips_ipsec_policy_log_interval *
-		    (hrtime_t)1000000) <= current) {
+		    MSEC2NSEC(ipst->ips_ipsec_policy_log_interval) <= current) {
 			va_start(adx, fmt);
 			(void) vstrlog(mid, sid, level, sl, fmt, adx);
 			va_end(adx);

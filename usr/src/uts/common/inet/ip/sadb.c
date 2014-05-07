@@ -4219,13 +4219,13 @@ sadb_retimeout(hrtime_t begin, queue_t *pfkey_q, void (*ager)(void *),
     void *agerarg, uint_t *intp, uint_t intmax, short mid)
 {
 	hrtime_t end = gethrtime();
-	uint_t interval = *intp;
+	uint_t interval = *intp;	/* "interval" is in ms. */
 
 	/*
 	 * See how long this took.  If it took too long, increase the
 	 * aging interval.
 	 */
-	if ((end - begin) > (hrtime_t)interval * (hrtime_t)1000000) {
+	if ((end - begin) > MSEC2NSEC(interval)) {
 		if (interval >= intmax) {
 			/* XXX Rate limit this?  Or recommend flush? */
 			(void) strlog(mid, 0, 0, SL_ERROR | SL_WARN,
@@ -4236,7 +4236,7 @@ sadb_retimeout(hrtime_t begin, queue_t *pfkey_q, void (*ager)(void *),
 			interval <<= 1;
 			interval = min(interval, intmax);
 		}
-	} else if ((end - begin) <= (hrtime_t)interval * (hrtime_t)500000 &&
+	} else if ((end - begin) <= (MSEC2NSEC(interval) / 2) &&
 	    interval > SADB_AGE_INTERVAL_DEFAULT) {
 		/*
 		 * If I took less than half of the interval, then I should
@@ -4255,7 +4255,7 @@ sadb_retimeout(hrtime_t begin, queue_t *pfkey_q, void (*ager)(void *),
 	}
 	*intp = interval;
 	return (qtimeout(pfkey_q, ager, agerarg,
-	    drv_usectohz(interval * 1000)));
+	    drv_usectohz(interval * (MICROSEC / MILLISEC))));
 }
 
 
