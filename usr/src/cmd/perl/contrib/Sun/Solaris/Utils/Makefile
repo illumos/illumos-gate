@@ -10,11 +10,14 @@
 #
 #
 # Copyright (c) 2014 Racktop Systems.
+# Copyright 2014, OmniTI Computer Consulting, Inc. All rights reserved.
 #
 
 MODULE = Utils
 
 include $(SRC)/cmd/perl/Makefile.perl
+
+LDLIBS += -lgen -lintl
 
 MAPFILES = mapfile-vers
 
