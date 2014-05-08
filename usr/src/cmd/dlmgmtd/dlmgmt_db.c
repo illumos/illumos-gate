@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2011, Joyent Inc. All rights reserved.
+ * Copyright 2014, Joyent Inc. All rights reserved.
  */
 
 #include <assert.h>
@@ -1415,7 +1415,7 @@ zone_file_exists(char *zoneroot, char *filename)
 	struct stat	sb;
 	char		fname[MAXPATHLEN];
 
-        (void) snprintf(fname, sizeof (fname), "%s/%s", zoneroot, filename);
+	(void) snprintf(fname, sizeof (fname), "%s/%s", zoneroot, filename);
 
 	if (stat(fname, &sb) == -1)
 		return (B_FALSE);
@@ -1439,6 +1439,14 @@ dlmgmt_db_init(zoneid_t zoneid, char *zoneroot)
 	if ((req = dlmgmt_db_req_alloc(DLMGMT_DB_OP_READ, NULL,
 	    DATALINK_INVALID_LINKID, zoneid, DLMGMT_ACTIVE, &err)) == NULL)
 		return (err);
+
+	/* Handle running in a non-native branded zone (i.e. has /native) */
+	if (zone_file_exists(zoneroot, "/native" DLMGMT_TMPFS_DIR)) {
+		char tdir[MAXPATHLEN];
+
+		(void) snprintf(tdir, sizeof (tdir), "/native%s", cachefile);
+		(void) strlcpy(cachefile, tdir, sizeof (cachefile));
+	}
 
 	if (zone_file_exists(zoneroot, cachefile)) {
 		if ((err = dlmgmt_process_db_req(req)) != 0) {
@@ -1512,7 +1520,7 @@ dlmgmt_db_fini(zoneid_t zoneid)
 			 */
 			if (onloan)
 				(void) dlmgmt_delete_db_entry(linkp,
-				     DLMGMT_ACTIVE);
+				    DLMGMT_ACTIVE);
 
 			(void) dlmgmt_destroy_common(linkp,
 			    DLMGMT_ACTIVE | DLMGMT_PERSIST);

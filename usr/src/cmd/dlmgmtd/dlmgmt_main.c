@@ -22,7 +22,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2012 Joyent, Inc.  All rights reserved.
+ * Copyright 2014 Joyent, Inc.  All rights reserved.
  */
 
 /*
@@ -132,9 +132,18 @@ dlmgmt_door_attach(zoneid_t zoneid, char *rootdir)
 	int	fd;
 	int	err = 0;
 	char	doorpath[MAXPATHLEN];
+	struct stat statbuf;
 
-	(void) snprintf(doorpath, sizeof (doorpath), "%s%s", rootdir,
-	    DLMGMT_DOOR);
+	/* Handle running in a non-native branded zone (i.e. has /native) */
+	(void) snprintf(doorpath, sizeof (doorpath), "%s/native%s",
+	    rootdir, DLMGMT_TMPFS_DIR);
+	if (stat(doorpath, &statbuf) == 0) {
+		(void) snprintf(doorpath, sizeof (doorpath), "%s/native%s",
+		    rootdir, DLMGMT_DOOR);
+	} else {
+		(void) snprintf(doorpath, sizeof (doorpath), "%s%s",
+		    rootdir, DLMGMT_DOOR);
+	}
 
 	/*
 	 * Create the door file for dlmgmtd.
@@ -193,8 +202,16 @@ dlmgmt_zone_init(zoneid_t zoneid)
 	(void) snprintf(tmpfsdir, sizeof (tmpfsdir), "%s%s", rootdir,
 	    DLMGMT_TMPFS_DIR);
 	if (stat(tmpfsdir, &statbuf) < 0) {
-		if (mkdir(tmpfsdir, (mode_t)0755) < 0)
-			return (errno);
+		if (mkdir(tmpfsdir, (mode_t)0755) < 0) {
+			/*
+			 * Handle running in a non-native branded zone
+			 * (i.e. has /native)
+			 */
+			(void) snprintf(tmpfsdir, sizeof (tmpfsdir),
+			    "%s/native%s", rootdir, DLMGMT_TMPFS_DIR);
+			if (mkdir(tmpfsdir, (mode_t)0755) < 0)
+				return (errno);
+		}
 	} else if ((statbuf.st_mode & S_IFMT) != S_IFDIR) {
 		return (ENOTDIR);
 	}
