@@ -10,18 +10,31 @@
 #
 
 #
-# Copyright (c) 2012 by Delphix. All rights reserved.
-# Copyright 2014 Garrett D'Amore <garrett@damore.org>
+# Copyright (c) 2014 Joyent, Inc. All rights reserved.
 #
 
-[DEFAULT]
-pre =
-verbose = False
-quiet = False
-timeout = 60
-post =
-outputdir = /var/tmp/test_results
+include $(SRC)/cmd/Makefile.cmd
+include $(SRC)/test/Makefile.com
 
-[/opt/util-tests/tests/printf_test]
-[/opt/util-tests/tests/allowed-ips]
+ROOTOPTPKG = $(ROOT)/opt/util-tests/tests
+PROG = allowed-ips
 
+ROOTPROG = $(PROG:%=$(ROOTOPTPKG)/%)
+
+all: 
+
+install: $(ROOTPROG)
+
+lint:
+
+clobber: clean
+
+clean:
+
+$(CMDS): $(TESTDIR)
+
+$(ROOTOPTPKG):
+	$(INS.dir)
+
+$(ROOTOPTPKG)/%: %.ksh $(ROOTOPTPKG)
+	$(INS.rename)

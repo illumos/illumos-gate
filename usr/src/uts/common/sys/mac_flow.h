@@ -158,7 +158,7 @@ typedef enum {
 typedef struct mac_ipaddr_s {
 	uint32_t	ip_version;
 	in6_addr_t	ip_addr;
-	uint32_t	ip_v4netmask;
+	uint8_t		ip_netmask;
 } mac_ipaddr_t;
 
 typedef enum {

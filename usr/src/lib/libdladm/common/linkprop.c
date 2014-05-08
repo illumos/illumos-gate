@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2014, Joyent, Inc. All rights reserved.
  */
 
 #include <stdlib.h>
@@ -2348,33 +2348,6 @@ get_protection(dladm_handle_t handle, prop_desc_t *pdp,
 	return (DLADM_STATUS_OK);
 }
 
-static uint32_t
-nbits_to_mask(int nbits)
-{
-	int i;
-	uint_t mask = 0;
-
-	for (i = 0; i < nbits; i++) {
-		mask >>= 1;
-		mask |= 0x80000000;
-	}
-
-	return (mask);
-}
-
-static uint32_t
-mask_to_nbits(uint32_t mask)
-{
-	uint_t nbits = 0;
-
-	while (mask != 0) {
-		nbits++;
-		mask <<= 1;
-	}
-
-	return (nbits);
-}
-
 /* ARGSUSED */
 static dladm_status_t
 get_allowedips(dladm_handle_t handle, prop_desc_t *pdp,
@@ -2402,20 +2375,19 @@ get_allowedips(dladm_handle_t handle, prop_desc_t *pdp,
 	for (i = 0; i < p->mp_ipaddrcnt; i++) {
 		if (p->mp_ipaddrs[i].ip_version == IPV4_VERSION) {
 			ipaddr_t	v4addr;
-			uint32_t	mask;
 
 			v4addr = V4_PART_OF_V6(p->mp_ipaddrs[i].ip_addr);
-			mask = p->mp_ipaddrs[i].ip_v4netmask;
 			(void) dladm_ipv4addr2str(&v4addr, prop_val[i]);
-			if (mask != 0) {
-				int len = strlen(prop_val[i]);
-				(void) sprintf(prop_val[i] + len, "/%d",
-				    mask_to_nbits(mask));
-			}
 		} else {
 			(void) dladm_ipv6addr2str(&p->mp_ipaddrs[i].ip_addr,
 			    prop_val[i]);
 		}
+		if (p->mp_ipaddrs[i].ip_netmask != 0) {
+			int len = strlen(prop_val[i]);
+			(void) sprintf(prop_val[i] + len, "/%d",
+			    p->mp_ipaddrs[i].ip_netmask);
+		}
+
 	}
 	*val_cnt = p->mp_ipaddrcnt;
 	return (DLADM_STATUS_OK);
@@ -2464,7 +2436,7 @@ check_single_ip(char *buf, mac_ipaddr_t *addr)
 	in6_addr_t	v6addr;
 	boolean_t	isv4 = B_TRUE;
 	char		*p;
-	uint32_t	mask;
+	uint32_t	mask = 0;
 
 	/*
 	 * If the IP address is in CIDR format, parse the bits component
@@ -2473,17 +2445,15 @@ check_single_ip(char *buf, mac_ipaddr_t *addr)
 	 */
 	if ((p = strchr(buf, '/')) != NULL) {
 		char *end = NULL;
-		long msk;
 
 		*p++ = '\0';
 		if (!isdigit(*p))
 			return (DLADM_STATUS_INVALID_IP);
-		msk = strtol(p, &end, 10);
+		mask = strtol(p, &end, 10);
 		if (end != NULL && *end != '\0')
 			return (DLADM_STATUS_INVALID_IP);
-		if (msk > 32 || msk < 1)
+		if (mask > 128|| mask < 1)
 			return (DLADM_STATUS_INVALID_IP);
-		mask = nbits_to_mask((int)msk);
 	}
 
 	status = dladm_str2ipv4addr(buf, &v4addr);
@@ -2502,23 +2472,52 @@ check_single_ip(char *buf, mac_ipaddr_t *addr)
 		IN6_IPADDR_TO_V4MAPPED(v4addr, &addr->ip_addr);
 		addr->ip_version = IPV4_VERSION;
 		if (p != NULL) {
+			uint32_t smask;
+
+			/*
+			 * Validate the netmask is in the proper range for v4
+			 */
+			if (mask > 32 || mask < 1)
+				return (DLADM_STATUS_INVALID_IP);
+
 			/*
 			 * We have a CIDR style address, confirm that only the
 			 * network number is set.
 			 */
-			if (htonl(v4addr) & ~mask)
+			smask = 0xFFFFFFFFu << (32 - mask);
+			if (htonl(v4addr) & ~smask)
 				return (DLADM_STATUS_INVALID_IP);
-			addr->ip_v4netmask = mask;
 		}
+		addr->ip_netmask = mask;
 	} else {
 		if (IN6_IS_ADDR_UNSPECIFIED(&v6addr))
 			return (DLADM_STATUS_INVALID_IP);
 
-		if (p != NULL)
+		if (IN6_IS_ADDR_V4MAPPED_ANY(&v6addr))
 			return (DLADM_STATUS_INVALID_IP);
+
+		if (p != NULL) {
+			int i, off, high;
+
+			/*
+			 * Note that the address in our buffer is stored in
+			 * network byte order.
+			 */
+			off = 0;
+			for (i = 3; i >= 0; i--) {
+				high = ffsl(ntohl(v6addr._S6_un._S6_u32[i]));
+				if (high != 0)
+					break;
+				off += 32;
+			}
+			off += high;
+			if (128 - off >= mask)
+				return (DLADM_STATUS_INVALID_IP);
+		}
 
 		addr->ip_addr = v6addr;
 		addr->ip_version = IPV6_VERSION;
+		addr->ip_netmask = mask;
 	}
 	return (DLADM_STATUS_OK);
 }

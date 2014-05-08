@@ -14,6 +14,6 @@
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 #
 
-SUBDIRS = printf
+SUBDIRS = dladm printf
 
 include $(SRC)/test/Makefile.com
