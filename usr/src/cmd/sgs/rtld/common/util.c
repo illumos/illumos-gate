@@ -24,6 +24,7 @@
  *	  All Rights Reserved
  *
  * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
  */
 
 /*
@@ -1424,6 +1425,7 @@ static	u_longlong_t		cmdisa = 0;	/* command line (-e) ISA */
 #define	ENV_FLG_CAP_FILES	0x0080000000000ULL
 #define	ENV_FLG_DEFERRED	0x0100000000000ULL
 #define	ENV_FLG_NOENVIRON	0x0200000000000ULL
+#define	ENV_FLG_TOXICPATH	0x0400000000000ULL
 
 #define	SEL_REPLACE		0x0001
 #define	SEL_PERMANT		0x0002
@@ -1597,8 +1599,7 @@ ld_generic_env(const char *s1, size_t len, const char *s2, Word *lmflags,
 		if ((len == MSG_LD_FLAGS_SIZE) && (strncmp(s1,
 		    MSG_ORIG(MSG_LD_FLAGS), MSG_LD_FLAGS_SIZE) == 0)) {
 			select |= SEL_ACT_SPEC_1;
-			str = (select & SEL_REPLACE) ? &rpl_ldflags :
-			    &prm_ldflags;
+			str = &rpl_ldflags;
 			variable = ENV_FLG_FLAGS;
 		}
 	}
@@ -1809,6 +1810,8 @@ ld_generic_env(const char *s1, size_t len, const char *s2, Word *lmflags,
 	 * In case an auditor is called, which in turn might exec(2) a
 	 * subprocess, this variable is disabled, so that any subprocess
 	 * escapes ldd(1) processing.
+	 *
+	 * Also, look for LD_TOXIC_PATH
 	 */
 	else if (*s1 == 'T') {
 		if (((len == MSG_LD_TRACE_OBJS_SIZE) &&
@@ -1846,7 +1849,13 @@ ld_generic_env(const char *s1, size_t len, const char *s2, Word *lmflags,
 			select |= SEL_ACT_LML;
 			val = LML_FLG_TRC_SEARCH;
 			variable = ENV_FLG_TRACE_PTHS;
+		} else if ((len == MSG_LD_TOXICPATH_SIZE) && (strncmp(s1,
+		    MSG_ORIG(MSG_LD_TOXICPATH), MSG_LD_TOXICPATH_SIZE) == 0)) {
+			select |= SEL_ACT_SPEC_1;
+			str = &rpl_ldtoxic;
+			variable = ENV_FLG_TOXICPATH;
 		}
+
 	}
 	/*
 	 * LD_UNREF and LD_UNUSED (internal, used by ldd(1)).
@@ -1970,7 +1979,8 @@ ld_generic_env(const char *s1, size_t len, const char *s2, Word *lmflags,
 			*lmtflags &= ~val;
 	} else if (select & SEL_ACT_SPEC_1) {
 		/*
-		 * variable is either ENV_FLG_FLAGS or ENV_FLG_LIBPATH
+		 * variable is either ENV_FLG_FLAGS, ENV_FLG_LIBPATH, or
+		 * ENV_FLG_TOXICPATH
 		 */
 		if (env_flags & ENV_TYP_NULL)
 			*str = NULL;

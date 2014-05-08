@@ -26,7 +26,7 @@
  * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
- * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
  */
 #ifndef	__RTLD_H
 #define	__RTLD_H
@@ -589,6 +589,8 @@ extern const char	*rpl_ldflags;	/* replaceable LD_FLAGS string */
 extern const char	*rpl_libpath;	/* replaceable LD_LIBRARY string */
 extern Alist		*rpl_libdirs;	/*	and its associated Pdesc list */
 extern const char	*rpl_preload;	/* replaceable LD_PRELOAD string */
+extern const char	*rpl_ldtoxic;	/* replaceable LD_TOXIC_PATH string */
+extern Alist		*rpl_toxdirs;	/*    and associated Pdesc list */
 
 extern const char	*prm_audit;	/* permanent LD_AUDIT string */
 extern const char	*prm_debug;	/* permanent LD_DEBUG string */

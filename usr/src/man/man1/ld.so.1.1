@@ -1,9 +1,10 @@
 '\"
 .\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved
+.\" Copyright (c) 2014, Joyent, Inc.  All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LD.SO.1 1 "Oct 5, 2012"
+.TH LD.SO.1 1 "May 8, 2014"
 .SH NAME
 ld.so.1 \- runtime linker for dynamic objects
 .SH SYNOPSIS
@@ -571,6 +572,24 @@ default, \fBSIGKILL\fR is used. For example, providing the alternative signal
 number \fB6\fR (\fBSIGABRT\fR), can provide for the creation of a core file to
 aid debugging. See also the \fBRTLD_DI_SETSIGNAL\fR request to
 \fBdlinfo\fR(3C).
+.RE
+
+.sp
+.ne 2
+.na
+.BR LD_TOXIC_PATH,
+.BR LD_TOXIC_PATH_32,
+.BR LD_TOXIC_PATH_64,
+.ad
+.sp .6
+.RS 4n
+The toxic path refers to a set of paths where by, if
+.B ld.so.1
+were to load a dependency on that path, rather than loading it, it
+should kill the process. This is useful when having built libraries that
+while matching the native architecture of the system, are not suitable
+to be used, for example, libraries that that correspond to an alternate
+release of an operating system.
 .RE
 
 .sp

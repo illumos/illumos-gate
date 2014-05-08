@@ -230,3 +230,9 @@ export SPRO_VROOT="$SPRO_ROOT"
 
 # Uncomment this to disable support for SMB printing.
 # export ENABLE_SMB_PRINTING='#'
+
+#
+# These checks ensure that if we accidentally run a program linked against the
+# proto area, that we then fail the build.
+#
+export LD_TOXIC_PATH="$ROOT/lib:$ROOT/usr/lib"
