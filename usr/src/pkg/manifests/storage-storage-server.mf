@@ -27,7 +27,6 @@ set name=pkg.summary value="Multi Protocol Storage Server cluster"
 set name=info.classification \
     value=org.opensolaris.category.2008:Drivers/Storage
 set name=variant.arch value=$(ARCH)
-depend fmri=benchmark/filebench type=require
 depend fmri=developer/debug/mdb/module/module-fibre-channel type=require
 depend fmri=developer/debug/mdb/module/module-qlc type=require
 depend fmri=driver/network/emlxs type=require
