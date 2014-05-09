@@ -27,7 +27,6 @@
 # software developed by the University of California, Berkeley, and its
 # contributors.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1	*/
 # Description file for Postscript printers. The resolution and unitwidth have
 # been selected to match, in a sense, PostScript's default coordinate system
 # and the widths given in Adobe's Font manual.
@@ -54,4 +53,4 @@ sq bx ci fa te ** pl mi \< eq \> ~= *A *B *X *D
 \| \} ap fm <= sl if <- ua da de +- >= mu pt pd
 bu di != == ~~ al Ox O+ es ca cu sp ip sb ib mo
 gr rg co tm sr no \^ or lc lf lt lk lb bv is rc
-rf rt rk rb ts lh rh LV LH Lb L1 LA `` '' ob vr
+rf rt rk rb ts lh rh LV Lb L1 LA `` '' ob vr
