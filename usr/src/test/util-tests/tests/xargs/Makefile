@@ -14,6 +14,25 @@
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 #
 
-SUBDIRS = printf xargs
-
+include $(SRC)/cmd/Makefile.cmd
 include $(SRC)/test/Makefile.com
+
+PROG = xargs_test
+
+ROOTOPTPKG = $(ROOT)/opt/util-tests
+TESTDIR = $(ROOTOPTPKG)/tests
+
+CMDS = $(PROG:%=$(TESTDIR)/%)
+$(CMDS) := FILEMODE = 0555
+
+all lint clean clobber:
+
+install: all $(CMDS)
+
+$(CMDS): $(TESTDIR) $(PROG).ksh
+
+$(TESTDIR):
+	$(INS.dir)
+
+$(TESTDIR)/%: %.ksh
+	$(INS.rename)
