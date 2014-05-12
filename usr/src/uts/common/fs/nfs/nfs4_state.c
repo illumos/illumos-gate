@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/systm.h>
@@ -1166,6 +1166,7 @@ rfs4_state_init()
 	int start_grace;
 	extern boolean_t rfs4_cpr_callb(void *, int);
 	char *dss_path = NFS4_DSS_VAR_DIR;
+	time_t start_time;
 
 	mutex_enter(&rfs4_state_lock);
 
@@ -1186,8 +1187,9 @@ rfs4_state_init()
 	 * service clients, then the start_time needs to be bumped
 	 * regardless.  A small window but it exists...
 	 */
-	if (rfs4_start_time != gethrestime_sec())
-		rfs4_start_time = gethrestime_sec();
+	start_time = gethrestime_sec();
+	if (rfs4_start_time < start_time)
+		rfs4_start_time = start_time;
 	else
 		rfs4_start_time++;
 
@@ -3268,8 +3270,8 @@ what_stateid_error(stateid_t *id, stateid_type_t type)
 	if (type != id->bits.type)
 		return (NFS4ERR_BAD_STATEID);
 
-	/* From a previous server instantiation, return STALE */
-	if (id->bits.boottime < rfs4_start_time)
+	/* From a different server instantiation, return STALE */
+	if (id->bits.boottime != rfs4_start_time)
 		return (NFS4ERR_STALE_STATEID);
 
 	/*
