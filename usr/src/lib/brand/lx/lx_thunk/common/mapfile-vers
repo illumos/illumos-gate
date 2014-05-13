@@ -46,7 +46,6 @@ SUNWprivate_1.1 {
 		lxt_gethostbyname_r;
 		lxt_getservbyport_r;
 		lxt_getservbyname_r;
-		_close;
 		_setppriv;
 		openlog;
 		syslog;

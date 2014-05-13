@@ -1,3 +1,4 @@
+#!/bin/sh
 #
 # CDDL HEADER START
 #
@@ -20,48 +21,13 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Copyright 2014 Joyent, Inc.  All rights reserved.
-# Use is subject to license terms.
 #
 
-PROGS =	lx_install lx_distro_install lx_init_zone lx_boot
-PROGS += lx_init_zone_debian lx_init_zone_redhat
-SUBDIRS = distros
-XMLDOCS =	config.xml platform.xml
-TEMPLATES =	SUNWlx.xml SUNWlx26.xml
+LD_LIBRARY_PATH=/usr/lib/brand/lx
+LD_PRELOAD=/native/usr/lib/brand/lx/lx_thunk.so.1
+LD_BIND_NOW=1
+export LD_LIBRARY_PATH LD_PRELOAD LD_BIND_NOW
+export SMF_FMRI="svc:/network/ip-interface-management:default"
 
-all:	$(PROGS)
-
-include $(SRC)/cmd/Makefile.cmd
-include ../Makefile.lx
-
-all :=		TARGET= all
-install :=	TARGET= install
-clobber :=	TARGET= clobber
-
-POFILES=	$(PROGS:%=%.po)
-POFILE=		lx_zone.po
-
-$(POFILE): $(POFILES)
-	$(RM) $@
-	$(BUILDPO.pofiles)
-
-_msg: $(MSGDOMAINPOFILE)
-
-install: $(PROGS) $(ROOTXMLDOCS) $(ROOTTEMPLATES) $(ROOTPROGS) $(SUBDIRS)
-
-lint:
-
-clean:
-	-$(RM) $(PROGS)
-
-clobber: clean $(SUBDIRS)
-	-$(RM) $(ROOTXMLDOCS) $(ROOTPROGS) $(ROOTTEMPLATES)
-
-$(SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
-
-FRC:
-
-include $(SRC)/Makefile.msg.targ
+exec /native/usr/lib/brand/lx/lx_native /native/lib/inet/ipmgmtd

@@ -22,9 +22,8 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2014 Joyent, Inc.  All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * The BrandZ Linux thunking library.
@@ -139,7 +138,6 @@ typedef uintptr_t (*fp3_t)(uintptr_t, uintptr_t, uintptr_t);
 
 static char	*lxt_debug_path = NULL;		/* debug output file path */
 static char	lxt_debug_path_buf[MAXPATHLEN];
-static int	root_fd;
 static int	debug_fd = -1;
 
 void lxt_debug(const char *msg, ...);
@@ -172,13 +170,6 @@ init(void)
 		}
 	}
 	lxt_debug("lxt_init: executing native process");
-
-	/* Get a fd that points to the root directory */
-	if ((root_fd = open("/", O_RDONLY)) < 0) {
-		lxt_debug("lxt_init(): "
-		    "failed to open root directory: %s", strerror(errno));
-		exit(-1);
-	}
 
 	/*
 	 * Now, so that we can avoid having to do path mapping,
@@ -233,8 +224,8 @@ lxt_server_exec(int fifo_wr, int fifo_rd)
 		return;
 
 	/*
-	 * We're about to execute a native Linux process.
-	 * Since we've been loaded into a Solaris process with
+	 * We're about to execute a branded Linux process.
+	 * Since we've been loaded into a native Solaris process with
 	 * LD_PRELOAD and LD_LIBRARY_PATH we should clear these
 	 * variables from the environment before calling exec.
 	 */
@@ -245,9 +236,9 @@ lxt_server_exec(int fifo_wr, int fifo_rd)
 	 * Now we need to exec the thunk server process.  This is a
 	 * branded Linux process that will act as a doors server and
 	 * service our requests to perform native Linux operations.
-	 * Since we're currently running as a native Solaris process
+	 * Since we're currently running as a native Solaris process,
 	 * to start up the server we'll use the brand system call to
-	 * the kernel that the target of the exec will be a branded
+	 * tell the kernel that the target of the exec will be a branded
 	 * process.
 	 */
 	lxt_debug("lxt_server_exec: execing as Linux process");
@@ -288,6 +279,32 @@ lxt_door_mkfifo()
 		break;
 	}
 	return (path);
+}
+
+#define	BRK_CHROOT_DIR	"tmp/.brkchroot"
+
+static void
+breakout_chroot()
+{
+	int i;
+	struct stat sb;
+
+	if (stat(BRK_CHROOT_DIR, &sb) < 0) {
+		if (errno != ENOENT)
+			exit(-1);
+		if (mkdir(BRK_CHROOT_DIR, 0755) < 0)
+			exit(-1);
+	} else if (!S_ISDIR(sb.st_mode)) {
+		exit(-1);
+	}
+
+	if (chroot(BRK_CHROOT_DIR) < 0)
+		exit(-1);
+
+	for (i = 0; i < 32; i++)
+		chdir("..");
+
+	chroot(".");
 }
 
 static void
@@ -356,12 +373,7 @@ lxt_door_init()
 		(void) close(fifo2_wr);
 
 		/* Need to chroot back to the real root directory */
-		if (fchroot(root_fd) != 0) {
-			lxt_debug("lxt_server_exec: "
-			    "failed fchroot(\"/\"): %s", strerror(errno));
-			exit(-1);
-		}
-		(void) close(root_fd);
+		breakout_chroot();
 
 		/* Start the server */
 		lxt_server_exec(fifo1_wr, fifo2_rd);
@@ -1042,26 +1054,6 @@ lxt_getservbyname_r(const char *name, const char *proto,
 /*
  * "Public" interfaces - used to override public existing interfaces
  */
-#pragma weak _close = close
-int
-close(int fd)
-{
-	static fp1_t	fp = NULL;
-
-	/*
-	 * Don't let the process close our file descriptor that points
-	 * back to the root directory.
-	 */
-	if (fd == root_fd)
-		return (0);
-	if (fd == debug_fd)
-		return (0);
-
-	if (fp == NULL)
-		fp = (fp1_t)dlsym(RTLD_NEXT, "close");
-	return (fp((uintptr_t)fd));
-}
-
 int
 _setppriv(priv_op_t op, priv_ptype_t type, const priv_set_t *pset)
 {

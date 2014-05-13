@@ -485,20 +485,6 @@ lxs_verify(char *xmlfile)
 	}
 
 	/*
-	 * Check to see whether the zone has ip-type configured as exclusive
-	 */
-	if (zonecfg_get_iptype(handle, &iptype) != Z_OK) {
-		zonecfg_fini_handle(handle);
-		lxs_err(gettext("zonecfg provided an invalid XML file"));
-	}
-
-	if (iptype == ZS_EXCLUSIVE) {
-		zonecfg_fini_handle(handle);
-		lxs_err(gettext("lx zones do not support an 'exclusive' "
-		    "ip-type"));
-	}
-
-	/*
 	 * Check to see whether the zone has hostid emulation enabled.
 	 */
 	if (zonecfg_get_hostid(handle, hostidp, sizeof (hostidp)) == Z_OK) {

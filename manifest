@@ -5037,12 +5037,14 @@ d usr/lib/brand/lx/amd64 0755 root bin
 f usr/lib/brand/lx/amd64/lx_librtld_db.so.1 0755 root root
 f usr/lib/brand/lx/amd64/lx_nametoaddr.so.1 0755 root root
 f usr/lib/brand/lx/amd64/lx_thunk.so.1 0755 root root
-f usr/lib/brand/lx/config.xml 0444 root root
 f usr/lib/brand/lx/etc_default_nfs 0444 root root
 f usr/lib/brand/lx/etc_netconfig 0444 root root
+f usr/lib/brand/lx/lx_boot 0755 root root
 f usr/lib/brand/lx/lx_init_zone 0755 root root
 f usr/lib/brand/lx/lx_init_zone_debian 0755 root root
 f usr/lib/brand/lx/lx_init_zone_redhat 0755 root root
+f usr/lib/brand/lx/lx_ipmgmtd 0755 root root
+f usr/lib/brand/lx/lx_isaexec_wrapper 0755 root root
 f usr/lib/brand/lx/lx_librtld_db.so.1 0755 root root
 f usr/lib/brand/lx/lx_lockd 0755 root root
 f usr/lib/brand/lx/lx_nametoaddr.so.1 0755 root root
