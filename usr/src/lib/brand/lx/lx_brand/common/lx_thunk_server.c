@@ -22,9 +22,8 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2014 Joyent, Inc.  All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * The BrandZ Linux thunking server.
@@ -46,7 +45,7 @@
  * to Linux services.  When lx_thunk.so receives a request that requires
  * accessing Linux services it creates a "thunk server" process by
  * forking and executing the following shell script (which runs as
- * a native /bin/sh Linux process):
+ * a branded /bin/sh Linux process):
  * 	/native/usr/lib/brand/lx/lx_thunk
  *
  * The first and only thing this shell script attempts to do is re-exec
@@ -338,6 +337,7 @@ lx_call_init(void)
 	}
 
 	lca.lca_ph = ph;
+	lca.lca_ptr = NULL;
 	if (Pobject_iter(ph, lookup_cb, &lca) == -1) {
 		lx_debug("lx_call_init() fail: couldn't find Linux dlsym");
 		return (NULL);

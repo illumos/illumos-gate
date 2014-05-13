@@ -22,10 +22,11 @@
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright 2014 Joyent, Inc.  All rights reserved.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
-PROGS =		lx_lockd lx_native lx_statd lx_thunk
+PROGS =		lx_lockd lx_native lx_isaexec_wrapper lx_statd lx_thunk \
+		lx_ipmgmtd
 
 include ../Makefile.lx
 

@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2014, Joyent, Inc. All rights reserved.
  */
 
 #include <stdio.h>
@@ -285,11 +286,19 @@ ipadm_close(ipadm_handle_t iph)
 boolean_t
 ipadm_check_auth(void)
 {
+	int		uid;
 	struct passwd	pwd;
 	char		buf[NSS_BUFLEN_PASSWD];
 
+	/*
+	 * Branded zones may have different kinds of auth, but root always
+	 * allowed.
+	 */
+	if ((uid = getuid()) == 0)
+		return (B_TRUE);
+
 	/* get the password entry for the given user ID */
-	if (getpwuid_r(getuid(), &pwd, buf, sizeof (buf)) == NULL)
+	if (getpwuid_r(uid, &pwd, buf, sizeof (buf)) == NULL)
 		return (B_FALSE);
 
 	/* check for presence of given authorization */
