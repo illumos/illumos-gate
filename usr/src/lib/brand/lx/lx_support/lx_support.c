@@ -447,7 +447,6 @@ lxs_verify(char *xmlfile)
 	struct zone_devtab	devtab;
 	boolean_t		audio, restart;
 	char			*idev, *odev, *kvers;
-	zone_iptype_t		iptype;
 	char			hostidp[HW_HOSTID_LEN];
 
 	if ((handle = zonecfg_init_handle()) == NULL)
