@@ -19,6 +19,7 @@
 # CDDL HEADER END
 #
 # Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2014, Joyent, Inc. All rights reserved.
 #
 
 #
@@ -187,7 +188,7 @@ safe_replace()
 	fi
 
 	cat <<-END >$filename || exit 1
-	#!/bin/sh -p
+	#!/bin/sh
 	#
 	# Solaris Brand Replacement
 	#

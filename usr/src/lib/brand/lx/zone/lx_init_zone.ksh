@@ -72,7 +72,7 @@ ln_fail=$(gettext "Unable to symlink '%s' to '%s'!")
 mkdir_fail=$(gettext "Unable to create the directory '%s'")
 mod_failed=$(gettext -n "Attempt to modify entries in '%s' failed!")
 
-usage=$(gettext "usage: %s <install_root> [mini]")
+usage=$(gettext "usage: %s <zonename> <install_root> [mini]")
 
 #
 # Output an internationalized string followed by a carriage return
@@ -162,28 +162,30 @@ install_ln()
 #
 # The syntax is:
 #
-#     lx_init_zone <rootdir> [mini]
+#     lx_init_zone <zonename> <rootdir> [mini]
 #
 # Where:
+#	<zonename> is the name of the zone to be modified
 #	<rootdir> is the root of the zone directory to be modified
 #
-#	[mini]	is an optional second argument that signifies whether this is
+#	[mini]	is an optional third argument that signifies whether this is
 #		to be a miniroot install; if it is, NFS services are not enabled
 #		in the processed zone
 #
 unset is_miniroot
 unset install_root
 
-install_root="$1"
+zonename="$1"
+install_root="$2"
 
 tag="lxsave_$(date +%m.%d.%Y@%T)"
 
-if (($# < 1 || $# > 2)); then
+if (($# < 2 || $# > 3)); then
 	i18n_echo "$usage" "$0"
 	exit 1
 fi
 
-(($# == 2)) && is_miniroot=1
+(($# == 3)) && is_miniroot=1
 
 if [[ ! -d "$install_root" ]]; then
 	i18n_echo "$install_noroot" "$install_root"
