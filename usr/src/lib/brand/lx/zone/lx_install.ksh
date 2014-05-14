@@ -22,6 +22,7 @@
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright 2014 Joyent, Inc.  All rights reserved.
 #
 
 # Restrict executables to /bin, /usr/bin, /usr/sbin and /usr/sfw/bin
@@ -118,7 +119,7 @@ init_tarzone()
 {
 	typeset rootdir="$1"
 
-        if ! $branddir/lx_init_zone "$rootdir"; then
+        if ! $branddir/lx_init_zone "$zonename" "$rootdir"; then
                 screenlog "$zone_initfail" "$zonename"
                 return 1
         fi
@@ -512,7 +513,7 @@ if [[ -n $gtaropts ]]; then
 		    -d "${install_root}/sbin" ]]; then
 			log "Error: improper or incomplete tar archive."
 		else
-			$branddir/lx_init_zone "$install_root" &&
+			$branddir/lx_init_zone "$zonename" "$install_root" &&
 			    init_tarzone "$install_root"
 
 			#

@@ -899,7 +899,7 @@ setup_miniroot()
 {
 	unset miniroot_booted
 
-	if ! "$cwd/lx_init_zone" "$rootdir" mini; then
+	if ! "$cwd/lx_init_zone" "$zonename" "$rootdir" mini; then
 		screenlog "$mini_initfail" "$zonename"
 		return 1
 	fi
@@ -1008,7 +1008,7 @@ finish_install()
 
 	rmdir -ps "$media_mntdir"
 
-	if ! "$cwd/lx_init_zone" "$rootdir"; then
+	if ! "$cwd/lx_init_zone" "$zonename" "$rootdir"; then
 		screenlog "$zone_initrootfail" "$zonename"
 		return 1
 	fi
