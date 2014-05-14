@@ -5,8 +5,8 @@
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
  *
- * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or http://www.opensolaris.org/os/licensing.
+ * You can obtain a copy of the license at
+ * http://www.opensource.org/licenses/cddl1.txt.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2010 Emulex.  All rights reserved.
+ * Copyright (c) 2004-2012 Emulex. All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -126,7 +126,8 @@ typedef struct emlxs_buf
 
 #ifdef SAN_DIAG_SUPPORT
 	hrtime_t		sd_start_time;
-#endif
+#endif /* SAN_DIAG_SUPPORT */
+
 } emlxs_buf_t;
 
 
@@ -247,7 +248,7 @@ typedef struct emlxs_vpd
 	char		model[80];
 	char		model_desc[256];
 	char		prog_types[256];
-	char		id[80];
+	char		id[256];
 
 	uint32_t	port_index;
 	uint16_t	link_speed;
@@ -408,7 +409,6 @@ typedef struct emlxs_node
 	NAME_TYPE		nlp_nodename;	/* node name */
 
 	uint32_t		nlp_DID;	/* fibre channel D_ID */
-	uint32_t		nlp_oldDID;
 
 	uint16_t		nlp_Rpi;	/* login id returned by */
 						/* REG_LOGIN */
@@ -422,6 +422,10 @@ typedef struct emlxs_node
 #define	NLP_FCP_INI_DEVICE	0x20	/* FCP Initiator device */
 #define	NLP_FCP_2_DEVICE	0x40	/* FCP-2 TGT device */
 #define	NLP_EMLX_VPORT		0x80    /* Virtual port */
+
+	uint8_t			dfc_state;
+#define	EMLXS_SET_DFC_STATE(_n, _state)	if (_n && _n->nlp_active)\
+		{(_n)->dfc_state = (_state); }
 
 	uint32_t		nlp_force_rscn;
 	uint32_t		nlp_tag;	/* Tag used by port_offline */
@@ -462,6 +466,11 @@ typedef struct emlxs_node
 #define	EMLXS_NODE_TO_RPI(_p, _n)	\
 	((_n)?((_n->rpip)?_n->rpip:emlxs_rpi_find(_p, _n->nlp_Rpi)):NULL)
 
+#ifdef NODE_THROTTLE_SUPPORT
+	uint32_t io_throttle;
+	uint32_t io_active;
+#endif /* NODE_THROTTLE_SUPPORT */
+
 } emlxs_node_t;
 typedef emlxs_node_t NODELIST;
 
@@ -488,24 +497,19 @@ typedef emlxs_fcip_nethdr_t NETHDR;
 
 #ifdef SFCT_SUPPORT
 #define	FC_MAX_SEG	8
+#define	MEM_FCTSEG	10 /* must be greater than FC_MAX_SEG */
 #else
 #define	FC_MAX_SEG	7
 #endif /* SFCT_SUPPORT */
 
 
 /* A BPL entry is 12 bytes. Subtract 2 for command and response buffers */
-#define	BPL_TO_SGLLEN(_bpl)   ((_bpl/12)-2)
-#define	MEM_BPL_SIZE		1024  /* Default size */
+#define	BPL_TO_SGLLEN(_bpl)	((_bpl/12)-2)
+#define	MEM_BPL_SIZE		36 /* Default size */
 
 /* A SGL entry is 16 bytes. Subtract 2 for command and response buffers */
-#define	SGL_TO_SGLLEN(_sgl)   ((_sgl/16)-2)
-#define	MEM_SGL_SIZE		4096  /* Default size */
-
-#ifdef EMLXS_I386
-#define	EMLXS_SGLLEN		BPL_TO_SGLLEN(MEM_BPL_SIZE)
-#else	/* EMLXS_SPARC */
-#define	EMLXS_SGLLEN		1
-#endif	/* EMLXS_I386 */
+#define	SGL_TO_SGLLEN(_sgl)	((_sgl/16)-2)
+#define	MEM_SGL_SIZE		4096 /* Default size */
 
 #define	MEM_BUF_SIZE		1024
 #define	MEM_BUF_COUNT		64
@@ -526,22 +530,25 @@ typedef struct emlxs_memseg
 	void			*fc_memput_ptr;
 	void			*fc_memput_end;
 
-	void			*fc_memstart_virt;	/* beginning address */
-							/* of memory block */
-	uint64_t		fc_memstart_phys;	/* beginning address */
-							/* of memory block */
-	ddi_dma_handle_t	fc_mem_dma_handle;
-	ddi_acc_handle_t	fc_mem_dat_handle;
 	uint32_t		fc_total_memsize;
 	uint32_t		fc_memsize;		/* size of mem blks */
 	uint32_t		fc_numblks;		/* no of mem blks */
 	uint32_t		fc_memget_cnt;		/* no of mem get blks */
 	uint32_t		fc_memput_cnt;		/* no of mem put blks */
 	uint32_t		fc_memflag;  /* emlxs_buf_info_t FLAGS */
-	uint32_t		fc_reserved; /* used with priority flag */
+#define	FC_MEMSEG_PUT_ENABLED	0x20000000
+#define	FC_MEMSEG_GET_ENABLED	0x40000000
+#define	FC_MEMSEG_DYNAMIC	0x80000000
+
 	uint32_t		fc_memalign;
 	uint32_t		fc_memtag;
 	char			fc_label[32];
+
+	uint32_t		fc_hi_water;
+	uint32_t		fc_lo_water;
+	uint32_t		fc_step;  /* Dyn increment.  Zero = static */
+	uint32_t		fc_low;   /* Lowest free count (dyn only) */
+	uint32_t		fc_last;  /* Last fc_numblks (dyn only) */
 
 } emlxs_memseg_t;
 typedef emlxs_memseg_t MEMSEG;
@@ -983,24 +990,39 @@ typedef struct emlxs_port
 
 	/* Virtual port management */
 	struct VPIobj		VPIobj;
-	uint32_t		vpi;
+	struct VPIobj		*vpip; /* &VPIobj */
+
+	uint32_t		vpi;	/* Legacy vpi == vpip->index */
+	uint32_t		mode;
+	uint32_t		mode_mask; /* User configured */
+#define	MODE_NONE			0x00000000
+#define	MODE_INITIATOR			0x00000001
+#define	MODE_TARGET			0x00000002
+#define	MODE_ALL			0x00000003
 
 	uint32_t		flag;
-#define	EMLXS_PORT_ENABLE		0x00000001
-#define	EMLXS_PORT_BOUND		0x00000002
+#define	EMLXS_PORT_ENABLED		0x00000001 /* vport setting */
+#define	EMLXS_PORT_CONFIG		0x00000002 /* vport setting */
+
+#define	EMLXS_INI_ENABLED		0x00000010 /* emlxs_mode_init */
+#define	EMLXS_INI_BOUND			0x00000020 /* emlxs_fca_bind_port */
+#define	EMLXS_TGT_ENABLED		0x00000040 /* emlxs_mode_init */
+#define	EMLXS_TGT_BOUND			0x00000080 /* emlxs_fct_bind_port */
+#define	EMLXS_PORT_BOUND		(EMLXS_INI_BOUND|EMLXS_TGT_BOUND)
+
+#define	EMLXS_PORT_IP_UP		0x00000100
+#define	EMLXS_PORT_RESTRICTED		0x00000200 /* Restrict logins */
 
 #define	EMLXS_PORT_REG_VPI		0x00010000 /* SLI3 */
 #define	EMLXS_PORT_REG_VPI_CMPL		0x00020000 /* SLI3 */
 
-#define	EMLXS_PORT_IP_UP		0x00000010
-#define	EMLXS_PORT_CONFIG		0x00000020
-#define	EMLXS_PORT_RESTRICTED		0x00000040 /* Restrict logins */
-#define	EMLXS_PORT_FLOGI_CMPL		0x00000080
+#define	EMLXS_PORT_FLOGI_CMPL		0x01000000	/* Fabric login */
+							/* completed */
 
-#define	EMLXS_PORT_RESET_MASK		0x0000FFFF /* Flags to keep */
-						/* across hard reset */
-#define	EMLXS_PORT_LINKDOWN_MASK	0xFFFFFF7F /* Flags to keep */
-						/* across link reset */
+#define	EMLXS_PORT_RESET_MASK		0x0000FFFF	/* Flags to keep */
+							/* across hard reset */
+#define	EMLXS_PORT_LINKDOWN_MASK	0x00FFFFFF	/* Flags to keep */
+							/* across link reset */
 
 	uint32_t		options;
 #define	EMLXS_OPT_RESTRICT		0x00000001 /* Force restricted */
@@ -1030,6 +1052,7 @@ typedef struct emlxs_port
 
 	/* FC_AL management */
 	uint8_t			lip_type;
+	uint8_t			granted_alpa;
 	uint8_t			alpa_map[128];
 
 	/* Node management */
@@ -1043,6 +1066,7 @@ typedef struct emlxs_port
 	kmutex_t		pkt_lock;	/* pkt polling */
 
 	/* ULP */
+	uint32_t		ulp_busy;
 	uint32_t		ulp_statec;
 	void			(*ulp_statec_cb) ();	/* Port state change */
 							/* callback routine */
@@ -1062,35 +1086,35 @@ typedef struct emlxs_port
 	emlxs_ub_priv_t		*ub_wait_tail;	/* Unsolicited IO received */
 						/* before link up */
 
-
 #ifdef DHCHAP_SUPPORT
 	emlxs_port_dhc_t	port_dhc;
 #endif	/* DHCHAP_SUPPORT */
 
-	uint16_t		ini_mode;
-	uint16_t		tgt_mode;
-
 #ifdef SFCT_SUPPORT
+	emlxs_memseg_t	*fct_memseg; /* Array */
+	uint32_t fct_memseg_cnt;
 
-#define	FCT_BUF_COUNT_512		256
-#define	FCT_BUF_COUNT_8K		128
-#define	FCT_BUF_COUNT_64K		64
-#define	FCT_BUF_COUNT_128K		64
-#define	FCT_MAX_BUCKETS			16
-#define	FCT_DMEM_MAX_BUF_SIZE		131072   /* 128K */
-#define	FCT_DMEM_MAX_BUF_SEGMENT	8388608  /* 8M */
-
-	struct emlxs_fct_dmem_bucket dmem_bucket[FCT_MAX_BUCKETS];
+/* Default buffer counts */
+#define	FCT_BUF_COUNT_2K		16
+#define	FCT_BUF_COUNT_4K		0
+#define	FCT_BUF_COUNT_8K		16
+#define	FCT_BUF_COUNT_16K		0
+#define	FCT_BUF_COUNT_32K		0
+#define	FCT_BUF_COUNT_64K		16
+#define	FCT_BUF_COUNT_128K		16
+#define	FCT_BUF_COUNT_256K		0
 
 	char			cfd_name[24];
 	stmf_port_provider_t	*port_provider;
 	fct_local_port_t	*fct_port;
+	uint8_t			fct_els_only_bmap;
 	uint32_t		fct_flags;
 
 #define	FCT_STATE_PORT_ONLINE		0x00000001
 #define	FCT_STATE_NOT_ACKED		0x00000002
 #define	FCT_STATE_LINK_UP		0x00000010
 #define	FCT_STATE_LINK_UP_ACKED		0x00000020
+#define	FCT_STATE_FLOGI_CMPL		0x00000040
 
 	emlxs_tgtport_stat_t	fct_stat;
 
@@ -1109,6 +1133,9 @@ typedef struct emlxs_port
 #endif /* FCT_IO_TRACE */
 
 #endif /* SFCT_SUPPORT */
+
+	uint32_t		clean_address_timer;
+	emlxs_buf_t		*clean_address_sbp;
 
 #ifdef SAN_DIAG_SUPPORT
 	uint8_t			sd_io_latency_state;
@@ -1230,6 +1257,13 @@ typedef struct emlxs_port
 	(_offset)))
 
 /* SLI4 registers */
+#define	WRITE_BAR0_REG(_hba, _regp, _value) ddi_put32(\
+	(_hba)->sli.sli4.bar0_acc_handle, (uint32_t *)(_regp), \
+	(uint32_t)(_value))
+
+#define	READ_BAR0_REG(_hba, _regp) ddi_get32(\
+	(_hba)->sli.sli4.bar0_acc_handle, (uint32_t *)(_regp))
+
 #define	WRITE_BAR1_REG(_hba, _regp, _value) ddi_put32(\
 	(_hba)->sli.sli4.bar1_acc_handle, (uint32_t *)(_regp), \
 	(uint32_t)(_value))
@@ -1358,6 +1392,11 @@ typedef struct EQ_DESC
 	kmutex_t	lastwq_lock;
 	uint16_t	lastwq;
 	MBUF_INFO	addr;
+
+	/* Statistics */
+	uint32_t	max_proc;
+	uint32_t	isr_count;
+	uint32_t	num_proc;
 } EQ_DESC_t;
 
 
@@ -1375,6 +1414,10 @@ typedef struct CQ_DESC
 	MBUF_INFO	addr;
 	CHANNEL		*channelp; /* ptr to CHANNEL associated with CQ */
 
+	/* Statistics */
+	uint32_t	max_proc;
+	uint32_t	isr_count;
+	uint32_t	num_proc;
 } CQ_DESC_t;
 
 
@@ -1388,6 +1431,10 @@ typedef struct WQ_DESC
 	uint16_t	qid;
 	uint16_t	cqid;
 	MBUF_INFO	addr;
+
+	/* Statistics */
+	uint32_t	num_proc;
+	uint32_t	num_busy;
 } WQ_DESC_t;
 
 
@@ -1403,6 +1450,8 @@ typedef struct RQ_DESC
 
 	kmutex_t	lock;
 
+	/* Statistics */
+	uint32_t	num_proc;
 } RQ_DESC_t;
 
 
@@ -1426,7 +1475,7 @@ typedef struct MQ_DESC
 
 /* Define the number of queues the driver will be using */
 #define	EMLXS_MAX_EQS	EMLXS_MSI_MAX_INTRS
-#define	EMLXS_MAX_WQS	EMLXS_MSI_MAX_INTRS
+#define	EMLXS_MAX_WQS	EMLXS_MAX_WQS_PER_EQ * EMLXS_MAX_EQS
 #define	EMLXS_MAX_RQS	2	/* ONLY 1 pair is allowed */
 #define	EMLXS_MAX_MQS	1
 
@@ -1450,12 +1499,6 @@ typedef struct MQ_DESC
 #define	EMLXS_FCFI_RQ0_RCTL	0 /* match all */
 #define	EMLXS_FCFI_RQ0_TMASK	0 /* match all */
 #define	EMLXS_FCFI_RQ0_TYPE	0 /* match all */
-
-/* Define the maximum value for a Queue Id */
-#define	EMLXS_MAX_EQ_IDS	256
-#define	EMLXS_MAX_CQ_IDS	1024
-#define	EMLXS_MAX_WQ_IDS	1024
-#define	EMLXS_MAX_RQ_IDS	4
 
 #define	EMLXS_RXQ_ELS		0
 #define	EMLXS_RXQ_CT		1
@@ -1524,19 +1567,18 @@ typedef struct emlxs_sli3
 	uint8_t		ring_tmask[6];
 
 	/* Protected by EMLXS_FCTAB_LOCK */
-#ifdef EMLXS_SPARC
-	MEMSEG		fcp_bpl_seg;
-	MATCHMAP	**fcp_bpl_table; /* iotag table for */
+	MATCHMAP	**bpl_table; /* iotag table for */
 					/* bpl buffers */
-#endif	/* EMLXS_SPARC */
 	uint32_t	mem_bpl_size;
 } emlxs_sli3_t;
 
 typedef struct emlxs_sli4
 {
 	MATCHMAP	bootstrapmb;
+	caddr_t		bar0_addr;
 	caddr_t		bar1_addr;
 	caddr_t		bar2_addr;
+	ddi_acc_handle_t bar0_acc_handle;
 	ddi_acc_handle_t bar1_acc_handle;
 	ddi_acc_handle_t bar2_acc_handle;
 
@@ -1548,20 +1590,49 @@ typedef struct emlxs_sli4
 	uint32_t	*MQDB_reg_addr;
 	uint32_t	*WQDB_reg_addr;
 	uint32_t	*RQDB_reg_addr;
+	uint32_t	*SEMA_reg_addr;
+	uint32_t	*STATUS_reg_addr;
+	uint32_t	*CNTL_reg_addr;
+	uint32_t	*ERR1_reg_addr;
+	uint32_t	*ERR2_reg_addr;
+	uint32_t	*PHYSDEV_reg_addr;
 
 	uint32_t	flag;
 #define	EMLXS_SLI4_INTR_ENABLED		0x00000001
 #define	EMLXS_SLI4_HW_ERROR		0x00000002
 #define	EMLXS_SLI4_DOWN_LINK		0x00000004
+#define	EMLXS_SLI4_PHON			0x00000008
+#define	EMLXS_SLI4_PHWQ			0x00000010
+#define	EMLXS_SLI4_NULL_XRI		0x00000020
+
+#define	EMLXS_SLI4_FCF_INIT		0x10000000
+#define	EMLXS_SLI4_FCOE_MODE		0x80000000
+
+#define	SLI4_FCOE_MODE	(hba->sli.sli4.flag & EMLXS_SLI4_FCOE_MODE)
+#define	SLI4_FC_MODE	(!SLI4_FCOE_MODE)
+
+
 
 	uint16_t	XRICount;
-	uint16_t	XRIBase;
+	uint16_t	XRIExtCount;
+	uint16_t	XRIExtSize;
+	uint16_t	XRIBase[MAX_EXTENTS];
+
 	uint16_t	RPICount;
-	uint16_t	RPIBase;
+	uint16_t	RPIExtCount;
+	uint16_t	RPIExtSize;
+	uint16_t	RPIBase[MAX_EXTENTS];
+
 	uint16_t	VPICount;
-	uint16_t	VPIBase;
+	uint16_t	VPIExtCount;
+	uint16_t	VPIExtSize;
+	uint16_t	VPIBase[MAX_EXTENTS];
+
 	uint16_t	VFICount;
-	uint16_t	VFIBase;
+	uint16_t	VFIExtCount;
+	uint16_t	VFIExtSize;
+	uint16_t	VFIBase[MAX_EXTENTS];
+
 	uint16_t	FCFICount;
 
 	kmutex_t	fcf_lock;
@@ -1596,18 +1667,17 @@ typedef struct emlxs_sli4
 	CQ_DESC_t	cq[EMLXS_MAX_CQS];
 	WQ_DESC_t	wq[EMLXS_MAX_WQS];
 	RQ_DESC_t	rq[EMLXS_MAX_RQS];
-	MQ_DESC_t	mq;
-
-	/* Used to map a queue ID to a queue DESC_t */
-	uint16_t	eq_map[EMLXS_MAX_EQ_IDS];
-	uint16_t	cq_map[EMLXS_MAX_CQ_IDS];
-	uint16_t	wq_map[EMLXS_MAX_WQ_IDS];
-	uint16_t	rq_map[EMLXS_MAX_RQ_IDS];
-
 	RXQ_DESC_t	rxq[EMLXS_MAX_RXQS];
+	MQ_DESC_t	mq;
+	uint32_t	que_stat_timer;
 
 	uint32_t	ue_mask_lo;
 	uint32_t	ue_mask_hi;
+
+	sli_params_t	param;
+
+	uint8_t port_name[4];
+	uint32_t link_number;
 
 } emlxs_sli4_t;
 
@@ -1633,6 +1703,8 @@ typedef struct emlxs_sli_api
 	void		(*sli_disable_intr)();
 	void		(*sli_timer)();
 	void		(*sli_poll_erratt)();
+	uint32_t	(*sli_reg_did)();
+	uint32_t	(*sli_unreg_node)();
 
 } emlxs_sli_api_t;
 
@@ -1646,6 +1718,7 @@ typedef struct emlxs_hba
 	uint8_t		pci_device_number;
 	uint8_t		pci_bus_number;
 	uint8_t		pci_cap_offset[PCI_CAP_MAX_PTR];
+	uint16_t	pci_ecap_offset[PCI_EXT_CAP_MAX_PTR];
 
 #ifdef FMA_SUPPORT
 	int32_t		fm_caps;	/* FMA capabilities */
@@ -1673,6 +1746,40 @@ typedef struct emlxs_hba
 	uint32_t	bus_type;
 #define	PCI_FC  	0
 #define	SBUS_FC		1
+	uint32_t	sli_intf;
+#define	SLI_INTF_VALID_MASK		0xe0000000
+#define	SLI_INTF_VALID			0xc0000000
+
+#define	SLI_INTF_HINT2_MASK		0x1f000000
+#define	SLI_INTF_HINT2_0		0x00000000
+
+#define	SLI_INTF_HINT1_MASK		0x00ff0000
+#define	SLI_INTF_HINT1_0		0x00000000
+#define	SLI_INTF_HINT1_1		0x00010000
+#define	SLI_INTF_HINT1_2		0x00020000
+
+#define	SLI_INTF_IF_TYPE_MASK		0x0000f000
+#define	SLI_INTF_IF_TYPE_0		0x00000000
+#define	SLI_INTF_IF_TYPE_1		0x00001000
+#define	SLI_INTF_IF_TYPE_2		0x00002000
+#define	SLI_INTF_IF_TYPE_3		0x00003000
+
+#define	SLI_INTF_FAMILY_MASK		0x00000f00
+#define	SLI_INTF_FAMILY_BE2		0x00000000
+#define	SLI_INTF_FAMILY_BE3		0x00000100
+#define	SLI_INTF_FAMILY_LANCER_A	0x00000a00
+#define	SLI_INTF_FAMILY_LANCER_B	0x00000b00
+
+#define	SLI_INTF_SLI_REV_MASK		0x000000f0
+#define	SLI_INTF_SLI_REV_NONE		0x00000000
+#define	SLI_INTF_SLI_REV_3		0x00000030
+#define	SLI_INTF_SLI_REV_4		0x00000040
+
+#define	SLI_INTF_RESERVED1		0x0000000e
+
+#define	SLI_INTF_FUNC_TYPE_MASK		0x00000001
+#define	SLI_INTF_FUNC_PF		0x00000000
+#define	SLI_INTF_FUNC_VF		0x00000001
 
 	/* Link management */
 	uint32_t	link_event_tag;
@@ -1688,6 +1795,7 @@ typedef struct emlxs_hba
 							/* structures */
 	kmutex_t	memget_lock;	/* locks all memory pools get */
 	kmutex_t	memput_lock;	/* locks all memory pools put */
+	uint32_t	mem_timer;
 
 	/* Fibre Channel Service Parameters */
 	SERV_PARM	sparam;
@@ -1847,6 +1955,8 @@ typedef struct emlxs_hba
 	void		*intr_arg;
 	uint32_t	intr_unclaimed;
 	uint32_t	intr_autoClear;
+	uint32_t	intr_busy_cnt;
+
 	uint32_t	intr_flags;
 #define	EMLXS_INTX_INITED	0x0001
 #define	EMLXS_INTX_ADDED	0x0002
@@ -1948,7 +2058,6 @@ typedef struct emlxs_hba
 	emlxs_msg_log_t	log;
 
 	/* Port managment */
-	uint32_t	vpi_base;
 	uint32_t	vpi_max;
 	uint32_t	vpi_high;
 	uint32_t	num_of_ports;
@@ -1971,9 +2080,6 @@ typedef struct emlxs_hba
 	uint32_t	auth_key_count;
 	uint32_t	rdn_flag;
 #endif	/* DHCHAP_SUPPORT */
-
-	uint16_t	ini_mode;
-	uint16_t	tgt_mode;
 
 #ifdef TEST_SUPPORT
 	uint32_t	underrun_counter;
@@ -1999,6 +2105,14 @@ typedef struct emlxs_hba
 
 #endif /* DUMP_SUPPORT */
 
+	uint32_t	reset_request;
+#define	FC_LINK_RESET		1
+#define	FC_PORT_RESET		2
+
+	uint32_t	reset_state;
+#define	FC_LINK_RESET_INP		1
+#define	FC_PORT_RESET_INP		2
+
 } emlxs_hba_t;
 
 #define	EMLXS_SLI_MAP_HDW 		(hba->sli_api.sli_map_hdw)
@@ -2020,6 +2134,8 @@ typedef struct emlxs_hba
 #define	EMLXS_SLI_DISABLE_INTR		(hba->sli_api.sli_disable_intr)
 #define	EMLXS_SLI_TIMER			(hba->sli_api.sli_timer)
 #define	EMLXS_SLI_POLL_ERRATT		(hba->sli_api.sli_poll_erratt)
+#define	EMLXS_SLI_REG_DID		(hba->sli_api.sli_reg_did)
+#define	EMLXS_SLI_UNREG_NODE		(hba->sli_api.sli_unreg_node)
 
 #define	EMLXS_HBA_T  1  /* flag emlxs_hba_t is already typedefed */
 
@@ -2151,6 +2267,9 @@ typedef struct emlxs_hba
 #define	BE_SWAP32(_x)			(_x)
 #define	BE_SWAP16(_x)			(_x)
 #endif /* EMLXS_BIG_ENDIAN */
+
+#define	EMLXS_DFC_RESET_ALL			0x10
+#define	EMLXS_DFC_RESET_ALL_FORCE_DUMP		0x11
 
 #ifdef	__cplusplus
 }

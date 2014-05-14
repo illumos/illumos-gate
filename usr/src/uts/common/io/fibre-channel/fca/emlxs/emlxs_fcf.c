@@ -5,8 +5,8 @@
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
  *
- * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or http://www.opensolaris.org/os/licensing.
+ * You can obtain a copy of the license at
+ * http://www.opensource.org/licenses/cddl1.txt.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -20,10 +20,9 @@
  */
 
 /*
- * Copyright 2010 Emulex.  All rights reserved.
+ * Copyright (c) 2004-2012 Emulex. All rights reserved.
  * Use is subject to license terms.
  */
-
 
 #include <emlxs.h>
 
@@ -56,8 +55,28 @@ EMLXS_MSG_DEF(EMLXS_FCF_C);
  * - The EMLXS_FCF_LOCK must be held before calling:
  * emlxs_XXXX_state(), emlxs_XXXX_event() and emlxs_XXXX_action().
  *
- * - All other calls touching fctab, fcfi, vfi, vpi, rpi objects must hold
- * the EMLXS_FCF_LOCK to protect these objects.
+ * - All other calls touching fcftab, fcfi, vfi, vpi, rpi objects
+ * must hold the EMLXS_FCF_LOCK to protect these objects.
+ */
+
+/*
+ * DEBUG MESSAGE TERMINATION RULES:
+ *
+ * - A message should end in ">" if a thread operating outside the
+ * XXXX state machine enters the XXXX state machine with a call to
+ * emlxs_XXXX_event() or emlxs_XXXX_state().  This includes calls made
+ * from emlxs_..._notify(), emlxs_..._mbcmpl() and emlxs_..._timer()
+ * routines since they represent the beginnning of new threads.
+ *
+ * - A message should end in "<" if the thread is about exit
+ * an emlxs_XXXX_..._action() without previously calling the
+ * next emlxs_XXXX_state().  This includes the emlxs_XXXX_action()
+ * and emlxs_XXXX_state() routines themselves since errors
+ * in these routines represent the termination of state change
+ * thread.
+ *
+ * - A message should end in "." if none of the previous
+ * conditions apply.
  */
 
 /* ************************************************************************** */
@@ -93,38 +112,39 @@ EMLXS_MSG_DEF(EMLXS_FCF_C);
  * FCF_EVENT_RPI_OFFLINE	RPIobj_t*
  * FCF_EVENT_RPI_PAUSE		RPIobj_t*
  * FCF_EVENT_RPI_RESUME		RPIobj_t*
+ * FCF_EVENT_RPI_TIMEOUT	RPIobj_t*
  */
 
 /* Order does not matter */
 emlxs_table_t emlxs_fcf_event_table[] =
 {
-	{FCF_EVENT_STATE_ENTER, "STATE_ENTER"},
+	{FCF_EVENT_STATE_ENTER, "E_ENTER"},
 
-	{FCF_EVENT_SHUTDOWN, "SHUTDOWN"},
-	{FCF_EVENT_LINKUP, "LINK_UP"},
-	{FCF_EVENT_LINKDOWN, "LINK_DOWN"},
-	{FCF_EVENT_CVL, "CVL_RECD"},
-	{FCF_EVENT_FCFTAB_FULL, "TABLE_FULL"},
-	{FCF_EVENT_FCF_FOUND, "FCF_FOUND"},
-	{FCF_EVENT_FCF_LOST, "FCF_LOST"},
-	{FCF_EVENT_FCF_CHANGED, "FCF_CHANGED"},
+	{FCF_EVENT_SHUTDOWN, "E_SHUTDOWN"},
+	{FCF_EVENT_LINKUP, "E_LINKUP"},
+	{FCF_EVENT_LINKDOWN, "E_LINKDOWN"},
+	{FCF_EVENT_CVL, "E_CVL"},
+	{FCF_EVENT_FCFTAB_FULL, "E_TABLE_FULL"},
+	{FCF_EVENT_FCF_FOUND, "E_FCF_FOUND"},
+	{FCF_EVENT_FCF_LOST, "E_FCF_LOST"},
+	{FCF_EVENT_FCF_CHANGED, "E_FCF_CHANGED"},
 
-	{FCF_EVENT_FCFI_ONLINE, "FCFI_ONLINE"},
-	{FCF_EVENT_FCFI_OFFLINE, "FCFI_OFFLINE"},
-	{FCF_EVENT_FCFI_PAUSE, "FCFI_PAUSE"},
+	{FCF_EVENT_FCFI_ONLINE, "E_FCFI_ONLINE"},
+	{FCF_EVENT_FCFI_OFFLINE, "E_FCFI_OFFLINE"},
+	{FCF_EVENT_FCFI_PAUSE, "E_FCFI_PAUSE"},
 
-	{FCF_EVENT_VFI_ONLINE, "VFI_ONLINE"},
-	{FCF_EVENT_VFI_OFFLINE, "VFI_OFFLINE"},
-	{FCF_EVENT_VFI_PAUSE, "VFI_PAUSE"},
+	{FCF_EVENT_VFI_ONLINE, "E_VFI_ONLINE"},
+	{FCF_EVENT_VFI_OFFLINE, "E_VFI_OFFLINE"},
+	{FCF_EVENT_VFI_PAUSE, "E_VFI_PAUSE"},
 
-	{FCF_EVENT_VPI_ONLINE, "VPI_ONLINE"},
-	{FCF_EVENT_VPI_OFFLINE, "VPI_OFFLINE"},
-	{FCF_EVENT_VPI_PAUSE, "VPI_PAUSE"},
+	{FCF_EVENT_VPI_ONLINE, "E_VPI_ONLINE"},
+	{FCF_EVENT_VPI_OFFLINE, "E_VPI_OFFLINE"},
+	{FCF_EVENT_VPI_PAUSE, "E_VPI_PAUSE"},
 
-	{FCF_EVENT_RPI_ONLINE, "RPI_ONLINE"},
-	{FCF_EVENT_RPI_OFFLINE, "RPI_OFFLINE"},
-	{FCF_EVENT_RPI_PAUSE, "RPI_PAUSE"},
-	{FCF_EVENT_RPI_RESUME, "RPI_RESUME"},
+	{FCF_EVENT_RPI_ONLINE, "E_RPI_ONLINE"},
+	{FCF_EVENT_RPI_OFFLINE, "E_RPI_OFFLINE"},
+	{FCF_EVENT_RPI_PAUSE, "E_RPI_PAUSE"},
+	{FCF_EVENT_RPI_RESUME, "E_RPI_RESUME"},
 
 }; /* emlxs_fcf_event_table */
 
@@ -132,111 +152,128 @@ emlxs_table_t emlxs_fcf_event_table[] =
 /* Order does not matter */
 emlxs_table_t emlxs_fcf_reason_table[] =
 {
-	{FCF_REASON_NONE, "REASON_NONE"},
-	{FCF_REASON_REENTER, "REASON_REENTER"},
-	{FCF_REASON_EVENT, "REASON_EVENT"},
-	{FCF_REASON_REQUESTED, "REASON_REQUESTED"},
-	{FCF_REASON_NO_MBOX, "REASON_NO_MBOX"},
-	{FCF_REASON_NO_BUFFER, "REASON_NO_BUFFER"},
-	{FCF_REASON_SEND_FAILED, "REASON_SEND_FAILED"},
-	{FCF_REASON_MBOX_FAILED, "REASON_MBOX_FAILED"},
-	{FCF_REASON_NO_FCFI, "REASON_NO_FCFI"},
-	{FCF_REASON_NO_VFI, "REASON_NO_VFI"},
-	{FCF_REASON_ONLINE_FAILED, "REASON_ONLINE_FAILED"},
-	{FCF_REASON_OFFLINE_FAILED, "REASON_OFFLINE_FAILED"},
-	{FCF_REASON_OP_FAILED, "REASON_OP_FAILED"},
-	{FCF_REASON_NO_PKT, "FCF_REASON_NO_PKT"},
-	{FCF_REASON_NO_NODE, "FCF_REASON_NO_NODE"},
-	{FCF_REASON_NOT_ALLOWED, "FCF_REASON_NOT_ALLOWED"},
+	{FCF_REASON_NONE, "R_NONE"},
+	{FCF_REASON_REENTER, "R_REENTER"},
+	{FCF_REASON_EVENT, "R_EVENT"},
+	{FCF_REASON_REQUESTED, "R_REQUESTED"},
+	{FCF_REASON_NO_MBOX, "R_NO_MBOX"},
+	{FCF_REASON_NO_BUFFER, "R_NO_BUFFER"},
+	{FCF_REASON_SEND_FAILED, "R_SEND_FAILED"},
+	{FCF_REASON_MBOX_FAILED, "R_MBOX_FAILED"},
+	{FCF_REASON_MBOX_BUSY, "R_MBOX_BUSY"},
+	{FCF_REASON_NO_FCFI, "R_NO_FCFI"},
+	{FCF_REASON_NO_VFI, "R_NO_VFI"},
+	{FCF_REASON_ONLINE_FAILED, "R_ONLINE_FAILED"},
+	{FCF_REASON_OFFLINE_FAILED, "R_OFFLINE_FAILED"},
+	{FCF_REASON_OP_FAILED, "R_OP_FAILED"},
+	{FCF_REASON_NO_PKT, "R_NO_PKT"},
+	{FCF_REASON_NO_NODE, "R_NO_NODE"},
+	{FCF_REASON_NOT_ALLOWED, "R_NOT_ALLOWED"},
+	{FCF_REASON_UNUSED, "R_UNUSED"},
+	{FCF_REASON_INVALID, "R_INVALID"},
 
 }; /* emlxs_fcf_reason_table */
 
 
 /* ********************************************************************** */
-/* FCFTAB */
+/* FCFTAB Generic */
+/* ********************************************************************** */
+static char 		*emlxs_fcftab_state_xlate(emlxs_port_t *port,
+				uint32_t state);
+static uint32_t		emlxs_fcftab_event(emlxs_port_t *port, uint32_t evt,
+				void *arg1);
+static uint32_t		emlxs_fcftab_shutdown_action(emlxs_port_t *port,
+				uint32_t evt, void *arg1);
+
+/* ********************************************************************** */
+/* FC FCFTAB */
 /* ********************************************************************** */
 
 /* Order does not matter */
-emlxs_table_t emlxs_fcftab_state_table[] =
+emlxs_table_t emlxs_fc_fcftab_state_table[] =
 {
-	{FCFTAB_STATE_SHUTDOWN, "FCFTAB_STATE_SHUTDOWN"},
-	{FCFTAB_STATE_OFFLINE, "FCFTAB_STATE_OFFLINE"},
+	{FC_FCFTAB_STATE_SHUTDOWN, "FCFTAB_SHUTDOWN"},
+	{FC_FCFTAB_STATE_OFFLINE, "FCFTAB_OFFLINE"},
 
-	{FCFTAB_STATE_SOLICIT, "FCFTAB_STATE_SOLICIT"},
-	{FCFTAB_STATE_SOLICIT_FAILED, "FCFTAB_STATE_SOLICIT_FAILED"},
-	{FCFTAB_STATE_SOLICIT_CMPL, "FCFTAB_STATE_SOLICIT_CMPL"},
+	{FC_FCFTAB_STATE_TOPO, "FCFTAB_TOPO"},
+	{FC_FCFTAB_STATE_TOPO_FAILED, "FCFTAB_TOPO_FAILED"},
+	{FC_FCFTAB_STATE_TOPO_CMPL, "FCFTAB_TOPO_CMPL"},
 
-	{FCFTAB_STATE_READ, "FCFTAB_STATE_READ"},
-	{FCFTAB_STATE_READ_FAILED, "FCFTAB_STATE_READ_FAILED"},
-	{FCFTAB_STATE_READ_CMPL, "FCFTAB_STATE_READ_CMPL"},
+	{FC_FCFTAB_STATE_CFGLINK, "FCFTAB_CFGLINK"},
+	{FC_FCFTAB_STATE_CFGLINK_FAILED, "FCFTAB_CFGLINK_FAILED"},
+	{FC_FCFTAB_STATE_CFGLINK_CMPL, "FCFTAB_CFGLINK_CMPL"},
 
-	{FCFTAB_STATE_FCFI_OFFLINE, "FCFTAB_STATE_FCFI_OFFLINE"},
-	{FCFTAB_STATE_FCFI_OFFLINE_CMPL, "FCFTAB_STATE_FCFI_OFFLINE_CMPL"},
+	{FC_FCFTAB_STATE_SPARM, "FCFTAB_SPARM"},
+	{FC_FCFTAB_STATE_SPARM_FAILED, "FCFTAB_SPARM_FAILED"},
+	{FC_FCFTAB_STATE_SPARM_CMPL, "FCFTAB_SPARM_CMPL"},
 
-	{FCFTAB_STATE_FCFI_ONLINE, "FCFTAB_STATE_FCFI_ONLINE"},
-	{FCFTAB_STATE_FCFI_ONLINE_CMPL, "FCFTAB_STATE_FCFI_ONLINE_CMPL"},
+	{FC_FCFTAB_STATE_FCFI_OFFLINE_CMPL,
+	    "FCFTAB_FCFI_OFFLINE_CMPL"},
+	{FC_FCFTAB_STATE_FCFI_OFFLINE, "FCFTAB_FCFI_OFFLINE"},
 
-	{FCFTAB_STATE_ONLINE, "FCFTAB_STATE_ONLINE"},
+	{FC_FCFTAB_STATE_FCFI_ONLINE, "FCFTAB_FCFI_ONLINE"},
+	{FC_FCFTAB_STATE_FCFI_ONLINE_CMPL, "FCFTAB_FCFI_ONLINE_CMPL"},
 
-}; /* emlxs_fcftab_state_table */
+	{FC_FCFTAB_STATE_ONLINE, "FCFTAB_ONLINE"},
 
+}; /* emlxs_fc_fcftab_state_table */
 
-static uint32_t emlxs_fcftab_sol_cmpl_action(emlxs_port_t *port,
+static void emlxs_fc_fcftab_online_timer(emlxs_hba_t *hba);
+
+static uint32_t emlxs_fc_fcftab_offline_action(emlxs_port_t *port,
 			uint32_t evt, void *arg1);
-static uint32_t emlxs_fcftab_sol_failed_action(emlxs_port_t *port,
-			uint32_t evt, void *arg1);
-static uint32_t emlxs_fcftab_sol_action(emlxs_port_t *port,
-			uint32_t evt, void *arg1);
-static uint32_t emlxs_fcftab_shutdown_evt_action(emlxs_port_t *port,
-			uint32_t evt, void *arg1);
-static uint32_t emlxs_fcftab_linkdown_evt_action(emlxs_port_t *port,
-			uint32_t evt, void *arg1);
-static uint32_t emlxs_fcftab_read_action(emlxs_port_t *port,
-			uint32_t evt, void *arg1);
-static uint32_t emlxs_fcftab_read_failed_action(emlxs_port_t *port,
-			uint32_t evt, void *arg1);
-static uint32_t emlxs_fcftab_read_cmpl_action(emlxs_port_t *port,
-			uint32_t evt, void *arg1);
-static uint32_t emlxs_fcftab_fcfi_online_action(emlxs_port_t *port,
-			uint32_t evt, void *arg1);
-static uint32_t emlxs_fcftab_fcfi_online_cmpl_action(emlxs_port_t *port,
-			uint32_t evt, void *arg1);
-static uint32_t emlxs_fcftab_fcfi_offline_action(emlxs_port_t *port,
-			uint32_t evt, void *arg1);
-static uint32_t emlxs_fcftab_fcfi_offline_cmpl_action(emlxs_port_t *port,
-			uint32_t evt, void *arg1);
-static uint32_t emlxs_fcftab_found_evt_action(emlxs_port_t *port,
-			uint32_t evt, void *arg1);
-static uint32_t emlxs_fcftab_lost_evt_action(emlxs_port_t *port,
-			uint32_t evt, void *arg1);
-static uint32_t emlxs_fcftab_changed_evt_action(emlxs_port_t *port,
-			uint32_t evt, void *arg1);
-static uint32_t emlxs_fcftab_full_evt_action(emlxs_port_t *port,
-			uint32_t evt, void *arg1);
-static uint32_t emlxs_fcftab_linkup_evt_action(emlxs_port_t *port,
-			uint32_t evt, void *arg1);
-static uint32_t emlxs_fcftab_cvl_evt_action(emlxs_port_t *port,
-			uint32_t evt, void *arg1);
-static uint32_t emlxs_fcftab_online_action(emlxs_port_t *port,
-			uint32_t evt, void *arg1);
-static uint32_t emlxs_fcftab_offline_action(emlxs_port_t *port,
-			uint32_t evt, void *arg1);
-static uint32_t emlxs_fcftab_fcfi_offline_evt_action(emlxs_port_t *port,
-			uint32_t evt, void *arg1);
-static uint32_t emlxs_fcftab_fcfi_online_evt_action(emlxs_port_t *port,
-			uint32_t evt, void *arg1);
-static uint32_t emlxs_fcftab_shutdown_action(emlxs_port_t *port,
+static uint32_t emlxs_fc_fcftab_online_action(emlxs_port_t *port,
 			uint32_t evt, void *arg1);
 
-static void emlxs_fcftab_read_timer(emlxs_hba_t *hba);
-static void emlxs_fcftab_sol_timer(emlxs_hba_t *hba);
-static void emlxs_fcftab_offline_timer(emlxs_hba_t *hba);
-static char *emlxs_fcftab_state_xlate(uint32_t state);
-static uint32_t emlxs_fcftab_event(emlxs_port_t *port,
+static uint32_t emlxs_fc_fcftab_topo_cmpl_action(emlxs_port_t *port,
 			uint32_t evt, void *arg1);
+static uint32_t emlxs_fc_fcftab_topo_failed_action(emlxs_port_t *port,
+			uint32_t evt, void *arg1);
+static uint32_t emlxs_fc_fcftab_topo_action(emlxs_port_t *port,
+			uint32_t evt, void *arg1);
+
+static uint32_t emlxs_fc_fcftab_cfglink_cmpl_action(emlxs_port_t *port,
+			uint32_t evt, void *arg1);
+static uint32_t emlxs_fc_fcftab_cfglink_failed_action(emlxs_port_t *port,
+			uint32_t evt, void *arg1);
+static uint32_t emlxs_fc_fcftab_cfglink_action(emlxs_port_t *port,
+			uint32_t evt, void *arg1);
+
+static uint32_t emlxs_fc_fcftab_sparm_cmpl_action(emlxs_port_t *port,
+			uint32_t evt, void *arg1);
+static uint32_t emlxs_fc_fcftab_sparm_failed_action(emlxs_port_t *port,
+			uint32_t evt, void *arg1);
+static uint32_t emlxs_fc_fcftab_sparm_action(emlxs_port_t *port,
+			uint32_t evt, void *arg1);
+
+static uint32_t emlxs_fc_fcftab_linkup_evt_action(emlxs_port_t *port,
+			uint32_t evt, void *arg1);
+static uint32_t emlxs_fc_fcftab_linkdown_evt_action(emlxs_port_t *port,
+			uint32_t evt, void *arg1);
+
+static uint32_t emlxs_fc_fcftab_fcfi_online_evt_action(emlxs_port_t *port,
+			uint32_t evt, void *arg1);
+static uint32_t emlxs_fc_fcftab_fcfi_offline_evt_action(emlxs_port_t *port,
+			uint32_t evt, void *arg1);
+
+static uint32_t emlxs_fc_fcftab_shutdown_evt_action(emlxs_port_t *port,
+			uint32_t evt, void *arg1);
+static uint32_t emlxs_fc_fcftab_fcfi_offline_action(emlxs_port_t *port,
+			uint32_t evt, void *arg1);
+static uint32_t emlxs_fc_fcftab_fcfi_offline_cmpl_action(emlxs_port_t *port,
+			uint32_t evt, void *arg1);
+static uint32_t emlxs_fc_fcftab_fcfi_online_action(emlxs_port_t *port,
+			uint32_t evt, void *arg1);
+static uint32_t emlxs_fc_fcftab_fcfi_online_cmpl_action(emlxs_port_t *port,
+			uint32_t evt, void *arg1);
+
+static char *emlxs_fc_fcftab_state_xlate(uint32_t state);
+static uint32_t emlxs_fc_fcftab_event(emlxs_port_t *port,
+			uint32_t evt, void *arg1);
+static uint32_t emlxs_fc_fcftab_req_handler(emlxs_port_t *port, void *arg1);
 
 /*
- * - Online sequencing can start from FCFI_STATE_OFFLINE state
+ * - Online sequencing can start from FC_FCFTAB_STATE_OFFLINE state
  *
  * - Offline sequencing can interrupt the online sequencing at the
  * entry of the next wait state.
@@ -244,32 +281,291 @@ static uint32_t emlxs_fcftab_event(emlxs_port_t *port,
  * NORMAL ONLINE SEQ
  * ---------------------------
  * LINK_UP event <-- Adapter
- * FCFTAB_STATE_OFFLINE
- * FCFTAB_STATE_SOLICIT
- *     FCFTAB_STATE_SOLICIT_CMPL
- * FCFTAB_STATE_READ
- *     FCFTAB_STATE_READ_CMPL
- * FCFTAB_STATE_FCFI_OFFLINE
- *     FCFTAB_STATE_FCFI_OFFLINE_CMPL
- * FCFTAB_STATE_FCFI_ONLINE
- *     FCFTAB_STATE_FCFI_ONLINE_CMPL
- * FCFTAB_STATE_ONLINE
+ * FC_FCFTAB_STATE_OFFLINE
+ * FC_FCFTAB_STATE_TOPO
+ *     FC_FCFTAB_STATE_TOPO_CMPL
+ * FC_FCFTAB_STATE_CFGLINK
+ *     FC_FCFTAB_STATE_CFGLINK_CMPL
+ * FC_FCFTAB_STATE_SPARM
+ *     FC_FCFTAB_STATE_SPARM_CMPL
+ * FC_FCFTAB_STATE_FCFI_ONLINE
+ *     FC_FCFTAB_STATE_FCFI_ONLINE_CMPL
+ * FC_FCFTAB_STATE_ONLINE
  *
  *
  * NORMAL OFFLINE SEQ
  * ---------------------------
  * LINK_DOWN event <-- Adapter
- * FCFTAB_STATE_ONLINE
- * FCFTAB_STATE_FCFI_OFFLINE
- *     FCFTAB_STATE_FCFI_OFFLINE_CMPL
- * FCFTAB_STATE_OFFLINE
+ * FC_FCFTAB_STATE_ONLINE
+ * FC_FCFTAB_STATE_FCFI_OFFLINE
+ *     FC_FCFTAB_STATE_FCFI_OFFLINE_CMPL
+ * FC_FCFTAB_STATE_OFFLINE
  *
  */
 /* Order does matter */
-static void *emlxs_fcftab_action_table[] =
+static void *emlxs_fc_fcftab_action_table[] =
 {
 	/* Action routine				Event */
-/* FCFTAB_STATE_SHUTDOWN  0		(Requires adapter reset) */
+/* FC_FCFTAB_STATE_SHUTDOWN  0			(Requires adapter reset) */
+	(void *) emlxs_fcftab_shutdown_action,		/* STATE_ENTER */
+	(void *) NULL,					/* SHUTDOWN */
+	(void *) NULL,					/* LINK_UP */
+	(void *) NULL,					/* LINK_DOWN */
+	(void *) NULL,					/* FCFI_ONLINE */
+	(void *) emlxs_fc_fcftab_fcfi_offline_evt_action, /* FCFI_OFFLINE */
+
+/* FC_FCFTAB_STATE_OFFLINE  1			(Wait for LINK_UP event) */
+	(void *) emlxs_fc_fcftab_offline_action,	/* STATE_ENTER */
+	(void *) emlxs_fc_fcftab_shutdown_evt_action,	/* SHUTDOWN */
+	(void *) emlxs_fc_fcftab_linkup_evt_action,	/* LINK_UP */
+	(void *) emlxs_fc_fcftab_linkdown_evt_action,	/* LINK_DOWN */
+	(void *) emlxs_fc_fcftab_fcfi_online_evt_action, /* FCFI_ONLINE */
+	(void *) emlxs_fc_fcftab_fcfi_offline_evt_action, /* FCFI_OFFLINE */
+
+
+/* FC_FCFTAB_STATE_TOPO  2			(Wait for topo mbcmpl) */
+	(void *) emlxs_fc_fcftab_topo_action,		/* STATE_ENTER */
+	(void *) emlxs_fc_fcftab_shutdown_evt_action,	/* SHUTDOWN */
+	(void *) emlxs_fc_fcftab_linkup_evt_action,	/* LINK_UP */
+	(void *) emlxs_fc_fcftab_linkdown_evt_action,	/* LINK_DOWN */
+	(void *) emlxs_fc_fcftab_fcfi_online_evt_action, /* FCFI_ONLINE */
+	(void *) emlxs_fc_fcftab_fcfi_offline_evt_action, /* FCFI_OFFLINE */
+
+/* FC_FCFTAB_STATE_TOPO_FAILED  3		(Transitional) */
+	(void *) emlxs_fc_fcftab_topo_failed_action,	/* STATE_ENTER */
+	(void *) emlxs_fc_fcftab_shutdown_evt_action,	/* SHUTDOWN */
+	(void *) emlxs_fc_fcftab_linkup_evt_action,	/* LINK_UP */
+	(void *) emlxs_fc_fcftab_linkdown_evt_action,	/* LINK_DOWN */
+	(void *) emlxs_fc_fcftab_fcfi_online_evt_action, /* FCFI_ONLINE */
+	(void *) emlxs_fc_fcftab_fcfi_offline_evt_action, /* FCFI_OFFLINE */
+
+/* FC_FCFTAB_STATE_TOPO_CMPL  4			(Transitional) */
+	(void *) emlxs_fc_fcftab_topo_cmpl_action,	/* STATE_ENTER */
+	(void *) emlxs_fc_fcftab_shutdown_evt_action,	/* SHUTDOWN */
+	(void *) emlxs_fc_fcftab_linkup_evt_action,	/* LINK_UP */
+	(void *) emlxs_fc_fcftab_linkdown_evt_action,	/* LINK_DOWN */
+	(void *) emlxs_fc_fcftab_fcfi_online_evt_action, /* FCFI_ONLINE */
+	(void *) emlxs_fc_fcftab_fcfi_offline_evt_action, /* FCFI_OFFLINE */
+
+
+/* FC_FCFTAB_STATE_CFGLINK  5			(Wait for cfglink mbcmpl) */
+	(void *) emlxs_fc_fcftab_cfglink_action,	/* STATE_ENTER */
+	(void *) emlxs_fc_fcftab_shutdown_evt_action,	/* SHUTDOWN */
+	(void *) emlxs_fc_fcftab_linkup_evt_action,	/* LINK_UP */
+	(void *) emlxs_fc_fcftab_linkdown_evt_action,	/* LINK_DOWN */
+	(void *) emlxs_fc_fcftab_fcfi_online_evt_action, /* FCFI_ONLINE */
+	(void *) emlxs_fc_fcftab_fcfi_offline_evt_action, /* FCFI_OFFLINE */
+
+/* FC_FCFTAB_STATE_CFGLINK_FAILED  6		(Transitional) */
+	(void *) emlxs_fc_fcftab_cfglink_failed_action,	/* STATE_ENTER */
+	(void *) emlxs_fc_fcftab_shutdown_evt_action,	/* SHUTDOWN */
+	(void *) emlxs_fc_fcftab_linkup_evt_action,	/* LINK_UP */
+	(void *) emlxs_fc_fcftab_linkdown_evt_action,	/* LINK_DOWN */
+	(void *) emlxs_fc_fcftab_fcfi_online_evt_action, /* FCFI_ONLINE */
+	(void *) emlxs_fc_fcftab_fcfi_offline_evt_action, /* FCFI_OFFLINE */
+
+/* FC_FCFTAB_STATE_CFGLINK_CMPL  7			(Transitional) */
+	(void *) emlxs_fc_fcftab_cfglink_cmpl_action,	/* STATE_ENTER */
+	(void *) emlxs_fc_fcftab_shutdown_evt_action,	/* SHUTDOWN */
+	(void *) emlxs_fc_fcftab_linkup_evt_action,	/* LINK_UP */
+	(void *) emlxs_fc_fcftab_linkdown_evt_action,	/* LINK_DOWN */
+	(void *) emlxs_fc_fcftab_fcfi_online_evt_action, /* FCFI_ONLINE */
+	(void *) emlxs_fc_fcftab_fcfi_offline_evt_action, /* FCFI_OFFLINE */
+
+
+/* FC_FCFTAB_STATE_SPARM  8			(Wait for sparm mbcmpl) */
+	(void *) emlxs_fc_fcftab_sparm_action,		/* STATE_ENTER */
+	(void *) emlxs_fc_fcftab_shutdown_evt_action,	/* SHUTDOWN */
+	(void *) emlxs_fc_fcftab_linkup_evt_action,	/* LINK_UP */
+	(void *) emlxs_fc_fcftab_linkdown_evt_action,	/* LINK_DOWN */
+	(void *) emlxs_fc_fcftab_fcfi_online_evt_action, /* FCFI_ONLINE */
+	(void *) emlxs_fc_fcftab_fcfi_offline_evt_action, /* FCFI_OFFLINE */
+
+/* FC_FCFTAB_STATE_SPARM_FAILED  9		(Transitional) */
+	(void *) emlxs_fc_fcftab_sparm_failed_action,	/* STATE_ENTER */
+	(void *) emlxs_fc_fcftab_shutdown_evt_action,	/* SHUTDOWN */
+	(void *) emlxs_fc_fcftab_linkup_evt_action,	/* LINK_UP */
+	(void *) emlxs_fc_fcftab_linkdown_evt_action,	/* LINK_DOWN */
+	(void *) emlxs_fc_fcftab_fcfi_online_evt_action, /* FCFI_ONLINE */
+	(void *) emlxs_fc_fcftab_fcfi_offline_evt_action, /* FCFI_OFFLINE */
+
+/* FC_FCFTAB_STATE_SPARM_CMPL  10		(Transitional) */
+	(void *) emlxs_fc_fcftab_sparm_cmpl_action,	/* STATE_ENTER */
+	(void *) emlxs_fc_fcftab_shutdown_evt_action,	/* SHUTDOWN */
+	(void *) emlxs_fc_fcftab_linkup_evt_action,	/* LINK_UP */
+	(void *) emlxs_fc_fcftab_linkdown_evt_action,	/* LINK_DOWN */
+	(void *) emlxs_fc_fcftab_fcfi_online_evt_action, /* FCFI_ONLINE */
+	(void *) emlxs_fc_fcftab_fcfi_offline_evt_action, /* FCFI_OFFLINE */
+
+
+/* FC_FCFTAB_STATE_FCFI_OFFLINE_CMPL  11	(Transitional) */
+	(void *) emlxs_fc_fcftab_fcfi_offline_cmpl_action, /* STATE_ENTER */
+	(void *) emlxs_fc_fcftab_shutdown_evt_action,	/* SHUTDOWN */
+	(void *) emlxs_fc_fcftab_linkup_evt_action,	/* LINK_UP */
+	(void *) emlxs_fc_fcftab_linkdown_evt_action,	/* LINK_DOWN */
+	(void *) emlxs_fc_fcftab_fcfi_online_evt_action, /* FCFI_ONLINE */
+	(void *) emlxs_fc_fcftab_fcfi_offline_evt_action, /* FCFI_OFFLINE */
+
+/* FC_FCFTAB_STATE_FCFI_OFFLINE  12		(Wait for FCFI_OFFLINE event) */
+	(void *) emlxs_fc_fcftab_fcfi_offline_action,	/* STATE_ENTER */
+	(void *) emlxs_fc_fcftab_shutdown_evt_action,	/* SHUTDOWN */
+	(void *) emlxs_fc_fcftab_linkup_evt_action,	/* LINK_UP */
+	(void *) emlxs_fc_fcftab_linkdown_evt_action,	/* LINK_DOWN */
+	(void *) emlxs_fc_fcftab_fcfi_online_evt_action, /* FCFI_ONLINE */
+	(void *) emlxs_fc_fcftab_fcfi_offline_evt_action, /* FCFI_OFFLINE */
+
+
+/* FC_FCFTAB_STATE_FCFI_ONLINE  13		(Wait for FCFI_ONLINE event) */
+	(void *) emlxs_fc_fcftab_fcfi_online_action,	/* STATE_ENTER */
+	(void *) emlxs_fc_fcftab_shutdown_evt_action,	/* SHUTDOWN */
+	(void *) emlxs_fc_fcftab_linkup_evt_action,	/* LINK_UP */
+	(void *) emlxs_fc_fcftab_linkdown_evt_action,	/* LINK_DOWN */
+	(void *) emlxs_fc_fcftab_fcfi_online_evt_action, /* FCFI_ONLINE */
+	(void *) emlxs_fc_fcftab_fcfi_offline_evt_action, /* FCFI_OFFLINE */
+
+/* FC_FCFTAB_STATE_FCFI_ONLINE_CMPL  14		(Transitional) */
+	(void *) emlxs_fc_fcftab_fcfi_online_cmpl_action, /* STATE_ENTER */
+	(void *) emlxs_fc_fcftab_shutdown_evt_action,	/* SHUTDOWN */
+	(void *) emlxs_fc_fcftab_linkup_evt_action,	/* LINK_UP */
+	(void *) emlxs_fc_fcftab_linkdown_evt_action,	/* LINK_DOWN */
+	(void *) emlxs_fc_fcftab_fcfi_online_evt_action, /* FCFI_ONLINE */
+	(void *) emlxs_fc_fcftab_fcfi_offline_evt_action, /* FCFI_OFFLINE */
+
+
+/* FC_FCFTAB_STATE_ONLINE  15			(Wait for LINK_DOWN evt) */
+	(void *) emlxs_fc_fcftab_online_action,		/* STATE_ENTER */
+	(void *) emlxs_fc_fcftab_shutdown_evt_action,	/* SHUTDOWN */
+	(void *) emlxs_fc_fcftab_linkup_evt_action,	/* LINK_UP */
+	(void *) emlxs_fc_fcftab_linkdown_evt_action,	/* LINK_DOWN */
+	(void *) emlxs_fc_fcftab_fcfi_online_evt_action, /* FCFI_ONLINE */
+	(void *) emlxs_fc_fcftab_fcfi_offline_evt_action, /* FCFI_OFFLINE */
+
+}; /* emlxs_fc_fcftab_action_table[] */
+#define	FC_FCFTAB_ACTION_EVENTS			6
+#define	FC_FCFTAB_ACTION_STATES			\
+	(sizeof (emlxs_fc_fcftab_action_table)/ \
+	(FC_FCFTAB_ACTION_EVENTS * sizeof (void *)))
+
+
+/* ********************************************************************** */
+/* FCOE FCFTAB */
+/* ********************************************************************** */
+
+/* Order does not matter */
+emlxs_table_t emlxs_fcoe_fcftab_state_table[] =
+{
+	{FCOE_FCFTAB_STATE_SHUTDOWN, "FCFTAB_SHUTDOWN"},
+	{FCOE_FCFTAB_STATE_OFFLINE, "FCFTAB_OFFLINE"},
+
+	{FCOE_FCFTAB_STATE_SOLICIT, "FCFTAB_SOLICIT"},
+	{FCOE_FCFTAB_STATE_SOLICIT_FAILED, "FCFTAB_SOLICIT_FAILED"},
+	{FCOE_FCFTAB_STATE_SOLICIT_CMPL, "FCFTAB_SOLICIT_CMPL"},
+
+	{FCOE_FCFTAB_STATE_READ, "FCFTAB_READ"},
+	{FCOE_FCFTAB_STATE_READ_FAILED, "FCFTAB_READ_FAILED"},
+	{FCOE_FCFTAB_STATE_READ_CMPL, "FCFTAB_READ_CMPL"},
+
+	{FCOE_FCFTAB_STATE_FCFI_OFFLINE_CMPL,
+	    "FCFTAB_FCFI_OFFLINE_CMPL"},
+	{FCOE_FCFTAB_STATE_FCFI_OFFLINE, "FCFTAB_FCFI_OFFLINE"},
+
+	{FCOE_FCFTAB_STATE_FCFI_ONLINE, "FCFTAB_FCFI_ONLINE"},
+	{FCOE_FCFTAB_STATE_FCFI_ONLINE_CMPL,
+	    "FCFTAB_FCFI_ONLINE_CMPL"},
+
+	{FCOE_FCFTAB_STATE_ONLINE, "FCFTAB_ONLINE"},
+
+}; /* emlxs_fcoe_fcftab_state_table */
+
+static uint32_t emlxs_fcoe_fcftab_sol_cmpl_action(emlxs_port_t *port,
+			uint32_t evt, void *arg1);
+static uint32_t emlxs_fcoe_fcftab_sol_failed_action(emlxs_port_t *port,
+			uint32_t evt, void *arg1);
+static uint32_t emlxs_fcoe_fcftab_sol_action(emlxs_port_t *port,
+			uint32_t evt, void *arg1);
+static uint32_t emlxs_fcoe_fcftab_shutdown_evt_action(emlxs_port_t *port,
+			uint32_t evt, void *arg1);
+static uint32_t emlxs_fcoe_fcftab_linkdown_evt_action(emlxs_port_t *port,
+			uint32_t evt, void *arg1);
+static uint32_t emlxs_fcoe_fcftab_read_action(emlxs_port_t *port,
+			uint32_t evt, void *arg1);
+static uint32_t emlxs_fcoe_fcftab_read_failed_action(emlxs_port_t *port,
+			uint32_t evt, void *arg1);
+static uint32_t emlxs_fcoe_fcftab_read_cmpl_action(emlxs_port_t *port,
+			uint32_t evt, void *arg1);
+static uint32_t emlxs_fcoe_fcftab_fcfi_online_action(emlxs_port_t *port,
+			uint32_t evt, void *arg1);
+static uint32_t emlxs_fcoe_fcftab_fcfi_online_cmpl_action(emlxs_port_t *port,
+			uint32_t evt, void *arg1);
+static uint32_t emlxs_fcoe_fcftab_fcfi_offline_action(emlxs_port_t *port,
+			uint32_t evt, void *arg1);
+static uint32_t emlxs_fcoe_fcftab_fcfi_offline_cmpl_action(emlxs_port_t *port,
+			uint32_t evt, void *arg1);
+static uint32_t emlxs_fcoe_fcftab_found_evt_action(emlxs_port_t *port,
+			uint32_t evt, void *arg1);
+static uint32_t emlxs_fcoe_fcftab_lost_evt_action(emlxs_port_t *port,
+			uint32_t evt, void *arg1);
+static uint32_t emlxs_fcoe_fcftab_changed_evt_action(emlxs_port_t *port,
+			uint32_t evt, void *arg1);
+static uint32_t emlxs_fcoe_fcftab_full_evt_action(emlxs_port_t *port,
+			uint32_t evt, void *arg1);
+static uint32_t emlxs_fcoe_fcftab_linkup_evt_action(emlxs_port_t *port,
+			uint32_t evt, void *arg1);
+static uint32_t emlxs_fcoe_fcftab_cvl_evt_action(emlxs_port_t *port,
+			uint32_t evt, void *arg1);
+static uint32_t emlxs_fcoe_fcftab_online_action(emlxs_port_t *port,
+			uint32_t evt, void *arg1);
+static uint32_t emlxs_fcoe_fcftab_offline_action(emlxs_port_t *port,
+			uint32_t evt, void *arg1);
+static uint32_t emlxs_fcoe_fcftab_fcfi_offline_evt_action(emlxs_port_t *port,
+			uint32_t evt, void *arg1);
+static uint32_t emlxs_fcoe_fcftab_fcfi_online_evt_action(emlxs_port_t *port,
+			uint32_t evt, void *arg1);
+
+static void emlxs_fcoe_fcftab_read_timer(emlxs_hba_t *hba);
+static void emlxs_fcoe_fcftab_sol_timer(emlxs_hba_t *hba);
+static void emlxs_fcoe_fcftab_offline_timer(emlxs_hba_t *hba);
+static char *emlxs_fcoe_fcftab_state_xlate(uint32_t state);
+static uint32_t emlxs_fcoe_fcftab_event(emlxs_port_t *port,
+			uint32_t evt, void *arg1);
+static uint32_t emlxs_fcoe_fcftab_state(emlxs_port_t *port, uint16_t state,
+	uint16_t reason, uint32_t explain, void *arg1);
+
+/*
+ * - Online sequencing can start from FCOE_FCFTAB_STATE_OFFLINE state
+ *
+ * - Offline sequencing can interrupt the online sequencing at the
+ * entry of the next wait state.
+ *
+ * NORMAL ONLINE SEQ
+ * ---------------------------
+ * LINK_UP event <-- Adapter
+ * FCOE_FCFTAB_STATE_OFFLINE
+ * FCOE_FCFTAB_STATE_SOLICIT
+ *     FCOE_FCFTAB_STATE_SOLICIT_CMPL
+ * FCOE_FCFTAB_STATE_READ
+ *     FCOE_FCFTAB_STATE_READ_CMPL
+ * FCOE_FCFTAB_STATE_FCFI_OFFLINE
+ *     FCOE_FCFTAB_STATE_FCFI_OFFLINE_CMPL
+ * FCOE_FCFTAB_STATE_FCFI_ONLINE
+ *     FCOE_FCFTAB_STATE_FCFI_ONLINE_CMPL
+ * FCOE_FCFTAB_STATE_ONLINE
+ *
+ *
+ * NORMAL OFFLINE SEQ
+ * ---------------------------
+ * LINK_DOWN event <-- Adapter
+ * FCOE_FCFTAB_STATE_ONLINE
+ * FCOE_FCFTAB_STATE_FCFI_OFFLINE
+ *     FCOE_FCFTAB_STATE_FCFI_OFFLINE_CMPL
+ * FCOE_FCFTAB_STATE_OFFLINE
+ *
+ */
+/* Order does matter */
+static void *emlxs_fcoe_fcftab_action_table[] =
+{
+	/* Action routine				Event */
+/* FCOE_FCFTAB_STATE_SHUTDOWN  0		(Requires adapter reset) */
 	(void *) emlxs_fcftab_shutdown_action,		/* STATE_ENTER */
 	(void *) NULL,					/* SHUTDOWN */
 	(void *) NULL,					/* LINK_UP */
@@ -280,186 +576,175 @@ static void *emlxs_fcftab_action_table[] =
 	(void *) NULL,					/* FCF_CHANGED */
 	(void *) NULL,					/* TABLE_FULL */
 	(void *) NULL,					/* FCFI_ONLINE */
-	(void *) emlxs_fcftab_fcfi_offline_evt_action,	/* FCFI_OFFLINE */
+	(void *) emlxs_fcoe_fcftab_fcfi_offline_evt_action, /* FCFI_OFFLINE */
 
-/* FCFTAB_STATE_OFFLINE  1		(Wait for LINK_UP event) */
-	(void *) emlxs_fcftab_offline_action,		/* STATE_ENTER */
-	(void *) emlxs_fcftab_shutdown_evt_action,	/* SHUTDOWN */
-	(void *) emlxs_fcftab_linkup_evt_action,	/* LINK_UP */
-	(void *) emlxs_fcftab_linkdown_evt_action,	/* LINK_DOWN */
-	(void *) emlxs_fcftab_cvl_evt_action,		/* CVL_RECD */
-	(void *) emlxs_fcftab_found_evt_action,		/* FCF_FOUND */
-	(void *) emlxs_fcftab_lost_evt_action,		/* FCF_LOST */
-	(void *) emlxs_fcftab_changed_evt_action,	/* FCF_CHANGED */
-	(void *) emlxs_fcftab_full_evt_action,		/* TABLE_FULL */
-	(void *) emlxs_fcftab_fcfi_online_evt_action,	/* FCFI_ONLINE */
-	(void *) emlxs_fcftab_fcfi_offline_evt_action,	/* FCFI_OFFLINE */
-
-
-/* FCFTAB_STATE_SOLICIT  2		(Wait on fcf_solicit cmpl) */
-	(void *) emlxs_fcftab_sol_action,		/* STATE_ENTER */
-	(void *) emlxs_fcftab_shutdown_evt_action,	/* SHUTDOWN */
-	(void *) emlxs_fcftab_linkup_evt_action,	/* LINK_UP */
-	(void *) emlxs_fcftab_linkdown_evt_action,	/* LINK_DOWN */
-	(void *) emlxs_fcftab_cvl_evt_action,		/* CVL_RECD */
-	(void *) emlxs_fcftab_found_evt_action,		/* FCF_FOUND */
-	(void *) emlxs_fcftab_lost_evt_action,		/* FCF_LOST */
-	(void *) emlxs_fcftab_changed_evt_action,	/* FCF_CHANGED */
-	(void *) emlxs_fcftab_full_evt_action,		/* TABLE_FULL */
-	(void *) emlxs_fcftab_fcfi_online_evt_action,	/* FCFI_ONLINE */
-	(void *) emlxs_fcftab_fcfi_offline_evt_action,	/* FCFI_OFFLINE */
-
-/* FCFTAB_STATE_SOLICIT_FAILED  3	(Transitional) */
-	(void *) emlxs_fcftab_sol_failed_action,	/* STATE_ENTER */
-	(void *) emlxs_fcftab_shutdown_evt_action,	/* SHUTDOWN */
-	(void *) emlxs_fcftab_linkup_evt_action,	/* LINK_UP */
-	(void *) emlxs_fcftab_linkdown_evt_action,	/* LINK_DOWN */
-	(void *) emlxs_fcftab_cvl_evt_action,		/* CVL_RECD */
-	(void *) emlxs_fcftab_found_evt_action,		/* FCF_FOUND */
-	(void *) emlxs_fcftab_lost_evt_action,		/* FCF_LOST */
-	(void *) emlxs_fcftab_changed_evt_action,	/* FCF_CHANGED */
-	(void *) emlxs_fcftab_full_evt_action,		/* TABLE_FULL */
-	(void *) emlxs_fcftab_fcfi_online_evt_action,	/* FCFI_ONLINE */
-	(void *) emlxs_fcftab_fcfi_offline_evt_action,	/* FCFI_OFFLINE */
-
-/* FCFTAB_STATE_SOLICIT_CMPL  4		(Wait on fcf timer cmpl) */
-	(void *) emlxs_fcftab_sol_cmpl_action,		/* STATE_ENTER */
-	(void *) emlxs_fcftab_shutdown_evt_action,	/* SHUTDOWN */
-	(void *) emlxs_fcftab_linkup_evt_action,	/* LINK_UP */
-	(void *) emlxs_fcftab_linkdown_evt_action,	/* LINK_DOWN */
-	(void *) emlxs_fcftab_cvl_evt_action,		/* CVL_RECD */
-	(void *) emlxs_fcftab_found_evt_action,		/* FCF_FOUND */
-	(void *) emlxs_fcftab_lost_evt_action,		/* FCF_LOST */
-	(void *) emlxs_fcftab_changed_evt_action,	/* FCF_CHANGED */
-	(void *) emlxs_fcftab_full_evt_action,		/* TABLE_FULL */
-	(void *) emlxs_fcftab_fcfi_online_evt_action,	/* FCFI_ONLINE */
-	(void *) emlxs_fcftab_fcfi_offline_evt_action,	/* FCFI_OFFLINE */
+/* FCOE_FCFTAB_STATE_OFFLINE  1			(Wait for LINK_UP event) */
+	(void *) emlxs_fcoe_fcftab_offline_action,	/* STATE_ENTER */
+	(void *) emlxs_fcoe_fcftab_shutdown_evt_action,	/* SHUTDOWN */
+	(void *) emlxs_fcoe_fcftab_linkup_evt_action,	/* LINK_UP */
+	(void *) emlxs_fcoe_fcftab_linkdown_evt_action,	/* LINK_DOWN */
+	(void *) emlxs_fcoe_fcftab_cvl_evt_action,	/* CVL_RECD */
+	(void *) emlxs_fcoe_fcftab_found_evt_action,	/* FCF_FOUND */
+	(void *) emlxs_fcoe_fcftab_lost_evt_action,	/* FCF_LOST */
+	(void *) emlxs_fcoe_fcftab_changed_evt_action,	/* FCF_CHANGED */
+	(void *) emlxs_fcoe_fcftab_full_evt_action,	/* TABLE_FULL */
+	(void *) emlxs_fcoe_fcftab_fcfi_online_evt_action, /* FCFI_ONLINE */
+	(void *) emlxs_fcoe_fcftab_fcfi_offline_evt_action, /* FCFI_OFFLINE */
 
 
-/* FCFTAB_STATE_READ  5			(Wait on fcf_read cmpl) */
-	(void *) emlxs_fcftab_read_action,		/* STATE_ENTER */
-	(void *) emlxs_fcftab_shutdown_evt_action,	/* SHUTDOWN */
-	(void *) emlxs_fcftab_linkup_evt_action,	/* LINK_UP */
-	(void *) emlxs_fcftab_linkdown_evt_action,	/* LINK_DOWN */
-	(void *) emlxs_fcftab_cvl_evt_action,		/* CVL_RECD */
-	(void *) emlxs_fcftab_found_evt_action,		/* FCF_FOUND */
-	(void *) emlxs_fcftab_lost_evt_action,		/* FCF_LOST */
-	(void *) emlxs_fcftab_changed_evt_action,	/* FCF_CHANGED */
-	(void *) emlxs_fcftab_full_evt_action,		/* TABLE_FULL */
-	(void *) emlxs_fcftab_fcfi_online_evt_action,	/* FCFI_ONLINE */
-	(void *) emlxs_fcftab_fcfi_offline_evt_action,	/* FCFI_OFFLINE */
+/* FCOE_FCFTAB_STATE_SOLICIT  2			(Wait on fcf_solicit cmpl) */
+	(void *) emlxs_fcoe_fcftab_sol_action,		/* STATE_ENTER */
+	(void *) emlxs_fcoe_fcftab_shutdown_evt_action,	/* SHUTDOWN */
+	(void *) emlxs_fcoe_fcftab_linkup_evt_action,	/* LINK_UP */
+	(void *) emlxs_fcoe_fcftab_linkdown_evt_action,	/* LINK_DOWN */
+	(void *) emlxs_fcoe_fcftab_cvl_evt_action,	/* CVL_RECD */
+	(void *) emlxs_fcoe_fcftab_found_evt_action,	/* FCF_FOUND */
+	(void *) emlxs_fcoe_fcftab_lost_evt_action,	/* FCF_LOST */
+	(void *) emlxs_fcoe_fcftab_changed_evt_action,	/* FCF_CHANGED */
+	(void *) emlxs_fcoe_fcftab_full_evt_action,	/* TABLE_FULL */
+	(void *) emlxs_fcoe_fcftab_fcfi_online_evt_action, /* FCFI_ONLINE */
+	(void *) emlxs_fcoe_fcftab_fcfi_offline_evt_action, /* FCFI_OFFLINE */
 
-/* FCFTAB_STATE_READ_FAILED  6		(Transitional) */
-	(void *) emlxs_fcftab_read_failed_action,	/* STATE_ENTER */
-	(void *) emlxs_fcftab_shutdown_evt_action,	/* SHUTDOWN */
-	(void *) emlxs_fcftab_linkup_evt_action,	/* LINK_UP */
-	(void *) emlxs_fcftab_linkdown_evt_action,	/* LINK_DOWN */
-	(void *) emlxs_fcftab_cvl_evt_action,		/* CVL_RECD */
-	(void *) emlxs_fcftab_found_evt_action,		/* FCF_FOUND */
-	(void *) emlxs_fcftab_lost_evt_action,		/* FCF_LOST */
-	(void *) emlxs_fcftab_changed_evt_action,	/* FCF_CHANGED */
-	(void *) emlxs_fcftab_full_evt_action,		/* TABLE_FULL */
-	(void *) emlxs_fcftab_fcfi_online_evt_action,	/* FCFI_ONLINE */
-	(void *) emlxs_fcftab_fcfi_offline_evt_action,	/* FCFI_OFFLINE */
+/* FCOE_FCFTAB_STATE_SOLICIT_FAILED  3		(Transitional) */
+	(void *) emlxs_fcoe_fcftab_sol_failed_action,	/* STATE_ENTER */
+	(void *) emlxs_fcoe_fcftab_shutdown_evt_action,	/* SHUTDOWN */
+	(void *) emlxs_fcoe_fcftab_linkup_evt_action,	/* LINK_UP */
+	(void *) emlxs_fcoe_fcftab_linkdown_evt_action,	/* LINK_DOWN */
+	(void *) emlxs_fcoe_fcftab_cvl_evt_action,	/* CVL_RECD */
+	(void *) emlxs_fcoe_fcftab_found_evt_action,	/* FCF_FOUND */
+	(void *) emlxs_fcoe_fcftab_lost_evt_action,	/* FCF_LOST */
+	(void *) emlxs_fcoe_fcftab_changed_evt_action,	/* FCF_CHANGED */
+	(void *) emlxs_fcoe_fcftab_full_evt_action,	/* TABLE_FULL */
+	(void *) emlxs_fcoe_fcftab_fcfi_online_evt_action, /* FCFI_ONLINE */
+	(void *) emlxs_fcoe_fcftab_fcfi_offline_evt_action, /* FCFI_OFFLINE */
 
-/* FCFTAB_STATE_READ_CMPL  7		(Transitional) */
-	(void *) emlxs_fcftab_read_cmpl_action,		/* STATE_ENTER */
-	(void *) emlxs_fcftab_shutdown_evt_action,	/* SHUTDOWN */
-	(void *) emlxs_fcftab_linkup_evt_action,	/* LINK_UP */
-	(void *) emlxs_fcftab_linkdown_evt_action,	/* LINK_DOWN */
-	(void *) emlxs_fcftab_cvl_evt_action,		/* CVL_RECD */
-	(void *) emlxs_fcftab_found_evt_action,		/* FCF_FOUND */
-	(void *) emlxs_fcftab_lost_evt_action,		/* FCF_LOST */
-	(void *) emlxs_fcftab_changed_evt_action,	/* FCF_CHANGED */
-	(void *) emlxs_fcftab_full_evt_action,		/* TABLE_FULL */
-	(void *) emlxs_fcftab_fcfi_online_evt_action,	/* FCFI_ONLINE */
-	(void *) emlxs_fcftab_fcfi_offline_evt_action,	/* FCFI_OFFLINE */
-
-
-/* FCFTAB_STATE_FCFI_OFFLINE_CMPL  8	(Transitional) */
-	(void *) emlxs_fcftab_fcfi_offline_cmpl_action,	/* STATE_ENTER */
-	(void *) emlxs_fcftab_shutdown_evt_action,	/* SHUTDOWN */
-	(void *) emlxs_fcftab_linkup_evt_action,	/* LINK_UP */
-	(void *) emlxs_fcftab_linkdown_evt_action,	/* LINK_DOWN */
-	(void *) emlxs_fcftab_cvl_evt_action,		/* CVL_RECD */
-	(void *) emlxs_fcftab_found_evt_action,		/* FCF_FOUND */
-	(void *) emlxs_fcftab_lost_evt_action,		/* FCF_LOST */
-	(void *) emlxs_fcftab_changed_evt_action,	/* FCF_CHANGED */
-	(void *) emlxs_fcftab_full_evt_action,		/* TABLE_FULL */
-	(void *) emlxs_fcftab_fcfi_online_evt_action,	/* FCFI_ONLINE */
-	(void *) emlxs_fcftab_fcfi_offline_evt_action,	/* FCFI_OFFLINE */
-
-/* FCFTAB_STATE_FCFI_OFFLINE  9		(Wait for FCFI_OFFLINE event) */
-	(void *) emlxs_fcftab_fcfi_offline_action,	/* STATE_ENTER */
-	(void *) emlxs_fcftab_shutdown_evt_action,	/* SHUTDOWN */
-	(void *) emlxs_fcftab_linkup_evt_action,	/* LINK_UP */
-	(void *) emlxs_fcftab_linkdown_evt_action,	/* LINK_DOWN */
-	(void *) emlxs_fcftab_cvl_evt_action,		/* CVL_RECD */
-	(void *) emlxs_fcftab_found_evt_action,		/* FCF_FOUND */
-	(void *) emlxs_fcftab_lost_evt_action,		/* FCF_LOST */
-	(void *) emlxs_fcftab_changed_evt_action,	/* FCF_CHANGED */
-	(void *) emlxs_fcftab_full_evt_action,		/* TABLE_FULL */
-	(void *) emlxs_fcftab_fcfi_online_evt_action,	/* FCFI_ONLINE */
-	(void *) emlxs_fcftab_fcfi_offline_evt_action,	/* FCFI_OFFLINE */
+/* FCOE_FCFTAB_STATE_SOLICIT_CMPL  4		(Wait on fcf timer cmpl) */
+	(void *) emlxs_fcoe_fcftab_sol_cmpl_action,	/* STATE_ENTER */
+	(void *) emlxs_fcoe_fcftab_shutdown_evt_action,	/* SHUTDOWN */
+	(void *) emlxs_fcoe_fcftab_linkup_evt_action,	/* LINK_UP */
+	(void *) emlxs_fcoe_fcftab_linkdown_evt_action,	/* LINK_DOWN */
+	(void *) emlxs_fcoe_fcftab_cvl_evt_action,	/* CVL_RECD */
+	(void *) emlxs_fcoe_fcftab_found_evt_action,	/* FCF_FOUND */
+	(void *) emlxs_fcoe_fcftab_lost_evt_action,	/* FCF_LOST */
+	(void *) emlxs_fcoe_fcftab_changed_evt_action,	/* FCF_CHANGED */
+	(void *) emlxs_fcoe_fcftab_full_evt_action,	/* TABLE_FULL */
+	(void *) emlxs_fcoe_fcftab_fcfi_online_evt_action, /* FCFI_ONLINE */
+	(void *) emlxs_fcoe_fcftab_fcfi_offline_evt_action, /* FCFI_OFFLINE */
 
 
-/* FCFTAB_STATE_FCFI_ONLINE  10		(Wait on FCFI_ONLINE event) */
-	(void *) emlxs_fcftab_fcfi_online_action,	/* STATE_ENTER */
-	(void *) emlxs_fcftab_shutdown_evt_action,	/* SHUTDOWN */
-	(void *) emlxs_fcftab_linkup_evt_action,	/* LINK_UP */
-	(void *) emlxs_fcftab_linkdown_evt_action,	/* LINK_DOWN */
-	(void *) emlxs_fcftab_cvl_evt_action,		/* CVL_RECD */
-	(void *) emlxs_fcftab_found_evt_action,		/* FCF_FOUND */
-	(void *) emlxs_fcftab_lost_evt_action,		/* FCF_LOST */
-	(void *) emlxs_fcftab_changed_evt_action,	/* FCF_CHANGED */
-	(void *) emlxs_fcftab_full_evt_action,		/* TABLE_FULL */
-	(void *) emlxs_fcftab_fcfi_online_evt_action,	/* FCFI_ONLINE */
-	(void *) emlxs_fcftab_fcfi_offline_evt_action,	/* FCFI_OFFLINE */
+/* FCOE_FCFTAB_STATE_READ  5			(Wait on fcf_read cmpl) */
+	(void *) emlxs_fcoe_fcftab_read_action,		/* STATE_ENTER */
+	(void *) emlxs_fcoe_fcftab_shutdown_evt_action,	/* SHUTDOWN */
+	(void *) emlxs_fcoe_fcftab_linkup_evt_action,	/* LINK_UP */
+	(void *) emlxs_fcoe_fcftab_linkdown_evt_action,	/* LINK_DOWN */
+	(void *) emlxs_fcoe_fcftab_cvl_evt_action,	/* CVL_RECD */
+	(void *) emlxs_fcoe_fcftab_found_evt_action,	/* FCF_FOUND */
+	(void *) emlxs_fcoe_fcftab_lost_evt_action,	/* FCF_LOST */
+	(void *) emlxs_fcoe_fcftab_changed_evt_action,	/* FCF_CHANGED */
+	(void *) emlxs_fcoe_fcftab_full_evt_action,	/* TABLE_FULL */
+	(void *) emlxs_fcoe_fcftab_fcfi_online_evt_action, /* FCFI_ONLINE */
+	(void *) emlxs_fcoe_fcftab_fcfi_offline_evt_action, /* FCFI_OFFLINE */
 
-/* FCFTAB_STATE_FCFI_ONLINE_CMPL  11	(Transitional) */
-	(void *) emlxs_fcftab_fcfi_online_cmpl_action,	/* STATE_ENTER */
-	(void *) emlxs_fcftab_shutdown_evt_action,	/* SHUTDOWN */
-	(void *) emlxs_fcftab_linkup_evt_action,	/* LINK_UP */
-	(void *) emlxs_fcftab_linkdown_evt_action,	/* LINK_DOWN */
-	(void *) emlxs_fcftab_cvl_evt_action,		/* CVL_RECD */
-	(void *) emlxs_fcftab_found_evt_action,		/* FCF_FOUND */
-	(void *) emlxs_fcftab_lost_evt_action,		/* FCF_LOST */
-	(void *) emlxs_fcftab_changed_evt_action,	/* FCF_CHANGED */
-	(void *) emlxs_fcftab_full_evt_action,		/* TABLE_FULL */
-	(void *) emlxs_fcftab_fcfi_online_evt_action,	/* FCFI_ONLINE */
-	(void *) emlxs_fcftab_fcfi_offline_evt_action,	/* FCFI_OFFLINE */
+/* FCOE_FCFTAB_STATE_READ_FAILED  6		(Transitional) */
+	(void *) emlxs_fcoe_fcftab_read_failed_action,	/* STATE_ENTER */
+	(void *) emlxs_fcoe_fcftab_shutdown_evt_action,	/* SHUTDOWN */
+	(void *) emlxs_fcoe_fcftab_linkup_evt_action,	/* LINK_UP */
+	(void *) emlxs_fcoe_fcftab_linkdown_evt_action,	/* LINK_DOWN */
+	(void *) emlxs_fcoe_fcftab_cvl_evt_action,	/* CVL_RECD */
+	(void *) emlxs_fcoe_fcftab_found_evt_action,	/* FCF_FOUND */
+	(void *) emlxs_fcoe_fcftab_lost_evt_action,	/* FCF_LOST */
+	(void *) emlxs_fcoe_fcftab_changed_evt_action,	/* FCF_CHANGED */
+	(void *) emlxs_fcoe_fcftab_full_evt_action,	/* TABLE_FULL */
+	(void *) emlxs_fcoe_fcftab_fcfi_online_evt_action, /* FCFI_ONLINE */
+	(void *) emlxs_fcoe_fcftab_fcfi_offline_evt_action, /* FCFI_OFFLINE */
 
-
-/* FCFTAB_STATE_ONLINE  12		(Wait for LINK_DOWN event) */
-	(void *) emlxs_fcftab_online_action,		/* STATE_ENTER */
-	(void *) emlxs_fcftab_shutdown_evt_action,	/* SHUTDOWN */
-	(void *) emlxs_fcftab_linkup_evt_action,	/* LINK_UP */
-	(void *) emlxs_fcftab_linkdown_evt_action,	/* LINK_DOWN */
-	(void *) emlxs_fcftab_cvl_evt_action,		/* CVL_RECD */
-	(void *) emlxs_fcftab_found_evt_action,		/* FCF_FOUND */
-	(void *) emlxs_fcftab_lost_evt_action,		/* FCF_LOST */
-	(void *) emlxs_fcftab_changed_evt_action,	/* FCF_CHANGED */
-	(void *) emlxs_fcftab_full_evt_action,		/* TABLE_FULL */
-	(void *) emlxs_fcftab_fcfi_online_evt_action,	/* FCFI_ONLINE */
-	(void *) emlxs_fcftab_fcfi_offline_evt_action,	/* FCFI_OFFLINE */
-
-}; /* emlxs_fcftab_action_table[] */
-#define	FCFTAB_ACTION_EVENTS			11
-#define	FCFTAB_ACTION_STATES			\
-	(sizeof (emlxs_fcftab_action_table)/ \
-	(FCFTAB_ACTION_EVENTS * sizeof (void *)))
+/* FCOE_FCFTAB_STATE_READ_CMPL  7		(Transitional) */
+	(void *) emlxs_fcoe_fcftab_read_cmpl_action,	/* STATE_ENTER */
+	(void *) emlxs_fcoe_fcftab_shutdown_evt_action,	/* SHUTDOWN */
+	(void *) emlxs_fcoe_fcftab_linkup_evt_action,	/* LINK_UP */
+	(void *) emlxs_fcoe_fcftab_linkdown_evt_action,	/* LINK_DOWN */
+	(void *) emlxs_fcoe_fcftab_cvl_evt_action,	/* CVL_RECD */
+	(void *) emlxs_fcoe_fcftab_found_evt_action,	/* FCF_FOUND */
+	(void *) emlxs_fcoe_fcftab_lost_evt_action,	/* FCF_LOST */
+	(void *) emlxs_fcoe_fcftab_changed_evt_action,	/* FCF_CHANGED */
+	(void *) emlxs_fcoe_fcftab_full_evt_action,	/* TABLE_FULL */
+	(void *) emlxs_fcoe_fcftab_fcfi_online_evt_action, /* FCFI_ONLINE */
+	(void *) emlxs_fcoe_fcftab_fcfi_offline_evt_action, /* FCFI_OFFLINE */
 
 
-/* ********************************************************************** */
-/* VFTAB - This will be needed for multi-virtual fabric environments */
-/* ********************************************************************** */
+/* FCOE_FCFTAB_STATE_FCFI_OFFLINE_CMPL  8	(Transitional) */
+	(void *) emlxs_fcoe_fcftab_fcfi_offline_cmpl_action, /* STATE_ENTER */
+	(void *) emlxs_fcoe_fcftab_shutdown_evt_action,	/* SHUTDOWN */
+	(void *) emlxs_fcoe_fcftab_linkup_evt_action,	/* LINK_UP */
+	(void *) emlxs_fcoe_fcftab_linkdown_evt_action,	/* LINK_DOWN */
+	(void *) emlxs_fcoe_fcftab_cvl_evt_action,	/* CVL_RECD */
+	(void *) emlxs_fcoe_fcftab_found_evt_action,	/* FCF_FOUND */
+	(void *) emlxs_fcoe_fcftab_lost_evt_action,	/* FCF_LOST */
+	(void *) emlxs_fcoe_fcftab_changed_evt_action,	/* FCF_CHANGED */
+	(void *) emlxs_fcoe_fcftab_full_evt_action,	/* TABLE_FULL */
+	(void *) emlxs_fcoe_fcftab_fcfi_online_evt_action, /* FCFI_ONLINE */
+	(void *) emlxs_fcoe_fcftab_fcfi_offline_evt_action, /* FCFI_OFFLINE */
 
-/* Order does not matter */
-emlxs_table_t emlxs_vftab_state_table[] =
-{
-	{VFTAB_STATE_DISABLED, "VFTAB_STATE_DISABLED"},
+/* FCOE_FCFTAB_STATE_FCFI_OFFLINE  9		(Wait for FCFI_OFFLINE event) */
+	(void *) emlxs_fcoe_fcftab_fcfi_offline_action,	/* STATE_ENTER */
+	(void *) emlxs_fcoe_fcftab_shutdown_evt_action,	/* SHUTDOWN */
+	(void *) emlxs_fcoe_fcftab_linkup_evt_action,	/* LINK_UP */
+	(void *) emlxs_fcoe_fcftab_linkdown_evt_action,	/* LINK_DOWN */
+	(void *) emlxs_fcoe_fcftab_cvl_evt_action,	/* CVL_RECD */
+	(void *) emlxs_fcoe_fcftab_found_evt_action,	/* FCF_FOUND */
+	(void *) emlxs_fcoe_fcftab_lost_evt_action,	/* FCF_LOST */
+	(void *) emlxs_fcoe_fcftab_changed_evt_action,	/* FCF_CHANGED */
+	(void *) emlxs_fcoe_fcftab_full_evt_action,	/* TABLE_FULL */
+	(void *) emlxs_fcoe_fcftab_fcfi_online_evt_action, /* FCFI_ONLINE */
+	(void *) emlxs_fcoe_fcftab_fcfi_offline_evt_action, /* FCFI_OFFLINE */
 
-}; /* emlxs_vftab_state_table */
+
+/* FCOE_FCFTAB_STATE_FCFI_ONLINE  10		(Wait on FCFI_ONLINE event) */
+	(void *) emlxs_fcoe_fcftab_fcfi_online_action,	/* STATE_ENTER */
+	(void *) emlxs_fcoe_fcftab_shutdown_evt_action,	/* SHUTDOWN */
+	(void *) emlxs_fcoe_fcftab_linkup_evt_action,	/* LINK_UP */
+	(void *) emlxs_fcoe_fcftab_linkdown_evt_action,	/* LINK_DOWN */
+	(void *) emlxs_fcoe_fcftab_cvl_evt_action,	/* CVL_RECD */
+	(void *) emlxs_fcoe_fcftab_found_evt_action,	/* FCF_FOUND */
+	(void *) emlxs_fcoe_fcftab_lost_evt_action,	/* FCF_LOST */
+	(void *) emlxs_fcoe_fcftab_changed_evt_action,	/* FCF_CHANGED */
+	(void *) emlxs_fcoe_fcftab_full_evt_action,	/* TABLE_FULL */
+	(void *) emlxs_fcoe_fcftab_fcfi_online_evt_action, /* FCFI_ONLINE */
+	(void *) emlxs_fcoe_fcftab_fcfi_offline_evt_action, /* FCFI_OFFLINE */
+
+/* FCOE_FCFTAB_STATE_FCFI_ONLINE_CMPL  11	(Transitional) */
+	(void *) emlxs_fcoe_fcftab_fcfi_online_cmpl_action, /* STATE_ENTER */
+	(void *) emlxs_fcoe_fcftab_shutdown_evt_action,	/* SHUTDOWN */
+	(void *) emlxs_fcoe_fcftab_linkup_evt_action,	/* LINK_UP */
+	(void *) emlxs_fcoe_fcftab_linkdown_evt_action,	/* LINK_DOWN */
+	(void *) emlxs_fcoe_fcftab_cvl_evt_action,	/* CVL_RECD */
+	(void *) emlxs_fcoe_fcftab_found_evt_action,	/* FCF_FOUND */
+	(void *) emlxs_fcoe_fcftab_lost_evt_action,	/* FCF_LOST */
+	(void *) emlxs_fcoe_fcftab_changed_evt_action,	/* FCF_CHANGED */
+	(void *) emlxs_fcoe_fcftab_full_evt_action,	/* TABLE_FULL */
+	(void *) emlxs_fcoe_fcftab_fcfi_online_evt_action, /* FCFI_ONLINE */
+	(void *) emlxs_fcoe_fcftab_fcfi_offline_evt_action, /* FCFI_OFFLINE */
+
+
+/* FCOE_FCFTAB_STATE_ONLINE  12			(Wait for LINK_DOWN event) */
+	(void *) emlxs_fcoe_fcftab_online_action,	/* STATE_ENTER */
+	(void *) emlxs_fcoe_fcftab_shutdown_evt_action,	/* SHUTDOWN */
+	(void *) emlxs_fcoe_fcftab_linkup_evt_action,	/* LINK_UP */
+	(void *) emlxs_fcoe_fcftab_linkdown_evt_action,	/* LINK_DOWN */
+	(void *) emlxs_fcoe_fcftab_cvl_evt_action,	/* CVL_RECD */
+	(void *) emlxs_fcoe_fcftab_found_evt_action,	/* FCF_FOUND */
+	(void *) emlxs_fcoe_fcftab_lost_evt_action,	/* FCF_LOST */
+	(void *) emlxs_fcoe_fcftab_changed_evt_action,	/* FCF_CHANGED */
+	(void *) emlxs_fcoe_fcftab_full_evt_action,	/* TABLE_FULL */
+	(void *) emlxs_fcoe_fcftab_fcfi_online_evt_action, /* FCFI_ONLINE */
+	(void *) emlxs_fcoe_fcftab_fcfi_offline_evt_action, /* FCFI_OFFLINE */
+
+}; /* emlxs_fcoe_fcftab_action_table[] */
+#define	FCOE_FCFTAB_ACTION_EVENTS			11
+#define	FCOE_FCFTAB_ACTION_STATES			\
+	(sizeof (emlxs_fcoe_fcftab_action_table)/ \
+	(FCOE_FCFTAB_ACTION_EVENTS * sizeof (void *)))
+
 
 
 
@@ -470,26 +755,26 @@ emlxs_table_t emlxs_vftab_state_table[] =
 /* Order does not matter */
 emlxs_table_t emlxs_fcfi_state_table[] =
 {
-	{FCFI_STATE_FREE, "FCFI_STATE_FREE"},
+	{FCFI_STATE_FREE, "FCFI_FREE"},
 
-	{FCFI_STATE_OFFLINE, "FCFI_STATE_OFFLINE"},
+	{FCFI_STATE_OFFLINE, "FCFI_OFFLINE"},
 
-	{FCFI_STATE_UNREG_CMPL, "FCFI_STATE_UNREG_CMPL"},
-	{FCFI_STATE_UNREG_FAILED, "FCFI_STATE_UNREG_FAILED"},
-	{FCFI_STATE_UNREG, "FCFI_STATE_UNREG"},
+	{FCFI_STATE_UNREG_CMPL, "FCFI_UNREG_CMPL"},
+	{FCFI_STATE_UNREG_FAILED, "FCFI_UNREG_FAILED"},
+	{FCFI_STATE_UNREG, "FCFI_UNREG"},
 
-	{FCFI_STATE_REG, "FCFI_STATE_REG"},
-	{FCFI_STATE_REG_FAILED, "FCFI_STATE_REG_FAILED"},
-	{FCFI_STATE_REG_CMPL, "FCFI_STATE_REG_CMPL"},
+	{FCFI_STATE_REG, "FCFI_REG"},
+	{FCFI_STATE_REG_FAILED, "FCFI_REG_FAILED"},
+	{FCFI_STATE_REG_CMPL, "FCFI_REG_CMPL"},
 
-	{FCFI_STATE_VFI_OFFLINE_CMPL, "FCFI_STATE_VFI_OFFLINE_CMPL"},
-	{FCFI_STATE_VFI_OFFLINE, "FCFI_STATE_VFI_OFFLINE"},
+	{FCFI_STATE_VFI_OFFLINE_CMPL, "FCFI_VFI_OFFLINE_CMPL"},
+	{FCFI_STATE_VFI_OFFLINE, "FCFI_VFI_OFFLINE"},
 
-	{FCFI_STATE_VFI_ONLINE, "FCFI_STATE_VFI_ONLINE"},
-	{FCFI_STATE_VFI_ONLINE_CMPL, "FCFI_STATE_VFI_ONLINE_CMPL"},
+	{FCFI_STATE_VFI_ONLINE, "FCFI_VFI_ONLINE"},
+	{FCFI_STATE_VFI_ONLINE_CMPL, "FCFI_VFI_ONLINE_CMPL"},
 
-	{FCFI_STATE_PAUSED, "FCFI_STATE_PAUSED"},
-	{FCFI_STATE_ONLINE, "FCFI_STATE_ONLINE"},
+	{FCFI_STATE_PAUSED, "FCFI_PAUSED"},
+	{FCFI_STATE_ONLINE, "FCFI_ONLINE"},
 
 }; /* emlxs_fcfi_state_table */
 
@@ -712,28 +997,28 @@ static void *emlxs_fcfi_action_table[] =
 /* Order does not matter */
 emlxs_table_t emlxs_vfi_state_table[] =
 {
-	{VFI_STATE_OFFLINE, "VFI_STATE_OFFLINE"},
+	{VFI_STATE_OFFLINE, "VFI_OFFLINE"},
 
-	{VFI_STATE_INIT, "VFI_STATE_INIT"},
-	{VFI_STATE_INIT_FAILED, "VFI_STATE_INIT_FAILED"},
-	{VFI_STATE_INIT_CMPL, "VFI_STATE_INIT_CMPL"},
+	{VFI_STATE_INIT, "VFI_INIT"},
+	{VFI_STATE_INIT_FAILED, "VFI_INIT_FAILED"},
+	{VFI_STATE_INIT_CMPL, "VFI_INIT_CMPL"},
 
-	{VFI_STATE_VPI_OFFLINE_CMPL, "VFI_STATE_VPI_OFFLINE_CMPL"},
-	{VFI_STATE_VPI_OFFLINE, "VFI_STATE_VPI_OFFLINE"},
+	{VFI_STATE_VPI_OFFLINE_CMPL, "VFI_VPI_OFFLINE_CMPL"},
+	{VFI_STATE_VPI_OFFLINE, "VFI_VPI_OFFLINE"},
 
-	{VFI_STATE_VPI_ONLINE, "VFI_STATE_VPI_ONLINE"},
-	{VFI_STATE_VPI_ONLINE_CMPL, "VFI_STATE_VPI_ONLINE_CMPL"},
+	{VFI_STATE_VPI_ONLINE, "VFI_VPI_ONLINE"},
+	{VFI_STATE_VPI_ONLINE_CMPL, "VFI_VPI_ONLINE_CMPL"},
 
-	{VFI_STATE_UNREG_CMPL, "VFI_STATE_UNREG_CMPL"},
-	{VFI_STATE_UNREG_FAILED, "VFI_STATE_UNREG_FAILED"},
-	{VFI_STATE_UNREG, "VFI_STATE_UNREG"},
+	{VFI_STATE_UNREG_CMPL, "VFI_UNREG_CMPL"},
+	{VFI_STATE_UNREG_FAILED, "VFI_UNREG_FAILED"},
+	{VFI_STATE_UNREG, "VFI_UNREG"},
 
-	{VFI_STATE_REG, "VFI_STATE_REG"},
-	{VFI_STATE_REG_FAILED, "VFI_STATE_REG_FAILED"},
-	{VFI_STATE_REG_CMPL, "VFI_STATE_REG_CMPL"},
+	{VFI_STATE_REG, "VFI_REG"},
+	{VFI_STATE_REG_FAILED, "VFI_REG_FAILED"},
+	{VFI_STATE_REG_CMPL, "VFI_REG_CMPL"},
 
-	{VFI_STATE_PAUSED, "VFI_STATE_PAUSED"},
-	{VFI_STATE_ONLINE, "VFI_STATE_ONLINE"},
+	{VFI_STATE_PAUSED, "VFI_PAUSED"},
+	{VFI_STATE_ONLINE, "VFI_ONLINE"},
 
 }; /* emlxs_vfi_state_table */
 
@@ -977,33 +1262,33 @@ static void *emlxs_vfi_action_table[] =
 /* Order does not matter */
 emlxs_table_t emlxs_vpi_state_table[] =
 {
-	{VPI_STATE_OFFLINE, "VPI_STATE_OFFLINE"},
+	{VPI_STATE_OFFLINE, "VPI_OFFLINE"},
 
-	{VPI_STATE_INIT, "VPI_STATE_INIT"},
-	{VPI_STATE_INIT_FAILED, "VPI_STATE_INIT_FAILED"},
-	{VPI_STATE_INIT_CMPL, "VPI_STATE_INIT_CMPL"},
+	{VPI_STATE_INIT, "VPI_INIT"},
+	{VPI_STATE_INIT_FAILED, "VPI_INIT_FAILED"},
+	{VPI_STATE_INIT_CMPL, "VPI_INIT_CMPL"},
 
-	{VPI_STATE_UNREG_CMPL, "VPI_STATE_UNREG_CMPL"},
-	{VPI_STATE_UNREG_FAILED, "VPI_STATE_UNREG_FAILED"},
-	{VPI_STATE_UNREG, "VPI_STATE_UNREG"},
+	{VPI_STATE_UNREG_CMPL, "VPI_UNREG_CMPL"},
+	{VPI_STATE_UNREG_FAILED, "VPI_UNREG_FAILED"},
+	{VPI_STATE_UNREG, "VPI_UNREG"},
 
-	{VPI_STATE_LOGO_CMPL, "VPI_STATE_LOGO_CMPL"},
-	{VPI_STATE_LOGO_FAILED, "VPI_STATE_LOGO_FAILED"},
-	{VPI_STATE_LOGO, "VPI_STATE_LOGO"},
+	{VPI_STATE_LOGO_CMPL, "VPI_LOGO_CMPL"},
+	{VPI_STATE_LOGO_FAILED, "VPI_LOGO_FAILED"},
+	{VPI_STATE_LOGO, "VPI_LOGO"},
 
-	{VPI_STATE_PORT_OFFLINE, "VPI_STATE_PORT_OFFLINE"},
-	{VPI_STATE_PORT_ONLINE, "VPI_STATE_PORT_ONLINE"},
+	{VPI_STATE_PORT_OFFLINE, "VPI_PORT_OFFLINE"},
+	{VPI_STATE_PORT_ONLINE, "VPI_PORT_ONLINE"},
 
-	{VPI_STATE_LOGI, "VPI_STATE_LOGI"},
-	{VPI_STATE_LOGI_FAILED, "VPI_STATE_LOGI_FAILED"},
-	{VPI_STATE_LOGI_CMPL, "VPI_STATE_LOGI_CMPL"},
+	{VPI_STATE_LOGI, "VPI_LOGI"},
+	{VPI_STATE_LOGI_FAILED, "VPI_LOGI_FAILED"},
+	{VPI_STATE_LOGI_CMPL, "VPI_LOGI_CMPL"},
 
-	{VPI_STATE_REG, "VPI_STATE_REG"},
-	{VPI_STATE_REG_FAILED, "VPI_STATE_REG_FAILED"},
-	{VPI_STATE_REG_CMPL, "VPI_STATE_REG_CMPL"},
+	{VPI_STATE_REG, "VPI_REG"},
+	{VPI_STATE_REG_FAILED, "VPI_REG_FAILED"},
+	{VPI_STATE_REG_CMPL, "VPI_REG_CMPL"},
 
-	{VPI_STATE_PAUSED, "VPI_STATE_PAUSED"},
-	{VPI_STATE_ONLINE, "VPI_STATE_ONLINE"},
+	{VPI_STATE_PAUSED, "VPI_PAUSED"},
+	{VPI_STATE_ONLINE, "VPI_ONLINE"},
 
 }; /* emlxs_vpi_state_table */
 
@@ -1070,8 +1355,10 @@ static uint32_t emlxs_vpi_logo_cmpl_action(emlxs_port_t *port,
 
 static uint32_t emlxs_vpi_event(emlxs_port_t *port,
 			uint32_t evt, void *arg1);
-static void emlxs_vpi_flogi_cmpl(emlxs_port_t *port, VPIobj_t *vpip,
-			uint32_t status);
+static uint32_t emlxs_vpi_logi_cmpl_notify(emlxs_port_t *port,
+			RPIobj_t *rpip);
+static void emlxs_vpi_logo_handler(emlxs_port_t *port,
+			VPIobj_t *vpip);
 
 /*
  * - Online sequencing can only start from VPI_STATE_OFFLINE or
@@ -1321,25 +1608,26 @@ static void *emlxs_vpi_action_table[] =
 /* Order does not matter */
 emlxs_table_t emlxs_rpi_state_table[] =
 {
-	{RPI_STATE_FREE, "RPI_STATE_FREE"},
+	{RPI_STATE_FREE, "RPI_FREE"},
 
-	{RPI_STATE_OFFLINE, "RPI_STATE_OFFLINE"},
+	{RPI_STATE_RESERVED, "RPI_RESERVED"},
+	{RPI_STATE_OFFLINE, "RPI_OFFLINE"},
 
-	{RPI_STATE_UNREG_CMPL, "RPI_STATE_UNREG_CMPL"},
-	{RPI_STATE_UNREG_FAILED, "RPI_STATE_UNREG_FAILED"},
-	{RPI_STATE_UNREG, "RPI_STATE_UNREG"},
+	{RPI_STATE_UNREG_CMPL, "RPI_UNREG_CMPL"},
+	{RPI_STATE_UNREG_FAILED, "RPI_UNREG_FAILED"},
+	{RPI_STATE_UNREG, "RPI_UNREG"},
 
-	{RPI_STATE_REG, "RPI_STATE_REG"},
-	{RPI_STATE_REG_FAILED, "RPI_STATE_REG_FAILED"},
-	{RPI_STATE_REG_CMPL, "RPI_STATE_REG_CMPL"},
+	{RPI_STATE_REG, "RPI_REG"},
+	{RPI_STATE_REG_FAILED, "RPI_REG_FAILED"},
+	{RPI_STATE_REG_CMPL, "RPI_REG_CMPL"},
 
-	{RPI_STATE_PAUSED, "RPI_STATE_PAUSED"},
+	{RPI_STATE_PAUSED, "RPI_PAUSED"},
 
-	{RPI_STATE_RESUME, "RPI_STATE_RESUME"},
-	{RPI_STATE_RESUME_FAILED, "RPI_STATE_RESUME_FAILED"},
-	{RPI_STATE_RESUME_CMPL, "RPI_STATE_RESUME_CMPL"},
+	{RPI_STATE_RESUME, "RPI_RESUME"},
+	{RPI_STATE_RESUME_FAILED, "RPI_RESUME_FAILED"},
+	{RPI_STATE_RESUME_CMPL, "RPI_RESUME_CMPL"},
 
-	{RPI_STATE_ONLINE, "RPI_STATE_ONLINE"},
+	{RPI_STATE_ONLINE, "RPI_ONLINE"},
 
 }; /* emlxs_rpi_state_table */
 
@@ -1375,6 +1663,8 @@ static uint32_t emlxs_rpi_paused_action(emlxs_port_t *port,
 			RPIobj_t *rpip, uint32_t evt, void *arg1);
 static uint32_t emlxs_rpi_offline_action(emlxs_port_t *port,
 			RPIobj_t *rpip, uint32_t evt, void *arg1);
+static uint32_t emlxs_rpi_reserved_action(emlxs_port_t *port,
+			RPIobj_t *rpip, uint32_t evt, void *arg1);
 
 static uint32_t emlxs_rpi_resume_failed_action(emlxs_port_t *port,
 			RPIobj_t *rpip, uint32_t evt, void *arg1);
@@ -1395,8 +1685,20 @@ static void emlxs_rpi_unreg_handler(emlxs_port_t *port,
 			RPIobj_t *rpip);
 static uint32_t emlxs_rpi_reg_handler(emlxs_port_t *port,
 			RPIobj_t *rpip);
+
+static void emlxs_rpi_idle_timer(emlxs_hba_t *hba);
+
+static uint32_t emlxs_rpi_state(emlxs_port_t *port, RPIobj_t *rpip,
+			uint16_t state, uint16_t reason, uint32_t explain,
+			void *arg1);
+
+static void emlxs_rpi_alloc_fabric_rpi(emlxs_port_t *port);
+
+static void emlxs_rpi_deferred_cmpl(emlxs_port_t *port, RPIobj_t *rpip,
+			uint32_t status);
+
 /*
- * - Online sequencing can start from RPI_STATE_OFFLINE state or
+ * - Online sequencing can start from RPI_STATE_RESERVED state or
  * the RPI_STATE_PAUSED state.
  *
  * - Offline sequencing can interrupt the online sequencing at the
@@ -1405,7 +1707,7 @@ static uint32_t emlxs_rpi_reg_handler(emlxs_port_t *port,
  * NORMAL ONLINE SEQ
  * ---------------------------
  * RPI_ONLINE event <-- VPI
- * RPI_STATE_OFFLINE
+ * RPI_STATE_RESERVED
  * RPI_STATE_REG
  *     RPI_STATE_REG_CMPL
  * RPI_STATE_ONLINE
@@ -1440,28 +1742,35 @@ static void *emlxs_rpi_action_table[] =
 	(void *) NULL,					/* RPI_PAUSE */
 	(void *) NULL,					/* RPI_RESUME */
 
-/* RPI_STATE_OFFLINE  1			(Wait for RPI_ONLINE event) */
+/* RPI_STATE_RESERVED  1		(Wait for RPI_ONLINE event) */
+	(void *) emlxs_rpi_reserved_action,		/* STATE_ENTER */
+	(void *) emlxs_rpi_online_evt_action,		/* RPI_ONLINE */
+	(void *) emlxs_rpi_offline_evt_action,		/* RPI_OFFLINE */
+	(void *) emlxs_rpi_pause_evt_action,		/* RPI_PAUSE */
+	(void *) emlxs_rpi_resume_evt_action,		/* RPI_RESUME */
+
+/* RPI_STATE_OFFLINE  2			(Transitional) */
 	(void *) emlxs_rpi_offline_action,		/* STATE_ENTER */
 	(void *) emlxs_rpi_online_evt_action,		/* RPI_ONLINE */
 	(void *) emlxs_rpi_offline_evt_action,		/* RPI_OFFLINE */
 	(void *) emlxs_rpi_pause_evt_action,		/* RPI_PAUSE */
 	(void *) emlxs_rpi_resume_evt_action,		/* RPI_RESUME */
 
-/* RPI_STATE_UNREG_CMPL  2		(Transitional)  */
+/* RPI_STATE_UNREG_CMPL  3		(Transitional)  */
 	(void *) emlxs_rpi_unreg_cmpl_action,		/* STATE_ENTER */
 	(void *) emlxs_rpi_online_evt_action,		/* RPI_ONLINE */
 	(void *) emlxs_rpi_offline_evt_action,		/* RPI_OFFLINE */
 	(void *) emlxs_rpi_pause_evt_action,		/* RPI_PAUSE */
 	(void *) emlxs_rpi_resume_evt_action,		/* RPI_RESUME */
 
-/* RPI_STATE_UNREG_FAILED  3		(Transitional) */
+/* RPI_STATE_UNREG_FAILED  4		(Transitional) */
 	(void *) emlxs_rpi_unreg_failed_action, 	/* STATE_ENTER */
 	(void *) emlxs_rpi_online_evt_action,		/* RPI_ONLINE */
 	(void *) emlxs_rpi_offline_evt_action,		/* RPI_OFFLINE */
 	(void *) emlxs_rpi_pause_evt_action,		/* RPI_PAUSE */
 	(void *) emlxs_rpi_resume_evt_action,		/* RPI_RESUME */
 
-/* RPI_STATE_UNREG  4			(Wait for unreg_rpi cmpl) */
+/* RPI_STATE_UNREG  5			(Wait for unreg_rpi cmpl) */
 	(void *) emlxs_rpi_unreg_action,		/* STATE_ENTER */
 	(void *) emlxs_rpi_online_evt_action,		/* RPI_ONLINE */
 	(void *) emlxs_rpi_offline_evt_action,		/* RPI_OFFLINE */
@@ -1469,21 +1778,21 @@ static void *emlxs_rpi_action_table[] =
 	(void *) emlxs_rpi_resume_evt_action,		/* RPI_RESUME */
 
 
-/* RPI_STATE_REG  5			(Wait for reg_rpi cmpl) */
+/* RPI_STATE_REG  6			(Wait for reg_rpi cmpl) */
 	(void *) emlxs_rpi_reg_action,			/* STATE_ENTER */
 	(void *) emlxs_rpi_online_evt_action,		/* RPI_ONLINE */
 	(void *) emlxs_rpi_offline_evt_action,		/* RPI_OFFLINE */
 	(void *) emlxs_rpi_pause_evt_action,		/* RPI_PAUSE */
 	(void *) emlxs_rpi_resume_evt_action,		/* RPI_RESUME */
 
-/* RPI_STATE_REG_FAILED  6		(Transitional) */
+/* RPI_STATE_REG_FAILED  7		(Transitional) */
 	(void *) emlxs_rpi_reg_failed_action,		/* STATE_ENTER */
 	(void *) emlxs_rpi_online_evt_action,		/* RPI_ONLINE */
 	(void *) emlxs_rpi_offline_evt_action,		/* RPI_OFFLINE */
 	(void *) emlxs_rpi_pause_evt_action,		/* RPI_PAUSE */
 	(void *) emlxs_rpi_resume_evt_action,		/* RPI_RESUME */
 
-/* RPI_STATE_REG_CMPL  7		(Transitional) */
+/* RPI_STATE_REG_CMPL  8		(Transitional) */
 	(void *) emlxs_rpi_reg_cmpl_action,		/* STATE_ENTER */
 	(void *) emlxs_rpi_online_evt_action,  		/* RPI_ONLINE */
 	(void *) emlxs_rpi_offline_evt_action, 		/* RPI_OFFLINE */
@@ -1491,7 +1800,7 @@ static void *emlxs_rpi_action_table[] =
 	(void *) emlxs_rpi_resume_evt_action,		/* RPI_RESUME */
 
 
-/* RPI_STATE_PAUSED  8			(Wait for RPI_ONLINE) */
+/* RPI_STATE_PAUSED  9			(Wait for RPI_ONLINE) */
 	(void *) emlxs_rpi_paused_action,		/* STATE_ENTER */
 	(void *) emlxs_rpi_online_evt_action,		/* RPI_ONLINE */
 	(void *) emlxs_rpi_offline_evt_action,		/* RPI_OFFLINE */
@@ -1499,21 +1808,21 @@ static void *emlxs_rpi_action_table[] =
 	(void *) emlxs_rpi_resume_evt_action,		/* RPI_RESUME */
 
 
-/* RPI_STATE_RESUME  9			(Wait for resume_rpi mbcmpl) */
+/* RPI_STATE_RESUME  10			(Wait for resume_rpi mbcmpl) */
 	(void *) emlxs_rpi_resume_action,		/* STATE_ENTER */
 	(void *) emlxs_rpi_online_evt_action,		/* RPI_ONLINE */
 	(void *) emlxs_rpi_offline_evt_action,		/* RPI_OFFLINE */
 	(void *) emlxs_rpi_pause_evt_action,		/* RPI_PAUSE */
 	(void *) emlxs_rpi_resume_evt_action,		/* RPI_RESUME */
 
-/* RPI_STATE_RESUME_FAILED  10		(Transitional) */
+/* RPI_STATE_RESUME_FAILED  11		(Transitional) */
 	(void *) emlxs_rpi_resume_failed_action,	/* STATE_ENTER */
 	(void *) emlxs_rpi_online_evt_action,		/* RPI_ONLINE */
 	(void *) emlxs_rpi_offline_evt_action,		/* RPI_OFFLINE */
 	(void *) emlxs_rpi_pause_evt_action,		/* RPI_PAUSE */
 	(void *) emlxs_rpi_resume_evt_action,		/* RPI_RESUME */
 
-/* RPI_STATE_RESUME_CMPL  11		(Transitional) */
+/* RPI_STATE_RESUME_CMPL  12		(Transitional) */
 	(void *) emlxs_rpi_resume_cmpl_action, 		/* STATE_ENTER */
 	(void *) emlxs_rpi_online_evt_action,		/* RPI_ONLINE */
 	(void *) emlxs_rpi_offline_evt_action,		/* RPI_OFFLINE */
@@ -1521,7 +1830,7 @@ static void *emlxs_rpi_action_table[] =
 	(void *) emlxs_rpi_resume_evt_action,		/* RPI_RESUME */
 
 
-/* RPI_STATE_ONLINE 12			(Wait for RPI_OFFLINE event) */
+/* RPI_STATE_ONLINE 13			(Wait for RPI_OFFLINE event) */
 	(void *) emlxs_rpi_online_action,		/* STATE_ENTER */
 	(void *) emlxs_rpi_online_evt_action,		/* RPI_ONLINE */
 	(void *) emlxs_rpi_offline_evt_action,		/* RPI_OFFLINE */
@@ -1538,6 +1847,73 @@ static void *emlxs_rpi_action_table[] =
 /* ************************************************************************** */
 /* FCF Generic */
 /* ************************************************************************** */
+static void
+emlxs_fcf_linkdown(emlxs_port_t *port)
+{
+	emlxs_hba_t *hba = HBA;
+
+	if (hba->state <= FC_LINK_DOWN) {
+		return;
+	}
+
+	mutex_enter(&EMLXS_PORT_LOCK);
+
+	if (hba->state <= FC_LINK_DOWN) {
+		mutex_exit(&EMLXS_PORT_LOCK);
+		return;
+	}
+
+	HBASTATS.LinkDown++;
+	EMLXS_STATE_CHANGE_LOCKED(hba, FC_LINK_DOWN);
+
+	hba->flag &= FC_LINKDOWN_MASK;
+	hba->discovery_timer = 0;
+	hba->linkup_timer = 0;
+
+	mutex_exit(&EMLXS_PORT_LOCK);
+
+	emlxs_log_link_event(port);
+
+	return;
+
+} /* emlxs_fcf_linkdown() */
+
+
+static void
+emlxs_fcf_linkup(emlxs_port_t *port)
+{
+	emlxs_hba_t *hba = HBA;
+	emlxs_config_t *cfg = &CFG;
+
+	if (hba->state >= FC_LINK_UP) {
+		return;
+	}
+
+	mutex_enter(&EMLXS_PORT_LOCK);
+
+	if (hba->state >= FC_LINK_UP) {
+		mutex_exit(&EMLXS_PORT_LOCK);
+		return;
+	}
+
+	/* Check for any mode changes */
+	emlxs_mode_set(hba);
+
+	HBASTATS.LinkUp++;
+	EMLXS_STATE_CHANGE_LOCKED(hba, FC_LINK_UP);
+
+	hba->discovery_timer = hba->timer_tics +
+	    cfg[CFG_LINKUP_TIMEOUT].current +
+	    cfg[CFG_DISC_TIMEOUT].current;
+
+	mutex_exit(&EMLXS_PORT_LOCK);
+
+	emlxs_log_link_event(port);
+
+	return;
+
+} /* emlxs_fcf_linkup() */
+
 
 extern void
 emlxs_fcf_fini(emlxs_hba_t *hba)
@@ -1548,20 +1924,21 @@ emlxs_fcf_fini(emlxs_hba_t *hba)
 	uint32_t	i;
 	RPIobj_t	*rpip;
 
-	if (!fcftab->table) {
+	if (!(hba->sli.sli4.flag & EMLXS_SLI4_FCF_INIT)) {
 		return;
 	}
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-	    "emlxs_fcf_fini: %s flag=%x fcfi_online=%d.",
-	    emlxs_fcftab_state_xlate(fcftab->state),
+	    "fcf_fini: %s flag=%x fcfi_online=%d.",
+	    emlxs_fcftab_state_xlate(port, fcftab->state),
 	    fcftab->flag, fcftab->fcfi_online);
 
-	if (fcftab->state != FCFTAB_STATE_SHUTDOWN) {
+	if (!(fcftab->flag & EMLXS_FCFTAB_SHUTDOWN)) {
 		(void) emlxs_fcf_shutdown_notify(port, 1);
 	}
 
 	mutex_enter(&EMLXS_FCF_LOCK);
+	hba->sli.sli4.flag &= ~EMLXS_SLI4_FCF_INIT;
 
 	/* Free the FCF memory */
 
@@ -1583,7 +1960,7 @@ emlxs_fcf_fini(emlxs_hba_t *hba)
 
 	for (i = 0; i < MAX_VPORTS; i++) {
 		vport = &VPORT(i);
-		rpip = &vport->VPIobj.fcf_rpi;
+		rpip = vport->vpip->fabric_rpip;
 
 		if (rpip->state == RPI_STATE_FREE) {
 			continue;
@@ -1610,7 +1987,6 @@ emlxs_fcf_fini(emlxs_hba_t *hba)
 	hba->sli.sli4.RPICount = 0;
 
 	/* Free the mutex */
-
 	mutex_exit(&EMLXS_FCF_LOCK);
 	mutex_destroy(&EMLXS_FCF_LOCK);
 
@@ -1626,24 +2002,21 @@ emlxs_fcf_init(emlxs_hba_t *hba)
 	emlxs_port_t	*vport;
 	uint16_t	i;
 	FCFIobj_t	*fcfp;
+	VPIobj_t	*vpip;
 	VFIobj_t	*vfip;
 	RPIobj_t	*rpip;
-	char		buf[64];
 	FCFTable_t	*fcftab = &hba->sli.sli4.fcftab;
-	uint16_t	index;
 
-	if (fcftab->table) {
+	if (hba->sli.sli4.flag & EMLXS_SLI4_FCF_INIT) {
 		return;
 	}
+
+	mutex_init(&EMLXS_FCF_LOCK, NULL, MUTEX_DRIVER, NULL);
+	mutex_enter(&EMLXS_FCF_LOCK);
 
 	/* FCFTAB */
 
 	bzero(fcftab, sizeof (FCFTable_t));
-
-	(void) sprintf(buf, "%s_fcf_lock mutex", DRIVER_NAME);
-	mutex_init(&EMLXS_FCF_LOCK, buf, MUTEX_DRIVER, NULL);
-	mutex_enter(&EMLXS_FCF_LOCK);
-
 	fcftab->state = FCFTAB_STATE_OFFLINE;
 
 	/* FCFI */
@@ -1665,32 +2038,33 @@ emlxs_fcf_init(emlxs_hba_t *hba)
 	    (sizeof (VFIobj_t) * hba->sli.sli4.VFICount), KM_SLEEP);
 
 	vfip = hba->sli.sli4.VFI_table;
-	index = hba->sli.sli4.VFIBase;
-	for (i = 0; i < hba->sli.sli4.VFICount; i++, vfip++, index++) {
-		vfip->VFI = index;
+	for (i = 0; i < hba->sli.sli4.VFICount; i++, vfip++) {
+		vfip->VFI = emlxs_sli4_index_to_vfi(hba, i);
 		vfip->index = i;
-		vfip->state = VPI_STATE_OFFLINE;
+		vfip->state = VFI_STATE_OFFLINE;
 	}
 
 	/* VPI */
 
 	for (i = 0; i < MAX_VPORTS; i++) {
 		vport = &VPORT(i);
-		bzero(&vport->VPIobj, sizeof (VPIobj_t));
+		vpip = &vport->VPIobj;
 
-		vport->VPIobj.index = i;
-		vport->VPIobj.VPI = i + hba->sli.sli4.VPIBase;
-		vport->VPIobj.port = vport;
-		vport->VPIobj.state = VPI_STATE_OFFLINE;
+		bzero(vpip, sizeof (VPIobj_t));
+		vpip->index = i;
+		vpip->VPI = emlxs_sli4_index_to_vpi(hba, i);
+		vpip->port = vport;
+		vpip->state = VPI_STATE_OFFLINE;
+		vport->vpip = vpip;
 
 		/* Init the Fabric RPI's */
-		rpip = &vport->VPIobj.fcf_rpi;
+		rpip = &vpip->fabric_rpi;
 		rpip->state = RPI_STATE_FREE;
-		rpip->RPI   = 0xffff;
 		rpip->index = 0xffff;
+		rpip->RPI   = FABRIC_RPI;
 		rpip->did   = FABRIC_DID;
-		rpip->vpip  = &vport->VPIobj;
-		vport->VPIobj.rpip = rpip;
+		rpip->vpip  = vpip;
+		vpip->fabric_rpip = rpip;
 	}
 
 	/* RPI */
@@ -1699,22 +2073,22 @@ emlxs_fcf_init(emlxs_hba_t *hba)
 	    (sizeof (RPIobj_t) * hba->sli.sli4.RPICount), KM_SLEEP);
 
 	rpip = hba->sli.sli4.RPIp;
-	index = hba->sli.sli4.RPIBase;
-	for (i = 0; i < hba->sli.sli4.RPICount; i++, rpip++, index++) {
+	for (i = 0; i < hba->sli.sli4.RPICount; i++, rpip++) {
 		rpip->state = RPI_STATE_FREE;
-		rpip->RPI = index;
+		rpip->RPI = emlxs_sli4_index_to_rpi(hba, i);
 		rpip->index = i;
 	}
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-	    "emlxs_fcf_init: %s flag=%x fcfi=%d vfi=%d vpi=%d rpi=%d",
-	    emlxs_fcftab_state_xlate(fcftab->state),
+	    "fcf_init: %s flag=%x fcfi=%d vfi=%d vpi=%d rpi=%d.",
+	    emlxs_fcftab_state_xlate(port, fcftab->state),
 	    fcftab->flag,
 	    fcftab->table_count,
 	    hba->sli.sli4.VFICount,
 	    MAX_VPORTS,
 	    hba->sli.sli4.RPICount);
 
+	hba->sli.sli4.flag |= EMLXS_SLI4_FCF_INIT;
 	mutex_exit(&EMLXS_FCF_LOCK);
 
 	return;
@@ -1736,7 +2110,7 @@ emlxs_fcf_event_xlate(uint32_t state)
 		}
 	}
 
-	(void) sprintf(buffer, "event=0x%x", state);
+	(void) snprintf(buffer, sizeof (buffer), "event=0x%x", state);
 	return (buffer);
 
 } /* emlxs_fcf_event_xlate() */
@@ -1756,7 +2130,7 @@ emlxs_fcf_reason_xlate(uint32_t reason)
 		}
 	}
 
-	(void) sprintf(buffer, "reason=0x%x", reason);
+	(void) snprintf(buffer, sizeof (buffer), "reason=0x%x", reason);
 	return (buffer);
 
 } /* emlxs_fcf_reason_xlate() */
@@ -1777,11 +2151,17 @@ emlxs_fcf_timer_notify(emlxs_hba_t *hba)
 
 	mutex_enter(&EMLXS_FCF_LOCK);
 
-	emlxs_fcftab_sol_timer(hba);
+	if (SLI4_FCOE_MODE) {
+		emlxs_fcoe_fcftab_sol_timer(hba);
 
-	emlxs_fcftab_read_timer(hba);
+		emlxs_fcoe_fcftab_read_timer(hba);
 
-	emlxs_fcftab_offline_timer(hba);
+		emlxs_fcoe_fcftab_offline_timer(hba);
+	} else {
+		emlxs_fc_fcftab_online_timer(hba);
+	}
+
+	emlxs_rpi_idle_timer(hba);
 
 	mutex_exit(&EMLXS_FCF_LOCK);
 
@@ -1796,40 +2176,48 @@ emlxs_fcf_shutdown_notify(emlxs_port_t *port, uint32_t wait)
 	emlxs_hba_t *hba = HBA;
 	emlxs_port_t *pport = &PPORT;
 	FCFTable_t *fcftab = &hba->sli.sli4.fcftab;
-	uint32_t rval;
+	uint32_t rval = 0;
 	uint32_t i;
 
 	if (hba->sli_mode < EMLXS_HBA_SLI4_MODE) {
 		return (1);
 	}
 
-	if (!(pport->flag & EMLXS_PORT_BOUND)) {
+	if (!(pport->flag & EMLXS_PORT_BOUND) ||
+	    (pport->vpip->flag & EMLXS_VPI_PORT_UNBIND)) {
 		return (1);
+	}
+
+	if (fcftab->flag & EMLXS_FCFTAB_SHUTDOWN) {
+		return (0);
 	}
 
 	mutex_enter(&EMLXS_FCF_LOCK);
 
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+	    "fcf_shutdown_notify: %s flag=%x "
+	    "fcfi_online=%d. Shutting down FCFTAB. >",
+	    emlxs_fcftab_state_xlate(port, fcftab->state),
+	    fcftab->flag, fcftab->fcfi_online);
+
 	rval = emlxs_fcftab_event(port, FCF_EVENT_SHUTDOWN, 0);
 
 	if (wait && (rval == 0)) {
-		/* Wait for FCF table to shutdown */
+		/* Wait for shutdown flag */
 		i = 0;
-		while (i++ < 120) {
-			if (fcftab->flag & EMLXS_FCFTAB_SHUTDOWN) {
-				break;
-			}
-
+		while (!(fcftab->flag & EMLXS_FCFTAB_SHUTDOWN) && (i++ < 120)) {
 			mutex_exit(&EMLXS_FCF_LOCK);
-			DELAYMS(1000);
+			BUSYWAIT_MS(1000);
 			mutex_enter(&EMLXS_FCF_LOCK);
 		}
 
-		if (i >= 120) {
+		if (!(fcftab->flag & EMLXS_FCFTAB_SHUTDOWN)) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
-			    "fcf_shutdown_notify: %s flag=%x fcfi_online=%d. "
-			    "Shutdown timeout.",
-			    emlxs_fcftab_state_xlate(fcftab->state),
+			    "fcf_shutdown_notify: %s flag=%x "
+			    "fcfi_online=%d. Shutdown timeout.",
+			    emlxs_fcftab_state_xlate(port, fcftab->state),
 			    fcftab->flag, fcftab->fcfi_online);
+			rval = 1;
 		}
 	}
 
@@ -1845,17 +2233,25 @@ emlxs_fcf_linkup_notify(emlxs_port_t *port)
 {
 	emlxs_hba_t *hba = HBA;
 	emlxs_port_t *pport = &PPORT;
-	uint32_t rval;
+	FCFTable_t *fcftab = &hba->sli.sli4.fcftab;
+	uint32_t rval = 0;
 
 	if (hba->sli_mode < EMLXS_HBA_SLI4_MODE) {
 		return (1);
 	}
 
-	if (!(pport->flag & EMLXS_PORT_BOUND)) {
+	if (!(pport->flag & EMLXS_PORT_BOUND) ||
+	    (pport->vpip->flag & EMLXS_VPI_PORT_UNBIND)) {
 		return (1);
 	}
 
 	mutex_enter(&EMLXS_FCF_LOCK);
+
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+	    "fcf_linkup_notify: %s flag=%x "
+	    "fcfi_online=%d. FCFTAB Link up. >",
+	    emlxs_fcftab_state_xlate(port, fcftab->state),
+	    fcftab->flag, fcftab->fcfi_online);
 
 	rval = emlxs_fcftab_event(port, FCF_EVENT_LINKUP, 0);
 
@@ -1871,17 +2267,25 @@ emlxs_fcf_linkdown_notify(emlxs_port_t *port)
 {
 	emlxs_hba_t *hba = HBA;
 	emlxs_port_t *pport = &PPORT;
-	uint32_t rval;
+	FCFTable_t *fcftab = &hba->sli.sli4.fcftab;
+	uint32_t rval = 0;
 
 	if (hba->sli_mode < EMLXS_HBA_SLI4_MODE) {
 		return (1);
 	}
 
-	if (!(pport->flag & EMLXS_PORT_BOUND)) {
+	if (!(pport->flag & EMLXS_PORT_BOUND) ||
+	    (pport->vpip->flag & EMLXS_VPI_PORT_UNBIND)) {
 		return (1);
 	}
 
 	mutex_enter(&EMLXS_FCF_LOCK);
+
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+	    "fcf_linkdown_notify: %s flag=%x "
+	    "fcfi_online=%d. FCFTAB Link down. >",
+	    emlxs_fcftab_state_xlate(port, fcftab->state),
+	    fcftab->flag, fcftab->fcfi_online);
 
 	rval = emlxs_fcftab_event(port, FCF_EVENT_LINKDOWN, 0);
 
@@ -1897,20 +2301,28 @@ emlxs_fcf_cvl_notify(emlxs_port_t *port, uint32_t vpi)
 {
 	emlxs_hba_t *hba = HBA;
 	emlxs_port_t *pport = &PPORT;
-	uint32_t rval;
+	FCFTable_t *fcftab = &hba->sli.sli4.fcftab;
+	uint32_t rval = 0;
 
 	if (hba->sli_mode < EMLXS_HBA_SLI4_MODE) {
 		return (1);
 	}
 
-	if (!(pport->flag & EMLXS_PORT_BOUND)) {
+	if (!(pport->flag & EMLXS_PORT_BOUND) ||
+	    (pport->vpip->flag & EMLXS_VPI_PORT_UNBIND)) {
 		return (1);
 	}
 
 	mutex_enter(&EMLXS_FCF_LOCK);
 
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+	    "fcf_cvl_notify: %s flag=%x "
+	    "fcfi_online=%d. FCFTAB FCF CVL. >",
+	    emlxs_fcftab_state_xlate(port, fcftab->state),
+	    fcftab->flag, fcftab->fcfi_online);
+
 	rval = emlxs_fcftab_event(port, FCF_EVENT_CVL,
-	    (void *)((uintptr_t)vpi));
+	    (void *)((unsigned long)vpi));
 
 	mutex_exit(&EMLXS_FCF_LOCK);
 
@@ -1924,17 +2336,25 @@ emlxs_fcf_full_notify(emlxs_port_t *port)
 {
 	emlxs_hba_t *hba = HBA;
 	emlxs_port_t *pport = &PPORT;
-	uint32_t rval;
+	FCFTable_t *fcftab = &hba->sli.sli4.fcftab;
+	uint32_t rval = 0;
 
 	if (hba->sli_mode < EMLXS_HBA_SLI4_MODE) {
 		return (1);
 	}
 
-	if (!(pport->flag & EMLXS_PORT_BOUND)) {
+	if (!(pport->flag & EMLXS_PORT_BOUND) ||
+	    (pport->vpip->flag & EMLXS_VPI_PORT_UNBIND)) {
 		return (1);
 	}
 
 	mutex_enter(&EMLXS_FCF_LOCK);
+
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+	    "fcf_full_notify: %s flag=%x "
+	    "fcfi_online=%d. FCFTAB FCF full. >",
+	    emlxs_fcftab_state_xlate(port, fcftab->state),
+	    fcftab->flag, fcftab->fcfi_online);
 
 	rval = emlxs_fcftab_event(port, FCF_EVENT_FCFTAB_FULL, 0);
 
@@ -1950,20 +2370,28 @@ emlxs_fcf_found_notify(emlxs_port_t *port, uint32_t fcf_index)
 {
 	emlxs_hba_t *hba = HBA;
 	emlxs_port_t *pport = &PPORT;
-	uint32_t rval;
+	FCFTable_t *fcftab = &hba->sli.sli4.fcftab;
+	uint32_t rval = 0;
 
 	if (hba->sli_mode < EMLXS_HBA_SLI4_MODE) {
 		return (1);
 	}
 
-	if (!(pport->flag & EMLXS_PORT_BOUND)) {
+	if (!(pport->flag & EMLXS_PORT_BOUND) ||
+	    (pport->vpip->flag & EMLXS_VPI_PORT_UNBIND)) {
 		return (1);
 	}
 
 	mutex_enter(&EMLXS_FCF_LOCK);
 
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+	    "fcf_found_notify: %s flag=%x "
+	    "fcfi_online=%d. FCFTAB FCF found. >",
+	    emlxs_fcftab_state_xlate(port, fcftab->state),
+	    fcftab->flag, fcftab->fcfi_online);
+
 	rval = emlxs_fcftab_event(port, FCF_EVENT_FCF_FOUND,
-	    (void *)((uintptr_t)fcf_index));
+	    (void *)((unsigned long)fcf_index));
 
 	mutex_exit(&EMLXS_FCF_LOCK);
 
@@ -1977,20 +2405,28 @@ emlxs_fcf_changed_notify(emlxs_port_t *port, uint32_t fcf_index)
 {
 	emlxs_hba_t *hba = HBA;
 	emlxs_port_t *pport = &PPORT;
-	uint32_t rval;
+	FCFTable_t *fcftab = &hba->sli.sli4.fcftab;
+	uint32_t rval = 0;
 
 	if (hba->sli_mode < EMLXS_HBA_SLI4_MODE) {
 		return (1);
 	}
 
-	if (!(pport->flag & EMLXS_PORT_BOUND)) {
+	if (!(pport->flag & EMLXS_PORT_BOUND) ||
+	    (pport->vpip->flag & EMLXS_VPI_PORT_UNBIND)) {
 		return (1);
 	}
 
 	mutex_enter(&EMLXS_FCF_LOCK);
 
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+	    "fcf_changes_notify: %s flag=%x "
+	    "fcfi_online=%d. FCFTAB FCF changed. >",
+	    emlxs_fcftab_state_xlate(port, fcftab->state),
+	    fcftab->flag, fcftab->fcfi_online);
+
 	rval = emlxs_fcftab_event(port, FCF_EVENT_FCF_CHANGED,
-	    (void *)((uintptr_t)fcf_index));
+	    (void *)((unsigned long)fcf_index));
 
 	mutex_exit(&EMLXS_FCF_LOCK);
 
@@ -2004,20 +2440,28 @@ emlxs_fcf_lost_notify(emlxs_port_t *port, uint32_t fcf_index)
 {
 	emlxs_hba_t *hba = HBA;
 	emlxs_port_t *pport = &PPORT;
-	uint32_t rval;
+	FCFTable_t *fcftab = &hba->sli.sli4.fcftab;
+	uint32_t rval = 0;
 
 	if (hba->sli_mode < EMLXS_HBA_SLI4_MODE) {
 		return (1);
 	}
 
-	if (!(pport->flag & EMLXS_PORT_BOUND)) {
+	if (!(pport->flag & EMLXS_PORT_BOUND) ||
+	    (pport->vpip->flag & EMLXS_VPI_PORT_UNBIND)) {
 		return (1);
 	}
 
 	mutex_enter(&EMLXS_FCF_LOCK);
 
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+	    "fcf_lost_notify: %s flag=%x "
+	    "fcfi_online=%d. FCFTAB FCF lost. >",
+	    emlxs_fcftab_state_xlate(port, fcftab->state),
+	    fcftab->flag, fcftab->fcfi_online);
+
 	rval = emlxs_fcftab_event(port, FCF_EVENT_FCF_LOST,
-	    (void *)((uintptr_t)fcf_index));
+	    (void *)((unsigned long)fcf_index));
 
 	mutex_exit(&EMLXS_FCF_LOCK);
 
@@ -2026,38 +2470,2157 @@ emlxs_fcf_lost_notify(emlxs_port_t *port, uint32_t fcf_index)
 } /* emlxs_fcf_lost_notify() */
 
 
-
 /* ************************************************************************** */
-/* FCFTAB */
+/* FCFTAB Generic */
 /* ************************************************************************** */
 
 static char *
-emlxs_fcftab_state_xlate(uint32_t state)
+emlxs_fcftab_state_xlate(emlxs_port_t *port, uint32_t state)
+{
+	emlxs_hba_t *hba = HBA;
+
+	if (SLI4_FCOE_MODE) {
+		return (emlxs_fcoe_fcftab_state_xlate(state));
+	} else {
+		return (emlxs_fc_fcftab_state_xlate(state));
+	}
+
+} /* emlxs_fcftab_state_xlate() */
+
+static uint32_t
+emlxs_fcftab_event(emlxs_port_t *port, uint32_t evt, void *arg1)
+{
+	emlxs_hba_t *hba = HBA;
+
+	if (SLI4_FCOE_MODE) {
+		return (emlxs_fcoe_fcftab_event(port, evt, arg1));
+	} else {
+		return (emlxs_fc_fcftab_event(port, evt, arg1));
+	}
+
+} /* emlxs_fcftab_event() */
+
+
+/*ARGSUSED*/
+static uint32_t
+emlxs_fcftab_shutdown_action(emlxs_port_t *port, uint32_t evt,
+    void *arg1)
+{
+	emlxs_hba_t *hba = HBA;
+	FCFTable_t *fcftab = &hba->sli.sli4.fcftab;
+	FCFIobj_t *fcfp;
+	uint32_t i;
+	uint32_t online;
+
+	if (fcftab->state != FCFTAB_STATE_SHUTDOWN) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
+		    "fcftab_shutdown_action:%x %s:%s arg=%p. "
+		    "Invalid state. <",
+		    fcftab->TID,
+		    emlxs_fcftab_state_xlate(port, fcftab->state),
+		    emlxs_fcf_event_xlate(evt), arg1);
+		return (1);
+	}
+
+	fcftab->flag &= ~EMLXS_FCFTAB_REQ_MASK;
+
+	if (fcftab->prev_state != FCFTAB_STATE_SHUTDOWN) {
+		/* Offline all FCF's */
+		online = 0;
+		fcfp = fcftab->table;
+		for (i = 0; i < fcftab->table_count; i++, fcfp++) {
+
+			if (fcfp->state <= FCFI_STATE_OFFLINE) {
+				continue;
+			}
+
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+			    "fcftab_shutdown_action:%x fcfi_online=%d. "
+			    "Offlining FCFI:%d. >",
+			    fcftab->TID,
+			    fcftab->fcfi_online,
+			    fcfp->fcf_index);
+
+			(void) emlxs_fcfi_event(port, FCF_EVENT_FCFI_OFFLINE,
+			    fcfp);
+
+			online++;
+		}
+
+		if (!online) {
+			goto done;
+		}
+
+		return (0);
+	}
+
+	/* Check FCF states */
+	online = 0;
+	fcfp = fcftab->table;
+	for (i = 0; i < fcftab->table_count; i++, fcfp++) {
+
+		if (fcfp->state <= FCFI_STATE_OFFLINE) {
+			continue;
+		}
+
+		online++;
+	}
+
+	if (online) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+		    "fcftab_shutdown_action:%x %s:%s arg=%p. "
+		    "fcfi_online=%d,%d <",
+		    fcftab->TID,
+		    emlxs_fcftab_state_xlate(port, fcftab->state),
+		    emlxs_fcf_event_xlate(evt), arg1,
+		    online, fcftab->fcfi_online);
+
+		return (0);
+	}
+
+done:
+	/* Free FCF table */
+	fcfp = fcftab->table;
+	for (i = 0; i < fcftab->table_count; i++, fcfp++) {
+
+		if (fcfp->state == FCFI_STATE_FREE) {
+			continue;
+		}
+
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+		    "fcftab_shutdown_action:%x. Freeing FCFI:%d. >",
+		    fcftab->TID,
+		    fcfp->fcf_index);
+
+		(void) emlxs_fcfi_free(port, fcfp);
+	}
+
+	/* Clean the selection table */
+	bzero(fcftab->fcfi, sizeof (fcftab->fcfi));
+	fcftab->fcfi_count = 0;
+
+	fcftab->flag |= EMLXS_FCFTAB_SHUTDOWN;
+
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+	    "fcftab_shutdown_action:%x %s:%s arg=%p flag=%x fcfi_online=%d. "
+	    "Shutdown. <",
+	    fcftab->TID,
+	    emlxs_fcftab_state_xlate(port, fcftab->state),
+	    emlxs_fcf_event_xlate(evt), arg1,
+	    fcftab->flag, fcftab->fcfi_online);
+
+	return (0);
+
+} /* emlxs_fcftab_shutdown_action() */
+
+
+/* ************************************************************************** */
+/* FC FCFTAB */
+/* ************************************************************************** */
+
+static char *
+emlxs_fc_fcftab_state_xlate(uint32_t state)
 {
 	static char buffer[32];
 	uint32_t i;
 	uint32_t count;
 
-	count = sizeof (emlxs_fcftab_state_table) / sizeof (emlxs_table_t);
+	count = sizeof (emlxs_fc_fcftab_state_table) / sizeof (emlxs_table_t);
 	for (i = 0; i < count; i++) {
-		if (state == emlxs_fcftab_state_table[i].code) {
-			return (emlxs_fcftab_state_table[i].string);
+		if (state == emlxs_fc_fcftab_state_table[i].code) {
+			return (emlxs_fc_fcftab_state_table[i].string);
 		}
 	}
 
-	(void) sprintf(buffer, "state=0x%x", state);
+	(void) snprintf(buffer, sizeof (buffer), "state=0x%x", state);
 	return (buffer);
 
-} /* emlxs_fcftab_state_xlate() */
+} /* emlxs_fc_fcftab_state_xlate() */
 
 
 static uint32_t
-emlxs_fcftab_action(emlxs_port_t *port, uint32_t evt,
+emlxs_fc_fcftab_action(emlxs_port_t *port, uint32_t evt,
     void *arg1)
 {
 	emlxs_hba_t *hba = HBA;
 	FCFTable_t *fcftab = &hba->sli.sli4.fcftab;
-	uint32_t rval;
+	uint32_t rval = 0;
+	uint32_t(*func) (emlxs_port_t *, uint32_t, void *);
+	uint32_t index;
+	uint32_t events;
+	uint16_t state;
+
+	/* Convert event to action table index */
+	switch (evt) {
+	case FCF_EVENT_STATE_ENTER:
+		index = 0;
+		break;
+	case FCF_EVENT_SHUTDOWN:
+		index = 1;
+		break;
+	case FCF_EVENT_LINKUP:
+		index = 2;
+		break;
+	case FCF_EVENT_LINKDOWN:
+		index = 3;
+		break;
+	case FCF_EVENT_FCFI_ONLINE:
+		index = 4;
+		break;
+	case FCF_EVENT_FCFI_OFFLINE:
+		index = 5;
+		break;
+	default:
+		return (1);
+	}
+
+	events = FC_FCFTAB_ACTION_EVENTS;
+	state  = fcftab->state;
+
+	index += (state * events);
+	func   = (uint32_t(*) (emlxs_port_t *, uint32_t, void *))
+	    emlxs_fc_fcftab_action_table[index];
+
+	if (!func) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_event_msg,
+		    "fc_fcftab_action:%x %s:%s arg=%p. No action. <",
+		    fcftab->TID,
+		    emlxs_fc_fcftab_state_xlate(fcftab->state),
+		    emlxs_fcf_event_xlate(evt), arg1);
+
+		return (1);
+	}
+
+	rval = (func)(port, evt, arg1);
+
+	return (rval);
+
+} /* emlxs_fc_fcftab_action() */
+
+
+static uint32_t
+emlxs_fc_fcftab_event(emlxs_port_t *port, uint32_t evt,
+    void *arg1)
+{
+	emlxs_hba_t *hba = HBA;
+	FCFTable_t *fcftab = &hba->sli.sli4.fcftab;
+	uint32_t rval = 0;
+
+	/* Filter events */
+	switch (evt) {
+	case FCF_EVENT_SHUTDOWN:
+	case FCF_EVENT_LINKUP:
+	case FCF_EVENT_LINKDOWN:
+	case FCF_EVENT_FCFI_ONLINE:
+	case FCF_EVENT_FCFI_OFFLINE:
+		break;
+
+	default:
+		return (1);
+	}
+
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_event_msg,
+	    "fc_fcftab_event:%x %s:%s arg=%p.",
+	    fcftab->TID,
+	    emlxs_fc_fcftab_state_xlate(fcftab->state),
+	    emlxs_fcf_event_xlate(evt), arg1);
+
+	rval = emlxs_fc_fcftab_action(port, evt, arg1);
+
+	return (rval);
+
+} /* emlxs_fc_fcftab_event() */
+
+
+/* EMLXS_FCF_LOCK must be held to enter */
+/*ARGSUSED*/
+static uint32_t
+emlxs_fc_fcftab_state(emlxs_port_t *port, uint16_t state, uint16_t reason,
+    uint32_t explain, void *arg1)
+{
+	emlxs_hba_t *hba = HBA;
+	FCFTable_t *fcftab = &hba->sli.sli4.fcftab;
+	uint32_t rval = 0;
+
+	if (state >= FC_FCFTAB_ACTION_STATES) {
+		return (1);
+	}
+
+	if ((fcftab->state == state) &&
+	    (reason != FCF_REASON_REENTER)) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
+		    "fcftab_state:%x %s:%s:0x%x arg=%p. "
+		    "State not changed. <",
+		    fcftab->TID,
+		    emlxs_fc_fcftab_state_xlate(state),
+		    emlxs_fcf_reason_xlate(reason),
+		    explain, arg1);
+		return (1);
+	}
+
+	if (!reason) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_state_msg,
+		    "fcftab_state:%x %s-->%s arg=%p",
+		    fcftab->TID,
+		    emlxs_fc_fcftab_state_xlate(fcftab->state),
+		    emlxs_fc_fcftab_state_xlate(state), arg1);
+	} else if (reason == FCF_REASON_EVENT) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_state_msg,
+		    "fcftab_state:%x %s-->%s:%s:%s arg=%p",
+		    fcftab->TID,
+		    emlxs_fc_fcftab_state_xlate(fcftab->state),
+		    emlxs_fc_fcftab_state_xlate(state),
+		    emlxs_fcf_reason_xlate(reason),
+		    emlxs_fcf_event_xlate(explain), arg1);
+	} else if (explain) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_state_msg,
+		    "fcftab_state:%x %s-->%s:%s:0x%x arg=%p",
+		    fcftab->TID,
+		    emlxs_fc_fcftab_state_xlate(fcftab->state),
+		    emlxs_fc_fcftab_state_xlate(state),
+		    emlxs_fcf_reason_xlate(reason),
+		    explain, arg1);
+	} else {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_state_msg,
+		    "fcftab_state:%x %s-->%s:%s arg=%p",
+		    fcftab->TID,
+		    emlxs_fc_fcftab_state_xlate(fcftab->state),
+		    emlxs_fc_fcftab_state_xlate(state),
+		    emlxs_fcf_reason_xlate(reason), arg1);
+	}
+
+	fcftab->prev_state = fcftab->state;
+	fcftab->prev_reason = fcftab->reason;
+	fcftab->state = state;
+	fcftab->reason = reason;
+
+	rval = emlxs_fc_fcftab_action(port, FCF_EVENT_STATE_ENTER, arg1);
+
+	return (rval);
+
+} /* emlxs_fc_fcftab_state() */
+
+
+static void
+emlxs_fc_fcftab_online_timer(emlxs_hba_t *hba)
+{
+	emlxs_port_t *port = &PPORT;
+	FCFTable_t *fcftab = &hba->sli.sli4.fcftab;
+
+	/* Check FCF timer */
+	if (!fcftab->online_timer ||
+	    (hba->timer_tics < fcftab->online_timer)) {
+		return;
+	}
+	fcftab->online_timer = 0;
+
+	switch (fcftab->state) {
+	case FC_FCFTAB_STATE_ONLINE:
+		emlxs_fcf_linkup(port);
+
+		fcftab->flag &= ~EMLXS_FCFTAB_REQ_MASK;
+		fcftab->flag |= EMLXS_FC_FCFTAB_TOPO_REQ;
+		fcftab->generation++;
+
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+		    "fc_fcftab_online_timer:%x %s gen=%x. Read topology. >",
+		    fcftab->TID,
+		    emlxs_fc_fcftab_state_xlate(fcftab->state),
+		    fcftab->generation);
+
+		(void) emlxs_fc_fcftab_state(port, FC_FCFTAB_STATE_TOPO,
+		    FCF_REASON_EVENT, 0, 0);
+		break;
+
+	default:
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+		    "fc_fcftab_online_timer:%x %s",
+		    fcftab->TID,
+		    emlxs_fc_fcftab_state_xlate(fcftab->state));
+		break;
+	}
+
+	return;
+
+}  /* emlxs_fc_fcftab_online_timer() */
+
+
+/*ARGSUSED*/
+static uint32_t
+emlxs_fc_fcftab_offline_action(emlxs_port_t *port, uint32_t evt,
+    void *arg1)
+{
+	emlxs_hba_t *hba = HBA;
+	FCFTable_t *fcftab = &hba->sli.sli4.fcftab;
+	uint32_t rval = 0;
+
+	if (fcftab->state != FC_FCFTAB_STATE_OFFLINE) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
+		    "fc_fcftab_offline_action:%x %s:%s arg=%p. "
+		    "Invalid state. <",
+		    fcftab->TID,
+		    emlxs_fc_fcftab_state_xlate(fcftab->state),
+		    emlxs_fcf_event_xlate(evt), arg1);
+		return (1);
+	}
+
+	fcftab->flag &= ~EMLXS_FC_FCFTAB_OFFLINE_REQ;
+
+	if (fcftab->flag & EMLXS_FCFTAB_REQ_MASK) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+		    "fc_fcftab_offline_action:%x %s:%s arg=%p flag=%x. "
+		    "Handling request.",
+		    fcftab->TID,
+		    emlxs_fc_fcftab_state_xlate(fcftab->state),
+		    emlxs_fcf_event_xlate(evt), arg1,
+		    fcftab->flag);
+
+		rval = emlxs_fc_fcftab_req_handler(port, arg1);
+		return (rval);
+	}
+
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+	    "fc_fcftab_offline_action:%x %s:%s arg=%p fcfi_online=%d. "
+	    "Offline. <",
+	    fcftab->TID,
+	    emlxs_fc_fcftab_state_xlate(fcftab->state),
+	    emlxs_fcf_event_xlate(evt), arg1,
+	    fcftab->fcfi_online);
+
+	return (0);
+
+} /* emlxs_fc_fcftab_offline_action() */
+
+
+/*ARGSUSED*/
+static uint32_t
+emlxs_fc_fcftab_online_action(emlxs_port_t *port, uint32_t evt,
+    void *arg1)
+{
+	emlxs_hba_t *hba = HBA;
+	emlxs_port_t *pport = &PPORT;
+	FCFTable_t *fcftab = &hba->sli.sli4.fcftab;
+	uint32_t rval = 0;
+
+	if (fcftab->state != FC_FCFTAB_STATE_ONLINE) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
+		    "fc_fcftab_online_action:%x %s:%s arg=%p. "
+		    "Invalid state. <",
+		    fcftab->TID,
+		    emlxs_fc_fcftab_state_xlate(fcftab->state),
+		    emlxs_fcf_event_xlate(evt), arg1);
+		return (1);
+	}
+
+	if (fcftab->flag & EMLXS_FCFTAB_REQ_MASK) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+		    "fc_fcftab_online_action:%x flag=%x. "
+		    "Handling requested.",
+		    fcftab->TID,
+		    fcftab->flag);
+
+		rval = emlxs_fc_fcftab_req_handler(port, arg1);
+		return (rval);
+	}
+
+	if (fcftab->fcfi_online == 0) {
+		if (!(pport->flag & EMLXS_PORT_BOUND) ||
+		    (pport->vpip->flag & EMLXS_VPI_PORT_UNBIND)) {
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+			    "fc_fcftab_online_action:%x %s:%s "
+			    "fcfi_online=0. Pport not bound. <",
+			    fcftab->TID,
+			    emlxs_fcoe_fcftab_state_xlate(fcftab->state),
+			    emlxs_fcf_event_xlate(evt));
+		} else {
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+			    "fc_fcftab_online_action:%x %s:%s "
+			    "fcfi_online=0. Starting online timer. <",
+			    fcftab->TID,
+			    emlxs_fcoe_fcftab_state_xlate(fcftab->state),
+			    emlxs_fcf_event_xlate(evt));
+
+			/* Start the online timer */
+			fcftab->online_timer = hba->timer_tics + 1;
+		}
+
+		emlxs_fcf_linkdown(port);
+
+		return (0);
+	}
+
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+	    "fc_fcftab_online_action:%x flag=%x fcfi_online=%d. "
+	    "Online. <",
+	    fcftab->TID,
+	    fcftab->flag,
+	    fcftab->fcfi_online);
+
+	emlxs_fcf_linkup(port);
+
+	return (0);
+
+} /* emlxs_fc_fcftab_online_action() */
+
+
+/*ARGSUSED*/
+static uint32_t
+emlxs_fc_fcftab_topo_mbcmpl(emlxs_hba_t *hba, MAILBOXQ *mbq)
+{
+	emlxs_port_t *port = (emlxs_port_t *)mbq->port;
+	FCFTable_t *fcftab = &hba->sli.sli4.fcftab;
+	MAILBOX4 *mb4 = (MAILBOX4 *)mbq;
+	MATCHMAP *mp;
+	uint8_t *alpa_map;
+	uint32_t j;
+	uint16_t TID;
+
+	mutex_enter(&EMLXS_FCF_LOCK);
+	TID = (uint16_t)((unsigned long)mbq->context);
+
+	if (fcftab->state != FC_FCFTAB_STATE_TOPO) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+		    "fc_fcftab_topo_mbcmpl:%x state=%s.",
+		    TID,
+		    emlxs_fc_fcftab_state_xlate(fcftab->state));
+
+		mutex_exit(&EMLXS_FCF_LOCK);
+		return (0);
+	}
+
+	if (TID != fcftab->generation) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+		    "fc_fcftab_topo_mbcmpl:%x %s. "
+		    "Incorrect generation %x. Dropping.",
+		    TID,
+		    emlxs_fc_fcftab_state_xlate(fcftab->state),
+		    fcftab->generation);
+
+		mutex_exit(&EMLXS_FCF_LOCK);
+		return (0);
+	}
+
+	if (mb4->mbxStatus) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+		    "fc_fcftab_topo_mbcmpl:%x failed. %s. >",
+		    fcftab->TID,
+		    emlxs_mb_xlate_status(mb4->mbxStatus));
+
+		if (mb4->mbxStatus == MBXERR_NO_RESOURCES) {
+			(void) emlxs_fc_fcftab_state(port,
+			    FC_FCFTAB_STATE_TOPO_FAILED,
+			    FCF_REASON_MBOX_BUSY, mb4->mbxStatus, 0);
+		} else {
+			(void) emlxs_fc_fcftab_state(port,
+			    FC_FCFTAB_STATE_TOPO_FAILED,
+			    FCF_REASON_MBOX_FAILED, mb4->mbxStatus, 0);
+		}
+
+		mutex_exit(&EMLXS_FCF_LOCK);
+		return (0);
+	}
+
+	if (mb4->un.varReadLA.attType == AT_LINK_DOWN) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+		    "fc_fcftab_topo_mbcmpl:%x  Linkdown attention. "
+		    "Offline requested.",
+		    fcftab->TID);
+
+		fcftab->flag &= ~EMLXS_FCFTAB_REQ_MASK;
+		fcftab->flag |= EMLXS_FC_FCFTAB_OFFLINE_REQ;
+		(void) emlxs_fc_fcftab_req_handler(port, 0);
+
+		mutex_exit(&EMLXS_FCF_LOCK);
+		return (0);
+	}
+
+	if (hba->link_event_tag != mb4->un.varReadLA.eventTag) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+		    "fc_fcftab_topo_mbcmpl:%x Event tag invalid. %x != %x",
+		    fcftab->TID,
+		    hba->link_event_tag, mb4->un.varReadLA.eventTag);
+	}
+
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+	    "fc_fcftab_topo_mbcmpl:%x state=%s type=%s iotag=%d "
+	    "alpa=%x. >",
+	    fcftab->TID,
+	    emlxs_fc_fcftab_state_xlate(fcftab->state),
+	    (mb4->un.varReadLA.attType == AT_LINK_UP)?"linkup":"linkdown",
+	    hba->link_event_tag,
+	    (uint32_t)mb4->un.varReadLA.granted_AL_PA);
+
+	/* Link is up */
+
+	/* Save the linkspeed & topology */
+	hba->linkspeed = mb4->un.varReadLA.UlnkSpeed;
+	hba->topology = mb4->un.varReadLA.topology;
+
+	if (hba->topology != TOPOLOGY_LOOP) {
+		port->did = 0;
+		port->lip_type = 0;
+		hba->flag &= ~FC_BYPASSED_MODE;
+		bzero((caddr_t)port->alpa_map, 128);
+
+		goto done;
+	}
+
+	/* TOPOLOGY_LOOP */
+
+	port->lip_type = mb4->un.varReadLA.lipType;
+
+	if (mb4->un.varReadLA.pb) {
+		hba->flag |= FC_BYPASSED_MODE;
+	} else {
+		hba->flag &= ~FC_BYPASSED_MODE;
+	}
+
+	/* Save the granted_alpa and alpa_map */
+
+	port->granted_alpa = mb4->un.varReadLA.granted_AL_PA;
+	mp = (MATCHMAP *)mbq->bp;
+	alpa_map = (uint8_t *)port->alpa_map;
+
+	bcopy((caddr_t)mp->virt, (caddr_t)alpa_map, 128);
+
+	/* Check number of devices in map */
+	if (alpa_map[0] > 127) {
+		alpa_map[0] = 127;
+	}
+
+	EMLXS_MSGF(EMLXS_CONTEXT,
+	    &emlxs_link_atten_msg,
+	    "alpa_map: %d device(s): "
+	    "%02x %02x %02x %02x %02x %02x %02x %02x",
+	    alpa_map[0], alpa_map[1],
+	    alpa_map[2], alpa_map[3],
+	    alpa_map[4], alpa_map[5],
+	    alpa_map[6], alpa_map[7],
+	    alpa_map[8]);
+
+	for (j = 9; j <= alpa_map[0]; j += 8) {
+		EMLXS_MSGF(EMLXS_CONTEXT,
+		    &emlxs_link_atten_msg,
+		    "alpa_map:               "
+		    "%02x %02x %02x %02x %02x %02x %02x %02x",
+		    alpa_map[j],
+		    alpa_map[j + 1],
+		    alpa_map[j + 2],
+		    alpa_map[j + 3],
+		    alpa_map[j + 4],
+		    alpa_map[j + 5],
+		    alpa_map[j + 6],
+		    alpa_map[j + 7]);
+	}
+
+done:
+
+	(void) emlxs_fc_fcftab_state(port, FC_FCFTAB_STATE_TOPO_CMPL,
+	    0, 0, 0);
+
+	mutex_exit(&EMLXS_FCF_LOCK);
+	return (0);
+
+} /* emlxs_fc_fcftab_topo_mbcmpl() */
+
+
+/*ARGSUSED*/
+static uint32_t
+emlxs_fc_fcftab_topo_action(emlxs_port_t *port, uint32_t evt,
+    void *arg1)
+{
+	emlxs_hba_t *hba = HBA;
+	FCFTable_t *fcftab = &hba->sli.sli4.fcftab;
+	MAILBOXQ *mbq;
+	MAILBOX4 *mb4;
+	uint32_t rval = 0;
+	MATCHMAP *mp;
+
+	if (fcftab->state != FC_FCFTAB_STATE_TOPO) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
+		    "fc_fcftab_topo_action:%x %s:%s arg=%p. "
+		    "Invalid state. <",
+		    fcftab->TID,
+		    emlxs_fc_fcftab_state_xlate(fcftab->state),
+		    emlxs_fcf_event_xlate(evt), arg1);
+		return (1);
+	}
+
+	if ((fcftab->prev_state != FC_FCFTAB_STATE_TOPO_FAILED) ||
+	    (fcftab->flag & EMLXS_FC_FCFTAB_TOPO_REQ)) {
+		fcftab->flag &= ~EMLXS_FC_FCFTAB_TOPO_REQ;
+		fcftab->attempts = 0;
+	}
+
+	if (fcftab->flag & EMLXS_FCFTAB_REQ_MASK) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+		    "fc_fcftab_sol_action:%x %s:%s arg=%p gen=%d flag=%x. "
+		    "Handling request.",
+		    fcftab->TID,
+		    emlxs_fc_fcftab_state_xlate(fcftab->state),
+		    emlxs_fcf_event_xlate(evt), arg1,
+		    fcftab->generation,
+		    fcftab->flag);
+
+		rval = emlxs_fc_fcftab_req_handler(port, arg1);
+		return (rval);
+	}
+
+	if (fcftab->attempts == 0) {
+		fcftab->TID = fcftab->generation;
+	}
+
+	if (hba->topology != TOPOLOGY_LOOP) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+		    "fc_fcftab_sol_action:%x %s:%s arg=%p gen=%d flag=%x. "
+		    "Fabric Topology. Skipping READ_TOPO.",
+		    fcftab->TID,
+		    emlxs_fc_fcftab_state_xlate(fcftab->state),
+		    emlxs_fcf_event_xlate(evt), arg1,
+		    fcftab->generation,
+		    fcftab->flag);
+
+		port->did = 0;
+		port->lip_type = 0;
+		hba->flag &= ~FC_BYPASSED_MODE;
+		bzero((caddr_t)port->alpa_map, 128);
+
+		rval = emlxs_fc_fcftab_state(port, FC_FCFTAB_STATE_CFGLINK,
+		    FCF_REASON_EVENT, evt, arg1);
+		return (rval);
+	}
+
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+	    "fc_fcftab_sol_action:%x %s:%s arg=%p gen=%d flag=%x. "
+	    "Sending READ_TOPO. <",
+	    fcftab->TID,
+	    emlxs_fc_fcftab_state_xlate(fcftab->state),
+	    emlxs_fcf_event_xlate(evt), arg1,
+	    fcftab->generation,
+	    fcftab->flag);
+
+	if (!(mbq = (MAILBOXQ *)emlxs_mem_get(hba, MEM_MBOX))) {
+		rval = emlxs_fc_fcftab_state(port, FC_FCFTAB_STATE_TOPO_FAILED,
+		    FCF_REASON_NO_MBOX, 0, arg1);
+		return (rval);
+	}
+	mb4 = (MAILBOX4*)mbq;
+	bzero((void *) mb4, MAILBOX_CMD_SLI4_BSIZE);
+
+	if ((mp = (MATCHMAP *)emlxs_mem_get(hba, MEM_BUF)) == 0) {
+		emlxs_mem_put(hba, MEM_MBOX, (void *)mbq);
+
+		rval = emlxs_fc_fcftab_state(port, FC_FCFTAB_STATE_TOPO_FAILED,
+		    FCF_REASON_NO_BUFFER, 0, arg1);
+		return (rval);
+	}
+	bzero(mp->virt, mp->size);
+
+	mbq->nonembed = NULL;
+	mbq->bp = (void *)mp;
+	mbq->mbox_cmpl = emlxs_fc_fcftab_topo_mbcmpl;
+	mbq->context = (void *)((unsigned long)fcftab->TID);
+	mbq->port = (void *)port;
+
+	mb4->un.varSLIConfig.be.embedded = 0;
+	mb4->mbxCommand = MBX_READ_TOPOLOGY;
+	mb4->mbxOwner = OWN_HOST;
+
+	mb4->un.varReadLA.un.lilpBde64.tus.f.bdeSize = 128;
+	mb4->un.varReadLA.un.lilpBde64.addrHigh = PADDR_HI(mp->phys);
+	mb4->un.varReadLA.un.lilpBde64.addrLow = PADDR_LO(mp->phys);
+
+	rval = EMLXS_SLI_ISSUE_MBOX_CMD(hba, mbq, MBX_NOWAIT, 0);
+	if ((rval != MBX_BUSY) && (rval != MBX_SUCCESS)) {
+		emlxs_mem_put(hba, MEM_BUF, (void *)mp);
+		emlxs_mem_put(hba, MEM_MBOX, (void *)mbq);
+
+		rval = emlxs_fc_fcftab_state(port, FC_FCFTAB_STATE_TOPO_FAILED,
+		    FCF_REASON_SEND_FAILED, rval, arg1);
+
+		return (rval);
+	}
+
+	return (0);
+
+} /* emlxs_fc_fcftab_topo_action() */
+
+
+/*ARGSUSED*/
+static uint32_t
+emlxs_fc_fcftab_topo_failed_action(emlxs_port_t *port, uint32_t evt,
+    void *arg1)
+{
+	emlxs_hba_t *hba = HBA;
+	FCFTable_t *fcftab = &hba->sli.sli4.fcftab;
+	uint32_t rval = 0;
+
+	fcftab->attempts++;
+
+	if (fcftab->state != FC_FCFTAB_STATE_TOPO_FAILED) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
+		    "fc_fcftab_topo_failed_action:%x %s:%s arg=%p "
+		    "attempt=%d. Invalid state. <",
+		    fcftab->TID,
+		    emlxs_fc_fcftab_state_xlate(fcftab->state),
+		    emlxs_fcf_event_xlate(evt),
+		    arg1, fcftab->attempts);
+		return (1);
+	}
+
+	if ((fcftab->reason == FCF_REASON_MBOX_FAILED) ||
+	    (fcftab->reason == FCF_REASON_SEND_FAILED) ||
+	    (fcftab->attempts >= 3)) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+		    "fc_fcftab_topo_failed_action:%x %s:%s arg=%p "
+		    "attempt=%d reason=%x. Giving up.",
+		    fcftab->TID,
+		    emlxs_fc_fcftab_state_xlate(fcftab->state),
+		    emlxs_fcf_event_xlate(evt), arg1,
+		    fcftab->attempts,
+		    fcftab->reason);
+
+		rval = emlxs_fc_fcftab_state(port, FC_FCFTAB_STATE_TOPO_CMPL,
+		    FCF_REASON_OP_FAILED, fcftab->attempts, arg1);
+
+	} else {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+		    "fc_fcftab_topo_failed_action:%x %s:%s arg=%p "
+		    "attempt=%d reason=%x. Retrying.",
+		    fcftab->TID,
+		    emlxs_fc_fcftab_state_xlate(fcftab->state),
+		    emlxs_fcf_event_xlate(evt), arg1,
+		    fcftab->attempts,
+		    fcftab->reason);
+
+		rval = emlxs_fc_fcftab_state(port, FC_FCFTAB_STATE_TOPO,
+		    FCF_REASON_OP_FAILED, fcftab->attempts, arg1);
+	}
+
+	return (rval);
+
+} /* emlxs_fc_fcftab_topo_failed_action() */
+
+
+/*ARGSUSED*/
+static uint32_t
+emlxs_fc_fcftab_topo_cmpl_action(emlxs_port_t *port, uint32_t evt,
+    void *arg1)
+{
+	emlxs_hba_t *hba = HBA;
+	FCFTable_t *fcftab = &hba->sli.sli4.fcftab;
+	uint32_t rval = 0;
+
+	if (fcftab->state != FC_FCFTAB_STATE_TOPO_CMPL) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
+		    "fc_fcftab_topo_cmpl_action:%x %s:%s arg=%p. "
+		    "Invalid state. <",
+		    fcftab->TID,
+		    emlxs_fc_fcftab_state_xlate(fcftab->state),
+		    emlxs_fcf_event_xlate(evt), arg1);
+		return (1);
+	}
+
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+	    "fc_fcftab_topo_cmpl_action:%x attempts=%d. "
+	    "Config link.",
+	    fcftab->TID,
+	    fcftab->attempts);
+
+	rval = emlxs_fc_fcftab_state(port, FC_FCFTAB_STATE_CFGLINK,
+	    FCF_REASON_EVENT, evt, arg1);
+
+	return (rval);
+
+} /* emlxs_fc_fcftab_topo_cmpl_action() */
+
+
+/*ARGSUSED*/
+static uint32_t
+emlxs_fc_fcftab_cfglink_mbcmpl(emlxs_hba_t *hba, MAILBOXQ *mbq)
+{
+	emlxs_port_t *port = (emlxs_port_t *)mbq->port;
+	FCFTable_t *fcftab = &hba->sli.sli4.fcftab;
+	MAILBOX4 *mb4 = (MAILBOX4 *)mbq;
+	uint16_t TID;
+
+	mutex_enter(&EMLXS_FCF_LOCK);
+	TID = (uint16_t)((unsigned long)mbq->context);
+
+	if (fcftab->state != FC_FCFTAB_STATE_CFGLINK) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+		    "fc_fcftab_cfglink_mbcmpl:%x state=%s.",
+		    TID,
+		    emlxs_fc_fcftab_state_xlate(fcftab->state));
+
+		mutex_exit(&EMLXS_FCF_LOCK);
+		return (0);
+	}
+
+	if (TID != fcftab->generation) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+		    "fc_fcftab_cfglink_mbcmpl:%x %s. "
+		    "Incorrect generation %x. Dropping.",
+		    TID,
+		    emlxs_fc_fcftab_state_xlate(fcftab->state),
+		    fcftab->generation);
+
+		mutex_exit(&EMLXS_FCF_LOCK);
+		return (0);
+	}
+
+	if (mb4->mbxStatus) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+		    "fc_fcftab_cfglink_mbcmpl:%x failed. %s. >",
+		    fcftab->TID,
+		    emlxs_mb_xlate_status(mb4->mbxStatus));
+
+		if (mb4->mbxStatus == MBXERR_NO_RESOURCES) {
+			(void) emlxs_fc_fcftab_state(port,
+			    FC_FCFTAB_STATE_CFGLINK_FAILED,
+			    FCF_REASON_MBOX_BUSY, mb4->mbxStatus, 0);
+		} else {
+			(void) emlxs_fc_fcftab_state(port,
+			    FC_FCFTAB_STATE_CFGLINK_FAILED,
+			    FCF_REASON_MBOX_FAILED, mb4->mbxStatus, 0);
+		}
+
+		mutex_exit(&EMLXS_FCF_LOCK);
+		return (0);
+	}
+
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
+	    "fc_fcftab_cfglink_mbcmpl:%x. >",
+	    fcftab->TID);
+
+	(void) emlxs_fc_fcftab_state(port, FC_FCFTAB_STATE_CFGLINK_CMPL,
+	    0, 0, 0);
+
+	mutex_exit(&EMLXS_FCF_LOCK);
+	return (0);
+
+} /* emlxs_fc_fcftab_cfglink_mbcmpl() */
+
+
+
+/*ARGSUSED*/
+static uint32_t
+emlxs_fc_fcftab_cfglink_action(emlxs_port_t *port, uint32_t evt,
+    void *arg1)
+{
+	emlxs_hba_t *hba = HBA;
+	emlxs_config_t *cfg = &CFG;
+	FCFTable_t *fcftab = &hba->sli.sli4.fcftab;
+	MAILBOXQ *mbq;
+	MAILBOX4 *mb4;
+	uint32_t rval = 0;
+
+	if (fcftab->state != FC_FCFTAB_STATE_CFGLINK) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
+		    "fc_fcftab_cfglink_action:%x %s:%s arg=%p. "
+		    "Invalid state. <",
+		    fcftab->TID,
+		    emlxs_fc_fcftab_state_xlate(fcftab->state),
+		    emlxs_fcf_event_xlate(evt), arg1);
+		return (1);
+	}
+
+	if ((fcftab->prev_state != FC_FCFTAB_STATE_CFGLINK_FAILED) ||
+	    (fcftab->flag & EMLXS_FC_FCFTAB_CFGLINK_REQ)) {
+		fcftab->flag &= ~EMLXS_FC_FCFTAB_CFGLINK_REQ;
+		fcftab->attempts = 0;
+	}
+
+	if (fcftab->flag & EMLXS_FCFTAB_REQ_MASK) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+		    "fc_fcftab_sol_action:%x %s:%s arg=%p gen=%d flag=%x. "
+		    "Handling request.",
+		    fcftab->TID,
+		    emlxs_fc_fcftab_state_xlate(fcftab->state),
+		    emlxs_fcf_event_xlate(evt), arg1,
+		    fcftab->generation,
+		    fcftab->flag);
+
+		rval = emlxs_fc_fcftab_req_handler(port, arg1);
+		return (rval);
+	}
+
+	if (fcftab->attempts == 0) {
+		fcftab->TID = fcftab->generation;
+	}
+
+	if (hba->topology != TOPOLOGY_LOOP) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+		    "fc_fcftab_sol_action:%x %s:%s arg=%p gen=%d flag=%x. "
+		    "Fabric Topology. Skipping CONFIG_LINK.",
+		    fcftab->TID,
+		    emlxs_fc_fcftab_state_xlate(fcftab->state),
+		    emlxs_fcf_event_xlate(evt), arg1,
+		    fcftab->generation,
+		    fcftab->flag);
+
+		rval = emlxs_fc_fcftab_state(port, FC_FCFTAB_STATE_SPARM,
+		    FCF_REASON_EVENT, evt, arg1);
+		return (rval);
+	}
+
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+	    "fc_fcftab_sol_action:%x %s:%s arg=%p gen=%d flag=%x. "
+	    "Sending CONFIG_LINK. <",
+	    fcftab->TID,
+	    emlxs_fc_fcftab_state_xlate(fcftab->state),
+	    emlxs_fcf_event_xlate(evt), arg1,
+	    fcftab->generation,
+	    fcftab->flag);
+
+	if (!(mbq = (MAILBOXQ *)emlxs_mem_get(hba, MEM_MBOX))) {
+		rval = emlxs_fc_fcftab_state(port,
+		    FC_FCFTAB_STATE_CFGLINK_FAILED,
+		    FCF_REASON_NO_MBOX, 0, arg1);
+		return (rval);
+	}
+	mb4 = (MAILBOX4*)mbq;
+	bzero((void *) mb4, MAILBOX_CMD_SLI4_BSIZE);
+
+	mbq->nonembed = NULL;
+	mbq->mbox_cmpl = emlxs_fc_fcftab_cfglink_mbcmpl;
+	mbq->context = (void *)((unsigned long)fcftab->TID);
+	mbq->port = (void *)port;
+
+	mb4->un.varSLIConfig.be.embedded = 0;
+	mb4->mbxCommand = MBX_CONFIG_LINK;
+	mb4->mbxOwner = OWN_HOST;
+
+	if (cfg[CFG_CR_DELAY].current) {
+		mb4->un.varCfgLnk.cr = 1;
+		mb4->un.varCfgLnk.ci = 1;
+		mb4->un.varCfgLnk.cr_delay = cfg[CFG_CR_DELAY].current;
+		mb4->un.varCfgLnk.cr_count = cfg[CFG_CR_COUNT].current;
+	}
+
+	if (cfg[CFG_ACK0].current) {
+		mb4->un.varCfgLnk.ack0_enable = 1;
+	}
+
+	mb4->un.varCfgLnk.myId = port->did;
+	mb4->un.varCfgLnk.edtov = hba->fc_edtov;
+	mb4->un.varCfgLnk.arbtov = hba->fc_arbtov;
+	mb4->un.varCfgLnk.ratov = hba->fc_ratov;
+	mb4->un.varCfgLnk.rttov = hba->fc_rttov;
+	mb4->un.varCfgLnk.altov = hba->fc_altov;
+	mb4->un.varCfgLnk.crtov = hba->fc_crtov;
+	mb4->un.varCfgLnk.citov = hba->fc_citov;
+
+	rval = EMLXS_SLI_ISSUE_MBOX_CMD(hba, mbq, MBX_NOWAIT, 0);
+	if ((rval != MBX_BUSY) && (rval != MBX_SUCCESS)) {
+		emlxs_mem_put(hba, MEM_MBOX, (void *)mbq);
+
+		rval = emlxs_fc_fcftab_state(port,
+		    FC_FCFTAB_STATE_CFGLINK_FAILED,
+		    FCF_REASON_SEND_FAILED, rval, arg1);
+
+		return (rval);
+	}
+
+	return (0);
+
+} /* emlxs_fc_fcftab_cfglink_action() */
+
+
+/*ARGSUSED*/
+static uint32_t
+emlxs_fc_fcftab_cfglink_failed_action(emlxs_port_t *port, uint32_t evt,
+    void *arg1)
+{
+	emlxs_hba_t *hba = HBA;
+	FCFTable_t *fcftab = &hba->sli.sli4.fcftab;
+	uint32_t rval = 0;
+
+	fcftab->attempts++;
+
+	if (fcftab->state != FC_FCFTAB_STATE_CFGLINK_FAILED) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
+		    "fc_fcftab_cfglink_failed_action:%x %s:%s arg=%p "
+		    "attempt=%d. Invalid state. <",
+		    fcftab->TID,
+		    emlxs_fc_fcftab_state_xlate(fcftab->state),
+		    emlxs_fcf_event_xlate(evt),
+		    arg1, fcftab->attempts);
+		return (1);
+	}
+
+	if ((fcftab->reason == FCF_REASON_MBOX_FAILED) ||
+	    (fcftab->reason == FCF_REASON_SEND_FAILED) ||
+	    (fcftab->attempts >= 3)) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+		    "fc_fcftab_cfglink_failed_action:%x %s:%s arg=%p "
+		    "attempt=%d reason=%x. Giving up.",
+		    fcftab->TID,
+		    emlxs_fc_fcftab_state_xlate(fcftab->state),
+		    emlxs_fcf_event_xlate(evt), arg1,
+		    fcftab->attempts,
+		    fcftab->reason);
+
+		rval = emlxs_fc_fcftab_state(port, FC_FCFTAB_STATE_CFGLINK_CMPL,
+		    FCF_REASON_OP_FAILED, fcftab->attempts, arg1);
+
+	} else {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+		    "fc_fcftab_cfglink_failed_action:%x %s:%s arg=%p "
+		    "attempt=%d reason=%x. Retrying.",
+		    fcftab->TID,
+		    emlxs_fc_fcftab_state_xlate(fcftab->state),
+		    emlxs_fcf_event_xlate(evt), arg1,
+		    fcftab->attempts,
+		    fcftab->reason);
+
+		rval = emlxs_fc_fcftab_state(port, FC_FCFTAB_STATE_CFGLINK,
+		    FCF_REASON_OP_FAILED, fcftab->attempts, arg1);
+	}
+
+	return (rval);
+
+} /* emlxs_fc_fcftab_cfglink_failed_action() */
+
+
+/*ARGSUSED*/
+static uint32_t
+emlxs_fc_fcftab_cfglink_cmpl_action(emlxs_port_t *port, uint32_t evt,
+    void *arg1)
+{
+	emlxs_hba_t *hba = HBA;
+	FCFTable_t *fcftab = &hba->sli.sli4.fcftab;
+	uint32_t rval = 0;
+
+	if (fcftab->state != FC_FCFTAB_STATE_CFGLINK_CMPL) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
+		    "fc_fcftab_cfglink_cmpl_action:%x %s:%s arg=%p. "
+		    "Invalid state. <",
+		    fcftab->TID,
+		    emlxs_fc_fcftab_state_xlate(fcftab->state),
+		    emlxs_fcf_event_xlate(evt), arg1);
+		return (1);
+	}
+
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+	    "fc_fcftab_cfglink_cmpl_action:%x attempts=%d. "
+	    "Read SPARM.",
+	    fcftab->TID,
+	    fcftab->attempts);
+
+	rval = emlxs_fc_fcftab_state(port, FC_FCFTAB_STATE_SPARM,
+	    FCF_REASON_EVENT, evt, arg1);
+
+	return (rval);
+
+} /* emlxs_fc_fcftab_cfglink_cmpl_action() */
+
+
+/*ARGSUSED*/
+static uint32_t
+emlxs_fc_fcftab_sparm_mbcmpl(emlxs_hba_t *hba, MAILBOXQ *mbq)
+{
+	emlxs_port_t *port = (emlxs_port_t *)mbq->port;
+	FCFTable_t *fcftab = &hba->sli.sli4.fcftab;
+	MAILBOX4 *mb4 = (MAILBOX4 *)mbq;
+	MATCHMAP *mp;
+	emlxs_port_t *vport;
+	VPIobj_t *vpip;
+	int32_t i;
+	uint8_t null_wwn[8];
+	uint16_t TID;
+
+	mutex_enter(&EMLXS_FCF_LOCK);
+	TID = (uint16_t)((unsigned long)mbq->context);
+
+	if (fcftab->state != FC_FCFTAB_STATE_SPARM) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+		    "fc_fcftab_sparm_mbcmpl:%x state=%s.",
+		    TID,
+		    emlxs_fc_fcftab_state_xlate(fcftab->state));
+
+		mutex_exit(&EMLXS_FCF_LOCK);
+		return (0);
+	}
+
+	if (TID != fcftab->generation) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+		    "fc_fcftab_sparm_mbcmpl:%x %s. "
+		    "Incorrect generation %x. Dropping.",
+		    TID,
+		    emlxs_fc_fcftab_state_xlate(fcftab->state),
+		    fcftab->generation);
+
+		mutex_exit(&EMLXS_FCF_LOCK);
+		return (0);
+	}
+
+	if (mb4->mbxStatus) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+		    "fc_fcftab_sparm_mbcmpl:%x failed. %s. >",
+		    fcftab->TID,
+		    emlxs_mb_xlate_status(mb4->mbxStatus));
+
+		if (mb4->mbxStatus == MBXERR_NO_RESOURCES) {
+			(void) emlxs_fc_fcftab_state(port,
+			    FC_FCFTAB_STATE_SPARM_FAILED,
+			    FCF_REASON_MBOX_BUSY, mb4->mbxStatus, 0);
+		} else {
+			(void) emlxs_fc_fcftab_state(port,
+			    FC_FCFTAB_STATE_SPARM_FAILED,
+			    FCF_REASON_MBOX_FAILED, mb4->mbxStatus, 0);
+		}
+
+		mutex_exit(&EMLXS_FCF_LOCK);
+		return (0);
+	}
+
+	/* Save the parameters */
+	mp = (MATCHMAP *)mbq->bp;
+	bcopy((caddr_t)mp->virt, (caddr_t)&hba->sparam, sizeof (SERV_PARM));
+
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
+	    "fc_fcftab_sparm_mbcmpl:%x edtov=%x,%x bbc=%x. >",
+	    fcftab->TID,
+	    hba->fc_edtov, hba->sparam.cmn.e_d_tov,
+	    hba->sparam.cmn.bbCreditlsb);
+
+	/* Initialize the node name and port name only once */
+	bzero(null_wwn, 8);
+	if ((bcmp((caddr_t)&hba->wwnn, (caddr_t)null_wwn, 8) == 0) &&
+	    (bcmp((caddr_t)&hba->wwpn, (caddr_t)null_wwn, 8) == 0)) {
+		bcopy((caddr_t)&hba->sparam.nodeName,
+		    (caddr_t)&hba->wwnn, sizeof (NAME_TYPE));
+
+		bcopy((caddr_t)&hba->sparam.portName,
+		    (caddr_t)&hba->wwpn, sizeof (NAME_TYPE));
+	} else {
+		bcopy((caddr_t)&hba->wwnn,
+		    (caddr_t)&hba->sparam.nodeName, sizeof (NAME_TYPE));
+
+		bcopy((caddr_t)&hba->wwpn,
+		    (caddr_t)&hba->sparam.portName, sizeof (NAME_TYPE));
+	}
+
+	/* Update all bound ports */
+	for (i = 0; i < MAX_VPORTS; i++) {
+		vport = &VPORT(i);
+		vpip = vport->vpip;
+
+		if (!(vport->flag & EMLXS_PORT_BOUND) ||
+		    (vpip->flag & EMLXS_VPI_PORT_UNBIND)) {
+			continue;
+		}
+
+		bcopy((caddr_t)&hba->sparam,
+		    (caddr_t)&vport->sparam,
+		    sizeof (SERV_PARM));
+
+		bcopy((caddr_t)&vport->wwnn,
+		    (caddr_t)&vport->sparam.nodeName,
+		    sizeof (NAME_TYPE));
+
+		bcopy((caddr_t)&vport->wwpn,
+		    (caddr_t)&vport->sparam.portName,
+		    sizeof (NAME_TYPE));
+	}
+
+	(void) emlxs_fc_fcftab_state(port, FC_FCFTAB_STATE_SPARM_CMPL,
+	    0, 0, 0);
+
+	mutex_exit(&EMLXS_FCF_LOCK);
+	return (0);
+
+} /* emlxs_fc_fcftab_sparm_mbcmpl() */
+
+
+/*ARGSUSED*/
+static uint32_t
+emlxs_fc_fcftab_sparm_action(emlxs_port_t *port, uint32_t evt,
+    void *arg1)
+{
+	emlxs_hba_t *hba = HBA;
+	FCFTable_t *fcftab = &hba->sli.sli4.fcftab;
+	MAILBOXQ *mbq;
+	MAILBOX4 *mb4;
+	uint32_t rval = 0;
+	MATCHMAP *mp;
+
+	if (fcftab->state != FC_FCFTAB_STATE_SPARM) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
+		    "fc_fcftab_sparm_action:%x %s:%s arg=%p. "
+		    "Invalid state. <",
+		    fcftab->TID,
+		    emlxs_fc_fcftab_state_xlate(fcftab->state),
+		    emlxs_fcf_event_xlate(evt), arg1);
+		return (1);
+	}
+
+	if ((fcftab->prev_state != FC_FCFTAB_STATE_SPARM_FAILED) ||
+	    (fcftab->flag & EMLXS_FC_FCFTAB_SPARM_REQ)) {
+		fcftab->flag &= ~EMLXS_FC_FCFTAB_SPARM_REQ;
+		fcftab->attempts = 0;
+	}
+
+	if (fcftab->flag & EMLXS_FCFTAB_REQ_MASK) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+		    "fc_fcftab_read_action:%x %s:%s arg=%p flag=%x. "
+		    "Handling request.",
+		    fcftab->TID,
+		    emlxs_fc_fcftab_state_xlate(fcftab->state),
+		    emlxs_fcf_event_xlate(evt), arg1,
+		    fcftab->flag);
+
+		rval = emlxs_fc_fcftab_req_handler(port, arg1);
+		return (rval);
+	}
+
+	if (fcftab->attempts == 0) {
+		fcftab->TID = fcftab->generation;
+	}
+
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+	    "fc_fcftab_read_action:%x %s:%s arg=%p attempts=%d. "
+	    "Reading SPARM. <",
+	    fcftab->TID,
+	    emlxs_fc_fcftab_state_xlate(fcftab->state),
+	    emlxs_fcf_event_xlate(evt), arg1,
+	    fcftab->attempts);
+
+	if (!(mbq = (MAILBOXQ *)emlxs_mem_get(hba, MEM_MBOX))) {
+		rval = emlxs_fc_fcftab_state(port,
+		    FC_FCFTAB_STATE_SPARM_FAILED,
+		    FCF_REASON_NO_MBOX, 0, arg1);
+		return (rval);
+	}
+	mb4 = (MAILBOX4*)mbq;
+	bzero((void *) mb4, MAILBOX_CMD_SLI4_BSIZE);
+
+	if ((mp = (MATCHMAP *)emlxs_mem_get(hba, MEM_BUF)) == 0) {
+		emlxs_mem_put(hba, MEM_MBOX, (void *)mbq);
+
+		rval = emlxs_fc_fcftab_state(port,
+		    FC_FCFTAB_STATE_SPARM_FAILED,
+		    FCF_REASON_NO_BUFFER, 0, arg1);
+		return (rval);
+	}
+	bzero(mp->virt, mp->size);
+
+	mbq->nonembed = NULL;
+	mbq->bp = (void *)mp;
+	mbq->mbox_cmpl = emlxs_fc_fcftab_sparm_mbcmpl;
+	mbq->context = (void *)((unsigned long)fcftab->TID);
+	mbq->port = (void *)port;
+
+	mb4->un.varSLIConfig.be.embedded = 0;
+	mb4->mbxCommand = MBX_READ_SPARM64;
+	mb4->mbxOwner = OWN_HOST;
+
+	mb4->un.varRdSparm.un.sp64.tus.f.bdeSize = sizeof (SERV_PARM);
+	mb4->un.varRdSparm.un.sp64.addrHigh = PADDR_HI(mp->phys);
+	mb4->un.varRdSparm.un.sp64.addrLow = PADDR_LO(mp->phys);
+
+	rval = EMLXS_SLI_ISSUE_MBOX_CMD(hba, mbq, MBX_NOWAIT, 0);
+	if ((rval != MBX_BUSY) && (rval != MBX_SUCCESS)) {
+		emlxs_mem_put(hba, MEM_BUF, (void *)mp);
+		emlxs_mem_put(hba, MEM_MBOX, (void *)mbq);
+
+		rval = emlxs_fc_fcftab_state(port,
+		    FC_FCFTAB_STATE_SPARM_FAILED,
+		    FCF_REASON_SEND_FAILED, rval, arg1);
+
+		return (rval);
+	}
+
+	return (0);
+
+} /* emlxs_fc_fcftab_sparm_action() */
+
+
+/*ARGSUSED*/
+static uint32_t
+emlxs_fc_fcftab_sparm_failed_action(emlxs_port_t *port, uint32_t evt,
+    void *arg1)
+{
+	emlxs_hba_t *hba = HBA;
+	FCFTable_t *fcftab = &hba->sli.sli4.fcftab;
+	uint32_t rval = 0;
+
+	fcftab->attempts++;
+
+	if (fcftab->state != FC_FCFTAB_STATE_SPARM_FAILED) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
+		    "fc_fcftab_sparm_failed_action:%x %s:%s arg=%p "
+		    "attempt=%d. Invalid state. <",
+		    fcftab->TID,
+		    emlxs_fc_fcftab_state_xlate(fcftab->state),
+		    emlxs_fcf_event_xlate(evt),
+		    arg1, fcftab->attempts);
+		return (1);
+	}
+
+	if ((fcftab->reason == FCF_REASON_MBOX_FAILED) ||
+	    (fcftab->reason == FCF_REASON_SEND_FAILED) ||
+	    (fcftab->attempts >= 3)) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+		    "fc_fcftab_read_failed_action:%x %s:%s arg=%p "
+		    "attempt=%d reason=%x. Giving up.",
+		    fcftab->TID,
+		    emlxs_fc_fcftab_state_xlate(fcftab->state),
+		    emlxs_fcf_event_xlate(evt), arg1,
+		    fcftab->attempts,
+		    fcftab->reason);
+
+		rval = emlxs_fc_fcftab_state(port, FC_FCFTAB_STATE_SPARM_CMPL,
+		    FCF_REASON_OP_FAILED, fcftab->attempts, arg1);
+	} else {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+		    "fc_fcftab_read_failed_action:%x %s:%s arg=%p "
+		    "attempt=%d reason=%x. Retrying.",
+		    fcftab->TID,
+		    emlxs_fc_fcftab_state_xlate(fcftab->state),
+		    emlxs_fcf_event_xlate(evt), arg1,
+		    fcftab->attempts,
+		    fcftab->reason);
+
+		rval = emlxs_fc_fcftab_state(port, FC_FCFTAB_STATE_SPARM,
+		    FCF_REASON_OP_FAILED, fcftab->attempts, arg1);
+	}
+
+	return (rval);
+
+} /* emlxs_fc_fcftab_sparm_failed_action() */
+
+
+/*ARGSUSED*/
+static uint32_t
+emlxs_fc_fcftab_sparm_cmpl_action(emlxs_port_t *port, uint32_t evt,
+    void *arg1)
+{
+	emlxs_hba_t *hba = HBA;
+	FCFTable_t *fcftab = &hba->sli.sli4.fcftab;
+	uint32_t rval = 0;
+
+	if (fcftab->state != FC_FCFTAB_STATE_SPARM_CMPL) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
+		    "fc_fcftab_sparm_cmpl_action:%x %s:%s arg=%p. "
+		    "Invalid state. <",
+		    fcftab->TID,
+		    emlxs_fc_fcftab_state_xlate(fcftab->state),
+		    emlxs_fcf_event_xlate(evt), arg1);
+		return (1);
+	}
+
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+	    "fc_fcftab_sparm_cmpl_action:%x attempts=%d. "
+	    "Bring FCFTAB online.",
+	    fcftab->TID,
+	    fcftab->attempts);
+
+	rval = emlxs_fc_fcftab_state(port, FC_FCFTAB_STATE_FCFI_ONLINE,
+	    FCF_REASON_EVENT, evt, arg1);
+
+	return (rval);
+
+} /* emlxs_fc_fcftab_sparm_cmpl_action() */
+
+
+/*ARGSUSED*/
+static void
+emlxs_fc_fcftab_process(emlxs_port_t *port)
+{
+	emlxs_hba_t *hba = HBA;
+	FCFTable_t *fcftab = &hba->sli.sli4.fcftab;
+	FCFIobj_t *fcfp;
+	FCF_RECORD_t fcf_record;
+	FCF_RECORD_t *fcf_rec;
+	uint8_t bitmap[512];
+	uint16_t i;
+
+	/* Get the FCFI */
+	fcfp = fcftab->fcfi[0];
+
+	if (!fcfp) {
+		/* Allocate an fcfi */
+		fcfp = emlxs_fcfi_alloc(port);
+	}
+
+	if (!fcfp) {
+		fcftab->fcfi_count = 0;
+
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+		    "fc_fcftab_process:%x No FCF available.",
+		    fcftab->TID);
+		return;
+	}
+
+	if (fcfp->flag & EMLXS_FCFI_SELECTED) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+		    "fc_fcftab_process:%x fcfi=%d %s. "
+		    "FCF still selected.",
+		    fcftab->TID,
+		    fcfp->fcf_index,
+		    emlxs_fcfi_state_xlate(fcfp->state));
+	} else {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+		    "fc_fcftab_process:%x fcfi=%d %s. "
+		    "New FCF selected.",
+		    fcftab->TID,
+		    fcfp->fcf_index,
+		    emlxs_fcfi_state_xlate(fcfp->state));
+	}
+
+	/* Initalize an fcf_rec */
+	fcf_rec = &fcf_record;
+	bzero(fcf_rec, sizeof (FCF_RECORD_t));
+
+	fcf_rec->max_recv_size = EMLXS_FCOE_MAX_RCV_SZ;
+	fcf_rec->fka_adv_period = 0;
+	fcf_rec->fip_priority = 128;
+
+#ifdef EMLXS_BIG_ENDIAN
+	fcf_rec->fcf_mac_address_hi[0] = FCOE_FCF_MAC3;
+	fcf_rec->fcf_mac_address_hi[1] = FCOE_FCF_MAC2;
+	fcf_rec->fcf_mac_address_hi[2] = FCOE_FCF_MAC1;
+	fcf_rec->fcf_mac_address_hi[3] = FCOE_FCF_MAC0;
+	fcf_rec->fcf_mac_address_low[0] = FCOE_FCF_MAC5;
+	fcf_rec->fcf_mac_address_low[1] = FCOE_FCF_MAC4;
+	fcf_rec->fc_map[0] = hba->sli.sli4.cfgFCOE.FCMap[2];
+	fcf_rec->fc_map[1] = hba->sli.sli4.cfgFCOE.FCMap[1];
+	fcf_rec->fc_map[2] = hba->sli.sli4.cfgFCOE.FCMap[0];
+#endif /* EMLXS_BIG_ENDIAN */
+#ifdef EMLXS_LITTLE_ENDIAN
+	fcf_rec->fcf_mac_address_hi[0] = FCOE_FCF_MAC0;
+	fcf_rec->fcf_mac_address_hi[1] = FCOE_FCF_MAC1;
+	fcf_rec->fcf_mac_address_hi[2] = FCOE_FCF_MAC2;
+	fcf_rec->fcf_mac_address_hi[3] = FCOE_FCF_MAC3;
+	fcf_rec->fcf_mac_address_low[0] = FCOE_FCF_MAC4;
+	fcf_rec->fcf_mac_address_low[1] = FCOE_FCF_MAC5;
+	fcf_rec->fc_map[0] = hba->sli.sli4.cfgFCOE.FCMap[0];
+	fcf_rec->fc_map[1] = hba->sli.sli4.cfgFCOE.FCMap[1];
+	fcf_rec->fc_map[2] = hba->sli.sli4.cfgFCOE.FCMap[2];
+#endif /* EMLXS_LITTLE_ENDIAN */
+
+	if (hba->sli.sli4.cfgFCOE.fip_flags & TLV_FCOE_VLAN) {
+		bzero((void *) bitmap, 512);
+		i = hba->sli.sli4.cfgFCOE.VLanId;
+		bitmap[i / 8] = (1 << (i % 8));
+		BE_SWAP32_BCOPY(bitmap, fcf_rec->vlan_bitmap, 512);
+	} else {
+		bzero((void *) bitmap, 512);
+		bitmap[0] = 1; /* represents bit 0 */
+		BE_SWAP32_BCOPY(bitmap, fcf_rec->vlan_bitmap, 512);
+	}
+
+	fcf_rec->fcf_valid = 1;
+	fcf_rec->fcf_available = 1;
+
+	/* Update the FCFI */
+	emlxs_fcfi_update(port, fcfp, fcf_rec, hba->link_event_tag);
+
+	/* Select the FCFI */
+	fcfp->flag &= ~EMLXS_FCFI_FAILED;
+	fcfp->flag |= EMLXS_FCFI_SELECTED;
+	fcftab->fcfi[0] = fcfp;
+	fcftab->fcfi_count = 1;
+
+	return;
+
+} /* emlxs_fc_fcftab_process() */
+
+
+/*ARGSUSED*/
+static uint32_t
+emlxs_fc_fcftab_fcfi_online_action(emlxs_port_t *port, uint32_t evt,
+    void *arg1)
+{
+	emlxs_hba_t *hba = HBA;
+	FCFTable_t *fcftab = &hba->sli.sli4.fcftab;
+	uint32_t rval = 0;
+	FCFIobj_t *fcfp;
+
+	if (fcftab->state != FC_FCFTAB_STATE_FCFI_ONLINE) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
+		    "fc_fcftab_fcfi_online_action:%x %s:%s arg=%p. "
+		    "Invalid state. <",
+		    fcftab->TID,
+		    emlxs_fc_fcftab_state_xlate(fcftab->state),
+		    emlxs_fcf_event_xlate(evt), arg1);
+		return (1);
+	}
+
+	if (fcftab->flag & EMLXS_FCFTAB_REQ_MASK) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+		    "fc_fcftab_fcfi_online_action:%x flag=%x. "
+		    "Handling request.",
+		    fcftab->TID,
+		    fcftab->flag);
+
+		rval = emlxs_fc_fcftab_req_handler(port, arg1);
+		return (rval);
+	}
+
+	emlxs_fc_fcftab_process(port);
+
+	fcfp = fcftab->fcfi[0];
+	if (!fcfp) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+		    "fc_fcftab_fcfi_online_action:%x. "
+		    "No FCF available. Offlining.",
+		    fcftab->TID);
+
+		fcftab->flag &= ~EMLXS_FCFTAB_REQ_MASK;
+		fcftab->flag |= EMLXS_FC_FCFTAB_OFFLINE_REQ;
+		rval = emlxs_fc_fcftab_req_handler(port, arg1);
+
+		mutex_exit(&EMLXS_FCF_LOCK);
+		return (rval);
+	}
+
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+	    "fc_fcftab_fcfi_online_action:%x fcfi_count=%d. "
+	    "Onlining FCFI:%d. >",
+	    fcftab->TID,
+	    fcftab->fcfi_count,
+	    fcfp->fcf_index);
+
+	(void) emlxs_fcfi_event(port, FCF_EVENT_FCFI_ONLINE, fcfp);
+
+	rval = emlxs_fc_fcftab_state(port, FC_FCFTAB_STATE_FCFI_ONLINE_CMPL,
+	    FCF_REASON_EVENT, evt, arg1);
+
+	return (rval);
+
+} /* emlxs_fc_fcftab_fcfi_online_action() */
+
+
+/*ARGSUSED*/
+static uint32_t
+emlxs_fc_fcftab_fcfi_online_cmpl_action(emlxs_port_t *port, uint32_t evt,
+    void *arg1)
+{
+	emlxs_hba_t *hba = HBA;
+	FCFTable_t *fcftab = &hba->sli.sli4.fcftab;
+	uint32_t rval = 0;
+
+	if (fcftab->state != FC_FCFTAB_STATE_FCFI_ONLINE_CMPL) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
+		    "fc_fcftab_fcfi_online_cmpl_action:%x %s:%s arg=%p. "
+		    "Invalid state. <",
+		    fcftab->TID,
+		    emlxs_fc_fcftab_state_xlate(fcftab->state),
+		    emlxs_fcf_event_xlate(evt), arg1);
+		return (1);
+	}
+
+	if (fcftab->flag & EMLXS_FCFTAB_REQ_MASK) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+		    "fc_fcftab_fcfi_online_cmpl_action:%x %s:%s arg=%p "
+		    "flag=%x. Handling request.",
+		    fcftab->TID,
+		    emlxs_fc_fcftab_state_xlate(fcftab->state),
+		    emlxs_fcf_event_xlate(evt), arg1,
+		    fcftab->flag);
+
+		rval = emlxs_fc_fcftab_req_handler(port, arg1);
+		return (rval);
+	}
+
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+	    "fc_fcftab_fcfi_online_cmpl_action:%x %s:%s arg=%p. "
+	    "Going online.",
+	    fcftab->TID,
+	    emlxs_fc_fcftab_state_xlate(fcftab->state),
+	    emlxs_fcf_event_xlate(evt), arg1);
+
+	rval = emlxs_fc_fcftab_state(port, FC_FCFTAB_STATE_ONLINE,
+	    FCF_REASON_EVENT, evt, arg1);
+
+	return (rval);
+
+} /* emlxs_fc_fcftab_fcfi_online_cmpl_action() */
+
+
+/*ARGSUSED*/
+static uint32_t
+emlxs_fc_fcftab_fcfi_offline_action(emlxs_port_t *port, uint32_t evt,
+    void *arg1)
+{
+	emlxs_hba_t *hba = HBA;
+	FCFTable_t *fcftab = &hba->sli.sli4.fcftab;
+	uint32_t rval = 0;
+	FCFIobj_t *fcfp;
+
+	if (fcftab->state != FC_FCFTAB_STATE_FCFI_OFFLINE) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
+		    "fc_fcftab_fcftab_offline_action:%x %s:%s arg=%p. "
+		    "Invalid state. <",
+		    fcftab->TID,
+		    emlxs_fc_fcftab_state_xlate(fcftab->state),
+		    emlxs_fcf_event_xlate(evt), arg1);
+		return (1);
+	}
+
+	if (fcftab->fcfi_online) {
+		fcfp = fcftab->fcfi[0];
+
+		if (!(fcfp->flag & EMLXS_FCFI_OFFLINE_REQ)) {
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+			    "fc_fcftab_fcfi_offline_action:%d. "
+			    "Offlining FCFI:%d. >",
+			    fcftab->TID,
+			    fcfp->fcf_index);
+
+			rval = emlxs_fcfi_event(port,
+			    FCF_EVENT_FCFI_OFFLINE, fcfp);
+
+			return (rval);
+		}
+
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+		    "fc_fcftab_fcfi_offline_action:%x  fcfi_online=%d. "
+		    "Waiting on FCF. <",
+		    fcftab->TID,
+		    fcftab->fcfi_online);
+
+		return (0);
+	}
+
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+	    "fc_fcftab_fcfi_offline_action:%x %s:%s arg=%p.",
+	    fcftab->TID,
+	    emlxs_fc_fcftab_state_xlate(fcftab->state),
+	    emlxs_fcf_event_xlate(evt), arg1);
+
+	rval = emlxs_fc_fcftab_state(port, FC_FCFTAB_STATE_FCFI_OFFLINE_CMPL,
+	    FCF_REASON_EVENT, evt, arg1);
+
+	return (rval);
+
+} /* emlxs_fc_fcftab_fcfi_offline_action() */
+
+
+/*ARGSUSED*/
+static uint32_t
+emlxs_fc_fcftab_fcfi_offline_cmpl_action(emlxs_port_t *port, uint32_t evt,
+    void *arg1)
+{
+	emlxs_hba_t *hba = HBA;
+	FCFTable_t *fcftab = &hba->sli.sli4.fcftab;
+	uint32_t rval = 0;
+
+	if (fcftab->state != FC_FCFTAB_STATE_FCFI_OFFLINE_CMPL) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
+		    "fc_fcftab_fcftab_offline_cmpl_action:%x %s:%s arg=%p. "
+		    "Invalid state. <",
+		    fcftab->TID,
+		    emlxs_fc_fcftab_state_xlate(fcftab->state),
+		    emlxs_fcf_event_xlate(evt), arg1);
+		return (1);
+	}
+
+	if (fcftab->flag & EMLXS_FCFTAB_REQ_MASK) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+		    "fc_fcftab_fcfi_offline_cmpl_action:%x %s:%s arg=%p. "
+		    "Handling request.",
+		    fcftab->TID,
+		    emlxs_fc_fcftab_state_xlate(fcftab->state),
+		    emlxs_fcf_event_xlate(evt), arg1);
+
+		rval = emlxs_fc_fcftab_req_handler(port, arg1);
+		return (rval);
+	}
+
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+	    "fc_fcftab_fcftab_offline_cmpl_action:%x %s:%s arg=%p. "
+	    "Returning FCF(s) online.",
+	    fcftab->TID,
+	    emlxs_fc_fcftab_state_xlate(fcftab->state),
+	    emlxs_fcf_event_xlate(evt), arg1);
+
+	rval = emlxs_fc_fcftab_state(port, FC_FCFTAB_STATE_FCFI_ONLINE,
+	    FCF_REASON_EVENT, evt, arg1);
+
+	return (rval);
+
+} /* emlxs_fc_fcftab_fcfi_offline_cmpl_action() */
+
+
+/*ARGSUSED*/
+static uint32_t
+emlxs_fc_fcftab_linkup_evt_action(emlxs_port_t *port, uint32_t evt,
+    void *arg1)
+{
+	emlxs_hba_t *hba = HBA;
+	FCFTable_t *fcftab = &hba->sli.sli4.fcftab;
+	uint32_t rval = 0;
+
+	if (evt != FCF_EVENT_LINKUP) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
+		    "fc_fcftab_linkup_evt_action:%x %s:%s arg=%p flag=%x. "
+		    "Invalid event type. <",
+		    fcftab->TID,
+		    emlxs_fc_fcftab_state_xlate(fcftab->state),
+		    emlxs_fcf_event_xlate(evt), arg1,
+		    fcftab->flag);
+		return (1);
+	}
+
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+	    "fc_fcftab_linkup_evt_action:%x %s:%s arg=%p gen=%x. Link up.",
+	    fcftab->TID,
+	    emlxs_fc_fcftab_state_xlate(fcftab->state),
+	    emlxs_fcf_event_xlate(evt), arg1,
+	    fcftab->generation);
+
+	emlxs_fcf_linkup(port);
+
+	fcftab->flag &= ~EMLXS_FCFTAB_REQ_MASK;
+	fcftab->flag |= EMLXS_FC_FCFTAB_TOPO_REQ;
+	fcftab->generation++;
+
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+	    "fc_fcftab_linkup_evt_action:%x %s gen=%x. "
+	    "Read topology.",
+	    fcftab->TID,
+	    emlxs_fc_fcftab_state_xlate(fcftab->state),
+	    fcftab->generation);
+
+	switch (fcftab->state) {
+	case FC_FCFTAB_STATE_TOPO:
+		rval = emlxs_fc_fcftab_state(port, FC_FCFTAB_STATE_TOPO,
+		    FCF_REASON_REENTER, evt, arg1);
+		break;
+
+	default:
+		rval = emlxs_fc_fcftab_state(port, FC_FCFTAB_STATE_TOPO,
+		    FCF_REASON_EVENT, evt, arg1);
+		break;
+	}
+
+	return (rval);
+
+} /* emlxs_fc_fcftab_linkup_evt_action() */
+
+
+/*ARGSUSED*/
+static uint32_t
+emlxs_fc_fcftab_linkdown_evt_action(emlxs_port_t *port, uint32_t evt,
+    void *arg1)
+{
+	emlxs_hba_t *hba = HBA;
+	FCFTable_t *fcftab = &hba->sli.sli4.fcftab;
+	uint32_t rval = 0;
+	uint32_t i;
+	FCFIobj_t *fcfp;
+
+	if (evt != FCF_EVENT_LINKDOWN) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
+		    "fc_fcftab_linkdown_evt_action:%x %s:%s arg=%p flag=%x. "
+		    "Invalid event type. <",
+		    fcftab->TID,
+		    emlxs_fc_fcftab_state_xlate(fcftab->state),
+		    emlxs_fcf_event_xlate(evt), arg1,
+		    fcftab->flag);
+		return (1);
+	}
+
+	fcftab->flag &= ~EMLXS_FCFTAB_REQ_MASK;
+	fcftab->flag |= EMLXS_FC_FCFTAB_OFFLINE_REQ;
+
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+	    "fc_fcftab_linkdown_evt_action:%x %s:%s arg=%p flag=%x. Linkdown.",
+	    fcftab->TID,
+	    emlxs_fc_fcftab_state_xlate(fcftab->state),
+	    emlxs_fcf_event_xlate(evt), arg1,
+	    fcftab->flag);
+
+	emlxs_fcf_linkdown(port);
+
+	/* Pause all active FCFI's */
+	for (i = 0; i < fcftab->fcfi_count; i++) {
+		fcfp = fcftab->fcfi[i];
+
+		if ((fcfp->state == FCFI_STATE_OFFLINE) ||
+		    (fcfp->state == FCFI_STATE_PAUSED)) {
+			break;
+		}
+
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+		    "fc_fcftab_linkdown_evt_action:%x. "
+		    "Pausing FCFI:%d. >",
+		    fcftab->TID,
+		    fcfp->fcf_index);
+
+		(void) emlxs_fcfi_event(port, FCF_EVENT_FCFI_PAUSE, fcfp);
+	}
+
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+	    "fc_fcftab_linkdown_evt_action:%x "
+	    "Going offline.",
+	    fcftab->TID);
+
+	switch (fcftab->state) {
+	case FC_FCFTAB_STATE_OFFLINE:
+		rval = emlxs_fc_fcftab_state(port, FC_FCFTAB_STATE_OFFLINE,
+		    FCF_REASON_REENTER, evt, arg1);
+		break;
+
+	default:
+		rval = emlxs_fc_fcftab_state(port, FC_FCFTAB_STATE_OFFLINE,
+		    FCF_REASON_EVENT, evt, arg1);
+		break;
+	}
+
+	return (rval);
+
+} /* emlxs_fc_fcftab_linkdown_evt_action() */
+
+
+/*ARGSUSED*/
+static uint32_t
+emlxs_fc_fcftab_fcfi_offline_evt_action(emlxs_port_t *port, uint32_t evt,
+    void *arg1)
+{
+	emlxs_hba_t *hba = HBA;
+	FCFTable_t *fcftab = &hba->sli.sli4.fcftab;
+	uint32_t rval = 0;
+	FCFIobj_t *fcfp;
+
+	if (evt != FCF_EVENT_FCFI_OFFLINE) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
+		    "fc_fcftab_fcftab_offline_evt_action:%x %s:%s arg=%p "
+		    "flag=%x. Invalid event type. <",
+		    fcftab->TID,
+		    emlxs_fc_fcftab_state_xlate(fcftab->state),
+		    emlxs_fcf_event_xlate(evt), arg1,
+		    fcftab->flag);
+		return (1);
+	}
+
+	fcfp = (FCFIobj_t *)arg1;
+
+	switch (fcftab->state) {
+	case FC_FCFTAB_STATE_SHUTDOWN:
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+		    "fc_fcftab_fcfi_offline_evt_action:%x fcfi:%d. "
+		    "Shutting down.",
+		    fcftab->TID,
+		    fcfp->fcf_index);
+
+		/* This will trigger final shutdown */
+		rval = emlxs_fc_fcftab_state(port, FC_FCFTAB_STATE_SHUTDOWN,
+		    FCF_REASON_REENTER, evt, arg1);
+		break;
+
+	case FC_FCFTAB_STATE_FCFI_OFFLINE:
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+		    "fc_fcftab_fcfi_offline_evt_action:%x fcfi:%d. Offlining.",
+		    fcftab->TID,
+		    fcfp->fcf_index);
+
+		rval = emlxs_fc_fcftab_state(port, FC_FCFTAB_STATE_FCFI_OFFLINE,
+		    FCF_REASON_REENTER, evt, arg1);
+		break;
+
+	case FC_FCFTAB_STATE_FCFI_ONLINE:
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+		    "fc_fcftab_fcfi_offline_evt_action:%x fcfi:%d. "
+		    "Retrying FCF.",
+		    fcftab->TID,
+		    fcfp->fcf_index);
+
+		fcfp->flag |= EMLXS_FCFI_FAILED;
+
+		rval = emlxs_fc_fcftab_state(port, FC_FCFTAB_STATE_FCFI_ONLINE,
+		    FCF_REASON_REENTER, evt, arg1);
+		break;
+
+	case FC_FCFTAB_STATE_ONLINE:
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+		    "fc_fcftab_fcfi_offline_evt_action:%x fcfi:%d.",
+		    fcftab->TID,
+		    fcfp->fcf_index);
+
+		rval = emlxs_fc_fcftab_state(port, FC_FCFTAB_STATE_ONLINE,
+		    FCF_REASON_REENTER, evt, arg1);
+		break;
+
+	default:
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+		    "fc_fcftab_fcfi_offline_evt_action:%x %s fcfi:%d.",
+		    fcftab->TID,
+		    emlxs_fc_fcftab_state_xlate(fcftab->state),
+		    fcfp->fcf_index);
+		break;
+	}
+
+	return (rval);
+
+} /* emlxs_fc_fcftab_fcfi_offline_evt_action() */
+
+
+/*ARGSUSED*/
+static uint32_t
+emlxs_fc_fcftab_fcfi_online_evt_action(emlxs_port_t *port, uint32_t evt,
+    void *arg1)
+{
+	emlxs_hba_t *hba = HBA;
+	FCFTable_t *fcftab = &hba->sli.sli4.fcftab;
+	uint32_t rval = 0;
+	FCFIobj_t *fcfp;
+
+	if (evt != FCF_EVENT_FCFI_ONLINE) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
+		    "fc_fcftab_fcftab_online_evt_action:%x %s:%s arg=%p "
+		    "flag=%x. Invalid event type. <",
+		    fcftab->TID,
+		    emlxs_fc_fcftab_state_xlate(fcftab->state),
+		    emlxs_fcf_event_xlate(evt), arg1,
+		    fcftab->flag);
+		return (1);
+	}
+
+	fcfp = (FCFIobj_t *)arg1;
+
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+	    "fc_fcftab_fcfi_online_evt_action:%d fcfi:%d. <",
+	    fcftab->TID,
+	    fcfp->fcf_index);
+
+	return (rval);
+
+} /* emlxs_fc_fcftab_fcfi_online_evt_action() */
+
+
+/*ARGSUSED*/
+static uint32_t
+emlxs_fc_fcftab_shutdown_evt_action(emlxs_port_t *port, uint32_t evt,
+    void *arg1)
+{
+	emlxs_hba_t *hba = HBA;
+	FCFTable_t *fcftab = &hba->sli.sli4.fcftab;
+	uint32_t rval = 0;
+
+	if (evt != FCF_EVENT_SHUTDOWN) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
+		    "fc_fcftab_shutdown_evt_action:%x %s:%s arg=%p flag=%x. "
+		    "Invalid event type. <",
+		    fcftab->TID,
+		    emlxs_fc_fcftab_state_xlate(fcftab->state),
+		    emlxs_fcf_event_xlate(evt), arg1,
+		    fcftab->flag);
+		return (1);
+	}
+
+	if (fcftab->flag & EMLXS_FCFTAB_SHUTDOWN) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+		    "fc_fcftab_shutdown_evt_action:%x %s:%s arg=%p flag=%x. "
+		    "Already shut down. <",
+		    fcftab->TID,
+		    emlxs_fc_fcftab_state_xlate(fcftab->state),
+		    emlxs_fcf_event_xlate(evt), arg1,
+		    fcftab->flag);
+		return (1);
+	}
+
+	if (fcftab->state == FC_FCFTAB_STATE_SHUTDOWN) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+		    "fc_fcftab_shutdown_evt_action:%x %s:%s arg=%p flag=%x. "
+		    "Already shutting down. <",
+		    fcftab->TID,
+		    emlxs_fc_fcftab_state_xlate(fcftab->state),
+		    emlxs_fcf_event_xlate(evt), arg1,
+		    fcftab->flag);
+		return (1);
+	}
+
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+	    "fc_fcftab_shutdown_evt_action:%x %s:%s arg=%p flag=%x. "
+	    "Shutting down.",
+	    fcftab->TID,
+	    emlxs_fc_fcftab_state_xlate(fcftab->state),
+	    emlxs_fcf_event_xlate(evt), arg1,
+	    fcftab->flag);
+
+	emlxs_fcf_linkdown(port);
+
+	rval = emlxs_fc_fcftab_state(port, FC_FCFTAB_STATE_SHUTDOWN,
+	    FCF_REASON_EVENT, evt, arg1);
+
+	return (rval);
+
+} /* emlxs_fc_fcftab_shutdown_evt_action() */
+
+
+static uint32_t
+emlxs_fc_fcftab_req_handler(emlxs_port_t *port, void *arg1)
+{
+	emlxs_hba_t *hba = HBA;
+	FCFTable_t *fcftab = &hba->sli.sli4.fcftab;
+	uint32_t rval = 0;
+
+	if (!(fcftab->flag & EMLXS_FCFTAB_REQ_MASK)) {
+		return (1);
+	}
+
+	if (fcftab->flag & EMLXS_FC_FCFTAB_OFFLINE_REQ) {
+		rval = emlxs_fc_fcftab_state(port, FC_FCFTAB_STATE_OFFLINE,
+		    FCF_REASON_REQUESTED, 0, arg1);
+	}
+
+	else if (fcftab->flag & EMLXS_FC_FCFTAB_TOPO_REQ) {
+		rval = emlxs_fc_fcftab_state(port, FC_FCFTAB_STATE_TOPO,
+		    FCF_REASON_REQUESTED, 0, arg1);
+	}
+
+	else if (fcftab->flag & EMLXS_FC_FCFTAB_CFGLINK_REQ) {
+		rval = emlxs_fc_fcftab_state(port, FC_FCFTAB_STATE_CFGLINK,
+		    FCF_REASON_REQUESTED, 0, arg1);
+	}
+
+	else if (fcftab->flag & EMLXS_FC_FCFTAB_SPARM_REQ) {
+		rval = emlxs_fc_fcftab_state(port, FC_FCFTAB_STATE_SPARM,
+		    FCF_REASON_REQUESTED, 0, arg1);
+	}
+
+	return (rval);
+
+} /* emlxs_fc_fcftab_req_handler() */
+
+
+
+/* ************************************************************************** */
+/* FCOE FCFTAB */
+/* ************************************************************************** */
+
+static char *
+emlxs_fcoe_fcftab_state_xlate(uint32_t state)
+{
+	static char buffer[32];
+	uint32_t i;
+	uint32_t count;
+
+	count = sizeof (emlxs_fcoe_fcftab_state_table) / sizeof (emlxs_table_t);
+	for (i = 0; i < count; i++) {
+		if (state == emlxs_fcoe_fcftab_state_table[i].code) {
+			return (emlxs_fcoe_fcftab_state_table[i].string);
+		}
+	}
+
+	(void) snprintf(buffer, sizeof (buffer), "state=0x%x", state);
+	return (buffer);
+
+} /* emlxs_fcoe_fcftab_state_xlate() */
+
+
+static uint32_t
+emlxs_fcoe_fcftab_action(emlxs_port_t *port, uint32_t evt,
+    void *arg1)
+{
+	emlxs_hba_t *hba = HBA;
+	FCFTable_t *fcftab = &hba->sli.sli4.fcftab;
+	uint32_t rval = 0;
 	uint32_t(*func) (emlxs_port_t *, uint32_t, void *);
 	uint32_t index;
 	uint32_t events;
@@ -2102,17 +4665,18 @@ emlxs_fcftab_action(emlxs_port_t *port, uint32_t evt,
 		return (1);
 	}
 
-	events = FCFTAB_ACTION_EVENTS;
+	events = FCOE_FCFTAB_ACTION_EVENTS;
 	state  = fcftab->state;
 
 	index += (state * events);
 	func   = (uint32_t(*) (emlxs_port_t *, uint32_t, void *))
-	    emlxs_fcftab_action_table[index];
+	    emlxs_fcoe_fcftab_action_table[index];
 
 	if (!func) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_event_msg,
-		    "fcftab: %s:%s arg=%p. No action. Terminated.",
-		    emlxs_fcftab_state_xlate(fcftab->state),
+		    "fcoe_fcftab_action:%x %s:%s arg=%p. No action. <",
+		    fcftab->TID,
+		    emlxs_fcoe_fcftab_state_xlate(fcftab->state),
 		    emlxs_fcf_event_xlate(evt), arg1);
 
 		return (1);
@@ -2122,16 +4686,16 @@ emlxs_fcftab_action(emlxs_port_t *port, uint32_t evt,
 
 	return (rval);
 
-} /* emlxs_fcftab_action() */
+} /* emlxs_fcoe_fcftab_action() */
 
 
 static uint32_t
-emlxs_fcftab_event(emlxs_port_t *port, uint32_t evt,
+emlxs_fcoe_fcftab_event(emlxs_port_t *port, uint32_t evt,
     void *arg1)
 {
 	emlxs_hba_t *hba = HBA;
 	FCFTable_t *fcftab = &hba->sli.sli4.fcftab;
-	uint32_t rval;
+	uint32_t rval = 0;
 
 	/* Filter events */
 	switch (evt) {
@@ -2152,67 +4716,72 @@ emlxs_fcftab_event(emlxs_port_t *port, uint32_t evt,
 	}
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_event_msg,
-	    "fcftab: %s:%s arg=%p.",
-	    emlxs_fcftab_state_xlate(fcftab->state),
+	    "fcoe_fcftab_event:%x %s:%s arg=%p.",
+	    fcftab->TID,
+	    emlxs_fcoe_fcftab_state_xlate(fcftab->state),
 	    emlxs_fcf_event_xlate(evt), arg1);
 
-	rval = emlxs_fcftab_action(port, evt, arg1);
+	rval = emlxs_fcoe_fcftab_action(port, evt, arg1);
 
 	return (rval);
 
-} /* emlxs_fcftab_event() */
+} /* emlxs_fcoe_fcftab_event() */
 
 
 /* EMLXS_FCF_LOCK must be held to enter */
 /*ARGSUSED*/
 static uint32_t
-emlxs_fcftab_state(emlxs_port_t *port, uint16_t state, uint16_t reason,
+emlxs_fcoe_fcftab_state(emlxs_port_t *port, uint16_t state, uint16_t reason,
     uint32_t explain, void *arg1)
 {
 	emlxs_hba_t *hba = HBA;
 	FCFTable_t *fcftab = &hba->sli.sli4.fcftab;
 	uint32_t rval = 0;
 
-	if (state >= FCFTAB_ACTION_STATES) {
+	if (state >= FCOE_FCFTAB_ACTION_STATES) {
 		return (1);
 	}
 
 	if ((fcftab->state == state) &&
 	    (reason != FCF_REASON_REENTER)) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
-		    "fcftab_state: %s:%s:0x%x arg=%p. "
-		    "State not changed. Terminated.",
-		    emlxs_fcftab_state_xlate(state),
+		    "fcftab_state:%x %s:%s:0x%x arg=%p. "
+		    "State not changed. <",
+		    fcftab->TID,
+		    emlxs_fcoe_fcftab_state_xlate(state),
 		    emlxs_fcf_reason_xlate(reason),
 		    explain, arg1);
-
 		return (1);
 	}
 
 	if (!reason) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_state_msg,
-		    "fcftab:%s-->%s arg=%p",
-		    emlxs_fcftab_state_xlate(fcftab->state),
-		    emlxs_fcftab_state_xlate(state), arg1);
+		    "fcftab_state:%x %s-->%s arg=%p",
+		    fcftab->TID,
+		    emlxs_fcoe_fcftab_state_xlate(fcftab->state),
+		    emlxs_fcoe_fcftab_state_xlate(state), arg1);
 	} else if (reason == FCF_REASON_EVENT) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_state_msg,
-		    "fcftab:%s-->%s:%s:%s arg=%p",
-		    emlxs_fcftab_state_xlate(fcftab->state),
-		    emlxs_fcftab_state_xlate(state),
+		    "fcftab_state:%x %s-->%s:%s:%s arg=%p",
+		    fcftab->TID,
+		    emlxs_fcoe_fcftab_state_xlate(fcftab->state),
+		    emlxs_fcoe_fcftab_state_xlate(state),
 		    emlxs_fcf_reason_xlate(reason),
 		    emlxs_fcf_event_xlate(explain), arg1);
 	} else if (explain) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_state_msg,
-		    "fcftab:%s-->%s:%s:0x%x arg=%p",
-		    emlxs_fcftab_state_xlate(fcftab->state),
-		    emlxs_fcftab_state_xlate(state),
+		    "fcftab_state:%x %s-->%s:%s:0x%x arg=%p",
+		    fcftab->TID,
+		    emlxs_fcoe_fcftab_state_xlate(fcftab->state),
+		    emlxs_fcoe_fcftab_state_xlate(state),
 		    emlxs_fcf_reason_xlate(reason),
 		    explain, arg1);
 	} else {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_state_msg,
-		    "fcftab:%s-->%s:%s arg=%p",
-		    emlxs_fcftab_state_xlate(fcftab->state),
-		    emlxs_fcftab_state_xlate(state),
+		    "fcftab_state:%x %s-->%s:%s arg=%p",
+		    fcftab->TID,
+		    emlxs_fcoe_fcftab_state_xlate(fcftab->state),
+		    emlxs_fcoe_fcftab_state_xlate(state),
 		    emlxs_fcf_reason_xlate(reason), arg1);
 	}
 
@@ -2221,16 +4790,16 @@ emlxs_fcftab_state(emlxs_port_t *port, uint16_t state, uint16_t reason,
 	fcftab->state = state;
 	fcftab->reason = reason;
 
-	rval = emlxs_fcftab_action(port, FCF_EVENT_STATE_ENTER, arg1);
+	rval = emlxs_fcoe_fcftab_action(port, FCF_EVENT_STATE_ENTER, arg1);
 
 	return (rval);
 
-} /* emlxs_fcftab_state() */
+} /* emlxs_fcoe_fcftab_state() */
 
 
 /*ARGSUSED*/
 static uint32_t
-emlxs_fcftab_fcfi_offline_evt_action(emlxs_port_t *port, uint32_t evt,
+emlxs_fcoe_fcftab_fcfi_offline_evt_action(emlxs_port_t *port, uint32_t evt,
     void *arg1)
 {
 	emlxs_hba_t *hba = HBA;
@@ -2240,9 +4809,10 @@ emlxs_fcftab_fcfi_offline_evt_action(emlxs_port_t *port, uint32_t evt,
 
 	if (evt != FCF_EVENT_FCFI_OFFLINE) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
-		    "fcftab_fcfi_offline_evt_action: %s:%s arg=%p flag=%x. "
-		    "Invalid event type. Terminated.",
-		    emlxs_fcftab_state_xlate(fcftab->state),
+		    "fcoe_fcftab_fcfi_offline_evt_action:%x %s:%s arg=%p "
+		    "flag=%x. Invalid event type. <",
+		    fcftab->TID,
+		    emlxs_fcoe_fcftab_state_xlate(fcftab->state),
 		    emlxs_fcf_event_xlate(evt), arg1,
 		    fcftab->flag);
 		return (1);
@@ -2251,60 +4821,71 @@ emlxs_fcftab_fcfi_offline_evt_action(emlxs_port_t *port, uint32_t evt,
 	fcfp = (FCFIobj_t *)arg1;
 
 	switch (fcftab->state) {
-	case FCFTAB_STATE_SHUTDOWN:
+	case FCOE_FCFTAB_STATE_SHUTDOWN:
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "fcftab_fcfi_offline_evt_action:%d. Shutting down.",
+		    "fcoe_fcftab_fcfi_offline_evt_action:%x fcfi:%d. "
+		    "Shutting down.",
+		    fcftab->TID,
 		    fcfp->fcf_index);
 
-		rval = emlxs_fcftab_state(port, FCFTAB_STATE_SHUTDOWN,
+		/* This will trigger final shutdown */
+		rval = emlxs_fcoe_fcftab_state(port, FCOE_FCFTAB_STATE_SHUTDOWN,
 		    FCF_REASON_REENTER, evt, arg1);
 		break;
 
-	case FCFTAB_STATE_FCFI_OFFLINE:
+	case FCOE_FCFTAB_STATE_FCFI_OFFLINE:
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "fcftab_fcfi_offline_evt_action:%d. Offlining.",
+		    "fcoe_fcftab_fcfi_offline_evt_action:%x fcfi:%d. "
+		    "Offlining.",
+		    fcftab->TID,
 		    fcfp->fcf_index);
 
-		rval = emlxs_fcftab_state(port, FCFTAB_STATE_FCFI_OFFLINE,
+		rval = emlxs_fcoe_fcftab_state(port,
+		    FCOE_FCFTAB_STATE_FCFI_OFFLINE,
 		    FCF_REASON_REENTER, evt, arg1);
 		break;
 
-	case FCFTAB_STATE_FCFI_ONLINE:
+	case FCOE_FCFTAB_STATE_FCFI_ONLINE:
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "fcftab_fcfi_offline_evt_action:%d. Attempting failover.",
+		    "fcoe_fcftab_fcfi_offline_evt_action:%x fcfi:%d. "
+		    "Attempting failover.",
+		    fcftab->TID,
 		    fcfp->fcf_index);
 
 		fcfp->flag |= EMLXS_FCFI_FAILED;
 
-		rval = emlxs_fcftab_state(port, FCFTAB_STATE_FCFI_ONLINE,
+		rval = emlxs_fcoe_fcftab_state(port,
+		    FCOE_FCFTAB_STATE_FCFI_ONLINE,
 		    FCF_REASON_REENTER, evt, arg1);
 		break;
 
-	case FCFTAB_STATE_ONLINE:
+	case FCOE_FCFTAB_STATE_ONLINE:
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "fcftab_fcfi_offline_evt_action:%d.",
+		    "fcoe_fcftab_fcfi_offline_evt_action:%x fcfi:%d.",
+		    fcftab->TID,
 		    fcfp->fcf_index);
 
-		rval = emlxs_fcftab_state(port, FCFTAB_STATE_ONLINE,
+		rval = emlxs_fcoe_fcftab_state(port, FCOE_FCFTAB_STATE_ONLINE,
 		    FCF_REASON_REENTER, evt, arg1);
 		break;
 
 	default:
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "fcftab_fcfi_offline_evt_action:%d %s. Terminated.",
-		    fcfp->fcf_index,
-		    emlxs_fcftab_state_xlate(fcftab->state));
+		    "fcoe_fcftab_fcfi_offline_evt_action:%x %s fcfi:%d.",
+		    fcftab->TID,
+		    emlxs_fcoe_fcftab_state_xlate(fcftab->state),
+		    fcfp->fcf_index);
 		break;
 	}
 
 	return (rval);
 
-} /* emlxs_fcftab_fcfi_offline_evt_action() */
+} /* emlxs_fcoe_fcftab_fcfi_offline_evt_action() */
 
 
 /*ARGSUSED*/
 static uint32_t
-emlxs_fcftab_fcfi_online_evt_action(emlxs_port_t *port, uint32_t evt,
+emlxs_fcoe_fcftab_fcfi_online_evt_action(emlxs_port_t *port, uint32_t evt,
     void *arg1)
 {
 	emlxs_hba_t *hba = HBA;
@@ -2314,9 +4895,10 @@ emlxs_fcftab_fcfi_online_evt_action(emlxs_port_t *port, uint32_t evt,
 
 	if (evt != FCF_EVENT_FCFI_ONLINE) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
-		    "fcftab_fcfi_online_evt_action: %s:%s arg=%p flag=%x. "
-		    "Invalid event type. Terminated.",
-		    emlxs_fcftab_state_xlate(fcftab->state),
+		    "fcoe_fcftab_fcfi_online_evt_action:%x %s:%s arg=%p "
+		    "flag=%x. Invalid event type. <",
+		    fcftab->TID,
+		    emlxs_fcoe_fcftab_state_xlate(fcftab->state),
 		    emlxs_fcf_event_xlate(evt), arg1,
 		    fcftab->flag);
 		return (1);
@@ -2325,148 +4907,146 @@ emlxs_fcftab_fcfi_online_evt_action(emlxs_port_t *port, uint32_t evt,
 	fcfp = (FCFIobj_t *)arg1;
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-	    "fcftab_fcfi_online_evt_action:%d. Terminated.",
+	    "fcoe_fcftab_fcfi_online_evt_action:%x fcfi:%d. <",
+	    fcftab->TID,
 	    fcfp->fcf_index);
 
 	return (rval);
 
-} /* emlxs_fcftab_fcfi_online_evt_action() */
+} /* emlxs_fcoe_fcftab_fcfi_online_evt_action() */
 
 
 /*ARGSUSED*/
 static uint32_t
-emlxs_fcftab_cvl_evt_action(emlxs_port_t *port, uint32_t evt,
+emlxs_fcoe_fcftab_cvl_evt_action(emlxs_port_t *port, uint32_t evt,
     void *arg1)
 {
 	emlxs_hba_t *hba = HBA;
 	FCFTable_t *fcftab = &hba->sli.sli4.fcftab;
-	uint32_t rval;
+	uint32_t rval = 0;
 	emlxs_port_t *vport;
 	uint32_t vpi;
 	VPIobj_t *vpip;
 
 	if (evt != FCF_EVENT_CVL) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
-		    "fcftab_cvl_evt_action: %s:%s arg=%p flag=%x. "
-		    "Invalid event type. Terminated.",
-		    emlxs_fcftab_state_xlate(fcftab->state),
+		    "fcoe_fcftab_cvl_evt_action:%x %s:%s arg=%p flag=%x. "
+		    "Invalid event type. <",
+		    fcftab->TID,
+		    emlxs_fcoe_fcftab_state_xlate(fcftab->state),
 		    emlxs_fcf_event_xlate(evt), arg1,
 		    fcftab->flag);
 		return (1);
 	}
 
 	/* Pause VPI */
-	vpi = (uint32_t)((uintptr_t)arg1);
+	vpi = (uint32_t)((unsigned long)arg1);
 	vport = &VPORT(vpi);
-	vpip = &vport->VPIobj;
+	vpip = vport->vpip;
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-	    "fcftab_cvl_evt_action: %s gen=%x. Pausing VPI:%d.",
-	    emlxs_fcftab_state_xlate(fcftab->state),
+	    "fcoe_fcftab_cvl_evt_action:%x %s gen=%x. Pausing VPI:%d. >",
+	    fcftab->TID,
+	    emlxs_fcoe_fcftab_state_xlate(fcftab->state),
 	    fcftab->generation,
 	    vpip->VPI);
 
 	rval = emlxs_vpi_event(vport, FCF_EVENT_VPI_PAUSE, vpip);
 
 	switch (fcftab->state) {
-	case FCFTAB_STATE_SOLICIT:
+	case FCOE_FCFTAB_STATE_SOLICIT:
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "fcftab_cvl_evt_action: %s gen=%x. "
-		    "Already soliciting. Terminated.",
-		    emlxs_fcftab_state_xlate(fcftab->state),
+		    "fcoe_fcftab_cvl_evt_action:%x %s gen=%x. "
+		    "Already soliciting. <",
+		    fcftab->TID,
+		    emlxs_fcoe_fcftab_state_xlate(fcftab->state),
 		    fcftab->generation);
 		break;
 
 	default:
 		fcftab->flag &= ~EMLXS_FCFTAB_REQ_MASK;
-		fcftab->flag |= EMLXS_FCFTAB_SOL_REQ;
+		fcftab->flag |= EMLXS_FCOE_FCFTAB_SOL_REQ;
 		fcftab->generation++;
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "fcftab_cvl_evt_action: %s gen=%x. Soliciting.",
-		    emlxs_fcftab_state_xlate(fcftab->state),
+		    "fcoe_fcftab_cvl_evt_action:%x %s gen=%x. Soliciting.",
+		    fcftab->TID,
+		    emlxs_fcoe_fcftab_state_xlate(fcftab->state),
 		    fcftab->generation);
 
-		rval = emlxs_fcftab_state(port, FCFTAB_STATE_SOLICIT,
+		rval = emlxs_fcoe_fcftab_state(port, FCOE_FCFTAB_STATE_SOLICIT,
 		    FCF_REASON_EVENT, evt, arg1);
 		break;
 	}
 
 	return (rval);
 
-} /* emlxs_fcftab_cvl_evt_action() */
+} /* emlxs_fcoe_fcftab_cvl_evt_action() */
 
 
 /*ARGSUSED*/
 static uint32_t
-emlxs_fcftab_linkup_evt_action(emlxs_port_t *port, uint32_t evt,
+emlxs_fcoe_fcftab_linkup_evt_action(emlxs_port_t *port, uint32_t evt,
     void *arg1)
 {
 	emlxs_hba_t *hba = HBA;
 	FCFTable_t *fcftab = &hba->sli.sli4.fcftab;
 	uint32_t rval = 0;
-	emlxs_config_t *cfg = &CFG;
 
 	if (evt != FCF_EVENT_LINKUP) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
-		    "fcftab_linkup_evt_action: %s:%s arg=%p flag=%x. "
-		    "Invalid event type. Terminated.",
-		    emlxs_fcftab_state_xlate(fcftab->state),
+		    "fcoe_fcftab_linkup_evt_action:%x %s:%s arg=%p flag=%x. "
+		    "Invalid event type. <",
+		    fcftab->TID,
+		    emlxs_fcoe_fcftab_state_xlate(fcftab->state),
 		    emlxs_fcf_event_xlate(evt), arg1,
 		    fcftab->flag);
 		return (1);
 	}
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-	    "fcftab_linkup_evt_action: %s:%s arg=%p gen=%x. Link up.",
-	    emlxs_fcftab_state_xlate(fcftab->state),
+	    "fcoe_fcftab_linkup_evt_action:%x %s:%s arg=%p gen=%x. Link up.",
+	    fcftab->TID,
+	    emlxs_fcoe_fcftab_state_xlate(fcftab->state),
 	    emlxs_fcf_event_xlate(evt), arg1,
 	    fcftab->generation);
 
-	mutex_enter(&EMLXS_PORT_LOCK);
-	if (hba->state < FC_LINK_UP) {
-		HBASTATS.LinkUp++;
-		EMLXS_STATE_CHANGE_LOCKED(hba, FC_LINK_UP);
-	}
-	hba->discovery_timer =
-	    hba->timer_tics + cfg[CFG_LINKUP_TIMEOUT].current +
-	    cfg[CFG_DISC_TIMEOUT].current;
-	mutex_exit(&EMLXS_PORT_LOCK);
-
-	emlxs_log_link_event(port);
+	emlxs_fcf_linkup(port);
 
 	switch (fcftab->state) {
-	case FCFTAB_STATE_SOLICIT:
+	case FCOE_FCFTAB_STATE_SOLICIT:
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "fcftab_linkup_evt_action: %s gen=%x. "
-		    "Already soliciting. Terminated.",
-		    emlxs_fcftab_state_xlate(fcftab->state),
+		    "fcoe_fcftab_linkup_evt_action:%x %s gen=%x. "
+		    "Already soliciting. <",
+		    fcftab->TID,
+		    emlxs_fcoe_fcftab_state_xlate(fcftab->state),
 		    fcftab->generation);
 		break;
 
 	default:
 		fcftab->flag &= ~EMLXS_FCFTAB_REQ_MASK;
-		fcftab->flag |= EMLXS_FCFTAB_SOL_REQ;
+		fcftab->flag |= EMLXS_FCOE_FCFTAB_SOL_REQ;
 		fcftab->generation++;
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "fcftab_linkup_evt_action: %s gen=%x. Soliciting.",
-		    emlxs_fcftab_state_xlate(fcftab->state),
+		    "fcoe_fcftab_linkup_evt_action:%x %s gen=%x. Soliciting.",
+		    fcftab->TID,
+		    emlxs_fcoe_fcftab_state_xlate(fcftab->state),
 		    fcftab->generation);
 
-		rval = emlxs_fcftab_state(port, FCFTAB_STATE_SOLICIT,
+		rval = emlxs_fcoe_fcftab_state(port, FCOE_FCFTAB_STATE_SOLICIT,
 		    FCF_REASON_EVENT, evt, arg1);
 		break;
 	}
 
 	return (rval);
 
-} /* emlxs_fcftab_linkup_evt_action() */
+} /* emlxs_fcoe_fcftab_linkup_evt_action() */
 
 
 /*ARGSUSED*/
 static uint32_t
-emlxs_fcftab_linkdown_evt_action(emlxs_port_t *port, uint32_t evt,
+emlxs_fcoe_fcftab_linkdown_evt_action(emlxs_port_t *port, uint32_t evt,
     void *arg1)
 {
 	emlxs_hba_t *hba = HBA;
@@ -2477,33 +5057,27 @@ emlxs_fcftab_linkdown_evt_action(emlxs_port_t *port, uint32_t evt,
 
 	if (evt != FCF_EVENT_LINKDOWN) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
-		    "fcftab_linkdown_evt_action: %s:%s arg=%p flag=%x. "
-		    "Invalid event type. Terminated.",
-		    emlxs_fcftab_state_xlate(fcftab->state),
+		    "fcoe_fcftab_linkdown_evt_action:%x %s:%s arg=%p "
+		    "flag=%x. Invalid event type. <",
+		    fcftab->TID,
+		    emlxs_fcoe_fcftab_state_xlate(fcftab->state),
 		    emlxs_fcf_event_xlate(evt), arg1,
 		    fcftab->flag);
 		return (1);
 	}
 
 	fcftab->flag &= ~EMLXS_FCFTAB_REQ_MASK;
-	fcftab->flag |= EMLXS_FCFTAB_OFFLINE_REQ;
+	fcftab->flag |= EMLXS_FCOE_FCFTAB_OFFLINE_REQ;
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-	    "fcftab_linkdown_evt_action: %s:%s arg=%p flag=%x. Linkdown.",
-	    emlxs_fcftab_state_xlate(fcftab->state),
+	    "fcoe_fcftab_linkdown_evt_action:%x %s:%s arg=%p flag=%x. "
+	    "Linkdown.",
+	    fcftab->TID,
+	    emlxs_fcoe_fcftab_state_xlate(fcftab->state),
 	    emlxs_fcf_event_xlate(evt), arg1,
 	    fcftab->flag);
 
-	mutex_enter(&EMLXS_PORT_LOCK);
-	if (hba->state > FC_LINK_DOWN) {
-		HBASTATS.LinkDown++;
-		EMLXS_STATE_CHANGE_LOCKED(hba, FC_LINK_DOWN);
-	}
-	hba->flag &= FC_LINKDOWN_MASK;
-	hba->discovery_timer = 0;
-	mutex_exit(&EMLXS_PORT_LOCK);
-
-	emlxs_log_link_event(port);
+	emlxs_fcf_linkdown(port);
 
 	/* Pause all active FCFI's */
 	for (i = 0; i < fcftab->fcfi_count; i++) {
@@ -2515,35 +5089,38 @@ emlxs_fcftab_linkdown_evt_action(emlxs_port_t *port, uint32_t evt,
 		}
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "fcftab_linkdown_evt_action: Pausing FCFI:%d.",
+		    "fcoe_fcftab_linkdown_evt_action:%x Pausing FCFI:%d. >",
+		    fcftab->TID,
 		    fcfp->fcf_index);
 
 		(void) emlxs_fcfi_event(port, FCF_EVENT_FCFI_PAUSE, fcfp);
 	}
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-	    "fcftab_linkdown_evt_action: Going offline.");
+	    "fcoe_fcftab_linkdown_evt_action:%x "
+	    "Going offline.",
+	    fcftab->TID);
 
 	switch (fcftab->state) {
-	case FCFTAB_STATE_OFFLINE:
-		rval = emlxs_fcftab_state(port, FCFTAB_STATE_OFFLINE,
+	case FCOE_FCFTAB_STATE_OFFLINE:
+		rval = emlxs_fcoe_fcftab_state(port, FCOE_FCFTAB_STATE_OFFLINE,
 		    FCF_REASON_REENTER, evt, arg1);
 		break;
 
 	default:
-		rval = emlxs_fcftab_state(port, FCFTAB_STATE_OFFLINE,
+		rval = emlxs_fcoe_fcftab_state(port, FCOE_FCFTAB_STATE_OFFLINE,
 		    FCF_REASON_EVENT, evt, arg1);
 		break;
 	}
 
 	return (rval);
 
-} /* emlxs_fcftab_linkdown_evt_action() */
+} /* emlxs_fcoe_fcftab_linkdown_evt_action() */
 
 
 /*ARGSUSED*/
 static uint32_t
-emlxs_fcftab_shutdown_evt_action(emlxs_port_t *port, uint32_t evt,
+emlxs_fcoe_fcftab_shutdown_evt_action(emlxs_port_t *port, uint32_t evt,
     void *arg1)
 {
 	emlxs_hba_t *hba = HBA;
@@ -2552,9 +5129,10 @@ emlxs_fcftab_shutdown_evt_action(emlxs_port_t *port, uint32_t evt,
 
 	if (evt != FCF_EVENT_SHUTDOWN) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
-		    "fcftab_shutdown_evt_action: %s:%s arg=%p flag=%x. "
-		    "Invalid event type. Terminated.",
-		    emlxs_fcftab_state_xlate(fcftab->state),
+		    "fcoe_fcftab_shutdown_evt_action:%x %s:%s arg=%p flag=%x. "
+		    "Invalid event type. <",
+		    fcftab->TID,
+		    emlxs_fcoe_fcftab_state_xlate(fcftab->state),
 		    emlxs_fcf_event_xlate(evt), arg1,
 		    fcftab->flag);
 		return (1);
@@ -2562,54 +5140,46 @@ emlxs_fcftab_shutdown_evt_action(emlxs_port_t *port, uint32_t evt,
 
 	if (fcftab->flag & EMLXS_FCFTAB_SHUTDOWN) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "fcftab_shutdown_evt_action: %s:%s arg=%p flag=%x. "
-		    "Already shut down. Terminated.",
-		    emlxs_fcftab_state_xlate(fcftab->state),
+		    "fcoe_fcftab_shutdown_evt_action:%x %s:%s arg=%p flag=%x. "
+		    "Already shut down. <",
+		    fcftab->TID,
+		    emlxs_fcoe_fcftab_state_xlate(fcftab->state),
 		    emlxs_fcf_event_xlate(evt), arg1,
 		    fcftab->flag);
 		return (1);
 	}
 
-	if (fcftab->state == FCFTAB_STATE_SHUTDOWN) {
+	if (fcftab->state == FCOE_FCFTAB_STATE_SHUTDOWN) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "fcftab_shutdown_evt_action: %s:%s arg=%p flag=%x. "
-		    "Already shutting down. Terminated.",
-		    emlxs_fcftab_state_xlate(fcftab->state),
+		    "fcoe_fcftab_shutdown_evt_action:%x %s:%s arg=%p flag=%x. "
+		    "Already shutting down. <",
+		    fcftab->TID,
+		    emlxs_fcoe_fcftab_state_xlate(fcftab->state),
 		    emlxs_fcf_event_xlate(evt), arg1,
 		    fcftab->flag);
 		return (1);
 	}
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-	    "fcftab_shutdown_evt_action: %s:%s arg=%p flag=%x. "
+	    "fcoe_fcftab_shutdown_evt_action:%x %s:%s arg=%p flag=%x. "
 	    "Shutting down.",
-	    emlxs_fcftab_state_xlate(fcftab->state),
+	    fcftab->TID,
+	    emlxs_fcoe_fcftab_state_xlate(fcftab->state),
 	    emlxs_fcf_event_xlate(evt), arg1,
 	    fcftab->flag);
 
-	if (hba->state > FC_LINK_DOWN) {
-		mutex_enter(&EMLXS_PORT_LOCK);
-		if (hba->state > FC_LINK_DOWN) {
-			HBASTATS.LinkDown++;
-			EMLXS_STATE_CHANGE_LOCKED(hba, FC_LINK_DOWN);
-		}
-		hba->flag &= FC_LINKDOWN_MASK;
-		hba->discovery_timer = 0;
-		mutex_exit(&EMLXS_PORT_LOCK);
+	emlxs_fcf_linkdown(port);
 
-		emlxs_log_link_event(port);
-	}
-
-	rval = emlxs_fcftab_state(port, FCFTAB_STATE_SHUTDOWN,
+	rval = emlxs_fcoe_fcftab_state(port, FCOE_FCFTAB_STATE_SHUTDOWN,
 	    FCF_REASON_EVENT, evt, arg1);
 
 	return (rval);
 
-} /* emlxs_fcftab_shutdown_evt_action() */
+} /* emlxs_fcoe_fcftab_shutdown_evt_action() */
 
 
 static uint32_t
-emlxs_fcftab_req_handler(emlxs_port_t *port, void *arg1)
+emlxs_fcoe_fcftab_req_handler(emlxs_port_t *port, void *arg1)
 {
 	emlxs_hba_t *hba = HBA;
 	FCFTable_t *fcftab = &hba->sli.sli4.fcftab;
@@ -2619,104 +5189,108 @@ emlxs_fcftab_req_handler(emlxs_port_t *port, void *arg1)
 		return (1);
 	}
 
-	if (fcftab->flag & EMLXS_FCFTAB_OFFLINE_REQ) {
-		rval = emlxs_fcftab_state(port, FCFTAB_STATE_OFFLINE,
+	if (fcftab->flag & EMLXS_FCOE_FCFTAB_OFFLINE_REQ) {
+		rval = emlxs_fcoe_fcftab_state(port, FCOE_FCFTAB_STATE_OFFLINE,
 		    FCF_REASON_REQUESTED, 0, arg1);
 	}
 
-	else if (fcftab->flag & EMLXS_FCFTAB_SOL_REQ) {
-		rval = emlxs_fcftab_state(port, FCFTAB_STATE_SOLICIT,
+	else if (fcftab->flag & EMLXS_FCOE_FCFTAB_SOL_REQ) {
+		rval = emlxs_fcoe_fcftab_state(port, FCOE_FCFTAB_STATE_SOLICIT,
 		    FCF_REASON_REQUESTED, 0, arg1);
 	}
 
-	else if (fcftab->flag & EMLXS_FCFTAB_READ_REQ) {
-		rval = emlxs_fcftab_state(port, FCFTAB_STATE_READ,
+	else if (fcftab->flag & EMLXS_FCOE_FCFTAB_READ_REQ) {
+		rval = emlxs_fcoe_fcftab_state(port, FCOE_FCFTAB_STATE_READ,
 		    FCF_REASON_REQUESTED, 0, FCFTAB_READ_ALL);
 	}
 
 	return (rval);
 
-} /* emlxs_fcftab_req_handler() */
+} /* emlxs_fcoe_fcftab_req_handler() */
 
 
 static void
-emlxs_fcftab_read_timer(emlxs_hba_t *hba)
+emlxs_fcoe_fcftab_read_timer(emlxs_hba_t *hba)
 {
 	emlxs_port_t *port = &PPORT;
 	FCFTable_t *fcftab = &hba->sli.sli4.fcftab;
 
 	/* Check FCF timer */
 	if (!fcftab->read_timer ||
-	    (hba->timer_tics <= fcftab->read_timer)) {
+	    (hba->timer_tics < fcftab->read_timer)) {
 		return;
 	}
 	fcftab->read_timer = 0;
-	fcftab->flag |= EMLXS_FCFTAB_READ_REQ;
+	fcftab->flag |= EMLXS_FCOE_FCFTAB_READ_REQ;
 
 	switch (fcftab->state) {
-	case FCFTAB_STATE_SOLICIT_CMPL:
+	case FCOE_FCFTAB_STATE_SOLICIT_CMPL:
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "fcftab_timer: %s",
-		    emlxs_fcftab_state_xlate(fcftab->state));
+		    "fcoe_fcftab_timer:%x %s >",
+		    fcftab->TID,
+		    emlxs_fcoe_fcftab_state_xlate(fcftab->state));
 
-		(void) emlxs_fcftab_state(port, FCFTAB_STATE_READ, 0, 0,
-		    FCFTAB_READ_ALL);
+		(void) emlxs_fcoe_fcftab_state(port, FCOE_FCFTAB_STATE_READ,
+		    0, 0, FCFTAB_READ_ALL);
 		break;
 
 	default:
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "fcftab_timer: %s Terminated.",
-		    emlxs_fcftab_state_xlate(fcftab->state));
+		    "fcoe_fcftab_timer:%x %s",
+		    fcftab->TID,
+		    emlxs_fcoe_fcftab_state_xlate(fcftab->state));
 		break;
 	}
 
 	return;
 
-}  /* emlxs_fcftab_read_timer() */
+}  /* emlxs_fcoe_fcftab_read_timer() */
 
 
 static void
-emlxs_fcftab_sol_timer(emlxs_hba_t *hba)
+emlxs_fcoe_fcftab_sol_timer(emlxs_hba_t *hba)
 {
 	emlxs_port_t *port = &PPORT;
 	FCFTable_t *fcftab = &hba->sli.sli4.fcftab;
 
 	/* Check FCF timer */
 	if (!fcftab->sol_timer ||
-	    (hba->timer_tics <= fcftab->sol_timer)) {
+	    (hba->timer_tics < fcftab->sol_timer)) {
 		return;
 	}
 	fcftab->sol_timer = 0;
 
 	switch (fcftab->state) {
-	case FCFTAB_STATE_ONLINE:
+	case FCOE_FCFTAB_STATE_ONLINE:
 		fcftab->flag &= ~EMLXS_FCFTAB_REQ_MASK;
-		fcftab->flag |= EMLXS_FCFTAB_SOL_REQ;
+		fcftab->flag |= EMLXS_FCOE_FCFTAB_SOL_REQ;
 		fcftab->generation++;
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "fcftab_sol_timer: %s gen=%x. Soliciting.",
-		    emlxs_fcftab_state_xlate(fcftab->state),
+		    "fcoe_fcftab_sol_timer:%x %s gen=%x. Soliciting. >",
+		    fcftab->TID,
+		    emlxs_fcoe_fcftab_state_xlate(fcftab->state),
 		    fcftab->generation);
 
-		(void) emlxs_fcftab_state(port, FCFTAB_STATE_SOLICIT,
+		(void) emlxs_fcoe_fcftab_state(port, FCOE_FCFTAB_STATE_SOLICIT,
 		    FCF_REASON_EVENT, 0, 0);
 		break;
 
 	default:
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "fcftab_sol_timer: %s Terminated.",
-		    emlxs_fcftab_state_xlate(fcftab->state));
+		    "fcoe_fcftab_sol_timer:%x %s",
+		    fcftab->TID,
+		    emlxs_fcoe_fcftab_state_xlate(fcftab->state));
 		break;
 	}
 
 	return;
 
-}  /* emlxs_fcftab_sol_timer() */
+}  /* emlxs_fcoe_fcftab_sol_timer() */
 
 
 static void
-emlxs_fcftab_offline_timer(emlxs_hba_t *hba)
+emlxs_fcoe_fcftab_offline_timer(emlxs_hba_t *hba)
 {
 	emlxs_port_t *port = &PPORT;
 	FCFTable_t *fcftab = &hba->sli.sli4.fcftab;
@@ -2728,74 +5302,89 @@ emlxs_fcftab_offline_timer(emlxs_hba_t *hba)
 
 		/* Check offline timer */
 		if (!fcfp->offline_timer ||
-		    (hba->timer_tics <= fcfp->offline_timer)) {
+		    (hba->timer_tics < fcfp->offline_timer)) {
 			continue;
 		}
 		fcfp->offline_timer = 0;
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "fcftab_offline_timer:%d %s. Offlining.",
-		    fcfp->fcf_index,
-		    emlxs_fcfi_state_xlate(fcfp->state));
+		    "fcoe_fcftab_offline_timer:%x. Offlining FCFI:%d. >",
+		    fcftab->TID,
+		    fcfp->fcf_index);
 
 		(void) emlxs_fcfi_event(port, FCF_EVENT_FCFI_OFFLINE, fcfp);
 	}
 
 	return;
 
-}  /* emlxs_fcftab_offline_timer() */
+}  /* emlxs_fcoe_fcftab_offline_timer() */
 
 
 /*ARGSUSED*/
 static uint32_t
-emlxs_fcftab_sol_failed_action(emlxs_port_t *port, uint32_t evt,
+emlxs_fcoe_fcftab_sol_failed_action(emlxs_port_t *port, uint32_t evt,
     void *arg1)
 {
 	emlxs_hba_t *hba = HBA;
 	FCFTable_t *fcftab = &hba->sli.sli4.fcftab;
-	uint32_t rval;
+	uint32_t rval = 0;
 
 	fcftab->attempts++;
 
-	if (fcftab->state != FCFTAB_STATE_SOLICIT_FAILED) {
+	if (fcftab->state != FCOE_FCFTAB_STATE_SOLICIT_FAILED) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
-		    "fcftab_sol_failed_action: %s:%s arg=%p attempt=%d. "
-		    "Invalid state. Terminated.",
-		    emlxs_fcftab_state_xlate(fcftab->state),
+		    "fcoe_fcftab_sol_failed_action:%x %s:%s arg=%p "
+		    "attempt=%d. Invalid state. <",
+		    fcftab->TID,
+		    emlxs_fcoe_fcftab_state_xlate(fcftab->state),
 		    emlxs_fcf_event_xlate(evt),
 		    arg1, fcftab->attempts);
 		return (1);
 	}
 
-	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-	    "fcftab_sol_failed_action: %s:%s arg=%p attempt=%d reason=%x",
-	    emlxs_fcftab_state_xlate(fcftab->state),
-	    emlxs_fcf_event_xlate(evt), arg1,
-	    fcftab->attempts,
-	    fcftab->reason);
-
-	if ((fcftab->reason == FCF_REASON_SEND_FAILED) ||
+	if ((fcftab->reason == FCF_REASON_MBOX_FAILED) ||
+	    (fcftab->reason == FCF_REASON_SEND_FAILED) ||
 	    (fcftab->attempts >= 3)) {
-		rval = emlxs_fcftab_state(port, FCFTAB_STATE_SOLICIT_CMPL,
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+		    "fcoe_fcftab_sol_failed_action:%x %s:%s arg=%p "
+		    "attempt=%d reason=%x. Giving up.",
+		    fcftab->TID,
+		    emlxs_fcoe_fcftab_state_xlate(fcftab->state),
+		    emlxs_fcf_event_xlate(evt), arg1,
+		    fcftab->attempts,
+		    fcftab->reason);
+
+		rval = emlxs_fcoe_fcftab_state(port,
+		    FCOE_FCFTAB_STATE_SOLICIT_CMPL,
 		    FCF_REASON_OP_FAILED, 0, arg1);
 	} else {
-		rval = emlxs_fcftab_state(port, FCFTAB_STATE_SOLICIT,
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+		    "fcoe_fcftab_sol_failed_action:%x %s:%s arg=%p "
+		    "attempt=%d reason=%x. Retrying.",
+		    fcftab->TID,
+		    emlxs_fcoe_fcftab_state_xlate(fcftab->state),
+		    emlxs_fcf_event_xlate(evt), arg1,
+		    fcftab->attempts,
+		    fcftab->reason);
+
+		rval = emlxs_fcoe_fcftab_state(port,
+		    FCOE_FCFTAB_STATE_SOLICIT,
 		    FCF_REASON_OP_FAILED, 0, arg1);
 	}
 
 	return (rval);
 
-} /* emlxs_fcftab_sol_failed_action() */
+} /* emlxs_fcoe_fcftab_sol_failed_action() */
 
 
 /*ARGSUSED*/
 static uint32_t
-emlxs_fcftab_sol_mbcmpl(emlxs_hba_t *hba, MAILBOXQ *mbq)
+emlxs_fcoe_fcftab_sol_mbcmpl(emlxs_hba_t *hba, MAILBOXQ *mbq)
 {
 	emlxs_port_t *port = (emlxs_port_t *)mbq->port;
 	FCFTable_t *fcftab = &hba->sli.sli4.fcftab;
 	MAILBOX4 *mb4 = (MAILBOX4 *)mbq;
-	uint32_t generation;
+	uint16_t TID;
 	mbox_rsp_hdr_t *hdr_rsp;
 	MATCHMAP *mp;
 	uint32_t status = MGMT_STATUS_FCF_IN_USE;
@@ -2803,6 +5392,7 @@ emlxs_fcftab_sol_mbcmpl(emlxs_hba_t *hba, MAILBOXQ *mbq)
 	uint32_t fip_mode = 1;
 
 	mutex_enter(&EMLXS_FCF_LOCK);
+	TID = (uint16_t)((unsigned long)mbq->context);
 
 	if (mbq->nonembed) {
 		fip_mode = 0;
@@ -2817,22 +5407,23 @@ emlxs_fcftab_sol_mbcmpl(emlxs_hba_t *hba, MAILBOXQ *mbq)
 		emlxs_mem_put(hba, MEM_BUF, (void *)mp);
 	}
 
-	if (fcftab->state != FCFTAB_STATE_SOLICIT) {
+	if (fcftab->state != FCOE_FCFTAB_STATE_SOLICIT) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "fcftab_sol_mbcmpl: %s. Terminated.",
-		    emlxs_fcftab_state_xlate(fcftab->state));
+		    "fcoe_fcftab_sol_mbcmpl:%x %s.",
+		    TID,
+		    emlxs_fcoe_fcftab_state_xlate(fcftab->state));
 
 		mutex_exit(&EMLXS_FCF_LOCK);
 		return (0);
 	}
 
-	generation = (uint32_t)((uintptr_t)mbq->context);
-	if (generation != fcftab->generation) {
+	if (TID != fcftab->generation) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "fcftab_sol_mbcmpl: %s gen=%x,%x. "
-		    "Incorrect generation. Terminated.",
-		    emlxs_fcftab_state_xlate(fcftab->state),
-		    generation, fcftab->generation);
+		    "fcoe_fcftab_sol_mbcmpl:%x %s. "
+		    "Incorrect generation %x. Dropping.",
+		    TID,
+		    emlxs_fcoe_fcftab_state_xlate(fcftab->state),
+		    fcftab->generation);
 
 		mutex_exit(&EMLXS_FCF_LOCK);
 		return (0);
@@ -2841,11 +5432,12 @@ emlxs_fcftab_sol_mbcmpl(emlxs_hba_t *hba, MAILBOXQ *mbq)
 	if (mb4->mbxStatus) {
 		if (fip_mode) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-			    "fcftab_sol_mbcmpl:failed. status=%x",
-			    mb4->mbxStatus);
+			    "fcoe_fcftab_sol_mbcmpl:%x failed. %s. >",
+			    fcftab->TID,
+			    emlxs_mb_xlate_status(mb4->mbxStatus));
 
-			(void) emlxs_fcftab_state(port,
-			    FCFTAB_STATE_SOLICIT_FAILED,
+			(void) emlxs_fcoe_fcftab_state(port,
+			    FCOE_FCFTAB_STATE_SOLICIT_FAILED,
 			    FCF_REASON_MBOX_FAILED, mb4->mbxStatus, 0);
 
 			mutex_exit(&EMLXS_FCF_LOCK);
@@ -2853,12 +5445,13 @@ emlxs_fcftab_sol_mbcmpl(emlxs_hba_t *hba, MAILBOXQ *mbq)
 
 		} else if ((status == 0)||(status != MGMT_STATUS_FCF_IN_USE)) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-			    "fcftab_sol_mbcmpl:failed. status=%x,%x,%x",
-			    mb4->mbxStatus, status,
-			    xstatus);
+			    "fcoe_fcftab_sol_mbcmpl:%x failed. %s %x,%x. >",
+			    fcftab->TID,
+			    emlxs_mb_xlate_status(mb4->mbxStatus),
+			    status, xstatus);
 
-			(void) emlxs_fcftab_state(port,
-			    FCFTAB_STATE_SOLICIT_FAILED,
+			(void) emlxs_fcoe_fcftab_state(port,
+			    FCOE_FCFTAB_STATE_SOLICIT_FAILED,
 			    FCF_REASON_MBOX_FAILED, mb4->mbxStatus, 0);
 
 			mutex_exit(&EMLXS_FCF_LOCK);
@@ -2867,22 +5460,23 @@ emlxs_fcftab_sol_mbcmpl(emlxs_hba_t *hba, MAILBOXQ *mbq)
 	}
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-	    "fcftab_sol_mbcmpl: %s gen=%x",
-	    emlxs_fcftab_state_xlate(fcftab->state),
+	    "fcoe_fcftab_sol_mbcmpl:%x %s gen=%x. Solicit complete. >",
+	    fcftab->TID,
+	    emlxs_fcoe_fcftab_state_xlate(fcftab->state),
 	    fcftab->generation);
 
-	(void) emlxs_fcftab_state(port, FCFTAB_STATE_SOLICIT_CMPL,
+	(void) emlxs_fcoe_fcftab_state(port, FCOE_FCFTAB_STATE_SOLICIT_CMPL,
 	    0, 0, 0);
 
 	mutex_exit(&EMLXS_FCF_LOCK);
 	return (0);
 
-} /* emlxs_fcftab_sol_mbcmpl() */
+} /* emlxs_fcoe_fcftab_sol_mbcmpl() */
 
 
 /*ARGSUSED*/
 static uint32_t
-emlxs_fcftab_sol_action(emlxs_port_t *port, uint32_t evt,
+emlxs_fcoe_fcftab_sol_action(emlxs_port_t *port, uint32_t evt,
     void *arg1)
 {
 	emlxs_hba_t *hba = HBA;
@@ -2890,46 +5484,54 @@ emlxs_fcftab_sol_action(emlxs_port_t *port, uint32_t evt,
 	MAILBOXQ *mbq;
 	MAILBOX4 *mb4;
 	MATCHMAP *mp = NULL;
-	uint32_t rval;
+	uint32_t rval = 0;
 
-	if (fcftab->state != FCFTAB_STATE_SOLICIT) {
+	if (fcftab->state != FCOE_FCFTAB_STATE_SOLICIT) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
-		    "fcftab_sol_action: %s:%s arg=%p. "
-		    "Invalid state. Terminated.",
-		    emlxs_fcftab_state_xlate(fcftab->state),
+		    "fcoe_fcftab_sol_action:%x %s:%s arg=%p. "
+		    "Invalid state. <",
+		    fcftab->TID,
+		    emlxs_fcoe_fcftab_state_xlate(fcftab->state),
 		    emlxs_fcf_event_xlate(evt), arg1);
 		return (1);
 	}
 
-	if ((fcftab->prev_state != FCFTAB_STATE_SOLICIT_FAILED) ||
-	    (fcftab->flag & EMLXS_FCFTAB_SOL_REQ)) {
-		fcftab->flag &= ~EMLXS_FCFTAB_SOL_REQ;
+	if ((fcftab->prev_state != FCOE_FCFTAB_STATE_SOLICIT_FAILED) ||
+	    (fcftab->flag & EMLXS_FCOE_FCFTAB_SOL_REQ)) {
+		fcftab->flag &= ~EMLXS_FCOE_FCFTAB_SOL_REQ;
 		fcftab->attempts = 0;
 	}
 
 	if (fcftab->flag & EMLXS_FCFTAB_REQ_MASK) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "fcftab_sol_action: %s:%s arg=%p gen=%d flag=%x. "
+		    "fcoe_fcftab_sol_action:%x %s:%s arg=%p gen=%d flag=%x. "
 		    "Handling request.",
-		    emlxs_fcftab_state_xlate(fcftab->state),
+		    fcftab->TID,
+		    emlxs_fcoe_fcftab_state_xlate(fcftab->state),
 		    emlxs_fcf_event_xlate(evt), arg1,
 		    fcftab->generation,
 		    fcftab->flag);
 
-		rval = emlxs_fcftab_req_handler(port, arg1);
+		rval = emlxs_fcoe_fcftab_req_handler(port, arg1);
 		return (rval);
 	}
 
+	if (fcftab->attempts == 0) {
+		fcftab->TID = fcftab->generation;
+	}
+
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-	    "fcftab_sol_action: %s:%s arg = %p gen=%x fip=%x. "
-	    "Requesting solicit.",
-	    emlxs_fcftab_state_xlate(fcftab->state),
+	    "fcoe_fcftab_sol_action:%x %s:%s arg=%p gen=%x fip=%x. "
+	    "Requesting solicit. <",
+	    fcftab->TID,
+	    emlxs_fcoe_fcftab_state_xlate(fcftab->state),
 	    emlxs_fcf_event_xlate(evt), arg1,
 	    fcftab->generation,
 	    ((hba->flag & FC_FIP_SUPPORTED)? 1:0));
 
-	if (!(mbq = (MAILBOXQ *)emlxs_mem_get(hba, MEM_MBOX, 1))) {
-		rval = emlxs_fcftab_state(port, FCFTAB_STATE_SOLICIT_FAILED,
+	if (!(mbq = (MAILBOXQ *)emlxs_mem_get(hba, MEM_MBOX))) {
+		rval = emlxs_fcoe_fcftab_state(port,
+		    FCOE_FCFTAB_STATE_SOLICIT_FAILED,
 		    FCF_REASON_NO_MBOX, 0, 0);
 		return (rval);
 	}
@@ -2941,8 +5543,8 @@ emlxs_fcftab_sol_action(emlxs_port_t *port, uint32_t evt,
 		IOCTL_FCOE_REDISCOVER_FCF_TABLE *fcf;
 
 		mbq->nonembed = NULL;
-		mbq->mbox_cmpl = emlxs_fcftab_sol_mbcmpl;
-		mbq->context = (void *)((uintptr_t)fcftab->generation);
+		mbq->mbox_cmpl = emlxs_fcoe_fcftab_sol_mbcmpl;
+		mbq->context = (void *)((unsigned long)fcftab->TID);
 		mbq->port = (void *)port;
 
 		mb4->un.varSLIConfig.be.embedded = 1;
@@ -2974,19 +5576,19 @@ emlxs_fcftab_sol_action(emlxs_port_t *port, uint32_t evt,
 		uint8_t bitmap[512];
 		uint16_t i;
 
-		if ((mp = (MATCHMAP *)emlxs_mem_get(hba, MEM_BUF, 1)) == 0) {
+		if ((mp = (MATCHMAP *)emlxs_mem_get(hba, MEM_BUF)) == 0) {
 			emlxs_mem_put(hba, MEM_MBOX, (void *)mbq);
 
-			rval = emlxs_fcftab_state(port,
-			    FCFTAB_STATE_SOLICIT_FAILED,
+			rval = emlxs_fcoe_fcftab_state(port,
+			    FCOE_FCFTAB_STATE_SOLICIT_FAILED,
 			    FCF_REASON_NO_BUFFER, 0, arg1);
 			return (rval);
 		}
 		bzero(mp->virt, mp->size);
 
 		mbq->nonembed = (void *)mp;
-		mbq->mbox_cmpl = emlxs_fcftab_sol_mbcmpl;
-		mbq->context = (void *)((uintptr_t)fcftab->generation);
+		mbq->mbox_cmpl = emlxs_fcoe_fcftab_sol_mbcmpl;
+		mbq->context = (void *)((unsigned long)fcftab->generation);
 		mbq->port = (void *)port;
 
 		mb4->un.varSLIConfig.be.embedded = 0;
@@ -3052,7 +5654,8 @@ emlxs_fcftab_sol_action(emlxs_port_t *port, uint32_t evt,
 		}
 		emlxs_mem_put(hba, MEM_MBOX, (void *)mbq);
 
-		rval = emlxs_fcftab_state(port, FCFTAB_STATE_SOLICIT_FAILED,
+		rval = emlxs_fcoe_fcftab_state(port,
+		    FCOE_FCFTAB_STATE_SOLICIT_FAILED,
 		    FCF_REASON_SEND_FAILED, rval, 0);
 
 		return (rval);
@@ -3060,49 +5663,48 @@ emlxs_fcftab_sol_action(emlxs_port_t *port, uint32_t evt,
 
 	return (0);
 
-
-} /* emlxs_fcftab_sol_action() */
+} /* emlxs_fcoe_fcftab_sol_action() */
 
 
 /*ARGSUSED*/
 static uint32_t
-emlxs_fcftab_sol_cmpl_action(emlxs_port_t *port, uint32_t evt,
+emlxs_fcoe_fcftab_sol_cmpl_action(emlxs_port_t *port, uint32_t evt,
     void *arg1)
 {
 	emlxs_hba_t *hba = HBA;
 	FCFTable_t *fcftab = &hba->sli.sli4.fcftab;
-	uint32_t rval;
+	uint32_t rval = 0;
 	emlxs_config_t *cfg = &CFG;
 
-	if (fcftab->state != FCFTAB_STATE_SOLICIT_CMPL) {
+	if (fcftab->state != FCOE_FCFTAB_STATE_SOLICIT_CMPL) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
-		    "fcftab_sol_cmpl_action: %s:%s arg=%p "
-		    "Invalid state. Terminated.",
-		    emlxs_fcftab_state_xlate(fcftab->state),
+		    "fcoe_fcftab_sol_cmpl_action:%x %s:%s arg=%p "
+		    "Invalid state. <",
+		    fcftab->TID,
+		    emlxs_fcoe_fcftab_state_xlate(fcftab->state),
 		    emlxs_fcf_event_xlate(evt), arg1);
 		return (1);
 	}
 
-	/* Increment the generation counter */
-	fcftab->generation++;
-
 	if (fcftab->flag & EMLXS_FCFTAB_REQ_MASK) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "fcftab_sol_cmpl_action: %s:%s arg=%p gen=%d flag=%x. "
-		    "Handling request.",
-		    emlxs_fcftab_state_xlate(fcftab->state),
+		    "fcoe_fcftab_sol_cmpl_action:%x %s:%s arg=%p gen=%d "
+		    "flag=%x. Handling request.",
+		    fcftab->TID,
+		    emlxs_fcoe_fcftab_state_xlate(fcftab->state),
 		    emlxs_fcf_event_xlate(evt), arg1,
 		    fcftab->generation,
 		    fcftab->flag);
 
-		rval = emlxs_fcftab_req_handler(port, arg1);
+		rval = emlxs_fcoe_fcftab_req_handler(port, arg1);
 		return (rval);
 	}
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-	    "fcftab_sol_cmpl_action: %s:%s arg=%p gen=%d. "
+	    "fcoe_fcftab_sol_cmpl_action:%x %s:%s arg=%p gen=%d. "
 	    "Starting timer (%d secs).",
-	    emlxs_fcftab_state_xlate(fcftab->state),
+	    fcftab->TID,
+	    emlxs_fcoe_fcftab_state_xlate(fcftab->state),
 	    emlxs_fcf_event_xlate(evt), arg1,
 	    fcftab->generation,
 	    cfg[CFG_FCF_SOLICIT_DELAY].current);
@@ -3113,12 +5715,12 @@ emlxs_fcftab_sol_cmpl_action(emlxs_port_t *port, uint32_t evt,
 
 	return (0);
 
-} /* emlxs_fcftab_sol_cmpl_action() */
+} /* emlxs_fcoe_fcftab_sol_cmpl_action() */
 
 
 /*ARGSUSED*/
 static uint32_t
-emlxs_fcftab_read_mbcmpl(emlxs_hba_t *hba, MAILBOXQ *mbq)
+emlxs_fcoe_fcftab_read_mbcmpl(emlxs_hba_t *hba, MAILBOXQ *mbq)
 {
 	emlxs_port_t *port = (emlxs_port_t *)mbq->port;
 	FCFTable_t *fcftab = &hba->sli.sli4.fcftab;
@@ -3128,40 +5730,61 @@ emlxs_fcftab_read_mbcmpl(emlxs_hba_t *hba, MAILBOXQ *mbq)
 	FCF_RECORD_t *fcfrec;
 	FCFIobj_t *fcfp;
 	MATCHMAP *mp;
-	uint32_t index;
+	uint32_t context;
+	uint16_t index;
+	uint16_t TID;
 	uint32_t event_tag;
 
 	mutex_enter(&EMLXS_FCF_LOCK);
+	context = (uint32_t)((unsigned long)mbq->context);
+	TID =	(uint16_t)(context >> 16);
+	index =	(uint16_t)(context & 0xFFFF);
 
-	if (fcftab->state != FCFTAB_STATE_READ) {
+	if (fcftab->state != FCOE_FCFTAB_STATE_READ) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "fcftab_read_mbcmpl: state=%s. Terminated.",
-		    emlxs_fcftab_state_xlate(fcftab->state));
+		    "fcoe_fcftab_read_mbcmpl:%x index=%d %s.",
+		    TID, index,
+		    emlxs_fcoe_fcftab_state_xlate(fcftab->state));
 
 		mutex_exit(&EMLXS_FCF_LOCK);
 		return (0);
 	}
 
-	index =	(uint32_t)((uintptr_t)mbq->context);
+	if (TID != fcftab->generation) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+		    "fcoe_fcftab_read_mbcmpl:%x index=%d %s. "
+		    "Incorrect generation %x. Dropping.",
+		    TID, index,
+		    emlxs_fcoe_fcftab_state_xlate(fcftab->state),
+		    fcftab->generation);
+
+		mutex_exit(&EMLXS_FCF_LOCK);
+		return (0);
+	}
+
 	mp = (MATCHMAP *)mbq->nonembed;
 	hdr_rsp = (mbox_rsp_hdr_t *)mp->virt;
 
 	if (mb4->mbxStatus || hdr_rsp->status) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "fcftab_read_mbcmpl:%d failed. status=%x,%x,%x",
-		    index, mb4->mbxStatus, hdr_rsp->status,
-		    hdr_rsp->extra_status);
+		    "fcoe_fcftab_read_mbcmpl:%x index=%d failed. %s %x,%x. >",
+		    fcftab->TID, index,
+		    emlxs_mb_xlate_status(mb4->mbxStatus),
+		    hdr_rsp->status, hdr_rsp->extra_status);
 
-		(void) emlxs_fcftab_state(port, FCFTAB_STATE_READ_FAILED,
-		    FCF_REASON_MBOX_FAILED, mb4->mbxStatus, 0);
+		(void) emlxs_fcoe_fcftab_state(port,
+		    FCOE_FCFTAB_STATE_READ_FAILED,
+		    FCF_REASON_MBOX_FAILED, mb4->mbxStatus,
+		    (void*)((unsigned long)index));
 
 		mutex_exit(&EMLXS_FCF_LOCK);
 		return (0);
 	}
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-	    "fcftab_read_mbcmpl: state=%s",
-	    emlxs_fcftab_state_xlate(fcftab->state));
+	    "fcoe_fcftab_read_mbcmpl:%x index=%d %s",
+	    fcftab->TID, index,
+	    emlxs_fcoe_fcftab_state_xlate(fcftab->state));
 
 	fcf = (IOCTL_FCOE_READ_FCF_TABLE *)(hdr_rsp + 1);
 	fcfrec = &fcf->params.response.fcf_entry[0];
@@ -3205,11 +5828,14 @@ emlxs_fcftab_read_mbcmpl(emlxs_hba_t *hba, MAILBOXQ *mbq)
 
 	if (!fcfp) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "fcftab_read_mbcmpl:%d failed. Unable to allocate fcfi.",
-		    index);
+		    "fcoe_fcftab_read_mbcmpl:%x index=%d failed. "
+		    "Unable to allocate fcfi. >",
+		    fcftab->TID, index);
 
-		(void) emlxs_fcftab_state(port, FCFTAB_STATE_READ_FAILED,
-		    FCF_REASON_NO_FCFI, 0, 0);
+		(void) emlxs_fcoe_fcftab_state(port,
+		    FCOE_FCFTAB_STATE_READ_FAILED,
+		    FCF_REASON_NO_FCFI, 0,
+		    (void*)((unsigned long)index));
 
 		mutex_exit(&EMLXS_FCF_LOCK);
 		return (0);
@@ -3220,26 +5846,33 @@ emlxs_fcftab_read_mbcmpl(emlxs_hba_t *hba, MAILBOXQ *mbq)
 
 	/* Check if another record needs to be acquired */
 	if (fcf->params.response.next_valid_fcf_index != 0xffff) {
-		fcftab->index = fcf->params.response.next_valid_fcf_index;
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+		    "fcoe_fcftab_read_mbcmpl:%x. Read next. >",
+		    fcftab->TID);
 
-		(void) emlxs_fcftab_state(port, FCFTAB_STATE_READ,
+		(void) emlxs_fcoe_fcftab_state(port, FCOE_FCFTAB_STATE_READ,
 		    FCF_REASON_REENTER, 0,
-		    (void *)((uintptr_t)fcf->params.response.
+		    (void *)((unsigned long)fcf->params.response.
 		    next_valid_fcf_index));
 	} else {
-		(void) emlxs_fcftab_state(port, FCFTAB_STATE_READ_CMPL,
-		    0, 0, 0);
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+		    "fcoe_fcftab_read_mbcmpl:%x. Read complete. >",
+		    fcftab->TID);
+
+		(void) emlxs_fcoe_fcftab_state(port,
+		    FCOE_FCFTAB_STATE_READ_CMPL,
+		    0, 0, (void*)((unsigned long)index));
 	}
 
 	mutex_exit(&EMLXS_FCF_LOCK);
 	return (0);
 
-} /* emlxs_fcftab_read_mbcmpl() */
+} /* emlxs_fcoe_fcftab_read_mbcmpl() */
 
 
 /*ARGSUSED*/
 static uint32_t
-emlxs_fcftab_read_action(emlxs_port_t *port, uint32_t evt,
+emlxs_fcoe_fcftab_read_action(emlxs_port_t *port, uint32_t evt,
     void *arg1)
 {
 	emlxs_hba_t *hba = HBA;
@@ -3247,66 +5880,77 @@ emlxs_fcftab_read_action(emlxs_port_t *port, uint32_t evt,
 	MAILBOXQ *mbq;
 	MAILBOX4 *mb4;
 	IOCTL_FCOE_READ_FCF_TABLE *fcf;
-	uint32_t rval;
+	uint32_t rval = 0;
 	MATCHMAP *mp;
 	mbox_req_hdr_t	*hdr_req;
-	uint16_t index;
+	uint16_t index = (uint16_t)((unsigned long)arg1);
+	uint32_t context;
 
-	if (fcftab->state != FCFTAB_STATE_READ) {
+	if (fcftab->state != FCOE_FCFTAB_STATE_READ) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
-		    "fcftab_read_action: %s:%s arg=%p. "
-		    "Invalid state. Terminated.",
-		    emlxs_fcftab_state_xlate(fcftab->state),
+		    "fcoe_fcftab_read_action:%x %s:%s arg=%p. "
+		    "Invalid state. <",
+		    fcftab->TID,
+		    emlxs_fcoe_fcftab_state_xlate(fcftab->state),
 		    emlxs_fcf_event_xlate(evt), arg1);
 		return (1);
 	}
 
-	fcftab->flag &= ~EMLXS_FCFTAB_READ_REQ;
-
-	if (fcftab->prev_state != FCFTAB_STATE_READ_FAILED) {
+	if ((fcftab->prev_state != FCOE_FCFTAB_STATE_READ_FAILED) ||
+	    (fcftab->flag & EMLXS_FCOE_FCFTAB_READ_REQ)) {
+		fcftab->flag &= ~EMLXS_FCOE_FCFTAB_READ_REQ;
 		fcftab->attempts = 0;
 	}
 
 	if (fcftab->flag & EMLXS_FCFTAB_REQ_MASK) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "fcftab_read_action: %s:%s arg=%p flag=%x. "
+		    "fcoe_fcftab_read_action:%x %s:%s arg=%p flag=%x. "
 		    "Handling request.",
-		    emlxs_fcftab_state_xlate(fcftab->state),
+		    fcftab->TID,
+		    emlxs_fcoe_fcftab_state_xlate(fcftab->state),
 		    emlxs_fcf_event_xlate(evt), arg1,
 		    fcftab->flag);
 
-		rval = emlxs_fcftab_req_handler(port, arg1);
+		rval = emlxs_fcoe_fcftab_req_handler(port, arg1);
 		return (rval);
 	}
 
-	index = (uint16_t)((uintptr_t)arg1);
+	if (fcftab->attempts == 0) {
+		fcftab->TID = fcftab->generation;
+	}
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-	    "fcftab_read_action: %s:%s arg=%p attempts=%d. Reading FCF.",
-	    emlxs_fcftab_state_xlate(fcftab->state),
+	    "fcoe_fcftab_read_action:%x %s:%s arg=%p attempts=%d. "
+	    "Reading FCF. <",
+	    fcftab->TID,
+	    emlxs_fcoe_fcftab_state_xlate(fcftab->state),
 	    emlxs_fcf_event_xlate(evt), arg1,
 	    fcftab->attempts);
 
-	if (!(mbq = (MAILBOXQ *)emlxs_mem_get(hba, MEM_MBOX, 1))) {
-		rval = emlxs_fcftab_state(port, FCFTAB_STATE_READ_FAILED,
+	if (!(mbq = (MAILBOXQ *)emlxs_mem_get(hba, MEM_MBOX))) {
+		rval = emlxs_fcoe_fcftab_state(port,
+		    FCOE_FCFTAB_STATE_READ_FAILED,
 		    FCF_REASON_NO_MBOX, 0, arg1);
 		return (rval);
 	}
 	mb4 = (MAILBOX4*)mbq;
 	bzero((void *) mb4, MAILBOX_CMD_SLI4_BSIZE);
 
-	if ((mp = (MATCHMAP *)emlxs_mem_get(hba, MEM_BUF, 1)) == 0) {
+	if ((mp = (MATCHMAP *)emlxs_mem_get(hba, MEM_BUF)) == 0) {
 		emlxs_mem_put(hba, MEM_MBOX, (void *)mbq);
 
-		rval = emlxs_fcftab_state(port, FCFTAB_STATE_READ_FAILED,
+		rval = emlxs_fcoe_fcftab_state(port,
+		    FCOE_FCFTAB_STATE_READ_FAILED,
 		    FCF_REASON_NO_BUFFER, 0, arg1);
 		return (rval);
 	}
 	bzero(mp->virt, mp->size);
 
 	mbq->nonembed = (void *)mp;
-	mbq->mbox_cmpl = emlxs_fcftab_read_mbcmpl;
-	mbq->context = (void *)((uintptr_t)index);
+	mbq->mbox_cmpl = emlxs_fcoe_fcftab_read_mbcmpl;
+
+	context = ((uint32_t)fcftab->TID << 16) | (uint32_t)index;
+	mbq->context = (void *)((unsigned long)context);
 	mbq->port = (void *)port;
 
 	mb4->un.varSLIConfig.be.embedded = 0;
@@ -3327,7 +5971,8 @@ emlxs_fcftab_read_action(emlxs_port_t *port, uint32_t evt,
 		emlxs_mem_put(hba, MEM_BUF, (void *)mp);
 		emlxs_mem_put(hba, MEM_MBOX, (void *)mbq);
 
-		rval = emlxs_fcftab_state(port, FCFTAB_STATE_READ_FAILED,
+		rval = emlxs_fcoe_fcftab_state(port,
+		    FCOE_FCFTAB_STATE_READ_FAILED,
 		    FCF_REASON_SEND_FAILED, rval, arg1);
 
 		return (rval);
@@ -3335,76 +5980,91 @@ emlxs_fcftab_read_action(emlxs_port_t *port, uint32_t evt,
 
 	return (0);
 
-} /* emlxs_fcftab_read_action() */
+} /* emlxs_fcoe_fcftab_read_action() */
 
 
 /*ARGSUSED*/
 static uint32_t
-emlxs_fcftab_read_failed_action(emlxs_port_t *port, uint32_t evt,
+emlxs_fcoe_fcftab_read_failed_action(emlxs_port_t *port, uint32_t evt,
     void *arg1)
 {
 	emlxs_hba_t *hba = HBA;
 	FCFTable_t *fcftab = &hba->sli.sli4.fcftab;
-	uint32_t rval;
+	uint32_t rval = 0;
 
 	fcftab->attempts++;
 
-	if (fcftab->state != FCFTAB_STATE_READ_FAILED) {
+	if (fcftab->state != FCOE_FCFTAB_STATE_READ_FAILED) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
-		    "fcftab_read_failed_action: %s:%s arg=%p attempt=%d. "
-		    "Invalid state. Terminated.",
-		    emlxs_fcftab_state_xlate(fcftab->state),
+		    "fcoe_fcftab_read_failed_action:%x %s:%s arg=%p "
+		    "attempt=%d. Invalid state. <",
+		    fcftab->TID,
+		    emlxs_fcoe_fcftab_state_xlate(fcftab->state),
 		    emlxs_fcf_event_xlate(evt),
 		    arg1, fcftab->attempts);
-
 		return (1);
 	}
 
-	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-	    "fcftab_read_failed_action: %s:%s arg=%p attempt=%d reason=%x",
-	    emlxs_fcftab_state_xlate(fcftab->state),
-	    emlxs_fcf_event_xlate(evt), arg1,
-	    fcftab->attempts,
-	    fcftab->reason);
-
-	if ((fcftab->reason == FCF_REASON_SEND_FAILED) ||
+	if ((fcftab->reason == FCF_REASON_MBOX_FAILED) ||
+	    (fcftab->reason == FCF_REASON_SEND_FAILED) ||
 	    (fcftab->attempts >= 3)) {
-		rval = emlxs_fcftab_state(port, FCFTAB_STATE_READ_CMPL,
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+		    "fcoe_fcftab_read_failed_action:%x %s:%s arg=%p "
+		    "attempt=%d reason=%x. Giving up.",
+		    fcftab->TID,
+		    emlxs_fcoe_fcftab_state_xlate(fcftab->state),
+		    emlxs_fcf_event_xlate(evt), arg1,
+		    fcftab->attempts,
+		    fcftab->reason);
+
+		rval = emlxs_fcoe_fcftab_state(port,
+		    FCOE_FCFTAB_STATE_READ_CMPL,
 		    FCF_REASON_OP_FAILED, fcftab->attempts, arg1);
 	} else {
-		rval = emlxs_fcftab_state(port, FCFTAB_STATE_READ,
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+		    "fcoe_fcftab_read_failed_action:%x %s:%s arg=%p "
+		    "attempt=%d reason=%x. Retrying.",
+		    fcftab->TID,
+		    emlxs_fcoe_fcftab_state_xlate(fcftab->state),
+		    emlxs_fcf_event_xlate(evt), arg1,
+		    fcftab->attempts,
+		    fcftab->reason);
+
+		rval = emlxs_fcoe_fcftab_state(port, FCOE_FCFTAB_STATE_READ,
 		    FCF_REASON_OP_FAILED, fcftab->attempts, FCFTAB_READ_ALL);
 	}
 
 	return (rval);
 
-} /* emlxs_fcftab_read_failed_action() */
+} /* emlxs_fcoe_fcftab_read_failed_action() */
 
 
 /*ARGSUSED*/
 static uint32_t
-emlxs_fcftab_read_cmpl_action(emlxs_port_t *port, uint32_t evt,
+emlxs_fcoe_fcftab_read_cmpl_action(emlxs_port_t *port, uint32_t evt,
     void *arg1)
 {
 	emlxs_hba_t *hba = HBA;
 	FCFTable_t *fcftab = &hba->sli.sli4.fcftab;
-	uint32_t rval;
+	uint32_t rval = 0;
 	FCFIobj_t *fcfp;
 	uint32_t i;
 
-	if (fcftab->state != FCFTAB_STATE_READ_CMPL) {
+	if (fcftab->state != FCOE_FCFTAB_STATE_READ_CMPL) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
-		    "fcftab_read_cmpl_action: %s:%s arg=%p. "
-		    "Invalid state. Terminated.",
-		    emlxs_fcftab_state_xlate(fcftab->state),
+		    "fcoe_fcftab_read_cmpl_action:%x %s:%s arg=%p. "
+		    "Invalid state. <",
+		    fcftab->TID,
+		    emlxs_fcoe_fcftab_state_xlate(fcftab->state),
 		    emlxs_fcf_event_xlate(evt), arg1);
 		return (1);
 	}
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-	    "fcftab_read_cmpl_action: %s:%s arg=%p attempts=%d. "
+	    "fcoe_fcftab_read_cmpl_action:%x %s:%s arg=%p attempts=%d. "
 	    "Cleaning table.",
-	    emlxs_fcftab_state_xlate(fcftab->state),
+	    fcftab->TID,
+	    emlxs_fcoe_fcftab_state_xlate(fcftab->state),
 	    emlxs_fcf_event_xlate(evt), arg1,
 	    fcftab->attempts);
 
@@ -3429,26 +6089,26 @@ emlxs_fcftab_read_cmpl_action(emlxs_port_t *port, uint32_t evt,
 		if (!(fcfp->flag & EMLXS_FCFI_FRESH) &&
 		    !(fcfp->flag & EMLXS_FCFI_SELECTED)) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-			    "fcftab_read_cmpl_action:%d %s. "
-			    "FCF stale. Freeing FCF.",
-			    fcfp->fcf_index,
-			    emlxs_fcfi_state_xlate(fcfp->state));
+			    "fcoe_fcftab_read_cmpl_action:%x. FCF stale. "
+			    "Freeing FCFI:%d. >",
+			    fcftab->TID,
+			    fcfp->fcf_index);
 
 			(void) emlxs_fcfi_free(port, fcfp);
 			continue;
 		}
 	}
 
-	rval = emlxs_fcftab_state(port, FCFTAB_STATE_FCFI_ONLINE,
+	rval = emlxs_fcoe_fcftab_state(port, FCOE_FCFTAB_STATE_FCFI_ONLINE,
 	    FCF_REASON_EVENT, evt, arg1);
 
 	return (rval);
 
-} /* emlxs_fcftab_read_cmpl_action() */
+} /* emlxs_fcoe_fcftab_read_cmpl_action() */
 
 
 static FCFIobj_t *
-emlxs_fcftab_fcfi_select(emlxs_port_t *port, char *fabric_wwn)
+emlxs_fcoe_fcftab_fcfi_select(emlxs_port_t *port, char *fabric_wwn)
 {
 	emlxs_hba_t *hba = HBA;
 	FCFTable_t *fcftab = &hba->sli.sli4.fcftab;
@@ -3553,12 +6213,12 @@ emlxs_fcftab_fcfi_select(emlxs_port_t *port, char *fabric_wwn)
 
 	return (fcfp);
 
-} /* emlxs_fcftab_fcfi_select() */
+} /* emlxs_fcoe_fcftab_fcfi_select() */
 
 
 /*ARGSUSED*/
 static void
-emlxs_fcftab_process(emlxs_port_t *port)
+emlxs_fcoe_fcftab_process(emlxs_port_t *port)
 {
 	emlxs_hba_t *hba = HBA;
 	FCFTable_t *fcftab = &hba->sli.sli4.fcftab;
@@ -3591,8 +6251,9 @@ emlxs_fcftab_process(emlxs_port_t *port)
 				fcfp->offline_timer = 0;
 
 				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-				    "fcftab_process:%d fcfi=%d %s. "
+				    "fcoe_fcftab_process:%x %d fcfi=%d %s. "
 				    "FCF viable. Offline timer disabled.",
+				    fcftab->TID,
 				    i, fcfp->fcf_index,
 				    emlxs_fcfi_state_xlate(fcfp->state),
 				    cfg[CFG_FCF_FAILOVER_DELAY].current);
@@ -3610,9 +6271,10 @@ emlxs_fcftab_process(emlxs_port_t *port)
 				    cfg[CFG_FCF_FAILOVER_DELAY].current;
 
 				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-				    "fcftab_process:%d fcfi=%d %s. "
+				    "fcoe_fcftab_process:%x %d fcfi=%d %s. "
 				    "No longer viable. "
 				    "Offlining FCF (%d secs).",
+				    fcftab->TID,
 				    i, fcfp->fcf_index,
 				    emlxs_fcfi_state_xlate(fcfp->state),
 				    cfg[CFG_FCF_FAILOVER_DELAY].current);
@@ -3625,16 +6287,17 @@ emlxs_fcftab_process(emlxs_port_t *port)
 
 		if (!(fcfp->flag & EMLXS_FCFI_FRESH)) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-			    "fcftab_process:%d fcfi=%d %s. "
-			    "No longer viable. Freeing FCF.",
-			    i, fcfp->fcf_index,
-			    emlxs_fcfi_state_xlate(fcfp->state));
+			    "fcoe_fcftab_process:%x %d. "
+			    "No longer viable. Freeing FCFI:%d. >",
+			    fcftab->TID,
+			    i, fcfp->fcf_index);
 
 			(void) emlxs_fcfi_free(port, fcfp);
 		} else {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-			    "fcftab_process:%d fcfi=%d %s. "
+			    "fcoe_fcftab_process:%x %d fcfi=%d %s. "
 			    "No longer viable. FCF deselected.",
+			    fcftab->TID,
 			    i, fcfp->fcf_index,
 			    emlxs_fcfi_state_xlate(fcfp->state));
 		}
@@ -3648,20 +6311,23 @@ emlxs_fcftab_process(emlxs_port_t *port)
 		/* If no previous selection, then make new one */
 		if (!prev_fcfp) {
 			/* Select an fcf on any fabric */
-			fcfp = emlxs_fcftab_fcfi_select(port, 0);
+			fcfp = emlxs_fcoe_fcftab_fcfi_select(port, 0);
 
 			if (fcfp) {
 				fcfp->flag |= EMLXS_FCFI_SELECTED;
 				fcftab->fcfi[i] = fcfp;
 
 				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-				    "fcftab_process:%d fcfi=%d %s. "
+				    "fcoe_fcftab_process:%x %d fcfi=%d %s. "
 				    "New FCF selected.",
+				    fcftab->TID,
 				    i, fcfp->fcf_index,
 				    emlxs_fcfi_state_xlate(fcfp->state));
 			} else {
 				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-				    "fcftab_process:%d. No FCF available.",
+				    "fcoe_fcftab_process:%x %d. "
+				    "No FCF available.",
+				    fcftab->TID,
 				    i);
 			}
 			continue;
@@ -3673,8 +6339,9 @@ emlxs_fcftab_process(emlxs_port_t *port)
 			fcftab->fcfi[i] = fcfp;
 
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-			    "fcftab_process:%d fcfi=%d %s. "
+			    "fcoe_fcftab_process:%x %d fcfi=%d %s. "
 			    "FCF still selected.",
+			    fcftab->TID,
 			    i, fcfp->fcf_index,
 			    emlxs_fcfi_state_xlate(fcfp->state));
 			continue;
@@ -3683,7 +6350,7 @@ emlxs_fcftab_process(emlxs_port_t *port)
 		/* Previous entry is no longer selected */
 
 		/* Select a new fcf from same fabric */
-		fcfp = emlxs_fcftab_fcfi_select(port,
+		fcfp = emlxs_fcoe_fcftab_fcfi_select(port,
 		    (char *)prev_fcfp->fcf_rec.fabric_name_identifier);
 
 		if (fcfp) {
@@ -3691,30 +6358,33 @@ emlxs_fcftab_process(emlxs_port_t *port)
 			fcftab->fcfi[i] = fcfp;
 
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-			    "fcftab_process:%d fcfi=%d %s. "
+			    "fcoe_fcftab_process:%x %d fcfi=%d %s. "
 			    "New FCF, same fabric selected.",
+			    fcftab->TID,
 			    i, fcfp->fcf_index,
 			    emlxs_fcfi_state_xlate(fcfp->state));
 			continue;
 		}
 
 		/* Select fcf from any fabric */
-		fcfp = emlxs_fcftab_fcfi_select(port, 0);
+		fcfp = emlxs_fcoe_fcftab_fcfi_select(port, 0);
 
 		if (fcfp) {
 			fcfp->flag |= EMLXS_FCFI_SELECTED;
 			fcftab->fcfi[i] = fcfp;
 
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-			    "fcftab_process:%d fcfi=%d %s. "
+			    "fcoe_fcftab_process:%x %d fcfi=%d %s. "
 			    "New FCF, new fabric selected.",
+			    fcftab->TID,
 			    i, fcfp->fcf_index,
 			    emlxs_fcfi_state_xlate(fcfp->state));
 			continue;
 		}
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "fcftab_process:%d. No FCF available.",
+		    "fcoe_fcftab_process:%x %d. No FCF available.",
+		    fcftab->TID,
 		    i);
 	}
 
@@ -3745,13 +6415,12 @@ emlxs_fcftab_process(emlxs_port_t *port)
 
 	return;
 
-} /* emlxs_fcftab_process() */
-
+} /* emlxs_fcoe_fcftab_process() */
 
 
 /*ARGSUSED*/
 static uint32_t
-emlxs_fcftab_fcfi_online_action(emlxs_port_t *port, uint32_t evt,
+emlxs_fcoe_fcftab_fcfi_online_action(emlxs_port_t *port, uint32_t evt,
     void *arg1)
 {
 	emlxs_hba_t *hba = HBA;
@@ -3762,28 +6431,28 @@ emlxs_fcftab_fcfi_online_action(emlxs_port_t *port, uint32_t evt,
 	uint32_t offline_count = 0;
 	uint32_t online_count = 0;
 
-	if (fcftab->state != FCFTAB_STATE_FCFI_ONLINE) {
+	if (fcftab->state != FCOE_FCFTAB_STATE_FCFI_ONLINE) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "fcftab_fcfi_online_action: %s:%s arg=%p. "
-		    "Invalid state. Terminated.",
-		    emlxs_fcftab_state_xlate(fcftab->state),
+		    "fcoe_fcftab_fcfi_online_action:%x %s:%s arg=%p. "
+		    "Invalid state. <",
+		    fcftab->TID,
+		    emlxs_fcoe_fcftab_state_xlate(fcftab->state),
 		    emlxs_fcf_event_xlate(evt), arg1);
 		return (1);
 	}
 
 	if (fcftab->flag & EMLXS_FCFTAB_REQ_MASK) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "fcftab_fcfi_online_action: %s:%s arg=%p flag=%x. "
+		    "fcoe_fcftab_fcfi_online_action:%x flag=%x. "
 		    "Handling request.",
-		    emlxs_fcftab_state_xlate(fcftab->state),
-		    emlxs_fcf_event_xlate(evt), arg1,
+		    fcftab->TID,
 		    fcftab->flag);
 
-		rval = emlxs_fcftab_req_handler(port, arg1);
+		rval = emlxs_fcoe_fcftab_req_handler(port, arg1);
 		return (rval);
 	}
 
-	emlxs_fcftab_process(port);
+	emlxs_fcoe_fcftab_process(port);
 
 	for (i = 0; i < fcftab->fcfi_count; i++) {
 		fcfp = fcftab->fcfi[i];
@@ -3792,8 +6461,9 @@ emlxs_fcftab_fcfi_online_action(emlxs_port_t *port, uint32_t evt,
 			online_count++;
 
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-			    "fcftab_fcfi_online_action: fcfi_count=%d. "
-			    "Onlining FCF:%d.",
+			    "fcoe_fcftab_fcfi_online_action:%x fcfi_count=%d. "
+			    "Onlining FCFI:%d. >",
+			    fcftab->TID,
 			    fcftab->fcfi_count,
 			    fcfp->fcf_index);
 
@@ -3803,8 +6473,9 @@ emlxs_fcftab_fcfi_online_action(emlxs_port_t *port, uint32_t evt,
 			offline_count++;
 
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-			    "fcftab_fcfi_online_action: fcfi_count=%d. "
-			    "Offlining FCF:%d.",
+			    "fcoe_fcftab_fcfi_online_action:%x fcfi_count=%d. "
+			    "Offlining fcfi:%d.",
+			    fcftab->TID,
 			    fcftab->fcfi_count,
 			    fcfp->fcf_index);
 		}
@@ -3812,89 +6483,97 @@ emlxs_fcftab_fcfi_online_action(emlxs_port_t *port, uint32_t evt,
 
 	if (offline_count) {
 		/* Wait for FCF's to go offline */
-		rval = emlxs_fcftab_state(port, FCFTAB_STATE_FCFI_OFFLINE,
+		rval = emlxs_fcoe_fcftab_state(port,
+		    FCOE_FCFTAB_STATE_FCFI_OFFLINE,
 		    FCF_REASON_EVENT, evt, arg1);
 
 		/* Service timer now */
-		emlxs_fcftab_offline_timer(hba);
+		emlxs_fcoe_fcftab_offline_timer(hba);
 
 		return (rval);
 	}
 
 	if (!online_count) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "fcftab_fcfi_online_action: fcfi_count=%d.",
+		    "fcoe_fcftab_fcfi_online_action:%x fcfi_count=%d.",
+		    fcftab->TID,
 		    fcftab->fcfi_count);
 	}
 
-	rval = emlxs_fcftab_state(port, FCFTAB_STATE_FCFI_ONLINE_CMPL,
+	rval = emlxs_fcoe_fcftab_state(port,
+	    FCOE_FCFTAB_STATE_FCFI_ONLINE_CMPL,
 	    FCF_REASON_EVENT, evt, arg1);
 
 	return (rval);
 
-} /* emlxs_fcftab_fcfi_online_action() */
+} /* emlxs_fcoe_fcftab_fcfi_online_action() */
 
 
 /*ARGSUSED*/
 static uint32_t
-emlxs_fcftab_fcfi_online_cmpl_action(emlxs_port_t *port, uint32_t evt,
+emlxs_fcoe_fcftab_fcfi_online_cmpl_action(emlxs_port_t *port, uint32_t evt,
     void *arg1)
 {
 	emlxs_hba_t *hba = HBA;
 	FCFTable_t *fcftab = &hba->sli.sli4.fcftab;
-	uint32_t rval;
+	uint32_t rval = 0;
 
-	if (fcftab->state != FCFTAB_STATE_FCFI_ONLINE_CMPL) {
+	if (fcftab->state != FCOE_FCFTAB_STATE_FCFI_ONLINE_CMPL) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
-		    "fcftab_fcfi_online_cmpl_action: %s:%s arg=%p. "
-		    "Invalid state. Terminated.",
-		    emlxs_fcftab_state_xlate(fcftab->state),
+		    "fcoe_fcftab_fcfi_online_cmpl_action:%x %s:%s arg=%p. "
+		    "Invalid state. <",
+		    fcftab->TID,
+		    emlxs_fcoe_fcftab_state_xlate(fcftab->state),
 		    emlxs_fcf_event_xlate(evt), arg1);
 		return (1);
 	}
 
 	if (fcftab->flag & EMLXS_FCFTAB_REQ_MASK) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "fcftab_fcfi_online_cmpl_action: %s:%s arg=%p flag=%x. "
-		    "Handling request.",
-		    emlxs_fcftab_state_xlate(fcftab->state),
+		    "fcoe_fcftab_fcfi_online_cmpl_action:%x %s:%s "
+		    "arg=%p flag=%x. Handling request.",
+		    fcftab->TID,
+		    emlxs_fcoe_fcftab_state_xlate(fcftab->state),
 		    emlxs_fcf_event_xlate(evt), arg1,
 		    fcftab->flag);
 
-		rval = emlxs_fcftab_req_handler(port, arg1);
+		rval = emlxs_fcoe_fcftab_req_handler(port, arg1);
 		return (rval);
 	}
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-	    "fcftab_fcfi_online_cmpl_action: %s:%s arg=%p",
-	    emlxs_fcftab_state_xlate(fcftab->state),
+	    "fcoe_fcftab_fcfi_online_cmpl_action:%x %s:%s arg=%p. "
+	    "Going online.",
+	    fcftab->TID,
+	    emlxs_fcoe_fcftab_state_xlate(fcftab->state),
 	    emlxs_fcf_event_xlate(evt), arg1);
 
-	rval = emlxs_fcftab_state(port, FCFTAB_STATE_ONLINE,
+	rval = emlxs_fcoe_fcftab_state(port, FCOE_FCFTAB_STATE_ONLINE,
 	    FCF_REASON_EVENT, evt, arg1);
 
 	return (rval);
 
-} /* emlxs_fcftab_fcfi_online_cmpl_action() */
+} /* emlxs_fcoe_fcftab_fcfi_online_cmpl_action() */
 
 
 /*ARGSUSED*/
 static uint32_t
-emlxs_fcftab_fcfi_offline_action(emlxs_port_t *port, uint32_t evt,
+emlxs_fcoe_fcftab_fcfi_offline_action(emlxs_port_t *port, uint32_t evt,
     void *arg1)
 {
 	emlxs_hba_t *hba = HBA;
 	FCFTable_t *fcftab = &hba->sli.sli4.fcftab;
 	FCFIobj_t *fcfp;
-	uint32_t rval;
+	uint32_t rval = 0;
 	int32_t i;
 	uint32_t fcfi_offline;
 
-	if (fcftab->state != FCFTAB_STATE_FCFI_OFFLINE) {
+	if (fcftab->state != FCOE_FCFTAB_STATE_FCFI_OFFLINE) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
-		    "fcftab_fcfi_offline_action: %s:%s arg=%p. "
-		    "Invalid state. Terminated.",
-		    emlxs_fcftab_state_xlate(fcftab->state),
+		    "fcoe_fcftab_fcfi_offline_action:%x %s:%s arg=%p. "
+		    "Invalid state. <",
+		    fcftab->TID,
+		    emlxs_fcoe_fcftab_state_xlate(fcftab->state),
 		    emlxs_fcf_event_xlate(evt), arg1);
 		return (1);
 	}
@@ -3916,9 +6595,10 @@ emlxs_fcftab_fcfi_offline_action(emlxs_port_t *port, uint32_t evt,
 
 	if (fcfi_offline) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "fcftab_fcfi_offline_action: %s:%s arg=%p "
-		    "fcfi_offline=%d. Terminated.",
-		    emlxs_fcftab_state_xlate(fcftab->state),
+		    "fcoe_fcftab_fcfi_offline_action:%x %s:%s arg=%p "
+		    "fcfi_offline=%d. <",
+		    fcftab->TID,
+		    emlxs_fcoe_fcftab_state_xlate(fcftab->state),
 		    emlxs_fcf_event_xlate(evt), arg1,
 		    fcfi_offline);
 
@@ -3926,75 +6606,83 @@ emlxs_fcftab_fcfi_offline_action(emlxs_port_t *port, uint32_t evt,
 	}
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-	    "fcftab_fcfi_offline_action: %s:%s arg=%p.",
-	    emlxs_fcftab_state_xlate(fcftab->state),
+	    "fcoe_fcftab_fcfi_offline_action:%x %s:%s arg=%p.",
+	    fcftab->TID,
+	    emlxs_fcoe_fcftab_state_xlate(fcftab->state),
 	    emlxs_fcf_event_xlate(evt), arg1);
 
-	rval = emlxs_fcftab_state(port, FCFTAB_STATE_FCFI_OFFLINE_CMPL,
+	rval = emlxs_fcoe_fcftab_state(port,
+	    FCOE_FCFTAB_STATE_FCFI_OFFLINE_CMPL,
 	    FCF_REASON_EVENT, evt, arg1);
+
 	return (rval);
 
-} /* emlxs_fcftab_fcfi_offline_action() */
+} /* emlxs_fcoe_fcftab_fcfi_offline_action() */
 
 
 /*ARGSUSED*/
 static uint32_t
-emlxs_fcftab_fcfi_offline_cmpl_action(emlxs_port_t *port, uint32_t evt,
+emlxs_fcoe_fcftab_fcfi_offline_cmpl_action(emlxs_port_t *port, uint32_t evt,
     void *arg1)
 {
 	emlxs_hba_t *hba = HBA;
 	FCFTable_t *fcftab = &hba->sli.sli4.fcftab;
-	uint32_t rval;
+	uint32_t rval = 0;
 
-	if (fcftab->state != FCFTAB_STATE_FCFI_OFFLINE_CMPL) {
+	if (fcftab->state != FCOE_FCFTAB_STATE_FCFI_OFFLINE_CMPL) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
-		    "fcftab_fcfi_offline_cmpl_action: %s:%s arg=%p. "
-		    "Invalid state. Terminated.",
-		    emlxs_fcftab_state_xlate(fcftab->state),
+		    "fcoe_fcftab_fcfi_offline_cmpl_action:%x %s:%s arg=%p. "
+		    "Invalid state. <",
+		    fcftab->TID,
+		    emlxs_fcoe_fcftab_state_xlate(fcftab->state),
 		    emlxs_fcf_event_xlate(evt), arg1);
 		return (1);
 	}
 
 	if (fcftab->flag & EMLXS_FCFTAB_REQ_MASK) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
-		    "fcftab_fcfi_offline_cmpl_action: %s:%s arg=%p. "
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+		    "fcoe_fcftab_fcfi_offline_cmpl_action:%x %s:%s arg=%p. "
 		    "Handling request.",
-		    emlxs_fcftab_state_xlate(fcftab->state),
+		    fcftab->TID,
+		    emlxs_fcoe_fcftab_state_xlate(fcftab->state),
 		    emlxs_fcf_event_xlate(evt), arg1);
 
-		rval = emlxs_fcftab_req_handler(port, arg1);
+		rval = emlxs_fcoe_fcftab_req_handler(port, arg1);
 		return (rval);
 	}
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-	    "fcftab_fcfi_offline_cmpl_action: %s:%s arg=%p.",
-	    emlxs_fcftab_state_xlate(fcftab->state),
+	    "fcoe_fcftab_fcfi_offline_cmpl_action:%x %s:%s arg=%p. "
+	    "Returning FCF(s) online.",
+	    fcftab->TID,
+	    emlxs_fcoe_fcftab_state_xlate(fcftab->state),
 	    emlxs_fcf_event_xlate(evt), arg1);
 
-	rval = emlxs_fcftab_state(port, FCFTAB_STATE_FCFI_ONLINE,
+	rval = emlxs_fcoe_fcftab_state(port, FCOE_FCFTAB_STATE_FCFI_ONLINE,
 	    FCF_REASON_EVENT, evt, arg1);
 
 	return (rval);
 
-} /* emlxs_fcftab_fcfi_offline_cmpl_action() */
+} /* emlxs_fcoe_fcftab_fcfi_offline_cmpl_action() */
 
 
 /*ARGSUSED*/
 static uint32_t
-emlxs_fcftab_found_evt_action(emlxs_port_t *port, uint32_t evt,
+emlxs_fcoe_fcftab_found_evt_action(emlxs_port_t *port, uint32_t evt,
     void *arg1)
 {
 	emlxs_hba_t *hba = HBA;
 	FCFTable_t *fcftab = &hba->sli.sli4.fcftab;
-	uint32_t fcf_index = (uint32_t)((uintptr_t)arg1);
+	uint32_t fcf_index = (uint32_t)((unsigned long)arg1);
 	FCFIobj_t *fcfp;
 	uint32_t rval = 0;
 
 	if (evt != FCF_EVENT_FCF_FOUND) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "fcftab_found_evt_action: %s:%s fcf_index=%d. "
-		    "Invalid event type. Terminated.",
-		    emlxs_fcftab_state_xlate(fcftab->state),
+		    "fcoe_fcftab_found_evt_action:%x %s:%s fcf_index=%d. "
+		    "Invalid event type. <",
+		    fcftab->TID,
+		    emlxs_fcoe_fcftab_state_xlate(fcftab->state),
 		    emlxs_fcf_event_xlate(evt),
 		    fcf_index);
 
@@ -4002,18 +6690,19 @@ emlxs_fcftab_found_evt_action(emlxs_port_t *port, uint32_t evt,
 	}
 
 	switch (fcftab->state) {
-	case FCFTAB_STATE_SOLICIT:
-	case FCFTAB_STATE_SOLICIT_CMPL:
-	case FCFTAB_STATE_READ:
+	case FCOE_FCFTAB_STATE_SOLICIT:
+	case FCOE_FCFTAB_STATE_SOLICIT_CMPL:
+	case FCOE_FCFTAB_STATE_READ:
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "fcftab_found_evt_action: %s:%s fcf_index=%d gen=%x. "
-		    "Terminated.",
-		    emlxs_fcftab_state_xlate(fcftab->state),
+		    "fcoe_fcftab_found_evt_action:%x %s:%s "
+		    "fcf_index=%d gen=%x. <",
+		    fcftab->TID,
+		    emlxs_fcoe_fcftab_state_xlate(fcftab->state),
 		    emlxs_fcf_event_xlate(evt),
 		    fcf_index, fcftab->generation);
 		break;
 
-	/* case FCFTAB_STATE_FCFI_OFFLINE: */
+	/* case FCOE_FCFTAB_STATE_FCFI_OFFLINE: */
 	default:
 
 		/* Scan for matching fcf index in table */
@@ -4023,17 +6712,19 @@ emlxs_fcftab_found_evt_action(emlxs_port_t *port, uint32_t evt,
 
 			/* Trigger table read */
 			fcftab->flag &= ~EMLXS_FCFTAB_REQ_MASK;
-			fcftab->flag |= EMLXS_FCFTAB_READ_REQ;
+			fcftab->flag |= EMLXS_FCOE_FCFTAB_READ_REQ;
 			fcftab->generation++;
 
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-			    "fcftab_found_evt_action: %s:%s fcf_index=%d "
-			    "gen=%x. Read FCF table.",
-			    emlxs_fcftab_state_xlate(fcftab->state),
+			    "fcoe_fcftab_found_evt_action:%x %s:%s "
+			    "fcf_index=%d gen=%x. Read FCF table.",
+			    fcftab->TID,
+			    emlxs_fcoe_fcftab_state_xlate(fcftab->state),
 			    emlxs_fcf_event_xlate(evt),
 			    fcf_index, fcftab->generation);
 
-			rval = emlxs_fcftab_state(port, FCFTAB_STATE_READ,
+			rval = emlxs_fcoe_fcftab_state(port,
+			    FCOE_FCFTAB_STATE_READ,
 			    FCF_REASON_EVENT, evt, arg1);
 
 			break;
@@ -4044,27 +6735,31 @@ emlxs_fcftab_found_evt_action(emlxs_port_t *port, uint32_t evt,
 
 			/* Trigger table read */
 			fcftab->flag &= ~EMLXS_FCFTAB_REQ_MASK;
-			fcftab->flag |= EMLXS_FCFTAB_READ_REQ;
+			fcftab->flag |= EMLXS_FCOE_FCFTAB_READ_REQ;
 			fcftab->generation++;
 
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-			    "fcftab_found_evt_action: %s:%s fcf_index=%d "
-			    "gen=%x fcfi_online=%d. Read FCF table.",
-			    emlxs_fcftab_state_xlate(fcftab->state),
+			    "fcoe_fcftab_found_evt_action:%x %s:%s "
+			    "fcf_index=%d gen=%x fcfi_online=%d. "
+			    "Read FCF table.",
+			    fcftab->TID,
+			    emlxs_fcoe_fcftab_state_xlate(fcftab->state),
 			    emlxs_fcf_event_xlate(evt),
 			    fcf_index, fcftab->generation,
 			    fcftab->fcfi_online);
 
-			rval = emlxs_fcftab_state(port, FCFTAB_STATE_READ,
+			rval = emlxs_fcoe_fcftab_state(port,
+			    FCOE_FCFTAB_STATE_READ,
 			    FCF_REASON_EVENT, evt, arg1);
 
 			break;
 		}
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "fcftab_found_evt_action: %s:%s fcfi=%d. "
-		    "FCF not needed. Terminated.",
-		    emlxs_fcftab_state_xlate(fcftab->state),
+		    "fcoe_fcftab_found_evt_action:%x %s:%s fcfi=%d. "
+		    "FCF not needed. <",
+		    fcftab->TID,
+		    emlxs_fcoe_fcftab_state_xlate(fcftab->state),
 		    emlxs_fcf_event_xlate(evt),
 		    fcf_index);
 
@@ -4073,28 +6768,29 @@ emlxs_fcftab_found_evt_action(emlxs_port_t *port, uint32_t evt,
 
 	return (rval);
 
-} /* emlxs_fcftab_found_evt_action() */
+} /* emlxs_fcoe_fcftab_found_evt_action() */
 
 
 /*ARGSUSED*/
 static uint32_t
-emlxs_fcftab_lost_evt_action(emlxs_port_t *port, uint32_t evt,
+emlxs_fcoe_fcftab_lost_evt_action(emlxs_port_t *port, uint32_t evt,
     void *arg1)
 {
 	emlxs_hba_t *hba = HBA;
 	FCFTable_t *fcftab = &hba->sli.sli4.fcftab;
 	FCFIobj_t *fcfp;
-	uint32_t fcf_index = (uint32_t)((uintptr_t)arg1);
+	uint32_t fcf_index = (uint32_t)((unsigned long)arg1);
 	emlxs_port_t *vport;
 	VPIobj_t *vpip;
 	uint32_t i;
-	uint32_t rval;
+	uint32_t rval = 0;
 
 	if (evt != FCF_EVENT_FCF_LOST) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "fcftab_lost_evt_action: %s:%s fcf_index=%d. "
-		    "Invalid event type. Terminated",
-		    emlxs_fcftab_state_xlate(fcftab->state),
+		    "fcoe_fcftab_lost_evt_action:%x %s:%s fcf_index=%d. "
+		    "Invalid event type. <",
+		    fcftab->TID,
+		    emlxs_fcoe_fcftab_state_xlate(fcftab->state),
 		    emlxs_fcf_event_xlate(evt),
 		    fcf_index);
 
@@ -4106,9 +6802,10 @@ emlxs_fcftab_lost_evt_action(emlxs_port_t *port, uint32_t evt,
 
 	if (!fcfp) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "fcftab_lost_evt_action: %s:%s fcf_index=%d. "
-		    "FCF not found. Terminated.",
-		    emlxs_fcftab_state_xlate(fcftab->state),
+		    "fcoe_fcftab_lost_evt_action:%x %s:%s fcf_index=%d. "
+		    "FCF not found. <",
+		    fcftab->TID,
+		    emlxs_fcoe_fcftab_state_xlate(fcftab->state),
 		    emlxs_fcf_event_xlate(evt),
 		    fcf_index);
 
@@ -4117,9 +6814,10 @@ emlxs_fcftab_lost_evt_action(emlxs_port_t *port, uint32_t evt,
 
 	if (!(fcfp->flag & EMLXS_FCFI_SELECTED)) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "fcftab_changed_evt_action: %s:%s fcf_index=%d. "
-		    "FCF not selected. Terminated.",
-		    emlxs_fcftab_state_xlate(fcftab->state),
+		    "fcoe_fcftab_changed_evt_action:%x %s:%s fcf_index=%d. "
+		    "FCF not selected. <",
+		    fcftab->TID,
+		    emlxs_fcoe_fcftab_state_xlate(fcftab->state),
 		    emlxs_fcf_event_xlate(evt),
 		    fcf_index);
 
@@ -4129,7 +6827,7 @@ emlxs_fcftab_lost_evt_action(emlxs_port_t *port, uint32_t evt,
 	/* Offline VPI's of this FCFI */
 	for (i = 0; i <= hba->vpi_max; i++) {
 		vport = &VPORT(i);
-		vpip = &vport->VPIobj;
+		vpip = vport->vpip;
 
 		if ((vpip->state == VPI_STATE_OFFLINE) ||
 		    (vpip->vfip->fcfp != fcfp)) {
@@ -4137,19 +6835,13 @@ emlxs_fcftab_lost_evt_action(emlxs_port_t *port, uint32_t evt,
 		}
 
 		/* Fabric logo is implied */
-		vpip->flag &= ~EMLXS_VPI_LOGI;
-		if (vpip->flag & EMLXS_VPI_VFI_LOGI) {
-			vpip->flag &= ~EMLXS_VPI_VFI_LOGI;
-
-			if (vpip->vfip->logi_count > 0) {
-				vpip->vfip->logi_count--;
-			}
-		}
+		emlxs_vpi_logo_handler(port, vpip);
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "fcftab_lost_evt_action: %s:%s fcf_index=%d gen=%x. "
-		    "Offlining VPI:%d.",
-		    emlxs_fcftab_state_xlate(fcftab->state),
+		    "fcoe_fcftab_lost_evt_action:%x %s:%s fcf_index=%d gen=%x. "
+		    "Offlining VPI:%d. >",
+		    fcftab->TID,
+		    emlxs_fcoe_fcftab_state_xlate(fcftab->state),
 		    emlxs_fcf_event_xlate(evt),
 		    fcf_index, fcftab->generation,
 		    vpip->VPI);
@@ -4158,75 +6850,53 @@ emlxs_fcftab_lost_evt_action(emlxs_port_t *port, uint32_t evt,
 	}
 
 	switch (fcftab->state) {
-	case FCFTAB_STATE_SOLICIT:
+	case FCOE_FCFTAB_STATE_SOLICIT:
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "fcftab_lost_evt_action: %s gen=%x. "
-		    "Already soliciting. Terminated.",
-		    emlxs_fcftab_state_xlate(fcftab->state),
+		    "fcoe_fcftab_lost_evt_action:%x %s gen=%x. "
+		    "Already soliciting. <",
+		    fcftab->TID,
+		    emlxs_fcoe_fcftab_state_xlate(fcftab->state),
 		    fcftab->generation);
 		break;
 
 	default:
 		fcftab->flag &= ~EMLXS_FCFTAB_REQ_MASK;
-		fcftab->flag |= EMLXS_FCFTAB_SOL_REQ;
+		fcftab->flag |= EMLXS_FCOE_FCFTAB_SOL_REQ;
 		fcftab->generation++;
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "fcftab_lost_evt_action: %s gen=%x. Soliciting.",
-		    emlxs_fcftab_state_xlate(fcftab->state),
+		    "fcoe_fcftab_lost_evt_action:%x %s gen=%x. Soliciting.",
+		    fcftab->TID,
+		    emlxs_fcoe_fcftab_state_xlate(fcftab->state),
 		    fcftab->generation);
 
-		rval = emlxs_fcftab_state(port, FCFTAB_STATE_SOLICIT,
+		rval = emlxs_fcoe_fcftab_state(port, FCOE_FCFTAB_STATE_SOLICIT,
 		    FCF_REASON_EVENT, evt, arg1);
 		break;
 	}
 
 	return (rval);
 
-} /* emlxs_fcftab_lost_evt_action() */
+} /* emlxs_fcoe_fcftab_lost_evt_action() */
 
 
 /*ARGSUSED*/
 static uint32_t
-emlxs_fcftab_changed_evt_action(emlxs_port_t *port, uint32_t evt,
+emlxs_fcoe_fcftab_changed_evt_action(emlxs_port_t *port, uint32_t evt,
     void *arg1)
 {
 	emlxs_hba_t *hba = HBA;
 	FCFTable_t *fcftab = &hba->sli.sli4.fcftab;
 	FCFIobj_t *fcfp;
-	uint32_t fcf_index = (uint32_t)((uintptr_t)arg1);
-	uint32_t rval;
+	uint32_t fcf_index = (uint32_t)((unsigned long)arg1);
+	uint32_t rval = 0;
 
 	if (evt != FCF_EVENT_FCF_CHANGED) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "fcftab_changed_evt_action: %s:%s fcf_index=%d. "
-		    "Invalid event type. Terminated",
-		    emlxs_fcftab_state_xlate(fcftab->state),
-		    emlxs_fcf_event_xlate(evt),
-		    fcf_index);
-
-		return (1);
-	}
-
-	/* Scan for matching fcf index in table */
-	fcfp = emlxs_fcfi_find(port, 0, &fcf_index);
-
-	if (!fcfp) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "fcftab_changed_evt_action: %s:%s fcf_index=%d. "
-		    "FCFI not found. Terminated.",
-		    emlxs_fcftab_state_xlate(fcftab->state),
-		    emlxs_fcf_event_xlate(evt),
-		    fcf_index);
-
-		return (1);
-	}
-
-	if (!(fcfp->flag & EMLXS_FCFI_SELECTED)) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "fcftab_changed_evt_action: %s:%s fcf_index=%d. "
-		    "FCFI not selected. Terminated.",
-		    emlxs_fcftab_state_xlate(fcftab->state),
+		    "fcoe_fcftab_changed_evt_action:%x %s:%s fcf_index=%d. "
+		    "Invalid event type. <",
+		    fcftab->TID,
+		    emlxs_fcoe_fcftab_state_xlate(fcftab->state),
 		    emlxs_fcf_event_xlate(evt),
 		    fcf_index);
 
@@ -4234,59 +6904,116 @@ emlxs_fcftab_changed_evt_action(emlxs_port_t *port, uint32_t evt,
 	}
 
 	switch (fcftab->state) {
-	case FCFTAB_STATE_SOLICIT:
+	case FCOE_FCFTAB_STATE_SOLICIT:
+	case FCOE_FCFTAB_STATE_SOLICIT_CMPL:
+	case FCOE_FCFTAB_STATE_READ:
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "fcftab_changed_evt_action: %s gen=%x. "
-		    "Already soliciting. Terminated.",
-		    emlxs_fcftab_state_xlate(fcftab->state),
-		    fcftab->generation);
+		    "fcoe_fcftab_changed_evt_action:%x %s:%s "
+		    "fcf_index=%d gen=%x. <",
+		    fcftab->TID,
+		    emlxs_fcoe_fcftab_state_xlate(fcftab->state),
+		    emlxs_fcf_event_xlate(evt),
+		    fcf_index, fcftab->generation);
 		break;
 
+	/* case FCOE_FCFTAB_STATE_FCFI_OFFLINE: */
 	default:
-		fcftab->flag &= ~EMLXS_FCFTAB_REQ_MASK;
-		fcftab->flag |= EMLXS_FCFTAB_SOL_REQ;
-		fcftab->generation++;
+
+		/* Scan for matching fcf index in table */
+		fcfp = emlxs_fcfi_find(port, 0, &fcf_index);
+
+		if (fcfp && (fcfp->flag & EMLXS_FCFI_SELECTED)) {
+
+			/* Trigger table read */
+			fcftab->flag &= ~EMLXS_FCFTAB_REQ_MASK;
+			fcftab->flag |= EMLXS_FCOE_FCFTAB_READ_REQ;
+			fcftab->generation++;
+
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+			    "fcoe_fcftab_changed_evt_action:%x %s:%s "
+			    "fcf_index=%d gen=%x. Read FCF table.",
+			    fcftab->TID,
+			    emlxs_fcoe_fcftab_state_xlate(fcftab->state),
+			    emlxs_fcf_event_xlate(evt),
+			    fcf_index, fcftab->generation);
+
+			rval = emlxs_fcoe_fcftab_state(port,
+			    FCOE_FCFTAB_STATE_READ,
+			    FCF_REASON_EVENT, evt, arg1);
+
+			break;
+		}
+
+		/* Check if we need more FCF's */
+		if (fcftab->fcfi_online < FCFTAB_MAX_FCFI_COUNT) {
+
+			/* Trigger table read */
+			fcftab->flag &= ~EMLXS_FCFTAB_REQ_MASK;
+			fcftab->flag |= EMLXS_FCOE_FCFTAB_READ_REQ;
+			fcftab->generation++;
+
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+			    "fcoe_fcftab_changed_evt_action:%x %s:%s "
+			    "fcf_index=%d gen=%x fcfi_online=%d. "
+			    "Read FCF table.",
+			    fcftab->TID,
+			    emlxs_fcoe_fcftab_state_xlate(fcftab->state),
+			    emlxs_fcf_event_xlate(evt),
+			    fcf_index, fcftab->generation,
+			    fcftab->fcfi_online);
+
+			rval = emlxs_fcoe_fcftab_state(port,
+			    FCOE_FCFTAB_STATE_READ,
+			    FCF_REASON_EVENT, evt, arg1);
+
+			break;
+		}
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "fcftab_changed_evt_action: %s gen=%x. Soliciting.",
-		    emlxs_fcftab_state_xlate(fcftab->state),
-		    fcftab->generation);
+		    "fcoe_fcftab_changed_evt_action:%x %s:%s fcfi=%d. "
+		    "FCF not needed. <",
+		    fcftab->TID,
+		    emlxs_fcoe_fcftab_state_xlate(fcftab->state),
+		    emlxs_fcf_event_xlate(evt),
+		    fcf_index);
 
-		rval = emlxs_fcftab_state(port, FCFTAB_STATE_SOLICIT,
-		    FCF_REASON_EVENT, evt, arg1);
 		break;
 	}
 
 	return (rval);
 
-} /* emlxs_fcftab_changed_evt_action() */
+} /* emlxs_fcoe_fcftab_changed_evt_action() */
 
 
 /*ARGSUSED*/
 static uint32_t
-emlxs_fcftab_fcf_delete(emlxs_port_t *port, uint32_t fcf_index)
+emlxs_fcoe_fcftab_fcf_delete(emlxs_port_t *port, uint32_t fcf_index)
 {
 	emlxs_hba_t *hba = HBA;
 	FCFTable_t *fcftab = &hba->sli.sli4.fcftab;
 	MAILBOXQ *mbq;
 	MAILBOX4 *mb4;
 	MATCHMAP *mp = NULL;
-	uint32_t rval;
+	uint32_t rval = 0;
 
 	IOCTL_FCOE_DELETE_FCF_TABLE *fcf;
 	mbox_req_hdr_t *hdr_req;
 
 	if (fcf_index >= fcftab->fcfi_count) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "fcftab_fcf_delete:%d failed.  Out of range.",
+		    "fcoe_fcftab_fcf_delete:%x fcfi:%d failed. "
+		    "Out of range.",
+		    fcftab->TID,
 		    fcf_index);
 
 		return (1);
 	}
 
-	if (!(mbq = (MAILBOXQ *)emlxs_mem_get(hba, MEM_MBOX, 1))) {
+	if (!(mbq = (MAILBOXQ *)emlxs_mem_get(hba, MEM_MBOX))) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "fcftab_fcf_delete:%d failed. Unable to allocate mailbox.",
+		    "fcoe_fcftab_fcf_delete:%x fcfi:%d failed. "
+		    "Unable to allocate mailbox.",
+		    fcftab->TID,
 		    fcf_index);
 
 		return (1);
@@ -4295,9 +7022,11 @@ emlxs_fcftab_fcf_delete(emlxs_port_t *port, uint32_t fcf_index)
 	mb4 = (MAILBOX4*)mbq;
 	bzero((void *) mb4, MAILBOX_CMD_SLI4_BSIZE);
 
-	if ((mp = (MATCHMAP *)emlxs_mem_get(hba, MEM_BUF, 1)) == 0) {
+	if ((mp = (MATCHMAP *)emlxs_mem_get(hba, MEM_BUF)) == 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "fcftab_fcf_delete:%d failed.  Unable to allocate buffer.",
+		    "fcoe_fcftab_fcf_delete:%x fcfi:%d failed. "
+		    "Unable to allocate buffer.",
+		    fcftab->TID,
 		    fcf_index);
 
 		emlxs_mem_put(hba, MEM_MBOX, (void *)mbq);
@@ -4307,7 +7036,7 @@ emlxs_fcftab_fcf_delete(emlxs_port_t *port, uint32_t fcf_index)
 
 	mbq->nonembed = (void *)mp;
 	mbq->mbox_cmpl = NULL;
-	mbq->context = (void *)((uintptr_t)fcf_index);
+	mbq->context = (void *)((unsigned long)fcf_index);
 	mbq->port = (void *)port;
 
 	mb4->un.varSLIConfig.be.embedded = 0;
@@ -4325,13 +7054,16 @@ emlxs_fcftab_fcf_delete(emlxs_port_t *port, uint32_t fcf_index)
 	fcf->params.request.fcf_indexes[0] = (uint16_t)fcf_index;
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-	    "fcftab_fcf_delete:%d.",
+	    "fcoe_fcftab_fcf_delete:%x fcfi:%d. <",
+	    fcftab->TID,
 	    fcf_index);
 
 	rval = EMLXS_SLI_ISSUE_MBOX_CMD(hba, mbq, MBX_NOWAIT, 0);
 	if ((rval != MBX_BUSY) && (rval != MBX_SUCCESS)) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "fcftab_fcf_delete:%d failed.  Unable to send request.",
+		    "fcoe_fcftab_fcf_delete:%x fcfi:%d failed. "
+		    "Unable to send request.",
+		    fcftab->TID,
 		    fcf_index);
 
 		if (mp) {
@@ -4345,18 +7077,18 @@ emlxs_fcftab_fcf_delete(emlxs_port_t *port, uint32_t fcf_index)
 	return (0);
 
 
-} /* emlxs_fcftab_fcf_delete() */
+} /* emlxs_fcoe_fcftab_fcf_delete() */
 
 
 /*ARGSUSED*/
 static uint32_t
-emlxs_fcftab_full_evt_action(emlxs_port_t *port, uint32_t evt,
+emlxs_fcoe_fcftab_full_evt_action(emlxs_port_t *port, uint32_t evt,
     void *arg1)
 {
 	emlxs_hba_t *hba = HBA;
 	FCFTable_t *fcftab = &hba->sli.sli4.fcftab;
 	FCFIobj_t *fcfp;
-	uint32_t rval;
+	uint32_t rval = 0;
 	uint32_t mask;
 	uint32_t viable;
 	uint32_t i;
@@ -4364,9 +7096,10 @@ emlxs_fcftab_full_evt_action(emlxs_port_t *port, uint32_t evt,
 
 	if (evt != FCF_EVENT_FCFTAB_FULL) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "fcftab_full_evt_action: %s:%s arg=%p. "
-		    "Invalid event type. Terminated",
-		    emlxs_fcftab_state_xlate(fcftab->state),
+		    "fcoe_fcftab_full_evt_action:%x %s:%s arg=%p. "
+		    "Invalid event type. <",
+		    fcftab->TID,
+		    emlxs_fcoe_fcftab_state_xlate(fcftab->state),
 		    emlxs_fcf_event_xlate(evt), arg1);
 
 		return (1);
@@ -4374,9 +7107,10 @@ emlxs_fcftab_full_evt_action(emlxs_port_t *port, uint32_t evt,
 
 	if (fcftab->fcfi_online == FCFTAB_MAX_FCFI_COUNT) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "fcftab_full_evt_action: %s:%s arg=%p fcfi_online=%d. "
-		    "Terminated.",
-		    emlxs_fcftab_state_xlate(fcftab->state),
+		    "fcoe_fcftab_full_evt_action:%x %s:%s arg=%p "
+		    "fcfi_online=%d. <",
+		    fcftab->TID,
+		    emlxs_fcoe_fcftab_state_xlate(fcftab->state),
 		    emlxs_fcf_event_xlate(evt), arg1,
 		    fcftab->fcfi_online);
 
@@ -4384,9 +7118,10 @@ emlxs_fcftab_full_evt_action(emlxs_port_t *port, uint32_t evt,
 	}
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-	    "fcftab_full_evt_action: %s:%s arg=%p fcfi_online=%d. "
+	    "fcoe_fcftab_full_evt_action:%x %s:%s arg=%p fcfi_online=%d. "
 	    "Cleaning table...",
-	    emlxs_fcftab_state_xlate(fcftab->state),
+	    fcftab->TID,
+	    emlxs_fcoe_fcftab_state_xlate(fcftab->state),
 	    emlxs_fcf_event_xlate(evt), arg1,
 	    fcftab->fcfi_online);
 
@@ -4411,91 +7146,94 @@ emlxs_fcftab_full_evt_action(emlxs_port_t *port, uint32_t evt,
 		}
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "fcftab_full_evt_action: fcfi=%d %s flag=%x. "
-		    "Deleting FCF.",
+		    "fcoe_fcftab_full_evt_action:%x. "
+		    "Deleting FCFI:%d %x. >",
+		    fcftab->TID,
 		    fcfp->fcf_index,
-		    emlxs_fcfi_state_xlate(fcfp->state),
 		    fcfp->flag);
 
 		(void) emlxs_fcfi_free(port, fcfp);
 
-		(void) emlxs_fcftab_fcf_delete(port, fcfp->fcf_index);
+		(void) emlxs_fcoe_fcftab_fcf_delete(port, fcfp->fcf_index);
 
 		count++;
 	}
 
 	if (!count) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "fcftab_full_evt_action: %s:%s arg=%p. "
-		    "All FCF's are viable. Terminated.",
-		    emlxs_fcftab_state_xlate(fcftab->state),
+		    "fcoe_fcftab_full_evt_action:%x %s:%s arg=%p. "
+		    "All FCF's are viable. <",
+		    fcftab->TID,
+		    emlxs_fcoe_fcftab_state_xlate(fcftab->state),
 		    emlxs_fcf_event_xlate(evt), arg1);
 
 		return (0);
 	}
 
 	switch (fcftab->state) {
-	case FCFTAB_STATE_SOLICIT:
+	case FCOE_FCFTAB_STATE_SOLICIT:
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "fcftab_full_evt_action: %s gen=%x. "
-		    "Already soliciting. Terminated.",
-		    emlxs_fcftab_state_xlate(fcftab->state),
+		    "fcoe_fcftab_full_evt_action:%x %s gen=%x. "
+		    "Already soliciting. <",
+		    fcftab->TID,
+		    emlxs_fcoe_fcftab_state_xlate(fcftab->state),
 		    fcftab->generation);
 		break;
 
 	default:
 		fcftab->flag &= ~EMLXS_FCFTAB_REQ_MASK;
-		fcftab->flag |= EMLXS_FCFTAB_SOL_REQ;
+		fcftab->flag |= EMLXS_FCOE_FCFTAB_SOL_REQ;
 		fcftab->generation++;
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "fcftab_full_evt_action: %s gen=%x. Soliciting.",
-		    emlxs_fcftab_state_xlate(fcftab->state),
+		    "fcoe_fcftab_full_evt_action:%x %s gen=%x. Soliciting.",
+		    fcftab->TID,
+		    emlxs_fcoe_fcftab_state_xlate(fcftab->state),
 		    fcftab->generation);
 
-		rval = emlxs_fcftab_state(port, FCFTAB_STATE_SOLICIT,
+		rval = emlxs_fcoe_fcftab_state(port, FCOE_FCFTAB_STATE_SOLICIT,
 		    FCF_REASON_EVENT, evt, arg1);
 		break;
 	}
 
 	return (rval);
 
-} /* emlxs_fcftab_full_evt_action() */
+} /* emlxs_fcoe_fcftab_full_evt_action() */
 
 
 /*ARGSUSED*/
 static uint32_t
-emlxs_fcftab_online_action(emlxs_port_t *port, uint32_t evt,
+emlxs_fcoe_fcftab_online_action(emlxs_port_t *port, uint32_t evt,
     void *arg1)
 {
 	emlxs_hba_t *hba = HBA;
 	FCFTable_t *fcftab = &hba->sli.sli4.fcftab;
 	emlxs_config_t *cfg = &CFG;
 	FCFIobj_t *fcfp;
-	uint32_t rval;
+	uint32_t rval = 0;
 	uint32_t mask;
 	uint32_t viable;
 	uint32_t i;
 	uint32_t count = 0;
 
-	if (fcftab->state != FCFTAB_STATE_ONLINE) {
+	if (fcftab->state != FCOE_FCFTAB_STATE_ONLINE) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
-		    "fcftab_online_action: %s:%s arg=%p. "
-		    "Invalid state. Terminated.",
-		    emlxs_fcftab_state_xlate(fcftab->state),
+		    "fcoe_fcftab_online_action:%x %s:%s arg=%p. "
+		    "Invalid state. <",
+		    fcftab->TID,
+		    emlxs_fcoe_fcftab_state_xlate(fcftab->state),
 		    emlxs_fcf_event_xlate(evt), arg1);
 		return (1);
 	}
 
 	if (fcftab->flag & EMLXS_FCFTAB_REQ_MASK) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "fcftab_online_action: %s:%s arg=%p flag=%x. "
+		    "fcoe_fcftab_online_action:%x flag=%x. "
 		    "Handling request.",
-		    emlxs_fcftab_state_xlate(fcftab->state),
-		    emlxs_fcf_event_xlate(evt), arg1,
+		    fcftab->TID,
 		    fcftab->flag);
 
-		rval = emlxs_fcftab_req_handler(port, arg1);
+		rval = emlxs_fcoe_fcftab_req_handler(port, arg1);
 		return (rval);
 	}
 
@@ -4520,9 +7258,10 @@ emlxs_fcftab_online_action(emlxs_port_t *port, uint32_t evt,
 
 		if (count) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-			    "fcftab_online_action: %s:%s "
-			    "fcfi_online=0,%d,%d. Starting solicit timer.",
-			    emlxs_fcftab_state_xlate(fcftab->state),
+			    "fcoe_fcftab_online_action:%x %s:%s "
+			    "fcfi_online=0,%d,%d. Starting resolicit timer. <",
+			    fcftab->TID,
+			    emlxs_fcoe_fcftab_state_xlate(fcftab->state),
 			    emlxs_fcf_event_xlate(evt),
 			    fcftab->fcfi_count, count);
 
@@ -4531,193 +7270,79 @@ emlxs_fcftab_online_action(emlxs_port_t *port, uint32_t evt,
 			    cfg[CFG_FCF_RESOLICIT_DELAY].current;
 		} else {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-			    "fcftab_online_action: %s:%s "
-			    "fcfi_online=0,%d,0. Wait for FCF event.",
-			    emlxs_fcftab_state_xlate(fcftab->state),
+			    "fcoe_fcftab_online_action:%x %s:%s "
+			    "fcfi_online=0,%d,0. Wait for FCF event. <",
+			    fcftab->TID,
+			    emlxs_fcoe_fcftab_state_xlate(fcftab->state),
 			    emlxs_fcf_event_xlate(evt),
 			    fcftab->fcfi_count);
 		}
 
-		if (hba->state > FC_LINK_DOWN) {
-			mutex_enter(&EMLXS_PORT_LOCK);
-			if (hba->state > FC_LINK_DOWN) {
-				HBASTATS.LinkDown++;
-				EMLXS_STATE_CHANGE_LOCKED(hba, FC_LINK_DOWN);
-			}
-			hba->flag &= FC_LINKDOWN_MASK;
-			hba->discovery_timer = 0;
-			mutex_exit(&EMLXS_PORT_LOCK);
-
-			emlxs_log_link_event(port);
-		}
+		emlxs_fcf_linkdown(port);
 
 		return (0);
 	}
 
-	if (hba->state < FC_LINK_UP) {
-		mutex_enter(&EMLXS_PORT_LOCK);
-		if (hba->state < FC_LINK_UP) {
-			HBASTATS.LinkUp++;
-			EMLXS_STATE_CHANGE_LOCKED(hba, FC_LINK_UP);
-		}
-		hba->discovery_timer =
-		    hba->timer_tics + cfg[CFG_LINKUP_TIMEOUT].current +
-		    cfg[CFG_DISC_TIMEOUT].current;
-		mutex_exit(&EMLXS_PORT_LOCK);
-
-		emlxs_log_link_event(port);
-	}
-
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-	    "fcftab_online_action: %s:%s arg=%p fcfi_online=%d. Terminated.",
-	    emlxs_fcftab_state_xlate(fcftab->state),
-	    emlxs_fcf_event_xlate(evt), arg1,
+	    "fcoe_fcftab_online_action:%x flag=%x fcfi_online=%d. "
+	    "Online. <",
+	    fcftab->TID,
+	    fcftab->flag,
 	    fcftab->fcfi_online);
 
-	return (0);
+	emlxs_fcf_linkup(port);
 
-} /* emlxs_fcftab_online_action() */
+	return (rval);
+
+} /* emlxs_fcoe_fcftab_online_action() */
 
 
 /*ARGSUSED*/
 static uint32_t
-emlxs_fcftab_offline_action(emlxs_port_t *port, uint32_t evt,
+emlxs_fcoe_fcftab_offline_action(emlxs_port_t *port, uint32_t evt,
     void *arg1)
 {
 	emlxs_hba_t *hba = HBA;
 	FCFTable_t *fcftab = &hba->sli.sli4.fcftab;
-	uint32_t rval;
+	uint32_t rval = 0;
 
-	if (fcftab->state != FCFTAB_STATE_OFFLINE) {
+	if (fcftab->state != FCOE_FCFTAB_STATE_OFFLINE) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
-		    "fcftab_offline_action: %s:%s arg=%p. "
-		    "Invalid state. Terminated.",
-		    emlxs_fcftab_state_xlate(fcftab->state),
+		    "fcoe_fcftab_offline_action:%x %s:%s arg=%p. "
+		    "Invalid state. <",
+		    fcftab->TID,
+		    emlxs_fcoe_fcftab_state_xlate(fcftab->state),
 		    emlxs_fcf_event_xlate(evt), arg1);
 		return (1);
 	}
 
-	fcftab->flag &= ~EMLXS_FCFTAB_OFFLINE_REQ;
+
+	fcftab->flag &= ~EMLXS_FCOE_FCFTAB_OFFLINE_REQ;
 
 	if (fcftab->flag & EMLXS_FCFTAB_REQ_MASK) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "fcftab_offline_action: %s:%s arg=%p flag=%x. "
+		    "fcoe_fcftab_offline_action:%x %s:%s arg=%p flag=%x. "
 		    "Handling request.",
-		    emlxs_fcftab_state_xlate(fcftab->state),
+		    fcftab->TID,
+		    emlxs_fcoe_fcftab_state_xlate(fcftab->state),
 		    emlxs_fcf_event_xlate(evt), arg1,
 		    fcftab->flag);
 
-		rval = emlxs_fcftab_req_handler(port, arg1);
+		rval = emlxs_fcoe_fcftab_req_handler(port, arg1);
 		return (rval);
 	}
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-	    "fcftab_offline_action: %s:%s arg=%p fcfi_online=%d. Terminated.",
-	    emlxs_fcftab_state_xlate(fcftab->state),
+	    "fcoe_fcftab_offline_action:%x %s:%s arg=%p fcfi_online=%d. "
+	    "Offline. <",
+	    fcftab->TID,
+	    emlxs_fcoe_fcftab_state_xlate(fcftab->state),
 	    emlxs_fcf_event_xlate(evt), arg1,
 	    fcftab->fcfi_online);
 
-	return (0);
+	return (rval);
 
-} /* emlxs_fcftab_offline_action() */
-
-
-/*ARGSUSED*/
-static uint32_t
-emlxs_fcftab_shutdown_action(emlxs_port_t *port, uint32_t evt,
-    void *arg1)
-{
-	emlxs_hba_t *hba = HBA;
-	FCFTable_t *fcftab = &hba->sli.sli4.fcftab;
-	FCFIobj_t *fcfp;
-	uint32_t i;
-	uint32_t online;
-
-	if (fcftab->state != FCFTAB_STATE_SHUTDOWN) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
-		    "fcftab_shutdown_action: %s:%s arg=%p. "
-		    "Invalid state. Terminated.",
-		    emlxs_fcftab_state_xlate(fcftab->state),
-		    emlxs_fcf_event_xlate(evt), arg1);
-		return (1);
-	}
-
-	fcftab->flag &= ~EMLXS_FCFTAB_REQ_MASK;
-
-	if (fcftab->prev_state != FCFTAB_STATE_SHUTDOWN) {
-		/* Offline all FCF's */
-		fcfp = fcftab->table;
-		for (i = 0; i < fcftab->table_count; i++, fcfp++) {
-
-			if (fcfp->state <= FCFI_STATE_OFFLINE) {
-				continue;
-			}
-
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-			    "fcftab_shutdown_action: fcfi=%d %s "
-			    "fcfi_online=%d. Offlining FCF.",
-			    fcfp->fcf_index,
-			    emlxs_fcfi_state_xlate(fcfp->state),
-			    fcftab->fcfi_online);
-
-			(void) emlxs_fcfi_event(port, FCF_EVENT_FCFI_OFFLINE,
-			    fcfp);
-		}
-
-		return (0);
-	}
-
-	/* Check FCF state */
-	online = 0;
-	fcfp = fcftab->table;
-	for (i = 0; i < fcftab->table_count; i++, fcfp++) {
-
-		if (fcfp->state <= FCFI_STATE_OFFLINE) {
-			continue;
-		}
-
-		online++;
-	}
-
-	if (online) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "fcftab_shutdown_action: %s:%s arg=%p. "
-		    "fcfi_online=%d,%d Terminated.",
-		    emlxs_fcftab_state_xlate(fcftab->state),
-		    emlxs_fcf_event_xlate(evt), arg1,
-		    online, fcftab->fcfi_online);
-
-		return (0);
-	}
-
-	/* Free FCF table */
-	fcfp = fcftab->table;
-	for (i = 0; i < fcftab->table_count; i++, fcfp++) {
-
-		if (fcfp->state == FCFI_STATE_FREE) {
-			continue;
-		}
-
-		(void) emlxs_fcfi_free(port, fcfp);
-	}
-
-	/* Clean the selection table */
-	bzero(fcftab->fcfi, sizeof (fcftab->fcfi));
-	fcftab->fcfi_count = 0;
-
-	fcftab->flag |= EMLXS_FCFTAB_SHUTDOWN;
-
-	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-	    "fcftab_shutdown_action: %s:%s arg=%p flag=%x fcfi_online=%d. "
-	    "Shutdown.",
-	    emlxs_fcftab_state_xlate(fcftab->state),
-	    emlxs_fcf_event_xlate(evt), arg1,
-	    fcftab->flag, fcftab->fcfi_online);
-
-	return (0);
-
-} /* emlxs_fcftab_shutdown_action() */
-
+} /* emlxs_fcoe_fcftab_offline_action() */
 
 
 /* ************************************************************************** */
@@ -4738,7 +7363,7 @@ emlxs_fcfi_state_xlate(uint32_t state)
 		}
 	}
 
-	(void) sprintf(buffer, "state=0x%x", state);
+	(void) snprintf(buffer, sizeof (buffer), "state=0x%x", state);
 	return (buffer);
 
 } /* emlxs_fcfi_state_xlate() */
@@ -4748,7 +7373,7 @@ static uint32_t
 emlxs_fcfi_action(emlxs_port_t *port, FCFIobj_t *fcfp, uint32_t evt,
     void *arg1)
 {
-	uint32_t rval;
+	uint32_t rval = 0;
 	uint32_t(*func) (emlxs_port_t *, FCFIobj_t *, uint32_t, void *);
 	uint32_t index;
 	uint32_t events;
@@ -4787,7 +7412,7 @@ emlxs_fcfi_action(emlxs_port_t *port, FCFIobj_t *fcfp, uint32_t evt,
 
 	if (!func) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_event_msg,
-		    "fcfi:%d %s:%s arg=%p. No action. Terminated.",
+		    "fcfi_action:%d %s:%s arg=%p. No action. <",
 		    fcfp->fcf_index,
 		    emlxs_fcfi_state_xlate(fcfp->state),
 		    emlxs_fcf_event_xlate(evt), arg1);
@@ -4808,7 +7433,7 @@ emlxs_fcfi_event(emlxs_port_t *port, uint32_t evt,
 {
 	FCFIobj_t *fcfp = NULL;
 	VFIobj_t *vfip = NULL;
-	uint32_t rval;
+	uint32_t rval = 0;
 
 	/* Filter events and acquire fcfi context */
 	switch (evt) {
@@ -4818,7 +7443,7 @@ emlxs_fcfi_event(emlxs_port_t *port, uint32_t evt,
 
 		if (!vfip) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_event_msg,
-			    "fcfi: %s arg=%p. Null VFI found. Terminated.",
+			    "fcfi_event: %s arg=%p. Null VFI found. <",
 			    emlxs_fcf_event_xlate(evt), arg1);
 
 			return (1);
@@ -4827,7 +7452,7 @@ emlxs_fcfi_event(emlxs_port_t *port, uint32_t evt,
 		fcfp = vfip->fcfp;
 		if (!fcfp) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_event_msg,
-			    "fcfi: %s arg=%p. FCF not found. Terminated.",
+			    "fcfi_event: %s arg=%p. FCF not found. <",
 			    emlxs_fcf_event_xlate(evt), arg1);
 
 			return (1);
@@ -4840,7 +7465,7 @@ emlxs_fcfi_event(emlxs_port_t *port, uint32_t evt,
 		fcfp = (FCFIobj_t *)arg1;
 		if (!fcfp) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_event_msg,
-			    "fcfi: %s arg=%p. Null FCFI found. Terminated.",
+			    "fcfi_event: %s arg=%p. Null FCFI found. <",
 			    emlxs_fcf_event_xlate(evt), arg1);
 
 			return (1);
@@ -4852,7 +7477,7 @@ emlxs_fcfi_event(emlxs_port_t *port, uint32_t evt,
 	}
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_event_msg,
-	    "fcfi:%d %s:%s arg=%p",
+	    "fcfi_event:%d %s:%s arg=%p",
 	    fcfp->fcf_index,
 	    emlxs_fcfi_state_xlate(fcfp->state),
 	    emlxs_fcf_event_xlate(evt), arg1);
@@ -4880,24 +7505,23 @@ emlxs_fcfi_state(emlxs_port_t *port, FCFIobj_t *fcfp, uint16_t state,
 	    (reason != FCF_REASON_REENTER)) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
 		    "fcfi_state:%d %s:%s:0x%x arg=%p. "
-		    "State not changed. Terminated.",
+		    "State not changed. <",
 		    fcfp->fcf_index,
 		    emlxs_fcfi_state_xlate(state),
 		    emlxs_fcf_reason_xlate(reason),
 		    explain, arg1);
-
 		return (1);
 	}
 
 	if (!reason) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_state_msg,
-		    "fcfi:%d %s-->%s arg=%p",
+		    "fcfi_state:%d %s-->%s arg=%p",
 		    fcfp->fcf_index,
 		    emlxs_fcfi_state_xlate(fcfp->state),
 		    emlxs_fcfi_state_xlate(state), arg1);
 	} else if (reason == FCF_REASON_EVENT) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_state_msg,
-		    "fcfi:%d %s-->%s:%s:%s arg=%p",
+		    "fcfi_state:%d %s-->%s:%s:%s arg=%p",
 		    fcfp->fcf_index,
 		    emlxs_fcfi_state_xlate(fcfp->state),
 		    emlxs_fcfi_state_xlate(state),
@@ -4905,7 +7529,7 @@ emlxs_fcfi_state(emlxs_port_t *port, FCFIobj_t *fcfp, uint16_t state,
 		    emlxs_fcf_event_xlate(explain), arg1);
 	} else if (explain) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_state_msg,
-		    "fcfi:%d %s-->%s:%s:0x%x arg=%p",
+		    "fcfi_state:%d %s-->%s:%s:0x%x arg=%p",
 		    fcfp->fcf_index,
 		    emlxs_fcfi_state_xlate(fcfp->state),
 		    emlxs_fcfi_state_xlate(state),
@@ -4913,7 +7537,7 @@ emlxs_fcfi_state(emlxs_port_t *port, FCFIobj_t *fcfp, uint16_t state,
 		    explain, arg1);
 	} else {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_state_msg,
-		    "fcfi:%d %s-->%s:%s arg=%p",
+		    "fcfi_state:%d %s-->%s:%s arg=%p",
 		    fcfp->fcf_index,
 		    emlxs_fcfi_state_xlate(fcfp->state),
 		    emlxs_fcfi_state_xlate(state),
@@ -4948,11 +7572,19 @@ emlxs_fcfi_alloc(emlxs_port_t *port)
 			fcfp->index = i;
 			fcfp->FCFI  = 0xFFFF;
 
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+			    "fcfi_alloc:%d. Allocating FCFI. >",
+			    fcfp->index);
+
 			(void) emlxs_fcfi_state(port, fcfp, FCFI_STATE_OFFLINE,
 			    0, 0, 0);
 			return (fcfp);
 		}
 	}
+
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+	    "fcfi_alloc: Out of FCFI objects.",
+	    fcfp->index);
 
 	return (NULL);
 
@@ -4962,7 +7594,7 @@ emlxs_fcfi_alloc(emlxs_port_t *port)
 static uint32_t
 emlxs_fcfi_free(emlxs_port_t *port, FCFIobj_t *fcfp)
 {
-	uint32_t rval;
+	uint32_t rval = 0;
 
 	rval = emlxs_fcfi_state(port, fcfp, FCFI_STATE_FREE, 0, 0, 0);
 
@@ -5029,7 +7661,7 @@ emlxs_fcfi_free_action(emlxs_port_t *port, FCFIobj_t *fcfp, uint32_t evt,
 	if (fcfp->state != FCFI_STATE_FREE) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
 		    "fcfi_free_action:%d %s:%s arg=%p. "
-		    "Invalid state. Terminated.",
+		    "Invalid state. <",
 		    fcfp->fcf_index,
 		    emlxs_fcfi_state_xlate(fcfp->state),
 		    emlxs_fcf_event_xlate(evt), arg1);
@@ -5045,7 +7677,7 @@ emlxs_fcfi_free_action(emlxs_port_t *port, FCFIobj_t *fcfp, uint32_t evt,
 	}
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-	    "fcfi_free_action:%d flag=%x. FCF freed.",
+	    "fcfi_free_action:%d flag=%x. FCF freed. <",
 	    fcfp->fcf_index,
 	    fcfp->flag);
 
@@ -5063,12 +7695,12 @@ emlxs_fcfi_offline_action(emlxs_port_t *port, FCFIobj_t *fcfp, uint32_t evt,
 {
 	emlxs_hba_t *hba = HBA;
 	FCFTable_t	*fcftab = &hba->sli.sli4.fcftab;
-	uint32_t rval;
+	uint32_t rval = 0;
 
 	if (fcfp->state != FCFI_STATE_OFFLINE) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 		    "fcfi_offline_action:%d %s:%s arg=%p. "
-		    "Invalid state. Terminated.",
+		    "Invalid state. <",
 		    fcfp->fcf_index,
 		    emlxs_fcfi_state_xlate(fcfp->state),
 		    emlxs_fcf_event_xlate(evt), arg1);
@@ -5079,7 +7711,7 @@ emlxs_fcfi_offline_action(emlxs_port_t *port, FCFIobj_t *fcfp, uint32_t evt,
 
 	if (fcfp->prev_state == FCFI_STATE_FREE) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "fcfi_offline_action:%d fcfi_online=%d. Terminated.",
+		    "fcfi_offline_action:%d fcfi_online=%d. <",
 		    fcfp->fcf_index,
 		    fcftab->fcfi_online);
 
@@ -5117,7 +7749,7 @@ emlxs_fcfi_offline_action(emlxs_port_t *port, FCFIobj_t *fcfp, uint32_t evt,
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 	    "fcfi_offline_action:%d fcfi_online=%d. "
-	    "FCFI offline. Notifying fcftab.",
+	    "FCFI offline. Notifying fcftab. >",
 	    fcfp->fcf_index,
 	    fcftab->fcfi_online);
 
@@ -5134,12 +7766,12 @@ static uint32_t
 emlxs_fcfi_vfi_online_evt_action(emlxs_port_t *port, FCFIobj_t *fcfp,
     uint32_t evt, void *arg1)
 {
-	uint32_t rval;
+	uint32_t rval = 0;
 
 	if (evt != FCF_EVENT_VFI_ONLINE) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
 		    "fcfi_vfi_online_evt_action:%d %s:%s arg=%p flag=%x. "
-		    "Invalid event type. Terminated.",
+		    "Invalid event type. <",
 		    fcfp->fcf_index,
 		    emlxs_fcfi_state_xlate(fcfp->state),
 		    emlxs_fcf_event_xlate(evt), arg1,
@@ -5174,8 +7806,7 @@ emlxs_fcfi_vfi_online_evt_action(emlxs_port_t *port, FCFIobj_t *fcfp,
 
 	default:
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "fcfi_vfi_online_evt_action:%d flag=%x vfi_online=%d. "
-		    "Terminated.",
+		    "fcfi_vfi_online_evt_action:%d flag=%x vfi_online=%d. <",
 		    fcfp->fcf_index,
 		    fcfp->flag,
 		    fcfp->vfi_online);
@@ -5191,13 +7822,13 @@ emlxs_fcfi_vfi_online_evt_action(emlxs_port_t *port, FCFIobj_t *fcfp,
 static uint32_t
 emlxs_fcfi_offline_handler(emlxs_port_t *port, FCFIobj_t *fcfp, void *arg1)
 {
-	uint32_t rval;
+	uint32_t rval = 0;
 
 	if (!(fcfp->flag & EMLXS_FCFI_OFFLINE_REQ)) {
 		return (0);
 	}
 
-	if (fcfp->vfi_online != 0) {
+	if (fcfp->vfi_online) {
 		if (fcfp->flag & EMLXS_FCFI_PAUSE_REQ) {
 			rval = emlxs_fcfi_state(port, fcfp, FCFI_STATE_PAUSED,
 			    FCF_REASON_REQUESTED, 0, arg1);
@@ -5226,13 +7857,13 @@ static uint32_t
 emlxs_fcfi_vfi_offline_evt_action(emlxs_port_t *port, FCFIobj_t *fcfp,
     uint32_t evt, void *arg1)
 {
-	uint32_t rval;
+	uint32_t rval = 0;
 	VFIobj_t *vfip;
 
 	if (evt != FCF_EVENT_VFI_OFFLINE) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
 		    "fcfi_vfi_offline_evt_action:%d %s:%s arg=%p flag=%x. "
-		    "Invalid event type. Terminated.",
+		    "Invalid event type. <",
 		    fcfp->fcf_index,
 		    emlxs_fcfi_state_xlate(fcfp->state),
 		    emlxs_fcf_event_xlate(evt), arg1,
@@ -5260,7 +7891,7 @@ emlxs_fcfi_vfi_offline_evt_action(emlxs_port_t *port, FCFIobj_t *fcfp,
 		} else {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 			    "fcfi_vfi_offline_evt_action:%d flag=%x "
-			    "vfi_online=%d. Terminated.",
+			    "vfi_online=%d. <",
 			    fcfp->fcf_index,
 			    fcfp->flag, fcfp->vfi_online);
 		}
@@ -5268,8 +7899,7 @@ emlxs_fcfi_vfi_offline_evt_action(emlxs_port_t *port, FCFIobj_t *fcfp,
 
 	case FCFI_STATE_PAUSED:
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "fcfi_vfi_offline_evt_action:%d flag=%x vfi_online=%d. "
-		    "Terminated.",
+		    "fcfi_vfi_offline_evt_action:%d flag=%x vfi_online=%d. <",
 		    fcfp->fcf_index,
 		    fcfp->flag, fcfp->vfi_online);
 		break;
@@ -5298,7 +7928,7 @@ emlxs_fcfi_vfi_offline_evt_action(emlxs_port_t *port, FCFIobj_t *fcfp,
 		if (fcfp->vfi_online == 0) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 			    "fcfi_vfi_offline_evt_action:%d flag=%x "
-			    "vfi_online=%d. Offline requested.",
+			    "vfi_online=%d. Offline requested. <",
 			    fcfp->fcf_index,
 			    fcfp->flag, fcfp->vfi_online);
 
@@ -5307,7 +7937,7 @@ emlxs_fcfi_vfi_offline_evt_action(emlxs_port_t *port, FCFIobj_t *fcfp,
 		} else {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 			    "fcfi_vfi_offline_evt_action:%d flag = %x "
-			    "vfi_online=%d. Terminated.",
+			    "vfi_online=%d. <",
 			    fcfp->fcf_index,
 			    fcfp->flag, fcfp->vfi_online);
 		}
@@ -5329,7 +7959,7 @@ emlxs_fcfi_online_evt_action(emlxs_port_t *port, FCFIobj_t *fcfp,
 	if (evt != FCF_EVENT_FCFI_ONLINE) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
 		    "fcfi_online_evt_action:%d %s:%s arg=%p. "
-		    "Invalid event type. Terminated.",
+		    "Invalid event type. <",
 		    fcfp->fcf_index,
 		    emlxs_fcfi_state_xlate(fcfp->state),
 		    emlxs_fcf_event_xlate(evt), arg1);
@@ -5339,7 +7969,7 @@ emlxs_fcfi_online_evt_action(emlxs_port_t *port, FCFIobj_t *fcfp,
 	if (fcfp->flag & EMLXS_FCFI_ONLINE_REQ) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 		    "fcfi_online_evt_action:%d. "
-		    "Online already requested. Terminated.",
+		    "Online already requested. <",
 		    fcfp->fcf_index);
 		return (1);
 	}
@@ -5381,7 +8011,7 @@ emlxs_fcfi_online_evt_action(emlxs_port_t *port, FCFIobj_t *fcfp,
 
 	default:
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "fcfi_online_evt_action:%d flag=%x. Terminated.",
+		    "fcfi_online_evt_action:%d flag=%x. <",
 		    fcfp->fcf_index,
 		    fcfp->flag);
 		break;
@@ -5399,13 +8029,13 @@ emlxs_fcfi_vfi_online_action(emlxs_port_t *port, FCFIobj_t *fcfp,
 {
 	emlxs_hba_t *hba = HBA;
 	uint32_t i;
-	uint32_t rval;
+	uint32_t rval = 0;
 	VFIobj_t *vfip;
 
 	if (fcfp->state != FCFI_STATE_VFI_ONLINE) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
 		    "fcfi_vfi_online_action:%d %s:%s arg=%p. "
-		    "Invalid state. Terminated.",
+		    "Invalid state. <",
 		    fcfp->fcf_index,
 		    emlxs_fcfi_state_xlate(fcfp->state),
 		    emlxs_fcf_event_xlate(evt), arg1);
@@ -5459,7 +8089,7 @@ emlxs_fcfi_vfi_online_action(emlxs_port_t *port, FCFIobj_t *fcfp,
 	}
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-	    "fcfi_vfi_online_action:%d vfi_online=%d. Onlining VFI:%d.",
+	    "fcfi_vfi_online_action:%d vfi_online=%d. Onlining VFI:%d. >",
 	    fcfp->fcf_index,
 	    fcfp->vfi_online,
 	    vfip->VFI);
@@ -5478,12 +8108,12 @@ static uint32_t
 emlxs_fcfi_vfi_online_cmpl_action(emlxs_port_t *port, FCFIobj_t *fcfp,
     uint32_t evt, void *arg1)
 {
-	uint32_t rval;
+	uint32_t rval = 0;
 
 	if (fcfp->state != FCFI_STATE_VFI_ONLINE_CMPL) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
 		    "fcfi_vfi_online_cmpl_action:%d %s:%s arg=%p. "
-		    "Invalid state. Terminated.",
+		    "Invalid state. <",
 		    fcfp->fcf_index,
 		    emlxs_fcfi_state_xlate(fcfp->state),
 		    emlxs_fcf_event_xlate(evt), arg1);
@@ -5509,13 +8139,13 @@ emlxs_fcfi_vfi_offline_action(emlxs_port_t *port, FCFIobj_t *fcfp, uint32_t evt,
 {
 	emlxs_hba_t *hba = HBA;
 	VFIobj_t *vfip;
-	uint32_t rval;
+	uint32_t rval = 0;
 	int32_t i;
 
 	if (fcfp->state != FCFI_STATE_VFI_OFFLINE) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 		    "fcfi_vfi_offline_action:%d %s:%s arg=%p. "
-		    "Invalid state. Terminated.",
+		    "Invalid state. <",
 		    fcfp->fcf_index,
 		    emlxs_fcfi_state_xlate(fcfp->state),
 		    emlxs_fcf_event_xlate(evt), arg1);
@@ -5558,7 +8188,7 @@ emlxs_fcfi_vfi_offline_action(emlxs_port_t *port, FCFIobj_t *fcfp, uint32_t evt,
 		}
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "fcfi_vfi_offline_action:%d. Offlining VFI:%d",
+		    "fcfi_vfi_offline_action:%d. Offlining VFI:%d >",
 		    fcfp->fcf_index,
 		    vfip->VFI);
 
@@ -5584,7 +8214,7 @@ emlxs_fcfi_paused_action(emlxs_port_t *port, FCFIobj_t *fcfp, uint32_t evt,
 	if (fcfp->state != FCFI_STATE_PAUSED) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 		    "fcfi_paused_action:%d %s:%s arg=%p. "
-		    "Invalid state. Terminated.",
+		    "Invalid state. <",
 		    fcfp->fcf_index,
 		    emlxs_fcfi_state_xlate(fcfp->state),
 		    emlxs_fcf_event_xlate(evt), arg1);
@@ -5605,7 +8235,7 @@ emlxs_fcfi_paused_action(emlxs_port_t *port, FCFIobj_t *fcfp, uint32_t evt,
 		}
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "fcfi_paused_action:%d vfi_online=%d. Pausing VFI:%d.",
+		    "fcfi_paused_action:%d vfi_online=%d. Pausing VFI:%d. >",
 		    fcfp->fcf_index,
 		    fcfp->vfi_online,
 		    vfip->VFI);
@@ -5614,7 +8244,7 @@ emlxs_fcfi_paused_action(emlxs_port_t *port, FCFIobj_t *fcfp, uint32_t evt,
 	}
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-	    "fcfi_paused_action:%d vfi_online=%d. FCFI paused.",
+	    "fcfi_paused_action:%d vfi_online=%d. FCFI paused. <",
 	    fcfp->fcf_index,
 	    fcfp->vfi_online);
 
@@ -5633,7 +8263,7 @@ emlxs_fcfi_vfi_offline_cmpl_action(emlxs_port_t *port, FCFIobj_t *fcfp,
 	if (fcfp->state != FCFI_STATE_VFI_OFFLINE_CMPL) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
 		    "fcfi_vfi_offline_cmpl_action:%d %s:%s arg=%p. "
-		    "Invalid state. Terminated.",
+		    "Invalid state. <",
 		    fcfp->fcf_index,
 		    emlxs_fcfi_state_xlate(fcfp->state),
 		    emlxs_fcf_event_xlate(evt), arg1);
@@ -5652,8 +8282,7 @@ emlxs_fcfi_vfi_offline_cmpl_action(emlxs_port_t *port, FCFIobj_t *fcfp,
 		    FCF_REASON_EVENT, evt, arg1);
 	} else {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "fcfi_vfi_offline_cmpl_action:%d vfi_online=%d. "
-		    "Terminated.",
+		    "fcfi_vfi_offline_cmpl_action:%d vfi_online=%d. <",
 		    fcfp->fcf_index,
 		    fcfp->vfi_online);
 	}
@@ -5668,12 +8297,12 @@ static uint32_t
 emlxs_fcfi_offline_evt_action(emlxs_port_t *port, FCFIobj_t *fcfp, uint32_t evt,
     void *arg1)
 {
-	uint32_t rval;
+	uint32_t rval = 0;
 
 	if (evt != FCF_EVENT_FCFI_OFFLINE) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
 		    "fcfi_offline_evt_action:%d %s:%s arg=%p. "
-		    "Invalid event type. Terminated.",
+		    "Invalid event type. <",
 		    fcfp->fcf_index,
 		    emlxs_fcfi_state_xlate(fcfp->state),
 		    emlxs_fcf_event_xlate(evt), arg1);
@@ -5683,8 +8312,7 @@ emlxs_fcfi_offline_evt_action(emlxs_port_t *port, FCFIobj_t *fcfp, uint32_t evt,
 	if ((fcfp->flag & EMLXS_FCFI_OFFLINE_REQ) &&
 	    !(fcfp->flag & EMLXS_FCFI_PAUSE_REQ)) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "fcfi_offline_evt_action:%d. Offline already requested. "
-		    "Terminated.",
+		    "fcfi_offline_evt_action:%d. Offline already requested. <",
 		    fcfp->fcf_index);
 		return (1);
 	}
@@ -5692,8 +8320,7 @@ emlxs_fcfi_offline_evt_action(emlxs_port_t *port, FCFIobj_t *fcfp, uint32_t evt,
 	switch (fcfp->state) {
 	case FCFI_STATE_OFFLINE:
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "fcfi_offline_evt_action:%d flag=%x. Already offline. "
-		    "Terminated.",
+		    "fcfi_offline_evt_action:%d flag=%x. Already offline. <",
 		    fcfp->fcf_index,
 		    fcfp->flag);
 		break;
@@ -5723,7 +8350,7 @@ emlxs_fcfi_offline_evt_action(emlxs_port_t *port, FCFIobj_t *fcfp, uint32_t evt,
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 		    "fcfi_offline_evt_action:%d. "
-		    "Invalid state. Terminated.",
+		    "Invalid state. <",
 		    fcfp->fcf_index);
 		break;
 	}
@@ -5738,12 +8365,12 @@ static uint32_t
 emlxs_fcfi_pause_evt_action(emlxs_port_t *port, FCFIobj_t *fcfp, uint32_t evt,
     void *arg1)
 {
-	uint32_t rval;
+	uint32_t rval = 0;
 
 	if (evt != FCF_EVENT_FCFI_PAUSE) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
 		    "fcfi_pause_evt_action:%d %s:%s arg=%p. "
-		    "Invalid event type. Terminated.",
+		    "Invalid event type. <",
 		    fcfp->fcf_index,
 		    emlxs_fcfi_state_xlate(fcfp->state),
 		    emlxs_fcf_event_xlate(evt), arg1);
@@ -5752,16 +8379,14 @@ emlxs_fcfi_pause_evt_action(emlxs_port_t *port, FCFIobj_t *fcfp, uint32_t evt,
 
 	if (fcfp->flag & EMLXS_FCFI_PAUSE_REQ) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "fcfi_pause_evt_action:%d. Pause already requested. "
-		    "Terminated.",
+		    "fcfi_pause_evt_action:%d. Pause already requested. <",
 		    fcfp->fcf_index);
 		return (1);
 	}
 
 	if (fcfp->flag & EMLXS_FCFI_OFFLINE_REQ) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "fcfi_pause_evt_action:%d. Offline already requested. "
-		    "Terminated.",
+		    "fcfi_pause_evt_action:%d. Offline already requested. <",
 		    fcfp->fcf_index);
 		return (1);
 	}
@@ -5769,16 +8394,14 @@ emlxs_fcfi_pause_evt_action(emlxs_port_t *port, FCFIobj_t *fcfp, uint32_t evt,
 	switch (fcfp->state) {
 	case FCFI_STATE_OFFLINE:
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "fcfi_pause_evt_action:%d flag=%x. Already offline. "
-		    "Terminated.",
+		    "fcfi_pause_evt_action:%d flag=%x. Already offline. <",
 		    fcfp->fcf_index,
 		    fcfp->flag);
 		break;
 
 	case FCFI_STATE_PAUSED:
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "fcfi_pause_evt_action:%d flag=%x. Already paused. "
-		    "Terminated.",
+		    "fcfi_pause_evt_action:%d flag=%x. Already paused. <",
 		    fcfp->fcf_index,
 		    fcfp->flag);
 		break;
@@ -5807,7 +8430,7 @@ emlxs_fcfi_pause_evt_action(emlxs_port_t *port, FCFIobj_t *fcfp, uint32_t evt,
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 		    "fcfi_pause_evt_action:%d. "
-		    "Invalid state. Terminated.",
+		    "Invalid state. <",
 		    fcfp->fcf_index);
 		break;
 	}
@@ -5822,19 +8445,18 @@ static uint32_t
 emlxs_fcfi_unreg_failed_action(emlxs_port_t *port, FCFIobj_t *fcfp,
     uint32_t evt, void *arg1)
 {
-	uint32_t rval;
+	uint32_t rval = 0;
 
 	fcfp->attempts++;
 
 	if (fcfp->state != FCFI_STATE_UNREG_FAILED) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
 		    "fcfi_unreg_failed_action:%d %s:%s arg=%p attempt=%d. "
-		    "Invalid state. Terminated.",
+		    "Invalid state. <",
 		    fcfp->fcf_index,
 		    emlxs_fcfi_state_xlate(fcfp->state),
 		    emlxs_fcf_event_xlate(evt),
 		    arg1, fcfp->attempts);
-
 		return (1);
 	}
 
@@ -5871,19 +8493,18 @@ static uint32_t
 emlxs_fcfi_reg_failed_action(emlxs_port_t *port, FCFIobj_t *fcfp, uint32_t evt,
     void *arg1)
 {
-	uint32_t rval;
+	uint32_t rval = 0;
 
 	fcfp->attempts++;
 
 	if (fcfp->state != FCFI_STATE_REG_FAILED) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
 		    "fcfi_reg_failed_action:%d %s:%s arg=%p attempt=%d. "
-		    "Invalid state. Terminated.",
+		    "Invalid state. <",
 		    fcfp->fcf_index,
 		    emlxs_fcfi_state_xlate(fcfp->state),
 		    emlxs_fcf_event_xlate(evt), arg1,
 		    fcfp->attempts);
-
 		return (1);
 	}
 
@@ -5895,7 +8516,6 @@ emlxs_fcfi_reg_failed_action(emlxs_port_t *port, FCFIobj_t *fcfp, uint32_t evt,
 		    fcfp->attempts,
 		    fcfp->reason);
 
-		fcfp->flag &= ~EMLXS_FCFI_REG;
 		fcfp->flag &= ~EMLXS_FCFI_REQ_MASK;
 		fcfp->flag |= EMLXS_FCFI_OFFLINE_REQ;
 
@@ -5931,7 +8551,7 @@ emlxs_fcfi_reg_mbcmpl(emlxs_hba_t *hba, MAILBOXQ *mbq)
 
 	if (fcfp->state != FCFI_STATE_REG) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "fcfi_reg_mbcmpl:%d state=%s. Terminated.",
+		    "fcfi_reg_mbcmpl:%d state=%s.",
 		    fcfp->fcf_index,
 		    emlxs_fcfi_state_xlate(fcfp->state));
 
@@ -5941,9 +8561,9 @@ emlxs_fcfi_reg_mbcmpl(emlxs_hba_t *hba, MAILBOXQ *mbq)
 
 	if (mb4->mbxStatus) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "fcfi_reg_mbcmpl:%d failed. status=%x",
+		    "fcfi_reg_mbcmpl:%d failed. %s. >",
 		    fcfp->fcf_index,
-		    mb4->mbxStatus);
+		    emlxs_mb_xlate_status(mb4->mbxStatus));
 
 		(void) emlxs_fcfi_state(port, fcfp, FCFI_STATE_REG_FAILED,
 		    FCF_REASON_MBOX_FAILED, mb4->mbxStatus, 0);
@@ -5955,7 +8575,7 @@ emlxs_fcfi_reg_mbcmpl(emlxs_hba_t *hba, MAILBOXQ *mbq)
 	fcfp->FCFI = mb4->un.varRegFCFI.FCFI;
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-	    "fcfi_reg_mbcmpl:%d Registered. FCFI=%d",
+	    "fcfi_reg_mbcmpl:%d FCFI=%d. Reg complete. >",
 	    fcfp->fcf_index,
 	    fcfp->FCFI);
 
@@ -5978,12 +8598,12 @@ emlxs_fcfi_reg_action(emlxs_port_t *port, FCFIobj_t *fcfp, uint32_t evt,
 	FCFTable_t	*fcftab = &hba->sli.sli4.fcftab;
 	MAILBOX4 *mb4;
 	MAILBOXQ *mbq;
-	uint32_t rval;
+	uint32_t rval = 0;
 
 	if (fcfp->state != FCFI_STATE_REG) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
 		    "fcfi_reg_action:%d %s:%s arg=%p. "
-		    "Invalid state. Terminated.",
+		    "Invalid state. <",
 		    fcfp->fcf_index,
 		    emlxs_fcfi_state_xlate(fcfp->state),
 		    emlxs_fcf_event_xlate(evt), arg1);
@@ -6011,7 +8631,8 @@ emlxs_fcfi_reg_action(emlxs_port_t *port, FCFIobj_t *fcfp, uint32_t evt,
 
 	if (fcfp->flag & EMLXS_FCFI_REG) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "fcfi_reg_action:%d. Already registered. Skipping reg.",
+		    "fcfi_reg_action:%d. Already registered. "
+		    "Skipping REG_FCFI update.",
 		    fcfp->fcf_index);
 
 		rval = emlxs_fcfi_state(port, fcfp, FCFI_STATE_VFI_ONLINE,
@@ -6020,11 +8641,11 @@ emlxs_fcfi_reg_action(emlxs_port_t *port, FCFIobj_t *fcfp, uint32_t evt,
 	}
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-	    "fcfi_reg_action:%d attempts=%d. Sending FCFI_REG.",
+	    "fcfi_reg_action:%d attempts=%d. Sending REG_FCFI. <",
 	    fcfp->fcf_index,
 	    fcfp->attempts);
 
-	if (!(mbq = (MAILBOXQ *)emlxs_mem_get(hba, MEM_MBOX, 1))) {
+	if (!(mbq = (MAILBOXQ *)emlxs_mem_get(hba, MEM_MBOX))) {
 		rval = emlxs_fcfi_state(port, fcfp, FCFI_STATE_REG_FAILED,
 		    FCF_REASON_NO_MBOX, 0, arg1);
 
@@ -6080,12 +8701,12 @@ static uint32_t
 emlxs_fcfi_reg_cmpl_action(emlxs_port_t *port, FCFIobj_t *fcfp, uint32_t evt,
     void *arg1)
 {
-	uint32_t rval;
+	uint32_t rval = 0;
 
 	if (fcfp->state != FCFI_STATE_REG_CMPL) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
 		    "fcfi_reg_cmpl_action:%d %s:%s arg=%p. "
-		    "Invalid state. Terminated.",
+		    "Invalid state. <",
 		    fcfp->fcf_index,
 		    emlxs_fcfi_state_xlate(fcfp->state),
 		    emlxs_fcf_event_xlate(evt), arg1);
@@ -6129,7 +8750,7 @@ emlxs_fcfi_unreg_mbcmpl(emlxs_hba_t *hba, MAILBOXQ *mbq)
 
 	if (fcfp->state != FCFI_STATE_UNREG) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "fcfi_unreg_mbcmpl:%d state=%s. Terminated.",
+		    "fcfi_unreg_mbcmpl:%d state=%s.",
 		    fcfp->fcf_index,
 		    emlxs_fcfi_state_xlate(fcfp->state));
 
@@ -6139,9 +8760,9 @@ emlxs_fcfi_unreg_mbcmpl(emlxs_hba_t *hba, MAILBOXQ *mbq)
 
 	if (mb4->mbxStatus) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "fcfi_unreg_mbcmpl:%d failed. status=%x",
+		    "fcfi_unreg_mbcmpl:%d failed. %s. >",
 		    fcfp->fcf_index,
-		    mb4->mbxStatus);
+		    emlxs_mb_xlate_status(mb4->mbxStatus));
 
 		(void) emlxs_fcfi_state(port, fcfp, FCFI_STATE_UNREG_FAILED,
 		    FCF_REASON_MBOX_FAILED, mb4->mbxStatus, 0);
@@ -6151,7 +8772,7 @@ emlxs_fcfi_unreg_mbcmpl(emlxs_hba_t *hba, MAILBOXQ *mbq)
 	}
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-	    "fcfi_unreg_mbcmpl:%d Unregistered.",
+	    "fcfi_unreg_mbcmpl:%d. Unreg complete. >",
 	    fcfp->fcf_index);
 
 	fcfp->flag &= ~EMLXS_FCFI_REG;
@@ -6172,22 +8793,22 @@ emlxs_fcfi_unreg_action(emlxs_port_t *port, FCFIobj_t *fcfp, uint32_t evt,
 	emlxs_hba_t *hba = HBA;
 	MAILBOX4 *mb4;
 	MAILBOXQ *mbq;
-	uint32_t rval;
+	uint32_t rval = 0;
 
 	if (fcfp->state != FCFI_STATE_UNREG) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
 		    "fcfi_unreg_action:%d %s:%s arg=%p. "
-		    "Invalid state. Terminated.",
+		    "Invalid state. <",
 		    fcfp->fcf_index,
 		    emlxs_fcfi_state_xlate(fcfp->state),
 		    emlxs_fcf_event_xlate(evt), arg1);
-
 		return (1);
 	}
 
 	if (!(fcfp->flag & EMLXS_FCFI_REG)) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "fcfi_unreg_action:%d. Not registered. Skipping unreg.",
+		    "fcfi_unreg_action:%d. Not registered. "
+		    "Skipping UNREG_FCFI.",
 		    fcfp->fcf_index);
 
 		rval = emlxs_fcfi_state(port, fcfp, FCFI_STATE_OFFLINE,
@@ -6200,11 +8821,11 @@ emlxs_fcfi_unreg_action(emlxs_port_t *port, FCFIobj_t *fcfp, uint32_t evt,
 	}
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-	    "fcfi_unreg_action:%d attempts=%d. Sending FCFI_UNREG.",
+	    "fcfi_unreg_action:%d attempts=%d. Sending UNREG_FCFI. <",
 	    fcfp->fcf_index,
 	    fcfp->attempts);
 
-	if (!(mbq = (MAILBOXQ *)emlxs_mem_get(hba, MEM_MBOX, 1))) {
+	if (!(mbq = (MAILBOXQ *)emlxs_mem_get(hba, MEM_MBOX))) {
 		rval = emlxs_fcfi_state(port, fcfp, FCFI_STATE_UNREG_FAILED,
 		    FCF_REASON_NO_MBOX, 0, arg1);
 		return (rval);
@@ -6240,12 +8861,12 @@ static uint32_t
 emlxs_fcfi_unreg_cmpl_action(emlxs_port_t *port, FCFIobj_t *fcfp, uint32_t evt,
     void *arg1)
 {
-	uint32_t rval;
+	uint32_t rval = 0;
 
 	if (fcfp->state != FCFI_STATE_UNREG_CMPL) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
 		    "fcfi_unreg_cmpl_action:%d %s:%s arg=%p. "
-		    "Invalid state. Terminated.",
+		    "Invalid state. <",
 		    fcfp->fcf_index,
 		    emlxs_fcfi_state_xlate(fcfp->state),
 		    emlxs_fcf_event_xlate(evt), arg1);
@@ -6273,14 +8894,14 @@ emlxs_fcfi_online_action(emlxs_port_t *port, FCFIobj_t *fcfp, uint32_t evt,
     void *arg1)
 {
 	emlxs_hba_t *hba = HBA;
-	uint32_t rval;
+	uint32_t rval = 0;
 	VFIobj_t *vfip;
 	uint32_t i;
 
 	if (fcfp->state != FCFI_STATE_ONLINE) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
 		    "fcfi_online_action:%d %s:%s arg=%p. "
-		    "Invalid state. Terminated.",
+		    "Invalid state. <",
 		    fcfp->fcf_index,
 		    emlxs_fcfi_state_xlate(fcfp->state),
 		    emlxs_fcf_event_xlate(evt), arg1);
@@ -6296,7 +8917,7 @@ emlxs_fcfi_online_action(emlxs_port_t *port, FCFIobj_t *fcfp, uint32_t evt,
 		    fcfp->attempts);
 
 		rval = emlxs_fcfi_offline_handler(port, fcfp, arg1);
-		return (1);
+		return (rval);
 	}
 
 	/* Online remaining VFI's for this FCFI */
@@ -6307,7 +8928,7 @@ emlxs_fcfi_online_action(emlxs_port_t *port, FCFIobj_t *fcfp, uint32_t evt,
 		}
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "fcfi_online_action:%d vfi_online=%d. Onlining VFI:%d.",
+		    "fcfi_online_action:%d vfi_online=%d. Onlining VFI:%d. >",
 		    fcfp->fcf_index,
 		    fcfp->vfi_online,
 		    vfip->VFI);
@@ -6332,7 +8953,7 @@ emlxs_fcfi_online_action(emlxs_port_t *port, FCFIobj_t *fcfp, uint32_t evt,
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 	    "fcfi_online_action:%d vfi_online=%d. "
-	    "FCFI online. Notifying fcftab.",
+	    "FCFI online. Notifying fcftab. >",
 	    fcfp->fcf_index,
 	    fcfp->vfi_online);
 
@@ -6492,7 +9113,7 @@ emlxs_fcfi_update(emlxs_port_t *port, FCFIobj_t *fcfp, FCF_RECORD_t *fcf_rec,
 		fcfp->flag &= ~EMLXS_FCFI_AVAILABLE;
 	}
 
-	if (fcf_rec->fcf_valid) {
+	if (fcf_rec->fcf_valid && !fcf_rec->fcf_sol) {
 		fcfp->flag |= EMLXS_FCFI_VALID;
 	} else {
 		fcfp->flag &= ~EMLXS_FCFI_VALID;
@@ -6517,12 +9138,13 @@ emlxs_fcfi_update(emlxs_port_t *port, FCFIobj_t *fcfp, FCF_RECORD_t *fcf_rec,
 	fcfp->flag |= EMLXS_FCFI_FRESH;
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-	    "fcfi:%d gen=%x tag=%x flag=%x avl=%x val=%x state=%x "
+	    "fcfi:%d gen=%x iotag=%d flag=%x sol=%x avl=%x val=%x state=%x "
 	    "map=%x pri=%x vid=%x",
 	    fcf_rec->fcf_index,
 	    fcfp->generation,
 	    fcfp->event_tag,
 	    fcfp->flag,
+	    fcf_rec->fcf_sol,
 	    fcf_rec->fcf_available,
 	    fcf_rec->fcf_valid,
 	    fcf_rec->fcf_state,
@@ -6583,7 +9205,7 @@ emlxs_vfi_state_xlate(uint32_t state)
 		}
 	}
 
-	(void) sprintf(buffer, "state=0x%x", state);
+	(void) snprintf(buffer, sizeof (buffer), "state=0x%x", state);
 	return (buffer);
 
 } /* emlxs_vfi_state_xlate() */
@@ -6593,7 +9215,7 @@ static uint32_t
 emlxs_vfi_action(emlxs_port_t *port, VFIobj_t *vfip, uint32_t evt,
     void *arg1)
 {
-	uint32_t rval;
+	uint32_t rval = 0;
 	uint32_t(*func) (emlxs_port_t *, VFIobj_t *, uint32_t, void *);
 	uint32_t index;
 	uint32_t events;
@@ -6632,7 +9254,7 @@ emlxs_vfi_action(emlxs_port_t *port, VFIobj_t *vfip, uint32_t evt,
 
 	if (!func) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_event_msg,
-		    "vfi:%d %s:%s arg=%p. No action. Terminated.",
+		    "vfi_action:%d %s:%s arg=%p. No action. <",
 		    vfip->VFI,
 		    emlxs_vfi_state_xlate(state),
 		    emlxs_fcf_event_xlate(evt), arg1);
@@ -6663,7 +9285,7 @@ emlxs_vfi_event(emlxs_port_t *port, uint32_t evt,
 
 		if (!vpip) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_event_msg,
-			    "vfi: %s arg=%p. Null VPI found. Terminated.",
+			    "vfi_event: %s arg=%p. Null VPI found. <",
 			    emlxs_fcf_event_xlate(evt), arg1);
 
 			return (1);
@@ -6673,7 +9295,7 @@ emlxs_vfi_event(emlxs_port_t *port, uint32_t evt,
 
 		if (!vfip) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_event_msg,
-			    "vfi: %s arg=%p. VFI not found. Terminated.",
+			    "vfi_event: %s arg=%p. VFI not found. <",
 			    emlxs_fcf_event_xlate(evt), arg1);
 
 			return (1);
@@ -6687,7 +9309,7 @@ emlxs_vfi_event(emlxs_port_t *port, uint32_t evt,
 
 		if (!vfip) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_event_msg,
-			    "vfi: %s arg=%p. VFI not found. Terminated.",
+			    "vfi_event: %s arg=%p. VFI not found. <",
 			    emlxs_fcf_event_xlate(evt), arg1);
 
 			return (1);
@@ -6699,7 +9321,7 @@ emlxs_vfi_event(emlxs_port_t *port, uint32_t evt,
 	}
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_event_msg,
-	    "vfi:%d %s:%s arg=%p",
+	    "vfi_event:%d %s:%s arg=%p",
 	    vfip->VFI,
 	    emlxs_vfi_state_xlate(vfip->state),
 	    emlxs_fcf_event_xlate(evt), arg1);
@@ -6716,15 +9338,14 @@ static uint32_t
 emlxs_vfi_state(emlxs_port_t *port, VFIobj_t *vfip, uint16_t state,
     uint16_t reason, uint32_t explain, void *arg1)
 {
-	uint32_t rval;
+	uint32_t rval = 0;
 
 	if (state >= VFI_ACTION_STATES) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
 		    "vfi_state:%d %s. "
-		    "Invalid state. Terminated.",
+		    "Invalid state. <",
 		    vfip->VFI,
 		    emlxs_vfi_state_xlate(vfip->state));
-
 		return (1);
 	}
 
@@ -6732,7 +9353,7 @@ emlxs_vfi_state(emlxs_port_t *port, VFIobj_t *vfip, uint16_t state,
 	    (reason != FCF_REASON_REENTER)) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
 		    "vfi_state:%d %s:%s:0x%x arg=%p. "
-		    "State not changed. Terminated.",
+		    "State not changed. <",
 		    vfip->VFI,
 		    emlxs_vfi_state_xlate(vfip->state),
 		    emlxs_fcf_reason_xlate(reason),
@@ -6743,13 +9364,13 @@ emlxs_vfi_state(emlxs_port_t *port, VFIobj_t *vfip, uint16_t state,
 
 	if (!reason) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_state_msg,
-		    "vfi:%d %s-->%s arg=%p",
+		    "vfi_state:%d %s-->%s arg=%p",
 		    vfip->VFI,
 		    emlxs_vfi_state_xlate(vfip->state),
 		    emlxs_vfi_state_xlate(state), arg1);
 	} else if (reason == FCF_REASON_EVENT) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_state_msg,
-		    "vfi:%d %s-->%s:%s:%s arg=%p",
+		    "vfi_state:%d %s-->%s:%s:%s arg=%p",
 		    vfip->VFI,
 		    emlxs_vfi_state_xlate(vfip->state),
 		    emlxs_vfi_state_xlate(state),
@@ -6757,7 +9378,7 @@ emlxs_vfi_state(emlxs_port_t *port, VFIobj_t *vfip, uint16_t state,
 		    emlxs_fcf_event_xlate(explain), arg1);
 	} else if (explain) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_state_msg,
-		    "vfi:%d %s-->%s:%s:0x%x arg=%p",
+		    "vfi_state:%d %s-->%s:%s:0x%x arg=%p",
 		    vfip->VFI,
 		    emlxs_vfi_state_xlate(vfip->state),
 		    emlxs_vfi_state_xlate(state),
@@ -6765,7 +9386,7 @@ emlxs_vfi_state(emlxs_port_t *port, VFIobj_t *vfip, uint16_t state,
 		    explain, arg1);
 	} else {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_state_msg,
-		    "vfi:%d %s-->%s:%s arg=%p",
+		    "vfi_state:%d %s-->%s:%s arg=%p",
 		    vfip->VFI,
 		    emlxs_vfi_state_xlate(vfip->state),
 		    emlxs_vfi_state_xlate(state),
@@ -6789,17 +9410,16 @@ static uint32_t
 emlxs_vfi_vpi_online_evt_action(emlxs_port_t *port, VFIobj_t *vfip,
     uint32_t evt, void *arg1)
 {
-	uint32_t rval;
+	uint32_t rval = 0;
 
 	if (evt != FCF_EVENT_VPI_ONLINE) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
 		    "vfi_vpi_online_evt_action:%d %s:%s arg=%p flag=%x. "
-		    "Invalid event type. Terminated.",
+		    "Invalid event type. <",
 		    vfip->VFI,
 		    emlxs_vfi_state_xlate(vfip->state),
 		    emlxs_fcf_event_xlate(evt), arg1,
 		    vfip->flag);
-
 		return (1);
 	}
 
@@ -6830,8 +9450,7 @@ emlxs_vfi_vpi_online_evt_action(emlxs_port_t *port, VFIobj_t *vfip,
 
 	default:
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "vfi_vpi_online_evt_action:%d flag=%x vpi_online=%d. "
-		    "Terminated.",
+		    "vfi_vpi_online_evt_action:%d flag=%x vpi_online=%d. <",
 		    vfip->VFI,
 		    vfip->flag,
 		    vfip->vpi_online);
@@ -6848,13 +9467,13 @@ emlxs_vfi_vpi_online_evt_action(emlxs_port_t *port, VFIobj_t *vfip,
 static uint32_t
 emlxs_vfi_offline_handler(emlxs_port_t *port, VFIobj_t *vfip, void *arg1)
 {
-	uint32_t rval;
+	uint32_t rval = 0;
 
 	if (!(vfip->flag & EMLXS_VFI_OFFLINE_REQ)) {
 		return (0);
 	}
 
-	if (vfip->vpi_online > 0) {
+	if (vfip->vpi_online) {
 		if (vfip->flag & EMLXS_VFI_PAUSE_REQ) {
 			rval = emlxs_vfi_state(port, vfip, VFI_STATE_PAUSED,
 			    FCF_REASON_REQUESTED, 0, arg1);
@@ -6887,13 +9506,13 @@ static uint32_t
 emlxs_vfi_vpi_offline_evt_action(emlxs_port_t *port, VFIobj_t *vfip,
     uint32_t evt, void *arg1)
 {
-	uint32_t rval;
+	uint32_t rval = 0;
 	VPIobj_t *vpip;
 
 	if (evt != FCF_EVENT_VPI_OFFLINE) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
 		    "vfi_vpi_offline_evt_action:%d %s:%s arg=%p flag=%x. "
-		    "Invalid event type. Terminated.",
+		    "Invalid event type. <",
 		    vfip->VFI,
 		    emlxs_vfi_state_xlate(vfip->state),
 		    emlxs_fcf_event_xlate(evt), arg1,
@@ -6921,16 +9540,15 @@ emlxs_vfi_vpi_offline_evt_action(emlxs_port_t *port, VFIobj_t *vfip,
 		} else {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 			    "vfi_vpi_offline_evt_action:%d flag=%x "
-			    "vpi_online=%d. Terminated.",
+			    "vpi_online=%d. <",
 			    vfip->VFI,
 			    vfip->flag, vfip->vpi_online);
 		}
 		break;
 
 	case VFI_STATE_PAUSED:
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
-		    "vfi_vpi_offline_evt_action:%d flag=%x vpi_online=%d. "
-		    "Terminated.",
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+		    "vfi_vpi_offline_evt_action:%d flag=%x vpi_online=%d. <",
 		    vfip->VFI,
 		    vfip->flag, vfip->vpi_online);
 		break;
@@ -6958,8 +9576,8 @@ emlxs_vfi_vpi_offline_evt_action(emlxs_port_t *port, VFIobj_t *vfip,
 	default:
 		if (vfip->vpi_online == 0) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-			    "vfi_vpi_offline_evt_action:%d flag=%x "\
-			    "vpi_online=%d. Requesting offline.",
+			    "vfi_vpi_offline_evt_action:%d flag=%x "
+			    "vpi_online=%d. Requesting offline. <",
 			    vfip->VFI,
 			    vfip->flag, vfip->vpi_online);
 
@@ -6967,8 +9585,8 @@ emlxs_vfi_vpi_offline_evt_action(emlxs_port_t *port, VFIobj_t *vfip,
 			vfip->flag |= EMLXS_VFI_OFFLINE_REQ;
 		} else {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-			    "vfi_vpi_offline_evt_action:%d flag=%x "\
-			    "vpi_online=%d. Terminated.",
+			    "vfi_vpi_offline_evt_action:%d flag=%x "
+			    "vpi_online=%d. <",
 			    vfip->VFI,
 			    vfip->flag, vfip->vpi_online);
 		}
@@ -6994,7 +9612,7 @@ emlxs_vfi_online_evt_action(emlxs_port_t *port, VFIobj_t *vfip, uint32_t evt,
 	if (evt != FCF_EVENT_VFI_ONLINE) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
 		    "vfi_online_evt_action:%d %s:%s arg=%p flag=%x. "
-		    "Invalid event type. Terminated.",
+		    "Invalid event type. <",
 		    vfip->VFI,
 		    emlxs_vfi_state_xlate(vfip->state),
 		    emlxs_fcf_event_xlate(evt), arg1,
@@ -7005,17 +9623,17 @@ emlxs_vfi_online_evt_action(emlxs_port_t *port, VFIobj_t *vfip, uint32_t evt,
 	if (vfip->flag & EMLXS_VFI_ONLINE_REQ) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 		    "vfi_online_evt_action:%d flag=%x. "
-		    "Online already requested. Terminated.",
+		    "Online already requested. <",
 		    vfip->VFI,
 		    vfip->flag);
 		return (0);
 	}
 
 	vfip->flag &= ~EMLXS_VFI_REQ_MASK;
-	vfip->flag |= EMLXS_VFI_ONLINE_REQ;
 
 	switch (vfip->state) {
 	case VFI_STATE_OFFLINE:
+		vfip->flag |= EMLXS_VFI_ONLINE_REQ;
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 		    "vfi_online_evt_action:%d flag=%x. Initiating online.",
 		    vfip->VFI,
@@ -7027,6 +9645,7 @@ emlxs_vfi_online_evt_action(emlxs_port_t *port, VFIobj_t *vfip, uint32_t evt,
 
 	case VFI_STATE_VPI_OFFLINE:
 	case VFI_STATE_PAUSED:
+		vfip->flag |= EMLXS_VFI_ONLINE_REQ;
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 		    "vfi_online_evt_action:%d flag=%x. Initiating online.",
 		    vfip->VFI,
@@ -7040,9 +9659,10 @@ emlxs_vfi_online_evt_action(emlxs_port_t *port, VFIobj_t *vfip, uint32_t evt,
 		/* Online all VPI's belonging to this vfi */
 		for (i = 0; i <= hba->vpi_max; i++) {
 			vport = &VPORT(i);
-			vpip = &vport->VPIobj;
+			vpip = vport->vpip;
 
-			if (!(vport->flag & EMLXS_PORT_BOUND)) {
+			if (!(vport->flag & EMLXS_PORT_BOUND) ||
+			    (vpip->flag & EMLXS_VPI_PORT_UNBIND)) {
 				continue;
 			}
 
@@ -7051,7 +9671,7 @@ emlxs_vfi_online_evt_action(emlxs_port_t *port, VFIobj_t *vfip, uint32_t evt,
 			}
 
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-			    "vfi_online_evt_action:%d. Onlining VPI:%d",
+			    "vfi_online_evt_action:%d. Onlining VPI:%d >",
 			    vfip->VFI,
 			    vpip->VPI);
 
@@ -7061,8 +9681,9 @@ emlxs_vfi_online_evt_action(emlxs_port_t *port, VFIobj_t *vfip, uint32_t evt,
 		break;
 
 	default:
+		vfip->flag |= EMLXS_VFI_ONLINE_REQ;
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "vfi_online_evt_action:%d flag=%x. Terminated.",
+		    "vfi_online_evt_action:%d flag=%x. <",
 		    vfip->VFI,
 		    vfip->flag);
 		return (1);
@@ -7083,7 +9704,7 @@ emlxs_vfi_offline_evt_action(emlxs_port_t *port, VFIobj_t *vfip, uint32_t evt,
 	if (evt != FCF_EVENT_VFI_OFFLINE) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
 		    "vfi_offline_evt_action:%d %s:%s arg=%p flag=%x. "
-		    "Invalid event type. Terminated.",
+		    "Invalid event type. <",
 		    vfip->VFI,
 		    emlxs_vfi_state_xlate(vfip->state),
 		    emlxs_fcf_event_xlate(evt), arg1,
@@ -7095,7 +9716,7 @@ emlxs_vfi_offline_evt_action(emlxs_port_t *port, VFIobj_t *vfip, uint32_t evt,
 	    !(vfip->flag & EMLXS_VFI_PAUSE_REQ)) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 		    "vfi_offline_evt_action:%d flag=%x. "
-		    "Offline already requested. Terminated.",
+		    "Offline already requested. <",
 		    vfip->VFI,
 		    vfip->flag);
 		return (0);
@@ -7105,7 +9726,7 @@ emlxs_vfi_offline_evt_action(emlxs_port_t *port, VFIobj_t *vfip, uint32_t evt,
 	case VFI_STATE_OFFLINE:
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 		    "vfi_offline_evt_action:%d flag=%x. "
-		    "Already offline. Terminated.",
+		    "Already offline. <",
 		    vfip->VFI,
 		    vfip->flag);
 		break;
@@ -7135,7 +9756,7 @@ emlxs_vfi_offline_evt_action(emlxs_port_t *port, VFIobj_t *vfip, uint32_t evt,
 		vfip->flag |= EMLXS_VFI_OFFLINE_REQ;
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "vfi_offline_evt_action:%d flag=%x. Terminated.",
+		    "vfi_offline_evt_action:%d flag=%x. <",
 		    vfip->VFI,
 		    vfip->flag);
 		break;
@@ -7156,7 +9777,7 @@ emlxs_vfi_pause_evt_action(emlxs_port_t *port, VFIobj_t *vfip, uint32_t evt,
 	if (evt != FCF_EVENT_VFI_PAUSE) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
 		    "vfi_pause_evt_action:%d %s:%s arg=%p flag=%x. "
-		    "Invalid event type. Terminated.",
+		    "Invalid event type. <",
 		    vfip->VFI,
 		    emlxs_vfi_state_xlate(vfip->state),
 		    emlxs_fcf_event_xlate(evt), arg1,
@@ -7167,7 +9788,7 @@ emlxs_vfi_pause_evt_action(emlxs_port_t *port, VFIobj_t *vfip, uint32_t evt,
 	if (vfip->flag & EMLXS_VFI_PAUSE_REQ) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 		    "vfi_pause_evt_action:%d flag=%x. "
-		    "Pause already requested. Terminated.",
+		    "Pause already requested. <",
 		    vfip->VFI,
 		    vfip->flag);
 		return (0);
@@ -7176,7 +9797,7 @@ emlxs_vfi_pause_evt_action(emlxs_port_t *port, VFIobj_t *vfip, uint32_t evt,
 	if (vfip->flag & EMLXS_VFI_OFFLINE_REQ) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 		    "vfi_pause_evt_action:%d flag=%x. "
-		    "Offline already requested. Terminated.",
+		    "Offline already requested. <",
 		    vfip->VFI,
 		    vfip->flag);
 		return (0);
@@ -7186,7 +9807,7 @@ emlxs_vfi_pause_evt_action(emlxs_port_t *port, VFIobj_t *vfip, uint32_t evt,
 	case VFI_STATE_OFFLINE:
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 		    "vfi_pause_evt_action:%d flag=%x. "
-		    "Already offline. Terminated.",
+		    "Already offline. <",
 		    vfip->VFI,
 		    vfip->flag);
 		break;
@@ -7194,7 +9815,7 @@ emlxs_vfi_pause_evt_action(emlxs_port_t *port, VFIobj_t *vfip, uint32_t evt,
 	case VFI_STATE_PAUSED:
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 		    "vfi_pause_evt_action:%d flag=%x. "
-		    "Already paused. Terminated.",
+		    "Already paused. <",
 		    vfip->VFI,
 		    vfip->flag);
 		break;
@@ -7222,7 +9843,7 @@ emlxs_vfi_pause_evt_action(emlxs_port_t *port, VFIobj_t *vfip, uint32_t evt,
 		vfip->flag |= (EMLXS_VFI_OFFLINE_REQ | EMLXS_VFI_PAUSE_REQ);
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "vfi_pause_evt_action:%d flag=%x. Terminated.",
+		    "vfi_pause_evt_action:%d flag=%x. <",
 		    vfip->VFI,
 		    vfip->flag);
 		break;
@@ -7238,12 +9859,12 @@ static uint32_t
 emlxs_vfi_offline_action(emlxs_port_t *port, VFIobj_t *vfip, uint32_t evt,
     void *arg1)
 {
-	uint32_t rval;
+	uint32_t rval = 0;
 
 	if (vfip->state != VFI_STATE_OFFLINE) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 		    "vfi_offline_action:%d %s:%s arg=%p. "
-		    "Invalid state. Terminated.",
+		    "Invalid state. <",
 		    vfip->VFI,
 		    emlxs_vfi_state_xlate(vfip->state),
 		    emlxs_fcf_event_xlate(evt), arg1);
@@ -7253,7 +9874,7 @@ emlxs_vfi_offline_action(emlxs_port_t *port, VFIobj_t *vfip, uint32_t evt,
 	if (!vfip->fcfp) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 		    "vfi_offline_action:%d %s:%s arg=%p flag=%x. "
-		    "Null fcfp found. Terminated.",
+		    "Null fcfp found. <",
 		    vfip->VFI,
 		    emlxs_vfi_state_xlate(vfip->state),
 		    emlxs_fcf_event_xlate(evt), arg1,
@@ -7265,7 +9886,7 @@ emlxs_vfi_offline_action(emlxs_port_t *port, VFIobj_t *vfip, uint32_t evt,
 
 	if (vfip->prev_state == VFI_STATE_OFFLINE) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "vfi_offline_action:%d vfi_online=%d. Terminated.",
+		    "vfi_offline_action:%d vfi_online=%d. <",
 		    vfip->VFI,
 		    vfip->fcfp->vfi_online);
 
@@ -7301,7 +9922,7 @@ emlxs_vfi_offline_action(emlxs_port_t *port, VFIobj_t *vfip, uint32_t evt,
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 	    "vfi_offline_action:%d vfi_online=%d. "
-	    "VFI offline. Notifying FCFI:%d",
+	    "VFI offline. Notifying FCFI:%d >",
 	    vfip->VFI,
 	    vfip->fcfp->vfi_online,
 	    vfip->fcfp->fcf_index);
@@ -7329,7 +9950,7 @@ emlxs_vfi_init_mbcmpl(emlxs_hba_t *hba, MAILBOXQ *mbq)
 
 	if (vfip->state != VFI_STATE_INIT) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "vfi_init_mbcmpl:%d %s. Terminated.",
+		    "vfi_init_mbcmpl:%d %s.",
 		    vfip->VFI,
 		    emlxs_vfi_state_xlate(vfip->state));
 
@@ -7339,9 +9960,9 @@ emlxs_vfi_init_mbcmpl(emlxs_hba_t *hba, MAILBOXQ *mbq)
 
 	if (mb4->mbxStatus) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "vfi_init_mbcmpl:%d failed. status=%x",
+		    "vfi_init_mbcmpl:%d failed. %s. >",
 		    vfip->VFI,
-		    mb4->mbxStatus);
+		    emlxs_mb_xlate_status(mb4->mbxStatus));
 
 		(void) emlxs_vfi_state(port, vfip, VFI_STATE_INIT_FAILED,
 		    FCF_REASON_MBOX_FAILED, mb4->mbxStatus, 0);
@@ -7351,7 +9972,7 @@ emlxs_vfi_init_mbcmpl(emlxs_hba_t *hba, MAILBOXQ *mbq)
 	}
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-	    "vfi_init_mbcmpl:%d Initialized.",
+	    "vfi_init_mbcmpl:%d. Init complete. >",
 	    vfip->VFI,
 	    mb4->mbxStatus);
 
@@ -7372,12 +9993,12 @@ emlxs_vfi_init_action(emlxs_port_t *port, VFIobj_t *vfip, uint32_t evt,
 	emlxs_hba_t *hba = HBA;
 	MAILBOXQ *mbq;
 	MAILBOX4 *mb4;
-	uint32_t rval;
+	uint32_t rval = 0;
 
 	if (vfip->state != VFI_STATE_INIT) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 		    "vfi_init_action:%d %s:%s arg=%p. "
-		    "Invalid state. Terminated.",
+		    "Invalid state. <",
 		    vfip->VFI,
 		    emlxs_vfi_state_xlate(vfip->state),
 		    emlxs_fcf_event_xlate(evt), arg1);
@@ -7406,7 +10027,7 @@ emlxs_vfi_init_action(emlxs_port_t *port, VFIobj_t *vfip, uint32_t evt,
 	if (vfip->flag & EMLXS_VFI_INIT) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 		    "vfi_init_action:%d flag=%x. "
-		    "Already init'd. Skipping init.",
+		    "Already init'd. Skipping INIT_VFI.",
 		    vfip->VFI);
 
 		rval = emlxs_vfi_state(port, vfip, VFI_STATE_VPI_ONLINE,
@@ -7414,11 +10035,11 @@ emlxs_vfi_init_action(emlxs_port_t *port, VFIobj_t *vfip, uint32_t evt,
 		return (rval);
 	}
 
-	if (vfip->fcfp->vfi_online == 1) {
+	if (((hba->sli_intf & SLI_INTF_IF_TYPE_MASK) ==
+	    SLI_INTF_IF_TYPE_0) && (vfip->fcfp->vfi_online == 1)) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "vfi_init_action:%d vfi_online=%d. Skipping init.",
-		    vfip->VFI,
-		    vfip->fcfp->vfi_online);
+		    "vfi_init_action:%d. First VFI. Skipping INIT_VFI.",
+		    vfip->VFI);
 
 		rval = emlxs_vfi_state(port, vfip, VFI_STATE_VPI_ONLINE,
 		    FCF_REASON_EVENT, evt, arg1);
@@ -7426,12 +10047,12 @@ emlxs_vfi_init_action(emlxs_port_t *port, VFIobj_t *vfip, uint32_t evt,
 	}
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-	    "vfi_init_action:%d vfi_online=%d attempts=%d",
+	    "vfi_init_action:%d vfi_online=%d attempts=%d. Sending INIT_VFI. <",
 	    vfip->VFI,
 	    vfip->fcfp->vfi_online,
 	    vfip->attempts);
 
-	if (!(mbq = (MAILBOXQ *)emlxs_mem_get(hba, MEM_MBOX, 1))) {
+	if (!(mbq = (MAILBOXQ *)emlxs_mem_get(hba, MEM_MBOX))) {
 		rval = emlxs_vfi_state(port, vfip, FCFI_STATE_REG_FAILED,
 		    FCF_REASON_NO_MBOX, 0, arg1);
 		return (rval);
@@ -7471,19 +10092,18 @@ static uint32_t
 emlxs_vfi_init_failed_action(emlxs_port_t *port, VFIobj_t *vfip, uint32_t evt,
     void *arg1)
 {
-	uint32_t rval;
+	uint32_t rval = 0;
 
 	vfip->attempts++;
 
 	if (vfip->state != VFI_STATE_INIT_FAILED) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
 		    "vfi_init_action:%d %s:%s arg=%p attempt=%d. "
-		    "Invalid state. Terminated.",
+		    "Invalid state. <",
 		    vfip->VFI,
 		    emlxs_vfi_state_xlate(vfip->state),
 		    emlxs_fcf_event_xlate(evt), arg1,
 		    vfip->attempts);
-
 		return (1);
 	}
 
@@ -7521,12 +10141,12 @@ static uint32_t
 emlxs_vfi_init_cmpl_action(emlxs_port_t *port, VFIobj_t *vfip, uint32_t evt,
     void *arg1)
 {
-	uint32_t rval;
+	uint32_t rval = 0;
 
 	if (vfip->state != VFI_STATE_INIT_CMPL) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 		    "vfi_init_cmpl_action:%d %s:%s arg=%p. "
-		    "Invalid state. Terminated.",
+		    "Invalid state. <",
 		    vfip->VFI,
 		    emlxs_vfi_state_xlate(vfip->state),
 		    emlxs_fcf_event_xlate(evt), arg1);
@@ -7552,7 +10172,7 @@ emlxs_vfi_vpi_online_action(emlxs_port_t *port, VFIobj_t *vfip, uint32_t evt,
     void *arg1)
 {
 	emlxs_hba_t *hba = HBA;
-	uint32_t rval;
+	uint32_t rval = 0;
 	uint32_t i;
 	emlxs_port_t *vport;
 	VPIobj_t *vpip;
@@ -7560,7 +10180,7 @@ emlxs_vfi_vpi_online_action(emlxs_port_t *port, VFIobj_t *vfip, uint32_t evt,
 	if (vfip->state != VFI_STATE_VPI_ONLINE) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 		    "vfi_vpi_online_action:%d %s:%s arg=%p. "
-		    "Invalid state. Terminated.",
+		    "Invalid state. <",
 		    vfip->VFI,
 		    emlxs_vfi_state_xlate(vfip->state),
 		    emlxs_fcf_event_xlate(evt), arg1);
@@ -7576,7 +10196,7 @@ emlxs_vfi_vpi_online_action(emlxs_port_t *port, VFIobj_t *vfip, uint32_t evt,
 		return (rval);
 	}
 
-	if (vfip->logi_count > 0) {
+	if (vfip->logi_count) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
 		    "vfi_vpi_online_action:%d vpi_online=%d logi_count=%d. "
 		    "VPI already logged in.",
@@ -7585,15 +10205,16 @@ emlxs_vfi_vpi_online_action(emlxs_port_t *port, VFIobj_t *vfip, uint32_t evt,
 		    vfip->logi_count);
 	}
 
-	if (vfip->vpi_online > 0) {
-		/* Waking up out after being paused */
+	if (vfip->vpi_online) {
+		/* Waking up after being paused */
 
 		/* Find first VPI of this VFI */
 		for (i = 0; i <= hba->vpi_max; i++) {
 			vport = &VPORT(i);
-			vpip = &vport->VPIobj;
+			vpip = vport->vpip;
 
-			if (!(vport->flag & EMLXS_PORT_BOUND)) {
+			if (!(vport->flag & EMLXS_PORT_BOUND) ||
+			    (vpip->flag & EMLXS_VPI_PORT_UNBIND)) {
 				continue;
 			}
 
@@ -7607,9 +10228,10 @@ emlxs_vfi_vpi_online_action(emlxs_port_t *port, VFIobj_t *vfip, uint32_t evt,
 		/* Find first available VPI */
 		for (i = 0; i <= hba->vpi_max; i++) {
 			vport = &VPORT(i);
-			vpip = &vport->VPIobj;
+			vpip = vport->vpip;
 
-			if (!(vport->flag & EMLXS_PORT_BOUND)) {
+			if (!(vport->flag & EMLXS_PORT_BOUND) ||
+			    (vpip->flag & EMLXS_VPI_PORT_UNBIND)) {
 				continue;
 			}
 
@@ -7621,7 +10243,7 @@ emlxs_vfi_vpi_online_action(emlxs_port_t *port, VFIobj_t *vfip, uint32_t evt,
 	}
 
 	if (i > hba->vpi_max) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 		    "vfi_vpi_online_action:%d vpi_online=%d logi_count=%d. "
 		    "No VPI found. Offlining.",
 		    vfip->VFI,
@@ -7636,7 +10258,7 @@ emlxs_vfi_vpi_online_action(emlxs_port_t *port, VFIobj_t *vfip, uint32_t evt,
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 	    "vfi_vpi_online_action:%d vpi_online=%d logi_count=%d. "
-	    "Onlining VPI:%d",
+	    "Onlining VPI:%d >",
 	    vfip->VFI,
 	    vfip->vpi_online,
 	    vfip->logi_count,
@@ -7656,19 +10278,31 @@ static uint32_t
 emlxs_vfi_vpi_online_cmpl_action(emlxs_port_t *port, VFIobj_t *vfip,
     uint32_t evt, void *arg1)
 {
-	uint32_t rval;
+	uint32_t rval = 0;
+	VPIobj_t *vpip = (VPIobj_t *)arg1;
 
 	if (vfip->state != VFI_STATE_VPI_ONLINE_CMPL) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 		    "vfi_vpi_online_cmpl_action:%d %s:%s arg=%p. "
-		    "Invalid state. Terminated.",
+		    "Invalid state. <",
 		    vfip->VFI,
 		    emlxs_vfi_state_xlate(vfip->state),
 		    emlxs_fcf_event_xlate(evt), arg1);
 		return (1);
 	}
 
-	if (vfip->vpi_online > 1) {
+	if (vpip == vfip->flogi_vpip) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+		    "vfi_vpi_online_cmpl_action:%d flag=%x vpi_online=%d "
+		    "logi_count=%d. flogi_vpi. Registering.",
+		    vfip->VFI,
+		    vfip->flag,
+		    vfip->vpi_online,
+		    vfip->logi_count);
+
+		rval = emlxs_vfi_state(port, vfip, VFI_STATE_REG,
+		    FCF_REASON_EVENT, evt, arg1);
+	} else {
 		/* Waking up after pause */
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 		    "vfi_vpi_online_cmpl_action:%d flag=%x vpi_online=%d "
@@ -7679,17 +10313,6 @@ emlxs_vfi_vpi_online_cmpl_action(emlxs_port_t *port, VFIobj_t *vfip,
 		    vfip->logi_count);
 
 		rval = emlxs_vfi_state(port, vfip, VFI_STATE_ONLINE,
-		    FCF_REASON_EVENT, evt, arg1);
-	} else {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "vfi_vpi_online_cmpl_action:%d flag=%x vpi_online=%d "
-		    "logi_count=%d. Registering.",
-		    vfip->VFI,
-		    vfip->flag,
-		    vfip->vpi_online,
-		    vfip->logi_count);
-
-		rval = emlxs_vfi_state(port, vfip, VFI_STATE_REG,
 		    FCF_REASON_EVENT, evt, arg1);
 	}
 
@@ -7708,7 +10331,7 @@ emlxs_vfi_vpi_offline_cmpl_action(emlxs_port_t *port, VFIobj_t *vfip,
 	if (vfip->state != VFI_STATE_VPI_OFFLINE_CMPL) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 		    "vfi_vpi_offline_cmpl_action:%d %s:%s arg=%p. "
-		    "Invalid state. Terminated.",
+		    "Invalid state. <",
 		    vfip->VFI,
 		    emlxs_vfi_state_xlate(vfip->state),
 		    emlxs_fcf_event_xlate(evt), arg1);
@@ -7727,7 +10350,7 @@ emlxs_vfi_vpi_offline_cmpl_action(emlxs_port_t *port, VFIobj_t *vfip,
 		    FCF_REASON_EVENT, evt, arg1);
 	} else {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "vfi_vpi_offline_cmpl_action:%d vpi_online=%d. Terminated.",
+		    "vfi_vpi_offline_cmpl_action:%d vpi_online=%d. <",
 		    vfip->VFI,
 		    vfip->vpi_online);
 	}
@@ -7744,14 +10367,14 @@ emlxs_vfi_vpi_offline_action(emlxs_port_t *port, VFIobj_t *vfip, uint32_t evt,
 {
 	emlxs_hba_t *hba = HBA;
 	emlxs_port_t *vport;
-	uint32_t rval;
+	uint32_t rval = 0;
 	int32_t i;
 	VPIobj_t *vpip;
 
 	if (vfip->state != VFI_STATE_VPI_OFFLINE) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 		    "vfi_vpi_offline_action:%d %s:%s arg=%p. "
-		    "Invalid state. Terminated.",
+		    "Invalid state. <",
 		    vfip->VFI,
 		    emlxs_vfi_state_xlate(vfip->state),
 		    emlxs_fcf_event_xlate(evt), arg1);
@@ -7773,7 +10396,7 @@ emlxs_vfi_vpi_offline_action(emlxs_port_t *port, VFIobj_t *vfip, uint32_t evt,
 	if (vfip->vpi_online == 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 		    "vfi_vpi_offline_action:%d vpi_online=%d. "
-		    "VPI already offline. Skipping offline.",
+		    "VPI already offline. Skipping VPI offline.",
 		    vfip->VFI,
 		    vfip->vpi_online);
 
@@ -7786,7 +10409,7 @@ emlxs_vfi_vpi_offline_action(emlxs_port_t *port, VFIobj_t *vfip, uint32_t evt,
 	/* Offline all VPI's of this VFI */
 	for (i = hba->vpi_max; i >= 0; i--) {
 		vport = &VPORT(i);
-		vpip = &vport->VPIobj;
+		vpip = vport->vpip;
 
 		if ((vpip->state == VPI_STATE_OFFLINE) ||
 		    (vpip->vfip != vfip)) {
@@ -7794,7 +10417,7 @@ emlxs_vfi_vpi_offline_action(emlxs_port_t *port, VFIobj_t *vfip, uint32_t evt,
 		}
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "vfi_vpi_offline_action:%d. Offlining VPI:%d.",
+		    "vfi_vpi_offline_action:%d. Offlining VPI:%d. >",
 		    vfip->VFI,
 		    vpip->VPI);
 
@@ -7821,7 +10444,7 @@ emlxs_vfi_paused_action(emlxs_port_t *port, VFIobj_t *vfip, uint32_t evt,
 	if (vfip->state != VFI_STATE_PAUSED) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 		    "vfi_paused_action:%d %s:%s arg=%p. "
-		    "Invalid state. Terminated.",
+		    "Invalid state. <",
 		    vfip->VFI,
 		    emlxs_vfi_state_xlate(vfip->state),
 		    emlxs_fcf_event_xlate(evt), arg1);
@@ -7833,7 +10456,7 @@ emlxs_vfi_paused_action(emlxs_port_t *port, VFIobj_t *vfip, uint32_t evt,
 	/* Pause all VPI's of this VFI */
 	for (i = hba->vpi_max; i >= 0; i--) {
 		vport = &VPORT(i);
-		vpip = &vport->VPIobj;
+		vpip = vport->vpip;
 
 		if ((vpip->state == VPI_STATE_PAUSED) ||
 		    (vpip->vfip != vfip)) {
@@ -7841,7 +10464,7 @@ emlxs_vfi_paused_action(emlxs_port_t *port, VFIobj_t *vfip, uint32_t evt,
 		}
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "vfi_paused_action:%d vpi_online=%d. Pausing VPI:%d.",
+		    "vfi_paused_action:%d vpi_online=%d. Pausing VPI:%d. >",
 		    vfip->VFI,
 		    vfip->vpi_online,
 		    vpip->VPI);
@@ -7850,7 +10473,7 @@ emlxs_vfi_paused_action(emlxs_port_t *port, VFIobj_t *vfip, uint32_t evt,
 	}
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-	    "vfi_paused_action:%d vpi_online=%d. VFI paused.",
+	    "vfi_paused_action:%d vpi_online=%d. VFI paused. <",
 	    vfip->VFI,
 	    vfip->vpi_online);
 
@@ -7864,19 +10487,18 @@ static uint32_t
 emlxs_vfi_unreg_failed_action(emlxs_port_t *port, VFIobj_t *vfip, uint32_t evt,
     void *arg1)
 {
-	uint32_t rval;
+	uint32_t rval = 0;
 
 	vfip->attempts++;
 
 	if (vfip->state != VFI_STATE_UNREG_FAILED) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
 		    "vfi_unreg_failed_action:%d %s:%s arg=%p attempt=%d. "
-		    "Invalid state. Terminated.",
+		    "Invalid state. <",
 		    vfip->VFI,
 		    emlxs_vfi_state_xlate(vfip->state),
 		    emlxs_fcf_event_xlate(evt), arg1,
 		    vfip->attempts);
-
 		return (1);
 	}
 
@@ -7920,7 +10542,7 @@ emlxs_vfi_unreg_mbcmpl(emlxs_hba_t *hba, MAILBOXQ *mbq)
 
 	if (vfip->state != VFI_STATE_UNREG) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "vfi_unreg_mbcmpl:%d state=%s. Terminated.",
+		    "vfi_unreg_mbcmpl:%d state=%s.",
 		    vfip->VFI,
 		    emlxs_vfi_state_xlate(vfip->state));
 
@@ -7930,9 +10552,9 @@ emlxs_vfi_unreg_mbcmpl(emlxs_hba_t *hba, MAILBOXQ *mbq)
 
 	if (mb4->mbxStatus) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "vfi_unreg_mbcmpl:%d failed. status=%x",
+		    "vfi_unreg_mbcmpl:%d failed. %s. >",
 		    vfip->VFI,
-		    mb4->mbxStatus);
+		    emlxs_mb_xlate_status(mb4->mbxStatus));
 
 		(void) emlxs_vfi_state(port, vfip, VFI_STATE_UNREG_FAILED,
 		    FCF_REASON_MBOX_FAILED, mb4->mbxStatus, (void *)mbq->sbp);
@@ -7942,7 +10564,7 @@ emlxs_vfi_unreg_mbcmpl(emlxs_hba_t *hba, MAILBOXQ *mbq)
 	}
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-	    "vfi_unreg_mbcmpl:%d Unregistered.",
+	    "vfi_unreg_mbcmpl:%d. Unreg complete. >",
 	    vfip->VFI);
 
 	vfip->flag &= ~(EMLXS_VFI_REG | EMLXS_VFI_INIT);
@@ -7963,22 +10585,21 @@ emlxs_vfi_unreg_action(emlxs_port_t *port, VFIobj_t *vfip, uint32_t evt,
 	emlxs_hba_t *hba = HBA;
 	MAILBOX4 *mb4;
 	MAILBOXQ *mbq;
-	uint32_t rval;
+	uint32_t rval = 0;
 
 	if (vfip->state != VFI_STATE_UNREG) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
 		    "vfi_unreg_action:%d %s:%s arg=%p. "
-		    "Invalid state. Terminated.",
+		    "Invalid state. <",
 		    vfip->VFI,
 		    emlxs_vfi_state_xlate(vfip->state),
 		    emlxs_fcf_event_xlate(evt), arg1);
-
 		return (1);
 	}
 
 	if (!(vfip->flag & EMLXS_VFI_REG)) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "vfi_unreg_action:%d. Not registered. Skipping unreg.",
+		    "vfi_unreg_action:%d. Not registered. Skipping UNREG_VFI.",
 		    vfip->VFI);
 
 		rval = emlxs_vfi_state(port, vfip, VFI_STATE_OFFLINE,
@@ -7991,11 +10612,11 @@ emlxs_vfi_unreg_action(emlxs_port_t *port, VFIobj_t *vfip, uint32_t evt,
 	}
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-	    "vfi_unreg_action:%d attempts=%d. Sending UNREG_VFI.",
+	    "vfi_unreg_action:%d attempts=%d. Sending UNREG_VFI. <",
 	    vfip->VFI,
 	    vfip->attempts);
 
-	if (!(mbq = (MAILBOXQ *)emlxs_mem_get(hba, MEM_MBOX, 1))) {
+	if (!(mbq = (MAILBOXQ *)emlxs_mem_get(hba, MEM_MBOX))) {
 		rval = emlxs_vfi_state(port, vfip, VFI_STATE_UNREG_FAILED,
 		    FCF_REASON_NO_MBOX, 0, arg1);
 
@@ -8033,12 +10654,12 @@ static uint32_t
 emlxs_vfi_unreg_cmpl_action(emlxs_port_t *port, VFIobj_t *vfip, uint32_t evt,
     void *arg1)
 {
-	uint32_t rval;
+	uint32_t rval = 0;
 
 	if (vfip->state != VFI_STATE_UNREG_CMPL) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
 		    "vfi_unreg_cmpl_action:%d %s:%s arg=%p. "
-		    "Invalid state. Terminated.",
+		    "Invalid state. <",
 		    vfip->VFI,
 		    emlxs_vfi_state_xlate(vfip->state),
 		    emlxs_fcf_event_xlate(evt), arg1);
@@ -8063,19 +10684,18 @@ static uint32_t
 emlxs_vfi_reg_failed_action(emlxs_port_t *port, VFIobj_t *vfip, uint32_t evt,
     void *arg1)
 {
-	uint32_t rval;
+	uint32_t rval = 0;
 
 	vfip->attempts++;
 
 	if (vfip->state != VFI_STATE_REG_FAILED) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
 		    "vfi_reg_failed_action:%d %s:%s arg=%p attempt=%d. "
-		    "Invalid state. Terminated.",
+		    "Invalid state. <",
 		    vfip->VFI,
 		    emlxs_vfi_state_xlate(vfip->state),
 		    emlxs_fcf_event_xlate(evt), arg1,
 		    vfip->attempts);
-
 		return (1);
 	}
 
@@ -8086,8 +10706,6 @@ emlxs_vfi_reg_failed_action(emlxs_port_t *port, VFIobj_t *vfip, uint32_t evt,
 		    vfip->VFI,
 		    vfip->attempts,
 		    vfip->reason);
-
-		vfip->flag &= ~(EMLXS_VFI_REG | EMLXS_VFI_INIT);
 
 		vfip->flag &= ~EMLXS_VFI_REQ_MASK;
 		vfip->flag |= EMLXS_VFI_OFFLINE_REQ;
@@ -8115,6 +10733,7 @@ emlxs_vfi_reg_mbcmpl(emlxs_hba_t *hba, MAILBOXQ *mbq)
 	emlxs_port_t *port = (emlxs_port_t *)mbq->port;
 	MAILBOX4 *mb4;
 	VFIobj_t *vfip;
+	MATCHMAP *mp;
 
 	vfip = (VFIobj_t *)mbq->context;
 	mb4 = (MAILBOX4 *)mbq;
@@ -8123,7 +10742,7 @@ emlxs_vfi_reg_mbcmpl(emlxs_hba_t *hba, MAILBOXQ *mbq)
 
 	if (vfip->state != VFI_STATE_REG) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "vfi_reg_mbcmpl:%d state=%s. Terminated.",
+		    "vfi_reg_mbcmpl:%d state=%s.",
 		    vfip->VFI,
 		    emlxs_vfi_state_xlate(vfip->state));
 
@@ -8133,9 +10752,9 @@ emlxs_vfi_reg_mbcmpl(emlxs_hba_t *hba, MAILBOXQ *mbq)
 
 	if (mb4->mbxStatus) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "vfi_reg_mbcmpl:%d failed. status=%x",
+		    "vfi_reg_mbcmpl:%d failed. %s. >",
 		    vfip->VFI,
-		    mb4->mbxStatus);
+		    emlxs_mb_xlate_status(mb4->mbxStatus));
 
 		(void) emlxs_vfi_state(port, vfip, VFI_STATE_REG_FAILED,
 		    FCF_REASON_MBOX_FAILED, mb4->mbxStatus, (void *)mbq->sbp);
@@ -8144,15 +10763,23 @@ emlxs_vfi_reg_mbcmpl(emlxs_hba_t *hba, MAILBOXQ *mbq)
 		return (0);
 	}
 
-	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-	    "vfi_reg_mbcmpl:%d Registered.",
-	    vfip->VFI);
+	/* Archive a copy of the sparams in case we need them later */
+	mp = (MATCHMAP *)mbq->bp;
+	bcopy((uint32_t *)mp->virt, (uint32_t *)&vfip->sparam,
+	    sizeof (SERV_PARM));
 
-	if (vfip->vpi_online == 1) {
-		port->VPIobj.flag |= EMLXS_VPI_REG;
+	if (vfip->flogi_vpip) {
+		if (mb4->un.varRegVFI4.vp == 1) {
+			vfip->flogi_vpip->flag |= EMLXS_VPI_REG;
+		}
+		vfip->flogi_vpip = NULL;
 	}
 
 	vfip->flag |= EMLXS_VFI_REG;
+
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+	    "vfi_reg_mbcmpl:%d. Reg complete. >",
+	    vfip->VFI);
 
 	(void) emlxs_vfi_state(port, vfip, VFI_STATE_REG_CMPL, 0, 0, 0);
 
@@ -8168,22 +10795,22 @@ emlxs_vfi_reg_action(emlxs_port_t *port, VFIobj_t *vfip, uint32_t evt,
     void *arg1)
 {
 	emlxs_hba_t *hba = HBA;
-	FCFIobj_t *fcfp;
 	MAILBOX4 *mb4;
 	MAILBOXQ *mbq;
 	MATCHMAP *mp;
-	uint32_t rval;
+	uint32_t rval = 0;
 	uint32_t edtov;
 	uint32_t ratov;
+	SERV_PARM *flogi_sparam;
+	uint32_t *wwpn;
 
 	if (vfip->state != VFI_STATE_REG) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
 		    "vfi_reg_action:%d %s:%s arg=%p. "
-		    "Invalid state. Terminated.",
+		    "Invalid state. <",
 		    vfip->VFI,
 		    emlxs_vfi_state_xlate(vfip->state),
 		    emlxs_fcf_event_xlate(evt), arg1);
-
 		return (1);
 	}
 
@@ -8201,10 +10828,24 @@ emlxs_vfi_reg_action(emlxs_port_t *port, VFIobj_t *vfip, uint32_t evt,
 		return (rval);
 	}
 
-	if (vfip->flag & EMLXS_VFI_REG) {
+	if (!vfip->flogi_vpip) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+		    "vfi_reg_action:%d %attempts=%d. No flogi_vpi found.",
+		    vfip->VFI,
+		    vfip->attempts);
+
+		vfip->flag &= ~EMLXS_VFI_REQ_MASK;
+		vfip->flag |= EMLXS_VFI_OFFLINE_REQ;
+
+		rval = emlxs_vfi_offline_handler(port, vfip, arg1);
+		return (rval);
+	}
+
+	if ((hba->model_info.chip & EMLXS_BE_CHIPS) &&
+	    (vfip->flag & EMLXS_VFI_REG)) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 		    "vfi_reg_action:%d flag=%x. "
-		    "Already registered. Skipping reg.",
+		    "Already registered. Skipping REG_VFI update.",
 		    vfip->VFI);
 
 		rval = emlxs_vfi_state(port, vfip, VFI_STATE_ONLINE,
@@ -8212,25 +10853,35 @@ emlxs_vfi_reg_action(emlxs_port_t *port, VFIobj_t *vfip, uint32_t evt,
 		return (rval);
 	}
 
-	if (vfip->fcf_sparam.cmn.edtovResolution) {
-		edtov = (LE_SWAP32(vfip->fcf_sparam.cmn.e_d_tov) + 999999) /
+	/* Get the flogi_vpip's fabric_rpip's service parameters */
+	flogi_sparam = &vfip->flogi_vpip->fabric_rpip->sparam;
+
+	if (flogi_sparam->cmn.edtovResolution) {
+		edtov = (LE_SWAP32(flogi_sparam->cmn.e_d_tov) + 999999) /
 		    1000000;
 	} else {
-		edtov = LE_SWAP32(vfip->fcf_sparam.cmn.e_d_tov);
+		edtov = LE_SWAP32(flogi_sparam->cmn.e_d_tov);
 	}
 
-	ratov = (LE_SWAP32(vfip->fcf_sparam.cmn.w2.r_a_tov) + 999) / 1000;
+	ratov = (LE_SWAP32(flogi_sparam->cmn.w2.r_a_tov) + 999) / 1000;
 
-	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-	    "vfi_reg_action:%d attempts=%d edtov=%d ratov=%d. "
-	    "Sending REG_VFI.",
-	    vfip->VFI,
-	    vfip->attempts,
-	    edtov, ratov);
+	if (vfip->flag & EMLXS_VFI_REG) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+		    "vfi_reg_action:%d attempts=%d edtov=%d ratov=%d. "
+		    "Updating REG_VFI. <",
+		    vfip->VFI,
+		    vfip->attempts,
+		    edtov, ratov);
+	} else {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+		    "vfi_reg_action:%d attempts=%d edtov=%d ratov=%d. "
+		    "Sending REG_VFI. <",
+		    vfip->VFI,
+		    vfip->attempts,
+		    edtov, ratov);
+	}
 
-	fcfp = vfip->fcfp;
-
-	if (!(mbq = (MAILBOXQ *)emlxs_mem_get(hba, MEM_MBOX, 1))) {
+	if (!(mbq = (MAILBOXQ *)emlxs_mem_get(hba, MEM_MBOX))) {
 		rval = emlxs_vfi_state(port, vfip, VFI_STATE_REG_FAILED,
 		    FCF_REASON_NO_MBOX, 0, arg1);
 
@@ -8239,7 +10890,7 @@ emlxs_vfi_reg_action(emlxs_port_t *port, VFIobj_t *vfip, uint32_t evt,
 	mb4 = (MAILBOX4*)mbq;
 	bzero((void *) mb4, MAILBOX_CMD_SLI4_BSIZE);
 
-	if ((mp = (MATCHMAP *)emlxs_mem_get(hba, MEM_BUF, 1)) == 0) {
+	if ((mp = (MATCHMAP *)emlxs_mem_get(hba, MEM_BUF)) == 0) {
 		emlxs_mem_put(hba, MEM_MBOX, (void *)mbq);
 
 		rval = emlxs_vfi_state(port, vfip, VFI_STATE_REG_FAILED,
@@ -8257,24 +10908,30 @@ emlxs_vfi_reg_action(emlxs_port_t *port, VFIobj_t *vfip, uint32_t evt,
 
 	mb4->mbxCommand = MBX_REG_VFI;
 	mb4->mbxOwner = OWN_HOST;
-	mb4->un.varRegVFI4.vfi = vfip->VFI;
 
-	if (vfip->fcfp->vfi_online == 1) {
+	mb4->un.varRegVFI4.vfi = vfip->VFI;
+	mb4->un.varRegVFI4.upd = (vfip->flag & EMLXS_VFI_REG)? 1:0;
+
+	/* If the flogi_vpip was not previously registered, */
+	/* perform the REG_VPI now */
+	if (!(vfip->flogi_vpip->flag & EMLXS_VPI_REG)) {
 		mb4->un.varRegVFI4.vp = 1;
-		mb4->un.varRegVFI4.vpi = port->VPIobj.VPI;
+		mb4->un.varRegVFI4.vpi = vfip->flogi_vpip->VPI;
 	}
 
-	mb4->un.varRegVFI4.fcfi = fcfp->FCFI;
+	mb4->un.varRegVFI4.fcfi = vfip->fcfp->FCFI;
+	wwpn = (uint32_t *)&port->wwpn;
+	mb4->un.varRegVFI4.portname[0] = BE_SWAP32(*wwpn);
+	wwpn++;
+	mb4->un.varRegVFI4.portname[1] = BE_SWAP32(*wwpn);
 	mb4->un.varRegVFI4.sid = port->did;
 	mb4->un.varRegVFI4.edtov = edtov;
-
-	/* Convert to seconds */
 	mb4->un.varRegVFI4.ratov = ratov;
 	mb4->un.varRegVFI4.bde.tus.f.bdeSize = sizeof (SERV_PARM);
 	mb4->un.varRegVFI4.bde.addrHigh = PADDR_HI(mp->phys);
 	mb4->un.varRegVFI4.bde.addrLow = PADDR_LO(mp->phys);
-	bcopy((uint32_t *)&vfip->fcf_sparam,
-	    (uint32_t *)mp->virt, sizeof (SERV_PARM));
+	bcopy((uint32_t *)flogi_sparam, (uint32_t *)mp->virt,
+	    sizeof (SERV_PARM));
 
 	rval = EMLXS_SLI_ISSUE_MBOX_CMD(hba, mbq, MBX_NOWAIT, 0);
 	if ((rval != MBX_BUSY) && (rval != MBX_SUCCESS)) {
@@ -8297,12 +10954,12 @@ static uint32_t
 emlxs_vfi_reg_cmpl_action(emlxs_port_t *port, VFIobj_t *vfip, uint32_t evt,
     void *arg1)
 {
-	uint32_t rval;
+	uint32_t rval = 0;
 
 	if (vfip->state != VFI_STATE_REG_CMPL) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
 		    "vfi_reg_cmpl_action:%d %s:%s arg=%p. "
-		    "Invalid state. Terminated.",
+		    "Invalid state. <",
 		    vfip->VFI,
 		    emlxs_vfi_state_xlate(vfip->state),
 		    emlxs_fcf_event_xlate(evt), arg1);
@@ -8339,14 +10996,14 @@ emlxs_vfi_online_action(emlxs_port_t *port, VFIobj_t *vfip, uint32_t evt,
 {
 	emlxs_hba_t *hba = HBA;
 	uint32_t i;
-	uint32_t rval;
-	VPIobj_t *vpip;
+	uint32_t rval = 0;
+	VPIobj_t *vpip = port->vpip;
 	emlxs_port_t *vport;
 
 	if (vfip->state != VFI_STATE_ONLINE) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 		    "vfi_online_action:%d %s:%s arg=%p. "
-		    "Invalid state. Terminated.",
+		    "Invalid state. <",
 		    vfip->VFI,
 		    emlxs_vfi_state_xlate(vfip->state),
 		    emlxs_fcf_event_xlate(evt), arg1);
@@ -8365,13 +11022,14 @@ emlxs_vfi_online_action(emlxs_port_t *port, VFIobj_t *vfip, uint32_t evt,
 		return (rval);
 	}
 
-	vpip = &port->VPIobj;
+	/* Take the port's Fabric RPI online now */
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+	    "vfi_online_action:%d. Onlining Fabric RPI. >",
+	    vfip->VFI);
 
-	/* Take Fabric RPI online now */
-	if (vpip->rpip->state != RPI_STATE_ONLINE) {
-		/* This will complete the FLOGI/FDISC back to Leadville */
-		(void) emlxs_rpi_event(port, FCF_EVENT_RPI_ONLINE, vpip->rpip);
-	}
+	/* This will complete the FLOGI/FDISC back to Leadville */
+	(void) emlxs_rpi_event(port, FCF_EVENT_RPI_ONLINE,
+	    vpip->fabric_rpip);
 
 	/* FLOGI/FDISC has been completed back to Leadville */
 	/* It is now safe to accept unsolicited requests */
@@ -8380,9 +11038,10 @@ emlxs_vfi_online_action(emlxs_port_t *port, VFIobj_t *vfip, uint32_t evt,
 	/* Online remaining VPI's */
 	for (i = 0; i <= hba->vpi_max; i++) {
 		vport = &VPORT(i);
-		vpip = &vport->VPIobj;
+		vpip = vport->vpip;
 
-		if (!(vport->flag & EMLXS_PORT_BOUND)) {
+		if (!(vport->flag & EMLXS_PORT_BOUND) ||
+		    (vpip->flag & EMLXS_VPI_PORT_UNBIND)) {
 			continue;
 		}
 
@@ -8393,7 +11052,7 @@ emlxs_vfi_online_action(emlxs_port_t *port, VFIobj_t *vfip, uint32_t evt,
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 		    "vfi_online_action:%d vpi_online=%d logi_count=%d. "
-		    "Onlining VPI:%d",
+		    "Onlining VPI:%d >",
 		    vfip->VFI,
 		    vfip->vpi_online,
 		    vfip->logi_count,
@@ -8405,7 +11064,7 @@ emlxs_vfi_online_action(emlxs_port_t *port, VFIobj_t *vfip, uint32_t evt,
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 	    "vfi_online_action:%d vpi_online=%d logi_count=%d. "
-	    "VFI online. Notifying FCFI:%d.",
+	    "VFI online. Notifying FCFI:%d. >",
 	    vfip->VFI,
 	    vfip->vpi_online,
 	    vfip->logi_count,
@@ -8437,7 +11096,7 @@ emlxs_vpi_state_xlate(uint32_t state)
 		}
 	}
 
-	(void) sprintf(buffer, "state=0x%x", state);
+	(void) snprintf(buffer, sizeof (buffer), "state=0x%x", state);
 	return (buffer);
 
 } /* emlxs_vpi_state_xlate() */
@@ -8447,7 +11106,7 @@ static uint32_t
 emlxs_vpi_action(emlxs_port_t *port, VPIobj_t *vpip, uint32_t evt,
     void *arg1)
 {
-	uint32_t rval;
+	uint32_t rval = 0;
 	uint32_t(*func) (emlxs_port_t *, VPIobj_t *, uint32_t, void *);
 	uint32_t index;
 	uint32_t events;
@@ -8489,7 +11148,7 @@ emlxs_vpi_action(emlxs_port_t *port, VPIobj_t *vpip, uint32_t evt,
 
 	if (!func) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_event_msg,
-		    "vpi:%d %s:%s arg=%p. No action. Terminated.",
+		    "vpi_action:%d %s:%s arg=%p. No action. <",
 		    vpip->VPI,
 		    emlxs_vpi_state_xlate(vpip->state),
 		    emlxs_fcf_event_xlate(evt), arg1);
@@ -8510,7 +11169,7 @@ emlxs_vpi_event(emlxs_port_t *port, uint32_t evt,
 {
 	VPIobj_t *vpip = NULL;
 	RPIobj_t *rpip;
-	uint32_t rval;
+	uint32_t rval = 0;
 
 	/* Filter events and acquire fcfi context */
 	switch (evt) {
@@ -8521,7 +11180,7 @@ emlxs_vpi_event(emlxs_port_t *port, uint32_t evt,
 
 		if (!rpip) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_event_msg,
-			    "rpi: %s arg=%p. Null RPI found. Terminated.",
+			    "vpi_event: %s arg=%p. Null RPI found. <",
 			    emlxs_fcf_event_xlate(evt), arg1);
 
 			return (1);
@@ -8537,7 +11196,7 @@ emlxs_vpi_event(emlxs_port_t *port, uint32_t evt,
 
 		if (!vpip) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_event_msg,
-			    "vpi: %s arg=%p. Null VPI found. Terminated.",
+			    "vpi_event: %s arg=%p. Null VPI found. <",
 			    emlxs_fcf_event_xlate(evt), arg1);
 
 			return (1);
@@ -8550,7 +11209,7 @@ emlxs_vpi_event(emlxs_port_t *port, uint32_t evt,
 	}
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_event_msg,
-	    "vpi:%d %s:%s arg=%p",
+	    "vpi_event:%d %s:%s arg=%p",
 	    vpip->VPI,
 	    emlxs_vpi_state_xlate(vpip->state),
 	    emlxs_fcf_event_xlate(evt), arg1);
@@ -8577,24 +11236,23 @@ emlxs_vpi_state(emlxs_port_t *port, VPIobj_t *vpip, uint16_t state,
 	    (reason != FCF_REASON_REENTER)) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
 		    "vpi_state:%d %s:%s:0x%x arg=%p. "
-		    "State not changed. Terminated.",
+		    "State not changed. <",
 		    vpip->VPI,
 		    emlxs_vpi_state_xlate(vpip->state),
 		    emlxs_fcf_reason_xlate(reason),
 		    explain, arg1);
-
 		return (1);
 	}
 
 	if (!reason) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_state_msg,
-		    "vpi:%d %s-->%s arg=%p",
+		    "vpi_state:%d %s-->%s arg=%p",
 		    vpip->VPI,
 		    emlxs_vpi_state_xlate(vpip->state),
 		    emlxs_vpi_state_xlate(state), arg1);
 	} else if (reason == FCF_REASON_EVENT) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_state_msg,
-		    "vpi:%d %s-->%s:%s:%s arg=%p",
+		    "vpi_state:%d %s-->%s:%s:%s arg=%p",
 		    vpip->VPI,
 		    emlxs_vpi_state_xlate(vpip->state),
 		    emlxs_vpi_state_xlate(state),
@@ -8602,7 +11260,7 @@ emlxs_vpi_state(emlxs_port_t *port, VPIobj_t *vpip, uint16_t state,
 		    emlxs_fcf_event_xlate(explain), arg1);
 	} else if (explain) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_state_msg,
-		    "vpi:%d %s-->%s:%s:0x%x arg=%p",
+		    "vpi_state:%d %s-->%s:%s:0x%x arg=%p",
 		    vpip->VPI,
 		    emlxs_vpi_state_xlate(vpip->state),
 		    emlxs_vpi_state_xlate(state),
@@ -8610,7 +11268,7 @@ emlxs_vpi_state(emlxs_port_t *port, VPIobj_t *vpip, uint16_t state,
 		    explain, arg1);
 	} else {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_state_msg,
-		    "vpi:%d %s-->%s:%s arg=%p",
+		    "vpi_state:%d %s-->%s:%s arg=%p",
 		    vpip->VPI,
 		    emlxs_vpi_state_xlate(vpip->state),
 		    emlxs_vpi_state_xlate(state),
@@ -8633,12 +11291,12 @@ extern uint32_t
 emlxs_vpi_port_bind_notify(emlxs_port_t *port)
 {
 	emlxs_hba_t *hba = HBA;
-	VPIobj_t 	*vpip = &port->VPIobj;
+	VPIobj_t 	*vpip = port->vpip;
 	FCFTable_t	*fcftab = &hba->sli.sli4.fcftab;
 	uint32_t rval = 0;
 	VFIobj_t *vfip;
 	VFIobj_t *vfip1;
-	uint32_t i;
+	uint32_t i = 0;
 	FCFIobj_t *fcfp;
 	FCFIobj_t *fcfp1;
 
@@ -8649,6 +11307,15 @@ emlxs_vpi_port_bind_notify(emlxs_port_t *port)
 	if (hba->state < FC_LINK_UP) {
 		if (port->vpi == 0) {
 			(void) emlxs_reset_link(hba, 1, 0);
+
+			/* Wait for VPI to go online */
+			while ((vpip->state != VPI_STATE_PORT_ONLINE) &&
+			    (hba->state != FC_ERROR)) {
+				delay(drv_usectohz(500000));
+				if (i++ > 30) {
+					break;
+				}
+			}
 		}
 		return (0);
 	}
@@ -8677,7 +11344,7 @@ emlxs_vpi_port_bind_notify(emlxs_port_t *port)
 	if (!fcfp) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 		    "vpi_port_bind_notify:%d %s. "
-		    "No FCF available yet. Terminated.",
+		    "No FCF available yet.",
 		    vpip->VPI,
 		    emlxs_vpi_state_xlate(vpip->state));
 
@@ -8698,7 +11365,7 @@ emlxs_vpi_port_bind_notify(emlxs_port_t *port)
 	if (!vfip) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 		    "vpi_port_bind_notify:%d %s fcfi:%d. "
-		    "No VFI available yet. Terminated.",
+		    "No VFI available yet.",
 		    vpip->VPI,
 		    emlxs_vpi_state_xlate(vpip->state),
 		    fcfp->fcf_index);
@@ -8711,7 +11378,7 @@ emlxs_vpi_port_bind_notify(emlxs_port_t *port)
 done:
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-	    "vpi_port_bind_notify:%d %s fcfi:%d vfi:%d. Onlining VPI:%d",
+	    "vpi_port_bind_notify:%d %s fcfi:%d vfi:%d. Onlining VPI:%d >",
 	    vpip->VPI,
 	    emlxs_vpi_state_xlate(vpip->state),
 	    fcfp->fcf_index,
@@ -8731,7 +11398,7 @@ extern uint32_t
 emlxs_vpi_port_unbind_notify(emlxs_port_t *port, uint32_t wait)
 {
 	emlxs_hba_t *hba = HBA;
-	VPIobj_t 	*vpip = &port->VPIobj;
+	VPIobj_t 	*vpip = port->vpip;
 	uint32_t rval = 0;
 	VFIobj_t *vfip;
 	uint32_t i;
@@ -8741,6 +11408,10 @@ emlxs_vpi_port_unbind_notify(emlxs_port_t *port, uint32_t wait)
 		return (1);
 	}
 
+	if (!(hba->sli.sli4.flag & EMLXS_SLI4_FCF_INIT)) {
+		return (0);
+	}
+
 	mutex_enter(&EMLXS_FCF_LOCK);
 
 	if (vpip->state == VPI_STATE_OFFLINE) {
@@ -8748,12 +11419,18 @@ emlxs_vpi_port_unbind_notify(emlxs_port_t *port, uint32_t wait)
 		return (0);
 	}
 
+	/*
+	 * Set flag to indicate that emlxs_vpi_port_unbind_notify
+	 * has been called
+	 */
+	vpip->flag |= EMLXS_VPI_PORT_UNBIND;
+
 	vfip = vpip->vfip;
 	fcfp = vfip->fcfp;
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 	    "vpi_port_unbind_notify:%d %s fcfi:%d vfi:%d. "
-	    "Offlining VPI:%d,%d",
+	    "Offlining VPI:%d,%d >",
 	    vpip->VPI,
 	    emlxs_vpi_state_xlate(vpip->state),
 	    fcfp->fcf_index,
@@ -8771,7 +11448,7 @@ emlxs_vpi_port_unbind_notify(emlxs_port_t *port, uint32_t wait)
 			}
 
 			mutex_exit(&EMLXS_FCF_LOCK);
-			DELAYMS(1000);
+			BUSYWAIT_MS(1000);
 			mutex_enter(&EMLXS_FCF_LOCK);
 		}
 
@@ -8787,6 +11464,8 @@ emlxs_vpi_port_unbind_notify(emlxs_port_t *port, uint32_t wait)
 		}
 	}
 
+	vpip->flag &= ~EMLXS_VPI_PORT_UNBIND;
+
 	mutex_exit(&EMLXS_FCF_LOCK);
 
 	return (rval);
@@ -8799,13 +11478,13 @@ static uint32_t
 emlxs_vpi_rpi_offline_evt_action(emlxs_port_t *port, VPIobj_t *vpip,
     uint32_t evt, void *arg1)
 {
-	uint32_t rval;
+	uint32_t rval = 0;
 	RPIobj_t *rpip = (RPIobj_t *)arg1;
 
 	if (evt != FCF_EVENT_RPI_OFFLINE) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
 		    "vpi_rpi_offline_evt_action:%d %s:%s arg=%p flag=%x. "
-		    "Invalid event type. Terminated.",
+		    "Invalid event type. <",
 		    vpip->VPI,
 		    emlxs_vpi_state_xlate(vpip->state),
 		    emlxs_fcf_event_xlate(evt), arg1,
@@ -8818,7 +11497,7 @@ emlxs_vpi_rpi_offline_evt_action(emlxs_port_t *port, VPIobj_t *vpip,
 		/* rpi_online will be checked when LOGO is complete */
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 		    "vpi_rpi_offline_evt_action:%d rpi_online=%d,%d did=%x "
-		    "rpi=%d. Waiting for LOGO. Terminated.",
+		    "rpi=%d. Waiting for LOGO. <",
 		    vpip->VPI,
 		    vpip->rpi_online, vpip->rpi_paused,
 		    rpip->did, rpip->RPI);
@@ -8841,7 +11520,7 @@ emlxs_vpi_rpi_offline_evt_action(emlxs_port_t *port, VPIobj_t *vpip,
 	case VPI_STATE_PAUSED:
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 		    "vpi_rpi_offline_evt_action:%d rpi_online=%d,%d did=%x "
-		    "rpi=%d. VPI paused. Terminated.",
+		    "rpi=%d. VPI paused. <",
 		    vpip->VPI,
 		    vpip->rpi_online, vpip->rpi_paused,
 		    rpip->did, rpip->RPI);
@@ -8852,7 +11531,7 @@ emlxs_vpi_rpi_offline_evt_action(emlxs_port_t *port, VPIobj_t *vpip,
 	case VPI_STATE_ONLINE:
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 		    "vpi_rpi_offline_evt_action:%d rpi_online=%d,%d did=%x "
-		    "rpi=%d. Terminated.",
+		    "rpi=%d. <",
 		    vpip->VPI,
 		    vpip->rpi_online, vpip->rpi_paused,
 		    rpip->did, rpip->RPI);
@@ -8864,7 +11543,7 @@ emlxs_vpi_rpi_offline_evt_action(emlxs_port_t *port, VPIobj_t *vpip,
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 		    "vpi_rpi_offline_evt_action:%d rpi_online=%d,%d did=%x "
 		    "rpi=%d. "
-		    "Invalid state. Terminated.",
+		    "Invalid state. <",
 		    vpip->VPI,
 		    vpip->rpi_online, vpip->rpi_paused,
 		    rpip->did, rpip->RPI);
@@ -8883,13 +11562,13 @@ static uint32_t
 emlxs_vpi_rpi_pause_evt_action(emlxs_port_t *port, VPIobj_t *vpip,
     uint32_t evt, void *arg1)
 {
-	uint32_t rval;
+	uint32_t rval = 0;
 	RPIobj_t *rpip = (RPIobj_t *)arg1;
 
 	if (evt != FCF_EVENT_RPI_PAUSE) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
 		    "vpi_rpi_pause_evt_action:%d %s:%s arg=%p flag=%x. "
-		    "Invalid event type. Terminated.",
+		    "Invalid event type. <",
 		    vpip->VPI,
 		    emlxs_vpi_state_xlate(vpip->state),
 		    emlxs_fcf_event_xlate(evt), arg1,
@@ -8902,7 +11581,7 @@ emlxs_vpi_rpi_pause_evt_action(emlxs_port_t *port, VPIobj_t *vpip,
 		/* rpi_online will be checked when LOGO is complete */
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 		    "vpi_rpi_pause_evt_action:%d rpi_online=%d,%d did=%x "
-		    "rpi=%d. Waiting for LOGO. Terminated.",
+		    "rpi=%d. Waiting for LOGO. <",
 		    vpip->VPI,
 		    vpip->rpi_online, vpip->rpi_paused,
 		    rpip->did, rpip->RPI);
@@ -8925,7 +11604,7 @@ emlxs_vpi_rpi_pause_evt_action(emlxs_port_t *port, VPIobj_t *vpip,
 	case VPI_STATE_PAUSED:
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 		    "vpi_rpi_pause_evt_action:%d rpi_online=%d,%d did=%x "
-		    "rpi=%d. VPI already paused. Terminated.",
+		    "rpi=%d. VPI already paused. <",
 		    vpip->VPI,
 		    vpip->rpi_online, vpip->rpi_paused,
 		    rpip->did, rpip->RPI);
@@ -8937,7 +11616,7 @@ emlxs_vpi_rpi_pause_evt_action(emlxs_port_t *port, VPIobj_t *vpip,
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 		    "vpi_rpi_pause_evt_action:%d rpi_online=%d,%d did=%x "
 		    "rpi=%d. "
-		    "Invalid state. Terminated.",
+		    "Invalid state. <",
 		    vpip->VPI,
 		    vpip->rpi_online, vpip->rpi_paused,
 		    rpip->did, rpip->RPI);
@@ -8961,7 +11640,7 @@ emlxs_vpi_rpi_online_evt_action(emlxs_port_t *port, VPIobj_t *vpip,
 	if (evt != FCF_EVENT_RPI_ONLINE) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
 		    "vpi_rpi_online_evt_action:%d %s:%s arg=%p flag=%x. "
-		    "Invalid event type. Terminated.",
+		    "Invalid event type. <",
 		    vpip->VPI,
 		    emlxs_vpi_state_xlate(vpip->state),
 		    emlxs_fcf_event_xlate(evt), arg1,
@@ -8970,8 +11649,7 @@ emlxs_vpi_rpi_online_evt_action(emlxs_port_t *port, VPIobj_t *vpip,
 	}
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-	    "vpi_rpi_online_evt_action:%d rpi_online=%d,%d did=%x rpi=%d. "
-	    "Terminated.",
+	    "vpi_rpi_online_evt_action:%d rpi_online=%d,%d did=%x rpi=%d. <",
 	    vpip->VPI,
 	    vpip->rpi_online, vpip->rpi_paused,
 	    rpip->did, rpip->RPI);
@@ -8986,12 +11664,12 @@ static uint32_t
 emlxs_vpi_online_evt_action(emlxs_port_t *port, VPIobj_t *vpip, uint32_t evt,
     void *arg1)
 {
-	uint32_t rval;
+	uint32_t rval = 0;
 
 	if (evt != FCF_EVENT_VPI_ONLINE) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
 		    "vpi_online_evt_action:%d %s:%s arg=%p flag=%x. "
-		    "Invalid event type. Terminated.",
+		    "Invalid event type. <",
 		    vpip->VPI,
 		    emlxs_vpi_state_xlate(vpip->state),
 		    emlxs_fcf_event_xlate(evt), arg1,
@@ -9002,7 +11680,7 @@ emlxs_vpi_online_evt_action(emlxs_port_t *port, VPIobj_t *vpip, uint32_t evt,
 	if (vpip->flag & EMLXS_VPI_ONLINE_REQ) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 		    "vpi_online_evt_action:%d flag=%x. "
-		    "Online already requested. Terminated.",
+		    "Online already requested. <",
 		    vpip->VPI,
 		    vpip->flag);
 		return (1);
@@ -9035,7 +11713,7 @@ emlxs_vpi_online_evt_action(emlxs_port_t *port, VPIobj_t *vpip, uint32_t evt,
 
 	default:
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "vpi_online_evt_action:%d flag=%x. Terminated.",
+		    "vpi_online_evt_action:%d flag=%x. <",
 		    vpip->VPI,
 		    vpip->flag);
 		return (1);
@@ -9050,7 +11728,7 @@ emlxs_vpi_online_evt_action(emlxs_port_t *port, VPIobj_t *vpip, uint32_t evt,
 static uint32_t
 emlxs_vpi_offline_handler(emlxs_port_t *port, VPIobj_t *vpip, void *arg1)
 {
-	uint32_t rval;
+	uint32_t rval = 0;
 
 	if (!(vpip->flag & EMLXS_VPI_OFFLINE_REQ)) {
 		return (0);
@@ -9087,13 +11765,13 @@ static uint32_t
 emlxs_vpi_offline_evt_action(emlxs_port_t *port, VPIobj_t *vpip, uint32_t evt,
     void *arg1)
 {
-	uint32_t rval;
+	uint32_t rval = 0;
 	uint32_t pause_req;
 
 	if (evt != FCF_EVENT_VPI_OFFLINE) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
 		    "vpi_offline_evt_action:%d %s:%s arg=%p flag=%x. "
-		    "Invalid event type. Terminated.",
+		    "Invalid event type. <",
 		    vpip->VPI,
 		    emlxs_vpi_state_xlate(vpip->state),
 		    emlxs_fcf_event_xlate(evt), arg1,
@@ -9105,7 +11783,7 @@ emlxs_vpi_offline_evt_action(emlxs_port_t *port, VPIobj_t *vpip, uint32_t evt,
 	    !(vpip->flag & EMLXS_VPI_PAUSE_REQ)) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 		    "vpi_offline_evt_action:%d flag=%x. "
-		    "Offline already requested. Terminated.",
+		    "Offline already requested. <",
 		    vpip->VPI,
 		    vpip->flag);
 		return (1);
@@ -9186,7 +11864,7 @@ emlxs_vpi_offline_evt_action(emlxs_port_t *port, VPIobj_t *vpip, uint32_t evt,
 	/* Transitional states */
 	default:
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "vpi_offline_evt_action:%d flag=%x. Terminated.",
+		    "vpi_offline_evt_action:%d flag=%x. <",
 		    vpip->VPI,
 		    vpip->flag);
 		break;
@@ -9203,12 +11881,12 @@ emlxs_vpi_pause_evt_action(emlxs_port_t *port, VPIobj_t *vpip, uint32_t evt,
     void *arg1)
 {
 	emlxs_hba_t *hba = HBA;
-	uint32_t rval;
+	uint32_t rval = 0;
 
 	if (evt != FCF_EVENT_VPI_PAUSE) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
 		    "vpi_pause_evt_action:%d %s:%s arg=%p flag=%x. "
-		    "Invalid event type. Terminated.",
+		    "Invalid event type. <",
 		    vpip->VPI,
 		    emlxs_vpi_state_xlate(vpip->state),
 		    emlxs_fcf_event_xlate(evt), arg1,
@@ -9219,7 +11897,7 @@ emlxs_vpi_pause_evt_action(emlxs_port_t *port, VPIobj_t *vpip, uint32_t evt,
 	if (vpip->flag & EMLXS_VPI_PAUSE_REQ) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 		    "vpi_pause_evt_action:%d flag=%x. "
-		    "Pause already requested. Terminated.",
+		    "Pause already requested. <",
 		    vpip->VPI,
 		    vpip->flag);
 		return (1);
@@ -9228,29 +11906,22 @@ emlxs_vpi_pause_evt_action(emlxs_port_t *port, VPIobj_t *vpip, uint32_t evt,
 	if (vpip->flag & EMLXS_VPI_OFFLINE_REQ) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 		    "vpi_pause_evt_action:%d flag=%x. "
-		    "Offline already requested. Terminated.",
+		    "Offline already requested. <",
 		    vpip->VPI,
 		    vpip->flag);
 		return (1);
 	}
 
-	if (!(hba->sli.sli4.flag & EMLXS_SLI4_DOWN_LINK)) {
+	if (SLI4_FC_MODE || !(hba->sli.sli4.flag & EMLXS_SLI4_DOWN_LINK)) {
 		/* Fabric logo is implied */
-		vpip->flag &= ~EMLXS_VPI_LOGI;
-		if (vpip->flag & EMLXS_VPI_VFI_LOGI) {
-			vpip->flag &= ~EMLXS_VPI_VFI_LOGI;
-
-			if (vpip->vfip->logi_count > 0) {
-				vpip->vfip->logi_count--;
-			}
-		}
+		emlxs_vpi_logo_handler(port, vpip);
 	}
 
 	switch (vpip->state) {
 	case VPI_STATE_PORT_OFFLINE:
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 		    "vpi_pause_evt_action:%d flag=%x. "
-		    "Already offline. Terminated.",
+		    "Already offline. <",
 		    vpip->VPI,
 		    vpip->flag);
 		break;
@@ -9258,7 +11929,7 @@ emlxs_vpi_pause_evt_action(emlxs_port_t *port, VPIobj_t *vpip, uint32_t evt,
 	case VPI_STATE_PAUSED:
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 		    "vpi_pause_evt_action:%d flag=%x. "
-		    "Already paused. Terminated.",
+		    "Already paused. <",
 		    vpip->VPI,
 		    vpip->flag);
 		break;
@@ -9288,7 +11959,7 @@ emlxs_vpi_pause_evt_action(emlxs_port_t *port, VPIobj_t *vpip, uint32_t evt,
 		vpip->flag |= (EMLXS_VPI_OFFLINE_REQ | EMLXS_VPI_PAUSE_REQ);
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "vpi_pause_evt_action:%d flag=%x. Terminated.",
+		    "vpi_pause_evt_action:%d flag=%x. <",
 		    vpip->VPI,
 		    vpip->flag);
 		break;
@@ -9301,15 +11972,33 @@ emlxs_vpi_pause_evt_action(emlxs_port_t *port, VPIobj_t *vpip, uint32_t evt,
 
 /* ARGSUSED */
 static void
-emlxs_pkt_cmpl_thread(emlxs_hba_t *hba,
+emlxs_deferred_cmpl_thread(emlxs_hba_t *hba,
 	void *arg1, void *arg2)
 {
-	emlxs_buf_t *sbp = (emlxs_buf_t *)arg1;
-	emlxs_pkt_complete(sbp, -1, 0, 1);
+	emlxs_deferred_cmpl_t *cmpl = (emlxs_deferred_cmpl_t *)arg1;
+	uint32_t status = (uint32_t)((unsigned long)arg2);
+	emlxs_port_t *port;
+	uint32_t mbxStatus;
+	emlxs_buf_t *sbp;
+	fc_unsol_buf_t *ubp;
+	IOCBQ *iocbq;
+
+	mbxStatus = (status)? MBX_FAILURE:MBX_SUCCESS;
+
+	port = cmpl->port;
+	sbp = (emlxs_buf_t *)cmpl->arg1;
+	ubp = (fc_unsol_buf_t *)cmpl->arg2;
+	iocbq = (IOCBQ *)cmpl->arg3;
+
+	kmem_free(cmpl, sizeof (emlxs_deferred_cmpl_t));
+
+	emlxs_mb_deferred_cmpl(port, mbxStatus, sbp, ubp, iocbq);
 
 	return;
 
-} /* emlxs_pkt_cmpl_thread() */
+} /* emlxs_deferred_cmpl_thread() */
+
+
 
 
 /* ARGSUSED */
@@ -9318,7 +12007,7 @@ emlxs_port_offline_thread(emlxs_hba_t *hba,
 	void *arg1, void *arg2)
 {
 	emlxs_port_t *port = (emlxs_port_t *)arg1;
-	uint32_t scope = (uint32_t)((uintptr_t)arg2);
+	uint32_t scope = (uint32_t)((unsigned long)arg2);
 
 	(void) emlxs_port_offline(port, scope);
 	return;
@@ -9340,6 +12029,25 @@ emlxs_port_online_thread(emlxs_hba_t *hba,
 
 
 /*ARGSUSED*/
+static void
+emlxs_vpi_logo_handler(emlxs_port_t *port, VPIobj_t *vpip)
+{
+	vpip->flag &= ~EMLXS_VPI_LOGI;
+	if (vpip->flag & EMLXS_VPI_VFI_LOGI) {
+		vpip->flag &= ~EMLXS_VPI_VFI_LOGI;
+
+		if (vpip->vfip->logi_count) {
+			vpip->vfip->logi_count--;
+		}
+		if (vpip == vpip->vfip->flogi_vpip) {
+			vpip->vfip->flogi_vpip = NULL;
+		}
+	}
+
+} /* emlxs_vpi_logo_handler() */
+
+
+/*ARGSUSED*/
 static uint32_t
 emlxs_vpi_port_offline_action(emlxs_port_t *port, VPIobj_t *vpip, uint32_t evt,
     void *arg1)
@@ -9351,7 +12059,7 @@ emlxs_vpi_port_offline_action(emlxs_port_t *port, VPIobj_t *vpip, uint32_t evt,
 	if (vpip->state != VPI_STATE_PORT_OFFLINE) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 		    "vpi_port_offline_action:%d %s:%s arg=%p. "
-		    "Invalid state. Terminated.",
+		    "Invalid state. <",
 		    vpip->VPI,
 		    emlxs_vpi_state_xlate(vpip->state),
 		    emlxs_fcf_event_xlate(evt), arg1);
@@ -9360,7 +12068,7 @@ emlxs_vpi_port_offline_action(emlxs_port_t *port, VPIobj_t *vpip, uint32_t evt,
 
 	if (vpip->flag & EMLXS_VPI_PORT_ONLINE) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "vpi_port_offline_action:%d flag=%x. Offline port.",
+		    "vpi_port_offline_action:%d flag=%x. Offlining port...",
 		    vpip->VPI,
 		    vpip->flag);
 
@@ -9374,7 +12082,7 @@ emlxs_vpi_port_offline_action(emlxs_port_t *port, VPIobj_t *vpip, uint32_t evt,
 		}
 
 		emlxs_thread_spawn(hba, emlxs_port_offline_thread,
-		    (void *)vpip->port, (void *)((uintptr_t)scope));
+		    (void *)vpip->port, (void *)((unsigned long)scope));
 
 		if (vpip->flag & EMLXS_VPI_LOGI) {
 			rval = emlxs_vpi_state(port, vpip, VPI_STATE_LOGO,
@@ -9388,16 +12096,21 @@ emlxs_vpi_port_offline_action(emlxs_port_t *port, VPIobj_t *vpip, uint32_t evt,
 		if (vpip->rpi_online > vpip->rpi_paused) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 			    "vpi_port_offline_action:%d rpi_online=%d,%d. "
-			    "Pausing. Waiting for RPI's.",
+			    "Pausing. Waiting for RPI's. <",
 			    vpip->VPI,
 			    vpip->rpi_online, vpip->rpi_paused);
 			return (0);
 		}
 
 		/* Take the Fabric RPI offline now */
-		if (vpip->rpip->state != RPI_STATE_FREE) {
+		if (vpip->fabric_rpip->state != RPI_STATE_FREE) {
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+			    "vpi_port_offline_action:%d. "
+			    "Offlining Fabric RPI. >",
+			    vpip->VPI);
+
 			(void) emlxs_rpi_event(port, FCF_EVENT_RPI_OFFLINE,
-			    vpip->rpip);
+			    vpip->fabric_rpip);
 		}
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
@@ -9414,7 +12127,7 @@ emlxs_vpi_port_offline_action(emlxs_port_t *port, VPIobj_t *vpip, uint32_t evt,
 	if (vpip->rpi_online > 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 		    "vpi_port_offline_action:%d rpi_online=%d,%d. Offlining. "
-		    "Waiting for RPI's.",
+		    "Waiting for RPI's. <",
 		    vpip->VPI,
 		    vpip->rpi_online, vpip->rpi_paused);
 
@@ -9422,8 +12135,13 @@ emlxs_vpi_port_offline_action(emlxs_port_t *port, VPIobj_t *vpip, uint32_t evt,
 	}
 
 	/* Take the Fabric RPI offline now */
-	if (vpip->rpip->state != RPI_STATE_FREE) {
-		(void) emlxs_rpi_event(port, FCF_EVENT_RPI_OFFLINE, vpip->rpip);
+	if (vpip->fabric_rpip->state != RPI_STATE_FREE) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+		    "vpi_port_offline_action:%d. Offlining Fabric RPI. >",
+		    vpip->VPI);
+
+		(void) emlxs_rpi_event(port, FCF_EVENT_RPI_OFFLINE,
+		    vpip->fabric_rpip);
 	}
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
@@ -9448,7 +12166,7 @@ emlxs_vpi_paused_action(emlxs_port_t *port, VPIobj_t *vpip, uint32_t evt,
 	if (vpip->state != VPI_STATE_PAUSED) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 		    "vpi_paused_action:%d %s:%s arg=%p. "
-		    "Invalid state. Terminated.",
+		    "Invalid state. <",
 		    vpip->VPI,
 		    emlxs_vpi_state_xlate(vpip->state),
 		    emlxs_fcf_event_xlate(evt), arg1);
@@ -9458,7 +12176,7 @@ emlxs_vpi_paused_action(emlxs_port_t *port, VPIobj_t *vpip, uint32_t evt,
 	vpip->flag &= ~(EMLXS_VPI_OFFLINE_REQ | EMLXS_VPI_PAUSE_REQ);
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-	    "vpi_paused_action:%d rpi_online=%d,%d. VPI paused.",
+	    "vpi_paused_action:%d rpi_online=%d,%d. VPI paused. <",
 	    vpip->VPI,
 	    vpip->rpi_online, vpip->rpi_paused);
 
@@ -9472,12 +12190,12 @@ static uint32_t
 emlxs_vpi_offline_action(emlxs_port_t *port, VPIobj_t *vpip, uint32_t evt,
     void *arg1)
 {
-	uint32_t rval;
+	uint32_t rval = 0;
 
 	if (vpip->state != VPI_STATE_OFFLINE) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 		    "vpi_offline_action:%d %s:%s arg=%p. "
-		    "Invalid state. Terminated.",
+		    "Invalid state. <",
 		    vpip->VPI,
 		    emlxs_vpi_state_xlate(vpip->state),
 		    emlxs_fcf_event_xlate(evt), arg1);
@@ -9487,7 +12205,7 @@ emlxs_vpi_offline_action(emlxs_port_t *port, VPIobj_t *vpip, uint32_t evt,
 	if (!vpip->vfip) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 		    "vpi_offline_action:%d %s:%s arg=%p flag=%x. "
-		    "Null vfip found. Terminated.",
+		    "Null vfip found. <",
 		    vpip->VPI,
 		    emlxs_vpi_state_xlate(vpip->state),
 		    emlxs_fcf_event_xlate(evt), arg1,
@@ -9496,8 +12214,13 @@ emlxs_vpi_offline_action(emlxs_port_t *port, VPIobj_t *vpip, uint32_t evt,
 	}
 
 	/* Take the Fabric RPI offline, if still active */
-	if (vpip->rpip->state != RPI_STATE_FREE) {
-		(void) emlxs_rpi_event(port, FCF_EVENT_RPI_OFFLINE, vpip->rpip);
+	if (vpip->fabric_rpip->state != RPI_STATE_FREE) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+		    "vpi_offline_action:%d. Offlining Fabric RPI. >",
+		    vpip->VPI);
+
+		(void) emlxs_rpi_event(port, FCF_EVENT_RPI_OFFLINE,
+		    vpip->fabric_rpip);
 	}
 
 	vpip->flag &= ~(EMLXS_VPI_OFFLINE_REQ | EMLXS_VPI_PAUSE_REQ);
@@ -9524,7 +12247,7 @@ emlxs_vpi_offline_action(emlxs_port_t *port, VPIobj_t *vpip, uint32_t evt,
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 	    "vpi_offline_action:%d vpi_online=%d. "
-	    "VPI offline. Notifying VFI:%d.",
+	    "VPI offline. Notifying VFI:%d. >",
 	    vpip->VPI,
 	    vpip->vfip->vpi_online,
 	    vpip->vfip->VFI);
@@ -9552,7 +12275,7 @@ emlxs_vpi_init_mbcmpl(emlxs_hba_t *hba, MAILBOXQ *mbq)
 
 	if (vpip->state != VPI_STATE_INIT) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "vpi_init_mbcmpl:%d %s. Terminated.",
+		    "vpi_init_mbcmpl:%d %s.",
 		    vpip->VPI,
 		    emlxs_vpi_state_xlate(vpip->state));
 
@@ -9562,9 +12285,9 @@ emlxs_vpi_init_mbcmpl(emlxs_hba_t *hba, MAILBOXQ *mbq)
 
 	if (mb4->mbxStatus) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "vpi_init_mbcmpl:%d failed. status=%x",
+		    "vpi_init_mbcmpl:%d failed. %s. >",
 		    vpip->VPI,
-		    mb4->mbxStatus);
+		    emlxs_mb_xlate_status(mb4->mbxStatus));
 
 		(void) emlxs_vpi_state(port, vpip, VPI_STATE_INIT_FAILED,
 		    FCF_REASON_MBOX_FAILED, mb4->mbxStatus, 0);
@@ -9574,7 +12297,7 @@ emlxs_vpi_init_mbcmpl(emlxs_hba_t *hba, MAILBOXQ *mbq)
 	}
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-	    "vpi_init_mbcmpl:%d Initialized.",
+	    "vpi_init_mbcmpl:%d. Init complete. >",
 	    vpip->VPI,
 	    mb4->mbxStatus);
 
@@ -9596,12 +12319,12 @@ emlxs_vpi_init_action(emlxs_port_t *port, VPIobj_t *vpip, uint32_t evt,
 	emlxs_hba_t *hba = HBA;
 	MAILBOXQ *mbq;
 	MAILBOX4 *mb4;
-	uint32_t rval;
+	uint32_t rval = 0;
 
 	if (vpip->state != VPI_STATE_INIT) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 		    "vpi_init_action:%d %s:%s arg=%p. "
-		    "Invalid state. Terminated.",
+		    "Invalid state. <",
 		    vpip->VPI,
 		    emlxs_vpi_state_xlate(vpip->state),
 		    emlxs_fcf_event_xlate(evt), arg1);
@@ -9627,11 +12350,11 @@ emlxs_vpi_init_action(emlxs_port_t *port, VPIobj_t *vpip, uint32_t evt,
 		vpip->vfip->vpi_online++;
 	}
 
-	if (vpip->vfip->vpi_online == 1) {
+	if (((hba->sli_intf & SLI_INTF_IF_TYPE_MASK) ==
+	    SLI_INTF_IF_TYPE_0) && (vpip->vfip->vpi_online == 1)) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "vpi_init_action:%d vpi_online=%d. Skipping init.",
-		    vpip->VPI,
-		    vpip->vfip->vpi_online);
+		    "vpi_init_action:%d. First VPI. Skipping INIT_VPI.",
+		    vpip->VPI);
 
 		rval = emlxs_vpi_state(port, vpip, VPI_STATE_PORT_ONLINE,
 		    FCF_REASON_EVENT, evt, arg1);
@@ -9641,7 +12364,7 @@ emlxs_vpi_init_action(emlxs_port_t *port, VPIobj_t *vpip, uint32_t evt,
 	if (vpip->flag & EMLXS_VPI_INIT) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 		    "vpi_init_action:%d flag=%x. "
-		    "Already init'd. Skipping init.",
+		    "Already init'd. Skipping INIT_VPI.",
 		    vpip->VPI);
 
 		rval = emlxs_vpi_state(port, vpip, VPI_STATE_PORT_ONLINE,
@@ -9650,12 +12373,12 @@ emlxs_vpi_init_action(emlxs_port_t *port, VPIobj_t *vpip, uint32_t evt,
 	}
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-	    "vpi_init_action:%d vpi_online=%d attempts=%d. Sending INIT_VPI.",
+	    "vpi_init_action:%d vpi_online=%d attempts=%d. Sending INIT_VPI. <",
 	    vpip->VPI,
 	    vpip->vfip->vpi_online,
 	    vpip->attempts);
 
-	if (!(mbq = (MAILBOXQ *)emlxs_mem_get(hba, MEM_MBOX, 1))) {
+	if (!(mbq = (MAILBOXQ *)emlxs_mem_get(hba, MEM_MBOX))) {
 		rval = emlxs_vpi_state(port, vpip, FCFI_STATE_REG_FAILED,
 		    FCF_REASON_NO_MBOX, 0, arg1);
 		return (rval);
@@ -9693,19 +12416,18 @@ static uint32_t
 emlxs_vpi_init_failed_action(emlxs_port_t *port, VPIobj_t *vpip, uint32_t evt,
     void *arg1)
 {
-	uint32_t rval;
+	uint32_t rval = 0;
 
 	vpip->attempts++;
 
 	if (vpip->state != VPI_STATE_INIT_FAILED) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
 		    "vpi_init_action:%d %s:%s arg=%p attempt=%d. "
-		    "Invalid state. Terminated.",
+		    "Invalid state. <",
 		    vpip->VPI,
 		    emlxs_vpi_state_xlate(vpip->state),
 		    emlxs_fcf_event_xlate(evt), arg1,
 		    vpip->attempts);
-
 		return (1);
 	}
 
@@ -9743,12 +12465,12 @@ static uint32_t
 emlxs_vpi_init_cmpl_action(emlxs_port_t *port, VPIobj_t *vpip, uint32_t evt,
     void *arg1)
 {
-	uint32_t rval;
+	uint32_t rval = 0;
 
 	if (vpip->state != VPI_STATE_INIT_CMPL) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 		    "vpi_init_cmpl_action:%d %s:%s arg=%p. "
-		    "Invalid state. Terminated.",
+		    "Invalid state. <",
 		    vpip->VPI,
 		    emlxs_vpi_state_xlate(vpip->state),
 		    emlxs_fcf_event_xlate(evt), arg1);
@@ -9773,12 +12495,13 @@ emlxs_vpi_port_online_action(emlxs_port_t *port, VPIobj_t *vpip, uint32_t evt,
     void *arg1)
 {
 	emlxs_hba_t *hba = HBA;
-	uint32_t rval;
+	emlxs_config_t *cfg = &CFG;
+	uint32_t rval = 0;
 
 	if (vpip->state != VPI_STATE_PORT_ONLINE) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 		    "vpi_port_online_action:%d %s:%s arg=%p. "
-		    "Invalid state. Terminated.",
+		    "Invalid state. <",
 		    vpip->VPI,
 		    emlxs_vpi_state_xlate(vpip->state),
 		    emlxs_fcf_event_xlate(evt), arg1);
@@ -9801,20 +12524,57 @@ emlxs_vpi_port_online_action(emlxs_port_t *port, VPIobj_t *vpip, uint32_t evt,
 	}
 
 	/* Initialize the Fabric RPI */
-	if (vpip->rpip->state == RPI_STATE_FREE) {
-		(void) emlxs_rpi_alloc(port, FABRIC_DID);
+	if (vpip->fabric_rpip->state == RPI_STATE_FREE) {
+		emlxs_rpi_alloc_fabric_rpi(vpip->port);
 	}
-
-	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-	    "vpi_port_online_action:%d vpi_online=%d. Onlining port.",
-	    vpip->VPI,
-	    vpip->vfip->vpi_online);
 
 	/* Notify ULP */
 	vpip->flag |= EMLXS_VPI_PORT_ONLINE;
 
-	emlxs_thread_spawn(hba, emlxs_port_online_thread,
-	    (void *)vpip->port, 0);
+	if (hba->flag & FC_LOOPBACK_MODE) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+		    "vpi_port_online_action:%d. Loopback mode. "
+		    "Registering VPI.",
+		    vpip->VPI);
+
+		if (hba->topology != TOPOLOGY_LOOP) {
+			port->did = 1;
+		}
+
+		vpip->vfip->flogi_vpip = vpip;
+
+		bcopy((void *)&vpip->port->sparam,
+		    (void *)&vpip->fabric_rpip->sparam,
+		    sizeof (SERV_PARM));
+
+		/* Update the VPI Fabric RPI */
+		vpip->fabric_rpip->sparam.cmn.w2.r_a_tov =
+		    LE_SWAP32((FF_DEF_RATOV * 1000));
+
+		rval = emlxs_vpi_state(port, vpip, VPI_STATE_REG,
+		    FCF_REASON_EVENT, evt, arg1);
+
+		return (rval);
+	}
+
+	if ((hba->topology == TOPOLOGY_LOOP) && ! (port->did)) {
+		port->did = port->granted_alpa;
+	}
+
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+	    "vpi_port_online_action:%d vpi_online=%d. Onlining port... <",
+	    vpip->VPI,
+	    vpip->vfip->vpi_online);
+
+	if (SLI4_FC_MODE && (port->vpi == 0)) {
+		mutex_enter(&EMLXS_PORT_LOCK);
+		hba->linkup_timer = hba->timer_tics +
+		    cfg[CFG_LINKUP_TIMEOUT].current;
+		mutex_exit(&EMLXS_PORT_LOCK);
+	} else {
+		emlxs_thread_spawn(hba, emlxs_port_online_thread,
+		    (void *)vpip->port, 0);
+	}
 
 	/* Wait for emlxs_vpi_logi_notify() */
 
@@ -9826,9 +12586,9 @@ emlxs_vpi_port_online_action(emlxs_port_t *port, VPIobj_t *vpip, uint32_t evt,
 extern uint32_t
 emlxs_vpi_logi_notify(emlxs_port_t *port, emlxs_buf_t *sbp)
 {
-	VPIobj_t *vpip = &port->VPIobj;
+	VPIobj_t *vpip = port->vpip;
 	emlxs_hba_t *hba = HBA;
-	uint32_t rval;
+	uint32_t rval = 0;
 
 	if (hba->sli_mode < EMLXS_HBA_SLI4_MODE) {
 		return (1);
@@ -9838,7 +12598,7 @@ emlxs_vpi_logi_notify(emlxs_port_t *port, emlxs_buf_t *sbp)
 
 	if (vpip->state == VPI_STATE_OFFLINE) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "port_logi_notify:%d %s. Terminated.",
+		    "vpi_logi_notify:%d %s.",
 		    vpip->VPI,
 		    emlxs_vpi_state_xlate(vpip->state));
 
@@ -9849,8 +12609,8 @@ emlxs_vpi_logi_notify(emlxs_port_t *port, emlxs_buf_t *sbp)
 
 	if (vpip->state != VPI_STATE_PORT_ONLINE) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
-		    "port_logi_notify:%d %s. "
-		    "Invalid state. Terminated.",
+		    "vpi_logi_notify:%d %s. "
+		    "Invalid state.",
 		    vpip->VPI,
 		    emlxs_vpi_state_xlate(vpip->state));
 
@@ -9859,12 +12619,18 @@ emlxs_vpi_logi_notify(emlxs_port_t *port, emlxs_buf_t *sbp)
 		return (1);
 	}
 
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+	    "vpi_logi_notify:%d %s. "
+	    "Logging in. >",
+	    vpip->VPI,
+	    emlxs_vpi_state_xlate(vpip->state));
+
 	rval = emlxs_vpi_state(port, vpip, VPI_STATE_LOGI,
 	    0, 0, sbp);
 
 	if (rval) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "port_logi_notify:%d %s rval=%d.",
+		    "vpi_logi_notify:%d %s rval=%d.",
 		    vpip->VPI,
 		    emlxs_vpi_state_xlate(vpip->state),
 		    rval);
@@ -9877,56 +12643,119 @@ emlxs_vpi_logi_notify(emlxs_port_t *port, emlxs_buf_t *sbp)
 } /* emlxs_vpi_logi_notify() */
 
 
-extern uint32_t
-emlxs_vpi_logi_cmpl_notify(emlxs_port_t *port, emlxs_buf_t *sbp)
+static uint32_t
+emlxs_vpi_logi_cmpl_notify(emlxs_port_t *port, RPIobj_t *rpip)
 {
-	VPIobj_t *vpip = &port->VPIobj;
 	emlxs_hba_t *hba = HBA;
-	uint32_t rval;
+	VPIobj_t *vpip = port->vpip;
+	uint32_t rval = 0;
 
-	if (hba->sli_mode < EMLXS_HBA_SLI4_MODE) {
-		emlxs_pkt_complete(sbp, IOSTAT_LOCAL_REJECT,
-		    IOERR_NO_RESOURCES, 1);
-		return (1);
-	}
-
-	mutex_enter(&EMLXS_FCF_LOCK);
+	/* EMLXS_FCF_LOCK must be held when calling this routine */
 
 	if (vpip->state != VPI_STATE_LOGI) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
-		    "port_logi_cmpl_notify:%d %s. "
-		    "Invalid state. Terminated.",
+		    "vpi_logi_cmpl_notify:%d %s. "
+		    "Invalid state.",
 		    vpip->VPI,
 		    emlxs_vpi_state_xlate(vpip->state));
-
-		mutex_exit(&EMLXS_FCF_LOCK);
 		return (1);
 	}
 
-	rval = emlxs_vpi_state(port, vpip, VPI_STATE_LOGI_CMPL,
-	    0, 0, sbp);
+	if (rpip->RPI == FABRIC_RPI) {
+		if (hba->flag & FC_PT_TO_PT) {
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+			    "vpi_logi_cmpl_notify:%d %s. P2P mode. "
+			    "Completing FLOGI.",
+			    vpip->VPI,
+			    emlxs_vpi_state_xlate(vpip->state));
 
-	if (rval) {
+			/* Complete the FLOGI/FDISC now */
+			if (rpip->cmpl) {
+				emlxs_rpi_deferred_cmpl(port, rpip, 0);
+			}
+
+			/* Wait for P2P PLOGI completion to continue */
+			return (0);
+		}
+
+		if (!rpip->cmpl || !rpip->cmpl->arg1) {
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
+			    "vpi_logi_cmpl_notify:%d. Null sbp.",
+			    vpip->VPI);
+			return (1);
+		}
+
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "port_logi_cmpl_notify:%d %s rval=%d.",
+		    "vpi_logi_cmpl_notify:%d %s. Fabric mode. "
+		    "Completing login. >",
 		    vpip->VPI,
-		    emlxs_vpi_state_xlate(vpip->state),
-		    rval);
+		    emlxs_vpi_state_xlate(vpip->state));
+
+		rval = emlxs_vpi_state(port, vpip, VPI_STATE_LOGI_CMPL,
+		    0, 0, 0);
+
+		if (rval) {
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+			    "vpi_logi_cmpl_notify:%d %s rval=%d.",
+			    vpip->VPI,
+			    emlxs_vpi_state_xlate(vpip->state),
+			    rval);
+		}
+
+		return (rval);
 	}
 
-	mutex_exit(&EMLXS_FCF_LOCK);
+	if (hba->flag & FC_PT_TO_PT) {
+		if (port->did == 0) {
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+			    "vpi_logi_cmpl_notify:%d %s did=0. P2P mode. "
+			    "Wait for PLOGI compl.",
+			    vpip->VPI,
+			    emlxs_vpi_state_xlate(vpip->state));
 
-	return (rval);
+			if (rpip->cmpl) {
+				emlxs_rpi_deferred_cmpl(port, rpip, 0);
+			}
+
+			/* Wait for P2P PLOGI completion to continue */
+			return (0);
+		}
+
+		vpip->p2p_rpip = rpip;
+
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+		    "vpi_logi_cmpl_notify:%d %s. P2P mode. "
+		    "Completing login. >",
+		    vpip->VPI,
+		    emlxs_vpi_state_xlate(vpip->state));
+
+		rval = emlxs_vpi_state(port, vpip, VPI_STATE_LOGI_CMPL,
+		    0, 0, 0);
+
+		if (rval) {
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+			    "vpi_logi_cmpl_notify:%d %s rval=%d.",
+			    vpip->VPI,
+			    emlxs_vpi_state_xlate(vpip->state),
+			    rval);
+		}
+
+		return (rval);
+	}
+
+	return (1);
 
 } /* emlxs_vpi_logi_cmpl_notify() */
 
 
 extern uint32_t
-emlxs_vpi_logi_failed_notify(emlxs_port_t *port)
+emlxs_vpi_logi_failed_notify(emlxs_port_t *port, emlxs_buf_t *sbp)
 {
 	emlxs_hba_t *hba = HBA;
-	VPIobj_t *vpip = &port->VPIobj;
-	uint32_t rval;
+	VPIobj_t *vpip = port->vpip;
+	RPIobj_t *rpip = vpip->fabric_rpip;
+	uint32_t rval = 0;
+	emlxs_deferred_cmpl_t *cmpl;
 
 	if (hba->sli_mode < EMLXS_HBA_SLI4_MODE) {
 		return (1);
@@ -9935,33 +12764,101 @@ emlxs_vpi_logi_failed_notify(emlxs_port_t *port)
 	mutex_enter(&EMLXS_FCF_LOCK);
 
 	if (vpip->state != VPI_STATE_LOGI) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
-		    "port_logi_failed_notify:%d %s. "
-		    "Invalid state. Terminated.",
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+		    "vpi_logi_failed_notify:%d %s. "
+		    "Invalid state.",
 		    vpip->VPI,
 		    emlxs_vpi_state_xlate(vpip->state));
+
+		/* Fabric logo is implied */
+		emlxs_vpi_logo_handler(port, vpip);
 
 		mutex_exit(&EMLXS_FCF_LOCK);
 
 		return (1);
 	}
 
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+	    "vpi_logi_failed_notify:%d %s. "
+	    "Failing login. >",
+	    vpip->VPI,
+	    emlxs_vpi_state_xlate(vpip->state));
+
+	/* For safety */
+	if (rpip->cmpl) {
+		emlxs_rpi_deferred_cmpl(port, rpip, 1);
+	}
+
+	if (sbp) {
+		cmpl = (emlxs_deferred_cmpl_t *)kmem_zalloc(
+		    sizeof (emlxs_deferred_cmpl_t), KM_SLEEP);
+
+		cmpl->port = port;
+		cmpl->arg1 = (void *)sbp;
+		cmpl->arg2 = 0;
+		cmpl->arg3 = 0;
+
+		rpip->cmpl = cmpl;
+	}
+
 	rval = emlxs_vpi_state(port, vpip, VPI_STATE_LOGI_FAILED,
 	    FCF_REASON_OP_FAILED, 1, 0);
 
-	if (rval) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "port_logi_failed_notify:%d %s rval=%d.",
-		    vpip->VPI,
-		    emlxs_vpi_state_xlate(vpip->state),
-		    rval);
+	if (rval && rpip->cmpl) {
+		kmem_free(rpip->cmpl, sizeof (emlxs_deferred_cmpl_t));
+		rpip->cmpl = 0;
 	}
+
+	mutex_exit(&EMLXS_FCF_LOCK);
+	return (rval);
+
+} /* emlxs_vpi_logi_failed_notify() */
+
+
+extern uint32_t
+emlxs_vpi_logo_cmpl_notify(emlxs_port_t *port)
+{
+	emlxs_hba_t *hba = HBA;
+	VPIobj_t *vpip = port->vpip;
+	uint32_t rval = 0;
+	VFIobj_t *vfip;
+	FCFIobj_t *fcfp;
+
+	if (hba->sli_mode < EMLXS_HBA_SLI4_MODE) {
+		return (1);
+	}
+
+	mutex_enter(&EMLXS_FCF_LOCK);
+
+	/* Fabric logo is complete */
+	emlxs_vpi_logo_handler(port, vpip);
+
+	if ((vpip->state == VPI_STATE_OFFLINE) ||
+	    (vpip->flag & EMLXS_VPI_OFFLINE_REQ)) {
+		/* Already offline. Do nothing */
+		mutex_exit(&EMLXS_FCF_LOCK);
+		return (0);
+	}
+
+	vfip = vpip->vfip;
+	fcfp = vfip->fcfp;
+
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+	    "vpi_logo_cmpl_notify:%d %s fcfi:%d vfi:%d. "
+	    "Offlining VPI:%d,%d >",
+	    vpip->VPI,
+	    emlxs_vpi_state_xlate(vpip->state),
+	    fcfp->fcf_index,
+	    vfip->VFI,
+	    vpip->index, vpip->VPI);
+
+	rval = emlxs_vpi_event(port, FCF_EVENT_VPI_OFFLINE, vpip);
 
 	mutex_exit(&EMLXS_FCF_LOCK);
 
 	return (rval);
 
-} /* emlxs_vpi_logi_failed_notify() */
+} /* emlxs_vpi_logo_cmpl_notify() */
 
 
 /*ARGSUSED*/
@@ -9969,14 +12866,15 @@ static uint32_t
 emlxs_vpi_logi_action(emlxs_port_t *port, VPIobj_t *vpip, uint32_t evt,
     void *arg1)
 {
+	emlxs_hba_t *hba = HBA;
 	emlxs_buf_t *sbp = (emlxs_buf_t *)arg1;
 	fc_packet_t *pkt = PRIV2PKT(sbp);
-	uint32_t rval;
+	uint32_t rval = 0;
 
 	if (vpip->state != VPI_STATE_LOGI) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 		    "vpi_logi_action:%d %s:%s arg=%p. "
-		    "Invalid state. Terminated.",
+		    "Invalid state. <",
 		    vpip->VPI,
 		    emlxs_vpi_state_xlate(vpip->state),
 		    emlxs_fcf_event_xlate(evt), arg1);
@@ -9995,29 +12893,44 @@ emlxs_vpi_logi_action(emlxs_port_t *port, VPIobj_t *vpip, uint32_t evt,
 	if (vpip->flag & EMLXS_VPI_LOGI) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
 		    "vpi_logi_action:%d flag=%x. LOGI already set.",
-		    vpip->VPI);
+		    vpip->VPI, vpip->flag);
 
-		vpip->flag &= ~EMLXS_VPI_LOGI;
-		if (vpip->flag & EMLXS_VPI_VFI_LOGI) {
-			vpip->flag &= ~EMLXS_VPI_VFI_LOGI;
+		/* Fabric logo is implied */
+		emlxs_vpi_logo_handler(port, vpip);
+	}
 
-			if (vpip->vfip->logi_count > 0) {
-				vpip->vfip->logi_count--;
-			}
+	/* Check if FC_PT_TO_PT is set */
+	if (hba->flag & FC_PT_TO_PT) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+		    "vpi_logi_action:%d logi_count=%d. FLOGI set. P2P. <",
+		    vpip->VPI,
+		    vpip->vfip->logi_count);
+
+		*((uint32_t *)pkt->pkt_cmd) = (uint32_t)ELS_CMD_FLOGI;
+
+		vpip->vfip->flogi_vpip = vpip;
+
+		if (vpip->vfip->logi_count == 0) {
+			vpip->vfip->logi_count++;
+			vpip->flag |= EMLXS_VPI_VFI_LOGI;
 		}
+
+		return (0);
 	}
 
 	/* Set login command based on vfi logi_count */
 	if (vpip->vfip->logi_count == 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "vpi_logi_action:%d logi_count=%d. FLOGI set.",
+		    "vpi_logi_action:%d logi_count=%d. FLOGI set. <",
 		    vpip->VPI,
 		    vpip->vfip->logi_count);
 
 		*((uint32_t *)pkt->pkt_cmd) = (uint32_t)ELS_CMD_FLOGI;
+
+		vpip->vfip->flogi_vpip = vpip;
 	} else {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "vpi_logi_action:%d logi_count=%d. FDISC set.",
+		    "vpi_logi_action:%d logi_count=%d. FDISC set. <",
 		    vpip->VPI,
 		    vpip->vfip->logi_count);
 
@@ -10037,25 +12950,43 @@ static uint32_t
 emlxs_vpi_logi_failed_action(emlxs_port_t *port, VPIobj_t *vpip, uint32_t evt,
     void *arg1)
 {
-	uint32_t rval;
+	emlxs_hba_t *hba = HBA;
+	uint32_t rval = 0;
 
 	if (vpip->state != VPI_STATE_LOGI_FAILED) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 		    "vpi_logi_failed_action:%d %s:%s arg=%p. "
-		    "Invalid state. Terminated.",
+		    "Invalid state. <",
 		    vpip->VPI,
 		    emlxs_vpi_state_xlate(vpip->state),
 		    emlxs_fcf_event_xlate(evt), arg1);
 		return (1);
 	}
 
-	vpip->flag &= ~EMLXS_VPI_LOGI;
-	if (vpip->flag & EMLXS_VPI_VFI_LOGI) {
-		vpip->flag &= ~EMLXS_VPI_VFI_LOGI;
+	/* Fabric logo is implied */
+	emlxs_vpi_logo_handler(port, vpip);
 
-		if (vpip->vfip->logi_count > 0) {
-			vpip->vfip->logi_count--;
-		}
+	if (hba->topology == TOPOLOGY_LOOP) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+		    "vpi_logi_failed_action:%d. Private loop. "
+		    "Registering VPI.",
+		    vpip->VPI);
+
+		/* Update the VPI flogi_vpip pointer for loop */
+		/* because the vpi_logo_handler cleared it */
+		vpip->vfip->flogi_vpip = vpip;
+
+		bcopy((void *)&vpip->port->sparam,
+		    (void *)&vpip->fabric_rpip->sparam,
+		    sizeof (SERV_PARM));
+
+		/* Update the VPI Fabric RPI */
+		vpip->fabric_rpip->sparam.cmn.w2.r_a_tov =
+		    LE_SWAP32((FF_DEF_RATOV * 1000));
+
+		rval = emlxs_vpi_state(port, vpip, VPI_STATE_REG,
+		    FCF_REASON_EVENT, evt, arg1);
+		return (rval);
 	}
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
@@ -10071,55 +13002,21 @@ emlxs_vpi_logi_failed_action(emlxs_port_t *port, VPIobj_t *vpip, uint32_t evt,
 } /* emlxs_vpi_logi_failed_action() */
 
 
-static void
-emlxs_vpi_flogi_cmpl(emlxs_port_t *port, VPIobj_t *vpip, uint32_t status)
-{
-	emlxs_hba_t *hba = HBA;
-	emlxs_buf_t *sbp;
-
-	sbp = vpip->flogi_sbp;
-	if (!sbp) {
-		return;
-	}
-	vpip->flogi_sbp = NULL;
-
-	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-	    "vpi_flogi_cmpl:%d. status=%x",
-	    vpip->VPI,
-	    status);
-
-	sbp->pkt_flags &= ~PACKET_STATE_VALID;
-
-	if (status) {
-		emlxs_set_pkt_state(sbp, IOSTAT_LOCAL_REJECT,
-		    IOERR_NO_RESOURCES, 1);
-	} else {
-		emlxs_set_pkt_state(sbp, IOSTAT_SUCCESS, 0, 1);
-	}
-
-	emlxs_thread_spawn(hba, emlxs_pkt_cmpl_thread, (void *)sbp, 0);
-
-	return;
-
-} /* emlxs_vpi_flogi_cmpl() */
-
-
 /*ARGSUSED*/
 static uint32_t
 emlxs_vpi_logi_cmpl_action(emlxs_port_t *port, VPIobj_t *vpip, uint32_t evt,
     void *arg1)
 {
-	uint32_t rval;
-	SERV_PARM *sp;
-	fc_packet_t *pkt;
-	emlxs_buf_t *sbp;
+	emlxs_hba_t *hba = HBA;
+	uint32_t rval = 0;
 	char buffer1[64];
 	char buffer2[64];
+	uint32_t new_config = 0;
 
 	if (vpip->state != VPI_STATE_LOGI_CMPL) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 		    "vpi_logi_cmpl_action:%d %s:%s arg=%p. "
-		    "Invalid state. Terminated.",
+		    "Invalid state. <",
 		    vpip->VPI,
 		    emlxs_vpi_state_xlate(vpip->state),
 		    emlxs_fcf_event_xlate(evt), arg1);
@@ -10128,49 +13025,48 @@ emlxs_vpi_logi_cmpl_action(emlxs_port_t *port, VPIobj_t *vpip, uint32_t evt,
 
 	vpip->flag |= EMLXS_VPI_LOGI;
 
-	sbp = (emlxs_buf_t *)arg1;
-	if (!sbp) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
-		    "vpi_logi_cmpl_action:%d. Null sbp. Terminated.",
-		    vpip->VPI);
-		return (1);
+	/* Check for new fabric */
+	if (port->prev_did) {
+		if (SLI4_FCOE_MODE) {
+			/* Check for FCF change */
+			if (((port->prev_did != port->did) ||
+			    bcmp(&port->prev_fabric_sparam.portName,
+			    &port->fabric_sparam.portName, 8)) &&
+			    emlxs_nport_count(port)) {
+				new_config = 1;
+			}
+		} else {
+			uint32_t old_topo;
+			uint32_t new_topo;
+
+			/* Check for topology change (0=loop 1=fabric) */
+			old_topo = ((port->prev_did && 0xFFFF00) == 0)? 0:1;
+			new_topo = ((port->did && 0xFFFF00) == 0)? 0:1;
+
+			if (old_topo != new_topo) {
+				new_config = 1;
+
+			/* Check for any switch change */
+			} else if ((port->prev_did != port->did) ||
+			    bcmp(&port->prev_fabric_sparam.portName,
+			    &port->fabric_sparam.portName, 8)) {
+				new_config = 1;
+			}
+		}
 	}
 
-	/* Check login parameters */
-	pkt = PRIV2PKT(sbp);
-	sp = (SERV_PARM *)((caddr_t)pkt->pkt_resp + sizeof (uint32_t));
-
-	/* For safety */
-	if (vpip->flogi_sbp) {
-		emlxs_vpi_flogi_cmpl(port, vpip, 1);
-	}
-	vpip->flogi_sbp = sbp;
-
-	/* Update the Fabric RPI */
-	bcopy((void *)sp, (void *)&vpip->rpip->sparam, sizeof (SERV_PARM));
-
-	if (vpip->vfip->vpi_online == 1) {
-		bcopy((void *)sp, (void *)&vpip->vfip->fcf_sparam,
-		    sizeof (SERV_PARM));
-	}
-
-	if (port->prev_did &&
-	    ((port->prev_did != port->did) ||
-	    bcmp(&port->prev_fabric_sparam.portName,
-	    &port->fabric_sparam.portName, 8)) &&
-	    emlxs_nport_count(port)) {
-
+	if (new_config) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 		    "vpi_logi_cmpl_action:%d. "
-		    "New fabric. Offlining port.",
+		    "New config. Offlining port.",
 		    vpip->VPI);
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 		    "vpi_logi_cmpl_action: prev_wwpn=%s wwpn=%s prev_did=%x "
 		    "did=%x.",
-		    emlxs_wwn_xlate(buffer1,
+		    emlxs_wwn_xlate(buffer1, sizeof (buffer1),
 		    (uint8_t *)&port->prev_fabric_sparam.portName),
-		    emlxs_wwn_xlate(buffer2,
+		    emlxs_wwn_xlate(buffer2, sizeof (buffer2),
 		    (uint8_t *)&port->fabric_sparam.portName),
 		    port->prev_did, port->did);
 
@@ -10199,19 +13095,18 @@ emlxs_vpi_logo_failed_action(emlxs_port_t *port, VPIobj_t *vpip, uint32_t evt,
     void *arg1)
 {
 	emlxs_hba_t *hba = HBA;
-	uint32_t rval;
+	uint32_t rval = 0;
 
 	vpip->attempts++;
 
 	if (vpip->state != VPI_STATE_LOGO_FAILED) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
 		    "vpi_logo_failed_action:%d %s:%s arg=%p attempt=%d. "
-		    "Invalid state. Terminated.",
+		    "Invalid state. <",
 		    vpip->VPI,
 		    emlxs_vpi_state_xlate(vpip->state),
 		    emlxs_fcf_event_xlate(evt), arg1,
 		    vpip->attempts);
-
 		return (1);
 	}
 
@@ -10253,7 +13148,7 @@ emlxs_vpi_logo_action(emlxs_port_t *port, VPIobj_t *vpip, uint32_t evt,
 {
 	emlxs_hba_t *hba = HBA;
 	emlxs_port_t *vport = vpip->port;
-	uint32_t rval;
+	uint32_t rval = 0;
 	uint32_t did;
 	uint32_t sid;
 	fc_packet_t *pkt;
@@ -10262,17 +13157,16 @@ emlxs_vpi_logo_action(emlxs_port_t *port, VPIobj_t *vpip, uint32_t evt,
 	if (vpip->state != VPI_STATE_LOGO) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
 		    "vpi_logo_action:%d %s:%s arg=%p. "
-		    "Invalid state. Terminated.",
+		    "Invalid state. <",
 		    vpip->VPI,
 		    emlxs_vpi_state_xlate(vpip->state),
 		    emlxs_fcf_event_xlate(evt), arg1);
-
 		return (1);
 	}
 
 	if (!(vpip->flag & EMLXS_VPI_LOGI)) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "vpi_logo_action:%d. No login. Skipping logo.",
+		    "vpi_logo_action:%d. No login. Skipping LOGO.",
 		    vpip->VPI);
 
 		rval = emlxs_vpi_state(port, vpip, VPI_STATE_PORT_OFFLINE,
@@ -10280,10 +13174,27 @@ emlxs_vpi_logo_action(emlxs_port_t *port, VPIobj_t *vpip, uint32_t evt,
 		return (rval);
 	}
 
-	if (!(hba->flag & FC_ONLINE_MODE)) {
+	if (!(hba->flag & FC_ONLINE_MODE) &&
+	    !(hba->flag & FC_OFFLINING_MODE)) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "vpi_logo_action:%d. HBA offline. Skipping logo.",
+		    "vpi_logo_action:%d. HBA offline. Skipping LOGO.",
 		    vpip->VPI);
+
+		/* Fabric logo is implied */
+		emlxs_vpi_logo_handler(port, vpip);
+
+		rval = emlxs_vpi_state(port, vpip, VPI_STATE_PORT_OFFLINE,
+		    FCF_REASON_EVENT, evt, arg1);
+		return (rval);
+	}
+
+	if (SLI4_FC_MODE) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+		    "vpi_logo_action:%d. FC mode. Skipping LOGO.",
+		    vpip->VPI);
+
+		/* Fabric logo is implied */
+		emlxs_vpi_logo_handler(port, vpip);
 
 		rval = emlxs_vpi_state(port, vpip, VPI_STATE_PORT_OFFLINE,
 		    FCF_REASON_EVENT, evt, arg1);
@@ -10294,10 +13205,14 @@ emlxs_vpi_logo_action(emlxs_port_t *port, VPIobj_t *vpip, uint32_t evt,
 		vpip->attempts = 0;
 	}
 
+	did = FABRIC_DID;
+	sid = (vport->did)? vport->did:vport->prev_did;
+
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-	    "vpi_logo_action:%d. Sending logo. Sending LOGO.",
+	    "vpi_logo_action:%d attempts=%d sid=%x did=%x. Sending LOGO. <",
 	    vpip->VPI,
-	    vpip->attempts);
+	    vpip->attempts,
+	    sid, did);
 
 	pkt = emlxs_pkt_alloc(vport,
 	    (sizeof (uint32_t) + sizeof (LOGO)),
@@ -10314,9 +13229,6 @@ emlxs_vpi_logo_action(emlxs_port_t *port, VPIobj_t *vpip, uint32_t evt,
 	pkt->pkt_timeout = (2 * hba->fc_ratov);
 
 	/* Build the fc header */
-	did = FABRIC_DID;
-	sid = (vport->did)? vport->did:vport->prev_did;
-
 	pkt->pkt_cmd_fhdr.d_id = LE_SWAP24_LO(did);
 	pkt->pkt_cmd_fhdr.r_ctl =
 	    R_CTL_EXTENDED_SVC | R_CTL_SOLICITED_CONTROL;
@@ -10338,13 +13250,8 @@ emlxs_vpi_logo_action(emlxs_port_t *port, VPIobj_t *vpip, uint32_t evt,
 	bcopy((uint8_t *)&vport->wwpn,
 	    (uint8_t *)&els->un.logo.portName, 8);
 
-	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-	    "vpi_logo_action:%d  LOGO:sid=%x did=%x.",
-	    vpip->VPI,
-	    sid, did);
-
 	/* Send the pkt now */
-	rval = emlxs_pkt_send(pkt, 1);
+	rval = emlxs_pkt_send(pkt, 0);
 	if (rval != FC_SUCCESS) {
 		/* Free the pkt */
 		emlxs_pkt_free(pkt);
@@ -10369,26 +13276,20 @@ static uint32_t
 emlxs_vpi_logo_cmpl_action(emlxs_port_t *port, VPIobj_t *vpip, uint32_t evt,
     void *arg1)
 {
-	uint32_t rval;
+	uint32_t rval = 0;
 
 	if (vpip->state != VPI_STATE_LOGO_CMPL) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
 		    "vpi_logo_cmpl_action:%d %s:%s arg=%p. "
-		    "Invalid state. Terminated.",
+		    "Invalid state. <",
 		    vpip->VPI,
 		    emlxs_vpi_state_xlate(vpip->state),
 		    emlxs_fcf_event_xlate(evt), arg1);
 		return (1);
 	}
 
-	vpip->flag &= ~EMLXS_VPI_LOGI;
-	if (vpip->flag & EMLXS_VPI_VFI_LOGI) {
-		vpip->flag &= ~EMLXS_VPI_VFI_LOGI;
-
-		if (vpip->vfip->logi_count > 0) {
-			vpip->vfip->logi_count--;
-		}
-	}
+	/* Fabric logo is complete */
+	emlxs_vpi_logo_handler(port, vpip);
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 	    "vpi_logo_cmpl_action:%d attempts=%d. Offline RPI's.",
@@ -10408,19 +13309,18 @@ static uint32_t
 emlxs_vpi_unreg_failed_action(emlxs_port_t *port, VPIobj_t *vpip, uint32_t evt,
     void *arg1)
 {
-	uint32_t rval;
+	uint32_t rval = 0;
 
 	vpip->attempts++;
 
 	if (vpip->state != VPI_STATE_UNREG_FAILED) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
 		    "vpi_unreg_failed_action:%d %s:%s arg=%p attempt=%d. "
-		    "Invalid state. Terminated.",
+		    "Invalid state. <",
 		    vpip->VPI,
 		    emlxs_vpi_state_xlate(vpip->state),
 		    emlxs_fcf_event_xlate(evt), arg1,
 		    vpip->attempts);
-
 		return (1);
 	}
 
@@ -10467,7 +13367,7 @@ emlxs_vpi_unreg_mbcmpl(emlxs_hba_t *hba, MAILBOXQ *mbq)
 
 	if (vpip->state != VPI_STATE_UNREG) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "vpi_unreg_mbcmpl:%d state=%s. Terminated.",
+		    "vpi_unreg_mbcmpl:%d state=%s.",
 		    vpip->VPI,
 		    emlxs_vpi_state_xlate(vpip->state));
 
@@ -10477,9 +13377,9 @@ emlxs_vpi_unreg_mbcmpl(emlxs_hba_t *hba, MAILBOXQ *mbq)
 
 	if (mb4->mbxStatus) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "vpi_unreg_mbcmpl:%d failed. status=%x",
+		    "vpi_unreg_mbcmpl:%d failed. %s. >",
 		    vpip->VPI,
-		    mb4->mbxStatus);
+		    emlxs_mb_xlate_status(mb4->mbxStatus));
 
 		(void) emlxs_vpi_state(port, vpip, VPI_STATE_UNREG_FAILED,
 		    FCF_REASON_MBOX_FAILED, mb4->mbxStatus, (void *)mbq->sbp);
@@ -10489,7 +13389,7 @@ emlxs_vpi_unreg_mbcmpl(emlxs_hba_t *hba, MAILBOXQ *mbq)
 	}
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-	    "vpi_unreg_mbcmpl:%d Unregistered.",
+	    "vpi_unreg_mbcmpl:%d. Unreg complete. >",
 	    vpip->VPI);
 
 	vpip->flag &= ~(EMLXS_VPI_REG | EMLXS_VPI_INIT);
@@ -10509,25 +13409,24 @@ emlxs_vpi_unreg_action(emlxs_port_t *port, VPIobj_t *vpip, uint32_t evt,
 	emlxs_hba_t *hba = HBA;
 	MAILBOX4 *mb4;
 	MAILBOXQ *mbq;
-	uint32_t rval;
+	uint32_t rval = 0;
 
 	if (vpip->state != VPI_STATE_UNREG) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
 		    "vpi_unreg_action:%d %s:%s arg=%p. "
-		    "Invalid state. Terminated.",
+		    "Invalid state. <",
 		    vpip->VPI,
 		    emlxs_vpi_state_xlate(vpip->state),
 		    emlxs_fcf_event_xlate(evt), arg1);
-
 		return (1);
 	}
 
-	if ((vpip->rpi_online > 0) ||
-	    (vpip->rpip->state != RPI_STATE_FREE)) {
+	if ((vpip->rpi_online > vpip->rpi_paused) ||
+	    (vpip->fabric_rpip->state != RPI_STATE_FREE)) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "vpi_unreg_action:%d rpi_online=%d,%d. Waiting for RPI's.",
-		    vpip->VPI,
-		    vpip->rpi_online, vpip->rpi_paused);
+		    "vpi_unreg_action:%d rpi_online=%d,%d fstate=%x. "
+		    "Waiting for RPI's.", vpip->VPI, vpip->rpi_online,
+		    vpip->rpi_paused, vpip->fabric_rpip->state);
 
 		rval = emlxs_vpi_state(port, vpip, VPI_STATE_PORT_OFFLINE,
 		    FCF_REASON_EVENT, evt, arg1);
@@ -10536,7 +13435,7 @@ emlxs_vpi_unreg_action(emlxs_port_t *port, VPIobj_t *vpip, uint32_t evt,
 
 	if (!(vpip->flag & EMLXS_VPI_REG)) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "vpi_unreg_action:%d. Not registered. Skipping unreg.",
+		    "vpi_unreg_action:%d. Not registered. Skipping UNREG_VPI.",
 		    vpip->VPI);
 
 		rval = emlxs_vpi_state(port, vpip, VPI_STATE_OFFLINE,
@@ -10560,11 +13459,11 @@ emlxs_vpi_unreg_action(emlxs_port_t *port, VPIobj_t *vpip, uint32_t evt,
 	}
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-	    "vpi_unreg_action:%d attempts=%d. Sending UNREG_VPI.",
+	    "vpi_unreg_action:%d attempts=%d. Sending UNREG_VPI. <",
 	    vpip->VPI,
 	    vpip->attempts);
 
-	if (!(mbq = (MAILBOXQ *)emlxs_mem_get(hba, MEM_MBOX, 1))) {
+	if (!(mbq = (MAILBOXQ *)emlxs_mem_get(hba, MEM_MBOX))) {
 		rval = emlxs_vpi_state(port, vpip, VPI_STATE_UNREG_FAILED,
 		    FCF_REASON_NO_MBOX, 0, arg1);
 
@@ -10603,12 +13502,12 @@ static uint32_t
 emlxs_vpi_unreg_cmpl_action(emlxs_port_t *port, VPIobj_t *vpip, uint32_t evt,
     void *arg1)
 {
-	uint32_t rval;
+	uint32_t rval = 0;
 
 	if (vpip->state != VPI_STATE_UNREG_CMPL) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
 		    "vpi_unreg_cmpl_action:%d %s:%s arg=%p. "
-		    "Invalid state. Terminated.",
+		    "Invalid state. <",
 		    vpip->VPI,
 		    emlxs_vpi_state_xlate(vpip->state),
 		    emlxs_fcf_event_xlate(evt), arg1);
@@ -10633,14 +13532,14 @@ static uint32_t
 emlxs_vpi_reg_failed_action(emlxs_port_t *port, VPIobj_t *vpip, uint32_t evt,
     void *arg1)
 {
-	uint32_t rval;
+	uint32_t rval = 0;
 
 	vpip->attempts++;
 
 	if (vpip->state != VPI_STATE_REG_FAILED) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
 		    "vpi_reg_failed_action:%d %s:%s arg=%p attempt=%d. "
-		    "Invalid state. Terminated.",
+		    "Invalid state. <",
 		    vpip->VPI,
 		    emlxs_vpi_state_xlate(vpip->state),
 		    emlxs_fcf_event_xlate(evt), arg1,
@@ -10690,7 +13589,7 @@ emlxs_vpi_reg_mbcmpl(emlxs_hba_t *hba, MAILBOXQ *mbq)
 
 	if (vpip->state != VPI_STATE_REG) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "vpi_reg_mbcmpl:%d state=%s. Terminated.",
+		    "vpi_reg_mbcmpl:%d state=%s.",
 		    vpip->VPI,
 		    emlxs_vpi_state_xlate(vpip->state));
 
@@ -10700,9 +13599,13 @@ emlxs_vpi_reg_mbcmpl(emlxs_hba_t *hba, MAILBOXQ *mbq)
 
 	if (mb4->mbxStatus) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "vpi_reg_mbcmpl:%d failed. status=%x",
+		    "vpi_reg_mbcmpl:%d failed. %s. >",
 		    vpip->VPI,
-		    mb4->mbxStatus);
+		    emlxs_mb_xlate_status(mb4->mbxStatus));
+
+		if (mb4->mbxStatus == MBXERR_DID_INCONSISTENT) {
+			vpip->flag |= EMLXS_VPI_OFFLINE_REQ;
+		}
 
 		(void) emlxs_vpi_state(port, vpip, VPI_STATE_REG_FAILED,
 		    FCF_REASON_MBOX_FAILED, mb4->mbxStatus, 0);
@@ -10712,7 +13615,7 @@ emlxs_vpi_reg_mbcmpl(emlxs_hba_t *hba, MAILBOXQ *mbq)
 	}
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-	    "vpi_reg_mbcmpl:%d. Registered.",
+	    "vpi_reg_mbcmpl:%d. Reg complete. >",
 	    vpip->VPI);
 
 	vpip->flag |= EMLXS_VPI_REG;
@@ -10734,12 +13637,12 @@ emlxs_vpi_reg_action(emlxs_port_t *port, VPIobj_t *vpip, uint32_t evt,
 	uint32_t *wwpn;
 	MAILBOX *mb;
 	MAILBOXQ *mbq;
-	uint32_t rval;
+	uint32_t rval = 0;
 
 	if (vpip->state != VPI_STATE_REG) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
 		    "vpi_reg_action:%d %s:%s arg=%p. "
-		    "Invalid state. Terminated.",
+		    "Invalid state. <",
 		    vpip->VPI,
 		    emlxs_vpi_state_xlate(vpip->state),
 		    emlxs_fcf_event_xlate(evt), arg1);
@@ -10760,31 +13663,47 @@ emlxs_vpi_reg_action(emlxs_port_t *port, VPIobj_t *vpip, uint32_t evt,
 		return (rval);
 	}
 
-	if (!(vpip->flag & EMLXS_VPI_REG) &&
-	    (vpip->vfip->vpi_online == 1)) {
+	if (!(vpip->vfip->flag & EMLXS_VFI_REG)) {
+		/* We can't register the VPI until our VFI is registered */
+
+		/* If this is the flogi_vpip, then we can skip the REG_VPI. */
+		/* REG_VPI will be performed later during REG_VFI */
+		if (vpip == vpip->vfip->flogi_vpip) {
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+			    "vpi_reg_action:%d. flogi_vpi. Skipping REG_VPI.",
+			    vpip->VPI);
+
+			rval = emlxs_vpi_state(port, vpip, VPI_STATE_ONLINE,
+			    FCF_REASON_EVENT, evt, arg1);
+
+			return (rval);
+		}
+
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "vpi_reg_action:%d. First vpi. Skipping reg.",
-		    vpip->VPI);
+		    "vpi_reg_action:%d attempts=%d. VFI not registered. "
+		    "Offlining.",
+		    vpip->VPI,
+		    vpip->attempts);
 
-		rval = emlxs_vpi_state(port, vpip, VPI_STATE_ONLINE,
-		    FCF_REASON_EVENT, evt, arg1);
-
+		vpip->flag &= ~EMLXS_VPI_REQ_MASK;
+		vpip->flag |= EMLXS_VPI_OFFLINE_REQ;
+		rval = emlxs_vpi_offline_handler(port, vpip, 0);
 		return (rval);
 	}
 
 	if (vpip->flag & EMLXS_VPI_REG) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "vpi_reg_action:%d attempts=%d. Updating REG_VPI.",
+		    "vpi_reg_action:%d attempts=%d. Updating REG_VPI. <",
 		    vpip->VPI,
 		    vpip->attempts);
 	} else {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "vpi_reg_action:%d attempts=%d. Sending REG_VPI.",
+		    "vpi_reg_action:%d attempts=%d. Sending REG_VPI. <",
 		    vpip->VPI,
 		    vpip->attempts);
 	}
 
-	if (!(mbq = (MAILBOXQ *)emlxs_mem_get(hba, MEM_MBOX, 1))) {
+	if (!(mbq = (MAILBOXQ *)emlxs_mem_get(hba, MEM_MBOX))) {
 		rval = emlxs_vpi_state(port, vpip, VPI_STATE_REG_FAILED,
 		    FCF_REASON_NO_MBOX, 0, arg1);
 
@@ -10831,12 +13750,12 @@ static uint32_t
 emlxs_vpi_reg_cmpl_action(emlxs_port_t *port, VPIobj_t *vpip, uint32_t evt,
     void *arg1)
 {
-	uint32_t rval;
+	uint32_t rval = 0;
 
 	if (vpip->state != VPI_STATE_REG_CMPL) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
 		    "vpi_reg_cmpl_action:%d %s:%s arg=%p. "
-		    "Invalid state. Terminated.",
+		    "Invalid state. <",
 		    vpip->VPI,
 		    emlxs_vpi_state_xlate(vpip->state),
 		    emlxs_fcf_event_xlate(evt), arg1);
@@ -10871,12 +13790,12 @@ static uint32_t
 emlxs_vpi_online_action(emlxs_port_t *port, VPIobj_t *vpip, uint32_t evt,
     void *arg1)
 {
-	uint32_t rval;
+	uint32_t rval = 0;
 
 	if (vpip->state != VPI_STATE_ONLINE) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 		    "vpi_online_action:%d %s:%s arg=%p. "
-		    "Invalid state. Terminated.",
+		    "Invalid state. <",
 		    vpip->VPI,
 		    emlxs_vpi_state_xlate(vpip->state),
 		    emlxs_fcf_event_xlate(evt), arg1);
@@ -10896,7 +13815,7 @@ emlxs_vpi_online_action(emlxs_port_t *port, VPIobj_t *vpip, uint32_t evt,
 	}
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-	    "vpi_online_action:%d. VPI online. Notifying VFI:%d",
+	    "vpi_online_action:%d. VPI online. Notifying VFI:%d >",
 	    vpip->VPI,
 	    vpip->vfip->VFI);
 
@@ -10926,7 +13845,7 @@ emlxs_rpi_state_xlate(uint32_t state)
 		}
 	}
 
-	(void) sprintf(buffer, "state=0x%x", state);
+	(void) snprintf(buffer, sizeof (buffer), "state=0x%x", state);
 	return (buffer);
 
 } /* emlxs_rpi_state_xlate() */
@@ -10936,7 +13855,7 @@ static uint32_t
 emlxs_rpi_action(emlxs_port_t *port, RPIobj_t *rpip, uint32_t evt,
     void *arg1)
 {
-	uint32_t rval;
+	uint32_t rval = 0;
 	uint32_t(*func) (emlxs_port_t *, RPIobj_t *, uint32_t, void *);
 	uint32_t index;
 	uint32_t events;
@@ -10972,7 +13891,7 @@ emlxs_rpi_action(emlxs_port_t *port, RPIobj_t *rpip, uint32_t evt,
 
 	if (!func) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_event_msg,
-		    "rpi:%d %s:%s arg=%p. No action. Terminated.",
+		    "rpi_action:%d %s:%s arg=%p. No action. <",
 		    rpip->RPI,
 		    emlxs_rpi_state_xlate(rpip->state),
 		    emlxs_fcf_event_xlate(evt), arg1);
@@ -10992,7 +13911,7 @@ emlxs_rpi_event(emlxs_port_t *port, uint32_t evt,
     void *arg1)
 {
 	RPIobj_t *rpip = NULL;
-	uint32_t rval;
+	uint32_t rval = 0;
 
 	/* Filter events and acquire fcfi context */
 	switch (evt) {
@@ -11004,7 +13923,7 @@ emlxs_rpi_event(emlxs_port_t *port, uint32_t evt,
 
 		if (!rpip) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_event_msg,
-			    "rpi: %s arg=%p. Null RPI found. Terminated.",
+			    "rpi_event: %s arg=%p. Null RPI found. <",
 			    emlxs_fcf_event_xlate(evt), arg1);
 
 			return (1);
@@ -11017,7 +13936,7 @@ emlxs_rpi_event(emlxs_port_t *port, uint32_t evt,
 	}
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_event_msg,
-	    "rpi:%d %s:%s arg=%p",
+	    "rpi_event:%d %s:%s arg=%p",
 	    rpip->RPI,
 	    emlxs_rpi_state_xlate(rpip->state),
 	    emlxs_fcf_event_xlate(evt), arg1);
@@ -11043,25 +13962,23 @@ emlxs_rpi_state(emlxs_port_t *port, RPIobj_t *rpip, uint16_t state,
 	if ((rpip->state == state) &&
 	    (reason != FCF_REASON_REENTER)) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
-		    "rpi_state:%d %s:%s:0x%x arg=%p. State not changed. "
-		    "Terminated.",
+		    "rpi_state:%d %s:%s:0x%x arg=%p. State not changed. <",
 		    rpip->RPI,
 		    emlxs_rpi_state_xlate(rpip->state),
 		    emlxs_fcf_reason_xlate(reason),
 		    explain, arg1);
-
 		return (1);
 	}
 
 	if (!reason) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_state_msg,
-		    "rpi:%d %s-->%s arg=%p",
+		    "rpi_state:%d %s-->%s arg=%p",
 		    rpip->RPI,
 		    emlxs_rpi_state_xlate(rpip->state),
 		    emlxs_rpi_state_xlate(state), arg1);
 	} else if (reason == FCF_REASON_EVENT) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_state_msg,
-		    "rpi:%d %s-->%s:%s:%s arg=%p",
+		    "rpi_state:%d %s-->%s:%s:%s arg=%p",
 		    rpip->RPI,
 		    emlxs_rpi_state_xlate(rpip->state),
 		    emlxs_rpi_state_xlate(state),
@@ -11069,7 +13986,7 @@ emlxs_rpi_state(emlxs_port_t *port, RPIobj_t *rpip, uint16_t state,
 		    emlxs_fcf_event_xlate(explain), arg1);
 	} else if (explain) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_state_msg,
-		    "rpi:%d %s-->%s:%s:0x%x arg=%p",
+		    "rpi_state:%d %s-->%s:%s:0x%x arg=%p",
 		    rpip->RPI,
 		    emlxs_rpi_state_xlate(rpip->state),
 		    emlxs_rpi_state_xlate(state),
@@ -11077,7 +13994,7 @@ emlxs_rpi_state(emlxs_port_t *port, RPIobj_t *rpip, uint16_t state,
 		    explain, arg1);
 	} else {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_state_msg,
-		    "rpi:%d %s-->%s:%s arg=%p",
+		    "rpi_state:%d %s-->%s:%s arg=%p",
 		    rpip->RPI,
 		    emlxs_rpi_state_xlate(rpip->state),
 		    emlxs_rpi_state_xlate(state),
@@ -11096,29 +14013,91 @@ emlxs_rpi_state(emlxs_port_t *port, RPIobj_t *rpip, uint16_t state,
 } /* emlxs_rpi_state() */
 
 
+static void
+emlxs_rpi_deferred_cmpl(emlxs_port_t *port, RPIobj_t *rpip, uint32_t status)
+{
+	emlxs_hba_t *hba = HBA;
+	emlxs_deferred_cmpl_t *cmpl;
+
+	if (!rpip->cmpl) {
+		return;
+	}
+
+	cmpl = rpip->cmpl;
+	rpip->cmpl = 0;
+
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+	    "rpi_deferred_cmpl:%d. status=%x ...",
+	    port->vpip->VPI,
+	    status);
+
+	emlxs_thread_spawn(hba, emlxs_deferred_cmpl_thread, (void *)cmpl,
+	    (void*)(uintptr_t)status);
+
+	return;
+
+} /* emlxs_rpi_deferred_cmpl() */
+
+
+static void
+emlxs_rpi_idle_timer(emlxs_hba_t *hba)
+{
+	emlxs_config_t *cfg = &CFG;
+	RPIobj_t *rpip;
+	uint32_t i;
+
+	/* This timer monitors for idle timeout of an RPI in a */
+	/* RESERVED state. */
+	/* This means that the RPI was reserved, but never registered. */
+	/* If the RPI sits for too long (~2 secs) in this state we free it */
+	rpip = hba->sli.sli4.RPIp;
+	for (i = 0; i < hba->sli.sli4.RPICount; i++, rpip++) {
+		if (rpip->state != RPI_STATE_RESERVED) {
+			continue;
+		}
+
+		/* If RPI is active, then clear timer. */
+		if (rpip->xri_count) {
+			rpip->idle_timer = 0;
+			continue;
+		}
+
+		/* If an F-port RPI is found idle, then free it. */
+		/* Since an F-port RPI is never registered after the login */
+		/* completes, it is safe to free it immediately. */
+		if ((rpip->did == FABRIC_DID) ||
+		    (rpip->did == SCR_DID)) {
+			goto free_it;
+		}
+
+		/* Start idle timer if not already active */
+		if (!rpip->idle_timer) {
+			rpip->idle_timer = hba->timer_tics +
+			    cfg[CFG_FCF_RPI_IDLE_TIMEOUT].current;
+		}
+
+		/* Check for idle timeout */
+		if (hba->timer_tics < rpip->idle_timer) {
+			continue;
+		}
+		rpip->idle_timer = 0;
+
+free_it:
+		(void) emlxs_rpi_state(rpip->vpip->port, rpip, RPI_STATE_FREE,
+		    FCF_REASON_UNUSED, 0, 0);
+	}
+
+	return;
+
+}  /* emlxs_rpi_idle_timer() */
+
+
 static RPIobj_t *
 emlxs_rpi_alloc(emlxs_port_t *port, uint32_t did)
 {
 	emlxs_hba_t *hba = HBA;
 	uint16_t	i;
 	RPIobj_t	*rpip;
-
-	/* Special handling for Fabric RPI */
-	if (did == FABRIC_DID) {
-		/* Use the reserved RPI in the port */
-		rpip = &port->VPIobj.fcf_rpi;
-
-		bzero(rpip, sizeof (RPIobj_t));
-		rpip->index = 0xffff;
-		rpip->RPI = 0xffff;
-		rpip->did = FABRIC_DID;
-		rpip->vpip = &port->VPIobj;
-
-		(void) emlxs_rpi_state(port, rpip, RPI_STATE_OFFLINE,
-		    0, 0, 0);
-
-		return (rpip);
-	}
 
 	rpip = hba->sli.sli4.RPIp;
 	for (i = 0; i < hba->sli.sli4.RPICount; i++, rpip++) {
@@ -11130,57 +14109,100 @@ emlxs_rpi_alloc(emlxs_port_t *port, uint32_t did)
 
 			bzero(rpip, sizeof (RPIobj_t));
 			rpip->index = i;
-			rpip->RPI = hba->sli.sli4.RPIBase + i;
-			rpip->vpip = &port->VPIobj;
+			rpip->RPI = emlxs_sli4_index_to_rpi(hba, i);
+			rpip->vpip = port->vpip;
 			rpip->did = did;
 
-			(void) emlxs_rpi_state(port, rpip, RPI_STATE_OFFLINE,
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+			    "rpi_alloc:%d. RPI allocated. >",
+			    rpip->RPI);
+
+			(void) emlxs_rpi_state(port, rpip, RPI_STATE_RESERVED,
 			    0, 0, 0);
 
 			return (rpip);
 		}
 	}
 
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+	    "rpi_alloc: Out of RPI objects.");
+
 	return (NULL);
 
 } /* emlxs_rpi_alloc() */
 
 
+/* Special routine for VPI object */
+static void
+emlxs_rpi_alloc_fabric_rpi(emlxs_port_t *port)
+{
+	RPIobj_t	*fabric_rpip;
+
+	fabric_rpip = port->vpip->fabric_rpip;
+
+	if (fabric_rpip->state != RPI_STATE_FREE) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+		    "rpi_alloc_fabric_rpi: Fabric RPI active:%s.",
+		    emlxs_rpi_state_xlate(fabric_rpip->state));
+		return;
+	}
+
+	bzero(fabric_rpip, sizeof (RPIobj_t));
+	fabric_rpip->index = 0xffff;
+	fabric_rpip->RPI = FABRIC_RPI;
+	fabric_rpip->did = FABRIC_DID;
+	fabric_rpip->vpip = port->vpip;
+
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+	    "rpi_alloc_fabric_rpi: Allocating Fabric RPI. >");
+
+	(void) emlxs_rpi_state(port, fabric_rpip, RPI_STATE_RESERVED,
+	    0, 0, 0);
+
+	return;
+
+} /* emlxs_rpi_alloc_fabric_rpi() */
+
+
 static uint32_t
 emlxs_rpi_free(emlxs_port_t *port, RPIobj_t *rpip)
 {
-	uint32_t rval;
+	uint32_t rval = 0;
+
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+	    "rpi_free:%d did=%x. Freeing RPI. >",
+	    rpip->RPI, rpip->did);
 
 	rval = emlxs_rpi_state(port, rpip, RPI_STATE_FREE, 0, 0, 0);
 
 	return (rval);
 
-} /* emlxs_fcfi_free() */
+} /* emlxs_rpi_free() */
 
 
 extern RPIobj_t *
 emlxs_rpi_find(emlxs_port_t *port, uint16_t rpi)
 {
 	emlxs_hba_t *hba = HBA;
-	RPIobj_t	*rpip;
+	RPIobj_t *rpip;
+	uint32_t index;
 
 	/* Special handling for Fabric RPI */
-	if (rpi == 0xffff) {
-		return (port->VPIobj.rpip);
+	if (rpi == FABRIC_RPI) {
+		return (port->vpip->fabric_rpip);
 	}
 
-	if ((rpi < hba->sli.sli4.RPIBase) ||
-	    (rpi >= hba->sli.sli4.RPIBase+hba->sli.sli4.RPICount)) {
+	index = emlxs_sli4_rpi_to_index(hba, rpi);
+
+	if (index >= hba->sli.sli4.RPICount) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "rpi_find:%d. RPI out of range (%d,%d).",
-		    rpi,
-		    hba->sli.sli4.RPIBase,
-		    hba->sli.sli4.RPIBase+hba->sli.sli4.RPICount);
+		    "rpi_find:%d. RPI Invalid.",
+		    rpi);
 
 		return (NULL);
 	}
 
-	rpip = &hba->sli.sli4.RPIp[(rpi - hba->sli.sli4.RPIBase)];
+	rpip = &hba->sli.sli4.RPIp[index];
 
 	if (rpip->state == RPI_STATE_FREE) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
@@ -11203,11 +14225,6 @@ emlxs_rpi_find_did(emlxs_port_t *port, uint32_t did)
 	RPIobj_t	*rpip1;
 	uint32_t	i;
 
-	/* Special handling for Fabric RPI */
-	if (did == FABRIC_DID) {
-		return (port->VPIobj.rpip);
-	}
-
 	rpip1 = NULL;
 	rpip = hba->sli.sli4.RPIp;
 	for (i = 0; i < hba->sli.sli4.RPICount; i++, rpip++) {
@@ -11215,7 +14232,7 @@ emlxs_rpi_find_did(emlxs_port_t *port, uint32_t did)
 			continue;
 		}
 
-		if ((rpip->did == did) && (rpip->vpip == &port->VPIobj)) {
+		if ((rpip->did == did) && (rpip->vpip == port->vpip)) {
 			rpip1 = rpip;
 			break;
 		}
@@ -11227,17 +14244,61 @@ emlxs_rpi_find_did(emlxs_port_t *port, uint32_t did)
 
 
 extern RPIobj_t *
+emlxs_rpi_reserve_notify(emlxs_port_t *port, uint32_t did, XRIobj_t *xrip)
+{
+	emlxs_hba_t 	*hba = HBA;
+	RPIobj_t	*rpip;
+
+	/* xrip will be NULL for unsolicited BLS requests */
+
+	if (hba->sli_mode != EMLXS_HBA_SLI4_MODE) {
+		return (NULL);
+	}
+
+	mutex_enter(&EMLXS_FCF_LOCK);
+
+	rpip = emlxs_rpi_find_did(port, did);
+
+	if (!rpip) {
+		rpip = emlxs_rpi_alloc(port, did);
+	}
+
+	if (!rpip) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+		    "rpi_reserve_notify: Unable to reserve an rpi. "
+		    "did=%x xri=%d.",
+		    did, ((xrip)?xrip->XRI:0));
+
+		mutex_exit(&EMLXS_FCF_LOCK);
+		return (NULL);
+	}
+
+	/* Bind the XRI */
+	if (xrip) {
+		mutex_enter(&EMLXS_FCTAB_LOCK);
+		xrip->reserved_rpip = rpip;
+		rpip->xri_count++;
+		mutex_exit(&EMLXS_FCTAB_LOCK);
+	}
+
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+	    "rpi_reserve_notify:%d  did=%x xri=%d.",
+	    rpip->RPI, rpip->did, ((xrip)?xrip->XRI:0));
+
+	mutex_exit(&EMLXS_FCF_LOCK);
+
+	return (rpip);
+
+} /* emlxs_rpi_reserve_notify() */
+
+
+extern RPIobj_t *
 emlxs_rpi_alloc_notify(emlxs_port_t *port, uint32_t did)
 {
 	emlxs_hba_t *hba = HBA;
 	RPIobj_t	*rpip;
 
 	if (hba->sli_mode != EMLXS_HBA_SLI4_MODE) {
-		return (NULL);
-	}
-
-	/* Fabric RPI will be handled automatically */
-	if (did == FABRIC_DID) {
 		return (NULL);
 	}
 
@@ -11256,7 +14317,7 @@ extern uint32_t
 emlxs_rpi_free_notify(emlxs_port_t *port, RPIobj_t *rpip)
 {
 	emlxs_hba_t	*hba = HBA;
-	uint32_t	rval;
+	uint32_t	rval = 0;
 
 	if (hba->sli_mode != EMLXS_HBA_SLI4_MODE) {
 		return (1);
@@ -11267,7 +14328,7 @@ emlxs_rpi_free_notify(emlxs_port_t *port, RPIobj_t *rpip)
 	}
 
 	/* Fabric RPI will be handled automatically */
-	if (rpip->did == FABRIC_DID) {
+	if (rpip->RPI == FABRIC_RPI) {
 		return (1);
 	}
 
@@ -11294,19 +14355,18 @@ emlxs_rpi_pause_notify(emlxs_port_t *port, RPIobj_t *rpip)
 	if (!rpip) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
 		    "rpi_pause_notify: No RPI provided.");
-
 		return (1);
 	}
 
 	/* Fabric RPI will be handled automatically */
-	if (rpip->did == FABRIC_DID) {
+	if (rpip->RPI == FABRIC_RPI) {
 		return (1);
 	}
 
 	mutex_enter(&EMLXS_FCF_LOCK);
 
-	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
-	    "rpi_pause_notify:%d %s. Pausing.",
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+	    "rpi_pause_notify:%d %s. Pausing RPI. >",
 	    rpip->RPI,
 	    emlxs_rpi_state_xlate(rpip->state));
 
@@ -11326,25 +14386,23 @@ emlxs_rpi_online_notify(emlxs_port_t *port, RPIobj_t *rpip, uint32_t did,
 	emlxs_hba_t *hba = HBA;
 	emlxs_deferred_cmpl_t *cmpl;
 	uint32_t allocated = 0;
+	uint32_t rval = 0;
 
 	if (hba->sli_mode != EMLXS_HBA_SLI4_MODE) {
 		return (1);
 	}
 
-	/* Fabric RPI will be handled automatically */
-	if (did == FABRIC_DID) {
+	if ((did == port->did) && (!(hba->flag & FC_LOOPBACK_MODE))) {
+		/* We never register our local port */
 		return (1);
 	}
 
 	mutex_enter(&EMLXS_FCF_LOCK);
 
-	if (!(port->VPIobj.flag & EMLXS_VPI_PORT_ENABLED)) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "rpi_online_notify: vpi=%d. Port disabled.",
-		    port->VPIobj.VPI);
-
-		mutex_exit(&EMLXS_FCF_LOCK);
-		return (1);
+	if (!rpip && (did == FABRIC_DID)) {
+		/* We never online the Fabric DID other */
+		/* than the fabric_rpip */
+		rpip = port->vpip->fabric_rpip;
 	}
 
 	if (!rpip) {
@@ -11377,11 +14435,35 @@ emlxs_rpi_online_notify(emlxs_port_t *port, RPIobj_t *rpip, uint32_t did,
 		cmpl->arg2 = arg2;
 		cmpl->arg3 = arg3;
 
+		/* For safety */
+		if (rpip->cmpl) {
+			emlxs_rpi_deferred_cmpl(port, rpip, 1);
+		}
+
 		rpip->cmpl = cmpl;
 	}
 
+	if ((rpip->RPI == FABRIC_RPI) ||
+	    (hba->flag & FC_PT_TO_PT)) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+		    "rpi_online_notify:%d %s. %s. Login cmpl.",
+		    rpip->RPI,
+		    emlxs_rpi_state_xlate(rpip->state),
+		    ((allocated)? "Allocated":"Updated"));
+
+		rval = emlxs_vpi_logi_cmpl_notify(port, rpip);
+
+		if (rval && rpip->cmpl) {
+			kmem_free(rpip->cmpl, sizeof (emlxs_deferred_cmpl_t));
+			rpip->cmpl = 0;
+		}
+
+		mutex_exit(&EMLXS_FCF_LOCK);
+		return (rval);
+	}
+
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-	    "rpi_online_notify:%d %s. %s. Onlining.",
+	    "rpi_online_notify:%d %s. %s. Onlining RPI. >",
 	    rpip->RPI,
 	    emlxs_rpi_state_xlate(rpip->state),
 	    ((allocated)? "Allocated":"Updated"));
@@ -11402,7 +14484,6 @@ emlxs_rpi_online_notify(emlxs_port_t *port, RPIobj_t *rpip, uint32_t did,
 	}
 
 	mutex_exit(&EMLXS_FCF_LOCK);
-
 	return (0);
 
 } /* emlxs_rpi_online_notify() */
@@ -11422,12 +14503,11 @@ emlxs_rpi_offline_notify(emlxs_port_t *port, RPIobj_t *rpip,
 	if (!rpip) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
 		    "rpi_offline_notify: No RPI provided.");
-
 		return (1);
 	}
 
 	/* Fabric RPI will be handled automatically */
-	if (rpip->did == FABRIC_DID) {
+	if (rpip->RPI == FABRIC_RPI) {
 		return (1);
 	}
 
@@ -11446,7 +14526,7 @@ emlxs_rpi_offline_notify(emlxs_port_t *port, RPIobj_t *rpip,
 	}
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-	    "rpi_offline_notify:%d %s. Offlining.",
+	    "rpi_offline_notify:%d %s. Offlining RPI. >",
 	    rpip->RPI,
 	    emlxs_rpi_state_xlate(rpip->state));
 
@@ -11485,12 +14565,11 @@ emlxs_rpi_resume_notify(emlxs_port_t *port, RPIobj_t *rpip, emlxs_buf_t *sbp)
 	if (!rpip) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
 		    "rpi_resume_notify: No RPI provided.");
-
 		return (1);
 	}
 
 	/* Fabric RPI will be handled automatically */
-	if (rpip->did == FABRIC_DID) {
+	if (rpip->RPI == FABRIC_RPI) {
 		return (1);
 	}
 
@@ -11514,7 +14593,7 @@ emlxs_rpi_resume_notify(emlxs_port_t *port, RPIobj_t *rpip, emlxs_buf_t *sbp)
 	}
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-	    "rpi_resume_notify:%d %s. Resuming.",
+	    "rpi_resume_notify:%d %s. Resuming RPI. >",
 	    rpip->RPI,
 	    emlxs_rpi_state_xlate(rpip->state));
 
@@ -11552,17 +14631,19 @@ emlxs_rpi_free_action(emlxs_port_t *port, RPIobj_t *rpip, uint32_t evt,
 	if (rpip->state != RPI_STATE_FREE) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
 		    "rpi_free_action:%d %s:%s arg=%p. "
-		    "Invalid state. Terminated.",
+		    "Invalid state. <",
 		    rpip->RPI,
 		    emlxs_rpi_state_xlate(rpip->state),
 		    emlxs_fcf_event_xlate(evt), arg1);
 		return (1);
 	}
 
-	if (rpip->did == FABRIC_DID) {
-		if (rpip->vpip->flogi_sbp) {
-			emlxs_vpi_flogi_cmpl(port, rpip->vpip, 1);
-		}
+	if (rpip->cmpl) {
+		emlxs_rpi_deferred_cmpl(port, rpip, 1);
+	}
+
+	if (rpip->vpip->p2p_rpip == rpip) {
+		rpip->vpip->p2p_rpip = NULL;
 	}
 
 	/* Break node/RPI binding */
@@ -11586,9 +14667,22 @@ emlxs_rpi_free_action(emlxs_port_t *port, RPIobj_t *rpip, uint32_t evt,
 			    rpip->xri_count,
 			    xrip->XRI, xrip->iotag);
 
-			xrip->rpip->xri_count--;
+			rpip->xri_count--;
 			xrip->rpip = NULL;
 		}
+
+		if (xrip->reserved_rpip == rpip) {
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+			    "rpi_free_action:%d xri_count=%d. "
+			    "Removing XRI:%d iotag:%d.",
+			    rpip->RPI,
+			    rpip->xri_count,
+			    xrip->XRI, xrip->iotag);
+
+			rpip->xri_count--;
+			xrip->reserved_rpip = NULL;
+		}
+
 		xrip = next_xrip;
 	}
 	mutex_exit(&EMLXS_FCTAB_LOCK);
@@ -11601,7 +14695,7 @@ emlxs_rpi_free_action(emlxs_port_t *port, RPIobj_t *rpip, uint32_t evt,
 	}
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-	    "rpi_free_action:%d flag=%x. RPI freed.",
+	    "rpi_free_action:%d flag=%x. RPI freed. <",
 	    rpip->RPI,
 	    rpip->flag);
 
@@ -11622,7 +14716,7 @@ emlxs_rpi_online_evt_action(emlxs_port_t *port, RPIobj_t *rpip, uint32_t evt,
 	if (evt != FCF_EVENT_RPI_ONLINE) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
 		    "rpi_online_evt_action:%d %s:%s arg=%p. "
-		    "Invalid event type. Terminated.",
+		    "Invalid event type. <",
 		    rpip->RPI,
 		    emlxs_rpi_state_xlate(rpip->state),
 		    emlxs_fcf_event_xlate(evt), arg1);
@@ -11666,7 +14760,7 @@ emlxs_rpi_offline_evt_action(emlxs_port_t *port, RPIobj_t *rpip, uint32_t evt,
 	if (evt != FCF_EVENT_RPI_OFFLINE) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
 		    "rpi_offline_evt_action:%d %s:%s arg=%p. "
-		    "Invalid event type. Terminated.",
+		    "Invalid event type. <",
 		    rpip->RPI,
 		    emlxs_rpi_state_xlate(rpip->state),
 		    emlxs_fcf_event_xlate(evt), arg1);
@@ -11674,20 +14768,20 @@ emlxs_rpi_offline_evt_action(emlxs_port_t *port, RPIobj_t *rpip, uint32_t evt,
 	}
 
 	switch (rpip->state) {
-	case RPI_STATE_OFFLINE:
+	case RPI_STATE_RESERVED:
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "rpi_offline_evt_action:%d flag=%x. Offlining RPI.",
+		    "rpi_offline_evt_action:%d flag=%x. Freeing RPI.",
 		    rpip->RPI,
 		    rpip->flag);
 
-		rval = emlxs_rpi_state(port, rpip, RPI_STATE_OFFLINE,
-		    FCF_REASON_REENTER, evt, arg1);
+		rval = emlxs_rpi_state(port, rpip, RPI_STATE_FREE,
+		    FCF_REASON_EVENT, evt, arg1);
 		break;
 
 	case RPI_STATE_UNREG:
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "rpi_offline_evt_action:%d flag=%x. Already unregistering. "
-		    "Terminated.",
+		    "rpi_offline_evt_action:%d flag=%x. "
+		    "Already unregistering. <",
 		    rpip->RPI,
 		    rpip->flag);
 
@@ -11715,12 +14809,15 @@ static uint32_t
 emlxs_rpi_pause_evt_action(emlxs_port_t *port, RPIobj_t *rpip, uint32_t evt,
     void *arg1)
 {
+	VPIobj_t *vpip;
 	uint32_t rval = 1;
+
+	vpip = rpip->vpip;
 
 	if (evt != FCF_EVENT_RPI_PAUSE) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
 		    "rpi_pause_evt_action:%d %s:%s arg=%p flag=%x. "
-		    "Invalid event type. Terminated.",
+		    "Invalid event type. <",
 		    rpip->RPI,
 		    emlxs_rpi_state_xlate(rpip->state),
 		    emlxs_fcf_event_xlate(evt), arg1,
@@ -11729,20 +14826,19 @@ emlxs_rpi_pause_evt_action(emlxs_port_t *port, RPIobj_t *rpip, uint32_t evt,
 	}
 
 	switch (rpip->state) {
-	case RPI_STATE_OFFLINE:
+	case RPI_STATE_RESERVED:
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "rpi_pause_evt_action:%d flag=%x. Offlining RPI.",
+		    "rpi_pause_evt_action:%d flag=%x. Freeing RPI.",
 		    rpip->RPI,
 		    rpip->flag);
 
-		rval = emlxs_rpi_state(port, rpip, RPI_STATE_OFFLINE,
-		    FCF_REASON_REENTER, evt, arg1);
+		rval = emlxs_rpi_state(port, rpip, RPI_STATE_FREE,
+		    FCF_REASON_EVENT, evt, arg1);
 		break;
 
 	case RPI_STATE_UNREG:
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "rpi_pause_evt_action:%d flag=%x. Not online. "
-		    "Terminated.",
+		    "rpi_pause_evt_action:%d flag=%x. Not online. <",
 		    rpip->RPI,
 		    rpip->flag);
 
@@ -11750,8 +14846,7 @@ emlxs_rpi_pause_evt_action(emlxs_port_t *port, RPIobj_t *rpip, uint32_t evt,
 
 	case RPI_STATE_PAUSED:
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "rpi_pause_evt_action:%d flag=%x. Already paused. "
-		    "Terminated.",
+		    "rpi_pause_evt_action:%d flag=%x. Already paused. <",
 		    rpip->RPI,
 		    rpip->flag);
 
@@ -11765,13 +14860,27 @@ emlxs_rpi_pause_evt_action(emlxs_port_t *port, RPIobj_t *rpip, uint32_t evt,
 		    rpip->RPI,
 		    rpip->flag);
 
+		/* Don't pause an RPI, if the VPI is not pausing too */
+		if (!(vpip->flag & EMLXS_VPI_PAUSE_REQ)) {
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+			    "rpi_pause_evt_action:%d rpi_online=%d,%d "
+			    "xri_count=%d. VPI:%d pause not requested.  "
+			    "Unregistering.", rpip->RPI,
+			    vpip->rpi_online, vpip->rpi_paused,
+			    rpip->xri_count, vpip->VPI);
+
+			rval = emlxs_rpi_state(port, rpip, RPI_STATE_UNREG,
+			    FCF_REASON_EVENT, evt, arg1);
+			break;
+		}
+
 		rval = emlxs_rpi_state(port, rpip, RPI_STATE_PAUSED,
 		    FCF_REASON_EVENT, evt, arg1);
 		break;
 
 	default:
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
-		    "rpi_pause_evt_action:%d flag=%x. Terminated.",
+		    "rpi_pause_evt_action:%d flag=%x. <",
 		    rpip->RPI,
 		    rpip->flag);
 		break;
@@ -11792,7 +14901,7 @@ emlxs_rpi_resume_evt_action(emlxs_port_t *port, RPIobj_t *rpip, uint32_t evt,
 	if (evt != FCF_EVENT_RPI_RESUME) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
 		    "rpi_resume_evt_action:%d %s:%s arg=%p flag=%x. "
-		    "Invalid event type. Terminated.",
+		    "Invalid event type. <",
 		    rpip->RPI,
 		    emlxs_rpi_state_xlate(rpip->state),
 		    emlxs_fcf_event_xlate(evt), arg1,
@@ -11813,7 +14922,7 @@ emlxs_rpi_resume_evt_action(emlxs_port_t *port, RPIobj_t *rpip, uint32_t evt,
 
 	default:
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "rpi_resume_evt_action:%d flag=%x. Not paused. Terminated.",
+		    "rpi_resume_evt_action:%d flag=%x. Not paused. <",
 		    rpip->RPI,
 		    rpip->flag);
 		break;
@@ -11826,10 +14935,51 @@ emlxs_rpi_resume_evt_action(emlxs_port_t *port, RPIobj_t *rpip, uint32_t evt,
 
 /*ARGSUSED*/
 static uint32_t
+emlxs_rpi_reserved_action(emlxs_port_t *port, RPIobj_t *rpip, uint32_t evt,
+    void *arg1)
+{
+	VPIobj_t *vpip;
+
+	vpip = rpip->vpip;
+
+	if (rpip->state != RPI_STATE_RESERVED) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+		    "rpi_reserved_action:%d %s:%s arg=%p. "
+		    "Invalid state. <",
+		    rpip->RPI,
+		    emlxs_rpi_state_xlate(rpip->state),
+		    emlxs_fcf_event_xlate(evt), arg1);
+		return (1);
+	}
+
+	if (rpip->prev_state != RPI_STATE_FREE) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+		    "rpi_reserved_action:%d %s:%s arg=%p. "
+		    "Invalid previous state. %s  <",
+		    rpip->RPI,
+		    emlxs_rpi_state_xlate(rpip->state),
+		    emlxs_fcf_event_xlate(evt), arg1,
+		    emlxs_rpi_state_xlate(rpip->prev_state));
+
+		return (1);
+	}
+
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+	    "rpi_reserved_action:%d rpi_online=%d,%d. <",
+	    rpip->RPI,
+	    vpip->rpi_online, vpip->rpi_paused);
+
+	return (0);
+
+} /* emlxs_rpi_reserved_action() */
+
+
+/*ARGSUSED*/
+static uint32_t
 emlxs_rpi_offline_action(emlxs_port_t *port, RPIobj_t *rpip, uint32_t evt,
     void *arg1)
 {
-	uint32_t rval;
+	uint32_t rval = 0;
 	VPIobj_t *vpip;
 
 	vpip = rpip->vpip;
@@ -11837,20 +14987,11 @@ emlxs_rpi_offline_action(emlxs_port_t *port, RPIobj_t *rpip, uint32_t evt,
 	if (rpip->state != RPI_STATE_OFFLINE) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 		    "rpi_offline_action:%d %s:%s arg=%p. "
-		    "Invalid state. Terminated.",
+		    "Invalid state. <",
 		    rpip->RPI,
 		    emlxs_rpi_state_xlate(rpip->state),
 		    emlxs_fcf_event_xlate(evt), arg1);
 		return (1);
-	}
-
-	if (rpip->prev_state == RPI_STATE_FREE) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "rpi_offline_action:%d rpi_online=%d,%d. Terminated.",
-		    rpip->RPI,
-		    vpip->rpi_online, vpip->rpi_paused);
-
-		return (0);
 	}
 
 	if (rpip->flag & EMLXS_RPI_PAUSED) {
@@ -11874,7 +15015,7 @@ emlxs_rpi_offline_action(emlxs_port_t *port, RPIobj_t *rpip, uint32_t evt,
 		}
 	}
 
-	if (rpip->did == FABRIC_DID) {
+	if (rpip->RPI == FABRIC_RPI) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 		    "rpi_offline_action:%d rpi_online=%d,%d xri_count=%d. "
 		    "Fabric RPI offline. Freeing.",
@@ -11893,7 +15034,7 @@ emlxs_rpi_offline_action(emlxs_port_t *port, RPIobj_t *rpip, uint32_t evt,
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 		    "rpi_offline_action:%d rpi_online=%d,%d xri_count=%d. "
 		    "RPI offline. "
-		    "Notifying VPI:%d",
+		    "Notifying VPI:%d >",
 		    rpip->RPI,
 		    vpip->rpi_online, vpip->rpi_paused,
 		    rpip->xri_count,
@@ -11925,17 +15066,32 @@ emlxs_rpi_paused_action(emlxs_port_t *port, RPIobj_t *rpip, uint32_t evt,
     void *arg1)
 {
 	VPIobj_t *vpip;
+	uint32_t rval = 0;
 
 	vpip = rpip->vpip;
 
 	if (rpip->state != RPI_STATE_PAUSED) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 		    "rpi_paused_action:%d %s:%s arg=%p. "
-		    "Invalid state. Terminated.",
+		    "Invalid state. <",
 		    rpip->RPI,
 		    emlxs_rpi_state_xlate(rpip->state),
 		    emlxs_fcf_event_xlate(evt), arg1);
 		return (1);
+	}
+
+	if (!(vpip->flag & EMLXS_VPI_PAUSE_REQ)) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+		    "rpi_paused_action:%d rpi_online=%d,%d xri_count=%d. "
+		    "VPI:%d pause not requested.  Unregistering.",
+		    rpip->RPI,
+		    vpip->rpi_online, vpip->rpi_paused,
+		    rpip->xri_count,
+		    vpip->VPI);
+
+		rval = emlxs_rpi_state(port, rpip, RPI_STATE_UNREG,
+		    FCF_REASON_EVENT, evt, arg1);
+		return (rval);
 	}
 
 	if (!(rpip->flag & EMLXS_RPI_PAUSED)) {
@@ -11948,7 +15104,7 @@ emlxs_rpi_paused_action(emlxs_port_t *port, RPIobj_t *rpip, uint32_t evt,
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 		    "rpi_paused_action:%d rpi_online=%d,%d xri_count=%d. "
 		    "RPI paused. "
-		    "Notifying VPI:%d",
+		    "Notifying VPI:%d >",
 		    rpip->RPI,
 		    vpip->rpi_online, vpip->rpi_paused,
 		    rpip->xri_count,
@@ -11960,7 +15116,7 @@ emlxs_rpi_paused_action(emlxs_port_t *port, RPIobj_t *rpip, uint32_t evt,
 	} else {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 		    "rpi_paused_action:%d rpi_online=%d,%d xri_count=%d. "
-		    "RPI paused.",
+		    "RPI paused. <",
 		    rpip->RPI,
 		    vpip->rpi_online, vpip->rpi_paused,
 		    rpip->xri_count);
@@ -11976,19 +15132,18 @@ static uint32_t
 emlxs_rpi_unreg_failed_action(emlxs_port_t *port, RPIobj_t *rpip, uint32_t evt,
     void *arg1)
 {
-	uint32_t rval;
+	uint32_t rval = 0;
 
 	rpip->attempts++;
 
 	if (rpip->state != RPI_STATE_UNREG_FAILED) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
 		    "rpi_unreg_failed_action:%d %s:%s arg=%p attempt=%d. "
-		    "Invalid state. Terminated.",
+		    "Invalid state. <",
 		    rpip->RPI,
 		    emlxs_rpi_state_xlate(rpip->state),
 		    emlxs_fcf_event_xlate(evt), arg1,
 		    rpip->attempts);
-
 		return (1);
 	}
 
@@ -12031,7 +15186,7 @@ emlxs_rpi_unreg_handler(emlxs_port_t *port, RPIobj_t *rpip)
 	XRIobj_t *next_xrip;
 
 	/* Special handling for Fabric RPI */
-	if (rpip->did == FABRIC_DID) {
+	if (rpip->RPI == FABRIC_RPI) {
 		if (node) {
 			(void) emlxs_tx_node_flush(port, node, 0, 0, 0);
 			(void) emlxs_chipq_node_flush(port, 0, node, 0);
@@ -12042,6 +15197,9 @@ emlxs_rpi_unreg_handler(emlxs_port_t *port, RPIobj_t *rpip)
 		xrip = (XRIobj_t *)hba->sli.sli4.XRIinuse_f;
 		while (xrip != (XRIobj_t *)&hba->sli.sli4.XRIinuse_f) {
 			next_xrip = xrip->_f;
+			/* We don't need to worry about xrip->reserved_rpip */
+			/* here because the Fabric RPI can never be reserved */
+			/* by an xri. */
 			if ((xrip->rpip == rpip) &&
 			    (xrip->flag & EMLXS_XRI_RESERVED)) {
 				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
@@ -12051,7 +15209,7 @@ emlxs_rpi_unreg_handler(emlxs_port_t *port, RPIobj_t *rpip)
 				    rpip->xri_count,
 				    xrip->XRI, xrip->iotag);
 
-				(void) emlxs_sli4_unreserve_xri(hba,
+				(void) emlxs_sli4_unreserve_xri(port,
 				    xrip->XRI, 0);
 			}
 			xrip = next_xrip;
@@ -12115,7 +15273,7 @@ emlxs_rpi_unreg_mbcmpl(emlxs_hba_t *hba, MAILBOXQ *mbq)
 	if (rpip->state != RPI_STATE_UNREG) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 		    "rpi_unreg_mbcmpl:%d state=%s. "
-		    "No longer in RPI_STATE_UNREG. Terminated.",
+		    "No longer in RPI_STATE_UNREG.",
 		    rpip->RPI,
 		    emlxs_rpi_state_xlate(rpip->state));
 
@@ -12125,9 +15283,9 @@ emlxs_rpi_unreg_mbcmpl(emlxs_hba_t *hba, MAILBOXQ *mbq)
 
 	if (mb4->mbxStatus) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "rpi_unreg_mbcmpl:%d failed. status=%x",
+		    "rpi_unreg_mbcmpl:%d failed. %s. >",
 		    rpip->RPI,
-		    mb4->mbxStatus);
+		    emlxs_mb_xlate_status(mb4->mbxStatus));
 
 		(void) emlxs_rpi_state(port, rpip, RPI_STATE_UNREG_FAILED,
 		    FCF_REASON_MBOX_FAILED, mb4->mbxStatus, 0);
@@ -12139,7 +15297,7 @@ emlxs_rpi_unreg_mbcmpl(emlxs_hba_t *hba, MAILBOXQ *mbq)
 	emlxs_rpi_unreg_handler(port, rpip);
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-	    "rpi_unreg_mbcmpl:%d Unregistered. Unreg cmpl.",
+	    "rpi_unreg_mbcmpl:%d Unregistered. Unreg complete. >",
 	    rpip->RPI);
 
 	(void) emlxs_rpi_state(port, rpip, RPI_STATE_UNREG_CMPL,
@@ -12159,17 +15317,16 @@ emlxs_rpi_unreg_action(emlxs_port_t *port, RPIobj_t *rpip, uint32_t evt,
 	emlxs_hba_t *hba = HBA;
 	MAILBOX4 *mb4;
 	MAILBOXQ *mbq;
-	uint32_t rval;
+	uint32_t rval = 0;
 	VPIobj_t *vpip = rpip->vpip;
 
 	if (rpip->state != RPI_STATE_UNREG) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
 		    "rpi_unreg_action:%d %s:%s arg=%p. "
-		    "Invalid state. Terminated.",
+		    "Invalid state. <",
 		    rpip->RPI,
 		    emlxs_rpi_state_xlate(rpip->state),
 		    emlxs_fcf_event_xlate(evt), arg1);
-
 		return (1);
 	}
 
@@ -12188,7 +15345,7 @@ emlxs_rpi_unreg_action(emlxs_port_t *port, RPIobj_t *rpip, uint32_t evt,
 		rpip->attempts = 0;
 	}
 
-	if (rpip->did == FABRIC_DID) {
+	if (rpip->RPI == FABRIC_RPI) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 		    "rpi_unreg_action:%d did=%x vpi=%d. Fabric RPI. "
 		    "Going offline.",
@@ -12206,11 +15363,11 @@ emlxs_rpi_unreg_action(emlxs_port_t *port, RPIobj_t *rpip, uint32_t evt,
 	}
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-	    "rpi_unreg_action:%d attempts=%d. Sending UNREG_RPI.",
+	    "rpi_unreg_action:%d attempts=%d. Sending UNREG_RPI. <",
 	    rpip->RPI,
 	    rpip->attempts);
 
-	if (!(mbq = (MAILBOXQ *)emlxs_mem_get(hba, MEM_MBOX, 1))) {
+	if (!(mbq = (MAILBOXQ *)emlxs_mem_get(hba, MEM_MBOX))) {
 
 		rval = emlxs_rpi_state(port, rpip, RPI_STATE_UNREG_FAILED,
 		    FCF_REASON_NO_MBOX, 0, arg1);
@@ -12261,12 +15418,12 @@ static uint32_t
 emlxs_rpi_unreg_cmpl_action(emlxs_port_t *port, RPIobj_t *rpip, uint32_t evt,
     void *arg1)
 {
-	uint32_t rval;
+	uint32_t rval = 0;
 
 	if (rpip->state != RPI_STATE_UNREG_CMPL) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
 		    "rpi_unreg_cmpl_action:%d %s:%s arg=%p. "
-		    "Invalid state. Terminated.",
+		    "Invalid state. <",
 		    rpip->RPI,
 		    emlxs_rpi_state_xlate(rpip->state),
 		    emlxs_fcf_event_xlate(evt), arg1);
@@ -12291,19 +15448,18 @@ static uint32_t
 emlxs_rpi_reg_failed_action(emlxs_port_t *port, RPIobj_t *rpip, uint32_t evt,
     void *arg1)
 {
-	uint32_t rval;
+	uint32_t rval = 0;
 
 	rpip->attempts++;
 
 	if (rpip->state != RPI_STATE_REG_FAILED) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
 		    "rpi_reg_failed_action:%d %s:%s arg=%p attempt=%d. "
-		    "Invalid state. Terminated.",
+		    "Invalid state. <",
 		    rpip->RPI,
 		    emlxs_rpi_state_xlate(rpip->state),
 		    emlxs_fcf_event_xlate(evt), arg1,
 		    rpip->attempts);
-
 		return (1);
 	}
 
@@ -12338,6 +15494,7 @@ emlxs_rpi_reg_failed_action(emlxs_port_t *port, RPIobj_t *rpip, uint32_t evt,
 static uint32_t
 emlxs_rpi_reg_handler(emlxs_port_t *port, RPIobj_t *rpip)
 {
+	emlxs_hba_t *hba = HBA;
 	VPIobj_t *vpip;
 	emlxs_node_t *node;
 
@@ -12353,10 +15510,14 @@ emlxs_rpi_reg_handler(emlxs_port_t *port, RPIobj_t *rpip)
 		}
 	}
 
-	if (!(rpip->flag & EMLXS_RPI_VPI) &&
-	    (rpip->did != FABRIC_DID)) {
+	if (!(rpip->flag & EMLXS_RPI_VPI) && (rpip->RPI != FABRIC_RPI)) {
 		rpip->flag |= EMLXS_RPI_VPI;
 		vpip->rpi_online++;
+	}
+
+	/* If private loop and this is fabric RPI, then exit now */
+	if (!(hba->flag & FC_FABRIC_ATTACHED) && (rpip->RPI == FABRIC_RPI)) {
+		return (0);
 	}
 
 	/* Create or update the node */
@@ -12383,7 +15544,7 @@ emlxs_rpi_reg_mbcmpl(emlxs_hba_t *hba, MAILBOXQ *mbq)
 	MAILBOX4 *mb4;
 	RPIobj_t *rpip;
 	emlxs_node_t *node;
-	uint32_t rval;
+	uint32_t rval = 0;
 
 	mutex_enter(&EMLXS_FCF_LOCK);
 
@@ -12392,8 +15553,7 @@ emlxs_rpi_reg_mbcmpl(emlxs_hba_t *hba, MAILBOXQ *mbq)
 
 	if (rpip->state != RPI_STATE_REG) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "rpi_reg_mbcmpl:%d state=%s. No longer in RPI_STATE_REG. "
-		    "Terminated.",
+		    "rpi_reg_mbcmpl:%d state=%s. No longer in RPI_STATE_REG.",
 		    rpip->RPI,
 		    emlxs_rpi_state_xlate(rpip->state));
 
@@ -12403,9 +15563,9 @@ emlxs_rpi_reg_mbcmpl(emlxs_hba_t *hba, MAILBOXQ *mbq)
 
 	if (mb4->mbxStatus) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "rpi_reg_mbcmpl:%d failed. status=%x",
+		    "rpi_reg_mbcmpl:%d failed. %s. >",
 		    rpip->RPI,
-		    mb4->mbxStatus);
+		    emlxs_mb_xlate_status(mb4->mbxStatus));
 
 		(void) emlxs_rpi_state(port, rpip, RPI_STATE_REG_FAILED,
 		    FCF_REASON_MBOX_FAILED, mb4->mbxStatus, 0);
@@ -12417,6 +15577,10 @@ emlxs_rpi_reg_mbcmpl(emlxs_hba_t *hba, MAILBOXQ *mbq)
 	rval = emlxs_rpi_reg_handler(port, rpip);
 
 	if (rval) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+		    "rpi_reg_mbcmpl:%d. Reg failed. >",
+		    rpip->RPI);
+
 		mb4->mbxStatus = MBX_FAILURE;
 
 		(void) emlxs_rpi_state(port, rpip, RPI_STATE_REG_FAILED,
@@ -12429,7 +15593,7 @@ emlxs_rpi_reg_mbcmpl(emlxs_hba_t *hba, MAILBOXQ *mbq)
 	node = rpip->node;
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-	    "rpi_reg_mbcmpl:%d Registered. Reg cmpl.",
+	    "rpi_reg_mbcmpl:%d Registered. Reg complete. >",
 	    rpip->RPI);
 
 	(void) emlxs_rpi_state(port, rpip, RPI_STATE_REG_CMPL, 0, 0, 0);
@@ -12467,20 +15631,19 @@ emlxs_rpi_reg_action(emlxs_port_t *port, RPIobj_t *rpip, uint32_t evt,
 	MAILBOX4 *mb4;
 	MAILBOXQ *mbq;
 	MATCHMAP *mp;
-	uint32_t rval;
+	uint32_t rval = 0;
 
 	if (rpip->state != RPI_STATE_REG) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
 		    "rpi_reg_action:%d %s:%s arg=%p. "
-		    "Invalid state. Terminated.",
+		    "Invalid state. <",
 		    rpip->RPI,
 		    emlxs_rpi_state_xlate(rpip->state),
 		    emlxs_fcf_event_xlate(evt), arg1);
-
 		return (1);
 	}
 
-	if (rpip->did == FABRIC_DID) {
+	if (rpip->RPI == FABRIC_RPI) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 		    "rpi_reg_action:%d did=%x vpi=%d. Fabric RPI. "
 		    "Going online.",
@@ -12504,37 +15667,25 @@ emlxs_rpi_reg_action(emlxs_port_t *port, RPIobj_t *rpip, uint32_t evt,
 		return (rval);
 	}
 
-	if (!(rpip->vpip->flag & EMLXS_VPI_PORT_ENABLED)) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "rpi_reg_action:%d did=%x. vpi=%d. Port disabled. "
-		    "Offlining RPI.",
-		    rpip->RPI,
-		    rpip->did,
-		    rpip->vpip->VPI);
-
-		rval = emlxs_rpi_state(port, rpip, RPI_STATE_OFFLINE,
-		    FCF_REASON_NOT_ALLOWED, evt, arg1);
-
-		return (rval);
-	}
-
 	if (rpip->prev_state != RPI_STATE_REG_FAILED) {
 		rpip->attempts = 0;
 	}
 
 	if (rpip->flag & EMLXS_RPI_REG) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "rpi_reg_action:%d flag=%x. Already registered. "
-		    "Updating registration.",
-		    rpip->RPI, rpip->flag);
+		    "rpi_reg_action:%d attempts=%d. "
+		    "Updating REG_RPI. <",
+		    rpip->RPI,
+		    rpip->attempts);
+	} else {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
+		    "rpi_reg_action:%d attempts=%d. "
+		    "Sending REG_RPI. <",
+		    rpip->RPI,
+		    rpip->attempts);
 	}
 
-	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-	    "rpi_reg_action:%d attempts=%d. Sending REG_RPI.",
-	    rpip->RPI,
-	    rpip->attempts);
-
-	if (!(mbq = (MAILBOXQ *)emlxs_mem_get(hba, MEM_MBOX, 1))) {
+	if (!(mbq = (MAILBOXQ *)emlxs_mem_get(hba, MEM_MBOX))) {
 
 		rval = emlxs_rpi_state(port, rpip, RPI_STATE_REG_FAILED,
 		    FCF_REASON_NO_MBOX, 0, arg1);
@@ -12545,7 +15696,7 @@ emlxs_rpi_reg_action(emlxs_port_t *port, RPIobj_t *rpip, uint32_t evt,
 	mb4 = (MAILBOX4*)mbq;
 	bzero((void *) mb4, MAILBOX_CMD_SLI4_BSIZE);
 
-	if ((mp = (MATCHMAP *)emlxs_mem_get(hba, MEM_BUF, 1)) == 0) {
+	if ((mp = (MATCHMAP *)emlxs_mem_get(hba, MEM_BUF)) == 0) {
 		emlxs_mem_put(hba, MEM_MBOX, (void *)mbq);
 
 		rval = emlxs_rpi_state(port, rpip, RPI_STATE_REG_FAILED,
@@ -12572,6 +15723,7 @@ emlxs_rpi_reg_action(emlxs_port_t *port, RPIobj_t *rpip, uint32_t evt,
 
 	mb4->un.varRegLogin.vpi = rpip->vpip->VPI;
 	mb4->un.varRegLogin.rpi = rpip->RPI;
+	mb4->un.varRegLogin.update = (rpip->flag & EMLXS_RPI_REG)? 1:0;
 
 	bcopy((void *)&rpip->sparam, (void *)mp->virt, sizeof (SERV_PARM));
 
@@ -12607,12 +15759,12 @@ static uint32_t
 emlxs_rpi_reg_cmpl_action(emlxs_port_t *port, RPIobj_t *rpip, uint32_t evt,
     void *arg1)
 {
-	uint32_t rval;
+	uint32_t rval = 0;
 
 	if (rpip->state != RPI_STATE_REG_CMPL) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
 		    "rpi_reg_cmpl_action:%d %s:%s arg=%p. "
-		    "Invalid state. Terminated.",
+		    "Invalid state. <",
 		    rpip->RPI,
 		    emlxs_rpi_state_xlate(rpip->state),
 		    emlxs_fcf_event_xlate(evt), arg1);
@@ -12621,7 +15773,7 @@ emlxs_rpi_reg_cmpl_action(emlxs_port_t *port, RPIobj_t *rpip, uint32_t evt,
 
 	if (rpip->flag & EMLXS_RPI_REG) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "rpi_reg_cmpl_action:%d flag=%x. Going online",
+		    "rpi_reg_cmpl_action:%d flag=%x. Going online.",
 		    rpip->RPI,
 		    rpip->flag);
 
@@ -12647,19 +15799,18 @@ static uint32_t
 emlxs_rpi_resume_failed_action(emlxs_port_t *port, RPIobj_t *rpip,
     uint32_t evt, void *arg1)
 {
-	uint32_t rval;
+	uint32_t rval = 0;
 
 	rpip->attempts++;
 
 	if (rpip->state != RPI_STATE_RESUME_FAILED) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
 		    "rpi_resume_failed_action:%d %s:%s arg=%p attempt=%d. "
-		    "Invalid state. Terminated.",
+		    "Invalid state. <",
 		    rpip->RPI,
 		    emlxs_rpi_state_xlate(rpip->state),
 		    emlxs_fcf_event_xlate(evt), arg1,
 		    rpip->attempts);
-
 		return (1);
 	}
 
@@ -12709,7 +15860,7 @@ emlxs_rpi_resume_mbcmpl(emlxs_hba_t *hba, MAILBOXQ *mbq)
 	if (rpip->state != RPI_STATE_RESUME) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 		    "rpi_resume_mbcmpl:%d state=%s. "
-		    "No longer in RPI_STATE_RESUME. Terminated.",
+		    "No longer in RPI_STATE_RESUME.",
 		    rpip->RPI,
 		    emlxs_rpi_state_xlate(rpip->state));
 
@@ -12719,9 +15870,9 @@ emlxs_rpi_resume_mbcmpl(emlxs_hba_t *hba, MAILBOXQ *mbq)
 
 	if (mb4->mbxStatus) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "rpi_resume_mbcmpl:%d failed. status=%x",
+		    "rpi_resume_mbcmpl:%d failed. %s. >",
 		    rpip->RPI,
-		    mb4->mbxStatus);
+		    emlxs_mb_xlate_status(mb4->mbxStatus));
 
 		(void) emlxs_rpi_state(port, rpip, RPI_STATE_RESUME_FAILED,
 		    FCF_REASON_MBOX_FAILED, mb4->mbxStatus, (void *)mbq->sbp);
@@ -12733,7 +15884,7 @@ emlxs_rpi_resume_mbcmpl(emlxs_hba_t *hba, MAILBOXQ *mbq)
 	emlxs_rpi_resume_handler(port, rpip);
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-	    "rpi_resume_mbcmpl:%d Resumed. Resume cmpl.",
+	    "rpi_resume_mbcmpl:%d Resumed. Resume complete. >",
 	    rpip->RPI);
 
 	(void) emlxs_rpi_state(port, rpip, RPI_STATE_RESUME_CMPL, 0, 0, 0);
@@ -12753,16 +15904,15 @@ emlxs_rpi_resume_action(emlxs_port_t *port, RPIobj_t *rpip, uint32_t evt,
 	emlxs_hba_t *hba = HBA;
 	MAILBOX4 *mb4;
 	MAILBOXQ *mbq;
-	uint32_t rval;
+	uint32_t rval = 0;
 
 	if (rpip->state != RPI_STATE_RESUME) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
 		    "rpi_resume_action:%d %s:%s arg=%p. "
-		    "Invalid state. Terminated.",
+		    "Invalid state. <",
 		    rpip->RPI,
 		    emlxs_rpi_state_xlate(rpip->state),
 		    emlxs_fcf_event_xlate(evt), arg1);
-
 		return (1);
 	}
 
@@ -12777,7 +15927,7 @@ emlxs_rpi_resume_action(emlxs_port_t *port, RPIobj_t *rpip, uint32_t evt,
 		return (rval);
 	}
 
-	if (rpip->did == FABRIC_DID) {
+	if (rpip->RPI == FABRIC_RPI) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 		    "rpi_resume_action:%d. Fabric RPI. "
 		    "Going online.",
@@ -12797,11 +15947,11 @@ emlxs_rpi_resume_action(emlxs_port_t *port, RPIobj_t *rpip, uint32_t evt,
 	}
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-	    "rpi_resume_action:%d attempts=%d. Sending RESUME_RPI.",
+	    "rpi_resume_action:%d attempts=%d. Sending RESUME_RPI. <",
 	    rpip->RPI,
 	    rpip->attempts);
 
-	if (!(mbq = (MAILBOXQ *)emlxs_mem_get(hba, MEM_MBOX, 1))) {
+	if (!(mbq = (MAILBOXQ *)emlxs_mem_get(hba, MEM_MBOX))) {
 
 		rval = emlxs_rpi_state(port, rpip, RPI_STATE_RESUME_FAILED,
 		    FCF_REASON_NO_MBOX, 0, arg1);
@@ -12852,12 +16002,12 @@ static uint32_t
 emlxs_rpi_resume_cmpl_action(emlxs_port_t *port, RPIobj_t *rpip, uint32_t evt,
     void *arg1)
 {
-	uint32_t rval;
+	uint32_t rval = 0;
 
 	if (rpip->state != RPI_STATE_RESUME_CMPL) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_error_msg,
 		    "rpi_resume_cmpl_action:%d %s:%s arg=%p. "
-		    "Invalid state. Terminated.",
+		    "Invalid state. <",
 		    rpip->RPI,
 		    emlxs_rpi_state_xlate(rpip->state),
 		    emlxs_fcf_event_xlate(evt), arg1);
@@ -12903,51 +16053,46 @@ emlxs_rpi_online_action(emlxs_port_t *port, RPIobj_t *rpip, uint32_t evt,
     void *arg1)
 {
 	emlxs_hba_t *hba = HBA;
-	uint32_t rval;
+	uint32_t rval = 0;
+	RPIobj_t *p2p_rpip;
 
 	if (rpip->state != RPI_STATE_ONLINE) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
 		    "rpi_online_action:%d %s:%s arg=%p. "
-		    "Invalid state. Terminated.",
+		    "Invalid state. <",
 		    rpip->RPI,
 		    emlxs_rpi_state_xlate(rpip->state),
 		    emlxs_fcf_event_xlate(evt), arg1);
 		return (1);
 	}
 
-	if (rpip->did == FABRIC_DID) {
+	if (rpip->RPI == FABRIC_RPI) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "rpi_online_action:%d did=%x. Fabric RPI online. "
-		    "Terminated.",
+		    "rpi_online_action:%d did=%x. Fabric RPI online. <",
 		    rpip->RPI,
 		    rpip->did,
 		    rpip->vpip->VPI);
 
+		/* Now register the p2p_rpip */
+		p2p_rpip = rpip->vpip->p2p_rpip;
+		if (p2p_rpip) {
+			rpip->vpip->p2p_rpip = NULL;
+
+			rval = emlxs_rpi_state(port, p2p_rpip, RPI_STATE_REG,
+			    FCF_REASON_EVENT, evt, arg1);
+		}
+
 		EMLXS_STATE_CHANGE(hba, FC_READY);
 
-		if (rpip->vpip->flogi_sbp) {
-			emlxs_vpi_flogi_cmpl(port, rpip->vpip, 0);
+		if (rpip->cmpl) {
+			emlxs_rpi_deferred_cmpl(port, rpip, 0);
 		}
 
 		return (0);
 	}
 
-	if (!(rpip->vpip->flag & EMLXS_VPI_PORT_ENABLED)) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-		    "rpi_online_action:%d did=%x. vpi=%d. Port disabled. "
-		    "Offlining RPI.",
-		    rpip->RPI,
-		    rpip->did,
-		    rpip->vpip->VPI);
-
-		rval = emlxs_rpi_state(port, rpip, RPI_STATE_OFFLINE,
-		    FCF_REASON_NOT_ALLOWED, evt, arg1);
-
-		return (rval);
-	}
-
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcf_detail_msg,
-	    "rpi_online_action:%d did=%x. RPI online. Notifying VPI:%d.",
+	    "rpi_online_action:%d did=%x. RPI online. Notifying VPI:%d. >",
 	    rpip->RPI,
 	    rpip->did,
 	    rpip->vpip->VPI);

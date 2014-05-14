@@ -5,8 +5,8 @@
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
  *
- * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or http://www.opensolaris.org/os/licensing.
+ * You can obtain a copy of the license at
+ * http://www.opensource.org/licenses/cddl1.txt.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2010 Emulex.  All rights reserved.
+ * Copyright (c) 2004-2011 Emulex. All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -54,32 +54,25 @@ extern "C" {
 #define	SAN_DIAG_SUPPORT	/* 2.40 driver */
 #define	FMA_SUPPORT		/* 2.40 driver */
 
+#define	NODE_THROTTLE_SUPPORT	/* 2.70 driver */
+
 /* #define	IDLE_TIMER	 Not yet - untested */
 
 /*
  * OS LEVEL FEATURES
  */
-#ifdef S10
-#define	 EMLXS_MODREV EMLXS_MODREV3
-#define	 MSI_SUPPORT
-
-
-#ifdef EMLXS_I386
-#define	 EMLXS_MODREVX EMLXS_MODREV2X
-#endif	/* i386 */
-#endif	/* S10 */
 
 
 #ifdef S11
 #define	MSI_SUPPORT
 #define	SFCT_SUPPORT  /* COMSTAR Support */
 #define	MODFW_SUPPORT /* Dynamic firmware module support */
-#define	EMLXS_MODREV EMLXS_MODREV5	/* Sun NPIV Enhancement */
+#define	EMLXS_MODREV EMLXS_MODREV5 /* Sun NPIV Enhancement */
 
 #ifdef EMLXS_I386
 #define	EMLXS_MODREVX EMLXS_MODREV2X
-#endif	/* i386 */
-#endif	/* S11 */
+#endif /* i386 */
+#endif /* S11 */
 
 /*
  * SUBFEATURES
@@ -102,8 +95,6 @@ extern "C" {
 #if defined(S10) || defined(S11)
 #define	S10S11
 #endif /* S10 or S11 */
-
-#define	DRIVER_NAME   "emlxs"
 
 #include <sys/types.h>
 #include <sys/varargs.h>
@@ -150,6 +141,7 @@ extern "C" {
 #include <sys/atomic.h>
 #ifdef S11
 #include <sys/pci.h>
+#include <sys/pcie.h>
 #else	/* !S11 */
 /*
  * Capabilities linked list entry offsets
@@ -199,6 +191,60 @@ extern "C" {
 #define	PCI_PMCSR_D1			0x1	/* power state D1 */
 #define	PCI_PMCSR_D2			0x2	/* power state D2 */
 #define	PCI_PMCSR_D3HOT			0x3	/* power state D3hot */
+
+
+/*
+ * PCI Express capability registers in PCI configuration space relative to
+ * the PCI Express Capability structure.
+ */
+#define	PCIE_CAP_ID			PCI_CAP_ID
+#define	PCIE_CAP_NEXT_PTR		PCI_CAP_NEXT_PTR
+#define	PCIE_PCIECAP			0x02	/* PCI-e Capability Reg */
+#define	PCIE_DEVCAP			0x04	/* Device Capability */
+#define	PCIE_DEVCTL			0x08	/* Device Control */
+#define	PCIE_DEVSTS			0x0A	/* Device Status */
+#define	PCIE_LINKCAP			0x0C	/* Link Capability */
+#define	PCIE_LINKCTL			0x10	/* Link Control */
+#define	PCIE_LINKSTS			0x12	/* Link Status */
+#define	PCIE_SLOTCAP			0x14	/* Slot Capability */
+#define	PCIE_SLOTCTL			0x18	/* Slot Control */
+#define	PCIE_SLOTSTS			0x1A	/* Slot Status */
+#define	PCIE_ROOTCTL			0x1C	/* Root Control */
+#define	PCIE_ROOTSTS			0x20	/* Root Status */
+
+/*
+ * PCI-Express Enhanced Capabilities Link Entry Bit Offsets
+ */
+#define	PCIE_EXT_CAP			0x100	/* Base Address of Ext Cap */
+
+#define	PCIE_EXT_CAP_ID_SHIFT		0	/* PCI-e Ext Cap ID */
+#define	PCIE_EXT_CAP_ID_MASK		0xFFFF
+#define	PCIE_EXT_CAP_VER_SHIFT		16	/* PCI-e Ext Cap Ver */
+#define	PCIE_EXT_CAP_VER_MASK		0xF
+#define	PCIE_EXT_CAP_NEXT_PTR_SHIFT	20	/* PCI-e Ext Cap Next Ptr */
+#define	PCIE_EXT_CAP_NEXT_PTR_MASK	0xFFF
+
+#define	PCIE_EXT_CAP_NEXT_PTR_NULL	0x0
+
+/*
+ * PCI-Express Enhanced Capability Identifier Values
+ */
+#define	PCIE_EXT_CAP_ID_AER		0x1	/* Advanced Error Handling */
+#define	PCIE_EXT_CAP_ID_VC		0x2	/* Virtual Channel, no MFVC */
+#define	PCIE_EXT_CAP_ID_SER		0x3	/* Serial Number */
+#define	PCIE_EXT_CAP_ID_PWR_BUDGET	0x4	/* Power Budgeting */
+#define	PCIE_EXT_CAP_ID_RC_LINK_DECL	0x5	/* RC Link Declaration */
+#define	PCIE_EXT_CAP_ID_RC_INT_LINKCTRL	0x6	/* RC Internal Link Control */
+#define	PCIE_EXT_CAP_ID_RC_EVNT_CEA	0x7	/* RC Event Collector */
+						/* Endpoint Association */
+#define	PCIE_EXT_CAP_ID_MFVC		0x8	/* Multi-func Virtual Channel */
+#define	PCIE_EXT_CAP_ID_VC_WITH_MFVC	0x9	/* Virtual Channel w/ MFVC */
+#define	PCIE_EXT_CAP_ID_RCRB		0xA	/* Root Complex Register Blck */
+#define	PCIE_EXT_CAP_ID_VS		0xB	/* Vendor Spec Extended Cap */
+#define	PCIE_EXT_CAP_ID_CAC		0xC	/* Config Access Correlation */
+#define	PCIE_EXT_CAP_ID_ACS		0xD	/* Access Control Services */
+#define	PCIE_EXT_CAP_ID_ARI		0xE	/* Alternative Routing ID */
+#define	PCIE_EXT_CAP_ID_ATS		0xF	/* Address Translation Svcs */
 #endif	/* S11 */
 
 #include <emlxs_hbaapi.h>
@@ -349,8 +395,8 @@ extern void ddi_fm_acc_err_clear();
 
 #define	MAX_FC_BRDS		256	/* Maximum # boards per system */
 
-#define	DELAYMS(ms)		drv_usecwait((ms*1000))
-#define	DELAYUS(us)		drv_usecwait(us)
+#define	BUSYWAIT_MS(ms)		drv_usecwait((ms*1000))
+#define	BUSYWAIT_US(us)		drv_usecwait(us)
 
 #define	EMLXS_MPDATA_SYNC(h, a, b, c)  \
 	if (h)  { \
@@ -387,6 +433,7 @@ extern void ddi_fm_acc_err_clear();
 #define	PCI_SLIM_RINDEX		  1
 #define	PCI_CSR_RINDEX		  2
 
+#define	PCI_BAR0_RINDEX		  1
 #define	PCI_BAR1_RINDEX		  2
 #define	PCI_BAR2_RINDEX		  3
 
@@ -494,7 +541,7 @@ typedef struct emlxs_xlat_err
 typedef struct emlxs_table
 {
 	uint32_t	code;
-	char		string[32];
+	char		string[48];
 } emlxs_table_t;
 
 

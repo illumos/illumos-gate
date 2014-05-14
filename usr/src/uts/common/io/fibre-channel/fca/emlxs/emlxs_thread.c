@@ -5,8 +5,8 @@
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
  *
- * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or http://www.opensolaris.org/os/licensing.
+ * You can obtain a copy of the license at
+ * http://www.opensource.org/licenses/cddl1.txt.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -20,10 +20,9 @@
  */
 
 /*
- * Copyright 2010 Emulex.  All rights reserved.
+ * Copyright (c) 2004-2011 Emulex. All rights reserved.
  * Use is subject to license terms.
  */
-
 
 #include <emlxs.h>
 
@@ -76,8 +75,6 @@ emlxs_taskq_thread(emlxs_taskq_thread_t *tthread)
 	mutex_exit(&tthread->lock);
 
 	thread_exit();
-
-	return;
 
 } /* emlxs_taskq_thread() */
 
@@ -146,7 +143,6 @@ void
 emlxs_taskq_create(emlxs_hba_t *hba, emlxs_taskq_t *taskq)
 {
 	emlxs_taskq_thread_t *tthread;
-	char buf[64];
 	uint32_t i;
 
 
@@ -158,32 +154,24 @@ emlxs_taskq_create(emlxs_hba_t *hba, emlxs_taskq_t *taskq)
 	/* Zero the taskq */
 	bzero(taskq, sizeof (emlxs_taskq_t));
 
-	(void) sprintf(buf, "%s%d_thread_taskq_get mutex", DRIVER_NAME,
-	    hba->ddiinst);
-	mutex_init(&taskq->get_lock, buf, MUTEX_DRIVER,
+	mutex_init(&taskq->get_lock, NULL, MUTEX_DRIVER,
 	    DDI_INTR_PRI(hba->intr_arg));
 
 	mutex_enter(&taskq->get_lock);
 
 	taskq->hba = hba;
 
-	(void) sprintf(buf, "%s%d_thread_taskq_put mutex", DRIVER_NAME,
-	    hba->ddiinst);
-	mutex_init(&taskq->put_lock, buf, MUTEX_DRIVER,
+	mutex_init(&taskq->put_lock, NULL, MUTEX_DRIVER,
 	    DDI_INTR_PRI(hba->intr_arg));
 
 	for (i = 0; i < EMLXS_MAX_TASKQ_THREADS; i++) {
 		tthread = &taskq->thread_list[i];
 		tthread->taskq = taskq;
 
-		(void) sprintf(buf, "%s%d_thread%d mutex", DRIVER_NAME,
-		    hba->ddiinst, i);
-		mutex_init(&tthread->lock, buf, MUTEX_DRIVER,
+		mutex_init(&tthread->lock, NULL, MUTEX_DRIVER,
 		    DDI_INTR_PRI(hba->intr_arg));
 
-		(void) sprintf(buf, "%s%d_thread%d cv", DRIVER_NAME,
-		    hba->ddiinst, i);
-		cv_init(&tthread->cv_flag, buf, CV_DRIVER, NULL);
+		cv_init(&tthread->cv_flag, NULL, CV_DRIVER, NULL);
 
 		tthread->flags |= EMLXS_THREAD_INITD;
 		tthread->thread =
@@ -358,7 +346,6 @@ emlxs_thread(emlxs_thread_t *ethread)
 void
 emlxs_thread_create(emlxs_hba_t *hba, emlxs_thread_t *ethread)
 {
-	char buf[64];
 	uint16_t pri;
 
 	if (ethread->flags & EMLXS_THREAD_INITD) {
@@ -367,14 +354,10 @@ emlxs_thread_create(emlxs_hba_t *hba, emlxs_thread_t *ethread)
 
 	bzero(ethread, sizeof (emlxs_thread_t));
 
-	(void) sprintf(buf, "%s%d_thread_%08x mutex", DRIVER_NAME, hba->ddiinst,
-	    (uint32_t)((uintptr_t)ethread & 0xFFFFFFFF));
-	mutex_init(&ethread->lock, buf, MUTEX_DRIVER,
+	mutex_init(&ethread->lock, NULL, MUTEX_DRIVER,
 	    DDI_INTR_PRI(hba->intr_arg));
 
-	(void) sprintf(buf, "%s%d_thread_%08x cv", DRIVER_NAME, hba->ddiinst,
-	    (uint32_t)((uintptr_t)ethread & 0xFFFFFFFF));
-	cv_init(&ethread->cv_flag, buf, CV_DRIVER, NULL);
+	cv_init(&ethread->cv_flag, NULL, CV_DRIVER, NULL);
 
 	ethread->hba = hba;
 	ethread->flags |= EMLXS_THREAD_INITD;
