@@ -16,6 +16,6 @@
 
 .PARALLEL: $(SUBDIRS)
 
-SUBDIRS = os-tests test-runner util-tests zfs-tests
+SUBDIRS = cmd runfiles tests doc
 
-include Makefile.com
+include $(SRC)/test/Makefile.com

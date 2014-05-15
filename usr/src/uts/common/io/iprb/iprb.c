@@ -298,8 +298,8 @@ iprb_attach(dev_info_t *dip)
 	/*
 	 * Precalculate watchdog times.
 	 */
-	ip->tx_timeout = drv_usectohz(TX_WATCHDOG * 1000000);
-	ip->rx_timeout = drv_usectohz(RX_WATCHDOG * 1000000);
+	ip->tx_timeout = TX_WATCHDOG;
+	ip->rx_timeout = RX_WATCHDOG;
 
 	iprb_identify(ip);
 
@@ -703,7 +703,7 @@ iprb_cmd_reclaim(iprb_t *ip)
 		if (ip->cmd_count == 0) {
 			ip->tx_wdog = 0;
 		} else {
-			ip->tx_wdog = ddi_get_time();
+			ip->tx_wdog = gethrtime();
 		}
 	}
 }
@@ -775,7 +775,7 @@ iprb_cmd_submit(iprb_t *ip, uint16_t cmd)
 	PUT8(ip, CSR_CMD, CUC_RESUME);
 	(void) GET8(ip, CSR_CMD);	/* flush CSR */
 
-	ip->tx_wdog = ddi_get_time();
+	ip->tx_wdog = gethrtime();
 	ip->cmd_last = ip->cmd_head;
 	ip->cmd_head++;
 	ip->cmd_head %= NUM_TX;
@@ -1010,15 +1010,15 @@ void
 iprb_update_stats(iprb_t *ip)
 {
 	iprb_dma_t	*sp = &ip->stats;
-	time_t		tstamp;
+	hrtime_t	tstamp;
 	int		i;
 
 	ASSERT(mutex_owned(&ip->culock));
 
 	/* Collect the hardware stats, but don't keep redoing it */
-	if ((tstamp = ddi_get_time()) == ip->stats_time) {
+	tstamp = gethrtime();
+	if (tstamp / NANOSEC == ip->stats_time / NANOSEC)
 		return;
-	}
 
 	PUTSTAT(sp, STATS_DONE_OFFSET, 0);
 	SYNCSTATS(sp, 0, 0, DDI_DMA_SYNC_FORDEV);
@@ -1174,7 +1174,7 @@ iprb_rx(iprb_t *ip)
 			break;
 		}
 
-		ip->rx_wdog = ddi_get_time();
+		ip->rx_wdog = gethrtime();
 
 		SYNCRFD(rfd, 0, 0, DDI_DMA_SYNC_FORKERNEL);
 		cnt = GETRFD16(rfd, RFD_CNT_OFFSET);
@@ -1663,7 +1663,7 @@ iprb_periodic(void *arg)
 	 */
 	if (ip->rxhangbug &&
 	    ((ip->miih == NULL) || (mii_get_speed(ip->miih) == 10000000)) &&
-	    ((ddi_get_time() - ip->rx_wdog) > ip->rx_timeout)) {
+	    ((gethrtime() - ip->rx_wdog) > ip->rx_timeout)) {
 		cmn_err(CE_CONT, "?Possible RU hang, resetting.\n");
 		reset = B_TRUE;
 	}
@@ -1671,7 +1671,7 @@ iprb_periodic(void *arg)
 	/* update the statistics */
 	mutex_enter(&ip->culock);
 
-	if (ip->tx_wdog && ((ddi_get_time() - ip->tx_wdog) > ip->tx_timeout)) {
+	if (ip->tx_wdog && ((gethrtime() - ip->tx_wdog) > ip->tx_timeout)) {
 		/* transmit/CU hang? */
 		cmn_err(CE_CONT, "?CU stalled, resetting.\n");
 		reset = B_TRUE;

@@ -21,6 +21,9 @@
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
+/*
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ */
 
 /*
  * ibdm.c
@@ -36,6 +39,7 @@
  * HCA's and IOC's (behind the IOU) present on the IB fabric.
  */
 
+#include <sys/sysmacros.h>
 #include <sys/systm.h>
 #include <sys/taskq.h>
 #include <sys/ib/mgt/ibdm/ibdm_impl.h>
@@ -971,7 +975,7 @@ ibdm_handle_hca_attach(ib_guid_t hca_guid)
 	    (sizeof (ibdm_port_attr_t) * hca_attr->hca_nports), KM_SLEEP);
 	hca_list->hl_hca_guid = hca_attr->hca_node_guid;
 	hca_list->hl_nports = hca_attr->hca_nports;
-	hca_list->hl_attach_time = ddi_get_time();
+	hca_list->hl_attach_time = gethrtime();
 	hca_list->hl_hca_hdl = hca_hdl;
 
 	/*
@@ -4691,11 +4695,13 @@ ibdm_ibnex_unregister_callback()
  * ibdm_get_waittime()
  *	Calculates the wait time based on the last HCA attach time
  */
-static time_t
-ibdm_get_waittime(ib_guid_t hca_guid, int dft_wait)
+static clock_t
+ibdm_get_waittime(ib_guid_t hca_guid, int dft_wait_sec)
 {
-	int		ii;
-	time_t		temp, wait_time = 0;
+	const hrtime_t	dft_wait = dft_wait_sec * NANOSEC;
+	hrtime_t	temp, wait_time = 0;
+	clock_t		usecs;
+	int		i;
 	ibdm_hca_list_t	*hca;
 
 	IBTF_DPRINTF_L4("ibdm", "\tget_waittime hcaguid:%llx"
@@ -4705,56 +4711,43 @@ ibdm_get_waittime(ib_guid_t hca_guid, int dft_wait)
 
 	hca = ibdm.ibdm_hca_list_head;
 
-	if (hca_guid) {
-		for (ii = 0; ii < ibdm.ibdm_hca_count; ii++) {
-			if ((hca_guid == hca->hl_hca_guid) &&
-			    (hca->hl_nports != hca->hl_nports_active)) {
-				wait_time =
-				    ddi_get_time() - hca->hl_attach_time;
-				wait_time = ((wait_time >= dft_wait) ?
-				    0 : (dft_wait - wait_time));
-				break;
-			}
-			hca = hca->hl_next;
+	for (i = 0; i < ibdm.ibdm_hca_count; i++, hca = hca->hl_next) {
+		if (hca->hl_nports == hca->hl_nports_active)
+			continue;
+
+		if (hca_guid && (hca_guid != hca->hl_hca_guid))
+			continue;
+
+		temp = gethrtime() - hca->hl_attach_time;
+		temp = MAX(0, (dft_wait - temp));
+
+		if (hca_guid) {
+			wait_time = temp;
+			break;
 		}
-		IBTF_DPRINTF_L2("ibdm", "\tget_waittime: wait_time = %ld secs",
-		    (long)wait_time);
-		return (wait_time);
+
+		wait_time = MAX(temp, wait_time);
 	}
 
-	for (ii = 0; ii < ibdm.ibdm_hca_count; ii++) {
-		if (hca->hl_nports != hca->hl_nports_active) {
-			temp = ddi_get_time() - hca->hl_attach_time;
-			temp = ((temp >= dft_wait) ? 0 : (dft_wait - temp));
-			wait_time = (temp > wait_time) ? temp : wait_time;
-		}
-		hca = hca->hl_next;
-	}
-	IBTF_DPRINTF_L2("ibdm", "\tget_waittime: wait_time = %ld secs",
-	    (long)wait_time);
-	return (wait_time);
+	/* convert to microseconds */
+	usecs = MIN(wait_time, dft_wait) / (NANOSEC / MICROSEC);
+
+	IBTF_DPRINTF_L2("ibdm", "\tget_waittime: wait_time = %ld usecs",
+	    (long)usecs);
+
+	return (drv_usectohz(usecs));
 }
 
 void
 ibdm_ibnex_port_settle_wait(ib_guid_t hca_guid, int dft_wait)
 {
-	time_t wait_time;
-	clock_t delta;
+	clock_t wait_time;
 
 	mutex_enter(&ibdm.ibdm_hl_mutex);
 
-	while ((wait_time = ibdm_get_waittime(hca_guid, dft_wait)) > 0) {
-		if (wait_time > dft_wait) {
-			IBTF_DPRINTF_L1("ibdm",
-			    "\tibnex_port_settle_wait: wait_time = %ld secs; "
-			    "Resetting to %d secs",
-			    (long)wait_time, dft_wait);
-			wait_time = dft_wait;
-		}
-		delta = drv_usectohz(wait_time * 1000000);
+	while ((wait_time = ibdm_get_waittime(hca_guid, dft_wait)) > 0)
 		(void) cv_reltimedwait(&ibdm.ibdm_port_settle_cv,
-		    &ibdm.ibdm_hl_mutex, delta, TR_CLOCK_TICK);
-	}
+		    &ibdm.ibdm_hl_mutex, wait_time, TR_CLOCK_TICK);
 
 	mutex_exit(&ibdm.ibdm_hl_mutex);
 }

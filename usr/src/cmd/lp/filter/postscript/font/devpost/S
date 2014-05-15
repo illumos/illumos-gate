@@ -27,7 +27,6 @@
 # software developed by the University of California, Berkeley, and its
 # contributors.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1	*/
 # Symbol
 name S
 internalname 33
@@ -40,7 +39,6 @@ sq	50	2	1
 L1	110	1	2
 LA	110	1	2
 LV	110	3	2
-LH	210	1	2
 Lb	"
 lh	100	0	2
 rh	100	0	2

@@ -10,12 +10,29 @@
 #
 
 #
-# Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
+# Copyright (c) 2012 by Delphix. All rights reserved.
 #
 
-.PARALLEL: $(SUBDIRS)
+include $(SRC)/Makefile.master
+include $(SRC)/test/Makefile.com
 
-SUBDIRS = os-tests test-runner util-tests zfs-tests
+ROOTOPTPKG = $(ROOT)/opt/util-tests
+ROOTBIN = $(ROOTOPTPKG)/bin
 
-include Makefile.com
+PROGS = utiltest
+
+CMDS = $(PROGS:%=$(ROOTBIN)/%)
+$(CMDS) := FILEMODE = 0555
+
+all lint clean clobber:
+
+install: $(CMDS)
+
+$(CMDS): $(ROOTBIN)
+
+$(ROOTBIN):
+	$(INS.dir)
+
+$(ROOTBIN)/%: %.ksh
+	$(INS.rename)

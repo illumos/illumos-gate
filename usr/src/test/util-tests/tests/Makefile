@@ -14,8 +14,6 @@
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 #
 
-.PARALLEL: $(SUBDIRS)
+SUBDIRS = printf
 
-SUBDIRS = os-tests test-runner util-tests zfs-tests
-
-include Makefile.com
+include $(SRC)/test/Makefile.com
