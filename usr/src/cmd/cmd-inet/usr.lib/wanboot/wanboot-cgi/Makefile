@@ -25,8 +25,11 @@
 include ../Makefile.com
 
 PROG =		wanboot-cgi
-LDLIBS +=	-lgen -lnsl -lwanbootutil -lnvpair -lwanboot -lcrypto
+LDLIBS +=	-lgen -lnsl -lwanbootutil -lnvpair -lwanboot
 CPPFLAGS +=	-I$(CMNCRYPTDIR)
+
+# libcrypto has no lint library, so we can only include this while building
+$(PROG) := LDLIBS += -lcrypto
 
 all:		$(PROG)
 

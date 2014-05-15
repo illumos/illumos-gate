@@ -2254,7 +2254,6 @@ print_ciphers(SSL *ssl)
 		return;
 
 	for (i = 0; i < sk_SSL_CIPHER_num(sk); i++) {
-		/* LINTED */
 		c = sk_SSL_CIPHER_value(sk, i);
 		libbootlog(BOOTLOG_VERBOSE, "%08lx %s", c->id, c->name);
 	}

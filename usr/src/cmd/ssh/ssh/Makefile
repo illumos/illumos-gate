@@ -40,8 +40,10 @@ include ../Makefile.ssh-common
 LDLIBS += $(SSH_COMMON_LDLIBS) -lsocket \
 	-lnsl \
 	-lz \
-	-lcrypto \
 	-lgss
+
+# libcrypto has no lint library, so we can only use it when building
+$(PROG) := LDLIBS += -lcrypto
 
 POFILE_DIR= ..
 
