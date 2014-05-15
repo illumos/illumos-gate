@@ -206,13 +206,30 @@ fi
 #
 # Fix mountall
 #
-tmpfile=etc/init.d/mountall.$$
-sed 's/mount_run/# disabled for lx brand: &/
-     s/mount_shm/# disabled for lx brand: &/
-     s/mount_tmp/# disabled for lx brand: &/
-     s/pidof \/sbin\/init/false/
-    ' etc/init.d/mountall.sh > $tmpfile
-mv -f $tmpfile etc/init.d/mountall.sh
-chmod +x etc/init.d/mountall.sh
+if [ -f etc/init.d/mountall.sh ]; then
+	tmpfile=etc/init.d/mountall.$$
+	sed 's/mount_run/# disabled for lx brand: &/
+	     s/mount_shm/# disabled for lx brand: &/
+	     s/mount_tmp/# disabled for lx brand: &/
+	     s/pidof \/sbin\/init/false/
+	    ' etc/init.d/mountall.sh > $tmpfile
+	mv -f $tmpfile etc/init.d/mountall.sh
+	chmod +x etc/init.d/mountall.sh
+fi
+
+ip_stack_type=`/usr/sbin/zonecfg -z $zonename info ip-type | cut -d' ' -f2`
+if [[ "$ip_stack_type" == "exclusive" ]]; then
+	# We already moved aside the 'networking' service in the code
+	# above. Setup our own service which will configure the net.
+	cp /usr/lib/brand/lx/lx_networking etc/init.d/networking
+fi
+
+if [[ $distro == "debian" ]]; then
+	# No upstart, setup rc link
+	ln -s ../init.d/networking etc/rcS.d/S10networking
+
+# else  must be Ubuntu, so upstart.
+
+fi
 
 # Hand control back to lx_init_zone

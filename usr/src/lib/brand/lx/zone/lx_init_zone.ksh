@@ -295,15 +295,28 @@ fi
 #
 # Perform distribution-specific changes.
 #
+distro=""
 if [[ -f etc/redhat-release ]]; then
-	. $(dirname $0)/lx_init_zone_redhat
+	distro="redhat"
+elif [[ -f etc/lsb-release ]]; then
+	if egrep -s Ubuntu etc/lsb-release; then
+		distro="ubuntu"
+	elif [[ -f etc/debian_version ]]; then
+		distro="debian"
+	fi
 elif [[ -f etc/debian_version ]]; then
-	. $(dirname $0)/lx_init_zone_debian
-else
+	distro="debian"
+fi
+
+if [[ -z $distro ]]; then
 	log ""
 	log "NOTE: Unsupported distribution!"
 	i18n_echo "NOTE: Unsupported distribution!"
+	exit 1
 fi
+
+i18n_echo "Customizing for $distro"
+. $(dirname $0)/lx_init_zone_${distro}
 
 log ""
 log "System configuration modifications complete `date`"

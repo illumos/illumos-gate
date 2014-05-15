@@ -26,7 +26,8 @@
 #
 
 PROGS =	lx_install lx_distro_install lx_init_zone lx_boot
-PROGS += lx_init_zone_debian lx_init_zone_redhat
+PROGS += lx_init_zone_debian lx_init_zone_redhat lx_init_zone_ubuntu
+PROGS += lx_networking
 SUBDIRS = distros
 XMLDOCS =	config.xml platform.xml
 TEMPLATES =	SUNWlx.xml SUNWlx26.xml
