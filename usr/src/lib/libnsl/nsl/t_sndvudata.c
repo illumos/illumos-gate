@@ -24,8 +24,9 @@
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ */
 
 /*
  * t_sndudata.c and t_sndvudata.c are very similar and contain common code.
@@ -56,7 +57,7 @@ _tx_sndvudata(int fd, const struct t_unitdata *unitdata, struct t_iovec *tiov,
 	struct _ti_user *tiptr;
 	int sv_errno;
 	int didalloc;
-	char *dataptr;
+	char *dataptr = NULL;
 	unsigned int nbytes;
 
 	assert(api_semantics == TX_XTI_XNS5_API);
@@ -157,7 +158,6 @@ _tx_sndvudata(int fd, const struct t_unitdata *unitdata, struct t_iovec *tiov,
 
 	ctlbuf.len = size;
 
-	dataptr = NULL;
 	if (nbytes != 0) {
 		if ((dataptr = malloc((size_t)nbytes)) == NULL) {
 			t_errno = TSYSERR;
@@ -187,13 +187,12 @@ _tx_sndvudata(int fd, const struct t_unitdata *unitdata, struct t_iovec *tiov,
 	sig_mutex_lock(&tiptr->ti_lock);
 
 	_T_TX_NEXTSTATE(T_SNDUDATA, tiptr,
-			"t_sndvudata: invalid state event T_SNDUDATA");
+	    "t_sndvudata: invalid state event T_SNDUDATA");
 	if (didalloc)
 		free(ctlbuf.buf);
 	else
 		tiptr->ti_ctlbuf = ctlbuf.buf;
-	if (dataptr != NULL)
-		free(dataptr);
+	free(dataptr);
 	sig_mutex_unlock(&tiptr->ti_lock);
 	return (0);
 err_out:
@@ -202,8 +201,7 @@ err_out:
 		free(ctlbuf.buf);
 	else
 		tiptr->ti_ctlbuf = ctlbuf.buf;
-	if (dataptr != NULL)
-		free(dataptr);
+	free(dataptr);
 	sig_mutex_unlock(&tiptr->ti_lock);
 	errno = sv_errno;
 	return (-1);
