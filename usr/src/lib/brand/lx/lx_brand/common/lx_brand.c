@@ -201,12 +201,13 @@ i_lx_msg(int fd, char *msg, va_list ap)
 	if (lx_debug_enabled != 0)
 		lx_debug(buf);
 
-	/*
-	 * If we are trying to print to stderr, we also want to send the
-	 * message to syslog.
-	 */
 	if (fd == 2) {
-		syslog(LOG_ERR, "%s", buf);
+		/*
+		 * We used to call syslog here but that idea is broken since
+		 * the syslog -> vsyslog code path in the native libc clearly
+		 * does things that will not work in the lx branded zone
+		 * (e.g. open /proc/{pid}/psinfo).
+		 */
 
 		/*
 		 * We let the user choose whether or not to see these
