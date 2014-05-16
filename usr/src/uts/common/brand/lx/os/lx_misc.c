@@ -23,6 +23,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright (c) 2014, Joyent, Inc. All rights reserved.
+ */
+
 #include <sys/errno.h>
 #include <sys/systm.h>
 #include <sys/archsystm.h>
@@ -345,7 +349,15 @@ lx_opnotsupp()
 greg_t
 lx_fixsegreg(greg_t sr, model_t datamodel)
 {
+	uint16_t idx = SELTOIDX(sr);
+
 	ASSERT(sr == (sr & 0xffff));
+
+	/*
+	 * If the segment selector is a valid TLS selector, just return it.
+	 */
+	if (!SELISLDT(sr) && idx >= GDT_TLSMIN && idx <= GDT_TLSMAX)
+		return (sr | SEL_UPL);
 
 	/*
 	 * Force the SR into the LDT in ring 3 for 32-bit processes.
