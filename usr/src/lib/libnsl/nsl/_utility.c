@@ -966,7 +966,6 @@ _t_create(int fd, struct t_info *info, int api_semantics, int *t_capreq_failed)
 		errno = ENOMEM;
 		return (NULL);
 	}
-	sig_mutex_lock(&ntiptr->ti_lock);
 
 	/*
 	 * Allocate buffers for the new descriptor
@@ -975,7 +974,6 @@ _t_create(int fd, struct t_info *info, int api_semantics, int *t_capreq_failed)
 		sv_errno = errno;
 		(void) _t_delete_tilink(fd);
 		t_errno = TSYSERR;
-		sig_mutex_unlock(&ntiptr->ti_lock);
 		errno = sv_errno;
 		return (NULL);
 	}
@@ -1020,7 +1018,6 @@ _t_create(int fd, struct t_info *info, int api_semantics, int *t_capreq_failed)
 		if ((rstate = _t_adjust_state(fd, T_IDLE)) < 0) {
 			sv_errno = errno;
 			(void) _t_delete_tilink(fd);
-			sig_mutex_unlock(&ntiptr->ti_lock);
 			errno = sv_errno;
 			return (NULL);
 		}
@@ -1039,7 +1036,6 @@ _t_create(int fd, struct t_info *info, int api_semantics, int *t_capreq_failed)
 		if ((rstate = _t_adjust_state(fd, T_DATAXFER)) < 0)  {
 			sv_errno = errno;
 			(void) _t_delete_tilink(fd);
-			sig_mutex_unlock(&ntiptr->ti_lock);
 			errno = sv_errno;
 			return (NULL);
 		}
@@ -1054,7 +1050,6 @@ _t_create(int fd, struct t_info *info, int api_semantics, int *t_capreq_failed)
 		if ((rstate = _t_adjust_state(fd, T_INREL)) < 0)  {
 			sv_errno = errno;
 			(void) _t_delete_tilink(fd);
-			sig_mutex_unlock(&ntiptr->ti_lock);
 			errno = sv_errno;
 			return (NULL);
 		}
@@ -1063,7 +1058,6 @@ _t_create(int fd, struct t_info *info, int api_semantics, int *t_capreq_failed)
 	default:
 		t_errno = TSTATECHNG;
 		(void) _t_delete_tilink(fd);
-		sig_mutex_unlock(&ntiptr->ti_lock);
 		return (NULL);
 	}
 
@@ -1080,7 +1074,6 @@ _t_create(int fd, struct t_info *info, int api_semantics, int *t_capreq_failed)
 		sv_errno = errno;
 		(void) _t_delete_tilink(fd);
 		t_errno = TSYSERR;
-		sig_mutex_unlock(&ntiptr->ti_lock);
 		errno = sv_errno;
 		return (NULL);
 	}
@@ -1094,7 +1087,6 @@ _t_create(int fd, struct t_info *info, int api_semantics, int *t_capreq_failed)
 		sv_errno = errno;
 		(void) _t_delete_tilink(fd);
 		t_errno = TSYSERR;
-		sig_mutex_unlock(&ntiptr->ti_lock);
 		errno = sv_errno;
 		return (NULL);
 	}
@@ -1103,7 +1095,7 @@ _t_create(int fd, struct t_info *info, int api_semantics, int *t_capreq_failed)
 		tsap->tsa_qlen = 0; /* not needed for TLI */
 
 	ntiptr->ti_qlen = tsap->tsa_qlen;
-	sig_mutex_unlock(&ntiptr->ti_lock);
+
 	return (ntiptr);
 }
 
