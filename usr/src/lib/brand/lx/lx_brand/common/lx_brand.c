@@ -1090,7 +1090,7 @@ static struct lx_sysent sysents[] = {
 	{"nfsservctl",	NULL,		NOSYS_KERNEL,	0},	/* 169 */
 	{"setresgid16",	lx_setresgid16,	0,		3},	/* 170 */
 	{"getresgid16",	lx_getresgid16,	0,		3},	/* 171 */
-	{"prctl",	NULL,		NOSYS_UNDOC,	0},	/* 172 */
+	{"prctl",	lx_prctl,	0,		5},	/* 172 */
 	{"rt_sigreturn", lx_rt_sigreturn, 0,		0},	/* 173 */
 	{"rt_sigaction", lx_rt_sigaction, 0,		4},	/* 174 */
 	{"rt_sigprocmask", lx_rt_sigprocmask, 0,	4},	/* 175 */

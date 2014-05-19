@@ -255,6 +255,8 @@ extern int lx_keyctl(void);
 
 extern int lx_ipc(uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t);
 
+extern int lx_prctl(int, uintptr_t, uintptr_t, uintptr_t, uintptr_t);
+
 #endif	/* !defined(_ASM) */
 
 #define	EBP_HAS_ARG6		0x01
