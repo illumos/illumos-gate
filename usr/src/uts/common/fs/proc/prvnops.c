@@ -2686,6 +2686,49 @@ prread(vnode_t *vp, uio_t *uiop, int ioflag, cred_t *cr, caller_context_t *ct)
 #endif
 }
 
+/*
+ * We make pr_write_psinfo() somewhat simpler by asserting at compile time
+ * that PRFNSZ has the same definition as MAXCOMLEN.
+ */
+#if PRFNSZ != MAXCOMLEN
+#error PRFNSZ/MAXCOMLEN mismatch
+#endif
+
+int
+pr_write_psinfo(prnode_t *pnp, uio_t *uiop)
+{
+	char fname[PRFNSZ];
+	int offset = offsetof(psinfo_t, pr_fname), error;
+
+	ASSERT(pnp->pr_type == PR_PSINFO);
+
+#ifdef _SYSCALL32_IMPL
+	if (curproc->p_model != DATAMODEL_LP64)
+		offset = offsetof(psinfo32_t, pr_fname);
+#endif
+
+	/*
+	 * The only field that we actually care about is the pr_fname -- and we
+	 * insist that only pr_fname (and exactly pr_fname) is being written.
+	 */
+	if (uiop->uio_offset != offset || uiop->uio_resid != PRFNSZ)
+		return (0);
+
+	if ((error = uiomove(fname, PRFNSZ, UIO_WRITE, uiop)) != 0)
+		return (error);
+
+	fname[PRFNSZ - 1] = '\0';
+
+	if ((error = prlock(pnp, ZNO)) != 0)
+		return (error);
+
+	bcopy(fname, pnp->pr_common->prc_proc->p_user.u_comm, PRFNSZ);
+
+	prunlock(pnp);
+
+	return (0);
+}
+
 /* ARGSUSED */
 static int
 prwrite(vnode_t *vp, uio_t *uiop, int ioflag, cred_t *cr, caller_context_t *ct)
@@ -2763,6 +2806,9 @@ prwrite(vnode_t *vp, uio_t *uiop, int ioflag, cred_t *cr, caller_context_t *ct)
 		if (error == EINTR)
 			uiop->uio_resid = resid;
 		return (error);
+
+	case PR_PSINFO:
+		return (pr_write_psinfo(pnp, uiop));
 
 	default:
 		return ((vp->v_type == VDIR)? EISDIR : EBADF);
@@ -4546,6 +4592,9 @@ prgetnode(vnode_t *dp, prnodetype_t type)
 		break;
 
 	case PR_PSINFO:
+		pnp->pr_mode = 0644;	/* readable by all + owner can write */
+		break;
+
 	case PR_LPSINFO:
 	case PR_LWPSINFO:
 	case PR_USAGE:
