@@ -1,8 +1,7 @@
 /*
- * Copyright 2012, Daniil Lunev. All rights reserved.
- */
-/*
  * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012, Daniil Lunev. All rights reserved.
+ * Copyright 2014, OmniTI Computer Consulting, Inc. All rights reserved.
  */
 /*
  * Copyright (c) 1983 Regents of the University of California.
@@ -1835,6 +1834,9 @@ addif(char *str, int64_t param)
 	 */
 	setaddr = 0;
 	(*afp->af_getaddr)(str, (struct sockaddr *)&laddr, &prefixlen);
+
+	(void) memset(&mask, 0, sizeof (mask));
+	mask.ss_family = afp->af_af;
 
 	switch (prefixlen) {
 	case NO_PREFIX:
