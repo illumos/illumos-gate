@@ -22,6 +22,9 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ */
+
+/*
  * Copyright 2014 Joyent, Inc.  All rights reserved.
  */
 
@@ -97,6 +100,13 @@ extern boolean_t lx_is_rpm;
  */
 #define	LX_RUSAGE_SELF		0
 #define	LX_RUSAGE_CHILDREN	(-1)
+
+/*
+ * Constants for prctl().  We only include the ones here that we actually
+ * support; everything else will be ENOSYS.
+ */
+#define	LX_PR_SET_NAME		15
+#define	LX_PR_SET_NAME_NAMELEN	16
 
 /*
  * Based on code from brand_misc.h, but use of that is incompatible with the
