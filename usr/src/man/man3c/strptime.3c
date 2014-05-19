@@ -1,4 +1,5 @@
 '\" te
+.\" Copyright 2014 Garrett D'Amore <garrett@damore.org>
 .\" Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
 .\" Portions Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
 .\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
@@ -8,9 +9,9 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH STRPTIME 3C "Aug 27, 2007"
+.TH STRPTIME 3C "Jun 27, 2014"
 .SH NAME
-strptime \- date and time conversion
+strptime, strptime_l \- date and time conversion
 .SH SYNOPSIS
 .LP
 .nf
@@ -19,7 +20,15 @@ strptime \- date and time conversion
 \fBchar *\fR\fBstrptime\fR(\fBconst char *restrict\fR \fIbuf\fR,
      \fBconst char *restrict\fR \fIformat\fR, \fBstruct tm *restrict\fR \fItm\fR);
 .fi
+.LP
+.nf
+#include <time.h>
+#include <xlocale.h>
 
+\fBchar *\fR\fBstrptime_l\fR(\fBconst char *restrict\fR \fIbuf\fR,
+     \fBconst char *restrict\fR \fIformat\fR, \fBstruct tm *restrict\fR \fItm\fR,
+     \fBlocale_t\fR \fIloc\fR);
+.fi
 .SS "Non-zeroing Behavior"
 .LP
 .nf
@@ -31,12 +40,12 @@ strptime \- date and time conversion
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBstrptime()\fR function converts the character string pointed to by
 \fIbuf\fR to values which are stored in the \fBtm\fR structure pointed to by
-\fItm\fR, using the format specified by \fIformat\fR.
-.sp
+\fItm\fR, using the format specified by \fIformat\fR. The \fBstrptime_l()\fR
+function is identical to \fBstrptime()\fR except instead of acting in the
+current locale, it acts in the locale specified by the argument \fIloc\fR.
 .LP
 The \fIformat\fR argument is composed of zero or more conversion
 specifications. Each conversion specification is composed of a "%" (percent)
@@ -45,12 +54,10 @@ replacement required. One or more white space characters (as specified by
 \fBisspace\fR(3C)) may precede or follow a conversion specification. There must
 be white-space or other non-alphanumeric characters between any two conversion
 specifications.
-.sp
 .LP
 A non-zeroing version of \fBstrptime()\fR, described below under \fBNon-zeroing
 Behavior\fR, is provided if \fB_STRPTIME_DONTZERO\fR is defined.
 .SS "Conversion Specifications"
-.sp
 .LP
 The following conversion specifications are supported:
 .sp
@@ -360,7 +367,6 @@ Time zone name or no characters if no time zone exists.
 .RE
 
 .SS "Modified Conversion Specifications"
-.sp
 .LP
 Some conversion specifications can be modified by the \fBE\fR and \fBO\fR
 modifier characters to indicate that an alternate format or specification
@@ -525,7 +531,6 @@ the locale's alternate numeric symbols.
 .RE
 
 .SS "General Specifications"
-.sp
 .LP
 A conversion specification that is an ordinary character is executed by
 scanning the next character from the buffer. If the character scanned from the
@@ -537,7 +542,6 @@ A series of specifications composed of \fB%n\fR, \fB%t\fR, white-space
 characters or any combination is executed by scanning up to the first character
 that is not white space (which remains unscanned), or until no more characters
 can be scanned.  White space is defined by \fBisspace\fR(3C).
-.sp
 .LP
 Any other conversion specification is executed by scanning characters until a
 character matching the next specification is scanned, or until no more
@@ -554,7 +558,6 @@ consist of any combination of upper and lower case letters.  The user can
 request that the input date or time specification be in a specific language by
 setting the \fBLC_TIME\fR category using \fBsetlocale\fR(3C).
 .SS "Non-zeroing Behavior"
-.sp
 .LP
 In addition to the behavior described above by various standards, the Solaris
 implementation of \fBstrptime()\fR provides the following extensions. These may
@@ -577,7 +580,6 @@ If \fB_STRPTIME_DONTZERO\fR is defined, \fBstrptime()\fR does not zero the
 will use some values in the input \fBtm struct\fR to recalculate the date and
 re-assign the appropriate members of the \fBtm struct\fR.
 .RE
-.sp
 .LP
 The following describes extended features regardless of whether
 \fB_STRPTIME_DONTZERO\fR is defined or not defined:
@@ -597,7 +599,6 @@ If \fB%U\fR or \fB%W\fR is specified and if weekday and year are given and
 month and day of month are not given, \fBstrptime()\fR calculates and sets
 \fBtm_mon\fR, \fBtm_mday\fR, \fBtm_wday\fR, and \fBtm_year\fR.
 .RE
-.sp
 .LP
 The following describes extended features when \fB_STRPTIME_DONTZERO\fR is not
 defined:
@@ -608,7 +609,6 @@ defined:
 If \fB%C\fR is specified and \fB%y\fR is not specified, \fBstrptime()\fRassumes
 0 as the year offset, then calculates the year, and assigns \fBtm_year\fR.
 .RE
-.sp
 .LP
 The following describes extended features when \fB_STRPTIME_DONTZERO\fR is
 defined:
@@ -654,17 +654,14 @@ input is p.m. and the input \fBtm_hour\fR value is between 0 - 11,
 \fBstrptime()\fR will subtract 12 hours and update \fBtm_hour\fR.
 .RE
 .SH RETURN VALUES
-.sp
 .LP
 Upon successful completion, \fBstrptime()\fR returns a pointer to the character
 following the last character parsed. Otherwise, a null pointer is returned.
 .SH USAGE
-.sp
 .LP
 Several "same as" formats, and the special processing of white-space characters
 are provided in order to ease the use of identical  \fIformat\fR strings for
 \fBstrftime\fR(3C) and \fBstrptime()\fR.
-.sp
 .LP
 The \fBstrptime()\fR function tries to calculate \fBtm_year\fR, \fBtm_mon\fR,
 and \fBtm_mday\fR when given incomplete input.  This allows the \fBstruct tm\fR
@@ -675,12 +672,8 @@ created by \fBstrptime()\fR to be passed to \fBmktime\fR(3C) to produce a
 in \fBtm_yday\fR when \fB%j\fR is specified without otherwise specifying a
 month and day within month.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
-.sp
-
-.sp
 .TS
 box;
 c | c
@@ -689,16 +682,20 @@ ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
 CSI	Enabled
 _
-Interface Stability	Committed
+Interface Stability	See below.
 _
 MT-Level	MT-Safe
 _
-Standard	See \fBstandards\fR(5).
+Standard	See \fBstandards\fR(5) for \fBstrptime()\fR.
 .TE
 
+.LP
+The \fBstrptime()\fR function is Standard.  The \fBstrptime_l()\fR function
+is Uncommitted.
 .SH SEE ALSO
-.sp
 .LP
 \fBctime\fR(3C), \fBgetdate\fR(3C), \fBisspace\fR(3C), \fBmktime\fR(3C),
-\fBsetlocale\fR(3C), \fBstrftime\fR(3C), \fBattributes\fR(5), \fBenviron\fR(5),
+\fBnewlocale\fR(3C),
+\fBsetlocale\fR(3C), \fBstrftime\fR(3C), \fBuselocale\fR(3C),
+\fBattributes\fR(5), \fBenviron\fR(5),
 \fBstandards\fR(5)

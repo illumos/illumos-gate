@@ -1,4 +1,5 @@
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2001 Alexey Zelkin <phantom@FreeBSD.org>
  * All rights reserved.
@@ -27,47 +28,54 @@
 
 #include "lint.h"
 #include <stddef.h>
+#include <errno.h>
 #include "ldpart.h"
 #include "lmessages.h"
+#include "localeimpl.h"
 
-#define	LCMESSAGES_SIZE_FULL (sizeof (struct lc_messages_T) / sizeof (char *))
+#define	LCMESSAGES_SIZE_FULL (sizeof (struct lc_messages) / sizeof (char *))
 #define	LCMESSAGES_SIZE_MIN \
-	(offsetof(struct lc_messages_T, yesstr) / sizeof (char *))
+	(offsetof(struct lc_messages, yesstr) / sizeof (char *))
 
 static char empty[] = "";
 
-static const struct lc_messages_T _C_messages_locale = {
+struct lc_messages lc_messages_posix = {
 	"^[yY]",	/* yesexpr */
 	"^[nN]",	/* noexpr */
 	"yes",		/* yesstr */
 	"no"		/* nostr */
 };
 
-static struct lc_messages_T _messages_locale;
-static int	_messages_using_locale;
-static char	*_messages_locale_buf;
+struct locdata __posix_messages_locdata = {
+	.l_lname = "C",
+	.l_data = { &lc_messages_posix }
+};
 
-int
-__messages_load_locale(const char *name)
+struct locdata *
+__lc_messages_load(const char *name)
 {
+	struct locdata *ldata;
+	struct lc_messages *lmsgs;
 	int ret;
 
-	ret = __part_load_locale(name, &_messages_using_locale,
-	    &_messages_locale_buf, "LC_MESSAGES",
-	    LCMESSAGES_SIZE_FULL, LCMESSAGES_SIZE_MIN,
-	    (const char **)&_messages_locale);
-	if (ret == _LDP_LOADED) {
-		if (_messages_locale.yesstr == NULL)
-			_messages_locale.yesstr = empty;
-		if (_messages_locale.nostr == NULL)
-			_messages_locale.nostr = empty;
-	}
-	return (ret);
-}
+	if ((ldata = __locdata_alloc(name, sizeof (*lmsgs))) == NULL)
+		return (NULL);
+	lmsgs = ldata->l_data[0];
 
-struct lc_messages_T *
-__get_current_messages_locale(void)
-{
-	return (_messages_using_locale ? &_messages_locale :
-	    (struct lc_messages_T *)&_C_messages_locale);
+	ret = __part_load_locale(name, (char **)&ldata->l_data[1],
+	    "LC_MESSAGES", LCMESSAGES_SIZE_FULL, LCMESSAGES_SIZE_MIN,
+	    (const char **)lmsgs);
+
+	if (ret != _LDP_LOADED) {
+		__locdata_free(ldata);
+		errno = EINVAL;
+		return (NULL);
+	}
+
+	if (lmsgs->yesstr == NULL)
+		lmsgs->yesstr = empty;
+	if (lmsgs->nostr == NULL)
+		lmsgs->nostr = empty;
+
+	return (ldata);
 }

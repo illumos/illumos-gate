@@ -1,4 +1,5 @@
 /*
+ * Copyright 2013 Garrett D'Amore <garrett@damore.org>
  * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2002-2004 Tim J. Robbins.
  * All rights reserved.
@@ -31,21 +32,31 @@
 #include <stdlib.h>
 #include <wchar.h>
 #include "mblocal.h"
+#include "localeimpl.h"
+#include "lctype.h"
 
 size_t
-mbsnrtowcs(wchar_t *_RESTRICT_KYWD dst, const char **_RESTRICT_KYWD src,
-    size_t nms, size_t len, mbstate_t *_RESTRICT_KYWD ps)
+mbsnrtowcs_l(wchar_t *_RESTRICT_KYWD dst, const char **_RESTRICT_KYWD src,
+    size_t nms, size_t len, mbstate_t *_RESTRICT_KYWD ps, locale_t loc)
 {
 	static mbstate_t mbs;
 
 	if (ps == NULL)
 		ps = &mbs;
-	return (__mbsnrtowcs(dst, src, nms, len, ps));
+	return (loc->ctype->lc_mbsnrtowcs(dst, src, nms, len, ps));
+}
+
+size_t
+mbsnrtowcs(wchar_t *_RESTRICT_KYWD dst, const char **_RESTRICT_KYWD src,
+    size_t nms, size_t len, mbstate_t *_RESTRICT_KYWD ps)
+{
+	return (mbsnrtowcs_l(dst, src, nms, len, ps, uselocale(NULL)));
 }
 
 size_t
 __mbsnrtowcs_std(wchar_t *_RESTRICT_KYWD dst, const char **_RESTRICT_KYWD src,
-    size_t nms, size_t len, mbstate_t *_RESTRICT_KYWD ps)
+    size_t nms, size_t len, mbstate_t *_RESTRICT_KYWD ps,
+    mbrtowc_pfn_t pmbrtowc)
 {
 	const char *s;
 	size_t nchr;
@@ -57,7 +68,7 @@ __mbsnrtowcs_std(wchar_t *_RESTRICT_KYWD dst, const char **_RESTRICT_KYWD src,
 
 	if (dst == NULL) {
 		for (;;) {
-			if ((nb = __mbrtowc(&wc, s, nms, ps)) == (size_t)-1)
+			if ((nb = pmbrtowc(&wc, s, nms, ps)) == (size_t)-1)
 				/* Invalid sequence - mbrtowc() sets errno. */
 				return ((size_t)-1);
 			else if (nb == 0 || nb == (size_t)-2)
@@ -70,7 +81,7 @@ __mbsnrtowcs_std(wchar_t *_RESTRICT_KYWD dst, const char **_RESTRICT_KYWD src,
 	}
 
 	while (len-- > 0) {
-		if ((nb = __mbrtowc(dst, s, nms, ps)) == (size_t)-1) {
+		if ((nb = pmbrtowc(dst, s, nms, ps)) == (size_t)-1) {
 			*src = s;
 			return ((size_t)-1);
 		} else if (nb == (size_t)-2) {

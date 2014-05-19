@@ -1,4 +1,5 @@
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 1996 - 2002 FreeBSD Project
  * Copyright (c) 1991, 1993
@@ -41,289 +42,144 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <alloca.h>
 #include <stdio.h>
+#include "mtlib.h"
 #include "collate.h"
-#include "lmonetary.h"	/* for __monetary_load_locale() */
-#include "lnumeric.h"	/* for __numeric_load_locale() */
-#include "lmessages.h"	/* for __messages_load_locale() */
+#include "lnumeric.h"	/* for struct lc_numeric */
+#include "lctype.h"	/* for struct lc_ctype */
 #include "setlocale.h"
-#include "ldpart.h"
-#include "timelocal.h" /* for __time_load_locale() */
 #include "../i18n/_loc_path.h"
-
-/*
- * Category names for getenv()  Note that this was modified
- * for Solaris.  See <iso/locale_iso.h>.
- */
-#define	NUM_CATS	7
-static char *categories[7] = {
-	"LC_CTYPE",
-	"LC_NUMERIC",
-	"LC_TIME",
-	"LC_COLLATE",
-	"LC_MONETARY",
-	"LC_MESSAGES",
-	"LC_ALL",
-};
-
-/*
- * Current locales for each category
- */
-static char current_categories[NUM_CATS][ENCODING_LEN + 1] = {
-	"C",
-	"C",
-	"C",
-	"C",
-	"C",
-	"C",
-	"C",
-};
+#include "localeimpl.h"
+#include "../i18n/_locale.h"
 
 /*
  * Path to locale storage directory.  See ../i18n/_loc_path.h
  */
 char	*_PathLocale = _DFLT_LOC_PATH;
 
-/*
- * The locales we are going to try and load
- */
-static char new_categories[NUM_CATS][ENCODING_LEN + 1];
-static char saved_categories[NUM_CATS][ENCODING_LEN + 1];
-static char current_locale_string[NUM_CATS * (ENCODING_LEN + 1 + 1)];
+static char	*current_locale(locale_t, int);
+static void	install_legacy(locale_t, int);
 
-static char	*currentlocale(void);
-static char	*loadlocale(int);
-static const char *__get_locale_env(int);
+static mutex_t setlocale_lock = DEFAULTMUTEX;
+static locale_t setlocale_list = NULL;
 
 char *
-setlocale(int category, const char *locale)
+setlocale(int category, const char *locname)
 {
-	int i, j, saverr;
-	const char *env, *r;
+	locale_t loc;
+	locale_t srch;
+	int mask;
 
-	if (category < 0 || category >= NUM_CATS) {
+	if (category < 0 || category > LC_ALL) {
 		errno = EINVAL;
 		return (NULL);
 	}
 
-	if (locale == NULL)
-		return (category != LC_ALL ?
-		    current_categories[category] : currentlocale());
+	if (locname == NULL)
+		return (current_locale(___global_locale, category));
 
-	/*
-	 * Default to the current locale for everything.
-	 */
-	for (i = 0; i < NUM_CATS; ++i)
-		(void) strcpy(new_categories[i], current_categories[i]);
+	mask = (category == LC_ALL ? LC_ALL_MASK : (1 << category));
 
-	/*
-	 * Now go fill up new_categories from the locale argument
-	 */
-	if (!*locale) {
-		if (category == LC_ALL) {
-			for (i = 0; i < NUM_CATS; ++i) {
-				if (i == LC_ALL)
-					continue;
-				env = __get_locale_env(i);
-				if (strlen(env) > ENCODING_LEN) {
-					errno = EINVAL;
-					return (NULL);
-				}
-				(void) strcpy(new_categories[i], env);
-			}
-		} else {
-			env = __get_locale_env(category);
-			if (strlen(env) > ENCODING_LEN) {
-				errno = EINVAL;
-				return (NULL);
-			}
-			(void) strcpy(new_categories[category], env);
-		}
-	} else if (category != LC_ALL) {
-		if (strlen(locale) > ENCODING_LEN) {
-			errno = EINVAL;
-			return (NULL);
-		}
-		(void) strcpy(new_categories[category], locale);
-	} else {
-		if ((r = strchr(locale, '/')) == NULL) {
-			if (strlen(locale) > ENCODING_LEN) {
-				errno = EINVAL;
-				return (NULL);
-			}
-			for (i = 0; i < NUM_CATS; ++i)
-				(void) strcpy(new_categories[i], locale);
-		} else {
-			char	*buf;
-			char	*save;
-
-			buf = alloca(strlen(locale) + 1);
-			(void) strcpy(buf, locale);
-
-			save = NULL;
-			r = strtok_r(buf, "/", &save);
-			for (i = 0;  i < NUM_CATS; i++) {
-				if (i == LC_ALL)
-					continue;
-				if (r == NULL) {
-					/*
-					 * Composite Locale is inadequately
-					 * specified!   (Or with empty fields.)
-					 * The old code would fill fields
-					 * out from the last one, but I think
-					 * this is suboptimal.
-					 */
-					errno = EINVAL;
-					return (NULL);
-				}
-				(void) strlcpy(new_categories[i], r,
-				    ENCODING_LEN);
-				r = strtok_r(NULL, "/", &save);
-			}
-			if (r != NULL) {
-				/*
-				 * Too many components - we had left over
-				 * data in the LC_ALL.  It is malformed.
-				 */
-				errno = EINVAL;
-				return (NULL);
-			}
-		}
+	loc = newlocale(mask, locname, NULL);
+	if (loc == NULL) {
+		return (NULL);
 	}
 
-	if (category != LC_ALL)
-		return (loadlocale(category));
-
-	for (i = 0; i < NUM_CATS; ++i) {
-		(void) strcpy(saved_categories[i], current_categories[i]);
-		if (i == LC_ALL)
-			continue;
-		if (loadlocale(i) == NULL) {
-			saverr = errno;
-			for (j = 0; j < i; j++) {
-				(void) strcpy(new_categories[j],
-				    saved_categories[j]);
-				if (i == LC_ALL)
-					continue;
-				if (loadlocale(j) == NULL) {
-					(void) strcpy(new_categories[j], "C");
-					(void) loadlocale(j);
-				}
-			}
-			errno = saverr;
-			return (NULL);
-		}
-	}
-	return (currentlocale());
-}
-
-static char *
-currentlocale(void)
-{
-	int i;
-	int composite = 0;
-
-	/* Look to see if any category is different */
-	for (i = 1; i < NUM_CATS; ++i) {
-		if (i == LC_ALL)
-			continue;
-		if (strcmp(current_categories[0], current_categories[i])) {
-			composite = 1;
+	/*
+	 * This next logic looks to see if we have ever used the same locale
+	 * settings before.  If so, we reuse it.  We avoid ever calling
+	 * freelocale() on a locale setting built up by setlocale, this
+	 * ensures that consumers (uselocale) will always be thread safe;
+	 * the actual locale data objects are never freed, and unique
+	 * locale objects are also never freed.  We reuse to avoid leaking
+	 * memory in applications that call setlocale repeatedly.
+	 */
+	lmutex_lock(&setlocale_lock);
+	for (srch = setlocale_list; srch != NULL; srch = srch->next) {
+		if (strcmp(srch->locname, loc->locname) == 0) {
 			break;
 		}
 	}
 
-	if (composite) {
-		/*
-		 * Note ordering of these follows the numeric order,
-		 * if the order is changed, then setlocale() will need
-		 * to be changed as well.
-		 */
-		(void) snprintf(current_locale_string,
-		    sizeof (current_locale_string),
-		    "%s/%s/%s/%s/%s/%s",
-		    current_categories[LC_CTYPE],
-		    current_categories[LC_NUMERIC],
-		    current_categories[LC_TIME],
-		    current_categories[LC_COLLATE],
-		    current_categories[LC_MONETARY],
-		    current_categories[LC_MESSAGES]);
+	if (srch == NULL) {
+		/* this is a new locale, save it for reuse later */
+		loc->next = setlocale_list;
+		loc->on_list = 1;
+		setlocale_list = loc;
 	} else {
-		(void) strlcpy(current_locale_string, current_categories[0],
-		    sizeof (current_locale_string));
+		/* we already had it, toss the new, and use what we found */
+		freelocale(loc);
+		loc = srch;
 	}
-	return (current_locale_string);
+	___global_locale = loc;
+
+	install_legacy(loc, mask);
+	lmutex_unlock(&setlocale_lock);
+
+	return (current_locale(loc, category));
 }
 
 static char *
-loadlocale(int category)
+current_locale(locale_t loc, int cat)
 {
-	char *new = new_categories[category];
-	char *old = current_categories[category];
-	int (*func)(const char *);
-
-	if ((new[0] == '.' &&
-	    (new[1] == '\0' || (new[1] == '.' && new[2] == '\0'))) ||
-	    strchr(new, '/') != NULL) {
-		errno = EINVAL;
-		return (NULL);
-	}
-
-	switch (category) {
+	switch (cat) {
 	case LC_CTYPE:
-		func = __wrap_setrunelocale;
-		break;
 	case LC_COLLATE:
-		func = _collate_load_tables;
-		break;
-	case LC_TIME:
-		func = __time_load_locale;
-		break;
-	case LC_NUMERIC:
-		func = __numeric_load_locale;
-		break;
-	case LC_MONETARY:
-		func = __monetary_load_locale;
-		break;
 	case LC_MESSAGES:
-		func = __messages_load_locale;
-		break;
+	case LC_MONETARY:
+	case LC_NUMERIC:
+	case LC_TIME:
+		return (loc->locdata[cat]->l_lname);
+	case LC_ALL:
+		return (loc->locname);
 	default:
-		errno = EINVAL;
 		return (NULL);
 	}
-
-	if (strcmp(new, old) == 0)
-		return (old);
-
-	if (func(new) != _LDP_ERROR) {
-		(void) strcpy(old, new);
-		return (old);
-	}
-
-	return (NULL);
 }
 
-static const char *
-__get_locale_env(int category)
+static void
+install_legacy(locale_t loc, int mask)
 {
-	const char *env;
+	/*
+	 * Update the legacy fixed variables that may be baked into
+	 * legacy programs.  This is really unfortunate, but we can't
+	 * solve for them otherwise.  Note that such legacy programs
+	 * are only going to see the global locale settings, and cannot
+	 * benefit from uselocale().
+	 */
+	if (mask & LC_NUMERIC_MASK) {
+		struct lc_numeric *lnum;
+		lnum = loc->locdata[LC_NUMERIC]->l_data[0];
+		_numeric[0] = *lnum->decimal_point;
+		_numeric[1] = *lnum->thousands_sep;
+	}
 
-	/* 1. check LC_ALL. */
-	env = getenv(categories[LC_ALL]);
+	if (mask & LC_CTYPE_MASK) {
+		struct lc_ctype *lct;
+		lct = loc->locdata[LC_CTYPE]->l_data[0];
+		for (int i = 0; i < _CACHED_RUNES; i++) {
+			/* ctype can only encode the lower 8 bits. */
+			__ctype[i+1] = lct->lc_ctype_mask[i] & 0xff;
+			__ctype_mask[i] = lct->lc_ctype_mask[i];
+		}
 
-	/* 2. check LC_* */
-	if (env == NULL || !*env)
-		env = getenv(categories[category]);
+		/* The bottom half is the toupper/lower array */
+		for (int i = 0; i < _CACHED_RUNES; i++) {
+			int u, l;
+			__ctype[258 + i] = i;
+			u = lct->lc_trans_upper[i];
+			l = lct->lc_trans_lower[i];
+			if (u && u != i)
+				__ctype[258+i] = u;
+			if (l && l != i)
+				__ctype[258+i] = l;
 
-	/* 3. check LANG */
-	if (env == NULL || !*env)
-		env = getenv("LANG");
+			/* Don't forget these annoyances either! */
+			__trans_upper[i] = u;
+			__trans_lower[i] = l;
+		}
 
-	/* 4. if none is set, fall to "C" */
-	if (env == NULL || !*env)
-		env = "C";
-
-	return (env);
+		/* Maximum mblen, cswidth, weird legacy */
+		__ctype[520] = lct->lc_max_mblen;
+	}
 }

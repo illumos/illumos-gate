@@ -1,4 +1,5 @@
 /*
+ * Copyright 2013 Garrett D'Amore <garrett@damore.org>
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -45,208 +46,103 @@
 #include "mblocal.h"
 #include "setlocale.h"
 #include "_ctype.h"
-#include "../i18n/_locale.h"
+#include "lctype.h"
+#include "localeimpl.h"
 
-extern _RuneLocale	*_Read_RuneMagi(FILE *);
-extern unsigned char	__ctype_C[];
+extern _RuneLocale	*_Read_RuneMagi(const char *);
 
-static int		__setrunelocale(const char *);
+struct lc_ctype lc_ctype_posix = {
+	.lc_mbrtowc = __mbrtowc_ascii,
+	.lc_mbsinit = __mbsinit_ascii,
+	.lc_mbsnrtowcs = __mbsnrtowcs_ascii,
+	.lc_wcrtomb = __wcrtomb_ascii,
+	.lc_wcsnrtombs = __wcsnrtombs_ascii,
+	.lc_is_ascii = 1,
+	.lc_max_mblen = 1,
+	.lc_trans_upper = _DefaultRuneLocale.__mapupper,
+	.lc_trans_lower = _DefaultRuneLocale.__maplower,
+	.lc_ctype_mask = _DefaultRuneLocale.__runetype,
+};
 
-static int
-__setrunelocale(const char *encoding)
+struct locdata __posix_ctype_locdata = {
+	.l_lname = "C",
+	.l_data = { &lc_ctype_posix, &_DefaultRuneLocale }
+};
+
+
+/*
+ * Table of initializers for encodings.  When you add a new encoding type,
+ * this table should be updated.
+ */
+static struct {
+	const char *e_name;
+	void (*e_init)(struct lc_ctype *);
+} encodings[] = {
+	{ "NONE", _none_init },
+	{ "UTF-8",	_UTF8_init },
+	{ "EUC-CN",	_EUC_CN_init },
+	{ "EUC-JP",	_EUC_JP_init },
+	{ "EUC-KR",	_EUC_KR_init },
+	{ "EUC-TW",	_EUC_TW_init },
+	{ "GB18030",	_GB18030_init },
+	{ "GB2312",	_GB2312_init },
+	{ "GBK",	_GBK_init },
+	{ "BIG5",	_BIG5_init },
+	{ "MSKanji",	_MSKanji_init },
+	{ NULL,		NULL }
+};
+
+
+struct locdata *
+__lc_ctype_load(const char *name)
 {
-	FILE *fp;
-	char name[PATH_MAX];
+	struct locdata *ldata;
+	struct lc_ctype *lct;
 	_RuneLocale *rl;
-	int saverr, ret;
-	size_t (*old__mbrtowc)(wchar_t *_RESTRICT_KYWD,
-	    const char *_RESTRICT_KYWD, size_t, mbstate_t *_RESTRICT_KYWD);
-	size_t (*old__wcrtomb)(char *_RESTRICT_KYWD, wchar_t,
-	    mbstate_t *_RESTRICT_KYWD);
-	int (*old__mbsinit)(const mbstate_t *);
-	size_t (*old__mbsnrtowcs)(wchar_t *_RESTRICT_KYWD,
-	    const char **_RESTRICT_KYWD, size_t, size_t,
-	    mbstate_t *_RESTRICT_KYWD);
-	size_t (*old__wcsnrtombs)(char *_RESTRICT_KYWD,
-	    const wchar_t **_RESTRICT_KYWD, size_t, size_t,
-	    mbstate_t *_RESTRICT_KYWD);
-	static char ctype_encoding[ENCODING_LEN + 1];
-	static _RuneLocale *CachedRuneLocale;
-	static size_t (*Cached__mbrtowc)(wchar_t *_RESTRICT_KYWD,
-	    const char *_RESTRICT_KYWD, size_t, mbstate_t *_RESTRICT_KYWD);
-	static size_t (*Cached__wcrtomb)(char *_RESTRICT_KYWD, wchar_t,
-	    mbstate_t *_RESTRICT_KYWD);
-	static int (*Cached__mbsinit)(const mbstate_t *);
-	static size_t (*Cached__mbsnrtowcs)(wchar_t *_RESTRICT_KYWD,
-	    const char **_RESTRICT_KYWD, size_t, size_t,
-	    mbstate_t *_RESTRICT_KYWD);
-	static size_t (*Cached__wcsnrtombs)(char *_RESTRICT_KYWD,
-	    const wchar_t **_RESTRICT_KYWD, size_t, size_t,
-	    mbstate_t *_RESTRICT_KYWD);
+	int i;
+	char path[PATH_MAX];
 
-	/*
-	 * The "C" and "POSIX" locale are always here.
-	 */
-	if (strcmp(encoding, "C") == 0 || strcmp(encoding, "POSIX") == 0) {
-		int i;
-
-		(void) memcpy(__ctype, __ctype_C, SZ_TOTAL);
-
-		for (i = 0; i < _CACHED_RUNES; i++) {
-			__ctype_mask[i] = _DefaultRuneLocale.__runetype[i];
-			__trans_upper[i] = _DefaultRuneLocale.__mapupper[i];
-			__trans_lower[i] = _DefaultRuneLocale.__maplower[i];
-		}
-
-		(void) _none_init(&_DefaultRuneLocale);
-		return (0);
-	}
-
-	/*
-	 * If the locale name is the same as our cache, use the cache.
-	 */
-	if (CachedRuneLocale != NULL &&
-	    strcmp(encoding, ctype_encoding) == 0) {
-		_CurrentRuneLocale = CachedRuneLocale;
-		__mbrtowc = Cached__mbrtowc;
-		__mbsinit = Cached__mbsinit;
-		__mbsnrtowcs = Cached__mbsnrtowcs;
-		__wcrtomb = Cached__wcrtomb;
-		__wcsnrtombs = Cached__wcsnrtombs;
-		return (0);
-	}
-
+	if ((ldata = __locdata_alloc(name, sizeof (*lct))) == NULL)
+		return (NULL);
+	lct = ldata->l_data[0];
 	/*
 	 * Slurp the locale file into the cache.
 	 */
 
-	(void) snprintf(name, sizeof (name), "%s/%s/LC_CTYPE/LCL_DATA",
-	    _PathLocale, encoding);
+	(void) snprintf(path, sizeof (path), "%s/%s/LC_CTYPE/LCL_DATA",
+	    _PathLocale, name);
 
-	if ((fp = fopen(name, "r")) == NULL)
-		return (errno == 0 ? ENOENT : errno);
-
-	if ((rl = _Read_RuneMagi(fp)) == NULL) {
-		saverr = (errno == 0 ? EINVAL : errno);
-		(void) fclose(fp);
-		return (saverr);
+	if ((rl = _Read_RuneMagi(path)) == NULL) {
+		__locdata_free(ldata);
+		errno = EINVAL;
+		return (NULL);
 	}
-	(void) fclose(fp);
+	ldata->l_data[1] = rl;
 
-	old__mbrtowc = __mbrtowc;
-	old__mbsinit = __mbsinit;
-	old__mbsnrtowcs = __mbsnrtowcs;
-	old__wcrtomb = __wcrtomb;
-	old__wcsnrtombs = __wcsnrtombs;
+	lct->lc_mbrtowc = NULL;
+	lct->lc_mbsinit = NULL;
+	lct->lc_mbsnrtowcs = NULL;
+	lct->lc_wcrtomb = NULL;
+	lct->lc_wcsnrtombs = NULL;
+	lct->lc_ctype_mask = rl->__runetype;
+	lct->lc_trans_upper = rl->__mapupper;
+	lct->lc_trans_lower = rl->__maplower;
 
-	__mbrtowc = NULL;
-	__mbsinit = NULL;
-	__mbsnrtowcs = __mbsnrtowcs_std;
-	__wcrtomb = NULL;
-	__wcsnrtombs = __wcsnrtombs_std;
-
-	if (strcmp(rl->__encoding, "NONE") == 0)
-		ret = _none_init(rl);
-	else if (strcmp(rl->__encoding, "UTF-8") == 0)
-		ret = _UTF8_init(rl);
-	else if (strcmp(rl->__encoding, "EUC-CN") == 0)
-		ret = _EUC_CN_init(rl);
-	else if (strcmp(rl->__encoding, "EUC-JP") == 0)
-		ret = _EUC_JP_init(rl);
-	else if (strcmp(rl->__encoding, "EUC-KR") == 0)
-		ret = _EUC_KR_init(rl);
-	else if (strcmp(rl->__encoding, "EUC-TW") == 0)
-		ret = _EUC_TW_init(rl);
-	else if (strcmp(rl->__encoding, "GB18030") == 0)
-		ret = _GB18030_init(rl);
-	else if (strcmp(rl->__encoding, "GB2312") == 0)
-		ret = _GB2312_init(rl);
-	else if (strcmp(rl->__encoding, "GBK") == 0)
-		ret = _GBK_init(rl);
-	else if (strcmp(rl->__encoding, "BIG5") == 0)
-		ret = _BIG5_init(rl);
-	else if (strcmp(rl->__encoding, "MSKanji") == 0)
-		ret = _MSKanji_init(rl);
-	else
-		ret = EINVAL;
-
-	if (ret == 0) {
-		if (CachedRuneLocale != NULL) {
-			free(CachedRuneLocale);
+	/* set up the function pointers */
+	for (i = 0; encodings[i].e_name != NULL; i++) {
+		int l = strlen(encodings[i].e_name);
+		if ((strncmp(rl->__encoding, encodings[i].e_name, l) == 0) &&
+		    (rl->__encoding[l] == '\0' || rl->__encoding[l] == '@')) {
+			encodings[i].e_init(lct);
+			break;
 		}
-		CachedRuneLocale = _CurrentRuneLocale;
-		Cached__mbrtowc = __mbrtowc;
-		Cached__mbsinit = __mbsinit;
-		Cached__mbsnrtowcs = __mbsnrtowcs;
-		Cached__wcrtomb = __wcrtomb;
-		Cached__wcsnrtombs = __wcsnrtombs;
-		(void) strcpy(ctype_encoding, encoding);
-
-		/*
-		 * We need to overwrite the _ctype array.  This requires
-		 * some finagling.  This is because references to it may
-		 * have been baked into applications.
-		 *
-		 * Note that it is interesting that toupper/tolower only
-		 * produce defined results when the input is representable
-		 * as a byte.
-		 */
-
-		/*
-		 * The top half is the type mask array.  Because we
-		 * want to support both legacy Solaris code (which have
-		 * mask valeus baked in to them), and we want to be able
-		 * to import locale files from other sources (FreeBSD)
-		 * which probably uses different masks, we have to perform
-		 * a conversion here.  Ugh.  Note that the _CTYPE definitions
-		 * we use from FreeBSD are richer than the Solaris legacy.
-		 *
-		 * We have to cope with these limitations though, because the
-		 * inadequate Solaris definitions were baked into binaries.
-		 */
-		for (int i = 0; i < _CACHED_RUNES; i++) {
-			/* ctype can only encode the lower 8 bits. */
-			__ctype[i+1] = rl->__runetype[i] & 0xff;
-			__ctype_mask[i] = rl->__runetype[i];
-		}
-
-		/* The bottom half is the toupper/lower array */
-		for (int i = 0; i < _CACHED_RUNES; i++) {
-			__ctype[258 + i] = i;
-			if (rl->__mapupper[i] && rl->__mapupper[i] != i)
-				__ctype[258+i] = rl->__mapupper[i];
-			if (rl->__maplower[i] && rl->__maplower[i] != i)
-				__ctype[258+i] = rl->__maplower[i];
-
-			/* Don't forget these annoyances either! */
-			__trans_upper[i] = rl->__mapupper[i];
-			__trans_lower[i] = rl->__maplower[i];
-		}
-
-		/*
-		 * Note that we expect the init code will have populated
-		 * the CSWIDTH array (__ctype[514-520]) properly.
-		 */
-	} else {
-		__mbrtowc = old__mbrtowc;
-		__mbsinit = old__mbsinit;
-		__mbsnrtowcs = old__mbsnrtowcs;
-		__wcrtomb = old__wcrtomb;
-		__wcsnrtombs = old__wcsnrtombs;
-		free(rl);
+	}
+	if (encodings[i].e_name == NULL) {
+		__locdata_free(ldata);
+		errno = EINVAL;
+		return (NULL);
 	}
 
-	return (ret);
-}
 
-int
-__wrap_setrunelocale(const char *locale)
-{
-	int ret = __setrunelocale(locale);
-
-	if (ret != 0) {
-		errno = ret;
-		return (_LDP_ERROR);
-	}
-	return (_LDP_LOADED);
+	return (ldata);
 }

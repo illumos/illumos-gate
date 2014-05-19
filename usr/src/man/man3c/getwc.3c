@@ -1,4 +1,5 @@
 '\" te
+.\" Copyright 2014 Garrett D'Amore <garrett@damore.org>
 .\"  Copyright (c) 1992, X/Open Company Limited  All Rights Reserved  Portions Copyright (c) 2002, Sun Microsystems, Inc.  All Rights Reserved
 .\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
@@ -7,9 +8,9 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH GETWC 3C "Jul 24, 2002"
+.TH GETWC 3C "Jul 11, 2014"
 .SH NAME
-getwc \- get wide character from a stream
+getwc, getwc_l \- get wide character from a stream
 .SH SYNOPSIS
 .LP
 .nf
@@ -18,6 +19,14 @@ getwc \- get wide character from a stream
 
 \fBwint_t\fR \fBgetwc\fR(\fBFILE\fR \fI*stream\fR);
 .fi
+.LP
+.nf
+#include <stdio.h>
+#include <wchar.h>
+#include <xlocale.h>
+
+\fBwint_t\fR \fBgetwc_l\fR(\fBFILE\fR \fI*stream\fR, \fBlocale_t\fR \fIloc\fR);
+.fi
 
 .SH DESCRIPTION
 .sp
@@ -25,44 +34,46 @@ getwc \- get wide character from a stream
 The \fBgetwc()\fR function is equivalent to \fBfgetwc\fR(3C), except that if it
 is implemented as a macro it may evaluate \fIstream\fR more than once, so the
 argument should never be an expression with side effects.
+.LP
+The \fBgetwc_l()\fR function is similar to \fBgetwc()\fR, except instead of
+acting on the current locale, it uses the locale specified by \fIloc\fR.
 .SH RETURN VALUES
-.sp
 .LP
 Refer to \fBfgetwc\fR(3C).
 .SH ERRORS
-.sp
 .LP
 Refer to \fBfgetwc\fR(3C).
 .SH USAGE
-.sp
 .LP
 This interface is provided to align with some current implementations and with
 possible future \fBISO\fR standards.
-.sp
 .LP
-Because it may be implemented as a macro, \fBgetwc()\fR may treat incorrectly a
-\fIstream\fR argument with side effects.  In particular,
-\fBgetwc\fR(*\fIf\fR\|++) may not work as expected.  Therefore, use of this
-function is not recommended; \fBfgetwc\fR(3C) should be used instead.
+Because they may be implemented as macros, these functions may treat incorrectly
+a \fIstream\fR argument with side effects.  In particular,
+\fBgetwc\fR(*\fIf\fR\|++) may not work as expected.  Therefore, use of these
+functions is not recommended; \fBfgetwc\fR(3C) and \fBfgetwc_l\fR(3C)
+should be used instead.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
-.sp
-
-.sp
 .TS
 box;
 c | c
 l | l .
 ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface Stability	Standard
+Interface Stability	See below.
 _
 MT-Level	MT-Safe
 .TE
 
-.SH SEE ALSO
-.sp
 .LP
-\fBfgetwc\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)
+The
+.B getwc()
+function is Standard.  The
+.B getwc_l()
+function is Uncommitted.
+.SH SEE ALSO
+.LP
+\fBfgetwc\fR(3C), \fBnewlocale\fR(3C), \fBsetlocale\fR(3C), \fBuselocale\fR(3C),
+\fBattributes\fR(5), \fBstandards\fR(5)

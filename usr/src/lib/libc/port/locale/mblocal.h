@@ -1,4 +1,5 @@
 /*
+ * Copyright 2013 Garrett D'Amore <garrett@damore.org>
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2004 Tim J. Robbins.
  * All rights reserved.
@@ -29,43 +30,31 @@
 #define	_MBLOCAL_H_
 
 #include "runetype.h"
+#include "lctype.h"
 
 /*
  * Rune initialization function prototypes.
  */
-int	_none_init(_RuneLocale *);
-int	_UTF8_init(_RuneLocale *);
-int	_EUC_CN_init(_RuneLocale *);
-int	_EUC_JP_init(_RuneLocale *);
-int	_EUC_KR_init(_RuneLocale *);
-int	_EUC_TW_init(_RuneLocale *);
-int	_GB18030_init(_RuneLocale *);
-int	_GB2312_init(_RuneLocale *);
-int	_GBK_init(_RuneLocale *);
-int	_BIG5_init(_RuneLocale *);
-int	_MSKanji_init(_RuneLocale *);
+void	_none_init(struct lc_ctype *);
+void	_UTF8_init(struct lc_ctype *);
+void	_EUC_CN_init(struct lc_ctype *);
+void	_EUC_JP_init(struct lc_ctype *);
+void	_EUC_KR_init(struct lc_ctype *);
+void	_EUC_TW_init(struct lc_ctype *);
+void	_GB18030_init(struct lc_ctype *);
+void	_GB2312_init(struct lc_ctype *);
+void	_GBK_init(struct lc_ctype *);
+void	_BIG5_init(struct lc_ctype *);
+void	_MSKanji_init(struct lc_ctype *);
 
-/*
- * Conversion function pointers for current encoding.
- */
-extern size_t (*__mbrtowc)(wchar_t *_RESTRICT_KYWD,
+typedef size_t (*mbrtowc_pfn_t)(wchar_t *_RESTRICT_KYWD,
     const char *_RESTRICT_KYWD, size_t, mbstate_t *_RESTRICT_KYWD);
-extern int (*__mbsinit)(const mbstate_t *);
-extern size_t (*__mbsnrtowcs)(wchar_t *_RESTRICT_KYWD,
-    const char **_RESTRICT_KYWD, size_t, size_t, mbstate_t *_RESTRICT_KYWD);
-
-extern size_t (*__wcrtomb)(char *_RESTRICT_KYWD, wchar_t,
+typedef size_t (*wcrtomb_pfn_t)(char *_RESTRICT_KYWD, wchar_t,
     mbstate_t *_RESTRICT_KYWD);
-
-extern size_t (*__wcsnrtombs)(char *_RESTRICT_KYWD,
-    const wchar_t **_RESTRICT_KYWD, size_t, size_t, mbstate_t *_RESTRICT_KYWD);
-
-extern int charset_is_ascii;
-
 size_t __mbsnrtowcs_std(wchar_t *_RESTRICT_KYWD, const char **_RESTRICT_KYWD,
-    size_t, size_t, mbstate_t *_RESTRICT_KYWD);
+    size_t, size_t, mbstate_t *_RESTRICT_KYWD, mbrtowc_pfn_t);
 size_t __wcsnrtombs_std(char *_RESTRICT_KYWD, const wchar_t **_RESTRICT_KYWD,
-    size_t, size_t, mbstate_t *_RESTRICT_KYWD);
+    size_t, size_t, mbstate_t *_RESTRICT_KYWD, wcrtomb_pfn_t);
 
 #define	MIN(a, b)	((a) < (b) ? (a) : (b))
 

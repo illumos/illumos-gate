@@ -1,4 +1,5 @@
 '\" te
+.\" Copyright 2014 Garrett D'Amore <garrett@damore.org>
 .\" Copyright 1989 AT&T.  Copyright (c) 2003, Sun Microsystems, Inc.  All Rights Reserved. Portions Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
 .\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
@@ -7,9 +8,9 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH STRXFRM 3C "Dec 10, 2003"
+.TH STRXFRM 3C "Jun 21, 2014"
 .SH NAME
-strxfrm \- string transformation
+strxfrm, strxfrm_l \- string transformation
 .SH SYNOPSIS
 .LP
 .nf
@@ -17,9 +18,12 @@ strxfrm \- string transformation
 
 \fBsize_t\fR \fBstrxfrm\fR(\fBchar *restrict\fR \fIs1\fR, \fBconst char *restrict\fR \fIs2\fR, \fBsize_t\fR \fIn\fR);
 .fi
-
+.LP
+.nf
+\fBsize_t\fR \fBstrxfrm_l\fR(\fBchar *restrict\fR \fIs1\fR, \fBconst char *restrict\fR \fIs2\fR, \fBsize_t\fR \fIn\fR,
+    \fBlocale_t\fR \fIloc\fR);
+.fi
 .SH DESCRIPTION
-.sp
 .LP
 The \fBstrxfrm()\fR function transforms the string pointed to by \fIs2\fR and
 places the resulting string into the array pointed to by \fIs1\fR. The
@@ -30,33 +34,31 @@ original strings. No more than \fIn\fR bytes are placed into the resulting
 array pointed to by \fIs1\fR, including the terminating null byte.  If \fIn\fR
 is \fB0\fR, \fIs1\fR is permitted to be a null pointer. If copying takes place
 between objects that overlap, the behavior is undefined.
-.sp
 .LP
 The \fBstrxfrm()\fR function does not change the setting of \fBerrno\fR if
 successful.
-.sp
 .LP
 Since no return value is reserved to indicate an error, an application wishing
 to check for error situations should set \fBerrno\fR to 0, then call
 \fBstrxfrm()\fR, then check \fBerrno\fR.
+.LP
+The \fBstrxfrm_l()\fR functions behaves identically to the function
+\fBstrxfrm()\fR, except instead of operating in the current locale it
+operates in the locale specified by the argument \fIloc\fR.
 .SH RETURN VALUES
-.sp
 .LP
 Upon successful completion, \fBstrxfrm()\fR returns the length of the
 transformed string (not including the terminating null byte). If the value
 returned is \fIn\fR or more, the contents of the array pointed to by \fIs1\fR
 are indeterminate.
-.sp
 .LP
 On error, \fBstrxfrm()\fR may set \fBerrno\fR but no return value is reserved
 to indicate the error.
 .SH USAGE
-.sp
 .LP
 The transformation function is such that two transformed strings can be ordered
 by \fBstrcmp\fR(3C) as appropriate to collating sequence information in the
-program's locale (category \fBLC_COLLATE\fR).
-.sp
+locale (category \fBLC_COLLATE\fR).
 .LP
 The fact that when \fIn\fR is \fB0\fR, \fIs1\fR is permitted to be a null
 pointer, is useful to determine the size of the \fIs1\fR array prior to making
@@ -64,7 +66,6 @@ the transformation.
 .SH EXAMPLES
 .LP
 \fBExample 1 \fRA sample of using the \fBstrxfm()\fR function.
-.sp
 .LP
 The value of the following expression is the size of the array needed to hold
 the transformation of the string pointed to by \fIs\fR.
@@ -77,23 +78,11 @@ the transformation of the string pointed to by \fIs\fR.
 .in -2
 
 .SH FILES
-.sp
-.ne 2
-.na
-\fB\fB/usr/lib/locale/\fIlocale\fR/\fIlocale\fR.so.*\fR\fR
-.ad
-.sp .6
-.RS 4n
-\fBLC_COLLATE\fR database for \fIlocale\fR
-.RE
-
+.IP \fB/usr/lib/locale/\fR\fIlocale\fR\fB/LC_COLLATE/*
+collation database for \fIlocale\fR
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
-.sp
-
-.sp
 .TS
 box;
 c | c
@@ -104,15 +93,11 @@ CSI	Enabled
 _
 Interface Stability	Standard
 _
-MT-Level	MT-Safe with exceptions
+MT-Level	MT-Safe
 .TE
 
-.sp
-.LP
-The \fBstrxfrm()\fR function can be used safely in a multithreaded application,
-as long as \fBsetlocale\fR(3C) is not being called to change the locale.
 .SH SEE ALSO
-.sp
 .LP
-\fBlocaledef\fR(1), \fBsetlocale\fR(3C), \fBstrcmp\fR(3C), \fBstrcoll\fR(3C),
+\fBlocaledef\fR(1), \fBnewlocale\fR(3C), \fBsetlocale\fR(3C), \fBstrcmp\fR(3C),
+\fBstrcoll\fR(3C), \fBuselocale\fR(3C),
 \fBwscoll\fR(3C), \fBattributes\fR(5), \fBenviron\fR(5), \fBstandards\fR(5)

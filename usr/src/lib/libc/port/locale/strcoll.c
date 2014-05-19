@@ -1,4 +1,5 @@
 /*
+ * Copyright 2013 Garrett D'Amore <garrett@damore.org>
  * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 1995 Alex Tatmanjants <alex@elvisti.kiev.ua>
  *		at Electronni Visti IA, Kiev, Ukraine.
@@ -33,6 +34,8 @@
 #include <string.h>
 #include <errno.h>
 #include <wchar.h>
+#include <xlocale.h>
+#include "localeimpl.h"
 #include "collate.h"
 
 #define	ALLOCA_LIMIT	16
@@ -44,15 +47,19 @@
  * should check errno.
  */
 int
-strcoll(const char *s1, const char *s2)
+strcoll_l(const char *s1, const char *s2, locale_t loc)
 {
 	int ret;
 	wchar_t *t1 = NULL, *t2 = NULL;
 	wchar_t *w1 = NULL, *w2 = NULL;
 	size_t sz1, sz2;
+	const struct lc_collate *lcc = loc->collate;
 
-	if (_collate_load_error)
-		goto error;
+	mbstate_t mbs1 = { 0 };	/* initial states */
+	mbstate_t mbs2 = { 0 };
+
+	if (lcc->lc_is_posix)
+		return (strcmp(s1, s2));
 
 	sz1 = strlen(s1) + 1;
 	sz2 = strlen(s2) + 1;
@@ -82,13 +89,13 @@ strcoll(const char *s1, const char *s2)
 			goto error;
 	}
 
-	if ((mbstowcs(w1, s1, sz1)) == (size_t)-1)
+	if ((mbsrtowcs_l(w1, &s1, sz1, &mbs1, loc)) == (size_t)-1)
 		goto error;
 
-	if ((mbstowcs(w2, s2, sz2)) == (size_t)-1)
+	if ((mbsrtowcs_l(w2, &s2, sz2, &mbs2, loc)) == (size_t)-1)
 		goto error;
 
-	ret = wcscoll(w1, w2);
+	ret = wcscoll_l(w1, w2, loc);
 	if (t1)
 		free(t1);
 	if (t2)
@@ -102,4 +109,10 @@ error:
 	if (t2)
 		free(t2);
 	return (strcmp(s1, s2));
+}
+
+int
+strcoll(const char *s1, const char *s2)
+{
+	return (strcoll_l(s1, s2, uselocale(NULL)));
 }

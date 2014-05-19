@@ -1,4 +1,5 @@
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2002-2004 Tim J. Robbins.
  * All rights reserved.
@@ -28,22 +29,29 @@
 #include "lint.h"
 #include <stdlib.h>
 #include <wchar.h>
+#include <locale.h>
+#include <xlocale.h>
 #include "mblocal.h"
 
 int
-mbtowc(wchar_t *_RESTRICT_KYWD pwc, const char *_RESTRICT_KYWD s, size_t n)
+mbtowc_l(wchar_t *_RESTRICT_KYWD pwc, const char *_RESTRICT_KYWD s, size_t n,
+    locale_t loc)
 {
-	static const mbstate_t initial = { 0 };
-	static mbstate_t mbs;
+	mbstate_t mbs = { 0 };
 	size_t rval;
 
 	if (s == NULL) {
 		/* No support for state dependent encodings. */
-		mbs = initial;
 		return (0);
 	}
-	rval = __mbrtowc(pwc, s, n, &mbs);
+	rval = mbrtowc_l(pwc, s, n, &mbs, loc);
 	if (rval == (size_t)-1 || rval == (size_t)-2)
 		return (-1);
 	return ((int)rval);
+}
+
+int
+mbtowc(wchar_t *_RESTRICT_KYWD pwc, const char *_RESTRICT_KYWD s, size_t n)
+{
+	return (mbtowc_l(pwc, s, n, uselocale(NULL)));
 }

@@ -1,4 +1,5 @@
 '\" te
+.\" Copyright 2014 Garrett D'Amore <garrett@damore.org>
 .\"  Copyright (c) 1992, X/Open Company Limited All Rights Reserved  Portions Copyright (c) 2002, Sun Microsystems, Inc.  All Rights Reserved
 .\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
@@ -7,9 +8,9 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH WCTOB 3C "Aug 14, 2002"
+.TH WCTOB 3C "Jun 25, 2014"
 .SH NAME
-wctob \- wide-character to single-byte conversion
+wctob, wctob_l \- wide-character to single-byte conversion
 .SH SYNOPSIS
 .LP
 .nf
@@ -18,52 +19,52 @@ wctob \- wide-character to single-byte conversion
 
 \fBint\fR \fBwctob\fR(\fBwint_t\fR \fIc\fR);
 .fi
+.LP
+.nf
+#include <stdio.h>
+#include <wchar.h>
+#include <xlocale.h>
 
+\fBint\fR \fBwctob_l\fR(\fBwint_t\fR \fIc\fR, \fBlocale_t\fR \fIloc\fR);
+.fi
 .SH DESCRIPTION
-.sp
 .LP
 The \fBwctob()\fR function determines whether \fIc\fR corresponds to a member
 of the extended character set whose  character representation is a single byte
 when in the initial shift state.
-.sp
 .LP
-The behavior of this function is affected by the \fBLC_CTYPE\fR category of the
+The behavior of \fBwctob()\fR is affected by the \fBLC_CTYPE\fR category of the
 current locale.  See \fBenviron\fR(5)
-.SH RETURN VALUES
-.sp
 .LP
-The \fBwctob()\fR function returns \fBEOF\fR if \fIc\fR does not correspond to
-a character with length one in the initial shift state.  Otherwise, it returns
+The function \fBwctob_l()\fR behaves identically to \fBwctob()\fR, except
+instead of operating in the current locale, it operates in the locale
+specified by \fIloc\fR.
+.SH RETURN VALUES
+.LP
+These functions return \fBEOF\fR if \fIc\fR does not correspond to
+a character with length one in the initial shift state.  Otherwise, they return
 the single-byte representation of that character.
 .SH ERRORS
-.sp
 .LP
 No errors are defined.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
-.sp
-
-.sp
 .TS
 box;
 c | c
 l | l .
 ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface Stability	Standard
+Interface Stability	See below
 _
-MT-Level	MT-Safe with exceptions
+MT-Level	MT-Safe
 .TE
 
+.LP
+The \fBwctob()\fR function is Standard.  The \fBwctob_l()\fR function
+is Uncommitted.
 .SH SEE ALSO
-.sp
 .LP
-\fBbtowc\fR(3C), \fBsetlocale\fR(3C), \fBattributes\fR(5), \fBenviron\fR(5),
-\fBstandards\fR(5)
-.SH NOTES
-.sp
-.LP
-The \fBwctob()\fR function can be used safely in multithreaded applications, as
-long as \fBsetlocale\fR(3C) is not being called to change the locale.
+\fBbtowc\fR(3C), \fBnewlocale\fR(3C), \fBsetlocale\fR(3C), \fBuselocale\fR(3C),
+\fBattributes\fR(5), \fBenviron\fR(5), \fBstandards\fR(5)

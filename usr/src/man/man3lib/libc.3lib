@@ -1,10 +1,11 @@
 '\" te
+.\" Copyright 2014 Garrett D'Amore <garrett@damore.org>
 .\" Copyright (c) 2009, Sun Microsystems, Inc.  All rights reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
 .\" Copyright 2011 by Delphix.  All rights reserved.
-.TH LIBC 3LIB "Sep 15, 2009"
+.TH LIBC 3LIB "Jul 1, 2014"
 .SH NAME
 libc \- C library
 .SH DESCRIPTION
@@ -35,7 +36,8 @@ l l .
 \fB__fwritable\fR	\fB__fwriting\fR
 \fB__huge_val\fR	\fB__iob\fR
 \fB__loc1\fR	\fB__major\fR
-\fB__makedev\fR	\fB__minor\fR
+\fB__makedev\fR	\fB__mb_cur_max_l\fR
+\fB__minor\fR
 \fB__nsw_extended_action\fR	\fB__nsw_freeconfig\fR
 \fB__nsw_getconfig\fR	\fB__posix_asctime_r\fR
 \fB__posix_ctime_r\fR	\fB__posix_getgrgid_r\fR
@@ -153,7 +155,8 @@ l l .
 \fBbcmp\fR	\fBbcopy\fR
 \fBbindtextdomain\fR	\fBbind_textdomain_codeset\fR
 \fBbrk\fR	\fBbsd_signal\fR
-\fBbsearch\fR	\fBbtowc\fR
+\fBbsearch\fR
+\fBbtowc\fR	\fBbtowc_l\fR
 \fBbzero\fR	\fBcalloc\fR
 \fBcatclose\fR	\fBcatgets\fR
 \fBcatopen\fR	\fBcfgetispeed\fR
@@ -201,6 +204,7 @@ l l .
 \fBdoor_ucred\fR	\fBdoor_unbind\fR
 \fBdouble_to_decimal\fR	\fBdrand48\fR
 \fBdup\fR	\fBdup2\fR
+\fBduplocale\fR
 \fBeconvert\fR	\fBecvt\fR
 \fBenable_extended_FILE_stdio\fR	
 \fBencrypt\fR	\fBendgrent\fR
@@ -232,7 +236,8 @@ l l .
 \fBfgetpos\fR	\fBfgetpwent\fR
 \fBfgetpwent_r\fR	\fBfgets\fR
 \fBfgetspent\fR	\fBfgetspent_r\fR
-\fBfgetwc\fR	\fBfgetws\fR
+\fBfgetwc\fR	\fBfgetwc_l\fR
+\fBfgetws\fR
 \fBfile_to_decimal\fR	\fBfileno\fR
 \fBfinite\fR	\fBflockfile\fR
 \fBfmtmsg\fR	\fBfnmatch\fR
@@ -246,7 +251,8 @@ l l .
 \fBfpsetsticky\fR	\fBfputc\fR
 \fBfputs\fR	\fBfputwc\fR
 \fBfputws\fR	\fBfread\fR
-\fBfree\fR	\fBfreopen\fR
+\fBfree\fR	\fBfreelocale\fR
+\fBfreopen\fR
 \fBfrexp\fR	\fBfscanf\fR
 \fBfseek\fR	\fBfseeko\fR
 \fBfsetattr\fR	
@@ -310,8 +316,10 @@ l l .
 \fBgetutxid\fR	\fBgetutxline\fR
 \fBgetvfsany\fR	\fBgetvfsent\fR
 \fBgetvfsfile\fR	\fBgetvfsspec\fR
-\fBgetw\fR	\fBgetwc\fR
-\fBgetwchar\fR	\fBgetwd\fR
+\fBgetw\fR
+\fBgetwc\fR	\fBgetwc_l\fR
+\fBgetwchar\fR	\fBgetwchar_l\fR
+\fBgetwd\fR
 \fBgetwidth\fR	\fBgetws\fR
 \fBgetzoneid\fR	\fBgetzoneidbyname\fR
 \fBgetzonenamebyid\fR	\fBglob\fR
@@ -326,25 +334,46 @@ l l .
 \fBinitstate\fR	\fBinnetgr\fR
 \fBinsque\fR	\fBioctl\fR
 \fBis_system_labeled\fR	
-\fBisaexec\fR	\fBisalnum\fR
-\fBisalpha\fR	\fBisascii\fR
-\fBisastream\fR	\fBisatty\fR
-\fBisblank\fR	\fBiscntrl\fR
-\fBisdigit\fR	\fBisenglish\fR
-\fBisgraph\fR	\fBisideogram\fR
-\fBislower\fR	\fBisnan\fR
+\fBisaexec\fR
+\fBisalnum\fR	\fBisalnum_l\fR
+\fBisalpha\fR	\fBisalpha_l\fR
+\fBisascii\fR	\fBisastream\fR
+\fBisatty\fR
+\fBisblank\fR	\fBisblank_l\fR
+\fBiscntrl\fR	\fBiscntrl_l\fR
+\fBisdigit\fR	\fBisdigit_l\fR
+\fBisenglish\fR
+\fBisgraph\fR	\fBisgraph_l\fR
+\fBisideogram\fR
+\fBislower\fR	\fBislower_l\fR
+\fBisnan\fR
 \fBisnand\fR	\fBisnanf\fR
 \fBisnumber\fR	\fBisphonogram\fR
-\fBisprint\fR	\fBispunct\fR
-\fBissetugid\fR	\fBisspace\fR
-\fBisspecial\fR	\fBisupper\fR
-\fBiswalnum\fR	\fBiswalpha\fR
-\fBiswblank\fR	\fBiswcntrl\fR
-\fBiswctype\fR	\fBiswdigit\fR
-\fBiswgraph\fR	\fBiswlower\fR
-\fBiswprint\fR	\fBiswpunct\fR
-\fBiswspace\fR	\fBiswupper\fR
-\fBiswxdigit\fR	\fBisxdigit\fR
+\fBisprint\fR	\fBisprint_l\fR
+\fBispunct\fR	\fBispunct_l\fR
+\fBissetugid\fR
+\fBisspace\fR	\fBisspace_l\fR
+\fBisspecial\fR
+\fBisupper\fR	\fBisupper_l\fR
+\fBiswalnum\fR	\fBiswalnum_l\fR
+\fBiswalpha\fR	\fBiswalpha_l\fR
+\fBiswblank\fR	\fBiswblank_l\fR
+\fBiswcntrl\fR	\fBiswcntrl_l\fR
+\fBiswctype\fR	\fBiswctype_l\fR
+\fBiswdigit\fR	\fBiswdigit_l\fR
+\fBiswideogram\fR	\fBiswideogram_l\fR
+\fBiswgraph\fR	\fBiswgraph_l\fR
+\fBiswhexnumber\fR	\fBiswhexnumber_l\fR
+\fBiswlower\fR	\fBiswlower_l\fR
+\fBiswnumber\fR	\fBiswnumber_l\fR
+\fBiswphonogram\fR	\fBiswphonogram_l\fR
+\fBiswprint\fR	\fBiswprint_l\fR
+\fBiswpunct\fR	\fBiswpunct_l\fR
+\fBiswspace\fR	\fBiswspace_l\fR
+\fBiswspecial\fR	\fBiswspecial_l\fR
+\fBiswupper\fR	\fBiswupper_l\fR
+\fBiswxdigit\fR	\fBiswxdigit_l\fR
+\fBisxdigit\fR	\fBisxdigit_l\fR
 \fBjrand48\fR	\fBkill\fR
 \fBkillpg\fR	\fBl64a\fR
 \fBlabs\fR	\fBladd\fR
@@ -365,10 +394,15 @@ l l .
 \fBlsub\fR	\fBlten\fR
 \fBlzero\fR	\fBmadvise\fR
 \fBmakecontext\fR	\fBmakeutx\fR
-\fBmalloc\fR	\fBmblen\fR
-\fBmbrlen\fR	\fBmbrtowc\fR
-\fBmbsinit\fR	\fBmbsrtowcs\fR
-\fBmbstowcs\fR	\fBmbtowc\fR
+\fBmalloc\fR
+\fBmblen\fR	\fBmblen_l\fR
+\fBmbrlen\fR	\fBmbrlen_l\fR
+\fBmbrtowc\fR	\fBmbrtowc_l\fR
+\fBmbsinit\fR	\fBmbsinit_l\fR
+\fBmbsnrtowcs\fR	\fBmbsnrtowcs_l\fR
+\fBmbsrtowcs\fR	\fBmbsrtowcs_l\fR
+\fBmbstowcs\fR	\fBmbstowcs_l\fR
+\fBmbtowc\fR	\fBmbtowc_l\fR
 \fBmemalign\fR	\fBmembar_consumer\fR
 \fBmembar_enter\fR	\fBmembar_exit\fR
 \fBmembar_producer\fR	\fBmemccpy\fR
@@ -400,10 +434,11 @@ l l .
 \fBmutex_destroy\fR	\fBmutex_init\fR
 \fBmutex_lock\fR	\fBmutex_trylock\fR
 \fBmutex_unlock\fR	\fBnanosleep\fR
-\fBnextafter\fR	
+\fBnextafter\fR		\fBnewlocale\fR
 \fBnfs_getfh\fR	\fBnftw\fR
 \fBngettext\fR	\fBnice\fR
-\fBnl_langinfo\fR	\fBnrand48\fR
+\fBnl_langinfo\fR	\fBnl_langinfo_l\fR
+\fBnrand48\fR
 \fBnss_default_finders\fR	\fBnss_delete\fR
 \fBnss_endent\fR	\fBnss_getent\fR
 \fBnss_search\fR	\fBnss_setent\fR
@@ -626,19 +661,23 @@ l l .
 \fBstack_setbounds\fR	\fBstack_violation\fR
 \fBstat\fR	\fBstatfs\fR
 \fBstatvfs\fR	\fBstime\fR
-\fBstr2sig\fR	\fBstrcasecmp\fR
+\fBstr2sig\fR
+\fBstrcasecmp\fR	\fBstrcasecmp_l\fR
 \fBstrcat\fR	\fBstrchr\fR
 \fBstrcmp\fR	\fBstrcoll\fR
 \fBstrcpy\fR	\fBstrcspn\fR
 \fBstrdup\fR	\fBstrerror\fR
-\fBstrerror_r\fR	\fBstrfmon\fR
-\fBstrftime\fR	\fBstring_to_decimal\fR
+\fBstrerror_r\fR
+\fBstrfmon\fR	\fBstrfmon_l\fR
+\fBstrftime\fR	\fBstrftime_l\fR
+\fBstring_to_decimal\fR
 \fBstrlcat\fR	\fBstrlcpy\fR
-\fBstrlen\fR	\fBstrncasecmp\fR
+\fBstrlen\fR
+\fBstrncasecmp\fR	\fBstrncasecmp_l\fR
 \fBstrncat\fR	\fBstrncmp\fR
 \fBstrncpy\fR	\fBstrpbrk\fR
-\fBstrptime\fR	\fBstrrchr\fR
-\fBstrsep\fR	
+\fBstrptime\fR	\fBstrptime_l\fR
+\fBstrrchr\fR	\fBstrsep\fR	
 \fBstrsignal\fR	\fBstrspn\fR
 \fBstrstr\fR	\fBstrtod\fR
 \fBstrtof\fR	\fBstrtoimax\fR
@@ -678,9 +717,12 @@ l l .
 \fBtimes\fR	\fBtimezone\fR
 \fBtmpfile\fR	\fBtmpnam\fR
 \fBtmpnam_r\fR	\fBtoascii\fR
-\fBtolower\fR	\fBtoupper\fR
-\fBtowctrans\fR	\fBtowlower\fR
-\fBtowupper\fR	\fBtruncate\fR
+\fBtolower\fR	\fBtolower_l\fR
+\fBtoupper\fR	\fBtoupper_l\fR
+\fBtowctrans\fR	\fBtowctrans_l\fR
+\fBtowlower\fR	\fBtowlower_l\fR
+\fBtowupper\fR	\fBtowupper_l\fR
+\fBtruncate\fR
 \fBtsearch\fR	\fBttyname\fR
 \fBttyname_r\fR	\fBttyslot\fR
 \fBtwalk\fR	\fBtzname\fR
@@ -706,6 +748,7 @@ l l .
 \fBunlinkat\fR	\fBunlockpt\fR
 \fBunordered\fR	\fBunsetenv\fR
 \fBupdwtmp\fR	\fBupdwtmpx\fR
+\fBuselocale\fR
 \fBusleep\fR	\fBustat\fR
 \fButime\fR	\fButimensat\fR
 \fButimes\fR	\fButmpname\fR
@@ -727,24 +770,32 @@ l l .
 \fBwaitid\fR	\fBwaitpid\fR
 \fBwalkcontext\fR	\fBwarn\fR
 \fBwarnx\fR	\fBwatoll\fR
-\fBwcrtomb\fR	\fBwcscat\fR
+\fBwcrtomb\fR	\fBwcrtomb_l\fR
+\fBwcscat\fR
 \fBwcschr\fR	\fBwcscmp\fR
-\fBwcscoll\fR	\fBwcscpy\fR
+\fBwcscoll\fR	\fBwcscoll_l\fR
+\fBwcscpy\fR
 \fBwcscspn\fR	\fBwcsftime\fR
 \fBwcslen\fR	\fBwcsncat\fR
 \fBwcsncmp\fR	\fBwcsncpy\fR
 \fBwcspbrk\fR	\fBwcsrchr\fR
-\fBwcsrtombs\fR	\fBwcsspn\fR
+\fBwcsrtombs\fR	\fBwcsrtombs_l\fR
+\fBwcsspn\fR
 \fBwcsstr\fR	\fBwcstod\fR
 \fBwcstof\fR	\fBwcstoimax\fR
 \fBwcstok\fR	\fBwcstol\fR
 \fBwcstold\fR	\fBwcstoll\fR
-\fBwcstombs\fR	\fBwcstoul\fR
+\fBwcstombs\fR	\fBwctombs_l\fR
+\fBwcstoul\fR
 \fBwcstoull\fR	\fBwcstoumax\fR
-\fBwcswcs\fR	\fBwcswidth\fR
-\fBwcsxfrm\fR	\fBwctob\fR
-\fBwctomb\fR	\fBwctrans\fR
-\fBwctype\fR	\fBwcwidth\fR
+\fBwcswcs\fR
+\fBwcswidth\fR	\fBwcswidth_l\fR
+\fBwcsxfrm\fR	\fBwcsxfrm_l\fR
+\fBwctob\fR	\fBwctob_l\fR
+\fBwctomb\fR	\fBwctomb_l\fR
+\fBwctrans\fR	\fBwctrans_l\fR
+\fBwctype\fR	\fBwctype_l\fR
+\fBwcwidth\fR	\fBwcwidth_l\fR
 \fBwmemchr\fR	\fBwmemcmp\fR
 \fBwmemcpy\fR	\fBwmemmove\fR
 \fBwmemset\fR	\fBwordexp\fR

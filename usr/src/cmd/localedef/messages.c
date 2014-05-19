@@ -10,6 +10,7 @@
  */
 
 /*
+ * Copyright 2013 Garrett D'Amore <garrett@damore.org>
  * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
  */
 
@@ -28,7 +29,7 @@
 #include "parser.tab.h"
 #include "lmessages.h"
 
-static struct lc_messages_T msgs;
+static struct lc_messages msgs;
 
 void
 init_messages(void)

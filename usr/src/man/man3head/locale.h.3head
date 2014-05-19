@@ -1,5 +1,7 @@
 '\" te
 .\" Copyright (c) 2001, The IEEE and The Open Group. All Rights Reserved. Portions Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright (c) 2014, Joyent, Inc.   All rights reserved.
+.\" Copyright 2014 Garrett D'Amore <garrett@damore.org>
 .\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
@@ -7,7 +9,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LOCALE.H 3HEAD "Sep 10, 2004"
+.TH LOCALE.H 3HEAD "Jun 23, 2004"
 .SH NAME
 locale.h, locale \- category macros
 .SH SYNOPSIS
@@ -15,9 +17,7 @@ locale.h, locale \- category macros
 .nf
 #include <\fBlocale.h\fR>
 .fi
-
 .SH DESCRIPTION
-.sp
 .LP
 The <\fBlocale.h\fR> header provides a definition for the \fBlconv\fR
 structure, which includes the following members. (See the definition of
@@ -51,8 +51,6 @@ char         p_sign_posn
 char         *thousands_sep
 .fi
 .in -2
-
-.sp
 .LP
 The <\fBlocale.h\fR> header defines \fINULL\fR (as defined in <\fBstddef.h\fR>)
 and the following as macros:
@@ -68,22 +66,64 @@ LC_NUMERIC
 LC_TIME
 .fi
 .in -2
-
-.sp
 .LP
 The preceding expand to distinct integer constant expressions, for use as the
 first argument to the \fBsetlocale()\fR function. See \fBsetlocale\fR(3C).
+.LP
+The <\fBlocale.h\fR> header also defines the following macros, for use with
+\fBnewlocale\fR(3C):
 .sp
+.in +2
+.nf
+LC_ALL_MASK
+LC_COLLATE_MASK
+LC_CTYPE_MASK
+LC_MESSAGES_MASK
+LC_MONETARY_MASK
+LC_NUMERIC_MASK
+LC_TIME_MASK
+.fi
+.in -2
+.LP
+In addition, to facilitate the use of per-thread locales with the
+.BR uselocale (3C)
+function, the
+.RB < locale.h >
+header defines the following type and macro:
+.sp
+.in +2
+.nf
+locale_t
+.fi
+.in -2
+.sp
+.RS 6n
+An opaque type that refers to a locale constructed through the use of
+the
+.BR newlocale (3C)
+function.
+.RE
+
+.sp
+.in +2
+.nf
+LC_GLOBAL_LOCALE
+.fi
+.in -2
+.sp
+.RS 6n
+A macro which expands to a
+.B locale_t
+that represents the current global locale as set by
+.BR setlocale (3C).
+.RE
+
 .LP
 Additional macro definitions, beginning with the characters \fBLC_\fR and an
 uppercase letter, can also be specified here.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
-.sp
-
-.sp
 .TS
 box;
 c | c
@@ -96,5 +136,11 @@ Interface Stability	Standard
 .SH SEE ALSO
 .sp
 .LP
-\fBsetlocale\fR(3C), \fBlocaleconv\fR(3C), \fBstddef.h\fR(3HEAD),
-\fBattributes\fR(5), \fBlocale\fR(5), \fBstandards\fR(5)
+.BR newlocale (3C),
+.BR setlocale (3C),
+.BR uselocale (3C),
+.BR localeconv (3C),
+.BR stddef.h (3HEAD),
+.BR attributes (5),
+.BR locale (5),
+.BR standards (5)

@@ -1,4 +1,5 @@
 /*
+ * Copyright 2013 Garrett D'Amore <garrett@damore.org>
  * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -260,16 +261,8 @@ _RuneLocale _DefaultRuneLocale = {
 	/* END CSTYLED */
 };
 
-_RuneLocale *_CurrentRuneLocale = &_DefaultRuneLocale;
-
 /* Taken from former _ctype.c */
 unsigned int *__ctype_mask = _DefaultRuneLocale.__runetype;
 
 int *__trans_lower = _DefaultRuneLocale.__maplower;
 int *__trans_upper = _DefaultRuneLocale.__mapupper;
-
-/*
- * Used in various string routines to conditionalize versions optimized for
- * the ASCII case
- */
-int charset_is_ascii = 1;

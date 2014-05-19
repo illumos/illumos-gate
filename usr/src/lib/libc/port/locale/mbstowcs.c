@@ -1,4 +1,5 @@
 /*
+ * Copyright 2013 Garrett D'Amore <garrett@damore.org>
  * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2002-2004 Tim J. Robbins.
  * All rights reserved.
@@ -29,10 +30,14 @@
 #include <limits.h>
 #include <stdlib.h>
 #include <wchar.h>
+#include <locale.h>
 #include "mblocal.h"
+#include "localeimpl.h"
+#include "lctype.h"
 
 size_t
-mbstowcs(wchar_t *_RESTRICT_KYWD pwcs, const char *_RESTRICT_KYWD s, size_t n)
+mbstowcs_l(wchar_t *_RESTRICT_KYWD pwcs, const char *_RESTRICT_KYWD s,
+    size_t n, locale_t loc)
 {
 	static const mbstate_t initial = { 0 };
 	mbstate_t mbs;
@@ -40,5 +45,11 @@ mbstowcs(wchar_t *_RESTRICT_KYWD pwcs, const char *_RESTRICT_KYWD s, size_t n)
 
 	mbs = initial;
 	sp = s;
-	return (__mbsnrtowcs(pwcs, &sp, ULONG_MAX, n, &mbs));
+	return (loc->ctype->lc_mbsnrtowcs(pwcs, &sp, ULONG_MAX, n, &mbs));
+}
+
+size_t
+mbstowcs(wchar_t *_RESTRICT_KYWD pwcs, const char *_RESTRICT_KYWD s, size_t n)
+{
+	return (mbstowcs_l(pwcs, s, n, uselocale(NULL)));
 }

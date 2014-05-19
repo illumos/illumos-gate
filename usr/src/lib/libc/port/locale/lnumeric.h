@@ -1,4 +1,5 @@
 /*
+ * Copyright 2013 Garrett D'Amore <garrett@damore.org>
  * Copyright (c) 2000, 2001 Alexey Zelkin <phantom@FreeBSD.org>
  * All rights reserved.
  *
@@ -27,13 +28,10 @@
 #ifndef _LNUMERIC_H_
 #define	_LNUMERIC_H_
 
-struct lc_numeric_T {
+struct lc_numeric {
 	const char	*decimal_point;
 	const char	*thousands_sep;
 	const char	*grouping;
 };
-
-struct lc_numeric_T *__get_current_numeric_locale(void);
-int	__numeric_load_locale(const char *);
 
 #endif /* !_LNUMERIC_H_ */

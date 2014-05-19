@@ -1,4 +1,5 @@
 /*
+ * Copyright 2013 Garrett D'Amore <garrett@damore.org>
  * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2004 Tim J. Robbins. All rights reserved.
  * Copyright (c) 2003 David Xu <davidxu@freebsd.org>
@@ -34,6 +35,7 @@
 #include <string.h>
 #include <wchar.h>
 #include "mblocal.h"
+#include "lctype.h"
 
 static size_t	_GB2312_mbrtowc(wchar_t *_RESTRICT_KYWD,
 		    const char *_RESTRICT_KYWD,
@@ -41,23 +43,30 @@ static size_t	_GB2312_mbrtowc(wchar_t *_RESTRICT_KYWD,
 static int	_GB2312_mbsinit(const mbstate_t *);
 static size_t	_GB2312_wcrtomb(char *_RESTRICT_KYWD, wchar_t,
 		    mbstate_t *_RESTRICT_KYWD);
+static size_t	_GB2312_mbsnrtowcs(wchar_t *_RESTRICT_KYWD,
+		    const char **_RESTRICT_KYWD, size_t, size_t,
+		    mbstate_t *_RESTRICT_KYWD);
+static size_t	_GB2312_wcsnrtombs(char *_RESTRICT_KYWD,
+		    const wchar_t **_RESTRICT_KYWD, size_t, size_t,
+		    mbstate_t *_RESTRICT_KYWD);
+
 
 typedef struct {
 	int	count;
 	uchar_t	bytes[2];
 } _GB2312State;
 
-int
-_GB2312_init(_RuneLocale *rl)
+void
+_GB2312_init(struct lc_ctype *lct)
 {
 
-	_CurrentRuneLocale = rl;
-	__mbrtowc = _GB2312_mbrtowc;
-	__wcrtomb = _GB2312_wcrtomb;
-	__mbsinit = _GB2312_mbsinit;
-	__ctype[520] = 2;
-	charset_is_ascii = 0;
-	return (0);
+	lct->lc_mbrtowc = _GB2312_mbrtowc;
+	lct->lc_wcrtomb = _GB2312_wcrtomb;
+	lct->lc_mbsinit = _GB2312_mbsinit;
+	lct->lc_mbsnrtowcs = _GB2312_mbsnrtowcs;
+	lct->lc_wcsnrtombs = _GB2312_wcsnrtombs;
+	lct->lc_max_mblen = 2;
+	lct->lc_is_ascii = 0;
 }
 
 static int
@@ -154,4 +163,20 @@ _GB2312_wcrtomb(char *_RESTRICT_KYWD s, wchar_t wc,
 	}
 	*s = wc & 0xff;
 	return (1);
+}
+
+static size_t
+_GB2312_mbsnrtowcs(wchar_t *_RESTRICT_KYWD dst,
+    const char **_RESTRICT_KYWD src, size_t nms, size_t len,
+    mbstate_t *_RESTRICT_KYWD ps)
+{
+	return (__mbsnrtowcs_std(dst, src, nms, len, ps, _GB2312_mbrtowc));
+}
+
+static size_t
+_GB2312_wcsnrtombs(char *_RESTRICT_KYWD dst,
+    const wchar_t **_RESTRICT_KYWD src, size_t nwc, size_t len,
+    mbstate_t *_RESTRICT_KYWD ps)
+{
+	return (__wcsnrtombs_std(dst, src, nwc, len, ps, _GB2312_wcrtomb));
 }

@@ -12,6 +12,7 @@
 #
 # Copyright 2011, Richard Lowe
 # Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2014 Garrett D'Amore <garrett@damore.org>
 #
 
 include		$(SRC)/Makefile.master
@@ -104,7 +105,8 @@ MANFILES=	acct.h.3head		\
 	 	wait.h.3head		\
 	 	wchar.h.3head		\
 	 	wctype.h.3head		\
-	 	wordexp.h.3head
+	 	wordexp.h.3head		\
+	 	xlocale.h.3head
 
 MANLINKS=	acct.3head		\
 		aio.3head		\
@@ -192,7 +194,8 @@ MANLINKS=	acct.3head		\
 		wait.3head		\
 		wchar.3head		\
 		wctype.3head		\
-		wordexp.3head
+		wordexp.3head		\
+		xlocale.3head
 
 acct.3head		:= LINKSRC = acct.h.3head
 aio.3head		:= LINKSRC = aio.h.3head
@@ -281,6 +284,7 @@ wait.3head		:= LINKSRC = wait.h.3head
 wchar.3head		:= LINKSRC = wchar.h.3head
 wctype.3head		:= LINKSRC = wctype.h.3head
 wordexp.3head		:= LINKSRC = wordexp.h.3head
+xlocale.3head		:= LINKSRC = xlocale.h.3head
 
 .KEEP_STATE:
 

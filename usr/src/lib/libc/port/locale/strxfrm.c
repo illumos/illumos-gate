@@ -1,4 +1,5 @@
 /*
+ * Copyright 2013 Garrett D'Amore <garrett@damore.org>
  * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 1995 Alex Tatmanjants <alex@elvisti.kiev.ua>
  *		at Electronni Visti IA, Kiev, Ukraine.
@@ -32,10 +33,12 @@
 #include <errno.h>
 #include <wchar.h>
 #include <assert.h>
+#include <xlocale.h>
 #include "collate.h"
 
 size_t
-strxfrm(char *_RESTRICT_KYWD xf, const char *_RESTRICT_KYWD src, size_t dlen)
+strxfrm_l(char *_RESTRICT_KYWD xf, const char *_RESTRICT_KYWD src,
+    size_t dlen, locale_t loc)
 {
 	size_t slen;
 	size_t xlen;
@@ -54,16 +57,16 @@ strxfrm(char *_RESTRICT_KYWD xf, const char *_RESTRICT_KYWD src, size_t dlen)
 	 */
 	slen = strlen(src);
 
-	if (_collate_load_error)
+	if (loc->collate->lc_is_posix)
 		goto error;
 
 	if ((wcs = malloc((slen + 1) * sizeof (wchar_t))) == NULL)
 		goto error;
 
-	if (mbstowcs(wcs, src, slen + 1) == (size_t)-1)
+	if (mbstowcs_l(wcs, src, slen + 1, loc) == (size_t)-1)
 		goto error;
 
-	if ((xlen = _collate_sxfrm(wcs, xf, dlen)) == (size_t)-1)
+	if ((xlen = _collate_sxfrm(wcs, xf, dlen, loc)) == (size_t)-1)
 		goto error;
 
 	if (wcs)
@@ -84,4 +87,10 @@ error:
 	(void) strlcpy(xf, src, dlen);
 
 	return (slen);
+}
+
+size_t
+strxfrm(char *_RESTRICT_KYWD xf, const char *_RESTRICT_KYWD src, size_t dlen)
+{
+	return (strxfrm_l(xf, src, dlen, uselocale(NULL)));
 }

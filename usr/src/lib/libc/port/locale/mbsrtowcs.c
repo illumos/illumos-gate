@@ -1,4 +1,5 @@
 /*
+ * Copyright 2013 Garrett D'Amore <garrett@damore.org>
  * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2002-2004 Tim J. Robbins.
  * All rights reserved.
@@ -26,19 +27,24 @@
  */
 
 #include "lint.h"
-#include <errno.h>
+#include <locale.h>
 #include <limits.h>
 #include <stdlib.h>
 #include <wchar.h>
 #include "mblocal.h"
+#include "localeimpl.h"
+#include "lctype.h"
+
+size_t
+mbsrtowcs_l(wchar_t *_RESTRICT_KYWD dst, const char **_RESTRICT_KYWD src,
+    size_t len, mbstate_t *_RESTRICT_KYWD ps, locale_t loc)
+{
+	return (loc->ctype->lc_mbsnrtowcs(dst, src, ULONG_MAX, len, ps));
+}
 
 size_t
 mbsrtowcs(wchar_t *_RESTRICT_KYWD dst, const char **_RESTRICT_KYWD src,
     size_t len, mbstate_t *_RESTRICT_KYWD ps)
 {
-	static mbstate_t mbs;
-
-	if (ps == NULL)
-		ps = &mbs;
-	return (__mbsnrtowcs(dst, src, ULONG_MAX, len, ps));
+	return (mbsrtowcs_l(dst, src, len, ps, uselocale(NULL)));
 }

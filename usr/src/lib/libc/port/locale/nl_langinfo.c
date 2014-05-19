@@ -1,4 +1,5 @@
 /*
+ * Copyright 2013 Garrett D'Amore <garrett@damore.org>
  * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2001, 2003 Alexey Zelkin <phantom@FreeBSD.org>
  * All rights reserved.
@@ -36,33 +37,38 @@
 #include "lmessages.h"
 #include "lmonetary.h"
 #include "timelocal.h"
+#include "localeimpl.h"
 
 #define	_REL(BASE) ((int)item-BASE)
-
-#define	MONETARY	(__get_current_monetary_locale())
-#define	TIME		(__get_current_time_locale())
-#define	MESSAGES	(__get_current_messages_locale())
-#define	NUMERIC		(__get_current_numeric_locale())
 
 #pragma weak _nl_langinfo = nl_langinfo
 
 char *
-nl_langinfo(nl_item item)
+nl_langinfo_l(nl_item item, locale_t loc)
 {
 	char *ret, *s, *cs;
-	static char *csym = NULL;
+	struct locdata *ldata;
+	const struct lc_monetary *lmon = loc->monetary;
+	const struct lc_numeric *lnum = loc->numeric;
+	const struct lc_messages *lmsgs = loc->messages;
+	const struct lc_time *ltime = loc->time;
 
 	switch (item) {
 	case CODESET:
 		ret = "";
 		/*
 		 * The codeset is the suffix of a locale, for most it will
-		 * will be UTF-8, as in "en.UTF-8".  Short form locales are
+		 * will be UTF-8, as in "en_US.UTF-8".  Short form locales are
 		 * not supported.  Note also that although FreeBSD uses
 		 * US-ASCII, Solaris historically has reported "646" for the
 		 * C locale.
+		 *
+		 * Note that this code will need to change if we ever support
+		 * POSIX defined locale variants (suffixes with an @ sign)
 		 */
-		if ((s = setlocale(LC_CTYPE, NULL)) != NULL) {
+		ldata = loc->locdata[LC_CTYPE];
+		s = ldata ? ldata->l_lname : NULL;
+		if (s != NULL) {
 			if ((cs = strchr(s, '.')) != NULL)
 				ret = cs + 1;
 			else if (strcmp(s, "C") == 0 || strcmp(s, "POSIX") == 0)
@@ -70,40 +76,40 @@ nl_langinfo(nl_item item)
 		}
 		break;
 	case D_T_FMT:
-		ret = (char *)TIME->c_fmt;
+		ret = (char *)ltime->c_fmt;
 		break;
 	case D_FMT:
-		ret = (char *)TIME->x_fmt;
+		ret = (char *)ltime->x_fmt;
 		break;
 	case T_FMT:
-		ret = (char *)TIME->X_fmt;
+		ret = (char *)ltime->X_fmt;
 		break;
 	case T_FMT_AMPM:
-		ret = (char *)TIME->ampm_fmt;
+		ret = (char *)ltime->ampm_fmt;
 		break;
 	case AM_STR:
-		ret = (char *)TIME->am;
+		ret = (char *)ltime->am;
 		break;
 	case PM_STR:
-		ret = (char *)TIME->pm;
+		ret = (char *)ltime->pm;
 		break;
 	case DAY_1: case DAY_2: case DAY_3:
 	case DAY_4: case DAY_5: case DAY_6: case DAY_7:
-		ret = (char *)TIME->weekday[_REL(DAY_1)];
+		ret = (char *)ltime->weekday[_REL(DAY_1)];
 		break;
 	case ABDAY_1: case ABDAY_2: case ABDAY_3:
 	case ABDAY_4: case ABDAY_5: case ABDAY_6: case ABDAY_7:
-		ret = (char *)TIME->wday[_REL(ABDAY_1)];
+		ret = (char *)ltime->wday[_REL(ABDAY_1)];
 		break;
 	case MON_1: case MON_2: case MON_3: case MON_4:
 	case MON_5: case MON_6: case MON_7: case MON_8:
 	case MON_9: case MON_10: case MON_11: case MON_12:
-		ret = (char *)TIME->month[_REL(MON_1)];
+		ret = (char *)ltime->month[_REL(MON_1)];
 		break;
 	case ABMON_1: case ABMON_2: case ABMON_3: case ABMON_4:
 	case ABMON_5: case ABMON_6: case ABMON_7: case ABMON_8:
 	case ABMON_9: case ABMON_10: case ABMON_11: case ABMON_12:
-		ret = (char *)TIME->mon[_REL(ABMON_1)];
+		ret = (char *)ltime->mon[_REL(ABMON_1)];
 		break;
 	case ERA:
 		/* XXX: need to be implemented  */
@@ -126,64 +132,37 @@ nl_langinfo(nl_item item)
 		ret = "";
 		break;
 	case RADIXCHAR:
-		ret = (char *)NUMERIC->decimal_point;
+		ret = (char *)lnum->decimal_point;
 		break;
 	case THOUSEP:
-		ret = (char *)NUMERIC->thousands_sep;
+		ret = (char *)lnum->thousands_sep;
 		break;
 	case YESEXPR:
-		ret = (char *)MESSAGES->yesexpr;
+		ret = (char *)lmsgs->yesexpr;
 		break;
 	case NOEXPR:
-		ret = (char *)MESSAGES->noexpr;
+		ret = (char *)lmsgs->noexpr;
 		break;
 	/*
-	 * YESSTR and NOSTR items marked with LEGACY are available, but not
-	 * recomended by SUSv2 to be used in portable applications since
-	 * they're subject to remove in future specification editions.
+	 * YESSTR and NOSTR items were removed from Issue 7.  But
+	 * older applications might still need them.  Their use is
+	 * discouraged.
 	 */
 	case YESSTR:	/* LEGACY  */
-		ret = (char *)MESSAGES->yesstr;
+		ret = (char *)lmsgs->yesstr;
 		break;
 	case NOSTR:	/* LEGACY  */
-		ret = (char *)MESSAGES->nostr;
+		ret = (char *)lmsgs->nostr;
 		break;
 	/*
 	 * SUSv2 special formatted currency string
 	 */
 	case CRNCYSTR:
-		ret = "";
-		cs = (char *)MONETARY->currency_symbol;
-		if (*cs != '\0') {
-			char pos = localeconv()->p_cs_precedes;
-
-			if (pos == localeconv()->n_cs_precedes) {
-				char psn = '\0';
-
-				if (pos == CHAR_MAX) {
-					if (strcmp(cs,
-					    MONETARY->mon_decimal_point) == 0)
-						psn = '.';
-				} else
-					psn = pos ? '-' : '+';
-				if (psn != '\0') {
-					int clen = strlen(cs);
-					char *newc;
-
-					newc = realloc(csym, clen + 2);
-					if (newc != NULL) {
-						free(csym);
-						csym = newc;
-						*csym = psn;
-						(void) strcpy(csym + 1, cs);
-						ret = csym;
-					}
-				}
-			}
-		}
+		ret = lmon->crncystr;
 		break;
+
 	case _DATE_FMT:		/* Solaris specific extension */
-		ret = (char *)TIME->date_fmt;
+		ret = (char *)ltime->date_fmt;
 		break;
 	/*
 	 * Note that FreeBSD also had a private D_MD_ORDER, but that appears
@@ -193,4 +172,10 @@ nl_langinfo(nl_item item)
 		ret = "";
 	}
 	return (ret);
+}
+
+char *
+nl_langinfo(nl_item item)
+{
+	return (nl_langinfo_l(item, uselocale(NULL)));
 }

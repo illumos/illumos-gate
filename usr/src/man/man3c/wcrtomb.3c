@@ -1,4 +1,5 @@
 '\" te
+.\" Copyright 2014 Garrett D'Amore <garrett@damore.org>
 .\" Copyright (c) 1992, X/Open Company Limited. All Rights Reserved.  Portions Copyright (c) 2003, Sun Microsystems, Inc.  All Rights Reserved.
 .\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
@@ -7,9 +8,9 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH WCRTOMB 3C "Nov 1, 2003"
+.TH WCRTOMB 3C "Jun 24, 2014"
 .SH NAME
-wcrtomb \- convert a wide-character code to a character (restartable)
+wcrtomb, wcrtomb_l \- convert a wide-character code to a character (restartable)
 .SH SYNOPSIS
 .LP
 .nf
@@ -17,19 +18,22 @@ wcrtomb \- convert a wide-character code to a character (restartable)
 
 \fBsize_t\fR \fBwcrtomb\fR(\fBchar *restrict\fR \fIs\fR, \fBwchar_t\fR \fIwc\fR, \fBmbstate_t *restrict\fR \fIps\fR);
 .fi
+.LP
+.nf
+#include <stdio.h>
+#include <xlocale.h>
 
+\fBsize_t\fR \fBwcrtomb_l\fR(\fBchar *restrict\fR \fIs\fR, \fBwchar_t\fR \fIwc\fR, \fBmbstate_t *restrict\fR \fIps\fR,
+    \fBlocale_t\fR \fIloc\fR);
+.fi
 .SH DESCRIPTION
-.sp
 .LP
 If \fIs\fR is a null pointer, the \fBwcrtomb()\fR function is equivalent to the
 call:
-.sp
-.LP
-wcrtomb(buf, L'\e0', ps)
-.sp
+.IP
+\fBwcrtomb\fR(\fIbuf\fR, L'\e0', \fIps\fR);
 .LP
 where \fIbuf\fR is an internal buffer.
-.sp
 .LP
 If \fIs\fR is not a null pointer, the \fBwcrtomb()\fR function determines the
 number of bytes needed to represent the character that corresponds to the
@@ -39,20 +43,19 @@ At most \fBMB_CUR_MAX\fR bytes are stored.  If \fIwc\fR is a null
 wide-character, a null byte is stored, preceded by any shift sequence needed to
 restore the initial shift state. The resulting state described is the initial
 conversion state.
-.sp
 .LP
 If \fIps\fR is a null pointer, the \fBwcrtomb()\fR function uses its own
 internal \fBmbstate_t\fR object, which is initialized at program startup to the
 initial conversion state.   Otherwise, the  \fBmbstate_t\fR object pointed to
 by \fIps\fR is used to completely describe the current conversion state of the
-associated character sequence. Solaris will behave as if no function defined in
-the Solaris Reference Manual calls \fBwcrtomb()\fR.
-.sp
+associated character sequence. The system will behave as if no function
+defined in the Reference Manual calls \fBwcrtomb()\fR.
 .LP
-The behavior of this function is affected by the \fBLC_CTYPE\fR category of the
-current locale.  See \fBenviron\fR(5).
+The behavior of \fBwcrtomb()\fR is affected by the \fBLC_CTYPE\fR category of the
+current locale.  See \fBenviron\fR(5). The function \fBwcrtomb_l()\fR behaves
+identically to \fBwcrtomb()\fR, except instead of operating in the current
+locale, it operates in the locale specified by \fIloc\fR.
 .SH RETURN VALUES
-.sp
 .LP
 The \fBwcrtomb()\fR function returns the number of bytes stored in the array
 object (including any shift sequences).  When \fIwc\fR is not a valid
@@ -60,7 +63,6 @@ wide-character, an encoding error occurs.  In this case, the function stores
 the value of the macros \fBEILSEQ\fR in \fBerrno\fR and returns
 \fB(size_t)\(mi1\fR; the conversion state is undefined.
 .SH ERRORS
-.sp
 .LP
 The \fBwcrtomb()\fR function may fail if:
 .sp
@@ -81,36 +83,28 @@ state.
 .RS 10n
 Invalid wide-character code is detected.
 .RE
-
-.SH USAGE
-.sp
-.LP
-If \fIps\fR is not a null pointer, \fBwcrtomb()\fR uses the \fBmbstate_t\fR
-object pointed to by \fIps\fR and the function can be used safely in
-multithreaded applications, as long as \fBsetlocale\fR(3C) is not being called
-to change the locale. If \fIps\fR is a null pointer, \fBwcrtomb()\fR uses its
-internal \fBmbstate_t\fR object and the function is Unsafe in multithreaded
-applications.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
-.sp
-
-.sp
 .TS
 box;
 c | c
 l | l .
 ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface Stability	Standard
+Interface Stability	See below.
 _
-MT-Level	See NOTES below
+MT-Level	See below.
 .TE
 
-.SH SEE ALSO
-.sp
 .LP
-\fBmbsinit\fR(3C), \fBsetlocale\fR(3C), \fBattributes\fR(5),
+The \fBwcrtomb()\fR function is Standard.  The
+\fBwcrtomb_l()\fR function is Uncommitted.
+.LP
+If \fIps\fR is a null pointer, these functions should be considered Unsafe
+for use in multithreaded applications.  Otherwise, they are MT-Safe.
+.SH SEE ALSO
+.LP
+\fBmbsinit\fR(3C), \fBnewlocale\fR(3C), \fBsetlocale\fR(3C),
+\fBuselocale\fR(3C), \fBattributes\fR(5),
 \fBstandards\fR(5), \fBenviron\fR(5)

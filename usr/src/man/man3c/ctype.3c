@@ -1,4 +1,5 @@
 '\" te
+.\" Copyright 2014 Garrett D'Amore <garrett@damore.org>
 .\" Copyright 1989 AT&T.  Copyright (c) 1992, X/Open Company Limited  All Rights Reserved.  Portions Copyright (c) 2005, Sun Microsystems, Inc.  All Rights Reserved.
 .\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
@@ -7,10 +8,12 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH CTYPE 3C "Jan 28, 2005"
+.TH CTYPE 3C "Jun 27, 2014"
 .SH NAME
-ctype, isalpha, isalnum, isascii, isblank, iscntrl, isdigit, islower, isprint,
-isspace, isupper, ispunct, isgraph, isxdigit \- character handling
+ctype, isalpha, isalnum, isascii, isblank, iscntrl, isdigit, islower,
+isprint, isspace, isupper, ispunct, isgraph, isxdigit, isalpha_l,
+isalnum_l, isblank_l, iscntrl_l, isdigit_l, islower_l, isprint_l,
+isspace_l, isupper_l, ispunct_l, isgraph_l \- character handling
 .SH SYNOPSIS
 .LP
 .nf
@@ -18,105 +21,122 @@ isspace, isupper, ispunct, isgraph, isxdigit \- character handling
 
 \fBint\fR \fBisalpha\fR(\fBint\fR \fIc\fR);
 .fi
-
 .LP
 .nf
 \fBint\fR \fBisalnum\fR(\fBint\fR \fIc\fR);
 .fi
-
 .LP
 .nf
 \fBint\fR \fBisascii\fR(\fBint\fR \fIc\fR);
 .fi
-
 .LP
 .nf
 \fBint\fR \fBisblank\fR(\fBint\fR \fIc\fR);
 .fi
-
 .LP
 .nf
 \fBint\fR \fBiscntrl\fR(\fBint\fR \fIc\fR);
 .fi
-
 .LP
 .nf
 \fBint\fR \fBisdigit\fR(\fBint\fR \fIc\fR);
 .fi
-
 .LP
 .nf
 \fBint\fR \fBisgraph\fR(\fBint\fR \fIc\fR);
 .fi
-
 .LP
 .nf
 \fBint\fR \fBislower\fR(\fBint\fR \fIc\fR);
 .fi
-
 .LP
 .nf
 \fBint\fR \fBisprint\fR(\fBint\fR \fIc\fR);
 .fi
-
 .LP
 .nf
 \fBint\fR \fBispunct\fR(\fBint\fR \fIc\fR);
 .fi
-
 .LP
 .nf
 \fBint\fR \fBisspace\fR(\fBint\fR \fIc\fR);
 .fi
-
 .LP
 .nf
 \fBint\fR \fBisupper\fR(\fBint\fR \fIc\fR);
 .fi
-
 .LP
 .nf
 \fBint\fR \fBisxdigit\fR(\fBint\fR \fIc\fR);
 .fi
-
-.SH DESCRIPTION
-.sp
 .LP
-These macros classify character-coded integer values. Each is a predicate
-returning non-zero for true, \fB0\fR for false. The behavior of these macros,
-except \fBisascii()\fR, is affected by the current locale (see
-\fBsetlocale\fR(3C)). To modify the behavior, change the \fBLC_TYPE\fR category
-in  \fBsetlocale()\fR, that is, \fBsetlocale(\fR\fBLC_CTYPE\fR,
-\fInewlocale\fR). In the "C" locale, or in a locale where character type
-information is not defined, characters are classified according to the rules of
-the \fBUS-ASCII\fR 7-bit coded character set.
-.sp
+.nf
+\fBint\fR \fBisalpha_l\fR(\fBint\fR \fIc\fR, \fBlocale_t\fR \fIloc\fR);
+.fi
+.LP
+.nf
+\fBint\fR \fBisalnum_l\fR(\fBint\fR \fIc\fR, \fBlocale_t\fR \fIloc\fR);
+.fi
+.LP
+.nf
+\fBint\fR \fBisblank_l\fR(\fBint\fR \fIc\fR, \fBlocale_t\fR \fIloc\fR);
+.fi
+.LP
+.nf
+\fBint\fR \fBiscntrl_l\fR(\fBint\fR \fIc\fR, \fBlocale_t\fR \fIloc\fR);
+.fi
+.LP
+.nf
+\fBint\fR \fBisdigit_l\fR(\fBint\fR \fIc\fR, \fBlocale_t\fR \fIloc\fR);
+.fi
+.LP
+.nf
+\fBint\fR \fBisgraph_l\fR(\fBint\fR \fIc\fR, \fBlocale_t\fR \fIloc\fR);
+.fi
+.LP
+.nf
+\fBint\fR \fBislower_l\fR(\fBint\fR \fIc\fR, \fBlocale_t\fR \fIloc\fR);
+.fi
+.LP
+.nf
+\fBint\fR \fBisprint_l\fR(\fBint\fR \fIc\fR, \fBlocale_t\fR \fIloc\fR);
+.fi
+.LP
+.nf
+\fBint\fR \fBispunct_l\fR(\fBint\fR \fIc\fR, \fBlocale_t\fR \fIloc\fR);
+.fi
+.LP
+.nf
+\fBint\fR \fBisspace_l\fR(\fBint\fR \fIc\fR, \fBlocale_t\fR \fIloc\fR);
+.fi
+.LP
+.nf
+\fBint\fR \fBisupper_l\fR(\fBint\fR \fIc\fR, \fBlocale_t\fR \fIloc\fR);
+.fi
+.SH DESCRIPTION
+.LP
+These functions classify character-coded integer values. Each is a
+predicate returning non-zero for true, \fB0\fR for false. The behavior
+of these macros, except \fBisascii()\fR, is affected by the current
+locale (see \fBsetlocale\fR(3C) and \fBuselocale\fR(3C)). To modify
+the behavior, change the \fBLC_TYPE\fR category in \fBsetlocale()\fR, that is,
+\fBsetlocale(\fR\fBLC_CTYPE\fR, \fInewlocale\fR). In the "C" locale,
+or in a locale where character type information is not defined,
+characters are classified according to the rules of the \fBUS-ASCII\fR
+7-bit coded character set.
+.LP
+The functions \fBisalnum_l()\fR, \fBisalpha_l()\fR, \fBisblank_l()\fR,
+\fBiscntrl_l\fR, \fBisdigit_l()\fR, \fBislower_l()\fR,
+\fBisprint_l()\fR, \fBispunct_l()\fR, \fBisspace_l()\fR,
+\fBisupper_l()\fR, all behave identically to their counterparts without
+the '\fB_l\fR' prefix, except that instead of acting on the current
+locale, that perform the test on the locale specified in the argument
+\fIloc\fR.
 .LP
 The \fBisascii()\fR macro is defined on all integer values. The rest are
 defined only where the argument is an \fBint\fR, the value of which is
 representable as an \fBunsigned char\fR, or \fBEOF\fR, which is defined by the
 <\fBstdio.h\fR> header and represents end-of-file.
-.sp
-.LP
-Functions exist for all the macros defined below. To get the function form, the
-macro name must be undefined (for example, \fB#undef isdigit\fR).
-.sp
-.LP
-For macros described with \fBDefault\fR and \fBStandard conforming\fR versions,
-standard-conforming behavior is provided for standard-conforming applications
-(see \fBstandards\fR(5)) and for applications that define
-\fB__XPG4_CHAR_CLASS__\fR before including <\fBctype.h\fR>.
-.SS "Default"
-.sp
-.ne 2
-.na
-\fB\fBisalpha()\fR\fR
-.ad
-.RS 13n
-Tests for any character for which \fBisupper()\fR or \fBislower()\fR is true.
-.RE
-
-.SS "Standard conforming"
 .sp
 .ne 2
 .na
@@ -178,18 +198,6 @@ Tests for any ``control character'' as defined by the character set.
 Tests for any decimal-digit character.
 .RE
 
-.SS "Default"
-.sp
-.ne 2
-.na
-\fB\fBisgraph()\fR\fR
-.ad
-.RS 13n
-Tests for any character for which \fBispunct()\fR, \fBisupper()\fR,
-\fBislower()\fR, and \fBisdigit()\fR is true.
-.RE
-
-.SS "Standard conforming"
 .sp
 .ne 2
 .na
@@ -214,18 +222,6 @@ In the "C" locale, \fBislower()\fR returns true only for the characters defined
 as lower-case \fBASCII\fR characters.
 .RE
 
-.SS "Default"
-.sp
-.ne 2
-.na
-\fB\fBisprint()\fR\fR
-.ad
-.RS 13n
-Tests for any character for which \fBispunct()\fR, \fBisupper()\fR,
-\fBislower()\fR, \fBisdigit()\fR, and the space character ("\|") is true.
-.RE
-
-.SS "Standard conforming"
 .sp
 .ne 2
 .na
@@ -272,18 +268,6 @@ In the "C" locale, \fBisupper()\fR returns true only for the characters defined
 as upper-case \fBASCII\fR characters.
 .RE
 
-.SS "Default"
-.sp
-.ne 2
-.na
-\fB\fBisxdigit()\fR\fR
-.ad
-.RS 14n
-Tests for any hexadecimal-digit character (\fB[0\(mi9]\fR, \fB[A\(miF]\fR, or
-\fB[a\(mif]\fR).
-.RE
-
-.SS "Standard conforming"
 .sp
 .ne 2
 .na
@@ -304,36 +288,30 @@ are included.
 .RE
 
 .SH RETURN VALUES
-.sp
 .LP
 If the argument to any of the character handling macros is not in the domain of
 the function, the result is undefined. Otherwise, the macro or function returns
 non-zero if the classification is \fBTRUE\fR and \fB0\fR if the classification
 is \fBFALSE\fR.
-.SH USAGE
-.sp
-.LP
-These macros or functions can be used safely in multithreaded applications, as
-long as \fBsetlocale\fR(3C) is not being called to change the locale.
 .SH ATTRIBUTES
 .sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
-.sp
-
-.sp
 .TS
 box;
-l l
-l l .
+c | c
+l | l .
 ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
 CSI	Enabled
+_
 Interface Stability	Standard
-MT-Level	MT-Safe with exceptions
+_
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
-\fBsetlocale\fR(3C), \fBstdio\fR(3C), \fBascii\fR(5), \fBenviron\fR(5),
+\fBnewlocale\fR(3C), \fBsetlocale\fR(3C), \fBuselocale\fR(3C),
+\fBstdio\fR(3C), \fBascii\fR(5), \fBenviron\fR(5),
 \fBstandards\fR(5)

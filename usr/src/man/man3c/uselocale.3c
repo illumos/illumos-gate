@@ -1,0 +1,95 @@
+'\" te
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright (c) 2014 Joyent, Inc.  All rights reserved.
+.\" Copyright 2014 Garrett D'Amore <garrett@damore.org>
+.\"
+.TH USELOCALE 3C "Jun 24, 2014"
+
+.SH NAME
+uselocale \- get and set the locale for an individual thread
+.SH SYNOPSIS
+.LP
+.nf
+#include <locale.h>
+
+\fBlocale_t\fR \fBuselocale\fR(\fBlocale_t\fR \fIloc\fR);
+.fi
+.SH DESCRIPTION
+.LP
+The
+.B uselocale()
+function is used to obtain and set the current locale for a thread. When
+a thread is created, it uses the global locale as specified by calls to
+.BR setlocale() .
+.LP
+If
+.BR (locale_t) 0
+is supplied for 
+.IR loc ,
+then no change is made to the thread's locale setting.  This can be used
+to query the thread's locale without making any change.
+.LP
+If
+.B LC_GLOBAL_LOCALE
+is supplied for
+.IR loc ,
+then the thread will use the global locale, undoing the effect of any
+prior call to establish a thread-specific locale.
+.LP
+Otherwise the thread will use the supplied
+.I loc
+locale object as a thread-specific locale. Changes to the global
+locale, or to the locale of any other thread, will not affect this thread.
+.LP
+Locale objects for use with
+.B uselocale()
+can be created with the functions
+.BR duplocale (3C)
+and
+.BR newlocale (3C).
+.SH RETURN VALUES
+Upon successful completion, the
+.B uselocale()
+function always returns the previous locale that was set. If no locale
+was previously set, the global locale,
+.BR LC_GLOBAL_LOCALE ,
+is returned. On failure, the
+.B uselocale()
+function returns
+.BR (locale_t) 0,
+and sets
+.B errno
+to indicate the error.
+.SH ERRORS
+.TP
+.B EINVAL
+An invalid locale was encountered or an internal error occurred that
+caused the system to be unable to update the locale.
+.SH ATTRIBUTES
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Interface Stability	Standard
+_
+MT-Level	MT-Safe
+.TE
+
+.SH SEE ALSO
+.BR locale (1),
+.BR duplocale (3C),
+.BR newlocale (3C),
+.BR setlocale (3C),
+.BR locale (5)

@@ -1,4 +1,5 @@
 '\" te
+.\" Copyright 2014 Garrett D'Amore <garrett@damore.org>
 .\"  Copyright 1989 AT&T  Copyright (c) 2002, Sun Microsystems, Inc.  All Rights Reserved  Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
 .\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
@@ -7,9 +8,9 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH NL_LANGINFO 3C "Jul 24, 2002"
+.TH NL_LANGINFO 3C "Jun 24, 2014"
 .SH NAME
-nl_langinfo \- language information
+nl_langinfo, nl_langinfo_l \- language information
 .SH SYNOPSIS
 .LP
 .nf
@@ -17,43 +18,36 @@ nl_langinfo \- language information
 
 \fBchar *\fR\fBnl_langinfo\fR(\fBnl_item\fR \fIitem\fR);
 .fi
-
+.LP
+.nf
+\fBchar *\fR\fBnl_langinfo_l\fR(\fBnl_item\fR \fIitem\fR, \fBlocale_t\fR \fIloc\fR);
+.fi
 .SH DESCRIPTION
-.sp
 .LP
 The \fBnl_langinfo()\fR function returns a pointer to a null-terminated string
 containing information relevant to a particular language or cultural area
 defined in the programs locale. The manifest constant names and values of
 \fIitem\fR are defined by <\fBlanginfo.h\fR>. For example:
-.sp
-.LP
-\fBnl_langinfo (ABDAY_1);\fR
-.sp
+.IP
+\fBnl_langinfo\fR(\fBABDAY_1\fR);
 .LP
 would return a pointer to the string "\fBDim\fR" if the identified language was
 French and a French locale was correctly installed; or "\fBSun\fR" if the
 identified language was English.
+.LP
+The function \fBnl_langinfo_l()\fR behaves identically to \fBnl_langinfo()\fR,
+except instead of acting in the current locale, it instead acts in the locale
+specified by \fIloc\fR.
 .SH RETURN VALUES
-.sp
 .LP
-If \fBsetlocale\fR(3C) has not been called successfully, or if  data for a
+If the locale has not been set or is invalid, or if  data for a
 supported language is either not available, or if \fIitem\fR is not defined
-therein, then \fBnl_langinfo()\fR returns a pointer to the corresponding string
-in the C locale. In all locales,  \fBnl_langinfo()\fR returns a pointer to an
+therein, then these functions return a pointer to the corresponding string
+in the C locale. In all locales, they return a pointer to an
 empty string if \fIitem\fR contains an invalid setting.
-.SH USAGE
-.sp
-.LP
-The \fBnl_langinfo()\fR function can be used safely in multithreaded
-applications, as long as \fBsetlocale\fR(3C) is not being called to change the
-locale.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
-.sp
-
-.sp
 .TS
 box;
 c | c
@@ -64,16 +58,15 @@ CSI	Enabled
 _
 Interface Stability	Standard
 _
-MT-Level	MT-Safe with exceptions
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
-\fBsetlocale\fR(3C), \fBlanginfo.h\fR(3HEAD), \fBnl_types.h\fR(3HEAD),
+\fBnewlocale\fR(3C), \fBsetlocale\fR(3C), \fBuselocale\fR(3C),
+\fBlanginfo.h\fR(3HEAD), \fBnl_types.h\fR(3HEAD),
 \fBattributes\fR(5), \fBstandards\fR(5)
 .SH WARNINGS
-.sp
 .LP
 The array pointed to by the return value should not be modified by the program.
-Subsequent calls to  \fBnl_langinfo()\fR may overwrite the array.
+Subsequent calls to these functions may overwrite the array.

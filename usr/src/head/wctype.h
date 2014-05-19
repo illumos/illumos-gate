@@ -24,6 +24,7 @@
 /*	definitions for international functions	*/
 
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -31,11 +32,9 @@
 #ifndef	_WCTYPE_H
 #define	_WCTYPE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
+#include <sys/feature_tests.h>
 #include <iso/wctype_iso.h>
-#if !defined(__XOPEN_OR_POSIX) && !defined(_STRICT_STDC) || \
-	defined(__EXTENSIONS__)
+#ifndef _STRICT_SYMBOLS
 #include <ctype.h>
 #include <wchar.h>
 #endif
@@ -64,22 +63,17 @@ using std::wctrans;
 using std::towctrans;
 using std::iswctype;
 using std::wctype;
+#if __cplusplus >= 201103L
+using std::iswblank;
 #endif
-
-/*
- * This header needs to be included here because it relies on the global
- * visibility of wint_t in the C++ environment.
- */
-
-#include <iso/wctype_c99.h>
+#endif
 
 #ifdef	__cplusplus
 extern "C" {
 #endif
 
 /* do not allow any of the following in a strictly conforming application */
-#if !defined(__XOPEN_OR_POSIX) && !defined(_STRICT_STDC) || \
-	defined(__EXTENSIONS__)
+#ifndef _STRICT_SYMBOLS
 
 /*
  * data structure for supplementary code set
@@ -111,24 +105,32 @@ extern	wint_t __nextwctype(wint_t, wctype_t);
 /* isw*, except iswascii(), are not macros any more.  They become functions */
 #ifdef __STDC__
 
-extern	unsigned _iswctype(wchar_t, int);
-extern	wchar_t _trwctype(wchar_t, int);
 /* is* also become functions */
 extern	int isphonogram(wint_t);
 extern	int isideogram(wint_t);
 extern	int isenglish(wint_t);
 extern	int isnumber(wint_t);
 extern	int isspecial(wint_t);
-#else
+/* From BSD/MacOS */
+extern	int iswideogram(wint_t);
+extern	int iswphonogram(wint_t);
+extern	int iswnumber(wint_t);
+extern	int iswhexnumber(wint_t);
+extern	int iswspecial(wint_t);
 
-extern  unsigned _iswctype();
-extern  wchar_t _trwctype();
+#else	/* __STDC__ */
+
 /* is* also become functions */
 extern  int isphonogram();
 extern  int isideogram();
 extern  int isenglish();
 extern  int isnumber();
 extern  int isspecial();
+/* From BSD/MacOS */
+extern	int iswideogram();
+extern	int iswphonogram();
+extern	int iswnumber();
+extern	int iswspecial();
 #endif
 
 #define	iscodeset0(c)	isascii(c)
@@ -136,7 +138,55 @@ extern  int isspecial();
 #define	iscodeset2(c)	(((c) & WCHAR_CSMASK) == WCHAR_CS2)
 #define	iscodeset3(c)	(((c) & WCHAR_CSMASK) == WCHAR_CS3)
 
-#endif /* !defined(__XOPEN_OR_POSIX)... */
+#endif /* !defined(_STRICT_SYMBOLS)... */
+
+
+/* XPG7 extended locale support */
+#if defined(_XPG7) || !defined(_STRICT_SYMBOLS)
+
+#ifndef	_LOCALE_T
+#define	_LOCALE_T
+typedef struct locale *locale_t;
+#endif
+
+#if	defined(__STDC__)
+extern wint_t towlower_l(wint_t, locale_t);
+extern wint_t towupper_l(wint_t, locale_t);
+extern wint_t towctrans_l(wint_t, wctrans_t, locale_t);
+extern int iswctype_l(wint_t, wctype_t, locale_t);
+extern int iswalnum_l(wint_t, locale_t);
+extern int iswalpha_l(wint_t, locale_t);
+extern int iswcntrl_l(wint_t, locale_t);
+extern int iswdigit_l(wint_t, locale_t);
+extern int iswgraph_l(wint_t, locale_t);
+extern int iswlower_l(wint_t, locale_t);
+extern int iswprint_l(wint_t, locale_t);
+extern int iswpunct_l(wint_t, locale_t);
+extern int iswspace_l(wint_t, locale_t);
+extern int iswupper_l(wint_t, locale_t);
+extern int iswxdigit_l(wint_t, locale_t);
+extern wctrans_t wctrans_l(const char *, locale_t);
+extern wctype_t wctype_l(const char *, locale_t);
+#else	/* __STDC__ */
+extern wint_t towlower_l();
+extern wint_t towupper_l();
+extern wint_t towctrans_l();
+extern int iswctype_l();
+extern int iswalnum_l();
+extern int iswalpha_l();
+extern int iswcntrl_l();
+extern int iswdigit_l();
+extern int iswgraph_l();
+extern int iswlower_l();
+extern int iswprint_l();
+extern int iswpunct_l();
+extern int iswspace_l();
+extern int iswupper_l();
+extern int iswxdigit_l();
+extern wctrans_t wctrans_l();
+extern wctype_t wctype_l();
+#endif	/* __STDC__ */
+#endif /* defined(_XPG7) || !defined(_STRICT_SYMBOLS) */
 
 #ifdef	__cplusplus
 }

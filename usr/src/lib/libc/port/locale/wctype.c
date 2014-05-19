@@ -1,4 +1,5 @@
 /*
+ * Copyright 2013 Garrett D'Amore <garrett@damore.org>
  * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2002 Tim J. Robbins.
  * All rights reserved.
@@ -29,10 +30,17 @@
 #include <ctype.h>
 #include <string.h>
 #include <wctype.h>
+#include <note.h>
+#include <locale.h>
 #include "_ctype.h"
 
+/*
+ * For now, we don't support locale specific character classes.  This is
+ * a capability that needs to be added (locales should be able to define
+ * their own character classes.)
+ */
 wctype_t
-wctype(const char *property)
+wctype_l(const char *property, locale_t loc)
 {
 	static const struct {
 		const char	*name;
@@ -57,10 +65,17 @@ wctype(const char *property)
 		{ NULL,		0 },		/* Default */
 	};
 	int i;
+	_NOTE(ARGUNUSED(loc));
 
 	i = 0;
 	while (props[i].name != NULL && strcmp(props[i].name, property) != 0)
 		i++;
 
 	return (props[i].mask);
+}
+
+wctype_t
+wctype(const char *property)
+{
+	return (wctype_l(property, uselocale(NULL)));
 }
