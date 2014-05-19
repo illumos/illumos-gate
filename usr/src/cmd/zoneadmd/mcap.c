@@ -129,10 +129,14 @@
 #define	TUNE_NPAGE	"phys-mcap-no-pageout"
 #define	TUNE_NPFTHROT	"phys-mcap-no-pf-throttle"
 
-#define	NSEC_INTERIM	4	/* num secs to pause between large mappings */
-#define	SMALL_MAPPING	10240	/* 10MB in KB */
-#define	LARGE_MAPPING	102400	/* 100MB in KB */
-#define	VRYLRG_MAPPING	512000	/* 500MB in KB */
+/*
+ * The large mapping value was derived empirically by seeing that mappings
+ * much bigger than 32mb sometimes take a relatively long time to invalidate
+ * (significant fraction of a second).
+ */
+#define	SEC_INTERIM	2	/* num secs to pause after stopped too long */
+#define	MSEC_TOO_LONG	100	/* release proc. after stopped for 100ms */
+#define	LARGE_MAPPING	32768	/* >= 32MB in KB - pageout in chunks */
 
 /*
  * These are only used in get_mem_info but global. We always need scale_rss and
@@ -159,6 +163,8 @@ static char	over_cmd[2 * BUFSIZ];	/* same size as zone_attr_value */
 static boolean_t skip_vmusage = B_FALSE;
 static boolean_t skip_pageout = B_FALSE;
 static boolean_t skip_pf_throttle = B_FALSE;
+
+static zlog_t	*logp;
 
 static int64_t check_suspend();
 static void get_mcap_tunables();
@@ -420,6 +426,9 @@ pageout_mapping(struct ps_prochandle *Pr, prmap_t *pmp, uintptr_t start,
 /*
  * Work through a process paging out mappings until the whole address space was
  * examined or the excess is < 0.  Return our estimate of the updated excess.
+ *
+ * This stops the victim process while pageout is occuring so we take special
+ * care below not to leave the victim stopped for too long.
  */
 static int64_t
 pageout_process(pid_t pid, int64_t excess)
@@ -430,6 +439,9 @@ pageout_process(pid_t pid, int64_t excess)
 	struct ps_prochandle	*ph = NULL;
 	int64_t			sum_att, d_rss;
 	int64_t			old_rss;
+	hrtime_t		stop_time;
+	long			stopped_ms; /* elapsed time while stopped */
+	int			map_cnt;
 	psinfo_t		psinfo;
 	char			pathbuf[MAXPATHLEN];
 
@@ -444,17 +456,19 @@ pageout_process(pid_t pid, int64_t excess)
 		goto done;
 
 	old_rss = (int64_t)psinfo.pr_rssize;
+	map_cnt = 0;
+	stop_time = 0;
 
 	/* If unscannable, skip it. */
 	if (psinfo.pr_nlwp == 0 || proc_issystem(pid)) {
-		debug("pid: %ld system process, skipping %s\n",
+		debug("pid %ld: system process, skipping %s\n",
 		    pid, psinfo.pr_psargs);
 		goto done;
 	}
 
 	/* If tiny RSS (16KB), skip it. */
 	if (old_rss <= 16) {
-		debug("pid: %ld skipping, RSS %lldKB %s\n",
+		debug("pid %ld: skipping, RSS %lldKB %s\n",
 		    pid, old_rss, psinfo.pr_psargs);
 		goto done;
 	}
@@ -464,7 +478,7 @@ pageout_process(pid_t pid, int64_t excess)
 
 	/* Skip process if it has no mappings. */
 	if (pmap == NULL) {
-		debug("%ld: map unreadable; ignoring\n", pid);
+		debug("pid %ld: map unreadable; ignoring\n", pid);
 		goto done;
 	}
 
@@ -486,22 +500,28 @@ pageout_process(pid_t pid, int64_t excess)
 		 * toward the goal of reducing the zone's RSS.
 		 *
 		 * However, in some cases a process might have one or more
-		 * large (100s of MB or N GB) mappings (e.g. DB files). Each
-		 * one of these will go a long way toward reducing the RSS. For
-		 * these processes, stopping the process while we invalidate
-		 * several of the large mappings can have a noticeable impact
-		 * on the process execution. In addition, after we get under
-		 * the cap then once we resume invalidation, we want to try to
-		 * pickup where we left off within the process so that all its
-		 * mappings are treated equally.
+		 * large (100s of MB or N GB) mappings (e.g. DB files or big
+		 * heap). Each one of these will go a long way toward reducing
+		 * the RSS. For these processes, being stopped while we
+		 * invalidate the entire large mapping can have a noticeable
+		 * impact on the process execution. In addition, after we get
+		 * under the cap then once we resume invalidation, we want to
+		 * try to pickup where we left off within the process address
+		 * space so that all of its mappings are treated equally.
 		 *
-		 * To handle this second case, we use a cutoff. If invalidating
-		 * a "large" mapping, then we pause after that to reduce
-		 * disruption of the process. If we get under the zone's cap,
-		 * while in the middle of this process, we suspend invalidation
-		 * in this code so that we can resume on this process later
-		 * if we go over the cap again (although this process might be
-		 * gone by that time).
+		 * To handle the first issue, when invalidating a large mapping
+		 * (>= LARGE_MAPPING), then we do it in chunks.
+		 *
+		 * In all cases we keep track of how much time has elapsed
+		 * (stopped_ms) since the process was stopped. If this gets to
+		 * be too long (> MSEC_TOO_LONG), then we release the process
+		 * so it can run for a while (SEC_INTERIM) before we re-grab it
+		 * and do more pageout.
+		 *
+		 * If we get under the zone's cap while in the middle of this
+		 * process we suspend invalidation in this code so that we can
+		 * resume on this process later if we go over the cap again
+		 * (although this process might be gone by that time).
 		 */
 
 		if (ph == NULL) {
@@ -515,20 +535,25 @@ pageout_process(pid_t pid, int64_t excess)
 				excess -= old_rss;
 				goto done;
 			}
+
+			stop_time = gethrtime();
 		}
 
 		msize = pmap->pr_size / 1024;
 		sum_att += msize;
 
 		/* Try to page out the mapping. */
-		if (msize > VRYLRG_MAPPING) {
+
+		if (msize >= LARGE_MAPPING) {
 			/*
-			 * For a very large mapping, invalidate it in chunks
-			 * and let the process run in-between.
+			 * For a large mapping, invalidate it in chunks and
+			 * check how much time has passed in-between. If it's
+			 * too much, let victim run for a while before doing
+			 * more pageout on this mapping.
 			 */
 			uintptr_t addr;
 			int64_t sz;
-			int64_t amnt = VRYLRG_MAPPING * 1024;
+			int64_t amnt = LARGE_MAPPING * 1024;
 
 			addr = pmap->pr_vaddr;
 			sz = pmap->pr_size;
@@ -542,11 +567,13 @@ pageout_process(pid_t pid, int64_t excess)
 				addr += amnt;
 				sz -= amnt;
 
-				if (sz > 0) {
+				/* convert elapsed ns to ms */
+				stopped_ms = (gethrtime() - stop_time) /
+				    1000000;
+
+				if (stopped_ms > MSEC_TOO_LONG && sz > 0) {
 					/*
-					 * If there is more to invalidate then
-					 * since we just tried to invalidate a
-					 * large mapping, release the process
+					 * Process stopped too long, release it
 					 * and wait a bit to give the process
 					 * a chance to do some work.
 					 */
@@ -554,7 +581,17 @@ pageout_process(pid_t pid, int64_t excess)
 					(void) Prelease(ph, 0);
 					ph = NULL;
 
-					(void) sleep_shutdown(NSEC_INTERIM);
+					/* log if stopped 1s or more */
+					if (stopped_ms >= 1000)
+						zerror(logp, B_FALSE, "zone %s "
+						    " pid %ld stopped for "
+						    "%ldms\n", zonename, pid,
+						    stopped_ms);
+
+					debug("pid %ld: interim suspend "
+					    "(elpsd: %ldms)\n", pid,
+					    stopped_ms);
+					(void) sleep_shutdown(SEC_INTERIM);
 					if (shutting_down)
 						goto done;
 
@@ -565,6 +602,8 @@ pageout_process(pid_t pid, int64_t excess)
 						excess -= old_rss;
 						goto done;
 					}
+
+					stop_time = gethrtime();
 				}
 
 				if (sz < amnt)
@@ -577,75 +616,66 @@ pageout_process(pid_t pid, int64_t excess)
 				debug("pid %ld: mapping unpageable\n", pid);
 			}
 		}
+		map_cnt++;
 
-		if (msize > LARGE_MAPPING) {
-			/*
-			 * Since we just tried to invalidate a large mapping,
-			 * release the process and wait a bit to give the
-			 * process a chance to do some work. We retake control
-			 * at the top of the loop.
-			 */
-			Pdestroy_agent(ph);
-			(void) Prelease(ph, 0);
-			ph = NULL;
-
-			(void) sleep_shutdown(NSEC_INTERIM);
-			if (shutting_down)
-				goto done;
+		/*
+		 * Re-check the process rss and get the delta.
+		 */
+		if (pread(psfd, &psinfo, sizeof (psinfo), 0)
+		    != sizeof (psinfo)) {
+			excess -= old_rss;
+			goto done;
 		}
 
-		if (msize > SMALL_MAPPING) {
-			/*
-			 * This mapping is not "small" so we re-check the
-			 * process rss and get the delta.
-			 */
-			if (pread(psfd, &psinfo, sizeof (psinfo), 0)
-			    != sizeof (psinfo)) {
-				excess -= old_rss;
-				goto done;
-			}
+		d_rss = (int64_t)psinfo.pr_rssize - old_rss;
+		old_rss = (int64_t)psinfo.pr_rssize;
 
-			d_rss = (int64_t)psinfo.pr_rssize - old_rss;
-			old_rss = (int64_t)psinfo.pr_rssize;
-
-			debug("pid %ld: interim d_rss %lldKB rss %lldKB "
-			    "ex %lldKB\n", pid, d_rss,
-			    (int64_t)psinfo.pr_rssize, (excess + d_rss));
-		} else {
-			/*
-			 * For smaller mappings, we just pretend that the
-			 * invalidation was successful and reduce the excess.
-			 * We'll re-check the excess once we think we reduced
-			 * the rss enough or after we hit a larger mapping.
-			 */
-			d_rss = -msize;
-			old_rss -= msize;
-		}
-
-		/* usually d_rss should be negative or 0 if nothing paged out */
+		/* d_rss should be negative (or 0 if nothing paged out) */
 		excess += d_rss;
 
-		if (excess <= 0) {
+		/* convert elapsed ns to ms */
+		stopped_ms = (gethrtime() - stop_time) / 1000000;
+
+		if (excess <= 0 || stopped_ms > MSEC_TOO_LONG) {
+			/*
+			 * In either case, we release control of the process
+			 * and let it run.
+			 */
 			if (ph != NULL) {
 				Pdestroy_agent(ph);
 				(void) Prelease(ph, 0);
 				ph = NULL;
 			}
 
-			debug("pid %ld (partial): atmpt %lluKB excess %lldKB\n",
-			    pid, (unsigned long long)sum_att,
-			    (long long)excess);
+			/* log if stopped 1s or more */
+			if (stopped_ms >= 1000)
+				zerror(logp, B_FALSE, "zone %s pid %ld stopped "
+				    "for %ldms\n", zonename, pid, stopped_ms);
 
-			/*
-			 * If we're actually under, this will suspend checking
-			 * in the middle of this process's address space.
-			 *
-			 */
-			excess = check_suspend();
+			debug("pid %ld: (part.) nmap %d atmpt %lluKB "
+			    "excess %lldKB stopped %ldms\n",
+			    pid, map_cnt, (unsigned long long)sum_att,
+			    (long long)excess, stopped_ms);
+			map_cnt = 0;
+
+			if (excess <= 0) {
+				/*
+				 * If we're actually under, this will suspend
+				 * checking in the middle of this process's
+				 * address space.
+				 */
+				excess = check_suspend();
+			} else {
+				/* Not under, but proc stopped too long. */
+				(void) sleep_shutdown(SEC_INTERIM);
+			}
+
 			if (shutting_down)
 				goto done;
 
-			/* since we likely suspended, re-get current rss */
+			/*
+			 * since the process was released, re-read it's rss
+			 */
 			if (pread(psfd, &psinfo, sizeof (psinfo), 0)
 			    != sizeof (psinfo)) {
 				excess -= old_rss;
@@ -662,8 +692,12 @@ pageout_process(pid_t pid, int64_t excess)
 		pmap = nextmapping(&cur);
 	}
 
-	debug("pid %ld: atmpt %lluKB excess %lldKB\n",
-	    pid, (unsigned long long)sum_att, (long long)excess);
+	/* convert elapsed ns to ms */
+	stopped_ms = (gethrtime() - stop_time) / 1000000;
+
+	debug("pid %ld: nmap %d atmpt %lluKB excess %lldKB stopped %ldms\n",
+	    pid, map_cnt, (unsigned long long)sum_att, (long long)excess,
+	    stopped_ms);
 
 done:
 	/* If a process is grabbed, release it, destroying its agent. */
@@ -1280,6 +1314,7 @@ create_mcap_thread(zlog_t *zlogp, zoneid_t id)
 
 	shutting_down = 0;
 	zid = id;
+	logp = zlogp;
 	(void) getzonenamebyid(zid, zonename, sizeof (zonename));
 
 	if (zone_get_zonepath(zonename, zonepath, sizeof (zonepath)) != 0)
