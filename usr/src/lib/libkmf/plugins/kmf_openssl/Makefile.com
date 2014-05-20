@@ -40,8 +40,8 @@ BERLIB64=	$(BERLIB)
 OPENSSLLIBS=	$(BERLIB) -lsunw_crypto -lcryptoutil -lc
 OPENSSLLIBS64=	$(BERLIB64) -lsunw_crypto -lcryptoutil -lc
 
-LINTSSLLIBS	= $(BERLIB) -lsunw_crypto -lcryptoutil -lc
-LINTSSLLIBS64	= $(BERLIB64) -lsunw_crypto -lcryptoutil -lc
+LINTSSLLIBS	= $(BERLIB) -lcryptoutil -lc
+LINTSSLLIBS64	= $(BERLIB64) -lcryptoutil -lc
 
 SRCDIR=		../common
 INCDIR=		../../include

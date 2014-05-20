@@ -64,7 +64,11 @@ $(LINTLIB):=	SRCS = $(SRCDIR)/$(LINTSRC)
 LIBS = $(DYNLIB) $(LINTLIB)
 
 
-LDLIBS +=	-lc -lsunw_ssl -lwanboot -lsunw_crypto -lscf -ladm
+LDLIBS +=	-lc -lwanboot -lscf -ladm
+
+# libcrypto and libssl have no lint library, and so can only be used when
+# building
+$(DYNLIB) := LDLIBS += -lsunw_crypto -lsunw_ssl
 
 CFLAGS +=	$(CCVERBOSE)
 CERRWARN +=	-_gcc=-Wno-unused-label
