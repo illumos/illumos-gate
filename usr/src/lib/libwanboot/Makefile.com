@@ -60,12 +60,7 @@ include ../../Makefile.lib
 
 LIBS +=		$(LINTLIB)
 LDLIBS +=	-lnvpair -lresolv -lnsl -lsocket -ldevinfo -ldhcputil \
-		-linetutil -lc
-
-# libcrypto and libssl have no lint library, so we can only use it when
-# building
-$(DYNLIB) := LDLIBS += -lcrypto -lssl
-
+		-linetutil -lc -lcrypto -lssl
 CPPFLAGS =	-I$(SRC)/common/net/wanboot/crypt $(CPPFLAGS.master)
 CERRWARN +=	-_gcc=-Wno-switch
 CERRWARN +=	-_gcc=-Wno-parentheses
