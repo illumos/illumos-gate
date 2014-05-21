@@ -136,7 +136,7 @@ $main::opt_h = 0;
 $| = 1;                      # autoflush
 
 # kstat "link" module includes:
-my @Network = qw(dmfe bge be bnx ce eri external ge hme igb ige internal ixgbe le ppp qfe rtls);
+my @Network = qw(dmfe bge be bnx ce eri external ge hme igb ige internal ixgbe le net ppp qfe rtls);
 my %Network;
 $Network{$_} = 1 foreach (@Network);
 my $ZONENAME = `/usr/bin/zonename`;
