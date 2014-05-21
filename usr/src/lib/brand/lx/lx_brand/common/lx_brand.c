@@ -1059,7 +1059,7 @@ static struct lx_sysent sysents[] = {
 	{"setfsuid16",	lx_setfsuid16,	0,		1},	/* 138 */
 	{"setfsgid16",	lx_setfsgid16,	0,		1},	/* 139 */
 	{"llseek",	lx_llseek,	0,		5},	/* 140 */
-	{"getdents",	getdents,	SYS_PASSTHRU,	3},	/* 141 */
+	{"getdents",	lx_getdents,	0,		3},	/* 141 */
 	{"select",	lx_select,	0,		5},	/* 142 */
 	{"flock",	lx_flock,	0,		2},	/* 143 */
 	{"msync",	lx_msync,	0,		3},	/* 144 */
