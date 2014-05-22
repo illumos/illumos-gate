@@ -39,7 +39,8 @@ if [ -e "/.initialboot" ]; then
 	echo ". /lib/svc/share/initial_include.sh" >> $SCRIPT
 	cat /.initialboot >> $SCRIPT
 	chmod 550 $SCRIPT
-	$SCRIPT
+	mkdir -p /var/log
+	$SCRIPT &> /var/log/initialboot.log
 	rv=$?
 	if [ "$rv" != "$SMF_EXIT_OK" ]; then
 		exit $rv
