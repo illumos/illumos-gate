@@ -75,13 +75,11 @@ LDLIBS += $(SSH_COMMON_LDLIBS) -lsocket \
 	-lpam \
 	-lbsm \
 	-lwrap \
+	-lsunw_crypto \
 	-lgss \
 	-lcontract
 MAPFILES = $(MAPFILE.INT) $(MAPFILE.NGB)
 LDFLAGS += $(MAPFILES:%=-M%)
-
-# libcrypto has no lint library, so we can only use it when building
-$(PROG) := LDLIBS += -lsunw_crypto
 
 POFILE_DIR= ..
 

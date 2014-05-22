@@ -907,6 +907,8 @@ clnt_vc_control(CLIENT *cl, int request, char *info)
 			    /* LINTED pointer cast */
 			    ct->ct_blocking_mode: *(int *)info);
 			ret = (0 == res);
+		} else {
+			ret = FALSE;
 		}
 		rpc_fd_unlock(vctbl, ct->ct_fd);
 		return (ret);

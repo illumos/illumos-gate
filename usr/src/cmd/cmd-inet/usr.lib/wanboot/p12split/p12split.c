@@ -24,6 +24,8 @@
  * Use is subject to license terms.
  */
 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
 #include <stdio.h>
 #include <libintl.h>
 #include <locale.h>
@@ -260,6 +262,7 @@ do_certs(void)
 			int i;
 
 			for (i = 0; i < sk_X509_num(ta_in); i++) {
+				/* LINTED */
 				x = sk_X509_value(ta_in, i);
 				(void) printf(
 				    gettext("\nTrust Anchor cert %d:\n"), i);
@@ -284,7 +287,7 @@ do_certs(void)
 				}
 
 				(void) sunw_print_times(stdout, PRNT_BOTH,
-				    NULL, x);
+					NULL, x);
 			}
 		}
 	}
@@ -373,11 +376,13 @@ check_certs(STACK_OF(X509) *ta_in, X509 **c_in)
 		return;
 
 	for (i = 0; i < sk_X509_num(ta_in); ) {
+		/* LINTED */
 		curr = sk_X509_value(ta_in, i);
 		ret = time_check_print(curr);
 		if ((ret != CHK_TIME_OK && ret != CHK_TIME_IS_BEFORE) &&
 		    del_expired) {
 			(void) fprintf(stderr, gettext("  Removing cert\n"));
+			/* LINTED */
 			curr = sk_X509_delete(ta_in, i);
 			X509_free(curr);
 			continue;
@@ -581,12 +586,14 @@ cleanup:
 	 */
 	if (clist != NULL) {
 		if (cert != NULL && sk_X509_num(clist) == 1) {
+			/* LINTED */
 			(void) sk_X509_delete(clist, 0);
 		}
 		sk_X509_pop_free(clist, X509_free);
 	}
 	if (klist != NULL) {
 		if (pkey != NULL && sk_EVP_PKEY_num(klist) == 1) {
+			/* LINTED */
 			(void) sk_EVP_PKEY_delete(klist, 0);
 		}
 		sk_EVP_PKEY_pop_free(klist, sunw_evp_pkey_free);

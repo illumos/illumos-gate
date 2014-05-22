@@ -23,6 +23,9 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ */
 
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
 /* All Rights Reserved */
@@ -580,6 +583,7 @@ __getpublickey_cached_g(const char netname[],	/* in  */
 			syslog(LOG_INFO, "Unknown publickey nameservice '%s'",
 			    look->service_name);
 			err = __NSW_UNAVAIL;
+			res = 0;
 		}
 
 		switch (look->actions[err]) {
@@ -662,6 +666,7 @@ getsecretkey_g(
 			syslog(LOG_INFO, "Unknown publickey nameservice '%s'",
 			    look->service_name);
 			err = __NSW_UNAVAIL;
+			res = 0;
 		}
 		switch (look->actions[err]) {
 		case __NSW_CONTINUE :

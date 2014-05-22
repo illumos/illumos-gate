@@ -36,10 +36,7 @@ include ../Makefile.ssh-common
 
 FILEMODE= 04555
 
-LDLIBS += $(SSH_COMMON_LDLIBS) -lsocket -lnsl -lz
-
-# libcrypto has no lint library, so we can only use it when building
-$(PROG) := LDLIBS += -lsunw_crypto
+LDLIBS += $(SSH_COMMON_LDLIBS) -lsocket -lnsl -lz -lsunw_crypto
 
 POFILE_DIR= ..
 
