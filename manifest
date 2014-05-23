@@ -12184,6 +12184,7 @@ f usr/share/man/man1m/useradd.1m 0444 root bin
 f usr/share/man/man1m/userdel.1m 0444 root bin
 f usr/share/man/man1m/usermod.1m 0444 root bin
 f usr/share/man/man1m/utmpd.1m 0444 root bin
+f usr/share/man/man1m/vfsstat.1m 0444 root bin
 f usr/share/man/man1m/vmstat.1m 0444 root bin
 f usr/share/man/man1m/vndadm.1m 0444 root bin
 f usr/share/man/man1m/vndstat.1m 0444 root bin

@@ -565,6 +565,7 @@ _MANFILES=	6to4relay.1m		\
 		uucleanup.1m		\
 		uusched.1m		\
 		uuxqt.1m		\
+		vfsstat.1m		\
 		vmstat.1m		\
 		vndadm.1m		\
 		vndstat.1m		\
