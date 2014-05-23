@@ -22,6 +22,9 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ */
 
 #include "mt.h"
 #include <stdio.h>
@@ -167,27 +170,10 @@ _getexecprof(char *name,
 {
 	int		getby_flag;
 	char		policy_buf[BUFSIZ];
-	const char	*empty = NULL;
 	nss_status_t	res = NSS_NOTFOUND;
 	nss_XbyY_args_t	arg;
 	_priv_execattr	_priv_exec;
 	static mutex_t	_nsw_exec_lock = DEFAULTMUTEX;
-
-	NSS_XbyY_INIT(&arg, result, buffer, buflen, str2execattr);
-
-	_priv_exec.name = (name == NULL) ? empty : (const char *)name;
-	_priv_exec.type = (type == NULL) ? empty : (const char *)type;
-	_priv_exec.id = (id == NULL) ? empty : (const char *)id;
-#ifdef SI_SECPOLICY
-	if (sysinfo(SI_SECPOLICY, policy_buf, BUFSIZ) == -1)
-#endif	/* SI_SECPOLICY */
-	(void) strncpy(policy_buf, DEFAULT_POLICY, BUFSIZ);
-
-retry_policy:
-	_priv_exec.policy = IS_SEARCH_ALL(search_flag) ? empty : policy_buf;
-	_priv_exec.search_flag = search_flag;
-	_priv_exec.head_exec = NULL;
-	_priv_exec.prev_exec = NULL;
 
 	if ((name != NULL) && (id != NULL)) {
 		getby_flag = NSS_DBOP_EXECATTR_BYNAMEID;
@@ -195,7 +181,25 @@ retry_policy:
 		getby_flag = NSS_DBOP_EXECATTR_BYNAME;
 	} else if (id != NULL) {
 		getby_flag = NSS_DBOP_EXECATTR_BYID;
+	} else {
+		return (NULL);
 	}
+
+	NSS_XbyY_INIT(&arg, result, buffer, buflen, str2execattr);
+
+	_priv_exec.name = name;
+	_priv_exec.type = type;
+	_priv_exec.id = id;
+#ifdef SI_SECPOLICY
+	if (sysinfo(SI_SECPOLICY, policy_buf, BUFSIZ) == -1)
+#endif	/* SI_SECPOLICY */
+	(void) strncpy(policy_buf, DEFAULT_POLICY, BUFSIZ);
+
+retry_policy:
+	_priv_exec.policy = IS_SEARCH_ALL(search_flag) ? NULL : policy_buf;
+	_priv_exec.search_flag = search_flag;
+	_priv_exec.head_exec = NULL;
+	_priv_exec.prev_exec = NULL;
 
 	arg.key.attrp = &(_priv_exec);
 

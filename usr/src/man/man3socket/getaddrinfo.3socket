@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH GETADDRINFO 3SOCKET "May 8, 2009"
+.TH GETADDRINFO 3SOCKET "May 22, 2014"
 .SH NAME
 getaddrinfo, getnameinfo, freeaddrinfo, gai_strerror \- translate between node
 name and address
@@ -299,7 +299,7 @@ flags already defined for \fBgetaddrinfo()\fR.
 .LP
 For \fBgetaddrinfo()\fR, if the query is successful, a pointer to a linked list
 of one or more \fBaddrinfo\fR structures is returned by the fourth argument and
-the function returns \fB0\fR. The order of the addresses returned i nthe fourth
+the function returns \fB0\fR. The order of the addresses returned in the fourth
 argument is discussed in the ADDRESS ORDERING section. If the query fails, a
 non-zero error code will be returned. For \fBgetnameinfo()\fR, if successful,
 the strings hostname and service are copied into \fIhost\fR and \fIserv\fR,

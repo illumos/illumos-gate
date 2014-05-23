@@ -24,3 +24,4 @@ outputdir = /var/tmp/test_results
 
 [/opt/util-tests/tests/printf_test]
 
+[/opt/util-tests/tests/xargs_test]
