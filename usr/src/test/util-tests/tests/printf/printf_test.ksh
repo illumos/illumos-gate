@@ -179,6 +179,18 @@ tests[21][format]='%2$s'
 tests[21][args]='abc xyz'
 tests[21][result]="xyz"
 
+typeset -A tests[22]=()
+tests[22][desc]="verify missing signed arg"
+tests[22][format]='%d %d'
+tests[22][args]='151'
+tests[22][result]="151 0"
+
+typeset -A tests[23]=()
+tests[23][desc]="verify missing unsigned arg"
+tests[23][format]='%u %u'
+tests[23][args]='151'
+tests[23][result]="151 0"
+
 #debug=yes
 
 for i in "${!tests[@]}"; do
