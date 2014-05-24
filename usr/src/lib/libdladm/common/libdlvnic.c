@@ -91,6 +91,8 @@ dladm_vnic_diag2status(vnic_ioc_diag_t ioc_diag)
 		return (DLADM_STATUS_NO_HWRINGS);
 	case VNIC_IOC_DIAG_MACADDR_INVALID:
 		return (DLADM_STATUS_INVALIDMACADDR);
+	case VNIC_IOC_DIAG_MACMTU_INVALID:
+		return (DLADM_STATUS_INVALID_MTU);
 	default:
 		return (DLADM_STATUS_FAILED);
 	}
@@ -546,7 +548,7 @@ dladm_vnic_create(dladm_handle_t handle, const char *vnic, datalink_id_t linkid,
 
 done:
 	if (status == DLADM_STATUS_OK && proplist != NULL) {
-    		uint32_t flg;
+		uint32_t flg;
 
 		flg = (flags & DLADM_OPT_PERSIST) ?
 		    DLADM_OPT_PERSIST : DLADM_OPT_ACTIVE;
