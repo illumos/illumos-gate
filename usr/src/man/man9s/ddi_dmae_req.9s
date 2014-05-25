@@ -1,10 +1,10 @@
 '\" te
+.\" Copyright 2014 Garrett D'Amore <garrett@damore.org>
 .\" Copyright (c) 2004, Sun Microsystems, Inc., All Rights Reserved
-.\" Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DDI_DMAE_REQ 9S "Feb 06, 2012"
+.TH DDI_DMAE_REQ 9S "May 24, 2014"
 .SH NAME
 ddi_dmae_req \- DMA engine request structure
 .SH SYNOPSIS
@@ -88,9 +88,9 @@ architecture supports the use of multiple \fBDMA\fR cookies in a single
 \fBI/O\fR transfer. A bus \fBDMA\fR engine can support this feature either with
 a fixed-length scatter/gather list, or by an interrupt chaining feature. A
 driver must determine whether its parent bus nexus supports this feature by
-examining the scatter/gather list size returned in the \fBdlim_sgllen\fR member
-of the \fBDMA\fR limit structure returned by the driver's call to
-\fBddi_dmae_getlim()\fR. (See \fBddi_dma_lim_x86\fR(9S).) If the size of the
+examining the scatter/gather list size returned in the \fBdma_attr_sgllen\fR
+member of the \fBDMA\fR attributes structure returned by the driver's call to
+\fBddi_dmae_getattr()\fR. (See \fBddi_dma_attr\fR(9S).) If the size of the
 scatter/gather list is 1, then no chaining is available. The driver must not
 specify the \fBDMAE_BUF_CHAIN\fR flag in the \fBddi_dmae_req\fR structure it
 passes to \fBddi_dmae_prog()\fR, and the driver need not provide a
@@ -155,7 +155,7 @@ recommended.
 When breaking a \fBDMA\fR window into segments, the system arranges for the end
 of every segment whose number is an integral multiple of the scatter/gather
 list size to fall on a device-granularity boundary, as specified in the
-\fBdlim_granular\fR field in the \fBddi_dma_lim_x86\fR(9S) structure.
+\fBdma_attr_granular\fR field in the \fBddi_dma_attr\fR(9S) structure.
 .sp
 If the scatter/gather list size is 1 (either because no chaining is available
 or because the driver does not want to use the chaining feature), then the
@@ -224,4 +224,4 @@ Architecture	x86
 .sp
 .LP
 \fBisa\fR(4), \fBattributes\fR(5),
-\fBddi_dmae\fR(9F), \fBddi_dma_lim_x86\fR(9S), \fBddi_dma_req\fR(9S)
+\fBddi_dmae\fR(9F), \fBddi_dma_attr\fR(9S)

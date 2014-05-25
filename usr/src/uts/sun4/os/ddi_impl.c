@@ -24,7 +24,7 @@
  * Use is subject to license terms.
  */
 /*
- * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  */
 
 /*
@@ -1131,6 +1131,30 @@ kfreea(void *addr)
 		vmem_free(big_endian_arena, (void *)saddr[-2], saddr[-1]);
 }
 
+/*
+ * This used to be ddi_iomin, but we were the only remaining caller, so
+ * we've made it private and moved it here.
+ */
+static int
+i_ddi_iomin(dev_info_t *a, int i, int stream)
+{
+	int r;
+
+	/*
+	 * Make sure that the initial value is sane
+	 */
+	if (i & (i - 1))
+		return (0);
+	if (i == 0)
+		i = (stream) ? 4 : 1;
+
+	r = ddi_ctlops(a, a,
+	    DDI_CTLOPS_IOMIN, (void *)(uintptr_t)stream, (void *)&i);
+	if (r != DDI_SUCCESS || (i & (i - 1)))
+		return (0);
+	return (i);
+}
+
 int
 i_ddi_mem_alloc(dev_info_t *dip, ddi_dma_attr_t *attr,
     size_t length, int cansleep, int flags,
@@ -1181,7 +1205,7 @@ i_ddi_mem_alloc(dev_info_t *dip, ddi_dma_attr_t *attr,
 		iomin = 1 << (ddi_fls(iomin) - 1);
 	iomin = maxbit(iomin, attr->dma_attr_minxfer);
 	iomin = maxbit(iomin, attr->dma_attr_align);
-	iomin = ddi_iomin(dip, iomin, streaming);
+	iomin = i_ddi_iomin(dip, iomin, streaming);
 	if (iomin == 0)
 		return (DDI_FAILURE);
 

@@ -11,8 +11,8 @@
 
 #
 # Copyright 2011, Richard Lowe
-# Copyright 2012 Garrett D'Amore <garrett@damore>.  All rights reserved.
 # Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2014 Garrett D'Amore <garrett@damore>
 #
 
 include		$(SRC)/Makefile.master
@@ -201,7 +201,6 @@ MANFILES= 	ASSERT.9f				\
 	 	ddi_io_put8.9f				\
 	 	ddi_io_rep_get8.9f			\
 	 	ddi_io_rep_put8.9f			\
-	 	ddi_iomin.9f				\
 	 	ddi_log_sysevent.9f			\
 	 	ddi_map_regs.9f				\
 	 	ddi_mem_get8.9f				\
@@ -692,7 +691,6 @@ MANLINKS=	SIZEOF_PTR.9f				\
 	 	ddi_dmae_enable.9f			\
 	 	ddi_dmae_getattr.9f			\
 	 	ddi_dmae_getcnt.9f			\
-	 	ddi_dmae_getlim.9f			\
 	 	ddi_dmae_prog.9f			\
 	 	ddi_dmae_release.9f			\
 	 	ddi_dmae_stop.9f			\
@@ -1090,7 +1088,6 @@ MANLINKS=	SIZEOF_PTR.9f				\
 	 	samestr.9f				\
 	 	scsi_dmafree.9f				\
 	 	scsi_dname.9f				\
-	 	scsi_hba_attach.9f			\
 	 	scsi_hba_detach.9f			\
 	 	scsi_hba_fini.9f			\
 	 	scsi_hba_pkt_free.9f			\
@@ -1399,7 +1396,6 @@ ddi_dmae_disable.9f			:= LINKSRC = ddi_dmae.9f
 ddi_dmae_enable.9f			:= LINKSRC = ddi_dmae.9f
 ddi_dmae_getattr.9f			:= LINKSRC = ddi_dmae.9f
 ddi_dmae_getcnt.9f			:= LINKSRC = ddi_dmae.9f
-ddi_dmae_getlim.9f			:= LINKSRC = ddi_dmae.9f
 ddi_dmae_prog.9f			:= LINKSRC = ddi_dmae.9f
 ddi_dmae_release.9f			:= LINKSRC = ddi_dmae.9f
 ddi_dmae_stop.9f			:= LINKSRC = ddi_dmae.9f
@@ -1883,7 +1879,6 @@ scsi_dmafree.9f				:= LINKSRC = scsi_dmaget.9f
 scsi_sense_cmdspecific_uint64.9f	:= LINKSRC = scsi_ext_sense_fields.9f
 scsi_sense_info_uint64.9f		:= LINKSRC = scsi_ext_sense_fields.9f
 
-scsi_hba_attach.9f			:= LINKSRC = scsi_hba_attach_setup.9f
 scsi_hba_detach.9f			:= LINKSRC = scsi_hba_attach_setup.9f
 
 scsi_hba_fini.9f			:= LINKSRC = scsi_hba_init.9f
