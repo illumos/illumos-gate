@@ -551,47 +551,113 @@ convert_sockflags(int lx_flags)
 {
 	int solaris_flags = 0;
 
-	if (lx_flags & LX_MSG_OOB)
+	if (lx_flags & LX_MSG_OOB) {
 		solaris_flags |= MSG_OOB;
+		lx_flags &= ~LX_MSG_OOB;
+	}
 
-	if (lx_flags & LX_MSG_PEEK)
+	if (lx_flags & LX_MSG_PEEK) {
 		solaris_flags |= MSG_PEEK;
+		lx_flags &= ~LX_MSG_PEEK;
+	}
 
-	if (lx_flags & LX_MSG_DONTROUTE)
+	if (lx_flags & LX_MSG_DONTROUTE) {
 		solaris_flags |= MSG_DONTROUTE;
+		lx_flags &= ~LX_MSG_DONTROUTE;
+	}
 
-	if (lx_flags & LX_MSG_CTRUNC)
+	if (lx_flags & LX_MSG_CTRUNC) {
 		solaris_flags |= MSG_CTRUNC;
+		lx_flags &= ~LX_MSG_CTRUNC;
+	}
 
-	if (lx_flags & LX_MSG_TRUNC)
+	if (lx_flags & LX_MSG_PROXY) {
+		lx_unsupported("Unsupported "
+		    "socket operation with MSG_PROXY flag set");
+		lx_flags &= ~LX_MSG_PROXY;
+	}
+
+	if (lx_flags & LX_MSG_TRUNC) {
 		solaris_flags |= MSG_TRUNC;
+		lx_flags &= ~LX_MSG_TRUNC;
+	}
 
-	if (lx_flags & LX_MSG_WAITALL)
-		solaris_flags |= MSG_WAITALL;
-
-	if (lx_flags & LX_MSG_DONTWAIT)
+	if (lx_flags & LX_MSG_DONTWAIT) {
 		solaris_flags |= MSG_DONTWAIT;
+		lx_flags &= ~LX_MSG_DONTWAIT;
+	}
 
-	if (lx_flags & LX_MSG_EOR)
+	if (lx_flags & LX_MSG_EOR) {
 		solaris_flags |= MSG_EOR;
+		lx_flags &= ~LX_MSG_EOR;
+	}
 
-	if (lx_flags & LX_MSG_PROXY)
-		lx_unsupported("socket operation with MSG_PROXY flag set");
+	if (lx_flags & LX_MSG_WAITALL) {
+		solaris_flags |= MSG_WAITALL;
+		lx_flags &= ~LX_MSG_WAITALL;
+	}
 
-	if (lx_flags & LX_MSG_FIN)
-		lx_unsupported("socket operation with MSG_FIN flag set");
+	if (lx_flags & LX_MSG_FIN) {
+		lx_unsupported("Unsupported "
+		    "socket operation with MSG_FIN flag set");
+		lx_flags &= ~LX_MSG_FIN;
+	}
 
-	if (lx_flags & LX_MSG_SYN)
-		lx_unsupported("socket operation with MSG_SYN flag set");
+	if (lx_flags & LX_MSG_SYN) {
+		lx_unsupported("Unsupported "
+		    "socket operation with MSG_SYN flag set");
+		lx_flags &= ~LX_MSG_SYN;
+	}
 
-	if (lx_flags & LX_MSG_CONFIRM)
-		lx_unsupported("socket operation with MSG_CONFIRM set");
+	if (lx_flags & LX_MSG_CONFIRM) {
+		lx_unsupported("Unsupported "
+		    "socket operation with MSG_CONFIRM set");
+		lx_flags &= ~LX_MSG_CONFIRM;
+	}
 
-	if (lx_flags & LX_MSG_RST)
-		lx_unsupported("socket operation with MSG_RST flag set");
+	if (lx_flags & LX_MSG_RST) {
+		lx_unsupported("Unsupported "
+		    "socket operation with MSG_RST flag set");
+		lx_flags &= ~LX_MSG_RST;
+	}
 
-	if (lx_flags & LX_MSG_MORE)
-		lx_unsupported("socket operation with MSG_MORE flag set");
+	if (lx_flags & LX_MSG_ERRQUEUE) {
+		lx_unsupported("Unsupported "
+		    "socket operation with MSG_ERRQUEUE flag set");
+		lx_flags &= ~LX_MSG_ERRQUEUE;
+	}
+
+	if (lx_flags & LX_MSG_NOSIGNAL) {
+		/* MSG_NOSIGNAL handled within each caller */
+		lx_flags &= ~LX_MSG_NOSIGNAL;
+	}
+
+	if (lx_flags & LX_MSG_MORE) {
+		lx_unsupported("Unsupported "
+		    "socket operation with MSG_MORE flag set");
+		lx_flags &= ~LX_MSG_MORE;
+	}
+
+	if (lx_flags & LX_MSG_WAITFORONE) {
+		lx_unsupported("Unsupported "
+		    "socket operation with MSG_WAITFORONE flag set");
+		lx_flags &= ~LX_MSG_WAITFORONE;
+	}
+
+	if (lx_flags & LX_MSG_FASTOPEN) {
+		lx_unsupported("Unsupported "
+		    "socket operation with MSG_FASTOPEN flag set");
+		lx_flags &= ~LX_MSG_FASTOPEN;
+	}
+
+	if (lx_flags & LX_MSG_CMSG_CLOEXEC) {
+		lx_unsupported("Unsupported "
+		    "socket operation with MSG_CMSG_CLOEXEC flag set");
+		lx_flags &= ~LX_MSG_CMSG_CLOEXEC;
+	}
+
+	if (lx_flags != 0)
+		lx_unsupported("unknown socket flag(s) set 0x%x", lx_flags);
 
 	return (solaris_flags);
 }
@@ -1502,7 +1568,7 @@ lx_recvmsg(ulong_t *args)
 	int nosigpipe = flags & LX_MSG_NOSIGNAL;
 	struct sigaction newact, oact;
 
-	lx_debug("\trecvmsg(%d, 0x%p, 0x%x)", sockfd, (void *)args[1], flags);
+	lx_debug("\trecvmsg(%d, 0x%p, 0x%x)", sockfd, msgp, flags);
 
 	flags = convert_sockflags(flags);
 
@@ -1553,7 +1619,7 @@ lx_recvmsg(ulong_t *args)
 		    gettext("%s: could not reset SIGPIPE handler to "
 		    "emulate LX_MSG_NOSIGNAL"), "recvmsg()");
 
-	if (r >= 0 && msg.msg_control != NULL) {
+	if (r >= 0 && msg.msg_controllen >= sizeof (struct cmsghdr)) {
 		/*
 		 * If there are control messages bundled in this message,
 		 * we need to convert them from Linux to Solaris.
@@ -1564,6 +1630,8 @@ lx_recvmsg(ulong_t *args)
 		if ((uucopy(msg.msg_control, cmsg, msg.msg_controllen)) != 0)
 			return (-errno);
 	}
+
+	msg.msg_control = cmsg;
 
 	/*
 	 * A handful of the values in the msghdr are set by the recvmsg()
