@@ -246,6 +246,9 @@ extern "C" {
 #define	LX_MSG_ERRQUEUE		0x2000
 #define	LX_MSG_NOSIGNAL		0x4000
 #define	LX_MSG_MORE		0x8000
+#define	LX_MSG_WAITFORONE	0x10000
+#define	LX_MSG_FASTOPEN		0x20000000
+#define	LX_MSG_CMSG_CLOEXEC	0x40000000
 
 struct lx_msghdr {
 	void		*msg_name;		/* optional address */
