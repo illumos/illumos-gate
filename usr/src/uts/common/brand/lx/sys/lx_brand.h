@@ -77,6 +77,7 @@ extern "C" {
 #define	B_GET_AFFINITY_MASK	133
 #define	B_PTRACE_EXT_OPTS	134
 #define	B_PTRACE_STOP_FOR_OPT	135
+#define	B_UNSUPPORTED		136
 
 #define	B_EMULATE_SYSCALL	192
 

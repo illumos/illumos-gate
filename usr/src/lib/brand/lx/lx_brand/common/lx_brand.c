@@ -338,8 +338,17 @@ void
 lx_unsupported(char *msg, ...)
 {
 	va_list	ap;
+	char dmsg[256];
 
 	assert(msg != NULL);
+
+	/* make a brand call so we can easily dtrace unsupported actions */
+	va_start(ap, msg);
+	/* LINTED [possible expansion issues] */
+	(void) vsnprintf(dmsg, sizeof (dmsg), msg, ap);
+	dmsg[255] = '\0';
+	(void) syscall(SYS_brand, B_UNSUPPORTED, dmsg);
+	va_end(ap);
 
 	/* send the msg to the error stream */
 	va_start(ap, msg);
