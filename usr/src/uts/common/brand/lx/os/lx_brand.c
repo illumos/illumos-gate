@@ -57,6 +57,7 @@
 #include <sys/archsystm.h>
 #include <sys/zone.h>
 #include <sys/brand.h>
+#include <sys/sdt.h>
 
 int	lx_debug = 0;
 
@@ -734,6 +735,21 @@ lx_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 
 	case B_PTRACE_STOP_FOR_OPT:
 		lx_ptrace_stop_for_option((int)arg1);
+		return (0);
+
+	case B_UNSUPPORTED:
+		{
+		char dmsg[256];
+
+		if (copyin((void *)arg1, &dmsg, sizeof (dmsg)) != 0) {
+			lx_print("Failed to copyin unsupported msg "
+			    "at 0x%p\n", (void *)arg1);
+			return (EFAULT);
+		}
+		dmsg[255] = '\0';
+		DTRACE_PROBE1(brand__lx__unsupported, char *, dmsg);
+		}
+
 		return (0);
 
 	default:
