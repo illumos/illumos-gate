@@ -23,8 +23,6 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 
 #include <stdlib.h>
 #include <stddef.h>
@@ -556,6 +554,29 @@ gen_utsname(void)
 	END;
 }
 
+static void
+gen_prfdinfo(void)
+{
+	START(prfdinfo, prfdinfo_t);
+
+	SCALAR_FIELD(prfdinfo_t,	pr_fd,		0);
+	SCALAR_FIELD(prfdinfo_t,	pr_mode,	0);
+	SCALAR_FIELD(prfdinfo_t,	pr_uid,		0);
+	SCALAR_FIELD(prfdinfo_t,	pr_gid,		0);
+	SCALAR_FIELD(prfdinfo_t,	pr_major,	0);
+	SCALAR_FIELD(prfdinfo_t,	pr_minor,	0);
+	SCALAR_FIELD(prfdinfo_t,	pr_rmajor,	0);
+	SCALAR_FIELD(prfdinfo_t,	pr_rminor,	0);
+	SCALAR_FIELD(prfdinfo_t,	pr_ino,		0);
+	SCALAR_FIELD(prfdinfo_t,	pr_offset,	0);
+	SCALAR_FIELD(prfdinfo_t,	pr_size,	0);
+	SCALAR_FIELD(prfdinfo_t,	pr_fileflags,	0);
+	SCALAR_FIELD(prfdinfo_t,	pr_fdflags,	0);
+	ARRAY_FIELD(prfdinfo_t,		pr_path,	0);
+
+	END;
+}
+
 
 /*ARGSUSED*/
 int
@@ -584,6 +605,7 @@ main(int argc, char *argv[])
 	gen_sysset();
 	gen_timestruc();
 	gen_utsname();
+	gen_prfdinfo();
 
 
 	/*
@@ -611,6 +633,7 @@ main(int argc, char *argv[])
 	(void) printf(fmt, "sysset");
 	(void) printf(fmt, "timestruc");
 	(void) printf(fmt, "utsname");
+	(void) printf(fmt, "prfdinfo");
 	(void) printf("};\n");
 
 	/*

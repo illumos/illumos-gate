@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH GETEXECATTR 3SECDB "Mar 31, 2005"
+.TH GETEXECATTR 3SECDB "May 27, 2014"
 .SH NAME
 getexecattr, free_execattr, setexecattr, endexecattr, getexecuser, getexecprof,
 match_execattr \- get execution profile entry
@@ -131,7 +131,7 @@ of all entries that meet the search criteria. See  \fBEXAMPLES\fR.
 Once a list of entries is returned by \fBgetexecuser()\fR or
 \fBgetexecprof()\fR, the convenience function \fBmatch_execattr()\fR can be
 used to identify an individual entry. It returns a pointer to the individual
-element with the same profile name ( \fIprofname\fR), type name ( \fItype\fR),
+element with the same profile name (\fIprofname\fR), type name (\fItype\fR),
 and \fIid\fR. Function parameters set to \fINULL\fR are not used as part of the
 matching criteria. In the event that multiple entries meet the matching
 criteria, only a pointer to the first entry is returned. The
@@ -149,7 +149,7 @@ the end of the enumeration.
 .LP
 The \fBgetexecattr()\fR, \fBgetexecuser()\fR, and \fBgetexecprof()\fR functions
 all allocate memory for the pointers they return. This memory should be
-deallocated with the \fBfree_execattr()\fR call. The \fBmatch_execattr()\fR(
+deallocated with the \fBfree_execattr()\fR call. The \fBmatch_execattr()\fR
 function does not allocate any memory. Therefore, pointers returned by this
 function should not be deallocated.
 .sp

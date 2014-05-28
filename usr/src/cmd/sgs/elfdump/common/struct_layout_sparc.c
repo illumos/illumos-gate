@@ -370,9 +370,9 @@ static const sl_prfdinfo_layout_t prfdinfo_layout = {
 	{ 32,	8,	0,	0 },		/* pr_ino */
 	{ 40,	8,	0,	0 },		/* pr_offset */
 	{ 48,	8,	0,	0 },		/* pr_size */
-	{ 56,	4,	0,	0 },		/* pr_filefags */
+	{ 56,	4,	0,	0 },		/* pr_fileflags */
 	{ 60,	4,	0,	0 },		/* pr_fdflags */
-	{ 64,	1,	1024,	0 },		/* pr_path */
+	{ 64,	1,	1024,	0 },		/* pr_path[] */
 };
 
 
