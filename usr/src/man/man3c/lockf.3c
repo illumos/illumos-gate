@@ -7,7 +7,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LOCKF 3C "Apr 10, 2002"
+.TH LOCKF 3C "May 27, 2014"
 .SH NAME
 lockf \- record locking on files
 .SH SYNOPSIS
@@ -35,8 +35,8 @@ have \fBO_WRONLY\fR or \fBO_RDWR\fR permission in order to establish locks with
 this function call.
 .sp
 .LP
-The \fBfunction\fR argument is a control value that specifies the action to be
-taken. The permissible values for \fBfunction\fR are defined in
+The \fIfunction\fR argument is a control value that specifies the action to be
+taken. The permissible values for \fIfunction\fR are defined in
 <\fBunistd.h\fR> as follows:
 .sp
 .in +2
@@ -50,7 +50,7 @@ taken. The permissible values for \fBfunction\fR are defined in
 
 .sp
 .LP
-All other values of \fBfunction\fR are reserved for future extensions and will
+All other values of \fIfunction\fR are reserved for future extensions and will
 result in an error if not implemented.
 .sp
 .LP
@@ -60,11 +60,11 @@ if the section is available. \fBF_ULOCK\fR removes locks from a section of the
 file.
 .sp
 .LP
-The \fBsize\fR argument is the number of contiguous bytes to be locked or
+The \fIsize\fR argument is the number of contiguous bytes to be locked or
 unlocked. The resource to be locked or unlocked starts at the current offset in
-the file and extends forward for a positive size and backward for a negative
-size (the preceding bytes up to but not including the current offset). If
-\fBsize\fR is zero, the section from the current offset through the largest
+the file and extends forward for a positive \fIsize\fR and backward for a negative
+\fIsize\fR (the preceding bytes up to but not including the current offset). If
+\fIsize\fR is zero, the section from the current offset through the largest
 file offset is locked (that is, from the current offset through the present or
 any future end-of-file). An area need not be allocated to the file in order to
 be locked as such locks may exist past the end-of-file.
@@ -73,7 +73,7 @@ be locked as such locks may exist past the end-of-file.
 The sections locked with \fBF_LOCK\fR or \fBF_TLOCK\fR may, in whole or in
 part, contain or be contained by a previously locked section for the same
 process.  Locked sections will be unlocked starting at the point of the offset
-through \fBsize\fR bytes or to the end of file if \fBsize\fR is (\fBoff_t\fR)
+through \fIsize\fR bytes or to the end of file if \fIsize\fR is (\fBoff_t\fR)
 0. When this situation occurs, or if this situation occurs in adjacent
 sections, the sections are combined into a single section. If the request
 requires that a new element be added to the table of active locks and this
@@ -99,11 +99,11 @@ active locks. If this table is full, an \fBerrno\fR is set to \fBEDEADLK\fR and
 the requested section is not released.
 .sp
 .LP
-An \fBF_ULOCK\fR request in which \fBsize\fR is non-zero and the offset of the
+An \fBF_ULOCK\fR request in which \fIsize\fR is non-zero and the offset of the
 last byte of the requested section is the maximum value for an object of type
-\fBoff_t\fR, when the process has an existing lock in which \fBsize\fR is 0 and
+\fBoff_t\fR, when the process has an existing lock in which \fIsize\fR is 0 and
 which includes the last byte of the requested section, will be treated as a
-request to unlock from the start of the requested section with a size equal to
+request to unlock from the start of the requested section with a \fIsize\fR equal to
 0. Otherwise, an \fBF_ULOCK\fR request will attempt to unlock only the
 requested section.
 .sp
@@ -134,7 +134,7 @@ The \fBlockf()\fR function will fail if:
 .ad
 .RS 20n
 The \fIfildes\fR argument is not a valid open file descriptor; or
-\fBfunction\fR is \fBF_LOCK\fR or \fBF_TLOCK\fR and \fIfildes\fR is not a valid
+\fIfunction\fR is \fBF_LOCK\fR or \fBF_TLOCK\fR and \fIfildes\fR is not a valid
 file descriptor open for writing.
 .RE
 
@@ -144,7 +144,7 @@ file descriptor open for writing.
 \fB\fBEACCES\fR or \fBEAGAIN\fR\fR
 .ad
 .RS 20n
-The \fBfunction\fR argument is \fBF_TLOCK\fR or \fBF_TEST\fR and the section is
+The \fIfunction\fR argument is \fBF_TLOCK\fR or \fBF_TEST\fR and the section is
 already locked by another process.
 .RE
 
@@ -154,7 +154,7 @@ already locked by another process.
 \fB\fBEDEADLK\fR\fR
 .ad
 .RS 20n
-The \fBfunction\fR argument is \fBF_LOCK\fR and a deadlock is detected.
+The \fIfunction\fR argument is \fBF_LOCK\fR and a deadlock is detected.
 .RE
 
 .sp
@@ -182,8 +182,8 @@ is no longer active.
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 20n
-The \fBfunction\fR argument is not one of \fBF_LOCK\fR, \fBF_TLOCK\fR,
-\fBF_TEST\fR, or \fBF_ULOCK\fR; or \fBsize\fR plus the current file offset is
+The \fIfunction\fR argument is not one of \fBF_LOCK\fR, \fBF_TLOCK\fR,
+\fBF_TEST\fR, or \fBF_ULOCK\fR; or \fIsize\fR plus the current file offset is
 less than 0.
 .RE
 
@@ -193,7 +193,7 @@ less than 0.
 \fB\fBEOVERFLOW\fR\fR
 .ad
 .RS 20n
-The offset of the first, or if \fBsize\fR is not 0 then the last, byte in the
+The offset of the first, or if \fIsize\fR is not 0 then the last, byte in the
 requested section cannot be represented correctly in an object of type
 \fBoff_t\fR.
 .RE
@@ -207,7 +207,7 @@ The \fBlockf()\fR function may fail if:
 \fB\fBEAGAIN\fR\fR
 .ad
 .RS 24n
-The \fBfunction\fR argument is \fBF_LOCK\fR or \fBF_TLOCK\fR and the file is
+The \fIfunction\fR argument is \fBF_LOCK\fR or \fBF_TLOCK\fR and the file is
 mapped with \fBmmap\fR(2).
 .RE
 
@@ -217,7 +217,7 @@ mapped with \fBmmap\fR(2).
 \fB\fBEDEADLK\fR or \fBENOLCK\fR\fR
 .ad
 .RS 24n
-The \fBfunction\fR argument is \fBF_LOCK\fR, \fBF_TLOCK\fR, or \fBF_ULOCK\fR
+The \fIfunction\fR argument is \fBF_LOCK\fR, \fBF_TLOCK\fR, or \fBF_ULOCK\fR
 and the request would cause the number of locks to exceed a system-imposed
 limit.
 .RE
