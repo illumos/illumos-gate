@@ -106,7 +106,7 @@ Default semaphore initialization (intra-process):
 .nf
 sema_t sp;
 int count  =  1;
-sema_init(&sp, count, NULL, NULL);
+sema_init(&sp, count, 0, NULL);
 .fi
 .in -2
 
