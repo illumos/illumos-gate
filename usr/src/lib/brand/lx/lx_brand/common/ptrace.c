@@ -1756,7 +1756,21 @@ lx_ptrace_stop_if_option(int option)
 	    &curr_opts) != 0)
 		return;
 
-	/* if the option is set, this brand call will stop us */
+	/*
+	 * If we just forked/cloned, then the trace flags only carry over to
+	 * the child if the specific flag was enabled on the parent. For
+	 * example, if only TRACEFORK is enabled and we clone, then we must
+	 * clear the trace flags. If TRACEFORK is enabled and we fork, then we
+	 * keep the flags.
+	 */
+	if ((option == LX_PTRACE_O_TRACECLONE ||
+	    option == LX_PTRACE_O_TRACEFORK ||
+	    option == LX_PTRACE_O_TRACEVFORK) && (curr_opts & option) == 0) {
+		(void) syscall(SYS_brand, B_PTRACE_EXT_OPTS,
+		    B_PTRACE_EXT_OPTS_SET, pid, 0);
+	}
+
+	/* now if the option is/was set, this brand call will stop us */
 	if (curr_opts & option)
 		(void) syscall(SYS_brand, B_PTRACE_STOP_FOR_OPT, option);
 }
