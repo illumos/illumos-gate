@@ -1,118 +1,31 @@
 #!/bin/ksh -p
 #
-# CDDL HEADER START
 #
-# The contents of this file are subject to the terms of the
-# Common Development and Distribution License (the "License").
-# You may not use this file except in compliance with the License.
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
 #
-# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or http://www.opensolaris.org/os/licensing.
-# See the License for the specific language governing permissions
-# and limitations under the License.
-#
-# When distributing Covered Code, include this CDDL HEADER in each
-# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
-# If applicable, add the following below this CDDL HEADER, with the
-# fields enclosed by brackets "[]" replaced with your own identifying
-# information: Portions Copyright [yyyy] [name of copyright owner]
-#
-# CDDL HEADER END
-#
-# Copyright (c) 2012, Joyent, Inc. All rights reserved.
-# Use is subject to license terms.
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
 #
 
-unset LD_LIBRARY_PATH
-PATH=/usr/bin:/usr/sbin
-export PATH
+#
+# Copyright (c) 2014 Joyent, Inc.  All rights reserved.
+#
 
-. /usr/lib/brand/shared/common.ksh
-. /usr/lib/brand/joyent/common.ksh
+# Does this brand support reprovisioning?
+# jst_reprovision="yes"
 
-ZONENAME=""
-ZONEPATH=""
-# Default to 10GB diskset quota
-ZQUOTA=10
+# Is a template image optional?
+# jst_tmplopt="yes"
 
-while getopts "R:t:U:q:z:" opt
-do
-	case "$opt" in
-		R)	ZONEPATH="$OPTARG";;
-		t)	TMPLZONE="$OPTARG";;
-			# UUID is only used in the postinstall script
-		U)	UUID="$OPTARG";;
-		q)	ZQUOTA="$OPTARG";;
-		z)	ZONENAME="$OPTARG";;
-		*)	printf "$m_usage\n"
-			exit $ZONE_SUBPROC_USAGE;;
-	esac
-done
-shift OPTIND-1
+. /usr/lib/brand/jcommon/libhooks.ksh
 
-if [[ -n $(zonecfg -z "${ZONENAME}" info attr name=transition \
-    | grep "value: receiving:") ]]; then
+function jcommon_attach_hook
+{
+	jattach_zone_final_setup
+}
 
-	# Here we're doing an install for a received zone, the dataset should have
-	# already been created.
-	exit $ZONE_SUBPROC_OK
-fi
-
-if [[ -z $ZONEPATH || -z $ZONENAME ]]; then
-	print -u2 "Brand error: No zone path or name"
-	exit $ZONE_SUBPROC_USAGE
-fi
-
-# The install requires a template zone.
-if [[ -z $TMPLZONE ]]; then
-	print -u2 "Brand error: a zone template is required"
-	exit $ZONE_SUBPROC_USAGE
-fi
-
-# The dataset quota must be a number.
-case $ZQUOTA in *[!0-9]*)
-	print -u2 "Brand error: The quota $ZQUOTA is not a number"
-	exit $ZONE_SUBPROC_USAGE;;
-esac
-
-ZROOT=$ZONEPATH/root
-
-# Get the dataset of the parent directory of the zonepath.
-dname=${ZONEPATH%/*}
-bname=${ZONEPATH##*/}
-PDS_NAME=`mount | nawk -v p=$dname '{if ($1 == p) print $3}'`
-[ -z "$PDS_NAME" ] && \
-    print -u2 "Brand error: missing parent ZFS dataset for $dname"
-
-# We expect that zoneadm was invoked with '-x nodataset', so it won't have
-# created the dataset.
-
-QUOTA_ARG=
-if [[ ${ZQUOTA} != "0" ]]; then
-	QUOTA_ARG="-o quota=${ZQUOTA}g"
-fi
-
-# New imgadm renames the dataset's snapshot at import to @final for us
-# and when it exists, we use that. However, when it does not exist we
-# still use the old method of creating a zones/<uuid>@<uuid> snapshot
-# so we can support old datasets.
-exists=$(zfs list -Ho name ${PDS_NAME}/${TMPLZONE}@final 2>&1)
-if [[ $? == 0 && ${exists} == "${PDS_NAME}/${TMPLZONE}@final" ]]; then
-	zfs clone -F ${QUOTA_ARG} ${PDS_NAME}/${TMPLZONE}@final \
-	    ${PDS_NAME}/${bname} || fatal "failed to clone zone dataset"
-elif [[ ${exists} =~ "dataset does not exist" ]]; then
-	zfs snapshot ${PDS_NAME}/${TMPLZONE}@${bname}
-	zfs clone -F ${QUOTA_ARG} ${PDS_NAME}/${TMPLZONE}@${bname} \
-	    ${PDS_NAME}/${bname} || fatal "failed to clone zone dataset"
-else
-	fatal "Unable to determine snapshot for ${PDS_NAME}/${TMPLZONE}"
-fi
-
-if [ ! -d ${ZONEPATH}/config ]; then
-	mkdir -p ${ZONEPATH}/config
-	chmod 755 ${ZONEPATH}/config
-fi
-
-final_setup
-
-exit $ZONE_SUBPROC_OK
+. /usr/lib/brand/jcommon/cinstall
