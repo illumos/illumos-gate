@@ -116,7 +116,7 @@ static struct {
 	lx_getsockopt, 5,
 	lx_sendmsg, 3,
 	lx_recvmsg, 3,
-	lx_accept4, 3,
+	lx_accept4, 4,
 	lx_recvmmsg, 5,
 	lx_sendmmsg, 4
 };
