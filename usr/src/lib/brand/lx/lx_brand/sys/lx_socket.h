@@ -226,6 +226,9 @@ extern "C" {
 #define	LX_GETSOCKOPT		15
 #define	LX_SENDMSG		16
 #define	LX_RECVMSG		17
+#define	LX_ACCEPT4		18
+#define	LX_RECVMMSG		19
+#define	LX_SENDMMSG		20
 
 /*
  * Linux socket flags for use with recv(2)/send(2)/recvmsg(2)/sendmsg(2)
