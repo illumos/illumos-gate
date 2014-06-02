@@ -89,6 +89,9 @@ static int lx_setsockopt(ulong_t *);
 static int lx_getsockopt(ulong_t *);
 static int lx_sendmsg(ulong_t *);
 static int lx_recvmsg(ulong_t *);
+static int lx_accept4(ulong_t *);
+static int lx_recvmmsg(ulong_t *);
+static int lx_sendmmsg(ulong_t *);
 
 typedef int (*sockfn_t)(ulong_t *);
 
@@ -112,7 +115,10 @@ static struct {
 	lx_setsockopt, 5,
 	lx_getsockopt, 5,
 	lx_sendmsg, 3,
-	lx_recvmsg, 3
+	lx_recvmsg, 3,
+	lx_accept4, 3,
+	lx_recvmmsg, 5,
+	lx_sendmmsg, 4
 };
 
 /*
@@ -1312,19 +1318,25 @@ lx_setsockopt(ulong_t *args)
 	/*
 	 * Do a table lookup of the Solaris equivalent of the given option
 	 */
-	if (level < IPPROTO_IP || level >= IPPROTO_TAB_SIZE)
+	if (level < IPPROTO_IP || level >= IPPROTO_TAB_SIZE) {
+		lx_unsupported("Unsupported sockopt level %d", level);
 		return (-ENOPROTOOPT);
+	}
 
 	if (ltos_proto_opts[level].maxentries == 0 ||
-	    optname <= 0 || optname >= (ltos_proto_opts[level].maxentries))
+	    optname <= 0 || optname >= (ltos_proto_opts[level].maxentries)) {
+		lx_unsupported("Unsupported sockopt %d %d", level, optname);
 		return (-ENOPROTOOPT);
+	}
 
 	/*
 	 * Linux sets this option when it wants to send credentials over a
 	 * socket. Currently we just ignore it to make Linux programs happy.
 	 */
-	if ((level == LX_SOL_SOCKET) && (optname == LX_SO_PASSCRED))
+	if ((level == LX_SOL_SOCKET) && (optname == LX_SO_PASSCRED)) {
+		lx_unsupported("Unsupported socket option SO_PASSCRED");
 		return (0);
+	}
 
 
 	if ((level == IPPROTO_TCP) && (optname == LX_TCP_CORK)) {
@@ -1644,6 +1656,61 @@ lx_recvmsg(ulong_t *args)
 	return ((r < 0) ? -errno : r);
 }
 
+/*
+ * Based on the lx_accept code with the addition of the flags handling.
+ * See internal comments in that function for more explanation.
+ */
+static int
+lx_accept4(ulong_t *args)
+{
+	int sockfd = (int)args[0];
+	struct sockaddr *name = (struct sockaddr *)args[1];
+	socklen_t namelen = 0;
+	int lx_flags, flags = 0;
+	int r;
+
+	lx_flags = (int)args[3];
+	lx_debug("\taccept4(%d, 0x%p, 0x%p 0x%x", sockfd, args[1], args[2],
+	    lx_flags);
+
+	if ((name != NULL) &&
+	    (uucopy((void *)args[2], &namelen, sizeof (socklen_t)) != 0))
+		return ((errno == EFAULT) ? -EINVAL : -errno);
+
+	lx_debug("\taccept4 namelen = %d", namelen);
+
+	if (lx_flags & LX_SOCK_NONBLOCK)
+		flags |= SOCK_NONBLOCK;
+
+	if (lx_flags & LX_SOCK_CLOEXEC)
+		flags |= SOCK_CLOEXEC;
+
+	if ((r = accept4(sockfd, name, &namelen, flags)) < 0)
+		return ((errno == EFAULT) ? -EINVAL : -errno);
+
+	lx_debug("\taccept4 namelen returned %d bytes", namelen);
+
+	if ((name != NULL) && (namelen != 0) &&
+	    (uucopy(&namelen, (void *)args[2], sizeof (socklen_t)) != 0))
+		return ((errno == EFAULT) ? -EINVAL : -errno);
+
+	return (r);
+}
+
+static int
+lx_recvmmsg(ulong_t *args)
+{
+	lx_unsupported("Unsupported socketcall: recvmmsg\n.");
+	return (-EINVAL);
+}
+
+static int
+lx_sendmmsg(ulong_t *args)
+{
+	lx_unsupported("Unsupported socketcall: sendmmsg\n.");
+	return (-EINVAL);
+}
+
 int
 lx_socketcall(uintptr_t p1, uintptr_t p2)
 {
@@ -1651,7 +1718,7 @@ lx_socketcall(uintptr_t p1, uintptr_t p2)
 	ulong_t args[6];
 	int r;
 
-	if (subcmd < 0 || subcmd >= LX_RECVMSG)
+	if (subcmd < 0 || subcmd >= LX_SENDMMSG)
 		return (-EINVAL);
 
 	/*
