@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2014 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2014, Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -257,23 +258,21 @@ zerror(zlog_t *zlogp, boolean_t use_strerror, const char *fmt, ...)
 }
 
 /*
- * Emit a warning for any boot arguments which are unrecognized.  Since
- * Solaris boot arguments are getopt(3c) compatible (see kernel(1m)), we
+ * Since Solaris boot arguments are getopt(3c) compatible (see kernel(1m)), we
  * put the arguments into an argv style array, use getopt to process them,
- * and put the resultant argument string back into outargs.
+ * and put the resultant argument string back into outargs. Non-Solaris brands
+ * may support alternate forms of boot arguments so we must handle that as well.
  *
  * During the filtering, we pull out any arguments which are truly "boot"
  * arguments, leaving only those which are to be passed intact to the
  * progenitor process.  The one we support at the moment is -i, which
  * indicates to the kernel which program should be launched as 'init'.
  *
- * A return of Z_INVAL indicates specifically that the arguments are
- * not valid; this is a non-fatal error.  Except for Z_OK, all other return
- * values are treated as fatal.
+ * Except for Z_OK, all other return values are treated as fatal.
  */
 static int
 filter_bootargs(zlog_t *zlogp, const char *inargs, char *outargs,
-    char *init_file, char *badarg)
+    char *init_file)
 {
 	int argc = 0, argc_save;
 	int i;
@@ -284,7 +283,6 @@ filter_bootargs(zlog_t *zlogp, const char *inargs, char *outargs,
 	char c;
 
 	bzero(outargs, BOOTARGS_MAX);
-	bzero(badarg, BOOTARGS_MAX);
 
 	/*
 	 * If the user didn't specify transient boot arguments, check
@@ -390,36 +388,29 @@ filter_bootargs(zlog_t *zlogp, const char *inargs, char *outargs,
 			break;
 		case '?':
 			/*
-			 * We warn about unknown arguments but pass them
-			 * along anyway-- if someone wants to develop their
-			 * own init replacement, they can pass it whatever
-			 * args they want.
+			 * If a brand has its own init, we need to pass along
+			 * whatever the user provides. We use the entire
+			 * unknown string here so that we correctly handle
+			 * unknown long options (e.g. --debug).
 			 */
-			err = Z_INVAL;
 			(void) snprintf(outargs, BOOTARGS_MAX,
-			    "%s -%c", outargs, optopt);
-			(void) snprintf(badarg, BOOTARGS_MAX,
-			    "%s -%c", badarg, optopt);
+			    "%s %s", outargs, argv[optind - 1]);
 			break;
 		}
 	}
 
 	/*
-	 * For Solaris Zones we warn about and discard non-option arguments.
-	 * Hence 'boot foo bar baz gub' --> 'boot'.  However, to be similar
-	 * to the kernel, we concat up all the other remaining boot args.
-	 * and warn on them as a group.
+	 * We need to pass along everything else since we don't know what
+	 * the brand's init is expecting. For example, an argument list like:
+	 *   --confdir /foo --debug
+	 * will cause the getopt parsing to stop at '/foo' but we need to pass
+	 * that on, along with the '--debug'. This does mean that we require
+	 * any of our known options (-ifms) to preceed the brand-specific ones.
 	 */
-	if (optind < argc) {
-		err = Z_INVAL;
-		while (optind < argc) {
-			(void) snprintf(badarg, BOOTARGS_MAX, "%s%s%s",
-			    badarg, strlen(badarg) > 0 ? " " : "",
-			    argv[optind]);
-			optind++;
-		}
-		zerror(zlogp, B_FALSE, "WARNING: Unused or invalid boot "
-		    "arguments `%s'.", badarg);
+	while (optind < argc) {
+		(void) snprintf(outargs, BOOTARGS_MAX, "%s %s", outargs,
+		    argv[optind]);
+		optind++;
 	}
 
 done:
@@ -879,11 +870,8 @@ zone_bootup(zlog_t *zlogp, const char *bootargs, int zstate)
 
 	brand_close(bh);
 
-	err = filter_bootargs(zlogp, bootargs, nbootargs, init_file,
-	    bad_boot_arg);
-	if (err == Z_INVAL)
-		eventstream_write(Z_EVT_ZONE_BADARGS);
-	else if (err != Z_OK)
+	err = filter_bootargs(zlogp, bootargs, nbootargs, init_file);
+	if (err != Z_OK)
 		goto bad;
 
 	assert(init_file[0] != '\0');
