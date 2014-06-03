@@ -22,7 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2013 Joyent, Inc.  All rights reserved.
+ * Copyright 2014 Joyent, Inc.  All rights reserved.
  */
 
 /*
@@ -121,7 +121,6 @@
 
 static int	serverfd = -1;	/* console server unix domain socket fd */
 char boot_args[BOOTARGS_MAX];
-char bad_boot_arg[BOOTARGS_MAX];
 
 /*
  * The eventstream is a simple one-directional flow of messages from the
@@ -677,14 +676,6 @@ event_message(int clifd, char *clilocale, zone_evt_t evt)
 		break;
 	case Z_EVT_ZONE_BOOTFAILED:
 		str = "NOTICE: Zone boot failed";
-		break;
-	case Z_EVT_ZONE_BADARGS:
-		/*LINTED*/
-		(void) snprintf(lmsg, sizeof (lmsg),
-		    localize_msg(clilocale,
-		    "WARNING: Ignoring invalid boot arguments: %s"),
-		    bad_boot_arg);
-		lstr = lmsg;
 		break;
 	default:
 		return;
