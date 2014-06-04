@@ -1998,10 +1998,11 @@ top:
 
 			/*
 			 * Startup a thread to perform memory capping for the
-			 * zone.
+			 * zone. zlogp won't be valid for much longer so use
+			 * logsys.
 			 */
 			if ((zid = getzoneidbyname(zone_name)) != -1)
-				create_mcap_thread(zlogp, zid);
+				create_mcap_thread(&logsys, zid);
 
 			/* recover the global configuration snapshot */
 			if (snap_hndl == NULL) {
