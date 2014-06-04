@@ -1155,7 +1155,7 @@ static int
 chk_proc_fs(void *data, const char *spec, const char *dir,
     const char *fstype, const char *opt)
 {
-	if (spec != NULL && strcmp(fstype, "proc") == 0)
+	if (fstype != NULL && strcmp(fstype, "proc") == 0)
 		*((boolean_t *)data) = B_TRUE;
 
 	return (0);
