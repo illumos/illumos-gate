@@ -1763,10 +1763,25 @@ top:
 
 			/*
 			 * Startup a thread to perform memory capping for the
-			 * zone.
+			 * zone. zlogp won't be valid for much longer so use
+			 * logsys.
 			 */
 			if ((zid = getzoneidbyname(zone_name)) != -1)
-				create_mcap_thread(zlogp, zid);
+				create_mcap_thread(&logsys, zid);
+
+			/* recover the global configuration snapshot */
+			if (snap_hndl == NULL) {
+				if ((snap_hndl = zonecfg_init_handle())
+				    == NULL ||
+				    zonecfg_create_snapshot(zone_name)
+				    != Z_OK ||
+				    zonecfg_get_snapshot_handle(zone_name,
+				    snap_hndl) != Z_OK) {
+					zerror(zlogp, B_FALSE, "recovering "
+					    "zone configuration handle");
+					goto out;
+				}
+			}
 		}
 
 		(void) fdetach(zone_door_path);
