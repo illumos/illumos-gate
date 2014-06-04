@@ -1150,7 +1150,7 @@ fill_security_from_secopts(struct secinfo *sp, sa_security_t secopts)
 			 * such as RO/RW
 			 */
 			if (sp->s_secinfo.sc_rpcnum == AUTH_UNIX)
-				continue;
+				break;
 			/* not AUTH_UNIX */
 			if (value != NULL) {
 				sp->s_rootnames = get_rootnames(&sp->s_secinfo,
