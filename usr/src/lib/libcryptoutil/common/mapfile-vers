@@ -19,6 +19,7 @@
 # CDDL HEADER END
 #
 # Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2014, OmniTI Computer Consulting Inc. All rights reserved.
 #
 
 #
@@ -54,9 +55,6 @@ SYMBOL_VERSION SUNWprivate {
 	get_pkcs11conf_info;
 	hexstr_to_bytes;
 	open_nointr;
-	pkcs11_close_random;
-	pkcs11_close_urandom;
-	pkcs11_close_urandom_seed;
 	pkcs11_default_token;
 	pkcs11_free_uri;
 	pkcs11_get_nzero_urandom;
