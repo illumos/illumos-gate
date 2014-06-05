@@ -20,9 +20,9 @@
 #
 
 #
-# Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2012 OmniTI Computer Consulting, Inc.  All rights reserved.
+# Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/developer/library/lint@$(PKGVERS)
@@ -198,6 +198,7 @@ $(i386_ONLY)file path=usr/lib/$(ARCH64)/crt1.o
 file path=usr/lib/$(ARCH64)/crti.o
 file path=usr/lib/$(ARCH64)/crtn.o
 $(i386_ONLY)file path=usr/lib/$(ARCH64)/gcrt1.o
+file path=usr/lib/$(ARCH64)/llib-lads.ln
 file path=usr/lib/$(ARCH64)/llib-ladutils.ln
 file path=usr/lib/$(ARCH64)/llib-lbsdmalloc.ln
 file path=usr/lib/$(ARCH64)/llib-lcfgadm.ln
@@ -246,6 +247,8 @@ $(i386_ONLY)file path=usr/lib/crt1.o
 file path=usr/lib/crti.o
 file path=usr/lib/crtn.o
 $(i386_ONLY)file path=usr/lib/gcrt1.o
+file path=usr/lib/llib-lads
+file path=usr/lib/llib-lads.ln
 file path=usr/lib/llib-ladutils
 file path=usr/lib/llib-ladutils.ln
 file path=usr/lib/llib-lbsdmalloc

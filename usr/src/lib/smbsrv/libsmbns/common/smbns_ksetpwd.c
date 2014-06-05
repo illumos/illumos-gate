@@ -255,15 +255,20 @@ smb_krb5_setpwd(krb5_context ctx, const char *fqdn, char *passwd)
 	code = krb5_set_password_using_ccache(ctx, cc, passwd, princ,
 	    &result_code, &result_code_string, &result_string);
 
+	(void) krb5_cc_close(ctx, cc);
+
 	if (code != 0)
 		smb_krb5_log_errmsg(ctx, "smbns_ksetpwd: KPASSWD protocol "
 		    "exchange failed", code);
 
-	(void) krb5_cc_close(ctx, cc);
-
-	if (result_code != 0)
-		syslog(LOG_ERR, "smbns_ksetpwd: KPASSWD failed: %s",
+	if (result_code != 0) {
+		syslog(LOG_ERR, "smbns_ksetpwd: KPASSWD failed: rc=%d %.*s",
+		    result_code,
+		    result_code_string.length,
 		    result_code_string.data);
+		if (code == 0)
+			code = EACCES;
+	}
 
 	krb5_free_principal(ctx, princ);
 	free(result_code_string.data);

@@ -29,6 +29,7 @@ OBJS_SMBD=			\
 	smbd_authsvc.o		\
 	smbd_doorsvc.o		\
 	smbd_join.o		\
+	smbd_krb5lookup.o	\
 	smbd_krb5ssp.o		\
 	smbd_logon.o		\
 	smbd_main.o		\

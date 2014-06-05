@@ -227,7 +227,7 @@ static uint32_t
 netlogon_logon(smb_logon_t *user_info, smb_token_t *token)
 {
 	char resource_domain[SMB_PI_MAX_DOMAIN];
-	char server[NETBIOS_NAME_SZ * 2];
+	char server[MAXHOSTNAMELEN];
 	mlsvc_handle_t netr_handle;
 	smb_domainex_t di;
 	uint32_t status;
@@ -243,13 +243,14 @@ netlogon_logon(smb_logon_t *user_info, smb_token_t *token)
 	}
 
 	do {
-		if (netr_open(di.d_dc, di.d_primary.di_nbname, &netr_handle)
-		    != 0)
+		if (netr_open(di.d_dci.dc_name, di.d_primary.di_nbname,
+		    &netr_handle) != 0)
 			return (NT_STATUS_OPEN_FAILED);
 
-		if (di.d_dc && (*netr_global_info.server != '\0')) {
+		if (di.d_dci.dc_name[0] != '\0' &&
+		    (*netr_global_info.server != '\0')) {
 			(void) snprintf(server, sizeof (server),
-			    "\\\\%s", di.d_dc);
+			    "\\\\%s", di.d_dci.dc_name);
 			if (strncasecmp(netr_global_info.server,
 			    server, strlen(server)) != 0)
 				netr_invalidate_chain();
@@ -257,7 +258,7 @@ netlogon_logon(smb_logon_t *user_info, smb_token_t *token)
 
 		if ((netr_global_info.flags & NETR_FLG_VALID) == 0 ||
 		    !smb_match_netlogon_seqnum()) {
-			status = netlogon_auth(di.d_dc, &netr_handle,
+			status = netlogon_auth(di.d_dci.dc_name, &netr_handle,
 			    NETR_FLG_NULL);
 
 			if (status != 0) {
@@ -269,7 +270,7 @@ netlogon_logon(smb_logon_t *user_info, smb_token_t *token)
 		}
 
 		status = netr_server_samlogon(&netr_handle,
-		    &netr_global_info, di.d_dc, user_info, token);
+		    &netr_global_info, di.d_dci.dc_name, user_info, token);
 
 		(void) netr_close(&netr_handle);
 	} while (status == NT_STATUS_INSUFFICIENT_LOGON_INFO && retries++ < 3);

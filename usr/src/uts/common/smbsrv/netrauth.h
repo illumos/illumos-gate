@@ -36,6 +36,7 @@
 #include <smbsrv/wintypes.h>
 #include <smbsrv/netbios.h>
 #include <smbsrv/smbinfo.h>
+#include <netdb.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -120,8 +121,8 @@ typedef struct netr_session_key {
 
 typedef struct netr_info {
 	DWORD flags;
-	char server[NETBIOS_NAME_SZ * 2];
-	char hostname[NETBIOS_NAME_SZ * 2];
+	char server[MAXHOSTNAMELEN];		/* Current DC, FQDN */
+	char hostname[NETBIOS_NAME_SZ * 2];	/* local "flat" name */
 	netr_cred_t client_challenge;
 	netr_cred_t server_challenge;
 	netr_cred_t client_credential;

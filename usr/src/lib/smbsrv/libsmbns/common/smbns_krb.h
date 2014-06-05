@@ -84,7 +84,7 @@ typedef struct smb_krb5_pn_set {
 	char		**s_pns;
 } smb_krb5_pn_set_t;
 
-int smb_kinit(char *, char *);
+int smb_kinit(char *, char *, char *);
 int smb_krb5_ctx_init(krb5_context *);
 void smb_krb5_ctx_fini(krb5_context);
 int smb_krb5_get_kprincs(krb5_context, char **, size_t, krb5_principal **);

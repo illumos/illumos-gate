@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef	_AD_COMMON_H
@@ -88,7 +89,7 @@ struct ad_backend {
 
 typedef struct nssad_prop {
 	char			*domain_name;
-	idmap_ad_disc_ds_t	*domain_controller;
+	ad_disc_ds_t	*domain_controller;
 } nssad_prop_t;
 
 typedef struct nssad_cfg {

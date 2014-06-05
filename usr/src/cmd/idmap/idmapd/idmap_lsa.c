@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -234,4 +235,14 @@ out:
 		*ret_sidprefix = NULL;
 	}
 	return (ret);
+}
+
+/*
+ * This exists just so we can avoid exposing all of idmapd to libsmb.h.
+ * Like the above functions, it's a door call over to smbd.
+ */
+void
+notify_dc_changed(void)
+{
+	smb_notify_dc_changed();
 }

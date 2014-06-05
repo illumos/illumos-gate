@@ -1,10 +1,10 @@
 '\" te
-.\" Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+.\" Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
 .\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SMBADM 1M "Jan 8, 2009"
+.TH SMBADM 1M "Feb 19, 2014"
 .SH NAME
 smbadm \- configure and manage CIFS local groups and users, and manage domain
 membership
@@ -41,12 +41,12 @@ membership
 
 .LP
 .nf
-\fBsmbadm join\fR -u \fIusername\fR \fIdomain\fR
+\fBsmbadm join\fR [-y] -u \fIusername\fR \fIdomain\fR
 .fi
 
 .LP
 .nf
-\fBsmbadm join\fR -w \fIworkgroup\fR
+\fBsmbadm join\fR [-y] -w \fIworkgroup\fR
 .fi
 
 .LP
@@ -80,7 +80,6 @@ membership
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBsmbadm\fR command is used to configure \fBCIFS\fR local groups and to
 manage domain membership. You can also use the \fBsmbadm\fR command to enable
@@ -161,7 +160,6 @@ then reset the user's password by using the \fBpasswd\fR command. The
 \fBpam_smb_passwd.so.1\fR module must be added to the system's PAM
 configuration to generate an SMB password.
 .SS "Escaping Backslash Character"
-.sp
 .LP
 For the \fBadd-member\fR, \fBremove-member\fR, and \fBjoin\fR (with \fB-u\fR)
 subcommands, the backslash character (\fB\e\fR) is a valid separator between
@@ -171,7 +169,6 @@ backslash character with another backslash character:
 \fIdomain\fR\fB\e\e\fR\fIusername\fR. For more information about handling shell
 special characters, see the man page for your shell.
 .SH OPERANDS
-.sp
 .LP
 The \fBsmbadm\fR command uses the following operands:
 .sp
@@ -205,7 +202,6 @@ Specifies the name of a Solaris local user.
 .RE
 
 .SH SUB-COMMANDS
-.sp
 .LP
 The \fBsmbadm\fR command includes these subcommands:
 .sp
@@ -301,7 +297,7 @@ all property values are shown.
 .sp
 .ne 2
 .na
-\fB\fBjoin\fR \fB-u\fR \fIusername\fR \fIdomain\fR\fR
+\fB\fBjoin\fR \fB[-y] -u\fR \fIusername\fR \fIdomain\fR\fR
 .ad
 .sp .6
 .RS 4n
@@ -335,12 +331,13 @@ controller, any authenticated user account can be used when joining the domain.
 However, if the machine trust account does \fBnot\fR already exist, an account
 that has administrative privileges on the domain is required to join the
 domain.
+Specifying \fB-y\fR will bypass the smb service restart prompt.
 .RE
 
 .sp
 .ne 2
 .na
-\fB\fBjoin\fR \fB-w\fR \fIworkgroup\fR\fR
+\fB\fBjoin\fR \fB[-y] -w\fR \fIworkgroup\fR\fR
 .ad
 .sp .6
 .RS 4n
@@ -348,6 +345,7 @@ Joins a Windows domain or a workgroup.
 .sp
 The \fB-w\fR \fIworkgroup\fR option specifies the name of the workgroup to join
 when using the \fBjoin\fR subcommand.
+Specifying \fB-y\fR will bypass the smb service restart prompt.
 .RE
 
 .sp
@@ -528,7 +526,6 @@ specified, the group privileges are also shown.
 .RE
 
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -550,7 +547,6 @@ An error occurred.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See the \fBattributes\fR(5) man page for descriptions of the following
 attributes:
@@ -571,7 +567,6 @@ _
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBpasswd\fR(1), \fBgroupadd\fR(1M), \fBidmap\fR(1M), \fBidmapd\fR(1M),
 \fBkclient\fR(1M), \fBshare\fR(1M), \fBsharectl\fR(1M), \fBsharemgr\fR(1M),

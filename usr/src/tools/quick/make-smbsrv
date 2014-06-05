@@ -20,7 +20,8 @@ make=${MAKE:-dmake}
 CLOSED_IS_PRESENT=no
 export CLOSED_IS_PRESENT
 
-export SOURCEDEBUG=yes
+# Do this if you want to use dbx or gdb
+# export SOURCEDEBUG=yes
 
 [ -n "$SRC" ] || {
   echo "SRC not set.  Run 'ws' or 'bldenv' first."
@@ -97,6 +98,7 @@ fi
 
 # Need some library headers too...
 for lib in \
+  libads \
   libbsm \
   libcmdutils \
   libcryptoutil \
@@ -159,6 +161,7 @@ do_lib2() {
 
 for lib in \
   libfakekernel \
+  libads \
   libsmbfs
 do
   (cd $SRC/lib/$lib && $make $1)

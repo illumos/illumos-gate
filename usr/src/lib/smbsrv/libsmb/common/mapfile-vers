@@ -196,6 +196,7 @@ SYMBOL_VERSION SUNWprivate {
 	smb_gmttoken_response_xdr;
 	smb_gmttoken_snapname_xdr;
 	smb_joininfo_xdr;
+	smb_joinres_xdr;
 	smb_idmap_batch_create;
 	smb_idmap_batch_destroy;
 	smb_idmap_batch_getid;
@@ -304,6 +305,7 @@ SYMBOL_VERSION SUNWprivate {
 	smb_nic_getnext;
 	smb_nic_getnum;
 	smb_nic_init;
+	smb_notify_dc_changed;
 	smb_priv_getbyname;
 	smb_priv_getbyvalue;
 	smb_priv_presentable_ids;

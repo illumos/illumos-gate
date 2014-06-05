@@ -31,6 +31,8 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include "k5-int.h"
@@ -138,6 +140,18 @@ krb5_get_default_realm(krb5_context context, char **lrealm)
     if (!context || (context->magic != KV5M_CONTEXT)) 
 	    return KV5M_CONTEXT;
 
+    /*
+     * Solaris Kerberos: (illumos)
+     * Another way to provide the default realm.
+     */
+    if (!context->default_realm) {
+	if ((realm = getenv("KRB5_DEFAULT_REALM")) != NULL) {
+	    context->default_realm = strdup(realm);
+	    if (context->default_realm == NULL)
+		return ENOMEM;
+	}
+    }
+
     if (!context->default_realm) {
         context->default_realm = 0;
         if (context->profile != 0) {
@@ -192,11 +206,13 @@ krb5_get_default_realm(krb5_context context, char **lrealm)
 		}
             } else
 #endif /* KRB5_DNS_LOOKUP */
-             {
+            if (getenv("MS_INTEROP") == NULL) {
 
 	/*
 	 * Solaris Kerberos:
-	 * Try to find a realm based on one of the local IP addresses
+	 * Try to find a realm based on one of the local IP addresses.
+	 * Don't do this for AD, which often does _not_ support any
+	 * DNS reverse lookup, making these queries take forever.
 	 */
 	(void) krb5int_foreach_localaddr(context,
 	    krb5int_address_get_realm, 0, 0);

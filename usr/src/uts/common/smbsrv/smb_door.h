@@ -67,7 +67,8 @@ typedef enum smb_dopcode {
 	SMB_DR_QUOTA_SET,
 	SMB_DR_DFS_GET_REFERRALS,
 	SMB_DR_SHR_HOSTACCESS,
-	SMB_DR_SHR_EXEC
+	SMB_DR_SHR_EXEC,
+	SMB_DR_NOTIFY_DC_CHANGED
 } smb_dopcode_t;
 
 struct smb_event;

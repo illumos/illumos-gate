@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 
@@ -244,7 +245,7 @@ idmap_stat
 idmap_init_ad(idmap_nm_handle_t *p)
 {
 	idmap_stat	rc = IDMAP_SUCCESS;
-	idmap_ad_disc_ds_t	*dc = NULL;
+	ad_disc_ds_t	*dc = NULL;
 	ad_disc_t	ad_ctx;
 
 	ad_ctx = ad_disc_init();

@@ -29,9 +29,16 @@
 #ifndef _SMB_TOKEN_H
 #define	_SMB_TOKEN_H
 
-#include <smbsrv/netrauth.h>
+#include <smbsrv/smb_inet.h>
 #include <smbsrv/smb_privilege.h>
 #include <smbsrv/smb_sid.h>
+
+/*
+ * Don't want <smbsrv/netrauth.h> in here, but
+ * uts/common/fs/smbsrv/smb_authenticate.c
+ * wants this.  Todo: cleanup
+ */
+#define	NETR_NETWORK_LOGON			0x02
 
 #ifdef __cplusplus
 extern "C" {

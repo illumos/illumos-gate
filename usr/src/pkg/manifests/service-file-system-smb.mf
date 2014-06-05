@@ -20,8 +20,8 @@
 #
 
 #
-# Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/service/file-system/smb@$(PKGVERS)
@@ -79,6 +79,7 @@ file path=usr/lib/mdb/kvm/$(ARCH64)/smbsrv.so group=sys mode=0555
 $(i386_ONLY)file path=usr/lib/mdb/kvm/smbsrv.so group=sys mode=0555
 file path=usr/lib/reparse/libreparse_smb.so.1
 file path=usr/lib/security/pam_smb_passwd.so.1
+file path=usr/lib/smbsrv/dtrace/smbd-all.d mode=0555
 file path=usr/lib/smbsrv/dtrace/smbd-authsvc.d mode=0555
 file path=usr/lib/smbsrv/dtrace/smbd-doorsvc.d mode=0555
 file path=usr/lib/smbsrv/dtrace/smbd-pipesvc.d mode=0555

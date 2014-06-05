@@ -54,6 +54,8 @@ SYMBOL_VERSION SUNWprivate {
 	mlsvc_netlogon;
 	smb_autohome_add;
 	smb_autohome_remove;
+	smb_ddiscover_bad_dc;
+	smb_ddiscover_refresh;
 	smb_decode_krb5_pac;
 	smb_locate_dc;
 	smb_logon;
