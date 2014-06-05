@@ -527,7 +527,7 @@ fmd_xprt_send_case(fmd_case_t *cp, void *arg)
 	nvlist_t *nvl;
 	char *class;
 
-	if (cip->ci_state == FMD_CASE_UNSOLVED)
+	if (cip->ci_state != FMD_CASE_SOLVED)
 		return;
 
 	nvl = fmd_case_mkevent(cp, FM_LIST_SUSPECT_CLASS);
@@ -555,7 +555,7 @@ fmd_xprt_send_case_ro(fmd_case_t *cp, void *arg)
 	nvlist_t *nvl;
 	char *class;
 
-	if (cip->ci_state == FMD_CASE_UNSOLVED)
+	if (cip->ci_state != FMD_CASE_SOLVED)
 		return;
 
 	nvl = fmd_case_mkevent(cp, FM_LIST_SUSPECT_CLASS);
