@@ -113,7 +113,6 @@
 	<!-- Symlinks to create under /dev -->
 	<symlink source="shm" target="/run/shm" />
 	<symlink source="fd" target="../proc/self/fd" />
-	<symlink source="log" target="/var/run/syslog" />
 	<symlink source="stderr" target="../proc/self/fd/2" />
 	<symlink source="stdin" target="../proc/self/fd/0" />
 	<symlink source="stdout" target="../proc/self/fd/1" />
@@ -121,5 +120,7 @@
 
 	<!-- Create a mount point for for the /dev/initctl fifo -->
 	<device match="null" name="initctl" />
+	<!-- Create a mount point for for the /dev/log socket -->
+	<device match="null" name="log" />
 
 </platform>
