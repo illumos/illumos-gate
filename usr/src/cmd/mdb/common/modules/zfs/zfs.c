@@ -1501,7 +1501,6 @@ space_cb(uintptr_t addr, const void *unknown, void *arg)
 		return (WALK_ERR);
 
 	for (i = 0; i < TXG_SIZE; i++) {
-
 		if (mdb_ctf_vread(&rt, "range_tree_t",
 		    "mdb_range_tree_t", ms.ms_alloctree[i], 0) == -1)
 		sd->ms_alloctree[i] += rt.rt_space;
