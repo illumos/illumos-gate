@@ -69,7 +69,7 @@ install_checkpath(uintptr_t p1)
 }
 
 /*
- * Convert linux LX_AT_* flags to solaris AT_* flags, while verifying allowed
+ * Convert linux LX_AT_* flags to solaris AT_* flags but skip verifying allowed
  * flags have been passed. This also allows EACCESS/REMOVEDIR to be translated
  * correctly since on linux they have the same value.
  */
@@ -99,9 +99,14 @@ ltos_at_flag(int lflag, int allow)
 		sflag |= LX_AT_SYMLINK_FOLLOW;
 	}
 
-	/* if flag is not zero than some flags did not hit the above code */
-	if (lflag)
-		return (-EINVAL);
+	/*
+	 * If lflag is not zero than some flags did not hit the above code.
+	 * We used to check for this, like so:
+	 * if (lflag)
+	 *  return (-EINVAL);
+	 * but some code can actually pass in other bits in the flag. We have
+	 * to simply ignore these. See lx_fchmodat for another example.
+	 */
 
 	return (sflag);
 }
