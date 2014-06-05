@@ -624,7 +624,7 @@ is_dep_init(Rt_map *dlmp, Rt_map *clmp)
 		return;
 
 	rt_mutex_lock(&dlmp->rt_lock);
-	while ((FLAGS(dlmp) &
+	while (dlmp->rt_init_thread != rt_thr_self() && (FLAGS(dlmp) &
 	    (FLG_RT_RELOCED | FLG_RT_INITCALL | FLG_RT_INITDONE)) ==
 	    (FLG_RT_RELOCED | FLG_RT_INITCALL)) {
 		leave(LIST(dlmp), 0);
@@ -719,6 +719,7 @@ call_init(Rt_map **tobj, int flag)
 			continue;
 
 		FLAGS(lmp) |= FLG_RT_INITCALL;
+		lmp->rt_init_thread = rt_thr_self();
 
 		/*
 		 * Establish an initfirst state if necessary - no other inits
@@ -756,6 +757,7 @@ call_init(Rt_map **tobj, int flag)
 		 */
 		rt_mutex_lock(&lmp->rt_lock);
 		FLAGS(lmp) |= FLG_RT_INITDONE;
+		lmp->rt_init_thread = (thread_t)0;
 		_lwp_cond_broadcast(&lmp->rt_cv);
 		rt_mutex_unlock(&lmp->rt_lock);
 		SORTVAL(lmp) = -1;

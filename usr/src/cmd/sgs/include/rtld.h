@@ -722,6 +722,7 @@ struct rt_map {
 	Rt_cond		rt_cv;		/* for waiting on flags changes */
 	Rt_lock		rt_lock;	/* for coordinating flags changes */
 					/* address of _init */
+	thread_t	rt_init_thread;	/* thread id in this lm's _init */
 	void		(*rt_init)(void);
 					/* address of _fini */
 	void		(*rt_fini)(void);
