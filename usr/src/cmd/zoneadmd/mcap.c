@@ -131,12 +131,12 @@
 
 /*
  * The large mapping value was derived empirically by seeing that mappings
- * much bigger than 32mb sometimes take a relatively long time to invalidate
+ * much bigger than 16mb sometimes take a relatively long time to invalidate
  * (significant fraction of a second).
  */
-#define	SEC_INTERIM	2	/* num secs to pause after stopped too long */
+#define	SEC_INTERIM	4	/* num secs to pause after stopped too long */
 #define	MSEC_TOO_LONG	100	/* release proc. after stopped for 100ms */
-#define	LARGE_MAPPING	32768	/* >= 32MB in KB - pageout in chunks */
+#define	LARGE_MAPPING	16384	/* >= 16MB in KB - pageout in chunks */
 
 /*
  * These are only used in get_mem_info but global. We always need scale_rss and
