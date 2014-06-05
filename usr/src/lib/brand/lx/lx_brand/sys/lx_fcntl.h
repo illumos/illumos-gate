@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2014 Joyent, Inc.  All rights reserved.
  */
 
 #ifndef _SYS_LX_FCNTL_H
@@ -86,10 +87,10 @@ extern "C" {
 #define	LX_LOCK_UN		8	/* unlock */
 
 #define	LX_AT_FDCWD		-100
-#define	LX_AT_EACCESS		512
-#define	LX_AT_REMOVEDIR		512
-#define	LX_AT_SYMLINK_NOFOLLOW	256
-#define	LX_AT_SYMLINK_FOLLOW	1024
+#define	LX_AT_SYMLINK_NOFOLLOW	0x100
+#define	LX_AT_EACCESS		0x200
+#define	LX_AT_REMOVEDIR		0x200
+#define	LX_AT_SYMLINK_FOLLOW	0x400
 
 struct lx_flock {
 	short		l_type;
