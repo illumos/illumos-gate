@@ -1543,10 +1543,10 @@ vread_helper(mdb_ctf_id_t modid, char *modbuf,
  *
  * typedef struct mdb_zio {
  *         enum zio_type io_type;
- *         void *io_waiter;
+ *         uintptr_t io_waiter;
  *         struct {
  *                 struct {
- *                         void *list_next;
+ *                         uintptr_t list_next;
  *                 } list_head;
  *         } io_parent_list;
  *         int io_error;

@@ -29,7 +29,7 @@
 # GRUB necessitating that the boot blocks be reinstalled for that fix or
 # enhancement to take effect.
 #
-VERSION=23
+VERSION=24
 dboot
 xVM
 zfs

@@ -166,12 +166,15 @@ zio_checksum_verify(blkptr_t *bp, char *data, int size)
 	zio_checksum_info_t *ci = &zio_checksum_table[checksum];
 	zio_cksum_t actual_cksum, expected_cksum;
 
-	/* byteswap is not supported */
-	if (byteswap)
+	if (byteswap) {
+		grub_printf("byteswap not supported\n");
 		return (-1);
+	}
 
-	if (checksum >= ZIO_CHECKSUM_FUNCTIONS || ci->ci_func[0] == NULL)
+	if (checksum >= ZIO_CHECKSUM_FUNCTIONS || ci->ci_func[0] == NULL) {
+		grub_printf("checksum algorithm %u not supported\n", checksum);
 		return (-1);
+	}
 
 	if (ci->ci_eck) {
 		expected_cksum = zec->zec_cksum;
@@ -179,7 +182,6 @@ zio_checksum_verify(blkptr_t *bp, char *data, int size)
 		ci->ci_func[0](data, size, &actual_cksum);
 		zec->zec_cksum = expected_cksum;
 		zc = expected_cksum;
-
 	} else {
 		ci->ci_func[byteswap](data, size, &actual_cksum);
 	}
@@ -379,6 +381,72 @@ zio_read_data(blkptr_t *bp, void *buf, char *stack)
 }
 
 /*
+ * buf must be at least BPE_GET_PSIZE(bp) bytes long (which will never be
+ * more than BPE_PAYLOAD_SIZE bytes).
+ */
+static void
+decode_embedded_bp_compressed(const blkptr_t *bp, void *buf)
+{
+	int psize, i;
+	uint8_t *buf8 = buf;
+	uint64_t w = 0;
+	const uint64_t *bp64 = (const uint64_t *)bp;
+
+	psize = BPE_GET_PSIZE(bp);
+
+	/*
+	 * Decode the words of the block pointer into the byte array.
+	 * Low bits of first word are the first byte (little endian).
+	 */
+	for (i = 0; i < psize; i++) {
+		if (i % sizeof (w) == 0) {
+			/* beginning of a word */
+			w = *bp64;
+			bp64++;
+			if (!BPE_IS_PAYLOADWORD(bp, bp64))
+				bp64++;
+		}
+		buf8[i] = BF64_GET(w, (i % sizeof (w)) * NBBY, NBBY);
+	}
+}
+
+/*
+ * Fill in the buffer with the (decompressed) payload of the embedded
+ * blkptr_t.  Takes into account compression and byteorder (the payload is
+ * treated as a stream of bytes).
+ * Return 0 on success, or ENOSPC if it won't fit in the buffer.
+ */
+static int
+decode_embedded_bp(const blkptr_t *bp, void *buf)
+{
+	int comp;
+	int lsize, psize;
+	uint8_t *dst = buf;
+	uint64_t w = 0;
+
+	lsize = BPE_GET_LSIZE(bp);
+	psize = BPE_GET_PSIZE(bp);
+	comp = BP_GET_COMPRESS(bp);
+
+	if (comp != ZIO_COMPRESS_OFF) {
+		uint8_t dstbuf[BPE_PAYLOAD_SIZE];
+
+		if ((unsigned int)comp >= ZIO_COMPRESS_FUNCTIONS ||
+		    decomp_table[comp].decomp_func == NULL) {
+			grub_printf("compression algorithm not supported\n");
+			return (ERR_FSYS_CORRUPT);
+		}
+
+		decode_embedded_bp_compressed(bp, dstbuf);
+		decomp_table[comp].decomp_func(dstbuf, buf, psize, lsize);
+	} else {
+		decode_embedded_bp_compressed(bp, buf);
+	}
+
+	return (0);
+}
+
+/*
  * Read in a block of data, verify its checksum, decompress if needed,
  * and put the uncompressed data in buf.
  *
@@ -392,6 +460,15 @@ zio_read(blkptr_t *bp, void *buf, char *stack)
 	int lsize, psize, comp;
 	char *retbuf;
 
+	if (BP_IS_EMBEDDED(bp)) {
+		if (BPE_GET_ETYPE(bp) != BP_EMBEDDED_TYPE_DATA) {
+			grub_printf("unsupported embedded BP (type=%u)\n",
+			    (int)BPE_GET_ETYPE(bp));
+			return (ERR_FSYS_CORRUPT);
+		}
+		return (decode_embedded_bp(bp, buf));
+	}
+
 	comp = BP_GET_COMPRESS(bp);
 	lsize = BP_GET_LSIZE(bp);
 	psize = BP_GET_PSIZE(bp);
@@ -404,7 +481,8 @@ zio_read(blkptr_t *bp, void *buf, char *stack)
 	}
 
 	if ((char *)buf < stack && ((char *)buf) + lsize > stack) {
-		grub_printf("not enough memory allocated\n");
+		grub_printf("not enough memory to fit %u bytes on stack\n",
+		    lsize);
 		return (ERR_WONT_FIT);
 	}
 
@@ -764,6 +842,7 @@ zap_iterate(dnode_phys_t *zap_dnode, zap_cb_t *cb, void *arg, char *stack)
  * Input
  *	mdn - metadnode to get the object dnode
  *	objnum - object number for the object dnode
+ *	type - if nonzero, object must be of this type
  *	buf - data buffer that holds the returning dnode
  *	stack - scratch area
  *
@@ -968,6 +1047,7 @@ static const char *spa_feature_names[] = {
 	"org.illumos:lz4_compress",
 	"com.delphix:hole_birth",
 	"com.delphix:extensible_dataset",
+	"com.delphix:embedded_data",
 	NULL
 };
 
