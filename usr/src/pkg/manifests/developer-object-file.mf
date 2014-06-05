@@ -160,4 +160,4 @@ link path=usr/ccs/lib/llib-ly.ln target=../../lib/llib-ly.ln
 link path=usr/lib/elfedit/32 target=.
 link path=usr/lib/elfedit/64 target=$(ARCH64)
 depend fmri=developer/macro/cpp type=require
-depend fmri=runtime/perl-510 type=require
+depend fmri=runtime/perl$(PERL_PKGVERS) type=require
