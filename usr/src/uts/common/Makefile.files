@@ -2077,3 +2077,60 @@ MYRI10GE_OBJS =	myri10ge.o myri10ge_lro.o
 NULLDRIVER_OBJS =	nulldriver.o
 
 TPM_OBJS =	tpm.o tpm_hcall.o
+
+#
+#	BNXE objects
+#
+BNXE_OBJS +=	bnxe_cfg.o		\
+		bnxe_fcoe.o		\
+		bnxe_debug.o		\
+		bnxe_gld.o		\
+		bnxe_hw.o		\
+		bnxe_intr.o		\
+		bnxe_kstat.o		\
+		bnxe_lock.o		\
+		bnxe_main.o		\
+		bnxe_mm.o		\
+		bnxe_mm_l4.o		\
+		bnxe_mm_l5.o		\
+		bnxe_rr.o		\
+		bnxe_rx.o		\
+		bnxe_timer.o		\
+		bnxe_tx.o		\
+		bnxe_workq.o		\
+		bnxe_clc.o		\
+		ecore_sp_verbs.o	\
+		bnxe_context.o		\
+		57710_init_values.o	\
+		57711_init_values.o	\
+		57712_init_values.o	\
+		bnxe_fw_funcs.o		\
+		bnxe_hw_debug.o		\
+		lm_l4fp.o		\
+		lm_l4rx.o		\
+		lm_l4sp.o		\
+		lm_l4tx.o		\
+		lm_l5.o			\
+		lm_l5sp.o		\
+		lm_dcbx.o		\
+		lm_devinfo.o		\
+		lm_dmae.o		\
+		lm_er.o			\
+		lm_hw_access.o		\
+		lm_hw_attn.o		\
+		lm_hw_init_reset.o	\
+		lm_main.o		\
+		lm_mcp.o		\
+		lm_niv.o		\
+		lm_nvram.o		\
+		lm_phy.o		\
+		lm_power.o		\
+		lm_recv.o		\
+		lm_resc.o		\
+		lm_sb.o			\
+		lm_send.o		\
+		lm_sp.o			\
+		lm_dcbx_mp.o		\
+		lm_sp_req_mgr.o		\
+		lm_stats.o		\
+		lm_util.o
