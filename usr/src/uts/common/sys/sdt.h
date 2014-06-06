@@ -407,7 +407,7 @@ extern "C" {
 	    type7, arg7, type8, arg8);
 
 /*
- * the set-error SDT probe is extra static, in that we declare its fake
+ * The set-error SDT probe is extra static, in that we declare its fake
  * function literally, rather than with the DTRACE_PROBE1() macro.  This is
  * necessary so that SET_ERROR() can evaluate to a value, which wouldn't
  * be possible if it required multiple statements (to declare the function

@@ -60,6 +60,7 @@
 #include <sys/dmu_tx.h>
 #include <sys/dsl_destroy.h>
 #include <sys/dsl_userhold.h>
+#include <sys/blkptr.h>
 
 extern uint64_t metaslab_gang_bang;
 extern uint64_t metaslab_df_alloc_threshold;
