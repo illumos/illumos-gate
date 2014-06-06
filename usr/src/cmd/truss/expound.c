@@ -22,7 +22,7 @@
 /*
  * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright (c) 2013 by Delphix. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -5071,9 +5071,9 @@ show_zfs_ioc(private_t *pri, long addr)
 		(void) printf("    zc_defer_destroy=%d\n",
 		    (int)zc.zc_defer_destroy);
 	}
-	if (zc.zc_temphold) {
-		(void) printf("    zc_temphold=%d\n",
-		    (int)zc.zc_temphold);
+	if (zc.zc_flags) {
+		(void) printf("    zc_flags=0x%x\n",
+		    zc.zc_flags);
 	}
 	if (zc.zc_action_handle) {
 		(void) printf("    zc_action_handle=%llu\n",

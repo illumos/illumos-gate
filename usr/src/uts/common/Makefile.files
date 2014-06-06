@@ -1333,6 +1333,7 @@ TRANS_OBJS += mdtrans.o trans_ioctl.o trans_log.o
 
 ZFS_COMMON_OBJS +=		\
 	arc.o			\
+	blkptr.o		\
 	bplist.o		\
 	bpobj.o			\
 	bptree.o		\

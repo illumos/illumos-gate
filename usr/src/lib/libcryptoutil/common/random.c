@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2014, OmniTI Computer Consulting, Inc. All rights reserved.
  */
 
 #include <stdio.h>
@@ -33,6 +34,7 @@
 #include <cryptoutil.h>
 #include <pthread.h>
 
+#pragma init(pkcs11_random_init)
 
 static pthread_mutex_t	random_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t	urandom_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -181,13 +183,13 @@ pkcs11_close_common(int *fd, pthread_mutex_t *mtx)
 	(void) pthread_mutex_unlock(mtx);
 }
 
-void
+static void
 pkcs11_close_random(void)
 {
 	pkcs11_close_common(&random_fd, &random_mutex);
 }
 
-void
+static void
 pkcs11_close_urandom(void)
 {
 	pkcs11_close_common(&urandom_fd, &urandom_mutex);
@@ -199,7 +201,7 @@ pkcs11_close_random_seed(void)
 	pkcs11_close_common(&random_seed_fd, &random_seed_mutex);
 }
 
-void
+static void
 pkcs11_close_urandom_seed(void)
 {
 	pkcs11_close_common(&urandom_seed_fd, &urandom_seed_mutex);
@@ -376,4 +378,46 @@ pkcs11_get_nzero_urandom(void *dbuf, size_t dlen)
 		((char *)dbuf)[i] = extrarand[bytesleft];
 	}
 	return (0);
+}
+
+static void
+pkcs11_random_prepare(void)
+{
+	/*
+	 * NOTE - None of these are acquired more than one at a time.
+	 * I can therefore acquire all four without fear of deadlock.
+	 */
+	(void) pthread_mutex_lock(&random_mutex);
+	(void) pthread_mutex_lock(&urandom_mutex);
+	(void) pthread_mutex_lock(&random_seed_mutex);
+	(void) pthread_mutex_lock(&urandom_seed_mutex);
+}
+
+static void
+pkcs11_random_parent_post(void)
+{
+	/* Drop the mutexes and get back to work! */
+	(void) pthread_mutex_unlock(&urandom_seed_mutex);
+	(void) pthread_mutex_unlock(&random_seed_mutex);
+	(void) pthread_mutex_unlock(&urandom_mutex);
+	(void) pthread_mutex_unlock(&random_mutex);
+}
+
+static void
+pkcs11_random_child_post(void)
+{
+	pkcs11_random_parent_post();
+
+	/* Also, close the FDs, just in case. */
+	pkcs11_close_random();
+	pkcs11_close_urandom();
+	pkcs11_close_random_seed();
+	pkcs11_close_urandom_seed();
+}
+
+static void
+pkcs11_random_init(void)
+{
+	(void) pthread_atfork(pkcs11_random_prepare, pkcs11_random_parent_post,
+	    pkcs11_random_child_post);
 }

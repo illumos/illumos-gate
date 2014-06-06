@@ -21,6 +21,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2014, OmniTI Computer Consulting, Inc. All rights reserved.
  */
 
 #include <strings.h>
@@ -354,9 +356,12 @@ finalize_common(boolean_t force, CK_VOID_PTR pReserved) {
 	softtoken_initialized = B_FALSE;
 	softtoken_pid = 0;
 
-	pkcs11_close_urandom();
-	pkcs11_close_urandom_seed();
-	pkcs11_close_random();
+	/*
+	 * There used to be calls to cleanup libcryptoutil here.  Given that
+	 * libcryptoutil can be linked and invoked independently of PKCS#11,
+	 * cleaning up libcryptoutil here makes no sense.  Decoupling these
+	 * two also prevent deadlocks and other artificial dependencies.
+	 */
 
 	/* Destroy the session list lock here */
 	(void) pthread_mutex_destroy(&soft_sessionlist_mutex);
