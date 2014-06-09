@@ -913,6 +913,10 @@ static uint8_t vnd_ipv6_mcast[2] = { 0x33, 0x33 };
  * vnd internal data structures and types
  */
 
+struct vnd_str;
+struct vnd_dev;
+struct vnd_pnsd;
+
 /*
  * As part of opening the device stream we need to properly communicate with our
  * underlying stream. This is a bit of an asynchronous dance and we need to
@@ -955,6 +959,8 @@ typedef enum vnd_capab_flags {
 /*
  * Definitions to interact with direct callbacks
  */
+typedef void (*vnd_rx_t)(struct vnd_str *, mac_resource_t *, mblk_t *,
+    mac_header_info_t *);
 typedef uintptr_t vnd_mac_cookie_t;
 /* DLD Direct capability function */
 typedef int (*vnd_dld_cap_t)(void *, uint_t, void *, uint_t);
@@ -983,10 +989,6 @@ typedef struct vnd_str_capab {
 	vnd_mac_cookie_t vsc_fc_cookie;
 	void *vsc_tx_fc_hdl;
 } vnd_str_capab_t;
-
-struct vnd_str;
-struct vnd_dev;
-struct vnd_pnsd;
 
 /*
  * The vnd_data_queue is a simple construct for storing a series of messages in
@@ -1205,6 +1207,19 @@ static void
 vnd_drop_panic(vnd_str_t *vsp, mblk_t *mp, const char *reason)
 {
 	panic("illegal vnd drop");
+}
+
+static void
+vnd_mac_drop_input(vnd_str_t *vsp, mac_resource_t *unused, mblk_t *mp_chain,
+    mac_header_info_t *mhip)
+{
+	mblk_t *mp;
+
+	while (mp_chain != NULL) {
+		mp = mp_chain;
+		mp_chain = mp->b_next;
+		vnd_drop_hook_in(vsp, mp, "stream not associated");
+	}
 }
 
 static vnd_pnsd_t *
@@ -2052,7 +2067,7 @@ vnd_st_scapabq(vnd_str_t *vsp)
 }
 
 static void
-vnd_mac_input(vnd_str_t *vsp, mac_resource_t *wtf, mblk_t *mp_chain,
+vnd_mac_input(vnd_str_t *vsp, mac_resource_t *unused, mblk_t *mp_chain,
     mac_header_info_t *mhip)
 {
 	int signal = 0;
@@ -2191,7 +2206,7 @@ vnd_mac_exit(vnd_str_t *vsp, mac_perim_handle_t mph)
 }
 
 static int
-vnd_dld_cap_enable(vnd_str_t *vsp)
+vnd_dld_cap_enable(vnd_str_t *vsp, vnd_rx_t rxfunc)
 {
 	int ret;
 	dld_capab_direct_t d;
@@ -2199,7 +2214,7 @@ vnd_dld_cap_enable(vnd_str_t *vsp)
 	vnd_str_capab_t *c = &vsp->vns_caps;
 
 	bzero(&d, sizeof (d));
-	d.di_rx_cf = (uintptr_t)vnd_mac_input;
+	d.di_rx_cf = (uintptr_t)rxfunc;
 	d.di_rx_ch = vsp;
 	d.di_flags = DI_DIRECT_RAW;
 
@@ -2303,7 +2318,14 @@ vnd_st_capabq(vnd_str_t *vsp)
 			    (vnd_dld_cap_t)dld->dld_capab;
 			vsp->vns_caps.vsc_capab_hdl =
 			    (void *)dld->dld_capab_handle;
-			if (vnd_dld_cap_enable(vsp) != 0) {
+			/*
+			 * At this point in time, we have to set up a direct
+			 * function that drops all input. This validates that
+			 * we'll be able to set up direct input and that we can
+			 * easily switch it earlier to the real data function
+			 * when we've plumbed everything up.
+			 */
+			if (vnd_dld_cap_enable(vsp, vnd_mac_drop_input) != 0) {
 				/* vns_errno set by vnd_dld_cap_enable */
 				ret = 1;
 				goto done;
@@ -3047,6 +3069,21 @@ vnd_striocdata(queue_t *q, vnd_str_t *vsp, mblk_t *mp, struct copyresp *csp)
 	}
 	vdp->vdd_str = vsp;
 	vsp->vns_dev = vdp;
+
+	/*
+	 * Now, it's time to do the las thing that can fail, changing out the
+	 * input function. After this we know that we can receive data, so we
+	 * should make sure that we're ready.
+	 */
+	if (vnd_dld_cap_enable(vsp, vnd_mac_input) != 0) {
+		error = EIO;
+		vss->vsa_errno = VND_E_DIRECTFAIL;
+		vdp->vdd_str = NULL;
+		vsp->vns_dev = NULL;
+		mutex_exit(&vsp->vns_lock);
+		mutex_exit(&vdp->vdd_lock);
+		goto nak;
+	}
 
 	zone = zone_find_by_id(vdp->vdd_nsd->vpnd_zid);
 	ASSERT(zone != NULL);
