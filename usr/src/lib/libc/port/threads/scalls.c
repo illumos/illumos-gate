@@ -22,6 +22,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2015, Joyent, Inc.  All rights reserved.
  */
 
 /* Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved. */
@@ -910,8 +911,28 @@ pread64(int fildes, void *buf, size_t nbyte, off64_t offset)
 
 	PERFORM(__pread64(fildes, buf, nbyte, offset))
 }
+
+ssize_t
+preadv64(int fildes, const struct iovec *iov, int iovcnt, off64_t offset)
+{
+
+	extern ssize_t __preadv64(int, const struct iovec *, int, off_t, off_t);
+	ssize_t rv;
+
+	PERFORM(__preadv64(fildes, iov, iovcnt, offset & 0xffffffffULL,
+	    offset>>32))
+}
 #endif	/* !_LP64 */
 
+ssize_t
+preadv(int fildes, const struct iovec *iov, int iovcnt, off_t offset)
+{
+
+	extern ssize_t __preadv(int, const struct iovec *, int, off_t, off_t);
+	ssize_t rv;
+
+	PERFORM(__preadv(fildes, iov, iovcnt, offset, 0))
+}
 ssize_t
 pwrite(int fildes, const void *buf, size_t nbyte, off_t offset)
 {
@@ -930,7 +951,29 @@ pwrite64(int fildes, const void *buf, size_t nbyte, off64_t offset)
 
 	PERFORM(__pwrite64(fildes, buf, nbyte, offset))
 }
+
+ssize_t
+pwritev64(int fildes, const struct iovec *iov, int iovcnt, off64_t offset)
+{
+
+	extern ssize_t __pwritev64(int,
+	    const struct iovec *, int, off_t, off_t);
+	ssize_t rv;
+
+	PERFORM(__pwritev64(fildes, iov, iovcnt, offset &
+	    0xffffffffULL, offset>>32))
+}
+
 #endif	/* !_LP64 */
+
+ssize_t
+pwritev(int fildes, const struct iovec *iov, int iovcnt, off_t offset)
+{
+	extern ssize_t __pwritev(int, const struct iovec *, int, off_t, off_t);
+	ssize_t rv;
+
+	PERFORM(__pwritev(fildes, iov, iovcnt, offset, 0))
+}
 
 ssize_t
 readv(int fildes, const struct iovec *iov, int iovcnt)

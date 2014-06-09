@@ -214,12 +214,14 @@ link path=usr/share/man/man2/pathconf.2 target=fpathconf.2
 link path=usr/share/man/man2/pipe2.2 target=pipe.2
 link path=usr/share/man/man2/ppoll.2 target=poll.2
 link path=usr/share/man/man2/pread.2 target=read.2
+link path=usr/share/man/man2/preadv.2 target=read.2
 link path=usr/share/man/man2/pset_assign.2 target=pset_create.2
 link path=usr/share/man/man2/pset_destroy.2 target=pset_create.2
 link path=usr/share/man/man2/pset_getattr.2 target=pset_setattr.2
 link path=usr/share/man/man2/putacct.2 target=getacct.2
 link path=usr/share/man/man2/putpmsg.2 target=putmsg.2
 link path=usr/share/man/man2/pwrite.2 target=write.2
+link path=usr/share/man/man2/pwritev.2 target=write.2
 link path=usr/share/man/man2/readlinkat.2 target=readlink.2
 link path=usr/share/man/man2/readv.2 target=read.2
 link path=usr/share/man/man2/renameat.2 target=rename.2

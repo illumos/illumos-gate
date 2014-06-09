@@ -25,7 +25,7 @@
 # Use is subject to license terms.
 #
 # Copyright (c) 2012 by Delphix. All rights reserved.
-# Copyright (c) 2012, Joyent, Inc.  All rights reserved.
+# Copyright (c) 2015, Joyent, Inc.  All rights reserved.
 # Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved.
 # Copyright (c) 2013 Gary Mills
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
@@ -92,6 +92,17 @@ $endif
 $if _x86 && _ELF64
 $add amd64
 $endif
+
+SYMBOL_VERSION ILLUMOS_0.10 {	# Illumos additions
+    protected:
+	preadv;
+	pwritev;
+
+$if lf64
+	preadv64;
+	pwritev64;
+$endif
+} ILLUMOS_0.9;
 
 SYMBOL_VERSION ILLUMOS_0.9 {
     protected:

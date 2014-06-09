@@ -3,11 +3,11 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LF64 5 "Jul 14, 2008"
+.\" Copyright (c) 2015, Joyent, Inc.  All rights reserved.
+.TH LF64 5 "Jan 14, 2015"
 .SH NAME
 lf64 \- transitional interfaces for 64-bit file offsets
 .SH DESCRIPTION
-.sp
 .LP
 The data types, interfaces, and macros described on this page provide explicit
 access to 64-bit file offsets. They are accessible through the transitional
@@ -16,7 +16,6 @@ function prototype and semantics of a transitional interface are equivalent to
 those of the standard version of the call, except that relevant data types are
 64-bit entities.
 .SS "Data Types"
-.sp
 .LP
 The following tables list the standard data or struct types in the left-hand
 column and their  corresponding explicit 64-bit file offset types in the
@@ -26,9 +25,7 @@ corresponds to the 64-bit type listed in the right\(emhand column.  Note that
 in a 64-bit application, the standard definition is equivalent to the 64-bit
 file offset definition.
 .SS "<\fBaio.h\fR>"
-.sp
 
-.sp
 .TS
 l l
 l l .
@@ -37,9 +34,7 @@ struct \fBaiocb\fR	struct \fBaiocb64\fR
 .TE
 
 .SS "<\fBsys/dirent.h\fR>"
-.sp
 
-.sp
 .TS
 l l
 l l .
@@ -49,9 +44,7 @@ struct \fBdirent\fR	struct \fBdirent64\fR
 .TE
 
 .SS "<\fBsys/fcntl.h\fR>"
-.sp
 
-.sp
 .TS
 l l
 l l .
@@ -67,18 +60,14 @@ struct \fBflock\fR	struct \fBflock64\fR
 .TE
 
 .SS "<\fBsys/stdio.h\fR>"
-.sp
 
-.sp
 .TS
 l l .
 \fBfpos_t\fR	\fBfpos64_t\fR
 .TE
 
 .SS "<\fBsys/resource.h\fR>"
-.sp
 
-.sp
 .TS
 l l
 l l .
@@ -92,9 +81,7 @@ struct \fBrlimit\fR	struct \fBrlimit64\fR
 .TE
 
 .SS "<\fBsys/stat.h\fR>"
-.sp
 
-.sp
 .TS
 l l
 l l .
@@ -105,9 +92,7 @@ struct \fBstat\fR	struct \fBstat64\fR
 .TE
 
 .SS "<\fBsys/statvfs.h\fR>"
-.sp
 
-.sp
 .TS
 l l
 l l .
@@ -121,9 +106,7 @@ struct \fBstatvfs\fR	struct \fBstatvfs64\fR
 .TE
 
 .SS "<\fBsys/types.h\fR>"
-.sp
 
-.sp
 .TS
 l l
 l l .
@@ -135,9 +118,7 @@ l l .
 .TE
 
 .SS "<\fBunistd.h\fR>"
-.sp
 
-.sp
 .TS
 l l
 l l .
@@ -146,9 +127,7 @@ l l .
 .TE
 
 .SS "<\fBsys/unistd.h\fR>"
-.sp
 
-.sp
 .TS
 l l
 l l .
@@ -159,16 +138,13 @@ l l .
 .TE
 
 .SS "System Interfaces"
-.sp
 .LP
 The following tables display the standard API and the corresponding
 transitional  interfaces for 64-bit file offsets. The interfaces are grouped by
 header. The interface name and the affected data types are displayed in courier
 font.
 .SS "<\fBaio.h\fR>"
-.sp
 
-.sp
 .TS
 l l
 l l .
@@ -190,9 +166,7 @@ int \fBlio_listio\fR(..., 	int \fBlio_listio64\fR(...,
 .TE
 
 .SS "<\fBdirent.h\fR>"
-.sp
 
-.sp
 .TS
 l l
 l l .
@@ -209,9 +183,7 @@ int \fBscandir\fR(..., 	int \fBscandir64\fR(...,
 .TE
 
 .SS "<\fBfcntl.h\fR>"
-.sp
 
-.sp
 .TS
 l l
 l l .
@@ -224,9 +196,7 @@ int \fBposix_fallocate()\fR	int \fBposix_fallocate64()\fR
 .TE
 
 .SS "<\fBftw.h\fR>"
-.sp
 
-.sp
 .TS
 l l
 l l .
@@ -239,18 +209,14 @@ int \fBnftw\fR(..	int \fBnftw64\fR(...,
 .TE
 
 .SS "<\fBlibgen.h\fR>"
-.sp
 
-.sp
 .TS
 l l .
 char *\fBcopylist\fR(..., \fBoff_t\fR);	char *\fBcopylist64\fR(..., \fBoff64_t\fR);
 .TE
 
 .SS "<\fBstdio.h\fR>"
-.sp
 
-.sp
 .TS
 l l
 l l .
@@ -265,18 +231,14 @@ FILE *\fBtmpfile()\fR;	FILE *\fBtmpfile64()\fR;
 .TE
 
 .SS "<\fBstdlib.h\fR>"
-.sp
 
-.sp
 .TS
 l l .
 int \fBmkstemp()\fR;	int \fBmkstemp64()\fR;
 .TE
 
 .SS "<\fBsys/async.h\fR>"
-.sp
 
-.sp
 .TS
 l l
 l l .
@@ -285,9 +247,7 @@ int \fBaiowrite\fR(..., \fBoff_t\fR, ...);	int \fBaiowrite64\fR(..., \fBoff64_t\
 .TE
 
 .SS "<\fBsys/dirent.h\fR>"
-.sp
 
-.sp
 .TS
 l l
 l l .
@@ -296,18 +256,14 @@ int \fBgetdents\fR(..., \fBdirent\fR);	int \fBgetdents64\fR(..., \fBdirent64\fR)
 .TE
 
 .SS "<\fBsys/mman.h\fR>"
-.sp
 
-.sp
 .TS
 l l .
 void \fBmmap\fR(..., \fBoff_t\fR);	void \fBmmap64\fR(..., \fBoff64_t\fR);
 .TE
 
 .SS "<\fBsys/resource.h\fR>"
-.sp
 
-.sp
 .TS
 l l
 l l .
@@ -318,9 +274,7 @@ int \fBsetrlimit\fR(...,	int \fBsetrlimit64\fR(...,
 .TE
 
 .SS "<\fBsys/sendfile.h\fR>"
-.sp
 
-.sp
 .TS
 l l
 l l .
@@ -332,9 +286,7 @@ ssize_t \fBsendfilev\fR(..., const 	ssize_t \fBsendfilev64\fR(..., const
 .TE
 
 .SS "<\fBsys/stat.h\fR>"
-.sp
 
-.sp
 .TS
 l l
 l l .
@@ -346,9 +298,7 @@ int \fBstat\fR(..., struct \fBstat\fR *);	int \fBstat64\fR(..., struct \fBstat64
 .TE
 
 .SS "<\fBsys/statvfs.h\fR>"
-.sp
 
-.sp
 .TS
 l l
 l l .
@@ -359,9 +309,7 @@ int \fBfstatvfs\fR(..., 	int \fBfstatvfs64\fR(...,
 .TE
 
 .SS "<\fBucbinclude/stdio.h\fR>"
-.sp
 
-.sp
 .TS
 l l
 l l .
@@ -370,9 +318,7 @@ FILE *\fBfreopen()\fR	FILE *\fBfreopen64()\fR
 .TE
 
 .SS "<\fBucbinclude/sys/dir.h\fR>"
-.sp
 
-.sp
 .TS
 l l
 l l .
@@ -386,9 +332,7 @@ int \fBscandir\fR(...,	int \fBscandir64\fR(...,
 .TE
 
 .SS "<\fBunistd.h\fR>"
-.sp
 
-.sp
 .TS
 l l
 l l .
@@ -397,10 +341,11 @@ int \fBlockf\fR(..., \fBoff_t\fR);	int \fBlockf64\fR(..., \fBoff64_t\fR);
 int \fBftruncate\fR(..., \fBoff_t\fR);	int \fBftruncate64\fR..., \fBoff64_t\fR);
 ssize_t \fBpread\fR(..., \fBoff_t\fR);	ssize_t \fBpread64\fR..., \fBoff64_t\fR);
 ssize_t \fBpwrite\fR(..., \fBoff_t\fR);	ssize_t \fBpwrite64\fR(..., \fBoff64_t\fR);
+ssize_t \fBpreadv\fR(..., \fBoff_t\fR);	ssize_t \fBpreadv64\fR..., \fBoff64_t\fR);
+ssize_t \fBpwritev\fR(..., \fBoff_t\fR);	ssize_t \fBpwritev64\fR(..., \fBoff64_t\fR);
 int \fBtruncate\fR(..., \fBoff_t\fR);	int \fBtruncate64\fR(..., \fBoff64_t\fR);
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBlfcompile\fR(5), \fBlfcompile64\fR(5)
