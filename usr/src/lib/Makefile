@@ -163,6 +163,7 @@ SUBDIRS += \
 	libm		\
 	libmvec		\
 	libvnd		\
+	libidspace	\
 	libbunyan
 
 SUBDIRS += \
@@ -402,6 +403,7 @@ HDRSUBDIRS=		\
 	libfru		\
 	libfstyp	\
 	libgen		\
+	libidspace	\
 	libipadm	\
 	libipd		\
 	libipsecutil	\
@@ -664,6 +666,7 @@ libprtdiag:	libm
 libsqlite:	libm
 libstmf:	libm
 libvscan: 	libm
+libidspace:	libumem
 libbunyan:	libnvpair
 
 

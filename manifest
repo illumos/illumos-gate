@@ -4789,6 +4789,7 @@ f usr/lib/amd64/libhotplug.so.1 0755 root bin
 s usr/lib/amd64/libhotplug.so=libhotplug.so.1
 f usr/lib/amd64/libidmap.so.1 0755 root bin
 s usr/lib/amd64/libidmap.so=libidmap.so.1
+f usr/lib/amd64/libidspace.so.1 0755 root bin
 f usr/lib/amd64/libike.so.1 0755 root bin
 s usr/lib/amd64/libike.so=libike.so.1
 f usr/lib/amd64/libilb.so.1 0755 root bin
@@ -6199,6 +6200,7 @@ f usr/lib/libhotplug.so.1 0755 root bin
 s usr/lib/libhotplug.so=libhotplug.so.1
 f usr/lib/libidmap.so.1 0755 root bin
 s usr/lib/libidmap.so=libidmap.so.1
+f usr/lib/libidspace.so.1 0755 root bin
 f usr/lib/libike.so.1 0755 root bin
 s usr/lib/libike.so=libike.so.1
 f usr/lib/libilb.so.1 0755 root bin
