@@ -343,9 +343,7 @@ get_pktiopb(struct scsi_address *ap, caddr_t *datap, int cdblen, int statuslen,
 
 	/*
 	 * use i_ddi_mem_alloc() for now until we have an interface to allocate
-	 * memory for DMA which doesn't require a DMA handle. ddi_iopb_alloc()
-	 * is obsolete and we want more flexibility in controlling the DMA
-	 * address constraints.
+	 * memory for DMA which doesn't require a DMA handle.
 	 */
 	if (i_ddi_mem_alloc(pdip, &scsi_alloc_attr, datalen,
 	    ((func == SLEEP_FUNC) ? 1 : 0), 0, NULL, &local.b_un.b_addr, &rlen,

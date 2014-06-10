@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  */
 
 #include <sys/note.h>
@@ -964,28 +964,6 @@ scsi_tran_ext_free(
 		kmem_free(tran->tran_extension, length);
 		tran->tran_extension = NULL;
 	}
-}
-
-/*
- * Obsolete: Called by an HBA to attach an instance of the driver
- * Implement this older interface in terms of the new.
- */
-/*ARGSUSED*/
-int
-scsi_hba_attach(
-	dev_info_t		*self,
-	ddi_dma_lim_t		*hba_lim,
-	scsi_hba_tran_t		*tran,
-	int			flags,
-	void			*hba_options)
-{
-	ddi_dma_attr_t		hba_dma_attr;
-
-	bzero(&hba_dma_attr, sizeof (ddi_dma_attr_t));
-	hba_dma_attr.dma_attr_burstsizes = hba_lim->dlim_burstsizes;
-	hba_dma_attr.dma_attr_minxfer = hba_lim->dlim_minxfer;
-
-	return (scsi_hba_attach_setup(self, &hba_dma_attr, tran, flags));
 }
 
 /*

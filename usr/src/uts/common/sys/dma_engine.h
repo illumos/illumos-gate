@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  */
 
 /*
@@ -136,16 +136,6 @@ struct dmae_chnl {
 /*
  * DMA Engine DDI functions
  */
-
-/*
- * Get DMA engine limits
- *
- * The limits of the DMA engine of the parent bus-nexus are copied into the
- * provided structure.  This should be called at driver attach time,
- * rather than for each dma setup (breakup).
- */
-
-int ddi_dmae_getlim(dev_info_t *dip, ddi_dma_lim_t *limitsp);
 
 /*
  * Get DMA engine attributes

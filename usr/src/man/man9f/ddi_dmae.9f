@@ -1,14 +1,14 @@
 '\" te
+.\"  Copyright 2014 Garrett D'Amore <garrett@damore.org>
 .\"  Copyright (c) 2006 Sun Microsystems, Inc.  All Rights Reserved.
-.\"  Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DDI_DMAE 9F "Feb 02, 2012"
+.TH DDI_DMAE 9F "May 24, 2014"
 .SH NAME
 ddi_dmae, ddi_dmae_alloc, ddi_dmae_release, ddi_dmae_prog, ddi_dmae_disable,
 ddi_dmae_enable, ddi_dmae_stop, ddi_dmae_getcnt, ddi_dmae_1stparty,
-ddi_dmae_getlim, ddi_dmae_getattr \- system DMA engine functions
+ddi_dmae_getattr \- system DMA engine functions
 .SH SYNOPSIS
 .LP
 .nf
@@ -54,20 +54,13 @@ ddi_dmae_getlim, ddi_dmae_getattr \- system DMA engine functions
 
 .LP
 .nf
-\fBint\fR \fBddi_dmae_getlim\fR(\fBdev_info_t *\fR\fIdip\fR, \fBddi_dma_lim_t *\fR\fIlimitsp\fR);
-.fi
-
-.LP
-.nf
 \fBint\fR \fBddi_dmae_getattr\fR(\fBdev_info_t *\fR\fIdip\fR, \fBddi_dma_attr_t *\fR\fIattrp\fR);
 .fi
 
 .SH INTERFACE LEVEL
 .sp
 .LP
-Solaris DDI specific (Solaris DDI). The \fBddi_dmae_getlim()\fR interface,
-described below, is obsolete. Use \fBddi_dmae_getattr()\fR, also described
-below, to replace it.
+Solaris DDI specific (Solaris DDI).
 .SH PARAMETERS
 .sp
 .ne 2
@@ -152,15 +145,6 @@ which contains the address and count.
 .RS 12n
 A pointer to an integer that will receive the count of the number of bytes not
 yet transferred upon completion of a \fBDMA\fR operation.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fIlimitsp\fR\fR
-.ad
-.RS 12n
-A pointer to a \fBDMA\fR limit structure. See \fBddi_dma_lim_x86\fR(9S).
 .RE
 
 .sp
@@ -300,29 +284,6 @@ first be allocated using \fBddi_dmae_alloc()\fR and then configured using
 \fBddi_dmae_1stparty()\fR. The driver then programs the device to perform the
 I/O, including the necessary \fBDMA\fR address and count values obtained from
 the \fBddi_dma_cookie\fR(9S).
-.SS "\fBddi_dmae_getlim()\fR"
-.sp
-.LP
-This function is obsolete. Use \fBddi_dmae_getattr()\fR, described below,
-instead.
-.sp
-.LP
-The \fBddi_dmae_getlim()\fR function fills in the \fBDMA\fR limit structure,
-pointed to by \fIlimitsp\fR, with the \fBDMA\fR limits of the system \fBDMA\fR
-engine. Drivers for devices that perform their own bus mastering or use
-first-party \fBDMA\fR must create and initialize their own \fBDMA\fR limit
-structures; they should not use \fBddi_dmae_getlim()\fR. The \fBDMA\fR limit
-structure must be passed to the \fBDMA\fR setup routines so that they will know
-how to break the \fBDMA\fR request into windows.  If the device has any
-particular restrictions on transfer size or granularity (such as the size of
-disk sector), the driver should further restrict the values in the structure
-members before passing them to the \fBDMA\fR setup routines. The driver must
-not relax any of the restrictions embodied in the structure after it is filled
-in by \fBddi_dmae_getlim()\fR. After calling \fBddi_dmae_getlim()\fR, a driver
-must examine, and possibly set, the size of the \fBDMA\fR engine's
-scatter/gather list to determine whether \fBDMA\fR chaining will be used. See
-\fBddi_dma_lim_x86\fR(9S) and \fBddi_dmae_req\fR(9S) for additional information
-on scatter/gather DMA.
 .SS "\fBddi_dmae_getattr()\fR"
 .sp
 .LP
@@ -393,5 +354,5 @@ Architecture	x86
 \fBisa\fR(4), \fBattributes\fR(5), \fBddi_dma_buf_setup\fR(9F),
 \fBddi_dma_getwin\fR(9F), \fBddi_dma_nextcookie\fR(9F),
 \fBddi_dma_mem_alloc\fR(9F), \fBddi_dma_addr_bind_handle\fR(9F), \fBddi_dma_attr\fR(9S),
-\fBddi_dma_cookie\fR(9S), \fBddi_dma_lim_x86\fR(9S), \fBddi_dma_req\fR(9S),
+\fBddi_dma_cookie\fR(9S),
 \fBddi_dmae_req\fR(9S)

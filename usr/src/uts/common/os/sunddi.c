@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  */
 
 #include <sys/note.h>
@@ -710,33 +710,6 @@ ddi_ctlops(dev_info_t *d, dev_info_t *r, ddi_ctl_enum_t op, void *a, void *v)
  * DMA/DVMA setup
  */
 
-#if defined(__sparc)
-static ddi_dma_lim_t standard_limits = {
-	(uint_t)0,	/* addr_t dlim_addr_lo */
-	(uint_t)-1,	/* addr_t dlim_addr_hi */
-	(uint_t)-1,	/* uint_t dlim_cntr_max */
-	(uint_t)1,	/* uint_t dlim_burstsizes */
-	(uint_t)1,	/* uint_t dlim_minxfer */
-	0		/* uint_t dlim_dmaspeed */
-};
-#elif defined(__x86)
-static ddi_dma_lim_t standard_limits = {
-	(uint_t)0,		/* addr_t dlim_addr_lo */
-	(uint_t)0xffffff,	/* addr_t dlim_addr_hi */
-	(uint_t)0,		/* uint_t dlim_cntr_max */
-	(uint_t)0x00000001,	/* uint_t dlim_burstsizes */
-	(uint_t)DMA_UNIT_8,	/* uint_t dlim_minxfer */
-	(uint_t)0,		/* uint_t dlim_dmaspeed */
-	(uint_t)0x86<<24+0,	/* uint_t dlim_version */
-	(uint_t)0xffff,		/* uint_t dlim_adreg_max */
-	(uint_t)0xffff,		/* uint_t dlim_ctreg_max */
-	(uint_t)512,		/* uint_t dlim_granular */
-	(int)1,			/* int dlim_sgllen */
-	(uint_t)0xffffffff	/* uint_t dlim_reqsizes */
-};
-
-#endif
-
 #if !defined(__sparc)
 /*
  * Request bus_dma_ctl parent to fiddle with a dma request.
@@ -778,7 +751,7 @@ ddi_dma_mctl(dev_info_t *dip, dev_info_t *rdip,
 /*ARGSUSED*/
 int
 ddi_dma_map(dev_info_t *dip, dev_info_t *rdip,
-	struct ddi_dma_req *dmareqp, ddi_dma_handle_t *handlep)
+    struct ddi_dma_req *dmareqp, ddi_dma_handle_t *handlep)
 {
 	return (DDI_FAILURE);
 }
@@ -929,26 +902,6 @@ ddi_dma_burstsizes(ddi_dma_handle_t handle)
 		return (0);
 	else
 		return (dimp->dmai_burstsizes);
-}
-
-int
-ddi_iomin(dev_info_t *a, int i, int stream)
-{
-	int r;
-
-	/*
-	 * Make sure that the initial value is sane
-	 */
-	if (i & (i - 1))
-		return (0);
-	if (i == 0)
-		i = (stream) ? 4 : 1;
-
-	r = ddi_ctlops(a, a,
-	    DDI_CTLOPS_IOMIN, (void *)(uintptr_t)stream, (void *)&i);
-	if (r != DDI_SUCCESS || (i & (i - 1)))
-		return (0);
-	return (i);
 }
 
 /*

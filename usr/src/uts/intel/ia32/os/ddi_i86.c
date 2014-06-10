@@ -23,6 +23,9 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ */
 
 #include <sys/conf.h>
 #include <sys/kmem.h>
@@ -53,13 +56,6 @@ ddi_dmae_release(dev_info_t *dip, int chnl)
 {
 	return (ddi_dma_mctl(dip, dip, 0, DDI_DMA_E_FREE, 0, 0,
 	    (caddr_t *)(uintptr_t)chnl, 0));
-}
-
-int
-ddi_dmae_getlim(dev_info_t *dip, ddi_dma_lim_t *limitsp)
-{
-	return (ddi_dma_mctl(dip, dip, 0, DDI_DMA_E_GETLIM, 0, 0,
-	    (caddr_t *)limitsp, 0));
 }
 
 int

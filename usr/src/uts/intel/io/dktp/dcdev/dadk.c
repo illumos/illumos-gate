@@ -1053,9 +1053,7 @@ dadk_iob_alloc(opaque_t objp, daddr_t blkno, ssize_t xfer, int kmsflg)
 	bp->b_un.b_addr = 0;
 	/*
 	 * use i_ddi_mem_alloc() for now until we have an interface to allocate
-	 * memory for DMA which doesn't require a DMA handle. ddi_iopb_alloc()
-	 * is obsolete and we want more flexibility in controlling the DMA
-	 * address constraints..
+	 * memory for DMA which doesn't require a DMA handle.
 	 */
 	if (i_ddi_mem_alloc((dadkp->dad_sd)->sd_dev, &dadk_alloc_attr,
 	    (size_t)iobp->b_pbytecnt, ((kmsflg == KM_SLEEP) ? 1 : 0), 0, NULL,
