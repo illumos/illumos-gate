@@ -53,6 +53,10 @@
  *   reservation, in which an ID is allocated but placed in a internal
  *   dictionary for later use, should be added when a consuming subsystem
  *   arrives.)
+ *
+ *   This code is also shared with userland. In userland, we don't have the same
+ *   ability to have sleeping variants, so we effectively turn the normal
+ *   versions without _nosleep into _nosleep.
  */
 
 #define	ID_TO_ADDR(id) ((void *)(uintptr_t)(id + 1))
@@ -60,16 +64,22 @@
 
 /*
  * Create an arena to represent the range [low, high).
- * Caller must be in a context in which VM_SLEEP is legal.
+ * Caller must be in a context in which VM_SLEEP is legal,
+ * for the kernel. Always VM_NOSLEEP in userland.
  */
 id_space_t *
 id_space_create(const char *name, id_t low, id_t high)
 {
+#ifdef _KERNEL
+	int flag = VM_SLEEP;
+#else
+	int flag = VM_NOSLEEP;
+#endif
 	ASSERT(low >= 0);
 	ASSERT(low < high);
 
 	return (vmem_create(name, ID_TO_ADDR(low), high - low, 1,
-	    NULL, NULL, NULL, 0, VM_SLEEP | VMC_IDENTIFIER));
+	    NULL, NULL, NULL, 0, flag | VMC_IDENTIFIER));
 }
 
 /*
@@ -85,7 +95,12 @@ id_space_destroy(id_space_t *isp)
 void
 id_space_extend(id_space_t *isp, id_t low, id_t high)
 {
-	(void) vmem_add(isp, ID_TO_ADDR(low), high - low, VM_SLEEP);
+#ifdef _KERNEL
+	int flag = VM_SLEEP;
+#else
+	int flag = VM_NOSLEEP;
+#endif
+	(void) vmem_add(isp, ID_TO_ADDR(low), high - low, flag);
 }
 
 /*
@@ -95,7 +110,12 @@ id_space_extend(id_space_t *isp, id_t low, id_t high)
 id_t
 id_alloc(id_space_t *isp)
 {
-	return (ADDR_TO_ID(vmem_alloc(isp, 1, VM_SLEEP | VM_NEXTFIT)));
+#ifdef _KERNEL
+	int flag = VM_SLEEP;
+#else
+	int flag = VM_NOSLEEP;
+#endif
+	return (ADDR_TO_ID(vmem_alloc(isp, 1, flag | VM_NEXTFIT)));
 }
 
 /*
@@ -116,7 +136,12 @@ id_alloc_nosleep(id_space_t *isp)
 id_t
 id_allocff(id_space_t *isp)
 {
-	return (ADDR_TO_ID(vmem_alloc(isp, 1, VM_SLEEP | VM_FIRSTFIT)));
+#ifdef _KERNEL
+	int flag = VM_SLEEP;
+#else
+	int flag = VM_NOSLEEP;
+#endif
+	return (ADDR_TO_ID(vmem_alloc(isp, 1, flag | VM_FIRSTFIT)));
 }
 
 /*
