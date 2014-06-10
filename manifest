@@ -18767,7 +18767,6 @@ f usr/share/man/man9f/ddi_io_rep_put8.9f 0444 root bin
 s usr/share/man/man9f/ddi_io_rep_putb.9f=ddi_io_rep_put8.9f
 s usr/share/man/man9f/ddi_io_rep_putl.9f=ddi_io_rep_put8.9f
 s usr/share/man/man9f/ddi_io_rep_putw.9f=ddi_io_rep_put8.9f
-f usr/share/man/man9f/ddi_iomin.9f 0444 root bin
 f usr/share/man/man9f/ddi_log_sysevent.9f 0444 root bin
 f usr/share/man/man9f/ddi_map_regs.9f 0444 root bin
 s usr/share/man/man9f/ddi_mem_get16.9f=ddi_mem_get8.9f
@@ -19514,10 +19513,6 @@ s usr/share/man/man9s/dblk.9s=datab.9s
 f usr/share/man/man9s/ddi_device_acc_attr.9s 0444 root bin
 f usr/share/man/man9s/ddi_dma_attr.9s 0444 root bin
 f usr/share/man/man9s/ddi_dma_cookie.9s 0444 root bin
-s usr/share/man/man9s/ddi_dma_lim.9s=ddi_dma_lim_sparc.9s
-f usr/share/man/man9s/ddi_dma_lim_sparc.9s 0444 root bin
-f usr/share/man/man9s/ddi_dma_lim_x86.9s 0444 root bin
-f usr/share/man/man9s/ddi_dma_req.9s 0444 root bin
 f usr/share/man/man9s/ddi_dmae_req.9s 0444 root bin
 f usr/share/man/man9s/ddi_fm_error.9s 0444 root bin
 f usr/share/man/man9s/ddi_idevice_cookie.9s 0444 root bin
