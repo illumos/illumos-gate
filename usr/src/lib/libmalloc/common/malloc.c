@@ -27,8 +27,6 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 
 #ifndef debug
@@ -37,6 +35,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 #include "assert.h"
 #include "malloc.h"
 #include "mallint.h"
@@ -845,12 +844,24 @@ void *
 calloc(size_t num, size_t size)
 {
 	char *mp;
+	size_t total;
 
-	num *= size;
-	mp = malloc(num);
+	if (num == 0 || size == 0) {
+		total = 0;
+	} else {
+		total = num * size;
+
+		/* check for overflow */
+		if ((total / num) != size) {
+			errno = ENOMEM;
+			return (NULL);
+		}
+	}
+
+	mp = malloc(total);
 	if (mp == NULL)
 		return (NULL);
-	(void) memset(mp, 0, num);
+	(void) memset(mp, 0, total);
 	return (mp);
 }
 

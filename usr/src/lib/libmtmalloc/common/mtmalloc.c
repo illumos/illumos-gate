@@ -331,7 +331,19 @@ void *
 calloc(size_t nelem, size_t bytes)
 {
 	void * ptr;
-	size_t size = nelem * bytes;
+	size_t size;
+
+	if (nelem == 0 || bytes == 0) {
+		size = 0;
+	} else {
+		size = nelem * bytes;
+
+		/* check for overflow */
+		if ((size / nelem) != bytes) {
+			errno = ENOMEM;
+			return (NULL);
+		}
+	}
 
 	ptr = malloc(size);
 	if (ptr == NULL)
