@@ -5041,6 +5041,7 @@ f usr/lib/brand/lx/amd64/lx_thunk.so.1 0755 root root
 f usr/lib/brand/lx/etc_default_nfs 0444 root root
 f usr/lib/brand/lx/etc_netconfig 0444 root root
 f usr/lib/brand/lx/lx_boot 0755 root root
+f usr/lib/brand/lx/lx_boot_zone_ubuntu 0755 root root
 f usr/lib/brand/lx/lx_init_zone 0755 root root
 f usr/lib/brand/lx/lx_init_zone_debian 0755 root root
 f usr/lib/brand/lx/lx_init_zone_redhat 0755 root root
