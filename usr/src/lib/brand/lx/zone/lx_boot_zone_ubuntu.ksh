@@ -19,6 +19,68 @@
 # sourced from lx_boot.
 #
 
+# Generate the networking.conf upstart script 
+setup_net()
+{
+    zonecfg -z $ZONENAME info net | awk '
+        BEGIN {
+            printf("description\t\"configure virtual network devices\"\n\n")
+            printf("emits static-network-up\n")
+	    printf("emits net-device-up\n\n")
+
+	    printf("start on local-filesystems\n\n")
+
+	    printf("task\n\n")
+
+	    printf("pre-start exec mkdir -p /run/network\n\n")
+
+	    printf("script\n")
+	    printf("    /sbin/ipmgmtd || true\n")
+	    printf("    /sbin/ifconfig lo0 plumb\n")
+	    printf("    /sbin/initctl emit --no-wait net-device-up IFACE=lo LOGICAL=lo ADDRFAM=inet METHOD=loopback || true\n")
+
+        } {
+            if ($1 == "physical:") {
+                phys = $2
+            } else if ($1 == "property:") {
+                split($2, a, ",")
+                split(a[1], k, "=")
+                split(a[2], v, "=")
+
+                val = substr(v[2], 2)
+                val = substr(val, 1, length(val) - 2)
+
+                if (k[2] == "ip")
+                    ip = val
+                else if (k[2] == "netmask")
+                    mask = val
+                else if (k[2] == "primary")
+                    prim = val
+            }
+
+            if ($1 == "net:" && phys != "") {
+		printf("    /sbin/ifconfig %s plumb || true\n", phys)
+		printf("    /sbin/ifconfig %s %s netmask %s up || true\n",
+		    phys, ip, mask)
+		printf("    /sbin/initctl emit --no-wait net-device-up IFACE=%s\n",
+		     phys)
+
+                phys = ""
+                prim = ""
+            }
+        }
+        END {
+	    printf("    /sbin/ifconfig %s plumb || true\n", phys)
+	    printf("    /sbin/ifconfig %s %s netmask %s up || true\n",
+		phys, ip, mask)
+	    printf("    /sbin/initctl emit --no-wait net-device-up IFACE=%s\n",
+		phys)
+
+	    printf("    /sbin/initctl emit --no-wait static-network-up\n")
+	    printf("end script\n")
+        }' > $fnm
+}
+
 RMSVCS="acpid.conf
 	control-alt-delete.conf
 	console-setup.conf
@@ -150,40 +212,12 @@ end script
 DONE
 fi
 
-# XXX fix up IP handling and multiple net definitions
-
 iptype=`/usr/sbin/zonecfg -z $ZONENAME info ip-type | cut -f2 -d' '`
 
 if [[ "$iptype" == "exclusive" ]]; then
-	ipaddr=`/usr/sbin/zonecfg -z $ZONENAME info net | \
-	    nawk -F, '/name=ip/{print substr($2, 8, length($2) - 9)}'`
-	netmask=`/usr/sbin/zonecfg -z $ZONENAME info net | \
-	    nawk -F, '/name=netmask/{print substr($2,8,length($2)-9)}'`
-
 	fnm=$ZONEROOT/etc/init/networking.conf
 	if [[ ! -h $fnm && -f $fnm ]] then
-		cat <<-DONE > $fnm
-		description	"configure virtual network devices"
-
-		emits static-network-up
-		emits net-device-up
-
-		start on local-filesystems
-
-		task
-
-		pre-start exec mkdir -p /run/network
-
-		script
-		    /sbin/ipmgmtd || true
-		    /sbin/ifconfig lo0 plumb
-		    /sbin/initctl emit --no-wait net-device-up IFACE=lo LOGICAL=lo ADDRFAM=inet METHOD=loopback || true
-		    /sbin/ifconfig net0 plumb || true
-		    /sbin/ifconfig net0 $ipaddr netmask $netmask up || true
-		    /sbin/initctl emit --no-wait net-device-up IFACE=net0
-		    /sbin/initctl emit --no-wait static-network-up
-		end script
-		DONE
+		setup_net
 	fi
 fi
 
