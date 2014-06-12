@@ -105,21 +105,39 @@ wrap_with_native() {
 
 #
 # Before we boot we validate and fix, if necessary, the required files within
-# the zone.  These modifications can be lost if a patch is applied within the
-# zone, so we validate and fix the zone every time it boots.
+# the zone.  These modifications can be lost if a patch or upgrade is applied
+# within the zone, so we validate and fix the zone every time it boots.
 #
+
+#
+# Determine the distro.
+#
+distro=""
+if [[ -f $ZONEROOT/etc/redhat-release ]]; then
+	distro="redhat"
+elif [[ -f $ZONEROOT/etc/lsb-release ]]; then
+	if egrep -s Ubuntu $ZONEROOT/etc/lsb-release; then
+		distro="ubuntu"
+	elif [[ -f $ZONEROOT/etc/debian_version ]]; then
+		distro="debian"
+	fi
+elif [[ -f $ZONEROOT/etc/debian_version ]]; then
+	distro="debian"
+fi
+
+[[ -z $distro ]] && fatal "Unsupported distribution!"
 
 #
 # BINARY REPLACEMENT
 #
-# This section of the boot script is responsible for replacing Solaris 10
-# binaries within the booting zone with Nevada binaries.  This is a two-step
+# This section of the boot script is responsible for replacing Linux
+# binaries within the booting zone with native binaries.  This is a two-step
 # process: First, the directory structure of the zone is validated to ensure
-# that binary replacement will proceed safely.  Second, Solaris 10 binaries
-# are replaced with Nevada binaries.
+# that binary replacement will proceed safely.  Second, the Linux binaries
+# are replaced with native binaries.
 #
 # Here's an example.  Suppose that you want to replace /usr/bin/zcat with the
-# Nevada /usr/bin/zcat binary.  Then you should do the following:
+# native /usr/bin/zcat binary.  Then you should do the following:
 #
 #	1.  Go to the section below labeled "STEP ONE" and add the following
 #	    two lines:
@@ -142,24 +160,30 @@ wrap_with_native() {
 # Validate that the zone filesystem looks like we expect it to.
 #
 safe_dir /sbin
+safe_dir /etc
+safe_dir /etc/init
+safe_dir /etc/update-motd.d
 
 #
 # STEP TWO
 #
 # Replace Linux binaries with native binaries.
 #
-
-#
-# Replace various network-related programs with native wrappers.
-#
 replace_with_native /sbin/ifconfig 0555 root:bin
 
-# Create native wrapper for illumos-only commands
-wrap_with_native /sbin/dladm 0555 root:bin
-wrap_with_native /sbin/ipmgmtd 0555 root:bin
+#
+# STEP THREE
+#
+# Perform distro-specific customization.
+#
+. $(dirname $0)/lx_boot_zone_${distro}
 
 #
-# END OF STEP TWO
+# STEP FOUR
 #
+# Create native wrappers for illumos-only commands
+#
+wrap_with_native /sbin/dladm 0555 root:bin
+wrap_with_native /sbin/ipmgmtd 0555 root:bin
 
 exit 0
