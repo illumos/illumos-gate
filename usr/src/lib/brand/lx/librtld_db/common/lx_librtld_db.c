@@ -205,8 +205,10 @@ lx_ldb_get_dyns32(rd_helper_data_t rhd,
 	 * success and pass back the unmolested dynamic elements that
 	 * we've already obtained.
 	 */
-	*dynpp = dynp;
-	*dynpp_sz = dynp_sz;
+	if (dynpp != NULL)
+		*dynpp = dynp;
+	if (dynpp_sz != NULL)
+		*dynpp_sz = dynp_sz;
 	ndyns = dynp_sz / sizeof (Elf32_Dyn);
 
 	/* If this isn't a dynamic object, there's nothing left todo */
