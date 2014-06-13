@@ -78,6 +78,10 @@ mount_opt_t lx_proc_options[] = {
 	{ NULL, MOUNT_OPT_INVALID }
 };
 
+mount_opt_t lx_tmpfs_options[] = {
+	{ NULL, MOUNT_OPT_INVALID }
+};
+
 mount_opt_t lx_autofs_options[] = {
 	{ LX_MNTOPT_FD,		MOUNT_OPT_UINT },
 	{ LX_MNTOPT_PGRP,	MOUNT_OPT_UINT },
@@ -588,6 +592,22 @@ lx_mount(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 			lx_unsupported("unsupported lofs mount options");
 			return (-ENOTSUP);
 		}
+	} else if (strcmp(fstype, "tmpfs") == 0) {
+
+		/* Copy in Linux mount options. */
+		if (datap != NULL) {
+			rv = uucopystr((void *)datap,
+			    options, sizeof (options));
+			if ((rv == -1) || (rv == sizeof (options)))
+				return (-EFAULT);
+		}
+		lx_debug("\tlinux mount options: \"%s\"", options);
+
+		/* Verify Linux mount options. */
+		if (i_lx_opt_verify(options, lx_tmpfs_options) == 0) {
+			lx_unsupported("unsupported tmpfs mount options");
+			return (-ENOTSUP);
+		}
 	} else if (strcmp(fstype, "proc") == 0) {
 		struct stat64	sb;
 
@@ -616,7 +636,7 @@ lx_mount(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 		}
 	} else if (strcmp(fstype, "autofs") == 0) {
 
-		/* Translate proc mount requests to lx_afs requests. */
+		/* Translate autofs mount requests to lx_afs requests. */
 		(void) strcpy(fstype, LX_AUTOFS_NAME);
 
 		/* Copy in Linux mount options. */
