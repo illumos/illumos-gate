@@ -152,37 +152,6 @@ end script
 DONE
 fi
 
-# XXX use original dbus.conf once /run is mounted as a tmpfs mount and we
-# don't need to cleanup the pid
-
-fnm=$ZONEROOT/etc/init/dbus.conf
-if [[ ! -h $fnm && -f $fnm ]] then
-	cat <<'DONE' > $fnm
-description	"D-Bus system message bus"
-
-start on local-filesystems
-stop on deconfiguring-networking
-
-expect fork
-respawn
-
-pre-start script
-    rm -f /run/dbus/pid
-
-    mkdir -p /var/run/dbus
-    chown messagebus:messagebus /var/run/dbus
-
-    exec dbus-uuidgen --ensure
-end script
-
-exec dbus-daemon --system --fork --activation=upstart
-
-post-start exec kill -USR1 1
-
-post-stop exec rm -f /var/run/dbus/pid
-DONE
-fi
-
 # XXX need to add real mounting into this svc definition
 
 fnm=$ZONEROOT/etc/init/mountall.conf
@@ -203,7 +172,7 @@ emits mounted
 
 script
     /sbin/initctl emit --no-wait virtual-filesystems
-#   mount -F tmpfs swap /run || true
+    /bin/mount -t tmpfs tmpfs /run || true
     /sbin/initctl emit --no-wait mounted MOUNTPOINT=/run
     /sbin/initctl emit --no-wait local-filesystems
     /sbin/initctl emit --no-wait all-swaps
