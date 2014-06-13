@@ -434,9 +434,11 @@ lx_ptrace_stop_for_option(int option)
 	 * setup specifically before it can send the signal, so do that here.
 	 */
 	sqp = kmem_zalloc(sizeof (sigqueue_t), KM_SLEEP);
+	mutex_enter(&pidlock);
 	p->p_wdata = SIGTRAP;
 	p->p_wcode = CLD_STOPPED;
 	sigcld(p, sqp);
+	mutex_exit(&pidlock);
 
 	/*
 	 * If (p_proc_flag & P_PR_PTRACE) were set, then in stop() we would set:
