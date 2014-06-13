@@ -20,6 +20,7 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Gary Mills
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -27,12 +28,11 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-/*	interface( label )
-	provide alternate definitions for the I/O functions through global
-	interfaces.
-*/
+/*
+ *	interface(label)
+ *	provide alternate definitions for the I/O functions through global
+ *	interfaces.
+ */
 #include	"uucp.h"
 
 #ifdef TLI
@@ -61,7 +61,7 @@ static int	usetup(), uteardown();
 GLOBAL ssize_t	(*Read)() = read,
 	(*Write)() = write;
 #if defined(__STDC__)
-GLOBAL int	(*Ioctl)(int,int,...) = ioctl,
+GLOBAL int	(*Ioctl)(int, int, ...) = ioctl,
 #else
 GLOBAL int	(*Ioctl)() = ioctl,
 #endif
@@ -76,30 +76,30 @@ static int	tioctl(int, int, ...),
 #else
 static int	tioctl(),		/* TLI i/o control */
 #endif
-		tsetup(),		/* TLI setup without streams module */
-		tssetup(),		/* TLI setup with streams module */
-		tteardown();		/* TLI teardown, works with either setup
-					*/
+		tsetup(),	/* TLI setup without streams module */
+		tssetup(),	/* TLI setup with streams module */
+		tteardown();	/* TLI teardown, works with either setup */
 #endif /*  TLI  */
-/*	The IN_label in Interface[] imply different caller routines:
-	e.g. tlicall().
-	If so, the names here and the names in callers.c must match.
-*/
+/*
+ *	The IN_label in Interface[] imply different caller routines:
+ *	e.g. tlicall().
+ *	If so, the names here and the names in callers.c must match.
+ */
 
 static
-  struct Interface {
+struct Interface {
 	char	*IN_label;		/* interface name */
 	ssize_t	(*IN_read)();		/* read function */
 	ssize_t	(*IN_write)();		/* write function */
 #ifdef __STDC__
-	int	(*IN_ioctl)(int,int,...);
+	int	(*IN_ioctl)(int, int, ...);
 #else
 	int	(*IN_ioctl)();		/* ioctl function */
 #endif
-	int	(*IN_setup)();		/* setup function, called before first
-					i/o operation */
-	int	(*IN_teardown)();	/* teardown function, called after last
-					i/o operation */
+	int	(*IN_setup)();		/* setup function, called before */
+					/* first i/o operation */
+	int	(*IN_teardown)();	/* teardown function, called after */
+					/* last i/o operation */
 } Interface[] = {
 			/* vanilla UNIX */
 		{ "UNIX", read, write, ioctl, usetup, uteardown },
@@ -132,7 +132,7 @@ static
 #endif /* DATAKIT */
 #ifdef UNET
 		{ "Unetserver", read, write, ioctl, usetup, uteardown },
-#endif		
+#endif
 		{ 0, 0, 0, 0, 0, 0 }
 	};
 
@@ -143,41 +143,41 @@ char	*label;
 {
 	register int	i;
 
-	for ( i = 0;  Interface[i].IN_label;  ++i ) {
-		if( !strcmp( Interface[i].IN_label, label ) ) {
+	for (i = 0;  Interface[i].IN_label;  ++i) {
+		if (0 == strcmp(Interface[i].IN_label, label)) {
 			Read = Interface[i].IN_read;
 			Write = Interface[i].IN_write;
 			Ioctl = Interface[i].IN_ioctl;
 			Setup = Interface[i].IN_setup;
 			Teardown = Interface[i].IN_teardown;
 			DEBUG(5, "set interface %s\n", label);
-			return( 0 );
+			return (0);
 		}
 	}
-	return( FAIL );
+	return (FAIL);
 }
 
 /*
  *	usetup - vanilla unix setup routine
  */
 static int
-usetup( role, fdreadp, fdwritep )
+usetup(role, fdreadp, fdwritep)
 int	*fdreadp, *fdwritep;
 {
-	if ( role == SLAVE )
+	if (role == SLAVE)
 	{
 		*fdreadp = 0;
 		*fdwritep = 1;
 		/* 2 has been re-opened to RMTDEBUG in main() */
 	}
-	return(SUCCESS);
+	return (SUCCESS);
 }
 
 /*
  *	uteardown - vanilla unix teardown routine
  */
 static int
-uteardown( role, fdread, fdwrite )
+uteardown(role, fdread, fdwrite)
 {
 	int ret;
 	char *ttyn;
@@ -195,7 +195,7 @@ uteardown( role, fdread, fdwrite )
 		(void) close(fdread);
 		(void) close(fdwrite);
 	}
-	return(SUCCESS);
+	return (SUCCESS);
 }
 
 #ifdef DATAKIT
@@ -206,51 +206,53 @@ uteardown( role, fdread, fdwrite )
  */
 
 static int
-dksetup (role, fdreadp, fdwritep)
+dksetup(role, fdreadp, fdwritep)
 
 int	role;
-int *	fdreadp;
-int *	fdwritep;
+int 	*fdreadp;
+int 	*fdwritep;
 
 {
 	static short dkrmode[3] = { DKR_BLOCK | DKR_TIME, 0, 0 };
 	int	ret;
 
 	(void) usetup(role, fdreadp, fdwritep);
-	if((ret = (*Ioctl)(*fdreadp, DIOCRMODE, dkrmode)) < 0) {
+	if ((ret = (*Ioctl)(*fdreadp, DIOCRMODE, dkrmode)) < 0) {
 		DEBUG(4, "dksetup: failed to set block mode. ret=%d,\n", ret);
 		DEBUG(4, "read fd=%d, ", *fdreadp);
 		DEBUG(4, "errno=%d\n", errno);
-		return(FAIL);
+		return (FAIL);
 	}
-	return(SUCCESS);
+	return (SUCCESS);
 }
 
 /*
  *	dkteardown  -  DATAKIT teardown routine
  */
 static int
-dkteardown( role, fdread, fdwrite )
+dkteardown(role, fdread, fdwrite)
 int	role, fdread, fdwrite;
 {
 	char	*ttyn;
 
-	if ( role == MASTER ) {
+	if (role == MASTER) {
 		ttyn = ttyname(fdread);
-		if ( ttyn != NULL && Dev_mode != 0 )
+		if (ttyn != NULL && Dev_mode != 0)
 			chmod(ttyn, Dev_mode);	/* can fail, but who cares? */
 	}
 
 	/*	must flush fd's for datakit	*/
 	/*	else close can hang		*/
-	if ( ioctl(fdread, DIOCFLUSH, NULL) != 0 )
-		DEBUG(4, "dkteardown: DIOCFLUSH of input fd %d failed", fdread);
-	if ( ioctl(fdwrite, DIOCFLUSH, NULL) != 0 )
-		DEBUG(4, "dkteardown: DIOCFLUSH of output fd %d failed", fdwrite);
+	if (ioctl(fdread, DIOCFLUSH, NULL) != 0)
+		DEBUG(4, "dkteardown: DIOCFLUSH of input fd %d failed",
+		    fdread);
+	if (ioctl(fdwrite, DIOCFLUSH, NULL) != 0)
+		DEBUG(4, "dkteardown: DIOCFLUSH of output fd %d failed",
+		    fdwrite);
 
-	(void)close(fdread);
-	(void)close(fdwrite);
-	return(SUCCESS);
+	(void) close(fdread);
+	(void) close(fdwrite);
+	return (SUCCESS);
 }
 #endif /* DATAKIT */
 
@@ -267,7 +269,7 @@ unsigned	nbytes;
 {
 	int		rcvflags;
 
-	return((ssize_t)t_rcv(fd, buf, nbytes, &rcvflags));
+	return ((ssize_t)t_rcv(fd, buf, nbytes, &rcvflags));
 }
 
 /*
@@ -284,39 +286,39 @@ unsigned	nbytes;
 	static int		n_writ, got_info;
 	static struct t_info	info;
 
-	if ( got_info == 0 ) {
-		if ( t_getinfo(fd, &info) != 0 ) {
+	if (got_info == 0) {
+		if (t_getinfo(fd, &info) != 0) {
 			tfaillog(fd, "twrite: t_getinfo\n");
-			return(FAIL);
+			return (FAIL);
 		}
 		got_info = 1;
 	}
 
 	/* on every N_CHECKth call, check that are still in DATAXFER state */
-	if ( ++n_writ == N_CHECK ) {
+	if (++n_writ == N_CHECK) {
 		n_writ = 0;
-		if ( t_getstate(fd) != T_DATAXFER )
-			return(FAIL);
-	}	
+		if (t_getstate(fd) != T_DATAXFER)
+			return (FAIL);
+	}
 
-	if ( info.tsdu <= 0 || nbytes <= info.tsdu )
-		return(t_snd(fd, buf, nbytes, NULL));
+	if (info.tsdu <= 0 || nbytes <= info.tsdu)
+		return (t_snd(fd, buf, nbytes, NULL));
 
 	/* if get here, then there is a limit on transmit size	*/
 	/* (info.tsdu > 0) and buf exceeds it			*/
 	i = ret = 0;
-	while ( nbytes >= info.tsdu ) {
-		if ( (ret = t_snd(fd,  &buf[i], info.tsdu, NULL)) != info.tsdu )
-			return( ( ret >= 0 ? (i + ret) : ret ) );
+	while (nbytes >= info.tsdu) {
+		if ((ret = t_snd(fd,  &buf[i], info.tsdu, NULL)) != info.tsdu)
+			return ((ret >= 0 ? (i + ret) : ret));
 		i += info.tsdu;
 		nbytes -= info.tsdu;
 	}
-	if ( nbytes != 0 ) {
-		if ( (ret = t_snd(fd,  &buf[i], nbytes, NULL)) != nbytes )
-			return( (ssize_t)( ret >= 0 ? (i + ret) : ret ) );
+	if (nbytes != 0) {
+		if ((ret = t_snd(fd,  &buf[i], nbytes, NULL)) != nbytes)
+			return ((ssize_t)(ret >= 0 ? (i + ret) : ret));
 		i += nbytes;
 	}
-	return((ssize_t)i);
+	return ((ssize_t)i);
 }
 
 
@@ -332,7 +334,7 @@ tioctl(fd, request, arg)
 int	fd, request;
 #endif
 {
-	return(SUCCESS);
+	return (SUCCESS);
 }
 
 /*
@@ -340,21 +342,21 @@ int	fd, request;
  *	note blatant assumption that *fdreadp == *fdwritep == 0
  */
 static int
-tsetup( role, fdreadp, fdwritep )
+tsetup(role, fdreadp, fdwritep)
 int	*fdreadp, *fdwritep;
 {
 
-	if ( role == SLAVE ) {
+	if (role == SLAVE) {
 		*fdreadp = 0;
 		*fdwritep = 1;
 		/* 2 has been re-opened to RMTDEBUG in main() */
 		errno = t_errno = 0;
-		if ( t_sync(*fdreadp) == -1 || t_sync(*fdwritep) == -1 ) {
+		if (t_sync(*fdreadp) == -1 || t_sync(*fdwritep) == -1) {
 			tfaillog(*fdreadp, "tsetup: t_sync\n");
-			return(FAIL);
+			return (FAIL);
 		}
 	}
-	return(SUCCESS);
+	return (SUCCESS);
 }
 
 /*
@@ -362,11 +364,11 @@ int	*fdreadp, *fdwritep;
  */
 /*ARGSUSED*/
 static int
-tteardown( role, fdread, fdwrite )
+tteardown(role, fdread, fdwrite)
 {
-	(void)t_unbind(fdread);
-	(void)t_close(fdread);
-	return(SUCCESS);
+	(void) t_unbind(fdread);
+	(void) t_close(fdread);
+	return (SUCCESS);
 }
 
 #ifdef TLIS
@@ -375,21 +377,21 @@ tteardown( role, fdread, fdwrite )
  *	note blatant assumption that *fdreadp == *fdwritep
  */
 static int
-tssetup( role, fdreadp, fdwritep )
+tssetup(role, fdreadp, fdwritep)
 int	role;
 int	*fdreadp;
 int	*fdwritep;
 {
-	if ( role == SLAVE ) {
+	if (role == SLAVE) {
 		*fdreadp = 0;
 		*fdwritep = 1;
 		/* 2 has been re-opened to RMTDEBUG in main() */
 		DEBUG(5, "tssetup: SLAVE mode: leaving ok\n%s", "");
-		return(SUCCESS);
+		return (SUCCESS);
 	}
 
 	DEBUG(4, "tssetup: MASTER mode: leaving ok\n%s", "");
-	return(SUCCESS);
+	return (SUCCESS);
 }
 
 /*
@@ -403,13 +405,13 @@ char	*s;
 	char	fmt[ BUFSIZ ];
 
 	if (0 < t_errno && t_errno < t_nerr) {
-		sprintf( fmt, "%s: %%s\n", s );
+		sprintf(fmt, "%s: %%s\n", s);
 		DEBUG(5, fmt, t_errlist[t_errno]);
 		logent(s, t_errlist[t_errno]);
-		if ( t_errno == TSYSERR ) {
+		if (t_errno == TSYSERR) {
 			strcpy(fmt, "tlicall: system error: %s\n");
 			DEBUG(5, fmt, strerror(errno));
-		} else if ( t_errno == TLOOK ) {
+		} else if (t_errno == TLOOK) {
 			show_tlook(fd);
 		}
 	} else {
@@ -420,7 +422,6 @@ char	*s;
 		sprintf(fmt, "%s: %%s\n", s);
 		DEBUG(5, fmt, strerror(errno));
 	}
-	return;
 }
 
 GLOBAL void
@@ -434,7 +435,7 @@ int fd;
  * Find out the current state of the interface.
  */
 	errno = t_errno = 0;
-	switch( reason = t_getstate(fd) ) {
+	switch (reason = t_getstate(fd)) {
 	case T_UNBND:		msg = "T_UNBIND";	break;
 	case T_IDLE:		msg = "T_IDLE";		break;
 	case T_OUTCON:		msg = "T_OUTCON";	break;
@@ -444,11 +445,11 @@ int fd;
 	case T_INREL:		msg = "T_INREL";	break;
 	default:		msg = NULL;		break;
 	}
-	if( msg == NULL )
+	if (msg == NULL)
 		return;
 
 	DEBUG(5, "state is %s", msg);
-	switch( reason = t_look(fd) ) {
+	switch (reason = t_look(fd)) {
 	case -1:		msg = ""; break;
 	case 0:			msg = "NO ERROR"; break;
 	case T_LISTEN:		msg = "T_LISTEN"; break;
@@ -457,18 +458,17 @@ int fd;
 	case T_EXDATA:		msg = "T_EXDATA"; break;
 	case T_DISCONNECT:	msg = "T_DISCONNECT"; break;
 	case T_ORDREL:		msg = "T_ORDREL"; break;
-	case T_ERROR:		msg = "T_ERROR"; break;
 	case T_UDERR:		msg = "T_UDERR"; break;
 	default:		msg = "UNKNOWN ERROR"; break;
 	}
 	DEBUG(4, " reason is %s\n", msg);
 
-	if ( reason == T_DISCONNECT )
+	if (reason == T_DISCONNECT)
 	{
 		struct t_discon	*dropped;
-		if ( ((dropped = 
-			(struct t_discon *)t_alloc(fd, T_DIS, T_ALL)) == 0) 
-		||  (t_rcvdis(fd, dropped) == -1 )) {
+		if (((dropped =
+		    (struct t_discon *)t_alloc(fd, T_DIS, T_ALL)) == 0) ||
+		    (t_rcvdis(fd, dropped) == -1)) {
 			if (dropped)
 				t_free((char *)dropped, T_DIS);
 			return;
@@ -476,7 +476,6 @@ int fd;
 		DEBUG(5, "disconnect reason #%d\n", dropped->reason);
 		t_free((char *)dropped, T_DIS);
 	}
-	return;
 }
 
 #endif /*  TLIS  */

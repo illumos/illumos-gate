@@ -28,12 +28,11 @@
 /*
  * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2014 Gary Mills
  */
 
 #ifndef _SYS_TIUSER_H
 #define	_SYS_TIUSER_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 /*
@@ -55,7 +54,6 @@ extern "C" {
 #define	T_DATA		0x0004	/* normal data received			*/
 #define	T_EXDATA	0x0008	/* expedited data received		*/
 #define	T_DISCONNECT	0x0010	/* disconnect received			*/
-#define	T_ERROR		0x0020	/* fatal error occurred			*/
 #define	T_UDERR		0x0040	/* data gram error indication		*/
 #define	T_ORDREL	0x0080	/* orderly release indication		*/
 #define	T_EVENTS	0x00ff	/* event mask				*/

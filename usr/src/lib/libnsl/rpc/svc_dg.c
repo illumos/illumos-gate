@@ -20,6 +20,7 @@
  */
 
 /*
+ * Copyright 2014 Gary Mills
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -384,7 +385,7 @@ again:
 			int lookres;
 
 			lookres = t_look(xprt->xp_fd);
-			if ((lookres & T_UDERR) &&
+			if ((lookres == T_UDERR) &&
 			    (t_rcvuderr(xprt->xp_fd,
 				    (struct t_uderr *)0) < 0)) {
 				/*EMPTY*/
@@ -394,7 +395,7 @@ again:
 					t_errno);
 #endif
 			}
-			if (lookres & T_DATA)
+			if (lookres == T_DATA)
 				goto again;
 		} else if ((errno == EINTR) && (t_errno == TSYSERR))
 			goto again;
