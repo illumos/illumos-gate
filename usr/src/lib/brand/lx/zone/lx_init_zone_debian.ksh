@@ -232,4 +232,11 @@ if [[ $distro == "debian" ]]; then
 
 fi
 
+if [[ -f etc/mtab ]]; then
+	log "Modifying: \"$install_root/etc/mtab\"..."
+
+	echo "/ / zfs rw 0 0" > etc/mtab
+	echo "proc /proc proc rw,noexec,nosuid,nodev 0 0" >> etc/mtab
+fi
+
 # Hand control back to lx_init_zone
