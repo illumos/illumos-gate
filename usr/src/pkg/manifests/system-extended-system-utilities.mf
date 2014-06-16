@@ -278,4 +278,4 @@ link path=usr/share/man/man1/uncompress.1 target=compress.1
 link path=usr/share/man/man1/unexpand.1 target=expand.1
 link path=usr/share/man/man1/unpack.1 target=pack.1
 link path=usr/share/man/man1/zcat.1 target=compress.1
-depend fmri=runtime/perl-510 type=require
+depend fmri=runtime/perl$(PERL_PKGVERS) type=require

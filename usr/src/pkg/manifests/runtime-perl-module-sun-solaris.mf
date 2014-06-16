@@ -1,0 +1,95 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2014 Racktop Systems.
+#
+
+$(i386_ONLY)<transform file dir path=.*PLAT.* -> edit path PLAT i86pc>
+$(sparc_ONLY)<transform file dir path=.*PLAT.* -> edit path PLAT sun4>
+
+<transform file path=.*\.(pm|bs) -> default mode 0444>
+<transform file path=.*\.so -> default mode 0555>
+set name=pkg.fmri \
+    value=pkg:/runtime/perl$(PERL_PKGVERS)/module/sun-solaris@0.5.11,$(PKGVERS_BUILTON)-$(PKGVERS_BRANCH)
+set name=pkg.summary value="Perl $(PERL_VERSION) Sun::Solaris Modules"
+set name=info.classification \
+    value=org.opensolaris.category.2008:Development/Perl
+set name=variant.arch value=$(ARCH)
+dir path=usr group=sys
+dir path=usr/perl5
+dir path=usr/perl5/$(PERL_VERSION)
+dir path=usr/perl5/$(PERL_VERSION)/lib
+dir path=usr/perl5/$(PERL_VERSION)/lib/PLAT-solaris-64int
+dir path=usr/perl5/$(PERL_VERSION)/lib/PLAT-solaris-64int/Sun
+dir path=usr/perl5/$(PERL_VERSION)/lib/PLAT-solaris-64int/Sun/Solaris
+dir path=usr/perl5/$(PERL_VERSION)/lib/PLAT-solaris-64int/auto
+dir path=usr/perl5/$(PERL_VERSION)/lib/PLAT-solaris-64int/auto/Sun
+dir path=usr/perl5/$(PERL_VERSION)/lib/PLAT-solaris-64int/auto/Sun/Solaris
+dir \
+    path=usr/perl5/$(PERL_VERSION)/lib/PLAT-solaris-64int/auto/Sun/Solaris/Intrs
+dir \
+    path=usr/perl5/$(PERL_VERSION)/lib/PLAT-solaris-64int/auto/Sun/Solaris/Kstat
+dir \
+    path=usr/perl5/$(PERL_VERSION)/lib/PLAT-solaris-64int/auto/Sun/Solaris/Lgrp
+dir \
+    path=usr/perl5/$(PERL_VERSION)/lib/PLAT-solaris-64int/auto/Sun/Solaris/Project
+dir \
+    path=usr/perl5/$(PERL_VERSION)/lib/PLAT-solaris-64int/auto/Sun/Solaris/Task
+dir \
+    path=usr/perl5/$(PERL_VERSION)/lib/PLAT-solaris-64int/auto/Sun/Solaris/Utils
+dir path=usr/perl5/$(PERL_VERSION)/lib/Sun
+dir path=usr/perl5/$(PERL_VERSION)/lib/Sun/Solaris
+dir path=usr/perl5/$(PERL_VERSION)/lib/Sun/Solaris/BSM
+dir path=usr/share/man
+dir path=usr/share/man/man3perl
+file \
+    path=usr/perl5/$(PERL_VERSION)/lib/PLAT-solaris-64int/Sun/Solaris/Intrs.pm
+file \
+    path=usr/perl5/$(PERL_VERSION)/lib/PLAT-solaris-64int/Sun/Solaris/Kstat.pm
+file path=usr/perl5/$(PERL_VERSION)/lib/PLAT-solaris-64int/Sun/Solaris/Lgrp.pm
+file \
+    path=usr/perl5/$(PERL_VERSION)/lib/PLAT-solaris-64int/Sun/Solaris/Project.pm
+file path=usr/perl5/$(PERL_VERSION)/lib/PLAT-solaris-64int/Sun/Solaris/Task.pm
+file \
+    path=usr/perl5/$(PERL_VERSION)/lib/PLAT-solaris-64int/Sun/Solaris/Utils.pm
+file \
+    path=usr/perl5/$(PERL_VERSION)/lib/PLAT-solaris-64int/auto/Sun/Solaris/Intrs/Intrs.so
+file \
+    path=usr/perl5/$(PERL_VERSION)/lib/PLAT-solaris-64int/auto/Sun/Solaris/Kstat/Kstat.so
+file \
+    path=usr/perl5/$(PERL_VERSION)/lib/PLAT-solaris-64int/auto/Sun/Solaris/Lgrp/Lgrp.so
+file \
+    path=usr/perl5/$(PERL_VERSION)/lib/PLAT-solaris-64int/auto/Sun/Solaris/Project/Project.so
+file \
+    path=usr/perl5/$(PERL_VERSION)/lib/PLAT-solaris-64int/auto/Sun/Solaris/Task/Task.so
+file \
+    path=usr/perl5/$(PERL_VERSION)/lib/PLAT-solaris-64int/auto/Sun/Solaris/Utils/Utils.so
+file path=usr/perl5/$(PERL_VERSION)/lib/Sun/Solaris/BSM/_BSMparse.pm
+file path=usr/perl5/$(PERL_VERSION)/lib/Sun/Solaris/Pg.pm
+file path=usr/share/man/man3perl/Kstat.3perl
+file path=usr/share/man/man3perl/Lgrp.3perl
+file path=usr/share/man/man3perl/Project.3perl
+file path=usr/share/man/man3perl/Task.3perl
+license cr_Sun license=cr_Sun
+license usr/src/cmd/perl/THIRDPARTYLICENSE \
+    license=usr/src/cmd/perl/THIRDPARTYLICENSE
