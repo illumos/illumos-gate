@@ -28,7 +28,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.TH SED 1 "May 24, 2009"
+.TH SED 1 "Jun 16, 2014"
 .SH NAME
 \fBsed\fP
 \- stream editor
@@ -69,7 +69,7 @@ The following options are available:
 Interpret regular expressions as extended (modern) regular expressions
 rather than basic regular expressions (BRE's).
 The
-\fBre_format\fP(7)
+\fBregex\fP(5)
 manual page fully describes both formats.
 .TP
 \fB\-a\fP
@@ -238,7 +238,7 @@ function.
 The regular expressions used in
 \fB,\fP
 by default, are basic regular expressions (BREs, see
-\fBre_format\fP(7)
+\fBregex\fP(5)
 for more information), but extended (modern) regular expressions can be used
 instead if the
 \fB\-E\fP
@@ -509,7 +509,7 @@ where
 ``#''
 is a digit, is replaced by the text matched
 by the corresponding backreference expression (see
-\fBre_format\fP(7)) .
+\fBregex\fP(5)) .
 
 A line can be split by substituting a newline character into it.
 To specify a newline character in the replacement string, precede it with
@@ -629,8 +629,8 @@ The \fBsed\fP utility exits 0 on success, and >0 if an error occurs.
 \fBawk\fP(1),
 \fBed\fP(1),
 \fBgrep\fP(1),
-\fBregex\fP(3),
-\fBre_format\fP(5)
+\fBregex\fP(3C),
+\fBregex\fP(5)
 .SH STANDARDS
 The
 \fBsed\fP
