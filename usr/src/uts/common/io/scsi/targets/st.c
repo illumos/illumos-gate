@@ -1690,9 +1690,7 @@ st_doattach(struct scsi_device *devp, int (*canwait)())
 
 	/*
 	 * use i_ddi_mem_alloc() for now until we have an interface to allocate
-	 * memory for DMA which doesn't require a DMA handle. ddi_iopb_alloc()
-	 * is obsolete and we want more flexibility in controlling the DMA
-	 * address constraints.
+	 * memory for DMA which doesn't require a DMA handle.
 	 */
 	(void) i_ddi_mem_alloc(devp->sd_dev, &st_alloc_attr,
 	    sizeof (struct seq_mode), ((km_flags == KM_SLEEP) ? 1 : 0), 0,

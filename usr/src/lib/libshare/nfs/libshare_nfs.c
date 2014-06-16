@@ -1041,14 +1041,17 @@ cleanup_export(struct exportdata *export)
 {
 	int i;
 
-	if (export->ex_index != NULL)
-		free(export->ex_index);
-	if (export->ex_secinfo != NULL) {
-		for (i = 0; i < export->ex_seccnt; i++)
-			if (export->ex_secinfo[i].s_rootnames != NULL)
-				free(export->ex_secinfo[i].s_rootnames);
-		free(export->ex_secinfo);
+	free(export->ex_index);
+
+	for (i = 0; i < export->ex_seccnt; i++) {
+		struct secinfo *s = &export->ex_secinfo[i];
+
+		while (s->s_rootcnt > 0)
+			free(s->s_rootnames[--s->s_rootcnt]);
+
+		free(s->s_rootnames);
 	}
+	free(export->ex_secinfo);
 }
 
 /*
@@ -1084,6 +1087,8 @@ get_rootnames(seconfig_t *sec, char *list, int *count)
 		for (i = 0; i < c; i++) {
 			host = strtok(list, ":");
 			if (!nfs_get_root_principal(sec, host, &a[i])) {
+				while (i > 0)
+					free(a[--i]);
 				free(a);
 				a = NULL;
 				break;
@@ -1150,7 +1155,7 @@ fill_security_from_secopts(struct secinfo *sp, sa_security_t secopts)
 			 * such as RO/RW
 			 */
 			if (sp->s_secinfo.sc_rpcnum == AUTH_UNIX)
-				continue;
+				break;
 			/* not AUTH_UNIX */
 			if (value != NULL) {
 				sp->s_rootnames = get_rootnames(&sp->s_secinfo,

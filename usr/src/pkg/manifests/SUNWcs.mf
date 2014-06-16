@@ -1860,6 +1860,10 @@ depend fmri=release/name type=require
 #
 depend fmri=runtime/perl type=require
 #
+# intrd uses sun-solaris Perl modules
+#
+depend fmri=runtime/perl/module/sun-solaris type=require
+#
 # The loadkeys binary needs the keytables.
 #
 depend fmri=system/data/keyboard/keytables type=require

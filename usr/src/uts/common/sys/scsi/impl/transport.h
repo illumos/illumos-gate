@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  */
 
 #ifndef	_SYS_SCSI_IMPL_TRANSPORT_H
@@ -352,13 +353,6 @@ int		scsi_hba_init(
 
 void		scsi_hba_fini(
 				struct modlinkage	*modlp);
-
-int		scsi_hba_attach(
-				dev_info_t		*hba_dip,
-				ddi_dma_lim_t		*hba_lim,
-				scsi_hba_tran_t		*tran,
-				int			flags,
-				void			*hba_options);
 
 int		scsi_hba_attach_setup(
 				dev_info_t		*hba_dip,

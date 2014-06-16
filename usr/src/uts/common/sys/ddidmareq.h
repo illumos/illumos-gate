@@ -22,7 +22,7 @@
  * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
- * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  */
 
 #ifndef	_SYS_DDIDMAREQ_H
@@ -730,12 +730,12 @@ enum ddi_dma_ctlops {
 	DDI_DMA_RELEASE,	/* free preallocated DVMA range		*/
 	DDI_DMA_RESETH,		/* obsolete - do not use		*/
 	DDI_DMA_CKSYNC,		/* obsolete - do not use		*/
-	DDI_DMA_IOPB_ALLOC,	/* get contiguous DMA-able memory	*/
-	DDI_DMA_IOPB_FREE,	/* return contiguous DMA-able memory	*/
-	DDI_DMA_SMEM_ALLOC,	/* get contiguous DMA-able memory	*/
-	DDI_DMA_SMEM_FREE,	/* return contiguous DMA-able memory	*/
+	DDI_DMA_IOPB_ALLOC,	/* obsolete - do not use		*/
+	DDI_DMA_IOPB_FREE,	/* obsolete - do not use		*/
+	DDI_DMA_SMEM_ALLOC,	/* obsolete - do not use		*/
+	DDI_DMA_SMEM_FREE,	/* obsolete - do not use		*/
 	DDI_DMA_SET_SBUS64,	/* 64 bit SBus support			*/
-	DDI_DMA_REMAP,		/* remap DMA buffers after relocation	*/
+	DDI_DMA_REMAP,		/* remap DVMA buffers after relocation	*/
 
 		/*
 		 * control ops for DMA engine on motherboard
@@ -752,7 +752,7 @@ enum ddi_dma_ctlops {
 	DDI_DMA_E_STOP,		/* stop a channel of DMA engine		*/
 	DDI_DMA_E_DISABLE,	/* disable channel of DMA engine	*/
 	DDI_DMA_E_GETCNT,	/* get remaining xfer count		*/
-	DDI_DMA_E_GETLIM,	/* get DMA engine limits		*/
+	DDI_DMA_E_GETLIM,	/* obsolete - do not use		*/
 	DDI_DMA_E_GETATTR	/* get DMA engine attributes		*/
 };
 
