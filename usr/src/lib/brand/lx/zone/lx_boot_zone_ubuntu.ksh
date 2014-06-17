@@ -173,7 +173,7 @@ emits mounted
 script
     /sbin/initctl emit --no-wait virtual-filesystems
     /bin/mount -t tmpfs tmpfs /run || true
-    /sbin/initctl emit --no-wait mounted MOUNTPOINT=/run
+    /sbin/initctl emit --no-wait mounted MOUNTPOINT=/run TYPE=tmpfs
     /sbin/initctl emit --no-wait local-filesystems
     /sbin/initctl emit --no-wait all-swaps
     /sbin/initctl emit --no-wait filesystem
