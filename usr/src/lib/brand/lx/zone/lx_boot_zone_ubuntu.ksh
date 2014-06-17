@@ -171,6 +171,9 @@ emits filesystem
 emits mounted
 
 script
+    echo "/ / zfs rw 0 0" > /etc/mtab
+    echo "proc /proc proc rw,noexec,nosuid,nodev 0 0" >> /etc/mtab
+
     /sbin/initctl emit --no-wait virtual-filesystems
     /bin/mount -t tmpfs tmpfs /run || true
     /sbin/initctl emit --no-wait mounted MOUNTPOINT=/run TYPE=tmpfs
