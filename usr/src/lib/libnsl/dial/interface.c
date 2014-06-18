@@ -26,9 +26,8 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2014 Gary Mills
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * interface( label )
@@ -287,10 +286,10 @@ tfaillog(int fd, const char *s)
 		}
 	} else {
 		(void) snprintf(fmt, sizeof (fmt),
-					"unknown tli error %d", t_errno);
+		    "unknown tli error %d", t_errno);
 		logent(s, fmt);
 		(void) snprintf(fmt, sizeof (fmt),
-					"%s: unknown tli error %d", s, t_errno);
+		    "%s: unknown tli error %d", s, t_errno);
 		DEBUG(5, fmt, 0);
 		(void) snprintf(fmt, sizeof (fmt), "%s: %%s\n", s);
 		DEBUG(5, fmt, strerror(errno));
@@ -329,7 +328,6 @@ show_tlook(int fd)
 	case T_EXDATA:		msg = (const char *)"T_EXDATA"; break;
 	case T_DISCONNECT:	msg = (const char *)"T_DISCONNECT"; break;
 	case T_ORDREL:		msg = (const char *)"T_ORDREL"; break;
-	case T_ERROR:		msg = (const char *)"T_ERROR"; break;
 	case T_UDERR:		msg = (const char *)"T_UDERR"; break;
 	default:		msg = (const char *)"UNKNOWN ERROR"; break;
 	}
@@ -338,9 +336,9 @@ show_tlook(int fd)
 	if (reason == T_DISCONNECT) {
 		struct t_discon	*dropped;
 		if (((dropped =
-			/* LINTED pointer cast */
-			(struct t_discon *)t_alloc(fd, T_DIS, T_ALL)) == 0) ||
-			(t_rcvdis(fd, dropped) == -1)) {
+		    /* LINTED pointer cast */
+		    (struct t_discon *)t_alloc(fd, T_DIS, T_ALL)) == 0) ||
+		    (t_rcvdis(fd, dropped) == -1)) {
 			if (dropped)
 				(void) t_free((char *)dropped, T_DIS);
 			return;

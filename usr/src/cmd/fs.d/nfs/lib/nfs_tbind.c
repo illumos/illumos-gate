@@ -23,6 +23,7 @@
  * Copyright (c) 1996, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
  * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2014 Gary Mills
  */
 
 
@@ -1589,9 +1590,8 @@ printf("do_poll_cots_action(%s,%d): T_DISCONNECT event\n", nconf->nc_proto, fd);
 			else
 				goto fdclose;
 
-		case T_ERROR:
 		default:
-			if (event == T_ERROR || t_errno == TSYSERR) {
+			if (t_errno == TSYSERR) {
 				if ((errorstr = strerror(errno)) == NULL) {
 					(void) sprintf(buf,
 					    "Unknown error num %d", errno);

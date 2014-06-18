@@ -20,6 +20,7 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Gary Mills
  * Copyright 2001 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -31,8 +32,6 @@
  * Portions of this source code were derived from Berkeley 4.3 BSD
  * under license from the Regents of the University of California.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Miscellaneous support routines for kernel implentation of AUTH_DES
@@ -111,187 +110,207 @@ again:
 		}
 
 		if (synconfig->knc_semantics == NC_TPI_CLTS) {
-		    if ((error = t_kalloc(tiptr, T_UNITDATA, T_UDATA|T_ADDR,
-			(char **)&unitdata)) != 0) {
-			    RPCLOG(1, "rtime: t_kalloc %d\n", error);
-			    (void) t_kclose(tiptr, 1);
-			    return (-1);
-		    }
+			if ((error = t_kalloc(tiptr, T_UNITDATA,
+			    T_UDATA|T_ADDR, (char **)&unitdata)) != 0) {
+				RPCLOG(1, "rtime: t_kalloc %d\n", error);
+				(void) t_kclose(tiptr, 1);
+				return (-1);
+			}
 
-		    unitdata->addr.len = addrp->len;
-		    bcopy(addrp->buf, unitdata->addr.buf, unitdata->addr.len);
+			unitdata->addr.len = addrp->len;
+			bcopy(addrp->buf, unitdata->addr.buf,
+			    unitdata->addr.len);
 
-		    dummy = 0;
-		    unitdata->udata.buf = (caddr_t)&dummy;
-		    unitdata->udata.len = sizeof (dummy);
+			dummy = 0;
+			unitdata->udata.buf = (caddr_t)&dummy;
+			unitdata->udata.len = sizeof (dummy);
 
-		    if ((error = t_ksndudata(tiptr, unitdata, NULL)) != 0) {
-			    RPCLOG(1, "rtime: t_ksndudata %d\n", error);
-			    (void) t_kfree(tiptr, (char *)unitdata, T_UNITDATA);
-			    (void) t_kclose(tiptr, 1);
-			    return (-1);
-		    }
+			if ((error = t_ksndudata(tiptr, unitdata, NULL)) !=
+			    0) {
+				RPCLOG(1, "rtime: t_ksndudata %d\n", error);
+				(void) t_kfree(tiptr, (char *)unitdata,
+				    T_UNITDATA);
+				(void) t_kclose(tiptr, 1);
+				return (-1);
+			}
 
-		    timo = TIMEVAL_TO_TICK(wait);
+			timo = TIMEVAL_TO_TICK(wait);
 
-		    RPCLOG(8, "rtime: timo %x\n", timo);
-		    if ((error = t_kspoll(tiptr, timo, READWAIT, &type)) != 0) {
-			    RPCLOG(1, "rtime: t_kspoll %d\n", error);
-			    (void) t_kfree(tiptr, (char *)unitdata, T_UNITDATA);
-			    (void) t_kclose(tiptr, 1);
-			    return (-1);
-		    }
-
-		    if (type == 0) {
-			    RPCLOG0(1, "rtime: t_kspoll timed out\n");
-			    (void) t_kfree(tiptr, (char *)unitdata, T_UNITDATA);
-			    (void) t_kclose(tiptr, 1);
-			    return (-1);
-		    }
-
-		    error = t_krcvudata(tiptr, unitdata, &type, &uderr);
-		    if (error != 0) {
-			    RPCLOG(1, "rtime: t_krcvudata %d\n", error);
-			    (void) t_kfree(tiptr, (char *)unitdata, T_UNITDATA);
-			    (void) t_kclose(tiptr, 1);
-			    return (-1);
-		    }
-
-		    if (type == T_UDERR) {
-			    if (bcmp(addrp->buf, unitdata->addr.buf,
-				unitdata->addr.len) != 0) {
-				/*
-				 * Response comes from some other
-				 * destination:
-				 * ignore it since it's not related to the
-				 * request we just sent out.
-				 */
-				    (void) t_kfree(tiptr, (char *)unitdata,
-					T_UNITDATA);
-				    (void) t_kclose(tiptr, 1);
-				    goto again;
-			    }
-		    }
-
-		    if (type != T_DATA) {
-			    RPCLOG(1, "rtime: t_krcvudata returned type %d\n",
-				type);
-			    (void) t_kfree(tiptr, (char *)unitdata, T_UNITDATA);
-			    (void) t_kclose(tiptr, 1);
-			    if (retries-- == 0)
-				    return (-1);
-			    goto again;
-		    }
-
-		    if (unitdata->udata.len < sizeof (uint32_t)) {
-			    RPCLOG(1, "rtime: bad rcvd length %d\n",
-				unitdata->udata.len);
-			    (void) t_kfree(tiptr, (char *)unitdata, T_UNITDATA);
-			    (void) t_kclose(tiptr, 1);
-			    if (retries-- == 0)
-				    return (-1);
-			    goto again;
-		    }
-
-		    /* LINTED pointer alignment */
-		    thetime = (time_t)ntohl(*(uint32_t *)unitdata->udata.buf);
-		    (void) t_kfree(tiptr, (char *)unitdata, T_UNITDATA);
-
-		} else {
-
-		    if ((error = t_kalloc(tiptr, T_CALL, T_ADDR,
-			(char **)&server)) != 0) {
-			    RPCLOG(1, "rtime: t_kalloc %d\n", error);
-			    (void) t_kclose(tiptr, 1);
-			    return (-1);
-		    }
-
-		    server->addr.len = addrp->len;
-		    bcopy(addrp->buf, server->addr.buf, server->addr.len);
-
-		    if ((error = t_kconnect(tiptr, server, NULL)) != 0) {
-			    RPCLOG(1, "rtime: t_kconnect %d\n", error);
-			    (void) t_kfree(tiptr, (char *)server, T_CALL);
-			    (void) t_kclose(tiptr, 1);
-			    return (-1);
-		    }
-		    (void) t_kfree(tiptr, (char *)server, T_CALL);
-
-		    timo = TIMEVAL_TO_TICK(wait);
-
-		    RPCLOG(8, "rtime: timo %x\n", timo);
-
-		    i = 0;
-		    dummy = 0;
-
-		    /* now read up to 4 bytes from the TIME server */
-		    while (i < sizeof (dummy)) {
-
-			error = t_kspoll(tiptr, timo, READWAIT, &type);
-			if (error != 0) {
+			RPCLOG(8, "rtime: timo %x\n", timo);
+			if ((error = t_kspoll(tiptr, timo, READWAIT,
+			    &type)) != 0) {
 				RPCLOG(1, "rtime: t_kspoll %d\n", error);
+				(void) t_kfree(tiptr, (char *)unitdata,
+				    T_UNITDATA);
 				(void) t_kclose(tiptr, 1);
 				return (-1);
 			}
 
 			if (type == 0) {
 				RPCLOG0(1, "rtime: t_kspoll timed out\n");
+				(void) t_kfree(tiptr, (char *)unitdata,
+				    T_UNITDATA);
 				(void) t_kclose(tiptr, 1);
 				return (-1);
 			}
 
-			error = tli_recv(tiptr, &mp, tiptr->fp->f_flag);
+			error = t_krcvudata(tiptr, unitdata, &type, &uderr);
 			if (error != 0) {
-				RPCLOG(1, "rtime: tli_recv %d\n", error);
+				RPCLOG(1, "rtime: t_krcvudata %d\n", error);
+				(void) t_kfree(tiptr, (char *)unitdata,
+				    T_UNITDATA);
+				(void) t_kclose(tiptr, 1);
+				if (error == EBADMSG && retries-- > 0)
+					goto again;
+				return (-1);
+			}
+
+			if (type == T_UDERR) {
+				if (bcmp(addrp->buf, unitdata->addr.buf,
+				    unitdata->addr.len) != 0) {
+				/*
+				 * Response comes from some other
+				 * destination:
+				 * ignore it since it's not related to the
+				 * request we just sent out.
+				 */
+					(void) t_kfree(tiptr, (char *)unitdata,
+					    T_UNITDATA);
+					(void) t_kclose(tiptr, 1);
+					goto again;
+				}
+			}
+
+			if (type != T_DATA) {
+				RPCLOG(1,
+				    "rtime: t_krcvudata returned type %d\n",
+				    type);
+				(void) t_kfree(tiptr, (char *)unitdata,
+				    T_UNITDATA);
+				(void) t_kclose(tiptr, 1);
+				if (retries-- == 0)
+					return (-1);
+				goto again;
+			}
+
+			if (unitdata->udata.len < sizeof (uint32_t)) {
+				RPCLOG(1, "rtime: bad rcvd length %d\n",
+				    unitdata->udata.len);
+				(void) t_kfree(tiptr, (char *)unitdata,
+				    T_UNITDATA);
+				(void) t_kclose(tiptr, 1);
+				if (retries-- == 0)
+					return (-1);
+				goto again;
+			}
+
+			thetime = (time_t)ntohl(
+			    /* LINTED pointer alignment */
+			    *(uint32_t *)unitdata->udata.buf);
+			(void) t_kfree(tiptr, (char *)unitdata, T_UNITDATA);
+
+		} else {
+
+			if ((error = t_kalloc(tiptr, T_CALL, T_ADDR,
+			    (char **)&server)) != 0) {
+				RPCLOG(1, "rtime: t_kalloc %d\n", error);
 				(void) t_kclose(tiptr, 1);
 				return (-1);
 			}
 
-			if (mp->b_datap->db_type != M_DATA) {
-				RPCLOG(1, "rtime: wrong msg type %d\n",
-					mp->b_datap->db_type);
-				RPCLOG(1, "rtime: wrong msg type: read %d"
-					" bytes\n", i);
+			server->addr.len = addrp->len;
+			bcopy(addrp->buf, server->addr.buf, server->addr.len);
+
+			if ((error = t_kconnect(tiptr, server, NULL)) != 0) {
+				RPCLOG(1, "rtime: t_kconnect %d\n", error);
+				(void) t_kfree(tiptr, (char *)server, T_CALL);
 				(void) t_kclose(tiptr, 1);
-				freemsg(mp);
 				return (-1);
 			}
+			(void) t_kfree(tiptr, (char *)server, T_CALL);
 
-			mp2 = mp;
+			timo = TIMEVAL_TO_TICK(wait);
 
-			/*
-			 * The outer loop iterates until we reach the end of
-			 * the mblk chain.
-			 */
-			while (mp2 != NULL) {
+			RPCLOG(8, "rtime: timo %x\n", timo);
+
+			i = 0;
+			dummy = 0;
+
+			/* now read up to 4 bytes from the TIME server */
+			while (i < sizeof (dummy)) {
+
+				error = t_kspoll(tiptr, timo, READWAIT, &type);
+				if (error != 0) {
+					RPCLOG(1, "rtime: t_kspoll %d\n",
+					    error);
+					(void) t_kclose(tiptr, 1);
+					return (-1);
+				}
+
+				if (type == 0) {
+					RPCLOG0(1,
+					    "rtime: t_kspoll timed out\n");
+					(void) t_kclose(tiptr, 1);
+					return (-1);
+				}
+
+				error = tli_recv(tiptr, &mp,
+				    tiptr->fp->f_flag);
+				if (error != 0) {
+					RPCLOG(1, "rtime: tli_recv %d\n",
+					    error);
+					(void) t_kclose(tiptr, 1);
+					return (-1);
+				}
+
+				if (mp->b_datap->db_type != M_DATA) {
+					RPCLOG(1, "rtime: wrong msg type %d\n",
+					    mp->b_datap->db_type);
+					RPCLOG(1,
+					    "rtime: wrong msg type: read %d"
+					    " bytes\n", i);
+					(void) t_kclose(tiptr, 1);
+					freemsg(mp);
+					return (-1);
+				}
+
+				mp2 = mp;
 
 				/*
-				 * The inner loop iterates until we've gotten
-				 * 4 bytes or until the mblk is exhausted.
+				 * The outer loop iterates until we reach the
+				 * end of the mblk chain.
 				 */
-				while (i < sizeof (dummy) &&
-				    mp2->b_rptr < mp2->b_wptr) {
+				while (mp2 != NULL) {
 
-					i++;
+					/*
+					 * The inner loop iterates until
+					 * we've gotten 4 bytes or until
+					 * the mblk is exhausted.
+					 */
+					while (i < sizeof (dummy) &&
+					    mp2->b_rptr < mp2->b_wptr) {
+
+						i++;
 
 					/*
 					 * We avoid big-endian/little-endian
 					 * issues by serializing the result
 					 * one byte at a time.
 					 */
-					dummy <<= 8;
-					dummy += ((*mp2->b_rptr) & 0xFF);
+						dummy <<= 8;
+						dummy += ((*mp2->b_rptr) &
+						    0xFF);
 
-					mp2->b_rptr++;
+						mp2->b_rptr++;
+					}
+
+					mp2 = mp2->b_cont;
 				}
 
-				mp2 = mp2->b_cont;
+			freemsg(mp);
 			}
 
-			freemsg(mp);
-		    }
-
-		    thetime = (time_t)dummy;
+			thetime = (time_t)dummy;
 		}
 
 		(void) t_kclose(tiptr, 1);
