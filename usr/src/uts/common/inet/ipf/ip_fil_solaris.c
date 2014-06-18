@@ -162,9 +162,13 @@ char *hook6_loop_out_gz = 	"ipfilter_hook6_loop_out_gz";
 
 /* vnd IPv4/v6 hook names */
 char *hook4_vnd_in =		"ipfilter_hookvndl3v4_in";
+char *hook4_vnd_in_gz =		"ipfilter_hookvndl3v4_in_gz";
 char *hook6_vnd_in =		"ipfilter_hookvndl3v6_in";
+char *hook6_vnd_in_gz =		"ipfilter_hookvndl3v6_in_gz";
 char *hook4_vnd_out =		"ipfilter_hookvndl3v4_out";
+char *hook4_vnd_out_gz =	"ipfilter_hookvndl3v4_out_gz";
 char *hook6_vnd_out =		"ipfilter_hookvndl3v6_out";
+char *hook6_vnd_out_gz =	"ipfilter_hookvndl3v6_out_gz";
 
 /* ------------------------------------------------------------------------ */
 /* Function:    ipldetach                                                   */
@@ -487,10 +491,10 @@ ipf_stack_t *ifs;
 	if (ifs->ifs_ipf_vndl3v4 == NULL)
 		goto hookup_failed;
 
-	HOOK_INIT(ifs->ifs_ipfhookvndl3v4_in, ipf_hookvndl3v4_in,
-	    hook4_vnd_in, ifs);
-	HOOK_INIT(ifs->ifs_ipfhookvndl3v4_out, ipf_hookvndl3v4_out,
-	    hook4_vnd_out, ifs);
+	HOOK_INIT_GZ_BEFORE(ifs->ifs_ipfhookvndl3v4_in, ipf_hookvndl3v4_in,
+	    hook4_vnd_in, hook4_vnd_in_gz, ifs);
+	HOOK_INIT_GZ_AFTER(ifs->ifs_ipfhookvndl3v4_out, ipf_hookvndl3v4_out,
+	    hook4_vnd_out, hook4_vnd_out_gz, ifs);
 	ifs->ifs_hookvndl3v4_physical_in = (net_hook_register(ifs->ifs_ipf_vndl3v4,
 	    NH_PHYSICAL_IN, ifs->ifs_ipfhookvndl3v4_in) == 0);
 	if (!ifs->ifs_hookvndl3v4_physical_in)
@@ -509,10 +513,10 @@ ipf_stack_t *ifs;
 	if (ifs->ifs_ipf_vndl3v6 == NULL)
 		goto hookup_failed;
 
-	HOOK_INIT(ifs->ifs_ipfhookvndl3v6_in, ipf_hookvndl3v6_in,
-	    hook6_vnd_in, ifs);
-	HOOK_INIT(ifs->ifs_ipfhookvndl3v6_out, ipf_hookvndl3v6_out,
-	    hook6_vnd_out, ifs);
+	HOOK_INIT_GZ_BEFORE(ifs->ifs_ipfhookvndl3v6_in, ipf_hookvndl3v6_in,
+	    hook6_vnd_in, hook6_vnd_in_gz, ifs);
+	HOOK_INIT_GZ_AFTER(ifs->ifs_ipfhookvndl3v6_out, ipf_hookvndl3v6_out,
+	    hook6_vnd_out, hook6_vnd_out_gz, ifs);
 	ifs->ifs_hookvndl3v6_physical_in = (net_hook_register(ifs->ifs_ipf_vndl3v6,
 	    NH_PHYSICAL_IN, ifs->ifs_ipfhookvndl3v6_in) == 0);
 	if (!ifs->ifs_hookvndl3v6_physical_in)
