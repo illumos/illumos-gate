@@ -311,7 +311,7 @@ mptsas_ioc_do_get_facts_reply(mptsas_t *mpt, caddr_t memp, int var,
 		    mpt->m_instance);
 		mpt->m_MPI25 = TRUE;
 	} else {
-		mptsas_log(mpt, CE_NOTE, "?mpt%d MPI Version 0x%x\n",
+		mptsas_log(mpt, CE_NOTE, "?mpt_sas%d MPI Version 0x%x\n",
 		    mpt->m_instance, msgversion);
 	}
 
