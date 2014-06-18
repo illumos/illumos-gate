@@ -37,7 +37,7 @@
 
 #include "lx_proc.h"
 
-#define	LXPRCACHE_NAME "lxpr_cache"
+#define	LXPRCACHE_NAME "lxbpr_cache"
 
 static int lxpr_node_constructor(void *, void *, int);
 static void lxpr_node_destructor(void *, void *);
