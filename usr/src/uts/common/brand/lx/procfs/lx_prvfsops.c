@@ -85,7 +85,7 @@ static vfsdef_t vfw = {
 extern struct mod_ops mod_fsops;
 
 static struct modlfs modlfs = {
-	&mod_fsops, "generic linux procfs", &vfw
+	&mod_fsops, "lx brand procfs", &vfw
 };
 
 static struct modlinkage modlinkage = {
