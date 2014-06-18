@@ -267,13 +267,7 @@ typedef struct	mptsas_cmd {
 	off_t			cmd_dma_offset;
 	size_t			cmd_dma_len;
 	uint32_t		cmd_totaldmacount;
-
-	ddi_dma_handle_t	cmd_arqhandle;	/* dma arq handle */
-	ddi_dma_cookie_t	cmd_arqcookie;
-	struct buf		*cmd_arq_buf;
-	ddi_dma_handle_t	cmd_ext_arqhandle; /* dma extern arq handle */
-	ddi_dma_cookie_t	cmd_ext_arqcookie;
-	struct buf		*cmd_ext_arq_buf;
+	caddr_t			cmd_arq_buf;
 
 	int			cmd_pkt_flags;
 
@@ -286,6 +280,9 @@ typedef struct	mptsas_cmd {
 	uchar_t			cmd_cdblen;	/* length of cdb */
 	uchar_t			cmd_rqslen;	/* len of requested rqsense */
 	uchar_t			cmd_privlen;
+	uint16_t		cmd_extrqslen;	/* len of extended rqsense */
+	uint16_t		cmd_extrqschunks; /* len in map chunks */
+	uint16_t		cmd_extrqsidx;	/* Index into map */
 	uint_t			cmd_scblen;
 	uint32_t		cmd_dmacount;
 	uint64_t		cmd_dma_addr;
@@ -333,7 +330,6 @@ typedef struct	mptsas_cmd {
 #define	CFLAG_PMM_RECEIVED	0x200000 /* use cmd_pmm* for saving pointers */
 #define	CFLAG_RETRY		0x400000 /* cmd has been retried */
 #define	CFLAG_CMDIOC		0x800000 /* cmd is just for for ioc, no io */
-#define	CFLAG_EXTARQBUFVALID	0x1000000 /* extern arq buf handle is valid */
 #define	CFLAG_PASSTHRU		0x2000000 /* cmd is a passthrough command */
 #define	CFLAG_XARQ		0x4000000 /* cmd requests for extra sense */
 #define	CFLAG_CMDACK		0x8000000 /* cmd for event ack */
@@ -750,6 +746,8 @@ typedef struct mptsas {
 
 	ddi_dma_handle_t m_dma_req_frame_hdl;
 	ddi_acc_handle_t m_acc_req_frame_hdl;
+	ddi_dma_handle_t m_dma_req_sense_hdl;
+	ddi_acc_handle_t m_acc_req_sense_hdl;
 	ddi_dma_handle_t m_dma_reply_frame_hdl;
 	ddi_acc_handle_t m_acc_reply_frame_hdl;
 	ddi_dma_handle_t m_dma_free_queue_hdl;
@@ -805,17 +803,22 @@ typedef struct mptsas {
 	 */
 	caddr_t		m_req_frame;
 	uint64_t	m_req_frame_dma_addr;
+	caddr_t		m_req_sense;
+	caddr_t		m_extreq_sense;
+	uint64_t	m_req_sense_dma_addr;
 	caddr_t		m_reply_frame;
 	uint64_t	m_reply_frame_dma_addr;
 	caddr_t		m_free_queue;
 	uint64_t	m_free_queue_dma_addr;
 	caddr_t		m_post_queue;
 	uint64_t	m_post_queue_dma_addr;
+	struct map	*m_erqsense_map;
 
 	m_replyh_arg_t *m_replyh_args;
 
 	uint16_t	m_max_requests;
 	uint16_t	m_req_frame_size;
+	uint16_t	m_req_sense_size;
 
 	/*
 	 * Max frames per request reprted in IOC Facts
@@ -1442,7 +1445,7 @@ void mptsas_debug_log(char *fmt, ...);
 #define	NDBG24(args)	MPTSAS_DBGPR(0x1000000, args)	/* capabilities */
 #define	NDBG25(args)	MPTSAS_DBGPR(0x2000000, args)	/* flushing */
 #define	NDBG26(args)	MPTSAS_DBGPR(0x4000000, args)
-#define	NDBG27(args)	MPTSAS_DBGPR(0x8000000, args)
+#define	NDBG27(args)	MPTSAS_DBGPR(0x8000000, args)	/* passthrough */
 
 #define	NDBG28(args)	MPTSAS_DBGPR(0x10000000, args)	/* hotplug */
 #define	NDBG29(args)	MPTSAS_DBGPR(0x20000000, args)	/* timeouts */
