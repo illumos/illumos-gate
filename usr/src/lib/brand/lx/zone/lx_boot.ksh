@@ -56,51 +56,56 @@ fi
 BRANDDIR=/native/usr/lib/brand/lx;
 EXIT_CODE=1
 
-#
-# Replace the specified file in the booting zone with a wrapper script that
-# invokes lx_isaexec_wrapper.  This is a convenience function that reduces
-# clutter and code duplication.
-#
-# Parameters:
-#	$1	The full path of the file to replace (e.g., /sbin/ifconfig)
-#	$2	The access mode of the replacement file in hex (e.g., 0555)
-#	$3	The name of the replacement file's owner (e.g., root:bin)
-#
-# NOTE: The checks performed in the 'if' statement below are not generic: they
-# depend on the success of the zone filesystem structure validation performed
-# above to ensure that intermediate directories exist and aren't symlinks.
-#
-replace_with_native() {
-	path_dname=$ZONEROOT/`dirname $1`
+# $1 is lx cmd, $2 is native cmd,
+# the lx cmd path must have already be verified with safe_dir
+setup_native_isaexeccmd() {
+	cmd_name=$ZONEROOT/$1
 
-	[ ! -f $1 ] && printf "$w_missing" "$1"
-	if [ ! -h $path_dname -a -d $path_dname ]; then
-		safe_replace $ZONEROOT/$1 $BRANDDIR/lx_isaexec_wrapper $2 $3 \
-		    remove
+	if [ -h $cmd_name -o \( -e $cmd_name -a ! -f $cmd_name \) ]; then
+		logger -p daemon.err "dangerous zone cmd: $ZONENAME, $1" 
+		return
 	fi
+
+	cat <<-DONE >$ZONEROOT/$1
+	#!/bin/sh
+
+	exec /native/usr/lib/brand/lx/lx_native \
+	    /native/lib/ld.so.1 \
+	    -e LD_NOENVIRON=1 \
+	    -e LD_NOCONFIG=1 \
+	    -e LD_PRELOAD_32=/native/usr/lib/brand/lx/lx_thunk.so.1 \
+	    -e LD_LIBRARY_PATH_32="/native/lib:/native/usr/lib" \
+	    $2 "\$@"
+
+	exec /native/usr/lib/brand/lx/lx_native $2 "\$@"
+	DONE
+
+	chmod 755 $ZONEROOT/$1
 }
 
-#
-# Create a new wrapper script that invokes lx_isaexec_wrapper in the
-# brand (for a non-existing Linux file) pointing to the native brand file.
-#
-# Parameters:
-#	$1	The full path of the wrapper file to create
-#	$2	The access mode of the replacement file in hex (e.g., 0555)
-#	$3	The name of the replacement file's owner (e.g., root:bin)
-#
-wrap_with_native() {
-	path_dname=$ZONEROOT/`dirname $1`
-	cmd_name=`basename $1`
-	if [ ! -h $path_dname -a -d $path_dname -a ! -f $ZONEROOT/$1 ]; then
-		if [ -x /usr/lib/brand/lx/lx_$cmd_name ]; then
-			safe_wrap $ZONEROOT/$1 $BRANDDIR/lx_$cmd_name \
-			   $2 $3
-		else
-			safe_wrap $ZONEROOT/$1 $BRANDDIR/lx_isaexec_wrapper \
-			   $2 $3
-		fi
+# $1 is lx cmd, $2 is native cmd, $3 is an optional inclusion in the script
+# the lx cmd path must have already be verified with safe_dir
+setup_native_cmd() {
+	cmd_name=$ZONEROOT/$1
+
+	if [ -h $cmd_name -o \( -e $cmd_name -a ! -f $cmd_name \) ]; then
+		logger -p daemon.err "dangerous zone cmd: $ZONENAME, $1" 
+		return
 	fi
+
+	cat <<-DONE >$ZONEROOT/$1
+	#!/bin/sh
+
+	LD_LIBRARY_PATH_32="/native/lib:/native/usr/lib"
+	LD_PRELOAD=/native/usr/lib/brand/lx/lx_thunk.so.1
+	LD_BIND_NOW=1
+	export LD_LIBRARY_PATH LD_PRELOAD LD_BIND_NOW
+	$3
+
+	exec /native/usr/lib/brand/lx/lx_native $2 "\$@"
+	DONE
+
+	chmod 755 $ZONEROOT/$1
 }
 
 #
@@ -151,7 +156,7 @@ fi
 #	2.  Go to the section below labeled "STEP TWO" and add the following
 #	    line:
 #
-#		replace_with_native /usr/bin/zcat 0555 root:bin
+#		setup_native_cmd /usr/bin/zcat /native/usr/bin/zcat
 #
 
 #
@@ -159,6 +164,7 @@ fi
 #
 # Validate that the zone filesystem looks like we expect it to.
 #
+safe_dir /bin
 safe_dir /sbin
 safe_dir /etc
 safe_dir /etc/init
@@ -169,7 +175,12 @@ safe_dir /etc/update-motd.d
 #
 # Replace Linux binaries with native binaries.
 #
-replace_with_native /sbin/ifconfig 0555 root:bin
+setup_native_isaexeccmd /sbin/ifconfig /native/sbin/ifconfig
+setup_native_isaexeccmd /sbin/dladm /native/usr/sbin/dladm
+setup_native_isaexeccmd /sbin/route /native/usr/sbin/route
+setup_native_cmd /sbin/ipmgmtd /native/lib/inet/ipmgmtd \
+	"export SMF_FMRI=\"svc:/network/ip-interface-management:default\""
+setup_native_cmd /bin/netstat /native/usr/bin/netstat
 
 #
 # STEP THREE
@@ -177,13 +188,5 @@ replace_with_native /sbin/ifconfig 0555 root:bin
 # Perform distro-specific customization.
 #
 . $(dirname $0)/lx_boot_zone_${distro}
-
-#
-# STEP FOUR
-#
-# Create native wrappers for illumos-only commands
-#
-wrap_with_native /sbin/dladm 0555 root:bin
-wrap_with_native /sbin/ipmgmtd 0555 root:bin
 
 exit 0

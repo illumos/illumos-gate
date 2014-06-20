@@ -60,6 +60,10 @@
 	<mount special="swap" directory="/native/tmp" type="tmpfs" />
 
 	<!-- Devices to create under /dev -->
+	<device match="arp" />
+	<device match="ipnet" />
+	<device match="kstat" />
+	<device match="lo0" />
 	<device match="null" />
 	<device match="poll" />
 	<device match="pts/*" />

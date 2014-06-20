@@ -22,7 +22,9 @@
 # Generate the networking.conf upstart script 
 setup_net()
 {
-    zonecfg -z $ZONENAME info net | awk '
+    [ -f /etc/defaultrouter ] && defroute=`cat /etc/defaultrouter`
+
+    zonecfg -z $ZONENAME info net | awk -v defroute=$defroute '
         BEGIN {
             printf("description\t\"configure virtual network devices\"\n\n")
             printf("emits static-network-up\n")
@@ -77,6 +79,8 @@ setup_net()
 		phys)
 
 	    printf("    /sbin/initctl emit --no-wait static-network-up\n")
+	    if (length(defroute) > 0)
+	        printf("    /sbin/route add default %s\n", defroute)
 	    printf("end script\n")
         }' > $fnm
 }
