@@ -586,11 +586,6 @@ so_sendmblk(struct sonode *so, struct nmsghdr *msg, int fflag,
 
 	SO_BLOCK_FALLBACK(so, SOP_SENDMBLK(so, msg, fflag, cr, mpp));
 
-	if ((so->so_mode & SM_SENDFILESUPP) == 0) {
-		SO_UNBLOCK_FALLBACK(so);
-		return (EOPNOTSUPP);
-	}
-
 	error = so_sendmblk_impl(so, msg, fflag, cr, mpp, so->so_filter_top,
 	    B_FALSE);
 
