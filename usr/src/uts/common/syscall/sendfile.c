@@ -82,7 +82,7 @@ extern sotpi_info_t *sotpi_sototpi(struct sonode *);
  * 64 bit kernel or 32 bit kernel. For 32 bit apps, we can't transfer
  * more than 2GB of data.
  */
-int
+static int
 sendvec_chunk64(file_t *fp, u_offset_t *fileoff, struct ksendfilevec64 *sfv,
     int copy_cnt, ssize32_t *count)
 {
@@ -343,7 +343,7 @@ sendvec_chunk64(file_t *fp, u_offset_t *fileoff, struct ksendfilevec64 *sfv,
 	return (0);
 }
 
-ssize32_t
+static ssize32_t
 sendvec64(file_t *fp, const struct ksendfilevec64 *vec, int sfvcnt,
 	size32_t *xferred, int fildes)
 {
@@ -390,7 +390,7 @@ sendvec64(file_t *fp, const struct ksendfilevec64 *vec, int sfvcnt,
 }
 #endif
 
-int
+static int
 sendvec_small_chunk(file_t *fp, u_offset_t *fileoff, struct sendfilevec *sfv,
     int copy_cnt, ssize_t total_size, int maxblk, ssize_t *count)
 {
@@ -680,7 +680,7 @@ sendvec_small_chunk(file_t *fp, u_offset_t *fileoff, struct sendfilevec *sfv,
 }
 
 
-int
+static int
 sendvec_chunk(file_t *fp, u_offset_t *fileoff, struct sendfilevec *sfv,
     int copy_cnt, ssize_t *count)
 {
@@ -1159,6 +1159,17 @@ sendfilev(int opcode, int fildes, const struct sendfilevec *vec, int sfvcnt,
 			maxblk = so->so_proto_props.sopp_maxblk;
 		} else {
 			maxblk = (int)vp->v_stream->sd_maxblk;
+		}
+
+		/*
+		 * We need to make sure that the socket that we're sending on
+		 * supports sendfile behavior. sockfs doesn't know that the APIs
+		 * we want to use are coming from sendfile, so we can't rely on
+		 * it to check for us.
+		 */
+		if ((so->so_mode & SM_SENDFILESUPP) == 0) {
+			error = EOPNOTSUPP;
+			goto err;
 		}
 		break;
 	case VREG:
