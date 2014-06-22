@@ -1526,6 +1526,9 @@ client_input_channel_req(int type, u_int32_t seq, void *ctxt)
 	c = channel_lookup(id);
 	if (c == NULL) {
 		error("client_input_channel_req: channel %d: unknown channel", id);
+	} else if (strcmp(rtype, "eow@openssh.com") == 0) {
+		packet_check_eom();
+		chan_rcvd_eow(c);
 	} else if (strcmp(rtype, "exit-status") == 0) {
 		success = 1;
 		exit_status = packet_get_int();
