@@ -19,6 +19,7 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Gary Mills
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -369,6 +370,11 @@ nd_get_reply(TIUSER *tiptr, XDR *xdrp, uint32_t call_xid, int *badmsg)
 	nd_log("nfs_dump: calling t_krcvudata\n");
 
 	if (error = t_krcvudata(tiptr, &rudata, &type, &uderr)) {
+		if (error == EBADMSG) {
+			cmn_err(CE_WARN, "\tnfs_dump:  received EBADMSG");
+			*badmsg = 1;
+			return (0);
+		}
 		nfs_perror(error, "\nnfs_dump: t_krcvudata failed: %m\n");
 		return (EIO);
 	}

@@ -21,14 +21,13 @@
  */
 
 /*
+ * Copyright 2014 Gary Mills
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_TX_H
 #define	_TX_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/uio.h>
 
@@ -249,12 +248,6 @@ extern char tiusr_statetbl[T_NOEVENTS][T_NOSTATES];
  */
 #define	LOCALNAME	0
 #define	REMOTENAME	1
-
-/*
- * Obsolete error event for t_look() in TLI, still needed for compatibility
- * to broken apps that are affected (e.g nfsd,lockd) if real error returned.
- */
-#define	T_ERROR 0x0020
 
 /*
  * GENERAL UTILITY MACROS

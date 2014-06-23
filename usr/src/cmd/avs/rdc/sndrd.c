@@ -25,6 +25,7 @@
  */
 /*
  * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2014 Gary Mills
  */
 
 /*
@@ -1278,9 +1279,8 @@ do_poll_cots_action(int fd, int conn_index)
 			else
 				goto fdclose;
 
-		case T_ERROR:
 		default:
-			if (event == T_ERROR || t_errno == TSYSERR) {
+			if (t_errno == TSYSERR) {
 				if ((errorstr = strerror(errno)) == NULL) {
 					(void) snprintf(buf, sizeof (buf),
 					    "Unknown error num %d", errno);

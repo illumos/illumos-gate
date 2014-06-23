@@ -26,9 +26,8 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2014 Gary Mills
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "mt.h"
 #include <errno.h>
@@ -133,23 +132,9 @@ _t_look_locked(
 	} while (retval < 0 && errno == EINTR);
 
 	if (retval < 0) {
-		if (_T_IS_TLI(api_semantics)) {
-			/*
-			 * This return of T_ERROR event is ancient
-			 * SVR3 TLI semantics and not documented for
-			 * current SVR4 TLI interface.
-			 * Fixing this will impact some apps
-			 * (e.g. nfsd,lockd) in ON consolidation
-			 * so they need to be fixed first before TLI
-			 * can be fixed.
-			 * XXX Should we never fix this because it might
-			 * break apps in field ?
-			 */
-			return (T_ERROR);
-		}
 		/*
-		 * XTI semantics (also identical to documented,
-		 * but not implemented TLI semantics).
+		 * XTI semantics (also identical to documented
+		 * TLI semantics).
 		 */
 		t_errno = TSYSERR;
 		return (-1);
@@ -159,7 +144,8 @@ _t_look_locked(
 	 * if something there and cntl part also there
 	 */
 	if ((tiptr->ti_lookcnt > 0) ||
-	((retval > 0) && (strpeek.ctlbuf.len >= (int)sizeof (t_scalar_t)))) {
+	    ((retval > 0) && (strpeek.ctlbuf.len >=
+	    (int)sizeof (t_scalar_t)))) {
 		/* LINTED pointer cast */
 		pptr = (union T_primitives *)strpeek.ctlbuf.buf;
 		if (tiptr->ti_lookcnt > 0) {
