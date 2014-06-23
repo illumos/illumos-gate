@@ -19,6 +19,7 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Gary Mills
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -102,7 +103,9 @@ main(int argc, char **argv)
 
 	oflag = getpflags(PRIV_PFEXEC);
 	if (setpflags(PRIV_PFEXEC, 1) != 0) {
-		perror("setpflags(PRIV_PFEXEC)");
+		(void) fprintf(stderr,
+		    gettext("pfexec: unable to set PFEXEC flag: %s\n"),
+		    strerror(errno));
 		exit(1);
 	}
 
@@ -126,7 +129,9 @@ main(int argc, char **argv)
 	switch (shellname(cmd, pathbuf)) {
 	case RES_OK:
 		(void) execv(pathbuf, argv);
-		perror(pathbuf);
+		(void) fprintf(stderr,
+		    gettext("pfexec: unable to execute %s: %s\n"),
+		    pathbuf, strerror(errno));
 		return (1);
 	case RES_PFEXEC:
 	case RES_FAILURE:
@@ -148,18 +153,26 @@ main(int argc, char **argv)
 			usage();
 
 		if (pset != NULL) {
-			wanted = priv_str_to_set(pset, ",", NULL);
+			if ((wanted = priv_str_to_set(pset, ",", NULL)) ==
+			    NULL) {
+				(void) fprintf(stderr,
+				    gettext("pfexec: error parsing "
+				    "privileges: %s\n"), strerror(errno));
+				exit(EXIT_FAILURE);
+			}
 			if (setppriv(PRIV_ON, PRIV_INHERITABLE, wanted) != 0) {
 				(void) fprintf(stderr,
-				    gettext("setppriv(): %s\n"),
-				    strerror(errno));
+				    gettext("pfexec: error setting "
+				    "privileges: %s\n"), strerror(errno));
 				exit(EXIT_FAILURE);
 			}
 			(void) setpflags(PRIV_PFEXEC, oflag);
 		}
 
 		(void) execvp(argv[0], argv);
-		perror(argv[0]);
+		(void) fprintf(stderr,
+		    gettext("pfexec: unable to execute %s: %s\n"),
+		    argv[0], strerror(errno));
 		return (1);
 	}
 	return (1);
