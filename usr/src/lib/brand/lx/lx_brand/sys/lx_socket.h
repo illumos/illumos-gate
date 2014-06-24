@@ -191,7 +191,11 @@ extern "C" {
 #define	LX_SO_PRIORITY				12
 #define	LX_SO_LINGER				13
 #define	LX_SO_BSDCOMPAT				14
-/* To add :#define	LX_SO_REUSEPORT 15 */
+#define	LX_SO_REUSEPORT				15
+/*
+ * For Linux see unix(7) man page SO_PASSCRED description. For Illumos see
+ * socket.h(3HEAD) man page SO_RECVUCRED description.
+ */
 #define	LX_SO_PASSCRED				16
 #define	LX_SO_PEERCRED				17
 #define	LX_SO_RCVLOWAT				18
@@ -210,6 +214,28 @@ extern "C" {
 #define	LX_SO_TIMESTAMP				29
 #define	LX_SCM_TIMESTAMP			LX_SO_TIMESTAMP
 #define	LX_SO_ACCEPTCONN			30
+
+#define	LX_SO_PEERSEC				31
+#define	LX_SO_SNDBUFFORCE			32
+#define	LX_SO_RCVBUFFORCE			33
+#define	LX_SO_PASSSEC				34
+#define	LX_SO_TIMESTAMPNS			35
+#define	LX_SCM_TIMESTAMPNS			LX_SO_TIMESTAMPNS
+#define	LX_SO_MARK				36
+#define	LX_SO_TIMESTAMPING			37
+#define	LX_SCM_TIMESTAMPING			LX_SO_TIMESTAMPING
+#define	LX_SO_PROTOCOL				38
+#define	LX_SO_DOMAIN				39
+#define	LX_SO_RXQ_OVFL				40
+#define	LX_SO_WIFI_STATUS			41
+#define	LX_SCM_WIFI_STATUS			LX_SO_WIFI_STATUS
+#define	LX_SO_PEEK_OFF				42
+#define	LX_SO_NOFCS				43
+#define	LX_SO_LOCK_FILTER			44
+#define	LX_SO_SELECT_ERR_QUEUE			45
+#define	LX_SO_BUSY_POLL				46
+#define	LX_SO_MAX_PACING_RATE			47
+#define	LX_SO_BPF_EXTENSIONS			48
 
 /*
  * Options for use with [gs]etsockopt at the RAW level.
