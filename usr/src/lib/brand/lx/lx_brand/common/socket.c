@@ -208,7 +208,7 @@ static const int ltos_socket_sockopts[LX_SO_ACCEPTCONN + 1] = {
 	OPTNOTSUP,	OPTNOTSUP,	SO_RCVLOWAT,	SO_SNDLOWAT,
 	SO_RCVTIMEO,	SO_SNDTIMEO,	OPTNOTSUP,	OPTNOTSUP,
 	OPTNOTSUP,	OPTNOTSUP,	OPTNOTSUP,	OPTNOTSUP,
-	OPTNOTSUP,	OPTNOTSUP,	SO_ACCEPTCONN
+	OPTNOTSUP,	SO_TIMESTAMP,	SO_ACCEPTCONN
 };
 
 /*
@@ -271,9 +271,14 @@ convert_cmsgs(int direction, struct lx_msghdr *msg, char *caller)
 {
 	struct cmsghdr *cmsg, *last;
 	int err = 0;
+	int level = 0;
+	int type = 0;
 
 	cmsg = CMSG_FIRSTHDR(msg);
 	while (cmsg != NULL && err == 0) {
+		level = cmsg->cmsg_level;
+		type = cmsg->cmsg_type;
+
 		if (direction == LX_TO_SOL) {
 			if (cmsg->cmsg_level == LX_SOL_SOCKET) {
 				cmsg->cmsg_level = SOL_SOCKET;
@@ -281,6 +286,8 @@ convert_cmsgs(int direction, struct lx_msghdr *msg, char *caller)
 					cmsg->cmsg_type = SCM_RIGHTS;
 				else if (cmsg->cmsg_type == LX_SCM_CRED)
 					cmsg->cmsg_type = SCM_UCRED;
+				else if (cmsg->cmsg_type == LX_SCM_TIMESTAMP)
+					cmsg->cmsg_type = SCM_TIMESTAMP;
 				else
 					err = ENOTSUP;
 			} else {
@@ -293,6 +300,8 @@ convert_cmsgs(int direction, struct lx_msghdr *msg, char *caller)
 					cmsg->cmsg_type = LX_SCM_RIGHTS;
 				else if (cmsg->cmsg_type == SCM_UCRED)
 					cmsg->cmsg_type = LX_SCM_CRED;
+				else if (cmsg->cmsg_type == SCM_TIMESTAMP)
+					cmsg->cmsg_type = LX_SCM_TIMESTAMP;
 				else
 					err = ENOTSUP;
 			} else {
@@ -304,8 +313,8 @@ convert_cmsgs(int direction, struct lx_msghdr *msg, char *caller)
 		cmsg = CMSG_NXTHDR(msg, last);
 	}
 	if (err)
-		lx_unsupported("Unsupported socket control message in %s\n.",
-		    caller);
+		lx_unsupported("Unsupported socket control message %d "
+		    "(%d) in %s\n.", type, level, caller);
 
 	return (err);
 }
