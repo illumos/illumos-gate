@@ -40,7 +40,9 @@ hook4_nicevents_gz
 hook4_out
 hook4_out_gz
 hook4_vnd_in
+hook4_vnd_in_gz
 hook4_vnd_out
+hook4_vnd_out_gz
 hook6_in
 hook6_in_gz
 hook6_loop_in
@@ -52,7 +54,9 @@ hook6_nicevents_gz
 hook6_out
 hook6_out_gz
 hook6_vnd_in
+hook6_vnd_in_gz
 hook6_vnd_out
+hook6_vnd_out_gz
 icmpreplytype4
 icmpreplytype6
 icmptoicmp6types
