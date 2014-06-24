@@ -33,6 +33,7 @@
 
 #include <stdio.h>
 #include <alloca.h>
+#include <dirent.h>
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/lwp.h>
@@ -44,6 +45,7 @@ extern "C" {
 #endif
 
 extern char lx_release[LX_VERS_MAX];
+extern char lx_cmd_name[MAXNAMLEN];
 extern pid_t zoneinit_pid;
 
 /*

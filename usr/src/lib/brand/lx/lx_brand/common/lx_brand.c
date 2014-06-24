@@ -98,6 +98,7 @@ static int stol_errno[] = {
 };
 
 char lx_release[LX_VERS_MAX];
+char lx_cmd_name[MAXNAMLEN];
 
 /*
  * Map a linux locale ending string to the solaris equivalent.
@@ -668,6 +669,7 @@ lx_init(int argc, char *argv[], char *envp[])
 		lx_debug("VERBOSE mode enabled.\n");
 	}
 
+	(void) strlcpy(lx_cmd_name, basename(argv[0]), sizeof (lx_cmd_name));
 	lx_debug("executing linux process: %s", argv[0]);
 	lx_debug("branding myself and setting handler to 0x%p",
 	    (void *)lx_handler_table);

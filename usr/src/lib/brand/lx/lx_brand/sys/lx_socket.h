@@ -103,6 +103,15 @@ extern "C" {
 #define	SOCK_INVAL		-2
 
 /*
+ * IP Protocol levels. Some of these match the Illumos IPPROTO_* values.
+ */
+#define	LX_IPPROTO_IP		0
+#define	LX_IPPROTO_ICMP		1
+#define	LX_IPPROTO_IGMP		2
+#define	LX_IPPROTO_TCP		6
+#define	LX_IPPROTO_RAW		255
+
+/*
  * Options for use with [gs]etsockopt at the IP level.
  * IPPROTO_IP
  */
@@ -201,6 +210,12 @@ extern "C" {
 #define	LX_SO_TIMESTAMP				29
 #define	LX_SCM_TIMESTAMP			LX_SO_TIMESTAMP
 #define	LX_SO_ACCEPTCONN			30
+
+/*
+ * Options for use with [gs]etsockopt at the RAW level.
+ * IPPROTO_RAW
+ */
+#define	LX_ICMP_FILTER				1
 
 /*
  * Linux socketcall indices.
