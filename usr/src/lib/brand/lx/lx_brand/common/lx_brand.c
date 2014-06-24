@@ -340,6 +340,7 @@ lx_unsupported(char *msg, ...)
 {
 	va_list	ap;
 	char dmsg[256];
+	int lastc;
 
 	assert(msg != NULL);
 
@@ -348,6 +349,9 @@ lx_unsupported(char *msg, ...)
 	/* LINTED [possible expansion issues] */
 	(void) vsnprintf(dmsg, sizeof (dmsg), msg, ap);
 	dmsg[255] = '\0';
+	lastc = strlen(dmsg) - 1;
+	if (dmsg[lastc] == '\n')
+		dmsg[lastc] = '\0';
 	(void) syscall(SYS_brand, B_UNSUPPORTED, dmsg);
 	va_end(ap);
 
