@@ -211,35 +211,26 @@ static const int ltos_socket_sockopts[LX_SO_ACCEPTCONN + 1] = {
 	OPTNOTSUP,	OPTNOTSUP,	SO_ACCEPTCONN
 };
 
+/*
+ * See the Linux raw.7 man page for description of the socket options.
+ *    In Linux ICMP_FILTER is defined as 1 in include/uapi/linux/icmp.h
+ */
+static const int ltos_raw_sockopts[LX_ICMP_FILTER + 1] = {
+	OPTNOTSUP, OPTNOTSUP
+};
+
 #define	PROTO_SOCKOPTS(opts)    \
 	{ (opts), sizeof ((opts)) / sizeof ((opts)[0]) }
 
 /*
- * The main Linux to Solaris protocol to options mapping table
- * IPPROTO_TAB_SIZE can be set up to IPPROTO_MAX. All entries above
- * IPPROTO_TAB_SIZE are in effect not implemented,
+ * [gs]etsockopt options mapping tables
  */
-
-#define	IPPROTO_TAB_SIZE	8
-
-static const lx_proto_opts_t ltos_proto_opts[IPPROTO_TAB_SIZE] = {
-	/* IPPROTO_IP		0 */
-	PROTO_SOCKOPTS(ltos_ip_sockopts),
-	/* SOL_SOCKET		1 */
-	PROTO_SOCKOPTS(ltos_socket_sockopts),
-	/* IPPROTO_IGMP		2 */
-	PROTO_SOCKOPTS(ltos_igmp_sockopts),
-	/* NOT IMPLEMENTED	3 */
-	{ NULL, 0 },
-	/* NOT IMPLEMENTED	4 */
-	{ NULL, 0 },
-	/* NOT IMPLEMENTED	5 */
-	{ NULL, 0 },
-	/* IPPROTO_TCP		6 */
-	PROTO_SOCKOPTS(ltos_tcp_sockopts),
-	/* NOT IMPLEMENTED	7 */
-	{ NULL, 0 }
-};
+static lx_proto_opts_t ip_sockopts_tbl = PROTO_SOCKOPTS(ltos_ip_sockopts);
+static lx_proto_opts_t socket_sockopts_tbl =
+    PROTO_SOCKOPTS(ltos_socket_sockopts);
+static lx_proto_opts_t igmp_sockopts_tbl = PROTO_SOCKOPTS(ltos_igmp_sockopts);
+static lx_proto_opts_t tcp_sockopts_tbl = PROTO_SOCKOPTS(ltos_tcp_sockopts);
+static lx_proto_opts_t raw_sockopts_tbl = PROTO_SOCKOPTS(ltos_raw_sockopts);
 
 /*
  * Lifted from socket.h, since these definitions are contained within
@@ -1294,6 +1285,21 @@ lx_shutdown(ulong_t *args)
 	return ((r < 0) ? -errno : r);
 }
 
+static lx_proto_opts_t *
+get_proto_opt_tbl(int level)
+{
+	switch (level) {
+	case LX_IPPROTO_IP:	return (&ip_sockopts_tbl);
+	case LX_SOL_SOCKET:	return (&socket_sockopts_tbl);
+	case LX_IPPROTO_IGMP:	return (&igmp_sockopts_tbl);
+	case LX_IPPROTO_TCP:	return (&tcp_sockopts_tbl);
+	case LX_IPPROTO_RAW:	return (&raw_sockopts_tbl);
+	default:
+		lx_unsupported("Unsupported sockopt level %d", level);
+		return (NULL);
+	}
+}
+
 static int
 lx_setsockopt(ulong_t *args)
 {
@@ -1304,6 +1310,7 @@ lx_setsockopt(ulong_t *args)
 	int optlen = (int)args[4];
 	int internal_opt;
 	int r;
+	lx_proto_opts_t *proto_opts;
 
 	lx_debug("\tsetsockopt(%d, %d, %d, 0x%p, %d)", sockfd, level, optname,
 	    optval, optlen);
@@ -1315,17 +1322,15 @@ lx_setsockopt(ulong_t *args)
 	if (optval == NULL)
 		return (-EFAULT);
 
+	if ((proto_opts = get_proto_opt_tbl(level)) == NULL)
+		return (-ENOPROTOOPT);
+
 	/*
 	 * Do a table lookup of the Solaris equivalent of the given option
 	 */
-	if (level < IPPROTO_IP || level >= IPPROTO_TAB_SIZE) {
-		lx_unsupported("Unsupported sockopt level %d", level);
-		return (-ENOPROTOOPT);
-	}
-
-	if (ltos_proto_opts[level].maxentries == 0 ||
-	    optname <= 0 || optname >= (ltos_proto_opts[level].maxentries)) {
-		lx_unsupported("Unsupported sockopt %d %d", level, optname);
+	if (optname <= 0 || optname >= proto_opts->maxentries) {
+		lx_unsupported("Unsupported sockopt %d, proto %d", optname,
+		    level);
 		return (-ENOPROTOOPT);
 	}
 
@@ -1334,12 +1339,29 @@ lx_setsockopt(ulong_t *args)
 	 * socket. Currently we just ignore it to make Linux programs happy.
 	 */
 	if ((level == LX_SOL_SOCKET) && (optname == LX_SO_PASSCRED)) {
-		lx_unsupported("Unsupported socket option SO_PASSCRED");
+		lx_unsupported("Ignored socket option SO_PASSCRED");
 		return (0);
 	}
 
+	/*
+	 * Ping sets this option. Currently we just ignore it to make ping
+	 * happy.
+	 */
+	if (level == LX_IPPROTO_RAW && optname == LX_ICMP_FILTER &&
+	    strcmp(lx_cmd_name, "ping") == 0)
+		return (0);
 
-	if ((level == IPPROTO_TCP) && (optname == LX_TCP_CORK)) {
+	/*
+	 * Ping sets this option to receive errors on raw sockets. Currently we
+	 * just ignore it to make ping happy. From the Linux ip.7 man page:
+	 *    For raw sockets, IP_RECVERR enables passing of all received ICMP
+	 *    errors to the application.
+	 */
+	if (level == LX_IPPROTO_IP && optname == LX_IP_RECVERR &&
+	    strcmp(lx_cmd_name, "ping") == 0)
+		return (0);
+
+	if ((level == LX_IPPROTO_TCP) && (optname == LX_TCP_CORK)) {
 		/*
 		 * TCP_CORK is a Linux-only option that instructs the TCP
 		 * stack not to send out partial frames.  Solaris doesn't
@@ -1359,10 +1381,14 @@ lx_setsockopt(ulong_t *args)
 		internal_opt = 1;
 		optval = &internal_opt;
 	} else {
-		optname = ltos_proto_opts[level].proto[optname];
+		int orig_optname = optname;
 
-		if (optname == OPTNOTSUP)
+		optname = proto_opts->proto[optname];
+		if (optname == OPTNOTSUP) {
+			lx_unsupported("unsupported sockopt %d, proto %d",
+			    orig_optname, level);
 			return (-ENOPROTOOPT);
+		}
 	}
 
 	if (level == LX_SOL_SOCKET)
@@ -1382,6 +1408,8 @@ lx_getsockopt(ulong_t *args)
 	void *optval = (void *)args[3];
 	int *optlenp = (int *)args[4];
 	int r;
+	int orig_optname;
+	lx_proto_opts_t *proto_opts;
 
 	lx_debug("\tgetsockopt(%d, %d, %d, 0x%p, 0x%p)", sockfd, level, optname,
 	    optval, optlenp);
@@ -1394,18 +1422,17 @@ lx_getsockopt(ulong_t *args)
 	if (optval == NULL)
 		return (-EFAULT);
 
-	/*
-	 * Do a table lookup of the Solaris equivalent of the given option
-	 */
-	if (level < IPPROTO_IP || level >= IPPROTO_TAB_SIZE)
-		return (-EOPNOTSUPP);
-
-	if (ltos_proto_opts[level].maxentries == 0 ||
-	    optname <= 0 || optname >= (ltos_proto_opts[level].maxentries))
+	if ((proto_opts = get_proto_opt_tbl(level)) == NULL)
 		return (-ENOPROTOOPT);
 
+	if (optname <= 0 || optname >= (proto_opts->maxentries)) {
+		lx_unsupported("Unsupported sockopt %d, proto %d", optname,
+		    level);
+		return (-ENOPROTOOPT);
+	}
+
 	if (((level == LX_SOL_SOCKET) && (optname == LX_SO_PASSCRED)) ||
-	    ((level == IPPROTO_TCP) && (optname == LX_TCP_CORK))) {
+	    ((level == LX_IPPROTO_TCP) && (optname == LX_TCP_CORK))) {
 		/*
 		 * Linux sets LX_SO_PASSCRED when it wants to send credentials
 		 * over a socket. Since we do not support it, it is never set
@@ -1466,10 +1493,14 @@ lx_getsockopt(ulong_t *args)
 		return (0);
 	}
 
-	optname = ltos_proto_opts[level].proto[optname];
+	orig_optname = optname;
 
-	if (optname == OPTNOTSUP)
+	optname = proto_opts->proto[optname];
+	if (optname == OPTNOTSUP) {
+		lx_unsupported("unsupported sockopt %d, proto %d",
+		    orig_optname, level);
 		return (-ENOPROTOOPT);
+	}
 
 	if (level == LX_SOL_SOCKET)
 		level = SOL_SOCKET;
