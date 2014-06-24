@@ -214,6 +214,9 @@ LZ4_uncompress_unknownOutputSize(const char *source,
 		}
 		/* copy literals */
 		cpy = op + length;
+		/* CORNER-CASE: cpy might overflow. */
+		if (cpy < op)
+			goto _output_error;	/* cpy was overflowed, bail! */
 		if ((cpy > oend - COPYLENGTH) ||
 		    (ip + length > iend - COPYLENGTH)) {
 			if (cpy > oend)
