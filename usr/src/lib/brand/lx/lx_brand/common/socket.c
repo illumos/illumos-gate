@@ -200,15 +200,74 @@ static const int ltos_igmp_sockopts[IGMP_MTRACE + 1] = {
 	IGMP_MTRACE_RESP, IGMP_MTRACE
 };
 
-static const int ltos_socket_sockopts[LX_SO_ACCEPTCONN + 1] = {
-	OPTNOTSUP,	SO_DEBUG,	SO_REUSEADDR,	SO_TYPE,
-	SO_ERROR,	SO_DONTROUTE,	SO_BROADCAST,	SO_SNDBUF,
-	SO_RCVBUF,	SO_KEEPALIVE,	SO_OOBINLINE,	OPTNOTSUP,
-	OPTNOTSUP,	SO_LINGER,	OPTNOTSUP,	OPTNOTSUP,
-	OPTNOTSUP,	OPTNOTSUP,	SO_RCVLOWAT,	SO_SNDLOWAT,
-	SO_RCVTIMEO,	SO_SNDTIMEO,	OPTNOTSUP,	OPTNOTSUP,
-	OPTNOTSUP,	OPTNOTSUP,	OPTNOTSUP,	OPTNOTSUP,
-	OPTNOTSUP,	SO_TIMESTAMP,	SO_ACCEPTCONN
+/*
+ * Socket option mapping:
+ *
+ * Linux				Illumos
+ * -----				-------
+ * SO_DEBUG               1		SO_DEBUG       0x0001
+ * SO_REUSEADDR           2		SO_REUSEADDR   0x0004
+ * SO_TYPE                3		SO_TYPE        0x1008
+ * SO_ERROR               4		SO_ERROR       0x1007
+ * SO_DONTROUTE           5		SO_DONTROUTE   0x0010
+ * SO_BROADCAST           6		SO_BROADCAST   0x0020
+ * SO_SNDBUF              7		SO_SNDBUF      0x1001
+ * SO_RCVBUF              8		SO_RCVBUF      0x1002
+ * SO_KEEPALIVE           9		SO_KEEPALIVE   0x0008
+ * SO_OOBINLINE          10		SO_OOBINLINE   0x0100
+ * SO_NO_CHECK           11
+ * SO_PRIORITY           12
+ * SO_LINGER             13		SO_LINGER      0x0080
+ * SO_BSDCOMPAT          14		ignored by linux, emulation returns 0
+ * SO_REUSEPORT          15
+ * SO_PASSCRED           16		SO_RECVUCRED   0x0400
+ * SO_PEERCRED           17		emulated with getpeerucred
+ * SO_RCVLOWAT           18		SO_RCVLOWAT    0x1004
+ * SO_SNDLOWAT           19		SO_SNDLOWAT    0x1003
+ * SO_RCVTIMEO           20		SO_RCVTIMEO    0x1006
+ * SO_SNDTIMEO           21		SO_SNDTIMEO    0x1005
+ * SO_SECURITY_AUTHENTICATION       22
+ * SO_SECURITY_ENCRYPTION_TRANSPORT 23
+ * SO_SECURITY_ENCRYPTION_NETWORK   24
+ * SO_BINDTODEVICE       25
+ * SO_ATTACH_FILTER      26		SO_ATTACH_FILTER 0x40000001
+ * SO_DETACH_FILTER      27		SO_DETACH_FILTER 0x40000002
+ * SO_PEERNAME           28
+ * SO_TIMESTAMP          29		SO_TIMESTAMP    0x1013
+ * SO_ACCEPTCONN         30		SO_ACCEPTCONN   0x0002
+ * SO_PEERSEC            31
+ * SO_SNDBUFFORCE        32
+ * SO_RCVBUFFORCE        33
+ * SO_PASSSEC            34
+ * SO_TIMESTAMPNS        35
+ * SO_MARK               36
+ * SO_TIMESTAMPING       37
+ * SO_PROTOCOL           38		SO_PROTOTYPE    0x1009
+ * SO_DOMAIN             39		SO_DOMAIN       0x100c
+ * SO_RXQ_OVFL           40
+ * SO_WIFI_STATUS        41
+ * SO_PEEK_OFF           42
+ * SO_NOFCS              43
+ * SO_LOCK_FILTER        44
+ * SO_SELECT_ERR_QUEUE   45
+ * SO_BUSY_POLL          46
+ * SO_MAX_PACING_RATE    47
+ * SO_BPF_EXTENSIONS     48
+ */
+static const int ltos_socket_sockopts[LX_SO_BPF_EXTENSIONS + 1] = {
+	OPTNOTSUP,	SO_DEBUG,	SO_REUSEADDR,	SO_TYPE,	/* 3 */
+	SO_ERROR,	SO_DONTROUTE,	SO_BROADCAST,	SO_SNDBUF,	/* 7 */
+	SO_RCVBUF,	SO_KEEPALIVE,	SO_OOBINLINE,	OPTNOTSUP,	/* 11 */
+	OPTNOTSUP,	SO_LINGER,	OPTNOTSUP,	OPTNOTSUP,	/* 15 */
+	SO_RECVUCRED,	OPTNOTSUP,	SO_RCVLOWAT,	SO_SNDLOWAT,	/* 19 */
+	SO_RCVTIMEO,	SO_SNDTIMEO,	OPTNOTSUP,	OPTNOTSUP,	/* 23 */
+	OPTNOTSUP,	OPTNOTSUP, SO_ATTACH_FILTER, SO_DETACH_FILTER,	/* 27 */
+	OPTNOTSUP,	SO_TIMESTAMP,	SO_ACCEPTCONN,	OPTNOTSUP,	/* 31 */
+	OPTNOTSUP,	OPTNOTSUP,	OPTNOTSUP,	OPTNOTSUP,	/* 35 */
+	OPTNOTSUP,	OPTNOTSUP,	SO_PROTOTYPE,	SO_DOMAIN,	/* 39 */
+	OPTNOTSUP,	OPTNOTSUP,	OPTNOTSUP,	OPTNOTSUP,	/* 43 */
+	OPTNOTSUP,	OPTNOTSUP,	OPTNOTSUP,	OPTNOTSUP,	/* 47 */
+	OPTNOTSUP							/* 48 */
 };
 
 /*
@@ -1343,32 +1402,34 @@ lx_setsockopt(ulong_t *args)
 		return (-ENOPROTOOPT);
 	}
 
-	/*
-	 * Linux sets this option when it wants to send credentials over a
-	 * socket. Currently we just ignore it to make Linux programs happy.
-	 */
-	if ((level == LX_SOL_SOCKET) && (optname == LX_SO_PASSCRED)) {
-		lx_unsupported("Ignored socket option SO_PASSCRED");
-		return (0);
+	if (level == LX_IPPROTO_IP) {
+		/*
+		 * Ping sets this option to receive errors on raw sockets.
+		 * Currently we just ignore it to make ping happy. From the
+		 * Linux ip.7 man page:
+		 *    For raw sockets, IP_RECVERR enables passing of all
+		 *    received ICMP errors to the application.
+		 */
+		if (optname == LX_IP_RECVERR &&
+		    strcmp(lx_cmd_name, "ping") == 0)
+			return (0);
+
+	} else if (level == LX_SOL_SOCKET) {
+		/* Linux ignores this option. */
+		if (optname == LX_SO_BSDCOMPAT)
+			return (0);
+
+		level = SOL_SOCKET;
+
+	} else if (level == LX_IPPROTO_RAW) {
+		/*
+		 * Ping sets this option. Currently we just ignore it to make
+		 * ping happy.
+		 */
+		if (optname == LX_ICMP_FILTER &&
+		    strcmp(lx_cmd_name, "ping") == 0)
+			return (0);
 	}
-
-	/*
-	 * Ping sets this option. Currently we just ignore it to make ping
-	 * happy.
-	 */
-	if (level == LX_IPPROTO_RAW && optname == LX_ICMP_FILTER &&
-	    strcmp(lx_cmd_name, "ping") == 0)
-		return (0);
-
-	/*
-	 * Ping sets this option to receive errors on raw sockets. Currently we
-	 * just ignore it to make ping happy. From the Linux ip.7 man page:
-	 *    For raw sockets, IP_RECVERR enables passing of all received ICMP
-	 *    errors to the application.
-	 */
-	if (level == LX_IPPROTO_IP && optname == LX_IP_RECVERR &&
-	    strcmp(lx_cmd_name, "ping") == 0)
-		return (0);
 
 	if ((level == LX_IPPROTO_TCP) && (optname == LX_TCP_CORK)) {
 		/*
@@ -1399,9 +1460,6 @@ lx_setsockopt(ulong_t *args)
 			return (-ENOPROTOOPT);
 		}
 	}
-
-	if (level == LX_SOL_SOCKET)
-		level = SOL_SOCKET;
 
 	r = setsockopt(sockfd, level, optname, optval, optlen);
 
@@ -1440,13 +1498,8 @@ lx_getsockopt(ulong_t *args)
 		return (-ENOPROTOOPT);
 	}
 
-	if (((level == LX_SOL_SOCKET) && (optname == LX_SO_PASSCRED)) ||
-	    ((level == LX_IPPROTO_TCP) && (optname == LX_TCP_CORK))) {
+	if ((level == LX_IPPROTO_TCP) && (optname == LX_TCP_CORK)) {
 		/*
-		 * Linux sets LX_SO_PASSCRED when it wants to send credentials
-		 * over a socket. Since we do not support it, it is never set
-		 * and we return 0.
-		 *
 		 * We don't support TCP_CORK but some apps rely on it.  So,
 		 * rather than return an error we just return 0.  This
 		 * isn't exactly a lie, since this option really isn't set,
