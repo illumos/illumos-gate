@@ -1,11 +1,12 @@
 '\" te
 .\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved
+.\" Copyright 2014, Nexenta Systems, Inc. All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 .\" or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add
 .\" the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH MPT_SAS 7D "Jul 16, 2009"
+.TH MPT_SAS 7D "Apr 24, 2014"
 .SH NAME
-mpt_sas \- SAS-2 host bus adapter driver
+mpt_sas \- SAS-2/3 host bus adapter driver
 .SH SYNOPSIS
 .sp
 .in +2
@@ -18,8 +19,9 @@ scsi@unit-address
 .sp
 .LP
 The \fBmpt_sas\fR host bus adapter driver is a nexus driver that supports the
-LSI SAS200x/2108 series of chips. These chips support SAS/SATA interfaces,
-including tagged and untagged queuing, SATA 3G/SAS 3G/SAS 6G.
+LSI SAS200x/2x08 and SAS300x/3x08 series of chips. These chips support SAS/SATA
+interfaces, including tagged and untagged queuing, SATA 3G/SAS 3G/SAS 6G/SAS
+12G.
 .SS "Configuration"
 .sp
 .LP
