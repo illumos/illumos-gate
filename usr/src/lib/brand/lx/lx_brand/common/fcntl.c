@@ -22,10 +22,8 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2014 Joyent, Inc.  All rights reserved.
  */
-
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/filio.h>
@@ -81,8 +79,7 @@ lx_fcntl(uintptr_t p1, uintptr_t p2, uintptr_t p3)
 
 	if (cmd == LX_F_SETSIG || cmd == LX_F_GETSIG || cmd == LX_F_SETLEASE ||
 	    cmd == LX_F_GETLEASE) {
-		lx_unsupported(gettext("%s(): unsupported command: %d"),
-		    "fcntl", cmd);
+		lx_unsupported("unsupported fcntl command: %d", cmd);
 		return (-ENOTSUP);
 	}
 
@@ -117,8 +114,7 @@ lx_fcntl64(uintptr_t p1, uintptr_t p2, uintptr_t p3)
 
 	if (cmd == LX_F_SETSIG || cmd == LX_F_GETSIG || cmd == LX_F_SETLEASE ||
 	    cmd == LX_F_GETLEASE) {
-		lx_unsupported(gettext("%s(): unsupported command: %d"),
-		    "fcntl64", cmd);
+		lx_unsupported("unsupported fcntl64 command: %d", cmd);
 		return (-ENOTSUP);
 	}
 

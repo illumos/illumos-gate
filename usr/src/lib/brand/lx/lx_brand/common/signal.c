@@ -1559,8 +1559,7 @@ lx_tgkill(uintptr_t tgid, uintptr_t pid, uintptr_t sig)
 		return (-EINVAL);
 
 	if (tgid != pid) {
-		lx_unsupported(gettext(
-		    "BrandZ tgkill(2) does not support gid != pid\n"));
+		lx_unsupported("tgkill does not support gid != pid");
 		return (-ENOTSUP);
 	}
 
