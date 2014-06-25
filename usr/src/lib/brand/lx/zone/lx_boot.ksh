@@ -76,8 +76,6 @@ setup_native_isaexeccmd() {
 	    -e LD_PRELOAD_32=/native/usr/lib/brand/lx/lx_thunk.so.1 \
 	    -e LD_LIBRARY_PATH_32="/native/lib:/native/usr/lib" \
 	    $2 "\$@"
-
-	exec /native/usr/lib/brand/lx/lx_native $2 "\$@"
 	DONE
 
 	chmod 755 $ZONEROOT/$1
