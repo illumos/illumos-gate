@@ -181,6 +181,17 @@ usr/src/uts/common/gssapi/mechs/krb5/include/old.h
 usr/src/uts/common/gssapi/mechs/krb5/include/raw.h
 usr/src/uts/common/gssapi/mechs/krb5/include/rsa-md4.h
 usr/src/uts/common/io/ixgbe/ixgbe_common.h
+usr/src/uts/common/sys/scsi/adapters/mpt_sas/mpi/mpi2.h
+usr/src/uts/common/sys/scsi/adapters/mpt_sas/mpi/mpi2_cnfg.h
+usr/src/uts/common/sys/scsi/adapters/mpt_sas/mpi/mpi2_hbd.h
+usr/src/uts/common/sys/scsi/adapters/mpt_sas/mpi/mpi2_init.h
+usr/src/uts/common/sys/scsi/adapters/mpt_sas/mpi/mpi2_ioc.h
+usr/src/uts/common/sys/scsi/adapters/mpt_sas/mpi/mpi2_ra.h
+usr/src/uts/common/sys/scsi/adapters/mpt_sas/mpi/mpi2_raid.h
+usr/src/uts/common/sys/scsi/adapters/mpt_sas/mpi/mpi2_sas.h
+usr/src/uts/common/sys/scsi/adapters/mpt_sas/mpi/mpi2_targ.h
+usr/src/uts/common/sys/scsi/adapters/mpt_sas/mpi/mpi2_tool.h
+usr/src/uts/common/sys/scsi/adapters/mpt_sas/mpi/mpi2_type.h
 usr/src/uts/intel/sys/acpi/acdebug.h
 usr/src/uts/intel/sys/acpi/acdisasm.h
 usr/src/uts/intel/sys/acpi/acevents.h

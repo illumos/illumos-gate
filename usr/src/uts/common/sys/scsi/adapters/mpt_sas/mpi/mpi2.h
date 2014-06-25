@@ -1,59 +1,48 @@
-/*
- * CDDL HEADER START
- *
- * The contents of this file are subject to the terms of the
- * Common Development and Distribution License (the "License").
- * You may not use this file except in compliance with the License.
- *
- * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or http://www.opensolaris.org/os/licensing.
- * See the License for the specific language governing permissions
- * and limitations under the License.
- *
- * When distributing Covered Code, include this CDDL HEADER in each
- * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
- * If applicable, add the following below this CDDL HEADER, with the
- * fields enclosed by brackets "[]" replaced with your own identifying
- * information: Portions Copyright [yyyy] [name of copyright owner]
- *
- * CDDL HEADER END
- */
-
-/*
- * Copyright (c) 2000 to 2009, LSI Corporation.
+/*-
+ * Copyright (c) 2013 LSI Corp.
  * All rights reserved.
  *
- * Redistribution and use in source and binary forms of all code within
- * this file that is exclusively owned by LSI, with or without
- * modification, is permitted provided that, in addition to the CDDL 1.0
- * License requirements, the following conditions are met:
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the author nor the names of any co-contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
  *
- *    Neither the name of the author nor the names of its contributors may be
- *    used to endorse or promote products derived from this software without
- *    specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
- * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
- * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
- * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
- * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
- * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
- * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
- * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
- * DAMAGE.
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
  */
 
 /*
+ *  Copyright (c) 2000-2013 LSI Corporation.
+ *
+ *
  *           Name:  mpi2.h
  *          Title:  MPI Message independent structures and definitions
  *                  including System Interface Register Set and
  *                  scatter/gather formats.
  *  Creation Date:  June 21, 2006
  *
- *  mpi2.h Version:  02.00.13
+ *  mpi2.h Version:  02.00.33
+ *
+ *  NOTE: Names (typedefs, defines, etc.) beginning with an MPI25 or Mpi25
+ *        prefix are for use only on MPI v2.5 products, and must not be used
+ *        with MPI v2.0 products. Unless otherwise noted, names beginning with
+ *        MPI2 or Mpi2 are for use with both MPI v2.0 and MPI v2.5 products.
  *
  *  Version History
  *  ---------------
@@ -98,6 +87,38 @@
  *                      bytes reserved.
  *                      Added RAID Accelerator functionality.
  *  07-30-09  02.00.13  Bumped MPI2_HEADER_VERSION_UNIT.
+ *  10-28-09  02.00.14  Bumped MPI2_HEADER_VERSION_UNIT.
+ *                      Added MSI-x index mask and shift for Reply Post Host
+ *                      Index register.
+ *                      Added function code for Host Based Discovery Action.
+ *  02-10-10  02.00.15  Bumped MPI2_HEADER_VERSION_UNIT.
+ *                      Added define for MPI2_FUNCTION_PWR_MGMT_CONTROL.
+ *                      Added defines for product-specific range of message
+ *                      function codes, 0xF0 to 0xFF.
+ *  05-12-10  02.00.16  Bumped MPI2_HEADER_VERSION_UNIT.
+ *                      Added alternative defines for the SGE Direction bit.
+ *  08-11-10  02.00.17  Bumped MPI2_HEADER_VERSION_UNIT.
+ *  11-10-10  02.00.18  Bumped MPI2_HEADER_VERSION_UNIT.
+ *                      Added MPI2_IEEE_SGE_FLAGS_SYSTEMPLBCPI_ADDR define.
+ *  02-23-11  02.00.19  Bumped MPI2_HEADER_VERSION_UNIT.
+ *                      Added MPI2_FUNCTION_SEND_HOST_MESSAGE.
+ *  03-09-11  02.00.20  Bumped MPI2_HEADER_VERSION_UNIT.
+ *  05-25-11  02.00.21  Bumped MPI2_HEADER_VERSION_UNIT.
+ *  08-24-11  02.00.22  Bumped MPI2_HEADER_VERSION_UNIT.
+ *  11-18-11  02.00.23  Bumped MPI2_HEADER_VERSION_UNIT.
+ *                      Incorporating additions for MPI v2.5.
+ *  02-06-12  02.00.24  Bumped MPI2_HEADER_VERSION_UNIT.
+ *  03-29-12  02.00.25  Bumped MPI2_HEADER_VERSION_UNIT.
+ *                      Added Hard Reset delay timings.
+ *  07-10-12  02.00.26  Bumped MPI2_HEADER_VERSION_UNIT.
+ *  07-26-12  02.00.27  Bumped MPI2_HEADER_VERSION_UNIT.
+ *  11-27-12  02.00.28  Bumped MPI2_HEADER_VERSION_UNIT.
+ *  12-20-12  02.00.29  Bumped MPI2_HEADER_VERSION_UNIT.
+ *                      Added MPI25_SUP_REPLY_POST_HOST_INDEX_OFFSET.
+ *  04-09-13  02.00.30  Bumped MPI2_HEADER_VERSION_UNIT.
+ *  04-17-13  02.00.31  Bumped MPI2_HEADER_VERSION_UNIT.
+ *  08-19-13  02.00.32  Bumped MPI2_HEADER_VERSION_UNIT.
+ *  12-05-13  02.00.33  Bumped MPI2_HEADER_VERSION_UNIT.
  *  --------------------------------------------------------------------------
  */
 
@@ -111,19 +132,30 @@
 *
 *****************************************************************************/
 
-#define MPI2_VERSION_MAJOR                  (0x02)
-#define MPI2_VERSION_MINOR                  (0x00)
 #define MPI2_VERSION_MAJOR_MASK             (0xFF00)
 #define MPI2_VERSION_MAJOR_SHIFT            (8)
 #define MPI2_VERSION_MINOR_MASK             (0x00FF)
 #define MPI2_VERSION_MINOR_SHIFT            (0)
+
+/* major version for all MPI v2.x */
+#define MPI2_VERSION_MAJOR                  (0x02)
+
+/* minor version for MPI v2.0 compatible products */
+#define MPI2_VERSION_MINOR                  (0x00)
 #define MPI2_VERSION ((MPI2_VERSION_MAJOR << MPI2_VERSION_MAJOR_SHIFT) |   \
                                       MPI2_VERSION_MINOR)
-
 #define MPI2_VERSION_02_00                  (0x0200)
 
-/* versioning for this MPI header set */
-#define MPI2_HEADER_VERSION_UNIT            (0x0D)
+
+/* minor version for MPI v2.5 compatible products */
+#define MPI25_VERSION_MINOR                 (0x05)
+#define MPI25_VERSION ((MPI2_VERSION_MAJOR << MPI2_VERSION_MAJOR_SHIFT) |   \
+                                      MPI25_VERSION_MINOR)
+#define MPI2_VERSION_02_05                  (0x0205)
+
+
+/* Unit and Dev versioning for this MPI header set */
+#define MPI2_HEADER_VERSION_UNIT            (0x21)
 #define MPI2_HEADER_VERSION_DEV             (0x00)
 #define MPI2_HEADER_VERSION_UNIT_MASK       (0xFF00)
 #define MPI2_HEADER_VERSION_UNIT_SHIFT      (8)
@@ -277,9 +309,14 @@ typedef volatile struct _MPI2_SYSTEM_INTERFACE_REGS
 #define MPI2_REPLY_FREE_HOST_INDEX_OFFSET       (0x00000048)
 
 /*
- * Offset for the Reply Descriptor Post Queue
+ * Defines for the Reply Descriptor Post Queue
  */
 #define MPI2_REPLY_POST_HOST_INDEX_OFFSET       (0x0000006C)
+#define MPI2_REPLY_POST_HOST_INDEX_MASK         (0x00FFFFFF)
+#define MPI2_RPHI_MSIX_INDEX_MASK               (0xFF000000)
+#define MPI2_RPHI_MSIX_INDEX_SHIFT              (24)
+#define MPI25_SUP_REPLY_POST_HOST_INDEX_OFFSET  (0x0000030C) /* MPI v2.5 only */
+
 
 /*
  * Defines for the HCBSize and address
@@ -297,6 +334,11 @@ typedef volatile struct _MPI2_SYSTEM_INTERFACE_REGS
 #define MPI2_REQUEST_DESCRIPTOR_POST_LOW_OFFSET     (0x000000C0)
 #define MPI2_REQUEST_DESCRIPTOR_POST_HIGH_OFFSET    (0x000000C4)
 
+
+/* Hard Reset delay timings */
+#define MPI2_HARD_RESET_PCIE_FIRST_READ_DELAY_MICRO_SEC     (50000)
+#define MPI2_HARD_RESET_PCIE_RESET_READ_WINDOW_MICRO_SEC    (255000)
+#define MPI2_HARD_RESET_PCIE_SECOND_READ_DELAY_MICRO_SEC    (256000)
 
 /*****************************************************************************
 *
@@ -325,6 +367,7 @@ typedef struct _MPI2_DEFAULT_REQUEST_DESCRIPTOR
 #define MPI2_REQ_DESCRIPT_FLAGS_HIGH_PRIORITY           (0x06)
 #define MPI2_REQ_DESCRIPT_FLAGS_DEFAULT_TYPE            (0x08)
 #define MPI2_REQ_DESCRIPT_FLAGS_RAID_ACCELERATOR        (0x0A)
+#define MPI25_REQ_DESCRIPT_FLAGS_FAST_PATH_SCSI_IO      (0x0C)
 
 #define MPI2_REQ_DESCRIPT_FLAGS_IOC_FIFO_MARKER (0x01)
 
@@ -384,6 +427,14 @@ typedef struct _MPI2_RAID_ACCEL_REQUEST_DESCRIPTOR
   MPI2_POINTER pMpi2RAIDAcceleratorRequestDescriptor_t;
 
 
+/* Fast Path SCSI IO Request Descriptor */
+typedef MPI2_SCSI_IO_REQUEST_DESCRIPTOR
+    MPI25_FP_SCSI_IO_REQUEST_DESCRIPTOR,
+    MPI2_POINTER PTR_MPI25_FP_SCSI_IO_REQUEST_DESCRIPTOR,
+    Mpi25FastPathSCSIIORequestDescriptor_t,
+    MPI2_POINTER pMpi25FastPathSCSIIORequestDescriptor_t;
+
+
 /* union of Request Descriptors */
 typedef union _MPI2_REQUEST_DESCRIPTOR_UNION
 {
@@ -392,6 +443,7 @@ typedef union _MPI2_REQUEST_DESCRIPTOR_UNION
     MPI2_SCSI_IO_REQUEST_DESCRIPTOR             SCSIIO;
     MPI2_SCSI_TARGET_REQUEST_DESCRIPTOR         SCSITarget;
     MPI2_RAID_ACCEL_REQUEST_DESCRIPTOR          RAIDAccelerator;
+    MPI25_FP_SCSI_IO_REQUEST_DESCRIPTOR         FastPathSCSIIO;
     U64                                         Words;
 } MPI2_REQUEST_DESCRIPTOR_UNION, MPI2_POINTER PTR_MPI2_REQUEST_DESCRIPTOR_UNION,
   Mpi2RequestDescriptorUnion_t, MPI2_POINTER pMpi2RequestDescriptorUnion_t;
@@ -416,6 +468,7 @@ typedef struct _MPI2_DEFAULT_REPLY_DESCRIPTOR
 #define MPI2_RPY_DESCRIPT_FLAGS_TARGETASSIST_SUCCESS        (0x02)
 #define MPI2_RPY_DESCRIPT_FLAGS_TARGET_COMMAND_BUFFER       (0x03)
 #define MPI2_RPY_DESCRIPT_FLAGS_RAID_ACCELERATOR_SUCCESS    (0x05)
+#define MPI25_RPY_DESCRIPT_FLAGS_FAST_PATH_SCSI_IO_SUCCESS  (0x06)
 #define MPI2_RPY_DESCRIPT_FLAGS_UNUSED                      (0x0F)
 
 /* values for marking a reply descriptor as unused */
@@ -495,6 +548,14 @@ typedef struct _MPI2_RAID_ACCELERATOR_SUCCESS_REPLY_DESCRIPTOR
   MPI2_POINTER pMpi2RAIDAcceleratorSuccessReplyDescriptor_t;
 
 
+/* Fast Path SCSI IO Success Reply Descriptor */
+typedef MPI2_SCSI_IO_SUCCESS_REPLY_DESCRIPTOR
+    MPI25_FP_SCSI_IO_SUCCESS_REPLY_DESCRIPTOR,
+    MPI2_POINTER PTR_MPI25_FP_SCSI_IO_SUCCESS_REPLY_DESCRIPTOR,
+    Mpi25FastPathSCSIIOSuccessReplyDescriptor_t,
+    MPI2_POINTER pMpi25FastPathSCSIIOSuccessReplyDescriptor_t;
+
+
 /* union of Reply Descriptors */
 typedef union _MPI2_REPLY_DESCRIPTORS_UNION
 {
@@ -504,6 +565,7 @@ typedef union _MPI2_REPLY_DESCRIPTORS_UNION
     MPI2_TARGETASSIST_SUCCESS_REPLY_DESCRIPTOR      TargetAssistSuccess;
     MPI2_TARGET_COMMAND_BUFFER_REPLY_DESCRIPTOR     TargetCommandBuffer;
     MPI2_RAID_ACCELERATOR_SUCCESS_REPLY_DESCRIPTOR  RAIDAcceleratorSuccess;
+    MPI25_FP_SCSI_IO_SUCCESS_REPLY_DESCRIPTOR       FastPathSCSIIOSuccess;
     U64                                             Words;
 } MPI2_REPLY_DESCRIPTORS_UNION, MPI2_POINTER PTR_MPI2_REPLY_DESCRIPTORS_UNION,
   Mpi2ReplyDescriptorsUnion_t, MPI2_POINTER pMpi2ReplyDescriptorsUnion_t;
@@ -513,8 +575,6 @@ typedef union _MPI2_REPLY_DESCRIPTORS_UNION
 /*****************************************************************************
 *
 *        Message Functions
-*              0x80 -> 0x8F reserved for private message use per product
-*
 *
 *****************************************************************************/
 
@@ -544,12 +604,16 @@ typedef union _MPI2_REPLY_DESCRIPTORS_UNION
 #define MPI2_FUNCTION_TARGET_CMD_BUF_BASE_POST      (0x24) /* Target Command Buffer Post Base */
 #define MPI2_FUNCTION_TARGET_CMD_BUF_LIST_POST      (0x25) /* Target Command Buffer Post List */
 #define MPI2_FUNCTION_RAID_ACCELERATOR              (0x2C) /* RAID Accelerator */
+#define MPI2_FUNCTION_HOST_BASED_DISCOVERY_ACTION   (0x2F) /* Host Based Discovery Action */
+#define MPI2_FUNCTION_PWR_MGMT_CONTROL              (0x30) /* Power Management Control */
+#define MPI2_FUNCTION_SEND_HOST_MESSAGE             (0x31) /* Send Host Message */
+#define MPI2_FUNCTION_MIN_PRODUCT_SPECIFIC          (0xF0) /* beginning of product-specific range */
+#define MPI2_FUNCTION_MAX_PRODUCT_SPECIFIC          (0xFF) /* end of product-specific range */
 
 
 
 /* Doorbell functions */
 #define MPI2_FUNCTION_IOC_MESSAGE_UNIT_RESET        (0x40)
-/* #define MPI2_FUNCTION_IO_UNIT_RESET                 (0x41) */
 #define MPI2_FUNCTION_HANDSHAKE                     (0x42)
 
 
@@ -777,7 +841,7 @@ typedef struct _MPI2_SGE_SIMPLE_UNION
 
 
 /****************************************************************************
-*  MPI Chain Element structures
+*  MPI Chain Element structures - for MPI v2.0 products only
 ****************************************************************************/
 
 typedef struct _MPI2_SGE_CHAIN32
@@ -813,7 +877,7 @@ typedef struct _MPI2_SGE_CHAIN_UNION
 
 
 /****************************************************************************
-*  MPI Transaction Context Element structures
+*  MPI Transaction Context Element structures - for MPI v2.0 products only
 ****************************************************************************/
 
 typedef struct _MPI2_SGE_TRANSACTION32
@@ -879,7 +943,7 @@ typedef struct _MPI2_SGE_TRANSACTION_UNION
 
 
 /****************************************************************************
-*  MPI SGE union for IO SGL's
+*  MPI SGE union for IO SGL's - for MPI v2.0 products only
 ****************************************************************************/
 
 typedef struct _MPI2_MPI_SGE_IO_UNION
@@ -894,7 +958,7 @@ typedef struct _MPI2_MPI_SGE_IO_UNION
 
 
 /****************************************************************************
-*  MPI SGE union for SGL's with Simple and Transaction elements
+*  MPI SGE union for SGL's with Simple and Transaction elements - for MPI v2.0 products only
 ****************************************************************************/
 
 typedef struct _MPI2_SGE_TRANS_SIMPLE_UNION
@@ -945,9 +1009,9 @@ typedef struct _MPI2_MPI_SGE_UNION
 
 /* Element Type */
 
-#define MPI2_SGE_FLAGS_TRANSACTION_ELEMENT      (0x00)
+#define MPI2_SGE_FLAGS_TRANSACTION_ELEMENT      (0x00) /* for MPI v2.0 products only */
 #define MPI2_SGE_FLAGS_SIMPLE_ELEMENT           (0x10)
-#define MPI2_SGE_FLAGS_CHAIN_ELEMENT            (0x30)
+#define MPI2_SGE_FLAGS_CHAIN_ELEMENT            (0x30) /* for MPI v2.0 products only */
 #define MPI2_SGE_FLAGS_ELEMENT_MASK             (0x30)
 
 /* Address location */
@@ -958,6 +1022,9 @@ typedef struct _MPI2_MPI_SGE_UNION
 
 #define MPI2_SGE_FLAGS_IOC_TO_HOST              (0x00)
 #define MPI2_SGE_FLAGS_HOST_TO_IOC              (0x04)
+
+#define MPI2_SGE_FLAGS_DEST                     (MPI2_SGE_FLAGS_IOC_TO_HOST)
+#define MPI2_SGE_FLAGS_SOURCE                   (MPI2_SGE_FLAGS_HOST_TO_IOC)
 
 /* Address Size */
 
@@ -1007,6 +1074,7 @@ typedef struct _MPI2_MPI_SGE_UNION
 *  IEEE Simple Element structures
 ****************************************************************************/
 
+/* MPI2_IEEE_SGE_SIMPLE32 is for MPI v2.0 products only */
 typedef struct _MPI2_IEEE_SGE_SIMPLE32
 {
     U32                     Address;
@@ -1036,8 +1104,10 @@ typedef union _MPI2_IEEE_SGE_SIMPLE_UNION
 *  IEEE Chain Element structures
 ****************************************************************************/
 
+/* MPI2_IEEE_SGE_CHAIN32 is for MPI v2.0 products only */
 typedef MPI2_IEEE_SGE_SIMPLE32  MPI2_IEEE_SGE_CHAIN32;
 
+/* MPI2_IEEE_SGE_CHAIN64 is for MPI v2.0 products only */
 typedef MPI2_IEEE_SGE_SIMPLE64  MPI2_IEEE_SGE_CHAIN64;
 
 typedef union _MPI2_IEEE_SGE_CHAIN_UNION
@@ -1047,11 +1117,23 @@ typedef union _MPI2_IEEE_SGE_CHAIN_UNION
 } MPI2_IEEE_SGE_CHAIN_UNION, MPI2_POINTER PTR_MPI2_IEEE_SGE_CHAIN_UNION,
   Mpi2IeeeSgeChainUnion_t, MPI2_POINTER pMpi2IeeeSgeChainUnion_t;
 
+/* MPI25_IEEE_SGE_CHAIN64 is for MPI v2.5 products only */
+typedef struct _MPI25_IEEE_SGE_CHAIN64
+{
+    U64                     Address;
+    U32                     Length;
+    U16                     Reserved1;
+    U8                      NextChainOffset;
+    U8                      Flags;
+} MPI25_IEEE_SGE_CHAIN64, MPI2_POINTER PTR_MPI25_IEEE_SGE_CHAIN64,
+  Mpi25IeeeSgeChain64_t, MPI2_POINTER pMpi25IeeeSgeChain64_t;
+
 
 /****************************************************************************
 *  All IEEE SGE types union
 ****************************************************************************/
 
+/* MPI2_IEEE_SGE_UNION is for MPI v2.0 products only */
 typedef struct _MPI2_IEEE_SGE_UNION
 {
     union
@@ -1064,12 +1146,25 @@ typedef struct _MPI2_IEEE_SGE_UNION
 
 
 /****************************************************************************
+*  IEEE SGE union for IO SGL's
+****************************************************************************/
+
+typedef union _MPI25_SGE_IO_UNION
+{
+    MPI2_IEEE_SGE_SIMPLE64      IeeeSimple;
+    MPI25_IEEE_SGE_CHAIN64      IeeeChain;
+} MPI25_SGE_IO_UNION, MPI2_POINTER PTR_MPI25_SGE_IO_UNION,
+  Mpi25SGEIOUnion_t, MPI2_POINTER pMpi25SGEIOUnion_t;
+
+
+/****************************************************************************
 *  IEEE SGE field definitions and masks
 ****************************************************************************/
 
 /* Flags field bit definitions */
 
 #define MPI2_IEEE_SGE_FLAGS_ELEMENT_TYPE_MASK   (0x80)
+#define MPI25_IEEE_SGE_FLAGS_END_OF_LIST        (0x40)
 
 #define MPI2_IEEE32_SGE_FLAGS_SHIFT             (24)
 
@@ -1083,11 +1178,12 @@ typedef struct _MPI2_IEEE_SGE_UNION
 /* Data Location Address Space */
 
 #define MPI2_IEEE_SGE_FLAGS_ADDR_MASK           (0x03)
-#define MPI2_IEEE_SGE_FLAGS_SYSTEM_ADDR         (0x00)
-#define MPI2_IEEE_SGE_FLAGS_IOCDDR_ADDR         (0x01)
+#define MPI2_IEEE_SGE_FLAGS_SYSTEM_ADDR         (0x00) /* for MPI v2.0, use in IEEE Simple Element only; for MPI v2.5, use in IEEE Simple or Chain element */
+#define MPI2_IEEE_SGE_FLAGS_IOCDDR_ADDR         (0x01) /* use in IEEE Simple Element only */
 #define MPI2_IEEE_SGE_FLAGS_IOCPLB_ADDR         (0x02)
-#define MPI2_IEEE_SGE_FLAGS_IOCPLBNTA_ADDR      (0x03)
-
+#define MPI2_IEEE_SGE_FLAGS_IOCPLBNTA_ADDR      (0x03) /* for MPI v2.0, use in IEEE Simple Element only; for MPI v2.5, use in IEEE Simple or Chain element */
+#define MPI2_IEEE_SGE_FLAGS_SYSTEMPLBPCI_ADDR   (0x03) /* use in MPI v2.0 IEEE Chain Element only */
+#define MPI2_IEEE_SGE_FLAGS_SYSTEMPLBCPI_ADDR   (MPI2_IEEE_SGE_FLAGS_SYSTEMPLBPCI_ADDR) /* typo in name */
 
 /****************************************************************************
 *  IEEE SGE operation Macros
@@ -1107,7 +1203,6 @@ typedef struct _MPI2_IEEE_SGE_UNION
 /* CAUTION - The following are READ-MODIFY-WRITE! */
 #define MPI2_IEEE32_pSGE_SET_FLAGS(psg,f)    (psg)->FlagsLength |= MPI2_IEEE32_SGE_SET_FLAGS(f)
 #define MPI2_IEEE32_pSGE_SET_LENGTH(psg,l)   (psg)->FlagsLength |= MPI2_IEEE32_SGE_LENGTH(l)
-
 
 
 
@@ -1150,7 +1245,7 @@ typedef union _MPI2_SGE_IO_UNION
 /* values for SGL Type subfield */
 #define MPI2_SGLFLAGS_SGL_TYPE_MASK                 (0x03)
 #define MPI2_SGLFLAGS_SGL_TYPE_MPI                  (0x00)
-#define MPI2_SGLFLAGS_SGL_TYPE_IEEE32               (0x01)
+#define MPI2_SGLFLAGS_SGL_TYPE_IEEE32               (0x01) /* MPI v2.0 products only */
 #define MPI2_SGLFLAGS_SGL_TYPE_IEEE64               (0x02)
 
 
