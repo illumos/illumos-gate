@@ -567,8 +567,7 @@ lx_mount(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 
 	/* Make sure we support the requested mount flags. */
 	if ((flags & ~LX_MS_SUPPORTED) != 0) {
-		lx_unsupported(
-		    "unsupported mount flags: 0x%x", flags);
+		lx_unsupported("unsupported mount flags: 0x%x", flags);
 		return (-ENOTSUP);
 	}
 
@@ -589,7 +588,8 @@ lx_mount(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 
 		/* Verify Linux mount options. */
 		if (i_lx_opt_verify(options, lofs_options) == 0) {
-			lx_unsupported("unsupported lofs mount options");
+			lx_unsupported("unsupported lofs mount options: %s",
+			    options);
 			return (-ENOTSUP);
 		}
 	} else if (strcmp(fstype, "tmpfs") == 0) {
@@ -605,7 +605,8 @@ lx_mount(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 
 		/* Verify Linux mount options. */
 		if (i_lx_opt_verify(options, lx_tmpfs_options) == 0) {
-			lx_unsupported("unsupported tmpfs mount options");
+			lx_unsupported("unsupported tmpfs mount options: %s",
+			    options);
 			return (-ENOTSUP);
 		}
 	} else if (strcmp(fstype, "proc") == 0) {
@@ -625,7 +626,8 @@ lx_mount(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 
 		/* Verify Linux mount options. */
 		if (i_lx_opt_verify(options, lx_proc_options) == 0) {
-			lx_unsupported("unsupported lx_proc mount options");
+			lx_unsupported("unsupported proc mount options: %s",
+			    options);
 			return (-ENOTSUP);
 		}
 
@@ -650,7 +652,8 @@ lx_mount(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 
 		/* Verify Linux mount options. */
 		if (i_lx_opt_verify(options, lx_autofs_options) == 0) {
-			lx_unsupported("unsupported lx_autofs mount options");
+			lx_unsupported("unsupported autofs mount options: %s",
+			    options);
 			return (-ENOTSUP);
 		}
 	} else if (strcmp(fstype, "nfs") == 0) {
@@ -682,8 +685,7 @@ lx_mount(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 		sdataptr = (char *)&nfs_args;
 		sdatalen = sizeof (nfs_args);
 	} else {
-		lx_unsupported(
-		    "unsupported mount filesystem type: %s", fstype);
+		lx_unsupported("unsupported mount filesystem type: %s", fstype);
 		return (-ENOTSUP);
 	}
 

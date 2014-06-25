@@ -22,9 +22,8 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2014 Joyent, Inc.  All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <assert.h>
 #include <fcntl.h>
@@ -672,8 +671,7 @@ lx_ioctl(uintptr_t p1, uintptr_t p2, uintptr_t p3)
 
 	lx_ioctl_msg(fd, cmd, NULL, &stat,
 	    "lx_ioctl(): unsupported linux ioctl");
-	lx_unsupported(gettext("lx_ioctl(): unsupported linux ioctl (%d)"),
-	    cmd);
+	lx_unsupported("unsupported linux ioctl 0x%x", cmd);
 	return (-EINVAL);
 }
 
@@ -864,9 +862,7 @@ ict_siocifhwaddr(int fd, struct stat *stat, int cmd, char *cmd_str,
 	 * should have returned EFAULT.
 	 */
 	if (cmd == LX_SIOCSIFHWADDR) {
-		lx_unsupported(gettext(
-		    "lx_ioctl(): unsupported linux ioctl: %s"),
-		    "SIOCSIFHWADDR");
+		lx_unsupported("unsupported linux ioctl: SIOCSIFHWADDR");
 		return (-EINVAL);
 	}
 
