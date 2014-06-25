@@ -22,6 +22,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
  */
 
 #include <sys/signal.h>
@@ -207,7 +208,8 @@ stol_signo[NSIG] = {
 	-1,			/* 38:  Solaris SIGXRES */
 	-1,			/* 39:  Solaris SIGJVM1 */
 	-1,			/* 40:  Solaris SIGJVM2 */
-	LX_SIGRTMIN,		/* 41:  Solaris _SIGRTMIN */
+	-1,			/* 41:  Solaris SIGINFO */
+	LX_SIGRTMIN,		/* 42:  Solaris _SIGRTMIN */
 	LX_SIGRTMIN + 1,
 	LX_SIGRTMIN + 2,
 	LX_SIGRTMIN + 3,
@@ -238,5 +240,5 @@ stol_signo[NSIG] = {
 	LX_SIGRTMIN + 28,
 	LX_SIGRTMIN + 29,
 	LX_SIGRTMIN + 30,
-	LX_SIGRTMAX,		/* 72: Solaris _SIGRTMAX */
+	LX_SIGRTMAX,		/* 73: Solaris _SIGRTMAX */
 };
