@@ -21,7 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2012 Joyent, Inc.  All rights reserved.
+ * Copyright 2014 Joyent, Inc.  All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -270,7 +270,12 @@ void	hat_kpm_walk(void (*)(void *, void *, size_t), void *);
  *	call.
  *
  * int hat_pageunload(pp, forceflag)
- *	unload all translations attached to pp.
+ *	Unload all translations attached to pp. On x86 the bulk of the work is
+ *	done by hat_page_inval.
+ *
+ * void	hat_page_inval(pp, pgsz, curhat)
+ *	Unload translations attached to pp. If curhat is provided, only the
+ *	translation for that process is unloaded, otherwise all are unloaded.
  *
  * uint_t hat_pagesync(pp, flags)
  *	get hw stats from hardware into page struct and reset hw stats
@@ -292,6 +297,7 @@ void	hat_page_setattr(struct page *, uint_t);
 void	hat_page_clrattr(struct page *, uint_t);
 uint_t	hat_page_getattr(struct page *, uint_t);
 int	hat_pageunload(struct page *, uint_t);
+void	hat_page_inval(struct page *, uint_t, struct hat *);
 uint_t	hat_pagesync(struct page *, uint_t);
 ulong_t	hat_page_getshare(struct page *);
 int	hat_page_checkshare(struct page *, ulong_t);
