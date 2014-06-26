@@ -2135,3 +2135,185 @@ start:
 	vmu_data.vmu_pending_waiters--;
 	goto start;
 }
+
+#if defined(__x86)
+/*
+ * Attempt to invalidate all of the pages in the mapping for the given process.
+ */
+static void
+map_inval(proc_t *p, struct seg *seg, caddr_t addr, size_t size)
+{
+	page_t		*pp;
+	size_t		psize;
+	u_offset_t	off;
+	caddr_t		eaddr;
+	struct vnode	*vp;
+	struct segvn_data *svd;
+	struct hat	*victim_hat;
+
+	ASSERT((addr + size) <= (seg->s_base + seg->s_size));
+
+	victim_hat = p->p_as->a_hat;
+	svd = (struct segvn_data *)seg->s_data;
+	vp = svd->vp;
+	psize = page_get_pagesize(seg->s_szc);
+
+	off = svd->offset + (uintptr_t)(addr - seg->s_base);
+
+	for (eaddr = addr + size; addr < eaddr; addr += psize, off += psize) {
+		pp = page_lookup_nowait(vp, off, SE_SHARED);
+
+		if (pp != NULL) {
+			/* following logic based on pvn_getdirty() */
+
+			if (pp->p_lckcnt != 0 || pp->p_cowcnt != 0) {
+				page_unlock(pp);
+				continue;
+			}
+
+			page_io_lock(pp);
+			hat_page_inval(pp, 0, victim_hat);
+			page_io_unlock(pp);
+
+			/*
+			 * For B_INVALCURONLY-style handling we let
+			 * page_release call VN_DISPOSE if no one else is using
+			 * the page.
+			 *
+			 * A hat_ismod() check would be useless because:
+			 * (1) we are not be holding SE_EXCL lock
+			 * (2) we've not unloaded _all_ translations
+			 *
+			 * Let page_release() do the heavy-lifting.
+			 */
+			(void) page_release(pp, 1);
+		}
+	}
+}
+
+/*
+ * vm_map_inval()
+ *
+ * Invalidate as many pages as possible within the given mapping for the given
+ * process. addr is expected to be the base address of the mapping and size is
+ * the length of the mapping. In some cases a mapping will encompass an
+ * entire segment, but at least for anon or stack mappings, these will be
+ * regions within a single large segment. Thus, the invalidation is oriented
+ * around a single mapping and not an entire segment.
+ *
+ * SPARC sfmmu hat does not support HAT_CURPROC_PGUNLOAD-style handling so
+ * this code is only applicable to x86.
+ */
+int
+vm_map_inval(pid_t pid, caddr_t addr, size_t size)
+{
+	int ret;
+	int error = 0;
+	proc_t *p;		/* target proc */
+	struct as *as;		/* target proc's address space */
+	struct seg *seg;	/* working segment */
+
+	if (curproc->p_zone != global_zone || crgetruid(curproc->p_cred) != 0)
+		return (set_errno(EPERM));
+
+	/* If not a valid mapping address, return an error */
+	if ((caddr_t)((uintptr_t)addr & (uintptr_t)PAGEMASK) != addr)
+		return (set_errno(EINVAL));
+
+again:
+	mutex_enter(&pidlock);
+	p = prfind(pid);
+	if (p == NULL) {
+		mutex_exit(&pidlock);
+		return (set_errno(ESRCH));
+	}
+
+	mutex_enter(&p->p_lock);
+	mutex_exit(&pidlock);
+
+	if (panicstr != NULL) {
+		mutex_exit(&p->p_lock);
+		return (0);
+	}
+
+	as = p->p_as;
+
+	/*
+	 * Try to set P_PR_LOCK - prevents process "changing shape"
+	 * - blocks fork
+	 * - blocks sigkill
+	 * - cannot be a system proc
+	 * - must be fully created proc
+	 */
+	ret = sprtrylock_proc(p);
+	if (ret == -1) {
+		/* Process in invalid state */
+		mutex_exit(&p->p_lock);
+		return (set_errno(ESRCH));
+	}
+
+	if (ret == 1) {
+		/*
+		 * P_PR_LOCK is already set. Wait and try again. This also
+		 * drops p_lock so p may no longer be valid since the proc may
+		 * have exited.
+		 */
+		sprwaitlock_proc(p);
+		goto again;
+	}
+
+	/* P_PR_LOCK is now set */
+	mutex_exit(&p->p_lock);
+
+	AS_LOCK_ENTER(as, &as->a_lock, RW_READER);
+	if ((seg = as_segat(as, addr)) == NULL) {
+		AS_LOCK_EXIT(as, &as->a_lock);
+		mutex_enter(&p->p_lock);
+		sprunlock(p);
+		return (set_errno(ENOMEM));
+	}
+
+	/*
+	 * The invalidation behavior only makes sense for vnode-backed segments.
+	 */
+	if (seg->s_ops != &segvn_ops) {
+		AS_LOCK_EXIT(as, &as->a_lock);
+		mutex_enter(&p->p_lock);
+		sprunlock(p);
+		return (0);
+	}
+
+	/*
+	 * If the mapping is out of bounds of the segement return an error.
+	 */
+	if ((addr + size) > (seg->s_base + seg->s_size)) {
+		AS_LOCK_EXIT(as, &as->a_lock);
+		mutex_enter(&p->p_lock);
+		sprunlock(p);
+		return (set_errno(EINVAL));
+	}
+
+	/*
+	 * Don't use MS_INVALCURPROC flag here since that would eventually
+	 * initiate hat invalidation based on curthread. Since we're doing this
+	 * on behalf of a different process, that would erroneously invalidate
+	 * our own process mappings.
+	 */
+	error = SEGOP_SYNC(seg, addr, size, 0, (uint_t)MS_ASYNC);
+	if (error == 0) {
+		/*
+		 * Since we didn't invalidate during the sync above, we now
+		 * try to invalidate all of the pages in the mapping.
+		 */
+		map_inval(p, seg, addr, size);
+	}
+	AS_LOCK_EXIT(as, &as->a_lock);
+
+	mutex_enter(&p->p_lock);
+	sprunlock(p);
+
+	if (error)
+		(void) set_errno(error);
+	return (error);
+}
+#endif

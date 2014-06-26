@@ -21,6 +21,7 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2014 Joyent, Inc.  All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -38,8 +39,6 @@
 
 #ifndef _SYS_RESOURCE_H
 #define	_SYS_RESOURCE_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/feature_tests.h>
 
@@ -191,6 +190,7 @@ struct	rusage {
 #define	_RUSAGESYS_GETRUSAGE_CHLD	1	/* rusage child process */
 #define	_RUSAGESYS_GETRUSAGE_LWP	2	/* rusage lwp */
 #define	_RUSAGESYS_GETVMUSAGE		3	/* getvmusage */
+#define	_RUSAGESYS_INVALMAP		4	/* vm_map_inval */
 
 #if defined(_SYSCALL32)
 
