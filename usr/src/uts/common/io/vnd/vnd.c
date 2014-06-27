@@ -2220,6 +2220,18 @@ vnd_dld_cap_enable(vnd_str_t *vsp, vnd_rx_t rxfunc)
 
 	vnd_mac_enter(vsp, &mph);
 
+	/*
+	 * If we're coming in here for a second pass, we need to make sure that
+	 * we remove an existing flow control notification callback, otherwise
+	 * we'll create a duplicate that will remain with garbage data.
+	 */
+	if (c->vsc_tx_fc_hdl != NULL) {
+		ASSERT(c->vsc_set_fcb_hdl != NULL);
+		(void) c->vsc_set_fcb_f(c->vsc_set_fcb_hdl, NULL,
+		    c->vsc_tx_fc_hdl);
+		c->vsc_tx_fc_hdl = NULL;
+	}
+
 	if (vsp->vns_caps.vsc_capab_f(c->vsc_capab_hdl,
 	    DLD_CAPAB_DIRECT, &d, DLD_ENABLE) == 0) {
 		c->vsc_tx_f = (vnd_dld_tx_t)d.di_tx_df;
@@ -2376,7 +2388,7 @@ vnd_st_shutdown(vnd_str_t *vsp)
 	if (vsc->vsc_flags & VNS_C_DIRECT) {
 		vnd_mac_enter(vsp, &mph);
 		vsc->vsc_flags &= ~VNS_C_DIRECT;
-		vsc->vsc_set_fcb_f(vsc->vsc_set_fcb_hdl, NULL,
+		(void) vsc->vsc_set_fcb_f(vsc->vsc_set_fcb_hdl, NULL,
 		    vsc->vsc_tx_fc_hdl);
 		vsc->vsc_tx_fc_hdl = NULL;
 		(void) vsc->vsc_capab_f(vsc->vsc_capab_hdl, DLD_CAPAB_DIRECT,
