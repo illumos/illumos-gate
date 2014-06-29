@@ -487,8 +487,10 @@ devnet_filldir(struct sdev_node *ddv)
 		/*
 		 * Clean out everything underneath before we remove ourselves.
 		 */
-		ret = sdev_cleandir(dv, NULL, 0);
-		ASSERT(ret == 0);
+		if (SDEVTOV(ddv)->v_type == VDIR) {
+			ret = sdev_cleandir(dv, NULL, 0);
+			ASSERT(ret == 0);
+		}
 		/* remove the cache node */
 		(void) sdev_cache_update(ddv, &dv, dv->sdev_name,
 		    SDEV_CACHE_DELETE);
