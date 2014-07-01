@@ -20,10 +20,11 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2012, 2014 by Delphix. All rights reserved.
+ * Copyright (c) 2011, 2014 by Delphix. All rights reserved.
  */
 /* Copyright (c) 2013 by Saso Kiselkov. All rights reserved. */
 /* Copyright (c) 2013, Joyent, Inc. All rights reserved. */
+/* Copyright (c) 2014, Nexenta Systems, Inc. All rights reserved. */
 
 #include <sys/dmu.h>
 #include <sys/dmu_impl.h>
@@ -44,6 +45,7 @@
 #include <sys/zio_checksum.h>
 #include <sys/zio_compress.h>
 #include <sys/sa.h>
+#include <sys/zfeature.h>
 #ifdef _KERNEL
 #include <sys/vmsystm.h>
 #include <sys/zfs_znode.h>
@@ -1379,7 +1381,7 @@ dmu_sync_late_arrival_done(zio_t *zio)
 
 static int
 dmu_sync_late_arrival(zio_t *pio, objset_t *os, dmu_sync_cb_t *done, zgd_t *zgd,
-    zio_prop_t *zp, zbookmark_t *zb)
+    zio_prop_t *zp, zbookmark_phys_t *zb)
 {
 	dmu_sync_arg_t *dsa;
 	dmu_tx_t *tx;
@@ -1440,7 +1442,7 @@ dmu_sync(zio_t *pio, uint64_t txg, dmu_sync_cb_t *done, zgd_t *zgd)
 	dsl_dataset_t *ds = os->os_dsl_dataset;
 	dbuf_dirty_record_t *dr;
 	dmu_sync_arg_t *dsa;
-	zbookmark_t zb;
+	zbookmark_phys_t zb;
 	zio_prop_t zp;
 	dnode_t *dn;
 
@@ -1635,8 +1637,16 @@ dmu_write_policy(objset_t *os, dnode_t *dn, int level, int wp, zio_prop_t *zp)
 		 * XXX -- we should design a compression algorithm
 		 * that specializes in arrays of bps.
 		 */
-		compress = zfs_mdcomp_disable ? ZIO_COMPRESS_EMPTY :
-		    ZIO_COMPRESS_LZJB;
+		boolean_t lz4_ac = spa_feature_is_active(os->os_spa,
+		    SPA_FEATURE_LZ4_COMPRESS);
+
+		if (zfs_mdcomp_disable) {
+			compress = ZIO_COMPRESS_EMPTY;
+		} else if (lz4_ac) {
+			compress = ZIO_COMPRESS_LZ4;
+		} else {
+			compress = ZIO_COMPRESS_LZJB;
+		}
 
 		/*
 		 * Metadata always gets checksummed.  If the data
