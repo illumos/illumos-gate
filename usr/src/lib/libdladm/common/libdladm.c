@@ -1175,7 +1175,7 @@ dladm_range2strs(mac_propval_range_t *rangep, char **prop_val)
 
 		/* Write ranges and individual elements */
 		ur = &rangep->mpr_range_uint32[0];
-		for (i = 0; i <= rangep->mpr_count; i++, ur++) {
+		for (i = 0; i < rangep->mpr_count; i++, ur++) {
 			if (ur->mpur_min == ur->mpur_max) {
 				/* single element */
 				(void) snprintf(prop_val[i], DLADM_PROP_VAL_MAX,
