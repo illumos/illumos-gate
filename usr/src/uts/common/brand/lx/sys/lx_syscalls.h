@@ -22,12 +22,11 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2014 Joyent, Inc.  All rights reserved.
  */
 
 #ifndef _SYS_LINUX_SYSCALLS_H
 #define	_SYS_LINUX_SYSCALLS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -42,6 +41,8 @@ extern long lx_clone();
 extern long lx_kill();
 extern long lx_tkill();
 extern long lx_modify_ldt();
+extern long lx_pipe();
+extern long lx_pipe2();
 extern long lx_gettid();
 extern long lx_futex();
 extern long lx_get_thread_area();

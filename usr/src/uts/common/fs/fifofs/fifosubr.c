@@ -614,9 +614,12 @@ fifo_stropen(vnode_t **vpp, int flag, cred_t *crp, int dotwist, int lockheld)
 	/*
 	 * The other end of the pipe is almost closed so
 	 * reject any other open on this end of the pipe
-	 * This only happens with a pipe mounted under namefs
+	 * This normally only happens with a pipe mounted under namefs, but
+	 * we can also see an open via proc/fd, which should still succeed.
+	 * To indicate the proc/fd case the FKLYR flag is passed.
 	 */
-	if ((fnp->fn_flag & (FIFOCLOSE|ISPIPE)) == (FIFOCLOSE|ISPIPE)) {
+	if ((fnp->fn_flag & (FIFOCLOSE|ISPIPE)) == (FIFOCLOSE|ISPIPE) &&
+	    (flag & FKLYR) == 0) {
 		fifo_cleanup(oldvp, flag);
 		cv_broadcast(&fnp->fn_wait_cv);
 		if (!lockheld)

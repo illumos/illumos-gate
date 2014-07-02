@@ -66,7 +66,7 @@ extern "C" {
  * brand(2) subcommands
  *
  * Everything >= 128 is a brand-specific subcommand.
- * 192 to 462 are reserved for system calls, although most of that space is
+ * > 192 is reserved for in-kernel system calls, although most of that space is
  * unused.
  */
 #define	B_LPID_TO_SPAIR		128

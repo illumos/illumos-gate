@@ -445,7 +445,7 @@ lx_getpid(void)
 	if (lxt_server_pid(&pid) != 0)
 		return (pid);
 
-	pid = syscall(SYS_brand, B_EMULATE_SYSCALL + 20);
+	pid = syscall(SYS_brand, B_EMULATE_SYSCALL + LX_SYS_getpid);
 	return ((pid == -1) ? -errno : pid);
 }
 
@@ -539,7 +539,7 @@ lx_prctl(int option, uintptr_t arg2, uintptr_t arg3,
 		return (-ENOSYS);
 
 	if (uucopy((void *)arg2, psinfo.pr_fname,
-	     MIN(LX_PR_SET_NAME_NAMELEN, size)) != 0)
+	    MIN(LX_PR_SET_NAME_NAMELEN, size)) != 0)
 		return (-errno);
 
 	psinfo.pr_fname[size - 1] = '\0';
@@ -548,7 +548,7 @@ lx_prctl(int option, uintptr_t arg2, uintptr_t arg3,
 		return (-errno);
 
 	if (pwrite(fd, psinfo.pr_fname, size,
-	     (uintptr_t)psinfo.pr_fname - (uintptr_t)&psinfo) != size) {
+	    (uintptr_t)psinfo.pr_fname - (uintptr_t)&psinfo) != size) {
 		(void) close(fd);
 		return (-EIO);
 	}

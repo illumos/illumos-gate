@@ -218,10 +218,4 @@ fi
 # upstart modifications are complete 
 #
 
-# XXX remove this since it blocks login until we can root cause and fix, might
-# be the rtnetlink issue
-
-fnm=$ZONEROOT/etc/update-motd.d/50-landscape-sysinfo
-[[ -h $fnm ]] && rm -f $fnm
-
 # Hand control back to lx_boot

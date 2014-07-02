@@ -38,6 +38,7 @@
 #include <string.h>
 #include <utime.h>
 #include <atomic.h>
+#include <sys/syscall.h>
 
 #include <sys/lx_syscall.h>
 #include <sys/lx_types.h>
@@ -117,68 +118,40 @@ ltos_at_flag(int lflag, int allow)
  */
 
 /*
- * Linux creates half-duplex unnamed pipes and Solaris creates full-duplex
- * pipes.  Thus, to get the correct semantics, our simple pipe() system
- * call actually needs to create a named pipe, do three opens, a close, and
- * an unlink.  This is woefully expensive.  If performance becomes a real
- * issue, we can implement a half-duplex pipe() in the brand module.
+ * Linux creates half-duplex pipes and Illumos creates full-duplex pipes.
+ * Thus, to get the correct semantics, we need to do this in the kernel's
+ * lx brand module.
  */
-#define	PIPENAMESZ	32 /* enough room for /tmp/.pipe.<pid>.<num> */
-
 int
 lx_pipe(uintptr_t p1)
 {
-	static uint32_t pipecnt = 0;
-	int cnt;
-	char pipename[PIPENAMESZ];
-	int fds[3];
-	int r = 0;
+	int r;
 
-	fds[0] = -1;
-	fds[1] = -1;
-	fds[2] = -1;
+	r = syscall(SYS_brand, B_EMULATE_SYSCALL + LX_SYS_pipe, p1);
 
-	/*
-	 * Construct a name for the named pipe: /tmp/.pipe.<pid>.<++cnt>
-	 */
-	cnt = atomic_inc_32_nv(&pipecnt);
+	return ((r == -1) ? -errno : r);
+}
 
-	(void) snprintf(pipename, PIPENAMESZ, "/tmp/.pipe.%d.%d",
-	    getpid(), cnt);
+int
+lx_pipe2(uintptr_t p1, uintptr_t p2)
+{
+	int flags = 0;
+	int r;
 
-	if (mkfifo(pipename, 0600))
-		return (-errno);
-
-	/*
-	 * To prevent either the read-only or write-only open from
-	 * blocking, we first need to open the pipe for both reading and
-	 * writing.
-	 */
-	if (((fds[2] = open(pipename, O_RDWR)) < 0) ||
-	    ((fds[0] = open(pipename, O_RDONLY)) < 0) ||
-	    ((fds[1] = open(pipename, O_WRONLY)) < 0)) {
-		r = errno;
-	} else {
-		/*
-		 * Copy the two one-way fds back to the app's address
-		 * space.
-		 */
-		if (uucopy(fds, (void *)p1, 2 * sizeof (int)))
-			r = errno;
+	if (p2 & LX_O_NONBLOCK) {
+		flags |= O_NONBLOCK;
+		p2 &= ~LX_O_NONBLOCK;
 	}
-
-	if (fds[2] >= 0)
-		(void) close(fds[2]);
-	(void) unlink(pipename);
-
-	if (r != 0) {
-		if (fds[0] >= 0)
-			(void) close(fds[0]);
-		if (fds[1] >= 0)
-			(void) close(fds[1]);
+	if (p2 & LX_O_CLOEXEC) {
+		flags |= O_CLOEXEC;
+		p2 &= ~LX_O_CLOEXEC;
 	}
+	if (p2 != 0)
+		return (-EINVAL);
 
-	return (-r);
+	r = syscall(SYS_brand, B_EMULATE_SYSCALL + LX_SYS_pipe2, p1, flags);
+
+	return ((r == -1) ? -errno : r);
 }
 
 /*

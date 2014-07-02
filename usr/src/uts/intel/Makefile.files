@@ -21,7 +21,7 @@
 
 #
 # Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright (c) 2013, Joyent, Inc. All rights reserved.
+# Copyright (c) 2014, Joyent, Inc. All rights reserved.
 #
 
 #
@@ -287,6 +287,7 @@ LX_BRAND_OBJS  =		\
 	lx_misc.o		\
 	lx_modify_ldt.o		\
 	lx_pid.o		\
+	lx_pipe.o		\
 	lx_sched.o		\
 	lx_signum.o		\
 	lx_syscall.o		\
