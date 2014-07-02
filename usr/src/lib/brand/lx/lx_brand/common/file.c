@@ -592,6 +592,34 @@ lx_futimesat(uintptr_t p1, uintptr_t p2, uintptr_t p3)
 	return (futimesat(atfd, path, times) ? -errno : 0);
 }
 
+/*
+ * From the utimensat man page:
+ * On Linux, futimens() is a library function implemented on top of the
+ * utimensat() system call. To support this, the Linux utimensat() system
+ * call implements a nonstandard feature: if pathname is NULL, then the
+ * call modifies the timestamps of the file referred to by the file
+ * descriptor dirfd (which may refer to any type of file). Using this
+ * feature, the call futimens(fd, times) is implemented as:
+ *
+ *     utimensat(fd, NULL, times, 0);
+ */
+int
+lx_utimensat(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4)
+{
+	int fd = (int)p1;
+	const char *path = (const char *)p2;
+	const timespec_t *times = (const timespec_t *)p3;
+	int flag = (int)p4;
+
+	if (flag == LX_AT_SYMLINK_NOFOLLOW)
+		flag = AT_SYMLINK_NOFOLLOW;
+
+	if (path == NULL) {
+		return (futimens(fd, times) ? -errno : 0);
+	} else {
+		return (utimensat(fd, path, times, flag) ? -errno : 0);
+	}
+}
 
 /*
  * Constructs an absolute path string in buf from the path of fd and the
