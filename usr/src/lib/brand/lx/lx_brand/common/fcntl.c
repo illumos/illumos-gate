@@ -33,6 +33,7 @@
 #include <libintl.h>
 #include <errno.h>
 #include <string.h>
+#include <sys/stat.h>
 
 #include <sys/lx_fcntl.h>
 #include <sys/lx_debug.h>
@@ -399,4 +400,48 @@ lx_flock(uintptr_t p1, uintptr_t p2)
 		return (-EWOULDBLOCK);
 
 	return ((ret == -1) ? -errno : ret);
+}
+
+/*
+ * Based on Illumos posix_fadvise which does nothing. The only difference is
+ * that on Linux an fd refering to a pipe or FIFO returns EINVAL.
+ * The Linux POSIX_FADV_* values are the same as the Illumos values.
+ */
+/* ARGSUSED */
+int
+lx_fadvise64(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4)
+{
+	int fd = (int)p1;
+	int advice = (int)p4;
+	off_t len = (off_t)p3;
+	struct stat64 statb;
+
+	switch (advice) {
+	case POSIX_FADV_NORMAL:
+	case POSIX_FADV_RANDOM:
+	case POSIX_FADV_SEQUENTIAL:
+	case POSIX_FADV_WILLNEED:
+	case POSIX_FADV_DONTNEED:
+	case POSIX_FADV_NOREUSE:
+		break;
+	default:
+		return (-EINVAL);
+	}
+	if (len < 0)
+		return (-EINVAL);
+	if (fstat64(fd, &statb) != 0)
+		return (-EBADF);
+	if (S_ISFIFO(statb.st_mode))
+		return (-EINVAL);
+	return (0);
+}
+
+int
+lx_fadvise64_64(uintptr_t p1, off64_t p2, off64_t p3, uintptr_t p4)
+{
+
+	if (p3 < 0)
+		return (-EINVAL);
+
+	return (lx_fadvise64(p1, (uintptr_t)p2, (uintptr_t)p3, p4));
 }
