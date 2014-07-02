@@ -60,6 +60,25 @@ lx_dup2(uintptr_t p1, uintptr_t p2)
 }
 
 int
+lx_dup3(uintptr_t p1, uintptr_t p2, uintptr_t p3)
+{
+	int oldfd = (int)p1;
+	int newfd = (int)p2;
+	int flags = (int)p3;
+	int rc;
+
+	/* The only valid flag is O_CLOEXEC. */
+	if (flags & ~LX_O_CLOEXEC)
+		return (-EINVAL);
+
+	if (oldfd == newfd)
+		return (-EINVAL);
+
+	rc = fcntl(oldfd, (flags == 0) ? F_DUP2FD : F_DUP2FD_CLOEXEC, newfd);
+	return ((rc == -1) ? -errno : rc);
+}
+
+int
 lx_fcntl(uintptr_t p1, uintptr_t p2, uintptr_t p3)
 {
 	int		fd = (int)p1;

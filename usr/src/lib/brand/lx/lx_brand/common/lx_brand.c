@@ -1267,7 +1267,7 @@ static struct lx_sysent sysents[] = {
 	{"signalfd4",	NULL,		NOSYS_NULL,	0},	/* 327 */
 	{"eventfd2",	NULL,		NOSYS_NULL,	0},	/* 328 */
 	{"epoll_create1", epoll_create1, SYS_PASSTHRU,	1},	/* 329 */
-	{"dup3",	NULL,		NOSYS_NULL,	0},	/* 330 */
+	{"dup3",	lx_dup3,	0,		3},	/* 330 */
 	{"pipe2",	lx_pipe2,	0,		2},	/* 331 */
 	{"inotify_init1", NULL,		NOSYS_NULL,	0},	/* 332 */
 	{"preadv",	NULL,		NOSYS_NULL,	0},	/* 333 */
