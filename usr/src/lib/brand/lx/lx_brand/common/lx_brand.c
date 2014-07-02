@@ -1257,7 +1257,7 @@ static struct lx_sysent sysents[] = {
 	{"move_pages",	NULL,		NOSYS_NULL,	0},	/* 317 */
 	{"getcpu",	NULL,		NOSYS_NULL,	0},	/* 318 */
 	{"epoll_pwait",	epoll_pwait,	SYS_PASSTHRU,	5},	/* 319 */
-	{"utimensat",	NULL,		NOSYS_NULL,	0},	/* 320 */
+	{"utimensat",	lx_utimensat,	0,		4},	/* 320 */
 	{"signalfd",	NULL,		NOSYS_NULL,	0},	/* 321 */
 	{"timerfd_create", NULL,	NOSYS_NULL,	0},	/* 322 */
 	{"eventfd",	NULL,		NOSYS_NULL,	0},	/* 323 */

@@ -47,6 +47,7 @@ extern int lx_mkdirat(uintptr_t, uintptr_t, uintptr_t);
 extern int lx_mknodat(uintptr_t, uintptr_t, uintptr_t, uintptr_t);
 extern int lx_fchownat(uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t);
 extern int lx_futimesat(uintptr_t, uintptr_t, uintptr_t);
+extern int lx_utimensat(uintptr_t, uintptr_t, uintptr_t, uintptr_t);
 extern int lx_fstatat64(uintptr_t, uintptr_t, uintptr_t, uintptr_t);
 extern int lx_unlinkat(uintptr_t, uintptr_t, uintptr_t);
 extern int lx_renameat(uintptr_t, uintptr_t, uintptr_t, uintptr_t);
