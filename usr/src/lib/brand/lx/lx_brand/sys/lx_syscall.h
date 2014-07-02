@@ -73,6 +73,7 @@ extern int lx_getdents64(uintptr_t, uintptr_t, uintptr_t);
 extern int lx_getpid(void);
 extern int lx_execve(uintptr_t, uintptr_t, uintptr_t);
 extern int lx_dup2(uintptr_t, uintptr_t);
+extern int lx_dup3(uintptr_t, uintptr_t, uintptr_t);
 extern int lx_ioctl(uintptr_t, uintptr_t, uintptr_t);
 extern int lx_vhangup(void);
 
@@ -563,7 +564,6 @@ extern int lx_prctl(int, uintptr_t, uintptr_t, uintptr_t, uintptr_t);
 #define	LX_SYS_tee		315
 #define	LX_SYS_vmsplice		316
 #define	LX_SYS_move_pages	317
-
 #define	LX_SYS_getcpu		318
 #define	LX_SYS_epoll_pwait	319
 #define	LX_SYS_utimensat	320
