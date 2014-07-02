@@ -23,6 +23,9 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -114,7 +117,9 @@ nfsauth_access(auth_req *argp, auth_res *result)
 		goto done;
 	}
 
-	result->auth_perm = check_client(sh, &nbuf, clnames, argp->req_flavor);
+	result->auth_perm = check_client(sh, &nbuf, clnames, argp->req_flavor,
+	    argp->req_clnt_uid, argp->req_clnt_gid, &result->auth_srv_uid,
+	    &result->auth_srv_gid);
 
 	sharefree(sh);
 
@@ -141,8 +146,8 @@ nfsauth_func(void *cookie, char *dataptr, size_t arg_size,
 	XDR		 xdrs_r;
 	caddr_t		 abuf = dataptr;
 	size_t		 absz = arg_size;
-	size_t		 rbsz = (size_t)(BYTES_PER_XDR_UNIT * 2);
-	char		 result[BYTES_PER_XDR_UNIT * 2];
+	size_t		 rbsz = (size_t)(BYTES_PER_XDR_UNIT * 4);
+	char		 result[BYTES_PER_XDR_UNIT * 4];
 	caddr_t		 rbuf = (caddr_t)&result;
 	varg_t		 varg = {0};
 

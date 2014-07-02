@@ -23,11 +23,12 @@
  *	All rights reserved.
  *	Use is subject to license terms.
  */
+/*
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ */
 
 #ifndef _NFS_NFS_ACL_H
 #define	_NFS_NFS_ACL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -328,31 +329,31 @@ extern bool_t xdr_GETXATTRDIR3res(XDR *, GETXATTRDIR3res *);
 #ifdef _KERNEL
 /* the service procedures */
 extern void acl2_getacl(GETACL2args *, GETACL2res *,
-			struct exportinfo *, struct svc_req *, cred_t *);
+    struct exportinfo *, struct svc_req *, cred_t *, bool_t);
 extern void *acl2_getacl_getfh(GETACL2args *);
 extern void acl2_getacl_free(GETACL2res *);
 extern void acl2_setacl(SETACL2args *, SETACL2res *,
-			struct exportinfo *, struct svc_req *, cred_t *);
+    struct exportinfo *, struct svc_req *, cred_t *, bool_t);
 extern void *acl2_setacl_getfh(SETACL2args *);
 extern void acl2_getattr(GETATTR2args *, GETATTR2res *,
-			struct exportinfo *, struct svc_req *, cred_t *);
+    struct exportinfo *, struct svc_req *, cred_t *, bool_t);
 extern void *acl2_getattr_getfh(GETATTR2args *);
 extern void acl2_access(ACCESS2args *, ACCESS2res *,
-			struct exportinfo *, struct svc_req *, cred_t *);
+    struct exportinfo *, struct svc_req *, cred_t *, bool_t);
 extern void *acl2_access_getfh(ACCESS2args *);
 extern void acl2_getxattrdir(GETXATTRDIR2args *, GETXATTRDIR2res *,
-			struct exportinfo *, struct svc_req *, cred_t *);
+    struct exportinfo *, struct svc_req *, cred_t *, bool_t);
 extern void *acl2_getxattrdir_getfh(GETXATTRDIR2args *);
 
 extern void acl3_getacl(GETACL3args *, GETACL3res *,
-			struct exportinfo *, struct svc_req *, cred_t *);
+    struct exportinfo *, struct svc_req *, cred_t *, bool_t);
 extern void *acl3_getacl_getfh(GETACL3args *);
 extern void acl3_getacl_free(GETACL3res *);
 extern void acl3_setacl(SETACL3args *, SETACL3res *,
-			struct exportinfo *, struct svc_req *, cred_t *);
+    struct exportinfo *, struct svc_req *, cred_t *, bool_t);
 extern void *acl3_setacl_getfh(SETACL3args *);
 extern void acl3_getxattrdir(GETXATTRDIR3args *, GETXATTRDIR3res *,
-			struct exportinfo *, struct svc_req *, cred_t *);
+    struct exportinfo *, struct svc_req *, cred_t *, bool_t);
 extern void *acl3_getxattrdir_getfh(GETXATTRDIR3args *);
 
 #endif

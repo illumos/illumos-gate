@@ -20,9 +20,8 @@
  */
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
- *
- * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -750,43 +749,43 @@ struct nfsstatfs {
 /*
  * XDR routines for handling structures defined above
  */
-bool_t	xdr_attrstat(XDR *, struct nfsattrstat *);
-bool_t	xdr_fastattrstat(XDR *, struct nfsattrstat *);
-bool_t	xdr_creatargs(XDR *, struct nfscreatargs *);
-bool_t	xdr_diropargs(XDR *, struct nfsdiropargs *);
-bool_t	xdr_diropres(XDR *, struct nfsdiropres *);
-bool_t	xdr_fastdiropres(XDR *, struct nfsdiropres *);
-bool_t	xdr_drok(XDR *, struct nfsdrok *);
+extern bool_t	xdr_attrstat(XDR *, struct nfsattrstat *);
+extern bool_t	xdr_fastattrstat(XDR *, struct nfsattrstat *);
+extern bool_t	xdr_creatargs(XDR *, struct nfscreatargs *);
+extern bool_t	xdr_diropargs(XDR *, struct nfsdiropargs *);
+extern bool_t	xdr_diropres(XDR *, struct nfsdiropres *);
+extern bool_t	xdr_fastdiropres(XDR *, struct nfsdiropres *);
+extern bool_t	xdr_drok(XDR *, struct nfsdrok *);
 #ifdef _LITTLE_ENDIAN
-bool_t	xdr_fastdrok(XDR *, struct nfsdrok *);
-bool_t	xdr_fastfattr(XDR *, struct nfsfattr *);
+extern bool_t	xdr_fastdrok(XDR *, struct nfsdrok *);
+extern bool_t	xdr_fastfattr(XDR *, struct nfsfattr *);
 #endif
-bool_t	xdr_fattr(XDR *, struct nfsfattr *);
-bool_t	xdr_fhandle(XDR *, fhandle_t *);
-bool_t	xdr_fastfhandle(XDR *, fhandle_t **);
-bool_t	xdr_linkargs(XDR *, struct nfslinkargs *);
-bool_t	xdr_rddirargs(XDR *, struct nfsrddirargs *);
-bool_t	xdr_putrddirres(XDR *, struct nfsrddirres *);
-bool_t	xdr_getrddirres(XDR *, struct nfsrddirres *);
-bool_t	xdr_rdlnres(XDR *, struct nfsrdlnres *);
-bool_t	xdr_rdresult(XDR *, struct nfsrdresult *);
-bool_t	xdr_readargs(XDR *, struct nfsreadargs *);
-bool_t	xdr_readlink(XDR *, fhandle_t *);
-bool_t	xdr_rnmargs(XDR *, struct nfsrnmargs *);
-bool_t	xdr_rrok(XDR *, struct nfsrrok *);
-bool_t	xdr_saargs(XDR *, struct nfssaargs *);
-bool_t	xdr_sattr(XDR *, struct nfssattr *);
-bool_t	xdr_slargs(XDR *, struct nfsslargs *);
-bool_t	xdr_srok(XDR *, struct nfssrok *);
-bool_t	xdr_nfs2_timeval(XDR *, struct nfs2_timeval *);
-bool_t	xdr_writeargs(XDR *, struct nfswriteargs *);
-bool_t	xdr_fsok(XDR *, struct nfsstatfsok *);
+extern bool_t	xdr_fattr(XDR *, struct nfsfattr *);
+extern bool_t	xdr_fhandle(XDR *, fhandle_t *);
+extern bool_t	xdr_fastfhandle(XDR *, fhandle_t **);
+extern bool_t	xdr_linkargs(XDR *, struct nfslinkargs *);
+extern bool_t	xdr_rddirargs(XDR *, struct nfsrddirargs *);
+extern bool_t	xdr_putrddirres(XDR *, struct nfsrddirres *);
+extern bool_t	xdr_getrddirres(XDR *, struct nfsrddirres *);
+extern bool_t	xdr_rdlnres(XDR *, struct nfsrdlnres *);
+extern bool_t	xdr_rdresult(XDR *, struct nfsrdresult *);
+extern bool_t	xdr_readargs(XDR *, struct nfsreadargs *);
+extern bool_t	xdr_readlink(XDR *, fhandle_t *);
+extern bool_t	xdr_rnmargs(XDR *, struct nfsrnmargs *);
+extern bool_t	xdr_rrok(XDR *, struct nfsrrok *);
+extern bool_t	xdr_saargs(XDR *, struct nfssaargs *);
+extern bool_t	xdr_sattr(XDR *, struct nfssattr *);
+extern bool_t	xdr_slargs(XDR *, struct nfsslargs *);
+extern bool_t	xdr_srok(XDR *, struct nfssrok *);
+extern bool_t	xdr_nfs2_timeval(XDR *, struct nfs2_timeval *);
+extern bool_t	xdr_writeargs(XDR *, struct nfswriteargs *);
+extern bool_t	xdr_fsok(XDR *, struct nfsstatfsok *);
 #ifdef _LITTLE_ENDIAN
-bool_t	xdr_fastfsok(XDR *, struct nfsstatfsok *);
-bool_t	xdr_fastenum(XDR *, enum_t *);
+extern bool_t	xdr_fastfsok(XDR *, struct nfsstatfsok *);
+extern bool_t	xdr_fastenum(XDR *, enum_t *);
 #endif
-bool_t	xdr_statfs(XDR *, struct nfsstatfs *);
-bool_t	xdr_faststatfs(XDR *, struct nfsstatfs *);
+extern bool_t	xdr_statfs(XDR *, struct nfsstatfs *);
+extern bool_t	xdr_faststatfs(XDR *, struct nfsstatfs *);
 #endif
 
 /*
@@ -820,58 +819,58 @@ struct exportinfo;	/* defined in nfs/export.h */
 struct servinfo;	/* defined in nfs/nfs_clnt.h */
 struct mntinfo;		/* defined in nfs/nfs_clnt.h */
 
-void	rfs_getattr(fhandle_t *, struct nfsattrstat *, struct exportinfo *,
-    struct svc_req *, cred_t *);
-void	*rfs_getattr_getfh(fhandle_t *);
-void	rfs_setattr(struct nfssaargs *, struct nfsattrstat *,
-    struct exportinfo *, struct svc_req *, cred_t *);
-void	*rfs_setattr_getfh(struct nfssaargs *);
-void	rfs_lookup(struct nfsdiropargs *, struct nfsdiropres *,
-    struct exportinfo *, struct svc_req *, cred_t *);
-void	*rfs_lookup_getfh(struct nfsdiropargs *);
-void	rfs_readlink(fhandle_t *, struct nfsrdlnres *, struct exportinfo *,
-    struct svc_req *, cred_t *);
-void	*rfs_readlink_getfh(fhandle_t *);
-void	rfs_rlfree(struct nfsrdlnres *);
-void	rfs_read(struct nfsreadargs *, struct nfsrdresult *,
-    struct exportinfo *, struct svc_req *, cred_t *);
-void	*rfs_read_getfh(struct nfsreadargs *);
-void	rfs_rdfree(struct nfsrdresult *);
-void	rfs_write_sync(struct nfswriteargs *, struct nfsattrstat *,
-    struct exportinfo *, struct svc_req *, cred_t *);
-void	rfs_write(struct nfswriteargs *, struct nfsattrstat *,
-    struct exportinfo *, struct svc_req *, cred_t *);
-void	*rfs_write_getfh(struct nfswriteargs *);
-void	rfs_create(struct nfscreatargs *, struct nfsdiropres *,
-    struct exportinfo *, struct svc_req *, cred_t *);
-void	*rfs_create_getfh(struct nfscreatargs *);
-void	rfs_remove(struct nfsdiropargs *, enum nfsstat *, struct exportinfo *,
-    struct svc_req *, cred_t *);
-void	*rfs_remove_getfh(struct nfsdiropargs *);
-void	rfs_rename(struct nfsrnmargs *, enum nfsstat *, struct exportinfo *,
-    struct svc_req *, cred_t *);
-void	*rfs_rename_getfh(struct nfsrnmargs *);
-void	rfs_link(struct nfslinkargs *, enum nfsstat *, struct exportinfo *,
-    struct svc_req *, cred_t *);
-void	*rfs_link_getfh(struct nfslinkargs *);
-void	rfs_symlink(struct nfsslargs *, enum nfsstat *, struct exportinfo *,
-    struct svc_req *, cred_t *);
-void	*rfs_symlink_getfh(struct nfsslargs *);
-void	rfs_mkdir(struct nfscreatargs *, struct nfsdiropres *,
-    struct exportinfo *, struct svc_req *, cred_t *);
-void	*rfs_mkdir_getfh(struct nfscreatargs *);
-void	rfs_rmdir(struct nfsdiropargs *, enum nfsstat *, struct exportinfo *,
-    struct svc_req *, cred_t *);
-void	*rfs_rmdir_getfh(struct nfsdiropargs *);
-void	rfs_readdir(struct nfsrddirargs *, struct nfsrddirres *,
-    struct exportinfo *, struct svc_req *, cred_t *);
-void	*rfs_readdir_getfh(struct nfsrddirargs *);
-void	rfs_rddirfree(struct nfsrddirres *);
-void	rfs_statfs(fhandle_t *, struct nfsstatfs *, struct exportinfo *,
-    struct svc_req *, cred_t *);
-void	*rfs_statfs_getfh(fhandle_t *);
-void	rfs_srvrinit(void);
-void	rfs_srvrfini(void);
+extern void	rfs_getattr(fhandle_t *, struct nfsattrstat *,
+    struct exportinfo *, struct svc_req *, cred_t *, bool_t);
+extern void	*rfs_getattr_getfh(fhandle_t *);
+extern void	rfs_setattr(struct nfssaargs *, struct nfsattrstat *,
+    struct exportinfo *, struct svc_req *, cred_t *, bool_t);
+extern void	*rfs_setattr_getfh(struct nfssaargs *);
+extern void	rfs_lookup(struct nfsdiropargs *, struct nfsdiropres *,
+    struct exportinfo *, struct svc_req *, cred_t *, bool_t);
+extern void	*rfs_lookup_getfh(struct nfsdiropargs *);
+extern void	rfs_readlink(fhandle_t *, struct nfsrdlnres *,
+    struct exportinfo *, struct svc_req *, cred_t *, bool_t);
+extern void	*rfs_readlink_getfh(fhandle_t *);
+extern void	rfs_rlfree(struct nfsrdlnres *);
+extern void	rfs_read(struct nfsreadargs *, struct nfsrdresult *,
+    struct exportinfo *, struct svc_req *, cred_t *, bool_t);
+extern void	*rfs_read_getfh(struct nfsreadargs *);
+extern void	rfs_rdfree(struct nfsrdresult *);
+extern void	rfs_write_sync(struct nfswriteargs *, struct nfsattrstat *,
+    struct exportinfo *, struct svc_req *, cred_t *, bool_t);
+extern void	rfs_write(struct nfswriteargs *, struct nfsattrstat *,
+    struct exportinfo *, struct svc_req *, cred_t *, bool_t);
+extern void	*rfs_write_getfh(struct nfswriteargs *);
+extern void	rfs_create(struct nfscreatargs *, struct nfsdiropres *,
+    struct exportinfo *, struct svc_req *, cred_t *, bool_t);
+extern void	*rfs_create_getfh(struct nfscreatargs *);
+extern void	rfs_remove(struct nfsdiropargs *, enum nfsstat *,
+    struct exportinfo *, struct svc_req *, cred_t *, bool_t);
+extern void	*rfs_remove_getfh(struct nfsdiropargs *);
+extern void	rfs_rename(struct nfsrnmargs *, enum nfsstat *,
+    struct exportinfo *, struct svc_req *, cred_t *, bool_t);
+extern void	*rfs_rename_getfh(struct nfsrnmargs *);
+extern void	rfs_link(struct nfslinkargs *, enum nfsstat *,
+    struct exportinfo *, struct svc_req *, cred_t *, bool_t);
+extern void	*rfs_link_getfh(struct nfslinkargs *);
+extern void	rfs_symlink(struct nfsslargs *, enum nfsstat *,
+    struct exportinfo *, struct svc_req *, cred_t *, bool_t);
+extern void	*rfs_symlink_getfh(struct nfsslargs *);
+extern void	rfs_mkdir(struct nfscreatargs *, struct nfsdiropres *,
+    struct exportinfo *, struct svc_req *, cred_t *, bool_t);
+extern void	*rfs_mkdir_getfh(struct nfscreatargs *);
+extern void	rfs_rmdir(struct nfsdiropargs *, enum nfsstat *,
+    struct exportinfo *, struct svc_req *, cred_t *, bool_t);
+extern void	*rfs_rmdir_getfh(struct nfsdiropargs *);
+extern void	rfs_readdir(struct nfsrddirargs *, struct nfsrddirres *,
+    struct exportinfo *, struct svc_req *, cred_t *, bool_t);
+extern void	*rfs_readdir_getfh(struct nfsrddirargs *);
+extern void	rfs_rddirfree(struct nfsrddirres *);
+extern void	rfs_statfs(fhandle_t *, struct nfsstatfs *, struct exportinfo *,
+    struct svc_req *, cred_t *, bool_t);
+extern void	*rfs_statfs_getfh(fhandle_t *);
+extern void	rfs_srvrinit(void);
+extern void	rfs_srvrfini(void);
 
 /*
  * flags to define path types during Multi Component Lookups
@@ -885,69 +884,71 @@ void	rfs_srvrfini(void);
 enum nfs_svccounts {NFS_CALLS, NFS_BADCALLS, NFS_REFERRALS, NFS_REFERLINKS};
 
 /*	function defs for NFS kernel */
-int	nfs_waitfor_purge_complete(vnode_t *);
-int	nfs_validate_caches(vnode_t *, cred_t *);
-void	nfs_purge_caches(vnode_t *, int, cred_t *);
-void	nfs_purge_rddir_cache(vnode_t *);
-void	nfs_attrcache(vnode_t *, struct nfsfattr *, hrtime_t);
-int	nfs_cache_fattr(vnode_t *, struct nfsfattr *, vattr_t *, hrtime_t,
-    cred_t *);
-void	nfs_attr_cache(vnode_t *, vattr_t *, hrtime_t, cred_t *);
-void	nfs_attrcache_va(vnode_t *, struct vattr *);
-int	nfs_getattr_otw(vnode_t *, struct vattr *, cred_t *);
-int	nfsgetattr(vnode_t *, struct vattr *, cred_t *);
-int	nattr_to_vattr(vnode_t *, struct nfsfattr *, struct vattr *);
-void	nfs_async_manager(struct vfs *);
-void	nfs_async_manager_stop(struct vfs *);
-void	nfs_async_stop(struct vfs *);
-int	nfs_async_stop_sig(struct vfs *);
-int	nfs_clntinit(void);
-void	nfs_clntfini(void);
-int	nfstsize(void);
-int	nfs_srvinit(void);
-void	nfs_srvfini(void);
-int	vattr_to_sattr(struct vattr *, struct nfssattr *);
-void	setdiropargs(struct nfsdiropargs *, char *, vnode_t *);
-int	setdirgid(vnode_t *, gid_t *, cred_t *);
-int	setdirmode(vnode_t *, mode_t *, cred_t *);
-int	newnum(void);
-char	*newname(void);
-int	nfs_subrinit(void);
-void	nfs_subrfini(void);
-enum nfsstat puterrno(int);
-int	geterrno(enum nfsstat);
-int	nfsinit(int, char *);
-void	nfsfini(void);
-int	nfs_vfsinit(void);
-void	nfs_vfsfini(void);
-int	nfs_dump(vnode_t *, caddr_t, offset_t, offset_t, caller_context_t *);
-void	nfs_perror(int error, char *fmt, ...);
-void	nfs_cmn_err(int error, int level, char *fmt, ...);
-int	nfs_addcllock(vnode_t *vp, struct flock64 *bfp);
-void	nfs_rmcllock(vnode_t *vp, struct flock64 *bfp);
-void	nfs_lockrelease(vnode_t *vp, int flag, offset_t offset, cred_t *credp);
-int	vattr_to_nattr(struct vattr *, struct nfsfattr *);
-int	mount_root(char *, char *, int, struct nfs_args *, int *);
-void	nfs_lockcompletion(vnode_t *vp, int cmd);
-void	nfs_add_locking_id(vnode_t *, pid_t, int, char *, int);
-void	nfs3copyfh(caddr_t, vnode_t *);
-void	nfscopyfh(caddr_t, vnode_t *);
-int	nfs3lookup(vnode_t *, char *, vnode_t **, struct pathname *, int,
+extern int	nfs_waitfor_purge_complete(vnode_t *);
+extern int	nfs_validate_caches(vnode_t *, cred_t *);
+extern void	nfs_purge_caches(vnode_t *, int, cred_t *);
+extern void	nfs_purge_rddir_cache(vnode_t *);
+extern void	nfs_attrcache(vnode_t *, struct nfsfattr *, hrtime_t);
+extern int	nfs_cache_fattr(vnode_t *, struct nfsfattr *, vattr_t *,
+    hrtime_t, cred_t *);
+extern void	nfs_attr_cache(vnode_t *, vattr_t *, hrtime_t, cred_t *);
+extern void	nfs_attrcache_va(vnode_t *, struct vattr *);
+extern int	nfs_getattr_otw(vnode_t *, struct vattr *, cred_t *);
+extern int	nfsgetattr(vnode_t *, struct vattr *, cred_t *);
+extern int	nattr_to_vattr(vnode_t *, struct nfsfattr *, struct vattr *);
+extern void	nfs_async_manager(struct vfs *);
+extern void	nfs_async_manager_stop(struct vfs *);
+extern void	nfs_async_stop(struct vfs *);
+extern int	nfs_async_stop_sig(struct vfs *);
+extern int	nfs_clntinit(void);
+extern void	nfs_clntfini(void);
+extern int	nfstsize(void);
+extern int	nfs_srvinit(void);
+extern void	nfs_srvfini(void);
+extern int	vattr_to_sattr(struct vattr *, struct nfssattr *);
+extern void	setdiropargs(struct nfsdiropargs *, char *, vnode_t *);
+extern int	setdirgid(vnode_t *, gid_t *, cred_t *);
+extern int	setdirmode(vnode_t *, mode_t *, cred_t *);
+extern int	newnum(void);
+extern char	*newname(void);
+extern int	nfs_subrinit(void);
+extern void	nfs_subrfini(void);
+extern enum nfsstat puterrno(int);
+extern int	geterrno(enum nfsstat);
+extern int	nfsinit(int, char *);
+extern void	nfsfini(void);
+extern int	nfs_vfsinit(void);
+extern void	nfs_vfsfini(void);
+extern int	nfs_dump(vnode_t *, caddr_t, offset_t, offset_t,
+    caller_context_t *);
+extern void	nfs_perror(int, char *, ...);
+extern void	nfs_cmn_err(int, int, char *, ...);
+extern int	nfs_addcllock(vnode_t *, struct flock64 *);
+extern void	nfs_rmcllock(vnode_t *, struct flock64 *);
+extern void	nfs_lockrelease(vnode_t *, int, offset_t, cred_t *);
+extern int	vattr_to_nattr(struct vattr *, struct nfsfattr *);
+extern int	mount_root(char *, char *, int, struct nfs_args *, int *);
+extern void	nfs_lockcompletion(vnode_t *, int);
+extern void	nfs_add_locking_id(vnode_t *, pid_t, int, char *, int);
+extern void	nfs3copyfh(caddr_t, vnode_t *);
+extern void	nfscopyfh(caddr_t, vnode_t *);
+extern int	nfs3lookup(vnode_t *, char *, vnode_t **, struct pathname *,
+    int, vnode_t *, cred_t *, int);
+extern int	nfslookup(vnode_t *, char *, vnode_t **, struct pathname *, int,
     vnode_t *, cred_t *, int);
-int	nfslookup(vnode_t *, char *, vnode_t **, struct pathname *, int,
-    vnode_t *, cred_t *, int);
-void	sv_free(struct servinfo *);
-int	nfsauth_access(struct exportinfo *exi, struct svc_req *req);
-void	nfsauth_init();
-void	nfsauth_fini();
-int	nfs_setopts(vnode_t *vp, model_t model, struct nfs_args *args);
-int	nfs_mount_label_policy(vfs_t *vfsp, struct netbuf *addr,
-    struct knetconfig *knconf, cred_t *cr);
-boolean_t nfs_has_ctty(void);
-void	nfs_srv_stop_all(void);
-void	nfs_srv_quiesce_all(void);
-int	rfs4_dss_setpaths(char *, size_t);
-int	nfs_setmod_check(page_t *pp);
+extern void	sv_free(struct servinfo *);
+extern int	nfsauth_access(struct exportinfo *, struct svc_req *, cred_t *,
+    uid_t *, gid_t *);
+extern void	nfsauth_init(void);
+extern void	nfsauth_fini(void);
+extern int	nfs_setopts(vnode_t *, model_t, struct nfs_args *);
+extern int	nfs_mount_label_policy(vfs_t *, struct netbuf *,
+    struct knetconfig *, cred_t *);
+extern boolean_t nfs_has_ctty(void);
+extern void	nfs_srv_stop_all(void);
+extern void	nfs_srv_quiesce_all(void);
+extern int	rfs4_dss_setpaths(char *, size_t);
+extern int	nfs_setmod_check(page_t *);
 
 extern time_t	rfs4_lease_time;
 extern time_t	rfs4_grace_period;
@@ -996,8 +997,8 @@ extern zone_key_t nfsstat_zone_key;
 /*
  * Zone callback functions.
  */
-void	*nfsstat_zone_init(zoneid_t);
-void	nfsstat_zone_fini(zoneid_t, void *);
+extern void	*nfsstat_zone_init(zoneid_t);
+extern void	nfsstat_zone_fini(zoneid_t, void *);
 
 #endif	/* _KERNEL */
 
@@ -2092,82 +2093,82 @@ typedef struct COMMIT3res COMMIT3res;
 #define	NFSPROC3_COMMIT ((rpcproc_t)21)
 
 #ifndef _KERNEL
-void		*nfsproc3_null_3();
-GETATTR3res	*nfsproc3_getattr_3();
-SETATTR3res	*nfsproc3_setattr_3();
-LOOKUP3res	*nfsproc3_lookup_3();
-ACCESS3res	*nfsproc3_access_3();
-READLINK3res	*nfsproc3_readlink_3();
-READ3res	*nfsproc3_read_3();
-WRITE3res	*nfsproc3_write_3();
-CREATE3res	*nfsproc3_create_3();
-MKDIR3res	*nfsproc3_mkdir_3();
-SYMLINK3res	*nfsproc3_symlink_3();
-MKNOD3res	*nfsproc3_mknod_3();
-REMOVE3res	*nfsproc3_remove_3();
-RMDIR3res	*nfsproc3_rmdir_3();
-RENAME3res	*nfsproc3_rename_3();
-LINK3res	*nfsproc3_link_3();
-READDIR3res	*nfsproc3_readdir_3();
-READDIRPLUS3res	*nfsproc3_readdirplus_3();
-FSSTAT3res	*nfsproc3_fsstat_3();
-FSINFO3res	*nfsproc3_fsinfo_3();
-PATHCONF3res	*nfsproc3_pathconf_3();
-COMMIT3res	*nfsproc3_commit_3();
+extern void		*nfsproc3_null_3();
+extern GETATTR3res	*nfsproc3_getattr_3();
+extern SETATTR3res	*nfsproc3_setattr_3();
+extern LOOKUP3res	*nfsproc3_lookup_3();
+extern ACCESS3res	*nfsproc3_access_3();
+extern READLINK3res	*nfsproc3_readlink_3();
+extern READ3res	*nfsproc3_read_3();
+extern WRITE3res	*nfsproc3_write_3();
+extern CREATE3res	*nfsproc3_create_3();
+extern MKDIR3res	*nfsproc3_mkdir_3();
+extern SYMLINK3res	*nfsproc3_symlink_3();
+extern MKNOD3res	*nfsproc3_mknod_3();
+extern REMOVE3res	*nfsproc3_remove_3();
+extern RMDIR3res	*nfsproc3_rmdir_3();
+extern RENAME3res	*nfsproc3_rename_3();
+extern LINK3res	*nfsproc3_link_3();
+extern READDIR3res	*nfsproc3_readdir_3();
+extern READDIRPLUS3res	*nfsproc3_readdirplus_3();
+extern FSSTAT3res	*nfsproc3_fsstat_3();
+extern FSINFO3res	*nfsproc3_fsinfo_3();
+extern PATHCONF3res	*nfsproc3_pathconf_3();
+extern COMMIT3res	*nfsproc3_commit_3();
 #endif	/* !_KERNEL */
 
 #ifdef _KERNEL
 /* the NFS Version 3 XDR functions */
 
-bool_t xdr_nfs_fh3(XDR *, nfs_fh3 *);
-bool_t xdr_nfslog_nfs_fh3(XDR *, nfs_fh3 *);
-bool_t xdr_nfs_fh3_server(XDR *, nfs_fh3 *);
-bool_t xdr_diropargs3(XDR *, diropargs3 *);
-bool_t xdr_post_op_attr(XDR *, post_op_attr *);
-bool_t xdr_post_op_fh3(XDR *, post_op_fh3 *);
-bool_t xdr_GETATTR3res(XDR *, GETATTR3res *);
-bool_t xdr_GETATTR3vres(XDR *, GETATTR3vres *);
-bool_t xdr_SETATTR3args(XDR *, SETATTR3args *);
-bool_t xdr_SETATTR3res(XDR *, SETATTR3res *);
-bool_t xdr_LOOKUP3res(XDR *, LOOKUP3res *);
-bool_t xdr_LOOKUP3vres(XDR *, LOOKUP3vres *);
-bool_t xdr_ACCESS3args(XDR *, ACCESS3args *);
-bool_t xdr_ACCESS3res(XDR *, ACCESS3res *);
-bool_t xdr_READLINK3args(XDR *, READLINK3args *);
-bool_t xdr_READLINK3res(XDR *, READLINK3res *);
-bool_t xdr_READ3args(XDR *, READ3args *);
-bool_t xdr_READ3res(XDR *, READ3res *);
-bool_t xdr_READ3vres(XDR *, READ3vres *);
-bool_t xdr_READ3uiores(XDR *, READ3uiores *);
-bool_t xdr_WRITE3args(XDR *, WRITE3args *);
-bool_t xdr_WRITE3res(XDR *, WRITE3res *);
-bool_t xdr_CREATE3args(XDR *, CREATE3args *);
-bool_t xdr_CREATE3res(XDR *, CREATE3res *);
-bool_t xdr_MKDIR3args(XDR *, MKDIR3args *);
-bool_t xdr_MKDIR3res(XDR *, MKDIR3res *);
-bool_t xdr_SYMLINK3args(XDR *, SYMLINK3args *);
-bool_t xdr_SYMLINK3res(XDR *, SYMLINK3res *);
-bool_t xdr_MKNOD3args(XDR *, MKNOD3args *);
-bool_t xdr_MKNOD3res(XDR *, MKNOD3res *);
-bool_t xdr_REMOVE3res(XDR *, REMOVE3res *);
-bool_t xdr_RMDIR3resfail(XDR *, RMDIR3resfail *);
-bool_t xdr_RMDIR3res(XDR *, RMDIR3res *);
-bool_t xdr_RENAME3args(XDR *, RENAME3args *);
-bool_t xdr_RENAME3res(XDR *, RENAME3res *);
-bool_t xdr_LINK3args(XDR *, LINK3args *);
-bool_t xdr_LINK3res(XDR *, LINK3res *);
-bool_t xdr_READDIR3args(XDR *, READDIR3args *);
-bool_t xdr_READDIR3res(XDR *, READDIR3res *);
-bool_t xdr_READDIR3vres(XDR *, READDIR3vres *);
-bool_t xdr_READDIRPLUS3args(XDR *, READDIRPLUS3args *);
-bool_t xdr_READDIRPLUS3res(XDR *, READDIRPLUS3res *);
-bool_t xdr_READDIRPLUS3vres(XDR *, READDIRPLUS3vres *);
-bool_t xdr_FSSTAT3res(XDR *, FSSTAT3res *);
-bool_t xdr_FSINFO3res(XDR *, FSINFO3res *);
-bool_t xdr_PATHCONF3res(XDR *, PATHCONF3res *);
-bool_t xdr_COMMIT3args(XDR *, COMMIT3args *);
-bool_t xdr_COMMIT3res(XDR *, COMMIT3res *);
-bool_t xdr_fastnfs_fh3(XDR *, nfs_fh3 **);
+extern bool_t xdr_nfs_fh3(XDR *, nfs_fh3 *);
+extern bool_t xdr_nfslog_nfs_fh3(XDR *, nfs_fh3 *);
+extern bool_t xdr_nfs_fh3_server(XDR *, nfs_fh3 *);
+extern bool_t xdr_diropargs3(XDR *, diropargs3 *);
+extern bool_t xdr_post_op_attr(XDR *, post_op_attr *);
+extern bool_t xdr_post_op_fh3(XDR *, post_op_fh3 *);
+extern bool_t xdr_GETATTR3res(XDR *, GETATTR3res *);
+extern bool_t xdr_GETATTR3vres(XDR *, GETATTR3vres *);
+extern bool_t xdr_SETATTR3args(XDR *, SETATTR3args *);
+extern bool_t xdr_SETATTR3res(XDR *, SETATTR3res *);
+extern bool_t xdr_LOOKUP3res(XDR *, LOOKUP3res *);
+extern bool_t xdr_LOOKUP3vres(XDR *, LOOKUP3vres *);
+extern bool_t xdr_ACCESS3args(XDR *, ACCESS3args *);
+extern bool_t xdr_ACCESS3res(XDR *, ACCESS3res *);
+extern bool_t xdr_READLINK3args(XDR *, READLINK3args *);
+extern bool_t xdr_READLINK3res(XDR *, READLINK3res *);
+extern bool_t xdr_READ3args(XDR *, READ3args *);
+extern bool_t xdr_READ3res(XDR *, READ3res *);
+extern bool_t xdr_READ3vres(XDR *, READ3vres *);
+extern bool_t xdr_READ3uiores(XDR *, READ3uiores *);
+extern bool_t xdr_WRITE3args(XDR *, WRITE3args *);
+extern bool_t xdr_WRITE3res(XDR *, WRITE3res *);
+extern bool_t xdr_CREATE3args(XDR *, CREATE3args *);
+extern bool_t xdr_CREATE3res(XDR *, CREATE3res *);
+extern bool_t xdr_MKDIR3args(XDR *, MKDIR3args *);
+extern bool_t xdr_MKDIR3res(XDR *, MKDIR3res *);
+extern bool_t xdr_SYMLINK3args(XDR *, SYMLINK3args *);
+extern bool_t xdr_SYMLINK3res(XDR *, SYMLINK3res *);
+extern bool_t xdr_MKNOD3args(XDR *, MKNOD3args *);
+extern bool_t xdr_MKNOD3res(XDR *, MKNOD3res *);
+extern bool_t xdr_REMOVE3res(XDR *, REMOVE3res *);
+extern bool_t xdr_RMDIR3resfail(XDR *, RMDIR3resfail *);
+extern bool_t xdr_RMDIR3res(XDR *, RMDIR3res *);
+extern bool_t xdr_RENAME3args(XDR *, RENAME3args *);
+extern bool_t xdr_RENAME3res(XDR *, RENAME3res *);
+extern bool_t xdr_LINK3args(XDR *, LINK3args *);
+extern bool_t xdr_LINK3res(XDR *, LINK3res *);
+extern bool_t xdr_READDIR3args(XDR *, READDIR3args *);
+extern bool_t xdr_READDIR3res(XDR *, READDIR3res *);
+extern bool_t xdr_READDIR3vres(XDR *, READDIR3vres *);
+extern bool_t xdr_READDIRPLUS3args(XDR *, READDIRPLUS3args *);
+extern bool_t xdr_READDIRPLUS3res(XDR *, READDIRPLUS3res *);
+extern bool_t xdr_READDIRPLUS3vres(XDR *, READDIRPLUS3vres *);
+extern bool_t xdr_FSSTAT3res(XDR *, FSSTAT3res *);
+extern bool_t xdr_FSINFO3res(XDR *, FSINFO3res *);
+extern bool_t xdr_PATHCONF3res(XDR *, PATHCONF3res *);
+extern bool_t xdr_COMMIT3args(XDR *, COMMIT3args *);
+extern bool_t xdr_COMMIT3res(XDR *, COMMIT3res *);
+extern bool_t xdr_fastnfs_fh3(XDR *, nfs_fh3 **);
 
 /*
  * The NFS Version 3 service procedures.
@@ -2177,102 +2178,105 @@ struct servinfo;	/* defined in nfs/nfs_clnt.h */
 struct mntinfo;		/* defined in nfs/nfs_clnt.h */
 struct sec_ol;		/* defined in nfs/export.h */
 
-void	rfs3_getattr(GETATTR3args *, GETATTR3res *, struct exportinfo *,
-    struct svc_req *, cred_t *);
-void	*rfs3_getattr_getfh(GETATTR3args *);
-void	rfs3_setattr(SETATTR3args *, SETATTR3res *, struct exportinfo *,
-    struct svc_req *, cred_t *);
-void	*rfs3_setattr_getfh(SETATTR3args *);
-void	rfs3_lookup(LOOKUP3args *, LOOKUP3res *, struct exportinfo *,
-    struct svc_req *, cred_t *);
-void	*rfs3_lookup_getfh(LOOKUP3args *);
-void	rfs3_access(ACCESS3args *, ACCESS3res *, struct exportinfo *,
-    struct svc_req *, cred_t *);
-void	*rfs3_access_getfh(ACCESS3args *);
-void	rfs3_readlink(READLINK3args *, READLINK3res *, struct exportinfo *,
-    struct svc_req *, cred_t *);
-void	*rfs3_readlink_getfh(READLINK3args *);
-void	rfs3_readlink_free(READLINK3res *);
-void	rfs3_read(READ3args *, READ3res *, struct exportinfo *,
-    struct svc_req *, cred_t *);
-void	*rfs3_read_getfh(READ3args *);
-void	rfs3_read_free(READ3res *);
-void	rfs3_write(WRITE3args *, WRITE3res *, struct exportinfo *,
-    struct svc_req *, cred_t *);
-void	*rfs3_write_getfh(WRITE3args *);
-void	rfs3_create(CREATE3args *, CREATE3res *, struct exportinfo *,
-    struct svc_req *, cred_t *);
-void	*rfs3_create_getfh(CREATE3args *);
-void	rfs3_mkdir(MKDIR3args *, MKDIR3res *, struct exportinfo *,
-    struct svc_req *, cred_t *);
-void	*rfs3_mkdir_getfh(MKDIR3args *);
-void	rfs3_symlink(SYMLINK3args *, SYMLINK3res *, struct exportinfo *,
-    struct svc_req *, cred_t *);
-void	*rfs3_symlink_getfh(SYMLINK3args *);
-void	rfs3_mknod(MKNOD3args *, MKNOD3res *, struct exportinfo *,
-    struct svc_req *, cred_t *);
-void	*rfs3_mknod_getfh(MKNOD3args *);
-void	rfs3_remove(REMOVE3args *, REMOVE3res *, struct exportinfo *,
-    struct svc_req *, cred_t *);
-void	*rfs3_remove_getfh(REMOVE3args *);
-void	rfs3_rmdir(RMDIR3args *, RMDIR3res *, struct exportinfo *,
-    struct svc_req *, cred_t *);
-void	*rfs3_rmdir_getfh(RMDIR3args *);
-void	rfs3_rename(RENAME3args *, RENAME3res *, struct exportinfo *,
-    struct svc_req *, cred_t *);
-void	*rfs3_rename_getfh(RENAME3args *);
-void	rfs3_link(LINK3args *, LINK3res *, struct exportinfo *,
-    struct svc_req *, cred_t *);
-void	*rfs3_link_getfh(LINK3args *);
-void	rfs3_readdir(READDIR3args *, READDIR3res *, struct exportinfo *,
-    struct svc_req *, cred_t *);
-void	*rfs3_readdir_getfh(READDIR3args *);
-void	rfs3_readdir_free(READDIR3res *);
-void	rfs3_readdirplus(READDIRPLUS3args *, READDIRPLUS3res *,
-    struct exportinfo *, struct svc_req *, cred_t *);
-void	*rfs3_readdirplus_getfh(READDIRPLUS3args *);
-void	rfs3_readdirplus_free(READDIRPLUS3res *);
-void	rfs3_fsstat(FSSTAT3args *, FSSTAT3res *, struct exportinfo *,
-    struct svc_req *, cred_t *);
-void	*rfs3_fsstat_getfh(FSSTAT3args *);
-void	rfs3_fsinfo(FSINFO3args *, FSINFO3res *, struct exportinfo *,
-    struct svc_req *, cred_t *);
-void	*rfs3_fsinfo_getfh(FSINFO3args *);
-void	rfs3_pathconf(PATHCONF3args *, PATHCONF3res *, struct exportinfo *,
-    struct svc_req *, cred_t *);
-void	*rfs3_pathconf_getfh(PATHCONF3args *);
-void	rfs3_commit(COMMIT3args *, COMMIT3res *, struct exportinfo *,
-    struct svc_req *, cred_t *);
-void	*rfs3_commit_getfh(COMMIT3args *);
-void	rfs3_srvrinit(void);
-void	rfs3_srvrfini(void);
+extern void	rfs3_getattr(GETATTR3args *, GETATTR3res *, struct exportinfo *,
+    struct svc_req *, cred_t *, bool_t);
+extern void	*rfs3_getattr_getfh(GETATTR3args *);
+extern void	rfs3_setattr(SETATTR3args *, SETATTR3res *, struct exportinfo *,
+    struct svc_req *, cred_t *, bool_t);
+extern void	*rfs3_setattr_getfh(SETATTR3args *);
+extern void	rfs3_lookup(LOOKUP3args *, LOOKUP3res *, struct exportinfo *,
+    struct svc_req *, cred_t *, bool_t);
+extern void	*rfs3_lookup_getfh(LOOKUP3args *);
+extern void	rfs3_access(ACCESS3args *, ACCESS3res *, struct exportinfo *,
+    struct svc_req *, cred_t *, bool_t);
+extern void	*rfs3_access_getfh(ACCESS3args *);
+extern void	rfs3_readlink(READLINK3args *, READLINK3res *,
+    struct exportinfo *, struct svc_req *, cred_t *, bool_t);
+extern void	*rfs3_readlink_getfh(READLINK3args *);
+extern void	rfs3_readlink_free(READLINK3res *);
+extern void	rfs3_read(READ3args *, READ3res *, struct exportinfo *,
+    struct svc_req *, cred_t *, bool_t);
+extern void	*rfs3_read_getfh(READ3args *);
+extern void	rfs3_read_free(READ3res *);
+extern void	rfs3_write(WRITE3args *, WRITE3res *, struct exportinfo *,
+    struct svc_req *, cred_t *, bool_t);
+extern void	*rfs3_write_getfh(WRITE3args *);
+extern void	rfs3_create(CREATE3args *, CREATE3res *, struct exportinfo *,
+    struct svc_req *, cred_t *, bool_t);
+extern void	*rfs3_create_getfh(CREATE3args *);
+extern void	rfs3_mkdir(MKDIR3args *, MKDIR3res *, struct exportinfo *,
+    struct svc_req *, cred_t *, bool_t);
+extern void	*rfs3_mkdir_getfh(MKDIR3args *);
+extern void	rfs3_symlink(SYMLINK3args *, SYMLINK3res *, struct exportinfo *,
+    struct svc_req *, cred_t *, bool_t);
+extern void	*rfs3_symlink_getfh(SYMLINK3args *);
+extern void	rfs3_mknod(MKNOD3args *, MKNOD3res *, struct exportinfo *,
+    struct svc_req *, cred_t *, bool_t);
+extern void	*rfs3_mknod_getfh(MKNOD3args *);
+extern void	rfs3_remove(REMOVE3args *, REMOVE3res *, struct exportinfo *,
+    struct svc_req *, cred_t *, bool_t);
+extern void	*rfs3_remove_getfh(REMOVE3args *);
+extern void	rfs3_rmdir(RMDIR3args *, RMDIR3res *, struct exportinfo *,
+    struct svc_req *, cred_t *, bool_t);
+extern void	*rfs3_rmdir_getfh(RMDIR3args *);
+extern void	rfs3_rename(RENAME3args *, RENAME3res *, struct exportinfo *,
+    struct svc_req *, cred_t *, bool_t);
+extern void	*rfs3_rename_getfh(RENAME3args *);
+extern void	rfs3_link(LINK3args *, LINK3res *, struct exportinfo *,
+    struct svc_req *, cred_t *, bool_t);
+extern void	*rfs3_link_getfh(LINK3args *);
+extern void	rfs3_readdir(READDIR3args *, READDIR3res *, struct exportinfo *,
+    struct svc_req *, cred_t *, bool_t);
+extern void	*rfs3_readdir_getfh(READDIR3args *);
+extern void	rfs3_readdir_free(READDIR3res *);
+extern void	rfs3_readdirplus(READDIRPLUS3args *, READDIRPLUS3res *,
+    struct exportinfo *, struct svc_req *, cred_t *, bool_t);
+extern void	*rfs3_readdirplus_getfh(READDIRPLUS3args *);
+extern void	rfs3_readdirplus_free(READDIRPLUS3res *);
+extern void	rfs3_fsstat(FSSTAT3args *, FSSTAT3res *, struct exportinfo *,
+    struct svc_req *, cred_t *, bool_t);
+extern void	*rfs3_fsstat_getfh(FSSTAT3args *);
+extern void	rfs3_fsinfo(FSINFO3args *, FSINFO3res *, struct exportinfo *,
+    struct svc_req *, cred_t *, bool_t);
+extern void	*rfs3_fsinfo_getfh(FSINFO3args *);
+extern void	rfs3_pathconf(PATHCONF3args *, PATHCONF3res *,
+    struct exportinfo *, struct svc_req *, cred_t *, bool_t);
+extern void	*rfs3_pathconf_getfh(PATHCONF3args *);
+extern void	rfs3_commit(COMMIT3args *, COMMIT3res *, struct exportinfo *,
+    struct svc_req *, cred_t *, bool_t);
+extern void	*rfs3_commit_getfh(COMMIT3args *);
+extern void	rfs3_srvrinit(void);
+extern void	rfs3_srvrfini(void);
 
-int	nfs3_validate_caches(vnode_t *, cred_t *);
-void	nfs3_cache_post_op_attr(vnode_t *, post_op_attr *, hrtime_t, cred_t *);
-void	nfs3_cache_post_op_vattr(vnode_t *, post_op_vattr *, hrtime_t,
+extern int	nfs3_validate_caches(vnode_t *, cred_t *);
+extern void	nfs3_cache_post_op_attr(vnode_t *, post_op_attr *, hrtime_t,
     cred_t *);
-void	nfs3_cache_wcc_data(vnode_t *, wcc_data *, hrtime_t, cred_t *);
-void	nfs3_attrcache(vnode_t *, fattr3 *, hrtime_t);
-int	nfs3_cache_fattr3(vnode_t *, fattr3 *, vattr_t *, hrtime_t, cred_t *);
-int	nfs3_getattr_otw(vnode_t *, struct vattr *, cred_t *);
-int	nfs3getattr(vnode_t *, struct vattr *, cred_t *);
-int	fattr3_to_vattr(vnode_t *, fattr3 *, struct vattr *);
-int	nfs3tsize(void);
-uint_t	nfs3_tsize(struct knetconfig *);
-uint_t	rfs3_tsize(struct svc_req *);
-int	vattr_to_sattr3(struct vattr *, sattr3 *);
-void	setdiropargs3(diropargs3 *, char *, vnode_t *);
-enum nfsstat3 puterrno3(int);
-int	geterrno3(enum nfsstat3);
-int	nfs3init(int, char *);
-void	nfs3fini(void);
-int	nfs3_vfsinit(void);
-void	nfs3_vfsfini(void);
-void	vattr_to_post_op_attr(struct vattr *, post_op_attr *);
-void	mblk_to_iov(mblk_t *, int, struct iovec *);
-int	rfs_publicfh_mclookup(char *, vnode_t *, cred_t *, vnode_t **,
+extern void	nfs3_cache_post_op_vattr(vnode_t *, post_op_vattr *, hrtime_t,
+    cred_t *);
+extern void	nfs3_cache_wcc_data(vnode_t *, wcc_data *, hrtime_t, cred_t *);
+extern void	nfs3_attrcache(vnode_t *, fattr3 *, hrtime_t);
+extern int	nfs3_cache_fattr3(vnode_t *, fattr3 *, vattr_t *, hrtime_t,
+    cred_t *);
+extern int	nfs3_getattr_otw(vnode_t *, struct vattr *, cred_t *);
+extern int	nfs3getattr(vnode_t *, struct vattr *, cred_t *);
+extern int	fattr3_to_vattr(vnode_t *, fattr3 *, struct vattr *);
+extern int	nfs3tsize(void);
+extern uint_t	nfs3_tsize(struct knetconfig *);
+extern uint_t	rfs3_tsize(struct svc_req *);
+extern int	vattr_to_sattr3(struct vattr *, sattr3 *);
+extern void	setdiropargs3(diropargs3 *, char *, vnode_t *);
+extern enum nfsstat3 puterrno3(int);
+extern int	geterrno3(enum nfsstat3);
+extern int	nfs3init(int, char *);
+extern void	nfs3fini(void);
+extern int	nfs3_vfsinit(void);
+extern void	nfs3_vfsfini(void);
+extern void	vattr_to_post_op_attr(struct vattr *, post_op_attr *);
+extern void	mblk_to_iov(mblk_t *, int, struct iovec *);
+extern int	rfs_publicfh_mclookup(char *, vnode_t *, cred_t *, vnode_t **,
     struct exportinfo **, struct sec_ol *);
-int	rfs_pathname(char *, vnode_t **, vnode_t **, vnode_t *, cred_t *, int);
+extern int	rfs_pathname(char *, vnode_t **, vnode_t **, vnode_t *,
+    cred_t *, int);
 
 extern vtype_t		nf3_to_vt[];
 extern kstat_named_t	*rfsproccnt_v3_ptr;
@@ -2291,27 +2295,28 @@ extern int		nfs_disable_rddir_cache;
 /*
  * External functions called by the v2/v3 code into the v4 code
  */
-void	nfs4_clnt_init(void);
-void	nfs4_clnt_fini(void);
+extern void	nfs4_clnt_init(void);
+extern void	nfs4_clnt_fini(void);
 
 /*
  * Does NFS4 server have a vnode delegated?  TRUE if so, FALSE if not.
  */
-bool_t	rfs4_check_delegated(int mode, vnode_t *, bool_t trunc);
+extern bool_t	rfs4_check_delegated(int mode, vnode_t *, bool_t trunc);
 /*
  * VOP_GETATTR call. If a NFS4 delegation is present on the supplied vnode
  * call back to the delegated client to get attributes for AT_MTIME and
  * AT_SIZE. Invoke VOP_GETATTR to get all other attributes or all attributes
  * if no delegation is present.
  */
-int	rfs4_delegated_getattr(vnode_t *, vattr_t *, int, cred_t *);
-void	rfs4_hold_deleg_policy(void);
-void	rfs4_rele_deleg_policy(void);
+extern int	rfs4_delegated_getattr(vnode_t *, vattr_t *, int, cred_t *);
+extern void	rfs4_hold_deleg_policy(void);
+extern void	rfs4_rele_deleg_policy(void);
 
-int	do_xattr_exists_check(vnode_t *, ulong_t *, cred_t *);
+extern int	do_xattr_exists_check(vnode_t *, ulong_t *, cred_t *);
 
-ts_label_t *nfs_getflabel(vnode_t *, struct exportinfo *);
-boolean_t do_rfs_label_check(bslabel_t *, vnode_t *, int, struct exportinfo *);
+extern ts_label_t *nfs_getflabel(vnode_t *, struct exportinfo *);
+extern boolean_t do_rfs_label_check(bslabel_t *, vnode_t *, int,
+    struct exportinfo *);
 
 /*
  * Copy Reduction support.
@@ -2325,11 +2330,11 @@ typedef struct nfs_xuio {
 	frtn_t nu_frtn;
 } nfs_xuio_t;
 
-xuio_t	*rfs_setup_xuio(vnode_t *);
-mblk_t	*uio_to_mblk(uio_t *);
-mblk_t	*rfs_read_alloc(uint_t, struct iovec **, int *);
-void	rfs_rndup_mblks(mblk_t *, uint_t, int);
-void	rfs_free_xuio(void *);
+extern xuio_t	*rfs_setup_xuio(vnode_t *);
+extern mblk_t	*uio_to_mblk(uio_t *);
+extern mblk_t	*rfs_read_alloc(uint_t, struct iovec **, int *);
+extern void	rfs_rndup_mblks(mblk_t *, uint_t, int);
+extern void	rfs_free_xuio(void *);
 
 #endif	/* _KERNEL */
 

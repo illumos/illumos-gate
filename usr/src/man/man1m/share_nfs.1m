@@ -1,9 +1,10 @@
 '\" te
+.\" Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
 .\" Copyright (C) 2008, Sun Microsystems, Inc. All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SHARE_NFS 1M "May 6, 2009"
+.TH SHARE_NFS 1M "Jun 30, 2014"
 .SH NAME
 share_nfs \- make local NFS file systems available for mounting by remote
 systems
@@ -101,6 +102,39 @@ Where \fIcharset\fR is one of: \fBeuc-cn\fR, \fBeuc-jp\fR, \fBeuc-jpms\fR,
 Clients that match the \fIaccess_list\fR for one of these properties will be
 assumed to be using that character set and file and path names will be
 converted to UTF-8 for the server.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBgidmap=\fR\fImapping\fR[\fB~\fR\fImapping\fR]...\fR
+.ad
+.sp .6
+.RS 4n
+Where \fImapping\fR is:
+.sp
+[\fIclnt\fR]\fB:\fR[\fIsrv\fR]\fB:\fR\fIaccess_list\fR
+.sp
+Allows remapping the group ID (gid) in the incoming request to some other gid.
+This effectively changes the identity of the user in the request to that of
+some other local user.
+.sp
+For clients where the gid in the incoming request is \fIclnt\fR and the client
+matches the \fIaccess_list\fR, change the group ID to \fIsrv\fR.  If \fIclnt\fR
+is asterisk (*), all groups are mapped by this rule.  If \fIclnt\fR is omitted,
+all unknown groups are mapped by this rule.  If \fIsrv\fR is set to \(mi1,
+access is denied.  If \fIsrv\fR is omitted, the gid is mapped to
+\fBUID_NOBODY\fR.
+.sp
+The particular \fImapping\fRs are separated in the \fBgidmap=\fR option
+by tilde (~) and are evaluated in the specified order until a match is
+found.  Both \fBroot=\fR and \fBroot_mapping=\fR options (if specified) are
+evaluated before the \fBgidmap=\fR option.  The \fBgidmap=\fR option is
+skipped in the case where the client matches the \fBroot=\fR option.
+.sp
+The \fBgidmap=\fR option is evaluated before the \fBanon=\fR option.
+.sp
+This option is supported only for \fBAUTH_SYS\fR.
 .RE
 
 .sp
@@ -301,6 +335,39 @@ description of how unauthenticated requests are handled.
 .sp .6
 .RS 4n
 This option has been deprecated in favor of the \fBsec=\fR\fIdh\fR option.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBuidmap=\fR\fImapping\fR[\fB~\fR\fImapping\fR]...\fR
+.ad
+.sp .6
+.RS 4n
+Where \fImapping\fR is:
+.sp
+[\fIclnt\fR]\fB:\fR[\fIsrv\fR]\fB:\fR\fIaccess_list\fR
+.sp
+Allows remapping the user ID (uid) in the incoming request to some other uid.
+This effectively changes the identity of the user in the request to that of
+some other local user.
+.sp
+For clients where the uid in the incoming request is \fIclnt\fR and the client
+matches the \fIaccess_list\fR, change the user ID to \fIsrv\fR.  If \fIclnt\fR
+is asterisk (*), all users are mapped by this rule.  If \fIclnt\fR is omitted,
+all unknown users are mapped by this rule.  If \fIsrv\fR is set to \(mi1,
+access is denied.  If \fIsrv\fR is omitted, the uid is mapped to
+\fBUID_NOBODY\fR.
+.sp
+The particular \fImapping\fRs are separated in the \fBuidmap=\fR option
+by tilde (~) and are evaluated in the specified order until a match is
+found.  Both \fBroot=\fR and \fBroot_mapping=\fR options (if specified) are
+evaluated before the \fBuidmap=\fR option.  The \fBuidmap=\fR option is
+skipped in the case where the client matches the \fBroot=\fR option.
+.sp
+The \fBuidmap=\fR option is evaluated before the \fBanon=\fR option.
+.sp
+This option is supported only for \fBAUTH_SYS\fR.
 .RE
 
 .sp
@@ -511,6 +578,21 @@ files, is specified by the global entry in \fB/etc/nfs/nfslog.conf\fR. The
 \fB/etc/dfs/dfstab\fR is shared with logging enabled upon starting or rebooting
 the system. Simply sharing a file system with logging enabled from the command
 line does not start the \fBnfslogd\fR(1M).
+
+.LP
+\fBExample 2 \fRRemap A User Coming From The Particular NFS Client
+.sp
+.LP
+The following example remaps the user with uid \fB100\fR at client
+\fB10.0.0.1\fR to user \fBjoe\fR:
+
+.sp
+.in +2
+.nf
+example% \fBshare -o uidmap=100:joe:@10.0.0.1 /export\fR
+.fi
+.in -2
+.sp
 
 .SH EXIT STATUS
 .sp

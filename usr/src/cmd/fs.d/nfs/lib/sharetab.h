@@ -23,6 +23,9 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
@@ -60,6 +63,8 @@ extern "C" {
 #define	SHOPT_INDEX	"index"
 #define	SHOPT_LOG	"log"
 #define	SHOPT_NOACLFAB	"noaclfab"
+#define	SHOPT_UIDMAP	"uidmap"
+#define	SHOPT_GIDMAP	"gidmap"
 
 /* XXX The following are added for testing volatile fh's purposes only */
 #ifdef VOLATILE_FH_TEST
