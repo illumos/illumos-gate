@@ -112,7 +112,7 @@ lx_sysent_t lx_sysent[] =
 	LX_NOSYS("mkdir"),
 	LX_NOSYS("rmdir"),					/* 40 */
 	LX_NOSYS("dup"),
-	LX_NOSYS("pipe"),
+	LX_CL("pipe",	lx_pipe,	1),
 	LX_NOSYS("times"),
 	LX_NOSYS("prof"),
 	LX_CL("brk",	lx_brk,		1),
@@ -402,7 +402,7 @@ lx_sysent_t lx_sysent[] =
 	LX_NOSYS("eventfd2"),
 	LX_NOSYS("epoll_create1"),
 	LX_NOSYS("dup3"),					/* 330 */
-	LX_NOSYS("pipe2"),
+	LX_CL("pipe2",	lx_pipe2,	2),
 	LX_NOSYS("inotify_init1"),
 	LX_NOSYS("preadv"),
 	LX_NOSYS("pwritev"),

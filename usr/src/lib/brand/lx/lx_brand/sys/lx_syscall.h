@@ -143,6 +143,7 @@ extern int lx_sysctl(uintptr_t);
 extern int lx_fsync(uintptr_t);
 extern int lx_fdatasync(uintptr_t);
 extern int lx_pipe(uintptr_t);
+extern int lx_pipe2(uintptr_t, uintptr_t);
 extern int lx_link(uintptr_t, uintptr_t);
 extern int lx_unlink(uintptr_t);
 extern int lx_rmdir(uintptr_t);
@@ -562,6 +563,42 @@ extern int lx_prctl(int, uintptr_t, uintptr_t, uintptr_t, uintptr_t);
 #define	LX_SYS_tee		315
 #define	LX_SYS_vmsplice		316
 #define	LX_SYS_move_pages	317
+
+#define	LX_SYS_getcpu		318
+#define	LX_SYS_epoll_pwait	319
+#define	LX_SYS_utimensat	320
+#define	LX_SYS_signalfd		321
+#define	LX_SYS_timerfd_create	322
+#define	LX_SYS_eventfd		323
+#define	LX_SYS_fallocate	324
+#define	LX_SYS_timerfd_settime	325
+#define	LX_SYS_timerfd_gettime	326
+#define	LX_SYS_signalfd4	327
+#define	LX_SYS_eventfd2		328
+#define	LX_SYS_epoll_create1	329
+#define	LX_SYS_dup3		330
+#define	LX_SYS_pipe2		331
+#define	LX_SYS_inotify_init1	332
+#define	LX_SYS_preadv		333
+#define	LX_SYS_pwritev		334
+#define	LX_SYS_rt_tgsigqueueinfo	335
+#define	LX_SYS_perf_event_open	336
+#define	LX_SYS_recvmmsg		337
+#define	LX_SYS_fanotify_init	338
+#define	LX_SYS_fanotify_mark	339
+#define	LX_SYS_prlimit64	340
+#define	LX_SYS_name_to_handle_at	341
+#define	LX_SYS_open_by_handle_at	342
+#define	LX_SYS_clock_adjtime	343
+#define	LX_SYS_syncfs		344
+#define	LX_SYS_sendmmsg		345
+#define	LX_SYS_setns		346
+#define	LX_SYS_process_vm_readv	347
+#define	LX_SYS_process_vm_writev	348
+#define	LX_SYS_kcmp		349
+#define	LX_SYS_finit_module	350
+#define	LX_SYS_sched_setattr	351
+#define	LX_SYS_sched_getattr	352
 
 #ifdef	__cplusplus
 }
