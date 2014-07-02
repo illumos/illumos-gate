@@ -1185,7 +1185,7 @@ static struct lx_sysent sysents[] = {
 	{"io_getevents", NULL,		NOSYS_NO_EQUIV,	0},	/* 247 */
 	{"io_submit",	NULL,		NOSYS_NO_EQUIV,	0},	/* 248 */
 	{"io_cancel",	NULL,		NOSYS_NO_EQUIV,	0},	/* 249 */
-	{"fadvise64",	NULL,		NOSYS_UNDOC,	0},	/* 250 */
+	{"fadvise64",	lx_fadvise64,	0,		4},	/* 250 */
 	{"nosys",	NULL,		0,		0},	/* 251 */
 	{"group_exit",	lx_group_exit,	0,		1},	/* 252 */
 	{"lookup_dcookie", NULL,	NOSYS_NO_EQUIV,	0},	/* 253 */
@@ -1209,7 +1209,7 @@ static struct lx_sysent sysents[] = {
 
 	/* The following system calls only exist in kernel 2.6 and greater */
 	{"utimes",	utimes,		SYS_PASSTHRU,	2},	/* 271 */
-	{"fadvise64_64", NULL,		NOSYS_NULL,	0},	/* 272 */
+	{"fadvise64_64", lx_fadvise64_64, 0,		4},	/* 272 */
 	{"vserver",	NULL,		NOSYS_NULL,	0},	/* 273 */
 	{"mbind",	NULL,		NOSYS_NULL,	0},	/* 274 */
 	{"get_mempolicy", NULL,		NOSYS_NULL,	0},	/* 275 */
