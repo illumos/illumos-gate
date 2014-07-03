@@ -1217,10 +1217,25 @@ static int
 dppoll(dev_t dev, short events, int anyyet, short *reventsp,
     struct pollhead **phpp)
 {
+	minor_t		minor;
+	dp_entry_t	*dpep;
+
+	minor = getminor(dev);
+
+	mutex_enter(&devpoll_lock);
+	dpep = devpolltbl[minor];
+	ASSERT(dpep != NULL);
+	mutex_exit(&devpoll_lock);
+
 	/*
 	 * Polling on a /dev/poll fd is not fully supported yet.
 	 */
-	*reventsp = POLLERR;
+	if (dpep->dpe_flag & DP_ISEPOLLCOMPAT) {
+		/* no error in epoll compat. mode */
+		*reventsp = 0;
+	} else {
+		*reventsp = POLLERR;
+	}
 	return (0);
 }
 
