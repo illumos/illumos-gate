@@ -1345,8 +1345,10 @@ set_inst_action(const char *fmri, const scf_instance_t *inst,
 	    (ent = scf_entry_create(h)) == NULL)
 		scfdie();
 
-	if (restarter_setup(fmri, inst))
+	if (restarter_setup(fmri, inst)) {
+		exit_status = 1;
 		goto out;
+	}
 
 	if (scf_instance_get_pg(inst, scf_pg_restarter_actions, pg) == -1) {
 		if (scf_error() != SCF_ERROR_NOT_FOUND)

@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright (c) 2013 by Delphix. All rights reserved.
+ * Copyright (c) 2012, 2014 by Delphix. All rights reserved.
  * Copyright (c) 2012 Joyent, Inc. All rights reserved.
  */
 
@@ -1731,6 +1731,7 @@ pipe_print(mdb_ctf_id_t id, ulong_t off, void *data)
 	uintptr_t value;
 	uintptr_t addr = pap->pa_addr + off / NBBY;
 	mdb_ctf_id_t base;
+	int enum_value;
 	ctf_encoding_t e;
 
 	union {
@@ -1765,10 +1766,18 @@ again:
 		mdb_printf("%#lr\n", value);
 		break;
 
-	case CTF_K_INTEGER:
 	case CTF_K_ENUM:
+		if (mdb_tgt_aread(pap->pa_tgt, pap->pa_as, &enum_value,
+		    sizeof (enum_value), addr) != sizeof (enum_value)) {
+			mdb_warn("failed to read enum at %llx", addr);
+			return (-1);
+		}
+		mdb_printf("%#r\n", enum_value);
+		break;
+
+	case CTF_K_INTEGER:
 		if (mdb_ctf_type_encoding(base, &e) != 0) {
-			mdb_printf("could not get type encoding\n");
+			mdb_warn("could not get type encoding\n");
 			return (-1);
 		}
 
