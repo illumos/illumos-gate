@@ -392,7 +392,7 @@ lxpr_open(vnode_t **vpp, int flag, cred_t *cr, caller_context_t *ct)
 			if (type == LXPR_PID_FD_FD && rvp->v_type == VFIFO) {
 				/*
 				 * This flag lets the fifo open know that
-				 * we're use proc/fd to open a fd which we
+				 * we're using proc/fd to open a fd which we
 				 * already have open. Otherwise, the fifo might
 				 * reject an open if the other end has closed.
 				 */
