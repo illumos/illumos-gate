@@ -1312,8 +1312,11 @@ link path=usr/share/man/man3c/wcslen.3c target=wcstring.3c
 link path=usr/share/man/man3c/wcsncat.3c target=wcstring.3c
 link path=usr/share/man/man3c/wcsncmp.3c target=wcstring.3c
 link path=usr/share/man/man3c/wcsncpy.3c target=wcstring.3c
+link path=usr/share/man/man3c/wcsnrtombs.3c target=wcsrtombs.3c
+link path=usr/share/man/man3c/wcsnrtombs_l.3c target=wcsrtombs.3c
 link path=usr/share/man/man3c/wcspbrk.3c target=wcstring.3c
 link path=usr/share/man/man3c/wcsrchr.3c target=wcstring.3c
+link path=usr/share/man/man3c/wcsrtombs_l.3c target=wcsrtombs.3c
 link path=usr/share/man/man3c/wcsspn.3c target=wcstring.3c
 link path=usr/share/man/man3c/wcstof.3c target=wcstod.3c
 link path=usr/share/man/man3c/wcstok.3c target=wcstring.3c

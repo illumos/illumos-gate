@@ -20,6 +20,7 @@
 #
 #
 # Copyright (c) 1997, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2014 Garrett D'Amore <garrett@damore.org>
 #
 
 # rebind basic build macros to 64-bit versions
@@ -41,15 +42,6 @@ CTF_FLAGS=	$(CTF_FLAGS_64)
 
 OFFSETS_CREATE=	$(OFFSETS_CREATE64)
 
-#
-# Some library path hackery, to allow building of partial workspaces
-# and properly set the 64-bit library paths with 'ws'
-#
-LDLIBS1=	$(ENVLDLIBS1:%=%/$(MACH64))
-LDLIBS2=	$(ENVLDLIBS2:%=%/$(MACH64))
-LDLIBS3=	$(ENVLDLIBS3:%=%/$(MACH64))
-LDLIBS64 = 	$(LDLIBS1) $(LDLIBS2) $(LDLIBS3)
-LDLIBS64 +=	$(ADJUNCT_PROTO:%=-L%/usr/lib/$(MACH64) -L%/lib/$(MACH64))
 #
 # Moved these up to the top level here, so they can be overridden
 #

@@ -25,6 +25,10 @@
  */
 
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ */
+
+/*
  * An application should not include this header directly.  Instead it
  * should be included only through the inclusion of other Sun headers.
  *
@@ -38,8 +42,6 @@
 
 #ifndef	_ISO_WCHAR_ISO_H
 #define	_ISO_WCHAR_ISO_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/feature_tests.h>
 #include <stdio_tag.h>
@@ -326,6 +328,10 @@ extern size_t	wcrtomb(char *_RESTRICT_KYWD, wchar_t,
 			mbstate_t *_RESTRICT_KYWD);
 extern size_t	wcsrtombs(char *_RESTRICT_KYWD, const wchar_t **_RESTRICT_KYWD,
 			size_t, mbstate_t *_RESTRICT_KYWD);
+#if defined(_XPG7) || !defined(_STRICT_SYMBOLS)
+extern size_t	wcsnrtombs(char *_RESTRICT_KYWD, const wchar_t **_RESTRICT_KYWD,
+			size_t, size_t, mbstate_t *_RESTRICT_KYWD);
+#endif
 extern int	wctob(wint_t);
 extern int	wmemcmp(const wchar_t *, const wchar_t *, size_t);
 extern wchar_t	*wmemcpy(wchar_t *_RESTRICT_KYWD,
@@ -420,6 +426,10 @@ extern int	vwprintf();
 extern int	vswprintf();
 extern size_t	wcrtomb();
 extern size_t	wcsrtombs();
+#if defined(_XPG7) || !defined(_STRICT_SYMBOLS)
+extern size_t	wcsnrtombs();
+#endif
+
 extern wchar_t	*wcsstr();
 extern int	wctob();
 extern wchar_t	*wmemchr();
