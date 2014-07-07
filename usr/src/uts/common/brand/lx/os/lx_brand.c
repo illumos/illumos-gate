@@ -58,6 +58,7 @@
 #include <sys/zone.h>
 #include <sys/brand.h>
 #include <sys/sdt.h>
+#include <lx_signum.h>
 
 int	lx_debug = 0;
 
@@ -78,6 +79,8 @@ extern int lx_initlwp(klwp_t *);
 extern void lx_forklwp(klwp_t *, klwp_t *);
 extern void lx_exitlwp(klwp_t *);
 extern void lx_freelwp(klwp_t *);
+extern void lx_exit_with_sig(proc_t *, sigqueue_t *, void *);
+extern boolean_t lx_wait_filter(proc_t *, proc_t *);
 extern greg_t lx_fixsegreg(greg_t, model_t);
 extern int lx_sched_affinity(int, uintptr_t, int, uintptr_t, int64_t *);
 
@@ -112,6 +115,8 @@ struct brand_ops lx_brops = {
 	NULL,
 	NULL,
 	NSIG,
+	lx_exit_with_sig,
+	lx_wait_filter,
 };
 
 struct brand_mach_ops lx_mops = {
@@ -127,7 +132,8 @@ struct brand lx_brand = {
 	BRAND_VER_1,
 	"lx",
 	&lx_brops,
-	&lx_mops
+	&lx_mops,
+	sizeof (struct lx_proc_data)
 };
 
 static struct modlbrand modlbrand = {
@@ -142,6 +148,7 @@ void
 lx_proc_exit(proc_t *p, klwp_t *lwp)
 {
 	zone_t *z = p->p_zone;
+	int sig = ptolxproc(p)->l_signal;
 
 	ASSERT(p->p_brand != NULL);
 	ASSERT(p->p_brand_data != NULL);
@@ -167,8 +174,7 @@ lx_proc_exit(proc_t *p, klwp_t *lwp)
 	 */
 	if (lwp != NULL)
 		lx_exitlwp(lwp);
-	kmem_free(p->p_brand_data, sizeof (struct lx_proc_data));
-	p->p_brand_data = NULL;
+	p->p_exit_data = sig;
 }
 
 void
@@ -181,6 +187,7 @@ lx_setbrand(proc_t *p)
 	ASSERT(ttolxlwp(curthread) == NULL);
 
 	p->p_brand_data = kmem_zalloc(sizeof (struct lx_proc_data), KM_SLEEP);
+	ptolxproc(p)->l_signal = stol_signo[SIGCHLD];
 
 	/*
 	 * This routine can only be called for single-threaded processes.
@@ -760,6 +767,47 @@ lx_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 
 		return (0);
 
+	case B_STORE_ARGS:
+			/*
+			 * B_STORE_ARGS subcommand
+			 * arg1 = address of struct to be copied in
+			 * arg2 = size of the struct being copied in
+			 * arg3-arg6 ignored
+			 * rval = the amount of data copied.
+			 */
+		{
+			int err;
+			lx_lwp_data_t *lwpd = ttolxlwp(curthread);
+			void *buf;
+
+			/* only have upper limit because arg2 is unsigned */
+			if (arg2 > LX_BR_ARGS_SIZE_MAX) {
+				return (EINVAL);
+			}
+
+			buf = kmem_alloc(arg2, KM_SLEEP);
+			if ((err = copyin((void *)arg1, buf, arg2)) != 0) {
+				lx_print("Failed to copyin scall arg at 0x%p\n",
+				    (void *) arg1);
+				kmem_free(buf, arg2);
+				/*
+				 * Purposely not setting br_scall_args to NULL
+				 * to preserve data for debugging.
+				 */
+				return (EFAULT);
+			}
+
+			if (lwpd->br_scall_args != NULL) {
+				ASSERT(lwpd->br_args_size > 0);
+				kmem_free(lwpd->br_scall_args,
+				    lwpd->br_args_size);
+			}
+
+			lwpd->br_scall_args = buf;
+			lwpd->br_args_size = arg2;
+			*rval = arg2;
+			return (0);
+		}
 	default:
 		linux_call = cmd - B_EMULATE_SYSCALL;
 		/*

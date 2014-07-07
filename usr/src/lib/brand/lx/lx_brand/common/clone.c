@@ -48,6 +48,7 @@
 #include <sys/lx_brand.h>
 #include <sys/lx_debug.h>
 #include <sys/lx_thread.h>
+#include <sys/fork.h>
 
 #define	LX_CSIGNAL		0x000000ff
 #define	LX_CLONE_VM		0x00000100
@@ -67,7 +68,8 @@
 #define	LX_CLONE_CHILD_SETTID	0x01000000
 
 #define	SHARED_AS	\
-	(LX_CLONE_VM | LX_CLONE_FS | LX_CLONE_FILES | LX_CLONE_SIGHAND)
+	(LX_CLONE_VM | LX_CLONE_FS | LX_CLONE_FILES | LX_CLONE_SIGHAND	\
+	    | LX_CLONE_THREAD)
 #define	CLONE_VFORK (LX_CLONE_VM | LX_CLONE_VFORK)
 #define	CLONE_TD (LX_CLONE_THREAD|LX_CLONE_DETACH)
 
@@ -353,6 +355,7 @@ lx_clone(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 	int pid;
 	lx_regs_t *rp;
 	sigset_t sigmask;
+	int fork_flags = 0;
 
 	if (flags & LX_CLONE_SETTLS) {
 		lx_debug("lx_clone(flags=0x%x stk=0x%p ptidp=0x%p ldt=0x%p "
@@ -413,13 +416,16 @@ lx_clone(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 		if (flags & LX_CLONE_PTRACE)
 			lx_ptrace_fork();
 
+		if ((flags & LX_CSIGNAL) == 0)
+			fork_flags |= FORK_NOSIGCHLD;
+
 		if (flags & LX_CLONE_VFORK) {
 			is_vforked++;
-			rval = vfork();
+			rval = vforkx(fork_flags);
 			if (rval != 0)
 				is_vforked--;
 		} else {
-			rval = fork1();
+			rval = forkx(fork_flags);
 			if (rval == 0 && lx_is_rpm)
 				(void) sleep(lx_rpm_delay);
 		}
@@ -449,12 +455,24 @@ lx_clone(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 		if (rval != 0)
 			return ((rval < 0) ? -errno : rval);
 
+
+		/*
+		 * Set up additional data in the lx_proc_data structure as
+		 * necessary.
+		 */
+		rval = syscall(SYS_brand, B_EMULATE_SYSCALL + LX_SYS_clone,
+		    flags, cldstk, ptidp, ldtinfo, ctidp, NULL);
+		if (rval < 0) {
+			return (rval);
+		}
+
 		/*
 		 * If provided, the child needs its new stack set up.
 		 */
 		if (cldstk)
 			lx_setup_clone(rp->lxr_gs, (void *)rp->lxr_eip, cldstk);
 
+		/* lx_setup_clone() doesn't return */
 		lx_ptrace_stop_if_option(LX_PTRACE_O_TRACECLONE);
 		return (0);
 	}
@@ -465,8 +483,8 @@ lx_clone(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 	 */
 	if (((flags & SHARED_AS) != SHARED_AS)) {
 		lx_unsupported(gettext(
-		    "clone(2) requires that all or none of CLONE_VM "
-		    "CLONE_FS, CLONE_FILES, and CLONE_SIGHAND be set.\n"));
+		    "clone(2) requires that all or none of CLONE_VM, CLONE_FS,"
+		    "CLONE_FILES, CLONE_THREAD and CLONE_SIGHAND be set.\n"));
 		return (-ENOTSUP);
 	}
 
