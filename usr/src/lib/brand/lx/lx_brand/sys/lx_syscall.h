@@ -94,6 +94,7 @@ extern int lx_poll(uintptr_t, uintptr_t, uintptr_t);
 extern int lx_oldgetrlimit(uintptr_t, uintptr_t);
 extern int lx_getrlimit(uintptr_t, uintptr_t);
 extern int lx_setrlimit(uintptr_t, uintptr_t);
+extern int lx_prlimit64(uintptr_t, uintptr_t, uintptr_t, uintptr_t);
 extern int lx_gettimeofday(uintptr_t, uintptr_t);
 extern int lx_settimeofday(uintptr_t, uintptr_t);
 extern int lx_getrusage(uintptr_t, uintptr_t);
