@@ -72,10 +72,12 @@
 #include <sys/lx_signal.h>
 #include <sys/lx_misc.h>
 #include <sys/lx_syscall.h>
+#include <sys/syscall.h>
 #include <sys/times.h>
 #include <strings.h>
 #include <unistd.h>
 #include <assert.h>
+#include <lx_syscall.h>
 
 /*
  * Convert between Linux options and Solaris options, returning -1 if any
@@ -99,13 +101,28 @@ static int
 ltos_options(uintptr_t options)
 {
 	int newoptions = 0;
+	int rval;
+	lx_waitid_args_t extra;
 
 	if (((options) & ~(LX_WNOHANG | LX_WUNTRACED | LX_WEXITED |
 	    LX_WCONTINUED | LX_WNOWAIT | LX_WNOTHREAD | LX_WALL |
 	    LX_WCLONE)) != 0) {
 		return (-1);
 	}
-	/* XXX implement LX_WNOTHREAD, LX_WALL, LX_WCLONE */
+	/*
+	 * We use the B_STORE_ARGS command to store any of LX_WNOTHREAD,
+	 * LX_WALL, and LX_WCLONE that have been set as options on this waitid
+	 * call. These flags are stored as part of the lwp_brand_data, so that
+	 * when there is a later syscall to waitid, the brand code there can
+	 * detect that we added extra flags here and use them as appropriate.
+	 * We pass them in here rather than the normal channel for flags to
+	 * prevent polluting the namespace.
+	 */
+	extra.waitid_flags = options & (LX_WNOTHREAD | LX_WALL | LX_WCLONE);
+	rval = syscall(SYS_brand, B_STORE_ARGS, &extra,
+	    sizeof (lx_waitid_args_t), NULL, NULL, NULL, NULL);
+	if (rval < 0)
+		return (rval);
 
 	if (options & LX_WNOHANG)
 		newoptions |= WNOHANG;

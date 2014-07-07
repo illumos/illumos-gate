@@ -236,7 +236,7 @@ _emulation_check:
 #endif /* sun4v */
 	ldn	[%g2 + CPU_THREAD], %g3;	/* get thread ptr */
 	ldn	[%g3 + T_PROCP], %g4;		/* get proc ptr */
-	ldn	[%g4 + P_BRAND_DATA], %g5;	/* get brand data ptr */
+	ldn	[%g4 + __P_BRAND_DATA], %g5;	/* get brand data ptr */
 	ldn	[%g5 + SPD_HANDLER], %g5;	/* get userland brnd hdlr ptr */
 	brz	%g5, _exit;			/* has it been set? */
 	nop;

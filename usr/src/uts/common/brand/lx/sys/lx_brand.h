@@ -78,6 +78,7 @@ extern "C" {
 #define	B_PTRACE_EXT_OPTS	134
 #define	B_PTRACE_STOP_FOR_OPT	135
 #define	B_UNSUPPORTED		136
+#define	B_STORE_ARGS		137
 
 #define	B_EMULATE_SYSCALL	192
 
@@ -186,12 +187,13 @@ typedef struct lx_proc_data {
 	uintptr_t l_handler;	/* address of user-space handler */
 	uintptr_t l_tracehandler; /* address of user-space traced handler */
 	uintptr_t l_traceflag;	/* address of 32-bit tracing flag */
-	void (*l_sigrestorer[MAXSIG])(void); /* array of sigrestorer fns */
 	pid_t l_ppid;		/* pid of originating parent proc */
 	uint64_t l_ptrace;	/* process being observed with ptrace */
 	uint_t l_ptrace_opts;	/* process's extended ptrace options */
 	uint_t l_ptrace_event;	/* extended ptrace option trap event */
 	lx_elf_data_t l_elf_data; /* ELF data for linux executable */
+	int l_signal;		/* signal to deliver to parent when this */
+				/* thread group dies */
 } lx_proc_data_t;
 
 #endif	/* _KERNEL */
@@ -231,13 +233,21 @@ typedef struct lx_lwp_data {
 	void	*br_set_ctidp;		/* clone thread id ptr */
 
 	/*
-	 * The following struct is used by lx_clone()
-	 * to pass info into fork()
+	 * The following struct is used by some system calls to pass extra
+	 * flags into the kernel without impinging on the namespace for
+	 * illumos.
 	 */
-	void	 *br_clone_args;
+	void	*br_scall_args;
+	int	br_args_size; /* size in bytes of br_scall_args */
 
 	uint_t	br_ptrace;		/* ptrace is active for this LWP */
 } lx_lwp_data_t;
+
+/*
+ * Upper limit on br_args_size, low because this value can persist until
+ * overridden with another value, and the size is given from userland.
+ */
+#define	LX_BR_ARGS_SIZE_MAX	(1024)
 
 /* brand specific data */
 typedef struct lx_zone_data {
@@ -250,6 +260,10 @@ typedef struct lx_zone_data {
 #define	ttolxlwp(t)	((struct lx_lwp_data *)ttolwpbrand(t))
 #define	lwptolxlwp(l)	((struct lx_lwp_data *)lwptolwpbrand(l))
 #define	ttolxproc(t)	((struct lx_proc_data *)(t)->t_procp->p_brand_data)
+#define	ptolxproc(p)	((struct lx_proc_data *)(p)->p_brand_data)
+/* Macro for converting to system call arguments. */
+#define	LX_ARGS(scall) ((struct lx_##scall##_args *)\
+	(ttolxlwp(curthread)->br_scall_args))
 
 void	lx_brand_int80_callback(void);
 int64_t	lx_emulate_syscall(int, uintptr_t, uintptr_t, uintptr_t, uintptr_t,

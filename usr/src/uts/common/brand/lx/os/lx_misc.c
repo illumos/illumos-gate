@@ -38,6 +38,12 @@
 #include <sys/lx_brand.h>
 #include <sys/lx_pid.h>
 #include <sys/lx_futex.h>
+#include <sys/cmn_err.h>
+#include <sys/siginfo.h>
+#include <sys/contract/process_impl.h>
+#include <lx_signum.h>
+#include <lx_syscall.h>
+#include <sys/proc.h>
 
 /* Linux specific functions and definitions */
 void lx_setrval(klwp_t *, int, int);
@@ -184,6 +190,10 @@ lx_exitlwp(klwp_t *lwp)
 	}
 
 free:
+	if (lwpd->br_scall_args != NULL) {
+		ASSERT(lwpd->br_args_size > 0);
+		kmem_free(lwpd->br_scall_args, lwpd->br_args_size);
+	}
 	if (sqp)
 		kmem_free(sqp, sizeof (sigqueue_t));
 
@@ -221,7 +231,8 @@ lx_initlwp(klwp_t *lwp)
 	lwpd->br_set_ctidp = NULL;
 	lwpd->br_signal = 0;
 	/*
-	 * lwpd->br_affinitymask was zeroed by kmem_zalloc().
+	 * lwpd->br_affinitymask was zeroed by kmem_zalloc()
+	 * as was lwpd->br_scall_args and lwpd->br_args_size.
 	 */
 
 	/*
@@ -280,7 +291,7 @@ lx_forklwp(klwp_t *srclwp, klwp_t *dstlwp)
 	 * copy only these flags
 	 */
 	dst->br_lwp_flags = src->br_lwp_flags & BR_CPU_BOUND;
-	dst->br_clone_args = NULL;
+	dst->br_scall_args = NULL;
 }
 
 /*
@@ -371,4 +382,142 @@ lx_fixsegreg(greg_t sr, model_t datamodel)
 	datamodel = datamodel;  /* datamodel currently unused for 32-bit */
 	return (sr | SEL_TI_LDT | SEL_UPL);
 #endif	/* __amd64 */
+}
+
+/*
+ * These two functions simulate winfo and post_sigcld for the lx brand. The
+ * difference is delivering a designated signal as opposed to always SIGCLD.
+ */
+void
+lx_winfo(proc_t *pp, k_siginfo_t *ip, struct lx_proc_data *dat)
+{
+	ASSERT(MUTEX_HELD(&pidlock));
+	bzero(ip, sizeof (k_siginfo_t));
+	ip->si_signo = ltos_signo[dat->l_signal];
+	ip->si_code = pp->p_wcode;
+	ip->si_pid = pp->p_pid;
+	ip->si_ctid = PRCTID(pp);
+	ip->si_zoneid = pp->p_zone->zone_id;
+	ip->si_status = pp->p_wdata;
+	ip->si_stime = pp->p_stime;
+	ip->si_utime = pp->p_utime;
+}
+
+void
+lx_post_exit_sig(proc_t *cp, sigqueue_t *sqp, struct lx_proc_data *dat)
+{
+	proc_t *pp = cp->p_parent;
+
+	ASSERT(MUTEX_HELD(&pidlock));
+	mutex_enter(&pp->p_lock);
+	/*
+	 * Since Linux doesn't queue SIGCHLD, or any other non RT
+	 * signals, we just blindly deliver whatever signal we can.
+	 */
+	ASSERT(sqp != NULL);
+	lx_winfo(cp, &sqp->sq_info, dat);
+	sigaddqa(pp, NULL, sqp);
+	sqp = NULL;
+	mutex_exit(&pp->p_lock);
+}
+
+
+/*
+ * Brand specific code for exiting and sending a signal to the parent, as
+ * opposed to sigcld().
+ */
+void
+lx_exit_with_sig(proc_t *cp, sigqueue_t *sqp, void *brand_data)
+{
+	proc_t *pp = cp->p_parent;
+	struct lx_proc_data *lx_brand_data = brand_data;
+	ASSERT(MUTEX_HELD(&pidlock));
+
+	switch (cp->p_wcode) {
+	case CLD_EXITED:
+	case CLD_DUMPED:
+	case CLD_KILLED:
+			ASSERT(cp->p_stat == SZOMB);
+			/*
+			 * The broadcast on p_srwchan_cv is a kludge to
+			 * wakeup a possible thread in uadmin(A_SHUTDOWN).
+			 */
+			cv_broadcast(&cp->p_srwchan_cv);
+
+			/*
+			 * Add to newstate list of the parent
+			 */
+			add_ns(pp, cp);
+
+			cv_broadcast(&pp->p_cv);
+			if ((pp->p_flag & SNOWAIT) ||
+			    PTOU(pp)->u_signal[SIGCLD - 1] == SIG_IGN) {
+				if (!(cp->p_pidflag & CLDWAITPID))
+					freeproc(cp);
+			} else if (!(cp->p_pidflag & CLDNOSIGCHLD) &&
+			    lx_brand_data->l_signal != 0) {
+				lx_post_exit_sig(cp, sqp, lx_brand_data);
+				sqp = NULL;
+			}
+			break;
+
+	case CLD_STOPPED:
+	case CLD_CONTINUED:
+	case CLD_TRAPPED:
+			panic("Should not be called in this case");
+	}
+
+	if (sqp)
+		siginfofree(sqp);
+}
+
+/*
+ * Filters based on arguments that have been passed in by a separate syscall
+ * using the B_STORE_ARGS mechanism. if the __WALL flag is set, no filter is
+ * applied, otherwise we look at the difference between a clone and non-clone
+ * process.
+ * The definition of a clone process in Linux is a thread that does not deliver
+ * SIGCHLD to its parent. The option __WCLONE   indicates to wait only on clone
+ * processes. Without that option, a process should only wait on normal
+ * children. The following table shows the cases.
+ *
+ *                   default    __WCLONE
+ *   no SIGCHLD      -           X
+ *   SIGCHLD         X           -
+ *
+ * This is an XOR of __WCLONE being set, and SIGCHLD being the signal sent on
+ * process exit.  Since (flags & __WCLONE) is not guaranteed to have the
+ * least-significant bit set when the flags is enabled, !! is used to place
+ * that bit into the least significant bit. Then, the bitwise XOR can be
+ * used, because there is no logical XOR in the C language.
+ *
+ * More information on wait in lx brands can be found at
+ * usr/src/lib/brand/lx/lx_brand/common/wait.c.
+ */
+boolean_t
+lx_wait_filter(proc_t *pp, proc_t *cp)
+{
+	int flags;
+	boolean_t ret;
+
+	if (LX_ARGS(waitid) != NULL) {
+		flags = LX_ARGS(waitid)->waitid_flags;
+		mutex_enter(&cp->p_lock);
+		if (flags & LX_WALL) {
+			ret = B_TRUE;
+		} else if (cp->p_stat == SZOMB ||
+		    cp->p_brand == &native_brand) {
+			ret = (((!!(flags & LX_WCLONE)) ^
+			    (stol_signo[SIGCHLD] == cp->p_exit_data))
+			    ? B_TRUE : B_FALSE);
+		} else {
+			ret = (((!!(flags & LX_WCLONE)) ^
+			    (stol_signo[SIGCHLD] == ptolxproc(cp)->l_signal))
+			    ? B_TRUE : B_FALSE);
+		}
+		mutex_exit(&cp->p_lock);
+		return (ret);
+	} else {
+		return (B_TRUE);
+	}
 }

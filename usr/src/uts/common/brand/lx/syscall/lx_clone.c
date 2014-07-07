@@ -30,6 +30,7 @@
 #include <sys/brand.h>
 #include <sys/lx_brand.h>
 #include <sys/lx_ldt.h>
+#include <lx_signum.h>
 
 #define	LX_CSIGNAL		0x000000ff
 #define	LX_CLONE_VM		0x00000100
@@ -57,6 +58,7 @@ long
 lx_clone(int flags, void *stkp, void *ptidp, void *ldtinfo, void *ctidp)
 {
 	struct lx_lwp_data *lwpd = ttolxlwp(curthread);
+	struct lx_proc_data *lproc = ttolxproc(curthread);
 	struct ldt_info info;
 	struct user_desc descr;
 	int tls_index;
@@ -64,62 +66,65 @@ lx_clone(int flags, void *stkp, void *ptidp, void *ldtinfo, void *ctidp)
 	int signo;
 
 	signo = flags & LX_CSIGNAL;
-	if (signo < 0 || signo > MAXSIG)
+	if (signo < 0 || signo > LX_NSIG)
 		return (set_errno(EINVAL));
 
-	if (flags & LX_CLONE_SETTLS) {
-		if (copyin((caddr_t)ldtinfo, &info, sizeof (info)))
-			return (set_errno(EFAULT));
-
-		if (LDT_INFO_EMPTY(&info))
-			return (set_errno(EINVAL));
-
-		entry = info.entry_number;
-		if (entry < GDT_TLSMIN || entry > GDT_TLSMAX)
-			return (set_errno(EINVAL));
-
-		tls_index = entry - GDT_TLSMIN;
-
-		/*
-		 * Convert the user-space structure into a real x86
-		 * descriptor and copy it into this LWP's TLS array.  We
-		 * also load it into the GDT.
-		 */
-		LDT_INFO_TO_DESC(&info, &descr);
-		bcopy(&descr, &lwpd->br_tls[tls_index], sizeof (descr));
-		lx_set_gdt(entry, &lwpd->br_tls[tls_index]);
+	if (!(flags & LX_CLONE_THREAD)) {
+		lproc->l_signal = signo;
 	} else {
-		tls_index = -1;
-		bzero(&descr, sizeof (descr));
+		if (flags & LX_CLONE_SETTLS) {
+			if (copyin((caddr_t)ldtinfo, &info, sizeof (info)))
+				return (set_errno(EFAULT));
+
+			if (LDT_INFO_EMPTY(&info))
+				return (set_errno(EINVAL));
+
+			entry = info.entry_number;
+			if (entry < GDT_TLSMIN || entry > GDT_TLSMAX)
+				return (set_errno(EINVAL));
+
+			tls_index = entry - GDT_TLSMIN;
+
+			/*
+			 * Convert the user-space structure into a real x86
+			 * descriptor and copy it into this LWP's TLS array.  We
+			 * also load it into the GDT.
+			 */
+			LDT_INFO_TO_DESC(&info, &descr);
+			bcopy(&descr, &lwpd->br_tls[tls_index], sizeof (descr));
+			lx_set_gdt(entry, &lwpd->br_tls[tls_index]);
+		} else {
+			tls_index = -1;
+			bzero(&descr, sizeof (descr));
+		}
+
+		lwpd->br_clear_ctidp =
+		    (flags & LX_CLONE_CHILD_CLEARTID) ?  ctidp : NULL;
+
+		if (signo && ! (flags & LX_CLONE_DETACH))
+			lwpd->br_signal = signo;
+		else
+			lwpd->br_signal = 0;
+
+		if (flags & LX_CLONE_THREAD)
+			lwpd->br_tgid = curthread->t_procp->p_pid;
+
+		if (flags & LX_CLONE_PARENT)
+			lwpd->br_ppid = 0;
+
+		if ((flags & LX_CLONE_CHILD_SETTID) && (ctidp != NULL) &&
+		    (suword32(ctidp, lwpd->br_pid) != 0)) {
+			if (entry >= 0)
+				lx_clear_gdt(entry);
+			return (set_errno(EFAULT));
+		}
+		if ((flags & LX_CLONE_PARENT_SETTID) && (ptidp != NULL) &&
+		    (suword32(ptidp, lwpd->br_pid) != 0)) {
+			if (entry >= 0)
+				lx_clear_gdt(entry);
+			return (set_errno(EFAULT));
+		}
 	}
-
-	lwpd->br_clear_ctidp =
-	    (flags & LX_CLONE_CHILD_CLEARTID) ?  ctidp : NULL;
-
-	if (signo && ! (flags & LX_CLONE_DETACH))
-		lwpd->br_signal = signo;
-	else
-		lwpd->br_signal = 0;
-
-	if (flags & LX_CLONE_THREAD)
-		lwpd->br_tgid = curthread->t_procp->p_pid;
-
-	if (flags & LX_CLONE_PARENT)
-		lwpd->br_ppid = 0;
-
-	if ((flags & LX_CLONE_CHILD_SETTID) && (ctidp != NULL) &&
-	    (suword32(ctidp, lwpd->br_pid) != 0)) {
-		if (entry >= 0)
-			lx_clear_gdt(entry);
-		return (set_errno(EFAULT));
-	}
-	if ((flags & LX_CLONE_PARENT_SETTID) && (ptidp != NULL) &&
-	    (suword32(ptidp, lwpd->br_pid) != 0)) {
-		if (entry >= 0)
-			lx_clear_gdt(entry);
-		return (set_errno(EFAULT));
-	}
-
 	return (lwpd->br_pid);
 }
 

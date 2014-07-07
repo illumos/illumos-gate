@@ -79,6 +79,8 @@ struct brand_ops sn1_brops = {
 	NULL,
 	NULL,
 	NSIG,
+	NULL,
+	NULL,
 };
 
 #ifdef	sparc
@@ -119,7 +121,8 @@ struct brand	sn1_brand = {
 	BRAND_VER_1,
 	"sn1",
 	&sn1_brops,
-	&sn1_mops
+	&sn1_mops,
+	sizeof (brand_proc_data_t),
 };
 
 static struct modlbrand modlbrand = {

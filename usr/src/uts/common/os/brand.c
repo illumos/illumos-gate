@@ -54,7 +54,8 @@ brand_t native_brand = {
 		BRAND_VER_1,
 		"native",
 		NULL,
-		&native_mach_ops
+		&native_mach_ops,
+		0,
 };
 
 /*
