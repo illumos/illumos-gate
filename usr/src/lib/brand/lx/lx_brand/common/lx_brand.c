@@ -1277,7 +1277,7 @@ static struct lx_sysent sysents[] = {
 	{"recvmmsg",	NULL,		NOSYS_NULL,	0},	/* 337 */
 	{"fanotify_init", NULL,		NOSYS_NULL,	0},	/* 338 */
 	{"fanotify_mark", NULL,		NOSYS_NULL,	0},	/* 339 */
-	{"prlimit64",	NULL,		NOSYS_NULL,	0},	/* 340 */
+	{"prlimit64",	lx_prlimit64,	0,		4},	/* 340 */
 	{"name_to_handle_at", NULL,	NOSYS_NULL,	0},	/* 341 */
 	{"open_by_handle_at", NULL,	NOSYS_NULL,	0},	/* 342 */
 	{"clock_adjtime", NULL,		NOSYS_NULL,	0},	/* 343 */
