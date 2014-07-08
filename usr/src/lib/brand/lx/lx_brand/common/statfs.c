@@ -21,9 +21,8 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2014 Joyent, Inc.  All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <assert.h>
 #include <errno.h>
@@ -97,6 +96,7 @@ static struct lx_ftype_name {
 	{ "nfs",	LX_NFS_SUPER_MAGIC,	"LX_NFS_SUPER_MAGIC"	},
 	{ "pcfs",	LX_MSDOS_SUPER_MAGIC,	"LX_MSDOS_SUPER_MAGIC"	},
 	{ "lx_proc",	LX_PROC_SUPER_MAGIC,	"LX_PROC_SUPER_MAGIC"	},
+	{ "tmpfs",	LX_TMPFS_SUPER_MAGIC,	"LX_TMPFS_SUPER_MAGIC"	},
 	{ "ufs",	LX_UFS_MAGIC,		"LX_UFS_MAGIC"		},
 	{ "lofs",	LX_UFS_MAGIC,		"LX_UFS_MAGIC"		},
 	{ "zfs",	LX_UFS_MAGIC,		"LX_UFS_MAGIC"		},
@@ -179,7 +179,7 @@ stol_statfs(const char *path, struct lx_statfs *l, struct statvfs *s)
 		return (type);
 
 	l->f_type = type;
-	l->f_bsize = s->f_bsize;
+	l->f_bsize = s->f_frsize;	/* other fields depend on frsize */
 	l->f_blocks = s->f_blocks;
 	l->f_bfree = s->f_bfree;
 	l->f_bavail = s->f_bavail;
@@ -202,7 +202,7 @@ stol_statfs64(const char *path, struct lx_statfs64 *l, struct statvfs64 *s)
 		return (type);
 
 	l->f_type = type;
-	l->f_bsize = s->f_bsize;
+	l->f_bsize = s->f_frsize;	/* other fields depend on frsize */
 	l->f_blocks = s->f_blocks;
 	l->f_bfree = s->f_bfree;
 	l->f_bavail = s->f_bavail;
