@@ -614,6 +614,9 @@ lx_utimensat(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4)
 	if (flag == LX_AT_SYMLINK_NOFOLLOW)
 		flag = AT_SYMLINK_NOFOLLOW;
 
+	if (fd == LX_AT_FDCWD)
+		fd = AT_FDCWD;
+
 	if (path == NULL) {
 		return (futimens(fd, times) ? -errno : 0);
 	} else {
