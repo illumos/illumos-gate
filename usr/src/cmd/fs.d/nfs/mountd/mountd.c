@@ -83,6 +83,8 @@
 #include <sys/nvpair.h>
 #include <attr.h>
 #include "smfcfg.h"
+#include <pwd.h>
+#include <grp.h>
 
 extern int daemonize_init(void);
 extern void daemonize_fini(int fd);
@@ -105,9 +107,9 @@ static int getclientsflavors_old(share_t *, SVCXPRT *, struct netbuf **,
 static int getclientsflavors_new(share_t *, SVCXPRT *, struct netbuf **,
 	struct nd_hostservlist **, int *);
 static int check_client_old(share_t *, SVCXPRT *, struct netbuf **,
-	struct nd_hostservlist **, int);
+	struct nd_hostservlist **, int, uid_t, gid_t, uid_t *, gid_t *);
 static int check_client_new(share_t *, SVCXPRT *, struct netbuf **,
-	struct nd_hostservlist **, int);
+	struct nd_hostservlist **, int, uid_t, gid_t, uid_t *, gid_t *);
 static void mnt(struct svc_req *, SVCXPRT *);
 static void mnt_pathconf(struct svc_req *);
 static int mount(struct svc_req *r);
@@ -1956,6 +1958,10 @@ static char *optlist[] = {
 	SHOPT_SEC,
 #define	OPT_NONE	9
 	SHOPT_NONE,
+#define	OPT_UIDMAP	10
+	SHOPT_UIDMAP,
+#define	OPT_GIDMAP	11
+	SHOPT_GIDMAP,
 	NULL
 };
 
@@ -2162,17 +2168,99 @@ getclientsflavors_new(share_t *sh, SVCXPRT *transp, struct netbuf **nb,
  */
 int
 check_client(share_t *sh, struct netbuf *nb,
-    struct nd_hostservlist *clnames, int flavor)
+    struct nd_hostservlist *clnames, int flavor, uid_t clnt_uid, gid_t clnt_gid,
+    uid_t *srv_uid, gid_t *srv_gid)
 {
 	if (newopts(sh->sh_opts))
-		return (check_client_new(sh, NULL, &nb, &clnames, flavor));
+		return (check_client_new(sh, NULL, &nb, &clnames, flavor,
+		    clnt_uid, clnt_gid, srv_uid, srv_gid));
 	else
-		return (check_client_old(sh, NULL, &nb, &clnames, flavor));
+		return (check_client_old(sh, NULL, &nb, &clnames, flavor,
+		    clnt_uid, clnt_gid, srv_uid, srv_gid));
+}
+
+/*
+ * is_a_number(number)
+ *
+ * is the string a number in one of the forms we want to use?
+ */
+
+static int
+is_a_number(char *number)
+{
+	int ret = 1;
+	int hex = 0;
+
+	if (strncmp(number, "0x", 2) == 0) {
+		number += 2;
+		hex = 1;
+	} else if (*number == '-') {
+		number++; /* skip the minus */
+	}
+	while (ret == 1 && *number != '\0') {
+		if (hex) {
+			ret = isxdigit(*number++);
+		} else {
+			ret = isdigit(*number++);
+		}
+	}
+	return (ret);
+}
+
+static boolean_t
+get_uid(char *value, uid_t *uid)
+{
+	if (!is_a_number(value)) {
+		struct passwd *pw;
+		/*
+		 * in this case it would have to be a
+		 * user name
+		 */
+		pw = getpwnam(value);
+		if (pw == NULL)
+			return (B_FALSE);
+		*uid = pw->pw_uid;
+		endpwent();
+	} else {
+		uint64_t intval;
+		intval = strtoull(value, NULL, 0);
+		if (intval > UID_MAX && intval != -1)
+			return (B_FALSE);
+		*uid = (uid_t)intval;
+	}
+
+	return (B_TRUE);
+}
+
+static boolean_t
+get_gid(char *value, gid_t *gid)
+{
+	if (!is_a_number(value)) {
+		struct group *gr;
+		/*
+		 * in this case it would have to be a
+		 * group name
+		 */
+		gr = getgrnam(value);
+		if (gr == NULL)
+			return (B_FALSE);
+		*gid = gr->gr_gid;
+		endgrent();
+	} else {
+		uint64_t intval;
+		intval = strtoull(value, NULL, 0);
+		if (intval > UID_MAX && intval != -1)
+			return (B_FALSE);
+		*gid = (gid_t)intval;
+	}
+
+	return (B_TRUE);
 }
 
 static int
 check_client_old(share_t *sh, SVCXPRT *transp, struct netbuf **nb,
-    struct nd_hostservlist **clnames, int flavor)
+    struct nd_hostservlist **clnames, int flavor, uid_t clnt_uid,
+    gid_t clnt_gid, uid_t *srv_uid, gid_t *srv_gid)
 {
 	char *opts, *p, *val;
 	int match;	/* Set when a flavor is matched */
@@ -2180,7 +2268,8 @@ check_client_old(share_t *sh, SVCXPRT *transp, struct netbuf **nb,
 	int list = 0;	/* Set when "ro", "rw" is found */
 	int ro_val = 0;	/* Set if ro option is 'ro=' */
 	int rw_val = 0;	/* Set if rw option is 'rw=' */
-	boolean_t reject = B_FALSE; /* if none= contains the host */
+
+	boolean_t map_deny = B_FALSE;
 
 	opts = strdup(sh->sh_opts);
 	if (opts == NULL) {
@@ -2200,14 +2289,16 @@ check_client_old(share_t *sh, SVCXPRT *transp, struct netbuf **nb,
 
 		case OPT_RO:
 			list++;
-			if (val) ro_val++;
+			if (val != NULL)
+				ro_val++;
 			if (in_access_list(transp, nb, clnames, val))
 				perm |= NFSAUTH_RO;
 			break;
 
 		case OPT_RW:
 			list++;
-			if (val) rw_val++;
+			if (val != NULL)
+				rw_val++;
 			if (in_access_list(transp, nb, clnames, val))
 				perm |= NFSAUTH_RW;
 			break;
@@ -2224,8 +2315,14 @@ check_client_old(share_t *sh, SVCXPRT *transp, struct netbuf **nb,
 			if (val == NULL || *val == '\0')
 				break;
 
-			if (in_access_list(transp, nb, clnames, val))
+			if (clnt_uid != 0)
+				break;
+
+			if (in_access_list(transp, nb, clnames, val)) {
 				perm |= NFSAUTH_ROOT;
+				perm |= NFSAUTH_UIDMAP | NFSAUTH_GIDMAP;
+				map_deny = B_FALSE;
+			}
 			break;
 
 		case OPT_NONE:
@@ -2235,14 +2332,160 @@ check_client_old(share_t *sh, SVCXPRT *transp, struct netbuf **nb,
 			 * more like "root" than either "rw" or "ro".
 			 */
 			if (in_access_list(transp, nb, clnames, val))
-				reject = B_TRUE;
+				perm |= NFSAUTH_DENIED;
+			break;
+
+		case OPT_UIDMAP: {
+			char *c;
+			char *n;
+
+			/*
+			 * The uidmap is supported for AUTH_SYS only.
+			 */
+			if (flavor != AUTH_SYS)
+				break;
+
+			if (perm & NFSAUTH_UIDMAP || map_deny)
+				break;
+
+			for (c = val; c != NULL; c = n) {
+				char *s;
+				char *al;
+				uid_t srv;
+
+				n = strchr(c, '~');
+				if (n != NULL)
+					*n++ = '\0';
+
+				s = strchr(c, ':');
+				if (s != NULL) {
+					*s++ = '\0';
+					al = strchr(s, ':');
+					if (al != NULL)
+						*al++ = '\0';
+				}
+
+				if (s == NULL || al == NULL)
+					continue;
+
+				if (*c == '\0') {
+					if (clnt_uid != (uid_t)-1)
+						continue;
+				} else if (strcmp(c, "*") != 0) {
+					uid_t clnt;
+
+					if (!get_uid(c, &clnt))
+						continue;
+
+					if (clnt_uid != clnt)
+						continue;
+				}
+
+				if (*s == '\0')
+					srv = UID_NOBODY;
+				else if (!get_uid(s, &srv))
+					continue;
+				else if (srv == (uid_t)-1) {
+					map_deny = B_TRUE;
+					break;
+				}
+
+				if (in_access_list(transp, nb, clnames, al)) {
+					*srv_uid = srv;
+					perm |= NFSAUTH_UIDMAP;
+					break;
+				}
+			}
+
+			break;
+		}
+
+		case OPT_GIDMAP: {
+			char *c;
+			char *n;
+
+			/*
+			 * The gidmap is supported for AUTH_SYS only.
+			 */
+			if (flavor != AUTH_SYS)
+				break;
+
+			if (perm & NFSAUTH_GIDMAP || map_deny)
+				break;
+
+			for (c = val; c != NULL; c = n) {
+				char *s;
+				char *al;
+				gid_t srv;
+
+				n = strchr(c, '~');
+				if (n != NULL)
+					*n++ = '\0';
+
+				s = strchr(c, ':');
+				if (s != NULL) {
+					*s++ = '\0';
+					al = strchr(s, ':');
+					if (al != NULL)
+						*al++ = '\0';
+				}
+
+				if (s == NULL || al == NULL)
+					break;
+
+				if (*c == '\0') {
+					if (clnt_gid != (gid_t)-1)
+						continue;
+				} else if (strcmp(c, "*") != 0) {
+					gid_t clnt;
+
+					if (!get_gid(c, &clnt))
+						continue;
+
+					if (clnt_gid != clnt)
+						continue;
+				}
+
+				if (*s == '\0')
+					srv = UID_NOBODY;
+				else if (!get_gid(s, &srv))
+					continue;
+				else if (srv == (gid_t)-1) {
+					map_deny = B_TRUE;
+					break;
+				}
+
+				if (in_access_list(transp, nb, clnames, al)) {
+					*srv_gid = srv;
+					perm |= NFSAUTH_GIDMAP;
+					break;
+				}
+			}
+
+			break;
+		}
+
+		default:
 			break;
 		}
 	}
 
 	free(opts);
 
-	if (flavor != match || reject)
+	if (perm & NFSAUTH_ROOT) {
+		*srv_uid = 0;
+		*srv_gid = 0;
+	}
+
+	if (map_deny)
+		perm |= NFSAUTH_DENIED;
+
+	if (!(perm & NFSAUTH_UIDMAP))
+		*srv_uid = clnt_uid;
+	if (!(perm & NFSAUTH_GIDMAP))
+		*srv_gid = clnt_gid;
+
+	if (flavor != match || perm & NFSAUTH_DENIED)
 		return (NFSAUTH_DENIED);
 
 	if (list) {
@@ -2260,7 +2503,6 @@ check_client_old(share_t *sh, SVCXPRT *transp, struct netbuf **nb,
 		 */
 		perm |= NFSAUTH_RW;
 	}
-
 
 	/*
 	 * The client may show up in both ro= and rw=
@@ -2337,7 +2579,8 @@ is_wrongsec(share_t *sh, SVCXPRT *transp, struct netbuf **nb,
 
 static int
 check_client_new(share_t *sh, SVCXPRT *transp, struct netbuf **nb,
-    struct nd_hostservlist **clnames, int flavor)
+    struct nd_hostservlist **clnames, int flavor, uid_t clnt_uid,
+    gid_t clnt_gid, uid_t *srv_uid, gid_t *srv_gid)
 {
 	char *opts, *p, *val;
 	char *lasts;
@@ -2347,7 +2590,8 @@ check_client_new(share_t *sh, SVCXPRT *transp, struct netbuf **nb,
 	int list = 0;	/* Set when "ro", "rw" is found */
 	int ro_val = 0;	/* Set if ro option is 'ro=' */
 	int rw_val = 0;	/* Set if rw option is 'rw=' */
-	boolean_t reject;
+
+	boolean_t map_deny = B_FALSE;
 
 	opts = strdup(sh->sh_opts);
 	if (opts == NULL) {
@@ -2379,7 +2623,8 @@ check_client_new(share_t *sh, SVCXPRT *transp, struct netbuf **nb,
 				break;
 
 			list++;
-			if (val) ro_val++;
+			if (val != NULL)
+				ro_val++;
 			if (in_access_list(transp, nb, clnames, val))
 				perm |= NFSAUTH_RO;
 			break;
@@ -2389,7 +2634,8 @@ check_client_new(share_t *sh, SVCXPRT *transp, struct netbuf **nb,
 				break;
 
 			list++;
-			if (val) rw_val++;
+			if (val != NULL)
+				rw_val++;
 			if (in_access_list(transp, nb, clnames, val))
 				perm |= NFSAUTH_RW;
 			break;
@@ -2409,8 +2655,14 @@ check_client_new(share_t *sh, SVCXPRT *transp, struct netbuf **nb,
 			if (val == NULL || *val == '\0')
 				break;
 
-			if (in_access_list(transp, nb, clnames, val))
+			if (clnt_uid != 0)
+				break;
+
+			if (in_access_list(transp, nb, clnames, val)) {
 				perm |= NFSAUTH_ROOT;
+				perm |= NFSAUTH_UIDMAP | NFSAUTH_GIDMAP;
+				map_deny = B_FALSE;
+			}
 			break;
 
 		case OPT_NONE:
@@ -2422,15 +2674,163 @@ check_client_new(share_t *sh, SVCXPRT *transp, struct netbuf **nb,
 			if (in_access_list(transp, nb, clnames, val))
 				perm |= NFSAUTH_DENIED;
 			break;
+
+		case OPT_UIDMAP: {
+			char *c;
+			char *n;
+
+			/*
+			 * The uidmap is supported for AUTH_SYS only.
+			 */
+			if (flavor != AUTH_SYS)
+				break;
+
+			if (!match || perm & NFSAUTH_UIDMAP || map_deny)
+				break;
+
+			for (c = val; c != NULL; c = n) {
+				char *s;
+				char *al;
+				uid_t srv;
+
+				n = strchr(c, '~');
+				if (n != NULL)
+					*n++ = '\0';
+
+				s = strchr(c, ':');
+				if (s != NULL) {
+					*s++ = '\0';
+					al = strchr(s, ':');
+					if (al != NULL)
+						*al++ = '\0';
+				}
+
+				if (s == NULL || al == NULL)
+					continue;
+
+				if (*c == '\0') {
+					if (clnt_uid != (uid_t)-1)
+						continue;
+				} else if (strcmp(c, "*") != 0) {
+					uid_t clnt;
+
+					if (!get_uid(c, &clnt))
+						continue;
+
+					if (clnt_uid != clnt)
+						continue;
+				}
+
+				if (*s == '\0')
+					srv = UID_NOBODY;
+				else if (!get_uid(s, &srv))
+					continue;
+				else if (srv == (uid_t)-1) {
+					map_deny = B_TRUE;
+					break;
+				}
+
+				if (in_access_list(transp, nb, clnames, al)) {
+					*srv_uid = srv;
+					perm |= NFSAUTH_UIDMAP;
+					break;
+				}
+			}
+
+			break;
+		}
+
+		case OPT_GIDMAP: {
+			char *c;
+			char *n;
+
+			/*
+			 * The gidmap is supported for AUTH_SYS only.
+			 */
+			if (flavor != AUTH_SYS)
+				break;
+
+			if (!match || perm & NFSAUTH_GIDMAP || map_deny)
+				break;
+
+			for (c = val; c != NULL; c = n) {
+				char *s;
+				char *al;
+				gid_t srv;
+
+				n = strchr(c, '~');
+				if (n != NULL)
+					*n++ = '\0';
+
+				s = strchr(c, ':');
+				if (s != NULL) {
+					*s++ = '\0';
+					al = strchr(s, ':');
+					if (al != NULL)
+						*al++ = '\0';
+				}
+
+				if (s == NULL || al == NULL)
+					break;
+
+				if (*c == '\0') {
+					if (clnt_gid != (gid_t)-1)
+						continue;
+				} else if (strcmp(c, "*") != 0) {
+					gid_t clnt;
+
+					if (!get_gid(c, &clnt))
+						continue;
+
+					if (clnt_gid != clnt)
+						continue;
+				}
+
+				if (*s == '\0')
+					srv = UID_NOBODY;
+				else if (!get_gid(s, &srv))
+					continue;
+				else if (srv == (gid_t)-1) {
+					map_deny = B_TRUE;
+					break;
+				}
+
+				if (in_access_list(transp, nb, clnames, al)) {
+					*srv_gid = srv;
+					perm |= NFSAUTH_GIDMAP;
+					break;
+				}
+			}
+
+			break;
+		}
+
+		default:
+			break;
 		}
 	}
 
 done:
+	if (perm & NFSAUTH_ROOT) {
+		*srv_uid = 0;
+		*srv_gid = 0;
+	}
+
+	if (map_deny)
+		perm |= NFSAUTH_DENIED;
+
+	if (!(perm & NFSAUTH_UIDMAP))
+		*srv_uid = clnt_uid;
+	if (!(perm & NFSAUTH_GIDMAP))
+		*srv_gid = clnt_gid;
+
 	/*
 	 * If no match then set the perm accordingly
 	 */
-	if (!match || perm & NFSAUTH_DENIED)
+	if (!match || perm & NFSAUTH_DENIED) {
+		free(opts);
 		return (NFSAUTH_DENIED);
+	}
 
 	if (list) {
 		/*

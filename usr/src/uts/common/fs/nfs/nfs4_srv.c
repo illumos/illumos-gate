@@ -21,7 +21,7 @@
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -1063,7 +1063,7 @@ do_rfs4_op_secinfo(struct compound_state *cs, char *nm, SECINFO4res *resp)
 			perm = secp[i].s_flags;
 
 			access = nfsauth4_secinfo_access(exi, cs->req,
-			    flavor, perm);
+			    flavor, perm, cs->basecr);
 
 			if (! (access & NFSAUTH_DENIED) &&
 			    ! (access & NFSAUTH_WRONGSEC)) {
@@ -1274,7 +1274,7 @@ rfs4_op_access(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	 * Special files are interpreted by the client, so the underlying
 	 * permissions are sent back to the client for interpretation.
 	 */
-	if (rdonly4(cs->exi, cs->vp, req) &&
+	if (rdonly4(req, cs) &&
 	    (vp->v_type == VREG || vp->v_type == VDIR))
 		checkwriteperm = 0;
 	else
@@ -1410,7 +1410,7 @@ rfs4_op_commit(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 		*cs->statusp = resp->status = puterrno4(error);
 		goto out;
 	}
-	if (rdonly4(cs->exi, cs->vp, req)) {
+	if (rdonly4(req, cs)) {
 		*cs->statusp = resp->status = NFS4ERR_ROFS;
 		goto out;
 	}
@@ -1581,7 +1581,7 @@ rfs4_op_create(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 		goto out;
 	}
 
-	if (rdonly4(cs->exi, cs->vp, req)) {
+	if (rdonly4(req, cs)) {
 		*cs->statusp = resp->status = NFS4ERR_ROFS;
 		goto out;
 	}
@@ -2520,7 +2520,7 @@ rfs4_op_link(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 		goto out;
 	}
 
-	if (rdonly4(cs->exi, cs->vp, req)) {
+	if (rdonly4(req, cs)) {
 		*cs->statusp = resp->status = NFS4ERR_ROFS;
 		kmem_free(nm, len);
 		goto out;
@@ -3045,7 +3045,7 @@ rfs4_op_openattr(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	 * Returning NOTSUPP is more appropriate in this case
 	 * because the object will never be able to have an attrdir.
 	 */
-	if (args->createdir && ! (exp_ro = rdonly4(cs->exi, cs->vp, req)))
+	if (args->createdir && ! (exp_ro = rdonly4(req, cs)))
 		lookup_flags |= CREATE_XATTR_DIR;
 
 	error = VOP_LOOKUP(cs->vp, "", &avp, NULL, lookup_flags, NULL, cs->cr,
@@ -4131,7 +4131,7 @@ rfs4_op_remove(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 		goto out;
 	}
 
-	if (rdonly4(cs->exi, cs->vp, req)) {
+	if (rdonly4(req, cs)) {
 		*cs->statusp = resp->status = NFS4ERR_ROFS;
 		kmem_free(nm, len);
 		goto out;
@@ -4493,7 +4493,7 @@ rfs4_op_rename(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	}
 
 
-	if (rdonly4(cs->exi, cs->vp, req)) {
+	if (rdonly4(req, cs)) {
 		*cs->statusp = resp->status = NFS4ERR_ROFS;
 		if (onm != converted_onm)
 			kmem_free(converted_onm, MAXPATHLEN + 1);
@@ -5388,7 +5388,7 @@ rfs4_op_setattr(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 
 	resp->attrsset = 0;
 
-	if (rdonly4(cs->exi, cs->vp, req)) {
+	if (rdonly4(req, cs)) {
 		*cs->statusp = resp->status = NFS4ERR_ROFS;
 		goto out;
 	}
@@ -5615,7 +5615,7 @@ rfs4_op_write(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 		goto out;
 	}
 
-	if (rdonly4(cs->exi, cs->vp, req)) {
+	if (rdonly4(req, cs)) {
 		*cs->statusp = resp->status = NFS4ERR_ROFS;
 		goto out;
 	}
@@ -6284,7 +6284,7 @@ check_open_access(uint32_t access, struct compound_state *cs,
 	 * to open for write, then return NFS4ERR_ROFS
 	 */
 
-	readonly = rdonly4(cs->exi, cs->vp, req);
+	readonly = rdonly4(req, cs);
 
 	if ((access & OPEN4_SHARE_ACCESS_WRITE) && readonly)
 		return (NFS4ERR_ROFS);
@@ -6338,7 +6338,7 @@ rfs4_createfile(OPEN4args *args, struct svc_req *req, struct compound_state *cs,
 	dvp = cs->vp;
 
 	/* Check if the file system is read only */
-	if (rdonly4(cs->exi, dvp, req))
+	if (rdonly4(req, cs))
 		return (NFS4ERR_ROFS);
 
 	/* check the label of including directory */

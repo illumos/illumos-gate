@@ -23,11 +23,12 @@
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ */
 
 #ifndef	_MOUNTD_H
 #define	_MOUNTD_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <door.h>
 #include <nfs/nfs.h>
@@ -63,7 +64,7 @@ extern void *exmalloc(size_t);
 
 extern struct share *findentry(char *);
 extern int check_client(struct share *, struct netbuf *,
-				struct nd_hostservlist *, int);
+    struct nd_hostservlist *, int, uid_t, gid_t, uid_t *, gid_t *);
 extern struct nd_hostservlist *anon_client(char *host);
 
 /*

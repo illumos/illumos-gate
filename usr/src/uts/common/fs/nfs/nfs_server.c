@@ -192,7 +192,7 @@ static void	common_dispatch(struct svc_req *, SVCXPRT *,
 		struct rpc_disptable *);
 static void	hanfsv4_failover(void);
 static	int	checkauth(struct exportinfo *, struct svc_req *, cred_t *, int,
-			bool_t);
+		bool_t, bool_t *);
 static char	*client_name(struct svc_req *req);
 static char	*client_addr(struct svc_req *req, char *buf);
 extern	int	sec_svc_getcred(struct svc_req *, cred_t *cr, char **, int *);
@@ -650,14 +650,15 @@ restart:
 
 /* ARGSUSED */
 void
-rpc_null(caddr_t *argp, caddr_t *resp)
+rpc_null(caddr_t *argp, caddr_t *resp, struct exportinfo *exi,
+    struct svc_req *req, cred_t *cr, bool_t ro)
 {
 }
 
 /* ARGSUSED */
 void
 rpc_null_v3(caddr_t *argp, caddr_t *resp, struct exportinfo *exi,
-    struct svc_req *req, cred_t *cr)
+    struct svc_req *req, cred_t *cr, bool_t ro)
 {
 	DTRACE_NFSV3_3(op__null__start, struct svc_req *, req,
 	    cred_t *, cr, vnode_t *, NULL);
@@ -667,7 +668,8 @@ rpc_null_v3(caddr_t *argp, caddr_t *resp, struct exportinfo *exi,
 
 /* ARGSUSED */
 static void
-rfs_error(caddr_t *argp, caddr_t *resp)
+rfs_error(caddr_t *argp, caddr_t *resp, struct exportinfo *exi,
+    struct svc_req *req, cred_t *cr, bool_t ro)
 {
 	/* return (EOPNOTSUPP); */
 }
@@ -1504,6 +1506,7 @@ common_dispatch(struct svc_req *req, SVCXPRT *xprt, rpcvers_t min_vers,
 	struct exportinfo *nfslog_exi = NULL;
 	char **procnames;
 	char cbuf[INET6_ADDRSTRLEN];	/* to hold both IPv4 and IPv6 addr */
+	bool_t ro = FALSE;
 
 	vers = req->rq_vers;
 
@@ -1658,7 +1661,8 @@ common_dispatch(struct svc_req *req, SVCXPRT *xprt, rpcvers_t min_vers,
 				goto done;
 			}
 
-			authres = checkauth(exi, req, cr, anon_ok, publicfh_ok);
+			authres = checkauth(exi, req, cr, anon_ok, publicfh_ok,
+			    &ro);
 			/*
 			 * authres >  0: authentication OK - proceed
 			 * authres == 0: authentication weak - return error
@@ -1702,7 +1706,7 @@ common_dispatch(struct svc_req *req, SVCXPRT *xprt, rpcvers_t min_vers,
 		case DUP_DROP:
 			curthread->t_flag |= T_DONTPEND;
 
-			(*disp->dis_proc)(args, res, exi, req, cr);
+			(*disp->dis_proc)(args, res, exi, req, cr, ro);
 
 			curthread->t_flag &= ~T_DONTPEND;
 			if (curthread->t_flag & T_WOULDBLOCK) {
@@ -1732,7 +1736,7 @@ common_dispatch(struct svc_req *req, SVCXPRT *xprt, rpcvers_t min_vers,
 	} else {
 		curthread->t_flag |= T_DONTPEND;
 
-		(*disp->dis_proc)(args, res, exi, req, cr);
+		(*disp->dis_proc)(args, res, exi, req, cr, ro);
 
 		curthread->t_flag &= ~T_DONTPEND;
 		if (curthread->t_flag & T_WOULDBLOCK) {
@@ -2006,13 +2010,16 @@ checkwin(int flavor, int window, struct svc_req *req)
  */
 static int
 checkauth(struct exportinfo *exi, struct svc_req *req, cred_t *cr, int anon_ok,
-    bool_t publicfh_ok)
+    bool_t publicfh_ok, bool_t *ro)
 {
 	int i, nfsflavor, rpcflavor, stat, access;
 	struct secinfo *secp;
 	caddr_t principal;
 	char buf[INET6_ADDRSTRLEN]; /* to hold both IPv4 and IPv6 addr */
 	int anon_res = 0;
+
+	uid_t uid;
+	gid_t gid;
 
 	/*
 	 * Check for privileged port number
@@ -2045,7 +2052,7 @@ checkauth(struct exportinfo *exi, struct svc_req *req, cred_t *cr, int anon_ok,
 	stat = sec_svc_getcred(req, cr, &principal, &nfsflavor);
 
 	/*
-	 * A failed AUTH_UNIX svc_get_cred() implies we couldn't set
+	 * A failed AUTH_UNIX sec_svc_getcred() implies we couldn't set
 	 * the credentials; below we map that to anonymous.
 	 */
 	if (!stat && nfsflavor != AUTH_UNIX) {
@@ -2071,14 +2078,17 @@ checkauth(struct exportinfo *exi, struct svc_req *req, cred_t *cr, int anon_ok,
 	/*
 	 * Check if the auth flavor is valid for this export
 	 */
-	access = nfsauth_access(exi, req);
+	access = nfsauth_access(exi, req, cr, &uid, &gid);
 	if (access & NFSAUTH_DROP)
 		return (-1);	/* drop the request */
+
+	if (access & NFSAUTH_RO)
+		*ro = TRUE;
 
 	if (access & NFSAUTH_DENIED) {
 		/*
 		 * If anon_ok == 1 and we got NFSAUTH_DENIED, it was
-		 * probably due to the flavor not matching during the
+		 * probably due to the flavor not matching during
 		 * the mount attempt. So map the flavor to AUTH_NONE
 		 * so that the credentials get mapped to the anonymous
 		 * user.
@@ -2112,12 +2122,11 @@ checkauth(struct exportinfo *exi, struct svc_req *req, cred_t *cr, int anon_ok,
 		break;
 
 	case AUTH_UNIX:
-		if (!stat || crgetuid(cr) == 0 && !(access & NFSAUTH_ROOT)) {
+		if (!stat || crgetuid(cr) == 0 && !(access & NFSAUTH_UIDMAP)) {
 			anon_res = crsetugid(cr, exi->exi_export.ex_anon,
 			    exi->exi_export.ex_anon);
 			(void) crsetgroups(cr, 0, NULL);
-		} else if (!stat || crgetuid(cr) == 0 &&
-		    access & NFSAUTH_ROOT) {
+		} else if (crgetuid(cr) == 0 && access & NFSAUTH_ROOT) {
 			/*
 			 * It is root, so apply rootid to get real UID
 			 * Find the secinfo structure.  We should be able
@@ -2138,7 +2147,14 @@ checkauth(struct exportinfo *exi, struct svc_req *req, cred_t *cr, int anon_ok,
 				    secp->s_rootid);
 				(void) crsetgroups(cr, 0, NULL);
 			}
+		} else if (crgetuid(cr) != uid || crgetgid(cr) != gid) {
+			if (crsetugid(cr, uid, gid) != 0)
+				anon_res = crsetugid(cr,
+				    exi->exi_export.ex_anon,
+				    exi->exi_export.ex_anon);
+			(void) crsetgroups(cr, 0, NULL);
 		}
+
 		break;
 
 	case AUTH_DES:
@@ -2254,6 +2270,9 @@ checkauth4(struct compound_state *cs, struct svc_req *req)
 	cred_t	*cr;
 	caddr_t	principal;
 
+	uid_t uid;
+	gid_t gid;
+
 	exi = cs->exi;
 	cr = cs->cr;
 	principal = cs->principal;
@@ -2293,7 +2312,7 @@ checkauth4(struct compound_state *cs, struct svc_req *req)
 	 * Check the access right per auth flavor on the vnode of
 	 * this export for the given request.
 	 */
-	access = nfsauth4_access(cs->exi, cs->vp, req);
+	access = nfsauth4_access(cs->exi, cs->vp, req, cr, &uid, &gid);
 
 	if (access & NFSAUTH_WRONGSEC)
 		return (-2);	/* no access for this security flavor */
@@ -2331,7 +2350,7 @@ checkauth4(struct compound_state *cs, struct svc_req *req)
 		break;
 
 	case AUTH_UNIX:
-		if (crgetuid(cr) == 0 && !(access & NFSAUTH_ROOT)) {
+		if (crgetuid(cr) == 0 && !(access & NFSAUTH_UIDMAP)) {
 			anon_res = crsetugid(cr, exi->exi_export.ex_anon,
 			    exi->exi_export.ex_anon);
 			(void) crsetgroups(cr, 0, NULL);
@@ -2356,7 +2375,14 @@ checkauth4(struct compound_state *cs, struct svc_req *req)
 				    secp->s_rootid);
 				(void) crsetgroups(cr, 0, NULL);
 			}
+		} else if (crgetuid(cr) != uid || crgetgid(cr) != gid) {
+			if (crsetugid(cr, uid, gid) != 0)
+				anon_res = crsetugid(cr,
+				    exi->exi_export.ex_anon,
+				    exi->exi_export.ex_anon);
+			(void) crsetgroups(cr, 0, NULL);
 		}
+
 		break;
 
 	default:

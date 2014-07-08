@@ -316,11 +316,12 @@ addrmask(struct netbuf *addr, struct netbuf *mask)
  * used does not meet the policy.
  */
 int
-nfsauth4_access(struct exportinfo *exi, vnode_t *vp, struct svc_req *req)
+nfsauth4_access(struct exportinfo *exi, vnode_t *vp, struct svc_req *req,
+    cred_t *cr, uid_t *uid, gid_t *gid)
 {
 	int access;
 
-	access = nfsauth_access(exi, req);
+	access = nfsauth_access(exi, req, cr, uid, gid);
 
 	/*
 	 * There are cases that the server needs to allow the client
@@ -368,7 +369,8 @@ sys_log(const char *msg)
  */
 static bool_t
 nfsauth_retrieve(struct exportinfo *exi, char *req_netid, int flavor,
-    struct netbuf *addr, int *access)
+    struct netbuf *addr, int *access, uid_t clnt_uid, gid_t clnt_gid,
+    uid_t *srv_uid, gid_t *srv_gid)
 {
 	varg_t			  varg = {0};
 	nfsauth_res_t		  res = {0};
@@ -376,8 +378,8 @@ nfsauth_retrieve(struct exportinfo *exi, char *req_netid, int flavor,
 	XDR			  xdrs_r;
 	size_t			  absz;
 	caddr_t			  abuf;
-	size_t			  rbsz = (size_t)(BYTES_PER_XDR_UNIT * 2);
-	char			  result[BYTES_PER_XDR_UNIT * 2] = {0};
+	size_t			  rbsz = (size_t)(BYTES_PER_XDR_UNIT * 4);
+	char			  result[BYTES_PER_XDR_UNIT * 4] = {0};
 	caddr_t			  rbuf = (caddr_t)&result;
 	int			  last = 0;
 	door_arg_t		  da;
@@ -426,6 +428,8 @@ retry:
 	varg.arg_u.arg.areq.req_netid = req_netid;
 	varg.arg_u.arg.areq.req_path = exi->exi_export.ex_path;
 	varg.arg_u.arg.areq.req_flavor = flavor;
+	varg.arg_u.arg.areq.req_clnt_uid = clnt_uid;
+	varg.arg_u.arg.areq.req_clnt_gid = clnt_gid;
 
 	/*
 	 * Setup the XDR stream for encoding the arguments. Notice that
@@ -452,7 +456,7 @@ retry:
 	XDR_DESTROY(&xdrs_a);
 
 	/*
-	 * The result (nfsauth_res_t) is always two int's, so we don't
+	 * The result (nfsauth_res_t) is always four int's, so we don't
 	 * have to dynamically size (or allocate) the results buffer.
 	 * Now that we've got what we need, we prep the door arguments
 	 * and place the call.
@@ -485,7 +489,7 @@ retry:
 				 * is iff userland wanted to hand us
 				 * a bigger response than what we
 				 * expect; that should not happen
-				 * (nfsauth_res_t is only 2 int's),
+				 * (nfsauth_res_t is only 4 int's),
 				 * but we check nevertheless.
 				 */
 				rbuf = da.rbuf;
@@ -493,7 +497,7 @@ retry:
 
 			} else if (rbsz > da.data_size) {
 				/*
-				 * We were expecting two int's; but if
+				 * We were expecting four int's; but if
 				 * userland fails in encoding the XDR
 				 * stream, we detect that here, since
 				 * the mountd forces down only one byte
@@ -588,6 +592,8 @@ retry:
 	switch (res.stat) {
 		case NFSAUTH_DR_OKAY:
 			*access = res.ares.auth_perm;
+			*srv_uid = res.ares.auth_srv_uid;
+			*srv_gid = res.ares.auth_srv_gid;
 			kmem_free(abuf, absz);
 			break;
 
@@ -707,7 +713,9 @@ nfsauth_refresh_thread(void)
 			ASSERT(p->auth_netid != NULL);
 
 			retrieval = nfsauth_retrieve(exi, p->auth_netid,
-			    p->auth_flavor, &p->auth_addr, &access);
+			    p->auth_flavor, &p->auth_addr, &access,
+			    p->auth_clnt_uid, p->auth_clnt_gid,
+			    &p->auth_srv_uid, &p->auth_srv_gid);
 
 			/*
 			 * This can only be set in one other place
@@ -751,8 +759,9 @@ nfsauth_refresh_thread(void)
  * Get the access information from the cache or callup to the mountd
  * to get and cache the access information in the kernel.
  */
-int
-nfsauth_cache_get(struct exportinfo *exi, struct svc_req *req, int flavor)
+static int
+nfsauth_cache_get(struct exportinfo *exi, struct svc_req *req, int flavor,
+    cred_t *cr, uid_t *uid, gid_t *gid)
 {
 	struct netbuf		*taddrmask;
 	struct netbuf		addr;
@@ -764,6 +773,11 @@ nfsauth_cache_get(struct exportinfo *exi, struct svc_req *req, int flavor)
 
 	refreshq_exi_node_t	*ren;
 	refreshq_auth_node_t	*ran;
+
+	uid_t			tmpuid;
+	gid_t			tmpgid;
+
+	ASSERT(cr != NULL);
 
 	/*
 	 * Now check whether this client already
@@ -787,7 +801,9 @@ nfsauth_cache_get(struct exportinfo *exi, struct svc_req *req, int flavor)
 	rw_enter(&exi->exi_cache_lock, RW_READER);
 	head = &exi->exi_cache[hash(&addr)];
 	for (p = *head; p; p = p->auth_next) {
-		if (EQADDR(&addr, &p->auth_addr) && flavor == p->auth_flavor)
+		if (EQADDR(&addr, &p->auth_addr) && flavor == p->auth_flavor &&
+		    crgetuid(cr) == p->auth_clnt_uid &&
+		    crgetgid(cr) == p->auth_clnt_gid)
 			break;
 	}
 
@@ -869,6 +885,11 @@ nfsauth_cache_get(struct exportinfo *exi, struct svc_req *req, int flavor)
 		}
 
 		access = p->auth_access;
+		if (uid != NULL)
+			*uid = p->auth_srv_uid;
+		if (gid != NULL)
+			*gid = p->auth_srv_gid;
+
 		p->auth_time = gethrestime_sec();
 
 		rw_exit(&exi->exi_cache_lock);
@@ -882,10 +903,15 @@ nfsauth_cache_get(struct exportinfo *exi, struct svc_req *req, int flavor)
 	nfsauth_cache_miss++;
 
 	if (!nfsauth_retrieve(exi, svc_getnetid(req->rq_xprt), flavor,
-	    &addr, &access)) {
+	    &addr, &access, crgetuid(cr), crgetgid(cr), &tmpuid, &tmpgid)) {
 		kmem_free(addr.buf, addr.len);
 		return (access);
 	}
+
+	if (uid != NULL)
+		*uid = tmpuid;
+	if (gid != NULL)
+		*gid = tmpgid;
 
 	/*
 	 * Now cache the result on the cache chain
@@ -895,6 +921,10 @@ nfsauth_cache_get(struct exportinfo *exi, struct svc_req *req, int flavor)
 	if (p != NULL) {
 		p->auth_addr = addr;
 		p->auth_flavor = flavor;
+		p->auth_clnt_uid = crgetuid(cr);
+		p->auth_clnt_gid = crgetgid(cr);
+		p->auth_srv_uid = tmpuid;
+		p->auth_srv_gid = tmpgid;
 		p->auth_access = access;
 		p->auth_time = p->auth_freshness = gethrestime_sec();
 		p->auth_state = NFS_AUTH_FRESH;
@@ -918,7 +948,7 @@ nfsauth_cache_get(struct exportinfo *exi, struct svc_req *req, int flavor)
  */
 int
 nfsauth4_secinfo_access(struct exportinfo *exi, struct svc_req *req,
-			int flavor, int perm)
+			int flavor, int perm, cred_t *cr)
 {
 	int access;
 
@@ -929,7 +959,7 @@ nfsauth4_secinfo_access(struct exportinfo *exi, struct svc_req *req,
 	/*
 	 * Optimize if there are no lists
 	 */
-	if ((perm & (M_ROOT|M_NONE)) == 0) {
+	if ((perm & (M_ROOT | M_NONE | M_MAP)) == 0) {
 		perm &= ~M_4SEC_EXPORTED;
 		if (perm == M_RO)
 			return (NFSAUTH_RO);
@@ -937,13 +967,14 @@ nfsauth4_secinfo_access(struct exportinfo *exi, struct svc_req *req,
 			return (NFSAUTH_RW);
 	}
 
-	access = nfsauth_cache_get(exi, req, flavor);
+	access = nfsauth_cache_get(exi, req, flavor, cr, NULL, NULL);
 
 	return (access);
 }
 
 int
-nfsauth_access(struct exportinfo *exi, struct svc_req *req)
+nfsauth_access(struct exportinfo *exi, struct svc_req *req, cred_t *cr,
+    uid_t *uid, gid_t *gid)
 {
 	int access, mapaccess;
 	struct secinfo *sp;
@@ -986,6 +1017,22 @@ nfsauth_access(struct exportinfo *exi, struct svc_req *req)
 	}
 
 	/*
+	 * By default root is mapped to anonymous user.
+	 * This might get overriden later in nfsauth_cache_get().
+	 */
+	if (crgetuid(cr) == 0) {
+		if (uid)
+			*uid = exi->exi_export.ex_anon;
+		if (gid)
+			*gid = exi->exi_export.ex_anon;
+	} else {
+		if (uid)
+			*uid = crgetuid(cr);
+		if (gid)
+			*gid = crgetgid(cr);
+	}
+
+	/*
 	 * If the flavor is in the ex_secinfo list, but not an explicitly
 	 * shared flavor by the user, it is a result of the nfsv4 server
 	 * namespace setup. We will grant an RO permission similar for
@@ -1010,7 +1057,7 @@ nfsauth_access(struct exportinfo *exi, struct svc_req *req)
 	 * Optimize if there are no lists
 	 */
 	perm = sp[i].s_flags;
-	if ((perm & (M_ROOT|M_NONE)) == 0) {
+	if ((perm & (M_ROOT | M_NONE | M_MAP)) == 0) {
 		perm &= ~M_4SEC_EXPORTED;
 		if (perm == M_RO)
 			return (mapaccess | NFSAUTH_RO);
@@ -1018,7 +1065,7 @@ nfsauth_access(struct exportinfo *exi, struct svc_req *req)
 			return (mapaccess | NFSAUTH_RW);
 	}
 
-	access = nfsauth_cache_get(exi, req, flavor);
+	access = nfsauth_cache_get(exi, req, flavor, cr, uid, gid);
 
 	/*
 	 * Client's security flavor doesn't match with "ro" or
@@ -1030,7 +1077,8 @@ nfsauth_access(struct exportinfo *exi, struct svc_req *req)
 		 */
 		if (authnone_entry != -1) {
 			mapaccess = NFSAUTH_MAPNONE;
-			access = nfsauth_cache_get(exi, req, AUTH_NONE);
+			access = nfsauth_cache_get(exi, req, AUTH_NONE, cr,
+			    NULL, NULL);
 		} else {
 			/*
 			 * Check for AUTH_NONE presence.
@@ -1039,7 +1087,7 @@ nfsauth_access(struct exportinfo *exi, struct svc_req *req)
 				if (sp[i].s_secinfo.sc_nfsnum == AUTH_NONE) {
 					mapaccess = NFSAUTH_MAPNONE;
 					access = nfsauth_cache_get(exi, req,
-					    AUTH_NONE);
+					    AUTH_NONE, cr, NULL, NULL);
 					break;
 				}
 			}
