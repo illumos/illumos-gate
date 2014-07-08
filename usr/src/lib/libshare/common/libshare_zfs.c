@@ -24,6 +24,7 @@
  */
 /*
  * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright (c) 2012, 2014 by Delphix. All rights reserved.
  */
 
 #include <stdio.h>
@@ -279,7 +280,6 @@ get_zfs_dataset(sa_handle_impl_t impl_handle, char *path,
 	char canmount[ZFS_MAXPROPLEN];
 
 	get_all_filesystems(impl_handle, &zlist, &count);
-	qsort(zlist, count, sizeof (void *), mountpoint_compare);
 	for (i = 0; i < count; i++) {
 		/* must have a mountpoint */
 		if (zfs_prop_get(zlist[i], ZFS_PROP_MOUNTPOINT, mountpoint,
