@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -597,7 +598,7 @@ validpath(sa_handle_t handle, char *path, int strictness)
  * check to see if group/share is persistent.
  *
  * "group" can be either an sa_group_t or an sa_share_t. (void *)
- * works since both thse types are also void *.
+ * works since both these types are also void *.
  * If the share is a ZFS share, mark it as persistent.
  */
 int

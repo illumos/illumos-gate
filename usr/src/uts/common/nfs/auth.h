@@ -22,12 +22,12 @@
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ */
 
 #ifndef _AUTH_H
 #define	_AUTH_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 
 /*
  * nfsauth_prot.x (The NFSAUTH Protocol)
@@ -39,7 +39,7 @@
  * The status result determines what kind of access the client is permitted.
  *
  * The result is cached in the kernel, so the authorization call will be
- * made * only the first time the client mounts the filesystem.
+ * made only the first time the client mounts the filesystem.
  *
  * const A_MAXPATH	= 1024;
  *
@@ -48,6 +48,8 @@
  * 	string	req_netid<>;		# Netid of address
  * 	string	req_path<A_MAXPATH>;	# export path
  * 	int	req_flavor;		# auth flavor
+ *	uid_t	req_clnt_uid;		# client's uid
+ *	gid_t	req_clnt_gid;		# client's gid
  * };
  *
  * const NFSAUTH_DENIED	  = 0x01;	# Access denied
@@ -56,6 +58,8 @@
  * const NFSAUTH_ROOT	  = 0x08;	# Root access
  * const NFSAUTH_WRONGSEC = 0x10;	# Advise NFS v4 clients to
  * 					# try a different flavor
+ * const NFSAUTH_UIDMAP   = 0x100;	# uid mapped
+ * const NFSAUTH_GIDMAP   = 0x200;	# gid mapped
  * #
  * # The following are not part of the protocol.
  * #
@@ -65,6 +69,8 @@
  *
  * struct auth_res {
  * 	int auth_perm;
+ *	uid_t	auth_srv_uid;
+ *	gid_t	auth_srv_gid;
  * };
  *
  * program NFSAUTH_PROG {
@@ -105,17 +111,23 @@ extern "C" {
 #define	NFSAUTH_DROP		0x20
 #define	NFSAUTH_MAPNONE		0x40
 #define	NFSAUTH_LIMITED		0x80
+#define	NFSAUTH_UIDMAP		0x100
+#define	NFSAUTH_GIDMAP		0x200
 
 struct auth_req {
 	netobj	 req_client;
 	char	*req_netid;
 	char	*req_path;
 	int	 req_flavor;
+	uid_t	 req_clnt_uid;
+	gid_t	 req_clnt_gid;
 };
 typedef struct auth_req auth_req;
 
 struct auth_res {
 	int	auth_perm;
+	uid_t	auth_srv_uid;
+	gid_t	auth_srv_gid;
 };
 typedef struct auth_res auth_res;
 

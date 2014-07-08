@@ -110,6 +110,7 @@ struct sec_ol {
 #define	M_ROOT		0x10	/* root list is defined */
 #define	M_4SEC_EXPORTED	0x20	/* this is an explicitly shared flavor */
 #define	M_NONE		0x40	/* none list is defined */
+#define	M_MAP		0x80	/* uidmap and/or gidmap is defined */
 
 /* invalid secinfo reference count */
 #define	SEC_REF_INVALID(p) ((p)->s_refcnt < 1)
@@ -190,7 +191,7 @@ struct exportdata32 {
 #define	RPC_IDEMPOTENT	0x1	/* idempotent or not */
 /*
  * Be very careful about which NFS procedures get the RPC_ALLOWANON bit.
- * Right now, it this bit is on, we ignore the results of per NFS request
+ * Right now, if this bit is on, we ignore the results of per NFS request
  * access control.
  */
 #define	RPC_ALLOWANON	0x2	/* allow anonymous access */
@@ -253,6 +254,10 @@ typedef enum auth_state {
 struct auth_cache {
 	struct netbuf		auth_addr;
 	int			auth_flavor;
+	uid_t			auth_clnt_uid;
+	gid_t			auth_clnt_gid;
+	uid_t			auth_srv_uid;
+	gid_t			auth_srv_gid;
 	int			auth_access;
 	time_t			auth_time;
 	time_t			auth_freshness;
@@ -533,31 +538,30 @@ typedef struct exp_visible exp_visible_t;
  * Note:  this macro should be as fast as possible since it's called
  * on each NFS modification request.
  */
-#define	rdonly(exi, vp, req) \
-	(vn_is_readonly(vp) || \
-	    (nfsauth_access(exi, req) & NFSAUTH_RO))
-#define	rdonly4(exi, vp, req)  \
-	(vn_is_readonly(vp) || \
-	    (nfsauth4_access(exi, vp, req) & (NFSAUTH_RO | NFSAUTH_LIMITED)))
+#define	rdonly(ro, vp)	((ro) || vn_is_readonly(vp))
+#define	rdonly4(req, cs)  \
+	(vn_is_readonly((cs)->vp) || \
+	    (nfsauth4_access((cs)->exi, (cs)->vp, (req), (cs)->basecr, NULL, \
+	    NULL) & (NFSAUTH_RO | NFSAUTH_LIMITED)))
 
 extern int	nfsauth4_access(struct exportinfo *, vnode_t *,
-				struct svc_req *);
+				struct svc_req *, cred_t *, uid_t *, gid_t *);
 extern int	nfsauth4_secinfo_access(struct exportinfo *,
-				struct svc_req *, int, int);
+				struct svc_req *, int, int, cred_t *);
 extern int	nfs_fhbcmp(char *, char *, int);
 extern int	nfs_exportinit(void);
 extern void	nfs_exportfini(void);
-extern int	chk_clnt_sec(struct exportinfo *, struct svc_req *req);
+extern int	chk_clnt_sec(struct exportinfo *, struct svc_req *);
 extern int	makefh(fhandle_t *, struct vnode *, struct exportinfo *);
 extern int	makefh_ol(fhandle_t *, struct exportinfo *, uint_t);
 extern int	makefh3(nfs_fh3 *, struct vnode *, struct exportinfo *);
 extern int	makefh3_ol(nfs_fh3 *, struct exportinfo *, uint_t);
 extern vnode_t *nfs_fhtovp(fhandle_t *, struct exportinfo *);
 extern vnode_t *nfs3_fhtovp(nfs_fh3 *, struct exportinfo *);
-extern vnode_t *lm_fhtovp(fhandle_t *fh);
-extern vnode_t *lm_nfs3_fhtovp(nfs_fh3 *fh);
+extern vnode_t *lm_fhtovp(fhandle_t *);
+extern vnode_t *lm_nfs3_fhtovp(nfs_fh3 *);
 extern struct	exportinfo *checkexport(fsid_t *, struct fid *);
-extern struct	exportinfo *checkexport4(fsid_t *, struct fid *, vnode_t *vp);
+extern struct	exportinfo *checkexport4(fsid_t *, struct fid *, vnode_t *);
 extern void	exi_hold(struct exportinfo *);
 extern void	exi_rele(struct exportinfo *);
 extern struct exportinfo *nfs_vptoexi(vnode_t *, vnode_t *, cred_t *, int *,
@@ -584,7 +588,7 @@ extern void	free_visible(struct exp_visible *);
 extern int	nfs_exported(struct exportinfo *, vnode_t *);
 extern struct exportinfo *pseudo_exportfs(vnode_t *, fid_t *,
     struct exp_visible *, struct exportdata *);
-extern int	vop_fid_pseudo(vnode_t *, fid_t *fidp);
+extern int	vop_fid_pseudo(vnode_t *, fid_t *);
 extern int	nfs4_vget_pseudo(struct exportinfo *, vnode_t **, fid_t *);
 /*
  * Functions that handle the NFSv4 server namespace security flavors

@@ -77,7 +77,7 @@
 /* ARGSUSED */
 void
 acl2_getacl(GETACL2args *args, GETACL2res *resp, struct exportinfo *exi,
-	struct svc_req *req, cred_t *cr)
+    struct svc_req *req, cred_t *cr, bool_t ro)
 {
 	int error;
 	vnode_t *vp;
@@ -191,7 +191,7 @@ acl2_getacl_free(GETACL2res *resp)
 /* ARGSUSED */
 void
 acl2_setacl(SETACL2args *args, SETACL2res *resp, struct exportinfo *exi,
-	struct svc_req *req, cred_t *cr)
+	struct svc_req *req, cred_t *cr, bool_t ro)
 {
 	int error;
 	vnode_t *vp;
@@ -203,7 +203,7 @@ acl2_setacl(SETACL2args *args, SETACL2res *resp, struct exportinfo *exi,
 		return;
 	}
 
-	if (rdonly(exi, vp, req)) {
+	if (rdonly(ro, vp)) {
 		VN_RELE(vp);
 		resp->status = NFSERR_ROFS;
 		return;
@@ -246,7 +246,7 @@ acl2_setacl_getfh(SETACL2args *args)
 /* ARGSUSED */
 void
 acl2_getattr(GETATTR2args *args, GETATTR2res *resp, struct exportinfo *exi,
-	struct svc_req *req, cred_t *cr)
+    struct svc_req *req, cred_t *cr, bool_t ro)
 {
 	int error;
 	vnode_t *vp;
@@ -285,7 +285,7 @@ acl2_getattr_getfh(GETATTR2args *args)
 /* ARGSUSED */
 void
 acl2_access(ACCESS2args *args, ACCESS2res *resp, struct exportinfo *exi,
-	struct svc_req *req, cred_t *cr)
+    struct svc_req *req, cred_t *cr, bool_t ro)
 {
 	int error;
 	vnode_t *vp;
@@ -304,7 +304,7 @@ acl2_access(ACCESS2args *args, ACCESS2res *resp, struct exportinfo *exi,
 	 * Special files are interpreted by the client, so the underlying
 	 * permissions are sent back to the client for interpretation.
 	 */
-	if (rdonly(exi, vp, req) && (vp->v_type == VREG || vp->v_type == VDIR))
+	if (rdonly(ro, vp) && (vp->v_type == VREG || vp->v_type == VDIR))
 		checkwriteperm = 0;
 	else
 		checkwriteperm = 1;
@@ -381,7 +381,7 @@ acl2_access_getfh(ACCESS2args *args)
 /* ARGSUSED */
 void
 acl2_getxattrdir(GETXATTRDIR2args *args, GETXATTRDIR2res *resp,
-	struct exportinfo *exi, struct svc_req *req, cred_t *cr)
+    struct exportinfo *exi, struct svc_req *req, cred_t *cr, bool_t ro)
 {
 	int error;
 	int flags;
@@ -446,7 +446,7 @@ acl2_getxattrdir_getfh(GETXATTRDIR2args *args)
 /* ARGSUSED */
 void
 acl3_getacl(GETACL3args *args, GETACL3res *resp, struct exportinfo *exi,
-	struct svc_req *req, cred_t *cr)
+    struct svc_req *req, cred_t *cr, bool_t ro)
 {
 	int error;
 	vnode_t *vp;
@@ -557,7 +557,7 @@ acl3_getacl_free(GETACL3res *resp)
 /* ARGSUSED */
 void
 acl3_setacl(SETACL3args *args, SETACL3res *resp, struct exportinfo *exi,
-	struct svc_req *req, cred_t *cr)
+    struct svc_req *req, cred_t *cr, bool_t ro)
 {
 	int error;
 	vnode_t *vp;
@@ -577,7 +577,7 @@ acl3_setacl(SETACL3args *args, SETACL3res *resp, struct exportinfo *exi,
 	va.va_mask = AT_ALL;
 	vap = rfs4_delegated_getattr(vp, &va, 0, cr) ? NULL : &va;
 
-	if (rdonly(exi, vp, req)) {
+	if (rdonly(ro, vp)) {
 		resp->status = NFS3ERR_ROFS;
 		goto out1;
 	}
@@ -621,7 +621,7 @@ acl3_setacl_getfh(SETACL3args *args)
 /* ARGSUSED */
 void
 acl3_getxattrdir(GETXATTRDIR3args *args, GETXATTRDIR3res *resp,
-	struct exportinfo *exi, struct svc_req *req, cred_t *cr)
+    struct exportinfo *exi, struct svc_req *req, cred_t *cr, bool_t ro)
 {
 	int error;
 	int flags;
