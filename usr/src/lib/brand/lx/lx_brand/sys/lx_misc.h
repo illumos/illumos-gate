@@ -107,7 +107,9 @@ extern boolean_t lx_is_rpm;
  * Constants for prctl().  We only include the ones here that we actually
  * support; everything else will be ENOSYS.
  */
+#define	LX_PR_SET_KEEPCAPS	8
 #define	LX_PR_SET_NAME		15
+
 #define	LX_PR_SET_NAME_NAMELEN	16
 
 /*
