@@ -810,9 +810,16 @@ lx_copy_procdata(proc_t *child, proc_t *parent)
  * Currently, only 32-bit branded ELF executables are supported.
  */
 #if defined(_LP64)
-#define	elfexec			elf32exec
 #define	mapexec_brand		mapexec32_brand
+#else
+#define	elf32exec		elfexec
 #endif /* _LP64 */
+
+extern int elfexec(vnode_t *, execa_t *, uarg_t *, intpdata_t *, int,
+    long *, int, caddr_t, cred_t *, int);
+
+extern int elf32exec(struct vnode *, execa_t *, uarg_t *, intpdata_t *, int,
+    long *, int, caddr_t, cred_t *, int);
 
 /*
  * Exec routine called by elfexec() to load 32-bit Linux binaries.
@@ -843,6 +850,14 @@ lx_elfexec(struct vnode *vp, struct execa *uap, struct uarg *args,
 	ASSERT(ttoproc(curthread)->p_brand == &lx_brand);
 	ASSERT(ttoproc(curthread)->p_brand_data != NULL);
 
+#if defined(_LP64)
+	/* Currently, only 32-bit branded ELF executables are supported. */
+	if (args->execswp->exec_func == elfexec) {
+		uprintf("64-bit applications are not supported");
+		return (ENOEXEC);
+	}
+#endif /* _LP64 */
+
 	/*
 	 * Set the brandname and library name for the new process so that
 	 * elfexec() puts them onto the stack.
@@ -860,7 +875,7 @@ lx_elfexec(struct vnode *vp, struct execa *uap, struct uarg *args,
 		return (error);
 	}
 
-	if ((error = elfexec(nvp, uap, args, idata, level + 1, execsz, setid,
+	if ((error = elf32exec(nvp, uap, args, idata, level + 1, execsz, setid,
 	    exec_file, cred, brand_action))) {
 		VN_RELE(nvp);
 		return (error);
