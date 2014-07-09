@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright (c) 2013 by Delphix. All rights reserved.
+# Copyright (c) 2012, 2014 by Delphix. All rights reserved.
 # Copyright 2014, OmniTI Computer Consulting, Inc. All rights reserved.
 #
 
@@ -1817,6 +1817,7 @@ file path=opt/zfs-tests/tests/functional/nestedfs/setup mode=0555
 file path=opt/zfs-tests/tests/functional/no_space/cleanup mode=0555
 file path=opt/zfs-tests/tests/functional/no_space/enospc.cfg mode=0555
 file path=opt/zfs-tests/tests/functional/no_space/enospc_001_pos mode=0555
+file path=opt/zfs-tests/tests/functional/no_space/enospc_002_pos mode=0555
 file path=opt/zfs-tests/tests/functional/no_space/setup mode=0555
 file path=opt/zfs-tests/tests/functional/nopwrite/cleanup mode=0555
 file path=opt/zfs-tests/tests/functional/nopwrite/nopwrite.shlib mode=0555
