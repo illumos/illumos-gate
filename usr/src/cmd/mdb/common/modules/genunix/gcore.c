@@ -67,6 +67,7 @@
 #include <stdbool.h>
 #include <string.h>
 #include <libproc.h>
+#include <errno.h>
 
 #include "avl.h"
 
@@ -2031,7 +2032,7 @@ gcore_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    p.p_user.u_comm, pid.pid_id);
 
 	if ((error = Pgcore(P, core_name, CC_CONTENT_DEFAULT)) != 0) {
-		mdb_warn("Failed to generate core file: %d", error);
+		mdb_warn("Failed to generate core file: %d", errno);
 		Pfree(P);
 		return (DCMD_ERR);
 	}

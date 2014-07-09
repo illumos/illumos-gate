@@ -24,7 +24,7 @@
  * Use is subject to license terms.
  */
 /*
- * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
  */
 
 /*
@@ -1388,6 +1388,13 @@ pt_gcore(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	(void) mdb_snprintf(fname, size, "%s.%d", prefix, (int)pid);
 
 	if (Pgcore(t->t_pshandle, fname, content) != 0) {
+		/*
+		 * Short writes during dumping are specifically described by
+		 * EBADE, just as ZFS uses this otherwise-unused code for
+		 * checksum errors.  Translate to and mdb errno.
+		 */
+		if (errno == EBADE)
+			(void) set_errno(EMDB_SHORTWRITE);
 		mdb_warn("couldn't dump core");
 		return (DCMD_ERR);
 	}
