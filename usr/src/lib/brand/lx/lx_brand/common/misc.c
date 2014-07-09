@@ -527,6 +527,10 @@ lx_setgroups(uintptr_t p1, uintptr_t p2)
 	return ((r == -1) ? -errno : r);
 }
 
+/*
+ * Linux currently defines 42 options for prctl (PR_CAPBSET_READ,
+ * PR_CAPBSET_DROP, etc.). Most of these are not emulated.
+ */
 int
 lx_prctl(int option, uintptr_t arg2, uintptr_t arg3,
     uintptr_t arg4, uintptr_t arg5)
@@ -535,8 +539,18 @@ lx_prctl(int option, uintptr_t arg2, uintptr_t arg3,
 	size_t size = sizeof (psinfo.pr_fname);
 	int fd;
 
-	if (option != LX_PR_SET_NAME)
+	if (option == LX_PR_SET_KEEPCAPS) {
+		/*
+		 * See lx_capget and lx_capset. We totally punt on capabilities
+		 * so do the same here.
+		 */
+		return (0);
+	}
+
+	if (option != LX_PR_SET_NAME) {
+		lx_unsupported("prctl option %d", option);
 		return (-ENOSYS);
+	}
 
 	if (uucopy((void *)arg2, psinfo.pr_fname,
 	    MIN(LX_PR_SET_NAME_NAMELEN, size)) != 0)
