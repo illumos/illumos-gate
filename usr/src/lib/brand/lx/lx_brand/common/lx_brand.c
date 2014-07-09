@@ -1119,8 +1119,8 @@ static struct lx_sysent sysents[] = {
 	{"pwrite64",	lx_pwrite64,	0,		5},	/* 181 */
 	{"chown16",	lx_chown16,	0,		3},	/* 182 */
 	{"getcwd",	lx_getcwd,	0,		2},	/* 183 */
-	{"capget",	NULL,		NOSYS_NO_EQUIV,	0},	/* 184 */
-	{"capset",	NULL,		NOSYS_NO_EQUIV,	0},	/* 185 */
+	{"capget",	lx_capget,	0,		2},	/* 184 */
+	{"capset",	lx_capset,	0,		2},	/* 185 */
 	{"sigaltstack",	lx_sigaltstack,	0,		2},	/* 186 */
 	{"sendfile",	lx_sendfile,	0,		4},	/* 187 */
 	{"getpmsg",	NULL,		NOSYS_OBSOLETE,	0},	/* 188 */

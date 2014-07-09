@@ -22,9 +22,8 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2014 Joyent, Inc.  All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/systm.h>
@@ -43,6 +42,29 @@
 #include <errno.h>
 #include <string.h>
 #include <sys/lx_misc.h>
+
+typedef struct {
+	uint32_t version;
+	int pid;
+} lx_cap_user_header_t;
+
+typedef struct {
+	uint32_t effective;
+	uint32_t permitted;
+	uint32_t inheritable;
+} lx_cap_user_data_t;
+
+#define	LX_CAPABILITY_VERSION_1	0x19980330
+#define	LX_CAPABILITY_VERSION_2	0x20071026	/* deprecated by Linux */
+#define	LX_CAPABILITY_VERSION_3	0x20080522
+
+/*
+ * All capabailities for super-user and basic capabilities for regular user.
+ * Linux current defines 38 capabilities, the last being CAP_AUDIT_READ.
+ * However, for a 32-bit kernel it looks like we only pass back up to
+ * CAP_SETFCAP.
+ */
+#define	LX_ALL_CAPABILITIES	0xFFFFFFFFU
 
 int
 lx_setuid16(uintptr_t uid)
@@ -266,4 +288,63 @@ int
 lx_setfsgid(uintptr_t fsgid)
 {
 	return (getegid());
+}
+
+/*
+ * As a future enhancement we could investigate mapping Linux capabilities
+ * into Illumos privileges, but for now we simply pretend we have capabilities
+ * and give all of them back if the euid is 0. Likewise, we do nothing when
+ * setting capabilities. We could also keep track of which capabilities have
+ * been set so we could hand back that subset, instead of always saying we
+ * have all of them enabled.
+ */
+int
+lx_capget(uintptr_t p1, uintptr_t p2)
+{
+	lx_cap_user_header_t *chp = (lx_cap_user_header_t *)p1;
+	lx_cap_user_data_t *cdp = (lx_cap_user_data_t *)p2;
+	lx_cap_user_header_t ch;
+	lx_cap_user_data_t cd;
+
+	if (uucopy(chp, &ch, sizeof (ch)) != 0)
+		return (-errno);
+
+	if (ch.version != LX_CAPABILITY_VERSION_1 &&
+	    ch.version != LX_CAPABILITY_VERSION_2 &&
+	    ch.version != LX_CAPABILITY_VERSION_3)
+		return (-EINVAL);
+
+	/* A null data pointer is used when querying supported version */
+	if (cdp == 0)
+		return (0);
+
+	if (geteuid() == 0) {
+		/* root, you have all capabilities */
+		cd.effective = LX_ALL_CAPABILITIES;
+		cd.permitted = LX_ALL_CAPABILITIES;
+		cd.inheritable = 0;
+	} else {
+		/* not root and trying to set another process's capabilities */
+		if (ch.pid != 0)
+			return (-EPERM);
+
+		/* not root, you have no capabilities */
+		cd.effective = 0;
+		cd.permitted = 0;
+		cd.inheritable = 0;
+	}
+
+	if (uucopy(&cd, cdp, sizeof (cd)) != 0)
+		return (-errno);
+
+	return (0);
+}
+
+/*ARGSUSED*/
+int
+lx_capset(uintptr_t p1, uintptr_t p2)
+{
+	if (geteuid() == 0)
+		return (0);
+	return (-EPERM);
 }
