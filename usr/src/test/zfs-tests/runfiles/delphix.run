@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright (c) 2013 by Delphix. All rights reserved.
+# Copyright (c) 2012, 2014 by Delphix. All rights reserved.
 #
 
 [DEFAULT]
@@ -397,7 +397,7 @@ tests = ['mv_files_001_pos', 'mv_files_002_pos']
 tests = ['nestedfs_001_pos']
 
 [/opt/zfs-tests/tests/functional/no_space]
-tests = ['enospc_001_pos']
+tests = ['enospc_001_pos', 'enospc_002_pos']
 
 [/opt/zfs-tests/tests/functional/nopwrite]
 tests = ['nopwrite_copies', 'nopwrite_mtime', 'nopwrite_negative',
