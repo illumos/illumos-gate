@@ -122,6 +122,8 @@ extern int lx_getresuid16(uintptr_t, uintptr_t, uintptr_t);
 extern int lx_getresgid16(uintptr_t, uintptr_t, uintptr_t);
 extern int lx_getresuid(uintptr_t, uintptr_t, uintptr_t);
 extern int lx_getresgid(uintptr_t, uintptr_t, uintptr_t);
+extern int lx_capget(uintptr_t, uintptr_t);
+extern int lx_capset(uintptr_t, uintptr_t);
 
 extern int lx_setuid16(uintptr_t);
 extern int lx_setreuid16(uintptr_t, uintptr_t);
