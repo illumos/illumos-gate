@@ -5118,7 +5118,6 @@ f usr/lib/crt1.o 0644 root bin
 f usr/lib/crti.o 0644 root bin
 f usr/lib/crtn.o 0644 root bin
 d usr/lib/crypto 0755 root bin
-f usr/lib/cryptpass 0555 root bin
 d usr/lib/devfsadm 0755 root sys
 s usr/lib/devfsadm/devfsadmd=../../sbin/devfsadm
 d usr/lib/devfsadm/linkmod 0755 root sys
