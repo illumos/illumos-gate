@@ -558,6 +558,17 @@ lx_ioctl(uintptr_t p1, uintptr_t p2, uintptr_t p3)
 		return (-errno);	/* errno already set. */
 	}
 
+	/* Generic handling for FIOCLEX and FIONCLEX */
+	if (cmd == LX_FIOCLEX) {
+		if (fcntl(fd, F_SETFD, FD_CLOEXEC) == -1)
+			return (-errno);
+		return (0);
+	} else if (cmd == LX_FIONCLEX) {
+		if (fcntl(fd, F_SETFD, 0) == -1)
+			return (-errno);
+		return (0);
+	}
+
 	switch (stat.st_mode & S_IFMT) {
 	default:
 		break;
