@@ -22,7 +22,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
 #
 
 PROG=		rpcbind
@@ -44,7 +44,7 @@ ROOTMANIFESTDIR=	$(ROOTSVCNETWORKRPC)
 CPPFLAGS= -I. -DPORTMAP $(CPPFLAGS.master)
 CPPFLAGS += -D_REENTRANT
 $(RELEASE_BUILD)CPPFLAGS += -DNDEBUG
-LDLIBS += -lsocket -lnsl -lwrap -lscf
+LDLIBS += -lsocket -lnsl -lwrap -lscf -lumem
 
 .KEEP_STATE:
 
