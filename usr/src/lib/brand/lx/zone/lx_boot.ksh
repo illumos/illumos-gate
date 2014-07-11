@@ -56,9 +56,19 @@ fi
 BRANDDIR=/native/usr/lib/brand/lx;
 EXIT_CODE=1
 
-# $1 is lx cmd, $2 is native cmd,
+# All native executables must be run using the native linker. By default, the
+# kernel runs the linker at /lib/ld.so.1, which doesn't exist in an lx zone.
+# In lx, the linker is ld-linux.so.N. Hence when we run the native executable
+# from the wrappers, we explicitly specify /native/lib/ld.so.1 as our 32-bit
+# linker (or /native/lib/64/ld.so.1 as our 64-bit linker). 
+
+# Setup a native command which uses the thunk library to access the Linux
+# nameservices within the zone.
+#
+# $1 is lx cmd, $2 is native cmd, $3 is an optional inclusion in the script
 # the lx cmd path must have already be verified with safe_dir
-setup_native_isaexeccmd() {
+#
+setup_native_thunk_cmd() {
 	cmd_name=$ZONEROOT/$1
 
 	if [ -h $cmd_name -o \( -e $cmd_name -a ! -f $cmd_name \) ]; then
@@ -69,19 +79,17 @@ setup_native_isaexeccmd() {
 	cat <<-DONE >$ZONEROOT/$1
 	#!/bin/sh
 
+	$3
 	exec /native/usr/lib/brand/lx/lx_native \
-	    /native/lib/ld.so.1 \
-	    -e LD_NOENVIRON=1 \
-	    -e LD_NOCONFIG=1 \
+	    /native/lib/ld.so.1 -e LD_NOENVIRON=1 -e LD_NOCONFIG=1 \
 	    -e LD_PRELOAD_32=/native/usr/lib/brand/lx/lx_thunk.so.1 \
-	    -e LD_LIBRARY_PATH_32="/native/lib:/native/usr/lib" \
-	    $2 "\$@"
+	    -e LD_LIBRARY_PATH_32="/native/lib:/native/usr/lib" $2 "\$@"
 	DONE
 
 	chmod 755 $ZONEROOT/$1
 }
 
-# $1 is lx cmd, $2 is native cmd, $3 is an optional inclusion in the script
+# $1 is lx cmd, $2 is native cmd
 # the lx cmd path must have already be verified with safe_dir
 setup_native_cmd() {
 	cmd_name=$ZONEROOT/$1
@@ -94,13 +102,9 @@ setup_native_cmd() {
 	cat <<-DONE >$ZONEROOT/$1
 	#!/bin/sh
 
-	LD_LIBRARY_PATH_32="/native/lib:/native/usr/lib"
-	LD_PRELOAD=/native/usr/lib/brand/lx/lx_thunk.so.1
-	LD_BIND_NOW=1
-	export LD_LIBRARY_PATH LD_PRELOAD LD_BIND_NOW
-	$3
-
-	exec /native/usr/lib/brand/lx/lx_native $2 "\$@"
+	exec /native/usr/lib/brand/lx/lx_native \
+	    /native/lib/ld.so.1 -e LD_NOENVIRON=1 -e LD_NOCONFIG=1 \
+	    -e LD_LIBRARY_PATH_32="/native/lib:/native/usr/lib" $2 "\$@"
 	DONE
 
 	chmod 755 $ZONEROOT/$1
@@ -162,6 +166,7 @@ fi
 #
 # Validate that the zone filesystem looks like we expect it to.
 #
+safe_dir /lib
 safe_dir /bin
 safe_dir /sbin
 safe_dir /etc
@@ -173,12 +178,27 @@ safe_dir /etc/update-motd.d
 #
 # Replace Linux binaries with native binaries.
 #
-setup_native_isaexeccmd /sbin/ifconfig /native/sbin/ifconfig
-setup_native_isaexeccmd /sbin/dladm /native/usr/sbin/dladm
-setup_native_isaexeccmd /sbin/route /native/usr/sbin/route
-setup_native_cmd /sbin/ipmgmtd /native/lib/inet/ipmgmtd \
+# XXX The lx_thunk code will perform a chroot, so these commands will not work
+# if they are run by a non-privileged user.
+#
+setup_native_thunk_cmd /sbin/ipmgmtd /native/lib/inet/ipmgmtd \
 	"export SMF_FMRI=\"svc:/network/ip-interface-management:default\""
+setup_native_thunk_cmd /sbin/ifconfig-native /native/sbin/ifconfig
+setup_native_thunk_cmd /sbin/dladm /native/usr/sbin/dladm
+
+setup_native_cmd /sbin/route /native/usr/sbin/route
 setup_native_cmd /bin/netstat /native/usr/bin/netstat
+
+#
+# When plumbing and configuring the NICs the native ifconfig needs to use
+# the thunk library, so we setup for that as ifconfig-native. However, the
+# thunk library does a chroot so that means a non-root user can't use the
+# native ifconfig to look at the NICs. Thus, we provide a basic shell script
+# which can display NICs in the Linux style.
+# 
+if [ ! -h $ZONEROOT/sbin/ifconfig ]; then
+    cp /usr/lib/brand/lx/ifconfig $ZONEROOT/sbin/ifconfig
+fi
 
 #
 # STEP THREE
