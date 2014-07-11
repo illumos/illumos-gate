@@ -38,7 +38,7 @@ setup_net()
 
 	    printf("script\n")
 	    printf("    /sbin/ipmgmtd || true\n")
-	    printf("    /sbin/ifconfig lo0 plumb\n")
+	    printf("    /sbin/ifconfig-native lo0 plumb\n")
 	    printf("    /sbin/initctl emit --no-wait net-device-up IFACE=lo LOGICAL=lo ADDRFAM=inet METHOD=loopback || true\n")
 
         } {
@@ -61,8 +61,8 @@ setup_net()
             }
 
             if ($1 == "net:" && phys != "") {
-		printf("    /sbin/ifconfig %s plumb || true\n", phys)
-		printf("    /sbin/ifconfig %s %s netmask %s up || true\n",
+		printf("    /sbin/ifconfig-native %s plumb || true\n", phys)
+		printf("    /sbin/ifconfig-native %s %s netmask %s up || true\n",
 		    phys, ip, mask)
 		printf("    /sbin/initctl emit --no-wait net-device-up IFACE=%s\n",
 		     phys)
@@ -72,8 +72,8 @@ setup_net()
             }
         }
         END {
-	    printf("    /sbin/ifconfig %s plumb || true\n", phys)
-	    printf("    /sbin/ifconfig %s %s netmask %s up || true\n",
+	    printf("    /sbin/ifconfig-native %s plumb || true\n", phys)
+	    printf("    /sbin/ifconfig-native %s %s netmask %s up || true\n",
 		phys, ip, mask)
 	    printf("    /sbin/initctl emit --no-wait net-device-up IFACE=%s\n",
 		phys)
