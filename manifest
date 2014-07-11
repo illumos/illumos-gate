@@ -642,6 +642,7 @@ f kernel/drv/amd64/mpt 0755 root sys
 f kernel/drv/amd64/mpt_sas 0755 root sys
 f kernel/drv/amd64/mr_sas 0755 root sys
 f kernel/drv/amd64/myri10ge 0755 root sys
+f kernel/drv/amd64/nfp 0755 root sys
 f kernel/drv/amd64/nge 0755 root sys
 f kernel/drv/amd64/ntxn 0755 root sys
 f kernel/drv/amd64/nulldriver 0755 root sys

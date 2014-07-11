@@ -2105,3 +2105,8 @@ AXF_OBJS = axf_usbgem.o
 UDMF_OBJS = udmf_usbgem.o
 URF_OBJS = urf_usbgem.o
 UPF_OBJS = upf_usbgem.o
+
+#
+#	NFP objects
+#
+NFP_OBJS = hostif.o osif.o drvlist.o i21555.o i21285.o i21555d.o
