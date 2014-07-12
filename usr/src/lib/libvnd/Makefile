@@ -26,13 +26,21 @@ clobber :=	TARGET = clobber
 install :=	TARGET = install
 lint :=		TARGET = lint
 
+TYPECHECK_LIB = libvnd.so.1
+TYPELIST = \
+	vnd_ioc_attach_t \
+	vnd_ioc_link_t \
+	vnd_ioc_unlink_t \
+	vnd_ioc_buf_t \
+	vnd_ioc_info_t	
+
 .KEEP_STATE:
 
 all clean clobber install lint: $(SUBDIRS)
 
 install_h: 	$(ROOTHDRS)
 
-check:		$(CHECKHDRS)
+check:		$(CHECKHDRS) $(TYPECHECK)
 
 $(SUBDIRS):  FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)

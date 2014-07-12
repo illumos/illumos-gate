@@ -65,6 +65,7 @@
 
 #include <uts/common/sys/ctf.h>
 #include <uts/common/sys/ctf_api.h>
+#include <common/ctf/ctf_impl.h>
 #include <lib/libctf/common/libctf.h>
 
 /*

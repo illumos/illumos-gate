@@ -251,3 +251,15 @@ TARGETMACH=	$(MACH)
 # shouldn't override this - they should override $(CLOBBERFILES) instead.
 #
 CLOBBERTARGFILES= $(LIBS) $(DYNLIB) $(CLOBBERFILES)
+
+#
+# Define the default ctfdiff invocation used to check a list of types
+# supplied by a user of a library. The goal is to validate that a given
+# series of types is the same in both a 32-bit and 64-bit artifact. This
+# is only defined if we have a 64-bit build to do.
+#
+TYPECHECK_LIB32 =		$(TYPECHECK_LIB:%=$(MACH)/%)
+TYPECHECK_LIB64 =		$(TYPECHECK_LIB:%=$(MACH64)/%)
+TYPECHECK_LIST=			$(TYPELIST:%=-T %)
+$(BUILD64)TYPECHECK.lib =	$(CTFDIFF) -I $(TYPECHECK_LIST) $(TYPECHECK_LIB32) $(TYPECHECK_LIB64)
+TYPECHECK =			$(TYPECHECK_LIB:%=%.typecheck)

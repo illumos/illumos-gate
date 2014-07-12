@@ -23,14 +23,24 @@
 # Use is subject to license terms.
 #
 
-include ../Makefile.shared.com
-include ../../Makefile.rootfs
+include ../../Makefile.tools
+
+HDRS = libctf.h
+HDRDIR = common
+
+SUBDIRS = $(MACH) 
+
+all := TARGET = all
+clean := TARGET = clean
+clobber := TARGET = clobber
+install := TARGET = install
+lint := TARGET = lint
 
 .KEEP_STATE:
 
-all: $(LIBS)
+all clean clobber install lint: $(SUBDIRS)
 
-lint: lintcheck
+$(SUBDIRS): FRC
+	@cd $@; pwd; $(MAKE) $(TARGET)
 
-include ../../Makefile.targ
-include ../Makefile.shared.targ
+FRC:

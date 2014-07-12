@@ -104,6 +104,7 @@ COMMON_SUBDIRS=		\
 	crypt		\
 	csh		\
 	csplit		\
+	ctfdiff		\
 	ctrun		\
 	ctstat		\
 	ctwatch		\

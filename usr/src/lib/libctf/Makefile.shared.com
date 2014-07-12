@@ -22,15 +22,46 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2014, Joyent, Inc.  All rights reserved.
+#
 
-include ../Makefile.shared.com
-include ../../Makefile.rootfs
+#
+# This Makefile is shared between the libctf native build in tools and
+# the libctf build here for the system.
+#
+LIBRARY = libctf.a
+VERS = .1
 
-.KEEP_STATE:
+COMMON_OBJS = \
+	ctf_create.o \
+	ctf_decl.o \
+	ctf_error.o \
+	ctf_hash.o \
+	ctf_labels.o \
+	ctf_lookup.o \
+	ctf_open.o \
+	ctf_types.o \
+	ctf_util.o
 
-all: $(LIBS)
+LIB_OBJS = \
+	ctf_diff.o \
+	ctf_lib.o \
+	ctf_subr.o
 
-lint: lintcheck
+OBJECTS = $(COMMON_OBJS) $(LIB_OBJS)
+MAPFILEDIR = $(SRC)/lib/libctf
 
-include ../../Makefile.targ
-include ../Makefile.shared.targ
+include $(SRC)/lib/Makefile.lib
+
+SRCS = $(COMMON_OBJS:%.o=$(SRC)/common/ctf/%.c) $(LIB_OBJS:%.o=$(SRC)/lib/libctf/common/%.c)
+LIBS = $(DYNLIB) $(LINTLIB)
+LDLIBS = -lc
+
+SRCDIR = $(SRC)/lib/libctf/common
+
+CPPFLAGS += -I$(SRC)/lib/libctf/common -I$(SRC)/common/ctf -DCTF_OLD_VERSIONS
+CFLAGS += $(CCVERBOSE)
+
+CERRWARN += -_gcc=-Wno-uninitialized
+
+$(LINTLIB) := SRCS = $(SRCDIR)/$(LINTSRC)

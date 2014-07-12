@@ -25,7 +25,7 @@
  * Use is subject to license terms.
  */
 /*
- * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
  */
 
 #ifndef	_CTF_IMPL_H
@@ -76,6 +76,10 @@ typedef struct ctf_hash {
 	ushort_t h_nelems;	/* number of elements in hash table */
 	uint_t h_free;		/* index of next free hash element */
 } ctf_hash_t;
+
+struct ctf_idhash_iter {
+	int cii_id;	/* Current iteration id */
+};
 
 typedef struct ctf_strs {
 	const char *cts_strs;	/* base address of string table */

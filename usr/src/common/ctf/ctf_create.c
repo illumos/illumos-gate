@@ -574,7 +574,7 @@ ctf_dtd_lookup(ctf_file_t *fp, ctf_id_t type)
 int
 ctf_discard(ctf_file_t *fp)
 {
-	ctf_dtdef_t *dtd, *ntd;
+	ctf_dtdef_t *dtd, *ntd = NULL;
 
 	if (!(fp->ctf_flags & LCTF_RDWR))
 		return (ctf_set_errno(fp, ECTF_RDONLY));

@@ -26,6 +26,7 @@
  */
 
 #include <ctf_impl.h>
+#include <sys/debug.h>
 
 ssize_t
 ctf_get_ctt_size(const ctf_file_t *fp, const ctf_type_t *tp, ssize_t *sizep,
@@ -867,4 +868,67 @@ int
 ctf_type_visit(ctf_file_t *fp, ctf_id_t type, ctf_visit_f *func, void *arg)
 {
 	return (ctf_type_rvisit(fp, type, func, arg, "", 0, 0));
+}
+
+int
+ctf_func_info_by_id(ctf_file_t *fp, ctf_id_t type, ctf_funcinfo_t *fip)
+{
+	ctf_file_t *ofp = fp;
+	const ctf_type_t *tp;
+	const ushort_t *dp;
+	int nargs;
+	ssize_t increment;
+
+	if ((tp = ctf_lookup_by_id(&fp, type)) == NULL)
+		return (CTF_ERR); /* errno is set for us */
+
+	if (LCTF_INFO_KIND(fp, tp->ctt_info) != CTF_K_FUNCTION)
+		return (ctf_set_errno(ofp, ECTF_NOTFUNC));
+
+	fip->ctc_return = tp->ctt_type;
+	nargs = LCTF_INFO_VLEN(fp, tp->ctt_info);
+	fip->ctc_argc = nargs;
+	fip->ctc_flags = 0;
+
+	/* dp should now point to the first argument */
+	if (nargs != 0) {
+		(void) ctf_get_ctt_size(fp, tp, NULL, &increment);
+		dp = (ushort_t *)((uintptr_t)fp->ctf_buf +
+		    fp->ctf_txlate[CTF_TYPE_TO_INDEX(type)] + increment);
+		if (dp[nargs - 1] == 0) {
+			fip->ctc_flags |= CTF_FUNC_VARARG;
+			fip->ctc_argc--;
+		}
+	}
+
+	return (0);
+}
+
+int
+ctf_func_args_by_id(ctf_file_t *fp, ctf_id_t type, uint_t argc, ctf_id_t *argv)
+{
+	ctf_file_t *ofp = fp;
+	const ctf_type_t *tp;
+	const ushort_t *dp;
+	int nargs;
+	ssize_t increment;
+
+	if ((tp = ctf_lookup_by_id(&fp, type)) == NULL)
+		return (CTF_ERR); /* errno is set for us */
+
+	if (LCTF_INFO_KIND(fp, tp->ctt_info) != CTF_K_FUNCTION)
+		return (ctf_set_errno(ofp, ECTF_NOTFUNC));
+
+	nargs = LCTF_INFO_VLEN(fp, tp->ctt_info);
+	(void) ctf_get_ctt_size(fp, tp, NULL, &increment);
+	dp = (ushort_t *)((uintptr_t)fp->ctf_buf +
+	    fp->ctf_txlate[CTF_TYPE_TO_INDEX(type)] +
+	    increment);
+	if (nargs != 0 && dp[nargs - 1] == 0)
+		nargs--;
+
+	for (nargs = MIN(argc, nargs); nargs != 0; nargs--)
+		*argv++ = *dp++;
+
+	return (0);
 }
