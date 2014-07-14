@@ -160,7 +160,13 @@ lx_proc_exit(proc_t *p, klwp_t *lwp)
 		    zone_status_get(global_zone) < ZONE_IS_SHUTTING_DOWN)
 			(void) zone_kadmin(A_REBOOT, 0, NULL, CRED());
 	}
-	lx_exitlwp(lwp);
+
+	/*
+	 * We might get here if fork failed (e.g. ENOMEM) so we don't always
+	 * have an lwp (see brand_clearbrand).
+	 */
+	if (lwp != NULL)
+		lx_exitlwp(lwp);
 	kmem_free(p->p_brand_data, sizeof (struct lx_proc_data));
 	p->p_brand_data = NULL;
 }
