@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2014 Gary Mills
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  * Copyright 2011, Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 1994 Powerdog Industries.  All rights reserved.
  *
@@ -40,30 +41,29 @@
 #include <string.h>
 #include <pthread.h>
 #include <alloca.h>
+#include <locale.h>
 #include "timelocal.h"
+#include "localeimpl.h"
 
 #define	asizeof(a)	(sizeof (a) / sizeof ((a)[0]))
 
 #define	F_GMT		(1 << 0)
-#define	F_ZERO		(1 << 1)
 #define	F_RECURSE	(1 << 2)
 
 static char *
-__strptime(const char *buf, const char *fmt, struct tm *tm, int *flagsp)
+__strptime(const char *_RESTRICT_KYWD buf, const char *_RESTRICT_KYWD fmt,
+    struct tm *_RESTRICT_KYWD tm, int *_RESTRICT_KYWD flagsp,
+    locale_t _RESTRICT_KYWD loc)
 {
 	char	c;
 	const char *ptr;
 	int	i, len, recurse = 0;
 	int Ealternative, Oalternative;
-	struct lc_time_T *tptr = __get_current_time_locale();
+	const struct lc_time *tptr = loc->time;
 
 	if (*flagsp & F_RECURSE)
 		recurse = 1;
 	*flagsp |= F_RECURSE;
-
-	if (*flagsp & F_ZERO)
-		(void) memset(tm, 0, sizeof (*tm));
-	*flagsp &= ~F_ZERO;
 
 	ptr = fmt;
 	while (*ptr != 0) {
@@ -93,7 +93,7 @@ label:
 			break;
 
 		case '+':
-			buf = __strptime(buf, tptr->date_fmt, tm, flagsp);
+			buf = __strptime(buf, tptr->date_fmt, tm, flagsp, loc);
 			if (buf == NULL)
 				return (NULL);
 			break;
@@ -116,13 +116,13 @@ label:
 			break;
 
 		case 'c':
-			buf = __strptime(buf, tptr->c_fmt, tm, flagsp);
+			buf = __strptime(buf, tptr->c_fmt, tm, flagsp, loc);
 			if (buf == NULL)
 				return (NULL);
 			break;
 
 		case 'D':
-			buf = __strptime(buf, "%m/%d/%y", tm, flagsp);
+			buf = __strptime(buf, "%m/%d/%y", tm, flagsp, loc);
 			if (buf == NULL)
 				return (NULL);
 			break;
@@ -140,37 +140,37 @@ label:
 			goto label;
 
 		case 'F':
-			buf = __strptime(buf, "%Y-%m-%d", tm, flagsp);
+			buf = __strptime(buf, "%Y-%m-%d", tm, flagsp, loc);
 			if (buf == NULL)
 				return (NULL);
 			break;
 
 		case 'R':
-			buf = __strptime(buf, "%H:%M", tm, flagsp);
+			buf = __strptime(buf, "%H:%M", tm, flagsp, loc);
 			if (buf == NULL)
 				return (NULL);
 			break;
 
 		case 'r':
-			buf = __strptime(buf, tptr->ampm_fmt, tm, flagsp);
+			buf = __strptime(buf, tptr->ampm_fmt, tm, flagsp, loc);
 			if (buf == NULL)
 				return (NULL);
 			break;
 
 		case 'T':
-			buf = __strptime(buf, "%H:%M:%S", tm, flagsp);
+			buf = __strptime(buf, "%H:%M:%S", tm, flagsp, loc);
 			if (buf == NULL)
 				return (NULL);
 			break;
 
 		case 'X':
-			buf = __strptime(buf, tptr->X_fmt, tm, flagsp);
+			buf = __strptime(buf, tptr->X_fmt, tm, flagsp, loc);
 			if (buf == NULL)
 				return (NULL);
 			break;
 
 		case 'x':
-			buf = __strptime(buf, tptr->x_fmt, tm, flagsp);
+			buf = __strptime(buf, tptr->x_fmt, tm, flagsp, loc);
 			if (buf == NULL)
 				return (NULL);
 			break;
@@ -519,11 +519,14 @@ label:
 }
 
 char *
-strptime(const char *buf, const char *fmt, struct tm *tm)
+strptime(const char *_RESTRICT_KYWD buf, const char *_RESTRICT_KYWD fmt,
+    struct tm *_RESTRICT_KYWD tm)
 {
-	int	flags = F_ZERO;
+	int	flags = 0;
 
-	return (__strptime(buf, fmt, tm, &flags));
+	(void) memset(tm, 0, sizeof (*tm));
+
+	return (__strptime(buf, fmt, tm, &flags, uselocale(NULL)));
 }
 
 /*
@@ -531,9 +534,31 @@ strptime(const char *buf, const char *fmt, struct tm *tm)
  * incoming tm.  It is triggered by -D_STRPTIME_DONTZERO.
  */
 char *
-__strptime_dontzero(const char *buf, const char *fmt, struct tm *tm)
+__strptime_dontzero(const char *_RESTRICT_KYWD buf,
+    const char *_RESTRICT_KYWD fmt, struct tm *_RESTRICT_KYWD tm)
 {
 	int	flags = 0;
 
-	return (__strptime(buf, fmt, tm, &flags));
+	return (__strptime(buf, fmt, tm, &flags, uselocale(NULL)));
+}
+
+/*
+ * strptime_l is an extension that seems natural, and indeed, MacOS X
+ * includes it within their <xlocale.h> and it is part of GNU libc as well.
+ * For now we restrict it to the cases where strict namespaces are not
+ * included.  We expect to see it in a future version of POSIX.  locale_t is
+ * not a restrict, since the spec for it doesn't assume its a pointer.  We
+ * therefore pass it analagously to the way strftime_l is specified.
+ *
+ * We are not providing a non-zeroing version at this time.
+ */
+char *
+strptime_l(const char *_RESTRICT_KYWD buf, const char *_RESTRICT_KYWD fmt,
+    struct tm *_RESTRICT_KYWD tm, locale_t loc)
+{
+	int	flags =  0;
+
+	(void) memset(tm, 0, sizeof (*tm));
+
+	return (__strptime(buf, fmt, tm, &flags, loc));
 }

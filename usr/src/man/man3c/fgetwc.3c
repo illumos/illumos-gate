@@ -1,4 +1,5 @@
 '\" te
+.\" Copyright 2014 Garrett D'Amore <garrett@damore.org>
 .\" Copyright (c) 2003, X/Open Company Limited.  All Rights Reserved.  Portions Copyright (c) 1996, Sun Microsystems, Inc.  All Rights Reserved.
 .\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
@@ -7,32 +8,41 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH FGETWC 3C "Oct 15, 2003"
+.TH FGETWC 3C "Jun 24, 2014"
 .SH NAME
-fgetwc \- get a wide-character code from a stream
+fgetwc, fgetwc_l \- get a wide-character code from a stream
 .SH SYNOPSIS
 .LP
 .nf
 #include <stdio.h>
 #include <wchar.h>
 
-\fBwint_t\fR \fBfgetwc\fR(\fBFILE*\fR\fIstream\fR);
+\fBwint_t\fR \fBfgetwc\fR(\fBFILE *\fR\fIstream\fR);
+.fi
+.LP
+.nf
+#include <stdio.h>
+#include <wchar.h>
+#include <xlocale.h>
+
+\fBwint_t\fR \fBfgetwc_l\fR(\fBFILE *\fR\fIstream\fR, \fBlocale_t\fR, \fIloc\fR);
 .fi
 
 .SH DESCRIPTION
 .sp
 .LP
-The \fBfgetwc()\fR function obtains the next character (if present) from the
-input stream pointed to by \fIstream\fR, converts that to the corresponding
-wide-character code and advances the associated file position indicator for the
-stream (if defined).
-.sp
+The \fBfgetwc()\fR and \fBfgetwc_l()\fR functions obtain the next
+character (if present) from the input stream pointed to by \fIstream\fR,
+convert that to the corresponding wide-character code and advance the
+associated file position indicator for the stream (if defined).
+Whereas \fBfgetwc()\fR uses the current locale, \fBfgetwc_l()\fR uses the
+locale specified by \fIloc\R.
 .LP
 If an error occurs, the resulting value of the file position indicator for the
 stream is indeterminate.
-.sp
 .LP
-The \fBfgetwc()\fR function may mark the \fBst_atime\fR field of the file
+The \fBfgetwc()\fR and \fBfgetwc_l()\fR functions may mark the \fBst_atime\fR
+field of the file
 associated with \fIstream\fR for update. The \fBst_atime\fR field will be
 marked for update by the first successful execution of \fBfgetwc()\fR,
 \fBfgetc\fR(3C), \fBfgets\fR(3C), \fBfgetws\fR(3C), \fBfread\fR(3C),
@@ -40,112 +50,62 @@ marked for update by the first successful execution of \fBfgetwc()\fR,
 \fBscanf\fR(3C) using \fIstream\fR that returns data not supplied by a prior
 call to \fBungetc\fR(3C) or \fBungetwc\fR(3C).
 .SH RETURN VALUES
-.sp
 .LP
-Upon successful completion the \fBfgetwc()\fR function returns the
+Upon successful completion both functions return the
 wide-character code of the character read from the input stream pointed to by
 \fIstream\fR converted to a type \fBwint_t\fR.
-.sp
 .LP
 For standard-conforming (see \fBstandards\fR(5)) applications, if the
-end-of-file indicator for the stream is set, \fBfgetwc()\fR returns \fBWEOF\fR
-whether or not the stream is at end-of-file.
-.sp
+end-of-file indicator for the stream is set, \fBfgetwc()\fR and
+\fBfgetwc_l()\fR return \fBWEOF\fR whether or not the stream is at
+end-of-file.
 .LP
 If a read error occurs, the error indicator for the stream is set,
-\fBfgetwc()\fR returns \fBWEOF\fR and sets \fBerrno\fR to indicate the error.
-.sp
+\fBfgetwc()\fR and \fBfgetwc_l()\fR returns \fBWEOF\fR and sets
+\fBerrno\fR to indicate the error.
 .LP
 If an encoding error occurs, the error indicator for the stream is set,
-\fBfgetwc()\fR returns \fBWEOF\fR, and \fBerrno\fR is set to indicate the
-error.
+\fBfgetwc()\fR and \fBfgetwc_l()\fR return \fBWEOF\fR, and \fBerrno\fR is
+set to indicate the error.
 .SH ERRORS
-.sp
 .LP
-The \fBfgetwc()\fR function will fail if data needs to be read and:
-.sp
-.ne 2
-.na
-\fB\fBEAGAIN\fR\fR
-.ad
-.RS 14n
+The \fBfgetwc()\fR and \fBfgetwc_l()\fR functions will fail if data needs to be
+read and:
+.TP
+.B EAGAIN
 The \fBO_NONBLOCK\fR flag is set for the file descriptor underlying
-\fIstream\fR and the process would be delayed in the \fBfgetwc()\fR operation.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEBADF\fR\fR
-.ad
-.RS 14n
+\fIstream\fR and the process would be delayed in the \fBfgetwc()\fR or
+\fBfgetwc_l()\fR operation.
+.TP
+.B EBADF
 The file descriptor underlying \fIstream\fR is not a valid file descriptor open
 for reading.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEINTR\fR\fR
-.ad
-.RS 14n
+.TP
+.B EINTR
 The read operation was terminated due to the receipt of a signal, and no data
 was transferred.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEIO\fR\fR
-.ad
-.RS 14n
+.TP
+.B EIO
 A physical I/O error has occurred, or the process is in a background process
 group attempting to read from its controlling terminal and either the process
 is ignoring or blocking the \fBSIGTTIN\fR signal or the process group is
 orphaned.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEOVERFLOW\fR \fR
-.ad
-.RS 14n
+.TP
+.B EOVERFLOW
 The file is a regular file and an attempt was made to read at or beyond the
 offset maximum associated with the corresponding  \fIstream\fR.
-.RE
-
-.sp
 .LP
-The \fBfgetwc()\fR function may fail if:
-.sp
-.ne 2
-.na
-\fB\fBENOMEM\fR\fR
-.ad
-.RS 10n
-Insufficient storage space is available.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBENXIO\fR\fR
-.ad
-.RS 10n
+The \fBfgetwc()\fR and \fBfgetwc_l()\fR functions may fail if:
+.TP
+.B ENOMEM
+Insufficient memory is available.
+.TP
+.B ENXIO
 A request was made of a non-existent device, or the request was outside the
 capabilities of the device.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEILSEQ\fR\fR
-.ad
-.RS 10n
+.TP
+.B EILSEQ
 The data obtained from the input stream does not form a valid character.
-.RE
-
 .SH USAGE
 .sp
 .LP
@@ -155,27 +115,30 @@ between an error condition and an end-of-file condition.
 .sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
-.sp
-
-.sp
 .TS
 box;
-l | l
+c | c
 l | l .
 ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
 CSI	Enabled
 _
-Interface Stability	Standard
+Interface Stability	See below.
 _
-MT-Level	MT-Safe with exceptions
+MT-Level	MT-Safe
 .TE
 
+.LP
+The
+.B fgetwc()
+function is Standard.  The
+.B fgetwc_l()
+function is Uncommitted.
 .SH SEE ALSO
-.sp
 .LP
 \fBfeof\fR(3C), \fBferror\fR(3C), \fBfgetc\fR(3C), \fBfgets\fR(3C),
 \fBfgetws\fR(3C), \fBfopen\fR(3C), \fBfread\fR(3C), \fBfscanf\fR(3C),
 \fBgetc\fR(3C), \fBgetchar\fR(3C), \fBgets\fR(3C), \fBscanf\fR(3C),
-\fBsetlocale\fR(3C), \fBungetc\fR(3C), \fBungetwc\fR(3C), \fBattributes\fR(5),
+\fBnewlocale\fR(3C), \fBsetlocale\fR(3C), \fBungetc\fR(3C), \fBungetwc\fR(3C),
+\fBuselocale\fR(3C), \fBattributes\fR(5),
 \fBstandards\fR(5)

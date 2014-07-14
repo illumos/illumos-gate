@@ -1,4 +1,5 @@
 /*
+ * Copyright 2013 Garrett D'Amore <garrett@damore.org>
  * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -37,11 +38,11 @@
 #include "runetype.h"
 
 unsigned int
-___runetype(__ct_rune_t c)
+__runetype(const _RuneLocale *rl, __ct_rune_t c)
 {
 	size_t lim;
-	_RuneRange *rr = &_CurrentRuneLocale->__runetype_ext;
-	_RuneEntry *base, *re;
+	const _RuneRange *rr = &rl->__runetype_ext;
+	const _RuneEntry *base, *re;
 
 	if (c < 0 || c == EOF)
 		return (0L);

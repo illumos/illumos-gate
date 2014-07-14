@@ -1,4 +1,5 @@
 /*
+ * Copyright 2013 Garrett D'Amore <garrett@damore.org>
  * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2002-2004 Tim J. Robbins.
  * All rights reserved.
@@ -29,23 +30,34 @@
 #include <limits.h>
 #include <stdlib.h>
 #include <string.h>
+#include <locale.h>
 #include <wchar.h>
 #include "mblocal.h"
+#include "localeimpl.h"
+#include "lctype.h"
 
 size_t
-wcsnrtombs(char *_RESTRICT_KYWD dst, const wchar_t **_RESTRICT_KYWD src,
-    size_t nwc, size_t len, mbstate_t *_RESTRICT_KYWD ps)
+wcsnrtombs_l(char *_RESTRICT_KYWD dst, const wchar_t **_RESTRICT_KYWD src,
+    size_t nwc, size_t len, mbstate_t *_RESTRICT_KYWD ps, locale_t loc)
 {
 	static mbstate_t mbs;
 
 	if (ps == NULL)
 		ps = &mbs;
-	return (__wcsnrtombs(dst, src, nwc, len, ps));
+	return (loc->ctype->lc_wcsnrtombs(dst, src, nwc, len, ps));
+}
+
+size_t
+wcsnrtombs(char *_RESTRICT_KYWD dst, const wchar_t **_RESTRICT_KYWD src,
+    size_t nwc, size_t len, mbstate_t *_RESTRICT_KYWD ps)
+{
+	return (wcsnrtombs_l(dst, src, nwc, len, ps, uselocale(NULL)));
 }
 
 size_t
 __wcsnrtombs_std(char *_RESTRICT_KYWD dst, const wchar_t **_RESTRICT_KYWD src,
-    size_t nwc, size_t len, mbstate_t *_RESTRICT_KYWD ps)
+    size_t nwc, size_t len, mbstate_t *_RESTRICT_KYWD ps,
+    wcrtomb_pfn_t pwcrtomb)
 {
 	mbstate_t mbsbak;
 	char buf[MB_LEN_MAX];
@@ -58,7 +70,7 @@ __wcsnrtombs_std(char *_RESTRICT_KYWD dst, const wchar_t **_RESTRICT_KYWD src,
 
 	if (dst == NULL) {
 		while (nwc-- > 0) {
-			if ((nb = __wcrtomb(buf, *s, ps)) == (size_t)-1)
+			if ((nb = pwcrtomb(buf, *s, ps)) == (size_t)-1)
 				/* Invalid character - wcrtomb() sets errno. */
 				return ((size_t)-1);
 			else if (*s == L'\0')
@@ -72,7 +84,7 @@ __wcsnrtombs_std(char *_RESTRICT_KYWD dst, const wchar_t **_RESTRICT_KYWD src,
 	while (len > 0 && nwc-- > 0) {
 		if (len > (size_t)MB_CUR_MAX) {
 			/* Enough space to translate in-place. */
-			if ((nb = __wcrtomb(dst, *s, ps)) == (size_t)-1) {
+			if ((nb = pwcrtomb(dst, *s, ps)) == (size_t)-1) {
 				*src = s;
 				return ((size_t)-1);
 			}
@@ -85,7 +97,7 @@ __wcsnrtombs_std(char *_RESTRICT_KYWD dst, const wchar_t **_RESTRICT_KYWD src,
 			 * character is too long for the buffer.
 			 */
 			mbsbak = *ps;
-			if ((nb = __wcrtomb(buf, *s, ps)) == (size_t)-1) {
+			if ((nb = pwcrtomb(buf, *s, ps)) == (size_t)-1) {
 				*src = s;
 				return ((size_t)-1);
 			}

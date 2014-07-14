@@ -1,4 +1,5 @@
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2001 Alexey Zelkin <phantom@FreeBSD.org>
  * Copyright (c) 1997 FreeBSD Inc.
@@ -28,16 +29,14 @@
 
 #include "lint.h"
 #include <stddef.h>
+#include <errno.h>
 #include "ldpart.h"
 #include "timelocal.h"
+#include "localeimpl.h"
 
-static struct lc_time_T _time_locale;
-static int _time_using_locale;
-static char *time_locale_buf;
+#define	LCTIME_SIZE (sizeof (struct lc_time) / sizeof (char *))
 
-#define	LCTIME_SIZE (sizeof (struct lc_time_T) / sizeof (char *))
-
-static const struct lc_time_T	_C_time_locale = {
+struct lc_time lc_time_posix = {
 	{
 		"Jan", "Feb", "Mar", "Apr", "May", "Jun",
 		"Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
@@ -84,17 +83,32 @@ static const struct lc_time_T	_C_time_locale = {
 	"%I:%M:%S %p"
 };
 
-struct lc_time_T *
-__get_current_time_locale(void)
-{
-	return (_time_using_locale ? &_time_locale :
-	    (struct lc_time_T *)&_C_time_locale);
-}
+struct locdata __posix_time_locdata = {
+	.l_lname = "C",
+	.l_data = { &lc_time_posix }
+};
 
-int
-__time_load_locale(const char *name)
+struct locdata *
+__lc_time_load(const char *name)
 {
-	return (__part_load_locale(name, &_time_using_locale,
-	    &time_locale_buf, "LC_TIME", LCTIME_SIZE, LCTIME_SIZE,
-	    (const char **)&_time_locale));
+	struct locdata	*ldata;
+	struct lc_time	*ltime;
+	int ret;
+
+	if ((ldata = __locdata_alloc(name, sizeof (*ltime))) == NULL) {
+		errno = EINVAL;
+		return (NULL);
+	}
+	ltime = ldata->l_data[0];
+
+	ret = __part_load_locale(name, (char **)&ldata->l_data[1],
+	    "LC_TIME", LCTIME_SIZE, LCTIME_SIZE, (const char **)ltime);
+
+	if (ret != _LDP_LOADED) {
+		__locdata_free(ldata);
+		errno = EINVAL;
+		return (NULL);
+	}
+
+	return (ldata);
 }

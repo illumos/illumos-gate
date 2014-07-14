@@ -1,4 +1,5 @@
 /*
+ * Copyright 2013 Garrett D'Amore <garrett@damore.org>
  * Copyright (c) 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
  * (c) UNIX System Laboratories, Inc.
@@ -44,23 +45,31 @@
 #include <wchar.h>
 #include "_ctype.h"
 #include "runetype.h"
+#include "localeimpl.h"
 
 #undef wcwidth
 
 int
-wcwidth(wchar_t wc)
+wcwidth_l(wchar_t wc, locale_t loc)
 {
 	unsigned int x;
+	const _RuneLocale *rl = loc->runelocale;
 
 	if (wc == 0)
 		return (0);
 
-	x = ((wc < 0 || wc >= _CACHED_RUNES) ? ___runetype(wc) :
-	    _CurrentRuneLocale->__runetype[wc]) & (_CTYPE_SWM|_CTYPE_R);
+	x = ((wc < 0 || wc >= _CACHED_RUNES) ? __runetype(rl, wc) :
+	    rl->__runetype[wc]) & (_CTYPE_SWM|_CTYPE_R);
 
 	if ((x & _CTYPE_SWM) != 0)
 		return ((x & _CTYPE_SWM) >> _CTYPE_SWS);
 	return ((x & _CTYPE_R) != 0 ? 1 : -1);
+}
+
+int
+wcwidth(wchar_t wc)
+{
+	return (wcwidth_l(wc, uselocale(NULL)));
 }
 
 #pragma weak _scrwidth = scrwidth

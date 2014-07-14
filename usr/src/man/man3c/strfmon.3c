@@ -1,0 +1,164 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2014 Garrett D'Amore <garrett@damore.org>
+.\"
+.TH STRFMON 3C "Jun 23, 2014"
+.SH NAME
+strfmon, strfmon_l \- convert monetary values to string
+.SH SYNOPSIS
+.LP
+.nf
+#include <monetary.h>
+
+\fBssize_t\fR \fBstrfmon\fR(\fBchar *restrict\fR \fIs\fR, \fBsize_t\fR \fImaxsize\fR,
+    \fBconst char *restrict\fR \fIformat\fR, ...);
+.fi
+.LP
+.nf
+\fBssize_t\fR \fBstrfmon_l\fR(\fBchar *restrict\fR \fIs\fR, \fBsize_t\fR \fImaxsize\fR,
+    \fBlocale_t\fR \fIloc\fR, \fBconst char *restrict\fR \fIformat\fR, ...);
+.fi
+.SH DESCRIPTION
+These functions are used to format strings containing numeric quantities using
+rules that are specific to a given locale.  For example, in the United States,
+currencies are formatted using the dollar sign
+.RB ( $ )
+and include two decimal digits (cents).
+.LP
+Each character from the
+.I format
+is copied to the output buffer supplied by
+.IR s .
+Furthermore, when a percent
+.RB ( % )
+character is encountered, this triggers an expansion, as follows:
+.LP
+Immediately following the
+.B %
+character there shall be zero or more flags, as indicated below:
+.TP
+.BI = f
+An equals sign followed by a character
+.I f
+is the numeric fill
+character, which must be a single byte.  The default fill character is <space>.
+.TP
+.B ^
+The carat suppresses the use of grouping characters, even if the
+locale indicates their use.
+.TP
+.B +
+The plus sign indicates that positive and negative numbers should use the
+locale's positive and negative signs.  This may not be used with the open
+parenthesis. This behavior is default.
+.TP
+.B (
+The open parenthesis indicates that negative numbers should be enclosed
+within parenthesis, and no special formatting should be applied to positive
+values.  This may not be supplied with the plus sign flag.
+.TP
+.B !
+The exclamation point suppresses the output of any currency symbol.
+.TP
+.B -
+The dash specifies that numeric values should be left-justified
+within a field width, if a field width is specified.
+.LP
+Next there may appear an optional minimum field width, specified as a string of
+decimal digits, indicating a minimum width in bytes of this fields.
+.LP
+Next there may appear a left precision, as
+.RI # p ,
+indicating the maximum
+number of digits expected to appear left of the radix character.  (If a numeric
+value does not require this many places, including grouping separators, then
+the numeric fill character is used to pad the value to this many places.)
+.LP
+Next there may appear a right precision, as
+.RI . p ,
+indicating the minimum
+number of digits to appear to to the right of the radix character.  If the
+value of
+.I p
+is zero, then the radix character is also suppressed.
+.LP
+Finally there shall appear one of the following conversion specifier
+characters:
+.TP
+.B i
+The next available argument (assumed to be
+.BR double )
+is formatted, using
+the locale's international currency format.  For example, in the United States,
+the output might look like "USD 1,234.56".
+.TP
+.B n
+The next available argument (assumed to be
+.BR double )
+is formatted, using
+the locale's national currency format.  For example, in the United States, the
+output might look like "$1,234.56".
+.TP
+.B %
+A single percent character is emitted.  In this case, the entire specifier
+shall be
+.BR %% .
+.LP
+Whereas the
+.B strfmon()
+function uses the current locale, the
+.B strfmon_l()
+function uses the supplied locale
+.IR loc .
+.SH RETURN VALUES
+.LP
+If the conversion was successfully performed, and the entire result (including
+the terminating null character) fits in
+.I maxsize
+bytes, then the number of
+bytes placed in the buffer (excluding the terminating null character) is
+returned.
+.LP
+If the result of expansion exceeds
+.I maxsize
+bytes, then the value \(mi1 is returned, and
+.I errno
+is set to
+.BR E2BIG .
+.SH NOTES
+The result of formatting a value that is not a rational number (e.g. +NaN) is
+unspecified.
+.SH ATTRIBUTES
+.LP
+See
+.BR attributes (5)
+for descriptions of the following attributes:
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+CSI	Enabled
+_
+Interface Stability	Standard
+_
+MT-Level	MT-Safe
+.TE
+
+.SH SEE ALSO
+.BR setlocale (3C),
+.BR uselocale (3C),
+.BR locale (3HEAD),
+.BR attributes (5),
+.BR standards (5)
+

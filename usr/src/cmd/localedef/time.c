@@ -10,6 +10,7 @@
  */
 
 /*
+ * Copyright 2013 Garrett D'Amore <garrett@damore.org>
  * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
  */
 
@@ -27,7 +28,7 @@
 #include "parser.tab.h"
 #include "timelocal.h"
 
-struct lc_time_T tm;
+struct lc_time tm;
 
 void
 init_time(void)

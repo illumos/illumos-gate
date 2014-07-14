@@ -1,4 +1,5 @@
 /*
+ * Copyright 2013 Garrett D'Amore <garrett@damore.org>
  * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2002-2004 Tim J. Robbins. All rights reserved.
  * Copyright (c) 1993
@@ -41,40 +42,25 @@
 #include <string.h>
 #include <wchar.h>
 #include <note.h>
-#include "runetype.h"
 #include "mblocal.h"
-
-static size_t	_none_mbrtowc(wchar_t *_RESTRICT_KYWD,
-    const char *_RESTRICT_KYWD, size_t, mbstate_t *_RESTRICT_KYWD);
-
-static int	_none_mbsinit(const mbstate_t *);
-static size_t	_none_mbsnrtowcs(wchar_t *_RESTRICT_KYWD dst,
-    const char **_RESTRICT_KYWD src, size_t nms, size_t len,
-    mbstate_t *_RESTRICT_KYWD);
-static size_t	_none_wcrtomb(char *_RESTRICT_KYWD, wchar_t,
-    mbstate_t *_RESTRICT_KYWD);
-static size_t	_none_wcsnrtombs(char *_RESTRICT_KYWD,
-    const wchar_t **_RESTRICT_KYWD,
-    size_t, size_t, mbstate_t *_RESTRICT_KYWD);
+#include "lctype.h"
 
 /* setup defaults */
 
-int
-_none_init(_RuneLocale *rl)
+void
+_none_init(struct lc_ctype *lct)
 {
-	charset_is_ascii = 1;
-
-	__mbrtowc = _none_mbrtowc;
-	__mbsinit = _none_mbsinit;
-	__mbsnrtowcs = _none_mbsnrtowcs;
-	__wcrtomb = _none_wcrtomb;
-	__wcsnrtombs = _none_wcsnrtombs;
-	_CurrentRuneLocale = rl;
-	return (0);
+	lct->lc_is_ascii = 1;
+	lct->lc_mbrtowc = __mbrtowc_ascii;
+	lct->lc_mbsinit = __mbsinit_ascii;
+	lct->lc_mbsnrtowcs = __mbsnrtowcs_ascii;
+	lct->lc_wcrtomb = __wcrtomb_ascii;
+	lct->lc_wcsnrtombs = __wcsnrtombs_ascii;
+	lct->lc_max_mblen = 1;
 }
 
-static int
-_none_mbsinit(const mbstate_t *unused)
+int
+__mbsinit_ascii(const mbstate_t *unused)
 {
 	_NOTE(ARGUNUSED(unused));
 
@@ -85,8 +71,8 @@ _none_mbsinit(const mbstate_t *unused)
 	return (1);
 }
 
-static size_t
-_none_mbrtowc(wchar_t *_RESTRICT_KYWD pwc, const char *_RESTRICT_KYWD s,
+size_t
+__mbrtowc_ascii(wchar_t *_RESTRICT_KYWD pwc, const char *_RESTRICT_KYWD s,
     size_t n, mbstate_t *_RESTRICT_KYWD unused)
 {
 	_NOTE(ARGUNUSED(unused));
@@ -102,8 +88,8 @@ _none_mbrtowc(wchar_t *_RESTRICT_KYWD pwc, const char *_RESTRICT_KYWD s,
 	return (*s == '\0' ? 0 : 1);
 }
 
-static size_t
-_none_wcrtomb(char *_RESTRICT_KYWD s, wchar_t wc,
+size_t
+__wcrtomb_ascii(char *_RESTRICT_KYWD s, wchar_t wc,
     mbstate_t *_RESTRICT_KYWD unused)
 {
 	_NOTE(ARGUNUSED(unused));
@@ -119,8 +105,8 @@ _none_wcrtomb(char *_RESTRICT_KYWD s, wchar_t wc,
 	return (1);
 }
 
-static size_t
-_none_mbsnrtowcs(wchar_t *_RESTRICT_KYWD dst, const char **_RESTRICT_KYWD src,
+size_t
+__mbsnrtowcs_ascii(wchar_t *_RESTRICT_KYWD dst, const char **_RESTRICT_KYWD src,
     size_t nms, size_t len, mbstate_t *_RESTRICT_KYWD unused)
 {
 	const char *s;
@@ -146,8 +132,8 @@ _none_mbsnrtowcs(wchar_t *_RESTRICT_KYWD dst, const char **_RESTRICT_KYWD src,
 	return (nchr);
 }
 
-static size_t
-_none_wcsnrtombs(char *_RESTRICT_KYWD dst, const wchar_t **_RESTRICT_KYWD src,
+size_t
+__wcsnrtombs_ascii(char *_RESTRICT_KYWD dst, const wchar_t **_RESTRICT_KYWD src,
     size_t nwc, size_t len, mbstate_t *_RESTRICT_KYWD unused)
 {
 	const wchar_t *s;
@@ -181,19 +167,3 @@ _none_wcsnrtombs(char *_RESTRICT_KYWD dst, const wchar_t **_RESTRICT_KYWD src,
 	*src = s;
 	return (nchr);
 }
-
-/* setup defaults */
-
-size_t (*__mbrtowc)(wchar_t *_RESTRICT_KYWD, const char *_RESTRICT_KYWD,
-    size_t, mbstate_t *_RESTRICT_KYWD) = _none_mbrtowc;
-
-int (*__mbsinit)(const mbstate_t *) = _none_mbsinit;
-
-size_t (*__mbsnrtowcs)(wchar_t *_RESTRICT_KYWD, const char **_RESTRICT_KYWD,
-    size_t, size_t, mbstate_t *_RESTRICT_KYWD) = _none_mbsnrtowcs;
-
-size_t (*__wcrtomb)(char *_RESTRICT_KYWD, wchar_t, mbstate_t *_RESTRICT_KYWD) =
-    _none_wcrtomb;
-
-size_t (*__wcsnrtombs)(char *_RESTRICT_KYWD, const wchar_t **_RESTRICT_KYWD,
-    size_t, size_t, mbstate_t *_RESTRICT_KYWD) = _none_wcsnrtombs;

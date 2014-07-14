@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  */
 
 /*
@@ -667,4 +668,53 @@ write(int fd, const void *buf, size_t size)
 {
 	extern ssize_t __write(int, const void *, size_t);
 	return (__write(fd, buf, size));
+}
+
+/*
+ * ASCII versions of ctype character classification functions.  This avoids
+ * pulling in the entire locale framework that is in libc.
+ */
+
+int
+isdigit(int c)
+{
+	return ((c >= '0' && c <= '9') ? 1 : 0);
+}
+
+int
+isupper(int c)
+{
+	return ((c >= 'A' && c <= 'Z') ? 1 : 0);
+}
+
+int
+islower(int c)
+{
+	return ((c >= 'a' && c <= 'z') ? 1 : 0);
+}
+
+int
+isspace(int c)
+{
+	return (((c == ' ') || (c == '\t') || (c == '\r') || (c == '\n') ||
+	    (c == '\v') || (c == '\f')) ? 1 : 0);
+}
+
+int
+isxdigit(int c)
+{
+	return ((isdigit(c) || (c >= 'A' && c <= 'F') ||
+	    (c >= 'a' && c <= 'f')) ? 1 : 0);
+}
+
+int
+isalpha(int c)
+{
+	return ((isupper(c) || islower(c)) ? 1 : 0);
+}
+
+int
+isalnum(int c)
+{
+	return ((isalpha(c) || isdigit(c)) ? 1 : 0);
 }

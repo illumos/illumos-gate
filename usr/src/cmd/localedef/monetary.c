@@ -10,6 +10,7 @@
  */
 
 /*
+ * Copyright 2013 Garrett D'Amore <garrett@damore.org>
  * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
  */
 
@@ -27,7 +28,7 @@
 #include "parser.tab.h"
 #include "lmonetary.h"
 
-static struct lc_monetary_T mon;
+static struct lc_monetary mon;
 
 void
 init_monetary(void)

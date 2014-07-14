@@ -28,6 +28,7 @@
  */
 /*
  * Copyright 2010 Nexenta Systems, Inc.  Al rights reserved.
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  */
 
 #ifndef _TIME_H
@@ -370,6 +371,23 @@ extern char *ctime_r();
 #endif /* __STDC__ */
 
 #endif /* defined(__EXTENSIONS__) || defined(_REENTRANT)... */
+
+
+#if defined(_XPG7) || !defined(_STRICT_SYMBOLS)
+
+#ifndef	_LOCALE_T
+#define	_LOCALE_T
+typedef struct locale *locale_t;
+#endif
+
+#if	defined(__STDC__)
+extern size_t strftime_l(char *_RESTRICT_KYWD, size_t,
+	const char *_RESTRICT_KYWD, const struct tm *_RESTRICT_KYWD, locale_t);
+#else /* __STDC__ */
+extern size_t strftime_l();
+#endif /* __STDC__ */
+
+#endif /* defined(_XPG7) || !defined(_STRICT_SYMBOLS) */
 
 #ifdef	__cplusplus
 }

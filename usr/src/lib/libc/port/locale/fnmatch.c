@@ -31,6 +31,7 @@
  */
 
 /*
+ * Copyright 2013 Garrett D'Amore <garrett@damore.org>
  * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -56,8 +57,9 @@
 #include <limits.h>
 #include <string.h>
 #include <wchar.h>
+#include <xlocale.h>
 #include <wctype.h>
-
+#include "localeimpl.h"
 #include "collate.h"
 
 #define	EOS	'\0'
@@ -66,23 +68,26 @@
 #define	RANGE_NOMATCH	0
 #define	RANGE_ERROR	(-1)
 
-static int rangematch(const char *, wchar_t, int, char **, mbstate_t *);
+static int rangematch(const char *, wchar_t, int, char **, mbstate_t *,
+    locale_t);
 static int fnmatch1(const char *, const char *, const char *, int, mbstate_t,
-    mbstate_t);
+    mbstate_t, locale_t);
 
 int
 fnmatch(pattern, string, flags)
 	const char *pattern, *string;
 	int flags;
 {
+	locale_t loc = uselocale(NULL);
 	static const mbstate_t initial = { 0 };
 
-	return (fnmatch1(pattern, string, string, flags, initial, initial));
+	return (fnmatch1(pattern, string, string, flags, initial, initial,
+	    loc));
 }
 
 static int
 fnmatch1(const char *pattern, const char *string, const char *stringstart,
-    int flags, mbstate_t patmbs, mbstate_t strmbs)
+    int flags, mbstate_t patmbs, mbstate_t strmbs, locale_t loc)
 {
 	char *newp;
 	char c;
@@ -90,11 +95,11 @@ fnmatch1(const char *pattern, const char *string, const char *stringstart,
 	size_t pclen, sclen;
 
 	for (;;) {
-		pclen = mbrtowc(&pc, pattern, MB_LEN_MAX, &patmbs);
+		pclen = mbrtowc_l(&pc, pattern, MB_LEN_MAX, &patmbs, loc);
 		if (pclen == (size_t)-1 || pclen == (size_t)-2)
 			return (FNM_NOMATCH);
 		pattern += pclen;
-		sclen = mbrtowc(&sc, string, MB_LEN_MAX, &strmbs);
+		sclen = mbrtowc_l(&sc, string, MB_LEN_MAX, &strmbs, loc);
 		if (sclen == (size_t)-1 || sclen == (size_t)-2) {
 			sc = (unsigned char)*string;
 			sclen = 1;
@@ -145,10 +150,10 @@ fnmatch1(const char *pattern, const char *string, const char *stringstart,
 			/* General case, use recursion. */
 			while (sc != EOS) {
 				if (!fnmatch1(pattern, string, stringstart,
-				    flags, patmbs, strmbs))
+				    flags, patmbs, strmbs, loc))
 					return (0);
-				sclen = mbrtowc(&sc, string, MB_LEN_MAX,
-				    &strmbs);
+				sclen = mbrtowc_l(&sc, string, MB_LEN_MAX,
+				    &strmbs, loc);
 				if (sclen == (size_t)-1 ||
 				    sclen == (size_t)-2) {
 					sc = (unsigned char)*string;
@@ -172,7 +177,7 @@ fnmatch1(const char *pattern, const char *string, const char *stringstart,
 				return (FNM_NOMATCH);
 
 			switch (rangematch(pattern, sc, flags, &newp,
-			    &patmbs)) {
+			    &patmbs, loc)) {
 			case RANGE_ERROR:
 				goto norm;
 			case RANGE_MATCH:
@@ -185,8 +190,8 @@ fnmatch1(const char *pattern, const char *string, const char *stringstart,
 			break;
 		case '\\':
 			if (!(flags & FNM_NOESCAPE)) {
-				pclen = mbrtowc(&pc, pattern, MB_LEN_MAX,
-				    &patmbs);
+				pclen = mbrtowc_l(&pc, pattern, MB_LEN_MAX,
+				    &patmbs, loc);
 				if (pclen == (size_t)-1 || pclen == (size_t)-2)
 					return (FNM_NOMATCH);
 				if (pclen == 0)
@@ -200,7 +205,7 @@ fnmatch1(const char *pattern, const char *string, const char *stringstart,
 				string += sclen;
 
 			else if ((flags & FNM_IGNORECASE) &&
-			    (towlower(pc) == towlower(sc)))
+			    (towlower_l(pc, loc) == towlower_l(sc, loc)))
 				string += sclen;
 			else
 				return (FNM_NOMATCH);
@@ -212,12 +217,8 @@ fnmatch1(const char *pattern, const char *string, const char *stringstart,
 }
 
 static int
-rangematch(pattern, test, flags, newp, patmbs)
-	const char *pattern;
-	wchar_t test;
-	int flags;
-	char **newp;
-	mbstate_t *patmbs;
+rangematch(const char *pattern, wchar_t test, int flags, char **newp,
+    mbstate_t *patmbs, locale_t loc)
 {
 	int negate, ok;
 	wchar_t c, c2;
@@ -235,7 +236,7 @@ rangematch(pattern, test, flags, newp, patmbs)
 		++pattern;
 
 	if (flags & FNM_IGNORECASE)
-		test = towlower(test);
+		test = towlower_l(test, loc);
 
 	/*
 	 * A right bracket shall lose its special meaning and represent
@@ -254,20 +255,21 @@ rangematch(pattern, test, flags, newp, patmbs)
 			return (RANGE_NOMATCH);
 		} else if (*pattern == '\\' && !(flags & FNM_NOESCAPE))
 			pattern++;
-		pclen = mbrtowc(&c, pattern, MB_LEN_MAX, patmbs);
+		pclen = mbrtowc_l(&c, pattern, MB_LEN_MAX, patmbs, loc);
 		if (pclen == (size_t)-1 || pclen == (size_t)-2)
 			return (RANGE_NOMATCH);
 		pattern += pclen;
 
 		if (flags & FNM_IGNORECASE)
-			c = towlower(c);
+			c = towlower_l(c, loc);
 
 		if (*pattern == '-' && *(pattern + 1) != EOS &&
 		    *(pattern + 1) != ']') {
 			if (*++pattern == '\\' && !(flags & FNM_NOESCAPE))
 				if (*pattern != EOS)
 					pattern++;
-			pclen = mbrtowc(&c2, pattern, MB_LEN_MAX, patmbs);
+			pclen = mbrtowc_l(&c2, pattern, MB_LEN_MAX, patmbs,
+			    loc);
 			if (pclen == (size_t)-1 || pclen == (size_t)-2)
 				return (RANGE_NOMATCH);
 			pattern += pclen;
@@ -275,12 +277,12 @@ rangematch(pattern, test, flags, newp, patmbs)
 				return (RANGE_ERROR);
 
 			if (flags & FNM_IGNORECASE)
-				c2 = towlower(c2);
+				c2 = towlower_l(c2, loc);
 
-			if (_collate_load_error ?
+			if (loc->collate->lc_is_posix ?
 			    c <= test && test <= c2 :
-			    _collate_range_cmp(c, test) <= 0 &&
-			    _collate_range_cmp(test, c2) <= 0)
+			    _collate_range_cmp(c, test, loc) <= 0 &&
+			    _collate_range_cmp(test, c2, loc) <= 0)
 				ok = 1;
 		} else if (c == test)
 			ok = 1;

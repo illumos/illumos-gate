@@ -20,6 +20,7 @@
  */
 
 /*
+ * Copyright 2013 Garrett D'Amore <garrett@damore.org>
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -30,6 +31,9 @@
 #include <string.h>
 #include <ctype.h>
 #include <sys/types.h>
+#include <locale.h>
+#include "lctype.h"
+#include "localeimpl.h"
 
 /*
  * strcasestr() locates the first occurrence in the string s1 of the
@@ -40,9 +44,9 @@
  */
 
 char *
-strcasestr(const char *s1, const char *s2)
+strcasestr_l(const char *s1, const char *s2, locale_t loc)
 {
-	int *cm = __trans_lower;
+	const int *cm = loc->ctype->lc_trans_lower;
 	const uchar_t *us1 = (const uchar_t *)s1;
 	const uchar_t *us2 = (const uchar_t *)s2;
 	const uchar_t *tptr;
@@ -66,4 +70,10 @@ strcasestr(const char *s1, const char *s2)
 	}
 
 	return (NULL);
+}
+
+char *
+strcasestr(const char *s1, const char *s2)
+{
+	return (strcasestr_l(s1, s2, uselocale(NULL)));
 }

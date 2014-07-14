@@ -16,6 +16,6 @@
 
 .PARALLEL: $(SUBDIRS)
 
-SUBDIRS = os-tests test-runner util-tests zfs-tests
+SUBDIRS = libc-tests os-tests test-runner util-tests zfs-tests
 
 include Makefile.com

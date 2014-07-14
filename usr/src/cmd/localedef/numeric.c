@@ -10,6 +10,7 @@
  */
 
 /*
+ * Copyright 2013 Garrett D'Amore <garrett@damore.org>
  * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
  */
 
@@ -27,7 +28,7 @@
 #include "parser.tab.h"
 #include "lnumeric.h"
 
-static struct lc_numeric_T numeric;
+static struct lc_numeric numeric;
 
 void
 init_numeric(void)

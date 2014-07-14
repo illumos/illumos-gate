@@ -1,0 +1,140 @@
+'\" te
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright (c) 2014 Joyent, Inc.  All rights reserved.
+.\" Copyright 2014 Garrett D'Amore <garrett@damore.org>
+.\"
+.TH WCTRANS 3C "Jun 25, 2014"
+
+.SH NAME
+towctrans, towctrans_l, wctrans, wctrans_l \- define and perform transliteration mappings
+.SH SYNOPSIS
+.LP
+.nf
+#include <wctype.h>
+
+\fBwint_t\fR \fBtowctrans\fR(\fBwint_t\fR \fIwc\fR, \fBwctrans_t\fR \fIdesc\fR);
+.fi
+.LP
+.nf
+\fBwint_t\fR \fBtowctrans_l\fR(\fBwint_t\fR \fIwc\fR, \fBwctrans_t\fR \fIdesc\fR, \fBlocale_t\fR \fIloc\fR);
+.fi
+.LP
+.nf
+\fBwctrans_t\fR \fBwctrans\fR(\fBconst char *\fR \fItranclass\fR);
+.fi
+.LP
+.nf
+\fBwctrans_t\fR \fBwctrans_l\fR(\fBconst char *\fR \fItranclass\fR, \fBlocale_t\fR \fIloc\fR);
+.fi
+.SH DESCRIPTION
+.LP
+The functions
+.B wctrans()
+and
+.B wctrans_l()
+are used to obtain a handle to a table that maps one set of wide
+characters to another. They return an object of type
+.I wctrans_t
+which can be used with the functions
+.B towctrans()
+and
+.BR towctrans_l() .
+The valid set of classes that are available depends on the locale.
+The following names are valid in all locales:
+.TP
+"tolower"
+Conversion from upper case to lower case characters.
+.TP
+"toupper"
+Conversion from lower case to upper case characters.
+.LP
+The
+.B towctrans()
+and
+.B towctrans_l()
+functions convert the wide character
+.IR wc
+based on the conversion table specified by
+.IR desc .
+.LP
+The functions
+.B towctrans_l()
+and
+.B wctrans_l()
+are equivalent to the functions
+.B towctrans()
+and
+.BR wctrans() ,
+but instead of operating in the current locale, they operate on the
+locale specified by
+.IR loc .
+.SH RETURN VALUES
+On successful completion,
+.B towctrans()
+and
+.B towctrans_l()
+functions return the character that corresponds to the argument passed
+through the mapping table described by
+.IR desc .
+Otherwise, they return the character unchanged and set
+.BR errno .
+On successful completion,
+.B wctrans()
+and
+.B wctrans_l()
+functions return a non-zero identifier for
+.IR tranclass .
+On failure, they return zero and set
+.BR errno .
+.SH ERRORS
+.LP
+The
+.B wctrans()
+and
+.B wctrans_l()
+functions will fail if:
+.TP
+.B EINVAL
+The mapping class specified by
+.I tranclass
+does not exist or is invalid.
+.LP
+The
+.B towctrans()
+and
+.B towctrans_l()
+functions will fail if:
+.TP
+.B EINVAL
+The mapping class specified by
+.I desc
+is invalid.
+.SH ATTRIBUTES
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Interface Stability	Standard
+_
+MT-Level	MT-Safe
+.TE
+
+.SH SEE ALSO
+.BR newlocale (3C),
+.BR setlocale (3C),
+.BR towlower (3C),
+.BR towupper (3C),
+.BR environ (5),
+.BR locale (5)

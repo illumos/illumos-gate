@@ -1,4 +1,5 @@
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -38,178 +39,133 @@
 
 #include "lint.h"
 #include <wctype.h>
+#include <locale.h>
 #include "runefile.h"
 #include "runetype.h"
+#include "localeimpl.h"
 #include "_ctype.h"
 
 /*
- * We removed: iswascii, iswhexnumber, and iswnumber, as
- * these are not present on Solaris.  Note that the standard requires
- * iswascii to be a macro, so it is defined in our headers.
+ * Note that the standard requires iswascii to be a macro, so it is defined
+ * in our headers.
  *
- * We renamed (per Solaris) iswideogram, iswspecial, iswspecial to the
- * equivalent values without "w".  We added a new isnumber, that looks
- * for non-ASCII numbers.
+ * We aliased (per Solaris) iswideogram, iswspecial, iswspecial to the
+ * equivalent values without "w".  The Solaris specific function isenglish()
+ * is here, but does not get an isw* equivalent.
+ *
+ * Note that various code assumes that "numbers" (iswdigit, iswxdigit)
+ * only return true for characters in the portable set.  While the assumption
+ * is not technically correct, it turns out that for all of our locales this
+ * is true.  iswhexnumber is aliased to iswxdigit.
  */
 
 static int
-__istype(wint_t c, unsigned int f)
+__istype_l(locale_t loc, wint_t c, unsigned int f)
 {
 	unsigned int rt;
 
-	/* Fast path for single byte locales */
 	if (c < 0 || c >= _CACHED_RUNES)
-		rt =  ___runetype(c);
+		rt = __runetype(loc->runelocale, c);
 	else
-		rt = _CurrentRuneLocale->__runetype[c];
+		rt = loc->runelocale->__runetype[c];
 	return (rt & f);
 }
 
 static int
-__isctype(wint_t c, unsigned int f)
+__istype(wint_t c, unsigned int f)
 {
-	unsigned int rt;
+	return (__istype_l(uselocale(NULL), c, f));
+}
 
-	/* Fast path for single byte locales */
-	if (c < 0 || c >= _CACHED_RUNES)
-		return (0);
-	else
-		rt = _CurrentRuneLocale->__runetype[c];
-	return (rt & f);
+int
+iswctype_l(wint_t wc, wctype_t class, locale_t loc)
+{
+	if (iswascii(wc))
+		return (__ctype_mask[wc] & class);
+	return (__istype_l(loc, wc, class));
 }
 
 #undef iswctype
 int
 iswctype(wint_t wc, wctype_t class)
 {
+	/*
+	 * Note that we don't just call iswctype_l because we optimize for
+	 * the iswascii() case, so that most of the time we have no need to
+	 * call uselocale().
+	 */
+	if (iswascii(wc))
+		return (__ctype_mask[wc] & class);
 	return (__istype(wc, class));
 }
 
+/*
+ * This is a legacy version, baked into binaries.
+ */
 #undef _iswctype
 unsigned
 _iswctype(wchar_t wc, int class)
 {
+	if (iswascii(wc))
+		return (__ctype_mask[wc] & class);
 	return (__istype((wint_t)wc, (unsigned int)class));
 }
 
-#undef iswalnum
-int
-iswalnum(wint_t wc)
-{
-	return (__istype(wc, _CTYPE_A|_CTYPE_D));
+#define	DEFN_ISWTYPE(type, mask)		\
+int						\
+isw##type##_l(wint_t wc, locale_t loc)		\
+{						\
+	return (iswascii(wc) ?			\
+		(__ctype_mask[wc] & (mask)) :	\
+		__istype_l(loc, wc, mask));	\
+}						\
+						\
+int						\
+isw##type(wint_t wc)				\
+{						\
+	return (iswascii(wc) ?			\
+		(__ctype_mask[wc] & (mask)) :	\
+		__istype(wc, mask));		\
 }
 
-#undef iswalpha
-int
-iswalpha(wint_t wc)
-{
-	return (__istype(wc, _CTYPE_A));
-}
+/* kill off any macros */
+#undef	iswalnum
+#undef	iswalpha
+#undef	iswblank
 
-#undef iswblank
-int
-iswblank(wint_t wc)
-{
-	return (__istype(wc, _CTYPE_B));
-}
+DEFN_ISWTYPE(alnum, _CTYPE_A|_CTYPE_D)
+DEFN_ISWTYPE(alpha, _CTYPE_A)
+DEFN_ISWTYPE(blank, _CTYPE_B)
+DEFN_ISWTYPE(cntrl, _CTYPE_C)
+DEFN_ISWTYPE(digit, _CTYPE_D)
+DEFN_ISWTYPE(graph, _CTYPE_D)
+DEFN_ISWTYPE(lower, _CTYPE_L)
+DEFN_ISWTYPE(upper, _CTYPE_U)
+DEFN_ISWTYPE(print, _CTYPE_R)
+DEFN_ISWTYPE(punct, _CTYPE_P)
+DEFN_ISWTYPE(space, _CTYPE_S)
+DEFN_ISWTYPE(xdigit, _CTYPE_X)
+DEFN_ISWTYPE(ideogram, _CTYPE_I)
+DEFN_ISWTYPE(phonogram, _CTYPE_Q)
+DEFN_ISWTYPE(special, _CTYPE_T)
+DEFN_ISWTYPE(number, _CTYPE_N)
 
-#undef iswcntrl
-int
-iswcntrl(wint_t wc)
-{
-	return (__istype(wc, _CTYPE_C));
-}
 
-#undef iswdigit
-int
-iswdigit(wint_t wc)
-{
-	return (__isctype(wc, _CTYPE_D));
-}
-
-#undef iswgraph
-int
-iswgraph(wint_t wc)
-{
-	return (__istype(wc, _CTYPE_G));
-}
+#undef iswhexnumber
+#pragma weak iswhexnumber = iswxdigit
+#pragma weak iswhexnumber_l = iswxdigit_l
 
 #undef isideogram
-int
-isideogram(wint_t wc)
-{
-	return (__istype(wc, _CTYPE_I));
-}
-
-#undef iswlower
-int
-iswlower(wint_t wc)
-{
-	return (__istype(wc, _CTYPE_L));
-}
+#pragma weak isideogram = iswideogram
 
 #undef isphonogram
-int
-isphonogram(wint_t wc)
-{
-	return (__istype(wc, _CTYPE_Q));
-}
-
-#undef iswprint
-int
-iswprint(wint_t wc)
-{
-	return (__istype(wc, _CTYPE_R));
-}
-
-#undef iswpunct
-int
-iswpunct(wint_t wc)
-{
-	return (__istype(wc, _CTYPE_P));
-}
-
-#undef iswspace
-int
-iswspace(wint_t wc)
-{
-	return (__istype(wc, _CTYPE_S));
-}
-
-#undef iswupper
-int
-iswupper(wint_t wc)
-{
-	return (__istype(wc, _CTYPE_U));
-}
-
-#undef iswxdigit
-int
-iswxdigit(wint_t wc)
-{
-	return (__isctype(wc, _CTYPE_X));
-}
-
-#undef isenglish
-int
-isenglish(wint_t wc)
-{
-	return (__istype(wc, _CTYPE_E));
-}
+#pragma weak isphonogram = iswphonogram
 
 #undef isspecial
-int
-isspecial(wint_t wc)
-{
-	return (__istype(wc, _CTYPE_T));
-}
+#pragma weak isspecial = iswspecial
 
 #undef isnumber
-int
-isnumber(wint_t wc)
-{
-	return (__istype(wc, _CTYPE_N));
-}
+#pragma weak isnumber = iswnumber
 
 /*
  * FreeBSD has iswrune() for use by external programs, and this is used by
@@ -228,6 +184,21 @@ __iswrune(wint_t wc)
 	 * ctype values differently.  We can't do that (ctype is baked into
 	 * applications), but instead can just check if *any* bit is set in
 	 * the ctype.  Any bit being set indicates its a valid rune.
+	 *
+	 * NB: For ASCII all positions except NULL are runes.
 	 */
-	return (__istype(wc, 0xffffffffU));
+	return (wc == 0 ? 0 : iswascii(wc) ? 1 : __istype(wc, 0xffffffffU));
+}
+
+/*
+ * isenglish is a Solaris legacy.  No isw* equivalent.  Note that this most
+ * likely doesn't work, as the locale data we have doesn't include it.  It
+ * specifically is only valid for non-ASCII characters.  We're not sure this
+ * is in actual use in the wild.
+ */
+#undef isenglish
+int
+isenglish(wint_t wc)
+{
+	return (__istype(wc, _CTYPE_E));
 }

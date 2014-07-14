@@ -1,5 +1,6 @@
 /*
- * Copright 2010 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 1995 Alex Tatmanjants <alex@elvisti.kiev.ua>
  *		at Electronni Visti IA, Kiev, Ukraine.
  *			All rights reserved.
@@ -44,7 +45,6 @@
 
 #include "collate.h"
 #include "setlocale.h"
-#include "ldpart.h"
 
 /*
  * See the comments in usr/src/cmd/localedef/collate.c for further
@@ -53,21 +53,21 @@
  * handy (www.opengroup.org).
  */
 
-static collate_subst_t		*subst_table[COLL_WEIGHTS_MAX];
-static collate_char_t		*char_pri_table;
-static collate_large_t		*large_pri_table;
-static collate_chain_t		*chain_pri_table;
-static char			*cache = NULL;
-static size_t			cachesz;
-static char			collate_encoding[ENCODING_LEN + 1];
+/*
+ * POSIX uses empty tables and falls down to strcmp.
+ */
+struct lc_collate lc_collate_posix = {
+	.lc_is_posix = 1,
+};
 
-/* Exposed externally to other parts of libc. */
-collate_info_t			*_collate_info;
-int _collate_load_error = 1;
+struct locdata __posix_collate_locdata = {
+	.l_lname = "C",
+	.l_data = { &lc_collate_posix }
+};
 
 
-int
-_collate_load_tables(const char *encoding)
+struct locdata *
+__lc_collate_load(const char *locname)
 {
 	int i, chains, z;
 	char buf[PATH_MAX];
@@ -76,49 +76,41 @@ _collate_load_tables(const char *encoding)
 	collate_info_t *info;
 	struct stat sbuf;
 	int fd;
-
-	/* 'encoding' must be already checked. */
-	if (strcmp(encoding, "C") == 0 || strcmp(encoding, "POSIX") == 0) {
-		_collate_load_error = 1;
-		return (_LDP_CACHE);
-	}
-
-	/*
-	 * If the locale name is the same as our cache, use the cache.
-	 */
-	if (cache && (strncmp(encoding, collate_encoding, ENCODING_LEN) == 0)) {
-		_collate_load_error = 0;
-		return (_LDP_CACHE);
-	}
+	struct locdata *ldata;
+	struct lc_collate *lcc;
 
 	/*
 	 * Slurp the locale file into the cache.
 	 */
 
 	(void) snprintf(buf, sizeof (buf), "%s/%s/LC_COLLATE/LCL_DATA",
-	    _PathLocale, encoding);
+	    _PathLocale, locname);
 
-	if ((fd = open(buf, O_RDONLY)) < 0)
-		return (_LDP_ERROR);
+	if ((fd = open(buf, O_RDONLY)) < 0) {
+		errno = EINVAL;
+		return (NULL);
+	}
 	if (fstat(fd, &sbuf) < 0) {
 		(void) close(fd);
-		return (_LDP_ERROR);
+		errno = EINVAL;
+		return (NULL);
 	}
 	if (sbuf.st_size < (COLLATE_STR_LEN + sizeof (info))) {
 		(void) close(fd);
 		errno = EINVAL;
-		return (_LDP_ERROR);
+		return (NULL);
 	}
 	map = mmap(NULL, sbuf.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
 	(void) close(fd);
 	if ((TMP = map) == NULL) {
-		return (_LDP_ERROR);
+		errno = EINVAL;
+		return (NULL);
 	}
 
 	if (strncmp(TMP, COLLATE_VERSION, COLLATE_STR_LEN) != 0) {
 		(void) munmap(map, sbuf.st_size);
 		errno = EINVAL;
-		return (_LDP_ERROR);
+		return (NULL);
 	}
 	TMP += COLLATE_STR_LEN;
 
@@ -130,72 +122,84 @@ _collate_load_tables(const char *encoding)
 	    ((chains = info->chain_count) < 0)) {
 		(void) munmap(map, sbuf.st_size);
 		errno = EINVAL;
-		return (_LDP_ERROR);
+		return (NULL);
 	}
 
 	i = (sizeof (collate_char_t) * (UCHAR_MAX + 1)) +
 	    (sizeof (collate_chain_t) * chains) +
 	    (sizeof (collate_large_t) * info->large_count);
-	for (z = 0; z < (info->directive_count); z++) {
+	for (z = 0; z < info->directive_count; z++) {
 		i += sizeof (collate_subst_t) * info->subst_count[z];
 	}
 	if (i != (sbuf.st_size - (TMP - map))) {
 		(void) munmap(map, sbuf.st_size);
 		errno = EINVAL;
-		return (_LDP_ERROR);
+		return (NULL);
 	}
 
-	char_pri_table = (void *)TMP;
+
+	if ((ldata = __locdata_alloc(locname, sizeof (*lcc))) == NULL) {
+		(void) munmap(map, sbuf.st_size);
+		return (NULL);
+	}
+	lcc = ldata->l_data[0];
+	ldata->l_map = map;
+	ldata->l_map_len = sbuf.st_size;
+
+	lcc->lc_info = info;
+	lcc->lc_directive_count = info->directive_count;
+	lcc->lc_large_count = info->large_count;
+
+	for (z = 0; z < COLL_WEIGHTS_MAX; z++) {
+		lcc->lc_directive[z] = info->directive[z];
+		lcc->lc_subst_count[z] = info->subst_count[z];
+		lcc->lc_pri_count[z] = info->pri_count[z];
+		lcc->lc_undef_pri[z] = info->undef_pri[z];
+	}
+
+	lcc->lc_char_table = (void *)TMP;
 	TMP += sizeof (collate_char_t) * (UCHAR_MAX + 1);
 
-	for (z = 0; z < info->directive_count; z++) {
-		if (info->subst_count[z] > 0) {
-			subst_table[z] = (void *)TMP;
-			TMP += info->subst_count[z] * sizeof (collate_subst_t);
+	for (z = 0; z < lcc->lc_directive_count; z++) {
+		int count;
+		if ((count = lcc->lc_subst_count[z]) > 0) {
+			lcc->lc_subst_table[z] = (void *)TMP;
+			TMP += count * sizeof (collate_subst_t);
 		} else {
-			subst_table[z] = NULL;
+			lcc->lc_subst_table[z] = NULL;
 		}
 	}
 
 	if (chains > 0) {
-		chain_pri_table = (void *)TMP;
+		lcc->lc_chain_table = (void *)TMP;
 		TMP += chains * sizeof (collate_chain_t);
 	} else
-		chain_pri_table = NULL;
-	if (info->large_count > 0)
-		large_pri_table = (void *)TMP;
+		lcc->lc_chain_table = NULL;
+	lcc->lc_chain_count = chains;
+	if (lcc->lc_large_count > 0)
+		lcc->lc_large_table = (void *)TMP;
 	else
-		large_pri_table = NULL;
+		lcc->lc_large_table = NULL;
 
-	(void) strlcpy(collate_encoding, encoding, ENCODING_LEN);
-	_collate_info = info;
-
-	if (cache)
-		(void) munmap(cache, cachesz);
-
-	cache = map;
-	cachesz = sbuf.st_size;
-	_collate_load_error = 0;
-
-	return (_LDP_LOADED);
+	return (ldata);
 }
 
-static int32_t *
-substsearch(const wchar_t key, int pass)
+static const int32_t *
+substsearch(const struct lc_collate *lcc, const wchar_t key, int pass)
 {
-	collate_subst_t *p;
-	int n = _collate_info->subst_count[pass];
+	const collate_subst_t *p;
+	int n = lcc->lc_subst_count[pass];
 
 	if (n == 0)
 		return (NULL);
 
-	if (pass >= _collate_info->directive_count)
+	if (pass >= lcc->lc_directive_count)
 		return (NULL);
 
 	if (!(key & COLLATE_SUBST_PRIORITY))
 		return (NULL);
 
-	p = subst_table[pass] + (key & ~COLLATE_SUBST_PRIORITY);
+	p = lcc->lc_subst_table[pass] + (key & ~COLLATE_SUBST_PRIORITY);
 	assert(p->key == key);
 	return (p->pri);
 }
@@ -206,7 +210,7 @@ substsearch(const wchar_t key, int pass)
  */
 
 static collate_chain_t *
-chainsearch(const wchar_t *key, int *len)
+chainsearch(const struct lc_collate *lcc, const wchar_t *key, int *len)
 {
 	int low;
 	int high;
@@ -214,12 +218,12 @@ chainsearch(const wchar_t *key, int *len)
 	collate_chain_t *p;
 	collate_chain_t *tab;
 
-	if (_collate_info->chain_count == 0)
+	if (lcc->lc_info->chain_count == 0)
 		return (NULL);
 
 	low = 0;
-	high = _collate_info->chain_count - 1;
-	tab = chain_pri_table;
+	high = lcc->lc_info->chain_count - 1;
+	tab = lcc->lc_chain_table;
 
 	while (low <= high) {
 		next = (low + high) / 2;
@@ -242,15 +246,15 @@ chainsearch(const wchar_t *key, int *len)
 }
 
 static collate_large_t *
-largesearch(const wchar_t key)
+largesearch(const struct lc_collate *lcc, const wchar_t key)
 {
 	int low = 0;
-	int high = _collate_info->large_count - 1;
+	int high = lcc->lc_info->large_count - 1;
 	int next, compar;
 	collate_large_t *p;
-	collate_large_t *tab = large_pri_table;
+	collate_large_t *tab = lcc->lc_large_table;
 
-	if (_collate_info->large_count == 0)
+	if (lcc->lc_info->large_count == 0)
 		return (NULL);
 
 	while (low <= high) {
@@ -268,19 +272,19 @@ largesearch(const wchar_t key)
 }
 
 void
-_collate_lookup(const wchar_t *t, int *len, int *pri, int which, int **state)
+_collate_lookup(const struct lc_collate *lcc, const wchar_t *t,
+    int *len, int *pri, int which, const int **state)
 {
 	collate_chain_t *p2;
 	collate_large_t *match;
-	collate_info_t *info = _collate_info;
 	int p, l;
-	int *sptr;
+	const int *sptr;
 
 	/*
 	 * If this is the "last" pass for the UNDEFINED, then
 	 * we just return the priority itself.
 	 */
-	if (which >= info->directive_count) {
+	if (which >= lcc->lc_directive_count) {
 		*pri = *t;
 		*len = 1;
 		*state = NULL;
@@ -306,7 +310,7 @@ _collate_lookup(const wchar_t *t, int *len, int *pri, int which, int **state)
 	 * Check for composites such as dipthongs that collate as a
 	 * single element (aka chains or collating-elements).
 	 */
-	if (((p2 = chainsearch(t, &l)) != NULL) &&
+	if (((p2 = chainsearch(lcc, t, &l)) != NULL) &&
 	    ((p = p2->pri[which]) >= 0)) {
 
 		*len = l;
@@ -318,10 +322,10 @@ _collate_lookup(const wchar_t *t, int *len, int *pri, int which, int **state)
 		 * Character is a small (8-bit) character.
 		 * We just look these up directly for speed.
 		 */
-		*pri = char_pri_table[*t].pri[which];
+		*pri = lcc->lc_char_table[*t].pri[which];
 
-	} else if ((info->large_count > 0) &&
-	    ((match = largesearch(*t)) != NULL)) {
+	} else if ((lcc->lc_info->large_count > 0) &&
+	    ((match = largesearch(lcc, *t)) != NULL)) {
 
 		/*
 		 * Character was found in the extended table.
@@ -332,11 +336,11 @@ _collate_lookup(const wchar_t *t, int *len, int *pri, int which, int **state)
 		/*
 		 * Character lacks a specific definition.
 		 */
-		if (info->directive[which] & DIRECTIVE_UNDEFINED) {
+		if (lcc->lc_directive[which] & DIRECTIVE_UNDEFINED) {
 			/* Mask off sign bit to prevent ordering confusion. */
 			*pri = (*t & COLLATE_MAX_PRIORITY);
 		} else {
-			*pri = info->undef_pri[which];
+			*pri = lcc->lc_undef_pri[which];
 		}
 		/* No substitutions for undefined characters! */
 		return;
@@ -354,7 +358,7 @@ _collate_lookup(const wchar_t *t, int *len, int *pri, int which, int **state)
 	 * to be substituted be unique for that level.  The localedef
 	 * code ensures this for us.
 	 */
-	if ((sptr = substsearch(*pri, which)) != NULL) {
+	if ((sptr = substsearch(lcc, *pri, which)) != NULL) {
 		if ((*pri = *sptr) != 0) {
 			sptr++;
 			*state = *sptr ? sptr : NULL;
@@ -368,7 +372,8 @@ _collate_lookup(const wchar_t *t, int *len, int *pri, int which, int **state)
  * NOT NULL terminate.  That is left to the caller.
  */
 size_t
-_collate_wxfrm(const wchar_t *src, wchar_t *xf, size_t room)
+_collate_wxfrm(const struct lc_collate *lcc, const wchar_t *src, wchar_t *xf,
+    size_t room)
 {
 	int		pri;
 	int		len;
@@ -376,13 +381,14 @@ _collate_wxfrm(const wchar_t *src, wchar_t *xf, size_t room)
 	wchar_t		*tr = NULL;
 	int		direc;
 	int		pass;
-	int32_t 	*state;
+	const int32_t 	*state;
 	size_t		want = 0;
 	size_t		need = 0;
+	int		ndir = lcc->lc_directive_count;
 
 	assert(src);
 
-	for (pass = 0; pass <= _collate_info->directive_count; pass++) {
+	for (pass = 0; pass <= ndir; pass++) {
 
 		state = NULL;
 
@@ -396,10 +402,10 @@ _collate_wxfrm(const wchar_t *src, wchar_t *xf, size_t room)
 		}
 
 		/* special pass for undefined */
-		if (pass == _collate_info->directive_count) {
+		if (pass == ndir) {
 			direc = DIRECTIVE_FORWARD | DIRECTIVE_UNDEFINED;
 		} else {
-			direc = _collate_info->directive[pass];
+			direc = lcc->lc_directive[pass];
 		}
 
 		t = src;
@@ -424,7 +430,8 @@ _collate_wxfrm(const wchar_t *src, wchar_t *xf, size_t room)
 
 		if (direc & DIRECTIVE_POSITION) {
 			while (*t || state) {
-				_collate_lookup(t, &len, &pri, pass, &state);
+				_collate_lookup(lcc, t, &len, &pri, pass,
+				    &state);
 				t += len;
 				if (pri <= 0) {
 					if (pri < 0) {
@@ -442,7 +449,8 @@ _collate_wxfrm(const wchar_t *src, wchar_t *xf, size_t room)
 			}
 		} else {
 			while (*t || state) {
-				_collate_lookup(t, &len, &pri, pass, &state);
+				_collate_lookup(lcc, t, &len, &pri, pass,
+				    &state);
 				t += len;
 				if (pri <= 0) {
 					if (pri < 0) {
@@ -497,10 +505,10 @@ fail:
 #define	XFRM_SEP	('.')	/* chosen to be less than XFRM_OFFSET */
 
 static int
-xfrm(unsigned char *p, int pri, int pass)
+xfrm(locale_t loc, unsigned char *p, int pri, int pass)
 {
 	/* we use unsigned to ensure zero fill on right shift */
-	uint32_t val = (uint32_t)_collate_info->pri_count[pass];
+	uint32_t val = (uint32_t)loc->collate->lc_pri_count[pass];
 	int nc = 0;
 
 	while (val) {
@@ -514,7 +522,7 @@ xfrm(unsigned char *p, int pri, int pass)
 }
 
 size_t
-_collate_sxfrm(const wchar_t *src, char *xf, size_t room)
+_collate_sxfrm(const wchar_t *src, char *xf, size_t room, locale_t loc)
 {
 	int		pri;
 	int		len;
@@ -522,15 +530,17 @@ _collate_sxfrm(const wchar_t *src, char *xf, size_t room)
 	wchar_t		*tr = NULL;
 	int		direc;
 	int		pass;
-	int32_t 	*state;
+	const int32_t 	*state;
 	size_t		want = 0;
 	size_t		need = 0;
 	int		b;
 	uint8_t		buf[XFRM_BYTES];
+	const struct lc_collate *lcc = loc->collate;
+	int		ndir = lcc->lc_directive_count;
 
 	assert(src);
 
-	for (pass = 0; pass <= _collate_info->directive_count; pass++) {
+	for (pass = 0; pass <= ndir; pass++) {
 
 		state = NULL;
 
@@ -544,10 +554,10 @@ _collate_sxfrm(const wchar_t *src, char *xf, size_t room)
 		}
 
 		/* special pass for undefined */
-		if (pass == _collate_info->directive_count) {
+		if (pass == ndir) {
 			direc = DIRECTIVE_FORWARD | DIRECTIVE_UNDEFINED;
 		} else {
-			direc = _collate_info->directive[pass];
+			direc = lcc->lc_directive[pass];
 		}
 
 		t = src;
@@ -573,7 +583,8 @@ _collate_sxfrm(const wchar_t *src, char *xf, size_t room)
 		if (direc & DIRECTIVE_POSITION) {
 			while (*t || state) {
 
-				_collate_lookup(t, &len, &pri, pass, &state);
+				_collate_lookup(lcc, t, &len, &pri, pass,
+				    &state);
 				t += len;
 				if (pri <= 0) {
 					if (pri < 0) {
@@ -583,7 +594,7 @@ _collate_sxfrm(const wchar_t *src, char *xf, size_t room)
 					pri = COLLATE_MAX_PRIORITY;
 				}
 
-				b = xfrm(buf, pri, pass);
+				b = xfrm(loc, buf, pri, pass);
 				want += b;
 				if (room) {
 					while (b) {
@@ -598,7 +609,8 @@ _collate_sxfrm(const wchar_t *src, char *xf, size_t room)
 			}
 		} else {
 			while (*t || state) {
-				_collate_lookup(t, &len, &pri, pass, &state);
+				_collate_lookup(lcc, t, &len, &pri, pass,
+				    &state);
 				t += len;
 				if (pri <= 0) {
 					if (pri < 0) {
@@ -608,7 +620,7 @@ _collate_sxfrm(const wchar_t *src, char *xf, size_t room)
 					continue;
 				}
 
-				b = xfrm(buf, pri, pass);
+				b = xfrm(loc, buf, pri, pass);
 				want += b;
 				if (room) {
 

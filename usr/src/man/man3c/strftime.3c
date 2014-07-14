@@ -1,4 +1,5 @@
 '\" te
+.\" Copyright 2014 Garrett D'Amore <garrett@damore.org>
 .\" Copyright (c) 2014 Gary Mills
 .\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved.
 .\" Copyright 1989 AT&T
@@ -10,9 +11,9 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH STRFTIME 3C "Jan 3, 2014"
+.TH STRFTIME 3C "Jun 24, 2014"
 .SH NAME
-strftime, cftime, ascftime \- convert date and time to string
+strftime, strftime_l cftime, ascftime \- convert date and time to string
 .SH SYNOPSIS
 .LP
 .nf
@@ -22,12 +23,16 @@ strftime, cftime, ascftime \- convert date and time to string
      \fBconst char *restrict\fR \fIformat\fR,
      \fBconst struct tm *restrict\fR \fItimeptr\fR);
 .fi
-
+.LP
+.nf
+\fBsize_t\fR \fBstrftime_l\fR(\fBchar *restrict\fR \fIs\fR, \fBsize_t\fR \fImaxsize\fR,
+     \fBconst char *restrict\fR \fIformat\fR,
+     \fBconst struct tm *restrict\fR \fItimeptr\fR, \fBlocale_t\fR \fIloc\fR);
+.fi
 .LP
 .nf
 \fBint\fR \fBcftime\fR(\fBchar *\fR\fIs\fR, \fBchar *\fR\fIformat\fR, \fBconst time_t *\fR\fIclock\fR);
 .fi
-
 .LP
 .nf
 \fBint\fR \fBascftime\fR(\fBchar *\fR\fIs\fR, \fBconst char *\fR\fIformat\fR,
@@ -37,7 +42,8 @@ strftime, cftime, ascftime \- convert date and time to string
 .SH DESCRIPTION
 .sp
 .LP
-The \fBstrftime()\fR, \fBascftime()\fR, and \fBcftime()\fR functions place
+The \fBstrftime()\fR, \fBstrftime_l()\fR, \fBascftime()\fR, and \fBcftime()\fR
+functions place
 bytes into the array pointed to by \fIs\fR as controlled by the string pointed
 to by \fIformat\fR. The \fIformat\fR string consists of zero or more conversion
 specifications and ordinary characters.  A conversion specification consists of
@@ -46,8 +52,9 @@ characters that determine the conversion specification's behavior.  All
 ordinary characters (including the terminating null byte) are copied unchanged
 into the array pointed to by \fIs\fR. If copying takes place between objects
 that overlap, the behavior is undefined. For \fBstrftime()\fR, no more than
-\fImaxsize\fR bytes are placed into the array.
-.sp
+\fImaxsize\fR bytes are placed into the array. The \fBstrftime_l()\fR function
+behaves identically to \fBstrftime()\fR function, but instead of operating in
+the current locale, it operates in the locale specified by \fIloc\fR.
 .LP
 If \fIformat\fR is \fB(char *)0\fR, then the locale's default format is used.
 For \fBstrftime()\fR the default format is the same as \fB%c\fR; for
@@ -55,7 +62,6 @@ For \fBstrftime()\fR the default format is the same as \fB%c\fR; for
 \fBcftime()\fR and \fBascftime()\fR first try to use the value of the
 environment variable \fBCFTIME\fR, and if that is undefined or empty, the
 default format is used.
-.sp
 .LP
 Each conversion specification is replaced by appropriate characters as
 described in the following list. The appropriate characters are determined by
@@ -465,12 +471,10 @@ Time zone name or abbreviation, or no bytes if no time zone information exists.
 Locale's date and time representation as produced by \fBdate\fR(1).
 .RE
 
-.sp
 .LP
 If a conversion specification does not correspond to any of the above or to any
 of the modified conversion specifications listed below, the behavior is
 undefined and \fB0\fR is returned.
-.sp
 .LP
 The difference between \fB%U\fR and \fB%W\fR (and also between modified
 conversion specifications \fB%OU\fR and \fB%OW\fR) lies in which day is counted
@@ -479,7 +483,6 @@ with a Sunday for \fB%U\fR or a Monday for \fB%W\fR. Week number 0 contains
 those days before the first Sunday or Monday in January for \fB%U\fR and
 \fB%W\fR, respectively.
 .SS "Modified Conversion Specifications"
-.sp
 .LP
 Some conversion specifications can be modified by the \fBE\fR and \fBO\fR
 modifiers to indicate that an alternate format or specification should be used
@@ -681,20 +684,16 @@ the locale's alternate numeric symbols.
 .RE
 
 .SS "Selecting the Output Language"
-.sp
 .LP
-By default, the output of \fBstrftime()\fR, \fBcftime()\fR, and
-\fBascftime()\fR appear in U.S. English. The user can request that the output
-of \fBstrftime()\fR, \fBcftime()\fR, or \fBascftime()\fR be in a specific
-language by setting the \fBLC_TIME\fR category using \fBsetlocale()\fR.
+These routines produce output that is formatted according to the \fBLC_TIME\fR
+locale category.  They use either the current locale, or in the case of
+\fBstrftime_l()\fR, the locale supplied by \fIloc\fR.
 .SS "Time Zone"
-.sp
 .LP
 Local time zone information is used as though \fBtzset\fR(3C) were called.
 .SH RETURN VALUES
-.sp
 .LP
-The \fBstrftime()\fR, \fBcftime()\fR, and \fBascftime()\fR functions return the
+These functions return the
 number of characters placed into the array pointed to by \fIs\fR, not including
 the terminating null character. If the total number of resulting characters
 including the terminating null character is more than \fImaxsize\fR,
@@ -703,31 +702,20 @@ indeterminate.
 .SH EXAMPLES
 .LP
 \fBExample 1 \fRAn example of the \fBstrftime()\fR function.
-.sp
 .LP
 The following example illustrates the use of \fBstrftime()\fR for the
 \fBPOSIX\fR locale. It shows what the string in \fIstr\fR would look like if
 the structure pointed to by \fItmptr\fR contains the values corresponding to
 Thursday, August 28, 1986 at 12:44:36.
-
-.sp
-.in +2
 .nf
-\fBstrftime (str, strsize, "%A %b %d %j", tmptr)\fR
+.IP
+\fBstrftime\fR(\fIstr\fR, \fIstrsize\fR, "%A %b %d %j", \fItmptr\fR);
 .fi
-.in -2
-
-.sp
 .LP
 This results in \fIstr\fR containing "Thursday Aug 28 240".
-
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
-.sp
-
-.sp
 .TS
 box;
 c | c
@@ -736,24 +724,25 @@ ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
 CSI	Enabled
 _
-Interface Stability	Committed
+Interface Stability	See below.
 _
 MT-Level	MT-Safe
 _
 Standard	See below.
 .TE
 
-.sp
 .LP
-For \fBstrftime()\fR, see \fBstandards\fR(5).
+The \fBstrftime()\fR and \fBstrftime_l()\fR functions are Standard.
+\fBcftime()\fR and \fBascftime()\fR functions are Committed.
+.LP
+For \fBstrftime()\fR and \fBstrftime_l()\fR, see \fBstandards\fR(5).
 .SH SEE ALSO
-.sp
 .LP
-\fBdate\fR(1), \fBctime\fR(3C), \fBmktime\fR(3C), \fBsetlocale\fR(3C),
-\fBstrptime\fR(3C), \fBtzset\fR(3C), \fBTIMEZONE\fR(4), \fBzoneinfo\fR(4),
+\fBdate\fR(1), \fBctime\fR(3C), \fBmktime\fR(3C),
+\fBnewlocale\fR(3C), \fBsetlocale\fR(3C), \fBstrptime\fR(3C), \fBtzset\fR(3C),
+\fBuselocale\fR(3C), \fBTIMEZONE\fR(4), \fBzoneinfo\fR(4),
 \fBattributes\fR(5), \fBenviron\fR(5), \fBstandards\fR(5)
 .SH NOTES
-.sp
 .LP
 The conversion specification for \fB%V\fR was changed in the Solaris 7 release.
 This change was based on the public review draft of the ISO C9x standard at
@@ -761,24 +750,19 @@ that time. Previously, the specification stated that if the week containing 1
 January had fewer than four days in the new year, it became week 53 of the
 previous year. The ISO C9x standard committee subsequently recognized that that
 specification had been incorrect.
-.sp
 .LP
 The conversion specifications for \fB%g\fR, \fB%G\fR, \fB%Eg\fR, \fB%EG\fR, and
 \fB%Og\fR were added in the Solaris 7 release.  This change was based on the
-public review draft of the ISO C9x standard at that time. These specifications
-are evolving.  If the ISO C9x standard is finalized with a different
-conclusion, these specifications will change to conform to the ISO C9x standard
-decision.
-.sp
+public review draft of the ISO C9x standard at that time. The \fB%g\fR and
+\fB%G\fR specifications were adopted in the formal standard.  The other two
+were not, and should not be used in portable applications.
 .LP
 The conversion specification for \fB%u\fR was changed in the Solaris 8 release.
 This change was based on the XPG4 specification.
-.sp
 .LP
 If using the \fB%Z\fR specifier and \fBzoneinfo\fR timezones and if the input
 date is outside the range 20:45:52 UTC, December  13, 1901 to 03:14:07 UTC,
 January 19, 2038, the timezone name may not be correct.
-.sp
 .LP
 The conversion specification for \fB%+\fR was added in illumos.
 It is not part of any standard, although it is available on a number

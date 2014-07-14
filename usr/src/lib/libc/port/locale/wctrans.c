@@ -1,4 +1,5 @@
 /*
+ * Copyright 2013 Garrett D'Amore <garrett@damore.org>
  * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2002 Tim J. Robbins.
  * All rights reserved.
@@ -26,9 +27,11 @@
  */
 
 #include "lint.h"
+#include <note.h>
 #include <errno.h>
 #include <string.h>
 #include <wctype.h>
+#include <locale.h>
 
 enum {
 	_WCT_ERROR	= 0,
@@ -37,15 +40,14 @@ enum {
 };
 
 wint_t
-towctrans(wint_t wc, wctrans_t desc)
+towctrans_l(wint_t wc, wctrans_t desc, locale_t loc)
 {
-
 	switch (desc) {
 	case _WCT_TOLOWER:
-		wc = towlower(wc);
+		wc = towlower_l(wc, loc);
 		break;
 	case _WCT_TOUPPER:
-		wc = towupper(wc);
+		wc = towupper_l(wc, loc);
 		break;
 	case _WCT_ERROR:
 	default:
@@ -56,8 +58,18 @@ towctrans(wint_t wc, wctrans_t desc)
 	return (wc);
 }
 
+wint_t
+towctrans(wint_t wc, wctrans_t desc)
+{
+	return (towctrans_l(wc, desc, uselocale(NULL)));
+}
+
+/*
+ * For *now* we don't support locale sensitive transforms besides toupper
+ * and tolower.
+ */
 wctrans_t
-wctrans(const char *charclass)
+wctrans_l(const char *charclass, locale_t loc)
 {
 	struct {
 		const char	*name;
@@ -68,6 +80,7 @@ wctrans(const char *charclass)
 		{ NULL,		_WCT_ERROR },		/* Default */
 	};
 	int i;
+	_NOTE(ARGUNUSED(loc));
 
 	i = 0;
 	while (ccls[i].name != NULL && strcmp(ccls[i].name, charclass) != 0)
@@ -76,4 +89,10 @@ wctrans(const char *charclass)
 	if (ccls[i].trans == _WCT_ERROR)
 		errno = EINVAL;
 	return (ccls[i].trans);
+}
+
+wctrans_t
+wctrans(const char *charclass)
+{
+	return (wctrans_l(charclass, uselocale(NULL)));
 }

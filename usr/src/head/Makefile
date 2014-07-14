@@ -22,6 +22,8 @@
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2013 Garrett D'Amore <garrett@damore.org>
+#
 # head/Makefile
 #
 # include global definitions
@@ -203,12 +205,12 @@ HDRS=   $($(MACH)_HDRS)  $(ATTRDB_HDRS) \
 	wctype.h	\
 	widec.h		\
 	wordexp.h	\
+	xlocale.h	\
 	xti.h		\
 	xti_inet.h	\
 	zone.h
 
 ISOHDRS = \
-	ctype_c99.h	\
 	ctype_iso.h	\
 	limits_iso.h	\
 	locale_iso.h	\
@@ -225,7 +227,6 @@ ISOHDRS = \
 	time_iso.h	\
 	wchar_c99.h	\
 	wchar_iso.h	\
-	wctype_c99.h	\
 	wctype_iso.h
 
 ARPAHDRS = 		\

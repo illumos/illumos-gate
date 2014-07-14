@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013 Garrett D'Amore <garrett@damore.org>
  */
 
 /*
@@ -29,27 +30,54 @@
  * All letters are converted to the lowercase and compared.
  */
 
-#pragma weak _wscasecmp = wscasecmp
-
 #include "lint.h"
 #include <stdlib.h>
-#include <widec.h>
+#include <wchar.h>
+#include <locale.h>
 #include "libc.h"
 
+/* Legacy Sun interfaces */
+#pragma weak wscasecmp = wcscasecmp
+#pragma weak wsncasecmp = wcsncasecmp
+
 int
-wcscasecmp(const wchar_t *s1, const wchar_t *s2)
+wcscasecmp_l(const wchar_t *s1, const wchar_t *s2, locale_t loc)
 {
 	if (s1 == s2)
 		return (0);
 
-	while (towlower(*s1) == towlower(*s2++))
-		if (*s1++ == 0)
+	while (towlower_l(*s1, loc) == towlower_l(*s2, loc)) {
+		if (*s1 == 0)
 			return (0);
-	return (towlower(*s1) - towlower(*(s2 - 1)));
+		s1++;
+		s2++;
+	}
+	return (towlower_l(*s1, loc) - towlower_l(*s2, loc));
 }
 
 int
-wscasecmp(const wchar_t *s1, const wchar_t *s2)
+wcscasecmp(const wchar_t *s1, const wchar_t *s2)
 {
-	return (wcscasecmp(s1, s2));
+	return (wcscasecmp_l(s1, s2, uselocale(NULL)));
+}
+
+int
+wcsncasecmp_l(const wchar_t *s1, const wchar_t *s2, size_t n, locale_t loc)
+{
+	if (s1 == s2)
+		return (0);
+
+	while ((towlower_l(*s1, loc) == towlower_l(*s2, loc)) && n--) {
+		if (*s1 == 0)
+			return (0);
+		s1++;
+		s2++;
+	}
+	return (towlower_l(*s1, loc) - towlower_l(*s2, loc));
+}
+
+int
+wcsncasecmp(const wchar_t *s1, const wchar_t *s2, size_t n)
+{
+	return (wcsncasecmp_l(s1, s2, n, uselocale(NULL)));
 }
