@@ -23,6 +23,7 @@
 # Copyright (c) 2014, Joyent, Inc. All rights reserved.
 #
 # Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved.
+# Copyright 2013 Garrett D'Amore <garrett@damore.org>
 # Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -655,9 +656,6 @@ PORTI18N=			\
 	getwchar.o		\
 	putwchar.o		\
 	putws.o			\
-	strcasecmp.o		\
-	strcasestr.o		\
-	strncasecmp.o		\
 	strtows.o		\
 	wcsnlen.o		\
 	wcsstr.o		\
@@ -670,7 +668,6 @@ PORTI18N=			\
 	wmemcpy.o		\
 	wmemmove.o		\
 	wmemset.o		\
-	wscasecmp.o		\
 	wscat.o			\
 	wschr.o			\
 	wscmp.o			\
@@ -678,7 +675,6 @@ PORTI18N=			\
 	wscspn.o		\
 	wsdup.o			\
 	wslen.o			\
-	wsncasecmp.o		\
 	wsncat.o		\
 	wsncmp.o		\
 	wsncpy.o		\
@@ -696,7 +692,6 @@ PORTI18N=			\
 	gettext_gnu.o		\
 	gettext_real.o		\
 	gettext_util.o		\
-	isdigit.o		\
 	plural_parser.o		\
 	wdresolve.o		\
 	_ctype.o		\
@@ -724,12 +719,14 @@ PORTLOCALE=			\
 	gb2312.o		\
 	gbk.o			\
 	getdate.o		\
+	isdigit.o		\
 	iswctype.o		\
 	ldpart.o		\
 	lmessages.o		\
 	lnumeric.o		\
 	lmonetary.o		\
 	localeconv.o		\
+	localeimpl.o		\
 	mbftowc.o		\
 	mblen.o			\
 	mbrlen.o		\
@@ -751,9 +748,12 @@ PORTLOCALE=			\
 	runetype.o		\
 	setlocale.o		\
 	setrunelocale.o		\
+	strcasecmp.o		\
+	strcasestr.o		\
 	strcoll.o		\
 	strfmon.o		\
 	strftime.o		\
+	strncasecmp.o		\
 	strptime.o		\
 	strxfrm.o		\
 	table.o			\
@@ -763,6 +763,7 @@ PORTLOCALE=			\
 	ungetwc.o		\
 	utf8.o			\
 	wcrtomb.o		\
+	wcscasecmp.o		\
 	wcscoll.o		\
 	wcsftime.o		\
 	wcsnrtombs.o		\

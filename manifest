@@ -2772,7 +2772,6 @@ f usr/include/ipp/meters/meter.h 0644 root bin
 f usr/include/ipsec_util.h 0644 root bin
 d usr/include/iso 0755 root bin
 s usr/include/iso/assert_iso.h=../assert.h
-f usr/include/iso/ctype_c99.h 0644 root bin
 f usr/include/iso/ctype_iso.h 0644 root bin
 s usr/include/iso/errno_iso.h=../errno.h
 s usr/include/iso/float_iso.h=../float.h
@@ -2792,7 +2791,6 @@ f usr/include/iso/string_iso.h 0644 root bin
 f usr/include/iso/time_iso.h 0644 root bin
 f usr/include/iso/wchar_c99.h 0644 root bin
 f usr/include/iso/wchar_iso.h 0644 root bin
-f usr/include/iso/wctype_c99.h 0644 root bin
 f usr/include/iso/wctype_iso.h 0644 root bin
 f usr/include/iso646.h 0644 root bin
 d usr/include/kerberosv5 0755 root bin
@@ -4513,6 +4511,7 @@ f usr/include/wchar_impl.h 0644 root bin
 f usr/include/wctype.h 0644 root bin
 f usr/include/widec.h 0644 root bin
 f usr/include/wordexp.h 0644 root bin
+f usr/include/xlocale.h 0644 root bin
 f usr/include/xti.h 0644 root bin
 f usr/include/xti_inet.h 0644 root bin
 f usr/include/zdoor.h 0644 root bin
@@ -12675,6 +12674,7 @@ f usr/share/man/man3c/bsd_signal.3c 0444 root bin
 f usr/share/man/man3c/bsearch.3c 0444 root bin
 f usr/share/man/man3c/bstring.3c 0444 root bin
 f usr/share/man/man3c/btowc.3c 0444 root bin
+s usr/share/man/man3c/btowc_l.3c=btowc.3c
 s usr/share/man/man3c/bzero.3c=bstring.3c
 s usr/share/man/man3c/calloc.3c=malloc.3c
 s usr/share/man/man3c/catclose.3c=catopen.3c
@@ -12765,6 +12765,7 @@ s usr/share/man/man3c/double_to_decimal.3c=floating_to_decimal.3c
 f usr/share/man/man3c/drand48.3c 0444 root bin
 f usr/share/man/man3c/dup2.3c 0444 root bin
 s usr/share/man/man3c/dup3.3c=dup2.3c
+s usr/share/man/man3c/duplocale.3c=newlocale.3c
 f usr/share/man/man3c/econvert.3c 0444 root bin
 f usr/share/man/man3c/ecvt.3c 0444 root bin
 s usr/share/man/man3c/edata.3c=end.3c
@@ -12817,6 +12818,7 @@ s usr/share/man/man3c/fgets.3c=gets.3c
 s usr/share/man/man3c/fgetspent.3c=getspnam.3c
 s usr/share/man/man3c/fgetspent_r.3c=getspnam.3c
 f usr/share/man/man3c/fgetwc.3c 0444 root bin
+s usr/share/man/man3c/fgetwc_l.3c=fgetwc.3c
 s usr/share/man/man3c/fgetws.3c=getws.3c
 s usr/share/man/man3c/file_to_decimal.3c=string_to_decimal.3c
 s usr/share/man/man3c/fileno.3c=ferror.3c
@@ -12840,6 +12842,7 @@ f usr/share/man/man3c/fputwc.3c 0444 root bin
 f usr/share/man/man3c/fputws.3c 0444 root bin
 f usr/share/man/man3c/fread.3c 0444 root bin
 s usr/share/man/man3c/free.3c=malloc.3c
+s usr/share/man/man3c/freelocale.3c=newlocale.3c
 f usr/share/man/man3c/freopen.3c 0444 root bin
 s usr/share/man/man3c/fscanf.3c=scanf.3c
 f usr/share/man/man3c/fseek.3c 0444 root bin
@@ -12933,7 +12936,9 @@ s usr/share/man/man3c/getvfsfile.3c=getvfsent.3c
 s usr/share/man/man3c/getvfsspec.3c=getvfsent.3c
 s usr/share/man/man3c/getw.3c=fgetc.3c
 f usr/share/man/man3c/getwc.3c 0444 root bin
+s usr/share/man/man3c/getwc_l.3c=getwc.3c
 f usr/share/man/man3c/getwchar.3c 0444 root bin
+s usr/share/man/man3c/getwchar_l.3c=getwchar.3c
 f usr/share/man/man3c/getwd.3c 0444 root bin
 f usr/share/man/man3c/getwidth.3c 0444 root bin
 f usr/share/man/man3c/getws.3c 0444 root bin
@@ -12963,41 +12968,76 @@ f usr/share/man/man3c/insque.3c 0444 root bin
 f usr/share/man/man3c/is_system_labeled.3c 0444 root bin
 f usr/share/man/man3c/isaexec.3c 0444 root bin
 s usr/share/man/man3c/isalnum.3c=ctype.3c
+s usr/share/man/man3c/isalnum_l.3c=ctype.3c
 s usr/share/man/man3c/isalpha.3c=ctype.3c
+s usr/share/man/man3c/isalpha_l.3c=ctype.3c
 s usr/share/man/man3c/isascii.3c=ctype.3c
 f usr/share/man/man3c/isastream.3c 0444 root bin
 f usr/share/man/man3c/isatty.3c 0444 root bin
 s usr/share/man/man3c/isblank.3c=ctype.3c
+s usr/share/man/man3c/isblank_l.3c=ctype.3c
 s usr/share/man/man3c/iscntrl.3c=ctype.3c
+s usr/share/man/man3c/iscntrl_l.3c=ctype.3c
 s usr/share/man/man3c/isdigit.3c=ctype.3c
+s usr/share/man/man3c/isdigit_l.3c=ctype.3c
 s usr/share/man/man3c/isenglish.3c=iswalpha.3c
 s usr/share/man/man3c/isgraph.3c=ctype.3c
+s usr/share/man/man3c/isgraph_l.3c=ctype.3c
 s usr/share/man/man3c/isideogram.3c=iswalpha.3c
 s usr/share/man/man3c/islower.3c=ctype.3c
+s usr/share/man/man3c/islower_l.3c=ctype.3c
 f usr/share/man/man3c/isnand.3c 0444 root bin
 s usr/share/man/man3c/isnanf.3c=isnand.3c
 s usr/share/man/man3c/isnumber.3c=iswalpha.3c
 s usr/share/man/man3c/isphonogram.3c=iswalpha.3c
 s usr/share/man/man3c/isprint.3c=ctype.3c
+s usr/share/man/man3c/isprint_l.3c=ctype.3c
 s usr/share/man/man3c/ispunct.3c=ctype.3c
+s usr/share/man/man3c/ispunct_l.3c=ctype.3c
 s usr/share/man/man3c/isspace.3c=ctype.3c
+s usr/share/man/man3c/isspace_l.3c=ctype.3c
 s usr/share/man/man3c/isspecial.3c=iswalpha.3c
 s usr/share/man/man3c/isupper.3c=ctype.3c
+s usr/share/man/man3c/isupper_l.3c=ctype.3c
 s usr/share/man/man3c/iswalnum.3c=iswalpha.3c
+s usr/share/man/man3c/iswalnum_l.3c=iswalpha.3c
 f usr/share/man/man3c/iswalpha.3c 0444 root bin
+s usr/share/man/man3c/iswalpha_l.3c=iswalpha.3c
 s usr/share/man/man3c/iswascii.3c=iswalpha.3c
 s usr/share/man/man3c/iswblank.3c=iswalpha.3c
+s usr/share/man/man3c/iswblank_l.3c=iswalpha.3c
 s usr/share/man/man3c/iswcntrl.3c=iswalpha.3c
+s usr/share/man/man3c/iswantrl_l.3c=iswalpha.3c
 f usr/share/man/man3c/iswctype.3c 0444 root bin
+s usr/share/man/man3c/iswctype_l.3c=iswalpha.3c
 s usr/share/man/man3c/iswdigit.3c=iswalpha.3c
+s usr/share/man/man3c/iswdigit_l.3c=iswalpha.3c
 s usr/share/man/man3c/iswgraph.3c=iswalpha.3c
+s usr/share/man/man3c/iswgraph_l.3c=iswalpha.3c
+s usr/share/man/man3c/iswhexnumber.3c=iswalpha.3c
+s usr/share/man/man3c/iswhexnumber_l.3c=iswalpha.3c
+s usr/share/man/man3c/iswideogram.3c=iswalpha.3c
+s usr/share/man/man3c/iswideogram_l.3c=iswalpha.3c
 s usr/share/man/man3c/iswlower.3c=iswalpha.3c
+s usr/share/man/man3c/iswlower_l.3c=iswalpha.3c
+s usr/share/man/man3c/iswnumber.3c=iswalpha.3c
+s usr/share/man/man3c/iswnumber_l.3c=iswalpha.3c
+s usr/share/man/man3c/iswphonogram.3c=iswalpha.3c
+s usr/share/man/man3c/iswphonogram_l.3c=iswalpha.3c
 s usr/share/man/man3c/iswprint.3c=iswalpha.3c
+s usr/share/man/man3c/iswprint_l.3c=iswalpha.3c
 s usr/share/man/man3c/iswpunct.3c=iswalpha.3c
+s usr/share/man/man3c/iswpunct_l.3c=iswalpha.3c
 s usr/share/man/man3c/iswspace.3c=iswalpha.3c
+s usr/share/man/man3c/iswspace_l.3c=iswalpha.3c
+s usr/share/man/man3c/iswspecial.3c=iswalpha.3c
+s usr/share/man/man3c/iswspecial_l.3c=iswalpha.3c
 s usr/share/man/man3c/iswupper.3c=iswalpha.3c
+s usr/share/man/man3c/iswupper_l.3c=iswalpha.3c
 s usr/share/man/man3c/iswxdigit.3c=iswalpha.3c
+s usr/share/man/man3c/iswxdigit_l.3c=iswalpha.3c
 s usr/share/man/man3c/isxdigit.3c=ctype.3c
+s usr/share/man/man3c/isxdigit_l.3c=ctype.3c
 s usr/share/man/man3c/jrand48.3c=drand48.3c
 f usr/share/man/man3c/killpg.3c 0444 root bin
 s usr/share/man/man3c/l64a.3c=a64l.3c
@@ -13024,11 +13064,21 @@ f usr/share/man/man3c/makecontext.3c 0444 root bin
 f usr/share/man/man3c/makedev.3c 0444 root bin
 f usr/share/man/man3c/malloc.3c 0444 root bin
 f usr/share/man/man3c/mblen.3c 0444 root bin
+s usr/share/man/man3c/mblen_l.3c=mblen.3c
 f usr/share/man/man3c/mbrlen.3c 0444 root bin
+s usr/share/man/man3c/mbrlen_l.3c=mbrlen.3c
 f usr/share/man/man3c/mbrtowc.3c 0444 root bin
+s usr/share/man/man3c/mbrtowc_l.3c=mbrtowc.3c
 f usr/share/man/man3c/mbsinit.3c 0444 root bin
+s usr/share/man/man3c/mbsinit_l.3c=mbsinit.3c
+s usr/share/man/man3c/mbsnrtowcs.3c=mbsrtowcs.3c
+s usr/share/man/man3c/mbsnrtowcs_l.3c=mbsrtowcs.3c
 f usr/share/man/man3c/mbsrtowcs.3c 0444 root bin
+s usr/share/man/man3c/mbsrtowcs_l.3c=mbsrtowcs.3c
+s usr/share/man/man3c/mbstowcs.3c=mbsrtowcs.3c
+s usr/share/man/man3c/mbstowcs_l.3c=mbsrtowcs.3c
 f usr/share/man/man3c/mbtowc.3c 0444 root bin
+s usr/share/man/man3c/mbtowc_l.3c=mbtowc.3c
 s usr/share/man/man3c/memalign.3c=malloc.3c
 s usr/share/man/man3c/membar_consumer.3c=membar_ops.3c
 s usr/share/man/man3c/membar_enter.3c=membar_ops.3c
@@ -13078,9 +13128,11 @@ s usr/share/man/man3c/mutex_trylock.3c=mutex_init.3c
 s usr/share/man/man3c/mutex_unlock.3c=mutex_init.3c
 f usr/share/man/man3c/nanosleep.3c 0444 root bin
 f usr/share/man/man3c/ndbm.3c 0444 root bin
+f usr/share/man/man3c/newlocale.3c 0444 root bin
 s usr/share/man/man3c/nftw.3c=ftw.3c
 s usr/share/man/man3c/ngettext.3c=gettext.3c
 f usr/share/man/man3c/nl_langinfo.3c 0444 root bin
+s usr/share/man/man3c/nl_langinfo_l.3c=nl_langinfo.3c
 s usr/share/man/man3c/nrand48.3c=drand48.3c
 f usr/share/man/man3c/offsetof.3c 0444 root bin
 f usr/share/man/man3c/opendir.3c 0444 root bin
@@ -13436,28 +13488,35 @@ f usr/share/man/man3c/stdio.3c 0444 root bin
 s usr/share/man/man3c/stdout.3c=stdio.3c
 f usr/share/man/man3c/str2sig.3c 0444 root bin
 s usr/share/man/man3c/strcasecmp.3c=string.3c
+s usr/share/man/man3c/strcasecmp_l.3c=string.3c
 s usr/share/man/man3c/strcat.3c=string.3c
 s usr/share/man/man3c/strchr.3c=string.3c
 s usr/share/man/man3c/strcmp.3c=string.3c
 f usr/share/man/man3c/strcoll.3c 0444 root bin
+s usr/share/man/man3c/strcoll_l.3c=strcoll.3c
 s usr/share/man/man3c/strcpy.3c=string.3c
 s usr/share/man/man3c/strcspn.3c=string.3c
 s usr/share/man/man3c/strdup.3c=string.3c
 f usr/share/man/man3c/strerror.3c 0444 root bin
 s usr/share/man/man3c/strerror_r.3c=strerror.3c
+f usr/share/man/man3c/strfmon.3c 0444 root bin
+s usr/share/man/man3c/strfmon_l.3c=strfmon.3c
 f usr/share/man/man3c/strftime.3c 0444 root bin
+s usr/share/man/man3c/strftime_l.3c=strftime.3c
 f usr/share/man/man3c/string.3c 0444 root bin
 f usr/share/man/man3c/string_to_decimal.3c 0444 root bin
 s usr/share/man/man3c/strlcat.3c=string.3c
 s usr/share/man/man3c/strlcpy.3c=string.3c
 s usr/share/man/man3c/strlen.3c=string.3c
 s usr/share/man/man3c/strncasecmp.3c=string.3c
+s usr/share/man/man3c/strncasecmp_l.3c=string.3c
 s usr/share/man/man3c/strncat.3c=string.3c
 s usr/share/man/man3c/strncmp.3c=string.3c
 s usr/share/man/man3c/strncpy.3c=string.3c
 s usr/share/man/man3c/strnlen.3c=string.3c
 s usr/share/man/man3c/strpbrk.3c=string.3c
 f usr/share/man/man3c/strptime.3c 0444 root bin
+s usr/share/man/man3c/strptime_l.3c=strptime.3c
 s usr/share/man/man3c/strrchr.3c=string.3c
 s usr/share/man/man3c/strsep.3c=string.3c
 f usr/share/man/man3c/strsignal.3c 0444 root bin
@@ -13476,6 +13535,7 @@ s usr/share/man/man3c/strtoull.3c=strtoul.3c
 s usr/share/man/man3c/strtoumax.3c=strtoimax.3c
 f usr/share/man/man3c/strtows.3c 0444 root bin
 f usr/share/man/man3c/strxfrm.3c 0444 root bin
+s usr/share/man/man3c/strxfrm_l.3c=strxfrm.3c
 f usr/share/man/man3c/swab.3c 0444 root bin
 s usr/share/man/man3c/swapcontext.3c=makecontext.3c
 s usr/share/man/man3c/swprintf.3c=fwprintf.3c
@@ -13535,7 +13595,15 @@ f usr/share/man/man3c/tmpnam.3c 0444 root bin
 s usr/share/man/man3c/tmpnam_r.3c=tmpnam.3c
 f usr/share/man/man3c/toascii.3c 0444 root bin
 f usr/share/man/man3c/tolower.3c 0444 root bin
+s usr/share/man/man3c/tolower_l.3c=tolower.3c
 f usr/share/man/man3c/toupper.3c 0444 root bin
+s usr/share/man/man3c/toupper_l.3c=toupper.3c
+s usr/share/man/man3c/towctrans.3c=wctrans.3c
+s usr/share/man/man3c/towctrans_l.3c=wctrans.3c
+f usr/share/man/man3c/towlower.3c 0444 root bin
+s usr/share/man/man3c/towlower_l.3c=towlower.3c
+f usr/share/man/man3c/towupper.3c 0444 root bin
+s usr/share/man/man3c/towupper_l.3c=towupper.3c
 f usr/share/man/man3c/truncate.3c 0444 root bin
 f usr/share/man/man3c/tsearch.3c 0444 root bin
 f usr/share/man/man3c/ttyname.3c 0444 root bin
@@ -13578,6 +13646,7 @@ s usr/share/man/man3c/unordered.3c=isnand.3c
 f usr/share/man/man3c/unsetenv.3c 0444 root bin
 s usr/share/man/man3c/updwtmp.3c=getutxent.3c
 s usr/share/man/man3c/updwtmpx.3c=getutxent.3c
+f usr/share/man/man3c/uselocale.3c 0444 root bin
 f usr/share/man/man3c/usleep.3c 0444 root bin
 s usr/share/man/man3c/utmpname.3c=getutent.3c
 s usr/share/man/man3c/utmpxname.3c=getutxent.3c
@@ -13615,10 +13684,12 @@ s usr/share/man/man3c/watoi.3c=wcstol.3c
 s usr/share/man/man3c/watol.3c=wcstol.3c
 s usr/share/man/man3c/watoll.3c=wcstol.3c
 f usr/share/man/man3c/wcrtomb.3c 0444 root bin
+s usr/share/man/man3c/wcrtomb_l.3c=wcrtomb.3c
 s usr/share/man/man3c/wcscat.3c=wcstring.3c
 s usr/share/man/man3c/wcschr.3c=wcstring.3c
 s usr/share/man/man3c/wcscmp.3c=wcstring.3c
 f usr/share/man/man3c/wcscoll.3c 0444 root bin
+s usr/share/man/man3c/wcscoll_l.3c=wcscoll.3c
 s usr/share/man/man3c/wcscpy.3c=wcstring.3c
 s usr/share/man/man3c/wcscspn.3c=wcstring.3c
 s usr/share/man/man3c/wcsetno.3c=cset.3c
@@ -13645,11 +13716,18 @@ s usr/share/man/man3c/wcstoumax.3c=wcstoimax.3c
 f usr/share/man/man3c/wcstring.3c 0444 root bin
 s usr/share/man/man3c/wcswcs.3c=wcstring.3c
 f usr/share/man/man3c/wcswidth.3c 0444 root bin
+s usr/share/man/man3c/wcswidth_l.3c=wcswidth.3c
 f usr/share/man/man3c/wcsxfrm.3c 0444 root bin
 f usr/share/man/man3c/wctob.3c 0444 root bin
+s usr/share/man/man3c/wctob_l.3c=wctob.3c
 f usr/share/man/man3c/wctomb.3c 0444 root bin
+s usr/share/man/man3c/wctomb_l.3c=wctomb.3c
+f usr/share/man/man3c/wctrans.3c 0444 root bin
+s usr/share/man/man3c/wctrans_l.3c=wctrans.3c
 f usr/share/man/man3c/wctype.3c 0444 root bin
+s usr/share/man/man3c/wctype_l.3c=wctype.3c
 f usr/share/man/man3c/wcwidth.3c 0444 root bin
+s usr/share/man/man3c/wcwidth_l.3c=wcwidth.3c
 s usr/share/man/man3c/windex.3c=wcstring.3c
 f usr/share/man/man3c/wmemchr.3c 0444 root bin
 f usr/share/man/man3c/wmemcmp.3c 0444 root bin
@@ -15198,6 +15276,8 @@ s usr/share/man/man3head/wctype.3head=wctype.h.3head
 f usr/share/man/man3head/wctype.h.3head 0444 root bin
 s usr/share/man/man3head/wordexp.3head=wordexp.h.3head
 f usr/share/man/man3head/wordexp.h.3head 0444 root bin
+s usr/share/man/man3head/xlocale.3head=xlocale.h.3head
+f usr/share/man/man3head/xlocale.h.3head 0444 root bin
 d usr/share/man/man3kstat 0755 root bin
 f usr/share/man/man3kstat/kstat.3kstat 0444 root bin
 f usr/share/man/man3kstat/kstat_chain_update.3kstat 0444 root bin

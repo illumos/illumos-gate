@@ -1,0 +1,75 @@
+'\" te
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright (c) 2014 Joyent, Inc.  All rights reserved.
+.\" Copyright 2014 Garrett D'Amore <garrett@damore.org>
+.\"
+.TH TOWUPPER 3C "Jun 21, 2014"
+.SH NAME
+towupper, towupper_l \- transliterate lower-case wide characters to upper-case
+.SH SYNOPSIS
+.LP
+.nf
+#include <wctype.h>
+
+\fBwint_t\fR \fBtowupper\fR(\fBwint_t\fR \fIwc\fR);
+.fi
+.LP
+.nf
+\fBwint_t\fR \fBtowupper_l\fR(\fBwint_t\fR \fIwc\fR, \fBlocale_t\fR \fIloc\fR);
+.fi
+.SH DESCRIPTION
+The function
+.BR towupper()
+is the wide character equivalent of the function
+.BR toupper (3C).
+It converts the lower-case wide character
+.I wc
+to the equivalent upper-case
+wide character, if one exists. If one does not exist, it returns
+.I wc
+unchanged.
+.LP
+The function
+.B towupper_l()
+is equivalent to the function
+.BR towupper() ,
+but instead of operating in the current locale, operates in the
+locale specified by
+.IR loc .
+.SH RETURN VALUES
+On successful completion,
+.B towupper()
+and
+.B towupper_l()
+return the upper-case character that corresponds to the argument passed.
+Otherwise, they return the argument unchanged.
+.SH ERRORS
+No errors are defined.
+.SH ATTRIBUTES
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Interface Stability	Standard
+_
+MT-Level	MT-Safe
+.TE
+
+.SH SEE ALSO
+.BR newlocale (3C),
+.BR setlocale (3C),
+.BR toupper(3C),
+.BR uselocale (3C),
+.BR locale (5)

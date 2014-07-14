@@ -1,4 +1,5 @@
 /*
+ * Copyright 2013 Garrett D'Amore <garrett@damore.org>
  * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -78,7 +79,5 @@
 #define	_CTYPE_SW3	0xc0000000U		/* 3 width character */
 #define	_CTYPE_SWM	0xe0000000U		/* Mask for screen width data */
 #define	_CTYPE_SWS	30			/* Bits to shift to get width */
-
-unsigned int	___runetype(int);
 
 #endif /* !__CTYPE_H_ */

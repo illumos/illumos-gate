@@ -23,6 +23,9 @@
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2013 Garrett D'Amore <garrett@damore.org>
+ */
 
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
@@ -50,11 +53,12 @@ extern "C" {
 #endif
 
 #if defined(__STDC__)
-extern unsigned char	__ctype[];
-#define	MB_CUR_MAX	__ctype[520]
+unsigned char __mb_cur_max(void);
 #else
-extern unsigned char	_ctype[];
-#define	MB_CUR_MAX	_ctype[520]
+unsigned char __mb_cur_max();
+#endif
+#ifndef MB_CUR_MAX
+#define	MB_CUR_MAX	(__mb_cur_max())
 #endif
 
 #if __cplusplus >= 199711L

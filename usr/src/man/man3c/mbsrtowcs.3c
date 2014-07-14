@@ -1,4 +1,5 @@
 '\" te
+.\" Copyright 2014 Garrett D'Amore <garrett@damore.org>
 .\" Copyright (c) 1992, X/Open Company Limited. All Rights Reserved.  Portions Copyright (c) 2003, Sun Microsystems, Inc.  All Rights Reserved.
 .\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
@@ -7,27 +8,43 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH MBSRTOWCS 3C "Nov 1, 2003"
+.TH MBSRTOWCS 3C "Jun 28, 2014"
 .SH NAME
-mbsrtowcs \- convert a character string to a wide-character string
-(restartable)
+mbsnrtwocs, mbsnrtowcs_l, mbsrtowcs, mbsrtowcs_l \- convert a character string
+to a wide-character string (restartable)
 .SH SYNOPSIS
 .LP
 .nf
 #include <wchar.h>
 
+\fBsize_t\fR \fBmbsnrtowcs\fR(\fBwchar_t *restrict\fR \fIdst\fR, \fBconst char **restrict\fR \fIsrc\fR,
+     \fBsize_t\fR \fInms\fR, \fBsize_t\fR \fIlen\fR, \fBmbstate_t *restrict\fR \fIps\fR);
+.fi
+.LP
+.nf
 \fBsize_t\fR \fBmbsrtowcs\fR(\fBwchar_t *restrict\fR \fIdst\fR, \fBconst char **restrict\fR \fIsrc\fR,
      \fBsize_t\fR \fIlen\fR, \fBmbstate_t *restrict\fR \fIps\fR);
 .fi
-
-.SH DESCRIPTION
-.sp
 .LP
-The \fBmbsrtowcs()\fR function converts a sequence of characters, beginning in
+.nf
+#include <wchar.h>
+#include <xlocale.h>
+
+\fBsize_t\fR \fBmbsnrtowcs_l\fR(\fBwchar_t *restrict\fR \fIdst\fR, \fBconst char **restrict\fR \fIsrc\fR,
+     \fBsize_t\fR \fInms\fR, \fBsize_t\fR \fIlen\fR, \fBmbstate_t *restrict\fR \fIps\fR, \fBlocale_t\fR \fIloc\fR);
+.fi
+.LP
+.nf
+\fBsize_t\fR \fBmbsrtowcs_l\fR(\fBwchar_t *restrict\fR \fIdst\fR, \fBconst char **restrict\fR \fIsrc\fR,
+     \fBsize_t\fR \fIlen\fR, \fBmbstate_t *restrict\fR \fIps\fR, \fBlocale_t\fR \fIloc\fR);
+.fi
+.SH DESCRIPTION
+.LP
+These function converts a sequence of characters, beginning in
 the conversion state described by the object pointed to by \fIps\fR, from the
 array indirectly pointed to by \fIsrc\fR into a sequence of corresponding
 wide-characters. If \fIdst\fR is not a null pointer, the converted characters
-are stored into the array pointed to by  \fIdst\fR. Conversion continues up to
+are stored into the array pointed to by \fIdst\fR. Conversion continues up to
 and including a terminating null character, which is also stored.  Conversion
 stops early in either of the following cases:
 .RS +4
@@ -43,10 +60,8 @@ When a sequence of bytes is encountered that does not form a valid character.
 When \fIlen\fR codes have been stored into the array pointed to by \fIdst\fR
 (and  \fIdst\fR is not a null pointer).
 .RE
-.sp
 .LP
 Each conversion takes place as if by a call to the \fBmbrtowc()\fR function.
-.sp
 .LP
 If \fIdst\fR is not a null pointer, the pointer object pointed to by \fIsrc\fR
 is assigned either a null pointer (if conversion stopped due to reaching a
@@ -54,31 +69,35 @@ terminating null character) or the address just past the last character
 converted (if any).  If conversion stopped due to reaching a terminating null
 character, and if \fIdst\fR is not a null pointer, the resulting state
 described is the initial conversion state.
-.sp
 .LP
-If \fIps\fR is a null pointer, the \fBmbsrtowcs()\fR function uses its own
+If \fIps\fR is a null pointer, these functions uses their own
 internal \fBmbstate_t\fR object, which is initialized at program startup to the
-initial conversion state.  Otherwise, the  \fBmbstate_t\fR object pointed to by
+initial conversion state.  Otherwise, the \fBmbstate_t\fR object pointed to by
 \fIps\fR is used to completely describe the current conversion state of the
-associated character sequence. Solaris will behave as if no function defined in
-the Solaris Reference Manual calls \fBmbsrtowcs()\fR.
-.sp
+associated character sequence. The system will behave as if no function defined
+in the Reference Manual calls any of these functions.
 .LP
-The behavior of this function is affected by the \fBLC_CTYPE\fR category of the
-current locale.  See \fBenviron\fR(5).
+The function \fBmbsnrtowcs()\fR behaves identically to \fBmbsrtowcs()\fR,
+except the conversion stops after reading \fInms\fR bytes from the
+buffer pointed to by \fIsrc\fR.
+.LP
+The behavior of \fBmbnrtowcs()\fR and \fBmbsrtowcs()\fR functions are
+affected by the \fBLC_CTYPE\fR category of the
+current locale.  See \fBenviron\fR(5). The functions \fBmbsrtowcs_l()\fR and
+\fBmbsnrtowcs_l()\fR behave identically to \fBmbsrtowcs()\fR and
+\fBmbsnrtowcs()\fR, except that instead of using the current locale, they use
+the locale specified by \fIloc\fR.
 .SH RETURN VALUES
-.sp
 .LP
 If the input conversion encounters a sequence of bytes that do not form a valid
-character, an encoding error occurs.  In this case, the \fBmbsrtowcs()\fR
-function stores the value of the macro \fBEILSEQ\fR in \fBerrno\fR and returns
-\fB(size_t)\(mi1\fR; the conversion state is undefined.  Otherwise, it returns
+character, an encoding error occurs.  In this case, these
+functions store the value of the macro \fBEILSEQ\fR in \fBerrno\fR and return
+\fB(size_t)\(mi1\fR; the conversion state is undefined.  Otherwise, they return
 the number of characters successfully converted, not including the terminating
 null (if any).
 .SH ERRORS
-.sp
 .LP
-The \fBmbsrtowcs()\fR function may fail if:
+Theses functions may fail if:
 .sp
 .ne 2
 .na
@@ -97,36 +116,38 @@ state.
 .RS 10n
 Invalid character sequence is detected.
 .RE
-
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
-.sp
-
-.sp
 .TS
 box;
 c | c
 l | l .
 ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface Stability	Standard
+Interface Stability	See below.
 _
-MT-Level	See NOTES below
+MT-Level	See below.
 .TE
 
-.SH SEE ALSO
-.sp
 .LP
-\fBmbrtowc\fR(3C), \fBmbsinit\fR(3C), \fBsetlocale\fR(3C), \fBattributes\fR(5),
-\fBenviron\fR(5), \fBstandards\fR(5)
-.SH NOTES
-.sp
+The
+.B mbsnrtowcs()
+and
+.B mbsrtowcs()
+functions are Standard.  The 
+.B mbsnrtowcs_l()
+and
+.B mbsrtowcs_l()
+functions are Uncommitted.
 .LP
-If \fIps\fR is not a null pointer, \fBmbsrtowcs()\fR uses the \fBmbstate_t\fR
-object pointed to by \fIps\fR and the function can be used safely in
-multithreaded applications, as long as \fBsetlocale\fR(3C) is not being called
-to change the locale. If \fIps\fR is a null pointer, \fBmbsrtowcs()\fR uses its
-internal \fBmbstate_t\fR object and the function is Unsafe in multithreaded
+If \fIps\fR is not a null pointer, these functions use the \fBmbstate_t\fR
+object pointed to by \fIps\fR and can be used safely in
+multithreaded applications, otherwise they use an
+internal \fBmbstate_t\fR object and are Unsafe in multithreaded
 applications.
+.SH SEE ALSO
+.LP
+\fBmbrtowc\fR(3C), \fBmbsinit\fR(3C), \fBnewlocale\fR(3C),
+\fBsetlocale\fR(3C), \fBuselocale()\fR, \fBattributes\fR(5),
+\fBenviron\fR(5), \fBstandards\fR(5)

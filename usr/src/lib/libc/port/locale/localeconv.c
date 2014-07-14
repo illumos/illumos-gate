@@ -1,4 +1,5 @@
 /*
+ * Copyright 2013 Garrett D'Amore <garrett@damore.org>
  * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2001 Alexey Zelkin <phantom@FreeBSD.org>
  * Copyright (c) 1991, 1993
@@ -37,35 +38,37 @@
 #include <locale.h>
 #include "lmonetary.h"
 #include "lnumeric.h"
+#include "localeimpl.h"
 
 /*
- * The localeconv() function constructs a struct lconv from the current
- * monetary and numeric locales.
+ * Return the current locale conversion.
+ *
+ * Note that XPG7 specifically states that localeconv's return value may
+ * be invalidated if the application calls setlocale() or uselocale() within
+ * the same thread.
  *
  * Because localeconv() may be called many times (especially by library
  * routines like printf() & strtod()), the approprate members of the
  * lconv structure are computed only when the monetary or numeric
  * locale has been changed.
  */
-int __mlocale_changed = 1;
-int __nlocale_changed = 1;
-
-/*
- * Return the current locale conversion.
- */
 struct lconv *
 localeconv(void)
 {
-	static struct lconv ret;
+	struct lconv	*lconv;
+	locale_t	loc;
+	struct lc_monetary	*mptr;
+	struct lc_numeric	*nptr;
 
-	if (__mlocale_changed) {
-		/* LC_MONETARY part */
-		struct lc_monetary_T *mptr;
+	loc = uselocale(NULL);
+	lconv = &loc->lconv;
 
-#define	M_ASSIGN_STR(NAME) (ret.NAME = (char *)mptr->NAME)
-#define	M_ASSIGN_CHAR(NAME) (ret.NAME = mptr->NAME[0])
+	if (loc->loaded[LC_MONETARY] == 0) {
+		mptr = loc->locdata[LC_MONETARY]->l_data[0];
 
-		mptr = __get_current_monetary_locale();
+#define	M_ASSIGN_STR(NAME) (lconv->NAME = (char *)mptr->NAME)
+#define	M_ASSIGN_CHAR(NAME) (lconv->NAME = mptr->NAME[0])
+
 		M_ASSIGN_STR(int_curr_symbol);
 		M_ASSIGN_STR(currency_symbol);
 		M_ASSIGN_STR(mon_decimal_point);
@@ -87,21 +90,19 @@ localeconv(void)
 		M_ASSIGN_CHAR(int_n_sep_by_space);
 		M_ASSIGN_CHAR(int_p_sign_posn);
 		M_ASSIGN_CHAR(int_n_sign_posn);
-		__mlocale_changed = 0;
+		loc->loaded[LC_MONETARY] = 1;
 	}
 
-	if (__nlocale_changed) {
-		/* LC_NUMERIC part */
-		struct lc_numeric_T *nptr;
+	if (loc->loaded[LC_NUMERIC] == 0) {
+		nptr = loc->locdata[LC_NUMERIC]->l_data[0];
 
-#define	N_ASSIGN_STR(NAME) (ret.NAME = (char *)nptr->NAME)
+#define	N_ASSIGN_STR(NAME) (lconv->NAME = (char *)nptr->NAME)
 
-		nptr = __get_current_numeric_locale();
 		N_ASSIGN_STR(decimal_point);
 		N_ASSIGN_STR(thousands_sep);
 		N_ASSIGN_STR(grouping);
-		__nlocale_changed = 0;
+		loc->loaded[LC_NUMERIC] = 1;
 	}
 
-	return (&ret);
+	return (lconv);
 }

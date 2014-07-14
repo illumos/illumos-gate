@@ -13,6 +13,7 @@
 # Copyright 2011, Richard Lowe
 # Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2013, OmniTI Computer Consulting, Inc. All rights reserved.
+# Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright (c) 2014, Joyent, Inc.  All rights reserved.
 #
 
@@ -243,6 +244,7 @@ MANFILES= 	__fbufsize.3c					\
 	 	mutex_init.3c					\
 	 	nanosleep.3c					\
 	 	ndbm.3c						\
+	 	newlocale.3c					\
 	 	nl_langinfo.3c					\
 	 	offsetof.3c					\
 	 	opendir.3c					\
@@ -414,6 +416,7 @@ MANFILES= 	__fbufsize.3c					\
 	 	str2sig.3c					\
 	 	strcoll.3c					\
 	 	strerror.3c					\
+	 	strfmon.3c					\
 	 	strftime.3c					\
 	 	string.3c					\
 	 	string_to_decimal.3c				\
@@ -465,6 +468,8 @@ MANFILES= 	__fbufsize.3c					\
 	 	toascii.3c					\
 	 	tolower.3c					\
 	 	toupper.3c					\
+	 	towlower.3c					\
+	 	towupper.3c					\
 	 	truncate.3c					\
 	 	tsearch.3c					\
 	 	ttyname.3c					\
@@ -479,6 +484,7 @@ MANFILES= 	__fbufsize.3c					\
 	 	ungetwc.3c					\
 	 	unlockpt.3c					\
 	 	unsetenv.3c					\
+	 	uselocale.3c					\
 	 	usleep.3c					\
 	 	vfwprintf.3c					\
 	 	vlfmt.3c					\
@@ -503,6 +509,7 @@ MANFILES= 	__fbufsize.3c					\
 	 	wcsxfrm.3c					\
 	 	wctob.3c					\
 	 	wctomb.3c					\
+	 	wctrans.3c					\
 	 	wctype.3c					\
 	 	wcwidth.3c					\
 	 	wmemchr.3c					\
@@ -658,6 +665,7 @@ MANLINKS=	FD_CLR.3c				\
 	 	bcopy.3c				\
 	 	bind_textdomain_codeset.3c		\
 	 	bindtextdomain.3c			\
+	 	btowc_l.3c				\
 	 	bzero.3c				\
 	 	calloc.3c				\
 	 	catclose.3c				\
@@ -702,6 +710,7 @@ MANLINKS=	FD_CLR.3c				\
 	 	door_unbind.3c				\
 	 	double_to_decimal.3c			\
 		dup3.3c					\
+	 	duplocale.3c				\
 	 	edata.3c				\
 	 	endgrent.3c				\
 	 	endnetgrent.3c				\
@@ -731,6 +740,7 @@ MANLINKS=	FD_CLR.3c				\
 	 	fgets.3c				\
 	 	fgetspent.3c				\
 	 	fgetspent_r.3c				\
+	 	fgetwc_l.3c				\
 	 	fgetws.3c				\
 	 	file_to_decimal.3c			\
 	 	fileno.3c				\
@@ -744,6 +754,7 @@ MANLINKS=	FD_CLR.3c				\
 	 	fpsetsticky.3c				\
 	 	fputs.3c				\
 	 	free.3c					\
+	 	freelocale.3c				\
 	 	fscanf.3c				\
 	 	fseeko.3c				\
 	 	fsetattr.3c				\
@@ -790,6 +801,8 @@ MANLINKS=	FD_CLR.3c				\
 	 	getvfsfile.3c				\
 	 	getvfsspec.3c				\
 	 	getw.3c					\
+	 	getwc_l.3c				\
+	 	getwchar_l.3c				\
 	 	getzoneidbyname.3c			\
 	 	getzonenamebyid.3c			\
 	 	globfree.3c				\
@@ -802,36 +815,71 @@ MANLINKS=	FD_CLR.3c				\
 	 	initstate.3c				\
 	 	innetgr.3c				\
 	 	isalnum.3c				\
+	 	isalnum_l.3c				\
 	 	isalpha.3c				\
+	 	isalpha_l.3c				\
 	 	isascii.3c				\
 	 	isblank.3c				\
+	 	isblank_l.3c				\
 	 	iscntrl.3c				\
+	 	iscntrl_l.3c				\
 	 	isdigit.3c				\
+	 	isdigit_l.3c				\
 	 	isenglish.3c				\
 	 	isgraph.3c				\
+	 	isgraph_l.3c				\
 	 	isideogram.3c				\
 	 	islower.3c				\
+	 	islower_l.3c				\
 	 	isnanf.3c				\
 	 	isnumber.3c				\
 	 	isphonogram.3c				\
 	 	isprint.3c				\
+	 	isprint_l.3c				\
 	 	ispunct.3c				\
+	 	ispunct_l.3c				\
 	 	isspace.3c				\
+	 	isspace_l.3c				\
 	 	isspecial.3c				\
 	 	isupper.3c				\
+	 	isupper_l.3c				\
 	 	iswalnum.3c				\
+	 	iswalnum_l.3c				\
+	 	iswalpha_l.3c				\
 	 	iswascii.3c				\
 	 	iswblank.3c				\
+	 	iswblank_l.3c				\
 	 	iswcntrl.3c				\
+	 	iswcntrl_l.3c				\
+	 	iswctype_l.3c				\
 	 	iswdigit.3c				\
+	 	iswdigit_l.3c				\
 	 	iswgraph.3c				\
+	 	iswgraph_l.3c				\
+	 	iswideogram.3c				\
+	 	iswideogram_l.3c			\
+	 	iswhexnumber.3c				\
+	 	iswhexnumber_l.3c			\
 	 	iswlower.3c				\
+	 	iswlower_l.3c				\
+	 	iswnumber.3c				\
+	 	iswnumber_l.3c				\
+	 	iswphonogram.3c				\
+	 	iswphonogram_l.3c			\
 	 	iswprint.3c				\
+	 	iswprint_l.3c				\
 	 	iswpunct.3c				\
+	 	iswpunct_l.3c				\
 	 	iswspace.3c				\
+	 	iswspace_l.3c				\
+	 	iswspecial.3c				\
+	 	iswspecial_l.3c				\
 	 	iswupper.3c				\
+	 	iswupper_l.3c				\
 	 	iswxdigit.3c				\
+	 	iswxdigit_l.3c				\
 	 	isxdigit.3c				\
+	 	isxdigit_l.3c				\
 	 	jrand48.3c				\
 	 	l64a.3c					\
 	 	labs.3c					\
@@ -846,6 +894,16 @@ MANLINKS=	FD_CLR.3c				\
 	 	longjmp.3c				\
 	 	lrand48.3c				\
 	 	major.3c				\
+	 	mblen_l.3c				\
+	 	mbrlen_l.3c				\
+	 	mbrtowc_l.3c				\
+	 	mbsinit_l.3c				\
+	 	mbsnrtowcs.3c				\
+	 	mbsnrtowcs_l.3c				\
+	 	mbsrtowcs_l.3c				\
+	 	mbstowcs.3c				\
+	 	mbstowcs_l.3c				\
+	 	mbtowc_l.3c				\
 	 	memalign.3c				\
 	 	membar_consumer.3c			\
 	 	membar_enter.3c				\
@@ -874,6 +932,7 @@ MANLINKS=	FD_CLR.3c				\
 	 	mutex_lock.3c				\
 	 	mutex_trylock.3c			\
 	 	mutex_unlock.3c				\
+	 	nl_langinfo_l.3c			\
 	 	nftw.3c					\
 	 	ngettext.3c				\
 	 	nrand48.3c				\
@@ -1063,22 +1122,28 @@ MANLINKS=	FD_CLR.3c				\
 		stdin.3c				\
 		stdout.3c				\
 	 	strcasecmp.3c				\
+	 	strcasecmp_l.3c				\
 	 	strcat.3c				\
 	 	strchr.3c				\
 	 	strcmp.3c				\
+	 	strcoll_l.3c				\
 	 	strcpy.3c				\
 	 	strcspn.3c				\
 	 	strdup.3c				\
 	 	strerror_r.3c				\
+	 	strfmon_l.3c				\
+	 	strftime_l.3c				\
 	 	strlcat.3c				\
 	 	strlcpy.3c				\
 	 	strlen.3c				\
 	 	strncasecmp.3c				\
+	 	strncasecmp_l.3c			\
 	 	strncat.3c				\
 	 	strncmp.3c				\
 	 	strncpy.3c				\
 	 	strnlen.3c				\
 	 	strpbrk.3c				\
+	 	strptime_l.3c				\
 	 	strrchr.3c				\
 	 	strsep.3c				\
 	 	strspn.3c				\
@@ -1090,6 +1155,7 @@ MANLINKS=	FD_CLR.3c				\
 	 	strtoll.3c				\
 	 	strtoull.3c				\
 	 	strtoumax.3c				\
+	 	strxfrm_l.3c				\
 	 	swapcontext.3c				\
 	 	swprintf.3c				\
 	 	swscanf.3c				\
@@ -1110,6 +1176,12 @@ MANLINKS=	FD_CLR.3c				\
 	 	timerisset.3c				\
 	 	timersub.3c				\
 	 	tmpnam_r.3c				\
+	 	tolower_l.3c				\
+	 	toupper_l.3c				\
+	 	towctrans.3c				\
+	 	towctrans_l.3c				\
+	 	towlower_l.3c				\
+	 	towupper_l.3c				\
 	 	ttyname_r.3c				\
 	 	twalk.3c				\
 	 	tzset.3c				\
@@ -1164,9 +1236,11 @@ MANLINKS=	FD_CLR.3c				\
 	 	watoi.3c				\
 	 	watol.3c				\
 	 	watoll.3c				\
+	 	wcrtomb_l.3c				\
 	 	wcscat.3c				\
 	 	wcschr.3c				\
 	 	wcscmp.3c				\
+	 	wcscoll_l.3c				\
 	 	wcscpy.3c				\
 	 	wcscspn.3c				\
 	 	wcsetno.3c				\
@@ -1184,6 +1258,12 @@ MANLINKS=	FD_CLR.3c				\
 	 	wcstoull.3c				\
 	 	wcstoumax.3c				\
 	 	wcswcs.3c				\
+	 	wcswidth_l.3c				\
+	 	wctob_l.3c				\
+	 	wctomb_l.3c				\
+	 	wctrans_l.3c				\
+	 	wctype_l.3c				\
+	 	wcwidth_l.3c				\
 	 	windex.3c				\
 	 	wordfree.3c				\
 	 	wprintf.3c				\
@@ -1348,6 +1428,8 @@ bcmp.3c					:= LINKSRC = bstring.3c
 bcopy.3c				:= LINKSRC = bstring.3c
 bzero.3c				:= LINKSRC = bstring.3c
 
+btowc_l.3c				:= LINKSRC = btowc.3c
+
 catclose.3c				:= LINKSRC = catopen.3c
 
 cfgetospeed.3c				:= LINKSRC = cfgetispeed.3c
@@ -1383,18 +1465,30 @@ localtime_r.3c				:= LINKSRC = ctime.3c
 tzset.3c				:= LINKSRC = ctime.3c
 
 isalnum.3c				:= LINKSRC = ctype.3c
+isalnum_l.3c				:= LINKSRC = ctype.3c
 isalpha.3c				:= LINKSRC = ctype.3c
+isalpha_l.3c				:= LINKSRC = ctype.3c
 isascii.3c				:= LINKSRC = ctype.3c
 isblank.3c				:= LINKSRC = ctype.3c
+isblank_l.3c				:= LINKSRC = ctype.3c
 iscntrl.3c				:= LINKSRC = ctype.3c
+iscntrl_l.3c				:= LINKSRC = ctype.3c
 isdigit.3c				:= LINKSRC = ctype.3c
+isdigit_l.3c				:= LINKSRC = ctype.3c
 isgraph.3c				:= LINKSRC = ctype.3c
+isgraph_l.3c				:= LINKSRC = ctype.3c
 islower.3c				:= LINKSRC = ctype.3c
+islower_l.3c				:= LINKSRC = ctype.3c
 isprint.3c				:= LINKSRC = ctype.3c
+isprint_l.3c				:= LINKSRC = ctype.3c
 ispunct.3c				:= LINKSRC = ctype.3c
+ispunct_l.3c				:= LINKSRC = ctype.3c
 isspace.3c				:= LINKSRC = ctype.3c
+isspace_l.3c				:= LINKSRC = ctype.3c
 isupper.3c				:= LINKSRC = ctype.3c
+isupper_l.3c				:= LINKSRC = ctype.3c
 isxdigit.3c				:= LINKSRC = ctype.3c
+isxdigit_l.3c				:= LINKSRC = ctype.3c
 
 decimal_to_double.3c			:= LINKSRC = decimal_to_floating.3c
 decimal_to_extended.3c			:= LINKSRC = decimal_to_floating.3c
@@ -1470,6 +1564,8 @@ getc_unlocked.3c			:= LINKSRC = fgetc.3c
 getchar.3c				:= LINKSRC = fgetc.3c
 getchar_unlocked.3c			:= LINKSRC = fgetc.3c
 getw.3c					:= LINKSRC = fgetc.3c
+
+fgetwc_l.3c				:= LINKSRC = fgetwc.3c
 
 double_to_decimal.3c			:= LINKSRC = floating_to_decimal.3c
 extended_to_decimal.3c			:= LINKSRC = floating_to_decimal.3c
@@ -1600,6 +1696,10 @@ getvfsany.3c				:= LINKSRC = getvfsent.3c
 getvfsfile.3c				:= LINKSRC = getvfsent.3c
 getvfsspec.3c				:= LINKSRC = getvfsent.3c
 
+getwc_l.3c				:= LINKSRC = getwc.3c
+
+getwchar_l.3c				:= LINKSRC = getwchar.3c
+
 fgetws.3c				:= LINKSRC = getws.3c
 
 getzoneidbyname.3c			:= LINKSRC = getzoneid.3c
@@ -1625,17 +1725,41 @@ isnumber.3c				:= LINKSRC = iswalpha.3c
 isphonogram.3c				:= LINKSRC = iswalpha.3c
 isspecial.3c				:= LINKSRC = iswalpha.3c
 iswalnum.3c				:= LINKSRC = iswalpha.3c
+iswalnum_l.3c				:= LINKSRC = iswalpha.3c
+iswalpha_l.3c				:= LINKSRC = iswalpha.3c
 iswascii.3c				:= LINKSRC = iswalpha.3c
 iswblank.3c				:= LINKSRC = iswalpha.3c
+iswblank_l.3c				:= LINKSRC = iswalpha.3c
 iswcntrl.3c				:= LINKSRC = iswalpha.3c
+iswcntrl_l.3c				:= LINKSRC = iswalpha.3c
 iswdigit.3c				:= LINKSRC = iswalpha.3c
+iswdigit_l.3c				:= LINKSRC = iswalpha.3c
 iswgraph.3c				:= LINKSRC = iswalpha.3c
+iswgraph_l.3c				:= LINKSRC = iswalpha.3c
+iswhexnumber.3c				:= LINKSRC = iswalpha.3c
+iswhexnumber_l.3c			:= LINKSRC = iswalpha.3c
+iswideogram.3c				:= LINKSRC = iswalpha.3c
+iswideogram_l.3c			:= LINKSRC = iswalpha.3c
 iswlower.3c				:= LINKSRC = iswalpha.3c
+iswlower_l.3c				:= LINKSRC = iswalpha.3c
+iswnumber.3c				:= LINKSRC = iswalpha.3c
+iswnumber_l.3c				:= LINKSRC = iswalpha.3c
+iswphonogram.3c				:= LINKSRC = iswalpha.3c
+iswphonogram_l.3c			:= LINKSRC = iswalpha.3c
 iswprint.3c				:= LINKSRC = iswalpha.3c
+iswprint_l.3c				:= LINKSRC = iswalpha.3c
 iswpunct.3c				:= LINKSRC = iswalpha.3c
+iswpunct_l.3c				:= LINKSRC = iswalpha.3c
 iswspace.3c				:= LINKSRC = iswalpha.3c
+iswspace_l.3c				:= LINKSRC = iswalpha.3c
+iswspecial.3c				:= LINKSRC = iswalpha.3c
+iswspecial_l.3c				:= LINKSRC = iswalpha.3c
 iswupper.3c				:= LINKSRC = iswalpha.3c
+iswupper_l.3c				:= LINKSRC = iswalpha.3c
 iswxdigit.3c				:= LINKSRC = iswalpha.3c
+iswxdigit_l.3c				:= LINKSRC = iswalpha.3c
+
+iswctype_l.3c				:= LINKSRC = iswctype.3c
 
 ulckpwdf.3c				:= LINKSRC = lckpwdf.3c
 
@@ -1652,6 +1776,22 @@ free.3c					:= LINKSRC = malloc.3c
 memalign.3c				:= LINKSRC = malloc.3c
 realloc.3c				:= LINKSRC = malloc.3c
 valloc.3c				:= LINKSRC = malloc.3c
+
+mblen_l.3c				:= LINKSRC = mblen.3c
+
+mbrlen_l.3c				:= LINKSRC = mbrlen.3c
+
+mbrtowc_l.3c				:= LINKSRC = mbrtowc.3c
+
+mbsinit_l.3c				:= LINKSRC = mbsinit.3c
+
+mbsnrtowcs.3c				:= LINKSRC = mbsrtowcs.3c
+mbsnrtowcs_l.3c				:= LINKSRC = mbsrtowcs.3c
+mbsrtowcs_l.3c				:= LINKSRC = mbsrtowcs.3c
+mbstowcs.3c				:= LINKSRC = mbsrtowcs.3c
+mbstowcs_l.3c				:= LINKSRC = mbsrtowcs.3c
+
+mbtowc_l.3c				:= LINKSRC = mbtowc.3c
 
 membar_consumer.3c			:= LINKSRC = membar_ops.3c
 membar_enter.3c				:= LINKSRC = membar_ops.3c
@@ -1695,6 +1835,11 @@ dbm_firstkey.3c				:= LINKSRC = ndbm.3c
 dbm_nextkey.3c				:= LINKSRC = ndbm.3c
 dbm_open.3c				:= LINKSRC = ndbm.3c
 dbm_store.3c				:= LINKSRC = ndbm.3c
+
+duplocale.3c				:= LINKSRC = newlocale.3c
+freelocale.3c				:= LINKSRC = newlocale.3c
+
+nl_langinfo_l.3c			:= LINKSRC = nl_langinfo.3c
 
 fdopendir.3c				:= LINKSRC = opendir.3c
 
@@ -1947,12 +2092,18 @@ stdout.3c				:= LINKSRC = stdio.3c
 
 sig2str.3c				:= LINKSRC = str2sig.3c
 
+strcoll_l.3c				:= LINKSRC = strcoll.3c
+
 strerror_r.3c				:= LINKSRC = strerror.3c
+
+strfmon_l.3c				:= LINKSRC = strfmon.3c
 
 ascftime.3c				:= LINKSRC = strftime.3c
 cftime.3c				:= LINKSRC = strftime.3c
+strftime_l.3c				:= LINKSRC = strftime.3c
 
 strcasecmp.3c				:= LINKSRC = string.3c
+strcasecmp_l.3c				:= LINKSRC = string.3c
 strcat.3c				:= LINKSRC = string.3c
 strchr.3c				:= LINKSRC = string.3c
 strcmp.3c				:= LINKSRC = string.3c
@@ -1963,6 +2114,7 @@ strlcat.3c				:= LINKSRC = string.3c
 strlcpy.3c				:= LINKSRC = string.3c
 strlen.3c				:= LINKSRC = string.3c
 strncasecmp.3c				:= LINKSRC = string.3c
+strncasecmp_l.3c			:= LINKSRC = string.3c
 strncat.3c				:= LINKSRC = string.3c
 strncmp.3c				:= LINKSRC = string.3c
 strncpy.3c				:= LINKSRC = string.3c
@@ -1978,6 +2130,8 @@ strtok_r.3c				:= LINKSRC = string.3c
 file_to_decimal.3c			:= LINKSRC = string_to_decimal.3c
 func_to_decimal.3c			:= LINKSRC = string_to_decimal.3c
 
+strptime_l.3c				:= LINKSRC = strptime.3c
+
 atof.3c					:= LINKSRC = strtod.3c
 strtof.3c				:= LINKSRC = strtod.3c
 strtold.3c				:= LINKSRC = strtod.3c
@@ -1992,7 +2146,10 @@ strtoll.3c				:= LINKSRC = strtol.3c
 ulltostr.3c				:= LINKSRC = strtol.3c
 
 strtoull.3c				:= LINKSRC = strtoul.3c
+
 wstostr.3c				:= LINKSRC = strtows.3c
+
+strxfrm_l.3c				:= LINKSRC = strxfrm.3c
 
 closelog.3c				:= LINKSRC = syslog.3c
 openlog.3c				:= LINKSRC = syslog.3c
@@ -2018,6 +2175,14 @@ timersub.3c				:= LINKSRC = timeradd.3c
 
 tempnam.3c				:= LINKSRC = tmpnam.3c
 tmpnam_r.3c				:= LINKSRC = tmpnam.3c
+
+tolower_l.3c				:= LINKSRC = tolower.3c
+
+toupper_l.3c				:= LINKSRC = toupper.3c
+
+towlower_l.3c				:= LINKSRC = towlower.3c
+
+towupper_l.3c				:= LINKSRC = towupper.3c
 
 ftruncate.3c				:= LINKSRC = truncate.3c
 
@@ -2065,6 +2230,9 @@ backtrace_symbols.3c			:= LINKSRC = walkcontext.3c
 backtrace_symbols_fd.3c			:= LINKSRC = walkcontext.3c
 printstack.3c				:= LINKSRC = walkcontext.3c
 
+wcrtomb_l.3c				:= LINKSRC = wcrtomb.3c
+
+wcscoll_l.3c				:= LINKSRC = wcscoll.3c
 wscoll.3c				:= LINKSRC = wcscoll.3c
 
 watof.3c				:= LINKSRC = wcstod.3c
@@ -2111,15 +2279,28 @@ wspbrk.3c				:= LINKSRC = wcstring.3c
 wsrchr.3c				:= LINKSRC = wcstring.3c
 wsspn.3c				:= LINKSRC = wcstring.3c
 wstok.3c				:= LINKSRC = wcstring.3c
-
-wsxfrm.3c				:= LINKSRC = wcsxfrm.3c
-
-wordfree.3c				:= LINKSRC = wordexp.3c
-
 wscasecmp.3c				:= LINKSRC = wstring.3c
 wscol.3c				:= LINKSRC = wstring.3c
 wsdup.3c				:= LINKSRC = wstring.3c
 wsncasecmp.3c				:= LINKSRC = wstring.3c
+
+wcswidth_l.3c				:= LINKSRC = wcswidth.3c
+
+wsxfrm.3c				:= LINKSRC = wcsxfrm.3c
+
+wctob_l.3c				:= LINKSRC = wctob.3c
+
+wctomb_l.3c				:= LINKSRC = wctomb.3c
+
+towctrans.3c				:= LINKSRC = wctrans.3c
+towctrans_l.3c				:= LINKSRC = wctrans.3c
+wctrans_l.3c				:= LINKSRC = wctrans.3c
+
+wctype_l.3c				:= LINKSRC = wctype.3c
+
+wcwidth_l.3c				:= LINKSRC = wcwidth.3c
+
+wordfree.3c				:= LINKSRC = wordexp.3c
 
 .KEEP_STATE:
 

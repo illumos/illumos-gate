@@ -20,6 +20,7 @@
  */
 
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -86,20 +87,30 @@ extern void *memccpy(void *_RESTRICT_KYWD, const void *_RESTRICT_KYWD,
 		int, size_t);
 #endif
 
-#if defined(__EXTENSIONS__) || \
-	(!defined(_STRICT_STDC) && !defined(__XOPEN_OR_POSIX))
-	/* || defined(_XPG7) */
-extern int strcasecmp(const char *, const char *);
-extern int strncasecmp(const char *, const char *, size_t);
+#if !defined(_STRICT_SYMBOLS) || defined(_XPG7)
+
 extern char *stpcpy(char *_RESTRICT_KYWD, const char *_RESTRICT_KYWD);
 extern char *stpncpy(char *_RESTRICT_KYWD, const char *_RESTRICT_KYWD, size_t);
 extern char *strndup(const char *, size_t);
 extern size_t strnlen(const char *, size_t);
 extern char *strsignal(int);
+
+#ifndef	_LOCALE_T
+#define	_LOCALE_T
+typedef struct locale *locale_t;
 #endif
 
-#if defined(__EXTENSIONS__) || \
-	(!defined(_STRICT_STDC) && !defined(__XOPEN_OR_POSIX))
+extern int strcoll_l(const char *, const char *, locale_t);
+extern size_t strxfrm_l(char *_RESTRICT_KYWD, const char *_RESTRICT_KYWD,
+    size_t, locale_t);
+extern int strcasecmp_l(const char *, const char *, locale_t);
+extern int strncasecmp_l(const char *, const char *, size_t, locale_t);
+
+#endif /* defined(_STRICT_SYMBOLS) || defined(_XPG7) */
+
+#if !defined(_STRICT_SYMBOLS)
+
+/* Note that some of these are also declared in strings.h for XPG4_2+ */
 extern int uucopy(const void *_RESTRICT_KYWD, void *_RESTRICT_KYWD, size_t);
 extern int uucopystr(const void *_RESTRICT_KYWD, void *_RESTRICT_KYWD, size_t);
 extern int ffs(int);
@@ -115,6 +126,9 @@ extern size_t strlcpy(char *, const char *, size_t);
 extern size_t strlcat(char *, const char *, size_t);
 extern char *strsep(char **stringp, const char *delim);
 extern char *strchrnul(const char *, int);
+extern char *strcasestr_l(const char *, const char *, locale_t);
+extern int strcasecmp(const char *, const char *);
+extern int strncasecmp(const char *, const char *, size_t);
 #endif /* defined(__EXTENSIONS__)... */
 
 #if defined(__EXTENSIONS__) || \
@@ -194,11 +208,11 @@ extern char *strtok_r();
 extern void *memccpy();
 #endif
 
-#if defined(__EXTENSIONS__) || \
-	(!defined(_STRICT_STDC) && !defined(__XOPEN_OR_POSIX))
-	/* || defined(_XPG7) */
+#if defined(_XPG7) || !defined(_STRICT_SYMBOLS)
 extern int strcasecmp();
 extern int strncasecmp();
+extern int strcasecmp_l();
+extern int strncasecmp_l();
 extern char *stpcpy();
 extern char *stpncpy();
 extern char *strndup();
@@ -206,8 +220,7 @@ extern size_t strnlen();
 extern char *strsignal();
 #endif
 
-#if defined(__EXTENSIONS__) || \
-	(!defined(_STRICT_STDC) && !defined(__XOPEN_OR_POSIX))
+#if !defined(_STRICT_SYMBOLS)
 extern int uucopy();
 extern int uucopystr();
 extern int ffs();
@@ -217,15 +230,21 @@ extern int fls();
 extern int flsl();
 extern int flsll();
 extern char *strcasestr();
+extern char *strcasestr_l();
 extern char *strnstr();
 extern size_t strlcpy();
 extern size_t strlcat();
 extern char *strsep();
 extern char *strchrnul();
-#endif /* defined(__EXTENSIONS__) ... */
+#endif /* _STRICT_SYMBOLS */
 
 #if defined(__EXTENSIONS__) || !defined(__XOPEN_OR_POSIX) || defined(_XPG4_2)
 extern char *strdup();
+#endif
+
+#if defined(_XPG7) || !defined(_STRICT_SYMBOLS)
+extern size_t strcoll_l();
+extern size_t strxfrm_l();
 #endif
 
 #endif	/* __STDC__ */

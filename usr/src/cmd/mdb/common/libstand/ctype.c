@@ -1,50 +1,97 @@
 /*
- * CDDL HEADER START
+ * This file and its contents are supplied under the terms of the
+ * Common Development and Distribution License ("CDDL"), version 1.0.
+ * You may only use this file in accordance with the terms of version
+ * 1.0 of the CDDL.
  *
- * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
- *
- * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or http://www.opensolaris.org/os/licensing.
- * See the License for the specific language governing permissions
- * and limitations under the License.
- *
- * When distributing Covered Code, include this CDDL HEADER in each
- * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
- * If applicable, add the following below this CDDL HEADER, with the
- * fields enclosed by brackets "[]" replaced with your own identifying
- * information: Portions Copyright [yyyy] [name of copyright owner]
- *
- * CDDL HEADER END
+ * A full copy of the text of the CDDL should have accompanied this
+ * source.  A copy of the CDDL is also available via the Internet at
+ * http://www.illumos.org/license/CDDL.
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * ASCII versions of ctype character classification functions.  This avoids
+ * pulling in the entire locale framework that is in libc.
+ */
 
-#include <ctype.h>
-
-unsigned char __ctype[129] =
+int
+isdigit(int c)
 {
-	0, /* EOF */
-	_C,	_C,	_C,	_C,	_C,	_C,	_C,	_C,
-	_C,	_S|_C,	_S|_C,	_S|_C,	_S|_C,	_S|_C,	_C,	_C,
-	_C,	_C,	_C,	_C,	_C,	_C,	_C,	_C,
-	_C,	_C,	_C,	_C,	_C,	_C,	_C,	_C,
-	_S|_B,	_P,	_P,	_P,	_P,	_P,	_P,	_P,
-	_P,	_P,	_P,	_P,	_P,	_P,	_P,	_P,
-	_N|_X,	_N|_X,	_N|_X,	_N|_X,	_N|_X,	_N|_X,	_N|_X,	_N|_X,
-	_N|_X,	_N|_X,	_P,	_P,	_P,	_P,	_P,	_P,
-	_P,	_U|_X,	_U|_X,	_U|_X,	_U|_X,	_U|_X,	_U|_X,	_U,
-	_U,	_U,	_U,	_U,	_U,	_U,	_U,	_U,
-	_U,	_U,	_U,	_U,	_U,	_U,	_U,	_U,
-	_U,	_U,	_U,	_P,	_P,	_P,	_P,	_P,
-	_P,	_L|_X,	_L|_X,	_L|_X,	_L|_X,	_L|_X,	_L|_X,	_L,
-	_L,	_L,	_L,	_L,	_L,	_L,	_L,	_L,
-	_L,	_L,	_L,	_L,	_L,	_L,	_L,	_L,
-	_L,	_L,	_L,	_P,	_P,	_P,	_P,	_C,
-};
+	return ((c >= '0' && c <= '9') ? 1 : 0);
+}
+
+int
+isupper(int c)
+{
+	return ((c >= 'A' && c <= 'Z') ? 1 : 0);
+}
+
+
+int
+islower(int c)
+{
+	return ((c >= 'a' && c <= 'z') ? 1 : 0);
+}
+
+int
+isspace(int c)
+{
+	return (((c == ' ') || (c == '\t') || (c == '\r') || (c == '\n') ||
+	    (c == '\v') || (c == '\f')) ? 1 : 0);
+}
+
+int
+isxdigit(int c)
+{
+	return ((isdigit(c) || (c >= 'A' && c <= 'F') ||
+	    (c >= 'a' && c <= 'f')) ? 1 : 0);
+}
+
+int
+isalpha(int c)
+{
+	return ((isupper(c) || islower(c)) ? 1 : 0);
+}
+
+
+int
+isalnum(int c)
+{
+	return ((isalpha(c) || isdigit(c)) ? 1 : 0);
+}
+
+int
+ispunct(int c)
+{
+	return (((c >= '!') && (c <= '/')) ||
+	    ((c >= ':') && (c <= '@')) ||
+	    ((c >= '[') && (c <= '`')) ||
+	    ((c >= '{') && (c <= '~')));
+}
+
+int
+iscntrl(int c)
+{
+	return ((c < 0x20) || (c == 0x7f));
+}
+
+int
+isprint(int c)
+{
+	/*
+	 * Almost the inverse of iscntrl, but be careful that c > 0x7f
+	 * returns false for everything.
+	 */
+	return ((c >= ' ') && (c <= '~'));
+}
+
+int
+isgraph(int c)
+{
+	/* isgraph is like is print, but excludes <space> */
+	return ((c >= '!') && (c <= '~'));
+}

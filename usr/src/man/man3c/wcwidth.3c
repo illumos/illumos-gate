@@ -1,4 +1,5 @@
 '\" te
+.\" Copyright 2014 Garrett D'Amore <garrett@damore.org>
 .\" Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
 .\" Portions Copyright (c) 2002, Sun Microsystems, Inc.  All Rights Reserved.
 .\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
@@ -8,9 +9,9 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH WCWIDTH 3C "Aug 14, 2002"
+.TH WCWIDTH 3C "Jun 25, 2014"
 .SH NAME
-wcwidth \- number of column positions of a wide-character code
+wcwidth, wcwidth_l \- number of column positions of a wide-character code
 .SH SYNOPSIS
 .LP
 .nf
@@ -18,32 +19,35 @@ wcwidth \- number of column positions of a wide-character code
 
 \fBint\fR \fBwcwidth\fR(\fBwchar_t\fR \fIwc\fR);
 .fi
+.LP
+.nf
+#include <wchar.h>
+#include <xlocale.h>
 
+\fBint\fR \fBwcwidth_l\fR(\fBwchar_t\fR \fIwc\fR, \fBlocale_t\fR \fIloc\fR);
+.fi
 .SH DESCRIPTION
-.sp
 .LP
 The \fBwcwidth()\fR function determines the number of column positions required
 for the wide character \fIwc\fR. The value of \fIwc\fR must be a character
 representable as a \fBwchar_t\fR, and must be a wide-character code
 corresponding to a valid character in the current locale.
-.SH RETURN VALUES
-.sp
 .LP
-The \fBwcwidth()\fR function either returns \fB0\fR (if \fIwc\fR is a null
-wide-character code), or returns the number of column positions to be occupied
-by the wide-character code \fIwc\fR, or returns \fB\(mi1\fR (if \fIwc\fR does
+The function \fBwcwidth_l()\fR behaves identically to \fBwcwidth()\fR, except
+instead of operating in the current locale, it operates in the locale
+specified by \fIloc\fR.
+.SH RETURN VALUES
+.LP
+These functions either return \fB0\fR (if \fIwc\fR is a null
+wide-character code), or the number of column positions to be occupied
+by the wide-character code \fIwc\fR, or \fB\(mi1\fR (if \fIwc\fR does
 not correspond to a printing wide-character code).
 .SH ERRORS
-.sp
 .LP
 No errors are defined.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
-.sp
-
-.sp
 .TS
 box;
 c | c
@@ -52,13 +56,16 @@ ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
 CSI	Enabled
 _
-Interface Stability	Standard
+Interface Stability	See below.
 _
-MT-Level	MT-Safe with exceptions
+MT-Level	MT-Safe
 .TE
 
-.SH SEE ALSO
-.sp
 .LP
-\fBsetlocale\fR(3C), \fBwcswidth\fR(3C), \fBattributes\fR(5),
+The \fBwcwidth()\fR function is Standard.  The \fBwcwidth_l()\fR function
+is Uncommitted.
+.SH SEE ALSO
+.LP
+\fBnewlocale\fR(3C), \fBsetlocale\fR(3C), \fBuselocale\fR(3C),
+\fBwcswidth\fR(3C), \fBattributes\fR(5),
 \fBstandards\fR(5)

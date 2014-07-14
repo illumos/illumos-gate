@@ -1,4 +1,5 @@
 /*
+ * Copyright 2014 Garrett D'Amore.
  * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2000, 2001 Alexey Zelkin <phantom@FreeBSD.org>
  * All rights reserved.
@@ -27,59 +28,57 @@
 
 #include "lint.h"
 #include <limits.h>
+#include <errno.h>
 #include "ldpart.h"
 #include "lnumeric.h"
-#include "../i18n/_locale.h"
+#include "localeimpl.h"
 
-extern int __nlocale_changed;
 extern const char *__fix_locale_grouping_str(const char *);
 
-#define	LCNUMERIC_SIZE (sizeof (struct lc_numeric_T) / sizeof (char *))
+#define	LCNUMERIC_SIZE (sizeof (struct lc_numeric) / sizeof (char *))
 
 static char	numempty[] = { CHAR_MAX, '\0' };
 
-static const struct lc_numeric_T _C_numeric_locale = {
+struct lc_numeric lc_numeric_posix = {
 	".",		/* decimal_point */
 	"",		/* thousands_sep */
 	numempty	/* grouping */
 };
 
-static struct lc_numeric_T _numeric_locale;
-static int	_numeric_using_locale;
-static char	*_numeric_locale_buf;
+struct locdata __posix_numeric_locdata = {
+	.l_lname = "C",
+	.l_data = { &lc_numeric_posix }
+};
 
-int
-__numeric_load_locale(const char *name)
+
+/*
+ * Return the locale's numeric locdata structure.
+ */
+struct locdata *
+__lc_numeric_load(const char *name)
 {
-	const struct lc_numeric_T *leg = &_C_numeric_locale;
-
+	struct locdata *ldata;
+	struct lc_numeric *lnum;
 	int ret;
 
-	ret = __part_load_locale(name, &_numeric_using_locale,
-	    &_numeric_locale_buf, "LC_NUMERIC", LCNUMERIC_SIZE, LCNUMERIC_SIZE,
-	    (const char **)&_numeric_locale);
-	if (ret == _LDP_ERROR)
-		return (_LDP_ERROR);
-
-	__nlocale_changed = 1;
-	if (ret == _LDP_LOADED) {
-		/* Can't be empty according to C99 */
-		if (*_numeric_locale.decimal_point == '\0')
-			_numeric_locale.decimal_point =
-			    _C_numeric_locale.decimal_point;
-		_numeric_locale.grouping =
-		    __fix_locale_grouping_str(_numeric_locale.grouping);
-		leg = (const struct lc_numeric_T *)&_numeric_locale;
+	if ((ldata = __locdata_alloc(name, sizeof (*lnum))) == NULL) {
+		errno = EINVAL;
+		return (NULL);
 	}
-	/* This is Solaris legacy, required for ABI compatability */
-	_numeric[0] = *leg->decimal_point;
-	_numeric[1] = *leg->grouping;
-	return (ret);
-}
+	lnum = ldata->l_data[0];
 
-struct lc_numeric_T *
-__get_current_numeric_locale(void)
-{
-	return (_numeric_using_locale ? &_numeric_locale :
-	    (struct lc_numeric_T *)&_C_numeric_locale);
+	ret = __part_load_locale(name, (char **)&ldata->l_data[1],
+	    "LC_NUMERIC", LCNUMERIC_SIZE, LCNUMERIC_SIZE, (const char **)lnum);
+
+	if (ret != _LDP_LOADED) {
+		__locdata_free(ldata);
+		return (NULL);
+	}
+
+	/* Can't be empty according to C99 */
+	if (*lnum->decimal_point == '\0')
+		lnum->decimal_point = lc_numeric_posix.decimal_point;
+	lnum->grouping = __fix_locale_grouping_str(lnum->grouping);
+
+	return (ldata);
 }

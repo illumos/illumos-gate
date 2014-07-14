@@ -1,4 +1,5 @@
 /*
+ * Copyright 2013 Garrett D'Amore <garrett@damore.org>
  * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2002, 2003 Tim J. Robbins.
  * All rights reserved.
@@ -28,10 +29,12 @@
 #include "lint.h"
 #include <stdio.h>
 #include <wchar.h>
+#include <locale.h>
+#include <xlocale.h>
 #include "mblocal.h"
 
 wint_t
-btowc(int c)
+btowc_l(int c, locale_t loc)
 {
 	static const mbstate_t initial = { 0 };
 	mbstate_t mbs = initial;
@@ -46,7 +49,13 @@ btowc(int c)
 	 * counts.
 	 */
 	cc = (char)c;
-	if (__mbrtowc(&wc, &cc, 1, &mbs) > 1)
+	if (mbrtowc_l(&wc, &cc, 1, &mbs, loc) > 1)
 		return (WEOF);
 	return (wc);
+}
+
+wint_t
+btowc(int c)
+{
+	return (btowc_l(c, uselocale(NULL)));
 }

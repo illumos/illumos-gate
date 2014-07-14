@@ -3,10 +3,15 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SOCONFIG 1M "Oct 29, 2008"
+.TH SOCONFIG 1M "Apr 12, 2014"
 .SH NAME
 soconfig \- configure transport providers for use by sockets
 .SH SYNOPSIS
+.LP
+.nf
+\fB/sbin/soconfig\fR \fB-d\fR \fIdir\fR
+.fi
+
 .LP
 .nf
 \fB/sbin/soconfig\fR \fB-f\fR \fIfile\fR
@@ -14,7 +19,7 @@ soconfig \- configure transport providers for use by sockets
 
 .LP
 .nf
-\fB/sbin/soconfig\fR \fIfamily\fR \fItype\fR \fIprotocol\fR [\fIpath\fR]
+\fB/sbin/soconfig\fR \fIfamily\fR \fItype\fR \fIprotocol\fR [\fImodule\fR | \fIpath\fR]
 .fi
 
 .SH DESCRIPTION
@@ -27,8 +32,8 @@ as \fB/dev/tcp\fR. This utility can be used to add an additional mapping or
 remove a previous mapping.
 .sp
 .LP
-The \fBinit\fR(1M) utility uses \fBsoconfig\fR with the \fBsock2path\fR(4) file
-during the booting sequence.
+The \fBinit\fR(1M) utility uses \fBsoconfig\fR with the \fBsock2path.d\fR(4)
+directory during the booting sequence.
 .SH OPTIONS
 .sp
 .LP
@@ -36,18 +41,29 @@ The following options are supported:
 .sp
 .ne 2
 .na
+\fB\fB-d\fR \fIdir\fR\fR
+.ad
+.RS 11n
+Set up the \fBsoconfig\fR configuration for each driver
+according  to  the  information stored in the
+files in \fIdir\fR.
+.RE
+
+.sp
+.ne 2
+.na
 \fB\fB-f\fR \fIfile\fR\fR
 .ad
 .RS 11n
 Set up the \fBsoconfig\fR configuration for each driver according to the
-information stored in \fBfile\fR. A \fBsoconfig\fR file consists of lines of at
+information stored in \fIfile\fR. A \fBsoconfig\fR file consists of lines of at
 least the first three fields listed below, separated by spaces:
 .sp
-\fIfamily  type  protocol  path\fR
+\fIfamily  type  protocol  [module | path]\fR
 .sp
 These fields are described in the \fBOPERANDS\fR section below.
 .sp
-An example of \fBfile\fR can be found in the \fBEXAMPLES\fR section below.
+An example of \fIfile\fR can be found in the \fBEXAMPLES\fR section below.
 .RE
 
 .SH OPERANDS
@@ -156,16 +172,17 @@ begin with a hash mark (\fB#\fR):
 .sp
 .ne 2
 .na
-\fB\fB/etc/sock2path\fR\fR
+\fB\fB/etc/sock2path.d\fR\fR
 .ad
 .RS 18n
-File containing mappings from sockets to transport providers.
+Directory containing files with mappings from
+sockets  to transport providers.
 .RE
 
 .SH SEE ALSO
 .sp
 .LP
-\fBinit\fR(1M), \fBsock2path\fR(4), \fBattributes\fR(5)
+\fBinit\fR(1M), \fBsock2path.d\fR(4), \fBattributes\fR(5)
 .sp
 .LP
 \fINetwork Interface Guide\fR

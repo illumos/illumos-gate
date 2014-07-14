@@ -28,7 +28,7 @@
 # Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved.
 # Copyright (c) 2013 Gary Mills
-#
+# Copyright 2014 Garrett D'Amore <garrett@damore.org>
 
 #
 # MAPFILE HEADER START
@@ -92,6 +92,88 @@ $endif
 $if _x86 && _ELF64
 $add amd64
 $endif
+
+SYMBOL_VERSION ILLUMOS_0.8 {	# POSIX 2008 newlocale and friends
+    protected:
+	__global_locale;
+	__mb_cur_max;
+	__mb_cur_max_l;
+	btowc_l;
+	duplocale;
+	fgetwc_l;
+	freelocale;
+	getwc_l;
+	isalnum_l;
+	isalpha_l;
+	isblank_l;
+	iscntrl_l;
+	isdigit_l;
+	isgraph_l;
+	islower_l;
+	isprint_l;
+	ispunct_l;
+	isspace_l;
+	isupper_l;
+	iswideogram;
+	iswideogram_l;
+	iswnumber;
+	iswnumber_l;
+	iswhexnumber;
+	iswhexnumber_l;
+	iswphonogram;
+	iswphonogram_l;
+	iswspecial;
+	iswspecial_l;
+	iswalnum_l;
+	iswalpha_l;
+	iswblank_l;
+	iswcntrl_l;
+	iswctype_l;
+	iswdigit_l;
+	iswgraph_l;
+	iswlower_l;
+	iswprint_l;
+	iswpunct_l;
+	iswspace_l;
+	iswupper_l;
+	mblen_l;
+	mbrlen_l;
+	mbsinit_l;
+	mbsnrtowcs;
+	mbsnrtowcs_l;
+	mbsrtowcs_l;
+	mbstowcs_l;
+	mbtowc_l;
+	newlocale;
+	nl_langinfo_l;
+	strcasecmp_l;
+	strcasestr_l;
+	strcoll_l;
+	strfmon_l;
+	strftime_l;
+	strncasecmp_l;
+	strptime_l;
+	strxfrm_l;
+	tolower_l;
+	toupper_l;
+	towlower_l;
+	towupper_l;
+	towctrans_l;
+	uselocale;
+	wcrtomb_l;
+	wcscasecmp_l;
+	wcscoll_l;
+	wcsncasecmp_l;
+	wcsrtombs_l;
+	wcstombs_l;
+	wcswidth_l;
+	wcsxfrm_l;
+	wctob_l;
+	wctomb_l;
+	wctrans_l;
+	wctype_l;
+	wcwidth_l;
+} ILLUMOS_0.7;
 
 SYMBOL_VERSION ILLUMOS_0.7 {	# Illumos additions
     protected:

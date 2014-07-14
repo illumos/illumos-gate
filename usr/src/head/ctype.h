@@ -27,14 +27,14 @@
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ */
 
 #ifndef _CTYPE_H
 #define	_CTYPE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <iso/ctype_iso.h>
-#include <iso/ctype_c99.h>
 
 /*
  * Allow global visibility for symbols defined in
@@ -54,6 +54,9 @@ using std::isupper;
 using std::isxdigit;
 using std::tolower;
 using std::toupper;
+#if _cplusplus >= 201103L
+using std::isblank;
+#endif
 #endif
 
 #ifdef	__cplusplus
@@ -80,25 +83,42 @@ extern int _toupper(int);
 	defined(_XOPEN_SOURCE)) || defined(__XPG4_CHAR_CLASS__)
 #define	isascii(c)	(!(((int)(c)) & ~0177))
 #define	toascii(c)	(((int)(c)) & 0177)
-#if defined(__XPG4_CHAR_CLASS__) || defined(_XPG4)
-#define	_toupper(c)	(__trans_upper[(int)(c)])
-#define	_tolower(c)	(__trans_lower[(int)(c)])
-#else
-#define	_toupper(c)	((__ctype + 258)[(int)(c)])
-#define	_tolower(c)	((__ctype + 258)[(int)(c)])
-#endif /* defined(__XPG4_CHAR_CLASS__) || defined(_XPG4) */
+#define	_toupper(c)	(toupper(c))
+#define	_tolower(c)	(tolower(c))
 
 #endif /* defined(__EXTENSIONS__) || ((!defined(_STRICT_STDC) ... */
 
 #endif	/* !defined(__lint) */
+
+#if defined(_XPG7) || !defined(_STRICT_SYMBOLS)
+
+#ifndef _LOCALE_T
+#define	_LOCALE_T
+typedef struct locale *locale_t;
+#endif
+
+extern int isalnum_l(int, locale_t);
+extern int isalpha_l(int, locale_t);
+extern int isblank_l(int, locale_t);
+extern int iscntrl_l(int, locale_t);
+extern int isdigit_l(int, locale_t);
+extern int isgraph_l(int, locale_t);
+extern int islower_l(int, locale_t);
+extern int isprint_l(int, locale_t);
+extern int ispunct_l(int, locale_t);
+extern int isspace_l(int, locale_t);
+extern int isupper_l(int, locale_t);
+extern int isxdigit_l(int, locale_t);
+
+#endif /* defined(_XPG7) || !defined(_STRICT_SYMBOLS) */
 
 #else	/* defined(__STDC__) */
 
 #if !defined(__lint)
 
 #define	isascii(c)	(!(((int)(c)) & ~0177))
-#define	_toupper(c)	((_ctype + 258)[(int)(c)])
-#define	_tolower(c)	((_ctype + 258)[(int)(c)])
+#define	_toupper(c)	(isascii(c) ? __trans_upper[(int)(c)] : toupper(c))
+#define	_tolower(c)	(isascii(c) ? __trans_lower[(int)(c)] : tolower(c))
 #define	toascii(c)	(((int)(c)) & 0177)
 
 #endif	/* !defined(__lint) */

@@ -23,7 +23,7 @@
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright 2012 Nexenta Systems, Inc. All rights reserved.
-# Copyright 2013 Garrett D'Amore <garrett@damore.org>
+# Copyright 2014 Garrett D'Amore <garrett@damore.org>
 #
 
 set name=pkg.fmri value=pkg:/system/header@$(PKGVERS)
@@ -440,7 +440,6 @@ file path=usr/include/ipp/ipp.h
 file path=usr/include/ipp/ipp_config.h
 file path=usr/include/ipp/ipp_impl.h
 file path=usr/include/ipp/ippctl.h
-file path=usr/include/iso/ctype_c99.h
 file path=usr/include/iso/ctype_iso.h
 file path=usr/include/iso/limits_iso.h
 file path=usr/include/iso/locale_iso.h
@@ -457,7 +456,6 @@ file path=usr/include/iso/string_iso.h
 file path=usr/include/iso/time_iso.h
 file path=usr/include/iso/wchar_c99.h
 file path=usr/include/iso/wchar_iso.h
-file path=usr/include/iso/wctype_c99.h
 file path=usr/include/iso/wctype_iso.h
 file path=usr/include/iso646.h
 file path=usr/include/kerberosv5/com_err.h
@@ -1681,6 +1679,7 @@ file path=usr/include/wchar_impl.h
 file path=usr/include/wctype.h
 file path=usr/include/widec.h
 file path=usr/include/wordexp.h
+file path=usr/include/xlocale.h
 file path=usr/include/xti.h
 file path=usr/include/xti_inet.h
 file path=usr/include/zone.h
@@ -1935,6 +1934,7 @@ file path=usr/share/man/man3head/wait.h.3head
 file path=usr/share/man/man3head/wchar.h.3head
 file path=usr/share/man/man3head/wctype.h.3head
 file path=usr/share/man/man3head/wordexp.h.3head
+file path=usr/share/man/man3head/xlocale.h.3head
 file path=usr/share/man/man4/note.4
 file path=usr/share/man/man5/prof.5
 file path=usr/share/man/man7i/cdio.7i
@@ -2115,6 +2115,7 @@ link path=usr/share/man/man3head/wait.3head target=wait.h.3head
 link path=usr/share/man/man3head/wchar.3head target=wchar.h.3head
 link path=usr/share/man/man3head/wctype.3head target=wctype.h.3head
 link path=usr/share/man/man3head/wordexp.3head target=wordexp.h.3head
+link path=usr/share/man/man3head/xlocale.3head target=xlocale.h.3head
 $(i386_ONLY)link path=usr/share/src/uts/i86pc/sys \
     target=../../../../platform/i86pc/include/sys
 $(i386_ONLY)link path=usr/share/src/uts/i86pc/vm \

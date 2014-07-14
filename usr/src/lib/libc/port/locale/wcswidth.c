@@ -1,4 +1,5 @@
 /*
+ * Copyright 2013 Garrett D'Amore <garrett@damore.org>
  * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -37,19 +38,27 @@
  */
 
 #include "lint.h"
+#include <locale.h>
 #include <wchar.h>
+#include <xlocale.h>
 
 int
-wcswidth(const wchar_t *pwcs, size_t n)
+wcswidth_l(const wchar_t *pwcs, size_t n, locale_t loc)
 {
 	wchar_t wc;
 	int len, l;
 
 	len = 0;
 	while (n-- > 0 && (wc = *pwcs++) != L'\0') {
-		if ((l = wcwidth(wc)) < 0)
+		if ((l = wcwidth_l(wc, loc)) < 0)
 			return (-1);
 		len += l;
 	}
 	return (len);
+}
+
+int
+wcswidth(const wchar_t *pwcs, size_t n)
+{
+	return (wcswidth_l(pwcs, n, uselocale(NULL)));
 }

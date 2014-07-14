@@ -20,6 +20,7 @@
  */
 
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -145,4 +146,19 @@ _tmem_get_base(void)
 void
 _tmem_set_cleanup(void (*f)(int, void *))
 {
+}
+
+int
+isspace(int c)
+{
+	switch (c) {
+	case ' ':
+	case '\t':
+	case '\n':
+	case '\r':
+	case '\f':
+	case '\v':
+		return (1);
+	}
+	return (0);
 }

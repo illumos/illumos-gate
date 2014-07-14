@@ -3,32 +3,32 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SOCK2PATH 4 "Nov 4, 2008"
+.TH SOCK2PATH.D 4 "Apr 12, 2014"
 .SH NAME
-sock2path \- socket mapping file that maps sockets to transport providers
+sock2path.d \- socket mapping files that map sockets to transport providers
 .SH SYNOPSIS
 .LP
 .nf
-\fB/etc/sock2path\fR
+\fB/etc/sock2path.d\fR
 .fi
 
 .SH DESCRIPTION
 .sp
 .LP
-The socket mapping file, \fB/etc/sock2path\fR, is a system file that contains
-the mappings between the \fBsocket\fR(3SOCKET) call parameters and the
-transport provider driver. Its format is described on the \fBsoconfig\fR(1M)
-manual page.
+\fB/etc/sock2path.d\fR is a directory containing files with mappings
+between the \fBsocket\fR(3SOCKET) call parameters and the transport
+provider driver.  The mapping file format is described in the
+\fBsoconfig\fR(1M) manual page.
 .sp
 .LP
 The \fBinit\fR(1M) utility uses the \fBsoconfig\fR utility with the
-\fBsock2path\fR file during the boot sequence.
+\fBsock2path.d\fR directory during the boot sequence.
 .SH EXAMPLES
 .LP
-\fBExample 1 \fRAn Example of the \fBsock2path\fR File
+\fBExample 1 \fRAn Example of a Mapping File
 .sp
 .LP
-The following is an example of a \fBsock2path\fR file:
+The following is an example of a mapping file:
 
 .sp
 .in +2

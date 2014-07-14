@@ -1,4 +1,5 @@
 /*
+ * Copyright 2013 Garrett D'Amore <garrett@damore.org>
  * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2002-2004 Tim J. Robbins.
  * All rights reserved.
@@ -27,14 +28,25 @@
 
 #include "lint.h"
 #include <wchar.h>
+#include <locale.h>
+#include <xlocale.h>
+#include "localeimpl.h"
+#include "lctype.h"
 #include "mblocal.h"
 
 size_t
-wcrtomb(char *_RESTRICT_KYWD s, wchar_t wc, mbstate_t *_RESTRICT_KYWD ps)
+wcrtomb_l(char *_RESTRICT_KYWD s, wchar_t wc, mbstate_t *_RESTRICT_KYWD ps,
+    locale_t loc)
 {
 	static mbstate_t mbs;
 
 	if (ps == NULL)
 		ps = &mbs;
-	return (__wcrtomb(s, wc, ps));
+	return (loc->ctype->lc_wcrtomb(s, wc, ps));
+}
+
+size_t
+wcrtomb(char *_RESTRICT_KYWD s, wchar_t wc, mbstate_t *_RESTRICT_KYWD ps)
+{
+	return (wcrtomb_l(s, wc, ps, uselocale(NULL)));
 }

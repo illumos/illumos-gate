@@ -1,4 +1,5 @@
 /*
+ * Copyright 2013 Garrett D'Amore <garrett@damore.org>
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2002-2004 Tim J. Robbins. All rights reserved.
  * Copyright (c) 1993
@@ -40,8 +41,8 @@
 #include <wchar.h>
 #include <sys/types.h>
 #include <sys/euc.h>
-#include "runetype.h"
 #include "mblocal.h"
+#include "lctype.h"
 
 static size_t	_EUC_mbrtowc_impl(wchar_t *_RESTRICT_KYWD,
     const char *_RESTRICT_KYWD,
@@ -61,6 +62,7 @@ static size_t	_EUC_KR_mbrtowc(wchar_t *_RESTRICT_KYWD,
 static size_t	_EUC_TW_mbrtowc(wchar_t *_RESTRICT_KYWD,
 		    const char *_RESTRICT_KYWD,
 		    size_t, mbstate_t *_RESTRICT_KYWD);
+
 static size_t	_EUC_CN_wcrtomb(char *_RESTRICT_KYWD, wchar_t,
 		    mbstate_t *_RESTRICT_KYWD);
 static size_t	_EUC_JP_wcrtomb(char *_RESTRICT_KYWD, wchar_t,
@@ -69,6 +71,33 @@ static size_t	_EUC_KR_wcrtomb(char *_RESTRICT_KYWD, wchar_t,
 		    mbstate_t *_RESTRICT_KYWD);
 static size_t	_EUC_TW_wcrtomb(char *_RESTRICT_KYWD, wchar_t,
 		    mbstate_t *_RESTRICT_KYWD);
+
+static size_t	_EUC_CN_mbsnrtowcs(wchar_t *_RESTRICT_KYWD,
+		    const char **_RESTRICT_KYWD, size_t, size_t,
+		    mbstate_t *_RESTRICT_KYWD);
+static size_t	_EUC_JP_mbsnrtowcs(wchar_t *_RESTRICT_KYWD,
+		    const char **_RESTRICT_KYWD, size_t, size_t,
+		    mbstate_t *_RESTRICT_KYWD);
+static size_t	_EUC_KR_mbsnrtowcs(wchar_t *_RESTRICT_KYWD,
+		    const char **_RESTRICT_KYWD, size_t, size_t,
+		    mbstate_t *_RESTRICT_KYWD);
+static size_t	_EUC_TW_mbsnrtowcs(wchar_t *_RESTRICT_KYWD,
+		    const char **_RESTRICT_KYWD, size_t, size_t,
+		    mbstate_t *_RESTRICT_KYWD);
+
+static size_t	_EUC_CN_wcsnrtombs(char *_RESTRICT_KYWD,
+		    const wchar_t **_RESTRICT_KYWD, size_t, size_t,
+		    mbstate_t *_RESTRICT_KYWD);
+static size_t	_EUC_JP_wcsnrtombs(char *_RESTRICT_KYWD,
+		    const wchar_t **_RESTRICT_KYWD, size_t, size_t,
+		    mbstate_t *_RESTRICT_KYWD);
+static size_t	_EUC_KR_wcsnrtombs(char *_RESTRICT_KYWD,
+		    const wchar_t **_RESTRICT_KYWD, size_t, size_t,
+		    mbstate_t *_RESTRICT_KYWD);
+static size_t	_EUC_TW_wcsnrtombs(char *_RESTRICT_KYWD,
+		    const wchar_t **_RESTRICT_KYWD, size_t, size_t,
+		    mbstate_t *_RESTRICT_KYWD);
+
 static int	_EUC_mbsinit(const mbstate_t *);
 
 typedef struct {
@@ -77,7 +106,7 @@ typedef struct {
 	int	want;
 } _EucState;
 
-static int
+int
 _EUC_mbsinit(const mbstate_t *ps)
 {
 
@@ -87,18 +116,17 @@ _EUC_mbsinit(const mbstate_t *ps)
 /*
  * EUC-CN uses CS0, CS1 and CS2 (4 bytes).
  */
-int
-_EUC_CN_init(_RuneLocale *rl)
+void
+_EUC_CN_init(struct lc_ctype *lct)
 {
-	__mbrtowc = _EUC_CN_mbrtowc;
-	__wcrtomb = _EUC_CN_wcrtomb;
-	__mbsinit = _EUC_mbsinit;
+	lct->lc_mbrtowc = _EUC_CN_mbrtowc;
+	lct->lc_wcrtomb = _EUC_CN_wcrtomb;
+	lct->lc_mbsnrtowcs = _EUC_CN_mbsnrtowcs;
+	lct->lc_wcsnrtombs = _EUC_CN_wcsnrtombs;
+	lct->lc_mbsinit = _EUC_mbsinit;
 
-	_CurrentRuneLocale = rl;
-
-	__ctype[520] = 4;
-	charset_is_ascii = 0;
-	return (0);
+	lct->lc_max_mblen = 4;
+	lct->lc_is_ascii = 0;
 }
 
 static size_t
@@ -109,27 +137,41 @@ _EUC_CN_mbrtowc(wchar_t *_RESTRICT_KYWD pwc, const char *_RESTRICT_KYWD s,
 }
 
 static size_t
+_EUC_CN_mbsnrtowcs(wchar_t *_RESTRICT_KYWD dst,
+    const char **_RESTRICT_KYWD src,
+    size_t nms, size_t len, mbstate_t *_RESTRICT_KYWD ps)
+{
+	return (__mbsnrtowcs_std(dst, src, nms, len, ps, _EUC_CN_mbrtowc));
+}
+
+static size_t
 _EUC_CN_wcrtomb(char *_RESTRICT_KYWD s, wchar_t wc,
     mbstate_t *_RESTRICT_KYWD ps)
 {
 	return (_EUC_wcrtomb_impl(s, wc, ps, SS2, 4, 0, 0));
 }
 
+static size_t
+_EUC_CN_wcsnrtombs(char *_RESTRICT_KYWD dst, const wchar_t **_RESTRICT_KYWD src,
+	size_t nwc, size_t len, mbstate_t *_RESTRICT_KYWD ps)
+{
+	return (__wcsnrtombs_std(dst, src, nwc, len, ps, _EUC_CN_wcrtomb));
+}
+
 /*
  * EUC-KR uses only CS0 and CS1.
  */
-int
-_EUC_KR_init(_RuneLocale *rl)
+void
+_EUC_KR_init(struct lc_ctype *lct)
 {
-	__mbrtowc = _EUC_KR_mbrtowc;
-	__wcrtomb = _EUC_KR_wcrtomb;
-	__mbsinit = _EUC_mbsinit;
+	lct->lc_mbrtowc = _EUC_KR_mbrtowc;
+	lct->lc_wcrtomb = _EUC_KR_wcrtomb;
+	lct->lc_mbsnrtowcs = _EUC_KR_mbsnrtowcs;
+	lct->lc_wcsnrtombs = _EUC_KR_wcsnrtombs;
+	lct->lc_mbsinit = _EUC_mbsinit;
 
-	_CurrentRuneLocale = rl;
-
-	__ctype[520] = 2;
-	charset_is_ascii = 0;
-	return (0);
+	lct->lc_max_mblen = 2;
+	lct->lc_is_ascii = 0;
 }
 
 static size_t
@@ -140,27 +182,41 @@ _EUC_KR_mbrtowc(wchar_t *_RESTRICT_KYWD pwc, const char *_RESTRICT_KYWD s,
 }
 
 static size_t
+_EUC_KR_mbsnrtowcs(wchar_t *_RESTRICT_KYWD dst,
+    const char **_RESTRICT_KYWD src,
+    size_t nms, size_t len, mbstate_t *_RESTRICT_KYWD ps)
+{
+	return (__mbsnrtowcs_std(dst, src, nms, len, ps, _EUC_KR_mbrtowc));
+}
+
+static size_t
 _EUC_KR_wcrtomb(char *_RESTRICT_KYWD s, wchar_t wc,
-    mbstate_t *_RESTRICT_KYWD ps)
+	mbstate_t *_RESTRICT_KYWD ps)
 {
 	return (_EUC_wcrtomb_impl(s, wc, ps, 0, 0, 0, 0));
+}
+
+static size_t
+_EUC_KR_wcsnrtombs(char *_RESTRICT_KYWD dst, const wchar_t **_RESTRICT_KYWD src,
+	size_t nwc, size_t len, mbstate_t *_RESTRICT_KYWD ps)
+{
+	return (__wcsnrtombs_std(dst, src, nwc, len, ps, _EUC_KR_wcrtomb));
 }
 
 /*
  * EUC-JP uses CS0, CS1, CS2, and CS3.
  */
-int
-_EUC_JP_init(_RuneLocale *rl)
+void
+_EUC_JP_init(struct lc_ctype *lct)
 {
-	__mbrtowc = _EUC_JP_mbrtowc;
-	__wcrtomb = _EUC_JP_wcrtomb;
-	__mbsinit = _EUC_mbsinit;
+	lct->lc_mbrtowc = _EUC_JP_mbrtowc;
+	lct->lc_wcrtomb = _EUC_JP_wcrtomb;
+	lct->lc_mbsnrtowcs = _EUC_JP_mbsnrtowcs;
+	lct->lc_wcsnrtombs = _EUC_JP_wcsnrtombs;
+	lct->lc_mbsinit = _EUC_mbsinit;
 
-	_CurrentRuneLocale = rl;
-
-	__ctype[520] = 3;
-	charset_is_ascii = 0;
-	return (0);
+	lct->lc_max_mblen = 3;
+	lct->lc_is_ascii = 0;
 }
 
 static size_t
@@ -171,41 +227,70 @@ _EUC_JP_mbrtowc(wchar_t *_RESTRICT_KYWD pwc, const char *_RESTRICT_KYWD s,
 }
 
 static size_t
+_EUC_JP_mbsnrtowcs(wchar_t *_RESTRICT_KYWD dst,
+    const char **_RESTRICT_KYWD src,
+    size_t nms, size_t len, mbstate_t *_RESTRICT_KYWD ps)
+{
+	return (__mbsnrtowcs_std(dst, src, nms, len, ps, _EUC_JP_mbrtowc));
+}
+
+static size_t
 _EUC_JP_wcrtomb(char *_RESTRICT_KYWD s, wchar_t wc,
     mbstate_t *_RESTRICT_KYWD ps)
 {
 	return (_EUC_wcrtomb_impl(s, wc, ps, SS2, 2, SS3, 3));
 }
 
+static size_t
+_EUC_JP_wcsnrtombs(char *_RESTRICT_KYWD dst, const wchar_t **_RESTRICT_KYWD src,
+	size_t nwc, size_t len, mbstate_t *_RESTRICT_KYWD ps)
+{
+	return (__wcsnrtombs_std(dst, src, nwc, len, ps, _EUC_JP_wcrtomb));
+}
+
 /*
  * EUC-TW uses CS0, CS1, and CS2.
  */
-int
-_EUC_TW_init(_RuneLocale *rl)
+void
+_EUC_TW_init(struct lc_ctype *lct)
 {
-	__mbrtowc = _EUC_TW_mbrtowc;
-	__wcrtomb = _EUC_TW_wcrtomb;
-	__mbsinit = _EUC_mbsinit;
+	lct->lc_mbrtowc = _EUC_TW_mbrtowc;
+	lct->lc_wcrtomb = _EUC_TW_wcrtomb;
+	lct->lc_mbsnrtowcs = _EUC_TW_mbsnrtowcs;
+	lct->lc_wcsnrtombs = _EUC_TW_wcsnrtombs;
+	lct->lc_mbsinit = _EUC_mbsinit;
 
-	_CurrentRuneLocale = rl;
-
-	__ctype[520] = 4;
-	charset_is_ascii = 0;
-	return (0);
+	lct->lc_max_mblen = 4;
+	lct->lc_is_ascii = 0;
 }
 
 static size_t
 _EUC_TW_mbrtowc(wchar_t *_RESTRICT_KYWD pwc, const char *_RESTRICT_KYWD s,
-    size_t n, mbstate_t *_RESTRICT_KYWD ps)
+	size_t n, mbstate_t *_RESTRICT_KYWD ps)
 {
 	return (_EUC_mbrtowc_impl(pwc, s, n, ps, SS2, 4, 0, 0));
 }
 
 static size_t
+_EUC_TW_mbsnrtowcs(wchar_t *_RESTRICT_KYWD dst,
+	const char **_RESTRICT_KYWD src,
+	size_t nms, size_t len, mbstate_t *_RESTRICT_KYWD ps)
+{
+	return (__mbsnrtowcs_std(dst, src, nms, len, ps, _EUC_TW_mbrtowc));
+}
+
+static size_t
 _EUC_TW_wcrtomb(char *_RESTRICT_KYWD s, wchar_t wc,
-    mbstate_t *_RESTRICT_KYWD ps)
+	mbstate_t *_RESTRICT_KYWD ps)
 {
 	return (_EUC_wcrtomb_impl(s, wc, ps, SS2, 4, 0, 0));
+}
+
+static size_t
+_EUC_TW_wcsnrtombs(char *_RESTRICT_KYWD dst, const wchar_t **_RESTRICT_KYWD src,
+	size_t nwc, size_t len, mbstate_t *_RESTRICT_KYWD ps)
+{
+	return (__wcsnrtombs_std(dst, src, nwc, len, ps, _EUC_TW_wcrtomb));
 }
 
 /*
@@ -214,8 +299,8 @@ _EUC_TW_wcrtomb(char *_RESTRICT_KYWD s, wchar_t wc,
 
 static size_t
 _EUC_mbrtowc_impl(wchar_t *_RESTRICT_KYWD pwc, const char *_RESTRICT_KYWD s,
-    size_t n, mbstate_t *_RESTRICT_KYWD ps,
-    uint8_t cs2, uint8_t cs2width, uint8_t cs3, uint8_t cs3width)
+	size_t n, mbstate_t *_RESTRICT_KYWD ps,
+	uint8_t cs2, uint8_t cs2width, uint8_t cs3, uint8_t cs3width)
 {
 	_EucState *es;
 	int i, want;

@@ -1,4 +1,5 @@
 /*
+ * Copyright 2013 Garrett D'Amore <garrett@damore.org>
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 1995 Alex Tatmanjants <alex@elvisti.kiev.ua>
  *		at Electronni Visti IA, Kiev, Ukraine.
@@ -36,10 +37,11 @@
 #define	WCS_XFRM_OFFSET	1
 
 size_t
-wcsxfrm(wchar_t *_RESTRICT_KYWD dest,
-    const wchar_t *_RESTRICT_KYWD src, size_t len)
+wcsxfrm_l(wchar_t *_RESTRICT_KYWD dest,
+    const wchar_t *_RESTRICT_KYWD src, size_t len, locale_t loc)
 {
 	size_t slen;
+	const struct lc_collate *lcc = loc->collate;
 
 	if (*src == L'\0') {
 		if (len != 0)
@@ -47,8 +49,8 @@ wcsxfrm(wchar_t *_RESTRICT_KYWD dest,
 		return (0);
 	}
 
-	if ((_collate_load_error) ||
-	    ((slen = _collate_wxfrm(src, dest, len)) == (size_t)-1)) {
+	if ((lcc->lc_is_posix) ||
+	    ((slen = _collate_wxfrm(lcc, src, dest, len)) == (size_t)-1)) {
 		goto error;
 	}
 
@@ -70,4 +72,11 @@ error:
 		dest[len - 1] = L'\0';
 	}
 	return (slen);
+}
+
+size_t
+wcsxfrm(wchar_t *_RESTRICT_KYWD dest,
+    const wchar_t *_RESTRICT_KYWD src, size_t len)
+{
+	return (wcsxfrm_l(dest, src, len, uselocale(NULL)));
 }

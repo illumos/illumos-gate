@@ -23,11 +23,12 @@
  * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2013 Garrett D'Amore <garrett@damore.org>
+ */
 
 #ifndef	_MONETARY_H
 #define	_MONETARY_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/feature_tests.h>
 #include <sys/types.h>
@@ -39,8 +40,21 @@ extern "C" {
 #if defined(__STDC__)
 extern ssize_t	strfmon(char *_RESTRICT_KYWD, size_t,
 			const char *_RESTRICT_KYWD, ...);
+
+#if defined(_XPG7) || (!defined(_STRICT_STRICT_SYMBOLS))
+
+#ifndef _LOCALE_T
+#define	_LOCALE_T
+typedef struct locale *locale_t;
+#endif
+
+extern ssize_t strfmon_l(char *_RESTRICT_KYWD, size_t, locale_t,
+		const char *_RESTRICT_KYWD, ...);
+#endif
+
 #else
 extern ssize_t	strfmon();
+extern ssize_t	strfmon_l();
 #endif
 
 #ifdef __cplusplus

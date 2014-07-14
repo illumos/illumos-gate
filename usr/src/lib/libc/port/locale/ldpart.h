@@ -1,4 +1,5 @@
 /*
+ * Copyright 2013 Garrett D'Amore <garrett@damore.org>
  * Copyright (c) 2000, 2001 Alexey Zelkin <phantom@FreeBSD.org>
  * All rights reserved.
  *
@@ -31,7 +32,7 @@
 #define	_LDP_ERROR  (-1)
 #define	_LDP_CACHE  1
 
-int	__part_load_locale(const char *, int *, char **, const char *,
+int	__part_load_locale(const char *, char **, const char *,
 		    int, int, const char **);
 
 #endif /* !_LDPART_H_ */

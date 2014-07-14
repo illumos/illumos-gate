@@ -1,4 +1,5 @@
 /*
+ * Copyright 2013 Garrett D'Amore <garrett@damore.org>
  * Copyright (c) 2004 Tim J. Robbins.
  * All rights reserved.
  *
@@ -28,20 +29,32 @@
 #include "runetype.h"
 #include <wchar.h>
 #include <wctype.h>
+#include "localeimpl.h"
 
-wint_t
-__nextwctype(wint_t wc, wctype_t wct)
+/*
+ * nextwctype, while exposed on *BSD/MacOS X, is considered "consolidation
+ * private" for illumos.  Hence, we keep the _l version static for now.
+ * If we decide to make this public, just remove the static keyword and
+ * put it in the headers and mapfile.  (Should fix up the underscore prefix
+ * to __nextwctype() as well.)
+ */
+static wint_t
+nextwctype_l(wint_t wc, wctype_t wct, locale_t loc)
 {
 	size_t lim;
-	_RuneRange *rr = &_CurrentRuneLocale->__runetype_ext;
-	_RuneEntry *base, *re;
+	const _RuneLocale *rl;
+	const _RuneRange *rr;
+	const _RuneEntry *base, *re;
 	int noinc;
+
+	rl = loc->runelocale;
+	rr = &rl->__runetype_ext;
 
 	noinc = 0;
 	if (wc < _CACHED_RUNES) {
 		wc++;
 		while (wc < _CACHED_RUNES) {
-			if (_CurrentRuneLocale->__runetype[wc] & wct)
+			if (rl->__runetype[wc] & wct)
 				return (wc);
 			wc++;
 		}
@@ -85,4 +98,13 @@ found:
 			return (wc);
 	}
 	return (-1);
+}
+
+/*
+ * External, but consolidation private routine.
+ */
+wint_t
+__nextwctype(wint_t wc, wctype_t wct)
+{
+	return (nextwctype_l(wc, wct, uselocale(NULL)));
 }

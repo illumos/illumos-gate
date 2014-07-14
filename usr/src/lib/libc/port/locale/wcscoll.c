@@ -1,4 +1,5 @@
 /*
+ * Copyright 2013 Garrett D'Amore <garrett@damore.org>
  * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2002 Tim J. Robbins
  * All rights reserved.
@@ -32,17 +33,17 @@
 #include <wchar.h>
 #include <assert.h>
 #include "collate.h"
+#include "localeimpl.h"
 
 int
-wcscoll(const wchar_t *ws1, const wchar_t *ws2)
+wcscoll_l(const wchar_t *ws1, const wchar_t *ws2, locale_t loc)
 {
 	int len1, len2, pri1, pri2, ret;
 	wchar_t *tr1 = NULL, *tr2 = NULL;
 	int direc, pass;
+	const struct lc_collate *lcc = loc->collate;
 
-	collate_info_t *info = _collate_info;
-
-	if (_collate_load_error)
+	if (lcc->lc_is_posix)
 		/*
 		 * Locale has no special collating order or could not be
 		 * loaded, do a fast binary comparison.
@@ -63,18 +64,18 @@ wcscoll(const wchar_t *ws1, const wchar_t *ws2)
 	 * Note that we do one final extra pass at the end to pick
 	 * up UNDEFINED elements.  There is special handling for them.
 	 */
-	for (pass = 0; pass <= info->directive_count; pass++) {
+	for (pass = 0; pass <= lcc->lc_directive_count; pass++) {
 
-		int32_t *st1 = NULL;
-		int32_t *st2 = NULL;
+		const int32_t *st1 = NULL;
+		const int32_t *st2 = NULL;
 		const wchar_t	*w1 = ws1;
 		const wchar_t	*w2 = ws2;
 
 		/* special pass for UNDEFINED */
-		if (pass == info->directive_count) {
+		if (pass == lcc->lc_directive_count) {
 			direc = DIRECTIVE_FORWARD | DIRECTIVE_UNDEFINED;
 		} else {
-			direc = info->directive[pass];
+			direc = lcc->lc_directive[pass];
 		}
 
 		if (direc & DIRECTIVE_BACKWARD) {
@@ -104,7 +105,8 @@ wcscoll(const wchar_t *ws1, const wchar_t *ws2)
 		if (direc & DIRECTIVE_POSITION) {
 			while ((*w1 || st1) && (*w2 || st2)) {
 				pri1 = pri2 = 0;
-				_collate_lookup(w1, &len1, &pri1, pass, &st1);
+				_collate_lookup(lcc, w1, &len1, &pri1, pass,
+				    &st1);
 				if (pri1 <= 0) {
 					if (pri1 < 0) {
 						errno = EINVAL;
@@ -112,7 +114,8 @@ wcscoll(const wchar_t *ws1, const wchar_t *ws2)
 					}
 					pri1 = COLLATE_MAX_PRIORITY;
 				}
-				_collate_lookup(w2, &len2, &pri2, pass, &st2);
+				_collate_lookup(lcc, w2, &len2, &pri2, pass,
+				    &st2);
 				if (pri2 <= 0) {
 					if (pri2 < 0) {
 						errno = EINVAL;
@@ -131,7 +134,7 @@ wcscoll(const wchar_t *ws1, const wchar_t *ws2)
 			while ((*w1 || st1) && (*w2 || st2)) {
 				pri1 = pri2 = 0;
 				while (*w1) {
-					_collate_lookup(w1, &len1,
+					_collate_lookup(lcc, w1, &len1,
 					    &pri1, pass, &st1);
 					if (pri1 > 0)
 						break;
@@ -142,7 +145,7 @@ wcscoll(const wchar_t *ws1, const wchar_t *ws2)
 					w1 += len1;
 				}
 				while (*w2) {
-					_collate_lookup(w2, &len2,
+					_collate_lookup(lcc, w2, &len2,
 					    &pri2, pass, &st2);
 					if (pri2 > 0)
 						break;
@@ -185,4 +188,11 @@ end:
 fail:
 	ret = wcscmp(ws1, ws2);
 	goto end;
+}
+
+
+int
+wcscoll(const wchar_t *ws1, const wchar_t *ws2)
+{
+	return (wcscoll_l(ws1, ws2, uselocale(NULL)));
 }

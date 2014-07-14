@@ -1,4 +1,5 @@
 /*
+ * Copyright 2013 Garrett D'Amore <garrett@damore.org>
  * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -110,7 +111,7 @@ typedef struct {
 
 typedef struct {
 	char		__magic[8];	/* Magic saying what version we are */
-	char		__encoding[32];	/* ASCII name of this encoding */
+	char		__encoding[32];	/* ASCII name of encoding */
 
 	unsigned int	__runetype[_CACHED_RUNES];
 	__rune_t	__maplower[_CACHED_RUNES];
@@ -132,6 +133,7 @@ typedef struct {
 #define	_RUNE_MAGIC_1	"RuneMagi"	/* Indicates version 0 of RuneLocale */
 
 extern _RuneLocale _DefaultRuneLocale;
-extern _RuneLocale *_CurrentRuneLocale;
+
+unsigned int __runetype(const _RuneLocale *, int);
 
 #endif	/* !_RUNETYPE_H_ */

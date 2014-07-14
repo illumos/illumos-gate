@@ -1,4 +1,5 @@
 '\" te
+.\" Copyright 2014 Garrett D'Amore <garrett@damore.org>
 .\"  Copyright (c) 1992, X/Open Company Limited  All Rights Reserved  Portions Copyright (c) 2002, Sun Microsystems, Inc.  All Rights Reserved
 .\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
@@ -7,9 +8,9 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH WCSCOLL 3C "Aug 14, 2002"
+.TH WCSCOLL 3C "Jun 25, 2014"
 .SH NAME
-wcscoll, wscoll \- wide character string comparison using collating information
+wcscoll, wcscoll_l wscoll \- wide character string comparison using collating information
 .SH SYNOPSIS
 .LP
 .nf
@@ -17,42 +18,43 @@ wcscoll, wscoll \- wide character string comparison using collating information
 
 \fBint\fR \fBwcscoll\fR(\fBconst wchar_t *\fR\fIws1\fR, \fBconst wchar_t *\fR\fIws2\fR);
 .fi
-
+.LP
+.nf
+\fBint\fR \fBwcscoll_l\fR(\fBconst wchar_t *\fR\fIws1\fR, \fBconst wchar_t *\fR\fIws2\fR, \fBlocale_t\fR \fIloc\fR);
+.fi
 .LP
 .nf
 \fBint\fR \fBwscoll\fR(\fBconst wchar_t *\fR\fIws1\fR, \fBconst wchar_t *\fR\fIws2\fR);
 .fi
-
 .SH DESCRIPTION
-.sp
 .LP
-The \fBwcscoll()\fR and  \fBwscoll()\fR functions compare the wide character
+The \fBwcscoll()\fR, \fBwcscoll_l()\fR, and \fBwscoll()\fR functions compare
+the wide character
 string pointed to by \fIws1\fR to the wide character string pointed to by
-\fIws2\fR, both interpreted as appropriate to the \fBLC_COLLATE\fR category of
-the current locale.
-.sp
+\fIws2\fR, both interpreted as appropriate to the \fBLC_COLLATE\fR locale
+category.
 .LP
-The \fBwcscoll()\fR and \fBwscoll()\fR functions do not change the setting of
-\fBerrno\fR if successful.
-.sp
+These  functions do not change the setting of \fBerrno\fR if successful.
 .LP
 An application wanting to check for error situations should set \fBerrno\fR to
-0 before calling \fBwcscoll()\fR or \fBwscoll()\fR.  If \fBerrno\fR is non-zero
+0 before calling these functions.  If \fBerrno\fR is non-zero
 on return, an error has occurred.
-.SH RETURN VALUES
-.sp
 .LP
-Upon successful completion, \fBwcscoll()\fR and \fBwscoll()\fR return an
+The function \fBwcsoll_l()\fR behaves identically to \fBwcsoll\fR(), except
+instead of operating in the current locale, it operates in the locale
+specified by \fIloc\fR.
+.SH RETURN VALUES
+.LP
+Upon successful completion, these functions return an
 integer greater than, equal to, or less than 0, depending upon whether the wide
 character string pointed to by \fIws1\fR is greater than, equal to, or less
 than the wide character string pointed to by \fIws2\fR, when both are
-interpreted as appropriate to the current locale. On error, \fBwcscoll()\fR and
-\fBwscoll()\fR may set \fBerrno\fR, but no return value is reserved to indicate
-an error.
+interpreted as appropriate to the the current locale, or the locale
+specified by \fIloc\fR. On error, 
+they set \fBerrno\fR, but no return value is reserved to indicate an error.
 .SH ERRORS
-.sp
 .LP
-The \fBwcscoll()\fR and \fBwscoll()\fR functions may fail if:
+The \fBwcscoll()\fR, \fBwcscoll_l()\fR and \fBwscoll()\fR functions may fail if:
 .sp
 .ne 2
 .na
@@ -62,39 +64,32 @@ The \fBwcscoll()\fR and \fBwscoll()\fR functions may fail if:
 The \fIws1\fR or \fIws2\fR arguments contain wide character codes outside the
 domain of the collating sequence.
 .RE
-
 .SH USAGE
 .sp
 .LP
 The \fBwcsxfrm\fR(3C) and \fBwcscmp\fR(3C) functions should be used for sorting
-large lists.
+large lists, or when performing many comparisions on the same strings.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
-.sp
-
-.sp
 .TS
 box;
-l | l
+c | c
 l | l .
 ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
 CSI	Enabled
 _
-Interface Stability	\fBwcscoll()\fR is Standard
+Interface Stability	See below.
 _
-MT-Level	MT-Safe with exceptions
+MT-Level	MT-Safe
 .TE
 
-.sp
 .LP
-The \fBwcscoll()\fR and \fBwscoll()\fR functions can be used safely in
-multithreaded applications as long as \fBsetlocale\fR(3C) is not being called
-to change the locale.
+The \fBwcscoll()\fR and \fBwcscoll_l()\fR functions are Standard.
+The \fBwscoll()\fR function is Committed.
 .SH SEE ALSO
-.sp
 .LP
-\fBsetlocale\fR(3C), \fBwcscmp\fR(3C), \fBwcsxfrm\fR(3C), \fBattributes\fR(5),
+\fBnewlocale\fR(3C), \fBsetlocale\fR(3C), \fBuselocale\fR(3C),
+\fBwcscmp\fR(3C), \fBwcsxfrm\fR(3C), \fBattributes\fR(5),
 \fBstandards\fR(5)

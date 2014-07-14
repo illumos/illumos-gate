@@ -20,6 +20,7 @@
  */
 
 /*
+ * Copyright 2013 Garrett D'Amore <garrett@damore.org>
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -35,24 +36,27 @@
 #include <sys/types.h>
 #include <strings.h>
 #include <ctype.h>
+#include <locale.h>
+#include "localeimpl.h"
+#include "lctype.h"
 
 int
-strcasecmp(const char *s1, const char *s2)
+strcasecmp_l(const char *s1, const char *s2, locale_t loc)
 {
-	extern int charset_is_ascii;
 	extern int ascii_strcasecmp(const char *s1, const char *s2);
-	int *cm;
+	const int *cm;
 	const uchar_t *us1;
 	const uchar_t *us2;
+	const struct lc_ctype *lct = loc->ctype;
 
 	/*
 	 * If we are in a locale that uses the ASCII character set
 	 * (C or POSIX), use the fast ascii_strcasecmp() function.
 	 */
-	if (charset_is_ascii)
+	if (lct->lc_is_ascii)
 		return (ascii_strcasecmp(s1, s2));
 
-	cm = __trans_lower;
+	cm = lct->lc_trans_lower;
 	us1 = (const uchar_t *)s1;
 	us2 = (const uchar_t *)s2;
 
@@ -60,4 +64,11 @@ strcasecmp(const char *s1, const char *s2)
 		if (*us1++ == '\0')
 			return (0);
 	return (cm[*us1] - cm[*(us2 - 1)]);
+}
+
+int
+strcasecmp(const char *s1, const char *s2)
+{
+	/* would be nice to avoid uselocale()... but I don't see how */
+	return (strcasecmp_l(s1, s2, uselocale(NULL)));
 }

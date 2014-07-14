@@ -27,6 +27,9 @@
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ */
 
 /*
  * An application should not include this header directly.  Instead it
@@ -42,8 +45,6 @@
 
 #ifndef	_ISO_WCTYPE_ISO_H
 #define	_ISO_WCTYPE_ISO_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/feature_tests.h>
 
@@ -94,6 +95,12 @@ extern	int iswpunct(wint_t);
 extern	int iswspace(wint_t);
 extern	int iswupper(wint_t);
 extern	int iswxdigit(wint_t);
+
+#if (__cplusplus >= 201103L) || defined(_STDC_C99) || defined(_XPG6) || \
+	!defined(_STRICT_SYMBOLS)
+extern	int iswblank(wint_t);
+#endif
+
 /* tow* also become functions */
 extern	wint_t towlower(wint_t);
 extern	wint_t towupper(wint_t);
@@ -101,7 +108,7 @@ extern	wctrans_t wctrans(const char *);
 extern	wint_t towctrans(wint_t, wctrans_t);
 extern  int iswctype(wint_t, wctype_t);
 extern  wctype_t wctype(const char *);
-#else
+#else	/* __STDC__ */
 extern  int iswalnum();
 extern  int iswalpha();
 extern  int iswcntrl();
@@ -120,7 +127,10 @@ extern	wctrans_t wctrans();
 extern	wint_t towctrans();
 extern  int iswctype();
 extern  wctype_t wctype();
+#if defined(_XPG6) || !defined(_STRICT_SYMBOLS)
+extern  int iswblank();
 #endif
+#endif	/* __STDC__ */
 
 /* bit definition for character class */
 

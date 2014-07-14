@@ -1,4 +1,5 @@
 /*
+ * Copyright 2013 Garrett D'Amore <garrett@damore.org>
  * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2012 Milan Jurik. All rights reserved.
  * Copyright (c) 1992, 1993, 1994 Henry Spencer.
@@ -725,6 +726,7 @@ p_b_term(struct parse *p, cset *cs)
 	char c;
 	wint_t start, finish;
 	wint_t i;
+	locale_t loc = uselocale(NULL);
 
 	/* classify what we've got */
 	switch ((MORE()) ? PEEK() : '\0') {
@@ -772,16 +774,18 @@ p_b_term(struct parse *p, cset *cs)
 		if (start == finish)
 			CHadd(p, cs, start);
 		else {
-			if (_collate_load_error) {
+			if (loc->collate->lc_is_posix) {
 				(void) REQUIRE((uch)start <= (uch)finish,
 				    REG_ERANGE);
 				CHaddrange(p, cs, start, finish);
 			} else {
 				(void) REQUIRE(_collate_range_cmp(start,
-				    finish) <= 0, REG_ERANGE);
+				    finish, loc) <= 0, REG_ERANGE);
 				for (i = 0; i <= UCHAR_MAX; i++) {
-					if (_collate_range_cmp(start, i) <= 0 &&
-					    _collate_range_cmp(i, finish) <= 0)
+					if (_collate_range_cmp(start, i, loc)
+					    <= 0 &&
+					    _collate_range_cmp(i, finish, loc)
+					    <= 0)
 						CHadd(p, cs, i);
 				}
 			}
@@ -1367,6 +1371,7 @@ findmust(struct parse *p, struct re_guts *g)
 	char buf[MB_LEN_MAX];
 	size_t clen;
 	mbstate_t mbs;
+	locale_t loc = uselocale(NULL);
 
 	/* avoid making error situations worse */
 	if (p->error != 0)
@@ -1378,7 +1383,7 @@ findmust(struct parse *p, struct re_guts *g)
 	 * UTF-8 (see RFC 3629).
 	 */
 	if (MB_CUR_MAX > 1 &&
-	    strcmp(_CurrentRuneLocale->__encoding, "UTF-8") != 0)
+	    strcmp(loc->runelocale->__encoding, "UTF-8") != 0)
 		return;
 
 	/* find the longest OCHAR sequence in strip */
