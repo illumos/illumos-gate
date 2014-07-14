@@ -33,6 +33,7 @@
 #include <sys/debug.h>
 #include <sys/msacct.h>
 #include <sys/time.h>
+#include <sys/zone.h>
 
 /*
  * Mega-theory block comment:
@@ -390,6 +391,7 @@ void
 syscall_mstate(int fromms, int toms)
 {
 	kthread_t *t = curthread;
+	zone_t *z = ttozone(t);
 	struct mstate *ms;
 	hrtime_t *mstimep;
 	hrtime_t curtime;
@@ -413,6 +415,10 @@ syscall_mstate(int fromms, int toms)
 		newtime = curtime - ms->ms_state_start;
 	}
 	*mstimep += newtime;
+	if (fromms == LMS_USER)
+		atomic_add_64(&z->zone_utime, newtime);
+	else if (fromms == LMS_SYSTEM)
+		atomic_add_64(&z->zone_stime, newtime);
 	t->t_mstate = toms;
 	ms->ms_state_start = curtime;
 	ms->ms_prev = fromms;
@@ -602,7 +608,10 @@ new_mstate(kthread_t *t, int new_state)
 	hrtime_t curtime;
 	hrtime_t newtime;
 	hrtime_t oldtime;
+	hrtime_t ztime;
+	hrtime_t origstart;
 	klwp_t *lwp;
+	zone_t *z;
 
 	ASSERT(new_state != LMS_WAIT_CPU);
 	ASSERT((unsigned)new_state < NMSTATES);
@@ -625,6 +634,7 @@ new_mstate(kthread_t *t, int new_state)
 
 	ms = &lwp->lwp_mstate;
 	state = t->t_mstate;
+	origstart = ms->ms_state_start;
 	do {
 		switch (state) {
 		case LMS_TFAULT:
@@ -637,7 +647,7 @@ new_mstate(kthread_t *t, int new_state)
 			mstimep = &ms->ms_acct[state];
 			break;
 		}
-		newtime = curtime - ms->ms_state_start;
+		ztime = newtime = curtime - ms->ms_state_start;
 		if (newtime < 0) {
 			curtime = gethrtime_unscaled();
 			oldtime = *mstimep - 1; /* force CAS to fail */
@@ -648,6 +658,20 @@ new_mstate(kthread_t *t, int new_state)
 		t->t_mstate = new_state;
 		ms->ms_state_start = curtime;
 	} while (cas64((uint64_t *)mstimep, oldtime, newtime) != oldtime);
+
+	/*
+	 * When the system boots the initial startup thread will have a
+	 * ms_state_start of 0 which would add a huge system time to the global
+	 * zone.  We want to skip aggregating that initial bit of work.
+	 */
+	if (origstart != 0) {
+		z = ttozone(t);
+		if (state == LMS_USER)
+			atomic_add_64(&z->zone_utime, ztime);
+		else if (state == LMS_SYSTEM)
+			atomic_add_64(&z->zone_stime, ztime);
+	}
+
 	/*
 	 * Remember the previous running microstate.
 	 */
@@ -686,6 +710,8 @@ restore_mstate(kthread_t *t)
 	hrtime_t waitrq;
 	hrtime_t newtime;
 	hrtime_t oldtime;
+	hrtime_t waittime;
+	zone_t *z;
 
 	/*
 	 * Don't call restore mstate of threads without lwps.  (Kernel threads)
@@ -756,11 +782,15 @@ restore_mstate(kthread_t *t)
 		oldtime = *mstimep;
 		newtime += oldtime;
 	} while (cas64((uint64_t *)mstimep, oldtime, newtime) != oldtime);
+
 	/*
 	 * Update the WAIT_CPU timer and per-cpu waitrq total.
 	 */
-	ms->ms_acct[LMS_WAIT_CPU] += (curtime - waitrq);
-	CPU->cpu_waitrq += (curtime - waitrq);
+	z = ttozone(t);
+	waittime = curtime - waitrq;
+	ms->ms_acct[LMS_WAIT_CPU] += waittime;
+	atomic_add_64(&z->zone_wtime, waittime);
+	CPU->cpu_waitrq += waittime;
 	ms->ms_state_start = curtime;
 }
 

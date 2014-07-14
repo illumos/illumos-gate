@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013, Joyent Inc. All rights reserved.
  */
 
 /*
@@ -1820,6 +1821,63 @@ zone_kstat_create_common(zone_t *zone, char *name,
 	return (ksp);
 }
 
+static int
+zone_misc_kstat_update(kstat_t *ksp, int rw)
+{
+	zone_t *zone = ksp->ks_private;
+	zone_misc_kstat_t *zmp = ksp->ks_data;
+	hrtime_t tmp;
+
+	if (rw == KSTAT_WRITE)
+		return (EACCES);
+
+	tmp = zone->zone_utime;
+	scalehrtime(&tmp);
+	zmp->zm_utime.value.ui64 = tmp;
+	tmp = zone->zone_stime;
+	scalehrtime(&tmp);
+	zmp->zm_stime.value.ui64 = tmp;
+	tmp = zone->zone_wtime;
+	scalehrtime(&tmp);
+	zmp->zm_wtime.value.ui64 = tmp;
+
+	return (0);
+}
+
+static kstat_t *
+zone_misc_kstat_create(zone_t *zone)
+{
+	kstat_t *ksp;
+	zone_misc_kstat_t *zmp;
+
+	if ((ksp = kstat_create_zone("zones", zone->zone_id,
+	    zone->zone_name, "zone_misc", KSTAT_TYPE_NAMED,
+	    sizeof (zone_misc_kstat_t) / sizeof (kstat_named_t),
+	    KSTAT_FLAG_VIRTUAL, zone->zone_id)) == NULL)
+		return (NULL);
+
+	if (zone->zone_id != GLOBAL_ZONEID)
+		kstat_zone_add(ksp, GLOBAL_ZONEID);
+
+	zmp = ksp->ks_data = kmem_zalloc(sizeof (zone_misc_kstat_t), KM_SLEEP);
+	ksp->ks_data_size += strlen(zone->zone_name) + 1;
+	ksp->ks_lock = &zone->zone_misc_lock;
+	zone->zone_misc_stats = zmp;
+
+	/* The kstat "name" field is not large enough for a full zonename */
+	kstat_named_init(&zmp->zm_zonename, "zonename", KSTAT_DATA_STRING);
+	kstat_named_setstr(&zmp->zm_zonename, zone->zone_name);
+	kstat_named_init(&zmp->zm_utime, "nsec_user", KSTAT_DATA_UINT64);
+	kstat_named_init(&zmp->zm_stime, "nsec_sys", KSTAT_DATA_UINT64);
+	kstat_named_init(&zmp->zm_wtime, "nsec_waitrq", KSTAT_DATA_UINT64);
+
+	ksp->ks_update = zone_misc_kstat_update;
+	ksp->ks_private = zone;
+
+	kstat_install(ksp);
+	return (ksp);
+}
+
 static void
 zone_kstat_create(zone_t *zone)
 {
@@ -1829,17 +1887,22 @@ zone_kstat_create(zone_t *zone)
 	    "swapresv", zone_swapresv_kstat_update);
 	zone->zone_nprocs_kstat = zone_kstat_create_common(zone,
 	    "nprocs", zone_nprocs_kstat_update);
+
+	if ((zone->zone_misc_ksp = zone_misc_kstat_create(zone)) == NULL) {
+		zone->zone_misc_stats = kmem_zalloc(
+		    sizeof (zone_misc_kstat_t), KM_SLEEP);
+	}
 }
 
 static void
-zone_kstat_delete_common(kstat_t **pkstat)
+zone_kstat_delete_common(kstat_t **pkstat, size_t datasz)
 {
 	void *data;
 
 	if (*pkstat != NULL) {
 		data = (*pkstat)->ks_data;
 		kstat_delete(*pkstat);
-		kmem_free(data, sizeof (zone_kstat_t));
+		kmem_free(data, datasz);
 		*pkstat = NULL;
 	}
 }
@@ -1847,9 +1910,14 @@ zone_kstat_delete_common(kstat_t **pkstat)
 static void
 zone_kstat_delete(zone_t *zone)
 {
-	zone_kstat_delete_common(&zone->zone_lockedmem_kstat);
-	zone_kstat_delete_common(&zone->zone_swapresv_kstat);
-	zone_kstat_delete_common(&zone->zone_nprocs_kstat);
+	zone_kstat_delete_common(&zone->zone_lockedmem_kstat,
+	    sizeof (zone_kstat_t));
+	zone_kstat_delete_common(&zone->zone_swapresv_kstat,
+	    sizeof (zone_kstat_t));
+	zone_kstat_delete_common(&zone->zone_nprocs_kstat,
+	    sizeof (zone_kstat_t));
+	zone_kstat_delete_common(&zone->zone_misc_ksp,
+	    sizeof (zone_misc_kstat_t));
 }
 
 /*
@@ -1907,6 +1975,11 @@ zone_zsd_init(void)
 	zone0.zone_lockedmem_kstat = NULL;
 	zone0.zone_swapresv_kstat = NULL;
 	zone0.zone_nprocs_kstat = NULL;
+
+	zone0.zone_stime = 0;
+	zone0.zone_utime = 0;
+	zone0.zone_wtime = 0;
+
 	list_create(&zone0.zone_ref_list, sizeof (zone_ref_t),
 	    offsetof(zone_ref_t, zref_linkage));
 	list_create(&zone0.zone_zsd, sizeof (struct zsd_entry),
