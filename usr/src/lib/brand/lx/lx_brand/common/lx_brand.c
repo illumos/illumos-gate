@@ -1113,7 +1113,7 @@ static struct lx_sysent sysents[] = {
 	{"rt_sigprocmask", lx_rt_sigprocmask, 0,	4},	/* 175 */
 	{"rt_sigpending", lx_rt_sigpending, 0,		2},	/* 176 */
 	{"rt_sigtimedwait", lx_rt_sigtimedwait,	0,	4},	/* 177 */
-	{"sigqueueinfo", NULL,		NOSYS_UNDOC,	0},	/* 178 */
+	{"rt_sigqueueinfo", lx_rt_sigqueueinfo,	0,	3},	/* 178 */
 	{"rt_sigsuspend", lx_rt_sigsuspend, 0,		2},	/* 179 */
 	{"pread64",	lx_pread64,	0,		5},	/* 180 */
 	{"pwrite64",	lx_pwrite64,	0,		5},	/* 181 */
@@ -1272,7 +1272,7 @@ static struct lx_sysent sysents[] = {
 	{"inotify_init1", NULL,		NOSYS_NULL,	0},	/* 332 */
 	{"preadv",	NULL,		NOSYS_NULL,	0},	/* 333 */
 	{"pwritev",	NULL,		NOSYS_NULL,	0},	/* 334 */
-	{"rt_tgsigqueueinfo", NULL,	NOSYS_NULL,	0},	/* 335 */
+	{"rt_tgsigqueueinfo", lx_rt_tgsigqueueinfo, 0,	4},	/* 335 */
 	{"perf_event_open", NULL,	NOSYS_NULL,	0},	/* 336 */
 	{"recvmmsg",	NULL,		NOSYS_NULL,	0},	/* 337 */
 	{"fanotify_init", NULL,		NOSYS_NULL,	0},	/* 338 */

@@ -21,10 +21,10 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2014 Joyent, Inc.  All rights reserved.
  */
 
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 
 #include <sys/types.h>
@@ -38,6 +38,7 @@
 #include <sys/lx_brand.h>
 #include <sys/lx_pid.h>
 #include <lx_signum.h>
+#include <sys/contract/process_impl.h>
 
 extern int kill(pid_t, int);
 
@@ -250,4 +251,133 @@ lx_kill(pid_t lx_pid, int lx_sig)
 	else if (err == 0 && v.perm == 0)
 		err = EPERM;
 	return (err ? set_errno(err) : 0);
+}
+
+/*
+ * This handles the unusual case where the user sends a non-queueable signal
+ * through rt_sigqueueinfo. Signals sent with codes that indicate they are
+ * queuable are sent through the sigqueue syscall via the user level function
+ * lx_rt_sigqueueinfo().
+ */
+long
+lx_rt_sigqueueinfo(pid_t tgid, int sig, siginfo_t *uinfo)
+{
+	proc_t *target_proc;
+	pid_t s_pid;
+	zone_t *zone = curproc->p_zone;
+	sigsend_t send;
+	int err;
+	siginfo_t kinfo;
+
+	if (copyin(uinfo, &kinfo, sizeof (siginfo_t)) != 0)
+		return (set_errno(EFAULT));
+	/* Unlike in lx_kill, this process id must be exact, no negatives. */
+	if (tgid == 0)
+		return (set_errno(ESRCH));
+	if (tgid < 0)
+		return (set_errno(EINVAL));
+	/*
+	 * Translate init directly, otherwise use the convenient utility
+	 * function to translate. Since we're sending to the whole group, we
+	 * only need the solaris pid, and not the lwp id.
+	 */
+	if (tgid == 1) {
+		s_pid = zone->zone_proc_initpid;
+	} else {
+		if (lx_lpid_to_spair(tgid, &s_pid, NULL) != 0) {
+			/*
+			 * If we didn't find this pid that means it doesn't
+			 * exist in this zone.
+			 */
+			return (set_errno(ESRCH));
+		}
+	}
+	/*
+	 * We shouldn't have queuable signals here, those are sent elsewhere by
+	 * the useland handler for this emulated call.
+	 */
+	if (!SI_CANQUEUE(kinfo.si_code)) {
+		return (set_errno(EINVAL));
+	}
+	/* Since our signal shouldn't queue, we just call sigsendproc(). */
+	bzero(&send, sizeof (send));
+	send.sig = sig;
+	send.checkperm = 1;
+	send.sicode = kinfo.si_code;
+	send.value = kinfo.si_value;
+
+	mutex_enter(&pidlock);
+	target_proc = prfind(s_pid);
+	err = 0;
+	if (target_proc != NULL) {
+		err = sigsendproc(target_proc, &send);
+		if (err == 0 && send.perm == 0)
+			err = EPERM;
+	} else {
+		err = ESRCH;
+	}
+	mutex_exit(&pidlock);
+
+	return (err ? set_errno(err) : 0);
+}
+
+/*
+ * Unlike the above function, this handles all system calls to rt_tgsigqueue
+ * regardless of si_code.
+ */
+long
+lx_rt_tgsigqueueinfo(pid_t tgid, pid_t tid, int sig, siginfo_t *uinfo)
+{
+	id_t s_tid;
+	pid_t s_pid;
+	proc_t *target_proc;
+	sigqueue_t *sqp;
+	kthread_t *t;
+	siginfo_t kinfo;
+
+	if (copyin(uinfo, &kinfo, sizeof (siginfo_t)) != 0)
+		return (set_errno(EFAULT));
+	if (lx_lpid_to_spair(tid, &s_pid, &s_tid) != 0)
+		return (set_errno(ESRCH));
+	/*
+	 * For group leaders, solaris pid == linux pid, so the solaris leader
+	 * pid should be the same as the tgid.
+	 */
+	ASSERT(s_pid == tgid);
+
+	mutex_enter(&pidlock);
+	target_proc = prfind(s_pid);
+	if (target_proc != NULL)
+		mutex_enter(&target_proc->p_lock);
+	mutex_exit(&pidlock);
+
+	if (target_proc == NULL) {
+		return (set_errno(ESRCH));
+	}
+	if (sig < 0 || sig >= NSIG)
+		return (set_errno(EINVAL));
+
+	/*
+	 * Some code adapted from lwp_kill, duplicated here because we do some
+	 * customization to the sq_info field of sqp.
+	 */
+	if ((t = idtot(target_proc, s_tid)) == NULL) {
+		mutex_exit(&target_proc->p_lock);
+		return (set_errno(ESRCH));
+	}
+	/* Just checking for existence of the process, not sending a signal. */
+	if (sig == 0) {
+		mutex_exit(&target_proc->p_lock);
+		return (0);
+	}
+	sqp = kmem_zalloc(sizeof (sigqueue_t), KM_SLEEP);
+	sqp->sq_info.si_signo = sig;
+	sqp->sq_info.si_code = kinfo.si_code;
+	sqp->sq_info.si_pid = target_proc->p_pid;
+	sqp->sq_info.si_ctid = PRCTID(target_proc);
+	sqp->sq_info.si_zoneid = getzoneid();
+	sqp->sq_info.si_uid = crgetruid(CRED());
+	sigaddqa(target_proc, t, sqp);
+	mutex_exit(&target_proc->p_lock);
+	return (0);
 }

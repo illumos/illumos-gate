@@ -248,7 +248,7 @@ lx_sysent_t lx_sysent[] =
 	LX_NOSYS("rt_sigprocmask"),
 	LX_NOSYS("rt_sigpending"),
 	LX_NOSYS("rt_sigtimedwait"),
-	LX_NOSYS("rt_sigqueueinfo"),
+	LX_CL("rt_sigqueueinfo",	lx_rt_sigqueueinfo, 3),
 	LX_NOSYS("rt_sigsuspend"),
 	LX_NOSYS("pread64"),					/* 180 */
 	LX_NOSYS("pwrite64"),
@@ -406,7 +406,7 @@ lx_sysent_t lx_sysent[] =
 	LX_NOSYS("inotify_init1"),
 	LX_NOSYS("preadv"),
 	LX_NOSYS("pwritev"),
-	LX_NOSYS("rt_tgsigqueueinfo"),
+	LX_CL("rt_tgsigqueueinfo",	lx_rt_tgsigqueueinfo, 4),
 	LX_NOSYS("perf_event_open"),
 	LX_NOSYS("recvmmsg"),
 	LX_NOSYS("fanotify_init"),
