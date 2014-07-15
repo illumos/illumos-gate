@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013, Joyent, Inc. All rights reserved.
+ * Copyright 2014, Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -1210,8 +1210,16 @@ kstat_install(kstat_t *ksp)
 
 	/*
 	 * Now that the kstat is active, make it visible to the kstat driver.
+	 * When copying out kstats the count is determined in
+	 * header_kstat_update() and actually copied into kbuf in
+	 * header_kstat_snapshot(). kstat_chain_lock is held across the two
+	 * calls to ensure that this list doesn't change. Thus, we need to
+	 * also take the lock to ensure that the we don't copy the new kstat
+	 * in the 2nd pass and overrun the buf.
 	 */
+	mutex_enter(&kstat_chain_lock);
 	ksp->ks_flags &= ~KSTAT_FLAG_INVALID;
+	mutex_exit(&kstat_chain_lock);
 	kstat_rele(ksp);
 }
 

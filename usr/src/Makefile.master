@@ -23,6 +23,7 @@
 # Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2012 OmniTI Computer Consulting, Inc.  All rights reserved.
 # Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright 2014 Garrett D'Amore <garrett@damore.org>
 #
 
 #
@@ -659,8 +660,9 @@ MAPFILE.NGB =		$(MAPFILE.NGB_$(MACH))
 MAPFILE.INT =		mapfile-intf
 
 #
-# LDLIBS32 can be set in the environment to override the following assignment.
-# LDLIBS64 can be set to override the assignment made in Makefile.master.64.
+# LDLIBS32 and LDLIBS64 can be set in the environment to override the following
+# assignments.
+#
 # These environment settings make sure that no libraries are searched outside
 # of the local workspace proto area:
 #	LDLIBS32=-YP,$ROOT/lib:$ROOT/usr/lib
@@ -670,6 +672,12 @@ LDLIBS32 =	$(ENVLDLIBS1) $(ENVLDLIBS2) $(ENVLDLIBS3)
 LDLIBS32 +=	$(ADJUNCT_PROTO:%=-L%/usr/lib -L%/lib)
 LDLIBS.cmd = 	$(LDLIBS32)
 LDLIBS.lib =	$(LDLIBS32)
+
+LDLIBS64 =	$(ENVLDLIBS1:%=%/$(MACH64)) \
+		$(ENVLDLIBS2:%=%/$(MACH64)) \
+		$(ENVLDLIBS3:%=%/$(MACH64))
+LDLIBS64 +=     $(ADJUNCT_PROTO:%=-L%/usr/lib/$(MACH64) -L%/lib/$(MACH64))
+
 #
 # Define compilation macros.
 #

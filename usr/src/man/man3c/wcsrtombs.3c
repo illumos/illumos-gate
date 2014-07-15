@@ -8,27 +8,34 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH WCSRTOMBS 3C "Jun 25, 2014"
+.TH WCSRTOMBS 3C "Jul 13, 2014"
 .SH NAME
-wcsrtombs, wcsrtombs_l \- convert a wide-character string to a character string
+wcsnrtombs, wcsnrtombs_l, wcsrtombs, wcsrtombs_l \- convert a wide-character string to a character string
 (restartable)
 .SH SYNOPSIS
 .LP
 .nf
 #include <wchar.h>
 
-\fBsize_t\fR \fBwcsrtombs\fR(\fBchar *restrict\fR \fIdst\fR,
-     \fBconst wchar_t **restrict\fR \fIsrc\fR, \fBsize_t\fR \fIlen\fR,
-     \fBmbstate_t *restrict\fR \fIps\fR);
+\fBsize_t\fR \fBwcsrtombs\fR(\fBchar *restrict\fR \fIdst\fR, \fBconst wchar_t **restrict\fR \fIsrc\fR,
+     \fBsize_t\fR \fIlen\fR, \fBmbstate_t *restrict\fR \fIps\fR);
 .fi
+.LP
+.nf
+\fBsize_t\fR \fBwcsnrtombs\fR(\fBchar *restrict\fR \fIdst\fR, \fBconst wchar_t **restrict\fR \fIsrc\fR,
+     \fBsize_t\fR \fInwc\fR, \fBsize_t\fR \fIlen\fR, \fBmbstate_t *restrict\fR \fIps\fR);
 .LP
 .nf
 #include <wchar.h>
 #include <xlocale.h>
 
-\fBsize_t\fR \fBwcsrtombs_l\fR(\fBchar *restrict\fR \fIdst\fR,
-     \fBconst wchar_t **restrict\fR \fIsrc\fR, \fBsize_t\fR \fIlen\fR,
-     \fBmbstate_t *restrict\fR \fIps\fR, \fBlocale_t\fR \fIloc\fR);
+\fBsize_t\fR \fBwcsrtombs_l\fR(\fBchar *restrict\fR \fIdst\fR, \fBconst wchar_t **restrict\fR \fIsrc\fR,
+     \fBsize_t\fR \fIlen\fR, \fBmbstate_t *restrict\fR \fIps\fR, \fBlocale_t\fR \fIloc\fR);
+.fi
+.LP
+.nf
+\fBsize_t\fR \fBwcsnrtombs_l\fR(\fBchar *restrict\fR \fIdst\fR, \fBconst wchar_t **restrict\fR \fIsrc\fR,
+     \fBsize_t\fR \fInwc\fR, \fBsize_t\fR \fIlen\fR, \fBmbstate_t *restrict\fR \fIps\fR, \fBlocale_t\fR \fIloc\fR);
 .fi
 .SH DESCRIPTION
 .LP
@@ -53,6 +60,13 @@ When the next character would exceed the limit of \fIlen\fR total bytes to be
 stored in the array pointed to by \fIdst\fR (and \fIdst\fR is not a null
 pointer).
 .RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+In the case of \fBwcsnrtombs()\fR and \fBwcsnrtombs_l()\fR, when \fInwc\fR
+wide characters have been completely converted.
+.RE
 .LP
 Each conversion takes place as if by a call to the \fBwcrtomb()\fR function.
 .LP
@@ -63,18 +77,19 @@ wide-character converted (if any). If conversion stopped due to reaching a
 terminating null wide-character, the resulting state described is the initial
 conversion state.
 .LP
-If \fIps\fR is a null pointer, the \fBwcsrtombs()\fR function uses its own
+If \fIps\fR is a null pointer, these functions uses their own
 internal \fBmbstate_t\fR object, which is initialized at program startup to the
 initial conversion state.  Otherwise, the  \fBmbstate_t\fR object pointed to by
 \fIps\fR is used to completely describe the current conversion state of the
 associated character sequence. The system will behave as if no function defined
 in the Reference Manual calls any of these functions.
 .LP
-The behavior of \fBwcsrtombs()\fR is affected by the \fBLC_CTYPE\fR category of
-the current locale.  See \fBenviron\fR(5).
+The behavior of \fBwcsrtombs()\fR and \fBwcsnrtombs()\fR are affected by the
+\fBLC_CTYPE\fR category of the current locale.  See \fBenviron\fR(5).
 .LP
-The function \fBwcsrtombs_l()\fR behaves identically to \fBwcsrtombs\fR, except
-instead of operating in the current locale, it operates in the locale
+The \fBwcsrtombs_l()\fR and \fBwcsnrtombs_l()\fR functions behave identically
+to \fBwcsrtombs()\fR and \fBwcsnrtombs()\fR respectively, except
+that instead of operating in the current locale, they operate in the locale
 specified by \fIloc\fR.
 .SH RETURN VALUES
 .LP
@@ -86,7 +101,7 @@ the number of bytes in the resulting character sequence, not including the
 terminating null (if any).
 .SH ERRORS
 .LP
-The \fBwcsrtombs()\fR and \fBwcsrtombs_l()\fR functions may fail if:
+These functions may fail if:
 .sp
 .ne 2
 .na
@@ -120,8 +135,8 @@ MT-Level	See below.
 .TE
 
 .LP
-The \fBwcsrtombs()\fR function is Standard.  The \fBwcsrtombs_l()\fR
-function is Uncommitted.
+The \fBwcsrtombs()\fR and \fBwcsnrtombs()\fR functions are Standard.  The
+\fBwcsrtombs_l()\fR and \fBwcsnrtombs_l()\fR functions are Uncommitted.
 .LP
 If \fIps\fR is a null pointer, these functions should be considered Unsafe
 for use in multithreaded applications.  Otherwise, they are MT-Safe.

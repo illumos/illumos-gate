@@ -10,48 +10,12 @@
 #
 
 #
-# Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 #
 
-include $(SRC)/cmd/Makefile.cmd
-include $(SRC)/test/Makefile.com
+include $(SRC)/Makefile.master
 
 PROG = newlocale_test
-OBJS = $(PROG:%=%.o)
-SRCS = $(OBJS:%.o=%.c)
+ARCHPROG = newlocale_test
 
-C99MODE = -xc99=%all
-
-ROOTOPTPKG = $(ROOT)/opt/libc-tests
-TESTDIR = $(ROOTOPTPKG)/tests
-
-CMDS = $(PROG:%=$(TESTDIR)/%)
-$(CMDS) := FILEMODE = 0555
-
-all: $(PROG)
-
-$(PROG): $(OBJS)
-	$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
-	$(POST_PROCESS)
-
-%.o: ../%.c
-	$(COMPILE.c) $<
-
-install: all $(CMDS)
-
-lint: lint_SRCS
-
-clobber: clean
-	-$(RM) $(PROG)
-
-clean:
-	-$(RM) $(OBJS)
-
-$(CMDS): $(TESTDIR) $(PROG)
-
-$(TESTDIR):
-	$(INS.dir)
-
-$(TESTDIR)/%: %
-	$(INS.file)
+include ../Makefile.com

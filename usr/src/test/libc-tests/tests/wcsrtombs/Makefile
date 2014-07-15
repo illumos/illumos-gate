@@ -10,11 +10,12 @@
 #
 
 #
-# Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 #
 
-SUBDIRS = newlocale nl_langinfo wcsrtombs
-
 include $(SRC)/Makefile.master
-include $(SRC)/test/Makefile.com
+
+PROG = wcsrtombs_test
+ARCHPROG = wcsrtombs_test
+
+include ../Makefile.com

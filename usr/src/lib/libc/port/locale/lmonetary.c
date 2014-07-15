@@ -156,10 +156,10 @@ __lc_monetary_load(const char *name)
 		char sign = '\0';
 		switch (lmon->p_cs_precedes[0]) {
 		case 0:
-			sign = '-';
+			sign = '+';
 			break;
 		case 1:
-			sign = '+';
+			sign = '-';
 			break;
 		case CHAR_MAX:
 			/*

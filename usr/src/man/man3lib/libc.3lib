@@ -778,6 +778,7 @@ l l .
 \fBwcscspn\fR	\fBwcsftime\fR
 \fBwcslen\fR	\fBwcsncat\fR
 \fBwcsncmp\fR	\fBwcsncpy\fR
+\fBwcsnrtombs\fR	\fBwcsnrtombs_l\fR
 \fBwcspbrk\fR	\fBwcsrchr\fR
 \fBwcsrtombs\fR	\fBwcsrtombs_l\fR
 \fBwcsspn\fR
