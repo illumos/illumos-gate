@@ -63,7 +63,8 @@ using std::wctrans;
 using std::towctrans;
 using std::iswctype;
 using std::wctype;
-#if __cplusplus >= 201103L
+#if (__cplusplus >= 201103L) || defined(_STDC_C99) || defined(_XPG6) || \
+	!defined(_STRICT_SYMBOLS)
 using std::iswblank;
 #endif
 #endif
