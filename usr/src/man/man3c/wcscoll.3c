@@ -50,7 +50,7 @@ integer greater than, equal to, or less than 0, depending upon whether the wide
 character string pointed to by \fIws1\fR is greater than, equal to, or less
 than the wide character string pointed to by \fIws2\fR, when both are
 interpreted as appropriate to the the current locale, or the locale
-specified by \fIloc\fR. On error, 
+specified by \fIloc\fR. On error,
 they set \fBerrno\fR, but no return value is reserved to indicate an error.
 .SH ERRORS
 .LP

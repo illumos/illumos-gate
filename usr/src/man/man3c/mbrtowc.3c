@@ -81,7 +81,7 @@ is a null pointer, these functions use their own
 internal
 .B mbstate_t
 object, which is initialized at program startup to the
-initial conversion state. Otherwise, the 
+initial conversion state. Otherwise, the
 .B mbstate_t
 object pointed to by
 .I ps

@@ -135,7 +135,7 @@ The
 .B mbsnrtowcs()
 and
 .B mbsrtowcs()
-functions are Standard.  The 
+functions are Standard.  The
 .B mbsnrtowcs_l()
 and
 .B mbsrtowcs_l()

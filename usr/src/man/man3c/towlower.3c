@@ -26,7 +26,7 @@ towlower, towlower_l \- transliterate upper-case wide characters to lower-case
 .LP
 .nf
 \fBwint_t\fR \fBtowlower_l\fR(\fBwint_t\fR \fIwc\fR, \fBlocale_t\fR \fIloc\fR);
-.nf
+.fi
 .SH DESCRIPTION
 The function
 .BR towlower()

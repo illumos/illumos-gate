@@ -174,7 +174,7 @@ versions of  \fBstrcmp()\fR and \fBstrncmp()\fR respectively, described below.
 The \fBstrcasecmp()\fR and \fBstrncasecmp()\fR functions compare two strings
 byte-by-byte, after
 converting each upper-case character to lower-case (as determined by the
-\fBLC_CTYPE\fR category of the current locale).  Note that neither the contents 
+\fBLC_CTYPE\fR category of the current locale).  Note that neither the contents
 pointed to by \fIs1\fR nor \fIs2\fR are modified.
 .LP
 The functions return an integer
