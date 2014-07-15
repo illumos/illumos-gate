@@ -17946,7 +17946,7 @@ f usr/share/man/man4/smbautohome.4 0444 root bin
 f usr/share/man/man4/smhba.conf.4 0444 root bin
 s usr/share/man/man4/snapshot_cache.4=devices.4
 f usr/share/man/man4/sndr.4 0444 root bin
-f usr/share/man/man4/sock2path.4 0444 root bin
+f usr/share/man/man4/sock2path.d.4 0444 root bin
 f usr/share/man/man4/space.4 0444 root bin
 f usr/share/man/man4/ssh_config.4 0444 root bin
 f usr/share/man/man4/sshd_config.4 0444 root bin
