@@ -26,8 +26,6 @@
 #ifndef _SYS_LX_SIGNAL_H
 #define	_SYS_LX_SIGNAL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #if !defined(_ASM)
 #include <sys/lx_types.h>
 #include <lx_signum.h>
@@ -157,7 +155,7 @@ typedef struct lx_siginfo {
  * lx_siginfo_t lsi_code values
  *
  *	LX_SI_ASYNCNL:	Sent by asynch name lookup completion
- *	LX_SI_TKILL:	Sent by tkill
+ *	LX_SI_DETHREAD:	Sent by execve() killing subsidiary threads
  *	LX_SI_SIGIO:	Sent by queued SIGIO
  *	LX_SI_ASYNCIO:	Sent by asynchronous I/O completion
  *	LX_SI_MESGQ:	Sent by real time message queue state change
@@ -165,10 +163,17 @@ typedef struct lx_siginfo {
  *	LX_SI_QUEUE:	Sent by sigqueue
  *	LX_SI_USER:	Sent by kill, sigsend, raise, etc.
  *	LX_SI_KERNEL:	Sent by kernel
+ *	LX_SI_CODE_NOT_EXIST: Error code. When translating from Linux to
+ *	    illumos errors, if there is no translation available, this value
+ *	    should be used. This value should have no meaning as an si_code in
+ *	    illumos or Linux.
  *
- * At present, LX_SI_ASYNCNL and LX_SI_SIGIO are unused by BrandZ.
+ * At present, LX_SI_ASYNCNL, LX_SI_DETHREAD, and LX_SI_SIGIO are unused by
+ * BrandZ.
  */
+#define	LX_SI_CODE_NOT_EXIST	(-61)
 #define	LX_SI_ASYNCNL	(-60)
+#define	LX_SI_DETHREAD	(-7)
 #define	LX_SI_TKILL	(-6)
 #define	LX_SI_SIGIO	(-5)
 #define	LX_SI_ASYNCIO	(-4)

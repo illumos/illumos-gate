@@ -38,6 +38,7 @@
 #include <sys/lx_signal.h>
 #include <sys/lx_syscall.h>
 #include <sys/lx_thread.h>
+#include <sys/syscall.h>
 #include <assert.h>
 #include <errno.h>
 #include <signal.h>
@@ -395,6 +396,27 @@ stol_sigcode(int si_code)
 	}
 }
 
+static int
+ltos_sigcode(int si_code)
+{
+	switch (si_code) {
+		case LX_SI_USER:
+			return (SI_USER);
+		case LX_SI_TKILL:
+			return (SI_LWP);
+		case LX_SI_QUEUE:
+			return (SI_QUEUE);
+		case LX_SI_TIMER:
+			return (SI_TIMER);
+		case LX_SI_ASYNCIO:
+			return (SI_ASYNCIO);
+		case LX_SI_MESGQ:
+			return (SI_MESGQ);
+		default:
+			return (LX_SI_CODE_NOT_EXIST);
+	}
+}
+
 int
 stol_siginfo(siginfo_t *siginfop, lx_siginfo_t *lx_siginfop)
 {
@@ -425,7 +447,6 @@ stol_siginfo(siginfo_t *siginfop, lx_siginfo_t *lx_siginfop)
 			lx_siginfo.lsi_status = siginfop->si_status;
 			lx_siginfo.lsi_utime = siginfop->si_utime;
 			lx_siginfo.lsi_stime = siginfop->si_stime;
-
 			break;
 
 		case LX_SIGILL:
@@ -1816,4 +1837,103 @@ lx_pselect6(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 		return (-errno);
 
 	return (r);
+}
+
+/*
+ * The first argument is the pid (Linux tgid) to send the signal to, second
+ * argument is the signal to send (an lx signal), and third is the siginfo_t
+ * with extra information. We translate the code and signal only from the
+ * siginfo_t, and leave everything else the same as it gets passed through the
+ * signalling system. This is enough to get sigqueue working. See Linux man
+ * page rt_sigqueueinfo(2).
+ */
+int
+lx_rt_sigqueueinfo(uintptr_t p1, uintptr_t p2, uintptr_t p3)
+{
+	pid_t tgid = (pid_t)p1;
+	int lx_sig = (int)p2;
+	int sig;
+	lx_siginfo_t lx_siginfo;
+	siginfo_t siginfo;
+	int s_code;
+	pid_t s_pid;
+
+	if (uucopy((void *)p3, &lx_siginfo, sizeof (lx_siginfo_t)) != 0)
+		return (-EFAULT);
+	s_code = ltos_sigcode(lx_siginfo.lsi_code);
+	if (s_code == LX_SI_CODE_NOT_EXIST)
+		return (-EINVAL);
+	if (lx_sig < 0 || lx_sig >= LX_NSIG ||
+	    (sig = ltos_signo[lx_sig]) < 0) {
+		return (-EINVAL);
+	}
+	/*
+	 * This case (when trying to kill pid 0) just has a different errno
+	 * returned in illumos than in Linux.
+	 */
+	if (tgid == 0)
+		return (-ESRCH);
+	if (lx_lpid_to_spid(tgid, &s_pid) != 0)
+		return (-ESRCH);
+	if (SI_CANQUEUE(s_code)) {
+		return ((syscall(SYS_sigqueue, s_pid, sig,
+		    lx_siginfo.lsi_value, s_code, 0) == -1) ?
+		    (-errno): 0);
+	} else {
+		/*
+		 * This case is unlikely, as the main entry point is through
+		 * sigqueue, which always has a queuable si_code.
+		 */
+		siginfo.si_signo = sig;
+		siginfo.si_code = s_code;
+		siginfo.si_pid = lx_siginfo.lsi_pid;
+		siginfo.si_value = lx_siginfo.lsi_value;
+		siginfo.si_uid = lx_siginfo.lsi_uid;
+		return ((syscall(SYS_brand, B_EMULATE_SYSCALL +
+		    LX_SYS_rt_sigqueueinfo, tgid, sig, &siginfo)) ?
+		    (-errno) : 0);
+	}
+
+}
+
+/*
+ * Adds an additional argument for which thread within a thread group to send
+ * the signal to (added as the second argument).
+ */
+int
+lx_rt_tgsigqueueinfo(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4)
+{
+	pid_t tgid = (pid_t)p1;
+	pid_t tid = (pid_t)p2;
+	int lx_sig = (int)p3;
+	int sig;
+	lx_siginfo_t lx_siginfo;
+	siginfo_t siginfo;
+	int si_code;
+
+
+	if (uucopy((void *)p4, &lx_siginfo, sizeof (lx_siginfo_t)) != 0)
+		return (-EFAULT);
+	if (lx_sig < 0 || lx_sig >= LX_NSIG ||
+	    (sig = ltos_signo[lx_sig]) < 0) {
+		return (-EINVAL);
+	}
+	si_code = ltos_sigcode(lx_siginfo.lsi_code);
+	if (si_code == LX_SI_CODE_NOT_EXIST)
+		return (-EINVAL);
+	/*
+	 * Check for invalid tgid and tids. That appears to be only negatives
+	 * and 0 values. Everything else that doesn't exist is instead ESRCH.
+	 */
+	if (tgid <= 0 || tid <= 0)
+		return (-EINVAL);
+	siginfo.si_signo = sig;
+	siginfo.si_code = si_code;
+	siginfo.si_pid = lx_siginfo.lsi_pid;
+	siginfo.si_value = lx_siginfo.lsi_value;
+	siginfo.si_uid = lx_siginfo.lsi_uid;
+	return ((syscall(SYS_brand, B_EMULATE_SYSCALL +
+	    LX_SYS_rt_tgsigqueueinfo, tgid, tid, sig, &siginfo)) ?
+	    (-errno) : 0);
+
 }

@@ -221,6 +221,8 @@ extern int lx_sigwaitinfo(uintptr_t, uintptr_t);
 extern int lx_rt_sigwaitinfo(uintptr_t, uintptr_t, uintptr_t);
 extern int lx_sigtimedwait(uintptr_t, uintptr_t, uintptr_t);
 extern int lx_rt_sigtimedwait(uintptr_t, uintptr_t, uintptr_t, uintptr_t);
+extern int lx_rt_sigqueueinfo(uintptr_t, uintptr_t, uintptr_t);
+extern int lx_rt_tgsigqueueinfo(uintptr_t, uintptr_t, uintptr_t, uintptr_t);
 
 extern int lx_sync(void);
 

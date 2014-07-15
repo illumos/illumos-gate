@@ -59,6 +59,8 @@ extern long lx_setresuid();
 extern long lx_setresuid16();
 extern long lx_sysinfo();
 extern long lx_setgroups();
+extern long lx_rt_sigqueueinfo();
+extern long lx_rt_tgsigqueueinfo();
 
 #endif	/* _KERNEL */
 
