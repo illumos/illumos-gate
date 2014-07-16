@@ -4370,6 +4370,20 @@ The following general link properties are supported:
 .sp
 .ne 2
 .na
+\fB\fBallowed-ips\fR\fR
+.ad
+.sp .6
+.RS 4n
+A comma-seperated list of IP addresses that are allowed on the interface.
+.sp
+An address in CIDR format with no host address specified is used to indicate
+that any address on that subnet is allowed (e.g. 192.168.10.0/24 means any
+address in the range 192.168.10.0 - 192.168.10.255 is allowed).
+.RE
+
+.sp
+.ne 2
+.na
 \fB\fBautopush\fR\fR
 .ad
 .sp .6

@@ -10,10 +10,31 @@
 #
 
 #
-# Copyright (c) 2012 by Delphix. All rights reserved.
-# Copyright 2014 Garrett D'Amore <garrett@damore.org>
+# Copyright (c) 2014 Joyent, Inc. All rights reserved.
 #
 
-SUBDIRS = dladm printf xargs
-
+include $(SRC)/cmd/Makefile.cmd
 include $(SRC)/test/Makefile.com
+
+ROOTOPTPKG = $(ROOT)/opt/util-tests/tests
+PROG = allowed-ips
+
+ROOTPROG = $(PROG:%=$(ROOTOPTPKG)/%)
+
+all: 
+
+install: $(ROOTPROG)
+
+lint:
+
+clobber: clean
+
+clean:
+
+$(CMDS): $(TESTDIR)
+
+$(ROOTOPTPKG):
+	$(INS.dir)
+
+$(ROOTOPTPKG)/%: %.ksh $(ROOTOPTPKG)
+	$(INS.rename)

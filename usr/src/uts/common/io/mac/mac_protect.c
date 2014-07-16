@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
  */
 /*
  * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
@@ -1533,9 +1534,22 @@ ipnospoof_check_v4(mac_client_impl_t *mcip, mac_protect_t *protect,
 	for (i = 0; i < protect->mp_ipaddrcnt; i++) {
 		mac_ipaddr_t	*v4addr = &protect->mp_ipaddrs[i];
 
-		if (v4addr->ip_version == IPV4_VERSION &&
-		    V4_PART_OF_V6(v4addr->ip_addr) == *addr)
-			return (B_TRUE);
+		if (v4addr->ip_version == IPV4_VERSION) {
+			uint32_t mask;
+
+			/* LINTED E_SUSPICIOUS_COMPARISON */
+			ASSERT(v4addr->ip_netmask >= 0 &&
+			    v4addr->ip_netmask <= 32);
+			mask = 0xFFFFFFFFu << (32 - v4addr->ip_netmask);
+			/*
+			 * Since we have a netmask we know this entry
+			 * signifies the entire subnet. Check if the
+			 * given address is on the subnet.
+			 */
+			if (htonl(V4_PART_OF_V6(v4addr->ip_addr)) ==
+			    (htonl(*addr) & mask))
+				return (B_TRUE);
+		}
 	}
 	return (protect->mp_ipaddrcnt == 0 ?
 	    check_dhcpv4_dyn_ip(mcip, *addr) : B_FALSE);
@@ -1560,7 +1574,9 @@ ipnospoof_check_v6(mac_client_impl_t *mcip, mac_protect_t *protect,
 		mac_ipaddr_t	*v6addr = &protect->mp_ipaddrs[i];
 
 		if (v6addr->ip_version == IPV6_VERSION &&
-		    IN6_ARE_ADDR_EQUAL(&v6addr->ip_addr, addr))
+		    /* LINTED E_SUSPICIOUS_COMPARISON */
+		    IN6_ARE_PREFIXEDADDR_EQUAL(&v6addr->ip_addr, addr,
+		    v6addr->ip_netmask))
 			return (B_TRUE);
 	}
 	return (protect->mp_ipaddrcnt == 0 ?
@@ -2095,14 +2111,27 @@ validate_ips(mac_protect_t *p)
 		mac_ipaddr_t	*addr = &p->mp_ipaddrs[i];
 
 		/*
-		 * The unspecified address is implicitly allowed
-		 * so there's no need to add it to the list.
+		 * The unspecified address is implicitly allowed so there's no
+		 * need to add it to the list. Also, validate that the netmask,
+		 * if any, is sane for the specific version of IP. A mask of
+		 * some kind is always required.
 		 */
+		if (addr->ip_netmask == 0)
+			return (EINVAL);
+
 		if (addr->ip_version == IPV4_VERSION) {
 			if (V4_PART_OF_V6(addr->ip_addr) == INADDR_ANY)
 				return (EINVAL);
+			if (addr->ip_netmask > 32)
+				return (EINVAL);
 		} else if (addr->ip_version == IPV6_VERSION) {
 			if (IN6_IS_ADDR_UNSPECIFIED(&addr->ip_addr))
+				return (EINVAL);
+
+			if (IN6_IS_ADDR_V4MAPPED_ANY(&addr->ip_addr))
+				return (EINVAL);
+
+			if (addr->ip_netmask > 128)
 				return (EINVAL);
 		} else {
 			/* invalid ip version */
