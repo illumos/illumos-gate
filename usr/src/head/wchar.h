@@ -172,7 +172,7 @@ using std::wctype;
 
 #ifndef _LOCALE_T
 #define	_LOCALE_T
-typedef struct locale *locale_t;
+typedef struct _locale *locale_t;
 #endif
 
 extern size_t wcsnlen(const wchar_t *, size_t);

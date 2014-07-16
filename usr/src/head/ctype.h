@@ -94,7 +94,7 @@ extern int _toupper(int);
 
 #ifndef _LOCALE_T
 #define	_LOCALE_T
-typedef struct locale *locale_t;
+typedef struct _locale *locale_t;
 #endif
 
 extern int isalnum_l(int, locale_t);

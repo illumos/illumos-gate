@@ -45,7 +45,7 @@ extern ssize_t	strfmon(char *_RESTRICT_KYWD, size_t,
 
 #ifndef _LOCALE_T
 #define	_LOCALE_T
-typedef struct locale *locale_t;
+typedef struct _locale *locale_t;
 #endif
 
 extern ssize_t strfmon_l(char *_RESTRICT_KYWD, size_t, locale_t,
