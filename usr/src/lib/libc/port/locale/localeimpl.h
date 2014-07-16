@@ -55,9 +55,9 @@ struct locdata {
 };
 
 
-struct locale {
+struct _locale {
 	struct locdata	*locdata[LC_ALL];
-	struct locale	*next;
+	struct _locale	*next;
 	int		on_list;	/* on linked list */
 	char		locname[(ENCODING_LEN+1)*NLOCDATA + 1];
 

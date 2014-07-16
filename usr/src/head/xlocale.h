@@ -45,7 +45,7 @@ extern "C" {
 
 #ifndef	_LOCALE_T
 #define	_LOCALE_T
-typedef struct locale *locale_t;
+typedef struct _locale *locale_t;
 #endif
 
 extern int mbsinit_l(const mbstate_t *, locale_t);

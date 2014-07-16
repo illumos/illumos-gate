@@ -98,7 +98,7 @@ extern struct lc_time lc_time_posix;
 extern struct lc_ctype lc_ctype_posix;
 extern struct lc_collate lc_collate_posix;
 
-static struct locale posix_locale = {
+static struct _locale posix_locale = {
 	/* locdata */
 	.locdata = {
 		&__posix_ctype_locdata,

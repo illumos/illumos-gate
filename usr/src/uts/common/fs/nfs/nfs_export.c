@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -2071,7 +2072,7 @@ makefh3(nfs_fh3 *fh, vnode_t *vp, struct exportinfo *exi)
 	fid_t fid;
 
 	bzero(&fid, sizeof (fid));
-	fid.fid_len = MAXFIDSZ;
+	fid.fid_len = sizeof (fh->fh3_data);
 	error = VOP_FID(vp, &fid, NULL);
 	if (error)
 		return (EREMOTE);
@@ -2080,12 +2081,16 @@ makefh3(nfs_fh3 *fh, vnode_t *vp, struct exportinfo *exi)
 	fh->fh3_fsid = exi->exi_fsid;
 	fh->fh3_len = fid.fid_len;
 	bcopy(fid.fid_data, fh->fh3_data, fh->fh3_len);
+
 	fh->fh3_xlen = exi->exi_fid.fid_len;
+	ASSERT(fh->fh3_xlen <= sizeof (fh->fh3_xdata));
 	bcopy(exi->exi_fid.fid_data, fh->fh3_xdata, fh->fh3_xlen);
-	fh->fh3_length = sizeof (fsid_t)
-	    + sizeof (ushort_t) + fh->fh3_len
-	    + sizeof (ushort_t) + fh->fh3_xlen;
+
+	fh->fh3_length = sizeof (fh->fh3_fsid)
+	    + sizeof (fh->fh3_len) + fh->fh3_len
+	    + sizeof (fh->fh3_xlen) + fh->fh3_xlen;
 	fh->fh3_flags = 0;
+
 	return (0);
 }
 
@@ -2188,6 +2193,7 @@ makefh4(nfs_fh4 *fh, vnode_t *vp, struct exportinfo *exi)
 
 	bzero(fh_fmtp->fh4_i.fhx_data, sizeof (fh_fmtp->fh4_i.fhx_data));
 	bzero(fh_fmtp->fh4_i.fhx_xdata, sizeof (fh_fmtp->fh4_i.fhx_xdata));
+	ASSERT(exi->exi_fh.fh_xlen <= sizeof (fh_fmtp->fh4_i.fhx_xdata));
 	bcopy(exi->exi_fh.fh_xdata, fh_fmtp->fh4_i.fhx_xdata,
 	    exi->exi_fh.fh_xlen);
 

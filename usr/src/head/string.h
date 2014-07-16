@@ -97,7 +97,7 @@ extern char *strsignal(int);
 
 #ifndef	_LOCALE_T
 #define	_LOCALE_T
-typedef struct locale *locale_t;
+typedef struct _locale *locale_t;
 #endif
 
 extern int strcoll_l(const char *, const char *, locale_t);
