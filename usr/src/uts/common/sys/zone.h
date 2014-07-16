@@ -321,6 +321,7 @@ typedef struct zone_net_data {
  * libraries which may be defining ther own versions.
  */
 #include <sys/list.h>
+#include <sys/cpuvar.h>
 
 #define	GLOBAL_ZONEUNIQID	0	/* uniqid of the global zone */
 
@@ -383,6 +384,9 @@ typedef struct {
 	kstat_named_t	zm_utime;
 	kstat_named_t	zm_stime;
 	kstat_named_t	zm_wtime;
+	kstat_named_t	zm_avenrun1;
+	kstat_named_t	zm_avenrun5;
+	kstat_named_t	zm_avenrun15;
 } zone_misc_kstat_t;
 
 typedef struct zone {
@@ -565,6 +569,10 @@ typedef struct zone {
 	uint64_t	zone_utime;		/* total user time */
 	uint64_t	zone_wtime;		/* total time waiting in runq */
 
+	struct loadavg_s zone_loadavg;		/* loadavg for this zone */
+	uint64_t	zone_hp_avenrun[3];	/* high-precision avenrun */
+	int		zone_avenrun[3];	/* FSCALED avg. run queue len */
+
 	/*
 	 * DTrace-private per-zone state
 	 */
@@ -604,6 +612,7 @@ extern zoneid_t getzoneid(void);
 extern zone_t *zone_find_by_id_nolock(zoneid_t);
 extern int zone_datalink_walk(zoneid_t, int (*)(datalink_id_t, void *), void *);
 extern int zone_check_datalink(zoneid_t *, datalink_id_t);
+extern void zone_loadavg_update();
 
 /*
  * Zone-specific data (ZSD) APIs

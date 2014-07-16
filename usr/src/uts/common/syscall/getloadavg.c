@@ -22,9 +22,8 @@
 /*
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2011 Joyent, Inc.  All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/systm.h>
@@ -41,7 +40,6 @@ int
 getloadavg(int *buf, int nelem)
 {
 	int *loadbuf = &avenrun[0];
-	int loadavg[LOADAVG_NSTATS];
 	int error;
 
 	if (nelem < 0)
@@ -50,15 +48,7 @@ getloadavg(int *buf, int nelem)
 		nelem = LOADAVG_NSTATS;
 
 	if (!INGLOBALZONE(curproc)) {
-		mutex_enter(&cpu_lock);
-		if (pool_pset_enabled()) {
-			psetid_t psetid = zone_pset_get(curproc->p_zone);
-
-			error = cpupart_get_loadavg(psetid, &loadavg[0], nelem);
-			ASSERT(error == 0);	/* pset isn't going anywhere */
-			loadbuf = &loadavg[0];
-		}
-		mutex_exit(&cpu_lock);
+		loadbuf = &curproc->p_zone->zone_avenrun[0];
 	}
 
 	error = copyout(loadbuf, buf, nelem * sizeof (avenrun[0]));
