@@ -93,6 +93,12 @@ $if _x86 && _ELF64
 $add amd64
 $endif
 
+SYMBOL_VERSION ILLUMOS_0.9 {
+    protected:
+	wcsnrtombs;
+	wcsnrtombs_l;
+} ILLUMOS_0.8;
+
 SYMBOL_VERSION ILLUMOS_0.8 {	# POSIX 2008 newlocale and friends
     protected:
 	__global_locale;

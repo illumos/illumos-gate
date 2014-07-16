@@ -13698,9 +13698,12 @@ s usr/share/man/man3c/wcslen.3c=wcstring.3c
 s usr/share/man/man3c/wcsncat.3c=wcstring.3c
 s usr/share/man/man3c/wcsncmp.3c=wcstring.3c
 s usr/share/man/man3c/wcsncpy.3c=wcstring.3c
+s usr/share/man/man3c/wcsnrtombs.3c=wcsrtombs.3c
+s usr/share/man/man3c/wcsnrtombs_l.3c=wcsrtombs.3c
 s usr/share/man/man3c/wcspbrk.3c=wcstring.3c
 s usr/share/man/man3c/wcsrchr.3c=wcstring.3c
 f usr/share/man/man3c/wcsrtombs.3c 0444 root bin
+s usr/share/man/man3c/wcsrtombs_l.3c=wcsrtombs.3c
 s usr/share/man/man3c/wcsspn.3c=wcstring.3c
 f usr/share/man/man3c/wcsstr.3c 0444 root bin
 f usr/share/man/man3c/wcstod.3c 0444 root bin

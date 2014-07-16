@@ -155,7 +155,7 @@ char   *nl_langinfo();		/* get a string from the database	*/
 #if defined(_XPG7) || !defined(_STRICT_SYMBOLS)
 #ifndef	_LOCALE_T
 #define	_LOCALE_T
-typedef struct locale *locale_t;
+typedef struct _locale *locale_t;
 #endif
 
 #if defined(__STDC__)

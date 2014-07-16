@@ -24,6 +24,7 @@
  * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2013 OmniTI Computer Consulting, Inc. All rights reserved.
  * Copyright (c) 2013 Gary Mills
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  */
 
 /* LINTLIBRARY */
@@ -165,6 +166,7 @@
 #if defined(__amd64)
 #include <stack_unwind.h>
 #endif
+#include <xlocale.h>
 
 /*
  * This really comes from the crt*.s startup modules.

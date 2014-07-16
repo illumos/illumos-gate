@@ -67,7 +67,7 @@ extern int strncasecmp(const char *, const char *, size_t);
 #if defined(_XPG7)
 #ifndef	_LOCALE_T
 #define	_LOCALE_T
-typedef struct locale *locale_t;
+typedef struct _locale *locale_t;
 #endif
 extern int strcasecmp_l(const char *, const char *, locale_t);
 extern int strncasecmp_l(const char *, const char *, size_t, locale_t);

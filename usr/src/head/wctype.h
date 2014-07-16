@@ -63,7 +63,8 @@ using std::wctrans;
 using std::towctrans;
 using std::iswctype;
 using std::wctype;
-#if __cplusplus >= 201103L
+#if (__cplusplus >= 201103L) || defined(_STDC_C99) || defined(_XPG6) || \
+	!defined(_STRICT_SYMBOLS)
 using std::iswblank;
 #endif
 #endif
@@ -146,7 +147,7 @@ extern	int iswspecial();
 
 #ifndef	_LOCALE_T
 #define	_LOCALE_T
-typedef struct locale *locale_t;
+typedef struct _locale *locale_t;
 #endif
 
 #if	defined(__STDC__)

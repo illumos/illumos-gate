@@ -1248,8 +1248,11 @@ MANLINKS=	FD_CLR.3c				\
 	 	wcsncat.3c				\
 	 	wcsncmp.3c				\
 	 	wcsncpy.3c				\
+		wcsnrtombs.3c				\
+		wcsnrtombs_l.3c				\
 	 	wcspbrk.3c				\
 	 	wcsrchr.3c				\
+		wcsrtombs_l.3c				\
 	 	wcsspn.3c				\
 	 	wcstof.3c				\
 	 	wcstok.3c				\
@@ -2234,6 +2237,10 @@ wcrtomb_l.3c				:= LINKSRC = wcrtomb.3c
 
 wcscoll_l.3c				:= LINKSRC = wcscoll.3c
 wscoll.3c				:= LINKSRC = wcscoll.3c
+
+wcsnrtombs.3c				:= LINKSRC = wcsrtombs.3c
+wcsnrtombs_l.3c				:= LINKSRC = wcsrtombs.3c
+wcsrtombs_l.3c				:= LINKSRC = wcsrtombs.3c
 
 watof.3c				:= LINKSRC = wcstod.3c
 wcstof.3c				:= LINKSRC = wcstod.3c

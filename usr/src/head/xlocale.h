@@ -45,7 +45,7 @@ extern "C" {
 
 #ifndef	_LOCALE_T
 #define	_LOCALE_T
-typedef struct locale *locale_t;
+typedef struct _locale *locale_t;
 #endif
 
 extern int mbsinit_l(const mbstate_t *, locale_t);
@@ -81,7 +81,9 @@ extern size_t mbrlen_l(const char *_RESTRICT_KYWD, size_t,
 extern int mbtowc_l(wchar_t *_RESTRICT_KYWD, const char *_RESTRICT_KYWD, size_t,
     locale_t);
 extern size_t wcsrtombs_l(char *_RESTRICT_KYWD, const wchar_t **_RESTRICT_KYWD,
-    size_t len, mbstate_t *_RESTRICT_KYWD, locale_t);
+    size_t, mbstate_t *_RESTRICT_KYWD, locale_t);
+extern size_t wcsnrtombs_l(char *_RESTRICT_KYWD, const wchar_t **_RESTRICT_KYWD,
+    size_t, size_t, mbstate_t *_RESTRICT_KYWD, locale_t);
 extern size_t wcrtomb_l(char *_RESTRICT_KYWD, wchar_t,
     mbstate_t *_RESTRICT_KYWD, locale_t);
 extern size_t wcstombs_l(char *_RESTRICT_KYWD, const wchar_t *_RESTRICT_KYWD,
