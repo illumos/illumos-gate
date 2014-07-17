@@ -23,6 +23,7 @@
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 Milan Jurik. All rights reserved.
  * Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved.
+ * Copyright 2014, Joyent, Inc. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -642,7 +643,7 @@ struct sysent sysent[NSYSCALL] =
 			SYSENT_NOSYS(),
 			SYSENT_C("llseek",	llseek32,	4)),
 	/* 176 */ SYSENT_LOADABLE(),		/* inst_sync */
-	/* 177 */ SYSENT_CI("brandsys",		brandsys,	6),
+	/* 177 */ SYSENT_CI("brandsys",		brandsys,	7),
 	/* 178 */ SYSENT_LOADABLE(),		/* kaio */
 	/* 179 */ SYSENT_LOADABLE(),		/* cpc */
 	/* 180 */ SYSENT_CI("lgrpsys",		lgrpsys,	3),
@@ -997,7 +998,7 @@ struct sysent sysent32[NSYSCALL] =
 	/* 174 */ SYSENT_CI("pwrite",		pwrite32,		4),
 	/* 175 */ SYSENT_C("llseek",		llseek32,	4),
 	/* 176 */ SYSENT_LOADABLE32(),		/* inst_sync */
-	/* 177 */ SYSENT_CI("brandsys",		brandsys,	6),
+	/* 177 */ SYSENT_CI("brandsys",		brandsys,	7),
 	/* 178 */ SYSENT_LOADABLE32(),		/* kaio */
 	/* 179 */ SYSENT_LOADABLE32(),		/* cpc */
 	/* 180 */ SYSENT_CI("lgrpsys",		lgrpsys,	3),
