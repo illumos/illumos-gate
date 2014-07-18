@@ -167,17 +167,18 @@ nlm_init_flock(struct flock64 *fl, struct nlm4_lock *nl,
  * This is just like nfs_fhtovp() but without the exportinfo argument.
  */
 static vnode_t *
-lm_fhtovp(fhandle_t *fh)
+lm_fhtovp(fhandle3_t *fh)
 {
 	vfs_t *vfsp;
 	vnode_t *vp;
 	int error;
 
-	vfsp = getvfs(&fh->fh_fsid);
+	vfsp = getvfs(&fh->_fh3_fsid);
 	if (vfsp == NULL)
 		return (NULL);
 
-	error = VFS_VGET(vfsp, &vp, (fid_t *)&(fh->fh_len));
+	/* LINTED E_BAD_PTR_CAST_ALIGN */
+	error = VFS_VGET(vfsp, &vp, (fid_t *)&(fh->_fh3_len));
 	VFS_RELE(vfsp);
 	if (error || vp == NULL)
 		return (NULL);
@@ -193,28 +194,26 @@ lm_fhtovp(fhandle_t *fh)
 static vnode_t *
 nlm_fh_to_vp(struct netobj *fh)
 {
-	fhandle_t *fhp;
+	fhandle3_t *fhp;
 
 	/*
 	 * Get a vnode pointer for the given NFS file handle.
-	 * Note that it could be an NFSv2 for NFSv3 handle,
+	 * Note that it could be an NFSv2 or NFSv3 handle,
 	 * which means the size might vary.  (don't copy)
 	 */
-	if (fh->n_len > MAX_NETOBJ_SZ || fh->n_len < sizeof (*fhp))
+	if (fh->n_len < sizeof (fhandle_t))
 		return (NULL);
 
 	/* We know this is aligned (kmem_alloc) */
 	/* LINTED E_BAD_PTR_CAST_ALIGN */
-	fhp = (fhandle_t *)fh->n_bytes;
+	fhp = (fhandle3_t *)fh->n_bytes;
 
 	/*
 	 * See the comment for NFS_FH3MAXDATA in uts/common/nfs/nfs.h for
-	 * converting fhandles. Check the NFSv3 file handle size in case there
-	 * is some unknown compatability issue here, even though we're only
-	 * using the "legacy" fhandle_t struct. The lockmgr is not used for
-	 * NFS v4.
+	 * converting fhandles. Check the NFSv3 file handle size. The lockmgr
+	 * is not used for NFS v4.
 	 */
-	if (fhp->fh_len > NFS_FH3MAXDATA || fhp->fh_len == 0)
+	if (fhp->_fh3_len > NFS_FH3MAXDATA || fhp->_fh3_len == 0)
 		return (NULL);
 
 	return (lm_fhtovp(fhp));
