@@ -515,6 +515,12 @@ lx_free_brand_data(zone_t *zone)
 	kmem_free(zone->zone_brand_data, sizeof (lx_zone_data_t));
 }
 
+void
+lx_unsupported(char *dmsg)
+{
+	DTRACE_PROBE1(brand__lx__unsupported, char *, dmsg);
+}
+
 /*
  * Get the addresses of the user-space system call handler and attach it to
  * the proc structure. Returning 0 indicates success; the value returned
@@ -762,7 +768,7 @@ lx_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 			return (EFAULT);
 		}
 		dmsg[255] = '\0';
-		DTRACE_PROBE1(brand__lx__unsupported, char *, dmsg);
+		lx_unsupported(dmsg);
 		}
 
 		return (0);

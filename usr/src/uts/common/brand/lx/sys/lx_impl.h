@@ -21,12 +21,11 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2014 Joyent, Inc.  All rights reserved.
  */
 
 #ifndef	_LX_IMPL_H
 #define	_LX_IMPL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 
@@ -54,6 +53,8 @@ extern lx_systrace_f *lx_systrace_return_ptr;
 
 extern void lx_brand_systrace_enable(void);
 extern void lx_brand_systrace_disable(void);
+
+extern void lx_unsupported(char *);
 
 #ifdef	__cplusplus
 }

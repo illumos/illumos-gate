@@ -39,7 +39,9 @@
 #include <sys/timer.h>
 #include <sys/condvar.h>
 #include <sys/inttypes.h>
+#include <sys/cmn_err.h>
 #include <sys/lx_futex.h>
+#include <sys/lx_impl.h>
 
 /*
  * Futexes are a Linux-specific implementation of inter-process mutexes.
@@ -274,7 +276,7 @@ futex_wait(memid_t *memid, caddr_t addr, int val, timespec_t *timeout)
 	err = 0;
 	while ((fw.fw_woken == 0) && (err == 0)) {
 		ret = cv_waituntil_sig(&fw.fw_cv, &futex_hash_lock[index],
-			timeout, timechanged);
+		    timeout, timechanged);
 		if (ret < 0)
 			err = set_errno(ETIMEDOUT);
 		else if (ret == 0)
@@ -597,6 +599,7 @@ lx_futex(uintptr_t addr, int op, int val, uintptr_t lx_timeout,
 	int rval = 0;
 	int cmd = op & FUTEX_CMD_MASK;
 	int private = op & FUTEX_PRIVATE_FLAG;
+	char dmsg[32];
 
 	/* must be aligned on int boundary */
 	if (addr & 0x3)
@@ -612,6 +615,8 @@ lx_futex(uintptr_t addr, int op, int val, uintptr_t lx_timeout,
 		 * semantics against humanity; it has been ripped out of Linux
 		 * and will never be supported by us.
 		 */
+		(void) snprintf(dmsg, sizeof (dmsg), "futex 0x%x", cmd);
+		lx_unsupported(dmsg);
 		return (set_errno(ENOSYS));
 	}
 
@@ -629,6 +634,8 @@ lx_futex(uintptr_t addr, int op, int val, uintptr_t lx_timeout,
 		 * deal with these being missing -- but if and as that changes,
 		 * they may well need to be implemented.
 		 */
+		(void) snprintf(dmsg, sizeof (dmsg), "futex 0x%x", cmd);
+		lx_unsupported(dmsg);
 		return (set_errno(ENOSYS));
 	}
 
