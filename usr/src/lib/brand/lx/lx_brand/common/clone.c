@@ -467,13 +467,17 @@ lx_clone(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 		}
 
 		/*
+		 * lx_setup_clone() doesn't return below, so stop now, if
+		 * necessary.
+		 */
+		lx_ptrace_stop_if_option(LX_PTRACE_O_TRACECLONE);
+
+		/*
 		 * If provided, the child needs its new stack set up.
 		 */
 		if (cldstk)
 			lx_setup_clone(rp->lxr_gs, (void *)rp->lxr_eip, cldstk);
 
-		/* lx_setup_clone() doesn't return */
-		lx_ptrace_stop_if_option(LX_PTRACE_O_TRACECLONE);
 		return (0);
 	}
 
