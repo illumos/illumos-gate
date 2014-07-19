@@ -23,6 +23,8 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2014 Garrett D'Amore <garrett@damore.org>
+#
 
 . /lib/svc/share/smf_include.sh
 
@@ -36,8 +38,7 @@ if smf_is_globalzone; then
         else
 		host=`/usr/bin/hostid`  
                 echo "# DO NOT EDIT" > /etc/hostid
-		r=`echo "0x${host}" | /usr/bin/perl -e \
-		    'while(<STDIN>){chop;tr/!-~/P-~!-O/;print $_,"\n";}exit 0;'`
+		r=`echo "0x${host}" | /usr/bin/tr 'P-~!-O' '!-OP-~'`
 		printf "\"%s\"\n"  $r >> /etc/hostid
         fi
 fi
