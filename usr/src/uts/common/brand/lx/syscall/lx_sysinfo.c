@@ -21,9 +21,8 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2014 Joyent, Inc.  All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <vm/anon.h>
 #include <sys/systm.h>
@@ -46,35 +45,25 @@ struct lx_sysinfo {
 	uint32_t si_mem_unit;	/* Unit size of memory fields */
 };
 
+extern pgcnt_t swapfs_minfree;
+
 long
 lx_sysinfo(struct lx_sysinfo *sip)
 {
 	struct lx_sysinfo si;
-	hrtime_t birthtime;
 	zone_t *zone = curthread->t_procp->p_zone;
-	proc_t *init_proc;
+	uint64_t zphysmem, zfreemem, ztotswap, zfreeswap;
 
-	/*
-	 * We don't record the time a zone was booted, so we use the
-	 * birthtime of that zone's init process instead.
-	 */
-	mutex_enter(&pidlock);
-	init_proc = prfind(zone->zone_proc_initpid);
-	if (init_proc != NULL)
-		birthtime = init_proc->p_mstart;
-	else
-		birthtime = p0.p_mstart;
-	mutex_exit(&pidlock);
-	si.si_uptime = (gethrtime() - birthtime) / NANOSEC;
+	si.si_uptime = gethrestime_sec() - zone->zone_boot_time;
 
 	/*
 	 * We scale down the load in avenrun to allow larger load averages
 	 * to fit in 32 bits.  Linux doesn't, so we remove the scaling
 	 * here.
 	 */
-	si.si_loads[0] = avenrun[0] << FSHIFT;
-	si.si_loads[1] = avenrun[1] << FSHIFT;
-	si.si_loads[2] = avenrun[2] << FSHIFT;
+	si.si_loads[0] = zone->zone_avenrun[0] << FSHIFT;
+	si.si_loads[1] = zone->zone_avenrun[1] << FSHIFT;
+	si.si_loads[2] = zone->zone_avenrun[2] << FSHIFT;
 
 	/*
 	 * In linux each thread looks like a process, so we conflate the
@@ -83,22 +72,59 @@ lx_sysinfo(struct lx_sysinfo *sip)
 	si.si_procs = (int32_t)zone->zone_nlwps;
 
 	/*
+	 * If memory or swap limits are set on the zone, use those, otherwise
+	 * use the system values. physmem and freemem are in pages, but the
+	 * zone values are in bytes. Likewise, ani_max and ani_free are in
+	 * pages.
+	 */
+	if (zone->zone_phys_mem_ctl == UINT64_MAX) {
+		zphysmem = physmem;
+		zfreemem = freemem;
+	} else {
+		zphysmem = btop(zone->zone_phys_mem_ctl);
+		zfreemem = btop(zone->zone_phys_mem_ctl - zone->zone_phys_mem);
+	}
+
+	if (zone->zone_max_swap_ctl == UINT64_MAX) {
+		ztotswap = k_anoninfo.ani_max;
+		zfreeswap = k_anoninfo.ani_free;
+	} else {
+		/*
+		 * See the comment in swapctl for a description of how free is
+		 * calculated within a zone.
+		 */
+		rctl_qty_t used;
+		spgcnt_t avail;
+		uint64_t max;
+
+		avail = MAX((spgcnt_t)(availrmem - swapfs_minfree), 0);
+		max = k_anoninfo.ani_max + k_anoninfo.ani_mem_resv + avail;
+
+		mutex_enter(&zone->zone_mem_lock);
+		ztotswap = btop(zone->zone_max_swap_ctl);
+		used = btop(zone->zone_max_swap);
+		mutex_exit(&zone->zone_mem_lock);
+
+		zfreeswap = MIN(ztotswap, max) - used;
+	}
+
+	/*
 	 * If the maximum memory stat is less than 1^20 pages (i.e. 4GB),
 	 * then we report the result in bytes.  Otherwise we use pages.
-	 * Once we start supporting >1TB x86 systems, we'll need a third
+	 * Once we start supporting >1TB systems/zones, we'll need a third
 	 * option.
 	 */
-	if (MAX(physmem, k_anoninfo.ani_max) < 1024 * 1024) {
-		si.si_totalram = physmem * PAGESIZE;
-		si.si_freeram = freemem * PAGESIZE;
-		si.si_totalswap = k_anoninfo.ani_max * PAGESIZE;
-		si.si_freeswap = k_anoninfo.ani_free * PAGESIZE;
+	if (MAX(zphysmem, ztotswap) < 1024 * 1024) {
+		si.si_totalram = ptob(zphysmem);
+		si.si_freeram = ptob(zfreemem);
+		si.si_totalswap = ptob(ztotswap);
+		si.si_freeswap = ptob(zfreeswap);
 		si.si_mem_unit = 1;
 	} else {
-		si.si_totalram = physmem;
-		si.si_freeram = freemem;
-		si.si_totalswap = k_anoninfo.ani_max;
-		si.si_freeswap = k_anoninfo.ani_free;
+		si.si_totalram = zphysmem;
+		si.si_freeram = zfreemem;
+		si.si_totalswap = ztotswap;
+		si.si_freeswap = zfreeswap;
 		si.si_mem_unit = PAGESIZE;
 	}
 	si.si_bufferram = 0;
