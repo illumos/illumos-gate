@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  */
 
 #ifndef _LIBDISKMGT_H
@@ -33,6 +34,144 @@ extern "C" {
 #include <libnvpair.h>
 #include <sys/swap.h>
 
+
+/*
+ * Disk Management Library
+ *
+ * This library provides a common way to gather information about a system's
+ * disks, controllers, and related components.
+ *
+ *
+ * THREADS
+ * -------
+ *
+ * In general all of the functions are thread safe, however there are some
+ * specific considerations for getting events.  The dm_get_event function may
+ * block the calling thread if no event is currently available.  If another
+ * thread calls dm_get_event while a thread is already blocked in this function,
+ * the second thread will also block.  When an event arrives and multiple
+ * threads are waiting for events, it is undefined which thread will be
+ * unblocked and receive the event.  If a callback is used for handling events,
+ * this is equivalent to the dm_get_event function, so mixing callbacks and
+ * dm_get_event is also nondeterministic.
+ *
+ *
+ * ERRORS
+ * ------
+ *
+ * In general all of the functions take an errno pointer.  This is an integer
+ * that will contain 0 if the function succeeded or contains an errno (see
+ * errno.h) if there was an error.  If the function returns some data, that
+ * return data will generally be null if an error occured (see the API comment
+ * for the specific function for details).  Many of the functions take a
+ * descriptor and provide more information for that descriptor.  These functions
+ * may return an error if the object was removed between the call which obtained
+ * the descriptor and the call to get more information about the object (errno
+ * will be ENODEV).  Only a few of the possible errno values will be returned;
+ * typically:
+ *     EPERM       not super-user
+ *     ENOMEM      not enough memory
+ *     ENODEV      no such device
+ *     EINVAL      invalid argument
+ *     ENOENT      no event queue has been created
+ *
+ * Many of the functions require the application to be running as root in order
+ * to get complete information.  EPERM will be returned if the application is
+ * not running as root.  However, not all of the functions have this requirement
+ * (i.e. event handling).
+ *
+ * It is possible for the system to run out of memory while receiving events.
+ * Since event receipt is asyncronous from the dm_get_event call there may not
+ * be a thread waiting when the event occurs and ENOMEM is detected.  In this
+ * case the event will be lost.  The first call to dm_get_event following this
+ * condition will immediately return ENOMEM, even if events are queued.
+ * Subsequent calls can return events.  The dm_get_event call will clear the
+ * pending ENOMEM condition.  There is no way to know how many events were lost
+ * when this situation occurs.  If a thread is waiting when the event arrives
+ * and the ENOMEM condition occurs, the call will also return with ENOMEM.
+ * There is no way to determine if the system ran out of memory before the
+ * dm_get_event call or while the thread was blocked in the dm_get_event call
+ * since both conditions cause dm_get_event to return ENOMEM.
+ *
+ *
+ * MEMORY MANAGEMENT
+ * -----------------
+ *
+ * Most of the functions that return data are returning memory that has been
+ * allocated and must be freed by the application when no longer needed.  The
+ * application should call the proper free function to free the memory.  Most of
+ * the functions return either a nvlist or an array of descriptors.  The normal
+ * nvlist function (nvlist_free; see libnvpair(3LIB)) can be used to free the
+ * simple nvlists.  Other functions are provided to free the more complex data
+ * structures.
+ *
+ * The following list shows the functions that return allocated memory and the
+ * corresponding function to free the memory:
+ *     dm_get_descriptors            dm_free_descriptors
+ *     dm_get_associated_descriptors dm_free_descriptors
+ *     dm_get_descriptor_by_name     dm_free_descriptor
+ *     dm_get_name                   dm_free_name
+ *     dm_get_attributes             nvlist_free
+ *     dm_get_stats	          nvlist_free
+ *     dm_get_event                  nvlist_free
+ *
+ *
+ * EVENTS
+ * ------
+ *
+ * Event information is returned as a nvlist.  It may be possible to return more
+ * information about events over time, especially information about what has
+ * changed.  However, that may not always be the case, so by using an nvlist we
+ * have a very generic event indication.  At a minimum the event will return the
+ * name of the device, the type of device (see dm_desc_type_t) and the type of
+ * event.  The event type is a string which can currently be; add, remove,
+ * change.
+ *
+ * If a drive goes up or down this could be returned as event type "change".
+ * The application could get the drive information to see that the "status"
+ * attribute has changed value (ideally the event would include an attribute
+ * with the name of the changed attribute as the value).  Although the API can
+ * return events for all drive related changes, events will not necessarily be
+ * delivered for all changes unless the system generates those events.
+ *
+ *
+ * Controller/HBAs
+ * ---------------
+ *
+ * In general the API means "the parent node of the drive in the device tree"
+ * where the word "controller" is used.  This can actually be either the HBA or
+ * the drive controller depending on the type of the drive.
+ *
+ * Drives can be connected to their controller(s) in three different ways:
+ *     single controller
+ *     multiple controllers
+ *     multiple controllers with mpxio
+ * These cases will lead to different information being available for the
+ * configuration.  The two interesting cases are multi-path with and without
+ * mpxio.  With mpxio the drive will have a unique name and a single controller
+ * (scsi_vhci).  The physical controllers, the paths to the drive, can be
+ * obtained by calling dm_get_associated_descriptors with a drive descriptor and
+ * a type of DM_PATH.  This will only return these physical paths when MPXIO, or
+ * possibly some future similar feature, is controlling the drive.
+ *
+ * Without mpxio the drive does not have a unique public name (in all cases the
+ * alias(es) of the drive can be determined by calling
+ * dm_get_associated_descriptors to get the DM_ALIAS descriptors.  There will be
+ * more than one controller returned from dm_get_associated_descriptors when
+ * called with a type of DM_CONTROLLER.  The controllers for each of the aliases
+ * will be returned in the same order as the aliases descriptors.  For example,
+ * a drive with two paths has the aliases c5t3d2 and c7t1d0.  There will be two
+ * controllers returned; the first corresponds to c5 and the second corresponds
+ * to c7.
+ *
+ * In the multi-path, non-mpxio case the drive has more than one alias.
+ * Although most of the drive attributes are represented on the drive (see
+ * dm_get_attributes) there can be some different attributes for the different
+ * aliases for the drive.  Use dm_get_associated_descriptors to get the DM_ALIAS
+ * descriptors which can then be used to obtain these attributes.  Use of this
+ * algorithm is not restricted to the multi-path, non-mpxio case.  For example,
+ * it can be used to get the target/lun for a SCSI drive with a single path.
+ */
 
 /*
  * Holds all the data regarding the device.
@@ -50,6 +189,17 @@ typedef enum {
 	DM_WHO_ZPOOL_SPARE
 } dm_who_type_t;
 
+/*
+ * The API uses a "descriptor" to identify the managed objects such as drives,
+ * controllers, media, slices, partitions, paths and buses.  The descriptors are
+ * opaque and are only returned or used as parameters to the other functions in
+ * the API.  The descriptor definition is a typedef to dm_descriptor_t.
+ *
+ * Applications call either the dm_get_descriptors or
+ * dm_get_associated_descriptors function to obtain a list of descriptors of a
+ * specific type.  The application specifies the desired type from the following
+ * enumeration:
+ */
 typedef enum {
     DM_DRIVE = 0,
     DM_CONTROLLER,
@@ -61,6 +211,31 @@ typedef enum {
     DM_BUS
 } dm_desc_type_t;
 
+/*
+ * These descriptors are associated with each other in the following way:
+ *
+ *                      alias                 partition
+ *     _                    \                /   |
+ *    / \                    \              /    |
+ *    \ /                     \            /     |
+ *    bus --- controller --- drive --- media     |
+ *                     |      /            \     |
+ *                     |     /              \    |
+ *                     |    /                \   |
+ *                      path                  slice
+ *
+ * The dm_get_associated_descriptors function can be used get the descriptors
+ * associated with a given descriptor.  The dm_get_associated_types function can
+ * be used to find the types that can be associated with a given type.
+ *
+ * The attributes and values for these objects are described using a list of
+ * name/value pairs (see libnvpair(3LIB) and the specific comments for each
+ * function in the API section of this document).
+ *
+ * Drives and media have a type which are defined as the following enumerations.
+ * There could be additional types added to these enumerations as new drive and
+ * media types are supported by the system.
+ */
 
 typedef enum {
     DM_DT_UNKNOWN = 0,
@@ -102,6 +277,11 @@ typedef enum {
 
 #define	DM_FILTER_END	-1
 
+/*
+ * The dm_get_stats function takes a stat_type argument for the specific sample
+ * to get for the descriptor.  The following enums specify the drive and slice
+ * stat types.
+ */
 /* drive stat name */
 typedef enum {
     DM_DRV_STAT_PERFORMANCE = 0,

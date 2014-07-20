@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -70,6 +71,11 @@
  * Due to this passthrough, some of the entry points exported by the
  * VNIC driver are never directly invoked. These entry points include
  * vnic_m_start, vnic_m_stop, vnic_m_promisc, vnic_m_multicst, etc.
+ *
+ * VNICs support multiple upper mac clients to enable support for
+ * multiple MAC addresses on the VNIC. When the VNIC is created the
+ * initial mac client is the primary upper mac. Any additional mac
+ * clients are secondary macs.
  */
 
 static int vnic_m_start(void *);
@@ -81,11 +87,13 @@ static int vnic_m_stat(void *, uint_t, uint64_t *);
 static void vnic_m_ioctl(void *, queue_t *, mblk_t *);
 static int vnic_m_setprop(void *, const char *, mac_prop_id_t, uint_t,
     const void *);
+static int vnic_m_getprop(void *, const char *, mac_prop_id_t, uint_t, void *);
 static void vnic_m_propinfo(void *, const char *, mac_prop_id_t,
     mac_prop_info_handle_t);
 static mblk_t *vnic_m_tx(void *, mblk_t *);
 static boolean_t vnic_m_capab_get(void *, mac_capab_t, void *);
 static void vnic_notify_cb(void *, mac_notify_type_t);
+static void vnic_cleanup_secondary_macs(vnic_t *, int);
 
 static kmem_cache_t	*vnic_cache;
 static krwlock_t	vnic_lock;
@@ -100,7 +108,7 @@ static mod_hash_t	*vnic_hash;
 #define	VNIC_HASH_KEY(vnic_id)	((mod_hash_key_t)(uintptr_t)vnic_id)
 
 #define	VNIC_M_CALLBACK_FLAGS	\
-	(MC_IOCTL | MC_GETCAPAB | MC_SETPROP | MC_PROPINFO)
+	(MC_IOCTL | MC_GETCAPAB | MC_SETPROP | MC_GETPROP | MC_PROPINFO)
 
 static mac_callbacks_t vnic_m_callbacks = {
 	VNIC_M_CALLBACK_FLAGS,
@@ -117,7 +125,7 @@ static mac_callbacks_t vnic_m_callbacks = {
 	NULL,
 	NULL,
 	vnic_m_setprop,
-	NULL,
+	vnic_m_getprop,
 	vnic_m_propinfo
 };
 
@@ -493,7 +501,7 @@ vnic_dev_create(datalink_id_t vnic_id, datalink_id_t linkid,
 		    &mac->m_max_sdu);
 	} else {
 		vnic->vn_margin = VLAN_TAGSZ;
-		mac->m_min_sdu = ANCHOR_VNIC_MIN_MTU;
+		mac->m_min_sdu = 1;
 		mac->m_max_sdu = ANCHOR_VNIC_MAX_MTU;
 	}
 
@@ -621,6 +629,8 @@ vnic_dev_delete(datalink_id_t vnic_id, uint32_t flags, cred_t *credp)
 		return (rc);
 	}
 
+	vnic_cleanup_secondary_macs(vnic, vnic->vn_nhandles);
+
 	vnic->vn_enabled = B_FALSE;
 	(void) mod_hash_remove(vnic_hash, VNIC_HASH_KEY(vnic_id), &val);
 	ASSERT(vnic == (vnic_t *)val);
@@ -741,6 +751,20 @@ vnic_mac_client_handle(void *vnic_arg)
 	return (vnic->vn_mch);
 }
 
+/*
+ * Invoked when updating the primary MAC so that the secondary MACs are
+ * kept in sync.
+ */
+static void
+vnic_mac_secondary_update(void *vnic_arg)
+{
+	vnic_t *vn = vnic_arg;
+	int i;
+
+	for (i = 1; i <= vn->vn_nhandles; i++) {
+		mac_secondary_dup(vn->vn_mc_handles[0], vn->vn_mc_handles[i]);
+	}
+}
 
 /*
  * Return information about the specified capability.
@@ -775,6 +799,8 @@ vnic_m_capab_get(void *arg, mac_capab_t cap, void *cap_data)
 			vnic_capab->mcv_arg = vnic;
 			vnic_capab->mcv_mac_client_handle =
 			    vnic_mac_client_handle;
+			vnic_capab->mcv_mac_secondary_update =
+			    vnic_mac_secondary_update;
 		}
 		break;
 	}
@@ -841,6 +867,126 @@ vnic_m_unicst(void *arg, const uint8_t *macaddr)
 	return (mac_vnic_unicast_set(vnic->vn_mch, macaddr));
 }
 
+static void
+vnic_cleanup_secondary_macs(vnic_t *vn, int cnt)
+{
+	int i;
+
+	/* Remove existing secondaries (primary is at 0) */
+	for (i = 1; i <= cnt; i++) {
+		mac_rx_clear(vn->vn_mc_handles[i]);
+
+		/* unicast handle might not have been set yet */
+		if (vn->vn_mu_handles[i] != NULL)
+			(void) mac_unicast_remove(vn->vn_mc_handles[i],
+			    vn->vn_mu_handles[i]);
+
+		mac_secondary_cleanup(vn->vn_mc_handles[i]);
+
+		mac_client_close(vn->vn_mc_handles[i], MAC_CLOSE_FLAGS_IS_VNIC);
+
+		vn->vn_mu_handles[i] = NULL;
+		vn->vn_mc_handles[i] = NULL;
+	}
+
+	vn->vn_nhandles = 0;
+}
+
+/*
+ * Setup secondary MAC addresses on the vnic. Due to limitations in the mac
+ * code, each mac address must be associated with a mac_client (and the
+ * flow that goes along with the client) so we need to create those clients
+ * here.
+ */
+static int
+vnic_set_secondary_macs(vnic_t *vn, mac_secondary_addr_t *msa)
+{
+	int i, err;
+	char primary_name[MAXNAMELEN];
+
+	/* First, remove pre-existing secondaries */
+	ASSERT(vn->vn_nhandles < MPT_MAXMACADDR);
+	vnic_cleanup_secondary_macs(vn, vn->vn_nhandles);
+
+	if (msa->ms_addrcnt == (uint32_t)-1)
+		msa->ms_addrcnt = 0;
+
+	vn->vn_nhandles = msa->ms_addrcnt;
+
+	(void) dls_mgmt_get_linkinfo(vn->vn_id, primary_name, NULL, NULL, NULL);
+
+	/*
+	 * Now add the new secondary MACs
+	 * Recall that the primary MAC address is the first element.
+	 * The secondary clients are named after the primary with their
+	 * index to distinguish them.
+	 */
+	for (i = 1; i <= vn->vn_nhandles; i++) {
+		uint8_t *addr;
+		mac_diag_t mac_diag;
+		char secondary_name[MAXNAMELEN];
+
+		(void) snprintf(secondary_name, sizeof (secondary_name),
+		    "%s%02d", primary_name, i);
+
+		err = mac_client_open(vn->vn_lower_mh, &vn->vn_mc_handles[i],
+		    secondary_name, MAC_OPEN_FLAGS_IS_VNIC);
+		if (err != 0) {
+			/* Remove any that we successfully added */
+			vnic_cleanup_secondary_macs(vn, --i);
+			return (err);
+		}
+
+		/*
+		 * Assign a MAC address to the VNIC
+		 *
+		 * Normally this would be done with vnic_unicast_add but since
+		 * we know these are fixed adddresses, and since we need to
+		 * save this in the proper array slot, we bypass that function
+		 * and go direct.
+		 */
+		addr = msa->ms_addrs[i - 1];
+		err = mac_unicast_add(vn->vn_mc_handles[i], addr, 0,
+		    &vn->vn_mu_handles[i], vn->vn_vid, &mac_diag);
+		if (err != 0) {
+			/* Remove any that we successfully added */
+			vnic_cleanup_secondary_macs(vn, i);
+			return (err);
+		}
+
+		/*
+		 * Setup the secondary the same way as the primary (i.e.
+		 * receiver function/argument (e.g. i_dls_link_rx, mac_pkt_drop,
+		 * etc.), the promisc list, and the resource controls).
+		 */
+		mac_secondary_dup(vn->vn_mc_handles[0], vn->vn_mc_handles[i]);
+	}
+
+	return (0);
+}
+
+static int
+vnic_get_secondary_macs(vnic_t *vn, uint_t pr_valsize, void *pr_val)
+{
+	int i;
+	mac_secondary_addr_t msa;
+
+	if (pr_valsize < sizeof (msa))
+		return (EINVAL);
+
+	/* Get existing addresses (primary is at 0) */
+	ASSERT(vn->vn_nhandles < MPT_MAXMACADDR);
+	for (i = 1; i <= vn->vn_nhandles; i++) {
+		ASSERT(vn->vn_mc_handles[i] != NULL);
+		mac_unicast_secondary_get(vn->vn_mc_handles[i],
+		    msa.ms_addrs[i - 1]);
+	}
+	msa.ms_addrcnt = vn->vn_nhandles;
+
+	bcopy(&msa, pr_val, sizeof (msa));
+	return (0);
+}
+
 /*
  * Callback functions for set/get of properties
  */
@@ -849,16 +995,16 @@ static int
 vnic_m_setprop(void *m_driver, const char *pr_name, mac_prop_id_t pr_num,
     uint_t pr_valsize, const void *pr_val)
 {
-	int 		err = ENOTSUP;
+	int 		err = 0;
 	vnic_t		*vn = m_driver;
-
-	/* allow setting MTU only on an etherstub */
-	if (vn->vn_link_id != DATALINK_INVALID_LINKID)
-		return (err);
 
 	switch (pr_num) {
 	case MAC_PROP_MTU: {
 		uint32_t	mtu;
+
+		/* allow setting MTU only on an etherstub */
+		if (vn->vn_link_id != DATALINK_INVALID_LINKID)
+			return (err);
 
 		if (pr_valsize < sizeof (mtu)) {
 			err = EINVAL;
@@ -872,10 +1018,38 @@ vnic_m_setprop(void *m_driver, const char *pr_name, mac_prop_id_t pr_num,
 		err = mac_maxsdu_update(vn->vn_mh, mtu);
 		break;
 	}
+	case MAC_PROP_SECONDARY_ADDRS: {
+		mac_secondary_addr_t msa;
+
+		bcopy(pr_val, &msa, sizeof (msa));
+		err = vnic_set_secondary_macs(vn, &msa);
+		break;
+	}
 	default:
+		err = ENOTSUP;
 		break;
 	}
 	return (err);
+}
+
+/* ARGSUSED */
+static int
+vnic_m_getprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
+    uint_t pr_valsize, void *pr_val)
+{
+	vnic_t		*vn = arg;
+	int 		ret = 0;
+
+	switch (pr_num) {
+	case MAC_PROP_SECONDARY_ADDRS:
+		ret = vnic_get_secondary_macs(vn, pr_valsize, pr_val);
+		break;
+	default:
+		ret = EINVAL;
+		break;
+	}
+
+	return (ret);
 }
 
 /* ARGSUSED */
@@ -929,7 +1103,8 @@ vnic_info(vnic_info_t *info, cred_t *credp)
 
 	bzero(&info->vn_resource_props, sizeof (mac_resource_props_t));
 	if (vnic->vn_mch != NULL)
-		mac_resource_ctl_get(vnic->vn_mch, &info->vn_resource_props);
+		mac_client_get_resources(vnic->vn_mch,
+		    &info->vn_resource_props);
 
 	rw_exit(&vnic_lock);
 	return (0);

@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2013 by Delphix. All rights reserved.
+ * Copyright (c) 2011, 2014 by Delphix. All rights reserved.
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  */
 
@@ -1874,6 +1874,16 @@ boolean_t
 spa_writeable(spa_t *spa)
 {
 	return (!!(spa->spa_mode & FWRITE));
+}
+
+/*
+ * Returns true if there is a pending sync task in any of the current
+ * syncing txg, the current quiescing txg, or the current open txg.
+ */
+boolean_t
+spa_has_pending_synctask(spa_t *spa)
+{
+	return (!txg_all_lists_empty(&spa->spa_dsl_pool->dp_sync_tasks));
 }
 
 int

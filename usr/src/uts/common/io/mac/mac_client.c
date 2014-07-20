@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
  */
 
 /*
@@ -84,12 +85,22 @@
  * client opens a VNIC (upper MAC), the MAC layer detects that
  * the MAC being opened is a VNIC, and gets the MAC client handle
  * that the VNIC driver obtained from the lower MAC. This exchange
- * is doing through a private capability between the MAC layer
+ * is done through a private capability between the MAC layer
  * and the VNIC driver. The upper MAC then returns that handle
  * directly to its MAC client. Any operation done by the upper
  * MAC client is now done on the lower MAC client handle, which
  * allows the VNIC driver to be completely bypassed for the
  * performance sensitive data-path.
+ *
+ * - Secondary MACs for VNICs:
+ *
+ * VNICs support multiple upper mac clients to enable support for
+ * multiple MAC addresses on the VNIC. When the VNIC is created the
+ * initial mac client is the primary upper mac. Any additional mac
+ * clients are secondary macs. These are kept in sync with the primary
+ * (for things such as the rx function and resource control settings)
+ * using the same private capability interface between the MAC layer
+ * and the VNIC layer.
  *
  */
 
@@ -148,6 +159,7 @@ static int mac_client_datapath_setup(mac_client_impl_t *, uint16_t,
     uint8_t *, mac_resource_props_t *, boolean_t, mac_unicast_impl_t *);
 static void mac_client_datapath_teardown(mac_client_handle_t,
     mac_unicast_impl_t *, flow_entry_t *);
+static int mac_resource_ctl_set(mac_client_handle_t, mac_resource_props_t *);
 
 /* ARGSUSED */
 static int
@@ -263,6 +275,18 @@ mac_vnic_lower(mac_impl_t *mip)
 	mcip = cap.mcv_mac_client_handle(cap.mcv_arg);
 
 	return (mcip);
+}
+
+/*
+ * Update the secondary macs
+ */
+void
+mac_vnic_secondary_update(mac_impl_t *mip)
+{
+	mac_capab_vnic_t cap;
+
+	VERIFY(i_mac_capab_get((mac_handle_t)mip, MAC_CAPAB_VNIC, &cap));
+	cap.mcv_mac_secondary_update(cap.mcv_arg);
 }
 
 /*
@@ -1048,6 +1072,18 @@ mac_unicast_primary_get(mac_handle_t mh, uint8_t *addr)
 }
 
 /*
+ * Return the secondary MAC address for the specified handle
+ */
+void
+mac_unicast_secondary_get(mac_client_handle_t mh, uint8_t *addr)
+{
+	mac_client_impl_t *mcip = (mac_client_impl_t *)mh;
+
+	ASSERT(mcip->mci_unicast != NULL);
+	bcopy(mcip->mci_unicast->ma_addr, addr, mcip->mci_unicast->ma_len);
+}
+
+/*
  * Return information about the use of the primary MAC address of the
  * specified MAC instance:
  *
@@ -1290,6 +1326,10 @@ mac_client_open(mac_handle_t mh, mac_client_handle_t *mchp, char *name,
 		mip->mi_clients_list = mcip;
 		i_mac_perim_exit(mip);
 		*mchp = (mac_client_handle_t)mcip;
+
+		DTRACE_PROBE2(mac__client__open__nonallocated, mac_impl_t *,
+		    mcip->mci_mip, mac_client_impl_t *, mcip);
+
 		return (err);
 	}
 
@@ -1394,10 +1434,6 @@ mac_client_open(mac_handle_t mh, mac_client_handle_t *mchp, char *name,
 	if (share_desired)
 		i_mac_share_alloc(mcip);
 
-	DTRACE_PROBE2(mac__client__open__allocated, mac_impl_t *,
-	    mcip->mci_mip, mac_client_impl_t *, mcip);
-	*mchp = (mac_client_handle_t)mcip;
-
 	/*
 	 * We will do mimimal datapath setup to allow a MAC client to
 	 * transmit or receive non-unicast packets without waiting
@@ -1409,6 +1445,11 @@ mac_client_open(mac_handle_t mh, mac_client_handle_t *mchp, char *name,
 			goto done;
 		}
 	}
+
+	DTRACE_PROBE2(mac__client__open__allocated, mac_impl_t *,
+	    mcip->mci_mip, mac_client_impl_t *, mcip);
+
+	*mchp = (mac_client_handle_t)mcip;
 	i_mac_perim_exit(mip);
 	return (0);
 
@@ -1532,6 +1573,7 @@ mac_rx_set(mac_client_handle_t mch, mac_rx_t rx_fn, void *arg)
 {
 	mac_client_impl_t *mcip = (mac_client_impl_t *)mch;
 	mac_impl_t	*mip = mcip->mci_mip;
+	mac_impl_t	*umip = mcip->mci_upper_mip;
 
 	/*
 	 * Instead of adding an extra set of locks and refcnts in
@@ -1547,6 +1589,15 @@ mac_rx_set(mac_client_handle_t mch, mac_rx_t rx_fn, void *arg)
 	mcip->mci_rx_arg = arg;
 	mac_rx_client_restart(mch);
 	i_mac_perim_exit(mip);
+
+	/*
+	 * If we're changing the rx function on the primary mac of a vnic,
+	 * make sure any secondary macs on the vnic are updated as well.
+	 */
+	if (umip != NULL) {
+		ASSERT((umip->mi_state_flags & MIS_IS_VNIC) != 0);
+		mac_vnic_secondary_update(umip);
+	}
 }
 
 /*
@@ -1556,6 +1607,42 @@ void
 mac_rx_clear(mac_client_handle_t mch)
 {
 	mac_rx_set(mch, mac_pkt_drop, NULL);
+}
+
+void
+mac_secondary_dup(mac_client_handle_t smch, mac_client_handle_t dmch)
+{
+	mac_client_impl_t *smcip = (mac_client_impl_t *)smch;
+	mac_client_impl_t *dmcip = (mac_client_impl_t *)dmch;
+	flow_entry_t *flent = dmcip->mci_flent;
+
+	/* This should only be called to setup secondary macs */
+	ASSERT((flent->fe_type & FLOW_PRIMARY_MAC) == 0);
+
+	mac_rx_set(dmch, smcip->mci_rx_fn, smcip->mci_rx_arg);
+	dmcip->mci_promisc_list = smcip->mci_promisc_list;
+
+	/*
+	 * Duplicate the primary mac resources to the secondary.
+	 * Since we already validated the resource controls when setting
+	 * them on the primary, we can ignore errors here.
+	 */
+	(void) mac_resource_ctl_set(dmch, MCIP_RESOURCE_PROPS(smcip));
+}
+
+/*
+ * Called when removing a secondary MAC. Currently only clears the promisc_list
+ * since we share the primary mac's promisc_list.
+ */
+void
+mac_secondary_cleanup(mac_client_handle_t mch)
+{
+	mac_client_impl_t *mcip = (mac_client_impl_t *)mch;
+	flow_entry_t *flent = mcip->mci_flent;
+
+	/* This should only be called for secondary macs */
+	ASSERT((flent->fe_type & FLOW_PRIMARY_MAC) == 0);
+	mcip->mci_promisc_list = NULL;
 }
 
 /*
@@ -1910,11 +1997,12 @@ mac_client_set_rings_prop(mac_client_impl_t *mcip, mac_resource_props_t *mrp,
  * mac_client_impl_t from the mac_impl_t (i.e if there are any cached
  * properties before the flow entry for the unicast address was created).
  */
-int
+static int
 mac_resource_ctl_set(mac_client_handle_t mch, mac_resource_props_t *mrp)
 {
 	mac_client_impl_t 	*mcip = (mac_client_impl_t *)mch;
 	mac_impl_t		*mip = (mac_impl_t *)mcip->mci_mip;
+	mac_impl_t		*umip = mcip->mci_upper_mip;
 	int			err = 0;
 	flow_entry_t		*flent = mcip->mci_flent;
 	mac_resource_props_t	*omrp, *nmrp = MCIP_RESOURCE_PROPS(mcip);
@@ -1998,18 +2086,15 @@ mac_resource_ctl_set(mac_client_handle_t mch, mac_resource_props_t *mrp)
 		mac_flow_modify(mip->mi_flow_tab, flent, mrp);
 		if (mrp->mrp_mask & MRP_PRIORITY)
 			mac_update_subflow_priority(mcip);
+
+		/* Apply these resource settings to any secondary macs */
+		if (umip != NULL) {
+			ASSERT((umip->mi_state_flags & MIS_IS_VNIC) != 0);
+			mac_vnic_secondary_update(umip);
+		}
 	}
 	kmem_free(omrp, sizeof (*omrp));
 	return (0);
-}
-
-void
-mac_resource_ctl_get(mac_client_handle_t mch, mac_resource_props_t *mrp)
-{
-	mac_client_impl_t	*mcip = (mac_client_impl_t *)mch;
-	mac_resource_props_t	*mcip_mrp = MCIP_RESOURCE_PROPS(mcip);
-
-	bcopy(mcip_mrp, mrp, sizeof (mac_resource_props_t));
 }
 
 static int
@@ -3219,7 +3304,16 @@ mac_promisc_add(mac_client_handle_t mch, mac_client_promisc_type_t type,
 	mutex_exit(mcbi->mcbi_lockp);
 
 	*mphp = (mac_promisc_handle_t)mpip;
+
+	if (mcip->mci_state_flags & MCIS_IS_VNIC) {
+		mac_impl_t *umip = mcip->mci_upper_mip;
+
+		ASSERT(umip != NULL);
+		mac_vnic_secondary_update(umip);
+	}
+
 	i_mac_perim_exit(mip);
+
 	return (0);
 }
 
@@ -3258,6 +3352,14 @@ mac_promisc_remove(mac_promisc_handle_t mph)
 	} else {
 		mac_callback_remove_wait(&mip->mi_promisc_cb_info);
 	}
+
+	if (mcip->mci_state_flags & MCIS_IS_VNIC) {
+		mac_impl_t *umip = mcip->mci_upper_mip;
+
+		ASSERT(umip != NULL);
+		mac_vnic_secondary_update(umip);
+	}
+
 	mutex_exit(mcbi->mcbi_lockp);
 	mac_stop((mac_handle_t)mip);
 

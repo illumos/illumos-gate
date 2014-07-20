@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
  */
 
 #ifndef	_SYS_MAC_H
@@ -128,6 +129,13 @@ typedef struct mac_propval_range_s {
  */
 #define	MAXMACADDRLEN		20
 
+#define	MPT_MAXMACADDR		32
+
+typedef struct mac_secondary_addr_s {
+	uint32_t	ms_addrcnt;
+	uint8_t		ms_addrs[MPT_MAXMACADDR][MAXMACADDRLEN];
+} mac_secondary_addr_t;
+
 typedef enum {
 	MAC_LOGTYPE_LINK = 1,
 	MAC_LOGTYPE_FLOW
@@ -205,6 +213,7 @@ typedef enum {
 	MAC_PROP_MAX_RXHWCLNT_AVAIL,
 	MAC_PROP_MAX_TXHWCLNT_AVAIL,
 	MAC_PROP_IB_LINKMODE,
+	MAC_PROP_SECONDARY_ADDRS,
 	MAC_PROP_PRIVATE = -1
 } mac_prop_id_t;
 
@@ -312,13 +321,18 @@ typedef struct mac_info_s {
  *
  * This capability allows the MAC layer to detect when a VNIC is being
  * access, and implement the required shortcuts.
+ *
+ * In addition, this capability is used to keep the VNIC's secondary
+ * mac_clients in sync when the primary MAC is updated.
  */
 
 typedef void *(*mac_client_handle_fn_t)(void *);
+typedef void (*mac_client_update_fn_t)(void *);
 
 typedef struct mac_capab_vnic_s {
 	void			*mcv_arg;
 	mac_client_handle_fn_t	mcv_mac_client_handle;
+	mac_client_update_fn_t	mcv_mac_secondary_update;
 } mac_capab_vnic_t;
 
 typedef void (*mac_rename_fn_t)(const char *, void *);

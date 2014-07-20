@@ -24,10 +24,10 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
+
 /*
  * calloc - allocate and clear memory block
  */
@@ -36,12 +36,24 @@ void *
 calloc(size_t num, size_t size)
 {
 	void *mp;
+	size_t total;
 
-	num *= size;
-	mp = malloc(num);
+	if (num == 0 || size == 0) {
+		total = 0;
+	} else {
+		total = num * size;
+
+		/* check for overflow */
+		if ((total / num) != size) {
+			errno = ENOMEM;
+			return (NULL);
+		}
+	}
+
+	mp = malloc(total);
 	if (mp == NULL)
 		return (NULL);
-	(void) memset(mp, 0, num);
+	(void) memset(mp, 0, total);
 	return (mp);
 }
 

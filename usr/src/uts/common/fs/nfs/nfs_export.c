@@ -2281,33 +2281,6 @@ nfs_fhtovp(fhandle_t *fh, struct exportinfo *exi)
 }
 
 /*
- * Convert an fhandle into a vnode.
- * Uses the file id (fh_len + fh_data) in the fhandle to get the vnode.
- * WARNING: users of this routine must do a VN_RELE on the vnode when they
- * are done with it.
- * This is just like nfs_fhtovp() but without the exportinfo argument.
- */
-
-vnode_t *
-lm_fhtovp(fhandle_t *fh)
-{
-	register vfs_t *vfsp;
-	vnode_t *vp;
-	int error;
-
-	vfsp = getvfs(&fh->fh_fsid);
-	if (vfsp == NULL)
-		return (NULL);
-
-	error = VFS_VGET(vfsp, &vp, (fid_t *)&(fh->fh_len));
-	VFS_RELE(vfsp);
-	if (error || vp == NULL)
-		return (NULL);
-
-	return (vp);
-}
-
-/*
  * Convert an nfs_fh3 into a vnode.
  * Uses the file id (fh_len + fh_data) in the file handle to get the vnode.
  * WARNING: users of this routine must do a VN_RELE on the vnode when they
@@ -2343,40 +2316,6 @@ nfs3_fhtovp(nfs_fh3 *fh, struct exportinfo *exi)
 	fidp = FH3TOFIDP(fh);
 
 	error = VFS_VGET(vfsp, &vp, fidp);
-	if (error || vp == NULL)
-		return (NULL);
-
-	return (vp);
-}
-
-/*
- * Convert an nfs_fh3 into a vnode.
- * Uses the file id (fh_len + fh_data) in the file handle to get the vnode.
- * WARNING: users of this routine must do a VN_RELE on the vnode when they
- * are done with it.
- * BTW: This is just like nfs3_fhtovp() but without the exportinfo arg.
- * Also, vfsp is accessed through getvfs() rather using exportinfo !!
- */
-
-vnode_t *
-lm_nfs3_fhtovp(nfs_fh3 *fh)
-{
-	vfs_t *vfsp;
-	vnode_t *vp;
-	int error;
-	fid_t *fidp;
-
-	if (fh->fh3_length < NFS3_OLDFHSIZE ||
-	    fh->fh3_length > NFS3_MAXFHSIZE)
-		return (NULL);
-
-	vfsp = getvfs(&fh->fh3_fsid);
-	if (vfsp == NULL)
-		return (NULL);
-	fidp = FH3TOFIDP(fh);
-
-	error = VFS_VGET(vfsp, &vp, fidp);
-	VFS_RELE(vfsp);
 	if (error || vp == NULL)
 		return (NULL);
 

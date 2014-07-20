@@ -461,8 +461,6 @@ stubs_base:
  */
 #ifndef NFSSRV_MODULE
 	MODULE(nfssrv,misc);
-	STUB(nfssrv,		lm_nfs3_fhtovp,	nomod_minus_one);
-	STUB(nfssrv,		lm_fhtovp,	nomod_minus_one);
 	STUB(nfssrv,		exportfs,	nomod_minus_one);
 	STUB(nfssrv,		nfs_getfh,	nomod_minus_one);
 	STUB(nfssrv,		nfsl_flush,	nomod_minus_one);
