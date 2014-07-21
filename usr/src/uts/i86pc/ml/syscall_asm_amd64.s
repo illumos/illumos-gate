@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
  */
 
 #include <sys/asm_linkage.h>
@@ -800,6 +800,13 @@ _syscall32_save:
 	 * more succinctly:
 	 *
 	 *	SA(MAXSYSARGS * sizeof (long)) == 64
+	 *
+	 * Note, this space is used both to copy in the arguments from user
+	 * land, but also to as part of the old UNIX style syscall_ap() method.
+	 * syscall_entry expects that we do not change the values of this space
+	 * that we give it. However, this means that when we end up in the more
+	 * recent model of passing the arguments based on the calling
+	 * conventions, we'll need to save an additional 16 bytes of stack.
 	 */
 #define	SYS_DROP	64			/* drop for args */
 	subq	$SYS_DROP, %rsp
@@ -827,12 +834,16 @@ _syscall32_save:
 	 */
 
 	movq	%rax, %rbx
-	movl	0(%rsp), %edi
-	movl	8(%rsp), %esi
-	movl	0x10(%rsp), %edx
-	movl	0x18(%rsp), %ecx
-	movl	0x20(%rsp), %r8d
-	movl	0x28(%rsp), %r9d
+	movl	0x0(%rsp), %edi		/* arg0 */
+	movl	0x8(%rsp), %esi		/* arg1 */
+	movl	0x10(%rsp), %edx	/* arg2 */
+	movl	0x38(%rsp), %eax	/* arg7 load */
+	movl	0x18(%rsp), %ecx	/* arg3 */
+	pushq	%rax			/* arg7 saved to stack */
+	movl	0x28(%rsp), %r8d	/* arg4 */
+	movl	0x38(%rsp), %eax	/* arg6 load */
+	movl	0x30(%rsp), %r9d	/* arg5 */
+	pushq	%rax			/* arg6 saved to stack */
 
 	call	*SY_CALLC(%rbx)
 
@@ -1079,15 +1090,20 @@ sys_sysenter()
 	/*
 	 * Fetch the arguments copied onto the kernel stack and put
 	 * them in the right registers to invoke a C-style syscall handler.
-	 * %rax contains the handler address.
+	 * %rax contains the handler address. For the last two arguments, we
+	 * push them onto the stack -- we can't clobber the old arguments.
 	 */
 	movq	%rax, %rbx
-	movl	0(%rsp), %edi
-	movl	8(%rsp), %esi
-	movl	0x10(%rsp), %edx
-	movl	0x18(%rsp), %ecx
-	movl	0x20(%rsp), %r8d
-	movl	0x28(%rsp), %r9d
+	movl	0x0(%rsp), %edi		/* arg0 */
+	movl	0x8(%rsp), %esi		/* arg1 */
+	movl	0x10(%rsp), %edx	/* arg2 */
+	movl	0x38(%rsp), %eax	/* arg7 load */
+	movl	0x18(%rsp), %ecx	/* arg3 */
+	pushq	%rax			/* arg7 saved to stack */
+	movl	0x28(%rsp), %r8d	/* arg4 */
+	movl	0x38(%rsp), %eax	/* arg6 load */
+	movl	0x30(%rsp), %r9d	/* arg5 */
+	pushq	%rax			/* arg6 saved to stack */
 
 	call	*SY_CALLC(%rbx)
 
