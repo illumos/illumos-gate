@@ -17,7 +17,7 @@ lxproc \- a loosely Linux-compatible /proc
 .LP
 \fBlxproc\fR is an implementation of the \fB/proc\fR filesystem that
 loosely matches the Linux semantics of providing human-readable text files
-that correspond to elements of the system.  
+that correspond to elements of the system.
 As with both \fBproc\fR(4) and Linux \fB/proc\fR, \fBlxproc\fR makes available
 a directory for every process, with each directory containing a number
 of files; like Linux \fB/proc\fR but unlike \fBproc\fR(4), \fBlxproc\fR also
@@ -33,31 +33,31 @@ somehow fool a consumer into believing that it is operating within a Linux
 environment. As such, \fBlxproc\fR should only be used by Linux-specific
 programs that are willing to trade precision in understanding the
 system in return for Linux compatibility.  To programmatically understand
-the system precisely and in terms of its native constructs, 
+the system precisely and in terms of its native constructs,
 one should not use \fBlxproc\fR, but rather \fBproc\fR(4) or
-\fBkstat\fR(3KSTAT). 
+\fBkstat\fR(3KSTAT).
 To understand
 a process or group of processes from either a shell script or the command line,
-one should not use \fBlxproc\fR, but rather \fBproc\fR(4)-based tools like 
-\fBprstat\fR(1M), 
-\fBpfiles\fR(1), 
-\fBpargs\fR(1), 
-\fBpmap\fR(1), 
-\fBptree\fR(1), 
-\fBplimit\fR(1), 
-\fBpflags\fR(1), 
-\fBpcred\fR(1), 
-\fBpstack\fR(1), 
-\fBpldd\fR(1), 
-\fBpsig\fR(1), 
+one should not use \fBlxproc\fR, but rather \fBproc\fR(4)-based tools like
+\fBprstat\fR(1M),
+\fBpfiles\fR(1),
+\fBpargs\fR(1),
+\fBpmap\fR(1),
+\fBptree\fR(1),
+\fBplimit\fR(1),
+\fBpflags\fR(1),
+\fBpcred\fR(1),
+\fBpstack\fR(1),
+\fBpldd\fR(1),
+\fBpsig\fR(1),
 or
 \fBpwdx\fR(1).
 To understand system-wide constructs from either a shell script or the
 command line, one should not use \fBlxproc\fR, but rather
 \fBkstat\fR(3KSTAT)-based tools like
-\fBkstat\fR(1M), 
-\fBmpstat\fR(1M), 
-\fBiostat\fR(1M), 
+\fBkstat\fR(1M),
+\fBmpstat\fR(1M),
+\fBiostat\fR(1M),
 \fBnetstat\fR(1M) or
 \fBpsrinfo\fR(1M).
 .sp
@@ -78,26 +78,26 @@ mount it by default, this will (or should) generally be the mount point.
 .SH SEE ALSO
 .sp
 .LP
-\fBdf\fR(1M), 
-\fBiostat\fR(1M), 
-\fBkstat\fR(1M), 
-\fBmpstat\fR(1M), 
+\fBdf\fR(1M),
+\fBiostat\fR(1M),
+\fBkstat\fR(1M),
+\fBmpstat\fR(1M),
 \fBmount\fR(1M),
 \fBnetstat\fR(1M),
-\fBpargs\fR(1), 
-\fBpcred\fR(1), 
-\fBpfiles\fR(1), 
-\fBpflags\fR(1), 
-\fBpldd\fR(1), 
-\fBplimit\fR(1), 
-\fBpmap\fR(1), 
-\fBprstat\fR(1M), 
-\fBpsig\fR(1), 
+\fBpargs\fR(1),
+\fBpcred\fR(1),
+\fBpfiles\fR(1),
+\fBpflags\fR(1),
+\fBpldd\fR(1),
+\fBplimit\fR(1),
+\fBpmap\fR(1),
+\fBprstat\fR(1M),
+\fBpsig\fR(1),
 \fBpsrinfo\fR(1M),
-\fBpstack\fR(1), 
-\fBptree\fR(1), 
+\fBpstack\fR(1),
+\fBptree\fR(1),
 \fBpwdx\fR(1),
-\fBmount\fR(2), \fBumount\fR(2), \fBkstat\fR(3KSTAT), \fBproc\fR(4), 
+\fBmount\fR(2), \fBumount\fR(2), \fBkstat\fR(3KSTAT), \fBproc\fR(4),
 \fBkstat\fR(9S)
 
 .SH NOTES

@@ -11,7 +11,7 @@
 .\"
 .\" Copyright 2014 Joyent, Inc. All rights reserved.
 .\"
-.TH "VFSSTAT" "1m" "May 2014" "" ""
+.TH "VFSSTAT" "1m" "May 1, 2014" "" ""
 .
 .SH "NAME"
 \fBvfsstat\fR \-\- Report VFS read and write activity
@@ -75,34 +75,65 @@ The vfsstat utility reports the following information:
 .IP "" 4
 .
 .nf
-r/s	reads per second
+r/s
+.RS
+reads per second
+.RE
 
-w/s	writes per second
+w/s
+.RS
+writes per second
+.RE
 
-kr/s	kilobytes read per second
+kr/s
+.RS
+kilobytes read per second
+.RE
 
-kw/s	kilobytes written per second
+kw/s
+.RS
+kilobytes written per second
+.RE
 
-ractv	average number of read operations actively being
-		serviced by the VFS layer
+ractv
+.RS
+average number of read operations actively being serviced by the VFS layer
+.RE
 
-wactv	average number of write operations actively being
-		serviced by the VFS layer
+wactv
+.RS
+average number of write operations actively being serviced by the VFS layer
+.RE
 
-read_t	average VFS read latency, in microseconds
+read_t
+.RS
+average VFS read latency, in microseconds
+.RE
 
-writ_t	average VFS write latency, in microseconds
+writ_t
+.RS
+average VFS write latency, in microseconds
+.RE
 
-%r	percent of time there is a VFS read operation
-	pending
+%r
+.RS
+percent of time there is a VFS read operation pending
+.RE
 
-%w	percent of time there is a VFS write operation
-	pending	
+%w
+.RS
+percent of time there is a VFS write operation pending
+.RE
 
-d/s	VFS operations per second delayed by the ZFS I/O
-	throttle
+d/s
+.RS
+VFS operations per second delayed by the ZFS I/O throttle
+.RE
 
-del_t	average ZFS I/O throttle delay, in microseconds
+del_t
+.RS
+average ZFS I/O throttle delay, in microseconds
+.RE
 .
 .fi
 .
@@ -112,23 +143,40 @@ del_t	average ZFS I/O throttle delay, in microseconds
 The following options are supported:
 .
 .P
-\-h	Show help message and exit
+\-h
+.RS
+Show help message and exit
+.RE
 .
 .P
-\-I	Print results per interval, rather than per second (where
-	applicable)
+\-I
+.RS
+Print results per interval, rather than per second (where applicable)
+.RE
 .
 .P
-\-M	Print results in MB/s instead of KB/s
+\-M
+.RS
+Print results in MB/s instead of KB/s
+.RE
 .
 .P
-\-r	Show results in a comma\-separated format
+\-r
+.RS
+Show results in a comma\-separated format
+.RE
 .
 .P
-\-z	Hide zones with no VFS activity
+\-z
+.RS
+Hide zones with no VFS activity
+.RE
 .
 .P
-\-Z	Print results for all zones, not just the current zone
+\-Z
+.RS
+Print results for all zones, not just the current zone
+.RE
 .
 .SH "OPERANDS"
 interval

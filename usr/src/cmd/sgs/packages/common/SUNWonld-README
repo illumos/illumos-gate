@@ -1653,3 +1653,4 @@ Bugid   Risk Synopsis
 4227	ld --library-path is translated to -l-path, not -L
 4270	ld(1) argument error reporting is still pretty bad
 4383	libelf can't write extended sections when ELF_F_LAYOUT
+4959	completely discarded merged string sections will corrupt output objects

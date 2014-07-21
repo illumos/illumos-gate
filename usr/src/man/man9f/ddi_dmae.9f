@@ -133,7 +133,7 @@ A pointer to a \fBDMA\fR engine request structure. See \fBddi_dmae_req\fR(9S).
 \fB\fIcookiep\fR\fR
 .ad
 .RS 12n
-A pointer to a \fBddi_dma_cookie\fR(9S) object, 
+A pointer to a \fBddi_dma_cookie\fR(9S) object,
 which contains the address and count.
 .RE
 

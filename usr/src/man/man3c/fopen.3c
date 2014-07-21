@@ -34,7 +34,7 @@ base sequences:
 .sp
 .ne 2
 .na
-\fB\fBr\fR\fR 
+\fB\fBr\fR\fR
 .ad
 .RS 20n
 Open file for reading.

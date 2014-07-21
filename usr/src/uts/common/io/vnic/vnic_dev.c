@@ -905,7 +905,7 @@ vnic_cleanup_secondary_macs(vnic_t *vn, int cnt)
 
 		/* unicast handle might not have been set yet */
 		if (vn->vn_mu_handles[i] != NULL)
-			mac_unicast_remove(vn->vn_mc_handles[i],
+			(void) mac_unicast_remove(vn->vn_mc_handles[i],
 			    vn->vn_mu_handles[i]);
 
 		mac_secondary_cleanup(vn->vn_mc_handles[i]);
@@ -1030,6 +1030,8 @@ vnic_m_setprop(void *m_driver, const char *pr_name, mac_prop_id_t pr_num,
 		uint32_t	mtu;
 
 		/* allow setting MTU only on an etherstub */
+		if (vn->vn_link_id != DATALINK_INVALID_LINKID)
+			return (err);
 
 		if (pr_valsize < sizeof (mtu)) {
 			err = EINVAL;
@@ -1078,7 +1080,7 @@ vnic_m_setprop(void *m_driver, const char *pr_name, mac_prop_id_t pr_num,
 		mac_secondary_addr_t msa;
 
 		bcopy(pr_val, &msa, sizeof (msa));
-		vnic_set_secondary_macs(vn, &msa);
+		err = vnic_set_secondary_macs(vn, &msa);
 		break;
 	}
 	default:
@@ -1088,6 +1090,7 @@ vnic_m_setprop(void *m_driver, const char *pr_name, mac_prop_id_t pr_num,
 	return (err);
 }
 
+/* ARGSUSED */
 static int
 vnic_m_getprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
     uint_t pr_valsize, void *pr_val)

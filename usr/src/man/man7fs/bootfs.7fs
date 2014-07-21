@@ -22,7 +22,7 @@ The
 .B bootfs
 file system is a read-only file system that provides access to any
 boot-time modules that were passed in to the system loader which were
-tagged with the type 
+tagged with the type
 .IR file .
 .B bootfs
 does not display any boot-time modules that were tagged as type
@@ -78,7 +78,7 @@ name:   bootfs                          class:    fs
 .LP
 The field
 .B ndiscard
-lists the number of boot-time modules that were discarded due to naming conflicts. The field 
+lists the number of boot-time modules that were discarded due to naming conflicts. The field
 .B ndup
 lists the number of duplicate entries that were found and therefore not displayed in the file system.
 .sp

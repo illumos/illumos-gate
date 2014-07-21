@@ -24,6 +24,7 @@ wcsnrtombs, wcsnrtombs_l, wcsrtombs, wcsrtombs_l \- convert a wide-character str
 .nf
 \fBsize_t\fR \fBwcsnrtombs\fR(\fBchar *restrict\fR \fIdst\fR, \fBconst wchar_t **restrict\fR \fIsrc\fR,
      \fBsize_t\fR \fInwc\fR, \fBsize_t\fR \fIlen\fR, \fBmbstate_t *restrict\fR \fIps\fR);
+.fi
 .LP
 .nf
 #include <wchar.h>

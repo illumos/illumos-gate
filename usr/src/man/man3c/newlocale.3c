@@ -76,7 +76,7 @@ An alternate name fo the locale "C".
 Indicates that the locale should be processed based in the values in the
 environment. See
 .BR setlocale (3C)
-and 
+and
 .BR environ (5)
 for more information.
 .LP

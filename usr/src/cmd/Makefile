@@ -24,12 +24,13 @@
 # Copyright (c) 2014 Joyent, Inc.  All rights reserved.
 # Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright (c) 2013 DEY Storage Systems, Inc. All rights reserved.
+# Copyright 2014 Garrett D'Amore <garrett@damore.org>
 
 include ../Makefile.master
 
 #
-#	Note that the commands 'perl', and 'man' are first in
-#	the list, violating alphabetical order.  This is because they are very
+#	Note that if the 'lp' command were built, it would be first in
+#	the list, violating alphabetical order.  This is because it is very
 #	long-running and should be given the most wall-clock time for a
 #	parallel build.
 #
@@ -51,7 +52,6 @@ COMMON_SUBDIRS=		\
 	allocate	\
 	availdevs	\
 	perl		\
-	man		\
 	Adm		\
 	abi		\
 	adbgen		\
@@ -250,6 +250,8 @@ COMMON_SUBDIRS=		\
 	mail		\
 	mailx		\
 	makekey		\
+	man		\
+	mandoc		\
 	mdb		\
 	mesg		\
 	mkdir		\
@@ -497,11 +499,10 @@ sparc_SUBDIRS=		\
 	vntsd
 
 #
-# Commands that are messaged.  Note that 'man' comes first
-# (see previous comment about 'man').
+# Commands that are messaged.  Note that 'lp' comes first
+# (see previous comment about 'lp'.)
 #
 MSGSUBDIRS=		\
-	man		\
 	abi		\
 	acctadm		\
 	allocate	\
@@ -614,6 +615,7 @@ MSGSUBDIRS=		\
 	ls		\
 	luxadm		\
 	mailx		\
+	man		\
 	mesg		\
 	mkdir		\
 	mkpwdict	\

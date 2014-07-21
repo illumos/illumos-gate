@@ -1,0 +1,33 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2014 Garrett D'Amore <garrett@damore.org>
+#
+
+PROGS=		mandoc mandoc_preconv
+mandoc_OBJS =	arch.o att.o chars.o eqn.o eqn_html.o eqn_term.o 	\
+		html.o lib.o main.o man.o man_hash.o man_html.o		\
+		man_macro.o man_term.o man_validate.o mandoc.o mdoc.o	\
+		mdoc_argv.o mdoc_hash.o mdoc_html.o mdoc_macro.o	\
+		mdoc_man.o mdoc_term.o mdoc_validate.o msec.o out.o	\
+		read.o roff.o st.o tbl.o tbl_data.o tbl_html.o		\
+		tbl_layout.o tbl_opts.o tbl_term.o term.o term_ascii.o	\
+		term_ps.o tree.o vol.o
+
+preconv_OBJS =	preconv.o
+
+CFLAGS +=	$(CC_VERBOSE)
+
+CPPFLAGS +=	-DHAVE_CONFIG_H -DUSE_WCHAR	\
+		-DOSNAME="\"illumos\""	\
+		-DVERSION="\"1.12.1\""

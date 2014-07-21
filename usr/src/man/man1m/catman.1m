@@ -1,373 +1,72 @@
-'\" te
-.\"  Copyright (c) 1998 Sun Microsystems, Inc.  All Rights Reserved.
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH CATMAN 1M "Feb 27, 1998"
-.SH NAME
-catman \- create the formatted files for the reference manual
-.SH SYNOPSIS
-.LP
-.nf
-\fB/usr/bin/catman\fR [\fB-c\fR] [\fB-n\fR] [\fB-p\fR] [\fB-t\fR] [\fB-w\fR] [\fB-M\fR \fIdirectory\fR]
-     [\fB-T\fR \fImacro-package\fR] [\fIsections\fR]
-.fi
-
-.SH DESCRIPTION
-.sp
-.LP
-The \fBcatman\fR utility creates the preformatted versions of the on-line
-manual from the \fBnroff\fR(1) or \fBsgml\fR(5) input files. This feature
-allows easy distribution of the preformatted manual pages among a group of
-associated machines (for example, with \fBrdist\fR(1)), since it makes the
-directories of preformatted manual pages self-contained and independent of the
-unformatted entries.
-.sp
-.LP
-\fBcatman\fR also creates the  \fBwindex\fR database file in the directories
-specified by the  \fBMANPATH\fR or the  \fB-M\fR option. The \fBwindex\fR
-database file is a three column list consisting of a keyword, the reference
-page that the keyword points to, and a line of text that describes the purpose
-of the utility or interface  documented on the reference page. Each keyword is
-taken from the comma separated list of words on the \fBNAME\fR line before the
-`\(mi' (dash). The reference page that the keyword points to is the first word
-on the  \fBNAME\fR line. The text after the \(mi on the \fBNAME\fR line is the
-descriptive text in the third column. The \fBNAME\fR line must be immediately
-preceded by the page heading line created by the \fB\&.TH\fR macro (see
-\fBNOTES\fR for required format).
-.sp
-.LP
-Each manual page is examined and those whose preformatted versions are missing
-or out of date are recreated. If any changes are made, \fBcatman\fR recreates
-the \fBwindex\fR database.
-.sp
-.LP
-If a manual page is a \fIshadow\fR page, that is, it sources another manual
-page for its contents, a symbolic link is made in the \fBcat\fR\fIx\fR or
-\fBfmt\fR\fIx\fR directory to the appropriate preformatted manual page.
-.sp
-.LP
-Shadow files in an unformatted nroff source file are identified by the first
-line being of the form \fB\&.so man\fR\fIx\fR\fB/yyy.\fR\fIx\fR\fB\&.\fR
-.sp
-.LP
-Shadow files in the \fBSGML\fR sources are identified by the string
-\fBSHADOW_PAGE\fR. The file entity declared in the shadow file identifies the
-file to be sourced.
-.SH OPTIONS
-.sp
-.LP
-The following options are supported:
-.sp
-.ne 2
-.na
-\fB\fB-c\fR\fR
-.ad
-.RS 20n
-Create unformatted nroff source files in the appropriate \fBman\fR
-subdirectories from the  \fBSGML\fR sources. This option will overwrite any
-existing file in the \fBman\fR directory of the same name as the  \fBSGML\fR
-file.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-n\fR\fR
-.ad
-.RS 20n
-Do not create (or recreate) the \fBwindex\fR database. If the \fB-n\fR option
-is specified, the \fBwindex\fR database is not created and the \fBapropos\fR,
-\fBwhatis\fR, \fBman\fR \fB-f\fR, and \fBman\fR \fB-k\fR commands will fail.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-p\fR\fR
-.ad
-.RS 20n
-Print what would be done instead of doing it.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-t\fR\fR
-.ad
-.RS 20n
-Create \fBtroff\fRed entries in the appropriate \fBfmt\fR subdirectories
-instead of \fBnroff\fRing into the \fBcat\fR subdirectories.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-w\fR\fR
-.ad
-.RS 20n
-Only create the \fBwindex\fR database that is used by \fBwhatis\fR(1) and the
-\fBman\fR(1) \fB-f\fR and \fB-k\fR options.  No manual reformatting is done.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-M\fR\fI directory\fR\fR
-.ad
-.RS 20n
-Update manual pages located in the specified \fIdirectory\fR,
-(\fB/usr/share/man\fR by default). If the  \fB-M\fR option is specified, the
-directory argument must not contain a `,' (comma), since a comma is used to
-delineate section numbers. See \fBman\fR(1).
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-T\fR\fI macro-package\fR\fR
-.ad
-.RS 20n
-Use \fImacro-package\fR in place of the standard manual page macros, (
-\fBman\fR(5) by default).
-.RE
-
-.SH OPERANDS
-.sp
-.LP
-The following operand is supported:
-.sp
-.ne 2
-.na
-\fB\fIsections\fR\fR
-.ad
-.RS 12n
-If there is one parameter not starting with a `\fB\(mi\fR\&', it is taken to be
-a space separated list of manual sections to be processed by \fBcatman\fR. If
-this operand is specified, only the manual sections in the list will be
-processed.  For example,
-.sp
-.in +2
-.nf
-\fBcatman 1 2 3\fR
-.fi
-.in -2
-.sp
-
-only updates manual sections \fB1\fR, \fB2\fR, and \fB3\fR. If specific
-sections are not listed, all sections in the  \fBman\fR directory specified by
-the environment variable \fBMANPATH\fR are processed.
-.RE
-
-.SH ENVIRONMENT VARIABLES
-.sp
-.ne 2
-.na
-\fB\fBTROFF\fR\fR
-.ad
-.RS 11n
-The name of the formatter to use when the \fB-t\fR flag is given. If not set,
-\fBtroff\fR(1) is used.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBMANPATH\fR\fR
-.ad
-.RS 11n
-A colon-separated list of directories that are processed by \fBcatman\fR and
-\fBman\fR(1). Each directory can be followed by a comma-separated list of
-sections. If set, its value overrides \fB/usr/share/man\fR as the default
-directory search path, and the \fBman.cf\fR file as the default section search
-path. The \fB-M\fR and \fB-s\fR flags, in turn, override these values.
-.RE
-
-.SH FILES
-.sp
-.ne 2
-.na
-\fB\fB/usr/share/man\fR\fR
-.ad
-.RS 28n
-default manual directory location
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/usr/share/man/man*/*.*\fR\fR
-.ad
-.RS 28n
-raw nroff input files
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/usr/share/man/sman*/*.*\fR\fR
-.ad
-.RS 28n
-raw  \fBSGML\fR input files
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/usr/share/man/cat*/*.*\fR\fR
-.ad
-.RS 28n
-preformatted \fBnroff\fRed manual pages
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/usr/share/man/fmt*/*.*\fR\fR
-.ad
-.RS 28n
-preformatted \fBtroff\fRed manual pages
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/usr/share/man/windex\fR\fR
-.ad
-.RS 28n
-table of contents and keyword database
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/usr/lib/makewhatis\fR\fR
-.ad
-.RS 28n
-command script to make  \fBwindex\fR database
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/usr/share/lib/tmac/an\fR\fR
-.ad
-.RS 28n
-default macro package
-.RE
-
-.SH ATTRIBUTES
-.sp
-.LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-CSI	Enabled
-.TE
-
-.SH SEE ALSO
-.sp
-.LP
-\fBapropos\fR(1), \fBman\fR(1), \fBnroff\fR(1), \fBrdist\fR(1), \fBrm\fR(1),
-\fBtroff\fR(1), \fBwhatis\fR(1), \fBattributes\fR(5), \fBman\fR(5),
-\fBsgml\fR(5)
-.SH DIAGNOSTICS
-.sp
-.ne 2
-.na
-\fB\fBman?/xxx.? (.so'ed from man?/yyy.?): No such file or directory\fR\fR
-.ad
-.sp .6
-.RS 4n
-The file outside the parentheses is missing, and is referred to by the file
-inside them.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBtarget of .so in man?/xxx.? must be relative to /usr/man\fR\fR
-.ad
-.sp .6
-.RS 4n
-\fBcatman\fR only allows references to filenames that are relative to the
-directory \fB/usr/man\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBopendir:man?:\fR \fBNo\fR \fBsuch\fR \fBfile\fR \fBor\fR
-\fBdirectory\fR\fR
-.ad
-.sp .6
-.RS 4n
-A harmless warning message indicating that one of the directories \fBcatman\fR
-normally looks for is missing.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB*.*:\fR \fBNo\fR \fBsuch\fR \fBfile\fR \fBor\fR \fBdirectory\fR\fR
-.ad
-.sp .6
-.RS 4n
-A harmless warning message indicating \fBcatman\fR came across an empty
-directory.
-.RE
-
-.SH WARNINGS
-.sp
-.LP
-If a user, who has previously run \fBcatman\fR to install the \fBcat*\fR
-directories, upgrades the operating system, the entire \fBcat*\fR directory
-structure should be removed prior to running \fBcatman\fR. See \fBrm\fR(1).
-.sp
-.LP
-Do not re-run \fBcatman\fR to re-build the \fBwhatis\fR database unless the
-complete set of \fBman*\fR directories is present. \fBcatman\fR builds this
-\fBwindex\fR file based on the  \fBman*\fR directories.
-.SH NOTES
-.sp
-.LP
-To generate a valid windex index file, \fBcatman\fR has certain requirements.
-Within the individual man page file, \fBcatman\fR requires two macro lines to
-have a specific format. These are the \fB\&.TH \fRpage heading line and the
-\fB\&.SH NAME \fRline.
-.sp
-.LP
-The \fB\&.TH \fRmacro requires at least the first three arguments, that is, the
-filename, section number, and the date.  The \fB\&.TH \fRline starts off with
-the \fB\&.TH \fRmacro, followed by a space, the man page filename, a single
-space, the section number, another single space, and the date. The date should
-appear in double quotes and is specified as "day month year," with the month
-always abbreviated to the first three letters (Jan, Feb, Mar, and so forth).
-.sp
-.LP
-The \fB\&.SH NAME \fRmacro, also known as the \fBNAME \fRline, must immediately
-follow the \fB\&.TH \fRline, with nothing in between those lines. No font
-changes are permitted in the \fBNAME \fRline. The \fBNAME \fRline is
-immediately followed by a line containing the man page filename; then shadow
-page names, if applicable, separated by commas; a dash; and a brief summary
-statement. These elements should all be on one line; no carriage returns are
-permitted.
-.sp
-.LP
-An example of proper coding of these lines is:
-.sp
-.in +2
-.nf
-\&.TH NISMATCH 1M "Apr "10, 1998""
-\&.SH NAME
-nismatch, nisgrep \e- utilities for searching NIS+ tables
-.fi
-.in -2
-
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2014 Garrett D'Amore <garrett@damore.org>
+.\"
+.Dd Jul 19, 2014
+.Dt CATMAN 1M
+.Os
+.Sh NAME
+.Nm catman
+.Nd generate
+.Nm whatis
+database files
+.Sh SYNOPSIS
+.Nm
+.Op Fl M Ar path
+.Op Fl w
+.Sh DESCRIPTION
+The
+.Nm
+utility generates a set of
+.Nm whatis
+database files suitable for use with
+.Xr apropos 1
+and
+.Xr whatis 1 .
+It is supplied for compatibility reasons.  The same databases can
+be generated using the
+.Fl w
+option with
+.Xr man 1 ,
+and that command should be used instead.
+.Sh OPTIONS
+.Bl -tag -width ".Fl d"
+.It Fl M Ar path
+Generate the
+.Nm whatis
+database files within the specified colon separated manual paths.
+Overrides the
+.Ev MANPATH
+environment variable.
+.It Fl w
+This option is present for backwards compatibility, and is ignored.
+.El
+.Sh ENVIRONMENT
+The following environment variables affect the execution of
+.Nm :
+.Bl -tag -width ".Ev MANPATH"
+.It Ev MANPATH
+Used to specify a colon seperated list of manual paths within
+which to generate
+.Nm whatis
+database files.
+.El
+.Sh EXIT STATUS
+.Ex -std
+.Sh INTERFACE STABILITY
+.Nm "Obsolete Committed" .
+.Sh CODE SET INDEPENDENCE
+Enabled.
+.Sh SEE ALSO
+.Xr apropos 1 ,
+.Xr man 1 ,
+.Xr whatis 1

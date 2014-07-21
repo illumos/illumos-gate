@@ -27,6 +27,7 @@ dir path=opt/util-tests/tests
 file path=opt/util-tests/README mode=0444
 file path=opt/util-tests/bin/utiltest mode=0555
 file path=opt/util-tests/runfiles/default.run mode=0444
+file path=opt/util-tests/tests/allowed-ips mode=0555
 file path=opt/util-tests/tests/printf_test mode=0555
 file path=opt/util-tests/tests/xargs_test mode=0555
 license lic_CDDL license=lic_CDDL

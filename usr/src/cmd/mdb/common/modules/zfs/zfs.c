@@ -21,7 +21,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
- * Copyright (c) 2013 by Delphix. All rights reserved.
+ * Copyright (c) 2012, 2014 by Delphix. All rights reserved.
  */
 
 /* Portions Copyright 2010 Robert Milkowski */
@@ -55,6 +55,19 @@ extern int64_t mdb_gethrtime(void);
 #ifndef _KERNEL
 int aok;
 #endif
+
+enum spa_flags {
+	SPA_FLAG_CONFIG			= 1 << 0,
+	SPA_FLAG_VDEVS			= 1 << 1,
+	SPA_FLAG_ERRORS			= 1 << 2,
+	SPA_FLAG_METASLAB_GROUPS	= 1 << 3,
+	SPA_FLAG_METASLABS		= 1 << 4,
+	SPA_FLAG_HISTOGRAMS		= 1 << 5
+};
+
+#define	SPA_FLAG_ALL_VDEV	\
+	(SPA_FLAG_VDEVS | SPA_FLAG_ERRORS | SPA_FLAG_METASLAB_GROUPS | \
+	SPA_FLAG_METASLABS | SPA_FLAG_HISTOGRAMS)
 
 static int
 getmember(uintptr_t addr, const char *type, mdb_ctf_id_t *idp,
@@ -111,6 +124,53 @@ strisprint(const char *cp)
 			return (B_FALSE);
 	}
 	return (B_TRUE);
+}
+
+#define	NICENUM_BUFLEN 6
+
+static int
+snprintfrac(char *buf, int len,
+    uint64_t numerator, uint64_t denom, int frac_digits)
+{
+	int mul = 1;
+	int whole, frac, i;
+
+	for (i = frac_digits; i; i--)
+		mul *= 10;
+	whole = numerator / denom;
+	frac = mul * numerator / denom - mul * whole;
+	return (mdb_snprintf(buf, len, "%u.%0*u", whole, frac_digits, frac));
+}
+
+static void
+mdb_nicenum(uint64_t num, char *buf)
+{
+	uint64_t n = num;
+	int index = 0;
+	char *u;
+
+	while (n >= 1024) {
+		n = (n + (1024 / 2)) / 1024; /* Round up or down */
+		index++;
+	}
+
+	u = &" \0K\0M\0G\0T\0P\0E\0"[index*2];
+
+	if (index == 0) {
+		(void) mdb_snprintf(buf, NICENUM_BUFLEN, "%llu",
+		    (u_longlong_t)n);
+	} else if (n < 10 && (num & (num - 1)) != 0) {
+		(void) snprintfrac(buf, NICENUM_BUFLEN,
+		    num, 1ULL << 10 * index, 2);
+		strcat(buf, u);
+	} else if (n < 100 && (num & (num - 1)) != 0) {
+		(void) snprintfrac(buf, NICENUM_BUFLEN,
+		    num, 1ULL << 10 * index, 1);
+		strcat(buf, u);
+	} else {
+		(void) mdb_snprintf(buf, NICENUM_BUFLEN, "%llu%s",
+		    (u_longlong_t)n, u);
+	}
 }
 
 static int verbose;
@@ -1013,6 +1073,9 @@ typedef struct mdb_spa_print {
  *	-c	Print configuration information as well
  *	-v	Print vdev state
  *	-e	Print vdev error stats
+ *	-m	Print vdev metaslab info
+ *	-M	print vdev metaslab group info
+ *	-h	Print histogram info (must be combined with -m or -M)
  *
  * Print a summarized spa_t.  When given no arguments, prints out a table of all
  * active pools on the system.
@@ -1024,14 +1087,15 @@ spa_print(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	const char *statetab[] = { "ACTIVE", "EXPORTED", "DESTROYED",
 		"SPARE", "L2CACHE", "UNINIT", "UNAVAIL", "POTENTIAL" };
 	const char *state;
-	int config = FALSE;
-	int vdevs = FALSE;
-	int errors = FALSE;
+	int spa_flags = 0;
 
 	if (mdb_getopts(argc, argv,
-	    'c', MDB_OPT_SETBITS, TRUE, &config,
-	    'v', MDB_OPT_SETBITS, TRUE, &vdevs,
-	    'e', MDB_OPT_SETBITS, TRUE, &errors,
+	    'c', MDB_OPT_SETBITS, SPA_FLAG_CONFIG, &spa_flags,
+	    'v', MDB_OPT_SETBITS, SPA_FLAG_VDEVS, &spa_flags,
+	    'e', MDB_OPT_SETBITS, SPA_FLAG_ERRORS, &spa_flags,
+	    'M', MDB_OPT_SETBITS, SPA_FLAG_METASLAB_GROUPS, &spa_flags,
+	    'm', MDB_OPT_SETBITS, SPA_FLAG_METASLABS, &spa_flags,
+	    'h', MDB_OPT_SETBITS, SPA_FLAG_HISTOGRAMS, &spa_flags,
 	    NULL) != argc)
 		return (DCMD_USAGE);
 
@@ -1064,7 +1128,7 @@ spa_print(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	mdb_printf("%0?p %9s %s\n", addr, state, spa.spa_name);
 
-	if (config) {
+	if (spa_flags & SPA_FLAG_CONFIG) {
 		mdb_printf("\n");
 		mdb_inc_indent(4);
 		if (mdb_call_dcmd("spa_config", addr, flags, 0,
@@ -1073,15 +1137,27 @@ spa_print(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		mdb_dec_indent(4);
 	}
 
-	if (vdevs || errors) {
+	if (spa_flags & SPA_FLAG_ALL_VDEV) {
 		mdb_arg_t v;
+		char opts[100] = "-";
+		int args =
+		    (spa_flags | SPA_FLAG_VDEVS) == SPA_FLAG_VDEVS ? 0 : 1;
+
+		if (spa_flags & SPA_FLAG_ERRORS)
+			strcat(opts, "e");
+		if (spa_flags & SPA_FLAG_METASLABS)
+			strcat(opts, "m");
+		if (spa_flags & SPA_FLAG_METASLAB_GROUPS)
+			strcat(opts, "M");
+		if (spa_flags & SPA_FLAG_HISTOGRAMS)
+			strcat(opts, "h");
 
 		v.a_type = MDB_TYPE_STRING;
-		v.a_un.a_str = "-e";
+		v.a_un.a_str = opts;
 
 		mdb_printf("\n");
 		mdb_inc_indent(4);
-		if (mdb_call_dcmd("spa_vdevs", addr, flags, errors ? 1 : 0,
+		if (mdb_call_dcmd("spa_vdevs", addr, flags, args,
 		    &v) != DCMD_OK)
 			return (DCMD_ERR);
 		mdb_dec_indent(4);
@@ -1123,6 +1199,161 @@ spa_print_config(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    0, NULL));
 }
 
+const char histo_stars[] = "****************************************";
+const int histo_width = sizeof (histo_stars) - 1;
+
+static void
+dump_histogram(const uint64_t *histo, int size, int offset)
+{
+	int i;
+	int minidx = size - 1;
+	int maxidx = 0;
+	uint64_t max = 0;
+
+	for (i = 0; i < size; i++) {
+		if (histo[i] > max)
+			max = histo[i];
+		if (histo[i] > 0 && i > maxidx)
+			maxidx = i;
+		if (histo[i] > 0 && i < minidx)
+			minidx = i;
+	}
+
+	if (max < histo_width)
+		max = histo_width;
+
+	for (i = minidx; i <= maxidx; i++) {
+		mdb_printf("%3u: %6llu %s\n",
+		    i + offset, (u_longlong_t)histo[i],
+		    &histo_stars[(max - histo[i]) * histo_width / max]);
+	}
+}
+
+typedef struct mdb_range_tree {
+	uint64_t rt_space;
+} mdb_range_tree_t;
+
+typedef struct mdb_metaslab_group {
+	uint64_t mg_fragmentation;
+	uint64_t mg_histogram[RANGE_TREE_HISTOGRAM_SIZE];
+} mdb_metaslab_group_t;
+
+typedef struct mdb_metaslab {
+	uint64_t ms_id;
+	uint64_t ms_start;
+	uint64_t ms_size;
+	uint64_t ms_fragmentation;
+	uintptr_t ms_alloctree[TXG_SIZE];
+	uintptr_t ms_freetree[TXG_SIZE];
+	uintptr_t ms_tree;
+	uintptr_t ms_sm;
+} mdb_metaslab_t;
+
+typedef struct mdb_space_map_phys_t {
+	uint64_t smp_alloc;
+	uint64_t smp_histogram[SPACE_MAP_HISTOGRAM_SIZE];
+} mdb_space_map_phys_t;
+
+typedef struct mdb_space_map {
+	uint64_t sm_size;
+	uint8_t sm_shift;
+	uint64_t sm_alloc;
+	uintptr_t sm_phys;
+} mdb_space_map_t;
+
+typedef struct mdb_vdev {
+	uintptr_t vdev_ms;
+	uint64_t vdev_ms_count;
+	vdev_stat_t vdev_stat;
+} mdb_vdev_t;
+
+static int
+metaslab_stats(uintptr_t addr, int spa_flags)
+{
+	mdb_vdev_t vdev;
+	uintptr_t *vdev_ms;
+
+	if (mdb_ctf_vread(&vdev, "vdev_t", "mdb_vdev_t",
+	    (uintptr_t)addr, 0) == -1) {
+		mdb_warn("failed to read vdev at %p\n", addr);
+		return (DCMD_ERR);
+	}
+
+	mdb_inc_indent(4);
+	mdb_printf("%<u>%-?s %6s %20s %10s %9s%</u>\n", "ADDR", "ID",
+	    "OFFSET", "FREE", "FRAGMENTATION");
+
+	vdev_ms = mdb_alloc(vdev.vdev_ms_count * sizeof (void *),
+	    UM_SLEEP | UM_GC);
+	if (mdb_vread(vdev_ms, vdev.vdev_ms_count * sizeof (void *),
+	    (uintptr_t)vdev.vdev_ms) == -1) {
+		mdb_warn("failed to read vdev_ms at %p\n", vdev.vdev_ms);
+		return (DCMD_ERR);
+	}
+
+	for (int m = 0; m < vdev.vdev_ms_count; m++) {
+		mdb_metaslab_t ms;
+		mdb_space_map_t sm = { 0 };
+		char free[NICENUM_BUFLEN];
+
+		if (mdb_ctf_vread(&ms, "metaslab_t", "mdb_metaslab_t",
+		    (uintptr_t)vdev_ms[m], 0) == -1)
+			return (DCMD_ERR);
+
+		if (ms.ms_sm != NULL &&
+		    mdb_ctf_vread(&sm, "space_map_t", "mdb_space_map_t",
+		    ms.ms_sm, 0) == -1)
+			return (DCMD_ERR);
+
+		mdb_nicenum(ms.ms_size - sm.sm_alloc, free);
+
+		mdb_printf("%0?p %6llu %20llx %10s ", vdev_ms[m], ms.ms_id,
+		    ms.ms_start, free);
+		if (ms.ms_fragmentation == ZFS_FRAG_INVALID)
+			mdb_printf("%9s\n", "-");
+		else
+			mdb_printf("%9llu%%\n", ms.ms_fragmentation);
+
+		if ((spa_flags & SPA_FLAG_HISTOGRAMS) && ms.ms_sm != NULL) {
+			mdb_space_map_phys_t smp;
+
+			if (sm.sm_phys == NULL)
+				continue;
+
+			(void) mdb_ctf_vread(&smp, "space_map_phys_t",
+			    "mdb_space_map_phys_t", sm.sm_phys, 0);
+
+			dump_histogram(smp.smp_histogram,
+			    SPACE_MAP_HISTOGRAM_SIZE, sm.sm_shift);
+		}
+	}
+	mdb_dec_indent(4);
+	return (DCMD_OK);
+}
+
+static int
+metaslab_group_stats(uintptr_t addr, int spa_flags)
+{
+	mdb_metaslab_group_t mg;
+	if (mdb_ctf_vread(&mg, "metaslab_group_t", "mdb_metaslab_group_t",
+	    (uintptr_t)addr, 0) == -1) {
+		mdb_warn("failed to read vdev_mg at %p\n", addr);
+		return (DCMD_ERR);
+	}
+
+	mdb_inc_indent(4);
+	mdb_printf("%<u>%-?s %15s%</u>\n", "ADDR", "FRAGMENTATION");
+	if (mg.mg_fragmentation == ZFS_FRAG_INVALID)
+		mdb_printf("%0?p %15s\n", addr, "-");
+	else
+		mdb_printf("%0?p %15llu%%\n", addr, mg.mg_fragmentation);
+
+	if (spa_flags & SPA_FLAG_HISTOGRAMS)
+		dump_histogram(mg.mg_histogram, RANGE_TREE_HISTOGRAM_SIZE, 0);
+	mdb_dec_indent(4);
+	return (DCMD_OK);
+}
+
 /*
  * ::vdev
  *
@@ -1136,8 +1367,8 @@ spa_print_config(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
  * With '-e', the statistics associated with the vdev are printed as well.
  */
 static int
-do_print_vdev(uintptr_t addr, int flags, int depth, int stats,
-    int recursive)
+do_print_vdev(uintptr_t addr, int flags, int depth, boolean_t recursive,
+    int spa_flags)
 {
 	vdev_t vdev;
 	char desc[MAXNAMELEN];
@@ -1264,7 +1495,7 @@ do_print_vdev(uintptr_t addr, int flags, int depth, int stats,
 
 		mdb_printf("%-9s %-12s %*s%s\n", state, aux, depth, "", desc);
 
-		if (stats) {
+		if (spa_flags & SPA_FLAG_ERRORS) {
 			vdev_stat_t *vs = &vdev.vdev_stat;
 			int i;
 
@@ -1290,10 +1521,17 @@ do_print_vdev(uintptr_t addr, int flags, int depth, int stats,
 			mdb_printf("ECKSUM   %10#llx\n",
 			    vs->vs_checksum_errors);
 			mdb_dec_indent(4);
+			mdb_printf("\n");
 		}
 
-		if (stats)
-			mdb_printf("\n");
+		if (spa_flags & SPA_FLAG_METASLAB_GROUPS &&
+		    vdev.vdev_mg != NULL) {
+			metaslab_group_stats((uintptr_t)vdev.vdev_mg,
+			    spa_flags);
+		}
+		if (spa_flags & SPA_FLAG_METASLABS && vdev.vdev_ms != NULL) {
+			metaslab_stats((uintptr_t)addr, spa_flags);
+		}
 	}
 
 	children = vdev.vdev_children;
@@ -1309,9 +1547,10 @@ do_print_vdev(uintptr_t addr, int flags, int depth, int stats,
 	}
 
 	for (c = 0; c < children; c++) {
-		if (do_print_vdev(child[c], flags, depth + 2, stats,
-		    recursive))
+		if (do_print_vdev(child[c], flags, depth + 2, recursive,
+		    spa_flags)) {
 			return (DCMD_ERR);
+		}
 	}
 
 	return (DCMD_OK);
@@ -1320,15 +1559,17 @@ do_print_vdev(uintptr_t addr, int flags, int depth, int stats,
 static int
 vdev_print(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
-	int recursive = FALSE;
-	int stats = FALSE;
 	uint64_t depth = 0;
+	boolean_t recursive = B_FALSE;
+	int spa_flags = 0;
 
 	if (mdb_getopts(argc, argv,
+	    'e', MDB_OPT_SETBITS, SPA_FLAG_ERRORS, &spa_flags,
+	    'm', MDB_OPT_SETBITS, SPA_FLAG_METASLABS, &spa_flags,
+	    'M', MDB_OPT_SETBITS, SPA_FLAG_METASLAB_GROUPS, &spa_flags,
+	    'h', MDB_OPT_SETBITS, SPA_FLAG_HISTOGRAMS, &spa_flags,
 	    'r', MDB_OPT_SETBITS, TRUE, &recursive,
-	    'e', MDB_OPT_SETBITS, TRUE, &stats,
-	    'd', MDB_OPT_UINT64, &depth,
-	    NULL) != argc)
+	    'd', MDB_OPT_UINT64, &depth, NULL) != argc)
 		return (DCMD_USAGE);
 
 	if (!(flags & DCMD_ADDRSPEC)) {
@@ -1336,7 +1577,7 @@ vdev_print(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_ERR);
 	}
 
-	return (do_print_vdev(addr, flags, (int)depth, stats, recursive));
+	return (do_print_vdev(addr, flags, (int)depth, recursive, spa_flags));
 }
 
 typedef struct metaslab_walk_data {
@@ -1449,34 +1690,6 @@ typedef struct mdb_dsl_dir_phys {
 	uint64_t dd_uncompressed_bytes;
 } mdb_dsl_dir_phys_t;
 
-typedef struct mdb_vdev {
-	uintptr_t vdev_parent;
-	uintptr_t vdev_ms;
-	uint64_t vdev_ms_count;
-	vdev_stat_t vdev_stat;
-} mdb_vdev_t;
-
-typedef struct mdb_space_map_phys_t {
-	uint64_t smp_alloc;
-} mdb_space_map_phys_t;
-
-typedef struct mdb_space_map {
-	uint64_t sm_size;
-	uint64_t sm_alloc;
-	uintptr_t sm_phys;
-} mdb_space_map_t;
-
-typedef struct mdb_range_tree {
-	uint64_t rt_space;
-} mdb_range_tree_t;
-
-typedef struct mdb_metaslab {
-	uintptr_t ms_alloctree[TXG_SIZE];
-	uintptr_t ms_freetree[TXG_SIZE];
-	uintptr_t ms_tree;
-	uintptr_t ms_sm;
-} mdb_metaslab_t;
-
 typedef struct space_data {
 	uint64_t ms_alloctree[TXG_SIZE];
 	uint64_t ms_freetree[TXG_SIZE];
@@ -1492,7 +1705,7 @@ space_cb(uintptr_t addr, const void *unknown, void *arg)
 	space_data_t *sd = arg;
 	mdb_metaslab_t ms;
 	mdb_range_tree_t rt;
-	mdb_space_map_t sm;
+	mdb_space_map_t sm = { 0 };
 	mdb_space_map_phys_t smp = { 0 };
 	int i;
 
@@ -1503,15 +1716,22 @@ space_cb(uintptr_t addr, const void *unknown, void *arg)
 	for (i = 0; i < TXG_SIZE; i++) {
 		if (mdb_ctf_vread(&rt, "range_tree_t",
 		    "mdb_range_tree_t", ms.ms_alloctree[i], 0) == -1)
+			return (WALK_ERR);
+
 		sd->ms_alloctree[i] += rt.rt_space;
 
 		if (mdb_ctf_vread(&rt, "range_tree_t",
 		    "mdb_range_tree_t", ms.ms_freetree[i], 0) == -1)
+			return (WALK_ERR);
+
 		sd->ms_freetree[i] += rt.rt_space;
 	}
 
 	if (mdb_ctf_vread(&rt, "range_tree_t",
-	    "mdb_range_tree_t", ms.ms_tree, 0) == -1 ||
+	    "mdb_range_tree_t", ms.ms_tree, 0) == -1)
+		return (WALK_ERR);
+
+	if (ms.ms_sm != NULL &&
 	    mdb_ctf_vread(&sm, "space_map_t",
 	    "mdb_space_map_t", ms.ms_sm, 0) == -1)
 		return (WALK_ERR);
@@ -1675,7 +1895,10 @@ spa_print_aux(mdb_spa_aux_vdev_t *sav, uint_t flags, mdb_arg_t *v,
 /*
  * ::spa_vdevs
  *
- * 	-e	Include error stats
+ *	-e	Include error stats
+ *	-m	Include metaslab information
+ *	-M	Include metaslab group information
+ *	-h	Include histogram information (requires -m or -M)
  *
  * Print out a summarized list of vdevs for the given spa_t.
  * This is accomplished by invoking "::vdev -re" on the root vdev, as well as
@@ -1686,11 +1909,15 @@ static int
 spa_vdevs(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	mdb_arg_t v[3];
-	int errors = FALSE;
 	int ret;
+	char opts[100] = "-r";
+	int spa_flags = 0;
 
 	if (mdb_getopts(argc, argv,
-	    'e', MDB_OPT_SETBITS, TRUE, &errors,
+	    'e', MDB_OPT_SETBITS, SPA_FLAG_ERRORS, &spa_flags,
+	    'm', MDB_OPT_SETBITS, SPA_FLAG_METASLABS, &spa_flags,
+	    'M', MDB_OPT_SETBITS, SPA_FLAG_METASLAB_GROUPS, &spa_flags,
+	    'h', MDB_OPT_SETBITS, SPA_FLAG_HISTOGRAMS, &spa_flags,
 	    NULL) != argc)
 		return (DCMD_USAGE);
 
@@ -1709,8 +1936,17 @@ spa_vdevs(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_OK);
 	}
 
+	if (spa_flags & SPA_FLAG_ERRORS)
+		strcat(opts, "e");
+	if (spa_flags & SPA_FLAG_METASLABS)
+		strcat(opts, "m");
+	if (spa_flags & SPA_FLAG_METASLAB_GROUPS)
+		strcat(opts, "M");
+	if (spa_flags & SPA_FLAG_HISTOGRAMS)
+		strcat(opts, "h");
+
 	v[0].a_type = MDB_TYPE_STRING;
-	v[0].a_un.a_str = errors ? "-re" : "-r";
+	v[0].a_un.a_str = opts;
 
 	ret = mdb_call_dcmd("vdev", (uintptr_t)spa.spa_root_vdev,
 	    flags, 1, v);
@@ -2131,57 +2367,10 @@ zio_walk_root_step(mdb_walk_state_t *wsp)
 	return (wsp->walk_callback(wsp->walk_addr, &zio, wsp->walk_cbdata));
 }
 
-#define	NICENUM_BUFLEN 6
-
-static int
-snprintfrac(char *buf, int len,
-    uint64_t numerator, uint64_t denom, int frac_digits)
-{
-	int mul = 1;
-	int whole, frac, i;
-
-	for (i = frac_digits; i; i--)
-		mul *= 10;
-	whole = numerator / denom;
-	frac = mul * numerator / denom - mul * whole;
-	return (mdb_snprintf(buf, len, "%u.%0*u", whole, frac_digits, frac));
-}
-
-static void
-mdb_nicenum(uint64_t num, char *buf)
-{
-	uint64_t n = num;
-	int index = 0;
-	char *u;
-
-	while (n >= 1024) {
-		n = (n + (1024 / 2)) / 1024; /* Round up or down */
-		index++;
-	}
-
-	u = &" \0K\0M\0G\0T\0P\0E\0"[index*2];
-
-	if (index == 0) {
-		(void) mdb_snprintf(buf, NICENUM_BUFLEN, "%llu",
-		    (u_longlong_t)n);
-	} else if (n < 10 && (num & (num - 1)) != 0) {
-		(void) snprintfrac(buf, NICENUM_BUFLEN,
-		    num, 1ULL << 10 * index, 2);
-		strcat(buf, u);
-	} else if (n < 100 && (num & (num - 1)) != 0) {
-		(void) snprintfrac(buf, NICENUM_BUFLEN,
-		    num, 1ULL << 10 * index, 1);
-		strcat(buf, u);
-	} else {
-		(void) mdb_snprintf(buf, NICENUM_BUFLEN, "%llu%s",
-		    (u_longlong_t)n, u);
-	}
-}
-
 /*
  * ::zfs_blkstats
  *
- * 	-v	print verbose per-level information
+ *	-v	print verbose per-level information
  *
  */
 static int
@@ -3087,15 +3276,30 @@ static const mdb_dcmd_t dcmds[] = {
 	{ "abuf_find", "dva_word[0] dva_word[1]",
 	    "find arc_buf_hdr_t of a specified DVA",
 	    abuf_find },
-	{ "spa", "?[-cv]", "spa_t summary", spa_print },
+	{ "spa", "?[-cevmMh]\n"
+	    "\t-c display spa config\n"
+	    "\t-e display vdev statistics\n"
+	    "\t-v display vdev information\n"
+	    "\t-m display metaslab statistics\n"
+	    "\t-M display metaslab group statistics\n"
+	    "\t-h display histogram (requires -m or -M)\n",
+	    "spa_t summary", spa_print },
 	{ "spa_config", ":", "print spa_t configuration", spa_print_config },
 	{ "spa_space", ":[-b]", "print spa_t on-disk space usage", spa_space },
-	{ "spa_vdevs", ":", "given a spa_t, print vdev summary", spa_vdevs },
+	{ "spa_vdevs", ":[-emMh]\n"
+	    "\t-e display vdev statistics\n"
+	    "\t-m dispaly metaslab statistics\n"
+	    "\t-M display metaslab group statistic\n"
+	    "\t-h display histogram (requires -m or -M)\n",
+	    "given a spa_t, print vdev summary", spa_vdevs },
 	{ "vdev", ":[-re]\n"
 	    "\t-r display recursively\n"
-	    "\t-e print statistics",
+	    "\t-e display statistics\n"
+	    "\t-m display metaslab statistics\n"
+	    "\t-M display metaslab group statistics\n"
+	    "\t-h display histogram (requires -m or -M)\n",
 	    "vdev_t summary", vdev_print },
-	{ "zio", ":[cpr]\n"
+	{ "zio", ":[-cpr]\n"
 	    "\t-c display children\n"
 	    "\t-p display parents\n"
 	    "\t-r display recursively",

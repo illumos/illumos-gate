@@ -36,7 +36,7 @@ character (if present) from the input stream pointed to by \fIstream\fR,
 convert that to the corresponding wide-character code and advance the
 associated file position indicator for the stream (if defined).
 Whereas \fBfgetwc()\fR uses the current locale, \fBfgetwc_l()\fR uses the
-locale specified by \fIloc\R.
+locale specified by \fIloc\fR.
 .LP
 If an error occurs, the resulting value of the file position indicator for the
 stream is indeterminate.

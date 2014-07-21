@@ -23,6 +23,7 @@
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2010, Richard Lowe
 # Copyright 2012, Piotr Jasiukajtis
+# Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright (c) 2013, Joyent, Inc.  All rights reserved.
 #
 
@@ -160,6 +161,8 @@ file path=opt/onbld/lib/python2.6/onbld/Checks/JStyle.py mode=0444
 file path=opt/onbld/lib/python2.6/onbld/Checks/JStyle.pyc mode=0444
 file path=opt/onbld/lib/python2.6/onbld/Checks/Keywords.py mode=0444
 file path=opt/onbld/lib/python2.6/onbld/Checks/Keywords.pyc mode=0444
+file path=opt/onbld/lib/python2.6/onbld/Checks/ManLint.py mode=0444
+file path=opt/onbld/lib/python2.6/onbld/Checks/ManLint.pyc mode=0444
 file path=opt/onbld/lib/python2.6/onbld/Checks/Mapfile.py mode=0444
 file path=opt/onbld/lib/python2.6/onbld/Checks/Mapfile.pyc mode=0444
 file path=opt/onbld/lib/python2.6/onbld/Checks/ProcessCheck.py mode=0444

@@ -35,7 +35,7 @@ state.
 .LP
 The behavior of \fBbtowc()\fR is affected by the \fBLC_CTYPE\fR category of the
 current locale.  See \fBenviron\fR(5). The function \fBbtowc_l()\fR does
-not use the current locale, and instead operates on the locale 
+not use the current locale, and instead operates on the locale
 specified by \fIloc\fR.
 .SH RETURN VALUES
 .LP

@@ -2136,6 +2136,7 @@ f usr/bin/mail 2511 root mail
 f usr/bin/mailx 2511 root mail
 f usr/bin/makedev 0555 root bin
 f usr/bin/man 0555 root bin
+f usr/bin/mandoc 0555 root bin
 f usr/bin/mcs 0555 root bin
 h usr/bin/mdb=usr/lib/isaexec
 f usr/bin/mesg 0555 root bin
@@ -5477,7 +5478,6 @@ s usr/lib/fwflash/verify/sgen-LSILOGIC.so=ses-SUN.so
 s usr/lib/fwflash/verify/sgen-SUN.so=ses-SUN.so
 f usr/lib/fwflash/verify/tavor-MELLANOX.so 0755 root bin
 f usr/lib/gcrt1.o 0644 root bin
-f usr/lib/getNAME 0555 root bin
 f usr/lib/getoptcvt 0555 root bin
 f usr/lib/gmsgfmt 0555 root bin
 d usr/lib/gss 0755 root bin
@@ -9473,7 +9473,8 @@ f usr/lib/lx_brand.so.1 0755 root sys
 f usr/lib/madv.so.1 0755 root bin
 f usr/lib/mail.local 0555 root bin
 f usr/lib/makekey 0555 root bin
-f usr/lib/makewhatis 0555 root bin
+h usr/lib/makewhatis=usr/bin/man
+f usr/lib/mandoc_preconv 0555 root bin
 d usr/lib/mdb 0755 root sys
 d usr/lib/mdb/kvm 0755 root sys
 d usr/lib/mdb/kvm/amd64 0755 root sys
@@ -11385,9 +11386,6 @@ d usr/share/locale 0755 root other
 d usr/share/locale/C 0755 root bin
 d usr/share/locale/C/LC_MESSAGES 0755 root bin
 d usr/share/man 0755 root bin
-d usr/share/man/cat1 0755 root bin
-d usr/share/man/cat1m 0755 root bin
-d usr/share/man/cat5 0755 root bin
 d usr/share/man/man1 0755 root bin
 f usr/share/man/man1/Intro.1 0444 root bin
 f usr/share/man/man1/alias.1 0444 root bin
@@ -11603,6 +11601,7 @@ f usr/share/man/man1/mailstats.1 0444 root bin
 f usr/share/man/man1/mailx.1 0444 root bin
 f usr/share/man/man1/makekey.1 0444 root bin
 f usr/share/man/man1/man.1 0444 root bin
+f usr/share/man/man1/mandoc.1 0444 root bin
 f usr/share/man/man1/mconnect.1 0444 root bin
 f usr/share/man/man1/mcs.1 0444 root bin
 f usr/share/man/man1/mdb.1 0444 root bin
@@ -11787,7 +11786,7 @@ f usr/share/man/man1/vgrind.1 0444 root bin
 f usr/share/man/man1/w.1 0444 root bin
 f usr/share/man/man1/wait.1 0444 root bin
 f usr/share/man/man1/wc.1 0444 root bin
-f usr/share/man/man1/whatis.1 0444 root bin
+s usr/share/man/man1/whatis.1=apropos.1
 f usr/share/man/man1/which.1 0444 root bin
 f usr/share/man/man1/who.1 0444 root bin
 f usr/share/man/man1/whocalls.1 0444 root bin
@@ -18034,6 +18033,7 @@ f usr/share/man/man5/dhcp.5 0444 root bin
 f usr/share/man/man5/dhcp_modules.5 0444 root bin
 f usr/share/man/man5/environ.5 0444 root bin
 f usr/share/man/man5/epoll.5 0444 root bin
+f usr/share/man/man5/eqn.5 0444 root bin
 f usr/share/man/man5/eqnchar.5 0444 root bin
 f usr/share/man/man5/extendedFILE.5 0444 root bin
 f usr/share/man/man5/filesystem.5 0444 root bin
@@ -18057,7 +18057,9 @@ f usr/share/man/man5/lfcompile.5 0444 root bin
 f usr/share/man/man5/lfcompile64.5 0444 root bin
 f usr/share/man/man5/locale.5 0444 root bin
 f usr/share/man/man5/man.5 0444 root bin
-f usr/share/man/man5/mansun.5 0444 root bin
+f usr/share/man/man5/mandoc_char.5 0444 root bin
+f usr/share/man/man5/mandoc_roff.5 0444 root bin
+f usr/share/man/man5/mdoc.5 0444 root bin
 f usr/share/man/man5/me.5 0444 root bin
 f usr/share/man/man5/mech_spnego.5 0444 root bin
 f usr/share/man/man5/mm.5 0444 root bin
@@ -18105,6 +18107,7 @@ s usr/share/man/man5/standard.5=attributes.5
 f usr/share/man/man5/standards.5 0444 root bin
 s usr/share/man/man5/step.5=regexp.5
 f usr/share/man/man5/sticky.5 0444 root bin
+f usr/share/man/man5/tbl.5 0444 root bin
 f usr/share/man/man5/tecla.5 0444 root bin
 s usr/share/man/man5/teclarc.5=tecla.5
 f usr/share/man/man5/term.5 0444 root bin

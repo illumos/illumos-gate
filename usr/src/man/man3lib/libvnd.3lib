@@ -527,7 +527,7 @@ property.
 27 VND_E_BUFTOOSMALL
 .ad
 .RS 23n
-requested buffer size is too small 
+requested buffer size is too small
 .sp
 The requested buffer size is less than the minimum buffer size. This
 generally occurs when making the buffer size less than the maximum
@@ -623,7 +623,7 @@ capabilities invalid, pass-through module detected
 .sp
 While negotiating capabilities, a pass-through module was detected and
 the capability had to be discarded. Because of this, the data path could
-not be initialized. 
+not be initialized.
 .RE
 
 

@@ -20,9 +20,9 @@ vnd \- virtual layer two network driver
 .nf
 .LP
 /dev/vnd/ctl
-.nf
 .LP
 /dev/vnd/*
+.fi
 
 .SH DESCRIPTION
 .sp
@@ -61,10 +61,9 @@ or named devices are private to the implementation. Instead,
 libvnd(3LIB) provides a stable interfaces for using, creating, and
 manipulating vnd devices.
 .sp
-.LP
 .SH FILES
 .sp
-.n3 2
+.ne 2
 .na
 /dev/vnd/ctl
 .ad
@@ -73,7 +72,7 @@ vnd self-cloning control node
 .RE
 
 .sp
-.n3 2
+.ne 2
 .na
 /dev/vnd/%link
 .ad
@@ -84,7 +83,7 @@ in the current zone.
 .RE
 
 .sp
-.n3 2
+.ne 2
 .na
 /dev/vnd/zone/%zone/%link
 .ad

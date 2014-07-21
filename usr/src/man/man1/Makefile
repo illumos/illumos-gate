@@ -12,6 +12,7 @@
 #
 # Copyright 2011, Richard Lowe
 # Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2014 Garrett D'Amore <garrett@damore.org>
 #
 
 include		$(SRC)/Makefile.master
@@ -229,6 +230,7 @@ MANFILES=	acctcom.1			\
 	 	mailx.1				\
 	 	makekey.1			\
 	 	man.1				\
+	 	mandoc.1			\
 	 	mconnect.1			\
 	 	mcs.1				\
 	 	mdb.1				\
@@ -411,7 +413,6 @@ MANFILES=	acctcom.1			\
 	 	w.1				\
 	 	wait.1				\
 	 	wc.1				\
-		whatis.1			\
 	 	which.1				\
 	 	who.1				\
 	 	whocalls.1			\
@@ -556,11 +557,14 @@ MANLINKS=	batch.1		\
 		valyorn.1	\
 		vax.1		\
 		vedit.1		\
+		whatis.1	\
 		whence.1	\
 		while.1		\
 		zcat.1
 
 intro.1		:= LINKSRC = Intro.1
+
+whatis.1	:= LINKSRC = apropos.1
 
 unalias.1	:= LINKSRC = alias.1
 

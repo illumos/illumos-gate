@@ -29,7 +29,7 @@
 #	1 = Improved sequential generation, with random variance in increment.
 #	2 = RFC 1948 sequence number generation, unique-per-connection-ID.
 #
-TCP_STRONG_ISS=1
+TCP_STRONG_ISS=2
 #
 # ACCEPT6TO4RELAY sets the policy for 6to4 tunnels communicating with 6to4
 # Relay Routers as defined in RFC 3056.  Traffic sent from a 6to4 site to a

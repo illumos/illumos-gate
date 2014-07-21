@@ -63,7 +63,7 @@ instead return one. In the case of library failure, vnd_prop_iter will
 return -1. In such cases, the vnd and system errors will be updated
 and available via vnd_errno(3VND) and vnd_syserrno(3VND).
 
-.SHEXAMPLES
+.SH EXAMPLES
 
 .LP
 Example 1    Print writeable properties

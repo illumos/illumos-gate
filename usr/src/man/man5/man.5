@@ -1,342 +1,254 @@
-'\" te
+.\" Copryight 2014 Garrett D'Amore <garrett@damore.org>
 .\" Copyright (c) 1995, Sun Microsystems, Inc.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH MAN 5 "Jan 30, 1995"
-.SH NAME
-man \- macros to format Reference Manual pages
-.SH SYNOPSIS
-.LP
-.nf
-\fBnroff\fR \fB-man\fR \fIfilename\fR...
-.fi
-
-.LP
-.nf
-\fBtroff\fR  \fB-man\fR \fIfilename\fR...
-.fi
-
-.SH DESCRIPTION
-.sp
-.LP
+.Dd "Jul 19, 2014"
+.Dt MAN 5
+.Os
+.Sh NAME
+.Nm man
+.Nd macros to format Reference Manual pages
+.Sh SYNOPSIS
+.Nm mandoc
+.Fl T Ar man
+.Ar
+.Nm nroff
+.Fl man
+.Ar
+.Nm troff
+.Fl man
+.Ar
+.Sh DESCRIPTION
 These macros are used to lay out the reference pages in this manual. Note: if
-\fIfilename\fR contains format input for a preprocessor, the commands shown
+.Ar file
+contains format input for a preprocessor, the commands shown
 above must be piped through the appropriate preprocessor. This is handled
-automatically by the \fBman\fR(1) command. See the ``Conventions'' section.
-.sp
-.LP
-Any text argument \fIt\fR may be zero to six words. Quotes may be used to
-include SPACE characters in a "word".  If \fItext\fR is empty, the special
+automatically by the
+.Xr man 1
+command. See the
+.Sx Conventions
+section.
+.Lp
+Any text argument
+.Ar t
+may be zero to six words. Quotes may be used to
+include SPACE characters in a
+.Qq word .
+If
+.Ar text
+is empty, the special
 treatment is applied to the next input line with text to be printed. In this
-way \fB\&.I\fR may be used to italicize a whole line, or \fB\&.SB\fR may be
-used to make small bold letters.
-.sp
-.LP
+way
+.Nm \&.I
+may be used to italicize a whole line, or
+.Nm \&.SB
+may be used to make small bold letters.
+.Lp
 A prevailing indent distance is remembered between successive indented
 paragraphs, and is reset to default value upon reaching a non-indented
-paragraph.  Default units for indents \fIi\fR are ens.
-.sp
-.LP
+paragraph.  Default units for indents
+.Nm i
+are ens.
+.Lp
 Type font and size are reset to default values before each paragraph, and after
 processing font and size setting macros.
-.sp
-.LP
-These strings are predefined by \fB-man\fR:
-.sp
-.ne 2
-.na
-\fB\fB\e*R\fR\fR
-.ad
-.RS 8n
-`\(rg', `(Reg)' in \fBnroff\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB\e*S\fR\fR
-.ad
-.RS 8n
+.Pp
+These strings are predefined by
+.Nm -man :
+.Bl -tag -width Ds
+.It Nm \e*R
+.Sq \(rg ,
+.Sq (Reg)
+in
+.Nm nroff .
+.It Nm \e*S
 Change to default type size.
-.RE
-
-.SS "Requests"
-.sp
-.LP
+.El
+.Sh "Requests"
 * n.t.l. = next text line; p.i. = prevailing indent
-.sp
-
-.sp
-.TS
-c c c c
-c c c c .
-\fIRequest\fR	\fICause\fR	\fIIf no\fR	\fIExplanation\fR
-	\fIBreak\fR	\fIArgument\fR	
-\fB\&.B \fR\fIt\fR	no	\fIt\fR=n.t.l.*	Text is in bold font.
-\fB\&.BI \fR\fIt\fR	no	\fIt\fR=n.t.l.	Join words, alternating bold and italic.
-\fB\&.BR \fR\fIt\fR	no	\fIt\fR=n.t.l.	Join words, alternating bold and roman.
-\fB\&.DT\fR	no	\&.5i 1i...	Restore default tabs.
-\fB\&.HP \fR\fIi\fR	yes	\fIi\fR=p.i.*	T{
-Begin paragraph with hanging indent. Set prevailing indent to \fIi\fR.
-T}
-\fB\&.I \fR\fIt\fR	no	\fIt\fR=n.t.l.	Text is italic.
-\fB\&.IB \fR\fIt\fR	no	\fIt\fR=n.t.l.	Join words, alternating italic and bold.
-\fB\&.IP \fR\fIx i\fR	yes	\fIx\fR=""	Same as \fB\&.TP\fR with tag \fIx\fR.
-\fB\&.IR \fR\fIt\fR	no	\fIt\fR=n.t.l.	T{
-Join words, alternating italic and roman.
-T}
-\fB\&.IX \fR\fIt\fR	no	-	Index macro, for SunSoft internal use.
-\fB\&.LP\fR	yes	-	T{
-Begin left-aligned paragraph. Set prevailing indent to .5i.
-T}
-\fB\&.P\fR	yes	-	Same as \fB\&.LP\fR.
-\fB\&.PD \fR\fId\fR	no	\fId\fR=.4v	T{
-Set vertical distance between paragraphs.
-T}
-\fB\&.PP\fR	yes	-	Same as \fB\&.LP\fR.
-\fB\&.RE\fR	yes	-	T{
-End of relative indent. Restores prevailing indent.
-T}
-\fB\&.RB \fR\fIt\fR	no	\fIt\fR=n.t.l.	Join words, alternating roman and bold.
-\fB\&.RI \fR\fIt\fR	no	\fIt\fR=n.t.l.	T{
-Join words, alternating roman and italic.
-T}
-\fB\&.RS \fR\fIi\fR	yes	\fIi\fR=p.i.	T{
-Start relative indent, increase indent by \fIi\fR. Sets prevailing indent to .5i for nested indents.
-T}
-\fB\&.SB \fR\fIt\fR	no	-	T{
-Reduce size of text by 1 point, make text bold.
-T}
-\fB\&.SH \fR\fIt\fR	yes	-	Section Heading.
-\fB\&.SM \fR\fIt\fR	no	\fIt\fR=n.t.l.	Reduce size of text by 1 point.
-\fB\&.SS \fR\fIt\fR	yes	\fIt\fR=n.t.l.	Section Subheading.
-\fB\&.TH \FR\FIN S "f d, m\fR"
-\fB\&.TH \fR\fIn s d f m\fR	yes	-	T{
-Begin reference page \fIn\fR, of of section \fIs\fR; \fId\fR is the date of the most recent change.  If present, \fIf\fR is the left page footer; \fIm\fR is the main page (center) header.  Sets prevailing indent and tabs to .5i.
-T}
-\fB\&.TP \fR\fIi\fR	yes	\fIi\fR=p.i.	T{
-Begin indented paragraph, with the tag given on the next text line. Set prevailing indent to \fIi\fR.
-T}
-\fB\&.TX \fR\fIt \fR\fIp\fR	no	-	T{
-Resolve the title abbreviation \fIt\fR; join to punctuation mark (or text) \fIp\fR.
-T}
-.TE
-
-.SS "Conventions"
-.sp
-.LP
-When formatting a manual page, \fBman\fR examines the first line to determine
+.Bl -column ".TH n s d f m" "Cause " "t=n.t.l.*" "Explanation " -offset Ds
+.It Sy Request	Sy Cause	Sy "If No"	Sy Explanation
+.It ""	Sy Break 	Sy "Argument"	""
+.It Nm \&.B Ar "t"	no 	Ar t Ns =n.t.l.*	Text is in bold font.
+.It Nm \&.BI Ar t	no	Ar t Ns =n.t.l.	Join words, alternating bold and italic.
+.It Nm \&.BR Ar t	no	Ar t Ns =n.t.l.	Join words, alternating bold and roman.
+.It Nm \&.DT	no	Li \&.5i 1i...	Restore default tabs.
+.It Nm \&.HP Ar i	yes	Ar i Ns =p.i.*	"Begin paragraph with hanging indent. Set prevailing indent to" Ar i .
+.It Nm \&.I Ar t	no	Ar t Ns =n.t.l.	Text is italic.
+.It Nm \&.IB Ar t	no	Ar t Ns =n.t.l.	Join words, altenrating italic and bold.
+.It Nm \&.IP Ar x Ar i	yes	Ar x Ns =""	Same as
+.Nm \&.TP
+with tag
+.Ar x .
+.It Nm \&.IR Ar t	no	Ar t Ns =n.t.l.	Join words, alternating italic and roman.
+.It Nm \&.IX Ar t	no	-	Index macro, not used (obsolete).
+.It Nm \&.LP	yes	-	Begin left-aligned paragraph. Set prevailing indent to .5i.
+.It Nm \&.P	yes	-	Same as
+.Nm \&.LP .
+.It Nm \&.PD Ar d	no	Ar d Ns =.4v	Set vertical distance between paragraphs.
+.It Nm \&.PP	yes	-	Same as
+.Nm \&.LP .
+.It Nm \&.RE	yes	-	End of relative indent. Restores prevailing indent.
+.It Nm \&.RB Ar t	no	Ar t Ns =n.t.l.	Join words, alternating roman and bold.
+.It Nm \&.RI Ar t	no	Ar t Ns =n.t.l.	Join words, alternating roman and italic.
+.It Nm \&.RS Ar i	yes	Ar i Ns =p.i.	Start relative indent, increase indent by Ar i .
+Sets prevailing indent to .5i for nested indents.
+.It Nm \&.SB Ar t	no	-	Reduce size of text by 1 point, make text bold.
+.It Nm \&.SH Ar t	yes	-	Section Heading.
+.It Nm \&.SM Ar t	no	Ar t Ns =n.t.l.	Reduce size of text by 1 point.
+.It Nm \&.SS Ar t	yes	Ar t Ns =n.t.l.	Section Subheading.
+.It Nm \&.TH Ar n s d f m	yes	-	Begin reference page Ar n , No of section Ar s ; Ar d No is the date of the most recent change.  If present, Ar f No is the left page footer; Ar m No is the main page (center) header.  Sets prevailing indent and tabs to .5i.
+.It Nm \&.TP Ar i	yes	Ar i Ns =p.i.	Begin indented paragraph, with the tag given on the next text line. Set prevailing indent to
+.Ar i .
+.It Nm \&.TX Ar t p	no	-	Resolve the title abbreviation Ar t ; No join to punctuation mark (or text) Ar p .
+.El
+.Ss "Conventions"
+When formatting a manual page,
+.Nm
+examines the first line to determine
 whether it requires special processing. For example a first line consisting of:
-.sp
-.LP
-\fB\&'\e" t\fR
-.sp
-.LP
-indicates that the manual page must be run through the \fBtbl\fR(1)
+.Lp
+.Dl \&'\e" t
+.Lp
+indicates that the manual page must be run through the
+.Xr tbl 1
 preprocessor.
-.sp
-.LP
+.Lp
 A typical manual page for a command or function is laid out as follows:
-.sp
-.ne 2
-.na
-\fB\&.TH\fI TITLE \FR[1-9]\FR " , "
-.ad
-.RS 23n
+.Bl -tag -width ".SH RETURN VALUES"
+.
+.It Nm \&.TH Ar title Op "1-9"
+.
 The name of the command or function, which serves as the title of the manual
 page. This is followed by the number of the section in which it appears.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\&.SH NAME\fR
-.ad
-.RS 23n
+.
+.It Nm SH NAME
+.
 The name, or list of names, by which the command is called, followed by a dash
 and then a one-line summary of the action performed. All in roman font, this
-section contains no \fBtroff\fR(1) commands or escapes, and no macro requests.
-It is used to generate the \fBwindex\fR database, which is used by the
-\fBwhatis\fR(1) command.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\&.SH SYNOPSIS\fR
-.ad
-.RS 23n
-.sp
-.ne 2
-.na
-\fBCommands:\fR
-.ad
-.RS 13n
+section contains no
+.Xr troff 1
+commands or escapes, and no macro requests.
+It is used to generate the database used by the
+.Xr whatis 1
+command.
+.
+.It Nm SH SYNOPSIS
+.Bl -tag -width "Functions:"
+.It Sy Commands:
 The syntax of the command and its arguments, as typed on the command line.
 When in boldface, a word must be typed exactly as printed.  When in italics, a
 word can be replaced with an argument that you supply. References to bold or
 italicized items are not capitalized in other sections, even when they begin a
 sentence.
-.sp
+.Lp
 Syntactic symbols appear in roman face:
-.sp
-.ne 2
-.na
-\fB[ ]\fR
-.ad
-.RS 13n
+.Bl -tag -width "   "
+.It Op " "
 An argument, when surrounded by brackets is optional.
-.RE
-
-.sp
-.ne 2
-.na
-\fB|\fR
-.ad
-.RS 13n
+.It |
 Arguments separated by a vertical bar are exclusive. You can supply only one
 item from such a list.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\&.\|.\|.\fR
-.ad
-.RS 13n
+.It \&.\|.\|.
 Arguments followed by an ellipsis can be repeated. When an ellipsis follows a
 bracketed set, the expression within the brackets can be repeated.
-.RE
-
-.RE
-
-.sp
-.ne 2
-.na
-\fBFunctions:\fR
-.ad
-.RS 14n
-If required, the data declaration, or \fB#include\fR directive, is shown first,
+.El
+.It Sy Functions:
+If required, the data declaration, or
+.Li #include
+directive, is shown first,
 followed by the  function declaration. Otherwise, the function declaration is
 shown.
-.RE
-
-.RE
-
-.sp
-.ne 2
-.na
-\fB\&.SH DESCRIPTION\fR
-.ad
-.RS 23n
+.El
+.
+.It Nm \&.SH DESCRIPTION
+.
 A narrative overview of the command or function's external behavior. This
 includes how it interacts with files or data, and how it handles the standard
 input, standard output and standard error. Internals and implementation details
 are normally omitted. This section attempts to provide a succinct overview in
 answer to the question, "what does it do?"
-.sp
+.Lp
 Literal text from the synopsis appears in constant width, as do literal
 filenames and references to items that appear elsewhere in the  reference
 manuals. Arguments are italicized.
-.sp
+.Lp
 If a command interprets either subcommands or an input grammar, its command
-interface or input grammar is normally described in a \fBUSAGE\fR section,
-which follows the \fBOPTIONS\fR section.  The  \fBDESCRIPTION\fR section only
+interface or input grammar is normally described in a
+.Nm USAGE
+section, which follows the
+.Nm OPTIONS
+section.  The
+.Nm DESCRIPTION
+section only
 describes the behavior of the command itself, not that of subcommands.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\&.SH OPTIONS\fR
-.ad
-.RS 23n
+.
+.It Nm \&.SH OPTIONS
+.
 The list of options along with a description of how each affects the command's
 operation.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\&.SH RETURN VALUES\fR
-.ad
-.RS 23n
+.
+.It Nm \&.SH RETURN VALUES
+.
 A list of the values the library routine will return to the calling  program
 and the conditions that cause these values to be returned.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\&.SH EXIT STATUS\fR
-.ad
-.RS 23n
+.
+.It Nm \&.SH EXIT STATUS
+.
 A list of the values the utility will return to the calling  program or shell,
 and the conditions that cause these values to be  returned.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\&.SH FILES\fR
-.ad
-.RS 23n
+.
+.It Nm \&.SH FILES
+.
 A list of files associated with the command or function.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\&.SH SEE ALSO\fR
-.ad
-.RS 23n
+.
+.It Nm \&.SH SEE ALSO
+.
 A comma-separated list of related manual pages, followed by references to other
 published materials.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\&.SH DIAGNOSTICS\fR
-.ad
-.RS 23n
+.
+.It Nm \&.SH DIAGNOSTICS
+.
 A list of diagnostic messages and an explanation of each.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\&.SH BUGS\fR
-.ad
-.RS 23n
+.
+.It Nm \&.SH BUGS
+.
 A description of limitations, known defects, and possible problems associated
 with the command or function.
-.RE
-
-.SH FILES
-.sp
-.ne 2
-.na
-\fB\fB/usr/share/lib/tmac/an\fR \fR
-.ad
-.RS 27n
-
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/usr/share/man/windex\fR\fR
-.ad
-.RS 27n
-
-.RE
-
-.SH SEE ALSO
-.sp
-.LP
-\fBman\fR(1), \fBnroff\fR(1), \fBtroff\fR(1), \fBwhatis\fR(1)
-.sp
-.LP
-Dale Dougherty and   Tim O'Reilly, \fIUnix\fR \fIText\fR \fIProcessing\fR
+.El
+.Sh FILES
+.Pa /usr/share/man/whatis
+.Sh NOTES
+The
+.Nm
+package should not be used for new documentation.  The
+.Xr mdoc 5 ,
+package is preferred, as it uses semantic markup rather than physical markup.
+.Sh CODE SET INDEPENDENCE
+When processed with
+.Xr mandoc 1 ,
+this package is Code Set Independent. However, when processed with
+legacy tools such as
+.Xr nroff 1
+and
+.Xr troff 1 ,
+the use of multi-byte characters may not be supported.
+.Sh INTERFACE STABILITY
+.Nm Obsolete Committed .
+The
+.Xr mdoc 5
+package should be used instead.
+.Sh SEE ALSO
+.Xr eqn 1 ,
+.Xr man 1 ,
+.Xr mandoc 1 ,
+.Xr nroff 1 ,
+.Xr troff 1 ,
+.Xr tbl 1 ,
+.Xr whatis 1 ,
+.Xr mdoc 5 ,
+.Rs
+.%A Dale Dougherty and Tim O'Reilly
+.%B Unix Text Processing
+.Re

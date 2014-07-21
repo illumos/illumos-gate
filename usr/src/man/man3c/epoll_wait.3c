@@ -39,7 +39,7 @@ number of milliseconds to wait for an event if none is pending.  A
 \fItimeout\fR of -1 denotes an infinite timeout.
 
 The \fBepoll_pwait()\fR is similar to \fBepoll_wait()\fR, but takes an
-additional \fIsigmask\fR argument that specifies the desired signal mask 
+additional \fIsigmask\fR argument that specifies the desired signal mask
 when \fBepoll_pwait()\fR is blocked.  It is equivalent to atomically
 setting the signal mask, calling \fBepoll_wait()\fR, and restoring the
 signal mask upon return, and is therefore similar to the relationship
@@ -95,7 +95,6 @@ is not greater than zero.
 .RE
 
 .sp
-.LP
 .SH NOTES
 .sp
 .LP
@@ -105,11 +104,10 @@ compatibility for Linux-borne applications; native
 applications should continue to prefer using event ports via the
 \fBport_create\fR(3C), \fBport_associate\fR(3C) and \fBport_get\fR(3C)
 interfaces.  See \fBepoll\fR(5) for compatibility details and restrictions.
-.RE
 
 .SH SEE ALSO
 .sp
 .LP
 \fBepoll_create\fR(3C), \fBepoll_ctl\fR(3C),
-\fBport_create\fR(3C), \fBport_associate\fR(3C), \fBport_get\fR(3C), 
+\fBport_create\fR(3C), \fBport_associate\fR(3C), \fBport_get\fR(3C),
 \fBpselect\fR(3C), \fBepoll\fR(5)

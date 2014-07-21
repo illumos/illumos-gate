@@ -13,9 +13,7 @@
 .\"
 .TH CPQARY3 7D Aug 26, 2013"
 .SH NAME
-.LP
 cpqary3 - provides disk and SCSI tape support for HP Smart Array controllers
-.LP
 .SH DESCRIPTION
 .LP
 The cpqary3 module provides low-level interface routines between the common
@@ -78,7 +76,6 @@ then target ID entries for tape drives from 65 to 65+N must be added in
 .BR driver.conf (4),
 .BR sd (7D),
 .BR st (7D)
-.LP
 .SH NOTES
 .LP
 The Smart Array controllers supported by the current version of the

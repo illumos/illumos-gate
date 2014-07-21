@@ -11,12 +11,12 @@
 
 #
 # Copyright 2011, Richard Lowe
-# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
 #
 
+MANDOC=		$(ONBLD_TOOLS)/bin/${MACH}/mandoc
 ROOTMAN=	$(ROOT)/usr/share/man
 ROOTHASMAN=	$(ROOT)/usr/has/man
-
 FILEMODE=	0444
 
 # The manual section being built, client Makefiles must set this to, for e.g.
@@ -24,6 +24,7 @@ FILEMODE=	0444
 #
 # MANSECT=
 
+MANCHECKS=	$(MANFILES:%=%.check)
 ROOTMANFILES= 	$(MANFILES:%=$(ROOTMAN)/man$(MANSECT)/%)
 ROOTMANLINKS=	$(MANLINKS:%=$(ROOTMAN)/man$(MANSECT)/%)
 
@@ -33,6 +34,10 @@ $(ROOTMAN)/man$(MANSECT) $(ROOTHASMAN)/man$(MANSECT):
 $(ROOTMAN)/man$(MANSECT)/% $(ROOTHASMAN)/man$(MANSECT)/%: % $(ROOTMAN)/man$(MANSECT) $(ROOTHASMAN)/man$(MANSECT)
 		$(INS.file)
 
+$(MANCHECKS):
+		@$(ECHO) "checking $(@:%.check=%)"; \
+		$(MANDOC) -Tlint $(@:%.check=%)
+
 $(MANLINKS):
 		$(RM) $@; $(SYMLINK) $(LINKSRC) $@
 
@@ -40,6 +45,8 @@ $(ROOTMANLINKS): $(MANLINKS) $(ROOTMAN)/man$(MANSECT)
 		$(RM) $@; $(CP) -RP $(@F) $(@D)
 
 all:
+
+check:		$(MANCHECKS)
 
 clean:
 

@@ -11,7 +11,7 @@
 
 #
 # Copyright 2011, Richard Lowe
-# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
 #
 
 SUBDIRS=	man1		\
@@ -103,8 +103,9 @@ all		:= TARGET = all
 clean		:= TARGET = clean
 clobber		:= TARGET = clobber
 install		:= TARGET = install
+check		:= TARGET = check
 
-all clean clobber install: $(SUBDIRS)
+all check clean clobber install: $(SUBDIRS)
 
 $(SUBDIRS):	FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)

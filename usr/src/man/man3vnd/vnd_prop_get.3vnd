@@ -44,21 +44,21 @@ libvnd(3LIB) manual page.
 
 
 .SH RETURN VALUES
-.LP 
+.LP
 On success, the vnd_prop_get and vnd_prop_set functions return zero.
 On failure, they return -1 and additional error information is
 available through vnd_errno(3VND) and vnd_syserrno(3VND).
 
-.LP 
+.LP
 When vnd_prop_get returns successfully, the contents of buf are
 filled in with the value of the corresponding property. The contents
 of buf should not change across a call to vnd_prop_set.
 
 .SH EXAMPLES
 
-.LP 
+.LP
 Example 1   Getting the value of the rxbuf property
-.LP 
+.LP
 The following sample C program retrieves the value of the
 rxbuf property and prints it to standard out.
 
@@ -219,7 +219,6 @@ main(void)
 	vnd_close(vnd);
 	return (0);
 }
-.nf
 .fi
 
 .SH ATTRIBUTES

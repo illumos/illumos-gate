@@ -87,7 +87,7 @@ top of.
 .LP
 The vnd_walk function will return zero on success. If the consumer
 supplied callback function returned non-zero, then the vnd_walk
-function will return 1. If an error occurred, -1 is returned, and if 
+function will return 1. If an error occurred, -1 is returned, and if
 vnderr and syserr are non-null, they are filled in with their
 respective error values. See vnd_errno(3VND) for more information on
 these errors.

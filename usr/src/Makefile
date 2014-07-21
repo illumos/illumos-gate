@@ -22,6 +22,7 @@
 #
 # Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright 2014 Garrett D'Amore <garrett@damore.org>
 #
 
 #
@@ -64,6 +65,9 @@ PARALLEL_DIRS = uts lib man
 
 # The check target also causes smf(5) service manifests to be validated.
 CHKMFSTSUBDIRS=	cmd
+
+# And man page formats
+CHKMANSUBDIRS = man
 
 MSGSUBDIRS=	cmd ucbcmd lib
 DOMAINS= \
@@ -208,7 +212,7 @@ cmdheaders: FRC
 	@cd cmd/fm; pwd; $(MAKE) install_h
 	@cd cmd/mdb; pwd; $(MAKE) install_h
 
-check:	$(CHKHDRSUBDIRS) $(CHKMFSTSUBDIRS)
+check:	$(CHKHDRSUBDIRS) $(CHKMFSTSUBDIRS) $(CHKMANSUBDIRS)
 
 #
 # Cross-reference customization: skip all of the subdirectories that

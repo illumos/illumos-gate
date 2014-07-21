@@ -46,7 +46,7 @@ with readv(2) and writev(2).
 vnd_frameio_read performs a framed I/O read of the device represented by
 the handle vhp, with the framed I/O data described by fiop.
 vnd_frameio_write works in the same manner, except performing a write
-instead of a read. 
+instead of a read.
 
 .LP
 The basic vector component of the frameio_t is the framevec_t. Each
@@ -548,7 +548,7 @@ main(void)
 	/* Do proper memory cleanup */
 	return (0);
 }
-.nf
+.fi
 .in -2
 
 .LP

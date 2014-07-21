@@ -2373,6 +2373,7 @@ get_allowedips(dladm_handle_t handle, prop_desc_t *pdp,
 		return (DLADM_STATUS_BADVALCNT);
 
 	for (i = 0; i < p->mp_ipaddrcnt; i++) {
+		int len;
 		if (p->mp_ipaddrs[i].ip_version == IPV4_VERSION) {
 			ipaddr_t	v4addr;
 
@@ -2382,12 +2383,9 @@ get_allowedips(dladm_handle_t handle, prop_desc_t *pdp,
 			(void) dladm_ipv6addr2str(&p->mp_ipaddrs[i].ip_addr,
 			    prop_val[i]);
 		}
-		if (p->mp_ipaddrs[i].ip_netmask != 0) {
-			int len = strlen(prop_val[i]);
-			(void) sprintf(prop_val[i] + len, "/%d",
-			    p->mp_ipaddrs[i].ip_netmask);
-		}
-
+		len = strlen(prop_val[i]);
+		(void) sprintf(prop_val[i] + len, "/%d",
+		    p->mp_ipaddrs[i].ip_netmask);
 	}
 	*val_cnt = p->mp_ipaddrcnt;
 	return (DLADM_STATUS_OK);
@@ -2487,6 +2485,8 @@ check_single_ip(char *buf, mac_ipaddr_t *addr)
 			smask = 0xFFFFFFFFu << (32 - mask);
 			if (htonl(v4addr) & ~smask)
 				return (DLADM_STATUS_INVALID_IP);
+		} else {
+			mask = 32;
 		}
 		addr->ip_netmask = mask;
 	} else {
@@ -2513,6 +2513,8 @@ check_single_ip(char *buf, mac_ipaddr_t *addr)
 			off += high;
 			if (128 - off >= mask)
 				return (DLADM_STATUS_INVALID_IP);
+		} else {
+			mask = 128;
 		}
 
 		addr->ip_addr = v6addr;
@@ -2911,16 +2913,16 @@ get_secondary_macs(dladm_handle_t handle, prop_desc_t *pdp,
 	if (status != DLADM_STATUS_OK)
 		return (status);
 
-	if (sa.ms_addrcnt == 0) {
-		*val_cnt = 0;
-		return (DLADM_STATUS_OK);
-	}
 	if (sa.ms_addrcnt > *val_cnt)
 		return (DLADM_STATUS_BADVALCNT);
 
 	for (i = 0; i < sa.ms_addrcnt; i++) {
-		(void) dladm_aggr_macaddr2str(
-		    (const unsigned char *)&sa.ms_addrs[i], prop_val[i]);
+		if (dladm_aggr_macaddr2str(
+		    (const unsigned char *)&sa.ms_addrs[i], prop_val[i]) ==
+		    NULL) {
+			*val_cnt = i;
+			return (DLADM_STATUS_NOMEM);
+		}
 	}
 	*val_cnt = sa.ms_addrcnt;
 	return (DLADM_STATUS_OK);
@@ -2988,7 +2990,7 @@ set_secondary_macs(dladm_handle_t handle, prop_desc_t *pd, datalink_id_t linkid,
 		}
 	}
 	msa.ms_addrcnt = val_cnt;
-	(void) memcpy(dip->pr_val, &msa, dip->pr_valsize);
+	bcopy(&msa, dip->pr_val, dip->pr_valsize);
 
 	status = i_dladm_macprop(handle, dip, B_TRUE);
 

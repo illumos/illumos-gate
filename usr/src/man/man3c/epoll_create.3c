@@ -88,7 +88,6 @@ The maximum allowable number of files is currently open in the system.
 .RE
 
 .sp
-.LP
 .SH NOTES
 .sp
 .LP
@@ -98,7 +97,6 @@ compatibility for Linux-borne applications; native
 applications should continue to prefer using event ports via the
 \fBport_create\fR(3C), \fBport_associate\fR(3C) and \fBport_get\fR(3C)
 interfaces.  See \fBepoll\fR(5) for compatibility details and restrictions.
-.RE
 
 .SH SEE ALSO
 .sp
