@@ -34,7 +34,7 @@ a thread is created, it uses the global locale as specified by calls to
 .LP
 If
 .BR (locale_t) 0
-is supplied for 
+is supplied for
 .IR loc ,
 then no change is made to the thread's locale setting.  This can be used
 to query the thread's locale without making any change.

@@ -67,6 +67,7 @@
 #include <sys/ddi_periodic.h>
 #include <sys/random.h>
 #include <sys/modctl.h>
+#include <sys/zone.h>
 
 /*
  * for NTP support
@@ -1149,6 +1150,10 @@ loadavg_update()
 
 	} while ((cpupart = cpupart->cp_next) != cp_list_head);
 
+	/*
+	 * Third pass totals up per-zone statistics.
+	 */
+	zone_loadavg_update();
 }
 
 /*

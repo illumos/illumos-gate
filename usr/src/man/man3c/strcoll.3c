@@ -69,8 +69,6 @@ collating sequence.
 .SH FILES
 .IP \fB/usr/lib/locale/\fR\fIlocale\fR\fB/LC_COLLATE/*\fR
 collation database for \fIlocale\fR
-.RE
-
 .SH ATTRIBUTES
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:

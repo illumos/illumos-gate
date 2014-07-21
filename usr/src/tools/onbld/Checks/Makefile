@@ -24,6 +24,7 @@
 #
 
 # Copyright 2010, Richard Lowe
+# Copyright 2014 Garrett D'Amore <garrett@damore.org>
 
 include $(SRC)/Makefile.master
 include ../../Makefile.tools
@@ -38,6 +39,7 @@ PYSRCS = \
 	HdrChk.py	\
 	JStyle.py	\
 	Keywords.py	\
+	ManLint.py	\
 	Mapfile.py	\
 	ProcessCheck.py \
 	__init__.py

@@ -140,7 +140,7 @@ destroyed.
 .sp
 .LP
 The \fBrw_enter()\fR function acquires the lock, and blocks if necessary. If
-\fIenter_type\fR is \fBRW_WRITER\fR, the caller blocks if any thread holds 
+\fIenter_type\fR is \fBRW_WRITER\fR, the caller blocks if any thread holds
 the lock. If \fIenter_type\fR is \fBRW_READER\fR, the caller blocks if there
 is a writer or a thread attempting to enter for writing. If \fIenter_type\fR
 is \fBRW_READER_STARVEWRITER\fR, the caller blocks only if there is a writer;

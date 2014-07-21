@@ -259,7 +259,7 @@ individual HBA man pages for any HBA-specific information
 .SS "scsi_hba_detach(\|)"
 .sp
 .LP
-The \fBscsi_hba_detach()\fR function removes the reference to the DMA 
+The \fBscsi_hba_detach()\fR function removes the reference to the DMA
 attributes structure and the transport vector for the given instance of an HBA
 driver.
 .SH RETURN VALUES

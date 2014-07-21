@@ -42,7 +42,7 @@ These functions are defined on
 and wide-character codes corresponding to the valid character encodings in the
 current locale (or
 .I loc
-for 
+for
 .BR iswctype_l() .)
 If the
 .I wc

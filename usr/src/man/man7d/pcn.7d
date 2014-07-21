@@ -43,7 +43,7 @@ the AMD PCnet family of Ethernet controllers\.
 .SH "APPLICATION PROGRAMMING INTERFACE"
 The \fBpcn\fR driver can be used as either a "style 1" or a "style 2" Data Link
 Service Provider\. Physical points of attachment (PPAs) are interpreted as the
-instance number of the \fBpcn\fR controller as assigned by the Illumos 
+instance number of the \fBpcn\fR controller as assigned by the
 operating environment\.
 .sp
 .LP
@@ -58,7 +58,7 @@ Maximum SDU is 1500\.
 .TP
 .ie t \(bu
 .el o
-Minimum SDU is 0\. 
+Minimum SDU is 0\.
 .RE
 .RS +4
 .TP
@@ -76,7 +76,7 @@ MAC type is \fBDL_ETHER\fR\.
 .TP
 .ie t \(bu
 .el o
-SAP length is \-2\. The 6\-byte physical address is immediately followed by a 
+SAP length is \-2\. The 6\-byte physical address is immediately followed by a
 2\-byte SAP\.
 .RE
 .RS +4
@@ -89,7 +89,7 @@ Service mode is \fBDL_CLDLS\fR\.
 .TP
 .ie t \(bu
 .el o
-The broadcast address is the 6\-byte Ethernet broadcast address 
+The broadcast address is the 6\-byte Ethernet broadcast address
 (\fBff:ff:ff:ff:ff:ff\fR)\.
 .SH "CONFIGURATION"
 .sp

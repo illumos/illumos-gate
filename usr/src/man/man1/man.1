@@ -1,664 +1,401 @@
-'\" te
+.\" Copyright 2014 Garrett D'Amore <garrett@damore.org>
 .\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved.
-.\" Copyright (c) 1980 Regents of the University of California. The Berkeley software License Agreement specifies the terms and conditions for redistribution.
-.TH MAN 1 "May 8, 2008"
-.SH NAME
-man \- find and display reference manual pages
-.SH SYNOPSIS
-.LP
-.nf
-\fBman\fR [\fB-\fR] [\fB-adFlrt\fR] [\fB-M\fR \fIpath\fR] [\fB-T\fR \fImacro-package\fR] [\fB-s\fR \fIsection\fR] \fIname\fR...
-.fi
-
-.LP
-.nf
-\fBman\fR [\fB-M\fR \fIpath\fR] \fB-k\fR \fIkeyword\fR...
-.fi
-
-.LP
-.nf
-\fBman\fR [\fB-M\fR \fIpath\fR] \fB-f\fR \fIfile\fR...
-.fi
-
-.SH DESCRIPTION
-.sp
-.LP
-The \fBman\fR command displays information from the reference manuals. It
-displays complete manual pages that you select by \fIname\fR, or one-line
-summaries selected either by \fIkeyword\fR (\fB-k\fR), or by the name of an
-associated file (\fB-f\fR). If no manual page is located, \fBman\fR prints an
-error message.
-.SS "Source Format"
-.sp
-.LP
-Reference Manual pages are marked up with either \fBnroff\fR (see
-\fBnroff\fR(1)) or \fBSGML\fR (Standard Generalized Markup Language) tags (see
-\fBsgml\fR(5)). The \fBman\fR command recognizes the type of markup and
-processes the file accordingly. The various source files are kept in separate
-directories depending on the type of markup.
-.SS "Location of Manual Pages"
-.sp
-.LP
+.\" Copyright (c) 1980 Regents of the University of California.
+.\" The Berkeley software License Agreement specifies the terms and conditions
+.\" for redistribution.
+.Dd Jul 18, 2014
+.Dt MAN 1
+.Os
+.Sh NAME
+.Nm man
+.Nd find and display reference manual pages
+.Sh SYNOPSIS
+.Nm
+.Op Fl
+.Op Fl adFlrt
+.Op Fl T Ar macro-package
+.Op Fl M Ar path
+.Op Fl s Ar section
+.Ar name ...
+.Nm
+.Op Fl M Ar path
+.Op Fl s Ar section
+.Fl k
+.Ar keyword
+.Ar ...
+.Nm
+.Op Fl M Ar path
+.Op Fl s Ar section
+.Fl f
+.Ar
+.Nm
+.Op Fl M Ar path
+.Fl w
+.Sh DESCRIPTION
+The
+.Nm
+command displays information from the reference manuals. It
+displays complete manual pages that you select by
+.Ar name ,
+or one-line summaries selected either by
+.Ar keyword
+.Pq Fl k ,
+or by the name of an associated file
+.Pq Fl f .
+If no manual page is located,
+.Nm
+prints an error message.
+.Ss "Source Format"
+Reference Manual pages are marked up with either
+.Xr man 5 ,
+or
+.Xr mdoc 5
+language tags. The
+.Nm
+command recognizes the type of markup and
+processes the file accordingly.
+.
+.Ss "Location of Manual Pages"
+.
 The online Reference Manual page directories are conventionally located in
-\fB/usr/share/man\fR. The nroff sources are located in the
-\fB/usr/share/man/man\fR* directories. The \fBSGML\fR sources are located in
-the \fB/usr/share/man/sman\fR* directories. Each directory corresponds to a
+.Pa /usr/share/man .
+Each directory corresponds to a
 section of the manual. Since these directories are optionally installed, they
-might not reside on your host. You might have to mount \fB/usr/share/man\fR
+might not reside on your host. You might have to mount
+.Pa /usr/share/man
 from a host on which they do reside.
-.sp
-.LP
-If there are preformatted, up-to-date versions in the corresponding \fBcat\fR*
-or \fBfmt\fR* directories, \fBman\fR simply displays or prints those versions.
-If the preformatted version of interest is out of date or missing, \fBman\fR
-reformats it prior to display and stores the preformatted version if \fBcat\fR*
-or \fBfmt\fR* is writable. The \fBwindex\fR database is not updated. See
-\fBcatman\fR(1M). If directories for the preformatted versions are not
-provided, \fBman\fR reformats a page whenever it is requested. \fBman\fR uses a
-temporary file to store the formatted text during display.
-.sp
-.LP
-If the standard output is not a terminal, or if the `\fB-\fR' flag is given,
-\fBman\fR pipes its output through \fBcat\fR(1). Otherwise, \fBman\fR pipes its
-output through \fBmore\fR(1) to handle paging and underlining on the screen.
-.SH OPTIONS
-.sp
-.LP
+The
+.Nm
+command reformats a page whenever it is requested.
+.Pp
+If the standard output is not a terminal, or if the
+.Fl
+flag is given,
+.Nm
+pipes its output through
+.Xr cat 1 .
+Otherwise,
+.Nm
+pipes its output through a pager such as
+.Xr more 1
+to handle paging and underlining on the screen.
+.Sh OPTIONS
 The following options are supported:
-.sp
-.ne 2
-.na
-\fB\fB-a\fR\fR
-.ad
-.RS 20n
-Shows all manual pages matching \fIname\fR within the \fBMANPATH\fR search
-path. Manual pages are displayed in the order found.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-d\fR\fR
-.ad
-.RS 20n
+.Bl -tag -width indent
+.It Fl a
+Shows all manual pages matching
+.Ar name
+within the
+.Ev MANPATH
+search path. Manual pages are displayed in the order found.
+.It Fl d
 Debugs. Displays what a section-specifier evaluates to, method used for
-searching, and paths searched by \fBman\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-f\fR \fIfile ...\fR\fR
-.ad
-.RS 20n
-\fBman\fR attempts to locate manual pages related to any of the given
-\fIfile\fRs. It strips the leading path name components from each \fIfile\fR,
+searching, and paths searched by
+.Nm .
+.It Fl f Ar file ...
+Attempts to locate manual pages related to any of the given
+.Ar file
+names. It strips the leading path name components from each
+.Ar file ,
 and then prints one-line summaries containing the resulting basename or names.
-This option also uses the \fBwindex\fR database.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-F\fR\fR
-.ad
-.RS 20n
-Forces \fBman\fR to search all directories specified by \fBMANPATH\fR or the
-\fBman.cf\fR file, rather than using the \fBwindex\fR lookup database. This
-option is useful if the database is not up to date and it has been made the
-default behavior of the \fBman\fR command. The option therefore does not have
-to be invoked and is documented here for reference only.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-k\fR \fIkeyword ...\fR\fR
-.ad
-.RS 20n
-Prints out one-line summaries from the \fBwindex\fR database (table of
-contents) that contain any of the given \fIkeyword\fRs. The \fBwindex\fR
-database is created using \fBcatman\fR(1M).
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-l\fR\fR
-.ad
-.RS 20n
-Lists all manual pages found matching \fIname\fR within the search path.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-M\fR \fIpath\fR\fR
-.ad
-.RS 20n
-Specifies an alternate search path for manual pages. \fIpath\fR is a
-colon-separated list of directories that contain manual page directory
-subtrees. For example, if \fIpath\fR is \fB/usr/share/man:/usr/local/man\fR,
-\fBman\fR searches for \fIname\fR in the standard location, and then
-\fB/usr/local/man\fR. When used with the \fB-k\fR or \fB-f\fR options, the
-\fB-M\fR option must appear first. Each directory in the \fIpath\fR is assumed
-to contain subdirectories of the form \fBman\fR* or \fBsman\fR* , one for each
-section. This option overrides the \fBMANPATH\fR environment variable.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-r\fR\fR
-.ad
-.RS 20n
-Reformats the manual page, but does not display it. This replaces the \fBman\fR
-\fB-\fR \fB-t\fR \fIname\fR combination.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-s\fR \fIsection ...\fR\fR
-.ad
-.RS 20n
-Specifies sections of the manual for \fBman\fR to search. The directories
-searched for \fIname\fR are limited to those specified by \fIsection\fR.
-\fIsection\fR can be a numerical digit, perhaps followed by one or more letters
-to match the desired section of the manual, for example, "\fB3libucb\fR". Also,
-\fIsection\fR can be a word, for example, \fBlocal\fR, \fBnew\fR, \fBold\fR,
-\fBpublic\fR. \fIsection\fR can also be a letter. To specify multiple sections,
-separate each section with a comma. This option overrides the \fBMANPATH\fR
-environment variable and the \fBman.cf\fR file. See \fBSearch\fR \fBPath\fR
-below for an explanation of how \fBman\fR conducts its search.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-t\fR\fR
-.ad
-.RS 20n
-\fBman\fR arranges for the specified manual pages to be \fBtroff\fRed to a
-suitable raster output device (see \fBtroff\fR(1)). If both the \fB-\fR and
-\fB-t\fR flags are given, \fBman\fR updates the \fBtroff\fRed versions of each
-named \fIname\fR (if necessary), but does not display them.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-T\fR \fImacro-package\fR\fR
-.ad
-.RS 20n
-Formats manual pages using \fImacro-package\fR rather than the standard
-\fB-man\fR macros defined in \fB/usr/share/lib/tmac/an\fR. See \fBSearch
-Path\fR under USAGE for a complete explanation of the default search path
-order.
-.RE
-
-.SH OPERANDS
-.sp
-.LP
+This option also uses the
+.Pa whatis
+database.
+.It Fl F
+This option is present for backwards compatibility and is documented
+here for reference only.  It performs no function.
+.It Fl k Ar keyword ...
+Prints out one-line summaries from the
+.Pa whatis
+database (table of contents) that contain any of the given
+.Ar keyword .
+The
+.Pa whatis
+database is created using the
+.Fl w
+option.
+.It Fl l
+Lists all manual pages found matching
+.Ar name
+within the search path.
+.It Fl M Ar path
+Specifies an alternate search path for manual pages. The
+.Ar path
+is a colon-separated list of directories that contain manual page directory
+subtrees. For example, if
+.Ar path
+is
+.Pa /usr/share/man:/usr/local/man ,
+.Nm
+searches for
+.Ar name
+in the standard location, and then
+.Pa /usr/local/man .
+When used with the
+.Fl k ,
+.Fl f ,
+or
+.Fl w
+options, the
+.Fl M
+option must appear first. Each directory in the
+.Ar path
+is assumed to contain subdirectories of the form
+.Pa man* ,
+one for each section. This option overrides the
+.Ev MANPATH
+environment variable.
+.It Fl r
+Reformats the manual page, checking for formatting errors, but does not
+display it.
+.It Fl s Ar section
+Specifies sections of the manual for
+.Nm
+to search. The directories searched for
+.Ar name
+are limited to those specified by
+.Ar section .
+.Ar section
+can be a numerical digit, perhaps followed by one or more letters
+to match the desired section of the manual, for example,
+.Li "3libucb".
+Also,
+.Ar section
+can be a word, for example,
+.Li local ,
+.Li new ,
+.Li old ,
+.Li public .
+.Ar section
+can also be a letter. To specify multiple sections,
+separate each section with a comma. This option overrides the
+.Ev MANPATH
+environment variable and the
+.Pa man.cf
+file. See
+.Sx Search Path
+below for an explanation of how
+.Nm
+conducts its search.
+.It Fl t
+Arranges for the specified manual pages to be sent to the default
+printer as PostScript.
+.It Fl T Ar macro-package
+This option is present for backwards compatibility and is documented
+here for reference only.  It performs no function.
+.It Fl w
+Updates the
+.Nm whatis
+database.
+.El
+.Sh OPERANDS
 The following operand is supported:
-.sp
-.ne 2
-.na
-\fB\fIname\fR\fR
-.ad
-.RS 8n
+.Bl -tag -width indent
+.It Ar name
 The name of a standard utility or a keyword.
-.RE
-
-.SH USAGE
-.sp
-.LP
-The usage of \fBman\fR is described below:
-.SS "Manual Page Sections"
-.sp
-.LP
-Entries in the reference manuals are organized into \fIsection\fRs. A section
+.El
+.Sh USAGE
+The usage of
+.Nm
+is described below:
+.
+.Ss "Manual Page Sections"
+.
+Entries in the reference manuals are organized into
+.Em sections .
+A section
 name consists of a major section name, typically a single digit, optionally
 followed by a subsection name, typically one or more letters. An unadorned
-major section name, for example, "\fB9\fR", does not act as an abbreviation for
-the subsections of that name, such as "\fB9e\fR", "\fB9f\fR", or "\fB9s\fR".
-That is, each subsection must be searched separately by \fBman\fR \fB-s\fR.
+major section name, for example,
+.Qq 9 ,
+does not act as an abbreviation for
+the subsections of that name, such as
+.Qq 9e ,
+.Qq 9f ,
+or
+.Qq 9s .
+That is, each subsection must be searched separately by
+.Nm
+.Fl s .
 Each section contains descriptions apropos to a particular reference category,
-with subsections refining these distinctions. See the \fBintro\fR manual pages
-for an explanation of the classification used in this release.
-.SS "Search Path"
-.sp
-.LP
-Before searching for a given \fIname\fR, \fBman\fR constructs a list of
-candidate directories and sections. \fBman\fR searches for \fIname\fR in the
-directories specified by the \fBMANPATH\fR environment variable.
-.sp
-.LP
-In the absence of \fBMANPATH\fR, \fBman\fR constructs its search path based
-upon the \fBPATH\fR environment variable, primarily by substituting \fBman\fR
-for the last component of the \fBPATH\fR element. Special provisions are added
-to account for unique characteristics of directories such as \fB/sbin\fR,
-\fB/usr/ucb\fR, \fB/usr/xpg4/bin\fR, and others. If the file argument contains
-a \fB/\fR character, the \fIdirname\fR portion of the argument is used in place
-of \fBPATH\fR elements to construct the search path.
-.sp
-.LP
-Within the manual page directories, \fBman\fR confines its search to the
+with subsections refining these distinctions. See the
+.Em intro
+manual pages for an explanation of the classification used in this release.
+.
+.Ss "Search Path"
+.
+Before searching for a given
+.Ar name ,
+.Nm
+constructs a list of candidate directories and sections.
+It searches for
+.Ar name
+in the directories specified by the
+.Ev MANPATH
+environment variable.
+.Lp
+In the absence of
+.Ev MANPATH ,
+.Nm
+constructs its search path based upon the
+.Ev PATH
+environment variable, primarily by substituting
+.Li man
+for the last component of the
+.Ev PATH
+element. Special provisions are added
+to account for unique characteristics of directories such as
+.Pa /sbin ,
+.Pa /usr/ucb ,
+.Pa /usr/xpg4/bin ,
+and others. If the file argument contains
+a
+.Qq /
+character, the
+.Em dirname
+portion of the argument is used in place of
+.Ev PATH
+elements to construct the search path.
+.Lp
+Within the manual page directories,
+.Nm
+confines its search to the
 sections specified in the following order:
-.RS +4
-.TP
-.ie t \(bu
-.el o
-\fIsection\fRs specified on the command line with the \fB-s\fR option
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-\fIsection\fRs embedded in the \fBMANPATH\fR environment variable
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-\fIsection\fRs specified in the \fBman.cf\fR file for each directory specified
-in the \fBMANPATH\fR environment variable
-.RE
-.sp
-.LP
-If none of the above exist, \fBman\fR searches each directory in the manual
+.Bl -bullet
+.It
+.Ar sections
+specified on the command line with the
+.Fl s
+option
+.It
+.Ar sections
+embedded in the
+.Ev MANPATH
+environment variable
+.It
+.Ar sections
+specified in the
+.Pa man.cf
+file for each directory specified in the
+.Ev MANPATH
+environment variable
+.El
+If none of the above exist,
+.Nm
+searches each directory in the manual
 page path, and displays the first matching manual page found.
-.sp
-.LP
-The \fBman.cf\fR file has the following format:
-.sp
-.in +2
-.nf
-MANSECTS=\fIsection\fR[,\fIsection\fR]...
-.fi
-.in -2
-.sp
-
-.sp
-.LP
-Lines beginning with `\fB#\fR' and blank lines are considered comments, and are
-ignored. Each directory specified in \fBMANPATH\fR can contain a manual page
+.Lp
+The
+.Pa man.cf
+file has the following format:
+.Lp
+.Dl Pf MANSECTS= Ar section , Ns Op Ar section...
+.Lp
+Lines beginning with
+.Sq Li #
+and blank lines are considered comments, and are
+ignored. Each directory specified in
+.Ev MANPATH
+can contain a manual page
 configuration file, specifying the default search order for that directory.
-.SH FORMATTING MANUAL PAGES
-.sp
-.LP
-Manual pages are marked up in \fBnroff\fR(1) or \fBsgml\fR(5). Nroff manual
-pages are processed by \fBnroff\fR(1) or \fBtroff\fR(1) with the \fB-man\fR
-macro package. Please refer to \fBman\fR(5) for information on macro usage.
-\fBSGML\fR\(emtagged manual pages are processed by an \fBSGML\fR parser and
-passed to the formatter.
-.SS "Preprocessing Nroff Manual Pages"
-.sp
-.LP
-When formatting an nroff manual page, \fBman\fR examines the first line to
-determine whether it requires special processing. If the first line is a string
-of the form:
-.sp
-.in +2
-.nf
-\&'\e" \fIX\fR
-.fi
-.in -2
-.sp
-
-.sp
-.LP
-where \fIX\fR is separated from the `\fB"\fR' by a single SPACE and consists of
-any combination of characters in the following list, \fBman\fR pipes its input
-to \fBtroff\fR(1) or \fBnroff\fR(1) through the corresponding preprocessors.
-.sp
-.ne 2
-.na
-\fB\fBe\fR\fR
-.ad
-.RS 5n
-\fBeqn\fR(1), or \fBneqn\fR for \fBnroff\fR
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBr\fR\fR
-.ad
-.RS 5n
-\fBrefer\fR(1)
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBt\fR\fR
-.ad
-.RS 5n
-\fBtbl\fR(1)
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBv\fR\fR
-.ad
-.RS 5n
-\fBvgrind\fR(1)
-.RE
-
-.sp
-.LP
-If \fBeqn\fR or \fBneqn\fR is invoked, it automatically reads the file
-\fB/usr/pub/eqnchar\fR (see \fBeqnchar\fR(5)). If \fBnroff\fR(1) is invoked,
-\fBcol\fR(1) is automatically used.
-.SS "Referring to Other nroff Manual Pages"
-.sp
-.LP
-If the first line of the nroff manual page is a reference to another manual
+.Sh "Referring to Other Manual Pages"
+If the first line of the manual page is a reference to another manual
 page entry fitting the pattern:
-.sp
-.in +2
-.nf
-\&.so man*/\fIsourcefile\fR
-.fi
-.in -2
-.sp
-
-.sp
-.LP
-\fBman\fR processes the indicated file in place of the current one. The
+.Lp
+.Dl \&.so man*/\fIsourcefile\fR
+.Lp
+.Nm
+processes the indicated file in place of the current one. The
 reference must be expressed as a path name relative to the root of the manual
 page directory subtree.
-.sp
-.LP
+.Lp
 When the second or any subsequent line starts with \fB\&.so\fR, \fBman\fR
 ignores it; \fBtroff\fR(1) or \fBnroff\fR(1) processes the request in the usual
 manner.
-.SS "Processing SGML Manual Pages"
-.sp
-.LP
-Manual pages are identified as being marked up in SGML by the presence of the
-string \fB<!DOCTYPE\fR\&. If the file also contains the string
-\fBSHADOW_PAGE\fR, the file refers to another manual page for the content. The
-reference is made with a file entity reference to the manual page that contains
-the text. This is similar to the \fB\&.so\fR mechanism used in the nroff
-formatted man pages.
-.SH ENVIRONMENT VARIABLES
-.sp
-.LP
-See \fBenviron\fR(5) for descriptions of the following environment variables
-that affect the execution of \fBman\fR: \fBLANG\fR, \fBLC_ALL\fR,
-\fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
-.sp
-.ne 2
-.na
-\fB\fBMANPATH\fR\fR
-.ad
-.RS 11n
+.Sh ENVIRONMENT VARIABLES
+See
+.Xr environ 5
+for descriptions of the following environment variables
+that affect the execution of
+.Nm man :
+.Ev LANG ,
+.Ev LC_ALL ,
+.Ev LC_CTYPE ,
+.Ev LC_MESSAGES ,
+and
+.Ev NLSPATH .
+.Bl -tag -width indent
+.It Ev MANPATH
 A colon-separated list of directories; each directory can be followed by a
 comma-separated list of sections. If set, its value overrides
 \fB/usr/share/man\fR as the default directory search path, and the \fBman.cf\fR
 file as the default section search path. The \fB-M\fR and \fB-s\fR flags, in
 turn, override these values.)
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBPAGER\fR\fR
-.ad
-.RS 11n
-A program to use for interactively delivering \fBman\fR's output to the screen.
-If not set, `\fBmore\fR \fB-s\fR' is used. See \fBmore\fR(1).
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBTCAT\fR\fR
-.ad
-.RS 11n
-The name of the program to use to display \fBtroff\fRed manual pages.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBTROFF\fR\fR
-.ad
-.RS 11n
-The name of the formatter to use when the \fB-t\fR flag is given. If not set,
-\fBtroff\fR(1) is used.
-.RE
-
-.SH EXAMPLES
-.LP
-\fBExample 1 \fRCreating a PostScript Version of a man page
-.sp
-.LP
-The following example creates the \fBpipe\fR(2) man page in postscript for csh,
-tcsh, ksh and sh users:
-
-.sp
-.in +2
-.nf
-	% env TCAT=/usr/lib/lp/postscript/dpost man -t -s 2 pipe > pipe.ps
-.fi
-.in -2
-.sp
-
-.sp
-.LP
-This is an alternative to using \fBman\fR \fB-t\fR, which sends the man page to
-the default printer, if the user wants a postscript file version of the man
-page.
-
-.LP
-\fBExample 2 \fRCreating a Text Version of a man page
-.sp
-.LP
-The following example creates the \fBpipe\fR(2) man page in ascii text:
-
-.sp
-.in +2
-.nf
-man pipe.2 | col -x -b > pipe.text
-.fi
-.in -2
-.sp
-
-.sp
-.LP
-This is an alternative to using \fBman\fR \fB-t\fR, which sends the man page to
-the default printer, if the user wants a text file version of the man page.
-
-.SH EXIT STATUS
-.sp
-.LP
-The following exit values are returned:
-.sp
-.ne 2
-.na
-\fB\fB0\fR\fR
-.ad
-.RS 6n
-Successful completion.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB>0\fR\fR
-.ad
-.RS 6n
-An error occurred.
-.RE
-
-.SH FILES
-.sp
-.ne 2
-.na
-\fB\fB/usr/share/man\fR\fR
-.ad
-.sp .6
-.RS 4n
+.It Ev PAGER
+A program to use for interactively delivering
+output to the screen. If not set,
+.Sq Nm more Fl s
+is used. See
+.Xr more 1 .
+.El
+.Sh FILES
+.Bl -tag -width indent
+.It Pa /usr/share/man
 Root of the standard manual page directory subtree
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/usr/share/man/man?/*\fR\fR
-.ad
-.sp .6
-.RS 4n
-Unformatted nroff manual entries
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/usr/share/man/sman?/*\fR\fR
-.ad
-.sp .6
-.RS 4n
-Unformatted \fBSGML\fR manual entries
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/usr/share/man/cat?/*\fR\fR
-.ad
-.sp .6
-.RS 4n
-\fBnroff\fRed manual entries
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/usr/share/man/fmt?/*\fR\fR
-.ad
-.sp .6
-.RS 4n
-\fBtroff\fRed manual entries
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/usr/share/man/windex\fR\fR
-.ad
-.sp .6
-.RS 4n
+.It Pa /usr/share/man/man?/*
+Unformatted manual entries
+.It Pa /usr/share/man/whatis
 Table of contents and keyword database
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/usr/share/lib/tmac/an\fR\fR
-.ad
-.sp .6
-.RS 4n
-Standard \fB-man\fR macro package
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/usr/share/lib/sgml/locale/C/dtd/*\fR\fR
-.ad
-.sp .6
-.RS 4n
-\fBSGML\fR document type definition files
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/usr/share/lib/sgml/locale/C/solbook/*\fR\fR
-.ad
-.sp .6
-.RS 4n
-\fBSGML\fR style sheet and entity definitions directories
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/usr/share/lib/pub/eqnchar\fR\fR
-.ad
-.sp .6
-.RS 4n
-Standard definitions for \fBeqn\fR and \fBneqn\fR
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBman.cf\fR\fR
-.ad
-.sp .6
-.RS 4n
+.It Pa man.cf
 Default search order by section
-.RE
-
-.SH ATTRIBUTES
-.sp
-.LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-CSI	Enabled, see \fBNOTES\fR.
-_
-Interface Stability	Committed
-_
-Standard	See \fBstandards\fR(5).
-.TE
-
-.SH SEE ALSO
-.sp
-.LP
-\fBapropos\fR(1), \fBcat\fR(1), \fBcol\fR(1), \fBdpost\fR(1), \fBeqn\fR(1),
-\fBmore\fR(1), \fBnroff\fR(1), \fBrefer\fR(1), \fBtbl\fR(1), \fBtroff\fR(1),
-\fBvgrind\fR(1), \fBwhatis\fR(1), \fBcatman\fR(1M), \fBattributes\fR(5),
-\fBenviron\fR(5), \fBeqnchar\fR(5), \fBman\fR(5), \fBsgml\fR(5),
-\fBstandards\fR(5)
-.SH NOTES
-.sp
-.LP
-The \fB-f\fR and \fB-k\fR options use the \fBwindex\fR database, which is
-created by \fBcatman\fR(1M).
-.sp
-.LP
-The \fBman\fR command is CSI-capable. However, some utilities invoked by the
-\fBman\fR command, namely, \fBtroff\fR, \fBeqn\fR, \fBneqn\fR, \fBrefer\fR,
-\fBtbl\fR, and \fBvgrind\fR, are not verified to be CSI-capable. Because of
-this, the man command with the \fB-t\fR option can not handle non-EUC data.
-Also, using the \fBman\fR command to display man pages that require special
-processing through \fBeqn\fR, \fBneqn\fR, \fBrefer\fR, \fBtbl\fR, or
-\fBvgrind\fR can not be CSI-capable.
-.SH BUGS
-.sp
-.LP
+.El
+.Sh EXIT STATUS
+.Ex -std man
+.Sh EXAMPLES
+.
+.Ss Example 1: Creating a PostScript Version of a man page
+.
+The following example spools the
+.Xr pipe 2
+man page in PostScript to the default printer:
+.Pp
+.Dl % man -t -s 2 pipe
+.Pp
+Note that
+.Xr mandoc 1
+can be used to obtain the PostScript content directly.
+.Ss Example 2: Creating a Text Version of a man page
+The following example creates the
+.Xr pipe 2
+man page in ASCII text:
+.Pp
+.Dl % man pipe.2 | col -x -b > pipe.text
+.Sh CODE SET INDEPENDENCE
+Enabled.
+.Sh INTERFACE STABILITY
+.Nm Committed .
+.Sh SEE ALSO
+.Xr apropos 1 ,
+.Xr cat 1 ,
+.Xr col 1 ,
+.Xr mandoc 1 ,
+.Xr more 1 ,
+.Xr whatis 1 ,
+.Xr environ 5 ,
+.Xr man 5 ,
+.Xr mdoc 5
+.Sh NOTES
+The
+.Fl f
+and
+.Fl k
+options use the
+.Nm whatis
+database, which is
+created with the
+.Fl w
+option.
+.Sh BUGS
 The manual is supposed to be reproducible either on a phototypesetter or on an
-\fBASCII\fR terminal. However, on a terminal some information (indicated by
+ASCII terminal. However, on a terminal some information (indicated by
 font changes, for instance) is lost.
-.sp
-.LP
-Some dumb terminals cannot process the vertical motions produced by the \fBe\fR
-(see \fBeqn\fR(1)) preprocessing flag. To prevent garbled output on these
-terminals, when you use \fBe\fR, also use \fBt\fR, to invoke \fBcol\fR(1)
-implicitly. This workaround has the disadvantage of eliminating superscripts
-and subscripts, even on those terminals that can display them. Control-q clears
-a terminal that gets confused by \fBeqn\fR(1) output.

@@ -806,7 +806,6 @@ system_misc_kstat_update(kstat_t *ksp, int rw)
 {
 	int myncpus = ncpus;
 	int *loadavgp = &avenrun[0];
-	int loadavg[LOADAVG_NSTATS];
 	time_t zone_boot_time;
 	clock_t zone_lbolt;
 	hrtime_t zone_hrtime;
@@ -823,17 +822,11 @@ system_misc_kstat_update(kstat_t *ksp, int rw)
 		 */
 		mutex_enter(&cpu_lock);
 		if (pool_pset_enabled()) {
-			psetid_t mypsid = zone_pset_get(curproc->p_zone);
-			int error;
-
 			myncpus = zone_ncpus_get(curproc->p_zone);
 			ASSERT(myncpus > 0);
-			error = cpupart_get_loadavg(mypsid, &loadavg[0],
-			    LOADAVG_NSTATS);
-			ASSERT(error == 0);
-			loadavgp = &loadavg[0];
 		}
 		mutex_exit(&cpu_lock);
+		loadavgp = &curproc->p_zone->zone_avenrun[0];
 	}
 
 	if (INGLOBALZONE(curproc)) {

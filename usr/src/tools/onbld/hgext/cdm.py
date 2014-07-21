@@ -16,6 +16,7 @@
 #
 # Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2008, 2011 Richard Lowe
+# Copyright 2014 Garrett D'Amore <garrett@damore.org>
 #
 
 '''OpenSolaris extensions to Mercurial
@@ -104,7 +105,7 @@ from mercurial import cmdutil, ignore, node, patch
 from onbld.Scm.WorkSpace import WorkSpace, WorkList
 from onbld.Scm.Backup import CdmBackup
 from onbld.Checks import Cddl, Comments, Copyright, CStyle, HdrChk
-from onbld.Checks import JStyle, Keywords, Mapfile
+from onbld.Checks import JStyle, Keywords, ManLint, Mapfile
 
 
 def yes_no(ui, msg, default):
@@ -386,6 +387,40 @@ def cdm_cddlchk(ui, repo, *args, **opts):
 
         fh = open(f, 'r')
         ret |= Cddl.cddlchk(fh, lenient=lenient, output=ui)
+        fh.close()
+    return ret
+
+
+def cdm_manlintchk(ui, repo, *args, **opts):
+    '''check for mandoc lint
+
+    Check for man page formatting errors.
+
+    Files can be excluded from this check using the manlint.NOT
+    file.  See NOT Files in the extension documentation ('hg help
+    cdm').
+    '''
+
+    filelist = buildfilelist(wslist[repo], opts.get('parent'), args)
+    exclude = not_check(repo, 'manlint')
+    ret = 0
+
+    # Man pages are identified as having a suffix starting with a digit.
+    ManfileRE = re.compile(r'.*\.[0-9][a-z]*$', re.IGNORECASE)
+
+    ui.write('Man format check:\n')
+
+    for f, e in filelist:
+        if e and e.is_removed():
+            continue
+        elif (not ManfileRE.match(f)):
+            continue
+        elif (e or opts.get('honour_nots')) and exclude(f):
+            ui.status('Skipping %s...\n' % f)
+            continue
+
+        fh = open(f, 'r')
+        ret |= ManLint.manlint(fh, output=ui, picky=True)
         fh.close()
     return ret
 
@@ -794,6 +829,7 @@ def cdm_nits(ui, repo, *args, **opts):
       - cstyle     (C source style)
       - hdrchk     (C header style)
       - jstyle     (java source style)
+      - manlint    (man page formatting)
       - mapfilechk (link-editor mapfiles)
       - permchk    (file permissions)
       - keywords   (SCCS keywords)
@@ -806,6 +842,7 @@ def cdm_nits(ui, repo, *args, **opts):
         cdm_cstyle,
         cdm_hdrchk,
         cdm_jstyle,
+        cmd_manlintchk,
         cdm_mapfilechk,
         cdm_permchk,
         cdm_keywords]
@@ -828,6 +865,7 @@ def cdm_pbchk(ui, repo, **opts):
       - hdrchk     (C header style)
       - jstyle     (java source style)
       - keywords   (SCCS keywords)
+      - manlint    (man page formatting)
       - mapfilechk (link-editor mapfiles)
       - permchk    (file permissions)
       - tagchk     (addition/modification of tags)
@@ -848,6 +886,7 @@ def cdm_pbchk(ui, repo, **opts):
         cdm_cstyle,
         cdm_hdrchk,
         cdm_jstyle,
+        cdm_manlintchk,
         cdm_mapfilechk,
         cdm_permchk,
         cdm_keywords,
@@ -1431,6 +1470,8 @@ cmdtable = {
                                 ('m', 'modified', None, 'show modified files'),
                                 ('r', 'removed', None, 'show removed files')],
                     'hg list [-amrRu] [-p PARENT]'),
+    'manlint': (cdm_manlintchk, [('p', 'parent', '', 'parent workspace')],
+                'hg manlint [-p PARENT]'),
     'mapfilechk': (cdm_mapfilechk, [('p', 'parent', '', 'parent workspace')],
                 'hg mapfilechk [-p PARENT]'),
     '^nits': (cdm_nits, [('p', 'parent', '', 'parent workspace')],
