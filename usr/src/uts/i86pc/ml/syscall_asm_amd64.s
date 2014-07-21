@@ -827,16 +827,12 @@ _syscall32_save:
 	 */
 
 	movq	%rax, %rbx
-	movl	0x0(%rsp), %edi		/* arg0 */
-	movl	0x8(%rsp), %esi		/* arg1 */
-	movl	0x10(%rsp), %edx	/* arg2 */
-	movl	0x30(%rsp), %eax	/* arg6 load */
-	movl	0x18(%rsp), %ecx	/* arg3 */
-	movl	%eax, 0x0(%rsp)		/* arg6 saved to stack */
-	movl	0x20(%rsp), %r8d	/* arg4 */
-	movl	0x38(%rsp), %eax	/* arg7 load */
-	movl	0x28(%rsp), %r9d	/* arg5 */
-	movl	%eax, 0x8(%rsp)		/* arg7 saved to stack */
+	movl	0(%rsp), %edi
+	movl	8(%rsp), %esi
+	movl	0x10(%rsp), %edx
+	movl	0x18(%rsp), %ecx
+	movl	0x20(%rsp), %r8d
+	movl	0x28(%rsp), %r9d
 
 	call	*SY_CALLC(%rbx)
 
@@ -1086,16 +1082,12 @@ sys_sysenter()
 	 * %rax contains the handler address.
 	 */
 	movq	%rax, %rbx
-	movl	0x0(%rsp), %edi		/* arg0 */
-	movl	0x8(%rsp), %esi		/* arg1 */
-	movl	0x10(%rsp), %edx	/* arg2 */
-	movl	0x30(%rsp), %eax	/* arg6 load */
-	movl	0x18(%rsp), %ecx	/* arg3 */
-	movl	%eax, 0x0(%rsp)		/* arg6 saved to stack */
-	movl	0x20(%rsp), %r8d	/* arg4 */
-	movl	0x38(%rsp), %eax	/* arg7 load */
-	movl	0x28(%rsp), %r9d	/* arg5 */
-	movl	%eax, 0x8(%rsp)		/* arg7 saved to stack */
+	movl	0(%rsp), %edi
+	movl	8(%rsp), %esi
+	movl	0x10(%rsp), %edx
+	movl	0x18(%rsp), %ecx
+	movl	0x20(%rsp), %r8d
+	movl	0x28(%rsp), %r9d
 
 	call	*SY_CALLC(%rbx)
 
