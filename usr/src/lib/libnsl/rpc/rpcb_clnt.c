@@ -21,6 +21,7 @@
  */
 
 /*
+ * Copyright 2014 Gary Mills
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -33,8 +34,6 @@
  * California.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * interface to rpcbind rpc service.
  */
@@ -46,14 +45,12 @@
 #include <rpc/rpcb_prot.h>
 #include <netconfig.h>
 #include <netdir.h>
+#include <netdb.h>
 #include <rpc/nettype.h>
 #include <syslog.h>
 #ifdef PORTMAP
 #include <netinet/in.h>		/* FOR IPPROTO_TCP/UDP definitions */
 #include <rpc/pmap_prot.h>
-#endif
-#ifdef ND_DEBUG
-#include <stdio.h>
 #endif
 #include <sys/utsname.h>
 #include <errno.h>
@@ -169,11 +166,7 @@ check_cache(char *host, char *netid)
 	for (cptr = front; cptr != NULL; cptr = cptr->ac_next) {
 		if ((strcmp(cptr->ac_host, host) == 0) &&
 		    (strcmp(cptr->ac_netid, netid) == 0) &&
-			(time(NULL) <= cptr->ac_maxtime)) {
-#ifdef ND_DEBUG
-			fprintf(stderr, "Found cache entry for %s: %s\n",
-				host, netid);
-#endif
+		    (time(NULL) <= cptr->ac_maxtime)) {
 			return (cptr);
 		}
 	}
@@ -222,7 +215,7 @@ add_cache(char *host, char *netid, struct netbuf *taddr, char *uaddr)
 	ad_cache->ac_uaddr = uaddr ? strdup(uaddr) : NULL;
 	ad_cache->ac_taddr = malloc(sizeof (struct netbuf));
 	if (!ad_cache->ac_host || !ad_cache->ac_netid || !ad_cache->ac_taddr ||
-		(uaddr && !ad_cache->ac_uaddr)) {
+	    (uaddr && !ad_cache->ac_uaddr)) {
 		goto memerr1;
 	}
 
@@ -233,9 +226,6 @@ add_cache(char *host, char *netid, struct netbuf *taddr, char *uaddr)
 	}
 
 	(void) memcpy(ad_cache->ac_taddr->buf, taddr->buf, taddr->len);
-#ifdef ND_DEBUG
-	(void) fprintf(stderr, "Added to cache: %s : %s\n", host, netid);
-#endif
 
 /* VARIABLES PROTECTED BY rpcbaddr_cache_lock:  cptr */
 
@@ -253,10 +243,6 @@ add_cache(char *host, char *netid, struct netbuf *taddr, char *uaddr)
 			cptr = cptr->ac_next;
 		}
 
-#ifdef ND_DEBUG
-		fprintf(stderr, "Deleted from cache: %s : %s\n",
-			cptr->ac_host, cptr->ac_netid);
-#endif
 		free(cptr->ac_host);
 		free(cptr->ac_netid);
 		free(cptr->ac_taddr->buf);
@@ -329,7 +315,7 @@ _getclnthandle_timed(char *host, struct netconfig *nconf, char **targaddr,
 	if (ad_cache != NULL) {
 		addr = ad_cache->ac_taddr;
 		client = _clnt_tli_create_timed(RPC_ANYFD, nconf, addr,
-				RPCBPROG, RPCBVERS4, 0, 0, tp);
+		    RPCBPROG, RPCBVERS4, 0, 0, tp);
 		if (client != NULL) {
 			if (targaddr) {
 				/*
@@ -344,9 +330,9 @@ _getclnthandle_timed(char *host, struct netconfig *nconf, char **targaddr,
 						"_getclnthandle_timed: strdup "
 						"failed.");
 						rpc_createerr.cf_stat =
-							RPC_SYSTEMERROR;
+						    RPC_SYSTEMERROR;
 						(void) rw_unlock(
-							&rpcbaddr_cache_lock);
+						    &rpcbaddr_cache_lock);
 						return (NULL);
 					}
 				} else {
@@ -381,11 +367,6 @@ _getclnthandle_timed(char *host, struct netconfig *nconf, char **targaddr,
 	}
 	rpcbind_hs.h_host = host;
 	rpcbind_hs.h_serv = "rpcbind";
-#ifdef ND_DEBUG
-	fprintf(stderr, "rpcbind client routines: diagnostics :\n");
-	fprintf(stderr, "\tGetting address for (%s, %s, %s) ... \n",
-		rpcbind_hs.h_host, rpcbind_hs.h_serv, nconf->nc_netid);
-#endif
 
 	if ((neterr = netdir_getbyname(nconf, &rpcbind_hs, &nas)) != 0) {
 		if (neterr == ND_NOHOST)
@@ -398,33 +379,11 @@ _getclnthandle_timed(char *host, struct netconfig *nconf, char **targaddr,
 
 	for (j = 0; j < nas->n_cnt; j++) {
 		addr = &(nas->n_addrs[j]);
-#ifdef ND_DEBUG
-{
-	int i;
-	char *ua;
-
-	ua = taddr2uaddr(nconf, &(nas->n_addrs[j]));
-	fprintf(stderr, "Got it [%s]\n", ua);
-	free(ua);
-
-	fprintf(stderr, "\tnetbuf len = %d, maxlen = %d\n",
-		addr->len, addr->maxlen);
-	fprintf(stderr, "\tAddress is ");
-	for (i = 0; i < addr->len; i++)
-		fprintf(stderr, "%u.", addr->buf[i]);
-	fprintf(stderr, "\n");
-}
-#endif
 	client = _clnt_tli_create_timed(RPC_ANYFD, nconf, addr, RPCBPROG,
-				RPCBVERS4, 0, 0, tp);
+	    RPCBVERS4, 0, 0, tp);
 	if (client)
 		break;
 	}
-#ifdef ND_DEBUG
-	if (!client) {
-		clnt_pcreateerror("rpcbind clnt interface");
-	}
-#endif
 
 	if (client) {
 		tmpaddr = targaddr ? taddr2uaddr(nconf, addr) : NULL;
@@ -439,34 +398,27 @@ _getclnthandle_timed(char *host, struct netconfig *nconf, char **targaddr,
 
 /*
  * This routine will return a client handle that is connected to the local
- * rpcbind. Returns NULL on error and free's everything.
+ * rpcbind. Returns NULL on error.
  */
 static CLIENT *
 local_rpcb(void)
 {
 	static struct netconfig *loopnconf;
-	static char *hostname;
+	static char hostname[MAXHOSTNAMELEN + 1];
 	extern mutex_t loopnconf_lock;
 
 /* VARIABLES PROTECTED BY loopnconf_lock: loopnconf */
 	(void) mutex_lock(&loopnconf_lock);
 	if (loopnconf == NULL) {
-		struct utsname utsname;
 		struct netconfig *nconf, *tmpnconf = NULL;
 		void *nc_handle;
 
-		if (hostname == NULL) {
-#if defined(__i386) && !defined(__amd64)
-			if ((_nuname(&utsname) == -1) ||
-#else
-			if ((uname(&utsname) == -1) ||
-#endif
-			    ((hostname = strdup(utsname.nodename)) == NULL)) {
-				syslog(LOG_ERR, "local_rpcb : strdup failed.");
-				rpc_createerr.cf_stat = RPC_UNKNOWNHOST;
-				(void) mutex_unlock(&loopnconf_lock);
-				return (NULL);
-			}
+		if ((hostname[0] == '\0') && (gethostname(hostname,
+		    sizeof (hostname)) < 0)) {
+			syslog(LOG_ERR, "local_rpcb: gethostname failed.");
+			rpc_createerr.cf_stat = RPC_UNKNOWNHOST;
+			(void) mutex_unlock(&loopnconf_lock);
+			return (NULL);
 		}
 		nc_handle = setnetconfig();
 		if (nc_handle == NULL) {
@@ -522,7 +474,7 @@ rpcb_set(const rpcprog_t program, const rpcvers_t version,
 		return (FALSE);
 
 	parms.r_addr = taddr2uaddr((struct netconfig *)nconf,
-			(struct netbuf *)address); /* convert to universal */
+	    (struct netbuf *)address); /* convert to universal */
 	if (!parms.r_addr) {
 		rpc_createerr.cf_stat = RPC_N2AXLATEFAILURE;
 		return (FALSE); /* no universal address */
@@ -539,7 +491,7 @@ rpcb_set(const rpcprog_t program, const rpcvers_t version,
 	parms.r_owner = uidbuf;
 
 	CLNT_CALL(client, RPCBPROC_SET, (xdrproc_t)xdr_rpcb, (char *)&parms,
-			(xdrproc_t)xdr_bool, (char *)&rslt, tottimeout);
+	    (xdrproc_t)xdr_bool, (char *)&rslt, tottimeout);
 
 	CLNT_DESTROY(client);
 	free(parms.r_addr);
@@ -576,7 +528,7 @@ rpcb_unset(const rpcprog_t program, const rpcvers_t version,
 	parms.r_owner = uidbuf;
 
 	CLNT_CALL(client, RPCBPROC_UNSET, (xdrproc_t)xdr_rpcb, (char *)&parms,
-			(xdrproc_t)xdr_bool, (char *)&rslt, tottimeout);
+	    (xdrproc_t)xdr_bool, (char *)&rslt, tottimeout);
 
 	CLNT_DESTROY(client);
 	return (rslt);
@@ -599,13 +551,6 @@ got_entry(rpcb_entry_list_ptr relp, struct netconfig *nconf)
 		    (nconf->nc_semantics == rmap->r_nc_semantics) &&
 		    (rmap->r_maddr != NULL) && (rmap->r_maddr[0] != NULL)) {
 			na = uaddr2taddr(nconf, rmap->r_maddr);
-#ifdef ND_DEBUG
-			fprintf(stderr, "\tRemote address is [%s].\n",
-				rmap->r_maddr);
-			if (!na)
-				fprintf(stderr,
-				    "\tCouldn't resolve remote address!\n");
-#endif
 			break;
 		}
 	}
@@ -619,7 +564,7 @@ got_entry(rpcb_entry_list_ptr relp, struct netconfig *nconf)
 bool_t
 __rpcbind_is_up(void)
 {
-	struct utsname name;
+	char hostname[MAXHOSTNAMELEN + 1];
 	char uaddr[SYS_NMLN];
 	struct netbuf *addr;
 	int fd;
@@ -627,11 +572,7 @@ __rpcbind_is_up(void)
 	struct netconfig *netconf;
 	bool_t res;
 
-#if defined(__i386) && !defined(__amd64)
-	if (_nuname(&name) == -1)
-#else
-	if (uname(&name) == -1)
-#endif
+	if (gethostname(hostname, sizeof (hostname)) < 0)
 		return (TRUE);
 
 	if ((fd = t_open("/dev/ticotsord", O_RDWR, NULL)) == -1)
@@ -649,7 +590,7 @@ __rpcbind_is_up(void)
 	}
 
 	uaddr[0] = '\0';
-	(void) strcpy(uaddr, name.nodename);
+	(void) strlcpy(uaddr, hostname, sizeof (uaddr) - 5);
 	(void) strcat(uaddr, ".rpc");
 	if ((netconf = getnetconfigent("ticotsord")) == NULL) {
 		(void) t_free((char *)sndcall, T_CALL);
@@ -686,17 +627,16 @@ __rpcbind_is_up(void)
 
 
 /*
- * An internal function which optimizes rpcb_getaddr function.  It also
+ * An internal function which optimizes rpcb_getaddr function.  It returns
+ * the universal address of the remote service or NULL.  It also optionally
  * returns the client handle that it uses to contact the remote rpcbind.
+ * The caller will re-purpose the client handle to contact the remote service.
  *
- * The algorithm used: If the transports is TCP or UDP, it first tries
- * version 2 (portmap), 4 and then 3 (svr4).  This order should be
- * changed in the next OS release to 4, 2 and 3.  We are assuming that by
- * that time, version 4 would be available on many machines on the network.
+ * The algorithm used: First try version 4.  Then try version 3 (svr4).
+ * Finally, if the transport is TCP or UDP, try version 2 (portmap).
+ * Version 4 is now available with all current systems on the network.
  * With this algorithm, we get performance as well as a plan for
  * obsoleting version 2.
- *
- * For all other transports, the algorithm remains as 4 and then 3.
  *
  * XXX: Due to some problems with t_connect(), we do not reuse the same client
  * handle for COTS cases and hence in these cases we do not return the
@@ -714,11 +654,17 @@ __rpcb_findaddr_timed(rpcprog_t program, rpcvers_t version,
 	char *ua = NULL;
 	uint_t vers;
 	struct netbuf *address = NULL;
-	uint_t start_vers = RPCBVERS4;
+	void *handle;
+	rpcb_entry_list_ptr relp = NULL;
+	bool_t tmp_client = FALSE;
 
 	/* parameter checking */
 	if (nconf == NULL) {
 		rpc_createerr.cf_stat = RPC_UNKNOWNPROTO;
+		/*
+		 * Setting rpc_createerr.cf_stat is sufficient.
+		 * No details in rpc_createerr.cf_error needed.
+		 */
 		return (NULL);
 	}
 
@@ -730,112 +676,6 @@ __rpcb_findaddr_timed(rpcprog_t program, rpcvers_t version,
 	if (tp == NULL)
 		tp = &tottimeout;
 
-#ifdef PORTMAP
-	/* Try version 2 for TCP or UDP */
-	if (strcmp(nconf->nc_protofmly, NC_INET) == 0) {
-		ushort_t port = 0;
-		struct netbuf remote;
-		uint_t pmapvers = 2;
-		struct pmap pmapparms;
-
-		/*
-		 * Try UDP only - there are some portmappers out
-		 * there that use UDP only.
-		 */
-		if (strcmp(nconf->nc_proto, NC_TCP) == 0) {
-			struct netconfig *newnconf;
-			void *handle;
-
-			if ((handle = __rpc_setconf("udp")) == NULL) {
-				rpc_createerr.cf_stat = RPC_UNKNOWNPROTO;
-				return (NULL);
-			}
-
-			/*
-			 * The following to reinforce that you can
-			 * only request for remote address through
-			 * the same transport you are requesting.
-			 * ie. requesting unversial address
-			 * of IPv4 has to be carried through IPv4.
-			 * Can't use IPv6 to send out the request.
-			 * The mergeaddr in rpcbind can't handle
-			 * this.
-			 */
-			for (;;) {
-				if ((newnconf = __rpc_getconf(handle))
-								    == NULL) {
-					__rpc_endconf(handle);
-					rpc_createerr.cf_stat =
-					    RPC_UNKNOWNPROTO;
-					return (NULL);
-				}
-				/*
-				 * here check the protocol family to
-				 * be consistent with the request one
-				 */
-				if (strcmp(newnconf->nc_protofmly,
-				    nconf->nc_protofmly) == NULL)
-					break;
-			}
-
-			client = _getclnthandle_timed(host, newnconf,
-					&parms.r_addr, tp);
-			__rpc_endconf(handle);
-		} else {
-			client = _getclnthandle_timed(host, nconf,
-					&parms.r_addr, tp);
-		}
-		if (client == NULL)
-			return (NULL);
-
-		/*
-		 * Set version and retry timeout.
-		 */
-		CLNT_CONTROL(client, CLSET_RETRY_TIMEOUT, (char *)&rpcbrmttime);
-		CLNT_CONTROL(client, CLSET_VERS, (char *)&pmapvers);
-
-		pmapparms.pm_prog = program;
-		pmapparms.pm_vers = version;
-		pmapparms.pm_prot = strcmp(nconf->nc_proto, NC_TCP) ?
-				    IPPROTO_UDP : IPPROTO_TCP;
-		pmapparms.pm_port = 0;	/* not needed */
-		clnt_st = CLNT_CALL(client, PMAPPROC_GETPORT,
-				    (xdrproc_t)xdr_pmap, (caddr_t)&pmapparms,
-				    (xdrproc_t)xdr_u_short, (caddr_t)&port,
-				    *tp);
-		if (clnt_st != RPC_SUCCESS) {
-			if ((clnt_st == RPC_PROGVERSMISMATCH) ||
-			    (clnt_st == RPC_PROGUNAVAIL))
-				goto try_rpcbind; /* Try different versions */
-			rpc_createerr.cf_stat = RPC_PMAPFAILURE;
-			clnt_geterr(client, &rpc_createerr.cf_error);
-			goto error;
-		} else if (port == 0) {
-			address = NULL;
-			rpc_createerr.cf_stat = RPC_PROGNOTREGISTERED;
-			goto error;
-		}
-		port = htons(port);
-		CLNT_CONTROL(client, CLGET_SVC_ADDR, (char *)&remote);
-		if (((address = malloc(sizeof (struct netbuf))) == NULL) ||
-		    ((address->buf = malloc(remote.len)) == NULL)) {
-			rpc_createerr.cf_stat = RPC_SYSTEMERROR;
-			clnt_geterr(client, &rpc_createerr.cf_error);
-			if (address) {
-				free(address);
-				address = NULL;
-			}
-			goto error;
-		}
-		(void) memcpy(address->buf, remote.buf, remote.len);
-		(void) memcpy(&address->buf[sizeof (short)], &port,
-								sizeof (short));
-		address->len = address->maxlen = remote.len;
-		goto done;
-	}
-#endif
-
-try_rpcbind:
 	/*
 	 * Check if rpcbind is up.  This prevents needless delays when
 	 * accessing applications such as the keyserver while booting
@@ -852,9 +692,7 @@ try_rpcbind:
 	}
 
 	/*
-	 * Now we try version 4 and then 3.
-	 * We also send the remote system the address we used to
-	 * contact it in case it can help to connect back with us
+	 * First try version 4.
 	 */
 	parms.r_prog = program;
 	parms.r_vers = version;
@@ -868,33 +706,36 @@ try_rpcbind:
 	 */
 	if (nconf->nc_semantics == NC_TPI_COTS_ORD ||
 	    nconf->nc_semantics == NC_TPI_COTS) {
-		void *handle;
-		struct netconfig *nconf_clts;
-		rpcb_entry_list_ptr relp = NULL;
+		tmp_client = TRUE;
+		if ((handle = __rpc_setconf("datagram_v")) != NULL) {
+			struct netconfig *nconf_clts;
 
-		if (client == NULL) {
-			/* This did not go through the above PORTMAP/TCP code */
-			if ((handle = __rpc_setconf("datagram_v")) != NULL) {
-				while ((nconf_clts = __rpc_getconf(handle))
-				    != NULL) {
-					if (strcmp(nconf_clts->nc_protofmly,
-					    nconf->nc_protofmly) != 0) {
-						continue;
-					}
-					client = _getclnthandle_timed(host,
-						nconf_clts, &parms.r_addr,
-						tp);
-					break;
+			while ((nconf_clts = __rpc_getconf(handle)) != NULL) {
+				if (strcmp(nconf_clts->nc_protofmly,
+				    nconf->nc_protofmly) != 0) {
+					continue;
 				}
-				__rpc_endconf(handle);
+				/*
+				 * Sets rpc_createerr.cf_error members
+				 * on failure
+				 */
+				client = _getclnthandle_timed(host, nconf_clts,
+				    &parms.r_addr, tp);
+				break;
 			}
-			if (client == NULL)
-				goto regular_rpcbind;	/* Go the regular way */
-		} else {
-			/* This is a UDP PORTMAP handle.  Change to version 4 */
-			vers = RPCBVERS4;
-			CLNT_CONTROL(client, CLSET_VERS, (char *)&vers);
+			__rpc_endconf(handle);
 		}
+	} else {
+		/* Sets rpc_createerr.cf_error members on failure */
+		client = _getclnthandle_timed(host, nconf, &parms.r_addr, tp);
+	}
+
+	if (client != NULL) {
+
+		/* Set rpcbind version 4 */
+		vers = RPCBVERS4;
+		CLNT_CONTROL(client, CLSET_VERS, (char *)&vers);
+
 		/*
 		 * We also send the remote system the address we used to
 		 * contact it in case it can help it connect back with us
@@ -903,148 +744,332 @@ try_rpcbind:
 			parms.r_addr = strdup(""); /* for XDRing */
 			if (parms.r_addr == NULL) {
 				syslog(LOG_ERR, "__rpcb_findaddr_timed: "
-					"strdup failed.");
+				    "strdup failed.");
+				/* Construct a system error */
+				rpc_createerr.cf_error.re_errno = errno;
+				rpc_createerr.cf_error.re_terrno = 0;
 				rpc_createerr.cf_stat = RPC_SYSTEMERROR;
-				address = NULL;
 				goto error;
 			}
 		}
 
-		CLNT_CONTROL(client, CLSET_RETRY_TIMEOUT, (char *)&rpcbrmttime);
+		CLNT_CONTROL(client, CLSET_RETRY_TIMEOUT,
+		    (char *)&rpcbrmttime);
 
+		/* Sets error structure members in client handle */
 		clnt_st = CLNT_CALL(client, RPCBPROC_GETADDRLIST,
-				    (xdrproc_t)xdr_rpcb, (char *)&parms,
-				    (xdrproc_t)xdr_rpcb_entry_list_ptr,
-				    (char *)&relp, *tp);
-		if (clnt_st == RPC_SUCCESS) {
-			if (address = got_entry(relp, nconf)) {
-				xdr_free((xdrproc_t)xdr_rpcb_entry_list_ptr,
-					(char *)&relp);
+		    (xdrproc_t)xdr_rpcb, (char *)&parms,
+		    (xdrproc_t)xdr_rpcb_entry_list_ptr, (char *)&relp, *tp);
+
+		switch (clnt_st) {
+		case RPC_SUCCESS: /* Call succeeded */
+			address = got_entry(relp, nconf);
+			xdr_free((xdrproc_t)xdr_rpcb_entry_list_ptr,
+			    (char *)&relp);
+			if (address != NULL) {
+				/* Program number and version number matched */
 				goto done;
 			}
-			/* Entry not found for this transport */
-			xdr_free((xdrproc_t)xdr_rpcb_entry_list_ptr,
-				    (char *)&relp);
+			/* Program and version not found for this transport */
 			/*
-			 * XXX: should have perhaps returned with error but
+			 * XXX: should have returned with RPC_PROGUNAVAIL
+			 * or perhaps RPC_PROGNOTREGISTERED error but
 			 * since the remote machine might not always be able
 			 * to send the address on all transports, we try the
-			 * regular way with regular_rpcbind
+			 * regular way with version 3, then 2
 			 */
-			goto regular_rpcbind;
-		} else if ((clnt_st == RPC_PROGVERSMISMATCH) ||
-			    (clnt_st == RPC_PROGUNAVAIL)) {
-			start_vers = RPCBVERS;	/* Try version 3 now */
-			goto regular_rpcbind; /* Try different versions */
-		} else {
-			rpc_createerr.cf_stat = RPC_PMAPFAILURE;
+			/* Try the next version */
+			break;
+		case RPC_PROGVERSMISMATCH: /* RPC protocol mismatch */
 			clnt_geterr(client, &rpc_createerr.cf_error);
+			if (rpc_createerr.cf_error.re_vers.low > vers) {
+				rpc_createerr.cf_stat = clnt_st;
+				goto error;  /* a new version, can't handle */
+			}
+			/* Try the next version */
+			break;
+		case RPC_PROCUNAVAIL: /* Procedure unavailable */
+		case RPC_PROGUNAVAIL: /* Program not available */
+		case RPC_TIMEDOUT: /* Call timed out */
+			/* Try the next version */
+			break;
+		default:
+			clnt_geterr(client, &rpc_createerr.cf_error);
+			rpc_createerr.cf_stat = RPC_PMAPFAILURE;
 			goto error;
+			break;
 		}
-	}
 
-regular_rpcbind:
+	} else {
 
-	/* Now the same transport is to be used to get the address */
-	if (client && ((nconf->nc_semantics == NC_TPI_COTS_ORD) ||
-	    (nconf->nc_semantics == NC_TPI_COTS))) {
-		/* A CLTS type of client - destroy it */
+		/* No client */
+		tmp_client = FALSE;
+
+	} /* End of version 4 */
+
+	/* Destroy a temporary client */
+	if (client != NULL && tmp_client) {
 		CLNT_DESTROY(client);
 		client = NULL;
 		free(parms.r_addr);
 		parms.r_addr = NULL;
 	}
+	tmp_client = FALSE;
 
+	/*
+	 * Try version 3
+	 */
+
+	/* Now the same transport is to be used to get the address */
 	if (client == NULL) {
+		/* Sets rpc_createerr.cf_error members on failure */
 		client = _getclnthandle_timed(host, nconf, &parms.r_addr, tp);
-		if (client == NULL) {
-			address = NULL;
-			goto error;
-		}
 	}
-	if (parms.r_addr == NULL) {
-		parms.r_addr = strdup("");	/* for XDRing */
+	address = NULL;
+	if (client != NULL) {
 		if (parms.r_addr == NULL) {
-			syslog(LOG_ERR, "__rpcb_findaddr_timed: "
-				"strdup failed.");
-			address = NULL;
-			rpc_createerr.cf_stat = RPC_SYSTEMERROR;
-			goto error;
+			parms.r_addr = strdup("");	/* for XDRing */
+			if (parms.r_addr == NULL) {
+				syslog(LOG_ERR, "__rpcb_findaddr_timed: "
+				    "strdup failed.");
+				/* Construct a system error */
+				rpc_createerr.cf_error.re_errno = errno;
+				rpc_createerr.cf_error.re_terrno = 0;
+				rpc_createerr.cf_stat = RPC_SYSTEMERROR;
+				goto error;
+			}
 		}
-	}
 
-	/* First try from start_vers and then version 3 (RPCBVERS) */
-
-	CLNT_CONTROL(client, CLSET_RETRY_TIMEOUT, (char *)&rpcbrmttime);
-	for (vers = start_vers;  vers >= RPCBVERS; vers--) {
-		/* Set the version */
+		CLNT_CONTROL(client, CLSET_RETRY_TIMEOUT,
+		    (char *)&rpcbrmttime);
+		vers = RPCBVERS; /* Set the version */
 		CLNT_CONTROL(client, CLSET_VERS, (char *)&vers);
-		clnt_st = CLNT_CALL(client, RPCBPROC_GETADDR,
-				    (xdrproc_t)xdr_rpcb, (char *)&parms,
-				    (xdrproc_t)xdr_wrapstring,
-				    (char *)&ua, *tp);
-		if (clnt_st == RPC_SUCCESS) {
-			if ((ua == NULL) || (ua[0] == NULL)) {
-				if (ua != NULL)
-					xdr_free(xdr_wrapstring, (char *)&ua);
 
-				/* address unknown */
+		/* Sets error structure members in client handle */
+		clnt_st = CLNT_CALL(client, RPCBPROC_GETADDR,
+		    (xdrproc_t)xdr_rpcb, (char *)&parms,
+		    (xdrproc_t)xdr_wrapstring, (char *)&ua, *tp);
+
+		switch (clnt_st) {
+		case RPC_SUCCESS: /* Call succeeded */
+			if (ua != NULL) {
+				if (ua[0] != '\0') {
+					address = uaddr2taddr(nconf, ua);
+				}
+				xdr_free((xdrproc_t)xdr_wrapstring,
+				    (char *)&ua);
+
+				if (address != NULL) {
+					goto done;
+				}
+				/* NULL universal address */
+				/* But client call was successful */
+				clnt_geterr(client, &rpc_createerr.cf_error);
 				rpc_createerr.cf_stat = RPC_PROGNOTREGISTERED;
 				goto error;
 			}
-			address = uaddr2taddr(nconf, ua);
-#ifdef ND_DEBUG
-			fprintf(stderr, "\tRemote address is [%s]\n", ua);
-			if (!address)
-				fprintf(stderr,
-					"\tCouldn't resolve remote address!\n");
+#ifndef PORTMAP
+			clnt_geterr(client, &rpc_createerr.cf_error);
+			rpc_createerr.cf_stat = RPC_UNKNOWNPROTO;
+			goto error;
 #endif
-			xdr_free((xdrproc_t)xdr_wrapstring, (char *)&ua);
+			/* Try the next version */
+			break;
+		case RPC_PROGVERSMISMATCH: /* RPC protocol mismatch */
+			clnt_geterr(client, &rpc_createerr.cf_error);
+#ifdef PORTMAP
+			if (rpc_createerr.cf_error.re_vers.low > vers) {
+				rpc_createerr.cf_stat = clnt_st;
+				goto error;  /* a new version, can't handle */
+			}
+#else
+			rpc_createerr.cf_stat = clnt_st;
+			goto error;
+#endif
+			/* Try the next version */
+			break;
+#ifdef PORTMAP
+		case RPC_PROCUNAVAIL: /* Procedure unavailable */
+		case RPC_PROGUNAVAIL: /* Program not available */
+		case RPC_TIMEDOUT: /* Call timed out */
+			/* Try the next version */
+			break;
+#endif
+		default:
+			clnt_geterr(client, &rpc_createerr.cf_error);
+			rpc_createerr.cf_stat = RPC_PMAPFAILURE;
+			goto error;
+			break;
+		}
+	} /* End of version 3 */
+#ifndef PORTMAP
+	/* cf_error members set by creation failure */
+	rpc_createerr.cf_stat = RPC_PROGNOTREGISTERED;
+#endif
+	/*
+	 * Try version 2
+	 */
 
-			if (!address) {
-				/* We don't know about your universal address */
-				rpc_createerr.cf_stat = RPC_N2AXLATEFAILURE;
+#ifdef PORTMAP
+	/* Try version 2 for TCP or UDP */
+	if (strcmp(nconf->nc_protofmly, NC_INET) == 0) {
+		ushort_t port = 0;
+		struct netbuf remote;
+		uint_t pmapvers = 2;
+		struct pmap pmapparms;
+
+		/*
+		 * Try UDP only - there are some portmappers out
+		 * there that use UDP only.
+		 */
+		if (strcmp(nconf->nc_proto, NC_TCP) == 0) {
+			struct netconfig *newnconf;
+
+			if (client != NULL) {
+				CLNT_DESTROY(client);
+				client = NULL;
+				free(parms.r_addr);
+				parms.r_addr = NULL;
+			}
+			if ((handle = __rpc_setconf("udp")) == NULL) {
+				/* Construct an unknown protocol error */
+				rpc_createerr.cf_stat = RPC_UNKNOWNPROTO;
 				goto error;
 			}
-			goto done;
-		}
-		if (clnt_st == RPC_PROGVERSMISMATCH) {
-			struct rpc_err rpcerr;
 
-			clnt_geterr(client, &rpcerr);
-			if (rpcerr.re_vers.low > RPCBVERS4)
-				goto error;  /* a new version, can't handle */
-		} else if (clnt_st != RPC_PROGUNAVAIL) {
-			/* Cant handle this error */
+			/*
+			 * The following to reinforce that you can
+			 * only request for remote address through
+			 * the same transport you are requesting.
+			 * ie. requesting unversial address
+			 * of IPv4 has to be carried through IPv4.
+			 * Can't use IPv6 to send out the request.
+			 * The mergeaddr in rpcbind can't handle
+			 * this.
+			 */
+			for (;;) {
+				if ((newnconf = __rpc_getconf(handle))
+				    == NULL) {
+					__rpc_endconf(handle);
+					/*
+					 * Construct an unknown protocol
+					 * error
+					 */
+					rpc_createerr.cf_stat =
+					    RPC_UNKNOWNPROTO;
+					goto error;
+				}
+				/*
+				 * here check the protocol family to
+				 * be consistent with the request one
+				 */
+				if (strcmp(newnconf->nc_protofmly,
+				    nconf->nc_protofmly) == 0)
+					break;
+			}
+
+			/* Sets rpc_createerr.cf_error members on failure */
+			client = _getclnthandle_timed(host, newnconf,
+			    &parms.r_addr, tp);
+			__rpc_endconf(handle);
+			tmp_client = TRUE;
+		}
+		if (client == NULL) {
+			/*
+			 * rpc_createerr. cf_error members were set by
+			 * creation failure
+			 */
+			rpc_createerr.cf_stat = RPC_PROGNOTREGISTERED;
+			tmp_client = FALSE;
 			goto error;
 		}
-	}
 
-	if ((address == NULL) || (address->len == 0)) {
-		rpc_createerr.cf_stat = RPC_PROGNOTREGISTERED;
-		clnt_geterr(client, &rpc_createerr.cf_error);
+		/*
+		 * Set version and retry timeout.
+		 */
+		CLNT_CONTROL(client, CLSET_RETRY_TIMEOUT, (char *)&rpcbrmttime);
+		CLNT_CONTROL(client, CLSET_VERS, (char *)&pmapvers);
+
+		pmapparms.pm_prog = program;
+		pmapparms.pm_vers = version;
+		pmapparms.pm_prot = (strcmp(nconf->nc_proto, NC_TCP) != 0) ?
+		    IPPROTO_UDP : IPPROTO_TCP;
+		pmapparms.pm_port = 0;	/* not needed */
+
+		/* Sets error structure members in client handle */
+		clnt_st = CLNT_CALL(client, PMAPPROC_GETPORT,
+		    (xdrproc_t)xdr_pmap, (caddr_t)&pmapparms,
+		    (xdrproc_t)xdr_u_short, (caddr_t)&port, *tp);
+
+		if (clnt_st != RPC_SUCCESS) {
+			clnt_geterr(client, &rpc_createerr.cf_error);
+			rpc_createerr.cf_stat = RPC_RPCBFAILURE;
+			goto error;
+		} else if (port == 0) {
+			/* Will be NULL universal address */
+			/* But client call was successful */
+			clnt_geterr(client, &rpc_createerr.cf_error);
+			rpc_createerr.cf_stat = RPC_PROGNOTREGISTERED;
+			goto error;
+		}
+		port = htons(port);
+		CLNT_CONTROL(client, CLGET_SVC_ADDR, (char *)&remote);
+		if (((address = malloc(sizeof (struct netbuf))) == NULL) ||
+		    ((address->buf = malloc(remote.len)) == NULL)) {
+			/* Construct a system error */
+			rpc_createerr.cf_error.re_errno = errno;
+			rpc_createerr.cf_error.re_terrno = 0;
+			rpc_createerr.cf_stat = RPC_SYSTEMERROR;
+			free(address);
+			address = NULL;
+			goto error;
+		}
+		(void) memcpy(address->buf, remote.buf, remote.len);
+		(void) memcpy(&address->buf[sizeof (short)], &port,
+		    sizeof (short));
+		address->len = address->maxlen = remote.len;
+		goto done;
+	} else {
+		/*
+		 * This is not NC_INET.
+		 * Always an error for version 2.
+		 */
+		if (client != NULL && clnt_st != RPC_SUCCESS) {
+			/* There is a client that failed */
+			clnt_geterr(client, &rpc_createerr.cf_error);
+			rpc_createerr.cf_stat = clnt_st;
+		} else {
+			/* Something else */
+			rpc_createerr.cf_stat = RPC_UNKNOWNPROTO;
+			/*
+			 * Setting rpc_createerr.cf_stat is sufficient.
+			 * No details in rpc_createerr.cf_error needed.
+			 */
+		}
 	}
+#endif
 
 error:
-	if (client) {
+	/* Return NULL address and NULL client */
+	address = NULL;
+	if (client != NULL) {
 		CLNT_DESTROY(client);
 		client = NULL;
 	}
+
 done:
-	if (nconf->nc_semantics != NC_TPI_CLTS) {
-		/* This client is the connectionless one */
-		if (client) {
-			CLNT_DESTROY(client);
-			client = NULL;
-		}
+	/* Return an address and optional client */
+	if (client != NULL && tmp_client) {
+		/* This client is the temporary one */
+		CLNT_DESTROY(client);
+		client = NULL;
 	}
-	if (clpp) {
+	if (clpp != NULL) {
 		*clpp = client;
-	} else if (client) {
+	} else if (client != NULL) {
 		CLNT_DESTROY(client);
 	}
-	if (parms.r_addr)
-		free(parms.r_addr);
+	free(parms.r_addr);
 	return (address);
 }
 
@@ -1095,19 +1120,19 @@ rpcb_getmaps(const struct netconfig *nconf, const char *host)
 	int vers = 0;
 
 	client = getclnthandle((char *)host,
-			(struct netconfig *)nconf, NULL);
+	    (struct netconfig *)nconf, NULL);
 	if (client == NULL)
 		return (NULL);
 
 	clnt_st = CLNT_CALL(client, RPCBPROC_DUMP,
-			(xdrproc_t)xdr_void, NULL,
-			(xdrproc_t)xdr_rpcblist_ptr,
-			(char *)&head, tottimeout);
+	    (xdrproc_t)xdr_void, NULL,
+	    (xdrproc_t)xdr_rpcblist_ptr,
+	    (char *)&head, tottimeout);
 	if (clnt_st == RPC_SUCCESS)
 		goto done;
 
 	if ((clnt_st != RPC_PROGVERSMISMATCH) &&
-		    (clnt_st != RPC_PROGUNAVAIL)) {
+	    (clnt_st != RPC_PROGUNAVAIL)) {
 		rpc_createerr.cf_stat = RPC_RPCBFAILURE;
 		clnt_geterr(client, &rpc_createerr.cf_error);
 		goto done;
@@ -1119,9 +1144,9 @@ rpcb_getmaps(const struct netconfig *nconf, const char *host)
 		vers = RPCBVERS;
 		CLNT_CONTROL(client, CLSET_VERS, (char *)&vers);
 		if (CLNT_CALL(client, RPCBPROC_DUMP,
-			(xdrproc_t)xdr_void,
-			NULL, (xdrproc_t)xdr_rpcblist_ptr,
-			(char *)&head, tottimeout) == RPC_SUCCESS)
+		    (xdrproc_t)xdr_void,
+		    NULL, (xdrproc_t)xdr_rpcblist_ptr,
+		    (char *)&head, tottimeout) == RPC_SUCCESS)
 				goto done;
 	}
 	rpc_createerr.cf_stat = RPC_RPCBFAILURE;
@@ -1167,8 +1192,8 @@ rpcb_rmtcall(const struct netconfig *nconf, const char *host,
 	for (rpcb_vers = RPCBVERS4; rpcb_vers >= RPCBVERS; rpcb_vers--) {
 		CLNT_CONTROL(client, CLSET_VERS, (char *)&rpcb_vers);
 		stat = CLNT_CALL(client, RPCBPROC_CALLIT,
-			(xdrproc_t)xdr_rpcb_rmtcallargs, (char *)&a,
-			(xdrproc_t)xdr_rpcb_rmtcallres, (char *)&r, tout);
+		    (xdrproc_t)xdr_rpcb_rmtcallargs, (char *)&a,
+		    (xdrproc_t)xdr_rpcb_rmtcallres, (char *)&r, tout);
 		if ((stat == RPC_SUCCESS) && (addr_ptr != NULL)) {
 			struct netbuf *na;
 
@@ -1191,7 +1216,7 @@ rpcb_rmtcall(const struct netconfig *nconf, const char *host,
 			break;
 		}
 		if ((stat != RPC_PROGVERSMISMATCH) &&
-			    (stat != RPC_PROGUNAVAIL))
+		    (stat != RPC_PROGUNAVAIL))
 			goto error;
 	}
 error:
@@ -1239,8 +1264,8 @@ rpcb_gettime(const char *host, time_t *timep)
 		return (FALSE);
 
 	st = CLNT_CALL(client, RPCBPROC_GETTIME,
-		(xdrproc_t)xdr_void, NULL,
-		(xdrproc_t)xdr_time_t, (char *)timep, tottimeout);
+	    (xdrproc_t)xdr_void, NULL,
+	    (xdrproc_t)xdr_time_t, (char *)timep, tottimeout);
 
 	if ((st == RPC_PROGVERSMISMATCH) || (st == RPC_PROGUNAVAIL)) {
 		CLNT_CONTROL(client, CLGET_VERS, (char *)&vers);
@@ -1249,9 +1274,9 @@ rpcb_gettime(const char *host, time_t *timep)
 			vers = RPCBVERS;
 			CLNT_CONTROL(client, CLSET_VERS, (char *)&vers);
 			st = CLNT_CALL(client, RPCBPROC_GETTIME,
-				(xdrproc_t)xdr_void, NULL,
-				(xdrproc_t)xdr_time_t, (char *)timep,
-				tottimeout);
+			    (xdrproc_t)xdr_void, NULL,
+			    (xdrproc_t)xdr_time_t, (char *)timep,
+			    tottimeout);
 		}
 	}
 	CLNT_DESTROY(client);
@@ -1282,8 +1307,8 @@ rpcb_taddr2uaddr(struct netconfig *nconf, struct netbuf *taddr)
 		return (NULL);
 
 	CLNT_CALL(client, RPCBPROC_TADDR2UADDR, (xdrproc_t)xdr_netbuf,
-		(char *)taddr, (xdrproc_t)xdr_wrapstring, (char *)&uaddr,
-		tottimeout);
+	    (char *)taddr, (xdrproc_t)xdr_wrapstring, (char *)&uaddr,
+	    tottimeout);
 	CLNT_DESTROY(client);
 	return (uaddr);
 }
@@ -1318,8 +1343,8 @@ rpcb_uaddr2taddr(struct netconfig *nconf, char *uaddr)
 	}
 
 	if (CLNT_CALL(client, RPCBPROC_UADDR2TADDR, (xdrproc_t)xdr_wrapstring,
-		(char *)&uaddr, (xdrproc_t)xdr_netbuf, (char *)taddr,
-		tottimeout) != RPC_SUCCESS) {
+	    (char *)&uaddr, (xdrproc_t)xdr_netbuf, (char *)taddr,
+	    tottimeout) != RPC_SUCCESS) {
 		free(taddr);
 		taddr = NULL;
 	}
