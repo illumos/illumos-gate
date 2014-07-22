@@ -22,12 +22,11 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2014 Joyent, Inc.  All rights reserved.
  */
 
 #ifndef _SYS_SYSTRACE_H
 #define	_SYS_SYSTRACE_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/dtrace.h>
 
@@ -47,16 +46,18 @@ extern systrace_sysent_t *systrace_sysent;
 extern systrace_sysent_t *systrace_sysent32;
 
 extern void (*systrace_probe)(dtrace_id_t, uintptr_t, uintptr_t,
-    uintptr_t, uintptr_t, uintptr_t, uintptr_t);
+    uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t);
 extern void systrace_stub(dtrace_id_t, uintptr_t, uintptr_t,
-    uintptr_t, uintptr_t, uintptr_t, uintptr_t);
+    uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t);
 
 extern int64_t dtrace_systrace_syscall(uintptr_t arg0, uintptr_t arg1,
-    uintptr_t arg2, uintptr_t arg3, uintptr_t arg4, uintptr_t arg5);
+    uintptr_t arg2, uintptr_t arg3, uintptr_t arg4, uintptr_t arg5,
+    uintptr_t arg6, uintptr_t arg7);
 
 #ifdef _SYSCALL32_IMPL
 extern int64_t dtrace_systrace_syscall32(uintptr_t arg0, uintptr_t arg1,
-    uintptr_t arg2, uintptr_t arg3, uintptr_t arg4, uintptr_t arg5);
+    uintptr_t arg2, uintptr_t arg3, uintptr_t arg4, uintptr_t arg5,
+    uintptr_t arg6, uintptr_t arg7);
 #endif
 
 #endif
