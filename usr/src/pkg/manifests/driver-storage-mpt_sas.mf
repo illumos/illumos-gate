@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2014, Nexenta Systems, Inc. All Rights Reserved
 #
 
 #
@@ -30,8 +31,8 @@
 #
 <include global_zone_only_component>
 set name=pkg.fmri value=pkg:/driver/storage/mpt_sas@$(PKGVERS)
-set name=pkg.description value="LSI MPT SAS 2.0 Controller HBA Driver"
-set name=pkg.summary value="LSI MPT SAS 2.0 Controller HBA Driver"
+set name=pkg.description value="LSI MPT SAS 2.0/2.5 Controller HBA Driver"
+set name=pkg.summary value="LSI MPT SAS 2.0/2.5 Controller HBA Driver"
 set name=info.classification \
     value=org.opensolaris.category.2008:Drivers/Storage
 set name=variant.arch value=$(ARCH)
@@ -46,17 +47,36 @@ driver name=mpt_sas class=scsi-self-identifying \
     alias=pci1000,72 \
     alias=pci1000,76 \
     alias=pciex1000,64 \
+    alias=pciex1000,65 \
+    alias=pciex1000,6e \
     alias=pciex1000,70 \
     alias=pciex1000,72 \
+    alias=pciex1000,74 \
     alias=pciex1000,76 \
+    alias=pciex1000,77 \
+    alias=pciex1000,7e \
+    alias=pciex1000,80 \
+    alias=pciex1000,81 \
+    alias=pciex1000,82 \
+    alias=pciex1000,83 \
+    alias=pciex1000,84 \
+    alias=pciex1000,85 \
     alias=pciex1000,86 \
-    alias=pciex1000,87
+    alias=pciex1000,87 \
+    alias=pciex1000,90 \
+    alias=pciex1000,91 \
+    alias=pciex1000,92 \
+    alias=pciex1000,93 \
+    alias=pciex1000,94 \
+    alias=pciex1000,95 \
+    alias=pciex1000,96 \
+    alias=pciex1000,97
 file path=kernel/drv/$(ARCH64)/mpt_sas group=sys
 $(i386_ONLY)file path=kernel/drv/mpt_sas group=sys
 file path=kernel/drv/mpt_sas.conf group=sys \
     original_name=SUNWmptsas:kernel/drv/mpt_sas.conf preserve=true
 file path=usr/share/man/man7d/mpt_sas.7d
-legacy pkg=SUNWmptsas desc="LSI MPT SAS 2.0 Controller HBA Driver" \
-    name="LSI MPT SAS 2.0 Controller HBA Driver"
+legacy pkg=SUNWmptsas desc="LSI MPT SAS 2.0/2.5 Controller HBA Driver" \
+    name="LSI MPT SAS 2.0/2.5 Controller HBA Driver"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

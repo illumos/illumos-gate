@@ -23,6 +23,7 @@
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2014 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2014, Tegile Systems Inc. All rights reserved.
  */
 
 /*
@@ -141,15 +142,21 @@ typedef uint16_t		mptsas_phymask_t;
 #define	MPTSAS_MAX_FRAME_SGES(mpt) \
 	(((mpt->m_req_frame_size - (sizeof (MPI2_SCSI_IO_REQUEST))) / 8) + 1)
 
+#define	MPTSAS_SGE_SIZE(mpt)					\
+	((mpt)->m_MPI25 ? sizeof (MPI2_IEEE_SGE_SIMPLE64) :	\
+	    sizeof (MPI2_SGE_SIMPLE64))
+
 /*
- * Caculating how many 64-bit DMA simple elements can be stored in the first
+ * Calculating how many 64-bit DMA simple elements can be stored in the first
  * frame. Note that msg_scsi_io_request contains 2 double-words (8 bytes) for
  * element storage.  And 64-bit dma element is 3 double-words (12 bytes) in
- * size.
+ * size. IEEE 64-bit dma element used for SAS3 controllers is 4 double-words
+ * (16 bytes).
  */
 #define	MPTSAS_MAX_FRAME_SGES64(mpt) \
 	((mpt->m_req_frame_size - \
-	(sizeof (MPI2_SCSI_IO_REQUEST)) + sizeof (MPI2_SGE_IO_UNION)) / 12)
+	sizeof (MPI2_SCSI_IO_REQUEST) + sizeof (MPI2_SGE_IO_UNION)) / \
+	MPTSAS_SGE_SIZE(mpt))
 
 /*
  * Scatter-gather list structure defined by HBA hardware
@@ -220,10 +227,12 @@ typedef	struct mptsas_target {
 
 		uint16_t		m_qfull_retry_interval;
 		uint8_t			m_qfull_retries;
+		uint16_t		m_io_flags;
 		uint16_t		m_enclosure;
 		uint16_t		m_slot_num;
 		uint32_t		m_tgt_unconfigured;
 		uint8_t			m_led_status;
+		uint8_t			m_scsi_req_desc_type;
 
 } mptsas_target_t;
 
@@ -371,6 +380,8 @@ typedef struct mptsas_pt_request {
 	uint32_t data_size;
 	uint32_t dataout_size;
 	uint32_t direction;
+	uint8_t simple;
+	uint16_t sgl_offset;
 	ddi_dma_cookie_t data_cookie;
 	ddi_dma_cookie_t dataout_cookie;
 } mptsas_pt_request_t;
@@ -899,6 +910,9 @@ typedef struct mptsas {
 	mptsas_fw_diagnostic_buffer_t
 		m_fw_diag_buffer_list[MPI2_DIAG_BUF_TYPE_COUNT];
 
+	/* GEN3 support */
+	uint8_t			m_MPI25;
+
 	/*
 	 * Event Replay flag (MUR support)
 	 */
@@ -1339,7 +1353,7 @@ int mptsas_ioc_init(mptsas_t *mpt);
 int mptsas_get_sas_device_page0(mptsas_t *mpt, uint32_t page_address,
     uint16_t *dev_handle, uint64_t *sas_wwn, uint32_t *dev_info,
     uint8_t *physport, uint8_t *phynum, uint16_t *pdevhandle,
-    uint16_t *slot_num, uint16_t *enclosure);
+    uint16_t *slot_num, uint16_t *enclosure, uint16_t *io_flags);
 int mptsas_get_sas_io_unit_page(mptsas_t *mpt);
 int mptsas_get_sas_io_unit_page_hndshk(mptsas_t *mpt);
 int mptsas_get_sas_expander_page0(mptsas_t *mpt, uint32_t page_address,
@@ -1404,7 +1418,7 @@ void mptsas_printf(char *fmt, ...);
 #define	NDBG12(args)	MPTSAS_DBGPR(0x1000, args)	/* enumeration */
 #define	NDBG13(args)	MPTSAS_DBGPR(0x2000, args)	/* configuration page */
 #define	NDBG14(args)	MPTSAS_DBGPR(0x4000, args)	/* LED control */
-#define	NDBG15(args)	MPTSAS_DBGPR(0x8000, args)
+#define	NDBG15(args)	MPTSAS_DBGPR(0x8000, args)	/* Passthrough */
 
 #define	NDBG16(args)	MPTSAS_DBGPR(0x010000, args)
 #define	NDBG17(args)	MPTSAS_DBGPR(0x020000, args)	/* scatter/gather */
