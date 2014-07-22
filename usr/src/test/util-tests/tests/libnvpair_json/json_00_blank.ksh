@@ -1,3 +1,4 @@
+#!/bin/ksh
 #
 # This file and its contents are supplied under the terms of the
 # Common Development and Distribution License ("CDDL"), version 1.0.
@@ -10,11 +11,21 @@
 #
 
 #
-# Copyright (c) 2012 by Delphix. All rights reserved.
-# Copyright 2014 Garrett D'Amore <garrett@damore.org>
+# Copyright (c) 2014, Joyent, Inc.
 #
 
-SUBDIRS = dladm printf xargs
-SUBDIRS = dladm libnvpair_json printf xargs
+DIR=$(dirname $(whence $0))
+. ${DIR}/json_common
 
-include $(SRC)/test/Makefile.com
+BASELINE="$(cat <<EOF
+{\
+}
+EOF)"
+
+OUTPUT="$(${DIR}/../../bin/print_json <<'EOF'
+/*
+ * Emit a blank object.
+ */
+EOF)"
+
+complete

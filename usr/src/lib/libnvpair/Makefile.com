@@ -23,7 +23,7 @@
 # Use is subject to license terms.
 #
 # Copyright (c) 2012 by Delphix. All rights reserved.
-# Copyright (c) 2013, Joyent, Inc. All rights reserved.
+# Copyright (c) 2014, Joyent, Inc.
 #
 
 LIBRARY=	libnvpair.a
@@ -60,10 +60,12 @@ LINTFLAGS +=	-erroff=E_BAD_FORMAT_STR2
 LINTFLAGS +=	-erroff=E_INVALID_TOKEN_IN_DEFINE_MACRO
 LINTFLAGS +=	-erroff=E_RET_INT_IMPLICITLY
 LINTFLAGS +=	-erroff=E_FUNC_USED_VAR_ARG2
+LINTFLAGS +=	-erroff=E_CONSTANT_CONDITION
 LINTFLAGS64 +=	-erroff=E_BAD_FORMAT_STR2
 LINTFLAGS64 +=	-erroff=E_INVALID_TOKEN_IN_DEFINE_MACRO
 LINTFLAGS64 +=	-erroff=E_RET_INT_IMPLICITLY
 LINTFLAGS64 +=	-erroff=E_FUNC_USED_VAR_ARG2
+LINTFLAGS64 +=	-erroff=E_CONSTANT_CONDITION
 
 CERRWARN +=	-_gcc=-Wno-type-limits
 CERRWARN +=	-_gcc=-Wno-parentheses
