@@ -1,57 +1,46 @@
-/*
- * CDDL HEADER START
- *
- * The contents of this file are subject to the terms of the
- * Common Development and Distribution License (the "License").
- * You may not use this file except in compliance with the License.
- *
- * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or http://www.opensolaris.org/os/licensing.
- * See the License for the specific language governing permissions
- * and limitations under the License.
- *
- * When distributing Covered Code, include this CDDL HEADER in each
- * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
- * If applicable, add the following below this CDDL HEADER, with the
- * fields enclosed by brackets "[]" replaced with your own identifying
- * information: Portions Copyright [yyyy] [name of copyright owner]
- *
- * CDDL HEADER END
- */
-
-/*
- * Copyright (c) 2000 to 2009, LSI Corporation.
+/*-
+ * Copyright (c) 2013 LSI Corp.
  * All rights reserved.
  *
- * Redistribution and use in source and binary forms of all code within
- * this file that is exclusively owned by LSI, with or without
- * modification, is permitted provided that, in addition to the CDDL 1.0
- * License requirements, the following conditions are met:
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the author nor the names of any co-contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
  *
- *    Neither the name of the author nor the names of its contributors may be
- *    used to endorse or promote products derived from this software without
- *    specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
- * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
- * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
- * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
- * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
- * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
- * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
- * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
- * DAMAGE.
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
  */
 
 /*
+ *  Copyright (c) 2000-2013 LSI Corporation.
+ *
+ *
  *           Name:  mpi2_sas.h
  *          Title:  MPI Serial Attached SCSI structures and definitions
  *  Creation Date:  February 9, 2007
  *
- *  mpi2.h Version:  02.00.02
+ *  mpi2_sas.h Version:  02.00.08
+ *
+ *  NOTE: Names (typedefs, defines, etc.) beginning with an MPI25 or Mpi25
+ *        prefix are for use only on MPI v2.5 products, and must not be used
+ *        with MPI v2.0 products. Unless otherwise noted, names beginning with
+ *        MPI2 or Mpi2 are for use with both MPI v2.0 and MPI v2.5 products.
  *
  *  Version History
  *  ---------------
@@ -63,6 +52,15 @@
  *                      Control Request.
  *  10-02-08  02.00.02  Added Set IOC Parameter Operation to SAS IO Unit Control
  *                      Request.
+ *  10-28-09  02.00.03  Changed the type of SGL in MPI2_SATA_PASSTHROUGH_REQUEST
+ *                      to MPI2_SGE_IO_UNION since it supports chained SGLs.
+ *  05-12-10  02.00.04  Modified some comments.
+ *  08-11-10  02.00.05  Added NCQ operations to SAS IO Unit Control.
+ *  11-18-11  02.00.06  Incorporating additions for MPI v2.5.
+ *  07-10-12  02.00.07  Added MPI2_SATA_PT_SGE_UNION for use in the SATA
+ *                      Passthrough Request message.
+ *  08-19-13  02.00.08  Made MPI2_SAS_OP_TRANSMIT_PORT_SELECT_SIGNAL obsolete
+ *                      for anything newer than MPI v2.0.
  *  --------------------------------------------------------------------------
  */
 
@@ -137,7 +135,7 @@ typedef struct _MPI2_SMP_PASSTHROUGH_REQUEST
     U8                      ChainOffset;        /* 0x02 */
     U8                      Function;           /* 0x03 */
     U16                     RequestDataLength;  /* 0x04 */
-    U8                      SGLFlags;           /* 0x06 */
+    U8                      SGLFlags;           /* 0x06 */ /* MPI v2.0 only. Reserved on MPI v2.5. */
     U8                      MsgFlags;           /* 0x07 */
     U8                      VP_ID;              /* 0x08 */
     U8                      VF_ID;              /* 0x09 */
@@ -146,14 +144,14 @@ typedef struct _MPI2_SMP_PASSTHROUGH_REQUEST
     U64                     SASAddress;         /* 0x10 */
     U32                     Reserved3;          /* 0x18 */
     U32                     Reserved4;          /* 0x1C */
-    MPI2_SIMPLE_SGE_UNION   SGL;                /* 0x20 */
+    MPI2_SIMPLE_SGE_UNION   SGL;                /* 0x20 */ /* MPI v2.5: IEEE Simple 64 elements only */
 } MPI2_SMP_PASSTHROUGH_REQUEST, MPI2_POINTER PTR_MPI2_SMP_PASSTHROUGH_REQUEST,
   Mpi2SmpPassthroughRequest_t, MPI2_POINTER pMpi2SmpPassthroughRequest_t;
 
 /* values for PassthroughFlags field */
 #define MPI2_SMP_PT_REQ_PT_FLAGS_IMMEDIATE      (0x80)
 
-/* values for SGLFlags field are in the SGL section of mpi2.h */
+/* MPI v2.0: use MPI2_SGLFLAGS_ defines from mpi2.h for the SGLFlags field */
 
 
 /* SMP Passthrough Reply Message */
@@ -188,6 +186,17 @@ typedef struct _MPI2_SMP_PASSTHROUGH_REPLY
 *  SATA Passthrough messages
 ****************************************************************************/
 
+typedef union _MPI2_SATA_PT_SGE_UNION
+{
+    MPI2_SGE_SIMPLE_UNION       MpiSimple;      /* MPI v2.0 only */
+    MPI2_SGE_CHAIN_UNION        MpiChain;       /* MPI v2.0 only */
+    MPI2_IEEE_SGE_SIMPLE_UNION  IeeeSimple;
+    MPI2_IEEE_SGE_CHAIN_UNION   IeeeChain;      /* MPI v2.0 only */
+    MPI25_IEEE_SGE_CHAIN64      IeeeChain64;    /* MPI v2.5 only */
+} MPI2_SATA_PT_SGE_UNION, MPI2_POINTER PTR_MPI2_SATA_PT_SGE_UNION,
+  Mpi2SataPTSGEUnion_t, MPI2_POINTER pMpi2SataPTSGEUnion_t;
+
+
 /* SATA Passthrough Request Message */
 typedef struct _MPI2_SATA_PASSTHROUGH_REQUEST
 {
@@ -195,7 +204,7 @@ typedef struct _MPI2_SATA_PASSTHROUGH_REQUEST
     U8                      ChainOffset;        /* 0x02 */
     U8                      Function;           /* 0x03 */
     U16                     PassthroughFlags;   /* 0x04 */
-    U8                      SGLFlags;           /* 0x06 */
+    U8                      SGLFlags;           /* 0x06 */ /* MPI v2.0 only. Reserved on MPI v2.5. */
     U8                      MsgFlags;           /* 0x07 */
     U8                      VP_ID;              /* 0x08 */
     U8                      VF_ID;              /* 0x09 */
@@ -205,7 +214,7 @@ typedef struct _MPI2_SATA_PASSTHROUGH_REQUEST
     U32                     Reserved4;          /* 0x14 */
     U32                     DataLength;         /* 0x18 */
     U8                      CommandFIS[20];     /* 0x1C */
-    MPI2_SIMPLE_SGE_UNION   SGL;                /* 0x20 */
+    MPI2_SATA_PT_SGE_UNION  SGL;                /* 0x30 */ /* MPI v2.5: IEEE 64 elements only */
 } MPI2_SATA_PASSTHROUGH_REQUEST, MPI2_POINTER PTR_MPI2_SATA_PASSTHROUGH_REQUEST,
   Mpi2SataPassthroughRequest_t, MPI2_POINTER pMpi2SataPassthroughRequest_t;
 
@@ -217,7 +226,7 @@ typedef struct _MPI2_SATA_PASSTHROUGH_REQUEST
 #define MPI2_SATA_PT_REQ_PT_FLAGS_WRITE             (0x0002)
 #define MPI2_SATA_PT_REQ_PT_FLAGS_READ              (0x0001)
 
-/* values for SGLFlags field are in the SGL section of mpi2.h */
+/* MPI v2.0: use MPI2_SGLFLAGS_ defines from mpi2.h for the SGLFlags field */
 
 
 /* SATA Passthrough Reply Message */
@@ -284,10 +293,16 @@ typedef struct _MPI2_SAS_IOUNIT_CONTROL_REQUEST
 #define MPI2_SAS_OP_PHY_CLEAR_ERROR_LOG         (0x08)
 #define MPI2_SAS_OP_SEND_PRIMITIVE              (0x0A)
 #define MPI2_SAS_OP_FORCE_FULL_DISCOVERY        (0x0B)
-#define MPI2_SAS_OP_TRANSMIT_PORT_SELECT_SIGNAL (0x0C)
+#define MPI2_SAS_OP_TRANSMIT_PORT_SELECT_SIGNAL (0x0C) /* MPI v2.0 only */
 #define MPI2_SAS_OP_REMOVE_DEVICE               (0x0D)
 #define MPI2_SAS_OP_LOOKUP_MAPPING              (0x0E)
 #define MPI2_SAS_OP_SET_IOC_PARAMETER           (0x0F)
+#define MPI25_SAS_OP_ENABLE_FP_DEVICE           (0x10)
+#define MPI25_SAS_OP_DISABLE_FP_DEVICE          (0x11)
+#define MPI25_SAS_OP_ENABLE_FP_ALL              (0x12)
+#define MPI25_SAS_OP_DISABLE_FP_ALL             (0x13)
+#define MPI2_SAS_OP_DEV_ENABLE_NCQ              (0x14)
+#define MPI2_SAS_OP_DEV_DISABLE_NCQ             (0x15)
 #define MPI2_SAS_OP_PRODUCT_SPECIFIC_MIN        (0x80)
 
 /* values for the PrimFlags field */

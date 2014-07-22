@@ -1,57 +1,41 @@
-/*
- * CDDL HEADER START
- *
- * The contents of this file are subject to the terms of the
- * Common Development and Distribution License (the "License").
- * You may not use this file except in compliance with the License.
- *
- * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or http://www.opensolaris.org/os/licensing.
- * See the License for the specific language governing permissions
- * and limitations under the License.
- *
- * When distributing Covered Code, include this CDDL HEADER in each
- * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
- * If applicable, add the following below this CDDL HEADER, with the
- * fields enclosed by brackets "[]" replaced with your own identifying
- * information: Portions Copyright [yyyy] [name of copyright owner]
- *
- * CDDL HEADER END
- */
-
-/*
- * Copyright (c) 2000 to 2009, LSI Corporation.
+/*-
+ * Copyright (c) 2013 LSI Corp.
  * All rights reserved.
  *
- * Redistribution and use in source and binary forms of all code within
- * this file that is exclusively owned by LSI, with or without
- * modification, is permitted provided that, in addition to the CDDL 1.0
- * License requirements, the following conditions are met:
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the author nor the names of any co-contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
  *
- *    Neither the name of the author nor the names of its contributors may be
- *    used to endorse or promote products derived from this software without
- *    specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
- * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
- * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
- * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
- * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
- * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
- * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
- * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
- * DAMAGE.
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
  */
 
 /*
+ *  Copyright (c) 2000-2013 LSI Corporation.
+ *
+ *
  *           Name:  mpi2_tool.h
  *          Title:  MPI diagnostic tool structures and definitions
  *  Creation Date:  March 26, 2007
  *
- *    mpi2_tool.h Version:  02.00.04
+ *    mpi2_tool.h Version:  02.00.11
  *
  *  Version History
  *  ---------------
@@ -67,6 +51,17 @@
  *                      and reply messages.
  *                      Added MPI2_DIAG_BUF_TYPE_EXTENDED.
  *                      Incremented MPI2_DIAG_BUF_TYPE_COUNT.
+ *  05-12-10  02.00.05  Added Diagnostic Data Upload tool.
+ *  08-11-10  02.00.06  Added defines that were missing for Diagnostic Buffer
+ *                      Post Request.
+ *  05-25-11  02.00.07  Added Flags field and related defines to
+ *                      MPI2_TOOLBOX_ISTWI_READ_WRITE_REQUEST.
+ *  11-18-11  02.00.08  Incorporating additions for MPI v2.5.
+ *  07-10-12  02.00.09  Add MPI v2.5 Toolbox Diagnostic CLI Tool Request
+ *                      message.
+ *  07-26-12  02.00.10  Modified MPI2_TOOLBOX_DIAGNOSTIC_CLI_REQUEST so that
+ *                      it uses MPI Chain SGE as well as MPI Simple SGE.
+ *  08-19-13  02.00.11  Added MPI2_TOOLBOX_TEXT_DISPLAY_TOOL and related info.
  *  --------------------------------------------------------------------------
  */
 
@@ -82,9 +77,11 @@
 /* defines for the Tools */
 #define MPI2_TOOLBOX_CLEAN_TOOL                     (0x00)
 #define MPI2_TOOLBOX_MEMORY_MOVE_TOOL               (0x01)
+#define MPI2_TOOLBOX_DIAG_DATA_UPLOAD_TOOL          (0x02)
 #define MPI2_TOOLBOX_ISTWI_READ_WRITE_TOOL          (0x03)
 #define MPI2_TOOLBOX_BEACON_TOOL                    (0x05)
 #define MPI2_TOOLBOX_DIAGNOSTIC_CLI_TOOL            (0x06)
+#define MPI2_TOOLBOX_TEXT_DISPLAY_TOOL              (0x07)
 
 
 /****************************************************************************
@@ -165,6 +162,46 @@ typedef struct _MPI2_TOOLBOX_MEM_MOVE_REQUEST
 
 
 /****************************************************************************
+*  Toolbox Diagnostic Data Upload request
+****************************************************************************/
+
+typedef struct _MPI2_TOOLBOX_DIAG_DATA_UPLOAD_REQUEST
+{
+    U8                      Tool;                       /* 0x00 */
+    U8                      Reserved1;                  /* 0x01 */
+    U8                      ChainOffset;                /* 0x02 */
+    U8                      Function;                   /* 0x03 */
+    U16                     Reserved2;                  /* 0x04 */
+    U8                      Reserved3;                  /* 0x06 */
+    U8                      MsgFlags;                   /* 0x07 */
+    U8                      VP_ID;                      /* 0x08 */
+    U8                      VF_ID;                      /* 0x09 */
+    U16                     Reserved4;                  /* 0x0A */
+    U8                      SGLFlags;                   /* 0x0C */
+    U8                      Reserved5;                  /* 0x0D */
+    U16                     Reserved6;                  /* 0x0E */
+    U32                     Flags;                      /* 0x10 */
+    U32                     DataLength;                 /* 0x14 */
+    MPI2_SGE_SIMPLE_UNION   SGL;                        /* 0x18 */
+} MPI2_TOOLBOX_DIAG_DATA_UPLOAD_REQUEST,
+  MPI2_POINTER PTR_MPI2_TOOLBOX_DIAG_DATA_UPLOAD_REQUEST,
+  Mpi2ToolboxDiagDataUploadRequest_t,
+  MPI2_POINTER pMpi2ToolboxDiagDataUploadRequest_t;
+
+/* use MPI2_SGLFLAGS_ defines from mpi2.h for the SGLFlags field */
+
+
+typedef struct _MPI2_DIAG_DATA_UPLOAD_HEADER
+{
+    U32                     DiagDataLength;             /* 00h */
+    U8                      FormatCode;                 /* 04h */
+    U8                      Reserved1;                  /* 05h */
+    U16                     Reserved2;                  /* 06h */
+} MPI2_DIAG_DATA_UPLOAD_HEADER, MPI2_POINTER PTR_MPI2_DIAG_DATA_UPLOAD_HEADER,
+  Mpi2DiagDataUploadHeader_t, MPI2_POINTER pMpi2DiagDataUploadHeader_t;
+
+
+/****************************************************************************
 *  Toolbox ISTWI Read Write Tool
 ****************************************************************************/
 
@@ -186,7 +223,7 @@ typedef struct _MPI2_TOOLBOX_ISTWI_READ_WRITE_REQUEST
     U8                      DevIndex;                   /* 0x14 */
     U8                      Action;                     /* 0x15 */
     U8                      SGLFlags;                   /* 0x16 */
-    U8                      Reserved7;                  /* 0x17 */
+    U8                      Flags;                      /* 0x17 */
     U16                     TxDataLength;               /* 0x18 */
     U16                     RxDataLength;               /* 0x1A */
     U32                     Reserved8;                  /* 0x1C */
@@ -208,7 +245,11 @@ typedef struct _MPI2_TOOLBOX_ISTWI_READ_WRITE_REQUEST
 #define MPI2_TOOL_ISTWI_ACTION_RELEASE_BUS          (0x11)
 #define MPI2_TOOL_ISTWI_ACTION_RESET                (0x12)
 
-/* values for SGLFlags field are in the SGL section of mpi2.h */
+/* use MPI2_SGLFLAGS_ defines from mpi2.h for the SGLFlags field */
+
+/* values for the Flags field */
+#define MPI2_TOOL_ISTWI_FLAG_AUTO_RESERVE_RELEASE   (0x80)
+#define MPI2_TOOL_ISTWI_FLAG_PAGE_ADDR_MASK         (0x07)
 
 
 /* Toolbox ISTWI Read Write Tool reply message */
@@ -271,7 +312,7 @@ typedef struct _MPI2_TOOLBOX_BEACON_REQUEST
 
 #define MPI2_TOOLBOX_DIAG_CLI_CMD_LENGTH    (0x5C)
 
-/* Toolbox Diagnostic CLI Tool request message */
+/* MPI v2.0 Toolbox Diagnostic CLI Tool request message */
 typedef struct _MPI2_TOOLBOX_DIAGNOSTIC_CLI_REQUEST
 {
     U8                      Tool;                       /* 0x00 */
@@ -289,13 +330,36 @@ typedef struct _MPI2_TOOLBOX_DIAGNOSTIC_CLI_REQUEST
     U16                     Reserved6;                  /* 0x0E */
     U32                     DataLength;                 /* 0x10 */
     U8                      DiagnosticCliCommand[MPI2_TOOLBOX_DIAG_CLI_CMD_LENGTH]; /* 0x14 */
-    MPI2_SGE_SIMPLE_UNION   SGL;                        /* 0x70 */
+    MPI2_MPI_SGE_IO_UNION   SGL;                        /* 0x70 */
 } MPI2_TOOLBOX_DIAGNOSTIC_CLI_REQUEST,
   MPI2_POINTER PTR_MPI2_TOOLBOX_DIAGNOSTIC_CLI_REQUEST,
   Mpi2ToolboxDiagnosticCliRequest_t,
   MPI2_POINTER pMpi2ToolboxDiagnosticCliRequest_t;
 
-/* values for SGLFlags field are in the SGL section of mpi2.h */
+/* use MPI2_SGLFLAGS_ defines from mpi2.h for the SGLFlags field */
+
+
+/* MPI v2.5 Toolbox Diagnostic CLI Tool request message */
+typedef struct _MPI25_TOOLBOX_DIAGNOSTIC_CLI_REQUEST
+{
+    U8                      Tool;                       /* 0x00 */
+    U8                      Reserved1;                  /* 0x01 */
+    U8                      ChainOffset;                /* 0x02 */
+    U8                      Function;                   /* 0x03 */
+    U16                     Reserved2;                  /* 0x04 */
+    U8                      Reserved3;                  /* 0x06 */
+    U8                      MsgFlags;                   /* 0x07 */
+    U8                      VP_ID;                      /* 0x08 */
+    U8                      VF_ID;                      /* 0x09 */
+    U16                     Reserved4;                  /* 0x0A */
+    U32                     Reserved5;                  /* 0x0C */
+    U32                     DataLength;                 /* 0x10 */
+    U8                      DiagnosticCliCommand[MPI2_TOOLBOX_DIAG_CLI_CMD_LENGTH]; /* 0x14 */
+    MPI25_SGE_IO_UNION      SGL;                        /* 0x70 */
+} MPI25_TOOLBOX_DIAGNOSTIC_CLI_REQUEST,
+  MPI2_POINTER PTR_MPI25_TOOLBOX_DIAGNOSTIC_CLI_REQUEST,
+  Mpi25ToolboxDiagnosticCliRequest_t,
+  MPI2_POINTER pMpi25ToolboxDiagnosticCliRequest_t;
 
 
 /* Toolbox Diagnostic CLI Tool reply message */
@@ -319,6 +383,45 @@ typedef struct _MPI2_TOOLBOX_DIAGNOSTIC_CLI_REPLY
   MPI2_POINTER PTR_MPI2_TOOLBOX_DIAG_CLI_REPLY,
   Mpi2ToolboxDiagnosticCliReply_t,
   MPI2_POINTER pMpi2ToolboxDiagnosticCliReply_t;
+
+
+/****************************************************************************
+*  Toolbox Console Text Display Tool
+****************************************************************************/
+
+/* Toolbox Console Text Display Tool request message */
+typedef struct _MPI2_TOOLBOX_TEXT_DISPLAY_REQUEST
+{
+    U8                      Tool;               /* 0x00 */
+    U8                      Reserved1;          /* 0x01 */
+    U8                      ChainOffset;        /* 0x02 */
+    U8                      Function;           /* 0x03 */
+    U16                     Reserved2;          /* 0x04 */
+    U8                      Reserved3;          /* 0x06 */
+    U8                      MsgFlags;           /* 0x07 */
+    U8                      VP_ID;              /* 0x08 */
+    U8                      VF_ID;              /* 0x09 */
+    U16                     Reserved4;          /* 0x0A */
+    U8                      Console;            /* 0x0C */
+    U8                      Flags;              /* 0x0D */
+    U16                     Reserved6;          /* 0x0E */
+    U8                      TextToDisplay[4];   /* 0x10 */ /* actual length determined at runtime based on frame size */
+} MPI2_TOOLBOX_TEXT_DISPLAY_REQUEST,
+  MPI2_POINTER PTR_MPI2_TOOLBOX_TEXT_DISPLAY_REQUEST,
+  Mpi2ToolboxTextDisplayRequest_t,
+  MPI2_POINTER pMpi2ToolboxTextDisplayRequest_t;
+
+/* defines for the Console field */
+#define MPI2_TOOLBOX_CONSOLE_TYPE_MASK          (0xF0)
+#define MPI2_TOOLBOX_CONSOLE_TYPE_DEFAULT       (0x00)
+#define MPI2_TOOLBOX_CONSOLE_TYPE_UART          (0x10)
+#define MPI2_TOOLBOX_CONSOLE_TYPE_ETHERNET      (0x20)
+
+#define MPI2_TOOLBOX_CONSOLE_NUMBER_MASK        (0x0F)
+
+/* defines for the Flags field */
+#define MPI2_TOOLBOX_CONSOLE_FLAG_TIMESTAMP     (0x01)
+
 
 
 /*****************************************************************************
@@ -362,6 +465,10 @@ typedef struct _MPI2_DIAG_BUFFER_POST_REQUEST
 #define MPI2_DIAG_BUF_TYPE_EXTENDED                 (0x02)
 /* count of the number of buffer types */
 #define MPI2_DIAG_BUF_TYPE_COUNT                    (0x03)
+
+/* values for the Flags field */
+#define MPI2_DIAG_BUF_FLAG_RELEASE_ON_FULL          (0x00000002) /* for MPI v2.0 products only */
+#define MPI2_DIAG_BUF_FLAG_IMMEDIATE_RELEASE        (0x00000001)
 
 
 /****************************************************************************
