@@ -48,7 +48,7 @@ extern "C" {
 #define	LX_UNAME_SYSNAME	"Linux"
 #define	LX_UNAME_RELEASE_2_6	"2.6.18"
 #define	LX_UNAME_RELEASE_2_4	"2.4.21"
-#define	LX_UNAME_VERSION	"BrandZ fake linux"
+#define	LX_UNAME_VERSION	"BrandZ virtual linux"
 #define	LX_UNAME_MACHINE	"i686"
 
 #define	LX_LINKER_NAME "ld-linux.so.2"
