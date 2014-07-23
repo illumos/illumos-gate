@@ -149,6 +149,11 @@ static const int ltos_socktype[LX_SOCK_PACKET + 1] = {
 #define	LTOS_SOCKTYPE(t)	\
 	((t) <= LX_SOCK_PACKET ? ltos_socktype[(t)] : SOCK_INVAL)
 
+static const int stol_socktype[SOCK_SEQPACKET + 1] = {
+	SOCK_NOTSUPPORTED, LX_SOCK_DGRAM, LX_SOCK_STREAM, SOCK_NOTSUPPORTED,
+	LX_SOCK_RAW, LX_SOCK_RDM, LX_SOCK_SEQPACKET
+};
+
 /*
  * Linux socket option type definitions
  *
@@ -1643,6 +1648,11 @@ lx_getsockopt(ulong_t *args)
 		level = SOL_SOCKET;
 
 	r = getsockopt(sockfd, level, optname, optval, optlenp);
+
+	if (r == 0 && level == SOL_SOCKET && optname == SO_TYPE) {
+		/* translate our type back to Linux */
+		*(int *)optval = stol_socktype[(*(int *)optval)];
+	}
 
 	return ((r < 0) ? -errno : r);
 }
