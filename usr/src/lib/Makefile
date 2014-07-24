@@ -137,6 +137,7 @@ SUBDIRS += \
 	libpp		\
 	libproc		\
 	libproject	\
+	librename	\
 	libsendfile	\
 	nametoaddr	\
 	ncad_addr	\
@@ -435,6 +436,7 @@ HDRSUBDIRS=		\
 	libraidcfg	\
 	librcm		\
 	librdc		\
+	librename	\
 	libscf		\
 	libsip		\
 	libsmbios	\
