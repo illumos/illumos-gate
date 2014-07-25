@@ -1706,20 +1706,6 @@ ptrace_setoptions(pid_t pid, int options)
 	if ((fd = open_procfile(pid, O_WRONLY, "ctl")) < 0)
 		return (-errno);
 
-
-	/*
-	 * If we're setting the TRACEEXEC option for a process, its PR_PTRACE
-	 * option might also be set. We clear it so that the process doesn't
-	 * stop twice on exec.
-	 */
-	if (options & LX_PTRACE_O_TRACEEXEC) {
-		ctl.cmd = PCUNSET;
-		ctl.arg.flags = PR_PTRACE;
-		size = sizeof (long) + sizeof (long);
-		if (write(fd, &ctl, size) != size)
-			error = -errno;
-	}
-
 	/* since we're doing option tracing now, only catch sigtrap */
 	if (error == 0) {
 		ctl.cmd = PCSTRACE;
