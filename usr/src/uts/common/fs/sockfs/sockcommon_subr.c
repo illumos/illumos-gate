@@ -22,6 +22,9 @@
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
+/*
+ * Copyright 2014, OmniTI Computer Consulting, Inc. All rights reserved.
+ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -396,7 +399,12 @@ socket_sendsig(struct sonode *so, int event)
 		 * the proc is active.
 		 */
 		mutex_enter(&pidlock);
-		proc = prfind(so->so_pgrp);
+		/*
+		 * Even if the thread started in another zone, we're receiving
+		 * on behalf of this socket's zone, so find the proc using the
+		 * socket's zone ID.
+		 */
+		proc = prfind_zone(so->so_pgrp, so->so_zoneid);
 		if (proc == NULL) {
 			mutex_exit(&pidlock);
 			return;
@@ -413,7 +421,12 @@ socket_sendsig(struct sonode *so, int event)
 		pid_t pgrp = -so->so_pgrp;
 
 		mutex_enter(&pidlock);
-		proc = pgfind(pgrp);
+		/*
+		 * Even if the thread started in another zone, we're receiving
+		 * on behalf of this socket's zone, so find the pgrp using the
+		 * socket's zone ID.
+		 */
+		proc = pgfind_zone(pgrp, so->so_zoneid);
 		while (proc != NULL) {
 			mutex_enter(&proc->p_lock);
 			socket_sigproc(proc, event);
