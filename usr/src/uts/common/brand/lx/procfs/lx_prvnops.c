@@ -65,6 +65,7 @@
 #include <sys/zone.h>
 #include <sys/pghw.h>
 #include <sys/vfs_opreg.h>
+#include <sys/param.h>
 
 /* Dependent on procfs */
 extern kthread_t *prchoose(proc_t *);
@@ -103,12 +104,16 @@ static vnode_t *lxpr_lookup_piddir(vnode_t *, char *);
 static vnode_t *lxpr_lookup_not_a_dir(vnode_t *, char *);
 static vnode_t *lxpr_lookup_fddir(vnode_t *, char *);
 static vnode_t *lxpr_lookup_netdir(vnode_t *, char *);
+static vnode_t *lxpr_lookup_sysdir(vnode_t *, char *);
+static vnode_t *lxpr_lookup_sys_kerneldir(vnode_t *, char *);
 
 static int lxpr_readdir_procdir(lxpr_node_t *, uio_t *, int *);
 static int lxpr_readdir_piddir(lxpr_node_t *, uio_t *, int *);
 static int lxpr_readdir_not_a_dir(lxpr_node_t *, uio_t *, int *);
 static int lxpr_readdir_fddir(lxpr_node_t *, uio_t *, int *);
 static int lxpr_readdir_netdir(lxpr_node_t *, uio_t *, int *);
+static int lxpr_readdir_sysdir(lxpr_node_t *, uio_t *, int *);
+static int lxpr_readdir_sys_kerneldir(lxpr_node_t *, uio_t *, int *);
 
 static void lxpr_read_invalid(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_empty(lxpr_node_t *, lxpr_uiobuf_t *);
@@ -149,6 +154,8 @@ static void lxpr_read_net_stat(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_net_tcp(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_net_udp(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_net_unix(lxpr_node_t *, lxpr_uiobuf_t *);
+static void lxpr_read_sys_kernel_pid_max(lxpr_node_t *, lxpr_uiobuf_t *);
+static void lxpr_read_sys_kernel_ngroups_max(lxpr_node_t *, lxpr_uiobuf_t *);
 
 /*
  * Simple conversion
@@ -197,6 +204,7 @@ static lxpr_dirent_t lx_procdir[] = {
 	{ LXPR_PARTITIONS,	"partitions" },
 	{ LXPR_SELF,		"self" },
 	{ LXPR_STAT,		"stat" },
+	{ LXPR_SYSDIR,		"sys" },
 	{ LXPR_UPTIME,		"uptime" },
 	{ LXPR_VERSION,		"version" }
 };
@@ -251,113 +259,22 @@ static lxpr_dirent_t netdir[] = {
 #define	NETDIRFILES	(sizeof (netdir) / sizeof (netdir[0]))
 
 /*
- * These are the major signal number differences between Linux and native:
- *
- * 	====================================
- * 	| Number | Linux      | Native     |
- * 	| ====== | =========  | ========== |
- *	|    7   | SIGBUS     | SIGEMT     |
- *	|   10   | SIGUSR1    | SIGBUS     |
- *	|   12   | SIGUSR2    | SIGSYS     |
- *	|   16   | SIGSTKFLT  | SIGUSR1    |
- *	|   17   | SIGCHLD    | SIGUSR2    |
- * 	|   18   | SIGCONT    | SIGCHLD    |
- *	|   19   | SIGSTOP    | SIGPWR     |
- * 	|   20   | SIGTSTP    | SIGWINCH   |
- * 	|   21   | SIGTTIN    | SIGURG     |
- * 	|   22   | SIGTTOU    | SIGPOLL    |
- *	|   23   | SIGURG     | SIGSTOP    |
- * 	|   24   | SIGXCPU    | SIGTSTP    |
- *	|   25   | SIGXFSZ    | SIGCONT    |
- *	|   26   | SIGVTALARM | SIGTTIN    |
- *	|   27   | SIGPROF    | SIGTTOU    |
- *	|   28   | SIGWINCH   | SIGVTALARM |
- *	|   29   | SIGPOLL    | SIGPROF    |
- *	|   30   | SIGPWR     | SIGXCPU    |
- *	|   31   | SIGSYS     | SIGXFSZ    |
- * 	====================================
- *
- * Not every Linux signal maps to a native signal, nor does every native
- * signal map to a Linux counterpart. However, when signals do map, the
- * mapping is unique.
+ * contents of /proc/sys directory
  */
-static int
-lxpr_sigmap[NSIG] = {
-	0,
-	LX_SIGHUP,
-	LX_SIGINT,
-	LX_SIGQUIT,
-	LX_SIGILL,
-	LX_SIGTRAP,
-	LX_SIGABRT,
-	LX_SIGSTKFLT,
-	LX_SIGFPE,
-	LX_SIGKILL,
-	LX_SIGBUS,
-	LX_SIGSEGV,
-	LX_SIGSYS,
-	LX_SIGPIPE,
-	LX_SIGALRM,
-	LX_SIGTERM,
-	LX_SIGUSR1,
-	LX_SIGUSR2,
-	LX_SIGCHLD,
-	LX_SIGPWR,
-	LX_SIGWINCH,
-	LX_SIGURG,
-	LX_SIGPOLL,
-	LX_SIGSTOP,
-	LX_SIGTSTP,
-	LX_SIGCONT,
-	LX_SIGTTIN,
-	LX_SIGTTOU,
-	LX_SIGVTALRM,
-	LX_SIGPROF,
-	LX_SIGXCPU,
-	LX_SIGXFSZ,
-	-1,			/* 32:  illumos SIGWAITING */
-	-1,			/* 33:  illumos SIGLWP */
-	-1,			/* 34:  illumos SIGFREEZE */
-	-1,			/* 35:  illumos SIGTHAW */
-	-1,			/* 36:  illumos SIGCANCEL */
-	-1,			/* 37:  illumos SIGLOST */
-	-1,			/* 38:  illumos SIGXRES */
-	-1,			/* 39:  illumos SIGJVM1 */
-	-1,			/* 40:  illumos SIGJVM2 */
-	-1,			/* 41:  illumos SIGINFO */
-	LX_SIGRTMIN,		/* 42:  illumos _SIGRTMIN */
-	LX_SIGRTMIN + 1,
-	LX_SIGRTMIN + 2,
-	LX_SIGRTMIN + 3,
-	LX_SIGRTMIN + 4,
-	LX_SIGRTMIN + 5,
-	LX_SIGRTMIN + 6,
-	LX_SIGRTMIN + 7,
-	LX_SIGRTMIN + 8,
-	LX_SIGRTMIN + 9,
-	LX_SIGRTMIN + 10,
-	LX_SIGRTMIN + 11,
-	LX_SIGRTMIN + 12,
-	LX_SIGRTMIN + 13,
-	LX_SIGRTMIN + 14,
-	LX_SIGRTMIN + 15,
-	LX_SIGRTMIN + 16,
-	LX_SIGRTMIN + 17,
-	LX_SIGRTMIN + 18,
-	LX_SIGRTMIN + 19,
-	LX_SIGRTMIN + 20,
-	LX_SIGRTMIN + 21,
-	LX_SIGRTMIN + 22,
-	LX_SIGRTMIN + 23,
-	LX_SIGRTMIN + 24,
-	LX_SIGRTMIN + 25,
-	LX_SIGRTMIN + 26,
-	LX_SIGRTMIN + 27,
-	LX_SIGRTMIN + 28,
-	LX_SIGRTMIN + 29,
-	LX_SIGRTMIN + 30,
-	LX_SIGRTMAX
+static lxpr_dirent_t sysdir[] = {
+	{ LXPR_SYS_KERNELDIR,	"kernel" },
 };
+
+#define	SYSDIRFILES	(sizeof (sysdir) / sizeof (sysdir[0]))
+/*
+ * contents of /proc/sys/kernel directory
+ */
+static lxpr_dirent_t sys_kerneldir[] = {
+	{ LXPR_SYS_KERNEL_NGROUPS_MAX, "ngroups_max" },
+	{ LXPR_SYS_KERNEL_PID_MAX, "pid_max" },
+};
+
+#define	SYS_KERNELDIRFILES (sizeof (sys_kerneldir) / sizeof (sys_kerneldir[0]))
 
 /*
  * lxpr_open(): Vnode operation for VOP_OPEN()
@@ -522,6 +439,10 @@ static void (*lxpr_read_function[LXPR_NFILES])() = {
 	lxpr_read_partitions,		/* /proc/partitions	*/
 	lxpr_read_invalid,		/* /proc/self		*/
 	lxpr_read_stat,			/* /proc/stat		*/
+	lxpr_read_invalid,		/* /proc/sys		*/
+	lxpr_read_invalid,		/* /proc/sys/kernel	*/
+	lxpr_read_sys_kernel_ngroups_max, /* /proc/sys/kernel/ngroups_max */
+	lxpr_read_sys_kernel_pid_max,	/* /proc/sys/kernel/pid_max */
 	lxpr_read_uptime,		/* /proc/uptime		*/
 	lxpr_read_version,		/* /proc/version	*/
 };
@@ -580,6 +501,10 @@ static vnode_t *(*lxpr_lookup_function[LXPR_NFILES])() = {
 	lxpr_lookup_not_a_dir,		/* /proc/partitions	*/
 	lxpr_lookup_not_a_dir,		/* /proc/self		*/
 	lxpr_lookup_not_a_dir,		/* /proc/stat		*/
+	lxpr_lookup_sysdir,		/* /proc/sys		*/
+	lxpr_lookup_sys_kerneldir,	/* /proc/sys/kernel	*/
+	lxpr_lookup_not_a_dir,		/* /proc/sys/kernel/ngroups_max */
+	lxpr_lookup_not_a_dir,		/* /proc/sys/kernel/pid_max */
 	lxpr_lookup_not_a_dir,		/* /proc/uptime		*/
 	lxpr_lookup_not_a_dir,		/* /proc/version	*/
 };
@@ -638,6 +563,10 @@ static int (*lxpr_readdir_function[LXPR_NFILES])() = {
 	lxpr_readdir_not_a_dir,		/* /proc/partitions	*/
 	lxpr_readdir_not_a_dir,		/* /proc/self		*/
 	lxpr_readdir_not_a_dir,		/* /proc/stat		*/
+	lxpr_readdir_sysdir,		/* /proc/sys		*/
+	lxpr_readdir_sys_kerneldir,	/* /proc/sys/kernel	*/
+	lxpr_readdir_not_a_dir,		/* /proc/sys/kernel/ngroups_max */
+	lxpr_readdir_not_a_dir,		/* /proc/sys/kernel/pid_max */
 	lxpr_readdir_not_a_dir,		/* /proc/uptime		*/
 	lxpr_readdir_not_a_dir,		/* /proc/version	*/
 };
@@ -1211,7 +1140,7 @@ lxpr_read_pid_status(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	sigemptyset(&handle);
 
 	for (i = 1; i < NSIG; i++) {
-		lx_sig = lxpr_sigmap[i];
+		lx_sig = stol_signo[i];
 
 		if ((lx_sig > 0) && (lx_sig < LX_NSIG)) {
 			if (sigismember(&p->p_sig, i))
@@ -2038,6 +1967,20 @@ lxpr_read_stat(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	}
 }
 
+static void
+lxpr_read_sys_kernel_ngroups_max(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
+{
+	ASSERT(lxpnp->lxpr_type == LXPR_SYS_KERNEL_NGROUPS_MAX);
+	lxpr_uiobuf_printf(uiobuf, "%d\n", ngroups_max);
+}
+
+static void
+lxpr_read_sys_kernel_pid_max(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
+{
+	ASSERT(lxpnp->lxpr_type == LXPR_SYS_KERNEL_PID_MAX);
+	lxpr_uiobuf_printf(uiobuf, "%d\n", maxpid);
+}
+
 /*
  * lxpr_read_uptime(): read the contents of the "uptime" file.
  *
@@ -2761,6 +2704,21 @@ lxpr_lookup_procdir(vnode_t *dp, char *comp)
 	return (lxpr_lookup_common(dp, comp, NULL, lx_procdir, PROCDIRFILES));
 }
 
+static vnode_t *
+lxpr_lookup_sysdir(vnode_t *dp, char *comp)
+{
+	ASSERT(VTOLXP(dp)->lxpr_type == LXPR_SYSDIR);
+	return (lxpr_lookup_common(dp, comp, NULL, sysdir, SYSDIRFILES));
+}
+
+static vnode_t *
+lxpr_lookup_sys_kerneldir(vnode_t *dp, char *comp)
+{
+	ASSERT(VTOLXP(dp)->lxpr_type == LXPR_SYS_KERNELDIR);
+	return (lxpr_lookup_common(dp, comp, NULL, sys_kerneldir,
+	    SYS_KERNELDIRFILES));
+}
+
 /*
  * lxpr_readdir(): Vnode operation for VOP_READDIR()
  */
@@ -3192,7 +3150,20 @@ out:
 	return (error);
 }
 
+static int
+lxpr_readdir_sysdir(lxpr_node_t *lxpnp, uio_t *uiop, int *eofp)
+{
+	ASSERT(lxpnp->lxpr_type == LXPR_SYSDIR);
+	return (lxpr_readdir_common(lxpnp, uiop, eofp, sysdir, SYSDIRFILES));
+}
 
+static int
+lxpr_readdir_sys_kerneldir(lxpr_node_t *lxpnp, uio_t *uiop, int *eofp)
+{
+	ASSERT(lxpnp->lxpr_type == LXPR_SYS_KERNELDIR);
+	return (lxpr_readdir_common(lxpnp, uiop, eofp, sys_kerneldir,
+	    SYS_KERNELDIRFILES));
+}
 /*
  * lxpr_readlink(): Vnode operation for VOP_READLINK()
  */

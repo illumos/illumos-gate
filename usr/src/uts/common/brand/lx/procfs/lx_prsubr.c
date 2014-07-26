@@ -474,6 +474,8 @@ lxpr_getnode(vnode_t *dp, lxpr_nodetype_t type, proc_t *p, int fd)
 		lxpnp->lxpr_mode = 0511;
 		break;
 
+	case LXPR_SYSDIR:
+	case LXPR_SYS_KERNELDIR:
 	case LXPR_NETDIR:
 		vp->v_type = VDIR;
 		lxpnp->lxpr_mode = 0555;	/* read-search by all */
