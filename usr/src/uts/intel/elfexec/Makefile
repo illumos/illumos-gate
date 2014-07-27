@@ -102,12 +102,15 @@ include $(UTSBASE)/intel/Makefile.targ
 
 $(OBJS_DIR)/elf32.o:	$(UTSBASE)/common/exec/elf/elf.c
 	$(COMPILE.c) -o $@ -D_ELF32_COMPAT $(UTSBASE)/common/exec/elf/elf.c
+	$(CTFCONVERT_O)
 
 $(OBJS_DIR)/elf32_notes.o: $(UTSBASE)/common/exec/elf/elf_notes.c
 	$(COMPILE.c) -o $@ -D_ELF32_COMPAT $(UTSBASE)/common/exec/elf/elf_notes.c
+	$(CTFCONVERT_O)
 
 $(OBJS_DIR)/old32_notes.o: $(UTSBASE)/common/exec/elf/old_notes.c
 	$(COMPILE.c) -o $@ -D_ELF32_COMPAT $(UTSBASE)/common/exec/elf/old_notes.c
+	$(CTFCONVERT_O)
 
 $(LINTS_DIR)/elf32.ln:	$(UTSBASE)/common/exec/elf/elf.c
 	@($(LHEAD) $(LINT.c) -Celf32 -D_ELF32_COMPAT $(UTSBASE)/common/exec/elf/elf.c $(LTAIL))
