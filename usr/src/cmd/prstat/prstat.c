@@ -182,6 +182,33 @@ static optdesc_t opts = {
 	-1			/* sort in decreasing order */
 };
 
+
+static int
+proc_snprintf(char *_RESTRICT_KYWD s, size_t n,
+    const char *_RESTRICT_KYWD fmt, ...)
+{
+	static boolean_t ptools_zroot_valid = B_FALSE;
+	static const char *ptools_zroot = NULL;
+	va_list args;
+	int ret, nret = 0;
+
+	if (ptools_zroot_valid == B_FALSE) {
+		ptools_zroot_valid = B_TRUE;
+		ptools_zroot = zone_get_nroot();
+	}
+
+	if (ptools_zroot != NULL) {
+		nret = snprintf(s, n, "%s", ptools_zroot);
+		if (nret > n)
+			return (nret);
+	}
+	va_start(args, fmt);
+	ret = vsnprintf(s + nret, n - nret, fmt, args);
+	va_end(args);
+
+	return (ret + nret);
+}
+
 /*
  * Print timestamp as decimal reprentation of time_t value (-d u was specified)
  * or the standard date format (-d d was specified).
@@ -854,9 +881,9 @@ lwp_update(lwp_info_t *lwp, pid_t pid, id_t lwpid, struct prusage *usage)
 static int
 read_procfile(fd_t **fd, char *pidstr, char *file, void *buf, size_t bufsize)
 {
-	char procfile[MAX_PROCFS_PATH];
+	char procfile[PATH_MAX];
 
-	(void) snprintf(procfile, MAX_PROCFS_PATH,
+	(void) proc_snprintf(procfile, PATH_MAX,
 	    "/proc/%s/%s", pidstr, file);
 	if ((*fd = fd_open(procfile, O_RDONLY, *fd)) == NULL)
 		return (1);
@@ -1382,6 +1409,7 @@ main(int argc, char **argv)
 	int timeout;
 	struct pollfd pollset;
 	char key;
+	char procpath[PATH_MAX];
 
 	(void) setlocale(LC_ALL, "");
 	(void) textdomain(TEXT_DOMAIN);
@@ -1584,7 +1612,8 @@ main(int argc, char **argv)
 	list_setkeyfunc(NULL, &opts, &lgroups, LT_LGRPS);
 	if (opts.o_outpmode & OPT_TERMCAP)
 		curses_on();
-	if ((procdir = opendir("/proc")) == NULL)
+	(void) proc_snprintf(procpath, sizeof (procpath), "/proc");
+	if ((procdir = opendir(procpath)) == NULL)
 		Die(gettext("cannot open /proc directory\n"));
 	if (opts.o_outpmode & OPT_TTY) {
 		(void) printf(gettext("Please wait...\r"));

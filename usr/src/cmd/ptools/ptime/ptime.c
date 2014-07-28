@@ -25,7 +25,7 @@
  * Portions Copyright 2008 Chad Mynhier
  */
 /*
- * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
  */
 
 #include <stdio.h>
@@ -41,6 +41,8 @@
 #include <sys/time.h>
 #include <signal.h>
 #include <libproc.h>
+#include <limits.h>
+#include "ptools_common.h"
 
 static	int	look(pid_t);
 static	void	hr_min_sec(char *, long);
@@ -189,7 +191,7 @@ main(int argc, char **argv)
 static int
 look(pid_t pid)
 {
-	char pathname[100];
+	char pathname[PATH_MAX];
 	int rval = 0;
 	int fd;
 	psinfo_t psinfo;
@@ -201,7 +203,8 @@ look(pid_t pid)
 	if (proc_get_psinfo(pid, &psinfo) < 0)
 		return (perr("read psinfo"));
 
-	(void) sprintf(pathname, "/proc/%d/usage", (int)pid);
+	(void) proc_snprintf(pathname, sizeof (pathname), "/proc/%d/usage",
+	    (int)pid);
 	if ((fd = open(pathname, O_RDONLY)) < 0)
 		return (perr("open usage"));
 

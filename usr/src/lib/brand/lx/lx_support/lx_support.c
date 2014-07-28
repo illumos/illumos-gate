@@ -443,8 +443,6 @@ static int
 lxs_verify(char *xmlfile)
 {
 	zone_dochandle_t	handle;
-	struct zone_dstab	dstab;
-	struct zone_devtab	devtab;
 	boolean_t		audio, restart;
 	char			*idev, *odev, *kvers;
 	char			hostidp[HW_HOSTID_LEN];
@@ -455,32 +453,6 @@ lxs_verify(char *xmlfile)
 	if (zonecfg_get_xml_handle(xmlfile, handle) != Z_OK) {
 		zonecfg_fini_handle(handle);
 		lxs_err(gettext("zonecfg provided an invalid XML file"));
-	}
-
-	/*
-	 * Check to see whether the zone has any ZFS datasets configured.
-	 */
-	if (zonecfg_setdsent(handle) != Z_OK) {
-		zonecfg_fini_handle(handle);
-		lxs_err(gettext("zonecfg provided an invalid XML file"));
-	}
-
-	if (zonecfg_getdsent(handle, &dstab) == Z_OK) {
-		zonecfg_fini_handle(handle);
-		lxs_err(gettext("lx zones do not support ZFS datasets"));
-	}
-
-	/*
-	 * Check to see whether the zone has any devices configured.
-	 */
-	if (zonecfg_setdevent(handle) != Z_OK) {
-		zonecfg_fini_handle(handle);
-		lxs_err(gettext("zonecfg provided an invalid XML file"));
-	}
-
-	if (zonecfg_getdevent(handle, &devtab) == Z_OK) {
-		zonecfg_fini_handle(handle);
-		lxs_err(gettext("lx zones do not support added devices"));
 	}
 
 	/*

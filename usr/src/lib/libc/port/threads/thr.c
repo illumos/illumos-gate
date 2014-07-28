@@ -136,6 +136,7 @@ uberdata_t __uberdata = {
 	NULL,			/* robustlocks */
 	NULL,			/* robustlist */
 	NULL,			/* progname */
+	NULL,			/* ub_broot */
 	NULL,			/* __tdb_bootstrap */
 	{			/* tdb */
 		NULL,		/* tdb_sync_addr_hash */
@@ -1219,6 +1220,24 @@ extern void atfork_init(void);
 extern void __proc64id(void);
 #endif
 
+static void
+init_brandroot(uberdata_t *udp)
+{
+	Dl_argsinfo_t args;
+
+	udp->ub_broot = NULL;
+	if (dlinfo(RTLD_SELF, RTLD_DI_ARGSINFO, &args) < 0)
+		return;
+
+	while (args.dla_auxv->a_type != AT_NULL) {
+		if (args.dla_auxv->a_type == AT_SUN_BRAND_NROOT) {
+			udp->ub_broot = args.dla_auxv->a_un.a_ptr;
+			return;
+		}
+		args.dla_auxv++;
+	}
+}
+
 /*
  * libc_init() is called by ld.so.1 for library initialization.
  * We perform minimal initialization; enough to work with the main thread.
@@ -1253,6 +1272,13 @@ libc_init(void)
 	 * Every libc, regardless of which link map, must register __cleanup().
 	 */
 	(void) _atexit(__cleanup);
+
+	/*
+	 * Every libc, regardless of link map, needs to go through and check its
+	 * aux vectors so as to indicate whether or not this has been given a
+	 * brand root with which we use to qualify various other data.
+	 */
+	init_brandroot(udp);
 
 	/*
 	 * We keep our uberdata on one of (a) the first alternate link map

@@ -106,6 +106,7 @@ typedef struct uarg {
 	vnode_t	*ex_vp;
 	char	*emulator;
 	char	*brandname;
+	const char *brand_nroot;
 	char	*auxp_auxflags; /* addr of auxflags auxv on the user stack */
 	char	*auxp_brand; /* address of first brand auxv on user stack */
 	cred_t	*pfcred;

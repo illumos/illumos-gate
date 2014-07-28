@@ -83,6 +83,7 @@ struct brand_ops sngl_brops = {
 	NSIG,
 	NULL,
 	NULL,
+	NULL
 };
 
 #ifdef	__amd64

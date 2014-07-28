@@ -3051,6 +3051,7 @@ $endif
 	zone_list;
 	zone_list_datalink;
 	zonept;
+	zone_get_nroot;
 	zone_remove_datalink;
 	zone_setattr;
 	zone_shutdown;

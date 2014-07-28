@@ -811,6 +811,7 @@ static struct aux_id aux_arr[] = {
 	{ AT_SUN_AUXFLAGS,	"AT_SUN_AUXFLAGS",	at_flags },
 	{ AT_SUN_EMULATOR,	"AT_SUN_EMULATOR",	at_str	},
 	{ AT_SUN_BRANDNAME,	"AT_SUN_BRANDNAME",	at_str	},
+	{ AT_SUN_BRAND_NROOT,	"AT_SUN_BRAND_NROOT",	at_str	},
 	{ AT_SUN_BRAND_AUX1,	"AT_SUN_BRAND_AUX1",	at_null	},
 	{ AT_SUN_BRAND_AUX2,	"AT_SUN_BRAND_AUX2",	at_null	},
 	{ AT_SUN_BRAND_AUX3,	"AT_SUN_BRAND_AUX3",	at_null	}

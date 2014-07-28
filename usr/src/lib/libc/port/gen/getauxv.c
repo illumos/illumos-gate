@@ -24,9 +24,8 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "lint.h"
+#include "thr_uberdata.h"
 #include <libc.h>
 #include <fcntl.h>
 #include <stdlib.h>
@@ -38,6 +37,7 @@
 #include <thread.h>
 #include <synch.h>
 #include <atomic.h>
+#include <limits.h>
 
 static mutex_t auxlock = DEFAULTMUTEX;
 
@@ -59,11 +59,20 @@ _getaux(int type)
 	if (auxb == NULL) {
 		lmutex_lock(&auxlock);
 		if (auxb == NULL) {
+			uberdata_t *udp = curthread->ul_uberdata;
 			struct stat statb;
 			auxv_t *buf = NULL;
+			char *path = "/proc/self/auxv";
+			char pbuf[PATH_MAX];
 			int fd;
 
-			if ((fd = open("/proc/self/auxv", O_RDONLY)) != -1 &&
+			if (udp->ub_broot != NULL) {
+				(void) snprintf(pbuf, sizeof (pbuf),
+				    "%s/proc/self/auxv", udp->ub_broot);
+				path = pbuf;
+			}
+
+			if ((fd = open(path, O_RDONLY)) != -1 &&
 			    fstat(fd, &statb) != -1)
 				buf = libc_malloc(
 				    statb.st_size + sizeof (auxv_t));

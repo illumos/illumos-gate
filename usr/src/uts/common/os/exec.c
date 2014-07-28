@@ -1628,8 +1628,9 @@ stk_copyin(execa_t *uap, uarg_t *args, intpdata_t *intp, void **auxvpp)
 	args->ne = args->na - argc;
 
 	/*
-	 * Add AT_SUN_PLATFORM, AT_SUN_EXECNAME, AT_SUN_BRANDNAME, and
-	 * AT_SUN_EMULATOR strings, as well as AT_RANDOM array, to the stack.
+	 * Add AT_SUN_PLATFORM, AT_SUN_EXECNAME, AT_SUN_BRANDNAME,
+	 * AT_SUN_BRAND_NROOT, and AT_SUN_EMULATOR strings, as well as AT_RANDOM
+	 * array, to the stack.
 	 */
 	if (auxvpp != NULL && *auxvpp != NULL) {
 		if ((error = stk_add(args, platform, UIO_SYSSPACE)) != 0)
@@ -1663,6 +1664,11 @@ stk_copyin(execa_t *uap, uarg_t *args, intpdata_t *intp, void **auxvpp)
 		rdata[7] = rdata[10] = ~(*rtp);
 
 		if ((error = stk_byte_add(args, rdata, sizeof (rdata))) != 0)
+			return (error);
+
+		if (args->brand_nroot != NULL &&
+		    (error = stk_add(args, args->brand_nroot,
+		    UIO_SYSSPACE)) != 0)
 			return (error);
 	}
 
@@ -1784,6 +1790,10 @@ stk_copyout(uarg_t *args, char *usrstack, void **auxvpp, user_t *up)
 				ADDAUX(*a,
 				    AT_SUN_EMULATOR, (long)&ustrp[*--offp])
 			ADDAUX(*a, AT_RANDOM, (long)&ustrp[*--offp])
+			if (args->brand_nroot != NULL) {
+				ADDAUX(*a,
+				    AT_SUN_BRAND_NROOT, (long)&ustrp[*--offp])
+			}
 		} else {
 			auxv32_t **a = (auxv32_t **)auxvpp;
 			ADDAUX(*a,
@@ -1797,6 +1807,10 @@ stk_copyout(uarg_t *args, char *usrstack, void **auxvpp, user_t *up)
 				ADDAUX(*a, AT_SUN_EMULATOR,
 				    (int)(uintptr_t)&ustrp[*--offp])
 			ADDAUX(*a, AT_RANDOM, (int)(uintptr_t)&ustrp[*--offp])
+			if (args->brand_nroot != NULL) {
+				ADDAUX(*a, AT_SUN_BRAND_NROOT,
+				    (int)(uintptr_t)&ustrp[*--offp])
+			}
 		}
 	}
 

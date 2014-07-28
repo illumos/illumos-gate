@@ -37,6 +37,7 @@
 #include <sys/types.h>
 
 #include "pmap_common.h"
+#include "ptools_common.h"
 
 /*
  * We compare the high memory addresses since stacks are faulted in from
@@ -88,7 +89,7 @@ make_name(struct ps_prochandle *Pr, int lflag, uintptr_t addr,
 		return (NULL);
 
 	/* first see if we can find a path via /proc */
-	(void) snprintf(path, sizeof (path), "/proc/%d/path/%s",
+	(void) proc_snprintf(path, sizeof (path), "/proc/%d/path/%s",
 	    (int)Psp->pr_pid, mapname);
 	len = readlink(path, buf, bufsz - 1);
 	if (len >= 0) {
@@ -97,7 +98,7 @@ make_name(struct ps_prochandle *Pr, int lflag, uintptr_t addr,
 	}
 
 	/* fall back to object information reported by /proc */
-	(void) snprintf(path, sizeof (path),
+	(void) proc_snprintf(path, sizeof (path),
 	    "/proc/%d/object/%s", (int)Psp->pr_pid, mapname);
 	if (stat(path, &statb) == 0) {
 		dev_t dev = statb.st_dev;

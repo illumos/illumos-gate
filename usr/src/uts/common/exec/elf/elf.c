@@ -255,7 +255,7 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 	caddr_t 	bssbase = 0;
 	caddr_t 	brkbase = 0;
 	size_t		brksize = 0;
-	ssize_t		dlnsize;
+	ssize_t		dlnsize, nsize = 0;
 	aux_entry_t	*aux;
 	int		error;
 	ssize_t		resid;
@@ -345,12 +345,38 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 #endif	/* _LP64 */
 
 	/*
-	 * We delay invoking the brand callback until we've figured out
-	 * what kind of elf binary we're trying to run, 32-bit or 64-bit.
-	 * We do this because now the brand library can just check
-	 * args->to_model to see if the target is 32-bit or 64-bit without
-	 * having do duplicate all the code above.
+	 * We delay invoking the brand callback until we've figured out what
+	 * kind of elf binary we're trying to run, 32-bit or 64-bit.  We do this
+	 * because now the brand library can just check args->to_model to see if
+	 * the target is 32-bit or 64-bit without having do duplicate all the
+	 * code above.
+	 *
+	 * We also give the brand a chance to indicate that based on the ELF
+	 * OSABI of the target binary it should become unbranded and optionally
+	 * indicate that it should be treated as existing in a specific prefix.
+	 *
+	 * Note that if a brand opts to go down this route it does not actually
+	 * end up being debranded. In other words, future programs that exec
+	 * will still be considered for branding unless this escape hatch is
+	 * used. Consider the case of lx brand for example. If a user runs
+	 * /native/usr/sbin/dtrace -c /bin/ls, the isaexec and normal executable
+	 * of DTrace that's in /native will take this escape hatch and be run
+	 * and interpreted using the normal system call table; however, the
+	 * execution of a non-illumos binary in the form of /bin/ls will still
+	 * be branded and be subject to all of the normal actions of the brand.
 	 */
+	if ((level < 2) &&
+	    (brand_action != EBA_NATIVE) && (PROC_IS_BRANDED(p))) {
+		if (BROP(p)->b_native_exec(ehdrp->e_ident[EI_OSABI],
+		    &args->brand_nroot) == B_TRUE) {
+			ASSERT(ehdrp->e_ident[EI_OSABI]);
+			brand_action = EBA_NATIVE;
+			/* Add one for the trailing '/' in the path */
+			if (args->brand_nroot != NULL)
+				nsize = strlen(args->brand_nroot) + 1;
+		}
+	}
+
 	if ((level < 2) &&
 	    (brand_action != EBA_NATIVE) && (PROC_IS_BRANDED(p))) {
 		error = BROP(p)->b_elfexec(vp, uap, args,
@@ -471,6 +497,14 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 	if (args->emulator != NULL)
 		args->auxsize += sizeof (aux_entry_t);
 
+	/*
+	 * If this is a native binary that's been given a modified interpreter
+	 * root, inform it that the native system exists at that root.
+	 */
+	if (args->brand_nroot != NULL) {
+		args->auxsize += sizeof (aux_entry_t);
+	}
+
 	if ((brand_action != EBA_NATIVE) && (PROC_IS_BRANDED(p))) {
 		branded = 1;
 		/*
@@ -548,17 +582,22 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 		char		*p;
 		struct vnode	*nvp;
 
-		dlnsize = dyphdr->p_filesz;
+		dlnsize = dyphdr->p_filesz + nsize;
 
 		if (dlnsize > MAXPATHLEN || dlnsize <= 0)
 			goto bad;
 
+		if (nsize != 0) {
+			bcopy(args->brand_nroot, dlnp, nsize - 1);
+			dlnp[nsize - 1] = '/';
+		}
+
 		/*
 		 * Read in "interpreter" pathname.
 		 */
-		if ((error = vn_rdwr(UIO_READ, vp, dlnp, dyphdr->p_filesz,
-		    (offset_t)dyphdr->p_offset, UIO_SYSSPACE, 0, (rlim64_t)0,
-		    CRED(), &resid)) != 0) {
+		if ((error = vn_rdwr(UIO_READ, vp, dlnp + nsize,
+		    dyphdr->p_filesz, (offset_t)dyphdr->p_offset, UIO_SYSSPACE,
+		    0, (rlim64_t)0, CRED(), &resid)) != 0) {
 			uprintf("%s: Cannot obtain interpreter pathname\n",
 			    exec_file);
 			goto bad;

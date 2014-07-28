@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -37,6 +35,8 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <libproc.h>
+#include <limits.h>
+#include "ptools_common.h"
 
 #define	NOREAP_TIME 60		/* wait 60 seconds before allow a reap */
 
@@ -53,11 +53,11 @@ intr(int sig)
 static int
 open_usage(pid_t pid, int *perr)
 {
-	char path[64];
+	char path[PATH_MAX];
 	struct stat64 st;
 	int fd;
 
-	(void) snprintf(path, sizeof (path), "/proc/%d/usage", (int)pid);
+	(void) proc_snprintf(path, sizeof (path), "/proc/%d/usage", (int)pid);
 
 	/*
 	 * Attempt to open the usage file, and return the fd if we can
