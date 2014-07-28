@@ -128,6 +128,7 @@ struct brand_ops {
 	int	b_nsig;
 	void	(*b_exit_with_sig)(proc_t *, sigqueue_t *, void *);
 	boolean_t (*b_wait_filter)(proc_t *, proc_t *);
+	boolean_t (*b_native_exec)(uint8_t, const char **);
 };
 
 /*

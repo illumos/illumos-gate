@@ -40,6 +40,7 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <assert.h>
+#include <zone.h>
 
 #define	_POSIX_PTHREAD_SEMANTICS
 #include <dirent.h>
@@ -683,8 +684,8 @@ const dtrace_pattr_t _dtrace_prvdesc = {
 { DTRACE_STABILITY_UNSTABLE, DTRACE_STABILITY_UNSTABLE, DTRACE_CLASS_COMMON },
 };
 
-const char *_dtrace_defcpp = "/usr/ccs/lib/cpp"; /* default cpp(1) to invoke */
-const char *_dtrace_defld = "/usr/ccs/bin/ld";   /* default ld(1) to invoke */
+const char *_dtrace_defcpp = "/usr/lib/cpp"; /* default cpp(1) to invoke */
+const char *_dtrace_defld = "/usr/bin/ld";   /* default ld(1) to invoke */
 
 const char *_dtrace_libdir = "/usr/lib/dtrace"; /* default library directory */
 const char *_dtrace_provdir = "/dev/dtrace/provider"; /* provider directory */
@@ -824,6 +825,8 @@ dt_vopen(int version, int flags, int *errp,
 	dt_provmod_t *provmod = NULL;
 	int i, err;
 	struct rlimit rl;
+	const char *zroot;
+	char *libpath = NULL;
 
 	const dt_intrinsic_t *dinp;
 	const dt_typedef_t *dtyp;
@@ -956,11 +959,19 @@ alloc:
 	dtp->dt_provs = calloc(dtp->dt_provbuckets, sizeof (dt_provider_t *));
 	dt_proc_init(dtp);
 	dtp->dt_vmax = DT_VERS_LATEST;
-	dtp->dt_cpp_path = strdup(_dtrace_defcpp);
+	zroot = zone_get_nroot();
+	if (zroot != NULL) {
+		(void) asprintf(&dtp->dt_ld_path, "%s/%s", zroot,
+		    _dtrace_defld);
+		(void) asprintf(&dtp->dt_cpp_path, "%s/%s", zroot,
+		    _dtrace_defcpp);
+	} else {
+		dtp->dt_ld_path = strdup(_dtrace_defld);
+		dtp->dt_cpp_path = strdup(_dtrace_defcpp);
+	}
 	dtp->dt_cpp_argv = malloc(sizeof (char *));
 	dtp->dt_cpp_argc = 1;
 	dtp->dt_cpp_args = 1;
-	dtp->dt_ld_path = strdup(_dtrace_defld);
 	dtp->dt_provmod = provmod;
 	dtp->dt_vector = vector;
 	dtp->dt_varg = arg;
@@ -1305,8 +1316,14 @@ alloc:
 	 * compile, and to provide better error reporting (because the full
 	 * reporting of compiler errors requires dtrace_open() to succeed).
 	 */
-	if (dtrace_setopt(dtp, "libdir", _dtrace_libdir) != 0)
+	if (zroot != NULL)
+		(void) asprintf(&libpath, "%s/%s", zroot, _dtrace_libdir);
+	if (dtrace_setopt(dtp, "libdir",
+	    libpath != NULL ? libpath : _dtrace_libdir) != 0)
 		return (set_open_errno(dtp, errp, dtp->dt_errno));
+
+	if (libpath != NULL)
+		free(libpath);
 
 	return (dtp);
 }

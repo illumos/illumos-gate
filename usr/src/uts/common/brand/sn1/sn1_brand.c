@@ -81,6 +81,7 @@ struct brand_ops sn1_brops = {
 	NSIG,
 	NULL,
 	NULL,
+	NULL
 };
 
 #ifdef	sparc

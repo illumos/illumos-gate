@@ -597,6 +597,8 @@ main(int argc, char *argv[])
 	const char *optstr;
 	optdesc_t *optd;
 	int nmatches, c;
+	const char *zroot;
+	char buf[PATH_MAX];
 
 	DIR *dirp;
 
@@ -625,6 +627,12 @@ main(int argc, char *argv[])
 		optstr = PGREP_OPTS;
 
 	opterr = 0;
+
+	zroot = zone_get_nroot();
+	if (zroot != NULL) {
+		(void) snprintf(buf, sizeof (buf), "%s/%s", zroot, g_procdir);
+		g_procdir = buf;
+	}
 
 	while (optind < argc) {
 		while ((c = getopt(argc, argv, optstr)) != (int)EOF) {

@@ -22,6 +22,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
  */
 
 #include <stdio.h>
@@ -42,6 +43,7 @@
 #include <sys/mman.h>
 #include <sys/lgrp_user.h>
 #include <libproc.h>
+#include "ptools_common.h"
 
 #include "pmap_common.h"
 
@@ -199,7 +201,7 @@ main(int argc, char **argv)
 	const char *bar;
 	struct rlimit rlim;
 	struct stat64 statbuf;
-	char buf[128];
+	char buf[PATH_MAX];
 	int mapfd;
 	int prg_gflags = PGRAB_RDONLY;
 	int prr_flags = 0;
@@ -358,7 +360,7 @@ main(int argc, char **argv)
 		proc_unctrl_psinfo(&psinfo);
 
 		if (Pstate(Pr) != PS_DEAD) {
-			(void) snprintf(buf, sizeof (buf),
+			(void) proc_snprintf(buf, sizeof (buf),
 			    "/proc/%d/map", (int)psinfo.pr_pid);
 			if ((mapfd = open(buf, O_RDONLY)) < 0) {
 				(void) fprintf(stderr, "%s: cannot "
@@ -590,7 +592,7 @@ rmapping_iter(struct ps_prochandle *Pr, proc_map_f *func, void *cd)
 	prmap_t *prmapp, *pmp;
 	ssize_t n;
 
-	(void) snprintf(mapname, sizeof (mapname),
+	(void) proc_snprintf(mapname, sizeof (mapname),
 	    "/proc/%d/rmap", (int)Pstatus(Pr)->pr_pid);
 
 	if ((mapfd = open(mapname, O_RDONLY)) < 0 || fstat(mapfd, &st) != 0) {
@@ -631,7 +633,7 @@ xmapping_iter(struct ps_prochandle *Pr, proc_xmap_f *func, void *cd, int doswap)
 	prxmap_t *prmapp, *pmp;
 	ssize_t n;
 
-	(void) snprintf(mapname, sizeof (mapname),
+	(void) proc_snprintf(mapname, sizeof (mapname),
 	    "/proc/%d/xmap", (int)Pstatus(Pr)->pr_pid);
 
 	if ((mapfd = open(mapname, O_RDONLY)) < 0 || fstat(mapfd, &st) != 0) {

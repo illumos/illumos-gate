@@ -95,6 +95,8 @@ static int lx_elfexec(struct vnode *vp, struct execa *uap, struct uarg *args,
     struct intpdata *idata, int level, long *execsz, int setid,
     caddr_t exec_file, struct cred *cred, int brand_action);
 
+static boolean_t lx_native_exec(uint8_t, const char **);
+
 /* lx brand */
 struct brand_ops lx_brops = {
 	lx_init_brand_data,
@@ -117,6 +119,7 @@ struct brand_ops lx_brops = {
 	NSIG,
 	lx_exit_with_sig,
 	lx_wait_filter,
+	lx_native_exec
 };
 
 struct brand_mach_ops lx_mops = {
@@ -1107,6 +1110,16 @@ lx_elfexec(struct vnode *vp, struct execa *uap, struct uarg *args,
 	}
 
 	return (0);
+}
+
+boolean_t
+lx_native_exec(uint8_t osabi, const char **interp)
+{
+	if (osabi != ELFOSABI_SOLARIS)
+		return (B_FALSE);
+
+	*interp = "/native";
+	return (B_TRUE);
 }
 
 int

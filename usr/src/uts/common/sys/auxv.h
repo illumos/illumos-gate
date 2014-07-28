@@ -199,6 +199,7 @@ extern uint_t getisax(uint32_t *, uint_t);
 #define	AT_SUN_BRAND_AUX1	2020
 #define	AT_SUN_BRAND_AUX2	2021
 #define	AT_SUN_BRAND_AUX3	2022
+#define	AT_SUN_BRAND_NROOT	2024
 
 /*
  * Note that 2023 is reserved for the AT_SUN_HWCAP2 word defined above.

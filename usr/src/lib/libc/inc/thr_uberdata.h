@@ -944,6 +944,7 @@ typedef struct uberdata {
 	robust_t	**robustlocks;	/* table of registered robust locks */
 	robust_t	*robustlist;	/* list of registered robust locks */
 	char	*progname;	/* the basename of the program, from argv[0] */
+	char	*ub_broot;	/* the root of the native code in the brand */
 	struct uberdata **tdb_bootstrap;
 	tdb_t	tdb;		/* thread debug interfaces (for libc_db) */
 } uberdata_t;
