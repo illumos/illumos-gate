@@ -77,7 +77,7 @@ extern int lx_dup2(uintptr_t, uintptr_t);
 extern int lx_dup3(uintptr_t, uintptr_t, uintptr_t);
 extern int lx_ioctl(uintptr_t, uintptr_t, uintptr_t);
 extern int lx_vhangup(void);
-extern int lx_fadvise64(uintptr_t, uintptr_t, uintptr_t, uintptr_t);
+extern int lx_fadvise64(uintptr_t, off64_t, uintptr_t, uintptr_t);
 extern int lx_fadvise64_64(uintptr_t, off64_t, off64_t, uintptr_t);
 
 extern int lx_read(uintptr_t, uintptr_t, uintptr_t);
