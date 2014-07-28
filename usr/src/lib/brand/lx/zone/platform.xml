@@ -58,9 +58,13 @@
 	<mount special="swap" directory="/native/etc/svc/volatile"
 	    type="tmpfs" />
 	<mount special="swap" directory="/native/tmp" type="tmpfs" />
+	<mount special="objfs" directory="/system/object" type="objfs" />
+	<mount special="ctfs" directory="/system/contract" type="ctfs" />
 
 	<!-- Devices to create under /dev -->
 	<device match="arp" />
+	<device match="dtrace/*" />
+	<device match="dtrace/provider/*" />
 	<device match="ipnet" />
 	<device match="kstat" />
 	<device match="lo0" />
@@ -75,6 +79,9 @@
 	<device match="udp6" />
 	<device match="urandom" />
 	<device match="zero" />
+	<device match="zfs" />
+	<device match="zvol/dsk/%P/%z/*" />
+	<device match="zvol/rdsk/%P/%z/*" />
 
 	<!-- Devices to create in exclusive IP zone only -->
 	<device match="dld" ip-type="exclusive" />
