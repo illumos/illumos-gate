@@ -28,6 +28,10 @@
  */
 
 /*
+ * Copyright (c) 2014 by Delphix. All rights reserved.
+ */
+
+/*
  * Utility routines for run-time linker.  some are duplicated here from libc
  * (with different names) to avoid name space collisions.
  */
@@ -3089,6 +3093,15 @@ assfail(const char *a, const char *f, int l)
 	(void) printf("assertion failed: %s, file: %s, line: %d\n", a, f, l);
 	(void) _lwp_kill(_lwp_self(), SIGABRT);
 	return (0);
+}
+
+void
+assfail3(const char *msg, uintmax_t a, const char *op, uintmax_t b,
+    const char *f, int l)
+{
+	(void) printf("assertion failed: %s (%llu %s %llu), "
+	    "file: %s, line: %d\n", msg, a, op, b, f, l);
+	(void) _lwp_kill(_lwp_self(), SIGABRT);
 }
 #endif
 
