@@ -22,12 +22,12 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2014 Joyent, Inc.  All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <errno.h>
 #include <unistd.h>
+#include <fcntl.h>
 #include <sys/lx_types.h>
 #include <sys/lx_misc.h>
 
@@ -45,7 +45,27 @@ lx_truncate(uintptr_t path, uintptr_t length)
 int
 lx_ftruncate(uintptr_t fd, uintptr_t length)
 {
-	return (ftruncate((int)fd, (off_t)length) == 0 ? 0 : -errno);
+	int r;
+
+	r = ftruncate((int)fd, (off_t)length);
+	/*
+	 * On Linux, truncating a file opened read-only returns EINVAL whereas
+	 * Illumos returns EBADF.
+	 */
+	if (r != 0) {
+		if (errno == EBADF) {
+			int mode;
+
+			if ((mode = fcntl(fd, F_GETFL, 0)) != -1 &&
+			    (mode & O_ACCMODE) == O_RDONLY)
+				r = -EINVAL;
+			else
+				r = -EBADF; /* keep existing errno */
+		} else {
+			r = -errno;
+		}
+	}
+	return (r);
 }
 
 int
@@ -58,6 +78,26 @@ lx_truncate64(uintptr_t path, uintptr_t length_lo, uintptr_t length_hi)
 int
 lx_ftruncate64(uintptr_t fd, uintptr_t length_lo, uintptr_t length_hi)
 {
-	return (ftruncate64((int)fd,
-	    LX_32TO64(length_lo, length_hi)) == 0 ? 0 : -errno);
+	int r;
+
+	r = ftruncate64((int)fd, LX_32TO64(length_lo, length_hi));
+	/*
+	 * On Linux, truncating a file opened read-only returns EINVAL whereas
+	 * Illumos returns EBADF.
+	 */
+	if (r != 0) {
+		if (errno == EBADF) {
+			int mode;
+
+			if ((mode = fcntl(fd, F_GETFL, 0)) != -1 &&
+			    (mode & O_ACCMODE) == O_RDONLY)
+				r = -EINVAL;
+			else
+				r = -EBADF; /* keep existing errno */
+		} else {
+			r = -errno;
+		}
+	}
+
+	return (r);
 }
