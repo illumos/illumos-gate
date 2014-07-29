@@ -32,6 +32,7 @@
 #include <sys/types.h>
 #include <sys/statvfs.h>
 #include <sys/param.h>
+#include <sys/stat.h>
 
 #include <sys/lx_debug.h>
 #include <sys/lx_misc.h>
@@ -241,19 +242,37 @@ int
 lx_fstatfs(uintptr_t p1, uintptr_t p2)
 {
 	struct lx_statfs lxfs, *fs = (struct lx_statfs *)p2;
+	struct stat64 sb;
 	struct statvfs vfs;
 	char *path, path_buf[MAXPATHLEN];
 	int fd = (int)p1;
 	int err;
 
 	lx_debug("\tfstatvfs(%d, 0x%p)", fd, fs);
-	if (fstatvfs(fd, &vfs) != 0)
-		return (-errno);
 
-	path = lx_fd_to_path(fd, path_buf, sizeof (path_buf));
+	/*
+	 * fstatfs emulation for a pipe.
+	 */
+	if (fstat64(fd, &sb) == 0 && S_ISFIFO(sb.st_mode)) {
+		lxfs.f_type = LX_PIPEFS_MAGIC;
+		lxfs.f_bsize = 4096;
+		lxfs.f_blocks = 0;
+		lxfs.f_bfree = 0;
+		lxfs.f_bavail = 0;
+		lxfs.f_files = 0;
+		lxfs.f_ffree = 0;
+		lxfs.f_fsid = 0;
+		lxfs.f_namelen = 255;
+		lxfs.f_frsize = 4096;
+	} else {
+		if (fstatvfs(fd, &vfs) != 0)
+			return (-errno);
 
-	if ((err = stol_statfs(path, &lxfs, &vfs)) != 0)
-		return (err);
+		path = lx_fd_to_path(fd, path_buf, sizeof (path_buf));
+
+		if ((err = stol_statfs(path, &lxfs, &vfs)) != 0)
+			return (err);
+	}
 
 	if (uucopy(&lxfs, fs, sizeof (struct lx_statfs)) != 0)
 		return (-errno);
@@ -288,19 +307,33 @@ int
 lx_fstatfs64(uintptr_t p1, uintptr_t p2, uintptr_t p3)
 {
 	struct lx_statfs64 lxfs, *fs = (struct lx_statfs64 *)p3;
+	struct stat64 sb;
 	struct statvfs64 vfs;
 	char *path, path_buf[MAXPATHLEN];
 	int fd = (int)p1;
 	int err;
 
 	lx_debug("\tfstatvfs64(%d, %d, 0x%p)", fd, p2, fs);
-	if (fstatvfs64(fd, &vfs) != 0)
-		return (-errno);
+	if (fstat64(fd, &sb) == 0 && S_ISFIFO(sb.st_mode)) {
+		lxfs.f_type = LX_PIPEFS_MAGIC;
+		lxfs.f_bsize = 4096;
+		lxfs.f_blocks = 0;
+		lxfs.f_bfree = 0;
+		lxfs.f_bavail = 0;
+		lxfs.f_files = 0;
+		lxfs.f_ffree = 0;
+		lxfs.f_fsid = 0;
+		lxfs.f_namelen = 255;
+		lxfs.f_frsize = 4096;
+	} else {
+		if (fstatvfs64(fd, &vfs) != 0)
+			return (-errno);
 
-	path = lx_fd_to_path(fd, path_buf, sizeof (path_buf));
+		path = lx_fd_to_path(fd, path_buf, sizeof (path_buf));
 
-	if ((err = stol_statfs64(path, &lxfs, &vfs)) != 0)
-		return (err);
+		if ((err = stol_statfs64(path, &lxfs, &vfs)) != 0)
+			return (err);
+	}
 
 	if (uucopy(&lxfs, fs, sizeof (struct lx_statfs64)) != 0)
 		return (-errno);
