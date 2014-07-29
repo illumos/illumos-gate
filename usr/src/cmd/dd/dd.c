@@ -147,6 +147,7 @@ static off_t	iseekn;	/* number of input records to seek past */
 static off_t	oseekn;	/* number of output records to seek past */
 static unsigned long long	count;	/* number of input records to copy */
 			/* (0 = all) */
+static boolean_t ecount;	/* explicit count given */
 static int	trantype; /* BSD or SVr4 compatible EBCDIC */
 
 static char		*string;	/* command arg pointer */
@@ -571,6 +572,7 @@ main(int argc, char **argv)
 		if (match("count="))
 		{
 			count = number(BIG);
+			ecount = B_TRUE;
 			continue;
 		}
 		if (match("files="))
@@ -1009,8 +1011,7 @@ main(int argc, char **argv)
 			nstats = 0;
 		}
 
-		if ((count == 0) || (nifr+nipr < count))
-		{
+		if ((count == 0 && ecount == B_FALSE) || (nifr+nipr < count)) {
 		/* If proceed on error is enabled, zero the input buffer */
 
 			if (cflag&NERR)
