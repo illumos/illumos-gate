@@ -1114,11 +1114,12 @@ lx_getpeername(ulong_t *args)
 
 	/*
 	 * Linux returns EFAULT in this case, even if the namelen parameter
-	 * is 0.  This check will not catch other illegal addresses, but
-	 * the benefit catching a non-null illegal address here is not
-	 * worth the cost of another system call.
+	 * is 0 (some test cases use -1, so we check for that too).  This check
+	 * will not catch other illegal addresses, but the benefit catching a
+	 * non-null illegal address here is not worth the cost of another
+	 * system call.
 	 */
-	if ((void *)args[1] == NULL)
+	if ((void *)args[1] == NULL || (void *)args[1] == (void *)-1)
 		return (-EFAULT);
 
 	if ((name = SAFE_ALLOCA(namelen)) == NULL)
