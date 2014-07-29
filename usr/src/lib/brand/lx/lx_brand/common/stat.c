@@ -482,7 +482,7 @@ lx_fstatat64(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4)
 	if (atfd == LX_AT_FDCWD)
 		atfd = AT_FDCWD;
 
-	flag = ltos_at_flag(p4, AT_SYMLINK_NOFOLLOW);
+	flag = ltos_at_flag(p4, AT_SYMLINK_NOFOLLOW, B_TRUE);
 	if (flag < 0)
 		return (-EINVAL);
 

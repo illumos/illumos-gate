@@ -88,11 +88,18 @@ extern "C" {
 #define	LX_LOCK_NB		4	/* non-blocking */
 #define	LX_LOCK_UN		8	/* unlock */
 
+/*
+ * On Linux the constants AT_REMOVEDIR and AT_EACCESS have the same value.
+ * AT_REMOVEDIR is used only by unlinkat and AT_EACCESS is used only by
+ * faccessat.
+ */
 #define	LX_AT_FDCWD		-100
 #define	LX_AT_SYMLINK_NOFOLLOW	0x100
-#define	LX_AT_EACCESS		0x200
 #define	LX_AT_REMOVEDIR		0x200
+#define	LX_AT_EACCESS		0x200
 #define	LX_AT_SYMLINK_FOLLOW	0x400
+#define	LX_AT_NO_AUTOMOUNT	0x800
+#define	LX_AT_EMPTY_PATH	0x1000
 
 struct lx_flock {
 	short		l_type;

@@ -171,7 +171,7 @@ extern void lx_ptrace_stop_if_option(int);
 extern int lx_check_alloca(size_t);
 #define	SAFE_ALLOCA(sz)	(lx_check_alloca(sz) ? alloca(sz) : NULL)
 
-extern int ltos_at_flag(int lflag, int allow);
+extern int ltos_at_flag(int lflag, int allow, boolean_t enforce);
 
 /*
  * NO_UUCOPY disables calls to the uucopy* system calls to help with

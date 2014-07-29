@@ -73,9 +73,13 @@ install_checkpath(uintptr_t p1)
  * Convert linux LX_AT_* flags to solaris AT_* flags but skip verifying allowed
  * flags have been passed. This also allows EACCESS/REMOVEDIR to be translated
  * correctly since on linux they have the same value.
+ *
+ * Some code can actually pass in other bits in the flag. We may have to simply
+ * ignore these, as indicated by the enforce parameter. See lx_fchmodat for
+ * another example of this type of behavior.
  */
 int
-ltos_at_flag(int lflag, int allow)
+ltos_at_flag(int lflag, int allow, boolean_t enforce)
 {
 	int sflag = 0;
 
@@ -100,14 +104,9 @@ ltos_at_flag(int lflag, int allow)
 		sflag |= LX_AT_SYMLINK_FOLLOW;
 	}
 
-	/*
-	 * If lflag is not zero than some flags did not hit the above code.
-	 * We used to check for this, like so:
-	 * if (lflag)
-	 *  return (-EINVAL);
-	 * but some code can actually pass in other bits in the flag. We have
-	 * to simply ignore these. See lx_fchmodat for another example.
-	 */
+	/* If lflag is not zero than some flags did not hit the above code. */
+	if (enforce && lflag)
+		return (-EINVAL);
 
 	return (sflag);
 }
@@ -197,7 +196,7 @@ lx_unlinkat(uintptr_t ext1, uintptr_t p1, uintptr_t p2)
 	if (atfd == LX_AT_FDCWD)
 		atfd = AT_FDCWD;
 
-	flag = ltos_at_flag(flag, AT_REMOVEDIR);
+	flag = ltos_at_flag(flag, AT_REMOVEDIR, B_TRUE);
 	if (flag < 0)
 		return (-EINVAL);
 
@@ -572,7 +571,7 @@ lx_faccessat(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4)
 	if (atfd == LX_AT_FDCWD)
 		atfd = AT_FDCWD;
 
-	flag = ltos_at_flag(flag, AT_EACCESS);
+	flag = ltos_at_flag(flag, AT_EACCESS, B_FALSE);
 	if (flag < 0)
 		return (-EINVAL);
 
@@ -770,7 +769,7 @@ lx_fchownat(uintptr_t ext1, uintptr_t p1, uintptr_t p2, uintptr_t p3,
 	char pathbuf[MAXPATHLEN];
 	int ret;
 
-	flag = ltos_at_flag(p4, AT_SYMLINK_NOFOLLOW);
+	flag = ltos_at_flag(p4, AT_SYMLINK_NOFOLLOW, B_TRUE);
 	if (flag < 0)
 		return (-EINVAL);
 
