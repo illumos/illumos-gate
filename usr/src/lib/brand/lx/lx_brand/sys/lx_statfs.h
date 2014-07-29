@@ -62,7 +62,7 @@ struct lx_statfs64 {
 };
 
 /*
- * These magic values are taken mostly from statfs(2).
+ * These magic values are taken mostly from statfs(2) or magic.h
  */
 #define	LX_DEVFS_SUPER_MAGIC		0x1373
 #define	LX_DEVPTS_SUPER_MAGIC		0x1cd1
@@ -72,6 +72,7 @@ struct lx_statfs64 {
 #define	LX_PROC_SUPER_MAGIC		0x9fa0
 #define	LX_TMPFS_SUPER_MAGIC		0x01021994
 #define	LX_UFS_MAGIC			0x00011954
+#define	LX_PIPEFS_MAGIC			0x50495045
 
 #ifdef	__cplusplus
 }
