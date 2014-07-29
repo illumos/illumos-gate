@@ -1451,6 +1451,9 @@ lx_setsockopt(ulong_t *args)
 	if (optval == NULL)
 		return (-EFAULT);
 
+	if (level > LX_IPPROTO_RAW || level == LX_IPPROTO_UDP)
+		return (-EOPNOTSUPP);
+
 	if ((proto_opts = get_proto_opt_tbl(level)) == NULL)
 		return (-ENOPROTOOPT);
 
@@ -1569,6 +1572,9 @@ lx_getsockopt(ulong_t *args)
 	 */
 	if (optval == NULL)
 		return (-EFAULT);
+
+	if (level > LX_IPPROTO_RAW || level == LX_IPPROTO_UDP)
+		return (-EOPNOTSUPP);
 
 	if ((proto_opts = get_proto_opt_tbl(level)) == NULL)
 		return (-ENOPROTOOPT);
