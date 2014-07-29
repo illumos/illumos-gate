@@ -109,6 +109,7 @@ extern "C" {
 #define	LX_IPPROTO_ICMP		1
 #define	LX_IPPROTO_IGMP		2
 #define	LX_IPPROTO_TCP		6
+#define	LX_IPPROTO_UDP		17
 #define	LX_IPPROTO_RAW		255
 
 /*
