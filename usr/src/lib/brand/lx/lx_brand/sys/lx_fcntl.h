@@ -74,6 +74,7 @@ extern "C" {
 #define	LX_F_SETLEASE		1024
 #define	LX_F_GETLEASE		1025
 #define	LX_F_NOTIFY		1026
+#define	LX_F_DUPFD_CLOEXEC	1030
 
 #define	LX_F_RDLCK		0
 #define	LX_F_WRLCK		1

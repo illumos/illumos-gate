@@ -170,6 +170,10 @@ lx_fcntl_com(int fd, int cmd, ulong_t arg)
 		rc = fcntl(fd, F_DUPFD, arg);
 		break;
 
+	case LX_F_DUPFD_CLOEXEC:
+		rc = fcntl(fd, F_DUPFD_CLOEXEC, arg);
+		break;
+
 	case LX_F_GETFD:
 		rc = fcntl(fd, F_GETFD, 0);
 		break;
