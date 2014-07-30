@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2014 Joyent, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -71,6 +72,8 @@ ltos_open_flags(uintptr_t p2)
 		flags |= O_LARGEFILE;
 	if (p2 & LX_O_NOFOLLOW)
 		flags |= O_NOFOLLOW;
+	if (p2 & LX_O_CLOEXEC)
+		flags |= O_CLOEXEC;
 
 	/*
 	 * Linux uses the LX_O_DIRECT flag to do raw, synchronous I/O to the
