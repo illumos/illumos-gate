@@ -743,11 +743,29 @@ lx_linkat(uintptr_t ext1, uintptr_t p1, uintptr_t ext2, uintptr_t p2,
 }
 
 int
+lx_readlink(uintptr_t p1, uintptr_t p2, uintptr_t p3)
+{
+	int ret;
+
+	if ((size_t)p3 <= 0)
+		return (-EINVAL);
+
+	ret = readlink((char *)p1, (char *)p2, (size_t)p3);
+	if (ret < 0)
+		return (-errno);
+
+	return (ret);
+}
+
+int
 lx_readlinkat(uintptr_t ext1, uintptr_t p1, uintptr_t p2, uintptr_t p3)
 {
 	int atfd = (int)ext1;
 	char pathbuf[MAXPATHLEN];
 	int ret;
+
+	if ((size_t)p3 <= 0)
+		return (-EINVAL);
 
 	ret = getpathat(atfd, p1, pathbuf, sizeof (pathbuf));
 	if (ret < 0)

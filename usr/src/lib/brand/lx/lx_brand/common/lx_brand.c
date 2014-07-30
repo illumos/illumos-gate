@@ -1020,7 +1020,7 @@ static struct lx_sysent sysents[] = {
 	{"select",	NULL,		NOSYS_OBSOLETE,	0},	/* 82 */
 	{"symlink",	symlink,	SYS_PASSTHRU,	2},	/* 83 */
 	{"oldlstat",	NULL,		NOSYS_OBSOLETE,	0},	/* 84 */
-	{"readlink",	readlink,	SYS_PASSTHRU,	3},	/* 85 */
+	{"readlink",	lx_readlink,	0,		3},	/* 85 */
 	{"uselib",	NULL,		NOSYS_KERNEL,	0},	/* 86 */
 	{"swapon",	NULL,		NOSYS_KERNEL,	0},	/* 87 */
 	{"reboot",	lx_reboot,	0,		4},	/* 88 */
