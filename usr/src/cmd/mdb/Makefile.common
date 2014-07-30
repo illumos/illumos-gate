@@ -28,7 +28,6 @@ COMMON_MODULES_PROC = \
 	dof \
 	libavl \
 	libc \
-	libctf \
 	libcmdutils \
 	libnvpair \
 	libproc \

@@ -24,7 +24,7 @@
  * Use is subject to license terms.
  */
 /*
- * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2015, Joyent, Inc.
  */
 
 /*
@@ -59,6 +59,62 @@ extern "C" {
  */
 typedef struct ctf_file ctf_file_t;
 typedef long ctf_id_t;
+
+#define	ECTF_BASE	1000	/* base value for libctf errnos */
+
+enum {
+	ECTF_FMT = ECTF_BASE,	/* file is not in CTF or ELF format */
+	ECTF_ELFVERS,		/* ELF version is more recent than libctf */
+	ECTF_CTFVERS,		/* CTF version is more recent than libctf */
+	ECTF_ENDIAN,		/* data is different endian-ness than lib */
+	ECTF_SYMTAB,		/* symbol table uses invalid entry size */
+	ECTF_SYMBAD,		/* symbol table data buffer invalid */
+	ECTF_STRBAD,		/* string table data buffer invalid */
+	ECTF_CORRUPT,		/* file data corruption detected */
+	ECTF_NOCTFDATA,		/* ELF file does not contain CTF data */
+	ECTF_NOCTFBUF,		/* buffer does not contain CTF data */
+	ECTF_NOSYMTAB,		/* symbol table data is not available */
+	ECTF_NOPARENT,		/* parent CTF container is not available */
+	ECTF_DMODEL,		/* data model mismatch */
+	ECTF_MMAP,		/* failed to mmap a data section */
+	ECTF_ZMISSING,		/* decompression library not installed */
+	ECTF_ZINIT,		/* failed to initialize decompression library */
+	ECTF_ZALLOC,		/* failed to allocate decompression buffer */
+	ECTF_DECOMPRESS,	/* failed to decompress CTF data */
+	ECTF_STRTAB,		/* string table for this string is missing */
+	ECTF_BADNAME,		/* string offset is corrupt w.r.t. strtab */
+	ECTF_BADID,		/* invalid type ID number */
+	ECTF_NOTSOU,		/* type is not a struct or union */
+	ECTF_NOTENUM,		/* type is not an enum */
+	ECTF_NOTSUE,		/* type is not a struct, union, or enum */
+	ECTF_NOTINTFP,		/* type is not an integer or float */
+	ECTF_NOTARRAY,		/* type is not an array */
+	ECTF_NOTREF,		/* type does not reference another type */
+	ECTF_NAMELEN,		/* buffer is too small to hold type name */
+	ECTF_NOTYPE,		/* no type found corresponding to name */
+	ECTF_SYNTAX,		/* syntax error in type name */
+	ECTF_NOTFUNC,		/* symtab entry does not refer to a function */
+	ECTF_NOFUNCDAT,		/* no func info available for function */
+	ECTF_NOTDATA,		/* symtab entry does not refer to a data obj */
+	ECTF_NOTYPEDAT,		/* no type info available for object */
+	ECTF_NOLABEL,		/* no label found corresponding to name */
+	ECTF_NOLABELDATA,	/* file does not contain any labels */
+	ECTF_NOTSUP,		/* feature not supported */
+	ECTF_NOENUMNAM,		/* enum element name not found */
+	ECTF_NOMEMBNAM,		/* member name not found */
+	ECTF_RDONLY,		/* CTF container is read-only */
+	ECTF_DTFULL,		/* CTF type is full (no more members allowed) */
+	ECTF_FULL,		/* CTF container is full */
+	ECTF_DUPMEMBER,		/* duplicate member name definition */
+	ECTF_CONFLICT,		/* conflicting type definition present */
+	ECTF_REFERENCED,	/* type has outstanding references */
+	ECTF_NOTDYN,		/* type is not a dynamic type */
+	ECTF_ELF,		/* elf library failure */
+	ECTF_MCHILD,		/* cannot merge child container */
+	ECTF_LABELEXISTS,	/* label already exists */
+	ECTF_LCONFLICT,		/* merged labels conflict */
+	ECTF_ZLIB		/* zlib library failure */
+};
 
 /*
  * If the debugger needs to provide the CTF library with a set of raw buffers
@@ -143,19 +199,24 @@ typedef struct ctf_lblinfo {
 typedef int ctf_visit_f(const char *, ctf_id_t, ulong_t, int, void *);
 typedef int ctf_member_f(const char *, ctf_id_t, ulong_t, void *);
 typedef int ctf_enum_f(const char *, int, void *);
-typedef int ctf_type_f(ctf_id_t, void *);
+typedef int ctf_type_f(ctf_id_t, boolean_t, void *);
 typedef int ctf_label_f(const char *, const ctf_lblinfo_t *, void *);
+typedef int ctf_function_f(const char *, ulong_t, ctf_funcinfo_t *, void *);
+typedef int ctf_object_f(const char *, ctf_id_t, ulong_t, void *);
+typedef int ctf_string_f(const char *, void *);
 
 extern ctf_file_t *ctf_bufopen(const ctf_sect_t *, const ctf_sect_t *,
     const ctf_sect_t *, int *);
 extern ctf_file_t *ctf_fdopen(int, int *);
 extern ctf_file_t *ctf_open(const char *, int *);
 extern ctf_file_t *ctf_create(int *);
+extern ctf_file_t *ctf_fdcreate(int, int *);
 extern ctf_file_t *ctf_dup(ctf_file_t *);
 extern void ctf_close(ctf_file_t *);
 
 extern ctf_file_t *ctf_parent_file(ctf_file_t *);
 extern const char *ctf_parent_name(ctf_file_t *);
+extern const char *ctf_parent_label(ctf_file_t *);
 
 extern int ctf_import(ctf_file_t *, ctf_file_t *);
 extern int ctf_setmodel(ctf_file_t *, int);
@@ -165,6 +226,7 @@ extern void ctf_setspecific(ctf_file_t *, void *);
 extern void *ctf_getspecific(ctf_file_t *);
 
 extern int ctf_errno(ctf_file_t *);
+extern uint_t ctf_flags(ctf_file_t *);
 extern const char *ctf_errmsg(int);
 extern int ctf_version(int);
 
@@ -175,6 +237,8 @@ extern int ctf_func_args_by_id(ctf_file_t *, ctf_id_t, uint_t, ctf_id_t *);
 
 extern ctf_id_t ctf_lookup_by_name(ctf_file_t *, const char *);
 extern ctf_id_t ctf_lookup_by_symbol(ctf_file_t *, ulong_t);
+
+extern char *ctf_symbol_name(ctf_file_t *, ulong_t, char *, size_t);
 
 extern ctf_id_t ctf_type_resolve(ctf_file_t *, ctf_id_t);
 extern ssize_t ctf_type_lname(ctf_file_t *, ctf_id_t, char *, size_t);
@@ -203,29 +267,39 @@ extern int ctf_label_info(ctf_file_t *, const char *, ctf_lblinfo_t *);
 
 extern int ctf_member_iter(ctf_file_t *, ctf_id_t, ctf_member_f *, void *);
 extern int ctf_enum_iter(ctf_file_t *, ctf_id_t, ctf_enum_f *, void *);
-extern int ctf_type_iter(ctf_file_t *, ctf_type_f *, void *);
+extern int ctf_type_iter(ctf_file_t *, boolean_t, ctf_type_f *, void *);
 extern int ctf_label_iter(ctf_file_t *, ctf_label_f *, void *);
+extern int ctf_function_iter(ctf_file_t *, ctf_function_f *, void *);
+extern int ctf_object_iter(ctf_file_t *, ctf_object_f *, void *);
+extern int ctf_string_iter(ctf_file_t *, ctf_string_f *, void *);
 
 extern ctf_id_t ctf_add_array(ctf_file_t *, uint_t, const ctf_arinfo_t *);
-extern ctf_id_t ctf_add_const(ctf_file_t *, uint_t, ctf_id_t);
+extern ctf_id_t ctf_add_const(ctf_file_t *, uint_t, const char *, ctf_id_t);
 extern ctf_id_t ctf_add_enum(ctf_file_t *, uint_t, const char *);
 extern ctf_id_t ctf_add_float(ctf_file_t *, uint_t,
     const char *, const ctf_encoding_t *);
 extern ctf_id_t ctf_add_forward(ctf_file_t *, uint_t, const char *, uint_t);
-extern ctf_id_t ctf_add_function(ctf_file_t *, uint_t,
-    const ctf_funcinfo_t *, const ctf_id_t *);
+extern ctf_id_t ctf_add_funcptr(ctf_file_t *, uint_t, const ctf_funcinfo_t *,
+    const ctf_id_t *);
 extern ctf_id_t ctf_add_integer(ctf_file_t *, uint_t,
     const char *, const ctf_encoding_t *);
-extern ctf_id_t ctf_add_pointer(ctf_file_t *, uint_t, ctf_id_t);
+extern ctf_id_t ctf_add_pointer(ctf_file_t *, uint_t, const char *, ctf_id_t);
 extern ctf_id_t ctf_add_type(ctf_file_t *, ctf_file_t *, ctf_id_t);
 extern ctf_id_t ctf_add_typedef(ctf_file_t *, uint_t, const char *, ctf_id_t);
-extern ctf_id_t ctf_add_restrict(ctf_file_t *, uint_t, ctf_id_t);
+extern ctf_id_t ctf_add_restrict(ctf_file_t *, uint_t, const char *, ctf_id_t);
 extern ctf_id_t ctf_add_struct(ctf_file_t *, uint_t, const char *);
 extern ctf_id_t ctf_add_union(ctf_file_t *, uint_t, const char *);
-extern ctf_id_t ctf_add_volatile(ctf_file_t *, uint_t, ctf_id_t);
+extern ctf_id_t ctf_add_volatile(ctf_file_t *, uint_t, const char *, ctf_id_t);
 
 extern int ctf_add_enumerator(ctf_file_t *, ctf_id_t, const char *, int);
-extern int ctf_add_member(ctf_file_t *, ctf_id_t, const char *, ctf_id_t);
+extern int ctf_add_member(ctf_file_t *, ctf_id_t, const char *, ctf_id_t,
+    ulong_t);
+
+
+extern int ctf_add_function(ctf_file_t *, ulong_t, const ctf_funcinfo_t *,
+    const ctf_id_t *);
+extern int ctf_add_object(ctf_file_t *, ulong_t, ctf_id_t);
+extern int ctf_add_label(ctf_file_t *, const char *, ctf_id_t, uint_t);
 
 extern int ctf_set_array(ctf_file_t *, ctf_id_t, const ctf_arinfo_t *);
 
@@ -234,6 +308,7 @@ extern int ctf_delete_type(ctf_file_t *, ctf_id_t);
 extern int ctf_update(ctf_file_t *);
 extern int ctf_discard(ctf_file_t *);
 extern int ctf_write(ctf_file_t *, int);
+extern void ctf_dataptr(ctf_file_t *, const void **, size_t *);
 
 #ifdef _KERNEL
 
@@ -241,34 +316,6 @@ struct module;
 extern ctf_file_t *ctf_modopen(struct module *, int *);
 
 #endif
-
-typedef struct ctf_ihelem {
-	ushort_t ih_type;	/* type ID number */
-	ushort_t ih_value;	/* type ID number in a different fp */
-	ushort_t ih_next;	/* index of next element in hash chain */
-} ctf_ihelem_t;
-
-typedef struct ctf_idhash {
-	ushort_t *ih_buckets;	/* hash bucket array (chain indices) */
-	ctf_ihelem_t *ih_chains;	/* hash chains buffer */
-	ushort_t ih_nbuckets;	/* number of elements in bucket array */
-	ushort_t ih_nelems;	/* number of elements in hash table */
-	uint_t ih_free;		/* index of next free hash element */
-} ctf_idhash_t;
-
-extern int ctf_idhash_create(ctf_idhash_t *, ulong_t);
-extern void ctf_idhash_clear(ctf_idhash_t *);
-extern int ctf_idhash_define(ctf_idhash_t *, ushort_t, ushort_t);
-extern int ctf_idhash_insert(ctf_idhash_t *, ushort_t, ushort_t);
-extern ctf_ihelem_t *ctf_idhash_lookup(ctf_idhash_t *, ushort_t);
-extern uint_t ctf_idhash_size(const ctf_idhash_t *);
-extern void ctf_idhash_destroy(ctf_idhash_t *);
-
-typedef struct ctf_idhash_iter ctf_idhash_iter_t;
-extern int ctf_idhash_iter_init(ctf_idhash_t *, ctf_idhash_iter_t **);
-extern const ctf_ihelem_t *ctf_idhash_iter(ctf_idhash_t *,
-    ctf_idhash_iter_t *);
-extern void ctf_idhash_iter_fini(ctf_idhash_t *, ctf_idhash_iter_t *);
 
 #ifdef	__cplusplus
 }

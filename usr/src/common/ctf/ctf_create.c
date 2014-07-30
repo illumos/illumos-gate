@@ -25,7 +25,7 @@
  * Use is subject to license terms.
  */
 /*
- * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2015, Joyent, Inc.
  */
 
 #include <sys/sysmacros.h>
@@ -71,6 +71,43 @@ ctf_create(int *errp)
 	cts.cts_offset = 0;
 
 	if ((fp = ctf_bufopen(&cts, NULL, NULL, errp)) == NULL) {
+		ctf_free(hash, hashlen * sizeof (ctf_dtdef_t *));
+		return (NULL);
+	}
+
+	fp->ctf_flags |= LCTF_RDWR;
+	fp->ctf_dthashlen = hashlen;
+	bzero(hash, hashlen * sizeof (ctf_dtdef_t *));
+	fp->ctf_dthash = hash;
+	fp->ctf_dtstrlen = sizeof (_CTF_STRTAB_TEMPLATE);
+	fp->ctf_dtnextid = 1;
+	fp->ctf_dtoldid = 0;
+
+	return (fp);
+}
+
+ctf_file_t *
+ctf_fdcreate(int fd, int *errp)
+{
+	ctf_file_t *fp;
+	static const ctf_header_t hdr = { { CTF_MAGIC, CTF_VERSION, 0 } };
+
+	const ulong_t hashlen = 128;
+	ctf_dtdef_t **hash = ctf_alloc(hashlen * sizeof (ctf_dtdef_t *));
+	ctf_sect_t cts;
+
+	if (hash == NULL)
+		return (ctf_set_open_errno(errp, EAGAIN));
+
+	cts.cts_name = _CTF_SECTION;
+	cts.cts_type = SHT_PROGBITS;
+	cts.cts_flags = 0;
+	cts.cts_data = &hdr;
+	cts.cts_size = sizeof (hdr);
+	cts.cts_entsize = 1;
+	cts.cts_offset = 0;
+
+	if ((fp = ctf_fdcreate_int(fd, errp, &cts)) == NULL) {
 		ctf_free(hash, hashlen * sizeof (ctf_dtdef_t *));
 		return (NULL);
 	}
@@ -236,14 +273,23 @@ int
 ctf_update(ctf_file_t *fp)
 {
 	ctf_file_t ofp, *nfp;
-	ctf_header_t hdr;
+	ctf_header_t hdr, *bhdr;
 	ctf_dtdef_t *dtd;
-	ctf_sect_t cts;
+	ctf_dsdef_t *dsd;
+	ctf_dldef_t *dld;
+	ctf_sect_t cts, *symp, *strp;
 
 	uchar_t *s, *s0, *t;
-	size_t size;
+	ctf_lblent_t *label;
+	uint16_t *obj, *func;
+	size_t size, objsize, funcsize, labelsize, plen;
 	void *buf;
 	int err;
+	ulong_t i;
+	const char *plabel;
+
+	uintptr_t symbase = (uintptr_t)fp->ctf_symtab.cts_data;
+	uintptr_t strbase = (uintptr_t)fp->ctf_strtab.cts_data;
 
 	if (!(fp->ctf_flags & LCTF_RDWR))
 		return (ctf_set_errno(fp, ECTF_RDONLY));
@@ -261,8 +307,26 @@ ctf_update(ctf_file_t *fp)
 	hdr.cth_magic = CTF_MAGIC;
 	hdr.cth_version = CTF_VERSION;
 
-	if (fp->ctf_flags & LCTF_CHILD)
-		hdr.cth_parname = 1; /* i.e. _CTF_STRTAB_TEMPLATE[1] */
+	if (fp->ctf_flags & LCTF_CHILD) {
+		if (fp->ctf_parname == NULL) {
+			plen = 0;
+			hdr.cth_parname = 1; /* i.e. _CTF_STRTAB_TEMPLATE[1] */
+			plabel = NULL;
+		} else {
+			plen = strlen(fp->ctf_parname) + 1;
+			plabel = ctf_label_topmost(fp->ctf_parent);
+		}
+	} else {
+		plabel = NULL;
+		plen = 0;
+	}
+
+	/*
+	 * Iterate over the labels that we have.
+	 */
+	for (labelsize = 0, dld = ctf_list_next(&fp->ctf_dldefs);
+	    dld != NULL; dld = ctf_list_next(dld))
+		labelsize += sizeof (ctf_lblent_t);
 
 	/*
 	 * Iterate through the dynamic type definition list and compute the
@@ -304,23 +368,119 @@ ctf_update(ctf_file_t *fp)
 	}
 
 	/*
+	 * An entry for each object must exist in the data section. However, if
+	 * the symbol is SHN_UNDEF, then it is skipped. For objects, the storage
+	 * is just the size of the 2-byte id. For functions it's always 2 bytes,
+	 * plus 2 bytes per argument and the return type.
+	 */
+	dsd = ctf_list_next(&fp->ctf_dsdefs);
+	for (objsize = 0, funcsize = 0, i = 0; i < fp->ctf_nsyms; i++) {
+		int type;
+
+		if (fp->ctf_symtab.cts_entsize == sizeof (Elf32_Sym)) {
+			const Elf32_Sym *symp = (Elf32_Sym *)symbase + i;
+
+			type = ELF32_ST_TYPE(symp->st_info);
+			if (ctf_sym_valid(strbase, type, symp->st_shndx,
+			    symp->st_value, symp->st_name) == B_FALSE)
+				continue;
+		} else {
+			const Elf64_Sym *symp = (Elf64_Sym *)symbase + i;
+
+			type = ELF64_ST_TYPE(symp->st_info);
+			if (ctf_sym_valid(strbase, type, symp->st_shndx,
+			    symp->st_value, symp->st_name) == B_FALSE)
+				continue;
+		}
+
+		while (dsd != NULL && i > dsd->dts_symidx)
+			dsd = ctf_list_next(dsd);
+		if (type == STT_OBJECT) {
+			objsize += sizeof (uint16_t);
+		} else {
+			/* Every function has a uint16_t info no matter what */
+			if (dsd == NULL || i < dsd->dts_symidx) {
+				funcsize += sizeof (uint16_t);
+			} else {
+				funcsize += sizeof (uint16_t) *
+				    (dsd->dts_nargs + 2);
+			}
+		}
+	}
+
+	/*
+	 * The objtoff and funcoffset must be 2-byte aligned. We're guaranteed
+	 * that this is always true for the objtoff because labels are always 8
+	 * bytes large. Similarly, because objects are always two bytes of data,
+	 * this will always be true for funcoff.
+	 */
+	hdr.cth_objtoff = hdr.cth_lbloff + labelsize;
+	hdr.cth_funcoff = hdr.cth_objtoff + objsize;
+
+	/*
+	 * The type offset must be 4 byte aligned.
+	 */
+	hdr.cth_typeoff = hdr.cth_funcoff + funcsize;
+	if (hdr.cth_typeoff & 3)
+		hdr.cth_typeoff += 4 - (hdr.cth_typeoff & 3);
+	ASSERT((hdr.cth_typeoff & 3) == 0);
+
+	/*
 	 * Fill in the string table offset and size, compute the size of the
 	 * entire CTF buffer we need, and then allocate a new buffer and
 	 * bcopy the finished header to the start of the buffer.
 	 */
 	hdr.cth_stroff = hdr.cth_typeoff + size;
-	hdr.cth_strlen = fp->ctf_dtstrlen;
+	hdr.cth_strlen = fp->ctf_dtstrlen + plen;
 	size = sizeof (ctf_header_t) + hdr.cth_stroff + hdr.cth_strlen;
+	ctf_dprintf("lbloff: %d\nobjtoff: %d\nfuncoff: %d\n"
+	    "typeoff: %d\nstroff: %d\nstrlen: %d\n",
+	    hdr.cth_lbloff, hdr.cth_objtoff, hdr.cth_funcoff,
+	    hdr.cth_typeoff, hdr.cth_stroff, hdr.cth_strlen);
 
 	if ((buf = ctf_data_alloc(size)) == MAP_FAILED)
 		return (ctf_set_errno(fp, EAGAIN));
 
 	bcopy(&hdr, buf, sizeof (ctf_header_t));
-	t = (uchar_t *)buf + sizeof (ctf_header_t);
+	bhdr = buf;
+	label = (ctf_lblent_t *)((uintptr_t)buf + sizeof (ctf_header_t));
+	t = (uchar_t *)buf + sizeof (ctf_header_t) + hdr.cth_typeoff;
 	s = s0 = (uchar_t *)buf + sizeof (ctf_header_t) + hdr.cth_stroff;
+	obj = (uint16_t *)((uintptr_t)buf + sizeof (ctf_header_t) +
+	    hdr.cth_objtoff);
+	func = (uint16_t *)((uintptr_t)buf + sizeof (ctf_header_t) +
+	    hdr.cth_funcoff);
 
 	bcopy(_CTF_STRTAB_TEMPLATE, s, sizeof (_CTF_STRTAB_TEMPLATE));
 	s += sizeof (_CTF_STRTAB_TEMPLATE);
+
+	/*
+	 * We have an actual parent name and we're a child container, therefore
+	 * we should make sure to note our parent's name here.
+	 */
+	if (plen != 0) {
+		VERIFY(s + plen - s0 <= hdr.cth_strlen);
+		bcopy(fp->ctf_parname, s, plen);
+		bhdr->cth_parname = s - s0;
+		s += plen;
+	}
+
+	/*
+	 * First pass over the labels and copy them out.
+	 */
+	for (dld = ctf_list_next(&fp->ctf_dldefs); dld != NULL;
+	    dld = ctf_list_next(dld), label++) {
+		size_t len = strlen(dld->dld_name) + 1;
+
+		VERIFY(s + len - s0 <= hdr.cth_strlen);
+		bcopy(dld->dld_name, s, len);
+		label->ctl_typeidx = dld->dld_type;
+		label->ctl_label = s - s0;
+		s += len;
+
+		if (plabel != NULL && strcmp(plabel, dld->dld_name) == 0)
+			bhdr->cth_parlabel = label->ctl_label;
+	}
 
 	/*
 	 * We now take a final lap through the dynamic type definition list and
@@ -339,6 +499,7 @@ ctf_update(ctf_file_t *fp)
 		if (dtd->dtd_name != NULL) {
 			dtd->dtd_data.ctt_name = (uint_t)(s - s0);
 			len = strlen(dtd->dtd_name) + 1;
+			VERIFY(s + len - s0 <= hdr.cth_strlen);
 			bcopy(dtd->dtd_name, s, len);
 			s += len;
 		} else
@@ -411,6 +572,61 @@ ctf_update(ctf_file_t *fp)
 	}
 
 	/*
+	 * Now we fill in our dynamic data and function sections. We use the
+	 * same criteria as above, but also consult the dsd list.
+	 */
+	dsd = ctf_list_next(&fp->ctf_dsdefs);
+	for (i = 0; i < fp->ctf_nsyms; i++) {
+		int type;
+		if (fp->ctf_symtab.cts_entsize == sizeof (Elf32_Sym)) {
+			const Elf32_Sym *symp = (Elf32_Sym *)symbase + i;
+			type = ELF32_ST_TYPE(symp->st_info);
+
+			if (ctf_sym_valid(strbase, type, symp->st_shndx,
+			    symp->st_value, symp->st_name) == B_FALSE)
+				continue;
+		} else {
+			const Elf64_Sym *symp = (Elf64_Sym *)symbase + i;
+			type = ELF64_ST_TYPE(symp->st_info);
+			if (ctf_sym_valid(strbase, type, symp->st_shndx,
+			    symp->st_value, symp->st_name) == B_FALSE)
+				continue;
+		}
+
+		while (dsd != NULL && i > dsd->dts_symidx) {
+			dsd = ctf_list_next(dsd);
+		}
+		if (type == STT_OBJECT) {
+			if (dsd == NULL || i < dsd->dts_symidx) {
+				*obj = 0;
+			} else {
+				*obj = dsd->dts_tid;
+			}
+			obj++;
+			VERIFY((uintptr_t)obj <= (uintptr_t)func);
+		} else {
+			if (dsd == NULL || i < dsd->dts_symidx) {
+				ushort_t data = CTF_TYPE_INFO(CTF_K_UNKNOWN,
+				    0, 0);
+				*func = data;
+				func++;
+			} else {
+				int j;
+				ushort_t data = CTF_TYPE_INFO(CTF_K_FUNCTION, 0,
+				    dsd->dts_nargs);
+
+				*func = data;
+				func++;
+				*func = dsd->dts_tid;
+				func++;
+				for (j = 0; j < dsd->dts_nargs; j++)
+					func[j] = dsd->dts_argc[j];
+				func += dsd->dts_nargs;
+			}
+		}
+	}
+
+	/*
 	 * Finally, we are ready to ctf_bufopen() the new container.  If this
 	 * is successful, we then switch nfp and fp and free the old container.
 	 */
@@ -423,7 +639,15 @@ ctf_update(ctf_file_t *fp)
 	cts.cts_entsize = 1;
 	cts.cts_offset = 0;
 
-	if ((nfp = ctf_bufopen(&cts, NULL, NULL, &err)) == NULL) {
+	if (fp->ctf_nsyms == 0) {
+		symp = NULL;
+		strp = NULL;
+	} else {
+		symp = &fp->ctf_symtab;
+		strp = &fp->ctf_strtab;
+	}
+
+	if ((nfp = ctf_bufopen(&cts, symp, strp, &err)) == NULL) {
 		ctf_data_free(buf, size);
 		return (ctf_set_errno(fp, err));
 	}
@@ -433,10 +657,11 @@ ctf_update(ctf_file_t *fp)
 
 	nfp->ctf_refcnt = fp->ctf_refcnt;
 	nfp->ctf_flags |= fp->ctf_flags & ~LCTF_DIRTY;
-	nfp->ctf_data.cts_data = NULL; /* force ctf_data_free() on close */
 	nfp->ctf_dthash = fp->ctf_dthash;
 	nfp->ctf_dthashlen = fp->ctf_dthashlen;
 	nfp->ctf_dtdefs = fp->ctf_dtdefs;
+	nfp->ctf_dsdefs = fp->ctf_dsdefs;
+	nfp->ctf_dldefs = fp->ctf_dldefs;
 	nfp->ctf_dtstrlen = fp->ctf_dtstrlen;
 	nfp->ctf_dtnextid = fp->ctf_dtnextid;
 	nfp->ctf_dtoldid = fp->ctf_dtnextid - 1;
@@ -445,6 +670,11 @@ ctf_update(ctf_file_t *fp)
 	fp->ctf_dthash = NULL;
 	fp->ctf_dthashlen = 0;
 	bzero(&fp->ctf_dtdefs, sizeof (ctf_list_t));
+	bzero(&fp->ctf_dsdefs, sizeof (ctf_list_t));
+	bzero(&fp->ctf_dldefs, sizeof (ctf_list_t));
+
+	bzero(&fp->ctf_symtab, sizeof (ctf_sect_t));
+	bzero(&fp->ctf_strtab, sizeof (ctf_sect_t));
 
 	bcopy(fp, &ofp, sizeof (ctf_file_t));
 	bcopy(nfp, fp, sizeof (ctf_file_t));
@@ -563,6 +793,101 @@ ctf_dtd_lookup(ctf_file_t *fp, ctf_id_t type)
 	return (dtd);
 }
 
+ctf_dsdef_t *
+ctf_dsd_lookup(ctf_file_t *fp, ulong_t idx)
+{
+	ctf_dsdef_t *dsd;
+
+	for (dsd = ctf_list_next(&fp->ctf_dsdefs); dsd != NULL;
+	    dsd = ctf_list_next(dsd)) {
+		if (dsd->dts_symidx == idx)
+			return (dsd);
+	}
+
+	return (NULL);
+}
+
+/*
+ * We order the ctf_dsdef_t by symbol index to make things better for updates.
+ */
+void
+ctf_dsd_insert(ctf_file_t *fp, ctf_dsdef_t *dsd)
+{
+	ctf_dsdef_t *i;
+
+	for (i = ctf_list_next(&fp->ctf_dsdefs); i != NULL;
+	    i = ctf_list_next(i)) {
+		if (i->dts_symidx > dsd->dts_symidx)
+			break;
+	}
+
+	if (i == NULL) {
+		ctf_list_append(&fp->ctf_dsdefs, dsd);
+		return;
+	}
+
+	ctf_list_insert_before(&fp->ctf_dsdefs, i, dsd);
+}
+
+/* ARGSUSED */
+void
+ctf_dsd_delete(ctf_file_t *fp, ctf_dsdef_t *dsd)
+{
+	if (dsd->dts_argc != NULL)
+		ctf_free(dsd->dts_argc,
+		    sizeof (ctf_id_t) * dsd->dts_nargs);
+	ctf_list_delete(&fp->ctf_dsdefs, dsd);
+	ctf_free(dsd, sizeof (ctf_dsdef_t));
+}
+
+ctf_dldef_t *
+ctf_dld_lookup(ctf_file_t *fp, const char *name)
+{
+	ctf_dldef_t *dld;
+
+	for (dld = ctf_list_next(&fp->ctf_dldefs); dld != NULL;
+	    dld = ctf_list_next(dld)) {
+		if (strcmp(name, dld->dld_name) == 0)
+			return (dld);
+	}
+
+	return (NULL);
+}
+
+void
+ctf_dld_insert(ctf_file_t *fp, ctf_dldef_t *dld, uint_t pos)
+{
+	ctf_dldef_t *l;
+
+	if (pos == 0) {
+		ctf_list_prepend(&fp->ctf_dldefs, dld);
+		return;
+	}
+
+	for (l = ctf_list_next(&fp->ctf_dldefs); pos != 0 && dld != NULL;
+	    l = ctf_list_next(l), pos--)
+		;
+
+	if (l == NULL)
+		ctf_list_append(&fp->ctf_dldefs, dld);
+	else
+		ctf_list_insert_before(&fp->ctf_dsdefs, l, dld);
+}
+
+void
+ctf_dld_delete(ctf_file_t *fp, ctf_dldef_t *dld)
+{
+	ctf_list_delete(&fp->ctf_dldefs, dld);
+
+	if (dld->dld_name != NULL) {
+		size_t len = strlen(dld->dld_name) + 1;
+		ctf_free(dld->dld_name, len);
+		fp->ctf_dtstrlen -= len;
+	}
+
+	ctf_free(dld, sizeof (ctf_dldef_t));
+}
+
 /*
  * Discard all of the dynamic type definitions that have been added to the
  * container since the last call to ctf_update().  We locate such types by
@@ -574,7 +899,7 @@ ctf_dtd_lookup(ctf_file_t *fp, ctf_id_t type)
 int
 ctf_discard(ctf_file_t *fp)
 {
-	ctf_dtdef_t *dtd, *ntd = NULL;
+	ctf_dtdef_t *dtd, *ntd;
 
 	if (!(fp->ctf_flags & LCTF_RDWR))
 		return (ctf_set_errno(fp, ECTF_RDONLY));
@@ -583,10 +908,10 @@ ctf_discard(ctf_file_t *fp)
 		return (0); /* no update required */
 
 	for (dtd = ctf_list_prev(&fp->ctf_dtdefs); dtd != NULL; dtd = ntd) {
+		ntd = ctf_list_prev(dtd);
 		if (dtd->dtd_type <= fp->ctf_dtoldid)
 			continue; /* skip types that have been committed */
 
-		ntd = ctf_list_prev(dtd);
 		ctf_dtd_delete(fp, dtd);
 	}
 
@@ -656,7 +981,7 @@ clp2(size_t x)
 	return (x + 1);
 }
 
-static ctf_id_t
+ctf_id_t
 ctf_add_encoded(ctf_file_t *fp, uint_t flag,
     const char *name, const ctf_encoding_t *ep, uint_t kind)
 {
@@ -676,8 +1001,9 @@ ctf_add_encoded(ctf_file_t *fp, uint_t flag,
 	return (type);
 }
 
-static ctf_id_t
-ctf_add_reftype(ctf_file_t *fp, uint_t flag, ctf_id_t ref, uint_t kind)
+ctf_id_t
+ctf_add_reftype(ctf_file_t *fp, uint_t flag,
+    const char *name, ctf_id_t ref, uint_t kind)
 {
 	ctf_dtdef_t *dtd;
 	ctf_id_t type;
@@ -685,7 +1011,7 @@ ctf_add_reftype(ctf_file_t *fp, uint_t flag, ctf_id_t ref, uint_t kind)
 	if (ref == CTF_ERR || ref < 0 || ref > CTF_MAX_TYPE)
 		return (ctf_set_errno(fp, EINVAL));
 
-	if ((type = ctf_add_generic(fp, flag, NULL, &dtd)) == CTF_ERR)
+	if ((type = ctf_add_generic(fp, flag, name, &dtd)) == CTF_ERR)
 		return (CTF_ERR); /* errno is set for us */
 
 	ctf_ref_inc(fp, ref);
@@ -711,9 +1037,9 @@ ctf_add_float(ctf_file_t *fp, uint_t flag,
 }
 
 ctf_id_t
-ctf_add_pointer(ctf_file_t *fp, uint_t flag, ctf_id_t ref)
+ctf_add_pointer(ctf_file_t *fp, uint_t flag, const char *name, ctf_id_t ref)
 {
-	return (ctf_add_reftype(fp, flag, ref, CTF_K_POINTER));
+	return (ctf_add_reftype(fp, flag, name, ref, CTF_K_POINTER));
 }
 
 ctf_id_t
@@ -781,7 +1107,7 @@ ctf_set_array(ctf_file_t *fp, ctf_id_t type, const ctf_arinfo_t *arp)
 }
 
 ctf_id_t
-ctf_add_function(ctf_file_t *fp, uint_t flag,
+ctf_add_funcptr(ctf_file_t *fp, uint_t flag,
     const ctf_funcinfo_t *ctc, const ctf_id_t *argv)
 {
 	ctf_dtdef_t *dtd;
@@ -965,21 +1291,21 @@ ctf_add_typedef(ctf_file_t *fp, uint_t flag, const char *name, ctf_id_t ref)
 }
 
 ctf_id_t
-ctf_add_volatile(ctf_file_t *fp, uint_t flag, ctf_id_t ref)
+ctf_add_volatile(ctf_file_t *fp, uint_t flag, const char *name, ctf_id_t ref)
 {
-	return (ctf_add_reftype(fp, flag, ref, CTF_K_VOLATILE));
+	return (ctf_add_reftype(fp, flag, name, ref, CTF_K_VOLATILE));
 }
 
 ctf_id_t
-ctf_add_const(ctf_file_t *fp, uint_t flag, ctf_id_t ref)
+ctf_add_const(ctf_file_t *fp, uint_t flag, const char *name, ctf_id_t ref)
 {
-	return (ctf_add_reftype(fp, flag, ref, CTF_K_CONST));
+	return (ctf_add_reftype(fp, flag, name, ref, CTF_K_CONST));
 }
 
 ctf_id_t
-ctf_add_restrict(ctf_file_t *fp, uint_t flag, ctf_id_t ref)
+ctf_add_restrict(ctf_file_t *fp, uint_t flag, const char *name, ctf_id_t ref)
 {
-	return (ctf_add_reftype(fp, flag, ref, CTF_K_RESTRICT));
+	return (ctf_add_reftype(fp, flag, name, ref, CTF_K_RESTRICT));
 }
 
 int
@@ -1039,7 +1365,8 @@ ctf_add_enumerator(ctf_file_t *fp, ctf_id_t enid, const char *name, int value)
 }
 
 int
-ctf_add_member(ctf_file_t *fp, ctf_id_t souid, const char *name, ctf_id_t type)
+ctf_add_member(ctf_file_t *fp, ctf_id_t souid, const char *name, ctf_id_t type,
+    ulong_t offset)
 {
 	ctf_dtdef_t *dtd = ctf_dtd_lookup(fp, souid);
 	ctf_dmdef_t *dmd;
@@ -1064,7 +1391,12 @@ ctf_add_member(ctf_file_t *fp, ctf_id_t souid, const char *name, ctf_id_t type)
 	if (vlen == CTF_MAX_VLEN)
 		return (ctf_set_errno(fp, ECTF_DTFULL));
 
-	if (name != NULL) {
+	/*
+	 * Structures may have members which are anonymous. If they have two of
+	 * these, then the duplicte member detection would find it due to the
+	 * string of "", so we skip it.
+	 */
+	if (name != NULL && *name != '\0') {
 		for (dmd = ctf_list_next(&dtd->dtd_u.dtu_members);
 		    dmd != NULL; dmd = ctf_list_next(dmd)) {
 			if (dmd->dmd_name != NULL &&
@@ -1092,29 +1424,36 @@ ctf_add_member(ctf_file_t *fp, ctf_id_t souid, const char *name, ctf_id_t type)
 	if (kind == CTF_K_STRUCT && vlen != 0) {
 		ctf_dmdef_t *lmd = ctf_list_prev(&dtd->dtd_u.dtu_members);
 		ctf_id_t ltype = ctf_type_resolve(fp, lmd->dmd_type);
-		size_t off = lmd->dmd_offset;
+		size_t off;
 
-		ctf_encoding_t linfo;
-		ssize_t lsize;
+		if (offset == ULONG_MAX) {
+			ctf_encoding_t linfo;
+			ssize_t lsize;
 
-		if (ctf_type_encoding(fp, ltype, &linfo) != CTF_ERR)
-			off += linfo.cte_bits;
-		else if ((lsize = ctf_type_size(fp, ltype)) != CTF_ERR)
-			off += lsize * NBBY;
+			off = lmd->dmd_offset;
+			if (ctf_type_encoding(fp, ltype, &linfo) != CTF_ERR)
+				off += linfo.cte_bits;
+			else if ((lsize = ctf_type_size(fp, ltype)) != CTF_ERR)
+				off += lsize * NBBY;
 
-		/*
-		 * Round up the offset of the end of the last member to the
-		 * next byte boundary, convert 'off' to bytes, and then round
-		 * it up again to the next multiple of the alignment required
-		 * by the new member.  Finally, convert back to bits and store
-		 * the result in dmd_offset.  Technically we could do more
-		 * efficient packing if the new member is a bit-field, but
-		 * we're the "compiler" and ANSI says we can do as we choose.
-		 */
-		off = roundup(off, NBBY) / NBBY;
-		off = roundup(off, MAX(malign, 1));
-		dmd->dmd_offset = off * NBBY;
-		ssize = off + msize;
+			/*
+			 * Round up the offset of the end of the last member to
+			 * the next byte boundary, convert 'off' to bytes, and
+			 * then round it up again to the next multiple of the
+			 * alignment required by the new member.  Finally,
+			 * convert back to bits and store the result in
+			 * dmd_offset.  Technically we could do more efficient
+			 * packing if the new member is a bit-field, but we're
+			 * the "compiler" and ANSI says we can do as we choose.
+			 */
+			off = roundup(off, NBBY) / NBBY;
+			off = roundup(off, MAX(malign, 1));
+			dmd->dmd_offset = off * NBBY;
+			ssize = off + msize;
+		} else {
+			dmd->dmd_offset = offset;
+			ssize = offset / NBBY + msize;
+		}
 	} else {
 		dmd->dmd_offset = 0;
 		ssize = ctf_get_ctt_size(fp, &dtd->dtd_data, NULL, NULL);
@@ -1380,7 +1719,7 @@ ctf_add_type(ctf_file_t *dst_fp, ctf_file_t *src_fp, ctf_id_t src_type)
 		if (src_type == CTF_ERR)
 			return (CTF_ERR); /* errno is set for us */
 
-		dst_type = ctf_add_reftype(dst_fp, flag, src_type, kind);
+		dst_type = ctf_add_reftype(dst_fp, flag, NULL, src_type, kind);
 		break;
 
 	case CTF_K_ARRAY:
@@ -1415,7 +1754,7 @@ ctf_add_type(ctf_file_t *dst_fp, ctf_file_t *src_fp, ctf_id_t src_type)
 		if (ctc.ctc_return == CTF_ERR)
 			return (CTF_ERR); /* errno is set for us */
 
-		dst_type = ctf_add_function(dst_fp, flag, &ctc, NULL);
+		dst_type = ctf_add_funcptr(dst_fp, flag, &ctc, NULL);
 		break;
 
 	case CTF_K_STRUCT:
@@ -1539,4 +1878,167 @@ ctf_add_type(ctf_file_t *dst_fp, ctf_file_t *src_fp, ctf_id_t src_type)
 	}
 
 	return (dst_type);
+}
+
+int
+ctf_add_function(ctf_file_t *fp, ulong_t idx, const ctf_funcinfo_t *fip,
+    const ctf_id_t *argc)
+{
+	int i;
+	ctf_dsdef_t *dsd;
+	ctf_file_t *afp;
+	uintptr_t symbase = (uintptr_t)fp->ctf_symtab.cts_data;
+
+	if (!(fp->ctf_flags & LCTF_RDWR))
+		return (ctf_set_errno(fp, ECTF_RDONLY));
+
+	if (ctf_dsd_lookup(fp, idx) != NULL)
+		return (ctf_set_errno(fp, ECTF_CONFLICT));
+
+	if (symbase == NULL)
+		return (ctf_set_errno(fp, ECTF_STRTAB));
+
+	if (idx > fp->ctf_nsyms)
+		return (ctf_set_errno(fp, ECTF_NOTDATA));
+
+	if (fp->ctf_symtab.cts_entsize == sizeof (Elf32_Sym)) {
+		const Elf32_Sym *symp = (Elf32_Sym *)symbase + idx;
+		if (ELF32_ST_TYPE(symp->st_info) != STT_FUNC)
+			return (ctf_set_errno(fp, ECTF_NOTFUNC));
+	} else {
+		const Elf64_Sym *symp = (Elf64_Sym *)symbase + idx;
+		if (ELF64_ST_TYPE(symp->st_info) != STT_FUNC)
+			return (ctf_set_errno(fp, ECTF_NOTFUNC));
+	}
+
+	afp = fp;
+	if (ctf_lookup_by_id(&afp, fip->ctc_return) == NULL)
+		return (CTF_ERR); /* errno is set for us */
+
+	for (i = 0; i < fip->ctc_argc; i++) {
+		afp = fp;
+		if (ctf_lookup_by_id(&afp, argc[i]) == NULL)
+			return (CTF_ERR); /* errno is set for us */
+	}
+
+	dsd = ctf_alloc(sizeof (ctf_dsdef_t));
+	if (dsd == NULL)
+		return (ctf_set_errno(fp, ENOMEM));
+	dsd->dts_nargs = fip->ctc_argc;
+	if (fip->ctc_flags & CTF_FUNC_VARARG)
+		dsd->dts_nargs++;
+	if (dsd->dts_nargs != 0) {
+		dsd->dts_argc = ctf_alloc(sizeof (ctf_id_t) * dsd->dts_nargs);
+		if (dsd->dts_argc == NULL) {
+			ctf_free(dsd, sizeof (ctf_dsdef_t));
+			return (ctf_set_errno(fp, ENOMEM));
+		}
+		bcopy(argc, dsd->dts_argc, sizeof (ctf_id_t) * fip->ctc_argc);
+		if (fip->ctc_flags & CTF_FUNC_VARARG)
+			dsd->dts_argc[fip->ctc_argc] = 0;
+	}
+	dsd->dts_symidx = idx;
+	dsd->dts_tid = fip->ctc_return;
+
+	ctf_dsd_insert(fp, dsd);
+	fp->ctf_flags |= LCTF_DIRTY;
+
+	return (0);
+}
+
+int
+ctf_add_object(ctf_file_t *fp, ulong_t idx, ctf_id_t type)
+{
+	ctf_dsdef_t *dsd;
+	ctf_file_t *afp;
+	uintptr_t symbase = (uintptr_t)fp->ctf_symtab.cts_data;
+
+	if (!(fp->ctf_flags & LCTF_RDWR))
+		return (ctf_set_errno(fp, ECTF_RDONLY));
+
+	if (!(fp->ctf_flags & LCTF_RDWR))
+		return (ctf_set_errno(fp, ECTF_RDONLY));
+
+	if (ctf_dsd_lookup(fp, idx) != NULL)
+		return (ctf_set_errno(fp, ECTF_CONFLICT));
+
+	if (symbase == NULL)
+		return (ctf_set_errno(fp, ECTF_STRTAB));
+
+	if (idx > fp->ctf_nsyms)
+		return (ctf_set_errno(fp, ECTF_NOTDATA));
+
+	if (fp->ctf_symtab.cts_entsize == sizeof (Elf32_Sym)) {
+		const Elf32_Sym *symp = (Elf32_Sym *)symbase + idx;
+		if (ELF32_ST_TYPE(symp->st_info) != STT_OBJECT)
+			return (ctf_set_errno(fp, ECTF_NOTDATA));
+	} else {
+		const Elf64_Sym *symp = (Elf64_Sym *)symbase + idx;
+		if (ELF64_ST_TYPE(symp->st_info) != STT_OBJECT)
+			return (ctf_set_errno(fp, ECTF_NOTDATA));
+	}
+
+	afp = fp;
+	if (ctf_lookup_by_id(&afp, type) == NULL)
+		return (CTF_ERR); /* errno is set for us */
+
+	dsd = ctf_alloc(sizeof (ctf_dsdef_t));
+	if (dsd == NULL)
+		return (ctf_set_errno(fp, ENOMEM));
+	dsd->dts_symidx = idx;
+	dsd->dts_tid = type;
+	dsd->dts_argc = NULL;
+
+	ctf_dsd_insert(fp, dsd);
+	fp->ctf_flags |= LCTF_DIRTY;
+
+	return (0);
+}
+
+void
+ctf_dataptr(ctf_file_t *fp, const void **addrp, size_t *sizep)
+{
+	if (addrp != NULL)
+		*addrp = fp->ctf_base;
+	if (sizep != NULL)
+		*sizep = fp->ctf_size;
+}
+
+int
+ctf_add_label(ctf_file_t *fp, const char *name, ctf_id_t type, uint_t position)
+{
+	ctf_file_t *fpd;
+	ctf_dldef_t *dld;
+
+	if (name == NULL)
+		return (ctf_set_errno(fp, EINVAL));
+
+	if (!(fp->ctf_flags & LCTF_RDWR))
+		return (ctf_set_errno(fp, ECTF_RDONLY));
+
+	fpd = fp;
+	if (type != 0 && ctf_lookup_by_id(&fpd, type) == NULL)
+		return (CTF_ERR); /* errno is set for us */
+
+	if (type != 0 && (fp->ctf_flags & LCTF_CHILD) &&
+	    CTF_TYPE_ISPARENT(type))
+		return (ctf_set_errno(fp, ECTF_NOPARENT));
+
+	if (ctf_dld_lookup(fp, name) != NULL)
+		return (ctf_set_errno(fp, ECTF_LABELEXISTS));
+
+	if ((dld = ctf_alloc(sizeof (ctf_dldef_t))) == NULL)
+		return (ctf_set_errno(fp, EAGAIN));
+
+	if ((dld->dld_name = ctf_strdup(name)) == NULL) {
+		ctf_free(dld, sizeof (ctf_dldef_t));
+		return (ctf_set_errno(fp, EAGAIN));
+	}
+
+	dld->dld_type = type;
+	fp->ctf_dtstrlen += strlen(name) + 1;
+	ctf_dld_insert(fp, dld, position);
+	fp->ctf_flags |= LCTF_DIRTY;
+
+	return (0);
 }

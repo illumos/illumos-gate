@@ -9,25 +9,36 @@
 # http://www.illumos.org/license/CDDL.
 #
 
-#
-# Copyright 2015, Joyent, Inc.
-#
+PROG = ctfdump
+SRCS = ctfdump.c
 
-PROG= ctfdiff
-
-include ../Makefile.cmd
+include ../../Makefile.ctf
 
 CFLAGS += $(CCVERBOSE)
 LDLIBS += -lctf
 
-.KEEP_STATE:
+LDFLAGS = \
+	-L$(ROOTONBLDLIBMACH) \
+	'-R$$ORIGIN/../../lib/$(MACH)' \
+
+CPPFLAGS += -include ../../common/ctf_headers.h
+
+OBJS = $(SRCS:%.c=%.o)
 
 all: $(PROG)
 
-install: all $(ROOTPROG)
+$(PROG): $(OBJS)
+	$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
+	$(POST_PROCESS)
+
+%.o: $(SRC)/cmd/ctfdump/%.c
+	$(COMPILE.c) $<
+
+$(ROOTONBLDMACHPROG): $(PROG)
+
+install: $(ROOTONBLDMACHPROG)
 
 clean:
+	$(RM) $(OBJS) $(LINTFILES)
 
-lint:	lint_PROG
-
-include ../Makefile.targ
+include $(SRC)/tools/Makefile.targ

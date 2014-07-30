@@ -105,6 +105,8 @@ COMMON_SUBDIRS=		\
 	csh		\
 	csplit		\
 	ctfdiff		\
+	ctfdump		\
+	ctfmerge	\
 	ctrun		\
 	ctstat		\
 	ctwatch		\

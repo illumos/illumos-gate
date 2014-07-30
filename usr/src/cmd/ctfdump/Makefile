@@ -10,10 +10,10 @@
 #
 
 #
-# Copyright 2015, Joyent, Inc.
+# Copyright (c) 2015, Joyent, Inc.
 #
 
-PROG= ctfdiff
+PROG= ctfdump
 
 include ../Makefile.cmd
 

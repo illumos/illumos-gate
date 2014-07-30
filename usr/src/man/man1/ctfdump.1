@@ -1,0 +1,214 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright (c) 2015, Joyent, Inc.
+.\"
+.Dd Oct 4, 2014
+.Dt CTFDUMP 1
+.Os
+.Sh NAME
+.Nm ctfdump
+.Nd dump parts of ctf data from files
+.Sh SYNOPSIS
+.Nm ctfdump
+.Op Fl dfhlsSt
+.Op Fl p Ar parent
+.Op Fl u Ar outfile
+.Ar file
+.Sh DESCRIPTION
+The
+.Nm
+utility dumps and decodes the
+.Sy CTF
+data contained inside of
+.Sy ELF
+objects and raw
+.Sy CTF
+files.
+.Lp
+.Nm
+can dump information about the
+.Sy CTF header ,
+the
+.Sy labels
+encoded in the
+.Sy CTF
+container,
+the types of
+.Sy data objects ,
+the internal
+.Sy string
+table,
+the types of the return function and the arguments for
+.Sy functions ,
+and of course, it displays information about the
+.Sy types
+defined in the
+.Sy CTF
+container.
+.Lp
+.Nm
+can also be used to dump out the raw
+.Sy CTF
+data and send it to another file. When writing out data, it always
+ensures that the
+.Sy CTF
+data is decompressed. In this form, the
+.Sy CTF
+data can be inspected using
+.Nm
+and other tools such as
+.Xr mdb 1 .
+.Lp
+When no options are specified,
+.Nm
+displays all information. However, when the
+.Fl u
+option is used, then no information is displayed by default, unless
+requested through the the appropriate option.
+.Sh OPTIONS
+The following options are supported:
+.Bl -hang -width Ds
+.It Fl d
+.Bd -filled -compact
+Dump the types of symbols that correspond to objects.
+.Ed
+.It Fl f
+.Bd -filled -compact
+Dump the types of the return values and arguments of the functions.
+.Ed
+.It Fl h
+.Bd -filled -compact
+Dump the
+.Sy CTF
+header
+.Ed
+.It Fl l
+.Bd -filled -compact
+Dump all
+.Sy CTF
+labels associated with the file.
+.Ed
+.It Fl p Ar parent
+.Bd -filled -compact
+Use the type information in
+.Em parent
+to supplement output. This is useful when a
+.Nm CTF
+container has been
+.Sy uniquified
+against
+.Em parent .
+This allows
+.Nm
+to use the names of types when used with
+.Fl t .
+.Ed
+.It Fl s
+.Bd -filled -compact
+Dump the internal
+.Sy CTF
+string table
+.Ed
+.It Fl S
+.Bd -filled -compact
+Displays statistics about the
+.Sy CTF
+container.
+.Ed
+.It Fl t
+.Bd -filled -compact
+Dump the type information contained in the
+.Sy CTF
+conatiner.
+.Ed
+.It Fl u Ar outfile
+.Bd -filled -compact
+Copies the uncompressed
+.Sy CTF
+data to the file specified by
+.Em outfile .
+This can be used to make it easier to inspect the raw
+.Sy CTF
+data.
+.Ed
+.El
+.Sh EXIT STATUS
+.Bl -inset
+.It Sy 0
+.Dl Execution completed successfully.
+.It Sy 1
+.Dl A fatal error occured.
+.It Sy 2
+.Dl Invalid command line options were specified.
+.El
+.Sh EXAMPLES
+.Sy Example 1
+Displaying the Type Section of a Single File
+.Lp
+The following example dumps the type section of the file
+.Sy /usr/lib/libc.so.1 .
+.Bd -literal -offset 6n
+$ ctfdump -t /usr/lib/libc.so.1
+- Types ----------------------------------------------------
+
+  <1> int encoding=SIGNED offset=0 bits=32
+  <2> long encoding=SIGNED offset=0 bits=32
+  <3> typedef pid_t refers to 2
+  <4> unsigned int encoding=0x0 offset=0 bits=32
+  <5> typedef uid_t refers to 4
+  <6> typedef gid_t refers to 5
+  <7> typedef uintptr_t refers to 4
+\&...
+.Ed
+.Lp
+.Sy Example 2
+Dumping the CTF data to Another File
+.Lp
+The following example dumps the entire CTF data from the file
+.Sy /usr/lib/libc.so.1
+and places it into the file
+.Sy ctf.out .
+This then shows how you can use the
+.Xr mdb 1
+to inspect its contents.
+.Bd -literal -offset 6n
+$ ctfdump -u ctf.out /usr/lib/libc.so.1
+$ mdb ./ctf.out
+> ::typedef -r /usr/lib/libctf.so.1
+> 0::print ctf_header_t
+{
+    cth_preamble = {
+        ctp_magic = 0xcff1
+        ctp_version = 0x2
+        ctp_flags = 0
+    }
+    cth_parlabel = 0
+    cth_parname = 0
+    cth_lbloff = 0
+    cth_objtoff = 0x8
+    cth_funcoff = 0x5e0
+    cth_typeoff = 0x7178
+    cth_stroff = 0x12964
+    cth_strlen = 0x7c9c
+}
+.Ed
+.Sh INTERFACE STABILITY
+The command syntax is
+.Sy Committed .
+The output format is
+.Sy Uncommitted .
+.Sh SEE ALSO
+.Xr ctfdiff 1 ,
+.Xr dump 1 ,
+.Xr elfdump 1 ,
+.Xr mdb 1 ,
+.Xr ctf 4

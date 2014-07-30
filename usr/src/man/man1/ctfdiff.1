@@ -1,0 +1,337 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright (c) 2015, Joyent, Inc.
+.\"
+.Dd Oct 4, 2014
+.Dt CTFDIFF 1
+.Os
+.Sh NAME
+.Nm ctfdiff
+.Nd compare two CTF containers
+.Sh SYNOPSIS
+.Nm ctfdiff
+.Op Fl afIloqt
+.Op Fl F Ar function
+.Op Fl O Ar object
+.Op Fl p Ar parent1
+.Op Fl p Ar parent2
+.Op Fl T Ar type
+.Ar file1 file2
+.Sh DESCRIPTION
+The
+.Nm
+utility identifies differences between the contents of the
+.Sy CTF
+containers found in
+.Em file1
+and
+.Em file2 .
+.Lp
+.Nm
+can find differences between two
+.Sy CTF
+container's
+.Sy labels ,
+.Sy functions ,
+.Sy objects ,
+and
+.Sy types .
+When no options are specified,
+.Nm
+will only consider
+.Sy functions ,
+.Sy objects,
+and
+.Sy types .
+.Lp
+Two
+.Sy labels
+are considered the same, if they have the same name. Two
+.Sy objects
+are considered the same if they have the same name and the type of the
+object is the same. Two
+.Sy functions
+are considered the same if they have the same, the same return type, the
+same number of arguments, and the types of their arguments are the same.
+.Lp
+Two
+.Sy types
+are considered the same if they have the same, they represent the same
+kind of thing, and the contents of the type are the same. This varies
+for each specific kind, for example, two structs are the same if they
+have the same members whose types, offsets, and names are all the same.
+For more information on the specifics for what we look at for each kind
+of type, and the kinds themselves, see the information we use to encode
+them in
+.Xr ctf 4 . If the option
+.Fl I
+is specified, then the names of basic integer types are ignored. For an
+example of where this makes sense, see
+.Sy Example 4 .
+.Lp
+If the
+.Sy CTF
+container found inside of either
+.Em file1
+or
+.Em file2
+has been uniquified (see
+.Xr ctf 4
+for more on uniquification), then the parent
+.Sy CTF
+container is also required for the diff to complete.
+.Sh OPTIONS
+The following options are supported:
+.Bl -hang -width Ds
+.It Fl a
+.Bd -filled -compact
+Diff
+.Sy labels ,
+.Sy types ,
+.Sy objects ,
+and
+.Sy functions .
+.Ed
+.It Fl f
+.Bd -filled -compact
+Diff
+.Sy function
+type argument information.
+.Ed
+.It Fl F Ar function
+.Bd -filled -compact
+When diffing
+.Sy functions ,
+only consider the function
+.Em function .
+This option requires that the option
+.Fl -f
+be specified and can be repeated multiple times.
+.Ed
+.It Fl I
+.Bd -filled -compact
+Ignore the names of integral types. This option is useful when comparing
+types between two
+.Sy CTF
+containers that have different programming models. In this case, when
+comparing integers, the name of the type is not considered. This means
+that the ILP32 type long which is a 32-bit wide signed integer is the
+same as the LP64 type int which is a 32-bit wide signed integer, even
+though they have different names.
+.Ed
+.It Fl l
+.Bd -filled -compact
+Diff the
+.Sy labels
+contained inside the
+.Sy CTF
+containers.
+.Ed
+.It Fl o
+.Bd -filled -compact
+Diff type information for
+.Sy objects .
+.Ed
+.It Fl O Ar object
+.Bd -filled -compact
+When diffing type information for
+.Sy objects ,
+only compare if the object is name
+.Em object . This option requires
+.Fl o
+to be specified and can be repeated multiple times.
+.Ed
+.It Fl p Ar parent1
+.Bd -filled -compact
+Specifies the path of file that is the parent of the
+.Sy CTF
+container inside of
+.Em file1
+is
+.Em parent1 .
+This option is required if
+.Em file1
+has been uniquified. For more information on uniquification, see
+.Xr ctf 4 .
+.Ed
+.It Fl P Ar parent2
+.Bd -filled -compact
+Specifies the path of file that is the parent of the
+.Sy CTF
+container inside of
+.Em file2 is
+.Em parent2 .
+This option is required if
+.Em file1
+has been uniquified. For more information on uniquification, see
+.Xr ctf 4 .
+.Ed
+.It Fl q
+.Bd -filled -compact
+Enables quiet mode. Standard output from the diff will not be emitted.
+However, diagnostics messages will still be emitted to standard error.
+.Ed
+.It Fl t
+.Bd -filled -compact
+Diff the
+.Sy type
+information sections in the
+.Sy CTF
+containers.
+.Ed
+.It Fl T Ar type
+.Bd -filled -compact
+When diffing the
+.Sy types
+section, only consider it if the type is name
+.Em type .
+Types specified here do not impact the diffing of
+.Sy objects
+or
+.Sy functions .
+Even with
+.Fl -T
+specified, other types will be diffed as necessary for the evaluation of
+the named types; however, the results of those intermediate differences
+will not impact the results of
+.Nm ,
+only named types are considered when evaluating the exit status of
+.Nm .
+.Ed
+.El
+.Sh EXIT STATUS
+.Bl -inset
+.It Sy 0
+.Bd -filled -offset indent -compact
+Execution completed successfully, no differences were detected
+between
+.Em file1
+and
+.Em file2 .
+.Ed
+.It Sy 1
+.Bd -filled -offset indent -compact
+Execution completed successfully, but differences were detected
+between
+.Em file1
+and
+.Em file2 .
+.Ed
+.It Sy 2
+.D1 Invalid command line options were specified.
+.It Sy 3
+.D1 A fatal error occured.
+.El
+.Sh EXAMPLES
+.Sy Example 1
+Diffing Two
+.Sy CTF
+Containers
+.Lp
+The following example compares two
+.Sy CTF
+containers using the default set
+of comparisons:
+.Sy objects ,
+.Sy functions ,
+and
+.Sy types .
+.Bd -literal -offset 6n
+$ ctfdiff /usr/lib/libc.so.1 /usr/lib/libdtrace.so.1
+ctf container /usr/lib/libc.so.1 type 37 is different
+ctf container /usr/lib/libc.so.1 type 38 is different
+ctf container /usr/lib/libc.so.1 type 39 is different
+ctf container /usr/lib/libc.so.1 type 40 is different
+ctf container /usr/lib/libc.so.1 type 41 is different
+ctf container /usr/lib/libc.so.1 type 42 is different
+ctf container /usr/lib/libc.so.1 type 43 is different
+ctf container /usr/lib/libc.so.1 type 47 is different
+ctf container /usr/lib/libc.so.1 type 48 is different
+ctf container /usr/lib/libc.so.1 type 49 is different
+\&...
+.Ed
+.Sy Example 2
+Diffing Types Between Two
+.Sy CTF
+Containers with Parents
+.Lp
+The following example compares two
+.Sy CTF
+containers
+.Sy /ws/rm/zlan/proto/kernel/drv/amd64/vnd
+and
+.Sy /ws/rm/zlan/proto/kernel/drv/amd64/overlay
+that have been uniquified against the same container
+.Sy /ws/rm/zlan/proto/kernel/amd64/genunix .
+.Bd -literal -offset 6n
+$ ctfdiff -t -p /ws/rm/zlan/proto/kernel/amd64/genunix \\
+    -P /ws/rm/zlan/proto/kernel/amd64/genunix \\
+    /ws/rm/zlan/proto/kernel/drv/amd64/vnd  \\
+    /ws/rm/zlan/proto/kernel/drv/amd64/overlay
+ctf container /ws/rm/zlan/proto/kernel/drv/amd64/vnd type 32769 is different
+ctf container /ws/rm/zlan/proto/kernel/drv/amd64/vnd type 32770 is different
+ctf container /ws/rm/zlan/proto/kernel/drv/amd64/vnd type 32771 is different
+ctf container /ws/rm/zlan/proto/kernel/drv/amd64/vnd type 32772 is different
+ctf container /ws/rm/zlan/proto/kernel/drv/amd64/vnd type 32774 is different
+ctf container /ws/rm/zlan/proto/kernel/drv/amd64/vnd type 32775 is different
+ctf container /ws/rm/zlan/proto/kernel/drv/amd64/vnd type 32776 is different
+ctf container /ws/rm/zlan/proto/kernel/drv/amd64/vnd type 32777 is different
+ctf container /ws/rm/zlan/proto/kernel/drv/amd64/vnd type 32778 is different
+ctf container /ws/rm/zlan/proto/kernel/drv/amd64/vnd type 32779 is different
+\&...
+.Ed
+.Lp
+.Sy Example 3
+Diffing a Specific Function in Two
+.Sy CTF
+Containers
+.Lp
+This example shows us looking for differences in the function
+.Sy libzfs_core_init
+in two different version of the library
+.Sy libzfs_core.so.1 .
+.Bd -literal -offset 6n
+$ ctfdiff -f -F libzfs_core_init /usr/lib/libzfs_core.so.1 \\
+    /ws/rm/ctf/proto/usr/lib/libzfs_core.so.1
+$ echo $?
+.Ed
+.Lp
+.Sy Example 4
+Diffing Types to Find Differences Between Different Data Models.
+.Lp
+This example looks for differences between structures used in an ioctl
+that the kernel wants to be bitness neutral by comparing a 32-bit and
+64-bit library that consumes it. In this example, we'll use the library
+.Sy libvnd.so.1
+and the types
+.Sy vnd_ioc_attach_t ,
+.Sy vnd_ioc_link_t ,
+.Sy vnd_ioc_unlink_t ,
+.Sy vnd_ioc_buf_t ,
+and
+.Sy vnd_ioc_info_t .
+.Bd -literal -offset 6n
+$ ctfdiff -t -I -T vnd_ioc_attach_t  -T vnd_ioc_link_t  \\
+    -T vnd_ioc_unlink_t -T vnd_ioc_buf_t  -T vnd_ioc_info_t \\
+    i386/libvnd.so.1 amd64/libvnd.so.1
+$ echo $?
+0
+.Ed
+.Sh INTERFACE STABILITY
+The command syntax is
+.Sy Committed .
+The output format is
+.Sy Uncommitted .
+.Sh SEE ALSO
+.Xr ctfdump 1 ,
+.Xr diff 1 ,
+.Xr ctf 4

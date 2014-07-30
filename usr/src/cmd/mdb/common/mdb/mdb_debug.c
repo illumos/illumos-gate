@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <mdb/mdb_debug.h>
 #include <mdb/mdb_err.h>
 #include <mdb/mdb_io.h>
@@ -157,7 +155,6 @@ mdb_dmode(uint_t bits)
 	mdb.m_debug = bits;
 }
 
-#ifdef DEBUG
 int
 mdb_dassert(const char *expr, const char *file, int line)
 {
@@ -165,7 +162,6 @@ mdb_dassert(const char *expr, const char *file, int line)
 	/*NOTREACHED*/
 	return (0);
 }
-#endif
 
 /*
  * Function to convert mdb longjmp codes (see <mdb/mdb.h>) into a string for

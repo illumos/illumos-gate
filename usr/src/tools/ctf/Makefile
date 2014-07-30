@@ -26,7 +26,7 @@
 
 include ../Makefile.tools
 
-SUBDIRS = cvt dump stabs scripts ctfstrip libctf .WAIT ctfdiff
+SUBDIRS = cvt stabs scripts ctfstrip libctf ctfdiff ctfmerge ctfdump
 
 .PARALLEL: $(SUBDIRS)
 
@@ -37,6 +37,10 @@ clobber	:= TARGET= clobber
 lint	:= TARGET= lint
 
 .KEEP_STATE:
+
+ctfmerge: libctf
+ctfdiff: libctf
+ctfdump: libctf
 
 all clean clobber install lint: dwarf .WAIT $(SUBDIRS)
 

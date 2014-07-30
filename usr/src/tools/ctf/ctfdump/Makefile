@@ -10,16 +10,24 @@
 #
 
 #
-# Copyright (c) 2013, Joyent, Inc. All rights reserved.
+# Copyright (c) 2015, Joyent, Inc.
 #
 
-MODULE = libctf.so
-MDBTGT = proc
-MODSRCS = mdb_modctf.c
+include		../../Makefile.tools
 
-include ../../../../Makefile.cmd
-include ../../Makefile.sparcv7
-include ../../../Makefile.module
+SUBDIRS	= $(MACH)
 
-MODSRCS_DIR = ../../../common/modules/ctf
-CPPFLAGS += -I$(SRC)/common/ctf
+all	:= TARGET= all
+install	:= TARGET= install
+clean	:= TARGET= clean
+clobber	:= TARGET= clobber
+lint	:= TARGET= lint
+
+.KEEP_STATE:
+
+install all clean clobber lint: $(SUBDIRS)
+
+$(SUBDIRS): FRC
+	@cd $@; pwd; $(MAKE) $(TARGET)
+
+FRC:

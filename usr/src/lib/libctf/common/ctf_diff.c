@@ -10,27 +10,90 @@
  */
 
 /*
- * Copyright (c) 2014 Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2015 Joyent, Inc.  All rights reserved.
+ */
+
+/*
+ * The following ia a basic overview of how we diff types in containers (the
+ * generally interesting part of diff, and what's used by merge). We maintain
+ * two mapping tables, a table of forward mappings (src->dest), and a reverse
+ * mapping (dest->src). Both are initialized to contain no mapping, and can also
+ * be updated to contain a negative mapping.
+ *
+ * What we do first is iterate over each type in the src container, and compare
+ * it with a type in the destination container. This may involve doing recursive
+ * comparisons -- which can involve cycles. To deal with this, whenever we
+ * encounter something which may be cyclic, we insert a guess. In other words,
+ * we assume that it may be true. This is necessary for the classic case of the
+ * following structure:
+ *
+ * struct foo {
+ * 	struct foo *foo_next;
+ * };
+ *
+ * If it turns out that we were wrong, we discard our guesses.
+ *
+ * If we find that a given type in src has no corresponding entry in dst, we
+ * then mark its map as CTF_ERR (-1) to indicate that it has *no* match, as
+ * opposed to the default value of 0, which indicates an unknown match.
+ * Once we've done the first iteration through src, we know at that point in
+ * time whether everything in dst is similar or not and can simply walk over it
+ * and don't have to do any additional checks.
  */
 
 #include <libctf.h>
 #include <ctf_impl.h>
 #include <sys/debug.h>
 
+typedef struct ctf_diff_func {
+	const char *cdf_name;
+	ulong_t cdf_symidx;
+	ulong_t cdf_matchidx;
+} ctf_diff_func_t;
+
+typedef struct ctf_diff_obj {
+	const char *cdo_name;
+	ulong_t cdo_symidx;
+	ctf_id_t cdo_id;
+	ulong_t cdo_matchidx;
+} ctf_diff_obj_t;
+
+typedef struct ctf_diff_guess {
+	struct ctf_diff_guess *cdg_next;
+	ctf_id_t cdg_iid;
+	ctf_id_t cdg_oid;
+} ctf_diff_guess_t;
+
 /* typedef in libctf.h */
 struct ctf_diff {
 	uint_t cds_flags;
+	boolean_t cds_tvalid;	/* types valid */
 	ctf_file_t *cds_ifp;
 	ctf_file_t *cds_ofp;
-	ctf_idhash_t cds_forward;
-	ctf_idhash_t cds_reverse;
-	ctf_idhash_t cds_fneg;
-	ctf_idhash_t cds_f_visited;
-	ctf_idhash_t cds_r_visited;
+	ctf_id_t *cds_forward;
+	ctf_id_t *cds_reverse;
 	ctf_diff_type_f cds_func;
-	int cds_visitid;
+	ctf_diff_guess_t *cds_guess;
 	void *cds_arg;
+	uint_t cds_nifuncs;
+	uint_t cds_nofuncs;
+	uint_t cds_nextifunc;
+	uint_t cds_nextofunc;
+	ctf_diff_func_t *cds_ifuncs;
+	ctf_diff_func_t *cds_ofuncs;
+	boolean_t cds_ffillip;
+	boolean_t cds_fvalid;
+	uint_t cds_niobj;
+	uint_t cds_noobj;
+	uint_t cds_nextiobj;
+	uint_t cds_nextoobj;
+	ctf_diff_obj_t *cds_iobj;
+	ctf_diff_obj_t *cds_oobj;
+	boolean_t cds_ofillip;
+	boolean_t cds_ovalid;
 };
+
+#define	TINDEX(tid) (tid - 1)
 
 /*
  * Team Diff
@@ -124,14 +187,23 @@ ctf_diff_array(ctf_diff_t *cds, ctf_file_t *ifp, ctf_id_t iid, ctf_file_t *ofp,
 	if (ret != B_FALSE)
 		return (ret);
 
-	if (iar.ctr_nelems == oar.ctr_nelems)
-		return (B_FALSE);
+	if (iar.ctr_nelems != oar.ctr_nelems)
+		return (B_TRUE);
 
-	ret = ctf_diff_type(cds, ifp, iar.ctr_index, ofp, oar.ctr_index);
-	if (ret != B_FALSE)
-		return (ret);
+	/*
+	 * If we're ignoring integer types names, then we're trying to do a bit
+	 * of a logical diff and we don't really care about the fact that the
+	 * index element might not be the same here, what we care about are the
+	 * number of elements and that they're the same type.
+	 */
+	if ((cds->cds_flags & CTF_DIFF_F_IGNORE_INTNAMES) == 0) {
+		ret = ctf_diff_type(cds, ifp, iar.ctr_index, ofp,
+		    oar.ctr_index);
+		if (ret != B_FALSE)
+			return (ret);
+	}
 
-	return (B_TRUE);
+	return (B_FALSE);
 }
 
 /*
@@ -143,7 +215,7 @@ ctf_diff_array(ctf_diff_t *cds, ctf_file_t *ifp, ctf_id_t iid, ctf_file_t *ofp,
  *   o They have the same flags
  */
 static int
-ctf_diff_func(ctf_diff_t *cds, ctf_file_t *ifp, ctf_id_t iid, ctf_file_t *ofp,
+ctf_diff_fptr(ctf_diff_t *cds, ctf_file_t *ifp, ctf_id_t iid, ctf_file_t *ofp,
     ctf_id_t oid)
 {
 	int ret, i;
@@ -214,6 +286,7 @@ ctf_diff_struct(ctf_diff_t *cds, ctf_file_t *ifp, ctf_id_t iid, ctf_file_t *ofp,
 	const ctf_member_t *imp, *omp;
 	const ctf_lmember_t *ilmp, *olmp;
 	int n;
+	ctf_diff_guess_t *cdg;
 
 	oifp = ifp;
 
@@ -245,6 +318,19 @@ ctf_diff_struct(ctf_diff_t *cds, ctf_file_t *ifp, ctf_id_t iid, ctf_file_t *ofp,
 		omp = NULL;
 		olmp = (const ctf_lmember_t *)((uintptr_t)otp + oincr);
 	}
+
+	/*
+	 * Insert our assumption that they're equal for the moment.
+	 */
+	cdg = ctf_alloc(sizeof (ctf_diff_guess_t));
+	if (cdg == NULL)
+		return (ctf_set_errno(ifp, ENOMEM));
+	cdg->cdg_iid = iid;
+	cdg->cdg_oid = oid;
+	cdg->cdg_next = cds->cds_guess;
+	cds->cds_guess = cdg;
+	cds->cds_forward[TINDEX(iid)] = oid;
+	cds->cds_reverse[TINDEX(oid)] = iid;
 
 	for (n = LCTF_INFO_VLEN(ifp, itp->ctt_info); n != 0; n--) {
 		const char *iname, *oname;
@@ -279,8 +365,9 @@ ctf_diff_struct(ctf_diff_t *cds, ctf_file_t *ifp, ctf_id_t iid, ctf_file_t *ofp,
 			return (B_TRUE);
 		}
 		ret = ctf_diff_type(cds, ifp, itype, ofp, otype);
-		if (ret != B_FALSE)
+		if (ret != B_FALSE) {
 			return (ret);
+		}
 
 		/* Advance our pointers */
 		if (imp != NULL)
@@ -385,6 +472,7 @@ ctf_diff_union(ctf_diff_t *cds, ctf_file_t *ifp, ctf_id_t iid, ctf_file_t *ofp,
 	ctf_file_t *oifp;
 	const ctf_type_t *itp, *otp;
 	ctf_diff_union_fp_t cduf;
+	ctf_diff_guess_t *cdg;
 	int ret;
 
 	oifp = ifp;
@@ -396,6 +484,16 @@ ctf_diff_union(ctf_diff_t *cds, ctf_file_t *ifp, ctf_id_t iid, ctf_file_t *ofp,
 	if (LCTF_INFO_VLEN(ifp, itp->ctt_info) !=
 	    LCTF_INFO_VLEN(ofp, otp->ctt_info))
 		return (B_TRUE);
+
+	cdg = ctf_alloc(sizeof (ctf_diff_guess_t));
+	if (cdg == NULL)
+		return (ctf_set_errno(ifp, ENOMEM));
+	cdg->cdg_iid = iid;
+	cdg->cdg_oid = oid;
+	cdg->cdg_next = cds->cds_guess;
+	cds->cds_guess = cdg;
+	cds->cds_forward[TINDEX(iid)] = oid;
+	cds->cds_reverse[TINDEX(oid)] = iid;
 
 	cduf.cduf_cds = cds;
 	cduf.cduf_curfp = ifp;
@@ -481,7 +579,6 @@ ctf_diff_type(ctf_diff_t *cds, ctf_file_t *ifp, ctf_id_t iid, ctf_file_t *ofp,
     ctf_id_t oid)
 {
 	int ret, ikind, okind;
-	ctf_ihelem_t *lookup, *fv, *rv;
 
 	/* Do a quick short circuit */
 	if (ifp == ofp && iid == oid)
@@ -489,28 +586,25 @@ ctf_diff_type(ctf_diff_t *cds, ctf_file_t *ifp, ctf_id_t iid, ctf_file_t *ofp,
 
 	/*
 	 * Check if it's something we've already encountered in a forward
-	 * reference or forward negative table.
+	 * reference or forward negative table. Also double check the reverse
+	 * table.
 	 */
-	if ((lookup = ctf_idhash_lookup(&cds->cds_forward, iid)) != NULL) {
-		if (lookup->ih_value == oid)
-			return (B_FALSE);
-		else
-			return (B_TRUE);
-	}
-
-	if (ctf_idhash_lookup(&cds->cds_forward, iid) != NULL) {
+	if (cds->cds_forward[TINDEX(iid)] == oid)
+		return (B_FALSE);
+	if (cds->cds_forward[TINDEX(iid)] != 0)
 		return (B_TRUE);
-	}
-
-	fv = ctf_idhash_lookup(&cds->cds_f_visited, iid);
-	rv = ctf_idhash_lookup(&cds->cds_r_visited, oid);
-	if (fv != NULL && rv != NULL)
-		return (fv->ih_value != rv->ih_value);
-	else if (fv != NULL || rv != NULL)
+	if (cds->cds_reverse[TINDEX(oid)] == iid)
+		return (B_FALSE);
+	if ((cds->cds_flags & CTF_DIFF_F_IGNORE_INTNAMES) == 0 &&
+	    cds->cds_reverse[TINDEX(oid)] != 0)
 		return (B_TRUE);
 
 	ikind = ctf_type_kind(ifp, iid);
 	okind = ctf_type_kind(ofp, oid);
+
+	if (ikind != okind &&
+	    ikind != CTF_K_FORWARD && okind != CTF_K_FORWARD)
+			return (B_TRUE);
 
 	/* Check names */
 	if ((ret = ctf_diff_name(ifp, iid, ofp, oid)) != B_FALSE) {
@@ -519,12 +613,8 @@ ctf_diff_type(ctf_diff_t *cds, ctf_file_t *ifp, ctf_id_t iid, ctf_file_t *ofp,
 			return (ret);
 	}
 
-	if (ikind != okind) {
-		if (ikind == CTF_K_FORWARD || okind == CTF_K_FORWARD)
-			return (ctf_diff_forward(ifp, iid, ofp, oid));
-		else
-			return (B_TRUE);
-	}
+	if (ikind == CTF_K_FORWARD || okind == CTF_K_FORWARD)
+		return (ctf_diff_forward(ifp, iid, ofp, oid));
 
 	switch (ikind) {
 	case CTF_K_INTEGER:
@@ -535,22 +625,12 @@ ctf_diff_type(ctf_diff_t *cds, ctf_file_t *ifp, ctf_id_t iid, ctf_file_t *ofp,
 		ret = ctf_diff_array(cds, ifp, iid, ofp, oid);
 		break;
 	case CTF_K_FUNCTION:
-		ret = ctf_diff_func(cds, ifp, iid, ofp, oid);
+		ret = ctf_diff_fptr(cds, ifp, iid, ofp, oid);
 		break;
 	case CTF_K_STRUCT:
-		VERIFY(ctf_idhash_insert(&cds->cds_f_visited, iid,
-		    cds->cds_visitid) == 0);
-		VERIFY(ctf_idhash_insert(&cds->cds_r_visited, oid,
-		    cds->cds_visitid) == 0);
-		cds->cds_visitid++;
 		ret = ctf_diff_struct(cds, ifp, iid, ofp, oid);
 		break;
 	case CTF_K_UNION:
-		VERIFY(ctf_idhash_insert(&cds->cds_f_visited, iid,
-		    cds->cds_visitid) == 0);
-		VERIFY(ctf_idhash_insert(&cds->cds_r_visited, oid,
-		    cds->cds_visitid) == 0);
-		cds->cds_visitid++;
 		ret = ctf_diff_union(cds, ifp, iid, ofp, oid);
 		break;
 	case CTF_K_ENUM:
@@ -610,35 +690,41 @@ ctf_diff_pass1(ctf_diff_t *cds)
 	for (i = istart; i <= iend; i++) {
 		diff = B_TRUE;
 		for (j = jstart; j <= jend; j++) {
-			cds->cds_visitid = 1;
-			ctf_idhash_clear(&cds->cds_f_visited);
-			ctf_idhash_clear(&cds->cds_r_visited);
+			ctf_diff_guess_t *cdg, *tofree;
 
+			ASSERT(cds->cds_guess == NULL);
 			diff = ctf_diff_type(cds, cds->cds_ifp, i,
 			    cds->cds_ofp, j);
 			if (diff == CTF_ERR)
 				return (CTF_ERR);
 
+			/* Clean up our guesses */
+			cdg = cds->cds_guess;
+			cds->cds_guess = NULL;
+			while (cdg != NULL) {
+				if (diff == B_TRUE) {
+					cds->cds_forward[TINDEX(cdg->cdg_iid)] =
+					    0;
+					cds->cds_reverse[TINDEX(cdg->cdg_oid)] =
+					    0;
+				}
+				tofree = cdg;
+				cdg = cdg->cdg_next;
+				ctf_free(tofree, sizeof (ctf_diff_guess_t));
+			}
+
 			/* Found a hit, update the tables */
 			if (diff == B_FALSE) {
-				VERIFY(ctf_idhash_lookup(&cds->cds_forward,
-				    i) == NULL);
-				VERIFY(ctf_idhash_insert(&cds->cds_forward,
-				    i, j) == 0);
-				if (ctf_idhash_lookup(&cds->cds_reverse, j) ==
-				    NULL) {
-					VERIFY(ctf_idhash_lookup(
-					    &cds->cds_reverse, j) == NULL);
-					VERIFY(ctf_idhash_insert(
-					    &cds->cds_reverse, j, i) == 0);
-				}
+				cds->cds_forward[TINDEX(i)] = j;
+				if (cds->cds_reverse[TINDEX(j)] == 0)
+					cds->cds_reverse[TINDEX(j)] = i;
 				break;
 			}
 		}
 
 		/* Call the callback at this point */
 		if (diff == B_TRUE) {
-			VERIFY(ctf_idhash_insert(&cds->cds_fneg, i, 1) == 0);
+			cds->cds_forward[TINDEX(i)] = CTF_ERR;
 			cds->cds_func(cds->cds_ifp, i, B_FALSE, NULL, CTF_ERR,
 			    cds->cds_arg);
 		} else {
@@ -657,10 +743,17 @@ ctf_diff_pass1(ctf_diff_t *cds)
 static int
 ctf_diff_pass2(ctf_diff_t *cds)
 {
-	int i;
+	int i, start, end;
 
-	for (i = 1; i <= cds->cds_ofp->ctf_typemax; i++) {
-		if (ctf_idhash_lookup(&cds->cds_reverse, i) != NULL)
+	start = 0x1;
+	end = cds->cds_ofp->ctf_typemax;
+	if (cds->cds_ofp->ctf_flags & LCTF_CHILD) {
+		start += 0x8000;
+		end += 0x8000;
+	}
+
+	for (i = start; i <= end; i++) {
+		if (cds->cds_reverse[TINDEX(i)] != 0)
 			continue;
 		cds->cds_func(cds->cds_ofp, i, B_FALSE, NULL, CTF_ERR,
 		    cds->cds_arg);
@@ -672,8 +765,8 @@ ctf_diff_pass2(ctf_diff_t *cds)
 int
 ctf_diff_init(ctf_file_t *ifp, ctf_file_t *ofp, ctf_diff_t **cdsp)
 {
-	int ret;
 	ctf_diff_t *cds;
+	size_t fsize, rsize;
 
 	cds = ctf_alloc(sizeof (ctf_diff_t));
 	if (cds == NULL)
@@ -682,41 +775,27 @@ ctf_diff_init(ctf_file_t *ifp, ctf_file_t *ofp, ctf_diff_t **cdsp)
 	bzero(cds, sizeof (ctf_diff_t));
 	cds->cds_ifp = ifp;
 	cds->cds_ofp = ofp;
-	ret = ctf_idhash_create(&cds->cds_forward, ifp->ctf_typemax);
-	if (ret != 0) {
+
+	fsize = sizeof (ctf_id_t) * ifp->ctf_typemax;
+	rsize = sizeof (ctf_id_t) * ofp->ctf_typemax;
+	if (ifp->ctf_flags & LCTF_CHILD)
+		fsize += 0x8000 * sizeof (ctf_id_t);
+	if (ofp->ctf_flags & LCTF_CHILD)
+		rsize += 0x8000 * sizeof (ctf_id_t);
+
+	cds->cds_forward = ctf_alloc(fsize);
+	if (cds->cds_forward == NULL) {
 		ctf_free(cds, sizeof (ctf_diff_t));
-		return (ctf_set_errno(ifp, ret));
+		return (ctf_set_errno(ifp, ENOMEM));
 	}
-	ret = ctf_idhash_create(&cds->cds_reverse, ofp->ctf_typemax);
-	if (ret != 0) {
-		ctf_idhash_destroy(&cds->cds_forward);
+	cds->cds_reverse = ctf_alloc(rsize);
+	if (cds->cds_reverse == NULL) {
+		ctf_free(cds->cds_forward, fsize);
 		ctf_free(cds, sizeof (ctf_diff_t));
-		return (ctf_set_errno(ifp, ret));
+		return (ctf_set_errno(ifp, ENOMEM));
 	}
-	ret = ctf_idhash_create(&cds->cds_f_visited, ifp->ctf_typemax);
-	if (ret != 0) {
-		ctf_idhash_destroy(&cds->cds_reverse);
-		ctf_idhash_destroy(&cds->cds_forward);
-		ctf_free(cds, sizeof (ctf_diff_t));
-		return (ctf_set_errno(ifp, ret));
-	}
-	ret = ctf_idhash_create(&cds->cds_r_visited, ofp->ctf_typemax);
-	if (ret != 0) {
-		ctf_idhash_destroy(&cds->cds_f_visited);
-		ctf_idhash_destroy(&cds->cds_reverse);
-		ctf_idhash_destroy(&cds->cds_forward);
-		ctf_free(cds, sizeof (ctf_diff_t));
-		return (ctf_set_errno(ifp, ret));
-	}
-	ret = ctf_idhash_create(&cds->cds_fneg, ifp->ctf_typemax);
-	if (ret != 0) {
-		ctf_idhash_destroy(&cds->cds_r_visited);
-		ctf_idhash_destroy(&cds->cds_f_visited);
-		ctf_idhash_destroy(&cds->cds_reverse);
-		ctf_idhash_destroy(&cds->cds_forward);
-		ctf_free(cds, sizeof (ctf_diff_t));
-		return (ctf_set_errno(ifp, ret));
-	}
+	bzero(cds->cds_forward, fsize);
+	bzero(cds->cds_reverse, rsize);
 
 	cds->cds_ifp->ctf_refcnt++;
 	cds->cds_ofp->ctf_refcnt++;
@@ -732,37 +811,50 @@ ctf_diff_types(ctf_diff_t *cds, ctf_diff_type_f cb, void *arg)
 	cds->cds_func = cb;
 	cds->cds_arg = arg;
 
-	/*
-	 * For the moment clear all idhashes and rerun this phase. Ideally we
-	 * should reuse this, but we can save that for when we add things like
-	 * taking the diff of the objects and the like.
-	 */
-	ctf_idhash_clear(&cds->cds_forward);
-	ctf_idhash_clear(&cds->cds_reverse);
-	ctf_idhash_clear(&cds->cds_fneg);
-	ctf_idhash_clear(&cds->cds_f_visited);
-	ctf_idhash_clear(&cds->cds_r_visited);
-
 	ret = ctf_diff_pass1(cds);
 	if (ret == 0)
 		ret = ctf_diff_pass2(cds);
 
 	cds->cds_func = NULL;
 	cds->cds_arg = NULL;
+	cds->cds_tvalid = B_TRUE;
 	return (ret);
 }
 
 void
 ctf_diff_fini(ctf_diff_t *cds)
 {
+	ctf_diff_guess_t *cdg;
+	size_t fsize, rsize;
+
 	cds->cds_ifp->ctf_refcnt--;
 	cds->cds_ofp->ctf_refcnt--;
 
-	ctf_idhash_destroy(&cds->cds_fneg);
-	ctf_idhash_destroy(&cds->cds_r_visited);
-	ctf_idhash_destroy(&cds->cds_f_visited);
-	ctf_idhash_destroy(&cds->cds_reverse);
-	ctf_idhash_destroy(&cds->cds_forward);
+	fsize = sizeof (ctf_id_t) * cds->cds_ifp->ctf_typemax;
+	rsize = sizeof (ctf_id_t) * cds->cds_ofp->ctf_typemax;
+	if (cds->cds_ifp->ctf_flags & LCTF_CHILD)
+		fsize += 0x8000 * sizeof (ctf_id_t);
+	if (cds->cds_ofp->ctf_flags & LCTF_CHILD)
+		rsize += 0x8000 * sizeof (ctf_id_t);
+
+	if (cds->cds_ifuncs != NULL)
+		ctf_free(cds->cds_ifuncs,
+		    sizeof (ctf_diff_func_t) * cds->cds_nifuncs);
+	if (cds->cds_ofuncs != NULL)
+		ctf_free(cds->cds_ofuncs,
+		    sizeof (ctf_diff_func_t) * cds->cds_nofuncs);
+	if (cds->cds_iobj != NULL)
+		ctf_free(cds->cds_iobj,
+		    sizeof (ctf_diff_obj_t) * cds->cds_niobj);
+	if (cds->cds_oobj != NULL)
+		ctf_free(cds->cds_oobj,
+		    sizeof (ctf_diff_obj_t) * cds->cds_noobj);
+	cdg = cds->cds_guess;
+	while (cdg != NULL) {
+		ctf_diff_guess_t *tofree = cdg;
+		cdg = cdg->cdg_next;
+		ctf_free(tofree, sizeof (ctf_diff_guess_t));
+	}
 	ctf_free(cds, sizeof (ctf_diff_t));
 }
 
@@ -779,5 +871,407 @@ ctf_diff_setflags(ctf_diff_t *cds, uint_t flags)
 		return (ctf_set_errno(cds->cds_ifp, EINVAL));
 
 	cds->cds_flags = flags;
+	return (0);
+}
+
+static boolean_t
+ctf_diff_symid(ctf_diff_t *cds, ctf_id_t iid, ctf_id_t oid)
+{
+	ctf_file_t *ifp, *ofp;
+
+	ifp = cds->cds_ifp;
+	ofp = cds->cds_ofp;
+
+	/*
+	 * If we have parent containers on the scene here, we need to go through
+	 * and do a full diff check because while a diff for types will not
+	 * actually go through and check types in the parent container.
+	 */
+	if (iid == 0 || oid == 0)
+		return (iid == oid ? B_FALSE: B_TRUE);
+
+	if (!(ifp->ctf_flags & LCTF_CHILD) && !(ofp->ctf_flags & LCTF_CHILD)) {
+		if (cds->cds_forward[TINDEX(iid)] != oid)
+			return (B_TRUE);
+		return (B_FALSE);
+	}
+
+	return (ctf_diff_type(cds, ifp, iid, ofp, oid));
+}
+
+/* ARGSUSED */
+static void
+ctf_diff_void_cb(ctf_file_t *ifp, ctf_id_t iid, boolean_t same, ctf_file_t *ofp,
+    ctf_id_t oid, void *arg)
+{
+}
+
+/* ARGSUSED */
+static int
+ctf_diff_func_count(const char *name, ulong_t symidx, ctf_funcinfo_t *fip,
+    void *arg)
+{
+	uint32_t *ip = arg;
+
+	*ip = *ip + 1;
+	return (0);
+}
+
+/* ARGSUSED */
+static int
+ctf_diff_func_fill_cb(const char *name, ulong_t symidx, ctf_funcinfo_t *fip,
+    void *arg)
+{
+	uint_t *next, max;
+	ctf_diff_func_t *funcptr;
+	ctf_diff_t *cds = arg;
+
+	if (cds->cds_ffillip == B_TRUE) {
+		max = cds->cds_nifuncs;
+		next = &cds->cds_nextifunc;
+		funcptr = cds->cds_ifuncs + *next;
+	} else {
+		max = cds->cds_nofuncs;
+		next = &cds->cds_nextofunc;
+		funcptr = cds->cds_ofuncs + *next;
+
+	}
+
+	VERIFY(*next < max);
+	funcptr->cdf_name = name;
+	funcptr->cdf_symidx = symidx;
+	funcptr->cdf_matchidx = ULONG_MAX;
+	*next = *next + 1;
+
+	return (0);
+}
+
+int
+ctf_diff_func_fill(ctf_diff_t *cds)
+{
+	int ret;
+	uint32_t ifcount, ofcount, idcnt, cti;
+	ulong_t i, j;
+	ctf_id_t *iids, *oids;
+
+	ifcount = 0;
+	ofcount = 0;
+	idcnt = 0;
+	iids = NULL;
+	oids = NULL;
+
+	ret = ctf_function_iter(cds->cds_ifp, ctf_diff_func_count, &ifcount);
+	if (ret != 0)
+		return (ret);
+	ret = ctf_function_iter(cds->cds_ofp, ctf_diff_func_count, &ofcount);
+	if (ret != 0)
+		return (ret);
+
+	cds->cds_ifuncs = ctf_alloc(sizeof (ctf_diff_func_t) * ifcount);
+	if (cds->cds_ifuncs == NULL)
+		return (ctf_set_errno(cds->cds_ifp, ENOMEM));
+
+	cds->cds_nifuncs = ifcount;
+	cds->cds_nextifunc = 0;
+
+	cds->cds_ofuncs = ctf_alloc(sizeof (ctf_diff_func_t) * ofcount);
+	if (cds->cds_ofuncs == NULL)
+		return (ctf_set_errno(cds->cds_ifp, ENOMEM));
+
+	cds->cds_nofuncs = ofcount;
+	cds->cds_nextofunc = 0;
+
+	cds->cds_ffillip = B_TRUE;
+	if ((ret = ctf_function_iter(cds->cds_ifp, ctf_diff_func_fill_cb,
+	    cds)) != 0)
+		return (ret);
+
+	cds->cds_ffillip = B_FALSE;
+	if ((ret = ctf_function_iter(cds->cds_ofp, ctf_diff_func_fill_cb,
+	    cds)) != 0)
+		return (ret);
+
+	/*
+	 * Everything is initialized to not match. This could probably be faster
+	 * with something that used a hash. But this part of the diff isn't used
+	 * by merge.
+	 */
+	for (i = 0; i < cds->cds_nifuncs; i++) {
+		for (j = 0; j < cds->cds_nofuncs; j++) {
+			ctf_diff_func_t *ifd, *ofd;
+			ctf_funcinfo_t ifip, ofip;
+			boolean_t match;
+
+			ifd = &cds->cds_ifuncs[i];
+			ofd = &cds->cds_ofuncs[j];
+			if (strcmp(ifd->cdf_name, ofd->cdf_name) != 0)
+				continue;
+
+			ret = ctf_func_info(cds->cds_ifp, ifd->cdf_symidx,
+			    &ifip);
+			if (ret != 0)
+				goto out;
+			ret = ctf_func_info(cds->cds_ofp, ofd->cdf_symidx,
+			    &ofip);
+			if (ret != 0) {
+				ret = ctf_set_errno(cds->cds_ifp,
+				    ctf_errno(cds->cds_ofp));
+				goto out;
+			}
+
+			if (ifip.ctc_argc != ofip.ctc_argc &&
+			    ifip.ctc_flags != ofip.ctc_flags)
+				continue;
+
+			/* Validate return type and arguments are the same */
+			if (ctf_diff_symid(cds, ifip.ctc_return,
+			    ofip.ctc_return))
+				continue;
+
+			if (ifip.ctc_argc > idcnt) {
+				if (iids != NULL)
+					ctf_free(iids,
+					    sizeof (ctf_id_t) * idcnt);
+				if (oids != NULL)
+					ctf_free(oids,
+					    sizeof (ctf_id_t) * idcnt);
+				iids = oids = NULL;
+				idcnt = ifip.ctc_argc;
+				iids = ctf_alloc(sizeof (ctf_id_t) * idcnt);
+				if (iids == NULL) {
+					ret = ctf_set_errno(cds->cds_ifp,
+					    ENOMEM);
+					goto out;
+				}
+				oids = ctf_alloc(sizeof (ctf_id_t) * idcnt);
+				if (iids == NULL) {
+					ret = ctf_set_errno(cds->cds_ifp,
+					    ENOMEM);
+					goto out;
+				}
+			}
+
+			if ((ret = ctf_func_args(cds->cds_ifp, ifd->cdf_symidx,
+			    ifip.ctc_argc, iids)) != 0)
+				goto out;
+			if ((ret = ctf_func_args(cds->cds_ofp, ofd->cdf_symidx,
+			    ofip.ctc_argc, oids)) != 0)
+				goto out;
+
+			match = B_TRUE;
+			for (cti = 0; cti < ifip.ctc_argc; cti++) {
+				if (ctf_diff_symid(cds, iids[cti], oids[cti])) {
+					match = B_FALSE;
+					break;
+				}
+			}
+
+			if (match == B_FALSE)
+				continue;
+
+			ifd->cdf_matchidx = j;
+			ofd->cdf_matchidx = i;
+			break;
+		}
+	}
+
+	ret = 0;
+
+out:
+	if (iids != NULL)
+		ctf_free(iids, sizeof (ctf_id_t) * idcnt);
+	if (oids != NULL)
+		ctf_free(oids, sizeof (ctf_id_t) * idcnt);
+
+	return (ret);
+}
+
+/*
+ * In general, two functions are the same, if they have the same name and their
+ * arguments have the same types, including the return type. Like types, we
+ * basically have to do this in two passes. In the first phase we walk every
+ * type in the first container and try to find a match in the second.
+ */
+int
+ctf_diff_functions(ctf_diff_t *cds, ctf_diff_func_f cb, void *arg)
+{
+	int ret;
+	ulong_t i;
+
+	if (cds->cds_tvalid == B_FALSE) {
+		if ((ret = ctf_diff_types(cds, ctf_diff_void_cb, NULL)) != 0)
+			return (ret);
+	}
+
+	if (cds->cds_fvalid == B_FALSE) {
+		if ((ret = ctf_diff_func_fill(cds)) != 0)
+			return (ret);
+		cds->cds_fvalid = B_TRUE;
+	}
+
+	for (i = 0; i < cds->cds_nifuncs; i++) {
+		if (cds->cds_ifuncs[i].cdf_matchidx == ULONG_MAX) {
+			cb(cds->cds_ifp, cds->cds_ifuncs[i].cdf_symidx,
+			    B_FALSE, NULL, ULONG_MAX, arg);
+		} else {
+			ulong_t idx = cds->cds_ifuncs[i].cdf_matchidx;
+			cb(cds->cds_ifp, cds->cds_ifuncs[i].cdf_symidx, B_TRUE,
+			    cds->cds_ofp, cds->cds_ofuncs[idx].cdf_symidx, arg);
+		}
+	}
+
+	for (i = 0; i < cds->cds_nofuncs; i++) {
+		if (cds->cds_ofuncs[i].cdf_matchidx != ULONG_MAX)
+			continue;
+		cb(cds->cds_ofp, cds->cds_ofuncs[i].cdf_symidx, B_FALSE,
+		    NULL, ULONG_MAX, arg);
+	}
+
+	return (0);
+}
+
+static int
+ctf_diff_obj_fill_cb(const char *name, ctf_id_t id, ulong_t symidx, void *arg)
+{
+	uint_t *next, max;
+	ctf_diff_obj_t *objptr;
+	ctf_diff_t *cds = arg;
+
+	if (cds->cds_ofillip == B_TRUE) {
+		max = cds->cds_niobj;
+		next = &cds->cds_nextiobj;
+		objptr = cds->cds_iobj + *next;
+	} else {
+		max = cds->cds_noobj;
+		next = &cds->cds_nextoobj;
+		objptr = cds->cds_oobj+ *next;
+
+	}
+
+	VERIFY(*next < max);
+	objptr->cdo_name = name;
+	objptr->cdo_symidx = symidx;
+	objptr->cdo_id = id;
+	objptr->cdo_matchidx = ULONG_MAX;
+	*next = *next + 1;
+
+	return (0);
+}
+
+/* ARGSUSED */
+static int
+ctf_diff_obj_count(const char *name, ctf_id_t id, ulong_t symidx, void *arg)
+{
+	uint32_t *count = arg;
+
+	*count = *count + 1;
+
+	return (0);
+}
+
+
+static int
+ctf_diff_obj_fill(ctf_diff_t *cds)
+{
+	int ret;
+	uint32_t iocount, oocount;
+	ulong_t i, j;
+
+	iocount = 0;
+	oocount = 0;
+
+	ret = ctf_object_iter(cds->cds_ifp, ctf_diff_obj_count, &iocount);
+	if (ret != 0)
+		return (ret);
+
+	ret = ctf_object_iter(cds->cds_ofp, ctf_diff_obj_count, &oocount);
+	if (ret != 0)
+		return (ret);
+
+	cds->cds_iobj = ctf_alloc(sizeof (ctf_diff_obj_t) * iocount);
+	if (cds->cds_iobj == NULL)
+		return (ctf_set_errno(cds->cds_ifp, ENOMEM));
+	cds->cds_niobj = iocount;
+	cds->cds_nextiobj = 0;
+
+	cds->cds_oobj = ctf_alloc(sizeof (ctf_diff_obj_t) * oocount);
+	if (cds->cds_oobj == NULL)
+		return (ctf_set_errno(cds->cds_ifp, ENOMEM));
+	cds->cds_noobj = oocount;
+	cds->cds_nextoobj = 0;
+
+	cds->cds_ofillip = B_TRUE;
+	if ((ret = ctf_object_iter(cds->cds_ifp, ctf_diff_obj_fill_cb,
+	    cds)) != 0)
+		return (ret);
+
+	cds->cds_ofillip = B_FALSE;
+	if ((ret = ctf_object_iter(cds->cds_ofp, ctf_diff_obj_fill_cb,
+	    cds)) != 0)
+		return (ret);
+
+	for (i = 0; i < cds->cds_niobj; i++) {
+		for (j = 0; j < cds->cds_noobj; j++) {
+			ctf_diff_obj_t *id, *od;
+
+			id = &cds->cds_iobj[i];
+			od = &cds->cds_oobj[j];
+
+			if (id->cdo_name == NULL || od->cdo_name == NULL)
+				continue;
+			if (strcmp(id->cdo_name, od->cdo_name) != 0)
+				continue;
+
+			if (ctf_diff_symid(cds, id->cdo_id, od->cdo_id)) {
+				continue;
+			}
+
+			id->cdo_matchidx = j;
+			od->cdo_matchidx = i;
+			break;
+		}
+	}
+
+	return (0);
+}
+
+int
+ctf_diff_objects(ctf_diff_t *cds, ctf_diff_obj_f cb, void *arg)
+{
+	int ret;
+	ulong_t i;
+
+	if (cds->cds_tvalid == B_FALSE) {
+		if ((ret = ctf_diff_types(cds, ctf_diff_void_cb, NULL)) != 0)
+			return (ret);
+	}
+
+	if (cds->cds_ovalid == B_FALSE) {
+		if ((ret = ctf_diff_obj_fill(cds)) != 0)
+			return (ret);
+		cds->cds_ovalid = B_TRUE;
+	}
+
+	for (i = 0; i < cds->cds_niobj; i++) {
+		ctf_diff_obj_t *o = &cds->cds_iobj[i];
+
+		if (cds->cds_iobj[i].cdo_matchidx == ULONG_MAX) {
+			cb(cds->cds_ifp, o->cdo_symidx, o->cdo_id, B_FALSE,
+			    NULL, ULONG_MAX, CTF_ERR, arg);
+		} else {
+			ctf_diff_obj_t *alt = &cds->cds_oobj[o->cdo_matchidx];
+			cb(cds->cds_ifp, o->cdo_symidx, o->cdo_id, B_TRUE,
+			    cds->cds_ofp, alt->cdo_symidx, alt->cdo_id, arg);
+		}
+	}
+
+	for (i = 0; i < cds->cds_noobj; i++) {
+		ctf_diff_obj_t *o = &cds->cds_oobj[i];
+		if (o->cdo_matchidx != ULONG_MAX)
+			continue;
+		cb(cds->cds_ofp, o->cdo_symidx, o->cdo_id, B_FALSE, NULL,
+		    ULONG_MAX, CTF_ERR, arg);
+	}
+
 	return (0);
 }

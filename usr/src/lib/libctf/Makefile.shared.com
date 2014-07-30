@@ -22,7 +22,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# Copyright (c) 2014, Joyent, Inc.  All rights reserved.
+# Copyright (c) 2015, Joyent, Inc.  All rights reserved.
 #
 
 #
@@ -43,19 +43,31 @@ COMMON_OBJS = \
 	ctf_types.o \
 	ctf_util.o
 
+LIST_OBJS = \
+	list.o
+
 LIB_OBJS = \
+	ctf_elfwrite.o \
 	ctf_diff.o \
 	ctf_lib.o \
+	ctf_merge.o \
 	ctf_subr.o
 
-OBJECTS = $(COMMON_OBJS) $(LIB_OBJS)
+OBJECTS = $(COMMON_OBJS) $(LIB_OBJS) $(LIST_OBJS)
 MAPFILEDIR = $(SRC)/lib/libctf
 
 include $(SRC)/lib/Makefile.lib
 
-SRCS = $(COMMON_OBJS:%.o=$(SRC)/common/ctf/%.c) $(LIB_OBJS:%.o=$(SRC)/lib/libctf/common/%.c)
+SRCS = \
+	$(COMMON_OBJS:%.o=$(SRC)/common/ctf/%.c) \
+	$(LIB_OBJS:%.o=$(SRC)/lib/libctf/common/%.c) \
+	$(LIST_OBJS:%.o=$(SRC)/common/list/%.c) \
+	
 LIBS = $(DYNLIB) $(LINTLIB)
-LDLIBS = -lc
+LDLIBS = -lc -lelf
+
+C99MODE=	-xc99=%all
+C99LMODE=	-Xc99=%all
 
 SRCDIR = $(SRC)/lib/libctf/common
 

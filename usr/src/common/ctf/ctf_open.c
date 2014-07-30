@@ -25,7 +25,7 @@
  * Use is subject to license terms.
  */
 /*
- * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2015, Joyent, Inc.  All rights reserved.
  */
 
 #include <ctf_impl.h>
@@ -550,6 +550,7 @@ ctf_bufopen(const ctf_sect_t *ctfsect, const ctf_sect_t *symsect,
 	void *buf, *base;
 	size_t size, hdrsz;
 	int err;
+	uint_t hflags;
 
 	if (ctfsect == NULL || ((symsect == NULL) != (strsect == NULL)))
 		return (ctf_set_open_errno(errp, EINVAL));
@@ -631,6 +632,7 @@ ctf_bufopen(const ctf_sect_t *ctfsect, const ctf_sect_t *symsect,
 	 * the CTF data buffer if it is compressed.  Otherwise we just put
 	 * the data section's buffer pointer into ctf_buf, below.
 	 */
+	hflags = hp.cth_flags;
 	if (hp.cth_flags & CTF_F_COMPRESS) {
 		size_t srclen, dstlen;
 		const void *src;
@@ -680,6 +682,7 @@ ctf_bufopen(const ctf_sect_t *ctfsect, const ctf_sect_t *symsect,
 	bzero(fp, sizeof (ctf_file_t));
 	fp->ctf_version = hp.cth_version;
 	fp->ctf_fileops = &ctf_fileops[hp.cth_version];
+	fp->ctf_hflags = hflags;
 	bcopy(ctfsect, &fp->ctf_data, sizeof (ctf_sect_t));
 
 	if (symsect != NULL) {
@@ -883,6 +886,8 @@ void
 ctf_close(ctf_file_t *fp)
 {
 	ctf_dtdef_t *dtd, *ntd;
+	ctf_dsdef_t *dsd, *nsd;
+	ctf_dldef_t *dld, *nld;
 
 	if (fp == NULL)
 		return; /* allow ctf_close(NULL) to simplify caller code */
@@ -906,10 +911,25 @@ ctf_close(ctf_file_t *fp)
 		ctf_dtd_delete(fp, dtd);
 	}
 
+	for (dsd = ctf_list_prev(&fp->ctf_dsdefs); dsd != NULL; dsd = nsd) {
+		nsd = ctf_list_prev(dsd);
+		ctf_dsd_delete(fp, dsd);
+	}
+
+	for (dld = ctf_list_prev(&fp->ctf_dldefs); dld != NULL; dld = nld) {
+		nld = ctf_list_prev(dld);
+		ctf_dld_delete(fp, dld);
+	}
+
 	ctf_free(fp->ctf_dthash, fp->ctf_dthashlen * sizeof (ctf_dtdef_t *));
 
 	if (fp->ctf_flags & LCTF_MMAP) {
-		if (fp->ctf_data.cts_data != NULL)
+		/*
+		 * Writeable containers shouldn't necessairily have the CTF
+		 * section freed.
+		 */
+		if (fp->ctf_data.cts_data != NULL &&
+		    !(fp->ctf_flags & LCTF_RDWR))
 			ctf_sect_munmap(&fp->ctf_data);
 		if (fp->ctf_symtab.cts_data != NULL)
 			ctf_sect_munmap(&fp->ctf_symtab);
@@ -980,6 +1000,16 @@ ctf_parent_name(ctf_file_t *fp)
 }
 
 /*
+ * Return the label of the parent CTF container, if one exists. Otherwise return
+ * NULL.
+ */
+const char *
+ctf_parent_label(ctf_file_t *fp)
+{
+	return (fp->ctf_parlabel);
+}
+
+/*
  * Import the types from the specified parent container by storing a pointer
  * to it in ctf_parent and incrementing its reference count.  Only one parent
  * is allowed: if a parent already exists, it is replaced by the new parent.
@@ -1042,4 +1072,10 @@ void *
 ctf_getspecific(ctf_file_t *fp)
 {
 	return (fp->ctf_specific);
+}
+
+uint_t
+ctf_flags(ctf_file_t *fp)
+{
+	return (fp->ctf_hflags);
 }

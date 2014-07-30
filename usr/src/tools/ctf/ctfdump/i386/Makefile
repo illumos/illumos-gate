@@ -10,17 +10,7 @@
 #
 
 #
-# Copyright (c) 2013, Joyent, Inc. All rights reserved.
+# Copyright (c) 2015, Joyent, Inc. 
 #
 
-MODULE = libctf.so
-MDBTGT = proc
-MODSRCS = mdb_modctf.c
-
-include ../../../../Makefile.cmd
-include ../../../../Makefile.cmd.64
-include ../../Makefile.sparcv9
-include ../../../Makefile.module
-
-MODSRCS_DIR = ../../../common/modules/ctf
-CPPFLAGS += -I$(SRC)/common/ctf
+include ../Makefile.com

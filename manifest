@@ -2000,6 +2000,8 @@ f usr/bin/crypt 0555 root bin
 f usr/bin/csh 0555 root bin
 f usr/bin/csplit 0555 root bin
 f usr/bin/ctags 0555 root bin
+f usr/bin/ctfdiff 0555 root bin
+f usr/bin/ctfdump 0555 root bin
 f usr/bin/ctrun 0555 root bin
 f usr/bin/ctstat 0555 root bin
 f usr/bin/ctwatch 0555 root bin
@@ -9598,7 +9600,6 @@ f usr/lib/mdb/proc/amd64/ld.so 0555 root sys
 f usr/lib/mdb/proc/amd64/libavl.so 0555 root sys
 f usr/lib/mdb/proc/amd64/libc.so 0555 root sys
 f usr/lib/mdb/proc/amd64/libcmdutils.so 0555 root sys
-f usr/lib/mdb/proc/amd64/libctf.so 0555 root sys
 f usr/lib/mdb/proc/amd64/libnvpair.so 0555 root sys
 f usr/lib/mdb/proc/amd64/libproc.so 0555 root sys
 f usr/lib/mdb/proc/amd64/libpython2.6.so 0555 root sys
@@ -9616,7 +9617,6 @@ f usr/lib/mdb/proc/ld.so 0555 root sys
 f usr/lib/mdb/proc/libavl.so 0555 root sys
 f usr/lib/mdb/proc/libc.so 0555 root sys
 f usr/lib/mdb/proc/libcmdutils.so 0555 root sys
-f usr/lib/mdb/proc/libctf.so 0555 root sys
 f usr/lib/mdb/proc/libnvpair.so 0555 root sys
 f usr/lib/mdb/proc/libproc.so 0555 root sys
 f usr/lib/mdb/proc/libpython2.6.so 0555 root sys
@@ -11447,6 +11447,8 @@ f usr/share/man/man1/crypt.1 0444 root bin
 f usr/share/man/man1/csh.1 0444 root bin
 f usr/share/man/man1/csplit.1 0444 root bin
 f usr/share/man/man1/ctags.1 0444 root bin
+f usr/share/man/man1/ctfdiff.1 0444 root bin
+f usr/share/man/man1/ctfdump.1 0444 root bin
 f usr/share/man/man1/ctrun.1 0444 root bin
 f usr/share/man/man1/ctstat.1 0444 root bin
 f usr/share/man/man1/ctwatch.1 0444 root bin

@@ -10,16 +10,24 @@
 #
 
 #
-# Copyright (c) 2013, Joyent, Inc. All rights reserved.
+# Copyright (c) 2015, Joyent, Inc.
 #
 
-MODULE = libctf.so
-MDBTGT = proc
-MODSRCS = mdb_modctf.c
+PROG= ctfmerge 
 
-include ../../../../Makefile.cmd
-include ../../Makefile.ia32
-include ../../../Makefile.module
+include ../Makefile.cmd
 
-MODSRCS_DIR = ../../../common/modules/ctf
-CPPFLAGS += -I$(SRC)/common/ctf
+CFLAGS += $(CCVERBOSE)
+LDLIBS += -lctf -lelf
+
+.KEEP_STATE:
+
+all: $(PROG)
+
+install: all $(ROOTPROG)
+
+clean:
+
+lint:	lint_PROG
+
+include ../Makefile.targ

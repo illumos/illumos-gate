@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright (c) 2014, Joyent, Inc.  All rights reserved.
+# Copyright (c) 2015, Joyent, Inc.  All rights reserved.
 #
 
 #
@@ -18,5 +18,9 @@
 #
 
 pics/%.o: $(SRC)/common/ctf/%.c
+	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)
+
+pics/%.o: $(SRC)/common/list/%.c
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)

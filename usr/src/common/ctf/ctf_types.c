@@ -24,6 +24,9 @@
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2015, Joyent, Inc.
+ */
 
 #include <ctf_impl.h>
 #include <sys/debug.h>
@@ -139,19 +142,21 @@ ctf_enum_iter(ctf_file_t *fp, ctf_id_t type, ctf_enum_f *func, void *arg)
 }
 
 /*
- * Iterate over every root (user-visible) type in the given CTF container.
- * We pass the type ID of each type to the specified callback function.
+ * Iterate over every type in the given CTF container. If the user doesn't ask
+ * for all types, then we only give them the user visible, aka root, types.  We
+ * pass the type ID of each type to the specified callback function.
  */
 int
-ctf_type_iter(ctf_file_t *fp, ctf_type_f *func, void *arg)
+ctf_type_iter(ctf_file_t *fp, boolean_t nonroot, ctf_type_f *func, void *arg)
 {
 	ctf_id_t id, max = fp->ctf_typemax;
 	int rc, child = (fp->ctf_flags & LCTF_CHILD);
 
 	for (id = 1; id <= max; id++) {
 		const ctf_type_t *tp = LCTF_INDEX_TO_TYPEPTR(fp, id);
-		if (CTF_INFO_ISROOT(tp->ctt_info) &&
-		    (rc = func(CTF_INDEX_TO_TYPE(id, child), arg)) != 0)
+		if ((nonroot || CTF_INFO_ISROOT(tp->ctt_info)) &&
+		    (rc = func(CTF_INDEX_TO_TYPE(id, child),
+		    CTF_INFO_ISROOT(tp->ctt_info),  arg)) != 0)
 			return (rc);
 	}
 
@@ -381,7 +386,22 @@ ctf_type_size(ctf_file_t *fp, ctf_id_t type)
 			return (-1); /* errno is set for us */
 
 		return (size * ar.ctr_nelems);
-
+	case CTF_K_STRUCT:
+	case CTF_K_UNION:
+		/*
+		 * If we have a zero size, we may be in the process of adding a
+		 * structure or union but having not called ctf_update() to deal
+		 * with the circular dependencies in such structures and unions.
+		 * To handle that case, if we get a size of zero from the ctt,
+		 * we look up the dtdef and use its size instead.
+		 */
+		size = ctf_get_ctt_size(fp, tp, NULL, NULL);
+		if (size == 0) {
+			ctf_dtdef_t *dtd = ctf_dtd_lookup(fp, type);
+			if (dtd != NULL)
+				return (dtd->dtd_data.ctt_size);
+		}
+		return (size);
 	default:
 		return (ctf_get_ctt_size(fp, tp, NULL, NULL));
 	}
@@ -929,6 +949,196 @@ ctf_func_args_by_id(ctf_file_t *fp, ctf_id_t type, uint_t argc, ctf_id_t *argv)
 
 	for (nargs = MIN(argc, nargs); nargs != 0; nargs--)
 		*argv++ = *dp++;
+
+	return (0);
+}
+
+int
+ctf_object_iter(ctf_file_t *fp, ctf_object_f *func, void *arg)
+{
+	int i, ret;
+	ctf_id_t id;
+	uintptr_t symbase = (uintptr_t)fp->ctf_symtab.cts_data;
+	uintptr_t strbase = (uintptr_t)fp->ctf_strtab.cts_data;
+
+	if (fp->ctf_symtab.cts_data == NULL)
+		return (ctf_set_errno(fp, ECTF_NOSYMTAB));
+
+	for (i = 0; i < fp->ctf_nsyms; i++) {
+		char *name;
+		if (fp->ctf_sxlate[i] == -1u)
+			continue;
+		id = *(ushort_t *)((uintptr_t)fp->ctf_buf +
+		    fp->ctf_sxlate[i]);
+
+		/*
+		 * Validate whether or not we're looking at a data object as
+		 * oposed to a function.
+		 */
+		if (fp->ctf_symtab.cts_entsize == sizeof (Elf32_Sym)) {
+			const Elf32_Sym *symp = (Elf32_Sym *)symbase + i;
+			if (ELF32_ST_TYPE(symp->st_info) != STT_OBJECT)
+				continue;
+			if (fp->ctf_strtab.cts_data != NULL &&
+			    symp->st_name != 0)
+				name = (char *)(strbase + symp->st_name);
+			else
+				name = NULL;
+		} else {
+			const Elf64_Sym *symp = (Elf64_Sym *)symbase + i;
+			if (ELF64_ST_TYPE(symp->st_info) != STT_OBJECT)
+				continue;
+			if (fp->ctf_strtab.cts_data != NULL &&
+			    symp->st_name != 0)
+				name = (char *)(strbase + symp->st_name);
+			else
+				name = NULL;
+		}
+
+		if ((ret = func(name, id, i, arg)) != 0)
+			return (ret);
+	}
+
+	return (0);
+}
+
+int
+ctf_function_iter(ctf_file_t *fp, ctf_function_f *func, void *arg)
+{
+	int i, ret;
+	uintptr_t symbase = (uintptr_t)fp->ctf_symtab.cts_data;
+	uintptr_t strbase = (uintptr_t)fp->ctf_strtab.cts_data;
+
+	if (fp->ctf_symtab.cts_data == NULL)
+		return (ctf_set_errno(fp, ECTF_NOSYMTAB));
+
+	for (i = 0; i < fp->ctf_nsyms; i++) {
+		char *name;
+		ushort_t info, *dp;
+		ctf_funcinfo_t fi;
+		if (fp->ctf_sxlate[i] == -1u)
+			continue;
+
+		dp = (ushort_t *)((uintptr_t)fp->ctf_buf +
+		    fp->ctf_sxlate[i]);
+		info = *dp;
+		if (info == 0)
+			continue;
+
+		/*
+		 * This may be a function or it may be a data object. We have to
+		 * consult the symbol table to be certain. Functions are encoded
+		 * with their info, data objects with their actual type.
+		 */
+		if (fp->ctf_symtab.cts_entsize == sizeof (Elf32_Sym)) {
+			const Elf32_Sym *symp = (Elf32_Sym *)symbase + i;
+			if (ELF32_ST_TYPE(symp->st_info) != STT_FUNC)
+				continue;
+			if (fp->ctf_strtab.cts_data != NULL)
+				name = (char *)(strbase + symp->st_name);
+			else
+				name = NULL;
+		} else {
+			const Elf64_Sym *symp = (Elf64_Sym *)symbase + i;
+			if (ELF64_ST_TYPE(symp->st_info) != STT_FUNC)
+				continue;
+			if (fp->ctf_strtab.cts_data != NULL)
+				name = (char *)(strbase + symp->st_name);
+			else
+				name = NULL;
+		}
+
+		if (LCTF_INFO_KIND(fp, info) != CTF_K_FUNCTION)
+			continue;
+		dp++;
+		fi.ctc_return = *dp;
+		dp++;
+		fi.ctc_argc = LCTF_INFO_VLEN(fp, info);
+		fi.ctc_flags = 0;
+
+		if (fi.ctc_argc != 0 && dp[fi.ctc_argc - 1] == 0) {
+			fi.ctc_flags |= CTF_FUNC_VARARG;
+			fi.ctc_argc--;
+		}
+
+		if ((ret = func(name, i, &fi, arg)) != 0)
+			return (ret);
+
+	}
+
+	return (0);
+}
+
+char *
+ctf_symbol_name(ctf_file_t *fp, ulong_t idx, char *buf, size_t len)
+{
+	const char *name;
+	uintptr_t symbase = (uintptr_t)fp->ctf_symtab.cts_data;
+	uintptr_t strbase = (uintptr_t)fp->ctf_strtab.cts_data;
+
+	if (fp->ctf_symtab.cts_data == NULL) {
+		(void) ctf_set_errno(fp, ECTF_NOSYMTAB);
+		return (NULL);
+	}
+
+	if (fp->ctf_strtab.cts_data == NULL) {
+		(void) ctf_set_errno(fp, ECTF_STRTAB);
+		return (NULL);
+	}
+
+	if (idx > fp->ctf_nsyms) {
+		(void) ctf_set_errno(fp, ECTF_NOTDATA);
+		return (NULL);
+	}
+
+	if (fp->ctf_symtab.cts_entsize == sizeof (Elf32_Sym)) {
+		const Elf32_Sym *symp = (Elf32_Sym *)symbase + idx;
+		if (ELF32_ST_TYPE(symp->st_info) != STT_OBJECT &&
+		    ELF32_ST_TYPE(symp->st_info) != STT_FUNC) {
+			(void) ctf_set_errno(fp, ECTF_NOTDATA);
+			return (NULL);
+		}
+		if (symp->st_name == 0) {
+			(void) ctf_set_errno(fp, ENOENT);
+			return (NULL);
+		}
+		name = (const char *)(strbase + symp->st_name);
+	} else {
+		const Elf64_Sym *symp = (Elf64_Sym *)symbase + idx;
+		if (ELF64_ST_TYPE(symp->st_info) != STT_FUNC &&
+		    ELF64_ST_TYPE(symp->st_info) != STT_OBJECT) {
+			(void) ctf_set_errno(fp, ECTF_NOTDATA);
+			return (NULL);
+		}
+		if (symp->st_name == 0) {
+			(void) ctf_set_errno(fp, ENOENT);
+			return (NULL);
+		}
+		name = (const char *)(strbase + symp->st_name);
+	}
+
+	(void) strlcpy(buf, name, len);
+
+	return (buf);
+}
+
+int
+ctf_string_iter(ctf_file_t *fp, ctf_string_f *func, void *arg)
+{
+	int rc;
+	const char *strp = fp->ctf_str[CTF_STRTAB_0].cts_strs;
+	size_t strl = fp->ctf_str[CTF_STRTAB_0].cts_len;
+
+	while (strl > 0) {
+		size_t len;
+
+		if ((rc = func(strp, arg)) != 0)
+			return (rc);
+
+		len = strlen(strp) + 1;
+		strl -= len;
+		strp += len;
+	}
 
 	return (0);
 }

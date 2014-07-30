@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2013, Joyent Inc. All rights reserved.
+ * Copyright (c) 2015, Joyent Inc. All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
  */
 
@@ -288,7 +288,7 @@ dt_type_pointer(dtrace_typeinfo_t *tip)
 		return (dt_set_errno(dtp, EDT_CTF));
 	}
 
-	ptr = ctf_add_pointer(dmp->dm_ctfp, CTF_ADD_ROOT, type);
+	ptr = ctf_add_pointer(dmp->dm_ctfp, CTF_ADD_ROOT, NULL, type);
 
 	if (ptr == CTF_ERR || ctf_update(dmp->dm_ctfp) == CTF_ERR) {
 		dtp->dt_ctferr = ctf_errno(dmp->dm_ctfp);

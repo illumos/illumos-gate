@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <mdb/mdb_debug.h>
 #include <mdb/mdb.h>
 
@@ -61,6 +59,13 @@ ctf_sect_munmap(const ctf_sect_t *sp)
 /*ARGSUSED*/
 ctf_file_t *
 ctf_fdopen(int fd, int *errp)
+{
+	return (ctf_set_open_errno(errp, ENOTSUP));
+}
+
+/*ARGSUSED*/
+ctf_file_t *
+ctf_fdcreate_int(int fd, int *errp, ctf_sect_t *ctfp)
 {
 	return (ctf_set_open_errno(errp, ENOTSUP));
 }

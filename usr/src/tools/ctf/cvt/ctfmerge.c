@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Given several files containing CTF data, merge and uniquify that data into
  * a single CTF section in an output file.
@@ -747,6 +745,8 @@ main(int argc, char **argv)
 	int c, i, idx, tidx, err;
 
 	progname = basename(argv[0]);
+
+	ctf_altexec("CTFMERGE_ALTEXEC", argc, argv);
 
 	if (getenv("CTFMERGE_DEBUG_LEVEL"))
 		debug_level = atoi(getenv("CTFMERGE_DEBUG_LEVEL"));

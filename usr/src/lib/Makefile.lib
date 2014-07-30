@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 # Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright (c) 2014, Joyent, Inc.
+# Copyright (c) 2015, Joyent, Inc.
 #
 #
 # Definitions common to libraries.
@@ -280,5 +280,5 @@ CLOBBERTARGFILES= $(LIBS) $(DYNLIB) $(CLOBBERFILES)
 TYPECHECK_LIB32 =		$(TYPECHECK_LIB:%=$(MACH)/%)
 TYPECHECK_LIB64 =		$(TYPECHECK_LIB:%=$(MACH64)/%)
 TYPECHECK_LIST=			$(TYPELIST:%=-T %)
-$(BUILD64)TYPECHECK.lib =	$(CTFDIFF) -I $(TYPECHECK_LIST) $(TYPECHECK_LIB32) $(TYPECHECK_LIB64)
+$(BUILD64)TYPECHECK.lib =	$(CTFDIFF) -t -I $(TYPECHECK_LIST) $(TYPECHECK_LIB32) $(TYPECHECK_LIB64)
 TYPECHECK =			$(TYPECHECK_LIB:%=%.typecheck)

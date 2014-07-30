@@ -10,14 +10,14 @@
 #
 
 #
-# Copyright (c) 2014, Joyent, Inc.  All rights reserved.
+# Copyright (c) 2015, Joyent, Inc.
 #
 
 include $(SRC)/lib/libctf/Makefile.shared.com
 include ../../Makefile.ctf
 
 CPPFLAGS += -include ../../common/ctf_headers.h -DCTF_OLD_VERSIONS
-LDLIBS += -lc
+LDLIBS += -lc -lelf
 
 .KEEP_STATE:
 

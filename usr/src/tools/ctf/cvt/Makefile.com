@@ -32,6 +32,7 @@ PROG=ctfconvert ctfmerge
 
 GENSRCS= \
 	alist.c \
+	altexec.c \
 	barrier.c \
 	ctf.c \
 	fifo.c \
