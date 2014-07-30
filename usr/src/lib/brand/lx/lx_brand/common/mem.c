@@ -47,6 +47,13 @@ int pagesize;	/* needed for mmap2() */
 #define	LX_MAP_LOCKED		0x02000
 #define	LX_MAP_NORESERVE	0x04000
 
+#define	LX_MADV_MERGEABLE	12
+#define	LX_MADV_UNMERGEABLE	13
+#define	LX_MADV_HUGEPAGE	14
+#define	LX_MADV_NOHUGEPAGE	15
+#define	LX_MADV_DONTDUMP	16
+#define	LX_MADV_DODUMP		17
+
 static int
 ltos_mmap_flags(int flags)
 {
@@ -181,6 +188,8 @@ lx_msync(uintptr_t addr, uintptr_t len, uintptr_t flags)
 int
 lx_madvise(uintptr_t start, uintptr_t len, uintptr_t advice)
 {
+	int ret;
+
 	if (len == 0)
 		return (0);
 
@@ -190,7 +199,21 @@ lx_madvise(uintptr_t start, uintptr_t len, uintptr_t advice)
 	case MADV_SEQUENTIAL:
 	case MADV_WILLNEED:
 	case MADV_DONTNEED:
-		return (madvise((void *)start, len, advice) ? -errno : 0);
+		ret = madvise((void *)start, len, advice);
+		if (ret == -1) {
+			if (errno == EBUSY)
+				return (-EINVAL);
+			return (-errno);
+		} else {
+			return (0);
+		}
+
+	/* pretend these work */
+	case LX_MADV_HUGEPAGE:
+	case LX_MADV_NOHUGEPAGE:
+	case LX_MADV_DONTDUMP:
+	case LX_MADV_DODUMP:
+		return (0);
 
 	default:
 		return (-EINVAL);
