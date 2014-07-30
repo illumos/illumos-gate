@@ -21,9 +21,8 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2014 Joyent, Inc.  All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <errno.h>
 #include <unistd.h>
@@ -45,6 +44,7 @@
 int pagesize;	/* needed for mmap2() */
 
 #define	LX_MAP_ANONYMOUS	0x00020
+#define	LX_MAP_LOCKED		0x02000
 #define	LX_MAP_NORESERVE	0x04000
 
 static int
@@ -107,8 +107,11 @@ mmap_common(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 
 	if (ret == MAP_FAILED)
 		return (errno == EOVERFLOW ? -ENOMEM : -errno);
-	else
-		return ((int)ret);
+
+	if (flags & LX_MAP_LOCKED)
+		(void) mlock(ret, len);
+
+	return ((int)ret);
 }
 
 int
