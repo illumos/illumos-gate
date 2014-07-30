@@ -991,6 +991,41 @@ lxpr_read_pid_statm(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 }
 
 /*
+ * Derived from procfs prgetxmap32
+ */
+static size_t
+get_locked(proc_t *p)
+{
+	struct as *as = p->p_as;
+	struct seg *seg;
+	uint_t nlocked = 0;
+
+	ASSERT(as != &kas && AS_READ_HELD(as, &as->a_lock));
+
+	if ((seg = AS_SEGFIRST(as)) == NULL)
+		return (0);
+
+	do {
+		char *parr;
+		uint64_t npages;
+		uint64_t pagenum;
+
+		npages = ((uintptr_t)seg->s_size) >> PAGESHIFT;
+		parr = kmem_zalloc(npages, KM_SLEEP);
+
+		SEGOP_INCORE(seg, seg->s_base, seg->s_size, parr);
+
+		for (pagenum = 0; pagenum < npages; pagenum++) {
+			if (parr[pagenum] & SEG_PAGE_LOCKED)
+				nlocked++;
+		}
+		kmem_free(parr, npages);
+	} while ((seg = AS_SEGNEXT(as, seg)) != NULL);
+
+	return (nlocked);
+}
+
+/*
  * lxpr_read_pid_status(): status file
  */
 static void
@@ -1006,6 +1041,7 @@ lxpr_read_pid_status(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	char *status;
 	pid_t pid, ppid;
 	size_t vsize;
+	size_t nlocked;
 	size_t rss;
 	k_sigset_t current, ignore, handle;
 	int    i, lx_sig;
@@ -1114,6 +1150,7 @@ lxpr_read_pid_status(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 		AS_LOCK_ENTER(as, &as->a_lock, RW_READER);
 		vsize = as->a_resvsize;
 		rss = rm_asrss(as);
+		nlocked = get_locked(p);
 		AS_LOCK_EXIT(as, &as->a_lock);
 		mutex_enter(&p->p_lock);
 
@@ -1127,7 +1164,7 @@ lxpr_read_pid_status(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 		    "VmExe:\t%8lu kB\n"
 		    "VmLib:\t%8lu kB",
 		    btok(vsize),
-		    0l,
+		    ptok(nlocked),
 		    ptok(rss),
 		    0l,
 		    btok(p->p_stksize),
