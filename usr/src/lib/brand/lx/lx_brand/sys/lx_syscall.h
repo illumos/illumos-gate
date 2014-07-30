@@ -68,6 +68,7 @@ extern int lx_fcntl(uintptr_t, uintptr_t, uintptr_t);
 extern int lx_fcntl64(uintptr_t, uintptr_t, uintptr_t);
 extern int lx_flock(uintptr_t, uintptr_t);
 extern int lx_open(uintptr_t, uintptr_t, uintptr_t);
+extern int lx_readlink(uintptr_t, uintptr_t, uintptr_t);
 extern int lx_readdir(uintptr_t, uintptr_t, uintptr_t);
 extern int lx_getdents(uintptr_t, uintptr_t, uintptr_t);
 extern int lx_getdents64(uintptr_t, uintptr_t, uintptr_t);
