@@ -1054,6 +1054,7 @@ d kernel/socketmod 0755 root sys
 d kernel/socketmod/amd64 0755 root sys
 h kernel/socketmod/amd64/icmp=kernel/drv/amd64/icmp
 f kernel/socketmod/amd64/ksslf 0755 root sys
+f kernel/socketmod/amd64/lx_netlink 0755 root sys
 f kernel/socketmod/amd64/rts 0755 root sys
 f kernel/socketmod/amd64/sockrds 0755 root sys
 f kernel/socketmod/amd64/socksctp 0755 root sys

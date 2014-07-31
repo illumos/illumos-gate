@@ -21,6 +21,7 @@
 # Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2012 Nexenta Systems, Inc. All rights reserved.
 # Copyright (c) 2013 Andrew Stormont.  All rights reserved.
+# Copyright (c) 2014, Joyent, Inc. All rights reserved.
 
 #
 #	This makefile contains the common definitions for all intel
@@ -517,7 +518,7 @@ MISC_KMODS	+= md_sp
 #	Brand modules
 #
 BRAND_KMODS	+= sn1_brand sngl_brand s10_brand lx_brand
-DRV_KMODS	+= lx_systrace lx_ptm lx_audio
+DRV_KMODS	+= lx_systrace lx_ptm lx_audio lx_netlink
 STRMOD_KMODS	+= ldlinux 
 
 #
