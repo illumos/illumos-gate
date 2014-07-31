@@ -156,6 +156,8 @@ static void lxpr_read_net_udp(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_net_unix(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_kernel_pid_max(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_kernel_ngroups_max(lxpr_node_t *, lxpr_uiobuf_t *);
+static void lxpr_read_sys_kernel_shmmax(lxpr_node_t *, lxpr_uiobuf_t *);
+static void lxpr_read_sys_kernel_threads_max(lxpr_node_t *, lxpr_uiobuf_t *);
 
 /*
  * Simple conversion
@@ -270,8 +272,10 @@ static lxpr_dirent_t sysdir[] = {
  * contents of /proc/sys/kernel directory
  */
 static lxpr_dirent_t sys_kerneldir[] = {
-	{ LXPR_SYS_KERNEL_NGROUPS_MAX, "ngroups_max" },
-	{ LXPR_SYS_KERNEL_PID_MAX, "pid_max" },
+	{ LXPR_SYS_KERNEL_NGROUPS_MAX,	"ngroups_max" },
+	{ LXPR_SYS_KERNEL_PID_MAX,	"pid_max" },
+	{ LXPR_SYS_KERNEL_SHMMAX,	"shmmax" },
+	{ LXPR_SYS_KERNEL_THREADS_MAX,	"threads-max" },
 };
 
 #define	SYS_KERNELDIRFILES (sizeof (sys_kerneldir) / sizeof (sys_kerneldir[0]))
@@ -443,6 +447,8 @@ static void (*lxpr_read_function[LXPR_NFILES])() = {
 	lxpr_read_invalid,		/* /proc/sys/kernel	*/
 	lxpr_read_sys_kernel_ngroups_max, /* /proc/sys/kernel/ngroups_max */
 	lxpr_read_sys_kernel_pid_max,	/* /proc/sys/kernel/pid_max */
+	lxpr_read_sys_kernel_shmmax,	/* /proc/sys/kernel/shmmax */
+	lxpr_read_sys_kernel_threads_max, /* /proc/sys/kernel/threads-max */
 	lxpr_read_uptime,		/* /proc/uptime		*/
 	lxpr_read_version,		/* /proc/version	*/
 };
@@ -505,6 +511,8 @@ static vnode_t *(*lxpr_lookup_function[LXPR_NFILES])() = {
 	lxpr_lookup_sys_kerneldir,	/* /proc/sys/kernel	*/
 	lxpr_lookup_not_a_dir,		/* /proc/sys/kernel/ngroups_max */
 	lxpr_lookup_not_a_dir,		/* /proc/sys/kernel/pid_max */
+	lxpr_lookup_not_a_dir,		/* /proc/sys/kernel/shmmax */
+	lxpr_lookup_not_a_dir,		/* /proc/sys/kernel/threads-max */
 	lxpr_lookup_not_a_dir,		/* /proc/uptime		*/
 	lxpr_lookup_not_a_dir,		/* /proc/version	*/
 };
@@ -567,6 +575,8 @@ static int (*lxpr_readdir_function[LXPR_NFILES])() = {
 	lxpr_readdir_sys_kerneldir,	/* /proc/sys/kernel	*/
 	lxpr_readdir_not_a_dir,		/* /proc/sys/kernel/ngroups_max */
 	lxpr_readdir_not_a_dir,		/* /proc/sys/kernel/pid_max */
+	lxpr_readdir_not_a_dir,		/* /proc/sys/kernel/shmmax */
+	lxpr_readdir_not_a_dir,		/* /proc/sys/kernel/threads-max */
 	lxpr_readdir_not_a_dir,		/* /proc/uptime		*/
 	lxpr_readdir_not_a_dir,		/* /proc/version	*/
 };
@@ -2016,6 +2026,34 @@ lxpr_read_sys_kernel_pid_max(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
 	ASSERT(lxpnp->lxpr_type == LXPR_SYS_KERNEL_PID_MAX);
 	lxpr_uiobuf_printf(uiobuf, "%d\n", maxpid);
+}
+
+extern rctl_hndl_t rc_zone_shmmax;
+#define	FOURGB	4294967295
+
+static void
+lxpr_read_sys_kernel_shmmax(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
+{
+	rctl_qty_t val;
+
+	ASSERT(lxpnp->lxpr_type == LXPR_SYS_KERNEL_SHMMAX);
+
+	mutex_enter(&curproc->p_lock);
+	val = rctl_enforced_value(rc_zone_shmmax,
+	    curproc->p_zone->zone_rctls, curproc);
+	mutex_exit(&curproc->p_lock);
+
+	if (val > FOURGB)
+		val = FOURGB;
+
+	lxpr_uiobuf_printf(uiobuf, "%u\n", (uint_t)val);
+}
+
+static void
+lxpr_read_sys_kernel_threads_max(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
+{
+	ASSERT(lxpnp->lxpr_type == LXPR_SYS_KERNEL_THREADS_MAX);
+	lxpr_uiobuf_printf(uiobuf, "%d\n", curproc->p_zone->zone_nlwps_ctl);
 }
 
 /*
