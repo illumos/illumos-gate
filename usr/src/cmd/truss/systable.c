@@ -29,6 +29,9 @@
 
 /* Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved. */
 
+/*
+ * Copyright (c) 2014, Joyent, Inc. All rights reserved.
+ */
 #include <stdio.h>
 #include <stdlib.h>
 #include <fcntl.h>
@@ -1716,9 +1719,10 @@ const char * const afcodes[] = {
 	"POLICY",	/* 29 */
 	"RDS",		/* 30 */
 	"TRILL",	/* 31 */
-	"PACKET"	/* 32 */
+	"PACKET",	/* 32 */
+	"LX_NETLINK"	/* 33 */
 };
-#if MAX_AFCODES != 33
+#if MAX_AFCODES != 34
 #error Need to update address-family table
 #endif
 
