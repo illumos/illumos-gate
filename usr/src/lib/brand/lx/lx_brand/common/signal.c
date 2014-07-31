@@ -1810,10 +1810,15 @@ lx_pselect6(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 		if (lx_sigset.size != sizeof (lx_sigset_t))
 			return (-EINVAL);
 
-		if ((r = ltos_sigset(lx_sigset.addr, &sigset)) != 0)
-			return (r);
+		/*
+		 * This is where we check if the sigset is *really* NULL.
+		 */
+		if (lx_sigset.addr) {
+			if ((r = ltos_sigset(lx_sigset.addr, &sigset)) != 0)
+				return (r);
 
-		sp = &sigset;
+			sp = &sigset;
+		}
 	}
 
 	if (nfds >= FD_SETSIZE)
