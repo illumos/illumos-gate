@@ -1,0 +1,81 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\" Copyright 2014 Garrett D'Amore <garrett@damore.org>
+.
+.Dd "Jul 30, 2014"
+.Dt BLKDEV 7D
+.Os
+.Sh NAME
+.Nm blkdev
+.Nd generic block device driver
+.Sh DESCRIPTION
+The
+.Nm
+driver supports generic block-oriented devices, such as non-volatile
+memory storage devices. It provides a hardware independent layer
+for such storage devices, allowing them to concentrate on the
+hardware-specific details, while
+.Nm
+takes care of all the other details, such as
+.Xr dkio 7I .
+.Lp
+The
+.Nm
+driver only supports block-oriented, random-access devices.  It does
+not support traditional rotational media and does not support
+SCSI commands.
+.Lp
+The most typical use case for
+.Nm
+devices is to be used to host a file system, such as
+.Xr pcfs 7FS
+or
+.Xr zfs 7FS .
+.
+.Sh INTERFACE STABILITY
+.Sy Uncommitted .
+.
+.Sh FILES
+.
+.Bl -tag -compact -width Pa
+.It Pa /dev/dsk/cndnsn
+Block device minor nodes.
+.It Pa /dev/rdsk/cndnsn
+Raw block device minor nodes.
+.El
+.Lp
+In the above, the following substitutions may occur:
+.Bl -tag -offset indent -width Va
+.It Va cn
+A controller number, typically one for each instance of
+each underlying hardware dependent device driver (there can be multiple
+such drivers in the system.)  Controller numbers are dynamically assigned
+by the system.
+.It Va dn
+Generally, each instance of the underlying hardware will have a
+logical unit number as well.
+.It Va sn
+This is the
+.Em slice
+number, representing a subset of the disk.  See
+.Xr dkio 7I .
+.El
+.
+.Sh SEE ALSO
+.Xr devinfo 1M ,
+.Xr fdisk 1M ,
+.Xr mount 1M ,
+.Xr rmformat 1M ,
+.Xr umount 1M ,
+.Xr sd 7D ,
+.Xr pcfs 7FS ,
+.Xr zfs 7FS ,
+.Xr dkio 7I
