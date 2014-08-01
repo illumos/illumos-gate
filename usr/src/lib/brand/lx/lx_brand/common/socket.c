@@ -60,16 +60,9 @@
 #define	ABST_PRFX "/tmp/.ABSK_"
 #define	ABST_PRFX_LEN 11
 
-/*
- * This string is used as the name of our emulated netlink socket which is
- * really a unix socket in /tmp.
- */
-#define	NETLINK_NAME "/tmp/.LX_Netlink_Sock"
-
 typedef enum {
 	lxa_none,
-	lxa_abstract,
-	lxa_netlink
+	lxa_abstract
 } lx_addr_type_t;
 
 static int lx_socket(ulong_t *);
@@ -131,7 +124,7 @@ static const int ltos_family[LX_AF_MAX + 1] =  {
 	AF_UNSPEC, AF_UNIX, AF_INET, AF_CCITT, AF_IPX,
 	AF_APPLETALK, AF_NOTSUPPORTED, AF_OSI, AF_NOTSUPPORTED,
 	AF_X25, AF_INET6, AF_CCITT, AF_DECnet,
-	AF_802, AF_POLICY, AF_KEY, AF_ROUTE,
+	AF_802, AF_POLICY, AF_KEY, AF_LX_NETLINK,
 	AF_NOTSUPPORTED, AF_NOTSUPPORTED, AF_NOTSUPPORTED, AF_NOTSUPPORTED,
 	AF_NOTSUPPORTED, AF_SNA, AF_NOTSUPPORTED, AF_NOTSUPPORTED,
 	AF_NOTSUPPORTED, AF_NOTSUPPORTED, AF_NOTSUPPORTED, AF_NOTSUPPORTED,
@@ -378,6 +371,7 @@ static lx_proto_opts_t raw_sockopts_tbl = PROTO_SOCKOPTS(ltos_raw_sockopts);
 
 #define	LX_AF_NETLINK			16
 #define	LX_NETLINK_KOBJECT_UEVENT	15
+#define	LX_NETLINK_ROUTE		0
 
 typedef struct {
 	sa_family_t	nl_family;
@@ -447,7 +441,6 @@ calc_addr_size(struct sockaddr *a, int in_len, lx_addr_type_t *type)
 {
 	struct sockaddr name;
 	boolean_t abst_sock;
-	boolean_t netlink_sock;
 	int nlen;
 
 	if (uucopy(a, &name, sizeof (struct sockaddr)) != 0)
@@ -460,23 +453,14 @@ calc_addr_size(struct sockaddr *a, int in_len, lx_addr_type_t *type)
 	abst_sock = (name.sa_family == AF_UNIX) && (name.sa_data[0] == '\0');
 
 	/*
-	 * Handle Linux netlink sockets which we emulate using UNIX sockets.
-	 */
-	netlink_sock = (name.sa_family == LX_AF_NETLINK);
-
-	/*
 	 * Convert_sockaddr will expand the socket path if it is abstract, so
-	 * we need to allocate extra memory for it. It will also generate
-	 * a UNIX socket address for netlinks.
+	 * we need to allocate extra memory for it.
 	 */
 
 	nlen = in_len;
 	if (abst_sock) {
 		nlen += ABST_PRFX_LEN;
 		*type = lxa_abstract;
-	} else if (netlink_sock) {
-		nlen = sizeof (struct sockaddr_un);
-		*type = lxa_netlink;
 	} else {
 		*type = lxa_none;
 	}
@@ -611,19 +595,6 @@ convert_sockaddr(struct sockaddr *addr, socklen_t *len,
 			}
 			break;
 
-		case AF_ROUTE:
-			/*
-			 * We got a Linux netlink sockaddr_nl struct as input
-			 * but we're really going to setup a unix sockaddr_un
-			 * address for emulation. We depend on the caller to
-			 * have pre-allocated enough space for this ahead of
-			 * time.
-			 */
-			*len = sizeof (struct sockaddr_un);
-			bcopy(NETLINK_NAME, addr->sa_data,
-			    sizeof (NETLINK_NAME));
-			family = AF_UNIX;
-			break;
 		default:
 			*len = inlen;
 	}
@@ -657,7 +628,7 @@ convert_sock_args(int in_dom, int in_type, int in_protocol, int *out_dom,
 	 * Linux does not allow the app to specify IP Protocol for raw
 	 * sockets.  Solaris does, so bail out here.
 	 */
-	if (type == SOCK_RAW && in_protocol == IPPROTO_IP)
+	if (domain == AF_INET && type == SOCK_RAW && in_protocol == IPPROTO_IP)
 		return (-ESOCKTNOSUPPORT);
 
 	options = 0;
@@ -807,33 +778,8 @@ lx_socket(ulong_t *args)
 	if (domain == AF_INET6)
 		return (-EAFNOSUPPORT);
 
-	/*
-	 * AF_NETLINK Handling
-	 *
-	 * The AF_NETLINK address family gets mapped to AF_ROUTE.
-	 *
-	 * Clients of the auditing subsystem used by CentOS 4 and 5 expect to
-	 * be able to create AF_ROUTE SOCK_RAW sockets to communicate with the
-	 * auditing daemons. Failure to create these sockets will cause login,
-	 * ssh and useradd, amoung other programs to fail. To trick these
-	 * programs into working, we convert the socket domain and type to
-	 * something that we do support. Then when sendto is called on these
-	 * sockets, we return an error code. See lx_sendto.
-	 *
-	 * We have a similar issue with the newer startup code (e.g. mountall)
-	 * which wants to setup a netlink socket to receive from udev (protocol
-	 * NETLINK_KOBJECT_UEVENT). These apps basically poll on the socket
-	 * looking for udev events, which will never happen in our case, so we
-	 * let this go through and fail if the app tries to write.
-	 */
-	if (domain == AF_ROUTE &&
-	    (type == SOCK_RAW || protocol == LX_NETLINK_KOBJECT_UEVENT)) {
-		domain = AF_UNIX;
-		type = SOCK_STREAM;
-		protocol = 0;
-	}
-
 	fd = socket(domain, type | options, protocol);
+
 	if (fd >= 0)
 		return (fd);
 
@@ -917,13 +863,6 @@ lx_bind(ulong_t *args)
 	    ((stat64(name->sa_data, &statbuf) == 0) &&
 	    (!S_ISSOCK(statbuf.st_mode))))
 		return (-EADDRINUSE);
-
-	/*
-	 * Now that the dummy netlink socket is setup, remove it to prevent
-	 * future name collisions.
-	 */
-	if (type == lxa_netlink && r >= 0)
-		(void) unlink(name->sa_data);
 
 	return ((r < 0) ? -errno : r);
 }
@@ -1057,36 +996,7 @@ lx_getsockname(ulong_t *args)
 		return (-errno);
 
 	/*
-	 * The caller might be asking for the name for an AF_NETLINK socket
-	 * which we're emulating as a unix socket. Check if that is the case
-	 * and if so, construct a made up name for this socket.
-	 */
-	if (namelen_orig < namelen && name->sa_family == AF_UNIX &&
-	    namelen_orig == sizeof (lx_sockaddr_nl_t)) {
-		struct sockaddr *tname;
-		socklen_t tlen = sizeof (struct sockaddr_un);
-
-		if ((tname = SAFE_ALLOCA(tlen)) != NULL) {
-			bzero(tname, tlen);
-			if (getsockname(sockfd, tname, &tlen) >= 0 &&
-			    strcmp(tname->sa_data, NETLINK_NAME) == 0) {
-				/*
-				 * This is indeed our netlink socket, make the
-				 * name look correct.
-				 */
-				lx_sockaddr_nl_t *p =
-				    (lx_sockaddr_nl_t *)(void *)name;
-
-				bzero(name, namelen_orig);
-				p->nl_family = LX_AF_NETLINK;
-				p->nl_pid = getpid();
-				namelen = namelen_orig;
-			}
-		}
-	}
-
-	/*
-	 * If the name that getsockname() want's to return is larger
+	 * If the name that getsockname() wants to return is larger
 	 * than namelen, getsockname() will copy out the maximum amount
 	 * of data possible and then update namelen to indicate the
 	 * actually size of all the data that it wanted to copy out.
@@ -1300,14 +1210,6 @@ lx_sendto(ulong_t *args)
 	    flags, to, tolen);
 
 	flags = convert_sockflags(flags, "sendto");
-
-	/*
-	 * Return this error if we try to write to our emulated netlink
-	 * socket. This makes the auditing subsystem happy.
-	 */
-	if (to && type == lxa_netlink) {
-		return (-ECONNREFUSED);
-	}
 
 	/*
 	 * If nosigpipe is set, we want to emulate the Linux action of
