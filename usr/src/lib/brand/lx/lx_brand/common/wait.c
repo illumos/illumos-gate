@@ -85,6 +85,7 @@
  */
 #define	LX_WNOHANG	0x00000001
 #define	LX_WUNTRACED	0x00000002
+#define	LX_WSTOPPED	LX_WUNTRACED
 #define	LX_WEXITED	0x00000004
 #define	LX_WCONTINUED	0x00000008
 #define	LX_WNOWAIT	0x01000000
@@ -294,7 +295,11 @@ lx_waitid(uintptr_t idtype, uintptr_t id, uintptr_t infop, uintptr_t opt)
 	int rval, options;
 	siginfo_t s_info = {0};
 	if ((options = ltos_options(opt)) == -1)
-		return (-1);
+		return (-EINVAL);
+
+	if (((opt) & (LX_WEXITED | LX_WSTOPPED | LX_WCONTINUED)) == 0)
+		return (-EINVAL);
+
 	switch (idtype) {
 	case LX_P_ALL:
 		idtype = P_ALL;
