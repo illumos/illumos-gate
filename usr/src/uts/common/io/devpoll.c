@@ -717,13 +717,6 @@ dpwrite(dev_t dev, struct uio *uiop, cred_t *credp)
 			if (pdp == NULL) {
 				pdp = pcache_alloc_fd(0);
 				pdp->pd_fd = fd;
-
-				if (dpep->dpe_flag & DP_ISEPOLLCOMPAT) {
-					/* LINTED pointer alignment */
-					epfdp = (dvpoll_epollfd_t *)pfdp;
-					pdp->pd_epolldata = epfdp->dpep_data;
-				}
-
 				pdp->pd_pcache = pcp;
 				pcache_insert_fd(pcp, pdp, pollfdnum);
 			} else {
@@ -736,6 +729,12 @@ dpwrite(dev_t dev, struct uio *uiop, cred_t *credp)
 					error = EEXIST;
 					break;
 				}
+			}
+
+			if (dpep->dpe_flag & DP_ISEPOLLCOMPAT) {
+				/* LINTED pointer alignment */
+				epfdp = (dvpoll_epollfd_t *)pfdp;
+				pdp->pd_epolldata = epfdp->dpep_data;
 			}
 
 			ASSERT(pdp->pd_fd == fd);
