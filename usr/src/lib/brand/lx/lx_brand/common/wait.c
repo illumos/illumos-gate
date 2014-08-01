@@ -303,7 +303,7 @@ lx_waitid(uintptr_t idtype, uintptr_t id, uintptr_t infop, uintptr_t opt)
 		idtype = P_PID;
 		break;
 	case LX_P_GID:
-		idtype = P_GID;
+		idtype = P_PGID;
 		break;
 	default:
 		return (-EINVAL);
