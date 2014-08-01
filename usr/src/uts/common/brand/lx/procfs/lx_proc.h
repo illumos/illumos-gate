@@ -152,6 +152,7 @@ typedef enum lxpr_nodetype {
 	LXPR_STAT,		/* /proc/stat		*/
 	LXPR_SYSDIR,		/* /proc/sys/		*/
 	LXPR_SYS_KERNELDIR,	/* /proc/sys/kernel/	*/
+	LXPR_SYS_KERNEL_MSGMNI,	/* /proc/sys/kernel/msgmni */
 	LXPR_SYS_KERNEL_NGROUPS_MAX,	/* /proc/sys/kernel/ngroups_max */
 	LXPR_SYS_KERNEL_PID_MAX,	/* /proc/sys/kernel/pid_max */
 	LXPR_SYS_KERNEL_SHMMAX,	/* /proc/sys/kernel/shmmax */
