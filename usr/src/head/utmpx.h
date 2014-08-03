@@ -20,6 +20,8 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 1997 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -34,8 +36,6 @@
 
 #ifndef _UTMPX_H
 #define	_UTMPX_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/feature_tests.h>
 #include <sys/types.h>
@@ -127,8 +127,6 @@ struct futmpx {
 
 #endif /* !defined(_XPG4_2) || defined(__EXTENSIONS__) */
 
-#if defined(__STDC__)
-
 extern void endutxent(void);
 extern struct utmpx *getutxent(void);
 extern struct utmpx *getutxid(const struct utmpx *);
@@ -145,27 +143,6 @@ extern void getutmpx(const struct utmp *, struct utmpx *);
 extern void updwtmp(const char *, struct utmp *);
 extern void updwtmpx(const char *, struct utmpx *);
 #endif /* !defined(_XPG4_2) || defined(__EXTENSIONS__) */
-
-#else /* __STDC__ */
-
-extern void endutxent();
-extern struct utmpx *getutxent();
-extern struct utmpx *getutxid();
-extern struct utmpx *getutxline();
-extern struct utmpx *pututxline();
-extern void setutxent();
-
-#if !defined(_XPG4_2) || defined(__EXTENSIONS__)
-extern int utmpxname();
-extern struct utmpx *makeutx();
-extern struct utmpx *modutx();
-extern void getutmp();
-extern void getutmpx();
-extern void updwtmp();
-extern void updwtmpx();
-#endif /* !defined(_XPG4_2) || defined(__EXTENSIONS__) */
-
-#endif /* __STDC__ */
 
 #ifdef	__cplusplus
 }

@@ -24,14 +24,14 @@
 
 
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_NETCONFIG_H
 #define	_SYS_NETCONFIG_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.4 */
 
 #ifdef	__cplusplus
 extern "C" {
@@ -137,8 +137,6 @@ typedef struct {
 #define	NC_IBTF		"ibtf"
 #define	NC_KDAPL	"kdapl"
 
-#if defined(__STDC__)
-
 extern void		*setnetconfig(void);
 extern int		endnetconfig(void *);
 extern struct netconfig	*getnetconfig(void *);
@@ -149,21 +147,6 @@ extern int		endnetpath(void *);
 extern struct netconfig *getnetpath(void *);
 extern void		nc_perror(const char *);
 extern char		*nc_sperror(void);
-
-#else	/* __STDC__ */
-
-extern void		*setnetconfig();
-extern int		endnetconfig();
-extern struct netconfig	*getnetconfig();
-extern struct netconfig	*getnetconfigent();
-extern void		freenetconfigent();
-extern void		*setnetpath();
-extern int		endnetpath();
-extern struct netconfig *getnetpath();
-extern void		nc_perror();
-extern char		*nc_sperror();
-
-#endif	/* __STDC__ */
 
 #ifdef	__cplusplus
 }

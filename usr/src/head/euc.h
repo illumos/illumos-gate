@@ -19,6 +19,9 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ */
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
@@ -26,24 +29,17 @@
 #ifndef _EUC_H
 #define	_EUC_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/euc.h>
 
 #ifdef	__cplusplus
 extern "C" {
 #endif
 
-#ifdef	__STDC__
 extern int csetcol(int n);	/* Returns # of columns for codeset n. */
 extern int csetlen(int n);	/* Returns # of bytes excluding SSx. */
 extern int euclen(const unsigned char *s);
 extern int euccol(const unsigned char *s);
 extern int eucscol(const unsigned char *str);
-#else	/* __STDC__ */
-extern int csetlen(), csetcol();
-extern int euclen(), euccol(), eucscol();
-#endif	/* __STDC__ */
 
 /* Returns code set number for the first byte of an EUC char. */
 #define	csetno(c) \
@@ -52,7 +48,6 @@ extern int euclen(), euccol(), eucscol();
 /*
  * Copied from _wchar.h of SVR4
  */
-#if defined(__STDC__)
 #define	multibyte	(__ctype[520] > 1)
 #define	eucw1		__ctype[514]
 #define	eucw2		__ctype[515]
@@ -60,15 +55,6 @@ extern int euclen(), euccol(), eucscol();
 #define	scrw1		__ctype[517]
 #define	scrw2		__ctype[518]
 #define	scrw3		__ctype[519]
-#else
-#define	multibyte	(_ctype[520] > 1)
-#define	eucw1		_ctype[514]
-#define	eucw2		_ctype[515]
-#define	eucw3		_ctype[516]
-#define	scrw1		_ctype[517]
-#define	scrw2		_ctype[518]
-#define	scrw3		_ctype[519]
-#endif
 
 #ifdef	__cplusplus
 }

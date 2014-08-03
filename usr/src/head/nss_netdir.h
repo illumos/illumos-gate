@@ -19,6 +19,8 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -35,8 +37,6 @@
 
 #ifndef _NSS_NETDIR_H
 #define	_NSS_NETDIR_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -123,8 +123,6 @@ union nss_netdirbyaddr_out {
 	} nss;
 };
 
-#ifdef __STDC__
-
 int __classic_netdir_getbyname(struct netconfig *,
 		struct nd_hostserv *, struct nd_addrlist **);
 int __classic_netdir_getbyaddr(struct netconfig *,
@@ -137,18 +135,6 @@ int __inet_netdir_options(struct netconfig *,
 		int option, int fd, char *par);
 struct netbuf *__inet_uaddr2taddr(struct netconfig *, char *);
 char *__inet_taddr2uaddr(struct netconfig *, struct netbuf *);
-
-#else
-
-int __classic_netdir_getbyname();
-int __classic_netdir_getbyaddr();
-int _get_hostserv_inetnetdir_byname();
-int _get_hostserv_inetnetdir_byaddr();
-int __inet_netdir_options();
-struct netbuf *__inet_uaddr2taddr();
-char *__inet_taddr2uaddr();
-
-#endif /* __STDC__ */
 
 #ifdef	__cplusplus
 }

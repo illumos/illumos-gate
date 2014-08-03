@@ -24,14 +24,14 @@
 
 
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _FLOAT_H
 #define	_FLOAT_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/feature_tests.h>
 
@@ -41,20 +41,13 @@ extern "C" {
 
 #if defined(__sparc)
 
-#if defined(__STDC__)
 extern int __flt_rounds(void);
-#else	/* defined(__STDC__) */
-extern int __flt_rounds();
-#endif	/* defined(__STDC__) */
 #define	FLT_ROUNDS	__flt_rounds()
 
 #else /* defined(__sparc) */
 
-#if defined(__STDC__)
 extern int __fltrounds(void);
-#else	/* defined (__STDC__) */
-extern int __fltrounds();
-#endif	/* defined(__STDC__) */
+
 #if defined(__amd64)
 #define	FLT_ROUNDS	__fltrounds()
 #else	/* defined(__amd64) */

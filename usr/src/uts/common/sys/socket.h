@@ -19,6 +19,8 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -522,7 +524,6 @@ struct cmsghdr {
 #endif /* (_XPG4_2) && !defined(_XPG5) */
 
 #if !defined(_KERNEL) || defined(_BOOT)
-#ifdef	__STDC__
 extern int accept(int, struct sockaddr *_RESTRICT_KYWD, Psocklen_t);
 extern int accept4(int, struct sockaddr *_RESTRICT_KYWD, Psocklen_t, int);
 extern int bind(int, const struct sockaddr *, socklen_t);
@@ -547,27 +548,6 @@ extern int socket(int, int, int);
 #if !defined(_XPG4_2) || defined(_XPG6) || defined(__EXTENSIONS__)
 extern int sockatmark(int);
 #endif /* !defined(_XPG4_2) || defined(_XPG6) || defined(__EXTENSIONS__) */
-#else	/* __STDC__ */
-extern int accept();
-extern int accept4();
-extern int bind();
-extern int connect();
-extern int getpeername();
-extern int getsockname();
-extern int getsockopt();
-extern int listen();
-extern int recv();
-extern int recvfrom();
-extern int send();
-extern int sendto();
-extern int setsockopt();
-extern int sockatmark();
-extern int socket();
-extern int recvmsg();
-extern int sendmsg();
-extern int shutdown();
-extern int socketpair();
-#endif	/* __STDC__ */
 #endif	/* !defined(_KERNEL) || defined(_BOOT) */
 
 #ifdef	__cplusplus

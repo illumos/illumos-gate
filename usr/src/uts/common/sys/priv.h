@@ -19,6 +19,8 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -50,13 +52,8 @@ typedef int priv_t;
  * Userland type definitions.
  */
 
-#ifdef __STDC__
 typedef const char *priv_ptype_t;
 typedef const char *priv_t;
-#else
-typedef char *priv_ptype_t;
-typedef char *priv_t;
-#endif
 
 #endif /* _KERNEL */
 

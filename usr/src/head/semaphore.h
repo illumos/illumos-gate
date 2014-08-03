@@ -20,14 +20,14 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SEMAPHORE_H
 #define	_SEMAPHORE_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/feature_tests.h>
 
@@ -52,7 +52,6 @@ typedef struct {
 /*
  * function prototypes
  */
-#if	defined(__STDC__)
 int	sem_init(sem_t *, int, unsigned int);
 int	sem_destroy(sem_t *);
 sem_t	*sem_open(const char *, int, ...);
@@ -75,21 +74,6 @@ int	sem_reltimedwait_np(sem_t *_RESTRICT_KYWD,
 int	sem_trywait(sem_t *);
 int	sem_post(sem_t *);
 int	sem_getvalue(sem_t *_RESTRICT_KYWD, int *_RESTRICT_KYWD);
-#else
-int	sem_init();
-int	sem_destroy();
-sem_t	*sem_open();
-int	sem_close();
-int	sem_unlink();
-int	sem_wait();
-#if !defined(__XOPEN_OR_POSIX) || defined(_XPG6) || defined(__EXTENSIONS__)
-int	sem_timedwait();
-int	sem_reltimedwait_np();
-#endif	/* #if !defined(__XOPEN_OR_POSIX) || defined(_XPG6) ... */
-int	sem_trywait();
-int	sem_post();
-int	sem_getvalue();
-#endif	/* __STDC__ */
 
 #ifdef	__cplusplus
 }

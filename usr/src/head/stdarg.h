@@ -22,16 +22,15 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved	*/
 
-
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _STDARG_H
 #define	_STDARG_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.8	*/
 
 /*
  * This header defines the ISO C 1989, ISO C++ 1998, and ISO C 1999
@@ -45,8 +44,6 @@
  * names into the users' namespace.
  */
 
-#if defined(__STDC__)
-
 #include <iso/stdarg_iso.h>
 #include <iso/stdarg_c99.h>
 
@@ -57,11 +54,5 @@
 #if __cplusplus >= 199711L
 using std::va_list;
 #endif
-
-#else	/* __STDC__ */
-
-#include <varargs.h>
-
-#endif	/* __STDC__ */
 
 #endif	/* _STDARG_H */

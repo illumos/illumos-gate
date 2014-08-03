@@ -22,8 +22,9 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -31,21 +32,15 @@
 #ifndef	_ASSERT_H
 #define	_ASSERT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.6.1.4 */
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
 
-#if defined(__STDC__)
 #if __STDC_VERSION__ - 0 >= 199901L
 extern void __assert_c99(const char *, const char *, int, const char *);
 #else
 extern void __assert(const char *, const char *, int);
 #endif /* __STDC_VERSION__ - 0 >= 199901L */
-#else
-extern void _assert();
-#endif
 
 #ifdef	__cplusplus
 }
@@ -68,15 +63,11 @@ extern void _assert();
 
 #else
 
-#if defined(__STDC__)
 #if __STDC_VERSION__ - 0 >= 199901L
 #define	assert(EX) (void)((EX) || \
 	(__assert_c99(#EX, __FILE__, __LINE__, __func__), 0))
 #else
 #define	assert(EX) (void)((EX) || (__assert(#EX, __FILE__, __LINE__), 0))
 #endif /* __STDC_VERSION__ - 0 >= 199901L */
-#else
-#define	assert(EX) (void)((EX) || (_assert("EX", __FILE__, __LINE__), 0))
-#endif	/* __STDC__ */
 
 #endif	/* NDEBUG */

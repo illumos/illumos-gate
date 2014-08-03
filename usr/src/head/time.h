@@ -23,12 +23,13 @@
 
 
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
  * Copyright 2010 Nexenta Systems, Inc.  Al rights reserved.
- * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  */
 
 #ifndef _TIME_H
@@ -75,8 +76,6 @@ typedef int	clockid_t;
 #define	_TIMER_T
 typedef int	timer_t;
 #endif
-
-#if defined(__STDC__)
 
 #if defined(__EXTENSIONS__) || \
 	(!defined(_STRICT_STDC) && !defined(__XOPEN_OR_POSIX)) || \
@@ -197,47 +196,6 @@ extern int getdate_err;
 #endif /* _REENTRANT */
 #endif /* (!defined(_STRICT_STDC) && !defined(__XOPEN_OR_POSIX))... */
 
-#else /* __STDC__ */
-
-extern int cftime(), ascftime();
-extern void tzset();
-extern time_t timegm();
-
-#ifdef _STRPTIME_DONTZERO
-#ifdef __PRAGMA_REDEFINE_EXTNAME
-#pragma	redefine_extname strptime	__strptime_dontzero
-#else	/* __PRAGMA_REDEFINE_EXTNAME */
-extern char *__strptime_dontzero();
-#define	strptime	__strptime_dontzero
-#endif	/* __PRAGMA_REDEFINE_EXTNAME */
-#endif	/* _STRPTIME_DONTZERO */
-
-extern char *strptime();
-
-#if defined(__EXTENSIONS__) || \
-	(!defined(_STRICT_STDC) && !defined(__XOPEN_OR_POSIX)) || \
-	(_POSIX_C_SOURCE - 0 >= 199506L) || defined(_REENTRANT)
-extern struct tm *gmtime_r();
-extern struct tm *localtime_r();
-#endif
-
-extern long timezone, altzone;
-extern int daylight;
-extern char *tzname[2];
-
-#if !defined(__XOPEN_OR_POSIX) || defined(_XPG4_2) || defined(__EXTENSIONS__)
-extern struct tm *getdate();
-#ifdef	_REENTRANT
-#undef getdate_err
-#define	getdate_err *(int *)_getdate_err_addr()
-extern int *_getdate_err_addr();
-#else
-extern int getdate_err;
-#endif /* _REENTRANT */
-#endif /* !defined(__XOPEN_OR_POSIX) || defined(_XPG4_2)... */
-
-#endif	/* __STDC__ */
-
 /*
  * ctime_r() & asctime_r() prototypes are defined here.
  */
@@ -277,8 +235,6 @@ extern int getdate_err;
 #if	defined(__EXTENSIONS__) || defined(_REENTRANT) || \
 	(!defined(_STRICT_STDC) && !defined(__XOPEN_OR_POSIX)) || \
 	(_POSIX_C_SOURCE - 0 >= 199506L) || defined(_POSIX_PTHREAD_SEMANTICS)
-
-#if	defined(__STDC__)
 
 #if	(_POSIX_C_SOURCE - 0 >= 199506L) || defined(_POSIX_PTHREAD_SEMANTICS)
 
@@ -322,54 +278,6 @@ extern char *ctime_r(const time_t *, char *, int);
 
 #endif  /* (_POSIX_C_SOURCE - 0 >= 199506L) || ... */
 
-#else  /* __STDC__ */
-
-#if	(_POSIX_C_SOURCE - 0 >= 199506L) || defined(_POSIX_PTHREAD_SEMANTICS)
-
-#ifdef __PRAGMA_REDEFINE_EXTNAME
-#pragma redefine_extname asctime_r __posix_asctime_r
-#pragma redefine_extname ctime_r __posix_ctime_r
-extern char *asctime_r();
-extern char *ctime_r();
-#else  /* __PRAGMA_REDEFINE_EXTNAME */
-
-extern char *__posix_asctime_r();
-extern char *__posix_ctime_r();
-
-#ifdef	__lint
-
-#define	asctime_r __posix_asctime_r
-#define	ctime_r __posix_ctime_r
-
-#else	/* !__lint */
-
-static char *
-asctime_r(__tm, __buf)
-	struct tm *__tm;
-	char *__buf;
-{
-	return (__posix_asctime_r(__tm, __buf));
-}
-static char *
-ctime_r(__time, __buf)
-	time_t *__time;
-	char *__buf;
-{
-	return (__posix_ctime_r(__time, __buf));
-}
-
-#endif /* !__lint */
-#endif /* __PRAGMA_REDEFINE_EXTNAME */
-
-#else  /* (_POSIX_C_SOURCE - 0 >= 199506L) || ... */
-
-extern char *asctime_r();
-extern char *ctime_r();
-
-#endif /* (_POSIX_C_SOURCE - 0 >= 199506L) || ... */
-
-#endif /* __STDC__ */
-
 #endif /* defined(__EXTENSIONS__) || defined(_REENTRANT)... */
 
 
@@ -380,12 +288,8 @@ extern char *ctime_r();
 typedef struct _locale *locale_t;
 #endif
 
-#if	defined(__STDC__)
 extern size_t strftime_l(char *_RESTRICT_KYWD, size_t,
 	const char *_RESTRICT_KYWD, const struct tm *_RESTRICT_KYWD, locale_t);
-#else /* __STDC__ */
-extern size_t strftime_l();
-#endif /* __STDC__ */
 
 #endif /* defined(_XPG7) || !defined(_STRICT_SYMBOLS) */
 

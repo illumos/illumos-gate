@@ -20,6 +20,8 @@
  */
 
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -66,8 +68,6 @@ typedef struct {
 typedef struct {
 	void *__file_attrp;	/* implementation-private */
 } posix_spawn_file_actions_t;
-
-#if defined(__STDC__)
 
 extern int posix_spawn(
 	pid_t *_RESTRICT_KYWD pid,
@@ -187,38 +187,6 @@ extern int posix_spawnattr_setsigmask(
 extern int posix_spawnattr_getsigmask(
 	const posix_spawnattr_t *_RESTRICT_KYWD attr,
 	sigset_t *_RESTRICT_KYWD sigmask);
-
-#else	/* __STDC__ */
-
-extern int posix_spawn();
-extern int posix_spawnp();
-extern int posix_spawn_file_actions_init();
-extern int posix_spawn_file_actions_destroy();
-extern int posix_spawn_file_actions_addopen();
-extern int posix_spawn_file_actions_addclose();
-extern int posix_spawn_file_actions_adddup2();
-extern int posix_spawnattr_init();
-extern int posix_spawnattr_destroy();
-extern int posix_spawnattr_setflags();
-extern int posix_spawnattr_getflags();
-extern int posix_spawnattr_setpgroup();
-extern int posix_spawnattr_getpgroup();
-extern int posix_spawnattr_setschedparam();
-extern int posix_spawnattr_getschedparam();
-extern int posix_spawnattr_setschedpolicy();
-extern int posix_spawnattr_getschedpolicy();
-extern int posix_spawnattr_setsigdefault();
-extern int posix_spawnattr_getsigdefault();
-#if !defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__)
-extern int posix_spawn_pipe_np();
-extern int posix_spawn_file_actions_addclosefrom_np();
-extern int posix_spawnattr_setsigignore_np();
-extern int posix_spawnattr_getsigignore_np();
-#endif	/* !defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__) */
-extern int posix_spawnattr_setsigmask();
-extern int posix_spawnattr_getsigmask();
-
-#endif	/* __STDC__ */
 
 #ifdef	__cplusplus
 }

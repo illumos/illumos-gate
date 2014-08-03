@@ -19,10 +19,12 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ */
 /*	Copyright (c) 1992 Sun Microsystems, Inc.	*/
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
 
 /*
  * netdir.h
@@ -33,8 +35,6 @@
 
 #ifndef _NETDIR_H
 #define	_NETDIR_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.5	*/
 
 /*
  * This files uses struct netconfig, and netconfig.h must be included
@@ -79,8 +79,6 @@ extern int _nderror;
 #endif  /* _REENTRANT */
 
 
-#ifdef __STDC__
-
 int netdir_options(struct netconfig *, int option, int fd, char *par);
 int netdir_getbyname(struct netconfig *, struct nd_hostserv *,
     struct nd_addrlist **);
@@ -100,25 +98,6 @@ struct nd_hostservlist *_netdir_getbyaddr(struct netconfig *, struct netbuf *);
 struct netbuf *_uaddr2taddr(struct netconfig *, char *);
 char *_taddr2uaddr(struct netconfig *, struct netbuf *);
 char *_netdir_mergeaddr(struct netconfig *, char *uaddr, char *ruaddr);
-
-#else	/* __STDC__ */
-
-int netdir_options();
-int netdir_getbyname();
-int netdir_getbyaddr();
-int netdir_mergeaddr();
-void netdir_free();
-struct netbuf *uaddr2taddr();
-void netdir_perror();
-char *netdir_sperror();
-char *taddr2uaddr();
-struct nd_addrlist *_netdir_getbyname();
-struct nd_hostservlist *_netdir_getbyaddr();
-char *_netdir_mergeaddr();
-struct netbuf *_uaddr2taddr();
-char *_taddr2uaddr();
-
-#endif	/* __STDC__ */
 
 /*
  * These are all objects that can be freed by netdir_free

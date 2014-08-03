@@ -25,7 +25,7 @@
  */
 
 /*
- * Copyright 2013 Garrett D'Amore <garrett@damore.org>
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  *
  * Portions of this file developed by Garrett D'Amore are licensed
  * under the terms of the Common Development and Distribution License (CDDL)
@@ -84,17 +84,10 @@ extern "C" {
 typedef struct _locale *locale_t;
 #endif
 
-#if	defined(__STDC__)
 extern locale_t	duplocale(locale_t);
 extern void	freelocale(locale_t);
 extern locale_t	newlocale(int, const char *, locale_t);
 extern locale_t	uselocale(locale_t);
-#else	/* __STDC__ */
-extern locale_t	duplocale();
-extern void	freelocale();
-extern locale_t	newlocale();
-extern locale_t	uselocale();
-#endif	/* __STDC__ */
 
 #define	LC_GLOBAL_LOCALE	(__global_locale())
 extern locale_t			__global_locale(void);

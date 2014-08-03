@@ -20,6 +20,8 @@
  */
 
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -150,19 +152,9 @@ typedef struct _cleanup {
 	uintptr_t	pthread_cleanup_pad[4];
 } _cleanup_t;
 
-#ifdef	__STDC__
-
 void	__pthread_cleanup_push(void (*)(void *), void *, caddr_t, _cleanup_t *);
 void	__pthread_cleanup_pop(int, _cleanup_t *);
 caddr_t	_getfp(void);
-
-#else	/* __STDC__ */
-
-void	__pthread_cleanup_push();
-void	__pthread_cleanup_pop();
-caddr_t	_getfp();
-
-#endif	/* __STDC__ */
 
 #if __cplusplus
 extern "C" {
@@ -182,8 +174,6 @@ typedef void (*_Voidfp)(void*); /* pointer to extern "C" function */
 #define	pthread_cleanup_pop(ex) \
 	__pthread_cleanup_pop(ex, &_cleanup_info); \
 }
-
-#ifdef	__STDC__
 
 /*
  * function prototypes - thread related calls
@@ -346,122 +336,6 @@ extern int pthread_mutex_consistent_np(pthread_mutex_t *);
 extern int pthread_mutexattr_setrobust_np(pthread_mutexattr_t *, int);
 extern int pthread_mutexattr_getrobust_np(
 	const pthread_mutexattr_t *_RESTRICT_KYWD, int *_RESTRICT_KYWD);
-
-#else	/* __STDC__ */
-
-/*
- * function prototypes - thread related calls
- */
-extern int pthread_atfork();
-extern int pthread_attr_init();
-extern int pthread_attr_destroy();
-extern int pthread_attr_setstack();
-extern int pthread_attr_getstack();
-extern int pthread_attr_setstacksize();
-extern int pthread_attr_getstacksize();
-extern int pthread_attr_setstackaddr();
-extern int pthread_attr_getstackaddr();
-extern int pthread_attr_setdetachstate();
-extern int pthread_attr_getdetachstate();
-extern int pthread_attr_setscope();
-extern int pthread_attr_getscope();
-extern int pthread_attr_setinheritsched();
-extern int pthread_attr_getinheritsched();
-extern int pthread_attr_setschedpolicy();
-extern int pthread_attr_getschedpolicy();
-extern int pthread_attr_setschedparam();
-extern int pthread_attr_getschedparam();
-extern int pthread_create();
-extern int pthread_once();
-extern int pthread_join();
-extern int pthread_detach();
-extern void pthread_exit();
-extern int pthread_cancel();
-extern int pthread_setschedparam();
-extern int pthread_getschedparam();
-extern int pthread_setschedprio();
-extern int pthread_setcancelstate();
-extern int pthread_setcanceltype();
-extern void pthread_testcancel();
-extern int pthread_equal();
-extern int pthread_key_create();
-extern int pthread_key_create_once_np();
-extern int pthread_key_delete();
-extern int pthread_setspecific();
-extern void *pthread_getspecific();
-extern pthread_t pthread_self();
-/*
- * function prototypes - synchronization related calls
- */
-extern int pthread_mutexattr_init();
-extern int pthread_mutexattr_destroy();
-extern int pthread_mutexattr_setpshared();
-extern int pthread_mutexattr_getpshared();
-extern int pthread_mutexattr_setprotocol();
-extern int pthread_mutexattr_getprotocol();
-extern int pthread_mutexattr_setprioceiling();
-extern int pthread_mutexattr_getprioceiling();
-extern int pthread_mutexattr_setrobust();
-extern int pthread_mutexattr_getrobust();
-extern int pthread_mutex_init();
-extern int pthread_mutex_consistent();
-extern int pthread_mutex_destroy();
-extern int pthread_mutex_lock();
-extern int pthread_mutex_timedlock();
-extern int pthread_mutex_reltimedlock_np();
-extern int pthread_mutex_unlock();
-extern int pthread_mutex_trylock();
-extern int pthread_mutex_setprioceiling();
-extern int pthread_mutex_getprioceiling();
-extern int pthread_condattr_init();
-extern int pthread_condattr_destroy();
-extern int pthread_condattr_setclock();
-extern int pthread_condattr_getclock();
-extern int pthread_condattr_setpshared();
-extern int pthread_condattr_getpshared();
-extern int pthread_cond_init();
-extern int pthread_cond_destroy();
-extern int pthread_cond_broadcast();
-extern int pthread_cond_signal();
-extern int pthread_cond_wait();
-extern int pthread_cond_timedwait();
-extern int pthread_cond_reltimedwait_np();
-extern int pthread_attr_getguardsize();
-extern int pthread_attr_setguardsize();
-extern int pthread_getconcurrency();
-extern int pthread_setconcurrency();
-extern int pthread_mutexattr_settype();
-extern int pthread_mutexattr_gettype();
-extern int pthread_rwlock_init();
-extern int pthread_rwlock_destroy();
-extern int pthread_rwlock_rdlock();
-extern int pthread_rwlock_tryrdlock();
-extern int pthread_rwlock_wrlock();
-extern int pthread_rwlock_trywrlock();
-extern int pthread_rwlock_unlock();
-extern int pthread_rwlockattr_init();
-extern int pthread_rwlockattr_destroy();
-extern int pthread_rwlockattr_getpshared();
-extern int pthread_rwlockattr_setpshared();
-extern int pthread_spin_init();
-extern int pthread_spin_destroy();
-extern int pthread_spin_lock();
-extern int pthread_spin_trylock();
-extern int pthread_spin_unlock();
-extern int pthread_barrierattr_init();
-extern int pthread_barrierattr_destroy();
-extern int pthread_barrierattr_setpshared();
-extern int pthread_barrierattr_getpshared();
-extern int pthread_barrier_init();
-extern int pthread_barrier_destroy();
-extern int pthread_barrier_wait();
-
-/* Historical names -- present only for binary compatibility */
-extern int pthread_mutex_consistent_np();
-extern int pthread_mutexattr_setrobust_np();
-extern int pthread_mutexattr_getrobust_np();
-
-#endif	/* __STDC__ */
 
 #endif	/* _ASM */
 

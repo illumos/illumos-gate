@@ -19,6 +19,7 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -88,7 +89,6 @@ typedef struct profattr_s {
 	kva_t  *attr;	/* array of key-value pair attributes */
 } profattr_t;
 
-#ifdef    __STDC__
 extern profattr_t *getprofnam(const char *);
 extern profattr_t *getprofattr(void);
 extern void getproflist(const char *, char **, int *);
@@ -96,18 +96,6 @@ extern void setprofattr(void);
 extern void endprofattr(void);
 extern void free_profattr(profattr_t *);
 extern void free_proflist(char **, int);
-
-#else				/* not __STDC__ */
-
-extern profattr_t *getprofnam();
-extern profattr_t *getprofattr();
-extern void getproflist();
-extern int setprofattr();
-extern int endprofattr();
-extern void free_profattr();
-extern void free_proflist();
-
-#endif
 
 #ifdef __cplusplus
 }

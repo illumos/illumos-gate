@@ -21,16 +21,15 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _REGEXP_H
 #define	_REGEXP_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.9	*/
 
 #include <string.h>
 
@@ -70,23 +69,11 @@ static int	size;
 
 static unsigned char	bittab[] = { 1, 2, 4, 8, 16, 32, 64, 128 };
 
-#ifdef	__STDC__
 int advance(const char *lp, const char *ep);
 static void getrnge(const char *str);
-#else
-int advance();
-static void getrnge();
-#endif
 
 char *
-#ifdef	__STDC__
 compile(char *instring, char *ep, const char *endbuf, int seof)
-#else
-compile(instring, ep, endbuf, seof)
-register char *ep;
-char *instring, *endbuf;
-int seof;
-#endif
 {
 	INIT	/* Dependent declarations and initializations */
 	register int c;
@@ -315,14 +302,8 @@ int seof;
 	/*NOTREACHED*/
 }
 
-#ifdef	__STDC__
 int
 step(const char *p1, const char *p2)
-#else
-int
-step(p1, p2)
-register char *p1, *p2;
-#endif
 {
 	char c;
 
@@ -355,18 +336,9 @@ register char *p1, *p2;
 }
 
 int
-#ifdef	__STDC__
 advance(const char *lp, const char *ep)
-#else
-advance(lp, ep)
-register char *lp, *ep;
-#endif
 {
-#ifdef	__STDC__
 	const char *curlp;
-#else
-	register char *curlp;
-#endif
 	int c;
 	char *bbeg;
 	register char neg;
@@ -580,12 +552,7 @@ register char *lp, *ep;
 }
 
 static void
-#ifdef	__STDC__
 getrnge(const char *str)
-#else
-getrnge(str)
-register char *str;
-#endif
 {
 	low = *str++ & 0377;
 	size = ((*str & 0377) == 255)? 20000: (*str &0377) - low;

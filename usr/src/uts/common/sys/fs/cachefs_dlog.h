@@ -20,14 +20,14 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_FS_CACHEFS_DLOG_H
 #define	_SYS_FS_CACHEFS_DLOG_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/vfs.h>
 #include <sys/acl.h>
@@ -279,7 +279,7 @@ typedef struct cfs_dlog_entry cfs_dlog_entry_t;
 	    offsetof(struct cfs_dlog_entry, dl_u.dl_setsecattr) +	\
 	    CFS_DLOG_SECATTR_MAXSIZE)
 
-#if defined(_KERNEL) && defined(__STDC__)
+#if defined(_KERNEL)
 int cachefs_dlog_setup(fscache_t *fscp, int createfile);
 void cachefs_dlog_teardown(fscache_t *fscp);
 int cachefs_dlog_commit(fscache_t *fscp, off_t offset, int error);

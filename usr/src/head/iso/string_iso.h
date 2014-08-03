@@ -24,6 +24,8 @@
 
 
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -42,8 +44,6 @@
 
 #ifndef _ISO_STRING_ISO_H
 #define	_ISO_STRING_ISO_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/feature_tests.h>
 
@@ -71,8 +71,6 @@ typedef unsigned int	size_t;		/* (historical version) */
 #define	NULL	0
 #endif
 #endif
-
-#if defined(__STDC__)
 
 extern int memcmp(const void *, const void *, size_t);
 extern void *memcpy(void *_RESTRICT_KYWD, const void *_RESTRICT_KYWD, size_t);
@@ -150,33 +148,6 @@ extern char *strpbrk(const char *, const char *);
 extern char *strrchr(const char *, int);
 extern char *strstr(const char *, const char *);
 #endif /* __cplusplus >= 199711L */
-
-#else	/* __STDC__ */
-
-extern void *memchr();
-extern int memcmp();
-extern void *memcpy();
-extern void *memmove();
-extern void *memset();
-extern char *strcat();
-extern char *strchr();
-extern int strcmp();
-extern int strcoll();
-extern char *strcpy();
-extern size_t strcspn();
-extern char *strerror();
-extern size_t strlen();
-extern char *strncat();
-extern int strncmp();
-extern char *strncpy();
-extern char *strpbrk();
-extern char *strrchr();
-extern size_t strspn();
-extern char *strstr();
-extern char *strtok();
-extern size_t strxfrm();
-
-#endif	/* __STDC__ */
 
 #if __cplusplus >= 199711L
 }

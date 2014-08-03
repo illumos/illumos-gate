@@ -19,6 +19,8 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -249,17 +251,8 @@ extern	uioasync_t uioasync;
 
 #else	/* defined(_KERNEL) */
 
-#if 	defined(__STDC__)
-
 extern ssize_t readv(int, const struct iovec *, int);
 extern ssize_t writev(int, const struct iovec *, int);
-
-#else	/* defined(__STDC__) */
-
-extern ssize_t readv();
-extern ssize_t writev();
-
-#endif	/* defined(__STDC__) */
 
 #endif	/* defined(_KERNEL) */
 

@@ -19,6 +19,8 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -98,11 +100,7 @@ extern char platform[];
 						/* name */
 
 #if !defined(_KERNEL)
-#if defined(__STDC__)
 int sysinfo(int, char *, long);
-#else
-int sysinfo();
-#endif
 #endif
 
 #ifdef	__cplusplus

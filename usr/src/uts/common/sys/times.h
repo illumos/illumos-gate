@@ -19,14 +19,15 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
 #ifndef _SYS_TIMES_H
 #define	_SYS_TIMES_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 11.7 */
 
 #include <sys/types.h>
 
@@ -58,11 +59,7 @@ struct tms32 {
 
 #endif	/* _SYSCALL32 */
 
-#if defined(__STDC__)
 clock_t times(struct tms *);
-#else
-clock_t times();
-#endif
 
 #ifdef	__cplusplus
 }

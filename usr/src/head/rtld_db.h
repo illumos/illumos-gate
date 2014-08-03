@@ -19,15 +19,14 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_RTLD_DB_H
 #define	_RTLD_DB_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 
 #ifdef	__cplusplus
 extern "C" {
@@ -135,11 +134,7 @@ typedef struct rd_loadobj {
 #define	RD_CTL_SET_HELPPATH	0x01	/* Set the path used to find helpers */
 
 typedef struct rd_agent rd_agent_t;
-#ifdef __STDC__
 typedef int rl_iter_f(const rd_loadobj_t *, void *);
-#else
-typedef int rl_iter_f();
-#endif
 
 
 /*
@@ -175,7 +170,6 @@ struct	ps_prochandle;
 /*
  * librtld_db.so entry points
  */
-#ifdef __STDC__
 extern void		rd_delete(rd_agent_t *);
 extern char		*rd_errstr(rd_err_e rderr);
 extern rd_err_e		rd_event_addr(rd_agent_t *, rd_event_e, rd_notify_t *);
@@ -192,22 +186,6 @@ extern rd_err_e		rd_plt_resolution(rd_agent_t *, psaddr_t, lwpid_t,
 				psaddr_t, rd_plt_info_t *);
 extern rd_err_e		rd_get_dyns(rd_agent_t *, psaddr_t, void **, size_t *);
 extern rd_err_e		rd_reset(struct rd_agent *);
-#else /* !__STDC__ */
-extern void		rd_delete();
-extern char		*rd_errstr();
-extern rd_err_e		rd_event_addr();
-extern rd_err_e		rd_event_enable();
-extern rd_err_e		rd_event_getmsg();
-extern rd_err_e		rd_init();
-extern rd_err_e		rd_ctl();
-extern rd_err_e		rd_loadobj_iter();
-extern void		rd_log();
-extern rd_agent_t	*rd_new();
-extern rd_err_e		rd_objpad_enable();
-extern rd_err_e		rd_plt_resolution();
-extern rd_err_e		rd_get_dyns();
-extern rd_err_e		rd_reset();
-#endif /* !__STDC__ */
 
 #ifdef	__cplusplus
 }

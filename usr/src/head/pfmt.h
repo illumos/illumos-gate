@@ -19,14 +19,14 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ */
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
 #ifndef	_PFMT_H
 #define	_PFMT_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #ifndef va_args
@@ -64,7 +64,6 @@ extern "C" {
 #define	MM_WARNING	2
 #define	MM_INFO		3
 
-#ifdef __STDC__
 int pfmt(FILE *, long, const char *, ...);
 int lfmt(FILE *, long, const char *, ...);
 int vpfmt(FILE *, long, const char *, va_list);
@@ -72,15 +71,6 @@ int vlfmt(FILE *, long, const char *, va_list);
 const char *setcat(const char *);
 int setlabel(const char *);
 int addsev(int, const char *);
-#else
-int pfmt();
-int lfmt();
-int vpfmt();
-int vlfmt();
-char *setcat();
-int setlabel();
-int addsev();
-#endif
 
 #define	DB_NAME_LEN		15
 #define	MAXLABEL		25

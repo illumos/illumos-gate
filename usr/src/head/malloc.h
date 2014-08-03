@@ -19,9 +19,11 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ */
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
-
 
 #ifndef _MALLOC_H
 #define	_MALLOC_H
@@ -57,8 +59,6 @@ struct mallinfo  {
 	unsigned long keepcost;	/* cost of enabling keep option */
 };
 
-#if defined(__STDC__)
-
 #if (!defined(_STRICT_STDC) && !defined(__XOPEN_OR_POSIX)) || \
 	defined(_XPG3)
 #if __cplusplus >= 199711L
@@ -82,17 +82,6 @@ using std::calloc;
 
 int mallopt(int, int);
 struct mallinfo mallinfo(void);
-
-#else
-
-void *malloc();
-void free();
-void *realloc();
-void *calloc();
-int mallopt();
-struct mallinfo mallinfo();
-
-#endif	/* __STDC__ */
 
 #ifdef	__cplusplus
 }

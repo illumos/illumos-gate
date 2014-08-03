@@ -20,6 +20,8 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -34,8 +36,6 @@
 
 #ifndef	_RPCSVC_YP_PROT_H
 #define	_RPCSVC_YP_PROT_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <rpc/rpc.h>
 #include <rpcsvc/ypclnt.h>
@@ -360,7 +360,6 @@ struct yppushresp_xfr {
 #define	YPPUSH_REFUSED	(-14)	/* Transfer request refused by ypserv */
 #define	YPPUSH_NOALIAS	(-15)	/* Alias not found for map or domain */
 
-#ifdef __STDC__
 extern bool xdr_datum(XDR *, datum *);
 extern bool xdr_ypdomain_wrap_string(XDR *, char **);
 extern bool xdr_ypmap_wrap_string(XDR *, char **);
@@ -377,27 +376,6 @@ extern bool xdr_ypresp_order(XDR *, struct ypresp_order *);
 extern bool xdr_ypresp_master(XDR *, struct ypresp_master *);
 extern bool xdr_ypall(XDR *, struct ypall_callback *);
 extern bool xdr_ypresp_maplist(XDR *, struct ypresp_maplist *);
-
-#else
-
-extern bool xdr_datum();
-extern bool xdr_ypdomain_wrap_string();
-extern bool xdr_ypmap_wrap_string();
-extern bool xdr_ypreq_key();
-extern bool xdr_ypreq_nokey();
-extern bool xdr_ypreq_xfr();
-extern bool xdr_ypreq_newxfr();
-extern bool xdr_ypresp_val();
-extern bool xdr_ypresp_key_val();
-extern bool xdr_yp_inaddr();
-extern bool xdr_ypmap_parms();
-extern bool xdr_ypowner_wrap_string();
-extern bool xdr_yppushresp_xfr();
-extern bool xdr_ypresp_order();
-extern bool xdr_ypresp_master();
-extern bool xdr_ypall();
-extern bool xdr_ypresp_maplist();
-#endif	/* __STDC__ */
 
 #ifdef __cplusplus
 }

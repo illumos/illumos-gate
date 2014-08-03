@@ -20,14 +20,14 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _AIO_H
 #define	_AIO_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/feature_tests.h>
 #include <sys/types.h>
@@ -104,7 +104,6 @@ extern "C" {
 /*
  * function prototypes
  */
-#if	defined(__STDC__)
 extern int	aio_read(aiocb_t *);
 extern int	aio_write(aiocb_t *);
 extern int	lio_listio(int,
@@ -136,32 +135,6 @@ extern int	aio_fsync64(int, aiocb64_t *);
 extern int	aio_waitn64(aiocb64_t *[], uint_t, uint_t *,
 		    const struct timespec *);
 #endif	/* _LARGEFILE64_SOURCE */
-
-#else
-extern int	aio_read();
-extern int	aio_write();
-extern int	lio_listio();
-extern int	aio_error();
-extern ssize_t	aio_return();
-extern int	aio_cancel();
-extern int	aio_suspend();
-extern int	aio_fsync();
-extern int	aio_waitn();
-
-#if defined(_LARGEFILE64_SOURCE) && !((_FILE_OFFSET_BITS == 64) && \
-	!defined(__PRAGMA_REDEFINE_EXTNAME))
-extern int	aio_read64();
-extern int	aio_write64();
-extern int	lio_listio64();
-extern int	aio_error64();
-extern ssize_t	aio_return64();
-extern int	aio_cancel64();
-extern int	aio_suspend64();
-extern int	aio_fsync64();
-extern int	aio_waitn64();
-#endif	/* _LARGEFILE64_SOURCE */
-
-#endif	/* __STDC__ */
 
 #ifdef	__cplusplus
 }

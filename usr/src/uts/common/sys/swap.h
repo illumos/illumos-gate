@@ -19,6 +19,7 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  * Copyright (c) 1987, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -112,11 +113,7 @@ extern int swapctl(int, void *, int *);
 extern int swapctl32(int, void *, int *);
 #endif /* _LP64 && _SYSCALL32 */
 #else /* !_KERNEL */
-#if defined(__STDC__)
 extern int swapctl(int, void *);
-#else
-extern int swapctl();
-#endif
 #endif /* _KERNEL */
 
 

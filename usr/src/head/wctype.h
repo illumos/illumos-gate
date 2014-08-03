@@ -25,6 +25,7 @@
 
 /*
  * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -104,7 +105,6 @@ extern	wint_t __nextwctype(wint_t, wctype_t);
 #define	iswascii(c)	isascii(c)
 
 /* isw*, except iswascii(), are not macros any more.  They become functions */
-#ifdef __STDC__
 
 /* is* also become functions */
 extern	int isphonogram(wint_t);
@@ -118,21 +118,6 @@ extern	int iswphonogram(wint_t);
 extern	int iswnumber(wint_t);
 extern	int iswhexnumber(wint_t);
 extern	int iswspecial(wint_t);
-
-#else	/* __STDC__ */
-
-/* is* also become functions */
-extern  int isphonogram();
-extern  int isideogram();
-extern  int isenglish();
-extern  int isnumber();
-extern  int isspecial();
-/* From BSD/MacOS */
-extern	int iswideogram();
-extern	int iswphonogram();
-extern	int iswnumber();
-extern	int iswspecial();
-#endif
 
 #define	iscodeset0(c)	isascii(c)
 #define	iscodeset1(c)	(((c) & WCHAR_CSMASK) == WCHAR_CS1)
@@ -150,7 +135,6 @@ extern	int iswspecial();
 typedef struct _locale *locale_t;
 #endif
 
-#if	defined(__STDC__)
 extern wint_t towlower_l(wint_t, locale_t);
 extern wint_t towupper_l(wint_t, locale_t);
 extern wint_t towctrans_l(wint_t, wctrans_t, locale_t);
@@ -168,25 +152,6 @@ extern int iswupper_l(wint_t, locale_t);
 extern int iswxdigit_l(wint_t, locale_t);
 extern wctrans_t wctrans_l(const char *, locale_t);
 extern wctype_t wctype_l(const char *, locale_t);
-#else	/* __STDC__ */
-extern wint_t towlower_l();
-extern wint_t towupper_l();
-extern wint_t towctrans_l();
-extern int iswctype_l();
-extern int iswalnum_l();
-extern int iswalpha_l();
-extern int iswcntrl_l();
-extern int iswdigit_l();
-extern int iswgraph_l();
-extern int iswlower_l();
-extern int iswprint_l();
-extern int iswpunct_l();
-extern int iswspace_l();
-extern int iswupper_l();
-extern int iswxdigit_l();
-extern wctrans_t wctrans_l();
-extern wctype_t wctype_l();
-#endif	/* __STDC__ */
 #endif /* defined(_XPG7) || !defined(_STRICT_SYMBOLS) */
 
 #ifdef	__cplusplus

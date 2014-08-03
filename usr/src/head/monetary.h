@@ -20,11 +20,10 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- */
-/*
- * Copyright 2013 Garrett D'Amore <garrett@damore.org>
  */
 
 #ifndef	_MONETARY_H
@@ -37,7 +36,6 @@
 extern "C" {
 #endif
 
-#if defined(__STDC__)
 extern ssize_t	strfmon(char *_RESTRICT_KYWD, size_t,
 			const char *_RESTRICT_KYWD, ...);
 
@@ -50,11 +48,6 @@ typedef struct _locale *locale_t;
 
 extern ssize_t strfmon_l(char *_RESTRICT_KYWD, size_t, locale_t,
 		const char *_RESTRICT_KYWD, ...);
-#endif
-
-#else
-extern ssize_t	strfmon();
-extern ssize_t	strfmon_l();
 #endif
 
 #ifdef __cplusplus

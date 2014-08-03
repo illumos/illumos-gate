@@ -19,14 +19,15 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ */
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
 #ifndef	_MACROS_H
 #define	_MACROS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.3.1.7 */
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -70,17 +71,8 @@ extern struct stat Statbuf;
 
 /*
  *	Use: DEBUG(sum,d) which becomes fprintf(stderr,"sum = %d\n",sum)
- *
- *	Note:	Sccsid[] strings are still supported but not the prefered
- *		method of labeling files.  Use #ident.
  */
-#ifdef	__STDC__
 #define	DEBUG(var, type)	fprintf(stderr, #var "= %" #type "\n", var)
-#define	SCCSID(arg)		static char Sccsid[] = #arg
-#else
-#define	DEBUG(var, type)	fprintf(stderr, "var = %type\n", var)
-#define	SCCSID(arg)		static char Sccsid[] = "arg"
-#endif
 
 /*
  *	Use of ERRABORT() will cause libS.a internal

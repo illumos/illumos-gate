@@ -19,6 +19,8 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -41,7 +43,6 @@ extern "C" {
 /*
  * library functions prototype.
  */
-#if	defined(__STDC__)
 
 extern int setppriv(priv_op_t, priv_ptype_t, const priv_set_t *);
 extern int getppriv(priv_ptype_t, priv_set_t *);
@@ -77,46 +78,6 @@ extern int priv_addset(priv_set_t *, const char *);
 extern void priv_copyset(const priv_set_t *, priv_set_t *);
 extern int priv_delset(priv_set_t *, const char *);
 extern boolean_t priv_ismember(const priv_set_t *, const char *);
-
-#else	/* Non ANSI */
-
-extern int setppriv(/* priv_op_t, priv_ptype_t, const priv_set_t * */);
-extern int getppriv(/* priv_ptype_t, priv_set_t * */);
-extern int setpflags(/* uint_t, uint_t */);
-extern uint_t getpflags(/* uint_t */);
-extern priv_impl_info_t *getprivimplinfo(/* void */);
-
-extern int priv_set(/* priv_op_t, priv_ptype_t, ... */);
-extern boolean_t priv_ineffect(/* const char * */);
-extern priv_set_t *priv_str_to_set(/*
-			    const char *, const char *, const char ** */);
-extern char *priv_set_to_str(/* const priv_set_t *, char, int */);
-
-extern int priv_getbyname(/* const char * */);
-extern char *priv_getbynum(/* int */);
-extern int priv_getsetbyname(/* const char * */);
-extern char *priv_getsetbynum(/* int */);
-extern char *priv_gettext(/* const char * */);
-
-extern priv_set_t *priv_allocset(/* void */);
-extern void priv_freeset(/* priv_set_t * */);
-
-extern void priv_emptyset(/* priv_set_t * */);
-extern void priv_basicset(/* priv_set_t * */);
-extern void priv_fillset(/* priv_set_t * */);
-extern boolean_t priv_isemptyset(/* const priv_set_t * */);
-extern boolean_t priv_isfullset(/* const priv_set_t * */);
-extern boolean_t priv_isequalset(/* const priv_set_t *, const priv_set_t * */);
-extern boolean_t priv_issubset(/* const priv_set_t *, const priv_set_t * */);
-extern void priv_intersect(/* const priv_set_t *, priv_set_t * */);
-extern void priv_union(/* const priv_set_t *, priv_set_t * */);
-extern void priv_inverse(/* priv_set_t * */);
-extern int priv_addset(/* priv_set_t *, const char * */);
-extern void priv_copyset(/* const priv_set_t *, priv_set_t * */);
-extern int priv_delset(/* priv_set_t *, const char * */);
-extern boolean_t priv_ismember(/* const priv_set_t *, const char * */);
-
-#endif	/* __STDC__ */
 
 #ifdef	__cplusplus
 }
