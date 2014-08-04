@@ -29,5 +29,4 @@ preconv_OBJS =	preconv.o
 CFLAGS +=	$(CC_VERBOSE)
 
 CPPFLAGS +=	-DHAVE_CONFIG_H -DUSE_WCHAR	\
-		-DOSNAME="\"illumos\""	\
-		-DVERSION="\"1.12.1\""
+		-DOSNAME="\"illumos\""

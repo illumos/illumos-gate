@@ -10,9 +10,71 @@
  */
 
 /*
- * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  */
 
 /*
- * TBD
+ * Note that we don't document "legacy" libraries that have moved into
+ * libc.  While there will be section 3lib man pages for them, they
+ * won't be referenced in other man pages.
  */
+LINE("libadm",		"General Administrative Library (libadm, \\-ladm)")
+LINE("libbsdmalloc",	"BSD Memory Allocation Library (libbsdmalloc, -lbsdmalloc)")
+LINE("libbsm",		"Security and Auditing Library (libbsm, \\lbsm)")
+LINE("libc",		"Standard C Library (libc, \\-lc)")
+LINE("libc_db",		"Threads Debugging Library (libc_db, \\-lc_db)")
+LINE("libcfgadm",	"Configuration Adminstration Library (libcfgadm, \\-lcfgadm)")
+LINE("libcommputil",	"Communication Protocol Parser Utilities Library (libpcommutil, \\-lcommputil)")
+LINE("libcontract",	"Contract Management Library (libcontract, \\-lcontract)")
+LINE("libcpc",		"CPU Performance Counters Library (libcpc, \\-lcpc)")
+LINE("libcurses",	"Curses Library (libcurses, \\-lcurses)")
+LINE("libdat",		"Direct Access Transport Library (libdat, \\-ldat)")
+LINE("libdevid",	"Device ID Library (libdevid, \\-ldevid)")
+LINE("libdevinfo",	"Device Information Library (libdevinfo, \\-ldevinfo)")
+LINE("libdlpi",		"Data Link Provider Interface (DLPI) Library (libdlp, \\-ldlpi)")
+LINE("libdns_sd",	"DNS Service Discovery Library (libdns_sd, \\-ldns_sd)")
+LINE("libelf",		"ELF Access Library (libelf, \\-lelf)")
+LINE("libexacct",	"Extended Accounting File Access Library (libexacct, \\-lexacct)")
+LINE("libfcoe",		"FCoE Port Management Library (libfcoe, \\-lfcoe)")
+LINE("libfstyp",	"File System Type Identification Library (libfstyp, \\-lfstyp \\-lnvpair)")
+LINE("libgen",		"String Pattern Matching Library (libgen, \\-lgen)")
+LINE("libgss",		"Generic Security Services Library (libgss, \\-lgss)")
+LINE("libiscsit",	"iSCSI Management Library (libiscsit, \\-liscsit)")
+LINE("libkstat",	"Kernel Statistics Library (libkstat, \\-lkstat)")
+LINE("libkvm",		"Kernel VM Library (libkvm, \\-lkvm)")
+LINE("libldap",		"LDAP Library (libldap, \\-lldap)")
+LINE("liblgrp",		"Locality Group Library (liblgrp, -llgrp)")
+LINE("libm",		"Mathematical Library (libm, -lm)")
+LINE("libmail",		"User Mailbox Library (libmail, -lmail)")
+LINE("libmalloc",	"Memory Allocation Library (libmalloc, -lmalloc)")
+LINE("libmd",		"Message Digest Library (libmd, -lmd)")
+LINE("libmp",		"Multiple Precision Library (libmp, -lmp)")
+LINE("libmpapi",	"Common Multipath Management Library (libmpapi, -lMPAPI)")
+LINE("libnsl",		"Network Services Library (libnsl, \\-lnsl)")
+LINE("libnvpair",	"Name-Value Pair Library (libnvpair, \\-lnvpair)")
+LINE("libpam",		"PAM (Pluggable Authentication Module) Library (libpam, \\-lpam)")
+LINE("libpicl",		"PICL Library (libpicl, \\-lpicl)")
+LINE("libpicltree",	"PICL Plug-In Library (libpicltree, \\-lpicltree)")
+LINE("libpkcs11",	"PKCS#11 Cryptographic Framework Library (libpkcs11, \\-lpkcs11)")
+LINE("libpool",		"Pool Configuration Manipulation Library (libpool, \\-lpool)")
+LINE("libproc",		"Process Control Library (libproc, \\-lproc)")
+LINE("libproject",	"Project Database Access Library (libproject, \\-lproject)")
+LINE("libresolv",	"Resolver Library (libresolv, \\-lresolv \\-lsocket \\-lnsl)")
+LINE("librpc",		"RPC Service Library (librpcsvc, \\-lrpc)")
+LINE("librsm",		"Remote Shared Memory Interface Library (librsm, \\-lrsm)")
+LINE("libsasl",		"Simple Authentication and Security Library (libsasl, \\-lsasl)")
+LINE("libscf",		"Service Configuration Facility Library (libscf, \\-lscf)")
+LINE("libsec",		"File Access Control Library (libsec, \\-lsec)")
+LINE("libsecdb",	"Security Attributes Database Library (libsecdb, \\-lsecdb)")
+LINE("libsip",		"Session Initiation Protocol Library (libsip, \\-lsip)")
+LINE("libslp",		"Service Location Protocol Library (libslp, \\-lslp)")
+LINE("libsocket",	"Sockets Library (libsocket, \\-lsocket)")
+LINE("libstmf",		"SCSI Target Mode Framework Library (libstmf, \\-lstmf)")
+LINE("libsysevet",	"System Event Inteface Library (libsysevent, \\-lsysevent)")
+LINE("libtecla",	"Interactive Command Line Input Library (libtecla, \\-ltecla)")
+LINE("libtnfctl",	"TNF Probe Control Library (libtnfctl, \\-ltnfctl)")
+LINE("libtsol",		"Trusted Extensions Library (libtsol, \\-ltsol)")
+LINE("libuuid",		"UUID Library (libuuid, \\-luuid)")
+LINE("libvolmgt",	"Volume Management Library (libvolmgt, \\-lvolmgt)")
+LINE("libxcurses",	"X/Open Curses Library (libxcurses, \\-lxcurses)")
+LINE("libxnet",		"X/Open Networking Library (libxnet, \\-lxnet)")

@@ -18137,6 +18137,7 @@ f usr/share/man/man7d/atge.7d 0444 root bin
 f usr/share/man/man7d/bcm_sata.7d 0444 root bin
 f usr/share/man/man7d/bfe.7d 0444 root bin
 f usr/share/man/man7d/bge.7d 0444 root bin
+f usr/share/man/man7d/blkdev.7d 0444 root bin
 f usr/share/man/man7d/chxge.7d 0444 root bin
 f usr/share/man/man7d/cmdk.7d 0444 root bin
 f usr/share/man/man7d/cpqary3.7d 0444 root bin

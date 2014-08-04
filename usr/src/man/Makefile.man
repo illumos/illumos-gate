@@ -34,9 +34,16 @@ $(ROOTMAN)/man$(MANSECT) $(ROOTHASMAN)/man$(MANSECT):
 $(ROOTMAN)/man$(MANSECT)/% $(ROOTHASMAN)/man$(MANSECT)/%: % $(ROOTMAN)/man$(MANSECT) $(ROOTHASMAN)/man$(MANSECT)
 		$(INS.file)
 
+#
+# Note that new mandoc adds some checks for lots of extra whitespace.
+# We don't want to check our legacy pages for that.  There are thousands
+# and thousands of them in our man pages.  Please still check them
+# manually when editing (git pbchk will do so for you.)
+#
 $(MANCHECKS):
-		@$(ECHO) "checking $(@:%.check=%)"; \
-		$(MANDOC) -Tlint $(@:%.check=%)
+		@$(EGREP) -q "^.TH" $(@:%.check=%) || \
+		( $(ECHO) "checking $(@:%.check=%)"; \
+		$(MANDOC) -Tlint $(@:%.check=%) )
 
 $(MANLINKS):
 		$(RM) $@; $(SYMLINK) $(LINKSRC) $@
