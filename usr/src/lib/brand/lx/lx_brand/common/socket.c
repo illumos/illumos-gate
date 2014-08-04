@@ -751,8 +751,8 @@ convert_sockflags(int lx_flags, char *call)
 	}
 
 	if (lx_flags != 0)
-		lx_unsupported("%s: unknown socket flag(s) 0x%x", lx_flags,
-		    call);
+		lx_unsupported("%s: unknown socket flag(s) 0x%x", call,
+		    lx_flags);
 
 	return (solaris_flags);
 }
