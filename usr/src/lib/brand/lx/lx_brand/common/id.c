@@ -340,11 +340,24 @@ lx_capget(uintptr_t p1, uintptr_t p2)
 	return (0);
 }
 
-/*ARGSUSED*/
 int
 lx_capset(uintptr_t p1, uintptr_t p2)
 {
+	lx_cap_user_header_t ch;
+
+	if ((int)p1 <= 0 || (int)p2 <= 0)
+		return (-EFAULT);
+
+	if (uucopy((void *)p1, &ch, sizeof (ch)) != 0)
+		return (-errno);
+
+	if (ch.version != LX_CAPABILITY_VERSION_1 &&
+	    ch.version != LX_CAPABILITY_VERSION_2 &&
+	    ch.version != LX_CAPABILITY_VERSION_3)
+		return (-EINVAL);
+
 	if (geteuid() == 0)
 		return (0);
+
 	return (-EPERM);
 }
