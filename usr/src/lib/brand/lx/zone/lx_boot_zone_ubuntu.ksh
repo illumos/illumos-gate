@@ -39,6 +39,7 @@ setup_net()
 	    printf("script\n")
 	    printf("    /sbin/ipmgmtd || true\n")
 	    printf("    /sbin/ifconfig-native lo0 plumb\n")
+	    printf("    /sbin/ifconfig-native lo0 up\n")
 	    printf("    /sbin/initctl emit --no-wait net-device-up IFACE=lo LOGICAL=lo ADDRFAM=inet METHOD=loopback || true\n")
 
         } {
