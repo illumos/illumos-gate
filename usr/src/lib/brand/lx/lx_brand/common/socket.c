@@ -1192,7 +1192,10 @@ lx_sendto(ulong_t *args)
 	int nosigpipe = flags & LX_MSG_NOSIGNAL;
 	struct sigaction newact, oact;
 
-	if ((args[4] != NULL) && (args[5] > 0)) {
+	if (args[4] != NULL) {
+		if ((int)args[5] < 0)
+			return (-EINVAL);
+
 		if ((nlen = calc_addr_size((struct sockaddr *)args[4],
 		    (int)args[5], &type)) < 0)
 			return (nlen);
@@ -1592,6 +1595,9 @@ lx_sendmsg(ulong_t *args)
 
 	if ((uucopy((void *)args[1], &msg, sizeof (msg))) != 0)
 		return (-errno);
+
+	if (msg.msg_name != NULL && msg.msg_namelen < sizeof (struct sockaddr))
+		return (-EINVAL);
 
 	/*
 	 * If there are control messages bundled in this message, we need
