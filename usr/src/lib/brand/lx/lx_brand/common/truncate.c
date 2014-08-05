@@ -39,6 +39,9 @@
 int
 lx_truncate(uintptr_t path, uintptr_t length)
 {
+	if ((off_t)length >= 0xffffffffUL)
+		return (-EFBIG);
+
 	return (truncate((const char *)path, (off_t)length) == 0 ? 0 : -errno);
 }
 
@@ -46,6 +49,9 @@ int
 lx_ftruncate(uintptr_t fd, uintptr_t length)
 {
 	int r;
+
+	if ((off_t)length >= 0xffffffffUL)
+		return (-EFBIG);
 
 	r = ftruncate((int)fd, (off_t)length);
 	/*
@@ -71,16 +77,24 @@ lx_ftruncate(uintptr_t fd, uintptr_t length)
 int
 lx_truncate64(uintptr_t path, uintptr_t length_lo, uintptr_t length_hi)
 {
-	return (truncate64((const char *)path,
-	    LX_32TO64(length_lo, length_hi)) == 0 ? 0 : -errno);
+	uint64_t len = LX_32TO64(length_lo, length_hi);
+
+	if (len >= 0x7fffffffffffffffULL)
+		return (-EFBIG);
+
+	return (truncate64((const char *)path, len) == 0 ? 0 : -errno);
 }
 
 int
 lx_ftruncate64(uintptr_t fd, uintptr_t length_lo, uintptr_t length_hi)
 {
 	int r;
+	uint64_t len = LX_32TO64(length_lo, length_hi);
 
-	r = ftruncate64((int)fd, LX_32TO64(length_lo, length_hi));
+	if (len >= 0x7fffffffffffffffULL)
+		return (-EFBIG);
+
+	r = ftruncate64((int)fd, len);
 	/*
 	 * On Linux, truncating a file opened read-only returns EINVAL whereas
 	 * Illumos returns EBADF.
