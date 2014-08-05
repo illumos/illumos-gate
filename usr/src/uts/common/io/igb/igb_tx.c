@@ -54,12 +54,16 @@ mblk_t *
 igb_tx_ring_send(void *arg, mblk_t *mp)
 {
 	igb_tx_ring_t *tx_ring = (igb_tx_ring_t *)arg;
+	igb_t *igb;
 
 	ASSERT(tx_ring != NULL);
 
+	igb = tx_ring->igb;
+
 	if ((tx_ring->igb->igb_state & IGB_SUSPENDED) ||
 	    (tx_ring->igb->igb_state & IGB_ERROR) ||
-	    !(tx_ring->igb->igb_state & IGB_STARTED)) {
+	    !(tx_ring->igb->igb_state & IGB_STARTED) ||
+	    igb->link_state != LINK_STATE_UP) {
 		freemsg(mp);
 		return (NULL);
 	}
