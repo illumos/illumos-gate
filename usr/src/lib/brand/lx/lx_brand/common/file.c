@@ -725,19 +725,41 @@ lx_linkat(uintptr_t ext1, uintptr_t p1, uintptr_t ext2, uintptr_t p2,
 	 * symlink and there is no obvious way to trigger the other behaviour.
 	 * So for now we just ignore this flag and act like link().
 	 */
-	/* LINTED [set but not used in function] */
 	int flag = p3;
 
-	if (flag != p3)
-		return (flag); /* workaround */
+	/* return proper error for invalid flags */
+	if ((flag & ~(LX_AT_SYMLINK_FOLLOW | LX_AT_EMPTY_PATH)) != 0)
+		return (-EINVAL);
 
 	ret = getpathat(atfd1, p1, pathbuf1, sizeof (pathbuf1));
-	if (ret < 0)
+	if (ret < 0) {
+		if (ret == -EBADF) {
+			/*
+			 * Try to figure out correct Linux errno. We know path
+			 * is relative. Check if we have a fd for a dir which
+			 * has been removed.
+			 */
+			if (atfd1 != -1 && lx_fd_to_path(atfd1, pathbuf1,
+			    sizeof (pathbuf1)) == NULL)
+				ret = -ENOENT;
+		}
 		return (ret);
+	}
 
 	ret = getpathat(atfd2, p2, pathbuf2, sizeof (pathbuf2));
-	if (ret < 0)
+	if (ret < 0) {
+		if (ret == -EBADF) {
+			/*
+			 * Try to figure out correct Linux errno. We know path
+			 * is relative. Check if we have a fd for a dir which
+			 * has been removed.
+			 */
+			if (atfd2 != -1 && lx_fd_to_path(atfd2, pathbuf2,
+			    sizeof (pathbuf2)) == NULL)
+				ret = -ENOENT;
+		}
 		return (ret);
+	}
 
 	return (lx_link((uintptr_t)pathbuf1, (uintptr_t)pathbuf2));
 }
