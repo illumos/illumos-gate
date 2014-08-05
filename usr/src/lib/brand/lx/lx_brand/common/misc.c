@@ -277,6 +277,10 @@ lx_setgroups16(uintptr_t p1, uintptr_t p2)
 	for (i = 0; i < count; i++)
 		grouplist32[i] = LX_GID16_TO_GID32(grouplist[i]);
 
+	/* order matters here to get the correct errno back */
+	if (count > NGROUPS_MAX_DEFAULT)
+		return (-EINVAL);
+
 	return (setgroups(count, grouplist32) ? -errno : 0);
 }
 
@@ -520,6 +524,10 @@ lx_setgroups(uintptr_t p1, uintptr_t p2)
 				glist[i] = MAXUID;
 		}
 	}
+
+	/* order matters here to get the correct errno back */
+	if (ng > NGROUPS_MAX_DEFAULT)
+		return (-EINVAL);
 
 	r = syscall(SYS_brand, B_EMULATE_SYSCALL + LX_SYS_setgroups32,
 	    ng, glist);
