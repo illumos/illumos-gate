@@ -54,7 +54,8 @@ using std::isupper;
 using std::isxdigit;
 using std::tolower;
 using std::toupper;
-#if _cplusplus >= 201103L
+#if (__cplusplus >= 201103L) || defined(_STDC_C99) || defined(_XPG6) || \
+	!defined(_STRICT_SYMBOLS)
 using std::isblank;
 #endif
 #endif
