@@ -171,6 +171,7 @@ int lx_verbose = 0;		/* verbose mode enabled if non-zero */
 int lx_debug_enabled = 0;	/* debugging output enabled if non-zero */
 
 pid_t zoneinit_pid;		/* zone init PID */
+long max_pid;			/* native maximum PID */
 
 thread_key_t lx_tsd_key;
 
@@ -674,6 +675,9 @@ lx_init(int argc, char *argv[], char *envp[])
 		lx_verbose = 1;
 		lx_debug("VERBOSE mode enabled.\n");
 	}
+
+	/* needed in wait4(), get it once since it never changes */
+	max_pid = sysconf(_SC_MAXPID);
 
 	(void) strlcpy(lx_cmd_name, basename(argv[0]), sizeof (lx_cmd_name));
 	lx_debug("executing linux process: %s", argv[0]);

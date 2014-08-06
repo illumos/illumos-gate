@@ -98,6 +98,8 @@
 #define	LX_P_PID	0x1
 #define	LX_P_GID	0x2
 
+extern long max_pid;
+
 static int
 ltos_options(uintptr_t options)
 {
@@ -218,6 +220,9 @@ lx_wait4(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4)
 
 	if ((options = ltos_options(p3)) == -1)
 		return (-EINVAL);
+
+	if (pid > max_pid)
+		return (-ECHILD);
 
 	/*
 	 * While not listed as a valid return code, Linux's wait4(2) does,
