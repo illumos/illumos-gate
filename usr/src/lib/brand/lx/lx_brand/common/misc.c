@@ -251,14 +251,20 @@ lx_getgroups16(uintptr_t p1, uintptr_t p2)
 	int ret;
 	int i;
 
+	if (count < 0)
+		return (-EINVAL);
+
 	grouplist32 = SAFE_ALLOCA(count * sizeof (gid_t));
-	if (grouplist32 == NULL)
+	if (grouplist32 == NULL && count > 0)
 		return (-ENOMEM);
 	if ((ret = getgroups(count, grouplist32)) < 0)
 		return (-errno);
 
-	for (i = 0; i < ret; i++)
-		grouplist[i] = LX_GID32_TO_GID16(grouplist32[i]);
+	/* we must not modify the list if the incoming count was 0 */
+	if (count > 0) {
+		for (i = 0; i < ret; i++)
+			grouplist[i] = LX_GID32_TO_GID16(grouplist32[i]);
+	}
 
 	return (ret);
 }
