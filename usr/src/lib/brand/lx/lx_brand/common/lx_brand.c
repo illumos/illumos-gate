@@ -922,7 +922,6 @@ lx_##name(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,	\
 
 IN_KERNEL_SYSCALL(kill, 37)
 IN_KERNEL_SYSCALL(brk, 45)
-IN_KERNEL_SYSCALL(ustat, 62)
 IN_KERNEL_SYSCALL(getppid, 64)
 IN_KERNEL_SYSCALL(sysinfo, 116)
 IN_KERNEL_SYSCALL(modify_ldt, 123)
@@ -1001,7 +1000,7 @@ static struct lx_sysent sysents[] = {
 	{"olduname",	NULL,		NOSYS_OBSOLETE,	0},	/* 59 */
 	{"umask",	(int (*)())umask, SYS_PASSTHRU,	1},	/* 60 */
 	{"chroot",	chroot,		SYS_PASSTHRU,	1},	/* 61 */
-	{"ustat",	lx_ustat,	0,		2},	/* 62 */
+	{"ustat",	NULL,		NOSYS_OBSOLETE,	2},	/* 62 */
 	{"dup2",	lx_dup2,	0,		2},	/* 63 */
 	{"getppid",	lx_getppid,	0,		0},	/* 64 */
 	{"getpgrp",	lx_getpgrp,	0,		0},	/* 65 */
