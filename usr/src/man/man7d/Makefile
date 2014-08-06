@@ -229,7 +229,6 @@ i386_MANFILES=	ahci.7d		\
 		rwd.7d		\
 		rwn.7d		\
 		sda.7d		\
-		sdcard.7d	\
 		sdhost.7d	\
 		si3124.7d	\
 		smbios.7d	\

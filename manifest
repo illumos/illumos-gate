@@ -18212,7 +18212,6 @@ f usr/share/man/man7d/scsa1394.7d 0444 root bin
 f usr/share/man/man7d/scsa2usb.7d 0444 root bin
 f usr/share/man/man7d/sd.7d 0444 root bin
 f usr/share/man/man7d/sda.7d 0444 root bin
-f usr/share/man/man7d/sdcard.7d 0444 root bin
 f usr/share/man/man7d/sdhost.7d 0444 root bin
 f usr/share/man/man7d/sdt.7d 0444 root bin
 f usr/share/man/man7d/ses.7d 0444 root bin
