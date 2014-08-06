@@ -703,8 +703,19 @@ lx_symlinkat(uintptr_t p1, uintptr_t ext1, uintptr_t p2)
 	int ret;
 
 	ret = getpathat(atfd, p2, pathbuf, sizeof (pathbuf));
-	if (ret < 0)
+	if (ret < 0) {
+		if (ret == -EBADF) {
+			/*
+			 * Try to figure out correct Linux errno. We know path
+			 * is relative. Check if we have a fd for a dir which
+			 * has been removed.
+			 */
+			if (atfd != -1 && lx_fd_to_path(atfd, pathbuf,
+			    sizeof (pathbuf)) == NULL)
+				ret = -ENOENT;
+		}
 		return (ret);
+	}
 
 	return (symlink((char *)p1, pathbuf) ? -errno : 0);
 }
