@@ -515,9 +515,11 @@ lx_getrusage(uintptr_t p1, uintptr_t p2)
 	int rv, swho;
 
 	if (who == LX_RUSAGE_SELF)
-		swho = _RUSAGESYS_GETRUSAGE;
+		swho = RUSAGE_SELF;
 	else if (who == LX_RUSAGE_CHILDREN)
-		swho = _RUSAGESYS_GETRUSAGE_CHLD;
+		swho = RUSAGE_CHILDREN;
+	else if (who == LX_RUSAGE_THREAD)
+		swho = RUSAGE_LWP;
 	else
 		return (-EINVAL);
 

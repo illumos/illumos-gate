@@ -102,6 +102,8 @@ extern boolean_t lx_is_rpm;
  */
 #define	LX_RUSAGE_SELF		0
 #define	LX_RUSAGE_CHILDREN	(-1)
+#define	LX_RUSAGE_BOTH		(-2)
+#define	LX_RUSAGE_THREAD	1
 
 /*
  * Constants for prctl().  We only include the ones here that we actually
