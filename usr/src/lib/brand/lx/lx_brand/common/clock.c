@@ -22,9 +22,8 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2014 Joyent, Inc.  All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <errno.h>
 #include <string.h>
@@ -84,6 +83,10 @@ lx_clock_getres(int clock, struct timespec *tp)
 
 	if (clock_getres(ltos_clock[clock], &ts) < 0)
 		return (-errno);
+
+	/* the timespec pointer is allowed to be NULL */
+	if (tp == NULL)
+		return (0);
 
 	return ((uucopy(&ts, tp, sizeof (struct timespec)) < 0) ? -EFAULT : 0);
 }
