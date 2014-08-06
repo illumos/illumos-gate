@@ -12,7 +12,7 @@
 #
 # Copyright 2011, Richard Lowe
 # Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
-# Copyright 2013 Garrett D'Amore <garrett@damore.org>
+# Copyright 2014 Garrett D'Amore <garrett@damore.org>
 #
 
 include		$(SRC)/Makefile.master
@@ -30,6 +30,7 @@ _MANFILES=	aac.7d		\
 		audiots.7d	\
 		av1394.7d	\
 		bge.7d		\
+		blkdev.7d	\
 		bscv.7d		\
 		chxge.7d	\
 		console.7d	\
@@ -227,7 +228,6 @@ i386_MANFILES=	ahci.7d		\
 		rwd.7d		\
 		rwn.7d		\
 		sda.7d		\
-		sdcard.7d	\
 		sdhost.7d	\
 		si3124.7d	\
 		smbios.7d	\

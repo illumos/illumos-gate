@@ -20,20 +20,6 @@ The \fBsdhost\fR driver supports Secure Digital (SD) standard media slots
 commonly found on mobile computers.
 .SH FILES
 .sp
-.LP
-Memory card device files are created by the \fBsdcard\fR(7D) driver. An
-attachment point device file is created for each physical slot on the system:
-.sp
-.ne 2
-.na
-\fB\fB/dev/sdcardx/y\fR\fR
-.ad
-.RS 30n
-Attachment point for slot \fIy\fR on controller \fIx\fR. Typically this is
-named \fB/dev/sdcard0/0\fR.
-.RE
-
-.sp
 .ne 2
 .na
 \fB\fB/kernel/drv/sdhost\fR\fR
@@ -51,15 +37,6 @@ named \fB/dev/sdcard0/0\fR.
 64-bit ELF kernel module (x86).
 .RE
 
-.sp
-.ne 2
-.na
-\fB\fB/kernel/drv/sparcv9/sdhost\fR\fR
-.ad
-.RS 30n
-64-bit ELF kernel module (SPARC).
-.RE
-
 .SH ATTRIBUTES
 .sp
 .LP
@@ -73,16 +50,10 @@ c | c
 l | l .
 ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Architecture	SPARC, x86
+Architecture	x86
 .TE
 
 .SH SEE ALSO
 .sp
 .LP
-\fBcfgadm_sdcard\fR(1M), \fBattributes\fR(5), \fBsda\fR(7D), \fBsdcard\fR(7D)
-.sp
-.LP
-\fISystem Administration Guide, Volume I\fR
-.sp
-.LP
-\fISystem Administration Guide: Basic Administration\fR
+\fBattributes\fR(5), \fBsda\fR(7D)

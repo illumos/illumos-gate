@@ -69,7 +69,6 @@ _MANFILES=	6to4relay.1m		\
 		cfgadm_sata.1m		\
 		cfgadm_sbd.1m		\
 		cfgadm_scsi.1m		\
-		cfgadm_sdcard.1m	\
 		cfgadm_sysctrl.1m	\
 		cfgadm_usb.1m		\
 		cfsadmin.1m		\

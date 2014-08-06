@@ -30,15 +30,6 @@ MultiMediaCard (MMC) slot and card device drivers.
 64-bit ELF kernel module (x86).
 .RE
 
-.sp
-.ne 2
-.na
-\fB\fB/kernel/misc/sparcv9/sda\fR\fR
-.ad
-.RS 28n
-64-bit ELF kernel module (SPARC).
-.RE
-
 .SH ATTRIBUTES
 .sp
 .LP
@@ -52,20 +43,13 @@ c | c
 l | l .
 ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Architecture	SPARC, x86
+Architecture	x86
 .TE
 
 .SH SEE ALSO
 .sp
 .LP
-\fBcfgadm_sdcard\fR(1M), \fBattributes\fR(5), \fBblk2scsa\fR(7D), \fBsd\fR(7D),
-\fBsdcard\fR(7D), \fBsdhost\fR(7D), \fBscsa2usb\fR(7D), \fBwbsd\fR(7D)
-.sp
-.LP
-\fISystem Administration Guide, Volume I\fR
-.sp
-.LP
-\fISystem Administration Guide: Basic Administration\fR
+\fBattributes\fR(5), \fBsdhost\fR(7D)
 .SH NOTES
 .sp
 .LP

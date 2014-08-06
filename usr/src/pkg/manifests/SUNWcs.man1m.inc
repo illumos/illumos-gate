@@ -45,7 +45,6 @@ file path=usr/share/man/man1m/cfgadm_pci.1m
 file path=usr/share/man/man1m/cfgadm_sata.1m
 file path=usr/share/man/man1m/cfgadm_sbd.1m
 file path=usr/share/man/man1m/cfgadm_scsi.1m
-file path=usr/share/man/man1m/cfgadm_sdcard.1m
 file path=usr/share/man/man1m/cfgadm_sysctrl.1m
 file path=usr/share/man/man1m/cfgadm_usb.1m
 file path=usr/share/man/man1m/cfsadmin.1m
