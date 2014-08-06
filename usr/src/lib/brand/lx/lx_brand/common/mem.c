@@ -47,6 +47,9 @@ int pagesize;	/* needed for mmap2() */
 #define	LX_MAP_LOCKED		0x02000
 #define	LX_MAP_NORESERVE	0x04000
 
+#define	LX_MADV_REMOVE		9
+#define	LX_MADV_DONTFORK	10
+#define	LX_MADV_DOFORK		11
 #define	LX_MADV_MERGEABLE	12
 #define	LX_MADV_UNMERGEABLE	13
 #define	LX_MADV_HUGEPAGE	14
@@ -181,9 +184,8 @@ lx_msync(uintptr_t addr, uintptr_t len, uintptr_t flags)
 }
 
 /*
- * Solaris recognizes more flags than Linux, so we don't want to inadvertently
- * use what would be an invalid flag on Linux.  Linux also allows the length to
- * be zero, while Solaris does not.
+ * Illumos and Linux overlap on the basic flags, and are disjoint on the rest.
+ * Linux also allows the length to be zero, while Illumos does not.
  */
 int
 lx_madvise(uintptr_t start, uintptr_t len, uintptr_t advice)
@@ -193,12 +195,17 @@ lx_madvise(uintptr_t start, uintptr_t len, uintptr_t advice)
 	if (len == 0)
 		return (0);
 
+	/* approximately similar */
+	if (advice == LX_MADV_REMOVE)
+		advice = MADV_FREE;
+
 	switch (advice) {
 	case MADV_NORMAL:
 	case MADV_RANDOM:
 	case MADV_SEQUENTIAL:
 	case MADV_WILLNEED:
 	case MADV_DONTNEED:
+	case MADV_FREE:
 		ret = madvise((void *)start, len, advice);
 		if (ret == -1) {
 			if (errno == EBUSY)
@@ -208,13 +215,16 @@ lx_madvise(uintptr_t start, uintptr_t len, uintptr_t advice)
 			return (0);
 		}
 
-	/* pretend these work */
+	/* harmless to pretend these work */
+	case LX_MADV_DONTFORK:
+	case LX_MADV_DOFORK:
 	case LX_MADV_HUGEPAGE:
 	case LX_MADV_NOHUGEPAGE:
 	case LX_MADV_DONTDUMP:
 	case LX_MADV_DODUMP:
 		return (0);
 
+	/* we'll return an error for the rest of the Linux flags */
 	default:
 		return (-EINVAL);
 	}
