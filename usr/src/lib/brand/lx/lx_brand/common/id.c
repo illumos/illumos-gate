@@ -26,6 +26,8 @@
  */
 
 #include <sys/types.h>
+#include <fcntl.h>
+#include <procfs.h>
 #include <sys/systm.h>
 #include <sys/errno.h>
 #include <sys/zone.h>
@@ -318,14 +320,49 @@ lx_capget(uintptr_t p1, uintptr_t p2)
 	if (cdp == 0)
 		return (0);
 
+	if (ch.pid < 0)
+		return (-EINVAL);
+
 	if (geteuid() == 0) {
-		/* root, you have all capabilities */
-		cd.effective = LX_ALL_CAPABILITIES;
-		cd.permitted = LX_ALL_CAPABILITIES;
-		cd.inheritable = 0;
+		if (ch.pid == getpid() || ch.pid == 0) {
+			/* root (or emulate pid 0), have all capabilities */
+			cd.effective = LX_ALL_CAPABILITIES;
+			cd.permitted = LX_ALL_CAPABILITIES;
+			cd.inheritable = 0;
+		} else {
+			int fd;
+			char path[MAXPATHLEN];
+			psinfo_t psinfo;
+
+			/* check the given pid */
+			(void) snprintf(path, sizeof (path),
+			    "/native/proc/%d/psinfo", ch.pid);
+
+			if ((fd = open(path, O_RDONLY)) < 0)
+				return (-ESRCH);
+
+			if (read(fd, &psinfo, sizeof (psinfo)) !=
+			    sizeof (psinfo)) {
+				(void) close(fd);
+				return (-ESRCH);
+			}
+			(void) close(fd);
+
+			if (psinfo.pr_euid == 0) {
+				/* root, it has all capabilities */
+				cd.effective = LX_ALL_CAPABILITIES;
+				cd.permitted = LX_ALL_CAPABILITIES;
+				cd.inheritable = 0;
+			} else {
+				/* not root, it has no capabilities */
+				cd.effective = 0;
+				cd.permitted = 0;
+				cd.inheritable = 0;
+			}
+		}
 	} else {
-		/* not root and trying to set another process's capabilities */
-		if (ch.pid != 0)
+		/* not root and trying to get another process's capabilities */
+		if (ch.pid != getpid())
 			return (-EPERM);
 
 		/* not root, you have no capabilities */
