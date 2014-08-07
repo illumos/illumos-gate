@@ -680,6 +680,14 @@ lx_ioctl(uintptr_t p1, uintptr_t p2, uintptr_t p3)
 		return (ret);
 	}
 
+	/*
+	 * errno tweaking which some test cases expect because kernel
+	 * version 2.6.39 changed the returned errno from EINVAL to
+	 * ENOTTY (see LTP sockioctl01 test cases).
+	 */
+	if (cmd == LX_SIOCATMARK && (stat.st_mode & S_IFMT) != S_IFSOCK)
+		return (-ENOTTY);
+
 	lx_ioctl_msg(fd, cmd, NULL, &stat,
 	    "lx_ioctl(): unsupported linux ioctl");
 	lx_unsupported("unsupported linux ioctl 0x%x", cmd);
@@ -743,8 +751,8 @@ ict_sioifoob(int fd, struct stat *stat, int cmd, char *cmd_str, intptr_t arg)
 	len = sizeof (val);
 
 	/*
-	 * Linux expects a SIOCATMARK of a UDP socket to return EINVAL, while
-	 * Solaris allows it.
+	 * Linux expects a SIOCATMARK of a UDP socket to return ENOTTY, while
+	 * Illumos allows it. Linux prior to 2.6.39 returned EINVAL for this.
 	 */
 	if (getsockopt(fd, SOL_SOCKET, SO_TYPE, &val, &len) < 0) {
 		lx_debug("ict_siofmark: getsockopt failed, errno %d", errno);
@@ -752,7 +760,7 @@ ict_sioifoob(int fd, struct stat *stat, int cmd, char *cmd_str, intptr_t arg)
 	}
 
 	if ((len != sizeof (val)) || (val != SOCK_STREAM))
-		return (-EINVAL);
+		return (-ENOTTY);
 
 	if (ioctl(fd, cmd, &req) < 0)
 		return (-errno);
