@@ -348,6 +348,11 @@ set_rctl(char *rctl, uint64_t value, rctl_priv_t priv)
 		if (rctlblk_get_value(oblk) == value)
 			return (0);
 
+		/* non-root cannot raise privileged limit */
+		if (priv == RCPRIV_PRIVILEGED && geteuid() != 0 &&
+		    value > rctlblk_get_value(oblk))
+			return (-EPERM);
+
 		bcopy(oblk, nblk, rctlblk_size());
 		rctlblk_set_value(nblk, value);
 		if (setrctl(rctl, oblk, nblk, RCTL_REPLACE) == -1)
@@ -412,6 +417,13 @@ setrlimit_common(int resource, uint64_t rlim_cur, uint64_t rlim_max)
 	if (strcmp(rctl, "process.max-sigqueue-size") == 0 && rlim_max > 8192)
 		return (0);
 
+	/*
+	 * Linux limits the max number of open files to 1m and there is a test
+	 * for this.
+	 */
+	if (resource == LX_RLIMIT_NOFILE && rlim_max > (1024 * 1024))
+		return (-EPERM);
+
 	if ((rv = set_rctl(rctl, rlim_max, RCPRIV_PRIVILEGED)) != 0)
 		return (rv);
 
@@ -441,7 +453,7 @@ lx_setrlimit(uintptr_t p1, uintptr_t p2)
 	if (rl.rlim_max == LX_RLIM_INFINITY_N)
 		rlim_max = LX_RLIM64_INFINITY;
 	else
-		rlim_max = rl.rlim_cur;
+		rlim_max = rl.rlim_max;
 
 	return (setrlimit_common(resource, rlim_cur, rlim_max));
 }
