@@ -41,6 +41,7 @@ file path=usr/share/man/man4/exec_attr.4
 file path=usr/share/man/man4/format.dat.4
 file path=usr/share/man/man4/fspec.4
 file path=usr/share/man/man4/fstypes.4
+file path=usr/share/man/man4/ftpusers.4
 file path=usr/share/man/man4/fx_dptbl.4
 file path=usr/share/man/man4/group.4
 file path=usr/share/man/man4/hosts.4

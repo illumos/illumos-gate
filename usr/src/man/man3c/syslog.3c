@@ -34,7 +34,6 @@ syslog, openlog, closelog, setlogmask \- control system log
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBsyslog()\fR function sends a message to \fBsyslogd\fR(1M), which,
 depending on the configuration of \fB/etc/syslog.conf\fR, logs it in an
@@ -177,7 +176,7 @@ The mail system.
 \fB\fBLOG_DAEMON\fR\fR
 .ad
 .RS 14n
-System daemons, such as \fBin.ftpd\fR(1M).
+System daemons.
 .RE
 
 .sp
@@ -394,12 +393,10 @@ macro \fBLOG_MASK(\fIpri\fR)\fR; the mask for all priorities up to and
 including \fItoppri\fR is given by the macro \fBLOG_UPTO(\fItoppri\fR)\fR. The
 default log mask allows all priorities to be logged.
 .SH RETURN VALUES
-.sp
 .LP
 The \fBsetlogmask()\fR function returns the previous log priority mask. The
 \fBcloselog()\fR, \fBopenlog()\fR and \fBsyslog()\fR functions return no value.
 .SH ERRORS
-.sp
 .LP
 No errors are defined.
 .SH EXAMPLES
@@ -475,7 +472,6 @@ other messages to the facility  \fBLOG_LOCAL2\fR are:
 .sp
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -495,9 +491,8 @@ Standard	See \fBstandards\fR(5).
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBat\fR(1), \fBcrontab\fR(1), \fBlogger\fR(1), \fBlogin\fR(1), \fBlpc\fR(1B),
 \fBlpr\fR(1B), \fBauditd\fR(1M), \fBcron\fR(1M), \fBgetty\fR(1M),
-\fBin.ftpd\fR(1M), \fBsu\fR(1M), \fBsyslogd\fR(1M), \fBprintf\fR(3UCB),
+\fBsu\fR(1M), \fBsyslogd\fR(1M), \fBprintf\fR(3UCB),
 \fBsyslog.conf\fR(4), \fBattributes\fR(5), \fBstandards\fR(5)

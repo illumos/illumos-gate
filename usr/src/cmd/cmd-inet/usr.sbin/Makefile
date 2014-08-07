@@ -61,12 +61,12 @@ K5RSHDOBJS=	in.rshd.o
 K5TELNETOBJS=	in.telnetd.o
 SRCS=		$(PROGSRCS) $(OTHERSRC)
 
-SUBDIRS=	bootconfchk htable ifconfig ilbadm in.ftpd in.rdisc in.routed \
+SUBDIRS=	bootconfchk htable ifconfig ilbadm in.rdisc in.routed \
 		in.talkd inetadm inetconv ipadm ipmpstat ipqosconf ipsecutils \
 		kssl/kssladm kssl/ksslcfg nwamadm nwamcfg ping routeadm \
 		snoop sppptun traceroute wificonfig
 
-MSGSUBDIRS=	bootconfchk htable ifconfig ilbadm in.ftpd in.routed in.talkd \
+MSGSUBDIRS=	bootconfchk htable ifconfig ilbadm in.routed in.talkd \
 		inetadm inetconv ipadm ipmpstat ipqosconf ipsecutils \
 		kssl/ksslcfg nwamadm nwamcfg routeadm sppptun snoop wificonfig
 

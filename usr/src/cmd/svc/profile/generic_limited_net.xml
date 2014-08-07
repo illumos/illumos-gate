@@ -206,9 +206,6 @@
   <service name='network/finger' version='1' type='service'>
     <instance name='default' enabled='false'/>
   </service>
-  <service name='network/ftp' version='1' type='service'>
-    <instance name='default' enabled='false'/>
-  </service>
   <service name='network/login' version='1' type='service'>
     <instance name='rlogin'  enabled='false'/>
     <instance name='klogin'  enabled='false'/>
