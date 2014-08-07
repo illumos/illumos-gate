@@ -21,9 +21,8 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2014 Joyent, Inc.  All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/systm.h>
@@ -73,19 +72,23 @@ lx_set_thread_area(struct ldt_info *inf)
 	int entry;
 	int i;
 
+	/* Check that casts for accessing the words in user_desc are valid */
+	ASSERT(sizeof (user_desc_t) == 8);
+
 	if (copyin(inf, &ldt_inf, sizeof (ldt_inf)))
 		return (set_errno(EFAULT));
 
 	entry = ldt_inf.entry_number;
 	if (entry == -1) {
 		/*
-		 * find an empty entry in the tls for this thread
+		 * Find an empty entry in the tls for this thread.
+		 * The casts assume each user_desc_t entry is 8 bytes.
 		 */
-		for (i = 0, dscrp = jlwp->br_tls;
-					i < LX_TLSNUM; i++, dscrp++)
-			if (((unsigned long *)dscrp)[0] == 0 &&
-			    ((unsigned long *)dscrp)[1] == 0)
+		for (i = 0, dscrp = jlwp->br_tls; i < LX_TLSNUM; i++, dscrp++) {
+			if (((uint_t *)dscrp)[0] == 0 &&
+			    ((uint_t *)dscrp)[1] == 0)
 				break;
+		}
 
 		if (i < LX_TLSNUM) {
 			/*
@@ -108,8 +111,8 @@ lx_set_thread_area(struct ldt_info *inf)
 	dscrp = jlwp->br_tls + entry - GDT_TLSMIN;
 
 	if (LDT_INFO_EMPTY(&ldt_inf)) {
-		((unsigned long *)dscrp)[0] = 0;
-		((unsigned long *)dscrp)[1] = 0;
+		((uint_t *)dscrp)[0] = 0;
+		((uint_t *)dscrp)[1] = 0;
 	} else {
 		LDT_INFO_TO_DESC(&ldt_inf, dscrp);
 	}
