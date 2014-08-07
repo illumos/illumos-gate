@@ -1193,7 +1193,7 @@ static struct lx_sysent sysents[] = {
 	{"group_exit",	lx_group_exit,	0,		1},	/* 252 */
 	{"lookup_dcookie", NULL,	NOSYS_NO_EQUIV,	0},	/* 253 */
 	{"epoll_create", epoll_create,	SYS_PASSTHRU,	1},	/* 254 */
-	{"epoll_ctl",	epoll_ctl,	SYS_PASSTHRU,	4},	/* 255 */
+	{"epoll_ctl",	lx_epoll_ctl,	0,		4},	/* 255 */
 	{"epoll_wait",	epoll_wait,	SYS_PASSTHRU,	4},	/* 256 */
 	{"remap_file_pages", NULL,	NOSYS_NO_EQUIV,	0},	/* 257 */
 	{"set_tid_address", lx_set_tid_address,	0,	1},	/* 258 */

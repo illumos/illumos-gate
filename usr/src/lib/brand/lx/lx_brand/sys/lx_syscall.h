@@ -92,6 +92,7 @@ extern int lx_select(uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t);
 extern int lx_pselect6(uintptr_t, uintptr_t, uintptr_t, uintptr_t,
     uintptr_t, uintptr_t);
 extern int lx_poll(uintptr_t, uintptr_t, uintptr_t);
+extern int lx_epoll_ctl(uintptr_t, uintptr_t, uintptr_t, uintptr_t);
 extern int lx_oldgetrlimit(uintptr_t, uintptr_t);
 extern int lx_getrlimit(uintptr_t, uintptr_t);
 extern int lx_setrlimit(uintptr_t, uintptr_t);
