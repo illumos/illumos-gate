@@ -1420,7 +1420,7 @@ cmi_hdl_rele(cmi_hdl_t ophdl)
 	cmi_hdl_impl_t *hdl = IMPLHDL(ophdl);
 
 	ASSERT(*hdl->cmih_refcntp > 0);
-	(void) atomic_dec_32_nv(hdl->cmih_refcntp);
+	atomic_dec_32(hdl->cmih_refcntp);
 }
 
 void
@@ -1431,7 +1431,7 @@ cmi_hdl_destroy(cmi_hdl_t ophdl)
 
 	/* Release the reference count held by cmi_hdl_create(). */
 	ASSERT(*hdl->cmih_refcntp > 0);
-	(void) atomic_dec_32_nv(hdl->cmih_refcntp);
+	atomic_dec_32(hdl->cmih_refcntp);
 	hdl->cmih_flags |= CMIH_F_DEAD;
 
 	ent = cmi_hdl_ent_lookup(hdl->cmih_chipid, hdl->cmih_coreid,

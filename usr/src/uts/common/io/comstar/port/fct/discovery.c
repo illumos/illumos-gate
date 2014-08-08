@@ -1160,7 +1160,7 @@ fct_register_remote_port(fct_local_port_t *port, fct_remote_port_t *rp,
 		iport->iport_rp_slots[rp->rp_handle] = irp;
 		atomic_or_32(&irp->irp_flags, IRP_HANDLE_OPENED);
 	}
-	(void) atomic_inc_64_nv(&iport->iport_last_change);
+	atomic_inc_64(&iport->iport_last_change);
 	fct_log_remote_port_event(port, ESC_SUNFC_TARGET_ADD,
 	    rp->rp_pwwn, rp->rp_id);
 
@@ -1205,7 +1205,7 @@ fct_deregister_remote_port(fct_local_port_t *port, fct_remote_port_t *rp)
 		atomic_and_32(&irp->irp_flags, ~IRP_HANDLE_OPENED);
 		iport->iport_rp_slots[rp->rp_handle] = NULL;
 	}
-	(void) atomic_inc_64_nv(&iport->iport_last_change);
+	atomic_inc_64(&iport->iport_last_change);
 	fct_log_remote_port_event(port, ESC_SUNFC_TARGET_REMOVE,
 	    rp->rp_pwwn, rp->rp_id);
 
