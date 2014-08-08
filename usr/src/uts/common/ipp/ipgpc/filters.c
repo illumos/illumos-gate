@@ -275,7 +275,7 @@ initialize_ba_tables(void)
 static void
 element_node_ref(element_node_t *element)
 {
-	atomic_add_32(&element->element_refcnt, 1);
+	atomic_inc_32(&element->element_refcnt);
 	ASSERT(element->element_refcnt > 1);
 }
 
@@ -283,7 +283,7 @@ static void
 element_node_unref(element_node_t *element)
 {
 	ASSERT(element->element_refcnt > 0);
-	if (atomic_add_32_nv(&element->element_refcnt, -1) == 0) {
+	if (atomic_dec_32_nv(&element->element_refcnt) == 0) {
 		kmem_cache_free(element_node_cache, element);
 	}
 }
@@ -1136,7 +1136,7 @@ ipgpc_addfilter(ipgpc_filter_t *filter, char *class_name, ipp_flags_t flags)
 		mutex_exit(&ipgpc_cid_list_lock);
 	}
 	mutex_exit(&ipgpc_fid_list_lock);
-	atomic_add_long(&ipgpc_num_fltrs, 1);
+	atomic_inc_ulong(&ipgpc_num_fltrs);
 	ipgpc3dbg(("ipgpc_addfilter: adding filter %s", filter->filter_name));
 	return (0);
 }
@@ -1154,12 +1154,12 @@ reset_dontcare_stats(void)
 	int i;
 
 	for (i = 0; i < NUM_TRIES; ++i) {
-		atomic_add_32(&ipgpc_trie_list[i].stats.num_dontcare, -1);
+		atomic_dec_32(&ipgpc_trie_list[i].stats.num_dontcare);
 	}
 	for (i = 0; i < NUM_TABLES; ++i) {
-		atomic_add_32(&ipgpc_table_list[i].stats.num_dontcare, -1);
+		atomic_dec_32(&ipgpc_table_list[i].stats.num_dontcare);
 	}
-	atomic_add_32(&ipgpc_ds_table_id.stats.num_dontcare, -1);
+	atomic_dec_32(&ipgpc_ds_table_id.stats.num_dontcare);
 }
 
 /*
@@ -1357,7 +1357,7 @@ insertcid(ipgpc_class_t *in_class, int *out_class_id)
 		bcopy(in_class->class_name,
 		    ipgpc_cid_list[class_id].aclass.class_name, MAXNAMELEN);
 		ipgpc_cid_list[class_id].filter_list = NULL;
-		atomic_add_long(&ipgpc_num_cls, 1);
+		atomic_inc_ulong(&ipgpc_num_cls);
 	} else {
 		ipgpc0dbg(("insertcid: class name lookup error %d", err));
 		mutex_exit(&ipgpc_cid_list_lock);
@@ -1504,7 +1504,7 @@ ipgpc_removefilter(char *filter_name, int32_t filter_instance,
 	/* remove filter id from class' list of filters */
 	remove_from_cid_filter_list(ipgpc_fid_list[filter_id].class_id,
 	    filter_id);
-	atomic_add_long(&ipgpc_num_fltrs, -1);
+	atomic_dec_ulong(&ipgpc_num_fltrs);
 	return (0);
 }
 
@@ -1525,7 +1525,7 @@ removecid(int in_class_id)
 		ipgpc_cid_list[in_class_id].cl_stats = NULL;
 	}
 	/* decrement total number of classes loaded */
-	atomic_add_long(&ipgpc_num_cls, -1);
+	atomic_dec_ulong(&ipgpc_num_cls);
 }
 
 /*

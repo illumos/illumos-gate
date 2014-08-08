@@ -51,7 +51,7 @@ extern "C" {
 /* atomic increment/decrement to keep track of outstanding binds, etc */
 #ifdef DEBUG
 #define	ROOTNEX_DPROF_INC(addr)		atomic_inc_64(addr)
-#define	ROOTNEX_DPROF_DEC(addr)		atomic_add_64(addr, -1)
+#define	ROOTNEX_DPROF_DEC(addr)		atomic_dec_64(addr)
 #define	ROOTNEX_DPROBE1(name, type1, arg1) \
 	DTRACE_PROBE1(name, type1, arg1)
 #define	ROOTNEX_DPROBE2(name, type1, arg1, type2, arg2) \

@@ -3263,7 +3263,7 @@ ipsec_action_free(ipsec_action_t *ap)
 		if (ap == NULL)
 			break;
 		membar_exit();
-		if (atomic_add_32_nv(&(ap)->ipa_refs, -1) != 0)
+		if (atomic_dec_32_nv(&(ap)->ipa_refs) != 0)
 			break;
 		/* End inlined IPACT_REFRELE */
 	}

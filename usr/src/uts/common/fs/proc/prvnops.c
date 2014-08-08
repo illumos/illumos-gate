@@ -4429,8 +4429,8 @@ prlwpnode(prnode_t *pnp, uint_t tid)
 static	uint32_t nprnode;
 static	uint32_t nprcommon;
 
-#define	INCREMENT(x)	atomic_add_32(&x, 1);
-#define	DECREMENT(x)	atomic_add_32(&x, -1);
+#define	INCREMENT(x)	atomic_inc_32(&x);
+#define	DECREMENT(x)	atomic_dec_32(&x);
 
 #else
 

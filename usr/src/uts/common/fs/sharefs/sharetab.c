@@ -154,15 +154,15 @@ sharefs_remove(share_t *sh, sharefs_lens_t *shl)
 			}
 
 			ASSERT(sht->s_buckets[iHash].ssh_count != 0);
-			atomic_add_32(&sht->s_buckets[iHash].ssh_count, -1);
-			atomic_add_32(&sht->s_count, -1);
-			atomic_add_32(&sharetab_count, -1);
+			atomic_dec_32(&sht->s_buckets[iHash].ssh_count);
+			atomic_dec_32(&sht->s_count);
+			atomic_dec_32(&sharetab_count);
 
 			ASSERT(sharetab_size >= s->sh_size);
 			sharetab_size -= s->sh_size;
 
 			gethrestime(&sharetab_mtime);
-			atomic_add_32(&sharetab_generation, 1);
+			atomic_inc_32(&sharetab_generation);
 
 			break;
 		}
@@ -281,7 +281,7 @@ sharefs_add(share_t *sh, sharefs_lens_t *shl)
 			sharefree(s, NULL);
 
 			gethrestime(&sharetab_mtime);
-			atomic_add_32(&sharetab_generation, 1);
+			atomic_inc_32(&sharetab_generation);
 
 			ASSERT(sht->s_buckets[iHash].ssh_count != 0);
 			rw_exit(&sharetab_lock);
@@ -298,13 +298,13 @@ sharefs_add(share_t *sh, sharefs_lens_t *shl)
 	 */
 	sh->sh_next = sht->s_buckets[iHash].ssh_sh;
 	sht->s_buckets[iHash].ssh_sh = sh;
-	atomic_add_32(&sht->s_buckets[iHash].ssh_count, 1);
-	atomic_add_32(&sht->s_count, 1);
-	atomic_add_32(&sharetab_count, 1);
+	atomic_inc_32(&sht->s_buckets[iHash].ssh_count);
+	atomic_inc_32(&sht->s_count);
+	atomic_inc_32(&sharetab_count);
 	sharetab_size += sh->sh_size;
 
 	gethrestime(&sharetab_mtime);
-	atomic_add_32(&sharetab_generation, 1);
+	atomic_inc_32(&sharetab_generation);
 
 	rw_exit(&sharetab_lock);
 

@@ -366,7 +366,7 @@ gref_get(xnf_t *xnfp)
 	if (gref == INVALID_GRANT_REF) {
 		xnfp->xnf_stat_gref_failure++;
 	} else {
-		atomic_add_64(&xnfp->xnf_stat_gref_outstanding, 1);
+		atomic_inc_64(&xnfp->xnf_stat_gref_outstanding);
 		if (xnfp->xnf_stat_gref_outstanding > xnfp->xnf_stat_gref_peak)
 			xnfp->xnf_stat_gref_peak =
 			    xnfp->xnf_stat_gref_outstanding;
@@ -387,7 +387,7 @@ gref_put(xnf_t *xnfp, grant_ref_t gref)
 	gnttab_release_grant_reference(&xnfp->xnf_gref_head, gref);
 	mutex_exit(&xnfp->xnf_gref_lock);
 
-	atomic_add_64(&xnfp->xnf_stat_gref_outstanding, -1);
+	atomic_dec_64(&xnfp->xnf_stat_gref_outstanding);
 }
 
 /*
@@ -2352,7 +2352,7 @@ xnf_buf_constructor(void *buf, void *arg, int kmflag)
 	bdesc->grant_ref = INVALID_GRANT_REF;
 	bdesc->gen = xnfp->xnf_gen;
 
-	atomic_add_64(&xnfp->xnf_stat_buf_allocated, 1);
+	atomic_inc_64(&xnfp->xnf_stat_buf_allocated);
 
 	return (0);
 
@@ -2378,7 +2378,7 @@ xnf_buf_destructor(void *buf, void *arg)
 	ddi_dma_mem_free(&bdesc->acc_handle);
 	ddi_dma_free_handle(&bdesc->dma_handle);
 
-	atomic_add_64(&xnfp->xnf_stat_buf_allocated, -1);
+	atomic_dec_64(&xnfp->xnf_stat_buf_allocated);
 }
 
 static xnf_buf_t *
@@ -2412,7 +2412,7 @@ xnf_buf_get(xnf_t *xnfp, int flags, boolean_t readonly)
 	    xvdi_get_oeid(bufp->xnfp->xnf_devinfo),
 	    bufp->buf_mfn, readonly ? 1 : 0);
 
-	atomic_add_64(&xnfp->xnf_stat_buf_outstanding, 1);
+	atomic_inc_64(&xnfp->xnf_stat_buf_outstanding);
 
 	return (bufp);
 }
@@ -2429,7 +2429,7 @@ xnf_buf_put(xnf_t *xnfp, xnf_buf_t *bufp, boolean_t readonly)
 
 	kmem_cache_free(xnfp->xnf_buf_cache, bufp);
 
-	atomic_add_64(&xnfp->xnf_stat_buf_outstanding, -1);
+	atomic_dec_64(&xnfp->xnf_stat_buf_outstanding);
 }
 
 /*

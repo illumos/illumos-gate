@@ -524,7 +524,7 @@ errorq_dispatch(errorq_t *eqp, const void *data, size_t len, uint_t flag)
 	errorq_elem_t *eep, *old;
 
 	if (eqp == NULL || !(eqp->eq_flags & ERRORQ_ACTIVE)) {
-		atomic_add_64(&errorq_lost, 1);
+		atomic_inc_64(&errorq_lost);
 		return; /* drop error if queue is uninitialized or disabled */
 	}
 
@@ -533,7 +533,7 @@ errorq_dispatch(errorq_t *eqp, const void *data, size_t len, uint_t flag)
 
 		if ((i = errorq_availbit(eqp->eq_bitmap, eqp->eq_qlen,
 		    eqp->eq_rotor)) == -1) {
-			atomic_add_64(&eqp->eq_kstat.eqk_dropped.value.ui64, 1);
+			atomic_inc_64(&eqp->eq_kstat.eqk_dropped.value.ui64);
 			return;
 		}
 		BT_ATOMIC_SET_EXCL(eqp->eq_bitmap, i, rval);
@@ -559,7 +559,7 @@ errorq_dispatch(errorq_t *eqp, const void *data, size_t len, uint_t flag)
 			break;
 	}
 
-	atomic_add_64(&eqp->eq_kstat.eqk_dispatched.value.ui64, 1);
+	atomic_inc_64(&eqp->eq_kstat.eqk_dispatched.value.ui64);
 
 	if (flag == ERRORQ_ASYNC && eqp->eq_id != NULL)
 		ddi_trigger_softintr(eqp->eq_id);
@@ -867,7 +867,7 @@ errorq_reserve(errorq_t *eqp)
 	errorq_elem_t *eqep;
 
 	if (eqp == NULL || !(eqp->eq_flags & ERRORQ_ACTIVE)) {
-		atomic_add_64(&errorq_lost, 1);
+		atomic_inc_64(&errorq_lost);
 		return (NULL);
 	}
 
@@ -876,7 +876,7 @@ errorq_reserve(errorq_t *eqp)
 
 		if ((i = errorq_availbit(eqp->eq_bitmap, eqp->eq_qlen,
 		    eqp->eq_rotor)) == -1) {
-			atomic_add_64(&eqp->eq_kstat.eqk_dropped.value.ui64, 1);
+			atomic_inc_64(&eqp->eq_kstat.eqk_dropped.value.ui64);
 			return (NULL);
 		}
 		BT_ATOMIC_SET_EXCL(eqp->eq_bitmap, i, rval);
@@ -893,7 +893,7 @@ errorq_reserve(errorq_t *eqp)
 		eqnp->eqn_nvl = fm_nvlist_create(eqnp->eqn_nva);
 	}
 
-	atomic_add_64(&eqp->eq_kstat.eqk_reserved.value.ui64, 1);
+	atomic_inc_64(&eqp->eq_kstat.eqk_reserved.value.ui64);
 	return (eqep);
 }
 
@@ -908,7 +908,7 @@ errorq_commit(errorq_t *eqp, errorq_elem_t *eqep, uint_t flag)
 	errorq_elem_t *old;
 
 	if (eqep == NULL || !(eqp->eq_flags & ERRORQ_ACTIVE)) {
-		atomic_add_64(&eqp->eq_kstat.eqk_commit_fail.value.ui64, 1);
+		atomic_inc_64(&eqp->eq_kstat.eqk_commit_fail.value.ui64);
 		return;
 	}
 
@@ -921,7 +921,7 @@ errorq_commit(errorq_t *eqp, errorq_elem_t *eqep, uint_t flag)
 			break;
 	}
 
-	atomic_add_64(&eqp->eq_kstat.eqk_committed.value.ui64, 1);
+	atomic_inc_64(&eqp->eq_kstat.eqk_committed.value.ui64);
 
 	if (flag == ERRORQ_ASYNC && eqp->eq_id != NULL)
 		ddi_trigger_softintr(eqp->eq_id);
@@ -939,7 +939,7 @@ errorq_cancel(errorq_t *eqp, errorq_elem_t *eqep)
 
 	BT_ATOMIC_CLEAR(eqp->eq_bitmap, eqep - eqp->eq_elems);
 
-	atomic_add_64(&eqp->eq_kstat.eqk_cancelled.value.ui64, 1);
+	atomic_inc_64(&eqp->eq_kstat.eqk_cancelled.value.ui64);
 }
 
 /*

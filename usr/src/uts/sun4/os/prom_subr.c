@@ -318,7 +318,7 @@ kern_preprom(void)
 	 * We now hold the prom_cpu lock.  Increment the hold count by one
 	 * and assert our current state before returning to the caller.
 	 */
-	atomic_add_32(&prom_holdcnt, 1);
+	atomic_inc_32(&prom_holdcnt);
 	ASSERT(prom_holdcnt >= 1);
 	prom_thread = curthread;
 }
@@ -345,7 +345,7 @@ kern_postprom(void)
 		panic("kern_postprom: prom_holdcnt == 0, owner=%p",
 		    (void *)prom_cpu);
 
-	if (atomic_add_32_nv(&prom_holdcnt, -1) != 0)
+	if (atomic_dec_32_nv(&prom_holdcnt) != 0)
 		return; /* prom lock is held recursively by this CPU */
 
 	if ((boothowto & RB_DEBUG) && prom_exit_enter_debugger)

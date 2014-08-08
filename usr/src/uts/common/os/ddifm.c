@@ -455,7 +455,7 @@ fm_dev_ereport_postv(dev_info_t *dip, dev_info_t *eqdip,
 
 	/* Count errors as drops. */
 err:	if (fmhdl)
-		atomic_add_64(&fmhdl->fh_kstat.fek_erpt_dropped.value.ui64, 1);
+		atomic_inc_64(&fmhdl->fh_kstat.fek_erpt_dropped.value.ui64);
 
 	/* Free up nvlists if normal interfaces were used to allocate memory */
 out:	if (ereport && (nva == NULL))
@@ -1019,7 +1019,7 @@ i_ddi_fm_acc_err_set(ddi_acc_handle_t handle, uint64_t ena, int status,
 	i_hdlp->ahi_err->err_ena = ena;
 	i_hdlp->ahi_err->err_status = status;
 	i_hdlp->ahi_err->err_expected = flag;
-	atomic_add_64(&fmhdl->fh_kstat.fek_acc_err.value.ui64, 1);
+	atomic_inc_64(&fmhdl->fh_kstat.fek_acc_err.value.ui64);
 }
 
 void
@@ -1032,7 +1032,7 @@ i_ddi_fm_dma_err_set(ddi_dma_handle_t handle, uint64_t ena, int status,
 	hdlp->dmai_error.err_ena = ena;
 	hdlp->dmai_error.err_status = status;
 	hdlp->dmai_error.err_expected = flag;
-	atomic_add_64(&fmhdl->fh_kstat.fek_dma_err.value.ui64, 1);
+	atomic_inc_64(&fmhdl->fh_kstat.fek_dma_err.value.ui64);
 }
 
 ddi_fmcompare_t

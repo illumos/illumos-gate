@@ -934,7 +934,7 @@ top:
 	 * a new one and use that.
 	 */
 #ifdef DEBUG
-	atomic_add_64(&nfscl->nfscl_stat.clalloc.value.ui64, 1);
+	atomic_inc_64(&nfscl->nfscl_stat.clalloc.value.ui64);
 #endif
 	mutex_exit(&nfscl->nfscl_chtable4_lock);
 
@@ -955,7 +955,7 @@ top:
 	if (error != 0) {
 		kmem_cache_free(chtab4_cache, cp);
 #ifdef DEBUG
-		atomic_add_64(&nfscl->nfscl_stat.clalloc.value.ui64, -1);
+		atomic_dec_64(&nfscl->nfscl_stat.clalloc.value.ui64);
 #endif
 		/*
 		 * Warning is unnecessary if error is EINTR.
@@ -977,7 +977,7 @@ top:
 		CLNT_DESTROY(cp->ch_client);
 		kmem_cache_free(chtab4_cache, cp);
 #ifdef DEBUG
-		atomic_add_64(&nfscl->nfscl_stat.clalloc.value.ui64, -1);
+		atomic_dec_64(&nfscl->nfscl_stat.clalloc.value.ui64);
 #endif
 		return ((error != 0) ? error : EINTR);
 	}
@@ -2646,7 +2646,7 @@ rddir4_cache_alloc(int flags)
 		mutex_init(&rdip->lock, NULL, MUTEX_DEFAULT, NULL);
 		rdip->count = 1;
 #ifdef DEBUG
-		atomic_add_64(&clstat4_debug.dirent.value.ui64, 1);
+		atomic_inc_64(&clstat4_debug.dirent.value.ui64);
 #endif
 	}
 	return (rc);
@@ -2703,7 +2703,7 @@ rddir4_cache_free(rddir4_cache_impl *rdip)
 	rddir4_cache *rc = &rdip->rc;
 
 #ifdef DEBUG
-	atomic_add_64(&clstat4_debug.dirent.value.ui64, -1);
+	atomic_dec_64(&clstat4_debug.dirent.value.ui64);
 #endif
 	if (rc->entries != NULL)
 		kmem_free(rc->entries, rc->buflen);

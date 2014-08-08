@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/kmem.h>
 #include <sys/random.h>
@@ -74,7 +72,7 @@ tswtcl_process(mblk_t **mpp, tswtcl_data_t *tswtcl_data,
 
 	if (mp == NULL) {
 		tswtcl0dbg(("tswtcl_process: null mp!\n"));
-		atomic_add_64(&tswtcl_data->epackets, 1);
+		atomic_inc_64(&tswtcl_data->epackets);
 		return (EINVAL);
 	}
 
@@ -84,7 +82,7 @@ tswtcl_process(mblk_t **mpp, tswtcl_data_t *tswtcl_data,
 			mp = mp->b_cont;
 		} else {
 			tswtcl0dbg(("tswtcl_process: no data\n"));
-			atomic_add_64(&tswtcl_data->epackets, 1);
+			atomic_inc_64(&tswtcl_data->epackets);
 			return (EINVAL);
 		}
 	}
@@ -93,7 +91,7 @@ tswtcl_process(mblk_t **mpp, tswtcl_data_t *tswtcl_data,
 	if ((mp->b_wptr - mp->b_rptr) < IP_SIMPLE_HDR_LENGTH) {
 		if (!pullupmsg(mp, IP_SIMPLE_HDR_LENGTH)) {
 			tswtcl0dbg(("tswtcl_process: pullup error\n"));
-			atomic_add_64(&tswtcl_data->epackets, 1);
+			atomic_inc_64(&tswtcl_data->epackets);
 			return (EINVAL);
 		}
 	}
@@ -184,14 +182,14 @@ tswtcl_process(mblk_t **mpp, tswtcl_data_t *tswtcl_data,
 
 	/* Update Stats */
 	if (*next_action == cfg_parms->green_action) {
-		atomic_add_64(&tswtcl_data->green_packets, 1);
+		atomic_inc_64(&tswtcl_data->green_packets);
 		atomic_add_64(&tswtcl_data->green_bits, pkt_len);
 	} else if (*next_action == cfg_parms->yellow_action) {
-		atomic_add_64(&tswtcl_data->yellow_packets, 1);
+		atomic_inc_64(&tswtcl_data->yellow_packets);
 		atomic_add_64(&tswtcl_data->yellow_bits, pkt_len);
 	} else {
 		ASSERT(*next_action == cfg_parms->red_action);
-		atomic_add_64(&tswtcl_data->red_packets, 1);
+		atomic_inc_64(&tswtcl_data->red_packets);
 		atomic_add_64(&tswtcl_data->red_bits, pkt_len);
 	}
 	return (0);

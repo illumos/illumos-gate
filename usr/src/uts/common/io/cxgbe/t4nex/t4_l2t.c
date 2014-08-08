@@ -422,7 +422,7 @@ t4_l2e_free(struct l2t_entry *e)
 	mutex_exit(&e->lock);
 
 	d = container_of(e, struct l2t_data, l2tab[e->idx]);
-	atomic_add_int(&d->nfree, 1);
+	atomic_inc_uint(&d->nfree);
 
 }
 

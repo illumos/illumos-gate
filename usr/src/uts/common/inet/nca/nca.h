@@ -959,7 +959,7 @@ extern kmutex_t nca_dcb_readers;
 #define	DCB_RD_EXIT(cpu) {						\
 	uint32_t *rp = &nca_gv[cpu].dcb_readers;			\
 									\
-	if (atomic_add_32_nv(rp, -1) == DCB_COUNT_USELOCK) {		\
+	if (atomic_dec_32_nv(rp) == DCB_COUNT_USELOCK) {		\
 		mutex_enter(&nca_dcb_lock);				\
 		if (CV_HAS_WAITERS(&nca_dcb_wait)) {			\
 			/* May be the last reader for this CPU */	\

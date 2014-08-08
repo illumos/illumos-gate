@@ -141,7 +141,7 @@ static uint_t clts_rsstat_ndata =
 	(struct rpc_clts_server *)(clone_xprt)->xp_master->xp_p2
 
 #define	RSSTAT_INCR(stats, x)	\
-	atomic_add_64(&(stats)->x.value.ui64, 1)
+	atomic_inc_64(&(stats)->x.value.ui64)
 
 /*
  * Create a transport record.

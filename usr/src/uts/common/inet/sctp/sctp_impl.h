@@ -404,7 +404,7 @@ typedef struct sctp_listen_cnt_s {
 #define	SCTP_DECR_LISTEN_CNT(sctp)					\
 {									\
 	ASSERT((sctp)->sctp_listen_cnt->slc_cnt > 0);			\
-	if (atomic_add_32_nv(&(sctp)->sctp_listen_cnt->slc_cnt, -1) == 0) \
+	if (atomic_dec_32_nv(&(sctp)->sctp_listen_cnt->slc_cnt) == 0) \
 		kmem_free((sctp)->sctp_listen_cnt, sizeof (sctp_listen_cnt_t));\
 	(sctp)->sctp_listen_cnt = NULL;					\
 }

@@ -614,7 +614,7 @@ skip_alloc:
 
 	if (!exclusive) {
 		ufs_shared_writes++;
-		ncur = atomic_add_32_nv(&ufs_cur_writes, 1);
+		ncur = atomic_inc_32_nv(&ufs_cur_writes);
 		if (ncur > ufs_maxcur_writes)
 			ufs_maxcur_writes = ncur;
 	}
@@ -727,7 +727,7 @@ skip_alloc:
 	}
 
 	if (!exclusive) {
-		atomic_add_32(&ufs_cur_writes, -1);
+		atomic_dec_32(&ufs_cur_writes);
 		/*
 		 * If this write was done shared, readers may
 		 * have pulled in unmodified pages. Get rid of

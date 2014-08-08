@@ -26,8 +26,6 @@
 #ifndef	_VM_HTABLE_H
 #define	_VM_HTABLE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -292,8 +290,8 @@ extern void x86pte_mapout(void);
  */
 #define	HTABLE_INC(x)	atomic_inc16((uint16_t *)&x)
 #define	HTABLE_DEC(x)	atomic_dec16((uint16_t *)&x)
-#define	HTABLE_LOCK_INC(ht)	atomic_add_32(&(ht)->ht_lock_cnt, 1)
-#define	HTABLE_LOCK_DEC(ht)	atomic_add_32(&(ht)->ht_lock_cnt, -1)
+#define	HTABLE_LOCK_INC(ht)	atomic_inc_32(&(ht)->ht_lock_cnt)
+#define	HTABLE_LOCK_DEC(ht)	atomic_dec_32(&(ht)->ht_lock_cnt)
 
 #ifdef __xpv
 extern void xen_flush_va(caddr_t va);

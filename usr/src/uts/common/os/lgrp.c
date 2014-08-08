@@ -584,12 +584,12 @@ lgrp_config(lgrp_config_flag_t event, uintptr_t resource, uintptr_t where)
 		cp->cpu_lpl = lpl_bootstrap;
 
 		lgrp_plat_config(event, resource);
-		atomic_add_32(&lgrp_gen, 1);
+		atomic_inc_32(&lgrp_gen);
 
 		break;
 	case LGRP_CONFIG_CPU_DEL:
 		lgrp_plat_config(event, resource);
-		atomic_add_32(&lgrp_gen, 1);
+		atomic_inc_32(&lgrp_gen);
 
 		break;
 	case LGRP_CONFIG_CPU_ONLINE:
@@ -601,7 +601,7 @@ lgrp_config(lgrp_config_flag_t event, uintptr_t resource, uintptr_t where)
 			panic("lpl_topo_verify failed: %d", rc);
 		}
 		lgrp_plat_config(event, resource);
-		atomic_add_32(&lgrp_gen, 1);
+		atomic_inc_32(&lgrp_gen);
 
 		break;
 	case LGRP_CONFIG_CPU_OFFLINE:
@@ -614,7 +614,7 @@ lgrp_config(lgrp_config_flag_t event, uintptr_t resource, uintptr_t where)
 			panic("lpl_topo_verify failed: %d", rc);
 		}
 		lgrp_plat_config(event, resource);
-		atomic_add_32(&lgrp_gen, 1);
+		atomic_inc_32(&lgrp_gen);
 
 		break;
 	case LGRP_CONFIG_CPUPART_ADD:
@@ -643,12 +643,12 @@ lgrp_config(lgrp_config_flag_t event, uintptr_t resource, uintptr_t where)
 	 */
 	case LGRP_CONFIG_MEM_ADD:
 		lgrp_mem_init((int)resource, where, B_FALSE);
-		atomic_add_32(&lgrp_gen, 1);
+		atomic_inc_32(&lgrp_gen);
 
 		break;
 	case LGRP_CONFIG_MEM_DEL:
 		lgrp_mem_fini((int)resource, where, B_FALSE);
-		atomic_add_32(&lgrp_gen, 1);
+		atomic_inc_32(&lgrp_gen);
 
 		break;
 	case LGRP_CONFIG_MEM_RENAME: {
@@ -658,12 +658,12 @@ lgrp_config(lgrp_config_flag_t event, uintptr_t resource, uintptr_t where)
 		lgrp_mem_rename((int)resource,
 		    ren_arg->lmem_rename_from,
 		    ren_arg->lmem_rename_to);
-		atomic_add_32(&lgrp_gen, 1);
+		atomic_inc_32(&lgrp_gen);
 
 		break;
 	}
 	case LGRP_CONFIG_GEN_UPDATE:
-		atomic_add_32(&lgrp_gen, 1);
+		atomic_inc_32(&lgrp_gen);
 
 		break;
 	case LGRP_CONFIG_FLATTEN:

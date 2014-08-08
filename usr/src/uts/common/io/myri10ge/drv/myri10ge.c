@@ -3132,7 +3132,7 @@ myri10ge_tx_tso_copy(struct myri10ge_slice_state *ss, mblk_t *mp,
 	/* check to see if the slots are really there */
 	avail = tx->mask - (tx->req - tx->done);
 	if (unlikely(avail <=  MYRI10GE_MAX_SEND_DESC_TSO)) {
-		atomic_add_32(&tx->stall, 1);
+		atomic_inc_32(&tx->stall);
 		mutex_exit(&tx->lock);
 		return (EBUSY);
 	}
@@ -3373,7 +3373,7 @@ again:
 
 	if (avail < max_segs) {
 		err = EBUSY;
-		atomic_add_32(&tx->stall_early, 1);
+		atomic_inc_32(&tx->stall_early);
 		goto stall;
 	}
 
@@ -3638,7 +3638,7 @@ again:
 
 late_stall:
 	try_pullup = 0;
-	atomic_add_32(&tx->stall_late, 1);
+	atomic_inc_32(&tx->stall_late);
 
 abort_with_handles:
 	/* unbind and free handles from previous mblks */
@@ -3671,7 +3671,7 @@ pullup:
 stall:
 	if (err != 0) {
 		if (err == EBUSY) {
-			atomic_add_32(&tx->stall, 1);
+			atomic_inc_32(&tx->stall);
 		} else {
 			MYRI10GE_ATOMIC_SLICE_STAT_INC(xmit_err);
 		}

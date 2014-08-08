@@ -773,7 +773,7 @@ fcoei_clear_watchdog_jobs(fcoei_soft_state_t *ss)
 			break;
 
 		case AE_EVENT_PORT:
-			atomic_add_32(&ss->ss_port_event_counter, -1);
+			atomic_dec_32(&ss->ss_port_event_counter);
 			/* FALLTHROUGH */
 
 		case AE_EVENT_RESET:

@@ -5642,7 +5642,7 @@ do_scrub(struct scrub_info *csi)
 	uint32_t *outstanding = &csmp->chsm_outstanding[index];
 
 	if (*(csi->csi_enable) && (csmp->chsm_enable[index])) {
-		if (atomic_add_32_nv(outstanding, 1) == 1) {
+		if (atomic_inc_32_nv(outstanding) == 1) {
 			xt_one_unchecked(CPU->cpu_id, setsoftint_tl1,
 			    csi->csi_inum, 0);
 		}

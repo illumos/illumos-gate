@@ -1453,7 +1453,7 @@ vmem_create_common(const char *name, void *base, size_t size, size_t quantum,
 	vmem_t *vmp, *cur, **vmpp;
 	vmem_seg_t *vsp;
 	vmem_freelist_t *vfp;
-	uint32_t id = atomic_add_32_nv(&vmem_id, 1);
+	uint32_t id = atomic_inc_32_nv(&vmem_id);
 
 	if (vmem_vmem_arena != NULL) {
 		vmp = vmem_alloc(vmem_vmem_arena, sizeof (vmem_t),
@@ -1555,7 +1555,7 @@ vmem_create_common(const char *name, void *base, size_t size, size_t quantum,
 
 	if (vmp->vm_cflags & VMC_POPULATOR) {
 		ASSERT(vmem_populators < VMEM_INITIAL);
-		vmem_populator[atomic_add_32_nv(&vmem_populators, 1) - 1] = vmp;
+		vmem_populator[atomic_inc_32_nv(&vmem_populators) - 1] = vmp;
 		mutex_enter(&vmp->vm_lock);
 		(void) vmem_populate(vmp, vmflag | VM_PANIC);
 		mutex_exit(&vmp->vm_lock);

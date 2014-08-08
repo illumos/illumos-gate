@@ -1227,14 +1227,14 @@ hat_get_mapped_size(hat_t *hat)
 int
 hat_stats_enable(hat_t *hat)
 {
-	atomic_add_32(&hat->hat_stats, 1);
+	atomic_inc_32(&hat->hat_stats);
 	return (1);
 }
 
 void
 hat_stats_disable(hat_t *hat)
 {
-	atomic_add_32(&hat->hat_stats, -1);
+	atomic_dec_32(&hat->hat_stats);
 }
 
 /*

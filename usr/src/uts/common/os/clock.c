@@ -1987,7 +1987,7 @@ deadman(void)
 	 * typically be a multiple of the total number of CPUs in
 	 * the system.
 	 */
-	atomic_add_32(&deadman_panics, 1);
+	atomic_inc_32(&deadman_panics);
 
 	if (!deadman_enabled) {
 		CPU->cpu_deadman_countdown = deadman_seconds;

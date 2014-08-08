@@ -2703,7 +2703,7 @@ segvn_faultpage(
 	}
 
 	if (type == F_SOFTLOCK) {
-		atomic_add_long((ulong_t *)&svd->softlockcnt, 1);
+		atomic_inc_ulong((ulong_t *)&svd->softlockcnt);
 	}
 
 	/*
@@ -3064,7 +3064,7 @@ out:
 		anon_array_exit(&cookie);
 
 	if (type == F_SOFTLOCK) {
-		atomic_add_long((ulong_t *)&svd->softlockcnt, -1);
+		atomic_dec_ulong((ulong_t *)&svd->softlockcnt);
 	}
 	return (FC_MAKE_ERR(err));
 }
@@ -8892,11 +8892,11 @@ segvn_pagelock(struct seg *seg, caddr_t addr, size_t len, struct page ***ppp,
 
 		if (sftlck_sbase) {
 			ASSERT(svd->softlockcnt_sbase > 0);
-			atomic_add_long((ulong_t *)&svd->softlockcnt_sbase, -1);
+			atomic_dec_ulong((ulong_t *)&svd->softlockcnt_sbase);
 		}
 		if (sftlck_send) {
 			ASSERT(svd->softlockcnt_send > 0);
-			atomic_add_long((ulong_t *)&svd->softlockcnt_send, -1);
+			atomic_dec_ulong((ulong_t *)&svd->softlockcnt_send);
 		}
 
 		/*
@@ -8993,10 +8993,10 @@ segvn_pagelock(struct seg *seg, caddr_t addr, size_t len, struct page ***ppp,
 			    npages);
 		}
 		if (sftlck_sbase) {
-			atomic_add_long((ulong_t *)&svd->softlockcnt_sbase, 1);
+			atomic_inc_ulong((ulong_t *)&svd->softlockcnt_sbase);
 		}
 		if (sftlck_send) {
-			atomic_add_long((ulong_t *)&svd->softlockcnt_send, 1);
+			atomic_inc_ulong((ulong_t *)&svd->softlockcnt_send);
 		}
 		SEGVN_LOCK_EXIT(seg->s_as, &svd->lock);
 		*ppp = pplist + adjustpages;
@@ -9186,10 +9186,10 @@ segvn_pagelock(struct seg *seg, caddr_t addr, size_t len, struct page ***ppp,
 			wlen = len;
 		}
 		if (sftlck_sbase) {
-			atomic_add_long((ulong_t *)&svd->softlockcnt_sbase, 1);
+			atomic_inc_ulong((ulong_t *)&svd->softlockcnt_sbase);
 		}
 		if (sftlck_send) {
-			atomic_add_long((ulong_t *)&svd->softlockcnt_send, 1);
+			atomic_inc_ulong((ulong_t *)&svd->softlockcnt_send);
 		}
 		if (use_pcache) {
 			(void) seg_pinsert(seg, pamp, paddr, len, wlen, pl,

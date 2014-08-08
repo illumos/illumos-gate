@@ -10490,11 +10490,11 @@ nfs4_map(vnode_t *vp, offset_t off, struct as *as, caddr_t *addrp,
 
 	if (nfs_rw_enter_sig(&rp->r_rwlock, RW_WRITER, INTR4(vp)))
 		return (EINTR);
-	atomic_add_int(&rp->r_inmap, 1);
+	atomic_inc_uint(&rp->r_inmap);
 	nfs_rw_exit(&rp->r_rwlock);
 
 	if (nfs_rw_enter_sig(&rp->r_lkserlock, RW_READER, INTR4(vp))) {
-		atomic_add_int(&rp->r_inmap, -1);
+		atomic_dec_uint(&rp->r_inmap);
 		return (EINTR);
 	}
 
@@ -10602,7 +10602,7 @@ nfs4_map(vnode_t *vp, offset_t off, struct as *as, caddr_t *addrp,
 
 done:
 	nfs_rw_exit(&rp->r_lkserlock);
-	atomic_add_int(&rp->r_inmap, -1);
+	atomic_dec_uint(&rp->r_inmap);
 	return (error);
 }
 

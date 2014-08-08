@@ -627,7 +627,7 @@ crypto_hold_minor(minor_t minor)
 	mutex_enter(&mp->kl_lock);
 
 	if ((cm = crypto_minors[minor - 1]) != NULL) {
-		atomic_add_32(&cm->cm_refcnt, 1);
+		atomic_inc_32(&cm->cm_refcnt);
 	}
 	mutex_exit(&mp->kl_lock);
 	return (cm);
@@ -636,7 +636,7 @@ crypto_hold_minor(minor_t minor)
 static void
 crypto_release_minor(crypto_minor_t *cm)
 {
-	if (atomic_add_32_nv(&cm->cm_refcnt, -1) == 0) {
+	if (atomic_dec_32_nv(&cm->cm_refcnt) == 0) {
 		cv_signal(&cm->cm_cv);
 	}
 }

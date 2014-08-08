@@ -218,9 +218,9 @@ static struct page_retire_kstat page_retire_kstat = {
 static kstat_t  *page_retire_ksp = NULL;
 
 #define	PR_INCR_KSTAT(stat)	\
-	atomic_add_64(&(page_retire_kstat.stat.value.ui64), 1)
+	atomic_inc_64(&(page_retire_kstat.stat.value.ui64))
 #define	PR_DECR_KSTAT(stat)	\
-	atomic_add_64(&(page_retire_kstat.stat.value.ui64), -1)
+	atomic_dec_64(&(page_retire_kstat.stat.value.ui64))
 
 #define	PR_KSTAT_RETIRED_CE	(page_retire_kstat.pr_mce.value.ui64)
 #define	PR_KSTAT_RETIRED_FMA	(page_retire_kstat.pr_fma.value.ui64)

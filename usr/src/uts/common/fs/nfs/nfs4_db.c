@@ -60,7 +60,7 @@ rfs4_dbe_getid(rfs4_dbe_t *entry)
 void
 rfs4_dbe_hold(rfs4_dbe_t *entry)
 {
-	atomic_add_32(&entry->dbe_refcnt, 1);
+	atomic_inc_32(&entry->dbe_refcnt);
 }
 
 /*
@@ -69,7 +69,7 @@ rfs4_dbe_hold(rfs4_dbe_t *entry)
 void
 rfs4_dbe_rele_nolock(rfs4_dbe_t *entry)
 {
-	atomic_add_32(&entry->dbe_refcnt, -1);
+	atomic_dec_32(&entry->dbe_refcnt);
 }
 
 
@@ -129,7 +129,7 @@ rfs4_dbe_rele(rfs4_dbe_t *entry)
 {
 	mutex_enter(entry->dbe_lock);
 	ASSERT(entry->dbe_refcnt > 1);
-	atomic_add_32(&entry->dbe_refcnt, -1);
+	atomic_dec_32(&entry->dbe_refcnt);
 	entry->dbe_time_rele = gethrestime_sec();
 	mutex_exit(entry->dbe_lock);
 }

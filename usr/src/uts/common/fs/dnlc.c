@@ -254,7 +254,7 @@ vnode_t negative_cache_vnode;
 #define	dnlc_free(ncp) \
 { \
 	kmem_free((ncp), sizeof (ncache_t) + (ncp)->namlen); \
-	atomic_add_32(&dnlc_nentries, -1); \
+	atomic_dec_32(&dnlc_nentries); \
 }
 
 
@@ -1024,7 +1024,7 @@ dnlc_get(uchar_t namlen)
 		return (NULL);
 	}
 	ncp->namlen = namlen;
-	atomic_add_32(&dnlc_nentries, 1);
+	atomic_inc_32(&dnlc_nentries);
 	dnlc_reduce_cache(NULL);
 	return (ncp);
 }

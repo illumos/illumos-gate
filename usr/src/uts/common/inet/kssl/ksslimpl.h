@@ -123,14 +123,14 @@ typedef struct mech_to_cipher_s {
 } mech_to_cipher_t;
 
 #define	KSSL_ENTRY_REFHOLD(kssl_entry) {				\
-	atomic_add_32(&(kssl_entry)->ke_refcnt, 1);			\
+	atomic_inc_32(&(kssl_entry)->ke_refcnt);			\
 	ASSERT((kssl_entry)->ke_refcnt != 0);				\
 }
 
 #define	KSSL_ENTRY_REFRELE(kssl_entry) {				\
 	ASSERT((kssl_entry)->ke_refcnt != 0);				\
 	membar_exit();							\
-	if (atomic_add_32_nv(&(kssl_entry)->ke_refcnt, -1) == 0) {	\
+	if (atomic_dec_32_nv(&(kssl_entry)->ke_refcnt) == 0) {	\
 		kssl_free_entry((kssl_entry));				\
 	}								\
 }

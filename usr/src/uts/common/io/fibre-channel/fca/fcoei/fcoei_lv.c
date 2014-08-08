@@ -860,7 +860,7 @@ fcoei_initiate_ct_req(fcoei_exchange_t *xch)
 
 	bzero(frm->frm_payload, cmd_len);
 	xch->xch_cnt = xch->xch_ss->ss_sol_cnt;
-	atomic_add_32(xch->xch_cnt, 1);
+	atomic_inc_32(xch->xch_cnt);
 
 	FFM_R_CTL(fpkt->pkt_cmd_fhdr.r_ctl, frm);
 	FFM_D_ID(fpkt->pkt_cmd_fhdr.d_id, frm);
@@ -1056,7 +1056,7 @@ fcoei_initiate_fcp_cmd(fcoei_exchange_t *xch)
 	 * This will affect timing check
 	 */
 	xch->xch_cnt = xch->xch_ss->ss_sol_cnt;
-	atomic_add_32(xch->xch_cnt, 1);
+	atomic_inc_32(xch->xch_cnt);
 
 	/*
 	 * Set exchange residual bytes
@@ -1160,7 +1160,7 @@ fcoei_initiate_els_req(fcoei_exchange_t *xch)
 	 * This will affect timing check
 	 */
 	xch->xch_cnt = xch->xch_ss->ss_sol_cnt;
-	atomic_add_32(xch->xch_cnt, 1);
+	atomic_inc_32(xch->xch_cnt);
 
 	els_code = (ls_code_t *)(void *)fpkt->pkt_cmd;
 	switch (els_code->ls_code) {
@@ -1267,7 +1267,7 @@ fcoei_initiate_els_resp(fcoei_exchange_t *xch)
 	 * This will affect timing check
 	 */
 	xch->xch_cnt = xch->xch_ss->ss_unsol_cnt;
-	atomic_add_32(xch->xch_cnt, 1);
+	atomic_inc_32(xch->xch_cnt);
 
 	/*
 	 * Set ifm_rctl

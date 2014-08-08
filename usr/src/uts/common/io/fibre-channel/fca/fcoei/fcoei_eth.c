@@ -1385,6 +1385,6 @@ fcoei_process_event_port(fcoei_event_t *ae)
 		FCOEI_LOG(__FUNCTION__, "ss %p not bound now", ss);
 	}
 
-	atomic_add_32(&ss->ss_port_event_counter, -1);
+	atomic_dec_32(&ss->ss_port_event_counter);
 	kmem_free(ae, sizeof (fcoei_event_t));
 }

@@ -223,8 +223,8 @@ typedef struct fcoet_exchange {
  * These two situation should seldom happen. But just invoke this seems won't
  * downgrade the performance too much, so we keep it.
  */
-#define	FCOET_BUSY_XCHG(xch)	atomic_add_8(&(xch)->xch_ref, 1)
-#define	FCOET_RELE_XCHG(xch)	atomic_add_8(&(xch)->xch_ref, -1)
+#define	FCOET_BUSY_XCHG(xch)	atomic_inc_8(&(xch)->xch_ref)
+#define	FCOET_RELE_XCHG(xch)	atomic_dec_8(&(xch)->xch_ref)
 
 #define	XCH_FLAG_NONFCP_REQ_SENT	0x0001
 #define	XCH_FLAG_NONFCP_RESP_SENT	0x0002

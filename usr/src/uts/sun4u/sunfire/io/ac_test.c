@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/conf.h>
 #include <sys/ddi.h>
@@ -192,7 +190,7 @@ ac_mem_test_start(ac_cfga_pkt_t *pkt, int flag)
 	test->board = softsp->board;
 	test->bank = pkt->bank;
 	test->bufp = kmem_alloc(TEST_PAGESIZE, KM_SLEEP);
-	test->info.handle = atomic_add_32_nv(&mem_test_sequence_id, 1);
+	test->info.handle = atomic_inc_32_nv(&mem_test_sequence_id);
 	(void) drv_getparm(PPID, (ulong_t *)(&(test->info.tester_pid)));
 	test->info.prev_condition = mem_info->condition;
 	test->info.page_size = TEST_PAGESIZE;
@@ -404,7 +402,7 @@ ac_mem_test_read(ac_cfga_pkt_t *pkt, int flag)
 	}
 
 	/* bump the busy bit */
-	atomic_add_32(&test->in_test, 1);
+	atomic_inc_32(&test->in_test);
 	mutex_exit(&test_mutex);
 
 	/* verify the remaining parameters */
@@ -498,7 +496,7 @@ ac_mem_test_read(ac_cfga_pkt_t *pkt, int flag)
 	}
 
 read_done:
-	atomic_add_32(&test->in_test, -1);
+	atomic_dec_32(&test->in_test);
 	return (retval);
 }
 
@@ -550,7 +548,7 @@ ac_mem_test_write(ac_cfga_pkt_t *pkt, int flag)
 	}
 
 	/* bump the busy bit */
-	atomic_add_32(&test->in_test, 1);
+	atomic_inc_32(&test->in_test);
 	mutex_exit(&test_mutex);
 
 	/* verify the remaining parameters */
@@ -602,6 +600,6 @@ ac_mem_test_write(ac_cfga_pkt_t *pkt, int flag)
 	kpreempt_enable();
 
 write_done:
-	atomic_add_32(&test->in_test, -1);
+	atomic_dec_32(&test->in_test);
 	return (retval);
 }

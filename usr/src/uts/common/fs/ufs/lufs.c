@@ -920,7 +920,7 @@ lufs_disable(vnode_t *vp, struct fiolog *flp)
 	vfs_lock_wait(ufsvfsp->vfs_vfs);
 	ulp = &ufsvfsp->vfs_ulockfs;
 	mutex_enter(&ulp->ul_lock);
-	atomic_add_long(&ufs_quiesce_pend, 1);
+	atomic_inc_ulong(&ufs_quiesce_pend);
 	(void) ufs_quiesce(ulp);
 
 	(void) ufs_flush(ufsvfsp->vfs_vfs);
@@ -939,7 +939,7 @@ lufs_disable(vnode_t *vp, struct fiolog *flp)
 	(void) lufs_unsnarf(ufsvfsp);
 	mutex_exit(&ufs_scan_lock);
 
-	atomic_add_long(&ufs_quiesce_pend, -1);
+	atomic_dec_ulong(&ufs_quiesce_pend);
 	mutex_exit(&ulp->ul_lock);
 	vfs_setmntopt(ufsvfsp->vfs_vfs, MNTOPT_NOLOGGING, NULL, 0);
 	vfs_unlock(ufsvfsp->vfs_vfs);

@@ -4331,7 +4331,7 @@ vfs_free(vfs_t *vfsp)
 void
 vfs_hold(vfs_t *vfsp)
 {
-	atomic_add_32(&vfsp->vfs_count, 1);
+	atomic_inc_32(&vfsp->vfs_count);
 	ASSERT(vfsp->vfs_count != 0);
 }
 
@@ -4344,7 +4344,7 @@ void
 vfs_rele(vfs_t *vfsp)
 {
 	ASSERT(vfsp->vfs_count != 0);
-	if (atomic_add_32_nv(&vfsp->vfs_count, -1) == 0) {
+	if (atomic_dec_32_nv(&vfsp->vfs_count) == 0) {
 		VFS_FREEVFS(vfsp);
 		lofi_remove(vfsp);
 		if (vfsp->vfs_zone)

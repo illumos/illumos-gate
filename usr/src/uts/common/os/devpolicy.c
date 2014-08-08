@@ -181,14 +181,14 @@ void
 dphold(devplcy_t *dp)
 {
 	ASSERT(dp->dp_ref != 0xdeadbeef && dp->dp_ref != 0);
-	atomic_add_32(&dp->dp_ref, 1);
+	atomic_inc_32(&dp->dp_ref);
 }
 
 void
 dpfree(devplcy_t *dp)
 {
 	ASSERT(dp->dp_ref != 0xdeadbeef && dp->dp_ref != 0);
-	if (atomic_add_32_nv(&dp->dp_ref, -1) == 0)
+	if (atomic_dec_32_nv(&dp->dp_ref) == 0)
 		kmem_free(dp, sizeof (*dp));
 }
 

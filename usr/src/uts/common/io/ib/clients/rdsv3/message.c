@@ -68,7 +68,7 @@ rdsv3_message_addref(struct rdsv3_message *rm)
 {
 	RDSV3_DPRINTF5("rdsv3_message_addref", "addref rm %p ref %d",
 	    rm, atomic_get(&rm->m_refcount));
-	atomic_add_32(&rm->m_refcount, 1);
+	atomic_inc_32(&rm->m_refcount);
 }
 
 /*

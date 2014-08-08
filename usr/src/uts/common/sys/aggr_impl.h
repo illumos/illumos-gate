@@ -234,26 +234,26 @@ typedef struct aggr_grp_s {
 } aggr_grp_t;
 
 #define	AGGR_GRP_REFHOLD(grp) {			\
-	atomic_add_32(&(grp)->lg_refs, 1);	\
+	atomic_inc_32(&(grp)->lg_refs);	\
 	ASSERT((grp)->lg_refs != 0);		\
 }
 
 #define	AGGR_GRP_REFRELE(grp) {					\
 	ASSERT((grp)->lg_refs != 0);				\
 	membar_exit();						\
-	if (atomic_add_32_nv(&(grp)->lg_refs, -1) == 0)		\
+	if (atomic_dec_32_nv(&(grp)->lg_refs) == 0)		\
 		aggr_grp_free(grp);				\
 }
 
 #define	AGGR_PORT_REFHOLD(port) {		\
-	atomic_add_32(&(port)->lp_refs, 1);	\
+	atomic_inc_32(&(port)->lp_refs);	\
 	ASSERT((port)->lp_refs != 0);		\
 }
 
 #define	AGGR_PORT_REFRELE(port) {				\
 	ASSERT((port)->lp_refs != 0);				\
 	membar_exit();						\
-	if (atomic_add_32_nv(&(port)->lp_refs, -1) == 0)	\
+	if (atomic_dec_32_nv(&(port)->lp_refs) == 0)	\
 		aggr_port_free(port);				\
 }
 

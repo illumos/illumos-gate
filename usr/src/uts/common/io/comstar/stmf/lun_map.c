@@ -267,7 +267,7 @@ stmf_session_destroy_lun_map(stmf_i_local_port_t *ilport,
 				}
 				ilu = (stmf_i_lu_t *)
 				    ent->ent_lu->lu_stmf_private;
-				atomic_add_32(&ilu->ilu_ref_cnt, -1);
+				atomic_dec_32(&ilu->ilu_ref_cnt);
 				kmem_free(sm->lm_plus[n],
 				    sizeof (stmf_lun_map_ent_t));
 			}
@@ -420,7 +420,7 @@ stmf_add_lu_to_session(stmf_i_local_port_t *ilport,
 	lun_map_ent->ent_lu = lu;
 	ret = stmf_add_ent_to_map(sm, (void *)lun_map_ent, lu_nbr);
 	ASSERT(ret == STMF_SUCCESS);
-	atomic_add_32(&ilu->ilu_ref_cnt, 1);
+	atomic_inc_32(&ilu->ilu_ref_cnt);
 	/*
 	 * do not set lun inventory flag for standby port
 	 * as this would be handled from peer
@@ -457,7 +457,7 @@ stmf_remove_lu_from_session(stmf_i_local_port_t *ilport,
 
 	ret = stmf_remove_ent_from_map(sm, lu_nbr);
 	ASSERT(ret == STMF_SUCCESS);
-	atomic_add_32(&ilu->ilu_ref_cnt, -1);
+	atomic_dec_32(&ilu->ilu_ref_cnt);
 	iss->iss_flags |= ISS_LUN_INVENTORY_CHANGED;
 	if (lun_map_ent->ent_itl_datap) {
 		stmf_do_itl_dereg(lu, lun_map_ent->ent_itl_datap,
@@ -684,7 +684,7 @@ stmf_append_id(stmf_id_list_t *idlist, stmf_id_data_t *id)
 		idlist->idl_tail->id_next = id;
 		idlist->idl_tail = id;
 	}
-	atomic_add_32(&idlist->id_count, 1);
+	atomic_inc_32(&idlist->id_count);
 }
 
 void
@@ -701,7 +701,7 @@ stmf_remove_id(stmf_id_list_t *idlist, stmf_id_data_t *id)
 	} else {
 		idlist->idl_head = id->id_next;
 	}
-	atomic_add_32(&idlist->id_count, -1);
+	atomic_dec_32(&idlist->id_count);
 }
 
 

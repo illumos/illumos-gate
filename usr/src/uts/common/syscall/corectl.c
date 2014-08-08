@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/proc.h>
 #include <sys/systm.h>
 #include <sys/param.h>
@@ -105,13 +103,13 @@ corectl_content_set(corectl_content_t *ccp, core_content_t content)
 void
 corectl_content_hold(corectl_content_t *ccp)
 {
-	atomic_add_32(&ccp->ccc_refcnt, 1);
+	atomic_inc_32(&ccp->ccc_refcnt);
 }
 
 void
 corectl_content_rele(corectl_content_t *ccp)
 {
-	if (atomic_add_32_nv(&ccp->ccc_refcnt, -1) == 0)
+	if (atomic_dec_32_nv(&ccp->ccc_refcnt) == 0)
 		kmem_free(ccp, sizeof (corectl_content_t));
 }
 
@@ -154,13 +152,13 @@ corectl_path_set(corectl_path_t *ccp, const char *path)
 void
 corectl_path_hold(corectl_path_t *ccp)
 {
-	atomic_add_32(&ccp->ccp_refcnt, 1);
+	atomic_inc_32(&ccp->ccp_refcnt);
 }
 
 void
 corectl_path_rele(corectl_path_t *ccp)
 {
-	if (atomic_add_32_nv(&ccp->ccp_refcnt, -1) == 0) {
+	if (atomic_dec_32_nv(&ccp->ccp_refcnt) == 0) {
 		refstr_rele(ccp->ccp_path);
 		kmem_free(ccp, sizeof (corectl_path_t));
 	}

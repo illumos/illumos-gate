@@ -2629,7 +2629,7 @@ pf_ereport_setup(dev_info_t *dip, uint64_t ena, nvlist_t **ereport,
 
 	*eqep = errorq_reserve(fmhdl->fh_errorq);
 	if (*eqep == NULL) {
-		atomic_add_64(&fmhdl->fh_kstat.fek_erpt_dropped.value.ui64, 1);
+		atomic_inc_64(&fmhdl->fh_kstat.fek_erpt_dropped.value.ui64);
 		return (DDI_FAILURE);
 	}
 

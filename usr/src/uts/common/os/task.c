@@ -373,7 +373,7 @@ task_hold_by_id_zone(taskid_t id, zoneid_t zoneid)
 
 	mutex_enter(&task_hash_lock);
 	if ((tk = task_find(id, zoneid)) != NULL)
-		atomic_add_32(&tk->tk_hold_count, 1);
+		atomic_inc_32(&tk->tk_hold_count);
 	mutex_exit(&task_hash_lock);
 
 	return (tk);
@@ -406,7 +406,7 @@ task_hold_by_id(taskid_t id)
 void
 task_hold(task_t *tk)
 {
-	atomic_add_32(&tk->tk_hold_count, 1);
+	atomic_inc_32(&tk->tk_hold_count);
 }
 
 /*

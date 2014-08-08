@@ -309,9 +309,9 @@ lib_va_free(struct lib_va *lvp)
 		vmem_xfree(is_64bit ? lib_va_64_arena : lib_va_32_arena,
 		    lvp->lv_base_va, lvp->lv_len);
 		if (is_64bit) {
-			atomic_add_32(&libs_mapped_64, -1);
+			atomic_dec_32(&libs_mapped_64);
 		} else {
-			atomic_add_32(&libs_mapped_32, -1);
+			atomic_dec_32(&libs_mapped_32);
 		}
 	}
 	kmem_free(lvp, sizeof (struct lib_va));
@@ -472,10 +472,10 @@ lib_va_add_hash(caddr_t base_va, ssize_t len, size_t align, vattr_t *vap)
 
 	if (base_va != NULL) {
 		if (model == DATAMODEL_LP64) {
-			atomic_add_32(&libs_mapped_64, 1);
+			atomic_inc_32(&libs_mapped_64);
 		} else {
 			ASSERT(model == DATAMODEL_ILP32);
-			atomic_add_32(&libs_mapped_32, 1);
+			atomic_inc_32(&libs_mapped_32);
 		}
 	}
 	ASSERT(*tmp == NULL);

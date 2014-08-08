@@ -465,7 +465,7 @@ static const struct rpc_cots_client {
 };
 
 #define	COTSRCSTAT_INCR(p, x)	\
-	atomic_add_64(&(p)->x.value.ui64, 1)
+	atomic_inc_64(&(p)->x.value.ui64)
 
 #define	CLNT_MAX_CONNS	1	/* concurrent connections between clnt/srvr */
 int clnt_max_conns = CLNT_MAX_CONNS;
@@ -2795,7 +2795,7 @@ connmgr_connect(
 	 * We need to increment rpc_kstat_instance atomically to prevent
 	 * two kstats being created with the same instance.
 	 */
-	kstat_instance = atomic_add_32_nv((uint32_t *)&rpc_kstat_instance, 1);
+	kstat_instance = atomic_inc_32_nv((uint32_t *)&rpc_kstat_instance);
 
 	if ((cm_entry->x_ksp = kstat_create_zone("unix", kstat_instance,
 	    "rpc_cots_connections", "rpc", KSTAT_TYPE_NAMED,

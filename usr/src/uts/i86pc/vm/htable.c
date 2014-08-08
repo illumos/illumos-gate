@@ -303,7 +303,7 @@ ptable_alloc(uintptr_t seed)
 	pfn = pp->p_pagenum;
 	if (pfn == PFN_INVALID)
 		panic("ptable_alloc(): Invalid PFN!!");
-	atomic_add_32(&active_ptables, 1);
+	atomic_inc_32(&active_ptables);
 	HATSTAT_INC(hs_ptable_allocs);
 	return (pfn);
 }
@@ -322,7 +322,7 @@ ptable_free(pfn_t pfn)
 	 */
 	ASSERT(pfn != PFN_INVALID);
 	HATSTAT_INC(hs_ptable_frees);
-	atomic_add_32(&active_ptables, -1);
+	atomic_dec_32(&active_ptables);
 	if (pp == NULL)
 		panic("ptable_free(): no page for pfn!");
 	ASSERT(PAGE_SHARED(pp));
@@ -460,7 +460,7 @@ htable_steal(uint_t cnt)
 	 * Loop through all user hats. The 1st pass takes cached htables that
 	 * aren't in use. The later passes steal by removing mappings, too.
 	 */
-	atomic_add_32(&htable_dont_cache, 1);
+	atomic_inc_32(&htable_dont_cache);
 	for (pass = 0; pass <= htable_steal_passes && stolen < cnt; ++pass) {
 		threshold = pass * mmu.ptes_per_table / htable_steal_passes;
 		hat = kas.a_hat;
@@ -669,7 +669,7 @@ htable_steal(uint_t cnt)
 			} while (stolen < cnt && h != h_start);
 		}
 	}
-	atomic_add_32(&htable_dont_cache, -1);
+	atomic_dec_32(&htable_dont_cache);
 	return (list);
 }
 
@@ -985,7 +985,7 @@ htable_purge_hat(hat_t *hat)
 	 * Purge the htable cache if just reaping.
 	 */
 	if (!(hat->hat_flags & HAT_FREEING)) {
-		atomic_add_32(&htable_dont_cache, 1);
+		atomic_inc_32(&htable_dont_cache);
 		for (;;) {
 			hat_enter(hat);
 			ht = hat->hat_ht_cached;
@@ -997,7 +997,7 @@ htable_purge_hat(hat_t *hat)
 			hat_exit(hat);
 			htable_free(ht);
 		}
-		atomic_add_32(&htable_dont_cache, -1);
+		atomic_dec_32(&htable_dont_cache);
 		return;
 	}
 

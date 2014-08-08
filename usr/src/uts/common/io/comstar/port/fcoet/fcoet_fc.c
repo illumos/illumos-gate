@@ -304,7 +304,7 @@ fcoet_xfer_scsi_data(fct_cmd_t *cmd, stmf_data_buf_t *dbuf, uint32_t ioflags)
 		FFM_S_ID(cmd->cmd_lportid, frm);
 		FFM_D_ID(cmd->cmd_rportid, frm);
 		FFM_SEQ_CNT(xch->xch_sequence_no, frm);
-		atomic_add_8(&xch->xch_sequence_no, 1);
+		atomic_inc_8(&xch->xch_sequence_no);
 		FFM_PARAM(offset, frm);
 		offset += data_size;
 		left_size -= data_size;
@@ -938,9 +938,9 @@ fcoet_logo_fabric(fcoet_soft_state_t *ss)
 		fcoet_init_tfm(frm, NULL);
 		bzero(frm->frm_payload, frm->frm_payload_size);
 	}
-	xch_oxid = atomic_add_16_nv(&ss->ss_next_sol_oxid, 1);
+	xch_oxid = atomic_inc_16_nv(&ss->ss_next_sol_oxid);
 	if (xch_oxid == 0xFFFF) {
-		xch_oxid = atomic_add_16_nv(&ss->ss_next_sol_oxid, 1);
+		xch_oxid = atomic_inc_16_nv(&ss->ss_next_sol_oxid);
 	}
 	FFM_R_CTL(0x22, frm);
 	FRM2TFM(frm)->tfm_rctl = 0x22;

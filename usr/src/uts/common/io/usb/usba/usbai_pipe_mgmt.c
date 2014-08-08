@@ -458,7 +458,7 @@ usba_init_pipe_handle(dev_info_t *dip,
 		    "USB_%s_%x_pipehndl_tq_%d",
 		    ddi_driver_name(dip), ep->bEndpointAddress, instance);
 	} else {
-		def_instance = atomic_add_32_nv(&anon_instance, 1);
+		def_instance = atomic_inc_32_nv(&anon_instance);
 
 		(void) snprintf(tq_name, sizeof (tq_name),
 		    "USB_%s_%x_pipehndl_tq_%d_",

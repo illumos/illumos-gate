@@ -2653,7 +2653,7 @@ hold_dm(struct streamtab *str, uint32_t qflag, uint32_t sqtype)
 	rw_enter(&perdm_rwlock, RW_READER);
 	for (p = perdm_list; p != NULL; p = p->dm_next) {
 		if (p->dm_str == str) {	/* found one */
-			atomic_add_32(&(p->dm_ref), 1);
+			atomic_inc_32(&(p->dm_ref));
 			rw_exit(&perdm_rwlock);
 			return (p);
 		}

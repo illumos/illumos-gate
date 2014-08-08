@@ -1213,7 +1213,7 @@ biowait(struct buf *bp)
 	ASSERT(SEMA_HELD(&bp->b_sem));
 
 	cpup = CPU;
-	atomic_add_64(&cpup->cpu_stats.sys.iowait, 1);
+	atomic_inc_64(&cpup->cpu_stats.sys.iowait);
 	DTRACE_IO1(wait__start, struct buf *, bp);
 
 	/*
@@ -1226,7 +1226,7 @@ biowait(struct buf *bp)
 		sema_p(&bp->b_io);
 
 	DTRACE_IO1(wait__done, struct buf *, bp);
-	atomic_add_64(&cpup->cpu_stats.sys.iowait, -1);
+	atomic_dec_64(&cpup->cpu_stats.sys.iowait);
 
 	error = geterror(bp);
 	if ((bp->b_flags & B_ASYNC) == 0) {

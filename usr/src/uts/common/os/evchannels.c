@@ -379,7 +379,7 @@ evch_gevent_free(evch_gevent_t *evp)
 {
 	int32_t refcnt;
 
-	refcnt = (int32_t)atomic_add_32_nv(&evp->ge_refcount, -1);
+	refcnt = (int32_t)atomic_dec_32_nv(&evp->ge_refcount);
 	if (refcnt <= 0) {
 		if (evp->ge_destruct != NULL) {
 			evp->ge_destruct((void *)&(evp->ge_payload),
@@ -647,7 +647,7 @@ evch_evq_pub(evch_eventq_t *eqp, void *ev, int flags)
 	}
 	qep->q_objref = (void *)evp;
 	qep->q_objsize = size;
-	atomic_add_32(&evp->ge_refcount, 1);
+	atomic_inc_32(&evp->ge_refcount);
 	mutex_enter(&eqp->eq_queuemx);
 	evch_q_in(&eqp->eq_eventq, qep);
 

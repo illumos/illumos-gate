@@ -4808,7 +4808,7 @@ emlxs_sli3_handle_ring_event(emlxs_hba_t *hba, int32_t ring_no,
 			}
 #endif /* SFCT_SUPPORT */
 			cp->hbaCmplCmd_sbp++;
-			atomic_add_32(&hba->io_active, -1);
+			atomic_dec_32(&hba->io_active);
 
 			/* Copy entry to sbp's iocbq */
 			iocbq = &sbp->iocbq;
@@ -5218,7 +5218,7 @@ emlxs_sli3_issue_iocb(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
 		sbp->pkt_flags |= PACKET_IN_CHIPQ;
 		mutex_exit(&sbp->mtx);
 
-		atomic_add_32(&hba->io_active, 1);
+		atomic_inc_32(&hba->io_active);
 
 #ifdef SFCT_SUPPORT
 #ifdef FCT_IO_TRACE

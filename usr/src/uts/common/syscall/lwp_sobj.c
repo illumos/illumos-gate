@@ -195,7 +195,7 @@ lwpchan_delete_mapping(proc_t *p, caddr_t start, caddr_t end)
 				if ((addr = ent->lwpchan_uaddr) != NULL)
 					lwp_mutex_unregister(addr);
 				kmem_free(ent, sizeof (*ent));
-				atomic_add_32(&lcp->lwpchan_entries, -1);
+				atomic_dec_32(&lcp->lwpchan_entries);
 			} else {
 				prev = &ent->lwpchan_next;
 			}
@@ -468,7 +468,7 @@ top:
 	ent->lwpchan_lwpchan = *lwpchan;
 	ent->lwpchan_next = hashbucket->lwpchan_chain;
 	hashbucket->lwpchan_chain = ent;
-	atomic_add_32(&lcp->lwpchan_entries, 1);
+	atomic_inc_32(&lcp->lwpchan_entries);
 	mutex_exit(&hashbucket->lwpchan_lock);
 	return (1);
 }
