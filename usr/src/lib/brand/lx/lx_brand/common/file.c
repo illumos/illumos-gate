@@ -46,6 +46,9 @@
 #include <sys/lx_misc.h>
 #include <sys/lx_fcntl.h>
 
+#define	LX_UTIME_NOW	((1l << 30) - 1l)
+#define	LX_UTIME_OMIT	((1l << 30) - 2l)
+
 static int
 install_checkpath(uintptr_t p1)
 {
@@ -601,6 +604,25 @@ lx_futimesat(uintptr_t p1, uintptr_t p2, uintptr_t p3)
  * feature, the call futimens(fd, times) is implemented as:
  *
  *     utimensat(fd, NULL, times, 0);
+ *
+ * Some of the returns fail here. Linux allows the time to be modified if:
+ *
+ *   the caller must have write access to the file
+ * or
+ *   the caller's effective user ID must match the owner of the file
+ * or
+ *   the caller must have appropriate privileges
+ *
+ * We behave differently. We fail with EPERM if:
+ *
+ *   the calling process's euid has write access to the file but does not match
+ *   the owner of the file and the calling process does not have the
+ *   appropriate privileges
+ *
+ * This causes some of the LTP utimensat tests to fail because they expect an
+ * unprivileged process can update the time on a file it can write but does not
+ * own. There are also other LTP failures when the test uses attributes
+ * (e.g. chattr a+) and expects a failure, but we succeed.
  */
 int
 lx_utimensat(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4)
@@ -608,7 +630,25 @@ lx_utimensat(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4)
 	int fd = (int)p1;
 	const char *path = (const char *)p2;
 	const timespec_t *times = (const timespec_t *)p3;
+	timespec_t ts[2];
 	int flag = (int)p4;
+
+	if (times != NULL) {
+		if (uucopy((void *)p3, ts, sizeof (ts)) == -1)
+			return (-errno);
+
+		if (ts[0].tv_nsec == LX_UTIME_NOW)
+			ts[0].tv_nsec = UTIME_NOW;
+		if (ts[1].tv_nsec == LX_UTIME_NOW)
+			ts[1].tv_nsec = UTIME_NOW;
+
+		if (ts[0].tv_nsec == LX_UTIME_OMIT)
+			ts[0].tv_nsec = UTIME_OMIT;
+		if (ts[1].tv_nsec == LX_UTIME_OMIT)
+			ts[1].tv_nsec = UTIME_OMIT;
+
+		times = (const timespec_t *)ts;
+	}
 
 	if (flag == LX_AT_SYMLINK_NOFOLLOW)
 		flag = AT_SYMLINK_NOFOLLOW;
