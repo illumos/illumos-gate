@@ -198,8 +198,8 @@ volatile int stmf_worker_scale_down_delay = 20;
 
 /* === [ Debugging and fault injection ] === */
 #ifdef	DEBUG
-volatile int stmf_drop_task_counter = 0;
-volatile int stmf_drop_buf_counter = 0;
+volatile uint32_t stmf_drop_task_counter = 0;
+volatile uint32_t stmf_drop_buf_counter = 0;
 
 #endif
 
@@ -4613,8 +4613,7 @@ stmf_xfer_data(scsi_task_t *task, stmf_data_buf_t *dbuf, uint32_t ioflags)
 		return (STMF_ABORTED);
 #ifdef	DEBUG
 	if (!(ioflags & STMF_IOF_STATS_ONLY) && stmf_drop_buf_counter > 0) {
-		if (atomic_dec_32_nv((uint32_t *)&stmf_drop_buf_counter) ==
-		    1)
+		if (atomic_dec_32_nv(&stmf_drop_buf_counter) == 1)
 			return (STMF_SUCCESS);
 	}
 #endif
@@ -6342,10 +6341,9 @@ out_itask_flag_loop:
 			}
 #ifdef	DEBUG
 			if (stmf_drop_task_counter > 0) {
-				if (atomic_dec_32_nv(
-				    (uint32_t *)&stmf_drop_task_counter) == 1) {
+				if (atomic_dec_32_nv(&stmf_drop_task_counter)
+				    == 1)
 					break;
-				}
 			}
 #endif
 			DTRACE_PROBE1(scsi__task__start, scsi_task_t *, task);
