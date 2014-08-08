@@ -27,8 +27,6 @@
 #ifndef	_SYS_ATOMIC_H
 #define	_SYS_ATOMIC_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/inttypes.h>
 
@@ -413,20 +411,6 @@ extern void membar_consumer();
 
 #if defined(__sparc)
 extern uint8_t ldstub(uint8_t *);
-#endif
-
-/*
- * Legacy kernel interfaces; they will go away (eventually).
- */
-extern uint8_t cas8(uint8_t *, uint8_t, uint8_t);
-extern uint32_t cas32(uint32_t *, uint32_t, uint32_t);
-extern uint64_t cas64(uint64_t *, uint64_t, uint64_t);
-extern ulong_t caslong(ulong_t *, ulong_t, ulong_t);
-extern void *casptr(void *, void *, void *);
-extern void atomic_and_long(ulong_t *, ulong_t);
-extern void atomic_or_long(ulong_t *, ulong_t);
-#if defined(__sparc)
-extern uint32_t swapl(uint32_t *, uint32_t);
 #endif
 
 #endif	/* _KERNEL */
