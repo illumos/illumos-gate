@@ -2773,8 +2773,8 @@ lgrp_loadavg(lpl_t *lpl, uint_t nrcpus, int ageflag)
 					new = LGRP_LOADAVG_MAX;
 				else if (new < 0)
 					new = 0;
-			} while (cas32((lgrp_load_t *)&lpl->lpl_loadavg, old,
-			    new) != old);
+			} while (atomic_cas_32((lgrp_load_t *)&lpl->lpl_loadavg,
+			    old, new) != old);
 		} else {
 			/*
 			 * We're supposed to update the load, but not age it.
@@ -2792,8 +2792,8 @@ lgrp_loadavg(lpl_t *lpl, uint_t nrcpus, int ageflag)
 				 */
 				if (new < old)
 					new = LGRP_LOADAVG_MAX;
-			} while (cas32((lgrp_load_t *)&lpl->lpl_loadavg, old,
-			    new) != old);
+			} while (atomic_cas_32((lgrp_load_t *)&lpl->lpl_loadavg,
+			    old, new) != old);
 		}
 
 		/*
@@ -3354,7 +3354,7 @@ lgrp_move_thread(kthread_t *t, lpl_t *newlpl, int do_lgrpset_delete)
 						 */
 						new = 0;
 					}
-				} while (cas32(
+				} while (atomic_cas_32(
 				    (lgrp_load_t *)&lpl->lpl_loadavg, old,
 				    new) != old);
 
@@ -3423,8 +3423,8 @@ lgrp_move_thread(kthread_t *t, lpl_t *newlpl, int do_lgrpset_delete)
 				 */
 				if (new < old)
 					new = UINT32_MAX;
-			} while (cas32((lgrp_load_t *)&lpl->lpl_loadavg, old,
-			    new) != old);
+			} while (atomic_cas_32((lgrp_load_t *)&lpl->lpl_loadavg,
+			    old, new) != old);
 
 			lpl = lpl->lpl_parent;
 			if (lpl == NULL)

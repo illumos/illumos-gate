@@ -3678,7 +3678,7 @@ sfmmu_shadow_hcreate(sfmmu_t *sfmmup, caddr_t vaddr, int ttesz, uint_t flags)
 	do {
 		shw_mask = hmeblkp->hblk_shw_mask;
 		newshw_mask = shw_mask | (1 << vshift);
-		newshw_mask = cas32(&hmeblkp->hblk_shw_mask, shw_mask,
+		newshw_mask = atomic_cas_32(&hmeblkp->hblk_shw_mask, shw_mask,
 		    newshw_mask);
 	} while (newshw_mask != shw_mask);
 
@@ -11678,7 +11678,7 @@ sfmmu_steal_this_hblk(struct hmehash_bucket *hmebp, struct hme_blk *hmeblkp,
 			shw_mask = shw_hblkp->hblk_shw_mask;
 			ASSERT(shw_mask & (1 << vshift));
 			newshw_mask = shw_mask & ~(1 << vshift);
-			newshw_mask = cas32(&shw_hblkp->hblk_shw_mask,
+			newshw_mask = atomic_cas_32(&shw_hblkp->hblk_shw_mask,
 			    shw_mask, newshw_mask);
 		} while (newshw_mask != shw_mask);
 		hmeblkp->hblk_shadow = NULL;
@@ -15757,7 +15757,7 @@ sfmmu_hblk_hash_rm(struct hmehash_bucket *hmebp, struct hme_blk *hmeblkp,
 			shw_mask = shw_hblkp->hblk_shw_mask;
 			ASSERT(shw_mask & (1 << vshift));
 			newshw_mask = shw_mask & ~(1 << vshift);
-			newshw_mask = cas32(&shw_hblkp->hblk_shw_mask,
+			newshw_mask = atomic_cas_32(&shw_hblkp->hblk_shw_mask,
 			    shw_mask, newshw_mask);
 		} while (newshw_mask != shw_mask);
 		hmeblkp->hblk_shadow = NULL;

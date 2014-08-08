@@ -4324,7 +4324,7 @@ ce_count_unum(int status, int len, char *unum)
 	/*
 	 * Initialize the leaky_bucket timeout
 	 */
-	if (casptr(&leaky_bucket_timeout_id,
+	if (atomic_cas_ptr(&leaky_bucket_timeout_id,
 	    TIMEOUT_NONE, TIMEOUT_SET) == TIMEOUT_NONE)
 		add_leaky_bucket_timeout();
 

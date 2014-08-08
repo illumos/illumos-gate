@@ -247,7 +247,8 @@ ksyms_open(dev_t *devp, int flag, int otyp, struct cred *cred)
 	 * since that's the "real" minor number.
 	 */
 	for (clone = 1; clone < nksyms_clones; clone++) {
-		if (casptr(&ksyms_clones[clone].ksyms_base, 0, addr) == 0) {
+		if (atomic_cas_ptr(&ksyms_clones[clone].ksyms_base, 0, addr) ==
+		    0) {
 			ksyms_clones[clone].ksyms_size = realsize;
 			*devp = makedevice(getemajor(*devp), clone);
 			(void) ddi_prop_update_int(*devp, ksyms_devi,

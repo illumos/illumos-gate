@@ -373,8 +373,8 @@ start_again:
 				    tx_ring_p->tdc));
 				goto nxge_start_fail_lso;
 			} else {
-				(void) cas32((uint32_t *)&tx_ring_p->queueing,
-				    0, 1);
+				(void) atomic_cas_32(
+				    (uint32_t *)&tx_ring_p->queueing, 0, 1);
 				tdc_stats->tx_no_desc++;
 
 				if (isLDOMservice(nxgep)) {

@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * zuluvm module
  *
@@ -78,7 +76,7 @@
 #define	ZULUVM_UNLOCK mutex_exit(&(zdev->dev_lck))
 
 #define	ZULUVM_SET_STATE(_z, b, c) \
-	cas32((uint32_t *)&((_z)->zvm.state), c, b)
+	atomic_cas_32((uint32_t *)&((_z)->zvm.state), c, b)
 #define	ZULUVM_GET_STATE(_z) \
 	(_z)->zvm.state
 #define	ZULUVM_SET_IDLE(_z) \

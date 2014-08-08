@@ -550,7 +550,7 @@ cpu_intr_swtch_enter(kthread_id_t t)
 		do {
 			start = t->t_intr_start;
 			interval = CLOCK_TICK_COUNTER() - start;
-		} while (cas64(&t->t_intr_start, start, 0) != start);
+		} while (atomic_cas_64(&t->t_intr_start, start, 0) != start);
 		cpu = CPU;
 		if (cpu->cpu_m.divisor > 1)
 			interval *= cpu->cpu_m.divisor;
@@ -577,7 +577,8 @@ cpu_intr_swtch_exit(kthread_id_t t)
 
 	do {
 		ts = t->t_intr_start;
-	} while (cas64(&t->t_intr_start, ts, CLOCK_TICK_COUNTER()) != ts);
+	} while (atomic_cas_64(&t->t_intr_start, ts, CLOCK_TICK_COUNTER()) !=
+	    ts);
 }
 
 

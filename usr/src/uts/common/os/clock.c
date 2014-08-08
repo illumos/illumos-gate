@@ -1650,7 +1650,7 @@ profil_tick(uintptr_t upc)
 
 	do {
 		ticks = lwp->lwp_oweupc;
-	} while (cas32(&lwp->lwp_oweupc, ticks, 0) != ticks);
+	} while (atomic_cas_32(&lwp->lwp_oweupc, ticks, 0) != ticks);
 
 	mutex_enter(&p->p_pflock);
 	if (pr->pr_scale >= 2 && upc >= pr->pr_off) {

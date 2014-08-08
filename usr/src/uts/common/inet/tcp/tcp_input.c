@@ -1939,7 +1939,8 @@ tcp_input_listener_unbound(void *arg, mblk_t *mp, void *arg2,
 		}
 		if (connp->conn_sqp != new_sqp) {
 			while (connp->conn_sqp != new_sqp)
-				(void) casptr(&connp->conn_sqp, sqp, new_sqp);
+				(void) atomic_cas_ptr(&connp->conn_sqp, sqp,
+				    new_sqp);
 			/* No special MT issues for outbound ixa_sqp hint */
 			connp->conn_ixa->ixa_sqp = new_sqp;
 		}
@@ -1947,8 +1948,8 @@ tcp_input_listener_unbound(void *arg, mblk_t *mp, void *arg2,
 		do {
 			conn_flags = connp->conn_flags;
 			conn_flags |= IPCL_FULLY_BOUND;
-			(void) cas32(&connp->conn_flags, connp->conn_flags,
-			    conn_flags);
+			(void) atomic_cas_32(&connp->conn_flags,
+			    connp->conn_flags, conn_flags);
 		} while (!(connp->conn_flags & IPCL_FULLY_BOUND));
 
 		mutex_exit(&connp->conn_fanout->connf_lock);

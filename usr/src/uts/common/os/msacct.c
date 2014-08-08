@@ -589,7 +589,7 @@ cpu_update_pct(kthread_t *t, hrtime_t newtime)
 			pctcpu = t->t_pctcpu;
 			npctcpu = cpu_decay(pctcpu, delta);
 		}
-	} while (cas32(&t->t_pctcpu, pctcpu, npctcpu) != pctcpu);
+	} while (atomic_cas_32(&t->t_pctcpu, pctcpu, npctcpu) != pctcpu);
 
 	return (npctcpu);
 }
@@ -657,7 +657,8 @@ new_mstate(kthread_t *t, int new_state)
 		newtime += oldtime;
 		t->t_mstate = new_state;
 		ms->ms_state_start = curtime;
-	} while (cas64((uint64_t *)mstimep, oldtime, newtime) != oldtime);
+	} while (atomic_cas_64((uint64_t *)mstimep, oldtime, newtime) !=
+	    oldtime);
 
 	/*
 	 * When the system boots the initial startup thread will have a
@@ -781,7 +782,8 @@ restore_mstate(kthread_t *t)
 		}
 		oldtime = *mstimep;
 		newtime += oldtime;
-	} while (cas64((uint64_t *)mstimep, oldtime, newtime) != oldtime);
+	} while (atomic_cas_64((uint64_t *)mstimep, oldtime, newtime) !=
+	    oldtime);
 
 	/*
 	 * Update the WAIT_CPU timer and per-cpu waitrq total.

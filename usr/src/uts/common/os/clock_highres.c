@@ -93,7 +93,7 @@ clock_highres_fire(void *arg)
 
 	do {
 		old = *addr;
-	} while (cas64((uint64_t *)addr, old, new) != old);
+	} while (atomic_cas_64((uint64_t *)addr, old, new) != old);
 
 	timer_fire(it);
 }
@@ -235,10 +235,10 @@ clock_highres_timer_gettime(itimer_t *it, struct itimerspec *when)
 	hrtime_t last;
 
 	/*
-	 * We're using cas64() here only to assure that we slurp the entire
-	 * timestamp atomically.
+	 * We're using atomic_cas_64() here only to assure that we slurp the
+	 * entire timestamp atomically.
 	 */
-	last = cas64((uint64_t *)addr, 0, 0);
+	last = atomic_cas_64((uint64_t *)addr, 0, 0);
 
 	*when = it->it_itime;
 

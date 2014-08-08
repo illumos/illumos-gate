@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/cmn_err.h>
@@ -273,7 +271,7 @@ kern_preprom(void)
 			 * previous kpreempt_disable() before returning since
 			 * preemption was disabled by an earlier kern_preprom.
 			 */
-			prcp = casptr((void *)&prom_cpu, NULL, cp);
+			prcp = atomic_cas_ptr((void *)&prom_cpu, NULL, cp);
 			if (prcp == NULL ||
 			    (prcp == cp && prom_thread == curthread)) {
 				if (prcp == cp)
@@ -310,7 +308,7 @@ kern_preprom(void)
 			 * the lock.  If we get it or already hold it, break.
 			 */
 			ASSERT(getpil() == PIL_MAX);
-			prcp = casptr((void *)&prom_cpu, NULL, cp);
+			prcp = atomic_cas_ptr((void *)&prom_cpu, NULL, cp);
 			if (prcp == NULL || prcp == cp)
 				break;
 		}

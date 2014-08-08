@@ -650,7 +650,7 @@ ts_enterclass(kthread_t *t, id_t cid, void *parmsp,
 	 * faster than a mutex (but check with an ordinary load first
 	 * since most of the time this will already be done).
 	 */
-	if (tspexists == 0 && cas32(&tspexists, 0, 1) == 0)
+	if (tspexists == 0 && atomic_cas_32(&tspexists, 0, 1) == 0)
 		(void) timeout(ts_update, NULL, hz);
 
 	return (0);

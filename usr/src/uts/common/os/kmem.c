@@ -3166,7 +3166,7 @@ kmem_reap_common(void *flag_arg)
 	uint32_t *flag = (uint32_t *)flag_arg;
 
 	if (MUTEX_HELD(&kmem_cache_lock) || kmem_taskq == NULL ||
-	    cas32(flag, 0, 1) != 0)
+	    atomic_cas_32(flag, 0, 1) != 0)
 		return;
 
 	/*

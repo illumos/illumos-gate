@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "bge_impl.h"
 
 /*
@@ -49,7 +47,7 @@ bge_atomic_reserve(uint64_t *count_p, uint64_t n)
 		newval = oldval - n;
 		if (oldval <= n)
 			return (0);		/* no resources left	*/
-	} while (cas64(count_p, oldval, newval) != oldval);
+	} while (atomic_cas_64(count_p, oldval, newval) != oldval);
 
 	return (newval);
 }
@@ -67,7 +65,7 @@ bge_atomic_renounce(uint64_t *count_p, uint64_t n)
 	do {
 		oldval = *count_p;
 		newval = oldval + n;
-	} while (cas64(count_p, oldval, newval) != oldval);
+	} while (atomic_cas_64(count_p, oldval, newval) != oldval);
 }
 
 /*
@@ -83,7 +81,7 @@ bge_atomic_claim(uint64_t *count_p, uint64_t limit)
 	do {
 		oldval = *count_p;
 		newval = NEXT(oldval, limit);
-	} while (cas64(count_p, oldval, newval) != oldval);
+	} while (atomic_cas_64(count_p, oldval, newval) != oldval);
 
 	return (oldval);
 }
@@ -102,7 +100,7 @@ bge_atomic_next(uint64_t *sp, uint64_t limit)
 	do {
 		oldval = *sp;
 		newval = NEXT(oldval, limit);
-	} while (cas64(sp, oldval, newval) != oldval);
+	} while (atomic_cas_64(sp, oldval, newval) != oldval);
 
 	return (oldval);
 }
@@ -120,7 +118,7 @@ bge_atomic_sub64(uint64_t *count_p, uint64_t n)
 	do {
 		oldval = *count_p;
 		newval = oldval - n;
-	} while (cas64(count_p, oldval, newval) != oldval);
+	} while (atomic_cas_64(count_p, oldval, newval) != oldval);
 }
 
 /*
@@ -137,7 +135,7 @@ bge_atomic_clr64(uint64_t *sp, uint64_t bits)
 	do {
 		oldval = *sp;
 		newval = oldval & ~bits;
-	} while (cas64(sp, oldval, newval) != oldval);
+	} while (atomic_cas_64(sp, oldval, newval) != oldval);
 
 	return (oldval);
 }
@@ -156,7 +154,7 @@ bge_atomic_shl32(uint32_t *sp, uint_t count)
 	do {
 		oldval = *sp;
 		newval = oldval << count;
-	} while (cas32(sp, oldval, newval) != oldval);
+	} while (atomic_cas_32(sp, oldval, newval) != oldval);
 
 	return (oldval);
 }

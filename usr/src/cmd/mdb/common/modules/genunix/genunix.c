@@ -3607,8 +3607,8 @@ eqd_walk_init(mdb_walk_state_t *wsp)
 
 	/*
 	 * If eq_ptail is set, it may point to a subset of the errors on the
-	 * pending list in the event a casptr() failed; if ptail's data is
-	 * already in our stack, NULL out eq_ptail and ignore it.
+	 * pending list in the event a atomic_cas_ptr() failed; if ptail's
+	 * data is already in our stack, NULL out eq_ptail and ignore it.
 	 */
 	if (eq.eq_ptail != NULL) {
 		for (i = 0; i < eqdp->eqd_qpos; i++) {

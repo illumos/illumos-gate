@@ -38,58 +38,7 @@ extern "C" {
 
 #if defined(__amd64)
 
-extern __GNU_INLINE void
-atomic_or_long(ulong_t *target, ulong_t bits)
-{
-	__asm__ __volatile__(
-	    "lock; orq %1, (%0)"
-	    : /* no output */
-	    : "r" (target), "r" (bits));
-}
-
-extern __GNU_INLINE void
-atomic_and_long(ulong_t *target, ulong_t bits)
-{
-	__asm__ __volatile__(
-	    "lock; andq %1, (%0)"
-	    : /* no output */
-	    : "r" (target), "r" (bits));
-}
-
-#ifdef notdef
-extern __GNU_INLINE uint64_t
-cas64(uint64_t *target, uint64_t cmp,
-	uint64_t newval)
-{
-	uint64_t retval;
-
-	__asm__ __volatile__(
-	    "movq %2, %%rax; lock; cmpxchgq %3, (%1)"
-	    : "=a" (retval)
-	    : "r" (target), "r" (cmp), "r" (newval));
-	return (retval);
-}
-#endif
-
 #elif defined(__i386)
-
-extern __GNU_INLINE void
-atomic_or_long(ulong_t *target, ulong_t bits)
-{
-	__asm__ __volatile__(
-	    "lock; orl %1, (%0)"
-	    : /* no output */
-	    : "r" (target), "r" (bits));
-}
-
-extern __GNU_INLINE void
-atomic_and_long(ulong_t *target, ulong_t bits)
-{
-	__asm__ __volatile__(
-	    "lock; andl %1, (%0)"
-	    : /* no output */
-	    : "r" (target), "r" (bits));
-}
 
 #else
 #error	"port me"

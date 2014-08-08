@@ -27,8 +27,6 @@
 #ifndef _SYS_SYNCH32_H
 #define	_SYS_SYNCH32_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -42,7 +40,7 @@ extern "C" {
 #define	mutex_owner		data
 /* used to atomically operate on whole word via cas or swap instruction */
 #define	mutex_lockword		lock.lock32.lockword
-/* this requires cas64 */
+/* this requires atomic_cas_64 */
 #define	mutex_lockword64	lock.owner64
 /* these are bytes */
 #define	mutex_lockw		lock.lock64.pad[7]

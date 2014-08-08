@@ -798,7 +798,8 @@ dupb(mblk_t *mp)
 			new_mp = NULL;
 			goto out;
 		}
-	} while (cas32(&DBLK_RTFU_WORD(dbp), oldrtfu, newrtfu) != oldrtfu);
+	} while (atomic_cas_32(&DBLK_RTFU_WORD(dbp), oldrtfu, newrtfu) !=
+	    oldrtfu);
 
 out:
 	FTRACE_1("dupb(): new_mp=0x%lx", (uintptr_t)new_mp);
@@ -4250,7 +4251,7 @@ str_ftevent(fthdr_t *hp, void *p, ushort_t evnt, ushort_t data)
 			 * the value is there for it.
 			 */
 			membar_producer();
-			if (casptr(&hp->tail, bp, nbp) == bp) {
+			if (atomic_cas_ptr(&hp->tail, bp, nbp) == bp) {
 				/* CAS was successful */
 				bp->nxt = nbp;
 				membar_producer();
@@ -4264,7 +4265,7 @@ str_ftevent(fthdr_t *hp, void *p, ushort_t evnt, ushort_t data)
 			}
 		}
 		nix = ix + 1;
-		if (cas32((uint32_t *)&bp->ix, ix, nix) == ix) {
+		if (atomic_cas_32((uint32_t *)&bp->ix, ix, nix) == ix) {
 		cas_good:
 			if (curthread != hp->thread) {
 				hp->thread = curthread;

@@ -555,7 +555,7 @@ errorq_dispatch(errorq_t *eqp, const void *data, size_t len, uint_t flag)
 		eep->eqe_prev = old;
 		membar_producer();
 
-		if (casptr(&eqp->eq_pend, old, eep) == old)
+		if (atomic_cas_ptr(&eqp->eq_pend, old, eep) == old)
 			break;
 	}
 
@@ -596,15 +596,16 @@ errorq_drain(errorq_t *eqp)
 	 * make sure that eq_ptail will be visible to errorq_panic() below
 	 * before the pending list is NULLed out.  This section is labeled
 	 * case (1) for errorq_panic, below.  If eq_ptail is not yet set (1A)
-	 * eq_pend has all the pending errors.  If casptr fails or has not
-	 * been called yet (1B), eq_pend still has all the pending errors.
-	 * If casptr succeeds (1C), eq_ptail has all the pending errors.
+	 * eq_pend has all the pending errors.  If atomic_cas_ptr fails or
+	 * has not been called yet (1B), eq_pend still has all the pending
+	 * errors.  If atomic_cas_ptr succeeds (1C), eq_ptail has all the
+	 * pending errors.
 	 */
 	while ((eep = eqp->eq_pend) != NULL) {
 		eqp->eq_ptail = eep;
 		membar_producer();
 
-		if (casptr(&eqp->eq_pend, eep, NULL) == eep)
+		if (atomic_cas_ptr(&eqp->eq_pend, eep, NULL) == eep)
 			break;
 	}
 
@@ -750,13 +751,14 @@ errorq_panic_drain(uint_t what)
 		loggedtmp = eqp->eq_kstat.eqk_logged.value.ui64;
 
 		/*
-		 * In case (1B) above, eq_ptail may be set but the casptr may
-		 * not have been executed yet or may have failed.  Either way,
-		 * we must log errors in chronological order.  So we search
-		 * the pending list for the error pointed to by eq_ptail.  If
-		 * it is found, we know that all subsequent errors are also
-		 * still on the pending list, so just NULL out eq_ptail and let
-		 * errorq_drain(), below, take care of the logging.
+		 * In case (1B) above, eq_ptail may be set but the
+		 * atomic_cas_ptr may not have been executed yet or may have
+		 * failed.  Either way, we must log errors in chronological
+		 * order.  So we search the pending list for the error
+		 * pointed to by eq_ptail.  If it is found, we know that all
+		 * subsequent errors are also still on the pending list, so
+		 * just NULL out eq_ptail and let errorq_drain(), below,
+		 * take care of the logging.
 		 */
 		for (eep = eqp->eq_pend; eep != NULL; eep = eep->eqe_prev) {
 			if (eep == eqp->eq_ptail) {
@@ -790,8 +792,9 @@ errorq_panic_drain(uint_t what)
 		 *
 		 * Unlike errorq_drain(), we don't need to worry about updating
 		 * eq_phead because errorq_panic() will be called at most once.
-		 * However, we must use casptr to update the freelist in case
-		 * errors are still being enqueued during panic.
+		 * However, we must use atomic_cas_ptr to update the
+		 * freelist in case errors are still being enqueued during
+		 * panic.
 		 */
 		for (eep = eqp->eq_phead; eep != NULL; eep = nep) {
 			eqp->eq_func(eqp->eq_private, eep->eqe_data, eep);
@@ -914,7 +917,7 @@ errorq_commit(errorq_t *eqp, errorq_elem_t *eqep, uint_t flag)
 		eqep->eqe_prev = old;
 		membar_producer();
 
-		if (casptr(&eqp->eq_pend, old, eqep) == old)
+		if (atomic_cas_ptr(&eqp->eq_pend, old, eqep) == old)
 			break;
 	}
 

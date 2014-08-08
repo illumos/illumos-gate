@@ -9711,17 +9711,18 @@ again:
 	 * replication and T1 new home is different from lgrp used for text
 	 * replication. When this happens asyncronous segvn thread rechecks if
 	 * segments should change lgrps used for text replication.  If we fail
-	 * to set p_tr_lgrpid with cas32 then set it to NLGRPS_MAX without cas
-	 * if it's not already NLGRPS_MAX and not equal lgrp_id we want to
-	 * use.  We don't need to use cas in this case because another thread
-	 * that races in between our non atomic check and set may only change
-	 * p_tr_lgrpid to NLGRPS_MAX at this point.
+	 * to set p_tr_lgrpid with atomic_cas_32 then set it to NLGRPS_MAX
+	 * without cas if it's not already NLGRPS_MAX and not equal lgrp_id
+	 * we want to use.  We don't need to use cas in this case because
+	 * another thread that races in between our non atomic check and set
+	 * may only change p_tr_lgrpid to NLGRPS_MAX at this point.
 	 */
 	ASSERT(lgrp_id != LGRP_NONE && lgrp_id < NLGRPS_MAX);
 	olid = p->p_tr_lgrpid;
 	if (lgrp_id != olid && olid != NLGRPS_MAX) {
 		lgrp_id_t nlid = (olid == LGRP_NONE) ? lgrp_id : NLGRPS_MAX;
-		if (cas32((uint32_t *)&p->p_tr_lgrpid, olid, nlid) != olid) {
+		if (atomic_cas_32((uint32_t *)&p->p_tr_lgrpid, olid, nlid) !=
+		    olid) {
 			olid = p->p_tr_lgrpid;
 			ASSERT(olid != LGRP_NONE);
 			if (olid != lgrp_id && olid != NLGRPS_MAX) {

@@ -217,7 +217,7 @@ rw_panic(char *msg, rwlock_impl_t *lp)
 	if (panicstr)
 		return;
 
-	if (casptr(&panic_rwlock_addr, NULL, lp) == NULL)
+	if (atomic_cas_ptr(&panic_rwlock_addr, NULL, lp) == NULL)
 		panic_rwlock = *lp;
 
 	panic("%s, lp=%p wwwh=%lx thread=%p",

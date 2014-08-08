@@ -467,7 +467,7 @@ vfs_setops(vfs_t *vfsp, vfsops_t *vfsops)
 	op = vfsp->vfs_op;
 	membar_consumer();
 	if (vfsp->vfs_femhead == NULL &&
-	    casptr(&vfsp->vfs_op, op, vfsops) == op) {
+	    atomic_cas_ptr(&vfsp->vfs_op, op, vfsops) == op) {
 		return;
 	}
 	fsem_setvfsops(vfsp, vfsops);
@@ -2969,7 +2969,7 @@ vfs_mono_time(timespec_t *ts)
 		oldhrt = hrt;
 		if (newhrt <= hrt)
 			newhrt = hrt + 1;
-		if (cas64((uint64_t *)&hrt, oldhrt, newhrt) == oldhrt)
+		if (atomic_cas_64((uint64_t *)&hrt, oldhrt, newhrt) == oldhrt)
 			break;
 	}
 	hrt2ts(newhrt, ts);

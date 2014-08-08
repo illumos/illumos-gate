@@ -840,7 +840,7 @@ segkp_map_red(void)
 
 		atomic_add_32(&red_nmapped, 1);
 		while (fp - (uintptr_t)curthread->t_stkbase < red_closest) {
-			(void) cas32(&red_closest, red_closest,
+			(void) atomic_cas_32(&red_closest, red_closest,
 			    (uint32_t)(fp - (uintptr_t)curthread->t_stkbase));
 		}
 		return (1);
