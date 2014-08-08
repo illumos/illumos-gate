@@ -1,239 +1,66 @@
-'\" te
-.\" Copyright (c) 2001-2007 by Garrett D'Amore.
-.\" Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met: 1. Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
-.\" 2. Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution. 3. Neither the name of the author nor the names of any co-contributors may be used to endorse
-.\" or promote products derived from this software    without specific prior written permission.  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDER AND CONTRIBUTORS ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-.\" FOR A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
-.\" OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
-.\" Portions Copyright (c) 2007 by Sun Microsystems, Inc.  All Rights Reserved.
-.TH AFE 7D "Apr 1, 2007"
-.SH NAME
-afe \- ADMtek Fast Ethernet device driver
-.SH SYNOPSIS
-.LP
-.nf
-\fB/dev/afe\fR
-.fi
-
-.SH DESCRIPTION
-.sp
-.LP
-The \fBafe\fR driver is a multi-threaded,  loadable, clonable, GLD-based
-STREAMS  driver supporting the Data Link Provider Interface \fBdlpi\fR(7P) on
-ADMtek (now Infineon) Centaur and Comet Fast Ethernet controllers.
-.SH APPLICATION PROGRAMMING INTERFACE
-.sp
-.LP
-The \fBafe\fR driver can be used as either a "style 1" or a "style 2" Data Link
-Service Provider. Physical points of attachment (PPAs) are interpreted as the
-instance  number of the \fBafe\fR controller as assigned by the Solaris
-operating environment.
-.sp
-.LP
-The relevant fields returned as part of a \fBDL_INFO_ACK\fR response are:
-.RS +4
-.TP
-.ie t \(bu
-.el o
-Maximum SDU is 1500.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-Minimum SDU is 0.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-The dlsap address length is 8.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-MAC type is \fBDL_ETHER\fR.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-SAP length is -2. The 6-byte physical address is followed immediately by a
-2-byte SAP.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-Service mode is \fBDL_CLDLS\fR.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-Broadcast address is the 6-byte Ethernet broadcast address
-(\fBff:ff:ff:ff:ff:ff\fR).
-.RE
-.sp
-.LP
-If the SAP provided is zero, then \fIIEEE 802.3\fR mode is assumed and outbound
-frames will have the frame payload length written into the type field.
-Likewise, inbound frames with a SAP between zero and 1500 are interpreted as
-\fIIEEE 802.3\fR frames and delivered to any streams that are bound to SAP zero
-(the \fI802.3\fR SAP).
-.SH PROPERTIES
-.sp
-.LP
-The following properties  may  be  configured  using  either \fBndd\fR(1M) or
-the \fBafe.conf\fR configuration file as described by \fBdriver.conf\fR(4):
-.sp
-.ne 2
-.na
-\fB\fBadv_autoneg_cap\fR\fR
-.ad
-.sp .6
-.RS 4n
-Enables (default) or disables \fIIEEE 802.3u\fR auto-negotiation of link speed
-and duplex settings. If enabled, the device negotiates among the supported (and
-configured, see below) link options with the link partner.  If disabled, at
-least one of the link options below must be specified. The driver selects the
-first enabled link option according to the \fIIEEE 802.3u\fR specified
-preferences.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBadv_100T4_cap\fR\fR
-.ad
-.sp .6
-.RS 4n
-Enables the 100 BaseT4 link option.  (Note that most hardware does not support
-this unusual link style.  Also, this uses two pairs of wires for data, rather
-than one.)
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBadv_100fdx_cap\fR\fR
-.ad
-.sp .6
-.RS 4n
-Enables the 100 Base TX full-duplex link option. (This is generally the fastest
-mode if both link partners support it. Most modern equipment supports this
-mode.)
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBadv_100hdx_cap\fR\fR
-.ad
-.sp .6
-.RS 4n
-Enables the 100 Base TX half-duplex link option. (Typically used when the link
-partner is a 100 Mbps hub.)
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBadv_10fdx_cap\fR\fR
-.ad
-.sp .6
-.RS 4n
-Enables the 10 Base-T full-duplex link option.  (This less-frequently used mode
-is typically used when the link partner is a 10 Mbps switch.)
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBadv_10hdx_cap\fR\fR
-.ad
-.sp .6
-.RS 4n
-Enables the 10 Base-T half-duplex link option.  (This is the fall-back when no
-other option is available.  It is typically used when the link partner is a 10
-Mbps hub or is an older network card.)
-.RE
-
-.SH ATTRIBUTES
-.sp
-.LP
-See \fBattributes\fR(5) for a description of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-Architecture	SPARC, x86
-_
-Interface Stability 	Committed
-.TE
-
-.SH FILES
-.sp
-.ne 2
-.na
-\fB\fB/dev/afe\fR\fR
-.ad
-.sp .6
-.RS 4n
+.\" Copyright 2014 Garrett D'Amore <garrett@damore.org>
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that the following conditions
+.\" are met:
+.\" 1. Redistributions of source code must retain the above copyright
+.\"    notice, this list of conditions and the following disclaimer.
+.\" 2. Redistributions in binary form must reproduce the above copyright
+.\"    notice, this list of conditions and the following disclaimer in the
+.\"    documentation and/or other materials provided with the distribution.
+.\"
+.\" THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDER AND CONTRIBUTORS
+.\" ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+.\" LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+.\" FOR A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE
+.\" COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+.\" INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+.\" NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF
+.\" USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+.\" ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+.\" (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+.\" THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
+.\"
+.Dd "Aug 3, 2014"
+.Dt AFE 7D
+.Os
+.Sh NAME
+.Nm afe
+.Nd ADMtek Fast Ethernet device driver
+.Sh SYNOPSIS
+.Pa /dev/afe
+.Sh DESCRIPTION
+The
+.Nm
+driver provides support for the Centaur and Comet families of Fast Ethernet
+PCI controllers originally produced by ADMtek and Infineon.
+.Lp
+These devices generally support the standard Fast Ethernet features, including
+10BASE-T and 100BASE-TX, both full and half duplex operation, IEEE 802.3
+autonegotiation, etc.  They also support full size MTUs (1500 bytes),
+even when used with VLANs.  Most of them also support flow control.
+.
+.Lp
+The device driver supports the
+.Xr ieee802.3 5
+properties, which can be configured with
+.Xr dladm 1M .
+.
+.\" The driver also has a "forcefiber" driver.conf setting, but this is for
+.\" very very obscure hardware, and we are not documenting this option
+.\" for now.
+.
+.Sh FILES
+.Bl -tag -width /dev/afe
+.It Pa /dev/afe
 Special character device.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/kernel/drv/afe\fR\fR
-.ad
-.sp .6
-.RS 4n
-32-bit driver binary (x86).
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/kernel/drv/amd64/afe\fR\fR
-.ad
-.sp .6
-.RS 4n
-64-bit driver binary (x86).
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/kernel/drv/sparcv9/afe\fR\fR
-.ad
-.sp .6
-.RS 4n
-64-bit driver binary (SPARC).
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/kernel/drv/afe.conf\fR\fR
-.ad
-.sp .6
-.RS 4n
-Configuration file.
-.RE
-
-.SH SEE ALSO
-.sp
-.LP
-\fBndd\fR(1M), \fBdriver.conf\fR(4), \fBattributes\fR(5), \fBstreamio\fR(7I),
-\fBdlpi\fR(7P)
-.sp
-.LP
-\fIIEEE 802.3\fR \(em Institute of Electrical and Electronics Engineers, 2002
+.El
+.Sh SEE ALSO
+.Xr dladm 1M ,
+.Xr ifconfig 1M ,
+.Xr pci 4 ,
+.Xr ieee802.3 5 ,
+.Xr dlpi 7P
+.Rs
+.%T IEEE 802.3: Ethernet
+.%Q IEEE Standards Association
+.Re
