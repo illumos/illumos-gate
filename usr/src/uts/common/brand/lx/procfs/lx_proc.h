@@ -227,6 +227,7 @@ extern lxpr_uiobuf_t *lxpr_uiobuf_new(uio_t *);
 extern void lxpr_uiobuf_free(lxpr_uiobuf_t *);
 extern int lxpr_uiobuf_flush(lxpr_uiobuf_t *);
 extern void lxpr_uiobuf_seek(lxpr_uiobuf_t *, offset_t);
+extern boolean_t lxpr_uiobuf_nonblock(lxpr_uiobuf_t *);
 extern void lxpr_uiobuf_write(lxpr_uiobuf_t *, const char *, size_t);
 extern void lxpr_uiobuf_printf(lxpr_uiobuf_t *, const char *, ...);
 extern void lxpr_uiobuf_seterr(lxpr_uiobuf_t *, int);

@@ -88,6 +88,14 @@ lxpr_uiobuf_seek(struct lxpr_uiobuf *uiobuf, offset_t offset)
 	uiobuf->uiop->uio_offset = (off_t)offset;
 }
 
+boolean_t
+lxpr_uiobuf_nonblock(struct lxpr_uiobuf *uiobuf)
+{
+	if ((uiobuf->uiop->uio_fmode & FNONBLOCK) != 0)
+		return (B_TRUE);
+	return (B_FALSE);
+}
+
 void
 lxpr_uiobuf_seterr(struct lxpr_uiobuf *uiobuf, int err)
 {

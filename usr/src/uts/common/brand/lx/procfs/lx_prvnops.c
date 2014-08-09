@@ -1495,7 +1495,8 @@ lxpr_read_net_unix(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
  * lxpr_read_kmsg(): read the contents of the kernel message queue. We
  * translate this into the reception of console messages for this zone; each
  * read copies out a single zone console message, or blocks until the next one
- * is produced.
+ * is produced, unless we're open non-blocking, in which case we return after
+ * 1ms.
  */
 
 #define	LX_KMSG_PRI	"<0>"
@@ -1505,8 +1506,16 @@ lxpr_read_kmsg(lxpr_node_t *lxpnp, struct lxpr_uiobuf *uiobuf)
 {
 	ldi_handle_t	lh = lxpnp->lxpr_cons_ldih;
 	mblk_t		*mp;
+	timestruc_t	to;
+	timestruc_t	*tp = NULL;
 
-	if (ldi_getmsg(lh, &mp, NULL) == 0) {
+	if (lxpr_uiobuf_nonblock(uiobuf)) {
+		to.tv_sec = 0;
+		to.tv_nsec = 1000000; /* 1msec */
+		tp = &to;
+	}
+
+	if (ldi_getmsg(lh, &mp, tp) == 0) {
 		/*
 		 * lx procfs doesn't like successive reads to the same file
 		 * descriptor unless we do an explicit rewind each time.
