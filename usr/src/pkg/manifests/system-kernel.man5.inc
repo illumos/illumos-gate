@@ -10,6 +10,8 @@
 #
 
 # Copyright 2011, Richard Lowe
+# Copyright 2014 Garrett D'Amore <garrett@damore.org>
 
 file path=usr/share/man/man5/fsattr.5
 file path=usr/share/man/man5/ieee802.11.5
+file path=usr/share/man/man5/ieee802.3.5

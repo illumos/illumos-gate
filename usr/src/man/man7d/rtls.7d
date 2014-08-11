@@ -20,19 +20,18 @@
 .\" (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 .\" THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 .\"
-.Dd "Aug 7, 2014"
-.Dt MXFE 7D
+.Dd "Aug 3, 2014"
+.Dt RTLS 7D
 .Os
 .Sh NAME
-.Nm mxfe
-.Nd Macronix Fast Ethernet device driver
+.Nm rtls
+.Nd RealTek Fast Ethernet device driver
 .Sh SYNOPSIS
-.Pa /dev/mxfe
+.Pa /dev/rtls
 .Sh DESCRIPTION
 The
 .Nm
-driver provides support for the
-Macronix 98715 family (including the Lite-On PNIC-II) of Fast Ethernet
+driver provides support for the RealTek 8139 family of Fast Ethernet
 PCI controllers.
 .Lp
 These devices generally support the standard Fast Ethernet features, including
@@ -45,9 +44,10 @@ The device driver supports the
 .Xr ieee802.3 5
 properties, which can be configured with
 .Xr dladm 1M .
+.
 .Sh FILES
-.Bl -tag -width /dev/mxfe
-.It Pa /dev/mxfe
+.Bl -tag -width /dev/rtls
+.It Pa /dev/rtls
 Special character device.
 .El
 .Sh SEE ALSO

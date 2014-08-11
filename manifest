@@ -18046,6 +18046,7 @@ f usr/share/man/man5/grub.5 0444 root bin
 f usr/share/man/man5/gss_auth_rules.5 0444 root bin
 f usr/share/man/man5/iconv.5 0444 root bin
 f usr/share/man/man5/iconv_unicode.5 0444 root bin
+f usr/share/man/man5/ieee802.3.5 0444 root bin
 f usr/share/man/man5/ieee802.11.5 0444 root bin
 s usr/share/man/man5/intro.5=Intro.5
 f usr/share/man/man5/ipfilter.5 0444 root bin
@@ -18167,6 +18168,7 @@ f usr/share/man/man7d/ieee1394.7d 0444 root bin
 f usr/share/man/man7d/igb.7d 0444 root bin
 f usr/share/man/man7d/ipmi.7d 0444 root bin
 f usr/share/man/man7d/ipnet.7d 0444 root bin
+f usr/share/man/man7d/iprb.7d 0444 root bin
 f usr/share/man/man7d/iscsi.7d 0444 root bin
 f usr/share/man/man7d/ixgbe.7d 0444 root bin
 f usr/share/man/man7d/kmdb.7d 0444 root bin
@@ -18206,6 +18208,7 @@ f usr/share/man/man7d/qlc.7d 0444 root bin
 f usr/share/man/man7d/ramdisk.7d 0444 root bin
 f usr/share/man/man7d/random.7d 0444 root bin
 f usr/share/man/man7d/rge.7d 0444 root bin
+f usr/share/man/man7d/rtls.7d 0444 root bin
 f usr/share/man/man7d/sad.7d 0444 root bin
 f usr/share/man/man7d/sata.7d 0444 root bin
 f usr/share/man/man7d/scsa1394.7d 0444 root bin
