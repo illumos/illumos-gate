@@ -659,6 +659,25 @@ lx_netlink_reply_done(lx_netlink_reply_t *reply)
 	kmem_free(reply, sizeof (lx_netlink_reply_t));
 }
 
+static int
+lx_netlink_reply_error(lx_netlink_sock_t *lxsock,
+    lx_netlink_hdr_t *hdr, int errno)
+{
+	/*
+	 * The type of the message doesn't matter, as we're going to explicitly
+	 * set lxnr_errno and therefore send only an error message.
+	 */
+	lx_netlink_reply_t *reply = lx_netlink_reply(lxsock, hdr, 0);
+
+	if (reply == NULL)
+		return (ENOMEM);
+
+	reply->lxnr_errno = errno;
+	lx_netlink_reply_done(reply);
+
+	return (0);
+}
+
 static void
 lx_netlink_getlink_lifreq(lx_netlink_reply_t *reply, struct lifreq *lifr)
 {
@@ -961,10 +980,12 @@ lx_netlink_send(sock_lower_handle_t handle, mblk_t *mp,
 	}
 
 	/*
-	 * An unrecognized message.
+	 * An unrecognized message.  We will bounce up an EOPNOTSUPP reply.
 	 */
+	rval = lx_netlink_reply_error(lxsock, hdr, EOPNOTSUPP);
 	freemsg(mp);
-	return (EOPNOTSUPP);
+
+	return (rval);
 }
 
 /*ARGSUSED*/
