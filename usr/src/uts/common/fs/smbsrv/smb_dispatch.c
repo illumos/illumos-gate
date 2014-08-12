@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -519,13 +519,11 @@ smb_dispatch_request(struct smb_request *sr)
 	boolean_t		disconnect = B_FALSE;
 	smb_session_t		*session;
 	smb_server_t		*server;
-	uint32_t		capabilities;
 	uint32_t		byte_count;
 	uint32_t		max_bytes;
 
 	session = sr->session;
 	server = session->s_server;
-	capabilities = session->capabilities;
 
 	ASSERT(sr->tid_tree == 0);
 	ASSERT(sr->uid_user == 0);
@@ -626,11 +624,8 @@ andx_more:
 	 * large reads/write and bcc is only 16-bits.
 	 */
 	max_bytes = sr->command.max_bytes - sr->command.chain_offset;
-	if (((sr->smb_com == SMB_COM_READ_ANDX) &&
-	    (capabilities & CAP_LARGE_READX)) ||
-	    ((sr->smb_com == SMB_COM_WRITE_ANDX) &&
-	    (capabilities & CAP_LARGE_WRITEX))) {
-		/* May be > BCC */
+	if (sr->smb_com == SMB_COM_WRITE_ANDX) {
+		/* Allow > BCC */
 		byte_count = max_bytes;
 	} else if (max_bytes < (uint32_t)sr->smb_bcc) {
 		/* BCC is bogus.  Will fail later. */
