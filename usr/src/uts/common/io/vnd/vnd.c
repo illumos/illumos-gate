@@ -3511,8 +3511,9 @@ static void
 vnd_squeue_tx_append(void *arg, mblk_t *mp, gsqueue_t *gsp, void *dummy)
 {
 	vnd_str_t *vsp = arg;
-	vnd_data_queue_t *vqp;
+	vnd_data_queue_t *vqp = &vsp->vns_dq_write;
 	vnd_pnsd_t *nsp = vsp->vns_nsd;
+	size_t len = msgsize(mp);
 
 	/*
 	 * Before we append this packet, we should run it through the firewall
@@ -3521,15 +3522,24 @@ vnd_squeue_tx_append(void *arg, mblk_t *mp, gsqueue_t *gsp, void *dummy)
 	if (nsp->vpnd_hooked && vnd_hook(vsp, &mp, nsp->vpnd_neti_v4,
 	    nsp->vpnd_event_out_v4, nsp->vpnd_token_out_v4, nsp->vpnd_neti_v6,
 	    nsp->vpnd_event_out_v6, nsp->vpnd_token_out_v6, vnd_drop_hook_out,
-	    vnd_drop_out) != 0)
+	    vnd_drop_out) != 0) {
+		/*
+		 * Because we earlier reserved space for this packet and it's
+		 * not making the cut, we need to go through and unreserve that
+		 * space. Also note that the message block will likely be freed
+		 * by the time we return from vnd_hook so we cannot rely on it.
+		 */
+		mutex_enter(&vqp->vdq_lock);
+		vnd_dq_unreserve(vqp, len);
+		mutex_exit(&vqp->vdq_lock);
 		return;
+	}
 
 	/*
 	 * We earlier reserved space for this packet. So for now simply append
 	 * it and call drain. We know that no other drain can be going on right
 	 * now thanks to the squeue.
 	 */
-	vqp = &vsp->vns_dq_write;
 	mutex_enter(&vqp->vdq_lock);
 	(void) vnd_dq_push(&vsp->vns_dq_write, mp, B_TRUE, vnd_drop_panic);
 	mutex_exit(&vqp->vdq_lock);
