@@ -179,7 +179,7 @@ objfs_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 	vfsp->vfs_fstype = objfs_fstype;
 	do {
 		dev = makedevice(objfs_major,
-		    atomic_add_32_nv(&objfs_minor, 1) & L_MAXMIN32);
+		    atomic_inc_32_nv(&objfs_minor) & L_MAXMIN32);
 	} while (vfs_devismounted(dev));
 	vfs_make_fsid(&vfsp->vfs_fsid, dev, objfs_fstype);
 	vfsp->vfs_data = data;

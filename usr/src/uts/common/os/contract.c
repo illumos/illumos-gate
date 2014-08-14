@@ -2302,7 +2302,7 @@ cte_publish_all(contract_t *ct, ct_kevent_t *e, nvlist_t *data, nvlist_t *gdata)
 	e->cte_data = data;
 	e->cte_gdata = gdata;
 	e->cte_refs = 3;
-	evid = e->cte_id = atomic_add_64_nv(&ct->ct_type->ct_type_evid, 1);
+	evid = e->cte_id = atomic_inc_64_nv(&ct->ct_type->ct_type_evid);
 	contract_hold(ct);
 
 	/*

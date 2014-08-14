@@ -226,7 +226,7 @@ oce_rqb_free(struct oce_rq *rq, oce_rq_bdesc_t *rqbd)
 	rq->rqb_freelist[free_index] = rqbd;
 	rq->rqb_rc_head = GET_Q_NEXT(free_index, 1, rq->cfg.nbufs);
 	mutex_exit(&rq->rc_lock);
-	atomic_add_32(&rq->rqb_free, 1);
+	atomic_inc_32(&rq->rqb_free);
 } /* oce_rqb_free */
 
 
@@ -597,7 +597,7 @@ oce_rx_pool_free(char *arg)
 	}
 
 	oce_rqb_free(rq, rqbd);
-	(void) atomic_add_32(&rq->pending, -1);
+	(void) atomic_dec_32(&rq->pending);
 } /* rx_pool_free */
 
 /*

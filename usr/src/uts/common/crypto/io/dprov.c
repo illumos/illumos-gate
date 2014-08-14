@@ -1101,7 +1101,7 @@ typedef struct dprov_object {
  * it REFHOLD()s.
  */
 #define	DPROV_OBJECT_REFHOLD(object) {		\
-	atomic_add_32(&(object)->do_refcnt, 1);	\
+	atomic_inc_32(&(object)->do_refcnt);	\
 	ASSERT((object)->do_refcnt != 0);		\
 }
 
@@ -1112,7 +1112,7 @@ typedef struct dprov_object {
 #define	DPROV_OBJECT_REFRELE(object) {				\
 	ASSERT((object)->do_refcnt != 0);			\
 	membar_exit();						\
-	if (atomic_add_32_nv(&(object)->do_refcnt, -1) == 0)	\
+	if (atomic_dec_32_nv(&(object)->do_refcnt) == 0)	\
 		dprov_free_object(object);			\
 }
 

@@ -496,9 +496,9 @@ flowacct_update_flows_tbl(header_t *header, flowacct_data_t *flowacct_data)
 		 * the maximum no. of flow items in the table.
 		 */
 	try_again:
-		atomic_add_32(&flowacct_data->nflows, 1);
+		atomic_inc_32(&flowacct_data->nflows);
 		if (flowacct_data->nflows > flowacct_data->max_limit) {
-			atomic_add_32(&flowacct_data->nflows, -1);
+			atomic_dec_32(&flowacct_data->nflows);
 
 			/* Try timing out once */
 			if (just_once) {
@@ -536,7 +536,7 @@ flowacct_update_flows_tbl(header_t *header, flowacct_data_t *flowacct_data)
 				    FLOWACCT_DEL_OBJ);
 			}
 			mutex_exit(&fhead->lock);
-			atomic_add_32(&flowacct_data->nflows, -1);
+			atomic_dec_32(&flowacct_data->nflows);
 			flowacct0dbg(("flowacct_update_flows_tbl: mem alloc "\
 			    "error"));
 			return (-1);
@@ -550,7 +550,7 @@ flowacct_update_flows_tbl(header_t *header, flowacct_data_t *flowacct_data)
 				    FLOWACCT_DEL_OBJ);
 			}
 			mutex_exit(&fhead->lock);
-			atomic_add_32(&flowacct_data->nflows, -1);
+			atomic_dec_32(&flowacct_data->nflows);
 			kmem_free(item, FLOWACCT_ITEM_SZ);
 			flowacct0dbg(("flowacct_update_flows_tbl: mem alloc "\
 			    "error\n"));
@@ -887,7 +887,7 @@ flowacct_process(mblk_t **mpp, flowacct_data_t *flowacct_data)
 			mp = mp->b_cont;
 		} else {
 			flowacct0dbg(("flowacct_process: no data\n"));
-			atomic_add_64(&flowacct_data->epackets, 1);
+			atomic_inc_64(&flowacct_data->epackets);
 			return (EINVAL);
 		}
 	}
@@ -895,26 +895,26 @@ flowacct_process(mblk_t **mpp, flowacct_data_t *flowacct_data)
 	header = kmem_zalloc(FLOWACCT_HEADER_SZ, KM_NOSLEEP);
 	if (header == NULL) {
 		flowacct0dbg(("flowacct_process: error allocing mem"));
-		atomic_add_64(&flowacct_data->epackets, 1);
+		atomic_inc_64(&flowacct_data->epackets);
 		return (ENOMEM);
 	}
 
 	/* Get all the required information into header. */
 	if (flowacct_extract_header(mp, header) != 0) {
 		kmem_free(header, FLOWACCT_HEADER_SZ);
-		atomic_add_64(&flowacct_data->epackets, 1);
+		atomic_inc_64(&flowacct_data->epackets);
 		return (EINVAL);
 	}
 
 	/* Updated the flow table with this entry */
 	if (flowacct_update_flows_tbl(header, flowacct_data) != 0) {
 		kmem_free(header, FLOWACCT_HEADER_SZ);
-		atomic_add_64(&flowacct_data->epackets, 1);
+		atomic_inc_64(&flowacct_data->epackets);
 		return (ENOMEM);
 	}
 
 	/* Update global stats */
-	atomic_add_64(&flowacct_data->npackets, 1);
+	atomic_inc_64(&flowacct_data->npackets);
 	atomic_add_64(&flowacct_data->nbytes, header->pktlen);
 
 	kmem_free(header, FLOWACCT_HEADER_SZ);

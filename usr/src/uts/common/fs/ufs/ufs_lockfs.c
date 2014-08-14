@@ -933,7 +933,7 @@ ufs__fiolfs(
 	ufs_thread_suspend(&ufsvfsp->vfs_delete);
 
 	mutex_enter(&ulp->ul_lock);
-	atomic_add_long(&ufs_quiesce_pend, 1);
+	atomic_inc_ulong(&ufs_quiesce_pend);
 
 	/*
 	 * Quit if there is another lockfs request in progress
@@ -1163,7 +1163,7 @@ ufs__fiolfs(
 		    ulp->ul_lockfs.lf_comment && ulp->ul_lockfs.lf_comlen > 0 ?
 		    ulp->ul_lockfs.lf_comment: "user-applied error lock");
 
-	atomic_add_long(&ufs_quiesce_pend, -1);
+	atomic_dec_ulong(&ufs_quiesce_pend);
 	mutex_exit(&ulp->ul_lock);
 	vfs_unlock(vfsp);
 
@@ -1202,7 +1202,7 @@ errout:
 	LOCKFS_CLR_BUSY(&ulp->ul_lockfs);
 
 errexit:
-	atomic_add_long(&ufs_quiesce_pend, -1);
+	atomic_dec_ulong(&ufs_quiesce_pend);
 	mutex_exit(&ulp->ul_lock);
 	vfs_unlock(vfsp);
 
@@ -1299,10 +1299,10 @@ ufs_check_lockfs(struct ufsvfs *ufsvfsp, struct ulockfs *ulp, ulong_t mask)
 	}
 
 	if (mask & ULOCKFS_FWLOCK) {
-		atomic_add_long(&ulp->ul_falloc_cnt, 1);
+		atomic_inc_ulong(&ulp->ul_falloc_cnt);
 		ULOCKFS_SET_FALLOC(ulp);
 	} else {
-		atomic_add_long(&ulp->ul_vnops_cnt, 1);
+		atomic_inc_ulong(&ulp->ul_vnops_cnt);
 	}
 
 	return (0);
@@ -1380,7 +1380,7 @@ ufs_lockfs_begin(struct ufsvfs *ufsvfsp, struct ulockfs **ulpp, ulong_t mask)
 	ctr = (mask & ULOCKFS_FWLOCK) ?
 	    &ulp->ul_falloc_cnt : &ulp->ul_vnops_cnt;
 	if (!ULOCKFS_IS_SLOCK(ulp)) {
-		atomic_add_long(ctr, 1);
+		atomic_inc_ulong(ctr);
 		op_cnt_incremented++;
 	}
 
@@ -1399,7 +1399,7 @@ ufs_lockfs_begin(struct ufsvfs *ufsvfsp, struct ulockfs **ulpp, ulong_t mask)
 	 */
 	if (!ULOCKFS_IS_JUSTULOCK(ulp) || ufs_quiesce_pend) {
 		if (op_cnt_incremented)
-			if (!atomic_add_long_nv(ctr, -1))
+			if (!atomic_dec_ulong_nv(ctr))
 				cv_broadcast(&ulp->ul_cv);
 		mutex_enter(&ulp->ul_lock);
 		error = ufs_check_lockfs(ufsvfsp, ulp, mask);
@@ -1514,14 +1514,14 @@ ufs_lockfs_end(struct ulockfs *ulp)
 	if (ULOCKFS_IS_FALLOC(ulp) && info->flags & ULOCK_INFO_FALLOCATE) {
 		/* Clear the thread's fallocate state */
 		info->flags &= ~ULOCK_INFO_FALLOCATE;
-		if (!atomic_add_long_nv(&ulp->ul_falloc_cnt, -1)) {
+		if (!atomic_dec_ulong_nv(&ulp->ul_falloc_cnt)) {
 			mutex_enter(&ulp->ul_lock);
 			ULOCKFS_CLR_FALLOC(ulp);
 			cv_broadcast(&ulp->ul_cv);
 			mutex_exit(&ulp->ul_lock);
 		}
 	} else  { /* normal thread */
-		if (!atomic_add_long_nv(&ulp->ul_vnops_cnt, -1))
+		if (!atomic_dec_ulong_nv(&ulp->ul_vnops_cnt))
 			cv_broadcast(&ulp->ul_cv);
 	}
 }
@@ -1587,7 +1587,7 @@ ufs_lockfs_trybegin(struct ufsvfs *ufsvfsp, struct ulockfs **ulpp, ulong_t mask)
 	ctr = (mask & ULOCKFS_FWLOCK) ?
 	    &ulp->ul_falloc_cnt : &ulp->ul_vnops_cnt;
 	if (!ULOCKFS_IS_SLOCK(ulp)) {
-		atomic_add_long(ctr, 1);
+		atomic_inc_ulong(ctr);
 		op_cnt_incremented++;
 	}
 
@@ -1601,7 +1601,7 @@ ufs_lockfs_trybegin(struct ufsvfs *ufsvfsp, struct ulockfs **ulpp, ulong_t mask)
 		 * file system is delete locked, a mmap can still go through).
 		 */
 		if (op_cnt_incremented)
-			if (!atomic_add_long_nv(ctr, -1))
+			if (!atomic_dec_ulong_nv(ctr))
 				cv_broadcast(&ulp->ul_cv);
 		mutex_enter(&ulp->ul_lock);
 		if (ULOCKFS_IS_HLOCK(ulp) ||
@@ -1617,7 +1617,7 @@ ufs_lockfs_trybegin(struct ufsvfs *ufsvfsp, struct ulockfs **ulpp, ulong_t mask)
 				    sizeof (ulockfs_info_t));
 			return (error);
 		}
-		atomic_add_long(ctr, 1);
+		atomic_inc_ulong(ctr);
 		if (mask & ULOCKFS_FWLOCK)
 			ULOCKFS_SET_FALLOC(ulp);
 		mutex_exit(&ulp->ul_lock);
@@ -1648,7 +1648,7 @@ ufs_lockfs_trybegin(struct ufsvfs *ufsvfsp, struct ulockfs **ulpp, ulong_t mask)
 					    sizeof (ulockfs_info_t));
 				return (error);
 			}
-			atomic_add_long(ctr, 1);
+			atomic_inc_ulong(ctr);
 			if (mask & ULOCKFS_FWLOCK)
 				ULOCKFS_SET_FALLOC(ulp);
 			mutex_exit(&ulp->ul_lock);
@@ -1730,9 +1730,9 @@ ufs_lockfs_begin_getpage(
 	/*
 	 * First time VOP call
 	 */
-	atomic_add_long(&ulp->ul_vnops_cnt, 1);
+	atomic_inc_ulong(&ulp->ul_vnops_cnt);
 	if (!ULOCKFS_IS_JUSTULOCK(ulp) || ufs_quiesce_pend) {
-		if (!atomic_add_long_nv(&ulp->ul_vnops_cnt, -1))
+		if (!atomic_dec_ulong_nv(&ulp->ul_vnops_cnt))
 			cv_broadcast(&ulp->ul_cv);
 		mutex_enter(&ulp->ul_lock);
 		if (seg->s_ops == &segvn_ops &&

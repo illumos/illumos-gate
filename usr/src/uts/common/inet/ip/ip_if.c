@@ -11777,7 +11777,7 @@ ipif_assign_seqid(ipif_t *ipif)
 {
 	ip_stack_t	*ipst = ipif->ipif_ill->ill_ipst;
 
-	ipif->ipif_seqid = atomic_add_64_nv(&ipst->ips_ipif_g_seqid, 1);
+	ipif->ipif_seqid = atomic_inc_64_nv(&ipst->ips_ipif_g_seqid);
 }
 
 /*
@@ -12450,9 +12450,9 @@ void
 ip_update_source_selection(ip_stack_t *ipst)
 {
 	/* We skip past SRC_GENERATION_VERIFY */
-	if (atomic_add_32_nv(&ipst->ips_src_generation, 1) ==
+	if (atomic_inc_32_nv(&ipst->ips_src_generation) ==
 	    SRC_GENERATION_VERIFY)
-		atomic_add_32(&ipst->ips_src_generation, 1);
+		atomic_inc_32(&ipst->ips_src_generation);
 }
 
 /*

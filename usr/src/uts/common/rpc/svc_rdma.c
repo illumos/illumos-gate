@@ -182,7 +182,7 @@ struct {
 kstat_named_t *rdmarsstat_ptr = (kstat_named_t *)&rdmarsstat;
 uint_t rdmarsstat_ndata = sizeof (rdmarsstat) / sizeof (kstat_named_t);
 
-#define	RSSTAT_INCR(x)	atomic_add_64(&rdmarsstat.x.value.ui64, 1)
+#define	RSSTAT_INCR(x)	atomic_inc_64(&rdmarsstat.x.value.ui64)
 /*
  * Create a transport record.
  * The transport record, output buffer, and private data structure

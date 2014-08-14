@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/systm.h>
 #include <sys/archsystm.h>
@@ -161,7 +159,8 @@ ppmapin(page_t *pp, uint_t vprot, caddr_t hint)
 #ifdef PPDEBUG
 			align_hits++;
 #endif /* PPDEBUG */
-			if (casptr(&ppmap_vaddrs[nset], va, NULL) == va) {
+			if (atomic_cas_ptr(&ppmap_vaddrs[nset], va, NULL) ==
+			    va) {
 				hat_memload(kas.a_hat, va, pp,
 				    vprot | HAT_NOSYNC,
 				    HAT_LOAD_LOCK);

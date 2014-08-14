@@ -117,8 +117,8 @@ typedef struct kcf_prov_tried {
 	error == CRYPTO_KEY_SIZE_RANGE ||	\
 	error == CRYPTO_NO_PERMISSION)
 
-#define	KCF_ATOMIC_INCR(x)	atomic_add_32(&(x), 1)
-#define	KCF_ATOMIC_DECR(x)	atomic_add_32(&(x), -1)
+#define	KCF_ATOMIC_INCR(x)	atomic_inc_32(&(x))
+#define	KCF_ATOMIC_DECR(x)	atomic_dec_32(&(x))
 
 /*
  * Node structure for synchronous requests.
@@ -210,14 +210,14 @@ typedef struct kcf_areq_node {
 } kcf_areq_node_t;
 
 #define	KCF_AREQ_REFHOLD(areq) {		\
-	atomic_add_32(&(areq)->an_refcnt, 1);	\
+	atomic_inc_32(&(areq)->an_refcnt);	\
 	ASSERT((areq)->an_refcnt != 0);		\
 }
 
 #define	KCF_AREQ_REFRELE(areq) {				\
 	ASSERT((areq)->an_refcnt != 0);				\
 	membar_exit();						\
-	if (atomic_add_32_nv(&(areq)->an_refcnt, -1) == 0)	\
+	if (atomic_dec_32_nv(&(areq)->an_refcnt) == 0)	\
 		kcf_free_req(areq);				\
 }
 
@@ -314,7 +314,7 @@ typedef struct kcf_context {
  * do a hold.
  */
 #define	KCF_CONTEXT_REFHOLD(ictx) {		\
-	atomic_add_32(&(ictx)->kc_refcnt, 1);	\
+	atomic_inc_32(&(ictx)->kc_refcnt);	\
 	ASSERT((ictx)->kc_refcnt != 0);		\
 }
 
@@ -326,7 +326,7 @@ typedef struct kcf_context {
 #define	KCF_CONTEXT_REFRELE(ictx) {				\
 	ASSERT((ictx)->kc_refcnt != 0);				\
 	membar_exit();						\
-	if (atomic_add_32_nv(&(ictx)->kc_refcnt, -1) == 0)	\
+	if (atomic_dec_32_nv(&(ictx)->kc_refcnt) == 0)	\
 		kcf_free_context(ictx);				\
 }
 

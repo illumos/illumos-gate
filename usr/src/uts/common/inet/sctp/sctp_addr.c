@@ -137,7 +137,7 @@ sctp_ipif_inactive(sctp_ipif_t *sctp_ipif)
 	rw_destroy(&sctp_ipif->sctp_ipif_lock);
 	kmem_free(sctp_ipif, sizeof (sctp_ipif_t));
 
-	(void) atomic_add_32_nv(&sctp_ill->sctp_ill_ipifcnt, -1);
+	atomic_dec_32(&sctp_ill->sctp_ill_ipifcnt);
 	if (rw_tryupgrade(&sctps->sctps_g_ills_lock) != 0) {
 		rw_downgrade(&sctps->sctps_g_ipifs_lock);
 		if (sctp_ill->sctp_ill_ipifcnt == 0 &&
@@ -884,8 +884,8 @@ sctp_move_ipif(ipif_t *ipif, ill_t *f_ill, ill_t *t_ill)
 	ASSERT(sctp_ipif->sctp_ipif_ill == fsctp_ill);
 	sctp_ipif->sctp_ipif_ill = tsctp_ill;
 	rw_exit(&sctp_ipif->sctp_ipif_lock);
-	(void) atomic_add_32_nv(&fsctp_ill->sctp_ill_ipifcnt, -1);
-	atomic_add_32(&tsctp_ill->sctp_ill_ipifcnt, 1);
+	atomic_dec_32(&fsctp_ill->sctp_ill_ipifcnt);
+	atomic_inc_32(&tsctp_ill->sctp_ill_ipifcnt);
 	rw_exit(&sctps->sctps_g_ipifs_lock);
 	rw_exit(&sctps->sctps_g_ills_lock);
 }
@@ -1097,8 +1097,7 @@ sctp_update_ipif_addr(ipif_t *ipif, in6_addr_t v6addr)
 			sctps->sctps_g_ipifs_count--;
 			rw_destroy(&osctp_ipif->sctp_ipif_lock);
 			kmem_free(osctp_ipif, sizeof (sctp_ipif_t));
-			(void) atomic_add_32_nv(&osctp_ill->sctp_ill_ipifcnt,
-			    -1);
+			atomic_dec_32(&osctp_ill->sctp_ill_ipifcnt);
 		}
 	}
 
@@ -1130,7 +1129,7 @@ sctp_update_ipif_addr(ipif_t *ipif, in6_addr_t v6addr)
 	list_insert_head(&sctps->sctps_g_ipifs[hindex].sctp_ipif_list,
 	    (void *)sctp_ipif);
 	sctps->sctps_g_ipifs[hindex].ipif_count++;
-	atomic_add_32(&sctp_ill->sctp_ill_ipifcnt, 1);
+	atomic_inc_32(&sctp_ill->sctp_ill_ipifcnt);
 	if (sctp_ipif->sctp_ipif_state == SCTP_IPIFS_UP)
 		sctp_chk_and_updt_saddr(hindex, sctp_ipif, sctps);
 	rw_exit(&sctps->sctps_g_ipifs_lock);
@@ -1210,7 +1209,7 @@ sctp_update_ipif(ipif_t *ipif, int op)
 		sctps->sctps_g_ipifs_count--;
 		rw_destroy(&sctp_ipif->sctp_ipif_lock);
 		kmem_free(sctp_ipif, sizeof (sctp_ipif_t));
-		(void) atomic_add_32_nv(&sctp_ill->sctp_ill_ipifcnt, -1);
+		atomic_dec_32(&sctp_ill->sctp_ill_ipifcnt);
 		if (rw_tryupgrade(&sctps->sctps_g_ills_lock) != 0) {
 			rw_downgrade(&sctps->sctps_g_ipifs_lock);
 			if (sctp_ill->sctp_ill_ipifcnt == 0 &&
@@ -2030,8 +2029,7 @@ sctp_free_ipifs(sctp_stack_t *sctps)
 			list_remove(&sctps->sctps_g_ipifs[i].sctp_ipif_list,
 			    sctp_ipif);
 			sctps->sctps_g_ipifs_count--;
-			(void) atomic_add_32_nv(&sctp_ill->sctp_ill_ipifcnt,
-			    -1);
+			atomic_dec_32(&sctp_ill->sctp_ill_ipifcnt);
 			kmem_free(sctp_ipif, sizeof (sctp_ipif_t));
 			sctp_ipif =
 			    list_tail(&sctps->sctps_g_ipifs[i].sctp_ipif_list);

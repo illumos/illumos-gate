@@ -317,7 +317,7 @@ uppc_addspl(int irqno, int ipl, int min_ipl, int max_ipl)
 	uchar_t	vectmask;
 
 	if (irqno <= MAX_ISA_IRQ)
-		atomic_add_16(&uppc_irq_shared_table[irqno], 1);
+		atomic_inc_16(&uppc_irq_shared_table[irqno]);
 
 	if (ipl != min_ipl)
 		return (0);
@@ -360,7 +360,7 @@ uppc_delspl(int irqno, int ipl, int min_ipl, int max_ipl)
 	uchar_t	vectmask;
 
 	if (irqno <= MAX_ISA_IRQ)
-		atomic_add_16(&uppc_irq_shared_table[irqno], -1);
+		atomic_dec_16(&uppc_irq_shared_table[irqno]);
 
 	/*
 	 * skip if we are not deleting the last handler

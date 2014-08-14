@@ -129,7 +129,7 @@ rdsv3_ib_recv_refill_one(struct rdsv3_connection *conn,
 		recv->r_ibinc = kmem_cache_alloc(rdsv3_ib_incoming_slab,
 		    KM_NOSLEEP);
 		if (recv->r_ibinc == NULL) {
-			atomic_add_32(&rdsv3_ib_allocation, -1);
+			atomic_dec_32(&rdsv3_ib_allocation);
 			goto out;
 		}
 		rdsv3_inc_init(&recv->r_ibinc->ii_inc, conn, conn->c_faddr);
@@ -154,7 +154,7 @@ rdsv3_ib_recv_refill_one(struct rdsv3_connection *conn,
 out:
 	if (recv->r_ibinc) {
 		kmem_cache_free(rdsv3_ib_incoming_slab, recv->r_ibinc);
-		atomic_add_32(&rdsv3_ib_allocation, -1);
+		atomic_dec_32(&rdsv3_ib_allocation);
 		recv->r_ibinc = NULL;
 	}
 	return (-ENOMEM);

@@ -280,7 +280,7 @@ cfork(int isvfork, int isfork1, int flags)
 			tk = cp->p_task;
 			task_detach(cp);
 			ASSERT(cp->p_pool->pool_ref > 0);
-			atomic_add_32(&cp->p_pool->pool_ref, -1);
+			atomic_dec_32(&cp->p_pool->pool_ref);
 			mutex_exit(&cp->p_lock);
 			pid_exit(cp, tk);
 			mutex_exit(&pidlock);
@@ -637,7 +637,7 @@ forklwperr:
 	tk = cp->p_task;
 	task_detach(cp);
 	ASSERT(cp->p_pool->pool_ref > 0);
-	atomic_add_32(&cp->p_pool->pool_ref, -1);
+	atomic_dec_32(&cp->p_pool->pool_ref);
 	mutex_exit(&cp->p_lock);
 
 	orphpp = &p->p_orphan;
@@ -1138,7 +1138,7 @@ getproc(proc_t **cpp, pid_t pid, uint_t flags)
 	} else {
 		cp->p_pool = pp->p_pool;
 	}
-	atomic_add_32(&cp->p_pool->pool_ref, 1);
+	atomic_inc_32(&cp->p_pool->pool_ref);
 	mutex_exit(&pp->p_lock);
 
 	/*

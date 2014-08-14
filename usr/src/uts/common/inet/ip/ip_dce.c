@@ -532,7 +532,7 @@ dce_lookup_and_add_v4(ipaddr_t dst, ip_stack_t *ipst)
 	dce->dce_ptpn = &dcb->dcb_dce;
 	dcb->dcb_dce = dce;
 	dce->dce_bucket = dcb;
-	atomic_add_32(&dcb->dcb_cnt, 1);
+	atomic_inc_32(&dcb->dcb_cnt);
 	dce_refhold(dce);	/* For the caller */
 	rw_exit(&dcb->dcb_lock);
 
@@ -604,7 +604,7 @@ dce_lookup_and_add_v6(const in6_addr_t *dst, uint_t ifindex, ip_stack_t *ipst)
 	dce->dce_ptpn = &dcb->dcb_dce;
 	dcb->dcb_dce = dce;
 	dce->dce_bucket = dcb;
-	atomic_add_32(&dcb->dcb_cnt, 1);
+	atomic_inc_32(&dcb->dcb_cnt);
 	dce_refhold(dce);	/* For the caller */
 	rw_exit(&dcb->dcb_lock);
 
@@ -731,7 +731,7 @@ dce_make_condemned(dce_t *dce)
 	dce->dce_generation = DCE_GENERATION_CONDEMNED;
 	mutex_exit(&dce->dce_lock);
 	/* Count how many condemned dces for kmem_cache callback */
-	atomic_add_32(&ipst->ips_num_dce_condemned, 1);
+	atomic_inc_32(&ipst->ips_num_dce_condemned);
 }
 
 /*
@@ -793,7 +793,7 @@ dce_delete_locked(dcb_t *dcb, dce_t *dce)
 		dce->dce_next->dce_ptpn = dce->dce_ptpn;
 	dce->dce_ptpn = NULL;
 	dce->dce_next = NULL;
-	atomic_add_32(&dcb->dcb_cnt, -1);
+	atomic_dec_32(&dcb->dcb_cnt);
 	dce_make_condemned(dce);
 }
 
@@ -808,7 +808,7 @@ dce_inactive(dce_t *dce)
 
 	/* Count how many condemned dces for kmem_cache callback */
 	if (DCE_IS_CONDEMNED(dce))
-		atomic_add_32(&ipst->ips_num_dce_condemned, -1);
+		atomic_dec_32(&ipst->ips_num_dce_condemned);
 
 	kmem_cache_free(dce_cache, dce);
 }
@@ -817,14 +817,14 @@ void
 dce_refrele(dce_t *dce)
 {
 	ASSERT(dce->dce_refcnt != 0);
-	if (atomic_add_32_nv(&dce->dce_refcnt, -1) == 0)
+	if (atomic_dec_32_nv(&dce->dce_refcnt) == 0)
 		dce_inactive(dce);
 }
 
 void
 dce_refhold(dce_t *dce)
 {
-	atomic_add_32(&dce->dce_refcnt, 1);
+	atomic_inc_32(&dce->dce_refcnt);
 	ASSERT(dce->dce_refcnt != 0);
 }
 
@@ -833,14 +833,14 @@ void
 dce_refrele_notr(dce_t *dce)
 {
 	ASSERT(dce->dce_refcnt != 0);
-	if (atomic_add_32_nv(&dce->dce_refcnt, -1) == 0)
+	if (atomic_dec_32_nv(&dce->dce_refcnt) == 0)
 		dce_inactive(dce);
 }
 
 void
 dce_refhold_notr(dce_t *dce)
 {
-	atomic_add_32(&dce->dce_refcnt, 1);
+	atomic_inc_32(&dce->dce_refcnt);
 	ASSERT(dce->dce_refcnt != 0);
 }
 

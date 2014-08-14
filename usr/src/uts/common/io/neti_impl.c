@@ -134,7 +134,7 @@ net_protocol_lookup(netid_t netid, const char *protocol)
 	mutex_enter(&nts->nts_lock);
 	nd = net_find(protocol, nts);
 	if (nd != NULL)
-		atomic_add_32((uint_t *)&nd->netd_refcnt, 1);
+		atomic_inc_32((uint_t *)&nd->netd_refcnt);
 	mutex_exit(&nts->nts_lock);
 	return (nd);
 }
@@ -157,7 +157,7 @@ net_protocol_release(net_handle_t info)
 	 * removed from the nts_netd_head list on the neti_stack_t from a
 	 * call to net_protocol_unregister already, so it is thus an orphan.
 	 */
-	if (atomic_add_32_nv((uint_t *)&info->netd_refcnt, -1) == 0) {
+	if (atomic_dec_32_nv((uint_t *)&info->netd_refcnt) == 0) {
 		ASSERT(info->netd_hooks == NULL);
 		ASSERT(info->netd_stack == NULL);
 		kmem_free(info, sizeof (struct net_data));
@@ -201,7 +201,7 @@ net_protocol_walk(netid_t netid, net_handle_t info)
 		(void) net_protocol_release(info);
 
 	if (n != NULL)
-		atomic_add_32((uint_t *)&n->netd_refcnt, 1);
+		atomic_inc_32((uint_t *)&n->netd_refcnt);
 
 	mutex_exit(&nts->nts_lock);
 

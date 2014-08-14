@@ -524,7 +524,7 @@ errorq_dispatch(errorq_t *eqp, const void *data, size_t len, uint_t flag)
 	errorq_elem_t *eep, *old;
 
 	if (eqp == NULL || !(eqp->eq_flags & ERRORQ_ACTIVE)) {
-		atomic_add_64(&errorq_lost, 1);
+		atomic_inc_64(&errorq_lost);
 		return; /* drop error if queue is uninitialized or disabled */
 	}
 
@@ -533,7 +533,7 @@ errorq_dispatch(errorq_t *eqp, const void *data, size_t len, uint_t flag)
 
 		if ((i = errorq_availbit(eqp->eq_bitmap, eqp->eq_qlen,
 		    eqp->eq_rotor)) == -1) {
-			atomic_add_64(&eqp->eq_kstat.eqk_dropped.value.ui64, 1);
+			atomic_inc_64(&eqp->eq_kstat.eqk_dropped.value.ui64);
 			return;
 		}
 		BT_ATOMIC_SET_EXCL(eqp->eq_bitmap, i, rval);
@@ -555,11 +555,11 @@ errorq_dispatch(errorq_t *eqp, const void *data, size_t len, uint_t flag)
 		eep->eqe_prev = old;
 		membar_producer();
 
-		if (casptr(&eqp->eq_pend, old, eep) == old)
+		if (atomic_cas_ptr(&eqp->eq_pend, old, eep) == old)
 			break;
 	}
 
-	atomic_add_64(&eqp->eq_kstat.eqk_dispatched.value.ui64, 1);
+	atomic_inc_64(&eqp->eq_kstat.eqk_dispatched.value.ui64);
 
 	if (flag == ERRORQ_ASYNC && eqp->eq_id != NULL)
 		ddi_trigger_softintr(eqp->eq_id);
@@ -596,15 +596,16 @@ errorq_drain(errorq_t *eqp)
 	 * make sure that eq_ptail will be visible to errorq_panic() below
 	 * before the pending list is NULLed out.  This section is labeled
 	 * case (1) for errorq_panic, below.  If eq_ptail is not yet set (1A)
-	 * eq_pend has all the pending errors.  If casptr fails or has not
-	 * been called yet (1B), eq_pend still has all the pending errors.
-	 * If casptr succeeds (1C), eq_ptail has all the pending errors.
+	 * eq_pend has all the pending errors.  If atomic_cas_ptr fails or
+	 * has not been called yet (1B), eq_pend still has all the pending
+	 * errors.  If atomic_cas_ptr succeeds (1C), eq_ptail has all the
+	 * pending errors.
 	 */
 	while ((eep = eqp->eq_pend) != NULL) {
 		eqp->eq_ptail = eep;
 		membar_producer();
 
-		if (casptr(&eqp->eq_pend, eep, NULL) == eep)
+		if (atomic_cas_ptr(&eqp->eq_pend, eep, NULL) == eep)
 			break;
 	}
 
@@ -750,13 +751,14 @@ errorq_panic_drain(uint_t what)
 		loggedtmp = eqp->eq_kstat.eqk_logged.value.ui64;
 
 		/*
-		 * In case (1B) above, eq_ptail may be set but the casptr may
-		 * not have been executed yet or may have failed.  Either way,
-		 * we must log errors in chronological order.  So we search
-		 * the pending list for the error pointed to by eq_ptail.  If
-		 * it is found, we know that all subsequent errors are also
-		 * still on the pending list, so just NULL out eq_ptail and let
-		 * errorq_drain(), below, take care of the logging.
+		 * In case (1B) above, eq_ptail may be set but the
+		 * atomic_cas_ptr may not have been executed yet or may have
+		 * failed.  Either way, we must log errors in chronological
+		 * order.  So we search the pending list for the error
+		 * pointed to by eq_ptail.  If it is found, we know that all
+		 * subsequent errors are also still on the pending list, so
+		 * just NULL out eq_ptail and let errorq_drain(), below,
+		 * take care of the logging.
 		 */
 		for (eep = eqp->eq_pend; eep != NULL; eep = eep->eqe_prev) {
 			if (eep == eqp->eq_ptail) {
@@ -790,8 +792,9 @@ errorq_panic_drain(uint_t what)
 		 *
 		 * Unlike errorq_drain(), we don't need to worry about updating
 		 * eq_phead because errorq_panic() will be called at most once.
-		 * However, we must use casptr to update the freelist in case
-		 * errors are still being enqueued during panic.
+		 * However, we must use atomic_cas_ptr to update the
+		 * freelist in case errors are still being enqueued during
+		 * panic.
 		 */
 		for (eep = eqp->eq_phead; eep != NULL; eep = nep) {
 			eqp->eq_func(eqp->eq_private, eep->eqe_data, eep);
@@ -864,7 +867,7 @@ errorq_reserve(errorq_t *eqp)
 	errorq_elem_t *eqep;
 
 	if (eqp == NULL || !(eqp->eq_flags & ERRORQ_ACTIVE)) {
-		atomic_add_64(&errorq_lost, 1);
+		atomic_inc_64(&errorq_lost);
 		return (NULL);
 	}
 
@@ -873,7 +876,7 @@ errorq_reserve(errorq_t *eqp)
 
 		if ((i = errorq_availbit(eqp->eq_bitmap, eqp->eq_qlen,
 		    eqp->eq_rotor)) == -1) {
-			atomic_add_64(&eqp->eq_kstat.eqk_dropped.value.ui64, 1);
+			atomic_inc_64(&eqp->eq_kstat.eqk_dropped.value.ui64);
 			return (NULL);
 		}
 		BT_ATOMIC_SET_EXCL(eqp->eq_bitmap, i, rval);
@@ -890,7 +893,7 @@ errorq_reserve(errorq_t *eqp)
 		eqnp->eqn_nvl = fm_nvlist_create(eqnp->eqn_nva);
 	}
 
-	atomic_add_64(&eqp->eq_kstat.eqk_reserved.value.ui64, 1);
+	atomic_inc_64(&eqp->eq_kstat.eqk_reserved.value.ui64);
 	return (eqep);
 }
 
@@ -905,7 +908,7 @@ errorq_commit(errorq_t *eqp, errorq_elem_t *eqep, uint_t flag)
 	errorq_elem_t *old;
 
 	if (eqep == NULL || !(eqp->eq_flags & ERRORQ_ACTIVE)) {
-		atomic_add_64(&eqp->eq_kstat.eqk_commit_fail.value.ui64, 1);
+		atomic_inc_64(&eqp->eq_kstat.eqk_commit_fail.value.ui64);
 		return;
 	}
 
@@ -914,11 +917,11 @@ errorq_commit(errorq_t *eqp, errorq_elem_t *eqep, uint_t flag)
 		eqep->eqe_prev = old;
 		membar_producer();
 
-		if (casptr(&eqp->eq_pend, old, eqep) == old)
+		if (atomic_cas_ptr(&eqp->eq_pend, old, eqep) == old)
 			break;
 	}
 
-	atomic_add_64(&eqp->eq_kstat.eqk_committed.value.ui64, 1);
+	atomic_inc_64(&eqp->eq_kstat.eqk_committed.value.ui64);
 
 	if (flag == ERRORQ_ASYNC && eqp->eq_id != NULL)
 		ddi_trigger_softintr(eqp->eq_id);
@@ -936,7 +939,7 @@ errorq_cancel(errorq_t *eqp, errorq_elem_t *eqep)
 
 	BT_ATOMIC_CLEAR(eqp->eq_bitmap, eqep - eqp->eq_elems);
 
-	atomic_add_64(&eqp->eq_kstat.eqk_cancelled.value.ui64, 1);
+	atomic_inc_64(&eqp->eq_kstat.eqk_cancelled.value.ui64);
 }
 
 /*

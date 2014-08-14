@@ -367,13 +367,13 @@ fem_unlock(struct fem_head *fp)
 static void
 fem_addref(struct fem_list *sp)
 {
-	atomic_add_32(&sp->feml_refc, 1);
+	atomic_inc_32(&sp->feml_refc);
 }
 
 static uint32_t
 fem_delref(struct fem_list *sp)
 {
-	return (atomic_add_32_nv(&sp->feml_refc, -1));
+	return (atomic_dec_32_nv(&sp->feml_refc));
 }
 
 static struct fem_list *
@@ -2872,7 +2872,7 @@ new_femhead(struct fem_head **hp)
 	head = kmem_alloc(sizeof (*head), KM_SLEEP);
 	mutex_init(&head->femh_lock, NULL, MUTEX_DEFAULT, NULL);
 	head->femh_list = NULL;
-	if (casptr(hp, NULL, head) != NULL) {
+	if (atomic_cas_ptr(hp, NULL, head) != NULL) {
 		kmem_free(head, sizeof (*head));
 		head = *hp;
 	}
@@ -3365,7 +3365,7 @@ fem_setvnops(vnode_t *v, vnodeops_t *newops)
 			}
 			fem_unlock(v->v_femhead);
 		}
-	} while (casptr(&v->v_op, r, newops) != r);
+	} while (atomic_cas_ptr(&v->v_op, r, newops) != r);
 }
 
 vnodeops_t *
@@ -3508,7 +3508,7 @@ fsem_setvfsops(vfs_t *v, vfsops_t *newops)
 			}
 			fem_unlock(v->vfs_femhead);
 		}
-	} while (casptr(&v->vfs_op, r, newops) != r);
+	} while (atomic_cas_ptr(&v->vfs_op, r, newops) != r);
 }
 
 vfsops_t *

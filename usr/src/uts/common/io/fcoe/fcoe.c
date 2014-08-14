@@ -1152,7 +1152,7 @@ fcoe_worker_frame(void *arg)
 	fcoe_i_frame_t	*fmi;
 	int		ret;
 
-	atomic_add_32(&fcoe_nworkers_running, 1);
+	atomic_inc_32(&fcoe_nworkers_running);
 	mutex_enter(&w->worker_lock);
 	w->worker_flags |= FCOE_WORKER_STARTED | FCOE_WORKER_ACTIVE;
 	while ((w->worker_flags & FCOE_WORKER_TERMINATE) == 0) {
@@ -1181,7 +1181,7 @@ fcoe_worker_frame(void *arg)
 	}
 	w->worker_flags &= ~(FCOE_WORKER_STARTED | FCOE_WORKER_ACTIVE);
 	mutex_exit(&w->worker_lock);
-	atomic_add_32(&fcoe_nworkers_running, -1);
+	atomic_dec_32(&fcoe_nworkers_running);
 	list_destroy(&w->worker_frm_list);
 }
 

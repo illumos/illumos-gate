@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * The idea behind composition-based stacked filesystems is to add a
  * vnode to the stack of vnodes for each mount. These vnodes have their
@@ -289,7 +287,7 @@ makelonode(struct vnode *vp, struct loinfo *li, int flag)
 			}
 			lp = tlp;
 		}
-		atomic_add_32(&li->li_refct, 1);
+		atomic_inc_32(&li->li_refct);
 		vfsp = makelfsnode(vp->v_vfsp, li);
 		lp->lo_vnode = nvp;
 		VN_SET_VFS_TYPE_DEV(nvp, vfsp, vp->v_type, vp->v_rdev);
@@ -632,7 +630,7 @@ lfs_rele(struct lfsnode *lfs, struct loinfo *li)
 
 	ASSERT(MUTEX_HELD(&li->li_lfslock));
 	ASSERT(vfsp->vfs_count > 1);
-	if (atomic_add_32_nv(&vfsp->vfs_count, -1) == 1)
+	if (atomic_dec_32_nv(&vfsp->vfs_count) == 1)
 		freelfsnode(lfs, li);
 }
 
@@ -672,7 +670,7 @@ freelonode(lnode_t *lp)
 			lo_dprint(4, "freeing %p, vfsp %p\n",
 			    vp, vp->v_vfsp);
 #endif
-			atomic_add_32(&li->li_refct, -1);
+			atomic_dec_32(&li->li_refct);
 			vfsp = vp->v_vfsp;
 			vn_invalid(vp);
 			if (vfsp != li->li_mountvfs) {

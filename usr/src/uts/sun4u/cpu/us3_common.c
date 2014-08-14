@@ -898,7 +898,7 @@ mondo_recover(uint16_t cpuid, int bn)
 	cheetah_livelock_entry_t *histp;
 	uint64_t idsr;
 
-	if (cas32(&sendmondo_in_recover, 0, 1) != 0) {
+	if (atomic_cas_32(&sendmondo_in_recover, 0, 1) != 0) {
 		/*
 		 * Wait while recovery takes place
 		 */
@@ -984,7 +984,7 @@ done:
 	CHEETAH_LIVELOCK_ENTRY_SET(histp, recovery_time, \
 	    (end_hrt -  begin_hrt));
 
-	while (cas32(&sendmondo_in_recover, 1, 0) != 1)
+	while (atomic_cas_32(&sendmondo_in_recover, 1, 0) != 1)
 		;
 
 	return (retval);
@@ -5642,7 +5642,7 @@ do_scrub(struct scrub_info *csi)
 	uint32_t *outstanding = &csmp->chsm_outstanding[index];
 
 	if (*(csi->csi_enable) && (csmp->chsm_enable[index])) {
-		if (atomic_add_32_nv(outstanding, 1) == 1) {
+		if (atomic_inc_32_nv(outstanding) == 1) {
 			xt_one_unchecked(CPU->cpu_id, setsoftint_tl1,
 			    csi->csi_inum, 0);
 		}
@@ -6300,7 +6300,7 @@ cpu_ce_delayed_ec_logout(uint64_t afar)
 		return (0);
 
 	clop = CPU_PRIVATE_PTR(CPU, chpr_cecc_logout);
-	if (cas64(&clop->clo_data.chd_afar, LOGOUT_INVALID, afar) !=
+	if (atomic_cas_64(&clop->clo_data.chd_afar, LOGOUT_INVALID, afar) !=
 	    LOGOUT_INVALID)
 		return (0);
 

@@ -353,7 +353,7 @@ typedef struct ipsa_s {
  */
 
 #define	IPSA_REFHOLD(ipsa) {			\
-	atomic_add_32(&(ipsa)->ipsa_refcnt, 1);	\
+	atomic_inc_32(&(ipsa)->ipsa_refcnt);	\
 	ASSERT((ipsa)->ipsa_refcnt != 0);	\
 }
 
@@ -368,7 +368,7 @@ typedef struct ipsa_s {
 #define	IPSA_REFRELE(ipsa) {					\
 	ASSERT((ipsa)->ipsa_refcnt != 0);			\
 	membar_exit();						\
-	if (atomic_add_32_nv(&(ipsa)->ipsa_refcnt, -1) == 0)	\
+	if (atomic_dec_32_nv(&(ipsa)->ipsa_refcnt) == 0)	\
 		((ipsa)->ipsa_freefunc)(ipsa);			\
 }
 

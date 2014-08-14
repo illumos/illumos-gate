@@ -178,7 +178,7 @@ dbuf_hash_insert(dmu_buf_impl_t *db)
 	db->db_hash_next = h->hash_table[idx];
 	h->hash_table[idx] = db;
 	mutex_exit(DBUF_HASH_MUTEX(h, idx));
-	atomic_add_64(&dbuf_hash_count, 1);
+	atomic_inc_64(&dbuf_hash_count);
 
 	return (NULL);
 }
@@ -212,7 +212,7 @@ dbuf_hash_remove(dmu_buf_impl_t *db)
 	*dbp = db->db_hash_next;
 	db->db_hash_next = NULL;
 	mutex_exit(DBUF_HASH_MUTEX(h, idx));
-	atomic_add_64(&dbuf_hash_count, -1);
+	atomic_dec_64(&dbuf_hash_count);
 }
 
 static arc_evict_func_t dbuf_do_evict;
@@ -1616,7 +1616,7 @@ dbuf_clear(dmu_buf_impl_t *db)
 	dndb = dn->dn_dbuf;
 	if (db->db_blkid != DMU_BONUS_BLKID && MUTEX_HELD(&dn->dn_dbufs_mtx)) {
 		avl_remove(&dn->dn_dbufs, db);
-		(void) atomic_dec_32_nv(&dn->dn_dbufs_count);
+		atomic_dec_32(&dn->dn_dbufs_count);
 		membar_producer();
 		DB_DNODE_EXIT(db);
 		/*
@@ -1792,7 +1792,7 @@ dbuf_create(dnode_t *dn, uint8_t level, uint64_t blkid,
 	ASSERT(dn->dn_object == DMU_META_DNODE_OBJECT ||
 	    refcount_count(&dn->dn_holds) > 0);
 	(void) refcount_add(&dn->dn_holds, db);
-	(void) atomic_inc_32_nv(&dn->dn_dbufs_count);
+	atomic_inc_32(&dn->dn_dbufs_count);
 
 	dprintf_dbuf(db, "db=%p\n", db);
 
@@ -1838,7 +1838,7 @@ dbuf_destroy(dmu_buf_impl_t *db)
 			dn = DB_DNODE(db);
 			mutex_enter(&dn->dn_dbufs_mtx);
 			avl_remove(&dn->dn_dbufs, db);
-			(void) atomic_dec_32_nv(&dn->dn_dbufs_count);
+			atomic_dec_32(&dn->dn_dbufs_count);
 			mutex_exit(&dn->dn_dbufs_mtx);
 			DB_DNODE_EXIT(db);
 			/*
@@ -2122,7 +2122,7 @@ dbuf_rele_and_unlock(dmu_buf_impl_t *db, void *tag)
 			 * until the move completes.
 			 */
 			DB_DNODE_ENTER(db);
-			(void) atomic_dec_32_nv(&DB_DNODE(db)->dn_dbufs_count);
+			atomic_dec_32(&DB_DNODE(db)->dn_dbufs_count);
 			DB_DNODE_EXIT(db);
 			/*
 			 * The bonus buffer's dnode hold is no longer discounted

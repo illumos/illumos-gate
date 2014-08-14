@@ -63,7 +63,7 @@ struct sof_kstat {
 };
 
 #define	SOF_GLOBAL_STAT_BUMP(s) \
-	atomic_add_64(&sof_stat.sofks_##s.value.ui64, 1)
+	atomic_inc_64(&sof_stat.sofks_##s.value.ui64)
 
 /*
  * Per filter statistics.

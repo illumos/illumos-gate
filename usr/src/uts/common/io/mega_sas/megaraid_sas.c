@@ -4565,7 +4565,7 @@ read_fw_status_reg_ppc(struct megasas_instance *instance)
 static void
 issue_cmd_xscale(struct megasas_cmd *cmd, struct megasas_instance *instance)
 {
-	atomic_add_16(&instance->fw_outstanding, 1);
+	atomic_inc_16(&instance->fw_outstanding);
 
 	/* Issue the command to the FW */
 	WR_IB_QPORT((host_to_le32(cmd->frame_phys_addr) >> 3) |
@@ -4575,7 +4575,7 @@ issue_cmd_xscale(struct megasas_cmd *cmd, struct megasas_instance *instance)
 static void
 issue_cmd_ppc(struct megasas_cmd *cmd, struct megasas_instance *instance)
 {
-	atomic_add_16(&instance->fw_outstanding, 1);
+	atomic_inc_16(&instance->fw_outstanding);
 
 	/* Issue the command to the FW */
 	WR_IB_QPORT((host_to_le32(cmd->frame_phys_addr)) |

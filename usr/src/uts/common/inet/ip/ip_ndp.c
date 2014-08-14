@@ -479,7 +479,7 @@ ncec_delete(ncec_t *ncec)
 	mutex_exit(&ncec->ncec_lock);
 
 	/* Count how many condemned ires for kmem_cache callback */
-	atomic_add_32(&ipst->ips_num_nce_condemned, 1);
+	atomic_inc_32(&ipst->ips_num_nce_condemned);
 	nce_fastpath_list_delete(ncec->ncec_ill, ncec, NULL);
 
 	/* Complete any waiting callbacks */

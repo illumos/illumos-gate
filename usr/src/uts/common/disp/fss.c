@@ -1756,7 +1756,7 @@ fss_enterclass(kthread_t *t, id_t cid, void *parmsp, cred_t *reqpcredp,
 	 * (but check with an ordinary load first since most of the time
 	 * this will already be done).
 	 */
-	if (fssexists == 0 && cas32(&fssexists, 0, 1) == 0)
+	if (fssexists == 0 && atomic_cas_32(&fssexists, 0, 1) == 0)
 		(void) timeout(fss_update, NULL, hz);
 
 	return (0);

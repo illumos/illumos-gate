@@ -1037,6 +1037,7 @@ mptsas_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	char			event_taskq_create = 0;
 	char			dr_taskq_create = 0;
 	char			doneq_thread_create = 0;
+	char			added_watchdog = 0;
 	scsi_hba_tran_t		*hba_tran;
 	uint_t			mem_bar = MEM_SPACE;
 	int			rval = DDI_FAILURE;
@@ -1404,7 +1405,28 @@ mptsas_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	mutex_exit(&mpt->m_mutex);
 
 	/*
-	 * Initialize PHY info for smhba
+	 * used for mptsas_watch
+	 */
+	mptsas_list_add(mpt);
+
+	mutex_enter(&mptsas_global_mutex);
+	if (mptsas_timeouts_enabled == 0) {
+		mptsas_scsi_watchdog_tick = ddi_prop_get_int(DDI_DEV_T_ANY,
+		    dip, 0, "scsi-watchdog-tick", DEFAULT_WD_TICK);
+
+		mptsas_tick = mptsas_scsi_watchdog_tick *
+		    drv_usectohz((clock_t)1000000);
+
+		mptsas_timeout_id = timeout(mptsas_watch, NULL, mptsas_tick);
+		mptsas_timeouts_enabled = 1;
+	}
+	mutex_exit(&mptsas_global_mutex);
+	added_watchdog++;
+
+	/*
+	 * Initialize PHY info for smhba.
+	 * This requires watchdog to be enabled otherwise if interrupts
+	 * don't work the system will hang.
 	 */
 	if (mptsas_smhba_setup(mpt)) {
 		mptsas_log(mpt, CE_WARN, "mptsas phy initialization "
@@ -1446,23 +1468,6 @@ mptsas_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	/*
 	 * After this point, we are not going to fail the attach.
 	 */
-	/*
-	 * used for mptsas_watch
-	 */
-	mptsas_list_add(mpt);
-
-	mutex_enter(&mptsas_global_mutex);
-	if (mptsas_timeouts_enabled == 0) {
-		mptsas_scsi_watchdog_tick = ddi_prop_get_int(DDI_DEV_T_ANY,
-		    dip, 0, "scsi-watchdog-tick", DEFAULT_WD_TICK);
-
-		mptsas_tick = mptsas_scsi_watchdog_tick *
-		    drv_usectohz((clock_t)1000000);
-
-		mptsas_timeout_id = timeout(mptsas_watch, NULL, mptsas_tick);
-		mptsas_timeouts_enabled = 1;
-	}
-	mutex_exit(&mptsas_global_mutex);
 
 	/* Print message of HBA present */
 	ddi_report_dev(dip);
@@ -1479,18 +1484,22 @@ fail:
 	mptsas_fm_ereport(mpt, DDI_FM_DEVICE_NO_RESPONSE);
 	ddi_fm_service_impact(mpt->m_dip, DDI_SERVICE_LOST);
 	if (mpt) {
-		mutex_enter(&mptsas_global_mutex);
-
-		if (mptsas_timeout_id && (mptsas_head == NULL)) {
-			timeout_id_t tid = mptsas_timeout_id;
-			mptsas_timeouts_enabled = 0;
-			mptsas_timeout_id = 0;
-			mutex_exit(&mptsas_global_mutex);
-			(void) untimeout(tid);
-			mutex_enter(&mptsas_global_mutex);
-		}
-		mutex_exit(&mptsas_global_mutex);
 		/* deallocate in reverse order */
+		if (added_watchdog) {
+			mptsas_list_del(mpt);
+			mutex_enter(&mptsas_global_mutex);
+
+			if (mptsas_timeout_id && (mptsas_head == NULL)) {
+				timeout_id_t tid = mptsas_timeout_id;
+				mptsas_timeouts_enabled = 0;
+				mptsas_timeout_id = 0;
+				mutex_exit(&mptsas_global_mutex);
+				(void) untimeout(tid);
+				mutex_enter(&mptsas_global_mutex);
+			}
+			mutex_exit(&mptsas_global_mutex);
+		}
+
 		mptsas_cache_destroy(mpt);
 
 		if (smp_attach_setup) {
@@ -5497,6 +5506,8 @@ mptsas_check_scsi_io_error(mptsas_t *mpt, pMpi2SCSIIOReply_t reply,
 			    mptsas_handle_dr,
 			    (void *)topo_node,
 			    DDI_NOSLEEP)) != DDI_SUCCESS) {
+				kmem_free(topo_node,
+				    sizeof (mptsas_topo_change_list_t));
 				mptsas_log(mpt, CE_NOTE, "mptsas start taskq"
 				    "for handle SAS dynamic reconfigure"
 				    "failed. \n");
@@ -7235,6 +7246,12 @@ mptsas_handle_event_sync(void *args)
 			if ((ddi_taskq_dispatch(mpt->m_dr_taskq,
 			    mptsas_handle_dr, (void *)topo_head,
 			    DDI_NOSLEEP)) != DDI_SUCCESS) {
+				while (topo_head != NULL) {
+					topo_node = topo_head;
+					topo_head = topo_head->next;
+					kmem_free(topo_node,
+					    sizeof (mptsas_topo_change_list_t));
+				}
 				mptsas_log(mpt, CE_NOTE, "mptsas start taskq "
 				    "for handle SAS DR event failed. \n");
 			}
@@ -7413,6 +7430,12 @@ mptsas_handle_event_sync(void *args)
 			if ((ddi_taskq_dispatch(mpt->m_dr_taskq,
 			    mptsas_handle_dr, (void *)topo_head,
 			    DDI_NOSLEEP)) != DDI_SUCCESS) {
+				while (topo_head != NULL) {
+					topo_node = topo_head;
+					topo_head = topo_head->next;
+					kmem_free(topo_node,
+					    sizeof (mptsas_topo_change_list_t));
+				}
 				mptsas_log(mpt, CE_NOTE, "mptsas start taskq "
 				    "for handle SAS DR event failed. \n");
 			}

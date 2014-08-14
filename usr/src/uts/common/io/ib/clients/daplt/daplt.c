@@ -8293,13 +8293,13 @@ daplka_ibt_alloc_rc_channel(daplka_ep_resource_t *ep_rp, ibt_hca_hdl_t hca_hdl,
 			return (IBT_INSUFF_RESOURCE);
 		}
 		DAPLKA_RS_ACCT_INC(ep_rp, 1);
-		atomic_add_32(&hca_p->hca_qp_count, 1);
+		atomic_inc_32(&hca_p->hca_qp_count);
 	}
 	status = ibt_alloc_rc_channel(hca_hdl, flags, args, chan_hdl_p, sizes);
 
 	if (status != IBT_SUCCESS && acct_enabled) {
 		DAPLKA_RS_ACCT_DEC(ep_rp, 1);
-		atomic_add_32(&hca_p->hca_qp_count, -1);
+		atomic_dec_32(&hca_p->hca_qp_count);
 	}
 	return (status);
 }
@@ -8318,7 +8318,7 @@ daplka_ibt_free_channel(daplka_ep_resource_t *ep_rp, ibt_channel_hdl_t chan_hdl)
 	}
 	if (DAPLKA_RS_ACCT_CHARGED(ep_rp) > 0) {
 		DAPLKA_RS_ACCT_DEC(ep_rp, 1);
-		atomic_add_32(&hca_p->hca_qp_count, -1);
+		atomic_dec_32(&hca_p->hca_qp_count);
 	}
 	return (status);
 }
@@ -8345,13 +8345,13 @@ daplka_ibt_alloc_cq(daplka_evd_resource_t *evd_rp, ibt_hca_hdl_t hca_hdl,
 			return (IBT_INSUFF_RESOURCE);
 		}
 		DAPLKA_RS_ACCT_INC(evd_rp, 1);
-		atomic_add_32(&hca_p->hca_cq_count, 1);
+		atomic_inc_32(&hca_p->hca_cq_count);
 	}
 	status = ibt_alloc_cq(hca_hdl, cq_attr, ibt_cq_p, real_size);
 
 	if (status != IBT_SUCCESS && acct_enabled) {
 		DAPLKA_RS_ACCT_DEC(evd_rp, 1);
-		atomic_add_32(&hca_p->hca_cq_count, -1);
+		atomic_dec_32(&hca_p->hca_cq_count);
 	}
 	return (status);
 }
@@ -8370,7 +8370,7 @@ daplka_ibt_free_cq(daplka_evd_resource_t *evd_rp, ibt_cq_hdl_t cq_hdl)
 	}
 	if (DAPLKA_RS_ACCT_CHARGED(evd_rp) > 0) {
 		DAPLKA_RS_ACCT_DEC(evd_rp, 1);
-		atomic_add_32(&hca_p->hca_cq_count, -1);
+		atomic_dec_32(&hca_p->hca_cq_count);
 	}
 	return (status);
 }
@@ -8397,13 +8397,13 @@ daplka_ibt_alloc_pd(daplka_pd_resource_t *pd_rp, ibt_hca_hdl_t hca_hdl,
 			return (IBT_INSUFF_RESOURCE);
 		}
 		DAPLKA_RS_ACCT_INC(pd_rp, 1);
-		atomic_add_32(&hca_p->hca_pd_count, 1);
+		atomic_inc_32(&hca_p->hca_pd_count);
 	}
 	status = ibt_alloc_pd(hca_hdl, flags, pd_hdl_p);
 
 	if (status != IBT_SUCCESS && acct_enabled) {
 		DAPLKA_RS_ACCT_DEC(pd_rp, 1);
-		atomic_add_32(&hca_p->hca_pd_count, -1);
+		atomic_dec_32(&hca_p->hca_pd_count);
 	}
 	return (status);
 }
@@ -8423,7 +8423,7 @@ daplka_ibt_free_pd(daplka_pd_resource_t *pd_rp, ibt_hca_hdl_t hca_hdl,
 	}
 	if (DAPLKA_RS_ACCT_CHARGED(pd_rp) > 0) {
 		DAPLKA_RS_ACCT_DEC(pd_rp, 1);
-		atomic_add_32(&hca_p->hca_pd_count, -1);
+		atomic_dec_32(&hca_p->hca_pd_count);
 	}
 	return (status);
 }
@@ -8451,13 +8451,13 @@ daplka_ibt_alloc_mw(daplka_mw_resource_t *mw_rp, ibt_hca_hdl_t hca_hdl,
 			return (IBT_INSUFF_RESOURCE);
 		}
 		DAPLKA_RS_ACCT_INC(mw_rp, 1);
-		atomic_add_32(&hca_p->hca_mw_count, 1);
+		atomic_inc_32(&hca_p->hca_mw_count);
 	}
 	status = ibt_alloc_mw(hca_hdl, pd_hdl, flags, mw_hdl_p, rkey_p);
 
 	if (status != IBT_SUCCESS && acct_enabled) {
 		DAPLKA_RS_ACCT_DEC(mw_rp, 1);
-		atomic_add_32(&hca_p->hca_mw_count, -1);
+		atomic_dec_32(&hca_p->hca_mw_count);
 	}
 	return (status);
 }
@@ -8477,7 +8477,7 @@ daplka_ibt_free_mw(daplka_mw_resource_t *mw_rp, ibt_hca_hdl_t hca_hdl,
 	}
 	if (DAPLKA_RS_ACCT_CHARGED(mw_rp) > 0) {
 		DAPLKA_RS_ACCT_DEC(mw_rp, 1);
-		atomic_add_32(&hca_p->hca_mw_count, -1);
+		atomic_dec_32(&hca_p->hca_mw_count);
 	}
 	return (status);
 }
@@ -8505,13 +8505,13 @@ daplka_ibt_register_mr(daplka_mr_resource_t *mr_rp, ibt_hca_hdl_t hca_hdl,
 			return (IBT_INSUFF_RESOURCE);
 		}
 		DAPLKA_RS_ACCT_INC(mr_rp, 1);
-		atomic_add_32(&hca_p->hca_mr_count, 1);
+		atomic_inc_32(&hca_p->hca_mr_count);
 	}
 	status = ibt_register_mr(hca_hdl, pd_hdl, mr_attr, mr_hdl_p, mr_desc_p);
 
 	if (status != IBT_SUCCESS && acct_enabled) {
 		DAPLKA_RS_ACCT_DEC(mr_rp, 1);
-		atomic_add_32(&hca_p->hca_mr_count, -1);
+		atomic_dec_32(&hca_p->hca_mr_count);
 	}
 	return (status);
 }
@@ -8540,14 +8540,14 @@ daplka_ibt_register_shared_mr(daplka_mr_resource_t *mr_rp,
 			return (IBT_INSUFF_RESOURCE);
 		}
 		DAPLKA_RS_ACCT_INC(mr_rp, 1);
-		atomic_add_32(&hca_p->hca_mr_count, 1);
+		atomic_inc_32(&hca_p->hca_mr_count);
 	}
 	status = ibt_register_shared_mr(hca_hdl, mr_hdl, pd_hdl,
 	    smr_attr_p, mr_hdl_p, mr_desc_p);
 
 	if (status != IBT_SUCCESS && acct_enabled) {
 		DAPLKA_RS_ACCT_DEC(mr_rp, 1);
-		atomic_add_32(&hca_p->hca_mr_count, -1);
+		atomic_dec_32(&hca_p->hca_mr_count);
 	}
 	return (status);
 }
@@ -8567,7 +8567,7 @@ daplka_ibt_deregister_mr(daplka_mr_resource_t *mr_rp, ibt_hca_hdl_t hca_hdl,
 	}
 	if (DAPLKA_RS_ACCT_CHARGED(mr_rp) > 0) {
 		DAPLKA_RS_ACCT_DEC(mr_rp, 1);
-		atomic_add_32(&hca_p->hca_mr_count, -1);
+		atomic_dec_32(&hca_p->hca_mr_count);
 	}
 	return (status);
 }
@@ -8595,13 +8595,13 @@ daplka_ibt_alloc_srq(daplka_srq_resource_t *srq_rp, ibt_hca_hdl_t hca_hdl,
 			return (IBT_INSUFF_RESOURCE);
 		}
 		DAPLKA_RS_ACCT_INC(srq_rp, 1);
-		atomic_add_32(&hca_p->hca_srq_count, 1);
+		atomic_inc_32(&hca_p->hca_srq_count);
 	}
 	status = ibt_alloc_srq(hca_hdl, flags, pd, reqsz, srq_hdl_p, realsz);
 
 	if (status != IBT_SUCCESS && acct_enabled) {
 		DAPLKA_RS_ACCT_DEC(srq_rp, 1);
-		atomic_add_32(&hca_p->hca_srq_count, -1);
+		atomic_dec_32(&hca_p->hca_srq_count);
 	}
 	return (status);
 }
@@ -8622,7 +8622,7 @@ daplka_ibt_free_srq(daplka_srq_resource_t *srq_rp, ibt_srq_hdl_t srq_hdl)
 	}
 	if (DAPLKA_RS_ACCT_CHARGED(srq_rp) > 0) {
 		DAPLKA_RS_ACCT_DEC(srq_rp, 1);
-		atomic_add_32(&hca_p->hca_srq_count, -1);
+		atomic_dec_32(&hca_p->hca_srq_count);
 	}
 	return (status);
 }
@@ -9035,7 +9035,7 @@ daplka_close(dev_t dev, int flag, int otyp, struct cred *cred)
 		return (EINVAL);
 	}
 	D2("daplka_close: closing rnum = %d\n", rnum);
-	atomic_add_32(&daplka_pending_close, 1);
+	atomic_inc_32(&daplka_pending_close);
 
 	/*
 	 * remove from resource table.
@@ -9048,7 +9048,7 @@ daplka_close(dev_t dev, int flag, int otyp, struct cred *cred)
 	if (ia_rp != NULL) {
 		DAPLKA_RS_UNREF(ia_rp);
 	}
-	atomic_add_32(&daplka_pending_close, -1);
+	atomic_dec_32(&daplka_pending_close);
 	return (DDI_SUCCESS);
 }
 
@@ -9846,7 +9846,7 @@ daplka_timer_hkey_gen()
 	uint32_t new_hkey;
 
 	do {
-		new_hkey = atomic_add_32_nv(&daplka_timer_hkey, 1);
+		new_hkey = atomic_inc_32_nv(&daplka_timer_hkey);
 	} while (new_hkey == 0);
 
 	return (new_hkey);

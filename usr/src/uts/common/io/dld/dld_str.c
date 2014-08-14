@@ -604,7 +604,7 @@ dld_str_create(queue_t *rq, uint_t type, major_t major, t_uscalar_t style)
 	/*
 	 * Allocate an object from the cache.
 	 */
-	atomic_add_32(&str_count, 1);
+	atomic_inc_32(&str_count);
 	dsp = kmem_cache_alloc(str_cachep, KM_SLEEP);
 
 	/*
@@ -613,7 +613,7 @@ dld_str_create(queue_t *rq, uint_t type, major_t major, t_uscalar_t style)
 	dsp->ds_tx_flow_mp = allocb(1, BPRI_HI);
 	if (dsp->ds_tx_flow_mp == NULL) {
 		kmem_cache_free(str_cachep, dsp);
-		atomic_add_32(&str_count, -1);
+		atomic_dec_32(&str_count);
 		return (NULL);
 	}
 	dsp->ds_type = type;
@@ -710,7 +710,7 @@ dld_str_destroy(dld_str_t *dsp)
 	 * Free the object back to the cache.
 	 */
 	kmem_cache_free(str_cachep, dsp);
-	atomic_add_32(&str_count, -1);
+	atomic_dec_32(&str_count);
 }
 
 /*

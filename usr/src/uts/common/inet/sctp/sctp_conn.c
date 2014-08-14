@@ -168,9 +168,9 @@ sctp_conn_request(sctp_t *sctp, mblk_t *mp, uint_t ifindex, uint_t ip_hdr_len,
 	if (slc != NULL) {
 		int64_t now;
 
-		if (atomic_add_32_nv(&slc->slc_cnt, 1) > slc->slc_max + 1) {
+		if (atomic_inc_32_nv(&slc->slc_cnt) > slc->slc_max + 1) {
 			now = ddi_get_lbolt64();
-			atomic_add_32(&slc->slc_cnt, -1);
+			atomic_dec_32(&slc->slc_cnt);
 			SCTP_KSTAT(sctps, sctp_listen_cnt_drop);
 			slc->slc_drop++;
 			if (now - slc->slc_report_time >
@@ -189,7 +189,7 @@ sctp_conn_request(sctp_t *sctp, mblk_t *mp, uint_t ifindex, uint_t ip_hdr_len,
 
 	if ((eager = sctp_create_eager(sctp)) == NULL) {
 		if (slc_set)
-			atomic_add_32(&slc->slc_cnt, -1);
+			atomic_dec_32(&slc->slc_cnt);
 		return (NULL);
 	}
 	econnp = eager->sctp_connp;

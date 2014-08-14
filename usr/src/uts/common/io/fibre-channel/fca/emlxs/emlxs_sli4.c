@@ -1991,7 +1991,7 @@ sendit:
 			sbp->pkt_flags |= PACKET_IN_CHIPQ;
 			mutex_exit(&sbp->mtx);
 
-			atomic_add_32(&hba->io_active, 1);
+			atomic_inc_32(&hba->io_active);
 			sbp->xrip->flag |= EMLXS_XRI_PENDING_IO;
 		}
 
@@ -3869,7 +3869,7 @@ emlxs_sli4_hba_flush_chipq(emlxs_hba_t *hba)
 #endif /* FCT_IO_TRACE */
 #endif /* SFCT_SUPPORT */
 
-		atomic_add_32(&hba->io_active, -1);
+		atomic_dec_32(&hba->io_active);
 
 		/* Copy entry to sbp's iocbq */
 		iocbq = &sbp->iocbq;
@@ -3963,7 +3963,7 @@ emlxs_sli4_process_wqe_cmpl(emlxs_hba_t *hba, CQ_DESC_t *cq, CQE_CmplWQ_t *cqe)
 
 	mutex_enter(&EMLXS_FCTAB_LOCK);
 	sbp = hba->fc_table[request_tag];
-	atomic_add_32(&hba->io_active, -1);
+	atomic_dec_32(&hba->io_active);
 
 	if (sbp == STALE_PACKET) {
 		cp->hbaCmplCmd_sbp++;

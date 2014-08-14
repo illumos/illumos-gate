@@ -49,7 +49,7 @@ rge_atomic_reserve(uint32_t *count_p, uint32_t n)
 		newval = oldval - n;
 		if (oldval <= n)
 			return (0);		/* no resources left	*/
-	} while (cas32(count_p, oldval, newval) != oldval);
+	} while (atomic_cas_32(count_p, oldval, newval) != oldval);
 
 	return (newval);
 }
@@ -70,7 +70,7 @@ rge_atomic_renounce(uint32_t *count_p, uint32_t n)
 	do {
 		oldval = *count_p;
 		newval = oldval + n;
-	} while (cas32(count_p, oldval, newval) != oldval);
+	} while (atomic_cas_32(count_p, oldval, newval) != oldval);
 }
 
 /*

@@ -55,7 +55,7 @@ typedef uint32_t	atomic_t;
 
 #define	atomic_set(p, v)	(*(p) = (v))
 #define	atomic_read(p)		(*(p))
-#define	atomic_inc(p)		atomic_add_int(p, 1)
+#define	atomic_inc(p)		atomic_inc_uint(p)
 #define	atomic_dec(p)		atomic_dec_uint(p)
 #define	atomic_add(n, p)	atomic_add_int(p, n)
 #define	atomic_sub(n, p)	atomic_add_int(p, -n)

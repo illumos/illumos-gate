@@ -1360,9 +1360,9 @@ cmt_ev_thread_swtch(pg_t *pg, cpu_t *cp, hrtime_t now, kthread_t *old,
 	pg_cmt_t	*cmt_pg = (pg_cmt_t *)pg;
 
 	if (old == cp->cpu_idle_thread) {
-		atomic_add_32(&cmt_pg->cmt_utilization, 1);
+		atomic_inc_32(&cmt_pg->cmt_utilization);
 	} else if (new == cp->cpu_idle_thread) {
-		atomic_add_32(&cmt_pg->cmt_utilization, -1);
+		atomic_dec_32(&cmt_pg->cmt_utilization);
 	}
 }
 
@@ -1385,7 +1385,7 @@ cmt_ev_thread_swtch_pwr(pg_t *pg, cpu_t *cp, hrtime_t now, kthread_t *old,
 
 	if (old == cp->cpu_idle_thread) {
 		ASSERT(new != cp->cpu_idle_thread);
-		u = atomic_add_32_nv(&cmt->cmt_utilization, 1);
+		u = atomic_inc_32_nv(&cmt->cmt_utilization);
 		if (u == 1) {
 			/*
 			 * Notify the CPU power manager that the domain
@@ -1397,7 +1397,7 @@ cmt_ev_thread_swtch_pwr(pg_t *pg, cpu_t *cp, hrtime_t now, kthread_t *old,
 		}
 	} else if (new == cp->cpu_idle_thread) {
 		ASSERT(old != cp->cpu_idle_thread);
-		u = atomic_add_32_nv(&cmt->cmt_utilization, -1);
+		u = atomic_dec_32_nv(&cmt->cmt_utilization);
 		if (u == 0) {
 			/*
 			 * The domain is idle, notify the CPU power

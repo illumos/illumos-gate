@@ -2817,7 +2817,7 @@ esp_outbound(mblk_t *data_mp, ip_xmit_attr_t *ixa)
 
 	esph_ptr->esph_spi = assoc->ipsa_spi;
 
-	esph_ptr->esph_replay = htonl(atomic_add_32_nv(&assoc->ipsa_replay, 1));
+	esph_ptr->esph_replay = htonl(atomic_inc_32_nv(&assoc->ipsa_replay));
 	if (esph_ptr->esph_replay == 0 && assoc->ipsa_replay_wsize != 0) {
 		/*
 		 * XXX We have replay counter wrapping.

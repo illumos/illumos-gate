@@ -673,7 +673,7 @@ static uint64_t open_owner_seq_num = 0;
 uint64_t
 nfs4_get_new_oo_name(void)
 {
-	return (atomic_add_64_nv(&open_owner_seq_num, 1));
+	return (atomic_inc_64_nv(&open_owner_seq_num));
 }
 
 /*
@@ -836,7 +836,7 @@ create_lock_owner(rnode4_t *rp, pid_t pid)
 	 * A Solaris lock_owner is <seq_num><pid>
 	 */
 	lop->lock_owner_name.ln_seq_num =
-	    atomic_add_64_nv(&lock_owner_seq_num, 1);
+	    atomic_inc_64_nv(&lock_owner_seq_num);
 	lop->lock_owner_name.ln_pid = pid;
 
 	cv_init(&lop->lo_cv_seqid_sync, NULL, CV_DEFAULT, NULL);
@@ -883,7 +883,7 @@ nfs4_set_new_lock_owner_args(lock_owner4 *owner, pid_t pid)
 	 * A Solaris lock_owner is <seq_num><pid>
 	 */
 	cast_namep = (nfs4_lo_name_t *)owner->owner_val;
-	cast_namep->ln_seq_num = atomic_add_64_nv(&lock_owner_seq_num, 1);
+	cast_namep->ln_seq_num = atomic_inc_64_nv(&lock_owner_seq_num);
 	cast_namep->ln_pid = pid;
 }
 

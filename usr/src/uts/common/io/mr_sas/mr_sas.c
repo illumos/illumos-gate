@@ -6734,7 +6734,7 @@ static void
 issue_cmd_ppc(struct mrsas_cmd *cmd, struct mrsas_instance *instance)
 {
 	struct scsi_pkt *pkt;
-	atomic_add_16(&instance->fw_outstanding, 1);
+	atomic_inc_16(&instance->fw_outstanding);
 
 	pkt = cmd->pkt;
 	if (pkt) {

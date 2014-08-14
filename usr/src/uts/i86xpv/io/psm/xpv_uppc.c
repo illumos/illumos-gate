@@ -251,7 +251,7 @@ xen_uppc_addspl(int irqno, int ipl, int min_ipl, int max_ipl)
 	cpuset_t cpus;
 
 	if (irqno >= 0 && irqno <= MAX_ISA_IRQ)
-		atomic_add_16(&xen_uppc_irq_shared_table[irqno], 1);
+		atomic_inc_16(&xen_uppc_irq_shared_table[irqno]);
 
 	/*
 	 * We are called at splhi() so we can't call anything that might end
@@ -284,7 +284,7 @@ xen_uppc_delspl(int irqno, int ipl, int min_ipl, int max_ipl)
 	int err = PSM_SUCCESS;
 
 	if (irqno >= 0 && irqno <= MAX_ISA_IRQ)
-		atomic_add_16(&xen_uppc_irq_shared_table[irqno], -1);
+		atomic_dec_16(&xen_uppc_irq_shared_table[irqno]);
 
 	if (irqno >= PIRQ_BASE && irqno < NR_PIRQS &&
 	    DOMAIN_IS_INITDOMAIN(xen_info)) {

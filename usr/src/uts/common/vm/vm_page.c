@@ -317,7 +317,7 @@ struct memseg_stats {
 } memseg_stats;
 
 #define	MEMSEG_STAT_INCR(v) \
-	atomic_add_32(&memseg_stats.v, 1)
+	atomic_inc_32(&memseg_stats.v)
 #else
 #define	MEMSEG_STAT_INCR(x)
 #endif

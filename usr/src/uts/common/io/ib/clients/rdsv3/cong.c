@@ -259,7 +259,7 @@ rdsv3_cong_map_updated(struct rdsv3_cong_map *map, uint64_t portmask)
 	    map, NIPQUAD(map->m_addr));
 
 	rdsv3_stats_inc(s_cong_update_received);
-	atomic_add_32(&rdsv3_cong_generation, 1);
+	atomic_inc_32(&rdsv3_cong_generation);
 #if 0
 XXX
 	if (waitqueue_active(&map->m_waitq))

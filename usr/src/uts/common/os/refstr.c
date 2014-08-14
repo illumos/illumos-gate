@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/systm.h>
 #include <sys/param.h>
 #include <sys/atomic.h>
@@ -57,12 +55,12 @@ refstr_value(refstr_t *rsp)
 void
 refstr_hold(refstr_t *rsp)
 {
-	atomic_add_32(&rsp->rs_refcnt, 1);
+	atomic_inc_32(&rsp->rs_refcnt);
 }
 
 void
 refstr_rele(refstr_t *rsp)
 {
-	if (atomic_add_32_nv(&rsp->rs_refcnt, -1) == 0)
+	if (atomic_dec_32_nv(&rsp->rs_refcnt) == 0)
 		kmem_free(rsp, (size_t)rsp->rs_size);
 }

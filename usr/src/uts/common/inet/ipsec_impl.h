@@ -298,13 +298,13 @@ typedef struct ipsec_action_s
 } ipsec_action_t;
 
 #define	IPACT_REFHOLD(ipa) {			\
-	atomic_add_32(&(ipa)->ipa_refs, 1);	\
+	atomic_inc_32(&(ipa)->ipa_refs);	\
 	ASSERT((ipa)->ipa_refs != 0);	\
 }
 #define	IPACT_REFRELE(ipa) {					\
 	ASSERT((ipa)->ipa_refs != 0);				\
 	membar_exit();						\
-	if (atomic_add_32_nv(&(ipa)->ipa_refs, -1) == 0)	\
+	if (atomic_dec_32_nv(&(ipa)->ipa_refs) == 0)	\
 		ipsec_action_free(ipa);				\
 	(ipa) = 0;						\
 }
@@ -414,13 +414,13 @@ struct ipsec_policy_s
 };
 
 #define	IPPOL_REFHOLD(ipp) {			\
-	atomic_add_32(&(ipp)->ipsp_refs, 1);	\
+	atomic_inc_32(&(ipp)->ipsp_refs);	\
 	ASSERT((ipp)->ipsp_refs != 0);		\
 }
 #define	IPPOL_REFRELE(ipp) {					\
 	ASSERT((ipp)->ipsp_refs != 0);				\
 	membar_exit();						\
-	if (atomic_add_32_nv(&(ipp)->ipsp_refs, -1) == 0)	\
+	if (atomic_dec_32_nv(&(ipp)->ipsp_refs) == 0)	\
 		ipsec_policy_free(ipp);				\
 	(ipp) = 0;						\
 }
@@ -461,13 +461,13 @@ typedef struct ipsec_policy_head_s
 } ipsec_policy_head_t;
 
 #define	IPPH_REFHOLD(iph) {			\
-	atomic_add_32(&(iph)->iph_refs, 1);	\
+	atomic_inc_32(&(iph)->iph_refs);	\
 	ASSERT((iph)->iph_refs != 0);		\
 }
 #define	IPPH_REFRELE(iph, ns) {					\
 	ASSERT((iph)->iph_refs != 0);				\
 	membar_exit();						\
-	if (atomic_add_32_nv(&(iph)->iph_refs, -1) == 0)	\
+	if (atomic_dec_32_nv(&(iph)->iph_refs) == 0)	\
 		ipsec_polhead_free(iph, ns);			\
 	(iph) = 0;						\
 }
@@ -548,14 +548,14 @@ typedef struct ipsec_tun_pol_s {
 	ITPF_I_PER_PORT_SECURITY))
 
 #define	ITP_REFHOLD(itp) { \
-	atomic_add_32(&((itp)->itp_refcnt), 1);	\
+	atomic_inc_32(&((itp)->itp_refcnt));	\
 	ASSERT((itp)->itp_refcnt != 0); \
 }
 
 #define	ITP_REFRELE(itp, ns) { \
 	ASSERT((itp)->itp_refcnt != 0); \
 	membar_exit(); \
-	if (atomic_add_32_nv(&((itp)->itp_refcnt), -1) == 0) \
+	if (atomic_dec_32_nv(&((itp)->itp_refcnt)) == 0) \
 		itp_free(itp, ns); \
 }
 
@@ -577,7 +577,7 @@ typedef struct ipsid_s
  */
 
 #define	IPSID_REFHOLD(ipsid) {			\
-	atomic_add_32(&(ipsid)->ipsid_refcnt, 1);	\
+	atomic_inc_32(&(ipsid)->ipsid_refcnt);	\
 	ASSERT((ipsid)->ipsid_refcnt != 0);	\
 }
 
@@ -588,7 +588,7 @@ typedef struct ipsid_s
 
 #define	IPSID_REFRELE(ipsid) {					\
 	membar_exit();						\
-	atomic_add_32(&(ipsid)->ipsid_refcnt, -1);		\
+	atomic_dec_32(&(ipsid)->ipsid_refcnt);		\
 }
 
 /*

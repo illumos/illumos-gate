@@ -1799,7 +1799,7 @@ qlt_ioctl(dev_t dev, int cmd, intptr_t data, int mode,
 			    qlt->fw_length02) << 2);
 			qlt->fw_code01 = NULL;
 		} else {
-			atomic_add_32(&qlt_loaded_counter, 1);
+			atomic_inc_32(&qlt_loaded_counter);
 		}
 		qlt->fw_length01 = intp[3];
 		qlt->fw_code01 = (uint32_t *)kmem_alloc(iocd->stmf_ibuf_size,
@@ -1816,7 +1816,7 @@ qlt_ioctl(dev_t dev, int cmd, intptr_t data, int mode,
 			kmem_free(qlt->fw_code01, (qlt->fw_length01 +
 			    qlt->fw_length02) << 2);
 			qlt->fw_code01 = NULL;
-			atomic_add_32(&qlt_loaded_counter, -1);
+			atomic_dec_32(&qlt_loaded_counter);
 		}
 		break;
 
@@ -4671,7 +4671,7 @@ qlt_abort_cmd(struct fct_local_port *port, fct_cmd_t *cmd, uint32_t flags)
 
 #ifdef DEBUG
 	if (qlt_drop_abort_counter > 0) {
-		if (atomic_add_32_nv(&qlt_drop_abort_counter, -1) == 1)
+		if (atomic_dec_32_nv(&qlt_drop_abort_counter) == 1)
 			return (FCT_SUCCESS);
 	}
 #endif

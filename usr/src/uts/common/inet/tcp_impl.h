@@ -371,7 +371,7 @@ typedef struct tcp_listen_cnt_s {
 #define	TCP_DECR_LISTEN_CNT(tcp)					\
 {									\
 	ASSERT((tcp)->tcp_listen_cnt->tlc_cnt > 0);			\
-	if (atomic_add_32_nv(&(tcp)->tcp_listen_cnt->tlc_cnt, -1) == 0) \
+	if (atomic_dec_32_nv(&(tcp)->tcp_listen_cnt->tlc_cnt) == 0) \
 		kmem_free((tcp)->tcp_listen_cnt, sizeof (tcp_listen_cnt_t)); \
 	(tcp)->tcp_listen_cnt = NULL;					\
 }

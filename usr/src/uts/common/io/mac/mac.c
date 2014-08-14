@@ -2256,7 +2256,7 @@ mac_minor_hold(boolean_t sleep)
 	/*
 	 * Grab a value from the arena.
 	 */
-	atomic_add_32(&minor_count, 1);
+	atomic_inc_32(&minor_count);
 
 	if (sleep)
 		minor = (uint_t)id_alloc(minor_ids);
@@ -2264,7 +2264,7 @@ mac_minor_hold(boolean_t sleep)
 		minor = (uint_t)id_alloc_nosleep(minor_ids);
 
 	if (minor == 0) {
-		atomic_add_32(&minor_count, -1);
+		atomic_dec_32(&minor_count);
 		return (0);
 	}
 
@@ -2281,7 +2281,7 @@ mac_minor_rele(minor_t minor)
 	 * Return the value to the arena.
 	 */
 	id_free(minor_ids, minor);
-	atomic_add_32(&minor_count, -1);
+	atomic_dec_32(&minor_count);
 }
 
 uint32_t

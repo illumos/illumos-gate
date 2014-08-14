@@ -243,7 +243,7 @@ static uint_t clts_rcstat_ndata =
 	sizeof (clts_rcstat_tmpl) / sizeof (kstat_named_t);
 
 #define	RCSTAT_INCR(s, x)			\
-	atomic_add_64(&(s)->x.value.ui64, 1)
+	atomic_inc_64(&(s)->x.value.ui64)
 
 #define	ptoh(p)		(&((p)->cku_client))
 #define	htop(h)		((struct cku_private *)((h)->cl_private))

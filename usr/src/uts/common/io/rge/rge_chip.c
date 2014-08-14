@@ -285,7 +285,7 @@ rge_atomic_shl32(uint32_t *sp, uint_t count)
 	do {
 		oldval = *sp;
 		newval = oldval << count;
-	} while (cas32(sp, oldval, newval) != oldval);
+	} while (atomic_cas_32(sp, oldval, newval) != oldval);
 
 	return (oldval);
 }

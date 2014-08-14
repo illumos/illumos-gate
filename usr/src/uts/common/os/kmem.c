@@ -1626,7 +1626,7 @@ slab_alloc_failure:
 vmem_alloc_failure:
 
 	kmem_log_event(kmem_failure_log, cp, NULL, NULL);
-	atomic_add_64(&cp->cache_alloc_fail, 1);
+	atomic_inc_64(&cp->cache_alloc_fail);
 
 	return (NULL);
 }
@@ -1995,7 +1995,7 @@ kmem_cache_alloc_debug(kmem_cache_t *cp, void *buf, int kmflag, int construct,
 
 	if (mtbf || (construct && cp->cache_constructor != NULL &&
 	    cp->cache_constructor(buf, cp->cache_private, kmflag) != 0)) {
-		atomic_add_64(&cp->cache_alloc_fail, 1);
+		atomic_inc_64(&cp->cache_alloc_fail);
 		btp->bt_bxstat = (intptr_t)bcp ^ KMEM_BUFTAG_FREE;
 		if (cp->cache_flags & KMF_DEADBEEF)
 			copy_pattern(KMEM_FREE_PATTERN, buf, cp->cache_verify);
@@ -2603,7 +2603,7 @@ kmem_cache_alloc(kmem_cache_t *cp, int kmflag)
 
 	if (cp->cache_constructor != NULL &&
 	    cp->cache_constructor(buf, cp->cache_private, kmflag) != 0) {
-		atomic_add_64(&cp->cache_alloc_fail, 1);
+		atomic_inc_64(&cp->cache_alloc_fail);
 		kmem_slab_free(cp, buf);
 		return (NULL);
 	}
@@ -3166,7 +3166,7 @@ kmem_reap_common(void *flag_arg)
 	uint32_t *flag = (uint32_t *)flag_arg;
 
 	if (MUTEX_HELD(&kmem_cache_lock) || kmem_taskq == NULL ||
-	    cas32(flag, 0, 1) != 0)
+	    atomic_cas_32(flag, 0, 1) != 0)
 		return;
 
 	/*
@@ -4877,7 +4877,7 @@ kmem_move_buffer(kmem_move_t *callback)
 	} else if (cp->cache_constructor != NULL &&
 	    cp->cache_constructor(callback->kmm_to_buf, cp->cache_private,
 	    KM_NOSLEEP) != 0) {
-		atomic_add_64(&cp->cache_alloc_fail, 1);
+		atomic_inc_64(&cp->cache_alloc_fail);
 		KMEM_STAT_ADD(kmem_move_stats.kms_constructor_fail);
 		kmem_slab_free(cp, callback->kmm_to_buf);
 		kmem_move_end(cp, callback);

@@ -408,7 +408,7 @@ handle_alloc(vnode_t *vp, struct ldi_ident *ident)
 	/* add it to the handle hash */
 	lhp->lh_next = ldi_handle_hash[index];
 	ldi_handle_hash[index] = lhp;
-	atomic_add_long(&ldi_handle_hash_count, 1);
+	atomic_inc_ulong(&ldi_handle_hash_count);
 
 	LDI_ALLOCFREE((CE_WARN, "ldi handle alloc: new "
 	    "lh=0x%p, ident=0x%p, vp=0x%p, drv=%s, minor=0x%x",
@@ -448,7 +448,7 @@ handle_release(struct ldi_handle *lhp)
 	lhpp = handle_find_ref_nolock(lhp->lh_vp, lhp->lh_ident);
 	ASSERT((lhpp != NULL) && (*lhpp != NULL));
 	*lhpp = lhp->lh_next;
-	atomic_add_long(&ldi_handle_hash_count, -1);
+	atomic_dec_ulong(&ldi_handle_hash_count);
 	mutex_exit(&ldi_handle_hash_lock[index]);
 
 	VN_RELE(lhp->lh_vp);

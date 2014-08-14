@@ -61,8 +61,8 @@ struct ipsecesp_stack {
 
 	/*
 	 * Keysock instance of ESP.  There can be only one per stack instance.
-	 * Use casptr() on this because I don't set it until KEYSOCK_HELLO
-	 * comes down.
+	 * Use atomic_cas_ptr() on this because I don't set it until
+	 * KEYSOCK_HELLO comes down.
 	 * Paired up with the esp_pfkey_q is the esp_event, which will age SAs.
 	 */
 	queue_t			*esp_pfkey_q;

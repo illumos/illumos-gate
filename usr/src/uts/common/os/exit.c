@@ -612,7 +612,7 @@ proc_exit(int why, int what)
 	 */
 	mutex_enter(&p->p_lock);
 	ASSERT(p->p_pool->pool_ref > 0);
-	atomic_add_32(&p->p_pool->pool_ref, -1);
+	atomic_dec_32(&p->p_pool->pool_ref);
 	p->p_pool = pool_default;
 	/*
 	 * Now that our address space has been freed and all other threads
