@@ -158,7 +158,7 @@ Parameters for controlling the reboot behavior.
 			</common_name>
 			<description>
 			    <loctext xml:lang='C'>
-When set to true, reboot(1M) and init(1M) 6 will call uadmin(2) with AD_FASTREOOT, which will bypass firmware.
+When set to true, reboot(1M) and init(1M) 6 will call uadmin(2) with AD_FASTREBOOT, which will bypass firmware.
 			    </loctext>
 			</description>
 		    </prop_pattern>
