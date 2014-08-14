@@ -1,4 +1,5 @@
 '\" te
+.\" Copyright 2014 Garrett D'Amore <garrett@damore.org>
 .\" Copyright (c) 2001, The IEEE and The Open Group. All Rights Reserved. Portions Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved.
 .\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
@@ -7,7 +8,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH WCHAR.H 3HEAD "Sep 10, 2004"
+.TH WCHAR.H 3HEAD "Aug 15, 2014"
 .SH NAME
 wchar.h, wchar \- wide-character handling
 .SH SYNOPSIS
@@ -17,7 +18,6 @@ wchar.h, wchar \- wide-character handling
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The <\fBwchar.h\fR> header defines the following types:
 .sp
@@ -115,7 +115,6 @@ The maximum value representable by an object of type \fBwchar_t\fR.
 .RS 13n
 The minimum value representable by an object of type \fBwchar_t\fR.
 .RE
-
 .sp
 .ne 2
 .na
@@ -134,22 +133,15 @@ functions to indicate end-of-file.
 .RS 13n
 As described in <\fBstddef.h\fR>.
 .RE
-
-.sp
 .LP
 The tag \fBtm\fR is declared as naming an incomplete structure type, the
 contents of which are described in the header <\fBtime.h\fR>.
-.sp
 .LP
 Inclusion of the <\fBwchar.h\fR> header can make visible all symbols from the
 headers <\fBctype.h\fR>,  <\fBstring.h\fR>, <\fBstdarg.h\fR>, <\fBstddef.h\fR>,
 <\fBstdio.h\fR>, <\fBstdlib.h\fR>, and <\fBtime.h\fR>.
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
-.sp
-
 .sp
 .TS
 box;
@@ -161,14 +153,18 @@ Interface Stability	Standard
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBgetconf\fR(1), \fBbtowc\fR(3C), \fBconfstr\fR(3C), \fBfgetwc\fR(3C),
 \fBgetws\fR(3C), \fBfputwc\fR(3C), \fBfputws\fR(3C), \fBfwide\fR(3C),
 \fBfwprintf\fR(3C), \fBfwscanf\fR(3C), \fBgetwc\fR(3C), \fBgetwchar\fR(3C),
 \fBiswalpha\fR(3C), \fBiswctype\fR(3C), \fBmbsinit\fR(3C), \fBmbrlen\fR(3C),
 \fBmbrtowc\fR(3C), \fBmbsrtowcs\fR(3C), \fBtowlower\fR(3C), \fBtowupper\fR(3C),
-\fBungetwc\fR(3C), \fBvfwprintf\fR(3C), \fBwcrtomb\fR(3C), \fBwcsrtombs\fR(3C),
+\fBungetwc\fR(3C), \fBvfwprintf\fR(3C),
+\fBwcpcpy\fR(3C),
+\fBwcrtomb\fR(3C),
+\fBwcscasecmp\fR(3C),
+\fBwcsdup\fR(3C),
+\fBwcslen\fR(3C),
+\fBwcsrtombs\fR(3C),
 \fBwcstring\fR(3C), \fBwcsstr\fR(3C), \fBwcstod\fR(3C), \fBwcscoll\fR(3C),
 \fBwcsftime\fR(3C), \fBwcstol\fR(3C), \fBwcstoul\fR(3C), \fBwcswidth\fR(3C),
 \fBwcsxfrm\fR(3C), \fBwctob\fR(3C), \fBwctype\fR(3C), \fBwcwidth\fR(3C),

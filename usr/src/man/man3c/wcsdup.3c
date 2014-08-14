@@ -1,0 +1,73 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2014 Garrett D'Amore <garrett@damore.org>
+.\"
+.Dd "Nov 4, 2014"
+.Dt WCSDUP 3C
+.Os
+.Sh NAME
+.Nm wcsdup
+.Nd duplicate wide-character string
+.Sh SYNOPSIS
+.In wchar.h
+.
+.Ft wchar_t
+.Fo wcsdup
+.Fa "const wchar_t *string"
+.Fc
+.
+.Sh DESCRIPTION
+The
+.Fn wcsdup
+function duplicates a wide-character
+.Fa string ,
+allocating sufficient memory to store the copy, and then
+copying from
+.Fa string .
+The resulting copy is returned.  It may be deallocated with
+.Xr free 3C
+when it is no longer needed.  The
+.Fn wcsdup
+function is the wide-character equivalent of
+.Xr strdup 3C .
+.Sh RETURN VALUES
+On success, the function
+.Fn wcsdup
+returns the newly allocated copy of the string; on failure it
+returns
+.Dv NULL
+and sets
+.Va errno .
+.Sh ERRORS
+The
+.Fn wcsdup
+function will fail if:
+.Bl -tag -width Er
+.It Er ENOMEM
+Insufficient memory was available to create the copy.
+.El
+.Sh INTERFACE STABILITY
+.Sy Standard .
+.Sh MT-LEVEL
+.Sy MT-Safe .
+.Sh SEE ALSO
+.Xr free 3C ,
+.Xr strdup 3C ,
+.Xr wcslen 3C ,
+.Xr wchar.h 3HEAD ,
+.Xr locale 5 ,
+.Xr standards 5
+.Sh STANDARDS
+The
+.Fn wcsdup
+function was introduced in
+.St -p1003.1-2008 .

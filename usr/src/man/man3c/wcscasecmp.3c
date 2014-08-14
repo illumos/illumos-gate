@@ -1,0 +1,158 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2014 Garrett D'Amore <garrett@damore.org>
+.\"
+.Dd "Nov 4, 2014"
+.Dt WCSCASECMP 3C
+.Os
+.Sh NAME
+.Nm wcscasecmp ,
+.Nm wcscasecmp_l ,
+.Nm wcsncasecmp ,
+.Nm wcsncasecmp_l
+.Nd case-insensitive wide-character string comparison
+.Sh SYNOPSIS
+.In wchar.h
+.
+.Ft int
+.Fo wcscasecmp
+.Fa "const wchar_t *ws1"
+.Fa "const wchar_t *ws2"
+.Fc
+.
+.Ft int
+.Fo wcscasecmp_l
+.Fa "const wchar_t *ws1"
+.Fa "const wchar_t *ws2"
+.Fa "locale_t loc"
+.Fc
+.
+.Ft int
+.Fo wcsncasecmp
+.Fa "const wchar_t *ws1"
+.Fa "const wchar_t *ws2"
+.Fa "size_t n"
+.Fc
+.
+.Ft int
+.Fo wcsncasecmp_l
+.Fa "const wchar_t *ws1"
+.Fa "const wchar_t *ws2"
+.Fa "size_t n"
+.Fa "locale_t loc"
+.Fc
+.Sh DESCRIPTION
+These functions perform case-insensitive comparison of wide-character
+strings
+.Fa ws1
+and
+.Fa ws2 .
+Pairs of wide-characters from each of
+.Fa ws1
+and
+.Fa ws2
+are compared consecutively, ignoring differences in case (if the
+.\"POSIX\." locale upper case characters are treated as lower case).  If
+the two values are different, the comparision stops and either
+a negative value is returned if the character from
+.Fa ws1
+is less than that from
+.Fa ws2 ,
+or a positive is returned if the character from
+.Fa ws1
+is greater than that from
+.Fa ws2 .
+The comparison also stops if both characters are null wide-characters,
+or, in the case of
+.Fn wcsncasecmp
+and
+.Fn wcsncasecmp_l ,
+after
+.Fa n
+comparisons have been made without finding a difference.  In either of
+these two cases, 0 is returned.
+.Lp
+The
+.Fn wcscasecmp
+and
+.Fn wcsncasecmp
+functions use the
+.Dv LC_CTYPE
+category of the current locale to determine case.  The
+.Fn wcscasecmp_l
+and
+.Fn wcsncasecmp_l
+functions use the
+.Dv LC_CTYPE
+category of the locale pointed to by
+.Fa loc
+to determine case.
+.Lp
+Passing
+.Dv LC_GLOBAL_LOCALE
+for
+.Fa loc
+results in undefined behavior.
+.Lp
+The
+.Fn wcscasecmp ,
+.Fn wcsncasecmp ,
+.Fn wcscasecmp_l ,
+and
+.Fn wcsncasecmp_l
+functions are the wide-character equivalents of the
+.Fn strcasecmp ,
+.Fn strncasecmp ,
+.Fn strcasemp_l ,
+and
+.Fn strncasecmp_l
+functions, respectively.
+.Sh RETURN VALUES
+These functions return a negative value if, ignoring case,
+.Fa ws1
+is less than
+.Fa ws1 ,
+or a positive value  if
+.Fa ws1
+is greater than
+.Fa ws2 ,
+or 0 if the both
+.Fa ws1
+and
+.Fa ws2
+are the same.
+.Sh ERRORS
+None.
+.Sh INTERFACE STABILITY
+.Sy Standard .
+.Sh MT-LEVEL
+.Sy MT-Safe .
+.Sh SEE ALSO
+.Xr newlocale 3C ,
+.Xr setlocale 3C ,
+.Xr strcasecmp 3C ,
+.Xr strcasecmp_l 3C ,
+.Xr strncasecmp 3C ,
+.Xr strncasecmp_l 3C ,
+.Xr uselocale 3C ,
+.Xr wchar.h 3HEAD ,
+.Xr locale 5 ,
+.Xr standards 5
+.Sh STANDARDS
+The
+.Fn wcscasecmp ,
+.Fn wcsncasecmp ,
+.Fn wcscasecmp_l ,
+and
+.Fn wcsncasecmp_l
+functions were introduced in
+.St -p1003.1-2008 .

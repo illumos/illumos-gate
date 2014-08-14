@@ -1,0 +1,116 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2014 Garrett D'Amore <garrett@damore.org>
+.\"
+.Dd "Jul 27, 2014"
+.Dt WCPCPY 3C
+.Os
+.Sh NAME
+.Nm wcpcpy ,
+.Nm wcpncpy
+.Nd copy a wide-character string and return a pointer to its end
+.Sh SYNOPSIS
+.In wchar.h
+.
+.Ft "wchar_t *"
+.Fo wcpcpy
+.Fa "wchar_t *restrict ws1"
+.Fa "const wchar_t *restrict ws2"
+.Fc
+.
+.Ft "wchar_t *"
+.Fo wcpncpy
+.Fa "wchar_t *restrict ws1"
+.Fa "const wchar_t *restrict ws2"
+.Fa "size_t n"
+.Fc
+.
+.Sh DESCRIPTION
+The
+.Fn wcpcpy
+and
+.Fn wcpncpy
+functions copy the wide-character string pointed to by
+.Fa ws2
+into the location pointed to by
+.Fa ws1 .
+They stop copying after a null wide-character is copied, or in the case
+of
+.Fn wcpncpy ,
+after
+.Fa n
+wide-characters have been copied. If
+.Fa ws2
+contains fewer than
+.Fa n
+wide-characters, then the
+.Fn wcpncpy
+function pads wide-characters to the end of the destination
+.Fa ws1
+until exactly
+.Fa n
+wide-characters have been written.
+.Lp
+In the case of
+.Fn wcpncpy
+a terminating null wide-character will
+.Em not
+be written if the length of
+.Fa ws2
+exceeds
+.Fa n .
+.Lp
+If
+.Fa ws1
+and
+.Fa ws2
+overlap, the result is undefined.
+.Lp
+The
+.Fn wcpcpy
+and
+.Fn wcpncpy
+functions are the wide-character equivalents of
+.Fn stpcpy
+and
+.Fn stpncpy ,
+respectively.
+.Sh RETURN VALUES
+The
+.Fn wcpcpy
+and
+.Fn wcpncpy
+functions return a pointer to the last wide-character written.  In the
+case of
+.Fn wcpncpy
+this will always be equal to
+.Po Fa ws1 Li + Fa n Li \(mi 1 Pc .
+.Sh ERRORS
+None.
+.Sh INTERFACE STABILITY
+.Sy Standard .
+.Sh MT-LEVEL
+.Sy MT-Safe .
+.Sh SEE ALSO
+.Xr stpcpy 3C ,
+.Xr stpncpy 3C ,
+.Xr wcscpy 3C ,
+.Xr wcsncpy 3C ,
+.Xr wchar.h 3HEAD ,
+.Xr standards 5
+.Sh STANDARDS
+The
+.Fn wcpcpy
+and
+.Fn wcpncpy
+functions were introduced in
+.St -p1003.1-2008 .
