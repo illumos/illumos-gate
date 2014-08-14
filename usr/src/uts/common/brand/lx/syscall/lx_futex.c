@@ -371,7 +371,7 @@ futex_wake_op_execute(int32_t *addr, int32_t val3)
 			no_fault();
 			return (set_errno(EINVAL));
 		}
-	} while (cas32((uint32_t *)addr, oldval, newval) != oldval);
+	} while (atomic_cas_32((uint32_t *)addr, oldval, newval) != oldval);
 
 	no_fault();
 
