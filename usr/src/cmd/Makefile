@@ -477,8 +477,6 @@ i386_SUBDIRS=		\
 	biosdev		\
 	diskscan	\
 	lms		\
-	ntfsprogs	\
-	parted		\
 	rtc		\
 	ucodeadm	\
 	xvm
