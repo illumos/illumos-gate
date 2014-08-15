@@ -37,8 +37,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Print the name of the signal indicated by "sig", along with the
  * supplied message
@@ -61,14 +59,15 @@ void
 psignal(int sig, const char *s)
 {
 	char *c;
-	size_t n;
+	size_t n = 0;
 	char buf[256];
 
 	if (sig < 0 || sig >= NSIG)
 		sig = 0;
 	c = strsignal(sig);
-	n = strlen(s);
-	if (n) {
+	if (s != NULL)
+		n = strlen(s);
+	if (n != 0) {
 		(void) snprintf(buf, sizeof (buf), "%s: %s\n", s, c);
 	} else {
 		(void) snprintf(buf, sizeof (buf), "%s\n", c);
