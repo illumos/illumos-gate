@@ -757,8 +757,6 @@ BOFI_OBJS += bofi.o
 
 HID_OBJS += hid.o
 
-HWA_RC_OBJS += hwarc.o
-
 USBSKEL_OBJS += usbskel.o
 
 USBVC_OBJS += usbvc.o usbvc_v4l2.o
@@ -786,8 +784,6 @@ USBSER_KEYSPAN_OBJS += usbser_keyspan.o keyspan_dsd.o keyspan_pipe.o
 USBS49_FW_OBJS += keyspan_49fw.o
 
 USBSPRL_OBJS += usbser_pl2303.o pl2303_dsd.o
-
-WUSB_CA_OBJS += wusb_ca.o
 
 USBFTDI_OBJS += usbser_uftdi.o uftdi_dsd.o
 
@@ -823,9 +819,6 @@ SMP_OBJS +=	smp.o
 SATA_OBJS +=	sata.o
 
 USBA_OBJS +=	hcdi.o	usba.o	usbai.o hubdi.o parser.o genconsole.o \
-		usbai_pipe_mgmt.o usbai_req.o usbai_util.o usbai_register.o \
-		usba_devdb.o usba10_calls.o usba_ugen.o whcdi.o wa.o
-USBA_WITHOUT_WUSB_OBJS +=	hcdi.o	usba.o	usbai.o hubdi.o parser.o genconsole.o \
 		usbai_pipe_mgmt.o usbai_req.o usbai_util.o usbai_register.o \
 		usba_devdb.o usba10_calls.o usba_ugen.o
 
@@ -1742,14 +1735,7 @@ USB_MID_OBJS += usb_mid.o
 
 USB_IA_OBJS += usb_ia.o
 
-UWBA_OBJS += uwba.o uwbai.o
-
 SCSA2USB_OBJS += scsa2usb.o usb_ms_bulkonly.o usb_ms_cbi.o
-
-HWAHC_OBJS += hwahc.o hwahc_util.o
-
-WUSB_DF_OBJS += wusb_df.o
-WUSB_FWMOD_OBJS += wusb_fwmod.o
 
 IPF_OBJS += ip_fil_solaris.o fil.o solaris.o ip_state.o ip_frag.o ip_nat.o \
 	    ip_proxy.o ip_auth.o ip_pool.o ip_htable.o ip_lookup.o \

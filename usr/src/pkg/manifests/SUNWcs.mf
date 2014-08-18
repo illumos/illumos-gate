@@ -23,6 +23,7 @@
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2015 Nexenta Systems, Inc. All rights reserved.
 # Copyright (c) 2013 Gary Mills
+# Copyright 2014 Garrett D'Amore <garrett@damore.org>
 #
 
 <include SUNWcs.man1.inc>
@@ -664,7 +665,6 @@ file path=sbin/uadmin group=sys mode=0555
 file path=sbin/umount mode=0555
 file path=sbin/umountall group=sys mode=0555
 file path=sbin/uname mode=0555
-file path=sbin/wusbadm mode=0555
 file path=sbin/zonename mode=0555
 $(i386_ONLY)file path=usr/bin/$(ARCH32)/amt mode=0555
 file path=usr/bin/$(ARCH32)/decrypt mode=0555
@@ -1785,7 +1785,6 @@ link path=usr/lib/locale/POSIX target=./C
 link path=usr/lib/rsh target=../bin/ksh93
 link path=usr/lib/secure/32 target=.
 link path=usr/lib/secure/64 target=$(ARCH64)
-link path=usr/lib/wusbd target=../../sbin/wusbadm
 link path=usr/mail target=../var/mail
 link path=usr/net/nls/listen target=../../lib/saf/listen
 link path=usr/net/nls/nlps_server target=../../lib/saf/nlps_server
@@ -1838,7 +1837,6 @@ link path=usr/sbin/uadmin target=../../sbin/uadmin
 link path=usr/sbin/ufsdump target=../lib/fs/ufs/ufsdump
 link path=usr/sbin/ufsrestore target=../lib/fs/ufs/ufsrestore
 link path=usr/sbin/umount target=../../sbin/umount
-link path=usr/sbin/wusbadm target=../../sbin/wusbadm
 link path=usr/spool target=../var/spool
 link path=usr/src target=./share/src
 link path=usr/tmp target=../var/tmp

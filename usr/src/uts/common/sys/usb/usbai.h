@@ -21,6 +21,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  */
 
 #ifndef	_SYS_USB_USBAI_H
@@ -445,113 +447,6 @@ typedef struct usb_string_descr {
 
 #define	USB_MAXSTRINGLEN	255		/* max string descr length */
 
-
-/*
- * usb_bos_descr:
- *	usb BOS descriptor, refer to WUSB 1.0/7.4.1
- */
-typedef struct usb_bos_descr {
-	uint8_t		bLength;
-	uint8_t		bDescriptorType;
-	uint16_t	wTotalLength;
-	uint8_t		bNumDeviceCaps;
-} usb_bos_descr_t;
-
-/*
- * usb_dev_cap_header:
- *	usb device capability descriptor header, refer to WUSB 1.0/7.4.1
- */
-typedef struct usb_cap_descr_header {
-	uint8_t		bLength;
-	uint8_t		bDescriptorType;
-	uint8_t		bDevCapabilityType;
-} usb_cap_descr_header_t;
-
-typedef struct usb_cap_descr {
-	uint8_t		bLength;
-	uint8_t		bDescriptorType;	/* set to DEVICE CAPABILITY */
-	uint8_t		bDevCapabilityType;
-	uint8_t		bCapValue[1];		/* variable length data */
-} usb_cap_descr_t;
-
-#define	USB_CAP_TYPE_WUSB	1
-
-/* Wireless USB device capability descriptor - UWB descriptor */
-typedef struct usb_uwb_cap_descr {
-	uint8_t		bLength;
-	uint8_t		bDescriptorType;
-	uint8_t		bDevCapabilityType;
-	uint8_t		bmAttributes;
-	uint16_t	wPHYRates;
-	uint8_t		bmTFITXPowerInfo;
-	uint8_t		bmFFITXPowerInfo;
-	uint16_t	bmBandGroup;
-	uint8_t		bReserved;
-} usb_uwb_cap_descr_t;
-
-/*
- * usb_ep_comp_descr:
- *	usb endpoint companion descriptor, refer to WUSB 1.0/7.4.4
- */
-typedef struct usb_ep_comp_descr {
-	uint8_t		bLength;
-	uint8_t		bDescriptorType;
-	uint8_t		bMaxBurst;
-	uint8_t		bMaxSequence;
-	uint16_t	wMaxStreamDelay;
-	uint16_t	wOverTheAirPacketSize;
-	uint8_t		bOverTheAirInterval;
-	uint8_t		bmCompAttributes;
-} usb_ep_comp_descr_t;
-
-/*
- * usb_security_descr:
- *	usb security descriptor, refer to WUSB 1.0/7.4.5
- */
-typedef struct usb_security_descr {
-	uint8_t		bLength;
-	uint8_t		bDescriptorType;
-	uint16_t	wTotalLength;
-	uint8_t		bNumEncryptionTypes;
-} usb_security_descr_t;
-
-/*
- * usb_encryption_descr:
- *	usb encryption descriptor, refer to WUSB 1.0/7.4.5
- */
-typedef struct usb_encryption_descr {
-	uint8_t		bLength;
-	uint8_t		bDescriptorType;
-	uint8_t		bEncryptionType;
-	uint8_t		bEncryptionValue;
-	uint8_t		bAuthKeyIndex;
-} usb_encryption_descr_t;
-
-#define	USB_ENC_TYPE_UNSECURE		0x00
-#define	USB_ENC_TYPE_WIRED		0x01
-#define	USB_ENC_TYPE_CCM_1		0x02
-#define	USB_ENC_TYPE_RSA_1		0x03
-
-/*
- * usb_key_descr:
- *	usb key descriptor, refer to WUSB 1.0/7.4.5
- */
-typedef struct usb_key_descr {
-	uint8_t		bLength;
-	uint8_t		bDescriptorType;
-	uint8_t		tTKID[3];
-	uint8_t		bReserved;
-	uint8_t		KeyData[1];	/* variable length */
-} usb_key_descr_t;
-
-#define	USB_EP_COMP_DESCR_SIZE		10
-#define	USB_BOS_DESCR_SIZE		5
-#define	USB_CAP_DESCR_HEADER_SIZE	3
-#define	USB_UWB_CAP_DESCR_SIZE		11
-#define	USB_SECURITY_DESCR_SIZE		5
-#define	USB_ENCRYPTION_DESCR_SIZE	5
-
-
 /*
  * ***************************************************************************
  * Client driver registration with USBA
@@ -622,7 +517,6 @@ typedef struct usb_alt_if_data {
  */
 typedef struct usb_ep_data {
 	usb_ep_descr_t		ep_descr;	/* endpoint descriptor */
-	usb_ep_comp_descr_t	ep_comp_descr;	/* endpoint companion descr */
 	struct usb_cvs_data	*ep_cvs;	/* cv mod/extending this ep */
 	uint_t			ep_n_cvs;	/* #elements in ep_cvs[] */
 } usb_ep_data_t;
@@ -635,15 +529,6 @@ typedef struct usb_cvs_data {
 	uchar_t			*cvs_buf;	/* raw data of cvs descr */
 	uint_t			cvs_buf_len;	/* cvs_buf size */
 } usb_cvs_data_t;
-
-
-/*
- * Data structure for wireless USB specific descriptor
- */
-typedef struct usb_bos_data {
-	usb_bos_descr_t		bos_descr;	/* parsed bos descr */
-	usb_uwb_cap_descr_t	bos_uwb_cap;	/* uwb cap descr */
-} usb_bos_data_t;
 
 
 /*
@@ -691,7 +576,6 @@ typedef struct usb_client_dev_data {
 	uint_t			dev_n_cfg;	/* #elements in dev_cfg[] */
 	struct usb_cfg_data	*dev_curr_cfg;	/* current cfg */
 	int			dev_curr_if;	/* current interface number */
-	struct usb_bos_data	*dev_bos;	/* bos for this device */
 } usb_client_dev_data_t;
 
 

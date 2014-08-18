@@ -21,6 +21,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  */
 
 
@@ -119,12 +121,10 @@ _init(void)
 	usba_usbai_register_initialization();
 	usba_hcdi_initialization();
 	usba_hubdi_initialization();
-	usba_whcdi_initialization();
 	usba_devdb_initialization();
 
 	if ((rval = mod_install(&modlinkage)) != 0) {
 		usba_devdb_destroy();
-		usba_whcdi_destroy();
 		usba_hubdi_destroy();
 		usba_hcdi_destroy();
 		usba_usbai_register_destroy();
@@ -142,7 +142,6 @@ _fini()
 
 	if ((rval = mod_remove(&modlinkage)) == 0) {
 		usba_devdb_destroy();
-		usba_whcdi_destroy();
 		usba_hubdi_destroy();
 		usba_hcdi_destroy();
 		usba_usbai_register_destroy();
@@ -641,26 +640,6 @@ usba_free_evdata(usba_evdata_t *evdata)
 
 
 /*
- * free wireless usb specific structure
- */
-void
-usba_free_wireless_data(usba_wireless_data_t *wireless_data)
-{
-	if (wireless_data == NULL) {
-
-		return;
-	}
-
-	if (wireless_data->wusb_bos) {
-		kmem_free(wireless_data->wusb_bos,
-		    wireless_data->wusb_bos_length);
-	}
-
-	kmem_free(wireless_data, sizeof (usba_wireless_data_t));
-}
-
-
-/*
  * free usb device structure
  */
 void
@@ -788,22 +767,7 @@ usba_free_usba_device(usba_device_t *usba_device)
 			    strlen(usba_device->usb_serialno_str) + 1);
 		}
 
-		if (usba_device->usb_wireless_data) {
-			mutex_enter(&usba_device->usb_mutex);
-			usba_free_wireless_data(
-			    usba_device->usb_wireless_data);
-			mutex_exit(&usba_device->usb_mutex);
-		}
-
-		/*
-		 * The device address on the wireless bus is assigned
-		 * by the wireless host controller driver(whci or hwahc),
-		 * not by USBA framework, so skip this for wireless
-		 * USB devices.
-		 */
-		if (!usba_device->usb_is_wireless) {
-			usba_unset_usb_address(usba_device);
-		}
+		usba_unset_usb_address(usba_device);
 	}
 
 #ifndef __lock_lint
@@ -1427,52 +1391,6 @@ usba_is_root_hub(dev_info_t *dip)
 		hub = hub->next;
 	}
 	mutex_exit(&usba_hub_mutex);
-
-	return (0);
-}
-
-/*
- * check whether this dip is a wire adapter device
- */
-int
-usba_is_wa(dev_info_t *dip)
-{
-	if (dip) {
-		usba_device_t *usba_device;
-
-		usba_device = usba_get_usba_device(dip);
-
-		return (usba_device->usb_is_wa? 1:0);
-	}
-
-	return (0);
-}
-
-/*
- * check whether this dip is a host wire adapter device node
- */
-int
-usba_is_hwa(dev_info_t *dip)
-{
-	dev_info_t	*cdip;
-
-	if (dip == NULL) {
-
-		return (0);
-	}
-
-	if (strcmp(ddi_driver_name(dip), "usb_mid") != 0) {
-
-		return (0);
-	}
-
-	for (cdip = ddi_get_child(dip); cdip;
-	    cdip = ddi_get_next_sibling(cdip)) {
-		if (strcmp(ddi_driver_name(cdip), "hwarc") == 0) {
-
-			return (1);
-		}
-	}
 
 	return (0);
 }
