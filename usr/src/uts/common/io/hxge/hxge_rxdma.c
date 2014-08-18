@@ -1031,7 +1031,7 @@ hxge_freeb(p_rx_msg_t rx_msg_p)
 	 * is processing a loaned up buffer block.
 	 */
 	free_state = rx_msg_p->free;
-	ref_cnt = atomic_add_32_nv(&rx_msg_p->ref_cnt, -1);
+	ref_cnt = atomic_dec_32_nv(&rx_msg_p->ref_cnt);
 	if (!ref_cnt) {
 		atomic_dec_32(&hxge_mblks_pending);
 

@@ -86,7 +86,7 @@ mem_node_add_slice(pfn_t start, pfn_t end)
 	mnode = PFN_2_MEM_NODE(start);
 	ASSERT(mnode >= 0 && mnode < max_mem_nodes);
 
-	if (cas32((uint32_t *)&mem_node_config[mnode].exists, 0, 1)) {
+	if (atomic_cas_32((uint32_t *)&mem_node_config[mnode].exists, 0, 1)) {
 		/*
 		 * Add slice to existing node.
 		 */
@@ -97,11 +97,12 @@ mem_node_add_slice(pfn_t start, pfn_t end)
 	} else {
 		mem_node_config[mnode].physbase = start;
 		mem_node_config[mnode].physmax = end;
-		atomic_add_16(&num_memnodes, 1);
+		atomic_inc_16(&num_memnodes);
 		do {
 			oldmask = memnodes_mask;
 			newmask = memnodes_mask | (1ull << mnode);
-		} while (cas64(&memnodes_mask, oldmask, newmask) != oldmask);
+		} while (atomic_cas_64(&memnodes_mask, oldmask, newmask) !=
+		    oldmask);
 	}
 
 	/*
@@ -161,8 +162,8 @@ mem_node_del_slice(pfn_t start, pfn_t end)
 		do {
 			omask = memnodes_mask;
 			nmask = omask & ~(1ull << mnode);
-		} while (cas64(&memnodes_mask, omask, nmask) != omask);
-		atomic_add_16(&num_memnodes, -1);
+		} while (atomic_cas_64(&memnodes_mask, omask, nmask) != omask);
+		atomic_dec_16(&num_memnodes);
 		mem_node_config[mnode].exists = 0;
 	}
 }
@@ -229,7 +230,7 @@ mem_node_alloc()
 	 * a first time memnode creation race.
 	 */
 	for (mnode = 0; mnode < max_mem_nodes; mnode++)
-		if (cas32((uint32_t *)&mem_node_config[mnode].exists,
+		if (atomic_cas_32((uint32_t *)&mem_node_config[mnode].exists,
 		    0, 1) == 0)
 			break;
 
@@ -238,11 +239,11 @@ mem_node_alloc()
 
 	mem_node_config[mnode].physbase = (pfn_t)-1l;
 	mem_node_config[mnode].physmax = 0;
-	atomic_add_16(&num_memnodes, 1);
+	atomic_inc_16(&num_memnodes);
 	do {
 		oldmask = memnodes_mask;
 		newmask = memnodes_mask | (1ull << mnode);
-	} while (cas64(&memnodes_mask, oldmask, newmask) != oldmask);
+	} while (atomic_cas_64(&memnodes_mask, oldmask, newmask) != oldmask);
 
 	return (mnode);
 }

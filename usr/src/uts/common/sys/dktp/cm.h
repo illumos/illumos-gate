@@ -20,13 +20,13 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright (c) 1992 Sun Microsystems, Inc.  All Rights Reserved.
  */
 
 #ifndef _SYS_DKTP_CM_H
 #define	_SYS_DKTP_CM_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #ifdef	_KERNEL
@@ -48,11 +48,7 @@ extern "C" {
 #ifdef	_KERNEL
 
 #ifndef _SYS_SCSI_SCSI_H
-#ifdef	__STDC__
 typedef	void *	opaque_t;
-#else	/* __STDC__ */
-typedef	char *	opaque_t;
-#endif	/* __STDC__ */
 #endif
 
 #define	PRF		prom_printf

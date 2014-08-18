@@ -1748,14 +1748,14 @@ gld_wput(queue_t *q, mblk_t *mp)
 		 * Nonzero count delays any attempted DL_UNBIND.
 		 * See comments above gld_start().
 		 */
-		atomic_add_32((uint32_t *)&gld->gld_wput_count, 1);
+		atomic_inc_32((uint32_t *)&gld->gld_wput_count);
 		membar_enter();
 
 		/* Recheck state now wput_count is set to prevent DL_UNBIND */
 		/* If this Q is in process of DL_UNBIND, don't call start */
 		if (gld->gld_state != DL_IDLE || gld->gld_in_unbind) {
 			/* Extremely unlikely */
-			atomic_add_32((uint32_t *)&gld->gld_wput_count, -1);
+			atomic_dec_32((uint32_t *)&gld->gld_wput_count);
 			goto use_wsrv;
 		}
 
@@ -1771,7 +1771,7 @@ gld_wput(queue_t *q, mblk_t *mp)
 
 		/* Allow DL_UNBIND again */
 		membar_exit();
-		atomic_add_32((uint32_t *)&gld->gld_wput_count, -1);
+		atomic_dec_32((uint32_t *)&gld->gld_wput_count);
 
 		if (rc == GLD_NORESOURCES)
 			qenable(q);

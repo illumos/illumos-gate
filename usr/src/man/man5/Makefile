@@ -54,6 +54,7 @@ MANFILES=	Intro.5			\
 		hal.5			\
 		iconv.5			\
 		iconv_unicode.5		\
+		ieee802.3.5		\
 		ieee802.11.5		\
 		ipfilter.5		\
 		isalist.5		\

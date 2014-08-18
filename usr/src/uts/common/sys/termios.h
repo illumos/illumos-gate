@@ -23,6 +23,8 @@
 
 
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -98,8 +100,6 @@ struct termios {
 
 #ifndef _KERNEL
 
-#if defined(__STDC__)
-
 extern speed_t cfgetospeed(const struct termios *);
 extern int cfsetospeed(struct termios *, speed_t);
 extern speed_t cfgetispeed(const struct termios *);
@@ -111,28 +111,9 @@ extern int tcdrain(int);
 extern int tcflush(int, int);
 extern int tcflow(int, int);
 
-#else
-
-extern speed_t cfgetospeed();
-extern int cfsetospeed();
-extern speed_t cfgetispeed();
-extern int cfsetispeed();
-extern int tcgetattr();
-extern int tcsetattr();
-extern int tcsendbreak();
-extern int tcdrain();
-extern int tcflush();
-extern int tcflow();
-
-#endif /* __STDC__ */
-
 #if !defined(__XOPEN_OR_POSIX) || defined(_XPG4_2) || defined(__EXTENSIONS__)
 
-#if defined(__STDC__)
 extern pid_t tcgetsid(int);
-#else
-extern pid_t tcgetsid();
-#endif /* __STDC__ */
 
 #endif /* !defined(__XOPEN_OR_POSIX) || defined(_XPG4_2) ... */
 

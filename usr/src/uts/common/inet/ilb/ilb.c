@@ -638,7 +638,7 @@ ilb_rule_add(ilb_stack_t *ilbs, zoneid_t zoneid, const ilb_rule_cmd_t *cmd)
 	/* ir_name is all 0 to begin with */
 	(void) memcpy(rule->ir_name, cmd->name, ILB_RULE_NAMESZ - 1);
 
-	rule->ir_ks_instance = atomic_add_int_nv(&ilb_kstat_instance, 1);
+	rule->ir_ks_instance = atomic_inc_uint_nv(&ilb_kstat_instance);
 	stackid = (netstackid_t)(uintptr_t)ilbs->ilbs_ksp->ks_private;
 	if ((rule->ir_ksp = ilb_rule_kstat_init(stackid, rule)) == NULL) {
 		ret = ENOMEM;

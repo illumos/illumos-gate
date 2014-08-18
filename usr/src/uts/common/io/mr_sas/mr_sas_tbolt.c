@@ -1894,7 +1894,7 @@ void
 tbolt_issue_cmd(struct mrsas_cmd *cmd, struct mrsas_instance *instance)
 {
 	MRSAS_REQUEST_DESCRIPTOR_UNION *req_desc = cmd->request_desc;
-	atomic_add_16(&instance->fw_outstanding, 1);
+	atomic_inc_16(&instance->fw_outstanding);
 
 	struct scsi_pkt *pkt;
 

@@ -508,7 +508,7 @@ igmp_query_in(ipha_t *ipha, igmpa_t *igmpa, ill_t *ill)
 		if (ill->ill_mcast_type != IGMP_V1_ROUTER) {
 			ip1dbg(("Received IGMPv1 Query on %s, switching mode "
 			    "to IGMP_V1_ROUTER\n", ill->ill_name));
-			atomic_add_16(&ill->ill_ifptr->illif_mcast_v1, 1);
+			atomic_inc_16(&ill->ill_ifptr->illif_mcast_v1);
 			ill->ill_mcast_type = IGMP_V1_ROUTER;
 		}
 
@@ -545,7 +545,7 @@ igmp_query_in(ipha_t *ipha, igmpa_t *igmpa, ill_t *ill)
 		if (ill->ill_mcast_type == IGMP_V3_ROUTER) {
 			ip1dbg(("Received IGMPv2 Query on %s, switching mode "
 			    "to IGMP_V2_ROUTER", ill->ill_name));
-			atomic_add_16(&ill->ill_ifptr->illif_mcast_v2, 1);
+			atomic_inc_16(&ill->ill_ifptr->illif_mcast_v2);
 			ill->ill_mcast_type = IGMP_V2_ROUTER;
 		}
 		ill->ill_mcast_v2_time = 0;
@@ -1716,7 +1716,7 @@ igmp_slowtimo(void *arg)
 				}
 				ill->ill_mcast_v1_time = 0;
 				ill->ill_mcast_v1_tset = 0;
-				atomic_add_16(&ifp->illif_mcast_v1, -1);
+				atomic_dec_16(&ifp->illif_mcast_v1);
 			}
 			if ((ill->ill_mcast_type == IGMP_V2_ROUTER) &&
 			    (ipst->ips_igmp_max_version >= IGMP_V3_ROUTER) &&
@@ -1727,7 +1727,7 @@ igmp_slowtimo(void *arg)
 				ill->ill_mcast_type = IGMP_V3_ROUTER;
 				ill->ill_mcast_v2_time = 0;
 				ill->ill_mcast_v2_tset = 0;
-				atomic_add_16(&ifp->illif_mcast_v2, -1);
+				atomic_dec_16(&ifp->illif_mcast_v2);
 			}
 			rw_exit(&ill->ill_mcast_lock);
 			ill_refrele(ill);
@@ -1786,7 +1786,7 @@ mld_slowtimo(void *arg)
 				ill->ill_mcast_type = MLD_V2_ROUTER;
 				ill->ill_mcast_v1_time = 0;
 				ill->ill_mcast_v1_tset = 0;
-				atomic_add_16(&ifp->illif_mcast_v1, -1);
+				atomic_dec_16(&ifp->illif_mcast_v1);
 			}
 			rw_exit(&ill->ill_mcast_lock);
 			ill_refrele(ill);
@@ -2216,7 +2216,7 @@ mld_query_in(mld_hdr_t *mldh, ill_t *ill)
 	if (ill->ill_mcast_type == MLD_V2_ROUTER) {
 		ip1dbg(("Received MLDv1 Query on %s, switching mode to "
 		    "MLD_V1_ROUTER\n", ill->ill_name));
-		atomic_add_16(&ill->ill_ifptr->illif_mcast_v1, 1);
+		atomic_inc_16(&ill->ill_ifptr->illif_mcast_v1);
 		ill->ill_mcast_type = MLD_V1_ROUTER;
 	}
 

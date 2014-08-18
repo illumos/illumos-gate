@@ -274,8 +274,8 @@ static const int P2Ps[] = {
 	mutex_enter(&(hp)->lock);					\
 	while ((_nuri = (hp)->list) != NULL) {				\
 		(hp)->list = _nuri->hash;				\
-		atomic_add_32(&uri_hash_cnt[(from)], -1);		\
-		atomic_add_32(&uri_hash_cnt[(to)], 1);			\
+		atomic_dec_32(&uri_hash_cnt[(from)]);		\
+		atomic_inc_32(&uri_hash_cnt[(to)]);			\
 		_nhix = _nuri->hvalue;					\
 		URI_HASH_IX(_nhix, to);					\
 		_nhp = &uri_hash_ab[(to)][_nhix];			\
@@ -294,7 +294,7 @@ static const int P2Ps[] = {
 	} else {							\
 		(hp)->list = (uri)->hash;				\
 	}								\
-	if (atomic_add_32_nv(&uri_hash_cnt[(cur)], -1) == 0 &&		\
+	if (atomic_dec_32_nv(&uri_hash_cnt[(cur)]) == 0 &&		\
 	    uri_hash_ab[(new)] != NULL) {				\
 		kmem_free(uri_hash_ab[cur],				\
 		    sizeof (uri_hash_t) * uri_hash_sz[cur]);		\
@@ -597,7 +597,7 @@ again:
 		 * as the check is only advisory.
 		 */
 	fast:
-		atomic_add_32(&uri_hash_cnt[cur], 1);
+		atomic_inc_32(&uri_hash_cnt[cur]);
 		hp = &uri_hash_ab[cur][hix];
 		mutex_enter(&hp->lock);
 		uri->hash = hp->list;
@@ -689,7 +689,7 @@ again:
 	 * completely migrated then walk all current hash chains and
 	 * migrate list members now.
 	 */
-	if (atomic_add_32_nv(&uri_hash_cnt[new], 1) >= uri_hash_overflow[new]) {
+	if (atomic_inc_32_nv(&uri_hash_cnt[new]) >= uri_hash_overflow[new]) {
 		for (hix = 0; hix < uri_hash_sz[cur]; hix++) {
 			hp = &uri_hash_ab[cur][hix];
 			if (hp->list != NULL) {
@@ -837,7 +837,7 @@ nexthash:
 				hp->list = uri->hash;
 			}
 			mutex_exit(&hp->lock);
-			atomic_add_32(&uri_hash_cnt[cur], -1);
+			atomic_dec_32(&uri_hash_cnt[cur]);
 			rw_exit(&uri_hash_access);
 			if (ruri->nocache)
 				nl7c_uri_purge++;

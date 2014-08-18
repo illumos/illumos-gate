@@ -291,11 +291,11 @@ struct myri10ge_info {
 #define	MYRI10GE_SLICE_STAT_DEC(field)					\
 (((struct myri10ge_slice_stat *)ss->ksp_stat->ks_data)->field.value.ul)--
 #define	MYRI10GE_ATOMIC_SLICE_STAT_INC(field) 				\
-atomic_add_long(&(((struct myri10ge_slice_stat *)			\
-	    ss->ksp_stat->ks_data)->field.value.ul), 1)
+atomic_inc_ulong(&(((struct myri10ge_slice_stat *)			\
+	ss->ksp_stat->ks_data)->field.value.ul))
 #define	MYRI10GE_ATOMIC_SLICE_STAT_DEC(field) 				\
-atomic_add_long(&(((struct myri10ge_slice_stat *)			\
-	    ss->ksp_stat->ks_data)->field.value.ul), -1)
+atomic_dec_ulong(&(((struct myri10ge_slice_stat *)			\
+	ss->ksp_stat->ks_data)->field.value.ul))
 #define	MYRI10GE_SLICE_STAT(field)					\
 (((struct myri10ge_slice_stat *)ss->ksp_stat->ks_data)->field.value.ul)
 

@@ -1113,7 +1113,7 @@ trill_node_unref(trill_inst_t *tip, trill_node_t *tnp)
 		if (tnp->tn_tsp != NULL)
 			trill_sock_unref(tnp->tn_tsp);
 		trill_node_free(tnp);
-		(void) atomic_dec_uint_nv(&tip->ti_nodecount);
+		atomic_dec_uint(&tip->ti_nodecount);
 	}
 }
 

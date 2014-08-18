@@ -240,18 +240,18 @@ typedef unsigned int	u_32_t;
 #  endif /* SOLARIS2 >= 10 */
 #  if SOLARIS2 >= 6
 #   if SOLARIS2 == 6
-#    define	ATOMIC_INCL(x)		atomic_add_long((uint32_t*)&(x), 1)
-#    define	ATOMIC_DECL(x)		atomic_add_long((uint32_t*)&(x), -1)
+#    define	ATOMIC_INCL(x)		atomic_inc_ulong((uint32_t *)&(x))
+#    define	ATOMIC_DECL(x)		atomic_dec_ulong((uint32_t *)&(x))
 #   else
-#    define	ATOMIC_INCL(x)		atomic_add_long(&(x), 1)
-#    define	ATOMIC_DECL(x)		atomic_add_long(&(x), -1)
+#    define	ATOMIC_INCL(x)		atomic_inc_ulong(&(x))
+#    define	ATOMIC_DECL(x)		atomic_dec_ulong(&(x))
 #   endif /* SOLARIS2 == 6 */
-#   define	ATOMIC_INC64(x)		atomic_add_64((uint64_t*)&(x), 1)
-#   define	ATOMIC_INC32(x)		atomic_add_32((uint32_t*)&(x), 1)
-#   define	ATOMIC_INC16(x)		atomic_add_16((uint16_t*)&(x), 1)
-#   define	ATOMIC_DEC64(x)		atomic_add_64((uint64_t*)&(x), -1)
-#   define	ATOMIC_DEC32(x)		atomic_add_32((uint32_t*)&(x), -1)
-#   define	ATOMIC_DEC16(x)		atomic_add_16((uint16_t*)&(x), -1)
+#   define	ATOMIC_INC64(x)		atomic_inc_64((uint64_t *)&(x))
+#   define	ATOMIC_INC32(x)		atomic_inc_32((uint32_t *)&(x))
+#   define	ATOMIC_INC16(x)		atomic_inc_16((uint16_t *)&(x))
+#   define	ATOMIC_DEC64(x)		atomic_dec_64((uint64_t *)&(x))
+#   define	ATOMIC_DEC32(x)		atomic_dec_32((uint32_t *)&(x))
+#   define	ATOMIC_DEC16(x)		atomic_dec_16((uint16_t *)&(x))
 #  else
 #   define	ATOMIC_INC(x)		{ mutex_enter(&ipf_rw); (x)++; \
 					  mutex_exit(&ipf_rw); }
@@ -925,14 +925,14 @@ typedef	u_int32_t	u_32_t;
 					  mtx_unlock(&ipf_rw.ipf_lk); }
 #   define	ATOMIC_DEC(x)		{ mtx_lock(&ipf_rw.ipf_lk); (x)--; \
 					  mtx_unlock(&ipf_rw.ipf_lk); }
-#   define	ATOMIC_INCL(x)		atomic_add_long(&(x), 1)
+#   define	ATOMIC_INCL(x)		atomic_inc_ulong(&(x))
 #   define	ATOMIC_INC64(x)		ATOMIC_INC(x)
-#   define	ATOMIC_INC32(x)		atomic_add_32(&(x), 1)
-#   define	ATOMIC_INC16(x)		atomic_add_16(&(x), 1)
-#   define	ATOMIC_DECL(x)		atomic_add_long(&(x), -1)
+#   define	ATOMIC_INC32(x)		atomic_inc_32(&(x))
+#   define	ATOMIC_INC16(x)		atomic_inc_16(&(x))
+#   define	ATOMIC_DECL(x)		atomic_dec_ulong(&(x))
 #   define	ATOMIC_DEC64(x)		ATOMIC_DEC(x)
-#   define	ATOMIC_DEC32(x)		atomic_add_32(&(x), -1)
-#   define	ATOMIC_DEC16(x)		atomic_add_16(&(x), -1)
+#   define	ATOMIC_DEC32(x)		atomic_dec_32(&(x))
+#   define	ATOMIC_DEC16(x)		atomic_dec_16(&(x))
 #   define	SPL_X(x)	;
 #   define	SPL_NET(x)	;
 #   define	SPL_IMP(x)	;

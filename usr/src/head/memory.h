@@ -19,14 +19,14 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ */
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
 #ifndef	_MEMORY_H
 #define	_MEMORY_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.4.1.2 */
 
 #include <sys/types.h>
 
@@ -34,7 +34,6 @@
 extern "C" {
 #endif
 
-#if defined(__STDC__)
 extern void *memccpy(void *, const void *, int, size_t);
 #if __cplusplus >= 199711L
 namespace std {
@@ -55,13 +54,6 @@ extern void *memchr(const void *, int, size_t);
 extern void *memcpy(void *, const void *, size_t);
 extern void *memset(void *, int, size_t);
 extern int memcmp(const void *, const void *, size_t);
-#else
-extern void *memccpy();
-extern void *memchr();
-extern void *memcpy();
-extern void *memset();
-extern int memcmp();
-#endif
 
 #ifdef	__cplusplus
 }

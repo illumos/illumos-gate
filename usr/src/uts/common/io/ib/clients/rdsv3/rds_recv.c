@@ -64,7 +64,7 @@ rdsv3_inc_addref(struct rdsv3_incoming *inc)
 {
 	RDSV3_DPRINTF4("rdsv3_inc_addref",
 	    "addref inc %p ref %d", inc, atomic_get(&inc->i_refcount));
-	atomic_add_32(&inc->i_refcount, 1);
+	atomic_inc_32(&inc->i_refcount);
 }
 
 void

@@ -24,14 +24,14 @@
 
 
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _PWD_H
 #define	_PWD_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.3.1.9 */
 
 #include <sys/feature_tests.h>
 
@@ -66,8 +66,6 @@ struct comment {
 };
 #endif /* !defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__) */
 
-#if defined(__STDC__)
-
 extern struct passwd *getpwuid(uid_t);		/* MT-unsafe */
 extern struct passwd *getpwnam(const char *);	/* MT-unsafe */
 
@@ -84,28 +82,6 @@ extern void endpwent(void);
 extern struct passwd *getpwent(void);		/* MT-unsafe */
 extern void setpwent(void);
 #endif /* !defined(__XOPEN_OR_POSIX) || defined(_XPG4_2) ... */
-
-#else  /* (__STDC__) */
-
-extern struct passwd *getpwuid();		/* MT-unsafe */
-extern struct passwd *getpwnam();		/* MT-unsafe */
-
-#if !defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__)
-extern struct passwd *getpwent_r();
-extern struct passwd *fgetpwent_r();
-
-extern struct passwd *fgetpwent();		/* MT-unsafe */
-extern int putpwent();
-#endif /* !defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__) */
-
-#if !defined(__XOPEN_OR_POSIX) || defined(_XPG4_2) || \
-	defined(__EXTENSIONS__)
-extern void endpwent();
-extern struct passwd *getpwent();		/* MT-unsafe */
-extern void setpwent();
-#endif /* !defined(__XOPEN_OR_POSIX) || defined(_XPG4_2) ... */
-
-#endif /* (__STDC__) */
 
 /*
  * getpwuid_r() & getpwnam_r() prototypes are defined here.
@@ -145,8 +121,6 @@ extern void setpwent();
 
 #if !defined(__XOPEN_OR_POSIX) || (_POSIX_C_SOURCE - 0 >= 199506L) || \
 	defined(_POSIX_PTHREAD_SEMANTICS) || defined(__EXTENSIONS__)
-
-#if defined(__STDC__)
 
 #if (_POSIX_C_SOURCE - 0 >= 199506L) || defined(_POSIX_PTHREAD_SEMANTICS)
 
@@ -192,60 +166,6 @@ extern struct passwd *getpwuid_r(uid_t, struct passwd *, char *, int);
 extern struct passwd *getpwnam_r(const char *, struct passwd *, char *, int);
 
 #endif  /* (_POSIX_C_SOURCE - 0 >= 199506L) || ... */
-
-#else  /* __STDC__ */
-
-#if (_POSIX_C_SOURCE - 0 >= 199506L) || defined(_POSIX_PTHREAD_SEMANTICS)
-
-#ifdef __PRAGMA_REDEFINE_EXTNAME
-#pragma redefine_extname getpwuid_r __posix_getpwuid_r
-#pragma redefine_extname getpwnam_r __posix_getpwnam_r
-extern int getpwuid_r();
-extern int getpwnam_r();
-#else  /* __PRAGMA_REDEFINE_EXTNAME */
-
-extern int __posix_getpwuid_r();
-extern int __posix_getpwnam_r();
-
-#ifdef	__lint
-
-#define	getpwuid_r __posix_getpwuid_r
-#define	getpwnam_r __posix_getpwnam_r
-
-#else	/* !__lint */
-
-static int
-getpwuid_r(__uid, __pwd, __buf, __len, __res)
-	uid_t __uid;
-	struct passwd *__pwd;
-	char *__buf;
-	int __len;
-	struct passwd **__res;
-{
-	return (__posix_getpwuid_r(__uid, __pwd, __buf, __len, __res));
-}
-static int
-getpwnam_r(__cb, __pwd, __buf, __len, __res)
-	char *__cb;
-	struct passwd *__pwd;
-	char *__buf;
-	int __len;
-	struct passwd **__res;
-{
-	return (__posix_getpwnam_r(__cb, __pwd, __buf, __len, __res));
-}
-
-#endif /* !__lint */
-#endif /* __PRAGMA_REDEFINE_EXTNAME */
-
-#else  /* (_POSIX_C_SOURCE - 0 >= 199506L) || ... */
-
-extern struct passwd *getpwuid_r();
-extern struct passwd *getpwnam_r();
-
-#endif /* (_POSIX_C_SOURCE - 0 >= 199506L) || ... */
-
-#endif /* __STDC__ */
 
 #endif /* !defined(__XOPEN_OR_POSIX) || (_POSIX_C_SOURCE - 0 >= 199506L)... */
 

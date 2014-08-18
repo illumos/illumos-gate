@@ -9,6 +9,8 @@
  */
 
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -372,26 +374,16 @@ extern	void		hrt2ts32(hrtime_t, timestruc32_t *);
 #endif /* _KERNEL */
 
 #if !defined(_KERNEL) && !defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__)
-#if defined(__STDC__)
 int adjtime(struct timeval *, struct timeval *);
-#else
-int adjtime();
-#endif
 #endif /* !defined(_KERNEL) && !defined(__XOPEN_OR_POSIX) ... */
 
 #if !defined(_KERNEL) && !defined(__XOPEN_OR_POSIX) || \
 	defined(_ATFILE_SOURCE) || defined(__EXTENSIONS__)
-#if defined(__STDC__)
 int futimesat(int, const char *, const struct timeval *);
-#else
-int futimesat();
-#endif /* defined(__STDC__) */
 #endif /* defined(__ATFILE_SOURCE) */
 
 #if !defined(_KERNEL) && !defined(__XOPEN_OR_POSIX) || defined(_XPG4_2) || \
 	defined(__EXTENSIONS__)
-
-#if defined(__STDC__)
 
 int getitimer(int, struct itimerval *);
 int utimes(const char *, const struct timeval *);
@@ -403,12 +395,6 @@ int setitimer(int, struct itimerval *_RESTRICT_KYWD,
 	struct itimerval *_RESTRICT_KYWD);
 #endif /* defined(_XPG2_2) */
 
-#else /* __STDC__ */
-
-int gettimer();
-int settimer();
-int utimes();
-#endif /* __STDC__ */
 #endif /* !defined(_KERNEL) ... defined(_XPG4_2) */
 
 /*
@@ -427,7 +413,6 @@ int utimes();
  */
 #if !defined(_KERNEL) && !defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__)
 
-#if defined(__STDC__)
 #if defined(_SVID_GETTOD)
 int settimeofday(struct timeval *);
 #else
@@ -435,26 +420,17 @@ int settimeofday(struct timeval *, void *);
 #endif
 hrtime_t	gethrtime(void);
 hrtime_t	gethrvtime(void);
-#else /* __STDC__ */
-int settimeofday();
-hrtime_t	gethrtime();
-hrtime_t	gethrvtime();
-#endif /* __STDC__ */
 
 #endif /* !(defined _KERNEL) && !defined(__XOPEN_OR_POSIX) ... */
 
 #if !defined(_KERNEL) && !defined(__XOPEN_OR_POSIX) || defined(_XPG4_2) || \
 	defined(__EXTENSIONS__)
 
-#if defined(__STDC__)
 #if defined(_SVID_GETTOD)
 int gettimeofday(struct timeval *);
 #else
 int gettimeofday(struct timeval *_RESTRICT_KYWD, void *_RESTRICT_KYWD);
 #endif
-#else /* __STDC__ */
-int gettimeofday();
-#endif /* __STDC__ */
 
 #endif /* !defined(_KERNEL) && !defined(__XOPEN_OR_POSIX) ... */
 

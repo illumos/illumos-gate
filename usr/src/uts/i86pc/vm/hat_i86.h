@@ -98,9 +98,9 @@ struct hat {
 typedef struct hat hat_t;
 
 #define	PGCNT_INC(hat, level)	\
-	atomic_add_long(&(hat)->hat_pages_mapped[level], 1);
+	atomic_inc_ulong(&(hat)->hat_pages_mapped[level]);
 #define	PGCNT_DEC(hat, level)	\
-	atomic_add_long(&(hat)->hat_pages_mapped[level], -1);
+	atomic_dec_ulong(&(hat)->hat_pages_mapped[level]);
 
 /*
  * Flags for the hat_flags field

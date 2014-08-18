@@ -1544,9 +1544,9 @@ fssnap_translate(struct snapshot_id **sidpp, struct buf *wbp)
 		if (throttle_write) {
 			if (sema_tryp(&cmap->cmap_throttle_sem) == 0) {
 				rw_exit(&sidp->sid_rwlock);
-				atomic_add_32(&cmap->cmap_waiters, 1);
+				atomic_inc_32(&cmap->cmap_waiters);
 				sema_p(&cmap->cmap_throttle_sem);
-				atomic_add_32(&cmap->cmap_waiters, -1);
+				atomic_dec_32(&cmap->cmap_waiters);
 				rw_enter(&sidp->sid_rwlock, RW_READER);
 
 			/*
@@ -1680,7 +1680,7 @@ fssnap_write_taskq(void *arg)
 	}
 	rw_exit(&sidp->sid_rwlock);
 
-	atomic_add_64((uint64_t *)&cmap->cmap_nchunks, 1);
+	atomic_inc_64((uint64_t *)&cmap->cmap_nchunks);
 
 	if ((cmap->cmap_maxsize != 0) &&
 	    ((cmap->cmap_nchunks * cmap->cmap_chunksz) > cmap->cmap_maxsize)) {

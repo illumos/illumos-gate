@@ -20,11 +20,10 @@
  */
 
 /*
+ * Copyright 2013 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- */
-/*
- * Copyright 2013 Garrett D'Amore <garrett@damore.org>
  */
 
 #ifndef _SYS_FEATURE_TESTS_H

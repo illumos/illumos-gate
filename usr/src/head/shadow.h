@@ -19,6 +19,8 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -71,8 +73,6 @@ struct spwd {
 #define	FAILCOUNT_MASK 0xF
 };
 
-#if defined(__STDC__)
-
 #ifndef _STDIO_H
 #include <stdio.h>
 #endif
@@ -92,17 +92,6 @@ extern struct spwd	*getspnam(const char *);	/* MT-unsafe */
 extern int	putspent(const struct spwd *, FILE *);
 extern int	lckpwdf(void);
 extern int	ulckpwdf(void);
-
-#else
-
-/* Declare all shadow password functions */
-
-struct spwd	*getspent_r(), *fgetspent_r(), *getspnam_r();
-void		setspent(), endspent();
-struct spwd	*getspent(), *fgetspent(), *getspnam(); /* MT-unsafe */
-int		putspent(), lckpwdf(), ulckpwdf();
-
-#endif
 
 #ifdef	__cplusplus
 }

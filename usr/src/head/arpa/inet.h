@@ -18,6 +18,8 @@
  *
  * CDDL HEADER END
  *
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
@@ -54,7 +56,6 @@ extern "C" {
  * External definitions for
  * functions in inet(3N)
  */
-#ifdef __STDC__
 #if !defined(_XPG4_2) || defined(__EXTENSIONS__)
 extern int inet_net_pton(int, const char *, void *, size_t);
 extern boolean_t inet_matchaddr(const void *, const char *);
@@ -87,24 +88,6 @@ extern int inet_aton(const char *, struct in_addr *);
 
 extern uint_t inet_nsap_addr(const char *, uchar_t *, int);
 extern char *inet_nsap_ntoa(int, const uchar_t *, char *);
-
-#else
-unsigned long inet_addr();
-char	*inet_ntoa();
-/*
- * With the introduction of CIDR the
- * following 4 routines are now considered to be Obsolete
- */
-struct	in_addr inet_makeaddr();
-unsigned long inet_network();
-extern unsigned long inet_lnaof();
-extern unsigned long inet_netof();
-
-extern int inet_pton();
-extern const char *inet_ntop();
-extern int inet_aton();
-
-#endif
 
 #ifdef	__cplusplus
 }

@@ -66,8 +66,6 @@ using std::strxfrm;
 extern "C" {
 #endif
 
-#if defined(__STDC__)
-
 #if defined(__EXTENSIONS__) || \
 	(!defined(_STRICT_STDC) && !defined(__XOPEN_OR_POSIX)) || \
 	defined(_XPG6) || defined(_REENTRANT)
@@ -190,64 +188,6 @@ extern __thread size_t __strdupa_len;
 
 #endif	/* __GNUC__ */
 #endif	/* __EXTENSIONS__ ... */
-
-#else	/* __STDC__ */
-
-#if defined(__EXTENSIONS__) || !defined(__XOPEN_OR_POSIX) || \
-	defined(_XPG6) || defined(_REENTRANT)
-extern int strerror_r();
-#endif
-
-#if defined(__EXTENSIONS__) || !defined(__XOPEN_OR_POSIX) || \
-	(_POSIX_C_SOURCE - 0 >= 199506L) || defined(_REENTRANT)
-extern char *strtok_r();
-#endif
-
-#if defined(__EXTENSIONS__) || !defined(_STRICT_STDC) || \
-	defined(__XOPEN_OR_POSIX)
-extern void *memccpy();
-#endif
-
-#if defined(_XPG7) || !defined(_STRICT_SYMBOLS)
-extern int strcasecmp();
-extern int strncasecmp();
-extern int strcasecmp_l();
-extern int strncasecmp_l();
-extern char *stpcpy();
-extern char *stpncpy();
-extern char *strndup();
-extern size_t strnlen();
-extern char *strsignal();
-#endif
-
-#if !defined(_STRICT_SYMBOLS)
-extern int uucopy();
-extern int uucopystr();
-extern int ffs();
-extern int ffsl();
-extern int ffsll();
-extern int fls();
-extern int flsl();
-extern int flsll();
-extern char *strcasestr();
-extern char *strcasestr_l();
-extern char *strnstr();
-extern size_t strlcpy();
-extern size_t strlcat();
-extern char *strsep();
-extern char *strchrnul();
-#endif /* _STRICT_SYMBOLS */
-
-#if defined(__EXTENSIONS__) || !defined(__XOPEN_OR_POSIX) || defined(_XPG4_2)
-extern char *strdup();
-#endif
-
-#if defined(_XPG7) || !defined(_STRICT_SYMBOLS)
-extern size_t strcoll_l();
-extern size_t strxfrm_l();
-#endif
-
-#endif	/* __STDC__ */
 
 #ifdef	__cplusplus
 }

@@ -20,6 +20,8 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -31,8 +33,6 @@
 
 #ifndef _SYS_FS_UFS_PROT_H
 #define	_SYS_FS_UFS_PROT_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <rpc/rpc.h>
 
@@ -166,7 +166,6 @@ typedef struct ufsd_msg_t ufsd_msg_t;
 #define	UFSD_PROG ((unsigned long)(100233))
 #define	UFSD_VERS ((unsigned long)(1))
 
-#if defined(__STDC__) || defined(__cplusplus)
 #define	UFSD_NULL ((unsigned long)(0))
 extern  ufsdrc_t *ufsd_null_1(void *, CLIENT *);
 extern  ufsdrc_t *ufsd_null_1_svc(void *, struct svc_req *);
@@ -189,31 +188,8 @@ extern  ufsdrc_t *ufsd_exit_1(void *, CLIENT *);
 extern  ufsdrc_t *ufsd_exit_1_svc(void *, struct svc_req *);
 extern int ufsd_prog_1_freeresult(SVCXPRT *, xdrproc_t, caddr_t);
 
-#else /* K&R C */
-#define	UFSD_NULL ((unsigned long)(0))
-extern  ufsdrc_t *ufsd_null_1();
-extern  ufsdrc_t *ufsd_null_1_svc();
-#define	UFSD_REPAIRFS ((unsigned long)(1))
-extern  ufsdrc_t *ufsd_repairfs_1();
-extern  ufsdrc_t *ufsd_repairfs_1_svc();
-#define	UFSD_REPAIRFSLIST ((unsigned long)(2))
-extern  ufsdrc_t *ufsd_repairfslist_1();
-extern  ufsdrc_t *ufsd_repairfslist_1_svc();
-#define	UFSD_SEND ((unsigned long)(3))
-extern  ufsdrc_t *ufsd_send_1();
-extern  ufsdrc_t *ufsd_send_1_svc();
-#define	UFSD_RECV ((unsigned long)(4))
-extern  ufsdrc_t *ufsd_recv_1();
-extern  ufsdrc_t *ufsd_recv_1_svc();
-#define	UFSD_EXIT ((unsigned long)(5))
-extern  ufsdrc_t *ufsd_exit_1();
-extern  ufsdrc_t *ufsd_exit_1_svc();
-extern int ufsd_prog_1_freeresult();
-#endif /* K&R C */
-
 /* the xdr functions */
 
-#if defined(__STDC__) || defined(__cplusplus)
 extern  bool_t xdr_ufsdrc_t(XDR *, ufsdrc_t *);
 extern  bool_t xdr_fs_identity_t(XDR *, fs_identity_t *);
 extern  bool_t xdr_ufsd_repairfs_args_t(XDR *, ufsd_repairfs_args_t *);
@@ -226,22 +202,6 @@ extern  bool_t xdr_ufsd_log_data_t(XDR *, ufsd_log_data_t *);
 extern  bool_t xdr_ufsd_log_msg_t(XDR *, ufsd_log_msg_t *);
 extern  bool_t xdr_ufsd_msg_vardata_t(XDR *, ufsd_msg_vardata_t *);
 extern  bool_t xdr_ufsd_msg_t(XDR *, ufsd_msg_t *);
-
-#else /* K&R C */
-extern bool_t xdr_ufsdrc_t();
-extern bool_t xdr_fs_identity_t();
-extern bool_t xdr_ufsd_repairfs_args_t();
-extern bool_t xdr_ufsd_repairfs_list_t();
-extern bool_t xdr_ufsd_event_t();
-extern bool_t xdr_ufsd_boot_type_t();
-extern bool_t xdr_ufsd_log_op_t();
-extern bool_t xdr_ufsd_fsck_state_t();
-extern bool_t xdr_ufsd_log_data_t();
-extern bool_t xdr_ufsd_log_msg_t();
-extern bool_t xdr_ufsd_msg_vardata_t();
-extern bool_t xdr_ufsd_msg_t();
-
-#endif /* K&R C */
 
 #ifdef __cplusplus
 }

@@ -20,6 +20,8 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -157,17 +159,10 @@ typedef	__longlong_t	fpos_t;
 
 #define	L_tmpnam	25	/* (sizeof(P_tmpdir) + 15) */
 
-#if defined(__STDC__)
 extern __FILE	__iob[_NFILE];
 #define	stdin	(&__iob[0])
 #define	stdout	(&__iob[1])
 #define	stderr	(&__iob[2])
-#else
-extern __FILE	_iob[_NFILE];
-#define	stdin	(&_iob[0])
-#define	stdout	(&_iob[1])
-#define	stderr	(&_iob[2])
-#endif	/* __STDC__ */
 
 #if __cplusplus >= 199711L
 namespace std {
@@ -198,8 +193,6 @@ namespace std {
 #endif
 
 #endif /* !defined(_LP64) && !defined(_LONGLONG_TYPE) */
-
-#if defined(__STDC__)
 
 extern int	remove(const char *);
 extern int	rename(const char *, const char *);
@@ -272,57 +265,6 @@ extern int	__filbuf(FILE *);
 extern int	__flsbuf(int, FILE *);
 #endif	/*	_LP64	*/
 
-#else	/* !defined __STDC__ */
-
-extern int	remove();
-extern int	rename();
-extern FILE	*tmpfile();
-extern char	*tmpnam();
-extern int	fclose();
-extern int	fflush();
-extern FILE	*fopen();
-extern FILE	*freopen();
-extern void	setbuf();
-extern int	setvbuf();
-extern int	fprintf();
-extern int	fscanf();
-extern int	printf();
-extern int	scanf();
-extern int	sprintf();
-extern int	sscanf();
-extern int	vfprintf();
-extern int	vprintf();
-extern int	vsprintf();
-extern int	fgetc();
-extern char	*fgets();
-extern int	fputc();
-extern int	fputs();
-extern int	getc();
-extern int	getchar();
-extern char	*gets();
-extern int	putc();
-extern int	putchar();
-extern int	puts();
-extern int	ungetc();
-extern size_t	fread();
-extern size_t	fwrite();
-extern int	fgetpos();
-extern int	fseek();
-extern int	fsetpos();
-extern long	ftell();
-extern void	rewind();
-extern void	clearerr();
-extern int	feof();
-extern int	ferror();
-extern void	perror();
-
-#ifndef	_LP64
-extern int	_filbuf();
-extern int	_flsbuf();
-#endif	/*	_LP64	*/
-
-#endif	/* __STDC__ */
-
 #if __cplusplus >= 199711L
 }
 #endif /* end of namespace std */
@@ -331,7 +273,6 @@ extern int	_flsbuf();
 
 #if	!defined(_REENTRANT) && !defined(_LP64)
 
-#ifdef	__STDC__
 #if __cplusplus >= 199711L
 namespace std {
 inline int getc(FILE *_p) {
@@ -345,11 +286,6 @@ inline int putc(int _x, FILE *_p) {
 #define	putc(x, p)	(--(p)->_cnt < 0 ? __flsbuf((x), (p)) \
 				: (int)(*(p)->_ptr++ = (unsigned char) (x)))
 #endif /* __cplusplus >= 199711L */
-#else /* __STDC__ */
-#define	getc(p)		(--(p)->_cnt < 0 ? _filbuf(p) : (int)*(p)->_ptr++)
-#define	putc(x, p)	(--(p)->_cnt < 0 ? _flsbuf((x), (p)) : \
-				(int)(*(p)->_ptr++ = (unsigned char) (x)))
-#endif	/* __STDC__ */
 
 #endif /* !defined(_REENTRANT) && !defined(_LP64) */
 

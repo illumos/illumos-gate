@@ -2010,7 +2010,7 @@ over_meta_open:
 	}
 
 	sl->sl_trans_op = SL_OP_NONE;
-	atomic_add_32(&sbd_lu_count, 1);
+	atomic_inc_32(&sbd_lu_count);
 	return (0);
 
 scm_err_out:
@@ -2184,7 +2184,7 @@ sbd_create_standby_lu(sbd_create_standby_lu_t *slu, uint32_t *err_ret)
 	}
 
 	sl->sl_trans_op = SL_OP_NONE;
-	atomic_add_32(&sbd_lu_count, 1);
+	atomic_inc_32(&sbd_lu_count);
 	return (0);
 
 scs_err_out:
@@ -2543,7 +2543,7 @@ sim_sli_loaded:
 		if (ret) {
 			goto sim_err_out;
 		}
-		atomic_add_32(&sbd_lu_count, 1);
+		atomic_inc_32(&sbd_lu_count);
 	}
 
 	bcopy(sl->sl_device_id + 4, ilu->ilu_ret_guid, 16);
@@ -2949,7 +2949,7 @@ sbd_delete_locked_lu(sbd_lu_t *sl, uint32_t *err_ret,
 sdl_do_dereg:;
 	if (stmf_deregister_lu(sl->sl_lu) != STMF_SUCCESS)
 		return (EBUSY);
-	atomic_add_32(&sbd_lu_count, -1);
+	atomic_dec_32(&sbd_lu_count);
 
 	return (sbd_close_delete_lu(sl, 0));
 }

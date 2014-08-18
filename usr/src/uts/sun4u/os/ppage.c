@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/systm.h>
 #include <sys/archsystm.h>
@@ -189,7 +187,7 @@ ppmapin(page_t *pp, uint_t vprot, caddr_t hint)
 #ifdef PPDEBUG
 				align_hits[color]++;
 #endif /* PPDEBUG */
-				if (casptr(&ppmap_vaddrs[index],
+				if (atomic_cas_ptr(&ppmap_vaddrs[index],
 				    va, NULL) == va) {
 					hat_memload(kas.a_hat, va, pp,
 					    vprot | HAT_NOSYNC,
@@ -319,7 +317,7 @@ pp_load_tlb(processorid_t cpu, caddr_t **pslot, page_t *pp, uint_t prot)
 
 	for (i = start; i < pp_slots; i += stride) {
 		if (*myslot == NULL) {
-			if (casptr(myslot, NULL, va) == NULL)
+			if (atomic_cas_ptr(myslot, NULL, va) == NULL)
 				break;
 		}
 		myslot += stride;

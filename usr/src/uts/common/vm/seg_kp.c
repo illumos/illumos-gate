@@ -714,8 +714,7 @@ segkp_release_internal(struct seg *seg, struct segkp_data *kpd, size_t len)
 				anon_free(kpd->kp_anon, kpd->kp_anon_idx + i,
 				    PAGESIZE);
 				anon_unresv_zone(PAGESIZE, NULL);
-				atomic_add_long(&anon_segkp_pages_resv,
-				    -1);
+				atomic_dec_ulong(&anon_segkp_pages_resv);
 			}
 			TRACE_5(TR_FAC_VM,
 			    TR_ANON_SEGKP, "anon segkp:%p %p %lu %u %u",
@@ -838,9 +837,9 @@ segkp_map_red(void)
 		 */
 		curthread->t_red_pp = red_pp;
 
-		atomic_add_32(&red_nmapped, 1);
+		atomic_inc_32(&red_nmapped);
 		while (fp - (uintptr_t)curthread->t_stkbase < red_closest) {
-			(void) cas32(&red_closest, red_closest,
+			(void) atomic_cas_32(&red_closest, red_closest,
 			    (uint32_t)(fp - (uintptr_t)curthread->t_stkbase));
 		}
 		return (1);
@@ -849,7 +848,7 @@ segkp_map_red(void)
 	stkbase = (caddr_t)(((uintptr_t)curthread->t_stkbase &
 	    (uintptr_t)PAGEMASK) - PAGESIZE);
 
-	atomic_add_32(&red_ndoubles, 1);
+	atomic_inc_32(&red_ndoubles);
 
 	if (fp - (uintptr_t)stkbase < RED_DEEP_THRESHOLD) {
 		/*
@@ -1437,7 +1436,7 @@ segkp_mem_config_post_add(void *arg, pgcnt_t delta_pages)
 static int
 segkp_mem_config_pre_del(void *arg, pgcnt_t delta_pages)
 {
-	atomic_add_32(&segkp_indel, 1);
+	atomic_inc_32(&segkp_indel);
 	segkp_cache_free();
 	return (0);
 }
@@ -1446,7 +1445,7 @@ segkp_mem_config_pre_del(void *arg, pgcnt_t delta_pages)
 static void
 segkp_mem_config_post_del(void *arg, pgcnt_t delta_pages, int cancelled)
 {
-	atomic_add_32(&segkp_indel, -1);
+	atomic_dec_32(&segkp_indel);
 }
 
 static kphysm_setup_vector_t segkp_mem_config_vec = {

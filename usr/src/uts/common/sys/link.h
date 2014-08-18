@@ -23,6 +23,8 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -622,15 +624,10 @@ typedef struct {
 
 #ifndef	_ASM
 
-#ifdef __STDC__
-
 /*
  * Concurrency communication structure for libc callbacks.
  */
 extern void	_ld_libc(void *);
-#else /* __STDC__ */
-extern void	_ld_libc();
-#endif /* __STDC__ */
 
 #pragma unknown_control_flow(_ld_libc)
 #endif /* _ASM */

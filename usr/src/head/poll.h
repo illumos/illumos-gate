@@ -20,6 +20,7 @@
  */
 
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -46,16 +47,8 @@ extern "C" {
 
 #if defined(__EXTENSIONS__) || !defined(__XOPEN_OR_POSIX)
 
-#if defined(__STDC__)
-
 extern int ppoll(struct pollfd *_RESTRICT_KYWD, nfds_t,
     const struct timespec *_RESTRICT_KYWD, const sigset_t *_RESTRICT_KYWD);
-
-#else	/* __STDC__ */
-
-extern int ppoll();
-
-#endif /* __STDC__ */
 
 #endif	/* defined(__EXTENSIONS__) ... */
 

@@ -21,6 +21,8 @@
  */
 
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 1989 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -31,19 +33,13 @@
 #ifndef	_GETWIDTH_H
 #define	_GETWIDTH_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <euc.h>
 
 #ifdef	__cplusplus
 extern "C" {
 #endif
 
-#ifdef	__STDC__
 extern void getwidth(eucwidth_t *);
-#else	/* __STDC__ */
-extern void getwidth();
-#endif	/* __STDC__ */
 
 #ifdef	__cplusplus
 }

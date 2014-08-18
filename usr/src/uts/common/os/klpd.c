@@ -87,7 +87,7 @@ extern size_t max_vnode_path;
 void
 klpd_rele(klpd_reg_t *p)
 {
-	if (atomic_add_32_nv(&p->klpd_ref, -1) == 0) {
+	if (atomic_dec_32_nv(&p->klpd_ref) == 0) {
 		if (p->klpd_refp != NULL)
 			klpd_unlink(p);
 		if (p->klpd_cred != NULL)
@@ -116,7 +116,7 @@ klpd_rele_next(klpd_reg_t *p)
 static void
 klpd_hold(klpd_reg_t *p)
 {
-	atomic_add_32(&p->klpd_ref, 1);
+	atomic_inc_32(&p->klpd_ref);
 }
 
 /*
@@ -350,7 +350,7 @@ klpd_call(const cred_t *cr, const priv_set_t *req, va_list ap)
 	 */
 	if (mutex_owned(&pidlock) || mutex_owned(&curproc->p_lock) ||
 	    mutex_owned(&curproc->p_crlock)) {
-		atomic_add_32(&klpd_bad_locks, 1);
+		atomic_inc_32(&klpd_bad_locks);
 		return (-1);
 	}
 
@@ -674,13 +674,13 @@ out:
 void
 crklpd_hold(credklpd_t *crkpd)
 {
-	atomic_add_32(&crkpd->crkl_ref, 1);
+	atomic_inc_32(&crkpd->crkl_ref);
 }
 
 void
 crklpd_rele(credklpd_t *crkpd)
 {
-	if (atomic_add_32_nv(&crkpd->crkl_ref, -1) == 0) {
+	if (atomic_dec_32_nv(&crkpd->crkl_ref) == 0) {
 		if (crkpd->crkl_reg != NULL)
 			klpd_rele(crkpd->crkl_reg);
 		mutex_destroy(&crkpd->crkl_lock);

@@ -1218,15 +1218,16 @@ cpu_intr_swtch_enter(kthread_id_t t)
 	 * PIL and zeroed its timestamp. Since there was no pinned thread to
 	 * return to, swtch() gets called and we end up here.
 	 *
-	 * Note that we use atomic ops below (cas64 and atomic_add_64), which
-	 * we don't use in the functions above, because we're not called
-	 * with interrupts blocked, but the epilog/prolog functions are.
+	 * Note that we use atomic ops below (atomic_cas_64 and
+	 * atomic_add_64), which we don't use in the functions above,
+	 * because we're not called with interrupts blocked, but the
+	 * epilog/prolog functions are.
 	 */
 	if (t->t_intr_start) {
 		do {
 			start = t->t_intr_start;
 			interval = tsc_read() - start;
-		} while (cas64(&t->t_intr_start, start, 0) != start);
+		} while (atomic_cas_64(&t->t_intr_start, start, 0) != start);
 		cpu = CPU;
 		cpu->cpu_m.intrstat[t->t_pil][0] += interval;
 
@@ -1250,7 +1251,7 @@ cpu_intr_swtch_exit(kthread_id_t t)
 
 	do {
 		ts = t->t_intr_start;
-	} while (cas64(&t->t_intr_start, ts, tsc_read()) != ts);
+	} while (atomic_cas_64(&t->t_intr_start, ts, tsc_read()) != ts);
 }
 
 /*

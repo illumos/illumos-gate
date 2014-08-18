@@ -938,7 +938,7 @@ start_els_posting:;
 		fct_post_to_discovery_queue(iport, irp, NULL);
 
 		/* A PLOGI also invalidates any RSCNs related to this rp */
-		atomic_add_32(&irp->irp_rscn_counter, 1);
+		atomic_inc_32(&irp->irp_rscn_counter);
 	} else {
 		/*
 		 * For everything else, we have (or be able to lookup) a
@@ -983,7 +983,7 @@ start_els_posting:;
 		 */
 		atomic_or_32(&icmd->icmd_flags, ICMD_IMPLICIT_CMD_HAS_RESOURCE);
 	}
-	atomic_add_16(&irp->irp_nonfcp_xchg_count, 1);
+	atomic_inc_16(&irp->irp_nonfcp_xchg_count);
 
 	/*
 	 * Grab the remote port lock while we modify the port state.
@@ -998,13 +998,13 @@ start_els_posting:;
 		if ((op == ELS_OP_PLOGI) || (op == ELS_OP_LOGO)) {
 			rf |= IRP_PLOGI_DONE;
 			if (irp->irp_flags & IRP_PLOGI_DONE)
-				atomic_add_32(&iport->iport_nrps_login, -1);
+				atomic_dec_32(&iport->iport_nrps_login);
 		}
-		atomic_add_16(&irp->irp_sa_elses_count, 1);
+		atomic_inc_16(&irp->irp_sa_elses_count);
 		atomic_and_32(&irp->irp_flags, ~rf);
 		atomic_or_32(&icmd->icmd_flags, ICMD_SESSION_AFFECTING);
 	} else {
-		atomic_add_16(&irp->irp_nsa_elses_count, 1);
+		atomic_inc_16(&irp->irp_nsa_elses_count);
 	}
 
 	fct_post_to_discovery_queue(iport, irp, icmd);
@@ -1160,7 +1160,7 @@ fct_register_remote_port(fct_local_port_t *port, fct_remote_port_t *rp,
 		iport->iport_rp_slots[rp->rp_handle] = irp;
 		atomic_or_32(&irp->irp_flags, IRP_HANDLE_OPENED);
 	}
-	(void) atomic_add_64_nv(&iport->iport_last_change, 1);
+	atomic_inc_64(&iport->iport_last_change);
 	fct_log_remote_port_event(port, ESC_SUNFC_TARGET_ADD,
 	    rp->rp_pwwn, rp->rp_id);
 
@@ -1205,7 +1205,7 @@ fct_deregister_remote_port(fct_local_port_t *port, fct_remote_port_t *rp)
 		atomic_and_32(&irp->irp_flags, ~IRP_HANDLE_OPENED);
 		iport->iport_rp_slots[rp->rp_handle] = NULL;
 	}
-	(void) atomic_add_64_nv(&iport->iport_last_change, 1);
+	atomic_inc_64(&iport->iport_last_change);
 	fct_log_remote_port_event(port, ESC_SUNFC_TARGET_REMOVE,
 	    rp->rp_pwwn, rp->rp_id);
 
@@ -1511,12 +1511,12 @@ fct_process_plogi(fct_i_cmd_t *icmd)
 			}
 		}
 	}
-	atomic_add_16(&irp->irp_sa_elses_count, -1);
+	atomic_dec_16(&irp->irp_sa_elses_count);
 
 	if (ret == FCT_SUCCESS) {
 		if (cmd_type == FCT_CMD_RCVD_ELS) {
 			atomic_or_32(&irp->irp_flags, IRP_PLOGI_DONE);
-			atomic_add_32(&iport->iport_nrps_login, 1);
+			atomic_inc_32(&iport->iport_nrps_login);
 			if (irp->irp_deregister_timer)
 				irp->irp_deregister_timer = 0;
 		}
@@ -1597,7 +1597,7 @@ fct_process_prli(fct_i_cmd_t *icmd)
 			    els->els_req_size, els->els_req_payload[6]);
 
 		fct_dequeue_els(irp);
-		atomic_add_16(&irp->irp_sa_elses_count, -1);
+		atomic_dec_16(&irp->irp_sa_elses_count);
 		ret = fct_send_accrjt(cmd, ELS_OP_LSRJT, 3, 0x2c);
 		goto prli_end;
 	}
@@ -1671,7 +1671,7 @@ fct_process_prli(fct_i_cmd_t *icmd)
 	}
 
 	fct_dequeue_els(irp);
-	atomic_add_16(&irp->irp_sa_elses_count, -1);
+	atomic_dec_16(&irp->irp_sa_elses_count);
 	if (ses == NULL) {
 		/* fail PRLI */
 		ret = fct_send_accrjt(cmd, ELS_OP_LSRJT, 3, 0);
@@ -1775,7 +1775,7 @@ fct_process_logo(fct_i_cmd_t *icmd)
 	}
 
 	fct_dequeue_els(irp);
-	atomic_add_16(&irp->irp_sa_elses_count, -1);
+	atomic_dec_16(&irp->irp_sa_elses_count);
 
 	/* don't send response if this is an implicit logout cmd */
 	if (!(icmd->icmd_flags & ICMD_IMPLICIT)) {
@@ -1886,7 +1886,7 @@ fct_process_prlo(fct_i_cmd_t *icmd)
 	}
 
 	fct_dequeue_els(irp);
-	atomic_add_16(&irp->irp_sa_elses_count, -1);
+	atomic_dec_16(&irp->irp_sa_elses_count);
 	ret = fct_send_accrjt(cmd, ELS_OP_ACC, 0, 0);
 	if (ret != FCT_SUCCESS)
 		fct_queue_cmd_for_termination(cmd, ret);
@@ -1911,7 +1911,7 @@ fct_process_rcvd_adisc(fct_i_cmd_t *icmd)
 	fct_status_t		ret;
 
 	fct_dequeue_els(irp);
-	atomic_add_16(&irp->irp_nsa_elses_count, -1);
+	atomic_dec_16(&irp->irp_nsa_elses_count);
 
 	/* Validate the adisc request */
 	p = els->els_req_payload;
@@ -1949,7 +1949,7 @@ fct_process_unknown_els(fct_i_cmd_t *icmd)
 
 	ASSERT(icmd->icmd_cmd->cmd_type == FCT_CMD_RCVD_ELS);
 	fct_dequeue_els(ICMD_TO_IRP(icmd));
-	atomic_add_16(&ICMD_TO_IRP(icmd)->irp_nsa_elses_count, -1);
+	atomic_dec_16(&ICMD_TO_IRP(icmd)->irp_nsa_elses_count);
 	op = ICMD_TO_ELS(icmd)->els_req_payload[0];
 	stmf_trace(iport->iport_alias, "Rejecting unknown unsol els %x (%s)",
 	    op, FCT_ELS_NAME(op));
@@ -1971,7 +1971,7 @@ fct_process_rscn(fct_i_cmd_t *icmd)
 	uint32_t		 rscn_req_size;
 
 	fct_dequeue_els(ICMD_TO_IRP(icmd));
-	atomic_add_16(&ICMD_TO_IRP(icmd)->irp_nsa_elses_count, -1);
+	atomic_dec_16(&ICMD_TO_IRP(icmd)->irp_nsa_elses_count);
 	if (icmd->icmd_cmd->cmd_type == FCT_CMD_RCVD_ELS) {
 		op = ICMD_TO_ELS(icmd)->els_req_payload[0];
 		stmf_trace(iport->iport_alias, "Accepting RSCN %x (%s)",
@@ -2068,9 +2068,9 @@ fct_process_els(fct_i_local_port_t *iport, fct_i_remote_port_t *irp)
 			fct_i_cmd_t *c = (*ppcmd)->icmd_next;
 
 			if ((*ppcmd)->icmd_flags & ICMD_SESSION_AFFECTING)
-				atomic_add_16(&irp->irp_sa_elses_count, -1);
+				atomic_dec_16(&irp->irp_sa_elses_count);
 			else
-				atomic_add_16(&irp->irp_nsa_elses_count, -1);
+				atomic_dec_16(&irp->irp_nsa_elses_count);
 			(*ppcmd)->icmd_next = cmd_to_abort;
 			cmd_to_abort = *ppcmd;
 			*ppcmd = c;
@@ -2125,7 +2125,7 @@ fct_process_els(fct_i_local_port_t *iport, fct_i_remote_port_t *irp)
 		fct_local_port_t *port = iport->iport_port;
 
 		fct_dequeue_els(irp);
-		atomic_add_16(&irp->irp_nsa_elses_count, -1);
+		atomic_dec_16(&irp->irp_nsa_elses_count);
 		atomic_or_32(&icmd->icmd_flags, ICMD_KNOWN_TO_FCA);
 		if ((s = port->port_send_cmd(cmd)) != FCT_SUCCESS) {
 			atomic_and_32(&icmd->icmd_flags, ~ICMD_KNOWN_TO_FCA);
@@ -2179,7 +2179,7 @@ fct_handle_sol_els_completion(fct_i_local_port_t *iport, fct_i_cmd_t *icmd)
 		stmf_wwn_to_devid_desc((scsi_devid_desc_t *)irp->irp_id,
 		    irp->irp_rp->rp_pwwn, PROTOCOL_FIBRE_CHANNEL);
 		atomic_or_32(&irp->irp_flags, IRP_PLOGI_DONE);
-		atomic_add_32(&iport->iport_nrps_login, 1);
+		atomic_inc_32(&iport->iport_nrps_login);
 		if (irp->irp_deregister_timer) {
 			irp->irp_deregister_timer = 0;
 			irp->irp_dereg_count = 0;
@@ -2225,7 +2225,7 @@ fct_check_cmdlist(fct_i_local_port_t *iport)
 		iport->iport_cached_cmdlist = icmd->icmd_next;
 		iport->iport_cached_ncmds--;
 		mutex_exit(&iport->iport_cached_cmd_lock);
-		atomic_add_32(&iport->iport_total_alloced_ncmds, -1);
+		atomic_dec_32(&iport->iport_total_alloced_ncmds);
 		fct_free(icmd->icmd_cmd);
 	}
 	mutex_enter(&iport->iport_worker_lock);
@@ -2374,7 +2374,7 @@ fct_handle_solct(fct_cmd_t *cmd)
 	rw_exit(&irp->irp_lock);
 	rw_exit(&iport->iport_lock);
 
-	atomic_add_16(&irp->irp_nonfcp_xchg_count, 1);
+	atomic_inc_16(&irp->irp_nonfcp_xchg_count);
 	atomic_or_32(&icmd->icmd_flags, ICMD_KNOWN_TO_FCA);
 	icmd->icmd_start_time = ddi_get_lbolt();
 	ret = iport->iport_port->port_send_cmd(cmd);
@@ -2763,7 +2763,7 @@ do {									\
 	    fct_gid_cb);						\
 	if (ct_cmd) {							\
 		uint32_t cnt;						\
-		cnt = atomic_add_32_nv(&irp->irp_rscn_counter, 1);	\
+		cnt = atomic_inc_32_nv(&irp->irp_rscn_counter);	\
 		CMD_TO_ICMD(ct_cmd)->icmd_cb_private =			\
 		    INT2PTR(cnt, void *);				\
 		irp->irp_flags |= IRP_RSCN_QUEUED;			\

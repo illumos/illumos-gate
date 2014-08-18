@@ -20,14 +20,14 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright (c) 1998 by Sun Microsystems, Inc.
  * All rights reserved.
  */
 
 #ifndef	_SYS_SCSI_RESET_NOTIFY_H
 #define	_SYS_SCSI_RESET_NOTIFY_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/note.h>
 #include <sys/scsi/scsi_types.h>
@@ -60,7 +60,6 @@ _NOTE(SCHEME_PROTECTS_DATA("protected by lock passed as arg",
 #endif
 
 #ifdef	_KERNEL
-#ifdef	__STDC__
 extern int scsi_hba_reset_notify_setup(struct scsi_address *, int,
 	void (*)(caddr_t), caddr_t, kmutex_t *,
 	struct scsi_reset_notify_entry **);
@@ -68,11 +67,6 @@ extern void scsi_hba_reset_notify_tear_down(
 	struct scsi_reset_notify_entry *listp);
 extern void scsi_hba_reset_notify_callback(kmutex_t *mutex,
 	struct scsi_reset_notify_entry **listp);
-#else	/* __STDC__ */
-extern int scsi_hba_reset_notify_setup();
-extern void scsi_hba_reset_notify_tear_down();
-extern void scsi_hba_reset_notify_callback();
-#endif	/* __STDC__ */
 
 #endif	/* _KERNEL */
 

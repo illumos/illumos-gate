@@ -20,6 +20,7 @@
  */
 
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -669,7 +670,6 @@ struct scsi_capacity_16 {
  * scsi_setup_cdb()
  */
 
-#ifdef  __STDC__
 extern void 	makecom_g0(struct scsi_pkt *pkt, struct scsi_device *devp,
 				int flag, int cmd, int addr, int cnt);
 extern void 	makecom_g0_s(struct scsi_pkt *pkt, struct scsi_device *devp,
@@ -680,16 +680,6 @@ extern void 	makecom_g5(struct scsi_pkt *pkt, struct scsi_device *devp,
 				int flag, int cmd, int addr, int cnt);
 extern int	scsi_setup_cdb(union scsi_cdb *cdbp, uchar_t cmd, uint_t addr,
 				uint_t cnt, uint_t addtl_cdb_data);
-
-#else   /* __STDC__ */
-
-extern void 	makecom_g0();
-extern void 	makecom_g0_s();
-extern void 	makecom_g1();
-extern void 	makecom_g5();
-extern int	scsi_setup_cdb();
-
-#endif  /* __STDC__ */
 
 #endif /* _KERNEL */
 

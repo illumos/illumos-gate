@@ -20,6 +20,8 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright (c) 1997-1998 by Sun Microsystems, Inc.
  * All rights reserved.
  */
@@ -30,8 +32,6 @@
 
 #ifndef _SAC_H
 #define	_SAC_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.4 */
 
 #include <sys/types.h>
 
@@ -143,11 +143,7 @@ struct	sacmsg {
 #define	E_RECOVER	9	/* in recovery */
 #define	E_SACNOTRUN	10	/* sac daemon is not running */
 
-#ifdef __STDC__
 extern int	doconfig(int, char *, long);
-#else
-extern int	doconfig();
-#endif
 
 #ifdef	__cplusplus
 }

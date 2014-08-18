@@ -19,14 +19,14 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_EXECINFO_H
 #define	_EXECINFO_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * These functions provide glibc-compatible backtrace functionality.
@@ -37,15 +37,9 @@
 extern "C" {
 #endif
 
-#if defined(__STDC__)
 extern int backtrace(void **, int);
 extern char **backtrace_symbols(void *const *, int);
 extern void backtrace_symbols_fd(void *const *, int, int);
-#else
-extern int backtrace();
-extern char **backtrace_symbols();
-extern void backtrace_symbols_fd();
-#endif
 
 #ifdef	__cplusplus
 }

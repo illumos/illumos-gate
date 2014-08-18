@@ -19,6 +19,7 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -46,7 +47,6 @@ extern "C" {
  * 32bit, or not in the large file environment.
  */
 #if !defined(_ILP32) || _FILE_OFFSET_BITS != 64
-#ifdef __STDC__
 #include <libelf.h>
 extern uint_t	ld_version(uint_t);
 extern void	ld_input_done(uint_t *);
@@ -73,27 +73,6 @@ extern void	ld_section64(const char *, Elf64_Shdr *, Elf64_Word,
 			Elf_Data *, Elf *);
 
 #endif /* (defined(_LP64) || defined(_LONGLONG_TYPE) */
-#else
-extern void	ld_version();
-extern void	ld_input_done();
-
-extern void	ld_start();
-extern void	ld_atexit();
-extern void	ld_open();
-extern void	ld_file();
-extern void	ld_input_section();
-extern void	ld_section();
-
-#if defined(_LP64) || defined(_LONGLONG_TYPE)
-extern void	ld_start64();
-extern void	ld_atexit64();
-extern void	ld_open64();
-extern void	ld_file64();
-extern void	ld_input_section64();
-extern void	ld_section64();
-
-#endif /* (defined(_LP64) || defined(_LONGLONG_TYPE) */
-#endif /* __STDC__ */
 #endif /* !defined(_ILP32) || _FILE_OFFSET_BITS != 64 */
 
 /*
@@ -224,7 +203,6 @@ typedef	unsigned int		uintptr_t;
 #endif
 
 
-#ifdef	__STDC__
 extern uint_t		la_version(uint_t);
 extern void		la_activity(uintptr_t *, uint_t);
 extern void		la_preinit(uintptr_t *);
@@ -254,25 +232,7 @@ extern uintptr_t	la_i86_pltenter(Elf32_Sym *, uint_t, uintptr_t *,
 extern uintptr_t	la_pltexit(Elf32_Sym *, uint_t, uintptr_t *,
 				uintptr_t *, uintptr_t);
 #endif /* _LP64 */
-#else  /* __STDC__ */
-extern uint_t		la_version();
-extern void		la_preinit();
-extern uint_t		la_objopen();
-extern uint_t		la_objclose();
-extern int		la_objfilter();
-#if	defined(_LP64)
-extern uintptr_t	la_sparcv9_pltenter();
-extern uintptr_t	la_pltexit64();
-extern uintptr_t	la_symbind64();
-#else  /* _ILP32 */
-extern uintptr_t	la_sparcv8_pltenter();
-extern uintptr_t	la_i86_pltenter();
-extern uintptr_t	la_pltexit();
-extern uintptr_t	la_symbind32();
-#endif /* _LP64 */
-#endif /* __STDC__ */
 
-#ifdef	__STDC__
 /*
  * The ElfW() macro is a GNU/Linux feature, provided as support for
  * the dl_phdr_info structure used by dl_phdr_iterate(), which also
@@ -326,7 +286,6 @@ struct dl_phdr_info {
 
 extern  int dl_iterate_phdr(int (*)(struct dl_phdr_info *, size_t, void *),
 	    void *);
-#endif /* __STDC__ */
 
 #endif	/* _ASM */
 #endif /* _KERNEL */

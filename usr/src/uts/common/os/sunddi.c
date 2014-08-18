@@ -8092,7 +8092,7 @@ umem_lock_undo(struct as *as, void *arg, uint_t event)
 	(*cp->callbacks.cbo_umem_lock_cleanup)((ddi_umem_cookie_t)cp);
 
 	/* remove the cookie if reference goes to zero */
-	if (atomic_add_long_nv((ulong_t *)(&(cp->cook_refcnt)), -1) == 0) {
+	if (atomic_dec_ulong_nv((ulong_t *)(&(cp->cook_refcnt))) == 0) {
 		kmem_free(cp, sizeof (struct ddi_umem_cookie));
 	}
 }
@@ -8487,7 +8487,7 @@ i_ddi_umem_unlock(struct ddi_umem_cookie *p)
 		 * case, just return the cookie memory.
 		 */
 		if ((rc != AS_CALLBACK_DELETE_DEFERRED) ||
-		    (atomic_add_long_nv((ulong_t *)(&(p->cook_refcnt)), -1)
+		    (atomic_dec_ulong_nv((ulong_t *)(&(p->cook_refcnt)))
 		    == 0)) {
 			kmem_free(p, sizeof (struct ddi_umem_cookie));
 		}

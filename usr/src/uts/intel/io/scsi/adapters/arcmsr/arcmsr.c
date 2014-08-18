@@ -1842,7 +1842,7 @@ arcmsr_post_ccb(struct ACB *acb, struct CCB *ccb)
 	    DDI_FAILURE)
 		return (DDI_FAILURE);
 
-	atomic_add_32(&acb->ccboutstandingcount, 1);
+	atomic_inc_32(&acb->ccboutstandingcount);
 	ccb->ccb_time = (time_t)(ddi_get_time() + pkt->pkt_time);
 
 	ccb->ccb_state = ARCMSR_CCB_START;
@@ -1955,7 +1955,7 @@ arcmsr_ccb_complete(struct CCB *ccb, int flag)
 		scsi_hba_pkt_comp(pkt);
 	}
 	if (flag == 1) {
-		atomic_add_32(&acb->ccboutstandingcount, -1);
+		atomic_dec_32(&acb->ccboutstandingcount);
 	}
 }
 

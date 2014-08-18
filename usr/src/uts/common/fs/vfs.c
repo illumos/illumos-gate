@@ -467,7 +467,7 @@ vfs_setops(vfs_t *vfsp, vfsops_t *vfsops)
 	op = vfsp->vfs_op;
 	membar_consumer();
 	if (vfsp->vfs_femhead == NULL &&
-	    casptr(&vfsp->vfs_op, op, vfsops) == op) {
+	    atomic_cas_ptr(&vfsp->vfs_op, op, vfsops) == op) {
 		return;
 	}
 	fsem_setvfsops(vfsp, vfsops);
@@ -2969,7 +2969,7 @@ vfs_mono_time(timespec_t *ts)
 		oldhrt = hrt;
 		if (newhrt <= hrt)
 			newhrt = hrt + 1;
-		if (cas64((uint64_t *)&hrt, oldhrt, newhrt) == oldhrt)
+		if (atomic_cas_64((uint64_t *)&hrt, oldhrt, newhrt) == oldhrt)
 			break;
 	}
 	hrt2ts(newhrt, ts);
@@ -4331,7 +4331,7 @@ vfs_free(vfs_t *vfsp)
 void
 vfs_hold(vfs_t *vfsp)
 {
-	atomic_add_32(&vfsp->vfs_count, 1);
+	atomic_inc_32(&vfsp->vfs_count);
 	ASSERT(vfsp->vfs_count != 0);
 }
 
@@ -4344,7 +4344,7 @@ void
 vfs_rele(vfs_t *vfsp)
 {
 	ASSERT(vfsp->vfs_count != 0);
-	if (atomic_add_32_nv(&vfsp->vfs_count, -1) == 0) {
+	if (atomic_dec_32_nv(&vfsp->vfs_count) == 0) {
 		VFS_FREEVFS(vfsp);
 		lofi_remove(vfsp);
 		if (vfsp->vfs_zone)

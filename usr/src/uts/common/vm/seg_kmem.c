@@ -1277,7 +1277,7 @@ segkmem_alloc_lp(vmem_t *vmp, size_t *sizep, size_t align, int vmflag)
 
 		if (lpthrt != 0) {
 			/* try to update the throttle value */
-			lpthrt = atomic_add_long_nv(lpthrtp, 1);
+			lpthrt = atomic_inc_ulong_nv(lpthrtp);
 			if (lpthrt >= segkmem_lpthrottle_max) {
 				lpthrt = atomic_cas_ulong(lpthrtp, lpthrt,
 				    segkmem_lpthrottle_max / 4);

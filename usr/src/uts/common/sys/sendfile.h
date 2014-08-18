@@ -20,14 +20,14 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_SENDFILE_H
 #define	_SYS_SENDFILE_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/feature_tests.h>
 
@@ -128,7 +128,6 @@ typedef struct ksendfilevec64 {
 #endif	/* __PRAGMA_REDEFINE_EXTNAME */
 #endif	/* _LP64 && _LARGEFILE64_SOURCE */
 
-#ifdef	__STDC__
 extern ssize_t sendfilev(int, const struct sendfilevec *, int, size_t *);
 extern ssize_t sendfile(int, int, off_t *, size_t);
 /* Transitional largefile interface */
@@ -137,15 +136,6 @@ extern ssize_t sendfile(int, int, off_t *, size_t);
 extern ssize_t sendfilev64(int, const struct sendfilevec64 *, int, size_t *);
 extern ssize_t sendfile64(int, int, off64_t *, size_t);
 #endif
-#else	/* __STDC__ */
-extern int sendfilev();
-extern int sendfile();
-#if	defined(_LARGEFILE64_SOURCE) && !((_FILE_OFFSET_BITS == 64) && \
-	    !defined(__PRAGMA_REDEFINE_EXTNAME))
-extern int sendfilev64();
-extern int sendfile64();
-#endif
-#endif	/* __STDC__ */
 #endif	/* _KERNEL */
 
 #ifdef	__cplusplus

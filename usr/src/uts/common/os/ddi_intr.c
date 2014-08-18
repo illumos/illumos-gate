@@ -678,7 +678,7 @@ ddi_intr_dup_handler(ddi_intr_handle_t org, int dup_inum,
 		dup_hdlp = (ddi_intr_handle_impl_t *)
 		    kmem_alloc(sizeof (ddi_intr_handle_impl_t), KM_SLEEP);
 
-		atomic_add_32(&hdlp->ih_dup_cnt, 1);
+		atomic_inc_32(&hdlp->ih_dup_cnt);
 
 		*dup = (ddi_intr_handle_t)dup_hdlp;
 		bcopy(hdlp, dup_hdlp, sizeof (ddi_intr_handle_impl_t));

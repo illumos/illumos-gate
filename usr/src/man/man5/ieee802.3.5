@@ -1,0 +1,501 @@
+.\" Copyright 2014 Garrett D'Amore <garrett@damore.org>
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that the following conditions
+.\" are met:
+.\" 1. Redistributions of source code must retain the above copyright
+.\"    notice, this list of conditions and the following disclaimer.
+.\" 2. Redistributions in binary form must reproduce the above copyright
+.\"    notice, this list of conditions and the following disclaimer in the
+.\"    documentation and/or other materials provided with the distribution.
+.\"
+.\" THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDER AND CONTRIBUTORS
+.\" ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+.\" LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+.\" FOR A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE
+.\" COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+.\" INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+.\" NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF
+.\" USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+.\" ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+.\" (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+.\" THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
+.\"
+.Dd "Aug 7, 2014"
+.Dt IEEE802.3 5
+.Os
+.Sh NAME
+.Nm ieee802.3
+.Nd IEEE 802.3 Ethernet parameters and statistics
+.Sh DESCRIPTION
+The IEEE 802.3 standard specifies the details for Ethernet
+networking.  This page describes the various statistics and tunables
+that device drivers supporting Ethernet commonly offer.
+.
+Note that not every device or driver supports every one of these
+values, and many devices offer additional statistics and tunables that
+are specific to that hardware.  See the device driver's documentation
+for those specific details.
+.
+.Lp
+Values that are statistics are visible
+.Xr kstat 1M ,
+whereas properties are visible using the
+.Xr dladm 1M
+.Sy show-linkprop
+subcommand.  Tunables are properties that can be changed using the
+.Xr dladm 1M
+.Sy set-linkprop
+subcommand.  A more useful summary of current operational
+state can be seen with the
+.Xr dladm 1M
+.Sy show-ether
+subcommand.
+.
+.Ss Statistics
+The following statistics are accessible with
+.Xr kstat 1M .
+Note that some statistics are available in both 32- and 64-bit counters,
+in which case the name of the 64 bit statistic will be the same as the
+32-bit, but with
+.Dq Sy 64
+appended.  For example,
+.Sy ipackets64
+is the 64-bit version of the
+.Sy ipackets
+statistic. These are indicated with the special suffix
+.Op Sy 64
+in the table below.
+.
+.Bl -tag -width tx_late_collisions
+.It Sy adv_cap_1000fdx
+Advertises 1000 Mbps full-duplex support.
+.It Sy adv_cap_1000hdx
+Advertises 1000 Mbps half-duplex support.
+.It Sy adv_cap_100fdx
+Advertises 100 Mbps full-duplex support.
+.It Sy adv_cap_100hdx
+Advertises 100 Mbps half-duplex support.
+.It Sy adv_cap_100T4
+Advertises 100BASE-T4 support.
+.It Sy adv_cap_10fdx
+Advertises 10 Mbps full-duplex support.
+.It Sy adv_cap_10gfdx
+Advertises 10 Gbps support.
+.It Sy adv_cap_10hdx
+Advertises 10 Mbps half-duplex support.
+.It Sy adv_cap_autoneg
+Advertises auto-negotiation support.
+.It Sy adv_cap_asmpause
+Advertises asymmetric flow control support.
+.It Sy adv_cap_pause
+Advertises flow control support.
+.It Sy adv_rem_fault
+Remote fault status sent to peer.
+.It Sy align_errors
+Mis-aligned frames received.
+.It Sy brdcstrcv
+Broadcast frames received.
+.It Sy brdcstxmt
+Broadcast frames transmitted.
+.It Sy cap_1000fdx
+Device supports 1000 Mbps full-duplex.
+.It Sy cap_1000hdx
+Device supports 1000 Mbps half-duplex.
+.It Sy cap_100fdx
+Device supports 100 Mbps full-duplex.
+.It Sy cap_100hdx
+Device supports 100 Mbps half-duplex.
+.It Sy cap_100T4
+Device supports 100BASE-T4.
+.It Sy cap_10fdx
+Device supports 10 Mbps full-duplex.
+.It Sy cap_10gfdx
+Device supports 10 Gpbs.
+.It Sy cap_10hdx
+Device supports 10 Mbps half-duplex.
+.It Sy cap_asmpause
+Device supports asymmetric flow control.
+.It Sy cap_autoneg
+Device supports auto-negotiation.
+.It Sy cap_pause
+Device supports symmetric flow control.
+.It Sy cap_rem_fault
+Device supports remote fault notification.
+.It Sy carrier_errors
+Frames dropped due to loss of link.
+.It Sy collisions
+Collisions.
+.It Sy defer_xmts
+Transmits deferred due to link activity.
+.It Sy ex_collisions
+Frames dropped due to too many collisions.
+.It Sy fcs_errors
+Frames received with bad frame checksum.
+.It Sy first_collisions
+Frames with at least one collision.
+.It Sy ierrors
+Receive errors.
+.It Sy ifspeed
+Link speed in bits per second.
+.It Sy ipackets Ns Op Sy 64
+Frames received successfully.
+.It Sy jabber_errors
+Jabber errors.
+.It Sy link_asmpause
+Asymmetric flow control; works together with
+.Sy link_pause .
+See the description for it below.
+.It Sy link_autoneg
+Link was auto-negotiated.
+.It Sy link_duplex
+Link duplex status, values as follows:
+.Bl -column "0" infinity
+.It 0 Ta Unknown.
+.It 1 Ta Half-duplex.
+.It 2 Ta Full-duplex.
+.El
+.It Sy link_pause
+Link flow control available; works together with
+.Sy link_asmpause .
+The meanings of these bits are:
+.Bl -column "pause" "asmpause"
+.It Sy pause Ta Sy asmpause Ta Sy meaning
+.It 0 Ta 0 Ta "No flow control."
+.It 1 Ta 0 Ta Symmetric flow control.
+.It 0 Ta 1 Ta Honor received pause frames.
+.It 1 Ta 1 Ta Send pause frames when congested.
+.El
+.It Sy link_state
+Link state; 0 for down, 1 for up.
+.It Sy link_up
+Link is up if 1.
+.It Sy lp_cap_1000fdx
+Peer supports 1000 Mbps full-duplex.
+.It Sy lp_cap_1000hdx
+Peer supports 1000 Mbps half-duplex.
+.It Sy lp_cap_100fdx
+Peer supports 100 Mbps full-duplex.
+.It Sy lp_cap_100hdx
+Peer supports 100 Mbps half-duplex.
+.It Sy lp_cap_100T4
+Peer supports 100BASE-T4.
+.It Sy lp_cap_10fdx
+Peer supports 10 Mbps full-duplex.
+.It Sy lp_cap_10gfdx
+Peer supports 10 Gbps.
+.It Sy lp_cap_10hdx
+Peer supports 10 Mbps half-duplex.
+.It Sy lp_cap_asmpause
+Peer supports asymmetric flow control.
+.It Sy lp_cap_autoneg
+Peer supports auto-negotiation.
+.It Sy lp_cap_pause
+Peer advertises flow control support.
+.It Sy lp_rem_fault
+Peer announces a remote fault.
+.It Sy macrv_errors
+Generic receive errors.
+.It Sy macxmt_errors
+Generic transmit errors.
+.It Sy multi_collisions
+Frames with more than one collision.
+.It Sy multircv
+Multicast frames received.
+.It Sy multixmt
+Multicast frames transmitted.
+.It Sy norcvbuf
+Receive frames dropped due to lack of resources.
+.It Sy noxmtbuf
+Transmit frames dropped due to lack of resources.
+.It Sy obytes Ns Op Sy 64
+Bytes (octets) transmitted successfully.
+.It Sy oerrors
+Transmit errors.
+.It Sy oflo
+Overflow errors.
+.It Sy opackets Ns Op Sy 64
+Frames successfully transmitted.
+.It Sy promisc
+Interface is in promiscuous mode.
+.It Sy rbytes Ns Op Sy 64
+Bytes (octets) received successfully.
+.It Sy runt_errors
+Frames received that were too short.
+.It Sy sqe_errors
+Squelch errors.
+.It Sy toolong_errors
+Frames received that were too long.
+.It Sy tx_late_collisions
+Late collisions on transmit.
+.It Sy uflo
+Underflow errors.
+.It Sy unknowns
+Frames received with no local recipient.
+.It Sy xcvr_addr
+Transceiver address.
+.It Sy xcvr_id
+Transceiver vendor and device ID.
+.It Sy xcvr_inuse
+Identifies the type of transceiver in use.  Values are as follows:
+.Bl -column "0"
+.It 0 Ta Unknown or undefined.
+.It 1 Ta None.
+.It 2 Ta 10 Mbps
+.It 3 Ta 100BASE-T4
+.It 4 Ta 100BASE-X
+.It 5 Ta 100BASE-T2
+.It 6 Ta 1000BASE-X
+.It 7 Ta 1000BASE-T
+.El
+.El
+.Ss Properties
+The following parameters are accessible with
+.Xr dladm 1M .
+Some of these are normally read-only.  Other properties that are not
+specific to IEEE 802.3 / Ethernet links are also available via
+.Xr dladm 1M ,
+and are documented in its man page rather than here.
+.
+.Bl -tag -width adv_1000hdx_cap
+.It Sy speed
+Link speed, in Mbps per second (dladm only).
+.It Sy duplex
+Link duplex, either "full" or "half".
+.It Sy state
+Link state, either "up" or "down".
+.It Sy mtu
+Maximum link frame size in bytes. See
+.Sx Jumbo Frames .
+.It Sy flowctrl
+Flow control setting, one of \(dqno\(dq, \(dqtx\(dq, \(dqrx\(dq, or \(dqbi\(dq.
+See
+.Sx Flow Control .
+.It Sy adv_10gfdx_cap
+Advertising 10 Gbps support.
+.It Sy en_10gfdx_cap
+Enable 10 Gbps support.
+.
+.It Sy adv_1000fdx_cap
+Advertising 1000 Mbps full-duplex support.
+.It Sy en_1000fdx_cap
+Enable 1000 Mbps full-duplex.
+.
+.It Sy adv_1000hdx_cap
+Advertising 1000 Mbps half-duplex support.
+.It Sy en_1000hdx_cap
+Enable 1000 Mbps half-duplex.
+.
+.It Sy adv_100fdx_cap
+Advertising 100 Mbps full-duplex support.
+.It Sy en_100fdx_cap
+Enable 100 Mbps full-duplex.
+.
+.It Sy adv_100hdx_cap
+Advertising 100 Mbps half-duplex support.
+.It Sy en_100hdx_cap
+Enable 100 Mbps half-duplex.
+.
+.It Sy adv_10fdx_cap
+Advertising 10 Mbps full-duplex support.
+.It Sy en_10fhdx_cap
+Enable 100 Mbps full-duplex.
+.
+.It Sy adv_10hdx_cap
+Advertising 10 Mbps half-duplex support.
+.It Sy en_10fhdx_cap
+Enable 10 Mbps half-duplex.
+.El
+.Ss Auto-negotiation
+With modern devices, auto-negotiation is normally handled automatically.  With
+10 Gbps and 1000 Gbps, it is mandatory.  (10GBASE-T also requires full-duplex
+operation.) It is also
+.Em strongly
+recommended for use whenever possible; without auto-negotiation the link
+will usually not operate unless both partners are configured to use the
+same link mode.
+.Lp
+Auto-negotiation, when enabled, takes place by comparing the local capabilities
+that have been advertised (which must also be supported by the local device),
+with the capabilities that have been advertised by the link partner (peer).
+.
+The first of the following modes that is supported by both partners is
+selected as the link negotiation result:
+.Lp
+.Bl -bullet -offset indent -compact
+.It
+10 Gbps (10gfdx)
+.It
+1000 Mbps full-duplex (1000fdx)
+.It
+1000 Mbps half-duplex (1000hdx)
+.It
+100 Mbps full-duplex (100fdx)
+.It
+100BASE-T4 (100T4)
+.It
+100 Mbps half-duplex (100hdx)
+.It
+10 Mbps full-duplex (10fdx)
+.It
+10 Mbps half-duplex (10hdx)
+.El
+.Lp
+Advertisement of these modes can be enabled or disabled by setting the
+appropriate
+.Sy en_
+property in
+.Xr dladm 1M .
+.Lp
+Auto-negotation may also be disabled, by setting the
+.Sy adv_autoneg_cap
+property to 0.  In this case, the highest enabled link mode (using the above
+list) is
+.Dq forced
+for the link.
+.Ss Flow Control
+Link layer flow control is available on many modern devices, and is mandatory
+for operation at 10 Gbps. It requires that the link be auto-negotiated, and
+that the link be full-duplex, in order to function.
+.Lp
+Flow control is applied when a receiver becomes congested.  In this case the
+receiver can send a special frame, called a pause frame, to request its
+partner cease transmitting for a short period of time.
+.Lp
+Flow control can be said to be either symmetric, in which case both partners
+can send and honor pause frames, or asymmetric, in which case one partner
+may not transmit pause frames.
+.Lp
+The flow control mode used is driven by the
+.Sy flowctrl
+property.  It has the following meanings:
+.Lp
+.Bl -column -compact -offset indent Dv
+.It \(dqno\(dq Ta Neither send, nor honor pause frames.
+.It \(dqtx\(dq Ta Send pause frames, provided that the peer can support them,
+but do not honor them.
+.It \(dqrx\(dq Ta Receive and honor pause frames.
+.It \(dqbi\(dq Ta Both send and receive (and honor) pause frames.
+.El
+.Lp
+The statistics for flow control
+.Po Sy adv_cap_pause , adv_cap_asmpause , lp_cap_pause , lp_cap_asmpause ,
+.Sy link_pause ,
+and
+.Sy link_asmpause
+.Pc
+are based on the properties exchanged in the auto-negotiation and are
+confusing as a result.  Administrators are advised to use the
+.Sy flowctrl
+property instead.
+.
+.Ss Jumbo Frames
+The IEEE 802.3 standard specifies a standard frame size of 1518 bytes,
+which includes a 4-byte frame checksum, a 14-byte header, and 1500 bytes
+of payload.  Most devices support larger frame sizes than this, and
+when all possible parties on the same local network can do so, it may be
+advantageous to choose a larger frame size; 9000 bytes is the most common
+option, as it allows a transport layer to convey 8 KB (8192) of data, while
+leaving room for various link, network, and transport layer headers.
+.Lp
+Note that the use of frames carrying more than 1500 bytes of payload is
+not standardized, even though it is common practice.
+.Lp
+The
+.Sy mtu
+property is used to configure the frame size.  Note that this is the size of
+the payload, and excludes the preamble, checksum, and header.  It also excludes
+the tag for devices that support tagging (see
+.Sx Virtual LANs
+below).
+.Lp
+Care must be taken to ensure that all communication parties agree on the same
+size, or communication may cease to function properly.
+.Lp
+Note that the
+.Sy mtu
+property refers to the link layer property.  It may be necessary to configure
+upper layer protocols such as IP to use a different size when this changes.
+See
+.Xr ifconfig 1M .
+.
+.Ss Virtual LANs
+Most devices support virtual LANs (and also priority control tagging) though
+the use of a 4-byte tag inserted between the frame header and payload.  The
+details of configuration of this are covered in the
+.Xr dladm 1M
+manual.
+.
+.Ss Data Link Provider Interface (DLPI) Details
+.
+The correct method for applications to access Ethernet devices directly
+is to use the DLPI. See
+.Xr dlpi 7P
+and
+.Xr libdlpi 3LIB
+for further information.
+.Lp
+The following DLPI parameters are presented to applications.
+.Bl -column -offset indent "Broadcast address"
+.It Maximum SDU Ta 1500 (or larger, as determined by the Sy mtu No property.)
+.It Minimum SDU Ta 0
+.It Address length Ta 6
+.It MAC type Ta Dv DL_ETHER
+.It SAP length Ta \(mi2
+.It Service mode Ta Dv DL_CLDLS
+.It Broadcast address Ta Li ff:ff:ff:ff:ff:ff No (6 bytes with all bits set)
+.El
+.Lp
+Note that if the application binds to SAP of 0, then standard IEEE 802.3
+mode is assumed and the frame length is stored in place of the Ethernet type.
+Frames that arrive with the type field set to 1500 or less, are delivered
+to applications that bind to SAP 0.
+.Lp
+Ethernet drivers on the support both DLPI style 1 and style 2 operation.
+Additionally, it is possible to configure provide
+.Dq vanity
+names to interfaces using the
+.Xr dladm 1M
+.Sy rename-link
+subcommand.  Such vanity names are only accessible using DLPI style 1.
+.Sh NOTES
+There may be other mechanisms available to configure link layer properties.
+Historically the
+.Xr ndd 1M
+command, and
+.Xr driver.conf 4
+files could be used to do this.  These methods are deprecated in favor of
+.Xr dladm 1M
+properties.
+.
+.Sh INTERFACE STABILITY
+When present, the statistics and properties presented here
+are
+.Sy Committed .
+However, note that not every Ethernet device supports all of these,
+and some devices may support additional statistics and properties.
+.Lp
+The DLPI and IEEE 802.3 itself are
+.Sy Standard .
+.Sh SEE ALSO
+.Xr dladm 1M ,
+.Xr ifconfig 1M ,
+.Xr kstat 1M ,
+.Xr netstat 1M ,
+.Xr ndd 1M ,
+.Xr libdlpi 3LIB ,
+.Xr driver.conf 4 ,
+.Xr dlpi 7P
+.Rs
+.%T IEEE 802.3: Ethernet
+.%Q IEEE Standards Association
+.Re
+.Rs
+.%B Data Link Provider Interface (DLPI)
+.%Q The Open Group
+.%D 1997
+.Re
+.Rs
+.%B STREAMs Programming Guide
+.%Q Sun Microsystems, Inc.
+.%D January 2005
+.Re

@@ -344,7 +344,7 @@ void
 crhold(cred_t *cr)
 {
 	ASSERT(cr->cr_ref != 0xdeadbeef && cr->cr_ref != 0);
-	atomic_add_32(&cr->cr_ref, 1);
+	atomic_inc_32(&cr->cr_ref);
 }
 
 /*
@@ -355,7 +355,7 @@ void
 crfree(cred_t *cr)
 {
 	ASSERT(cr->cr_ref != 0xdeadbeef && cr->cr_ref != 0);
-	if (atomic_add_32_nv(&cr->cr_ref, -1) == 0) {
+	if (atomic_dec_32_nv(&cr->cr_ref) == 0) {
 		ASSERT(cr != kcred);
 		if (cr->cr_label)
 			label_rele(cr->cr_label);
@@ -1467,12 +1467,12 @@ crsetcredgrp(cred_t *cr, credgrp_t *grps)
 void
 crgrprele(credgrp_t *grps)
 {
-	if (atomic_add_32_nv(&grps->crg_ref, -1) == 0)
+	if (atomic_dec_32_nv(&grps->crg_ref) == 0)
 		kmem_free(grps, CREDGRPSZ(grps->crg_ngroups));
 }
 
 static void
 crgrphold(credgrp_t *grps)
 {
-	atomic_add_32(&grps->crg_ref, 1);
+	atomic_inc_32(&grps->crg_ref);
 }

@@ -20,6 +20,8 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -38,8 +40,6 @@
 #ifndef	_ISO_WCHAR_C99_H
 #define	_ISO_WCHAR_C99_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -57,8 +57,6 @@ extern "C" {
 #define	vwscanf		_vwscanf_c89
 #endif
 #endif /* !defined(_LP64) && !defined(_LONGLONG_TYPE) */
-
-#ifdef __STDC__
 
 #if defined(_STDC_C99) || \
 	(!defined(_STRICT_STDC) && !defined(__XOPEN_OR_POSIX)) || \
@@ -80,20 +78,6 @@ extern unsigned long long wcstoull(const wchar_t *_RESTRICT_KYWD,
 #endif /* defined(_LONGLONG_TYPE) */
 
 #endif /* defined(_STDC_C99) || (!defined(_STRICT_STDC)... */
-
-#else /* __STDC__ */
-
-#if !defined(__XOPEN_OR_POSIX) || defined(_XPG6) || defined(__EXTENSIONS__)
-extern int 	vfwscanf();
-extern int 	vswscanf();
-extern int 	vwscanf();
-extern float 	wcstof();
-extern long double wcstold();
-extern long int wcstoll();
-extern long int wcstoull();
-#endif /* !defined(__XOPEN_OR_POSIX) || defined(_XPG6) ... */
-
-#endif /* __STDC__ */
 
 #ifdef	__cplusplus
 }

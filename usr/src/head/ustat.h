@@ -19,14 +19,15 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ */
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
 #ifndef _USTAT_H
 #define	_USTAT_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.3.1.6 */
 
 #include <sys/types.h>
 #include <sys/ustat.h>
@@ -35,11 +36,7 @@
 extern "C" {
 #endif
 
-#if defined(__STDC__)
 extern int ustat(dev_t, struct ustat *);
-#else
-extern int ustat();
-#endif	/* end defined(_STDC) */
 
 #ifdef	__cplusplus
 }

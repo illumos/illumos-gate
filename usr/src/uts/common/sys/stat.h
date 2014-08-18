@@ -20,6 +20,7 @@
  */
 
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -480,8 +481,6 @@ struct stat64_32 {
 
 #if !defined(_KERNEL) || defined(_BOOT)
 
-#if defined(__STDC__)
-
 #if !defined(__XOPEN_OR_POSIX) || (_POSIX_C_SOURCE > 2) || \
 	defined(_XPG4_2) || defined(__EXTENSIONS__)
 extern int fchmod(int, mode_t);
@@ -514,43 +513,6 @@ extern int fchmodat(int, const char *, mode_t, int);
 extern int futimens(int, const struct timespec[2]);
 extern int utimensat(int, const char *, const struct timespec[2], int);
 #endif	/* defined(__EXTENSIONS__) ... */
-
-#else /* !__STDC__ */
-
-#if !defined(__XOPEN_OR_POSIX) || (_POSIX_C_SOURCE > 2) || \
-	defined(_XPG4_2) || defined(__EXTENSIONS__)
-extern int fchmod();
-#endif /* !defined(__XOPEN_OR_POSIX) || (_POSIX_C_SOURCE > 2)... */
-
-extern int chmod();
-extern int mkdir();
-extern int mkfifo();
-extern mode_t umask();
-
-/* transitional large file interfaces */
-#if	defined(_LARGEFILE64_SOURCE) && !((_FILE_OFFSET_BITS == 64) && \
-	    !defined(__PRAGMA_REDEFINE_EXTNAME))
-extern int fstat64();
-extern int stat64();
-extern int lstat64();
-#if !defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__) || \
-	defined(_ATFILE_SOURCE)
-extern int fstatat64();
-#endif /* defined (_ATFILE_SOURCE) */
-#endif
-
-#if defined(__EXTENSIONS__) || defined(_ATFILE_SOURCE) || \
-	(!defined(_STRICT_STDC) && !defined(__XOPEN_OR_POSIX))
-	/* || defined(_XPG7) */
-extern int mkdirat();
-extern int mkfifoat();
-extern int mknodat();
-extern int fchmodat();
-extern int futimens();
-extern int utimensat();
-#endif	/* defined(__EXTENSIONS__) ... */
-
-#endif /* defined(__STDC__) */
 
 #include <sys/stat_impl.h>
 

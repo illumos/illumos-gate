@@ -19,6 +19,8 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -134,11 +136,7 @@ void e_ddi_return_instance(dev_info_t *cdip, char *addr, in_node_t *cnp);
 
 
 #else	/* _KERNEL */
-#ifdef __STDC__
 extern int inst_sync(char *pathname, int flags);
-#else
-extern int inst_sync();
-#endif	/* __STDC__ */
 #endif	/* _KERNEL */
 
 #define	INST_SYNC_IF_REQUIRED	0

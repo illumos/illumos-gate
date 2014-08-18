@@ -20,6 +20,7 @@
  */
 
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -215,19 +216,11 @@ extern unsigned char	 _sibuf[], _sobuf[];
 /* large file compilation environment setup */
 #if !defined(_LP64) && _FILE_OFFSET_BITS == 64
 #if !defined(__PRAGMA_REDEFINE_EXTNAME)
-#if defined(__STDC__)
 extern FILE	*fopen64(const char *, const char *);
 extern FILE	*freopen64(const char *, const char *, FILE *);
 extern FILE	*tmpfile64(void);
 extern int	fgetpos64(FILE *, fpos_t *);
 extern int	fsetpos64(FILE *, const fpos_t *);
-#else	/* defined(__STDC__) */
-extern FILE	*fopen64();
-extern FILE	*freopen64();
-extern FILE	*tmpfile64();
-extern int	fgetpos64();
-extern int	fsetpos64();
-#endif	/* defined(__STDC__) */
 #define	fopen			fopen64
 #define	freopen			freopen64
 #define	tmpfile			tmpfile64
@@ -268,8 +261,6 @@ typedef long	ssize_t;	/* size of something in bytes or -1 */
 typedef int	ssize_t;	/* (historical version) */
 #endif
 #endif	/* !_SSIZE_T */
-
-#if defined(__STDC__)
 
 #if defined(__EXTENSIONS__) || \
 	(!defined(_STRICT_STDC) && !defined(__XOPEN_OR_POSIX)) || \
@@ -371,94 +362,11 @@ extern int	fseeko64(FILE *, off64_t, int);
 extern off64_t	ftello64(FILE *);
 #endif
 
-#else	/* !defined __STDC__ */
-
-#ifndef	_LP64
-#define	_bufend(p)	((fileno(p) < _NFILE) ? _bufendtab[fileno(p)] : \
-			(unsigned char *)_realbufend(p))
-#define	_bufsiz(p)	(_bufend(p) - (p)->_base)
-#endif	/*	_LP64	*/
-
-#if defined(__EXTENSIONS__) || !defined(__XOPEN_OR_POSIX) || \
-	defined(_REENTRANT)
-extern char	*tmpnam_r();
-#endif
-
-#if defined(__EXTENSIONS__) || !defined(__XOPEN_OR_POSIX)
-extern int fcloseall();
-extern void setbuffer();
-extern int setlinebuf();
-extern int asprintf();
-extern int vasprintf();
-#endif
-
-#if defined(__EXTENSIONS__) || !defined(__XOPEN_OR_POSIX)
-	/* || defined(_XPG7) */
-extern ssize_t getdelim();
-extern ssize_t getline();
-#endif	/* __EXTENSIONS__ ... */
-
-#if defined(__EXTENSIONS__) || defined(__XOPEN_OR_POSIX)
-extern FILE	*fdopen();
-extern char	*ctermid();
-extern int	fileno();
-#endif	/* defined(__EXTENSIONS__) || defined(__XOPEN_OR_POSIX) */
-
-#if defined(__EXTENSIONS__) || defined(_REENTRANT) || \
-	    (_POSIX_C_SOURCE - 0 >= 199506L)
-extern void	flockfile();
-extern int	ftrylockfile();
-extern void	funlockfile();
-extern int	getc_unlocked();
-extern int	getchar_unlocked();
-extern int	putc_unlocked();
-extern int	putchar_unlocked();
-#endif	/* defined(__EXTENSIONS__) || defined(_REENTRANT).. */
-
-#if defined(__EXTENSIONS__) || defined(_XOPEN_SOURCE)
-extern FILE	*popen();
-extern char	*tempnam();
-extern int	pclose();
-
-#if !defined(_XOPEN_SOURCE)
-extern int	getsubopt();
-#endif /* !defined(_XOPEN_SOURCE) */
-
-#if !defined(_XPG6) || defined(__EXTENSIONS__)
-extern char	*cuserid();
-extern int	getopt();
-extern char	*optarg;
-extern int	optind, opterr, optopt;
-extern int	getw();
-extern int	putw();
-#endif /* !defined(_XPG6) || defined(__EXTENSIONS__) */
-
-#endif	/* defined(__EXTENSIONS__) || defined(_XOPEN_SOURCE) */
-
-#if defined(_LARGEFILE_SOURCE) || defined(_XPG5)
-extern int	fseeko();
-extern off_t	ftello();
-#endif
-
-#if defined(_LARGEFILE64_SOURCE) && !((_FILE_OFFSET_BITS == 64) && \
-	    !defined(__PRAGMA_REDEFINE_EXTNAME))
-extern FILE	*fopen64();
-extern FILE	*freopen64();
-extern FILE	*tmpfile64();
-extern int	fgetpos64();
-extern int	fsetpos64();
-extern int	fseeko64();
-extern off64_t	ftello64();
-#endif
-
-#endif	/* __STDC__ */
-
 #if !defined(__lint)
 
 #if defined(__EXTENSIONS__) || defined(_REENTRANT) || \
 	    (_POSIX_C_SOURCE - 0 >= 199506L)
 #ifndef	_LP64
-#ifdef	__STDC__
 #define	getc_unlocked(p)	(--(p)->_cnt < 0 \
 					? __filbuf(p) \
 					: (int)*(p)->_ptr++)
@@ -466,15 +374,6 @@ extern off64_t	ftello64();
 					? __flsbuf((x), (p)) \
 					: (int)(*(p)->_ptr++ = \
 					(unsigned char) (x)))
-#else
-#define	getc_unlocked(p)	(--(p)->_cnt < 0 \
-					? _filbuf(p) \
-					: (int)*(p)->_ptr++)
-#define	putc_unlocked(x, p)	(--(p)->_cnt < 0 \
-					? _flsbuf((x), (p)) \
-					: (int)(*(p)->_ptr++ = \
-					(unsigned char) (x)))
-#endif	/* __STDC__ */
 #endif	/* _LP64 */
 #define	getchar_unlocked()	getc_unlocked(stdin)
 #define	putchar_unlocked(x)	putc_unlocked((x), stdout)

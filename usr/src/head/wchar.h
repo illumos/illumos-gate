@@ -120,8 +120,6 @@ typedef	int	wctype_t;
 typedef __va_list va_list;
 #endif  /* defined(_XPG6) && !defined(_VA_LIST) */
 
-#ifdef __STDC__
-
 #if !defined(_STRICT_STDC) || defined(_XOPEN_SOURCE) || defined(__EXTENSIONS__)
 #if __cplusplus >= 199711L
 namespace std {
@@ -191,45 +189,6 @@ extern size_t mbsnrtowcs(wchar_t *_RESTRICT_KYWD, const char **_RESTRICT_KYWD,
     size_t, size_t, mbstate_t *_RESTRICT_KYWD);
 
 #endif	/* defined(_XPG7) || !defined(_STRICT_SYMBOLS) */
-
-#else /* __STDC__ */
-
-#if !defined(_STRICT_STDC) || defined(_XOPEN_SOURCE) || defined(__EXTENSIONS__)
-extern  int iswalpha();
-extern  int iswupper();
-extern  int iswlower();
-extern  int iswdigit();
-extern  int iswxdigit();
-extern  int iswalnum();
-extern  int iswspace();
-extern  int iswpunct();
-extern  int iswprint();
-extern  int iswgraph();
-extern  int iswcntrl();
-extern  int iswctype();
-extern  wint_t towlower();
-extern  wint_t towupper();
-extern wchar_t *wcswcs();
-extern int wcswidth();
-extern int wcwidth();
-extern wctype_t wctype();
-#endif /* !defined(_STRICT_STDC) || defined(_XOPEN_SOURCE)... */
-
-#if defined(_XGP7) || !defined(_STRICT_SYMBOLS)
-extern size_t wcsnlen();
-extern wchar_t *wcpcpy();
-extern wchar_t *wcpncpy();
-extern size_t wcsxfrm_l();
-extern int wcscoll_l();
-extern wchar_t *wcsdup();
-extern int wcscasecmp();
-extern int wcscasecmp_l();
-extern int wcsncasecmp();
-extern int wcsncasecmp_l();
-extern size_t mbsnrtowcs();
-#endif
-
-#endif /* __STDC__ */
 
 #ifdef	__cplusplus
 }

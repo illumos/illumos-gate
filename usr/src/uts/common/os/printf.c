@@ -167,7 +167,7 @@ out:
 			new = old + len;
 			if (new >= PANICBUFSIZE)
 				new = panicbuf_log + len;
-		} while (cas32(&panicbuf_index, old, new) != old);
+		} while (atomic_cas_32(&panicbuf_index, old, new) != old);
 		bcopy(body, &panicbuf[new - len], len);
 	}
 	if (bufp != buf)

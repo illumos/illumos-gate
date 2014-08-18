@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -284,7 +282,7 @@ try_again:
 	rw_enter(&fmodsw_lock, RW_READER);
 	if (i_fmodsw_hash_find(name, &fp) == 0) {
 		if (flags & FMODSW_HOLD) {
-			atomic_add_32(&(fp->f_ref), 1);	/* lock must be held */
+			atomic_inc_32(&(fp->f_ref));	/* lock must be held */
 			ASSERT(fp->f_ref > 0);
 		}
 
@@ -308,5 +306,5 @@ void
 fmodsw_rele(fmodsw_impl_t *fp)
 {
 	ASSERT(fp->f_ref > 0);
-	atomic_add_32(&(fp->f_ref), -1);
+	atomic_dec_32(&(fp->f_ref));
 }

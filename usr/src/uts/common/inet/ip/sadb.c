@@ -1731,7 +1731,7 @@ sadb_keysock_hello(queue_t **pfkey_qp, queue_t *q, mblk_t *mp,
 	 * messages.
 	 */
 
-	oldq = casptr((void **)pfkey_qp, NULL, OTHERQ(q));
+	oldq = atomic_cas_ptr((void **)pfkey_qp, NULL, OTHERQ(q));
 	if (oldq != NULL) {
 		ASSERT(oldq != q);
 		cmn_err(CE_WARN, "Danger!  Multiple keysocks on top of %s.\n",
@@ -1746,8 +1746,8 @@ sadb_keysock_hello(queue_t **pfkey_qp, queue_t *q, mblk_t *mp,
 	kha->ks_hello_satype = (uint8_t)satype;
 
 	/*
-	 * If we made it past the casptr, then we have "exclusive" access
-	 * to the timeout handle.  Fire it off after the default ager
+	 * If we made it past the atomic_cas_ptr, then we have "exclusive"
+	 * access to the timeout handle.  Fire it off after the default ager
 	 * interval.
 	 */
 	*top = qtimeout(*pfkey_qp, ager, agerarg,

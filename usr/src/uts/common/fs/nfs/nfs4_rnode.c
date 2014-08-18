@@ -647,7 +647,7 @@ start:
 		rp = kmem_cache_alloc(rnode4_cache, KM_SLEEP);
 		new_vp = vn_alloc(KM_SLEEP);
 
-		atomic_add_long((ulong_t *)&rnode4_new, 1);
+		atomic_inc_ulong((ulong_t *)&rnode4_new);
 #ifdef DEBUG
 		clstat4_debug.nrnode.value.ui64++;
 #endif
@@ -1220,7 +1220,7 @@ destroy_rnode4(rnode4_t *rp)
 	vfsp = vp->v_vfsp;
 
 	uninit_rnode4(rp);
-	atomic_add_long((ulong_t *)&rnode4_new, -1);
+	atomic_dec_ulong((ulong_t *)&rnode4_new);
 #ifdef DEBUG
 	clstat4_debug.nrnode.value.ui64--;
 #endif

@@ -373,7 +373,7 @@ mac_bcast_add(mac_client_impl_t *mcip, const uint8_t *addr, uint16_t vid,
 			flow_desc.fd_mask |= FLOW_LINK_VID;
 		}
 
-		grp->mbg_id = atomic_add_32_nv(&mac_bcast_id, 1);
+		grp->mbg_id = atomic_inc_32_nv(&mac_bcast_id);
 		(void) sprintf(flow_name,
 		    "mac/%s/mcast%d", mip->mi_name, grp->mbg_id);
 

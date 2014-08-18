@@ -3148,7 +3148,7 @@ nfs_free_mi4(mntinfo4_t *mi)
 void
 mi_hold(mntinfo4_t *mi)
 {
-	atomic_add_32(&mi->mi_count, 1);
+	atomic_inc_32(&mi->mi_count);
 	ASSERT(mi->mi_count != 0);
 }
 
@@ -3156,7 +3156,7 @@ void
 mi_rele(mntinfo4_t *mi)
 {
 	ASSERT(mi->mi_count != 0);
-	if (atomic_add_32_nv(&mi->mi_count, -1) == 0) {
+	if (atomic_dec_32_nv(&mi->mi_count) == 0) {
 		nfs_free_mi4(mi);
 	}
 }
@@ -4111,7 +4111,7 @@ again:
 void
 fn_hold(nfs4_fname_t *fnp)
 {
-	atomic_add_32(&fnp->fn_refcnt, 1);
+	atomic_inc_32(&fnp->fn_refcnt);
 	NFS4_DEBUG(nfs4_fname_debug, (CE_NOTE,
 	    "fn_hold %p:%s, new refcnt=%d",
 	    (void *)fnp, fnp->fn_name, fnp->fn_refcnt));
@@ -4137,7 +4137,7 @@ recur:
 	parent = fnp->fn_parent;
 	if (parent != NULL)
 		mutex_enter(&parent->fn_lock);	/* prevent new references */
-	newref = atomic_add_32_nv(&fnp->fn_refcnt, -1);
+	newref = atomic_dec_32_nv(&fnp->fn_refcnt);
 	if (newref > 0) {
 		NFS4_DEBUG(nfs4_fname_debug, (CE_NOTE,
 		    "fn_rele %p:%s, new refcnt=%d",

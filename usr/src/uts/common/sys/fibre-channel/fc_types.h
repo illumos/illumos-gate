@@ -19,6 +19,8 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -60,11 +62,7 @@ extern "C" {
 #ifndef	_SYS_SCSI_SCSI_TYPES_H
 
 
-#ifdef	__STDC__
 typedef void *opaque_t;
-#else	/* __STDC__ */
-typedef char *opaque_t;
-#endif	/* __STDC__ */
 
 #endif /* _SYS_SCSI_SCSI_TYPES_H */
 

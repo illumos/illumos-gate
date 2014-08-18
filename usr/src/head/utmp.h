@@ -24,6 +24,8 @@
 
 
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -31,8 +33,6 @@
 
 #ifndef _UTMP_H
 #define	_UTMP_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.5.1.7 */
 
 /*
  * Note:  The getutent(3c) family of interfaces are obsolete.
@@ -151,7 +151,6 @@ struct futmp {
 #define	setuser(ut)	((ut).ut_exit.e_exit = NONROOT_USR)
 
 
-#if defined(__STDC__)
 extern void endutent(void);
 extern struct utmp *getutent(void);
 extern struct utmp *getutid(const struct utmp *);
@@ -159,15 +158,6 @@ extern struct utmp *getutline(const struct utmp *);
 extern struct utmp *pututline(const struct utmp *);
 extern void setutent(void);
 extern int utmpname(const char *);
-#else
-extern void endutent();
-extern struct utmp *getutent();
-extern struct utmp *getutid();
-extern struct utmp *getutline();
-extern struct utmp *pututline();
-extern void setutent();
-extern int utmpname();
-#endif
 
 #endif /* !defined(_XPG4_2) || defined(__EXTENSIONS__) */
 

@@ -1300,7 +1300,7 @@ xnb_txbuf_constructor(void *buf, void *arg, int kmflag)
 
 	DTRACE_PROBE(txbuf_allocated);
 
-	atomic_add_32(&xnbp->xnb_tx_buf_count, 1);
+	atomic_inc_32(&xnbp->xnb_tx_buf_count);
 	xnbp->xnb_tx_buf_outstanding++;
 
 	return (0);
@@ -1326,7 +1326,7 @@ xnb_txbuf_destructor(void *buf, void *arg)
 	ddi_dma_mem_free(&txp->xt_acc_handle);
 	ddi_dma_free_handle(&txp->xt_dma_handle);
 
-	atomic_add_32(&xnbp->xnb_tx_buf_count, -1);
+	atomic_dec_32(&xnbp->xnb_tx_buf_count);
 }
 
 /*

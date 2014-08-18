@@ -21,6 +21,7 @@
  */
 
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  * Copyright 1985, 1992 by Mortice Kern Systems Inc.  All rights reserved.
  */
 
@@ -159,18 +160,9 @@ typedef	struct	glob_t	{
 #define	globfree	_globfree_ext
 #endif /* __PRAGMA_REDEFINE_EXTNAME */
 
-#if defined(__STDC__)
-
 extern int glob(const char *_RESTRICT_KYWD, int, int(*)(const char *, int),
 		glob_t *_RESTRICT_KYWD);
 extern void globfree(glob_t *);
-
-#else /* __STDC__ */
-
-extern int glob();
-extern void globfree();
-
-#endif /* __STDC__ */
 
 #ifdef	__cplusplus
 }

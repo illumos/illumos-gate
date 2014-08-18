@@ -4043,7 +4043,7 @@ rsm_intr_event(rsmipc_request_t *msg)
 				seg = (rsmseg_t *)p;
 				rsmseglock_acquire(seg);
 
-				atomic_add_32(&seg->s_pollevent, 1);
+				atomic_inc_32(&seg->s_pollevent);
 
 				if (seg->s_pollflag & RSM_SEGMENT_POLL)
 					pollwakeup(&seg->s_poll, POLLRDNORM);
@@ -4064,7 +4064,7 @@ rsm_intr_event(rsmipc_request_t *msg)
 
 		ASSERT(rsmseglock_held(seg));
 
-		atomic_add_32(&seg->s_pollevent, 1);
+		atomic_inc_32(&seg->s_pollevent);
 
 		/*
 		 * We must hold the segment lock here, or else the segment
@@ -5502,7 +5502,7 @@ again:
 			    e, no_reply_cnt));
 			ASSERT(e != RSMERR_QUEUE_FENCE_UP &&
 			    e != RSMERR_BAD_BARRIER_HNDL);
-			atomic_add_64(&rsm_ipcsend_errcnt, 1);
+			atomic_inc_64(&rsm_ipcsend_errcnt);
 			goto again;
 		} else {
 			DBG_PRINTF((category, RSM_DEBUG_VERBOSE,
@@ -5533,7 +5533,7 @@ again:
 			DBG_PRINTF((category, RSM_ERR,
 			    "rsm: rsmipc_send reply send"
 			    " err = %d\n", e));
-			atomic_add_64(&rsm_ipcsend_errcnt, 1);
+			atomic_inc_64(&rsm_ipcsend_errcnt);
 			goto again;
 		} else {
 			DBG_PRINTF((category, RSM_DEBUG_VERBOSE,
@@ -5639,7 +5639,7 @@ again:
 			RSMIPC_CLEAR(rslot, RSMIPC_PENDING);
 			rsmipc_free(rslot);
 			rele_sendq_token(sendq_token);
-			atomic_add_64(&rsm_ipcsend_errcnt, 1);
+			atomic_inc_64(&rsm_ipcsend_errcnt);
 			goto again;
 		}
 
@@ -5935,7 +5935,7 @@ rsmipc_send_controlmsg(path_t *path, int msgtype)
 			break;
 		}
 		/* error counter for statistics */
-		atomic_add_64(&rsm_ctrlmsg_errcnt, 1);
+		atomic_inc_64(&rsm_ctrlmsg_errcnt);
 
 		DBG_PRINTF((category, RSM_ERR,
 		    "rsmipc_send_controlmsg:rsm_send error=%d", e));
@@ -6449,7 +6449,7 @@ rsm_connect(rsmseg_t *seg, rsm_ioctlmsg_t *msg, cred_t *cred,
 	seg->s_flags &= ~RSM_IMPORT_DUMMY;	/* clear dummy flag */
 	if (bar_va) {
 		/* increment generation number on barrier page */
-		atomic_add_16(bar_va + seg->s_hdr.rsmrc_num, 1);
+		atomic_inc_16(bar_va + seg->s_hdr.rsmrc_num);
 		/* return user off into barrier page where status will be */
 		msg->off = (int)seg->s_hdr.rsmrc_num;
 		msg->gnum = bar_va[msg->off]; 	/* gnum race */
@@ -6685,7 +6685,7 @@ rsm_closeconnection(rsmseg_t *seg, void **cookie)
 
 	/* increment generation number on barrier page */
 	if (bar_va) {
-		atomic_add_16(bar_va + seg->s_hdr.rsmrc_num, 1);
+		atomic_inc_16(bar_va + seg->s_hdr.rsmrc_num);
 	}
 
 	/*
@@ -7284,7 +7284,7 @@ rsm_consumeevent_ioctl(caddr_t arg, int mode)
 			    seg));
 			if (seg->s_pollevent) {
 				/* consume the event */
-				atomic_add_32(&seg->s_pollevent, -1);
+				atomic_dec_32(&seg->s_pollevent);
 				event_list[i].revent = POLLRDNORM;
 			}
 			rsmseglock_release(seg);

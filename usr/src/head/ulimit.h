@@ -19,6 +19,9 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ */
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
@@ -26,19 +29,13 @@
 #ifndef _ULIMIT_H
 #define	_ULIMIT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.4	*/
-
 #include <sys/ulimit.h>
 
 #ifdef	__cplusplus
 extern "C" {
 #endif
 
-#ifdef __STDC__
 extern long ulimit(int, ...);
-#else
-extern long ulimit();
-#endif
 
 #ifdef	__cplusplus
 }

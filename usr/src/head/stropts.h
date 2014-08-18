@@ -22,16 +22,15 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_STROPTS_H
 #define	_STROPTS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.6	*/
 
 /*
  * Streams user options definitions.
@@ -43,8 +42,6 @@
 #ifdef	__cplusplus
 extern "C" {
 #endif
-
-#if defined(__STDC__)
 
 extern int isastream(int);
 
@@ -64,8 +61,6 @@ extern int putpmsg(int, const struct strbuf *, const struct strbuf *, int, int);
 extern int ioctl(int, int, ...);
 extern int fattach(int, const char *);
 extern int fdetach(const char *);
-
-#endif
 
 #ifdef	__cplusplus
 }

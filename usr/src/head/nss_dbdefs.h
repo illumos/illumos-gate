@@ -19,6 +19,8 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
@@ -234,17 +236,12 @@ extern "C" {
  * The nss_groupstr_t routine does the real work for any backend
  * that can supply a netgroup entry as a string in /etc/group format
  */
-#if defined(__STDC__)
 typedef int		(*nss_str2ent_t)(const char *in, int inlen,
 				void *ent, char *buf, int buflen);
 
 struct nss_groupsbymem;		/* forward definition */
 typedef nss_status_t	(*nss_groupstr_t)(const char *instr, int inlen,
 				struct nss_groupsbymem *);
-#else
-typedef int		(*nss_str2ent_t)();
-typedef nss_status_t	(*nss_groupstr_t)();
-#endif
 
 /*
  * The initgroups() function [see initgroups(3c)] needs to find all the
@@ -376,13 +373,8 @@ typedef struct {
 	int		buflen;		/* "buflen"     "             "      */
 } nss_XbyY_buf_t;
 
-#if defined(__STDC__)
 extern nss_XbyY_buf_t	*_nss_XbyY_buf_alloc(int struct_size, int buffer_size);
 extern void		 _nss_XbyY_buf_free(nss_XbyY_buf_t *);
-#else
-extern nss_XbyY_buf_t	*_nss_XbyY_buf_alloc();
-extern void		 _nss_XbyY_buf_free();
-#endif
 
 #define	NSS_XbyY_ALLOC(bufpp, str_size, buf_size)		(\
 	(*bufpp) == 0						\
@@ -453,12 +445,8 @@ typedef union nss_XbyY_key {	/* No tag; backend should know what to expect */
 } nss_XbyY_key_t;
 
 
-#if defined(__STDC__)
 typedef int		(*nss_key2str_t)(void *buffer, size_t buflen,
 				nss_XbyY_key_t *key, size_t *len);
-#else
-typedef int		(*nss_key2str_t)();
-#endif
 
 
 typedef struct nss_XbyY_args {
@@ -689,7 +677,6 @@ typedef struct {
 	((nss_pheader_t *)(buf))->p_ruid == (ruid) && \
 	((nss_pheader_t *)(buf))->p_euid == (euid))
 
-#if defined(__STDC__)
 extern char		**_nss_netdb_aliases(const char *, int, char *, int);
 extern nss_status_t	nss_default_key2str(void *, size_t, nss_XbyY_args_t *,
 					const char *, int, size_t *);
@@ -703,14 +690,6 @@ extern void		nss_packed_set_status(void *, size_t, nss_status_t,
 					nss_XbyY_args_t *);
 extern nss_status_t	nss_packed_getkey(void *, size_t, char **, int *,
 					nss_XbyY_args_t *);
-#else
-extern char		**_nss_netdb_aliases();
-extern int		nss_default_key2str();
-extern nss_status_t	nss_packed_arg_init();
-extern nss_status_t	nss_packed_context_init();
-extern void		nss_packed_set_status();
-extern nss_status_t	nss_packed_getkey();
-#endif
 
 /*
  * nss_dbop_t values for searches with various keys;  values for

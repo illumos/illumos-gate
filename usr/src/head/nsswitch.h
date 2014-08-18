@@ -19,6 +19,8 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -34,8 +36,6 @@
 
 #ifndef _NSSWITCH_H
 #define	_NSSWITCH_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -125,20 +125,10 @@ struct __nsw_switchconfig {
 		: \
 			__nsw_extended_action(lkp, err)))
 
-#ifdef __STDC__
-
 struct __nsw_switchconfig *__nsw_getconfig
 	(const char *, enum __nsw_parse_err *);
 int __nsw_freeconfig(struct __nsw_switchconfig *);
 action_t __nsw_extended_action(struct __nsw_lookup *, int);
-
-#else
-
-struct __nsw_switchconfig *__nsw_getconfig();
-int __nsw_freeconfig();
-action_t __nsw_extended_action();
-
-#endif /* __STDC__ */
 
 #ifdef	__cplusplus
 }

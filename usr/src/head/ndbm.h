@@ -20,6 +20,8 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 1989 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -38,8 +40,6 @@
 
 #ifndef _NDBM_H
 #define	_NDBM_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/feature_tests.h>
 #include <sys/types.h>
@@ -90,7 +90,6 @@ typedef struct {
 } datum;
 #endif
 
-#ifdef	__STDC__
 DBM	*dbm_open(const char *, int, mode_t);
 void	dbm_close(DBM *);
 datum	dbm_fetch(DBM *, datum);
@@ -100,17 +99,6 @@ int	dbm_delete(DBM *, datum);
 int	dbm_store(DBM *, datum, datum, int);
 int	dbm_clearerr(DBM *);
 int	dbm_error(DBM *);
-#else
-DBM	*dbm_open();
-void	dbm_close();
-datum	dbm_fetch();
-datum	dbm_firstkey();
-datum	dbm_nextkey();
-int	dbm_delete();
-int	dbm_store();
-int	dbm_clearerr();
-int	dbm_error();
-#endif
 
 #define	_DBM_RDONLY	0x1	/* data base open read-only */
 #define	_DBM_IOERR	0x2	/* data base I/O error */

@@ -24,11 +24,10 @@
 
 
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- */
-/*
- * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  */
 
 #ifndef _CTYPE_H
@@ -63,8 +62,6 @@ using std::isblank;
 #ifdef	__cplusplus
 extern "C" {
 #endif
-
-#if defined(__STDC__)
 
 #if defined(__EXTENSIONS__) || \
 	((!defined(_STRICT_STDC) && !defined(_POSIX_C_SOURCE)) || \
@@ -112,19 +109,6 @@ extern int isupper_l(int, locale_t);
 extern int isxdigit_l(int, locale_t);
 
 #endif /* defined(_XPG7) || !defined(_STRICT_SYMBOLS) */
-
-#else	/* defined(__STDC__) */
-
-#if !defined(__lint)
-
-#define	isascii(c)	(!(((int)(c)) & ~0177))
-#define	_toupper(c)	(isascii(c) ? __trans_upper[(int)(c)] : toupper(c))
-#define	_tolower(c)	(isascii(c) ? __trans_lower[(int)(c)] : tolower(c))
-#define	toascii(c)	(((int)(c)) & 0177)
-
-#endif	/* !defined(__lint) */
-
-#endif	/* defined(__STDC__) */
 
 #ifdef	__cplusplus
 }

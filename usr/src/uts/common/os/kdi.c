@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/cpuvar.h>
 #include <sys/kdi_impl.h>
 #include <sys/reboot.h>
@@ -151,7 +149,7 @@ kdi_dtrace_set(kdi_dtrace_set_t transition)
 		default:
 			return (EINVAL);
 		}
-	} while (cas32((uint_t *)&kdi_dtrace_state, cur, new) != cur);
+	} while (atomic_cas_32((uint_t *)&kdi_dtrace_state, cur, new) != cur);
 
 	return (0);
 }

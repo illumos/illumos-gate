@@ -4237,7 +4237,7 @@ leaky_bucket_timeout(void *arg)
 
 	for (i = 0; i < mem_ce_simm_size; i++) {
 		if (psimm[i].leaky_bucket_cnt > 0)
-			atomic_add_16(&psimm[i].leaky_bucket_cnt, -1);
+			atomic_dec_16(&psimm[i].leaky_bucket_cnt);
 	}
 	add_leaky_bucket_timeout();
 }
@@ -4324,7 +4324,7 @@ ce_count_unum(int status, int len, char *unum)
 	/*
 	 * Initialize the leaky_bucket timeout
 	 */
-	if (casptr(&leaky_bucket_timeout_id,
+	if (atomic_cas_ptr(&leaky_bucket_timeout_id,
 	    TIMEOUT_NONE, TIMEOUT_SET) == TIMEOUT_NONE)
 		add_leaky_bucket_timeout();
 
@@ -4382,8 +4382,8 @@ ce_count_unum(int status, int len, char *unum)
 			} else if (status & ECC_PERSISTENT) {
 				int new_value;
 
-				new_value = atomic_add_16_nv(
-				    &psimm[i].leaky_bucket_cnt, 1);
+				new_value = atomic_inc_16_nv(
+				    &psimm[i].leaky_bucket_cnt);
 				psimm[i].persistent_total++;
 				if (new_value > ecc_softerr_limit) {
 					cmn_err(CE_NOTE, "[AFT0] Most recent %d"
@@ -4394,8 +4394,8 @@ ce_count_unum(int status, int len, char *unum)
 					    ecc_softerr_limit,
 					    ecc_softerr_interval / 60,
 					    ecc_softerr_interval % 60);
-					atomic_add_16(
-					    &psimm[i].leaky_bucket_cnt, -1);
+					atomic_dec_16(
+					    &psimm[i].leaky_bucket_cnt);
 					page_status = PR_MCE;
 				}
 			} else { /* Intermittent */

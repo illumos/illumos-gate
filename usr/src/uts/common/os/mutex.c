@@ -243,7 +243,7 @@ mutex_panic(char *msg, mutex_impl_t *lp)
 	if (panicstr)
 		return;
 
-	if (casptr(&panic_mutex_addr, NULL, lp) == NULL)
+	if (atomic_cas_ptr(&panic_mutex_addr, NULL, lp) == NULL)
 		panic_mutex = *lp;
 
 	panic("%s, lp=%p owner=%p thread=%p",

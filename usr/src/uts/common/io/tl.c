@@ -1138,7 +1138,7 @@ tl_info(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg, void **result)
 static void
 tl_refhold(tl_endpt_t *tep)
 {
-	atomic_add_32(&tep->te_refcnt, 1);
+	atomic_inc_32(&tep->te_refcnt);
 }
 
 static void
@@ -1146,7 +1146,7 @@ tl_refrele(tl_endpt_t *tep)
 {
 	ASSERT(tep->te_refcnt != 0);
 
-	if (atomic_add_32_nv(&tep->te_refcnt, -1) == 0)
+	if (atomic_dec_32_nv(&tep->te_refcnt) == 0)
 		tl_free(tep);
 }
 
@@ -1264,13 +1264,13 @@ tl_serializer_alloc(int flags)
 static void
 tl_serializer_refhold(tl_serializer_t *s)
 {
-	atomic_add_32(&s->ts_refcnt, 1);
+	atomic_inc_32(&s->ts_refcnt);
 }
 
 static void
 tl_serializer_refrele(tl_serializer_t *s)
 {
-	if (atomic_add_32_nv(&s->ts_refcnt, -1) == 0) {
+	if (atomic_dec_32_nv(&s->ts_refcnt) == 0) {
 		serializer_destroy(s->ts_serializer);
 		kmem_free(s, sizeof (tl_serializer_t));
 	}
@@ -5426,7 +5426,7 @@ tl_get_any_addr(tl_endpt_t *tep, tl_addr_t *req)
 		 * Use default address.
 		 */
 		bcopy(&tep->te_defaddr, tep->te_abuf, sizeof (uint32_t));
-		atomic_add_32(&tep->te_defaddr, 1);
+		atomic_inc_32(&tep->te_defaddr);
 	}
 
 	/*

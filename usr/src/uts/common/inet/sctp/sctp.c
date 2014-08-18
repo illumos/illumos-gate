@@ -1756,7 +1756,7 @@ sctp_inc_taskq(sctp_stack_t *sctps)
 	ASSERT(sctps->sctps_recvq_tq_list[
 	    sctps->sctps_recvq_tq_list_cur_sz] == NULL);
 	sctps->sctps_recvq_tq_list[sctps->sctps_recvq_tq_list_cur_sz] = tq;
-	atomic_add_32(&sctps->sctps_recvq_tq_list_cur_sz, 1);
+	atomic_inc_32(&sctps->sctps_recvq_tq_list_cur_sz);
 	mutex_exit(&sctps->sctps_rq_tq_lock);
 }
 
@@ -1783,7 +1783,7 @@ sctp_find_next_tq(sctp_t *sctp)
 	 * this loop.  The problem this will create is that the loop may
 	 * not have tried all the recvq_tq.  This should be OK.
 	 */
-	next_tq = atomic_add_32_nv(&sctps->sctps_recvq_tq_list_cur, 1) %
+	next_tq = atomic_inc_32_nv(&sctps->sctps_recvq_tq_list_cur) %
 	    sctps->sctps_recvq_tq_list_cur_sz;
 	for (try = 0; try < sctps->sctps_recvq_tq_list_cur_sz; try++) {
 		tq = sctps->sctps_recvq_tq_list[next_tq];

@@ -66,14 +66,14 @@ dlcosmk_process(mblk_t **mpp, dlcosmk_data_t *dlcosmk_data, uint32_t ill_index,
 	if (mp->b_datap->db_type != M_DATA) {
 		if ((mp->b_cont == NULL) ||
 		    (mp->b_cont->b_datap->db_type != M_DATA)) {
-			atomic_add_64(&dlcosmk_data->epackets, 1);
+			atomic_inc_64(&dlcosmk_data->epackets);
 			dlcosmk0dbg(("dlcosmk_process: no data\n"));
 			return (EINVAL);
 		}
 	}
 
 	/* Update global stats */
-	atomic_add_64(&dlcosmk_data->npackets, 1);
+	atomic_inc_64(&dlcosmk_data->npackets);
 
 	/*
 	 * This should only be called for outgoing packets. For inbound, just
@@ -81,7 +81,7 @@ dlcosmk_process(mblk_t **mpp, dlcosmk_data_t *dlcosmk_data, uint32_t ill_index,
 	 */
 	if ((proc == IPP_LOCAL_IN) || (proc == IPP_FWD_IN)) {
 		dlcosmk2dbg(("dlcosmk_process:cannot mark incoming packets\n"));
-		atomic_add_64(&dlcosmk_data->ipackets, 1);
+		atomic_inc_64(&dlcosmk_data->ipackets);
 		return (0);
 	}
 
@@ -90,7 +90,7 @@ dlcosmk_process(mblk_t **mpp, dlcosmk_data_t *dlcosmk_data, uint32_t ill_index,
 	    B_FALSE)) == NULL)) {
 		dlcosmk2dbg(("dlcosmk_process:invalid ill index %u\n",
 		    ill_index));
-		atomic_add_64(&dlcosmk_data->ipackets, 1);
+		atomic_inc_64(&dlcosmk_data->ipackets);
 		return (0);
 	}
 
@@ -101,7 +101,7 @@ dlcosmk_process(mblk_t **mpp, dlcosmk_data_t *dlcosmk_data, uint32_t ill_index,
 	if (!(ill->ill_flags & ILLF_COS_ENABLED)) {
 		dlcosmk2dbg(("dlcosmk_process:ill %u does not support CoS\n",
 		    ill_index));
-		atomic_add_64(&dlcosmk_data->ipackets, 1);
+		atomic_inc_64(&dlcosmk_data->ipackets);
 		ill_refrele(ill);
 		return (0);
 	}
@@ -124,8 +124,7 @@ dlcosmk_process(mblk_t **mpp, dlcosmk_data_t *dlcosmk_data, uint32_t ill_index,
 					dlur->dl_priority.dl_max =
 					    dlcosmk_data->dl_max;
 				} else {
-					atomic_add_64(&dlcosmk_data->ipackets,
-					    1);
+					atomic_inc_64(&dlcosmk_data->ipackets);
 				}
 				break;
 			}
@@ -134,7 +133,7 @@ dlcosmk_process(mblk_t **mpp, dlcosmk_data_t *dlcosmk_data, uint32_t ill_index,
 			mp->b_band = dlcosmk_data->b_band;
 			break;
 		default:
-			atomic_add_64(&dlcosmk_data->ipackets, 1);
+			atomic_inc_64(&dlcosmk_data->ipackets);
 			break;
 	}
 

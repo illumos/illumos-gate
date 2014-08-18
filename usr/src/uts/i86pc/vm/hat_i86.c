@@ -944,7 +944,7 @@ hat_init_finish(void)
 
 /*
  * On 32 bit PAE mode, PTE's are 64 bits, but ordinary atomic memory references
- * are 32 bit, so for safety we must use cas64() to install these.
+ * are 32 bit, so for safety we must use atomic_cas_64() to install these.
  */
 #ifdef __i386
 static void
@@ -967,7 +967,7 @@ reload_pae32(hat_t *hat, cpu_t *cpu)
 			pte = dest[i];
 			if (pte == src[i])
 				break;
-			if (cas64(dest + i, pte, src[i]) != src[i])
+			if (atomic_cas_64(dest + i, pte, src[i]) != src[i])
 				break;
 		}
 	}
@@ -1227,14 +1227,14 @@ hat_get_mapped_size(hat_t *hat)
 int
 hat_stats_enable(hat_t *hat)
 {
-	atomic_add_32(&hat->hat_stats, 1);
+	atomic_inc_32(&hat->hat_stats);
 	return (1);
 }
 
 void
 hat_stats_disable(hat_t *hat)
 {
-	atomic_add_32(&hat->hat_stats, -1);
+	atomic_dec_32(&hat->hat_stats);
 }
 
 /*
@@ -1988,7 +1988,7 @@ flush_all_tlb_entries(void)
 #define	TLB_CPU_HALTED	(01ul)
 #define	TLB_INVAL_ALL	(02ul)
 #define	CAS_TLB_INFO(cpu, old, new)	\
-	caslong((ulong_t *)&(cpu)->cpu_m.mcpu_tlb_info, (old), (new))
+	atomic_cas_ulong((ulong_t *)&(cpu)->cpu_m.mcpu_tlb_info, (old), (new))
 
 /*
  * Record that a CPU is going idle
@@ -1996,7 +1996,7 @@ flush_all_tlb_entries(void)
 void
 tlb_going_idle(void)
 {
-	atomic_or_long((ulong_t *)&CPU->cpu_m.mcpu_tlb_info, TLB_CPU_HALTED);
+	atomic_or_ulong((ulong_t *)&CPU->cpu_m.mcpu_tlb_info, TLB_CPU_HALTED);
 }
 
 /*

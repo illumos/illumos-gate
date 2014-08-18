@@ -20,14 +20,14 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 1998-2002 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_CLADM_H
 #define	_SYS_CLADM_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -143,11 +143,7 @@ typedef struct {
 extern int cladmin(int fac, int cmd, void *data);
 extern int cluster_bootflags;
 #else
-#if defined(__STDC__)
 extern int _cladm(int fac, int cmd, void *data);
-#else	/* !defined(__STDC__) */
-extern int _cladm();
-#endif	/* defined(__STDC__) */
 #endif	/* _KERNEL */
 
 #ifdef	__cplusplus

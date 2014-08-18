@@ -20,6 +20,8 @@
  */
 
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -327,21 +329,10 @@ struct vtoc32 {
 #define	CK_CHECKSUM	0	/* check checksum */
 #define	CK_MAKESUM	1	/* generate checksum */
 
-#if defined(__STDC__)
-
 extern	int	read_vtoc(int, struct vtoc *);
 extern	int	write_vtoc(int, struct vtoc *);
 extern	int	read_extvtoc(int, struct extvtoc *);
 extern	int	write_extvtoc(int, struct extvtoc *);
-
-#else
-
-extern	int	read_vtoc();
-extern	int	write_vtoc();
-extern	int	read_extvtoc();
-extern	int	write_extvtoc();
-
-#endif 	/* __STDC__ */
 
 #ifdef	__cplusplus
 }

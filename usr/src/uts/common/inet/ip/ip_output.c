@@ -1558,7 +1558,7 @@ ire_send_noroute_v4(ire_t *ire, mblk_t *mp, void *iph_arg,
 	boolean_t	dummy;
 
 	/* We assign an IP ident for nice errors */
-	ipha->ipha_ident = atomic_add_32_nv(identp, 1);
+	ipha->ipha_ident = atomic_inc_32_nv(identp);
 
 	BUMP_MIB(&ipst->ips_ip_mib, ipIfStatsOutNoRoutes);
 

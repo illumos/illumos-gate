@@ -24,14 +24,14 @@
 
 
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_VALUES_H
 #define	_VALUES_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.33	*/
 
 #include <sys/isa_defs.h>
 
@@ -52,17 +52,8 @@ extern "C" {
 /* short, regular and long ints with only the high-order bit turned on */
 #define	HIBITS	((short)(1 << (BITS(short) - 1)))
 
-#if defined(__STDC__)
-
 #define	HIBITI	(1U << (BITS(int) - 1))
 #define	HIBITL	(1UL << (BITS(long) - 1))
-
-#else
-
-#define	HIBITI	((unsigned)1 << (BITS(int) - 1))
-#define	HIBITL	(1L << (BITS(long) - 1))
-
-#endif
 
 /* largest short, regular and long int */
 #define	MAXSHORT	((short)~HIBITS)

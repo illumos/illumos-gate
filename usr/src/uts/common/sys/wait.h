@@ -22,16 +22,15 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_WAIT_H
 #define	_SYS_WAIT_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.10 */
 
 #include <sys/feature_tests.h>
 
@@ -95,7 +94,6 @@ extern "C" {
 
 
 #if !defined(_KERNEL)
-#if defined(__STDC__)
 
 extern pid_t wait(int *);
 extern pid_t waitpid(pid_t, int *, int);
@@ -112,23 +110,6 @@ extern pid_t wait3(int *, int, struct rusage *);
 extern pid_t wait4(pid_t, int *, int, struct rusage *);
 #endif /* !defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__) */
 
-#else /* __STDC__ */
-
-extern pid_t wait();
-extern pid_t waitpid();
-#if !defined(__XOPEN_OR_POSIX) || defined(_XPG4_2) || defined(__EXTENSIONS__)
-extern int waitid();
-/* Marked as LEGACY in SUSv2 and removed in SUSv3 */
-#if !defined(_XPG6) || defined(__EXTENSIONS__)
-extern pid_t wait3();
-#endif /* !defined(_XPG6) || defined(__EXTENSIONS__) */
-#endif /* !defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__) */
-
-#if !defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__)
-extern pid_t wait4();
-#endif /* !defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__) */
-
-#endif	/* __STDC__ */
 #endif	/* _KERNEL */
 
 #ifdef	__cplusplus

@@ -20,14 +20,14 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_FS_CACHEFS_DIR_H
 #define	_SYS_FS_CACHEFS_DIR_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/fs/cachefs_fs.h>
@@ -71,7 +71,7 @@ struct c_dirent {
 #define	CDE_COMPLETE	0x2		/* entry is complete */
 
 
-#if defined(_KERNEL) && defined(__STDC__)
+#if defined(_KERNEL)
 int cachefs_dir_look(cnode_t *dcp, char *nm, fid_t *cookiep, uint_t *flagp,
     u_offset_t *d_offsetp, cfs_cid_t *cidp);
 int cachefs_dir_new(cnode_t *dcp, cnode_t *cp);
@@ -86,7 +86,7 @@ int cachefs_dir_empty(cnode_t *dcp);
 int cachefs_async_populate_dir(struct cachefs_populate_req *, cred_t *,
     vnode_t *, vnode_t *);
 
-#endif /* defined(_KERNEL) && defined(__STDC__) */
+#endif /* defined(_KERNEL) */
 
 #ifdef __cplusplus
 }

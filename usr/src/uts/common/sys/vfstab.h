@@ -19,14 +19,15 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
 #ifndef	_SYS_VFSTAB_H
 #define	_SYS_VFSTAB_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.2 */
 
 #ifdef	__cplusplus
 extern "C" {
@@ -64,17 +65,10 @@ struct vfstab {
 	char	*vfs_mntopts;
 };
 
-#ifdef __STDC__
 extern int	getvfsent(FILE *, struct vfstab *);
 extern int	getvfsspec(FILE *, struct vfstab *, char *);
 extern int	getvfsfile(FILE *, struct vfstab *, char *);
 extern int	getvfsany(FILE *, struct vfstab *, struct vfstab *);
-#else
-extern int	getvfsent();
-extern int	getvfsspec();
-extern int	getvfsfile();
-extern int	getvfsany();
-#endif
 
 #ifdef	__cplusplus
 }

@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/atomic.h>
 #include <sys/pattr.h>
@@ -68,7 +66,7 @@ dscpmk_process(mblk_t **mpp, dscpmk_data_t *dscpmk_data, ip_proc_t proc)
 			mp = mp->b_cont;
 		} else {
 			dscpmk0dbg(("dscpmk_process: no data\n"));
-			atomic_add_64(&dscpmk_data->epackets, 1);
+			atomic_inc_64(&dscpmk_data->epackets);
 			return (EINVAL);
 		}
 	}
@@ -77,14 +75,14 @@ dscpmk_process(mblk_t **mpp, dscpmk_data_t *dscpmk_data, ip_proc_t proc)
 	if ((mp->b_wptr - mp->b_rptr) < IP_SIMPLE_HDR_LENGTH) {
 		if (!pullupmsg(mp, IP_SIMPLE_HDR_LENGTH)) {
 			dscpmk0dbg(("dscpmk_process: pullup failed\n"));
-			atomic_add_64(&dscpmk_data->epackets, 1);
+			atomic_inc_64(&dscpmk_data->epackets);
 			return (EINVAL);
 		}
 	}
 	ipha = (ipha_t *)mp->b_rptr;
 
 	/* Update global stats */
-	atomic_add_64(&dscpmk_data->npackets, 1);
+	atomic_inc_64(&dscpmk_data->npackets);
 
 	/*
 	 * This should only be called for outgoing packets. For inbound packets
@@ -92,7 +90,7 @@ dscpmk_process(mblk_t **mpp, dscpmk_data_t *dscpmk_data, ip_proc_t proc)
 	 */
 	if ((proc == IPP_LOCAL_IN) || (proc == IPP_FWD_IN)) {
 		dscpmk2dbg(("dscpmk_process: cannot mark incoming packets\n"));
-		atomic_add_64(&dscpmk_data->ipackets, 1);
+		atomic_inc_64(&dscpmk_data->ipackets);
 		return (0);
 	}
 
@@ -114,21 +112,21 @@ dscpmk_process(mblk_t **mpp, dscpmk_data_t *dscpmk_data, ip_proc_t proc)
 	new_dscp = dscpmk_data->dscp_map[dscp >> 2];
 
 	/* Update stats for this new_dscp */
-	atomic_add_64(&dscpmk_data->dscp_stats[new_dscp].npackets, 1);
+	atomic_inc_64(&dscpmk_data->dscp_stats[new_dscp].npackets);
 
 	/*
 	 * if new_dscp is same as the original, update stats and
 	 * return.
 	 */
 	if (new_dscp == (dscp >> 2)) {
-		atomic_add_64(&dscpmk_data->unchanged, 1);
+		atomic_inc_64(&dscpmk_data->unchanged);
 		return (0);
 	}
 
 	/* Get back the ECN/CU value from the original dscp */
 	new_dscp = (new_dscp << 2) | (dscp & 0x3);
 
-	atomic_add_64(&dscpmk_data->changed, 1);
+	atomic_inc_64(&dscpmk_data->changed);
 	/*
 	 * IPv4 : ToS structure -- RFC 791
 	 *

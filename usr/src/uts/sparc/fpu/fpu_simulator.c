@@ -42,7 +42,7 @@
 	extern void __dtrace_probe___fpuinfo_##opcode(uint64_t *);	\
 	uint64_t *stataddr = &fpuinfo.opcode.value.ui64;		\
 	__dtrace_probe___fpuinfo_##opcode(stataddr);			\
-	atomic_add_64(&fpuinfo.opcode.value.ui64, 1);			\
+	atomic_inc_64(&fpuinfo.opcode.value.ui64);			\
 }
 
 #define	FPUINFO_KSTAT_PREC(prec, kstat_s, kstat_d, kstat_q)		\
@@ -791,9 +791,9 @@ fp_kstat_update(enum ftt_type ftt)
 	ASSERT((ftt == ftt_ieee) || (ftt == ftt_unfinished) ||
 	    (ftt == ftt_unimplemented));
 	if (ftt == ftt_ieee)
-		atomic_add_64(&fpustat.fpu_ieee_traps.value.ui64, 1);
+		atomic_inc_64(&fpustat.fpu_ieee_traps.value.ui64);
 	else if (ftt == ftt_unfinished)
-		atomic_add_64(&fpustat.fpu_unfinished_traps.value.ui64, 1);
+		atomic_inc_64(&fpustat.fpu_unfinished_traps.value.ui64);
 	else if (ftt == ftt_unimplemented)
-		atomic_add_64(&fpustat.fpu_unimplemented_traps.value.ui64, 1);
+		atomic_inc_64(&fpustat.fpu_unimplemented_traps.value.ui64);
 }

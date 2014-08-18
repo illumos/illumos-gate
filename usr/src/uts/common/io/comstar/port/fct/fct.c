@@ -1162,7 +1162,7 @@ fct_register_local_port(fct_local_port_t *port)
 	stmf_wwn_to_devid_desc((scsi_devid_desc_t *)iport->iport_id,
 	    port->port_pwwn, PROTOCOL_FIBRE_CHANNEL);
 	(void) snprintf(taskq_name, sizeof (taskq_name), "stmf_fct_taskq_%d",
-	    atomic_add_32_nv(&taskq_cntr, 1));
+	    atomic_inc_32_nv(&taskq_cntr));
 	if ((iport->iport_worker_taskq = ddi_taskq_create(NULL,
 	    taskq_name, 1, TASKQ_DEFAULTPRI, 0)) == NULL) {
 		return (FCT_FAILURE);
@@ -1440,7 +1440,7 @@ fct_deque_rp(fct_i_local_port_t *iport, fct_i_remote_port_t *irp)
 	while (irp_next != NULL) {
 		if (irp == irp_next) {
 			if (irp->irp_flags & IRP_PLOGI_DONE) {
-				atomic_add_32(&iport->iport_nrps_login, -1);
+				atomic_dec_32(&iport->iport_nrps_login);
 			}
 			atomic_and_32(&irp->irp_flags,
 			    ~(IRP_PLOGI_DONE | IRP_PRLI_DONE));
@@ -1678,7 +1678,7 @@ fct_scsi_task_alloc(fct_local_port_t *port, uint16_t rp_handle,
 		icmd = (fct_i_cmd_t *)cmd->cmd_fct_private;
 		icmd->icmd_next = NULL;
 		cmd->cmd_port = port;
-		atomic_add_32(&iport->iport_total_alloced_ncmds, 1);
+		atomic_inc_32(&iport->iport_total_alloced_ncmds);
 	}
 
 	/*
@@ -1701,7 +1701,7 @@ fct_scsi_task_alloc(fct_local_port_t *port, uint16_t rp_handle,
 		fct_cmd_free(cmd);
 		return (NULL);
 	}
-	atomic_add_16(&irp->irp_fcp_xchg_count, 1);
+	atomic_inc_16(&irp->irp_fcp_xchg_count);
 	cmd->cmd_rp = rp;
 	icmd->icmd_flags |= ICMD_IN_TRANSITION | ICMD_KNOWN_TO_FCA;
 	rw_exit(&irp->irp_lock);
@@ -1826,15 +1826,15 @@ fct_post_implicit_logo(fct_cmd_t *cmd)
 
 	rw_enter(&irp->irp_lock, RW_WRITER);
 	atomic_or_32(&icmd->icmd_flags, ICMD_IMPLICIT_CMD_HAS_RESOURCE);
-	atomic_add_16(&irp->irp_nonfcp_xchg_count, 1);
-	atomic_add_16(&irp->irp_sa_elses_count, 1);
+	atomic_inc_16(&irp->irp_nonfcp_xchg_count);
+	atomic_inc_16(&irp->irp_sa_elses_count);
 	/*
 	 * An implicit LOGO can also be posted to a irp where a PLOGI might
 	 * be in process. That PLOGI will reset this flag and decrement the
 	 * iport_nrps_login counter.
 	 */
 	if (irp->irp_flags & IRP_PLOGI_DONE) {
-		atomic_add_32(&iport->iport_nrps_login, -1);
+		atomic_dec_32(&iport->iport_nrps_login);
 	}
 	atomic_and_32(&irp->irp_flags, ~(IRP_PLOGI_DONE | IRP_PRLI_DONE));
 	atomic_or_32(&icmd->icmd_flags, ICMD_SESSION_AFFECTING);
@@ -1865,7 +1865,7 @@ fct_alloc_cmd_slot(fct_i_local_port_t *iport, fct_cmd_t *cmd)
 		new |= iport->iport_cmd_slots[cmd_slot].slot_next;
 	} while (atomic_cas_32(&iport->iport_next_free_slot, old, new) != old);
 
-	atomic_add_16(&iport->iport_nslots_free, -1);
+	atomic_dec_16(&iport->iport_nslots_free);
 	iport->iport_cmd_slots[cmd_slot].slot_cmd = icmd;
 	cmd->cmd_handle = (uint32_t)cmd_slot | 0x80000000 |
 	    (((uint32_t)(iport->iport_cmd_slots[cmd_slot].slot_uniq_cntr))
@@ -2072,14 +2072,14 @@ fct_cmd_free(fct_cmd_t *cmd)
 		} while (atomic_cas_32(&iport->iport_next_free_slot,
 		    old, new) != old);
 		cmd->cmd_handle = 0;
-		atomic_add_16(&iport->iport_nslots_free, 1);
+		atomic_inc_16(&iport->iport_nslots_free);
 		if (cmd->cmd_rp) {
 			irp = (fct_i_remote_port_t *)
 			    cmd->cmd_rp->rp_fct_private;
 			if (cmd->cmd_type == FCT_CMD_FCP_XCHG)
-				atomic_add_16(&irp->irp_fcp_xchg_count, -1);
+				atomic_dec_16(&irp->irp_fcp_xchg_count);
 			else
-				atomic_add_16(&irp->irp_nonfcp_xchg_count, -1);
+				atomic_dec_16(&irp->irp_nonfcp_xchg_count);
 		}
 		rw_exit(&iport->iport_lock);
 	} else if ((icmd->icmd_flags & ICMD_IMPLICIT) &&
@@ -2089,9 +2089,9 @@ fct_cmd_free(fct_cmd_t *cmd)
 			irp = (fct_i_remote_port_t *)
 			    cmd->cmd_rp->rp_fct_private;
 			if (cmd->cmd_type == FCT_CMD_FCP_XCHG)
-				atomic_add_16(&irp->irp_fcp_xchg_count, -1);
+				atomic_dec_16(&irp->irp_fcp_xchg_count);
 			else
-				atomic_add_16(&irp->irp_nonfcp_xchg_count, -1);
+				atomic_dec_16(&irp->irp_nonfcp_xchg_count);
 		}
 	}
 
@@ -2126,7 +2126,7 @@ fct_cmd_free(fct_cmd_t *cmd)
 			iport->iport_cached_ncmds++;
 			mutex_exit(&iport->iport_cached_cmd_lock);
 		} else {
-			atomic_add_32(&iport->iport_total_alloced_ncmds, -1);
+			atomic_dec_32(&iport->iport_total_alloced_ncmds);
 			fct_free(cmd);
 		}
 	} else {

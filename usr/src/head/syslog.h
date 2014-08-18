@@ -19,14 +19,15 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
 #ifndef	_SYSLOG_H
 #define	_SYSLOG_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1	*/
 
 #include <sys/feature_tests.h>
 #include <sys/syslog.h>
@@ -36,8 +37,6 @@
 extern "C" {
 #endif
 
-#ifdef	__STDC__
-
 void openlog(const char *, int, int);
 void syslog(int, const char *, ...);
 void closelog(void);
@@ -45,18 +44,6 @@ int setlogmask(int);
 #if !defined(_XPG4_2) || defined(__EXTENSIONS__)
 void vsyslog(int, const char *, __va_list);
 #endif	/* !defined(_XPG4_2) || defined(__EXTENSIONS__) */
-
-#else	/* __STDC__ */
-
-void openlog();
-void syslog();
-void closelog();
-int setlogmask();
-#if !defined(_XPG4_2) || defined(__EXTENSIONS__)
-void vsyslog();
-#endif	/* !defined(_XPG4_2) || defined(__EXTENSIONS__) */
-
-#endif	/* __STDC__ */
 
 #ifdef	__cplusplus
 }

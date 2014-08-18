@@ -22,13 +22,11 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- */
-/*
- * Copyright 2013 Garrett D'Amore <garrett@damore.org>
  */
 
 /*
@@ -79,8 +77,6 @@ extern unsigned int	*__ctype_mask;
 extern int		*__trans_upper;
 extern int		*__trans_lower;
 
-#if defined(__STDC__)
-
 #if __cplusplus >= 199711L
 namespace std {
 #endif
@@ -113,27 +109,6 @@ extern int toupper(int);
 #if __cplusplus >= 199711L
 } /* end of namespace std */
 #endif
-
-#else	/* defined(__STDC__) */
-
-#if !defined(__lint)
-
-extern int isalpha();
-extern int isupper();
-extern int islower();
-extern int isdigit();
-extern int isxdigit();
-extern int isalnum();
-extern int isspace();
-extern int ispunct();
-extern int isprint();
-extern int isgraph();
-extern int iscntrl();
-extern int isblank();
-
-#endif	/* !defined(__lint) */
-
-#endif	/* defined(__STDC__) */
 
 #ifdef	__cplusplus
 }

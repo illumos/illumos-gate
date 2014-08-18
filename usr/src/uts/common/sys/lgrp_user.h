@@ -20,14 +20,14 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_LGRP_USER_H
 #define	_LGRP_USER_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * latency group definitions for user
@@ -244,8 +244,6 @@ typedef struct lgrp_snapshot_header32 {
 
 #if (!defined(_KERNEL) && !defined(_KMEMUSER))
 
-#ifdef	__STDC__
-
 lgrp_affinity_t	lgrp_affinity_get(idtype_t idtype, id_t id, lgrp_id_t lgrp);
 
 int		lgrp_affinity_set(idtype_t idtype, id_t id, lgrp_id_t lgrp,
@@ -286,25 +284,6 @@ lgrp_id_t	lgrp_root(lgrp_cookie_t cookie);
 int		lgrp_version(int version);
 
 lgrp_view_t	lgrp_view(lgrp_cookie_t cookie);
-
-#else	/* __STDC__ */
-lgrp_affinity_t	lgrp_affinity_get();
-int		lgrp_affinity_set();
-int		lgrp_children();
-int		lgrp_cookie_stale();
-int		lgrp_cpus();
-int		lgrp_fini();
-lgrp_id_t	lgrp_home();
-int		lgrp_init();
-int		lgrp_latency();
-spgcnt_t	lgrp_mem_size();
-int		lgrp_nlgrps();
-int		lgrp_parents();
-int		lgrp_resources();
-lgrp_id_t	lgrp_root();
-int		lgrp_version();
-lgrp_view_t	lgrp_view();
-#endif	/* __STDC__ */
 
 #endif	/* !_KERNEL && !_KMEMUSER */
 

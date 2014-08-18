@@ -19,6 +19,8 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -129,7 +131,6 @@ typedef struct __private_execattr {
 } _priv_execattr;		/* Un-supported. For Sun internal use only */
 
 
-#ifdef    __STDC__
 extern execattr_t *getexecattr(void);
 extern execattr_t *getexecuser(const char *, const char *, const char *, int);
 extern execattr_t *getexecprof(const char *, const char *, const char *, int);
@@ -138,17 +139,6 @@ extern execattr_t *match_execattr(execattr_t *, const char *, const char *, \
 extern void free_execattr(execattr_t *);
 extern void setexecattr(void);
 extern void endexecattr(void);
-
-#else				/* not __STDC__ */
-
-extern execattr_t *getexecattr();
-extern execattr_t *getexecuser();
-extern execattr_t *getexecprof();
-extern execattr_t *match_execattr();
-extern void setexecattr();
-extern void endexecattr();
-extern void free_execattr();
-#endif
 
 #ifdef __cplusplus
 }

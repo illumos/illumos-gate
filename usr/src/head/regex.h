@@ -20,6 +20,8 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -142,11 +144,7 @@ typedef struct {		/* regcomp() data saved for regexec() */
 
 /* subexpression positions */
 typedef struct {
-#ifdef __STDC__
 	const char	*rm_sp, *rm_ep;	/* Start pointer, end pointer */
-#else
-	char		*rm_sp, *rm_ep;	/* Start pointer, end pointer */
-#endif
 	regoff_t	rm_so, rm_eo;	/* Start offset, end offset */
 	int		rm_ss, rm_es;	/* Used internally */
 } regmatch_t;
@@ -157,23 +155,12 @@ typedef struct {
  * on wide characters.
  */
 
-#if defined(__STDC__)
-
 extern int regcomp(regex_t *_RESTRICT_KYWD, const char *_RESTRICT_KYWD, int);
 extern int regexec(const regex_t *_RESTRICT_KYWD, const char *_RESTRICT_KYWD,
 	size_t, regmatch_t *_RESTRICT_KYWD, int);
 extern size_t regerror(int, const regex_t *_RESTRICT_KYWD,
 	char *_RESTRICT_KYWD, size_t);
 extern void regfree(regex_t *);
-
-#else  /* defined(__STDC__) */
-
-extern int regcomp();
-extern int regexec();
-extern size_t regerror();
-extern void regfree();
-
-#endif  /* defined(__STDC__) */
 
 #ifdef	__cplusplus
 }

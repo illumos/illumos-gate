@@ -1414,7 +1414,7 @@ memscrub_mem_config_post_add(
 	 * atomic_add_32() allows concurrent memory DR operations to use the
 	 * callbacks safely.
 	 */
-	atomic_add_32(&pause_memscrub, 1);
+	atomic_inc_32(&pause_memscrub);
 	ASSERT(pause_memscrub != 0);
 
 	/*
@@ -1423,7 +1423,7 @@ memscrub_mem_config_post_add(
 	(void) new_memscrub(0);		/* retain page retire list */
 
 	/* Restore the pause setting. */
-	atomic_add_32(&pause_memscrub, -1);
+	atomic_dec_32(&pause_memscrub);
 }
 
 /*ARGSUSED*/
@@ -1450,7 +1450,7 @@ memscrub_mem_config_post_del(
 	 * atomic_add_32() allows concurrent memory DR operations to use the
 	 * callbacks safely.
 	 */
-	atomic_add_32(&pause_memscrub, 1);
+	atomic_inc_32(&pause_memscrub);
 	ASSERT(pause_memscrub != 0);
 
 	/*
@@ -1461,7 +1461,7 @@ memscrub_mem_config_post_del(
 	}
 
 	/* Restore the pause setting. */
-	atomic_add_32(&pause_memscrub, -1);
+	atomic_dec_32(&pause_memscrub);
 }
 
 static kphysm_setup_vector_t memscrub_mem_config_vec = {

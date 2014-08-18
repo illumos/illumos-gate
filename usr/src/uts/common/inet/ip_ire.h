@@ -102,7 +102,7 @@ extern "C" {
  * We use atomics so that we get an accurate accounting on the ires.
  * Otherwise we can't determine leaks correctly.
  */
-#define	BUMP_IRE_STATS(ire_stats, x) atomic_add_64(&(ire_stats).x, 1)
+#define	BUMP_IRE_STATS(ire_stats, x) atomic_inc_64(&(ire_stats).x)
 
 #ifdef _KERNEL
 struct ts_label_s;

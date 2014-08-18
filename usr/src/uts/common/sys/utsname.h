@@ -24,6 +24,8 @@
 
 
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -63,8 +65,6 @@ extern struct utsname utsname;
 
 #if defined(__i386) && !defined(__amd64)
 
-#if defined(__STDC__)
-
 extern int uname(struct utsname *);
 extern int _uname(struct utsname *);
 
@@ -72,18 +72,6 @@ extern int _uname(struct utsname *);
 extern int nuname(struct utsname *);
 #endif /* !defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__) */
 extern int _nuname(struct utsname *);
-
-#else	/* defined(__STDC__) */
-
-extern int uname();
-extern int _uname();
-
-#if !defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__)
-extern int nuname();
-#endif /* !defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__) */
-extern int _nuname();
-
-#endif	/* defined(__STDC__) */
 
 /*
  * On i386 in SVID.2 uname() returns a utsname structure with 8 byte members,
@@ -102,11 +90,7 @@ extern int _nuname();
 
 #else	/* defined(__i386) */
 
-#if defined(__STDC__)
 extern int uname(struct utsname *);
-#else
-extern int uname();
-#endif	/* (__STDC__) */
 
 #endif	/* defined(__i386) */
 

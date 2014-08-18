@@ -19,14 +19,14 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_APPTRACE_IMPL_H
 #define	_APPTRACE_IMPL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -46,8 +46,6 @@ extern struct liblist *__abi_pflib_list;
 
 extern sigset_t abisigset;
 
-#ifdef	__STDC__
-
 extern void abilock(sigset_t *);
 extern void abiunlock(sigset_t *);
 
@@ -59,20 +57,6 @@ extern int (*abi_sigsetmask)(int, const sigset_t *, sigset_t *);
 extern int (*abi_sigaction)(int, const struct sigaction *, struct sigaction *);
 extern int (*abi_mutex_lock)(mutex_t *);
 extern int (*abi_mutex_unlock)(mutex_t *);
-
-#else	/* __STDC__ */
-
-extern void abilock();
-extern void abiunlock();
-extern int	is_empty_string();
-extern int (*abi_thr_main)();
-extern thread_t (*abi_thr_self)();
-extern int (*abi_sigsetmask)();
-extern int (*abi_sigaction)();
-extern int (*abi_mutex_lock)();
-extern int (*abi_mutex_unlock)();
-
-#endif	/* __STDC__ */
 
 #ifdef	__cplusplus
 }

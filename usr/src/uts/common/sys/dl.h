@@ -20,6 +20,8 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 1997 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -29,8 +31,6 @@
 
 #ifndef _SYS_DL_H
 #define	_SYS_DL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/isa_defs.h>
 
@@ -48,7 +48,6 @@ typedef	struct dl {
 #endif
 } dl_t;
 
-#ifdef __STDC__
 extern dl_t	ladd(dl_t, dl_t);
 extern dl_t	lsub(dl_t, dl_t);
 extern dl_t	lmul(dl_t, dl_t);
@@ -56,15 +55,6 @@ extern dl_t	ldivide(dl_t, dl_t);
 extern dl_t	lshiftl(dl_t, int);
 extern dl_t	llog10(dl_t);
 extern dl_t	lexp10(dl_t);
-#else
-extern dl_t	ladd();
-extern dl_t	lsub();
-extern dl_t	lmul();
-extern dl_t	ldivide();
-extern dl_t	lshiftl();
-extern dl_t	llog10();
-extern dl_t	lexp10();
-#endif	/* __STDC__ */
 
 extern dl_t	lzero;
 extern dl_t	lone;

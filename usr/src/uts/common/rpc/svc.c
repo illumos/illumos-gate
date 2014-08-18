@@ -24,7 +24,7 @@
  * Use is subject to license terms.
  */
 /*
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -2290,8 +2290,8 @@ svc_queueclean(queue_t *q)
  *
  * - clear xp_wq to mark the master server transport handle as closing
  * - if there are no more threads on this transport close/destroy it
- * - otherwise, broadcast threads sleeping in svc_poll(); the last
- *   thread will close/destroy the transport.
+ * - otherwise, leave the linked threads to close/destroy the transport
+ *   later.
  */
 void
 svc_queueclose(queue_t *q)
@@ -2337,12 +2337,17 @@ svc_queueclose(queue_t *q)
 		mutex_exit(&pool->p_thread_lock);
 	} else {
 		/*
-		 * Wakeup threads sleeping in svc_poll() so that they
-		 * unlink from the transport
+		 * There are still some threads linked to the transport.  They
+		 * are very likely sleeping in svc_poll().  We could wake up
+		 * them by broadcasting on the p_req_cv condition variable, but
+		 * that might give us a performance penalty if there are too
+		 * many sleeping threads.
+		 *
+		 * Instead, we do nothing here.  The linked threads will unlink
+		 * themselves and destroy the transport once they are woken up
+		 * on timeout, or by new request.  There is no reason to hurry
+		 * up now with the thread wake up.
 		 */
-		mutex_enter(&xprt->xp_pool->p_req_lock);
-		cv_broadcast(&xprt->xp_pool->p_req_cv);
-		mutex_exit(&xprt->xp_pool->p_req_lock);
 
 		/*
 		 *  NOTICE: No references to the master transport structure

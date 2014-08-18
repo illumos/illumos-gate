@@ -396,7 +396,7 @@ typedef struct kcf_policy_desc {
  * by the policy table has a reference count of one.
  */
 #define	KCF_POLICY_REFHOLD(desc) {		\
-	atomic_add_32(&(desc)->pd_refcnt, 1);	\
+	atomic_inc_32(&(desc)->pd_refcnt);	\
 	ASSERT((desc)->pd_refcnt != 0);		\
 }
 
@@ -407,7 +407,7 @@ typedef struct kcf_policy_desc {
 #define	KCF_POLICY_REFRELE(desc) {				\
 	ASSERT((desc)->pd_refcnt != 0);				\
 	membar_exit();						\
-	if (atomic_add_32_nv(&(desc)->pd_refcnt, -1) == 0)	\
+	if (atomic_dec_32_nv(&(desc)->pd_refcnt) == 0)	\
 		kcf_policy_free_desc(desc);			\
 }
 

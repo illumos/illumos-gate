@@ -78,7 +78,7 @@ smb_open(dev_t *dp, int flag, int otyp, cred_t *cred)
 	 * the real minor number, and we assign a new minor to each clone.
 	 */
 	for (c = 1; c < smb_nclones; c++) {
-		if (casptr(&smb_clones[c].c_hdl, NULL, ksmbios) == NULL)
+		if (atomic_cas_ptr(&smb_clones[c].c_hdl, NULL, ksmbios) == NULL)
 			break;
 	}
 

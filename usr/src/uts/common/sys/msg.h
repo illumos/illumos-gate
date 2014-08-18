@@ -20,6 +20,8 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 1999-2003 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -30,8 +32,6 @@
 
 #ifndef _SYS_MSG_H
 #define	_SYS_MSG_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/ipc.h>
 
@@ -126,21 +126,12 @@ struct msgsnap_mhead {
 };
 
 #if !defined(_KERNEL)
-#if defined(__STDC__)
 int msgctl(int, int, struct msqid_ds *);
 int msgget(key_t, int);
 int msgids(int *, uint_t, uint_t *);
 int msgsnap(int, void *, size_t, long);
 ssize_t msgrcv(int, void *, size_t, long, int);
 int msgsnd(int, const void *, size_t, int);
-#else /* __STDC__ */
-int msgctl();
-int msgget();
-int msgids();
-int msgsnap();
-int msgrcv();
-int msgsnd();
-#endif /* __STDC__ */
 #endif /* ! _KERNEL */
 
 #ifdef	__cplusplus

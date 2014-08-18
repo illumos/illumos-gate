@@ -20,14 +20,14 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 1998 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_PCSAMPLE_H
 #define	_PCSAMPLE_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 
@@ -38,11 +38,7 @@ extern "C" {
 /*
  * PC sampling profiling
  */
-#ifdef __STDC__
 long pcsample(uintptr_t [], long);
-#else
-long pcsample();
-#endif /* __STDC__ */
 
 #ifdef __cplusplus
 }

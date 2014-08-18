@@ -27,8 +27,6 @@
 #ifndef _SYS_SOCKFS_NL7CURI_H
 #define	_SYS_SOCKFS_NL7CURI_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -83,12 +81,12 @@ typedef struct ref_s {
 }
 
 #define	REF_HOLD(container) {						\
-	atomic_add_32(&(container)->ref.cnt, 1);			\
+	atomic_inc_32(&(container)->ref.cnt);			\
 	ASSERT((container)->ref.cnt != 0);				\
 }
 
 #define	REF_RELE(container) {						\
-	if (atomic_add_32_nv(&(container)->ref.cnt, -1) == 0) {		\
+	if (atomic_dec_32_nv(&(container)->ref.cnt) == 0) {		\
 		(container)->ref.last((container));			\
 		kmem_cache_free((container)->ref.kmc, (container));	\
 	}								\

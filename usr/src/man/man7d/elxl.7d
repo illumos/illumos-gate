@@ -1,0 +1,102 @@
+.\" Copyright 2014 Garrett D'Amore <garrett@damore.org>
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that the following conditions
+.\" are met:
+.\" 1. Redistributions of source code must retain the above copyright
+.\"    notice, this list of conditions and the following disclaimer.
+.\" 2. Redistributions in binary form must reproduce the above copyright
+.\"    notice, this list of conditions and the following disclaimer in the
+.\"    documentation and/or other materials provided with the distribution.
+.\"
+.\" THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDER AND CONTRIBUTORS
+.\" ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+.\" LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+.\" FOR A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE
+.\" COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+.\" INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+.\" NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF
+.\" USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+.\" ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+.\" (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+.\" THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
+.\"
+.Dd "Aug 7, 2014"
+.Dt ELXL 7D
+.Os
+.Sh NAME
+.Nm elxl
+.Nd 3Com Etherlink XL device driver
+.Sh SYNOPSIS
+.Pa /dev/elxl
+.Sh DESCRIPTION
+The
+.Nm
+driver provides support for the 3Com Etherlink XL
+family of Ethernet and Fast Ethernet PCI controllers. These are often known
+by their part numbers, most often 3c905 or 3c900 variants.
+.Lp
+The 3c905 devices generally support some form of 100 Mbps Ethernet,
+whereas the 3c900 devices usually only support 10 Mbps.  Some devices
+support legacy media such as 10BASE-15, 10BASE-2, and even 10BASE-FL.
+.
+Where applicable, the devices support auto-negotiation, both full and
+half duplex, etc.  They also support full size MTUs (1500 bytes),
+even when used with VLANs.
+.
+.Lp
+The device driver supports the
+.Xr ieee802.3 5
+properties, which can be configured with
+.Xr dladm 1M .
+.Lp
+In addition, for devices with multiple external media ports, the driver
+supports a driver-specific
+.Xr dladm 1M
+property called
+.Sy media ,
+which can take one of the following values, depending on the available
+media options on the device:
+.Lp
+.Bl -tag -compact -offset indent -width Sy
+.It Sy mii
+Media Indendent Interface (MII), also 100BASE-TX
+.It Sy tp-hdx
+10 Mbps twisted pair, half-duplex
+.It Sy tp-fdx
+10 Mbps twisted pair full-duplex
+.It Sy fx-hdx
+100BASE-FX (fiber), half-duplex
+.It Sy fx-hdx
+100BASE-FX (fiber), full-duplex
+.It Sy bnc
+10BASE-2
+.Pq BNC, aka Dq thin-net
+.It Sy aui
+10BASE-15
+.Pq aka Dq thick-net
+.It Sy fl-hdx
+10BASE-FL (fiber), half-duplex
+.It Sy fl-fdx
+10BASE-FL (fiber), full-duplex
+.El
+.Lp
+The specific media options available can be queried with the
+device-specific
+.Sy available_media
+.Xr dladm 1M
+property.
+.Sh FILES
+.Bl -tag -width /dev/elxl
+.It Pa /dev/elxl
+Special character device.
+.El
+.Sh SEE ALSO
+.Xr dladm 1M ,
+.Xr ifconfig 1M ,
+.Xr pci 4 ,
+.Xr ieee802.3 5 ,
+.Xr dlpi 7P
+.Rs
+.%T IEEE 802.3: Ethernet
+.%Q IEEE Standards Association
+.Re
