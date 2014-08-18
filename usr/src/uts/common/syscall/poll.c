@@ -29,6 +29,7 @@
 
 /*
  * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright (c) 2014, Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -525,13 +526,13 @@ poll_common(pollfd_t *fds, nfds_t nfds, timespec_t *tsp, k_sigset_t *ksetp)
 		}
 
 		/*
-		 * If T_POLLWAKE is set, a pollwakeup() was performed on
+		 * If PC_POLLWAKE is set, a pollwakeup() was performed on
 		 * one of the file descriptors.  This can happen only if
 		 * one of the VOP_POLL() functions dropped pcp->pc_lock.
 		 * The only current cases of this is in procfs (prpoll())
 		 * and STREAMS (strpoll()).
 		 */
-		if (pcp->pc_flag & T_POLLWAKE)
+		if (pcp->pc_flag & PC_POLLWAKE)
 			continue;
 
 		/*
@@ -886,9 +887,9 @@ retry:
 }
 
 /*
- * This function is called to inform a thread that
- * an event being polled for has occurred.
- * The pollstate lock on the thread should be held on entry.
+ * This function is called to inform a thread (or threads) that an event being
+ * polled on has occurred.  The pollstate lock on the thread should be held
+ * on entry.
  */
 void
 pollnotify(pollcache_t *pcp, int fd)
@@ -896,8 +897,8 @@ pollnotify(pollcache_t *pcp, int fd)
 	ASSERT(fd < pcp->pc_mapsize);
 	ASSERT(MUTEX_HELD(&pcp->pc_lock));
 	BT_SET(pcp->pc_bitmap, fd);
-	pcp->pc_flag |= T_POLLWAKE;
-	cv_signal(&pcp->pc_cv);
+	pcp->pc_flag |= PC_POLLWAKE;
+	cv_broadcast(&pcp->pc_cv);
 }
 
 /*
@@ -2024,7 +2025,7 @@ retry:
 				 */
 				if ((pdp->pd_php != NULL) &&
 				    (pollfdp[entry].events == pdp->pd_events) &&
-				    ((pcp->pc_flag & T_POLLWAKE) == 0)) {
+				    ((pcp->pc_flag & PC_POLLWAKE) == 0)) {
 					BT_CLEAR(pcp->pc_bitmap, fd);
 				}
 				/*
@@ -2251,7 +2252,7 @@ pollstate_destroy(pollstate_t *ps)
 	pcacheset_destroy(ps->ps_pcacheset, ps->ps_nsets);
 	ps->ps_pcacheset = NULL;
 	if (ps->ps_dpbuf != NULL) {
-		kmem_free(ps->ps_dpbuf, ps->ps_dpbufsize * sizeof (pollfd_t));
+		kmem_free(ps->ps_dpbuf, ps->ps_dpbufsize);
 		ps->ps_dpbuf = NULL;
 	}
 	mutex_destroy(&ps->ps_lock);

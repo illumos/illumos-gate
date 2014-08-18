@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2014 Joyent, Inc.  All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -346,7 +347,12 @@ typedef struct	proc {
 	struct zone	*p_zone;	/* zone in which process lives */
 	struct vnode	*p_execdir;	/* directory that p_exec came from */
 	struct brand	*p_brand;	/* process's brand  */
-	void		*p_brand_data;	/* per-process brand state */
+
+	/* per-process brand state */
+	union {
+		void	*__brand_data;
+		int	__exit_data;
+	} __p_brand_data;
 
 	/* additional lock to protect p_sessp (but not its contents) */
 	kmutex_t p_splock;
@@ -361,7 +367,8 @@ typedef struct	proc {
 	 */
 	struct user p_user;		/* (see sys/user.h) */
 } proc_t;
-
+#define	p_brand_data		__p_brand_data.__brand_data
+#define	p_exit_data		__p_brand_data.__exit_data
 #define	PROC_T				/* headers relying on proc_t are OK */
 
 #ifdef _KERNEL

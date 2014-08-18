@@ -22,6 +22,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2014 Joyent, Inc.  All rights reserved.
  */
 
 /*
@@ -125,15 +126,24 @@ dlmgmt_door_fini(void)
 	dlmgmt_door_fd = -1;
 }
 
-int
+static int
 dlmgmt_door_attach(zoneid_t zoneid, char *rootdir)
 {
 	int	fd;
 	int	err = 0;
 	char	doorpath[MAXPATHLEN];
+	struct stat statbuf;
 
-	(void) snprintf(doorpath, sizeof (doorpath), "%s%s", rootdir,
-	    DLMGMT_DOOR);
+	/* Handle running in a non-native branded zone (i.e. has /native) */
+	(void) snprintf(doorpath, sizeof (doorpath), "%s/native%s",
+	    rootdir, DLMGMT_TMPFS_DIR);
+	if (stat(doorpath, &statbuf) == 0) {
+		(void) snprintf(doorpath, sizeof (doorpath), "%s/native%s",
+		    rootdir, DLMGMT_DOOR);
+	} else {
+		(void) snprintf(doorpath, sizeof (doorpath), "%s%s",
+		    rootdir, DLMGMT_DOOR);
+	}
 
 	/*
 	 * Create the door file for dlmgmtd.
@@ -192,8 +202,16 @@ dlmgmt_zone_init(zoneid_t zoneid)
 	(void) snprintf(tmpfsdir, sizeof (tmpfsdir), "%s%s", rootdir,
 	    DLMGMT_TMPFS_DIR);
 	if (stat(tmpfsdir, &statbuf) < 0) {
-		if (mkdir(tmpfsdir, (mode_t)0755) < 0)
-			return (errno);
+		if (mkdir(tmpfsdir, (mode_t)0755) < 0) {
+			/*
+			 * Handle running in a non-native branded zone
+			 * (i.e. has /native)
+			 */
+			(void) snprintf(tmpfsdir, sizeof (tmpfsdir),
+			    "%s/native%s", rootdir, DLMGMT_TMPFS_DIR);
+			if (mkdir(tmpfsdir, (mode_t)0755) < 0)
+				return (errno);
+		}
 	} else if ((statbuf.st_mode & S_IFMT) != S_IFDIR) {
 		return (ENOTDIR);
 	}
@@ -203,7 +221,7 @@ dlmgmt_zone_init(zoneid_t zoneid)
 		return (EPERM);
 	}
 
-	if ((err = dlmgmt_db_init(zoneid)) != 0)
+	if ((err = dlmgmt_db_init(zoneid, rootdir)) != 0)
 		return (err);
 	return (dlmgmt_door_attach(zoneid, rootdir));
 }
@@ -214,7 +232,7 @@ dlmgmt_zone_init(zoneid_t zoneid)
 static int
 dlmgmt_allzones_init(void)
 {
-	int		err, i;
+	int		i;
 	zoneid_t	*zids = NULL;
 	uint_t		nzids, nzids_saved;
 
@@ -235,11 +253,37 @@ again:
 	}
 
 	for (i = 0; i < nzids; i++) {
-		if ((err = dlmgmt_zone_init(zids[i])) != 0)
-			break;
+		int res;
+		zone_status_t status;
+
+		/*
+		 * Skip over zones that have gone away or are going down
+		 * since we got the list.  Process all zones in the list,
+		 * logging errors for any that failed.
+		 */
+		if (zone_getattr(zids[i], ZONE_ATTR_STATUS, &status,
+		    sizeof (status)) < 0)
+			continue;
+		switch (status) {
+			case ZONE_IS_SHUTTING_DOWN:
+			case ZONE_IS_EMPTY:
+			case ZONE_IS_DOWN:
+			case ZONE_IS_DYING:
+			case ZONE_IS_DEAD:
+				/* FALLTHRU */
+				continue;
+			default:
+				break;
+		}
+		if ((res = dlmgmt_zone_init(zids[i])) != 0) {
+			(void) fprintf(stderr, "zone (%ld) init error %s",
+			    zids[i], strerror(res));
+			dlmgmt_log(LOG_ERR, "zone (%d) init error %s",
+			    zids[i], strerror(res));
+		}
 	}
 	free(zids);
-	return (err);
+	return (0);
 }
 
 static int
@@ -261,6 +305,8 @@ dlmgmt_init(void)
 		    strerror(err));
 		return (err);
 	}
+
+	(void) unlink(ZONE_LOCK);
 
 	/*
 	 * First derive the name of the cache file from the FMRI name. This

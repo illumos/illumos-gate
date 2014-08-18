@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013, Joyent, Inc. All rights reserved.
  */
 
 #ifndef	_LIBSCF_IMPL_H
@@ -52,7 +53,8 @@ typedef enum {
 	SCF_MSG_PATTERN_NOENTITY,
 	SCF_MSG_PATTERN_MULTIMATCH,
 	SCF_MSG_PATTERN_POSSIBLE,
-	SCF_MSG_PATTERN_LEGACY
+	SCF_MSG_PATTERN_LEGACY,
+	SCF_MSG_PATTERN_MULTIPARTIAL
 } scf_msg_t;
 
 scf_type_t scf_true_base_type(scf_type_t);

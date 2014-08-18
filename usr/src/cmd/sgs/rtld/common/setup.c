@@ -28,7 +28,7 @@
  *	  All Rights Reserved
  */
 /*
- * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
  */
 
 /*
@@ -817,6 +817,14 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 	if (!(rtld_flags & RT_FL_NOCFG)) {
 		if ((features = elf_config(mlmp, (aoutdyn != 0))) == -1)
 			return (0);
+	}
+
+	/*
+	 * Initialize our toxic paths
+	 */
+	if (rpl_ldtoxic != NULL) {
+		(void) expand_paths(mlmp, rpl_ldtoxic, &rpl_toxdirs,
+		    AL_CNT_SEARCH, 0, PD_TKN_CAP);
 	}
 
 #if	defined(_ELF64)

@@ -34,7 +34,7 @@ UTSBASE = ../..
 MODULE		= pcbe.AuthenticAMD
 OBJECTS		= $(OPTERON_PCBE_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(OPTERON_PCBE_OBJS:%.o=$(LINTS_DIR)/%.ln)
-ROOTMODULE	= $(USR_PCBE_DIR)/$(MODULE)
+ROOTMODULE	= $(ROOT_PSM_PCBE_DIR)/$(MODULE)
 
 #
 #	Include common rules.

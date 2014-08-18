@@ -23,6 +23,7 @@
  * Copyright (c) 2013 Gary Mills
  *
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -143,6 +144,8 @@
 
 #define	UT_USER_SZ	32	/* Size of a utmpx ut_user field */
 #define	UT_LINE_SZ	32	/* Size of a utmpx ut_line field */
+
+#define	CHECK_SVC	SCF_INSTANCE_FS_MINIMAL
 
 /*
  * SLEEPTIME	The number of seconds "init" sleeps between wakeups if
@@ -696,9 +699,8 @@ main(int argc, char *argv[])
 		console(B_FALSE,
 		    "\n\n%s Release %s Version %s %d-bit\r\n",
 		    un.sysname, un.release, un.version, bits);
-		console(B_FALSE,
-		    "Copyright (c) 1983, 2010, Oracle and/or its affiliates."
-		    " All rights reserved.\r\n");
+		console(B_FALSE, "Copyright (c) 2010-2012, "
+		    "Joyent Inc. All rights reserved.\r\n");
 	}
 
 	/*
@@ -3509,6 +3511,28 @@ bail:
 }
 
 /*
+ * Attempt to confirm that svc.startd is ready to accept a user-initiated
+ * run-level change. startd is not ready until it has started its
+ * _scf_notify_wait thread to watch for events from svc.configd. This is
+ * inherently racy. To workaround this, we check the status of a file that
+ * startd will create once it has started the _scf_notify_wait thread.
+ * If we don't see this file after one minute, then charge ahead.
+ */
+static void
+verify_startd_ready()
+{
+	struct stat64 buf;
+	int i;
+
+	for (i = 0; i < 60; i++) {
+		if (stat64("/etc/svc/volatile/startd.ready", &buf) == 0)
+			return;
+		sleep(1);
+	}
+	console(B_TRUE, "verify startd timeout\n");
+}
+
+/*
  * Function to handle requests from users to main init running as process 1.
  */
 static void
@@ -3594,6 +3618,12 @@ userinit(int argc, char **argv)
 	update_boot_archive(init_signal);
 
 	(void) audit_put_record(ADT_SUCCESS, ADT_SUCCESS, argv[1]);
+
+	/*
+	 * Before we tell init to start a run-level change, we need to be
+	 * sure svc.startd is ready to accept that.
+	 */
+	verify_startd_ready();
 
 	/*
 	 * Signal init; init will take care of telling svc.startd.
@@ -4305,9 +4335,7 @@ contract_event(struct pollfd *poll)
 		if (ret == 0) {
 			if (cookie == STARTD_COOKIE &&
 			    do_restart_startd) {
-				if (smf_debug)
-					console(B_TRUE, "Restarting "
-					    "svc.startd.\n");
+				console(B_TRUE, "Restarting svc.startd.\n");
 
 				/*
 				 * Account for the failure.  If the failure rate

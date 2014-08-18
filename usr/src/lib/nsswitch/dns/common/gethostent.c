@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * gethostent.c
  *
@@ -52,12 +50,6 @@ struct hostent *_gethostbyname(int *h_errnop, const char *name);
 static struct hostent *_gethostbyaddr(int *h_errnop, const char *addr,
     int len, int type);
 struct hostent *_nss_dns_gethostbyname2(int *h_errnop, const char *name);
-
-#pragma weak	res_gethostbyname
-#pragma weak	res_gethostbyname2
-#pragma weak	res_gethostbyaddr
-#pragma weak	res_sethostent
-#pragma weak	res_endhostent
 
 nss_backend_t *_nss_dns_constr(dns_backend_op_t ops[], int n_ops);
 nss_status_t __nss_dns_getbyaddr(dns_backend_ptr_t, void *);

@@ -23,6 +23,9 @@
  * Copyright 2001-2003 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
+ */
 
 /*
  * This header file defines the interfaces available from the CTF debugger
@@ -40,8 +43,6 @@
 #ifndef	_LIBCTF_H
 #define	_LIBCTF_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/ctf_api.h>
 
 #ifdef	__cplusplus
@@ -52,6 +53,21 @@ extern "C" {
  * This flag can be used to enable debug messages.
  */
 extern int _libctf_debug;
+
+typedef enum ctf_diff_flag {
+	CTF_DIFF_F_IGNORE_INTNAMES = 0x01,
+	CTF_DIFF_F_MASK	= 0x01
+} ctf_diff_flag_t;
+
+typedef struct ctf_diff ctf_diff_t;
+typedef void (*ctf_diff_type_f)(ctf_file_t *, ctf_id_t, boolean_t, ctf_file_t *,
+    ctf_id_t, void *);
+
+extern int ctf_diff_init(ctf_file_t *, ctf_file_t *, ctf_diff_t **);
+extern uint_t ctf_diff_getflags(ctf_diff_t *);
+extern int ctf_diff_setflags(ctf_diff_t *, uint_t);
+extern int ctf_diff_types(ctf_diff_t *, ctf_diff_type_f, void *);
+extern void ctf_diff_fini(ctf_diff_t *);
 
 #ifdef	__cplusplus
 }

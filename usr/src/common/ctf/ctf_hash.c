@@ -25,9 +25,8 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <ctf_impl.h>
+#include <sys/debug.h>
 
 static const ushort_t _CTF_EMPTY[1] = { 0 };
 
@@ -175,4 +174,161 @@ ctf_hash_destroy(ctf_hash_t *hp)
 		ctf_free(hp->h_chains, sizeof (ctf_helem_t) * hp->h_nelems);
 		hp->h_chains = NULL;
 	}
+}
+
+int
+ctf_idhash_create(ctf_idhash_t *ihp, ulong_t nelems)
+{
+	if (nelems > USHRT_MAX)
+		return (EOVERFLOW);
+
+	/*
+	 * If the hash table is going to be empty, don't bother allocating any
+	 * memory and make the only bucket point to a zero so lookups fail.
+	 */
+	if (nelems == 0) {
+		bzero(ihp, sizeof (ctf_idhash_t));
+		ihp->ih_buckets = (ushort_t *)_CTF_EMPTY;
+		ihp->ih_nbuckets = 1;
+		return (0);
+	}
+
+	ihp->ih_nbuckets = 211;		/* use a prime number of hash buckets */
+	ihp->ih_nelems = nelems + 1;	/* we use index zero as a sentinel */
+	ihp->ih_free = 1;		/* first free element is index 1 */
+
+	ihp->ih_buckets = ctf_alloc(sizeof (ushort_t) * ihp->ih_nbuckets);
+	ihp->ih_chains = ctf_alloc(sizeof (ctf_ihelem_t) * ihp->ih_nelems);
+
+	if (ihp->ih_buckets == NULL || ihp->ih_chains == NULL) {
+		ctf_idhash_destroy(ihp);
+		return (EAGAIN);
+	}
+
+	bzero(ihp->ih_buckets, sizeof (ushort_t) * ihp->ih_nbuckets);
+	bzero(ihp->ih_chains, sizeof (ctf_ihelem_t) * ihp->ih_nelems);
+
+	return (0);
+}
+
+void
+ctf_idhash_clear(ctf_idhash_t *ihp)
+{
+	/* Nothing to do for a sentinel hash */
+	if (ihp->ih_nbuckets == 1) {
+		ASSERT(ihp->ih_buckets == (ushort_t *)_CTF_EMPTY);
+		return;
+	}
+
+	ihp->ih_free = 1;
+	bzero(ihp->ih_buckets, sizeof (ushort_t) * ihp->ih_nbuckets);
+	bzero(ihp->ih_chains, sizeof (ctf_ihelem_t) * ihp->ih_nelems);
+}
+
+uint_t
+ctf_idhash_size(const ctf_idhash_t *hp)
+{
+	return (hp->ih_nelems ? hp->ih_nelems - 1 : 0);
+}
+
+static ulong_t
+ctf_idhash_compute(ctf_id_t id)
+{
+	return (id);
+}
+
+int
+ctf_idhash_insert(ctf_idhash_t *ihp, ushort_t type, ushort_t value)
+{
+	ctf_ihelem_t *ihep = &ihp->ih_chains[ihp->ih_free];
+	ulong_t h;
+
+	if (ihp->ih_free >= ihp->ih_nelems)
+		return (EOVERFLOW);
+
+	ihep->ih_type = type;
+	ihep->ih_value = value;
+	h = ctf_idhash_compute(type) % ihp->ih_nbuckets;
+	ihep->ih_next = ihp->ih_buckets[h];
+	ihp->ih_buckets[h] = ihp->ih_free++;
+
+	return (0);
+}
+
+int
+ctf_idhash_define(ctf_idhash_t *ihp, ushort_t type, ushort_t value)
+{
+	ctf_ihelem_t *hep = ctf_idhash_lookup(ihp, type);
+
+	if (hep == NULL)
+		return (ctf_idhash_insert(ihp, type, value));
+
+	hep->ih_value = value;
+	return (0);
+}
+
+
+ctf_ihelem_t *
+ctf_idhash_lookup(ctf_idhash_t *ihp, ushort_t key)
+{
+	ctf_ihelem_t *ihep;
+	ushort_t i;
+
+	ulong_t h = ctf_idhash_compute(key) % ihp->ih_nbuckets;
+
+	for (i = ihp->ih_buckets[h]; i != 0; i = ihep->ih_next) {
+		ihep = &ihp->ih_chains[i];
+
+		if (ihep->ih_type == key)
+			return (ihep);
+	}
+
+	return (NULL);
+}
+
+void
+ctf_idhash_destroy(ctf_idhash_t *ihp)
+{
+	if (ihp->ih_buckets != NULL && ihp->ih_nbuckets != 1) {
+		ctf_free(ihp->ih_buckets, sizeof (ushort_t) * ihp->ih_nbuckets);
+		ihp->ih_buckets = NULL;
+	}
+
+	if (ihp->ih_chains != NULL) {
+		ctf_free(ihp->ih_chains, sizeof (ctf_helem_t) * ihp->ih_nelems);
+		ihp->ih_chains = NULL;
+	}
+}
+
+/*ARGSUSED*/
+int
+ctf_idhash_iter_init(ctf_idhash_t *ihp, ctf_idhash_iter_t **iterp)
+{
+
+	*iterp = ctf_alloc(sizeof (ctf_idhash_iter_t));
+	if (*iterp == NULL)
+		return (ENOMEM);
+
+	if (ihp->ih_free == 0)
+		(*iterp)->cii_id = 0;
+	else
+		(*iterp)->cii_id = 1;
+
+	return (0);
+}
+
+const ctf_ihelem_t *
+ctf_idhash_iter(ctf_idhash_t *ihp, ctf_idhash_iter_t *iter)
+{
+	if (iter->cii_id >= ihp->ih_free)
+		return (NULL);
+
+	return (&ihp->ih_chains[iter->cii_id++]);
+}
+
+/*ARGSUSED*/
+void
+ctf_idhash_iter_fini(ctf_idhash_t *ihp, ctf_idhash_iter_t *iter)
+{
+	ctf_free(iter, sizeof (ctf_idhash_iter_t));
 }

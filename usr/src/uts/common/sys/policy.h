@@ -173,6 +173,7 @@ int secpolicy_setid_setsticky_clear(vnode_t *, vattr_t *,
     const vattr_t *, cred_t *);
 int secpolicy_xvattr(xvattr_t *, uid_t, cred_t *, vtype_t);
 int secpolicy_xvm_control(const cred_t *);
+int secpolicy_hyprlofs_control(const cred_t *);
 
 int secpolicy_basic_exec(const cred_t *, vnode_t *);
 int secpolicy_basic_fork(const cred_t *);

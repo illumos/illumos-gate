@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2011 Joyent, Inc.  All rights reserved.
  */
 
 #ifndef	_SYS_DLS_IMPL_H
@@ -61,6 +62,7 @@ struct dls_link_s {				/* Protected by */
 	uint_t			dl_zone_ref;
 	link_tagmode_t		dl_tagmode;		/* atomic */
 	uint_t			dl_nonip_cnt;		/* SL */
+	uint_t			dl_exclusive;		/* SL */
 };
 
 typedef struct dls_head_s {
@@ -96,7 +98,8 @@ extern void		dls_create_str_kstats(dld_str_t *);
 extern int		dls_stat_update(kstat_t *, dls_link_t *, int);
 extern int		dls_stat_create(const char *, int, const char *,
 			    zoneid_t, int (*)(struct kstat *, int), void *,
-			    kstat_t **);
+			    kstat_t **, zoneid_t);
+extern void	dls_stat_delete(kstat_t *);
 
 extern int		dls_devnet_open_by_dev(dev_t, dls_link_t **,
 			    dls_dl_handle_t *);
@@ -126,6 +129,7 @@ extern void		dls_mgmt_init(void);
 extern void		dls_mgmt_fini(void);
 
 extern int		dls_mgmt_get_phydev(datalink_id_t, dev_t *);
+extern int		dls_exclusive_set(dld_str_t *, boolean_t);
 
 #ifdef	__cplusplus
 }

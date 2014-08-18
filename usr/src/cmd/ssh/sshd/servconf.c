@@ -155,6 +155,7 @@ initialize_server_options(ServerOptions *options)
 	options->pre_userauth_hook = NULL;
 	options->pam_service_name = NULL;
 	options->pam_service_prefix = NULL;
+	options->pubkey_plugin = NULL;
 }
 
 #ifdef HAVE_DEFOPEN
@@ -419,13 +420,14 @@ typedef enum {
 	sPermitUserEnvironment, sUseLogin, sAllowTcpForwarding, sCompression,
 	sAllowUsers, sDenyUsers, sAllowGroups, sDenyGroups,
 	sIgnoreUserKnownHosts, sCiphers, sMacs, sProtocol, sPidFile,
-	sGatewayPorts, sPubkeyAuthentication, sXAuthLocation, sSubsystem, sMaxStartups,
+	sGatewayPorts, sPubkeyAuthentication, sXAuthLocation, sSubsystem, 
 	sBanner, sVerifyReverseMapping, sHostbasedAuthentication,
 	sHostbasedUsesNameFromPacketOnly, sClientAliveInterval,
 	sClientAliveCountMax, sAuthorizedKeysFile, sAuthorizedKeysFile2,
 	sMaxAuthTries, sMaxAuthTriesLog, sUsePrivilegeSeparation,
 	sLookupClientHostnames, sUseOpenSSLEngine, sChrootDirectory,
 	sPreUserauthHook, sMatch, sPAMServicePrefix, sPAMServiceName,
+	sMaxStartups, sPubKeyPlugin,
 	sDeprecated
 } ServerOpCodes;
 
@@ -532,6 +534,7 @@ static struct {
 	{ "match", sMatch, SSHCFG_ALL },
 	{ "pamserviceprefix", sPAMServicePrefix, SSHCFG_GLOBAL },
 	{ "pamservicename", sPAMServiceName, SSHCFG_GLOBAL },
+	{ "pubkeyplugin", sPubKeyPlugin, SSHCFG_ALL },
 
 	{ NULL, sBadOption, 0 }
 };
@@ -1355,6 +1358,10 @@ parse_flag:
 		if (options->pam_service_name == NULL)
 			options->pam_service_name = xstrdup(arg);
 		break;
+
+	case sPubKeyPlugin:
+		charptr = &options->pubkey_plugin;
+		goto parse_filename;
 
 	default:
 		fatal("%s line %d: Missing handler for opcode %s (%d)",

@@ -101,8 +101,7 @@ record_login(pid_t pid, const char *ttyname, const char *progname,
         fatal_cleanup();
       }
     }
-    remote_name_or_ip = get_remote_name_or_ip(utmp_len,
-      options.verify_reverse_mapping);
+    remote_name_or_ip = get_remote_ipaddr();
 
     initialized = 1;
   }

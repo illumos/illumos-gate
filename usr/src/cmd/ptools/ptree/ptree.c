@@ -21,13 +21,12 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
  */
 
 /*
  * ptree -- print family tree of processes
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <assert.h>
 #include <stdio.h>
@@ -48,6 +47,7 @@
 #include <sys/ctfs.h>
 #include <libcontract_priv.h>
 #include <sys/stat.h>
+#include "ptools_common.h"
 
 #define	FAKEDPID0(p)	(p->pid == 0 && p->psargs[0] == '\0')
 
@@ -103,10 +103,11 @@ main(int argc, char **argv)
 	char *s;
 	int n;
 	int retc = 0;
+	char ppath[PATH_MAX];
 
 	DIR *dirp;
 	struct dirent *dentp;
-	char	pname[100];
+	char	pname[PATH_MAX];
 	int	pdlen;
 
 	ps_t *p;
@@ -169,16 +170,18 @@ main(int argc, char **argv)
 	psize = 0;
 	ps = NULL;
 
+	(void) proc_snprintf(ppath, sizeof (ppath), "/proc");
+
 	/*
 	 * Search the /proc directory for all processes.
 	 */
-	if ((dirp = opendir("/proc")) == NULL) {
-		(void) fprintf(stderr, "%s: cannot open /proc directory\n",
-		    command);
+	if ((dirp = opendir(ppath)) == NULL) {
+		(void) fprintf(stderr, "%s: cannot open %s directory\n",
+		    command, ppath);
 		return (1);
 	}
 
-	(void) strcpy(pname, "/proc");
+	(void) strcpy(pname, ppath);
 	pdlen = strlen(pname);
 	pname[pdlen++] = '/';
 

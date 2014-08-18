@@ -10,17 +10,17 @@ zonecfg \- set up zone configuration
 .SH SYNOPSIS
 .LP
 .nf
-\fBzonecfg\fR \fB-z\fR \fIzonename\fR
+\fBzonecfg\fR {\fB-z\fR \fIzonename\fR | \fB-u\fR \fIuuid\fR}
 .fi
 
 .LP
 .nf
-\fBzonecfg\fR \fB-z\fR \fIzonename\fR \fIsubcommand\fR
+\fBzonecfg\fR {\fB-z\fR \fIzonename\fR | \fB-u\fR \fIuuid\fR} \fIsubcommand\fR
 .fi
 
 .LP
 .nf
-\fBzonecfg\fR \fB-z\fR \fIzonename\fR \fB-f\fR \fIcommand_file\fR
+\fBzonecfg\fR {\fB-z\fR \fIzonename\fR | \fB-u\fR \fIuuid\fR} \fB-f\fR \fIcommand_file\fR
 .fi
 
 .LP
@@ -43,7 +43,8 @@ The following synopsis of the \fBzonecfg\fR command is for interactive usage:
 .sp
 .in +2
 .nf
-zonecfg \fB-z\fR \fIzonename subcommand\fR
+{\fB-z\fR \fIzonename\fR | \fB-u\fR \fIuuid\fR}
+zonecfg {\fB-z\fR \fIzonename | \fB-u\fR \fIuuid} subcommand\fR
 .fi
 .in -2
 .sp
@@ -337,6 +338,16 @@ The following properties are supported:
 .sp
 .ne 2
 .na
+\fB(global)\fR
+.ad
+.sp .6
+.RS 4n
+\fBzfs-io-priority\fR
+.RE
+
+.sp
+.ne 2
+.na
 \fB\fBfs\fR\fR
 .ad
 .sp .6
@@ -351,7 +362,7 @@ The following properties are supported:
 .ad
 .sp .6
 .RS 4n
-\fBaddress\fR, \fBphysical\fR, \fBdefrouter\fR
+\fBaddress\fR, \fBallowed-address\fR, \fBdefrouter\fR, \fBglobal-nic\fR, \fBmac-addr\fR, \fBphysical\fR, \fBproperty\fR, \fBvlan-id\fR
 .RE
 
 .sp
@@ -614,7 +625,17 @@ Values needed to determine how, where, and so forth to mount file systems. See
 .sp
 .ne 2
 .na
-\fB\fBnet\fR: address, physical, defrouter\fR
+\fB\fBinherit-pkg-dir\fR: dir\fR
+.ad
+.sp .6
+.RS 4n
+The directory path.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBnet\fR: address, allowed-address, defrouter, global-nic, mac-addr, physical, property, vlan-id\fR
 .ad
 .sp .6
 .RS 4n
@@ -652,6 +673,10 @@ property must be plumbed in the global zone prior to booting the non-global
 zone. However, if the interface is not used by the global zone, it should be
 configured \fBdown\fR in the global zone, and the default router for the
 interface should be specified here.
+.sp
+The global-nic is used for exclusive stack zones which will use a VNIC on-demand.  When the zone boots, a VNIC named using the physical property will be created on the global NIC.  If provided, the mac-addr and vlan-id will be set on this VNIC.
+.sp
+The \fBproperty\fR setting is a resource which can be used to set arbitrary name/value pairs on the network.  These name/value pairs are made available to the zone's brand, which can use them as needed to set up the network interface.
 .sp
 For an exclusive-IP zone, the physical property must be set and the address and
 default router properties cannot be set.
@@ -884,6 +909,16 @@ is not supported.
 .RE
 
 .sp
+.ne 2
+.na
+\fBglobal: \fBzfs-io-priority\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies a priority for this zone's ZFS I/O. The priority is used by the ZFS I/O scheduler as in input to determine how to schedule I/O across zones. By default all zones have a priority of 1. The value can be increased for zones whose I/O is more critical. This property is the preferred way to set the \fBzone.zfs-io-priority\fR rctl.
+.RE
+
+.sp
 .LP
 The following table summarizes resources, property-names, and types:
 .sp
@@ -906,13 +941,22 @@ resource          property-name   type
 (global)          max-shm-ids     simple
 (global)          max-shm-memory  simple
 (global)          scheduling-class simple
+(global)          zfs-io-priority simple
 fs                dir             simple
                    special         simple
                    raw             simple
                    type            simple
                    options         list of simple
 net               address         simple
+                   allowed-address simple
+                   defrouter       simple
+                   global-nic      simple
+                   mac-addr        simple
                    physical        simple
+                   property        list of complex
+                    name            simple
+                    value           simple
+                   vlan-id         simple
 device            match           simple
 rctl              name            simple
                    value           list of complex
@@ -1125,6 +1169,16 @@ name \fBglobal\fR and all names beginning with \fBSUNW\fR are reserved and
 cannot be used.
 .RE
 
+.sp
+.ne 2
+.na
+\fB\fB-u\fR \fIuuid\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specify the uuid of a zone instead of the Zone name.
+.RE
+
 .SH SUBCOMMANDS
 .sp
 .LP
@@ -1215,8 +1269,7 @@ correct to be committed, this operation automatically does a verify.
 .sp
 .ne 2
 .na
-\fB\fBcreate [\fR\fB-F\fR\fB] [\fR \fB-a\fR \fIpath\fR |\fB-b\fR \fB|\fR
-\fB-t\fR \fItemplate\fR\fB]\fR\fR
+\fB\fBcreate [\fR\fB-F\fR\fB] [\fR \fB-a\fR \fIpath\fR |\fB-b\fR \fB|\fR \fB-t\fR \fItemplate\fR\fB] [\fR\fB-X\fR\fB]\fR\fR
 .ad
 .sp .6
 .RS 4n
@@ -1238,6 +1291,8 @@ configured, it should be installed using the "\fBzoneadm attach\fR" command
 .sp
 Use the \fB-b\fR option to create a blank configuration. Without arguments,
 \fBcreate\fR applies the Sun default settings.
+.sp
+Use the \fB-X\fR option to facilitate creating a zone whose XML definition already exists on the host. The zone will be atomically added to the zone index file.
 .RE
 
 .sp
@@ -1314,18 +1369,21 @@ which is currently being added or modified.
 .sp
 .ne 2
 .na
-\fB\fBremove\fR \fIresource-type\fR\fB{\fR\fIproperty-name\fR\fB=\fR\fIproperty
--value\fR\fB}\fR(global scope)\fR
+\fB\fBremove\fR [\fR\fB-F\fR\fB] \fIresource-type\fR\fB [\fR\fIproperty-name\fR\fB=\fR\fIproperty-value\fR\fB]* \fR(global scope)\fR
+.br
+\fB\fBremove\fR \fR\fIproperty-name\fR\fB \fR\fIproperty-value\fR\fB \fR(resource scope)\fR
 .ad
 .sp .6
 .RS 4n
 In the global scope, removes the specified resource. The \fB[]\fR syntax means
-0 or more of whatever is inside the square braces. If you want only to remove a
+0 or more property name-value pairs. If you want to only remove a
 single instance of the resource, you must specify enough property name-value
 pairs for the resource to be uniquely identified. If no property name-value
 pairs are specified, all instances will be removed. If there is more than one
-pair is specified, a confirmation is required, unless you use the \fB-F\fR
-option.
+pair specified, a confirmation is required, unless you use the \fB-F\fR
+option. Likewise, the \fB-F\fR option can be used to remove a resource that
+does not exist (that is, no error will occur). In the resource scope, remove
+the specified name-value pair.
 .RE
 
 .sp

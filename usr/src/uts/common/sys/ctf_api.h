@@ -169,7 +169,9 @@ extern const char *ctf_errmsg(int);
 extern int ctf_version(int);
 
 extern int ctf_func_info(ctf_file_t *, ulong_t, ctf_funcinfo_t *);
+extern int ctf_func_info_by_id(ctf_file_t *, ctf_id_t, ctf_funcinfo_t *);
 extern int ctf_func_args(ctf_file_t *, ulong_t, uint_t, ctf_id_t *);
+extern int ctf_func_args_by_id(ctf_file_t *, ctf_id_t, uint_t, ctf_id_t *);
 
 extern ctf_id_t ctf_lookup_by_name(ctf_file_t *, const char *);
 extern ctf_id_t ctf_lookup_by_symbol(ctf_file_t *, ulong_t);
@@ -239,6 +241,34 @@ struct module;
 extern ctf_file_t *ctf_modopen(struct module *, int *);
 
 #endif
+
+typedef struct ctf_ihelem {
+	ushort_t ih_type;	/* type ID number */
+	ushort_t ih_value;	/* type ID number in a different fp */
+	ushort_t ih_next;	/* index of next element in hash chain */
+} ctf_ihelem_t;
+
+typedef struct ctf_idhash {
+	ushort_t *ih_buckets;	/* hash bucket array (chain indices) */
+	ctf_ihelem_t *ih_chains;	/* hash chains buffer */
+	ushort_t ih_nbuckets;	/* number of elements in bucket array */
+	ushort_t ih_nelems;	/* number of elements in hash table */
+	uint_t ih_free;		/* index of next free hash element */
+} ctf_idhash_t;
+
+extern int ctf_idhash_create(ctf_idhash_t *, ulong_t);
+extern void ctf_idhash_clear(ctf_idhash_t *);
+extern int ctf_idhash_define(ctf_idhash_t *, ushort_t, ushort_t);
+extern int ctf_idhash_insert(ctf_idhash_t *, ushort_t, ushort_t);
+extern ctf_ihelem_t *ctf_idhash_lookup(ctf_idhash_t *, ushort_t);
+extern uint_t ctf_idhash_size(const ctf_idhash_t *);
+extern void ctf_idhash_destroy(ctf_idhash_t *);
+
+typedef struct ctf_idhash_iter ctf_idhash_iter_t;
+extern int ctf_idhash_iter_init(ctf_idhash_t *, ctf_idhash_iter_t **);
+extern const ctf_ihelem_t *ctf_idhash_iter(ctf_idhash_t *,
+    ctf_idhash_iter_t *);
+extern void ctf_idhash_iter_fini(ctf_idhash_t *, ctf_idhash_iter_t *);
 
 #ifdef	__cplusplus
 }

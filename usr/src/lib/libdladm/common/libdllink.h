@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011, Joyent Inc. All rights reserved.
  */
 
 #ifndef _LIBDLLINK_H
@@ -121,7 +122,7 @@ extern dladm_status_t	dladm_info(dladm_handle_t, datalink_id_t,
 			    dladm_attr_t *);
 
 extern dladm_status_t	dladm_rename_link(dladm_handle_t, const char *,
-			    const char *);
+			    const char *, const char *);
 
 extern dladm_status_t	dladm_set_linkprop(dladm_handle_t, datalink_id_t,
 			    const char *, char **, uint_t, uint_t);
@@ -170,6 +171,9 @@ extern dladm_status_t	dladm_up_datalink_id(dladm_handle_t, datalink_id_t);
 extern dladm_status_t	dladm_name2info(dladm_handle_t, const char *,
 			    datalink_id_t *, uint32_t *, datalink_class_t *,
 			    uint32_t *);
+extern dladm_status_t	dladm_zname2info(dladm_handle_t, const char *,
+			    const char *, datalink_id_t *, uint32_t *,
+			    datalink_class_t *, uint32_t *);
 extern dladm_status_t	dladm_datalink_id2info(dladm_handle_t, datalink_id_t,
 			    uint32_t *, datalink_class_t *, uint32_t *, char *,
 			    size_t);

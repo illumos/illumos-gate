@@ -1,0 +1,54 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2010 Joyent, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+set name=pkg.fmri value=pkg:/system/zones/brand/joyent@$(PKGVERS)
+set name=pkg.description value="Support for the 'joyent' Brand"
+set name=pkg.summary value="Joyent Containers: joyent brand support"
+set name=info.classification \
+    value=org.opensolaris.category.2008:System/Virtualization
+set name=variant.arch value=$(ARCH)
+dir path=etc group=sys
+dir path=etc/zones group=sys
+dir path=lib variant.opensolaris.zone=global
+dir path=lib/svc variant.opensolaris.zone=global
+dir path=lib/svc/manifest group=sys variant.opensolaris.zone=global
+dir path=lib/svc/manifest/system group=sys variant.opensolaris.zone=global
+dir path=lib/svc/method variant.opensolaris.zone=global
+dir path=usr group=sys
+dir path=usr/lib
+dir path=usr/lib/brand
+dir path=usr/lib/brand/joyent group=sys
+file path=etc/zones/Joyent.xml mode=0444
+file path=lib/svc/manifest/system/joyinit.xml group=sys mode=0444 \
+    variant.opensolaris.zone=global
+file path=lib/svc/method/svc-joyinit mode=0555 variant.opensolaris.zone=global
+file path=usr/lib/brand/joyent/config.xml mode=0444
+file path=usr/lib/brand/joyent/jinstall mode=0755
+file path=usr/lib/brand/joyent/juninstall mode=0755
+file path=usr/lib/brand/joyent/pinstall mode=0755
+file path=usr/lib/brand/joyent/platform.xml mode=0444
+file path=usr/lib/brand/joyent/prestate mode=0755
+license lic_CDDL license=lic_CDDL

@@ -21,11 +21,13 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012, 2014 by Delphix. All rights reserved.
+ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2013 Joyent, Inc.  All rights reserved.
  */
 
 #include <sys/zfs_context.h>
+#include <sys/zfs_zone.h>
 #include <sys/spa_impl.h>
 #include <sys/refcount.h>
 #include <sys/vdev_disk.h>
@@ -43,6 +45,11 @@
 extern ldi_ident_t zfs_li;
 
 static void vdev_disk_close(vdev_t *);
+
+typedef struct vdev_disk_buf {
+	buf_t	vdb_buf;
+	zio_t	*vdb_io;
+} vdev_disk_buf_t;
 
 typedef struct vdev_disk_ldi_cb {
 	list_node_t		lcb_next;
@@ -127,6 +134,8 @@ vdev_disk_off_finalize(ldi_handle_t lh, ldi_ev_cookie_t ecookie,
     int ldi_result, void *arg, void *ev_data)
 {
 	vdev_t *vd = (vdev_t *)arg;
+	vdev_disk_t *dvd = vd->vdev_tsd;
+	vdev_disk_ldi_cb_t *lcb;
 
 	/*
 	 * Ignore events other than offline.
@@ -586,6 +595,7 @@ static void
 vdev_disk_close(vdev_t *vd)
 {
 	vdev_disk_t *dvd = vd->vdev_tsd;
+	vdev_disk_ldi_cb_t *lcb;
 
 	if (vd->vdev_reopening || dvd == NULL)
 		return;
@@ -809,6 +819,8 @@ vdev_disk_io_start(zio_t *zio)
 	bp->b_bufsize = zio->io_size;
 	bp->b_iodone = (int (*)())vdev_disk_io_intr;
 
+	zfs_zone_zio_start(zio);
+
 	/* ldi_strategy() will return non-zero only on programming errors */
 	VERIFY(ldi_strategy(dvd->vd_lh, bp) == 0);
 
@@ -819,6 +831,8 @@ static void
 vdev_disk_io_done(zio_t *zio)
 {
 	vdev_t *vd = zio->io_vd;
+
+	zfs_zone_zio_done(zio);
 
 	/*
 	 * If the device returned EIO, then attempt a DKIOCSTATE ioctl to see if

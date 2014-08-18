@@ -21,9 +21,8 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdio_ext.h>
@@ -37,6 +36,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <libproc.h>
+#include "ptools_common.h"
 
 /* evil knowledge of libc internals */
 #include "../../../lib/libc/inc/thr_uberdata.h"
@@ -172,7 +172,7 @@ lwp_iter(void *cd, const lwpstatus_t *lwpstatus)
 static int
 look(char *arg)
 {
-	char pathname[100];
+	char pathname[PATH_MAX];
 	struct stat statb;
 	int fd = -1;
 	int sig, gcode;
@@ -199,7 +199,8 @@ look(char *arg)
 	(void) memcpy(&psinfo, psinfop, sizeof (psinfo_t));
 	proc_unctrl_psinfo(&psinfo);
 
-	(void) sprintf(pathname, "/proc/%d/sigact", (int)psinfo.pr_pid);
+	(void) proc_snprintf(pathname, sizeof (pathname), "/proc/%d/sigact",
+	    (int)psinfo.pr_pid);
 	if ((fd = open(pathname, O_RDONLY)) < 0) {
 		perr("open sigact");
 		goto look_error;
@@ -213,8 +214,8 @@ look(char *arg)
 	action = malloc(maxsig * sizeof (struct sigaction));
 	if (action == NULL) {
 		(void) fprintf(stderr,
-		"%s: cannot malloc() space for %d sigaction structures\n",
-			command, maxsig);
+		    "%s: cannot malloc() space for %d sigaction structures\n",
+		    command, maxsig);
 		goto look_error;
 	}
 	if (read(fd, (char *)action, maxsig * sizeof (struct sigaction)) !=
@@ -239,7 +240,7 @@ look(char *arg)
 		if (psinfo.pr_dmodel != PR_MODEL_NATIVE) {
 			caddr32_t addr;
 			aharraddr = uberaddr +
-				offsetof(uberdata32_t, siguaction);
+			    offsetof(uberdata32_t, siguaction);
 			aharrlen = sizeof (siguaction32_t) * NSIG;
 			(void) Pread(Pr, &addr, sizeof (addr),
 			    uberaddr + offsetof(uberdata32_t, sigacthandler));
@@ -248,7 +249,7 @@ look(char *arg)
 #endif
 		{
 			aharraddr = uberaddr +
-				offsetof(uberdata_t, siguaction);
+			    offsetof(uberdata_t, siguaction);
 			aharrlen = sizeof (siguaction_t) * NSIG;
 			(void) Pread(Pr, &intfnaddr, sizeof (intfnaddr),
 			    uberaddr + offsetof(uberdata_t, sigacthandler));
@@ -323,7 +324,7 @@ look(char *arg)
 					(void) printf("\t%-8s", hname);
 				else
 					(void) printf("\t0x%-8lx",
-						(ulong_t)haddr);
+					    (ulong_t)haddr);
 
 				s = sigflags(sig, sp->sa_flags);
 				(void) printf("%s", (*s != '\0')? s : "\t0");
@@ -334,7 +335,7 @@ look(char *arg)
 			}
 		} else if (sig == SIGCLD) {
 			s = sigflags(sig,
-				sp->sa_flags & (SA_NOCLDWAIT|SA_NOCLDSTOP));
+			    sp->sa_flags & (SA_NOCLDWAIT|SA_NOCLDSTOP));
 			if (*s != '\0')
 				(void) printf("\t\t%s", s);
 		}
@@ -371,7 +372,7 @@ sigflags(int sig, int flags)
 	static char code_buf[100];
 	char *str = code_buf;
 	int flagmask =
-		(SA_ONSTACK|SA_RESETHAND|SA_RESTART|SA_SIGINFO|SA_NODEFER);
+	    (SA_ONSTACK|SA_RESETHAND|SA_RESTART|SA_SIGINFO|SA_NODEFER);
 
 	if (sig == SIGCLD)
 		flagmask |= (SA_NOCLDSTOP|SA_NOCLDWAIT);
@@ -414,19 +415,19 @@ deinterpose(int sig, void *aharr, psinfo_t *psinfo, struct sigaction *sp)
 #ifdef _LP64
 	if (psinfo->pr_dmodel != PR_MODEL_NATIVE) {
 		struct sigaction32 *sa32 = (struct sigaction32 *)
-			((uintptr_t)aharr + sig * sizeof (siguaction32_t) +
-			offsetof(siguaction32_t, sig_uaction));
+		    ((uintptr_t)aharr + sig * sizeof (siguaction32_t) +
+		    offsetof(siguaction32_t, sig_uaction));
 
 		sp->sa_flags = sa32->sa_flags;
 		sp->sa_handler = (void (*)())(uintptr_t)sa32->sa_handler;
 		(void) memcpy(&sp->sa_mask, &sa32->sa_mask,
-			sizeof (sp->sa_mask));
+		    sizeof (sp->sa_mask));
 	} else
 #endif
 	{
 		struct sigaction *sa = (struct sigaction *)
-			((uintptr_t)aharr + sig * sizeof (siguaction_t) +
-			offsetof(siguaction_t, sig_uaction));
+		    ((uintptr_t)aharr + sig * sizeof (siguaction_t) +
+		    offsetof(siguaction_t, sig_uaction));
 
 		sp->sa_flags = sa->sa_flags;
 		sp->sa_handler = sa->sa_handler;

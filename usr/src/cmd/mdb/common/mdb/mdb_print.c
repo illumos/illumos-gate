@@ -2104,10 +2104,10 @@ cmd_print_tab_common(mdb_tab_cookie_t *mcp, uint_t flags, int argc,
 
 	/*
 	 * This is the reason that tab completion was created. We're going to go
-	 * along and walk the delimiters until we find something a member that
-	 * we don't recognize, at which point we'll try and tab complete it.
-	 * Note that ::print takes multiple args, so this is going to operate on
-	 * whatever the last arg that we have is.
+	 * along and walk the delimiters until we find something in a member
+	 * that we don't recognize, at which point we'll try and tab complete
+	 * it.  Note that ::print takes multiple args, so this is going to
+	 * operate on whatever the last arg that we have is.
 	 */
 	if (mdb_ctf_lookup_by_name(tn, &id) != 0)
 		return (1);
@@ -2117,11 +2117,11 @@ cmd_print_tab_common(mdb_tab_cookie_t *mcp, uint_t flags, int argc,
 	delim = parse_delimiter(&start);
 
 	/*
-	 * If we hit the case where we actually have no delimiters, than we need
+	 * If we hit the case where we actually have no delimiters, then we need
 	 * to make sure that we properly set up the fields the loops would.
 	 */
 	if (delim == MEMBER_DELIM_DONE)
-		(void) mdb_snprintf(member, sizeof (member), "%s", start);
+		(void) mdb_snprintf(member, sizeof (member), start);
 
 	while (delim != MEMBER_DELIM_DONE) {
 		switch (delim) {
@@ -2178,7 +2178,7 @@ cmd_print_tab_common(mdb_tab_cookie_t *mcp, uint_t flags, int argc,
 
 		/*
 		 * We are going to try to resolve this name as a member. There
-		 * are a few two different questions that we need to answer. The
+		 * are a two different questions that we need to answer. The
 		 * first is do we recognize this member. The second is are we at
 		 * the end of the string. If we encounter a member that we don't
 		 * recognize before the end, then we have to error out and can't
@@ -2208,6 +2208,7 @@ cmd_print_tab_common(mdb_tab_cookie_t *mcp, uint_t flags, int argc,
 	 * already have in rid.
 	 */
 	return (mdb_tab_complete_member_by_id(mcp, rid, member));
+
 }
 
 int
@@ -2537,8 +2538,7 @@ print_help(void)
 }
 
 static int
-printf_signed(mdb_ctf_id_t id, uintptr_t addr, ulong_t off, char *fmt,
-    boolean_t sign)
+printf_signed(mdb_ctf_id_t id, uintptr_t addr, ulong_t off, char *fmt, int sign)
 {
 	ssize_t size;
 	mdb_ctf_id_t base;
@@ -2556,7 +2556,7 @@ printf_signed(mdb_ctf_id_t id, uintptr_t addr, ulong_t off, char *fmt,
 	} u;
 
 	if (mdb_ctf_type_resolve(id, &base) == -1) {
-		mdb_warn("could not resolve type");
+		mdb_warn("could not resolve type\n");
 		return (DCMD_ABORT);
 	}
 
@@ -2566,7 +2566,7 @@ printf_signed(mdb_ctf_id_t id, uintptr_t addr, ulong_t off, char *fmt,
 	}
 
 	if (mdb_ctf_type_encoding(base, &e) != 0) {
-		mdb_warn("could not get type encoding");
+		mdb_warn("could not get type encoding\n");
 		return (DCMD_ABORT);
 	}
 
@@ -2768,7 +2768,6 @@ printf_string(mdb_ctf_id_t id, uintptr_t addr, ulong_t off, char *fmt)
 	if (size != 1) {
 		mdb_warn("string format specifier requires "
 		    "an array of characters\n");
-		return (DCMD_ABORT);
 	}
 
 	bzero(buf, sizeof (buf));
@@ -2902,7 +2901,7 @@ cmd_printf(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	if (argc == 0 || argv[0].a_type != MDB_TYPE_STRING) {
 		mdb_warn("expected a format string\n");
-		return (DCMD_USAGE);
+		return (DCMD_ABORT);
 	}
 
 	/*
@@ -2911,12 +2910,6 @@ cmd_printf(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	 * subset of mdb_printf() format strings that we allow.
 	 */
 	fmt = argv[0].a_un.a_str;
-	/*
-	 * 'dest' must be large enough to hold a copy of the format string,
-	 * plus a NUL and up to 2 additional characters for each conversion
-	 * in the format string.  This gives us a bloat factor of 5/2 ~= 3.
-	 *   e.g. "%d" (strlen of 2) --> "%lld\0" (need 5 bytes)
-	 */
 	dest = mdb_zalloc(strlen(fmt) * 3, UM_SLEEP | UM_GC);
 	fmts = mdb_zalloc(strlen(fmt) * sizeof (char *), UM_SLEEP | UM_GC);
 	funcs = mdb_zalloc(strlen(fmt) * sizeof (void *), UM_SLEEP | UM_GC);
@@ -3099,22 +3092,22 @@ static char _mdb_printf_help[] =
 "\n"
 "  %%    Prints the '%' symbol.\n"
 "  %a    Prints the member in symbolic form.\n"
-"  %d    Prints the member as a decimal integer.  If the member is a signed\n"
+"  %d    Prints the member as a decimal integer. If the member is a signed\n"
 "        integer type, the output will be signed.\n"
 "  %H    Prints the member as a human-readable size.\n"
 "  %I    Prints the member as an IPv4 address (must be 32-bit integer type).\n"
 "  %N    Prints the member as an IPv6 address (must be of type in6_addr_t).\n"
 "  %o    Prints the member as an unsigned octal integer.\n"
 "  %p    Prints the member as a pointer, in hexadecimal.\n"
-"  %q    Prints the member in signed octal.  Honk if you ever use this!\n"
-"  %r    Prints the member as an unsigned value in the current output radix.\n"
-"  %R    Prints the member as a signed value in the current output radix.\n"
+"  %q    Prints the member in signed octal. Honk if you ever use this!\n"
+"  %r    Prints the member as an unsigned value in the current output radix. \n"
+"  %R    Prints the member as a signed value in the current output radix. \n"
 "  %s    Prints the member as a string (requires a pointer or an array of\n"
 "        characters).\n"
 "  %u    Prints the member as an unsigned decimal integer.\n"
 "  %x    Prints the member in hexadecimal.\n"
 "  %X    Prints the member in hexadecimal, using the characters A-F as the\n"
-"        digits for the values 10-15.\n"
+"        digits for the values 10-15. \n"
 "  %Y    Prints the member as a time_t as the string "
 	    "'year month day HH:MM:SS'.\n"
 "\n"
@@ -3127,13 +3120,13 @@ static char _mdb_printf_help[] =
 "\n"
 "The following flag specifers are recognized by ::printf:\n"
 "\n"
-"  %-    Left-justify the output within the specified field width.  If the\n"
+"  %-    Left-justify the output within the specified field width. If the\n"
 "        width of the output is less than the specified field width, the\n"
-"        output will be padded with blanks on the right-hand side.  Without\n"
+"        output will be padded with blanks on the right-hand side. Without\n"
 "        %-, values are right-justified by default.\n"
 "\n"
 "  %0    Zero-fill the output field if the output is right-justified and the\n"
-"        width of the output is less than the specified field width.  Without\n"
+"        width of the output is less than the specified field width. Without\n"
 "        %0, right-justified values are prepended with blanks in order to\n"
 "        fill the field.\n"
 "\n"

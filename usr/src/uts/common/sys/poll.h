@@ -30,6 +30,10 @@
  * All rights reserved.
  */
 
+/*
+ * Copyright (c) 2014, Joyent, Inc. All rights reserved.
+ */
+
 #ifndef _SYS_POLL_H
 #define	_SYS_POLL_H
 
@@ -59,6 +63,7 @@ typedef unsigned long	nfds_t;
 #define	POLLWRNORM	POLLOUT
 #define	POLLRDBAND	0x0080		/* out-of-band data is readable */
 #define	POLLWRBAND	0x0100		/* out-of-band data is writeable */
+#define	POLLRDHUP	0x4000		/* read-side hangup */
 
 #define	POLLNORM	POLLRDNORM
 
@@ -70,7 +75,13 @@ typedef unsigned long	nfds_t;
 #define	POLLHUP		0x0010		/* fd has been hung up on */
 #define	POLLNVAL	0x0020		/* invalid pollfd entry */
 
-#define	POLLREMOVE	0x0800	/* remove a cached poll fd from /dev/poll */
+/*
+ * These events will never be specified in revents, but may be specified in
+ * events to control /dev/poll behavior.
+ */
+#define	POLLREMOVE	0x0800		/* remove cached /dev/poll fd */
+#define	POLLONESHOT	0x1000		/* /dev/poll should one-shot this fd */
+#define	POLLET		0x2000		/* edge-triggered /dev/poll fd */
 
 #ifdef _KERNEL
 

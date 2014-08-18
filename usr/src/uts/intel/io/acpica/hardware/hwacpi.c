@@ -6,7 +6,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2011, Intel Corp.
+ * Copyright (C) 2000 - 2012, Intel Corp.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -52,6 +52,7 @@
         ACPI_MODULE_NAME    ("hwacpi")
 
 
+#if (!ACPI_REDUCED_HARDWARE) /* Entire module */
 /******************************************************************************
  *
  * FUNCTION:    AcpiHwSetMode
@@ -204,3 +205,5 @@ AcpiHwGetMode (
         return_UINT32 (ACPI_SYS_MODE_LEGACY);
     }
 }
+
+#endif /* !ACPI_REDUCED_HARDWARE */

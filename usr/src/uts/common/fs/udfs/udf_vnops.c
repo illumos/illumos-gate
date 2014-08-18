@@ -911,7 +911,7 @@ udf_rename(
 	caller_context_t *ct,
 	int flags)
 {
-	int32_t error = 0;
+	int32_t error = 0, err;
 	struct udf_vfs *udf_vfsp;
 	struct ud_inode *sip;		/* source inode */
 	struct ud_inode *sdp, *tdp;	/* source and target parent inode */
@@ -995,7 +995,6 @@ udf_rename(
 		rw_exit(&tdp->i_rwlock);
 		goto errout;
 	}
-	vnevent_rename_src(ITOV(sip), sdvp, snm, ct);
 	rw_exit(&tdp->i_rwlock);
 
 	rw_enter(&sdp->i_rwlock, RW_WRITER);
@@ -1006,11 +1005,15 @@ udf_rename(
 	 * If the entry has changed just forget about it.  Release
 	 * the source inode.
 	 */
-	if ((error = ud_dirremove(sdp, snm, sip, (struct vnode *)0,
+	if ((error = err = ud_dirremove(sdp, snm, sip, (struct vnode *)0,
 	    DR_RENAME, cr, ct)) == ENOENT) {
 		error = 0;
 	}
 	rw_exit(&sdp->i_rwlock);
+
+	if (err == 0)
+		vnevent_rename_src(ITOV(sip), sdvp, snm, ct);
+
 errout:
 	ITIMES(sdp);
 	ITIMES(tdp);

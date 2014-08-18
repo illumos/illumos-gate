@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2011 Joyent, Inc.  All rights reserved.
  */
 
 #ifndef	_SYS_DLS_H
@@ -85,6 +86,7 @@ typedef struct dls_link_s	dls_link_t;
 #define	DLS_PROMISC_SAP		0x00000001
 #define	DLS_PROMISC_MULTI	0x00000002
 #define	DLS_PROMISC_PHYS	0x00000004
+#define	DLS_PROMISC_RX_ONLY	0x00000008
 
 extern int	dls_open(dls_link_t *, dls_dl_handle_t, dld_str_t *);
 extern void	dls_close(dld_str_t *);
@@ -106,11 +108,13 @@ extern void	str_notify(void *, mac_notify_type_t);
 
 extern int		dls_devnet_open(const char *,
 			    dls_dl_handle_t *, dev_t *);
+extern int		dls_devnet_open_in_zone(const char *,
+			    dls_dl_handle_t *, dev_t *, zoneid_t);
 extern void		dls_devnet_close(dls_dl_handle_t);
 extern boolean_t	dls_devnet_rebuild();
 
 extern int		dls_devnet_rename(datalink_id_t, datalink_id_t,
-			    const char *);
+			    const char *, boolean_t);
 extern int		dls_devnet_create(mac_handle_t, datalink_id_t,
 			    zoneid_t);
 extern int		dls_devnet_destroy(mac_handle_t, datalink_id_t *,
@@ -127,7 +131,7 @@ extern uint16_t		dls_devnet_vid(dls_dl_handle_t);
 extern datalink_id_t	dls_devnet_linkid(dls_dl_handle_t);
 extern int		dls_devnet_dev2linkid(dev_t, datalink_id_t *);
 extern int		dls_devnet_phydev(datalink_id_t, dev_t *);
-extern int		dls_devnet_setzid(dls_dl_handle_t, zoneid_t);
+extern int		dls_devnet_setzid(dls_dl_handle_t, zoneid_t, boolean_t);
 extern zoneid_t		dls_devnet_getzid(dls_dl_handle_t);
 extern zoneid_t		dls_devnet_getownerzid(dls_dl_handle_t);
 extern boolean_t	dls_devnet_islinkvisible(datalink_id_t, zoneid_t);
@@ -141,6 +145,8 @@ extern int		dls_mgmt_update(const char *, uint32_t, boolean_t,
 extern int		dls_mgmt_get_linkinfo(datalink_id_t, char *,
 			    datalink_class_t *, uint32_t *, uint32_t *);
 extern int		dls_mgmt_get_linkid(const char *, datalink_id_t *);
+extern int		dls_mgmt_get_linkid_in_zone(const char *,
+    datalink_id_t *, zoneid_t);
 extern datalink_id_t	dls_mgmt_get_next(datalink_id_t, datalink_class_t,
 			    datalink_media_t, uint32_t);
 extern int		dls_devnet_macname2linkid(const char *,

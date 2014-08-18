@@ -48,7 +48,7 @@ SRCS = $(OBJECTS:%.o = %.c)
 CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-I../libipp-listener/common
 CPPFLAGS +=	-I../libipp-core/common
-CPPFLAGS +=	-I/usr/apache/include
+CPPFLAGS +=	-I$(ADJUNCT_PROTO)/usr/apache/include
 CPPFLAGS +=	-DEAPI
 ZDEFS =		$(ZNODEFS)
 

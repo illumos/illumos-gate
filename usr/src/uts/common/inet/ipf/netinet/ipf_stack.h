@@ -5,6 +5,8 @@
  *
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2014 Joyent, Inc.  All rights reserved.
  */
 
 #ifndef	__IPF_STACK_H__
@@ -41,8 +43,10 @@
 struct ipf_stack {
 	struct ipf_stack	*ifs_next;
 	struct ipf_stack	**ifs_pnext;
+	struct ipf_stack	*ifs_pgz;
 	netid_t			ifs_netid;
 	zoneid_t		ifs_zone;
+	boolean_t		ifs_gz;
 
 	/* ipf module */
 	fr_info_t		ifs_frcache[2][8];
@@ -121,6 +125,10 @@ struct ipf_stack {
 	hook_t		*ifs_ipfhook6_loop_in;
 	hook_t		*ifs_ipfhook6_loop_out;
 	hook_t		*ifs_ipfhook6_nicevents;
+	hook_t		*ifs_ipfhookvndl3v4_in;
+	hook_t		*ifs_ipfhookvndl3v6_in;
+	hook_t		*ifs_ipfhookvndl3v4_out;
+	hook_t		*ifs_ipfhookvndl3v6_out;
 
 	/* flags to indicate whether hooks are registered. */
 	boolean_t	ifs_hook4_physical_in;
@@ -133,10 +141,16 @@ struct ipf_stack {
 	boolean_t	ifs_hook6_nic_events;
 	boolean_t	ifs_hook6_loopback_in;
 	boolean_t	ifs_hook6_loopback_out;
+	boolean_t	ifs_hookvndl3v4_physical_in;
+	boolean_t	ifs_hookvndl3v6_physical_in;
+	boolean_t	ifs_hookvndl3v4_physical_out;
+	boolean_t	ifs_hookvndl3v6_physical_out;
 
 	int		ifs_ipf_loopback;
 	net_handle_t	ifs_ipf_ipv4;
 	net_handle_t	ifs_ipf_ipv6;
+	net_handle_t	ifs_ipf_vndl3v4;
+	net_handle_t	ifs_ipf_vndl3v6;
 
 	/* ip_auth.c */
 	int			ifs_fr_authsize;

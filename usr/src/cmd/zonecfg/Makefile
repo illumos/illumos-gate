@@ -27,6 +27,7 @@ PROG=	zonecfg
 OBJS=	zonecfg.o zonecfg_lex.o zonecfg_grammar.tab.o
 
 include ../Makefile.cmd
+include ../Makefile.ctf
 
 # zonecfg has a name clash with main() and libl.so.1.  However, zonecfg must
 # still export a number of "yy*" (libl) interfaces.  Reduce all other symbols
@@ -36,7 +37,7 @@ MAPOPTS =	$(MAPFILES:%=-M%)
 
 LFLAGS =	-t
 YFLAGS =	-d -b zonecfg_grammar
-LDLIBS +=	-lzonecfg -ll -lnsl -ltecla -lzfs -lbrand -ldladm -linetutil
+LDLIBS +=	-lzonecfg -ll -lnsl -ltecla -lzfs -lbrand -ldladm -linetutil -luuid
 CPPFLAGS +=	-I.
 LDFLAGS +=	$(MAPOPTS)
 CLEANFILES +=	zonecfg_lex.c zonecfg_grammar.tab.c zonecfg_grammar.tab.h

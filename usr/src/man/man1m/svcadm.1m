@@ -9,33 +9,38 @@ svcadm \- manipulate service instances
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/sbin/svcadm\fR [\fB-v\fR] [\fB-z\fR \fIzone\fR] enable [\fB-rst\fR] {\fIFMRI\fR | \fIpattern\fR}...
+\fB/usr/sbin/svcadm\fR [\fB-S state\fR] [\fB-v\fR] [\fB-Z\fR | \fB-z\fR \fIzone\fR] enable [\fB-rst\fR]
+     [{\fIFMRI\fR | \fIpattern\fR}...]
 .fi
 
 .LP
 .nf
-\fB/usr/sbin/svcadm\fR [\fB-v\fR] [\fB-z\fR \fIzone\fR] disable [\fB-st\fR] {\fIFMRI\fR | \fIpattern\fR}...
+\fB/usr/sbin/svcadm\fR [\fB-S state\fR] [\fB-v\fR] [\fB-Z\fR | \fB-z\fR \fIzone\fR] disable [\fB-s\fR]
+     [{\fIFMRI\fR | \fIpattern\fR}...]
 .fi
 
 .LP
 .nf
-\fB/usr/sbin/svcadm\fR [\fB-v\fR] [\fB-z\fR \fIzone\fR] restart {\fIFMRI\fR | \fIpattern\fR}...
+\fB/usr/sbin/svcadm\fR [\fB-S state\fR] [\fB-v\fR] [\fB-Z\fR | \fB-z\fR \fIzone\fR] restart [\fB-d\fR] 
+     [{\fIFMRI\fR | \fIpattern\fR}...]
 .fi
 
 .LP
 .nf
-\fB/usr/sbin/svcadm\fR [\fB-v\fR] [\fB-z\fR \fIzone\fR] refresh {\fIFMRI\fR | \fIpattern\fR}...
+\fB/usr/sbin/svcadm\fR [\fB-S state\fR] [\fB-v\fR] [\fB-Z\fR | \fB-z\fR \fIzone\fR] refresh
+     [{\fIFMRI\fR | \fIpattern\fR}...]
 .fi
 
 .LP
 .nf
-\fB/usr/sbin/svcadm\fR [\fB-v\fR] [\fB-z\fR \fIzone\fR] clear {\fIFMRI\fR | \fIpattern\fR}...
+\fB/usr/sbin/svcadm\fR [\fB-S state\fR] [\fB-v\fR] [\fB-Z\fR | \fB-z\fR \fIzone\fR] clear
+     [{\fIFMRI\fR | \fIpattern\fR}...]
 .fi
 
 .LP
 .nf
-\fB/usr/sbin/svcadm\fR [\fB-v\fR] [\fB-z\fR \fIzone\fR] mark [\fB-It\fR] \fIinstance_state\fR
-     {\fIFMRI\fR | \fIpattern\fR}...
+\fB/usr/sbin/svcadm\fR [\fB-S state\fR] [\fB-v\fR] [\fB-Z\fR | \fB-z\fR \fIzone\fR] mark [\fB-It] \fIinstance_state\fR
+     [{\fIFMRI\fR | \fIpattern\fR}...]
 .fi
 
 .LP
@@ -57,10 +62,31 @@ The following options are supported:
 .sp
 .ne 2
 .na
+\fB-S\fR \fIstate\fR
+.ad
+.RS 20n
+For the subcommands which normally operate on explicit \fIFMRI\fRs or an
+\fIFMRI\fR pattern, the \fB-S\fR option can be used to select all \fIFMRI\fRs
+in the given state.
+.RE
+
+.sp
+.ne 2
+.na
 \fB\fB-v\fR\fR
 .ad
 .RS 20n
 Print actions verbosely to standard output.
+.RE
+
+.sp
+.ne 2
+.na
+\fB-Z\fR
+.ad
+.RS 20n
+Administer services in all zones.  This option is only applicable
+from the global zone, see \fBzones\fR(5).
 .RE
 
 .sp
@@ -84,8 +110,10 @@ service instance.
 For subcommands taking one or more operands, if the operand specifies a service
 (instead of a service instance), and that service has only a single instance,
 \fBsvcadm\fR operates on that instance. If an abbreviated \fIFMRI\fR (a fault
-management resource identifier) or pattern matches more than one service, a
-warning message is displayed and that operand is ignored. See \fBsmf\fR(5).
+management resource identifier) matches more than one service or instance, a
+warning message is displayed and that operand is ignored.
+If a pattern matches more than one service or instance, the subcommand is
+applied to all matches. See \fBsmf\fR(5).
 .sp
 .LP
 In the case that the service has more than one instance, \fBsvcadm\fR return a
@@ -144,7 +172,7 @@ persistent across reboot.
 .sp
 .ne 2
 .na
-\fB\fBrestart\fR {\fIFMRI\fR | \fIpattern\fR}. . .\fR
+\fB\fBrestart\fR [\fB-d\fR] {\fIFMRI\fR | \fIpattern\fR}. . .\fR
 .ad
 .sp .6
 .RS 4n
@@ -154,6 +182,10 @@ group of the service instance (see \fBsmf_security\fR(5)).
 .sp
 This subcommand can restart only those services that are in the online or
 degraded states, as those states are defined in \fBsmf\fR(5).
+.sp
+If the \fB-d\fR option is specified, the restarter sends a \fBSIGABRT\fR to all
+members of the contract, which should cause a core dump, before restarting
+the service.
 .RE
 
 .sp

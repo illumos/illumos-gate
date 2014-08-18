@@ -1,0 +1,155 @@
+'\" te
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright (c) 2014, Joyent, Inc.  All rights reserved.
+.\"
+.TH VND_CREATE 3VND "Feb 21, 2014"
+
+.SH NAME
+
+vnd_walk \- walk all vnd devices
+
+
+.SH SYNOPSIS
+
+.LP
+.nf
+cc [ flag... ] file... -lvnd [ library... ]
+#include <libvnd.h>
+
+typedef int (*vnd_walk_cb_f)(vnd_info_t *viip, void *cbarg);
+
+int vnd_walk(vnd_walk_cb_t cb, void *arg, vnd_errno_t *vnderr, int *syserr);
+.fi
+
+
+.SH DESCRIPTION
+.LP
+The vnd_walk() function fires the callback function cb once for every
+vnd device that is visible in the current zone. If the caller is in
+the global zone, then all vnd devices in all zones will be walked. If
+the caller is in a non-global zone, then only the devices in that zone
+will be visible.
+
+.LP
+The function cb will be called with two arguments. The first argument,
+viip, is a pointer to a structure that contains information about the
+link. The second argument to the function cb, cbarg, is the same
+argument that is passed to the function vnd_walk as arg. To continue
+the function cb should return zero. If the function cb returns
+non-zero the walk will terminate.
+
+.LP
+As the vnd_walk function does not have a handle, errors are returned
+in vnderr and syserr. Both vnderr and syserr are allowed to be NULL
+pointers. If either one is a NULL pointer, then error information for
+that class of error will not be returned. It is not recommended that
+consumers supply NULL pointers.
+
+.LP
+The vnd_info_t structure contains the following members:
+
+.in +2
+.nf
+uint32_t	vi_version
+zoneid_t	vi_zone
+char		vi_name[LIBVND_NAMELEN];
+char		vi_datalink[LIBVND_NAMELEN];
+.fi
+.in -2
+
+.LP
+The member vi_version is guaranteed to be the first member of the
+structure. This number indicates the current revision of the structure
+and is set to the integer value 1. More properties may be added in
+future releases. Those properties will be tied to a greater version
+number so software knows whether or not it is legal to access them.
+
+.LP
+The vi_zone field indicates the zone id that the vnd device exists in.
+The vi_name field is the name of the vnd device. If the vnd_device is
+not linked, the name field is set to "<unknown>". The vi_datalink
+field is filled in with the name of the data link the vnd device is on
+top of.
+
+
+.SH RETURN VALUES
+
+.LP
+The vnd_walk function will return zero on success. If the consumer
+supplied callback function returned non-zero, then the vnd_walk
+function will return 1. If an error occurred, -1 is returned, and if
+vnderr and syserr are non-null, they are filled in with their
+respective error values. See vnd_errno(3VND) for more information on
+these errors.
+
+.SH EXAMPLES
+
+.LP
+Example 1  Walk all devices and print information about them
+
+.LP
+The following sample C program walks every vnd device and prints out
+information about them.
+
+.sp
+.in +2
+.nf
+#include <libvnd.h>
+#include <stdio.h>
+
+static int
+print_entry(vnd_info_t *viip, void *unused)
+{
+	(void) printf("device %s over data link %s in zone %d\n",
+	    viip->vi_name, viip->vi_datalink, viip->vi_zone);
+	return (0);
+}
+
+int
+main(void)
+{
+	vnd_errno_t vnderr;
+	int syserr;
+
+	if (vnd_walk(print_entry, NULL, &vnderr, &syserr) != 0) {
+		(void) fprintf(stderr, "failed to walk vnd devices: %s\n",
+		    vnderr != VND_E_SYS ? vnd_strerror(vnderr) :
+		    vnd_strsyserror(syserr));
+		return (1);
+	}
+
+	return (0);
+}
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See attributes(5) for descriptions of the following attributes:
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Stability	Committed
+_
+MT-Level	MT-Safe
+.TE
+
+.SH SEE ALSO
+
+libvnd(3VND), vnd_errno(3VND), attributes(5), zones(5)

@@ -18,6 +18,7 @@
 # CDDL HEADER END
 #
 # Copyright (c) 1995, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2014, Joyent, Inc. All rights reserved.
 #
 # socket configuration information
 #
@@ -52,3 +53,6 @@
 	29	4	1	/dev/spdsock
 
 	31	1	0	trill
+
+	33	1	0	lx_netlink
+	33	4	0	lx_netlink

@@ -1015,6 +1015,7 @@ xuio_stat_wbuf_nocopy()
 }
 
 #ifdef _KERNEL
+
 int
 dmu_read_uio(objset_t *os, uint64_t object, uio_t *uio, uint64_t size)
 {
@@ -1704,7 +1705,6 @@ dmu_write_policy(objset_t *os, dnode_t *dn, int level, int wp, zio_prop_t *zp)
 			if (!zio_checksum_table[checksum].ci_dedup)
 				dedup_verify = B_TRUE;
 		}
-
 		/*
 		 * Enable nopwrite if we have a cryptographically secure
 		 * checksum that has no known collisions (i.e. SHA-256)

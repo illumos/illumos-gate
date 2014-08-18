@@ -30,11 +30,15 @@
 
 /* Copyright 1976, Bell Telephone Laboratories, Inc. */
 
+/* Copyright (c) 2013, joyent, Inc.  All rights reserved. */
+
 #include <string.h>
 #include "once.h"
 #include "sgs.h"
 #include <locale.h>
 #include <limits.h>
+#include <unistd.h>
+#include <libgen.h>
 
 static wchar_t  L_INITIAL[] = {'I', 'N', 'I', 'T', 'I', 'A', 'L', 0};
 static void get1core(void);
@@ -46,6 +50,25 @@ static void get3core(void);
 static void free3core(void);
 #endif
 
+static int
+lex_construct_path(char *buf, size_t size, const char *file, int type)
+{
+	int ret;
+	char origin[PATH_MAX];
+
+	if (type != 0) {
+		ret = readlink("/proc/self/path/a.out", origin, PATH_MAX - 1);
+		if (ret < 0)
+			error(
+			    "lex: failed to read origin from /proc\n");
+		origin[ret] = '\0';
+		return (snprintf(buf, size, "%s/../%s/%s", dirname(origin),
+		    NBASE, file));
+	}
+
+	return (snprintf(buf, size, "%s/%s/%s", NPREFIX, NBASE, file));
+}
+
 int
 main(int argc, char **argv)
 {
@@ -53,6 +76,7 @@ main(int argc, char **argv)
 	int c;
 	char *apath = NULL;
 	char *ypath;
+	char pathbuf[PATH_MAX];
 	Boolean eoption = 0, woption = 0;
 
 	sargv = argv;
@@ -224,6 +248,11 @@ main(int argc, char **argv)
 	free3core();
 #endif
 
+	/*
+	 * Try to find the file relative to $ORIGIN. Note that we don't touch
+	 * antyhing related to -Y. In fact, unfortunately it's always been
+	 * ignored it seems.
+	 */
 	if (handleeuc) {
 		if (ratfor)
 			error("Ratfor is not supported by -w or -e option.");
@@ -232,9 +261,19 @@ main(int argc, char **argv)
 	else
 		ypath = ratfor ? RATNAME : CNAME;
 
-	if (apath != NULL)
-		ypath = strcat(apath, strrchr(ypath, '/'));
-	fother = fopen(ypath, "r");
+	if (apath == NULL) {
+		(void) lex_construct_path(pathbuf, sizeof (pathbuf), ypath, 1);
+		fother = fopen(pathbuf, "r");
+		if (fother == NULL) {
+			(void) lex_construct_path(pathbuf, sizeof (pathbuf),
+			    ypath, 0);
+			fother = fopen(pathbuf, "r");
+		}
+	} else {
+		apath = strcat(apath, "/");
+		ypath = strcat(apath, ypath);
+		fother = fopen(ypath, "r");
+	}
 	if (fother == NULL)
 		error("Lex driver missing, file %s", ypath);
 	while ((i = getc(fother)) != EOF)

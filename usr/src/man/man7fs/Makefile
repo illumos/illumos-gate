@@ -12,19 +12,23 @@
 #
 # Copyright 2011, Richard Lowe
 # Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2014 Joyent, Inc. All rights reserved.
 #
 
 include		$(SRC)/Makefile.master
 
 MANSECT= 	7fs
 
-MANFILES= 	ctfs.7fs	\
+MANFILES= 	bootfs.7fs	\
+		ctfs.7fs	\
 	 	dcfs.7fs	\
 	 	dev.7fs		\
 	 	devfs.7fs	\
 		fd.7fs		\
 	 	hsfs.7fs	\
+	 	hyprlofs.7fs	\
 	 	lofs.7fs	\
+	 	lxproc.7fs	\
 	 	objfs.7fs	\
 	 	pcfs.7fs	\
 	 	sharefs.7fs	\

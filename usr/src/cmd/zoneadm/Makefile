@@ -21,14 +21,18 @@
 
 #
 # Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2011, Joyent, Inc. All rights reserved.
 #
 
 PROG=		zoneadm
+SCRIPTS=
 MANIFEST=	zones.xml resource-mgmt.xml
 SVCMETHOD=	svc-zones svc-resource-mgmt
 
 include ../Makefile.cmd
+include ../Makefile.ctf
 
+ROOTUSRSBINSCRIPTS=     $(SCRIPTS:%=$(ROOTUSRSBIN)/%)
 ROOTMANIFESTDIR=        $(ROOTSVCSYSTEM)
 
 OBJS= zoneadm.o zfs.o
@@ -42,13 +46,14 @@ CERRWARN += -_gcc=-Wno-uninitialized
 
 .KEEP_STATE:
 
-all: $(PROG)
+all: $(PROG) $(SCRIPTS)
 
 $(PROG): $(OBJS)
 	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
 	$(POST_PROCESS)
 
-install: all $(ROOTUSRSBINPROG) $(ROOTMANIFEST) $(ROOTSVCMETHOD)
+install: all $(ROOTUSRSBINPROG) $(ROOTUSRSBINSCRIPTS) $(ROOTMANIFEST) \
+	$(ROOTSVCMETHOD)
 
 check:	$(PROG).c $(CHKMANIFEST)
 	$(CSTYLE) -pP $(SRCS:%=%)
@@ -58,7 +63,7 @@ $(POFILE): $(POFILES)
 	$(CAT) $(POFILES) > $@
 
 clean:
-	$(RM) $(OBJS) $(POFILES)
+	$(RM) $(OBJS) $(POFILES) $(SCRIPTS)
 
 lint:	lint_SRCS
 

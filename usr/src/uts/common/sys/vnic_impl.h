@@ -21,7 +21,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2013 Joyent, Inc.  All rights reserved.
+ * Copyright 2014 Joyent, Inc.  All rights reserved.
  */
 
 #ifndef	_SYS_VNIC_IMPL_H
@@ -64,6 +64,7 @@ typedef struct vnic_s {
 	mac_notify_handle_t	vn_mnh;
 
 	uint32_t		vn_hcksum_txflags;
+	uint32_t		vn_mtu;
 } vnic_t;
 
 #define	vn_mch	vn_mc_handles[0]

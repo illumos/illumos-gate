@@ -26,7 +26,7 @@
  * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
- * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
  */
 #ifndef	__RTLD_H
 #define	__RTLD_H
@@ -589,6 +589,8 @@ extern const char	*rpl_ldflags;	/* replaceable LD_FLAGS string */
 extern const char	*rpl_libpath;	/* replaceable LD_LIBRARY string */
 extern Alist		*rpl_libdirs;	/*	and its associated Pdesc list */
 extern const char	*rpl_preload;	/* replaceable LD_PRELOAD string */
+extern const char	*rpl_ldtoxic;	/* replaceable LD_TOXIC_PATH string */
+extern Alist		*rpl_toxdirs;	/*    and associated Pdesc list */
 
 extern const char	*prm_audit;	/* permanent LD_AUDIT string */
 extern const char	*prm_debug;	/* permanent LD_DEBUG string */
@@ -764,7 +766,6 @@ extern int		remove_hdl(Grp_hdl *, Rt_map *, int *);
 extern void		remove_lmc(Lm_list *, Rt_map *, Aliste, const char *);
 extern void		remove_lml(Lm_list *);
 extern void		remove_so(Lm_list *, Rt_map *, Rt_map *);
-extern int		rt_cond_wait(Rt_cond *, Rt_lock *);
 extern int		rt_critical(void);
 extern int		rt_bind_guard(int);
 extern int		rt_bind_clear(int);

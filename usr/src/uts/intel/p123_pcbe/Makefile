@@ -35,8 +35,8 @@ UTSBASE = ../..
 MODULE		= pcbe.GenuineIntel.6
 OBJECTS		= $(P123_PCBE_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(P123_PCBE_OBJS:%.o=$(LINTS_DIR)/%.ln)
-ROOTMODULE	= $(USR_PCBE_DIR)/$(MODULE)
-ROOTLINK	= $(USR_PCBE_DIR)/pcbe.GenuineIntel.5
+ROOTMODULE	= $(ROOT_PSM_PCBE_DIR)/$(MODULE)
+ROOTLINK	= $(ROOT_PSM_PCBE_DIR)/pcbe.GenuineIntel.5
 
 #
 #	Include common rules.

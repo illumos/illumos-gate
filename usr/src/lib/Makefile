@@ -67,6 +67,7 @@ SUBDIRS += \
 	libcommputil		\
 	libresolv			\
 	libresolv2		.WAIT	\
+	libresolv2_joy		.WAIT	\
 	libw			.WAIT	\
 	libintl			.WAIT	\
 	../cmd/sgs/librtld_db	\
@@ -79,6 +80,8 @@ SUBDIRS += \
 	librt			\
 	libadm			\
 	libctf			\
+	libbrand	.WAIT   \
+	libzonecfg	.WAIT	\
 	libdtrace		\
 	libdtrace_jni		\
 	libcurses		\
@@ -154,7 +157,8 @@ SUBDIRS += \
 	librdc		\
 	libinstzones	\
 	libpkg		\
-	libpcidb
+	libpcidb	\
+	libvnd
 
 SUBDIRS += \
 	passwdutil	\
@@ -179,7 +183,6 @@ SUBDIRS += \
 	libxnet		\
 	libipsecutil	\
 	nsswitch	\
-	print		\
 	libuutil	\
 	libscf		\
 	libinetsvc	\
@@ -198,10 +201,10 @@ SUBDIRS += \
 	libwrap		\
 	libxcurses	\
 	libxcurses2	\
-	libbrand	.WAIT   \
-	libzonecfg	\
+	libzdoor	\
 	libzoneinfo	\
 	libzonestat	\
+	libsmartsshd	\
 	libtsnet	\
 	libtsol		\
 	gss_mechs/mech_spnego	\
@@ -216,7 +219,6 @@ SUBDIRS += \
 	raidcfg_plugins	\
 	cfgadm_plugins	\
 	libmail		\
-	lvm		\
 	libsmedia	\
 	libipp		\
 	libdiskmgt	\
@@ -233,10 +235,7 @@ SUBDIRS += \
 	libzfs_core	\
 	libzfs		\
 	libbe		\
-	pylibbe		\
 	libzfs_jni	\
-	pyzfs		\
-	pysolaris	\
 	libmapid	\
 	brand		\
 	policykit	\
@@ -295,9 +294,6 @@ fm:			\
 #
 NOWAIT_SUBDIRS= $(SUBDIRS:.WAIT=)
 
-DCSUBDIRS =		\
-	lvm
-
 MSGSUBDIRS=		\
 	abi		\
 	auditd_plugins	\
@@ -353,12 +349,11 @@ MSGSUBDIRS=		\
 	libwanbootutil	\
 	libzfs		\
 	libzonecfg	\
-	lvm		\
+	libzdoor	\
+	libsmartsshd	\
 	madv		\
 	mpss		\
 	pam_modules	\
-	pyzfs		\
-	pysolaris	\
 	rpcsec_gss	\
 	libreparse
 MSGSUBDIRS += \
@@ -467,6 +462,7 @@ HDRSUBDIRS=		\
 	libumem		\
 	libunistat	\
 	libuutil	\
+	libvnd		\
 	libwanboot	\
 	libwanbootutil	\
 	libwrap		\
@@ -478,7 +474,6 @@ HDRSUBDIRS=		\
 	libzonestat	\
 	hal		\
 	policykit	\
-	lvm		\
 	pkcs11		\
 	passwdutil	\
 	../cmd/sendmail/libmilter	\
@@ -562,7 +557,7 @@ gss_mechs/mech_krb5:	libgss libnsl libsocket libresolv pkcs11
 libadt_jni:	libbsm
 libast: 	libsocket
 libadutils: 	libldap5 libresolv libsocket libnsl
-nsswitch:	libadutils libidmap
+nsswitch:	libadutils libidmap libresolv2_joy
 libbe: 		libzfs
 libbsm:		libtsol
 libcmd: 	libsum libast libsocket libnsl
@@ -615,6 +610,8 @@ libpool:	libnvpair libexacct
 libpp:		libast
 libzonecfg:	libc libsocket libnsl libuuid libnvpair libsysevent libsec \
 		libbrand libpool libscf
+libzdoor:	libc libzonecfg libcontract
+libsmartsshd:	libc libcontract
 libproc:	../cmd/sgs/librtld_db ../cmd/sgs/libelf libctf libsaveargs
 libproject:	libpool libproc libsecdb
 libtermcap:	libcurses
@@ -630,8 +627,6 @@ librestart:	libuutil libscf
 libsaveargs:	libdisasm
 ../cmd/sgs/libdl:	../cmd/sgs/libconv
 ../cmd/sgs/libelf:	../cmd/sgs/libconv
-pkcs11:		libcryptoutil
-print:		libldap5
 udapl/udapl_tavor:	udapl/libdat
 libzfs:		libdevid libgen libnvpair libuutil \
 		libadm libavl libefi libidmap libmd libzfs_core
@@ -656,9 +651,6 @@ sun_fc:		libdevinfo libsysevent libnvpair
 libsun_ima:	libdevinfo libsysevent libnsl
 sun_sas:	libdevinfo libsysevent libnvpair libkstat libdevid
 libgrubmgmt:	libdevinfo libzfs libfstyp
-pylibbe: 	libbe libzfs
-pyzfs:		libnvpair libzfs
-pysolaris:	libsec libidmap
 libreparse:	libnvpair
 libhotplug:	libnvpair
 cfgadm_plugins:	libhotplug

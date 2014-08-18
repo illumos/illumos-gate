@@ -25,7 +25,7 @@
  */
 
 /*
- * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -583,6 +583,10 @@ tmp_read(struct vnode *vp, struct uio *uiop, int ioflag, cred_t *cred,
 	struct tmount *tm = (struct tmount *)VTOTM(vp);
 	int error;
 
+	/* If the filesystem was umounted by force, return immediately. */
+	if (vp->v_vfsp->vfs_flag & VFS_UNMOUNTED)
+		return (EIO);
+
 	/*
 	 * We don't currently support reading non-regular files
 	 */
@@ -611,6 +615,10 @@ tmp_write(struct vnode *vp, struct uio *uiop, int ioflag, struct cred *cred,
 	struct tmpnode *tp = (struct tmpnode *)VTOTN(vp);
 	struct tmount *tm = (struct tmount *)VTOTM(vp);
 	int error;
+
+	/* If the filesystem was umounted by force, return immediately. */
+	if (vp->v_vfsp->vfs_flag & VFS_UNMOUNTED)
+		return (EIO);
 
 	/*
 	 * We don't currently support writing to non-regular files
@@ -832,6 +840,9 @@ tmp_lookup(
 	struct tmpnode *ntp = NULL;
 	int error;
 
+	/* If the filesystem was umounted by force, return immediately. */
+	if (dvp->v_vfsp->vfs_flag & VFS_UNMOUNTED)
+		return (EIO);
 
 	/* allow cd into @ dir */
 	if (flags & LOOKUP_XATTR) {
@@ -870,8 +881,7 @@ tmp_lookup(
 				return (error);
 			}
 
-			xdp = tmp_memalloc(sizeof (struct tmpnode),
-			    TMP_MUSTHAVE);
+			xdp = kmem_zalloc(sizeof (struct tmpnode), KM_SLEEP);
 			tm = VTOTM(dvp);
 			tmpnode_init(tm, xdp, &tp->tn_attr, NULL);
 			/*
@@ -1185,7 +1195,7 @@ tmp_rename(
 	struct tmpnode *toparent;
 	struct tmpnode *fromtp = NULL;	/* source tmpnode */
 	struct tmount *tm = (struct tmount *)VTOTM(odvp);
-	int error;
+	int error, err;
 	int samedir = 0;	/* set if odvp == ndvp */
 	struct vnode *realvp;
 
@@ -1261,15 +1271,6 @@ tmp_rename(
 			error = 0;
 		goto done;
 	}
-	vnevent_rename_src(TNTOV(fromtp), odvp, onm, ct);
-
-	/*
-	 * Notify the target directory if not same as
-	 * source directory.
-	 */
-	if (ndvp != odvp) {
-		vnevent_rename_dest_dir(ndvp, ct);
-	}
 
 	/*
 	 * Unlink from source.
@@ -1277,7 +1278,7 @@ tmp_rename(
 	rw_enter(&fromparent->tn_rwlock, RW_WRITER);
 	rw_enter(&fromtp->tn_rwlock, RW_WRITER);
 
-	error = tdirdelete(fromparent, fromtp, onm, DR_RENAME, cred);
+	error = err = tdirdelete(fromparent, fromtp, onm, DR_RENAME, cred);
 
 	/*
 	 * The following handles the case where our source tmpnode was
@@ -1292,6 +1293,14 @@ tmp_rename(
 
 	rw_exit(&fromtp->tn_rwlock);
 	rw_exit(&fromparent->tn_rwlock);
+
+	if (err == 0) {
+		vnevent_rename_src(TNTOV(fromtp), odvp, onm, ct);
+		/* Notify the target dir if not same as source dir. */
+		if (ndvp != odvp)
+			vnevent_rename_dest_dir(ndvp, ct);
+	}
+
 done:
 	tmpnode_rele(fromtp);
 	mutex_exit(&tm->tm_renamelck);
@@ -1458,6 +1467,10 @@ tmp_readdir(
 	int reclen;
 	caddr_t outbuf;
 
+	/* If the filesystem was umounted by force, return immediately. */
+	if (vp->v_vfsp->vfs_flag & VFS_UNMOUNTED)
+		return (EIO);
+
 	if (uiop->uio_loffset >= MAXOFF_T) {
 		if (eofp)
 			*eofp = 1;
@@ -1596,7 +1609,7 @@ tmp_symlink(
 		return (error);
 	}
 	len = strlen(tnm) + 1;
-	cp = tmp_memalloc(len, 0);
+	cp = kmem_alloc(len, KM_NOSLEEP | KM_NORMALPRI);
 	if (cp == NULL) {
 		tmpnode_rele(self);
 		return (ENOSPC);
@@ -1661,10 +1674,27 @@ top:
 	 * there's little to do -- just drop our hold.
 	 */
 	if (vp->v_count > 1 || tp->tn_nlink != 0) {
-		vp->v_count--;
+		if (vp->v_vfsp->vfs_flag & VFS_UNMOUNTED) {
+			/*
+			 * Since the file system was forcibly unmounted, we can
+			 * have a case (v_count == 1, tn_nlink != 0) where this
+			 * file was open so we didn't add an extra hold on the
+			 * file in tmp_unmount. We are counting on the
+			 * interaction of the hold made in tmp_unmount and
+			 * rele-ed in tmp_vfsfree so we need to be sure we
+			 * don't decrement in this case.
+			 */
+			if (vp->v_count > 1)
+				vp->v_count--;
+		} else {
+			vp->v_count--;
+		}
 		mutex_exit(&vp->v_lock);
 		mutex_exit(&tp->tn_tlock);
 		rw_exit(&tp->tn_rwlock);
+		/* If the filesystem was umounted by force, rele the vfs ref */
+		if (tm->tm_vfsp->vfs_flag & VFS_UNMOUNTED)
+			VFS_RELE(tm->tm_vfsp);
 		return;
 	}
 
@@ -1689,7 +1719,7 @@ top:
 			goto top;
 		}
 		if (tp->tn_type == VLNK)
-			tmp_memfree(tp->tn_symlink, tp->tn_size + 1);
+			kmem_free(tp->tn_symlink, tp->tn_size + 1);
 	}
 
 	/*
@@ -1723,7 +1753,11 @@ top:
 	rw_destroy(&tp->tn_rwlock);
 	mutex_destroy(&tp->tn_tlock);
 	vn_free(TNTOV(tp));
-	tmp_memfree(tp, sizeof (struct tmpnode));
+	kmem_free(tp, sizeof (struct tmpnode));
+
+	/* If the filesystem was umounted by force, rele the vfs ref */
+	if (tm->tm_vfsp->vfs_flag & VFS_UNMOUNTED)
+		VFS_RELE(tm->tm_vfsp);
 }
 
 /* ARGSUSED2 */
@@ -1848,6 +1882,10 @@ tmp_getapage(
 	int err = 0;
 	struct vnode *pvp;
 	u_offset_t poff;
+
+	/* If the filesystem was umounted by force, return immediately. */
+	if (vp->v_vfsp->vfs_flag & VFS_UNMOUNTED)
+		return (EIO);
 
 	if (protp != NULL)
 		*protp = PROT_ALL;
@@ -2069,6 +2107,10 @@ tmp_putapage(
 	u_offset_t pstart;
 	u_offset_t offset;
 	u_offset_t tmpoff;
+
+	/* If the filesystem was umounted by force, return immediately. */
+	if (vp->v_vfsp->vfs_flag & VFS_UNMOUNTED)
+		return (EIO);
 
 	ASSERT(PAGE_LOCKED(pp));
 

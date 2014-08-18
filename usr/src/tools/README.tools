@@ -192,6 +192,9 @@ findunref
 	  sort > ~/unref-sparc.out
 	$ comm -12 ~/unref-i386.out ~/unref-sparc.out > ~/unref.out
 
+git-active
+	helper used by webrev to generate file lists for Git workspaces.
+
 hdrchk
 	checks headers for compliance with OS/Net standards (form, includes,
 	C++ guards).

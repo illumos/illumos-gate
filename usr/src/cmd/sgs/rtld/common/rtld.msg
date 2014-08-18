@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 1995, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2014, Joyent, Inc.  All rights reserved.
 #
 
 @ _START_
@@ -99,9 +100,14 @@
 @ MSG_SYS_MPROT		"%s: mprotect failed: %s"
 @ MSG_SYS_MMAPANON	"mmap anon failed: %s"
 
+# Secure path failures
+
 @ MSG_SEC_OPEN		"%s: open failed: No such file in secure directories"
 @ MSG_SEC_ILLEGAL	"%s: open failed: illegal insecure pathname"
 
+# Toxic failures
+
+@ MSG_TOXIC_FILE	"%s: dependency marked as toxic"
 
 # Configuration failures
 
@@ -395,6 +401,7 @@
 @ MSG_LD_PROFILE_OUTPUT	"PROFILE_OUTPUT"
 @ MSG_LD_SFCAP		"SFCAP"
 @ MSG_LD_SIGNAL		"SIGNAL"
+@ MSG_LD_TOXICPATH	"TOXIC_PATH"
 @ MSG_LD_TRACE_OBJS	"TRACE_LOADED_OBJECTS"
 @ MSG_LD_TRACE_OBJS_E	"TRACE_LOADED_OBJECTS_E"
 @ MSG_LD_TRACE_OBJS_A	"TRACE_LOADED_OBJECTS_A"

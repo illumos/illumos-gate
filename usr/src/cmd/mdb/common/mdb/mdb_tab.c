@@ -388,11 +388,6 @@ mdb_tab_size(mdb_tab_cookie_t *mcp)
 	return (mdb_nv_size(&mcp->mtc_nv));
 }
 
-/*
- * Determine whether the specified name is a valid tab completion for
- * the given command. If the name is a valid tab completion then
- * it will be saved in the mdb_tab_cookie_t.
- */
 void
 mdb_tab_insert(mdb_tab_cookie_t *mcp, const char *name)
 {
@@ -508,31 +503,18 @@ tab_complete_type(mdb_ctf_id_t id, void *arg)
 	mdb_tab_cookie_t *mcp = arg;
 	uint_t flags = (uint_t)(uintptr_t)mcp->mtc_cba;
 
-	/*
-	 * CTF data includes types that mdb commands don't understand. Before
-	 * we resolve the actual type prune any entry that is a type we
-	 * don't care about.
-	 */
-	switch (mdb_ctf_type_kind(id)) {
-	case CTF_K_CONST:
-	case CTF_K_RESTRICT:
-	case CTF_K_VOLATILE:
-		return (0);
-	}
-
 	if (mdb_ctf_type_resolve(id, &rid) != 0)
 		return (1);
 
 	rkind = mdb_ctf_type_kind(rid);
-
-	if ((flags & MDB_TABC_MEMBERS) && rkind != CTF_K_STRUCT &&
+	if (flags & MDB_TABC_MEMBERS && rkind != CTF_K_STRUCT &&
 	    rkind != CTF_K_UNION)
 		return (0);
 
-	if ((flags & MDB_TABC_NOPOINT) && rkind == CTF_K_POINTER)
+	if (flags & MDB_TABC_NOPOINT && rkind == CTF_K_POINTER)
 		return (0);
 
-	if ((flags & MDB_TABC_NOARRAY) && rkind == CTF_K_ARRAY)
+	if (flags & MDB_TABC_NOARRAY && rkind == CTF_K_ARRAY)
 		return (0);
 
 	(void) mdb_ctf_type_name(id, buf, sizeof (buf));

@@ -599,7 +599,7 @@ db_table::setEntryExp(entryp where, entry_obj *obj, int initialLoad) {
 			if (o != 0) {
 				__nis_buffer_t	b = {0, 0};
 
-				bp2buf(myself, &b, "%s.%s",
+				bp2buf(myself, &b, (char *)"%s.%s",
 					o->zo_name, o->zo_domain);
 				t = getObjMapping(b.buf, 0, 1, 0, 0);
 				sfree(b.buf);
@@ -967,7 +967,7 @@ db_table::setEnumMode(long enumNum) {
 		if (stat != DB_SUCCESS) {
 			enumMode.flag = 0;
 			enumCount.flag = 0;
-			logmsg(MSG_NOTIMECHECK, LOG_ERR,
+			logmsg(MSG_NOTIMECHECK, LOG_ERR, (char *)
 		"%s: No memory for enum check array; entry removal disabled",
 				myself);
 		}

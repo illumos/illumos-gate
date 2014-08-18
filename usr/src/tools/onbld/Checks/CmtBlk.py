@@ -1,4 +1,4 @@
-#! /usr/bin/python
+#!ON_PYTHON
 
 #
 # CDDL HEADER START

@@ -502,8 +502,6 @@ void    Dbg32_util_lcinterface(Rt_map *, int, char *);
 void    Dbg64_util_lcinterface(Rt_map *, int, char *);
 void	Dbg32_util_nl(Lm_list *, int);
 void	Dbg64_util_nl(Lm_list *, int);
-void	Dbg32_util_no_init(Rt_map *);
-void	Dbg64_util_no_init(Rt_map *);
 void	Dbg32_util_scc_entry(Rt_map *, uint_t);
 void	Dbg64_util_scc_entry(Rt_map *, uint_t);
 void	Dbg32_util_scc_title(Lm_list *, int);

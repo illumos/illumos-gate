@@ -1320,7 +1320,7 @@ i_ddi_irm_notify(ddi_irm_pool_t *pool_p, ddi_irm_req_t *req_p)
 
 	/* Log callback errors */
 	if (ret != DDI_SUCCESS) {
-		cmn_err(CE_WARN, "%s%d: failed callback (action=%d, ret=%d)\n",
+		cmn_err(CE_WARN, "!%s%d: failed callback (action=%d, ret=%d)\n",
 		    ddi_driver_name(req_p->ireq_dip),
 		    ddi_get_instance(req_p->ireq_dip), (int)action, ret);
 	}

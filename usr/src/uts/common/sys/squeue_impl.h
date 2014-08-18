@@ -117,6 +117,7 @@ struct squeue_s {
 	squeue_set_t	*sq_set;	/* managed by squeue creator */
 
 	pri_t		sq_priority;	/* squeue thread priority */
+	boolean_t	sq_isip;	/* use IP-centric features */
 
 	/* Keep the debug-only fields at the end of the structure */
 #ifdef DEBUG
@@ -165,6 +166,7 @@ struct squeue_s {
 #define	SQS_POLL_RESTART_DONE	0x01000000
 #define	SQS_POLL_THR_QUIESCE	0x02000000
 #define	SQS_PAUSE		0x04000000 /* The squeue has been paused */
+#define	SQS_EXIT		0x08000000 /* squeue is being torn down */
 
 #define	SQS_WORKER_THR_CONTROL          \
 	(SQS_POLL_QUIESCE | SQS_POLL_RESTART | SQS_POLL_CLEANUP)

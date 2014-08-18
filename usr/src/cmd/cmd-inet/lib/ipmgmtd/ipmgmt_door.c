@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2014, Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -112,7 +113,9 @@ ipmgmt_handler(void *cookie, char *argp, size_t argsz, door_desc_t *dp,
 		goto fail;
 	}
 
-	/* check for solaris.network.interface.config authorization */
+	/*
+	 * if not root, check for solaris.network.interface.config authorization
+	 */
 	if (infop->idi_set) {
 		uid_t		uid;
 		struct passwd	pwd;
@@ -124,24 +127,32 @@ ipmgmt_handler(void *cookie, char *argp, size_t argsz, door_desc_t *dp,
 			goto fail;
 		}
 		uid = ucred_getruid(cred);
+		ucred_free(cred);
 		if ((int)uid < 0) {
 			err = errno;
 			ipmgmt_log(LOG_ERR, "Could not get user id.");
 			goto fail;
 		}
-		if (getpwuid_r(uid, &pwd, buf, sizeof (buf)) ==
-		    NULL) {
-			err = errno;
-			ipmgmt_log(LOG_ERR, "Could not get password entry.");
-			goto fail;
+
+		/*
+		 * Branded zones may have different auth, but root always
+		 * allowed.
+		 */
+		if (uid != 0) {
+			if (getpwuid_r(uid, &pwd, buf, sizeof (buf)) == NULL) {
+				err = errno;
+				ipmgmt_log(LOG_ERR,
+				    "Could not get password entry.");
+				goto fail;
+			}
+			if (chkauthattr(NETWORK_INTERFACE_CONFIG_AUTH,
+			    pwd.pw_name) != 1) {
+				err = EPERM;
+				ipmgmt_log(LOG_ERR,
+				    "Not authorized for operation.");
+				goto fail;
+			}
 		}
-		if (chkauthattr(NETWORK_INTERFACE_CONFIG_AUTH,
-		    pwd.pw_name) != 1) {
-			err = EPERM;
-			ipmgmt_log(LOG_ERR, "Not authorized for operation.");
-			goto fail;
-		}
-		ucred_free(cred);
 	}
 
 	/* individual handlers take care of calling door_return */

@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2013 Joshua M. Clulow <josh@sysmgr.org>
- *
+ * Copyright 2013 Joyent, Inc.  All rights reserved.
  * Copyright (c) 2014 Gary Mills
  */
 
@@ -315,7 +315,8 @@ static int ex(struct event *e);
 static void read_dirs(int);
 static void mail(char *, char *, int);
 static char *next_field(int, int);
-static void readcron(struct usr *, time_t);
+static void readcron(char *, struct usr *, time_t);
+static void readcronfile(FILE *, struct usr *, time_t);
 static int next_ge(int, char *);
 static void free_if_unused(struct usr *);
 static void del_atjob(char *, char *);
@@ -420,7 +421,7 @@ extern void el_delete(void);
 
 static int valid_entry(char *, int);
 static struct usr *create_ulist(char *, int);
-static void init_cronevent(char *, int);
+static void init_cronevent(char *, char *);
 static void init_atevent(char *, time_t, int, int);
 static void update_atevent(struct usr *, char *, time_t, int);
 
@@ -759,6 +760,18 @@ read_dirs(int first)
 	time_t		tim;
 
 
+	if (chdir(SYSCRONDIR) != -1) {
+		cwd = CRON;
+		if ((dir = opendir(".")) != NULL) {
+			while ((dp = readdir(dir)) != NULL) {
+				if (!valid_entry(dp->d_name, CRONEVENT))
+					continue;
+				init_cronevent(SYSCRONDIR, dp->d_name);
+			}
+			(void) closedir(dir);
+		}
+	}
+
 	if (chdir(CRONDIR) == -1)
 		crabort(BADCD, REMOVE_FIFO|CONSOLE_MSG);
 	cwd = CRON;
@@ -767,7 +780,7 @@ read_dirs(int first)
 	while ((dp = readdir(dir)) != NULL) {
 		if (!valid_entry(dp->d_name, CRONEVENT))
 			continue;
-		init_cronevent(dp->d_name, first);
+		init_cronevent(CRONDIR, dp->d_name);
 	}
 	(void) closedir(dir);
 
@@ -853,23 +866,18 @@ create_ulist(char *name, int type)
 }
 
 void
-init_cronevent(char *name, int first)
+init_cronevent(char *basedir, char *name)
 {
 	struct usr	*u;
 
-	if (first) {
+	if ((u = find_usr(name)) == NULL) {
 		u = create_ulist(name, CRONEVENT);
-		readcron(u, 0);
+		readcron(basedir, u, 0);
 	} else {
-		if ((u = find_usr(name)) == NULL) {
-			u = create_ulist(name, CRONEVENT);
-			readcron(u, 0);
-		} else {
-			u->ctexists = TRUE;
-			rm_ctevents(u);
-			el_remove(u->ctid, 0);
-			readcron(u, 0);
-		}
+		u->ctexists = TRUE;
+		rm_ctevents(u);
+		el_remove(u->ctid, 0);
+		readcron(basedir, u, 0);
 	}
 }
 
@@ -950,7 +958,7 @@ mod_ctab(char *name, time_t reftime)
 		(void) strcpy(u->home, pw->pw_dir);
 		u->uid = pw->pw_uid;
 		u->gid = pw->pw_gid;
-		readcron(u, reftime);
+		readcron(CRONDIR, u, reftime);
 	} else {
 		u->uid = pw->pw_uid;
 		u->gid = pw->pw_gid;
@@ -973,7 +981,7 @@ mod_ctab(char *name, time_t reftime)
 			/* user didnt have a crontab last time */
 			u->ctid = ecid++;
 			u->ctevents = NULL;
-			readcron(u, reftime);
+			readcron(CRONDIR, u, reftime);
 			return;
 		}
 #ifdef DEBUG
@@ -981,7 +989,7 @@ mod_ctab(char *name, time_t reftime)
 #endif
 		rm_ctevents(u);
 		el_remove(u->ctid, 0);
-		readcron(u, reftime);
+		readcron(CRONDIR, u, reftime);
 	}
 }
 
@@ -1116,8 +1124,94 @@ update_atevent(struct usr *u, char *name, time_t tim, int jobtype)
 static char line[CTLINESIZE];	/* holds a line from a crontab file */
 static int cursor;		/* cursor for the above line */
 
+static int
+copyfile(char *name, FILE *dp)
+{
+	FILE *tf;
+
+	if ((tf = fopen(name, "r")) == NULL) {
+		(void) fclose(dp);
+		return (1);
+	}
+
+	while (fgets(line, CTLINESIZE, tf) != NULL) {
+		if (fputs(line, dp) == EOF) {
+			(void) fclose(tf);
+			(void) fclose(dp);
+			return (1);
+		}
+	}
+	(void) fclose(tf);
+
+	return (0);
+}
+
 static void
-readcron(struct usr *u, time_t reftime)
+readcron(char *basedir, struct usr *u, time_t reftime)
+{
+	char *altpath;
+	struct stat sb;
+	FILE *cf;	/* cf will be a user's crontab file */
+	char altnamebuf[PATH_MAX];
+	char namebuf[PATH_MAX];
+
+	if (strcmp(basedir, SYSCRONDIR) == 0)
+		altpath = CRONDIR;
+	else
+		altpath = SYSCRONDIR;
+
+	if (snprintf(altnamebuf, sizeof (altnamebuf), "%s/%s", altpath,
+	    u->name) >= sizeof (altnamebuf))
+		return;
+
+	if (snprintf(namebuf, sizeof (namebuf), "%s/%s", basedir, u->name) >=
+	    sizeof (namebuf))
+		return;
+
+	if (stat(altnamebuf, &sb) != -1) {
+		/*
+		 * There is a secondary crontab for this user.  We need to
+		 * merge the two crontabs into a temporary file for loading.
+		 */
+		int fd;
+		char tmpfile[PATH_MAX];
+
+		(void) strlcpy(tmpfile, "/tmp/cronXXXXXX", sizeof (tmpfile));
+		if ((fd = mkstemp(tmpfile)) == -1)
+			return;
+
+		unlink(tmpfile);
+		if ((cf = fdopen(fd, "w+")) == NULL) {
+			close(fd);
+			return;
+		}
+
+		if (copyfile(namebuf, cf) != 0)
+			return;
+
+		if (copyfile(altnamebuf, cf) != 0)
+			return;
+
+		(void) fflush(cf);
+		rewind(cf);
+
+	} else {
+		/*
+		 * Only one crontab, open it directly.
+		 */
+		if ((cf = fopen(namebuf, "r")) == NULL) {
+			mail(u->name, NOREAD, ERR_UNIXERR);
+			return;
+		}
+	}
+
+	readcronfile(cf, u, reftime);
+
+	(void) fclose(cf);
+}
+
+static void
+readcronfile(FILE *cf, struct usr *u, time_t reftime)
 {
 	/*
 	 * readcron reads in a crontab file for a user (u). The list of
@@ -1125,12 +1219,9 @@ readcron(struct usr *u, time_t reftime)
 	 * this list. Each event is also entered into the main event
 	 * list.
 	 */
-	FILE *cf;	/* cf will be a user's crontab file */
 	struct event *e;
 	int start;
 	unsigned int i;
-	char namebuf[PATH_MAX];
-	char *pname;
 	struct shared *tz = NULL;
 	struct shared *home = NULL;
 	struct shared *shell = NULL;
@@ -1138,19 +1229,6 @@ readcron(struct usr *u, time_t reftime)
 
 	/* read the crontab file */
 	cte_init();		/* Init error handling */
-	if (cwd != CRON) {
-		if (snprintf(namebuf, sizeof (namebuf), "%s/%s",
-		    CRONDIR, u->name) >= sizeof (namebuf)) {
-			return;
-		}
-		pname = namebuf;
-	} else {
-		pname = u->name;
-	}
-	if ((cf = fopen(pname, "r")) == NULL) {
-		mail(u->name, NOREAD, ERR_UNIXERR);
-		return;
-	}
 	while (fgets(line, CTLINESIZE, cf) != NULL) {
 		char *tmp;
 		/* process a line of a crontab file */
@@ -1279,7 +1357,6 @@ again:
 #endif
 	}
 	cte_sendmail(u->name);	/* mail errors if any to user */
-	(void) fclose(cf);
 	rel_shared(tz);
 	rel_shared(shell);
 	rel_shared(home);
@@ -2442,6 +2519,9 @@ ex(struct event *e)
 	} else {
 		r = audit_cron_session(e->u->name, CRONDIR,
 		    e->u->uid, e->u->gid, NULL);
+		if (r != 0)
+			r = audit_cron_session(e->u->name, SYSCRONDIR,
+			    e->u->uid, e->u->gid, NULL);
 	}
 	if (r != 0) {
 		msg("cron audit problem. job failed (%s) for user %s",

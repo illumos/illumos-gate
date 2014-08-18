@@ -100,4 +100,4 @@ $(LINTPOUT):	$(SRCS)
 
 
 $(LINTLIB):	$(LINTSRCS)
-		$(LINT.c) -o $(LIBNAME) $(LINTSRCS)
+		$(LINT.c) -o $(LIBNAME) $(LINTSRCS) > $(LINTOUT) 2>&1

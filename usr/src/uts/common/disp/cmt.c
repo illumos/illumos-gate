@@ -201,13 +201,15 @@ pg_cmt_cpu_startup(cpu_t *cp)
 
 /*
  * Return non-zero if thread can migrate between "from" and "to"
- * without a performance penalty
+ * without a performance penalty.  This is true only if we share a core on
+ * virtually any CPU; sharing the last-level cache is insufficient to make
+ * migration possible without penalty.
  */
 int
 pg_cmt_can_migrate(cpu_t *from, cpu_t *to)
 {
-	if (from->cpu_physid->cpu_cacheid ==
-	    to->cpu_physid->cpu_cacheid)
+	if (from->cpu_physid->cpu_coreid ==
+	    to->cpu_physid->cpu_coreid)
 		return (1);
 	return (0);
 }

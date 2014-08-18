@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
  */
 
 #include <mdb/mdb_param.h>
@@ -33,9 +34,9 @@
 
 #define	ZONE_NAMELEN	20
 #ifdef _LP64
-#define	ZONE_PATHLEN	32
+#define	ZONE_PATHLEN	25
 #else
-#define	ZONE_PATHLEN	40
+#define	ZONE_PATHLEN	33
 #endif
 
 /*
@@ -53,6 +54,56 @@ char *zone_status_names[] = {
 	"dying",		/* ZONE_IS_DYING */
 	"dead"			/* ZONE_IS_DEAD */
 };
+
+static int
+zid_lookup_cb(uintptr_t addr, const zone_t *zone, void *arg)
+{
+	zoneid_t zid = *(uintptr_t *)arg;
+	if (zone->zone_id == zid)
+		mdb_printf("%p\n", addr);
+
+	return (WALK_NEXT);
+}
+
+/*ARGSUSED*/
+int
+zid2zone(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	if (!(flags & DCMD_ADDRSPEC) || argc != 0)
+		return (DCMD_USAGE);
+
+	if (mdb_walk("zone", (mdb_walk_cb_t)zid_lookup_cb, &addr) == -1) {
+		mdb_warn("failed to walk zone");
+		return (DCMD_ERR);
+	}
+
+	return (DCMD_OK);
+}
+
+static int
+zdid_lookup_cb(uintptr_t addr, const zone_t *zone, void *arg)
+{
+	zoneid_t zdid = *(uintptr_t *)arg;
+	if (zone->zone_did == zdid)
+		mdb_printf("%p\n", addr);
+
+	return (WALK_NEXT);
+}
+
+/*ARGSUSED*/
+int
+zdid2zone(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	if (!(flags & DCMD_ADDRSPEC) || argc != 0)
+		return (DCMD_USAGE);
+
+	if (mdb_walk("zone", (mdb_walk_cb_t)zdid_lookup_cb, &addr) == -1) {
+		mdb_warn("failed to walk zone");
+		return (DCMD_ERR);
+	}
+
+	return (DCMD_OK);
+}
 
 int
 zoneprt(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
@@ -96,10 +147,10 @@ zoneprt(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	 */
 	if (DCMD_HDRSPEC(flags)) {
 		if (ropt_given == FALSE)
-			mdb_printf("%<u>%?s %6s %-13s %-20s %-s%</u>\n",
+			mdb_printf("%<u>%?s %4s %-13s %-19s %-s%</u>\n",
 			    "ADDR", "ID", "STATUS", "NAME", "PATH");
 		else
-			mdb_printf("%<u>%?s %6s %10s %10s %-20s%</u>\n",
+			mdb_printf("%<u>%?s %6s %10s %10s %-19s%</u>\n",
 			    "ADDR", "ID", "REFS", "CREFS", "NAME");
 	}
 
@@ -138,7 +189,7 @@ zoneprt(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			statusp = zone_status_names[zn.zone_status];
 		else
 			statusp = "???";
-		mdb_printf("%0?p %6d %-13s %-20s %s\n", addr, zn.zone_id,
+		mdb_printf("%0?p %4d %-13s %-19s %s\n", addr, zn.zone_id,
 		    statusp, name, path);
 	} else {
 		/*
@@ -146,7 +197,7 @@ zoneprt(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		 * Display the zone's subsystem-specific reference counts if
 		 * the user specified the '-v' option.
 		 */
-		mdb_printf("%0?p %6d %10u %10u %-20s\n", addr, zn.zone_id,
+		mdb_printf("%0?p %6d %10u %10u %-19s\n", addr, zn.zone_id,
 		    zn.zone_ref, zn.zone_cred_ref, name);
 		if (vopt_given == TRUE) {
 			GElf_Sym subsys_names_sym;
@@ -384,7 +435,7 @@ zsd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	 * Prepare to output the specified zone's ZSD information.
 	 */
 	if (DCMD_HDRSPEC(flags))
-		mdb_printf("%<u>%-20s %?s %?s %8s%</u>\n", "ZONE", "KEY",
+		mdb_printf("%<u>%-19s %?s %?s %8s%</u>\n", "ZONE", "KEY",
 		    "VALUE", "FLAGS");
 	len = mdb_readstr(name, ZONE_NAMELEN, (uintptr_t)zone.zone_name);
 	if (len > 0) {
@@ -393,7 +444,7 @@ zsd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	} else {
 		(void) strcpy(name, "??");
 	}
-	mdb_printf("%-20s ", name);
+	mdb_printf("%-19s ", name);
 
 	/*
 	 * Display the requested ZSD entries.

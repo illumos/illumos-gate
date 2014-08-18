@@ -63,6 +63,11 @@ uint64_t metaslab_gang_bang = SPA_MAXBLOCKSIZE + 1;	/* force gang blocks */
 int zfs_condense_pct = 200;
 
 /*
+ * Never condense any space map.  This is for debugging/recovery only.
+ */
+int zfs_condense_never = 0;
+
+/*
  * Condensing a metaslab is not guaranteed to actually reduce the amount of
  * space used on disk. In particular, a space map uses data in increments of
  * MAX(1 << ashift, SPACE_MAP_INITIAL_BLOCKSIZE), so a metaslab might use the
@@ -1643,6 +1648,9 @@ metaslab_should_condense(metaslab_t *msp)
 
 	ASSERT(MUTEX_HELD(&msp->ms_lock));
 	ASSERT(msp->ms_loaded);
+
+	if (zfs_condense_never != 0)
+		return (B_FALSE);
 
 	/*
 	 * Use the ms_size_tree range tree, which is ordered by size, to

@@ -21,6 +21,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2014 Joyent, Inc.  All rights reserved.
  */
 
 /*
@@ -257,6 +258,19 @@ rusagesys(int code, void *arg1, void *arg2, void *arg3, void *arg4)
 	case _RUSAGESYS_GETVMUSAGE:
 		return (vm_getusage((uint_t)(uintptr_t)arg1, (time_t)arg2,
 		    (vmusage_t *)arg3, (size_t *)arg4, 0));
+	case _RUSAGESYS_INVALMAP:
+		/*
+		 * SPARC sfmmu hat does not support HAT_CURPROC_PGUNLOAD
+		 * handling so callers on SPARC should get simple sync
+		 * handling with invalidation to all processes.
+		 */
+#if defined(__sparc)
+		return (memcntl((caddr_t)arg2, (size_t)arg3, MC_SYNC,
+		    (caddr_t)(MS_ASYNC | MS_INVALIDATE), 0, 0));
+#else
+		return (vm_map_inval((pid_t)(uintptr_t)arg1, (caddr_t)arg2,
+		    (size_t)arg3));
+#endif
 	default:
 		return (set_errno(EINVAL));
 	}

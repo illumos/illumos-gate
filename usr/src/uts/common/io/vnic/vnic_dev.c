@@ -52,6 +52,7 @@
 #include <sys/vlan.h>
 #include <sys/vnic.h>
 #include <sys/vnic_impl.h>
+#include <sys/mac_impl.h>
 #include <sys/mac_flow_impl.h>
 #include <inet/ip_impl.h>
 
@@ -499,10 +500,21 @@ vnic_dev_create(datalink_id_t vnic_id, datalink_id_t linkid,
 
 		mac_sdu_get(vnic->vn_lower_mh, &mac->m_min_sdu,
 		    &mac->m_max_sdu);
+		err = mac_mtu_add(vnic->vn_lower_mh, &mac->m_max_sdu, B_FALSE);
+		if (err != 0) {
+			VERIFY(mac_margin_remove(vnic->vn_lower_mh,
+			    vnic->vn_margin) == 0);
+			mac_free(mac);
+			if (diag != NULL)
+				*diag = VNIC_IOC_DIAG_MACMTU_INVALID;
+			goto bail;
+		}
+		vnic->vn_mtu = mac->m_max_sdu;
 	} else {
 		vnic->vn_margin = VLAN_TAGSZ;
 		mac->m_min_sdu = 1;
 		mac->m_max_sdu = ANCHOR_VNIC_MAX_MTU;
+		vnic->vn_mtu = ANCHOR_VNIC_MAX_MTU;
 	}
 
 	mac->m_margin = vnic->vn_margin;
@@ -510,8 +522,12 @@ vnic_dev_create(datalink_id_t vnic_id, datalink_id_t linkid,
 	err = mac_register(mac, &vnic->vn_mh);
 	mac_free(mac);
 	if (err != 0) {
-		VERIFY(is_anchor || mac_margin_remove(vnic->vn_lower_mh,
-		    vnic->vn_margin) == 0);
+		if (!is_anchor) {
+			VERIFY(mac_mtu_remove(vnic->vn_lower_mh,
+			    vnic->vn_mtu) == 0);
+			VERIFY(mac_margin_remove(vnic->vn_lower_mh,
+			    vnic->vn_margin) == 0);
+		}
 		goto bail;
 	}
 
@@ -526,6 +542,10 @@ vnic_dev_create(datalink_id_t vnic_id, datalink_id_t linkid,
 			}
 			err = mac_client_set_resources(vnic->vn_mch, mrp);
 			if (err != 0) {
+				VERIFY(mac_mtu_remove(vnic->vn_lower_mh,
+				    vnic->vn_mtu) == 0);
+				VERIFY(mac_margin_remove(vnic->vn_lower_mh,
+				    vnic->vn_margin) == 0);
 				(void) mac_unregister(vnic->vn_mh);
 				goto bail;
 			}
@@ -536,6 +556,12 @@ vnic_dev_create(datalink_id_t vnic_id, datalink_id_t linkid,
 	if (err != 0) {
 		VERIFY(is_anchor || mac_margin_remove(vnic->vn_lower_mh,
 		    vnic->vn_margin) == 0);
+		if (!is_anchor) {
+			VERIFY(mac_mtu_remove(vnic->vn_lower_mh,
+			    vnic->vn_mtu) == 0);
+			VERIFY(mac_margin_remove(vnic->vn_lower_mh,
+			    vnic->vn_margin) == 0);
+		}
 		(void) mac_unregister(vnic->vn_mh);
 		goto bail;
 	}
@@ -654,6 +680,7 @@ vnic_dev_delete(datalink_id_t vnic_id, uint32_t flags, cred_t *credp)
 			    vnic->vn_slot_id);
 		}
 		(void) mac_margin_remove(vnic->vn_lower_mh, vnic->vn_margin);
+		(void) mac_mtu_remove(vnic->vn_lower_mh, vnic->vn_mtu);
 		(void) mac_notify_remove(vnic->vn_mnh, B_TRUE);
 		(void) mac_unicast_remove(vnic->vn_mch, vnic->vn_muh);
 		mac_client_close(vnic->vn_mch, MAC_CLOSE_FLAGS_IS_VNIC);
@@ -1011,11 +1038,42 @@ vnic_m_setprop(void *m_driver, const char *pr_name, mac_prop_id_t pr_num,
 			break;
 		}
 		bcopy(pr_val, &mtu, sizeof (mtu));
-		if (mtu < ANCHOR_VNIC_MIN_MTU || mtu > ANCHOR_VNIC_MAX_MTU) {
+
+		if (vn->vn_link_id == DATALINK_INVALID_LINKID) {
+			if (mtu < ANCHOR_VNIC_MIN_MTU ||
+			    mtu > ANCHOR_VNIC_MAX_MTU) {
+				err = EINVAL;
+				break;
+			}
+		} else {
+			err = mac_mtu_add(vn->vn_lower_mh, &mtu, B_FALSE);
+			/*
+			 * If it's not supported to set a value here, translate
+			 * that to EINVAL, so user land gets a better idea of
+			 * what went wrong. This realistically means that they
+			 * violated the output of prop info.
+			 */
+			if (err == ENOTSUP)
+				err = EINVAL;
+			if (err != 0)
+				break;
+			VERIFY(mac_mtu_remove(vn->vn_lower_mh,
+			    vn->vn_mtu) == 0);
+		}
+		vn->vn_mtu = mtu;
+		err = mac_maxsdu_update(vn->vn_mh, mtu);
+		break;
+	}
+	case MAC_PROP_VN_PROMISC_FILTERED: {
+		boolean_t filtered;
+
+		if (pr_valsize < sizeof (filtered)) {
 			err = EINVAL;
 			break;
 		}
-		err = mac_maxsdu_update(vn->vn_mh, mtu);
+
+		bcopy(pr_val, &filtered, sizeof (filtered));
+		mac_set_promisc_filtered(vn->vn_mch, filtered);
 		break;
 	}
 	case MAC_PROP_SECONDARY_ADDRS: {
@@ -1039,8 +1097,14 @@ vnic_m_getprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 {
 	vnic_t		*vn = arg;
 	int 		ret = 0;
+	boolean_t	out;
 
 	switch (pr_num) {
+	case MAC_PROP_VN_PROMISC_FILTERED:
+		out = mac_get_promisc_filtered(vn->vn_mch);
+		ASSERT(pr_valsize >= sizeof (boolean_t));
+		bcopy(&out, pr_val, sizeof (boolean_t));
+		break;
 	case MAC_PROP_SECONDARY_ADDRS:
 		ret = vnic_get_secondary_macs(vn, pr_valsize, pr_val);
 		break;
@@ -1058,14 +1122,43 @@ static void vnic_m_propinfo(void *m_driver, const char *pr_name,
 {
 	vnic_t		*vn = m_driver;
 
-	/* MTU setting allowed only on an etherstub */
-	if (vn->vn_link_id != DATALINK_INVALID_LINKID)
-		return;
-
 	switch (pr_num) {
 	case MAC_PROP_MTU:
-		mac_prop_info_set_range_uint32(prh,
-		    ANCHOR_VNIC_MIN_MTU, ANCHOR_VNIC_MAX_MTU);
+		if (vn->vn_link_id == DATALINK_INVALID_LINKID) {
+			mac_prop_info_set_range_uint32(prh,
+			    ANCHOR_VNIC_MIN_MTU, ANCHOR_VNIC_MAX_MTU);
+		} else {
+			uint32_t		max;
+			mac_perim_handle_t	mph;
+			mac_propval_range_t	range;
+
+			/*
+			 * The valid range for a VNIC's MTU is the minimum that
+			 * the device supports and the current value of the
+			 * device. A VNIC cannot increase the current MTU of the
+			 * device. Therefore we need to get the range from the
+			 * propinfo endpoint and current mtu from the
+			 * traditional property endpoint.
+			 */
+			mac_perim_enter_by_mh(vn->vn_lower_mh, &mph);
+			if (mac_get_prop(vn->vn_lower_mh, MAC_PROP_MTU, "mtu",
+			    &max, sizeof (uint32_t)) != 0) {
+				mac_perim_exit(mph);
+				return;
+			}
+
+			range.mpr_count = 1;
+			if (mac_prop_info(vn->vn_lower_mh, MAC_PROP_MTU, "mtu",
+			    NULL, 0, &range, NULL) != 0) {
+				mac_perim_exit(mph);
+				return;
+			}
+
+			mac_prop_info_set_default_uint32(prh, max);
+			mac_prop_info_set_range_uint32(prh,
+			    range.mpr_range_uint32[0].mpur_min, max);
+			mac_perim_exit(mph);
+		}
 		break;
 	}
 }

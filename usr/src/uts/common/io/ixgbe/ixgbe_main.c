@@ -1792,6 +1792,7 @@ ixgbe_cbfunc(dev_info_t *dip, ddi_cb_action_t cbaction, void *cbarg,
     void *arg1, void *arg2)
 {
 	ixgbe_t *ixgbe = (ixgbe_t *)arg1;
+	int prev = ixgbe->intr_cnt;
 
 	switch (cbaction) {
 	/* IRM callback */
@@ -1805,7 +1806,8 @@ ixgbe_cbfunc(dev_info_t *dip, ddi_cb_action_t cbaction, void *cbarg,
 		if (ixgbe_intr_adjust(ixgbe, cbaction, count) !=
 		    DDI_SUCCESS) {
 			ixgbe_error(ixgbe,
-			    "IRM CB: Failed to adjust interrupts");
+			    "IRM CB: Failed to adjust interrupts [%d %d %d]",
+			    cbaction, count, prev);
 			goto cb_fail;
 		}
 		break;

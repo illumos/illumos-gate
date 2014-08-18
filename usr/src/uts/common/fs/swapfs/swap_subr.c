@@ -110,9 +110,11 @@ swapfs_recalc(pgcnt_t pgs)
 		 * memory that can be used as swap space should do so by
 		 * setting swapfs_desfree at boot time, not swapfs_minfree.
 		 * However, swapfs_minfree is tunable by install as a
-		 * workaround for bugid 1147463.
+		 * workaround for bugid 1147463. Note swapfs_minfree is set
+		 * to 1/8th of memory, but clamped at the limit of 256 MB.
 		 */
-		new_swapfs_minfree = MAX(btopr(2 * 1024 * 1024), pgs >> 3);
+		new_swapfs_minfree = MIN(MAX(btopr(2 * 1024 * 1024), pgs >> 3),
+		    btopr(256 * 1024 * 1024));
 	}
 
 	/*

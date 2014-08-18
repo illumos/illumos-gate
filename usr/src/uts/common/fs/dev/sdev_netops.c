@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
  */
 
 /*
@@ -41,7 +42,101 @@
 #include <sys/zone.h>
 #include <sys/dls.h>
 
+static const char *devnet_zpath = "/dev/net/zone/";
 struct vnodeops		*devnet_vnodeops;
+
+static zoneid_t
+devnet_nodetozone(sdev_node_t *dv)
+{
+	char *zname = NULL, *dup;
+	zone_t *zone;
+	int duplen;
+	zoneid_t zid;
+
+	/*
+	 * If in a non-global zone, always return it's zid no matter what the
+	 * node is.
+	 */
+	zid = getzoneid();
+	if (zid != GLOBAL_ZONEID)
+		return (zid);
+
+	/*
+	 * If it doesn't have /dev/net/zone/ then it can't be a specific zone
+	 * we're targetting.
+	 */
+	if (strncmp(devnet_zpath, dv->sdev_path, strlen(devnet_zpath)) != 0)
+		return (GLOBAL_ZONEID);
+
+	if (dv->sdev_vnode->v_type == VDIR) {
+		zone = zone_find_by_name(dv->sdev_name);
+	} else {
+		/* Non directories have the form /dev/net/zone/%z/%s */
+		dup = strdup(dv->sdev_path);
+		duplen = strlen(dup);
+		zname = strrchr(dup, '/');
+		*zname = '\0';
+		zname--;
+		zname = strrchr(dup, '/');
+		zname++;
+		zone = zone_find_by_name(zname);
+		kmem_free(dup, duplen + 1);
+	}
+	if (zone == NULL)
+		return (GLOBAL_ZONEID);
+	zid = zone->zone_id;
+	zone_rele(zone);
+	return (zid);
+}
+
+static int
+devnet_mkdir(struct sdev_node *ddv, char *name)
+{
+	sdev_node_t *dv;
+	struct vattr va;
+	int ret;
+
+	ASSERT(RW_WRITE_HELD(&ddv->sdev_contents));
+	dv = sdev_cache_lookup(ddv, name);
+	if (dv != NULL) {
+		SDEV_SIMPLE_RELE(dv);
+		return (EEXIST);
+	}
+
+	va = *sdev_getdefault_attr(VDIR);
+	gethrestime(&va.va_atime);
+	va.va_mtime = va.va_atime;
+	va.va_ctime = va.va_atime;
+
+	ret = sdev_mknode(ddv, name, &dv, &va, NULL, NULL, kcred, SDEV_READY);
+	if (ret != 0)
+		return (ret);
+	SDEV_SIMPLE_RELE(dv);
+	return (0);
+}
+
+/*
+ * We basically need to walk down the directory path to determine what we should
+ * do. At the top level of /dev/net, only the directory /dev/net/zone is valid,
+ * and it is always valid. Following on that, /dev/net/zone/%zonename is valid
+ * if and only if we can look up that zone name. If it's not, or it's some other
+ * name, then it's SDEV_VTOR_INVALID.
+ */
+static int
+devnet_dirvalidate(struct sdev_node *dv)
+{
+	zone_t *zonep;
+	char *path = "/dev/net/zone";
+
+	if (strcmp(path, dv->sdev_path) == 0)
+		return (SDEV_VTOR_VALID);
+
+	zonep = zone_find_by_name(dv->sdev_name);
+	if (zonep == NULL)
+		return (SDEV_VTOR_INVALID);
+	zone_rele(zonep);
+	return (SDEV_VTOR_VALID);
+}
 
 /*
  * Check if a net sdev_node is still valid - i.e. it represents a current
@@ -60,11 +155,20 @@ devnet_validate(struct sdev_node *dv)
 
 	ASSERT(dv->sdev_state == SDEV_READY);
 
-	if (dls_mgmt_get_linkid(dv->sdev_name, &linkid) != 0)
+	if (dv->sdev_vnode->v_type == VDIR)
+		return (devnet_dirvalidate(dv));
+
+	if (strncmp(devnet_zpath, dv->sdev_path, strlen(devnet_zpath)) == 0) {
+		ASSERT(SDEV_IS_GLOBAL(dv));
+		zoneid = devnet_nodetozone(dv);
+	} else {
+		zoneid = getzoneid();
+	}
+
+	if (dls_mgmt_get_linkid_in_zone(dv->sdev_name, &linkid, zoneid) != 0)
 		return (SDEV_VTOR_INVALID);
-	if (SDEV_IS_GLOBAL(dv))
+	if (zoneid == GLOBAL_ZONEID)
 		return (SDEV_VTOR_VALID);
-	zoneid = getzoneid();
 	return (zone_check_datalink(&zoneid, linkid) == 0 ?
 	    SDEV_VTOR_VALID : SDEV_VTOR_INVALID);
 }
@@ -74,13 +178,14 @@ devnet_validate(struct sdev_node *dv)
  * a net entry when the node is not found in the cache.
  */
 static int
-devnet_create_rvp(const char *nm, struct vattr *vap, dls_dl_handle_t *ddhp)
+devnet_create_rvp(const char *nm, struct vattr *vap, dls_dl_handle_t *ddhp,
+    zoneid_t zid)
 {
 	timestruc_t now;
 	dev_t dev;
 	int error;
 
-	if ((error = dls_devnet_open(nm, ddhp, &dev)) != 0) {
+	if ((error = dls_devnet_open_in_zone(nm, ddhp, &dev, zid)) != 0) {
 		sdcmn_err12(("devnet_create_rvp: not a valid vanity name "
 		    "network node: %s\n", nm));
 		return (error);
@@ -116,12 +221,16 @@ devnet_lookup(struct vnode *dvp, char *nm, struct vnode **vpp,
 	struct sdev_node *ddv = VTOSDEV(dvp);
 	struct sdev_node *dv = NULL;
 	dls_dl_handle_t ddh = NULL;
+	zone_t *zone;
 	struct vattr vattr;
 	int nmlen;
 	int error = ENOENT;
 
 	if (SDEVTOV(ddv)->v_type != VDIR)
 		return (ENOTDIR);
+
+	if (!SDEV_IS_GLOBAL(ddv) && crgetzoneid(cred) == GLOBAL_ZONEID)
+		return (EPERM);
 
 	/*
 	 * Empty name or ., return node itself.
@@ -145,6 +254,12 @@ devnet_lookup(struct vnode *dvp, char *nm, struct vnode **vpp,
 	rw_enter(&ddv->sdev_contents, RW_WRITER);
 
 	/*
+	 * ZOMBIED parent does not allow new node creation, bail out early.
+	 */
+	if (ddv->sdev_state == SDEV_ZOMBIE)
+		goto failed;
+
+	/*
 	 * directory cache lookup:
 	 */
 	if ((dv = sdev_cache_lookup(ddv, nm)) != NULL) {
@@ -153,13 +268,42 @@ devnet_lookup(struct vnode *dvp, char *nm, struct vnode **vpp,
 			goto found;
 	}
 
-	/*
-	 * ZOMBIED parent does not allow new node creation, bail out early.
-	 */
-	if (ddv->sdev_state == SDEV_ZOMBIE)
-		goto failed;
+	if (SDEV_IS_GLOBAL(ddv)) {
+		/*
+		 * Check for /dev/net/zone
+		 */
+		if (strcmp("zone", nm) == 0 && strcmp("/dev/net",
+		    ddv->sdev_path) == 0) {
+			(void) devnet_mkdir(ddv, nm);
+			dv = sdev_cache_lookup(ddv, nm);
+			ASSERT(dv != NULL);
+			goto found;
+		}
 
-	error = devnet_create_rvp(nm, &vattr, &ddh);
+		/*
+		 * Check for /dev/net/zone/%z. We can't use devnet_zpath due to
+		 * its trailing slash.
+		 */
+		if (strcmp("/dev/net/zone", ddv->sdev_path) == 0) {
+			zone = zone_find_by_name(nm);
+			if (zone == NULL)
+				goto failed;
+			(void) devnet_mkdir(ddv, nm);
+			zone_rele(zone);
+			dv = sdev_cache_lookup(ddv, nm);
+			ASSERT(dv != NULL);
+			goto found;
+		}
+	} else if (strcmp("/dev/net", ddv->sdev_path) != 0) {
+		goto failed;
+	}
+
+	/*
+	 * We didn't find what we were looking for. What that is depends a lot
+	 * on what directory we're in.
+	 */
+
+	error = devnet_create_rvp(nm, &vattr, &ddh, devnet_nodetozone(ddv));
 	if (error != 0)
 		goto failed;
 
@@ -219,7 +363,7 @@ devnet_filldir_datalink(datalink_id_t linkid, void *arg)
 	if ((dv = sdev_cache_lookup(ddv, (char *)link)) != NULL)
 		goto found;
 
-	if (devnet_create_rvp(link, &vattr, &ddh) != 0)
+	if (devnet_create_rvp(link, &vattr, &ddh, devnet_nodetozone(arg)) != 0)
 		return (0);
 
 	ASSERT(ddh != NULL);
@@ -244,16 +388,77 @@ found:
 	return (0);
 }
 
+/*
+ * Fill in all the entries for the current zone.
+ */
+static void
+devnet_fillzone(struct sdev_node *ddv, zoneid_t zid)
+{
+	datalink_id_t	linkid;
+
+	ASSERT(RW_WRITE_HELD(&ddv->sdev_contents));
+	if (zid == GLOBAL_ZONEID) {
+		ASSERT(SDEV_IS_GLOBAL(ddv));
+		linkid = DATALINK_INVALID_LINKID;
+		do {
+			linkid = dls_mgmt_get_next(linkid, DATALINK_CLASS_ALL,
+			    DATALINK_ANY_MEDIATYPE, DLMGMT_ACTIVE);
+			if (linkid != DATALINK_INVALID_LINKID)
+				(void) devnet_filldir_datalink(linkid, ddv);
+		} while (linkid != DATALINK_INVALID_LINKID);
+	} else {
+		(void) zone_datalink_walk(zid,  devnet_filldir_datalink, ddv);
+	}
+}
+
+/*
+ * Callback for zone_walk when filling up /dev/net/zone/...
+ */
+static int
+devnet_fillzdir_cb(zone_t *zonep, void *arg)
+{
+	sdev_node_t *ddv = arg;
+
+	ASSERT(RW_WRITE_HELD(&ddv->sdev_contents));
+	(void) devnet_mkdir(ddv, zonep->zone_name);
+	return (0);
+}
+
+/*
+ * Fill in a directory that isn't the top level /dev/net.
+ */
+static void
+devnet_fillzdir(struct sdev_node *ddv)
+{
+	zone_t *zonep;
+	char *path = "/dev/net/zone";
+
+	if (strcmp(path, ddv->sdev_path) == 0) {
+		(void) zone_walk(devnet_fillzdir_cb, ddv);
+		return;
+	}
+
+	zonep = zone_find_by_name(ddv->sdev_name);
+	if (zonep == NULL)
+		return;
+	devnet_fillzone(ddv, zonep->zone_id);
+	zone_rele(zonep);
+}
+
 static void
 devnet_filldir(struct sdev_node *ddv)
 {
-	sdev_node_t	*dv, *next;
-	datalink_id_t	linkid;
+	int ret;
+	sdev_node_t *dv, *next;
 
 	ASSERT(RW_READ_HELD(&ddv->sdev_contents));
 	if (rw_tryupgrade(&ddv->sdev_contents) == NULL) {
 		rw_exit(&ddv->sdev_contents);
 		rw_enter(&ddv->sdev_contents, RW_WRITER);
+		if (ddv->sdev_state == SDEV_ZOMBIE) {
+			rw_exit(&ddv->sdev_contents);
+			return;
+		}
 	}
 
 	for (dv = SDEV_FIRST_ENTRY(ddv); dv; dv = next) {
@@ -276,31 +481,36 @@ devnet_filldir(struct sdev_node *ddv)
 
 		if (SDEVTOV(dv)->v_count > 0)
 			continue;
+
 		SDEV_HOLD(dv);
+
+		/*
+		 * Clean out everything underneath before we remove ourselves.
+		 */
+		ret = sdev_cleandir(dv, NULL, 0);
+		ASSERT(ret == 0);
 		/* remove the cache node */
 		(void) sdev_cache_update(ddv, &dv, dv->sdev_name,
 		    SDEV_CACHE_DELETE);
 		SDEV_RELE(dv);
 	}
 
+	if (strcmp(ddv->sdev_path, "/dev/net") != 0) {
+		devnet_fillzdir(ddv);
+		goto done;
+	}
+
 	if (((ddv->sdev_flags & SDEV_BUILD) == 0) && !dls_devnet_rebuild())
 		goto done;
 
 	if (SDEV_IS_GLOBAL(ddv)) {
-		linkid = DATALINK_INVALID_LINKID;
-		do {
-			linkid = dls_mgmt_get_next(linkid, DATALINK_CLASS_ALL,
-			    DATALINK_ANY_MEDIATYPE, DLMGMT_ACTIVE);
-			if (linkid != DATALINK_INVALID_LINKID)
-				(void) devnet_filldir_datalink(linkid, ddv);
-		} while (linkid != DATALINK_INVALID_LINKID);
+		devnet_fillzone(ddv, GLOBAL_ZONEID);
+		(void) devnet_mkdir(ddv, "zone");
 	} else {
-		(void) zone_datalink_walk(getzoneid(),
-		    devnet_filldir_datalink, ddv);
+		devnet_fillzone(ddv, getzoneid());
 	}
 
 	ddv->sdev_flags &= ~SDEV_BUILD;
-
 done:
 	rw_downgrade(&ddv->sdev_contents);
 }
@@ -318,6 +528,9 @@ devnet_readdir(struct vnode *dvp, struct uio *uiop, struct cred *cred,
 	struct sdev_node *sdvp = VTOSDEV(dvp);
 
 	ASSERT(sdvp);
+
+	if (crgetzoneid(cred) == GLOBAL_ZONEID && !SDEV_IS_GLOBAL(sdvp))
+		return (EPERM);
 
 	if (uiop->uio_offset == 0)
 		devnet_filldir(sdvp);

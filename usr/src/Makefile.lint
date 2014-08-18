@@ -339,6 +339,7 @@ COMMON_SUBDIRS = \
 	lib/libbe \
 	lib/pylibbe \
 	lib/brand/sn1 \
+	lib/brand/sngl \
 	lib/brand/solaris10 \
 	lib/crypt_modules \
 	lib/extendedFILE \
@@ -460,7 +461,6 @@ COMMON_SUBDIRS = \
 	lib/pam_modules \
 	lib/passwdutil \
 	lib/pkcs11 \
-	lib/print \
 	lib/raidcfg_plugins \
 	lib/scsi \
 	lib/smbsrv \
@@ -485,6 +485,7 @@ i386_SUBDIRS= \
 	cmd/biosdev \
 	cmd/rtc \
 	cmd/ucodeadm \
+	lib/brand/lx \
 	lib/cfgadm_plugins/sata \
 	lib/cfgadm_plugins/sbd \
 	lib/libfdisk

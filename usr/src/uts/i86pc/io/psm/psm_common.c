@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -979,7 +980,7 @@ acpi_poweroff(void)
 		return (1);
 	}
 	ACPI_DISABLE_IRQS();
-	status = AcpiEnterSleepState(5);
+	status = AcpiEnterSleepState(5, ACPI_NO_OPTIONAL_METHODS);
 	ACPI_ENABLE_IRQS();
 
 	/* we should be off; if we get here it's an error */

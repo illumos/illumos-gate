@@ -25,7 +25,7 @@
 include ../Makefile.com
 
 PROG =		wanboot-cgi
-LDLIBS +=	-lgen -lnsl -lwanbootutil -lnvpair -lwanboot -lcrypto
+LDLIBS +=	-lgen -lnsl -lwanbootutil -lnvpair -lwanboot -lsunw_crypto
 CPPFLAGS +=	-I$(CMNCRYPTDIR)
 
 all:		$(PROG)

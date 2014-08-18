@@ -21,6 +21,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2011 Joyent, Inc.  All rights reserved.
  */
 
 #ifndef	_SYS_DLD_H
@@ -191,6 +192,7 @@ typedef struct dld_ioc_rename {
 	datalink_id_t	dir_linkid1;
 	datalink_id_t	dir_linkid2;
 	char		dir_link[MAXLINKNAMELEN];
+	boolean_t	dir_zoneinit;
 } dld_ioc_rename_t;
 
 /*
@@ -203,6 +205,7 @@ typedef struct dld_ioc_rename {
 typedef struct dld_ioc_zid {
 	zoneid_t	diz_zid;
 	datalink_id_t	diz_linkid;
+	boolean_t	diz_transient;
 } dld_ioc_zid_t;
 
 /*
@@ -350,6 +353,7 @@ typedef struct dld_hwgrpinfo {
  */
 typedef	int	(*dld_capab_func_t)(void *, uint_t, void *, uint_t);
 
+#define	DI_DIRECT_RAW	0x1
 /*
  * Direct Tx/Rx capability.
  */
@@ -374,6 +378,9 @@ typedef struct dld_capab_direct_s {
 	/* flow control "can I put on a ring" callback */
 	uintptr_t	di_tx_fctl_df; /* canput-like callback */
 	void		*di_tx_fctl_dh;
+
+	/* flags that control our behavior */
+	uint_t		di_flags;
 } dld_capab_direct_t;
 
 /*

@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2011, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -59,6 +59,7 @@
 #include <sys/ctfs.h>
 #include <sys/stat.h>
 
+#include <sasl/saslutil.h>
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -134,6 +135,9 @@ static int first_paragraph = 1;		/* For -l mode. */
 static char *common_name_buf;		/* Sized for maximal length value. */
 char *locale;				/* Current locale. */
 char *g_zonename;			/* zone being operated upon */
+char *g_zonealias;			/* alias for zone, if any */
+static char g_aliasdec[MAXPATHLEN / 4 * 3];	/* decoded zone alias buffer */
+static char g_aliasbuf[MAXPATHLEN];	/* base64 encoded zone alias buffer */
 
 /*
  * Pathname storage for path generated from the fmri.
@@ -240,7 +244,25 @@ ht_free(void)
 static void
 ht_init(void)
 {
-	assert(ht_buckets == NULL);
+	if (ht_buckets != NULL) {
+		/*
+		 * If we already have a hash table (e.g., because we are
+		 * processing multiple zones), destroy it before creating
+		 * a new one.
+		 */
+		struct ht_elem *elem, *next;
+		int i;
+
+		for (i = 0; i < ht_buckets_num; i++) {
+			for (elem = ht_buckets[i]; elem != NULL; elem = next) {
+				next = elem->next;
+				free((char *)elem->fmri);
+				free(elem);
+			}
+		}
+
+		free(ht_buckets);
+	}
 
 	ht_buckets_num = 8;
 	ht_buckets = safe_malloc(sizeof (*ht_buckets) * ht_buckets_num);
@@ -553,7 +575,7 @@ get_restarter_time_prop(scf_instance_t *inst, const char *pname,
 	int r;
 
 	r = inst_get_single_val(inst, SCF_PG_RESTARTER, pname, SCF_TYPE_TIME,
-	    tvp, NULL, ok_if_empty ? EMPTY_OK : 0, 0, 1);
+	    tvp, 0, ok_if_empty ? EMPTY_OK : 0, 0, 1);
 
 	return (r == 0 ? 0 : -1);
 }
@@ -1650,7 +1672,7 @@ sprint_stime(char **buf, scf_walkinfo_t *wip)
 		    SCF_PROPERTY_STATE_TIMESTAMP, &tv, 0);
 	} else {
 		r = pg_get_single_val(wip->pg, SCF_PROPERTY_STATE_TIMESTAMP,
-		    SCF_TYPE_TIME, &tv, NULL, 0);
+		    SCF_TYPE_TIME, &tv, 0, 0);
 	}
 
 	if (r != 0) {
@@ -1702,7 +1724,7 @@ sortkey_stime(char *buf, int reverse, scf_walkinfo_t *wip)
 		    SCF_PROPERTY_STATE_TIMESTAMP, &tv, 0);
 	else
 		r = pg_get_single_val(wip->pg, SCF_PROPERTY_STATE_TIMESTAMP,
-		    SCF_TYPE_TIME, &tv, NULL, 0);
+		    SCF_TYPE_TIME, &tv, 0, 0);
 
 	if (r == 0) {
 		int64_t sec;
@@ -2514,7 +2536,7 @@ print_detailed(void *unused, scf_walkinfo_t *wip)
 			    gettext("next_state"), buf);
 
 		if (pg_get_single_val(rpg, SCF_PROPERTY_STATE_TIMESTAMP,
-		    SCF_TYPE_TIME, &tv, NULL, 0) == 0) {
+		    SCF_TYPE_TIME, &tv, 0, 0) == 0) {
 			stime = tv.tv_sec;
 			tmp = localtime(&stime);
 			for (tbsz = 50; ; tbsz *= 2) {
@@ -3663,6 +3685,24 @@ again:
 		assert(opt_zone == NULL || zids == NULL);
 
 		if (opt_zone == NULL) {
+			zone_status_t status;
+
+			if (zone_getattr(zids[zent], ZONE_ATTR_STATUS,
+			    &status, sizeof (status)) < 0 ||
+			    status != ZONE_IS_RUNNING) {
+				/*
+				 * If this zone is not running or we cannot
+				 * get its status, we do not want to attempt
+				 * to bind an SCF handle to it, lest we
+				 * accidentally interfere with a zone that
+				 * is not yet running by looking up a door
+				 * to its svc.configd (which could potentially
+				 * block a mount with an EBUSY).
+				 */
+				zent++;
+				goto nextzone;
+			}
+
 			if (getzonenamebyid(zids[zent++],
 			    zonename, sizeof (zonename)) < 0) {
 				uu_warn(gettext("could not get name for "
@@ -3685,18 +3725,46 @@ again:
 			uu_die(gettext("invalid zone '%s'\n"), g_zonename);
 
 		scf_value_destroy(zone);
+
+		/*
+		 * On SmartOS, there may be a base64-encoded string attribute
+		 * named 'alias' associated with this zone.  This alias is
+		 * useful, so we attempt to make it available when we are
+		 * displaying -xZ output.  If it's not available or not
+		 * decodable, we just ignore it.
+		 */
+		if (g_zonename != NULL) {
+			unsigned len;
+			struct zone_attrtab zattrs;
+			zone_dochandle_t zhdl = zonecfg_init_handle();
+
+			bzero(&zattrs, sizeof (zattrs));
+			(void) strcpy(zattrs.zone_attr_name, "alias");
+
+			if (zhdl != NULL &&
+			    zonecfg_get_handle(g_zonename, zhdl) == Z_OK &&
+			    zonecfg_lookup_attr(zhdl, &zattrs) == Z_OK &&
+			    zonecfg_get_attr_string(&zattrs, g_aliasbuf,
+			    sizeof (g_aliasbuf)) == Z_OK &&
+			    sasl_decode64(g_aliasbuf, strlen(g_aliasbuf),
+			    g_aliasdec, sizeof (g_aliasdec), &len) == SASL_OK) {
+				g_aliasdec[len] = '\0';
+				g_zonealias = g_aliasdec;
+			} else {
+				g_zonealias = NULL;
+			}
+			zonecfg_fini_handle(zhdl);
+		}
 	}
 
 	if (scf_handle_bind(h) == -1) {
 		if (g_zonename != NULL) {
-			uu_warn(gettext("Could not bind to repository "
+			if (show_zones)
+				goto nextzone;
+
+			uu_die(gettext("Could not bind to repository "
 			    "server for zone %s: %s\n"), g_zonename,
 			    scf_strerror(scf_error()));
-
-			if (!show_zones)
-				return (UU_EXIT_FATAL);
-
-			goto nextzone;
 		}
 
 		uu_die(gettext("Could not bind to repository server: %s.  "
@@ -3755,7 +3823,7 @@ again:
 
 	if (opt_mode == 'L') {
 		if ((err = scf_walk_fmri(h, argc, argv, SCF_WALK_MULTIPLE,
-		    print_log, NULL, &exit_status, uu_warn)) != 0) {
+		    print_log, NULL, errarg, errfunc)) != 0) {
 			uu_warn(gettext("failed to iterate over "
 			    "instances: %s\n"), scf_strerror(err));
 			exit_status = UU_EXIT_FATAL;

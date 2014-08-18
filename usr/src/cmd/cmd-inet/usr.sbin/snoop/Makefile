@@ -45,6 +45,7 @@ SRCS=	$(OBJS:.o=.c)
 HDRS=	snoop.h snoop_mip.h at.h snoop_ospf.h snoop_ospf6.h
 
 include	../../../Makefile.cmd
+include ../../../Makefile.ctf
 
 CPPFLAGS += -I. -I$(SRC)/common/net/dhcp \
 	-D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64

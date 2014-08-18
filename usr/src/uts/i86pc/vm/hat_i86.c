@@ -27,6 +27,7 @@
  */
 /*
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2014 Joyent, Inc.  All rights reserved.
  */
 
 /*
@@ -3294,7 +3295,7 @@ hat_page_getattr(struct page *pp, uint_t flag)
 
 
 /*
- * common code used by hat_pageunload() and hment_steal()
+ * common code used by hat_page_inval() and hment_steal()
  */
 hment_t *
 hati_page_unmap(page_t *pp, htable_t *ht, uint_t entry)
@@ -3350,15 +3351,13 @@ hati_page_unmap(page_t *pp, htable_t *ht, uint_t entry)
 
 extern int	vpm_enable;
 /*
- * Unload all translations to a page. If the page is a subpage of a large
+ * Unload translations to a page. If the page is a subpage of a large
  * page, the large page mappings are also removed.
- *
- * The forceflags are unused.
+ * If curhat is not NULL, then we only unload the translation
+ * for the given process, otherwise all translations are unloaded.
  */
-
-/*ARGSUSED*/
-static int
-hati_pageunload(struct page *pp, uint_t pg_szcd, uint_t forceflag)
+void
+hat_page_inval(struct page *pp, uint_t pg_szcd, struct hat *curhat)
 {
 	page_t		*cur_pp = pp;
 	hment_t		*hm;
@@ -3366,14 +3365,9 @@ hati_pageunload(struct page *pp, uint_t pg_szcd, uint_t forceflag)
 	htable_t	*ht;
 	uint_t		entry;
 	level_t		level;
+	ulong_t		cnt;
 
 	XPV_DISALLOW_MIGRATE();
-
-	/*
-	 * prevent recursion due to kmem_free()
-	 */
-	++curthread->t_hatdepth;
-	ASSERT(curthread->t_hatdepth < 16);
 
 #if defined(__amd64)
 	/*
@@ -3387,6 +3381,8 @@ hati_pageunload(struct page *pp, uint_t pg_szcd, uint_t forceflag)
 	 * The loop with next_size handles pages with multiple pagesize mappings
 	 */
 next_size:
+	if (curhat != NULL)
+		cnt = hat_page_getshare(cur_pp);
 	for (;;) {
 
 		/*
@@ -3398,14 +3394,13 @@ next_size:
 			if (hm == NULL) {
 				x86_hm_exit(cur_pp);
 
+curproc_done:
 				/*
 				 * If not part of a larger page, we're done.
 				 */
 				if (cur_pp->p_szc <= pg_szcd) {
-					ASSERT(curthread->t_hatdepth > 0);
-					--curthread->t_hatdepth;
 					XPV_ALLOW_MIGRATE();
-					return (0);
+					return;
 				}
 
 				/*
@@ -3424,8 +3419,20 @@ next_size:
 			 * If this mapping size matches, remove it.
 			 */
 			level = ht->ht_level;
-			if (level == pg_szcd)
-				break;
+			if (level == pg_szcd) {
+				if (curhat == NULL || ht->ht_hat == curhat)
+					break;
+				/*
+				 * Unloading only the given process but it's
+				 * not the hat for the current process. Leave
+				 * entry in place. Also do a safety check to
+				 * ensure we don't get in an infinite loop
+				 */
+				if (cnt-- == 0) {
+					x86_hm_exit(cur_pp);
+					goto curproc_done;
+				}
+			}
 		}
 
 		/*
@@ -3435,14 +3442,44 @@ next_size:
 		hm = hati_page_unmap(cur_pp, ht, entry);
 		if (hm != NULL)
 			hment_free(hm);
+
+		/* Perform check above for being part of a larger page. */
+		if (curhat != NULL)
+			goto curproc_done;
 	}
 }
 
+/*
+ * Unload translations to a page. If unloadflag is HAT_CURPROC_PGUNLOAD, then
+ * we only unload the translation for the current process, otherwise all
+ * translations are unloaded.
+ */
+static int
+hati_pageunload(struct page *pp, uint_t pg_szcd, uint_t unloadflag)
+{
+	struct hat	*curhat = NULL;
+
+	/*
+	 * prevent recursion due to kmem_free()
+	 */
+	++curthread->t_hatdepth;
+	ASSERT(curthread->t_hatdepth < 16);
+
+	if (unloadflag == HAT_CURPROC_PGUNLOAD)
+		curhat = curthread->t_procp->p_as->a_hat;
+
+	hat_page_inval(pp, pg_szcd, curhat);
+
+	ASSERT(curthread->t_hatdepth > 0);
+	--curthread->t_hatdepth;
+	return (0);
+}
+
 int
-hat_pageunload(struct page *pp, uint_t forceflag)
+hat_pageunload(struct page *pp, uint_t unloadflag)
 {
 	ASSERT(PAGE_EXCL(pp));
-	return (hati_pageunload(pp, 0, forceflag));
+	return (hati_pageunload(pp, 0, unloadflag));
 }
 
 /*

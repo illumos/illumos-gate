@@ -337,9 +337,15 @@ static const ps_ops_t P_live_ops = {
 void
 _libproc_init(void)
 {
+	const char *root;
+
 	_libproc_debug = getenv("LIBPROC_DEBUG") != NULL;
 	_libproc_no_qsort = getenv("LIBPROC_NO_QSORT") != NULL;
 	_libproc_incore_elf = getenv("LIBPROC_INCORE_ELF") != NULL;
+
+	if ((root = zone_get_nroot()) != NULL)
+		(void) snprintf(procfs_path, sizeof (procfs_path), "%s/proc",
+		    root);
 
 	(void) sigfillset(&blockable_sigs);
 	(void) sigdelset(&blockable_sigs, SIGKILL);

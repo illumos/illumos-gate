@@ -69,17 +69,19 @@ EOF
 enclosure=1
 bay=0
 slot=0
-devctl='/devices/pci@0,0/pci8086,3c02@1/pci15d9,691@0:devctl'
+devctl0='/devices/pci@0,0/pci8086,3c02@1/pci15d9,691@0:devctl'
+devctl1='/devices/pci@0,0/pci8086,e02@1/pci15d9,691@0:devctl'
 while (( slot <= 7 )); do
-  do_node $bay "Front Disk $bay" "$devctl" $enclosure $slot
+  do_node $bay "Front Disk $bay" "$devctl0|$devctl1" $enclosure $slot
   (( bay = bay + 1 ))
   (( slot = slot + 1 ))
 done
 
 slot=0
-devctl='/devices/pci@0,0/pci8086,3c06@2,2/pci15d9,691@0:devctl'
+devctl0='/devices/pci@0,0/pci8086,3c06@2,2/pci15d9,691@0:devctl'
+devctl1='/devices/pci@0,0/pci8086,e06@2,2/pci15d9,691@0:devctl'
 while (( slot <= 7 )); do
-  do_node $bay "Front Disk $bay" "$devctl" $enclosure $slot
+  do_node $bay "Front Disk $bay" "$devctl0|$devctl1" $enclosure $slot
   (( bay = bay + 1 ))
   (( slot = slot + 1 ))
 done

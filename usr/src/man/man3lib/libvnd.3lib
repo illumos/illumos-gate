@@ -1,0 +1,690 @@
+'\" te
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright (c) 2014, Joyent, Inc.  All rights reserved.
+.\"
+.TH LIBVND 3LIB "Mar 06, 2014"
+.SH NAME
+libvnd \- vnd library
+
+.SH SYNOPSIS
+.LP
+.nf
+cc [ flag... ] file... -lvnd [ library... ]
+#include <libvnd.h>
+.fi
+
+.SH DESCRIPTION
+.LP
+The libvnd library provides a stable and programmatic interface to
+vnd(7D) devices. vnd devices provide the means for creating a layer two
+interface over a data link, similar to the use of libdlpi(3LIB) and
+IP(7P). In dlpi parlance, a vnd device obtains data from all service
+attachment points (SAP). For ethernet devices, this means that a vnd
+device sends and receives traffic for all ethertypes. It is intended to
+be used for services such as virtual machines which emulate layer two
+devices.
+
+.LP
+Handles to vnd(7D) devices are obtained through the use of vnd_create
+and vnd_open. With a handle, I/O can be performed and properties on the
+device can be set and retrieved. I/O on devices should be performed
+through the vnd_frameio_read and vnd_frameio_write functions. A file
+descriptor suitable for use with event ports and polling may be obtained
+through vnd_pollfd. Handles are relinquished through calls to vnd_close;
+however, devices will persist until vnd_unlink has been called.
+
+.LP
+The rest of this manual documents the interfaces, properties, errors,
+and threading model for libvnd. The in-depth description of individual
+interfaces, their arguments, and examples, are in manual pages for each
+provided interface.
+
+
+.SH INTERFACES
+.sp
+.LP
+
+The shared object libvnd.so.1 provides the public interfaces defined
+below. See Intro(3) for additional information on shared object
+interfaces. Individual functions are documented in their own manual
+pages.
+
+.sp
+.TS
+l l
+l l .
+vnd_create	vnd_errno
+vnd_open	vnd_syserrno
+vnd_unlink	vnd_strerror
+vnd_close	vnd_strsyserror
+vnd_pollfd	vnd_walk
+vnd_prop_get	vnd_prop_set
+vnd_prop_iter	vnd_prop_writeable
+vnd_frameio_read	vnd_frameio_write
+.TE
+
+.SH PROPERTIES
+
+.LP
+The following table summarizes properties of a vnd device. The
+properties can be retrieved and set with the functions
+vnd_prop_get(3VND) and vnd_prop_set(3VND). Following the table, the
+structures and properties are described in greater detail.
+
+.nf
+    +-------------------+---------------------+-------+
+    | PROPERTY          |  STRUCTURE          |  PERM |
+    +-------------------+---------------------+-------+
+    | VND_PROP_RXBUF    | vnd_prop_buf_t      |  R/W  |
+    +-------------------+---------------------+-------+
+    | VND_PROP_TXBUF    | vnd_prop_buf_t      |  R/W  |
+    +-------------------+---------------------+-------+
+    | VND_PROP_MAXBUF   | vnd_prop_buf_t      |  R/-  |
+    +-------------------+---------------------+-------+
+    | VND_PROP_MINTU    | vnd_prop_buf_t      |  R/-  |
+    +-------------------+---------------------+-------+
+    | VND_PROP_MAXTU    | vnd_prop_buf_t      |  R/-  |
+    +-------------------+---------------------+-------+
+.fi
+
+.SS Structures
+
+.LP
+The vnd_prop_buf_t structure has the following members:
+
+.in +2
+.nf
+uint64_t	vpb_size;
+.fi
+.in -2
+
+.LP
+The vpb_size member refers to a size in bytes. When getting a property,
+it represents the size of that property, when setting a property, it is
+the size to set the property to.
+
+
+.SS Property Descriptions
+.sp
+.ne 2
+.na
+rxbuf
+.ad
+.sp .6
+.RS 4n
+A read/write property that controls the size of the receive buffer for
+the device. All received data enters the receive buffer until a consumer
+consumes it. If adding a received frame would exceed the size of the
+receive buffer, then that frame will be dropped. The maximum size of the
+buffer is limited by the 'maxsize' property.
+.RE
+
+.sp
+.ne 2
+.na
+txbuf
+.ad
+.sp .6
+.RS 4n
+A read/write property that controls the size of the transmit buffer. All
+in-flight transmitted data must be able to fix into the transmit buffer
+to deal with potential flow control events. If there is not enough space
+in the transmit buffer, transmit related I/O operations will either
+block or fail based on whether or not O_NONBLOCK or O_NDELAY were set
+with fcntl(2).
+.RE
+
+.sp
+.ne 2
+.na
+maxsize
+.ad
+.sp .6
+.RS 4n
+A read only property that describes the maximum size of buffers in the
+system. Properties such as rxbuf and txbuf cannot be set beyond this.
+.RE
+
+.sp
+.ne 2
+.na
+mintu
+.ad
+.sp .6
+.RS 4n
+A read only property that describes the minimum size of a frame
+transmitted to the underlying data link. Note that the minimum listed
+here may be less than the size of a valid layer two frame and therefore
+may be dropped. A frame smaller than this value will be rejected by vnd.
+.RE
+
+.sp
+.ne 2
+.na
+maxtu
+.ad
+.sp .6
+.RS 4n
+A read only property that describes the maximum size of
+a frame transmitted to the underlying data link. A frame
+larger than this value will be rejected by vnd.
+.RE
+
+
+.SH ERRORS
+.sp
+.LP
+Most interfaces provided by libvnd provide a means to retrieve a
+vnd_errno_t that describes an error that has occurred. The manuals for
+individual interfaces describe whether or not this additional error
+information is available and how to retrieve it. The following is a
+complete list of the error numbers and their names as defined in
+<sys/vnd_errno.h>. Any entries not listed here are private to the
+implementation and may change at any time.
+
+.sp
+.ne 2
+.na
+0 VND_E_SUCCESS
+.ad
+.RS 23n
+no error
+.sp
+This indicates that the operation completed successfully.
+.RE
+
+.sp
+.ne 2
+.na
+1 VND_E_NOMEM
+.ad
+.RS 23n
+not enough memory available
+.sp
+Insufficient memory was available. This is the equivalent of the
+standard system errno ENOMEM.
+.RE
+
+.sp
+.ne 2
+.na
+2 VND_E_NODATALINK
+.ad
+.RS 23n
+no such datalink
+.sp
+The data link requested to be used as part of vnd_create does not exist
+in the requested zone.
+.RE
+
+.sp
+.ne 2
+.na
+3 VND_E_NOTETHER
+.ad
+.RS 23n
+datalink not of type DL_ETHER
+.sp
+The data link used as part of a call to vnd_create is not an Ethernet
+device.  vnd_create only works with Ethernet devices at this time.
+.RE
+
+.sp
+.ne 2
+.na
+4 VND_E_DLPIINVAL
+.ad
+.RS 23n
+unknown dlpi failure
+.sp
+An unexpected DLPI message was received during vnd device
+initialization.
+.RE
+
+.sp
+.ne 2
+.na
+5 VND_E_ATTACHFAIL
+.ad
+.RS 23n
+DL_ATTACH_REQ failed
+.sp
+During vnd device initialization, the dlpi call to attach to the
+requested data link failed.
+.RE
+
+.sp
+.ne 2
+.na
+6 VND_E_BINDFAIL
+.ad
+.RS 23n
+DL_BIND_REQ failed
+.sp
+
+During vnd device initialization, the dlpi call to bind to a service
+attachment point on the data link failed.
+.RE
+
+.sp
+.ne 2
+.na
+7 VND_E_PROMISCFAIL
+.ad
+.RS 23n
+DL_PROMISCON_REQ failed
+.sp
+
+During vnd device initialization, the dlpi call to enable promiscuous
+mode on the underlying device failed.
+.RE
+
+.sp
+.ne 2
+.na
+8 VND_E_DIRECTFAIL
+.ad
+.RS 23n
+DLD_CAPAB_DIRECT enable failed
+.sp
+During vnd device initialization, the dlpi call to enable the DLD fast
+path failed.
+.RE
+
+.sp
+.ne 2
+.na
+9 VND_E_CAPACKINVAL
+.ad
+.RS 23n
+bad datalink capability
+.sp
+During vnd device initialization, the kernel responded with an invalid
+capability acknowledgement.
+.RE
+
+.sp
+.ne 2
+.na
+10 VND_E_SUBCAPINVAL
+.ad
+.RS 23n
+bad datalink subcapability
+.sp
+During vnd device initialization, the kernel responded with an invalid
+sub-capability.
+.RE
+
+.sp
+.ne 2
+.na
+11 VND_E_DLDBADVERS
+.ad
+.RS 23n
+bad dld version
+.sp
+The vnd(7D) module does not support the version of the dld capability
+that the kernel sent. As such, the data path could not be brought up and
+the device could not be fully initialized.
+.RE
+
+.sp
+.ne 2
+.na
+12 VND_E_KSTATCREATE
+.ad
+.RS 23n
+failed to create kstats
+.sp
+During vnd device initialization, the necessary kstats could not be
+created.
+.RE
+
+.sp
+.ne 2
+.na
+13 VND_E_NODEV
+.ad
+.RS 23n
+no such vnd link
+.sp
+During device initialization, the requested character device did not
+exist.
+.RE
+
+.sp
+.ne 2
+.na
+14 VND_E_NONETSTACK
+.ad
+.RS 23n
+netstack doesn't exist
+.sp
+During device initialization, the networking stack for the device did
+not exist.
+.RE
+
+.sp
+.ne 2
+.na
+15 VND_E_ASSOCIATED
+.ad
+.RS 23n
+device already associated
+.sp
+During vnd device initialization, the vnd STREAMS device was already
+associated with another vnd device.
+.RE
+
+.sp
+.ne 2
+.na
+16 VND_E_ATTACHED
+.ad
+.RS 23n
+device already attached
+.sp
+The given vnd device has already been created over a data link and
+cannot be created over another one.
+.RE
+
+.sp
+.ne 2
+.na
+17 VND_E_LINKED
+.ad
+.RS 23n
+device already linked
+.sp
+The given vnd device has already been given a name and bound into the
+file system name space.
+.RE
+
+.sp
+.ne 2
+.na
+18 VND_E_BADNAME
+.ad
+.RS 23n
+invalid name
+.sp
+The requested name is not a valid name.  Valid names are alphanumeric
+ascii names, along with the following ascii characters: ':', '\-', and
+\'_'. Names must be less than LIBVND_NAMELEN bytes including the null
+terminator.
+.RE
+
+.sp
+.ne 2
+.na
+19 VND_E_PERM
+.ad
+.RS 23n
+permission denied
+.sp
+A request was made from a non-global zone to manipulate a vnd device
+that belongs to a different zone.
+.RE
+
+.sp
+.ne 2
+.na
+20 VND_E_NOZONE
+.ad
+.RS 23n
+no such zone
+.sp
+A request was made which targeted a zone that did not exist.
+.RE
+
+.sp
+.ne 2
+.na
+21 VND_E_STRINIT
+.ad
+.RS 23n
+failed to initialize vnd stream module
+.sp
+During vnd device initialization, the vnd STREAMS module could not be
+pushed onto the data link's stream head.
+.RE
+
+.sp
+.ne 2
+.na
+22 VND_E_NOTATTACHED
+.ad
+.RS 23n
+device not attached
+.sp
+A request was made that requires a vnd device be attached to a data
+link, such as a call to change a property. The device was not attached
+to a data link.
+.RE
+
+.sp
+.ne 2
+.na
+23 VND_E_NOTLINKED
+.ad
+.RS 23n
+device not linked
+.sp
+A request was made to a vnd device that requires the vnd device to be
+named and present in /dev. The given device was not linked into /dev at
+the time of the call.
+.RE
+
+.sp
+.ne 2
+.na
+24 VND_E_LINKEXISTS
+.ad
+.RS 23n
+another device has the same link name
+.sp
+When trying to link a given vnd device into a zones /dev name space,
+another device already exists with the same name.
+.RE
+
+.sp
+.ne 2
+.na
+25 VND_E_MINORNODE
+.ad
+.RS 23n
+failed to create minor node
+.sp
+While trying to link a vnd device into the /devices and /dev name space,
+the call to ddi_create_minor_node() failed.
+.RE
+
+.sp
+.ne 2
+.na
+26 VND_E_BUFTOOBIG
+.ad
+.RS 23n
+requested buffer size is too large
+.sp
+The requested buffer size exceeds the maximum valid value for the given
+property.
+.RE
+
+.sp
+.ne 2
+.na
+27 VND_E_BUFTOOSMALL
+.ad
+.RS 23n
+requested buffer size is too small
+.sp
+The requested buffer size is less than the minimum buffer size. This
+generally occurs when making the buffer size less than the maximum
+transmission unit.
+.RE
+
+.sp
+.ne 2
+.na
+28 VND_E_DLEXCL
+.ad
+.RS 23n
+unable to obtain exclusive access to dlpi link, link busy
+.sp
+When a vnd device is created, it expects exclusive active access to the
+device.  If any other active dlpi consumers, such as IP, are already
+using the device, then the vnd device will not be created.  Passive
+consumers, such as snoop, can still use a device that has been
+exclusively opened.
+.RE
+
+.sp
+.ne 2
+.na
+28 VND_E_DIRECTNOTSUP
+.ad
+.RS 23n
+DLD direct capability not supported over data link
+.sp
+The data link that the vnd device was created over does not supported
+the DLD Direct capability. As such, the data path could not be
+initialized.
+.RE
+
+.sp
+.ne 2
+.na
+30 VND_E_BADPROPSIZE
+.ad
+.RS 23n
+invalid property size
+.sp
+The size of the data passed into vnd_prop_get or vnd_prop_set is
+incorrect and does not match the expected data size.
+.RE
+
+.sp
+.ne 2
+.na
+31 VND_E_BADPROP
+.ad
+.RS 23n
+invalid property
+.sp
+An unknown property identifier was specified. For a list of valid
+properties, see the section above entitled "PROPERTIES".
+.RE
+
+.sp
+.ne 2
+.na
+32 VND_E_PROPRDONLY
+.ad
+.RS 23n
+property is read only
+.sp
+An operation tried to update the value of a read only property. For a
+list of which properties are read only and which are readable and
+writeable, see the section above entitled "PROPERTIES".
+.RE
+
+.sp
+.ne 2
+.na
+33 VND_E_SYS
+.ad
+.RS 23n
+unexpected system error
+.sp
+This indicates that there is no vnd specific error available and that
+the system errno is valid. The system errno can be obtained and printed
+through vnd_syserrno and vnd_strsyserror. The possible values and their
+meanings are documented in Intro(2).
+.RE
+
+.sp
+.ne 2
+.na
+34 VND_E_CAPABPASS
+.ad
+.RS 23n
+capabilities invalid, pass-through module detected
+.sp
+While negotiating capabilities, a pass-through module was detected and
+the capability had to be discarded. Because of this, the data path could
+not be initialized.
+.RE
+
+
+.SH THREADING
+
+.LP
+The libvnd library is not truly MT-safe. MT-safety is provided on
+the granularity of a given vnd_handle_t. Operations on a single
+vnd_handle_t are unsafe; however, operations on different handles are
+MT-safe. If a single vnd_handle_t is used by multiple threads, it
+is the caller's responsibility to provide locking to ensure that
+multiple threads aren't simultaneously calling into libvnd on a
+single handle.
+
+
+.SH FILES
+.sp
+.ne 2
+.na
+/usr/lib/libvnd.so.1
+.ad
+.RS 27n
+shared object
+.RE
+
+.sp
+.ne 2
+.na
+/usr/lib/64/libvnd.so.1
+.ad
+.RS 27n
+64-bit shared object
+.RE
+
+.SH ATTRIBUTES
+
+.sp
+.LP
+See attributes(5) for descriptions of the following attributes:
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Stability	Committed
+_
+MT-Level	See "THREADING"
+.TE
+
+.SH SEE ALSO
+
+.sp
+.LP
+attributes(5), Intro(2), fcntl(2), Intro(3), fcntl.h(3HEAD), libdlpi(3LIB), port_create(3C), vnd(7D)
+.sp
+.LP
+vnd_close(3VND), vnd_create(3VND), vnd_errno(3VND),
+vnd_frameio_read(3VND), vnd_frameio_write(3VND), vnd_open(3VND)
+vnd_pollfd(3VND), vnd_prop_get(3VND), vnd_prop_iter(3VND),
+vnd_prop_set(3VND),
+vnd_prop_writeable(3VND), vnd_walk(3VND)

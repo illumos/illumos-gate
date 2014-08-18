@@ -129,6 +129,7 @@
 #include <sys/vdev.h>
 #include <sys/vdev_impl.h>
 #include <sys/dsl_pool.h>
+#include <sys/zfs_zone.h>
 #ifdef _KERNEL
 #include <sys/vmsystm.h>
 #include <vm/anon.h>
@@ -279,6 +280,7 @@ typedef struct arc_stats {
 	 * not from the spa we're trying to evict from.
 	 */
 	kstat_named_t arcstat_evict_skip;
+	kstat_named_t arcstat_evict_allocfail;
 	kstat_named_t arcstat_evict_l2_cached;
 	kstat_named_t arcstat_evict_l2_eligible;
 	kstat_named_t arcstat_evict_l2_ineligible;
@@ -345,6 +347,7 @@ static arc_stats_t arc_stats = {
 	{ "recycle_miss",		KSTAT_DATA_UINT64 },
 	{ "mutex_miss",			KSTAT_DATA_UINT64 },
 	{ "evict_skip",			KSTAT_DATA_UINT64 },
+	{ "evict_allocfail",		KSTAT_DATA_UINT64 },
 	{ "evict_l2_cached",		KSTAT_DATA_UINT64 },
 	{ "evict_l2_eligible",		KSTAT_DATA_UINT64 },
 	{ "evict_l2_ineligible",	KSTAT_DATA_UINT64 },
@@ -2523,15 +2526,27 @@ arc_get_data_buf(arc_buf_t *buf)
 	 */
 	if (!arc_evict_needed(type)) {
 		if (type == ARC_BUFC_METADATA) {
-			buf->b_data = zio_buf_alloc(size);
-			arc_space_consume(size, ARC_SPACE_DATA);
+			buf->b_data = zio_buf_alloc_canfail(size);
+			if (buf->b_data != NULL) {
+				arc_space_consume(size, ARC_SPACE_DATA);
+				goto out;
+			}
 		} else {
 			ASSERT(type == ARC_BUFC_DATA);
-			buf->b_data = zio_data_buf_alloc(size);
-			ARCSTAT_INCR(arcstat_data_size, size);
-			atomic_add_64(&arc_size, size);
+			buf->b_data = zio_data_buf_alloc_canfail(size);
+			if (buf->b_data != NULL) {
+				ARCSTAT_INCR(arcstat_data_size, size);
+				atomic_add_64(&arc_size, size);
+				goto out;
+			}
 		}
-		goto out;
+
+		/*
+		 * Memory allocation failed, presumably due to excessive
+		 * fragmentation; we'll bump a counter and drop into the ARC
+		 * eviction case.
+		 */
+		ARCSTAT_BUMP(arcstat_evict_allocfail);
 	}
 
 	/*
@@ -3194,6 +3209,14 @@ top:
 		rzio = zio_read(pio, spa, bp, buf->b_data, size,
 		    arc_read_done, buf, priority, zio_flags, zb);
 
+		/*
+		 * At this point, this read I/O has already missed in the ARC
+		 * and will be going through to the disk.  The I/O throttle
+		 * should delay this I/O if this zone is using more than its I/O
+		 * priority allows.
+		 */
+		zfs_zone_io_throttle(ZFS_ZONE_IOP_READ);
+
 		if (*arc_flags & ARC_WAIT)
 			return (zio_wait(rzio));
 
@@ -3766,9 +3789,6 @@ arc_init(void)
 	/* Allow the tunable to override if it is reasonable */
 	if (zfs_arc_meta_limit > 0 && zfs_arc_meta_limit <= arc_c_max)
 		arc_meta_limit = zfs_arc_meta_limit;
-
-	if (arc_c_min < arc_meta_limit / 2 && zfs_arc_min == 0)
-		arc_c_min = arc_meta_limit / 2;
 
 	if (zfs_arc_grow_retry > 0)
 		arc_grow_retry = zfs_arc_grow_retry;

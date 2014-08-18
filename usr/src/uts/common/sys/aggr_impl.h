@@ -21,6 +21,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 OmniTI Computer Consulting, Inc  All rights reserved.
  */
 
 #ifndef	_SYS_AGGR_IMPL_H
@@ -307,6 +308,8 @@ extern boolean_t aggr_port_notify_link(aggr_grp_t *, aggr_port_t *);
 extern void aggr_port_init_callbacks(aggr_port_t *);
 
 extern void aggr_recv_cb(void *, mac_resource_handle_t, mblk_t *, boolean_t);
+extern void aggr_recv_promisc_cb(void *, mac_resource_handle_t, mblk_t *,
+    boolean_t);
 
 extern void aggr_tx_ring_update(void *, uintptr_t);
 extern void aggr_tx_notify_thread(void *);

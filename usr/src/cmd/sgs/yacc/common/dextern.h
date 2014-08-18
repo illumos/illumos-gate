@@ -26,10 +26,12 @@
 /* Copyright (c) 1988 AT&T */
 /* All Rights Reserved */
 
+/*
+ * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
+ */
+
 #ifndef _DEXTERN_H
 #define	_DEXTERN_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <inttypes.h>
@@ -42,6 +44,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <wctype.h>
+#include <limits.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -301,6 +304,12 @@ extern int wscmp(const wchar_t *, const wchar_t *);
 
 extern char *parser;
 
+#ifndef	PBUFSIZE
+#define	PBUFSIZE PATH_MAX
+#endif
+
+extern char pbuf[PBUFSIZE];
+
 	/* default settings for a number of macros */
 
 	/* name of yacc tempfiles */
@@ -324,7 +333,11 @@ extern char *parser;
 #endif
 
 #ifndef PARSER
-#define	PARSER "/usr/share/lib/ccs/yaccpar"
+#define	PARSER "/share/lib/ccs/yaccpar"
+#endif
+
+#ifndef	PARSERPREFIX
+#define	PARSERPREFIX "/usr"
 #endif
 
 /*

@@ -1,19 +1,20 @@
 '\" te
 .\" Copyright (c) 2013 Gary Mills
 .\" Copyright (c) 2006, 2009 Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright (c) 2013, Joyent, Inc. All Rights Reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PRSTAT 1M "Apr 15, 2013"
+.TH PRSTAT 1M "Jun 5, 2013"
 .SH NAME
 prstat \- report active process statistics
 .SH SYNOPSIS
 .LP
 .nf
-\fBprstat\fR [\fB-acHJLmRrtTvWZ\fR] [\fB-d\fR u | d] [\fB-C\fR \fIpsrsetlist\fR] [\fB-h\fR \fIlgrplist\fR]
+\fBprstat\fR [\fB-acHJLmRrtTvVWZ\fR] [\fB-d\fR u | d] [\fB-C\fR \fIpsrsetlist\fR] [\fB-h\fR \fIlgrplist\fR]
      [\fB-j\fR \fIprojlist\fR] [\fB-k\fR \fItasklist\fR] [\fB-n\fR \fIntop\fR[,\fInbottom\fR]]
      [\fB-p\fR \fIpidlist\fR] [\fB-P\fR \fIcpulist\fR] [\fB-s\fR \fIkey\fR | \fB-S\fR \fIkey\fR ]
-     [\fB-u\fR \fIeuidlist\fR] [\fB-U\fR \fIuidlist\fR] [\fB-z\fR \fIzoneidlist\fR]
+     [\fB-u\fR \fIeuidlist\fR] [\fB-U\fR \fIuidlist\fR] [\fB-z\fR \fIzoneidlist\fR] [\fB-Z\fR]
      [\fIinterval\fR [\fIcount\fR]]
 .fi
 
@@ -177,10 +178,10 @@ waiting for user locks and waiting for \fBCPU\fR (latency time).
 .RS 4n
 Restrict number of output lines. The \fIntop\fR argument determines how many
 lines of process or \fBlwp\fR statistics are reported, and the \fInbottom\fR
-argument determines how many lines of user, task, or projects statistics are
-reported if the \fB-a\fR, \fB-t\fR, \fB-T\fR, or \fB-J\fR options are
-specified. By default, \fBprstat\fR displays as many lines of output that fit
-in a window or terminal. When you specify the \fB-c\fR option or direct the
+argument determines how many lines of user, task, project or zone statistics
+are reported if the \fB-a\fR, \fB-t\fR, \fB-T\fR, \fB-J\fR or \fB-Z\fR options
+are specified. By default, \fBprstat\fR displays as many lines of output that
+fit in a window or terminal. When you specify the \fB-c\fR option or direct the
 output to a file, the default values for \fBntop\fR and \fBnbottom\fR are
 \fB15\fR and \fB5\fR.
 .RE
@@ -368,6 +369,18 @@ with the \fB-\fR sign.
 .sp
 .ne 2
 .na
+\fB\fB-V\fR\fR
+.ad
+.sp .6
+.RS 4n
+Report accurate aggregated SWAP and  RSS values when used with the \fB-J\fR,
+\fB-t\fR, \fB-T\fR or \fB-Z\fR options. This uses an accurate, but more expensive,
+calculation to determine the aggregated values for the specified grouping.
+.RE
+
+.sp
+.ne 2
+.na
 \fB\fB-W\fR\fR
 .ad
 .sp .6
@@ -450,9 +463,11 @@ devices, in kilobytes (\fBK\fR), megabytes (\fBM\fR), or gigabytes (\fBG\fR).
 .RS 4n
 The resident set size of the process (\fBRSS\fR), in kilobytes (\fBK\fR),
 megabytes (\fBM\fR), or gigabytes (\fBG\fR). The RSS value is an estimate
-provided by \fBproc\fR(4) that might underestimate the actual resident set
-size. Users who want to get more accurate usage information for capacity
-planning should use the \fB-x\fR option to \fBpmap\fR(1) instead.
+provided by \fBproc\fR(4) that might underestimate the actual
+per-process resident set size and usually overestimates the aggregated
+resident set size. Users who want to get more accurate usage information for
+capacity planning should use either the \fB-V\fR option or, for per-process
+results, the \fB-x\fR option to \fBpmap\fR(1) instead.
 .RE
 
 .sp

@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
  */
 
 /*
@@ -2684,6 +2685,100 @@ mac_margin_update(mac_handle_t mh, uint32_t margin)
 	return (margin_needed <= margin);
 }
 
+int
+mac_mtu_add(mac_handle_t mh, uint32_t *mtup, boolean_t current)
+{
+	mac_impl_t		*mip = (mac_impl_t *)mh;
+	mac_mtu_req_t		*prev, *cur;
+	mac_propval_range_t	mpr;
+	int			err;
+
+	i_mac_perim_enter(mip);
+	rw_enter(&mip->mi_rw_lock, RW_WRITER);
+
+	if (current == B_TRUE)
+		*mtup = mip->mi_sdu_max;
+	mpr.mpr_count = 1;
+	err = mac_prop_info(mh, MAC_PROP_MTU, "mtu", NULL, 0, &mpr, NULL);
+	if (err != 0) {
+		rw_exit(&mip->mi_rw_lock);
+		i_mac_perim_exit(mip);
+		return (err);
+	}
+
+	if (*mtup > mip->mi_sdu_max ||
+	    *mtup < mpr.mpr_range_uint32[0].mpur_min) {
+		rw_exit(&mip->mi_rw_lock);
+		i_mac_perim_exit(mip);
+		return (ENOTSUP);
+	}
+
+	prev = NULL;
+	for (cur = mip->mi_mtrp; cur != NULL; cur = cur->mtr_nextp) {
+		if (*mtup == cur->mtr_mtu) {
+			cur->mtr_ref++;
+			rw_exit(&mip->mi_rw_lock);
+			i_mac_perim_exit(mip);
+			return (0);
+		}
+
+		if (*mtup > cur->mtr_mtu)
+			break;
+
+		prev = cur;
+	}
+
+	cur = kmem_alloc(sizeof (mac_mtu_req_t), KM_SLEEP);
+	cur->mtr_mtu = *mtup;
+	cur->mtr_ref = 1;
+	if (prev != NULL) {
+		cur->mtr_nextp = prev->mtr_nextp;
+		prev->mtr_nextp = cur;
+	} else {
+		cur->mtr_nextp = mip->mi_mtrp;
+		mip->mi_mtrp = cur;
+	}
+
+	rw_exit(&mip->mi_rw_lock);
+	i_mac_perim_exit(mip);
+	return (0);
+}
+
+int
+mac_mtu_remove(mac_handle_t mh, uint32_t mtu)
+{
+	mac_impl_t *mip = (mac_impl_t *)mh;
+	mac_mtu_req_t *cur, *prev;
+
+	i_mac_perim_enter(mip);
+	rw_enter(&mip->mi_rw_lock, RW_WRITER);
+
+	prev = NULL;
+	for (cur = mip->mi_mtrp; cur != NULL; cur = cur->mtr_nextp) {
+		if (cur->mtr_mtu == mtu) {
+			ASSERT(cur->mtr_ref > 0);
+			cur->mtr_ref--;
+			if (cur->mtr_ref == 0) {
+				if (prev == NULL) {
+					mip->mi_mtrp = cur->mtr_nextp;
+				} else {
+					prev->mtr_nextp = cur->mtr_nextp;
+				}
+				kmem_free(cur, sizeof (mac_mtu_req_t));
+			}
+			rw_exit(&mip->mi_rw_lock);
+			i_mac_perim_exit(mip);
+			return (0);
+		}
+
+		prev = cur;
+	}
+
+	rw_exit(&mip->mi_rw_lock);
+	i_mac_perim_exit(mip);
+	return (ENOENT);
+}
+
 /*
  * MAC Type Plugin functions.
  */
@@ -2988,6 +3083,9 @@ mac_prop_check_size(mac_prop_id_t id, uint_t valsize, boolean_t is_range)
 		break;
 	case MAC_PROP_WL_MLME:
 		minsize = sizeof (wl_mlme_t);
+		break;
+	case MAC_PROP_VN_PROMISC_FILTERED:
+		minsize = sizeof (boolean_t);
 		break;
 	}
 

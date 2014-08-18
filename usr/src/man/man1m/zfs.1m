@@ -112,7 +112,7 @@ zfs \- configures ZFS file systems
 
 .LP
 .nf
-\fBzfs\fR \fBget\fR [\fB-r\fR|\fB-d\fR \fIdepth\fR][\fB-Hp\fR][\fB-o\fR \fIfield\fR[,\fIfield\fR]...] [\fB-t\fR \fItype\fR[,\fItype\fR]...]
+\fBzfs\fR \fBget\fR [\fB-r\fR|\fB-d\fR \fIdepth\fR][\fB-Hpc\fR][\fB-o\fR \fIfield\fR[,\fIfield\fR]...] [\fB-t\fR \fItype\fR[,\fItype\fR]...] 
     [\fB-s\fR \fIsource\fR[,\fIsource\fR]...] \fBall\fR | \fIproperty\fR[,\fIproperty\fR]...
     \fIfilesystem\fR|\fIvolume\fR|\fIsnapshot\fR...
 .fi
@@ -2378,6 +2378,16 @@ A comma-separated list of types to display, where \fItype\fR is one of
 For example, specifying \fB-t snapshot\fR displays only snapshots.
 .RE
 
+.sp
+.ne 2
+.na
+\fB\fB-p\fR\fR
+.ad
+.sp .6
+.RS 4n
+Display numbers in parseable (exact) values.
+.RE
+
 .RE
 
 .sp
@@ -2401,7 +2411,7 @@ Properties" section.
 .sp
 .ne 2
 .na
-\fB\fBzfs get\fR [\fB-r\fR|\fB-d\fR \fIdepth\fR] [\fB-Hp\fR] [\fB-o\fR
+\fB\fBzfs get\fR [\fB-r\fR|\fB-d\fR \fIdepth\fR] [\fB-Hpc\fR] [\fB-o\fR
 \fIfield\fR[,\fIfield\fR]... [\fB-t\fR \fItype\fR[,\fItype\fR]...] [\fB-s\fR \fIsource\fR[,\fIsource\fR]... \fBall\fR |
 \fIproperty\fR[,\fIproperty\fR]... \fIfilesystem\fR|\fIvolume\fR|\fIsnapshot\fR...\fR
 .ad
@@ -2494,6 +2504,19 @@ is all sources.
 .sp .6
 .RS 4n
 Display numbers in parsable (exact) values.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-c\fR\fR
+.ad
+.sp .6
+.RS 4n
+Only display properties which can be retrieved without issuing any I/O requests,
+i.e. properties which are already cached.  Most properties are cached except for
+create-time properties (normalization, utf8only, casesensitivity) as well as a
+volume's size and block size.
 .RE
 
 .RE
@@ -2923,7 +2946,7 @@ See \fBzpool-features\fR(5) for details on ZFS feature flags and the
 .sp
 .ne 2
 .na
-\fBzfs send\fR [\fB-DnPpRve\fR] [\fB-\fR[\fBiI\fR] \fIsnapshot\fR] \fIsnapshot\fR
+\fBzfs send\fR [\fB-DnPpRrve\fR] [\fB-\fR[\fBiI\fR] \fIsnapshot\fR] \fIsnapshot\fR
 .ad
 .sp .6
 .RS 4n
@@ -2994,6 +3017,18 @@ also support this feature to recieve a deduplicated stream.  This flag can
 be used regardless of the dataset's \fBdedup\fR property, but performance
 will be much better if the filesystem uses a dedup-capable checksum (eg.
 \fBsha256\fR).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-r\fR\fR
+.ad
+.sp .6
+.RS 4n
+Recursively send all descendant snapshots.  This is similar to the \fB-R\fR
+flag, but information about deleted and renamed datasets is not included, and
+property information is only included if the \fB-p\fR flag is specified.
 .RE
 
 .sp

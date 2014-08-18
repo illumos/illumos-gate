@@ -24,7 +24,10 @@
 
 LINK_OBJS_i386 = \
 	misc_link_i386.o \
+	lx_link_i386.o \
 	xen_link.o
+
+lx_link_i386.o lx_link_i386.po lx_link_i386.ln := CPPFLAGS += -I$(UTSBASE)/common/brand/lx
 
 xen_link.o xen_link.ln xen_link.po := CPPFLAGS += -I$(UTSBASE)/i86xpv
 

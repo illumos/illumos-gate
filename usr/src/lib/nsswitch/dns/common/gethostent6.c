@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This is the DNS backend for IPv6 addresses.
  * getbyname() is a local routine, but getbyaddr() actually shares the
@@ -49,8 +47,6 @@
  * core dumps. Hence, we check if a libresolv is already loaded.
  */
 
-
-#pragma weak	res_endhostent
 
 extern struct hostent *_gethostbyname(int *, const char *);
 extern struct hostent *_nss_dns_gethostbyname2(int *, const char *);

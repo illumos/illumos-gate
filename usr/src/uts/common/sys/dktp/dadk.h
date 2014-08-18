@@ -65,6 +65,8 @@ struct	dadk {
 	kstat_t		*dad_errstats;	/* error stats			*/
 	kmutex_t	dad_cmd_mutex;
 	int		dad_cmd_count;
+	uint32_t	dad_err_cnt;	/* number of recent errors	*/
+	hrtime_t	dad_last_log;	/* time of last error log	*/
 };
 
 #define	DAD_SECSIZ	dad_phyg.g_secsiz

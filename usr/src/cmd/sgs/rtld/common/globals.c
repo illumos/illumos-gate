@@ -24,6 +24,7 @@
  *	  All Rights Reserved
  *
  * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
  */
 
 #include	<sys/types.h>
@@ -132,6 +133,8 @@ const char	*rpl_ldflags = NULL;	/* replaceable LD_FLAGS string */
 const char	*rpl_libpath = NULL;	/* replaceable LD_LIBRARY_PATH string */
 Alist		*rpl_libdirs = NULL;	/*    and associated Pdesc list */
 const char	*rpl_preload = NULL;	/* replaceable LD_PRELOAD string */
+const char	*rpl_ldtoxic = NULL;	/* replaceable LD_TOXIC string */
+Alist		*rpl_toxdirs = NULL;	/*    and associated Pdesc list */
 
 const char	*prm_audit = NULL;	/* permanent LD_AUDIT string */
 const char	*prm_debug = NULL;	/* permanent LD_DEBUG string */

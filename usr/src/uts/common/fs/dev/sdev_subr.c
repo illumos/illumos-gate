@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2014, Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -149,12 +149,6 @@ vattr_t sdev_vattr_chr = {
 
 kmem_cache_t	*sdev_node_cache;	/* sdev_node cache */
 int		devtype;		/* fstype */
-
-/* static */
-static struct vnodeops *sdev_get_vop(struct sdev_node *);
-static void sdev_set_no_negcache(struct sdev_node *);
-static fs_operation_def_t *sdev_merge_vtab(const fs_operation_def_t []);
-static void sdev_free_vtab(fs_operation_def_t *);
 
 static void
 sdev_prof_free(struct sdev_node *dv)
@@ -318,6 +312,7 @@ sdev_nodeinit(struct sdev_node *ddv, char *nm, struct sdev_node **newdv,
 	(void) snprintf(dv->sdev_path, len, "%s/%s", ddv->sdev_path, nm);
 	/* overwritten for VLNK nodes */
 	dv->sdev_symlink = NULL;
+	list_link_init(&dv->sdev_plist);
 
 	vp = SDEVTOV(dv);
 	vn_reinit(vp);
@@ -406,6 +401,7 @@ sdev_nodeready(struct sdev_node *dv, struct vattr *vap, struct vnode *avp,
 	} else {
 		dv->sdev_nlink = 1;
 	}
+	sdev_plugin_nodeready(dv);
 
 	if (!(SDEV_IS_GLOBAL(dv))) {
 		dv->sdev_origin = (struct sdev_node *)args;
@@ -502,37 +498,22 @@ sdev_mkroot(struct vfs *vfsp, dev_t devdev, struct vnode *mvp,
 	return (dv);
 }
 
-/* directory dependent vop table */
-struct sdev_vop_table {
-	char *vt_name;				/* subdirectory name */
-	const fs_operation_def_t *vt_service;	/* vnodeops table */
-	struct vnodeops *vt_vops;		/* constructed vop */
-	struct vnodeops **vt_global_vops;	/* global container for vop */
-	int (*vt_vtor)(struct sdev_node *);	/* validate sdev_node */
-	int vt_flags;
-};
-
-/*
- * A nice improvement would be to provide a plug-in mechanism
- * for this table instead of a const table.
- */
-static struct sdev_vop_table vtab[] =
-{
-	{ "pts", devpts_vnodeops_tbl, NULL, &devpts_vnodeops, devpts_validate,
+struct sdev_vop_table vtab[] = {
+	{ "pts", devpts_vnodeops_tbl, &devpts_vnodeops, devpts_validate,
 	SDEV_DYNAMIC | SDEV_VTOR },
 
-	{ "vt", devvt_vnodeops_tbl, NULL, &devvt_vnodeops, devvt_validate,
+	{ "vt", devvt_vnodeops_tbl, &devvt_vnodeops, devvt_validate,
 	SDEV_DYNAMIC | SDEV_VTOR },
 
-	{ "zvol", devzvol_vnodeops_tbl, NULL, &devzvol_vnodeops,
+	{ "zvol", devzvol_vnodeops_tbl, &devzvol_vnodeops,
 	devzvol_validate, SDEV_ZONED | SDEV_DYNAMIC | SDEV_VTOR | SDEV_SUBDIR },
 
-	{ "zcons", NULL, NULL, NULL, NULL, SDEV_NO_NCACHE },
+	{ "zcons", NULL, NULL, NULL, SDEV_NO_NCACHE },
 
-	{ "net", devnet_vnodeops_tbl, NULL, &devnet_vnodeops, devnet_validate,
-	SDEV_DYNAMIC | SDEV_VTOR },
+	{ "net", devnet_vnodeops_tbl, &devnet_vnodeops, devnet_validate,
+	SDEV_DYNAMIC | SDEV_VTOR | SDEV_SUBDIR },
 
-	{ "ipnet", devipnet_vnodeops_tbl, NULL, &devipnet_vnodeops,
+	{ "ipnet", devipnet_vnodeops_tbl, &devipnet_vnodeops,
 	devipnet_validate, SDEV_DYNAMIC | SDEV_VTOR | SDEV_NO_NCACHE },
 
 	/*
@@ -547,132 +528,14 @@ static struct sdev_vop_table vtab[] =
 	 * preventing a mkdir.
 	 */
 
-	{ "lofi", NULL, NULL, NULL, NULL,
+	{ "lofi", NULL, NULL, NULL,
 	    SDEV_ZONED | SDEV_DYNAMIC | SDEV_PERSIST },
-	{ "rlofi", NULL, NULL, NULL, NULL,
+	{ "rlofi", NULL, NULL, NULL,
 	    SDEV_ZONED | SDEV_DYNAMIC | SDEV_PERSIST },
 
-	{ NULL, NULL, NULL, NULL, NULL, 0}
+	{ NULL, NULL, NULL, NULL, 0}
 };
 
-/*
- * We need to match off of the sdev_path, not the sdev_name. We are only allowed
- * to exist directly under /dev.
- */
-struct sdev_vop_table *
-sdev_match(struct sdev_node *dv)
-{
-	int vlen;
-	int i;
-	const char *path;
-
-	if (strlen(dv->sdev_path) <= 5)
-		return (NULL);
-
-	if (strncmp(dv->sdev_path, "/dev/", 5) != 0)
-		return (NULL);
-	path = dv->sdev_path + 5;
-
-	for (i = 0; vtab[i].vt_name; i++) {
-		if (strcmp(vtab[i].vt_name, path) == 0)
-			return (&vtab[i]);
-		if (vtab[i].vt_flags & SDEV_SUBDIR) {
-			vlen = strlen(vtab[i].vt_name);
-			if ((strncmp(vtab[i].vt_name, path,
-			    vlen - 1) == 0) && path[vlen] == '/')
-				return (&vtab[i]);
-		}
-
-	}
-	return (NULL);
-}
-
-/*
- *  sets a directory's vnodeops if the directory is in the vtab;
- */
-static struct vnodeops *
-sdev_get_vop(struct sdev_node *dv)
-{
-	struct sdev_vop_table *vtp;
-	char *path;
-
-	path = dv->sdev_path;
-	ASSERT(path);
-
-	/* gets the relative path to /dev/ */
-	path += 5;
-
-	/* gets the vtab entry it matches */
-	if ((vtp = sdev_match(dv)) != NULL) {
-		dv->sdev_flags |= vtp->vt_flags;
-		if (SDEV_IS_PERSIST(dv->sdev_dotdot) &&
-		    (SDEV_IS_PERSIST(dv) || !SDEV_IS_DYNAMIC(dv)))
-			dv->sdev_flags |= SDEV_PERSIST;
-
-		if (vtp->vt_vops) {
-			if (vtp->vt_global_vops)
-				*(vtp->vt_global_vops) = vtp->vt_vops;
-
-			return (vtp->vt_vops);
-		}
-
-		if (vtp->vt_service) {
-			fs_operation_def_t *templ;
-			templ = sdev_merge_vtab(vtp->vt_service);
-			if (vn_make_ops(vtp->vt_name,
-			    (const fs_operation_def_t *)templ,
-			    &vtp->vt_vops) != 0) {
-				cmn_err(CE_PANIC, "%s: malformed vnode ops\n",
-				    vtp->vt_name);
-				/*NOTREACHED*/
-			}
-			if (vtp->vt_global_vops) {
-				*(vtp->vt_global_vops) = vtp->vt_vops;
-			}
-			sdev_free_vtab(templ);
-
-			return (vtp->vt_vops);
-		}
-
-		return (sdev_vnodeops);
-	}
-
-	/* child inherits the persistence of the parent */
-	if (SDEV_IS_PERSIST(dv->sdev_dotdot))
-		dv->sdev_flags |= SDEV_PERSIST;
-
-	return (sdev_vnodeops);
-}
-
-static void
-sdev_set_no_negcache(struct sdev_node *dv)
-{
-	int i;
-	char *path;
-
-	ASSERT(dv->sdev_path);
-	path = dv->sdev_path + strlen("/dev/");
-
-	for (i = 0; vtab[i].vt_name; i++) {
-		if (strcmp(vtab[i].vt_name, path) == 0) {
-			if (vtab[i].vt_flags & SDEV_NO_NCACHE)
-				dv->sdev_flags |= SDEV_NO_NCACHE;
-			break;
-		}
-	}
-}
-
-void *
-sdev_get_vtor(struct sdev_node *dv)
-{
-	struct sdev_vop_table *vtp;
-
-	vtp = sdev_match(dv);
-	if (vtp)
-		return ((void *)vtp->vt_vtor);
-	else
-		return (NULL);
-}
 
 /*
  * Build the base root inode
@@ -952,8 +815,11 @@ sdev_nodedestroy(struct sdev_node *dv, uint_t flags)
 		dv->sdev_path = NULL;
 	}
 
-	if (!SDEV_IS_GLOBAL(dv))
+	if (!SDEV_IS_GLOBAL(dv)) {
 		sdev_prof_free(dv);
+		if (dv->sdev_vnode->v_type != VLNK && dv->sdev_origin != NULL)
+			SDEV_RELE(dv->sdev_origin);
+	}
 
 	if (SDEVTOV(dv)->v_type == VDIR) {
 		ASSERT(SDEV_FIRST_ENTRY(dv) == NULL);
@@ -967,6 +833,7 @@ sdev_nodedestroy(struct sdev_node *dv, uint_t flags)
 	(void) memset((void *)&dv->sdev_instance_data, 0,
 	    sizeof (dv->sdev_instance_data));
 	vn_invalid(SDEVTOV(dv));
+	dv->sdev_private = NULL;
 	kmem_cache_free(sdev_node_cache, dv);
 }
 
@@ -2946,46 +2813,6 @@ sdev_modctl_devexists(const char *path)
 		VN_RELE(vp);
 
 	return (error);
-}
-
-extern int sdev_vnodeops_tbl_size;
-
-/*
- * construct a new template with overrides from vtab
- */
-static fs_operation_def_t *
-sdev_merge_vtab(const fs_operation_def_t tab[])
-{
-	fs_operation_def_t *new;
-	const fs_operation_def_t *tab_entry;
-
-	/* make a copy of standard vnode ops table */
-	new = kmem_alloc(sdev_vnodeops_tbl_size, KM_SLEEP);
-	bcopy((void *)sdev_vnodeops_tbl, new, sdev_vnodeops_tbl_size);
-
-	/* replace the overrides from tab */
-	for (tab_entry = tab; tab_entry->name != NULL; tab_entry++) {
-		fs_operation_def_t *std_entry = new;
-		while (std_entry->name) {
-			if (strcmp(tab_entry->name, std_entry->name) == 0) {
-				std_entry->func = tab_entry->func;
-				break;
-			}
-			std_entry++;
-		}
-		if (std_entry->name == NULL)
-			cmn_err(CE_NOTE, "sdev_merge_vtab: entry %s unused.",
-			    tab_entry->name);
-	}
-
-	return (new);
-}
-
-/* free memory allocated by sdev_merge_vtab */
-static void
-sdev_free_vtab(fs_operation_def_t *new)
-{
-	kmem_free(new, sdev_vnodeops_tbl_size);
 }
 
 /*

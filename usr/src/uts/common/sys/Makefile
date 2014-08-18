@@ -22,6 +22,7 @@
 # Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2013, Joyent, Inc. All rights reserved.
 # Copyright 2013 Garrett D'Amore <garrett@damore.org>
+# Copyright (c) 2014, Joyent, Inc. All rights reserved.
 #
 
 include $(SRC)/uts/Makefile.uts
@@ -212,6 +213,7 @@ CHKHDRS=			\
 	emul64cmd.h		\
 	emul64var.h		\
 	epm.h			\
+	epoll.h			\
 	errno.h			\
 	errorq.h		\
 	errorq_impl.h		\
@@ -243,6 +245,7 @@ CHKHDRS=			\
 	flock.h			\
 	flock_impl.h		\
 	fork.h			\
+	frameio.h		\
 	fss.h			\
 	fsspriocntl.h		\
 	fsid.h			\
@@ -635,6 +638,8 @@ CHKHDRS=			\
 	vmem.h			\
 	vmem_impl.h		\
 	vmsystm.h		\
+	vnd.h			\
+	vnd_errno.h		\
 	vnic.h			\
 	vnic_impl.h		\
 	vnode.h			\
@@ -852,13 +857,14 @@ FSHDRS=				\
 	cachefs_log.h		\
 	decomp.h		\
 	dv_node.h		\
-	sdev_impl.h		\
 	fifonode.h		\
 	hsfs_isospec.h		\
 	hsfs_node.h		\
 	hsfs_rrip.h		\
 	hsfs_spec.h		\
 	hsfs_susp.h		\
+	hyprlofs.h		\
+	hyprlofs_info.h		\
 	lofs_info.h		\
 	lofs_node.h		\
 	mntdata.h		\
@@ -868,6 +874,8 @@ FSHDRS=				\
 	pc_label.h		\
 	pc_node.h		\
 	pxfs_ki.h		\
+	sdev_impl.h		\
+	sdev_plugin.h		\
 	snode.h			\
 	swapnode.h		\
 	tmp.h			\

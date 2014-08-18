@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
  */
 
 #include <sys/param.h>
@@ -220,10 +221,37 @@ netstack_unregister(int moduleid)
 	 * instances can use this module.
 	 */
 	for (ns = netstack_head; ns != NULL; ns = ns->netstack_next) {
+		boolean_t created = B_FALSE;
 		nm_state_t *nms = &ns->netstack_m_state[moduleid];
 
 		mutex_enter(&ns->netstack_lock);
-		if (ns_reg[moduleid].nr_shutdown != NULL &&
+
+		/*
+		 * We need to be careful here. We could actually have a netstack
+		 * being created as we speak waiting for us to let go of this
+		 * lock to proceed. It may have set NSS_CREATE_NEEDED, but not
+		 * have gotten to the point of completing it yet. If
+		 * NSS_CREATE_NEEDED, we can safely just remove it here and
+		 * never create the module. However, if NSS_CREATE_INPROGRESS is
+		 * set, we need to still flag this module for shutdown and
+		 * deletion, just as though it had reached NSS_CREATE_COMPLETED.
+		 *
+		 * It is safe to do that because of two different guarantees
+		 * that exist in the system. The first is that before we do a
+		 * create, shutdown, or destroy, we ensure that nothing else is
+		 * in progress in the system for this netstack and wait for it
+		 * to complete. Secondly, because the zone is being created, we
+		 * know that the following call to apply_all_netstack will block
+		 * on the zone finishing its initialization.
+		 */
+		if (nms->nms_flags & NSS_CREATE_NEEDED)
+			nms->nms_flags &= ~NSS_CREATE_NEEDED;
+
+		if (nms->nms_flags & NSS_CREATE_INPROGRESS ||
+		    nms->nms_flags & NSS_CREATE_COMPLETED)
+			created = B_TRUE;
+
+		if (ns_reg[moduleid].nr_shutdown != NULL && created &&
 		    (nms->nms_flags & NSS_CREATE_COMPLETED) &&
 		    (nms->nms_flags & NSS_SHUTDOWN_ALL) == 0) {
 			nms->nms_flags |= NSS_SHUTDOWN_NEEDED;
@@ -231,8 +259,7 @@ netstack_unregister(int moduleid)
 			    netstack_t *, ns, int, moduleid);
 		}
 		if ((ns_reg[moduleid].nr_flags & NRF_REGISTERED) &&
-		    ns_reg[moduleid].nr_destroy != NULL &&
-		    (nms->nms_flags & NSS_CREATE_COMPLETED) &&
+		    ns_reg[moduleid].nr_destroy != NULL && created &&
 		    (nms->nms_flags & NSS_DESTROY_ALL) == 0) {
 			nms->nms_flags |= NSS_DESTROY_NEEDED;
 			DTRACE_PROBE2(netstack__destroy__needed,

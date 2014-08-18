@@ -26,6 +26,10 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
+/*
+ * Copyright (c) 2014, Joyent, Inc. All rights reserved.
+ */
+
 #ifndef _SYS_EXEC_H
 #define	_SYS_EXEC_H
 
@@ -102,6 +106,7 @@ typedef struct uarg {
 	vnode_t	*ex_vp;
 	char	*emulator;
 	char	*brandname;
+	const char *brand_nroot;
 	char	*auxp_auxflags; /* addr of auxflags auxv on the user stack */
 	char	*auxp_brand; /* address of first brand auxv on user stack */
 	cred_t	*pfcred;
@@ -239,14 +244,16 @@ extern void exec_set_sp(size_t);
 extern int elfexec(vnode_t *, execa_t *, uarg_t *, intpdata_t *, int,
     long *, int, caddr_t, cred_t *, int);
 extern int mapexec_brand(vnode_t *, uarg_t *, Ehdr *, Addr *,
-    intptr_t *, caddr_t, int *, caddr_t *, caddr_t *, size_t *, uintptr_t *);
+    intptr_t *, caddr_t, int *, caddr_t *, caddr_t *, size_t *,
+    uintptr_t *, uintptr_t *);
 #endif /* !_ELF32_COMPAT */
 
 #if defined(_LP64)
 extern int elf32exec(vnode_t *, execa_t *, uarg_t *, intpdata_t *, int,
     long *, int, caddr_t, cred_t *, int);
 extern int mapexec32_brand(vnode_t *, uarg_t *, Elf32_Ehdr *, Elf32_Addr *,
-    intptr_t *, caddr_t, int *, caddr_t *, caddr_t *, size_t *, uintptr_t *);
+    intptr_t *, caddr_t, int *, caddr_t *, caddr_t *, size_t *,
+    uintptr_t *, uintptr_t *);
 #endif  /* _LP64 */
 
 /*

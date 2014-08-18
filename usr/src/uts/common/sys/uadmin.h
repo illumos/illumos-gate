@@ -23,6 +23,7 @@
  *
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2011 Joyent, Inc.  All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -159,7 +160,7 @@ extern kmutex_t ualock;
 extern void mdboot(int, int, char *, boolean_t);
 extern void mdpreboot(int, int, char *);
 extern int kadmin(int, int, void *, cred_t *);
-extern void killall(zoneid_t);
+extern void killall(zoneid_t, boolean_t);
 #endif
 
 extern int uadmin(int, int, uintptr_t);

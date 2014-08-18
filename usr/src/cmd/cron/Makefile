@@ -26,6 +26,7 @@
 DEFAULTFILES =	cron.dfl
 
 include		../Makefile.cmd
+include		../Makefile.ctf
 
 MANIFEST =	cron.xml
 
@@ -96,20 +97,20 @@ XPG4ATOBJS=	$(ATOBJS:%=objs.xpg4/%) $(XPG4OBJS:%=objs.xpg4/%)
 XPG6COMMONOBJS=	$(COMMONOBJS:%=objs.xpg6/%)
 XPG6CTOBJS=	$(CRONTABOBJS:%=objs.xpg6/%)
 
-cron :=		POBJS = $(CRONOBJS) $(COMMONOBJ2)
-at :=		POBJS = $(ATOBJS) $(COMMONOBJS)
-at.xpg4 :=	POBJS = $(XPG4ATOBJS) $(XPG4COMMONOBJS)
-atrm :=		POBJS = $(ATRMOBJS) $(COMMONOBJS)
-atq :=		POBJS = $(ATQOBJS) $(COMMONOBJS)
-crontab :=	POBJS = $(CRONTABOBJS) $(COMMONOBJS)
-crontab.xpg4 :=	POBJS = $(XPG4CTOBJS) $(XPG4COMMONOBJS)
-crontab.xpg6 :=	POBJS = $(XPG6CTOBJS) $(XPG6COMMONOBJS)
+cron :=		OBJS = $(CRONOBJS) $(COMMONOBJ2)
+at :=		OBJS = $(ATOBJS) $(COMMONOBJS)
+at.xpg4 :=	OBJS = $(XPG4ATOBJS) $(XPG4COMMONOBJS)
+atrm :=		OBJS = $(ATRMOBJS) $(COMMONOBJS)
+atq :=		OBJS = $(ATQOBJS) $(COMMONOBJS)
+crontab :=	OBJS = $(CRONTABOBJS) $(COMMONOBJS)
+crontab.xpg4 :=	OBJS = $(XPG4CTOBJS) $(XPG4COMMONOBJS)
+crontab.xpg6 :=	OBJS = $(XPG6CTOBJS) $(XPG6COMMONOBJS)
 
 CFLAGS += $(CCVERBOSE)
 
 NOBJS=		$(CRONOBJS) $(ATOBJS) $(ATRMOBJS1) $(ATQOBJS) $(CRONTABOBJS1) \
 		$(COMMONOBJS)
-OBJS =		$(NOBJS) $(XPG4COMMONOBJS) $(XPG4ATOBJS) $(XPG4CTOBJS) \
+COBJS =		$(NOBJS) $(XPG4COMMONOBJS) $(XPG4ATOBJS) $(XPG4CTOBJS) \
 		$(XPG6COMMONOBJS) $(XPG6CTOBJS) $(GETRESPOBJ)
 
 SRCS =		$(NOBJS:%.o=%.c) $(GETRESPSRC)
@@ -157,32 +158,35 @@ all :		$(PROG) $(XPG4) $(XPG6) $(SCRIPT) $(XPG4SCRIPT) $(FILES)
 install :	all $(ROOTPROG) $(ROOTETCDEFAULTFILES) $(ROOTSYMLINK) \
 		$(ROOTMANIFEST) $(ROOTMETHOD)
 
-$(PROG) :	$$(POBJS)
-		$(LINK.c) $(POBJS) -o $@ $(LDLIBS)
+$(PROG) :	$$(OBJS)
+		$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
 		$(POST_PROCESS)
 
-$(XPG4) :	objs.xpg4 $$(POBJS)
-		$(LINK.c) $(POBJS) -o $@ $(LDLIBS)
+$(XPG4) :	objs.xpg4 $$(OBJS)
+		$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
 		$(POST_PROCESS)
 
-$(XPG6) :	objs.xpg6 $$(POBJS)
-		$(LINK.c) $(POBJS) -o $@ $(LDLIBS)
+$(XPG6) :	objs.xpg6 $$(OBJS)
+		$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
 		$(POST_PROCESS)
 
 objs.xpg6/%.o:		%.c
 	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)
 
 objs.xpg6:
 	-@mkdir -p $@
 
 objs.xpg4/%.o:		%.c
 	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)
 
 objs.xpg4:
 	-@mkdir -p $@
 
 objs.xpg4/values-xpg4.o:	../../lib/common/common/values-xpg4.c
 	$(COMPILE.c) -o $@ ../../lib/common/common/values-xpg4.c
+	$(POST_PROCESS_O)
 
 %.o:			$(SRC)/common/util/%.c
 	$(COMPILE.c) $(OUTPUT_OPTION) $<
@@ -219,7 +223,7 @@ $(POFILE):	$(POFILES)
 	$(RM) $@; cat $(POFILES) > $@
 
 clean :
-		$(RM) $(OBJS) att1.h att1.c att2.c
+		$(RM) $(COBJS) att1.h att1.c att2.c
 
 lint :		lint_SRCS
 

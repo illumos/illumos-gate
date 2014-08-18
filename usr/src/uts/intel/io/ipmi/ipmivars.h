@@ -78,6 +78,7 @@ struct ipmi_request {
 #define	SMIC_CTL_STS			1
 #define	SMIC_FLAGS			2
 
+struct ipmi_softc;
 #define	IPMI_BUSY	0x1
 #define	IPMI_CLOSING	0x2
 

@@ -1,0 +1,101 @@
+'\" te
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright (c) 2014, Joyent, Inc.  All rights reserved.
+.\"
+.TH VND_PROP_WRITEABLE 3VND "Feb 21, 2014"
+
+.SH NAME
+
+vnd_prop_writeable \- determine if a vnd property can be updated
+
+.SH SYNOPSIS
+
+.LP
+.nf
+cc [ flag... ] file... -lvnd [ library... ]
+#include <libvnd.h>
+
+int vnd_prop_writeable(vnd_prop_t prop, boolean_t *wp);
+.fi
+
+
+.SH DESCRIPTION
+.LP
+The vnd_prop_writeable function is used as a programmatic means to
+determine whether a given vnd property is writeable or not. The
+property to check is specified in prop and should be from the list
+described in libvnd(3VND). The argument wp is a pointer to a boolean_t
+which will be updated upon the successful completion of the function.
+The argument wp must be a valid pointer. If a property is writeable
+than the value pointed to by wp is set to B_TRUE. If the property is
+read-only, then the value is set to B_FALSE.
+
+
+.SH RETURN VALUES
+.LP
+On success, vnd_prop_writeable returns zero and the value pointed to
+by wp is updated with whether the property is writeable. If the
+property prop does not exist, then vnd_prop_writeable will return -1.
+
+.SH EXAMPLES
+.LP
+Example 1    Check whether the property VND_PROP_TXBUF is writable
+.LP
+The following sample C program checks whether the vnd property
+VND_PROP_TXBUF is writeable or not.
+
+.sp
+.in +2
+.nf
+#include <libvnd.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+int
+main(void)
+{
+	boolean_t canwrite;
+
+	if (vnd_prop_writeable(VND_PROP_TXBUF, &prop) != 0)
+		abort();
+
+	if (canwrite == B_TRUE)
+		(void) printf("VND_PROP_TXBUF is writeable\n");
+	else
+		(void) printf("VND_PROP_TXBUF is read only\n");
+
+	return (0);
+}
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See attributes(5) for descriptions of the following attributes:
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Stability	Committed
+_
+MT-Level	MT-Safe
+.TE
+
+.SH SEE ALSO
+
+vndadm(1M), libvnd(3VND)

@@ -77,6 +77,10 @@ typedef struct file
 #include <sys/fcntl.h>
 #endif
 
+#if !defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__)
+int flock(int, int);
+#endif
+
 /* flags - see also fcntl.h */
 
 #ifndef FOPEN

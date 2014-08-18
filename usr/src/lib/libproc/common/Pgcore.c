@@ -25,7 +25,7 @@
  */
 /*
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
- * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2014, Joyent, Inc. All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
  */
 
@@ -94,6 +94,29 @@ typedef struct {
 	off64_t		*fd_doff;
 } fditer_t;
 
+static int
+gc_pwrite64(int fd, const void *buf, size_t len, off64_t off)
+{
+	int err;
+
+	err = pwrite64(fd, buf, len, off);
+
+	if (err < 0)
+		return (err);
+
+	/*
+	 * We will take a page from ZFS's book here and use the otherwise
+	 * unused EBADE to mean a short write.  Typically this will actually
+	 * result from ENOSPC or EDQUOT, but we can't be sure.
+	 */
+	if (err < len) {
+		errno = EBADE;
+		return (-1);
+	}
+
+	return (0);
+}
+
 static void
 shstrtab_init(shstrtab_t *s)
 {
@@ -126,13 +149,16 @@ Pgcore(struct ps_prochandle *P, const char *fname, core_content_t content)
 {
 	int fd;
 	int err;
+	int saved_errno;
 
 	if ((fd = creat64(fname, 0666)) < 0)
 		return (-1);
 
 	if ((err = Pfgcore(P, fd, content)) != 0) {
+		saved_errno = errno;
 		(void) close(fd);
 		(void) unlink(fname);
+		errno = saved_errno;
 		return (err);
 	}
 
@@ -414,12 +440,12 @@ write_note(int fd, uint_t type, const void *desc, size_t descsz, off64_t *offp)
 	n.nhdr.n_namesz = 5;
 	n.nhdr.n_descsz = roundup(descsz, 4);
 
-	if (pwrite64(fd, &n, sizeof (n), *offp) != sizeof (n))
+	if (gc_pwrite64(fd, &n, sizeof (n), *offp) != 0)
 		return (-1);
 
 	*offp += sizeof (n);
 
-	if (pwrite64(fd, desc, n.nhdr.n_descsz, *offp) != n.nhdr.n_descsz)
+	if (gc_pwrite64(fd, desc, n.nhdr.n_descsz, *offp) != 0)
 		return (-1);
 
 	*offp += n.nhdr.n_descsz;
@@ -652,8 +678,8 @@ write_shdr(pgcore_t *pgc, shstrtype_t name, uint_t type, ulong_t flags,
 		shdr.sh_addralign = addralign;
 		shdr.sh_entsize = entsize;
 
-		if (pwrite64(pgc->pgc_fd, &shdr, sizeof (shdr),
-		    *pgc->pgc_soff) != sizeof (shdr))
+		if (gc_pwrite64(pgc->pgc_fd, &shdr, sizeof (shdr),
+		    *pgc->pgc_soff) != 0)
 			return (-1);
 
 		*pgc->pgc_soff += sizeof (shdr);
@@ -673,8 +699,8 @@ write_shdr(pgcore_t *pgc, shstrtype_t name, uint_t type, ulong_t flags,
 		shdr.sh_addralign = addralign;
 		shdr.sh_entsize = entsize;
 
-		if (pwrite64(pgc->pgc_fd, &shdr, sizeof (shdr),
-		    *pgc->pgc_soff) != sizeof (shdr))
+		if (gc_pwrite64(pgc->pgc_fd, &shdr, sizeof (shdr),
+		    *pgc->pgc_soff) != 0)
 			return (-1);
 
 		*pgc->pgc_soff += sizeof (shdr);
@@ -699,8 +725,8 @@ dump_symtab(pgcore_t *pgc, file_info_t *fptr, uint_t index, int dynsym)
 		return (0);
 
 	size = sym->sym_hdr_pri.sh_size;
-	if (pwrite64(pgc->pgc_fd, sym->sym_data_pri->d_buf, size,
-	    *pgc->pgc_doff) != size)
+	if (gc_pwrite64(pgc->pgc_fd, sym->sym_data_pri->d_buf, size,
+	    *pgc->pgc_doff) != 0)
 		return (-1);
 
 	if (write_shdr(pgc, symname, symtype, 0, addr, *pgc->pgc_doff, size,
@@ -711,7 +737,7 @@ dump_symtab(pgcore_t *pgc, file_info_t *fptr, uint_t index, int dynsym)
 	*pgc->pgc_doff += roundup(size, 8);
 
 	size = sym->sym_strhdr.sh_size;
-	if (pwrite64(pgc->pgc_fd, sym->sym_strs, size, *pgc->pgc_doff) != size)
+	if (gc_pwrite64(pgc->pgc_fd, sym->sym_strs, size, *pgc->pgc_doff) != 0)
 		return (-1);
 
 	if (write_shdr(pgc, strname, SHT_STRTAB, SHF_STRINGS, addr,
@@ -773,9 +799,8 @@ dump_sections(pgcore_t *pgc)
 			 * Write the CTF data that we've read out of the
 			 * file itself into the core file.
 			 */
-			if (pwrite64(pgc->pgc_fd, fptr->file_ctf_buf,
-			    fptr->file_ctf_size, *pgc->pgc_doff) !=
-			    fptr->file_ctf_size)
+			if (gc_pwrite64(pgc->pgc_fd, fptr->file_ctf_buf,
+			    fptr->file_ctf_size, *pgc->pgc_doff) != 0)
 				return (-1);
 
 			if (write_shdr(pgc, STR_CTF, SHT_PROGBITS, 0,
@@ -887,10 +912,10 @@ dump_map(void *data, const prmap_t *pmp, const char *name)
 		 * mapping would have been.
 		 */
 		if (Pread(P, pgc->pgc_chunk, csz, pmp->pr_vaddr + n) != csz ||
-		    pwrite64(pgc->pgc_fd, pgc->pgc_chunk, csz,
-		    *pgc->pgc_doff + n) != csz) {
+		    gc_pwrite64(pgc->pgc_fd, pgc->pgc_chunk, csz,
+		    *pgc->pgc_doff + n) != 0) {
 			int err = errno;
-			(void) pwrite64(pgc->pgc_fd, &err, sizeof (err),
+			(void) gc_pwrite64(pgc->pgc_fd, &err, sizeof (err),
 			    *pgc->pgc_doff);
 			*pgc->pgc_doff += roundup(sizeof (err), 8);
 
@@ -908,8 +933,8 @@ dump_map(void *data, const prmap_t *pmp, const char *name)
 
 exclude:
 	if (P->status.pr_dmodel == PR_MODEL_NATIVE) {
-		if (pwrite64(pgc->pgc_fd, &phdr, sizeof (phdr),
-		    *pgc->pgc_poff) != sizeof (phdr))
+		if (gc_pwrite64(pgc->pgc_fd, &phdr, sizeof (phdr),
+		    *pgc->pgc_poff) != 0)
 			return (1);
 
 		*pgc->pgc_poff += sizeof (phdr);
@@ -925,8 +950,8 @@ exclude:
 		phdr32.p_offset = (Elf32_Off)phdr.p_offset;
 		phdr32.p_filesz = (Elf32_Word)phdr.p_filesz;
 
-		if (pwrite64(pgc->pgc_fd, &phdr32, sizeof (phdr32),
-		    *pgc->pgc_poff) != sizeof (phdr32))
+		if (gc_pwrite64(pgc->pgc_fd, &phdr32, sizeof (phdr32),
+		    *pgc->pgc_poff) != 0)
 			return (1);
 
 		*pgc->pgc_poff += sizeof (phdr32);
@@ -961,7 +986,7 @@ write_shstrtab(struct ps_prochandle *P, pgcore_t *pgc)
 		if ((ndx = s->sst_ndx[i]) != 0 || i == STR_NONE) {
 			const char *str = shstrtab_data[i];
 			size_t len = strlen(str) + 1;
-			if (pwrite64(pgc->pgc_fd, str, len, off + ndx) != len)
+			if (gc_pwrite64(pgc->pgc_fd, str, len, off + ndx) != 0)
 				return (1);
 		}
 	}
@@ -977,8 +1002,8 @@ write_shstrtab(struct ps_prochandle *P, pgcore_t *pgc)
 		shdr.sh_flags = SHF_STRINGS;
 		shdr.sh_type = SHT_STRTAB;
 
-		if (pwrite64(pgc->pgc_fd, &shdr, sizeof (shdr),
-		    *pgc->pgc_soff) != sizeof (shdr))
+		if (gc_pwrite64(pgc->pgc_fd, &shdr, sizeof (shdr),
+		    *pgc->pgc_soff) != 0)
 			return (1);
 
 		*pgc->pgc_soff += sizeof (shdr);
@@ -994,8 +1019,8 @@ write_shstrtab(struct ps_prochandle *P, pgcore_t *pgc)
 		shdr.sh_flags = SHF_STRINGS;
 		shdr.sh_type = SHT_STRTAB;
 
-		if (pwrite64(pgc->pgc_fd, &shdr, sizeof (shdr),
-		    *pgc->pgc_soff) != sizeof (shdr))
+		if (gc_pwrite64(pgc->pgc_fd, &shdr, sizeof (shdr),
+		    *pgc->pgc_soff) != 0)
 			return (1);
 
 		*pgc->pgc_soff += sizeof (shdr);
@@ -1120,7 +1145,7 @@ Pfgcore(struct ps_prochandle *P, int fd, core_content_t content)
 			ehdr.e_shoff = ehdr.e_phoff + ehdr.e_phentsize * nphdrs;
 		}
 
-		if (pwrite64(fd, &ehdr, sizeof (ehdr), 0) != sizeof (ehdr))
+		if (gc_pwrite64(fd, &ehdr, sizeof (ehdr), 0) != 0)
 			goto err;
 
 		poff = ehdr.e_phoff;
@@ -1178,7 +1203,7 @@ Pfgcore(struct ps_prochandle *P, int fd, core_content_t content)
 			ehdr.e_shoff = ehdr.e_phoff + ehdr.e_phentsize * nphdrs;
 		}
 
-		if (pwrite64(fd, &ehdr, sizeof (ehdr), 0) != sizeof (ehdr))
+		if (gc_pwrite64(fd, &ehdr, sizeof (ehdr), 0) != 0)
 			goto err;
 
 		poff = ehdr.e_phoff;
@@ -1260,7 +1285,7 @@ Pfgcore(struct ps_prochandle *P, int fd, core_content_t content)
 		phdr.p_filesz = doff - boff;
 		boff = doff;
 
-		if (pwrite64(fd, &phdr, sizeof (phdr), poff) != sizeof (phdr))
+		if (gc_pwrite64(fd, &phdr, sizeof (phdr), poff) != 0)
 			goto err;
 		poff += sizeof (phdr);
 #ifdef _LP64
@@ -1274,7 +1299,7 @@ Pfgcore(struct ps_prochandle *P, int fd, core_content_t content)
 		phdr.p_filesz = doff - boff;
 		boff = doff;
 
-		if (pwrite64(fd, &phdr, sizeof (phdr), poff) != sizeof (phdr))
+		if (gc_pwrite64(fd, &phdr, sizeof (phdr), poff) != 0)
 			goto err;
 		poff += sizeof (phdr);
 #endif	/* _LP64 */
@@ -1432,7 +1457,7 @@ Pfgcore(struct ps_prochandle *P, int fd, core_content_t content)
 		phdr.p_filesz = doff - boff;
 		boff = doff;
 
-		if (pwrite64(fd, &phdr, sizeof (phdr), poff) != sizeof (phdr))
+		if (gc_pwrite64(fd, &phdr, sizeof (phdr), poff) != 0)
 			goto err;
 		poff += sizeof (phdr);
 #ifdef _LP64
@@ -1446,7 +1471,7 @@ Pfgcore(struct ps_prochandle *P, int fd, core_content_t content)
 		phdr.p_filesz = doff - boff;
 		boff = doff;
 
-		if (pwrite64(fd, &phdr, sizeof (phdr), poff) != sizeof (phdr))
+		if (gc_pwrite64(fd, &phdr, sizeof (phdr), poff) != 0)
 			goto err;
 		poff += sizeof (phdr);
 #endif	/* _LP64 */

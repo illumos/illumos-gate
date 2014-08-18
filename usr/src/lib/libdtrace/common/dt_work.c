@@ -25,7 +25,9 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 2011, Joyent, Inc. All rights reserved.
+ */
 
 #include <dt_impl.h>
 #include <stddef.h>
@@ -164,11 +166,20 @@ dtrace_status(dtrace_hdl_t *dtp)
 int
 dtrace_go(dtrace_hdl_t *dtp)
 {
-	void *dof;
-	int err;
-
 	if (dtp->dt_active)
 		return (dt_set_errno(dtp, EINVAL));
+
+	/*
+	 * In most cases, we will have already ioctl'd down our options DOF
+	 * by this point -- but if a libdtrace does a dtrace_setopt() after
+	 * calling dtrace_program_exec() but before calling dtrace_go(),
+	 * dt_optset will be cleared and we need to ioctl down the options
+	 * DOF now.
+	 */
+	if (dtrace_setopts(dtp) != 0 &&
+	    (dtp->dt_errno != ENOTTY || dtp->dt_vector == NULL)) {
+		return (-1);
+	}
 
 	/*
 	 * If a dtrace:::ERROR program and callback are registered, enable the
@@ -178,18 +189,9 @@ dtrace_go(dtrace_hdl_t *dtp)
 	 * though they do not provide support for the DTRACEIOC_ENABLE ioctl.
 	 */
 	if (dtp->dt_errprog != NULL &&
-	    dtrace_program_exec(dtp, dtp->dt_errprog, NULL) == -1 && (
-	    dtp->dt_errno != ENOTTY || dtp->dt_vector == NULL))
+	    dtrace_program_exec(dtp, dtp->dt_errprog, NULL) == -1 &&
+	    (dtp->dt_errno != ENOTTY || dtp->dt_vector == NULL))
 		return (-1); /* dt_errno has been set for us */
-
-	if ((dof = dtrace_getopt_dof(dtp)) == NULL)
-		return (-1); /* dt_errno has been set for us */
-
-	err = dt_ioctl(dtp, DTRACEIOC_ENABLE, dof);
-	dtrace_dof_destroy(dtp, dof);
-
-	if (err == -1 && (errno != ENOTTY || dtp->dt_vector == NULL))
-		return (dt_set_errno(dtp, errno));
 
 	if (dt_ioctl(dtp, DTRACEIOC_GO, &dtp->dt_beganon) == -1) {
 		if (errno == EACCES)

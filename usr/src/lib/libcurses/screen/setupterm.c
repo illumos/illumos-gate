@@ -37,8 +37,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*LINTLIBRARY*/
 
 #include	<stdio.h>
@@ -48,6 +46,7 @@
 #include	<string.h>
 #include	<unistd.h>
 #include	<errno.h>
+#include	<zone.h>
 #include	"curses_inc.h"
 
 #define	TERMPATH	"/usr/share/lib/terminfo/"
@@ -272,9 +271,11 @@ setupterm(char *term, int filenum, int *errret)
 	}
 
 	if (tfd < 0) {
+		const char *zroot = zone_get_nroot();
 		/* /usr/share/lib/terminfo/?/$TERM */
 		if (snprintf(fname, sizeof (fname),
-			"%s/%c/%s", TERMPATH, *term, term) >= sizeof (fname)) {
+			"%s/%s/%c/%s", zroot == NULL ? "" : zroot, TERMPATH,
+			*term, term) >= sizeof (fname)) {
 			term_errno = TERMINFO_TOO_LONG;
 			goto out_err;
 		}

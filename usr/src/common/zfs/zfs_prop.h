@@ -21,6 +21,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  */
 
 #ifndef	_ZFS_PROP_H
@@ -86,6 +87,7 @@ typedef struct {
 void zfs_prop_init(void);
 zprop_type_t zfs_prop_get_type(zfs_prop_t);
 boolean_t zfs_prop_delegatable(zfs_prop_t prop);
+boolean_t zfs_prop_cacheable(zfs_prop_t prop);
 zprop_desc_t *zfs_prop_get_table(void);
 
 /*

@@ -7,6 +7,8 @@
  * $Id: ip_fil.h,v 2.170.2.22 2005/07/16 05:55:35 darrenr Exp $
  *
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+ *
+ * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
  */
 
 #ifndef	__IP_FIL_H__
@@ -106,6 +108,10 @@
 #define	SIOCADDFR	SIOCADAFR
 #define	SIOCDELFR	SIOCRMAFR
 #define	SIOCINSFR	SIOCINAFR
+
+#ifdef SOLARIS
+# define	SIOCIPFZONESET	_IOWR('r', 97, struct ipfzoneobj)
+#endif
 
 /*
  * What type of table is getting flushed?
@@ -1165,6 +1171,25 @@ typedef	struct	ipfobj	{
 	u_char	ipfo_xxxpad[32];	/* reserved for future use */
 } ipfobj_t;
 
+#if defined(SOLARIS)
+
+#include <sys/zone.h>
+
+typedef	struct	ipfzoneobj	{
+	u_32_t		ipfz_gz;			/* GZ stack */
+	char		ipfz_zonename[ZONENAME_MAX];	/* zone to act on */
+} ipfzoneobj_t;
+
+#if defined(_KERNEL)
+typedef	struct	ipf_devstate	{
+	zoneid_t	ipfs_zoneid;
+	minor_t		ipfs_minor;
+	boolean_t	ipfs_gz;
+} ipf_devstate_t;
+#endif
+
+#endif
+
 #define	IPFOBJ_FRENTRY		0	/* struct frentry */
 #define	IPFOBJ_IPFSTAT		1	/* struct friostat */
 #define	IPFOBJ_IPFINFO		2	/* struct fr_info */
@@ -1352,7 +1377,7 @@ extern	void	ipfilterattach __P((int));
 extern	int	ipl_enable __P((void));
 extern	int	ipl_disable __P((void));
 # ifdef MENTAT
-extern	ipf_stack_t *ipf_find_stack(const zoneid_t zone);
+extern	ipf_stack_t *ipf_find_stack(const zoneid_t zone, boolean_t gz);
 extern	int	fr_check __P((struct ip *, int, void *, int, void *,
 			      mblk_t **, ipf_stack_t *));
 #  if SOLARIS
@@ -1574,6 +1599,10 @@ extern	int		ipf_earlydrop __P((int, ipftq_t *, int, ipf_stack_t *));
 
 #ifndef	ipf_random
 extern	u_32_t		ipf_random __P((void));
+#endif
+
+#if defined(SOLARIS) && defined(_KERNEL)
+extern	int	fr_setzoneid __P((ipf_devstate_t *, void *));
 #endif
 
 extern	char	ipfilter_version[];

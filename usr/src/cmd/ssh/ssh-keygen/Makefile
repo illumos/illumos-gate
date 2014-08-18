@@ -32,7 +32,7 @@ SRCS	= $(OBJS:.o=.c)
 include ../../Makefile.cmd
 include ../Makefile.ssh-common
 
-LDLIBS += $(SSH_COMMON_LDLIBS) -lcrypto -lsocket
+LDLIBS += $(SSH_COMMON_LDLIBS) -lsunw_crypto -lsocket
 
 POFILE_DIR= ..
 

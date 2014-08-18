@@ -11,6 +11,7 @@
 
 #
 # Copyright 2014 Adam Stevko.  All rights reserved.
+# Copyright (c) 2011, Joyent, Inc. All rights reserved.
 #
 
 include $(SRC)/cmd/Makefile.cmd

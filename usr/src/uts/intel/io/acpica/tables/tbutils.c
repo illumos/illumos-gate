@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2011, Intel Corp.
+ * Copyright (C) 2000 - 2012, Intel Corp.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -50,6 +50,7 @@
 #define _COMPONENT          ACPI_TABLES
         ACPI_MODULE_NAME    ("tbutils")
 
+
 /* Local prototypes */
 
 static void
@@ -68,6 +69,7 @@ AcpiTbGetRootTableEntry (
     UINT32                  TableEntrySize);
 
 
+#if (!ACPI_REDUCED_HARDWARE)
 /*******************************************************************************
  *
  * FUNCTION:    AcpiTbInitializeFacs
@@ -88,10 +90,19 @@ AcpiTbInitializeFacs (
     ACPI_STATUS             Status;
 
 
+    /* If Hardware Reduced flag is set, there is no FACS */
+
+    if (AcpiGbl_ReducedHardware)
+    {
+        AcpiGbl_FACS = NULL;
+        return (AE_OK);
+    }
+
     Status = AcpiGetTableByIndex (ACPI_TABLE_INDEX_FACS,
                 ACPI_CAST_INDIRECT_PTR (ACPI_TABLE_HEADER, &AcpiGbl_FACS));
     return (Status);
 }
+#endif /* !ACPI_REDUCED_HARDWARE */
 
 
 /*******************************************************************************
@@ -415,7 +426,7 @@ AcpiTbCopyDsdt (
  * RETURN:      None
  *
  * DESCRIPTION: Install an ACPI table into the global data structure. The
- *              table override mechanism is implemented here to allow the host
+ *              table override mechanism is called to allow the host
  *              OS to replace any table before it is installed in the root
  *              table array.
  *
@@ -427,11 +438,9 @@ AcpiTbInstallTable (
     char                    *Signature,
     UINT32                  TableIndex)
 {
-    UINT8                   Flags;
-    ACPI_STATUS             Status;
-    ACPI_TABLE_HEADER       *TableToInstall;
-    ACPI_TABLE_HEADER       *MappedTable;
-    ACPI_TABLE_HEADER       *OverrideTable = NULL;
+    ACPI_TABLE_HEADER       *Table;
+    ACPI_TABLE_HEADER       *FinalTable;
+    ACPI_TABLE_DESC         *TableDesc;
 
 
     if (!Address)
@@ -443,22 +452,36 @@ AcpiTbInstallTable (
 
     /* Map just the table header */
 
-    MappedTable = AcpiOsMapMemory (Address, sizeof (ACPI_TABLE_HEADER));
-    if (!MappedTable)
+    Table = AcpiOsMapMemory (Address, sizeof (ACPI_TABLE_HEADER));
+    if (!Table)
     {
+        ACPI_ERROR ((AE_INFO, "Could not map memory for table [%s] at %p",
+            Signature, ACPI_CAST_PTR (void, Address)));
         return;
     }
 
     /* If a particular signature is expected (DSDT/FACS), it must match */
 
     if (Signature &&
-        !ACPI_COMPARE_NAME (MappedTable->Signature, Signature))
+        !ACPI_COMPARE_NAME (Table->Signature, Signature))
     {
         ACPI_ERROR ((AE_INFO,
             "Invalid signature 0x%X for ACPI table, expected [%s]",
-            *ACPI_CAST_PTR (UINT32, MappedTable->Signature), Signature));
+            *ACPI_CAST_PTR (UINT32, Table->Signature), Signature));
         goto UnmapAndExit;
     }
+
+    /*
+     * Initialize the table entry. Set the pointer to NULL, since the
+     * table is not fully mapped at this time.
+     */
+    TableDesc = &AcpiGbl_RootTableList.Tables[TableIndex];
+
+    TableDesc->Address = Address;
+    TableDesc->Pointer = NULL;
+    TableDesc->Length = Table->Length;
+    TableDesc->Flags = ACPI_TABLE_ORIGIN_MAPPED;
+    ACPI_MOVE_32_TO_32 (TableDesc->Signature.Ascii, Table->Signature);
 
     /*
      * ACPI Table Override:
@@ -466,47 +489,47 @@ AcpiTbInstallTable (
      * Before we install the table, let the host OS override it with a new
      * one if desired. Any table within the RSDT/XSDT can be replaced,
      * including the DSDT which is pointed to by the FADT.
+     *
+     * NOTE: If the table is overridden, then FinalTable will contain a
+     * mapped pointer to the full new table. If the table is not overridden,
+     * or if there has been a physical override, then the table will be
+     * fully mapped later (in verify table). In any case, we must
+     * unmap the header that was mapped above.
      */
-    Status = AcpiOsTableOverride (MappedTable, &OverrideTable);
-    if (ACPI_SUCCESS (Status) && OverrideTable)
+    FinalTable = AcpiTbTableOverride (Table, TableDesc);
+    if (!FinalTable)
     {
-        ACPI_INFO ((AE_INFO,
-            "%4.4s @ 0x%p Table override, replaced with:",
-            MappedTable->Signature, ACPI_CAST_PTR (void, Address)));
-
-        AcpiGbl_RootTableList.Tables[TableIndex].Pointer = OverrideTable;
-        Address = ACPI_PTR_TO_PHYSADDR (OverrideTable);
-
-        TableToInstall = OverrideTable;
-        Flags = ACPI_TABLE_ORIGIN_OVERRIDE;
-    }
-    else
-    {
-        TableToInstall = MappedTable;
-        Flags = ACPI_TABLE_ORIGIN_MAPPED;
+        FinalTable = Table; /* There was no override */
     }
 
-    /* Initialize the table entry */
+    AcpiTbPrintTableHeader (TableDesc->Address, FinalTable);
 
-    AcpiGbl_RootTableList.Tables[TableIndex].Address = Address;
-    AcpiGbl_RootTableList.Tables[TableIndex].Length = TableToInstall->Length;
-    AcpiGbl_RootTableList.Tables[TableIndex].Flags = Flags;
-
-    ACPI_MOVE_32_TO_32 (
-        &(AcpiGbl_RootTableList.Tables[TableIndex].Signature),
-        TableToInstall->Signature);
-
-    AcpiTbPrintTableHeader (Address, TableToInstall);
+    /* Set the global integer width (based upon revision of the DSDT) */
 
     if (TableIndex == ACPI_TABLE_INDEX_DSDT)
     {
-        /* Global integer width is based upon revision of the DSDT */
-
-        AcpiUtSetIntegerWidth (TableToInstall->Revision);
+        AcpiUtSetIntegerWidth (FinalTable->Revision);
     }
 
+    /*
+     * If we have a physical override during this early loading of the ACPI
+     * tables, unmap the table for now. It will be mapped again later when
+     * it is actually used. This supports very early loading of ACPI tables,
+     * before virtual memory is fully initialized and running within the
+     * host OS. Note: A logical override has the ACPI_TABLE_ORIGIN_OVERRIDE
+     * flag set and will not be deleted below.
+     */
+    if (FinalTable != Table)
+    {
+        AcpiTbDeleteTable (TableDesc);
+    }
+
+
 UnmapAndExit:
-    AcpiOsUnmapMemory (MappedTable, sizeof (ACPI_TABLE_HEADER));
+
+    /* Always unmap the table header that we mapped above */
+
+    AcpiOsUnmapMemory (Table, sizeof (ACPI_TABLE_HEADER));
 }
 
 

@@ -77,7 +77,7 @@ check: $(CHECKHDRS)
 _msg:
 	$(RM) $(POFILE)
 	$(TOUCH) $(POFILE)
-	$(MAKE) $(POFILE) XGETTEXT=/usr/bin/gxgettext
+	$(MAKE) $(POFILE) XGETTEXT=$(GNUXGETTEXT)
 	$(CP) $(POFILE) $(MSGFILE)
 	$(CP) $(MSGFILE) $(MSGDOMAIN)
 

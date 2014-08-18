@@ -50,6 +50,9 @@ i386_DIRS=			\
 	/boot/grub		\
 	/boot/grub/bin		\
 	/platform/i86pc		\
+	/usr/lib/brand/lx \
+	/usr/lib/brand/lx/amd64 \
+	/usr/lib/brand/lx/distros \
 	/usr/lib/xen		\
 	/usr/lib/xen/bin
 
@@ -203,6 +206,7 @@ DIRS= \
 	/root  \
 	/sbin  \
 	/system \
+	/system/boot \
 	/system/contract \
 	/system/object \
 	/tmp \
@@ -245,6 +249,7 @@ DIRS= \
 	/usr/lib/brand/labeled \
 	/usr/lib/brand/shared \
 	/usr/lib/brand/sn1 \
+	/usr/lib/brand/sngl \
 	/usr/lib/brand/solaris10 \
 	/usr/lib/class \
 	/usr/lib/class/FSS \
@@ -529,6 +534,7 @@ DIRS64= \
 	/usr/lib/$(MACH64) \
 	/usr/lib/$(MACH64)/gss \
 	/usr/lib/brand/sn1/$(MACH64) \
+	/usr/lib/brand/sngl/$(MACH64) \
 	/usr/lib/brand/solaris10/$(MACH64) \
 	/usr/lib/elfedit/$(MACH64) \
 	/usr/lib/fm/$(MACH64) \
@@ -591,6 +597,9 @@ SYM.DIRS= \
 	/usr/ucblib/32 \
 	/var/ld/32
 
+i386_SYM.DIRS64= \
+	/usr/lib/brand/lx/64
+
 sparc_SYM.DIRS64=
 
 SYM.DIRS64= \
@@ -600,6 +609,7 @@ SYM.DIRS64= \
 	/lib/secure/64 \
 	/usr/lib/64 \
 	/usr/lib/brand/sn1/64 \
+	/usr/lib/brand/sngl/64 \
 	/usr/lib/brand/solaris10/64 \
 	/usr/lib/elfedit/64 \
 	/usr/lib/libp/64 \
@@ -707,7 +717,9 @@ $(BUILD64) $(ROOT)/lib/crypto/64:=	LINKDEST=$(MACH64)
 $(BUILD64) $(ROOT)/lib/secure/64:=	LINKDEST=$(MACH64)
 $(BUILD64) $(ROOT)/usr/lib/64:=		LINKDEST=$(MACH64)
 $(BUILD64) $(ROOT)/usr/lib/elfedit/64:=	LINKDEST=$(MACH64)
+$(BUILD64) $(ROOT)/usr/lib/brand/lx/64:=	LINKDEST=$(MACH64)
 $(BUILD64) $(ROOT)/usr/lib/brand/sn1/64:=	LINKDEST=$(MACH64)
+$(BUILD64) $(ROOT)/usr/lib/brand/sngl/64:=	LINKDEST=$(MACH64)
 $(BUILD64) $(ROOT)/usr/lib/brand/solaris10/64:=	LINKDEST=$(MACH64)
 $(BUILD64) $(ROOT)/usr/lib/libp/64:=	LINKDEST=$(MACH64)
 $(BUILD64) $(ROOT)/usr/lib/lwp/64:=	LINKDEST=$(MACH64)

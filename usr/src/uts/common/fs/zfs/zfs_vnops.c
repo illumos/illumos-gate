@@ -22,10 +22,15 @@
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2013, 2014 by Delphix. All rights reserved.
  * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2013 Joyent, Inc.  All rights reserved.
  */
 
 /* Portions Copyright 2007 Jeremy Teo */
 /* Portions Copyright 2010 Robert Milkowski */
+
+/*
+ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -633,6 +638,17 @@ zfs_write(vnode_t *vp, uio_t *uio, int ioflag, cred_t *cr, caller_context_t *ct)
 	if (limit == RLIM64_INFINITY || limit > MAXOFFSET_T)
 		limit = MAXOFFSET_T;
 
+	/*
+	 * Pre-fault the pages to ensure slow (eg NFS) pages
+	 * don't hold up txg.
+	 * Skip this if uio contains loaned arc_buf.
+	 */
+	if ((uio->uio_extflg == UIO_XUIO) &&
+	    (((xuio_t *)uio)->xu_type == UIOTYPE_ZEROCOPY))
+		xuio = (xuio_t *)uio;
+	else
+		uio_prefaultpages(n, uio);
+
 	ZFS_ENTER(zfsvfs);
 	ZFS_VERIFY_ZP(zp);
 
@@ -683,17 +699,6 @@ zfs_write(vnode_t *vp, uio_t *uio, int ioflag, cred_t *cr, caller_context_t *ct)
 		ZFS_EXIT(zfsvfs);
 		return (error);
 	}
-
-	/*
-	 * Pre-fault the pages to ensure slow (eg NFS) pages
-	 * don't hold up txg.
-	 * Skip this if uio contains loaned arc_buf.
-	 */
-	if ((uio->uio_extflg == UIO_XUIO) &&
-	    (((xuio_t *)uio)->xu_type == UIOTYPE_ZEROCOPY))
-		xuio = (xuio_t *)uio;
-	else
-		uio_prefaultpages(MIN(n, max_blksz), uio);
 
 	/*
 	 * If in append mode, set the io offset pointer to eof.
@@ -929,9 +934,6 @@ zfs_write(vnode_t *vp, uio_t *uio, int ioflag, cred_t *cr, caller_context_t *ct)
 			break;
 		ASSERT(tx_bytes == nbytes);
 		n -= nbytes;
-
-		if (!xuio && n > 0)
-			uio_prefaultpages(MIN(n, max_blksz), uio);
 	}
 
 	zfs_range_unlock(rl);
@@ -3603,18 +3605,6 @@ top:
 		}
 	}
 
-	vnevent_rename_src(ZTOV(szp), sdvp, snm, ct);
-	if (tzp)
-		vnevent_rename_dest(ZTOV(tzp), tdvp, tnm, ct);
-
-	/*
-	 * notify the target directory if it is not the same
-	 * as source directory.
-	 */
-	if (tdvp != sdvp) {
-		vnevent_rename_dest_dir(tdvp, ct);
-	}
-
 	tx = dmu_tx_create(zfsvfs->z_os);
 	dmu_tx_hold_sa(tx, szp->z_sa_hdl, B_FALSE);
 	dmu_tx_hold_sa(tx, sdzp->z_sa_hdl, B_FALSE);
@@ -3655,8 +3645,12 @@ top:
 		return (error);
 	}
 
-	if (tzp)	/* Attempt to remove the existing target */
+	if (tzp) {
+		/* Attempt to remove the existing target */
 		error = zfs_link_destroy(tdl, tzp, tx, zflg, NULL);
+		if (error == 0)
+			vnevent_rename_dest(ZTOV(tzp), tdvp, tnm, ct);
+	}
 
 	if (error == 0) {
 		error = zfs_link_create(tdl, szp, tx, ZRENAMING);
@@ -3698,6 +3692,13 @@ top:
 	}
 
 	dmu_tx_commit(tx);
+
+	if (error == 0) {
+		vnevent_rename_src(ZTOV(szp), sdvp, snm, ct);
+		/* notify the target dir if it is not the same as source dir */
+		if (tdvp != sdvp)
+			vnevent_rename_dest_dir(tdvp, ct);
+	}
 out:
 	if (zl != NULL)
 		zfs_rename_unlock(&zl);
@@ -4188,6 +4189,8 @@ zfs_putapage(vnode_t *vp, page_t *pp, u_offset_t *offp,
 		    &zp->z_pflags, 8);
 		zfs_tstamp_update_setup(zp, CONTENT_MODIFIED, mtime, ctime,
 		    B_TRUE);
+		err = sa_bulk_update(zp->z_sa_hdl, bulk, count, tx);
+
 		zfs_log_write(zfsvfs->z_log, tx, TX_WRITE, zp, off, len, 0);
 	}
 	dmu_tx_commit(tx);
@@ -4722,10 +4725,6 @@ zfs_delmap(vnode_t *vp, offset_t off, struct as *as, caddr_t addr,
 
 	ASSERT3U(VTOZ(vp)->z_mapcnt, >=, pages);
 	atomic_add_64(&VTOZ(vp)->z_mapcnt, -pages);
-
-	if ((flags & MAP_SHARED) && (prot & PROT_WRITE) &&
-	    vn_has_cached_data(vp))
-		(void) VOP_PUTPAGE(vp, off, len, B_ASYNC, cr, ct);
 
 	return (0);
 }

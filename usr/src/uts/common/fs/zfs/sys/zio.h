@@ -420,7 +420,8 @@ struct zio {
 	const zio_vsd_ops_t *io_vsd_ops;
 
 	uint64_t	io_offset;
-	hrtime_t	io_timestamp;
+	hrtime_t	io_timestamp;	/* time I/O entered zio pipeline */
+	hrtime_t	io_dispatched;	/* time I/O was dispatched to disk */
 	avl_node_t	io_queue_node;
 
 	/* Internal pipeline state */
@@ -448,6 +449,7 @@ struct zio {
 	zio_cksum_report_t *io_cksum_report;
 	uint64_t	io_ena;
 
+	zoneid_t	io_zoneid;	/* zone which originated this I/O */
 	/* Taskq dispatching state */
 	taskq_ent_t	io_tqent;
 };
@@ -514,8 +516,10 @@ extern zio_t *zio_unique_parent(zio_t *cio);
 extern void zio_add_child(zio_t *pio, zio_t *cio);
 
 extern void *zio_buf_alloc(size_t size);
+extern void *zio_buf_alloc_canfail(size_t size);
 extern void zio_buf_free(void *buf, size_t size);
 extern void *zio_data_buf_alloc(size_t size);
+extern void *zio_data_buf_alloc_canfail(size_t size);
 extern void zio_data_buf_free(void *buf, size_t size);
 
 extern void zio_resubmit_stage_async(void *);

@@ -36,11 +36,13 @@ LIBSHELLBASE=../../../lib/libshell
 LIBSHELLSRC=$(LIBSHELLBASE)/common/sh
 
 SRCS=	$(OBJECTS:%.o=$(LIBSHELLSRC)/%.c)
+OBJS=	$(OBJECTS)
 
 LDLIBS += -lshell
 
 # Set common AST build flags (e.g., needed to support the math stuff).
 include ../../../Makefile.ast
+include ../../Makefile.ctf
 
 # 1. Make sure that the -D/-U defines in CFLAGS below are in sync
 # with usr/src/lib/libshell/Makefile.com

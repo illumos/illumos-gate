@@ -68,6 +68,8 @@ typedef struct ctxop {
 	void	(*free_op)(void *, int); /* function which frees the context */
 	void	*arg;		/* argument to above functions, ctx pointer */
 	struct ctxop *next;	/* next context ops */
+	hrtime_t save_ts;		/* timestamp of last save */
+	hrtime_t restore_ts;		/* timestamp of last restore */
 } ctxop_t;
 
 /*

@@ -104,6 +104,9 @@ $(LINTLIB): $$(SRCS)
 lintcheck: $$(SRCS)
 	$(LINT.c) $(LINTCHECKFLAGS) $(SRCS) $(LDLIBS)
 
+$(TYPECHECK): $(TYPECHECK_LIB32) $(TYPECHECK_LIB64)
+	$(TYPECHECK.lib)
+
 clobber: clean
 	-$(RM) $(CLOBBERTARGFILES)
 

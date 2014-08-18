@@ -61,6 +61,9 @@ $(OBJS_DIR)/%.o:		$(SRC)/common/util/i386/%.s
 $(OBJS_DIR)/%.o:		$(UTSBASE)/intel/brand/sn1/%.s
 	$(COMPILE.s) -o $@ $<
 
+$(OBJS_DIR)/%.o:		$(UTSBASE)/intel/brand/sngl/%.s
+	$(COMPILE.s) -o $@ $<
+
 $(OBJS_DIR)/%.o:		$(UTSBASE)/intel/brand/solaris10/%.s
 	$(COMPILE.s) -o $@ $<
 
@@ -174,6 +177,10 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/intel/io/ipmi/%.c
 	$(CTFCONVERT_O)
 
 $(OBJS_DIR)/%.o:		$(UTSBASE)/intel/io/intel_nb5000/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/intel/io/vmxnet/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
@@ -319,6 +326,9 @@ $(LINTS_DIR)/%.ln:		$(SRC)/common/util/i386/%.s
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/intel/brand/sn1/%.s
 	@($(LHEAD) $(LINT.s) $< $(LTAIL))
 
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/intel/brand/sngl/%.s
+	@($(LHEAD) $(LINT.s) $< $(LTAIL))
+
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/intel/brand/solaris10/%.s
 	@($(LHEAD) $(LINT.s) $< $(LTAIL))
 
@@ -455,6 +465,9 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/intel/io/scsi/targets/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/intel/io/vgatext/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/intel/io/vmxnet/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/intel/io/heci/%.c

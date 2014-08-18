@@ -72,6 +72,12 @@ _topo_fini(topo_mod_t *mod)
 	topo_mod_unregister(mod);
 }
 
+/*
+ * Get or set LED state for a particular target attached to an mpt_sas
+ * instance at (Enclosure Number, Slot Number).  The function returns
+ * -1 on error and sets errno to ENOENT _only_ if the /devices node
+ *  (*devctl) does not exist.
+ */
 static int
 do_led_control(topo_mod_t *mod, char *devctl, uint16_t enclosure,
     uint16_t slot, uint8_t led, uint32_t *ledmode, boolean_t set)
@@ -88,8 +94,10 @@ do_led_control(topo_mod_t *mod, char *devctl, uint16_t enclosure,
 	lc.LedStatus = *ledmode;
 
 	if ((fd = open(devctl, (set ? O_RDWR : O_RDONLY))) == -1) {
+		int en = errno;
 		topo_mod_dprintf(mod, "devctl open failed: %s",
 		    strerror(errno));
+		errno = en;
 		return (-1);
 	}
 
@@ -103,9 +111,11 @@ do_led_control(topo_mod_t *mod, char *devctl, uint16_t enclosure,
 			 */
 			lc.LedStatus = 0;
 		} else {
+			int en = errno;
 			topo_mod_dprintf(mod, "led control ioctl failed: %s",
 			    strerror(errno));
 			(void) close(fd);
+			errno = en;
 			return (-1);
 		}
 	}
@@ -113,6 +123,7 @@ do_led_control(topo_mod_t *mod, char *devctl, uint16_t enclosure,
 	*ledmode = lc.LedStatus ? TOPO_LED_STATE_ON : TOPO_LED_STATE_OFF;
 
 	(void) close(fd);
+	errno = 0;
 	return (0);
 }
 
@@ -127,7 +138,8 @@ mptsas_led_mode(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 	char *driver = NULL, *devctl = NULL;
 	uint32_t enclosure, slot;
 	uint8_t mptsas_led;
-	boolean_t set;
+	boolean_t set, done;
+	char *elem, *lastp;
 
 	if (vers > TOPO_METH_MPTSAS_LED_MODE_VERSION)
 		return (topo_mod_seterrno(mod, ETOPO_METHOD_VERNEW));
@@ -197,8 +209,41 @@ mptsas_led_mode(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 		topo_mod_dprintf(mod, "%s: Getting LED mode\n", __func__);
 	}
 
-	if (do_led_control(mod, devctl, enclosure, slot, mptsas_led, &ledmode,
-	    set) != 0) {
+	/*
+	 * devctl is a (potentially) pipe-separated list of different device
+	 * paths to try.
+	 */
+	if ((elem = topo_mod_strsplit(mod, devctl, "|", &lastp)) == NULL) {
+		topo_mod_dprintf(mod, "%s: could not parse devctl list",
+		    __func__);
+		ret = topo_mod_seterrno(mod, EMOD_UNKNOWN);
+		goto out;
+	}
+	done = B_FALSE;
+	do {
+		topo_mod_dprintf(mod, "%s: trying mpt_sas instance at %s\n",
+		    __func__, elem);
+
+		ret = do_led_control(mod, elem, enclosure, slot,
+		    mptsas_led, &ledmode, set);
+
+		/*
+		 * Only try further devctl paths from the list if this one
+		 * was not found:
+		 */
+		if (ret == 0 || errno != ENOENT) {
+			done = B_TRUE;
+		} else {
+			topo_mod_dprintf(mod, "%s: instance not found\n",
+			    __func__);
+		}
+
+		topo_mod_strfree(mod, elem);
+
+	} while (!done && (elem = topo_mod_strsplit(mod, NULL, "|",
+	    &lastp)) != NULL);
+
+	if (ret != 0) {
 		topo_mod_dprintf(mod, "%s: do_led_control failed", __func__);
 		ret = topo_mod_seterrno(mod, EMOD_UNKNOWN);
 		goto out;

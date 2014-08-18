@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
- * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -433,6 +433,7 @@ dtracemdb_bufsnap(dtrace_buffer_t *which, dtrace_bufdesc_t *desc)
 	desc->dtbd_size = bufsize;
 	desc->dtbd_drops = buf.dtb_drops;
 	desc->dtbd_errors = buf.dtb_errors;
+	desc->dtbd_timestamp = gethrtime();
 
 	return (0);
 }

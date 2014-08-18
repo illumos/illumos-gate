@@ -22,6 +22,9 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2014, Joyent, Inc.
+ */
 
 /*
  * Data-Link Provider Interface (Version 2)
@@ -51,7 +54,7 @@
 
 #include "libdlpi_impl.h"
 
-static int i_dlpi_open(const char *, int *, uint_t, boolean_t);
+static int i_dlpi_open(const char *, const char *, int *, uint_t, boolean_t);
 static int i_dlpi_style1_open(dlpi_impl_t *);
 static int i_dlpi_style2_open(dlpi_impl_t *);
 static int i_dlpi_checkstyle(dlpi_impl_t *, t_uscalar_t);
@@ -130,7 +133,8 @@ dlpi_walk(dlpi_walkfunc_t *fn, void *arg, uint_t flags)
 }
 
 int
-dlpi_open(const char *linkname, dlpi_handle_t *dhp, uint_t flags)
+dlpi_open_zone(const char *linkname, const char *zonename, dlpi_handle_t *dhp,
+    uint_t flags)
 {
 	int		retval, on = 1;
 	ifspec_t	ifsp;
@@ -163,6 +167,16 @@ dlpi_open(const char *linkname, dlpi_handle_t *dhp, uint_t flags)
 	dip->dli_note_processing = B_FALSE;
 	if (getenv("DLPI_DEVONLY") != NULL)
 		dip->dli_oflags |= DLPI_DEVONLY;
+
+	if (zonename == NULL) {
+		dip->dli_zonename[0] = '\0';
+	} else {
+		if (strlcpy(dip->dli_zonename, zonename,
+		    sizeof (dip->dli_zonename)) >= sizeof (dip->dli_zonename)) {
+			free(dip);
+			return (DLPI_EZONENAMEINVAL);
+		}
+	}
 
 	/* Copy linkname provided to the function. */
 	if (strlcpy(dip->dli_linkname, linkname, sizeof (dip->dli_linkname)) >=
@@ -235,6 +249,12 @@ dlpi_open(const char *linkname, dlpi_handle_t *dhp, uint_t flags)
 
 	*dhp = (dlpi_handle_t)dip;
 	return (DLPI_SUCCESS);
+}
+
+int
+dlpi_open(const char *linkname, dlpi_handle_t *dhp, uint_t flags)
+{
+	return (dlpi_open_zone(linkname, NULL, dhp, flags));
 }
 
 void
@@ -1013,6 +1033,15 @@ dlpi_iftype(uint_t dlpitype)
  *	/dev		- if DLPI_DEVONLY is specified, or if there is no
  *			  data-link with the specified name (could be /dev/ip)
  *
+ * If a zone's name has been specified, eg. via dlpi_open_zone, then we instead
+ * will check in:
+ *
+ * 	/dev/ipnet/zone/%z/	- if DLPI_DEVIPNET is specified
+ * 	/dev/net/zone/%z/	- if a data-link with the specified name exists.
+ *
+ * When a zone name is specified, all of the fallback procedures that we opt for
+ * in the normal case are not used.
+ *
  * In particular, if DLPI_DEVIPNET is not specified, this function is used to
  * open a data-link node, or "/dev/ip" node. It is usually be called firstly
  * with style1 being B_TRUE, and if that fails and the return value is not
@@ -1040,7 +1069,8 @@ dlpi_iftype(uint_t dlpitype)
  * the second style-2 open attempt.
  */
 static int
-i_dlpi_open(const char *provider, int *fd, uint_t flags, boolean_t style1)
+i_dlpi_open(const char *provider, const char *zonename, int *fd, uint_t flags,
+    boolean_t style1)
 {
 	char		path[MAXPATHLEN];
 	int		oflags;
@@ -1051,7 +1081,13 @@ i_dlpi_open(const char *provider, int *fd, uint_t flags, boolean_t style1)
 		oflags |= O_EXCL;
 
 	if (flags & DLPI_DEVIPNET) {
-		(void) snprintf(path, sizeof (path), "/dev/ipnet/%s", provider);
+		if (*zonename != '\0') {
+			(void) snprintf(path, sizeof (path),
+			    "/dev/ipnet/zone/%s/%s", zonename, provider);
+		} else {
+			(void) snprintf(path, sizeof (path), "/dev/ipnet/%s",
+			    provider);
+		}
 		if ((*fd = open(path, oflags)) != -1)
 			return (DLPI_SUCCESS);
 		else
@@ -1070,7 +1106,13 @@ i_dlpi_open(const char *provider, int *fd, uint_t flags, boolean_t style1)
 		if (dlpi_parselink(provider, driver, &ppa) != DLPI_SUCCESS)
 			goto fallback;
 
-		(void) snprintf(path, sizeof (path), "/dev/net/%s", provider);
+		if (*zonename != '\0') {
+			(void) snprintf(path, sizeof (path),
+			    "/dev/net/zone/%s/%s", zonename, provider);
+		} else {
+			(void) snprintf(path, sizeof (path), "/dev/net/%s",
+			    provider);
+		}
 		if ((*fd = open(path, oflags)) != -1)
 			return (DLPI_SUCCESS);
 
@@ -1130,7 +1172,8 @@ i_dlpi_style1_open(dlpi_impl_t *dip)
 	int		retval, save_errno;
 	int		fd;
 
-	retval = i_dlpi_open(dip->dli_linkname, &fd, dip->dli_oflags, B_TRUE);
+	retval = i_dlpi_open(dip->dli_linkname, dip->dli_zonename, &fd,
+	    dip->dli_oflags, B_TRUE);
 	if (retval != DLPI_SUCCESS)
 		return (retval);
 	dip->dli_fd = fd;
@@ -1153,7 +1196,8 @@ i_dlpi_style2_open(dlpi_impl_t *dip)
 	int 		fd;
 	int 		retval, save_errno;
 
-	retval = i_dlpi_open(dip->dli_provider, &fd, dip->dli_oflags, B_FALSE);
+	retval = i_dlpi_open(dip->dli_provider, dip->dli_zonename, &fd,
+	    dip->dli_oflags, B_FALSE);
 	if (retval != DLPI_SUCCESS)
 		return (retval);
 	dip->dli_fd = fd;
@@ -1571,7 +1615,8 @@ static const char *libdlpi_errlist[] = {
 						/* DLPI_ENOTENOTSUP */
 	"invalid DLPI notification type",	/* DLPI_ENOTEINVAL */
 	"invalid DLPI notification id",		/* DLPI_ENOTEIDINVAL */
-	"DLPI_IPNETINFO not supported"		/* DLPI_EIPNETINFONOTSUP */
+	"DLPI_IPNETINFO not supported",		/* DLPI_EIPNETINFONOTSUP */
+	"invalid zone name"			/* DLPI_EZONENAMEINVAL */
 };
 
 const char *

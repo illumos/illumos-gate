@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
- * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -968,6 +968,7 @@ create_zfs_zonepath(char *zonepath)
 	zfs_handle_t	*zhp;
 	char		zfs_name[MAXPATHLEN];
 	nvlist_t	*props = NULL;
+	int		i;
 
 	if (path2name(zonepath, zfs_name, sizeof (zfs_name)) != Z_OK)
 		return;
@@ -1004,9 +1005,20 @@ create_zfs_zonepath(char *zonepath)
 
 	nvlist_free(props);
 
-	if (zfs_mount(zhp, NULL, 0) != 0) {
+	/*
+	 * A monitoring tool might race with us and touch the mountpoint just
+	 * as we're trying to mount, blocking the mount. We wait and retry a
+	 * few times to workaround this race.
+	 */
+	for (i = 0; i < 5; i++) {
+		if (zfs_mount(zhp, NULL, 0) == 0)
+			break;
 		(void) fprintf(stderr, gettext("cannot mount ZFS dataset %s: "
 		    "%s\n"), zfs_name, libzfs_error_description(g_zfs));
+		(void) sleep(1);
+	}
+
+	if (i >= 5) {
 		(void) zfs_destroy(zhp, B_FALSE);
 	} else {
 		if (chmod(zonepath, S_IRWXU) != 0) {

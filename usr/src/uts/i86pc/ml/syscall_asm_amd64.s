@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
  */
 
 #include <sys/asm_linkage.h>
@@ -800,6 +800,13 @@ _syscall32_save:
 	 * more succinctly:
 	 *
 	 *	SA(MAXSYSARGS * sizeof (long)) == 64
+	 *
+	 * Note, this space is used both to copy in the arguments from user
+	 * land, but also to as part of the old UNIX style syscall_ap() method.
+	 * syscall_entry expects that we do not change the values of this space
+	 * that we give it. However, this means that when we end up in the more
+	 * recent model of passing the arguments based on the calling
+	 * conventions, we'll need to save an additional 16 bytes of stack.
 	 */
 #define	SYS_DROP	64			/* drop for args */
 	subq	$SYS_DROP, %rsp
@@ -827,12 +834,16 @@ _syscall32_save:
 	 */
 
 	movq	%rax, %rbx
-	movl	0(%rsp), %edi
-	movl	8(%rsp), %esi
-	movl	0x10(%rsp), %edx
-	movl	0x18(%rsp), %ecx
-	movl	0x20(%rsp), %r8d
-	movl	0x28(%rsp), %r9d
+	movl	0x0(%rsp), %edi		/* arg0 */
+	movl	0x8(%rsp), %esi		/* arg1 */
+	movl	0x10(%rsp), %edx	/* arg2 */
+	movl	0x38(%rsp), %eax	/* arg7 load */
+	movl	0x18(%rsp), %ecx	/* arg3 */
+	pushq	%rax			/* arg7 saved to stack */
+	movl	0x28(%rsp), %r8d	/* arg4 */
+	movl	0x38(%rsp), %eax	/* arg6 load */
+	movl	0x30(%rsp), %r9d	/* arg5 */
+	pushq	%rax			/* arg6 saved to stack */
 
 	call	*SY_CALLC(%rbx)
 
@@ -1079,15 +1090,20 @@ sys_sysenter()
 	/*
 	 * Fetch the arguments copied onto the kernel stack and put
 	 * them in the right registers to invoke a C-style syscall handler.
-	 * %rax contains the handler address.
+	 * %rax contains the handler address. For the last two arguments, we
+	 * push them onto the stack -- we can't clobber the old arguments.
 	 */
 	movq	%rax, %rbx
-	movl	0(%rsp), %edi
-	movl	8(%rsp), %esi
-	movl	0x10(%rsp), %edx
-	movl	0x18(%rsp), %ecx
-	movl	0x20(%rsp), %r8d
-	movl	0x28(%rsp), %r9d
+	movl	0x0(%rsp), %edi		/* arg0 */
+	movl	0x8(%rsp), %esi		/* arg1 */
+	movl	0x10(%rsp), %edx	/* arg2 */
+	movl	0x38(%rsp), %eax	/* arg7 load */
+	movl	0x18(%rsp), %ecx	/* arg3 */
+	pushq	%rax			/* arg7 saved to stack */
+	movl	0x28(%rsp), %r8d	/* arg4 */
+	movl	0x38(%rsp), %eax	/* arg6 load */
+	movl	0x30(%rsp), %r9d	/* arg5 */
+	pushq	%rax			/* arg6 saved to stack */
 
 	call	*SY_CALLC(%rbx)
 
@@ -1159,6 +1175,48 @@ sys_sysenter()
 	SET_SIZE(brand_sys_sysenter)
 
 #endif	/* __lint */
+ 
+#if defined(__lint)
+/*
+ * System call via an int80.  This entry point is only used by the Linux
+ * application environment.  Unlike the other entry points, there is no
+ * default action to take if no callback is registered for this process.
+ */
+void
+sys_int80()
+{}
+
+#else	/* __lint */
+
+	ENTRY_NP(brand_sys_int80)
+	SWAPGS				/* kernel gsbase */
+	XPV_TRAP_POP
+	BRAND_CALLBACK(BRAND_CB_INT80, BRAND_URET_FROM_INTR_STACK())
+	SWAPGS				/* user gsbase */
+	jmp	nopop_int80
+
+	ENTRY_NP(sys_int80)
+	/*
+	 * We hit an int80, but this process isn't of a brand with an int80
+	 * handler.  Bad process!  Make it look as if the INT failed.
+	 * Modify %rip to point before the INT, push the expected error
+	 * code and fake a GP fault. Note on 64-bit hypervisor we need
+	 * to undo the XPV_TRAP_POP and push rcx and r11 back on the stack
+	 * because gptrap will pop them again with its own XPV_TRAP_POP.
+	 */
+	XPV_TRAP_POP
+nopop_int80:
+	subq	$2, (%rsp)	/* int insn 2-bytes */
+	pushq	$_CONST(_MUL(T_INT80, GATE_DESC_SIZE) + 2)
+#if defined(__xpv)
+	push	%r11
+	push	%rcx
+#endif
+	jmp	gptrap			/ GP fault
+	SET_SIZE(sys_int80)
+	SET_SIZE(brand_sys_int80)
+#endif	/* __lint */
+
 
 /*
  * This is the destination of the "int $T_SYSCALLINT" interrupt gate, used by

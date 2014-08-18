@@ -297,7 +297,7 @@ retry:
 		 */
 		timep = (quick ? &create_timeout : NULL);
 		cl = clnt_create_timed(list[i].host, MOUNTPROG, vers,
-		    "datagram_n", timep);
+		    NULL, timep);
 		/*
 		 * Do not print any error messages in case of forced
 		 * unmount.

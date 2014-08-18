@@ -22,6 +22,7 @@
 
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013, Joyent Inc. All rights reserved.
  */
 
 /*
@@ -136,6 +137,7 @@ complex_piece_func(int cp_type, const char *str, complex_property_ptr_t cp_next)
 %token OPEN_PAREN CLOSE_PAREN COMMA DATASET LIMITPRIV BOOTARGS BRAND PSET PCAP
 %token MCAP NCPUS IMPORTANCE SHARES MAXLWPS MAXSHMMEM MAXSHMIDS MAXMSGIDS
 %token MAXSEMIDS LOCKED SWAP SCHED CLEAR DEFROUTER ADMIN USER AUTHS MAXPROCS
+%token ZFSPRI MAC VLANID GNIC NPROP UUID
 
 %type <strval> TOKEN EQUAL OPEN_SQ_BRACKET CLOSE_SQ_BRACKET
     property_value OPEN_PAREN CLOSE_PAREN COMMA simple_prop_val
@@ -145,7 +147,7 @@ complex_piece_func(int cp_type, const char *str, complex_property_ptr_t cp_next)
 %type <ival> property_name SPECIAL RAW DIR OPTIONS TYPE ADDRESS PHYSICAL NAME
     MATCH ZONENAME ZONEPATH AUTOBOOT POOL LIMITPRIV BOOTARGS VALUE PRIV LIMIT
     ACTION BRAND SCHED IPTYPE DEFROUTER HOSTID USER AUTHS FS_ALLOWED
-    ALLOWED_ADDRESS
+    ALLOWED_ADDRESS MAC VLANID GNIC NPROP UUID
 %type <cmd> command
 %type <cmd> add_command ADD
 %type <cmd> cancel_command CANCEL
@@ -650,6 +652,24 @@ info_command:	INFO
 		$$->cmd_res_type = RT_FS_ALLOWED;
 		$$->cmd_prop_nv_pairs = 0;
 	}
+	|	INFO UUID
+	{
+		if (($$ = alloc_cmd()) == NULL)
+			YYERROR;
+		cmd = $$;
+		$$->cmd_handler = &info_func;
+		$$->cmd_res_type = RT_UUID;
+		$$->cmd_prop_nv_pairs = 0;
+	}
+	|	INFO ZFSPRI
+	{
+		if (($$ = alloc_cmd()) == NULL)
+			YYERROR;
+		cmd = $$;
+		$$->cmd_handler = &info_func;
+		$$->cmd_res_type = RT_ZFSPRI;
+		$$->cmd_prop_nv_pairs = 0;
+	}
 	|	INFO resource_type property_name EQUAL property_value
 	{
 		if (($$ = alloc_cmd()) == NULL)
@@ -734,6 +754,19 @@ remove_command: REMOVE
 		$$->cmd_prop_name[0] = $2;
 		$$->cmd_property_ptr[0] = &property[0];
 	}
+	| REMOVE TOKEN property_name property_value
+	{
+		if (($$ = alloc_cmd()) == NULL)
+			YYERROR;
+		cmd = $$;
+		$$->cmd_handler = &remove_func;
+		$$->cmd_argc = 1;
+		$$->cmd_argv[0] = claim_token($2);
+		$$->cmd_argv[1] = NULL;
+		$$->cmd_prop_nv_pairs = 1;
+		$$->cmd_prop_name[0] = $3;
+		$$->cmd_property_ptr[0] = &property[0];
+	}
 	| REMOVE resource_type property_name EQUAL property_value
 	{
 		if (($$ = alloc_cmd()) == NULL)
@@ -743,6 +776,20 @@ remove_command: REMOVE
 		$$->cmd_res_type = $2;
 		$$->cmd_prop_nv_pairs = 1;
 		$$->cmd_prop_name[0] = $3;
+		$$->cmd_property_ptr[0] = &property[0];
+	}
+	| REMOVE TOKEN resource_type property_name EQUAL property_value
+	{
+		if (($$ = alloc_cmd()) == NULL)
+			YYERROR;
+		cmd = $$;
+		$$->cmd_handler = &remove_func;
+		$$->cmd_res_type = $3;
+		$$->cmd_argc = 1;
+		$$->cmd_argv[0] = claim_token($2);
+		$$->cmd_argv[1] = NULL;
+		$$->cmd_prop_nv_pairs = 1;
+		$$->cmd_prop_name[0] = $4;
 		$$->cmd_property_ptr[0] = &property[0];
 	}
 	| REMOVE resource_type property_name EQUAL property_value property_name EQUAL property_value
@@ -758,6 +805,22 @@ remove_command: REMOVE
 		$$->cmd_prop_name[1] = $6;
 		$$->cmd_property_ptr[1] = &property[1];
 	}
+	| REMOVE TOKEN resource_type property_name EQUAL property_value property_name EQUAL property_value
+	{
+		if (($$ = alloc_cmd()) == NULL)
+			YYERROR;
+		cmd = $$;
+		$$->cmd_handler = &remove_func;
+		$$->cmd_res_type = $3;
+		$$->cmd_argc = 1;
+		$$->cmd_argv[0] = claim_token($2);
+		$$->cmd_argv[1] = NULL;
+		$$->cmd_prop_nv_pairs = 2;
+		$$->cmd_prop_name[0] = $4;
+		$$->cmd_property_ptr[0] = &property[0];
+		$$->cmd_prop_name[1] = $7;
+		$$->cmd_property_ptr[1] = &property[1];
+	}
 	| REMOVE resource_type property_name EQUAL property_value property_name EQUAL property_value property_name EQUAL property_value
 	{
 		if (($$ = alloc_cmd()) == NULL)
@@ -771,6 +834,24 @@ remove_command: REMOVE
 		$$->cmd_prop_name[1] = $6;
 		$$->cmd_property_ptr[1] = &property[1];
 		$$->cmd_prop_name[2] = $9;
+		$$->cmd_property_ptr[2] = &property[2];
+	}
+	| REMOVE TOKEN resource_type property_name EQUAL property_value property_name EQUAL property_value property_name EQUAL property_value
+	{
+		if (($$ = alloc_cmd()) == NULL)
+			YYERROR;
+		cmd = $$;
+		$$->cmd_handler = &remove_func;
+		$$->cmd_res_type = $3;
+		$$->cmd_argc = 1;
+		$$->cmd_argv[0] = claim_token($2);
+		$$->cmd_argv[1] = NULL;
+		$$->cmd_prop_nv_pairs = 3;
+		$$->cmd_prop_name[0] = $4;
+		$$->cmd_property_ptr[0] = &property[0];
+		$$->cmd_prop_name[1] = $7;
+		$$->cmd_property_ptr[1] = &property[1];
+		$$->cmd_prop_name[2] = $10;
 		$$->cmd_property_ptr[2] = &property[2];
 	}
 
@@ -976,6 +1057,10 @@ property_name: SPECIAL	{ $$ = PT_SPECIAL; }
 	| ALLOWED_ADDRESS	{ $$ = PT_ALLOWED_ADDRESS; }
 	| PHYSICAL	{ $$ = PT_PHYSICAL; }
 	| DEFROUTER	{ $$ = PT_DEFROUTER; }
+	| MAC		{ $$ = PT_MAC; }
+	| VLANID	{ $$ = PT_VLANID; }
+	| GNIC		{ $$ = PT_GNIC; }
+	| NPROP		{ $$ = PT_NPROP; }
 	| NAME		{ $$ = PT_NAME; }
 	| VALUE		{ $$ = PT_VALUE; }
 	| MATCH		{ $$ = PT_MATCH; }
@@ -999,6 +1084,8 @@ property_name: SPECIAL	{ $$ = PT_SPECIAL; }
 	| USER		{ $$ = PT_USER; }
 	| AUTHS 	{ $$ = PT_AUTHS; }
 	| FS_ALLOWED	{ $$ = PT_FS_ALLOWED; }
+	| UUID		{ $$ = PT_UUID; }
+	| ZFSPRI	{ $$ = PT_ZFSPRI; }
 
 /*
  * The grammar builds data structures from the bottom up.  Thus various

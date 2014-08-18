@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011, Joyent Inc. All rights reserved.
  */
 
 /*
@@ -84,6 +85,8 @@ typedef struct dlmgmt_dlconf_s {
 	avl_node_t		ld_node;
 } dlmgmt_dlconf_t;
 
+#define ZONE_LOCK	"/etc/dladm/zone.lck"
+
 extern boolean_t	debug;
 extern const char	*progname;
 extern char		cachefile[];
@@ -138,7 +141,7 @@ void		dlmgmt_handler(void *, char *, size_t, door_desc_t *, uint_t);
 void		dlmgmt_log(int, const char *, ...);
 int		dlmgmt_write_db_entry(const char *, dlmgmt_link_t *, uint32_t);
 int		dlmgmt_delete_db_entry(dlmgmt_link_t *, uint32_t);
-int 		dlmgmt_db_init(zoneid_t);
+int 		dlmgmt_db_init(zoneid_t, char *);
 void		dlmgmt_db_fini(zoneid_t);
 
 #ifdef  __cplusplus

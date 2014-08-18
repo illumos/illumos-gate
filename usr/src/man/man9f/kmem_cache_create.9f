@@ -336,7 +336,7 @@ requirement is that the client must free the object (using
 this, so programming errors will lead to hard-to-find bugs.
 .sp
 .LP
-A driver should call \fBkmem_cache_create()\fR at the time of \fB_fini\fR(9E)
+A driver should call \fBkmem_cache_create()\fR at the time of \fB_init\fR(9E)
 or \fBattach\fR(9E), and call the corresponding \fBkmem_cache_destroy()\fR at
 the time of \fB_fini\fR(9E) or \fBdetach\fR(9E).
 .sp

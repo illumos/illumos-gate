@@ -114,7 +114,7 @@ select_datalink(const char *linkname, void *arg)
  * about the datalink useful for building the proper packet filters.
  */
 boolean_t
-open_datalink(dlpi_handle_t *dhp, const char *linkname)
+open_datalink(dlpi_handle_t *dhp, const char *linkname, const char *zonename)
 {
 	int retval;
 	int flags = DLPI_PASSIVE | DLPI_RAW;
@@ -122,6 +122,9 @@ open_datalink(dlpi_handle_t *dhp, const char *linkname)
 	dlpi_info_t dlinfo;
 
 	if (linkname == NULL) {
+		if (zonename != NULL)
+			pr_err("a datalink must be specified with a zone name");
+
 		/*
 		 * Select a datalink to use by default.  Prefer datalinks that
 		 * are plumbed by IP.
@@ -145,7 +148,8 @@ open_datalink(dlpi_handle_t *dhp, const char *linkname)
 		flags |= DLPI_DEVIPNET;
 	if (Iflg || strcmp(linkname, "lo0") == 0)
 		flags |= DLPI_IPNETINFO;
-	if ((retval = dlpi_open(linkname, dhp, flags)) != DLPI_SUCCESS) {
+	if ((retval = dlpi_open_zone(linkname, zonename, dhp,
+	    flags)) != DLPI_SUCCESS) {
 		pr_err("cannot open \"%s\": %s", linkname,
 		    dlpi_strerror(retval));
 	}

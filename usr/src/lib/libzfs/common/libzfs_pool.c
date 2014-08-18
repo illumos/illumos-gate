@@ -270,6 +270,12 @@ zpool_get_prop(zpool_handle_t *zhp, zpool_prop_t prop, char *buf, size_t len,
 	case PROP_TYPE_NUMBER:
 		intval = zpool_get_prop_int(zhp, prop, &src);
 
+		if (literal && prop != ZPOOL_PROP_HEALTH) {
+			(void) snprintf(buf, len, "%llu",
+			    (u_longlong_t)intval);
+			break;
+		}
+
 		switch (prop) {
 		case ZPOOL_PROP_SIZE:
 		case ZPOOL_PROP_ALLOCATED:
@@ -328,6 +334,7 @@ zpool_get_prop(zpool_handle_t *zhp, zpool_prop_t prop, char *buf, size_t len,
 		default:
 			(void) snprintf(buf, len, "%llu", intval);
 		}
+
 		break;
 
 	case PROP_TYPE_INDEX:

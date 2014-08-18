@@ -21,7 +21,7 @@
 
 # Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
-# Copyright (c) 2012 Joyent, Inc.  All rights reserved.
+# Copyright (c) 2014 Joyent, Inc.  All rights reserved.
 # Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright (c) 2013 DEY Storage Systems, Inc. All rights reserved.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
@@ -29,8 +29,8 @@
 include ../Makefile.master
 
 #
-#	Note that the commands 'lp', and 'perl' are first in
-#	the list, violating alphabetical order.  This is because they are very
+#	Note that if the 'lp' command were built, it would be first in
+#	the list, violating alphabetical order.  This is because it is very
 #	long-running and should be given the most wall-clock time for a
 #	parallel build.
 #
@@ -51,7 +51,6 @@ FIRST_SUBDIRS=		\
 COMMON_SUBDIRS=		\
 	allocate	\
 	availdevs	\
-	lp		\
 	perl		\
 	Adm		\
 	abi		\
@@ -95,6 +94,7 @@ COMMON_SUBDIRS=		\
 	cmd-crypto	\
 	cmd-inet	\
 	col		\
+	column		\
 	compress	\
 	consadm		\
 	coreadm		\
@@ -104,6 +104,7 @@ COMMON_SUBDIRS=		\
 	crypt		\
 	csh		\
 	csplit		\
+	ctfdiff		\
 	ctrun		\
 	ctstat		\
 	ctwatch		\
@@ -187,7 +188,6 @@ COMMON_SUBDIRS=		\
 	groups		\
 	grpck		\
 	gss		\
-	hal		\
 	halt		\
 	head		\
 	hostid		\
@@ -225,7 +225,6 @@ COMMON_SUBDIRS=		\
 	kvmstat		\
 	last		\
 	lastcomm	\
-	latencytop	\
 	ldap		\
 	ldapcachemgr	\
 	lgrpinfo	\
@@ -246,7 +245,6 @@ COMMON_SUBDIRS=		\
 	look		\
 	ls		\
 	luxadm		\
-	lvm		\
 	mach		\
 	machid		\
 	mail		\
@@ -281,6 +279,7 @@ COMMON_SUBDIRS=		\
 	news		\
 	newtask		\
 	nice		\
+	nicstat		\
 	nl		\
 	nlsadmin	\
 	nohup		\
@@ -313,7 +312,6 @@ COMMON_SUBDIRS=		\
 	plockstat	\
 	pr		\
 	prctl		\
-	print		\
 	printf		\
 	priocntl	\
 	profiles	\
@@ -331,7 +329,6 @@ COMMON_SUBDIRS=		\
 	pwck		\
 	pwconv		\
 	pwd		\
-	pyzfs		\
 	raidctl		\
 	ramdiskadm	\
 	rcap		\
@@ -436,6 +433,8 @@ COMMON_SUBDIRS=		\
 	valtools	\
 	vgrind		\
 	vi		\
+	vndadm		\
+	vndstat		\
 	volcheck	\
 	volrmmount	\
 	vrrpadm		\
@@ -502,7 +501,6 @@ sparc_SUBDIRS=		\
 # (see previous comment about 'lp'.)
 #
 MSGSUBDIRS=		\
-	lp		\
 	abi		\
 	acctadm		\
 	allocate	\
@@ -614,7 +612,6 @@ MSGSUBDIRS=		\
 	logins		\
 	ls		\
 	luxadm		\
-	lvm		\
 	mailx		\
 	man		\
 	mesg		\
@@ -644,7 +641,6 @@ MSGSUBDIRS=		\
 	power		\
 	pr		\
 	praudit		\
-	print		\
 	profiles	\
 	projadd		\
 	projects	\
@@ -655,7 +651,6 @@ MSGSUBDIRS=		\
 	ptools		\
 	pwconv		\
 	pwd		\
-	pyzfs		\
 	raidctl		\
 	ramdiskadm	\
 	rcap		\

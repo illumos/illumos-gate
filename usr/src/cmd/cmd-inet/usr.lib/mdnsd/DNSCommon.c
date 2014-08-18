@@ -1485,7 +1485,7 @@ mDNSlocal const mDNSu8 *getOptRdata(const mDNSu8 *ptr, const mDNSu8 *const limit
 			ptr += sizeof(mDNSs32);
 			nread += sizeof(mDNSs32);
 			}
-		else { LogMsg("ERROR: getOptRdata - unknown opt %d", opt->opt); return mDNSNULL; }
+		else { return mDNSNULL; }
 		opt++;  // increment pointer into rdatabody
 		}
 	

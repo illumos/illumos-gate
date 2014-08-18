@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 /*
- * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
  */
 
 /*
@@ -791,6 +791,7 @@ static struct aux_id aux_arr[] = {
 	{ AT_BASE,		"AT_BASE",		at_null	},
 	{ AT_FLAGS,		"AT_FLAGS",		at_null	},
 	{ AT_ENTRY,		"AT_ENTRY",		at_null	},
+	{ AT_RANDOM,		"AT_RANDOM",		at_null	},
 	{ AT_SUN_UID,		"AT_SUN_UID",		at_uid	},
 	{ AT_SUN_RUID,		"AT_SUN_RUID",		at_uid	},
 	{ AT_SUN_GID,		"AT_SUN_GID",		at_gid	},
@@ -810,6 +811,7 @@ static struct aux_id aux_arr[] = {
 	{ AT_SUN_AUXFLAGS,	"AT_SUN_AUXFLAGS",	at_flags },
 	{ AT_SUN_EMULATOR,	"AT_SUN_EMULATOR",	at_str	},
 	{ AT_SUN_BRANDNAME,	"AT_SUN_BRANDNAME",	at_str	},
+	{ AT_SUN_BRAND_NROOT,	"AT_SUN_BRAND_NROOT",	at_str	},
 	{ AT_SUN_BRAND_AUX1,	"AT_SUN_BRAND_AUX1",	at_null	},
 	{ AT_SUN_BRAND_AUX2,	"AT_SUN_BRAND_AUX2",	at_null	},
 	{ AT_SUN_BRAND_AUX3,	"AT_SUN_BRAND_AUX3",	at_null	}

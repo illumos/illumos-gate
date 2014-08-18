@@ -71,6 +71,9 @@ struct	message {
 	char	logname[LLEN];
 };
 
+/* anything below here can be changed */
+
+#define	SYSCRONDIR	"/etc/cron.d/crontabs"
 #define	CRONDIR		"/var/spool/cron/crontabs"
 #define	ATDIR		"/var/spool/cron/atjobs"
 #define	ACCTFILE	"/var/cron/log"

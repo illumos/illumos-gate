@@ -21,6 +21,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2013 Joyent, Inc.  All rights reserved.
  */
 
 /*
@@ -390,8 +391,8 @@ i_mac_stat_create(void *handle, const char *modname, const char *statname,
 	kstat_t		*ksp;
 	kstat_named_t	*knp;
 
-	ksp = kstat_create(modname, 0, statname, "net",
-	    KSTAT_TYPE_NAMED, count, 0);
+	ksp = kstat_create_zone(modname, 0, statname, "net",
+	    KSTAT_TYPE_NAMED, count, 0, getzoneid());
 
 	if (ksp == NULL)
 		return (NULL);
@@ -948,9 +949,9 @@ mac_driver_stat_create(mac_impl_t *mip)
 	major_t		major = getmajor(mip->mi_phy_dev);
 
 	count = MAC_MOD_NKSTAT + MAC_NKSTAT + mip->mi_type->mt_statcount;
-	ksp = kstat_create((const char *)ddi_major_to_name(major),
+	ksp = kstat_create_zone((const char *)ddi_major_to_name(major),
 	    getminor(mip->mi_phy_dev) - 1, MAC_KSTAT_NAME,
-	    MAC_KSTAT_CLASS, KSTAT_TYPE_NAMED, count, 0);
+	    MAC_KSTAT_CLASS, KSTAT_TYPE_NAMED, count, 0, getzoneid());
 	if (ksp == NULL)
 		return;
 

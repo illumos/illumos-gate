@@ -24,6 +24,7 @@
 
 /*
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2014, Joyent, Inc. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -3177,6 +3178,7 @@ job_control_type(int cmd)
 	case JAGENT:	/* Obsolete */
 	case JTRUN:	/* Obsolete */
 	case JXTPROTO:	/* Obsolete */
+	case TIOCSETLD:
 		return (JCSETP);
 	}
 
@@ -8311,7 +8313,7 @@ chkrd:
 	}
 
 	*reventsp = (short)retevents;
-	if (retevents) {
+	if (retevents && !(events & POLLET)) {
 		if (headlocked)
 			mutex_exit(&stp->sd_lock);
 		return (0);

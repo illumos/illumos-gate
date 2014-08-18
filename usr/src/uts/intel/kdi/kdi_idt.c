@@ -217,7 +217,8 @@ kdi_idt_patch(caddr_t code, size_t sz)
 			continue;	/* uses kernel's handler */
 
 		gd = &kdi_idt[i];
-		patch = (uchar_t *)GATESEG_GETOFFSET(gd) + KDI_MSR_PATCHOFF;
+		patch = ((uchar_t *)(uintptr_t)GATESEG_GETOFFSET(gd)) +
+		    KDI_MSR_PATCHOFF;
 
 		/*
 		 * We can't ASSERT that there's a nop here, because this may be

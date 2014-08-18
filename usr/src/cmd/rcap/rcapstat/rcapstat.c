@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -71,6 +72,8 @@ typedef struct col {
 
 static col_t *col_head;
 static int ncol;
+
+#define	RCAPD_NA	"rcapd is not active (try zonememstat)\n"
 
 static col_t *
 col_find(rcid_t id)
@@ -152,7 +155,7 @@ read_stats(rcid_type_t stat_type)
 	struct stat st;
 
 	if ((fd = open(STAT_FILE_DEFAULT, O_RDONLY)) < 0) {
-		warn(gettext("rcapd is not active\n"));
+		warn(gettext(RCAPD_NA));
 		return (E_ERROR);
 	}
 
@@ -173,7 +176,7 @@ read_stats(rcid_type_t stat_type)
 	pid = hdr.rs_pid;
 	(void) snprintf(procfile, 20, "/proc/%lld/psinfo", pid);
 	if ((proc_fd = open(procfile, O_RDONLY)) < 0) {
-		warn(gettext("rcapd is not active\n"));
+		warn(gettext(RCAPD_NA));
 		(void) close(fd);
 		return (E_ERROR);
 	}

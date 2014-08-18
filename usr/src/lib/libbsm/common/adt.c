@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013, Joyent, Inc. All rights reserved.
  */
 
 #include <bsm/adt.h>
@@ -702,7 +703,37 @@ adt_get_hostIP(const char *hostname, au_tid_addr_t *p_term)
 	int	tries = 3;
 	char	msg[512];
 	int	eai_err;
+	struct ifaddrlist al;
+	int	family;
+	boolean_t found = B_FALSE;
 
+	/*
+	 * getaddrinfo can take a long time to timeout if it can't map the
+	 * hostname to an IP address so try to get an IP address from a local
+	 * interface first.
+	 */
+	family = AF_INET6;
+	if (adt_get_local_address(family, &al) == 0) {
+		found = B_TRUE;
+	} else {
+		family = AF_INET;
+		if (adt_get_local_address(family, &al) == 0)
+			found = B_TRUE;
+	}
+
+	if (found) {
+		if (family == AF_INET) {
+			p_term->at_type = AU_IPv4;
+			(void) memcpy(p_term->at_addr, &al.addr.addr, AU_IPv4);
+		} else {
+			p_term->at_type = AU_IPv6;
+			(void) memcpy(p_term->at_addr, &al.addr.addr6, AU_IPv6);
+		}
+
+		return (0);
+	}
+
+	/* Now try getaddrinfo */
 	while ((tries-- > 0) &&
 	    ((eai_err = getaddrinfo(hostname, NULL, NULL, &ai)) != 0)) {
 		/*
@@ -739,7 +770,9 @@ adt_get_hostIP(const char *hostname, au_tid_addr_t *p_term)
 		}
 		freeaddrinfo(ai);
 		return (0);
-	} else if (auditstate & (AUC_AUDITING | AUC_NOSPACE)) {
+	}
+
+	if (auditstate & (AUC_AUDITING | AUC_NOSPACE)) {
 		auditinfo_addr_t  audit_info;
 
 		/*
@@ -747,58 +780,23 @@ adt_get_hostIP(const char *hostname, au_tid_addr_t *p_term)
 		 * kernel audit context
 		 */
 		if (auditon(A_GETKAUDIT, (caddr_t)&audit_info,
-		    sizeof (audit_info)) < 0) {
-			adt_write_syslog("unable to get kernel audit context",
-			    errno);
-			goto try_interface;
+		    sizeof (audit_info)) >= 0) {
+			adt_write_syslog("setting Audit IP address to kernel",
+			    0);
+			*p_term = audit_info.ai_termid;
+			return (0);
 		}
-		adt_write_syslog("setting Audit IP address to kernel", 0);
-		*p_term = audit_info.ai_termid;
-		return (0);
+		adt_write_syslog("unable to get kernel audit context", errno);
 	}
-try_interface:
-	{
-		struct ifaddrlist al;
-		int	family;
-		char	ntop[INET6_ADDRSTRLEN];
 
-		/*
-		 * getaddrinfo has failed to map the hostname
-		 * to an IP address, try to get an IP address
-		 * from a local interface.  If none up, default
-		 * to loopback.
-		 */
-		family = AF_INET6;
-		if (adt_get_local_address(family, &al) != 0) {
-			family = AF_INET;
-
-			if (adt_get_local_address(family, &al) != 0) {
-				adt_write_syslog("adt_get_local_address "
-				    "failed, no Audit IP address available, "
-				    "faking loopback and error",
-				    errno);
-				IN_SET_LOOPBACK_ADDR(
-				    (struct sockaddr_in *)&(al.addr.addr));
-				(void) memcpy(p_term->at_addr, &al.addr.addr,
-				    AU_IPv4);
-				p_term->at_type = AU_IPv4;
-				return (-1);
-			}
-		}
-		if (family == AF_INET) {
-			p_term->at_type = AU_IPv4;
-			(void) memcpy(p_term->at_addr, &al.addr.addr, AU_IPv4);
-		} else {
-			p_term->at_type = AU_IPv6;
-			(void) memcpy(p_term->at_addr, &al.addr.addr6, AU_IPv6);
-		}
-
-		(void) snprintf(msg, sizeof (msg), "mapping %s to %s",
-		    hostname, inet_ntop(family, &(al.addr), ntop,
-		    sizeof (ntop)));
-		adt_write_syslog(msg, 0);
-		return (0);
-	}
+	/* No mapping, default to loopback. */
+	errno = ENETDOWN;
+	adt_write_syslog("adt_get_local_address failed, no Audit IP address "
+	    "available, faking loopback and error", errno);
+	IN_SET_LOOPBACK_ADDR((struct sockaddr_in *)&(al.addr.addr));
+	(void) memcpy(p_term->at_addr, &al.addr.addr, AU_IPv4);
+	p_term->at_type = AU_IPv4;
+	return (-1);
 }
 
 /*
@@ -2093,8 +2091,8 @@ adt_selected(struct adt_event_state *event, au_event_t actual_id, int status)
 }
 
 /*
- * Can't map the host name to an IP address in
- * adt_get_hostIP.  Get something off an interface
+ * Before trying to map the host name to an IP address in
+ * adt_get_hostIP, get something off an interface
  * to act as the hosts IP address for auditing.
  */
 

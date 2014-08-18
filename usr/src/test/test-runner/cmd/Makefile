@@ -34,4 +34,6 @@ $(ROOTBIN):
 	$(INS.dir)
 
 $(ROOTBIN)/%: %.py
-	$(INS.rename)
+	$(RM) $@
+	$(SED.py) $< > $@
+	$(CHMOD) 0555 $@

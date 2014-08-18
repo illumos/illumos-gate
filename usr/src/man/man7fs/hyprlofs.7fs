@@ -1,0 +1,62 @@
+'\" te
+.\" Copyright (c) 2012, Joyent, Inc.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH HYPRLOFS 7FS "March 7, 2012"
+.SH NAME
+hyprlofs \- fast name space virtual file system
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/fs/hyprlofs.h>
+
+\fB\fR\fBmount\fR (\fB\fR\fIspecial\fR, \fB\fR\fIdirectory\fR, \fB\fR\fIMS_DATA\fR, \fB\fR\fI"hyprlofs"\fR, \fB\fR\fINULL\fR, \fB\fR\fI0\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBhyprlofs\fR is a hybrid file system combining features from
+\fBtmpfs(7FS)\fR and \fBlofs(7FS)\fR.
+As with \fBlofs\fR, the \fBhyprlofs\fR file system allows new, virtual file
+systems to be created which provide access to existing files using alternate
+pathnames.  In addition, the files themselves may have alternate names and
+paths within the mount.
+Unlike \fBlofs\fR, files cannot be created and backing files cannot be removed.
+The name space is completely managed through ioctls on the mount.
+Entries in the name space are not mounts and thus, they will not appear in the
+mnttab.  The file system is designed to provide a very fast name space to the
+backing files.  The name space can be modified very quickly through the ioctl
+interface.
+.sp
+.LP
+\fBhyprlofs\fR file systems can be mounted with the command:
+.sp
+.in +2
+.nf
+\fBmount \fR\fB-F\fR\fB hyprlofs swap \fR\fIdirectory\fR
+.fi
+.in -2
+
+.sp
+.LP
+The name space used by \fBhyprlofs\fR exists only in-memory so it will consume
+a small amount of the system's virtual memory.  The files themselves are backed
+by the original file as with \fBlofs\fR.
+
+.SH SEE ALSO
+.sp
+.LP
+\fBdf\fR(1M), \fBmount\fR(1M), \fBswap\fR(1M),
+\fBmount\fR(2), \fBumount\fR(2)
+.sp
+.LP
+\fISystem Administration Guide: Basic Administration\fR
+.SH DIAGNOSTICS
+.sp
+.LP
+\fBdf\fR(1M) output is of limited accuracy since
+the space available to \fBhyprlofs\fR is dependent on the swap
+space demands of the entire system and the files in the name space are not
+included.

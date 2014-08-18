@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2011 Joyent Inc.
+ * Copyright 2012 Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -100,34 +100,18 @@ static uint_t method_events[] = {
  * method_record_start(restarter_inst_t *)
  *   Record a service start for rate limiting.  Place the current time
  *   in the circular array of instance starts.
+ *
+ *   Save the critical_failure_period and critical_failure_allowed with either
+ *   the defaults or the svc properties startd/critical_failure_count and
+ *   startd/critical_failure_period.
+ *   ri_crit_fail_allowed is capped at RINST_START_TIMES.
  */
 static void
 method_record_start(restarter_inst_t *inst)
 {
-	int index = inst->ri_start_index++ % RINST_START_TIMES;
-
-	inst->ri_start_time[index] = gethrtime();
-}
-
-/*
- * method_rate_critical(restarter_inst_t *)
- *    Return true if the average start interval is less than the permitted
- *    interval.  The implicit interval defaults to RINST_FAILURE_RATE_NS and
- *    RINST_START_TIMES but may be overridden with the svc properties
- *    startd/critical_failure_count and startd/critical_failure_period
- *    which represent the number of failures to consider and the amount of
- *    time in seconds in which that number may occur, respectively. Note that
- *    this time is measured as of the transition to 'enabled' rather than wall
- *    clock time.
- *    Implicit success if insufficient measurements for an average exist.
- */
-int
-method_rate_critical(restarter_inst_t *inst)
-{
+	int index;
+	uint_t critical_failure_allowed = RINST_START_TIMES;
 	hrtime_t critical_failure_period;
-	uint_t critical_failure_count = RINST_START_TIMES;
-	uint_t n = inst->ri_start_index;
-	hrtime_t avg_ns = 0;
 	uint64_t scf_fr, scf_st;
 	scf_propvec_t *prop = NULL;
 	scf_propvec_t restart_critical[] = {
@@ -151,17 +135,48 @@ method_rate_critical(restarter_inst_t *inst)
 		 * in seconds but tracked in ns
 		 */
 		critical_failure_period = (hrtime_t)scf_fr * NANOSEC;
-		critical_failure_count = (uint_t)scf_st;
+		critical_failure_allowed = (uint_t)scf_st;
+
+		if (critical_failure_allowed > RINST_START_TIMES)
+			critical_failure_allowed = RINST_START_TIMES;
+		if (critical_failure_allowed < 1)
+			critical_failure_allowed = 1;
+
 	}
-	if (inst->ri_start_index < critical_failure_count)
+
+	inst->ri_crit_fail_allowed = critical_failure_allowed;
+	inst->ri_crit_fail_period = critical_failure_period;
+
+	index = inst->ri_start_index++ % critical_failure_allowed;
+	inst->ri_start_time[index] = gethrtime();
+}
+
+/*
+ * method_rate_critical(restarter_inst_t *)
+ *    Return true if the number of failures within the interval
+ *    ri_crit_fail_period exceeds ri_crit_fail_allowed. The allowed failure
+ *    count defaults to RINST_START_TIMES and the implicit interval defaults
+ *    to RINST_FAILURE_RATE_NS but may be overridden with the svc properties
+ *    startd/critical_failure_count and startd/critical_failure_period which
+ *    represent the acceptable number of failures and the amount of time in
+ *    seconds in which that number may occur, respectively. Note that this time
+ *    is measured as of the transition to 'enabled' rather than wall clock
+ *    time. Implicitly not critical if insufficient failures have occured.
+ */
+int
+method_rate_critical(restarter_inst_t *inst)
+{
+	uint_t n = inst->ri_start_index;
+	uint_t fail_allowed = inst->ri_crit_fail_allowed;
+	hrtime_t diff_ns;
+
+	if (n < fail_allowed)
 		return (0);
 
-	avg_ns =
-	    (inst->ri_start_time[(n - 1) % critical_failure_count] -
-	    inst->ri_start_time[n % critical_failure_count]) /
-	    (critical_failure_count - 1);
+	diff_ns = inst->ri_start_time[(n - 1) % fail_allowed] -
+	    inst->ri_start_time[n % fail_allowed];
 
-	return (avg_ns < critical_failure_period);
+	return (diff_ns < inst->ri_crit_fail_period);
 }
 
 /*
@@ -989,7 +1004,8 @@ method_run(restarter_inst_t **instp, int type, int *exit_code)
 			goto contract_out;
 		}
 
-		if (!WIFEXITED(ret_status)) {
+		if (!WIFEXITED(ret_status) &&
+		    WEXITSTATUS(ret_status) != SMF_EXIT_NODAEMON) {
 			/*
 			 * If method didn't exit itself (it was killed by an
 			 * external entity, etc.), consider the entire
@@ -1018,7 +1034,7 @@ method_run(restarter_inst_t **instp, int type, int *exit_code)
 		}
 
 		*exit_code = WEXITSTATUS(ret_status);
-		if (*exit_code != 0) {
+		if (*exit_code != 0 && *exit_code != SMF_EXIT_NODAEMON) {
 			log_error(LOG_WARNING,
 			    "%s: Method \"%s\" failed with exit status %d.\n",
 			    inst->ri_i.i_fmri, method, WEXITSTATUS(ret_status));
@@ -1027,6 +1043,7 @@ method_run(restarter_inst_t **instp, int type, int *exit_code)
 		log_instance(inst, B_TRUE, "Method \"%s\" exited with status "
 		    "%d.", mname, *exit_code);
 
+		/* Note: we will take this path for SMF_EXIT_NODAEMON */
 		if (*exit_code != 0)
 			goto contract_out;
 
@@ -1073,7 +1090,10 @@ assured_kill:
 	}
 
 contract_out:
-	/* Abandon contracts for transient methods & methods that fail. */
+	/*
+	 * Abandon contracts for transient methods, methods that exit with
+	 * SMF_EXIT_NODAEMON & methods that fail.
+	 */
 	transient = method_is_transient(inst, type);
 	if ((transient || *exit_code != 0 || result != 0) &&
 	    (restarter_is_kill_method(method) < 0))
@@ -1169,7 +1189,7 @@ retry:
 
 	r = method_run(&inst, info->sf_method_type, &exit_code);
 
-	if (r == 0 && exit_code == 0) {
+	if (r == 0 && (exit_code == 0 || exit_code == SMF_EXIT_NODAEMON)) {
 		/* Success! */
 		assert(inst->ri_i.i_next_state != RESTARTER_STATE_NONE);
 
@@ -1187,6 +1207,12 @@ retry:
 			else
 				method_remove_contract(inst, B_TRUE, B_TRUE);
 		}
+
+		/*
+		 * For methods that exit with SMF_EXIT_NODAEMON, we already
+		 * called method_remove_contract in method_run.
+		 */
+
 		/*
 		 * We don't care whether the handle was rebound because this is
 		 * the last thing we do with it.

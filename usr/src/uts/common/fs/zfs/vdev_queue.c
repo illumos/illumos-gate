@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2013, Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -33,6 +34,7 @@
 #include <sys/zio.h>
 #include <sys/avl.h>
 #include <sys/dsl_pool.h>
+#include <sys/zfs_zone.h>
 
 /*
  * ZFS I/O Scheduler
@@ -141,7 +143,7 @@ uint32_t zfs_vdev_sync_write_min_active = 10;
 uint32_t zfs_vdev_sync_write_max_active = 10;
 uint32_t zfs_vdev_async_read_min_active = 1;
 uint32_t zfs_vdev_async_read_max_active = 3;
-uint32_t zfs_vdev_async_write_min_active = 1;
+uint32_t zfs_vdev_async_write_min_active = 3;
 uint32_t zfs_vdev_async_write_max_active = 10;
 uint32_t zfs_vdev_scrub_min_active = 1;
 uint32_t zfs_vdev_scrub_max_active = 2;
@@ -215,6 +217,8 @@ vdev_queue_init(vdev_t *vd)
 	avl_create(&vq->vq_active_tree, vdev_queue_offset_compare,
 	    sizeof (zio_t), offsetof(struct zio, io_queue_node));
 
+	vq->vq_last_zone_id = 0;
+
 	for (zio_priority_t p = 0; p < ZIO_PRIORITY_NUM_QUEUEABLE; p++) {
 		/*
 		 * The synchronous i/o queues are FIFO rather than LBA ordered.
@@ -248,6 +252,7 @@ vdev_queue_io_add(vdev_queue_t *vq, zio_t *zio)
 {
 	spa_t *spa = zio->io_spa;
 	ASSERT3U(zio->io_priority, <, ZIO_PRIORITY_NUM_QUEUEABLE);
+	zfs_zone_zio_enqueue(zio);
 	avl_add(&vq->vq_class[zio->io_priority].vqc_queued_tree, zio);
 
 	mutex_enter(&spa->spa_iokstat_lock);
@@ -262,6 +267,7 @@ vdev_queue_io_remove(vdev_queue_t *vq, zio_t *zio)
 {
 	spa_t *spa = zio->io_spa;
 	ASSERT3U(zio->io_priority, <, ZIO_PRIORITY_NUM_QUEUEABLE);
+	zfs_zone_zio_dequeue(zio);
 	avl_remove(&vq->vq_class[zio->io_priority].vqc_queued_tree, zio);
 
 	mutex_enter(&spa->spa_iokstat_lock);
@@ -630,7 +636,11 @@ again:
 	search.io_timestamp = 0;
 	search.io_offset = vq->vq_last_offset + 1;
 	VERIFY3P(avl_find(&vqc->vqc_queued_tree, &search, &idx), ==, NULL);
+#ifdef _KERNEL
+	zio = zfs_zone_schedule(vq, p, idx);
+#else
 	zio = avl_nearest(&vqc->vqc_queued_tree, idx, AVL_AFTER);
+#endif
 	if (zio == NULL)
 		zio = avl_first(&vqc->vqc_queued_tree);
 	ASSERT3U(zio->io_priority, ==, p);

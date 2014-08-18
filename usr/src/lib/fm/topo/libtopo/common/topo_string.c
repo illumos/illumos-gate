@@ -23,8 +23,9 @@
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ */
 
 #include <strings.h>
 #include <ctype.h>
@@ -56,6 +57,58 @@ topo_hdl_strfree(topo_hdl_t *thp, char *s)
 }
 
 char *
+topo_hdl_strsplit(topo_hdl_t *hdl, const char *input, const char *sep,
+    char **lastp)
+{
+	size_t seplen = strlen(sep);
+	const char *scanstart;
+	char *token;
+	char *ret;
+
+	if (input != NULL) {
+		/*
+		 * Start scanning at beginning of input:
+		 */
+		scanstart = input;
+	} else if (*lastp == NULL) {
+		/*
+		 * If we have already finished scanning, return NULL.
+		 */
+		return (NULL);
+	} else {
+		/*
+		 * Otherwise, start scanning where we left off:
+		 */
+		scanstart = *lastp;
+	}
+
+	token = strstr(scanstart, sep);
+	if (token != NULL) {
+		/*
+		 * We still have a separator, so advance the next-start
+		 * pointer past it:
+		 */
+		*lastp = token + seplen;
+		/*
+		 * Copy out this element.  The buffer must fit the string
+		 * exactly, so that topo_hdl_strfree() can determine its
+		 * size with strlen().
+		 */
+		ret = topo_hdl_alloc(hdl, token - scanstart + 1);
+		(void) strncpy(ret, scanstart, token - scanstart);
+		ret[token - scanstart] = '\0';
+	} else {
+		/*
+		 * We have no separator, so this is the last element:
+		 */
+		*lastp = NULL;
+		ret = topo_hdl_strdup(hdl, scanstart);
+	}
+
+	return (ret);
+}
+
+char *
 topo_mod_strdup(topo_mod_t *mod, const char *s)
 {
 	return (topo_hdl_strdup(mod->tm_hdl, s));
@@ -65,6 +118,13 @@ void
 topo_mod_strfree(topo_mod_t *mod, char *s)
 {
 	topo_hdl_strfree(mod->tm_hdl, s);
+}
+
+char *
+topo_mod_strsplit(topo_mod_t *mod, const char *input, const char *sep,
+    char **lastp)
+{
+	return (topo_hdl_strsplit(mod->tm_hdl, input, sep, lastp));
 }
 
 const char *

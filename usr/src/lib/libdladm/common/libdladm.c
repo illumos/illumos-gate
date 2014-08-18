@@ -415,6 +415,9 @@ dladm_status2str(dladm_status_t status, char *buf)
 	case DLADM_STATUS_PORT_NOPROTO:
 		s = "local or remote port requires transport";
 		break;
+	case DLADM_STATUS_INVALID_MTU:
+		s = "MTU check failed, MTU outside of device's supported range";
+		break;
 	default:
 		s = "<unknown error>";
 		break;

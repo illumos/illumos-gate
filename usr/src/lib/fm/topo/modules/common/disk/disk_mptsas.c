@@ -32,11 +32,18 @@
 #include "disk.h"
 #include "disk_drivers.h"
 
+/*
+ * Request the SAS address of the disk (if any) attached to this mpt_sas
+ * instance at (Enclosure Number, Slot Number).  The function returns
+ * -1 on error and sets errno to ENOENT _only_ if the /devices node
+ * (*devctl) does not exist.
+ */
 static int
 get_sas_address(topo_mod_t *mod, char *devctl, uint32_t enclosure,
     uint32_t slot, char **sas_address)
 {
-	int fd, err, i;
+	int ret = -1, en = ENXIO;
+	int fd, i;
 	mptsas_get_disk_info_t gdi;
 	mptsas_disk_info_t *di;
 	size_t disz;
@@ -44,16 +51,19 @@ get_sas_address(topo_mod_t *mod, char *devctl, uint32_t enclosure,
 	bzero(&gdi, sizeof (gdi));
 
 	if ((fd = open(devctl, O_RDWR)) == -1) {
+		en = errno;
 		topo_mod_dprintf(mod, "could not open '%s' for ioctl: %s\n",
 		    devctl, strerror(errno));
+		errno = en;
 		return (-1);
 	}
 
 	if (ioctl(fd, MPTIOCTL_GET_DISK_INFO, &gdi) == -1) {
+		if (errno != ENOENT)
+			en = errno;
 		topo_mod_dprintf(mod, "ioctl 1 on '%s' failed: %s\n", devctl,
 		    strerror(errno));
-		(void) close(fd);
-		return (-1);
+		goto out;
 	}
 
 	gdi.DiskInfoArraySize = disz = sizeof (mptsas_disk_info_t) *
@@ -61,19 +71,19 @@ get_sas_address(topo_mod_t *mod, char *devctl, uint32_t enclosure,
 	gdi.PtrDiskInfoArray = di = topo_mod_alloc(mod, disz);
 	if (di == NULL) {
 		topo_mod_dprintf(mod, "memory allocation failed\n");
-		(void) close(fd);
-		return (-1);
+		en = ENOMEM;
+		goto out;
 	}
 
 	if (ioctl(fd, MPTIOCTL_GET_DISK_INFO, &gdi) == -1) {
+		if (errno != ENOENT)
+			en = errno;
 		topo_mod_dprintf(mod, "ioctl 2 on '%s' failed: %s\n", devctl,
 		    strerror(errno));
 		topo_mod_free(mod, di, disz);
-		(void) close(fd);
-		return (-1);
+		goto out;
 	}
 
-	err = -1;
 	for (i = 0; i < gdi.DiskCount; i++) {
 		if (di[i].Enclosure == enclosure && di[i].Slot == slot) {
 			char sas[17]; /* 16 hex digits and NUL */
@@ -81,14 +91,16 @@ get_sas_address(topo_mod_t *mod, char *devctl, uint32_t enclosure,
 			topo_mod_dprintf(mod, "found mpt_sas disk (%d/%d) "
 			    "with adddress %s\n", enclosure, slot, sas);
 			*sas_address = topo_mod_strdup(mod, sas);
-			err = 0;
+			en = ret = 0;
 			break;
 		}
 	}
 
 	topo_mod_free(mod, di, disz);
+out:
 	(void) close(fd);
-	return (err);
+	errno = en;
+	return (ret);
 }
 
 int
@@ -97,6 +109,8 @@ disk_mptsas_find_disk(topo_mod_t *mod, tnode_t *baynode, char **sas_address)
 	char *devctl = NULL;
 	uint32_t enclosure, slot;
 	int err;
+	char *elem, *lastp;
+	int ret = -1;
 
 	/*
 	 * Get the required properties from the node.  These come from
@@ -115,6 +129,35 @@ disk_mptsas_find_disk(topo_mod_t *mod, tnode_t *baynode, char **sas_address)
 		return (-1);
 	}
 
-	return (get_sas_address(mod, devctl, enclosure, slot, sas_address));
+	/*
+	 * devctl is a (potentially) pipe-separated list of different device
+	 * paths to try.
+	 */
+	if ((elem = topo_mod_strsplit(mod, devctl, "|", &lastp)) != NULL) {
+		boolean_t done = B_FALSE;
+		do {
+			topo_mod_dprintf(mod, "trying mpt_sas instance at %s\n",
+			    elem);
 
+			ret = get_sas_address(mod, elem, enclosure,
+			    slot, sas_address);
+
+			/*
+			 * Only try further devctl paths from the list if this
+			 * one was not found:
+			 */
+			if (ret == 0 || errno != ENOENT) {
+				done = B_TRUE;
+			} else {
+				topo_mod_dprintf(mod, "instance not found\n");
+			}
+
+			topo_mod_strfree(mod, elem);
+
+		} while (!done && (elem = topo_mod_strsplit(mod, NULL, "|",
+		    &lastp)) != NULL);
+	}
+
+	topo_mod_strfree(mod, devctl);
+	return (ret);
 }

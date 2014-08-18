@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  */
 
 #ifndef	_SMFCFG_H
@@ -42,6 +43,7 @@
 #include <locale.h>
 #include <errno.h>
 #include <sys/types.h>
+#include <zone.h>
 
 #ifdef	__cplusplus
 extern	"C" {

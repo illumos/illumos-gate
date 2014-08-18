@@ -1026,6 +1026,7 @@ boot_hsfs_getdents(int fd, struct dirent *dep, unsigned size)
 		 *	  alignment.
 		 */
 		n = strlen(hdp->hs_ufs_dir.d_name);
+
 		n = roundup((sizeof (struct dirent) + ((n > SLOP) ? n : 0)),
 		    sizeof (off_t));
 

@@ -26,6 +26,7 @@
  * Use is subject to license terms.
  *
  * Portions Copyright 2009 Chad Mynhier
+ * Copyright 2012 Joyent, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -181,6 +182,33 @@ static optdesc_t opts = {
 	-1			/* sort in decreasing order */
 };
 
+
+static int
+proc_snprintf(char *_RESTRICT_KYWD s, size_t n,
+    const char *_RESTRICT_KYWD fmt, ...)
+{
+	static boolean_t ptools_zroot_valid = B_FALSE;
+	static const char *ptools_zroot = NULL;
+	va_list args;
+	int ret, nret = 0;
+
+	if (ptools_zroot_valid == B_FALSE) {
+		ptools_zroot_valid = B_TRUE;
+		ptools_zroot = zone_get_nroot();
+	}
+
+	if (ptools_zroot != NULL) {
+		nret = snprintf(s, n, "%s", ptools_zroot);
+		if (nret > n)
+			return (nret);
+	}
+	va_start(args, fmt);
+	ret = vsnprintf(s + nret, n - nret, fmt, args);
+	va_end(args);
+
+	return (ret + nret);
+}
+
 /*
  * Print timestamp as decimal reprentation of time_t value (-d u was specified)
  * or the standard date format (-d d was specified).
@@ -236,7 +264,12 @@ list_getsize(list_t *list)
 	size_t i;
 	uint_t flags = 0;
 	int ret;
-	size_t physmem = sysconf(_SC_PHYS_PAGES) * pagesize;
+	size_t physmem;
+
+	if (!(opts.o_outpmode & OPT_VMUSAGE))
+		return;
+
+	physmem = sysconf(_SC_PHYS_PAGES) * pagesize;
 
 	/*
 	 * Determine what swap/rss results to calculate.  getvmusage() will
@@ -366,6 +399,9 @@ list_print(list_t *list)
 	float cpu, mem;
 	double loadavg[3] = {0, 0, 0};
 	int i, lwpid;
+
+	if (list->l_size == 0)
+		return;
 
 	if (foreach_element(&set_tbl, &loadavg, psetloadavg) == 0) {
 		/*
@@ -845,9 +881,9 @@ lwp_update(lwp_info_t *lwp, pid_t pid, id_t lwpid, struct prusage *usage)
 static int
 read_procfile(fd_t **fd, char *pidstr, char *file, void *buf, size_t bufsize)
 {
-	char procfile[MAX_PROCFS_PATH];
+	char procfile[PATH_MAX];
 
-	(void) snprintf(procfile, MAX_PROCFS_PATH,
+	(void) proc_snprintf(procfile, PATH_MAX,
 	    "/proc/%s/%s", pidstr, file);
 	if ((*fd = fd_open(procfile, O_RDONLY, *fd)) == NULL)
 		return (1);
@@ -1160,7 +1196,10 @@ setmovecur()
 		return;
 	}
 	if (opts.o_outpmode & OPT_SPLIT) {
-		n = opts.o_ntop + opts.o_nbottom + 2;
+		if (opts.o_ntop == 0)
+			n = opts.o_nbottom + 1;
+		else
+			n = opts.o_ntop + opts.o_nbottom + 2;
 	} else {
 		if (opts.o_outpmode & OPT_USERS)
 			n = opts.o_nbottom + 1;
@@ -1370,6 +1409,7 @@ main(int argc, char **argv)
 	int timeout;
 	struct pollfd pollset;
 	char key;
+	char procpath[PATH_MAX];
 
 	(void) setlocale(LC_ALL, "");
 	(void) textdomain(TEXT_DOMAIN);
@@ -1380,7 +1420,7 @@ main(int argc, char **argv)
 	pagesize = sysconf(_SC_PAGESIZE);
 
 	while ((opt = getopt(argc, argv,
-	    "vcd:HmarRLtu:U:n:p:C:P:h:s:S:j:k:TJWz:Z")) != (int)EOF) {
+	    "vVcd:HmarRLtu:U:n:p:C:P:h:s:S:j:k:TJWz:Z")) != (int)EOF) {
 		switch (opt) {
 		case 'r':
 			opts.o_outpmode |= OPT_NORESOLVE;
@@ -1434,6 +1474,8 @@ main(int argc, char **argv)
 			opts.o_ntop = Atoi(p);
 			if (p = strtok(NULL, ","))
 				opts.o_nbottom = Atoi(p);
+			else if (opts.o_ntop == 0)
+				opts.o_nbottom = 5;
 			opts.o_outpmode &= ~OPT_FULLSCREEN;
 			break;
 		case 's':
@@ -1457,6 +1499,9 @@ main(int argc, char **argv)
 			add_uid(&ruid_tbl, p);
 			while (p = strtok(NULL, ", "))
 				add_uid(&ruid_tbl, p);
+			break;
+		case 'V':
+			opts.o_outpmode |= OPT_VMUSAGE;
 			break;
 		case 'p':
 			fill_table(&pid_tbl, optarg, 'p');
@@ -1499,7 +1544,9 @@ main(int argc, char **argv)
 	if ((opts.o_outpmode & OPT_USERS) &&
 	    !(opts.o_outpmode & OPT_SPLIT))
 		opts.o_nbottom = opts.o_ntop;
-	if (opts.o_ntop == 0 || opts.o_nbottom == 0)
+	if (!(opts.o_outpmode & OPT_SPLIT) && opts.o_ntop == 0)
+		Die(gettext("invalid argument for -n\n"));
+	if (opts.o_nbottom == 0)
 		Die(gettext("invalid argument for -n\n"));
 	if (!(opts.o_outpmode & OPT_SPLIT) && (opts.o_outpmode & OPT_USERS) &&
 	    ((opts.o_outpmode & (OPT_PSINFO | OPT_MSACCT))))
@@ -1565,7 +1612,8 @@ main(int argc, char **argv)
 	list_setkeyfunc(NULL, &opts, &lgroups, LT_LGRPS);
 	if (opts.o_outpmode & OPT_TERMCAP)
 		curses_on();
-	if ((procdir = opendir("/proc")) == NULL)
+	(void) proc_snprintf(procpath, sizeof (procpath), "/proc");
+	if ((procdir = opendir(procpath)) == NULL)
 		Die(gettext("cannot open /proc directory\n"));
 	if (opts.o_outpmode & OPT_TTY) {
 		(void) printf(gettext("Please wait...\r"));

@@ -53,7 +53,8 @@ typedef enum {
 typedef enum {
 	DLD_UNINITIALIZED,
 	DLD_PASSIVE,
-	DLD_ACTIVE
+	DLD_ACTIVE,
+	DLD_EXCLUSIVE
 } dld_passivestate_t;
 
 /*
@@ -255,6 +256,8 @@ extern void		dld_str_rx_unitdata(void *, mac_resource_handle_t,
     mblk_t *, mac_header_info_t *);
 extern void		dld_str_notify_ind(dld_str_t *);
 extern mac_tx_cookie_t	str_mdata_fastpath_put(dld_str_t *, mblk_t *,
+    uintptr_t, uint16_t);
+extern mac_tx_cookie_t	str_mdata_raw_fastpath_put(dld_str_t *, mblk_t *,
     uintptr_t, uint16_t);
 extern int		dld_flow_ctl_callb(dld_str_t *, uint64_t,
     int (*func)(), void *);

@@ -405,7 +405,7 @@ typedef enum {
 
 #define	RINST_RETAKE_MASK	0x0f000000
 
-#define	RINST_START_TIMES	5		/* failures to consider */
+#define	RINST_START_TIMES	10		/* up to 10 fails to consider */
 #define	RINST_FAILURE_RATE_NS	600000000000LL	/* 1 failure/10 minutes */
 #define	RINST_WT_SVC_FAILURE_RATE_NS	NANOSEC	/* 1 failure/second */
 
@@ -427,6 +427,8 @@ typedef struct restarter_inst {
 
 	hrtime_t		ri_start_time[RINST_START_TIMES];
 	uint_t			ri_start_index;	/* times started */
+	uint_t			ri_crit_fail_allowed;
+	hrtime_t		ri_crit_fail_period;
 
 	uu_list_node_t		ri_link;
 	pthread_mutex_t		ri_lock;

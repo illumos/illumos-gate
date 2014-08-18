@@ -22,6 +22,7 @@
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright 2012 Joyent, Inc.  All rights reserved.
 #
 
 smf_present () {
@@ -234,7 +235,12 @@ smf_kill_contract() {
 #   SMF_EXIT_ERR_OTHER, although not defined, encompasses all non-zero
 #   exit status values.
 #
+# The SMF_EXIT_NODAEMON exit status should be used when a method does not
+# need to run any persistent process. This indicates success, abandons the
+# contract, and allows dependencies to be met.
+#
 SMF_EXIT_OK=0
+SMF_EXIT_NODAEMON=94
 SMF_EXIT_ERR_FATAL=95
 SMF_EXIT_ERR_CONFIG=96
 SMF_EXIT_MON_DEGRADE=97

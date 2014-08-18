@@ -34,7 +34,7 @@ UTSBASE = ../..
 MODULE		= pcbe.GenuineIntel.6.15
 OBJECTS		= $(CORE_PCBE_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(CORE_PCBE_OBJS:%.o=$(LINTS_DIR)/%.ln)
-ROOTMODULE	= $(USR_PCBE_DIR)/$(MODULE)
+ROOTMODULE	= $(ROOT_PSM_PCBE_DIR)/$(MODULE)
 SOFTLINKS	= pcbe.GenuineIntel.6.23 \
 			pcbe.GenuineIntel.6.26 \
 			pcbe.GenuineIntel.6.28 \
@@ -45,7 +45,7 @@ SOFTLINKS	= pcbe.GenuineIntel.6.23 \
 			pcbe.GenuineIntel.6.44 \
 			pcbe.GenuineIntel.6.46 \
 			pcbe.GenuineIntel.6.47
-ROOTSOFTLINKS	= $(SOFTLINKS:%=$(USR_PCBE_DIR)/%)
+ROOTSOFTLINKS	= $(SOFTLINKS:%=$(ROOT_PSM_PCBE_DIR)/%)
 
 #
 #	Include common rules.

@@ -150,6 +150,14 @@ usdt/tst.forker.o: usdt/forker.h
 usdt/forker.h: usdt/forker.d
 	$(DTRACE) -h -s usdt/forker.d -o usdt/forker.h
 
+ustack/tst.unpriv.exe: ustack/tst.unpriv.o ustack/unpriv_helper.o
+	$(LINK.c) -o ustack/tst.unpriv.exe \
+	    ustack/tst.unpriv.o ustack/unpriv_helper.o $(LDLIBS)
+	$(POST_PROCESS) ; $(STRIP_STABS)
+
+ustack/unpriv_helper.o: ustack/unpriv_helper.d
+	$(COMPILE.d) -o ustack/unpriv_helper.o -s ustack/unpriv_helper.d
+
 usdt/tst.lazyprobe.exe: usdt/tst.lazyprobe.o usdt/lazyprobe.o
 	$(LINK.c) -o usdt/tst.lazyprobe.exe \
 	    usdt/tst.lazyprobe.o usdt/lazyprobe.o $(LDLIBS)

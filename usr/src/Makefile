@@ -46,7 +46,7 @@ $(SPARC_BLD)psm: stand
 
 SUBDIRS= $(COMMON_SUBDIRS) $($(MACH)_SUBDIRS)
 
-HDRSUBDIRS=	uts head lib cmd
+HDRSUBDIRS=	uts head lib cmd ucbhead
 
 # UCB headers are bug-for-bug compatible and not checkable against the header
 # standards.
@@ -56,7 +56,7 @@ CHKHDRSUBDIRS=	head uts lib
 #
 # Headers that can be built in parallel
 #
-PARALLEL_HEADERS = sysheaders userheaders libheaders cmdheaders
+PARALLEL_HEADERS = sysheaders userheaders libheaders ucbheaders cmdheaders
 
 #
 # Directories that can be built in parallel
@@ -111,7 +111,7 @@ all: mapfiles closedbins sgs .WAIT $(SUBDIRS) pkg
 # packaging to be pulled from $(SRC) and $(CLOSED) and staged in
 # $(ROOT)/licenses.
 #
-install: install1 install2 _msg stage-licenses
+install: install1 install2 _msg
 	@cd msg; pwd; $(MAKE) _msg
 	@rm -rf "$(ROOT)/catalog"
 
@@ -162,13 +162,13 @@ closedbins: bldtools $(ROOTDIRS) FRC
 .PARALLEL: $(PARALLEL_HEADERS) DUMMY
 .PARALLEL: $(PARALLEL_DIRS) DUMMY
 
-$(SUBDIRS) head pkg: FRC
+$(SUBDIRS) head ucbhead pkg: FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
 
 # librpcsvc has a dependency on headers installed by
 # userheaders, hence the .WAIT before libheaders.
 sgs: rootdirs .WAIT sysheaders userheaders .WAIT \
-	libheaders cmdheaders
+	libheaders ucbheaders cmdheaders
 
 #
 # Top-level setup target to setup the development environment that includes
@@ -204,6 +204,9 @@ libheaders: bldtools
 
 sysheaders: FRC
 	@cd uts; pwd; $(MAKE) install_h
+
+ucbheaders: FRC
+	@cd ucbhead; pwd; $(MAKE) install_h
 
 cmdheaders: FRC
 	@cd cmd/fm; pwd; $(MAKE) install_h

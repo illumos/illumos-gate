@@ -25,6 +25,7 @@
  * Use is subject to license terms.
  *
  * Portions Copyright 2009 Chad Mynhier
+ * Copyright 2012 Joyent, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -108,7 +109,7 @@ void
 Usage()
 {
 	(void) fprintf(stderr, gettext(
-	    "Usage:\tprstat [-acHJLmrRtTvWZ] [-u euidlist] [-U uidlist]\n"
+	    "Usage:\tprstat [-acHJLmrRtTvVWZ] [-u euidlist] [-U uidlist]\n"
 	    "\t[-p pidlist] [-P cpulist] [-C psrsetlist] [-h lgrouplist]\n"
 	    "\t[-j projidlist] [-k taskidlist] [-z zoneidlist]\n"
 	    "\t[-s key | -S key] [-n nprocs[,nusers]] [-d d|u]\n"

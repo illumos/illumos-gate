@@ -84,6 +84,9 @@ struct brand_ops s10_brops = {
 	s10_sigset_native_to_s10,
 	s10_sigset_s10_to_native,
 	S10_NSIG,
+	NULL,
+	NULL,
+	NULL
 };
 
 #ifdef	sparc
@@ -99,9 +102,11 @@ struct brand_mach_ops s10_mops = {
 
 struct brand_mach_ops s10_mops = {
 	s10_brand_sysenter_callback,
+	NULL,
 	s10_brand_int91_callback,
 	s10_brand_syscall_callback,
-	s10_brand_syscall32_callback
+	s10_brand_syscall32_callback,
+	NULL
 };
 
 #else	/* ! __amd64 */
@@ -109,7 +114,9 @@ struct brand_mach_ops s10_mops = {
 struct brand_mach_ops s10_mops = {
 	s10_brand_sysenter_callback,
 	NULL,
+	NULL,
 	s10_brand_syscall_callback,
+	NULL,
 	NULL
 };
 #endif	/* __amd64 */
@@ -120,7 +127,8 @@ struct brand	s10_brand = {
 	BRAND_VER_1,
 	"solaris10",
 	&s10_brops,
-	&s10_mops
+	&s10_mops,
+	sizeof (brand_proc_data_t),
 };
 
 static struct modlbrand modlbrand = {

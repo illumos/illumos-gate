@@ -41,6 +41,7 @@
 #include <sys/zfs_znode.h>
 #include <sys/spa_impl.h>
 #include <sys/dsl_deadlist.h>
+#include <sys/zfs_zone.h>
 #include <sys/bptree.h>
 #include <sys/zfeature.h>
 #include <sys/zil_impl.h>
@@ -131,7 +132,6 @@ uint64_t zfs_delay_scale = 1000 * 1000 * 1000 / 2000;
  */
 
 
-hrtime_t zfs_throttle_delay = MSEC2NSEC(10);
 hrtime_t zfs_throttle_resolution = MSEC2NSEC(10);
 
 int

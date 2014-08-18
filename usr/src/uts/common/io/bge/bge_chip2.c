@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2011, 2012 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include "bge_impl.h"
@@ -363,7 +363,34 @@ bge_chip_cfg_init(bge_t *bgep, chip_id_t *cidp, boolean_t enable_dma)
 	if (DEVICE_5717_SERIES_CHIPSETS(bgep))
 		pci_config_put32(handle, PCI_CONF_BGE_MHCR, 0);
 	mhcr = pci_config_get32(handle, PCI_CONF_BGE_MHCR);
-	cidp->asic_rev = mhcr & MHCR_CHIP_REV_MASK;
+	cidp->asic_rev = (mhcr & MHCR_CHIP_REV_MASK) >> MHCR_CHIP_REV_SHIFT;
+	if (MHCR_CHIP_ASIC_REV(cidp->asic_rev) == MHCR_CHIP_ASIC_REV_PRODID) {
+		uint32_t reg;
+		switch (cidp->device) {
+		case DEVICE_ID_5717:
+		case DEVICE_ID_5718:
+		case DEVICE_ID_5719:
+		case DEVICE_ID_5720:
+			reg = PCI_CONF_GEN2_PRODID_ASICREV;
+			break;
+		case DEVICE_ID_57781:
+		case DEVICE_ID_57785:
+		case DEVICE_ID_57761:
+		case DEVICE_ID_57765:
+		case DEVICE_ID_57791:
+		case DEVICE_ID_57795:
+		case DEVICE_ID_57762:
+		case DEVICE_ID_57766:
+		case DEVICE_ID_57782:
+		case DEVICE_ID_57786:
+			reg = PCI_CONF_GEN15_PRODID_ASICREV;
+			break;
+		default:
+			reg = PCI_CONF_PRODID_ASICREV;
+			break;
+		}
+		cidp->asic_rev = pci_config_get32(handle, reg);
+	}
 	cidp->businfo = pci_config_get32(handle, PCI_CONF_BGE_PCISTATE);
 	cidp->command = pci_config_get16(handle, PCI_CONF_COMM);
 
@@ -385,6 +412,45 @@ bge_chip_cfg_init(bge_t *bgep, chip_id_t *cidp, boolean_t enable_dma)
 	    cidp->subven, cidp->subdev, cidp->asic_rev));
 	BGE_DEBUG(("bge_chip_cfg_init: clsize %d latency %d command 0x%x",
 	    cidp->clsize, cidp->latency, cidp->command));
+
+	cidp->chip_type = 0;
+	if (MHCR_CHIP_ASIC_REV(cidp->asic_rev) == MHCR_CHIP_ASIC_REV_5717 ||
+	    MHCR_CHIP_ASIC_REV(cidp->asic_rev) == MHCR_CHIP_ASIC_REV_5719 ||
+	    MHCR_CHIP_ASIC_REV(cidp->asic_rev) == MHCR_CHIP_ASIC_REV_5720)
+		cidp->chip_type |= CHIP_TYPE_5717_PLUS;
+
+	if (MHCR_CHIP_ASIC_REV(cidp->asic_rev) == MHCR_CHIP_ASIC_REV_57765 ||
+	    MHCR_CHIP_ASIC_REV(cidp->asic_rev) == MHCR_CHIP_ASIC_REV_57766)
+		cidp->chip_type |= CHIP_TYPE_57765_CLASS;
+
+	if (cidp->chip_type & CHIP_TYPE_57765_CLASS ||
+	    cidp->chip_type & CHIP_TYPE_5717_PLUS)
+		cidp->chip_type |= CHIP_TYPE_57765_PLUS;
+
+	/* Intentionally exclude ASIC_REV_5906 */
+	if (MHCR_CHIP_ASIC_REV(cidp->asic_rev) == MHCR_CHIP_ASIC_REV_5755 ||
+	    MHCR_CHIP_ASIC_REV(cidp->asic_rev) == MHCR_CHIP_ASIC_REV_5787 ||
+	    MHCR_CHIP_ASIC_REV(cidp->asic_rev) == MHCR_CHIP_ASIC_REV_5784 ||
+	    MHCR_CHIP_ASIC_REV(cidp->asic_rev) == MHCR_CHIP_ASIC_REV_5761 ||
+	    MHCR_CHIP_ASIC_REV(cidp->asic_rev) == MHCR_CHIP_ASIC_REV_5785 ||
+	    MHCR_CHIP_ASIC_REV(cidp->asic_rev) == MHCR_CHIP_ASIC_REV_57780 ||
+	    cidp->chip_type & CHIP_TYPE_57765_PLUS)
+		cidp->chip_type |= CHIP_TYPE_5755_PLUS;
+
+	if (MHCR_CHIP_ASIC_REV(cidp->asic_rev) == MHCR_CHIP_ASIC_REV_5780 ||
+	    MHCR_CHIP_ASIC_REV(cidp->asic_rev) == MHCR_CHIP_ASIC_REV_5714)
+		cidp->chip_type |= CHIP_TYPE_5780_CLASS;
+
+	if (MHCR_CHIP_ASIC_REV(cidp->asic_rev) == MHCR_CHIP_ASIC_REV_5750 ||
+	    MHCR_CHIP_ASIC_REV(cidp->asic_rev) == MHCR_CHIP_ASIC_REV_5752 ||
+	    MHCR_CHIP_ASIC_REV(cidp->asic_rev) == MHCR_CHIP_ASIC_REV_5906 ||
+	    cidp->chip_type & CHIP_TYPE_5755_PLUS ||
+	    cidp->chip_type & CHIP_TYPE_5780_CLASS)
+		cidp->chip_type |= CHIP_TYPE_5750_PLUS;
+
+	if (MHCR_CHIP_ASIC_REV(cidp->asic_rev) == MHCR_CHIP_ASIC_REV_5705 ||
+	    cidp->chip_type & CHIP_TYPE_5750_PLUS)
+		cidp->chip_type |= CHIP_TYPE_5705_PLUS;
 
 	/*
 	 * Step 2 (also step 6): disable and clear interrupts.
@@ -445,8 +511,9 @@ bge_chip_cfg_init(bge_t *bgep, chip_id_t *cidp, boolean_t enable_dma)
 	 * see whether the host is truly up to date, and regenerate
 	 * its interrupt if not.
 	 */
-	mhcr =	MHCR_ENABLE_INDIRECT_ACCESS |
+	mhcr = MHCR_ENABLE_INDIRECT_ACCESS |
 	    MHCR_ENABLE_TAGGED_STATUS_MODE |
+	    MHCR_ENABLE_PCI_STATE_WRITE |
 	    MHCR_MASK_INTERRUPT_MODE |
 	    MHCR_CLEAR_INTERRUPT_INTA;
 
@@ -1896,10 +1963,16 @@ bge_nvmem_id(bge_t *bgep)
 	case DEVICE_ID_5705_2:
 	case DEVICE_ID_5717:
 	case DEVICE_ID_5718:
+	case DEVICE_ID_5719:
+	case DEVICE_ID_5720:
 	case DEVICE_ID_5724:
+	case DEVICE_ID_57760:
 	case DEVICE_ID_57780:
+	case DEVICE_ID_57788:
+	case DEVICE_ID_57790:
 	case DEVICE_ID_5780:
 	case DEVICE_ID_5782:
+	case DEVICE_ID_5784M:
 	case DEVICE_ID_5785:
 	case DEVICE_ID_5787:
 	case DEVICE_ID_5787M:
@@ -1918,6 +1991,8 @@ bge_nvmem_id(bge_t *bgep)
 	case DEVICE_ID_5723:
 	case DEVICE_ID_5761:
 	case DEVICE_ID_5761E:
+	case DEVICE_ID_5761S:
+	case DEVICE_ID_5761SE:
 	case DEVICE_ID_5764:
 	case DEVICE_ID_5714C:
 	case DEVICE_ID_5714S:
@@ -2023,14 +2098,35 @@ bge_chip_id_init(bge_t *bgep)
 
 	cidp->msi_enabled = B_FALSE;
 
+	if (MHCR_CHIP_ASIC_REV(bgep->chipid.asic_rev) >
+	    MHCR_CHIP_ASIC_REV_PRODID ||
+	    MHCR_CHIP_ASIC_REV(bgep->chipid.asic_rev) ==
+	    MHCR_CHIP_ASIC_REV_5906 ||
+	    MHCR_CHIP_ASIC_REV(bgep->chipid.asic_rev) ==
+	    MHCR_CHIP_ASIC_REV_5700 ||
+	    MHCR_CHIP_ASIC_REV(bgep->chipid.asic_rev) ==
+	    MHCR_CHIP_ASIC_REV_5701 ||
+	    MHCR_CHIP_ASIC_REV(bgep->chipid.asic_rev) ==
+	    MHCR_CHIP_ASIC_REV_5750)
+		/*
+		 * Just a plain reset; the "check" code breaks these chips
+		 */
+		cidp->flags |= CHIP_FLAG_NO_CHECK_RESET;
+
 	switch (cidp->device) {
 	case DEVICE_ID_5717:
 	case DEVICE_ID_5718:
+	case DEVICE_ID_5719:
+	case DEVICE_ID_5720:
 	case DEVICE_ID_5724:
 		if (cidp->device == DEVICE_ID_5717)
 			cidp->chip_label = 5717;
 		else if (cidp->device == DEVICE_ID_5718)
 			cidp->chip_label = 5718;
+		else if (cidp->device == DEVICE_ID_5719)
+			cidp->chip_label = 5719;
+		else if (cidp->device == DEVICE_ID_5720)
+			cidp->chip_label = 5720;
 		else
 			cidp->chip_label = 5724;
 		cidp->msi_enabled = bge_enable_msi;
@@ -2044,7 +2140,7 @@ bge_chip_id_init(bge_t *bgep)
 		cidp->mbuf_hi_water = MBUF_HIWAT_5717;
 		cidp->mbuf_base = bge_mbuf_pool_base_5705;
 		cidp->mbuf_length = bge_mbuf_pool_len_5705;
-		cidp->recv_slots = BGE_RECV_SLOTS_5705;
+		cidp->recv_slots = BGE_RECV_SLOTS_5717;
 		cidp->bge_mlcr_default = MLCR_DEFAULT_5717;
 		cidp->rx_rings = BGE_RECV_RINGS_MAX_5705;
 		cidp->tx_rings = BGE_SEND_RINGS_MAX_5705;
@@ -2220,7 +2316,13 @@ bge_chip_id_init(bge_t *bgep)
 	case DEVICE_ID_5723:
 	case DEVICE_ID_5761:
 	case DEVICE_ID_5761E:
+	case DEVICE_ID_5761S:
+	case DEVICE_ID_5761SE:
+	case DEVICE_ID_5784M:
+	case DEVICE_ID_57760:
 	case DEVICE_ID_57780:
+	case DEVICE_ID_57788:
+	case DEVICE_ID_57790:
 		cidp->msi_enabled = bge_enable_msi;
 		/*
 		 * We don't use MSI for BCM5764 and BCM5785, as the
@@ -2234,10 +2336,18 @@ bge_chip_id_init(bge_t *bgep)
 			cidp->chip_label = 5723;
 		else if (cidp->device == DEVICE_ID_5764)
 			cidp->chip_label = 5764;
+		else if (cidp->device == DEVICE_ID_5784M)
+			cidp->chip_label = 5784;
 		else if (cidp->device == DEVICE_ID_5785)
 			cidp->chip_label = 5785;
+		else if (cidp->device == DEVICE_ID_57760)
+			cidp->chip_label = 57760;
 		else if (cidp->device == DEVICE_ID_57780)
 			cidp->chip_label = 57780;
+		else if (cidp->device == DEVICE_ID_57788)
+			cidp->chip_label = 57788;
+		else if (cidp->device == DEVICE_ID_57790)
+			cidp->chip_label = 57790;
 		else
 			cidp->chip_label = 5761;
 		cidp->bge_dma_rwctrl = bge_dma_rwctrl_5721;
@@ -3401,18 +3511,27 @@ bge_chip_reset(bge_t *bgep, boolean_t enable_dma)
 		mhcr = MHCR_ENABLE_INDIRECT_ACCESS |
 			MHCR_ENABLE_TAGGED_STATUS_MODE |
 			MHCR_MASK_INTERRUPT_MODE |
-			MHCR_MASK_PCI_INT_OUTPUT |
 			MHCR_CLEAR_INTERRUPT_INTA |
 			MHCR_ENABLE_ENDIAN_WORD_SWAP |
 			MHCR_ENABLE_ENDIAN_BYTE_SWAP;
+
+		if (bgep->intr_type == DDI_INTR_TYPE_FIXED)
+			mhcr |= MHCR_MASK_PCI_INT_OUTPUT;
+
 		if (DEVICE_5717_SERIES_CHIPSETS(bgep))
 			pci_config_put32(bgep->cfg_handle, PCI_CONF_BGE_MHCR,
 					0);
+#else
+		mhcr = MHCR_ENABLE_INDIRECT_ACCESS |
+			MHCR_ENABLE_TAGGED_STATUS_MODE |
+			MHCR_MASK_INTERRUPT_MODE |
+			MHCR_MASK_PCI_INT_OUTPUT |
+			MHCR_CLEAR_INTERRUPT_INTA;
+#endif
 		pci_config_put32(bgep->cfg_handle, PCI_CONF_BGE_MHCR, mhcr);
 		bge_reg_put32(bgep, MEMORY_ARBITER_MODE_REG,
 			bge_reg_get32(bgep, MEMORY_ARBITER_MODE_REG) |
 			MEMORY_ARBITER_ENABLE);
-#endif
 		if (asf_mode == ASF_MODE_INIT) {
 			bge_asf_pre_reset_operations(bgep, BGE_INIT_RESET);
 		} else if (asf_mode == ASF_MODE_SHUTDOWN) {
@@ -3436,9 +3555,13 @@ bge_chip_reset(bge_t *bgep, boolean_t enable_dma)
 
 	mhcr = MHCR_ENABLE_INDIRECT_ACCESS |
 	    MHCR_ENABLE_TAGGED_STATUS_MODE |
+	    MHCR_ENABLE_PCI_STATE_WRITE |
 	    MHCR_MASK_INTERRUPT_MODE |
-	    MHCR_MASK_PCI_INT_OUTPUT |
 	    MHCR_CLEAR_INTERRUPT_INTA;
+
+	if (bgep->intr_type == DDI_INTR_TYPE_FIXED)
+		mhcr |= MHCR_MASK_PCI_INT_OUTPUT;
+
 #ifdef  _BIG_ENDIAN
 	mhcr |= MHCR_ENABLE_ENDIAN_WORD_SWAP | MHCR_ENABLE_ENDIAN_BYTE_SWAP;
 #endif  /* _BIG_ENDIAN */
@@ -3449,6 +3572,12 @@ bge_chip_reset(bge_t *bgep, boolean_t enable_dma)
 	if (bgep->asf_enabled)
 		bgep->asf_wordswapped = B_FALSE;
 #endif
+
+	if (DEVICE_IS_5755_PLUS(bgep) ||
+	    MHCR_CHIP_ASIC_REV(bgep->chipid.asic_rev) ==
+	    MHCR_CHIP_ASIC_REV_5752)
+		bge_reg_put32(bgep, GRC_FASTBOOT_PC, 0);
+
 	/*
 	 * NVRAM Corruption Workaround
 	 */
@@ -3508,6 +3637,11 @@ bge_chip_reset(bge_t *bgep, boolean_t enable_dma)
 #else
 	modeflags = MODE_WORD_SWAP_FRAME | MODE_BYTE_SWAP_FRAME;
 #endif	/* _BIG_ENDIAN */
+	if (MHCR_CHIP_ASIC_REV(bgep->chipid.asic_rev) ==
+	    MHCR_CHIP_ASIC_REV_5720)
+		modeflags |=
+		    MODE_BYTE_SWAP_B2HRX_DATA | MODE_WORD_SWAP_B2HRX_DATA |
+		    MODE_B2HRX_ENABLE | MODE_HTX2B_ENABLE;
 #ifdef BGE_IPMI_ASF
 	if (bgep->asf_enabled)
 		modeflags |= MODE_HOST_STACK_UP;
@@ -3591,6 +3725,13 @@ bge_chip_reset(bge_t *bgep, boolean_t enable_dma)
 	 * Step 20: clear the Ethernet MAC mode register
 	 */
 	bge_reg_put32(bgep, ETHERNET_MAC_MODE_REG, 0);
+
+	if (MHCR_CHIP_ASIC_REV(bgep->chipid.asic_rev) ==
+	    MHCR_CHIP_ASIC_REV_5720) {
+		uint32_t regval = bge_reg_get32(bgep, CPMU_CLCK_ORIDE_REG);
+		bge_reg_put32(bgep, CPMU_CLCK_ORIDE_REG,
+		    regval & ~CPMU_CLCK_ORIDE_MAC_ORIDE_EN);
+	}
 
 	/*
 	 * Step 21: restore cache-line-size, latency timer, and
@@ -3818,8 +3959,17 @@ bge_chip_start(bge_t *bgep, boolean_t reset_phys)
 	/*
 	 * Steps 34-36: enable buffer manager & internal h/w queues
 	 */
-	if (!bge_chip_enable_engine(bgep, BUFFER_MANAGER_MODE_REG,
-	    STATE_MACHINE_ATTN_ENABLE_BIT))
+
+	regval = STATE_MACHINE_ATTN_ENABLE_BIT;
+	if (MHCR_CHIP_ASIC_REV(bgep->chipid.asic_rev) ==
+	    MHCR_CHIP_ASIC_REV_5719)
+		regval |= BUFF_MGR_NO_TX_UNDERRUN;
+	if (MHCR_CHIP_ASIC_REV(bgep->chipid.asic_rev) ==
+	    MHCR_CHIP_ASIC_REV_5717 ||
+	    bgep->chipid.asic_rev == MHCR_CHIP_REV_5719_A0 ||
+	    bgep->chipid.asic_rev == MHCR_CHIP_REV_5720_A0)
+		regval |= BUFF_MGR_MBUF_LOW_ATTN_ENABLE;
+	if (!bge_chip_enable_engine(bgep, BUFFER_MANAGER_MODE_REG, regval))
 		retval = DDI_FAILURE;
 	if (!bge_chip_enable_engine(bgep, FTQ_RESET_REG, 0))
 		retval = DDI_FAILURE;
@@ -3913,7 +4063,13 @@ bge_chip_start(bge_t *bgep, boolean_t reset_phys)
 	/*
 	 * Step 50: configure the IPG et al
 	 */
-	bge_reg_put32(bgep, MAC_TX_LENGTHS_REG, MAC_TX_LENGTHS_DEFAULT);
+	regval = MAC_TX_LENGTHS_DEFAULT;
+	if (MHCR_CHIP_ASIC_REV(bgep->chipid.asic_rev)
+	    == MHCR_CHIP_ASIC_REV_5720)
+		regval |= bge_reg_get32(bgep, MAC_TX_LENGTHS_REG) &
+		    (MAC_TX_LENGTHS_JMB_FRM_LEN_MSK |
+		    MAC_TX_LENGTHS_CNT_DWN_VAL_MSK);
+	bge_reg_put32(bgep, MAC_TX_LENGTHS_REG, regval);
 
 	/*
 	 * Step 51: configure the default Rx Return Ring
@@ -4068,22 +4224,45 @@ bge_chip_start(bge_t *bgep, boolean_t reset_phys)
 			retval = DDI_FAILURE;
 	dma_wrprio = (bge_dma_wrprio << DMA_PRIORITY_SHIFT) |
 	    ALL_DMA_ATTN_BITS;
-	if ((MHCR_CHIP_ASIC_REV(bgep->chipid.asic_rev) ==
-	    MHCR_CHIP_ASIC_REV_5755) ||
-	    (MHCR_CHIP_ASIC_REV(bgep->chipid.asic_rev) ==
-	    MHCR_CHIP_ASIC_REV_5723) ||
-	    (MHCR_CHIP_ASIC_REV(bgep->chipid.asic_rev) ==
-	    MHCR_CHIP_ASIC_REV_5906)) {
+	if (DEVICE_IS_5755_PLUS(bgep))
 		dma_wrprio |= DMA_STATUS_TAG_FIX_CQ12384;
-	}
 	if (!bge_chip_enable_engine(bgep, WRITE_DMA_MODE_REG,
 	    dma_wrprio))
 		retval = DDI_FAILURE;
+	if (MHCR_CHIP_ASIC_REV(bgep->chipid.asic_rev) ==
+	    MHCR_CHIP_ASIC_REV_5761 ||
+	    MHCR_CHIP_ASIC_REV(bgep->chipid.asic_rev) ==
+	    MHCR_CHIP_ASIC_REV_5784 ||
+	    MHCR_CHIP_ASIC_REV(bgep->chipid.asic_rev) ==
+	    MHCR_CHIP_ASIC_REV_5785 ||
+	    MHCR_CHIP_ASIC_REV(bgep->chipid.asic_rev) ==
+	    MHCR_CHIP_ASIC_REV_57780 ||
+	    DEVICE_IS_57765_PLUS(bgep)) {
+		regval = bge_reg_get32(bgep, READ_DMA_RESERVED_CONTROL_REG);
+		if (MHCR_CHIP_ASIC_REV(bgep->chipid.asic_rev) ==
+		    MHCR_CHIP_ASIC_REV_5719 ||
+		    MHCR_CHIP_ASIC_REV(bgep->chipid.asic_rev) ==
+		    MHCR_CHIP_ASIC_REV_5720) {
+			regval &= ~(RDMA_RSRVCTRL_TXMRGN_MASK |
+			    RDMA_RSRVCTRL_FIFO_LWM_MASK |
+			    RDMA_RSRVCTRL_FIFO_HWM_MASK);
+			regval |= RDMA_RSRVCTRL_TXMRGN_320B |
+			    RDMA_RSRVCTRL_FIFO_LWM_1_5K |
+			    RDMA_RSRVCTRL_FIFO_HWM_1_5K;
+		}
+		bge_reg_put32(bgep, READ_DMA_RESERVED_CONTROL_REG,
+		    regval | RDMA_RSRVCTRL_FIFO_OFLW_FIX);
+	}
 	if (DEVICE_5723_SERIES_CHIPSETS(bgep) ||
 	    DEVICE_5717_SERIES_CHIPSETS(bgep))
 		bge_dma_rdprio = 0;
+	regval = bge_dma_rdprio << DMA_PRIORITY_SHIFT;
+	if (MHCR_CHIP_ASIC_REV(bgep->chipid.asic_rev) ==
+	    MHCR_CHIP_ASIC_REV_5720)
+		regval |= bge_reg_get32(bgep, READ_DMA_MODE_REG) &
+		    DMA_H2BNC_VLAN_DET;
 	if (!bge_chip_enable_engine(bgep, READ_DMA_MODE_REG,
-	    (bge_dma_rdprio << DMA_PRIORITY_SHIFT) | ALL_DMA_ATTN_BITS))
+	    regval | ALL_DMA_ATTN_BITS))
 		retval = DDI_FAILURE;
 	if (!bge_chip_enable_engine(bgep, RCV_DATA_COMPLETION_MODE_REG,
 	    STATE_MACHINE_ATTN_ENABLE_BIT))
@@ -4116,7 +4295,23 @@ bge_chip_start(bge_t *bgep, boolean_t reset_phys)
 	 * Step 88: download firmware -- doesn't apply
 	 * Steps 89-90: enable Transmit & Receive MAC Engines
 	 */
-	if (!bge_chip_enable_engine(bgep, TRANSMIT_MAC_MODE_REG, 0))
+	if (DEVICE_IS_5755_PLUS(bgep) ||
+	    MHCR_CHIP_ASIC_REV(bgep->chipid.asic_rev) ==
+	    MHCR_CHIP_ASIC_REV_5906) {
+		regval = bge_reg_get32(bgep, TRANSMIT_MAC_MODE_REG);
+		regval |= TRANSMIT_MODE_MBUF_LOCKUP_FIX;
+	} else {
+		regval = 0;
+	}
+	if (MHCR_CHIP_ASIC_REV(bgep->chipid.asic_rev) ==
+	    MHCR_CHIP_ASIC_REV_5720) {
+		regval &= ~(TRANSMIT_MODE_HTX2B_JMB_FRM_LEN |
+		    TRANSMIT_MODE_HTX2B_CNT_DN_MODE);
+		regval |= bge_reg_get32(bgep, TRANSMIT_MAC_MODE_REG) &
+		    (TRANSMIT_MODE_HTX2B_JMB_FRM_LEN |
+		    TRANSMIT_MODE_HTX2B_CNT_DN_MODE);
+	}
+	if (!bge_chip_enable_engine(bgep, TRANSMIT_MAC_MODE_REG, regval))
 		retval = DDI_FAILURE;
 #ifdef BGE_IPMI_ASF
 	if (!bgep->asf_enabled) {
@@ -4219,7 +4414,6 @@ bge_chip_start(bge_t *bgep, boolean_t reset_phys)
 	if (bgep->intr_type == DDI_INTR_TYPE_FIXED)
 		bge_cfg_clr32(bgep, PCI_CONF_BGE_MHCR,
 		    bgep->chipid.mask_pci_int);
-
 	/*
 	 * All done!
 	 */

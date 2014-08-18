@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2014 Joyent, Inc.  All rights reserved.
 # Copyright (c) 2012 Nexenta Systems, Inc. All rights reserved.
 # Copyright (c) 2013 by Delphix. All rights reserved.
 # Copyright (c) 2013 by Saso Kiselkov. All rights reserved.
@@ -426,6 +427,8 @@ PROFILE_OBJS += profile.o
 
 SYSTRACE_OBJS += systrace.o
 
+LX_SYSTRACE_OBJS += lx_systrace.o
+
 LOCKSTAT_OBJS += lockstat.o
 
 FASTTRAP_OBJS += fasttrap.o fasttrap_isa.o
@@ -489,6 +492,12 @@ PTC_OBJS +=	tty_pty.o
 PTSL_OBJS +=	tty_pts.o
 
 PTM_OBJS +=	ptm.o
+
+LX_PTM_OBJS +=	lx_ptm.o
+
+LX_AUDIO_OBJS += lx_audio.o
+
+LX_NETLINK_OBJS +=	lx_netlink.o
 
 MII_OBJS +=	mii.o mii_cicada.o mii_natsemi.o mii_intel.o mii_qualsemi.o \
 		mii_marvell.o mii_realtek.o mii_other.o
@@ -672,6 +681,10 @@ NET80211_OBJS += net80211.o net80211_proto.o net80211_input.o \
 		 net80211_ht.o
 
 VNIC_OBJS +=	vnic_ctl.o vnic_dev.o
+
+VND_OBJS +=	vnd.o frameio.o
+
+GSQUEUE_OBJS +=	gsqueue.o
 
 SIMNET_OBJS +=	simnet.o
 
@@ -1128,8 +1141,7 @@ DEVFS_OBJS +=	devfs_subr.o	devfs_vfsops.o	devfs_vnops.o
 DEV_OBJS  +=	sdev_subr.o	sdev_vfsops.o	sdev_vnops.o	\
 		sdev_ptsops.o	sdev_zvolops.o	sdev_comm.o	\
 		sdev_profile.o	sdev_ncache.o	sdev_netops.o	\
-		sdev_ipnetops.o	\
-		sdev_vtops.o
+		sdev_ipnetops.o	sdev_vtops.o	sdev_plugin.o
 
 CTFS_OBJS +=	ctfs_all.o ctfs_cdir.o ctfs_ctl.o ctfs_event.o \
 		ctfs_latest.o ctfs_root.o ctfs_sym.o ctfs_tdir.o ctfs_tmpl.o
@@ -1146,7 +1158,12 @@ PIPE_OBJS +=	pipe.o
 HSFS_OBJS +=	hsfs_node.o	hsfs_subr.o	hsfs_vfsops.o	hsfs_vnops.o \
 		hsfs_susp.o	hsfs_rrip.o	hsfs_susp_subr.o
 
+HYPRLOFS_OBJS += hyprlofs_dir.o hyprlofs_subr.o \
+		hyprlofs_vnops.o hyprlofs_vfsops.o
+
 LOFS_OBJS +=	lofs_subr.o	lofs_vfsops.o	lofs_vnops.o
+
+LXPROC_OBJS +=	lxpr_subr.o	lxpr_vfsops.o	lxpr_vnops.o
 
 NAMEFS_OBJS +=	namevfs.o	namevno.o
 
@@ -1301,6 +1318,7 @@ SMBFS_OBJS +=	smbfs_vfsops.o	smbfs_vnops.o	smbfs_node.o	\
 		smbfs_rwlock.o	smbfs_xattr.o	\
 		$(SMBFS_COMMON_OBJS)
 
+BOOTFS_OBJS +=	bootfs_construct.o bootfs_vfsops.o bootfs_vnops.o
 
 #
 #			LVM modules
@@ -1394,6 +1412,7 @@ ZFS_COMMON_OBJS +=		\
 	zfs_fuid.o		\
 	zfs_sa.o		\
 	zfs_znode.o		\
+	zfs_zone.o		\
 	zil.o			\
 	zio.o			\
 	zio_checksum.o		\
@@ -2038,6 +2057,11 @@ MEGA_SAS_OBJS = megaraid_sas.o
 MR_SAS_OBJS = ld_pd_map.o mr_sas.o mr_sas_tbolt.o mr_sas_list.o
 
 #
+#	DR_SAS module
+#
+DR_SAS_OBJS = dr_sas.o
+
+#
 #	CPQARY3 module
 #
 CPQARY3_OBJS =	cpqary3.o cpqary3_noe.o cpqary3_talk2ctlr.o	\
@@ -2074,3 +2098,17 @@ MYRI10GE_OBJS =	myri10ge.o myri10ge_lro.o
 NULLDRIVER_OBJS =	nulldriver.o
 
 TPM_OBJS =	tpm.o tpm_hcall.o
+
+#
+# USB Fast ethernet drivers
+#
+USBGEM_OBJS = usbgem.o
+AXF_OBJS = axf_usbgem.o
+UDMF_OBJS = udmf_usbgem.o
+URF_OBJS = urf_usbgem.o
+UPF_OBJS = upf_usbgem.o
+
+#
+#	NFP objects
+#
+NFP_OBJS = hostif.o osif.o drvlist.o i21555.o i21285.o i21555d.o

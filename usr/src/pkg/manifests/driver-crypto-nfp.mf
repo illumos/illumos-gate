@@ -1,0 +1,33 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2014 <contributor>
+#
+
+set name=pkg.fmri value=pkg:/driver/crypto/nfp@$(PKGVERS)
+set name=pkg.description value="nfast Crypto Accelerator Driver"
+set name=pkg.summary value="nfast Crypto Accelerator"
+set name=info.classification \
+    value=org.opensolaris.category.2008:System/Hardware
+set name=variant.arch value=i386
+dir path=kernel group=sys
+dir path=kernel/drv group=sys
+dir path=kernel/drv/$(ARCH64) group=sys
+driver name=nfp \
+    alias=pci1011,1065.100.100 \
+    alias=pci8086,b555.100.100 \
+    alias=pciex1011,1065.100.100 \
+    alias=pciex8086,b555.100.100
+file path=kernel/drv/$(ARCH64)/nfp group=sys
+$(i386_ONLY)file path=kernel/drv/nfp group=sys
+license usr/src/uts/common/io/nfp/THIRDPARTYLICENSE \
+    license=usr/src/uts/common/io/nfp/THIRDPARTYLICENSE

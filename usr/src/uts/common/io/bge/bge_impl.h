@@ -23,6 +23,10 @@
  * Copyright (c) 2002, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
+/*
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+ */
+
 #ifndef _BGE_IMPL_H
 #define	_BGE_IMPL_H
 
@@ -605,6 +609,7 @@ typedef struct {
 	uint8_t			latency;	/* latency-timer	*/
 
 	uint8_t			flags;
+	uint32_t		chip_type;	/* see CHIP_TYPE_ in bge_hw.h */
 	uint16_t		chip_label;	/* numeric part only	*/
 						/* (e.g. 5703/5794/etc)	*/
 	uint32_t		mbuf_base;	/* Mbuf pool parameters */
@@ -640,10 +645,11 @@ typedef struct {
 	uint32_t		mask_pci_int;
 } chip_id_t;
 
-#define	CHIP_FLAG_SUPPORTED	0x80
-#define	CHIP_FLAG_SERDES	0x40
-#define	CHIP_FLAG_PARTIAL_CSUM	0x20
-#define	CHIP_FLAG_NO_JUMBO	0x1
+#define	CHIP_FLAG_SUPPORTED	 0x80
+#define	CHIP_FLAG_SERDES	 0x40
+#define	CHIP_FLAG_PARTIAL_CSUM	 0x20
+#define	CHIP_FLAG_NO_CHECK_RESET 0x2
+#define	CHIP_FLAG_NO_JUMBO	 0x1
 
 /*
  * Collection of physical-layer functions to:

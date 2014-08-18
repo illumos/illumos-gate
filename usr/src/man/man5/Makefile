@@ -14,6 +14,7 @@
 # Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
+# Copyright (c) 2014, Joyent, Inc.  All rights reserved.
 #
 
 include		$(SRC)/Makefile.master
@@ -42,6 +43,7 @@ MANFILES=	Intro.5			\
 		dhcp.5			\
 		dhcp_modules.5		\
 		environ.5		\
+		epoll.5			\
 		eqn.5			\
 		eqnchar.5		\
 		extendedFILE.5		\

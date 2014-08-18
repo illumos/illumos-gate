@@ -39,11 +39,17 @@ extern "C" {
 
 typedef struct Key Key;
 enum types {
-	KEY_RSA1,
-	KEY_RSA,
-	KEY_DSA,
+        KEY_RSA1,
+        KEY_RSA,
+        KEY_DSA,
+        KEY_ECDSA,
+        KEY_RSA_CERT,
+        KEY_DSA_CERT,
+        KEY_ECDSA_CERT,
+        KEY_RSA_CERT_V00,
+        KEY_DSA_CERT_V00,
 	KEY_NULL,
-	KEY_UNSPEC
+        KEY_UNSPEC
 };
 enum fp_type {
 	SSH_FP_SHA1,
@@ -87,6 +93,7 @@ int	 key_names_valid2(const char *);
 int	 key_sign(Key *, u_char **, u_int *, u_char *, u_int);
 int	 key_verify(Key *, u_char *, u_int, u_char *, u_int);
 
+int      key_type_plain(int type);
 #ifdef __cplusplus
 }
 #endif

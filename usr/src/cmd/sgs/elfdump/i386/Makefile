@@ -30,4 +30,6 @@ include		../Makefile.com
 
 .KEEP_STATE:
 
+install:	all $(ROOTPROG32)
+
 include		../Makefile.targ

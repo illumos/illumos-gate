@@ -1,0 +1,148 @@
+'\" te
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright (c) 2014, Joyent, Inc.  All rights reserved.
+.\"
+.TH VND_PROP_ITER 3VND "Feb 21, 2014"
+
+.SH NAME
+
+vnd_prop_iter \- iterate vnd properties
+
+.SH SYNOPSIS
+
+.LP
+.nf
+cc [ flag... ] file... -lvnd [ library... ]
+#include <libvnd.h>
+
+typedef int (vnd_prop_iter_f)(vnd_handle_t *vhp, vnd_prop_t prop,
+    void *cbarg);
+
+int vnd_prop_iter(vnd_handle_t *vhp, vnd_prop_iter_f cb,
+    void *arg);
+.fi
+
+.SH DESCRIPTION
+.LP
+The vnd_prop_iter function iterates over all the available properties
+for the vnd handle vhp and calls the user supplied callback function
+cb. The argument arg is passed directly to the callback function.
+
+.LP
+The function specified by cb receives three arguments. The first, vhp,
+is the same vnd library handle that was passed to vnd_prop_iter. During
+the callback, the consumer should not call vnd_close(3VND). Doing so
+will lead to undefined and undocumented behavior. The second argument,
+prop, is the current property. While vnd_prop_iter guarantees that all
+properties will be recieved, it does not guarantee the order of them.
+The final argument, cbarg, is the same argument that the caller passed
+in during arg.
+
+.LP
+The return value of the callback function cb indicates whether or not
+property iteration should continue. To continue iteration, the
+function cb should return zero. Otherwise, to stop property iteration
+it should return non-zero.
+
+.SH RETURN VALUES
+
+.LP
+On success, the function vnd_prop_iter returns zero. If the callback
+function returned non-zero to terminate iteration, vnd_prop_iter will
+instead return one. In the case of library failure, vnd_prop_iter will
+return -1. In such cases, the vnd and system errors will be updated
+and available via vnd_errno(3VND) and vnd_syserrno(3VND).
+
+.SH EXAMPLES
+
+.LP
+Example 1    Print writeable properties
+
+.LP
+The following sample C program walks over every vnd property and
+prints out whether the property is read-only or read-write for the
+vnd device "vnd1" in the current zone.
+
+.sp
+.in +2
+.nf
+#include <libvnd.h>
+#include <stdlib.h>
+#include <stdio.h>
+
+static int
+print_prop(vnd_handle_t *vhp, vnd_prop_t prop, void *unused)
+{
+	boolean_t canwrite;
+
+	if (vnd_prop_writeable(vhp, &canwrite) != 0)
+		abort();
+
+	(void) printf("prop %d is %s", prop, canwrite == B_TRUE ? "rw" : "r-");
+	return (0);
+}
+
+int
+main(void)
+{
+	vnd_handle_t *vhp;
+	vnd_errno_t vnderr;
+	int syserr;
+
+	vhp = vnd_open(NULL, "vnd1", &vnderr, &syserr);
+	if (vhp != NULL) {
+		if (vnderr == VND_E_SYS)
+			(void) fprintf(stderr, "failed to open device: %s",
+			    vnd_strsyserror(syserr));
+		else
+			(void) fprintf(stderr, "failed to open device: %s",
+			    vnd_strerror(vnderr));
+		return (1);
+	}
+
+	if (vnd_prop_iter(vhp, print_prop, NULL) != 0) {
+		vnderr = vnd_errno(vhp);
+		syserr = vnd_syserrno(vhp);
+		if (vnderr == VND_E_SYS)
+			(void) fprintf(stderr, "failed to open device: %s",
+			    vnd_strsyserror(syserr));
+		else
+			(void) fprintf(stderr, "failed to open device: %s",
+			    vnd_strerror(vnderr));
+		return (1);
+	}
+
+	vnd_close(vnd);
+	return (0);
+}
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See attributes(5) for descriptions of the following attributes:
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Stability	Committed
+_
+MT-Level	See "THREADING" in libvnd(3LIB)
+.TE
+
+libvnd(3LIB), vnd_close(3VND), vnd_errno(3VND), vnd_syserrno(3VND)

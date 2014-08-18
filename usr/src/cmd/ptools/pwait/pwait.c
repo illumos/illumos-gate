@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <stdio_ext.h>
 #include <ctype.h>
@@ -39,6 +37,8 @@
 #include <poll.h>
 #include <procfs.h>
 #include <sys/resource.h>
+#include <limits.h>
+#include "ptools_common.h"
 
 static int count_my_files();
 static char *command;
@@ -49,6 +49,7 @@ static char *command;
 int
 main(int argc, char **argv)
 {
+	char buf[PATH_MAX];
 	unsigned long remain = 0;
 	struct pollfd *pollfd;
 	struct pollfd *pfd;
@@ -75,9 +76,11 @@ main(int argc, char **argv)
 		(void) fprintf(stderr, "usage:\t%s [-v] pid ...\n", command);
 		(void) fprintf(stderr, "  (wait for processes to terminate)\n");
 		(void) fprintf(stderr,
-			"  -v: verbose; report terminations to standard out\n");
+		    "  -v: verbose; report terminations to standard out\n");
 		return (2);
 	}
+
+	(void) proc_snprintf(buf, sizeof (buf), "/proc/");
 
 	/* make sure we have enough file descriptors */
 	if (getrlimit(RLIMIT_NOFILE, &rlim) == 0) {
@@ -87,8 +90,8 @@ main(int argc, char **argv)
 			rlim.rlim_cur = argc + nfiles + SLOP;
 			if (setrlimit(RLIMIT_NOFILE, &rlim) != 0) {
 				(void) fprintf(stderr,
-					"%s: insufficient file descriptors\n",
-					command);
+				    "%s: insufficient file descriptors\n",
+				    command);
 				return (2);
 			}
 		}
@@ -108,11 +111,11 @@ main(int argc, char **argv)
 		if (strchr(arg, '/') != NULL)
 			(void) strncpy(psinfofile, arg, sizeof (psinfofile));
 		else {
-			(void) strcpy(psinfofile, "/proc/");
+			(void) strcpy(psinfofile, buf);
 			(void) strncat(psinfofile, arg, sizeof (psinfofile)-6);
 		}
 		(void) strncat(psinfofile, "/psinfo",
-			sizeof (psinfofile)-strlen(psinfofile));
+		    sizeof (psinfofile)-strlen(psinfofile));
 
 		pfd = &pollfd[i];
 		if ((pfd->fd = open(psinfofile, O_RDONLY)) >= 0) {
@@ -126,7 +129,7 @@ main(int argc, char **argv)
 			pfd->revents = 0;
 		} else if (errno == ENOENT) {
 			(void) fprintf(stderr, "%s: no such process: %s\n",
-				command, arg);
+			    command, arg);
 		} else {
 			perror(arg);
 		}
@@ -160,9 +163,9 @@ main(int argc, char **argv)
 					if (pread(pfd->fd, &psinfo,
 					    sizeof (psinfo), (off_t)0)
 					    == sizeof (psinfo)) {
-						(void) printf(
-					"%s: terminated, wait status 0x%.4x\n",
-							arg, psinfo.pr_wstat);
+						(void) printf("%s: terminated, "
+						    "wait status 0x%.4x\n",
+						    arg, psinfo.pr_wstat);
 					} else {
 						(void) printf(
 						    "%s: terminated\n", arg);
@@ -170,10 +173,10 @@ main(int argc, char **argv)
 				}
 				if (pfd->revents & POLLNVAL)
 					(void) printf("%s: system process\n",
-						arg);
+					    arg);
 				if (pfd->revents & ~(POLLPRI|POLLHUP|POLLNVAL))
 					(void) printf("%s: unknown error\n",
-						arg);
+					    arg);
 			}
 
 			(void) close(pfd->fd);

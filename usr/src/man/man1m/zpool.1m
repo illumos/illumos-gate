@@ -1,5 +1,6 @@
 '\" te
 .\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright (c) 2013, Joyent, Inc. All Rights Reserved.
 .\" Copyright 2011, Nexenta Systems, Inc. All Rights Reserved.
 .\" Copyright (c) 2013 by Delphix. All rights reserved.
 .\" The contents of this file are subject to the terms of the Common Development
@@ -1608,7 +1609,7 @@ the pool, in addition to the pool-wide statistics.
 .sp
 .ne 2
 .na
-\fB\fBzpool list\fR [\fB-T\fR \fBu\fR | \fBd\fR] [\fB-Hv\fR] [\fB-o\fR \fIprops\fR[,...]] [\fIpool\fR] ...
+\fB\fBzpool list\fR [\fB-T\fR \fBu\fR | \fBd\fR] [\fB-Hvp\fR] [\fB-o\fR \fIprops\fR[,...]] [\fIpool\fR] ...
 [\fIinterval\fR[\fIcount\fR]]\fR
 .ad
 .sp .6
@@ -1668,6 +1669,15 @@ fragmentation, expandsize, capacity, dedupratio, health, altroot"
 .RS 12n
 Verbose statistics.  Reports usage statistics for individual \fIvdevs\fR within
 the pool, in addition to the pool-wise statistics.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-p\fR\fR
+.ad
+.RS 12n
+Display numbers in parseable (exact) values.
 .RE
 
 .RE

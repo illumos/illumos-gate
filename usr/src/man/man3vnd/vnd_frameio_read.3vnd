@@ -1,0 +1,705 @@
+'\" te
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright (c) 2014, Joyent, Inc.  All rights reserved.
+.\"
+.TH VND_FRAMEIO_READ 3VND "Mar 06, 2014"
+
+.SH NAME
+
+vnd_frameio_read, vnd_frameio_write \- perform framed I/O to a vnd device
+
+.SH SYNOPSIS
+
+.LP
+.nf
+cc [ flag... ] file... -lvnd [ library... ]
+#include <libvnd.h>
+
+int vnd_frameio_read(vnd_handle_t *vhp, frameio_t *fiop);
+
+int vnd_frameio_write(vnd_handle_t *vhp, frameio_t *fiop);
+.fi
+
+.SH DESCRIPTION
+.LP
+Framed I/O is a general means to manipulate data that is inherently
+framed, meaning that there is a maximum frame size, but the data may
+often be less than that size. As an example, an Ethernet device's MTU
+describes the maximum frame size, but the size of an individual frame
+is often much less. You can read a single frame at a time, or you can
+read multiple frames in a single call.
+
+In addition, framed I/O allows the consumer to break individual frames
+into a series of vectors. This is analogous to the use of an iovec(9S)
+with readv(2) and writev(2).
+
+vnd_frameio_read performs a framed I/O read of the device represented by
+the handle vhp, with the framed I/O data described by fiop.
+vnd_frameio_write works in the same manner, except performing a write
+instead of a read.
+
+.LP
+The basic vector component of the frameio_t is the framevec_t. Each
+framevec_t represents a single vector entry. An array of these is
+present in the frameio_t. The framevec_t structure has the following
+members:
+
+.in +2
+.nf
+void		*fv_buf		/* data buffer */
+size_t	fv_buflen;	/* total size of buffer */
+size_t	fv_actlen;	/* amount of buffer consumed */
+.fi
+.in -2
+
+.LP
+The fv_buf member points to a buffer which contains the data for this
+individual vector. When reading, data is consumed from fv_buf. When
+writing, data is written into fv_buf.
+
+The fv_buflen should indicate the total amount of data that is in the
+buffer. When reading, it indicates the size of the buffer. It must be
+set prior to calling vnd_frameio_read(). When writing, it indicates the
+amount of data that is valid in the buffer.
+
+The fv_actlen is a read-only member. It is set on successful return of
+the functions vnd_frameio_read and vnd_frameio_write. When reading, it
+is updated with the amount of data that was read into fv_buf. When
+writing, it is instead updated with the amount of data from fv_buf that
+was actually consumed. Generally when writing data, a framevec_t will
+either be entirely consumed or it will not be consumed at all.
+
+
+.LP
+A series of framevec_t's is encapsulated in a frameio_t. The frameio_t
+structure has the following members:
+
+.in +2
+.nf
+uint_t		fio_version;	/* current version */
+uint_t		fio_nvpf;		/* number of vectors in one frame */
+uint_t		fio_nvecs;	/* The total number of vectors */
+framevec_t	fio_vecs[];	/* vectors */
+.fi
+.in -2
+
+.LP
+The fio_version member represents the current version of the frameio_t.
+The fio_version should be set to the macro FRAMEIO_CURRENT_VERSION,
+which is currently 1.
+
+The members fio_nvpf and fio_nvecs describe the number of frames that
+exist. fio_nvecs describes the total number of vectors that are present
+in fio_vecs.  The upper bound on this is described by FRAMEIO_NVECS_MAX
+which is currently 32. fio_nvpf describe the number of vectors that
+should be used to make up each frame. By setting fio_vecs to be an even
+multiple of fio_nvpf, multiple frames can be read or written in a single
+call.
+
+After a call to vnd_frameio_read or vnd_frameio_write fio_nvecs is
+updated with total number of vectors read or written to. This value can
+be divided by fio_nvpf to determine the total number of frames that were
+written or read.
+
+.LP
+Each frame can be broken down into a series of multiple vectors. As an
+example, someone might want to break Ethernet frames into mac headers
+and payloads. The value of fio_nvpf would be set to two, to indicate
+that a single frame consists of two different vector components. The
+member fio_nvecs describes the total number of frames. As such, the
+value of fio_vecs divided by fio_nvpf describes the total number of
+frames that can be consumed in one call. As a result of this, fio_nvpf
+must evenly divide fio_vecs. If fio_nvpf is set to two and
+fio_nvecs is set to ten, then a total of five frames can be processed
+at once, each frame being broken down into two different vector
+components.
+
+A given frame will never overflow the number of vectors described by
+fio_nvpf. Consider the case where each vector component has a buffer
+sized to 1518 bytes, fio_nvpf is set to one, and fio_nvecs is set to
+three. If a call to vnd_frameio_read is made and four 500 byte Ethernet
+frames come in, then each frame will be mapped to a single vector. The
+500 bytes will be copied into fio_nvecs[i]->fio_buf and
+fio_nvecs[i]->fio_actlen will be set to 500. To contrast this, if
+readv(2) had been called, the first three frames would all be in the
+first iov and the fourth frame's first eight bytes would be in the first
+iov and the remaining in the second.
+
+.LP
+The user must properly initialize fio_nvecs framevec_t's worth of the
+fio_vecs array. When multiple vectors comprise a frame, fv_buflen data
+is consumed before moving onto the next vector. Consider the case
+where the user wants to break a vector into three different
+components, an 18 byte vector for an Ethernet VLAN header, a 20 byte
+vector for an IPv4 header, and a third 1500 byte vector for the
+remaining payload. If a frame was received that only had 30 bytes,
+then the first 18 bytes would fill up the first vector, the remaining
+12 bytes would fill up the IPv4 header. If instead a 524 byte frame
+came in, then the first 18 bytes would be placed in the first vector,
+the next 24 bytes would be placed in the next vector, and the remaining
+500 bytes in the third.
+
+.LP
+The functions vnd_frameio_read and vnd_frameio_write operate in both
+blocking and non-blocking mode. If either O_NONBLOCK or O_NDELAY have
+been set on the file descriptor, then the I/O will behave in
+non-blocking mode. When in non-blocking mode, if no data is available
+when vnd_frameio_read is called, EAGAIN is returned. When
+vnd_frameio_write is called in non-blocking mode, if sufficient buffer
+space to hold all of the output frames is not available, then
+vnd_frameio_write will return EAGAIN. To know when the given vnd device
+has sufficient space, the device fires POLLIN/POLLRDNORM when data is
+available for read and POLLOUT/POLLRDOUT when space in the buffer has
+opened up for write. These events can be watched for through
+port_associate(3C) and similar routines with a file descriptor returned
+from vnd_polfd(3VND).
+
+.LP
+When non-blocking mode is disabled, calls to vnd_frameio_read will
+block until some amount of data is available. Calls to
+vnd_frameio_write will block until sufficient buffer space is
+available.
+
+.LP
+Similar to read(2) and write(2), vnd_frameio_read and
+vnd_frameio_write make no guarantees about the ordering of data when
+multiple threads simultaneously call the interface. While the data
+itself will be atomic, the ordering of multiple simultaneous calls is
+not defined.
+
+.SH RETURN VALUES
+
+.LP
+The vnd_frameio_read function returns zero on success. The member
+fio_nvecs of fiop is updated with the total number of vectors that had
+data read into them. Each updated framevec_t will have the buffer
+pointed to by fv_buf filled in with data, and fv_actlen will be
+updated with the amount of valid data in fv_buf.
+
+.LP
+The vnd_frameio_write function returns zero on success. The member
+fio_nvecs of fiop is updated with the total number of vectors that
+were written out to the underlying datalink. The fv_actlen of each
+vector is updated to indicate the amount of data that was written from
+that buffer.
+
+.LP
+On failure, both vnd_frameio_read and vnd_frameio_write return -1. The
+vnd and system error numbers are updated and available via
+vnd_errno(3VND) and vnd_syserrno(3VND). See ERRORS below for a list of
+errors and their meaning.
+
+
+.SH ERRORS
+.LP
+The functions vnd_frameio_read and vnd_frameio_write always set the
+vnd error to VND_E_SYS. The following system errors will be
+encountered:
+
+.sp
+.ne 2
+.na
+EAGAIN
+.ad
+.RS 10n
+Insufficient system memory was available for the operation.
+.sp
+Non-blocking mode was enabled and during the call to vnd_frameio_read,
+no data was available. Non-blocking mode was enabled and during the call
+to vnd_frameio_write, insufficient buffer space was available.
+.RE
+
+.sp
+.ne 2
+.na
+ENXIO
+.ad
+.RS 10n
+The vnd device referred to by vhp is not currently attached to an
+underlying data link and cannot send data.
+.RE
+
+.sp
+.ne 2
+.na
+EFAULT
+.ad
+.RS 10n
+The fiop argument points to an illegal address or the fv_buf members of
+the framevec_t's associated with the fiop member fio_vecs point to
+illegal addresses.
+.RE
+
+.sp
+.ne 2
+.na
+EINVAL
+.ad
+.RS 10n
+The fio_version member of fiop was unknown, the number of vectors
+specified by fio_nvecs is zero or greater than FRAMEIO_NVECS_MAX,
+fio_nvpf equals zero, fio_nvecs is not evenly divisible by fio_nvpf, or
+a buffer in fio_vecs[] has set fv_buf or fv_buflen to zero.
+.RE
+
+
+.sp
+.ne 2
+.na
+EINTR
+.ad
+.RS 10n
+A signal was caught during vnd_frameio_read or vnd_frameio_write, and no
+data was transferred.
+.RE
+
+
+.sp
+.ne 2
+.na
+EOVERFLOW
+.ad
+.RS 10n
+During vnd_frameio_read, the size of a frame specified by fiop->fio_nvpf
+and fiop->fio_vecs[].fv_buflen cannot contain a frame.
+.sp
+In a ILP32 environment, more data than UINT_MAX would be set in
+fv_actlen.
+.RE
+
+
+.sp
+.ne 2
+.na
+ERANGE
+.ad
+.RS 10n
+During vnd_frameio_write, the size of a frame is less than the device's
+minimum transmission unit or it is larger than the size of the maximum
+transmission unit.
+.RE
+
+
+.SH EXAMPLES
+
+.LP
+Example 1    Read a single frame with a single vector
+
+.sp
+.LP
+The following sample C program opens an existing vnd device named
+"vnd0" in the current zone and performs a blocking read of a single
+frame from it.
+
+.sp
+.in +2
+.nf
+#include <libvnd.h>
+#include <stdio.h>
+
+int
+main(void)
+{
+	vnd_handle_t *vhp;
+	vnd_errno_t vnderr;
+	int syserr, i;
+	frameio_t *fiop;
+
+	fiop = malloc(sizeof (frameio_t) + sizeof (framevec_t));
+	if (fiop == NULL) {
+		perror("malloc frameio_t");
+		return (1);
+	}
+	fiop->fio_version = FRAMEIO_CURRENT_VERSION;
+	fiop->fio_nvpf = 1;
+	fiop->fio_nvecs = 1;
+	fiop->fio_vecs[0].fv_buf = malloc(1518);
+	fiop->fio_vecs[0].fv_buflen = 1518;
+	if (fiop->fio_vecs[0].fv_buf == NULL) {
+		perror("malloc framevec_t.fv_buf");
+		free(fiop);
+		return (1);
+	}
+
+	vhp = vnd_open(NULL, "vnd1", &vnderr, &syserr);
+	if (vhp != NULL) {
+		if (vnderr == VND_E_SYS)
+			(void) fprintf(stderr, "failed to open device: %s",
+			    vnd_strsyserror(syserr));
+		else
+			(void) fprintf(stderr, "failed to open device: %s",
+			    vnd_strerror(vnderr));
+		free(fiop->fio_vecs[0].fv_buf);
+		free(fiop);
+		return (1);
+	}
+
+	if (frameio_read(vhp, fiop) != 0) {
+		vnd_errno_t vnderr = vnd_errno(vhp);
+		int syserr = vnd_syserrno(vhp);
+
+		/* Most consumers should retry on EINTR */
+		if (vnderr == VND_E_SYS)
+			(void) fprintf(stderr, "failed to read: %s",
+			    vnd_strsyserror(syserr));
+		else
+			(void) fprintf(stderr, "failed to read: %s",
+			    vnd_strerror(vnderr));
+		vnd_close(vhp);
+		free(fiop->fio_vecs[0].fv_buf);
+		free(fiop);
+		return (1);
+	}
+
+	
+	/* Consume the data however it's desired */
+	(void) printf("received %d bytes\n", fiop->fio_vecs[0].fv_actlen);
+	for (i = 0; i < fiop->fio_vecs[0].fv_actlen)
+		(void) printf("%x ", fiop->fio_vecs[0].fv_buf[i]);
+
+	vnd_close(vhp);
+	free(fiop->fio_vecs[0].fv_buf);
+	free(viop);
+	return (0);
+}
+.fi
+.in -2
+
+.LP
+Example 2    Write a single frame with a single vector
+.sp
+.LP
+The following sample C program opens an existing vnd device named
+"vnd0" in the current zone and performs a blocking write of a single
+frame to it.
+
+.sp
+.in +2
+.nf
+#include <libvnd.h>
+#include <stdio.h>
+#include <string.h>
+
+int
+main(void)
+{
+	vnd_handle_t *vhp;
+	vnd_errno_t vnderr;
+	int syserr;
+	frameio_t *fiop;
+
+	fiop = malloc(sizeof (frameio_t) + sizeof (framevec_t));
+	if (fiop == NULL) {
+		perror("malloc frameio_t");
+		return (1);
+	}
+	fiop->fio_version = FRAMEIO_CURRENT_VERSION;
+	fiop->fio_nvpf = 1;
+	fiop->fio_nvecs = 1;
+	fiop->fio_vecs[0].fv_buf = malloc(1518);
+	if (fiop->fio_vecs[0].fv_buf == NULL) {
+		perror("malloc framevec_t.fv_buf");
+		free(fiop);
+		return (1);
+	}
+
+	/*
+	 * Fill in your data however you desire. This is an entirely
+	 * invalid frame and while the frameio write may succeed, the
+	 * networking stack will almost certainly drop it.
+	 */
+	(void) memset(fiop->fio_vecs[0].fv_buf, 'r', 1518);
+	fiop->fio_vecs[0].fv_buflen = 1518;
+
+	vhp = vnd_open(NULL, "vnd0", &vnderr, &syserr);
+	if (vhp != NULL) {
+		if (vnderr == VND_E_SYS)
+			(void) fprintf(stderr, "failed to open device: %s",
+			    vnd_strsyserror(syserr));
+		else
+			(void) fprintf(stderr, "failed to open device: %s",
+			    vnd_strerror(vnderr));
+		free(fiop->fio_vecs[0].fv_buf);
+		free(fiop);
+		return (1);
+	}
+
+	if (frameio_write(vhp, fiop) != 0) {
+		/* Most consumers should retry on EINTR */
+		if (vnderr == VND_E_SYS)
+			(void) fprintf(stderr, "failed to write: %s",
+			    vnd_strsyserror(syserr));
+		else
+			(void) fprintf(stderr, "failed to write: %s",
+			    vnd_strerror(vnderr));
+		vnd_close(vhp);
+		free(fiop->fio_vecs[0].fv_buf);
+		free(fiop);
+		return (1);
+	}
+
+	
+	(void) printf("wrote %d bytes\n", fiop->fio_vecs[0].fv_actlen);
+
+	vnd_close(vhp);
+	free(fiop->fio_vecs[0].fv_buf);
+	free(viop);
+	return (0);
+}
+.fi
+.in -2
+
+.LP
+Example 3    Read frames comprised of multiple vectors
+.sp
+.LP
+The following sample C program is similar to example 1, except instead
+of reading a single frame consisting of a single vector it reads
+multiple frames consisting of two vectors. The first vector has room for
+an 18 byte VLAN enabled Ethernet header and the second vector has room
+for a 1500 byte payload.
+
+.sp
+.in +2
+.nf
+#include <libvnd.h>
+#include <stdio.h>
+
+int
+main(void)
+{
+	vnd_handle_t *vhp;
+	vnd_errno_t vnderr;
+	int syserr, i, nframes;
+	frameio_t *fiop;
+
+	/* Allocate enough framevec_t's for 5 frames */
+	fiop = malloc(sizeof (frameio_t) + sizeof (framevec_t) * 10);
+	if (fiop == NULL) {
+		perror("malloc frameio_t");
+		return (1);
+	}
+	fiop->fio_version = FRAMEIO_CURRENT_VERSION;
+	fiop->fio_nvpf = 2;
+	fiop->fio_nvecs = 10;
+	for (i = 0; i < 10; i += 2) {
+		fiop->fio_vecs[i].fv_buf = malloc(18);
+		fiop->fio_vecs[i].fv_buflen = 18;
+		if (fiop->fio_vecs[i].fv_buf == NULL) {
+			perror("malloc framevec_t.fv_buf");
+			/* Perform appropriate memory cleanup */
+			return (1);
+		}
+		fiop->fio_vecs[i+1].fv_buf = malloc(1500);
+		fiop->fio_vecs[i+1].fv_buflen = 1500;
+		if (fiop->fio_vecs[i+1].fv_buf == NULL) {
+			perror("malloc framevec_t.fv_buf");
+			/* Perform appropriate memory cleanup */
+			return (1);
+		}
+	}
+
+	vhp = vnd_open(NULL, "vnd1", &vnderr, &syserr);
+	if (vhp != NULL) {
+		if (vnderr == VND_E_SYS)
+			(void) fprintf(stderr, "failed to open device: %s",
+			    vnd_strsyserror(syserr));
+		else
+			(void) fprintf(stderr, "failed to open device: %s",
+			    vnd_strerror(vnderr));
+		/* Perform appropriate memory cleanup */
+		return (1);
+	}
+
+	if (frameio_read(vhp, fiop) != 0) {
+		/* Most consumers should retry on EINTR */
+		if (vnderr == VND_E_SYS)
+			(void) fprintf(stderr, "failed to read: %s",
+			    vnd_strsyserror(syserr));
+		else
+			(void) fprintf(stderr, "failed to read: %s",
+			    vnd_strerror(vnderr));
+		vnd_close(vhp);
+		/* Perform appropriate memory cleanup */
+		return (1);
+	}
+
+	/* Consume the data however it's desired */
+	nframes = fiop->fio_nvecs / fiop->fio_nvpf;
+	(void) printf("consumed %d frames!\n", nframes);
+	for (i = 0; i < nframes; i++) {
+		(void) printf("received %d bytes of Ethernet Header\n",
+		    fiop->fio_vecs[i].fv_actlen);
+		(void) printf("received %d bytes of payload\n",
+		    fiop->fio_vecs[i+1].fv_actlen);
+	}
+
+	vnd_close(vhp);
+	/* Do proper memory cleanup */
+	return (0);
+}
+.fi
+.in -2
+
+.LP
+Example 4    Perform non-blocking reads of multiple frames with a
+single vector
+.sp
+.LP
+In this sample C program, opens an existing vnd device named "vnd0" in
+the current zone, ensures that it is in non-blocking mode, and uses
+event ports to do device reads.
+
+.sp
+.in +2
+.nf
+#include <libvnd.h>
+#include <stdio.h>
+#include <port.h>
+#include <unistd.h>
+#include <errno.h>
+#include <sys/tpyes.h>
+#include <fcntl.h>
+
+int
+main(void)
+{
+	vnd_handle_t *vhp;
+	vnd_errno_t vnderr;
+	int syserr, i, nframes, port, vfd;
+	frameio_t *fiop;
+
+	port = port_create();
+	if (port < 0) {
+		perror("port_create");
+		return (1);
+	}
+	/* Allocate enough framevec_t's for 10 frames */
+	fiop = malloc(sizeof (frameio_t) + sizeof (framevec_t) * 10);
+	if (fiop == NULL) {
+		perror("malloc frameio_t");
+		(void) close(port);
+		return (1);
+	}
+	fiop->fio_version = FRAMEIO_CURRENT_VERSION;
+	fiop->fio_nvpf = 1;
+	fiop->fio_nvecs = 10;
+	for (i = 0; i < 10; i++) {
+		fiop->fio_vecs[i].fv_buf = malloc(1518);
+		fiop->fio_vecs[i].fv_buflen = 1518;
+		if (fiop->fio_vecs[i].fv_buf == NULL) {
+			perror("malloc framevec_t.fv_buf");
+			/* Perform appropriate memory cleanup */
+			(void) close(port);
+			return (1);
+		}
+	}
+
+	vhp = vnd_open(NULL, "vnd1", &vnderr, &syserr);
+	if (vhp != NULL) {
+		if (vnderr == VND_E_SYS)
+			(void) fprintf(stderr, "failed to open device: %s",
+			    vnd_strsyserror(syserr));
+		else
+			(void) fprintf(stderr, "failed to open device: %s",
+			    vnd_strerror(vnderr));
+		/* Perform appropriate memory cleanup */
+		(void) close(port);
+		return (1);
+	}
+	vfd = vnd_pollfd(vhp);
+	if (fcntl(fd, F_SETFL, O_NONBLOCK) != 0) {
+		(void) fprintf(stderr, "failed to enable non-blocking mode: %s",
+		    strerrror(errno));
+	}
+
+	for (;;) {
+		port_event_t pe;
+
+		if (port_associate(port, PORT_SOURCE_FD, vfd, POLLIN,
+		    vhp) != 0) {
+			perror("port_associate");
+			vnd_close(vhp);
+			/* Perform appropriate memory cleanup */
+			(void) close(port);
+			return (1);
+		}
+
+		if (port_get(port, &pe, NULL) != 0) {
+			if (errno == EINTR)
+				continue;
+			perror("port_associate");
+			vnd_close(vhp);
+			/* Perform appropriate memory cleanup */
+			(void) close(port);
+			return (1);
+		}
+
+		/*
+		 * Most real applications will need to compare the file
+		 * descriptor and switch on it. In this case, assume
+		 * that the fd in question that is readable is 'vfd'.
+		 */
+		if (frameio_read(pe.portev_user, fiop) != 0) {
+			vnd_errno_t vnderr = vnd_errno(vhp);
+			int syserr = vnd_syserrno(vhp);
+
+			if (vnderr == VND_E_SYS && (syserr == EINTR ||
+			    syserr == EAGAIN))
+				continue;
+			(void) fprintf(stderr, "failed to get read: %s",
+			    vnd_strsyserror(vnderr));
+			vnd_close(vhp);
+			/* Perform appropriate memory cleanup */
+			(void) close(port);
+			return (1);
+		}
+
+		/* Consume the data however it's desired */
+		nframes = fiop->fio_nvecs / fiop->fio_nvpf;
+		for (i = 0; i < nframes; i++) {
+			(void) printf("frame %d is %d bytes large\n", i,
+			    fiop->fio_vecs[i].fv_actlen);
+		}
+
+	}
+
+	vnd_close(vhp);
+	/* Do proper memory cleanup */
+	return (0);
+}
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.LP
+See attributes(5) for descriptions of the following attributes:
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Stability	Committed
+_
+MT-Level	See "THREADING" in libvnd(3LIB)
+.TE
+
+
+.SH SEE ALSO
+
+Intro(2), getmsg(2), read(2), readv(2), write(2), writev(2),
+libvnd(3VND), vnd_errno(3VND), vnd_pollfd(3VND), vnd_syserrno(3VND),
+iovec(9S)

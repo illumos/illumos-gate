@@ -22,9 +22,8 @@
 /*
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <unistd.h>
@@ -32,6 +31,8 @@
 #include <errno.h>
 #include <libproc.h>
 #include <sys/param.h>
+
+#include "ptools_common.h"
 
 static char *command;
 
@@ -49,7 +50,7 @@ show_cwd(const char *arg)
 		return (1);
 	}
 
-	(void) snprintf(proc, sizeof (proc), "/proc/%d/path/cwd",
+	(void) proc_snprintf(proc, sizeof (proc), "/proc/%d/path/cwd",
 	    (int)p.pr_pid);
 
 	if ((ret = readlink(proc, cwd, sizeof (cwd) - 1)) <= 0) {

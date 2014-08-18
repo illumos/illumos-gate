@@ -64,6 +64,7 @@ typedef enum zfs_error {
 	EZFS_PROPTYPE,		/* property does not apply to dataset type */
 	EZFS_PROPNONINHERIT,	/* property is not inheritable */
 	EZFS_PROPSPACE,		/* bad quota or reservation */
+	EZFS_PROPCACHED,	/* prop unavail since cachedprops flag set */
 	EZFS_BADTYPE,		/* dataset is not of appropriate type */
 	EZFS_BUSY,		/* pool or dataset is busy */
 	EZFS_EXISTS,		/* pool or dataset already exists */
@@ -184,6 +185,7 @@ extern libzfs_handle_t *zpool_get_handle(zpool_handle_t *);
 extern libzfs_handle_t *zfs_get_handle(zfs_handle_t *);
 
 extern void libzfs_print_on_error(libzfs_handle_t *, boolean_t);
+extern void libzfs_set_cachedprops(libzfs_handle_t *, boolean_t);
 
 extern void zfs_save_arguments(int argc, char **, char *, int);
 extern int zpool_log_history(libzfs_handle_t *, const char *);

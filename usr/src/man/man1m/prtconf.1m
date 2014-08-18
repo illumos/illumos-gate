@@ -10,7 +10,7 @@ prtconf \- print system configuration
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/sbin/prtconf\fR [\fB-V\fR] | [\fB-F\fR] | [\fB-x\fR] | [\fB-bpv\fR] | [\fB-acdDPv\fR]
+\fB/usr/sbin/prtconf\fR [\fB-V\fR] | [\fB-F\fR] | [\fB-m\fr] | [\fB-x\fR] | [\fB-bpv\fR] | [\fB-acdDPv\fR]
      [\fIdev_path\fR]
 .fi
 
@@ -95,6 +95,16 @@ console, frame buffer device or a non-zero exit code. For example, if the
 console frame buffer on a SUNW,Ultra-30 is \fBffb\fR, the command returns:
 \fB/SUNW,ffb@1e,0:ffb0\fR. This option could be used to create a symlink for
 \fB/dev/fb\fR to the actual console device.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-m\fR\fR
+.ad
+.RS 6n
+Displays the amount system memory in megabytes.
+This flag must be used by itself.
 .RE
 
 .sp

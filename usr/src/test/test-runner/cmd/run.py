@@ -1,4 +1,4 @@
-#!/usr/bin/python2.6
+#!ON_PYTHON_26
 
 #
 # This file and its contents are supplied under the terms of the

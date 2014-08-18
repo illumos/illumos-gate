@@ -48,14 +48,6 @@
 		<service_fmri value='svc:/system/filesystem/minimal' />
 	</dependency>
 
-	<dependency
-		name='coreadm_manifest-import'
-		type='service'
-		grouping='require_all'
-		restart_on='none'>
-		<service_fmri value='svc:/system/manifest-import:default' />
-	</dependency>
-
 	<instance name='default' enabled='false'>
 		<exec_method
 			type='method'

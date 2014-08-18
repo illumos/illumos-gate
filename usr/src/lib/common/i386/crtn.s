@@ -33,7 +33,6 @@
  *
  * For further details - see bug#4433015
  */
-	.ident	"%Z%%M%	%I%	%E% SMI"
 	.file	"crtn.s"
 
 /*

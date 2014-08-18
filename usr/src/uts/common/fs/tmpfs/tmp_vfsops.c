@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -55,6 +56,15 @@
 static int tmpfsfstype;
 
 /*
+ * tmpfs_mountcount is used to prevent module unloads while there is still
+ * state from a former mount hanging around. With forced umount support, the
+ * filesystem module must not be allowed to go away before the last
+ * VFS_FREEVFS() call has been made. Since this is just an atomic counter,
+ * there's no need for locking.
+ */
+static uint32_t	tmpfs_mountcount;
+
+/*
  * tmpfs vfs operations.
  */
 static int tmpfsinit(int, char *);
@@ -64,6 +74,7 @@ static int tmp_unmount(struct vfs *, int, struct cred *);
 static int tmp_root(struct vfs *, struct vnode **);
 static int tmp_statvfs(struct vfs *, struct statvfs64 *);
 static int tmp_vget(struct vfs *, struct vnode **, struct fid *);
+static void tmp_freevfs(vfs_t *vfsp);
 
 /*
  * Loadable module wrapper
@@ -76,7 +87,7 @@ static vfsdef_t vfw = {
 	VFSDEF_VERSION,
 	"tmpfs",
 	tmpfsinit,
-	VSW_HASPROTO|VSW_STATS|VSW_ZMOUNT,
+	VSW_HASPROTO|VSW_CANREMOUNT|VSW_STATS|VSW_ZMOUNT,
 	&tmpfs_proto_opttbl
 };
 
@@ -121,6 +132,14 @@ _fini()
 {
 	int error;
 
+	/*
+	 * If a forceably unmounted instance is still hanging around, we cannot
+	 * allow the module to be unloaded because that would cause panics once
+	 * the VFS framework decides it's time to call into VFS_FREEVFS().
+	 */
+	if (tmpfs_mountcount)
+		return (EBUSY);
+
 	error = mod_remove(&modlinkage);
 	if (error)
 		return (error);
@@ -139,14 +158,6 @@ _info(struct modinfo *modinfop)
 }
 
 /*
- * The following are patchable variables limiting the amount of system
- * resources tmpfs can use.
- *
- * tmpfs_maxkmem limits the amount of kernel kmem_alloc memory
- * tmpfs can use for it's data structures (e.g. tmpnodes, directory entries)
- * It is not determined by setting a hard limit but rather as a percentage of
- * physical memory which is determined when tmpfs is first used in the system.
- *
  * tmpfs_minfree is the minimum amount of swap space that tmpfs leaves for
  * the rest of the system.  In other words, if the amount of free swap space
  * in the system (i.e. anoninfo.ani_free) drops below tmpfs_minfree, tmpfs
@@ -155,9 +166,7 @@ _info(struct modinfo *modinfop)
  * There is also a per mount limit on the amount of swap space
  * (tmount.tm_anonmax) settable via a mount option.
  */
-size_t tmpfs_maxkmem = 0;
 size_t tmpfs_minfree = 0;
-size_t tmp_kmemspace;		/* bytes of kernel heap used by all tmpfs */
 
 static major_t tmpfs_major;
 static minor_t tmpfs_minor;
@@ -176,6 +185,7 @@ tmpfsinit(int fstype, char *name)
 		VFSNAME_ROOT,		{ .vfs_root = tmp_root },
 		VFSNAME_STATVFS,	{ .vfs_statvfs = tmp_statvfs },
 		VFSNAME_VGET,		{ .vfs_vget = tmp_vget },
+		VFSNAME_FREEVFS,	{ .vfs_freevfs = tmp_freevfs },
 		NULL,			NULL
 	};
 	int error;
@@ -210,18 +220,12 @@ tmpfsinit(int fstype, char *name)
 		tmpfs_minfree = btopr(TMPMINFREE);
 	}
 
-	/*
-	 * The maximum amount of space tmpfs can allocate is
-	 * TMPMAXPROCKMEM percent of kernel memory
-	 */
-	if (tmpfs_maxkmem == 0)
-		tmpfs_maxkmem = MAX(PAGESIZE, kmem_maxavail() / TMPMAXFRACKMEM);
-
 	if ((tmpfs_major = getudev()) == (major_t)-1) {
 		cmn_err(CE_WARN, "tmpfsinit: Can't get unique device number.");
 		tmpfs_major = 0;
 	}
 	mutex_init(&tmpfs_minor_lock, NULL, MUTEX_DEFAULT, NULL);
+	tmpfs_mountcount = 0;
 	return (0);
 }
 
@@ -249,7 +253,7 @@ tmp_mount(
 		return (ENOTDIR);
 
 	mutex_enter(&mvp->v_lock);
-	if ((uap->flags & MS_OVERLAY) == 0 &&
+	if ((uap->flags & MS_REMOUNT) == 0 && (uap->flags & MS_OVERLAY) == 0 &&
 	    (mvp->v_count != 1 || (mvp->v_flag & VROOT))) {
 		mutex_exit(&mvp->v_lock);
 		return (EBUSY);
@@ -286,7 +290,23 @@ tmp_mount(
 	    (uap->flags & MS_SYSSPACE) ? UIO_SYSSPACE : UIO_USERSPACE, &dpn))
 		goto out;
 
-	if ((tm = tmp_memalloc(sizeof (struct tmount), 0)) == NULL) {
+	if (uap->flags & MS_REMOUNT) {
+		tm = (struct tmount *)VFSTOTM(vfsp);
+
+		/*
+		 * If we change the size so its less than what is currently
+		 * being used, we allow that. The file system will simply be
+		 * full until enough files have been removed to get below the
+		 * new max.
+		 */
+		mutex_enter(&tm->tm_contents);
+		tm->tm_anonmax = anonmax;
+		mutex_exit(&tm->tm_contents);
+		goto out;
+	}
+
+	if ((tm = kmem_zalloc(sizeof (struct tmount),
+	    KM_NOSLEEP | KM_NORMALPRI)) == NULL) {
 		pn_free(&dpn);
 		error = ENOMEM;
 		goto out;
@@ -318,7 +338,7 @@ tmp_mount(
 	vfsp->vfs_bsize = PAGESIZE;
 	vfsp->vfs_flag |= VFS_NOTRUNC;
 	vfs_make_fsid(&vfsp->vfs_fsid, tm->tm_dev, tmpfsfstype);
-	tm->tm_mntpath = tmp_memalloc(dpn.pn_pathlen + 1, TMP_MUSTHAVE);
+	tm->tm_mntpath = kmem_zalloc(dpn.pn_pathlen + 1, KM_SLEEP);
 	(void) strcpy(tm->tm_mntpath, dpn.pn_path);
 
 	/*
@@ -328,7 +348,7 @@ tmp_mount(
 	rattr.va_mode = (mode_t)(S_IFDIR | 0777);	/* XXX modes */
 	rattr.va_type = VDIR;
 	rattr.va_rdev = 0;
-	tp = tmp_memalloc(sizeof (struct tmpnode), TMP_MUSTHAVE);
+	tp = kmem_zalloc(sizeof (struct tmpnode), KM_SLEEP);
 	tmpnode_init(tm, tp, &rattr, cr);
 
 	/*
@@ -366,6 +386,7 @@ tmp_mount(
 
 	pn_free(&dpn);
 	error = 0;
+	atomic_inc_32(&tmpfs_mountcount);
 
 out:
 	if (error == 0)
@@ -381,36 +402,107 @@ tmp_unmount(struct vfs *vfsp, int flag, struct cred *cr)
 	struct tmpnode *tnp, *cancel;
 	struct vnode	*vp;
 	int error;
+	uint_t cnt;
+	int i;
 
 	if ((error = secpolicy_fs_unmount(cr, vfsp)) != 0)
 		return (error);
 
-	/*
-	 * forced unmount is not supported by this file system
-	 * and thus, ENOTSUP, is being returned.
-	 */
-	if (flag & MS_FORCE)
-		return (ENOTSUP);
-
 	mutex_enter(&tm->tm_contents);
 
 	/*
-	 * If there are no open files, only the root node should have
-	 * a reference count.
+	 * In the normal unmount case (non-forced unmount), if there are no
+	 * open files, only the root node should have a reference count.
+	 *
 	 * With tm_contents held, nothing can be added or removed.
 	 * There may be some dirty pages.  To prevent fsflush from
 	 * disrupting the unmount, put a hold on each node while scanning.
 	 * If we find a previously referenced node, undo the holds we have
 	 * placed and fail EBUSY.
+	 *
+	 * However, in the case of a forced umount, things are a bit different.
+	 * An additional VFS_HOLD is added for each outstanding VN_HOLD to
+	 * ensure that the file system is not cleaned up (tmp_freevfs) until
+	 * the last vfs hold is dropped. This happens in tmp_inactive as the
+	 * vnodes are released. Also, we can't add an additional VN_HOLD in
+	 * this case since that would prevent tmp_inactive from ever being
+	 * called. Finally, we do need to drop the zone ref now (zone_rele_ref)
+	 * so that the zone is not blocked waiting for the final file system
+	 * cleanup.
 	 */
 	tnp = tm->tm_rootnode;
-	if (TNTOV(tnp)->v_count > 1) {
+
+	vp = TNTOV(tnp);
+	mutex_enter(&vp->v_lock);
+	cnt = vp->v_count;
+	if (flag & MS_FORCE) {
+		vfsp->vfs_flag |= VFS_UNMOUNTED;
+		/* Extra hold which we rele below when we drop the zone ref */
+		VFS_HOLD(vfsp);
+
+		for (i = 1; i < cnt; i++)
+			VFS_HOLD(vfsp);
+
+		/* drop the mutex now because no one can find this mount */
+		mutex_exit(&tm->tm_contents);
+	} else if (cnt > 1) {
+		mutex_exit(&vp->v_lock);
 		mutex_exit(&tm->tm_contents);
 		return (EBUSY);
 	}
+	mutex_exit(&vp->v_lock);
 
+	/*
+	 * Check for open files. An open file causes everything to unwind
+	 * unless this is a forced umount.
+	 */
 	for (tnp = tnp->tn_forw; tnp; tnp = tnp->tn_forw) {
-		if ((vp = TNTOV(tnp))->v_count > 0) {
+		vp = TNTOV(tnp);
+		mutex_enter(&vp->v_lock);
+		cnt = vp->v_count;
+		if (flag & MS_FORCE) {
+			for (i = 0; i < cnt; i++)
+				VFS_HOLD(vfsp);
+
+			/*
+			 * In the case of a forced umount don't add an
+			 * additional VN_HOLD on the already held vnodes, like
+			 * we do in the non-forced unmount case. If the
+			 * cnt > 0, then the vnode already has at least one
+			 * hold and we need tmp_inactive to get called when the
+			 * last pre-existing hold on the node is released so
+			 * that we can VFS_RELE the VFS holds we just added.
+			 */
+			if (cnt == 0) {
+				/* directly add VN_HOLD since have the lock */
+				vp->v_count++;
+			}
+
+			mutex_exit(&vp->v_lock);
+
+			/*
+			 * If the tmpnode has any pages associated with it
+			 * (i.e. if it's a normal file with non-zero size), the
+			 * tmpnode could still be discovered by pageout or
+			 * fsflush via the page vnode pointers. To prevent this
+			 * from interfering with the tmp_freevfs, truncate the
+			 * tmpnode now.
+			 */
+			if (tnp->tn_size != 0 && tnp->tn_type == VREG) {
+				rw_enter(&tnp->tn_rwlock, RW_WRITER);
+				rw_enter(&tnp->tn_contents, RW_WRITER);
+
+				(void) tmpnode_trunc(tm, tnp, 0);
+
+				rw_exit(&tnp->tn_contents);
+				rw_exit(&tnp->tn_rwlock);
+
+				ASSERT(tnp->tn_size == 0);
+				ASSERT(tnp->tn_nblocks == 0);
+			}
+		} else if (cnt > 0) {
+			/* An open file; unwind the holds we've been adding. */
+			mutex_exit(&vp->v_lock);
 			cancel = tm->tm_rootnode->tn_forw;
 			while (cancel != tnp) {
 				vp = TNTOV(cancel);
@@ -420,14 +512,50 @@ tmp_unmount(struct vfs *vfsp, int flag, struct cred *cr)
 			}
 			mutex_exit(&tm->tm_contents);
 			return (EBUSY);
+		} else {
+			/* directly add a VN_HOLD since we have the lock */
+			vp->v_count++;
+			mutex_exit(&vp->v_lock);
 		}
-		VN_HOLD(vp);
 	}
 
-	/*
-	 * We can drop the mutex now because no one can find this mount
-	 */
-	mutex_exit(&tm->tm_contents);
+	if (flag & MS_FORCE) {
+		/*
+		 * Drop the zone ref now since we don't know how long it will
+		 * be until the final vfs_rele is called by tmp_inactive.
+		 */
+		if (vfsp->vfs_zone) {
+			zone_rele_ref(&vfsp->vfs_implp->vi_zone_ref,
+			    ZONE_REF_VFS);
+			vfsp->vfs_zone = 0;
+		}
+		/* We can now drop the extra hold we added above. */
+		VFS_RELE(vfsp);
+	} else {
+		/*
+		 * For the non-forced case, we can drop the mutex now because
+		 * no one can find this mount anymore
+		 */
+		vfsp->vfs_flag |= VFS_UNMOUNTED;
+		mutex_exit(&tm->tm_contents);
+	}
+
+	return (0);
+}
+
+/*
+ * Implementation of VFS_FREEVFS() to support forced umounts. This is called by
+ * the vfs framework after umount and the last VFS_RELE, to trigger the release
+ * of any resources still associated with the given vfs_t. We only add
+ * additional VFS_HOLDs during the forced umount case, so this is normally
+ * called immediately after tmp_umount.
+ */
+void
+tmp_freevfs(vfs_t *vfsp)
+{
+	struct tmount *tm = (struct tmount *)VFSTOTM(vfsp);
+	struct tmpnode *tnp;
+	struct vnode	*vp;
 
 	/*
 	 * Free all kmemalloc'd and anonalloc'd memory associated with
@@ -437,6 +565,16 @@ tmp_unmount(struct vfs *vfsp, int flag, struct cred *cr)
 	 * tmpnode_free which assumes that the directory entry has been
 	 * removed before the file.
 	 */
+
+	/*
+	 * Now that we are tearing ourselves down we need to remove the
+	 * UNMOUNTED flag. If we don't, we'll later hit a VN_RELE when we remove
+	 * files from the system causing us to have a negative value. Doing this
+	 * seems a bit better than trying to set a flag on the tmount that says
+	 * we're tearing down.
+	 */
+	vfsp->vfs_flag &= ~VFS_UNMOUNTED;
+
 	/*
 	 * Remove all directory entries
 	 */
@@ -503,15 +641,16 @@ tmp_unmount(struct vfs *vfsp, int flag, struct cred *cr)
 
 	ASSERT(tm->tm_mntpath);
 
-	tmp_memfree(tm->tm_mntpath, strlen(tm->tm_mntpath) + 1);
+	kmem_free(tm->tm_mntpath, strlen(tm->tm_mntpath) + 1);
 
 	ASSERT(tm->tm_anonmem == 0);
 
 	mutex_destroy(&tm->tm_contents);
 	mutex_destroy(&tm->tm_renamelck);
-	tmp_memfree(tm, sizeof (struct tmount));
+	kmem_free(tm, sizeof (struct tmount));
 
-	return (0);
+	/* Allow _fini() to succeed now */
+	atomic_dec_32(&tmpfs_mountcount);
 }
 
 /*
@@ -614,13 +753,7 @@ tmp_statvfs(struct vfs *vfsp, struct statvfs64 *sbp)
 	 * available to tmpfs.  This is fairly inaccurate since it doesn't
 	 * take into account the names stored in the directory entries.
 	 */
-	if (tmpfs_maxkmem > tmp_kmemspace)
-		sbp->f_ffree = (tmpfs_maxkmem - tmp_kmemspace) /
-		    (sizeof (struct tmpnode) + sizeof (struct tdirent));
-	else
-		sbp->f_ffree = 0;
-
-	sbp->f_files = tmpfs_maxkmem /
+	sbp->f_ffree = sbp->f_files = ptob(availrmem) /
 	    (sizeof (struct tmpnode) + sizeof (struct tdirent));
 	sbp->f_favail = (fsfilcnt64_t)(sbp->f_ffree);
 	(void) cmpldev(&d32, vfsp->vfs_dev);

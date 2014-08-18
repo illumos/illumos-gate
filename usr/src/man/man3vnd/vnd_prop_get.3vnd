@@ -1,0 +1,242 @@
+'\" te
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright (c) 2014, Joyent, Inc.  All rights reserved.
+.\"
+.TH VND_PROP_GET 3VND "Feb 21, 2014"
+
+.SH NAME
+
+vnd_prop_get, vnd_prop_set \- get and set vnd properties
+
+.SH SYNOPSIS
+
+.LP
+.nf
+cc [ flag... ] file... -lvnd [ library... ]
+#include <libvnd.h>
+
+int vnd_prop_get(vnd_handle_t *vhp, vnd_prop_t prop, void *buf, size_t len);
+
+int vnd_prop_set(vnd_handle_t *vhp, vnd_prop_t prop, void *buf, size_t len);
+.fi
+
+.SH DESCRIPTION
+.LP
+The vnd_prop_get and vnd_prop_set functions are used to retrieve
+and set property values on the vnd_handle_t referred to by vhp. The
+property to get or set is specified by the argument prop. The
+argument buf and the size of buf, in len, should be a pointer to the
+appropriate structure for the property as defined in libvnd(3LIB).
+
+.LP
+All of the supported properties are listed and described in the
+libvnd(3LIB) manual page.
+
+
+.SH RETURN VALUES
+.LP
+On success, the vnd_prop_get and vnd_prop_set functions return zero.
+On failure, they return -1 and additional error information is
+available through vnd_errno(3VND) and vnd_syserrno(3VND).
+
+.LP
+When vnd_prop_get returns successfully, the contents of buf are
+filled in with the value of the corresponding property. The contents
+of buf should not change across a call to vnd_prop_set.
+
+.SH EXAMPLES
+
+.LP
+Example 1   Getting the value of the rxbuf property
+.LP
+The following sample C program retrieves the value of the
+rxbuf property and prints it to standard out.
+
+.sp
+.in +2
+.nf
+#include <libvnd.h>
+#include <stdio.h>
+
+int
+main(void)
+{
+	vnd_handle_t *vhp;
+	vnd_errno_t vnderr;
+	int syserr;
+	vnd_prop_buf_t vpb;
+
+	vhp = vnd_open(NULL, "vnd1", &vnderr, &syserr);
+	if (vhp != NULL) {
+		if (vnderr == VND_E_SYS)
+			(void) fprintf(stderr, "failed to open device: %s",
+			    vnd_strsyserror(syserr));
+		else
+			(void) fprintf(stderr, "failed to open device: %s",
+			    vnd_strerror(vnderr));
+		return (1);
+	}
+
+	if (vnd_prop_get(vhp, VND_PROP_RXBUF, &vpn, sizeof (vpn)) != 0) {
+		vnderr = vnd_errno(vhp);
+		syserr = vnd_syserrno(vhp);
+		if (vnderr == VND_E_SYS)
+			(void) fprintf(stderr, "failed to get VND_PROP_RXBUF: %s",
+			    vnd_strsyserror(syserr));
+		else
+			(void) fprintf(stderr, "failed to get VND_PROP_RXBUF: %s",
+			    vnd_strerror(vnderr));
+		return (1);
+	}
+
+	(void) printf("recieve buffer size is %d bytes\n", vpb.vpb_size);
+
+	vnd_close(vnd);
+	return (0);
+}
+.fi
+.in -2
+
+.LP
+EXAMPLE 2    Setting a property
+.LP
+This sample C program sets the property VND_PROP_RXBUF to the value of
+4200 bytes.
+
+.sp
+.in +2
+.nf
+#include <libvnd.h>
+#include <stdio.h>
+
+int
+main(void)
+{
+	vnd_handle_t *vhp;
+	vnd_errno_t vnderr;
+	int syserr;
+	vnd_prop_buf_t vpb;
+
+	vhp = vnd_open(NULL, "vnd1", &vnderr, &syserr);
+	if (vhp != NULL) {
+		if (vnderr == VND_E_SYS)
+			(void) fprintf(stderr, "failed to open device: %s",
+			    vnd_strsyserror(syserr));
+		else
+			(void) fprintf(stderr, "failed to open device: %s",
+			    vnd_strerror(vnderr));
+		return (1);
+	}
+
+	vpb.vpb_size = 4200;
+	if (vnd_prop_set(vhp, VND_PROP_RXBUF, &vpb, sizeof (vpb)) != 0) {
+		vnderr = vnd_errno(vhp);
+		syserr = vnd_syserrno(vhp);
+		if (vnderr == VND_E_SYS)
+			(void) fprintf(stderr, "failed to set VND_PROP_RXBUF: %s",
+			    vnd_strsyserror(syserr));
+		else
+			(void) fprintf(stderr, "failed to set VND_PROP_RXBUF: %s",
+			    vnd_strerror(vnderr));
+		return (1);
+	}
+
+	(void) printf("successfully set VND_PROP_RXBUF to 4200\n");
+
+	vnd_close(vnd);
+	return (0);
+}
+.fi
+.in -2
+
+.LP
+Example 3    Setting a property to the value of another.
+.LP
+In this sample C program, we set the VND_PROP_TXBUF to the maximum
+allowable size as determined by the read-only property VND_PROP_MAXBUF.
+
+.sp
+.in +2
+.nf
+#include <libvnd.h>
+#include <stdio.h>
+
+int
+main(void)
+{
+	vnd_handle_t *vhp;
+	vnd_errno_t vnderr;
+	int syserr;
+	vnd_prop_buf_t vpb;
+
+	vhp = vnd_open(NULL, "vnd1", &vnderr, &syserr);
+	if (vhp != NULL) {
+		if (vnderr == VND_E_SYS)
+			(void) fprintf(stderr, "failed to open device: %s",
+			    vnd_strsyserror(syserr));
+		else
+			(void) fprintf(stderr, "failed to open device: %s",
+			    vnd_strerror(vnderr));
+		return (1);
+	}
+
+	if (vnd_prop_get(vhp, VND_PROP_MAXBUF, &vpb, sizeof (vpb)) != 0) {
+		vnderr = vnd_errno(vhp);
+		syserr = vnd_syserrno(vhp);
+		if (vnderr == VND_E_SYS)
+			(void) fprintf(stderr, "failed to get VND_PROP_MAXBUF: %s",
+			    vnd_strsyserror(syserr));
+		else
+			(void) fprintf(stderr, "failed to get VND_PROP_MAXBUF: %s",
+			    vnd_strerror(vnderr));
+		return (1);
+	}
+
+	if (vnd_prop_set(vhp, VND_PROP_TXBUF, &vpb, sizeof (vpb)) != 0) {
+		vnderr = vnd_errno(vhp);
+		syserr = vnd_syserrno(vhp);
+		if (vnderr == VND_E_SYS)
+			(void) fprintf(stderr, "failed to set VND_PROP_TXBUF: %s",
+			    vnd_strsyserror(syserr));
+		else
+			(void) fprintf(stderr, "failed to set VND_PROP_TXBUF: %s",
+			    vnd_strerror(vnderr));
+		return (1);
+	}
+
+	(void) printf("successfully set VND_PROP_TXBUF to %d\n", vpb.vpb_size);
+
+	vnd_close(vnd);
+	return (0);
+}
+.fi
+
+.SH ATTRIBUTES
+.sp
+.LP
+See attributes(5) for descriptions of the following attributes:
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Stability	Committed
+_
+MT-Level	See "THREADING" in libvnd(3LIB)
+.TE
+
+.SH SEE ALSO
+libvnd(3VND), vnd_errno(3VND, vnd_syserrno(3VND)

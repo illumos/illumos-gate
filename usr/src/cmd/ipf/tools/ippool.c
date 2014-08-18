@@ -5,6 +5,8 @@
  *
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -42,6 +44,10 @@
 #include "netinet/ip_htable.h"
 #include "kmem.h"
 
+#if SOLARIS
+#include "ipfzone.h"
+#endif
+
 extern	int	ippool_yyparse __P((void));
 extern	int	ippool_yydebug;
 extern	FILE	*ippool_yyin;
@@ -71,15 +77,25 @@ int	use_inet6 = 0;
 void usage(prog)
 char *prog;
 {
+#if SOLARIS
+	const char *zoneopt = "[-G|-z zonename] ";
+#else
+	const char *zoneopt = "";
+#endif
 	fprintf(stderr, "Usage:\t%s\n", prog);
-	fprintf(stderr, "\t\t\t-a [-dnv] [-m <name>] [-o <role>] -i <ipaddr>[/netmask]\n");
-	fprintf(stderr, "\t\t\t-A [-dnv] [-m <name>] [-o <role>] [-S <seed>] [-t <type>]\n");
-	fprintf(stderr, "\t\t\t-f <file> [-dnuv]\n");
-	fprintf(stderr, "\t\t\t-F [-dv] [-o <role>] [-t <type>]\n");
-	fprintf(stderr, "\t\t\t-l [-dv] [-m <name>] [-t <type>]\n");
-	fprintf(stderr, "\t\t\t-r [-dnv] [-m <name>] [-o <role>] -i <ipaddr>[/netmask]\n");
-	fprintf(stderr, "\t\t\t-R [-dnv] [-m <name>] [-o <role>] [-t <type>]\n");
-	fprintf(stderr, "\t\t\t-s [-dtv] [-M <core>] [-N <namelist>]\n");
+	fprintf(stderr, "\t\t\t-a [-dnv] %s[-m <name>] [-o <role>] -i <ipaddr>[/netmask]\n",
+	    zoneopt);
+	fprintf(stderr, "\t\t\t-A [-dnv] %s[-m <name>] [-o <role>] [-S <seed>] [-t <type>]\n",
+	    zoneopt);
+	fprintf(stderr, "\t\t\t-f <file> %s[-dnuv]\n", zoneopt);
+	fprintf(stderr, "\t\t\t-F [-dv] %s[-o <role>] [-t <type>]\n", zoneopt);
+	fprintf(stderr, "\t\t\t-l [-dv] %s[-m <name>] [-t <type>]\n", zoneopt);
+	fprintf(stderr, "\t\t\t-r [-dnv] %s[-m <name>] [-o <role>] -i <ipaddr>[/netmask]\n",
+	    zoneopt);
+	fprintf(stderr, "\t\t\t-R [-dnv] %s[-m <name>] [-o <role>] [-t <type>]\n",
+	    zoneopt);
+	fprintf(stderr, "\t\t\t-s [-dtv] %s[-M <core>] [-N <namelist>]\n",
+	    zoneopt);
 	exit(1);
 }
 
@@ -140,12 +156,19 @@ char *argv[];
 	role = IPL_LOGIPF;
 	bzero((char *)&node, sizeof(node));
 
-	while ((c = getopt(argc, argv, "di:m:no:Rv")) != -1)
+	while ((c = getopt(argc, argv, "di:G:m:no:Rvz:")) != -1)
 		switch (c)
 		{
 		case 'd' :
 			opts |= OPT_DEBUG;
 			ippool_yydebug++;
+			break;
+		case 'G' :
+#if SOLARIS
+			setzonename_global(optarg);
+#else
+			usage(argv[0]);
+#endif
 			break;
 		case 'i' :
 			s = strchr(optarg, '/');
@@ -181,6 +204,13 @@ char *argv[];
 			break;
 		case 'v' :
 			opts |= OPT_VERBOSE;
+			break;
+		case 'z' :
+#if SOLARIS
+			setzonename(optarg);
+#else
+			usage(argv[0]);
+#endif
 			break;
 		}
 
@@ -219,13 +249,19 @@ char *argv[];
 	bzero((char *)&iph, sizeof(iph));
 	bzero((char *)&pool, sizeof(pool));
 
-	while ((c = getopt(argc, argv, "dm:no:RS:t:v")) != -1)
+	while ((c = getopt(argc, argv, "dG:m:no:RS:t:vz:")) != -1)
 		switch (c)
 		{
 		case 'd' :
 			opts |= OPT_DEBUG;
 			ippool_yydebug++;
 			break;
+		case 'G' :
+#if SOLARIS
+			setzonename_global(optarg);
+#else
+			usage(argv[0]);
+#endif
 		case 'm' :
 			poolname = optarg;
 			break;
@@ -254,6 +290,13 @@ char *argv[];
 			break;
 		case 'v' :
 			opts |= OPT_VERBOSE;
+			break;
+		case 'z' :
+#if SOLARIS
+			setzonename(optarg);
+#else
+			usage(argv[0]);
+#endif
 			break;
 		}
 
@@ -308,12 +351,19 @@ char *argv[], *infile;
 
 	infile = optarg;
 
-	while ((c = getopt(argc, argv, "dnRuv")) != -1)
+	while ((c = getopt(argc, argv, "dG:nRuvz:")) != -1)
 		switch (c)
 		{
 		case 'd' :
 			opts |= OPT_DEBUG;
 			ippool_yydebug++;
+			break;
+		case 'G' :
+#if SOLARIS
+			setzonename_global(optarg);
+#else
+			usage(argv[0]);
+#endif
 			break;
 		case 'n' :
 			opts |= OPT_DONOTHING;
@@ -327,6 +377,13 @@ char *argv[], *infile;
 		case 'v' :
 			opts |= OPT_VERBOSE;
 			break;
+		case 'z' :
+#if SOLARIS
+			setzonename(optarg);
+#else
+			usage(argv[0]);
+#endif
+			break;
 		}
 
 	if (opts & OPT_DEBUG)
@@ -338,6 +395,12 @@ char *argv[], *infile;
 			perror("open(IPLOOKUP_NAME)");
 			exit(1);
 		}
+#if SOLARIS
+		if (setzone(fd) != 0) {
+			close(fd);
+			exit(1);
+		}
+#endif
 	}
 
 	if (ippool_parsefile(fd, infile, ioctl) != 0)
@@ -365,11 +428,18 @@ char *argv[];
 	poolname = NULL;
 	role = IPL_LOGALL;
 
-	while ((c = getopt(argc, argv, "dm:M:N:o:Rt:v")) != -1)
+	while ((c = getopt(argc, argv, "dG:m:M:N:o:Rt:vz:")) != -1)
 		switch (c)
 		{
 		case 'd' :
 			opts |= OPT_DEBUG;
+			break;
+		case 'G' :
+#if SOLARIS
+			setzonename_global(optarg);
+#else
+			usage(argv[0]);
+#endif
 			break;
 		case 'm' :
 			poolname = optarg;
@@ -402,6 +472,13 @@ char *argv[];
 		case 'v' :
 			opts |= OPT_VERBOSE;
 			break;
+		case 'z' :
+#if SOLARIS
+			setzonename(optarg);
+#else
+			usage(argv[0]);
+#endif
+			break;
 		}
 
 	if (opts & OPT_DEBUG)
@@ -413,6 +490,12 @@ char *argv[];
 			perror("open(IPLOOKUP_NAME)");
 			exit(1);
 		}
+#if SOLARIS
+		if (setzone(fd) != 0) {
+			close(fd);
+			exit(1);
+		}
+#endif
 	}
 
 	bzero((char *)&op, sizeof(op));
@@ -615,11 +698,18 @@ char *argv[];
 
 	bzero((char *)&op, sizeof(op));
 
-	while ((c = getopt(argc, argv, "dM:N:o:t:v")) != -1)
+	while ((c = getopt(argc, argv, "dG:M:N:o:t:vz:")) != -1)
 		switch (c)
 		{
 		case 'd' :
 			opts |= OPT_DEBUG;
+			break;
+		case 'G' :
+#if SOLARIS
+			setzonename_global(optarg);
+#else
+			usage(argv[0]);
+#endif
 			break;
 		case 'M' :
 			live_kernel = 0;
@@ -647,6 +737,13 @@ char *argv[];
 		case 'v' :
 			opts |= OPT_VERBOSE;
 			break;
+		case 'z' :
+#if SOLARIS
+			setzonename(optarg);
+#else
+			usage(argv[0]);
+#endif
+			break;
 		}
 
 	if (opts & OPT_DEBUG)
@@ -658,6 +755,12 @@ char *argv[];
 			perror("open(IPLOOKUP_NAME)");
 			exit(1);
 		}
+#if SOLARIS
+		if (setzone(fd) != 0) {
+			close(fd);
+			exit(1);
+		}
+#endif
 	}
 
 	if (type == IPLT_ALL || type == IPLT_POOL) {
@@ -705,7 +808,7 @@ char *argv[];
 	type = IPLT_ALL;
 	role = IPL_LOGALL;
 
-	while ((c = getopt(argc, argv, "do:t:v")) != -1)
+	while ((c = getopt(argc, argv, "do:t:vz:")) != -1)
 		switch (c)
 		{
 		case 'd' :
@@ -728,6 +831,13 @@ char *argv[];
 		case 'v' :
 			opts |= OPT_VERBOSE;
 			break;
+		case 'z' :
+#if SOLARIS
+			setzonename(optarg);
+#else
+			usage(argv[0]);
+#endif
+			break;
 		}
 
 	if (opts & OPT_DEBUG)
@@ -739,6 +849,12 @@ char *argv[];
 			perror("open(IPLOOKUP_NAME)");
 			exit(1);
 		}
+#if SOLARIS
+		if (setzone(fd) != 0) {
+			close(fd);
+			exit(1);
+		}
+#endif
 	}
 
 	bzero((char *)&flush, sizeof(flush));

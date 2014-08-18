@@ -212,8 +212,27 @@ run_script (char *script, char *heap)
 	     intervention.  */
 	  if (fallback_entryno < 0)
 	    {
-	      grub_printf ("\nPress any key to continue...");
-	      (void) getkey ();
+             int time1, time2 = -1;
+
+             grub_printf (
+                "\nRebooting in 2 minutes (press any key to continue)...");
+             grub_timeout = 120;
+
+             /* using RT clock now, need to initialize value */
+             while ((time1 = getrtsecs()) == 0xFF);
+
+             while (grub_timeout >= 0) {
+               if ((time1 = getrtsecs()) != time2 && time1 != 0xFF) {
+                  time2 = time1;
+                  grub_timeout--;
+               }
+
+               if (checkkey() >= 0)
+                 break;
+             }
+
+             grub_printf ("\nresetting...");
+             grub_reboot();
 	    }
 	  
 	  return 1;

@@ -1,8 +1,6 @@
 .\" Copyright (c) 1992, 1993
 .\"     The Regents of the University of California.  All rights reserved.
 .\"
-.\" Copyright 2011 Nexenta Systems, Inc. All rights reserved.
-.\"
 .\" This code is derived from software contributed to Berkeley by
 .\" the Institute of Electrical and Electronics Engineers, Inc.
 .\"
@@ -30,7 +28,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.TH SED 1 "Nov 2, 2011"
+.TH SED 1 "Jun 16, 2014"
 .SH NAME
 \fBsed\fP
 \- stream editor
@@ -45,7 +43,8 @@
 [\fB\-Ealnr\fP]
 [\fB\-e\fP \fIcommand\fP]
 [\fB\-f\fP \fIcommand_file\fP]
-[\fB\-I\fP[\fIextension\fP] | \fB\-i\fP[\fIextension\fP]]
+[\fB\-I\fP \fIextension\fP]
+[\fB\-i\fP \fIextension\fP]
 [\fIfile ...\fP]
 .SH DESCRIPTION
 The
@@ -70,7 +69,7 @@ The following options are available:
 Interpret regular expressions as extended (modern) regular expressions
 rather than basic regular expressions (BRE's).
 The
-\fBre_format\fP(7)
+\fBregex\fP(5)
 manual page fully describes both formats.
 .TP
 \fB\-a\fP
@@ -98,11 +97,16 @@ Append the editing commands found in the file
 to the list of commands.
 The editing commands should each be listed on a separate line.
 .TP
-\fB\-I\fP[\fIextension\fP]
-Edit files in-place, saving backups if \fIextension\fP was specified.
-It is not recommended to omit saving backups when in-place editing files,
-as you risk corruption or partial content in situations where disk
-space is exhausted, etc.
+\fB\-I\fP \fIextension\fP
+Edit files in-place, saving backups with the specified
+\fIextension\fP.
+If a zero-length
+\fIextension\fP
+is given, no backup will be saved.
+It is not recommended to give a zero-length
+\fIextension\fP
+when in-place editing files, as you risk corruption or partial content
+in situations where disk space is exhausted, etc.
 
 Note that in-place editing with
 \fB\-I\fP
@@ -120,7 +124,7 @@ where using
 \fB\-i\fP
 is desired.
 .TP
-\fB\-i\fP[\fIextension\fP]
+\fB\-i\fP \fIextension\fP
 Edit files in-place similarly to
 \fB\-I\fP,
 but treat each file independently from other files.
@@ -234,7 +238,7 @@ function.
 The regular expressions used in
 \fB,\fP
 by default, are basic regular expressions (BREs, see
-\fBre_format\fP(7)
+\fBregex\fP(5)
 for more information), but extended (modern) regular expressions can be used
 instead if the
 \fB\-E\fP
@@ -505,7 +509,7 @@ where
 ``#''
 is a digit, is replaced by the text matched
 by the corresponding backreference expression (see
-\fBre_format\fP(7)) .
+\fBregex\fP(5)) .
 
 A line can be split by substituting a newline character into it.
 To specify a newline character in the replacement string, precede it with
@@ -625,8 +629,8 @@ The \fBsed\fP utility exits 0 on success, and >0 if an error occurs.
 \fBawk\fP(1),
 \fBed\fP(1),
 \fBgrep\fP(1),
-\fBregex\fP(3),
-\fBre_format\fP(5)
+\fBregex\fP(3C),
+\fBregex\fP(5)
 .SH STANDARDS
 The
 \fBsed\fP

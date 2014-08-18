@@ -266,7 +266,7 @@
        this depends heavily on your system/compiler and is a nightmare
        known well to anyone who has worked with shared-library portability
        before. 'gcc' on Linux, for example, would use the following syntax;
-          gcc -shared -o dyn_atalla.so tmp_atalla.o -L../.. -lcrypto
+	  gcc -shared -o dyn_atalla.so tmp_atalla.o -L../.. -lsunw_crypto
     5) Test your shared library using "openssl engine" as explained in the
        previous section. Eg. from the top-level directory, you might try;
           apps/openssl engine -vvvv dynamic \

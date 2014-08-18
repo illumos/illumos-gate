@@ -854,6 +854,77 @@ i_dld_ether_header_update_tag(mblk_t *mp, uint_t pri, uint16_t vid,
 	return (mp);
 }
 
+static boolean_t
+i_dld_raw_ether_check(dld_str_t *dsp, mac_header_info_t *mhip, mblk_t **mpp)
+{
+	mblk_t *mp = *mpp;
+	mblk_t *newmp;
+	uint_t pri, vid, dvid;
+
+	dvid = mac_client_vid(dsp->ds_mch);
+
+	/*
+	 * Discard the packet if this is a VLAN stream but the VID in
+	 * the packet is not correct.
+	 */
+	vid = VLAN_ID(mhip->mhi_tci);
+	if ((dvid != VLAN_ID_NONE) && (vid != VLAN_ID_NONE))
+		return (B_FALSE);
+
+	/*
+	 * Discard the packet if this packet is a tagged packet
+	 * but both pri and VID are 0.
+	 */
+	pri = VLAN_PRI(mhip->mhi_tci);
+	if (mhip->mhi_istagged && !mhip->mhi_ispvid && pri == 0 &&
+	    vid == VLAN_ID_NONE)
+		return (B_FALSE);
+
+	/*
+	 * Update the priority bits to the per-stream priority if
+	 * priority is not set in the packet. Update the VID for
+	 * packets on a VLAN stream.
+	 */
+	pri = (pri == 0) ? dsp->ds_pri : 0;
+	if ((pri != 0) || (dvid != VLAN_ID_NONE)) {
+		if ((newmp = i_dld_ether_header_update_tag(mp, pri,
+		    dvid, dsp->ds_dlp->dl_tagmode)) == NULL) {
+			return (B_FALSE);
+		}
+		*mpp = newmp;
+	}
+
+	return (B_TRUE);
+}
+
+mac_tx_cookie_t
+str_mdata_raw_fastpath_put(dld_str_t *dsp, mblk_t *mp, uintptr_t f_hint,
+    uint16_t flag)
+{
+	boolean_t is_ethernet = (dsp->ds_mip->mi_media == DL_ETHER);
+	mac_header_info_t mhi;
+	mac_tx_cookie_t cookie;
+
+	if (mac_vlan_header_info(dsp->ds_mh, mp, &mhi) != 0)
+		goto discard;
+
+	if (is_ethernet) {
+		if (i_dld_raw_ether_check(dsp, &mhi, &mp) == B_FALSE)
+			goto discard;
+	}
+
+	if ((cookie = DLD_TX(dsp, mp, f_hint, flag)) != NULL) {
+		DLD_SETQFULL(dsp);
+	}
+	return (cookie);
+discard:
+	/* TODO: bump kstat? */
+	freemsg(mp);
+	return (NULL);
+}
+
+
+
 /*
  * M_DATA put (IP fast-path mode)
  */
@@ -902,7 +973,6 @@ str_mdata_raw_put(dld_str_t *dsp, mblk_t *mp)
 	mblk_t *bp, *newmp;
 	size_t size;
 	mac_header_info_t mhi;
-	uint_t pri, vid, dvid;
 	uint_t max_sdu;
 
 	/*
@@ -948,38 +1018,8 @@ str_mdata_raw_put(dld_str_t *dsp, mblk_t *mp)
 		goto discard;
 
 	if (is_ethernet) {
-		dvid = mac_client_vid(dsp->ds_mch);
-
-		/*
-		 * Discard the packet if this is a VLAN stream but the VID in
-		 * the packet is not correct.
-		 */
-		vid = VLAN_ID(mhi.mhi_tci);
-		if ((dvid != VLAN_ID_NONE) && (vid != VLAN_ID_NONE))
+		if (i_dld_raw_ether_check(dsp, &mhi, &mp) == B_FALSE)
 			goto discard;
-
-		/*
-		 * Discard the packet if this packet is a tagged packet
-		 * but both pri and VID are 0.
-		 */
-		pri = VLAN_PRI(mhi.mhi_tci);
-		if (mhi.mhi_istagged && !mhi.mhi_ispvid && pri == 0 &&
-		    vid == VLAN_ID_NONE)
-			goto discard;
-
-		/*
-		 * Update the priority bits to the per-stream priority if
-		 * priority is not set in the packet. Update the VID for
-		 * packets on a VLAN stream.
-		 */
-		pri = (pri == 0) ? dsp->ds_pri : 0;
-		if ((pri != 0) || (dvid != VLAN_ID_NONE)) {
-			if ((newmp = i_dld_ether_header_update_tag(mp, pri,
-			    dvid, dsp->ds_dlp->dl_tagmode)) == NULL) {
-				goto discard;
-			}
-			mp = newmp;
-		}
 	}
 
 	if (DLD_TX(dsp, mp, 0, 0) != NULL) {

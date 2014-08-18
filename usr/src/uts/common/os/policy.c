@@ -2575,3 +2575,12 @@ secpolicy_ppp_config(const cred_t *cr)
 		return (secpolicy_net_config(cr, B_FALSE));
 	return (PRIV_POLICY(cr, PRIV_SYS_PPP_CONFIG, B_FALSE, EPERM, NULL));
 }
+
+int
+secpolicy_hyprlofs_control(const cred_t *cr)
+{
+	if (PRIV_POLICY(cr, PRIV_HYPRLOFS_CONTROL, B_FALSE, EPERM, NULL))
+		return (EPERM);
+	return (0);
+}
+

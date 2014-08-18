@@ -37,8 +37,8 @@ KMFINC=		-I../../../include -I../../../ber_der/inc
 BERLIB=		-lkmf -lkmfberder
 BERLIB64=	$(BERLIB)
 
-OPENSSLLIBS=	$(BERLIB) -lcrypto -lcryptoutil -lc
-OPENSSLLIBS64=	$(BERLIB64) -lcrypto -lcryptoutil -lc
+OPENSSLLIBS=	$(BERLIB) -lsunw_crypto -lcryptoutil -lc
+OPENSSLLIBS64=	$(BERLIB64) -lsunw_crypto -lcryptoutil -lc
 
 LINTSSLLIBS	= $(BERLIB) -lcrypto -lcryptoutil -lc
 LINTSSLLIBS64	= $(BERLIB64) -lcrypto -lcryptoutil -lc

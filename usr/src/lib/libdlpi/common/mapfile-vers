@@ -67,6 +67,11 @@ SYMBOL_VERSION SUNW_1.1 {	# first release of libdlpi, Solaris 11
 
 SYMBOL_VERSION SUNWprivate {
     global:
+	#
+	# dlpi_open_zone should be moved to a new public section once it is
+	# upstreamed into illumos-gate .
+	#
+	dlpi_open_zone;
         dlpi_parselink;
 	dlpi_makelink;
 	dlpi_style;

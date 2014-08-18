@@ -64,7 +64,7 @@ $(LINTLIB):=	SRCS = $(SRCDIR)/$(LINTSRC)
 LIBS = $(DYNLIB) $(LINTLIB)
 
 
-LDLIBS +=	-lc -lssl -lwanboot -lcrypto -lscf -ladm
+LDLIBS +=	-lc -lsunw_ssl -lwanboot -lsunw_crypto -lscf -ladm
 
 CFLAGS +=	$(CCVERBOSE)
 CERRWARN +=	-_gcc=-Wno-unused-label

@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011, Joyent, Inc. All rights reserved.
  * Copyright (c) 2011 by Delphix. All rights reserved.
  */
 
@@ -153,6 +154,14 @@ dtrace_program_exec(dtrace_hdl_t *dtp, dtrace_prog_t *pgp,
 {
 	void *dof;
 	int n, err;
+
+	/*
+	 * If we have not yet ioctl'd down our options DOF, we'll do that
+	 * before enabling any probes (some options will affect which probes
+	 * we match).
+	 */
+	if (dtrace_setopts(dtp) != 0)
+		return (-1);
 
 	dtrace_program_info(dtp, pgp, pip);
 

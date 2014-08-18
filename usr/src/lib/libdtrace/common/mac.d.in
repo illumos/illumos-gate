@@ -1,0 +1,66 @@
+/*
+ * This file and its contents are supplied under the terms of the
+ * Common Development and Distribution License ("CDDL"), version 1.0.
+ * You may only use this file in accordance with the terms of version
+ * 1.0 of the CDDL.
+ *
+ * A full copy of the text of the CDDL should have accompanied this
+ * source.  A copy of the CDDL is also available via the Internet at
+ * http://www.illumos.org/license/CDDL.
+ */
+
+/*
+ * Copyright (c) 2014 Joyent, Inc.  All rights reserved.
+ */
+
+#pragma D depends_on library ip.d
+
+inline int ETHERTYPE_PUP = @ETHERTYPE_PUP@; 
+inline int ETHERTYPE_802_MIN = @ETHERTYPE_802_MIN@;
+inline int ETHERTYPE_IP = @ETHERTYPE_IP@; 
+inline int ETHERTYPE_ARP = @ETHERTYPE_ARP@; 
+inline int ETHERTYPE_REVARP = @ETHERTYPE_REVARP@;
+inline int ETHERTYPE_AT = @ETHERTYPE_AT@; 
+inline int ETHERTYPE_AARP = @ETHERTYPE_AARP@;
+inline int ETHERTYPE_VLAN = @ETHERTYPE_VLAN@;
+inline int ETHERTYPE_IPV6 = @ETHERTYPE_IPV6@;
+inline int ETHERTYPE_SLOW = @ETHERTYPE_SLOW@;
+inline int ETHERTYPE_PPPOED = @ETHERTYPE_PPPOED@;
+inline int ETHERTYPE_PPPOES = @ETHERTYPE_PPPOES@;
+inline int ETHERTYPE_EAPOL = @ETHERTYPE_EAPOL@;
+inline int ETHERTYPE_RSN_PREAUTH = @ETHERTYPE_RSN_PREAUTH@;
+inline int ETHERTYPE_TRILL = @ETHERTYPE_TRILL@;
+inline int ETHERTYPE_FCOE = @ETHERTYPE_FCOE@;
+inline int ETHERTYPE_MAX = @ETHERTYPE_MAX@;
+
+
+typedef struct etherinfo {
+	uint8_t eth_dst[6];		/* Destination MAC addr */
+	uint8_t eth_src[6];		/* Source MAC addr */
+	uint16_t eth_type;		/* Ethertype */
+	boolean_t eth_istagged;		/* Is the VLAN tag present */
+	uint8_t eth_priority;		/* Priority tag */
+	uint8_t eth_dei;		/* drop eligible indicator */
+	uint16_t eth_vlanid;		/* VLAN ID */
+	uintptr_t eth_header;		/* Pointer to start of header */
+	uintptr_t eth_mblk;		/* Pointer to the mblk containing header */
+} etherinfo_t;
+
+#pragma D binding "1.12.1" translator
+translator etherinfo_t < mblk_t *mp > {
+	eth_dst = mp->b_rptr;
+	eth_src = mp->b_rptr + 6;
+	eth_type = ntohs(*(uint16_t *)(mp->b_rptr + 12)) == ETHERTYPE_VLAN ?
+	    ntohs(*(uint16_t *)(mp->b_rptr + 16)) :
+	    ntohs(*(uint16_t *)(mp->b_rptr + 12));
+	eth_istagged = ntohs(*(uint16_t *)(mp->b_rptr + 12)) == ETHERTYPE_VLAN ?
+	    1 : 0;
+	eth_priority = ntohs(*(uint16_t *)(mp->b_rptr + 12)) == ETHERTYPE_VLAN ?
+	    ntohs(*(uint16_t *)(mp->b_rptr + 14)) & 0xe000: 0;
+	eth_dei = ntohs(*(uint16_t *)(mp->b_rptr + 12)) == ETHERTYPE_VLAN ?
+	    ntohs(*(uint16_t *)(mp->b_rptr + 14)) & 0x1000: 0;
+	eth_vlanid = ntohs(*(uint16_t *)(mp->b_rptr + 12)) == ETHERTYPE_VLAN ?
+	    ntohs(*(uint16_t *)(mp->b_rptr + 14)) & 0x0fff: 0;
+	eth_header = (uintptr_t)mp->b_rptr;
+	eth_mblk = (uintptr_t)mp;
+};

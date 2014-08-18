@@ -68,28 +68,27 @@ enum dr_op	{ DR_REMOVE, DR_RMDIR, DR_RENAME };	/* dirremove ops */
 
 /*
  * tmpfs_minfree is the amount (in pages) of anonymous memory that tmpfs
- * leaves free for the rest of the system.  E.g. in a system with 32MB of
- * configured swap space, if 16MB were reserved (leaving 16MB free),
- * tmpfs could allocate up to 16MB - tmpfs_minfree.  The default value
- * for tmpfs_minfree is btopr(TMPMINFREE) but it can cautiously patched
- * to a different number of pages.
- * NB: If tmpfs allocates too much swap space, other processes will be
- * unable to execute.
+ * leaves free for the rest of the system.  In antiquity, this number could be
+ * relevant on a system-wide basis, as physical DRAM was routinely exhausted;
+ * however, in more modern times, the relative growth of DRAM with respect to
+ * application footprint means that this number is only likely to become
+ * factor in a virtualized OS environment (e.g., a zone) -- and even then only
+ * when DRAM and swap have both been capped low to allow for maximum tenancy.
+ * TMPMINFREE -- the value from which tmpfs_minfree is derived -- should
+ * therefore be configured to a value that is roughly the smallest practical
+ * value for memory + swap minus the largest reasonable size for tmpfs in such
+ * a configuration.  As of this writing, the smallest practical memory + swap
+ * configuration is 128MB, and it seems reasonable to allow tmpfs to consume
+ * no more than seven-eighths of this, yielding a TMPMINFREE of 16MB.  Care
+ * should be exercised in changing this:  tuning this value too high will
+ * result in spurious ENOSPC errors in tmpfs in small zones (a problem that
+ * can induce cascading failure surprisingly often); tuning this value too low
+ * will result in tmpfs consumption alone to alone induce application-level
+ * memory allocation failure.
  */
-#define	TMPMINFREE	2 * 1024 * 1024	/* 2 Megabytes */
+#define	TMPMINFREE	16 * 1024 * 1024	/* 16 Megabytes */
 
 extern size_t	tmpfs_minfree;		/* Anonymous memory in pages */
-
-/*
- * tmpfs can allocate only a certain percentage of kernel memory,
- * which is used for tmpnodes, directories, file names, etc.
- * This is statically set as TMPMAXFRACKMEM of physical memory.
- * The actual number of allocatable bytes can be patched in tmpfs_maxkmem.
- */
-#define	TMPMAXFRACKMEM	25	/* 1/25 of physical memory */
-
-extern size_t 	tmp_kmemspace;
-extern size_t	tmpfs_maxkmem;	/* Allocatable kernel memory in bytes */
 
 extern	void	tmpnode_init(struct tmount *, struct tmpnode *,
 	struct vattr *, struct cred *);
@@ -101,8 +100,6 @@ extern	int	tdirdelete(struct tmpnode *, struct tmpnode *, char *,
 	enum dr_op, struct cred *);
 extern	void	tdirinit(struct tmpnode *, struct tmpnode *);
 extern	void	tdirtrunc(struct tmpnode *);
-extern	void	*tmp_memalloc(size_t, int);
-extern	void	tmp_memfree(void *, size_t);
 extern	int	tmp_resv(struct tmount *, struct tmpnode *, size_t, int);
 extern	int	tmp_taccess(void *, int, struct cred *);
 extern	int	tmp_sticky_remove_access(struct tmpnode *, struct tmpnode *,

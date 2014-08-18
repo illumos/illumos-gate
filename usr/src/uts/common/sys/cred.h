@@ -93,6 +93,7 @@ extern gid_t crgetgid(const cred_t *);
 extern gid_t crgetrgid(const cred_t *);
 extern gid_t crgetsgid(const cred_t *);
 extern zoneid_t crgetzoneid(const cred_t *);
+extern zoneid_t crgetzonedid(const cred_t *);
 extern projid_t crgetprojid(const cred_t *);
 
 extern cred_t *crgetmapped(const cred_t *);

@@ -200,6 +200,7 @@ static char *emsg_invalid_dep;
 
 extern scf_handle_t *h;
 extern char *g_zonename;
+extern char *g_zonealias;
 
 /* ARGSUSED */
 static int
@@ -1999,6 +2000,9 @@ print_service(inst_t *svcp, int verbose)
 
 	if (g_zonename != NULL)
 		(void) printf(gettext("  Zone: %s\n"), g_zonename);
+
+	if (g_zonealias != NULL)
+		(void) printf(gettext(" Alias: %s\n"), g_zonealias);
 
 	stime = svcp->stime.tv_sec;
 	tmp = localtime(&stime);

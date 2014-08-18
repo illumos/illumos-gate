@@ -33,7 +33,7 @@ include	../../../Makefile.cmd
 ROOTMANIFESTDIR = $(ROOTSVCNETWORK)
 
 LDLIBS    += 	-ldladm -ldlpi
-all install := LDLIBS += -lcrypto
+all install := LDLIBS += -lsunw_crypto
 
 LINTFLAGS += 	-u
 

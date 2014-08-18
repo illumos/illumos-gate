@@ -97,6 +97,10 @@ static dtrace_pattr_t iscsi_attr = {
 { DTRACE_STABILITY_EVOLVING, DTRACE_STABILITY_EVOLVING, DTRACE_CLASS_ISA },
 };
 
+/*
+ * When adding a new provider you must add it before sdt as sdt is a catch all
+ * for remaining probes.
+ */
 sdt_provider_t sdt_providers[] = {
 	{ "vtrace", "__vtrace_", &vtrace_attr },
 	{ "sysinfo", "__cpu_sysinfo_", &info_attr, DTRACE_PRIV_USER },
@@ -117,6 +121,7 @@ sdt_provider_t sdt_providers[] = {
 	{ "fc", "__fc_", &fc_attr },
 	{ "srp", "__srp_", &fc_attr },
 	{ "sysevent", "__sysevent_", &stab_attr },
+	{ "vnd", "__vnd_", &stab_attr },
 	{ "sdt", NULL, &sdt_attr },
 	{ NULL }
 };
@@ -1151,6 +1156,34 @@ sdt_argdesc_t sdt_args[] = {
 	{ "fc", "abts-receive", 2, 2, "fct_i_remote_port_t *",
 	    "fc_port_info_t *" },
 
+	{ "vnd", "flow-blocked", 0, 0, "vnd_str_t *", "ifinfo_t *" },
+	{ "vnd", "flow-blocked", 1, 1, "uint64_t", "uint64_t" },
+	{ "vnd", "flow-blocked", 2, 2, "uintptr_t", "uintptr_t" },
+	{ "vnd", "flow-resumed", 0, 0, "vnd_str_t *", "ifinfo_t *" },
+	{ "vnd", "flow-resumed", 1, 1, "uint64_t", "uint64_t" },
+	{ "vnd", "flow-resumed", 2, 2, "uintptr_t", "uintptr_t" },
+	{ "vnd", "drop-in", 0, 0, "mblk_t *", "pktinfo_t *" },
+	{ "vnd", "drop-in", 1, 1, "vnd_str_t *", "ifinfo_t *" },
+	{ "vnd", "drop-in", 2, 2, "mblk_t *", "etherinfo_t *" },
+	{ "vnd", "drop-in", 3, 3, "const char *", "const char *" },
+	{ "vnd", "drop-out", 0, 0, "mblk_t *", "pktinfo_t *" },
+	{ "vnd", "drop-out", 1, 1, "vnd_str_t *", "ifinfo_t *" },
+	{ "vnd", "drop-out", 2, 2, "mblk_t *", "etherinfo_t *" },
+	{ "vnd", "drop-out", 3, 3, "const char *", "const char *" },
+	{ "vnd", "drop-ctl", 0, 0, "mblk_t *", "pktinfo_t *" },
+	{ "vnd", "drop-ctl", 1, 1, "vnd_str_t *", "ifinfo_t *" },
+	{ "vnd", "drop-ctl", 2, 2, "mblk_t *", "etherinfo_t *" },
+	{ "vnd", "drop-ctl", 3, 3, "const char *", "const char *" },
+	{ "vnd", "send", 0, 0, "mblk_t *", "pktinfo_t *" },
+	{ "vnd", "send", 1, 1, "void *", "csinfo_t *" },
+	{ "vnd", "send", 2, 2, "void *", "ipinfo_t *" },
+	{ "vnd", "send", 3, 3, "vnd_str_t *", "ifinfo_t *" },
+	{ "vnd", "send", 4, 4, "mblk_t *", "etherinfo_t *" },
+	{ "vnd", "recv", 0, 0, "mblk_t *", "pktinfo_t *" },
+	{ "vnd", "recv", 1, 1, "void *", "csinfo_t *" },
+	{ "vnd", "recv", 2, 2, "void *", "ipinfo_t *" },
+	{ "vnd", "recv", 3, 3, "vnd_str_t *", "ifinfo_t *" },
+	{ "vnd", "recv", 4, 4, "mblk_t *", "etherinfo_t *" },
 
 	{ NULL }
 };

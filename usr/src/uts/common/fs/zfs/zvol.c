@@ -25,7 +25,7 @@
  *
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2012, 2014 by Delphix. All rights reserved.
- * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2014, Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -83,6 +83,7 @@
 #include <sys/zvol.h>
 #include <sys/dumphdr.h>
 #include <sys/zil_impl.h>
+#include <sys/sdt.h>
 #include <sys/dbuf.h>
 #include <sys/dmu_tx.h>
 #include <sys/zfeature.h>
@@ -136,6 +137,11 @@ typedef struct zvol_state {
 #define	ZVOL_DUMPIFIED	0x2
 #define	ZVOL_EXCL	0x4
 #define	ZVOL_WCE	0x8
+
+#define	VOP_LATENCY_10MS	10000000
+#define	VOP_LATENCY_100MS	100000000
+#define	VOP_LATENCY_1S		1000000000
+#define	VOP_LATENCY_10S		10000000000
 
 /*
  * zvol maximum transfer in one DMU tx.
@@ -1373,6 +1379,9 @@ zvol_read(dev_t dev, uio_t *uio, cred_t *cr)
 	uint64_t volsize;
 	rl_t *rl;
 	int error = 0;
+	zone_t *zonep = curzone;
+	uint64_t tot_bytes;
+	hrtime_t start, lat;
 
 	zv = zfsdev_get_soft_state(minor, ZSST_ZVOL);
 	if (zv == NULL)
@@ -1389,6 +1398,14 @@ zvol_read(dev_t dev, uio_t *uio, cred_t *cr)
 		return (error);
 	}
 
+	DTRACE_PROBE3(zvol__uio__start, dev_t, dev, uio_t *, uio, int, 0);
+
+	mutex_enter(&zonep->zone_vfs_lock);
+	kstat_runq_enter(&zonep->zone_vfs_rwstats);
+	mutex_exit(&zonep->zone_vfs_lock);
+	start = gethrtime();
+	tot_bytes = 0;
+
 	rl = zfs_range_lock(&zv->zv_znode, uio->uio_loffset, uio->uio_resid,
 	    RL_READER);
 	while (uio->uio_resid > 0 && uio->uio_loffset < volsize) {
@@ -1398,6 +1415,7 @@ zvol_read(dev_t dev, uio_t *uio, cred_t *cr)
 		if (bytes > volsize - uio->uio_loffset)
 			bytes = volsize - uio->uio_loffset;
 
+		tot_bytes += bytes;
 		error =  dmu_read_uio(zv->zv_objset, ZVOL_OBJ, uio, bytes);
 		if (error) {
 			/* convert checksum errors into IO errors */
@@ -1407,6 +1425,39 @@ zvol_read(dev_t dev, uio_t *uio, cred_t *cr)
 		}
 	}
 	zfs_range_unlock(rl);
+
+	mutex_enter(&zonep->zone_vfs_lock);
+	zonep->zone_vfs_rwstats.reads++;
+	zonep->zone_vfs_rwstats.nread += tot_bytes;
+	kstat_runq_exit(&zonep->zone_vfs_rwstats);
+	mutex_exit(&zonep->zone_vfs_lock);
+
+	lat = gethrtime() - start;
+
+	if (lat >= VOP_LATENCY_10MS) {
+		zone_vfs_kstat_t *zvp;
+
+		zvp = zonep->zone_vfs_stats;
+		if (lat < VOP_LATENCY_100MS) {
+			atomic_inc_64(&zvp->zv_10ms_ops.value.ui64);
+		} else if (lat < VOP_LATENCY_1S) {
+			atomic_inc_64(&zvp->zv_10ms_ops.value.ui64);
+			atomic_inc_64(&zvp->zv_100ms_ops.value.ui64);
+		} else if (lat < VOP_LATENCY_10S) {
+			atomic_inc_64(&zvp->zv_10ms_ops.value.ui64);
+			atomic_inc_64(&zvp->zv_100ms_ops.value.ui64);
+			atomic_inc_64(&zvp->zv_1s_ops.value.ui64);
+		} else {
+			atomic_inc_64(&zvp->zv_10ms_ops.value.ui64);
+			atomic_inc_64(&zvp->zv_100ms_ops.value.ui64);
+			atomic_inc_64(&zvp->zv_1s_ops.value.ui64);
+			atomic_inc_64(&zvp->zv_10s_ops.value.ui64);
+		}
+	}
+
+	DTRACE_PROBE4(zvol__uio__done, dev_t, dev, uio_t *, uio, int, 0, int,
+	    error);
+
 	return (error);
 }
 
@@ -1420,6 +1471,9 @@ zvol_write(dev_t dev, uio_t *uio, cred_t *cr)
 	rl_t *rl;
 	int error = 0;
 	boolean_t sync;
+	zone_t *zonep = curzone;
+	uint64_t tot_bytes;
+	hrtime_t start, lat;
 
 	zv = zfsdev_get_soft_state(minor, ZSST_ZVOL);
 	if (zv == NULL)
@@ -1436,6 +1490,19 @@ zvol_write(dev_t dev, uio_t *uio, cred_t *cr)
 		return (error);
 	}
 
+	DTRACE_PROBE3(zvol__uio__start, dev_t, dev, uio_t *, uio, int, 1);
+
+	/*
+	 * For the purposes of VFS kstat consumers, the "waitq" calculation is
+	 * repurposed as the active queue for zvol write operations. There's no
+	 * actual wait queue for zvol operations.
+	 */
+	mutex_enter(&zonep->zone_vfs_lock);
+	kstat_waitq_enter(&zonep->zone_vfs_rwstats);
+	mutex_exit(&zonep->zone_vfs_lock);
+	start = gethrtime();
+	tot_bytes = 0;
+
 	sync = !(zv->zv_flags & ZVOL_WCE) ||
 	    (zv->zv_objset->os_sync == ZFS_SYNC_ALWAYS);
 
@@ -1449,6 +1516,7 @@ zvol_write(dev_t dev, uio_t *uio, cred_t *cr)
 		if (bytes > volsize - off)	/* don't write past the end */
 			bytes = volsize - off;
 
+		tot_bytes += bytes;
 		dmu_tx_hold_write(tx, ZVOL_OBJ, off, bytes);
 		error = dmu_tx_assign(tx, TXG_WAIT);
 		if (error) {
@@ -1466,6 +1534,39 @@ zvol_write(dev_t dev, uio_t *uio, cred_t *cr)
 	zfs_range_unlock(rl);
 	if (sync)
 		zil_commit(zv->zv_zilog, ZVOL_OBJ);
+
+	DTRACE_PROBE4(zvol__uio__done, dev_t, dev, uio_t *, uio, int, 1, int,
+	    error);
+
+	mutex_enter(&zonep->zone_vfs_lock);
+	zonep->zone_vfs_rwstats.writes++;
+	zonep->zone_vfs_rwstats.nwritten += tot_bytes;
+	kstat_waitq_exit(&zonep->zone_vfs_rwstats);
+	mutex_exit(&zonep->zone_vfs_lock);
+
+	lat = gethrtime() - start;
+
+	if (lat >= VOP_LATENCY_10MS) {
+		zone_vfs_kstat_t *zvp;
+
+		zvp = zonep->zone_vfs_stats;
+		if (lat < VOP_LATENCY_100MS) {
+			atomic_inc_64(&zvp->zv_10ms_ops.value.ui64);
+		} else if (lat < VOP_LATENCY_1S) {
+			atomic_inc_64(&zvp->zv_10ms_ops.value.ui64);
+			atomic_inc_64(&zvp->zv_100ms_ops.value.ui64);
+		} else if (lat < VOP_LATENCY_10S) {
+			atomic_inc_64(&zvp->zv_10ms_ops.value.ui64);
+			atomic_inc_64(&zvp->zv_100ms_ops.value.ui64);
+			atomic_inc_64(&zvp->zv_1s_ops.value.ui64);
+		} else {
+			atomic_inc_64(&zvp->zv_10ms_ops.value.ui64);
+			atomic_inc_64(&zvp->zv_100ms_ops.value.ui64);
+			atomic_inc_64(&zvp->zv_1s_ops.value.ui64);
+			atomic_inc_64(&zvp->zv_10s_ops.value.ui64);
+		}
+	}
+
 	return (error);
 }
 

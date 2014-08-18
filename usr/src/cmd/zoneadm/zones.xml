@@ -54,11 +54,19 @@
 		<service_fmri value='svc:/milestone/multi-user-server' />
 	</dependency>
 
+	<dependency
+		name='metadata'
+		type='service'
+		grouping='require_all'
+		restart_on='none'>
+		<service_fmri value='svc:/system/smartdc/metadata' />
+	</dependency>
+
 	<exec_method
 		type='method'
 		name='start'
 		exec='/lib/svc/method/svc-zones %m'
-		timeout_seconds='60'>
+		timeout_seconds='0'>
 	</exec_method>
 
 	<!--

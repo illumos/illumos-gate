@@ -2,10 +2,11 @@
 .\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved
 .\" Portions Copyright 2008 Chad Mynhier
 .\" Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
+.\" Copyright 2013 (c) Joyent, Inc.  All rights reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PROC 1 "Oct 23, 2012"
+.TH PROC 1 "Apr 01, 2013"
 .SH NAME
 proc, pflags, pcred, pldd, psig, pstack, pfiles, pwdx, pstop, prun, pwait,
 ptime \- proc tools
@@ -72,7 +73,7 @@ ptime \- proc tools
 
 .LP
 .nf
-\fB/usr/bin/ptime\fR [\fB-Fm\fR] [\fB-p\fR] \fIpid\fR...
+\fB/usr/bin/ptime\fR [\fB-Fm\fR] \fB-p pidlist\fR
 .fi
 
 .LP
@@ -215,8 +216,10 @@ Time the \fIcommand\fR, like \fBtime\fR(1), but using microstate accounting for
 reproducible precision. Unlike \fBtime\fR(1), children of the command are not
 timed.
 .sp
-If the \fB-p\fR \fIpid\fR version is used, display a snapshot of timing
-statistics for the specified \fIpid\fR.
+If the \fB-p\fR \fIpidlist\fR version is used, display a snapshot of timing
+statistics for the specified processes. The \fIpidlist\fR may either be a comma
+delineated list or a space delineated list. Space delineated lists must be
+properly quoted to assure that they are in a single argument.
 .RE
 
 .SH OPTIONS

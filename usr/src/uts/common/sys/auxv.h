@@ -29,7 +29,7 @@
  * Use is subject to license terms.
  */
 /*
- * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
  */
 
 #ifndef	_SYS_AUXV_H
@@ -78,6 +78,9 @@ typedef struct {
 #define	AT_FLAGS	8	/* processor flags */
 #define	AT_ENTRY	9	/* a.out entry point */
 
+/* First introduced on Linux */
+#define	AT_RANDOM	25	/* address of 16 random bytes */
+
 /*
  * These relate to the original PPC ABI document; Linux reused
  * the values for other things (see below), so disambiguation of
@@ -110,6 +113,16 @@ typedef struct {
  * AT_UCACHEBSIZE	21	(moved from 12)
  *
  * AT_IGNOREPPC		22
+ *
+ * On Linux:
+ * AT_* values 18 through 22 are reserved
+ * AT_SECURE		23	secure mode boolean
+ * AT_BASE_PLATFORM	24	string identifying real platform, may
+ *				differ from AT_PLATFORM.
+ * AT_HWCAP2		26	extension of AT_HWCAP
+ * AT_EXECFN		31	filename of program
+ * AT_SYSINFO		32
+ * AT_SYSINFO_EHDR	33	The vDSO location
  */
 
 /*
@@ -186,6 +199,7 @@ extern uint_t getisax(uint32_t *, uint_t);
 #define	AT_SUN_BRAND_AUX1	2020
 #define	AT_SUN_BRAND_AUX2	2021
 #define	AT_SUN_BRAND_AUX3	2022
+#define	AT_SUN_BRAND_NROOT	2024
 
 /*
  * Note that 2023 is reserved for the AT_SUN_HWCAP2 word defined above.

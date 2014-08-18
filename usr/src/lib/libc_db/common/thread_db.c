@@ -24,6 +24,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright (c) 2014, Joyent, Inc. All rights reserved.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stddef.h>
@@ -146,6 +150,7 @@ static td_err_e
 td_read_uberdata(td_thragent_t *ta_p)
 {
 	struct ps_prochandle *ph_p = ta_p->ph_p;
+	int i;
 
 	if (ta_p->model == PR_MODEL_NATIVE) {
 		uberdata_t uberdata;
@@ -163,12 +168,10 @@ td_read_uberdata(td_thragent_t *ta_p)
 		if (ps_pdread(ph_p, (psaddr_t)uberdata.tdb.tdb_events,
 		    ta_p->tdb_events, sizeof (ta_p->tdb_events)) != PS_OK)
 			return (TD_DBERR);
-
 	} else {
 #if defined(_LP64) && defined(_SYSCALL32)
 		uberdata32_t uberdata;
 		caddr32_t tdb_events[TD_MAX_EVENT_NUM - TD_MIN_EVENT_NUM + 1];
-		int i;
 
 		if (ps_pdread(ph_p, ta_p->uberdata_addr,
 		    &uberdata, sizeof (uberdata)) != PS_OK)
@@ -189,6 +192,29 @@ td_read_uberdata(td_thragent_t *ta_p)
 		return (TD_DBERR);
 #endif
 	}
+
+	/*
+	 * Unfortunately, we are (implicitly) assuming that our uberdata
+	 * definition precisely matches that of our target.  If this is not
+	 * true (that is, if we're examining a core file from a foreign
+	 * system that has a different definition of uberdata), the failure
+	 * modes can be frustratingly non-explicit.  In an effort to catch
+	 * this upon initialization (when the debugger may still be able to
+	 * opt for another thread model or may be able to fail explicitly), we
+	 * check that each of our tdb_events points to valid memory (these are
+	 * putatively text upon which a breakpoint can be issued), with the
+	 * hope that this is enough of a self-consistency check to lead to
+	 * explicit failure on a mismatch.
+	 */
+	for (i = 0; i < TD_MAX_EVENT_NUM - TD_MIN_EVENT_NUM + 1; i++) {
+		uint8_t check;
+
+		if (ps_pdread(ph_p, (psaddr_t)ta_p->tdb_events[i],
+		    &check, sizeof (check)) != PS_OK) {
+			return (TD_DBERR);
+		}
+	}
+
 	if (ta_p->hash_size != 1) {	/* multi-threaded */
 		ta_p->initialized = 2;
 		ta_p->single_lwpid = 0;
