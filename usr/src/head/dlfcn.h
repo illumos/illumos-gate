@@ -19,6 +19,7 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  *
  *	Copyright (c) 1989 AT&T
@@ -44,21 +45,12 @@ extern "C" {
  * Information structures for various dlinfo() requests.
  */
 #if !defined(_XOPEN_SOURCE) || defined(__EXTENSIONS__)
-#ifdef __STDC__
 typedef struct	dl_info {
 	const char	*dli_fname;	/* file containing address range */
 	void		*dli_fbase;	/* base address of file image */
 	const char	*dli_sname;	/* symbol name */
 	void		*dli_saddr;	/* symbol address */
 } Dl_info;
-#else
-typedef struct	dl_info {
-	char		*dli_fname;
-	void		*dli_fbase;
-	char		*dli_sname;
-	void		*dli_saddr;
-} Dl_info;
-#endif /* __STDC__ */
 typedef	Dl_info		Dl_info_t;
 
 typedef struct	dl_serpath {
@@ -114,7 +106,6 @@ typedef ulong_t		Lmid_t;
 /*
  * Declarations used for dynamic linking support routines.
  */
-#ifdef __STDC__
 extern void	*dlopen(const char *, int);
 extern void   	*dlsym(void *_RESTRICT_KYWD, const char *_RESTRICT_KYWD);
 extern int	dlclose(void *);
@@ -127,20 +118,6 @@ extern int	dldump(const char *, const char *, int);
 extern int	dlinfo(void *, int, void *);
 extern Dl_amd64_unwindinfo  *dlamd64getunwind(void *, Dl_amd64_unwindinfo *);
 #endif /* !defined(_XOPEN_SOURCE) || defined(__EXTENSIONS__) */
-#else
-extern void	*dlopen();
-extern void	*dlsym();
-extern int	dlclose();
-extern char	*dlerror();
-#if !defined(_XOPEN_SOURCE) || defined(__EXTENSIONS__)
-extern void 	*dlmopen();
-extern int	dladdr();
-extern int	dladdr1();
-extern int	dldump();
-extern int	dlinfo();
-extern Dl_amd64_unwindinfo  *dlamd64getunwind();
-#endif /* !defined(_XOPEN_SOURCE) || defined(__EXTENSIONS__) */
-#endif /* __STDC__ */
 
 #pragma unknown_control_flow(dlopen, dlsym, dlclose, dlerror)
 #if !defined(_XOPEN_SOURCE) || defined(__EXTENSIONS__)

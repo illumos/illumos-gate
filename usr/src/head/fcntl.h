@@ -20,6 +20,8 @@
  */
 
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -29,8 +31,6 @@
 
 #ifndef	_FCNTL_H
 #define	_FCNTL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.6.1.7 */
 
 #include <sys/feature_tests.h>
 #if defined(__EXTENSIONS__) || defined(_XPG4)
@@ -128,8 +128,6 @@ extern "C" {
 #endif
 #endif	/* _LP64 && _LARGEFILE64_SOURCE */
 
-#if defined(__STDC__)
-
 extern int fcntl(int, int, ...);
 extern int open(const char *, int, ...);
 extern int creat(const char *, mode_t);
@@ -161,43 +159,6 @@ extern int openat64(int, const char *, int, ...);
 extern int attropen64(const char *, const char *, int, ...);
 #endif /* defined(__EXTENSIONS__) || !defined(__XOPEN_OR_POSIX) ... */
 #endif
-
-#else	/* defined(__STDC__) */
-
-extern int fcntl();
-extern int open();
-extern int creat();
-#if !defined(__XOPEN_OR_POSIX) || defined(_XPG6) || defined(__EXTENSIONS__)
-extern int posix_fadvise();
-extern int posix_fallocate();
-#endif /* !defined(__XOPEN_OR_POSIX) || defined(_XPG6) || ... */
-#if defined(__EXTENSIONS__) || !defined(__XOPEN_OR_POSIX) || \
-	defined(_ATFILE_SOURCE)
-extern int openat();
-extern int attropen();
-#endif /* defined(__EXTENSIONS__) || !defined(__XOPEN_OR_POSIX) ... */
-
-#if defined(__EXTENSIONS__) || !defined(__XOPEN_OR_POSIX)
-extern int directio();
-#endif
-
-/* transitional large file interface versions */
-#if	defined(_LARGEFILE64_SOURCE) && !((_FILE_OFFSET_BITS == 64) && \
-	    !defined(__PRAGMA_REDEFINE_EXTNAME))
-extern int open64();
-extern int creat64();
-#if !defined(__XOPEN_OR_POSIX) || defined(_XPG6) || defined(__EXTENSIONS__)
-extern int posix_fadvise64();
-extern int posix_fallocate64();
-#endif /* !defined(__XOPEN_OR_POSIX) || defined(_XPG6) || ... */
-#if defined(__EXTENSIONS__) || !defined(__XOPEN_OR_POSIX) || \
-	defined(_ATFILE_SOURCE)
-extern int openat64();
-extern int attropen64();
-#endif /* defined(__EXTENSIONS__) || !defined(__XOPEN_OR_POSIX) ... */
-#endif
-
-#endif	/* defined(__STDC__) */
 
 #ifdef	__cplusplus
 }

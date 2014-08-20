@@ -26,6 +26,8 @@
  */
 
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2014 Gary Mills
@@ -192,8 +194,6 @@ struct t_uderr {
 #define	LOCALNAME	0
 #define	REMOTENAME	1
 
-#if defined(__STDC__)
-
 extern int t_accept(int fildes, int resfd, struct t_call *call);
 extern char *t_alloc(int fildes, int struct_type, int fields);
 extern int t_bind(int fildes, struct t_bind *req, struct t_bind *ret);
@@ -229,8 +229,6 @@ extern int t_unbind(int fildes);
  */
 extern char *t_errlist[];
 extern int t_nerr;
-
-#endif /* __STDC__ */
 
 #ifdef	__cplusplus
 }

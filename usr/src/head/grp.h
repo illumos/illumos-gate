@@ -24,14 +24,14 @@
 
 
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _GRP_H
 #define	_GRP_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.3.3.1 */
 
 #include <sys/feature_tests.h>
 
@@ -52,8 +52,6 @@ struct	group {	/* see getgrent(3C) */
 	char	**gr_mem;
 };
 
-#if defined(__STDC__)
-
 extern struct group *getgrgid(gid_t);		/* MT-unsafe */
 extern struct group *getgrnam(const char *);	/* MT-unsafe */
 
@@ -71,28 +69,6 @@ extern void endgrent(void);
 extern void setgrent(void);
 extern struct group *getgrent(void);		/* MT-unsafe */
 #endif /* defined(__EXTENSIONS__) || !defined(__XOPEN_OR_POSIX)... */
-
-#else
-
-extern struct group *getgrgid();		/* MT-unsafe */
-extern struct group *getgrnam();		/* MT-unsafe */
-
-#if defined(__EXTENSIONS__) || !defined(__XOPEN_OR_POSIX)
-extern struct group *getgrent_r();
-extern struct group *fgetgrent_r();
-
-extern struct group *fgetgrent();		/* MT-unsafe */
-extern int initgroups();
-#endif /* defined(__EXTENSIONS__) || !defined(__XOPEN_OR_POSIX) */
-
-#if defined(__EXTENSIONS__) || !defined(__XOPEN_OR_POSIX) || defined(_XPG4_2)
-extern void endgrent();
-extern void setgrent();
-extern struct group *getgrent();		/* MT-unsafe */
-#endif /* defined(__EXTENSIONS__) || !defined(__XOPEN_OR_POSIX)... */
-
-#endif	/* __STDC__ */
-
 
 /*
  * getgrgid_r() & getgrnam_r() prototypes are defined here.
@@ -132,8 +108,6 @@ extern struct group *getgrent();		/* MT-unsafe */
 
 #if	defined(__EXTENSIONS__) || !defined(__XOPEN_OR_POSIX) || \
 	(_POSIX_C_SOURCE - 0 >= 199506L) || defined(_POSIX_PTHREAD_SEMANTICS)
-
-#if	defined(__STDC__)
 
 #if	(_POSIX_C_SOURCE - 0 >= 199506L) || defined(_POSIX_PTHREAD_SEMANTICS)
 
@@ -179,60 +153,6 @@ extern struct group *getgrgid_r(gid_t, struct group *, char *, int);
 extern struct group *getgrnam_r(const char *, struct group *, char *, int);
 
 #endif  /* (_POSIX_C_SOURCE - 0 >= 199506L) || ... */
-
-#else  /* __STDC__ */
-
-#if	(_POSIX_C_SOURCE - 0 >= 199506L) || defined(_POSIX_PTHREAD_SEMANTICS)
-
-#ifdef __PRAGMA_REDEFINE_EXTNAME
-#pragma redefine_extname getgrgid_r __posix_getgrgid_r
-#pragma redefine_extname getgrnam_r __posix_getgrnam_r
-extern int getgrgid_r();
-extern int getgrnam_r();
-#else  /* __PRAGMA_REDEFINE_EXTNAME */
-
-extern int __posix_getgrgid_r();
-extern int __posix_getgrnam_r();
-
-#ifdef	__lint
-
-#define	getgrgid_r __posix_getgrgid_r
-#define	getgrnam_r __posix_getgrnam_r
-
-#else	/* !__lint */
-
-static int
-getgrgid_r(__gid, __grp, __buf, __len, __res)
-	gid_t __gid;
-	struct group *__grp;
-	char *__buf;
-	int __len;
-	struct group **__res;
-{
-	return (__posix_getgrgid_r(__gid, __grp, __buf, __len, __res));
-}
-static int
-getgrnam_r(__cb, __grp, __buf, __len, __res)
-	char *__cb;
-	struct group *__grp;
-	char *__buf;
-	int __len;
-	struct group **__res;
-{
-	return (__posix_getgrnam_r(__cb, __grp, __buf, __len, __res));
-}
-
-#endif /* !__lint */
-#endif /* __PRAGMA_REDEFINE_EXTNAME */
-
-#else  /* (_POSIX_C_SOURCE - 0 >= 199506L) || ... */
-
-extern struct group *getgrgid_r();
-extern struct group *getgrnam_r();
-
-#endif /* (_POSIX_C_SOURCE - 0 >= 199506L) || ... */
-
-#endif /* __STDC__ */
 
 #endif /* defined(__EXTENSIONS__) || !defined(__XOPEN_OR_POSIX)... */
 

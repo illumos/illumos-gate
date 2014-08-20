@@ -128,8 +128,7 @@ export MAILTO="$STAFFER"
 # specified, the build is simply run in a new task in the current project.
 export BUILD_PROJECT=''
 
-# You should not need to change the next four lines
-export LOCKNAME="$(basename -- "$CODEMGR_WS")_nightly.lock"
+# You should not need to change the next three lines
 export ATLOG="$CODEMGR_WS/log"
 export LOGFILE="$ATLOG/nightly.log"
 export MACH="$(uname -p)"

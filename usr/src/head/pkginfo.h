@@ -19,14 +19,14 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
 #ifndef	_PKGINFO_H
 #define	_PKGINFO_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.5.1.2 */
 
 #ifdef	__cplusplus
 extern "C" {
@@ -51,15 +51,9 @@ struct pkginfo {
 
 extern char	*pkgdir;
 
-#ifdef __STDC__
 extern char	*pkgparam(char *, char *);
 extern int	pkginfo(struct pkginfo *, char *, ...),
 		pkgnmchk(char *, char *, int);
-#else
-extern char	*pkgparam();
-extern int	pkginfo(),
-		pkgnmchk();
-#endif	/* __STDC__ */
 
 #ifdef	__cplusplus
 }

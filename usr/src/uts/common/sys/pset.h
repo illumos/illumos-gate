@@ -19,6 +19,8 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -51,7 +53,6 @@ typedef int psetid_t;
 #define	PS_PRIVATE	2
 
 #ifndef	_KERNEL
-#ifdef	__STDC__
 
 extern int	pset_create(psetid_t *);
 extern int	pset_destroy(psetid_t);
@@ -64,20 +65,6 @@ extern int	pset_list(psetid_t *, uint_t *);
 extern int	pset_setattr(psetid_t, uint_t);
 extern int	pset_getattr(psetid_t, uint_t *);
 
-#else
-
-extern int	pset_create();
-extern int	pset_destroy();
-extern int	pset_assign();
-extern int	pset_info();
-extern int	pset_bind();
-extern int	pset_bind_lwp();
-extern int	pset_getloadavg();
-extern int	pset_list();
-extern int	pset_setattr();
-extern int	pset_getattr();
-
-#endif	/* __STDC__ */
 #endif	/* ! _KERNEL */
 
 #endif	/* !defined(_ASM) */

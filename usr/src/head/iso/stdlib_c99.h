@@ -20,6 +20,8 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -37,8 +39,6 @@
 
 #ifndef _ISO_STDLIB_C99_H
 #define	_ISO_STDLIB_C99_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -59,8 +59,6 @@ typedef struct {
 } lldiv_t;
 #endif  /* defined(_LONGLONG_TYPE) */
 
-#ifdef __STDC__
-
 #if (!defined(_STRICT_STDC) && !defined(__XOPEN_OR_POSIX)) || \
 	defined(_STDC_C99) || defined(__EXTENSIONS__)
 
@@ -79,26 +77,6 @@ extern unsigned long long strtoull(const char *_RESTRICT_KYWD,
 #endif /* defined(_LONGLONG_TYPE) */
 
 #endif  /* (!defined(_STRICT_STDC) && !defined(__XOPEN_OR_POSIX)) ... */
-
-#else /* __STDC__ */
-
-#if !defined(__XOPEN_OR_POSIX) || defined(_XPG6) || defined(__EXTENSIONS__)
-
-extern void _Exit();
-extern float strtof();
-extern long double strtold();
-
-#if defined(_LONGLONG_TYPE)
-extern long long atoll();
-extern long long llabs();
-extern lldiv_t lldiv();
-extern long long strtoll();
-extern unsigned long long strtoull();
-#endif /* defined(_LONGLONG_TYPE) */
-
-#endif /* !defined(__XOPEN_OR_POSIX) || defined(_XPG6)... */
-
-#endif /* __STDC__ */
 
 #ifdef	__cplusplus
 }

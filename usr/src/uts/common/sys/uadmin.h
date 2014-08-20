@@ -19,6 +19,8 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2011 Joyent, Inc.  All rights reserved.
@@ -161,11 +163,7 @@ extern int kadmin(int, int, void *, cred_t *);
 extern void killall(zoneid_t, boolean_t);
 #endif
 
-#if defined(__STDC__)
 extern int uadmin(int, int, uintptr_t);
-#else
-extern int uadmin();
-#endif
 
 #endif	/* _ASM */
 

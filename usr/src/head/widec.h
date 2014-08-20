@@ -20,6 +20,8 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -33,13 +35,9 @@
 #ifndef	_WIDEC_H
 #define	_WIDEC_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/feature_tests.h>
 
-#if defined(__STDC__)
 #include <stdio.h>	/* For definition of FILE */
-#endif
 #include <euc.h>
 #include <wchar.h>
 
@@ -47,7 +45,6 @@
 extern "C" {
 #endif
 
-#if defined(__STDC__)
 /* Character based input and output functions */
 extern wchar_t	*getws(wchar_t *);
 extern int	putws(const wchar_t *);
@@ -93,57 +90,6 @@ extern long long	wstoll(const wchar_t *, wchar_t **, int);
 #endif	/* defined(_LONGLONG_TYPE) */
 
 #endif /* !defined(_STRICT_STDC) && !defined(__XOPEN_OR_POSIX) */
-
-#else	/* !defined(__STDC__) */
-/* Character based input and output functions */
-extern wchar_t		*getws();
-extern int		putws();
-
-#ifndef getwc
-#define	getwc(p)	fgetwc(p)
-#endif
-#ifndef putwc
-#define	putwc(x, p)	fputwc((x), (p))
-#endif
-#ifndef getwchar
-#define	getwchar()	getwc(stdin)
-#endif
-#ifndef putwchar
-#define	putwchar(x)	putwc((x), stdout)
-#endif
-
-/* wchar_t string operation functions */
-extern wchar_t	*strtows();
-extern wchar_t	*wscpy();
-extern wchar_t	*wsncpy();
-extern wchar_t	*wscat();
-extern wchar_t	*wsncat();
-extern wchar_t	*wschr();
-extern wchar_t	*wsrchr();
-extern wchar_t	*wspbrk();
-extern wchar_t	*wstok();
-
-extern int	wscmp();
-extern int	wsncmp();
-extern int	wslen();
-extern int	wsspn();
-extern int	wscspn();
-extern int	wscoll();
-extern int	wsxfrm();
-
-extern char	*wstostr();
-extern wchar_t	*wsdup();
-extern int	wscol();
-extern double	wstod();
-extern long	wstol();
-extern int	wscasecmp();
-extern int	wsncasecmp();
-extern int	wsprintf();
-#if defined(_LONGLONG_TYPE)
-extern long long	wstoll();
-#endif	/* defined(_LONGLONG_TYPE) */
-
-#endif	/* !defined(__STDC__) */
 
 /* Returns the code set number for the process code c. */
 #define	WCHAR_SHIFT	7

@@ -20,14 +20,14 @@
  */
 
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_AIOCB_H
 #define	_SYS_AIOCB_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/fcntl.h>
@@ -40,11 +40,7 @@ extern "C" {
 
 typedef struct aiocb {
 	int 		aio_fildes;
-#if	defined(__STDC__)
 	volatile void	*aio_buf;		/* buffer location */
-#else
-	void		*aio_buf;		/* buffer location */
-#endif
 	size_t 		aio_nbytes;		/* length of transfer */
 	off_t 		aio_offset;		/* file offset */
 	int		aio_reqprio;		/* request priority offset */
@@ -59,11 +55,7 @@ typedef struct aiocb {
 #if	!defined(_KERNEL)
 typedef struct aiocb64 {
 	int 		aio_fildes;
-#if	defined(__STDC__)
 	volatile void	*aio_buf;		/* buffer location */
-#else
-	void		*aio_buf;		/* buffer location */
-#endif
 	size_t 		aio_nbytes;		/* length of transfer */
 	off64_t		aio_offset;		/* file offset */
 	int		aio_reqprio;		/* request priority offset */

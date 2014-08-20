@@ -20,6 +20,8 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright (c) 1997-1998 by Sun Microsystems, Inc.
  * All rights reserved.
  */
@@ -30,8 +32,6 @@
 
 #ifndef _SYS_FBUF_H
 #define	_SYS_FBUF_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.3	*/
 
 #include <sys/vnode.h>
 
@@ -53,7 +53,6 @@ struct fbuf {
 	uint_t	fb_count;
 };
 
-#if defined(__STDC__)
 extern int fbread(struct vnode *, offset_t, uint_t, enum seg_rw,
     struct fbuf **);
 extern void fbzero(struct vnode *, offset_t, uint_t, struct fbuf **);
@@ -61,7 +60,6 @@ extern int fbwrite(struct fbuf *);
 extern int fbdwrite(struct fbuf *);
 extern int fbiwrite(struct fbuf *, struct vnode *, daddr_t bn, int bsize);
 extern void fbrelse(struct fbuf *, enum seg_rw);
-#endif
 
 #ifdef	__cplusplus
 }

@@ -24,6 +24,8 @@
 
 
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -76,17 +78,8 @@ extern "C" {
 #define	__va_alist_type int
 #endif
 
-#if defined(__STDC__) /* source language is ISO C or C++ */
-
 #define	__va_void(expr)	((void)expr)
 #define	__va_ptr_base	void
-
-#else /* source language is K&R C */
-
-#define	__va_void(expr)	expr
-#define	__va_ptr_base	char
-
-#endif /* __STDC__ */
 
 #if defined(__BUILTIN_VA_STRUCT) && !defined(__lint)	/* -------- protocol */
 

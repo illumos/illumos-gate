@@ -20,14 +20,14 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_INT_TYPES_H
 #define	_SYS_INT_TYPES_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This file, <sys/int_types.h>, is part of the Sun Microsystems implementation
@@ -74,9 +74,7 @@ extern "C" {
 #if defined(_CHAR_IS_SIGNED)
 typedef char			int8_t;
 #else
-#if defined(__STDC__)
 typedef signed char		int8_t;
-#endif
 #endif
 typedef short			int16_t;
 typedef int			int32_t;
@@ -133,9 +131,7 @@ typedef	unsigned int		uintptr_t;
 #if defined(_CHAR_IS_SIGNED)
 typedef char			int_fast8_t;
 #else
-#if defined(__STDC__)
 typedef signed char		int_fast8_t;
-#endif
 #endif
 typedef int			int_fast16_t;
 typedef int			int_fast32_t;
@@ -165,9 +161,7 @@ typedef unsigned long long	uint_fast64_t;
 #if defined(_CHAR_IS_SIGNED)
 typedef char			int_least8_t;
 #else
-#if defined(__STDC__)
 typedef signed char		int_least8_t;
-#endif
 #endif
 typedef short			int_least16_t;
 typedef int			int_least32_t;

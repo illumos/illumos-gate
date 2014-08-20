@@ -19,10 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
- */
-/*
  * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
+ * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_DDIDMAREQ_H
@@ -509,13 +508,8 @@ typedef struct ddi_dma_req {
  * defines then it is assumed that one wishes a callback and is providing
  * a function address.
  */
-#ifdef __STDC__
 #define	DDI_DMA_DONTWAIT	((int (*)(caddr_t))0)
 #define	DDI_DMA_SLEEP		((int (*)(caddr_t))1)
-#else
-#define	DDI_DMA_DONTWAIT	((int (*)())0)
-#define	DDI_DMA_SLEEP		((int (*)())1)
-#endif
 
 /*
  * Return values from callback functions.

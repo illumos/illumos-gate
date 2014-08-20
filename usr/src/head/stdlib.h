@@ -20,6 +20,7 @@
  */
 
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  * Copyright (c) 2013 Gary Mills
  *
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
@@ -86,8 +87,6 @@ extern "C" {
 #define	_UID_T
 typedef	unsigned int	uid_t;		/* UID type		*/
 #endif	/* !_UID_T */
-
-#if defined(__STDC__)
 
 /* large file compilation environment setup */
 #if !defined(_LP64) && _FILE_OFFSET_BITS == 64
@@ -260,128 +259,6 @@ extern char *ulltostr(unsigned long long, char *);
 #endif	/* !defined(_STRICT_STDC) && defined(_LONGLONG_TYPE) */
 
 #endif /* defined(__EXTENSIONS__) || !defined(_STRICT_STDC) ... */
-
-#else /* not __STDC__ */
-
-#if defined(__EXTENSIONS__) || !defined(__XOPEN_OR_POSIX) || \
-	(_POSIX_C_SOURCE - 0 >= 199506L) || defined(_REENTRANT)
-extern int rand_r();
-#endif	/* defined(__EXTENSIONS__) || defined(_REENTRANT) ... */
-
-extern void _exithandle();
-
-#if defined(__EXTENSIONS__) || !defined(_POSIX_C_SOURCE) || defined(_XPG4)
-extern double drand48();
-extern double erand48();
-extern long jrand48();
-extern void lcong48();
-extern long lrand48();
-extern long mrand48();
-extern long nrand48();
-extern unsigned short *seed48();
-extern void srand48();
-extern int putenv();
-extern void setkey();
-#endif /* defined(__EXTENSIONS__) || !defined(_POSIX_C_SOURCE) ... */
-
-#if (defined(__EXTENSIONS__) || !defined(_POSIX_C_SOURCE)) && \
-	(!defined(_XOPEN_SOURCE) || (defined(_XPG3) && !defined(_XPG4)))
-extern void swab();
-#endif
-
-#if defined(__EXTENSIONS__) || \
-	!defined(__XOPEN_OR_POSIX) || defined(_XPG4_2) || \
-	(defined(_LARGEFILE_SOURCE) && _FILE_OFFSET_BITS == 64)
-extern int	mkstemp();
-#if !defined(_XPG4_2) || defined(__EXTENSIONS__)
-extern int	mkstemps();
-#endif
-#endif	/* defined(__EXTENSIONS__) ... */
-
-#if	defined(_LARGEFILE64_SOURCE) && !((_FILE_OFFSET_BITS == 64) && \
-	    !defined(__PRAGMA_REDEFINE_EXTNAME))
-extern int	mkstemp64();
-#if !defined(_XPG4_2) || defined(__EXTENSIONS__)
-extern int	mkstemps64();
-#endif
-#endif	/* _LARGEFILE64_SOURCE... */
-
-#if defined(__EXTENSIONS__) || !defined(__XOPEN_OR_POSIX) || defined(_XPG4_2)
-extern long a64l();
-extern char *ecvt();
-extern char *fcvt();
-extern char *gcvt();
-extern int getsubopt();
-extern int grantpt();
-extern char *initstate();
-extern char *l64a();
-extern char *mktemp();
-extern char *ptsname();
-extern long random();
-extern char *realpath();
-extern char *setstate();
-extern void srandom();
-/* Marked LEGACY in SUSv2 and removed in SUSv3 */
-#if !defined(_XPG6) || defined(__EXTENSIONS__)
-extern int ttyslot();
-extern void *valloc();
-#endif /* !defined(_XPG6) || defined(__EXTENSIONS__) */
-#endif /* defined(__EXTENSIONS__) || ... || defined(_XPG4_2) */
-
-#if defined(__EXTENSIONS__) || !defined(__XOPEN_OR_POSIX) || defined(_XPG6)
-extern int posix_memalign();
-extern int posix_openpt();
-extern int setenv();
-extern int unsetenv();
-#endif
-
-#if defined(__EXTENSIONS__) || !defined(__XOPEN_OR_POSIX)
-extern char *canonicalize_file_name();
-extern int clearenv();
-extern void closefrom();
-extern int daemon();
-extern int dup2();
-extern int dup3();
-extern int fdwalk();
-extern char *qecvt();
-extern char *qfcvt();
-extern char *qgcvt();
-extern char *getcwd();
-extern char *getexecname();
-
-#ifndef	__GETLOGIN_DEFINED	/* Avoid duplicate in unistd.h */
-#define	__GETLOGIN_DEFINED
-#ifndef	__USE_LEGACY_LOGNAME__
-#ifdef	__PRAGMA_REDEFINE_EXTNAME
-#pragma	redefine_extname getlogin getloginx
-#else	/* __PRAGMA_REDEFINE_EXTNAME */
-extern char *getloginx();
-#define	getlogin	getloginx
-#endif	/* __PRAGMA_REDEFINE_EXTNAME */
-#endif	/* __USE_LEGACY_LOGNAME__ */
-extern char *getlogin();
-#endif	/* __GETLOGIN_DEFINED */
-
-extern int getopt();
-extern char *optarg;
-extern int optind, opterr, optopt;
-extern char *getpass();
-extern char *getpassphrase();
-extern int getpw();
-extern int isatty();
-extern void *memalign();
-extern char *ttyname();
-extern char *mkdtemp();
-extern char *getprogname();
-extern void setprogname();
-
-#if defined(_LONGLONG_TYPE)
-extern char *lltostr();
-extern char *ulltostr();
-#endif  /* defined(_LONGLONG_TYPE) */
-#endif	/* defined(__EXTENSIONS__) || !defined(__XOPEN_OR_POSIX) ... */
-
-#endif	/* __STDC__ */
 
 #ifdef	__cplusplus
 }

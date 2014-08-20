@@ -1,9 +1,0 @@
-This is the Solaris ON port of ntfsprogs v2.0.0
-Please see http://www.linux-ntfs.org/ for more information.
-
-ntfsprogs has been broken into two pieces: src/lib/libntfs and src/cmd/ntfsprogs
-
-The Makefiles have all been replaced by ON Makefiles.
-
-This directory contains the necessary contents of ntfsprogs-2.0.0/ntfsprogs
-ntfsmount is missing until FUSE has been integrated into ON.

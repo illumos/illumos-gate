@@ -22,8 +22,9 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved	*/
 
-
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -31,14 +32,11 @@
 #ifndef	_SYS_VARARGS_H
 #define	_SYS_VARARGS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* UCB 4.1 83/05/03 */
-
 /*
  * This header defines the Solaris system definitions for variable
  * argument lists.  For the most part, it follows the definitions of
  * ISO C 1999.  It does not follow the namespace rules for ISO C++
- * 1998.  For legacy support, it also defines the pre-standard variable
- * argument definitions.
+ * 1998.
  *
  * The varargs definitions within this header are defined in terms of
  * implementation definitions.  These implementation definitions reside
@@ -58,10 +56,8 @@ extern "C" {
 typedef __va_list va_list;
 #endif
 
-#if defined(__STDC__)
 /*
- * When __STDC__ is defined, this file provides stdarg semantics despite
- * the name of the file.
+ * This file provides stdarg semantics despite the name of the file.
  */
 
 #define	va_start(list, name)	__va_start(list, name)
@@ -69,20 +65,6 @@ typedef __va_list va_list;
 #define	va_copy(to, from)	__va_copy(to, from)
 #define	va_end(list)		__va_end(list)
 
-#else	/* ! __STDC__ */
-/*
- * In the absence of __STDC__, this file provides traditional varargs
- * semantics.
- */
-
-#define	va_alist		__builtin_va_alist
-#define	va_dcl			__va_alist_type va_alist;
-#define	va_start(list)		__va_start(list, va_alist)
-#define	va_arg(list, type)	__va_arg(list, type)
-#define	va_copy(to, from)	__va_copy(to, from)
-#define	va_end(list)		__va_end(list)
-
-#endif	/* __STDC__ */
 
 #ifdef	__cplusplus
 }

@@ -20,14 +20,13 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  * Copyright (c) 1994 by Sun Microsystems, Inc.
  * Copyright 1985, 1994 by Mortice Kern Systems Inc.  All rights reserved.
  */
 
 #ifndef	_FNMATCH_H
 #define	_FNMATCH_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -43,11 +42,7 @@ extern "C" {
 #define	FNM_ERROR	2	/* error occured */
 #define	FNM_NOSYS	3	/* Function (XPG4) not supported */
 
-#if defined(__STDC__)
 extern int fnmatch(const char *, const char *, int);
-#else
-extern int fnmatch();
-#endif
 
 #ifdef	__cplusplus
 }

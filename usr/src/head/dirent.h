@@ -20,6 +20,8 @@
  */
 
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -29,8 +31,6 @@
 
 #ifndef _DIRENT_H
 #define	_DIRENT_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.6.1.5   */
 
 #include <sys/feature_tests.h>
 
@@ -68,8 +68,6 @@ typedef struct {
 } DIR;				/* stream data from opendir() */
 
 #endif /* !defined(__XOPEN_OR_POSIX) */
-
-#if defined(__STDC__)
 
 /* large file compilation environment setup */
 #if !defined(_LP64) && _FILE_OFFSET_BITS == 64
@@ -133,31 +131,6 @@ extern int	alphasort64(const struct dirent64 **, const struct dirent64 **);
 #endif /* defined(__EXTENSIONS__) || !defined(__XOPEN_OR_POSIX) */
 #endif
 
-#else
-
-extern DIR		*opendir();
-#if defined(__EXTENSIONS__) || !defined(__XOPEN_OR_POSIX) || \
-	defined(_ATFILE_SOURCE)
-extern DIR		*fdopendir();
-extern int		dirfd();
-#endif /* defined(__EXTENSIONS__) || !defined(__XOPEN_OR_POSIX) ... */
-extern struct dirent	*readdir();
-#if defined(__EXTENSIONS__) || !defined(_POSIX_C_SOURCE) || \
-	defined(_XOPEN_SOURCE)
-extern long		telldir();
-extern void		seekdir();
-#endif /* defined(__EXTENSIONS__) || !defined(_POSIX_C_SOURCE) ... */
-extern void		rewinddir();
-extern int		closedir();
-
-/* transitional large file interface */
-#if	defined(_LARGEFILE64_SOURCE) && !((_FILE_OFFSET_BITS == 64) && \
-	    !defined(__PRAGMA_REDEFINE_EXTNAME))
-extern struct dirent64	*readdir64();
-#endif
-
-#endif
-
 #if defined(__EXTENSIONS__) || !defined(_POSIX_C_SOURCE) || \
 	defined(_XOPEN_SOURCE)
 #define	rewinddir(dirp)	seekdir(dirp, 0L)
@@ -181,8 +154,6 @@ extern struct dirent64	*readdir64();
 #if	defined(__EXTENSIONS__) || defined(_REENTRANT) || \
 	!defined(__XOPEN_OR_POSIX) || (_POSIX_C_SOURCE - 0 >= 199506L) || \
 	defined(_POSIX_PTHREAD_SEMANTICS)
-
-#if	defined(__STDC__)
 
 #if	!defined(_LP64) && _FILE_OFFSET_BITS == 32
 
@@ -242,66 +213,6 @@ extern int readdir_r(DIR *_RESTRICT_KYWD, struct dirent *_RESTRICT_KYWD,
 extern int readdir64_r(DIR *_RESTRICT_KYWD, struct dirent64 *_RESTRICT_KYWD,
 	struct dirent64 **_RESTRICT_KYWD);
 #endif
-
-#else  /* __STDC__ */
-
-#if	!defined(_LP64) && _FILE_OFFSET_BITS == 32
-
-#if	(_POSIX_C_SOURCE - 0 >= 199506L) || defined(_POSIX_PTHREAD_SEMANTICS)
-
-#ifdef __PRAGMA_REDEFINE_EXTNAME
-#pragma redefine_extname readdir_r __posix_readdir_r
-extern int readdir_r();
-#else  /* __PRAGMA_REDEFINE_EXTNAME */
-
-extern int __posix_readdir_r();
-
-#ifdef	__lint
-#define	readdir_r __posix_readdir_r
-#else	/* !__lint */
-
-static int
-readdir_r(DIR *_RESTRICT_KYWD __dp, struct dirent *_RESTRICT_KYWD __ent,
-	struct dirent **_RESTRICT_KYWD __res)
-{
-	return (__posix_readdir_r(__dp, __ent, __res));
-}
-
-#endif /* !__lint */
-#endif /* __PRAGMA_REDEFINE_EXTNAME */
-
-#else  /* (_POSIX_C_SOURCE - 0 >= 199506L) || ... */
-
-extern struct dirent *readdir_r();
-
-#endif /* (_POSIX_C_SOURCE - 0 >= 199506L) || ... */
-
-#else	/* !_LP64 && _FILE_OFFSET_BITS == 32 */
-
-#if defined(_LP64)
-#ifdef	__PRAGMA_REDEFINE_EXTNAME
-#pragma	redefine_extname readdir64_r	readdir_r
-#else
-#define	readdir64_r	readdir
-#endif
-#else	/* _LP64 */
-#ifdef	__PRAGMA_REDEFINE_EXTNAME
-#pragma	redefine_extname readdir_r readdir64_r
-#else
-#define	readdir_r readdir64_r
-#endif
-#endif	/* _LP64 */
-extern int	readdir_r();
-
-#endif	/* !_LP64 && _FILE_OFFSET_BITS == 32 */
-
-#if	defined(_LARGEFILE64_SOURCE) && !((_FILE_OFFSET_BITS == 64) && \
-	    !defined(__PRAGMA_REDEFINE_EXTNAME))
-/* transitional large file interface */
-extern int 	readdir64_r();
-#endif
-
-#endif /* __STDC__ */
 
 #endif /* defined(__EXTENSIONS__) || defined(_REENTRANT)... */
 

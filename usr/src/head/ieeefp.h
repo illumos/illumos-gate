@@ -20,6 +20,8 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -30,8 +32,6 @@
 
 #ifndef _IEEEFP_H
 #define	_IEEEFP_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -69,13 +69,9 @@ typedef	enum	fpclass_t {
 	FP_PNORM = 9	/* positive normalized non-zero */
 } fpclass_t;
 
-#if defined(__STDC__)
 extern fpclass_t fpclass(double);	/* get class of double value */
 extern int	finite(double);
 extern int	unordered(double, double);
-#else
-extern fpclass_t fpclass();	/* get class of double value */
-#endif
 
 /*
  * ROUNDING CONTROL ******************************************
@@ -114,15 +110,8 @@ typedef	enum	fp_rnd {
 
 #endif
 
-#if defined(__STDC__)
 extern fp_rnd	fpsetround(fp_rnd);	/* set rounding mode, return previous */
 extern fp_rnd	fpgetround(void);	/* return current rounding mode */
-
-#else
-extern fp_rnd	fpsetround();		/* set rounding mode, return previous */
-extern fp_rnd	fpgetround();		/* return current rounding mode */
-
-#endif
 
 /*
  * EXCEPTION CONTROL *****************************************
@@ -182,33 +171,17 @@ extern fp_rnd	fpgetround();		/* return current rounding mode */
 
 #endif
 
-#if defined(__STDC__)
 extern fp_except fpgetmask(void);		/* current exception mask */
 extern fp_except fpsetmask(fp_except);		/* set mask, return previous */
 extern fp_except fpgetsticky(void);		/* return logged exceptions */
 extern fp_except fpsetsticky(fp_except);	/* change logged exceptions */
 
-#else
-extern fp_except fpgetmask();	/* current exception mask */
-extern fp_except fpsetmask();	/* set mask, return previous */
-extern fp_except fpgetsticky();	/* return logged exceptions */
-extern fp_except fpsetsticky();	/* change logged exceptions */
-
-#endif
-
 /*
  * UTILITY MACROS ********************************************
  */
 
-#if defined(__STDC__)
 extern int isnanf(float);
 extern int isnand(double);
-
-#else
-extern int isnand();
-#define	isnanf(x)	(((*(long *)&(x) & 0x7f800000L) == 0x7f800000L) && \
-			    ((*(long *)&(x) & 0x007fffffL) != 0x00000000L))
-#endif
 
 #if defined(__i386) || defined(__amd64)
 

@@ -20,6 +20,8 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -34,8 +36,6 @@
 
 #ifndef	_SYS_SHM_H
 #define	_SYS_SHM_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/ipc.h>
 
@@ -121,7 +121,6 @@ struct shmid_ds {
 #define	SHM_UNLOCK	4	/* Unlock segment */
 
 #if !defined(_KERNEL)
-#if defined(__STDC__)
 int shmget(key_t, size_t, int);
 int shmids(int *, uint_t, uint_t *);
 int shmctl(int, int, struct shmid_ds *);
@@ -131,13 +130,6 @@ int shmdt(const void *);
 #else
 int shmdt(char *);
 #endif /* defined(_XPG4) */
-#else /* __STDC__ */
-int shmctl();
-int shmget();
-int shmids();
-void *shmat();
-int shmdt();
-#endif /* __STDC__ */
 #endif /* !defined(_KERNEL) */
 
 #ifdef	__cplusplus

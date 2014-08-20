@@ -20,6 +20,7 @@
  */
 
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
  */
@@ -506,15 +507,9 @@ typedef struct {	/* return values from system call */
 
 #if !defined(_KERNEL)
 
-#if defined(__STDC__)
 extern int	syscall(int, ...);
 extern int	__systemcall(sysret_t *, int, ...);
 extern int	__set_errno(int);
-#else
-extern int	syscall();
-extern int	__systemcall();
-extern int	__set_errno();
-#endif
 
 #endif	/* _KERNEL */
 

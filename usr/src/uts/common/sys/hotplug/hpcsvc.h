@@ -21,14 +21,14 @@
  */
 
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright (c) 1999-2000 by Sun Microsystems, Inc.
  * All rights reserved.
  */
 
 #ifndef	_SYS_HOTPLUG_HPCSVC_H
 #define	_SYS_HOTPLUG_HPCSVC_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/hotplug/hpctrl.h>
 
@@ -40,7 +40,6 @@ extern "C" {
 #define	HPC_EVENT_NORMAL	0	/* normal, queued event handling */
 #define	HPC_EVENT_SYNCHRONOUS	1	/* unqueued sync. event handling */
 
-#ifdef	__STDC__
 extern int hpc_nexus_register_bus(dev_info_t *dip,
 	int (* callback)(dev_info_t *dip, hpc_slot_t handle,
 		hpc_slot_info_t *slot_info, int slot_state),
@@ -54,16 +53,6 @@ extern int hpc_nexus_control(hpc_slot_t handle, int request, caddr_t arg);
 extern int hpc_install_event_handler(hpc_slot_t handle, uint_t event_mask,
 	int (*event_handler)(caddr_t, uint_t), caddr_t arg);
 extern int hpc_remove_event_handler(hpc_slot_t handle);
-#else
-extern int hpc_nexus_register_bus();
-extern int hpc_nexus_unregister_bus();
-extern int hpc_nexus_connect();
-extern int hpc_nexus_disconnect();
-extern int hpc_nexus_insert();
-extern int hpc_nexus_remove();
-extern int hpc_nexus_control();
-extern int hpc_install_event_handler();
-#endif
 
 #ifdef	__cplusplus
 }

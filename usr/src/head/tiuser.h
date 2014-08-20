@@ -19,14 +19,15 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
 #ifndef	_TIUSER_H
 #define	_TIUSER_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1	*/
 
 /*
  * TLI user interface definitions.
@@ -40,11 +41,7 @@ extern "C" {
 
 #if defined(_REENTRANT) || defined(_TS_ERRNO) || \
 	_POSIX_C_SOURCE - 0 >= 199506L
-#if defined(__STDC__)
 extern int	*__t_errno(void);
-#else
-extern int	*__t_errno();
-#endif
 #define	t_errno	(*(__t_errno()))
 #else
 extern int t_errno;

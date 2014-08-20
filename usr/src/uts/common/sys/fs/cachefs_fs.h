@@ -20,14 +20,14 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_FS_CACHEFS_FS_H
 #define	_SYS_FS_CACHEFS_FS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/vnode.h>
 #include <sys/vfs.h>
@@ -1107,7 +1107,7 @@ typedef struct cachefs_debug_info {
 /*
  * cachefs function prototypes
  */
-#if defined(_KERNEL) && defined(__STDC__)
+#if defined(_KERNEL)
 extern int cachefs_getcookie(vnode_t *, struct fid *, struct vattr *,
 		cred_t *, uint32_t);
 cachefscache_t *cachefs_cache_create(void);
@@ -1305,7 +1305,7 @@ extern void *cachefs_kmem_zalloc(size_t, int);
 extern void cachefs_kmem_free(void *, size_t);
 extern char *cachefs_strdup(char *);
 
-#endif /* defined (_KERNEL) && defined (__STDC__) */
+#endif /* defined (_KERNEL) */
 
 
 

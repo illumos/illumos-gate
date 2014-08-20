@@ -20,6 +20,7 @@
  */
 
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -82,11 +83,7 @@ struct o_acct {
 };
 
 #if !defined(_KERNEL)
-#if defined(__STDC__)
 extern int acct(const char *);
-#else
-extern int acct();
-#endif
 #endif /* !defined(_KERNEL) */
 
 #if defined(_KERNEL)

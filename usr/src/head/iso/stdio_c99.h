@@ -20,6 +20,8 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -37,8 +39,6 @@
 
 #ifndef _ISO_STDIO_C99_H
 #define	_ISO_STDIO_C99_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -71,29 +71,18 @@ extern "C" {
 #endif
 #endif /* !defined(_LP64) && !defined(_LONGLONG_TYPE) */
 
-#ifdef __STDC__
 extern int vfscanf(FILE *_RESTRICT_KYWD, const char *_RESTRICT_KYWD, __va_list);
 extern int vscanf(const char *_RESTRICT_KYWD, __va_list);
 extern int vsscanf(const char *_RESTRICT_KYWD, const char *_RESTRICT_KYWD,
 		__va_list);
-#else
-extern int vfscanf();
-extern int vscanf();
-extern int vsscanf();
-#endif /* __STDC__ */
 #endif /* defined(__EXTENSIONS__) ... */
 #if defined(__EXTENSIONS__) || defined(_STDC_C99) || \
 	(!defined(_STRICT_STDC) && !defined(__XOPEN_OR_POSIX)) || \
 	defined(_XPG5)
-#ifdef __STDC__
 extern int snprintf(char *_RESTRICT_KYWD, size_t, const char *_RESTRICT_KYWD,
 	...);
 extern int vsnprintf(char *_RESTRICT_KYWD, size_t, const char *_RESTRICT_KYWD,
 	__va_list);
-#else
-extern int snprintf();
-extern int vsnprintf();
-#endif /* __STDC__ */
 
 #endif /* defined(__EXTENSIONS__) || defined(_STDC_C99) ... */
 

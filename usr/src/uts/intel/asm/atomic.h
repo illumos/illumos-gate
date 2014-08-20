@@ -105,24 +105,24 @@ __ATOMIC_OPXX(atomic_dec_ulong,  ulong_t,  "dec" SUF_LONG)
 
 #undef __ATOMIC_OPXX
 
-#define	__ATOMIC_OPXX(fxn, type1, type2, op)				\
+#define	__ATOMIC_OPXX(fxn, type1, type2, op, reg)			\
 extern __GNU_INLINE void						\
 fxn(volatile type1 *target, type2 delta)				\
 {									\
 	__asm__ __volatile__(						\
 	    "lock; " op " %1,%0"					\
 	    : "+m" (*target)						\
-	    : "ir" (delta));						\
+	    : "i" reg (delta));						\
 }
 
-__ATOMIC_OPXX(atomic_add_8,     uint8_t,  int8_t,      "add" SUF_8)
-__ATOMIC_OPXX(atomic_add_16,    uint16_t, int16_t,     "add" SUF_16)
-__ATOMIC_OPXX(atomic_add_32,    uint32_t, int32_t,     "add" SUF_32)
-__ATOMIC_OP64(atomic_add_64,    uint64_t, int64_t,     "add" SUF_64)
-__ATOMIC_OPXX(atomic_add_char,  uchar_t,  signed char, "add" SUF_8)
-__ATOMIC_OPXX(atomic_add_short, ushort_t, short,       "add" SUF_16)
-__ATOMIC_OPXX(atomic_add_int,   uint_t,   int,         "add" SUF_32)
-__ATOMIC_OPXX(atomic_add_long,  ulong_t,  long,        "add" SUF_LONG)
+__ATOMIC_OPXX(atomic_add_8,     uint8_t,  int8_t,      "add" SUF_8,    "q")
+__ATOMIC_OPXX(atomic_add_16,    uint16_t, int16_t,     "add" SUF_16,   "r")
+__ATOMIC_OPXX(atomic_add_32,    uint32_t, int32_t,     "add" SUF_32,   "r")
+__ATOMIC_OP64(atomic_add_64,    uint64_t, int64_t,     "add" SUF_64,   "r")
+__ATOMIC_OPXX(atomic_add_char,  uchar_t,  signed char, "add" SUF_8,    "q")
+__ATOMIC_OPXX(atomic_add_short, ushort_t, short,       "add" SUF_16,   "r")
+__ATOMIC_OPXX(atomic_add_int,   uint_t,   int,         "add" SUF_32,   "r")
+__ATOMIC_OPXX(atomic_add_long,  ulong_t,  long,        "add" SUF_LONG, "r")
 
 /*
  * We don't use the above macro here because atomic_add_ptr has an
@@ -140,23 +140,23 @@ atomic_add_ptr(volatile void *target, ssize_t delta)
 	    : "ir" (delta));
 }
 
-__ATOMIC_OPXX(atomic_or_8,       uint8_t,  uint8_t,  "or" SUF_8)
-__ATOMIC_OPXX(atomic_or_16,      uint16_t, uint16_t, "or" SUF_16)
-__ATOMIC_OPXX(atomic_or_32,      uint32_t, uint32_t, "or" SUF_32)
-__ATOMIC_OP64(atomic_or_64,      uint64_t, uint64_t, "or" SUF_64)
-__ATOMIC_OPXX(atomic_or_uchar,   uchar_t,  uchar_t,  "or" SUF_8)
-__ATOMIC_OPXX(atomic_or_ushort,  ushort_t, ushort_t, "or" SUF_16)
-__ATOMIC_OPXX(atomic_or_uint,    uint_t,   uint_t,   "or" SUF_32)
-__ATOMIC_OPXX(atomic_or_ulong,   ulong_t,  ulong_t,  "or" SUF_LONG)
+__ATOMIC_OPXX(atomic_or_8,       uint8_t,  uint8_t,  "or" SUF_8,    "q")
+__ATOMIC_OPXX(atomic_or_16,      uint16_t, uint16_t, "or" SUF_16,   "r")
+__ATOMIC_OPXX(atomic_or_32,      uint32_t, uint32_t, "or" SUF_32,   "r")
+__ATOMIC_OP64(atomic_or_64,      uint64_t, uint64_t, "or" SUF_64,   "r")
+__ATOMIC_OPXX(atomic_or_uchar,   uchar_t,  uchar_t,  "or" SUF_8,    "q")
+__ATOMIC_OPXX(atomic_or_ushort,  ushort_t, ushort_t, "or" SUF_16,   "r")
+__ATOMIC_OPXX(atomic_or_uint,    uint_t,   uint_t,   "or" SUF_32,   "r")
+__ATOMIC_OPXX(atomic_or_ulong,   ulong_t,  ulong_t,  "or" SUF_LONG, "r")
 
-__ATOMIC_OPXX(atomic_and_8,      uint8_t,  uint8_t,  "and" SUF_8)
-__ATOMIC_OPXX(atomic_and_16,     uint16_t, uint16_t, "and" SUF_16)
-__ATOMIC_OPXX(atomic_and_32,     uint32_t, uint32_t, "and" SUF_32)
-__ATOMIC_OP64(atomic_and_64,     uint64_t, uint64_t, "and" SUF_64)
-__ATOMIC_OPXX(atomic_and_uchar,  uchar_t,  uchar_t,  "and" SUF_8)
-__ATOMIC_OPXX(atomic_and_ushort, ushort_t, ushort_t, "and" SUF_16)
-__ATOMIC_OPXX(atomic_and_uint,   uint_t,   uint_t,   "and" SUF_32)
-__ATOMIC_OPXX(atomic_and_ulong,  ulong_t,  ulong_t,  "and" SUF_LONG)
+__ATOMIC_OPXX(atomic_and_8,      uint8_t,  uint8_t,  "and" SUF_8,    "q")
+__ATOMIC_OPXX(atomic_and_16,     uint16_t, uint16_t, "and" SUF_16,   "r")
+__ATOMIC_OPXX(atomic_and_32,     uint32_t, uint32_t, "and" SUF_32,   "r")
+__ATOMIC_OP64(atomic_and_64,     uint64_t, uint64_t, "and" SUF_64,   "r")
+__ATOMIC_OPXX(atomic_and_uchar,  uchar_t,  uchar_t,  "and" SUF_8,    "q")
+__ATOMIC_OPXX(atomic_and_ushort, ushort_t, ushort_t, "and" SUF_16,   "r")
+__ATOMIC_OPXX(atomic_and_uint,   uint_t,   uint_t,   "and" SUF_32,   "r")
+__ATOMIC_OPXX(atomic_and_ulong,  ulong_t,  ulong_t,  "and" SUF_LONG, "r")
 
 #undef __ATOMIC_OPXX
 

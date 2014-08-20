@@ -20,6 +20,8 @@
  */
 
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -30,8 +32,6 @@
 #ifndef _SYS_PRIOCNTL_H
 #define	_SYS_PRIOCNTL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* from SVR4 1.6 */
-
 #include <sys/types.h>
 #include <sys/procset.h>
 
@@ -41,12 +41,8 @@ extern "C" {
 
 #define	PC_VERSION	1	/* First version of priocntl */
 
-#ifdef __STDC__
 extern long	priocntl(idtype_t, id_t, int, ...);
 extern long	priocntlset(procset_t *, int, ...);
-#else
-extern long	priocntl(), priocntlset();
-#endif	/* __STDC__ */
 
 /*
  * The following are the possible values of the command

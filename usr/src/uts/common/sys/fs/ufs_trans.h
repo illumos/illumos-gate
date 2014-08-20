@@ -20,14 +20,14 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_FS_UFS_TRANS_H
 #define	_SYS_FS_UFS_TRANS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -481,7 +481,7 @@ struct ufsvfs;
 /*
  * ufs trans function prototypes
  */
-#if defined(_KERNEL) && defined(__STDC__)
+#if defined(_KERNEL)
 
 extern int		ufs_trans_hlock();
 extern void		ufs_trans_onerror();
@@ -538,7 +538,7 @@ void	top_matadel(struct ufsvfs *ufsvfsp, offset_t mof, off_t nb);
 void	top_mataclr(struct ufsvfs *ufsvfsp);
 
 
-#endif	/* defined(_KERNEL) && defined(__STDC__) */
+#endif	/* defined(_KERNEL) */
 
 #ifdef	__cplusplus
 }

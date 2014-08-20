@@ -20,6 +20,8 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright (c) 1991,1997-1998 by Sun Microsystems, Inc.
  * All rights reserved.
  */
@@ -33,8 +35,6 @@
 
 #ifndef	_RPCSVC_NIS_DB_H
 #define	_RPCSVC_NIS_DB_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <rpc/rpc.h>
 #include <rpcsvc/nis.h>
@@ -89,8 +89,6 @@ typedef struct db_result db_result;
  * Prototypes for the database functions.
  */
 
-#if defined(__STDC__) || defined(__cplusplus)
-
 extern bool_t db_initialize(char *);
 extern db_status db_create_table(char *, table_obj *);
 extern db_status db_destroy_table(char *);
@@ -105,25 +103,6 @@ extern db_status db_standby(char *);
 extern db_status db_table_exists(char *);
 extern db_status db_unload_table(char *);
 extern void db_free_result(db_result *);
-
-#else /* Non-prototype definitions */
-
-extern bool_t db_initialize();
-extern db_status db_create_table();
-extern db_status db_destroy_table();
-extern db_result *db_first_entry();
-extern db_result *db_next_entry();
-extern db_result *db_reset_next_entry();
-extern db_result *db_list_entries();
-extern db_result *db_add_entry();
-extern db_result *db_remove_entry();
-extern db_status db_checkpoint();
-extern db_status db_standby();
-extern db_status db_table_exists();
-extern db_status db_unload_table();
-extern void db_free_result();
-
-#endif  /* defined(__STDC__) || defined(__cplusplus) */
 
 #ifdef __cplusplus
 }

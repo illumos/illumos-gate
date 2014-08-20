@@ -19,14 +19,14 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
 #ifndef _LIBW_H
 #define	_LIBW_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1	*/
 
 #include <stdlib.h>
 
@@ -44,11 +44,7 @@ typedef struct {
 } eucwidth_t;
 #endif
 
-#ifdef __STDC__
 void getwidth(eucwidth_t *);
-#else
-void getwidth();
-#endif	/* __STDC__ */
 
 #ifdef	__cplusplus
 }

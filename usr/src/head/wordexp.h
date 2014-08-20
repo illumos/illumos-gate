@@ -20,6 +20,8 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -30,8 +32,6 @@
 
 #ifndef	_WORDEXP_H
 #define	_WORDEXP_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/feature_tests.h>
 #include <sys/types.h>
@@ -70,13 +70,8 @@ typedef	struct	wordexp_t {
 #define	WRDE_SYNTAX	(7)		/* bad syntax */
 #define	WRDE_NOSYS	(8)		/* function not supported (XPG4) */
 
-#ifdef __STDC__
 extern int wordexp(const char *_RESTRICT_KYWD, wordexp_t *_RESTRICT_KYWD, int);
 extern void wordfree(wordexp_t *);
-#else
-extern int wordexp();
-extern void wordfree();
-#endif
 
 #ifdef	__cplusplus
 }

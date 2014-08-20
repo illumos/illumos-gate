@@ -23,6 +23,8 @@
 
 
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -83,21 +85,12 @@ struct mntentbuf {
 };
 
 #if !defined(_KERNEL)
-#ifdef __STDC__
 extern void	resetmnttab(FILE *);
 extern int	getmntent(FILE *, struct mnttab *);
 extern int	getextmntent(FILE *, struct extmnttab *, size_t);
 extern int	getmntany(FILE *, struct mnttab *, struct mnttab *);
 extern char	*hasmntopt(struct mnttab *, char *);
 extern char	*mntopt(char **);
-#else
-extern void	resetmnttab();
-extern int	getmntent();
-extern int	getextmntent();
-extern int	getmntany();
-extern char	*hasmntopt();
-extern char	*mntopt();
-#endif
 #endif
 
 #ifdef	__cplusplus

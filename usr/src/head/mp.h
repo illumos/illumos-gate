@@ -20,6 +20,8 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 1989 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -35,8 +37,6 @@
 #ifndef _MP_H
 #define	_MP_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -48,7 +48,6 @@ struct mint {
 typedef struct mint MINT;
 
 
-#ifdef __STDC__
 extern void mp_gcd(MINT *, MINT *, MINT *);
 extern void mp_madd(MINT *, MINT *, MINT *);
 extern void mp_msub(MINT *, MINT *, MINT *);
@@ -65,24 +64,6 @@ extern int mp_mcmp(MINT *, MINT *);
 extern MINT *mp_xtom(char *);
 extern char *mp_mtox(MINT *);
 extern void mp_mfree(MINT *);
-#else
-extern void mp_gcd();
-extern void mp_madd();
-extern void mp_msub();
-extern void mp_mdiv();
-extern void mp_sdiv();
-extern int mp_min();
-extern void mp_mout();
-extern int mp_msqrt();
-extern void mp_mult();
-extern void mp_pow();
-extern void mp_rpow();
-extern MINT *mp_itom();
-extern int mp_mcmp();
-extern MINT *mp_xtom();
-extern char *mp_mtox();
-extern void mp_mfree();
-#endif
 
 #define	FREE(x)	_mp_xfree(&(x))		/* Compatibility */
 

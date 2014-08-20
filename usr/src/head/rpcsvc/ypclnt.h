@@ -20,6 +20,8 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 1989 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -34,8 +36,6 @@
 
 #ifndef	_RPCSVC_YPCLNT_H
 #define	_RPCSVC_YPCLNT_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -100,7 +100,6 @@ struct ypall_callback {
  * External yp client function references.
  */
 
-#ifdef __STDC__
 extern int yp_bind(char *);
 extern void yp_unbind(char *);
 extern int yp_get_default_domain(char **);
@@ -113,23 +112,6 @@ extern int yp_all(char *, char *, struct ypall_callback *);
 extern char *yperr_string(int);
 extern int ypprot_err(int);
 extern int yp_update(char *, char *, unsigned,  char *, int, char *, int);
-
-#else
-
-extern int yp_bind();
-extern int __yp_dobind();
-extern void yp_unbind();
-extern int yp_get_default_domain();
-extern int yp_match();
-extern int yp_first();
-extern int yp_next();
-extern int yp_master();
-extern int yp_order();
-extern int yp_all();
-extern char *yperr_string();
-extern int ypprot_err();
-extern int yp_update();
-#endif	/* __STDC__ */
 
 /*
  * Global yp data structures

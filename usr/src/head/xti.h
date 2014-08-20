@@ -19,14 +19,15 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ */
 /*	Copyright (c) 1996 Sun Microsystems, Inc.	*/
 /*	  All Rights Reserved  	*/
 
 
 #ifndef _XTI_H
 #define	_XTI_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 
@@ -479,8 +480,6 @@ struct t_uderr {
  * XTI LIBRARY FUNCTIONS
  */
 
-#if defined(__STDC__)
-
 #if defined(_XOPEN_SOURCE) && !defined(_XPG5)
 extern int t_accept(int, int, struct t_call *);
 extern char *t_alloc(int, int, int);
@@ -533,8 +532,6 @@ extern int t_sndvudata(int, struct t_unitdata *, struct t_iovec *,
 extern int t_sync(int);
 extern int t_sysconf(int);
 extern int t_unbind(int);
-
-#endif /* __STDC__ */
 
 #ifdef	__cplusplus
 }

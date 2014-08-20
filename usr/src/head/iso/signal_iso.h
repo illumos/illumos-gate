@@ -24,6 +24,8 @@
 
 
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright (c) 1998-1999, by Sun Microsystems, Inc.
  * All rights reserved.
  */
@@ -43,9 +45,6 @@
 #ifndef _ISO_SIGNAL_ISO_H
 #define	_ISO_SIGNAL_ISO_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-/* SVr4.0 1.5.3.4 */
-
 #include <sys/iso/signal_iso.h>
 
 #ifdef	__cplusplus
@@ -58,21 +57,12 @@ namespace std {
 
 typedef int	sig_atomic_t;
 
-#if defined(__STDC__)
-
 #ifdef __cplusplus
 extern "C" SIG_PF signal(int, SIG_PF);
 #else
 extern void (*signal(int, void (*)(int)))(int);
 #endif
 extern int raise(int);
-
-#else /* __STDC__ */
-
-extern	void(*signal())();
-extern int raise();
-
-#endif /* __STDC__ */
 
 #if __cplusplus >= 199711L
 }

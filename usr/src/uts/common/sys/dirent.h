@@ -23,6 +23,8 @@
 
 
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -119,11 +121,7 @@ typedef struct dirent64 {
 #endif
 #endif	/* _LP64 && _LARGEFILE64_SOURCE */
 
-#if defined(__STDC__)
 extern int getdents(int, struct dirent *, size_t);
-#else
-extern int getdents();
-#endif
 
 /* N.B.: transitional large file interface version deliberately not provided */
 

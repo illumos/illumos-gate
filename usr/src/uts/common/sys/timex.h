@@ -13,14 +13,14 @@
  */
 
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 1996-1997, 2002 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_TIMEX_H
 #define	_SYS_TIMEX_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -237,16 +237,11 @@ struct timex {
 	int32_t stbcnt;		/* stability limit exceeded (ro) */
 };
 
-#if defined(__STDC__)
 /*
  * NTP syscalls
  */
 int ntp_gettime(struct ntptimeval *);
 int ntp_adjtime(struct timex *);
-#else
-int ntp_gettime();
-int ntp_adjtime();
-#endif /* __STDC__ */
 
 #ifdef _KERNEL
 

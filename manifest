@@ -3041,21 +3041,6 @@ f usr/include/p12aux.h 0644 root bin
 f usr/include/p12err.h 0644 root bin
 f usr/include/panel.h 0644 root bin
 f usr/include/parseURL.h 0644 root bin
-d usr/include/parted 0755 root bin
-f usr/include/parted/constraint.h 0644 root bin
-f usr/include/parted/crc32.h 0644 root bin
-f usr/include/parted/debug.h 0644 root bin
-f usr/include/parted/device.h 0644 root bin
-f usr/include/parted/disk.h 0644 root bin
-f usr/include/parted/endian.h 0644 root bin
-f usr/include/parted/exception.h 0644 root bin
-f usr/include/parted/filesys.h 0644 root bin
-f usr/include/parted/geom.h 0644 root bin
-f usr/include/parted/natmath.h 0644 root bin
-f usr/include/parted/parted.h 0644 root bin
-f usr/include/parted/solaris.h 0644 root bin
-f usr/include/parted/timer.h 0644 root bin
-f usr/include/parted/unit.h 0644 root bin
 f usr/include/passwdutil.h 0644 root bin
 f usr/include/pcsample.h 0644 root bin
 f usr/include/pfmt.h 0644 root bin
@@ -6281,8 +6266,6 @@ f usr/lib/libnsctl.so.1 0755 root bin
 s usr/lib/libnsctl.so=libnsctl.so.1
 s usr/lib/libnsl.so.1=../../lib/libnsl.so.1
 s usr/lib/libnsl.so=../../lib/libnsl.so.1
-f usr/lib/libntfs.so.10 0755 root bin
-s usr/lib/libntfs.so=libntfs.so.10
 f usr/lib/libnvfru.so.1 0755 root bin
 s usr/lib/libnvfru.so=libnvfru.so.1
 s usr/lib/libnvpair.so.1=../../lib/libnvpair.so.1
@@ -6299,8 +6282,6 @@ s usr/lib/libpam.so.1=../../lib/libpam.so.1
 s usr/lib/libpam.so=../../lib/libpam.so.1
 f usr/lib/libpanel.so.1 0755 root bin
 s usr/lib/libpanel.so=libpanel.so.1
-f usr/lib/libparted.so.8 0755 root bin
-s usr/lib/libparted.so=libparted.so.8
 f usr/lib/libpcidb.so.1 0755 root bin
 f usr/lib/libpctx.so.1 0755 root bin
 s usr/lib/libpctx.so=libpctx.so.1

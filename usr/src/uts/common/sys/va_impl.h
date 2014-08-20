@@ -24,6 +24,8 @@
 
 
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -118,17 +120,8 @@ static void __va_end(__va_list list) { __va_end(list); }
 
 /* ISA __va_list structures defined in <sys/va_list.h> */
 
-#if defined(__STDC__)	/* source language is ISO C or C++ */
-
 void __builtin_va_start(__va_list, ...);
 void *__builtin_va_arg_incr(__va_list, ...);
-
-#else	/* source language is K&R C */
-
-int __builtin_va_start();
-char *__builtin_va_arg_incr();
-
-#endif	/* source language */
 
 #define	__va_start(list, name)	__builtin_va_start(list, 0)
 #define	__va_arg(list, type)	\

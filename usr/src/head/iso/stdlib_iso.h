@@ -20,11 +20,10 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- */
-/*
- * Copyright 2013 Garrett D'Amore <garrett@damore.org>
  */
 
 /*	Copyright (c) 1988 AT&T	*/
@@ -52,11 +51,7 @@
 extern "C" {
 #endif
 
-#if defined(__STDC__)
 unsigned char __mb_cur_max(void);
-#else
-unsigned char __mb_cur_max();
-#endif
 #ifndef MB_CUR_MAX
 #define	MB_CUR_MAX	(__mb_cur_max())
 #endif
@@ -120,8 +115,6 @@ typedef long	wchar_t;
 #endif	/* !_WCHAR_T */
 #endif	/* !defined(__cplusplus) ... */
 
-#if defined(__STDC__)
-
 extern void abort(void) __NORETURN;
 extern int abs(int);
 extern int atexit(void (*)(void));
@@ -173,39 +166,6 @@ extern "C++" {
 	inline ldiv_t div(long _l1, long _l2) { return ldiv(_l1, _l2); }
 }
 #endif /* __cplusplus */
-
-#else /* not __STDC__ */
-
-extern void abort();
-extern int abs();
-extern int atexit();
-extern double atof();
-extern int atoi();
-extern long int atol();
-extern void *bsearch();
-extern void *calloc();
-extern div_t div();
-extern void exit();
-extern void free();
-extern char *getenv();
-extern long int labs();
-extern ldiv_t ldiv();
-extern void *malloc();
-extern int mblen();
-extern size_t mbstowcs();
-extern int mbtowc();
-extern void qsort();
-extern int rand();
-extern void *realloc();
-extern void srand();
-extern double strtod();
-extern long int strtol();
-extern unsigned long strtoul();
-extern int system();
-extern int wctomb();
-extern size_t wcstombs();
-
-#endif	/* __STDC__ */
 
 #if __cplusplus >= 199711L
 }

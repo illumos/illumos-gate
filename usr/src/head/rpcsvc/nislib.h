@@ -19,6 +19,8 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -27,8 +29,7 @@
  * nislib.h
  *
  * This file contains the interfaces that are visible in the SunOS 5.x
- * implementation of NIS Plus. When using C++ the defined __cplusplus and
- * __STDC__ should both be true.
+ * implementation of NIS Plus.
  */
 
 #ifndef	_RPCSVC_NISLIB_H
@@ -39,7 +40,6 @@
 extern "C" {
 #endif
 
-#ifdef __STDC__
 extern name_pos nis_dir_cmp(nis_name, nis_name);
 
 extern nis_name nis_domain_of(nis_name);
@@ -60,32 +60,6 @@ extern nis_name __nis_rpc_domain(void);
 
 CLIENT *__nis_clnt_create(int, struct netconfig *, char *, struct netbuf *,
 			int, int, int, int, int);
-
-#else
-
-/* Non-prototype definitions (old fashioned C) */
-
-extern name_pos nis_dir_cmp();
-
-extern nis_name nis_domain_of();
-extern nis_name nis_leaf_of();
-extern nis_name nis_leaf_of_r();
-extern nis_name nis_name_of();
-extern nis_name nis_local_group();
-extern nis_name nis_local_directory();
-extern nis_name nis_local_host();
-
-extern void nis_destroy_object();
-extern nis_object *nis_clone_object();
-
-extern nis_object *nis_read_obj();
-extern int nis_write_obj();
-extern void *nis_get_static_storage();
-extern nis_name __nis_rpc_domain();
-
-CLIENT *__nis_clnt_create();
-
-#endif
 
 #ifdef	__cplusplus
 }

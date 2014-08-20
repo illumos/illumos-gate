@@ -19,14 +19,15 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
 #ifndef _SYS_FSTYP_H
 #define	_SYS_FSTYP_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 11.6	*/
 
 #ifdef	__cplusplus
 extern "C" {
@@ -43,7 +44,7 @@ extern "C" {
 #define	GETFSTYP	2	/* translate fstype index to fs identifier */
 #define	GETNFSTYP	3	/* return the number of fstypes */
 
-#if defined(__STDC__) && !defined(_KERNEL)
+#if !defined(_KERNEL)
 int sysfs(int, ...);
 #endif
 

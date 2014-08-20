@@ -24,6 +24,8 @@
 
 
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright (c) 1995, 1998 by Sun Microsystems, Inc.
  * All rights reserved.
  */
@@ -147,11 +149,7 @@ extern void pollhead_clean(pollhead_t *);
 #endif /* defined(_KERNEL) || defined(_KMEMUSER) */
 
 #if !defined(_KERNEL)
-#if defined(__STDC__)
 int poll(struct pollfd *, nfds_t, int);
-#else
-int poll();
-#endif /* __STDC__ */
 #endif /* !_KERNEL */
 
 #ifdef	__cplusplus

@@ -20,6 +20,8 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 1998 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -39,8 +41,6 @@
 
 #ifndef	_SYS_T_KUSER_H
 #define	_SYS_T_KUSER_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/file.h>
@@ -91,9 +91,6 @@ extern int	ktlilog;
  */
 #define		MADE_FP		0x02
 
-
-#ifdef __STDC__
-
 extern int	t_kalloc(TIUSER *, int, int, char **);
 extern int	t_kbind(TIUSER *, struct t_bind *, struct t_bind *);
 extern int	t_kclose(TIUSER *, int);
@@ -109,25 +106,6 @@ extern int	tli_send(TIUSER *, mblk_t *, int);
 extern int	tli_recv(TIUSER *, mblk_t **, int);
 extern int	t_tlitosyserr(int);
 extern int	get_ok_ack(TIUSER *, int, int);
-
-#else
-
-extern int	t_kalloc();
-extern int	t_kbind();
-extern int	t_kclose();
-extern int	t_kconnect();
-extern int	t_kfree();
-extern int	t_kgetstate();
-extern int	t_kopen();
-extern int	t_krcvudata();
-extern int	t_ksndudata();
-extern int	t_kspoll();
-extern int	t_kunbind();
-extern int	tli_send();
-extern int	tli_recv();
-extern int	t_tlitosyserr();
-extern int	get_ok_ack();
-#endif	/* __STDC__ */
 
 /*
  * these make life a lot easier

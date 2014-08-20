@@ -20,14 +20,14 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_HOTPLUG_HPCTRL_H
 #define	_SYS_HOTPLUG_HPCTRL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * ****************************************************************
@@ -270,7 +270,6 @@ typedef enum { HPC_BOARD_UNKNOWN, HPC_BOARD_PCI_HOTPLUG,
  * function prototype definitions for interfaces between HPC driver
  * and Hot Plug Services framework.
  */
-#ifdef	__STDC__
 extern int hpc_slot_register(dev_info_t *dip, char *bus_path,
 	hpc_slot_info_t *slot_info, hpc_slot_t *slot_hdl,
 	hpc_slot_ops_t *slot_ops, caddr_t ops_arg, uint_t flags);
@@ -280,14 +279,6 @@ extern void hpc_free_slot_ops(hpc_slot_ops_t *ops);
 extern int hpc_slot_event_notify(hpc_slot_t slot_hdl, uint_t event,
 	uint_t flags);
 extern boolean_t hpc_bus_registered(hpc_slot_t slot_hdl);
-#else
-extern int hpc_slot_register();
-extern int hpc_slot_unregister();
-extern struct hpc_slot_ops *hpc_alloc_slot_ops();
-extern void hpc_free_slot_ops();
-extern int hpc_slot_event_notify();
-extern boolean_t hpc_bus_registered();
-#endif	/* __STDC__ */
 
 /*
  * *****************************************************************

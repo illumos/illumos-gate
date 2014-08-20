@@ -24,14 +24,14 @@
 
 
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright (c) 1996, by Sun Microsystems, Inc.
  * All Rights Reserved
  */
 
 #ifndef _NAN_H
 #define	_NAN_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Handling of Not_a_Number's (only in IEEE floating-point standard)
@@ -120,11 +120,7 @@ typedef union
 #define	GETNaNPC(dval)	(((dnan *)&(dval))->inf_parts.bits << 12 | \
 			    ((dnan *)&(dval))->nan_parts.fraction_low >> 20)
 
-#if defined(__STDC__)
 #define	KILLFPE()	(void) _kill(_getpid(), 8)
-#else
-#define	KILLFPE()	(void) kill(getpid(), 8)
-#endif
 #define	NaN(X)		(((dnan *)&(X))->nan_parts.exponent == 0x7ff)
 #define	KILLNaN(X)	if (NaN(X)) KILLFPE()
 
