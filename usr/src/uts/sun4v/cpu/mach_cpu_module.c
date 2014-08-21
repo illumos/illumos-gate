@@ -156,6 +156,11 @@ cpu_inv_tsb(caddr_t tsb_base, uint_t tsb_bytes)
  */
 
 /* ARGSUSED */
+uint64_t
+atomic_cas_64(volatile uint64_t *target, uint64_t value1, uint64_t value2)
+{ return (0); }
+
+/* ARGSUSED */
 void
 atomic_inc_8(volatile uint8_t *target)
 {}
