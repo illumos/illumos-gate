@@ -965,22 +965,69 @@ has_proc()
 }
 
 /*
- * We run this loop for brands with no /proc to simply update the RSS, using the
- * expensive sycall, every 5 minutes.
+ * We run this loop for brands with no /proc to simply update the RSS, using
+ * the cheap GZ /proc data, every 5 minutes.
  */
 static void
 no_procfs()
 {
-	uint64_t		n;
-	zsd_vmusage64_t		buf;
+	DIR			*pdir = NULL;
+	struct dirent		*dent;
+	uint64_t		zone_rss_bytes;
 
 	(void) sleep_shutdown(30);
 	while (!shutting_down) {
-		buf.vmu_id = zid;
-		n = 1;
+		/*
+		 * Just do the fast, cheap RSS calculation using the rss value
+		 * in psinfo_t.  Because that's per-process, it can lead to
+		 * double counting some memory and overestimating how much is
+		 * being used. Since there is no /proc in the zone, we use the
+		 * GZ /proc and check for the correct zone.
+		 */
+		if ((pdir = opendir("/proc")) == NULL)
+			return;
 
-		(void) syscall(SYS_rusagesys, _RUSAGESYS_GETVMUSAGE,
-		    VMUSAGE_A_ZONE, 60, (uintptr_t)&buf, (uintptr_t)&n);
+		fast_rss = 0;
+		while (!shutting_down && (dent = readdir(pdir)) != NULL) {
+			pid_t		pid;
+			int		psfd;
+			int64_t		rss;
+			char		pathbuf[MAXPATHLEN];
+			psinfo_t	psinfo;
+
+			if (strcmp(".", dent->d_name) == 0 ||
+			    strcmp("..", dent->d_name) == 0)
+				continue;
+
+			pid = atoi(dent->d_name);
+			if (pid == 0 || pid == 1)
+				continue;
+
+			(void) snprintf(pathbuf, sizeof (pathbuf),
+			    "/proc/%d/psinfo", pid);
+
+			rss = 0;
+			if ((psfd = open(pathbuf, O_RDONLY, 0000)) != -1) {
+				if (pread(psfd, &psinfo, sizeof (psinfo), 0) ==
+				    sizeof (psinfo)) {
+					if (psinfo.pr_zoneid == zid)
+						rss = (int64_t)psinfo.pr_rssize;
+				}
+
+				(void) close(psfd);
+			}
+
+			fast_rss += rss;
+		}
+
+		(void) closedir(pdir);
+
+		if (shutting_down)
+			return;
+
+		zone_rss_bytes = fast_rss * 1024;
+		/* Use the zone's approx. RSS in the kernel */
+		(void) zone_setattr(zid, ZONE_ATTR_RSS, &zone_rss_bytes, 0);
 
 		(void) sleep_shutdown(300);
 	}
