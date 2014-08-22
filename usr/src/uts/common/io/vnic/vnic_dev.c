@@ -1029,10 +1029,6 @@ vnic_m_setprop(void *m_driver, const char *pr_name, mac_prop_id_t pr_num,
 	case MAC_PROP_MTU: {
 		uint32_t	mtu;
 
-		/* allow setting MTU only on an etherstub */
-		if (vn->vn_link_id != DATALINK_INVALID_LINKID)
-			return (err);
-
 		if (pr_valsize < sizeof (mtu)) {
 			err = EINVAL;
 			break;
