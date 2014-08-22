@@ -332,6 +332,9 @@ int restarter_inst_ractions_from_tty(scf_instance_t *);
 /* Delete instance's restarter/auxiliary_fmri property */
 int restarter_inst_reset_aux_fmri(scf_instance_t *);
 
+/* Get boolean value from instance's restarter_actions/do_dump */
+int restarter_inst_dump(scf_instance_t *);
+
 /*
  * Set instance's restarter/auxiliary_fmri, value come from
  * restarter_actions/auxliary_fmri

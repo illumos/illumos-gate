@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
  */
 
 /*
@@ -5241,6 +5241,14 @@ mac_set_mtu(mac_handle_t mh, uint_t new_mtu, uint_t *old_mtu_arg)
 		rv = EINVAL;
 		goto bail;
 	}
+
+	rw_enter(&mip->mi_rw_lock, RW_READER);
+	if (mip->mi_mtrp != NULL && new_mtu < mip->mi_mtrp->mtr_mtu) {
+		rv = EBUSY;
+		rw_exit(&mip->mi_rw_lock);
+		goto bail;
+	}
+	rw_exit(&mip->mi_rw_lock);
 
 	if (old_mtu != new_mtu) {
 		rv = mip->mi_callbacks->mc_setprop(mip->mi_driver,

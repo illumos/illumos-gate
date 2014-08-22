@@ -347,12 +347,12 @@ smb_common_rename(smb_request_t *sr, smb_fqi_t *src_fqi, smb_fqi_t *dst_fqi)
 
 	src_fnode = src_fqi->fq_fnode;
 	src_dnode = src_fqi->fq_dnode;
+	tnode = sr->tid_tree->t_snode;
 
 	/* Find destination dnode and last_comp */
 	if (dst_fqi->fq_dnode) {
 		smb_node_ref(dst_fqi->fq_dnode);
 	} else {
-		tnode = sr->tid_tree->t_snode;
 		rc = smb_pathname_reduce(sr, sr->user_cr, path, tnode, tnode,
 		    &dst_fqi->fq_dnode, dst_fqi->fq_last_comp);
 		if (rc != 0) {

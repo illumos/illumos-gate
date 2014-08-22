@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
  */
 
 #ifndef	_SYS_MAC_H
@@ -617,6 +617,9 @@ extern void			mac_margin_get(mac_handle_t, uint32_t *);
 extern int			mac_margin_remove(mac_handle_t, uint32_t);
 extern int			mac_margin_add(mac_handle_t, uint32_t *,
 				    boolean_t);
+extern int			mac_mtu_add(mac_handle_t, uint32_t *,
+				    boolean_t);
+extern int			mac_mtu_remove(mac_handle_t, uint32_t);
 extern int			mac_fastpath_disable(mac_handle_t);
 extern void			mac_fastpath_enable(mac_handle_t);
 extern void			mac_no_active(mac_handle_t);

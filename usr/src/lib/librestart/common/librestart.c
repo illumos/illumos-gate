@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  */
 
 #include <libintl.h>
@@ -3849,6 +3849,55 @@ restarter_inst_ractions_from_tty(scf_instance_t *inst)
 		goto out;
 
 	ret = has_tty;
+
+out:
+	scf_value_destroy(val);
+	scf_property_destroy(prop);
+	scf_pg_destroy(pg);
+	return (ret);
+}
+
+/*
+ * If the instance's dump-on-restart property exists, remove it and return true,
+ * otherwise return false.
+ */
+int
+restarter_inst_dump(scf_instance_t *inst)
+{
+	scf_handle_t *h;
+	scf_propertygroup_t *pg;
+	scf_property_t *prop;
+	scf_value_t *val;
+	int ret = 0;
+
+	h = scf_instance_handle(inst);
+	pg = scf_pg_create(h);
+	prop = scf_property_create(h);
+	val = scf_value_create(h);
+	if (pg == NULL || prop == NULL || val == NULL)
+		goto out;
+
+	if (scf_instance_get_pg(inst, SCF_PG_RESTARTER_ACTIONS, pg) !=
+	    SCF_SUCCESS) {
+		if (scf_error() == SCF_ERROR_CONNECTION_BROKEN)
+			uu_die(rcbroken);
+		goto out;
+	}
+
+	if (scf_pg_get_property(pg, SCF_PROPERTY_DODUMP, prop) != SCF_SUCCESS) {
+		if (scf_error() == SCF_ERROR_CONNECTION_BROKEN)
+			uu_die(rcbroken);
+		goto out;
+	}
+
+	ret = 1;
+
+	if (scf_instance_delete_prop(inst, SCF_PG_RESTARTER_ACTIONS,
+	    SCF_PROPERTY_DODUMP) != SCF_SUCCESS) {
+		if (scf_error() == SCF_ERROR_CONNECTION_BROKEN)
+			uu_die(rcbroken);
+		goto out;
+	}
 
 out:
 	scf_value_destroy(val);
