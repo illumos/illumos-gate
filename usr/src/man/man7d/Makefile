@@ -41,7 +41,6 @@ _MANFILES=	aac.7d		\
 		dmfe.7d		\
 		dtrace.7d	\
 		ehci.7d		\
-		elxl.7d		\
 		fasttrap.7d	\
 		fbt.7d		\
 		fcip.7d		\
@@ -71,7 +70,6 @@ _MANFILES=	aac.7d		\
 		igb.7d		\
 		ii.7d		\
 		ipnet.7d	\
-		iprb.7d		\
 		iscsi.7d	\
 		iser.7d		\
 		ixgbe.7d	\
@@ -213,9 +211,11 @@ i386_MANFILES=	ahci.7d		\
 		cpqary3.7d	\
 		dnet.7d		\
 		ecpp.7d		\
+		elxl.7d		\
 		heci.7d		\
 		i915.7d		\
 		ipmi.7d		\
+		iprb.7d		\
 		ipw.7d		\
 		iwh.7d		\
 		iwi.7d		\
