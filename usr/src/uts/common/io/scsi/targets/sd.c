@@ -27,9 +27,9 @@
  * Copyright (c) 2012, 2016 by Delphix. All rights reserved.
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
  * Copyright 2019 Joyent, Inc.
- * Copyright 2017 Nexenta Systems, Inc.
  * Copyright 2019 Racktop Systems
  * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2022 Tintri by DDN, Inc. All rights reserved.
  */
 /*
  * Copyright 2011 cyril.galibern@opensvc.com
@@ -1054,7 +1054,6 @@ static int sd_pm_idletime = 1;
 #define	sd_get_media_info_ext		ssd_get_media_info_ext
 #define	sd_dkio_ctrl_info		ssd_dkio_ctrl_info
 #define	sd_nvpair_str_decode		ssd_nvpair_str_decode
-#define	sd_strtok_r			ssd_strtok_r
 #define	sd_set_properties		ssd_set_properties
 #define	sd_get_tunables_from_conf	ssd_get_tunables_from_conf
 #define	sd_setup_next_xfer		ssd_setup_next_xfer
@@ -1234,7 +1233,6 @@ static void	sd_set_mmc_caps(sd_ssc_t *ssc);
 static void sd_read_unit_properties(struct sd_lun *un);
 static int  sd_process_sdconf_file(struct sd_lun *un);
 static void sd_nvpair_str_decode(struct sd_lun *un, char *nvpair_str);
-static char *sd_strtok_r(char *string, const char *sepset, char **lasts);
 static void sd_set_properties(struct sd_lun *un, char *name, char *value);
 static void sd_get_tunables_from_conf(struct sd_lun *un, int flags,
     int *data_list, sd_tunables *values);
@@ -3885,9 +3883,9 @@ sd_process_sdconf_file(struct sd_lun *un)
 			 * data-property-name-list
 			 * setting the properties for each.
 			 */
-			for (dataname_ptr = sd_strtok_r(dnlist_ptr, " \t",
+			for (dataname_ptr = strtok_r(dnlist_ptr, " \t",
 			    &dataname_lasts); dataname_ptr != NULL;
-			    dataname_ptr = sd_strtok_r(NULL, " \t",
+			    dataname_ptr = strtok_r(NULL, " \t",
 			    &dataname_lasts)) {
 				int version;
 
@@ -3961,12 +3959,12 @@ sd_nvpair_str_decode(struct sd_lun *un, char *nvpair_str)
 	char	*nv, *name, *value, *token;
 	char	*nv_lasts, *v_lasts, *x_lasts;
 
-	for (nv = sd_strtok_r(nvpair_str, ",", &nv_lasts); nv != NULL;
-	    nv = sd_strtok_r(NULL, ",", &nv_lasts)) {
-		token = sd_strtok_r(nv, ":", &v_lasts);
-		name  = sd_strtok_r(token, " \t", &x_lasts);
-		token = sd_strtok_r(NULL, ":", &v_lasts);
-		value = sd_strtok_r(token, " \t", &x_lasts);
+	for (nv = strtok_r(nvpair_str, ",", &nv_lasts); nv != NULL;
+	    nv = strtok_r(NULL, ",", &nv_lasts)) {
+		token = strtok_r(nv, ":", &v_lasts);
+		name  = strtok_r(token, " \t", &x_lasts);
+		token = strtok_r(NULL, ":", &v_lasts);
+		value = strtok_r(token, " \t", &x_lasts);
 		if (name == NULL || value == NULL) {
 			SD_INFO(SD_LOG_ATTACH_DETACH, un,
 			    "sd_nvpair_str_decode: "
@@ -3975,41 +3973,6 @@ sd_nvpair_str_decode(struct sd_lun *un, char *nvpair_str)
 			sd_set_properties(un, name, value);
 		}
 	}
-}
-
-/*
- *    Function: sd_strtok_r()
- *
- * Description: This function uses strpbrk and strspn to break
- *    string into tokens on sequentially subsequent calls. Return
- *    NULL when no non-separator characters remain. The first
- *    argument is NULL for subsequent calls.
- */
-static char *
-sd_strtok_r(char *string, const char *sepset, char **lasts)
-{
-	char	*q, *r;
-
-	/* First or subsequent call */
-	if (string == NULL)
-		string = *lasts;
-
-	if (string == NULL)
-		return (NULL);
-
-	/* Skip leading separators */
-	q = string + strspn(string, sepset);
-
-	if (*q == '\0')
-		return (NULL);
-
-	if ((r = strpbrk(q, sepset)) == NULL) {
-		*lasts = NULL;
-	} else {
-		*r = '\0';
-		*lasts = r + 1;
-	}
-	return (q);
 }
 
 /*

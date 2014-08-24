@@ -1,13 +1,14 @@
 '\" te
 .\" Copyright (c) 2009, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright 2022 Tintri by DDN, Inc. All rights reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH STRING 9F "Mar 14, 2016"
+.TH STRING 9F "May 20, 2022"
 .SH NAME
 string, strcasecmp, strncasecmp, strcat, strncat, strlcat, strchr,
 strrchr, strcmp, strncmp, strcpy, strncpy, strlcpy, strfree, strspn,
-strdup, ddi_strdup, strlen, strnlen \- string operations
+strdup, ddi_strdup, strlen, strnlen, strtok_r \- string operations
 .SH SYNOPSIS
 .nf
 #include <sys/ddi.h>
@@ -101,13 +102,19 @@ strdup, ddi_strdup, strlen, strnlen \- string operations
 \fBsize_t\fR \fBstrnlen\fR(\fBconst char *\fR\fIs\fR, \fBsize_t\fR \fIn\fR);
 .fi
 
+.LP
+.nf
+\fBchar *\fR\fBstrtok_r\fR(\fBchar *\fR\fIs1\fR, \fBconst char *\fR\fIs2\fR, \fBchar **\fR\fIlasts\fR);
+.fi
+
 .SH INTERFACE LEVEL
 illumos DDI specific (illumos DDI).
 .SH DESCRIPTION
 The arguments \fIs\fR, \fIs1\fR, and \fIs2\fR point to strings (arrays of
 characters terminated by a null character). The \fBstrcat()\fR,
 \fBstrncat()\fR, \fBstrlcat()\fR, \fBstrcpy()\fR, \fBstrncpy()\fR,
-\fBstrlcpy()\fR, and \fBstrfree()\fR functions all alter their first argument.
+\fBstrlcpy()\fR, \fBstrfree()\fR, and \fBstrtok_r()\R functions all alter their
+first argument.
 Additionally, the \fBstrcpy()\fR function does not check for overflow of the
 array.
 .SS "\fBstrcasecmp()\fR, \fBstrncasecmp()\fR"
@@ -218,6 +225,25 @@ The \fBstrnlen()\fR function returns the smaller of \fIn\fR or the number of
 bytes in \fIs\fR, not including the terminating null character. The
 \fBstrnlen()\fR function never examines more than \fIn\fR bytes of the string
 pointed to by \fIs\fR.
+.SS "\fBstrtok_r()\fR"
+The \fBstrtok_r()\fR function considers the null-terminated string \fIs1\fR as
+a sequence of zero or more text tokens separated by spans of one or more
+characters from the separator string \fIs2\fR. The argument \fIlasts\fR points
+to a user-provided pointer which points to stored information necessary for
+\fBstrtok_r()\fR to continue scanning the same string.
+.LP
+In the first call to \fBstrtok_r()\fR, \fIs1\fR points to a null-terminated
+string, \fIs2\fR to a null-terminated string of separator characters, and the
+value pointed to by \fIlasts\fR is ignored. The \fBstrtok_r()\fR function
+returns a pointer to the first character of the first token, writes a null
+character into \fIs1\fR immediately following the returned token, and updates
+the pointer to which \fIlasts\fR points.
+.LP
+In subsequent calls, \fIs1\fR is a null pointer and \fIlasts\fR is unchanged
+from the previous call so that subsequent calls move through the string
+\fIs1\fR, returning successive tokens until no tokens remain. The separator
+string \fIs2\fR can be different from call to call. When no token remains in
+\fIs1\fR, a null pointer is returned.
 .SH CONTEXT
 The \fBstrdup()\fR and \fBddi_strdup()\fR functions can be called from user or
 kernel context.
