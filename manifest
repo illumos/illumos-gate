@@ -10396,7 +10396,6 @@ f usr/sbin/poolcfg 0555 root bin
 h usr/sbin/ports=usr/sbin/devfsadm
 h usr/sbin/poweroff=usr/sbin/halt
 f usr/sbin/praudit 0555 root bin
-f usr/sbin/privatepw 0555 root bin
 f usr/sbin/projadd 0555 root sys
 f usr/sbin/projdel 0555 root sys
 f usr/sbin/projmod 0555 root sys
