@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 Milan Jurik. All rights reserved.
+ * Copyright 2014 Toomas Soome <tsoome@me.com>
  */
 
 /*
@@ -79,6 +80,8 @@ slist_t	ptag_choices[] = {
 	{ "home",	"",	V_HOME		},
 	{ "alternates",	"",	V_ALTSCTR	},
 	{ "reserved",	"",	V_RESERVED	},
+	{ "system",	"",	V_SYSTEM	},
+	{ "BIOS_boot",	"",	V_BIOS_BOOT	},
 	{ NULL }
 };
 
