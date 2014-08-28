@@ -1660,8 +1660,6 @@ license usr/src/cmd/cmd-inet/usr.sbin/THIRDPARTYLICENSE.route \
     license=usr/src/cmd/cmd-inet/usr.sbin/THIRDPARTYLICENSE.route
 license usr/src/cmd/cmd-inet/usr.sbin/ifconfig/THIRDPARTYLICENSE \
     license=usr/src/cmd/cmd-inet/usr.sbin/ifconfig/THIRDPARTYLICENSE
-license usr/src/cmd/cmd-inet/usr.sbin/in.ftpd/LICENSE \
-    license=usr/src/cmd/cmd-inet/usr.sbin/in.ftpd/LICENSE
 license usr/src/cmd/cmd-inet/usr.sbin/traceroute/THIRDPARTYLICENSE \
     license=usr/src/cmd/cmd-inet/usr.sbin/traceroute/THIRDPARTYLICENSE
 license usr/src/cmd/cron/THIRDPARTYLICENSE \
@@ -1706,6 +1704,7 @@ link path=etc/format target=../usr/sbin/format
 link path=etc/fsck target=../usr/sbin/fsck
 link path=etc/fsdb target=../usr/sbin/fsdb
 link path=etc/fstyp target=../usr/sbin/fstyp
+link path=etc/ftpusers target=./ftpd/ftpusers
 link path=etc/getty target=../usr/lib/saf/ttymon
 link path=etc/grpck target=../usr/sbin/grpck
 link path=etc/halt target=../usr/sbin/halt

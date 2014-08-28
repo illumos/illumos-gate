@@ -140,8 +140,6 @@ MANFILES=	acctcom.1			\
 	 	fmtmsg.1			\
 	 	fold.1				\
 	 	ftp.1				\
-	 	ftpcount.1			\
-	 	ftpwho.1			\
 	 	gcore.1				\
 	 	gencat.1			\
 	 	genmsg.1			\

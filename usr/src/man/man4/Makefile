@@ -70,11 +70,6 @@ _MANFILES=	Intro.4				\
 		fspec.4				\
 		fstypes.4			\
 		ftp.4				\
-		ftpaccess.4			\
-		ftpconversions.4		\
-		ftpgroups.4			\
-		ftphosts.4			\
-		ftpservers.4			\
 		ftpusers.4			\
 		fx_dptbl.4			\
 		gateways.4			\
@@ -210,7 +205,6 @@ _MANFILES=	Intro.4				\
 		volume-request.4		\
 		wanboot.conf.4			\
 		warn.conf.4			\
-		xferlog.4			\
 		ypfiles.4			\
 		yppasswdd.4			\
 		ypserv.4			\

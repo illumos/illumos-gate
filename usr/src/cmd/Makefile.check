@@ -94,7 +94,6 @@ MANIFEST_SUBDIRS=			\
 	cmd-inet/usr.lib/vrrpd		\
 	cmd-inet/usr.lib/wpad		\
 	cmd-inet/usr.sbin		\
-	cmd-inet/usr.sbin/in.ftpd	\
 	cmd-inet/usr.sbin/in.rdisc	\
 	cmd-inet/usr.sbin/in.routed	\
 	cmd-inet/usr.sbin/in.talkd	\

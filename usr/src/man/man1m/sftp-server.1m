@@ -12,7 +12,6 @@ sftp-server \- SFTP server subsystem
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 \fBsftp-server\fR implements the server side of the SSH File Transfer Protocol
 as defined in the IETF \fBdraft-ietf-secsh-filexfer\fR.
@@ -40,9 +39,8 @@ file.
 .sp
 .LP
 There is no relationship between the protocol used by \fBsftp-server\fR and the
-FTP protocol (RFC 959) provided by \fBin.ftpd\fR.
+FTP protocol (RFC 959).
 .SH OPTIONS
-.sp
 .LP
 Valid options are listed below. As stated above, these are to be specified in
 the Subsystem declation of \fBsshd_config\fR.
@@ -77,7 +75,6 @@ client. \fBDEBUG\fR and \fBDEBUG1\fR are equivalent. \fBDEBUG2\fR and
 .RE
 
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -99,7 +96,6 @@ An error occurred.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/usr/lib/ssh/sftp-server\fR\fR
@@ -109,7 +105,6 @@ Server-side binary.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -125,7 +120,6 @@ Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBsftp\fR(1), \fBssh\fR(1), \fBssh-add\fR(1), \fBssh-keygen\fR(1),
 \fBsshd\fR(1M), \fBsshd_config\fR(4), \fBattributes\fR(5)

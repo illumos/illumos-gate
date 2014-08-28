@@ -13,7 +13,6 @@ pam.conf \- configuration file for pluggable authentication modules
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 \fBpam.conf\fR is the configuration file for the Pluggable Authentication
 Module architecture, or \fBPAM\fR. A \fBPAM\fR module provides functionality
@@ -66,7 +65,6 @@ Provides functionality to change a user's authentication token or password.
 Each of the four service modules can be implemented as a shared library object
 which can be referenced in the \fBpam.conf\fR configuration file.
 .SS "Simplified pam.conf Configuration File"
-.sp
 .LP
 The \fBpam.conf\fR file contains a listing of services. Each service is paired
 with a corresponding service module. When a service is requested, its
@@ -151,7 +149,6 @@ This field can be used by the modules to turn on debugging or to pass any
 module specific parameters such as a \fBTIMEOUT\fR value. The options supported
 by the modules are documented in their respective manual pages.
 .SS "Integrating Multiple Authentication Services With Stacking"
-.sp
 .LP
 When a \fIservice_name\fR of the same \fImodule_type\fR is defined more than
 once, the service is said to be stacked. Each module referenced in the
@@ -314,7 +311,6 @@ Some modules return \fBPAM_IGNORE\fR in certain situations. In these cases the
 whether or not it is \fBbinding\fR, \fBrequisite\fR, \fBrequired\fR,
 \fBoptional\fR, or \fBsufficient\fR.
 .SS "Utilities and Files"
-.sp
 .LP
 The specific service names and module types for each service should be
 documented in the man page for that service. For instance, the \fBsshd\fR(1M)
@@ -424,7 +420,6 @@ OTHER   password include        unix_common
 .sp
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -443,9 +438,8 @@ Interface Stability	See Below.
 .LP
 The format is Stable. The contents has no stability attributes.
 .SH SEE ALSO
-.sp
 .LP
-\fBlogin\fR(1), \fBpasswd\fR(1), \fBin.ftpd\fR(1M), \fBin.rlogind\fR(1M),
+\fBlogin\fR(1), \fBpasswd\fR(1), \fBin.rlogind\fR(1M),
 \fBin.rshd\fR(1M), \fBin.telnetd\fR(1M), \fBin.uucpd\fR(1M), \fBinit\fR(1M),
 \fBrpc.rexd\fR(1M), \fBsac\fR(1M), \fBttymon\fR(1M), \fBsu\fR(1M),
 \fBpam\fR(3PAM), \fBsyslog\fR(3C), \fBlibpam\fR(3LIB), \fBattributes\fR(5),
@@ -454,7 +448,6 @@ The format is Stable. The contents has no stability attributes.
 \fBpam_passwd_auth\fR(5), \fBpam_unix_account\fR(5), \fBpam_unix_auth\fR(5),
 \fBpam_unix_session\fR(5)
 .SH NOTES
-.sp
 .LP
 The \fBpam_unix\fR module is no longer supported. Similar functionality is
 provided by \fBpam_authtok_check\fR(5), \fBpam_authtok_get\fR(5),

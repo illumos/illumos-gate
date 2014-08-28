@@ -1669,7 +1669,6 @@ f lib/svc/method/svc-dumpadm 0555 root sys
 f lib/svc/method/svc-fcoei 0555 root sys
 f lib/svc/method/svc-fcoet 0555 root sys
 f lib/svc/method/svc-forwarding 0555 root bin
-f lib/svc/method/svc-ftp 0555 root sys
 f lib/svc/method/svc-hostid 0555 root bin
 f lib/svc/method/svc-hotplug 0555 root bin
 f lib/svc/method/svc-ii 0744 root sys
@@ -10291,12 +10290,6 @@ s usr/sbin/fsdb=clri
 s usr/sbin/fsirand=../lib/fs/ufs/fsirand
 s usr/sbin/fssnap=clri
 f usr/sbin/fstyp 0555 root sys
-f usr/sbin/ftpaddhost 0555 root bin
-f usr/sbin/ftpconfig 0555 root bin
-f usr/sbin/ftpcount 0555 root bin
-f usr/sbin/ftprestart 0555 root bin
-f usr/sbin/ftpshut 0555 root bin
-h usr/sbin/ftpwho=usr/sbin/ftpcount
 f usr/sbin/fuser 0555 root bin
 f usr/sbin/fwflash 0555 root bin
 f usr/sbin/getdevpolicy 0555 root sys
@@ -10321,7 +10314,6 @@ f usr/sbin/ikecert 0555 root bin
 f usr/sbin/ilbadm 0555 root bin
 f usr/sbin/in.comsat 0555 root bin
 f usr/sbin/in.fingerd 0555 root bin
-f usr/sbin/in.ftpd 0555 root bin
 f usr/sbin/in.rdisc 0555 root bin
 f usr/sbin/in.rexecd 0555 root bin
 f usr/sbin/in.rlogind 0555 root bin
@@ -11491,8 +11483,6 @@ f usr/share/man/man1/fmt.1 0444 root bin
 f usr/share/man/man1/fmtmsg.1 0444 root bin
 f usr/share/man/man1/fold.1 0444 root bin
 f usr/share/man/man1/ftp.1 0444 root bin
-f usr/share/man/man1/ftpcount.1 0444 root bin
-f usr/share/man/man1/ftpwho.1 0444 root bin
 f usr/share/man/man1/gcore.1 0444 root bin
 f usr/share/man/man1/gencat.1 0444 root bin
 f usr/share/man/man1/genmsg.1 0444 root bin
@@ -11892,11 +11882,6 @@ f usr/share/man/man1m/fssnap.1m 0444 root bin
 f usr/share/man/man1m/fssnap_ufs.1m 0444 root bin
 f usr/share/man/man1m/fsstat.1m 0444 root bin
 f usr/share/man/man1m/fstyp.1m 0444 root bin
-f usr/share/man/man1m/ftpaddhost.1m 0444 root bin
-f usr/share/man/man1m/ftpconfig.1m 0444 root bin
-s usr/share/man/man1m/ftpd.1m=in.ftpd.1m
-f usr/share/man/man1m/ftprestart.1m 0444 root bin
-f usr/share/man/man1m/ftpshut.1m 0444 root bin
 f usr/share/man/man1m/fuser.1m 0444 root bin
 f usr/share/man/man1m/fwflash.1m 0444 root bin
 f usr/share/man/man1m/getdev.1m 0444 root bin
@@ -11923,7 +11908,6 @@ f usr/share/man/man1m/ifconfig.1m 0444 root bin
 f usr/share/man/man1m/ifparse.1m 0444 root bin
 f usr/share/man/man1m/ikeadm.1m 0444 root bin
 f usr/share/man/man1m/ikecert.1m 0444 root bin
-f usr/share/man/man1m/in.ftpd.1m 0444 root bin
 f usr/share/man/man1m/in.iked.1m 0444 root bin
 f usr/share/man/man1m/in.mpathd.1m 0444 root bin
 f usr/share/man/man1m/in.ndpd.1m 0444 root bin
@@ -17807,11 +17791,6 @@ s usr/share/man/man4/fs.4=default_fs.4
 f usr/share/man/man4/fspec.4 0444 root bin
 f usr/share/man/man4/fstypes.4 0444 root bin
 f usr/share/man/man4/ftp.4 0444 root bin
-f usr/share/man/man4/ftpaccess.4 0444 root bin
-f usr/share/man/man4/ftpconversions.4 0444 root bin
-f usr/share/man/man4/ftpgroups.4 0444 root bin
-f usr/share/man/man4/ftphosts.4 0444 root bin
-f usr/share/man/man4/ftpservers.4 0444 root bin
 f usr/share/man/man4/ftpusers.4 0444 root bin
 f usr/share/man/man4/fx_dptbl.4 0444 root bin
 f usr/share/man/man4/gateways.4 0444 root bin
@@ -17960,7 +17939,6 @@ f usr/share/man/man4/volume-request.4 0444 root bin
 f usr/share/man/man4/warn.conf.4 0444 root bin
 s usr/share/man/man4/wtmp.4=utmp.4
 s usr/share/man/man4/wtmpx.4=utmpx.4
-f usr/share/man/man4/xferlog.4 0444 root bin
 f usr/share/man/man4/ypfiles.4 0444 root bin
 f usr/share/man/man4/yppasswdd.4 0444 root bin
 f usr/share/man/man4/ypserv.4 0444 root bin
