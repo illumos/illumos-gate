@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * smq.c: to provide a message queue system for scadm functions (used in the
  * firmware download context where BP messages, received from the service
@@ -91,8 +89,7 @@ smq_receive(smq_t *smq, smq_msg_t *msg)
 	/* Copy messaged into queue */
 	*msg = *smq->smq_head;
 
-	/* Increment Head */
-	smq->smq_head = smq->smq_head++;
+	smq->smq_head++;
 	if ((unsigned long)smq->smq_head > ((unsigned long)smq->smq_msgBuffer +
 	    (unsigned long)(smq->smq_depth * sizeof (smq_msg_t)))) {
 		smq->smq_head = smq->smq_msgBuffer;
@@ -115,8 +112,7 @@ smq_send(smq_t *smq, smq_msg_t *msg)
 	/* Copy messaged into queue */
 	*smq->smq_tail = *msg;
 
-	/* Increment Tail */
-	smq->smq_tail = smq->smq_tail++;
+	smq->smq_tail++;
 	if ((unsigned long)smq->smq_tail > ((unsigned long)smq->smq_msgBuffer +
 	    (unsigned long)(smq->smq_depth * sizeof (smq_msg_t)))) {
 		smq->smq_tail = smq->smq_msgBuffer;
@@ -175,8 +171,7 @@ smq_xreceive(smq_t *smq, timestruc_t *timeout, smq_msg_t *msg)
 	/* Copy messaged into queue */
 	*msg = *smq->smq_head;
 
-	/* Increment Head */
-	smq->smq_head = smq->smq_head++;
+	smq->smq_head++;
 	if ((unsigned long)smq->smq_head > ((unsigned long)smq->smq_msgBuffer +
 	    (unsigned long)(smq->smq_depth * sizeof (smq_msg_t)))) {
 		smq->smq_head = smq->smq_msgBuffer;

@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2002, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2014 Toomas Soome <tsoome@me.com>
  */
 
 #ifndef	_SYS_EFI_PARTITION_H
@@ -144,6 +145,8 @@ typedef struct efi_gpe_Attrs {
 				    { 0x00, 0x02, 0x2d, 0x09, 0x71, 0x2b } }
 #define	EFI_FREEBSD_ZFS		{ 0x516e7cba, 0x6ecf, 0x11d6, 0x8f, 0xf8, \
 				    { 0x00, 0x02, 0x2d, 0x09, 0x71, 0x2b } }
+#define	EFI_BIOS_BOOT		{ 0x21686148, 0x6449, 0x6e6f, 0x74, 0x4e, \
+				    { 0x65, 0x65, 0x64, 0x45, 0x46, 0x49 } }
 
 /* minimum # of bytes for partition table entires, per EFI spec */
 #define	EFI_MIN_ARRAY_SIZE	(16 * 1024)

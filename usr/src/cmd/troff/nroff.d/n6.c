@@ -37,8 +37,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "tdef.h"
 #include "tw.h"
 #include "ext.h"
@@ -244,7 +242,7 @@ int	a;
 
 	if (a)
 		i = getrq();
-	else 
+	else
 		i = getsn();
 	if (!i || i == 'P') {
 		j = font1;
@@ -271,7 +269,7 @@ setwd()
 	int	delim, emsz, k;
 	int	savhp, savapts, savapts1, savfont, savfont1, savpts, savpts1;
 
-	base = numtab[ST].val = numtab[ST].val = wid = numtab[CT].val = 0;
+	base = numtab[ST].val = wid = numtab[CT].val = 0;
 	if (ismot(i = getch()))
 		return (0);
 	delim = cbits(i);
@@ -296,7 +294,7 @@ setwd()
 				k = -k;
 			base -= k;
 			emsz = 0;
-		} else 
+		} else
 			continue;
 		if (base < numtab[SB].val)
 			numtab[SB].val = base;
@@ -434,7 +432,7 @@ bd0:
 	if (skip() || !(i = getrq()) || (j = findft(i)) == -1) {
 		if (k)
 			goto bd1;
-		else 
+		else
 			return (0);
 	}
 	if (j == smnt) {
