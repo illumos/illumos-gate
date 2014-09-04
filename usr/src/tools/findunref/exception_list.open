@@ -19,6 +19,7 @@
 # CDDL HEADER END
 #
 
+# Copyright 2014 Gary Mills
 #
 # Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
 #
@@ -44,7 +45,6 @@
 ./usr/src/cmd/sqlite
 ./usr/src/lib/libsqlite
 ./usr/src/cmd/tcpd
-./usr/src/common/openssl
 ./usr/src/grub
 ./usr/src/uts/intel/sys/acpi
 

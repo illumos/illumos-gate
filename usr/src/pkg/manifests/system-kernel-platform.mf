@@ -22,6 +22,7 @@
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2014 Gary Mills
 #
 
 #
@@ -1108,7 +1109,6 @@ $(sparc_ONLY)file path=platform/sun4u/kernel/tod/$(ARCH64)/todstarcat \
     group=sys mode=0755
 $(sparc_ONLY)file path=platform/sun4u/kernel/tod/$(ARCH64)/todstarfire \
     group=sys mode=0755
-$(sparc_ONLY)file path=platform/sun4u/wanboot group=sys reboot-needed=true
 $(sparc_ONLY)file path=platform/sun4v/bootlst group=sys reboot-needed=true
 $(sparc_ONLY)file path=platform/sun4v/kernel/$(ARCH64)/genunix group=sys \
     mode=0755
@@ -1153,7 +1153,6 @@ $(sparc_ONLY)file path=platform/sun4v/kernel/misc/$(ARCH64)/platmod group=sys \
     mode=0755
 $(sparc_ONLY)file path=platform/sun4v/kernel/misc/$(ARCH64)/vis group=sys \
     mode=0755
-$(sparc_ONLY)file path=platform/sun4v/wanboot group=sys reboot-needed=true
 $(sparc_ONLY)file path=usr/share/man/man4/sbus.4
 $(i386_ONLY)file path=usr/share/man/man4/sysbus.4
 $(sparc_ONLY)file path=usr/share/man/man7d/bbc_beep.7d

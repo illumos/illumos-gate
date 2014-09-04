@@ -18,6 +18,7 @@
 #
 # CDDL HEADER END
 #
+# Copyright 2014 Gary Mills
 #
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -92,38 +93,6 @@ XRPRUNE =	i86pc i386
 
 #############################
 #
-#  WANboot booter
-#
-# Libraries used to build wanboot
-#
-LIBWAN_LIBS     = \
-		libwanboot.a \
-		libnvpair.a libufs.a libhsfs.a libnfs.a \
-		libxdr.a libnames.a libsock.a libinet.a libtcp.a \
-		libscrypt.a libssl.a libcrypto.a \
-		libmd5.a libsa.a libprom.a libssl.a \
-		$(LIBPLAT_LIBS)
-WAN_LIBS        = $(LIBWAN_LIBS:lib%.a=-l%)
-WAN_DIRS        = $(LIBNAME_DIR:%=-L%) $(LIBSYS_DIR:%=-L%)
-WAN_DIRS        += $(LIBPLAT_DIR:%=-L%) $(LIBPROM_DIR:%=-L%)
-
-#
-# Loader flags used to build wanboot
-#
-WAN_MAPFILE	= $(MACH_DIR)/mapfile
-WAN_LDFLAGS	= -dn -M $(WAN_MAPFILE) -e _start $(WAN_DIRS)
-WAN_L_LDFLAGS	= $(WAN_DIRS)
-
-#
-# Object files used to build wanboot
-#
-WAN_SRT0        = $(SRT0_OBJ)
-WAN_OBJS        = $(OBJS) wbfsconf.o wbcli.o wanboot.o ramdisk.o
-WAN_L_OBJS      = $(WAN_SRT0:%.o=%.ln) $(WAN_OBJS:%.o=%.ln)
-
-
-#############################
-#
 # NFS booter
 #
 # Libraries used to build nfsboot
@@ -156,20 +125,11 @@ FRC:
 
 .KEEP_STATE:
 
-all: $(WANBOOT) $(NFSBOOT)
+all: $(NFSBOOT)
 
 install: all					\
-	$(ROOT_PLAT_SUN4U_WANBOOT)		\
-	$(ROOT_PLAT_SUN4V_WANBOOT) 		\
 	$(USR_PLAT_SUN4U_LIB_FS_NFS_NFSBOOT)	\
 	$(USR_PLAT_SUN4V_LIB_FS_NFS_NFSBOOT)
-
-$(WANBOOT): $(WAN_MAPFILE) $(WAN_SRT0) $(WAN_OBJS) $(LIBDEPS)
-	$(LD) $(WAN_LDFLAGS) -o $@ $(WAN_SRT0) $(WAN_OBJS) $(WAN_LIBS)
-	$(MCS) -d $@
-	$(POST_PROCESS)
-	$(MCS) -c $@
-	$(STRIP) $@
 
 $(NFSBOOT): $(NFS_MAPFILE) $(NFS_SRT0) $(NFS_OBJS) $(LIBDEPS)
 	$(LD) $(NFS_LDFLAGS) -o $@ $(NFS_SRT0) $(NFS_OBJS) $(NFS_LIBS)
@@ -178,21 +138,10 @@ $(NFSBOOT): $(NFS_MAPFILE) $(NFS_SRT0) $(NFS_OBJS) $(LIBDEPS)
 	$(MCS) -c $@
 	$(STRIP) $@
 
-$(WANBOOT)_lint: $(WAN_L_OBJS) $(L_LIBDEPS)
-	@echo ""
-	@echo wanboot lint: global crosschecks:
-	$(LINT.c) $(WAN_L_LDFLAGS) $(WAN_L_OBJS) $(WAN_LIBS)
-
 $(NFSBOOT)_lint: $(NFS_L_OBJS) $(L_LIBDEPS)
 	@echo ""
 	@echo inetboot lint: global crosschecks:
 	$(LINT.c) $(NFS_L_LDFLAGS) $(NFS_L_OBJS) $(NFS_LIBS)
-
-$(ROOT_PLAT_SUN4U_WANBOOT): $(WANBOOT)
-	$(INS) -s -m $(FILEMODE) -f $(ROOT_PLAT_DIR)/sun4u $(WANBOOT)
-
-$(ROOT_PLAT_SUN4V_WANBOOT): $(WANBOOT)
-	$(INS) -s -m $(FILEMODE) -f $(ROOT_PLAT_DIR)/sun4v $(WANBOOT)
 
 $(USR_PLAT_SUN4U_LIB_FS_NFS):
 	$(INS.dir)
@@ -212,11 +161,11 @@ $(STRIPALIGN): $(CMN_DIR)/$$(@).c
 clean:
 	$(RM) make.out lint.out
 	$(RM) $(OBJS) $(CONF_OBJS) $(MISC_OBJS) $(SRT0_OBJ)
-	$(RM) $(WANBOOT_OBJS) $(NFSBOOT_OBJS)
+	$(RM) $(NFSBOOT_OBJS)
 	$(RM) $(L_OBJS) $(CONF_L_OBJS) $(MISC_L_OBJS) $(SRT0_L_OBJ)
-	$(RM) $(WANBOOT_L_OBJS) $(NFSBOOT_L_OBJS)
+	$(RM) $(NFSBOOT_L_OBJS)
 
 clobber: clean
-	$(RM) $(WANBOOT) $(NFSBOOT) $(STRIPALIGN)
+	$(RM) $(NFSBOOT) $(STRIPALIGN)
 
-lint: $(WANBOOT)_lint $(NFSBOOT)_lint
+lint: $(NFSBOOT)_lint
