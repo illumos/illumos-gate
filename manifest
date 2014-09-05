@@ -10739,23 +10739,23 @@ f usr/share/lib/zoneinfo/Africa/Addis_Ababa 0644 root bin
 f usr/share/lib/zoneinfo/Africa/Algiers 0644 root bin
 f usr/share/lib/zoneinfo/Africa/Asmara 0644 root bin
 f usr/share/lib/zoneinfo/Africa/Asmera 0644 root bin
-f usr/share/lib/zoneinfo/Africa/Bamako 0644 root bin
-f usr/share/lib/zoneinfo/Africa/Bangui 0644 root bin
-f usr/share/lib/zoneinfo/Africa/Banjul 0644 root bin
+h usr/share/lib/zoneinfo/Africa/Bamako=usr/share/lib/zoneinfo/Africa/Abidjan
+h usr/share/lib/zoneinfo/Africa/Bangui=usr/share/lib/zoneinfo/Africa/Lagos
+h usr/share/lib/zoneinfo/Africa/Banjul=usr/share/lib/zoneinfo/Africa/Abidjan
 f usr/share/lib/zoneinfo/Africa/Bissau 0644 root bin
 f usr/share/lib/zoneinfo/Africa/Blantyre 0644 root bin
-f usr/share/lib/zoneinfo/Africa/Brazzaville 0644 root bin
+h usr/share/lib/zoneinfo/Africa/Brazzaville=usr/share/lib/zoneinfo/Africa/Lagos
 f usr/share/lib/zoneinfo/Africa/Bujumbura 0644 root bin
 f usr/share/lib/zoneinfo/Africa/Cairo 0644 root bin
 f usr/share/lib/zoneinfo/Africa/Casablanca 0644 root bin
 f usr/share/lib/zoneinfo/Africa/Ceuta 0644 root bin
-f usr/share/lib/zoneinfo/Africa/Conakry 0644 root bin
-f usr/share/lib/zoneinfo/Africa/Dakar 0644 root bin
+h usr/share/lib/zoneinfo/Africa/Conakry=usr/share/lib/zoneinfo/Africa/Abidjan
+h usr/share/lib/zoneinfo/Africa/Dakar=usr/share/lib/zoneinfo/Africa/Abidjan
 f usr/share/lib/zoneinfo/Africa/Dar_es_Salaam 0644 root bin
 f usr/share/lib/zoneinfo/Africa/Djibouti 0644 root bin
-f usr/share/lib/zoneinfo/Africa/Douala 0644 root bin
+h usr/share/lib/zoneinfo/Africa/Douala=usr/share/lib/zoneinfo/Africa/Lagos
 f usr/share/lib/zoneinfo/Africa/El_Aaiun 0644 root bin
-f usr/share/lib/zoneinfo/Africa/Freetown 0644 root bin
+h usr/share/lib/zoneinfo/Africa/Freetown=usr/share/lib/zoneinfo/Africa/Abidjan
 f usr/share/lib/zoneinfo/Africa/Gaborone 0644 root bin
 f usr/share/lib/zoneinfo/Africa/Harare 0644 root bin
 f usr/share/lib/zoneinfo/Africa/Johannesburg 0644 root bin
@@ -10763,14 +10763,14 @@ f usr/share/lib/zoneinfo/Africa/Juba 0644 root bin
 f usr/share/lib/zoneinfo/Africa/Kampala 0644 root bin
 f usr/share/lib/zoneinfo/Africa/Khartoum 0644 root bin
 f usr/share/lib/zoneinfo/Africa/Kigali 0644 root bin
-f usr/share/lib/zoneinfo/Africa/Kinshasa 0644 root bin
+h usr/share/lib/zoneinfo/Africa/Kinshasa=usr/share/lib/zoneinfo/Africa/Lagos
 f usr/share/lib/zoneinfo/Africa/Lagos 0644 root bin
-f usr/share/lib/zoneinfo/Africa/Libreville 0644 root bin
-f usr/share/lib/zoneinfo/Africa/Lome 0644 root bin
-f usr/share/lib/zoneinfo/Africa/Luanda 0644 root bin
+h usr/share/lib/zoneinfo/Africa/Libreville=usr/share/lib/zoneinfo/Africa/Lagos
+h usr/share/lib/zoneinfo/Africa/Lome=usr/share/lib/zoneinfo/Africa/Abidjan
+h usr/share/lib/zoneinfo/Africa/Luanda=usr/share/lib/zoneinfo/Africa/Lagos
 f usr/share/lib/zoneinfo/Africa/Lubumbashi 0644 root bin
 f usr/share/lib/zoneinfo/Africa/Lusaka 0644 root bin
-f usr/share/lib/zoneinfo/Africa/Malabo 0644 root bin
+h usr/share/lib/zoneinfo/Africa/Malabo=usr/share/lib/zoneinfo/Africa/Lagos
 f usr/share/lib/zoneinfo/Africa/Maputo 0644 root bin
 f usr/share/lib/zoneinfo/Africa/Maseru 0644 root bin
 f usr/share/lib/zoneinfo/Africa/Mbabane 0644 root bin
@@ -10778,12 +10778,12 @@ f usr/share/lib/zoneinfo/Africa/Mogadishu 0644 root bin
 f usr/share/lib/zoneinfo/Africa/Monrovia 0644 root bin
 f usr/share/lib/zoneinfo/Africa/Nairobi 0644 root bin
 f usr/share/lib/zoneinfo/Africa/Ndjamena 0644 root bin
-f usr/share/lib/zoneinfo/Africa/Niamey 0644 root bin
-f usr/share/lib/zoneinfo/Africa/Nouakchott 0644 root bin
-f usr/share/lib/zoneinfo/Africa/Ouagadougou 0644 root bin
-f usr/share/lib/zoneinfo/Africa/Porto-Novo 0644 root bin
-f usr/share/lib/zoneinfo/Africa/Sao_Tome 0644 root bin
-f usr/share/lib/zoneinfo/Africa/Timbuktu 0644 root bin
+h usr/share/lib/zoneinfo/Africa/Niamey=usr/share/lib/zoneinfo/Africa/Lagos
+h usr/share/lib/zoneinfo/Africa/Nouakchott=usr/share/lib/zoneinfo/Africa/Abidjan
+h usr/share/lib/zoneinfo/Africa/Ouagadougou=usr/share/lib/zoneinfo/Africa/Abidjan
+h usr/share/lib/zoneinfo/Africa/Porto-Novo=usr/share/lib/zoneinfo/Africa/Abidjan
+h usr/share/lib/zoneinfo/Africa/Sao_Tome=usr/share/lib/zoneinfo/Africa/Abidjan
+h usr/share/lib/zoneinfo/Africa/Timbuktu=usr/share/lib/zoneinfo/Africa/Abidjan
 f usr/share/lib/zoneinfo/Africa/Tripoli 0644 root bin
 f usr/share/lib/zoneinfo/Africa/Tunis 0644 root bin
 f usr/share/lib/zoneinfo/Africa/Windhoek 0644 root bin
@@ -10966,6 +10966,7 @@ f usr/share/lib/zoneinfo/Antarctica/Palmer 0644 root bin
 f usr/share/lib/zoneinfo/Antarctica/Rothera 0644 root bin
 f usr/share/lib/zoneinfo/Antarctica/South_Pole 0644 root bin
 f usr/share/lib/zoneinfo/Antarctica/Syowa 0644 root bin
+f usr/share/lib/zoneinfo/Antarctica/Troll 0644 root bin
 f usr/share/lib/zoneinfo/Antarctica/Vostok 0644 root bin
 d usr/share/lib/zoneinfo/Arctic 0755 root bin
 h usr/share/lib/zoneinfo/Arctic/Longyearbyen=usr/share/lib/zoneinfo/Europe/Oslo
@@ -10986,9 +10987,10 @@ f usr/share/lib/zoneinfo/Asia/Beirut 0644 root bin
 f usr/share/lib/zoneinfo/Asia/Bishkek 0644 root bin
 f usr/share/lib/zoneinfo/Asia/Brunei 0644 root bin
 f usr/share/lib/zoneinfo/Asia/Calcutta 0644 root bin
+f usr/share/lib/zoneinfo/Asia/Chita 0644 root bin
 f usr/share/lib/zoneinfo/Asia/Choibalsan 0644 root bin
-f usr/share/lib/zoneinfo/Asia/Chongqing 0644 root bin
-f usr/share/lib/zoneinfo/Asia/Chungking 0644 root bin
+h usr/share/lib/zoneinfo/Asia/Chongqing=usr/share/lib/zoneinfo/Asia/Shanghai
+h usr/share/lib/zoneinfo/Asia/Chungking=usr/share/lib/zoneinfo/Asia/Shanghai
 f usr/share/lib/zoneinfo/Asia/Colombo 0644 root bin
 f usr/share/lib/zoneinfo/Asia/Dacca 0644 root bin
 f usr/share/lib/zoneinfo/Asia/Damascus 0644 root bin
@@ -10997,7 +10999,7 @@ f usr/share/lib/zoneinfo/Asia/Dili 0644 root bin
 f usr/share/lib/zoneinfo/Asia/Dubai 0644 root bin
 f usr/share/lib/zoneinfo/Asia/Dushanbe 0644 root bin
 f usr/share/lib/zoneinfo/Asia/Gaza 0644 root bin
-f usr/share/lib/zoneinfo/Asia/Harbin 0644 root bin
+h usr/share/lib/zoneinfo/Asia/Harbin=usr/share/lib/zoneinfo/Asia/Shanghai
 f usr/share/lib/zoneinfo/Asia/Hebron 0644 root bin
 f usr/share/lib/zoneinfo/Asia/Ho_Chi_Minh 0644 root bin
 f usr/share/lib/zoneinfo/Asia/Hong_Kong 0644 root bin
@@ -11010,7 +11012,7 @@ h usr/share/lib/zoneinfo/Asia/Jerusalem=usr/share/lib/zoneinfo/Israel
 f usr/share/lib/zoneinfo/Asia/Kabul 0644 root bin
 f usr/share/lib/zoneinfo/Asia/Kamchatka 0644 root bin
 f usr/share/lib/zoneinfo/Asia/Karachi 0644 root bin
-f usr/share/lib/zoneinfo/Asia/Kashgar 0644 root bin
+h usr/share/lib/zoneinfo/Asia/Kashgar=usr/share/lib/zoneinfo/Asia/Urumqi
 f usr/share/lib/zoneinfo/Asia/Kathmandu 0644 root bin
 f usr/share/lib/zoneinfo/Asia/Katmandu 0644 root bin
 f usr/share/lib/zoneinfo/Asia/Kolkata 0644 root bin
@@ -11045,6 +11047,7 @@ f usr/share/lib/zoneinfo/Asia/Samarkand 0644 root bin
 f usr/share/lib/zoneinfo/Asia/Seoul 0644 root bin
 f usr/share/lib/zoneinfo/Asia/Shanghai 0644 root bin
 f usr/share/lib/zoneinfo/Asia/Singapore 0644 root bin
+f usr/share/lib/zoneinfo/Asia/Srednekolymsk 0644 root bin
 f usr/share/lib/zoneinfo/Asia/Taipei 0644 root bin
 f usr/share/lib/zoneinfo/Asia/Tashkent 0644 root bin
 f usr/share/lib/zoneinfo/Asia/Tbilisi 0644 root bin
@@ -11073,7 +11076,7 @@ h usr/share/lib/zoneinfo/Atlantic/Jan_Mayen=usr/share/lib/zoneinfo/Europe/Oslo
 f usr/share/lib/zoneinfo/Atlantic/Madeira 0644 root bin
 f usr/share/lib/zoneinfo/Atlantic/Reykjavik 0644 root bin
 f usr/share/lib/zoneinfo/Atlantic/South_Georgia 0644 root bin
-f usr/share/lib/zoneinfo/Atlantic/St_Helena 0644 root bin
+h usr/share/lib/zoneinfo/Atlantic/St_Helena=usr/share/lib/zoneinfo/Africa/Abidjan
 f usr/share/lib/zoneinfo/Atlantic/Stanley 0644 root bin
 d usr/share/lib/zoneinfo/Australia 0755 root bin
 f usr/share/lib/zoneinfo/Australia/ACT 0644 root bin
