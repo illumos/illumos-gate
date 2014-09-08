@@ -223,7 +223,6 @@ file path=lib/$(ARCH64)/libthread.so.1
 file path=lib/$(ARCH64)/libtsnet.so.1
 file path=lib/$(ARCH64)/libtsol.so.2
 file path=lib/$(ARCH64)/libumem.so.1
-file path=lib/$(ARCH64)/libumem_trampoline.so.1
 file path=lib/$(ARCH64)/libuuid.so.1
 file path=lib/$(ARCH64)/libuutil.so.1
 file path=lib/$(ARCH64)/libw.so.1
@@ -307,7 +306,6 @@ file path=lib/libthread.so.1
 file path=lib/libtsnet.so.1
 file path=lib/libtsol.so.2
 file path=lib/libumem.so.1
-file path=lib/libumem_trampoline.so.1
 file path=lib/libuuid.so.1
 file path=lib/libuutil.so.1
 file path=lib/libw.so.1
@@ -645,7 +643,6 @@ link path=lib/$(ARCH64)/libthread_db.so.1 target=libc_db.so.1
 link path=lib/$(ARCH64)/libtsnet.so target=libtsnet.so.1
 link path=lib/$(ARCH64)/libtsol.so target=libtsol.so.2
 link path=lib/$(ARCH64)/libumem.so target=libumem.so.1
-link path=lib/$(ARCH64)/libumem_trampoline.so target=libumem_trampoline.so.1
 link path=lib/$(ARCH64)/libuuid.so target=libuuid.so.1
 link path=lib/$(ARCH64)/libuutil.so target=libuutil.so.1
 link path=lib/$(ARCH64)/libw.so target=libw.so.1
@@ -710,7 +707,6 @@ link path=lib/libthread_db.so target=libc_db.so.1
 link path=lib/libthread_db.so.1 target=libc_db.so.1
 link path=lib/libtsol.so target=libtsol.so.2
 link path=lib/libumem.so target=libumem.so.1
-link path=lib/libumem_trampoline.so target=libumem_trampoline.so.1
 link path=lib/libuuid.so target=libuuid.so.1
 link path=lib/libw.so target=libw.so.1
 link path=lib/libxnet.so target=libxnet.so.1

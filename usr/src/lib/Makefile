@@ -154,7 +154,6 @@ SUBDIRS += \
 	librdc		\
 	libinstzones	\
 	libpkg		\
-	libumem_trampoline	\
 	libpcidb
 
 SUBDIRS += \
