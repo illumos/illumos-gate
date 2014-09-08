@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2013, Joyent, Inc. All rights reserved.
+ * Copyright 2014, Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -1141,10 +1141,10 @@ zfs_zone_zio_done(zio_t *zp)
 	if (zp->io_type == ZIO_TYPE_IOCTL)
 		return;
 
-	if ((zonep = zone_find_by_id(zp->io_zoneid)) == NULL)
+	if (zp->io_dispatched == 0)
 		return;
 
-	if (zp->io_dispatched == 0)
+	if ((zonep = zone_find_by_id(zp->io_zoneid)) == NULL)
 		return;
 
 	now = gethrtime();
