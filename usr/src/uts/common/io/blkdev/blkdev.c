@@ -22,7 +22,7 @@
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
  * Copyright 2012 Alexey Zaytsev <alexey.zaytsev@gmail.com> All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -541,7 +541,7 @@ bd_xfer_alloc(bd_t *bd, struct buf *bp, int (*func)(void *, bd_xfer_t *),
     int kmflag)
 {
 	bd_xfer_impl_t		*xi;
-	int			rv;
+	int			rv = 0;
 	int			status;
 	unsigned		dir;
 	int			(*cb)(caddr_t);
@@ -1041,6 +1041,11 @@ bd_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *credp, int *rvalp)
 	rv = cmlb_ioctl(bd->d_cmlbh, dev, cmd, arg, flag, credp, rvalp, 0);
 	if (rv != ENOTTY)
 		return (rv);
+
+	if (rvalp != NULL) {
+		/* the return value of the ioctl is 0 by default */
+		*rvalp = 0;
+	}
 
 	switch (cmd) {
 	case DKIOCGMEDIAINFO: {
