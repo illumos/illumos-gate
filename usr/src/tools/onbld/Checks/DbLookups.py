@@ -37,6 +37,7 @@ import htmllib
 import re
 import urllib
 import urllib2
+import json
 
 try:				# Python >= 2.5
 	from xml.etree import ElementTree
@@ -62,9 +63,9 @@ class BugDB(object):
 	print r["6505625"]["synopsis"]
 	"""
 
-	VALID_DBS = ["illumos"]
+	VALID_DBS = ["illumos", "smartos"]
 
-	def __init__(self, priority = ["illumos"]):
+	def __init__(self, priority = VALID_DBS):
 		"""Create a BugDB object.
 
 		Keyword argument:
@@ -74,6 +75,24 @@ class BugDB(object):
 			if database not in self.VALID_DBS:
 				raise BugDBException, database
 		self.__priority = priority
+
+	def __smartosbug(self, cr):
+		url = "http://smartos.org/bugview/json/%s" % cr
+		req = urllib2.Request(url)
+
+		try:
+			data = urllib2.urlopen(req)
+		except urllib2.HTTPError, e:
+			if e.code == 404 or e.code == 403 or e.code == 400:
+				raise NonExistentBug(cr)
+			else:
+				raise
+
+		bug = json.load(data)
+
+		return {'cr_number': bug['id'],
+			'synopsis': bug['summary']
+		}
 
 
 	def __illbug(self, cr):
@@ -115,6 +134,12 @@ class BugDB(object):
 				for cr in crs:
 					try:
 						results[str(cr)] = self.__illbug(cr)
+					except NonExistentBug:
+						continue
+			elif database == "smartos":
+				for cr in crs:
+					try:
+						results[str(cr)] = self.__smartosbug(cr)
 					except NonExistentBug:
 						continue
 

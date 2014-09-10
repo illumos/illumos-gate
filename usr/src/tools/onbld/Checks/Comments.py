@@ -38,7 +38,7 @@ import re, sys
 from onbld.Checks.DbLookups import BugDB
 
 
-bugre = re.compile(r'^(\d{2,7}) (.*)$')
+bugre = re.compile(r'^(\d{2,7}|[A-Z]{1,7}-\d{1,7}) (.*)$')
 
 
 def isBug(comment):
