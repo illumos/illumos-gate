@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2014 Toomas Soome <tsoome@me.com>
  */
 
 #ifndef	_MESSAGE_H
@@ -73,7 +74,7 @@ extern "C" {
 #define	TOO_LONG gettext("the following line is too long (> %d chars)\n\t%s\n")
 
 #define	NOT_GRUB_BOOT \
-	gettext("not a GRUB based Solaris instance. Operation not supported\n")
+    gettext("not a GRUB 0.97 based Illumos instance. Operation not supported\n")
 
 #define	NOT_GRUB_ROOT gettext("missing /boot/grub on root: %s\n")
 
