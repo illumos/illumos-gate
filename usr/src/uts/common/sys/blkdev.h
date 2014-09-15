@@ -20,7 +20,7 @@
  */
 /*
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -42,7 +42,10 @@ extern "C" {
  * but do not need all the capabilities of SCSA.  So we make quite a few
  * simplifications:
  *
- * 1) Device block size is a multiple of 512 bytes.
+ * 1) Device block size is a power of 2 greater or equal to 512 bytes.
+ *    An optional physical block size can be reported if the underlying
+ *    device uses larger block sizes internally, so that writes can be
+ *    aligned properly.
  *
  * 2) Non-rotating media.  We assume a simple linear layout.
  *
@@ -113,11 +116,15 @@ struct bd_media {
 	 * d_maxxfer field.  If the maxxfer is a power of two larger
 	 * than the block size, then this will automatically be
 	 * satisfied.
+	 *
+	 * The physical block size (m_pblksize) must be 0 or a power
+	 * of two not less than the block size.
 	 */
 	uint64_t		m_nblks;
 	uint32_t		m_blksize;
 	boolean_t		m_readonly;
 	boolean_t		m_solidstate;
+	uint32_t		m_pblksize;
 };
 
 #define	BD_INFO_FLAG_REMOVABLE		(1U << 0)
