@@ -32,9 +32,9 @@
  * $Id: smb_trantcp.c,v 1.39 2005/03/02 01:27:44 lindak Exp $
  */
 /*
- * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/param.h>
@@ -596,7 +596,10 @@ nb_unloan_fp(struct nbpcb *nbp)
 		nbp->nbp_flags |= NBF_LOCKWAIT;
 		cv_wait(&nbp->nbp_cv, &nbp->nbp_lock);
 	}
-
+	if (nbp->nbp_frag != NULL) {
+		freemsg(nbp->nbp_frag);
+		nbp->nbp_frag = NULL;
+	}
 	if (nbp->nbp_tiptr != NULL) {
 		(void) t_kclose(nbp->nbp_tiptr, 0);
 		nbp->nbp_tiptr = NULL;
@@ -663,12 +666,6 @@ nb_disconnect(struct nbpcb *nbp)
 
 	if ((nbp->nbp_flags & NBF_CONNECTED) != 0) {
 		nbp->nbp_flags &= ~NBF_CONNECTED;
-
-		if (nbp->nbp_frag != NULL) {
-			freemsg(nbp->nbp_frag);
-			nbp->nbp_frag = NULL;
-		}
-
 		err = nb_snddis(nbp);
 	}
 
