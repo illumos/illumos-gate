@@ -631,8 +631,6 @@ lock_stat()
 	struct lockdaemon *ldp;
 	int i;
 
-	spcs_log("cfglockd", NULL,
-	    "%s, Lock daemon built %s **********", program, __DATE__);
 	switch (the_lock.type) {
 	case LOCK_NOTLOCKED:
 		lt = "not locked";

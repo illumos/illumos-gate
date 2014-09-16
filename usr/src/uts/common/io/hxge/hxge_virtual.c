@@ -935,8 +935,8 @@ hxge_ldgv_setup(p_hxge_ldg_t *ldgp, p_hxge_ldv_t *ldvp, uint8_t ldv,
 		HXGE_DEBUG_MSG((NULL, INT_CTL, "==> hxge_ldgv_setup(done): "
 		    "ldv %d endldg %d ldg %d, ldvp $%p",
 		    ldv, endldg, (*ldgp)->ldg, (*ldgp)->ldvp));
-		(*ldvp) = ++*ldvp;
-		(*ldgp) = ++*ldgp;
+		++*ldvp;
+		++*ldgp;
 		HXGE_DEBUG_MSG((NULL, INT_CTL,
 		    "==> hxge_ldgv_setup: new ngrps %d", *ngrps));
 	}

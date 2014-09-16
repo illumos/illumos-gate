@@ -21,13 +21,12 @@
 
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2014 Igor Kozhukhov <ikozhukhov@gmail.com>.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_LOADAVG_H
 #define	_SYS_LOADAVG_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -38,6 +37,16 @@ extern "C" {
 #define	LOADAVG_15MIN	2
 
 #define	LOADAVG_NSTATS	3
+
+#define	S_LOADAVG_SZ	11
+#define	S_MOVAVG_SZ	10
+
+struct loadavg_s {
+	int lg_cur;		/* current loadavg entry */
+	unsigned int lg_len;	/* number entries recorded */
+	hrtime_t lg_total;	/* used to temporarily hold load totals */
+	hrtime_t lg_loads[S_LOADAVG_SZ];	/* table of recorded entries */
+};
 
 #ifdef _KERNEL
 

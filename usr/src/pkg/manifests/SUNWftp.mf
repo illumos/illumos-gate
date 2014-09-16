@@ -23,7 +23,9 @@
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
+# Was renamed to service/network/ftp, both now obsolete
+
 set name=pkg.fmri value=pkg:/SUNWftp@0.5.11,5.11-0.133
-set name=pkg.renamed value=true
+set name=pkg.obsolete value=true
+set name=org.opensolaris.noincorp value=true
 set name=variant.arch value=$(ARCH)
-depend fmri=pkg:/service/network/ftp@0.5.11,5.11-0.133 type=require

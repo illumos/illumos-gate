@@ -111,8 +111,8 @@ int zfs_delay_min_dirty_percent = 60;
 
 /*
  * This controls how quickly the delay approaches infinity.
- * Larger values cause it to delay less for a given amount of dirty data.
- * Therefore larger values will cause there to be more dirty data for a
+ * Larger values cause it to delay more for a given amount of dirty data.
+ * Therefore larger values will cause there to be less dirty data for a
  * given throughput.
  *
  * For the smoothest delay, this value should be about 1 billion divided
@@ -123,6 +123,10 @@ int zfs_delay_min_dirty_percent = 60;
  * multiply in dmu_tx_delay().
  */
 uint64_t zfs_delay_scale = 1000 * 1000 * 1000 / 2000;
+
+
+hrtime_t zfs_throttle_delay = MSEC2NSEC(10);
+hrtime_t zfs_throttle_resolution = MSEC2NSEC(10);
 
 int
 dsl_pool_open_special_dir(dsl_pool_t *dp, const char *name, dsl_dir_t **ddp)

@@ -44,6 +44,7 @@ file path=usr/bin/ftp mode=0555
 file path=usr/sbin/ping mode=4555
 file path=usr/share/man/man1/ftp.1
 file path=usr/share/man/man1m/ping.1m
+file path=usr/share/man/man4/ftp.4
 file path=usr/share/man/man4/netrc.4
 legacy pkg=SUNWbip desc="Basic IP commands (/usr/sbin/ping, /bin/ftp)" \
     name="Basic IP commands (Usr)"

@@ -80,7 +80,13 @@ extern "C" {
 #define	V_HOME		0x08		/* Home partition */
 #define	V_ALTSCTR	0x09		/* Alternate sector partition */
 #define	V_CACHE		0x0a		/* Cache (cachefs) partition */
+
+/* Tags for EFI/GPT labels */
 #define	V_RESERVED	0x0b		/* SMI reserved data */
+#define	V_SYSTEM	0x0c		/* EFI/GPT system partition */
+#define	V_BIOS_BOOT	0x18		/* BIOS Boot partition */
+
+#define	V_UNKNOWN	0xff		/* Unknown partition */
 
 /*
  * Partition permission flags

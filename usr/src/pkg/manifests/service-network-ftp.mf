@@ -25,62 +25,6 @@
 #
 
 set name=pkg.fmri value=pkg:/service/network/ftp@$(PKGVERS)
-set name=pkg.description value="FTP Server and Utilities"
-set name=pkg.summary value="FTP Server"
-set name=info.classification value=org.opensolaris.category.2008:System/Core
+set name=pkg.obsolete value=true
+set name=org.opensolaris.noincorp value=true
 set name=variant.arch value=$(ARCH)
-dir path=etc group=sys
-dir path=etc/ftpd group=sys
-dir path=lib
-dir path=lib/svc
-dir path=lib/svc/manifest group=sys
-dir path=lib/svc/manifest/network group=sys
-dir path=lib/svc/method
-dir path=usr group=sys
-dir path=usr/sbin
-dir path=usr/share/man
-dir path=usr/share/man/man1
-dir path=usr/share/man/man1m
-dir path=usr/share/man/man4
-file path=etc/ftpd/ftpaccess group=sys \
-    original_name=SUNWftp:etc/ftpd/ftpaccess preserve=true
-file path=etc/ftpd/ftpconversions group=sys \
-    original_name=SUNWftp:etc/ftpd/ftpconversions preserve=true
-file path=etc/ftpd/ftpgroups group=sys \
-    original_name=SUNWftp:etc/ftpd/ftpgroups preserve=true
-file path=etc/ftpd/ftphosts group=sys original_name=SUNWftp:etc/ftpd/ftphosts \
-    preserve=true
-file path=etc/ftpd/ftpservers group=sys \
-    original_name=SUNWftp:etc/ftpd/ftpservers preserve=true
-file path=lib/svc/manifest/network/ftp.xml group=sys mode=0444
-file path=lib/svc/method/svc-ftp mode=0555
-file path=usr/sbin/ftpaddhost mode=0555
-file path=usr/sbin/ftpconfig mode=0555
-file path=usr/sbin/ftpcount mode=0555
-file path=usr/sbin/ftprestart mode=0555
-file path=usr/sbin/ftpshut mode=0555
-file path=usr/sbin/in.ftpd mode=0555
-file path=usr/sbin/privatepw mode=0555
-file path=usr/share/man/man1/ftpcount.1
-file path=usr/share/man/man1/ftpwho.1
-file path=usr/share/man/man1m/ftpaddhost.1m
-file path=usr/share/man/man1m/ftpconfig.1m
-file path=usr/share/man/man1m/ftprestart.1m
-file path=usr/share/man/man1m/ftpshut.1m
-file path=usr/share/man/man1m/in.ftpd.1m
-file path=usr/share/man/man4/ftp.4
-file path=usr/share/man/man4/ftpaccess.4
-file path=usr/share/man/man4/ftpconversions.4
-file path=usr/share/man/man4/ftpgroups.4
-file path=usr/share/man/man4/ftphosts.4
-file path=usr/share/man/man4/ftpservers.4
-file path=usr/share/man/man4/ftpusers.4
-file path=usr/share/man/man4/xferlog.4
-hardlink path=usr/sbin/ftpwho target=../../usr/sbin/ftpcount
-legacy pkg=SUNWftpr desc="FTP Server Configuration Files" \
-    name="FTP Server, (Root)"
-legacy pkg=SUNWftpu desc="FTP Server and Utilities" name="FTP Server, (Usr)"
-license cr_Sun license=cr_Sun
-license usr/src/cmd/cmd-inet/usr.sbin/in.ftpd/LICENSE \
-    license=usr/src/cmd/cmd-inet/usr.sbin/in.ftpd/LICENSE
-link path=usr/share/man/man1m/ftpd.1m target=in.ftpd.1m

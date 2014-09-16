@@ -157,10 +157,6 @@ _MANFILES=	6to4relay.1m		\
 		fssnap_ufs.1m		\
 		fsstat.1m		\
 		fstyp.1m		\
-		ftpaddhost.1m		\
-		ftpconfig.1m		\
-		ftprestart.1m		\
-		ftpshut.1m		\
 		fuser.1m		\
 		fwflash.1m		\
 		fwtmp.1m		\
@@ -206,7 +202,6 @@ _MANFILES=	6to4relay.1m		\
 		in.discardd.1m		\
 		in.echod.1m		\
 		in.fingerd.1m		\
-		in.ftpd.1m		\
 		in.iked.1m		\
 		in.lpd.1m		\
 		in.mpathd.1m		\
@@ -632,7 +627,6 @@ MANLINKS=	acctcon1.1m			\
 		dodisk.1m			\
 		fcadm.1m			\
 		fingerd.1m			\
-		ftpd.1m				\
 		grpck.1m			\
 		hal-find-by-capability.1m	\
 		hal-find-by-property.1m		\
@@ -741,7 +735,6 @@ poweroff.1m			:= LINKSRC = halt.1m
 
 comsat.1m			:= LINKSRC = in.comsat.1m
 fingerd.1m			:= LINKSRC = in.fingerd.1m
-ftpd.1m				:= LINKSRC = in.ftpd.1m
 rarpd.1m			:= LINKSRC = in.rarpd.1m
 rdisc.1m			:= LINKSRC = in.rdisc.1m
 rexecd.1m			:= LINKSRC = in.rexecd.1m

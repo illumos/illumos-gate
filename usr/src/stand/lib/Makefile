@@ -18,6 +18,7 @@
 #
 # CDDL HEADER END
 #
+# Copyright 2014 Gary Mills
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -25,23 +26,15 @@
 
 include Makefile.com
 
-i386_SUBDIRS = fs/pcfs fs/compfs
-sparc_SUBDIRS = md5 nvpair scrypt openssl .WAIT wanboot crypto ssl
+i386_SUBDIRS =
+sparc_SUBDIRS =
 SUBDIRS = fakeboot fs/hsfs fs/nfs fs/ufs inet sa sock tcpstubs xdr \
 	tcp $($(MACH)_SUBDIRS)
 
 #
-# It would be groovy if everything was lint-clean, but the crypto and ssl
-# code is third-party swill out of our jurisdiction.  Also, don't lint
-# fakeboot since it doesn't have any source files.
+# Don't lint fakeboot since it doesn't have any source files.
 #
-# If someone can come up with a more elegant way to strip these
-# directories out, please make it so.
-#
-LINTSUBDIRS1 = $(SUBDIRS:openssl=)
-LINTSUBDIRS2 = $(LINTSUBDIRS1:ssl=)
-LINTSUBDIRS3 = $(LINTSUBDIRS2:crypto=)
-LINTSUBDIRS  = $(LINTSUBDIRS3:fakeboot=)
+LINTSUBDIRS = $(SUBDIRS:fakeboot=)
 
 #
 # We can get away with this since we're only building .a's, and by the
