@@ -195,6 +195,7 @@ COMMON_SUBDIRS = \
 	cmd/luxadm \
 	cmd/lvm \
 	cmd/machid \
+	cmd/mailwrapper \
 	cmd/makekey \
 	cmd/mdb \
 	cmd/mesg \
