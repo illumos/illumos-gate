@@ -3041,6 +3041,7 @@ f usr/include/p12err.h 0644 root bin
 f usr/include/panel.h 0644 root bin
 f usr/include/parseURL.h 0644 root bin
 f usr/include/passwdutil.h 0644 root bin
+f usr/include/paths.h 0644 root bin
 f usr/include/pcsample.h 0644 root bin
 f usr/include/pfmt.h 0644 root bin
 f usr/include/picl.h 0644 root bin
