@@ -198,6 +198,9 @@ MANFILES= 	__fbufsize.3c					\
 	 	imaxdiv.3c					\
 	 	index.3c					\
 	 	initgroups.3c					\
+	 	inotify_init.3c					\
+	 	inotify_add_watch.3c				\
+	 	inotify_rm_watch.3c				\
 	 	insque.3c					\
 	 	is_system_labeled.3c				\
 	 	isaexec.3c					\

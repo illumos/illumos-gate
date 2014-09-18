@@ -25,7 +25,7 @@
  */
 
 /*
- * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2014, Joyent, Inc. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -1296,9 +1296,7 @@ tmp_rename(
 
 	if (err == 0) {
 		vnevent_rename_src(TNTOV(fromtp), odvp, onm, ct);
-		/* Notify the target dir if not same as source dir. */
-		if (ndvp != odvp)
-			vnevent_rename_dest_dir(ndvp, ct);
+		vnevent_rename_dest_dir(ndvp, TNTOV(fromtp), nnm, ct);
 	}
 
 done:

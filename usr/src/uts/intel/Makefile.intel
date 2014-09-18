@@ -251,6 +251,7 @@ DRV_KMODS	+= i8042
 DRV_KMODS	+= i915
 DRV_KMODS	+= icmp
 DRV_KMODS	+= icmp6
+DRV_KMODS	+= inotify
 DRV_KMODS	+= intel_nb5000
 DRV_KMODS	+= intel_nhm
 DRV_KMODS	+= ip

@@ -3767,6 +3767,7 @@ f usr/include/sys/idm/idm_so.h 0644 root bin
 f usr/include/sys/idm/idm_text.h 0644 root bin
 f usr/include/sys/idm/idm_transport.h 0644 root bin
 f usr/include/sys/idmap.h 0644 root bin
+f usr/include/sys/inotify.h 0644 root bin
 f usr/include/sys/inline.h 0644 root bin
 f usr/include/sys/instance.h 0644 root bin
 f usr/include/sys/int_const.h 0644 root bin
@@ -4516,6 +4517,7 @@ f usr/kernel/drv/amd64/dump 0755 root sys
 f usr/kernel/drv/amd64/fssnap 0755 root sys
 f usr/kernel/drv/amd64/ipf 0755 root sys
 f usr/kernel/drv/amd64/ipmi 0755 root sys
+f usr/kernel/drv/amd64/inotify 0755 root sys
 f usr/kernel/drv/amd64/kstat 0755 root sys
 f usr/kernel/drv/amd64/ksyms 0755 root sys
 f usr/kernel/drv/amd64/logindmux 0755 root sys
@@ -4534,6 +4536,7 @@ f usr/kernel/drv/amd64/zcons 0755 root sys
 f usr/kernel/drv/bpf.conf 0644 root sys
 f usr/kernel/drv/dump.conf 0644 root sys
 f usr/kernel/drv/fssnap.conf 0644 root sys
+f usr/kernel/drv/inotify.conf 0644 root sys
 f usr/kernel/drv/ipf.conf 0644 root sys
 f usr/kernel/drv/ipmi.conf 0644 root sys
 f usr/kernel/drv/kstat.conf 0644 root sys
@@ -12934,6 +12937,10 @@ f usr/share/man/man3c/imaxdiv.3c 0444 root bin
 f usr/share/man/man3c/index.3c 0444 root bin
 f usr/share/man/man3c/initgroups.3c 0444 root bin
 s usr/share/man/man3c/initstate.3c=random.3c
+f usr/share/man/man3c/inotify_init.3c 0444 root bin
+s usr/share/man/man3c/inotify_init1.3c=inotify_init.3c
+f usr/share/man/man3c/inotify_add_watch.3c 0444 root bin
+f usr/share/man/man3c/inotify_rm_watch.3c 0444 root bin
 s usr/share/man/man3c/innetgr.3c=getnetgrent.3c
 f usr/share/man/man3c/insque.3c 0444 root bin
 f usr/share/man/man3c/is_system_labeled.3c 0444 root bin
@@ -18010,6 +18017,7 @@ f usr/share/man/man5/iconv.5 0444 root bin
 f usr/share/man/man5/iconv_unicode.5 0444 root bin
 f usr/share/man/man5/ieee802.3.5 0444 root bin
 f usr/share/man/man5/ieee802.11.5 0444 root bin
+f usr/share/man/man5/inotify.5 0444 root bin
 s usr/share/man/man5/intro.5=Intro.5
 f usr/share/man/man5/ipfilter.5 0444 root bin
 f usr/share/man/man5/isalist.5 0444 root bin

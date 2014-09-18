@@ -58,6 +58,7 @@ MANFILES=	Intro.5			\
 		iconv_unicode.5		\
 		ieee802.3.5		\
 		ieee802.11.5		\
+		inotify.5		\
 		ipfilter.5		\
 		isalist.5		\
 		kerberos.5		\

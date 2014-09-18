@@ -24,6 +24,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright (c) 2014, Joyent, Inc. All rights reserved.
+ */
+
 #include <sys/param.h>
 #include <sys/errno.h>
 #include <sys/systm.h>
@@ -822,10 +826,10 @@ top:
 			return (error);
 		}
 	}
-out:
-	vnevent_rename_src(PCTOV(pcp), PCTOV(dp), snm, ctp);
-	if (dp != tdp) {
-		vnevent_rename_dest_dir(PCTOV(tdp), ctp);
+
+	if (error == 0) {
+		vnevent_rename_src(PCTOV(pcp), PCTOV(dp), snm, ctp);
+		vnevent_rename_dest_dir(PCTOV(tdp), PCTOV(pcp), tnm, ctp);
 	}
 
 	VN_RELE(PCTOV(pcp));

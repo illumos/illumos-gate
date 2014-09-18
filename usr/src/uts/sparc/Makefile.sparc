@@ -21,6 +21,7 @@
 
 # Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2013 Andrew Stormont.  All rights reserved.
+# Copyright (c) 2014, Joyent, Inc. All rights reserved.
 
 
 #
@@ -236,6 +237,7 @@ DRV_KMODS	+= nulldriver
 DRV_KMODS	+= bridge trill
 DRV_KMODS	+= bpf
 DRV_KMODS	+= dca
+DRV_KMODS	+= inotify
 
 #
 #       Hardware Drivers in common space

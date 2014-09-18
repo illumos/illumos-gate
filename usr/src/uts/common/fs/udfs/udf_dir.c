@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2014, Joyent, Inc. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -562,9 +563,8 @@ out:
 				    namep, ctp);
 			}
 
-			if (sdp != tdp) {
-				vnevent_rename_dest_dir(ITOV(tdp), ctp);
-			}
+			vnevent_rename_dest_dir(ITOV(tdp), ITOV(tip),
+			    namep, ctp);
 		}
 
 		/*
