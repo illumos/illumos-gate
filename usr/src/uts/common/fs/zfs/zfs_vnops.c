@@ -3760,9 +3760,7 @@ top:
 
 	if (error == 0) {
 		vnevent_rename_src(ZTOV(szp), sdvp, snm, ct);
-		/* notify the target dir if it is not the same as source dir */
-		if (tdvp != sdvp)
-			vnevent_rename_dest_dir(tdvp, ct);
+		vnevent_rename_dest_dir(tdvp, ZTOV(szp), tnm, ct);
 	}
 out:
 	if (zl != NULL)

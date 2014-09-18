@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2014, Joyent, Inc. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -744,6 +744,7 @@ typedef enum vnevent	{
 	VE_PRE_RENAME_SRC = 10,	/* Pre-rename, with vnode as source */
 	VE_PRE_RENAME_DEST = 11, /* Pre-rename, with vnode as target/dest. */
 	VE_PRE_RENAME_DEST_DIR = 12 /* Pre-rename with vnode as target dir */
+	VE_RENAME_SRC_DIR = 13	/* Rename with vnode as source dir */
 } vnevent_t;
 
 /*
@@ -1298,7 +1299,8 @@ void	vnevent_remove(vnode_t *, vnode_t *, char *, caller_context_t *);
 void	vnevent_rmdir(vnode_t *, vnode_t *, char *, caller_context_t *);
 void	vnevent_create(vnode_t *, caller_context_t *);
 void	vnevent_link(vnode_t *, caller_context_t *);
-void	vnevent_rename_dest_dir(vnode_t *, caller_context_t *ct);
+void	vnevent_rename_dest_dir(vnode_t *, vnode_t *, char *,
+    caller_context_t *ct);
 void	vnevent_mountedover(vnode_t *, caller_context_t *);
 void	vnevent_truncate(vnode_t *, caller_context_t *);
 int	vnevent_support(vnode_t *, caller_context_t *);

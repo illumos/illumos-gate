@@ -241,6 +241,7 @@ DRV_KMODS	+= bpf
 DRV_KMODS	+= dca
 DRV_KMODS	+= eventfd
 DRV_KMODS	+= signalfd
+DRV_KMODS	+= inotify
 
 #
 #       Hardware Drivers in common space

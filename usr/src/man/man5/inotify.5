@@ -1,0 +1,305 @@
+'\" te
+.\"  Copyright (c) 2014, Joyent, Inc. All Rights Reserved.
+.\"  This file and its contents are supplied under the terms of the
+.\"  Common Development and Distribution License ("CDDL"), version 1.0.
+.\"  You may only use this file in accordance with the terms of version
+.\"  1.0 of the CDDL.
+.\" 
+.\"  A full copy of the text of the CDDL should have accompanied this
+.\"  source.  A copy of the CDDL is also available via the Internet at
+.\"  http://www.illumos.org/license/CDDL.
+.TH INOTIFY 5 "Sep 17, 2014"
+.SH NAME
+inotify \- Linux-compatible file event notification facility
+.SH SYNOPSIS
+
+.LP
+.nf
+#include <sys/inotify.h>
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+
+\fBinotify\fR is a facility for receiving file system events on specified
+files or directories.  When monitoring a directory, \fBinotify\fR can be
+used to retrieve events not only on the directory, but also on any files
+that the directory contains.  \fBinotify\fR originated with Linux, and
+this facility is designed to be binary-compatible with the Linux facility,
+including the following interfaces:
+
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBinotify_init\fR(3C) creates an \fBinotify\fR instance, returning a file
+descriptor associated with the in-kernel event queue.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBinotify_init1\fR(3C) also creates an \fBinotify\fR instance, but allows
+for a flags argument that controls some attributes of the returned file
+descriptor.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBinotify_add_watch\fR(3C) allows a watch of a particular file or directory
+to be added to a watch list associated with the specified \fBinotify\fR
+instance. \fBinotify_add_watch\fR(3C) returns a watch descriptor that will
+be reflected in the \fIwd\fR member of the \fIinotify_event\fR structure
+returned via a \fBread\fR(2) of the instance.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBinotify_rm_watch\fR(3C) removes the watch that corresponds to the specified
+watch descriptor.
+.RE
+
+When all file descriptors referring to a particular \fBinotify\fR instance
+are closed, the instance and all watches associated with that instance are
+freed.
+
+To consume events on an \fBinotify\fR instance, an application should 
+issue a \fBread\fR(2) to the instance.  If no events are available
+(and the \fBinotify\fR instance has not been explicitly made non-blocking
+via \fBinotify_init1\fR(3C)) the \fBread\fR(2) will block until a
+watched event occurs. If and when events are available, \fBread\fR(2) will
+return an array of the following structures:
+
+.sp
+.in +2
+.nf
+struct inotify_event {
+        int      wd;       /* watch descriptor */
+        uint32_t mask;     /* mask of event */
+        uint32_t cookie;   /* cookie for associating renames */
+        uint32_t len;      /* size of name field */
+        char     name[];   /* optional name */
+};
+.fi
+.in -2
+
+\fIwd\fR contains the watch descriptor that corresponds to the event,
+as returned by \fBinotify_add_watch\fR(3C).
+
+\fImask\fR is a bitwise \fBOR\fR of event masks (see below) that
+describes the event.
+
+\fIcookie\fR is an opaque value that can be used to associate different
+events into a single logical event. In particular, it allows consumers to
+associate \fBIN_MOVED_FROM\fR events with subsequent \fBIN_MOVED_TO\fR
+events.
+
+\fIlen\fR denotes the length of the \fIname\fR field, including any padding
+required for trailing null bytes and alignment. The size of the entire
+event is therefore the size of the \fIinotify_event\fR structure plus the
+value of \fIlen\fR.
+
+\fIname\fR contains the name of the file associated with the event, if any.
+This field is only present when the watched entity is a directory and
+the event corresponds to a file that was contained by the watched directory
+(though see \fBNOTES\fR and \fBWARNINGS\fR for details and limitations).
+When present, \fIname\fR is null terminated, and may contain additional
+zero bytes
+to pad for alignment. (The length of this field -- including any bytes
+for alignment -- is denoted by the \fIlen\fR field.)
+
+.SS "Events"
+
+The events that can be generated on a watched entity are as follows:
+
+.sp
+.in +2
+.TS
+c c
+l l .
+\fIEvent\fR	\fIDescription\fR
+\fBIN_ACCESS\fR	File/directory was accessed
+\fBIN_ATTRIB\fR	File/directory attributes were changed
+\fBIN_CLOSE_WRITE\fR	File/directory opened for writing was closed 
+\fBIN_CLOSE_NOWRITE\fR	File/directory not opened for writing was closed
+\fBIN_CREATE\fR	File/directory created in watched directory
+\fBIN_DELETE\fR	File/directory deleted from watched directory
+\fBIN_DELETE_SELF\fR	Watched file/directory was deleted
+\fBIN_MODIFY\fR	File/directory was modified
+\fBIN_MODIFY_SELF\fR	Watched file/directory was modified
+\fBIN_MOVED_FROM\fR	File was renamed from entity in watched directory
+\fBIN_MOVED_TO\fR	File was renamed to entity in watched directory
+\fBIN_OPEN\fR	File/directory was opened
+.TE
+.in -2
+
+Of these, all events except \fBIN_MOVE_SELF\fR and \fBIN_DELETE_SELF\fR
+can refer to either the watched entity or (if the watched entity
+is a directory) a file or directory contained by the watched directory.
+(See \fBNOTES\fR and \fBWARNINGS\fR, below for details on this
+mechanism and its limitations.)
+If the event corresponds to a contained entity,
+\fIname\fR will be set to the name of the affected
+entity.
+
+In addition to speciyfing events of interest, watched events may
+be modified by potentially setting any of the following when adding a
+watch via \fBinotify_add_watch\fR(3C):
+
+.sp
+.ne 2
+.na
+\fBIN_DONT_FOLLOW\fR
+.ad
+.RS 12n
+Don't follow the specified pathname if it is a symbolic link.
+.RE
+
+.sp
+.ne 2
+.na
+\fBIN_EXCL_UNLINK\fR
+.ad
+.RS 12n
+If watching a directory and a contained entity becomes unlinked, cease
+generating events for that entity. (By default, contained entities will
+continue to generate events on their former parent directory.)
+.RE
+
+.sp
+.ne 2
+.na
+\fBIN_MASK_ADD\fR
+.ad
+.RS 12n
+If the specified pathname is already being watched, the specified events
+will be added to the watched events instead of the default behavior of
+replacing them. (If one
+may forgive the editorializing, this particular interface gewgaw
+seems entirely superfluous, and a canonical example of
+feasibility trumping wisdom.)
+.RE
+
+.sp
+.ne 2
+.na
+\fBIN_ONESHOT\fR
+.ad
+.RS 12n
+Once an event has been generated for the watched entity, remove the
+watch from the watch list as if \fBinotify_rm_watch\fR(3C) had been called
+on it (thereby inducing an \fBIN_IGNORED\fR event).
+.RE
+
+.sp
+.ne 2
+.na
+\fBIN_ONLYDIR\fR
+.ad
+.RS 12n
+Only watch the specified pathname if it is a directory.
+.RE
+
+In addition to the specified events, the following bits may be specified
+in the \fImask\fR field as returned from \fBread\fR(2):
+
+.sp
+.ne 2
+.na
+\fBIN_IGNORED\fR
+.ad
+.RS 12n
+A watch was removed explicitly (i.e, via \fBinotify_rm_watch\fR(3C)) or
+implicitly (e.g., because \fBIN_ONESHOT\fR was set or because the watched
+entity was deleted). 
+.RE
+
+.sp
+.ne 2
+.na
+\fBIN_ISDIR\fR
+.ad
+.RS 12n
+The entity inducing the event is a directory.
+.RE
+
+.sp
+.ne 2
+.na
+\fBIN_Q_OVERFLOW\fR
+.ad
+.RS 12n
+The event queue exceeded the maximum event queue length per instance.
+(By default, this is 16384, but it can be tuned by setting 
+\fBinotify_maxevents\fR via \fB/etc/system\fR.)
+.RE
+
+.sp
+.ne 2
+.na
+\fBIN_UNMOUNT\fR
+.ad
+.RS 12n
+The filesystem containing the watched entity was unmounted.
+.RE
+
+.sp
+.SH NOTES
+.sp
+.LP
+
+\fBinotify\fR instances can be monitored via \fBpoll\fR(2), 
+\fBport_get\fR(3C), \fBepoll\fR(5), etc.
+
+The event queue associated with an \fBinotify\fR instance is serialized
+and ordered: events will be placed on the tail of the queue in the order
+that they occur.
+
+If at the time an event occurs the tail of the event queue is identical
+to the newly received event, the newly received event will be dropped,
+effectively coalescing the two events.
+
+When watching a directory and receieving events on contained elements
+(i.e., a contained file or subdirectory), note that the information
+received in the \fIname\fR field may be stale:  the file may have been
+renamed between the event and its processing.  If a file has been unlinked
+(and if \fBIN_EXCL_UNLINK\fR has not been set),
+the \fIname\fR will reflect the last name that resolved to the file.
+If a new file is created in the same directory with the old name, events
+on the new file and the old (unlinked) file will become undistinguishable.
+
+The number of bytes that are available to be read on an \fBinotify\fR 
+instance can be determined via a \fBFIONREAD\fR \fBioctl\fR(2).
+
+.sp
+.SH WARNINGS
+.sp
+.LP
+
+While a best effort has been made to mimic the Linux semantics, there
+remains a fundamental difference with respect to hard links:  on Linux,
+if a file has multiple hard links to it, a notification on watched
+directory or file will be received if and only if that event was received
+via a watched directory or file.  For events that are induced by open files
+(such as \fBIN_MODIFY\fR), these semantics seem peculiar:  the watched
+file is in fact changing, but because it is not changing via the watched
+path, no notification is received.  By contrast, the implementation here
+will always yield an event in this case -- even if the event was induced
+by an \fBopen\fR(2) via an unwatched path.  If an event occurs within a
+watched directory on a file for which there exist multiple hard links within
+the same (watched) directory, the event's \fIname\fR will correspond to one
+of the links to the file.  If multiple hard links exist to the
+same file in the same watched directory and one of the links is removed,
+notifications may not necessarily continue to be received for the file,
+despite the (remaining) link in the watched directory; users of
+\fBinotify\fR should exercise extreme caution when watching directories
+that contain files with multiple hard links in the same directory.
+
+.SH SEE ALSO
+.sp
+.LP
+\fBinotify_init\fR(3C), \fBinotify_init1\fR(3C), \fBinotify_add_watch\fR(3C),
+\fBinotify_rm_watch\fR(3C), \fBport_get\fR(3C), \fBepoll\fR(5)

@@ -1,0 +1,107 @@
+'\" te
+.\"  Copyright (c) 2014, Joyent, Inc. All Rights Reserved.
+.\"  This file and its contents are supplied under the terms of the
+.\"  Common Development and Distribution License ("CDDL"), version 1.0.
+.\"  You may only use this file in accordance with the terms of version
+.\"  1.0 of the CDDL.
+.\" 
+.\"  A full copy of the text of the CDDL should have accompanied this
+.\"  source.  A copy of the CDDL is also available via the Internet at
+.\"  http://www.illumos.org/license/CDDL.
+.TH INOTIFY_INIT 3C "Sep 17, 2014"
+.SH NAME
+inotify_init, inotify_init1 \- initialize an inotify instance
+.SH SYNOPSIS
+
+.LP
+.nf
+#include <sys/inotify.h>
+
+\fBint\fR \fBinotify_init\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBinotify_init1\fR(\fBint\fR \fIflags\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBinotify_init()\fR and \fBinotify_init1()\fR functions both create an
+\fBinotify\fR(5) instance that can be operated upon via
+\fBinotify_add_watch\fR(3C), \fBinotify_rm_watch\fR(3C) and \fBread\fR(2).
+\fBinotify\fR instances are
+represented as file descriptors, and should be closed via \fBclose\fR(2).
+
+The only difference between the two functions is their signature;
+\fBinotify_init()\fR takes no arguments,
+while \fBinotify_init1()\fR takes a \fIflags\fR argument that can have
+any of the following values:
+
+.sp
+.ne 2
+.na
+\fBIN_CLOEXEC\fR
+.ad
+.RS 12n
+Instance should be closed upon an
+\fBexec\fR(2); see \fBopen\fR(2)'s description of \fBO_CLOEXEC\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fBIN_NONBLOCK\fR
+.ad
+.RS 12n
+Instance be set to be non-blocking.  A \fBread\fR(2) on an
+\fBinotify\fR instance that has been initialized with
+\fBIN_NONBLOCK\fR will return \fBEAGAIN\fR if there are
+no events enqueued in lieu of blocking.
+.RE
+
+.SH RETURN VALUES
+.sp
+.LP
+Upon succesful completion, 0 is returned. Otherwise, -1 is returned and errno
+is set to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBinotify_init()\fR and \fBinotify_init1()\fR functions will fail if:
+.sp
+.ne 2
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+The \fIflags\fR are invalid (\fBinotify_init1()\fR).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBEMFILE\fR\fR
+.ad
+.RS 10n
+There are currently {\fBOPEN_MAX\fR} file descriptors open in the calling
+process, or the maximum number of \fBinotify\fR instances for the user 
+would be exceeded.
+.RE
+
+.sp
+.SH NOTES
+.sp
+.LP
+
+While the \fBinotify\fR(5) facility is implemented for purposes of
+offering compatibility for Linux-borne applications, native
+applications may opt to use it instead of (or in addition to) the 
+\fBPORT_SOURCE_FILE\fR capability of event ports.  See
+\fBinotify\fR(5) for details and restrictions.
+
+.SH SEE ALSO
+.sp
+.LP
+\fBinotiy_add_watch\fR(3C), \fBinotify_rm_watch\fR(3C), \fBinotify\fR(5)

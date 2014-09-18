@@ -25,6 +25,10 @@
  * Copyright 2015 Joyent, Inc.
  */
 
+/*
+ * Copyright (c) 2014, Joyent, Inc. All rights reserved.
+ */
+
 #include <sys/param.h>
 #include <sys/errno.h>
 #include <sys/systm.h>
@@ -826,8 +830,7 @@ top:
 
 	if (error == 0) {
 		vnevent_rename_src(PCTOV(pcp), PCTOV(dp), snm, ctp);
-		if (dp != tdp)
-			vnevent_rename_dest_dir(PCTOV(tdp), ctp);
+		vnevent_rename_dest_dir(PCTOV(tdp), PCTOV(pcp), tnm, ctp);
 	}
 
 done:

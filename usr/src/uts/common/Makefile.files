@@ -1008,6 +1008,8 @@ SIGNALFD_OBJS += signalfd.o
 
 I8042_OBJS +=	i8042.o
 
+INOTIFY_OBJS +=	inotify.o
+
 KB8042_OBJS +=	\
 		at_keyprocess.o	\
 		kb8042.o	\

@@ -1302,10 +1302,8 @@ tmp_rename(
 		vnevent_rename_src(TNTOV(fromtp), odvp, onm, ct);
 		/*
 		 * vnevent_rename_dest is called in tdirenter().
-		 * Notify the target dir if not same as source dir.
 		 */
-		if (ndvp != odvp)
-			vnevent_rename_dest_dir(ndvp, ct);
+		vnevent_rename_dest_dir(ndvp, TNTOV(fromtp), nnm, ct);
 	}
 
 done:
