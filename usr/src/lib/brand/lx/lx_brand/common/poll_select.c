@@ -144,6 +144,16 @@ lx_poll(uintptr_t p1, uintptr_t p2, uintptr_t p3)
 	int		fds_size, i, rval, revents;
 
 	/*
+	 * Deal with the NULL fds[] case.
+	 */
+	if (nfds == 0 && p1 == NULL) {
+		if ((rval = poll(NULL, 0, (int)p3)) < 0)
+			return (-errno);
+
+		return (rval);
+	}
+
+	/*
 	 * Note: we are assuming that the Linux and Solaris pollfd
 	 * structures are identical.  Copy in the linux poll structure.
 	 */
