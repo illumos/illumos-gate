@@ -602,6 +602,14 @@ lx_ioctl(uintptr_t p1, uintptr_t p2, uintptr_t p3)
 			ict = ioc_translators_dev[i]->idt_cmds;
 			break;
 		}
+
+		/*
+		 * If we didn't find a device translator, fall back on the
+		 * file translators.
+		 */
+		if (ict == NULL)
+			ict = ioc_translators_file;
+
 		break;
 	}
 

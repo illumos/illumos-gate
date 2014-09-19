@@ -42,6 +42,7 @@
 #include <zone.h>
 #include <sys/brand.h>
 #include <sys/epoll.h>
+#include <sys/inotify.h>
 
 #include <assert.h>
 #include <stdio.h>
@@ -1231,9 +1232,9 @@ static struct lx_sysent sysents[] = {
 	{"keyctl",	NULL,		NOSYS_NULL,	0},	/* 288 */
 	{"ioprio_set",	NULL,		NOSYS_NULL,	0},	/* 289 */
 	{"ioprio_get",	NULL,		NOSYS_NULL,	0},	/* 290 */
-	{"inotify_init", NULL,		NOSYS_NULL,	0},	/* 291 */
-	{"inotify_add_watch", NULL,	NOSYS_NULL,	0},	/* 292 */
-	{"inotify_rm_watch", NULL,	NOSYS_NULL,	0},	/* 293 */
+	{"inotify_init", inotify_init,	SYS_PASSTHRU,	0},	/* 291 */
+	{"inotify_add_watch", inotify_add_watch, SYS_PASSTHRU, 3}, /* 292 */
+	{"inotify_rm_watch", inotify_rm_watch, SYS_PASSTHRU, 2}, /* 293 */
 	{"migrate_pages", NULL,		NOSYS_NULL,	0},	/* 294 */
 	{"openat",	lx_openat,	0,		4},	/* 295 */
 	{"mkdirat",	lx_mkdirat,	0,		3},	/* 296 */
@@ -1272,7 +1273,7 @@ static struct lx_sysent sysents[] = {
 	{"epoll_create1", epoll_create1, SYS_PASSTHRU,	1},	/* 329 */
 	{"dup3",	lx_dup3,	0,		3},	/* 330 */
 	{"pipe2",	lx_pipe2,	0,		2},	/* 331 */
-	{"inotify_init1", NULL,		NOSYS_NULL,	0},	/* 332 */
+	{"inotify_init1", inotify_init1, SYS_PASSTHRU,	1},	/* 332 */
 	{"preadv",	NULL,		NOSYS_NULL,	0},	/* 333 */
 	{"pwritev",	NULL,		NOSYS_NULL,	0},	/* 334 */
 	{"rt_tgsigqueueinfo", lx_rt_tgsigqueueinfo, 0,	4},	/* 335 */

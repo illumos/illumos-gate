@@ -151,6 +151,11 @@ typedef enum lxpr_nodetype {
 	LXPR_SELF,		/* /proc/self		*/
 	LXPR_STAT,		/* /proc/stat		*/
 	LXPR_SYSDIR,		/* /proc/sys/		*/
+	LXPR_SYS_FSDIR,		/* /proc/sys/fs/	*/
+	LXPR_SYS_FS_INOTIFYDIR,	/* /proc/sys/fs/inotify	*/
+	LXPR_SYS_FS_INOTIFY_MAX_QUEUED_EVENTS,	/* inotify/max_queued_events */
+	LXPR_SYS_FS_INOTIFY_MAX_USER_INSTANCES,	/* inotify/max_user_instances */
+	LXPR_SYS_FS_INOTIFY_MAX_USER_WATCHES,	/* inotify/max_user_watches */
 	LXPR_SYS_KERNELDIR,	/* /proc/sys/kernel/	*/
 	LXPR_SYS_KERNEL_MSGMNI,	/* /proc/sys/kernel/msgmni */
 	LXPR_SYS_KERNEL_NGROUPS_MAX,	/* /proc/sys/kernel/ngroups_max */
@@ -173,10 +178,9 @@ typedef enum lxpr_nodetype {
 /*
  * external dirent characteristics
  */
-#define	LXPRMAXNAMELEN	14
 typedef struct {
 	lxpr_nodetype_t	d_type;
-	char		d_name[LXPRMAXNAMELEN];
+	char		*d_name;
 } lxpr_dirent_t;
 
 /*

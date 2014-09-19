@@ -483,6 +483,8 @@ lxpr_getnode(vnode_t *dp, lxpr_nodetype_t type, proc_t *p, int fd)
 		break;
 
 	case LXPR_SYSDIR:
+	case LXPR_SYS_FSDIR:
+	case LXPR_SYS_FS_INOTIFYDIR:
 	case LXPR_SYS_KERNELDIR:
 	case LXPR_NETDIR:
 		vp->v_type = VDIR;

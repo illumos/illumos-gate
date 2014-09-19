@@ -105,6 +105,8 @@ static vnode_t *lxpr_lookup_not_a_dir(vnode_t *, char *);
 static vnode_t *lxpr_lookup_fddir(vnode_t *, char *);
 static vnode_t *lxpr_lookup_netdir(vnode_t *, char *);
 static vnode_t *lxpr_lookup_sysdir(vnode_t *, char *);
+static vnode_t *lxpr_lookup_sys_fsdir(vnode_t *, char *);
+static vnode_t *lxpr_lookup_sys_fs_inotifydir(vnode_t *, char *);
 static vnode_t *lxpr_lookup_sys_kerneldir(vnode_t *, char *);
 
 static int lxpr_readdir_procdir(lxpr_node_t *, uio_t *, int *);
@@ -113,6 +115,8 @@ static int lxpr_readdir_not_a_dir(lxpr_node_t *, uio_t *, int *);
 static int lxpr_readdir_fddir(lxpr_node_t *, uio_t *, int *);
 static int lxpr_readdir_netdir(lxpr_node_t *, uio_t *, int *);
 static int lxpr_readdir_sysdir(lxpr_node_t *, uio_t *, int *);
+static int lxpr_readdir_sys_fsdir(lxpr_node_t *, uio_t *, int *);
+static int lxpr_readdir_sys_fs_inotifydir(lxpr_node_t *, uio_t *, int *);
 static int lxpr_readdir_sys_kerneldir(lxpr_node_t *, uio_t *, int *);
 
 static void lxpr_read_invalid(lxpr_node_t *, lxpr_uiobuf_t *);
@@ -154,6 +158,12 @@ static void lxpr_read_net_stat(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_net_tcp(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_net_udp(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_net_unix(lxpr_node_t *, lxpr_uiobuf_t *);
+static void lxpr_read_sys_fs_inotify_max_queued_events(lxpr_node_t *,
+    lxpr_uiobuf_t *);
+static void lxpr_read_sys_fs_inotify_max_user_instances(lxpr_node_t *,
+    lxpr_uiobuf_t *);
+static void lxpr_read_sys_fs_inotify_max_user_watches(lxpr_node_t *,
+    lxpr_uiobuf_t *);
 static void lxpr_read_sys_kernel_msgmni(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_kernel_ngroups_max(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_kernel_pid_max(lxpr_node_t *, lxpr_uiobuf_t *);
@@ -269,10 +279,33 @@ static lxpr_dirent_t netdir[] = {
  * contents of /proc/sys directory
  */
 static lxpr_dirent_t sysdir[] = {
+	{ LXPR_SYS_FSDIR,	"fs" },
 	{ LXPR_SYS_KERNELDIR,	"kernel" },
 };
 
 #define	SYSDIRFILES	(sizeof (sysdir) / sizeof (sysdir[0]))
+
+/*
+ * contents of /proc/sys/fs directory
+ */
+static lxpr_dirent_t sys_fsdir[] = {
+	{ LXPR_SYS_FS_INOTIFYDIR,	"inotify" },
+};
+
+#define	SYS_FSDIRFILES (sizeof (sys_fsdir) / sizeof (sys_fsdir[0]))
+
+/*
+ * contents of /proc/sys/fs/inotify directory
+ */
+static lxpr_dirent_t sys_fs_inotifydir[] = {
+	{ LXPR_SYS_FS_INOTIFY_MAX_QUEUED_EVENTS,	"max_queued_events" },
+	{ LXPR_SYS_FS_INOTIFY_MAX_USER_INSTANCES,	"max_user_instances" },
+	{ LXPR_SYS_FS_INOTIFY_MAX_USER_WATCHES,		"max_user_watches" },
+};
+
+#define	SYS_FS_INOTIFYDIRFILES \
+	(sizeof (sys_fs_inotifydir) / sizeof (sys_fs_inotifydir[0]))
+
 /*
  * contents of /proc/sys/kernel directory
  */
@@ -450,6 +483,11 @@ static void (*lxpr_read_function[LXPR_NFILES])() = {
 	lxpr_read_invalid,		/* /proc/self		*/
 	lxpr_read_stat,			/* /proc/stat		*/
 	lxpr_read_invalid,		/* /proc/sys		*/
+	lxpr_read_invalid,		/* /proc/sys/fs		*/
+	lxpr_read_invalid,		/* /proc/sys/fs/inotify	*/
+	lxpr_read_sys_fs_inotify_max_queued_events, /* max_queued_events */
+	lxpr_read_sys_fs_inotify_max_user_instances, /* max_user_instances */
+	lxpr_read_sys_fs_inotify_max_user_watches, /* max_user_watches */
 	lxpr_read_invalid,		/* /proc/sys/kernel	*/
 	lxpr_read_sys_kernel_msgmni,	/* /proc/sys/kernel/msgmni */
 	lxpr_read_sys_kernel_ngroups_max, /* /proc/sys/kernel/ngroups_max */
@@ -515,6 +553,11 @@ static vnode_t *(*lxpr_lookup_function[LXPR_NFILES])() = {
 	lxpr_lookup_not_a_dir,		/* /proc/self		*/
 	lxpr_lookup_not_a_dir,		/* /proc/stat		*/
 	lxpr_lookup_sysdir,		/* /proc/sys		*/
+	lxpr_lookup_sys_fsdir,		/* /proc/sys/fs		*/
+	lxpr_lookup_sys_fs_inotifydir,	/* /proc/sys/fs/inotify	*/
+	lxpr_lookup_not_a_dir,		/* .../inotify/max_queued_events */
+	lxpr_lookup_not_a_dir,		/* .../inotify/max_user_instances */
+	lxpr_lookup_not_a_dir,		/* .../inotify/max_user_watches */
 	lxpr_lookup_sys_kerneldir,	/* /proc/sys/kernel	*/
 	lxpr_lookup_not_a_dir,		/* /proc/sys/kernel/msgmni */
 	lxpr_lookup_not_a_dir,		/* /proc/sys/kernel/ngroups_max */
@@ -580,6 +623,11 @@ static int (*lxpr_readdir_function[LXPR_NFILES])() = {
 	lxpr_readdir_not_a_dir,		/* /proc/self		*/
 	lxpr_readdir_not_a_dir,		/* /proc/stat		*/
 	lxpr_readdir_sysdir,		/* /proc/sys		*/
+	lxpr_readdir_sys_fsdir,		/* /proc/sys/fs		*/
+	lxpr_readdir_sys_fs_inotifydir,	/* /proc/sys/fs/inotify	*/
+	lxpr_readdir_not_a_dir,		/* .../inotify/max_queued_events */
+	lxpr_readdir_not_a_dir,		/* .../inotify/max_user_instances */
+	lxpr_readdir_not_a_dir,		/* .../inotify/max_user_watches	*/
 	lxpr_readdir_sys_kerneldir,	/* /proc/sys/kernel	*/
 	lxpr_readdir_not_a_dir,		/* /proc/sys/kernel/msgmni */
 	lxpr_readdir_not_a_dir,		/* /proc/sys/kernel/ngroups_max */
@@ -2032,6 +2080,37 @@ lxpr_read_stat(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	}
 }
 
+/*
+ * inotify tunables exported via /proc.
+ */
+extern int inotify_maxevents;
+extern int inotify_maxinstances;
+extern int inotify_maxwatches;
+
+static void
+lxpr_read_sys_fs_inotify_max_queued_events(lxpr_node_t *lxpnp,
+    lxpr_uiobuf_t *uiobuf)
+{
+	ASSERT(lxpnp->lxpr_type == LXPR_SYS_FS_INOTIFY_MAX_QUEUED_EVENTS);
+	lxpr_uiobuf_printf(uiobuf, "%d\n", inotify_maxevents);
+}
+
+static void
+lxpr_read_sys_fs_inotify_max_user_instances(lxpr_node_t *lxpnp,
+    lxpr_uiobuf_t *uiobuf)
+{
+	ASSERT(lxpnp->lxpr_type == LXPR_SYS_FS_INOTIFY_MAX_USER_INSTANCES);
+	lxpr_uiobuf_printf(uiobuf, "%d\n", inotify_maxinstances);
+}
+
+static void
+lxpr_read_sys_fs_inotify_max_user_watches(lxpr_node_t *lxpnp,
+    lxpr_uiobuf_t *uiobuf)
+{
+	ASSERT(lxpnp->lxpr_type == LXPR_SYS_FS_INOTIFY_MAX_USER_WATCHES);
+	lxpr_uiobuf_printf(uiobuf, "%d\n", inotify_maxwatches);
+}
+
 static void
 lxpr_read_sys_kernel_msgmni(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -2824,6 +2903,22 @@ lxpr_lookup_sys_kerneldir(vnode_t *dp, char *comp)
 	    SYS_KERNELDIRFILES));
 }
 
+static vnode_t *
+lxpr_lookup_sys_fsdir(vnode_t *dp, char *comp)
+{
+	ASSERT(VTOLXP(dp)->lxpr_type == LXPR_SYS_FSDIR);
+	return (lxpr_lookup_common(dp, comp, NULL, sys_fsdir,
+	    SYS_FSDIRFILES));
+}
+
+static vnode_t *
+lxpr_lookup_sys_fs_inotifydir(vnode_t *dp, char *comp)
+{
+	ASSERT(VTOLXP(dp)->lxpr_type == LXPR_SYS_FS_INOTIFYDIR);
+	return (lxpr_lookup_common(dp, comp, NULL, sys_fs_inotifydir,
+	    SYS_FS_INOTIFYDIRFILES));
+}
+
 /*
  * lxpr_readdir(): Vnode operation for VOP_READDIR()
  */
@@ -3263,12 +3358,29 @@ lxpr_readdir_sysdir(lxpr_node_t *lxpnp, uio_t *uiop, int *eofp)
 }
 
 static int
+lxpr_readdir_sys_fsdir(lxpr_node_t *lxpnp, uio_t *uiop, int *eofp)
+{
+	ASSERT(lxpnp->lxpr_type == LXPR_SYS_FSDIR);
+	return (lxpr_readdir_common(lxpnp, uiop, eofp, sys_fsdir,
+	    SYS_FSDIRFILES));
+}
+
+static int
+lxpr_readdir_sys_fs_inotifydir(lxpr_node_t *lxpnp, uio_t *uiop, int *eofp)
+{
+	ASSERT(lxpnp->lxpr_type == LXPR_SYS_FS_INOTIFYDIR);
+	return (lxpr_readdir_common(lxpnp, uiop, eofp, sys_fs_inotifydir,
+	    SYS_FS_INOTIFYDIRFILES));
+}
+
+static int
 lxpr_readdir_sys_kerneldir(lxpr_node_t *lxpnp, uio_t *uiop, int *eofp)
 {
 	ASSERT(lxpnp->lxpr_type == LXPR_SYS_KERNELDIR);
 	return (lxpr_readdir_common(lxpnp, uiop, eofp, sys_kerneldir,
 	    SYS_KERNELDIRFILES));
 }
+
 /*
  * lxpr_readlink(): Vnode operation for VOP_READLINK()
  */
