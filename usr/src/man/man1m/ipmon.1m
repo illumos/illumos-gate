@@ -2,18 +2,18 @@
 .\" To view license terms, attribution, and copyright for IP Filter, the default path is /usr/lib/ipf/IPFILTER.LICENCE. If the Solaris operating environment has been installed anywhere other than the default, modify the given path to access the file at the installed
 .\" location.
 .\" Portions Copyright (c) 2008, Sun Microsystems Inc. All Rights Reserved.
-.TH IPMON 1M "Apr 3, 2008"
+.\" Portions Copyright (c) 2013, Joyent, Inc. All Rights Reserved.
+.TH IPMON 1M "Oct 30, 2013"
 .SH NAME
 ipmon \- monitors /dev/ipl for logged packets
 .SH SYNOPSIS
 .LP
 .nf
 \fBipmon\fR [\fB-abDFhnpstvxX\fR] [\fB-N\fR \fIdevice\fR] [ [o] [NSI]] [\fB-O\fR [NSI]]
-     [\fB-P\fR \fIpidfile\fR] [\fB-S\fR \fIdevice\fR] [\fB-f\fR \fIdevice\fR] [\fIfilename\fR]
+     [\fB-P\fR \fIpidfile\fR] [\fB-S\fR \fIdevice\fR] [\fB-f\fR \fIdevice\fR] [\fB-G\fR | \fB-z\fR \fIzonename\fR] [\fIfilename\fR]
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBipmon\fR command is part of a suite of commands associated with the
 Solaris IP Filter feature. See \fBipfilter\fR(5).
@@ -102,7 +102,6 @@ always being \fBicmp\fR, the next being the ICMP message and submessage type,
 separated by a slash. For example, \fBicmp 3/3\fR for a port unreachable
 message.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -343,6 +342,32 @@ Show the packet data in hex.
 Show the log header record data in hex.
 .RE
 
+.sp
+.ne 2
+.na
+\fB\fB-z\fR \fIzonename\fR\fR
+.ad
+.sp .6
+.RS 4n
+Monitor packets the specified zone's in-zone filter. If neither this option
+nor \fB-G\fR is specified, the current zone is used. This command is only
+available in the Global Zone. See \fBZONES\fR in \fBipf\fR(1m) for more
+information.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-G\fR \fIzonename\fR\fR
+.ad
+.sp .6
+.RS 4n
+Monitor packets for the specified zone's global zone controlled filter. If
+neither this option nor \fB-z\fR is specified, the current zone is used. This
+command is only available in the Global Zone. See \fBZONES\fR in \fBipf\fR(1m)
+for more information.
+.RE
+
 .SH FILES
 .RS +4
 .TP
@@ -363,7 +388,6 @@ Show the log header record data in hex.
 \fB/dev/ipstate\fR
 .RE
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -379,15 +403,13 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBipf\fR(1M), \fBipfstat\fR(1M), \fBipnat\fR(1M), \fBattributes\fR(5),
-\fBipfilter\fR(5)
+\fBipfilter\fR(5), \fBzones(5)\fR
 .sp
 .LP
 \fI\fR
 .SH DIAGNOSTICS
-.sp
 .LP
 \fBipmon\fR expects data that it reads to be consistent with how it should be
 saved and aborts if it fails an assertion which detects an anomaly in the

@@ -4,6 +4,8 @@
  * See the IPFILTER.LICENCE file for details on licencing.
  *
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+ *
+ * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
  */
 
 #if defined(KERNEL) || defined(_KERNEL)
@@ -134,6 +136,9 @@ struct file;
 # endif
 #endif
 #include "netinet/ipl.h"
+#if defined(_KERNEL)
+#include <sys/sunddi.h>
+#endif
 /* END OF INCLUDES */
 
 #if !defined(lint)
@@ -5693,6 +5698,54 @@ static	int	fr_objbytes[NUM_OBJ_TYPES][2] = {
 	{ 0,	sizeof(struct ipftable) },
 	{ 0,	sizeof(struct ipflookupiter) }
 };
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    fr_getzoneid                                                */
+/* Returns:     int     - 0 = success, else failure                         */
+/* Parameters:  idsp(I) - pointer to ipf_devstate_t                         */
+/*              data(I) - pointer to ioctl data                             */
+/*                                                                          */
+/* Set the zone ID in idsp based on the zone name in ipfzoneobj.  Further   */
+/* ioctls will act on the IPF stack for that zone ID.                       */
+/* ------------------------------------------------------------------------ */
+#if defined(_KERNEL)
+int fr_setzoneid(idsp, data)
+ipf_devstate_t *idsp;
+void *data;
+{
+	int error = 0;
+	ipfzoneobj_t ipfzo;
+	zone_t *zone;
+
+	error = BCOPYIN(data, &ipfzo, sizeof(ipfzo));
+	if (error != 0)
+		return EFAULT;
+
+	if (memchr(ipfzo.ipfz_zonename, '\0', ZONENAME_MAX) == NULL)
+		return EFAULT;
+
+	/*
+	 * The global zone doesn't have a GZ-controlled stack, so no
+	 * sense in going any further
+	 */
+	if (strcmp(ipfzo.ipfz_zonename, "global") == 0)
+		return ENODEV;
+
+	if ((zone = zone_find_by_name(ipfzo.ipfz_zonename)) == NULL)
+		return ENODEV;
+
+	/*
+	 * Store the zone ID that to control, and whether it's the
+	 * GZ-controlled stack that's wanted
+	 */
+	idsp->ipfs_zoneid = zone->zone_id;
+	idsp->ipfs_gz = (ipfzo.ipfz_gz == 1) ? B_TRUE : B_FALSE;
+	zone_rele(zone);
+
+	return error;
+}
+#endif
 
 
 /* ------------------------------------------------------------------------ */

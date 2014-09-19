@@ -5,6 +5,8 @@
  *
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
  */
 
 #ifdef	__FreeBSD__
@@ -44,6 +46,7 @@
 #include <resolv.h>
 #include "ipf.h"
 #include "netinet/ipl.h"
+#include "ipfzone.h"
 
 #if !defined(lint)
 static const char rcsid[] = "@(#)Id: ipfs.c,v 1.12 2003/12/01 01:56:53 darrenr Exp";
@@ -86,14 +89,17 @@ char	*progname;
 
 void usage()
 {
-	fprintf(stderr, "usage: %s [-nv] -l\n", progname);
-	fprintf(stderr, "usage: %s [-nv] -u\n", progname);
-	fprintf(stderr, "usage: %s [-nv] [-d <dir>] -R\n", progname);
-	fprintf(stderr, "usage: %s [-nv] [-d <dir>] -W\n", progname);
-	fprintf(stderr, "usage: %s [-nv] [-N|-S] [-f <file>] -r\n", progname);
-	fprintf(stderr, "usage: %s [-nv] [-N|-S] [-f <file>] -w\n", progname);
-	fprintf(stderr, "usage: %s [-nv] [-N|-S] -f <file> -i <if1>,<if2>\n",
-		progname);
+	const char *zoneopt = "[-G|-z zonename] ";
+	fprintf(stderr, "usage: %s %s[-nv] -l\n", progname, zoneopt);
+	fprintf(stderr, "usage: %s %s[-nv] -u\n", progname, zoneopt);
+	fprintf(stderr, "usage: %s %s[-nv] [-d <dir>] -R\n", progname, zoneopt);
+	fprintf(stderr, "usage: %s %s[-nv] [-d <dir>] -W\n", progname, zoneopt);
+	fprintf(stderr, "usage: %s %s[-nv] [-N|-S] [-f <file>] -r\n", progname,
+		zoneopt);
+	fprintf(stderr, "usage: %s %s[-nv] [-N|-S] [-f <file>] -w\n", progname,
+		zoneopt);
+	fprintf(stderr, "usage: %s %s[-nv] [-N|-S] -f <file> -i <if1>,<if2>\n",
+		progname, zoneopt);
 	exit(1);
 }
 
@@ -218,7 +224,7 @@ char *argv[];
 	char *dirname = NULL, *filename = NULL, *ifs = NULL;
 
 	progname = argv[0];
-	while ((c = getopt(argc, argv, "d:f:lNnSRruvWw")) != -1)
+	while ((c = getopt(argc, argv, "d:f:G:lNnSRruvWwz:")) != -1)
 		switch (c)
 		{
 		case 'd' :
@@ -232,6 +238,9 @@ char *argv[];
 				filename = optarg;
 			else
 				usage();
+			break;
+		case 'G' :
+			setzonename_global(optarg);
 			break;
 		case 'i' :
 			ifs = optarg;
@@ -286,6 +295,9 @@ char *argv[];
 		case 'W' :
 			rw = 3;
 			set = 1;
+			break;
+		case 'z' :
+			setzonename(optarg);
 			break;
 		case '?' :
 		default :
@@ -355,6 +367,12 @@ char *ipfdev;
 	if ((fd = open(ipfdev, O_RDWR)) == -1)
 		if ((fd = open(ipfdev, O_RDONLY)) == -1)
 			perror("open device");
+
+	if (setzone(fd) != 0) {
+		close(fd);
+		fd = -1;
+	}
+
 	return fd;
 }
 

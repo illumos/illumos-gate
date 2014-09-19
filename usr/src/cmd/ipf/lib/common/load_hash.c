@@ -7,15 +7,16 @@
  *
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <fcntl.h>
 #include <sys/ioctl.h>
 #include "ipf.h"
 #include "netinet/ip_lookup.h"
 #include "netinet/ip_htable.h"
+#include "ipfzone.h"
 
 static int hashfd = -1;
 
@@ -35,6 +36,10 @@ ioctlfunc_t iocfunc;
 		hashfd = open(IPLOOKUP_NAME, O_RDWR);
 	if ((hashfd == -1) && ((opts & OPT_DONOTHING) == 0))
 		return -1;
+	if (setzone(hashfd) != 0) {
+		close(hashfd);
+		return -1;
+	}
 
 	for (n = 0, a = list; a != NULL; a = a->ipe_next)
 		n++;

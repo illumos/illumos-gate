@@ -2,19 +2,19 @@
 .\" To view license terms, attribution, and copyright for IP Filter, the default path is /usr/lib/ipf/IPFILTER.LICENCE. If the Solaris operating environment has been installed anywhere other than the default, modify the given path to access the file at the installed
 .\" location.
 .\" Portions Copyright (c) 2009, Sun Microsystems Inc. All Rights Reserved.
-.TH IPF 1M "Feb 25, 2009"
+.\" Portions Copyright (c) 2014, Joyent, Inc. All Rights Reserved.
+.TH IPF 1M "Oct 7, 2014"
 .SH NAME
 ipf \- alter packet filtering lists for IP packet input and output
 .SH SYNOPSIS
 .LP
 .nf
-\fBipf\fR [\fB-6AdDEInoPRrsvVyzZ\fR] [\fB-l\fR block | pass | nomatch]
+\fBipf\fR [\fB-6AdDEGInoPRrsvVyzZ\fR] [\fB-l\fR block | pass | nomatch]
      [\fB-T\fR \fIoptionlist\fR] [\fB-F\fR i | o | a | s | S] \fB-f\fR \fIfilename\fR
-     [\fB-f\fR \fIfilename\fR...]
+     [\fB-f\fR \fIfilename\fR...] [\fIzonename\fR]
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBipf\fR utility is part of a suite of commands associated with the
 Solaris IP Filter feature. See \fBipfilter\fR(5).
@@ -34,7 +34,6 @@ matching the order in which they appear when given to \fBipf\fR.
 \fB/dev/ipl\fR, and \fB/dev/ipstate\fR. The default permissions of these files
 require \fBipf\fR to be run as root for all operations.
 .SS "Enabling Solaris IP Filter Feature"
-.sp
 .LP
 Solaris IP Filter is installed with the Solaris operating system. However,
 packet filtering is not enabled by default. Use the following procedure to
@@ -159,7 +158,6 @@ If you reboot your system, the IPfilter configuration is automatically
 activated.
 .RE
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -252,6 +250,17 @@ indicating the connection is not fully established.
 .RS 4n
 Specifies which files \fBipf\fR should use to get input from for modifying the
 packet filter rule lists.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-G\fR\fR
+.ad
+.sp .6
+.RS 4n
+Make changes to the Global Zone-controlled ipfilter for the zone given as an
+argument. See the \fBZONES\fR section for more information.
 .RE
 
 .sp
@@ -459,8 +468,25 @@ Zero global statistics held in the kernel for filtering only. This does not
 affect fragment or state statistics.
 .RE
 
+.SH ZONES
+.LP
+Each non-global zone has two ipfilter instances: the in-zone ipfilter, which
+can be controlled from both the zone itself and the global zone, and the
+Global Zone-controlled (GZ-controlled) instance, which can only be controlled
+from the Global Zone. The non-global zone is not able to observe or control
+the GZ-controlled ipfilter.
+
+ipf optionally takes a zone name as an argument, which will change the
+ipfilter settings for that zone, rather than the current one. The zonename
+option is only available in the Global Zone. Using it in any other zone will
+return an error. If the \fB-G\fR option is specified with this argument, the
+Global Zone-controlled ipfilter is operated on. If \fB-G\fR is not specified,
+the in-zone ipfilter is operated on. Note that ipf differs from the other
+ipfilter tools in how the zone name is specified. It takes the zone name as the
+last argument, while all of the other tools take the zone name as an argument
+to the \fB-G\fR and \fB-z\fR options.
+
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/dev/ipauth\fR\fR
@@ -499,7 +525,6 @@ Contains numerous IP Filter examples.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -515,16 +540,14 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBipfstat\fR(1M), \fBipmon\fR(1M), \fBipnat\fR(1M), \fBippool\fR(1M),
 \fBsvcadm\fR(1M), \fBsvc.ipfd\fR(1M), \fBipf\fR(4), \fBipnat.conf\fR(4),
-\fBippool\fR(4), \fBattributes\fR(5), \fBipfilter\fR(5)
+\fBippool\fR(4), \fBattributes\fR(5), \fBipfilter\fR(5), \fBzones(5)\fR
 .sp
 .LP
 \fI\fR
 .SH DIAGNOSTICS
-.sp
 .LP
 Needs to be run as root for the packet filtering lists to actually be affected
 inside the kernel.
