@@ -21,7 +21,12 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- *
+ */
+/*
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ */
+
+/*
  * Common code and structures used by name-service-switch "files" backends.
  */
 
@@ -406,11 +411,13 @@ retry:
 	retries = 100;
 	while (stat64(be->filename, &st) < 0) {
 		/*
-		 * On a healthy system this can't happen except during brief
-		 * periods when the file is being modified/renamed.  Keep
-		 * trying until things settle down, but eventually give up.
+		 * This can happen only in two cases: Either the file is
+		 * completely missing and we were not able to read it yet
+		 * (fh_table is NULL), or there is some brief period when the
+		 * file is being modified/renamed.  Keep trying until things
+		 * settle down, but eventually give up.
 		 */
-		if (--retries == 0)
+		if (fhp->fh_table == NULL || --retries == 0)
 			goto unavail;
 		poll(0, 0, 100);
 	}

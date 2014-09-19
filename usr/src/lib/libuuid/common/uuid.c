@@ -22,7 +22,7 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2012 Milan Jurik. All rights reserved.
- * Copyright 2013 Joyent, Inc. All rights reserved.
+ * Copyright 2014 Joyent, Inc. All rights reserved.
  * Copyright 2014 Andrew Stormont.
  */
 
@@ -358,6 +358,35 @@ load_cache()
 		rcachep = NULL;
 }
 
+static void
+close_pre()
+{
+	(void) mutex_lock(&urandmtx);
+}
+
+static void
+close_parent()
+{
+	(void) mutex_unlock(&urandmtx);
+}
+
+static void
+close_child()
+{
+	if (fd_urand != -1) {
+		(void) close(fd_urand);
+		fd_urand = -1;
+	}
+	(void) mutex_unlock(&urandmtx);
+}
+
+#pragma init(cache_init)
+static void
+cache_init(void)
+{
+	(void) pthread_atfork(close_pre, close_parent, close_child);
+}
+
 /*
  * Fills buf with random numbers - nbytes is the number of bytes
  * to fill-in. Tries to use cached data from the /dev/urandom random number
@@ -372,7 +401,8 @@ fill_random_bytes(uchar_t *buf, int nbytes)
 		(void) mutex_lock(&urandmtx);
 		/* check again now that we have the mutex */
 		if (fd_urand == -1) {
-			if ((fd_urand = open(URANDOM_PATH, O_RDONLY)) >= 0)
+			if ((fd_urand = open(URANDOM_PATH,
+			    O_RDONLY | O_CLOEXEC)) >= 0)
 				load_cache();
 		}
 		(void) mutex_unlock(&urandmtx);

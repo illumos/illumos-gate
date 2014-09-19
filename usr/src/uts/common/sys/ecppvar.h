@@ -27,8 +27,6 @@
 #ifndef	_SYS_ECPPVAR_H
 #define	_SYS_ECPPVAR_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/note.h>
 
 #ifdef	__cplusplus
@@ -96,6 +94,15 @@ struct ecpp_hw_bind {
 	char		*info;		/* info string */
 };
 
+/* ecpp e_busy states */
+typedef enum {
+	ECPP_IDLE = 1,	/* No ongoing transfers */
+	ECPP_BUSY = 2,	/* Ongoing transfers on the cable */
+	ECPP_DATA = 3,	/* Not used */
+	ECPP_ERR = 4,	/* Bad status in Centronics mode */
+	ECPP_FLUSH = 5	/* Currently flushing the q */
+} ecpp_busy_t;
+
 /*
  * ecpp soft state structure
  */
@@ -104,7 +111,7 @@ struct ecppunit {
 	int		instance;	/* instance number */
 	dev_info_t	*dip;		/* device information */
 	ddi_iblock_cookie_t ecpp_trap_cookie;	/* interrupt cookie */
-	boolean_t	e_busy;		/* ecpp busy flag */
+	ecpp_busy_t	e_busy;		/* ecpp busy flag */
 	kcondvar_t	pport_cv;	/* cv to signal idle state */
 	/*
 	 * common SuperIO registers
@@ -277,13 +284,6 @@ _NOTE(DATA_READABLE_WITHOUT_LOCK(ecppunit::writeq))
 /* ecpp return values */
 #define	SUCCESS		1
 #define	FAILURE		2
-
-/* ecpp e_busy states */
-#define	ECPP_IDLE	1 /* No ongoing transfers */
-#define	ECPP_BUSY	2 /* Ongoing transfers on the cable */
-#define	ECPP_DATA	3 /* Not used */
-#define	ECPP_ERR	4 /* Bad status in Centronics mode */
-#define	ECPP_FLUSH	5 /* Currently flushing the q */
 
 #define	TRUE		1
 #define	FALSE		0
