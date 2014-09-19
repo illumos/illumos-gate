@@ -1695,8 +1695,8 @@ lxpr_read_stat(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	ulong_t sys_cum  = 0;
 	ulong_t user_cum = 0;
 	ulong_t irq_cum = 0;
-	uint_t cpu_nrunnable_cum = 0;
-	uint_t w_io_cum = 0;
+	ulong_t cpu_nrunnable_cum = 0;
+	ulong_t w_io_cum = 0;
 
 	ulong_t pgpgin_cum    = 0;
 	ulong_t pgpgout_cum   = 0;
@@ -1760,8 +1760,8 @@ lxpr_read_stat(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 			cp = cp->cpu_next;
 	} while (cp != cpstart);
 
-	lxpr_uiobuf_printf(uiobuf, "cpu %ld %ld %ld %ld %ld %ld %ld\n",
-	    user_cum, 0, sys_cum, idle_cum, 0, irq_cum, 0);
+	lxpr_uiobuf_printf(uiobuf, "cpu %lu %lu %lu %lu %lu %lu %lu\n",
+	    user_cum, 0L, sys_cum, idle_cum, 0L, irq_cum, 0L);
 
 	/* Do per processor stats */
 	do {
@@ -1793,9 +1793,9 @@ lxpr_read_stat(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 		}
 
 		lxpr_uiobuf_printf(uiobuf,
-		    "cpu%d %ld %ld %ld %ld %ld %ld %ld\n",
-		    cp->cpu_id, user_ticks, 0, sys_ticks, idle_ticks,
-		    0, irq_ticks, 0);
+		    "cpu%d %lu %lu %lu %lu %lu %lu %lu\n",
+		    cp->cpu_id, user_ticks, 0L, sys_ticks, idle_ticks,
+		    0L, irq_ticks, 0L);
 
 		if (pools_enabled)
 			cp = cp->cpu_next_part;
