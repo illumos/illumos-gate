@@ -34,6 +34,7 @@
 #include <sys/dirent.h>
 #include <sys/lx_misc.h>
 #include <sys/lx_debug.h>
+#include <sys/lx_syscall.h>
 
 #define	LX_NAMEMAX	256
 
@@ -79,7 +80,7 @@ struct lx_dirent64 {
  * p3 (count) is ignored.
  */
 /*ARGSUSED*/
-int
+long
 lx_readdir(uintptr_t p1, uintptr_t p2, uintptr_t p3)
 {
 	int fd = (int)p1;
@@ -114,7 +115,7 @@ lx_readdir(uintptr_t p1, uintptr_t p2, uintptr_t p3)
  * Read in dirent structures from p1 (fd) into p2 (buffer).
  * p3 (count) is the size of the memory area.
  */
-int
+long
 lx_getdents(uintptr_t p1, uintptr_t p2, uintptr_t p3)
 {
 	int fd = (int)p1;
@@ -189,7 +190,7 @@ lx_getdents(uintptr_t p1, uintptr_t p2, uintptr_t p3)
  * Read in dirent64 structures from p1 (fd) into p2 (buffer).
  * p3 (count) is the size of the memory area.
  */
-int
+long
 lx_getdents64(uintptr_t p1, uintptr_t p2, uintptr_t p3)
 {
 	int fd = (uint_t)p1;

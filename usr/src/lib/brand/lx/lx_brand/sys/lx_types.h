@@ -21,12 +21,11 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2014 Joyent, Inc.  All rights reserved.
  */
 
 #ifndef _SYS_LX_TYPES_H
 #define	_SYS_LX_TYPES_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -38,10 +37,12 @@ extern "C" {
 #define	INT_MIN		(-2147483647-1) /* min value of an "int" */
 #define	INT_MAX		2147483647	/* max value of an "int" */
 #define	UINT_MAX	4294967295U	/* max value of an "unsigned int" */
-#define	LONG_MIN	(-2147483647L-1L)
-					/* min value of a "long int" */
-#define	LONG_MAX	2147483647L	/* max value of a "long int" */
-#define	ULONG_MAX	4294967295UL	/* max of "unsigned long int" */
+
+#if defined(_LP64)
+#define	LONG_MAX	9223372036854775807L
+#else
+#define	LONG_MAX	2147483647L	/* max value of a 32-bit "long int" */
+#endif
 
 #define	LX_SYS_UTS_LN	65
 
@@ -67,7 +68,7 @@ typedef	uint64_t	lx_off64_t;
 typedef	uint32_t	lx_blksize_t;
 typedef	uint32_t	lx_blkcnt_t;
 typedef	uint64_t	lx_blkcnt64_t;
-typedef	ulong_t		lx_mode_t;
+typedef	uint32_t	lx_mode_t;
 typedef	uint16_t	lx_mode16_t;
 
 #define	LX_UID16_TO_UID32(uid16)	\

@@ -29,6 +29,7 @@
 #include <string.h>
 #include <time.h>
 #include <sys/lx_misc.h>
+#include <sys/lx_syscall.h>
 
 /*
  * Linux uses different values for it clock identifiers, so we have to do basic
@@ -45,7 +46,7 @@ static int ltos_clock[] = {
 
 #define	LX_CLOCK_MAX	(sizeof (ltos_clock) / sizeof (ltos_clock[0]))
 
-int
+long
 lx_clock_gettime(int clock, struct timespec *tp)
 {
 	struct timespec ts;
@@ -59,7 +60,7 @@ lx_clock_gettime(int clock, struct timespec *tp)
 	return ((uucopy(&ts, tp, sizeof (struct timespec)) < 0) ? -EFAULT : 0);
 }
 
-int
+long
 lx_clock_settime(int clock, struct timespec *tp)
 {
 	struct timespec ts;
@@ -73,7 +74,7 @@ lx_clock_settime(int clock, struct timespec *tp)
 	return ((clock_settime(ltos_clock[clock], &ts) < 0) ? -errno : 0);
 }
 
-int
+long
 lx_clock_getres(int clock, struct timespec *tp)
 {
 	struct timespec ts;
@@ -91,7 +92,7 @@ lx_clock_getres(int clock, struct timespec *tp)
 	return ((uucopy(&ts, tp, sizeof (struct timespec)) < 0) ? -EFAULT : 0);
 }
 
-int
+long
 lx_clock_nanosleep(int clock, int flags, struct timespec *rqtp,
     struct timespec *rmtp)
 {
@@ -116,4 +117,11 @@ lx_clock_nanosleep(int clock, int flags, struct timespec *rqtp,
 		return (-EFAULT);
 
 	return (0);
+}
+
+/*ARGSUSED*/
+long
+lx_adjtimex(void *tp)
+{
+	return (-EPERM);
 }

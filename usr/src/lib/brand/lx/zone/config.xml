@@ -39,7 +39,7 @@
 
 	<install>/usr/lib/brand/lx/lx_install %z %R</install>
 	<installopts>d:hsvX</installopts>
-	<boot>/usr/lib/brand/lx/lx_boot $z %R</boot>
+	<boot>/usr/lib/brand/lx/lx_boot %z %R</boot>
 	<halt>/usr/lib/brand/lx/lx_support halt %R %z</halt>
 	<verify_cfg>/usr/lib/brand/lx/lx_support verify</verify_cfg>
 	<verify_adm></verify_adm>

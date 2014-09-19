@@ -23,7 +23,7 @@
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
- * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ * Copyright 2014 Joyent, Inc. All rights reserved.
  */
 
 #include "lint.h"
@@ -124,6 +124,7 @@ uberdata_t __uberdata = {
 	0,			/* ndaemons */
 	0,			/* pid */
 	sigacthandler,		/* sigacthandler */
+	__setcontext,		/* setctxt */
 	NULL,			/* lwp_stacks */
 	NULL,			/* lwp_laststack */
 	0,			/* nfreestack */

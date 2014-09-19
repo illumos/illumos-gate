@@ -22,9 +22,8 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2014 Joyent, Inc.  All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/cred_impl.h>
@@ -201,7 +200,7 @@ stol_sparam(int policy, struct sched_param *sp, struct lx_sched_param *lsp)
 #define	BITSHIFT(ind)	(1 << (ind % (sizeof (ulong_t) * 8)))
 
 /* ARGSUSED */
-int
+long
 lx_sched_getaffinity(uintptr_t pid, uintptr_t len, uintptr_t maskp)
 {
 	int	sz;
@@ -243,7 +242,7 @@ lx_sched_getaffinity(uintptr_t pid, uintptr_t len, uintptr_t maskp)
 }
 
 /* ARGSUSED */
-int
+long
 lx_sched_setaffinity(uintptr_t pid, uintptr_t len, uintptr_t maskp)
 {
 	int		ret;
@@ -343,7 +342,7 @@ lx_sched_setaffinity(uintptr_t pid, uintptr_t len, uintptr_t maskp)
 	return ((ret == 0) ? 0 : -errno);
 }
 
-int
+long
 lx_sched_getparam(uintptr_t pid, uintptr_t param)
 {
 	int	policy, ret;
@@ -365,7 +364,7 @@ lx_sched_getparam(uintptr_t pid, uintptr_t param)
 	 */
 	if (s_pid == getpid()) {
 		if ((ret = pthread_getschedparam(s_tid, &policy, &sp)) != 0)
-		    return (-ret);
+			return (-ret);
 	} else {
 		if (sched_getparam(s_pid, &sp) == -1)
 			return (-errno);
@@ -377,7 +376,7 @@ lx_sched_getparam(uintptr_t pid, uintptr_t param)
 	return (stol_sparam(policy, &sp, (struct lx_sched_param *)param));
 }
 
-int
+long
 lx_sched_setparam(uintptr_t pid, uintptr_t param)
 {
 	int	err, policy;
@@ -438,7 +437,7 @@ lx_sched_setparam(uintptr_t pid, uintptr_t param)
 	return ((sched_setparam(s_pid, &sp) == -1) ? -errno : 0);
 }
 
-int
+long
 lx_sched_rr_get_interval(uintptr_t pid, uintptr_t timespec)
 {
 	struct timespec ts;
@@ -457,7 +456,7 @@ lx_sched_rr_get_interval(uintptr_t pid, uintptr_t timespec)
 	return ((sched_rr_get_interval(s_pid, &ts) == -1) ? -errno : 0);
 }
 
-int
+long
 lx_sched_getscheduler(uintptr_t pid)
 {
 	int	policy, rv;
@@ -497,7 +496,7 @@ lx_sched_getscheduler(uintptr_t pid)
 	return (LX_SCHED_OTHER);
 }
 
-int
+long
 lx_sched_setscheduler(uintptr_t pid, uintptr_t policy, uintptr_t param)
 {
 	int	rt_pol;
@@ -569,7 +568,7 @@ lx_sched_setscheduler(uintptr_t pid, uintptr_t policy, uintptr_t param)
 	    ? -errno : rv);
 }
 
-int
+long
 lx_sched_get_priority_min(uintptr_t policy)
 {
 	/*
@@ -589,7 +588,7 @@ lx_sched_get_priority_min(uintptr_t policy)
 	return (-EINVAL);
 }
 
-int
+long
 lx_sched_get_priority_max(uintptr_t policy)
 {
 	/*

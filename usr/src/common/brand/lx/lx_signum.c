@@ -92,7 +92,7 @@
  * Usage:  solaris_signal = ltos_signum[lx_signal];
  */
 const int
-ltos_signo[LX_NSIG] = {
+ltos_signo[LX_NSIG + 1] = {
 	0,
 	SIGHUP,
 	SIGINT,

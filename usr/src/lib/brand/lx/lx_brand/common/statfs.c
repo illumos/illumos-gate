@@ -37,6 +37,7 @@
 #include <sys/lx_debug.h>
 #include <sys/lx_misc.h>
 #include <sys/lx_statfs.h>
+#include <sys/lx_syscall.h>
 
 /*
  * these defines must exist before we include regexp.h, see regexp(5)
@@ -217,7 +218,7 @@ stol_statfs64(const char *path, struct lx_statfs64 *l, struct statvfs64 *s)
 	return (0);
 }
 
-int
+long
 lx_statfs(uintptr_t p1, uintptr_t p2)
 {
 	const char *path = (const char *)p1;
@@ -238,7 +239,7 @@ lx_statfs(uintptr_t p1, uintptr_t p2)
 	return (0);
 }
 
-int
+long
 lx_fstatfs(uintptr_t p1, uintptr_t p2)
 {
 	struct lx_statfs lxfs, *fs = (struct lx_statfs *)p2;
@@ -281,7 +282,7 @@ lx_fstatfs(uintptr_t p1, uintptr_t p2)
 }
 
 /* ARGSUSED */
-int
+long
 lx_statfs64(uintptr_t p1, uintptr_t p2, uintptr_t p3)
 {
 	const char *path = (const char *)p1;
@@ -303,7 +304,7 @@ lx_statfs64(uintptr_t p1, uintptr_t p2, uintptr_t p3)
 }
 
 /* ARGSUSED */
-int
+long
 lx_fstatfs64(uintptr_t p1, uintptr_t p2, uintptr_t p3)
 {
 	struct lx_statfs64 lxfs, *fs = (struct lx_statfs64 *)p3;

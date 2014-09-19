@@ -21,38 +21,38 @@
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright 2014 Joyent, Inc.  All rights reserved.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 #
 #	Section 1a: C object build rules
 #
 $(OBJS_DIR_OBJ64)/%.o:		$(UTSBASE)/common/brand/lx/os/%.c
-	$(COMPILE.c) -D_ELF32_COMPAT -o $@ $<
+	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
 $(OBJS_DIR_DBG64)/%.o:		$(UTSBASE)/common/brand/lx/os/%.c
-	$(COMPILE.c) -D_ELF32_COMPAT -o $@ $<
+	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
 $(OBJS_DIR_OBJ64)/%.o:		$(UTSBASE)/common/brand/lx/syscall/%.c
-	$(COMPILE.c) -D_ELF32_COMPAT -o $@ $<
+	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
 $(OBJS_DIR_DBG64)/%.o:		$(UTSBASE)/common/brand/lx/syscall/%.c
-	$(COMPILE.c) -D_ELF32_COMPAT -o $@ $<
+	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
 $(OBJS_DIR_OBJ64)/%.o:		$(UTSBASE)/intel/brand/lx/%.s
-	$(COMPILE.s) -D_ELF32_COMPAT -o $@ $<
+	$(COMPILE.s) -o $@ $<
 
 $(OBJS_DIR_OBJ64)/%.o:		$(LX_CMN)/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
 $(OBJS_DIR_DBG64)/%.o:		$(UTSBASE)/intel/brand/lx/%.s
-	$(COMPILE.s) -D_ELF32_COMPAT -o $@ $<
+	$(COMPILE.s) -o $@ $<
 
 $(OBJS_DIR)/%.o:		$(UTSBASE)/common/brand/lx/os/%.c
 	$(COMPILE.c) -o $@ $<

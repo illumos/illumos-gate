@@ -42,6 +42,7 @@
 #include <libintl.h>
 #include <sys/bitmap.h>
 #include <sys/lx_autofs.h>
+#include <sys/lx_syscall.h>
 #include <sys/modctl.h>
 #include <sys/filio.h>
 #include <sys/termios.h>
@@ -237,10 +238,11 @@ lx_ioctl_msg(int fd, int cmd, char *lx_cmd_str, struct stat *stat, char *msg)
 
 			/* Try to display the drivers name. */
 			if (modctl(MODGETNAME,
-			    fd_driver, sizeof (fd_driver), &fd_major) == 0)
+			    fd_driver, sizeof (fd_driver), &fd_major) == 0) {
 				i = strlen(buf);
 				(void) snprintf(buf + i, sizeof (buf) - i,
 				    "; driver = %s", fd_driver);
+			}
 		}
 		lx_debug(buf);
 	}
@@ -497,11 +499,10 @@ lx_ioctl_init()
 		    &idt->idt_major);
 
 		if (ret != 0) {
-			lx_err(gettext("%s%s) failed: %s\n"),
-			    "lx_ioctl_init(): modctl(MODGETMAJBIND, ",
-			    idt->idt_driver, strerror(errno));
-			lx_err(gettext("%s: %s translator disabled for: %s\n"),
-			    "lx_ioctl_init()", "ioctl", idt->idt_driver);
+			lx_err("lx_ioctl_init(): modctl(MODGETMAJBIND, %s) "
+			    "failed: %s\n", idt->idt_driver, strerror(errno));
+			lx_err("lx_ioctl_init(): ioctl translator disabled "
+			    "for: %s\n", idt->idt_driver);
 			idt->idt_major = (major_t)-1;
 		}
 	}
@@ -528,7 +529,7 @@ lx_ioctl_find_ict_cmd(ioc_cmd_translator_t *ict, int cmd)
 /*
  * Main entry point for the ioctl translater.
  */
-int
+long
 lx_ioctl(uintptr_t p1, uintptr_t p2, uintptr_t p3)
 {
 	int			fd = (int)p1;
@@ -884,8 +885,8 @@ ict_siocifhwaddr(int fd, struct stat *stat, int cmd, char *cmd_str,
 	    req.ifr_name);
 
 	/*
-	 * We're not going to support SIOCSIFHWADDR, but we need to be
-	 * able to check the result of the uucopy first to see if the command
+	 * We're not going to support SIOCSIFHWADDR, but we need to be able to
+	 * check the result of the uucopy first to see if the command
 	 * should have returned EFAULT.
 	 */
 	if (cmd == LX_SIOCSIFHWADDR) {
@@ -2730,7 +2731,7 @@ static ioc_errno_translator_t ioc_translators_errno[] = {
 	IOC_ERRNO_TRANSLATOR_END
 };
 
-int
+long
 lx_vhangup(void)
 {
 	if (geteuid() != 0)

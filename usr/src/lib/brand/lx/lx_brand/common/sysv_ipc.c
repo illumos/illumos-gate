@@ -21,9 +21,8 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2014 Joyent, Inc.  All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <errno.h>
 #include <unistd.h>
@@ -105,7 +104,7 @@ slot_to_id(int type, int slot)
 /*
  * Semaphore operations.
  */
-static int
+long
 lx_semget(key_t key, int nsems, int semflg)
 {
 	int sol_flag;
@@ -122,16 +121,32 @@ lx_semget(key_t key, int nsems, int semflg)
 	return ((r < 0) ? -errno : r);
 }
 
-static int
-lx_semop(int semid, struct sembuf *sops, size_t nsops)
+long
+lx_semop(int semid, void *p1, size_t nsops)
 {
 	int r;
+	struct sembuf *sops = (struct sembuf *)p1;
 
 	lx_debug("\nsemop(%d, 0x%p, %u)\n", semid, sops, nsops);
 	if (nsops == 0)
 		return (-EINVAL);
 
 	r = semop(semid, sops, nsops);
+	return ((r < 0) ? -errno : r);
+}
+
+long
+lx_semtimedop(int semid, void *p1, size_t nsops, struct timespec *timeout)
+{
+	int r;
+	struct sembuf *sops = (struct sembuf *)p1;
+
+	lx_debug("\nsemtimedop(%d, 0x%p, %u, 0x%p)\n", semid, sops, nsops,
+	    timeout);
+	if (nsops == 0)
+		return (-EINVAL);
+
+	r = semtimedop(semid, sops, nsops, timeout);
 	return ((r < 0) ? -errno : r);
 }
 
@@ -273,7 +288,7 @@ lx_semctl_setall(int semid, union lx_semun *arg)
 	return ((r < 0) ? -errno : r);
 }
 
-static int
+long
 lx_semctl(int semid, int semnum, int cmd, void *ptr)
 {
 	union lx_semun arg;
@@ -359,7 +374,7 @@ lx_semctl(int semid, int semnum, int cmd, void *ptr)
 /*
  * msg operations.
  */
-static int
+long
 lx_msgget(key_t key, int flag)
 {
 	int sol_flag;
@@ -377,11 +392,12 @@ lx_msgget(key_t key, int flag)
 	return (r < 0 ? -errno : r);
 }
 
-static int
-lx_msgsnd(int id, struct msgbuf *buf, size_t sz, int flag)
+long
+lx_msgsnd(int id, void *p1, size_t sz, int flag)
 {
 	int sol_flag = 0;
 	int r;
+	struct msgbuf *buf = (struct msgbuf *)p1;
 
 	lx_debug("\tlx_msgsnd(%d, 0x%p, %d, %d)\n", id, buf, sz, flag);
 
@@ -395,15 +411,16 @@ lx_msgsnd(int id, struct msgbuf *buf, size_t sz, int flag)
 	return (r < 0 ? -errno : r);
 }
 
-static int
-lx_msgrcv(int id, struct msgbuf *buf, size_t sz, int flag)
+long
+lx_msgrcv(int id, void *p1, size_t sz, int flag)
 {
 	int sol_flag = 0;
 	struct {
 		void *msgp;
 		long msgtype;
 	} args;
-	int r;
+	ssize_t r;
+	struct msgbuf *buf = (struct msgbuf *)p1;
 
 	/*
 	 * Rather than passing 5 args into ipc(2) directly, glibc passes 4
@@ -572,7 +589,7 @@ lx_msgctl_msgstat(int slot, void *buf)
 /*
  * Split off the various msgctl's here
  */
-static int
+long
 lx_msgctl(int msgid, int cmd, void *buf)
 {
 	int r;
@@ -610,7 +627,7 @@ lx_msgctl(int msgid, int cmd, void *buf)
 /*
  * shm-related operations.
  */
-static int
+long
 lx_shmget(key_t key, size_t size, int flag)
 {
 	int sol_flag;
@@ -628,13 +645,13 @@ lx_shmget(key_t key, size_t size, int flag)
 	return (r < 0 ? -errno : r);
 }
 
-static int
-lx_shmat(int shmid, void *addr, int flags, void **rval)
+long
+lx_shmat(int shmid, void *addr, int flags)
 {
 	int sol_flags;
 	void *ptr;
 
-	lx_debug("\tlx_shmat(%d, 0x%p, %d, 0%o)\n", shmid, addr, flags);
+	lx_debug("\tlx_shmat(%d, 0x%p, %d)\n", shmid, addr, flags);
 
 	sol_flags = 0;
 	if (flags & LX_SHM_RDONLY)
@@ -647,10 +664,8 @@ lx_shmat(int shmid, void *addr, int flags, void **rval)
 	ptr = shmat(shmid, addr, sol_flags);
 	if (ptr == (void *)-1)
 		return (-errno);
-	if (uucopy(&ptr, rval, sizeof (ptr)) != 0)
-		return (-errno);
 
-	return (0);
+	return ((ssize_t)ptr);
 }
 
 static int
@@ -776,7 +791,7 @@ lx_shmctl_shmstat(int slot, void *buf)
 	return (r < 0 ? r : shmid);
 }
 
-static int
+long
 lx_shmctl(int shmid, int cmd, void *buf)
 {
 	int r;
@@ -830,11 +845,11 @@ lx_shmctl(int shmid, int cmd, void *buf)
 }
 
 /*
- * Under Linux, glibc funnels all of the sysv IPC operations into this
+ * Under 32-bit Linux, glibc funnels all of the sysv IPC operations into this
  * single ipc(2) system call.  We need to blow that up and filter the
  * remnants into the proper Solaris system calls.
  */
-int
+long
 lx_ipc(uintptr_t cmd, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3,
     uintptr_t arg4)
 {
@@ -842,7 +857,7 @@ lx_ipc(uintptr_t cmd, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3,
 	void *bufptr = (void *)arg4;
 
 	lx_debug("lx_ipc(%d, %d, %d, %d, 0x%p, %d)\n",
-		cmd, arg1, arg2, arg3, bufptr, arg4);
+	    cmd, arg1, arg2, arg3, bufptr, arg4);
 
 	switch (cmd) {
 	case LX_MSGGET:
@@ -871,7 +886,11 @@ lx_ipc(uintptr_t cmd, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3,
 		r = lx_semget((int)arg1, (size_t)arg2, (int)arg3);
 		break;
 	case LX_SHMAT:
-		r = lx_shmat((int)arg1, bufptr, (size_t)arg2, (void *)arg3);
+		r = lx_shmat((int)arg1, bufptr, (size_t)arg2);
+		if (r >= 0 || r <= -4096) {
+			if (uucopy(&r, (void *)arg3, sizeof (r)) != 0)
+				r = -errno;
+		}
 		break;
 	case LX_SHMDT:
 		r = shmdt(bufptr);

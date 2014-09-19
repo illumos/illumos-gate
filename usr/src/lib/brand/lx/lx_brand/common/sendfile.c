@@ -37,8 +37,10 @@
 #include <string.h>
 #include <errno.h>
 #include <sys/lx_misc.h>
+#include <sys/lx_syscall.h>
 
-int
+#if defined(_ILP32)
+long
 lx_sendfile(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4)
 {
 	sysret_t rval;
@@ -78,8 +80,9 @@ lx_sendfile(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4)
 
 	return (error ? -error : (int)rval.sys_rval1);
 }
+#endif
 
-int
+long
 lx_sendfile64(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4)
 {
 	sysret_t rval;

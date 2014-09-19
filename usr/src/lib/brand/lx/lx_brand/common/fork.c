@@ -28,6 +28,7 @@
 #include <errno.h>
 #include <unistd.h>
 #include <sys/lx_misc.h>
+#include <sys/lx_syscall.h>
 
 /*
  * fork() and vfork()
@@ -37,7 +38,7 @@
  * schedctl page).  On Linux, there is no such thing as forkall(), so we use
  * fork1() here.
  */
-int
+long
 lx_fork(void)
 {
 	int ret = fork1();
@@ -58,7 +59,7 @@ lx_fork(void)
  * faster than fork"), we should theoretically be safe by falling back to
  * fork1().
  */
-int
+long
 lx_vfork(void)
 {
 	int ret = fork1();

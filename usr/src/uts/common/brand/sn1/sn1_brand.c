@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2014 Joyent, Inc. All rights reserved.
  */
 
 #include <sys/errno.h>
@@ -76,6 +77,7 @@ struct brand_ops sn1_brops = {
 	sn1_freelwp,
 	sn1_lwpexit,
 	sn1_elfexec,
+	NULL,
 	NULL,
 	NULL,
 	NSIG,

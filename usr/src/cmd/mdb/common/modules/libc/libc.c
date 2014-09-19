@@ -841,14 +841,19 @@ d_uberdata(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    prt_addr(uberdata.all_lwps, 1),
 	    prt_addr(uberdata.all_zombies, 0));
 
-	HD("nthreads   nzombies   ndaemons   pid        sigacthandler");
-	mdb_printf(OFFSTR "%-10d %-10d %-10d %-10d %s\n",
+	HD("nthreads   nzombies   ndaemons   pid");
+	mdb_printf(OFFSTR "%-10d %-10d %-10d %-10d\n",
 	    OFFSET(nthreads),
 	    uberdata.nthreads,
 	    uberdata.nzombies,
 	    uberdata.ndaemons,
-	    (int)uberdata.pid,
-	    prt_addr((void *)uberdata.sigacthandler, 0));
+	    (int)uberdata.pid);
+
+	HD("sigacthandler         setctxt");
+	mdb_printf(OFFSTR "%s %s\n",
+	    OFFSET(sigacthandler),
+	    prt_addr((void *)uberdata.sigacthandler, 1),
+	    prt_addr((void *)uberdata.setctxt, 1));
 
 	HD("lwp_stacks            lwp_laststack         nfreestack stk_cache");
 	mdb_printf(OFFSTR "%s %s %-10d %d\n",
@@ -880,7 +885,7 @@ d_uberdata(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	HD("progname              ub_broot");
 	mdb_printf(OFFSTR "%s %s\n",
 	    OFFSET(progname),
-	    prt_addr(uberdata.progname, 0),
+	    prt_addr(uberdata.progname, 1),
 	    prt_addr(uberdata.ub_broot, 1));
 
 	HD("tdb_bootstrap         tdb_sync_addr_hash    tdb_'count tdb_'fail");

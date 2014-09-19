@@ -22,9 +22,8 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2014 Joyent, Inc.  All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <errno.h>
 #include <unistd.h>
@@ -49,7 +48,7 @@ lx_is_directory(int fd)
 	return ((sbuf.st_mode & S_IFMT) == S_IFDIR);
 }
 
-int
+long
 lx_read(uintptr_t p1, uintptr_t p2, uintptr_t p3)
 {
 	int 		fd = (int)p1;
@@ -66,7 +65,7 @@ lx_read(uintptr_t p1, uintptr_t p2, uintptr_t p3)
 	return (ret);
 }
 
-int
+long
 lx_pread64(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4, uintptr_t p5)
 {
 	int 		fd = (int)p1;
@@ -93,7 +92,7 @@ lx_pread64(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4, uintptr_t p5)
  * pwrite(2) ignores the offset parameter and instead appends the data to the
  * file without modifying the current seek pointer.
  */
-int
+long
 lx_pwrite64(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
     uintptr_t p5)
 {
@@ -148,22 +147,26 @@ lx_pwrite64(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 static int
 lx_iovec_copy_and_check(const struct iovec *iovp, struct iovec *iov, int count)
 {
+#if defined(_ILP32)
 	int	i;
 	ssize_t	cnt = 0;
+#endif
 
 	if (uucopy(iovp, (void *)iov, count * sizeof (struct iovec)) != 0)
 		return (-errno);
 
+#if defined(_ILP32)
 	for (i = 0; i < count; i++) {
 		cnt += iov[i].iov_len;
 		if (iov[i].iov_len < 0 || cnt < 0)
 			return (-EINVAL);
 	}
+#endif
 
 	return (0);
 }
 
-int
+long
 lx_readv(uintptr_t p1, uintptr_t p2, uintptr_t p3)
 {
 	int			fd = (int)p1;
@@ -203,7 +206,7 @@ lx_readv(uintptr_t p1, uintptr_t p2, uintptr_t p3)
 	return (total);
 }
 
-int
+long
 lx_writev(uintptr_t p1, uintptr_t p2, uintptr_t p3)
 {
 	int			fd = (int)p1;

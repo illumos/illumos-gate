@@ -30,13 +30,14 @@
 #include <fcntl.h>
 #include <sys/lx_types.h>
 #include <sys/lx_misc.h>
+#include <sys/lx_syscall.h>
 
 /*
- * On Solaris, truncate() and ftruncate() are implemented in libc, so these are
+ * On Illumos, truncate() and ftruncate() are implemented in libc, so these are
  * layered on those interfaces.
  */
 
-int
+long
 lx_truncate(uintptr_t path, uintptr_t length)
 {
 	if ((off_t)length >= 0xffffffffUL)
@@ -45,7 +46,7 @@ lx_truncate(uintptr_t path, uintptr_t length)
 	return (truncate((const char *)path, (off_t)length) == 0 ? 0 : -errno);
 }
 
-int
+long
 lx_ftruncate(uintptr_t fd, uintptr_t length)
 {
 	int r;
@@ -74,7 +75,7 @@ lx_ftruncate(uintptr_t fd, uintptr_t length)
 	return (r);
 }
 
-int
+long
 lx_truncate64(uintptr_t path, uintptr_t length_lo, uintptr_t length_hi)
 {
 	uint64_t len = LX_32TO64(length_lo, length_hi);
@@ -85,7 +86,7 @@ lx_truncate64(uintptr_t path, uintptr_t length_lo, uintptr_t length_hi)
 	return (truncate64((const char *)path, len) == 0 ? 0 : -errno);
 }
 
-int
+long
 lx_ftruncate64(uintptr_t fd, uintptr_t length_lo, uintptr_t length_hi)
 {
 	int r;

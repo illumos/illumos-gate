@@ -1,0 +1,35 @@
+\
+\ This file and its contents are supplied under the terms of the
+\ Common Development and Distribution License ("CDDL"), version 1.0.
+\ You may only use this file in accordance with the terms of version
+\ 1.0 of the CDDL.
+\
+\ A full copy of the text of the CDDL should have accompanied this
+\ source.  A copy of the CDDL is also available via the Internet at
+\ http://www.illumos.org/license/CDDL.
+\
+\ Copyright 2014 Joyent, Inc.  All rights reserved.
+\
+
+#include <sys/lx_brand.h>
+
+lx_regs_t	SIZEOF_LX_REGS_T
+	lxr_gs
+	lxr_rdi
+	lxr_rsi
+	lxr_rbp
+	lxr_rsp
+	lxr_rbx
+	lxr_rdx
+	lxr_rcx
+	lxr_rax
+	lxr_r8
+	lxr_r9
+	lxr_r10
+	lxr_r11
+	lxr_r12
+	lxr_r13
+	lxr_r14
+	lxr_r15
+	lxr_rip
+	lxr_orig_rax

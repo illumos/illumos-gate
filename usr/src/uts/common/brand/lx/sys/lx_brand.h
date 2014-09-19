@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright (c) 2014, Joyent, Inc. All rights reserved.
+ * Copyright 2014 Joyent, Inc. All rights reserved.
  */
 
 #ifndef _LX_BRAND_H
@@ -51,23 +51,33 @@ extern "C" {
 #define	LX_UNAME_VERSION	"BrandZ virtual linux"
 #define	LX_UNAME_MACHINE	"i686"
 
-#define	LX_LINKER_NAME "ld-linux.so.2"
-#define	LX_LINKER	"/lib/" LX_LINKER_NAME
-#define	LX_LIBC_NAME	"libc.so.6"
-#define	LIB_PATH	"/native/usr/lib/"
-#define	LX_LIB		"lx_brand.so.1"
-#define	LX_LIB_PATH	LIB_PATH LX_LIB
+#define	LX_LINKER32	"/lib/ld-linux.so.2"
+#define	LX_LINKER64	"/lib64/ld-linux-x86-64.so.2"
 
-#define	LX_NSYSCALLS_2_4	270
-#define	LX_NSYSCALLS_2_6	352
-#define	LX_NSYSCALLS	LX_NSYSCALLS_2_6
+#define	LX_LIB_PATH32	"/native/usr/lib/lx_brand.so.1"
+#define	LX_LIB_PATH64	"/native/usr/lib/amd64/lx_brand.so.1"
+
+#if defined(_LP64)
+#define	LX_LIB_PATH	LX_LIB_PATH64
+#define	LX_LINKER	LX_LINKER64
+#else
+#define	LX_LIB_PATH	LX_LIB_PATH32
+#define	LX_LINKER	LX_LINKER32
+#endif
+
+/*
+ * This must be large enough for both the 32-bit table and 64-bit table.
+ */
+#define	LX_NSYSCALLS		352
+
+/* The number of In-Kernel Emulation functions */
+#define	LX_N_IKE_FUNCS		25
 
 /*
  * brand(2) subcommands
  *
  * Everything >= 128 is a brand-specific subcommand.
- * > 192 is reserved for in-kernel system calls, although most of that space is
- * unused.
+ * > 192 is reserved for in-kernel emulated system calls.
  */
 #define	B_LPID_TO_SPAIR		128
 #define	B_SYSENTRY		129
@@ -79,8 +89,10 @@ extern "C" {
 #define	B_PTRACE_STOP_FOR_OPT	135
 #define	B_UNSUPPORTED		136
 #define	B_STORE_ARGS		137
+#define	B_CLR_NTV_SYSC_FLAG	138
+#define	B_SIGNAL_RETURN		139
 
-#define	B_EMULATE_SYSCALL	192
+#define	B_IKE_SYSCALL		192
 
 /* B_PTRACE_EXT_OPTS subcommands */
 #define	 B_PTRACE_EXT_OPTS_SET	1
@@ -133,15 +145,37 @@ typedef struct lx_brand_registration {
 	void *lxbr_traceflag;		/* address of trace flag */
 } lx_brand_registration_t;
 
-#ifdef	_SYSCALL32
 typedef struct lx_brand_registration32 {
-	uint32_t lxbr_version;		/* version number */
-	caddr32_t lxbr_handler;		/* base address of handler */
-	caddr32_t lxbr_tracehandler;	/* base address of trace handler */
-	caddr32_t lxbr_traceflag;	/* address of trace flag */
+	uint_t lxbr_version;		/* version number */
+	uint32_t lxbr_handler;		/* base address of handler */
+	uint32_t lxbr_tracehandler;	/* base address of trace handler */
+	uint32_t lxbr_traceflag;	/* address of trace flag */
 } lx_brand_registration32_t;
-#endif
 
+#ifdef __amd64
+typedef struct lx_regs {
+	long lxr_gs;
+	long lxr_rdi;
+	long lxr_rsi;
+	long lxr_rbp;
+	long lxr_rsp;
+	long lxr_rbx;
+	long lxr_rdx;
+	long lxr_rcx;
+	long lxr_rax;
+	long lxr_r8;
+	long lxr_r9;
+	long lxr_r10;
+	long lxr_r11;
+	long lxr_r12;
+	long lxr_r13;
+	long lxr_r14;
+	long lxr_r15;
+	long lxr_rip;
+
+	long lxr_orig_rax;
+} lx_regs_t;
+#else /* ! __amd64 */
 typedef struct lx_regs {
 	long lxr_gs;
 	long lxr_edi;
@@ -156,6 +190,7 @@ typedef struct lx_regs {
 
 	long lxr_orig_eax;
 } lx_regs_t;
+#endif /* __amd64 */
 
 #endif /* _ASM */
 
@@ -172,14 +207,29 @@ typedef struct lx_regs {
  * Stores information needed by the lx linker to launch the main
  * lx executable.
  */
-typedef struct lx_elf_data {
+typedef struct lx_elf_data64 {
+	uintptr_t	ed_phdr;
+	uintptr_t	ed_phent;
+	uintptr_t	ed_phnum;
+	uintptr_t	ed_entry;
+	uintptr_t	ed_base;
+	uintptr_t	ed_ldentry;
+} lx_elf_data64_t;
+
+typedef struct lx_elf_data32 {
 	int	ed_phdr;
 	int	ed_phent;
 	int	ed_phnum;
 	int	ed_entry;
 	int	ed_base;
 	int	ed_ldentry;
-} lx_elf_data_t;
+} lx_elf_data32_t;
+
+#if defined(_LP64)
+typedef lx_elf_data64_t lx_elf_data_t;
+#else
+typedef lx_elf_data32_t lx_elf_data_t;
+#endif
 
 #ifdef	_KERNEL
 
@@ -216,6 +266,8 @@ typedef ulong_t lx_affmask_t[LX_AFF_ULONGS];
  * lx-specific data in the klwp_t
  */
 typedef struct lx_lwp_data {
+	/* lx_brand_asm.s requires br_libc_syscall to be the first member */
+	uint_t	br_libc_syscall;	/* 1 = syscall from native libc */
 	uint_t	br_lwp_flags;		/* misc. flags */
 	klwp_t	*br_lwp;		/* back pointer to container lwp */
 	int	br_signal;		/* signal to send to parent when */
@@ -266,6 +318,7 @@ typedef struct lx_zone_data {
 	(ttolxlwp(curthread)->br_scall_args))
 
 void	lx_brand_int80_callback(void);
+void	lx_brand_syscall_callback(void);
 int64_t	lx_emulate_syscall(int, uintptr_t, uintptr_t, uintptr_t, uintptr_t,
 	uintptr_t, uintptr_t);
 

@@ -30,6 +30,7 @@
 #include <sys/param.h>
 #include <sys/lx_debug.h>
 #include <sys/lx_misc.h>
+#include <sys/lx_syscall.h>
 
 /*
  * There are two forms of mmap, mmap() and mmap2().  The only difference is that
@@ -71,7 +72,7 @@ ltos_mmap_flags(int flags)
 	return (new_flags);
 }
 
-static int
+static void *
 mmap_common(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
     uintptr_t p5, off64_t p6)
 {
@@ -116,29 +117,30 @@ mmap_common(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 	ret = mmap64(addr, len, prot, ltos_mmap_flags(flags), fd, off);
 
 	if (ret == MAP_FAILED)
-		return (errno == EOVERFLOW ? -ENOMEM : -errno);
+		return ((void *)(long)(errno == EOVERFLOW ? -ENOMEM : -errno));
 
 	if (flags & LX_MAP_LOCKED)
 		(void) mlock(ret, len);
 
-	return ((int)ret);
+	return (ret);
 }
 
-int
+long
 lx_mmap(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
     uintptr_t p5, uintptr_t p6)
 {
-	return (mmap_common(p1, p2, p3, p4, p5, (off64_t)p6));
+	return ((ssize_t)mmap_common(p1, p2, p3, p4, p5, (off64_t)p6));
 }
 
-int
+long
 lx_mmap2(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
     uintptr_t p5, uintptr_t p6)
 {
 	if (pagesize == 0)
 		pagesize = sysconf(_SC_PAGESIZE);
 
-	return (mmap_common(p1, p2, p3, p4, p5, (off64_t)p6 * pagesize));
+	return ((ssize_t)mmap_common(p1, p2, p3, p4, p5,
+	    (off64_t)p6 * pagesize));
 }
 
 
@@ -147,7 +149,7 @@ lx_mmap2(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
  * Solaris, they are layered on top of the memcntl syscall, so they cannot be
  * pass-thru.
  */
-int
+long
 lx_mlock(uintptr_t addr, uintptr_t len)
 {
 	uintptr_t addr1 = addr & PAGEMASK;
@@ -156,13 +158,13 @@ lx_mlock(uintptr_t addr, uintptr_t len)
 	return (mlock((void *)addr1, (size_t)len1) ? -errno : 0);
 }
 
-int
+long
 lx_mlockall(uintptr_t flags)
 {
 	return (mlockall(flags) ? -errno : 0);
 }
 
-int
+long
 lx_munlock(uintptr_t addr, uintptr_t len)
 {
 	uintptr_t addr1 = addr & PAGEMASK;
@@ -171,13 +173,13 @@ lx_munlock(uintptr_t addr, uintptr_t len)
 	return (munlock((void *)addr1, (size_t)len1) ? -errno : 0);
 }
 
-int
+long
 lx_munlockall(void)
 {
 	return (munlockall() ? -errno : 0);
 }
 
-int
+long
 lx_msync(uintptr_t addr, uintptr_t len, uintptr_t flags)
 {
 	return (msync((void *)addr, (size_t)len, flags) ? -errno : 0);
@@ -187,7 +189,7 @@ lx_msync(uintptr_t addr, uintptr_t len, uintptr_t flags)
  * Illumos and Linux overlap on the basic flags, and are disjoint on the rest.
  * Linux also allows the length to be zero, while Illumos does not.
  */
-int
+long
 lx_madvise(uintptr_t start, uintptr_t len, uintptr_t advice)
 {
 	int ret;
@@ -237,7 +239,7 @@ lx_madvise(uintptr_t start, uintptr_t len, uintptr_t advice)
 #define	LX_PROT_GROWSDOWN	0x01000000
 #define	LX_PROT_GROWSUP		0x02000000
 
-int
+long
 lx_mprotect(uintptr_t start, uintptr_t len, uintptr_t prot)
 {
 	prot &= ~(LX_PROT_GROWSUP | LX_PROT_GROWSDOWN);

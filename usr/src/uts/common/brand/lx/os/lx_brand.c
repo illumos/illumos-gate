@@ -72,6 +72,8 @@ int	lx_brandsys(int, int64_t *, uintptr_t, uintptr_t, uintptr_t,
 void	lx_set_kern_version(zone_t *, char *);
 void	lx_copy_procdata(proc_t *, proc_t *);
 
+extern int getsetcontext(int, void *);
+
 extern void lx_setrval(klwp_t *, int, int);
 extern void lx_proc_exit(proc_t *, klwp_t *);
 extern void lx_exec();
@@ -80,6 +82,7 @@ extern void lx_forklwp(klwp_t *, klwp_t *);
 extern void lx_exitlwp(klwp_t *);
 extern void lx_freelwp(klwp_t *);
 extern void lx_exit_with_sig(proc_t *, sigqueue_t *, void *);
+static void lx_psig_to_proc(proc_t *, kthread_t *, int);
 extern boolean_t lx_wait_filter(proc_t *, proc_t *);
 extern greg_t lx_fixsegreg(greg_t, model_t);
 extern int lx_sched_affinity(int, uintptr_t, int, uintptr_t, int64_t *);
@@ -116,6 +119,7 @@ struct brand_ops lx_brops = {
 	lx_elfexec,
 	NULL,
 	NULL,
+	lx_psig_to_proc,
 	NSIG,
 	lx_exit_with_sig,
 	lx_wait_filter,
@@ -124,9 +128,9 @@ struct brand_ops lx_brops = {
 
 struct brand_mach_ops lx_mops = {
 	NULL,
-	lx_brand_int80_callback,
+	lx_brand_int80_callback,	/* 32-bit Linux entry point */
 	NULL,
-	NULL,
+	lx_brand_syscall_callback,	/* 64-bit common entry point */
 	NULL,
 	lx_fixsegreg,
 };
@@ -479,7 +483,14 @@ lx_brand_systrace_enable(void)
 
 	ASSERT(!lx_systrace_enabled);
 
+#if defined(__amd64)
+	/* enable the trace points for both 32-bit and 64-bit lx calls */
+	extern void lx_brand_syscall_enable(void);
+	lx_brand_syscall_enable();
 	lx_brand_int80_enable();
+#else
+	lx_brand_int80_enable();
+#endif
 
 	lx_systrace_enabled = 1;
 }
@@ -491,9 +502,49 @@ lx_brand_systrace_disable(void)
 
 	ASSERT(lx_systrace_enabled);
 
+#if defined(__amd64)
+	/* disable the trace points for both 32-bit and 64-bit lx calls */
+	extern void lx_brand_syscall_disable(void);
+	lx_brand_syscall_disable();
 	lx_brand_int80_disable();
+#else
+	lx_brand_int80_disable();
+#endif
 
 	lx_systrace_enabled = 0;
+}
+
+/*
+ * Posting a signal to a proc/thread, switch to native syscall mode.
+ * See the comment on lwp_segregs_save() for how we handle the user-land
+ * registers when we come into the kernel and see update_sregs() for how we
+ * restore.
+ */
+/*ARGSUSED*/
+static void
+lx_psig_to_proc(proc_t *p, kthread_t *t, int sig)
+{
+	lx_lwp_data_t *lwpd = ttolxlwp(t);
+#if defined(__amd64)
+	klwp_t *lwp = ttolwp(t);
+	model_t datamodel;
+	struct regs *rp;
+
+	datamodel = lwp_getdatamodel(lwp);
+	if (datamodel == DATAMODEL_NATIVE) {
+		rp = lwptoregs(lwp);
+
+		if (rp->r_gs != 0)
+			cmn_err(CE_WARN, "lx_psig_to_proc: non-zero %%gs");
+
+		/*
+		 * XXX sometimes pcb_gs?
+		 */
+		rp->r_gs = lwpd->br_libc_syscall;
+	}
+#endif
+
+	lwpd->br_libc_syscall = 1;
 }
 
 void
@@ -508,7 +559,7 @@ lx_init_brand_data(zone_t *zone)
 	 * This can be changed by a call to setattr() during zone boot.
 	 */
 	(void) strlcpy(data->lxzd_kernel_version, "2.4.21", LX_VERS_MAX);
-	data->lxzd_max_syscall = LX_NSYSCALLS_2_4;
+	data->lxzd_max_syscall = LX_NSYSCALLS;
 	zone->zone_brand_data = data;
 }
 
@@ -540,11 +591,12 @@ lx_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 	kthread_t *t = curthread;
 	proc_t *p = ttoproc(t);
 	lx_proc_data_t *pd;
-	int linux_call;
+	int ike_call;
 	struct termios *termios;
 	uint_t termios_len;
 	int error;
 	lx_brand_registration_t reg;
+	lx_lwp_data_t *lwpd;
 
 	/*
 	 * There is one operation that is suppored for non-branded
@@ -575,8 +627,10 @@ lx_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 				    "at 0x%p\n", (void *)arg1);
 				return (EFAULT);
 			}
+		}
 #ifdef _LP64
-		} else {
+		else {
+			/* 32-bit userland on 64-bit kernel */
 			lx_brand_registration32_t reg32;
 
 			if (copyin((void *)arg1, &reg32, sizeof (reg32)) != 0) {
@@ -592,8 +646,8 @@ lx_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 			    (void *)(uintptr_t)reg32.lxbr_tracehandler;
 			reg.lxbr_traceflag =
 			    (void *)(uintptr_t)reg32.lxbr_traceflag;
-#endif
 		}
+#endif
 
 		if (reg.lxbr_version != LX_VERSION_1) {
 			lx_print("Invalid brand library version (%u)\n",
@@ -607,6 +661,15 @@ lx_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 		pd->l_handler = (uintptr_t)reg.lxbr_handler;
 		pd->l_tracehandler = (uintptr_t)reg.lxbr_tracehandler;
 		pd->l_traceflag = (uintptr_t)reg.lxbr_traceflag;
+
+		/*
+		 * When we register, start with native syscalls enabled so that
+		 * lx_init can finish initialization before switch to Linux
+		 * syscall mode.
+		 */
+		lwpd = ttolxlwp(t);
+		lwpd->br_libc_syscall = 1;
+
 		*rval = 0;
 		return (0);
 	case B_TTYMODES:
@@ -629,11 +692,32 @@ lx_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 
 	case B_ELFDATA:
 		pd = curproc->p_brand_data;
-		if (copyout(&pd->l_elf_data, (void *)arg1,
-		    sizeof (lx_elf_data_t)) != 0) {
-			(void) set_errno(EFAULT);
-			return (*rval = -1);
+		if (get_udatamodel() == DATAMODEL_NATIVE) {
+			if (copyout(&pd->l_elf_data, (void *)arg1,
+			    sizeof (lx_elf_data_t)) != 0) {
+				(void) set_errno(EFAULT);
+				return (*rval = -1);
+			}
 		}
+#if defined(_LP64)
+		else {
+			/* 32-bit userland on 64-bit kernel */
+			lx_elf_data32_t led32;
+
+			led32.ed_phdr = (int)pd->l_elf_data.ed_phdr;
+			led32.ed_phent = (int)pd->l_elf_data.ed_phent;
+			led32.ed_phnum = (int)pd->l_elf_data.ed_phnum;
+			led32.ed_entry = (int)pd->l_elf_data.ed_entry;
+			led32.ed_base = (int)pd->l_elf_data.ed_base;
+			led32.ed_ldentry = (int)pd->l_elf_data.ed_ldentry;
+
+			if (copyout(&led32, (void *)arg1,
+			    sizeof (led32)) != 0) {
+				(void) set_errno(EFAULT);
+				return (*rval = -1);
+			}
+		}
+#endif
 		*rval = 0;
 		return (0);
 
@@ -692,7 +776,7 @@ lx_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 
 	case B_SYSENTRY:
 		if (lx_systrace_enabled) {
-			uint32_t args[6];
+			uintptr_t args[6];
 
 			ASSERT(lx_systrace_entry_ptr != NULL);
 
@@ -777,18 +861,18 @@ lx_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 		return (0);
 
 	case B_STORE_ARGS:
-			/*
-			 * B_STORE_ARGS subcommand
-			 * arg1 = address of struct to be copied in
-			 * arg2 = size of the struct being copied in
-			 * arg3-arg6 ignored
-			 * rval = the amount of data copied.
-			 */
+		/*
+		 * B_STORE_ARGS subcommand
+		 * arg1 = address of struct to be copied in
+		 * arg2 = size of the struct being copied in
+		 * arg3-arg6 ignored
+		 * rval = the amount of data copied.
+		 */
 		{
 			int err;
-			lx_lwp_data_t *lwpd = ttolxlwp(curthread);
 			void *buf;
 
+			lwpd = ttolxlwp(curthread);
 			/* only have upper limit because arg2 is unsigned */
 			if (arg2 > LX_BR_ARGS_SIZE_MAX) {
 				return (EINVAL);
@@ -817,16 +901,26 @@ lx_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 			*rval = arg2;
 			return (0);
 		}
-	default:
-		linux_call = cmd - B_EMULATE_SYSCALL;
+
+	case B_CLR_NTV_SYSC_FLAG:
+		lwpd = ttolxlwp(curthread);
+		lwpd->br_libc_syscall = 0;
+		return (0);
+
+	case B_SIGNAL_RETURN:
 		/*
-		 * Only checking against highest syscall number for all kernel
-		 * versions, since check for specific kernel version is done
-		 * in userland prior to this call, and duplicating logic would
-		 * be redundant.
+		 * Set the syscall mode and do the setcontext syscall.
+		 * arg1 = mode
+		 * arg2 = ucontext_t pointer
 		 */
-		if (linux_call >= 0 && linux_call < LX_NSYSCALLS) {
-			*rval = lx_emulate_syscall(linux_call, arg1, arg2,
+		lwpd = ttolxlwp(curthread);
+		lwpd->br_libc_syscall = arg1;
+		return (getsetcontext(SETCONTEXT, (void *)arg2));
+
+	default:
+		ike_call = cmd - B_IKE_SYSCALL;
+		if (ike_call > 0 && ike_call <= LX_N_IKE_FUNCS) {
+			*rval = lx_emulate_syscall(ike_call, arg1, arg2,
 			    arg3, arg4, arg5, arg6);
 			return (0);
 		}
@@ -847,8 +941,6 @@ lx_set_kern_version(zone_t *zone, char *vers)
 	lx_zone_data_t *lxzd = (lx_zone_data_t *)zone->zone_brand_data;
 
 	(void) strlcpy(lxzd->lxzd_kernel_version, vers, LX_VERS_MAX);
-	if (strncmp(vers, "2.4", 3) != 0)
-		lxzd->lxzd_max_syscall = LX_NSYSCALLS_2_6;
 }
 
 /*
@@ -869,14 +961,37 @@ lx_copy_procdata(proc_t *child, proc_t *parent)
 	child->p_brand_data = cpd;
 }
 
-/*
- * Currently, only 32-bit branded ELF executables are supported.
- */
 #if defined(_LP64)
-#define	mapexec_brand		mapexec32_brand
-#else
-#define	elf32exec		elfexec
+static void
+Ehdr32to64(Elf32_Ehdr *src, Ehdr *dst)
+{
+	bcopy(src->e_ident, dst->e_ident, sizeof (src->e_ident));
+	dst->e_type =		src->e_type;
+	dst->e_machine =	src->e_machine;
+	dst->e_version =	src->e_version;
+	dst->e_entry =		src->e_entry;
+	dst->e_phoff =		src->e_phoff;
+	dst->e_shoff =		src->e_shoff;
+	dst->e_flags =		src->e_flags;
+	dst->e_ehsize =		src->e_ehsize;
+	dst->e_phentsize =	src->e_phentsize;
+	dst->e_phnum =		src->e_phnum;
+	dst->e_shentsize =	src->e_shentsize;
+	dst->e_shnum =		src->e_shnum;
+	dst->e_shstrndx =	src->e_shstrndx;
+}
 #endif /* _LP64 */
+
+static void
+restoreexecenv(struct execenv *ep, stack_t *sp)
+{
+	klwp_t *lwp = ttolwp(curthread);
+
+	setexecenv(ep);
+	lwp->lwp_sigaltstack.ss_sp = sp->ss_sp;
+	lwp->lwp_sigaltstack.ss_size = sp->ss_size;
+	lwp->lwp_sigaltstack.ss_flags = sp->ss_flags;
+}
 
 extern int elfexec(vnode_t *, execa_t *, uarg_t *, intpdata_t *, int,
     long *, int, caddr_t, cred_t *, int);
@@ -885,7 +1000,8 @@ extern int elf32exec(struct vnode *, execa_t *, uarg_t *, intpdata_t *, int,
     long *, int, caddr_t, cred_t *, int);
 
 /*
- * Exec routine called by elfexec() to load 32-bit Linux binaries.
+ * Exec routine called by elfexec() to load either 32-bit or 64-bit Linux
+ * binaries.
  */
 static int
 lx_elfexec(struct vnode *vp, struct execa *uap, struct uarg *args,
@@ -894,63 +1010,124 @@ lx_elfexec(struct vnode *vp, struct execa *uap, struct uarg *args,
 {
 	int		error;
 	vnode_t		*nvp;
-	auxv32_t	phdr_auxv32[3] = {
-	    { AT_SUN_BRAND_LX_PHDR, 0 },
-	    { AT_SUN_BRAND_LX_INTERP, 0 },
-	    { AT_SUN_BRAND_AUX3, 0 }
-	};
-	Elf32_Ehdr	ehdr;
-	Elf32_Addr	uphdr_vaddr;
+	Ehdr		ehdr;
+	Addr		uphdr_vaddr;
 	intptr_t	voffset;
 	int		interp;
 	uintptr_t	ldaddr = NULL;
 	int		i;
+	proc_t		*p = ttoproc(curthread);
+	klwp_t		*lwp = ttolwp(curthread);
 	struct execenv	env;
+	struct execenv	origenv;
+	stack_t		orig_sigaltstack;
 	struct user	*up = PTOU(ttoproc(curthread));
 	lx_elf_data_t	*edp =
 	    &((lx_proc_data_t *)ttoproc(curthread)->p_brand_data)->l_elf_data;
+	char		*lib_path = NULL;
+	char		*lx_linker_path = NULL;
 
 	ASSERT(ttoproc(curthread)->p_brand == &lx_brand);
 	ASSERT(ttoproc(curthread)->p_brand_data != NULL);
 
-#if defined(_LP64)
-	/* Currently, only 32-bit branded ELF executables are supported. */
-	if (args->execswp->exec_func == elfexec) {
-		uprintf("64-bit applications are not supported");
-		return (ENOEXEC);
+	if (args->to_model == DATAMODEL_NATIVE) {
+		lib_path = LX_LIB_PATH;
+		lx_linker_path = LX_LINKER;
 	}
-#endif /* _LP64 */
+#if defined(_LP64)
+	else {
+		lib_path = LX_LIB_PATH32;
+		lx_linker_path = LX_LINKER32;
+	}
+#endif
 
 	/*
 	 * Set the brandname and library name for the new process so that
 	 * elfexec() puts them onto the stack.
 	 */
 	args->brandname = LX_BRANDNAME;
-	args->emulator = LX_LIB_PATH;
+	args->emulator = lib_path;
 
 	/*
-	 * We will exec the brand library, and map in the linux linker and the
-	 * linux executable.
+	 * We will first exec the brand library, then map in the linux
+	 * executable and the linux linker.
 	 */
-	if ((error = lookupname(LX_LIB_PATH, UIO_SYSSPACE, FOLLOW, NULLVPP,
+	if ((error = lookupname(lib_path, UIO_SYSSPACE, FOLLOW, NULLVPP,
 	    &nvp))) {
-		uprintf("%s: not found.", LX_LIB);
+		uprintf("%s: not found.", lib_path);
 		return (error);
 	}
 
-	if ((error = elf32exec(nvp, uap, args, idata, level + 1, execsz, setid,
-	    exec_file, cred, brand_action))) {
-		VN_RELE(nvp);
+	/*
+	 * We will eventually set the p_exec member to be the vnode for the new
+	 * executable when we call setexecenv(). However, if we get an error
+	 * before that call we need to restore the execenv to its original
+	 * values so that when we return to the caller fop_close() works
+	 * properly while cleaning up from the failed exec().  Restoring the
+	 * original value will also properly decrement the 2nd VN_RELE that we
+	 * took on the brand library.
+	 */
+	origenv.ex_bssbase = p->p_bssbase;
+	origenv.ex_brkbase = p->p_brkbase;
+	origenv.ex_brksize = p->p_brksize;
+	origenv.ex_vp = p->p_exec;
+	orig_sigaltstack.ss_sp = lwp->lwp_sigaltstack.ss_sp;
+	orig_sigaltstack.ss_size = lwp->lwp_sigaltstack.ss_size;
+	orig_sigaltstack.ss_flags = lwp->lwp_sigaltstack.ss_flags;
+
+	if (args->to_model == DATAMODEL_NATIVE) {
+		error = elfexec(nvp, uap, args, idata, level + 1, execsz,
+		    setid, exec_file, cred, brand_action);
+	}
+#if defined(_LP64)
+	else {
+		error = elf32exec(nvp, uap, args, idata, level + 1, execsz,
+		    setid, exec_file, cred, brand_action);
+	}
+#endif
+	VN_RELE(nvp);
+	if (error != 0) {
+		restoreexecenv(&origenv, &orig_sigaltstack);
 		return (error);
 	}
-	VN_RELE(nvp);
+
+	/*
+	 * exec-ed in the brand library above.
+	 * The u_auxv vectors are now setup by elfexec to point to the
+	 * brand emulation library and its linker.
+	 */
 
 	bzero(&env, sizeof (env));
 
-	if ((error = mapexec_brand(vp, args, &ehdr, &uphdr_vaddr, &voffset,
-	    exec_file, &interp, &env.ex_bssbase, &env.ex_brkbase,
-	    &env.ex_brksize, NULL, NULL)))
+	/*
+	 * map in the the Linux executable
+	 */
+	if (args->to_model == DATAMODEL_NATIVE) {
+		error = mapexec_brand(vp, args, &ehdr, &uphdr_vaddr,
+		    &voffset, exec_file, &interp, &env.ex_bssbase,
+		    &env.ex_brkbase, &env.ex_brksize, NULL, NULL);
+	}
+#if defined(_LP64)
+	else {
+		Elf32_Ehdr	ehdr32;
+		Elf32_Addr	uphdr_vaddr32;
+
+		error = mapexec32_brand(vp, args, &ehdr32, &uphdr_vaddr32,
+		    &voffset, exec_file, &interp, &env.ex_bssbase,
+		    &env.ex_brkbase, &env.ex_brksize, NULL, NULL);
+
+		Ehdr32to64(&ehdr32, &ehdr);
+
+		if (uphdr_vaddr32 == (Elf32_Addr)-1)
+			uphdr_vaddr = (Addr)-1;
+		else
+			uphdr_vaddr = uphdr_vaddr32;
+	}
+#endif
+	if (error != 0) {
+		restoreexecenv(&origenv, &orig_sigaltstack);
 		return (error);
+	}
 
 	/*
 	 * Save off the important properties of the lx executable. The brand
@@ -979,22 +1156,48 @@ lx_elfexec(struct vnode *vp, struct execa *uap, struct uarg *args,
 		 * store relevant information about it in the aux vector, where
 		 * the brand library can find it.
 		 */
-		if ((error = lookupname(LX_LINKER, UIO_SYSSPACE, FOLLOW,
+		if ((error = lookupname(lx_linker_path, UIO_SYSSPACE, FOLLOW,
 		    NULLVPP, &nvp))) {
-			uprintf("%s: not found.", LX_LINKER);
+			uprintf("%s: not found.", lx_linker_path);
+			restoreexecenv(&origenv, &orig_sigaltstack);
 			return (error);
 		}
-		if ((error = mapexec_brand(nvp, args, &ehdr, &uphdr_vaddr,
-		    &voffset, exec_file, &interp, NULL, NULL, NULL, NULL,
-		    &ldaddr))) {
-			VN_RELE(nvp);
-			return (error);
+
+		/*
+		 * map in the Linux linker
+		 */
+		if (args->to_model == DATAMODEL_NATIVE) {
+			error = mapexec_brand(nvp, args, &ehdr,
+			    &uphdr_vaddr, &voffset, exec_file, &interp, NULL,
+			    NULL, NULL, NULL, &ldaddr);
 		}
+#if defined(_LP64)
+		else {
+			Elf32_Ehdr	ehdr32;
+			Elf32_Addr	uphdr_vaddr32;
+
+			error = mapexec32_brand(nvp, args, &ehdr32,
+			    &uphdr_vaddr32, &voffset, exec_file, &interp, NULL,
+			    NULL, NULL, NULL, &ldaddr);
+
+			Ehdr32to64(&ehdr32, &ehdr);
+
+			if (uphdr_vaddr32 == (Elf32_Addr)-1)
+				uphdr_vaddr = (Addr)-1;
+			else
+				uphdr_vaddr = uphdr_vaddr32;
+		}
+#endif
+
 		VN_RELE(nvp);
+		if (error != 0) {
+			restoreexecenv(&origenv, &orig_sigaltstack);
+			return (error);
+		}
 
 		/*
 		 * Now that we know the base address of the brand's linker,
-		 * place it in the aux vector.
+		 * we also save this for later use by the brand library.
 		 */
 		edp->ed_base = voffset;
 		edp->ed_ldentry = voffset + ehdr.e_entry;
@@ -1067,21 +1270,38 @@ lx_elfexec(struct vnode *vp, struct execa *uap, struct uarg *args,
 	 * least try to keep /proc's view of the aux vector consistent with
 	 * what's on the process stack.
 	 */
-	phdr_auxv32[0].a_un.a_val = edp->ed_phdr;
-	phdr_auxv32[1].a_un.a_val = ldaddr;
+	if (args->to_model == DATAMODEL_NATIVE) {
+		auxv_t phdr_auxv[3] = {
+		    { AT_SUN_BRAND_LX_PHDR, 0 },
+		    { AT_SUN_BRAND_LX_INTERP, 0 },
+		    { AT_SUN_BRAND_AUX3, 0 }
+		};
+		phdr_auxv[0].a_un.a_val = edp->ed_phdr;
+		phdr_auxv[1].a_un.a_val = ldaddr;
+		phdr_auxv[2].a_type = AT_CLKTCK;
+		phdr_auxv[2].a_un.a_val = hz;
 
-	/*
-	 * Linux 2.6 (or greater) programs such as ps will print an error
-	 * message if the following aux entry is missing
-	 */
-	if (strncmp(lx_get_zone_kern_version(curzone), "2.4", 3) != 0) {
+		if (copyout(&phdr_auxv, args->auxp_brand,
+		    sizeof (phdr_auxv)) == -1)
+			return (EFAULT);
+	}
+#if defined(_LP64)
+	else {
+		auxv32_t phdr_auxv32[3] = {
+		    { AT_SUN_BRAND_LX_PHDR, 0 },
+		    { AT_SUN_BRAND_LX_INTERP, 0 },
+		    { AT_SUN_BRAND_AUX3, 0 }
+		};
+		phdr_auxv32[0].a_un.a_val = edp->ed_phdr;
+		phdr_auxv32[1].a_un.a_val = ldaddr;
 		phdr_auxv32[2].a_type = AT_CLKTCK;
 		phdr_auxv32[2].a_un.a_val = hz;
-	}
 
-	if (copyout(&phdr_auxv32, args->auxp_brand,
-	    sizeof (phdr_auxv32)) == -1)
-		return (EFAULT);
+		if (copyout(&phdr_auxv32, args->auxp_brand,
+		    sizeof (phdr_auxv32)) == -1)
+			return (EFAULT);
+	}
+#endif
 
 	/*
 	 * /proc uses the AT_ENTRY aux vector entry to deduce
@@ -1099,14 +1319,22 @@ lx_elfexec(struct vnode *vp, struct execa *uap, struct uarg *args,
 	 * but leave AT_BASE to be the address of the Solaris linker.
 	 */
 	for (i = 0; i < __KERN_NAUXV_IMPL; i++) {
-		if (up->u_auxv[i].a_type == AT_ENTRY)
+		switch (up->u_auxv[i].a_type) {
+		case AT_ENTRY:
 			up->u_auxv[i].a_un.a_val = edp->ed_entry;
+			break;
 
-		if (up->u_auxv[i].a_type == AT_SUN_BRAND_LX_PHDR)
+		case AT_SUN_BRAND_LX_PHDR:
 			up->u_auxv[i].a_un.a_val = edp->ed_phdr;
+			break;
 
-		if (up->u_auxv[i].a_type == AT_SUN_BRAND_LX_INTERP)
+		case AT_SUN_BRAND_LX_INTERP:
 			up->u_auxv[i].a_un.a_val = ldaddr;
+			break;
+
+		default:
+			break;
+		}
 	}
 
 	return (0);

@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved.
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2014, Joyent, Inc. All rights reserved.
  */
 
 #include <sys/errno.h>
@@ -83,6 +84,7 @@ struct brand_ops s10_brops = {
 	s10_elfexec,
 	s10_sigset_native_to_s10,
 	s10_sigset_s10_to_native,
+	NULL,
 	S10_NSIG,
 	NULL,
 	NULL,

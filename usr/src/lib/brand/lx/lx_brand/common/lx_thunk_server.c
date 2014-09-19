@@ -144,6 +144,7 @@
 #include <strings.h>
 #include <sys/lx_debug.h>
 #include <sys/lx_misc.h>
+#include <sys/lx_syscall.h>
 #include <sys/lx_thread.h>
 #include <sys/lx_thunk_server.h>
 #include <sys/varargs.h>
@@ -372,7 +373,9 @@ lx_call(lx_handle_sym_t lx_ch, uintptr_t p1, uintptr_t p2,
 	lx_regs_t		*rp;
 	uintptr_t		ret;
 	fp8_t			lx_funcp = (fp8_t)lx_ch;
+#if defined(_ILP32)
 	long			cur_gs;
+#endif
 
 	rp = lx_syscall_regs();
 
@@ -380,12 +383,15 @@ lx_call(lx_handle_sym_t lx_ch, uintptr_t p1, uintptr_t p2,
 	lx_debug("lx_call: loading Linux gs, rp = 0x%p, gs = 0x%p",
 	    rp, rp->lxr_gs);
 
+#if defined(_ILP32)
 	lx_swap_gs(rp->lxr_gs, &cur_gs);
+#endif
 	ret = lx_funcp(p1, p2, p3, p4, p5, p6, p7, p8);
+#if defined(_ILP32)
 	lx_swap_gs(cur_gs, &rp->lxr_gs);
+#endif
 
 	lx_debug("lx_call: returned from Linux code at 0x%p (%p)", lx_ch, ret);
-	lx_debug("lx_call: restored solaris gs 0x%p", cur_gs);
 	return (ret);
 }
 

@@ -22,9 +22,8 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2014 Joyent, Inc.  All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <errno.h>
 #include <time.h>
@@ -36,14 +35,14 @@
 
 /*
  * time() - This cannot be passthrough because on Linux a bad buffer will
- *	    set errno to EFAULT, and on Solaris the failure mode is documented
+ *	    set errno to EFAULT, and on Illumos the failure mode is documented
  *	    as "undefined."
  *
- *	    (At present, Solaris' time(2) will segmentation fault, as the call
+ *	    (At present, Illumos' time(2) will segmentation fault, as the call
  *	    is simply a libc wrapper atop the time() syscall that will
  *	    dereference the passed  pointer if it is non-zero.)
  */
-int
+long
 lx_time(uintptr_t p1)
 {
 	time_t ret = time((time_t *)0);
@@ -56,10 +55,10 @@ lx_time(uintptr_t p1)
 }
 
 /*
- * times() - The Linux implementation avoids writing to NULL, while Solaris
+ * times() - The Linux implementation avoids writing to NULL, while Illumos
  *	     returns EFAULT.
  */
-int
+long
 lx_times(uintptr_t p1)
 {
 	clock_t ret;
@@ -76,15 +75,15 @@ lx_times(uintptr_t p1)
 
 /*
  * setitimer() - the Linux implementation can handle tv_usec values greater
- *		 than 1,000,000 where Solaris would return EINVAL.
+ *		 than 1,000,000 where Illumos would return EINVAL.
  *
  *		 There's still an issue here where Linux can handle a
- *		 tv_sec value greater than 100,000,000 but Solaris cannot,
+ *		 tv_sec value greater than 100,000,000 but Illumos cannot,
  *		 but that would also mean setting an interval timer to fire
  *		 over _three years_ in the future so it's unlikely anything
  *		 other than Linux test suites will trip over it.
  */
-int
+long
 lx_setitimer(uintptr_t p1, uintptr_t p2, uintptr_t p3)
 {
 	struct itimerval itv;
@@ -116,7 +115,7 @@ lx_setitimer(uintptr_t p1, uintptr_t p2, uintptr_t p3)
 	}
 
 	return ((setitimer((int)p1, itp, (struct itimerval *)p3) != 0) ?
-		-errno : 0);
+	    -errno : 0);
 }
 
 /*
@@ -133,7 +132,7 @@ struct lx_timezone {
  * as pass-through calls to Solaris' libc due to the need to return EFAULT
  * for a bad buffer rather than die with a segmentation fault.
  */
-int
+long
 lx_gettimeofday(uintptr_t p1, uintptr_t p2)
 {
 	struct timeval tv;
@@ -158,7 +157,7 @@ lx_gettimeofday(uintptr_t p1, uintptr_t p2)
 	return (0);
 }
 
-int
+long
 lx_settimeofday(uintptr_t p1, uintptr_t p2)
 {
 	struct timeval tv;

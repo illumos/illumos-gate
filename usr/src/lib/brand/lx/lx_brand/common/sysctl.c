@@ -21,9 +21,8 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2014 Joyent, Inc.  All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <alloca.h>
 #include <errno.h>
@@ -59,7 +58,7 @@ struct lx_sysctl_args {
 #define	LX_KERN_OSREV		3
 #define	LX_KERN_VERSION		4
 
-int
+long
 lx_sysctl(uintptr_t raw)
 {
 	struct lx_sysctl_args args;
