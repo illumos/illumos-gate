@@ -79,8 +79,8 @@ inotify_add_watch(int fd, const char *pathname, uint32_t mask)
 	}
 
 	if (!(buf.st_mode & S_IFDIR) || !(mask & IN_CHILD_EVENTS)) {
-		(void) ioctl(fd, INOTIFYIOC_ACTIVATE, wd);
 		(void) close(dirfd);
+		(void) ioctl(fd, INOTIFYIOC_ACTIVATE, wd);
 		return (wd);
 	}
 
