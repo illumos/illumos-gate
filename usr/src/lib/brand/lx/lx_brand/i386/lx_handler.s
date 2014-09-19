@@ -37,6 +37,10 @@
 
 #include "assym.h"
 
+/* 32-bit syscall numbers */
+#define	LX_SYS_sigreturn	119
+#define	LX_SYS_rt_sigreturn	173
+
 #define	PIC_SETUP(r)					\
 	call	9f;					\
 9:	popl	r;					\
@@ -251,7 +255,7 @@ lx_sigreturn_tolibc(uintptr_t sp)
 
 	ENTRY_NP(lx_setup_clone)
 	xorl	%ebp, %ebp	/* terminating stack */
-	popl	%edx		/* eat the start_clone() return address */
+	popl	%edx		/* eat the clone_start() return address */
 	popl	%gs		/* Switch back to the Linux libc's %gs */
 	popl	%edx		/* Linux clone() return address */
 	popl	%esp		/* New stack pointer */
@@ -273,12 +277,15 @@ lx_sigreturn_tolibc(uintptr_t sp)
 	 * like this:
 	 *
 	 * 	=================================================
-	 *	| Linux signal frame built by lx_stackbuilder() |
+	 * |	| %ebp						|
+	 * | 	=================================================
+	 * |	| LX_SIGRT_MAGIC				|
+	 * | 	=================================================
+	 * V	| Linux signal frame built by lx_stackbuilder() |
 	 * 	=================================================
-	 *	| LX_SIGRT_MAGIC				|
-	 * 	=================================================
-	 *	| %ebp						|
-	 * 	=================================================
+	 *
+	 * The stack frame (%ebp) will be reset to its original value (i.e. the
+	 * previous frame) on entry to the Linux signal handler.
 	 */
 	ENTRY_NP(lx_sigdeliver)
 	pushl   %ebp
@@ -287,7 +294,7 @@ lx_sigreturn_tolibc(uintptr_t sp)
 	pushl	%edx			/* save ucontext_t ptr for later */
 	pushl	$LX_SIGRT_MAGIC		/* marker value for lx_(rt)_sigreturn */
 
-	subl    20(%ebp), %esp		/* create stack buffer */
+	subl    20(%ebp), %esp		/* create stack_size stack buffer */
 	pushl   %esp			/* push stack pointer */
 	pushl   %edx			/* push pointer to ucontext_t */
 	pushl   12(%ebp)		/* push pointer to siginfo_t */
@@ -373,6 +380,6 @@ lx_sigreturn_tolibc(uintptr_t sp)
 	ENTRY_NP(lx_sigreturn_tolibc)
 	movl	4(%esp), %esp		/* set %esp to passed value */
 	popl	%ebp			/* restore proper %ebp */
-	ret				/* return to libc interposer */
+	ret				/* return to lx_call_user_handler */
 	SET_SIZE(lx_sigreturn_tolibc)
 #endif	/* lint */

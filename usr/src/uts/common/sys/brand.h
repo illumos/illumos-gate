@@ -125,6 +125,7 @@ struct brand_ops {
 	    struct cred *cred, int brand_action);
 	void	(*b_sigset_native_to_brand)(sigset_t *);
 	void	(*b_sigset_brand_to_native)(sigset_t *);
+	void	(*b_psig_to_proc)(proc_t *, kthread_t *, int);
 	int	b_nsig;
 	void	(*b_exit_with_sig)(proc_t *, sigqueue_t *, void *);
 	boolean_t (*b_wait_filter)(proc_t *, proc_t *);

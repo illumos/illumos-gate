@@ -22,7 +22,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
+ * Copyright 2014, Joyent, Inc.  All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -60,6 +60,7 @@
 #include <sys/cyclic.h>
 #include <sys/dtrace.h>
 #include <sys/sdt.h>
+#include <sys/brand.h>
 
 const k_sigset_t nullsmask = {0, 0, 0};
 
@@ -1412,6 +1413,9 @@ psig(void)
 
 		DTRACE_PROC3(signal__handle, int, sig, k_siginfo_t *,
 		    sip, void (*)(void), func);
+
+		if (PROC_IS_BRANDED(p) && BROP(p)->b_psig_to_proc)
+			BROP(p)->b_psig_to_proc(p, t, sig);
 
 		lwp->lwp_cursig = 0;
 		lwp->lwp_extsig = 0;

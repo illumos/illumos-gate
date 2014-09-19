@@ -123,6 +123,13 @@
 #define	LX_PTRACE_SYSCALL	24
 #define	LX_PTRACE_SETOPTIONS	0x4200
 
+/* execve syscall numbers for 64-bit vs. 32-bit */
+#if defined(_LP64)
+#define	LX_SYS_execve	520
+#else
+#define	LX_SYS_execve	11
+#endif
+
 /*
  * This corresponds to the user_i387_struct Linux structure.
  */
@@ -397,6 +404,7 @@ getregs(pid_t pid, lwpid_t lwpid, lx_user_regs_t *rp)
 
 		(void) close(fd);
 
+#if defined(_ILP32)
 		rp->lxur_ebx = regs.lxr_ebx;
 		rp->lxur_ecx = regs.lxr_ecx;
 		rp->lxur_edx = regs.lxr_edx;
@@ -414,10 +422,12 @@ getregs(pid_t pid, lwpid_t lwpid, lx_user_regs_t *rp)
 		rp->lxur_eflags = status.pr_reg[EFL];
 		rp->lxur_esp = regs.lxr_esp;
 		rp->lxur_xss = status.pr_reg[SS];
+#endif
 
 	} else {
 		(void) close(fd);
 
+#if defined(_ILP32)
 		rp->lxur_ebx = status.pr_reg[EBX];
 		rp->lxur_ecx = status.pr_reg[ECX];
 		rp->lxur_edx = status.pr_reg[EDX];
@@ -448,6 +458,7 @@ getregs(pid_t pid, lwpid_t lwpid, lx_user_regs_t *rp)
 			rp->lxur_eax = 0;
 			rp->lxur_orig_eax = LX_SYS_execve;
 		}
+#endif
 	}
 
 	return (0);
@@ -474,6 +485,7 @@ setregs(pid_t pid, lwpid_t lwpid, const lx_user_regs_t *rp)
 	 * the /proc interface to set register values;
 	 */
 	if ((addr = syscall_regs(fd, status.pr_reg[EBP], pid)) != 0) {
+#if defined(_ILP32)
 		lx_regs_t regs;
 
 		regs.lxr_ebx = rp->lxur_ebx;
@@ -493,19 +505,23 @@ setregs(pid_t pid, lwpid_t lwpid, const lx_user_regs_t *rp)
 			lx_debug("ptrace failed to write register set");
 			return (-EIO);
 		}
+#endif
 
 		(void) close(fd);
 
+#if defined(_ILP32)
 		status.pr_reg[DS] = rp->lxur_xds;
 		status.pr_reg[ES] = rp->lxur_xes;
 		status.pr_reg[FS] = rp->lxur_xfs;
 		status.pr_reg[CS] = rp->lxur_xcs;
 		status.pr_reg[EFL] = rp->lxur_eflags;
 		status.pr_reg[SS] = rp->lxur_xss;
+#endif
 
 	} else {
 		(void) close(fd);
 
+#if defined(_ILP32)
 		status.pr_reg[EBX] = rp->lxur_ebx;
 		status.pr_reg[ECX] = rp->lxur_ecx;
 		status.pr_reg[EDX] = rp->lxur_edx;
@@ -523,6 +539,7 @@ setregs(pid_t pid, lwpid_t lwpid, const lx_user_regs_t *rp)
 		status.pr_reg[UESP] = rp->lxur_esp;
 		status.pr_reg[SS] = rp->lxur_xss;
 		status.pr_reg[SS] = rp->lxur_xss;
+#endif
 	}
 
 	if ((fd = open_lwpfile(pid, lwpid, O_WRONLY, "lwpctl")) < 0)
@@ -546,14 +563,18 @@ getfpregs(pid_t pid, lwpid_t lwpid, lx_user_fpregs_t *rp)
 {
 	lwpstatus_t status;
 	struct _fpstate *fp;
+#if defined(_ILP32)
 	char *data;
-	int ret, i;
+	int i;
+#endif
+	int ret;
 
 	if ((ret = get_lwpstatus(pid, lwpid, &status)) != 0)
 		return (ret);
 
 	fp = (struct _fpstate *)&status.pr_fpreg.fp_reg_set.fpchip_state;
 
+#if defined(_ILP32)
 	rp->lxuf_cwd = fp->cw;
 	rp->lxuf_swd = fp->sw;
 	rp->lxuf_twd = fp->tag;
@@ -570,6 +591,7 @@ getfpregs(pid_t pid, lwpid_t lwpid, lx_user_fpregs_t *rp)
 		bcopy(&fp->_st[i], data, 10);
 		data += 10;
 	}
+#endif
 
 	return (0);
 }
@@ -582,15 +604,19 @@ setfpregs(pid_t pid, lwpid_t lwpid, const lx_user_fpregs_t *rp)
 		long cmd;
 		prfpregset_t regs;
 	} ctl;
+#if defined(_ILP32)
 	struct _fpstate *fp = (struct _fpstate *)&ctl.regs;
 	char *data;
-	int ret, i, fd;
+	int i;
+#endif
+	int ret, fd;
 
 	if ((ret = get_lwpstatus(pid, lwpid, &status)) != 0)
 		return (ret);
 
 	bcopy(&status.pr_fpreg, &ctl.regs, sizeof (ctl.regs));
 
+#if defined(_ILP32)
 	fp->cw = rp->lxuf_cwd;
 	fp->sw = rp->lxuf_swd;
 	fp->tag = rp->lxuf_twd;
@@ -607,6 +633,7 @@ setfpregs(pid_t pid, lwpid_t lwpid, const lx_user_fpregs_t *rp)
 		bcopy(data, &fp->_st[i], 10);
 		data += 10;
 	}
+#endif
 
 	if ((fd = open_lwpfile(pid, lwpid, O_WRONLY, "lwpctl")) < 0)
 		return (-ESRCH);
@@ -626,6 +653,7 @@ setfpregs(pid_t pid, lwpid_t lwpid, const lx_user_fpregs_t *rp)
 static int
 getfpxregs(pid_t pid, lwpid_t lwpid, lx_user_fpxregs_t *rp)
 {
+#if defined(_ILP32)
 	lwpstatus_t status;
 	struct _fpstate *fp;
 	int ret, i;
@@ -651,6 +679,7 @@ getfpxregs(pid_t pid, lwpid_t lwpid, lx_user_fpxregs_t *rp)
 		bcopy(&fp->_st[i], &rp->lxux_st_space[i * 4],
 		    sizeof (fp->_st[i]));
 	}
+#endif
 
 	return (0);
 }
@@ -658,6 +687,7 @@ getfpxregs(pid_t pid, lwpid_t lwpid, lx_user_fpxregs_t *rp)
 static int
 setfpxregs(pid_t pid, lwpid_t lwpid, const lx_user_fpxregs_t *rp)
 {
+#if defined(_ILP32)
 	lwpstatus_t status;
 	struct {
 		long cmd;
@@ -695,6 +725,7 @@ setfpxregs(pid_t pid, lwpid_t lwpid, const lx_user_fpxregs_t *rp)
 	}
 
 	(void) close(fd);
+#endif
 
 	return (0);
 }
@@ -910,9 +941,8 @@ ptrace_traceme(void)
 	pid_t pid = getpid();
 
 	if (_lwp_self() != 1) {
-		lx_unsupported(gettext(
-		    "thread %d calling PTRACE_TRACEME is unsupported"),
-		    _lwp_self());
+		lx_unsupported("thread %d calling PTRACE_TRACEME is "
+		    "unsupported", _lwp_self());
 		return (-ENOTSUP);
 	}
 
@@ -997,7 +1027,7 @@ ptrace_peek_user(pid_t pid, lwpid_t lwpid, uintptr_t off, int *ret)
 		    offsetof(lx_user_t, lxu_regs));
 
 	} else if (off < LX_USER_BOUND(lxu_fpvalid)) {
-		lx_err(gettext("offset = %lu\n"), off);
+		lx_err("offset = %lu\n", off);
 		assert(0);
 	} else if (off < LX_USER_BOUND(lxu_i387)) {
 		lx_user_fpregs_t regs;
@@ -1009,37 +1039,37 @@ ptrace_peek_user(pid_t pid, lwpid_t lwpid, uintptr_t off, int *ret)
 		    offsetof(lx_user_t, lxu_i387));
 
 	} else if (off < LX_USER_BOUND(lxu_tsize)) {
-		lx_err(gettext("offset = %lu\n"), off);
+		lx_err("offset = %lu\n", off);
 		assert(0);
 	} else if (off < LX_USER_BOUND(lxu_dsize)) {
-		lx_err(gettext("offset = %lu\n"), off);
+		lx_err("offset = %lu\n", off);
 		assert(0);
 	} else if (off < LX_USER_BOUND(lxu_ssize)) {
-		lx_err(gettext("offset = %lu\n"), off);
+		lx_err("offset = %lu\n", off);
 		assert(0);
 	} else if (off < LX_USER_BOUND(lxu_start_code)) {
-		lx_err(gettext("offset = %lu\n"), off);
+		lx_err("offset = %lu\n", off);
 		assert(0);
 	} else if (off < LX_USER_BOUND(lxu_start_stack)) {
-		lx_err(gettext("offset = %lu\n"), off);
+		lx_err("offset = %lu\n", off);
 		assert(0);
 	} else if (off < LX_USER_BOUND(lxu_signal)) {
-		lx_err(gettext("offset = %lu\n"), off);
+		lx_err("offset = %lu\n", off);
 		assert(0);
 	} else if (off < LX_USER_BOUND(lxu_reserved)) {
-		lx_err(gettext("offset = %lu\n"), off);
+		lx_err("offset = %lu\n", off);
 		assert(0);
 	} else if (off < LX_USER_BOUND(lxu_ar0)) {
-		lx_err(gettext("offset = %lu\n"), off);
+		lx_err("offset = %lu\n", off);
 		assert(0);
 	} else if (off < LX_USER_BOUND(lxu_fpstate)) {
-		lx_err(gettext("offset = %lu\n"), off);
+		lx_err("offset = %lu\n", off);
 		assert(0);
 	} else if (off < LX_USER_BOUND(lxu_magic)) {
-		lx_err(gettext("offset = %lu\n"), off);
+		lx_err("offset = %lu\n", off);
 		assert(0);
 	} else if (off < LX_USER_BOUND(lxu_comm)) {
-		lx_err(gettext("offset = %lu\n"), off);
+		lx_err("offset = %lu\n", off);
 		assert(0);
 	} else if (off < LX_USER_BOUND(lxu_debugreg)) {
 		dreg = (off - offsetof(lx_user_t, lxu_debugreg)) / sizeof (int);
@@ -1052,8 +1082,8 @@ ptrace_peek_user(pid_t pid, lwpid_t lwpid, uintptr_t off, int *ret)
 		else
 			data = 0;
 	} else {
-		lx_unsupported(gettext(
-		    "unsupported ptrace %s user offset: 0x%x\n"), "peek", off);
+		lx_unsupported("unsupported ptrace peek user offset: 0x%x\n",
+		    off);
 		assert(0);
 		return (-ENOTSUP);
 	}
@@ -1129,8 +1159,7 @@ ptrace_poke_user(pid_t pid, lwpid_t lwpid, uintptr_t off, int data)
 		return (err);
 	}
 
-	lx_unsupported(gettext("unsupported ptrace %s user offset: 0x%x\n"),
-	    "poke", off);
+	lx_unsupported("unsupported ptrace poke user offset: 0x%x\n", off);
 	assert(0);
 	return (-ENOTSUP);
 }
@@ -1142,7 +1171,7 @@ ptrace_cont_common(int fd, int sig, int run, int step)
 	long *ctlp = ctl;
 	size_t size;
 
-	assert(0 <= sig && sig < LX_NSIG);
+	assert(0 <= sig && sig <= LX_NSIG);
 	assert(!step || run);
 
 	/*
@@ -1218,7 +1247,7 @@ ptrace_cont(pid_t lxpid, pid_t pid, lwpid_t lwpid, int sig, int step)
 	if (!is_traced(pid))
 		return (-ESRCH);
 
-	if (sig < 0 || sig >= LX_NSIG)
+	if (sig < 0 || sig > LX_NSIG)
 		return (-EINVAL);
 
 	if ((fd = open_lwpfile(pid, lwpid, O_WRONLY, "lwpctl")) < 0)
@@ -1598,7 +1627,7 @@ ptrace_attach(pid_t lxpid, pid_t pid, lwpid_t lwpid)
 
 	ctl = PCSTOP;
 	if (write(fd, &ctl, sizeof (ctl)) != sizeof (ctl)) {
-		lx_err(gettext("failed to stop %d/%d\n"), (int)pid, (int)lwpid);
+		lx_err("failed to stop %d/%d\n", (int)pid, (int)lwpid);
 		assert(0);
 	}
 
@@ -1618,7 +1647,7 @@ ptrace_detach(pid_t lxpid, pid_t pid, lwpid_t lwpid, int sig)
 	if (!is_traced(pid))
 		return (-ESRCH);
 
-	if (sig < 0 || sig >= LX_NSIG)
+	if (sig < 0 || sig > LX_NSIG)
 		return (-EINVAL);
 
 	if ((fd = open_lwpfile(pid, lwpid, O_WRONLY, "lwpctl")) < 0)
@@ -1761,7 +1790,7 @@ lx_ptrace_stop_if_option(int option)
 		(void) syscall(SYS_brand, B_PTRACE_STOP_FOR_OPT, option);
 }
 
-int
+long
 lx_ptrace(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4)
 {
 	pid_t pid, lxpid = (pid_t)p2;
@@ -2140,8 +2169,7 @@ found:
 
 	if (read(fd, &status.pr_lwp, sizeof (status.pr_lwp)) !=
 	    sizeof (status.pr_lwp)) {
-		lx_err(gettext("read lwpstatus failed %d %s"),
-		    fd, strerror(errno));
+		lx_err("read lwpstatus failed %d %s", fd, strerror(errno));
 		assert(0);
 	}
 
@@ -2212,8 +2240,7 @@ found:
 	case PR_FAULTED:
 	case PR_SUSPENDED:
 	default:
-		lx_err(gettext("didn't expect %d (%d %d)"),
-		    status.pr_lwp.pr_why,
+		lx_err("didn't expect %d (%d %d)", status.pr_lwp.pr_why,
 		    status.pr_lwp.pr_what, status.pr_lwp.pr_flags);
 		assert(0);
 	}

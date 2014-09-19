@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2014 Joyent, Inc.  All rights reserved.
  */
 
 /*
@@ -54,6 +55,7 @@
 #include <sys/lx_ptm.h>
 #include <sys/lx_audio.h>
 #include <sys/lx_fcntl.h>
+#include <sys/lx_syscall.h>
 #include <sys/modctl.h>
 
 /* define _KERNEL to get the devt manipulation macros */
@@ -129,11 +131,10 @@ lx_stat_init()
 		ret = modctl(MODGETMAJBIND,
 		    driver, strlen(driver) + 1, &major);
 		if (ret != 0) {
-			lx_err(gettext("%s%s) failed: %s\n"),
-			    "lx_stat_init(): modctl(MODGETMAJBIND, ",
-			    driver, strerror(errno));
-			lx_err(gettext("%s: %s translator disabled for: %s\n"),
-			    "lx_stat_init()", "devt", driver);
+			lx_err("lx_stat_init(): modctl(MODGETMAJBIND, %s) "
+			    "failed: %s\n", driver, strerror(errno));
+			lx_err("lx_stat_init(): devt translator disabled "
+			    "for: %s\n", driver);
 			devt_translators[i].dt_major = (major_t)-1;
 			continue;
 		}
@@ -152,13 +153,10 @@ lx_stat_init()
 			/* stat the device */
 			ret = stat(mt[j].mt_path, &st);
 			if (ret != 0) {
-				lx_err(gettext("%s%s) failed: %s\n"),
-				    "lx_stat_init(): stat(",
+				lx_err("lx_stat_init(): stat(%s) failed: %s\n",
 				    mt[j].mt_path, strerror(errno));
-				lx_err(gettext(
-				    "%s: %s translator disabled for: %s\n"),
-				    "lx_stat_init()", "devt",
-				    mt[j].mt_path);
+				lx_err("lx_stat_init(): devt translator "
+				    "disabled for: %s\n", mt[j].mt_path);
 				st.st_rdev = NODEV;
 			} else {
 				/* make sure the major node matches */
@@ -317,7 +315,7 @@ stat_convert(uintptr_t lx_statp, struct stat *s, int fd)
 		return (err);
 
 	if ((st_dev > USHRT_MAX) || (st_rdev > USHRT_MAX) ||
-	    (s->st_nlink  > USHRT_MAX) || (s->st_size > ULONG_MAX))
+	    (s->st_nlink  > USHRT_MAX) || (s->st_size > LONG_MAX))
 		return (-EOVERFLOW);
 
 	/* Linux seems to report a 0 st_size for all block devices */
@@ -327,13 +325,13 @@ stat_convert(uintptr_t lx_statp, struct stat *s, int fd)
 	bzero(&buf, sizeof (buf));
 	buf.st_dev = st_dev;
 	buf.st_rdev = st_rdev;
-	buf.st_ino = s->st_ino;
+	buf.st_ino = (lx_ino_t)s->st_ino;
 	buf.st_mode = s->st_mode;
 	buf.st_nlink = s->st_nlink;
 	buf.st_uid = LX_UID32_TO_UID16(s->st_uid);
 	buf.st_gid = LX_GID32_TO_GID16(s->st_gid);
-	buf.st_size = s->st_size;
-	buf.st_blksize = s->st_blksize;
+	buf.st_size = (lx_off_t)s->st_size;
+	buf.st_blksize = (lx_blksize_t)s->st_blksize;
 	buf.st_blocks = s->st_blocks;
 	buf.st_atime.ts_sec = s->st_atim.tv_sec;
 	buf.st_atime.ts_nsec = s->st_atim.tv_nsec;
@@ -389,7 +387,7 @@ stat64_convert(uintptr_t lx_statp, struct stat64 *s, int fd)
 	return (0);
 }
 
-int
+long
 lx_stat(uintptr_t p1, uintptr_t p2)
 {
 	char		*path = (char *)p1;
@@ -403,7 +401,7 @@ lx_stat(uintptr_t p1, uintptr_t p2)
 }
 
 
-int
+long
 lx_fstat(uintptr_t p1, uintptr_t p2)
 {
 	int		fd = (int)p1;
@@ -424,7 +422,7 @@ lx_fstat(uintptr_t p1, uintptr_t p2)
 }
 
 
-int
+long
 lx_lstat(uintptr_t p1, uintptr_t p2)
 {
 	char		*path = (char *)p1;
@@ -437,7 +435,7 @@ lx_lstat(uintptr_t p1, uintptr_t p2)
 	return (stat_convert(p2, &sbuf, -1));
 }
 
-int
+long
 lx_stat64(uintptr_t p1, uintptr_t p2)
 {
 	char			*path = (char *)p1;
@@ -451,7 +449,7 @@ lx_stat64(uintptr_t p1, uintptr_t p2)
 }
 
 
-int
+long
 lx_fstat64(uintptr_t p1, uintptr_t p2)
 {
 	int			fd = (int)p1;
@@ -471,7 +469,7 @@ lx_fstat64(uintptr_t p1, uintptr_t p2)
 	return (stat64_convert(p2, &sbuf, fd));
 }
 
-int
+long
 lx_fstatat64(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4)
 {
 	int atfd = (int)p1;
@@ -493,7 +491,7 @@ lx_fstatat64(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4)
 }
 
 
-int
+long
 lx_lstat64(uintptr_t p1, uintptr_t p2)
 {
 	char			*path = (char *)p1;

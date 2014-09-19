@@ -83,7 +83,7 @@ lx_tkill(pid_t pid, int lx_sig)
 	 * be sent to process IDs <= 0 as it doesn't overlay any special
 	 * semantics on the pid.
 	 */
-	if ((pid <= 0) || ((lx_sig < 0) || (lx_sig >= LX_NSIG)) ||
+	if ((pid <= 0) || ((lx_sig < 0) || (lx_sig > LX_NSIG)) ||
 	    ((sig = ltos_signo[lx_sig]) < 0))
 		return (set_errno(EINVAL));
 
@@ -171,7 +171,7 @@ lx_kill(pid_t lx_pid, int lx_sig)
 	struct proc *p;
 	int err, sig, nfound;
 
-	if ((lx_sig < 0) || (lx_sig >= LX_NSIG) ||
+	if ((lx_sig < 0) || (lx_sig > LX_NSIG) ||
 	    ((sig = ltos_signo[lx_sig]) < 0))
 		return (set_errno(EINVAL));
 

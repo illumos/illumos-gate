@@ -25,7 +25,7 @@
  */
 
 /*
- * Copyright (c) 2014, Joyent, Inc. All rights reserved.
+ * Copyright 2014 Joyent, Inc. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -42,7 +42,6 @@
 #include <zone.h>
 #include <sys/brand.h>
 #include <sys/epoll.h>
-#include <sys/inotify.h>
 
 #include <assert.h>
 #include <stdio.h>
@@ -77,7 +76,69 @@
 #include <sys/lx_thunk_server.h>
 
 /*
- * Map solaris errno to the linux equivalent.
+ * General emulation guidelines.
+ *
+ * Once the emulation handler has been installed onto the process, we need to
+ * be concerned about system calls made by the emulation, as well as any
+ * library calls which in turn make system calls. This is actually only an
+ * issue for the 64-bit case, since the kernel sycall entry point is common for
+ * both Illumos and Linux. The trampoline code in the kernel needs some way to
+ * distinguish when it should bounce out for emulation (Linux system call) vs.
+ * stay in the kernel (emulation system call). For the 32-bit case Linux uses
+ * int80 for system calls which is orthogonal to all of the Illumos system call
+ * entry points and thus there is no issue.
+ *
+ * To cope with this for the 64-bit case, we maintain a mode flag on each
+ * LWP so we can tell when a system call comes from Linux. We then set the mode
+ * flag to Illumos so that all future system calls from the emulation are
+ * handled correctly. The emulation must reset the mode when it is ready to
+ * return control to Linux. This is done via the B_CLR_NTV_SYSC_FLAG brand
+ * call. There is additional complexity with this mode switching in the
+ * case of a user-defined signal handler. This is described in the signal
+ * emulation code comments.
+ *
+ * *** Setting errno
+ *
+ * This emulation library is loaded onto a seperate link map from the
+ * application whose address space we're running in. The Linux libc errno is
+ * independent of our native libc errno. To pass back an error the emulation
+ * function should return -errno back to the Linux caller.
+ *
+ * *** General considerations
+ *
+ * The lx brand interposes on _all_ system calls. Linux system calls that need
+ * special handling in the kernel are redirected back to the kernel via the
+ * IN_KERNEL_EMULATION macro which uses a range of the brand system call
+ * command number to determine which in-kernel lx function to invoke.
+ *
+ * *** DTrace
+ *
+ * The lx-syscall DTrace provider (see lx_systrace_attach in
+ * uts/common/brand/lx/dtrace/lx_systrace.c) works as follows:
+ *
+ * When probes are enabled:
+ *    lx_systrace_enable -> lx_brand_systrace_enable
+ *
+ * This enables the trace jump table in the kernel (see
+ * uts/intel/brand/lx/lx_brand_asm.s which has the functions
+ * lx_brand_int80_enable and lx_brand_syscall_enable, and the corresponding
+ * patch points lx_brand_int80_patch_point and lx_brand_syscall_patch_point).
+ *
+ * The library code defines lx_handler_table and lx_handler_trace_table
+ * in the i386 and amd64 lx_handler.s code.
+ *
+ * The trace jump table enables lx_traceflag which is used in the lx_emulate
+ * function to make the B_SYSENTRY/B_SYSRETURN brandsys syscalls. These in turn
+ * will call lx_systrace_entry_ptr/lx_systrace_return_ptr so that we can DTrace
+ * the Linux syscalls via the provider.
+ *
+ * When probes are disbaled, we undo the patch points via:
+ *    lx_systrace_disable -> lx_brand_systrace_disable
+ */
+
+
+/*
+ * Map Illumos errno to the Linux equivalent.
  */
 static int stol_errno[] = {
 	0,   1,   2,   3,   4,   5,   6,   7,   8,   9,
@@ -135,14 +196,9 @@ int lx_traceflag;
 #define	NOSYS_UNDOC		4
 #define	NOSYS_OBSOLETE		5
 
-/*
- * SYS_PASSTHRU denotes a system call we can just call on behalf of the
- * branded process without having to translate the arguments.
- *
- * The restriction on this is that the call in question MUST return -1 to
- * denote an error.
- */
-#define	SYS_PASSTHRU		5
+#if defined(_ILP32)
+#define	EBP_HAS_ARG6		0x01
+#endif
 
 static char *nosys_msgs[] = {
 	"Not done yet",
@@ -153,9 +209,18 @@ static char *nosys_msgs[] = {
 	"Unsupported, obsolete system call"
 };
 
+/*
+ * Most syscalls return an int but some return something else, typically a
+ * ssize_t. This can be either an int or a long, depending on if we're compiled
+ * for 32-bit or 64-bit. To correctly propagate the -errno return code in the
+ * 64-bit case, we declare all emulation wrappers will return a long. Thus,
+ * when we save the return value into the %eax or %rax register and return to
+ * Linux, we will have the right size value in both the 32 and 64 bit cases.
+ */
+
 struct lx_sysent {
 	char    *sy_name;
-	int	(*sy_callc)();
+	long	(*sy_callc)();
 	char	sy_flags;
 	char	sy_narg;
 };
@@ -207,13 +272,6 @@ i_lx_msg(int fd, char *msg, va_list ap)
 		lx_debug(buf);
 
 	if (fd == 2) {
-		/*
-		 * We used to call syslog here but that idea is broken since
-		 * the syslog -> vsyslog code path in the native libc clearly
-		 * does things that will not work in the lx branded zone
-		 * (e.g. open /proc/{pid}/psinfo).
-		 */
-
 		/*
 		 * We let the user choose whether or not to see these
 		 * messages on the console.
@@ -372,12 +430,20 @@ lx_unsupported(char *msg, ...)
 		(void) kill(getpid(), SIGSYS);
 }
 
-extern void lx_runexe(void *argv, int32_t entry);
+extern void lx_runexe(void *argv, void *entry);
 int lx_init(int argc, char *argv[], char *envp[]);
 
 static int
 lx_emulate_args(lx_regs_t *rp, struct lx_sysent *s, uintptr_t *args)
 {
+#if defined(_LP64)
+	args[0] = rp->lxr_rdi;
+	args[1] = rp->lxr_rsi;
+	args[2] = rp->lxr_rdx;
+	args[3] = rp->lxr_r10;
+	args[4] = rp->lxr_r8;
+	args[5] = rp->lxr_r9;
+#else
 	/*
 	 * If the system call takes 6 args, then libc has stashed them in
 	 * memory at the address contained in %ebx. Except for some syscalls
@@ -395,6 +461,7 @@ lx_emulate_args(lx_regs_t *rp, struct lx_sysent *s, uintptr_t *args)
 		args[4] = rp->lxr_edi;
 		args[5] = rp->lxr_ebp;
 	}
+#endif
 
 	return (0);
 }
@@ -404,14 +471,21 @@ lx_emulate(lx_regs_t *rp)
 {
 	struct lx_sysent *s;
 	uintptr_t args[6];
+#if defined(_ILP32)
 	uintptr_t gs = rp->lxr_gs & 0xffff;	/* %gs is only 16 bits */
-	int syscall_num, ret;
+#endif
+	int syscall_num;
+	long ret;
 
+#if defined(_LP64)
+	syscall_num = rp->lxr_rax;
+#else
 	syscall_num = rp->lxr_eax;
+#endif
 
 	/*
-	 * lx_brand_int80_callback() ensures that the syscall_num is sane;
-	 * Use it as is.
+	 * lx_brand_int80_callback() or lx_brand_syscall_callback() ensures
+	 * that the syscall_num is sane; Use it as is.
 	 */
 	assert(syscall_num >= 0);
 	assert(syscall_num < (sizeof (sysents) / sizeof (sysents[0])));
@@ -433,14 +507,19 @@ lx_emulate(lx_regs_t *rp)
 	if (lx_traceflag != 0) {
 		/*
 		 * Part of the ptrace "interface" is that on syscall entry
-		 * %eax should be reported as -ENOSYS while the orig_eax
-		 * field of the user structure needs to contain the actual
-		 * system call number. If we end up stopping here, the
-		 * controlling process will dig the lx_regs_t structure out of
-		 * our stack.
+		 * %rax / %eax should be reported as -ENOSYS while the
+		 * orig_rax /  orig_eax field of the user structure needs to
+		 * contain the actual system call number. If we end up stopping
+		 * here, the controlling process will dig the lx_regs_t
+		 * structure out of our stack.
 		 */
+#if defined(_LP64)
+		rp->lxr_orig_rax = syscall_num;
+		rp->lxr_rax = -stol_errno[ENOSYS];
+#else
 		rp->lxr_orig_eax = syscall_num;
 		rp->lxr_eax = -stol_errno[ENOSYS];
+#endif
 
 		(void) syscall(SYS_brand, B_SYSENTRY, syscall_num, args);
 
@@ -453,7 +532,7 @@ lx_emulate(lx_regs_t *rp)
 	}
 
 	if (s->sy_callc == NULL) {
-		lx_unsupported(gettext("unimplemented syscall #%d (%s): %s\n"),
+		lx_unsupported("unimplemented syscall #%d (%s): %s\n",
 		    syscall_num, s->sy_name, nosys_msgs[(int)s->sy_flags]);
 		ret = -stol_errno[ENOTSUP];
 		goto out;
@@ -490,6 +569,10 @@ lx_emulate(lx_regs_t *rp)
 		    args[4], args[5]);
 	}
 
+	/*
+	 * On 64-bit code, the %gs will be 0 in both native and Linux code.
+	 */
+#if defined(_ILP32)
 	if (gs != LWPGS_SEL) {
 		lx_tsd_t *lx_tsd;
 
@@ -517,9 +600,8 @@ lx_emulate(lx_regs_t *rp)
 
 		if ((ret = thr_getspecific(lx_tsd_key,
 		    (void **)&lx_tsd)) != 0)
-			lx_err_fatal(gettext(
-			    "%s: unable to read thread-specific data: %s"),
-			    "lx_emulate", strerror(ret));
+			lx_err_fatal("lx_emulate: unable to read "
+			    "thread-specific data: %s", strerror(ret));
 
 		assert(lx_tsd != 0);
 
@@ -527,52 +609,65 @@ lx_emulate(lx_regs_t *rp)
 
 		lx_debug("lx_emulate(): gsp 0x%p, saved gs: 0x%x", lx_tsd, gs);
 	}
+#endif /* _ILP32 */
 
-	if (s->sy_flags == SYS_PASSTHRU)
-		lx_debug("\tCalling Solaris %s()", s->sy_name);
-
-	ret = s->sy_callc(args[0], args[1], args[2], args[3], args[4], args[5]);
+	ret = s->sy_callc(args[0], args[1], args[2], args[3], args[4],
+	    args[5]);
 
 	if (ret > -65536 && ret < 65536)
 		lx_debug("\t= %d", ret);
 	else
 		lx_debug("\t= 0x%x", ret);
 
-	if ((s->sy_flags == SYS_PASSTHRU) && (ret == -1)) {
-		ret = -stol_errno[errno];
-	} else {
-		/*
-		 * If the return value is between -4096 and 0 we assume it's an
-		 * error, so we translate the Solaris error number into the
-		 * Linux equivalent.
-		 */
-		if (ret < 0 && ret > -4096) {
-			if (-ret >=
-			    sizeof (stol_errno) / sizeof (stol_errno[0])) {
-				lx_debug("Invalid return value from emulated "
-				    "syscall %d (%s): %d\n",
-				    syscall_num, s->sy_name, ret);
-				assert(0);
-			}
-
-			ret = -stol_errno[-ret];
+	/*
+	 * If the return value is between -1 and -4095 then it's an errno, so
+	 * we translate the Illumos error number into the Linux equivalent.
+	 */
+	if (ret < 0 && ret > -4096) {
+		if (-ret >= sizeof (stol_errno) / sizeof (stol_errno[0])) {
+			lx_debug("Invalid return value from emulated "
+			    "syscall %d (%s): %d\n",
+			    syscall_num, s->sy_name, ret);
+			assert(0);
 		}
+
+		ret = -stol_errno[-ret];
 	}
 
 out:
 	/*
-	 * %eax holds the return code from the system call.
+	 * For 32-bit, %eax holds the return code from the system call. For
+	 * 64-bit, %rax holds the return code.
 	 */
+#if defined(_LP64)
+	rp->lxr_rax = ret;
+#else
 	rp->lxr_eax = ret;
+#endif
 
 	/*
 	 * If the trace flag is set, bounce into the kernel to let it do
 	 * any necessary tracing (DTrace or ptrace).
 	 */
 	if (lx_traceflag != 0) {
+#if defined(_LP64)
+		rp->lxr_orig_rax = syscall_num;
+#else
 		rp->lxr_orig_eax = syscall_num;
+#endif
 		(void) syscall(SYS_brand, B_SYSRETURN, syscall_num, ret);
 	}
+
+#if defined(_LP64)
+	/*
+	 * For 64-bit code this must be the last thing we do in the emulation
+	 * code path before we return back to the Linux program. This will
+	 * disable native syscalls so the next time a syscall happens on this
+	 * thread, it will come back into the emulation. We can omit the extra
+	 * syscall overhead in the 32-bit case.
+	 */
+	(void) syscall(SYS_brand, B_CLR_NTV_SYSC_FLAG);
+#endif
 }
 
 static void
@@ -604,28 +699,11 @@ lx_init(int argc, char *argv[], char *envp[])
 {
 	char		*r;
 	auxv_t		*ap;
-	int		*p, err;
+	long		*p;
+	int		err;
 	lx_elf_data_t	edp;
 	lx_brand_registration_t reg;
 	static lx_tsd_t lx_tsd;
-
-
-	/* Look up the PID that serves as init for this zone */
-	if ((err = lx_lpid_to_spid(1, &zoneinit_pid)) < 0)
-		lx_err_fatal(gettext(
-		    "Unable to find PID for zone init process: %s"),
-		    strerror(err));
-
-	/*
-	 * Ubuntu init will fail if its TERM environment variable is not set
-	 * so if we are running init, and TERM is not set, we set term and
-	 * reexec so that the new environment variable is propagated to the
-	 * linux application stack.
-	 */
-	if ((getpid() == zoneinit_pid) && (getenv("TERM") == NULL)) {
-		if (setenv("TERM", "vt100", 1) < 0 || execv(argv[0], argv) < 0)
-			lx_err_fatal(gettext("failed to set TERM"));
-	}
 
 	stack_bottom = 2 * sysconf(_SC_PAGESIZE);
 
@@ -706,38 +784,52 @@ lx_init(int argc, char *argv[], char *envp[])
 	reg.lxbr_version = LX_VERSION;
 	reg.lxbr_handler = (void *)&lx_handler_table;
 	reg.lxbr_tracehandler = (void *)&lx_handler_trace_table;
-	reg.lxbr_traceflag = &lx_traceflag;
+	reg.lxbr_traceflag = (void *)&lx_traceflag;
 
 	/*
-	 * Register the address of the user-space handler with the lx
-	 * brand module.
+	 * Register the address of the user-space handler with the lx brand
+	 * module. As a side-effect this leaves the thread in native syscall
+	 * mode so that it's ok to continue to make syscalls during setup. We
+	 * need to switch to Linux mode at the end of initialization.
 	 */
 	if (syscall(SYS_brand, B_REGISTER, &reg))
-		lx_err_fatal(gettext("failed to brand the process"));
+		lx_err_fatal("failed to brand the process");
+
+	/* Look up the PID that serves as init for this zone */
+	if ((err = lx_lpid_to_spid(1, &zoneinit_pid)) < 0)
+		lx_err_fatal("Unable to find PID for zone init process: %s",
+		    strerror(err));
 
 	/*
-	 * Download data about the lx executable from the kernel.
+	 * Ubuntu init will fail if its TERM environment variable is not set
+	 * so if we are running init, and TERM is not set, we set term and
+	 * reexec so that the new environment variable is propagated to the
+	 * linux application stack.
+	 */
+	if ((getpid() == zoneinit_pid) && (getenv("TERM") == NULL)) {
+		if (setenv("TERM", "vt100", 1) < 0 || execv(argv[0], argv) < 0)
+			lx_err_fatal("failed to set TERM");
+	}
+
+	/*
+	 * Upload data about the lx executable from the kernel.
 	 */
 	if (syscall(SYS_brand, B_ELFDATA, (void *)&edp))
-		lx_err_fatal(gettext(
-		    "failed to get required ELF data from the kernel"));
+		lx_err_fatal("failed to get required ELF data from the kernel");
 
 	if (lx_ioctl_init() != 0)
-		lx_err_fatal(gettext("failed to setup the %s translator"),
-		    "ioctl");
+		lx_err_fatal("failed to setup the ioctl translator");
 
 	if (lx_stat_init() != 0)
-		lx_err_fatal(gettext("failed to setup the %s translator"),
-		    "stat");
+		lx_err_fatal("failed to setup the stat translator");
 
 	if (lx_statfs_init() != 0)
-		lx_err_fatal(gettext("failed to setup the %s translator"),
-		    "statfs");
+		lx_err_fatal("failed to setup the statfs translator");
 
 	/*
 	 * Find the aux vector on the stack.
 	 */
-	p = (int *)envp;
+	p = (long *)envp;
 	while (*p != NULL)
 		p++;
 	/*
@@ -772,24 +864,28 @@ lx_init(int argc, char *argv[], char *envp[])
 
 	/* Setup signal handler information. */
 	if (lx_siginit())
-		lx_err_fatal(gettext(
-		    "failed to initialize lx signals for the branded process"));
+		lx_err_fatal("failed to initialize lx signals for the "
+		    "branded process");
 
 	/* Setup thread-specific data area for managing linux threads. */
 	if ((err = thr_keycreate(&lx_tsd_key, NULL)) != 0)
-		lx_err_fatal(
-		    gettext("%s failed: %s"), "thr_keycreate(lx_tsd_key)",
+		lx_err_fatal("thr_keycreate(lx_tsd_key) failed: %s",
 		    strerror(err));
 
 	lx_debug("thr_keycreate created lx_tsd_key (%d)", lx_tsd_key);
 
 	/* Initialize the thread specific data for this thread. */
 	bzero(&lx_tsd, sizeof (lx_tsd));
+#if defined(_LP64)
+	/* start the syscall mode stack in native mode */
+	lx_tsd.lxtsd_scms = 1;
+#else
+	/* start with %gs having the native libc value */
 	lx_tsd.lxtsd_gs = LWPGS_SEL;
+#endif
 
 	if ((err = thr_setspecific(lx_tsd_key, &lx_tsd)) != 0)
-		lx_err_fatal(gettext(
-		    "Unable to initialize thread-specific data: %s"),
+		lx_err_fatal("Unable to initialize thread-specific data: %s",
 		    strerror(err));
 
 	/*
@@ -797,12 +893,16 @@ lx_init(int argc, char *argv[], char *envp[])
 	 * We'll restore this context when this thread attempts to exit.
 	 */
 	if (getcontext(&lx_tsd.lxtsd_exit_context) != 0)
-		lx_err_fatal(gettext(
-		    "Unable to initialize thread-specific exit context: %s"),
-		    strerror(errno));
+		lx_err_fatal("Unable to initialize thread-specific exit "
+		    "context: %s", strerror(errno));
 
 	if (lx_tsd.lxtsd_exit == 0) {
-		lx_runexe(argv, edp.ed_ldentry);
+#if defined(_LP64)
+		/* Switch to Linux syscall mode */
+		(void) syscall(SYS_brand, B_CLR_NTV_SYSC_FLAG);
+#endif
+
+		lx_runexe(argv, (void *)edp.ed_ldentry);
 		/* lx_runexe() never returns. */
 		assert(0);
 	}
@@ -813,7 +913,7 @@ lx_init(int argc, char *argv[], char *envp[])
 	 * setcontext() to jump to the thread context state we saved above.
 	 */
 	if (lx_tsd.lxtsd_exit == 1)
-		thr_exit((void *)lx_tsd.lxtsd_exit_status);
+		thr_exit((void *)(long)lx_tsd.lxtsd_exit_status);
 	else
 		exit(lx_tsd.lxtsd_exit_status);
 
@@ -905,53 +1005,381 @@ lx_fd_to_path(int fd, char *buf, int buf_size)
 }
 
 /*
- * Create a translation routine that jumps to a particular emulation
- * module syscall.
+ * Create a translation function that calls an in-kernel emulation function
+ * vectored through the brand's in-kernel translation table.
  */
-#define	IN_KERNEL_SYSCALL(name, num)		\
-int						\
+#define	IN_KERNEL_EMULATION(name, num)					\
+long									\
 lx_##name(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,	\
-	uintptr_t p5, uintptr_t p6)		\
-{						\
-	int r;					\
+	uintptr_t p5, uintptr_t p6)					\
+{									\
+	long r;								\
 	lx_debug("\tsyscall %d re-vectoring to lx kernel module "	\
-	    "for " #name "()", num);		\
-	r = syscall(SYS_brand, B_EMULATE_SYSCALL + num, p1, p2,		\
-	    p3, p4, p5, p6);			\
-	return ((r == -1) ? -errno : r);		\
+	    "for " #name "()", num);					\
+	r = syscall(SYS_brand, B_IKE_SYSCALL + num,			\
+	    p1, p2, p3, p4, p5, p6);					\
+	return ((r == -1) ? -errno : r);				\
 }
 
-IN_KERNEL_SYSCALL(kill, 37)
-IN_KERNEL_SYSCALL(brk, 45)
-IN_KERNEL_SYSCALL(getppid, 64)
-IN_KERNEL_SYSCALL(sysinfo, 116)
-IN_KERNEL_SYSCALL(modify_ldt, 123)
-IN_KERNEL_SYSCALL(adjtimex, 124)
-IN_KERNEL_SYSCALL(setresuid16, 164)
-IN_KERNEL_SYSCALL(setresgid16, 170)
-IN_KERNEL_SYSCALL(setresuid, 208)
-IN_KERNEL_SYSCALL(setresgid, 210)
-IN_KERNEL_SYSCALL(gettid, 224)
-IN_KERNEL_SYSCALL(tkill, 238)
-IN_KERNEL_SYSCALL(futex, 240)
-IN_KERNEL_SYSCALL(set_thread_area, 243)
-IN_KERNEL_SYSCALL(get_thread_area, 244)
-IN_KERNEL_SYSCALL(set_tid_address, 258)
+IN_KERNEL_EMULATION(kill, LX_EMUL_kill)
+IN_KERNEL_EMULATION(pipe, LX_EMUL_pipe)
+IN_KERNEL_EMULATION(brk, LX_EMUL_brk)
+IN_KERNEL_EMULATION(getppid, LX_EMUL_getppid)
+IN_KERNEL_EMULATION(sysinfo, LX_EMUL_sysinfo)
+IN_KERNEL_EMULATION(modify_ldt, LX_EMUL_modify_ldt)
+IN_KERNEL_EMULATION(setresuid16, LX_EMUL_setresuid16)
+IN_KERNEL_EMULATION(setresgid16, LX_EMUL_setresgid16)
+IN_KERNEL_EMULATION(setresuid, LX_EMUL_setresuid)
+IN_KERNEL_EMULATION(setresgid, LX_EMUL_setresgid)
+IN_KERNEL_EMULATION(gettid, LX_EMUL_gettid)
+IN_KERNEL_EMULATION(tkill, LX_EMUL_tkill)
+IN_KERNEL_EMULATION(futex, LX_EMUL_futex)
+IN_KERNEL_EMULATION(set_thread_area, LX_EMUL_set_thread_area)
+IN_KERNEL_EMULATION(get_thread_area, LX_EMUL_get_thread_area)
+IN_KERNEL_EMULATION(set_tid_address, LX_EMUL_set_tid_address)
+
+#if defined(_LP64)
+/* The following is the 64-bit syscall table */
+
+static struct lx_sysent sysents[] = {
+	{"read",	lx_read,		0,		3}, /* 0 */
+	{"write",	lx_write,		0,		3}, /* 1 */
+	{"open",	lx_open,		0,		3}, /* 2 */
+	{"close",	lx_close,		0,		1}, /* 3 */
+	{"stat",	lx_stat64,		0,		2}, /* 4 */
+	{"fstat",	lx_fstat64,		0,		2}, /* 5 */
+	{"lstat",	lx_lstat64,		0,		2}, /* 6 */
+	{"poll",	lx_poll,		0,		3}, /* 7 */
+	{"lseek",	lx_lseek,		0,		3}, /* 8 */
+	{"mmap",	lx_mmap,		0,		6}, /* 9 */
+	{"mprotect",	lx_mprotect,		0,		3}, /* 10 */
+	{"munmap",	lx_munmap,		0,		2}, /* 11 */
+	{"brk",		lx_brk,			0,		1}, /* 12 */
+	{"rt_sigaction", lx_rt_sigaction,	0,		4}, /* 13 */
+	{"rt_sigprocmask", lx_rt_sigprocmask,	0,		4}, /* 14 */
+	{"rt_sigreturn", lx_rt_sigreturn,	0,		0}, /* 15 */
+	{"ioctl",	lx_ioctl,		0,		3}, /* 16 */
+	{"pread64",	lx_pread64,		0,		5}, /* 17 */
+	{"pwrite64",	lx_pwrite64,		0,		5}, /* 18 */
+	{"readv",	lx_readv,		0,		3}, /* 19 */
+	{"writev",	lx_writev,		0,		3}, /* 20 */
+	{"access",	lx_access,		0,		2}, /* 21 */
+	{"pipe",	lx_pipe,		0,		1}, /* 22 */
+	{"select",	lx_select,		0,		5}, /* 23 */
+	{"sched_yield",	lx_yield,		0,		0}, /* 24 */
+	{"mremap",	NULL,			NOSYS_NO_EQUIV,	0}, /* 25 */
+	{"msync",	lx_msync,		0,		3}, /* 26 */
+	{"mincore",	lx_mincore,		0,		3}, /* 27 */
+	{"madvise",	lx_madvise,		0,		3}, /* 28 */
+	{"shmget",	lx_shmget,		0,		3}, /* 29 */
+	{"shmat",	lx_shmat,		0,		4}, /* 30 */
+	{"shmctl",	lx_shmctl,		0,		3}, /* 31 */
+	{"dup",		lx_dup,			0,		1}, /* 32 */
+	{"dup2",	lx_dup2,		0,		2}, /* 33 */
+	{"pause",	lx_pause,		0,		0}, /* 34 */
+	{"nanosleep",	lx_nanosleep,		0,		2}, /* 35 */
+	{"getitimer",	lx_getitimer,		0,		2}, /* 36 */
+	{"alarm",	lx_alarm,		0,		1}, /* 37 */
+	{"setitimer",	lx_setitimer,		0,		3}, /* 38 */
+	{"getpid",	lx_getpid,		0,		0}, /* 39 */
+	{"sendfile",	lx_sendfile64,		0,		4}, /* 40 */
+	{"socket",	lx_socket,		0,		3}, /* 41 */
+	{"connect",	lx_connect,		0,		3}, /* 42 */
+	{"accept",	lx_accept,		0,		3}, /* 43 */
+	{"sendto",	lx_sendto,		0,		6}, /* 44 */
+	{"recvfrom",	lx_recvfrom,		0,		6}, /* 45 */
+	{"sendmsg",	lx_sendmsg,		0,		3}, /* 46 */
+	{"recvmsg",	lx_recvmsg,		0,		3}, /* 47 */
+	{"shutdown",	lx_shutdown,		0,		2}, /* 48 */
+	{"bind",	lx_bind,		0,		3}, /* 49 */
+	{"listen",	lx_listen,		0,		2}, /* 50 */
+	{"getsockname",	lx_getsockname,		0,		3}, /* 51 */
+	{"getpeername",	lx_getpeername,		0,		3}, /* 52 */
+	{"socketpair",	lx_socketpair,		0,		4}, /* 53 */
+	{"setsockopt",	lx_setsockopt,		0,		5}, /* 54 */
+	{"getsockopt",	lx_getsockopt,		0,		5}, /* 55 */
+	{"clone",	lx_clone,		0,		5}, /* 56 */
+	{"fork",	lx_fork,		0,		0}, /* 57 */
+	{"vfork",	lx_vfork,		0,		0}, /* 58 */
+	{"execve",	lx_execve,		0,		3}, /* 59 */
+	{"exit",	lx_exit,		0,		1}, /* 60 */
+	{"wait4",	lx_wait4,		0,		4}, /* 61 */
+	{"kill",	lx_kill,		0,		2}, /* 62 */
+	{"uname",	lx_uname,		0,		1}, /* 63 */
+	{"semget",	lx_semget,		0,		3}, /* 64 */
+	{"semop",	lx_semop,		0,		3}, /* 65 */
+	{"semctl",	lx_semctl,		0,		4}, /* 66 */
+	{"shmdt",	lx_shmdt,		0,		1}, /* 67 */
+	{"msgget",	lx_msgget,		0,		2}, /* 68 */
+	{"msgsnd",	lx_msgsnd,		0,		4}, /* 69 */
+	{"msgrcv",	lx_msgrcv,		0,		4}, /* 70 */
+	{"msgctl",	lx_msgctl,		0,		3}, /* 71 */
+	{"fcntl",	lx_fcntl64,		0,		3}, /* 72 */
+	{"flock",	lx_flock,		0,		2}, /* 73 */
+	{"fsync",	lx_fsync,		0,		1}, /* 74 */
+	{"fdatasync",	lx_fdatasync,		0,		1}, /* 75 */
+	{"truncate",	lx_truncate64,		0,		2}, /* 76 */
+	{"ftruncate",	lx_ftruncate64,		0,		2}, /* 77 */
+	{"getdents",	lx_getdents,		0,		3}, /* 78 */
+	{"getcwd",	lx_getcwd,		0,		2}, /* 79 */
+	{"chdir",	lx_chdir,		0,		1}, /* 80 */
+	{"fchdir",	lx_fchdir,		0,		1}, /* 81 */
+	{"rename",	lx_rename,		0,		2}, /* 82 */
+	{"mkdir",	lx_mkdir,		0,		2}, /* 83 */
+	{"rmdir",	lx_rmdir,		0,		1}, /* 84 */
+	{"creat",	lx_creat,		0,		2}, /* 85 */
+	{"link",	lx_link,		0,		2}, /* 86 */
+	{"unlink",	lx_unlink,		0,		1}, /* 87 */
+	{"symlink",	lx_symlink,		0,		2}, /* 88 */
+	{"readlink",	lx_readlink,		0,		3}, /* 89 */
+	{"chmod",	lx_chmod,		0,		2}, /* 90 */
+	{"fchmod",	lx_fchmod,		0,		2}, /* 91 */
+	{"chown",	lx_chown,		0,		3}, /* 92 */
+	{"fchown",	lx_fchown,		0,		3}, /* 93 */
+	{"lchown",	lx_lchown,		0,		3}, /* 94 */
+	{"umask",	lx_umask,		0,		1}, /* 95 */
+	{"gettimeofday", lx_gettimeofday,	0,		2}, /* 96 */
+	{"getrlimit",	lx_getrlimit,		0,		2}, /* 97 */
+	{"getrusage",	lx_getrusage,		0,		2}, /* 98 */
+	{"sysinfo",	lx_sysinfo,		0,		1}, /* 99 */
+	{"times",	lx_times,		0,		1}, /* 100 */
+	{"ptrace",	lx_ptrace,		0,		4}, /* 101 */
+	{"getuid",	lx_getuid,		0,		0}, /* 102 */
+	{"syslog",	NULL,			NOSYS_KERNEL,	0}, /* 103 */
+	{"getgid",	lx_getgid,		0,		0}, /* 104 */
+	{"setuid",	lx_setuid,		0,		1}, /* 105 */
+	{"setgid",	lx_setgid,		0,		1}, /* 106 */
+	{"geteuid",	lx_geteuid,		0,		0}, /* 107 */
+	{"getegid",	lx_getegid,		0,		0}, /* 108 */
+	{"setpgid",	lx_setpgid,		0,		2}, /* 109 */
+	{"getppid",	lx_getppid,		0,		0}, /* 110 */
+	{"getpgrp",	lx_getpgrp,		0,		0}, /* 111 */
+	{"setsid",	lx_setsid,		0,		0}, /* 112 */
+	{"setreuid",	lx_setreuid,		0,		0}, /* 113 */
+	{"setregid",	lx_setregid,		0,		0}, /* 114 */
+	{"getgroups",	lx_getgroups,		0,		2}, /* 115 */
+	{"setgroups",	lx_setgroups,		0,		2}, /* 116 */
+	{"setresuid",	lx_setresuid,		0,		3}, /* 117 */
+	{"getresuid",	lx_getresuid,		0,		3}, /* 118 */
+	{"setresgid",	lx_setresgid,		0,		3}, /* 119 */
+	{"getresgid",	lx_getresgid,		0,		3}, /* 120 */
+	{"getpgid",	lx_getpgid,		0,		1}, /* 121 */
+	{"setfsuid",	lx_setfsuid,		0,		1}, /* 122 */
+	{"setfsgid",	lx_setfsgid,		0,		1}, /* 123 */
+	{"getsid",	lx_getsid,		0,		1}, /* 124 */
+	{"capget",	lx_capget,		0,		2}, /* 125 */
+	{"capset",	lx_capset,		0,		2}, /* 126 */
+	{"rt_sigpending", lx_rt_sigpending,	0,		2}, /* 127 */
+	{"rt_sigtimedwait", lx_rt_sigtimedwait,	0,		4}, /* 128 */
+	{"rt_sigqueueinfo", lx_rt_sigqueueinfo,	0,		3}, /* 129 */
+	{"rt_sigsuspend", lx_rt_sigsuspend,	0,		2}, /* 130 */
+	{"sigaltstack",	lx_sigaltstack,		0,		2}, /* 131 */
+	{"utime",	lx_utime,		0,		2}, /* 132 */
+	{"mknod",	lx_mknod,		0,		3}, /* 133 */
+	{"uselib",	NULL,			NOSYS_KERNEL,	0}, /* 134 */
+	{"personality",	lx_personality,		0,		1}, /* 135 */
+	{"ustat",	NULL,			NOSYS_OBSOLETE,	2}, /* 136 */
+	{"statfs",	lx_statfs64,		0,		2}, /* 137 */
+	{"fstatfs",	lx_fstatfs64,		0,		2}, /* 138 */
+	{"sysfs",	lx_sysfs, 		0,		3}, /* 139 */
+	{"getpriority",	lx_getpriority,		0,		2}, /* 140 */
+	{"setpriority",	lx_setpriority,		0,		3}, /* 141 */
+	{"sched_setparam", lx_sched_setparam,	0,		2}, /* 142 */
+	{"sched_getparam", lx_sched_getparam,	0,		2}, /* 143 */
+	{"sched_setscheduler", lx_sched_setscheduler, 0,	3}, /* 144 */
+	{"sched_getscheduler", lx_sched_getscheduler, 0,	1}, /* 145 */
+	{"sched_get_priority_max", lx_sched_get_priority_max, 0, 1}, /* 146 */
+	{"sched_get_priority_min", lx_sched_get_priority_min, 0, 1}, /* 147 */
+	{"sched_rr_get_interval", lx_sched_rr_get_interval, 0, 2},  /* 148 */
+	{"mlock",	lx_mlock,		0,		2}, /* 149 */
+	{"munlock",	lx_munlock,		0,		2}, /* 150 */
+	{"mlockall",	lx_mlockall,		0,		1}, /* 151 */
+	{"munlockall",	lx_munlockall,		0,		0}, /* 152 */
+	{"vhangup",	lx_vhangup,		0,		0}, /* 153 */
+	{"modify_ldt",	lx_modify_ldt,		0,		3}, /* 154 */
+	{"pivot_root",	NULL,			NOSYS_KERNEL,	0}, /* 155 */
+	{"sysctl",	lx_sysctl,		0,		1}, /* 156 */
+	{"prctl",	lx_prctl,		0,		5}, /* 157 */
+	{"arch_prctl",	NULL,			NOSYS_NULL,	0}, /* 158 */
+	{"adjtimex",	lx_adjtimex,		0,		1}, /* 159 */
+	{"setrlimit",	lx_setrlimit,		0,		2}, /* 160 */
+	{"chroot",	lx_chroot,		0,		1}, /* 161 */
+	{"sync",	lx_sync,		0,		0}, /* 162 */
+	{"acct",	NULL,			NOSYS_NO_EQUIV,	0}, /* 163 */
+	{"settimeofday", lx_settimeofday,	0,		2}, /* 164 */
+	{"mount",	lx_mount,		0,		5}, /* 165 */
+	{"umount2",	lx_umount2,		0,		2}, /* 166 */
+	{"swapon",	NULL,			NOSYS_KERNEL,	0}, /* 167 */
+	{"swapoff",	NULL,			NOSYS_KERNEL,	0}, /* 168 */
+	{"reboot",	lx_reboot,		0,		4}, /* 169 */
+	{"sethostname",	lx_sethostname,		0,		2}, /* 170 */
+	{"setdomainname", lx_setdomainname,	0,		2}, /* 171 */
+	{"iopl",	NULL,			NOSYS_NO_EQUIV,	0}, /* 172 */
+	{"ioperm",	NULL,			NOSYS_NO_EQUIV,	0}, /* 173 */
+	{"create_module", NULL,			NOSYS_KERNEL,	0}, /* 174 */
+	{"init_module",	NULL,			NOSYS_KERNEL,	0}, /* 175 */
+	{"delete_module", NULL,			NOSYS_KERNEL,	0}, /* 176 */
+	{"get_kernel_syms", NULL,		NOSYS_KERNEL,	0}, /* 177 */
+	{"query_module", lx_query_module,	NOSYS_KERNEL,	5}, /* 178 */
+	{"quotactl",	NULL,			NOSYS_KERNEL,	0}, /* 179 */
+	{"nfsservctl",	NULL,			NOSYS_KERNEL,	0}, /* 180 */
+	{"getpmsg",	NULL,			NOSYS_OBSOLETE,	0}, /* 181 */
+	{"putpmsg",	NULL,			NOSYS_OBSOLETE,	0}, /* 182 */
+	{"afs_syscall",	NULL,			NOSYS_KERNEL,	0}, /* 183 */
+	{"tux",		NULL,			NOSYS_NO_EQUIV,	0}, /* 184 */
+	{"security",	NULL,			NOSYS_NO_EQUIV,	0}, /* 185 */
+	{"gettid",	lx_gettid,		0,		0}, /* 186 */
+	{"readahead",	NULL,			NOSYS_NO_EQUIV,	0}, /* 187 */
+	{"setxattr",	NULL,			NOSYS_NO_EQUIV,	0}, /* 188 */
+	{"lsetxattr",	NULL,			NOSYS_NO_EQUIV,	0}, /* 189 */
+	{"fsetxattr",	NULL,			NOSYS_NO_EQUIV,	0}, /* 190 */
+	{"getxattr",	lx_xattr4,		0,		4}, /* 191 */
+	{"lgetxattr",	lx_xattr4,		0,		4}, /* 192 */
+	{"fgetxattr",	lx_xattr4,		0,		4}, /* 193 */
+	{"listxattr",	lx_xattr3,		0,		3}, /* 194 */
+	{"llistxattr",	lx_xattr3,		0,		3}, /* 195 */
+	{"flistxattr",	lx_xattr3,		0,		3}, /* 196 */
+	{"removexattr",	lx_xattr2,		0,		2}, /* 197 */
+	{"lremovexattr", lx_xattr2,		0,		2}, /* 198 */
+	{"fremovexattr", lx_xattr2,		0,		2}, /* 199 */
+	{"tkill",	lx_tkill,		0,		2}, /* 200 */
+	{"time",	lx_time,		0,		1}, /* 201 */
+	{"futex",	lx_futex,		0,		6}, /* 202 */
+	{"sched_setaffinity", lx_sched_setaffinity, 0,		3}, /* 203 */
+	{"sched_getaffinity", lx_sched_getaffinity, 0,		3}, /* 204 */
+	{"set_thread_area", lx_set_thread_area,	0,		1}, /* 205 */
+	{"io_setup",	NULL,			NOSYS_NO_EQUIV,	0}, /* 206 */
+	{"io_destroy",	NULL,			NOSYS_NO_EQUIV,	0}, /* 207 */
+	{"io_getevents", NULL,			NOSYS_NO_EQUIV,	0}, /* 208 */
+	{"io_submit",	NULL,			NOSYS_NO_EQUIV,	0}, /* 209 */
+	{"io_cancel",	NULL,			NOSYS_NO_EQUIV,	0}, /* 210 */
+	{"get_thread_area", lx_get_thread_area,	0,		1}, /* 211 */
+	{"lookup_dcookie", NULL,		NOSYS_NO_EQUIV,	0}, /* 212 */
+	{"epoll_create", lx_epoll_create,	0,		1}, /* 213 */
+	{"epoll_ctl_old", NULL,			NOSYS_NULL,	0}, /* 214 */
+	{"epoll_wait_old", NULL,		NOSYS_NULL,	0}, /* 215 */
+	{"remap_file_pages", NULL,		NOSYS_NO_EQUIV,	0}, /* 216 */
+	{"getdents64",	lx_getdents64,		0,		3}, /* 217 */
+	{"set_tid_address", lx_set_tid_address, 0,		1}, /* 218 */
+	{"restart_syscall", NULL,		NOSYS_NULL,	0}, /* 219 */
+	{"semtimedop",	lx_semtimedop,		0,		4}, /* 220 */
+	{"fadvise64",	lx_fadvise64_64,	0,		4}, /* 221 */
+	{"timer_create", NULL,			NOSYS_UNDOC,	0}, /* 222 */
+	{"timer_settime", NULL,			NOSYS_UNDOC,	0}, /* 223 */
+	{"timer_gettime", NULL,			NOSYS_UNDOC,	0}, /* 224 */
+	{"timer_getoverrun", NULL,		NOSYS_UNDOC,	0}, /* 225 */
+	{"timer_delete", NULL,			NOSYS_UNDOC,	0}, /* 226 */
+	{"clock_settime", lx_clock_settime,	0,		2}, /* 227 */
+	{"clock_gettime", lx_clock_gettime,	0,		2}, /* 228 */
+	{"clock_getres", lx_clock_getres,	0,		2}, /* 229 */
+	{"clock_nanosleep", lx_clock_nanosleep,	0,		4}, /* 230 */
+	{"exit_group",	lx_group_exit,		0,		1}, /* 231 */
+	{"epoll_wait",	lx_epoll_wait,		0,		4}, /* 232 */
+	{"epoll_ctl",	lx_epoll_ctl,		0,		4}, /* 233 */
+	{"tgkill",	lx_tgkill,		0,		3}, /* 234 */
+	{"utimes",	lx_utimes,		0,		2}, /* 235 */
+	{"vserver",	NULL,			NOSYS_NULL,	0}, /* 236 */
+	{"mbind",	NULL,			NOSYS_NULL,	0}, /* 237 */
+	{"set_mempolicy", NULL,			NOSYS_NULL,	0}, /* 238 */
+	{"get_mempolicy", NULL,			NOSYS_NULL,	0}, /* 239 */
+	{"mq_open",	NULL,			NOSYS_NULL,	0}, /* 240 */
+	{"mq_unlink",	NULL,			NOSYS_NULL,	0}, /* 241 */
+	{"mq_timedsend", NULL,			NOSYS_NULL,	0}, /* 242 */
+	{"mq_timedreceive", NULL,		NOSYS_NULL,	0}, /* 243 */
+	{"mq_notify",	NULL,			NOSYS_NULL,	0}, /* 244 */
+	{"mq_getsetattr", NULL,			NOSYS_NULL,	0}, /* 245 */
+	{"kexec_load",	NULL,			NOSYS_NULL,	0}, /* 246 */
+	{"waitid",	lx_waitid,		0,		4}, /* 247 */
+	{"add_key",	NULL,			NOSYS_NULL,	0}, /* 248 */
+	{"request_key",	NULL,			NOSYS_NULL,	0}, /* 249 */
+	{"keyctl",	NULL,			NOSYS_NULL,	0}, /* 250 */
+	{"ioprio_set",	NULL,			NOSYS_NULL,	0}, /* 251 */
+	{"ioprio_get",	NULL,			NOSYS_NULL,	0}, /* 252 */
+	{"inotify_init", lx_inotify_init,	0,		0}, /* 253 */
+	{"inotify_add_watch", lx_inotify_add_watch, 0,		3}, /* 254 */
+	{"inotify_rm_watch", lx_inotify_rm_watch, 0,		2}, /* 255 */
+	{"migrate_pages", NULL,			NOSYS_NULL,	0}, /* 256 */
+	{"openat",	lx_openat,		0,		4}, /* 257 */
+	{"mkdirat",	lx_mkdirat,		0,		3}, /* 258 */
+	{"mknodat",	lx_mknodat,		0,		4}, /* 259 */
+	{"fchownat",	lx_fchownat,		0,		5}, /* 260 */
+	{"futimesat",	lx_futimesat,		0,		3}, /* 261 */
+	{"fstatat64",	lx_fstatat64,		0,		4}, /* 262 */
+	{"unlinkat",	lx_unlinkat,		0,		3}, /* 263 */
+	{"renameat",	lx_renameat,		0,		4}, /* 264 */
+	{"linkat",	lx_linkat,		0,		5}, /* 265 */
+	{"symlinkat",	lx_symlinkat,		0,		3}, /* 266 */
+	{"readlinkat",	lx_readlinkat,		0,		4}, /* 267 */
+	{"fchmodat",	lx_fchmodat,		0,		4}, /* 268 */
+	{"faccessat",	lx_faccessat,		0,		4}, /* 269 */
+	{"pselect6",	lx_pselect6,		0,		6}, /* 270 */
+	{"ppoll",	NULL,			NOSYS_NULL,	0}, /* 271 */
+	{"unshare",	NULL,			NOSYS_NULL,	0}, /* 272 */
+	{"set_robust_list", NULL,		NOSYS_NULL,	0}, /* 273 */
+	{"get_robust_list", NULL,		NOSYS_NULL,	0}, /* 274 */
+	{"splice",	NULL,			NOSYS_NULL,	0}, /* 275 */
+	{"tee",		NULL,			NOSYS_NULL,	0}, /* 276 */
+	{"sync_file_range", NULL,		NOSYS_NULL,	0}, /* 277 */
+	{"vmsplice",	NULL,			NOSYS_NULL,	0}, /* 278 */
+	{"move_pages",	NULL,			NOSYS_NULL,	0}, /* 279 */
+	{"utimensat",	lx_utimensat,		0,		4}, /* 280 */
+	{"epoll_pwait",	lx_epoll_pwait,		0,		5}, /* 281 */
+	{"signalfd",	NULL,			NOSYS_NULL,	0}, /* 282 */
+	{"timerfd_create", NULL,		NOSYS_NULL,	0}, /* 283 */
+	{"eventfd",	NULL,			NOSYS_NULL,	0}, /* 284 */
+	{"fallocate",	NULL,			NOSYS_NULL,	0}, /* 285 */
+	{"timerfd_settime", NULL,		NOSYS_NULL,	0}, /* 286 */
+	{"timerfd_gettime", NULL,		NOSYS_NULL,	0}, /* 287 */
+	{"accept4",	lx_accept4,		0,		4}, /* 288 */
+	{"signalfd4",	NULL,			NOSYS_NULL,	0}, /* 289 */
+	{"eventfd2",	NULL,			NOSYS_NULL,	0}, /* 290 */
+	{"epoll_create1", lx_epoll_create1,	0,		1}, /* 291 */
+	{"dup3",	lx_dup3,		0,		3}, /* 292 */
+	{"pipe2",	lx_pipe2,		0,		2}, /* 293 */
+	{"inotify_init1", lx_inotify_init1,	0,		1}, /* 294 */
+	{"preadv",	NULL,			NOSYS_NULL,	0}, /* 295 */
+	{"pwritev",	NULL,			NOSYS_NULL,	0}, /* 296 */
+	{"rt_tgsigqueueinfo", lx_rt_tgsigqueueinfo, 0,		4}, /* 297 */
+	{"perf_event_open", NULL,		NOSYS_NULL,	0}, /* 298 */
+	{"recvmmsg",	lx_recvmmsg,		0,		5}, /* 299 */
+	{"fanotify_init", NULL,			NOSYS_NULL,	0}, /* 300 */
+	{"fanotify_mark", NULL,			NOSYS_NULL,	0}, /* 301 */
+	{"prlimit64",	lx_prlimit64,		0,		4}, /* 302 */
+	{"name_to_handle_at", NULL,		NOSYS_NULL,	0}, /* 303 */
+	{"open_by_handle_at", NULL,		NOSYS_NULL,	0}, /* 304 */
+	{"clock_adjtime", NULL,			NOSYS_NULL,	0}, /* 305 */
+	{"syncfs",	NULL,			NOSYS_NULL,	0}, /* 306 */
+	{"sendmmsg",	lx_sendmmsg,		0,		4}, /* 307 */
+	{"setns",	NULL,			NOSYS_NULL,	0}, /* 309 */
+	{"getcpu",	NULL,			NOSYS_NULL,	0}, /* 309 */
+	{"process_vm_readv", NULL,		NOSYS_NULL,	0}, /* 310 */
+	{"process_vm_writev", NULL,		NOSYS_NULL,	0}, /* 311 */
+	{"kcmp",	NULL,			NOSYS_NULL,	0}, /* 312 */
+	{"finit_module", NULL,			NOSYS_NULL,	0}, /* 313 */
+	{"sched_setattr", NULL,			NOSYS_NULL,	0}, /* 314 */
+	{"sched_getattr", NULL,			NOSYS_NULL,	0}, /* 315 */
+	{"renameat2", NULL,			NOSYS_NULL,	0}, /* 316 */
+
+	/* XXX TBD gap then x32 syscalls from 512 - 544 */
+};
+
+#else
+/* The following is the 32-bit syscall table */
 
 static struct lx_sysent sysents[] = {
 	{"nosys",	NULL,		NOSYS_NONE,	0},	/*  0 */
 	{"exit",	lx_exit,	0,		1},	/*  1 */
 	{"fork",	lx_fork,	0,		0},	/*  2 */
 	{"read",	lx_read,	0,		3},	/*  3 */
-	{"write",	write,		SYS_PASSTHRU,	3},	/*  4 */
+	{"write",	lx_write,	0,		3},	/*  4 */
 	{"open",	lx_open,	0,		3},	/*  5 */
-	{"close",	close,		SYS_PASSTHRU,	1},	/*  6 */
+	{"close",	lx_close,	0,		1},	/*  6 */
 	{"waitpid",	lx_waitpid,	0,		3},	/*  7 */
-	{"creat",	creat,		SYS_PASSTHRU,	2},	/*  8 */
+	{"creat",	lx_creat,	0,		2},	/*  8 */
 	{"link",	lx_link,	0,		2},	/*  9 */
 	{"unlink",	lx_unlink,	0,		1},	/* 10 */
 	{"execve",	lx_execve,	0,		3},	/* 11 */
-	{"chdir",	chdir,		SYS_PASSTHRU,	1},	/* 12 */
+	{"chdir",	lx_chdir,	0,		1},	/* 12 */
 	{"time",	lx_time,	0,		1},	/* 13 */
 	{"mknod",	lx_mknod,	0,		3},	/* 14 */
 	{"chmod",	lx_chmod,	0,		2},	/* 15 */
@@ -964,23 +1392,23 @@ static struct lx_sysent sysents[] = {
 	{"umount",	lx_umount,	0,		1},	/* 22 */
 	{"setuid16",	lx_setuid16,	0,		1},	/* 23 */
 	{"getuid16",	lx_getuid16,	0,		0},	/* 24 */
-	{"stime",	stime,		SYS_PASSTHRU,	1},	/* 25 */
+	{"stime",	lx_stime,	0,		1},	/* 25 */
 	{"ptrace",	lx_ptrace,	0,		4},	/* 26 */
-	{"alarm",	(int (*)())alarm, SYS_PASSTHRU,	1},	/* 27 */
+	{"alarm",	lx_alarm,	0,		1},	/* 27 */
 	{"fstat",	NULL,		NOSYS_OBSOLETE,	0},	/* 28 */
-	{"pause",	pause,		SYS_PASSTHRU,	0},	/* 29 */
+	{"pause",	lx_pause,	0,		0},	/* 29 */
 	{"utime",	lx_utime,	0,		2},	/* 30 */
 	{"stty",	NULL,		NOSYS_OBSOLETE,	0},	/* 31 */
 	{"gtty",	NULL,		NOSYS_OBSOLETE,	0},	/* 32 */
 	{"access",	lx_access,	0,		2},	/* 33 */
-	{"nice",	nice,		SYS_PASSTHRU,	1},	/* 34 */
+	{"nice",	lx_nice,	0,		1},	/* 34 */
 	{"ftime",	NULL,		NOSYS_OBSOLETE,	0},	/* 35 */
 	{"sync",	lx_sync, 	0, 		0},	/* 36 */
 	{"kill",	lx_kill,	0,		2},	/* 37 */
 	{"rename",	lx_rename,	0,		2},	/* 38 */
-	{"mkdir",	mkdir,		SYS_PASSTHRU,	2},	/* 39 */
+	{"mkdir",	lx_mkdir,	0,		2},	/* 39 */
 	{"rmdir",	lx_rmdir,	0,		1},	/* 40 */
-	{"dup",		dup,		SYS_PASSTHRU,	1},	/* 41 */
+	{"dup",		lx_dup,		0,		1},	/* 41 */
 	{"pipe",	lx_pipe,	0,		1},	/* 42 */
 	{"times",	lx_times,	0,		1},	/* 43 */
 	{"prof",	NULL,		NOSYS_OBSOLETE,	0},	/* 44 */
@@ -999,8 +1427,8 @@ static struct lx_sysent sysents[] = {
 	{"setpgid",	lx_setpgid,	0,		2},	/* 57 */
 	{"ulimit",	NULL,		NOSYS_OBSOLETE,	0},	/* 58 */
 	{"olduname",	NULL,		NOSYS_OBSOLETE,	0},	/* 59 */
-	{"umask",	(int (*)())umask, SYS_PASSTHRU,	1},	/* 60 */
-	{"chroot",	chroot,		SYS_PASSTHRU,	1},	/* 61 */
+	{"umask",	lx_umask,	0,		1},	/* 60 */
+	{"chroot",	lx_chroot,	0,		1},	/* 61 */
 	{"ustat",	NULL,		NOSYS_OBSOLETE,	2},	/* 62 */
 	{"dup2",	lx_dup2,	0,		2},	/* 63 */
 	{"getppid",	lx_getppid,	0,		0},	/* 64 */
@@ -1022,7 +1450,7 @@ static struct lx_sysent sysents[] = {
 	{"getgroups16",	lx_getgroups16,	0,		2},	/* 80 */
 	{"setgroups16",	lx_setgroups16,	0,		2},	/* 81 */
 	{"select",	NULL,		NOSYS_OBSOLETE,	0},	/* 82 */
-	{"symlink",	symlink,	SYS_PASSTHRU,	2},	/* 83 */
+	{"symlink",	lx_symlink,	0,		2},	/* 83 */
 	{"oldlstat",	NULL,		NOSYS_OBSOLETE,	0},	/* 84 */
 	{"readlink",	lx_readlink,	0,		3},	/* 85 */
 	{"uselib",	NULL,		NOSYS_KERNEL,	0},	/* 86 */
@@ -1030,10 +1458,10 @@ static struct lx_sysent sysents[] = {
 	{"reboot",	lx_reboot,	0,		4},	/* 88 */
 	{"readdir",	lx_readdir,	0,		3},	/* 89 */
 	{"mmap",	lx_mmap,	0,		6},	/* 90 */
-	{"munmap",	munmap,		SYS_PASSTHRU,	2},	/* 91 */
+	{"munmap",	lx_munmap,	0,		2},	/* 91 */
 	{"truncate",	lx_truncate,	0,		2},	/* 92 */
 	{"ftruncate",	lx_ftruncate,	0,		2},	/* 93 */
-	{"fchmod",	fchmod,		SYS_PASSTHRU,	2},	/* 94 */
+	{"fchmod",	lx_fchmod,	0,		2},	/* 94 */
 	{"fchown16",	lx_fchown16,	0,		3},	/* 95 */
 	{"getpriority",	lx_getpriority,	0,		2},	/* 96 */
 	{"setpriority",	lx_setpriority,	0,		3},	/* 97 */
@@ -1044,7 +1472,7 @@ static struct lx_sysent sysents[] = {
 	{"socketcall",	lx_socketcall,	0,		2},	/* 102 */
 	{"syslog",	NULL,		NOSYS_KERNEL,	0},	/* 103 */
 	{"setitimer",	lx_setitimer,	0,		3},	/* 104 */
-	{"getitimer",	getitimer,	SYS_PASSTHRU,	2},	/* 105 */
+	{"getitimer",	lx_getitimer,	0,		2},	/* 105 */
 	{"stat",	lx_stat,	0,		2},	/* 106 */
 	{"lstat",	lx_lstat,	0,		2},	/* 107 */
 	{"fstat",	lx_fstat,	0,		2},	/* 108 */
@@ -1072,7 +1500,7 @@ static struct lx_sysent sysents[] = {
 	{"get_kernel_syms", NULL,	NOSYS_KERNEL,	0},	/* 130 */
 	{"quotactl",	NULL,		NOSYS_KERNEL,	0},	/* 131 */
 	{"getpgid",	lx_getpgid,	0,		1},	/* 132 */
-	{"fchdir",	fchdir,		SYS_PASSTHRU,	1},	/* 133 */
+	{"fchdir",	lx_fchdir,	0,		1},	/* 133 */
 	{"bdflush",	NULL,		NOSYS_KERNEL,	0},	/* 134 */
 	{"sysfs",	lx_sysfs, 	0,		3},	/* 135 */
 	{"personality",	lx_personality,	0,		1},	/* 136 */
@@ -1097,19 +1525,19 @@ static struct lx_sysent sysents[] = {
 	{"sched_getparam", lx_sched_getparam,	0,	2},	/* 155 */
 	{"sched_setscheduler", lx_sched_setscheduler, 0, 3},	/* 156 */
 	{"sched_getscheduler", lx_sched_getscheduler, 0, 1},	/* 157 */
-	{"sched_yield",	(int (*)())yield, SYS_PASSTHRU,	0},	/* 158 */
+	{"sched_yield",	lx_yield,	0,		 0},	/* 158 */
 	{"sched_get_priority_max", lx_sched_get_priority_max, 0, 1}, /* 159 */
 	{"sched_get_priority_min", lx_sched_get_priority_min, 0, 1}, /* 160 */
 	{"sched_rr_get_interval", lx_sched_rr_get_interval, 0,	2},  /* 161 */
-	{"nanosleep",	nanosleep,	SYS_PASSTHRU,	2},	/* 162 */
+	{"nanosleep",	lx_nanosleep,	0,		2},	/* 162 */
 	{"mremap",	NULL,		NOSYS_NO_EQUIV,	0},	/* 163 */
-	{"setresuid16",	lx_setresuid16,	0,		3},	/* 164 */
+	{"setresuid16",	lx_setresuid16, 0,		3},	/* 164 */
 	{"getresuid16",	lx_getresuid16,	0,		3},	/* 165 */
 	{"vm86",	NULL,		NOSYS_NO_EQUIV,	0},	/* 166 */
 	{"query_module", lx_query_module, NOSYS_KERNEL,	5},	/* 167 */
 	{"poll",	lx_poll,	0,		3},	/* 168 */
 	{"nfsservctl",	NULL,		NOSYS_KERNEL,	0},	/* 169 */
-	{"setresgid16",	lx_setresgid16,	0,		3},	/* 170 */
+	{"setresgid16",	lx_setresgid16, 0,		3},	/* 170 */
 	{"getresgid16",	lx_getresgid16,	0,		3},	/* 171 */
 	{"prctl",	lx_prctl,	0,		5},	/* 172 */
 	{"rt_sigreturn", lx_rt_sigreturn, 0,		0},	/* 173 */
@@ -1137,14 +1565,14 @@ static struct lx_sysent sysents[] = {
 	{"stat64",	lx_stat64,	0,		2},	/* 195 */
 	{"lstat64",	lx_lstat64,	0,		2},	/* 196 */
 	{"fstat64",	lx_fstat64,	0,		2},	/* 197 */
-	{"lchown",	lchown,		SYS_PASSTHRU,	3},	/* 198 */
-	{"getuid",	(int (*)())getuid, SYS_PASSTHRU, 0},	/* 199 */
-	{"getgid",	(int (*)())getgid, SYS_PASSTHRU, 0},	/* 200 */
+	{"lchown",	lx_lchown,	0,		3},	/* 198 */
+	{"getuid",	lx_getuid,	0,		0},	/* 199 */
+	{"getgid",	lx_getgid, 	0,		0},	/* 200 */
 	{"geteuid",	lx_geteuid,	0,		0},	/* 201 */
 	{"getegid",	lx_getegid,	0,		0},	/* 202 */
-	{"setreuid",	setreuid,	SYS_PASSTHRU,	0},	/* 203 */
-	{"setregid",	setregid,	SYS_PASSTHRU,	0},	/* 204 */
-	{"getgroups",	getgroups,	SYS_PASSTHRU,	2},	/* 205 */
+	{"setreuid",	lx_setreuid,	0,		0},	/* 203 */
+	{"setregid",	lx_setregid,	0,		0},	/* 204 */
+	{"getgroups",	lx_getgroups,	0,		2},	/* 205 */
 	{"setgroups",	lx_setgroups,	0,		2},	/* 206 */
 	{"fchown",	lx_fchown,	0,		3},	/* 207 */
 	{"setresuid",	lx_setresuid,	0,		3},	/* 208 */
@@ -1152,12 +1580,12 @@ static struct lx_sysent sysents[] = {
 	{"setresgid",	lx_setresgid,	0,		3},	/* 210 */
 	{"getresgid",	lx_getresgid,	0,		3},	/* 211 */
 	{"chown",	lx_chown,	0,		3},	/* 212 */
-	{"setuid",	setuid,		SYS_PASSTHRU,	1},	/* 213 */
-	{"setgid",	setgid,		SYS_PASSTHRU,	1},	/* 214 */
+	{"setuid",	lx_setuid,	0,		1},	/* 213 */
+	{"setgid",	lx_setgid,	0,		1},	/* 214 */
 	{"setfsuid",	lx_setfsuid,	0,		1},	/* 215 */
 	{"setfsgid",	lx_setfsgid,	0,		1},	/* 216 */
 	{"pivot_root",	NULL,		NOSYS_KERNEL,	0},	/* 217 */
-	{"mincore",	mincore,	SYS_PASSTHRU,	3},	/* 218 */
+	{"mincore",	lx_mincore,	0,		3},	/* 218 */
 	{"madvise",	lx_madvise,	0,		3},	/* 219 */
 	{"getdents64",	lx_getdents64,	0,		3},	/* 220 */
 	{"fcntl64",	lx_fcntl64,	0,		3},	/* 221 */
@@ -1180,10 +1608,10 @@ static struct lx_sysent sysents[] = {
 	{"tkill",	lx_tkill,	0,		2},	/* 238 */
 	{"sendfile64",	lx_sendfile64,	0,		4},	/* 239 */
 	{"futex",	lx_futex,	EBP_HAS_ARG6,	6},	/* 240 */
-	{"sched_setaffinity",	lx_sched_setaffinity,	0, 3},	/* 241 */
-	{"sched_getaffinity",	lx_sched_getaffinity,	0, 3},	/* 242 */
-	{"set_thread_area", lx_set_thread_area,	0,	1},	/* 243 */
-	{"get_thread_area", lx_get_thread_area,	0,	1},	/* 244 */
+	{"sched_setaffinity", lx_sched_setaffinity, 0,	3},	/* 241 */
+	{"sched_getaffinity", lx_sched_getaffinity, 0,	3},	/* 242 */
+	{"set_thread_area", lx_set_thread_area, 0,	1},	/* 243 */
+	{"get_thread_area", lx_get_thread_area, 0,	1},	/* 244 */
 	{"io_setup",	NULL,		NOSYS_NO_EQUIV,	0},	/* 245 */
 	{"io_destroy",	NULL,		NOSYS_NO_EQUIV,	0},	/* 246 */
 	{"io_getevents", NULL,		NOSYS_NO_EQUIV,	0},	/* 247 */
@@ -1193,11 +1621,11 @@ static struct lx_sysent sysents[] = {
 	{"nosys",	NULL,		0,		0},	/* 251 */
 	{"group_exit",	lx_group_exit,	0,		1},	/* 252 */
 	{"lookup_dcookie", NULL,	NOSYS_NO_EQUIV,	0},	/* 253 */
-	{"epoll_create", epoll_create,	SYS_PASSTHRU,	1},	/* 254 */
+	{"epoll_create", lx_epoll_create, 0,		1},	/* 254 */
 	{"epoll_ctl",	lx_epoll_ctl,	0,		4},	/* 255 */
-	{"epoll_wait",	epoll_wait,	SYS_PASSTHRU,	4},	/* 256 */
+	{"epoll_wait",	lx_epoll_wait,	0,		4},	/* 256 */
 	{"remap_file_pages", NULL,	NOSYS_NO_EQUIV,	0},	/* 257 */
-	{"set_tid_address", lx_set_tid_address,	0,	1},	/* 258 */
+	{"set_tid_address", lx_set_tid_address, 0,	1},	/* 258 */
 	{"timer_create", NULL,		NOSYS_UNDOC,	0},	/* 259 */
 	{"timer_settime", NULL,		NOSYS_UNDOC,	0},	/* 260 */
 	{"timer_gettime", NULL,		NOSYS_UNDOC,	0},	/* 261 */
@@ -1212,7 +1640,7 @@ static struct lx_sysent sysents[] = {
 	{"tgkill",	lx_tgkill,	0,		3},	/* 270 */
 
 	/* The following system calls only exist in kernel 2.6 and greater */
-	{"utimes",	utimes,		SYS_PASSTHRU,	2},	/* 271 */
+	{"utimes",	lx_utimes,	0,		2},	/* 271 */
 	{"fadvise64_64", lx_fadvise64_64, 0,		4},	/* 272 */
 	{"vserver",	NULL,		NOSYS_NULL,	0},	/* 273 */
 	{"mbind",	NULL,		NOSYS_NULL,	0},	/* 274 */
@@ -1232,9 +1660,9 @@ static struct lx_sysent sysents[] = {
 	{"keyctl",	NULL,		NOSYS_NULL,	0},	/* 288 */
 	{"ioprio_set",	NULL,		NOSYS_NULL,	0},	/* 289 */
 	{"ioprio_get",	NULL,		NOSYS_NULL,	0},	/* 290 */
-	{"inotify_init", inotify_init,	SYS_PASSTHRU,	0},	/* 291 */
-	{"inotify_add_watch", inotify_add_watch, SYS_PASSTHRU, 3}, /* 292 */
-	{"inotify_rm_watch", inotify_rm_watch, SYS_PASSTHRU, 2}, /* 293 */
+	{"inotify_init", lx_inotify_init, 0,		0},	/* 291 */
+	{"inotify_add_watch", lx_inotify_add_watch, 0,	3},	/* 292 */
+	{"inotify_rm_watch", lx_inotify_rm_watch, 0,	2},	/* 293 */
 	{"migrate_pages", NULL,		NOSYS_NULL,	0},	/* 294 */
 	{"openat",	lx_openat,	0,		4},	/* 295 */
 	{"mkdirat",	lx_mkdirat,	0,		3},	/* 296 */
@@ -1260,7 +1688,7 @@ static struct lx_sysent sysents[] = {
 	{"vmsplice",	NULL,		NOSYS_NULL,	0},	/* 316 */
 	{"move_pages",	NULL,		NOSYS_NULL,	0},	/* 317 */
 	{"getcpu",	NULL,		NOSYS_NULL,	0},	/* 318 */
-	{"epoll_pwait",	epoll_pwait,	SYS_PASSTHRU,	5},	/* 319 */
+	{"epoll_pwait",	lx_epoll_pwait, 0,		5},	/* 319 */
 	{"utimensat",	lx_utimensat,	0,		4},	/* 320 */
 	{"signalfd",	NULL,		NOSYS_NULL,	0},	/* 321 */
 	{"timerfd_create", NULL,	NOSYS_NULL,	0},	/* 322 */
@@ -1270,10 +1698,10 @@ static struct lx_sysent sysents[] = {
 	{"timerfd_gettime", NULL,	NOSYS_NULL,	0},	/* 326 */
 	{"signalfd4",	NULL,		NOSYS_NULL,	0},	/* 327 */
 	{"eventfd2",	NULL,		NOSYS_NULL,	0},	/* 328 */
-	{"epoll_create1", epoll_create1, SYS_PASSTHRU,	1},	/* 329 */
+	{"epoll_create1", lx_epoll_create1, 0,		1},	/* 329 */
 	{"dup3",	lx_dup3,	0,		3},	/* 330 */
 	{"pipe2",	lx_pipe2,	0,		2},	/* 331 */
-	{"inotify_init1", inotify_init1, SYS_PASSTHRU,	1},	/* 332 */
+	{"inotify_init1", lx_inotify_init1, 0,		1},	/* 332 */
 	{"preadv",	NULL,		NOSYS_NULL,	0},	/* 333 */
 	{"pwritev",	NULL,		NOSYS_NULL,	0},	/* 334 */
 	{"rt_tgsigqueueinfo", lx_rt_tgsigqueueinfo, 0,	4},	/* 335 */
@@ -1295,3 +1723,4 @@ static struct lx_sysent sysents[] = {
 	{"sched_setattr", NULL,		NOSYS_NULL,	0},	/* 351 */
 	{"sched_getattr", NULL,		NOSYS_NULL,	0},	/* 352 */
 };
+#endif

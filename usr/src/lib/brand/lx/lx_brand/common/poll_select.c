@@ -48,10 +48,12 @@
 #include <sys/lx_brand.h>
 #include <sys/lx_misc.h>
 
+#if defined(_ILP32)
 extern int select_large_fdset(int nfds, fd_set *in0, fd_set *out0, fd_set *ex0,
 	struct timeval *tv);
+#endif
 
-int
+long
 lx_select(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 	uintptr_t p5)
 {
@@ -96,10 +98,14 @@ lx_select(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 		start = gethrtime();
 	}
 
+#if defined(_LP64)
+	r = select(nfds, rfdsp, wfdsp, efdsp, tvp);
+#else
 	if (nfds >= FD_SETSIZE)
 		r = select_large_fdset(nfds, rfdsp, wfdsp, efdsp, tvp);
 	else
 		r = select(nfds, rfdsp, wfdsp, efdsp, tvp);
+#endif
 	if (r < 0)
 		return (-errno);
 
@@ -136,7 +142,7 @@ lx_select(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 	return (r);
 }
 
-int
+long
 lx_poll(uintptr_t p1, uintptr_t p2, uintptr_t p3)
 {
 	struct pollfd	*lfds, *sfds;
@@ -226,7 +232,7 @@ lx_poll(uintptr_t p1, uintptr_t p2, uintptr_t p3)
 	return (rval);
 }
 
-int
+long
 lx_epoll_ctl(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4)
 {
 	int epfd = (int)p1;

@@ -22,9 +22,8 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2014 Joyent, Inc.  All rights reserved.
  */
-
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/asm_linkage.h>
 
@@ -32,7 +31,7 @@
 
 /*ARGSUSED*/
 void
-lx_runexe(void *argv, int32_t entry)
+lx_runexe(void *argv, void *entry)
 {
 }
 

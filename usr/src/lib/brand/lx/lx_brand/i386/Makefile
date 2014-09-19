@@ -21,8 +21,7 @@
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright 2014 Joyent, Inc.  All rights reserved.
 #
 # lib/brand/lx/i386/Makefile
 
@@ -31,6 +30,8 @@ ISASRCDIR=.
 ASFLAGS	+= -P -D_ASM
 
 include ../Makefile.com
+
+DYNFLAGS +=	-Wl,-I/native/lib/ld.so.1
 
 POFILE=		lx_brand.po
 MSGFILES=	$(CSRCS)

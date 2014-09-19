@@ -22,6 +22,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2014 Joyent, Inc.  All rights reserved.
  */
 
 #include "lint.h"
@@ -458,11 +459,12 @@ sigaction(int sig, const struct sigaction *nact, struct sigaction *oact)
 }
 
 /*
- * This is a private interface for the linux brand interface.
+ * This is a private interface for the lx brand.
  */
 void
 setsigacthandler(void (*nsigacthandler)(int, siginfo_t *, void *),
-    void (**osigacthandler)(int, siginfo_t *, void *))
+    void (**osigacthandler)(int, siginfo_t *, void *),
+    int (*brsetctxt)(const ucontext_t *))
 {
 	ulwp_t *self = curthread;
 	uberdata_t *udp = self->ul_uberdata;
@@ -471,6 +473,9 @@ setsigacthandler(void (*nsigacthandler)(int, siginfo_t *, void *),
 		*osigacthandler = udp->sigacthandler;
 
 	udp->sigacthandler = nsigacthandler;
+
+	if (brsetctxt != NULL)
+		udp->setctxt = brsetctxt;
 }
 
 /*
@@ -522,6 +527,7 @@ int
 setcontext(const ucontext_t *ucp)
 {
 	ulwp_t *self = curthread;
+	uberdata_t *udp = self->ul_uberdata;
 	int ret;
 	ucontext_t uc;
 
@@ -578,7 +584,7 @@ setcontext(const ucontext_t *ucp)
 	 */
 	set_parking_flag(self, 0);
 	self->ul_sp = 0;
-	ret = __setcontext(&uc);
+	ret = udp->setctxt(&uc);
 
 	/*
 	 * It is OK for setcontext() to return if the user has not specified

@@ -33,20 +33,9 @@
 extern "C" {
 #endif
 
-typedef int64_t (*llfcn_t)();
-
-typedef struct lx_sysent {
-	int	sy_flags;
-	char	*sy_name;
-	llfcn_t	sy_callc;
-	char	sy_narg;
-} lx_sysent_t;
-
 typedef void (lx_systrace_f)(ulong_t, ulong_t, ulong_t, ulong_t, ulong_t,
     ulong_t, ulong_t);
 
-
-extern lx_sysent_t lx_sysent[];
 
 extern lx_systrace_f *lx_systrace_entry_ptr;
 extern lx_systrace_f *lx_systrace_return_ptr;

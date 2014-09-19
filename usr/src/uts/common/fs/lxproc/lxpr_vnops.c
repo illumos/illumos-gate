@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ * Copyright 2014 Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -1032,7 +1032,7 @@ lxpr_read_pid_status(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	for (i = 1; i < NSIG; i++) {
 		lx_sig = lxpr_sigmap[i];
 
-		if ((lx_sig > 0) && (lx_sig < LX_NSIG)) {
+		if ((lx_sig > 0) && (lx_sig <= LX_NSIG)) {
 			if (sigismember(&p->p_sig, i))
 				sigaddset(&current, lx_sig);
 

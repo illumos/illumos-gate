@@ -21,12 +21,11 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2014 Joyent, Inc.  All rights reserved.
  */
 
 #ifndef _LX_SIGNUM_H
 #define	_LX_SIGNUM_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -67,12 +66,10 @@ extern "C" {
 #define	LX_SIGSYS	31
 #define	LX_SIGUNUSED	31
 
-#define	LX_NSIG_WORDS	2
-#define	LX_NBPW		32
-#define	LX_NSIG		((LX_NBPW * LX_NSIG_WORDS) + 1)
+#define	LX_NSIG		64	/* Linux _NSIG */
 
 #define	LX_SIGRTMIN	32
-#define	LX_SIGRTMAX	LX_NSIG - 1
+#define	LX_SIGRTMAX	LX_NSIG
 
 extern const int ltos_signo[];
 extern const int stol_signo[];

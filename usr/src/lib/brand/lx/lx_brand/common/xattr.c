@@ -25,21 +25,21 @@
 #include <sys/lx_types.h>
 #include <sys/lx_syscall.h>
 
-int
+long
 lx_xattr2(uintptr_t p1, uintptr_t p2)
 {
 
 	return (-EOPNOTSUPP);
 }
 
-int
+long
 lx_xattr3(uintptr_t p1, uintptr_t p2, uintptr_t p3)
 {
 
 	return (-EOPNOTSUPP);
 }
 
-int
+long
 lx_xattr4(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4)
 {
 

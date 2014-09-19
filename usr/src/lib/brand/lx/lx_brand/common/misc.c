@@ -37,6 +37,9 @@
 #include <sys/sysmacros.h>
 #include <sys/systeminfo.h>
 #include <sys/types.h>
+#include <sys/epoll.h>
+#include <sys/mman.h>
+#include <sys/shm.h>
 #include <sys/lx_types.h>
 #include <sys/lx_debug.h>
 #include <sys/lx_misc.h>
@@ -44,6 +47,7 @@
 #include <sys/lx_syscall.h>
 #include <sys/lx_thunk_server.h>
 #include <sys/lx_fcntl.h>
+#include <sys/inotify.h>
 #include <unistd.h>
 #include <libintl.h>
 #include <zone.h>
@@ -51,7 +55,7 @@
 extern int sethostname(char *, int);
 
 /* ARGUSED */
-int
+long
 lx_rename(uintptr_t p1, uintptr_t p2)
 {
 	int ret;
@@ -86,7 +90,7 @@ lx_rename(uintptr_t p1, uintptr_t p2)
 	return (0);
 }
 
-int
+long
 lx_renameat(uintptr_t ext1, uintptr_t p1, uintptr_t ext2, uintptr_t p2)
 {
 	int ret;
@@ -120,7 +124,7 @@ lx_renameat(uintptr_t ext1, uintptr_t p1, uintptr_t ext2, uintptr_t p2)
 }
 
 /*ARGSUSED*/
-int
+long
 lx_reboot(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4)
 {
 	int magic = (int)p1;
@@ -151,7 +155,7 @@ lx_reboot(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4)
 	case LINUX_REBOOT_CMD_RESTART:
 	case LINUX_REBOOT_CMD_RESTART2:
 		/* RESTART2 may need more work */
-		lx_msg(gettext("Restarting system.\n"));
+		lx_msg("Restarting system.\n");
 		rc = reboot(RB_AUTOBOOT, NULL);
 		break;
 	default:
@@ -165,7 +169,7 @@ lx_reboot(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4)
  * getcwd() - Linux syscall semantics are slightly different; we need to return
  * the length of the pathname copied (+ 1 for the terminating NULL byte.)
  */
-int
+long
 lx_getcwd(uintptr_t p1, uintptr_t p2)
 {
 	char *buf;
@@ -180,9 +184,9 @@ lx_getcwd(uintptr_t p1, uintptr_t p2)
 	 * We need the length of the pathname getcwd() copied but we never want
 	 * to dereference a Linux pointer for any reason.
 	 *
-	 * Thus, to get the string length we will uucopy() up to copylen bytes
-	 * at a time into a local buffer and will walk each chunk looking for
-	 * the string-terminating NULL byte.
+	 * Thus, to get the string length we will uucopy() up to copylen
+	 * bytes at a time into a local buffer and will walk each chunk looking
+	 * for the string-terminating NULL byte.
 	 *
 	 * We can use strlen() to find the length of the string in the
 	 * local buffer by delimiting the buffer with a NULL byte in the
@@ -217,7 +221,7 @@ lx_getcwd(uintptr_t p1, uintptr_t p2)
 	return (len + 1);
 }
 
-int
+long
 lx_uname(uintptr_t p1)
 {
 	struct lx_utsname *un = (struct lx_utsname *)p1;
@@ -242,7 +246,7 @@ lx_uname(uintptr_t p1)
  * {get,set}groups16() - Handle the conversion between 16-bit Linux gids and
  * 32-bit Solaris gids.
  */
-int
+long
 lx_getgroups16(uintptr_t p1, uintptr_t p2)
 {
 	int count = (int)p1;
@@ -269,7 +273,7 @@ lx_getgroups16(uintptr_t p1, uintptr_t p2)
 	return (ret);
 }
 
-int
+long
 lx_setgroups16(uintptr_t p1, uintptr_t p2)
 {
 	int count = (int)p1;
@@ -296,7 +300,7 @@ lx_setgroups16(uintptr_t p1, uintptr_t p2)
  */
 #define	LX_PER_LINUX	0x0
 
-int
+long
 lx_personality(uintptr_t p1)
 {
 	int per = (int)p1;
@@ -327,7 +331,7 @@ lx_personality(uintptr_t p1)
 #define	LX_S_IFSOCK	0140000
 
 /*ARGSUSED*/
-int
+long
 lx_mknod(uintptr_t p1, uintptr_t p2, uintptr_t p3)
 {
 	char *path = (char *)p1;
@@ -422,7 +426,7 @@ lx_mknod(uintptr_t p1, uintptr_t p2, uintptr_t p3)
 	return (mknod(path, mode | type, dev) ? -errno : 0);
 }
 
-int
+long
 lx_sethostname(uintptr_t p1, uintptr_t p2)
 {
 	char *name = (char *)p1;
@@ -431,7 +435,7 @@ lx_sethostname(uintptr_t p1, uintptr_t p2)
 	return (sethostname(name, len) ? -errno : 0);
 }
 
-int
+long
 lx_setdomainname(uintptr_t p1, uintptr_t p2)
 {
 	char *name = (char *)p1;
@@ -446,7 +450,7 @@ lx_setdomainname(uintptr_t p1, uintptr_t p2)
 	return ((rval < 0) ? -errno : 0);
 }
 
-int
+long
 lx_getpid(void)
 {
 	int pid;
@@ -455,11 +459,11 @@ lx_getpid(void)
 	if (lxt_server_pid(&pid) != 0)
 		return (pid);
 
-	pid = syscall(SYS_brand, B_EMULATE_SYSCALL + LX_SYS_getpid);
+	pid = syscall(SYS_brand, B_IKE_SYSCALL + LX_EMUL_getpid);
 	return ((pid == -1) ? -errno : pid);
 }
 
-int
+long
 lx_execve(uintptr_t p1, uintptr_t p2, uintptr_t p3)
 {
 	char *filename = (char *)p1;
@@ -504,7 +508,7 @@ lx_execve(uintptr_t p1, uintptr_t p2, uintptr_t p3)
 	return (-errno);
 }
 
-int
+long
 lx_setgroups(uintptr_t p1, uintptr_t p2)
 {
 	int ng = (int)p1;
@@ -535,7 +539,7 @@ lx_setgroups(uintptr_t p1, uintptr_t p2)
 	if (ng > NGROUPS_MAX_DEFAULT)
 		return (-EINVAL);
 
-	r = syscall(SYS_brand, B_EMULATE_SYSCALL + LX_SYS_setgroups32,
+	r = syscall(SYS_brand, B_IKE_SYSCALL + LX_EMUL_setgroups,
 	    ng, glist);
 
 	return ((r == -1) ? -errno : r);
@@ -545,7 +549,7 @@ lx_setgroups(uintptr_t p1, uintptr_t p2)
  * Linux currently defines 42 options for prctl (PR_CAPBSET_READ,
  * PR_CAPBSET_DROP, etc.). Most of these are not emulated.
  */
-int
+long
 lx_prctl(int option, uintptr_t arg2, uintptr_t arg3,
     uintptr_t arg4, uintptr_t arg5)
 {
@@ -583,5 +587,352 @@ lx_prctl(int option, uintptr_t arg2, uintptr_t arg3,
 
 	(void) close(fd);
 
+	return (0);
+}
+
+/*
+ * The following are pass-through functions but we need to return the correct
+ * long so that the errno propagates back to the Linux code correctly.
+ */
+
+long
+lx_alarm(unsigned int seconds)
+{
+	int r;
+
+	r = alarm(seconds);
+	return ((r == -1) ? -errno : r);
+}
+
+long
+lx_close(int fildes)
+{
+	int r;
+
+	r = close(fildes);
+	return ((r == -1) ? -errno : r);
+}
+
+long
+lx_chdir(const char *path)
+{
+	int r;
+
+	r = chdir(path);
+	return ((r == -1) ? -errno : r);
+}
+
+long
+lx_chroot(const char *path)
+{
+	int r;
+
+	r = chroot(path);
+	return ((r == -1) ? -errno : r);
+}
+
+long
+lx_creat(const char *path, mode_t mode)
+{
+	int r;
+
+	r = creat(path, mode);
+	return ((r == -1) ? -errno : r);
+}
+
+long
+lx_dup(int fildes)
+{
+	int r;
+
+	r = dup(fildes);
+	return ((r == -1) ? -errno : r);
+}
+
+long
+lx_epoll_pwait(int epfd, void *events, int maxevents, int timeout,
+    const sigset_t *sigmask)
+{
+	int r;
+
+	r = epoll_pwait(epfd, events, maxevents, timeout, sigmask);
+	return ((r == -1) ? -errno : r);
+}
+
+long
+lx_epoll_create(int size)
+{
+	int r;
+
+	r = epoll_create(size);
+	return ((r == -1) ? -errno : r);
+}
+
+long
+lx_epoll_create1(int flags)
+{
+	int r;
+
+	r = epoll_create1(flags);
+	return ((r == -1) ? -errno : r);
+}
+
+long
+lx_epoll_wait(int epfd, void *events, int maxevents, int timeout)
+{
+	int r;
+
+	r = epoll_wait(epfd, events, maxevents, timeout);
+	return ((r == -1) ? -errno : r);
+}
+
+long
+lx_fchdir(int fildes)
+{
+	int r;
+
+	r = fchdir(fildes);
+	return ((r == -1) ? -errno : r);
+}
+
+long
+lx_fchmod(int fildes, mode_t mode)
+{
+	int r;
+
+	r = fchmod(fildes, mode);
+	return ((r == -1) ? -errno : r);
+}
+
+long
+lx_getgid(void)
+{
+	int r;
+
+	r = getgid();
+	return (r);
+}
+
+long
+lx_getgroups(int gidsetsize, gid_t *grouplist)
+{
+	int r;
+
+	r = getgroups(gidsetsize, grouplist);
+	return ((r == -1) ? -errno : r);
+}
+
+long
+lx_getitimer(int which, struct itimerval *value)
+{
+	int r;
+
+	r = getitimer(which, value);
+	return ((r == -1) ? -errno : r);
+}
+
+long
+lx_getuid(void)
+{
+	int r;
+
+	r = getuid();
+	return (r);
+}
+
+long
+lx_inotify_add_watch(int fd, const char *pathname, uint32_t mask)
+{
+	int r;
+
+	r = inotify_add_watch(fd, pathname, mask);
+	return ((r == -1) ? -errno : r);
+}
+
+long
+lx_inotify_init(void)
+{
+	int r;
+
+	r = inotify_init();
+	return ((r == -1) ? -errno : r);
+}
+
+long
+lx_inotify_init1(int flags)
+{
+	int r;
+
+	r = inotify_init1(flags);
+	return ((r == -1) ? -errno : r);
+}
+
+long
+lx_inotify_rm_watch(int fd, int wd)
+{
+	int r;
+
+	r = inotify_rm_watch(fd, wd);
+	return ((r == -1) ? -errno : r);
+}
+
+long
+lx_lchown(const char *path, uid_t owner, gid_t group)
+{
+	int r;
+
+	r = lchown(path, owner, group);
+	return ((r == -1) ? -errno : r);
+}
+
+long
+lx_mincore(caddr_t addr, size_t len, char *vec)
+{
+	int r;
+
+	r = mincore(addr, len, vec);
+	return ((r == -1) ? -errno : r);
+}
+
+long
+lx_mkdir(const char *path, mode_t mode)
+{
+	int r;
+
+	r = mkdir(path, mode);
+	return ((r == -1) ? -errno : r);
+}
+
+long
+lx_munmap(void *addr, size_t len)
+{
+	int r;
+
+	r = munmap(addr, len);
+	return ((r == -1) ? -errno : r);
+}
+
+long
+lx_nice(int incr)
+{
+	int r;
+
+	r = nice(incr);
+	return ((r == -1) ? -errno : r);
+}
+
+long
+lx_nanosleep(const struct timespec *rqtp, struct timespec *rmtp)
+{
+	int r;
+
+	r = nanosleep(rqtp, rmtp);
+	return ((r == -1) ? -errno : r);
+}
+
+long
+lx_pause(void)
+{
+	int r;
+
+	r = pause();
+	return ((r == -1) ? -errno : r);
+}
+
+long
+lx_setgid(gid_t gid)
+{
+	int r;
+
+	r = setgid(gid);
+	return ((r == -1) ? -errno : r);
+}
+
+long
+lx_setuid(uid_t uid)
+{
+	int r;
+
+	r = setuid(uid);
+	return ((r == -1) ? -errno : r);
+}
+
+long
+lx_setregid(gid_t rgid, gid_t egid)
+{
+	int r;
+
+	r = setregid(rgid, egid);
+	return ((r == -1) ? -errno : r);
+}
+
+long
+lx_setreuid(uid_t ruid, uid_t euid)
+{
+	int r;
+
+	r = setreuid(ruid, euid);
+	return ((r == -1) ? -errno : r);
+}
+
+long
+lx_shmdt(char *shmaddr)
+{
+	int r;
+
+	r = shmdt(shmaddr);
+	return ((r == -1) ? -errno : r);
+}
+
+long
+lx_stime(const time_t *tp)
+{
+	int r;
+
+	r = stime(tp);
+	return ((r == -1) ? -errno : r);
+}
+
+long
+lx_symlink(const char *name1, const char *name2)
+{
+	int r;
+
+	r = symlink(name1, name2);
+	return ((r == -1) ? -errno : r);
+}
+
+long
+lx_umask(mode_t cmask)
+{
+	int r;
+
+	r = umask(cmask);
+	return ((r == -1) ? -errno : r);
+}
+
+long
+lx_utimes(const char *path, const struct timeval times[2])
+{
+	int r;
+
+	r = utimes(path, times);
+	return ((r == -1) ? -errno : r);
+}
+
+long
+lx_write(int fildes, const void *buf, size_t nbyte)
+{
+	int r;
+
+	r = write(fildes, buf, nbyte);
+	return ((r == -1) ? -errno : r);
+}
+
+long
+lx_yield(void)
+{
+
+	yield();
 	return (0);
 }

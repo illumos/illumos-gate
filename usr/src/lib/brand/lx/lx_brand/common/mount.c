@@ -44,6 +44,7 @@
 #include <sys/lx_autofs.h>
 #include <sys/lx_debug.h>
 #include <sys/lx_misc.h>
+#include <sys/lx_syscall.h>
 #include <sys/lx_mount.h>
 
 /*
@@ -517,7 +518,7 @@ i_make_nfs_args(lx_nfs_mount_data_t *lx_nmd, struct nfs_args *nfs_args,
 	return (0);
 }
 
-int
+long
 lx_mount(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
     uintptr_t p5)
 {
@@ -719,7 +720,7 @@ lx_mount(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
  * umount() is identical, though it is implemented on top of umount2() in
  * Solaris so it cannot be a pass-thru system call.
  */
-int
+long
 lx_umount(uintptr_t p1)
 {
 	return (umount((char *)p1) ? -errno : 0);
@@ -731,7 +732,7 @@ lx_umount(uintptr_t p1)
  */
 #define	LX_MNT_FORCE	0x1
 
-int
+long
 lx_umount2(uintptr_t p1, uintptr_t p2)
 {
 	char *path = (char *)p1;

@@ -22,12 +22,11 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.	All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2014 Joyent, Inc. All rights reserved.
  */
 
 #ifndef _SYS_LX_THREAD_H
 #define	_SYS_LX_THREAD_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -36,13 +35,19 @@ extern "C" {
 #include <thread.h>
 
 typedef struct lx_tsd {
+#if defined(_LP64)
+	/* 64-bit thread-specific syscall mode state "stack" */
+	uint_t		lxtsd_scms;
+#else
+	/* 32-bit thread-specific Linux %gs value */
 	uintptr_t	lxtsd_gs;
+#endif
 	int		lxtsd_exit;
 	int		lxtsd_exit_status;
 	ucontext_t	lxtsd_exit_context;
 } lx_tsd_t;
 
-extern thread_key_t	lx_tsd_key;	/* thread-specific Linux %gs value */
+extern thread_key_t	lx_tsd_key;
 
 extern void		lx_swap_gs(long, long *);
 

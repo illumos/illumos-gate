@@ -68,55 +68,55 @@ typedef struct {
  */
 #define	LX_ALL_CAPABILITIES	0xFFFFFFFFU
 
-int
+long
 lx_setuid16(uintptr_t uid)
 {
 	return ((setuid(LX_UID16_TO_UID32((lx_uid16_t)uid))) ? -errno : 0);
 }
 
-int
+long
 lx_getuid16(void)
 {
 	return ((int)LX_UID32_TO_UID16(getuid()));
 }
 
-int
+long
 lx_setgid16(uintptr_t gid)
 {
 	return ((setgid(LX_GID16_TO_GID32((lx_gid16_t)gid))) ? -errno : 0);
 }
 
-int
+long
 lx_getgid16(void)
 {
 	return ((int)LX_GID32_TO_GID16(getgid()));
 }
 
-int
+long
 lx_geteuid16(void)
 {
 	return ((int)LX_UID32_TO_UID16(geteuid()));
 }
 
-int
+long
 lx_getegid16(void)
 {
 	return ((int)LX_GID32_TO_GID16(getegid()));
 }
 
-int
+long
 lx_geteuid(void)
 {
 	return ((int)geteuid());
 }
 
-int
+long
 lx_getegid(void)
 {
 	return ((int)getegid());
 }
 
-int
+long
 lx_getresuid(uintptr_t ruid, uintptr_t euid, uintptr_t suid)
 {
 	lx_uid_t lx_ruid, lx_euid, lx_suid;
@@ -153,7 +153,7 @@ lx_getresuid(uintptr_t ruid, uintptr_t euid, uintptr_t suid)
 	    ? -errno : 0);
 }
 
-int
+long
 lx_getresuid16(uintptr_t ruid16, uintptr_t euid16, uintptr_t suid16)
 {
 	lx_uid_t lx_ruid, lx_euid, lx_suid;
@@ -178,7 +178,7 @@ lx_getresuid16(uintptr_t ruid16, uintptr_t euid16, uintptr_t suid16)
 	    ? -errno : 0);
 }
 
-int
+long
 lx_getresgid(uintptr_t rgid, uintptr_t egid, uintptr_t sgid)
 {
 	ucred_t	*cr;
@@ -215,7 +215,7 @@ lx_getresgid(uintptr_t rgid, uintptr_t egid, uintptr_t sgid)
 	    ? -errno : 0);
 }
 
-int
+long
 lx_getresgid16(uintptr_t rgid16, uintptr_t egid16, uintptr_t sgid16)
 {
 	lx_gid_t lx_rgid, lx_egid, lx_sgid;
@@ -240,14 +240,14 @@ lx_getresgid16(uintptr_t rgid16, uintptr_t egid16, uintptr_t sgid16)
 	    ? -errno : 0);
 }
 
-int
+long
 lx_setreuid16(uintptr_t ruid, uintptr_t euid)
 {
 	return ((setreuid(LX_UID16_TO_UID32((lx_uid16_t)ruid),
 	    LX_UID16_TO_UID32((lx_uid16_t)euid))) ? -errno : 0);
 }
 
-int
+long
 lx_setregid16(uintptr_t rgid, uintptr_t egid)
 {
 	return ((setregid(LX_UID16_TO_UID32((lx_gid16_t)rgid),
@@ -265,28 +265,28 @@ lx_setregid16(uintptr_t rgid, uintptr_t egid)
  * worry about setting error codes because the Linux calls don't set any.
  */
 /*ARGSUSED*/
-int
+long
 lx_setfsuid16(uintptr_t fsuid16)
 {
 	return (lx_geteuid16());
 }
 
 /*ARGSUSED*/
-int
+long
 lx_setfsgid16(uintptr_t fsgid16)
 {
 	return (lx_getegid16());
 }
 
 /*ARGSUSED*/
-int
+long
 lx_setfsuid(uintptr_t fsuid)
 {
 	return (geteuid());
 }
 
 /*ARGSUSED*/
-int
+long
 lx_setfsgid(uintptr_t fsgid)
 {
 	return (getegid());
@@ -300,7 +300,7 @@ lx_setfsgid(uintptr_t fsgid)
  * been set so we could hand back that subset, instead of always saying we
  * have all of them enabled.
  */
-int
+long
 lx_capget(uintptr_t p1, uintptr_t p2)
 {
 	lx_cap_user_header_t *chp = (lx_cap_user_header_t *)p1;
@@ -377,7 +377,7 @@ lx_capget(uintptr_t p1, uintptr_t p2)
 	return (0);
 }
 
-int
+long
 lx_capset(uintptr_t p1, uintptr_t p2)
 {
 	lx_cap_user_header_t ch;

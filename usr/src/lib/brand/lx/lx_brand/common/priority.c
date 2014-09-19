@@ -34,7 +34,7 @@
 #include <sys/resource.h>
 #include <sys/lx_misc.h>
 
-int
+long
 lx_getpriority(uintptr_t p1, uintptr_t p2)
 {
 	int	which = (int)p1;
@@ -73,7 +73,7 @@ lx_getpriority(uintptr_t p1, uintptr_t p2)
 	return (20 - ret);
 }
 
-int
+long
 lx_setpriority(uintptr_t p1, uintptr_t p2, uintptr_t p3)
 {
 	int which = (int)p1;

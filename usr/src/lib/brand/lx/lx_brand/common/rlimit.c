@@ -33,6 +33,7 @@
 #include <rctl.h>
 #include <sys/lx_types.h>
 #include <sys/lx_misc.h>
+#include <sys/lx_syscall.h>
 
 #define	LX_RLIMIT_CPU		0
 #define	LX_RLIMIT_FSIZE		1
@@ -206,7 +207,7 @@ getrlimit_common(int resource, uint64_t *rlim_curp, uint64_t *rlim_maxp)
  * RLIM_INFINITY, which is smaller for the older version.  Modern code will
  * use this version by default.
  */
-int
+long
 lx_getrlimit(uintptr_t p1, uintptr_t p2)
 {
 	int resource = (int)p1;
@@ -245,7 +246,7 @@ lx_getrlimit(uintptr_t p1, uintptr_t p2)
  * getrlimit (variously called getrlimit or ugetrlimit) is the value of
  * RLIM_INFINITY, which is smaller for the older version.
  */
-int
+long
 lx_oldgetrlimit(uintptr_t p1, uintptr_t p2)
 {
 	int resource = (int)p1;
@@ -430,7 +431,7 @@ setrlimit_common(int resource, uint64_t rlim_cur, uint64_t rlim_max)
 	return (set_rctl(rctl, rlim_cur, RCPRIV_BASIC));
 }
 
-int
+long
 lx_setrlimit(uintptr_t p1, uintptr_t p2)
 {
 	int resource = (int)p1;
@@ -466,7 +467,7 @@ lx_setrlimit(uintptr_t p1, uintptr_t p2)
  *
  * If pid is 0, then the call applies to the calling process.
  */
-int
+long
 lx_prlimit64(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4)
 {
 	pid_t pid = (pid_t)p1;
@@ -519,7 +520,7 @@ lx_prlimit64(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4)
  * We lucked out here.  Linux and Solaris have exactly the same
  * rusage structures.
  */
-int
+long
 lx_getrusage(uintptr_t p1, uintptr_t p2)
 {
 	int who = (int)p1;

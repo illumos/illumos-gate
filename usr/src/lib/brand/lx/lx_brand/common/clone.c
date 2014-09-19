@@ -122,7 +122,7 @@ extern void lx_setup_clone(uintptr_t, void *, void *);
  */
 static int is_vforked = 0;
 
-int
+long
 lx_exit(uintptr_t p1)
 {
 	int		ret, status = (int)p1;
@@ -138,9 +138,8 @@ lx_exit(uintptr_t p1)
 	}
 
 	if ((ret = thr_getspecific(lx_tsd_key, (void **)&lx_tsd)) != 0)
-		lx_err_fatal(gettext(
-		    "%s: unable to read thread-specific data: %s"),
-		    "exit", strerror(ret));
+		lx_err_fatal("exit: unable to read thread-specific data: %s",
+		    strerror(ret));
 
 	assert(lx_tsd != 0);
 
@@ -164,14 +163,13 @@ lx_exit(uintptr_t p1)
 	/*
 	 * If we returned from the setcontext(2), something is very wrong.
 	 */
-	lx_err_fatal(gettext("%s: unable to set exit context: %s"),
-	    "exit", strerror(errno));
+	lx_err_fatal("exit: unable to set exit context: %s", strerror(errno));
 
 	/*NOTREACHED*/
 	return (0);
 }
 
-int
+long
 lx_group_exit(uintptr_t p1)
 {
 	int		ret, status = (int)p1;
@@ -187,9 +185,8 @@ lx_group_exit(uintptr_t p1)
 	}
 
 	if ((ret = thr_getspecific(lx_tsd_key, (void **)&lx_tsd)) != 0)
-		lx_err_fatal(gettext(
-		    "%s: unable to read thread-specific data: %s"),
-		    "group_exit", strerror(ret));
+		lx_err_fatal("group_exit: unable to read thread-specific "
+		    "data: %s", strerror(ret));
 
 	assert(lx_tsd != 0);
 
@@ -211,8 +208,8 @@ lx_group_exit(uintptr_t p1)
 	/*
 	 * If we returned from the setcontext(2), something is very wrong.
 	 */
-	lx_err_fatal(gettext("%s: unable to set exit context: %s"),
-	    "group_exit", strerror(errno));
+	lx_err_fatal("group_exits: unable to set exit context: %s",
+	    strerror(errno));
 
 	/*NOTREACHED*/
 	return (0);
@@ -240,7 +237,7 @@ clone_start(void *arg)
 	lx_debug("\tLX_SYS_clone(0x%x, 0x%p, 0x%p, 0x%p, 0x%p)",
 	    cs->c_flags, cs->c_stk, cs->c_ptidp, cs->c_ldtinfo, cs->c_ctidp);
 
-	rval = syscall(SYS_brand, B_EMULATE_SYSCALL + LX_SYS_clone,
+	rval = syscall(SYS_brand, B_IKE_SYSCALL + LX_EMUL_clone,
 	    cs->c_flags, cs->c_stk, cs->c_ptidp, cs->c_ldtinfo, cs->c_ctidp,
 	    NULL);
 
@@ -260,14 +257,17 @@ clone_start(void *arg)
 	    (uintptr_t)&cs->c_affmask) != 0) {
 		*(cs->c_clone_res) = -errno;
 
-		lx_err_fatal(gettext(
-		    "Unable to set affinity mask in child thread: %s"),
+		lx_err_fatal("Unable to set affinity mask in child thread: %s",
 		    strerror(errno));
 	}
 
 	/* Initialize the thread specific data for this thread. */
 	bzero(&lx_tsd, sizeof (lx_tsd));
+#if defined(_LP64)
+	lx_tsd.lxtsd_scms = 0x1;
+#else
 	lx_tsd.lxtsd_gs = cs->c_gs;
+#endif
 
 	/*
 	 * Use the address of the stack-allocated lx_tsd as the
@@ -280,8 +280,7 @@ clone_start(void *arg)
 	 */
 	if (thr_setspecific(lx_tsd_key, &lx_tsd) != 0) {
 		*(cs->c_clone_res) = -errno;
-		lx_err_fatal(
-		    gettext("Unable to set thread-specific ptr for clone: %s"),
+		lx_err_fatal("Unable to set thread-specific ptr for clone: %s",
 		    strerror(rval));
 	}
 
@@ -293,9 +292,8 @@ clone_start(void *arg)
 	if (getcontext(&lx_tsd.lxtsd_exit_context) != 0) {
 		*(cs->c_clone_res) = -errno;
 
-		lx_err_fatal(gettext(
-		    "Unable to initialize thread-specific exit context: %s"),
-		    strerror(errno));
+		lx_err_fatal("Unable to initialize thread-specific exit "
+		    "context: %s", strerror(errno));
 	}
 
 	/*
@@ -306,9 +304,8 @@ clone_start(void *arg)
 		if (sigprocmask(SIG_SETMASK, &cs->c_sigmask, NULL) < 0) {
 			*(cs->c_clone_res) = -errno;
 
-			lx_err_fatal(gettext(
-			    "Unable to release held signals for child "
-			    "thread: %s"), strerror(errno));
+			lx_err_fatal("Unable to release held signals for child "
+			    "thread: %s", strerror(errno));
 		}
 
 		/*
@@ -330,7 +327,7 @@ clone_start(void *arg)
 	 * getcontext(), above.
 	 */
 	if (lx_tsd.lxtsd_exit == LX_EXIT)
-		thr_exit((void *)lx_tsd.lxtsd_exit_status);
+		thr_exit((void *)(long)lx_tsd.lxtsd_exit_status);
 	else
 		exit(lx_tsd.lxtsd_exit_status);
 
@@ -338,7 +335,7 @@ clone_start(void *arg)
 	/*NOTREACHED*/
 }
 
-int
+long
 lx_clone(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 	uintptr_t p5)
 {
@@ -407,9 +404,8 @@ lx_clone(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 	/* See if this is a fork() operation or a thr_create().  */
 	if (IS_FORK(flags) || IS_VFORK(flags)) {
 		if (flags & LX_CLONE_PARENT) {
-			lx_unsupported(gettext(
-			    "clone(2) only supports CLONE_PARENT "
-			    "for threads.\n"));
+			lx_unsupported("clone(2) only supports CLONE_PARENT "
+			    "for threads.\n");
 			return (-ENOTSUP);
 		}
 
@@ -431,9 +427,9 @@ lx_clone(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 		}
 
 		/*
-		 * Since we've already forked, we can't do much if uucopy fails,
-		 * so we just ignore failure. Failure is unlikely since we've
-		 * tested the memory before we did the fork.
+		 * Since we've already forked, we can't do much if uucopy
+		 * fails, so we just ignore failure. Failure is unlikely since
+		 * we've tested the memory before we did the fork.
 		 */
 		if (rval > 0 && (flags & LX_CLONE_PARENT_SETTID)) {
 			(void) uucopy(&rval, ptidp, sizeof (int));
@@ -460,7 +456,7 @@ lx_clone(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 		 * Set up additional data in the lx_proc_data structure as
 		 * necessary.
 		 */
-		rval = syscall(SYS_brand, B_EMULATE_SYSCALL + LX_SYS_clone,
+		rval = syscall(SYS_brand, B_IKE_SYSCALL + LX_EMUL_clone,
 		    flags, cldstk, ptidp, ldtinfo, ctidp, NULL);
 		if (rval < 0) {
 			return (rval);
@@ -475,8 +471,13 @@ lx_clone(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 		/*
 		 * If provided, the child needs its new stack set up.
 		 */
-		if (cldstk)
+		if (cldstk) {
+#if defined(_LP64)
+			lx_setup_clone(rp->lxr_gs, (void *)rp->lxr_rip, cldstk);
+#else
 			lx_setup_clone(rp->lxr_gs, (void *)rp->lxr_eip, cldstk);
+#endif
+		}
 
 		return (0);
 	}
@@ -486,16 +487,15 @@ lx_clone(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 	 * supported
 	 */
 	if (((flags & SHARED_AS) != SHARED_AS)) {
-		lx_unsupported(gettext(
-		    "clone(2) requires that all or none of CLONE_VM, CLONE_FS,"
-		    "CLONE_FILES, CLONE_THREAD and CLONE_SIGHAND be set.\n"));
+		lx_unsupported("clone(2) requires that all or none of "
+		    "CLONE_VM, CLONE_FS, CLONE_FILES, CLONE_THREAD and "
+		    "CLONE_SIGHAND be set.\n");
 		return (-ENOTSUP);
 	}
 
 	if (cldstk == NULL) {
-		lx_unsupported(gettext(
-		    "clone(2) requires the caller to allocate the "
-		    "child's stack.\n"));
+		lx_unsupported("clone(2) requires the caller to allocate the "
+		    "child's stack.\n");
 		return (-ENOTSUP);
 	}
 
@@ -503,8 +503,7 @@ lx_clone(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 	 * If we want a signal-on-exit, ensure that the signal is valid.
 	 */
 	if ((sig = ltos_signo[flags & LX_CSIGNAL]) == -1) {
-		lx_unsupported(gettext(
-		    "clone(2) passed unsupported signal: %d"), sig);
+		lx_unsupported("clone(2) passed unsupported signal: %d", sig);
 		return (-ENOTSUP);
 	}
 
@@ -527,15 +526,18 @@ lx_clone(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 
 	if (lx_sched_getaffinity(0, sizeof (cs->c_affmask),
 	    (uintptr_t)&cs->c_affmask) == -1)
-		lx_err_fatal(gettext(
-		    "Unable to get affinity mask for parent thread: %s"),
-		    strerror(errno));
+		lx_err_fatal("Unable to get affinity mask for parent "
+		    "thread: %s", strerror(errno));
 
 	/*
 	 * We want the new thread to return directly to the return site for
 	 * the system call.
 	 */
+#if defined(_LP64)
+	cs->c_retaddr = (void *)rp->lxr_rip;
+#else
 	cs->c_retaddr = (void *)rp->lxr_eip;
+#endif
 	clone_res = 0;
 
 	(void) sigfillset(&sigmask);

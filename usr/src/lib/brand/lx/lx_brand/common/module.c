@@ -22,9 +22,8 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2014 Joyent, Inc.  All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * We don't support Linux modules, but we have to emulate enough of the system
@@ -34,6 +33,7 @@
 #include <errno.h>
 #include <sys/types.h>
 #include <sys/lx_misc.h>
+#include <sys/lx_syscall.h>
 
 /*
  * For query_module(), we provide an empty list of modules, and return ENOENT
@@ -46,7 +46,7 @@
 #define	LX_QM_INFO	5
 
 /*ARGSUSED*/
-int
+long
 lx_query_module(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
     uintptr_t p5)
 {

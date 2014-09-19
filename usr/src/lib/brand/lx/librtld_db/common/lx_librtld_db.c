@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright (c) 2014, Joyent, Inc. All rights reserved.
+ * Copyright 2014 Joyent, Inc. All rights reserved.
  */
 
 #include <stdio.h>
@@ -39,6 +39,49 @@
 #include <synch.h>
 
 #include <sys/lx_brand.h>
+
+/*
+ * Overview of this library derived from the original "BrandZ" PSARC design
+ * document.
+ *
+ * Since Linux binaries are standard ELF objects, Illumos debug tools (i.e. mdb
+ * or ptools) are able to process them in essentially the same way that Illumos
+ * binaries are processed. The main objective is to retrieve symbols and
+ * thereby aid debugging and observability. Unfortunately, most Linux
+ * distributions strip(1) their binaries as a misguided "optimization" so the
+ * majority of the useful debugging information is lost.
+ *
+ * The debug tools use interfaces provided by librtld_db to debug live
+ * processes and core files. librtld_db discovers ELF objects which have been
+ * mapped into the target's address space and reports these back to the tool.
+ * The librtld_db library understands enough of the internals of the Illumos
+ * runtime linker to iterate over the linker's private link maps and process
+ * the objects it finds. librtld_db allows our tools to debug the Illumos
+ * portions of a branded process (e.g. the brand library, libc, etc.) but they
+ * can't understand any Linux objects that are mapped into the address space
+ * because the Illumos linker only has Illumos objects on its link maps.
+ *
+ * In order to give the tools visibility into Linux binaries, a brand helper
+ * framework is implemented in librtld_db. When librtld_db is asked to examine
+ * a branded target process or core file, it uses the AT_SUN_BRANDNAME aux
+ * vector to get our brand name (lx). It then dlopen-s this lx_librtld_db.so
+ * helper library.
+ *
+ * Once loaded, this helper library is responsible for finding any lx-specific
+ * information it needs, such as the Linux equivalent LDDATA aux entry and
+ * preparing to return details about the objects loaded into the address space
+ * by the Linux linker.
+ *
+ * When a debug tool asks to know what objects are loaded in the target,
+ * librtld_db walks the Illumos link maps and iterates over each object it
+ * finds there, handing information about each to the tool. It then calls down
+ * into this helper library, which does the same for the brand-specific objects
+ * used by the target.
+ *
+ * This debug-helper code contains a bunch of helpful ps_plog calls. To enable
+ * this output with the ptools (e.g. pmap) set LIBPROC_DEBUG=1 in your
+ * environment. To enable it with mdb set MDB_DEBUG=psvc in your environment.
+ */
 
 /*
  * ATTENTION:
@@ -75,18 +118,6 @@
  * Instead we should declare all pointers as uint32_t.  Then when we
  * are compiled to deal with 64-bit targets we'll re-define uint32_t
  * to be a uint64_t.
- *
- * Finally, one last important note.  All the 64-bit elf file code
- * is never used and can't be tested.  This is because we don't actually
- * support 64-bit Linux processes yet.  The reason that we have it here
- * is because we want to support debugging 32-bit elf targets with the
- * 64-bit version of this library, so we need to have a 64-bit version
- * of this library.  But a 64-bit version of this library is expected
- * to provide debugging interfaces for both 32 and 64-bit elf targets.
- * So we provide the 64-bit elf target interfaces, but they will never
- * be invoked and are untested.  If we ever add support for 64-bit elf
- * Linux processes, we'll need to verify that this code works correctly
- * for those targets.
  */
 #ifdef _LP64
 #ifdef _ELF64
@@ -339,6 +370,9 @@ lx_ldb_init32(rd_agent_t *rap, struct ps_prochandle *php)
 		return (NULL);
 	}
 	ps_plog("lx_ldb_init: read ehdr at: 0x%p", addr);
+	ps_plog("lx_ldb_init: ehdr t %d ent 0x%p poff 0x%p psize %d pnum %d",
+	    ehdr.e_type, ehdr.e_entry, ehdr.e_phoff, ehdr.e_phentsize,
+	    ehdr.e_phnum);
 
 	if ((phdrs = malloc(ehdr.e_phnum * ehdr.e_phentsize)) == NULL) {
 		ps_plog("lx_ldb_init: couldn't alloc phdrs memory");
@@ -354,12 +388,15 @@ lx_ldb_init32(rd_agent_t *rap, struct ps_prochandle *php)
 		free(phdrs);
 		return (NULL);
 	}
+
+	/* program headers */
 	ps_plog("lx_ldb_init: read %d phdrs at: 0x%p",
 	    ehdr.e_phnum, phdr_addr);
 
 	for (i = 0, ph = phdrs; i < ehdr.e_phnum; i++,
 	    /*LINTED */
 	    ph = (Elf32_Phdr *)((char *)ph + ehdr.e_phentsize)) {
+		ps_plog("lx_ldb_init: ph[%d] 0x%p type %d", i, ph, ph->p_type);
 		if (ph->p_type == PT_DYNAMIC)
 			break;
 	}
@@ -371,6 +408,8 @@ lx_ldb_init32(rd_agent_t *rap, struct ps_prochandle *php)
 	}
 	ps_plog("lx_ldb_init: found PT_DYNAMIC phdr[%d] at: 0x%p",
 	    i, (phdr_addr + ((char *)ph - (char *)phdrs)));
+	ps_plog("lx_ldb_init: ph t 0x%x f 0x%x o 0x%p v 0x%p s %d",
+	    ph->p_type, ph->p_flags, ph->p_offset, ph->p_vaddr, ph->p_filesz);
 
 	if ((dyn = malloc(ph->p_filesz)) == NULL) {
 		ps_plog("lx_ldb_init: couldn't alloc for PT_DYNAMIC");
@@ -379,8 +418,18 @@ lx_ldb_init32(rd_agent_t *rap, struct ps_prochandle *php)
 		return (NULL);
 	}
 
-	dyn_addr = addr + ph->p_offset;
+	/*
+	 * For core dumps from 64-bit code we must use the p_vaddr.
+	 */
+	if (sizeof (Elf32_Dyn) == 8)
+		dyn_addr = ph->p_vaddr;
+	else
+		dyn_addr = addr + ph->p_vaddr;
+
 	dyn_count = ph->p_filesz / sizeof (Elf32_Dyn);
+	ps_plog("lx_ldb_init: dyn_addr 0x%p 0x%x = 0x%p",
+	    addr, ph->p_offset, dyn_addr);
+	ps_plog("lx_ldb_init: dyn_count %d %d", dyn_count, sizeof (Elf32_Dyn));
 	if (ps_pread(php, dyn_addr, dyn, ph->p_filesz) != PS_OK) {
 		ps_plog("lx_ldb_init: couldn't read dynamic at 0x%p",
 		    dyn_addr);
@@ -706,6 +755,8 @@ lx_ldb_loadobj_iter32(rd_helper_data_t rhd, rl_iter_f *cb, void *client_data)
 		    "client callb failed for executable");
 		return (PS_ERR);
 	}
+	ps_plog("lx_ldb_loadobj_iter: exec base 0x%p dyn 0x%p",
+	    exec.rl_base, exec.rl_dynamic);
 
 	for (p = map.lxm_next; p != NULL; p = map.lxm_next) {
 		rd_loadobj_t	obj;
@@ -729,6 +780,9 @@ lx_ldb_loadobj_iter32(rd_helper_data_t rhd, rl_iter_f *cb, void *client_data)
 		obj.rl_plt_base = NULL;
 		obj.rl_plt_size = 0;
 		obj.rl_lmident = LM_ID_BASE;
+
+		ps_plog("lx_ldb_loadobj_iter: map base 0x%p 0x%p",
+		    obj.rl_base, obj.rl_nameaddr);
 
 		/*
 		 * Ugh - we have to walk the ELF stuff, find the PT_LOAD

@@ -207,7 +207,7 @@ lx_waitid_helper(idtype_t idtype, id_t id, siginfo_t *info, int options)
 	return (0);
 }
 
-int
+long
 lx_wait4(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4)
 {
 	siginfo_t info = { 0 };
@@ -288,13 +288,13 @@ lx_wait4(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4)
 	return (info.si_pid);
 }
 
-int
+long
 lx_waitpid(uintptr_t p1, uintptr_t p2, uintptr_t p3)
 {
 	return (lx_wait4(p1, p2, p3, NULL));
 }
 
-int
+long
 lx_waitid(uintptr_t idtype, uintptr_t id, uintptr_t infop, uintptr_t opt)
 {
 	int rval, options;

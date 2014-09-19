@@ -139,7 +139,7 @@ lx_open_postprocess(int fd, uintptr_t p2)
 	return (fd);
 }
 
-int
+long
 lx_openat(uintptr_t ext1, uintptr_t p1, uintptr_t p2, uintptr_t p3)
 {
 	int atfd = (int)ext1;
@@ -164,7 +164,7 @@ lx_openat(uintptr_t ext1, uintptr_t p1, uintptr_t p2, uintptr_t p3)
 	return (lx_open_postprocess(fd, p2));
 }
 
-int
+long
 lx_open(uintptr_t p1, uintptr_t p2, uintptr_t p3)
 {
 	int flags, fd;
