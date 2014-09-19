@@ -24,6 +24,8 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2014 Joyent, Inc.  All rights reserved.
+#
 #	This makefile drives the production of the lxproc file system
 #	kernel module.
 #
@@ -70,7 +72,7 @@ CFLAGS		+= $(CCVERBOSE)
 #
 #	Depends on procfs and lx_brand
 #
-LDFLAGS		+= -dy -Nfs/procfs -Nbrand/lx_brand
+LDFLAGS		+= -dy -Nfs/procfs -Nbrand/lx_brand -Ndrv/inotify
 
 #
 # For now, disable these lint checks; maintainers should endeavor
