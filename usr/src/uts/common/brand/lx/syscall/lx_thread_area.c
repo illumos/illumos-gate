@@ -33,6 +33,38 @@
 #include <sys/brand.h>
 #include <sys/lx_brand.h>
 #include <sys/lx_ldt.h>
+#include <sys/x86_archext.h>
+#include <sys/controlregs.h>
+
+/* For arch_prctl(2) */
+#define	LX_ARCH_SET_GS	0x1001
+#define	LX_ARCH_SET_FS	0x1002
+#define	LX_ARCH_GET_FS	0x1003
+#define	LX_ARCH_GET_GS	0x1004
+
+long
+lx_arch_prctl(int code, ulong_t addr)
+{
+	struct lx_lwp_data *llwp = ttolxlwp(curthread);
+
+	/* We currently only support [g|s]et_fs */
+	switch (code) {
+	case LX_ARCH_GET_FS:
+		if (copyout(&llwp->br_lx_fsbase, (void *)addr,
+		    sizeof (llwp->br_lx_fsbase)))
+			return (set_errno(EFAULT));
+		break;
+	case LX_ARCH_SET_FS:
+		llwp->br_lx_fsbase = addr;
+		/* save current native libc fsbase */
+		llwp->br_ntv_fsbase = rdmsr(MSR_AMD_FSBASE);
+		break;
+	default:
+		return (set_errno(EINVAL));
+	}
+
+	return (0);
+}
 
 long
 lx_get_thread_area(struct ldt_info *inf)

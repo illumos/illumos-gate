@@ -31,6 +31,8 @@
 #ifndef _SYS_LX_SYSCALL_H
 #define	_SYS_LX_SYSCALL_H
 
+#include <sys/lx_brand.h>
+
 #if !defined(_ASM)
 
 #include <sys/types.h>
@@ -369,8 +371,9 @@ extern long lx_yield(void);
 #define	LX_EMUL_set_tid_address		23
 #define	LX_EMUL_pipe2			24
 #define	LX_EMUL_rt_tgsigqueueinfo	25
+#define	LX_EMUL_arch_prctl		LX_N_IKE_FUNCS
 
-/* XXX adjust LX_N_IKE_FUNCS when adding new in-kernel functions */
+/* Note: adjust LX_N_IKE_FUNCS when adding new in-kernel functions */
 
 #ifdef	__cplusplus
 }
