@@ -58,6 +58,8 @@
 #include <sys/zone.h>
 #include <sys/brand.h>
 #include <sys/sdt.h>
+#include <sys/x86_archext.h>
+#include <sys/controlregs.h>
 #include <lx_signum.h>
 
 int	lx_debug = 0;
@@ -541,6 +543,17 @@ lx_psig_to_proc(proc_t *p, kthread_t *t, int sig)
 		 * XXX sometimes pcb_gs?
 		 */
 		rp->r_gs = lwpd->br_libc_syscall;
+
+		/*
+		 * Make sure we have the native fsbase loaded. Because of the
+		 * amd64 guard and datamodel check, this obviously will only
+		 * happen for the 64-bit user-land.
+		 */
+		if (lwpd->br_ntv_fsbase == 0) {
+			cmn_err(CE_WARN, "lx_psig_to_proc: NULL native fsbase");
+		} else {
+			wrmsr(MSR_AMD_FSBASE, lwpd->br_ntv_fsbase);
+		}
 	}
 #endif
 
@@ -905,6 +918,13 @@ lx_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 	case B_CLR_NTV_SYSC_FLAG:
 		lwpd = ttolxlwp(curthread);
 		lwpd->br_libc_syscall = 0;
+		/*
+		 * If Linux fsbase has been set, restore it. The user-level
+		 * code only ever calls this in the 64-bit library.
+		 */
+		if (lwpd->br_lx_fsbase != 0) {
+			wrmsr(MSR_AMD_FSBASE, lwpd->br_lx_fsbase);
+		}
 		return (0);
 
 	case B_SIGNAL_RETURN:
@@ -915,6 +935,29 @@ lx_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 		 */
 		lwpd = ttolxlwp(curthread);
 		lwpd->br_libc_syscall = arg1;
+		/*
+		 * If setting the mode to lx, make sure we load the lx fsbase.
+		 * The user-level code only ever calls this in the 64-bit
+		 * library.
+		 */
+		if (lwpd->br_libc_syscall == 1) {
+#ifdef DEBUG
+			/*
+			 * Native mode, debug check to see if we have the
+			 * correct fsbase. We should since this syscall came
+			 * from native code.
+			 */
+			if (lwpd->br_ntv_fsbase != 0 &&
+			    lwpd->br_ntv_fsbase != rdmsr(MSR_AMD_FSBASE))
+				cmn_err(CE_WARN, "Incorrect native fsbase 0x%p",
+				    (void *)lwpd->br_ntv_fsbase);
+#endif
+		} else {
+			/* if Linux fsbase has been set, restore it */
+			if (lwpd->br_lx_fsbase != 0) {
+				wrmsr(MSR_AMD_FSBASE, lwpd->br_lx_fsbase);
+			}
+		}
 		return (getsetcontext(SETCONTEXT, (void *)arg2));
 
 	default:

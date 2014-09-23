@@ -71,7 +71,7 @@ extern "C" {
 #define	LX_NSYSCALLS		352
 
 /* The number of In-Kernel Emulation functions */
-#define	LX_N_IKE_FUNCS		25
+#define	LX_N_IKE_FUNCS		26
 
 /*
  * brand(2) subcommands
@@ -266,7 +266,6 @@ typedef ulong_t lx_affmask_t[LX_AFF_ULONGS];
  * lx-specific data in the klwp_t
  */
 typedef struct lx_lwp_data {
-	/* lx_brand_asm.s requires br_libc_syscall to be the first member */
 	uint_t	br_libc_syscall;	/* 1 = syscall from native libc */
 	uint_t	br_lwp_flags;		/* misc. flags */
 	klwp_t	*br_lwp;		/* back pointer to container lwp */
@@ -277,6 +276,8 @@ typedef struct lx_lwp_data {
 	lx_affmask_t br_affinitymask;	/* bitmask of CPU sched affinities */
 	struct user_desc br_tls[LX_TLSNUM];
 			/* descriptors used by libc for TLS */
+	ulong_t	br_lx_fsbase;		/* lx fsbase for 64-bit thread ptr */
+	ulong_t	br_ntv_fsbase;		/* native fsbase 64-bit thread ptr */
 	pid_t	br_pid;			/* converted pid for this thread */
 	pid_t	br_tgid;		/* thread group ID for this thread */
 	pid_t	br_ppid;		/* parent pid for this thread */

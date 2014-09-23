@@ -34,6 +34,7 @@ extern "C" {
 
 #ifdef	_KERNEL
 
+extern long lx_arch_prctl();
 extern long lx_brk();
 extern long lx_getpid();
 extern long lx_getppid();

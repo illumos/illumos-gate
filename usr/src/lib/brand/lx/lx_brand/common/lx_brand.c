@@ -1037,6 +1037,7 @@ IN_KERNEL_EMULATION(futex, LX_EMUL_futex)
 IN_KERNEL_EMULATION(set_thread_area, LX_EMUL_set_thread_area)
 IN_KERNEL_EMULATION(get_thread_area, LX_EMUL_get_thread_area)
 IN_KERNEL_EMULATION(set_tid_address, LX_EMUL_set_tid_address)
+IN_KERNEL_EMULATION(arch_prctl, LX_EMUL_arch_prctl)
 
 #if defined(_LP64)
 /* The following is the 64-bit syscall table */
@@ -1200,7 +1201,7 @@ static struct lx_sysent sysents[] = {
 	{"pivot_root",	NULL,			NOSYS_KERNEL,	0}, /* 155 */
 	{"sysctl",	lx_sysctl,		0,		1}, /* 156 */
 	{"prctl",	lx_prctl,		0,		5}, /* 157 */
-	{"arch_prctl",	NULL,			NOSYS_NULL,	0}, /* 158 */
+	{"arch_prctl",	lx_arch_prctl,		0,		2}, /* 158 */
 	{"adjtimex",	lx_adjtimex,		0,		1}, /* 159 */
 	{"setrlimit",	lx_setrlimit,		0,		2}, /* 160 */
 	{"chroot",	lx_chroot,		0,		1}, /* 161 */

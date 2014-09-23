@@ -31,6 +31,7 @@
 
 #else	/* __lint */
 
+#include <sys/controlregs.h>
 #include "genassym.h"
 #include "../common/brand_asm.h"
 
@@ -141,7 +142,7 @@ ENTRY(lx_brand_syscall_callback)
 	/* check for native vs. Linux syscall */
 	GET_V(SP_REG, 0, V_LWP, %r15);		/* get lwp pointer */
 	movq	LWP_BRAND(%r15), %r15		/* grab lx lwp data pointer */
-	movl	(%r15), %r15d			/* grab syscall src flag */
+	movl	BR_LIBC_SYSCALL(%r15), %r15d	/* grab syscall src flag */
 	cmp	$1, %r15			/* check for native syscall */
 	je	2f				/* is native, stay in kernel */
 
@@ -149,6 +150,29 @@ ENTRY(lx_brand_syscall_callback)
 	GET_V(SP_REG, 0, V_LWP, %r15);		/* get lwp pointer */
 	movq	LWP_BRAND(%r15), %r15		/* grab lx lwp data pointer */
 	movl	$1, (%r15)			/* set native syscall flag */
+
+	/* check if we have to restore native fsbase */
+	GET_V(SP_REG, 0, V_LWP, %r15);		/* get lwp pointer */
+	movq	LWP_BRAND(%r15), %r15		/* grab lx lwp data pointer */
+	movq	BR_NTV_FSBASE(%r15), %r15	/* grab native fsbase */
+	cmp	$0, %r15			/* native fsbase not saved? */
+	je	3f				/* yes, skip loading */
+
+	/* switch fsbase from Linux value back to native value */
+	subq	$24, %rsp			/* make room for 3 regs */
+	movq	%rax, 0x0(%rsp)			/* save regs used by wrmsr */
+	movq	%rcx, 0x8(%rsp)
+	movq	%rdx, 0x10(%rsp)
+	movq	%r15, %rax			/* native fsbase to %rax */
+	movq	%rax, %rdx			/* setup regs for wrmsr */
+	shrq	$32, %rdx			/* fix %edx; %eax already ok */
+	movl	$MSR_AMD_FSBASE, %ecx		/* fsbase msr */
+	wrmsr					/* set fsbase from edx:eax */
+	movq	0x0(%rsp), %rax			/* restore regs */
+	movq	0x8(%rsp), %rcx
+	movq	0x10(%rsp), %rdx
+	addq	$24, %rsp
+3:
 
 	/* Linux syscall - validate syscall number */
 	GET_PROCP(SP_REG, 0, %r15)
