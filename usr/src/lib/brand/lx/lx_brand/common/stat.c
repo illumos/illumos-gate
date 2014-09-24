@@ -365,7 +365,9 @@ stat64_convert(uintptr_t lx_statp, struct stat64 *s, int fd)
 	bzero(&buf, sizeof (buf));
 	buf.st_dev = st_dev;
 	buf.st_rdev = st_rdev;
+#if defined(_ILP32)
 	buf.st_small_ino = (lx_ino_t)(s->st_ino & UINT_MAX);
+#endif
 	buf.st_ino = (lx_ino64_t)s->st_ino;
 	buf.st_mode = s->st_mode;
 	buf.st_nlink = s->st_nlink;

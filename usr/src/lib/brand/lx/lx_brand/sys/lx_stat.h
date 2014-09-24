@@ -21,12 +21,11 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2014 Joyent, Inc.  All rights reserved.
  */
 
 #ifndef _SYS_LX_STAT_H
 #define	_SYS_LX_STAT_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -67,6 +66,27 @@ struct lx_stat {
 	uint32_t		st_pad4;
 };
 
+#if defined(_LP64)
+struct lx_stat64 {
+	ulong_t			st_dev;
+	ulong_t			st_ino;
+	ulong_t			st_nlink;	/* yes, the order really is */
+	uint_t			st_mode;	/* different for these two */
+	uint_t			st_uid;
+	uint_t			st_gid;
+	uint_t			st_pad0;
+	ulong_t			st_rdev;
+	long			st_size;
+	long			st_blksize;
+	long			st_blocks;
+	struct lx_timespec	st_atime;
+	struct lx_timespec	st_mtime;
+	struct lx_timespec	st_ctime;
+	long			st_unused[3];
+};
+
+#else /* is 32-bit */
+
 struct lx_stat64 {
 	lx_dev_t		st_dev;
 	uint32_t		st_pad1;
@@ -85,6 +105,7 @@ struct lx_stat64 {
 	struct lx_timespec	st_ctime;
 	lx_ino64_t		st_ino;
 };
+#endif
 
 extern int lx_stat_init(void);
 
