@@ -149,7 +149,7 @@ ENTRY(lx_brand_syscall_callback)
 	/* Linux syscall - subsequent emul. syscalls will use native mode */
 	GET_V(SP_REG, 0, V_LWP, %r15);		/* get lwp pointer */
 	movq	LWP_BRAND(%r15), %r15		/* grab lx lwp data pointer */
-	movl	$1, (%r15)			/* set native syscall flag */
+	movl	$1, BR_LIBC_SYSCALL(%r15)	/* set native syscall flag */
 
 	/* check if we have to restore native fsbase */
 	GET_V(SP_REG, 0, V_LWP, %r15);		/* get lwp pointer */
