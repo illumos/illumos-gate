@@ -35,6 +35,7 @@
 #include <strings.h>
 #include <alloca.h>
 #include <ucred.h>
+#include <limits.h>
 
 #include <sys/param.h>
 #include <sys/brand.h>
@@ -1213,6 +1214,7 @@ long
 lx_setsockopt(int sockfd, int level, int optname, void *optval, int optlen)
 {
 	int internal_opt;
+	uchar_t internal_uchar;
 	int r;
 	lx_proto_opts_t *proto_opts;
 	boolean_t converted = B_FALSE;
@@ -1265,6 +1267,28 @@ lx_setsockopt(int sockfd, int level, int optname, void *optval, int optlen)
 			converted = B_TRUE;
 		}
 
+		/*
+		 * For IP_MULTICAST_TTL and IP_MULTICAST_LOOP, Linux defines
+		 * the option value to be an integer while we define it to be
+		 * an unsigned character.  To prevent the kernel from spitting
+		 * back an error on an illegal length, verify that the option
+		 * value is less than UCHAR_MAX and then swizzle it.
+		 */
+		if (optname == LX_IP_MULTICAST_TTL ||
+		    optname == LX_IP_MULTICAST_LOOP) {
+			if (optlen != sizeof (int))
+				return (-EINVAL);
+
+			if (uucopy(optval, &internal_opt, sizeof (int)) != 0)
+				return (-errno);
+
+			if (internal_opt > UCHAR_MAX)
+				return (-EINVAL);
+
+			internal_uchar = (uchar_t)internal_opt;
+			optval = &internal_uchar;
+			optlen = sizeof (uchar_t);
+		}
 	} else if (level == LX_SOL_SOCKET) {
 		/* Linux ignores this option. */
 		if (optname == LX_SO_BSDCOMPAT)
@@ -1286,8 +1310,7 @@ lx_setsockopt(int sockfd, int level, int optname, void *optval, int optlen)
 			optname = TCP_NODELAY;
 			if (optlen != sizeof (int))
 				return (-EINVAL);
-			if (uucopy(optval, &internal_opt,
-			    sizeof (int)) != 0)
+			if (uucopy(optval, &internal_opt, sizeof (int)) != 0)
 				return (-errno);
 			if (internal_opt == 0)
 				return (0);
