@@ -362,9 +362,11 @@ getipnodebyname(const char *name, int af, int flags, int *error_num)
 			 * !IPNODE_WANTIPV6.
 			 */
 			if (hp != NULL && (ipnode_bits & IPNODE_UNMAP)) {
-				struct hostent *input = hp;
-				hp = __mappedtov4(input, error_num);
-				free(input);
+				/*
+				 * Just set hp to a new value, cleanup: will
+				 * free the old one
+				 */
+				hp = __mappedtov4(hp, error_num);
 			} else if (hp == NULL)
 				*error_num = NO_ADDRESS;
 		}
