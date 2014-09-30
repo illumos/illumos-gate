@@ -930,12 +930,13 @@ migrate to checking \fBPR_ISSYS\fR in the \fBpstatus\fR structure's
 0x8000). \fBpr_pctcpu\fR is the summation over all lwps in the process.
 .sp
 .LP
-The \fBpr_fname\fR is writable by the owner of the process. To write to it,
-the \fBpsinfo\fR file should be open for writing and the desired value for
-\fBpr_fname\fR should be written at the file offset that corresponds to the
-\fBpr_fname\fR member of the structure.  No other entry may be written to; if
-a write is attempted to any other offset, or if the size of the write is not
-exactly \fBPRFNSZ\fR bytes, no bytes will be written.
+The \fBpr_fname\fR and \fBpr_psargs\fR are writable by the owner of the
+process. To write to them, the \fBpsinfo\fR file should be open for writing
+and the desired value for the field should be written at the file offset
+that corresponds to the member of structure.  No other entry may be written
+to; if a write is attempted to an offset that does not represent one of
+these two memers, or if the size of the write is not exactly the size of
+the member being written, no bytes will be written and zero will be returned.
 .sp
 .LP
 \fBpr_lwp\fR contains the \fBps\fR(1) information for the representative lwp.
