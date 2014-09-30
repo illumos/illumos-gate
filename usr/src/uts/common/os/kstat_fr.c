@@ -161,6 +161,7 @@ struct {
 	kstat_named_t avenrun_5min;
 	kstat_named_t avenrun_15min;
 	kstat_named_t boot_time;
+	kstat_named_t nsec_per_tick;
 } system_misc_kstat = {
 	{ "ncpus",		KSTAT_DATA_UINT32 },
 	{ "lbolt",		KSTAT_DATA_UINT32 },
@@ -172,6 +173,7 @@ struct {
 	{ "avenrun_5min",	KSTAT_DATA_UINT32 },
 	{ "avenrun_15min",	KSTAT_DATA_UINT32 },
 	{ "boot_time",		KSTAT_DATA_UINT32 },
+	{ "nsec_per_tick",	KSTAT_DATA_UINT32 },
 };
 
 struct {
@@ -855,6 +857,8 @@ system_misc_kstat_update(kstat_t *ksp, int rw)
 	system_misc_kstat.avenrun_15min.value.ui32	= (uint32_t)loadavgp[2];
 	system_misc_kstat.boot_time.value.ui32		= (uint32_t)
 	    zone_boot_time;
+	system_misc_kstat.nsec_per_tick.value.ui32	= (uint32_t)
+	    nsec_per_tick;
 	return (0);
 }
 
