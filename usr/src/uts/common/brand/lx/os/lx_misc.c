@@ -74,17 +74,7 @@ lx_exec()
 {
 	klwp_t *lwp = ttolwp(curthread);
 	struct lx_lwp_data *lwpd = lwptolxlwp(lwp);
-	proc_t *p = ttoproc(curthread);
-	lx_proc_data_t *pd = p->p_brand_data;
 	int err;
-
-	/*
-	 * Any l_handler handlers set as a result of B_REGISTER are now
-	 * invalid; clear them.
-	 */
-	pd->l_handler = NULL;
-	pd->l_tracehandler = NULL;
-	pd->l_traceflag = NULL;
 
 	/*
 	 * There are two mutually exclusive special cases we need to
