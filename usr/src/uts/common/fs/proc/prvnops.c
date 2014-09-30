@@ -2687,20 +2687,18 @@ prread(vnode_t *vp, uio_t *uiop, int ioflag, cred_t *cr, caller_context_t *ct)
 }
 
 /*
- * We make pr_write_psinfo() somewhat simpler by asserting at compile time
- * that PRFNSZ has the same definition as MAXCOMLEN.
+ * We make pr_write_psinfo_fname() somewhat simpler by asserting at compile
+ * time that PRFNSZ has the same definition as MAXCOMLEN.
  */
 #if PRFNSZ != MAXCOMLEN
 #error PRFNSZ/MAXCOMLEN mismatch
 #endif
 
-int
-pr_write_psinfo(prnode_t *pnp, uio_t *uiop)
+static int
+pr_write_psinfo_fname(prnode_t *pnp, uio_t *uiop)
 {
 	char fname[PRFNSZ];
 	int offset = offsetof(psinfo_t, pr_fname), error;
-
-	ASSERT(pnp->pr_type == PR_PSINFO);
 
 #ifdef _SYSCALL32_IMPL
 	if (curproc->p_model != DATAMODEL_LP64)
@@ -2708,8 +2706,8 @@ pr_write_psinfo(prnode_t *pnp, uio_t *uiop)
 #endif
 
 	/*
-	 * The only field that we actually care about is the pr_fname -- and we
-	 * insist that only pr_fname (and exactly pr_fname) is being written.
+	 * If this isn't a write to pr_fname (or if the size doesn't match
+	 * PRFNSZ) return.
 	 */
 	if (uiop->uio_offset != offset || uiop->uio_resid != PRFNSZ)
 		return (0);
@@ -2728,6 +2726,62 @@ pr_write_psinfo(prnode_t *pnp, uio_t *uiop)
 
 	return (0);
 }
+
+/*
+ * We make pr_write_psinfo_psargs() somewhat simpler by asserting at compile
+ * time that PRARGSZ has the same definition as PSARGSZ.
+ */
+#if PRARGSZ != PSARGSZ
+#error PRARGSZ/PSARGSZ mismatch
+#endif
+
+static int
+pr_write_psinfo_psargs(prnode_t *pnp, uio_t *uiop)
+{
+	char psargs[PRARGSZ];
+	int offset = offsetof(psinfo_t, pr_psargs), error;
+
+#ifdef _SYSCALL32_IMPL
+	if (curproc->p_model != DATAMODEL_LP64)
+		offset = offsetof(psinfo32_t, pr_psargs);
+#endif
+
+	/*
+	 * If this isn't a write to pr_psargs (or if the size doesn't match
+	 * PRARGSZ) return.
+	 */
+	if (uiop->uio_offset != offset || uiop->uio_resid != PRARGSZ)
+		return (0);
+
+	if ((error = uiomove(psargs, PRARGSZ, UIO_WRITE, uiop)) != 0)
+		return (error);
+
+	psargs[PRARGSZ - 1] = '\0';
+
+	if ((error = prlock(pnp, ZNO)) != 0)
+		return (error);
+
+	bcopy(psargs, pnp->pr_common->prc_proc->p_user.u_psargs, PRARGSZ);
+
+	prunlock(pnp);
+
+	return (0);
+}
+
+int
+pr_write_psinfo(prnode_t *pnp, uio_t *uiop)
+{
+	int error;
+
+	if ((error = pr_write_psinfo_fname(pnp, uiop)) != 0)
+		return (error);
+
+	if ((error = pr_write_psinfo_psargs(pnp, uiop)) != 0)
+		return (error);
+
+	return (0);
+}
+
 
 /* ARGSUSED */
 static int
