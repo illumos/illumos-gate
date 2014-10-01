@@ -21,9 +21,8 @@ Historically, functions in this library provided POSIX threading support. See
 .LP
 This library is maintained to provide backward compatibility for both runtime
 and compilation environments. The shared object is implemented as a filter on
-\fBlibc.so.1\fR. New application development needs to specify \fB-lpthread\fR
-only to obtain POSIX semantics for \fBfork\fR(2) that assumes the behavior of
-\fBfork1\fR(2) rather than the default behavior that forks all threads.
+\fBlibc.so.1\fR. New application development need not specify \fB-lpthread\fR
+although doing so has no effect.
 .SH INTERFACES
 .sp
 .LP
