@@ -335,6 +335,11 @@ clone_start(void *arg)
 	/*NOTREACHED*/
 }
 
+/*
+ * See glibc sysdeps/unix/sysv/linux/x86_64/clone.S code for x64 argument order
+ * and the Linux kernel/fork.c code for the various ways arguments can be passed
+ * to the clone syscall (CONFIG_CLONE_BACKWARDS, et al).
+ */
 long
 lx_clone(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 	uintptr_t p5)
@@ -343,8 +348,13 @@ lx_clone(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 	int flags = (int)p1;
 	void *cldstk = (void *)p2;
 	void *ptidp = (void *)p3;
+#if defined(_LP64)
+	void *ctidp = (void *)p4;
+	struct lx_desc *ldtinfo = (void *)p5;
+#else /* is 32bit */
 	struct lx_desc *ldtinfo = (void *)p4;
 	void *ctidp = (void *)p5;
+#endif
 	thread_t tid;
 	volatile int clone_res;
 	int sig;
