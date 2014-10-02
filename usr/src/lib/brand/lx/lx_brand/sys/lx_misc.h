@@ -161,6 +161,7 @@ extern void lx_handler_table(void);
 extern void lx_handler_trace_table(void);
 extern void lx_emulate_done(void);
 extern lx_regs_t *lx_syscall_regs(void);
+extern int lx_errno(int);
 
 extern char *lx_fd_to_path(int fd, char *buf, int buf_size);
 extern int lx_lpid_to_spair(pid_t, pid_t *, lwpid_t *);

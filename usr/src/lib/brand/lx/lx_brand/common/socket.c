@@ -1451,9 +1451,17 @@ lx_getsockopt(int sockfd, int level, int optname, void *optval, int *optlenp)
 
 	r = getsockopt(sockfd, level, optname, optval, optlenp);
 
-	if (r == 0 && level == SOL_SOCKET && optname == SO_TYPE) {
-		/* translate our type back to Linux */
-		*(int *)optval = stol_socktype[(*(int *)optval)];
+	if (r == 0 && level == SOL_SOCKET) {
+		switch (optname) {
+		case SO_TYPE:
+			/* translate our type back to Linux */
+			*(int *)optval = stol_socktype[(*(int *)optval)];
+			break;
+
+		case SO_ERROR:
+			*(int *)optval = lx_errno(*(int *)optval);
+			break;
+		}
 	}
 
 	return ((r < 0) ? -errno : r);

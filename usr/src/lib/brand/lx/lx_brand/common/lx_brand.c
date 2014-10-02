@@ -242,6 +242,17 @@ long max_pid;			/* native maximum PID */
 thread_key_t lx_tsd_key;
 
 int
+lx_errno(int err)
+{
+	if (err >= sizeof (stol_errno) / sizeof (stol_errno[0])) {
+		lx_debug("invalid errno %d\n", err);
+		assert(0);
+	}
+
+	return (stol_errno[err]);
+}
+
+int
 uucopy_unsafe(const void *src, void *dst, size_t n)
 {
 	bcopy(src, dst, n);
