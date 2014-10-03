@@ -597,7 +597,7 @@ lx_ldb_init32(rd_agent_t *rap, struct ps_prochandle *php)
 		return (NULL);
 	}
 
-	ps_plog("lx_ldb_init: strtab is 0x%x, symtab is 0x%x",
+	ps_plog("lx_ldb_init: strtab is 0x%p, symtab is 0x%p",
 	    addr + strtab, addr + symtab);
 
 	if ((mem = malloc(memsz)) == NULL) {
@@ -619,17 +619,37 @@ lx_ldb_init32(rd_agent_t *rap, struct ps_prochandle *php)
 	 * that the DT_SYMTAB immediately precedes the DT_STRTAB.
 	 */
 	for (offs = symtab; offs < strtab; offs += sizeof (Elf32_Sym)) {
+		uint32_t p;
+
 		sym = (Elf32_Sym *)&mem[offs];
 
 		if (sym->st_name > memsz) {
 			ps_plog("lx_ldb_init: invalid st_name at sym 0x%p",
 			    addr + offs);
+			continue;
 		}
 
-		ps_plog("lx_ldb_init: found interp symbol %s",
-		    &mem[strtab + sym->st_name]);
+		p = sym->st_name;
 
-		if (strcmp(&mem[strtab + sym->st_name], "_r_debug") == 0)
+		if (strtab + p > memsz) {
+			ps_plog("lx_ldb_init: invalid symbol address 0x%p, "
+			    "memsz 0x%p", strtab + p, memsz);
+			continue;
+		}
+
+		if (mem[strtab + p] == '\0')
+			continue;
+
+		/* Sometimes we're pointing into the middle of a symbol? */
+		while ((strtab + p) > 0 && (strtab + p) < memsz &&
+		    mem[strtab + p] != '\0')
+			p--;
+		p++;
+
+		ps_plog("lx_ldb_init: interp symbol (0x%p) %s",
+		    strtab + p, &mem[strtab + p]);
+
+		if (strcmp(&mem[strtab + p], "_r_debug") == 0)
 			break;
 	}
 
