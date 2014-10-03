@@ -680,6 +680,7 @@ f kernel/drv/amd64/sfe 0755 root sys
 f kernel/drv/amd64/sgen 0755 root sys
 f kernel/drv/amd64/si3124 0755 root sys
 f kernel/drv/amd64/simnet 0755 root sys
+f kernel/drv/amd64/skd 0755 root sys
 f kernel/drv/amd64/smbios 0755 root sys
 f kernel/drv/amd64/softmac 0755 root sys
 f kernel/drv/amd64/spdsock 0755 root sys
@@ -813,6 +814,7 @@ f kernel/drv/sdt.conf 0644 root sys
 f kernel/drv/ses.conf 0644 root sys
 f kernel/drv/sgen.conf 0644 root sys
 f kernel/drv/simnet.conf 0644 root sys
+f kernel/drv/skd.conf 0644 root sys
 f kernel/drv/smbios.conf 0644 root sys
 f kernel/drv/smp.conf 0644 root sys
 f kernel/drv/softmac.conf 0644 root sys
@@ -18192,6 +18194,7 @@ f usr/share/man/man7d/ses.7d 0444 root bin
 f usr/share/man/man7d/sfe.7d 0444 root bin
 f usr/share/man/man7d/sgen.7d 0444 root bin
 f usr/share/man/man7d/si3124.7d 0444 root bin
+f usr/share/man/man7d/skd.7d 0444 root bin
 f usr/share/man/man7d/smbios.7d 0444 root bin
 f usr/share/man/man7d/st.7d 0444 root bin
 f usr/share/man/man7d/sysmsg.7d 0444 root bin

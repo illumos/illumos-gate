@@ -577,7 +577,13 @@ static struct modlinkage modlinkage = {
  * Local static data
  */
 #if defined(MPTSAS_DEBUG)
-uint32_t mptsas_debug_flags = 0;
+/*
+ * Flags to indicate which debug messages are to be printed and which go to the
+ * debug log ring buffer. Default is to not print anything, and to log
+ * everything except the watchsubr() output which normally happens every second.
+ */
+uint32_t mptsas_debugprt_flags = 0x0;
+uint32_t mptsas_debuglog_flags = ~(1U << 30);
 #endif	/* defined(MPTSAS_DEBUG) */
 uint32_t mptsas_debug_resets = 0;
 
@@ -3299,7 +3305,7 @@ mptsas_accept_pkt(mptsas_t *mpt, mptsas_cmd_t *cmd)
 	 * driver is not suppose to select a offlined path.
 	 */
 	if (ptgt->m_devhdl == MPTSAS_INVALID_DEVHDL) {
-		NDBG20(("rejecting command, it might because invalid devhdl "
+		NDBG3(("rejecting command, it might because invalid devhdl "
 		    "request."));
 		mptsas_set_pkt_reason(mpt, cmd, CMD_DEV_GONE, STAT_TERMINATED);
 		if (cmd->cmd_flags & CFLAG_TXQ) {
@@ -3806,7 +3812,8 @@ get_dma_cookies:
 		 * If there is only one window, the resid will be 0
 		 */
 		pkt->pkt_resid = (bp->b_bcount - cmd->cmd_totaldmacount);
-		NDBG16(("mptsas_dmaget: cmd_dmacount=%d.", cmd->cmd_dmacount));
+		NDBG3(("mptsas_scsi_init_pkt: cmd_dmacount=%d.",
+		    cmd->cmd_dmacount));
 	}
 	return (pkt);
 }
@@ -5161,6 +5168,9 @@ mptsas_handle_address_reply(mptsas_t *mpt,
 	    mpt->m_reply_frame_dma_addr));
 	function = ddi_get8(mpt->m_acc_reply_frame_hdl, &reply->Function);
 
+	NDBG31(("mptsas_handle_address_reply: function 0x%x, reply_addr=0x%x",
+	    function, reply_addr));
+
 	/*
 	 * don't get slot information and command for events since these values
 	 * don't exist
@@ -5331,7 +5341,7 @@ mptsas_handle_address_reply(mptsas_t *mpt,
 
 	if (cmd->cmd_flags & CFLAG_RETRY) {
 		/*
-		 * The target returned QFULL or busy, do not add tihs
+		 * The target returned QFULL or busy, do not add this
 		 * pkt to the doneq since the hba will retry
 		 * this cmd.
 		 *
@@ -6254,7 +6264,9 @@ mptsas_handle_topo_change(mptsas_topo_change_list_t *topo_node,
 	int		circ = 0, circ1 = 0;
 	char		attached_wwnstr[MPTSAS_WWN_STRLEN];
 
-	NDBG20(("mptsas%d handle_topo_change enter", mpt->m_instance));
+	NDBG20(("mptsas%d handle_topo_change enter, devhdl 0x%x,"
+	    "event 0x%x, flags 0x%x", mpt->m_instance, topo_node->devhdl,
+	    topo_node->event, topo_node->flags));
 
 	ASSERT(mutex_owned(&mpt->m_mutex));
 
@@ -6783,14 +6795,16 @@ mptsas_handle_event_sync(void *args)
 	    &eventreply->IOCStatus)) {
 		if (iocstatus == MPI2_IOCSTATUS_FLAG_LOG_INFO_AVAILABLE) {
 			mptsas_log(mpt, CE_WARN,
-			    "!mptsas_handle_event_sync: IOCStatus=0x%x, "
-			    "IOCLogInfo=0x%x", iocstatus,
+			    "!mptsas_handle_event_sync: event 0x%x, "
+			    "IOCStatus=0x%x, "
+			    "IOCLogInfo=0x%x", event, iocstatus,
 			    ddi_get32(mpt->m_acc_reply_frame_hdl,
 			    &eventreply->IOCLogInfo));
 		} else {
 			mptsas_log(mpt, CE_WARN,
-			    "mptsas_handle_event_sync: IOCStatus=0x%x, "
-			    "IOCLogInfo=0x%x", iocstatus,
+			    "mptsas_handle_event_sync: event 0x%x, "
+			    "IOCStatus=0x%x, "
+			    "(IOCLogInfo=0x%x)", event, iocstatus,
 			    ddi_get32(mpt->m_acc_reply_frame_hdl,
 			    &eventreply->IOCLogInfo));
 		}
@@ -7593,8 +7607,9 @@ mptsas_handle_event(void *args)
 		default:
 		break;
 		}
-		NDBG20(("mptsas%d ENCLOSURE STATUS CHANGE for enclosure %x%s\n",
-		    mpt->m_instance, ddi_get16(mpt->m_acc_reply_frame_hdl,
+		NDBG20(("mptsas%d ENCLOSURE STATUS CHANGE for enclosure "
+		    "%x%s\n", mpt->m_instance,
+		    ddi_get16(mpt->m_acc_reply_frame_hdl,
 		    &encstatus->EnclosureHandle), string));
 		break;
 	}
@@ -7788,12 +7803,12 @@ mptsas_handle_event(void *args)
 			    &mpt->m_phy_info[phy_num].smhba_info);
 			break;
 		default:
-			NDBG20(("mptsas%d: unknown BROADCAST PRIMITIVE"
+			NDBG16(("mptsas%d: unknown BROADCAST PRIMITIVE"
 			    " %x received",
 			    mpt->m_instance, primitive));
 			break;
 		}
-		NDBG20(("mptsas%d sas broadcast primitive: "
+		NDBG16(("mptsas%d sas broadcast primitive: "
 		    "\tprimitive(0x%04x), phy(%d) complete\n",
 		    mpt->m_instance, primitive, phy_num));
 		break;
@@ -8069,7 +8084,8 @@ mptsas_remove_cmd(mptsas_t *mpt, mptsas_cmd_t *cmd)
 	 * remove the cmd.
 	 */
 	if (cmd == slots->m_slot[slot]) {
-		NDBG31(("mptsas_remove_cmd: removing cmd=0x%p", (void *)cmd));
+		NDBG31(("mptsas_remove_cmd: removing cmd=0x%p, flags "
+		    "0x%x", (void *)cmd, cmd->cmd_flags));
 		slots->m_slot[slot] = NULL;
 		mpt->m_ncmds--;
 
@@ -8270,7 +8286,8 @@ mptsas_start_cmd(mptsas_t *mpt, mptsas_cmd_t *cmd)
 	uint32_t		request_desc_low, request_desc_high;
 	mptsas_cmd_t		*c;
 
-	NDBG1(("mptsas_start_cmd: cmd=0x%p", (void *)cmd));
+	NDBG1(("mptsas_start_cmd: cmd=0x%p, flags 0x%x", (void *)cmd,
+	    cmd->cmd_flags));
 
 	/*
 	 * Set SMID and increment index.  Rollover to 1 instead of 0 if index
@@ -8390,8 +8407,8 @@ mptsas_start_cmd(mptsas_t *mpt, mptsas_cmd_t *cmd)
 
 	ddi_put32(acc_hdl, &io_request->Control, control);
 
-	NDBG31(("starting message=0x%p, with cmd=0x%p",
-	    (void *)(uintptr_t)mpt->m_req_frame_dma_addr, (void *)cmd));
+	NDBG31(("starting message=%d(0x%p), with cmd=0x%p",
+	    SMID, (void *)io_request, (void *)cmd));
 
 	(void) ddi_dma_sync(dma_hdl, 0, 0, DDI_DMA_SYNC_FORDEV);
 
@@ -9673,6 +9690,32 @@ mptsas_log(mptsas_t *mpt, int level, char *fmt, ...)
 }
 
 #ifdef MPTSAS_DEBUG
+/*
+ * Use a circular buffer to log messages to private memory.
+ * Increment idx atomically to minimize risk to miss lines.
+ * It's fast and does not hold up the proceedings too much.
+ */
+static const size_t mptsas_dbglog_linecnt = MPTSAS_DBGLOG_LINECNT;
+static const size_t mptsas_dbglog_linelen = MPTSAS_DBGLOG_LINELEN;
+static char mptsas_dbglog_bufs[MPTSAS_DBGLOG_LINECNT][MPTSAS_DBGLOG_LINELEN];
+static uint32_t mptsas_dbglog_idx = 0;
+
+/*PRINTFLIKE1*/
+void
+mptsas_debug_log(char *fmt, ...)
+{
+	va_list		ap;
+	uint32_t	idx;
+
+	idx = atomic_inc_32_nv(&mptsas_dbglog_idx) &
+	    (mptsas_dbglog_linecnt - 1);
+
+	va_start(ap, fmt);
+	(void) vsnprintf(mptsas_dbglog_bufs[idx],
+	    mptsas_dbglog_linelen, fmt, ap);
+	va_end(ap);
+}
+
 /*PRINTFLIKE1*/
 void
 mptsas_printf(char *fmt, ...)
@@ -9885,7 +9928,8 @@ mptsas_cmd_timeout(mptsas_t *mpt, mptsas_target_t *ptgt)
 
 	NDBG29(("mptsas_cmd_timeout: target=%d", devhdl));
 	mptsas_log(mpt, CE_WARN, "Disconnected command timeout for "
-	    "target %d %s.", devhdl, wwn_str);
+	    "target %d %s, enclosure %u", devhdl, wwn_str,
+	    ptgt->m_enclosure);
 
 	/*
 	 * Abort all outstanding commands on the device.

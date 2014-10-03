@@ -118,6 +118,7 @@ _MANFILES=	aac.7d		\
 		ses.7d		\
 		sfe.7d		\
 		sgen.7d		\
+ 	 	skd.7d		\
 		srpt.7d		\
 		st.7d		\
 		sv.7d		\

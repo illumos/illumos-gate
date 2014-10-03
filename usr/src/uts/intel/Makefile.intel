@@ -19,7 +19,7 @@
 #
 
 # Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright (c) 2012 Nexenta Systems, Inc. All rights reserved.
+# Copyright (c) 2014 Nexenta Systems, Inc. All rights reserved.
 # Copyright (c) 2013 Andrew Stormont.  All rights reserved.
 # Copyright (c) 2014, Joyent, Inc. All rights reserved.
 
@@ -327,6 +327,7 @@ DRV_KMODS	+= sdhost
 DRV_KMODS	+= sgen
 DRV_KMODS	+= si3124
 DRV_KMODS	+= smbios
+DRV_KMODS	+= skd
 DRV_KMODS	+= softmac
 DRV_KMODS	+= spdsock
 DRV_KMODS	+= smbsrv
