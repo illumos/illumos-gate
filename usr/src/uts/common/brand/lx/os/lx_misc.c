@@ -240,6 +240,7 @@ lx_initlwp(klwp_t *lwp)
 	lwpd->br_set_ctidp = NULL;
 	lwpd->br_signal = 0;
 	lwpd->br_libc_syscall = 1;
+
 	/*
 	 * lwpd->br_affinitymask was zeroed by kmem_zalloc()
 	 * as was lwpd->br_scall_args and lwpd->br_args_size.
@@ -259,6 +260,9 @@ lx_initlwp(klwp_t *lwp)
 		bcopy(plwpd->br_tls, lwpd->br_tls, sizeof (lwpd->br_tls));
 		lwpd->br_ppid = plwpd->br_pid;
 		lwpd->br_ptid = curthread->t_tid;
+		/* The child inherits the 2 fsbase values from the parent */
+		lwpd->br_lx_fsbase = plwpd->br_lx_fsbase;
+		lwpd->br_ntv_fsbase = plwpd->br_ntv_fsbase;
 	} else {
 		/*
 		 * Oddball case: the parent thread isn't a Linux process.
