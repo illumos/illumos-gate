@@ -175,6 +175,18 @@ extern "C" {
 #define	LX_TCP_WINDOW_CLAMP	10 /* Bound advertised window */
 #define	LX_TCP_INFO		11 /* Information about this connection. */
 #define	LX_TCP_QUICKACK		12 /* Bock/reenable quick ACKs.  */
+#define	LX_TCP_CONGESTION	13 /* Congestion control algorithm */
+#define	LX_TCP_MD5SIG		14 /* TCP MD5 Signature (RFC2385) */
+#define	LX_TCP_THIN_LINEAR_TIMEOUTS 16 /* Use linear timeouts on thin streams */
+#define	LX_TCP_THIN_DUPACK	17 /* Fast retrans. after 1 dupack */
+#define	LX_TCP_USER_TIMEOUT	18 /* How long for loss retry before timeout */
+#define	LX_TCP_REPAIR		19 /* TCP socket under repair */
+#define	LX_TCP_REPAIR_QUEUE	20
+#define	LX_TCP_QUEUE_SEQ	21
+#define	LX_TCP_REPAIR_OPTIONS	22
+#define	LX_TCP_FASTOPEN		23 /* Enable FastOpen on listeners */
+#define	LX_TCP_TIMESTAMP	24
+#define	LX_TCP_NOTSENT_LOWAT	25 /* limit number of unsent bytes */
 
 /*
  * Options for use with [gs]etsockopt at the IGMP level.

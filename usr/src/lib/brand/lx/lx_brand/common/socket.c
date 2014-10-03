@@ -238,11 +238,46 @@ static const int ltos_ip_sockopts[LX_IP_UNICAST_IF + 1] = {
 	OPTNOTSUP, OPTNOTSUP, OPTNOTSUP				/* 50 */
 };
 
-static const int ltos_tcp_sockopts[LX_TCP_QUICKACK + 1] = {
-	OPTNOTSUP, TCP_NODELAY, TCP_MAXSEG, OPTNOTSUP,
-	OPTNOTSUP, OPTNOTSUP, OPTNOTSUP, OPTNOTSUP,
-	TCP_KEEPALIVE, OPTNOTSUP, OPTNOTSUP, OPTNOTSUP,
-	OPTNOTSUP
+/*
+ *
+ * TCP socket option mapping:
+ *
+ * Linux					Illumos
+ * -----					-------
+ * TCP_NODELAY                1                 TCP_NODELAY      1
+ * TCP_MAXSEG                 2                 TCP_MAXSEG       2
+ * TCP_CORK                   3                 TCP_CORK         24
+ * TCP_KEEPIDLE               4                 TCP_KEEPIDLE     34
+ * TCP_KEEPINTVL              5                 TCP_KEEPINTVL    36
+ * TCP_KEEPCNT                6                 TCP_KEEPCNT      35
+ * TCP_SYNCNT                 7
+ * TCP_LINGER2                8                 TCP_LINGER2      28
+ * TCP_DEFER_ACCEPT           9
+ * TCP_WINDOW_CLAMP           10
+ * TCP_INFO                   11
+ * TCP_QUICKACK               12
+ * TCP_CONGESTION             13
+ * TCP_MD5SIG                 14
+ * TCP_THIN_LINEAR_TIMEOUTS   16
+ * TCP_THIN_DUPACK            17
+ * TCP_USER_TIMEOUT           18
+ * TCP_REPAIR                 19
+ * TCP_REPAIR_QUEUE           20
+ * TCP_QUEUE_SEQ              21
+ * TCP_REPAIR_OPTIONS         22
+ * TCP_FASTOPEN               23
+ * TCP_TIMESTAMP              24
+ * TCP_NOTSENT_LOWAT          25
+ */
+
+static const int ltos_tcp_sockopts[LX_TCP_NOTSENT_LOWAT + 1] = {
+	OPTNOTSUP, TCP_NODELAY, TCP_MAXSEG, TCP_CORK,		/* 0-3 */
+	TCP_KEEPIDLE, TCP_KEEPINTVL, TCP_KEEPCNT, OPTNOTSUP,	/* 4-7 */
+	TCP_LINGER2, OPTNOTSUP, OPTNOTSUP, OPTNOTSUP,		/* 8-11 */
+	OPTNOTSUP, OPTNOTSUP, OPTNOTSUP, OPTNOTSUP,		/* 12-15 */
+	OPTNOTSUP, OPTNOTSUP, OPTNOTSUP, OPTNOTSUP,		/* 16-19 */
+	OPTNOTSUP, OPTNOTSUP, OPTNOTSUP, OPTNOTSUP,		/* 20-23 */
+	OPTNOTSUP, OPTNOTSUP					/* 24-25 */
 };
 
 static const int ltos_igmp_sockopts[IGMP_MTRACE + 1] = {
@@ -1295,31 +1330,6 @@ lx_setsockopt(int sockfd, int level, int optname, void *optval, int optlen)
 			return (0);
 
 		level = SOL_SOCKET;
-
-	} else if (level == LX_IPPROTO_TCP) {
-		if (optname == LX_TCP_CORK) {
-			/*
-			 * TCP_CORK is a Linux-only option that instructs the
-			 * TCP stack not to send out partial frames. Illumos
-			 * doesn't include this option but some apps require
-			 * it. So, we do our best to emulate the option by
-			 * disabling TCP_NODELAY. If the app requests that we
-			 * disable TCP_CORK, we just ignore it since enabling
-			 * TCP_NODELAY may be overcompensating.
-			 */
-			optname = TCP_NODELAY;
-			if (optlen != sizeof (int))
-				return (-EINVAL);
-			if (uucopy(optval, &internal_opt, sizeof (int)) != 0)
-				return (-errno);
-			if (internal_opt == 0)
-				return (0);
-			internal_opt = 1;
-			optval = &internal_opt;
-
-			converted = B_TRUE;
-		}
-
 	} else if (level == LX_IPPROTO_RAW) {
 		/*
 		 * Ping sets this option. Currently we just ignore it to make
