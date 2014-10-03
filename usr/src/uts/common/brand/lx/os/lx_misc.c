@@ -84,7 +84,6 @@ lx_exec()
 	 */
 	pd->l_handler = NULL;
 	pd->l_tracehandler = NULL;
-	pd->l_traceflag = NULL;
 
 	/*
 	 * There are two mutually exclusive special cases we need to
