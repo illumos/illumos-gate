@@ -314,7 +314,12 @@ clone_start(void *arg)
 		 */
 		*(cs->c_clone_res) = rval;
 
+#if defined(_LP64)
+		(void) syscall(SYS_brand, B_CLR_NTV_SYSC_FLAG);
+		lx_setup_clone(0, cs->c_retaddr, cs->c_stk);
+#else
 		lx_setup_clone(cs->c_gs, cs->c_retaddr, cs->c_stk);
+#endif
 
 		/* lx_setup_clone() should never return. */
 		assert(0);
@@ -483,10 +488,13 @@ lx_clone(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 		 */
 		if (cldstk) {
 #if defined(_LP64)
-			lx_setup_clone(rp->lxr_gs, (void *)rp->lxr_rip, cldstk);
+			(void) syscall(SYS_brand, B_CLR_NTV_SYSC_FLAG);
+			lx_setup_clone(0, (void *)rp->lxr_rip, cldstk);
 #else
 			lx_setup_clone(rp->lxr_gs, (void *)rp->lxr_eip, cldstk);
 #endif
+			/* lx_setup_clone() should never return. */
+			assert(0);
 		}
 
 		return (0);
