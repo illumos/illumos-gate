@@ -26,7 +26,7 @@
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright 2018 Nexenta Systems, Inc.
 # Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
-# Copyright 2019 Joyent, Inc.
+# Copyright 2020 Joyent, Inc.
 # Copyright 2019 Peter Tribble.
 #
 
@@ -1169,6 +1169,7 @@ file path=usr/include/sys/lc_core.h
 file path=usr/include/sys/ldterm.h
 file path=usr/include/sys/lgrp.h
 file path=usr/include/sys/lgrp_user.h
+file path=usr/include/sys/limits.h
 file path=usr/include/sys/link.h
 file path=usr/include/sys/linker_set.h
 file path=usr/include/sys/list.h

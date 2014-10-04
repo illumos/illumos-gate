@@ -79,6 +79,7 @@
 #include <sys/dld.h>
 #include <sys/zone.h>
 #include <sys/ptms.h>
+#include <sys/limits.h>
 #include <c2/audit.h>
 
 /*
@@ -1037,12 +1038,20 @@ strget(struct stdata *stp, queue_t *q, struct uio *uiop, int first,
 		 * (registered in sd_wakeq).
 		 */
 		struiod_t uiod;
+		struct iovec buf[IOV_MAX_STACK];
+		int iovlen = 0;
 
 		if (first)
 			stp->sd_wakeq &= ~RSLEEP;
 
-		(void) uiodup(uiop, &uiod.d_uio, uiod.d_iov,
-		    sizeof (uiod.d_iov) / sizeof (*uiod.d_iov));
+		if (uiop->uio_iovcnt > IOV_MAX_STACK) {
+			iovlen = uiop->uio_iovcnt * sizeof (iovec_t);
+			uiod.d_iov = kmem_alloc(iovlen, KM_SLEEP);
+		} else {
+			uiod.d_iov = buf;
+		}
+
+		(void) uiodup(uiop, &uiod.d_uio, uiod.d_iov, uiop->uio_iovcnt);
 		uiod.d_mp = 0;
 		/*
 		 * Mark that a thread is in rwnext on the read side
@@ -1081,6 +1090,8 @@ strget(struct stdata *stp, queue_t *q, struct uio *uiop, int first,
 			if ((bp = uiod.d_mp) != NULL) {
 				*errorp = 0;
 				ASSERT(MUTEX_HELD(&stp->sd_lock));
+				if (iovlen != 0)
+					kmem_free(uiod.d_iov, iovlen);
 				return (bp);
 			}
 			error = 0;
@@ -1100,8 +1111,14 @@ strget(struct stdata *stp, queue_t *q, struct uio *uiop, int first,
 		} else {
 			*errorp = error;
 			ASSERT(MUTEX_HELD(&stp->sd_lock));
+			if (iovlen != 0)
+				kmem_free(uiod.d_iov, iovlen);
 			return (NULL);
 		}
+
+		if (iovlen != 0)
+			kmem_free(uiod.d_iov, iovlen);
+
 		/*
 		 * Try a getq in case a rwnext() generated mblk
 		 * has bubbled up via strrput().
@@ -2596,6 +2613,8 @@ strput(struct stdata *stp, mblk_t *mctl, struct uio *uiop, ssize_t *iosize,
     int b_flag, int pri, int flags)
 {
 	struiod_t uiod;
+	struct iovec buf[IOV_MAX_STACK];
+	int iovlen = 0;
 	mblk_t *mp;
 	queue_t *wqp = stp->sd_wrq;
 	int error = 0;
@@ -2687,13 +2706,21 @@ strput(struct stdata *stp, mblk_t *mctl, struct uio *uiop, ssize_t *iosize,
 	mp->b_flag |= b_flag;
 	mp->b_band = (uchar_t)pri;
 
-	(void) uiodup(uiop, &uiod.d_uio, uiod.d_iov,
-	    sizeof (uiod.d_iov) / sizeof (*uiod.d_iov));
+	if (uiop->uio_iovcnt > IOV_MAX_STACK) {
+		iovlen = uiop->uio_iovcnt * sizeof (iovec_t);
+		uiod.d_iov = (struct iovec *)kmem_alloc(iovlen, KM_SLEEP);
+	} else {
+		uiod.d_iov = buf;
+	}
+
+	(void) uiodup(uiop, &uiod.d_uio, uiod.d_iov, uiop->uio_iovcnt);
 	uiod.d_uio.uio_offset = 0;
 	uiod.d_mp = mp;
 	error = rwnext(wqp, &uiod);
 	if (! uiod.d_mp) {
 		uioskip(uiop, *iosize);
+		if (iovlen != 0)
+			kmem_free(uiod.d_iov, iovlen);
 		return (error);
 	}
 	ASSERT(mp == uiod.d_mp);
@@ -2711,17 +2738,23 @@ strput(struct stdata *stp, mblk_t *mctl, struct uio *uiop, ssize_t *iosize,
 		error = 0;
 	} else {
 		freemsg(mp);
+		if (iovlen != 0)
+			kmem_free(uiod.d_iov, iovlen);
 		return (error);
 	}
 	/* Have to check canput before consuming data from the uio */
 	if (pri == 0) {
 		if (!canputnext(wqp) && !(flags & MSG_IGNFLOW)) {
 			freemsg(mp);
+			if (iovlen != 0)
+				kmem_free(uiod.d_iov, iovlen);
 			return (EWOULDBLOCK);
 		}
 	} else {
 		if (!bcanputnext(wqp, pri) && !(flags & MSG_IGNFLOW)) {
 			freemsg(mp);
+			if (iovlen != 0)
+				kmem_free(uiod.d_iov, iovlen);
 			return (EWOULDBLOCK);
 		}
 	}
@@ -2729,6 +2762,8 @@ strput(struct stdata *stp, mblk_t *mctl, struct uio *uiop, ssize_t *iosize,
 	/* Copyin data from the uio */
 	if ((error = struioget(wqp, mp, &uiod, 0)) != 0) {
 		freemsg(mp);
+		if (iovlen != 0)
+			kmem_free(uiod.d_iov, iovlen);
 		return (error);
 	}
 	uioskip(uiop, *iosize);
@@ -2745,6 +2780,8 @@ strput(struct stdata *stp, mblk_t *mctl, struct uio *uiop, ssize_t *iosize,
 		putnext(wqp, mp);
 		stream_runservice(stp);
 	}
+	if (iovlen != 0)
+		kmem_free(uiod.d_iov, iovlen);
 	return (0);
 }
 

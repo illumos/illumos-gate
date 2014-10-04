@@ -3,8 +3,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Copyright (c) 1982, 1985, 1986 Regents of the University of California.
  * All rights reserved.  The Berkeley software License Agreement
@@ -168,7 +166,5 @@ struct msghdr {
 #define	MSG_OOB		0x1		/* process out-of-band data */
 #define	MSG_PEEK	0x2		/* peek at incoming message */
 #define	MSG_DONTROUTE	0x4		/* send without using routing tables */
-
-#define	MSG_MAXIOVLEN	16
 
 #endif /*!_sys_socket_h*/

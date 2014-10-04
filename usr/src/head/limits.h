@@ -25,6 +25,7 @@
  *
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2015 Joyent, Inc.  All rights reserved.
  */
 
 /*	Copyright (c) 1988 AT&T	*/
@@ -37,6 +38,7 @@
 #include <sys/feature_tests.h>
 #include <sys/isa_defs.h>
 #include <iso/limits_iso.h>
+#include <sys/limits.h>
 
 /*
  * Include fixed width type limits as proposed by the ISO/JTC1/SC22/WG14 C
@@ -242,8 +244,6 @@ extern "C" {
 #define	_XOPEN_IOV_MAX	16	/* max # iovec/process with readv()/writev() */
 #define	_XOPEN_NAME_MAX	255	/* max # bytes in filename excluding null */
 #define	_XOPEN_PATH_MAX	1024	/* max # bytes in a pathname */
-
-#define	IOV_MAX		_XOPEN_IOV_MAX
 
 #if defined(__EXTENSIONS__) || \
 	(!defined(_STRICT_STDC) && !defined(__XOPEN_OR_POSIX))

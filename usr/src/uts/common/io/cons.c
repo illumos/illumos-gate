@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1982, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2015, Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -53,6 +54,7 @@
 #include <sys/vnode.h>
 #include <sys/uio.h>
 #include <sys/stat.h>
+#include <sys/limits.h>
 
 #include <sys/console.h>
 #include <sys/consdev.h>
@@ -414,14 +416,24 @@ cnwrite(dev_t dev, struct uio *uio, struct cred *cred)
 	 */
 	if (vsconsvp != NULL && vsconsvp->v_stream != NULL) {
 		struiod_t uiod;
+		struct iovec buf[IOV_MAX_STACK];
+		int iovlen = 0;
+
+		if (uio->uio_iovcnt > IOV_MAX_STACK) {
+			iovlen = uio->uio_iovcnt * sizeof (iovec_t);
+			uiod.d_iov = kmem_alloc(iovlen, KM_SLEEP);
+		} else {
+			uiod.d_iov = buf;
+		}
 
 		/*
 		 * strwrite modifies uio so need to make copy.
 		 */
-		(void) uiodup(uio, &uiod.d_uio, uiod.d_iov,
-		    sizeof (uiod.d_iov) / sizeof (*uiod.d_iov));
+		(void) uiodup(uio, &uiod.d_uio, uiod.d_iov, uio->uio_iovcnt);
 
 		(void) strwrite(vsconsvp, &uiod.d_uio, cred);
+		if (iovlen != 0)
+			kmem_free(uiod.d_iov, iovlen);
 	}
 
 	if (rconsvp->v_stream != NULL)

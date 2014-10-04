@@ -22,6 +22,7 @@
  * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  *
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2015, Joyent, Inc. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -429,6 +430,7 @@ struct msghdr32 {
 					/* with left over data */
 #define	MSG_XPG4_2	0x8000		/* Private: XPG4.2 flag */
 
+/* Obsolete but kept for compilation compatibility. Use IOV_MAX. */
 #define	MSG_MAXIOVLEN	16
 
 #ifdef _KERNEL
