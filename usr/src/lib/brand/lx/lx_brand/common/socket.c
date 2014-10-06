@@ -810,10 +810,6 @@ lx_socket(int domain, int type, int protocol)
 
 	lx_debug("\tsocket(%d, %d, %d)", domain, type, protocol);
 
-	/* Right now IPv6 sockets don't work */
-	if (domain == AF_INET6)
-		return (-EAFNOSUPPORT);
-
 	fd = socket(domain, type | options, protocol);
 
 	if (fd >= 0)
