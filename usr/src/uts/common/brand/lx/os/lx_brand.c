@@ -536,6 +536,9 @@ lx_psig_to_proc(proc_t *p, kthread_t *t, int sig)
 	if (datamodel == DATAMODEL_NATIVE) {
 		rp = lwptoregs(lwp);
 
+		DTRACE_PROBE1(brand__lx__sig__fsbase,
+		    uintptr_t, rdmsr(MSR_AMD_FSBASE));
+
 		if (rp->r_gs != 0)
 			cmn_err(CE_WARN, "lx_psig_to_proc: non-zero %%gs");
 
@@ -1308,21 +1311,21 @@ lx_elfexec(struct vnode *vp, struct execa *uap, struct uarg *args,
 	setexecenv(&env);
 
 	/*
-	 * We don't need to copy this stuff out. It is only used by our
-	 * tools to locate the lx linker's debug section. But we should at
-	 * least try to keep /proc's view of the aux vector consistent with
+	 * We try to keep /proc's view of the aux vector consistent with
 	 * what's on the process stack.
 	 */
 	if (args->to_model == DATAMODEL_NATIVE) {
-		auxv_t phdr_auxv[3] = {
+		auxv_t phdr_auxv[4] = {
 		    { AT_SUN_BRAND_LX_PHDR, 0 },
 		    { AT_SUN_BRAND_LX_INTERP, 0 },
-		    { AT_SUN_BRAND_AUX3, 0 }
+		    { AT_SUN_BRAND_LX_SYSINFO_EHDR, 0 },
+		    { AT_SUN_BRAND_AUX4, 0 }
 		};
 		phdr_auxv[0].a_un.a_val = edp->ed_phdr;
 		phdr_auxv[1].a_un.a_val = ldaddr;
-		phdr_auxv[2].a_type = AT_CLKTCK;
-		phdr_auxv[2].a_un.a_val = hz;
+		phdr_auxv[2].a_un.a_val = 1;	/* set in lx_init */
+		phdr_auxv[3].a_type = AT_CLKTCK;
+		phdr_auxv[3].a_un.a_val = hz;
 
 		if (copyout(&phdr_auxv, args->auxp_brand,
 		    sizeof (phdr_auxv)) == -1)

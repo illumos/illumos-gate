@@ -704,6 +704,29 @@ lx_close_fh(FILE *file)
 
 extern int set_l10n_alternate_root(char *path);
 
+#if defined(_LP64)
+static void *
+map_vdso()
+{
+	int fd;
+	mmapobj_result_t	mpp[10]; /* we know the size of our lib */
+	mmapobj_result_t	*smpp = mpp;
+	uint_t			mapnum = 10;
+
+	if ((fd = open("/native/usr/lib/brand/lx/amd64/lx_vdso.so.1",
+	    O_RDONLY)) == -1)
+		lx_err_fatal("couldn't open lx_vdso.so.1");
+
+	if (mmapobj(fd, MMOBJ_INTERPRET, smpp, &mapnum, NULL) == -1)
+		lx_err_fatal("couldn't mmapobj lx_vdso.so.1");
+
+	(void) close(fd);
+
+	/* assume first segment is the base of the mapping */
+	return (smpp->mr_addr);
+}
+#endif
+
 /*ARGSUSED*/
 int
 lx_init(int argc, char *argv[], char *envp[])
@@ -715,6 +738,9 @@ lx_init(int argc, char *argv[], char *envp[])
 	lx_elf_data_t	edp;
 	lx_brand_registration_t reg;
 	static lx_tsd_t lx_tsd;
+#if defined(_LP64)
+	void		*vdso_hdr;
+#endif
 
 	stack_bottom = 2 * sysconf(_SC_PAGESIZE);
 
@@ -837,6 +863,10 @@ lx_init(int argc, char *argv[], char *envp[])
 	if (lx_statfs_init() != 0)
 		lx_err_fatal("failed to setup the statfs translator");
 
+#if defined(_LP64)
+	vdso_hdr = map_vdso();
+#endif
+
 	/*
 	 * Find the aux vector on the stack.
 	 */
@@ -865,6 +895,12 @@ lx_init(int argc, char *argv[], char *envp[])
 			case AT_PHNUM:
 				ap->a_un.a_val = edp.ed_phnum;
 				break;
+#if defined(_LP64)
+			case AT_SUN_BRAND_LX_SYSINFO_EHDR:
+				ap->a_type = AT_SYSINFO_EHDR;
+				ap->a_un.a_val = (long)vdso_hdr;
+				break;
+#endif
 			default:
 				break;
 		}
