@@ -5031,6 +5031,7 @@ d usr/lib/brand/lx/amd64 0755 root bin
 f usr/lib/brand/lx/amd64/lx_librtld_db.so.1 0755 root root
 f usr/lib/brand/lx/amd64/lx_nametoaddr.so.1 0755 root root
 f usr/lib/brand/lx/amd64/lx_thunk.so.1 0755 root root
+f usr/lib/brand/lx/amd64/lx_vdso.so.1 0755 root root
 f usr/lib/brand/lx/etc_default_nfs 0444 root root
 f usr/lib/brand/lx/etc_netconfig 0444 root root
 f usr/lib/brand/lx/ifconfig 0755 root root

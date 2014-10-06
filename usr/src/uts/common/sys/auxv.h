@@ -199,6 +199,7 @@ extern uint_t getisax(uint32_t *, uint_t);
 #define	AT_SUN_BRAND_AUX1	2020
 #define	AT_SUN_BRAND_AUX2	2021
 #define	AT_SUN_BRAND_AUX3	2022
+#define	AT_SUN_BRAND_AUX4	2025
 #define	AT_SUN_BRAND_NROOT	2024
 
 /*

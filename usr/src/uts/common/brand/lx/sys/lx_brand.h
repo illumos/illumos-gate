@@ -129,12 +129,17 @@ extern "C" {
 /*
  * Aux vector containing phdr of Linux executable and ehdr of interpreter
  * (if any), both of which are used by lx_librtld_db to ascertain r_debug.
+ * We repurpose the 3rd brand-specific aux vector slot for the Linux
+ * AT_SYSINFO_EHDR entry (we modify the a_type in the brand library).
  */
 #define	AT_SUN_BRAND_LX_PHDR	AT_SUN_BRAND_AUX1
 #define	AT_SUN_BRAND_LX_INTERP	AT_SUN_BRAND_AUX2
+#define	AT_SUN_BRAND_LX_SYSINFO_EHDR	AT_SUN_BRAND_AUX3
 
 /* Aux vector containing hz value */
 #define	AT_CLKTCK	17
+/* Aux vector containing vDSO addr */
+#define	AT_SYSINFO_EHDR	33
 
 #ifndef	_ASM
 

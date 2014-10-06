@@ -1,0 +1,59 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2014 Joyent, Inc.  All rights reserved.
+#
+
+#
+# MAPFILE HEADER START
+#
+# WARNING:  STOP NOW.  DO NOT MODIFY THIS FILE.
+# Object versioning must comply with the rules detailed in
+#
+#	usr/src/lib/README.mapfiles
+#
+# You should not be making modifications here until you've read the most current
+# copy of that file. If you need help, contact a gatekeeper for guidance.
+#
+# MAPFILE HEADER END
+#
+
+$mapfile_version 2
+
+SYMBOL_VERSION LINUX_2.6 {
+    global:
+	__vdso_gettimeofday;
+	__vdso_clock_gettime;
+	__vdso_getcpu;
+	__vdso_time;
+    local:
+        *;
+};
+
+#
+# The vDSO module in GNU/Linux must only have a single PT_LOAD section.
+# Further, we should not have any data sections at all. Therefore, we go
+# through and explicitly disable several of the writeable sections that
+# might commonly show up.
+#
+LOAD_SEGMENT data {
+        disable;
+};
+
+LOAD_SEGMENT ldata {
+        disable;
+};
+
+LOAD_SEGMENT bss {
+        disable;
+};
+

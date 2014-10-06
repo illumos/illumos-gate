@@ -22,8 +22,7 @@
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright 2014 Joyent, Inc.  All rights reserved.
 #
 
 default: all
@@ -34,7 +33,7 @@ include Makefile.lx
 .PARALLEL:
 
 SUBDIRS=	cmd librtld_db lx_support lx_brand lx_thunk netfiles zone \
-		.WAIT lx_nametoaddr
+		lx_vdso .WAIT lx_nametoaddr
 MSGSUBDIRS=	lx_brand lx_support zone
 
 all :=		TARGET= all

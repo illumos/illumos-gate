@@ -508,10 +508,10 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 	if ((brand_action != EBA_NATIVE) && (PROC_IS_BRANDED(p))) {
 		branded = 1;
 		/*
-		 * We will be adding 4 entries to the aux vectors.  One for
-		 * the the brandname and 3 for the brand specific aux vectors.
+		 * We will be adding 5 entries to the aux vectors.  One for
+		 * the the brandname and 4 for the brand specific aux vectors.
 		 */
-		args->auxsize += 4 * sizeof (aux_entry_t);
+		args->auxsize += 5 * sizeof (aux_entry_t);
 	}
 
 	/* Hardware/Software capabilities */
@@ -834,6 +834,7 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 			ADDAUX(aux, AT_SUN_BRAND_AUX1, 0)
 			ADDAUX(aux, AT_SUN_BRAND_AUX2, 0)
 			ADDAUX(aux, AT_SUN_BRAND_AUX3, 0)
+			ADDAUX(aux, AT_SUN_BRAND_AUX4, 0)
 		}
 
 		ADDAUX(aux, AT_NULL, 0)
