@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright (c) 2012, Nexenta Systems, Inc. All rights reserved.
+ * Copyright (c) 2014, Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2012, Alexey Zaytsev <alexey.zaytsev@gmail.com>
  */
 
@@ -64,7 +64,10 @@
 #define	VIRTIO_BLK_CONFIG_GEOMETRY_H	18 /* 8bit */
 #define	VIRTIO_BLK_CONFIG_GEOMETRY_S	19 /* 8bit */
 #define	VIRTIO_BLK_CONFIG_BLK_SIZE	20 /* 32bit */
-#define	VIRTIO_BLK_CONFIG_TOPOLOGY	24 /* 32bit */
+#define	VIRTIO_BLK_CONFIG_TOPO_PBEXP	24 /* 8bit */
+#define	VIRTIO_BLK_CONFIG_TOPO_ALIGN	25 /* 8bit */
+#define	VIRTIO_BLK_CONFIG_TOPO_MIN_SZ	26 /* 16bit */
+#define	VIRTIO_BLK_CONFIG_TOPO_OPT_SZ	28 /* 32bit */
 
 /* Command */
 #define	VIRTIO_BLK_T_IN			0
@@ -149,6 +152,7 @@ struct vioblk_softc {
 	boolean_t		sc_in_poll_mode;
 	boolean_t		sc_readonly;
 	int			sc_blk_size;
+	int			sc_pblk_size;
 	int			sc_seg_max;
 	int			sc_seg_size_max;
 	kmutex_t		lock_devid;
@@ -444,8 +448,9 @@ vioblk_mediainfo(void *arg, bd_media_t *media)
 	struct vioblk_softc *sc = (void *)arg;
 
 	media->m_nblks = sc->sc_nblks;
-	media->m_blksize = DEV_BSIZE;
+	media->m_blksize = sc->sc_blk_size;
 	media->m_readonly = sc->sc_readonly;
+	media->m_pblksize = sc->sc_pblk_size;
 	return (0);
 }
 
@@ -584,6 +589,7 @@ vioblk_dev_features(struct vioblk_softc *sc)
 	    VIRTIO_BLK_F_GEOMETRY |
 	    VIRTIO_BLK_F_BLK_SIZE |
 	    VIRTIO_BLK_F_FLUSH |
+	    VIRTIO_BLK_F_TOPOLOGY |
 	    VIRTIO_BLK_F_SEG_MAX |
 	    VIRTIO_BLK_F_SIZE_MAX |
 	    VIRTIO_F_RING_INDIRECT_DESC);
@@ -884,14 +890,16 @@ vioblk_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	    VIRTIO_BLK_CONFIG_CAPACITY);
 	sc->sc_nblks = sc->sc_capacity;
 
-	/*
-	 * BLK_SIZE is just a hint for the optimal logical block
-	 * granularity. Ignored for now.
-	 */
 	sc->sc_blk_size = DEV_BSIZE;
 	if (sc->sc_virtio.sc_features & VIRTIO_BLK_F_BLK_SIZE) {
 		sc->sc_blk_size = virtio_read_device_config_4(&sc->sc_virtio,
 		    VIRTIO_BLK_CONFIG_BLK_SIZE);
+	}
+
+	sc->sc_pblk_size = sc->sc_blk_size;
+	if (sc->sc_virtio.sc_features & VIRTIO_BLK_F_TOPOLOGY) {
+		sc->sc_pblk_size <<= virtio_read_device_config_1(&sc->sc_virtio,
+		    VIRTIO_BLK_CONFIG_TOPO_PBEXP);
 	}
 
 	/* Flushing is not supported. */
@@ -931,9 +939,9 @@ vioblk_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	    vioblk_bd_dma_attr.dma_attr_sgllen * sc->sc_seg_size_max;
 
 	dev_debug(devinfo, CE_NOTE,
-	    "nblks=%" PRIu64 " blksize=%d  num_seg=%d, "
+	    "nblks=%" PRIu64 " blksize=%d (%d) num_seg=%d, "
 	    "seg_size=%d, maxxfer=%" PRIu64,
-	    sc->sc_nblks, sc->sc_blk_size,
+	    sc->sc_nblks, sc->sc_blk_size, sc->sc_pblk_size,
 	    vioblk_bd_dma_attr.dma_attr_sgllen,
 	    sc->sc_seg_size_max,
 	    vioblk_bd_dma_attr.dma_attr_maxxfer);
