@@ -43,6 +43,7 @@ _MANFILES=	Intro.4				\
 		core.4				\
 		crypt.conf.4			\
 		crypto_certs.4			\
+		ctf.4				\
 		d_passwd.4			\
 		dacf.conf.4			\
 		dat.conf.4			\
