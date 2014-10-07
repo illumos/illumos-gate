@@ -90,10 +90,6 @@
  */
 #include <sys/fm/io/ddi.h>
 
-#if defined(MPTSAS_DEBUG)
-extern uint32_t mptsas_debug_flags;
-#endif
-
 /*
  *  prototypes
  */

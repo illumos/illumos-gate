@@ -23,7 +23,7 @@
 # Use is subject to license terms.
 
 DEFAULT_FILE="/etc/default/sendmail"
-SENDMAIL="/usr/lib/sendmail"
+SENDMAIL="/usr/lib/smtp/sendmail/sendmail"
 PATH="/usr/bin:/usr/sbin:/usr/ccs/bin"
 export PATH
 

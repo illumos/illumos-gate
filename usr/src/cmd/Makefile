@@ -250,6 +250,7 @@ COMMON_SUBDIRS=		\
 	lvm		\
 	mach		\
 	mail		\
+	mailwrapper	\
 	mailx		\
 	makekey		\
 	man		\

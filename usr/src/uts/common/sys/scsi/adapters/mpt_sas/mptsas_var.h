@@ -957,9 +957,7 @@ _NOTE(SCHEME_PROTECTS_DATA("stable data", mptsas::m_kmem_cache))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(mptsas::m_io_dma_attr.dma_attr_sgllen))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(mptsas::m_devid))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(mptsas::m_productid))
-_NOTE(DATA_READABLE_WITHOUT_LOCK(mptsas::m_port_type))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(mptsas::m_mpxio_enable))
-_NOTE(DATA_READABLE_WITHOUT_LOCK(mptsas::m_ntargets))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(mptsas::m_instance))
 
 /*
@@ -1388,14 +1386,25 @@ void mptsas_raid_action_system_shutdown(mptsas_t *mpt);
 #define	MPTSAS_IOCSTATUS(status) (status & MPI2_IOCSTATUS_MASK)
 /*
  * debugging.
+ * MPTSAS_DBGLOG_LINECNT must be a power of 2.
  */
+#define	MPTSAS_DBGLOG_LINECNT	128
+#define	MPTSAS_DBGLOG_LINELEN	256
+#define	MPTSAS_DBGLOG_BUFSIZE	(MPTSAS_DBGLOG_LINECNT * MPTSAS_DBGLOG_LINELEN)
+
 #if defined(MPTSAS_DEBUG)
 
+extern uint32_t mptsas_debugprt_flags;
+extern uint32_t mptsas_debuglog_flags;
+
 void mptsas_printf(char *fmt, ...);
+void mptsas_debug_log(char *fmt, ...);
 
 #define	MPTSAS_DBGPR(m, args)	\
-	if (mptsas_debug_flags & (m)) \
-		mptsas_printf args
+	if (mptsas_debugprt_flags & (m)) \
+		mptsas_printf args;   \
+	if (mptsas_debuglog_flags & (m)) \
+		mptsas_debug_log args
 #else	/* ! defined(MPTSAS_DEBUG) */
 #define	MPTSAS_DBGPR(m, args)
 #endif	/* defined(MPTSAS_DEBUG) */
@@ -1420,7 +1429,7 @@ void mptsas_printf(char *fmt, ...);
 #define	NDBG14(args)	MPTSAS_DBGPR(0x4000, args)	/* LED control */
 #define	NDBG15(args)	MPTSAS_DBGPR(0x8000, args)	/* Passthrough */
 
-#define	NDBG16(args)	MPTSAS_DBGPR(0x010000, args)
+#define	NDBG16(args)	MPTSAS_DBGPR(0x010000, args)	/* SAS Broadcasts */
 #define	NDBG17(args)	MPTSAS_DBGPR(0x020000, args)	/* scatter/gather */
 #define	NDBG18(args)	MPTSAS_DBGPR(0x040000, args)
 #define	NDBG19(args)	MPTSAS_DBGPR(0x080000, args)	/* handshaking */

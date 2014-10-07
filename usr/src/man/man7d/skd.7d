@@ -1,0 +1,25 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+.\"
+
+.TH SKD 7D "August 10, 2013"
+.SH NAME
+skd \- sTec S112x PCIe Solid-State Disk driver
+.SH DESCRIPTION
+.LP
+The \fBskd\fR driver uses the \fBblkdev\fR framework to provide a solid-state
+disk in \fB/dev/dsk/cNt0d0*\fR from the sTec S112x series of PCIe cards.
+.LP
+The skd.conf file, in \fB/kernel/drv/skd.conf\fR, contains configuration
+parameters for the driver, and are documented there.  They are considered an
+unstable interface, subject to change without notice.

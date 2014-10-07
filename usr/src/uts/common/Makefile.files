@@ -22,9 +22,9 @@
 #
 # Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2012 Joyent, Inc.  All rights reserved.
-# Copyright (c) 2012 Nexenta Systems, Inc. All rights reserved.
 # Copyright (c) 2013 by Delphix. All rights reserved.
 # Copyright (c) 2013 by Saso Kiselkov. All rights reserved.
+# Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
 #
 
 #
@@ -1872,6 +1872,8 @@ VR_OBJS += vr.o
 ATGE_OBJS += atge_main.o atge_l1e.o atge_mii.o atge_l1.o atge_l1c.o
 
 YGE_OBJS = yge.o
+
+SKD_OBJS = skd.o
 
 #
 #	Build up defines and paths.
