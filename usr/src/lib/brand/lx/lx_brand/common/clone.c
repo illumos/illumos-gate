@@ -263,9 +263,7 @@ clone_start(void *arg)
 
 	/* Initialize the thread specific data for this thread. */
 	bzero(&lx_tsd, sizeof (lx_tsd));
-#if defined(_LP64)
-	lx_tsd.lxtsd_scms = 0x1;
-#else
+#if defined(_ILP32)
 	lx_tsd.lxtsd_gs = cs->c_gs;
 #endif
 

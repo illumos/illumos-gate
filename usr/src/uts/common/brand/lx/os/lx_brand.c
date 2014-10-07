@@ -530,23 +530,19 @@ lx_psig_to_proc(proc_t *p, kthread_t *t, int sig)
 #if defined(__amd64)
 	klwp_t *lwp = ttolwp(t);
 	model_t datamodel;
-	struct regs *rp;
 
 	datamodel = lwp_getdatamodel(lwp);
 	if (datamodel == DATAMODEL_NATIVE) {
-		rp = lwptoregs(lwp);
 		pcb_t *pcb = &lwp->lwp_pcb;
 
-		DTRACE_PROBE1(brand__lx__sig__fsbase,
-		    uintptr_t, rdmsr(MSR_AMD_FSBASE));
+		DTRACE_PROBE2(brand__lx__psig,
+		    uintptr_t, rdmsr(MSR_AMD_FSBASE),
+		    uintptr_t, lwpd->br_libc_syscall);
 
-		if (rp->r_gs != 0)
-			cmn_err(CE_WARN, "lx_psig_to_proc: non-zero %%gs");
-
-		/*
-		 * XXX sometimes pcb_gs?
-		 */
-		rp->r_gs = lwpd->br_libc_syscall;
+		/* We "push" the current syscall mode flag on the "stack". */
+		ASSERT(lwpd->br_libc_syscall == 0 ||
+		    lwpd->br_libc_syscall == 1);
+		lwpd->br_scms = (lwpd->br_scms << 1) | lwpd->br_libc_syscall;
 
 		/*
 		 * Make sure we have the native fsbase loaded. Also update pcb
@@ -555,9 +551,7 @@ lx_psig_to_proc(proc_t *p, kthread_t *t, int sig)
 		 * and datamodel check, this obviously will only happen for the
 		 * 64-bit user-land.
 		 */
-		if (lwpd->br_ntv_fsbase == 0) {
-			cmn_err(CE_WARN, "lx_psig_to_proc: NULL native fsbase");
-		} else {
+		if (lwpd->br_ntv_fsbase != 0) {
 			pcb->pcb_fsbase = lwpd->br_ntv_fsbase;
 			wrmsr(MSR_AMD_FSBASE, lwpd->br_ntv_fsbase);
 		}
@@ -682,13 +676,18 @@ lx_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 		pd->l_tracehandler = (uintptr_t)reg.lxbr_tracehandler;
 		pd->l_traceflag = (uintptr_t)reg.lxbr_traceflag;
 
+#if defined(__amd64)
 		/*
 		 * When we register, start with native syscalls enabled so that
 		 * lx_init can finish initialization before switch to Linux
-		 * syscall mode.
+		 * syscall mode. Also initialize the syscall mode "stack" to
+		 * native. We push/pop bits into this "stack" during signal
+		 * handling.
 		 */
 		lwpd = ttolxlwp(t);
 		lwpd->br_libc_syscall = 1;
+		lwpd->br_scms = 1;
+#endif
 
 		*rval = 0;
 		return (0);
@@ -946,15 +945,21 @@ lx_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 		return (0);
 
 	case B_SIGNAL_RETURN:
+#if defined(__amd64)
 		/*
-		 * Set the syscall mode and do the setcontext syscall.
-		 * arg1 = mode
-		 * arg2 = ucontext_t pointer
+		 * Set the syscall mode and do the setcontext syscall. The
+		 * user-level code only ever calls this in the 64-bit library.
+		 *
+		 * We get the previous syscall mode off of the br_scms "stack".
+		 * That is a sequence of syscall mode flag bits we've pushed
+		 * into that int as we took signals.
+		 * arg1 = ucontext_t pointer
 		 */
 		lwpd = ttolxlwp(curthread);
-		lwpd->br_libc_syscall = arg1;
 
-#if defined(__amd64)
+		lwpd->br_libc_syscall = lwpd->br_scms & 0x1;
+		/* "pop" this value from the "stack" */
+		lwpd->br_scms >>= 1;
 
 #ifdef DEBUG
 		/*
@@ -978,10 +983,8 @@ lx_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 
 		/*
 		 * If setting the mode to lx, make sure we load the lx fsbase.
-		 * The user-level code only ever calls this in the 64-bit
-		 * library.
 		 */
-		if (lwpd->br_libc_syscall != 1) {
+		if (lwpd->br_libc_syscall == 0) {
 			/* if Linux fsbase has been initialized, restore it */
 			if (lwpd->br_lx_fsbase != 0) {
 				klwp_t *lwp = ttolwp(t);
@@ -992,7 +995,7 @@ lx_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 			}
 		}
 #endif /* amd64 */
-		return (getsetcontext(SETCONTEXT, (void *)arg2));
+		return (getsetcontext(SETCONTEXT, (void *)arg1));
 
 	default:
 		ike_call = cmd - B_IKE_SYSCALL;

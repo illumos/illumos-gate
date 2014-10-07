@@ -35,14 +35,7 @@ extern "C" {
 #include <thread.h>
 
 typedef struct lx_tsd {
-#if defined(_LP64)
-	/*
-	 * 64-bit thread-specific syscall mode state "stack". Bits tracking the
-	 * syscall mode are shifted on/off this int like a stack as we take
-	 * signals and return.
-	 */
-	uint_t		lxtsd_scms;
-#else
+#if defined(_ILP32)
 	/* 32-bit thread-specific Linux %gs value */
 	uintptr_t	lxtsd_gs;
 #endif
