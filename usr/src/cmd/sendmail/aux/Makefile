@@ -27,11 +27,13 @@
 include		../../Makefile.cmd
 include		../Makefile.cmd
 
-PROG= 		mailstats mconnect vacation mailcompat praliases mailq
+PROG= 		mailstats mconnect vacation mailcompat praliases
 
 LIBPROG=	mail.local smrsh
 
 USRSBINPROG=	etrn makemap editmap
+
+LIBSMTPSMPROG= mailq
 
 # $(PROG) by default
 CLOBBERFILES=	$(LIBPROG) $(USRSBINPROG)
@@ -51,7 +53,7 @@ mconnect :=	LDLIBS += -lsocket -lnsl
 praliases :=	LDLIBS += -lldap
 smrsh :=	LDLIBS += -lldap
 vacation :=	LDLIBS += -lldap
-$(ROOTBIN)/mailq :=	FILEMODE = 4555
+$(ROOTLIBSMTPSM)/mailq :=	FILEMODE = 4555
 
 INCPATH=	-I../src -I../db -I../include
 
@@ -67,7 +69,7 @@ LDFLAGS +=	$(MAPFILE.NGB:%=-M%)
 
 .KEEP_STATE:
 
-all:		$(PROG) $(LIBPROG) $(USRSBINPROG)
+all:		$(PROG) $(LIBSMTPSMPROG) $(LIBPROG) $(USRSBINPROG)
 
 convtime.o:	../src/convtime.c
 	$(COMPILE.c) ../src/convtime.c
@@ -111,7 +113,8 @@ mailstats:	mailstats.o ../libsmutil/libsmutil.a ../libsm/libsm.a
 	$(POST_PROCESS)
 
 install: all $(ROOTPROG) $(ROOTLIB)/mail.local $(ROOTLIB)/smrsh \
-	$(ROOTUSRSBIN)/makemap $(ROOTUSRSBIN)/etrn $(ROOTUSRSBIN)/editmap
+	$(ROOTLIBSMTPSM)/mailq $(ROOTUSRSBIN)/makemap \
+	$(ROOTUSRSBIN)/etrn $(ROOTUSRSBIN)/editmap
 
 clean:
 	$(RM) $(OBJS) *.o

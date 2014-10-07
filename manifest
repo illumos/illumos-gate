@@ -243,6 +243,7 @@ s etc/TIMEZONE=default/init
 d etc/acct 0755 adm adm
 f etc/acct/holidays 0644 root bin
 d etc/amd64 0755 root sys
+s etc/aliases=./mail/aliases
 f etc/auto_home 0644 root bin
 f etc/auto_master 0644 root bin
 d etc/brand 0755 root sys
@@ -375,7 +376,7 @@ f etc/logadm.d/fmd.logadm.conf 0444 root sys
 f etc/logindevperm 0644 root sys
 f etc/mach 0644 root sys
 f etc/magic 0444 root bin
-d etc/mail 0755 root sys
+d etc/mail 0755 root mail
 f etc/mail/Mail.rc 0644 root mail
 f etc/mail/aliases 0644 root mail
 d etc/mail/cf 0755 root mail
@@ -389,6 +390,7 @@ f etc/mail/submit.cf 0444 root mail
 s etc/mail/subsidiary.cf=sendmail.cf
 f etc/mail/trusted-users 0644 root mail
 f etc/mailcap 0644 root bin
+f etc/mailer.conf 0644 root sys
 f etc/mime.types 0644 root bin
 f etc/mnttab 0444 root root
 f etc/mpapi.conf 0644 root bin
@@ -2136,6 +2138,7 @@ f usr/bin/m68k 0555 root bin
 h usr/bin/mac=usr/lib/isaexec
 f usr/bin/mach 0555 root bin
 f usr/bin/mail 2511 root mail
+s usr/bin/mailq=../lib/mailwrapper
 f usr/bin/mailx 2511 root mail
 f usr/bin/makedev 0555 root bin
 f usr/bin/man 0555 root bin
@@ -9462,6 +9465,7 @@ s usr/lib/lwp/libthread_db.so.1=../libthread_db.so.1
 f usr/lib/lx_brand.so.1 0755 root sys
 f usr/lib/madv.so.1 0755 root bin
 f usr/lib/mail.local 0555 root bin
+f usr/lib/mailwrapper 0555 root bin
 f usr/lib/makekey 0555 root bin
 h usr/lib/makewhatis=usr/bin/man
 f usr/lib/mandoc_preconv 0555 root bin
@@ -9962,7 +9966,7 @@ f usr/lib/security/pkcs11_kernel.so.1 0755 root bin
 s usr/lib/security/pkcs11_kernel.so=pkcs11_kernel.so.1
 f usr/lib/security/pkcs11_softtoken.so.1 0755 root bin
 s usr/lib/security/pkcs11_softtoken.so=pkcs11_softtoken.so.1
-f usr/lib/sendmail 2555 root smmsp
+s usr/lib/sendmail=mailwrapper
 f usr/lib/servinfo 0555 root bin
 f usr/lib/set_keyboard_layout 0555 root bin
 d usr/lib/smbfs 0755 root bin
@@ -10000,6 +10004,11 @@ f usr/lib/smedia/sm_blkdev.so.1 0555 root bin
 f usr/lib/smedia/sm_fd.so.1 0555 root bin
 f usr/lib/smedia/sm_scsi.so.1 0555 root bin
 f usr/lib/smrsh 0555 root bin
+d usr/lib/smtp 0555 root bin
+d usr/lib/smtp/sendmail 0555 root bin
+f usr/lib/smtp/sendmail/mailq 4555 root bin
+s usr/lib/smtp/sendmail/newaliases=sendmail
+f usr/lib/smtp/sendmail/sendmail 2555 root smmsp
 f usr/lib/sndrd 0555 root bin
 f usr/lib/sndrsyncd 0555 root bin
 f usr/lib/sngl_brand.so.1 0755 root bin
@@ -10384,7 +10393,7 @@ f usr/sbin/msgid 0555 root bin
 f usr/sbin/mvdir 0555 root bin
 s usr/sbin/ncheck=ff
 f usr/sbin/ndd 0555 root bin
-s usr/sbin/newaliases=../lib/sendmail
+s usr/sbin/newaliases=../lib/mailwrapper
 s usr/sbin/newfs=../lib/fs/ufs/newfs
 f usr/sbin/newkey 0555 root sys
 f usr/sbin/nfsref 0555 root bin
@@ -10442,7 +10451,7 @@ f usr/sbin/rwall 0555 root bin
 f usr/sbin/sacadm 4755 root sys
 f usr/sbin/safe_finger 0555 root bin
 f usr/sbin/sbdadm 0555 root bin
-s usr/sbin/sendmail=../lib/sendmail
+s usr/sbin/sendmail=../lib/smtp/sendmail/sendmail
 f usr/sbin/setmnt 0555 root bin
 h usr/sbin/share=usr/sbin/sharemgr
 f usr/sbin/shareall 0555 root bin
@@ -11973,6 +11982,7 @@ f usr/share/man/man1m/lofiadm.1m 0444 root bin
 f usr/share/man/man1m/logadm.1m 0444 root bin
 f usr/share/man/man1m/logins.1m 0444 root bin
 f usr/share/man/man1m/mail.local.1m 0444 root bin
+f usr/share/man/man1m/mailwrapper.1m 0444 root bin
 f usr/share/man/man1m/makedbm.1m 0444 root bin
 f usr/share/man/man1m/makemap.1m 0444 root bin
 f usr/share/man/man1m/mkdevalloc.1m 0444 root bin
@@ -17771,6 +17781,7 @@ f usr/share/man/man4/copyright.4 0444 root bin
 f usr/share/man/man4/core.4 0444 root bin
 f usr/share/man/man4/crypt.conf.4 0444 root bin
 f usr/share/man/man4/crypto_certs.4 0444 root bin
+f usr/share/man/man4/ctf.4 0444 root bin
 f usr/share/man/man4/d_passwd.4 0444 root bin
 f usr/share/man/man4/dacf.conf.4 0444 root bin
 f usr/share/man/man4/dat.conf.4 0444 root bin
@@ -17841,6 +17852,7 @@ f usr/share/man/man4/logadm.conf.4 0444 root bin
 f usr/share/man/man4/logindevperm.4 0444 root bin
 f usr/share/man/man4/loginlog.4 0444 root bin
 f usr/share/man/man4/magic.4 0444 root bin
+f usr/share/man/man4/mailer.conf.4 0444 root bin
 f usr/share/man/man4/md.tab.4 0444 root bin
 f usr/share/man/man4/mddb.cf.4 0444 root bin
 s usr/share/man/man4/mdi_ib_cache.4=devices.4

@@ -59,7 +59,7 @@ CPPFLAGS = 	$(INCPATH) $(ENVDEF) $(SUNENVDEF) $(DBMDEF) $(CPPFLAGS.sm)
 
 FILEMODE= 	2555
 
-ROOTSYMLINKS=	$(ROOTUSRSBIN)/newaliases $(ROOTUSRSBIN)/sendmail
+ROOTSYMLINKS=	$(ROOTLIBSMTPSM)/newaliases
 
 # build rule
 #
@@ -74,10 +74,10 @@ $(PROG):	$(OBJS) $(MAPFILES) \
 	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
 	$(POST_PROCESS)
 
-install:	$(ROOTLIBPROG) $(ROOTSYMLINKS)
+install:	$(ROOTLIBSMTPSM)/sendmail $(ROOTSYMLINKS)
 
 $(ROOTSYMLINKS):
-	$(RM) $@; $(SYMLINK) ../lib/sendmail $@
+	$(RM) $@; $(SYMLINK) sendmail $@
 
 clean:
 	$(RM) $(PROG) $(OBJS)

@@ -122,8 +122,9 @@ fi
 
 if [[ -z $email ]]; then
 	my_id=$(id -un)
-	my_checkhostname=$(check-hostname)
-	my_fqhn=${my_checkhostname##* }
+	my_hostname=$(hostname)
+	possible_fqhns=$(getent hosts $my_hostname | cut -f 2-) 
+	my_fqhn=`for i in $possible_fqhns; do case $i in *.*) echo $i; break;; esac; done` 
 	email="$my_id@$my_fqhn"
 	echo "No e-mail address provided, defaulting to $email"
 fi

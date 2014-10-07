@@ -60,7 +60,6 @@
 	    type='service'>
 		<service_fmri value='svc:/milestone/multi-user:default' />
 		<service_fmri value='svc:/system/fmd:default' />
-		<service_fmri value='svc:/network/sendmail-client:default' />
 	</dependency>
 
 	<exec_method

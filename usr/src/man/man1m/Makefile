@@ -297,6 +297,7 @@ _MANFILES=	6to4relay.1m		\
 		lpusers.1m		\
 		luxadm.1m		\
 		mail.local.1m		\
+		mailwrapper.1m		\
 		makedbm.1m		\
 		makemap.1m		\
 		mdmonitord.1m		\

@@ -231,7 +231,5 @@ link path=opt/onbld/lib/python target=python2.6
 link path=opt/onbld/man/man1/git-nits.1 target=git-pbchk.1
 # webrev(1) requires ps2pdf
 depend fmri=print/filter/ghostscript type=require
-# hgsetup(1) uses check-hostname(1) and nightly sendmail(1M)
-depend fmri=service/network/smtp/sendmail type=require
 # nightly(1) uses wget
 depend fmri=web/wget type=require

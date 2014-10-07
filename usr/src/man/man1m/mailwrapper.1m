@@ -1,0 +1,130 @@
+.\"	$OpenBSD: mailwrapper.8,v 1.10 2009/02/07 16:58:23 martynas Exp $
+.\"	$NetBSD: mailwrapper.8,v 1.11 2002/02/08 01:38:50 ross Exp $
+.\" $FreeBSD: releng/9.1/usr.sbin/mailwrapper/mailwrapper.8 205938 2010-03-30 21:54:25Z delphij $
+.\"
+.\" Copyright (c) 1998
+.\" 	Perry E. Metzger.  All rights reserved.
+.\"
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that the following conditions
+.\" are met:
+.\" 1. Redistributions of source code must retain the above copyright
+.\"    notice, this list of conditions and the following disclaimer.
+.\" 2. Redistributions in binary form must reproduce the above copyright
+.\"    notice, this list of conditions and the following disclaimer in the
+.\"    documentation and/or other materials provided with the distribution.
+.\" 3. All advertising materials mentioning features or use of this software
+.\"    must display the following acknowledgment:
+.\"	This product includes software developed for the NetBSD Project
+.\"	by Perry E. Metzger.
+.\" 4. The name of the author may not be used to endorse or promote products
+.\"    derived from this software without specific prior written permission.
+.\"
+.\" THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
+.\" IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+.\" OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+.\" IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
+.\" INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+.\" NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+.\" DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+.\" THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+.\" (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+.\" THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+.\"
+.Dd August 7, 2006
+.Dt MAILWRAPPER 1M
+.Os
+.Sh NAME
+.Nm \fB/usr/lib/mailwrapper\fR
+.Nd invoke appropriate MTA software based on configuration file
+.Sh SYNOPSIS
+Special.
+See below.
+.Sh DESCRIPTION
+At one time, the only Mail Transfer Agent (MTA) software easily available
+was
+.Xr sendmail 1M .
+As a result of this, most Mail User Agents (MUAs) such as
+.Xr mail 1
+had the path and calling conventions expected by
+.Xr sendmail 1M
+compiled in.
+.Pp
+Times have changed, however.
+On a modern
+.Ux
+system, the administrator may wish to use one of several
+available MTAs.
+.Pp
+It would be difficult to modify all MUA software typically available
+on a system, so most of the authors of alternative MTAs have written
+their front end message submission programs so that they use the same
+calling conventions as
+.Xr sendmail 1M
+and may be put into place instead of
+.Xr sendmail 1M
+in
+.Pa /usr/lib/sendmail .
+.Pp
+.Xr sendmail 1M
+also typically has aliases named
+.Xr mailq 1
+and
+.Xr newaliases 1M
+linked to it.
+The program knows to behave differently when its
+.Va argv[0]
+is
+.Dq mailq
+or
+.Dq newaliases
+and behaves appropriately.
+Typically, replacement MTAs provide similar
+functionality, either through a program that also switches behavior
+based on calling name, or through a set of programs that provide
+similar functionality.
+.Pp
+Although having drop-in replacements for
+.Xr sendmail 1M
+helps in installing alternative MTAs, it essentially makes the
+configuration of the system depend on hand installing new programs in
+.Pa /usr .
+This leads to configuration problems for many administrators, since
+they may wish to install a new MTA without altering the system
+provided
+.Pa /usr .
+(This may be, for example, to avoid having upgrade problems when a new
+version of the system is installed over the old.)
+They may also have a shared
+.Pa /usr
+among several
+machines, and may wish to avoid placing implicit configuration
+information in a read-only
+.Pa /usr .
+.Pp
+The
+.Nm
+utility is designed to replace
+.Pa /usr/lib/sendmail
+and to invoke an appropriate MTA instead of
+.Xr sendmail 1M
+based on configuration information placed in
+.Pa /etc/mailer.conf .
+This permits the administrator to configure which MTA is to be invoked on
+the system at run time.
+.Pp
+Other configuration files may need to be altered when replacing
+.Xr sendmail 1M .
+.Sh EXIT STATUS
+.Ex -std
+.Sh DIAGNOSTICS
+The
+.Nm
+will print a diagnostic if its configuration file is missing or malformed,
+or does not contain a mapping for the name under which it was invoked.
+.Sh SEE ALSO
+.Xr mail 1 ,
+.Xr mailq 1 ,
+.Xr newaliases 1M ,
+.Xr mailer.conf 4 ,
+.Xr sendmail 1M
