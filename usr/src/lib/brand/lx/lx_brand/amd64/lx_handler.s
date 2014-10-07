@@ -335,9 +335,6 @@ lx_sigreturn_tolibc(uintptr_t sp)
 	SET_SIZE(lx_sigdeliver)
 
 	/*
-	 * For the 64-bit case, since %gs is 0 for both Illumos and Linux, we
-	 * overload %gs to pass the current syscall mode flag out of the kernel.
-	 *
 	 * The libc routine that calls user signal handlers ends with a
 	 * setcontext, so we would never return here even if we used a call
 	 * rather than a jmp. However, we'll let the emulation unwind the stack
@@ -355,31 +352,7 @@ lx_sigreturn_tolibc(uintptr_t sp)
 	 * lx_sigacthandler(int sig, siginfo_t *s, void *p)
 	 */
 	ENTRY_NP(lx_sigacthandler)
-	pushq	%rbp
-	movq	%rsp, %rbp
-	subq	$0x20,%rsp
-
-	movq	%rdi,-0x8(%rbp)			/* save parameters */
-	movq	%rsi,-0x10(%rbp)
-	movq	%rdx,-0x18(%rbp)
-
-	movq	$0, %rdi			/* setup to pass %gs */
-	movw	%gs, %di			/* value as parameter */
-
-	movq    lx_sigsavegs@GOTPCREL(%rip), %rax
-        call    *%rax                           /* save mode flag from %gs */
-
-	movq	$0, %rdi
-	movw	%di, %gs			/* now clear %gs */
-
-	movq	-0x18(%rbp),%rdx		/* restore parameters */
-	movq	-0x10(%rbp),%rsi
-	movq	-0x8(%rbp),%rdi
-
 	movq    libc_sigacthandler@GOTPCREL(%rip), %rax 
-	addq	$0x20,%rsp
-	popq	%rbp				/* restore %rbp */
-
 	jmp     *(%rax)				/* jmp to libc's interposer */
 	SET_SIZE(lx_sigacthandler)
 

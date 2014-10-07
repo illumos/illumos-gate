@@ -92,12 +92,16 @@ static int lx_setcontext(const ucontext_t *ucp);
  * such as libc's sigacthandler(), that code would experience a segmentation
  * fault the first time it tried to dereference a memory location using %gs.
  *
- * For 64-bit code the %gs should be 0 for both native and Linux code, so we
- * overload %gs as a mechanism to pass the syscall mode flag out from the
- * kernel back to the emulation so we can save/restore the flag at the end of
- * the signal handling. The flag is saved/restored from the per-thread
- * lxtsd_scms variable which is used like a stack to push/pop the flag bit as
- * we take signals and return.
+ * For 64-bit code the %gs is usually 0 for both native and Linux code and the
+ * thread pointer for both Illumos and Linux libc is referenced off the %fsbase
+ * register, as per the AMD64 ABI. When a thread receives a signal, it may be
+ * running with the Linux value in the x86 %fsbase register as opposed to the
+ * value Illumos libc expects. Switching the %fsbase value is handled in the
+ * kernel module at the same time as we switch the syscall mode flag. We track
+ * the syscall mode flag in the kernel using the per-lwp br_scms integer so we
+ * can save/restore the correct mode at the end of the signal handling. The
+ * flag value is saved/restored in the per-thread br_scms variable which is
+ * used like a stack to push/pop the flag bit as we take signals and return.
  *
  * Second, the signal number translation referenced above must take place.
  * Further, for 32-bit code, as was the case with Illumos libc, before the
@@ -128,9 +132,8 @@ static int lx_setcontext(const ucontext_t *ucp);
  * 	lx_sigacthandler
  *	================
  *	This routine is responsible for setting the %gs segment register to the
- *	value 32-bit Illumos code expects or saving the syscall mode flag for
- *	64-bit code, and jumping to Illumos' libc signal interposition handler,
- *	sigacthandler().
+ *	value 32-bit Illumos code expects (it does nothing in 64-bit code) and
+ *	jumping to Illumos' libc signal interposition handler, sigacthandler().
  *
  * 	lx_call_user_handler
  *	====================
@@ -1225,18 +1228,7 @@ lx_rt_sigreturn(void)
 static int
 lx_setcontext(const ucontext_t *ucp)
 {
-	lx_tsd_t *lx_tsd;
-	int err, sysc_mode;
-
-	if ((err = thr_getspecific(lx_tsd_key, (void **)&lx_tsd)) != 0)
-		lx_err_fatal("lx_rt_sigreturn: unable to read "
-		    "thread-specific data: %s", strerror(err));
-
-	sysc_mode = lx_tsd->lxtsd_scms & 0x1;
-	/* "pop" this value from the "stack" */
-	lx_tsd->lxtsd_scms >>= 1;
-
-	return (syscall(SYS_brand, B_SIGNAL_RETURN, sysc_mode, ucp));
+	return (syscall(SYS_brand, B_SIGNAL_RETURN, ucp));
 }
 #endif
 
@@ -1848,22 +1840,19 @@ lx_tgkill(uintptr_t tgid, uintptr_t pid, uintptr_t sig)
 	return (lx_tkill(pid, sig, NULL, NULL, NULL, NULL));
 }
 
+#if defined(_ILP32)
 /*
- * For 32-bit code this C routine saves the passed %gs value into the
- * thread-specific save area.
+ * This is only used in 32-bit code and is called by the assembly routine
+ * lx_sigacthandler.
  *
- * For 64-bit code we pass back the syscall mode flag in %gs.
- *
- * This is called by the assembly routine lx_sigacthandler.
+ * This C routine saves the passed %gs value into the thread-specific save area.
  */
 void
 lx_sigsavegs(uintptr_t signalled_gs)
 {
 	lx_tsd_t *lx_tsd;
 	int err;
-	int save_gs = 1;
 
-#if defined(_ILP32)
 	signalled_gs &= 0xffff;		/* gs is only 16 bits */
 
 	/*
@@ -1886,11 +1875,7 @@ lx_sigsavegs(uintptr_t signalled_gs)
 	 */
 	assert(signalled_gs != 0);
 
-	if (signalled_gs == LWPGS_SEL)
-		save_gs = 0;
-#endif
-
-	if (save_gs == 1) {
+	if (signalled_gs != LWPGS_SEL) {
 		if ((err = thr_getspecific(lx_tsd_key,
 		    (void **)&lx_tsd)) != 0)
 			lx_err_fatal("sigsavegs: unable to read "
@@ -1898,19 +1883,12 @@ lx_sigsavegs(uintptr_t signalled_gs)
 
 		assert(lx_tsd != 0);
 
-#if defined(_LP64)
-		/* We "push" the current syscall mode flag on the "stack". */
-		signalled_gs &= 0x1;		/* 1-bit flag */
-		lx_tsd->lxtsd_scms = (lx_tsd->lxtsd_scms << 1) | signalled_gs;
-
-#else
 		lx_tsd->lxtsd_gs = signalled_gs;
-#endif
-
 		lx_debug("lx_sigsavegs(): gsp 0x%p, saved gs: 0x%x\n",
 		    lx_tsd, signalled_gs);
 	}
 }
+#endif
 
 int
 lx_siginit(void)

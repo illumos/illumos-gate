@@ -283,6 +283,12 @@ typedef struct lx_lwp_data {
 			/* descriptors used by libc for TLS */
 	ulong_t	br_lx_fsbase;		/* lx fsbase for 64-bit thread ptr */
 	ulong_t	br_ntv_fsbase;		/* native fsbase 64-bit thread ptr */
+	/*
+	 * 64-bit thread-specific syscall mode state "stack". Bits tracking the
+	 * syscall mode are shifted on/off this int like a stack as we take
+	 * signals and return.
+	 */
+	uint_t	br_scms;
 	pid_t	br_pid;			/* converted pid for this thread */
 	pid_t	br_tgid;		/* thread group ID for this thread */
 	pid_t	br_ppid;		/* parent pid for this thread */

@@ -240,6 +240,7 @@ lx_initlwp(klwp_t *lwp)
 	lwpd->br_set_ctidp = NULL;
 	lwpd->br_signal = 0;
 	lwpd->br_libc_syscall = 1;
+	lwpd->br_scms = 1;
 
 	/*
 	 * lwpd->br_affinitymask was zeroed by kmem_zalloc()

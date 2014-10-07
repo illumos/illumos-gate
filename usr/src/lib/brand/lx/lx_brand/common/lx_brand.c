@@ -923,10 +923,7 @@ lx_init(int argc, char *argv[], char *envp[])
 
 	/* Initialize the thread specific data for this thread. */
 	bzero(&lx_tsd, sizeof (lx_tsd));
-#if defined(_LP64)
-	/* start the syscall mode stack in native mode */
-	lx_tsd.lxtsd_scms = 1;
-#else
+#if defined(_ILP32)
 	/* start with %gs having the native libc value */
 	lx_tsd.lxtsd_gs = LWPGS_SEL;
 #endif
