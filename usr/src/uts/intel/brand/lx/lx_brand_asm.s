@@ -158,7 +158,67 @@ ENTRY(lx_brand_syscall_callback)
 	cmp	$0, %r15			/* native fsbase not saved? */
 	je	3f				/* yes, skip loading */
 
-	/* switch fsbase from Linux value back to native value */
+#ifdef DEBUG
+	/*
+	 * This block is basically similar to a large assert.
+	 *
+	 * In debug code we do some extra validation of the %fsbase register to
+	 * validate that we always have the expected Linux thread pointer and not
+	 * the native value. At this point we know that the lwp brand data should
+	 * contain the Linux %fsbase (from a Linux arch_prctl syscall) since the 
+	 * native %fsbase check above is non-null. We also know that we are
+	 * making a Linux syscall from the other check above. We read the %fsbase
+	 * and compare to the saved Linux %fsbase in the lwp_brand data. If we
+	 * don't have the expected value, we save the incorrect %fsbase value
+	 * into the br_lx_fsbase member for later inspection and change the
+	 * syscall we are making into the Linux pivot_root syscall (an obscure
+	 * syscall which we don't support and which an app in the zone cannot
+	 * use). This allows us to see this error downstream via DTrace and
+	 * see the incorrect %fsbase value we had.
+	 */
+	GET_V(SP_REG, 0, V_LWP, %r15);		/* get lwp pointer */
+	movq	LWP_BRAND(%r15), %r15		/* grab lx lwp data pointer */
+	movq	BR_LX_FSBASE(%r15), %r15	/* grab Linux fsbase */
+
+	subq	$24, %rsp			/* make room for 3 regs */
+	movq	%rax, 0x0(%rsp)			/* save regs used by wrmsr */
+	movq	%rcx, 0x8(%rsp)
+	movq	%rdx, 0x10(%rsp)
+
+	movl	$MSR_AMD_FSBASE, %ecx		/* fsbase msr */
+	rdmsr					/* get fsbase to edx:eax */
+
+	shlq	$32, %rdx			/* fix %edx; %eax lo already ok */
+	or	%rdx, %rax			/* full value in %rax */
+	cmp	%rax, %r15			/* check if is lx fsbase */
+	je	4f				/* match, ok */
+
+	movq	%rsp, %rdx			/* use rdx as temp sp */
+	addq	$24, %rdx			/* fix it back up */
+	GET_V(%rdx, 0, V_LWP, %r15);		/* get lwp pointer */
+	movq	LWP_BRAND(%r15), %r15		/* grab lx lwp data pointer */
+	movq	%rax, BR_LX_FSBASE(%r15)	/* save bad Linux fsbase */
+	movq	$155, %rax			/* fail! use pivot_root syscall */
+	jmp	5f
+
+4:
+	movq	0x0(%rsp), %rax			/* restore %rax */
+5:
+	movq	0x8(%rsp), %rcx			/* restore other regs */
+	movq	0x10(%rsp), %rdx
+	addq	$24, %rsp
+
+	/* reload r15 with the native value */
+	GET_V(SP_REG, 0, V_LWP, %r15);		/* get lwp pointer */
+	movq	LWP_BRAND(%r15), %r15		/* grab lx lwp data pointer */
+	movq	BR_NTV_FSBASE(%r15), %r15	/* grab native fsbase */
+#endif
+
+	/*
+	 * Switch fsbase from Linux value back to native value. Also update pcb
+	 * so that if we service an interrupt we will restore the correct fsbase
+	 * in update_sregs().
+	 */
 	subq	$24, %rsp			/* make room for 3 regs */
 	movq	%rax, 0x0(%rsp)			/* save regs used by wrmsr */
 	movq	%rcx, 0x8(%rsp)
@@ -168,6 +228,10 @@ ENTRY(lx_brand_syscall_callback)
 	shrq	$32, %rdx			/* fix %edx; %eax already ok */
 	movl	$MSR_AMD_FSBASE, %ecx		/* fsbase msr */
 	wrmsr					/* set fsbase from edx:eax */
+	movq	%rsp, %rdx			/* use rdx as temp sp */
+	addq	$24, %rdx			/* fix it back up */
+	GET_V(%rdx, 0, V_LWP, %r15);		/* get lwp pointer */
+	movq	%rax, LWP_PCB_FSBASE(%r15)	/* save native fsbase in pcb */
 	movq	0x0(%rsp), %rax			/* restore regs */
 	movq	0x8(%rsp), %rcx
 	movq	0x10(%rsp), %rdx
