@@ -188,9 +188,9 @@ stol_sparam(int policy, struct sched_param *sp, struct lx_sched_param *lsp)
 		    LX_PRI_MAX) / (smax - smin);
 	}
 
-	lx_debug("stol_sparam: Solaris prio %d = linux prio %d "
-	    "(Solaris range %d,%d)\n", sp->sched_priority, ls.lx_sched_prio,
-	    smin, smax);
+	lx_debug("stol_sparam: policy %d: Solaris prio %d = linux prio %d "
+	    "(Solaris range %d,%d)\n", policy,
+	    sp->sched_priority, ls.lx_sched_prio, smin, smax);
 
 	return ((uucopy(&ls, lsp, sizeof (struct lx_sched_param)) != 0)
 	    ? -errno : 0);
@@ -373,6 +373,13 @@ lx_sched_getparam(uintptr_t pid, uintptr_t param)
 			return (-errno);
 	}
 
+	/*
+	 * Make sure that any non-SCHED_FIFO non-SCHED_RR scheduler is mapped
+	 * onto SCHED_OTHER.
+	 */
+	if (policy != SCHED_FIFO && policy != SCHED_RR)
+		policy = SCHED_OTHER;
+
 	return (stol_sparam(policy, &sp, (struct lx_sched_param *)param));
 }
 
@@ -520,11 +527,19 @@ lx_sched_setscheduler(uintptr_t pid, uintptr_t policy, uintptr_t param)
 	if (uucopy((void *)param, &lp, sizeof (lp)) != 0)
 		return (-errno);
 
-	/*
-	 * In Linux, the only valid SCHED_OTHER scheduler priority is 0
-	 */
-	if ((rt_pol == LX_SCHED_OTHER) && (lp.lx_sched_prio != 0))
-		return (-EINVAL);
+	if (rt_pol == LX_SCHED_OTHER) {
+		/*
+		 * In Linux, the only valid SCHED_OTHER scheduler priority is 0
+		 */
+		if (lp.lx_sched_prio != 0)
+			return (-EINVAL);
+
+		/*
+		 * If we're already SCHED_OTHER, there's nothing else to do.
+		 */
+		if (lx_sched_getscheduler(pid) == LX_SCHED_OTHER)
+			return (0);
+	}
 
 	if (lx_lpid_to_spair((pid_t)pid, &s_pid, &s_tid) < 0)
 		return (-ESRCH);
@@ -548,7 +563,7 @@ lx_sched_setscheduler(uintptr_t pid, uintptr_t policy, uintptr_t param)
 		struct sched_param param;
 		int pol;
 
-		if ((pol = sched_getscheduler(s_pid)) != 0)
+		if ((pol = sched_getscheduler(s_pid)) == -1)
 			return (-errno);
 
 		/*
