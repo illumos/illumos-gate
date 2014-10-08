@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2014 by Delphix. All rights reserved.
  */
 
 #include <sys/conf.h>
@@ -402,7 +403,7 @@ sbd_zvol_copy_read(sbd_lu_t *sl, uio_t *uio)
 
 	rl = zfs_range_lock(sl->sl_zvol_rl_hdl, offset, len, RL_READER);
 
-	error =  dmu_read_uio(sl->sl_zvol_objset_hdl, ZVOL_OBJ, uio, len);
+	error = dmu_read_uio_dbuf(sl->sl_zvol_bonus_hdl, uio, len);
 
 	zfs_range_unlock(rl);
 	if (error == ECKSUM)
@@ -441,11 +442,7 @@ sbd_zvol_copy_write(sbd_lu_t *sl, uio_t *uio, int flags)
 	if (error) {
 		dmu_tx_abort(tx);
 	} else {
-		/*
-		 * XXX use the new bonus handle entry.
-		 */
-		error = dmu_write_uio(sl->sl_zvol_objset_hdl, ZVOL_OBJ,
-		    uio, len, tx);
+		error = dmu_write_uio_dbuf(sl->sl_zvol_bonus_hdl, uio, len, tx);
 		if (error == 0) {
 			zvol_log_write_minor(sl->sl_zvol_minor_hdl, tx, offset,
 			    (ssize_t)len, sync);
