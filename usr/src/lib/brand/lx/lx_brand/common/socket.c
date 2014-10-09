@@ -54,16 +54,21 @@
 #include <sys/lx_misc.h>
 
 /*
- * This string is used to prefix all abstract namespace unix sockets, ie all
+ * This string is used to prefix all abstract namespace Unix sockets, ie all
  * abstract namespace sockets are converted to regular sockets in the /tmp
  * directory with .ABSK_ prefixed to their names.
  */
 #define	ABST_PRFX "/tmp/.ABSK_"
 #define	ABST_PRFX_LEN 11
 
+#define	LX_DEV_LOG			"/dev/log"
+#define	LX_DEV_LOG_REDIRECT		"/var/run/.dev_log_redirect"
+#define	LX_DEV_LOG_REDIRECT_LEN		18
+
 typedef enum {
 	lxa_none,
-	lxa_abstract
+	lxa_abstract,
+	lxa_devlog
 } lx_addr_type_t;
 
 #ifdef __i386
@@ -476,46 +481,51 @@ convert_cmsgs(int direction, struct lx_msghdr *msg, char *caller)
  * We may need a different size socket address vs. the one passed in.
  */
 static int
-calc_addr_size(struct sockaddr *a, int in_len, lx_addr_type_t *type)
+calc_addr_size(struct sockaddr *a, int nlen, lx_addr_type_t *type)
 {
 	struct sockaddr name;
-	boolean_t abst_sock;
-	int nlen;
+	boolean_t abst_socko;
+	size_t fsize = sizeof (name.sa_family);
 
 	if (uucopy(a, &name, sizeof (struct sockaddr)) != 0)
 		return (-errno);
 
-	/*
-	 * Handle Linux abstract sockets, which are UNIX sockets whose path
-	 * begins with a NULL character.
-	 */
-	abst_sock = (name.sa_family == AF_UNIX) && (name.sa_data[0] == '\0');
-
-	/*
-	 * Convert_sockaddr will expand the socket path if it is abstract, so
-	 * we need to allocate extra memory for it.
-	 */
-
-	nlen = in_len;
-	if (abst_sock) {
-		nlen += ABST_PRFX_LEN;
-		*type = lxa_abstract;
-	} else {
+	if (name.sa_family != AF_UNIX) {
 		*type = lxa_none;
+		return (nlen);
 	}
 
+	/*
+	 * Handle Linux abstract sockets, which are Unix sockets whose path
+	 * begins with a NULL character.
+	 */
+	if (name.sa_data[0] == '\0') {
+		*type = lxa_abstract;
+		return (nlen + ABST_PRFX_LEN);
+	}
+
+	/*
+	 * For /dev/log, we need to create the Unix domain socket away from
+	 * the (unwritable) /dev.
+	 */
+	if (strncmp(name.sa_data, LX_DEV_LOG, nlen - fsize) == 0) {
+		*type = lxa_devlog;
+		return (nlen + LX_DEV_LOG_REDIRECT_LEN);
+	}
+
+	*type = lxa_none;
 	return (nlen);
 }
 
 /*
- * If inaddr is an abstract namespace unix socket, this function expects addr
+ * If inaddr is an abstract namespace Unix socket, this function expects addr
  * to have enough memory to hold the expanded socket name, ie it must be of
  * size *len + ABST_PRFX_LEN. If inaddr is a netlink socket then we expect
- * addr to have enough memory to hold an UNIX socket address.
+ * addr to have enough memory to hold an Unix socket address.
  */
 static int
 convert_sockaddr(struct sockaddr *addr, socklen_t *len,
-	struct sockaddr *inaddr, socklen_t inlen)
+	struct sockaddr *inaddr, socklen_t inlen, lx_addr_type_t type)
 {
 	sa_family_t family;
 	int lx_in6_len;
@@ -574,7 +584,20 @@ convert_sockaddr(struct sockaddr *addr, socklen_t *len,
 			*len = inlen;
 
 			/*
-			 * Linux supports abstract unix sockets, which are
+			 * In order to support /dev/log -- a Unix domain socket
+			 * used for logging that has had its path hard-coded
+			 * far and wide -- we need to relocate the socket
+			 * into a writable filesystem.  This also necessitates
+			 * some cleanup in bind(); see lx_bind() for details.
+			 */
+			if (type == lxa_devlog) {
+				*len = inlen + LX_DEV_LOG_REDIRECT_LEN;
+				strcpy(addr->sa_data, LX_DEV_LOG_REDIRECT);
+				break;
+			}
+
+			/*
+			 * Linux supports abstract Unix sockets, which are
 			 * simply sockets that do not exist on the file system.
 			 * These sockets are denoted by beginning the path with
 			 * a NULL character. To support these, we strip out the
@@ -583,8 +606,7 @@ convert_sockaddr(struct sockaddr *addr, socklen_t *len,
 			 * ABST_PRFX and replacing all illegal characters with
 			 * '_'.
 			 */
-			if (addr->sa_data[0] == '\0') {
-
+			if (type == lxa_abstract) {
 				/*
 				 * inlen is the entire size of the sockaddr_un
 				 * data structure, including the sun_family, so
@@ -832,30 +854,37 @@ lx_bind(int sockfd, void *np, int nl)
 	lx_addr_type_t type;
 	struct stat sb;
 
-	if ((nlen = calc_addr_size((struct sockaddr *)np, nl, &type)) < 0)
+	if ((nlen = calc_addr_size(np, nl, &type)) < 0)
 		return (nlen);
 
 	if ((name = SAFE_ALLOCA(nlen)) == NULL)
 		return (-EINVAL);
 
-	if ((r = convert_sockaddr(name, &len, (struct sockaddr *)np, nl)) < 0)
+	if ((r = convert_sockaddr(name, &len, np, nl, type)) < 0)
 		return (r);
 
 	/*
-	 * Linux abstract namespace unix sockets are simply socket that do not
-	 * exist on the filesystem. We emulate them by changing their paths
-	 * in convert_sockaddr so that they point real files names on the
-	 * filesystem. Because in Linux they do not exist on the filesystem
-	 * applications do not have to worry about deleting files, however in
-	 * our filesystem based emulation we do. To solve this problem, we first
-	 * check to see if the socket already exists before we create one. If it
-	 * does we attempt to connect to it to see if it is in use, or just
-	 * left over from a previous lx_bind call. If we are unable to connect,
-	 * we assume it is not in use and remove the file, then continue on
-	 * as if the file never existed.
+	 * There are two types of Unix domain sockets for which we need to
+	 * do some special handling with respect to bind:  abstract namespace
+	 * sockets and /dev/log.  Abstract namespace sockets are simply Unix
+	 * domain sockets that do not exist on the filesystem; we emulate them
+	 * by changing their paths in convert_sockaddr() to point to real
+	 * file names in the  filesystem.  /dev/log is a special Unix domain
+	 * socket that is used for system logging.  On us, /dev isn't writable,
+	 * so we rewrite these sockets in convert_sockaddr() to point to a
+	 * writable file (defined by LX_DEV_LOG_REDIRECT).  In both cases, we
+	 * introduce a new problem with respect to cleanup:  abstract namespace
+	 * sockets don't need to be cleaned up (when they are closed they are
+	 * removed) and /dev/log can't be cleaned up because it's in the
+	 * non-writable /dev.  We solve these problems by cleaning up here in
+	 * lx_bind():  before we create the socket, we check to see if it
+	 * exists.  If it does, we attempt to connect to it to see if it is in
+	 * use, or just left over from a previous lx_bind() call. If we are
+	 * unable to connect, we assume it is not in use and remove the file,
+	 * then continue on as if the file never existed.
 	 */
-	if (type == lxa_abstract && stat(name->sa_data, &sb) == 0 &&
-	    S_ISSOCK(sb.st_mode)) {
+	if ((type == lxa_abstract || type == lxa_devlog) &&
+	    stat(name->sa_data, &sb) == 0 && S_ISSOCK(sb.st_mode)) {
 		if ((r2 = socket(AF_UNIX, SOCK_STREAM, 0)) < 0)
 			return (-ENOSR);
 		ret = connect(r2, name, len);
@@ -885,7 +914,7 @@ lx_bind(int sockfd, void *np, int nl)
 	r = bind(sockfd, name, len);
 
 	/*
-	 * Linux returns EADDRINUSE for attempts to bind to UNIX domain
+	 * Linux returns EADDRINUSE for attempts to bind to Unix domain
 	 * sockets that aren't sockets.
 	 */
 	if ((r < 0) && (errno == EINVAL) && (name->sa_family == AF_UNIX) &&
@@ -905,13 +934,13 @@ lx_connect(int sockfd, void *np, int nl)
 	int nlen;
 	lx_addr_type_t type;
 
-	if ((nlen = calc_addr_size((struct sockaddr *)np, nl, &type)) < 0)
+	if ((nlen = calc_addr_size(np, nl, &type)) < 0)
 		return (nlen);
 
 	if ((name = SAFE_ALLOCA(nlen)) == NULL)
 		return (-EINVAL);
 
-	if ((r = convert_sockaddr(name, &len, (struct sockaddr *)np, nl)) < 0)
+	if ((r = convert_sockaddr(name, &len, np, nl, type)) < 0)
 		return (r);
 
 	lx_debug("\tconnect(%d, 0x%p, %d)", sockfd, name, len);
@@ -1114,15 +1143,13 @@ lx_sendto(int sockfd, void *buf, size_t len, int flags, void *lto, int tolen)
 		if (tolen < 0)
 			return (-EINVAL);
 
-		if ((nlen = calc_addr_size((struct sockaddr *)lto, tolen,
-		    &type)) < 0)
+		if ((nlen = calc_addr_size(lto, tolen, &type)) < 0)
 			return (nlen);
 
 		if ((to = SAFE_ALLOCA(nlen)) == NULL)
 			return (-EINVAL);
 
-		if ((r = convert_sockaddr(to, &tlen, (struct sockaddr *)lto,
-		    tlen)) < 0)
+		if ((r = convert_sockaddr(to, &tlen, lto, tlen, type)) < 0)
 			return (r);
 	}
 
