@@ -25,7 +25,7 @@
  */
 
 /*
- * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -51,6 +51,7 @@
 #include <libctf.h>
 #include <errno.h>
 #include <kvm.h>
+#include <zone.h>
 
 #include <mdb/mdb_lex.h>
 #include <mdb/mdb_debug.h>
@@ -797,9 +798,15 @@ main(int argc, char *argv[], char *envp[])
 		if (strchr(pidarg, '/') != NULL)
 			(void) mdb_iob_snprintf(object, MAXPATHLEN,
 			    "%s/object/a.out", pidarg);
-		else
+		else {
+			const char *root;
+
 			(void) mdb_iob_snprintf(object, MAXPATHLEN,
-			    "/proc/%s/object/a.out", pidarg);
+			    "%s/proc/%s/object/a.out",
+			    (root = zone_get_nroot()) != NULL ? root : "",
+			    pidarg);
+		}
+
 		tgt_argv[tgt_argc++] = object;
 		tgt_argv[tgt_argc++] = pidarg;
 	}
