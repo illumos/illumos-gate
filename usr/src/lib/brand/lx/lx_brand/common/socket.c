@@ -484,7 +484,6 @@ static int
 calc_addr_size(struct sockaddr *a, int nlen, lx_addr_type_t *type)
 {
 	struct sockaddr name;
-	boolean_t abst_socko;
 	size_t fsize = sizeof (name.sa_family);
 
 	if (uucopy(a, &name, sizeof (struct sockaddr)) != 0)
