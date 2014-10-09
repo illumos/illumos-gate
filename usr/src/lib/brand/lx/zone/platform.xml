@@ -60,6 +60,7 @@
 	<mount special="swap" directory="/native/tmp" type="tmpfs" />
 	<mount special="objfs" directory="/system/object" type="objfs" />
 	<mount special="ctfs" directory="/system/contract" type="ctfs" />
+	<mount special="mnttab" directory="/etc/mnttab" type="mntfs" />
 
 	<!-- Devices to create under /dev -->
 	<device match="arp" />
