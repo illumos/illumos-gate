@@ -673,8 +673,8 @@ inotify_watch_remove(inotify_state_t *state, inotify_watch_t *watch)
 		 * If this child watch has been orphaned, remove it from the
 		 * state's list of orphans.
 		 */
-		if (watch->inw_orphaned)
-			list_remove(&state->ins_orphans, watch);
+		if (child->inw_orphaned)
+			list_remove(&state->ins_orphans, child);
 
 		VN_RELE(child->inw_vp);
 
