@@ -112,6 +112,7 @@ static lx_ike_t lx_ike_ent[] =
 	LX_CL("pipe2",			lx_pipe2,		2),
 	LX_CL("rt_tgsigqueueinfo",	lx_rt_tgsigqueueinfo,	4),
 	LX_CL("arch_prctl",		lx_arch_prctl,		2),
+	LX_CL("tgkill",			lx_tgkill,		3),
 };
 
 int64_t

@@ -67,8 +67,8 @@ init_sig_check(int sig, pid_t pid)
 	return (rv);
 }
 
-long
-lx_tkill(pid_t pid, int lx_sig)
+static long
+lx_thrkill(pid_t tgid, pid_t pid, int lx_sig, boolean_t tgkill)
 {
 	kthread_t *t;
 	proc_t *pp;
@@ -100,6 +100,9 @@ lx_tkill(pid_t pid, int lx_sig)
 	if ((pid == initpid) && ((rv = init_sig_check(sig, pid)) != 0))
 		return (set_errno(rv));
 	else if (lx_lpid_to_spair(pid, &pid, &tid) < 0)
+		return (set_errno(ESRCH));
+
+	if (tgkill && tgid != pid)
 		return (set_errno(ESRCH));
 
 	sqp = kmem_zalloc(sizeof (sigqueue_t), KM_SLEEP);
@@ -160,6 +163,18 @@ lx_tkill(pid_t pid, int lx_sig)
 free_and_exit:
 	kmem_free(sqp, sizeof (sigqueue_t));
 	return (rv);
+}
+
+long
+lx_tgkill(pid_t tgid, pid_t pid, int lx_sig)
+{
+	return (lx_thrkill(tgid, pid, lx_sig, B_TRUE));
+}
+
+long
+lx_tkill(pid_t pid, int lx_sig)
+{
+	return (lx_thrkill(0, pid, lx_sig, B_FALSE));
 }
 
 long
