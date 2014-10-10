@@ -254,7 +254,8 @@ extern long lx_futex(uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t,
 
 extern long lx_tkill(uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t,
     uintptr_t);
-extern long lx_tgkill(uintptr_t, uintptr_t, uintptr_t);
+extern long lx_tgkill(uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t,
+    uintptr_t);
 
 extern long lx_sethostname(uintptr_t, uintptr_t);
 extern long lx_setdomainname(uintptr_t, uintptr_t);
@@ -371,7 +372,8 @@ extern long lx_yield(void);
 #define	LX_EMUL_set_tid_address		23
 #define	LX_EMUL_pipe2			24
 #define	LX_EMUL_rt_tgsigqueueinfo	25
-#define	LX_EMUL_arch_prctl		LX_N_IKE_FUNCS
+#define	LX_EMUL_arch_prctl		26
+#define	LX_EMUL_tgkill			LX_N_IKE_FUNCS
 
 /* Note: adjust LX_N_IKE_FUNCS when adding new in-kernel functions */
 

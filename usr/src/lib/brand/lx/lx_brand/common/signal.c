@@ -1822,24 +1822,6 @@ lx_signal(uintptr_t lx_sig, uintptr_t handler)
 }
 #endif
 
-long
-lx_tgkill(uintptr_t tgid, uintptr_t pid, uintptr_t sig)
-{
-	if (((pid_t)tgid <= 0) || ((pid_t)pid <= 0))
-		return (-EINVAL);
-
-	if (tgid != pid) {
-		lx_unsupported("tgkill does not support gid != pid");
-		return (-ENOTSUP);
-	}
-
-	/*
-	 * Pad the lx_tkill() call with NULLs to match the IN_KERNEL_SYSCALL
-	 * prototype generated for it by IN_KERNEL_SYSCALL in lx_brand.c.
-	 */
-	return (lx_tkill(pid, sig, NULL, NULL, NULL, NULL));
-}
-
 #if defined(_ILP32)
 /*
  * This is only used in 32-bit code and is called by the assembly routine
