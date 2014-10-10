@@ -23,6 +23,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright (c) 2014 Joyent, Inc.  All rights reserved.
+ */
+
 #include	<stdlib.h>
 #include	<stdio.h>
 #include	<proc_service.h>
@@ -36,6 +40,14 @@
 #include	<limits.h>
 #include	<string.h>
 #include	<sys/param.h>
+
+/*
+ * We want to include zone.h to pull in the prototype for zone_get_nroot(),
+ * but we need to avoid pulling in <sys/stream.h>, which has a definition
+ * of M_DATA that conflicts with the ELF-related definition in machdep_*.h.
+ */
+#define		_SYS_STREAM_H
+#include	<zone.h>
 
 /*
  * 64-bit builds are going to compile this module twice, the
@@ -283,26 +295,32 @@ _rd_reset32(struct rd_agent *rap)
 	 * If we are debugging a branded executable, load the appropriate
 	 * helper library, and call its initialization routine.  Being unable
 	 * to load the helper library is not a critical error.  (Hopefully
-	 * we'll still be able to access some objects in the target.)
+	 * we'll still be able to access some objects in the target.)  Note
+	 * that we pull in the native root here to allow for helper libraries
+	 * to be properly found from within the branded zone.
 	 */
 	ps_pbrandname = (ps_pbrandname_fp_t)dlsym(RTLD_PROBE, "ps_pbrandname");
 	while ((ps_pbrandname != NULL) &&
 	    (ps_pbrandname(php, brandname, MAXPATHLEN) == PS_OK)) {
 		const char *isa = "";
+		const char *nroot = zone_get_nroot();
 
 #ifdef _LP64
 		isa = MSG_ORIG(MSG_DB_64BIT_PREFIX);
 #endif /* _LP64 */
 
+		if (nroot == NULL)
+			nroot = "";
+
 		if (rtld_db_helper_path[0] != '\0')
 			(void) snprintf(brandlib, MAXPATHLEN,
 			    MSG_ORIG(MSG_DB_BRAND_HELPERPATH_PREFIX),
-			    rtld_db_helper_path,
+			    nroot, rtld_db_helper_path,
 			    MSG_ORIG(MSG_DB_HELPER_PREFIX), brandname, isa,
 			    brandname);
 		else
 			(void) snprintf(brandlib, MAXPATHLEN,
-			    MSG_ORIG(MSG_DB_BRAND_HELPERPATH),
+			    MSG_ORIG(MSG_DB_BRAND_HELPERPATH), nroot,
 			    MSG_ORIG(MSG_DB_HELPER_PREFIX), brandname, isa,
 			    brandname);
 
