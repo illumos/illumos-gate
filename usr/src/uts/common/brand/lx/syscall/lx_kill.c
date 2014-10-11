@@ -153,6 +153,7 @@ lx_thrkill(pid_t tgid, pid_t pid, int lx_sig, boolean_t tgkill)
 	sqp->sq_info.si_signo = sig;
 	sqp->sq_info.si_code = SI_LWP;
 	sqp->sq_info.si_pid = br->br_pid;
+	sqp->sq_info.si_zoneid = getzoneid();
 	sqp->sq_info.si_uid = crgetruid(CRED());
 	sigaddqa(pp, t, sqp);
 
