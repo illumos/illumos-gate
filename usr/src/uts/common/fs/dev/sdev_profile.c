@@ -655,51 +655,83 @@ prof_make_names(struct sdev_node *dir)
 }
 
 /*
+ * Return True if directory cache is out of date and should be updated.
+ */
+static boolean_t
+prof_dev_needupdate(sdev_node_t *ddv)
+{
+	sdev_node_t *gdir = ddv->sdev_origin;
+
+	/*
+	 * Caller can have either reader or writer lock
+	 */
+	ASSERT(RW_LOCK_HELD(&ddv->sdev_contents));
+
+	/*
+	 * We need to rebuild the directory content if
+	 * - ddv is not in a SDEV_ZOMBIE state
+	 * - SDEV_BUILD is set OR
+	 * - The device tree generation number has changed OR
+	 * - The corresponding /dev namespace has been updated
+	 */
+	return ((ddv->sdev_state != SDEV_ZOMBIE) &&
+	    (((ddv->sdev_flags & SDEV_BUILD) != 0) ||
+	    (ddv->sdev_devtree_gen != devtree_gen) ||
+	    ((gdir != NULL) &&
+	    (ddv->sdev_ldir_gen != gdir->sdev_gdir_gen))));
+}
+
+/*
  * Build directory vnodes based on the profile and the global
  * dev instance.
  */
 void
-prof_filldir(struct sdev_node *ddv)
+prof_filldir(sdev_node_t *ddv)
 {
-	int firsttime = 1;
-	struct sdev_node *gdir = ddv->sdev_origin;
+	sdev_node_t *gdir;
 
 	ASSERT(RW_READ_HELD(&ddv->sdev_contents));
 
-	/*
-	 * We need to rebuild the directory content if
-	 * - SDEV_BUILD is set
-	 * - The device tree generation number has changed
-	 * - The corresponding /dev namespace has been updated
-	 */
-check_build:
-	if ((ddv->sdev_flags & SDEV_BUILD) == 0 &&
-	    ddv->sdev_devtree_gen == devtree_gen &&
-	    (gdir == NULL || ddv->sdev_ldir_gen
-	    == gdir->sdev_gdir_gen))
-		return;		/* already up to date */
-
-	/* We may have become a zombie (across a try) */
-	if (ddv->sdev_state == SDEV_ZOMBIE)
+	if (!prof_dev_needupdate(ddv)) {
+		ASSERT(RW_READ_HELD(&ddv->sdev_contents));
 		return;
-
-	if (firsttime && rw_tryupgrade(&ddv->sdev_contents) == 0) {
-		rw_exit(&ddv->sdev_contents);
-		firsttime = 0;
-		rw_enter(&ddv->sdev_contents, RW_WRITER);
-		goto check_build;
 	}
+	/*
+	 * Upgrade to writer lock
+	 */
+	if (rw_tryupgrade(&ddv->sdev_contents) == 0) {
+		/*
+		 * We need to drop the read lock and re-acquire it as a
+		 * write lock. While we do this the condition may change so we
+		 * need to re-check condition
+		 */
+		rw_exit(&ddv->sdev_contents);
+		rw_enter(&ddv->sdev_contents, RW_WRITER);
+		if (!prof_dev_needupdate(ddv)) {
+			/* Downgrade back to the read lock before returning */
+			rw_downgrade(&ddv->sdev_contents);
+			return;
+		}
+	}
+	/* At this point we should have a write lock */
+	ASSERT(RW_WRITE_HELD(&ddv->sdev_contents));
+
 	sdcmn_err10(("devtree_gen (%s): %ld -> %ld\n",
 	    ddv->sdev_path, ddv->sdev_devtree_gen, devtree_gen));
-	if (gdir)
+
+	gdir = ddv->sdev_origin;
+
+	if (gdir != NULL)
 		sdcmn_err10(("sdev_dir_gen (%s): %ld -> %ld\n",
 		    ddv->sdev_path, ddv->sdev_ldir_gen,
 		    gdir->sdev_gdir_gen));
 
 	/* update flags and generation number so next filldir is quick */
-	ddv->sdev_flags &= ~SDEV_BUILD;
+	if ((ddv->sdev_flags & SDEV_BUILD) == SDEV_BUILD) {
+		ddv->sdev_flags &= ~SDEV_BUILD;
+	}
 	ddv->sdev_devtree_gen = devtree_gen;
-	if (gdir)
+	if (gdir != NULL)
 		ddv->sdev_ldir_gen = gdir->sdev_gdir_gen;
 
 	prof_make_symlinks(ddv);
