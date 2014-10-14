@@ -116,10 +116,15 @@ SET_SIZE(lx_brand_int80_disable)
  *
  * %rax - syscall number
  *
- * When called, all general registers, except for %r15, are as they were when
- * the user process made the system call.  %r15 is available to the callback as
- * a scratch register. If the callback returns to the kernel path, %r15 does
- * not have to be restored to the user value.
+ * See uts/i86pc/ml/syscall_asm_amd64.s for what happens before we get into
+ * the following lx brand-specific codepath.
+ *
+ * As the comment on the BRAND_CALLBACK macro describes, when we're called, all
+ * general registers, except for %r15, are as they were when the user process
+ * made the system call.  %r15 is available to the callback as a scratch
+ * register. If the callback returns to the kernel path, %r15 does not have to
+ * be restored to the user value since BRAND_CALLBACK does that. If we jump
+ * out to the emulation we need to restore %r15 here.
  *
  * To 'return' to our user-space handler, we just need to place its address
  * into %rcx. The original return address is passed back in %rax.
@@ -163,18 +168,18 @@ ENTRY(lx_brand_syscall_callback)
 	 * This block is basically similar to a large assert.
 	 *
 	 * In debug code we do some extra validation of the %fsbase register to
-	 * validate that we always have the expected Linux thread pointer and not
-	 * the native value. At this point we know that the lwp brand data should
-	 * contain the Linux %fsbase (from a Linux arch_prctl syscall) since the 
-	 * native %fsbase check above is non-null. We also know that we are
-	 * making a Linux syscall from the other check above. We read the %fsbase
-	 * and compare to the saved Linux %fsbase in the lwp_brand data. If we
-	 * don't have the expected value, we save the incorrect %fsbase value
-	 * into the br_lx_fsbase member for later inspection and change the
-	 * syscall we are making into the Linux pivot_root syscall (an obscure
-	 * syscall which we don't support and which an app in the zone cannot
-	 * use). This allows us to see this error downstream via DTrace and
-	 * see the incorrect %fsbase value we had.
+	 * validate that we always have the expected Linux thread pointer and
+	 * not the native value. At this point we know that the lwp brand data
+	 * should contain the Linux %fsbase (from a Linux arch_prctl syscall)
+	 * since the native %fsbase check above is non-null. We also know that
+	 * we are making a Linux syscall from the other check above. We read
+	 * the %fsbase and compare to the saved Linux %fsbase in the lwp_brand
+	 * data. If we don't have the expected value, we save the incorrect
+	 * %fsbase value into the br_lx_fsbase member for later inspection and
+	 * change the syscall we are making into the Linux pivot_root syscall
+	 * (an obscure syscall which we don't support and which an app in the
+	 * zone cannot use). This allows us to see this error downstream via
+	 * DTrace and see the incorrect %fsbase value we had.
 	 */
 	GET_V(SP_REG, 0, V_LWP, %r15);		/* get lwp pointer */
 	movq	LWP_BRAND(%r15), %r15		/* grab lx lwp data pointer */
@@ -188,7 +193,8 @@ ENTRY(lx_brand_syscall_callback)
 	movl	$MSR_AMD_FSBASE, %ecx		/* fsbase msr */
 	rdmsr					/* get fsbase to edx:eax */
 
-	shlq	$32, %rdx			/* fix %edx; %eax lo already ok */
+	/* fix %edx; %eax lo already ok */
+	shlq	$32, %rdx
 	or	%rdx, %rax			/* full value in %rax */
 	cmp	%rax, %r15			/* check if is lx fsbase */
 	je	4f				/* match, ok */
@@ -198,7 +204,7 @@ ENTRY(lx_brand_syscall_callback)
 	GET_V(%rdx, 0, V_LWP, %r15);		/* get lwp pointer */
 	movq	LWP_BRAND(%r15), %r15		/* grab lx lwp data pointer */
 	movq	%rax, BR_LX_FSBASE(%r15)	/* save bad Linux fsbase */
-	movq	$155, %rax			/* fail! use pivot_root syscall */
+	movq	$155, %rax			/* fail! use pivot_root */
 	jmp	5f
 
 4:
@@ -236,9 +242,12 @@ ENTRY(lx_brand_syscall_callback)
 	movq	0x8(%rsp), %rcx
 	movq	0x10(%rsp), %rdx
 	addq	$24, %rsp
-3:
 
-	/* Linux syscall - validate syscall number */
+3:
+	/*
+	 * Linux syscall - validate syscall number.
+	 * If necessary, the Linux %fsbase has already been loaded above.
+	 */
 	GET_PROCP(SP_REG, 0, %r15)
 	movq	P_ZONE(%r15), %r15		/* grab the zone pointer */
 	/* grab the 'max syscall num' for this process from 'zone brand data' */
@@ -304,7 +313,7 @@ ENTRY(lx_brand_int80_callback)
 
 	cmpl	%ebx, %eax 			/* is 0 <= syscall <= MAX? */
 	jbe	0f				/* yes, syscall is OK */
-	xorl    %eax, %eax		     	/* no, zero syscall number */	
+	xorl	%eax, %eax			/* no, zero syscall number */
 0:
 
 .lx_brand_int80_patch_point:

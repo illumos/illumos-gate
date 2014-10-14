@@ -37,12 +37,12 @@
 #define	JMP	\
 	pushq	$_CONST(. - lx_handler_table); \
 	jmp	lx_handler;	\
-	.align	16;	
+	.align	16;
 
 #define	JMP4	JMP; JMP; JMP; JMP
-#define JMP16	JMP4; JMP4; JMP4; JMP4
-#define JMP64	JMP16; JMP16; JMP16; JMP16
-#define JMP256	JMP64; JMP64; JMP64; JMP64
+#define	JMP16	JMP4; JMP4; JMP4; JMP4
+#define	JMP64	JMP16; JMP16; JMP16; JMP16
+#define	JMP256	JMP64; JMP64; JMP64; JMP64
 
 /*
  * Alternate jump table that turns on lx_traceflag before proceeding with
@@ -51,14 +51,14 @@
 #define	TJMP	\
 	pushq	$_CONST(. - lx_handler_trace_table); \
 	jmp	lx_handler_trace;	\
-	.align	16;	
+	.align	16;
 
 #define	TJMP4	TJMP; TJMP; TJMP; TJMP
-#define TJMP16	TJMP4; TJMP4; TJMP4; TJMP4
-#define TJMP64	TJMP16; TJMP16; TJMP16; TJMP16
-#define TJMP256	TJMP64; TJMP64; TJMP64; TJMP64
+#define	TJMP16	TJMP4; TJMP4; TJMP4; TJMP4
+#define	TJMP64	TJMP16; TJMP16; TJMP16; TJMP16
+#define	TJMP256	TJMP64; TJMP64; TJMP64; TJMP64
 
-	
+
 #if defined(lint)
 
 #include <sys/types.h>
@@ -126,10 +126,12 @@ lx_sigreturn_tolibc(uintptr_t sp)
 	SET_SIZE(lx_handler_table)
 
 	ENTRY_NP(lx_handler_trace)
+	subq	$128, %rsp		/* skip red zone */
 	pushq	%rsi
-	movq    lx_traceflag@GOTPCREL(%rip), %rsi 
+	movq    lx_traceflag@GOTPCREL(%rip), %rsi
 	movq	$1, (%rsi)
 	popq	%rsi
+	addq	$128, %rsp
 	/*
 	 * While we could just fall through to lx_handler(), we "tail-call" it
 	 * instead to make ourselves a little more comprehensible to trace
@@ -139,6 +141,13 @@ lx_sigreturn_tolibc(uintptr_t sp)
 	SET_SIZE(lx_handler_trace)
 
 	ALTENTRY(lx_handler)
+	/*
+	 * We are running on the Linux process's stack here so we have to
+	 * account for the AMD64 ABI red zone of 128 bytes past the %rsp which
+	 * the process can use as scratch space.
+	 */
+	subq	$128, %rsp
+
 	/*
 	 * %rbp isn't always going to be a frame pointer on Linux, but when
 	 * it is, saving it here lets us have a coherent stack backtrace.
@@ -154,13 +163,13 @@ lx_sigreturn_tolibc(uintptr_t sp)
 	 * Save %rbp and then fill it with what would be its usual value as
 	 * the frame pointer. The value we save for %rsp needs to be the
 	 * stack pointer at the time of the syscall so we need to skip the
-	 * saved %rbp and (what will be) the return address.
+	 * red zone, saved %rbp and (what will be) the return address.
 	 */
 	movq	%rbp, LXR_RBP(%rsp)
 	movq	%rsp, %rbp
-	addq	$_CONST(SIZEOF_LX_REGS_T), %rbp
+	addq	$SIZEOF_LX_REGS_T, %rbp
 	movq	%rbp, LXR_RSP(%rsp)
-	addq	$_CONST(_MUL(CPTRSIZE, 2)), LXR_RSP(%rsp)
+	addq	$144, LXR_RSP(%rsp)	/* 128 byte red zone + 2 pointers */
 
 	movq	$0, LXR_GS(%rsp)
 	movw	%gs, LXR_GS(%rsp)
@@ -187,7 +196,7 @@ lx_sigreturn_tolibc(uintptr_t sp)
 	 * value on the stack with the return address, and use the value to
 	 * compute the system call number by dividing by the table entry size.
 	 */
-	xchgq	CPTRSIZE(%rbp), %rax
+	xchgq	136(%rbp), %rax		/* 128 byte red zone + rbp we pushed */
 	shrq	$4, %rax
 	movq	%rax, LXR_RAX(%rsp)
 
@@ -225,10 +234,12 @@ lx_sigreturn_tolibc(uintptr_t sp)
 	movq	LXR_R15(%rsp), %r15
 	movw	LXR_GS(%rsp), %gs
 
-	addq	$SIZEOF_LX_REGS_T, %rsp
+	/* addq	$SIZEOF_LX_REGS_T, %rsp	not needed due to next instr. */
 
 	movq	%rbp, %rsp
 	popq	%rbp
+
+	addq	$128, %rsp		/* red zone */
 	ret
 	SET_SIZE(lx_handler)
 
@@ -236,7 +247,7 @@ lx_sigreturn_tolibc(uintptr_t sp)
 	 * lx_setup_clone(uintptr_t %gs, void *retaddr, void *stack)
 	 * ignore arg0 (%rdi) on 64-bit
 	 * Return to Linux app using arg1 (%rsi) with the Linux stack we got
-	 * in arg2 (%rdx). 
+	 * in arg2 (%rdx).
 	 */
 	ENTRY_NP(lx_setup_clone)
 	xorq	%rbp, %rbp	/* terminating stack */
@@ -281,7 +292,7 @@ lx_sigreturn_tolibc(uintptr_t sp)
 	 * Unlike the 32-bit case, we don't reset %rbp before jumping into the
 	 * Linux handler, since that would mean the handler would clobber our
 	 * data in the stack frame it builds.
-	 * 
+	 *
 	 */
 	ENTRY_NP(lx_sigdeliver)
 	pushq   %rbp
@@ -320,7 +331,7 @@ lx_sigreturn_tolibc(uintptr_t sp)
 	 * arg1 %rsi is ptr to converted siginfo on stack or NULL
 	 */
 	movq	-16(%rbp), %rsi
-	cmp     $0, %rsi 
+	cmp	$0, %rsi
 	je	1f
 	movq	8(%rsp), %rsi
 1:
@@ -352,7 +363,7 @@ lx_sigreturn_tolibc(uintptr_t sp)
 	 * lx_sigacthandler(int sig, siginfo_t *s, void *p)
 	 */
 	ENTRY_NP(lx_sigacthandler)
-	movq    libc_sigacthandler@GOTPCREL(%rip), %rax 
+	movq    libc_sigacthandler@GOTPCREL(%rip), %rax
 	jmp     *(%rax)				/* jmp to libc's interposer */
 	SET_SIZE(lx_sigacthandler)
 
