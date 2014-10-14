@@ -400,32 +400,6 @@ lxpr_open(vnode_t **vpp, int flag, cred_t *cr, caller_context_t *ct)
 		}
 	}
 
-	if (type == LXPR_KMSG) {
-		ldi_ident_t	li = VTOLXPM(vp)->lxprm_li;
-		struct strioctl	str;
-		int		rv;
-
-		/*
-		 * Open the zone's console device using the layered driver
-		 * interface.
-		 */
-		if ((error = ldi_open_by_name("/dev/log", FREAD, cr,
-		    &lxpnp->lxpr_cons_ldih, li)) != 0)
-			return (error);
-
-		/*
-		 * Send an ioctl to the underlying console device, letting it
-		 * know we're interested in getting console messages.
-		 */
-		str.ic_cmd = I_CONSLOG;
-		str.ic_timout = 0;
-		str.ic_len = 0;
-		str.ic_dp = NULL;
-		if ((error = ldi_ioctl(lxpnp->lxpr_cons_ldih, I_STR,
-		    (intptr_t)&str, FKIOCTL, cr, &rv)) != 0)
-			return (error);
-	}
-
 	return (error);
 }
 
@@ -440,7 +414,6 @@ lxpr_close(vnode_t *vp, int flag, int count, offset_t offset, cred_t *cr,
 {
 	lxpr_node_t	*lxpr = VTOLXP(vp);
 	lxpr_nodetype_t	type = lxpr->lxpr_type;
-	int		err;
 
 	/*
 	 * we should never get here because the close is done on the realvp
@@ -450,11 +423,6 @@ lxpr_close(vnode_t *vp, int flag, int count, offset_t offset, cred_t *cr,
 	    type != LXPR_PID_CURDIR &&
 	    type != LXPR_PID_ROOTDIR &&
 	    type != LXPR_PID_EXE);
-
-	if (type == LXPR_KMSG) {
-		if ((err = ldi_close(lxpr->lxpr_cons_ldih, 0, cr)) != 0)
-			return (err);
-	}
 
 	return (0);
 }
@@ -647,7 +615,38 @@ lxpr_read(vnode_t *vp, uio_t *uiop, int ioflag, cred_t *cr,
 
 	ASSERT(type < LXPR_NFILES);
 
+	if (type == LXPR_KMSG) {
+		ldi_ident_t	li = VTOLXPM(vp)->lxprm_li;
+		struct strioctl	str;
+		int		rv;
+
+		/*
+		 * Open the zone's console device using the layered driver
+		 * interface.
+		 */
+		if ((error = ldi_open_by_name("/dev/log", FREAD, cr,
+		    &lxpnp->lxpr_cons_ldih, li)) != 0)
+			return (error);
+
+		/*
+		 * Send an ioctl to the underlying console device, letting it
+		 * know we're interested in getting console messages.
+		 */
+		str.ic_cmd = I_CONSLOG;
+		str.ic_timout = 0;
+		str.ic_len = 0;
+		str.ic_dp = NULL;
+		if ((error = ldi_ioctl(lxpnp->lxpr_cons_ldih, I_STR,
+		    (intptr_t)&str, FKIOCTL, cr, &rv)) != 0)
+			return (error);
+	}
+
 	lxpr_read_function[type](lxpnp, uiobuf);
+
+	if (type == LXPR_KMSG) {
+		if ((error = ldi_close(lxpnp->lxpr_cons_ldih, FREAD, cr)) != 0)
+			return (error);
+	}
 
 	error = lxpr_uiobuf_flush(uiobuf);
 	lxpr_uiobuf_free(uiobuf);
@@ -1339,6 +1338,8 @@ lxpr_read_kmsg(lxpr_node_t *lxpnp, struct lxpr_uiobuf *uiobuf)
 {
 	ldi_handle_t	lh = lxpnp->lxpr_cons_ldih;
 	mblk_t		*mp;
+
+	ASSERT(lxpnp->lxpr_type == LXPR_KMSG);
 
 	if (ldi_getmsg(lh, &mp, NULL) == 0) {
 		/*
