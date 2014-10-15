@@ -302,7 +302,7 @@ struct lx_sigstack {
 	lx_siginfo_t si;	/* saved signal information */
 	lx_ucontext_t uc;	/* saved user context */
 	lx_fpstate_t fpstate;	/* saved FP state */
-	char trampoline[10];	/* code for trampoline to lx_rt_sigreturn() */
+	char pad[2];		/* stack alignment */
 };
 #else
 struct lx_sigstack {
@@ -779,6 +779,7 @@ lx_sigprocmask_common(uintptr_t how, uintptr_t l_setp, uintptr_t l_osetp,
 
 		s_setp = &set;
 
+		/* Only 32-bit code passes other than USE_SIGSET */
 		if (sigset_type == USE_SIGSET)
 			err = ltos_sigset((lx_sigset_t *)l_setp, s_setp);
 #if defined(_ILP32)
@@ -1067,7 +1068,12 @@ lx_rt_sigreturn(void)
 	 */
 	sp = (uintptr_t)rp->lxr_esp - 4;
 #else
-	sp = (uintptr_t)rp->lxr_rsp;
+	/*
+	 * We need to make an adjustment for 64-bit code as well. Since 64-bit
+	 * does not use the trampoline, it's probably for the same reason as
+	 * alluded to above.
+	 */
+	sp = (uintptr_t)rp->lxr_rsp - 8;
 #endif
 
 	/*
@@ -1090,6 +1096,9 @@ lx_rt_sigreturn(void)
 	 * Check for and remove LX_SIGRT_MAGIC from the stack.
 	 */
 #if defined(_LP64)
+	/* account for extra word used in lx_sigdeliver for stack alignment */
+	sp += 8;
+
 	if (*(uint64_t *)sp != LX_SIGRT_MAGIC)
 		lx_err_fatal("sp @ 0x%p, expected 0x%x, found 0x%x!",
 		    sp, LX_SIGRT_MAGIC, *(uint32_t *)sp);
@@ -1228,6 +1237,16 @@ lx_rt_sigreturn(void)
 static int
 lx_setcontext(const ucontext_t *ucp)
 {
+	extern int lx_traceflag;
+
+	/*
+	 * See we don't return via lx_emulate, issue a trace msg here if
+	 * necessary. We know this is only called in the 64-bit rt_sigreturn
+	 * code path to the syscall number is 15.
+	 */
+	if (lx_traceflag != 0) {
+		(void) syscall(SYS_brand, B_SYSRETURN, 15, 0);
+	}
 	return (syscall(SYS_brand, B_SIGNAL_RETURN, ucp));
 }
 #endif
@@ -1334,17 +1353,16 @@ lx_build_signal_frame(int lx_sig, siginfo_t *sip, void *p, void *sp)
 
 	if (lxsap && (lxsap->lxsa_flags & LX_SA_RESTORER) &&
 	    lxsap->lxsa_restorer) {
-#if defined(_LP64)
 		/*
-		 * lxsa_restorer is only set by sigaction in 32-bit code
-		 * XXX should lxsa_restorer ever be set for 64-bit code?
+		 * lxsa_restorer is explicitly set by sigaction in 32-bit code
+		 * but it can also be implicitly set for both 32 and 64 bit
+		 * code via lx_sigaction_common when we bcopy the user-supplied
+		 * lx_sigaction element into the proper slot in the sighandler
+		 * array.
 		 */
-		assert(0);
-#endif
 		lx_ssp->retaddr = lxsap->lxsa_restorer;
 		lx_debug("lxsa_restorer exists @ 0x%p", lx_ssp->retaddr);
 	} else {
-		/* We should always take this path in 64-bit code */
 		lx_ssp->retaddr = lx_rt_sigreturn_tramp;
 		lx_debug("lx_ssp->retaddr set to 0x%p", lx_rt_sigreturn_tramp);
 	}
@@ -1434,6 +1452,7 @@ lx_build_signal_frame(int lx_sig, siginfo_t *sip, void *p, void *sp)
 		lx_ucp->uc_sigcontext.sc_fpstate = NULL;
 	}
 
+#if defined(_ILP32)
 	/*
 	 * Believe it or not, gdb wants to SEE the sigreturn code on the
 	 * top of the stack to determine whether the stack frame belongs to
@@ -1443,6 +1462,7 @@ lx_build_signal_frame(int lx_sig, siginfo_t *sip, void *p, void *sp)
 	 */
 	bcopy((void *)lx_rt_sigreturn_tramp, lx_ssp->trampoline,
 	    sizeof (lx_ssp->trampoline));
+#endif
 
 #if defined(_LP64)
 	/*
@@ -1465,7 +1485,6 @@ lx_call_user_handler(int sig, siginfo_t *sip, void *p)
 {
 	void (*user_handler)();
 	void (*stk_builder)();
-
 #if defined(_ILP32)
 	lx_tsd_t *lx_tsd;
 	int err;
@@ -1503,6 +1522,10 @@ lx_call_user_handler(int sig, siginfo_t *sip, void *p)
 #if defined(_LP64)
 	/* %gs is ignored in the 64-bit lx_sigdeliver */
 	gs = 0;
+
+	stksize = sizeof (struct lx_sigstack);
+	stk_builder = lx_build_signal_frame;
+
 #else
 	if ((err = thr_getspecific(lx_tsd_key, (void **)&lx_tsd)) != 0)
 		lx_err_fatal("lx_call_user_handler: unable to read "
@@ -1518,21 +1541,15 @@ lx_call_user_handler(int sig, siginfo_t *sip, void *p)
 	 * bugs in the library. This is only applicable to 32-bit code.
 	 */
 	assert(gs != 0);
-#endif
 
 	if (lxsap->lxsa_flags & LX_SA_SIGINFO) {
 		stksize = sizeof (struct lx_sigstack);
 		stk_builder = lx_build_signal_frame;
 	} else  {
-#if defined(_LP64)
-		/* 64-bit code should never generate old-style signals */
-		stk_builder = NULL;	/* shutup the compiler */
-		assert(0);
-#else
 		stksize = sizeof (struct lx_oldsigstack);
 		stk_builder = lx_build_old_signal_frame;
-#endif
 	}
+#endif
 
 	user_handler = lxsap->lxsa_handler;
 
@@ -1786,11 +1803,6 @@ lx_rt_sigaction(uintptr_t lx_sig, uintptr_t actp, uintptr_t oactp,
 	 */
 	if ((size_t)setsize != sizeof (lx_sigset_t))
 		return (-EINVAL);
-
-	/*
-	 * XXX - for 64 bit code this is the only sigaction. Why don't we have
-	 * the logic around lx_sigaction in this code path?
-	 */
 
 	return (lx_sigaction_common(lx_sig, (struct lx_sigaction *)actp,
 	    (struct lx_sigaction *)oactp));

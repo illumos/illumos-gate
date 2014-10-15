@@ -285,6 +285,8 @@ lx_sigreturn_tolibc(uintptr_t sp)
 	 * |	| stuff we saved in our prologue		|
 	 * |	=================================================
 	 * |	| LX_SIGRT_MAGIC				|
+	 * |	=================================================
+	 * |	| {unused word to maintain ABI stack alignment} |
 	 * V	=================================================
 	 *	| Linux local data built by lx stk_builder()	|
 	 * 	=================================================
@@ -297,7 +299,7 @@ lx_sigreturn_tolibc(uintptr_t sp)
 	ENTRY_NP(lx_sigdeliver)
 	pushq   %rbp
 	movq    %rsp, %rbp
-	subq	$0x30, %rsp
+	subq	$0x40, %rsp		/* an extra word to maintain alignmnt */
 	movq	%rdi,  -8(%rbp)		/* sig */
 	movq	%rsi, -16(%rbp)		/* siginfo* */
 	movq	%rdx, -24(%rbp)		/* ucontext* */
@@ -305,16 +307,12 @@ lx_sigreturn_tolibc(uintptr_t sp)
 	movq	%r8,  -40(%rbp)		/* stack builder */
 	movq	%r9,  -48(%rbp)		/* Linux signal handler */
 
-					/*
-					 * create stack_size stack buffer as a
-					 * local varible
-					 */
-	subq    %rcx, %rsp
+	subq    %rcx, %rsp		/* create stack_size stack buffer */
 
-	movq	$LX_SIGRT_MAGIC, %rcx	/* load and "push" marker value onto */
-	movq	%rcx, -56(%rbp)		/*         stack for lx_rt_sigreturn */
+	movq	$LX_SIGRT_MAGIC, %rcx	/* load and place marker value onto */
+	movq	%rcx, -56(%rbp)		/*        stack for lx_rt_sigreturn */
 
-	movq	%rsp, %rcx		/* arg3 - %rcx stack pointer */
+	movq	%rsp, %rcx		/* arg3 - %rcx is stack pointer */
 					/* arg2 - %rdx is ucontext ptr */
 					/* arg1 - %rsi is siginfo ptr */
 					/* arg0 - %rdi is sig num */
@@ -371,10 +369,6 @@ lx_sigreturn_tolibc(uintptr_t sp)
 	 * Trampoline code is called by the return at the end of a Linux
 	 * signal handler to return control to the interrupted application
 	 * via the lx_rt_sigreturn() syscall.
-	 *
-	 * This routine must consist of the EXACT code sequence below
-	 * as gdb looks at the sequence of instructions a routine will return
-	 * to determine whether it is in a signal handler or not.
 	 */
 	ENTRY_NP(lx_rt_sigreturn_tramp)
 	movq	$LX_SYS_rt_sigreturn, %rax
