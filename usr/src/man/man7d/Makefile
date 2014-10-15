@@ -11,7 +11,7 @@
 
 #
 # Copyright 2011, Richard Lowe
-# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 #
 
@@ -219,6 +219,7 @@ i386_MANFILES=	ahci.7d		\
 		npe.7d		\
 		ntxn.7d		\
 		nv_sata.7d	\
+		nvme.7d		\
 		pcn.7d		\
 		radeon.7d	\
 		ral.7d		\
