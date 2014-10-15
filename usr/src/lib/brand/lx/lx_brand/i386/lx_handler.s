@@ -360,6 +360,7 @@ lx_sigreturn_tolibc(uintptr_t sp)
 	 * These two routines must consist of the EXACT code sequences below
 	 * as gdb looks at the sequence of instructions a routine will return
 	 * to determine whether it is in a signal handler or not.
+	 * See the Linux code setup_signal_stack_sc() in arch/x86/um/signal.c.
 	 */
 	ENTRY_NP(lx_sigreturn_tramp)
 	popl	%eax

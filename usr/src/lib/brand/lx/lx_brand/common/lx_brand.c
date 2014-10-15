@@ -448,6 +448,16 @@ static int
 lx_emulate_args(lx_regs_t *rp, struct lx_sysent *s, uintptr_t *args)
 {
 #if defined(_LP64)
+	/*
+	 * Note: Syscall argument passing is different from function call
+	 * argument passing on amd64.  For function calls, the fourth arg is
+	 * passed via %rcx, but for system calls the 4th arg is passed via %r10.
+	 * This is because in amd64, the syscall instruction puts the lower
+	 * 32 bits of %rflags in %r11 and puts the %rip value to %rcx.
+	 *
+	 * Appendix A of the amd64 ABI (Linux conventions) states that syscalls
+	 * are limited to 6 args and no arg is passed on the stack.
+	 */
 	args[0] = rp->lxr_rdi;
 	args[1] = rp->lxr_rsi;
 	args[2] = rp->lxr_rdx;
@@ -981,7 +991,16 @@ lx_syscall_regs(void)
 		assert(fr->fr_savpc != NULL);
 	}
 
+#if defined(_LP64)
+	/*
+	 * This is %rbp, update to be at the end of the frame for correct
+	 * struct offsets. lx_emulate only takes one parameter, a pointer to
+	 * lx_regs_t.
+	 */
+	return ((lx_regs_t *)(fr->fr_savfp - sizeof (lx_regs_t)));
+#else
 	return ((lx_regs_t *)((uintptr_t *)fr)[2]);
+#endif
 }
 
 int
