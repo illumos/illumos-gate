@@ -1210,7 +1210,7 @@ static struct lx_sysent sysents[] = {
 	{"times",	lx_times,		0,		1}, /* 100 */
 	{"ptrace",	lx_ptrace,		0,		4}, /* 101 */
 	{"getuid",	lx_getuid,		0,		0}, /* 102 */
-	{"syslog",	NULL,			NOSYS_KERNEL,	0}, /* 103 */
+	{"syslog",	lx_syslog,		0,		3}, /* 103 */
 	{"getgid",	lx_getgid,		0,		0}, /* 104 */
 	{"setuid",	lx_setuid,		0,		1}, /* 105 */
 	{"setgid",	lx_setgid,		0,		1}, /* 106 */
@@ -1535,7 +1535,7 @@ static struct lx_sysent sysents[] = {
 	{"fstatfs",	lx_fstatfs,	0,		2},	/* 100 */
 	{"ioperm",	NULL,		NOSYS_NO_EQUIV,	0},	/* 101 */
 	{"socketcall",	lx_socketcall,	0,		2},	/* 102 */
-	{"syslog",	NULL,		NOSYS_KERNEL,	0},	/* 103 */
+	{"syslog",	lx_syslog,	0,		3},	/* 103 */
 	{"setitimer",	lx_setitimer,	0,		3},	/* 104 */
 	{"getitimer",	lx_getitimer,	0,		2},	/* 105 */
 	{"stat",	lx_stat,	0,		2},	/* 106 */
