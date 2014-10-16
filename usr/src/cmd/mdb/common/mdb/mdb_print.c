@@ -26,6 +26,7 @@
 /*
  * Copyright (c) 2012, 2014 by Delphix. All rights reserved.
  * Copyright (c) 2012 Joyent, Inc. All rights reserved.
+ * Copyright (c) 2014 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <mdb/mdb_modapi.h>
@@ -2560,14 +2561,21 @@ printf_signed(mdb_ctf_id_t id, uintptr_t addr, ulong_t off, char *fmt,
 		return (DCMD_ABORT);
 	}
 
-	if (mdb_ctf_type_kind(base) != CTF_K_INTEGER) {
-		mdb_warn("expected integer type\n");
-		return (DCMD_ABORT);
-	}
-
-	if (mdb_ctf_type_encoding(base, &e) != 0) {
-		mdb_warn("could not get type encoding");
-		return (DCMD_ABORT);
+	switch (mdb_ctf_type_kind(base)) {
+		case CTF_K_ENUM:
+			e.cte_format = CTF_INT_SIGNED;
+			e.cte_offset = 0;
+			e.cte_bits = mdb_ctf_type_size(id) * NBBY;
+			break;
+		case CTF_K_INTEGER:
+			if (mdb_ctf_type_encoding(base, &e) != 0) {
+				mdb_warn("could not get type encoding");
+				return (DCMD_ABORT);
+			}
+			break;
+		default:
+			mdb_warn("expected integer type\n");
+			return (DCMD_ABORT);
 	}
 
 	if (sign)
@@ -2750,6 +2758,25 @@ printf_string(mdb_ctf_id_t id, uintptr_t addr, ulong_t off, char *fmt)
 		}
 
 		mdb_printf(fmt, buf);
+		return (0);
+	}
+
+	if (mdb_ctf_type_kind(base) == CTF_K_ENUM) {
+		const char *strval;
+		int value;
+
+		if (mdb_vread(&value, sizeof (value), addr) == -1) {
+			mdb_warn("failed to read pointer at %llx", addr);
+			return (DCMD_ERR);
+		}
+
+		if ((strval = mdb_ctf_enum_name(id, value))) {
+			mdb_printf(fmt, strval);
+		} else {
+			(void) mdb_snprintf(buf, sizeof (buf), "<%d>", value);
+			mdb_printf(fmt, buf);
+		}
+
 		return (0);
 	}
 
