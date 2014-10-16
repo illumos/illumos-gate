@@ -604,6 +604,30 @@ lx_prctl(int option, uintptr_t arg2, uintptr_t arg3,
 }
 
 /*
+ * For syslog(), as there is no kernel and nothing to log, we simply emulate a
+ * kernel cyclic buffer (LOG_BUF_LEN) of 0 bytes, only handling errors for bad
+ * input.  All actions except 3 and 10 require CAP_SYS_ADMIN or CAP_SYSLOG, in
+ * lieu of full capabilities support for now we just perform an euid check.
+ */
+long
+lx_syslog(int type, char *bufp, int len)
+{
+	if (type < 0 || type > 10)
+		return (-EINVAL);
+
+	if ((type != 3 && type != 10) && (geteuid() != 0))
+		return (-EPERM);
+
+	if ((type >= 2 && type <= 4) && (bufp == NULL || len < 0))
+		return (-EINVAL);
+
+	if ((type == 8) && (len < 1 || len > 8))
+		return (-EINVAL);
+
+	return (0);
+}
+
+/*
  * The following are pass-through functions but we need to return the correct
  * long so that the errno propagates back to the Linux code correctly.
  */
