@@ -110,6 +110,10 @@ lx_exec()
 		lx_pid_reassign(curthread);
 	}
 
+	/* clear the fsbase values until the app. can reinitialize them */
+	lwpd->br_lx_fsbase = NULL;
+	lwpd->br_ntv_fsbase = NULL;
+
 	installctx(lwptot(lwp), lwp, lx_save, lx_restore, NULL, NULL, lx_save,
 	    NULL);
 
