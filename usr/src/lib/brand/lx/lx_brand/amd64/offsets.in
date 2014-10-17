@@ -14,7 +14,7 @@
 #include <sys/lx_brand.h>
 
 lx_regs_t	SIZEOF_LX_REGS_T
-	lxr_gs
+	lxr_fs
 	lxr_rdi
 	lxr_rsi
 	lxr_rbp

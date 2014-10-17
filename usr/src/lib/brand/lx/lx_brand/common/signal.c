@@ -1240,7 +1240,7 @@ lx_setcontext(const ucontext_t *ucp)
 	extern int lx_traceflag;
 
 	/*
-	 * See we don't return via lx_emulate, issue a trace msg here if
+	 * Since we don't return via lx_emulate, issue a trace msg here if
 	 * necessary. We know this is only called in the 64-bit rt_sigreturn
 	 * code path to the syscall number is 15.
 	 */

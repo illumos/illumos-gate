@@ -44,6 +44,6 @@ lx_zone_data
 	lxzd_max_syscall
 
 lx_lwp_data
-	br_libc_syscall
+	br_ntv_syscall
 	br_lx_fsbase
 	br_ntv_fsbase

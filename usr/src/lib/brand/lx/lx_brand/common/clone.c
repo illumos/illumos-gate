@@ -108,7 +108,9 @@ struct clone_state {
 	void 		*c_ptidp;
 	struct lx_desc	*c_ldtinfo;	/* thread-specific segment */
 	void		*c_ctidp;
+#if defined(_ILP32)
 	uintptr_t	c_gs;		/* Linux's %gs */
+#endif
 	sigset_t	c_sigmask;	/* signal mask */
 	lx_affmask_t	c_affmask;	/* CPU affinity mask */
 	volatile int	*c_clone_res;	/* pid/error returned to cloner */
@@ -538,7 +540,9 @@ lx_clone(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 	cs->c_ldtinfo = ldtinfo;
 	cs->c_ctidp = ctidp;
 	cs->c_clone_res = &clone_res;
+#if defined(_ILP32)
 	cs->c_gs = rp->lxr_gs;
+#endif
 
 	if (lx_sched_getaffinity(0, sizeof (cs->c_affmask),
 	    (uintptr_t)&cs->c_affmask) == -1)
