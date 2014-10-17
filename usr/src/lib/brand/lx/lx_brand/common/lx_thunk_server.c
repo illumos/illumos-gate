@@ -379,14 +379,15 @@ lx_call(lx_handle_sym_t lx_ch, uintptr_t p1, uintptr_t p2,
 
 	rp = lx_syscall_regs();
 
-	lx_debug("lx_call: calling to Linux code at 0x%p", lx_ch);
+#if defined(_ILP32)
 	lx_debug("lx_call: loading Linux gs, rp = 0x%p, gs = 0x%p",
 	    rp, rp->lxr_gs);
-
-#if defined(_ILP32)
 	lx_swap_gs(rp->lxr_gs, &cur_gs);
 #endif
+
+	lx_debug("lx_call: calling to Linux code at 0x%p", lx_ch);
 	ret = lx_funcp(p1, p2, p3, p4, p5, p6, p7, p8);
+
 #if defined(_ILP32)
 	lx_swap_gs(cur_gs, &rp->lxr_gs);
 #endif

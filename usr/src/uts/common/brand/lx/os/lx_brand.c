@@ -526,39 +526,86 @@ lx_brand_systrace_disable(void)
 static void
 lx_psig_to_proc(proc_t *p, kthread_t *t, int sig)
 {
-	lx_lwp_data_t *lwpd = ttolxlwp(t);
 #if defined(__amd64)
+	lx_lwp_data_t *lwpd = ttolxlwp(t);
 	klwp_t *lwp = ttolwp(t);
+	pcb_t *pcb;
 	model_t datamodel;
 
 	datamodel = lwp_getdatamodel(lwp);
-	if (datamodel == DATAMODEL_NATIVE) {
-		pcb_t *pcb = &lwp->lwp_pcb;
+	if (datamodel != DATAMODEL_NATIVE)
+		return;
 
-		DTRACE_PROBE2(brand__lx__psig,
-		    uintptr_t, rdmsr(MSR_AMD_FSBASE),
-		    uintptr_t, lwpd->br_libc_syscall);
+	pcb = &lwp->lwp_pcb;
 
-		/* We "push" the current syscall mode flag on the "stack". */
-		ASSERT(lwpd->br_libc_syscall == 0 ||
-		    lwpd->br_libc_syscall == 1);
-		lwpd->br_scms = (lwpd->br_scms << 1) | lwpd->br_libc_syscall;
+#ifdef DEBUG
+	/*
+	 * Debug check to see if we have the correct fsbase.
+	 */
+	ulong_t curr_base = rdmsr(MSR_AMD_FSBASE);
 
-		/*
-		 * Make sure we have the native fsbase loaded. Also update pcb
-		 * so that if we service an interrupt we will restore the
-		 * correct fsbase in update_sregs(). Because of the amd64 guard
-		 * and datamodel check, this obviously will only happen for the
-		 * 64-bit user-land.
-		 */
-		if (lwpd->br_ntv_fsbase != 0) {
-			pcb->pcb_fsbase = lwpd->br_ntv_fsbase;
-			wrmsr(MSR_AMD_FSBASE, lwpd->br_ntv_fsbase);
+	if (curr_base != 0) {
+		if (lwpd->br_ntv_syscall == 0 && lwpd->br_lx_fsbase != 0) {
+			/* should have Linux fsbase */
+			if (lwpd->br_lx_fsbase != curr_base) {
+				DTRACE_PROBE2(brand__lx__psig__lx__fsb,
+				    uintptr_t, lwpd->br_lx_fsbase,
+				    uintptr_t, curr_base);
+			}
+
+			if (lwpd->br_lx_fsbase != pcb->pcb_fsbase) {
+				DTRACE_PROBE2(brand__lx__psig__lx__pcb,
+				    uintptr_t, lwpd->br_lx_fsbase,
+				    uintptr_t, pcb->pcb_fsbase);
+			}
+
+		}
+
+		if (lwpd->br_ntv_syscall == 1 && lwpd->br_ntv_fsbase != 0) {
+			/* should have Illumos fsbase */
+			if (lwpd->br_ntv_fsbase != curr_base) {
+				DTRACE_PROBE2(brand__lx__psig__ntv__fsb,
+				    uintptr_t, lwpd->br_ntv_fsbase,
+				    uintptr_t, curr_base);
+			}
+
+			if (lwpd->br_ntv_fsbase != pcb->pcb_fsbase) {
+				DTRACE_PROBE2(brand__lx__psig__ntv__pcb,
+				    uintptr_t, lwpd->br_ntv_fsbase,
+				    uintptr_t, pcb->pcb_fsbase);
+			}
 		}
 	}
 #endif
 
-	lwpd->br_libc_syscall = 1;
+	/* We "push" the current syscall mode flag on the "stack". */
+	ASSERT(lwpd->br_ntv_syscall == 0 || lwpd->br_ntv_syscall == 1);
+	lwpd->br_scms = (lwpd->br_scms << 1) | lwpd->br_ntv_syscall;
+
+	if (lwpd->br_ntv_syscall == 0 && lwpd->br_ntv_fsbase != 0) {
+		/*
+		 * We were executing in Linux code but now that we're handling
+		 * a signal we have to make sure we have the native fsbase
+		 * loaded. Also update pcb so that if we service an interrupt
+		 * we will restore the correct fsbase in update_sregs().
+		 * Because of the amd64 guard and datamodel check, this
+		 * obviously will only happen for the 64-bit user-land.
+		 *
+		 * There is a non-obvious side-effect here. Since the fsbase
+		 * will now be the native value, when we bounce out to
+		 * user-land the ucontext will capture the native value, even
+		 * though we need to restore the Linux value when we return
+		 * from the signal. This is handled by the B_SIGNAL_RETURN
+		 * code in lx_brandsys().
+		 */
+		pcb->pcb_fsbase = lwpd->br_ntv_fsbase;
+		wrmsr(MSR_AMD_FSBASE, lwpd->br_ntv_fsbase);
+
+		/* Ensure that we go out via update_sregs */
+		pcb->pcb_rupdate = 1;
+	}
+	lwpd->br_ntv_syscall = 1;
+#endif
 }
 
 void
@@ -611,6 +658,9 @@ lx_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 	int error;
 	lx_brand_registration_t reg;
 	lx_lwp_data_t *lwpd;
+#if defined(__amd64) && defined(DEBUG)
+	ulong_t curr_base;
+#endif
 
 	/*
 	 * There is one operation that is suppored for non-branded
@@ -685,7 +735,7 @@ lx_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 		 * handling.
 		 */
 		lwpd = ttolxlwp(t);
-		lwpd->br_libc_syscall = 1;
+		lwpd->br_ntv_syscall = 1;
 		lwpd->br_scms = 1;
 #endif
 
@@ -753,10 +803,17 @@ lx_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 	/*
 	 * The B_TRUSS_POINT subcommand is used so that we can make a no-op
 	 * syscall for debugging purposes (dtracing) from within the user-level
-	 * emulation.
+	 * emulation. Enhanced in the lx brand to allow probing of fsbase.
 	 */
 	case B_TRUSS_POINT:
+		DTRACE_PROBE1(brand__lx__rd__fsbase,
+		    uintptr_t, rdmsr(MSR_AMD_FSBASE));
+#if defined(__amd64)
+		lwpd = ttolxlwp(curthread);
+		*rval = lwpd->br_ntv_fsbase;
+#else
 		*rval = 0;
+#endif
 		return (0);
 
 	case B_LPID_TO_SPAIR:
@@ -922,8 +979,25 @@ lx_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 		}
 
 	case B_CLR_NTV_SYSC_FLAG:
+#if defined(__amd64)
 		lwpd = ttolxlwp(curthread);
-		lwpd->br_libc_syscall = 0;
+		lwpd->br_ntv_syscall = 0;
+
+#ifdef DEBUG
+		/*
+		 * Debug check to see if we have the native fsbase. We should
+		 * since this syscall came from native code.
+		 */
+		curr_base = rdmsr(MSR_AMD_FSBASE);
+
+		if (curr_base != 0 && lwpd->br_ntv_fsbase != 0 &&
+		    lwpd->br_ntv_fsbase != curr_base) {
+			DTRACE_PROBE2(brand__lx__clr__ntv__fsb,
+			    uintptr_t, lwpd->br_ntv_fsbase,
+			    uintptr_t, curr_base);
+		}
+#endif
+
 		/*
 		 * If Linux fsbase has been set, restore it. The user-level
 		 * code only ever calls this in the 64-bit library.
@@ -933,13 +1007,15 @@ lx_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 		 * in the pcb so that if we service an interrupt we will restore
 		 * the correct fsbase in update_sregs().
 		 */
-#if defined(__amd64)
 		if (lwpd->br_lx_fsbase != 0) {
 			klwp_t *lwp = ttolwp(t);
 			pcb_t *pcb = &lwp->lwp_pcb;
 
 			pcb->pcb_fsbase = lwpd->br_lx_fsbase;
 			wrmsr(MSR_AMD_FSBASE, lwpd->br_lx_fsbase);
+
+			/* Ensure that we go out via update_sregs */
+			pcb->pcb_rupdate = 1;
 		}
 #endif
 		return (0);
@@ -957,7 +1033,7 @@ lx_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 		 */
 		lwpd = ttolxlwp(curthread);
 
-		lwpd->br_libc_syscall = lwpd->br_scms & 0x1;
+		lwpd->br_ntv_syscall = lwpd->br_scms & 0x1;
 		/* "pop" this value from the "stack" */
 		lwpd->br_scms >>= 1;
 
@@ -966,33 +1042,60 @@ lx_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 		 * Debug check to see if we have the native fsbase. We should
 		 * since this syscall came from native code.
 		 */
-		if (lwpd->br_ntv_fsbase != 0) {
+		curr_base = rdmsr(MSR_AMD_FSBASE);
+
+		if (curr_base != 0 && lwpd->br_ntv_fsbase != 0) {
 			klwp_t *lwp = ttolwp(t);
 			pcb_t *pcb = &lwp->lwp_pcb;
 
-			if (lwpd->br_ntv_fsbase != rdmsr(MSR_AMD_FSBASE))
-				cmn_err(CE_WARN, "Incorrect msr native fsbase "
-				    "0x%lx 0x%lx", lwpd->br_ntv_fsbase,
-				    rdmsr(MSR_AMD_FSBASE));
-			if (lwpd->br_ntv_fsbase != pcb->pcb_fsbase)
-				cmn_err(CE_WARN, "Incorrect pcb native fsbase "
-				    "0x%lx 0x%lx", lwpd->br_ntv_fsbase,
-				    pcb->pcb_fsbase);
+			if (lwpd->br_ntv_fsbase != curr_base) {
+				DTRACE_PROBE2(brand__lx__sigret__ntv__fsb,
+				    uintptr_t, lwpd->br_ntv_fsbase,
+				    uintptr_t, curr_base);
+			}
+			if (lwpd->br_ntv_fsbase != pcb->pcb_fsbase) {
+				DTRACE_PROBE2(brand__lx__sigret__ntv__pcb,
+				    uintptr_t, lwpd->br_ntv_fsbase,
+				    uintptr_t, pcb->pcb_fsbase);
+			}
 		}
 #endif
 
 		/*
-		 * If setting the mode to lx, make sure we load the lx fsbase.
+		 * If setting the mode to lx, make sure we fix up the context
+		 * so that we load the lx fsbase when we return to the Linux
+		 * code. For the native case, the context already has the
+		 * correct native fsbase so we don't need to do anything here.
+		 * Note that setgregs updates the pcb and in update_sregs we
+		 * wrmsr the correct fsbase when we return to user-level.
+		 *	getsetcontext -> restorecontext -> setgregs
 		 */
-		if (lwpd->br_libc_syscall == 0) {
-			/* if Linux fsbase has been initialized, restore it */
-			if (lwpd->br_lx_fsbase != 0) {
-				klwp_t *lwp = ttolwp(t);
-				pcb_t *pcb = &lwp->lwp_pcb;
+		if (lwpd->br_ntv_syscall == 0 && lwpd->br_lx_fsbase != 0 &&
+		    arg1 != NULL) {
+			/*
+			 * Linux fsbase has been initialized, restore it.
+			 * We have to copyin to modify since the user-level
+			 * emulation doesn't have a copy of the lx fsbase or
+			 * know that we are returning to Linux code.
+			 */
+			ucontext_t uc;
+			klwp_t *lwp = ttolwp(t);
+			pcb_t *pcb = &lwp->lwp_pcb;
 
-				pcb->pcb_fsbase = lwpd->br_lx_fsbase;
-				wrmsr(MSR_AMD_FSBASE, lwpd->br_lx_fsbase);
-			}
+			if (copyin((void *)arg1, &uc, sizeof (ucontext_t) -
+			    sizeof (uc.uc_filler) -
+			    sizeof (uc.uc_mcontext.fpregs)))
+				return (set_errno(EFAULT));
+
+			uc.uc_mcontext.gregs[REG_FSBASE] = lwpd->br_lx_fsbase;
+
+			if (copyout(&uc, (void *)arg1, sizeof (ucontext_t) -
+			    sizeof (uc.uc_filler) -
+			    sizeof (uc.uc_mcontext.fpregs)))
+				return (set_errno(EFAULT));
+
+			/* Ensure that we go out via update_sregs */
+			pcb->pcb_rupdate = 1;
 		}
 #endif /* amd64 */
 		return (getsetcontext(SETCONTEXT, (void *)arg1));

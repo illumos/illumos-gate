@@ -147,14 +147,14 @@ ENTRY(lx_brand_syscall_callback)
 	/* check for native vs. Linux syscall */
 	GET_V(SP_REG, 0, V_LWP, %r15);		/* get lwp pointer */
 	movq	LWP_BRAND(%r15), %r15		/* grab lx lwp data pointer */
-	movl	BR_LIBC_SYSCALL(%r15), %r15d	/* grab syscall src flag */
+	movl	BR_NTV_SYSCALL(%r15), %r15d	/* grab syscall src flag */
 	cmp	$1, %r15			/* check for native syscall */
 	je	2f				/* is native, stay in kernel */
 
 	/* Linux syscall - subsequent emul. syscalls will use native mode */
 	GET_V(SP_REG, 0, V_LWP, %r15);		/* get lwp pointer */
 	movq	LWP_BRAND(%r15), %r15		/* grab lx lwp data pointer */
-	movl	$1, BR_LIBC_SYSCALL(%r15)	/* set native syscall flag */
+	movl	$1, BR_NTV_SYSCALL(%r15)	/* set native syscall flag */
 
 	/* check if we have to restore native fsbase */
 	GET_V(SP_REG, 0, V_LWP, %r15);		/* get lwp pointer */
@@ -186,7 +186,7 @@ ENTRY(lx_brand_syscall_callback)
 	movq	BR_LX_FSBASE(%r15), %r15	/* grab Linux fsbase */
 
 	subq	$24, %rsp			/* make room for 3 regs */
-	movq	%rax, 0x0(%rsp)			/* save regs used by wrmsr */
+	movq	%rax, 0x0(%rsp)			/* save regs used by rdmsr */
 	movq	%rcx, 0x8(%rsp)
 	movq	%rdx, 0x10(%rsp)
 
@@ -199,11 +199,7 @@ ENTRY(lx_brand_syscall_callback)
 	cmp	%rax, %r15			/* check if is lx fsbase */
 	je	4f				/* match, ok */
 
-	movq	%rsp, %rdx			/* use rdx as temp sp */
-	addq	$24, %rdx			/* fix it back up */
-	GET_V(%rdx, 0, V_LWP, %r15);		/* get lwp pointer */
-	movq	LWP_BRAND(%r15), %r15		/* grab lx lwp data pointer */
-	movq	%rax, BR_LX_FSBASE(%r15)	/* save bad Linux fsbase */
+	movq	%rax, %rdi			/* pass bad fsbase as arg0 */
 	movq	$155, %rax			/* fail! use pivot_root */
 	jmp	5f
 

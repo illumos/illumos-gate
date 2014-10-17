@@ -171,8 +171,8 @@ lx_sigreturn_tolibc(uintptr_t sp)
 	movq	%rbp, LXR_RSP(%rsp)
 	addq	$144, LXR_RSP(%rsp)	/* 128 byte red zone + 2 pointers */
 
-	movq	$0, LXR_GS(%rsp)
-	movw	%gs, LXR_GS(%rsp)
+	movq	$0, LXR_FS(%rsp)
+	movw	%fs, LXR_FS(%rsp)
 	movq	%rdi, LXR_RDI(%rsp)
 	movq	%rsi, LXR_RSI(%rsp)
 	movq	%rbx, LXR_RBX(%rsp)
@@ -232,7 +232,7 @@ lx_sigreturn_tolibc(uintptr_t sp)
 	movq	LXR_R13(%rsp), %r13
 	movq	LXR_R14(%rsp), %r14
 	movq	LXR_R15(%rsp), %r15
-	movw	LXR_GS(%rsp), %gs
+	/* XXX movw	LXR_FS(%rsp), %fs */
 
 	/* addq	$SIZEOF_LX_REGS_T, %rsp	not needed due to next instr. */
 
@@ -342,6 +342,17 @@ lx_sigreturn_tolibc(uintptr_t sp)
 	movq	-48(%rbp), %r9		/* fetch signal handler ptr */
 	jmp	*%r9			/* jmp to the Linux signal handler */
 	SET_SIZE(lx_sigdeliver)
+
+	ENTRY_NP(lx_fsbchk)
+	movq	%fs:0, %rax
+	ret
+	SET_SIZE(lx_fsbchk)
+
+	ENTRY_NP(lx_fschk)
+	xorq	%rax, %rax
+	mov	%fs, %rax
+	ret
+	SET_SIZE(lx_fsbchk)
 
 	/*
 	 * The libc routine that calls user signal handlers ends with a

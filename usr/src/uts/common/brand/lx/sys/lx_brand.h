@@ -159,7 +159,7 @@ typedef struct lx_brand_registration32 {
 
 #ifdef __amd64
 typedef struct lx_regs {
-	long lxr_gs;
+	long lxr_fs;
 	long lxr_rdi;
 	long lxr_rsi;
 	long lxr_rbp;
@@ -271,7 +271,7 @@ typedef ulong_t lx_affmask_t[LX_AFF_ULONGS];
  * lx-specific data in the klwp_t
  */
 typedef struct lx_lwp_data {
-	uint_t	br_libc_syscall;	/* 1 = syscall from native libc */
+	uint_t	br_ntv_syscall;		/* 1 = syscall from native libc */
 	uint_t	br_lwp_flags;		/* misc. flags */
 	klwp_t	*br_lwp;		/* back pointer to container lwp */
 	int	br_signal;		/* signal to send to parent when */

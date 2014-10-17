@@ -41,6 +41,8 @@
 #include <sys/cmn_err.h>
 #include <sys/siginfo.h>
 #include <sys/contract/process_impl.h>
+#include <sys/x86_archext.h>
+#include <sys/sdt.h>
 #include <lx_signum.h>
 #include <lx_syscall.h>
 #include <sys/proc.h>
@@ -239,7 +241,7 @@ lx_initlwp(klwp_t *lwp)
 	lwpd->br_clear_ctidp = NULL;
 	lwpd->br_set_ctidp = NULL;
 	lwpd->br_signal = 0;
-	lwpd->br_libc_syscall = 1;
+	lwpd->br_ntv_syscall = 1;
 	lwpd->br_scms = 1;
 
 	/*
@@ -264,6 +266,30 @@ lx_initlwp(klwp_t *lwp)
 		/* The child inherits the 2 fsbase values from the parent */
 		lwpd->br_lx_fsbase = plwpd->br_lx_fsbase;
 		lwpd->br_ntv_fsbase = plwpd->br_ntv_fsbase;
+
+#if defined(__amd64)
+		pcb_t *pcb = &lwp->lwp_pcb;
+		DTRACE_PROBE2(brand__lx__initlwp,
+		    uintptr_t, pcb->pcb_fsbase,
+		    uintptr_t, rdmsr(MSR_AMD_FSBASE));
+#ifdef DEBUG
+		ulong_t curr_base = rdmsr(MSR_AMD_FSBASE);
+
+		if (curr_base != 0 && lwpd->br_ntv_fsbase != 0 &&
+		    lwpd->br_ntv_fsbase != curr_base) {
+			DTRACE_PROBE2(brand__lx__initlwp__ntv__fsb,
+			    uintptr_t, lwpd->br_lx_fsbase,
+			    uintptr_t, curr_base);
+		}
+
+		if (pcb->pcb_fsbase != 0 && lwpd->br_ntv_fsbase != 0 &&
+		    lwpd->br_ntv_fsbase != pcb->pcb_fsbase) {
+			DTRACE_PROBE2(brand__lx__initlwp__ntv__pcb,
+			    uintptr_t, lwpd->br_ntv_fsbase,
+			    uintptr_t, pcb->pcb_fsbase);
+		}
+#endif
+#endif
 	} else {
 		/*
 		 * Oddball case: the parent thread isn't a Linux process.

@@ -229,6 +229,10 @@ static struct lx_sysent sysents[LX_NSYSCALLS + 1];
 
 static uintptr_t stack_bottom;
 
+#if defined(_LP64)
+long lx_fsb;
+long lx_fs;
+#endif
 int lx_install = 0;		/* install mode enabled if non-zero */
 boolean_t lx_is_rpm = B_FALSE;
 int lx_rpm_delay = 1;
@@ -500,6 +504,11 @@ lx_emulate(lx_regs_t *rp)
 
 #if defined(_LP64)
 	syscall_num = rp->lxr_rax;
+	extern long lx_fsbchk();
+	extern long lx_fschk();
+	lx_fsb = lx_fsbchk();
+	lx_fs = lx_fschk();
+	(void) syscall(SYS_brand, B_TRUSS_POINT, lx_fsb, lx_fs, syscall_num);
 #else
 	syscall_num = rp->lxr_eax;
 #endif
