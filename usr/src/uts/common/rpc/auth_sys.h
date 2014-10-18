@@ -18,6 +18,11 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ */
+
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -100,8 +105,8 @@ struct short_hand_verf {
 
 struct svc_req;
 
-extern bool_t xdr_gid_t(XDR *, gid_t *ip);
-extern bool_t xdr_uid_t(XDR *, gid_t *ip);
+extern bool_t xdr_gid_t(XDR *, gid_t *);
+extern bool_t xdr_uid_t(XDR *, uid_t *);
 
 #ifdef _KERNEL
 extern bool_t xdr_authkern(XDR *);
