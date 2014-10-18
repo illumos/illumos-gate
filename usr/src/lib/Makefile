@@ -158,6 +158,9 @@ SUBDIRS += \
 	libinstzones	\
 	libpkg		\
 	libpcidb	\
+	libm1		\
+	libm		\
+	libmvec		\
 	libvnd
 
 SUBDIRS += \
@@ -555,7 +558,7 @@ _dc:			$(DCSUBDIRS:%=%-nodepend)
 auditd_plugins: libbsm libnsl libsecdb
 gss_mechs/mech_krb5:	libgss libnsl libsocket libresolv pkcs11
 libadt_jni:	libbsm
-libast: 	libsocket
+libast: 	libsocket libm
 libadutils: 	libldap5 libresolv libsocket libnsl
 nsswitch:	libadutils libidmap libresolv2_joy
 libbe: 		libzfs
@@ -584,6 +587,9 @@ libipadm:	libnsl libinetutil libsocket libdlpi libnvpair libdhcpagent \
 		libdladm libsecdb
 libiscsit:	libc libnvpair libstmf libuuid libnsl
 libkmf:		libcryptoutil pkcs11
+libm:		libc
+libm1:		libc libm
+libmvec:	libc libm
 libnsl:		libmd5
 libmapid:	libresolv
 librdc:		libsocket libnsl libnsctl libunistat libdscfg
@@ -597,7 +603,7 @@ libsecdb:	libnsl
 libsasl:	libgss libsocket pkcs11 libmd
 sasl_plugins:	pkcs11 libgss libsocket libsasl
 libsctp:	libsocket
-libshell:	libast libcmd libdll libsocket libsecdb
+libshell:	libast libcmd libdll libsocket libsecdb libm
 libsip:		libmd5
 libsmbfs:	libcmdutils libsocket libnsl libkrb5
 libsocket:	libnsl
@@ -629,7 +635,7 @@ libsaveargs:	libdisasm
 ../cmd/sgs/libelf:	../cmd/sgs/libconv
 udapl/udapl_tavor:	udapl/libdat
 libzfs:		libdevid libgen libnvpair libuutil \
-		libadm libavl libefi libidmap libmd libzfs_core
+		libadm libavl libefi libidmap libmd libzfs_core libm
 libzfs_core:	libnvpair
 libzfs_jni:	libdiskmgt libnvpair libzfs
 libzpool:	libavl libumem libnvpair libcmdutils
@@ -655,6 +661,13 @@ libreparse:	libnvpair
 libhotplug:	libnvpair
 cfgadm_plugins:	libhotplug
 libilb:		libsocket
+libipmi:	libm
+libprtdiag:	libm
+libsqlite:	libm
+libstmf:	libm
+libvscan: 	libm
+
+
 $(INTEL_BUILD)libdiskmgt:libfdisk
 
 #

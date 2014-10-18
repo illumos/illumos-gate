@@ -44,7 +44,6 @@ usr/include/rpcsvc/daemon_utils.h
 usr/include/rpcsvc/svc_dg_priv.h
 usr/include/security/pam_impl.h
 usr/include/sys/clock_impl.h
-usr/include/sys/ieeefp.h
 usr/include/sys/winlockio.h
 usr/include/scsi/plugins/ses/vendor/sun_impl.h
 #

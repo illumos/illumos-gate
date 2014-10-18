@@ -1,0 +1,92 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright (c) 2012, Igor Kozhukhov <ikozhukhov@gmail.com>.  All rights reserved.
+#
+
+<include system-library-math.man3m.inc>
+<include system-library-math.man3mvec.inc>
+set name=pkg.fmri value=pkg:/system/library/math@$(PKGVERS)
+set name=pkg.description value="Math Libraries"
+set name=pkg.summary value="Math Libraries"
+set name=description value="Math Libraries"
+set name=info.classification \
+    value=org.opensolaris.category.2008:System/Libraries
+set name=variant.arch value=$(ARCH)
+set name=variant.opensolaris.zone value=global value=nonglobal
+dir path=lib
+dir path=lib/$(ARCH64)
+$(sparc_ONLY)dir path=lib/cpu
+$(sparc_ONLY)dir path=lib/cpu/sparcv8plus+vis
+$(sparc_ONLY)dir path=lib/cpu/sparcv9+vis
+$(sparc_ONLY)dir path=lib/cpu/sparcv9+vis/$(ARCH64)
+$(sparc_ONLY)dir path=lib/cpu/sparcv9+vis2
+$(sparc_ONLY)dir path=lib/cpu/sparcv9+vis2/$(ARCH64)
+$(i386_ONLY)dir path=lib/libmvec
+dir path=usr group=sys
+dir path=usr/include
+dir path=usr/include/iso
+dir path=usr/include/sys
+dir path=usr/lib
+dir path=usr/lib/$(ARCH64)
+dir path=usr/share/man/man3m
+dir path=usr/share/man/man3mvec
+file path=lib/$(ARCH64)/libm.so.1
+file path=lib/$(ARCH64)/libm.so.2
+file path=lib/$(ARCH64)/libmvec.so.1
+file path=lib/$(ARCH64)/llib-lm.ln
+$(sparc_ONLY)file path=lib/cpu/sparcv8plus+vis/libmvec_isa.so.1
+$(sparc_ONLY)file path=lib/cpu/sparcv9+vis/$(ARCH64)/libmvec_isa.so.1
+$(sparc_ONLY)file path=lib/cpu/sparcv9+vis2/$(ARCH64)/libmvec_isa.so.1
+$(sparc_ONLY)file path=lib/cpu/sparcv9+vis2/libmvec_isa.so.1
+file path=lib/libm.so.1
+file path=lib/libm.so.2
+file path=lib/libmvec.so.1
+$(i386_ONLY)file path=lib/libmvec/libmvec_hwcap1.so.1
+file path=lib/llib-lm
+file path=lib/llib-lm.ln
+file path=usr/include/complex.h
+file path=usr/include/fenv.h
+file path=usr/include/floatingpoint.h
+file path=usr/include/iso/math_c99.h
+file path=usr/include/iso/math_iso.h
+file path=usr/include/math.h
+file path=usr/include/sys/ieeefp.h
+file path=usr/include/tgmath.h
+legacy pkg=SUNWlibms desc="Math Libraries (Usr)" \
+    hotline="Please contact your local service provider" \
+    name="Math Libraries (Usr)" vendor="Sun Microsystems, Inc." \
+    version=5.11,REV=2009.08.04
+legacy pkg=SUNWlibmsr desc="Math Libraries (Root)" \
+    hotline="Please contact your local service provider" \
+    name="Math Libraries (Root)" vendor="Sun Microsystems, Inc." \
+    version=5.11,REV=2009.08.04
+link path=lib/$(ARCH64)/libm.so target=libm.so.2
+link path=lib/$(ARCH64)/libmvec.so target=libmvec.so.1
+link path=lib/libm.so target=libm.so.2
+link path=lib/libmvec.so target=libmvec.so.1
+link path=usr/lib/$(ARCH64)/libm.so target=../../../lib/$(ARCH64)/libm.so.2
+link path=usr/lib/$(ARCH64)/libm.so.1 target=../../../lib/$(ARCH64)/libm.so.1
+link path=usr/lib/$(ARCH64)/libm.so.2 target=../../../lib/$(ARCH64)/libm.so.2
+link path=usr/lib/$(ARCH64)/libmvec.so \
+    target=../../../lib/$(ARCH64)/libmvec.so.1
+link path=usr/lib/$(ARCH64)/libmvec.so.1 \
+    target=../../../lib/$(ARCH64)/libmvec.so.1
+link path=usr/lib/$(ARCH64)/llib-lm.ln \
+    target=../../../lib/$(ARCH64)/llib-lm.ln
+link path=usr/lib/libm.so target=../../lib/libm.so.2
+link path=usr/lib/libm.so.1 target=../../lib/libm.so.1
+link path=usr/lib/libm.so.2 target=../../lib/libm.so.2
+link path=usr/lib/libmvec.so target=../../lib/libmvec.so.1
+link path=usr/lib/libmvec.so.1 target=../../lib/libmvec.so.1
+link path=usr/lib/llib-lm target=../../lib/llib-lm
+link path=usr/lib/llib-lm.ln target=../../lib/llib-lm.ln

@@ -1,0 +1,473 @@
+'\" te
+.\" Copyright (c) 2006, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH fex_set_handling 3M "12 Jul 2006" "SunOS 5.11" "Mathematical Library Functions"
+.SH NAME
+fex_set_handling, fex_get_handling, fex_getexcepthandler, fex_setexcepthandler
+\- control floating point exception handling modes
+.SH SYNOPSIS
+.LP
+.nf
+c99 [ \fIflag\fR... ] \fIfile\fR... -lm [ \fIlibrary\fR... ]
+#include <fenv.h> 
+
+\fBint\fR \fBfex_set_handling\fR(\fBint\fR \fIex\fR, \fBint\fR \fImode\fR, \fBvoid(*\fR\fIhandler\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBfex_get_handling\fR(\fBint\fR \fIex\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBfex_getexcepthandler\fR(\fBfex_handler_t *\fR\fIbuf\fR, \fBint\fR \fIex\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBfex_setexcepthandler\fR(\fBconst fex_handler_t *\fR\fIbuf\fR, \fBint\fR \fIex\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+These functions provide control of floating point exception handling modes. For
+each function, the \fIex\fR argument specifies one or more exceptions indicated
+by a bitwise-OR of any of the following values defined in <\fBfenv.h\fR>:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBFEX_INEXACT\fR\fR
+.ad
+.RS 17n
+.rt  
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBFEX_UNDERFLOW\fR\fR
+.ad
+.RS 17n
+.rt  
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBFEX_OVERFLOW\fR\fR
+.ad
+.RS 17n
+.rt  
+
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBFEX_DIVBYZERO\fR\fR
+.ad
+.RS 17n
+.rt  
+division by zero
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBFEX_INV_ZDZ\fR\fR
+.ad
+.RS 17n
+.rt  
+0/0 invalid operation
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBFEX_INV_IDI\fR\fR
+.ad
+.RS 17n
+.rt  
+infinity/infinity invalid operation
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBFEX_INV_ISI\fR\fR
+.ad
+.RS 17n
+.rt  
+infinity-infinity invalid operation
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBFEX_INV_ZMI\fR\fR
+.ad
+.RS 17n
+.rt  
+0*infinity invalid operation
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBFEX_INV_SQRT\fR\fR
+.ad
+.RS 17n
+.rt  
+square root of negative operand
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBFEX_INV_SNAN\fR\fR
+.ad
+.RS 17n
+.rt  
+signaling NaN
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBFEX_INV_INT\fR\fR
+.ad
+.RS 17n
+.rt  
+invalid integer conversion
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBFEX_INV_CMP\fR\fR
+.ad
+.RS 17n
+.rt  
+invalid comparison
+.RE
+
+.sp
+.LP
+For convenience, the following combinations of values are also defined:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBFEX_NONE\fR\fR
+.ad
+.RS 15n
+.rt  
+no exceptions
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBFEX_INVALID\fR\fR
+.ad
+.RS 15n
+.rt  
+all invalid operation exceptions
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBFEX_COMMON\fR\fR
+.ad
+.RS 15n
+.rt  
+overflow, division by zero, and invalid operation
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBFEX_ALL\fR\fR
+.ad
+.RS 15n
+.rt  
+all exceptions
+.RE
+
+.sp
+.LP
+The \fBfex_set_handling()\fR function establishes the specified \fImode\fR for
+handling the floating point exceptions identified by \fIex\fR.  The selected
+\fImode\fR determines the action to be taken when one of the indicated
+exceptions occurs.  It must be one of the following values:
+.sp
+.ne 2
+.mk
+.na
+\fB\fBFEX_NOHANDLER\fR\fR
+.ad
+.RS 17n
+.rt  
+Trap but do not otherwise handle the exception, evoking instead whatever
+ambient behavior would normally be in effect.  This is the default behavior
+when the exception's trap is enabled. The \fIhandler\fR parameter is ignored.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBFEX_NONSTOP\fR\fR
+.ad
+.RS 17n
+.rt  
+Provide the IEEE 754 default result for the operation that caused the
+exception, set the exception's flag, and continue execution. This is the
+default behavior when the exception's trap is disabled.  The \fIhandler\fR
+parameter is ignored.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBFEX_ABORT\fR\fR
+.ad
+.RS 17n
+.rt  
+Call \fBabort\fR(3C). The \fIhandler\fR parameter is ignored.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBFEX_SIGNAL\fR\fR
+.ad
+.RS 17n
+.rt  
+Invoke the function *\fIhandler\fR with the parameters normally supplied to a
+signal handler installed with \fBsigfpe\fR(3C).
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fBFEX_CUSTOM\fR\fR
+.ad
+.RS 17n
+.rt  
+Invoke the function *\fIhandler\fR as described in the next paragraph.
+.RE
+
+.sp
+.LP
+In \fBFEX_CUSTOM\fR mode, when a floating point exception occurs, the handler
+function is invoked as though its prototype were:
+.sp
+.in +2
+.nf
+#include <fenv.h>
+void handler(int ex, fex_info_t *info);
+.fi
+.in -2
+
+.sp
+.LP
+On entry, \fIex\fR is the value (of the first twelve listed above)
+corresponding to the exception that occurred, \fBinfo->op\fR indicates the
+operation that caused the exception, \fBinfo->op1\fR and \fBinfo->op2\fR
+contain the values of the operands, \fBinfo->res\fR contains the default
+untrapped result value, and \fBinfo->flags\fR reflects the exception flags that
+the operation would have set had it not been trapped.  If the handler returns,
+the value contained in \fBinfo->res\fR on exit is substituted for the result of
+the operation, the flags indicated by \fBinfo->flags\fR are set, and execution
+resumes at the point where the exception occurred.  The handler might modify
+\fBinfo->res\fR and \fBinfo->flags\fR to supply any desired result value and
+flags.  Alternatively, if the exception is underflow or overflow, the hander
+might set
+.sp
+.LP
+info->res.type = fex_nodata;
+.sp
+.LP
+which causes the exponent-adjusted result specified by IEEE 754 to be
+substituted.  If the handler does not modify \fBinfo->res\fR or
+\fBinfo->flags\fR, the effect is the same as if the exception had not been
+trapped.
+.sp
+.LP
+Although the default untrapped result of an exceptional operation is always
+available to a \fBFEX_CUSTOM\fR handler, in some cases, one or both operands
+may not be.  In these cases, the handler may be invoked with \fBinfo->op1.type
+== fex_nodata\fR or \fBinfo->op2.type == fex_nodata\fR to indicate that the
+respective data structures do not contain valid data.  (For example,
+\fBinfo->op2.type == fex_nodata\fR if the exceptional operation is a unary
+operation.)  Before accessing the operand values, a custom handler should
+always examine the \fBtype\fR field of the operand data structures to ensure
+that they contain valid data in the appropriate format.
+.sp
+.LP
+The \fBfex_get_handling()\fR function returns the current handling mode for the
+exception specified by \fIex\fR, which must be one of the first twelve
+exceptions listed above.
+.sp
+.LP
+The \fBfex_getexcepthandler()\fR function saves the current handling modes and
+associated data for the exceptions specified by \fIex\fR in the data structure
+pointed to by \fIbuf\fR. The type \fBfex_handler_t\fR is defined in
+<\fBfenv.h\fR>.
+.sp
+.LP
+The \fBfex_setexcepthandler()\fR function restores the handling modes and
+associated data for the exceptions specified by \fIex\fR from the data
+structure pointed to by \fIbuf\fR.  This data structure must have been set by a
+previous call to \fBfex_getexcepthandler()\fR. Otherwise the effect on the
+indicated modes is undefined.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBfex_set_handling()\fR function returns a non-zero value if the requested
+exception handling mode is established. Otherwise, it returns 0.
+.SH EXAMPLES
+.sp
+.LP
+The following example demonstrates how to substitute a predetermined value for
+the result of a 0/0 invalid operation.
+.sp
+.in +2
+.nf
+#include <math.h>
+#include <fenv.h>
+
+double k;
+
+void presub(int ex, fex_info_t *info) {
+	info->res.type = fex_double;
+	info->res.val.d = k;
+}
+
+int main() {
+	double x, w;
+	int i;
+	fex_handler_t buf;
+/*
+ * save current 0/0 handler
+ */
+	(void) fex_getexcepthandler(&buf, FEX_INV_ZDZ);
+/* 
+ * set up presubstitution handler for 0/0
+ */
+	(void) fex_set_handling(FEX_INV_ZDZ, FEX_CUSTOM, presub);
+/*
+ *  compute (k*x)/sin(x) for k=2.0, x=0.5, 0.4, ..., 0.1, 0.0
+ */
+	k = 2.0;
+	(void) printf("Evaluating f(x) = (k*x)/sin(x)\en\en");
+	for (i = 5; i >= 0; i--) {
+	        x = (double) i * 0.1;
+	        w = (k * x) / sin(x);
+	        (void) printf("\etx=%3.3f\et f(x) = % 1.20e\en", x, w);
+	}
+/*
+ * restore old 0/0 handler 
+ */
+	(void) fex_setexcepthandler(&buf, FEX_INV_ZDZ);
+	return 0;
+}
+.fi
+.in -2
+
+.sp
+.LP
+The output from the preceding program reads:
+.sp
+.in +2
+.nf
+Evaluating f(x) = (k*x)/sin(x)
+
+	x=0.500  f(x) =  2.08582964293348816000e+00
+	x=0.400  f(x) =  2.05434596443822626000e+00
+	x=0.300  f(x) =  2.03031801709447368000e+00
+	x=0.200  f(x) =  2.01339581906893761000e+00
+	x=0.100  f(x) =  2.00333722632695554000e+00
+	x=0.000  f(x) =  2.00000000000000000000e+00
+.fi
+.in -2
+
+.sp
+.LP
+When \fIx\fR = 0, \fIf(x)\fR is computed as 0/0 and an invalid operation
+exception occurs.  In this example, the value 2.0 is substituted for the
+result.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+lw(2.75i) lw(2.75i) 
+lw(2.75i) lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+AvailabilitySUNWlibms, SUNWlmxs
+Interface StabilityStable
+MT-LevelMT-Safe (see Notes)
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBsigfpe\fR(3C), \fBfeclearexcept\fR(3M), \fBfegetenv\fR(3M),
+\fBfex_set_log\fR(3M), \fBattributes\fR(5)
+.sp
+.LP
+\fINumerical Computation Guide\fR
+.SH NOTES
+.sp
+.LP
+In a multithreaded application, the preceding functions affect exception
+handling modes only for the calling thread.
+.sp
+.LP
+The functions described on this page automatically install and deinstall
+\fBSIGFPE\fR handlers and set and clear the trap enable mode bits in the
+floating point status register as needed.  If a program uses these functions
+and attempts to install a \fBSIGFPE\fR handler or control the trap enable mode
+bits independently, the resulting behavior is not defined.
+.sp
+.LP
+All traps are disabled before a handler installed in \fBFEX_CUSTOM\fR mode is
+invoked.  When the \fBSIGFPE\fR signal is blocked, as it is when such a handler
+is invoked, the floating point environment, exception flags, and retrospective
+diagnostic functions described in \fBfeclearexcept\fR(3M), \fBfegetenv\fR(3M),
+and \fBfex_set_log\fR(3M) do not re-enable traps.  Thus, the handler itself
+always runs in \fBFEX_NONSTOP\fR mode with logging of retrospective diagnostics
+disabled.  Attempting to change these modes within the handler may not produce
+the expected results.

@@ -1,0 +1,209 @@
+'\" te
+.\" Copyright (c) 2006, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH fex_set_log 3M "12 Jul 2006" "SunOS 5.11" "Mathematical Library Functions"
+.SH NAME
+fex_set_log, fex_get_log, fex_set_log_depth, fex_get_log_depth, fex_log_entry
+\- log retrospective diagnostics for floating point exceptions
+.SH SYNOPSIS
+.LP
+.nf
+c99 [ \fIflag\fR... ] \fIfile\fR... -lm [ \fIlibrary\fR... ]
+#include <fenv.h> 
+
+\fBint\fR \fBfex_set_log\fR(\fBFILE *\fR\fIfp\fR);
+.fi
+
+.LP
+.nf
+\fBFILE *\fR\fBfex_get_log\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBfex_set_log_depth\fR(\fBint\fR \fIdepth\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBfex_get_log_depth\fR(\fBvoid\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBfex_log_entry\fR(\fBconst char *\fR\fImsg\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBfex_set_log()\fR function enables logging of retrospective diagnostic
+messages regarding floating point exceptions to the file specified by \fIfp\fR.
+If \fIfp\fR is \fINULL\fR, logging is disabled.  When a program starts, logging
+is initially disabled.
+.sp
+.LP
+The occurrence of any of the twelve exceptions listed in
+\fBfex_set_handling\fR(3M) constitutes an event that can be logged.  To prevent
+the log from becoming exhorbitantly long, the logging mechanism eliminates
+redundant entries by two methods.  First, each exception is associated with a
+\fIsite\fR in the program.  The site is identified by the address of the
+instruction that caused the exception together with a stack trace.  Only the
+first exception of a given type to occur at a given site will be logged.
+Second, when \fBFEX_NONSTOP\fR handling mode is in effect for some exception,
+only those occurrences of that exception that set its previously clear flag are
+logged.  Clearing a flag using \fBfeclearexcept()\fR allows the next occurrence
+of the exception to be logged provided it does not occur at a site at which it
+was previously logged.
+.sp
+.LP
+Each of the different types of invalid operation exceptions can be logged at
+the same site.  Because all invalid operation exceptions share the same flag,
+however, of those types for which \fBFEX_NONSTOP\fR mode is in effect, only the
+first exception to set the flag will be logged.  When the invalid operation
+exception is raised by a call to \fBferaiseexcept\fR(3M) or
+\fBfeupdateenv\fR(3M), which type of invalid operation is logged depends on the
+implementation.
+.sp
+.LP
+If an exception results in the creation of a log entry, the entry is created at
+the time the exception occurs and before any exception handling actions
+selected with \fBfex_set_handling()\fR are taken.  In particular, the log entry
+is available even if the program terminates as a result of the exception.  The
+log entry shows the type of exception, the address of the instruction that
+caused it, how it will be handled, and the stack trace. If symbols are
+available, the address of the excepting instruction and the addresses in the
+stack trace are followed by the names of the corresponding symbols.
+.sp
+.LP
+The \fBfex_get_log()\fR function returns the current log file.
+.sp
+.LP
+The \fBfex_set_log_depth()\fR sets the maximum depth of the stack trace
+recorded with each exception to \fIdepth\fR stack frames.  The default depth is
+100.
+.sp
+.LP
+The\fBfex_get_log_depth()\fR function returns the current maximum stack trace
+depth.
+.sp
+.LP
+The \fBfex_log_entry()\fR function adds a user-supplied entry to the log.  The
+entry includes the string pointed to by \fImsg\fR and the stack trace.  Like
+entries for floating point exceptions, redundant user-supplied entries are
+eliminated: only the first user-supplied entry with a given \fImsg\fR to be
+requested from a given site will be logged.  For the purpose of a user-supplied
+entry, the site is defined only by the stack trace, which begins with the
+function that called \fBfex_log_entry()\fR.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBfex_set_log()\fR function returns a non-zero value if logging is enabled
+or disabled accordingly and returns 0 otherwise.  The \fBfex_set_log_depth()\fR
+returns a non-zero value if the requested stack trace depth is established
+(regardless of whether logging is enabled) and returns 0 otherwise.
+.SH EXAMPLES
+.sp
+.LP
+The following example demonstrates the output generated when a floating point
+overflow occurs in \fBsscanf\fR(3C).
+.sp
+.in +2
+.nf
+#include <fenv.h>
+
+int
+main() {
+	double x;
+/*
+ * enable logging of retrospective diagnostics
+ */
+	(void) fex_set_log(stdout);
+/*
+ * establish default handling for overflows
+ */
+	(void) fex_set_handling(FEX_OVERFLOW, FEX_NONSTOP, NULL);
+/* 
+ * trigger an overflow in sscanf
+ */
+	(void) sscanf("1.0e+400", "%lf", &x);
+	return 0;
+}
+.fi
+.in -2
+
+.sp
+.LP
+The output from the preceding program reads:
+.sp
+.in +2
+.nf
+Floating point overflow at 0xef71cac4 __base_conversion_set_exceptio
+n, nonstop mode
+   0xef71cacc  __base_conversion_set_exception
+   0xef721820  _decimal_to_double
+   0xef75aba8  number
+   0xef75a94c  __doscan_u
+   0xef75ecf8  sscanf
+   0x00010f20  main
+.fi
+.in -2
+
+.sp
+.LP
+Recompiling the program or running it on another system can produce different
+text addresses from those shown above.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+lw(2.75i) lw(2.75i) 
+lw(2.75i) lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+AvailabilitySUNWlibms, SUNWlmxs
+Interface StabilityStable
+MT-LevelMT-Safe (see NOTES)
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBfeclearexcept\fR(3M), \fBfegetenv\fR(3M), \fBferaiseexcept\fR(3M),
+\fBfeupdateenv\fR(3M), \fBfex_set_handling\fR(3M), \fBattributes\fR(5)
+.sp
+.LP
+\fINumerical Computation Guide\fR
+.SH NOTES
+.sp
+.LP
+All threads in a process share the same log file.  Each call to
+\fBfex_set_log()\fR preempts the previous one.
+.sp
+.LP
+In addition to the log file itself, two additional file descriptors are used
+during the creation of a log entry in order to obtain symbol names from the
+executable and any shared objects it uses.  These file descriptors are
+relinquished once the log entry is written.  If the file descriptors cannot be
+allocated, symbols names are omitted from the stack trace.
+.sp
+.LP
+The functions described on this page automatically install and deinstall
+\fBSIGFPE\fR handlers and set and clear the trap enable mode bits in the
+floating point status register as needed.  If a program uses these functions
+and attempts to install a \fBSIGFPE\fR handler or control the trap enable mode
+bits independently, the resulting behavior is not defined.
+.sp
+.LP
+As described in \fBfex_set_handling()\fR, when a handling function installed in
+\fBFEX_CUSTOM\fR mode is invoked, all exception traps are disabled (and will
+not be reenabled while \fBSIGFPE\fR is blocked).  Thus, retrospective
+diagnostic messages are not logged for exceptions that occur within such a
+handler.

@@ -1,0 +1,80 @@
+'\" te
+.\" Copyright (c) 2001, The IEEE and The Open Group. All Rights Reserved. Portions Copyright (c) 2002, Sun Microsystems, Inc. All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH fegetexceptflag 3M "1 Sep 2002" "SunOS 5.11" "Mathematical Library Functions"
+.SH NAME
+fegetexceptflag, fesetexceptflag \- get and set floating-point status flags
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR... ] \fIfile\fR... \fB-lm\fR [ \fIlibrary\fR... ]
+#include <fenv.h>
+
+\fBint\fR \fBfegetexceptflag\fR(\fBfexcept_t *\fR\fIflagp\fR, \fBint\fR \fIexcepts\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBfesetexceptflag\fR(\fBconst fexcept_t *\fR\fIflagp\fR, \fBint\fR \fIexcepts\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBfegetexceptflag()\fR function attempts to store an
+implementation-defined representation of the states of the floating-point
+status flags indicated by the \fIexcepts\fR argument in the object pointed to
+by the \fIflagp\fR argument.
+.sp
+.LP
+The \fBfesetexceptflag()\fR function attempts to set the floating-point status
+flags indicated by the \fIexcepts\fR argument to the states stored in the
+object pointed to by \fIflagp\fR. The value pointed to by \fIflagp\fR will have
+been set by a previous call to \fBfegetexceptflag()\fR whose second argument
+represented at least those floating-point exceptions represented by the
+\fIexcepts\fR argument. This function does not raise floating-point exceptions
+but only sets the state of the flags.
+.SH RETURN VALUES
+.sp
+.LP
+If the representation was successfully stored, \fBfegetexceptflag()\fR returns
+0. Otherwise, it returns a non-zero value.
+.sp
+.LP
+If the excepts argument is 0 or if all the specified exceptions were
+successfully set, \fBfesetexceptflag()\fR returns 0. Otherwise, it returns a
+non-zero value.
+.SH ERRORS
+.sp
+.LP
+No errors are defined.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBfenv.h\fR(3HEAD), \fBfeclearexcept\fR(3M), \fBferaiseexcept\fR(3M),
+\fBfesetexceptflag\fR(3M), \fBattributes\fR(5), \fBstandards\fR(5)

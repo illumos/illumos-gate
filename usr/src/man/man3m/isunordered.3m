@@ -1,0 +1,73 @@
+'\" te
+.\" Copyright (c) 2001, the Institute of Electrical and Electronics Engineers, Inc. and The Open Group. All Rights Reserved.
+.\" Portions Copyright (c) 2006, Sun Microsystems, Inc. All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH isunordered 3M "12 Jul 2006" "SunOS 5.11" "Mathematical Library Functions"
+.SH NAME
+isunordered \- test if arguments are unordered
+.SH SYNOPSIS
+.LP
+.nf
+c99 [ \fIflag\fR... ] \fIfile\fR... \fB-lm\fR [ \fIlibrary\fR... ]
+#include <math.h>
+
+\fBint\fR \fBisunordered\fR(\fBreal-floating\fR \fIx\fR, \fBreal-floating\fR \fIy\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBisunordered()\fR macro determines whether its arguments are unordered.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, the \fBisunordered()\fR macro returns 1 if its
+arguments are unordered and 0 otherwise.
+.SH ERRORS
+.sp
+.LP
+No errors are defined.
+.SH USAGE
+.sp
+.LP
+The relational and equality operators support the usual mathematical
+relationships between numeric values. For any ordered pair of numeric values,
+exactly one of the relationships (less, greater, and equal) is true. Relational
+operators can raise the invalid floating-point exception when argument values
+are NaNs. For a NaN and a numeric value, or for two NaNs, just the unordered
+relationship is true. This macro is a quiet (non-floating-point exception
+raising) version of a relational operator. It facilitates writing efficient
+code that accounts for quiet NaNs without suffering the invalid floating-point
+exception. In the \fBSYNOPSIS\fR section, \fBreal-floating\fR indicates that
+the argument shall be an expression of \fBreal-floating\fR type.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBisgreater\fR(3M), \fBisgreaterequal\fR(3M), \fBisless\fR(3M),
+\fBislessequal\fR(3M), \fBislessgreater\fR(3M), \fBmath.h\fR(3HEAD),
+\fBattributes\fR(5), \fBstandards\fR(5)

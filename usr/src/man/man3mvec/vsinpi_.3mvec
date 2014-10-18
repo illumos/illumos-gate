@@ -1,0 +1,117 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH vsinpi_ 3MVEC "14 Dec 2007" "SunOS 5.11" "Vector Math Library Functions"
+.SH NAME
+vsinpi_, vsinpif_ \- vector sinpi functions
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lmvec\fR [ \fIlibrary\fR\&.\|.\|. ]
+
+\fBvoid\fR \fBvsinpi_\fR(\fBint *\fR\fIn\fR, \fBdouble * restrict\fR \fIx\fR, \fBint *\fR\fIstridex\fR,
+     \fBdouble * restrict\fR \fIy\fR, \fBint *\fR\fIstridey\fR);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBvsinpif_\fR(\fBint *\fR\fIn\fR, \fBfloat * restrict\fR \fIx\fR, \fBint *\fR\fIstridex\fR,
+     \fBfloat * restrict\fR \fIy\fR, \fBint *\fR\fIstridey\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+These functions evaluate the function \fBsinpi\fR(\fIx\fR), defined by
+\fBsinpi\fR(\fIx\fR) =  \fBsin\fR(\c
+.if n pi\c
+.if t \(*p
+\c
+ * \fIx\fR), for an entire vector of values at once. The first parameter
+specifies the number of values to compute. Subsequent parameters specify the
+argument and result vectors. Each vector is described by a pointer to the first
+element and a stride, which is the increment between successive elements.
+.sp
+.LP
+Specifically, \fBvsinpi_\fR(\fIn\fR, \fIx\fR, \fIsx\fR, \fIy\fR, \fIsy\fR)
+computes \fIy\fR[\fIi\fR * *\fIsy\fR] = \fBsinpi\fR(\fIx\fR[\fIi\fR *
+*\fIsx\fR]) for each \fIi\fR = 0, 1, ..., *\fIn\fR - 1. The \fBvsinpif_()\fR
+function performs the same computation for single precision data.
+.sp
+.LP
+Non-exceptional results are accurate to within a unit in the last place.
+.SH USAGE
+.sp
+.LP
+The element count *\fIn\fR must be greater than zero. The strides for the
+argument and result arrays can be arbitrary integers, but the arrays themselves
+must not be the same or overlap. A zero stride effectively collapses an entire
+vector into a single element. A negative stride causes a vector to be accessed
+in descending memory order, but note that the corresponding pointer must still
+point to the first element of the vector to be used; if the stride is negative,
+this will be the highest-addressed element in memory. This convention differs
+from the Level 1 BLAS, in which array parameters always refer to the
+lowest-addressed element in memory even when negative increments are used.
+.sp
+.LP
+These functions assume that the default round-to-nearest rounding direction
+mode is in effect. On x86, these functions also assume that the default
+round-to-64-bit rounding precision mode is in effect. The result of calling a
+vector function with a non-default rounding mode in effect is undefined.
+.sp
+.LP
+These functions handle special cases and exceptions in the spirit of IEEE 754.
+In particular,
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBsinpi\fR(NaN) is NaN,
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBsinpi\fR(\(+-0) is \(+-0,
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBsinpi\fR(\(+-Inf) is NaN, and an invalid operation exception is raised.
+.RE
+.sp
+.LP
+An application wanting to check for exceptions should call
+\fBfeclearexcept\fR(\fBFE_ALL_EXCEPT\fR) before calling these functions. On
+return, if \fBfetestexcept\fR(\fBFE_INVALID\fR | \fBFE_DIVBYZERO\fR |
+\fBFE_OVERFLOW\fR | \fBFE_UNDERFLOW\fR) is non-zero, an exception has been
+raised. The application can then examine the result or argument vectors for
+exceptional values. Some vector functions can raise the inexact exception even
+if all elements of the argument array are such that the numerical results are
+exact.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityCommitted
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBfeclearexcept\fR(3M), \fBfetestexcept\fR(3M), \fBattributes\fR(5)

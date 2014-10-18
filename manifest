@@ -1180,6 +1180,9 @@ f lib/amd64/libkstat.so.1 0755 root bin
 s lib/amd64/libkstat.so=libkstat.so.1
 f lib/amd64/libld.so.4 0755 root bin
 f lib/amd64/liblddbg.so.4 0755 root bin
+s lib/amd64/libm.so=libm.so.2
+f lib/amd64/libm.so.1 0755 root bin
+f lib/amd64/libm.so.2 0755 root bin
 f lib/amd64/libmd.so.1 0755 root bin
 s lib/amd64/libmd.so=libmd.so.1
 f lib/amd64/libmd5.so.1 0755 root bin
@@ -1188,6 +1191,8 @@ f lib/amd64/libmp.so.2 0755 root bin
 s lib/amd64/libmp.so=libmp.so.2
 f lib/amd64/libmpscsi_vhci.so.1 0755 root bin
 s lib/amd64/libmpscsi_vhci.so=libmpscsi_vhci.so.1
+s lib/amd64/libmvec.so=libmvec.so.1
+f lib/amd64/libmvec.so.1 0755 root bin
 f lib/amd64/libnsl.so.1 0755 root bin
 s lib/amd64/libnsl.so=libnsl.so.1
 f lib/amd64/libnvpair.so.1 0755 root bin
@@ -1370,6 +1375,9 @@ f lib/libkstat.so.1 0755 root bin
 s lib/libkstat.so=libkstat.so.1
 f lib/libld.so.4 0755 root bin
 f lib/liblddbg.so.4 0755 root bin
+s lib/libm.so=libm.so.2
+f lib/libm.so.1 0755 root bin
+f lib/libm.so.2 0755 root bin
 f lib/libmd.so.1 0755 root bin
 s lib/libmd.so=libmd.so.1
 f lib/libmd5.so.1 0755 root bin
@@ -1379,6 +1387,10 @@ f lib/libmp.so.2 0755 root bin
 s lib/libmp.so=libmp.so.2
 f lib/libmpscsi_vhci.so.1 0755 root bin
 s lib/libmpscsi_vhci.so=libmpscsi_vhci.so.1
+d lib/libmvec 0755 root bin
+s lib/libmvec.so=libmvec.so.1
+f lib/libmvec.so.1 0755 root bin
+f lib/libmvec/libmvec_hwcap1.so.1 0755 root bin
 f lib/libnsl.so.1 0755 root bin
 s lib/libnsl.so=libnsl.so.1
 f lib/libnvpair.so.1 0755 root bin
@@ -2582,6 +2594,7 @@ f usr/include/bsm/audit_uevents.h 0644 root bin
 f usr/include/bsm/devalloc.h 0644 root bin
 f usr/include/bsm/devices.h 0644 root bin
 f usr/include/bsm/libbsm.h 0644 root bin
+f usr/include/complex.h 0644 root bin
 f usr/include/config_admin.h 0644 root bin
 f usr/include/cpio.h 0644 root bin
 f usr/include/crypt.h 0644 root bin
@@ -2640,7 +2653,9 @@ f usr/include/exec_attr.h 0644 root bin
 f usr/include/execinfo.h 0644 root bin
 f usr/include/fatal.h 0644 root bin
 f usr/include/fcntl.h 0644 root bin
+f usr/include/fenv.h 0644 root bin
 f usr/include/float.h 0644 root bin
+f usr/include/floatingpoint.h 0644 root bin
 d usr/include/fm 0755 root bin
 f usr/include/fm/diagcode.h 0644 root bin
 f usr/include/fm/fmd_adm.h 0644 root bin
@@ -2785,6 +2800,8 @@ s usr/include/iso/float_iso.h=../float.h
 s usr/include/iso/iso646_iso.h=../iso646.h
 f usr/include/iso/limits_iso.h 0644 root bin
 f usr/include/iso/locale_iso.h 0644 root bin
+f usr/include/iso/math_c99.h 0644 root bin
+f usr/include/iso/math_iso.h 0644 root bin
 f usr/include/iso/setjmp_iso.h 0644 root bin
 f usr/include/iso/signal_iso.h 0644 root bin
 f usr/include/iso/stdarg_c99.h 0644 root bin
@@ -2914,6 +2931,7 @@ f usr/include/locale.h 0644 root bin
 f usr/include/macros.h 0644 root bin
 f usr/include/maillock.h 0644 root bin
 f usr/include/malloc.h 0644 root bin
+f usr/include/math.h 0644 root bin
 f usr/include/md4.h 0644 root bin
 f usr/include/md5.h 0644 root bin
 f usr/include/mdiox.h 0644 root bin
@@ -3772,6 +3790,7 @@ f usr/include/sys/idm/idm_so.h 0644 root bin
 f usr/include/sys/idm/idm_text.h 0644 root bin
 f usr/include/sys/idm/idm_transport.h 0644 root bin
 f usr/include/sys/idmap.h 0644 root bin
+f usr/include/sys/ieeefp.h 0644 root bin
 f usr/include/sys/inotify.h 0644 root bin
 f usr/include/sys/inline.h 0644 root bin
 f usr/include/sys/instance.h 0644 root bin
@@ -4439,6 +4458,7 @@ f usr/include/tcpd.h 0644 root bin
 f usr/include/term.h 0644 root bin
 f usr/include/termio.h 0644 root bin
 f usr/include/termios.h 0644 root bin
+f usr/include/tgmath.h 0644 root bin
 f usr/include/thread.h 0644 root bin
 f usr/include/thread_db.h 0644 root bin
 f usr/include/time.h 0644 root bin
@@ -4819,6 +4839,9 @@ f usr/lib/amd64/liblgrp.so.1 0755 root bin
 s usr/lib/amd64/liblgrp.so=liblgrp.so.1
 f usr/lib/amd64/liblm.so.1 0755 root bin
 s usr/lib/amd64/liblm.so=liblm.so.1
+s usr/lib/amd64/libm.so=../../../lib/amd64/libm.so.2
+s usr/lib/amd64/libm.so.1=../../../lib/amd64/libm.so.1
+s usr/lib/amd64/libm.so.2=../../../lib/amd64/libm.so.2
 f usr/lib/amd64/libmail.so.1 0755 root bin
 s usr/lib/amd64/libmail.so=libmail.so.1
 f usr/lib/amd64/libmalloc.so.1 0755 root bin
@@ -4838,6 +4861,8 @@ s usr/lib/amd64/libmpscsi_vhci.so.1=../../../lib/amd64/libmpscsi_vhci.so.1
 s usr/lib/amd64/libmpscsi_vhci.so=../../../lib/amd64/libmpscsi_vhci.so.1
 f usr/lib/amd64/libmtmalloc.so.1 0755 root bin
 s usr/lib/amd64/libmtmalloc.so=libmtmalloc.so.1
+s usr/lib/amd64/libmvec.so=../../../lib/amd64/libmvec.so.1
+s usr/lib/amd64/libmvec.so.1=../../../lib/amd64/libmvec.so.1
 f usr/lib/amd64/libndmp.so.1 0755 root bin
 s usr/lib/amd64/libndmp.so=libndmp.so.1
 f usr/lib/amd64/libnls.so.1 0755 root bin
@@ -6244,6 +6269,9 @@ f usr/lib/liblgrp.so.1 0755 root bin
 s usr/lib/liblgrp.so=liblgrp.so.1
 f usr/lib/liblm.so.1 0755 root bin
 s usr/lib/liblm.so=liblm.so.1
+s usr/lib/libm.so=../../lib/libm.so.2
+s usr/lib/libm.so.1=../../lib/libm.so.1
+s usr/lib/libm.so.2=../../lib/libm.so.2
 f usr/lib/libmail.so.1 0755 root bin
 s usr/lib/libmail.so=libmail.so.1
 f usr/lib/libmalloc.so.1 0755 root bin
@@ -6266,6 +6294,8 @@ s usr/lib/libmpscsi_vhci.so.1=../../lib/libmpscsi_vhci.so.1
 s usr/lib/libmpscsi_vhci.so=../../lib/libmpscsi_vhci.so.1
 f usr/lib/libmtmalloc.so.1 0755 root bin
 s usr/lib/libmtmalloc.so=libmtmalloc.so.1
+s usr/lib/libmvec.so=../../lib/libmvec.so.1
+s usr/lib/libmvec.so.1=../../lib/libmvec.so.1
 f usr/lib/libndmp.so.1 0755 root bin
 s usr/lib/libndmp.so=libndmp.so.1
 f usr/lib/libnisdb.so.2 0755 root bin
@@ -15640,6 +15670,114 @@ f usr/share/man/man3lib/libvolmgt.3lib 0444 root bin
 f usr/share/man/man3lib/libw.3lib 0444 root bin
 f usr/share/man/man3lib/libxnet.3lib 0444 root bin
 f usr/share/man/man3lib/liby.3lib 0444 root bin
+d usr/share/man/man3m 0755 root bin
+f usr/share/man/man3m/acos.3m 0444 root bin
+f usr/share/man/man3m/acosh.3m 0444 root bin
+f usr/share/man/man3m/asin.3m 0444 root bin
+f usr/share/man/man3m/asinh.3m 0444 root bin
+f usr/share/man/man3m/atan.3m 0444 root bin
+f usr/share/man/man3m/atan2.3m 0444 root bin
+f usr/share/man/man3m/atanh.3m 0444 root bin
+f usr/share/man/man3m/cabs.3m 0444 root bin
+f usr/share/man/man3m/cacos.3m 0444 root bin
+f usr/share/man/man3m/cacosh.3m 0444 root bin
+f usr/share/man/man3m/carg.3m 0444 root bin
+f usr/share/man/man3m/casin.3m 0444 root bin
+f usr/share/man/man3m/casinh.3m 0444 root bin
+f usr/share/man/man3m/catan.3m 0444 root bin
+f usr/share/man/man3m/catanh.3m 0444 root bin
+f usr/share/man/man3m/cbrt.3m 0444 root bin
+f usr/share/man/man3m/ccos.3m 0444 root bin
+f usr/share/man/man3m/ccosh.3m 0444 root bin
+f usr/share/man/man3m/ceil.3m 0444 root bin
+f usr/share/man/man3m/cexp.3m 0444 root bin
+f usr/share/man/man3m/cimag.3m 0444 root bin
+f usr/share/man/man3m/clog.3m 0444 root bin
+f usr/share/man/man3m/conj.3m 0444 root bin
+f usr/share/man/man3m/copysign.3m 0444 root bin
+f usr/share/man/man3m/cos.3m 0444 root bin
+f usr/share/man/man3m/cosh.3m 0444 root bin
+f usr/share/man/man3m/cpow.3m 0444 root bin
+f usr/share/man/man3m/cproj.3m 0444 root bin
+f usr/share/man/man3m/creal.3m 0444 root bin
+f usr/share/man/man3m/csin.3m 0444 root bin
+f usr/share/man/man3m/csinh.3m 0444 root bin
+f usr/share/man/man3m/csqrt.3m 0444 root bin
+f usr/share/man/man3m/ctan.3m 0444 root bin
+f usr/share/man/man3m/ctanh.3m 0444 root bin
+f usr/share/man/man3m/erf.3m 0444 root bin
+f usr/share/man/man3m/erfc.3m 0444 root bin
+f usr/share/man/man3m/exp.3m 0444 root bin
+f usr/share/man/man3m/exp2.3m 0444 root bin
+f usr/share/man/man3m/expm1.3m 0444 root bin
+f usr/share/man/man3m/fabs.3m 0444 root bin
+f usr/share/man/man3m/fdim.3m 0444 root bin
+f usr/share/man/man3m/feclearexcept.3m 0444 root bin
+f usr/share/man/man3m/fegetenv.3m 0444 root bin
+f usr/share/man/man3m/fegetexceptflag.3m 0444 root bin
+f usr/share/man/man3m/fegetround.3m 0444 root bin
+f usr/share/man/man3m/feholdexcept.3m 0444 root bin
+f usr/share/man/man3m/feraiseexcept.3m 0444 root bin
+f usr/share/man/man3m/fesetprec.3m 0444 root bin
+f usr/share/man/man3m/fetestexcept.3m 0444 root bin
+f usr/share/man/man3m/feupdateenv.3m 0444 root bin
+f usr/share/man/man3m/fex_merge_flags.3m 0444 root bin
+f usr/share/man/man3m/fex_set_handling.3m 0444 root bin
+f usr/share/man/man3m/fex_set_log.3m 0444 root bin
+f usr/share/man/man3m/floor.3m 0444 root bin
+f usr/share/man/man3m/fma.3m 0444 root bin
+f usr/share/man/man3m/fmax.3m 0444 root bin
+f usr/share/man/man3m/fmin.3m 0444 root bin
+f usr/share/man/man3m/fmod.3m 0444 root bin
+f usr/share/man/man3m/fpclassify.3m 0444 root bin
+f usr/share/man/man3m/frexp.3m 0444 root bin
+f usr/share/man/man3m/hypot.3m 0444 root bin
+f usr/share/man/man3m/ilogb.3m 0444 root bin
+f usr/share/man/man3m/isfinite.3m 0444 root bin
+f usr/share/man/man3m/isgreater.3m 0444 root bin
+f usr/share/man/man3m/isgreaterequal.3m 0444 root bin
+f usr/share/man/man3m/isinf.3m 0444 root bin
+f usr/share/man/man3m/isless.3m 0444 root bin
+f usr/share/man/man3m/islessequal.3m 0444 root bin
+f usr/share/man/man3m/islessgreater.3m 0444 root bin
+f usr/share/man/man3m/isnan.3m 0444 root bin
+f usr/share/man/man3m/isnormal.3m 0444 root bin
+f usr/share/man/man3m/isunordered.3m 0444 root bin
+f usr/share/man/man3m/j0.3m 0444 root bin
+f usr/share/man/man3m/ldexp.3m 0444 root bin
+f usr/share/man/man3m/lgamma.3m 0444 root bin
+f usr/share/man/man3m/llrint.3m 0444 root bin
+f usr/share/man/man3m/llround.3m 0444 root bin
+f usr/share/man/man3m/log.3m 0444 root bin
+f usr/share/man/man3m/log10.3m 0444 root bin
+f usr/share/man/man3m/log1p.3m 0444 root bin
+f usr/share/man/man3m/log2.3m 0444 root bin
+f usr/share/man/man3m/logb.3m 0444 root bin
+f usr/share/man/man3m/lrint.3m 0444 root bin
+f usr/share/man/man3m/lround.3m 0444 root bin
+f usr/share/man/man3m/matherr.3m 0444 root bin
+f usr/share/man/man3m/modf.3m 0444 root bin
+f usr/share/man/man3m/nan.3m 0444 root bin
+f usr/share/man/man3m/nearbyint.3m 0444 root bin
+f usr/share/man/man3m/nextafter.3m 0444 root bin
+f usr/share/man/man3m/pow.3m 0444 root bin
+f usr/share/man/man3m/remainder.3m 0444 root bin
+f usr/share/man/man3m/remquo.3m 0444 root bin
+f usr/share/man/man3m/rint.3m 0444 root bin
+f usr/share/man/man3m/round.3m 0444 root bin
+f usr/share/man/man3m/scalb.3m 0444 root bin
+f usr/share/man/man3m/scalbln.3m 0444 root bin
+f usr/share/man/man3m/signbit.3m 0444 root bin
+f usr/share/man/man3m/significand.3m 0444 root bin
+f usr/share/man/man3m/sin.3m 0444 root bin
+f usr/share/man/man3m/sincos.3m 0444 root bin
+f usr/share/man/man3m/sinh.3m 0444 root bin
+f usr/share/man/man3m/sqrt.3m 0444 root bin
+f usr/share/man/man3m/tan.3m 0444 root bin
+f usr/share/man/man3m/tanh.3m 0444 root bin
+f usr/share/man/man3m/tgamma.3m 0444 root bin
+f usr/share/man/man3m/trunc.3m 0444 root bin
+f usr/share/man/man3m/y0.3m 0444 root bin
 d usr/share/man/man3mail 0755 root bin
 f usr/share/man/man3mail/maillock.3mail 0444 root bin
 s usr/share/man/man3mail/mailunlock.3mail=maillock.3mail
@@ -15731,6 +15869,26 @@ f usr/share/man/man3mpapi/MP_SetProbingPollingRate.3mpapi 0444 root bin
 f usr/share/man/man3mpapi/MP_SetProprietaryProperties.3mpapi 0444 root bin
 f usr/share/man/man3mpapi/MP_SetTPGAccess.3mpapi 0444 root bin
 f usr/share/man/man3mpapi/Sun_MP_SendScsiCmd.3mpapi 0444 root bin
+d usr/share/man/man3mvec 0755 root bin
+f usr/share/man/man3mvec/vatan2_.3mvec 0444 root bin
+f usr/share/man/man3mvec/vatan_.3mvec 0444 root bin
+f usr/share/man/man3mvec/vcos_.3mvec 0444 root bin
+f usr/share/man/man3mvec/vcospi_.3mvec 0444 root bin
+f usr/share/man/man3mvec/vexp_.3mvec 0444 root bin
+f usr/share/man/man3mvec/vhypot_.3mvec 0444 root bin
+f usr/share/man/man3mvec/vlog_.3mvec 0444 root bin
+f usr/share/man/man3mvec/vpow_.3mvec 0444 root bin
+f usr/share/man/man3mvec/vrhypot_.3mvec 0444 root bin
+f usr/share/man/man3mvec/vrsqrt_.3mvec 0444 root bin
+f usr/share/man/man3mvec/vsin_.3mvec 0444 root bin
+f usr/share/man/man3mvec/vsincos_.3mvec 0444 root bin
+f usr/share/man/man3mvec/vsincospi_.3mvec 0444 root bin
+f usr/share/man/man3mvec/vsinpi_.3mvec 0444 root bin
+f usr/share/man/man3mvec/vsqrt_.3mvec 0444 root bin
+f usr/share/man/man3mvec/vz_abs_.3mvec 0444 root bin
+f usr/share/man/man3mvec/vz_exp_.3mvec 0444 root bin
+f usr/share/man/man3mvec/vz_log_.3mvec 0444 root bin
+f usr/share/man/man3mvec/vz_pow_.3mvec 0444 root bin
 d usr/share/man/man3nsl 0755 root bin
 s usr/share/man/man3nsl/auth_destroy.3nsl=rpc_clnt_auth.3nsl
 s usr/share/man/man3nsl/authdes_create.3nsl=rpc_soc.3nsl
