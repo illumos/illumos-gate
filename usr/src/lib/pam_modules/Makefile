@@ -22,6 +22,8 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2014 Nexenta Systems, Inc.
+#
 # lib/pam_modules/Makefile
 #
 
@@ -45,6 +47,7 @@ SUBDIRS = \
 	sample		\
 	smb		\
 	smbfs		\
+	timestamp	\
 	tsol_acct	\
 	unix_auth	\
 	unix_account	\

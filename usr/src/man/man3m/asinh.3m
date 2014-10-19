@@ -1,0 +1,73 @@
+'\" te
+.\"  Copyright (c) 1992, X/Open Company Limited All Rights Reserved  Portions Copyright (c) 2002, Sun Microsystems, Inc.  All Rights Reserved
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH asinh 3M "1 Sep 2002" "SunOS 5.11" "Mathematical Library Functions"
+.SH NAME
+asinh, asinhf, asinhl \- inverse hyperbolic sine functions
+.SH SYNOPSIS
+.LP
+.nf
+cc [ \fIflag\fR... ] \fIfile\fR... \fB-lm\fR [ \fIlibrary\fR... ]
+#include <math.h>
+
+\fBdouble\fR \fBasinh\fR(\fBdouble\fR \fIx\fR);
+.fi
+
+.LP
+.nf
+\fBfloat\fR \fBasinhf\fR(\fBfloat\fR \fIx\fR);
+.fi
+
+.LP
+.nf
+\fBlong double\fR \fBasinhl\fR(\fBlong double\fR \fIx\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+These functions compute the inverse hyperbolic sine of their argument \fIx\fR.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, these functions return the inverse hyperbolic sine
+of their argument.
+.sp
+.LP
+If \fIx\fR is NaN, NaN is returned.
+.sp
+.LP
+If \fIx\fR is \(+-0 or \(+-Inf, \fIx\fR is returned.
+.SH ERRORS
+.sp
+.LP
+No errors are defined.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBmath.h\fR(3HEAD), \fBsinh\fR(3M), \fBattributes\fR(5), \fBstandards\fR(5)

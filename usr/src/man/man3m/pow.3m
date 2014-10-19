@@ -1,0 +1,244 @@
+'\" te
+.\" Copyright (c) 2001, the Institute of Electrical and Electronics Engineers, Inc. and The Open Group. All Rights Reserved.
+.\" Copyright (c) 1992, X/Open Company Limited. All Rights Reserved.
+.\" Portions Copyright (c) 2006, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH pow 3M "12 Jul 2006" "SunOS 5.11" "Mathematical Library Functions"
+.SH NAME
+pow, powf, powl \- power function
+.SH SYNOPSIS
+.LP
+.nf
+c99 [ \fIflag\fR... ] \fIfile\fR... \fB-lm\fR [ \fIlibrary\fR... ]
+#include <math.h>
+
+\fBdouble\fR \fBpow\fR(\fBdouble\fR x, \fBdouble\fR y);
+.fi
+
+.LP
+.nf
+\fBfloat\fR \fBpowf\fR(\fBfloat\fR x, \fBfloat\fR y);
+.fi
+
+.LP
+.nf
+\fBlong double\fR \fBpowl\fR(\fBlong double\fR x, \fBlong double\fR y);
+.fi
+
+.LP
+.nf
+cc [ \fIflag\fR... ] \fIfile\fR... \fB-lm\fR [ \fIlibrary\fR... ]
+#include <math.h>
+
+\fBdouble\fR \fBpow\fR(\fBdouble\fR x, \fBdouble\fR y);
+.fi
+
+.LP
+.nf
+\fBfloat\fR \fBpowf\fR(\fBfloat\fR x, \fBfloat\fR y);
+.fi
+
+.LP
+.nf
+\fBlong double\fR \fBpowl\fR(\fBlong double\fR x, \fBlong double\fR y);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+These functions compute the value of \fIx\fR raised to the power \fIy,\fR
+\fIx\fR^y>. If \fIx\fR is negative, \fIy\fR must be an integer value.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, these functions return the value of \fIx\fR raised
+to the power \fIy\fR.
+.sp
+.LP
+For finite values of \fIx\fR < 0, and finite non-integer values of \fIy\fR, a
+domain error occurs and either a NaN (if representable), or an
+implementation-defined value is returned.
+.sp
+.LP
+If the correct value would cause overflow, a range error occurs and
+\fBpow()\fR, \fBpowf()\fR, and \fBpowl()\fR return \fBHUGE_VAL\fR,
+\fBHUGE_VALF\fR, and \fBHUGE_VALL\fR, respectively.
+.sp
+.LP
+If \fIx\fR or \fIy\fR is a NaN, a NaN is returned unless:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If \fIx\fR is +1 and \fIy\fR is NaN and the application was compiled with the
+\fBc99\fR compiler driver and is therefore SUSv3-conforming (see
+\fBstandards\fR(5)), 1.0 is returned.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+For any value of \fIx\fR (including NaN), if \fIy\fR is +0, 1.0 is returned.
+.RE
+.sp
+.LP
+For any odd integer value of \fIy\fR > 0, if \fIx\fR is \(+-0, \(+-0 is
+returned.
+.sp
+.LP
+For \fIy\fR > 0 and not an odd integer, if \fIx\fR is \(+-0, +0 is returned.
+.sp
+.LP
+If \fIx\fR is \(+-1 and \fIy\fR is \(+-Inf, and the application was compiled
+with the \fBcc\fR compiler driver, NaN is returned. If, however, the
+application was compiled with the \fBc99\fR compiler driver and is therefore
+SUSv3-conforming (see\fBstandards\fR(5)), 1.0 is returned.
+.sp
+.LP
+For |\fIx\fR| < 1, if \fIy\fR is \(miInf, +Inf is returned.
+.sp
+.LP
+For |\fIx\fR| > 1, if \fIy\fR is \(miInf, +0 is returned.
+.sp
+.LP
+For |\fIx\fR| < 1, if \fIy\fR is +Inf, +0 is returned.
+.sp
+.LP
+For |\fIx\fR| > 1, if \fIy\fR is +Inf, +Inf is returned.
+.sp
+.LP
+For \fIy\fR an odd integer < 0, if \fIx\fR is \(miInf, \(mi0 is returned.
+.sp
+.LP
+For \fIy\fR < 0 and not an odd integer, if \fIx\fR is \(miInf, +0 is returned.
+.sp
+.LP
+For \fIy\fR an odd integer > 0, if \fIx\fR is \(miInf, \(miInf is returned.
+.sp
+.LP
+For \fIy\fR > 0 and not an odd integer, if \fIx\fR is \(miInf, +Inf is
+returned.
+.sp
+.LP
+For \fIy\fR < 0, if \fIx\fR is +Inf, +0 is returned.
+.sp
+.LP
+For \fIy\fR > 0, if \fIx\fR is +Inf, +Inf is returned.
+.sp
+.LP
+For \fIy\fR an odd integer < 0, if \fIx\fR is \(+-0, a pole error occurs and
+\(+-\fBHUGE_VAL\fR, \(+-\fBHUGE_VALF\fR, and \(+-\fBHUGE_VALL\fR are returned
+for \fBpow()\fR, \fBpowf()\fR, and \fBpowl()\fR, respectively.
+.sp
+.LP
+For \fIy\fR < 0 and not an odd integer, if \fIx\fR is \(+-0, a pole error
+occurs and \fBHUGE_VAL\fR, \fBHUGE_VALF\fR, and \fBHUGE_VALL\fR are returned
+for \fBpow()\fR, \fBpowf()\fR, and \fBpowl()\fR, respectively.
+.sp
+.LP
+For exceptional cases, \fBmatherr\fR(3M) tabulates the values to be returned by
+\fBpow()\fR as specified by SVID3 and XPG3.
+.SH ERRORS
+.sp
+.LP
+These functions will fail if:
+.sp
+.ne 2
+.mk
+.na
+\fBDomain Error\fR
+.ad
+.RS 16n
+.rt  
+The value of \fIx\fR is negative and \fIy\fR is a finite non-integer.
+.sp
+If the integer expression (\fBmath_errhandling\fR & \fBMATH_ERREXCEPT\fR) is
+non-zero, the invalid floating-point exception is raised.
+.sp
+The \fBpow()\fR function sets \fBerrno\fR to \fBEDOM\fR if the value of \fIx\fR
+is negative and \fIy\fR is non-integral.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBPole Error\fR
+.ad
+.RS 16n
+.rt  
+The value of \fIx\fR is 0 and \fIy\fR is negative.
+.sp
+If the integer expression (\fBmath_errhandling\fR & \fBMATH_ERREXCEPT\fR) is
+non-zero, the divide-by-zero floating-point exception is raised.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fBRange Error\fR
+.ad
+.RS 16n
+.rt  
+The result overflows.
+.sp
+If the integer expression (\fBmath_errhandling\fR & \fBMATH_ERREXCEPT\fR) is
+non-zero, the overflow floating-point exception is raised.
+.sp
+The \fBpow()\fR function sets \fBerrno\fR to \fBEDOM\fR if the value to be
+returned would cause overflow.
+.RE
+
+.SH USAGE
+.sp
+.LP
+An application wanting to check for exceptions should call
+\fBfeclearexcept\fR(\fBFE_ALL_EXCEPT\fR) before calling these functions. On
+return, if \fBfetestexcept\fR(\fBFE_INVALID\fR | \fBFE_DIVBYZERO\fR |
+\fBFE_OVERFLOW\fR | \fBFE_UNDERFLOW\fR) is non-zero, an exception has been
+raised. An application should either examine the return value or check the
+floating point exception flags to detect exceptions.
+.sp
+.LP
+An application can also set \fBerrno\fR to 0 before calling \fBpow()\fR. On
+return, if \fBerrno\fR is non-zero, an error has occurred. The \fBpowf()\fR and
+\fBpowl()\fR functions do not set \fBerrno\fR.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBexp\fR(3M), \fBfeclearexcept\fR(3M), \fBfetestexcept\fR(3M),
+\fBisnan\fR(3M), \fBmath.h\fR(3HEAD), \fBmatherr\fR(3M), \fBattributes\fR(5),
+\fBstandards\fR(5)
+.SH NOTES
+.sp
+.LP
+Prior to Solaris 2.6,  there was a conflict between the \fBpow()\fR function in
+this library and the \fBpow()\fR function in the \fBlibmp\fR library. This
+conflict was resolved by prepending \fBmp_\fR to all functions in the
+\fBlibmp\fR library. See \fBmp\fR(3MP) for more information.

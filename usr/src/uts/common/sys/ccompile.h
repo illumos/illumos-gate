@@ -139,6 +139,7 @@ extern "C" {
 #define	__RETURNS_TWICE		__sun_attr__((__returns_twice__))
 #define	__CONST			__sun_attr__((__const__))
 #define	__PURE			__sun_attr__((__pure__))
+#define	__GNU_UNUSED	__attribute__((__unused__))
 
 #ifdef	__cplusplus
 }

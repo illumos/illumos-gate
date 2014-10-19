@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 Milan Jurik. All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.
  */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T */
 /*	  All Rights Reserved	*/
@@ -282,6 +283,9 @@ main(int argc, char **argv)
 	    embedded ? &emb_pam_conv : &pam_conv, &pamh) != PAM_SUCCESS)
 		exit(1);
 	if (pam_set_item(pamh, PAM_TTY, ttyn) != PAM_SUCCESS)
+		exit(1);
+	if (getpwuid_r(getuid(), &pwd, pwdbuf, sizeof (pwdbuf)) == NULL ||
+	    pam_set_item(pamh, PAM_AUSER, pwd.pw_name) != PAM_SUCCESS)
 		exit(1);
 #endif	/* DYNAMIC_SU */
 

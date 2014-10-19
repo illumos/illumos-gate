@@ -1,0 +1,154 @@
+'\" te
+.\" Copyright (c) 2001, the Institute of Electrical and Electronics Engineers, Inc. and The Open Group. All Rights Reserved.
+.\" Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
+.\" Portions Copyright (c) 2006, Sun Microsystems, Inc. All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH atan2 3M "12 Jul 2006" "SunOS 5.11" "Mathematical Library Functions"
+.SH NAME
+atan2, atan2f, atan2l \- arc tangent function
+.SH SYNOPSIS
+.LP
+.nf
+c99 [ \fIflag\fR... ] \fIfile\fR... \fB-lm\fR [ \fIlibrary\fR... ]
+#include <math.h>
+
+\fBdouble\fR \fBatan2\fR(\fBdouble\fR \fIy\fR, \fBdouble\fR \fIx\fR);
+.fi
+
+.LP
+.nf
+\fBfloat\fR \fBatan2f\fR(\fBfloat\fR \fIy\fR, \fBfloat\fR \fIx\fR);
+.fi
+
+.LP
+.nf
+\fBlong double\fR \fBatan2l\fR(\fBlong double\fR \fIy\fR, \fBlong double\fR \fIx\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+These functions compute the principal value of the arc tangent of \fIy/x\fR,
+using the signs of both arguments to determine the quadrant of the return
+value.
+.SH RETURN VALUES
+.sp
+.LP
+Upon successful completion, these functions return the arc tangent of
+\fIy\fR/\fIx\fR in the range [ \(mi\c
+.if n pi\c
+.if t \(*p
+\c
+,\c
+.if n pi\c
+.if t \(*p
+\c
+ ] radians.
+.sp
+.LP
+If \fIy\fR is \(+-0 and \fIx\fR is < 0, \(+-\c
+.if n pi\c
+.if t \(*p
+\c
+ is returned.
+.sp
+.LP
+If \fIy\fR is \(+-0 and \fIx\fR is > 0, \(+-0 is returned.
+.sp
+.LP
+If \fIy\fR is < 0 and \fIx\fR is \(+-0, \(mi\c
+.if n pi\c
+.if t \(*p
+\c
+/2 is returned.
+.sp
+.LP
+If \fIy\fR is > 0 and \fIx\fR is \(+-0, \c
+.if n pi\c
+.if t \(*p
+\c
+/2 is returned.
+.sp
+.LP
+If \fIx\fR is 0, a pole error does not occur.
+.sp
+.LP
+If either \fIx\fR or \fIy\fR is NaN, a NaN is returned.
+.sp
+.LP
+If \fIy\fR is \(+-0 and \fIx\fR is -0, \(+-\c
+.if n pi\c
+.if t \(*p
+\c
+ is returned.
+.sp
+.LP
+If \fIy\fR is \(+-0 and \fIx\fR is +0, \(+-0 is returned.
+.sp
+.LP
+For finite values of \(+-\fIy\fR > 0, if x is \(miInf,  \(+-\c
+.if n pi\c
+.if t \(*p
+\c
+ is returned.
+.sp
+.LP
+For finite values of \(+-\fIy\fR > 0, if x is +Inf,  \(+-0 is returned.
+.sp
+.LP
+For finite values of \fIx\fR, if \fIy\fR is \(+-Inf, \(+-\c
+.if n pi\c
+.if t \(*p
+\c
+/2 is returned.
+.sp
+.LP
+If \fIy\fR is \(+-Inf and \fIx\fR is \(miInf, \(+-3\c
+.if n pi\c
+.if t \(*p
+\c
+/4 is returned.
+.sp
+.LP
+If \fIy\fR is \(+-Inf and \fIx\fR is +Inf, \(+-\c
+.if n pi\c
+.if t \(*p
+\c
+/4 is returned.
+.sp
+.LP
+If both arguments are 0, a domain error does not occur.
+.SH ERRORS
+.sp
+.LP
+No errors are defined.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBatan\fR(3M), \fBisnan\fR(3M), \fBmath.h\fR(3HEAD)\fBtan\fR(3M),
+\fBattributes\fR(5), \fBstandards\fR(5)

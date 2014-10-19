@@ -11,7 +11,7 @@
 
 #
 # Copyright 2011, Richard Lowe
-# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2014 Nexenta Systems, Inc.
 #
 
 file path=usr/share/man/man5/audit_binfile.5
@@ -49,6 +49,7 @@ file path=usr/share/man/man5/pam_passwd_auth.5
 file path=usr/share/man/man5/pam_rhosts_auth.5
 file path=usr/share/man/man5/pam_roles.5
 file path=usr/share/man/man5/pam_sample.5
+file path=usr/share/man/man5/pam_timestamp.5
 file path=usr/share/man/man5/pam_tsol_account.5
 file path=usr/share/man/man5/pam_unix_account.5
 file path=usr/share/man/man5/pam_unix_auth.5

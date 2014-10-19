@@ -1,0 +1,74 @@
+'\" te
+.\" Copyright (c) 2001, the Institute of Electrical and Electronics Engineers, Inc. and The Open Group. All Rights Reserved.
+.\" Portions Copyright (c) 2006, Sun Microsystems, Inc. All Rights Reserved.
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" http://www.opengroup.org/bookstore/.
+.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
+.\"  This notice shall appear on any product containing this material.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH feholdexcept 3M "12 Jul 2006" "SunOS 5.11" "Mathematical Library Functions"
+.SH NAME
+feholdexcept \- save current floating-point environment
+.SH SYNOPSIS
+.LP
+.nf
+c99 [ \fIflag\fR... ] \fIfile\fR... \fB-lm\fR [ \fIlibrary\fR... ]
+#include <fenv.h>
+
+\fBint\fR \fBfeholdexcept\fR(\fBfenv_t *\fR\fIenvp\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBfeholdexcept()\fR function saves the current floating-point environment
+in the object pointed to by \fIenvp\fR, clears the floating-point status flags,
+and then installs a non-stop (continue on floating-point exceptions) mode, if
+available, for all floating-point exceptions.
+.SH RETURN VALUES
+.sp
+.LP
+The \fBfeholdexcept()\fR function returns 0 if and only if non-stop
+floating-point exception handling was successfully installed.
+.SH ERRORS
+.sp
+.LP
+No errors are defined.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab() box;
+cw(2.75i) |cw(2.75i) 
+lw(2.75i) |lw(2.75i) 
+.
+ATTRIBUTE TYPEATTRIBUTE VALUE
+_
+Interface StabilityStandard
+_
+MT-LevelMT-Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBfegetenv\fR(3M), \fBfenv.h\fR(3HEAD), \fBfeupdateenv\fR(3M),
+\fBattributes\fR(5), \fBstandards\fR(5)
+.SH NOTES
+.sp
+.LP
+In a multithreaded program, the \fBfeholdexcept()\fR function affects the
+floating point environment only for the calling thread.
+.sp
+.LP
+The \fBfeholdexcept()\fR function automatically installs and deinstalls
+\fBSIGFPE\fR handlers and sets and clears the trap enable mode bits in the
+floating point status register as needed. If a program uses these functions and
+attempts to install a \fBSIGFPE\fR handler or control the trap enable mode bits
+independently, the resulting behavior is not defined.
