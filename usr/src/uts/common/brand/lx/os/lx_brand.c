@@ -101,6 +101,7 @@ static int lx_elfexec(struct vnode *vp, struct execa *uap, struct uarg *args,
     caddr_t exec_file, struct cred *cred, int brand_action);
 
 static boolean_t lx_native_exec(uint8_t, const char **);
+static void lx_ptrace_exectrap(proc_t *);
 
 /* lx brand */
 struct brand_ops lx_brops = {
@@ -125,7 +126,8 @@ struct brand_ops lx_brops = {
 	NSIG,
 	lx_exit_with_sig,
 	lx_wait_filter,
-	lx_native_exec
+	lx_native_exec,
+	lx_ptrace_exectrap
 };
 
 struct brand_mach_ops lx_mops = {
@@ -461,21 +463,22 @@ lx_ptrace_stop_for_option(int option)
 	p->p_wcode = CLD_STOPPED;
 	sigcld(p, sqp);
 	mutex_exit(&pidlock);
+}
 
-	/*
-	 * If (p_proc_flag & P_PR_PTRACE) were set, then in stop() we would set:
-	 *	p->p_wcode = CLD_TRAPPED
-	 *	p->p_wdata = SIGTRAP
-	 * However, when using the extended ptrace options we disable
-	 * P_PR_PTRACE so that we don't stop twice on exec when
-	 * LX_PTRACE_O_TRACEEXEC is set. We could ensure P_PR_PTRACE is set
-	 * when using extended options but then we would stop on exec even when
-	 * LX_PTRACE_O_TRACEEXEC is not set, so that is clearly broken. Thus,
-	 * we have to set p_wcode and p_wdata ourselves so that waitid will
-	 * do the right thing for this process. We still rely on stop() to do
-	 * all of the other processing needed for our signal.
-	 */
-	p->p_wcode = CLD_TRAPPED;
+/*
+ * Brand entry to allow us to optionally generate the ptrace SIGTRAP on exec().
+ * This will only be called if ptrace is enabled -- and we only generate the
+ * SIGTRAP if LX_PTRACE_O_TRACEEXEC hasn't been set.
+ */
+void
+lx_ptrace_exectrap(proc_t *p)
+{
+	lx_proc_data_t *lpdp;
+
+	if ((lpdp = p->p_brand_data) == NULL ||
+	    !(lpdp->l_ptrace_opts & LX_PTRACE_O_TRACEEXEC)) {
+		psignal(p, SIGTRAP);
+	}
 }
 
 void

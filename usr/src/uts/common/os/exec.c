@@ -859,8 +859,22 @@ gexec(
 			if (pp->p_plist || (pp->p_proc_flag & P_PR_TRACE))
 				args->traceinval = 1;
 		}
-		if (pp->p_proc_flag & P_PR_PTRACE)
-			psignal(pp, SIGTRAP);
+
+		/*
+		 * If legacy ptrace is enabled, defer to the brand as to the
+		 * behavior as to the SIGTRAP generated during exec().  (If
+		 * we're not branded or the brand isn't interested in changing
+		 * the default behavior, we generate the SIGTRAP.)
+		 */
+		if (pp->p_proc_flag & P_PR_PTRACE) {
+			if (PROC_IS_BRANDED(pp) &&
+			    BROP(pp)->b_ptrace_exectrap != NULL) {
+				BROP(pp)->b_ptrace_exectrap(pp);
+			} else {
+				psignal(pp, SIGTRAP);
+			}
+		}
+
 		if (args->traceinval)
 			prinvalidate(&pp->p_user);
 	}
