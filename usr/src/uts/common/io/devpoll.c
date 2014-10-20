@@ -1063,22 +1063,30 @@ dpioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 			curthread->t_pollstate = pollstate_create();
 			ps = curthread->t_pollstate;
 		}
+
 		if (ps->ps_dpbufsize < size) {
 			/*
-			 * The maximum size should be no large than
-			 * current maximum open file count.
+			 * If nfds is larger than twice the current maximum
+			 * open file count, we'll silently clamp it.  This
+			 * only limits our exposure to allocating an
+			 * inordinate amount of kernel memory; it doesn't
+			 * otherwise affect the semantics.  (We have this
+			 * check at twice the maximum instead of merely the
+			 * maximum because some applications pass an nfds that
+			 * is only slightly larger than their limit.)
 			 */
 			mutex_enter(&p->p_lock);
-			if (nfds > p->p_fno_ctl) {
-				mutex_exit(&p->p_lock);
-				DP_REFRELE(dpep);
-				DP_SIGMASK_RESTORE(ksetp);
-				return (EINVAL);
+			if ((nfds >> 1) > p->p_fno_ctl) {
+				nfds = p->p_fno_ctl;
+				size = nfds * fdsize;
 			}
 			mutex_exit(&p->p_lock);
-			kmem_free(ps->ps_dpbuf, ps->ps_dpbufsize);
-			ps->ps_dpbuf = kmem_zalloc(size, KM_SLEEP);
-			ps->ps_dpbufsize = size;
+
+			if (ps->ps_dpbufsize < size) {
+				kmem_free(ps->ps_dpbuf, ps->ps_dpbufsize);
+				ps->ps_dpbuf = kmem_zalloc(size, KM_SLEEP);
+				ps->ps_dpbufsize = size;
+			}
 		}
 
 		mutex_enter(&pcp->pc_lock);
