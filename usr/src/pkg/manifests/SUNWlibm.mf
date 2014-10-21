@@ -13,7 +13,7 @@
 # Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 #
 
-set name=pkg.fmri value=pkg:/SUNWlibm@0.5.11,5.11-0.132
+set name=pkg.fmri value=pkg:/SUNWlibm@0.5.11,5.11-0.133
 set name=pkg.description \
     value="Math & Microtasking Library Headers & Lint Files"
 # license license=SUNWlibm.copyright
