@@ -10,22 +10,12 @@
 #
 
 #
-# Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 #
 
-[DEFAULT]
-pre =
-verbose = False
-quiet = False
-timeout = 60
-post =
-outputdir = /var/tmp/test_results
+include $(SRC)/Makefile.master
 
-[/opt/libc-tests/tests/newlocale_test]
+PROG = wctype_test
+ARCHPROG = wctype_test
 
-[/opt/libc-tests/tests/nl_langinfo_test]
-
-[/opt/libc-tests/tests/wcsrtombs_test]
-
-[/opt/libc-tests/tests/wctype_test]
+include ../Makefile.com
