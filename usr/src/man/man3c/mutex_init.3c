@@ -1,4 +1,5 @@
 '\" te
+.\" Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
 .\" Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved.
 .\" Portions Copyright (c) 2001, the Institute of Electrical and Electronics Engineers, Inc. and The Open Group. All Rights Reserved.
 .\" Portions Copyright (c) 1995 IEEE  All Rights Reserved.
@@ -9,7 +10,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH MUTEX_INIT 3C "Jun 5, 2007"
+.TH MUTEX_INIT 3C "Oct 22, 2014"
 .SH NAME
 mutex_init, mutex_lock, mutex_trylock, mutex_unlock, mutex_consistent,
 mutex_destroy \- mutual exclusion locks
@@ -130,7 +131,7 @@ then attempt to make the state protected by the mutex consistent, since this
 state could have been left inconsistent when the last owner died. If the new
 owner is able to make the state consistent, it should call
 \fBmutex_consistent()\fR to restore the state of the mutex and then unlock the
-mutex. All subsequent calls to \fBmutex_lock()\fRwill then behave normally.
+mutex. All subsequent calls to \fBmutex_lock()\fR will then behave normally.
 Only the new owner can make the mutex consistent. If for any reason the new
 owner is not able to make the state consistent, it should not call
 \fBmutex_consistent()\fR but should simply unlock the mutex. All waiting
@@ -245,7 +246,7 @@ A mutex lock must not be reinitialized while in use by other threads.
 .sp
 .LP
 These rules do not apply to \fBLOCK_ROBUST\fR mutexes. See the description for
-\fBLOCK_ROBUST\fRabove. If default mutex attributes are used, the macro
+\fBLOCK_ROBUST\fR above. If default mutex attributes are used, the macro
 \fBDEFAULTMUTEX\fR can be used to initialize mutexes that are statically
 allocated.
 .sp
@@ -790,7 +791,7 @@ The following example shows how to use a \fBUSYNC_PROCESS\fR |
          buffer = (buffer_t *)mmap(NULL, sizeof(buffer_t),
                    PROT_READ | PROT_WRITE, MAP_SHARED, ipc_fd, 0);
          mutex_init(&buffer->Interprocess_mutex,
-                     USYNC_PROCESS | LOCK_ROBUST,0);
+                     USYNC_PROCESS | LOCK_ROBUST, 0);
      } else {
          create_shared_memory();
          ipc_fd = open(INTERPROCESS_FILE, O_RDWR);
@@ -798,7 +799,7 @@ The following example shows how to use a \fBUSYNC_PROCESS\fR |
                PROT_READ | PROT_WRITE, MAP_SHARED, ipc_fd, 0);
          buffer->Interprocess_data = 0;
          mutex_init(&buffer->Interprocess_mutex,
-                     USYNC_PROCESS | LOCK_ROBUST,0);
+                     USYNC_PROCESS | LOCK_ROBUST, 0);
      }
      for(;;) {
          rc = mutex_lock(&buffer->Interprocess_mutex);
