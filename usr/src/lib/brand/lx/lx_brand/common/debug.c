@@ -90,11 +90,19 @@ void
 lx_debug(const char *msg, ...)
 {
 	va_list		ap;
-	char		buf[LX_MSG_MAXLEN + 1];
+	char		*buf;
 	int		rv, fd, n;
 	int		errno_backup;
 
 	if (lx_debug_enabled == 0)
+		return;
+
+	/*
+	 * If debugging is not enabled, we do not wish to have a large stack
+	 * footprint.  The buffer allocation is thus done conditionally,
+	 * rather than as regular automatic storage.
+	 */
+	if ((buf = SAFE_ALLOCA(LX_MSG_MAXLEN + 1)) == NULL)
 		return;
 
 	errno_backup = errno;
