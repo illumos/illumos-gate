@@ -18,7 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -285,10 +287,6 @@ extern int unmount_subtree(fnnode_t *, boolean_t);
 extern void unmount_tree(struct autofs_globals *, boolean_t);
 extern void autofs_free_globals(struct autofs_globals *);
 extern void autofs_shutdown_zone(struct autofs_globals *);
-/*
- * external routines not defined in any header file
- */
-extern bool_t xdr_uid_t(XDR *, uid_t *);
 
 #endif	/* _KERNEL */
 

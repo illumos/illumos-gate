@@ -18,6 +18,11 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ */
+
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -375,7 +380,6 @@ extern int getmapkeys_ldap(char *, struct dir_entry **, int *, int *,
 /*
  * not defined in any header file
  */
-extern bool_t xdr_uid_t(XDR *, uid_t *);
 extern int __clnt_bindresvport(CLIENT *);
 extern int getnetmaskbynet(const struct in_addr, struct in_addr *);
 

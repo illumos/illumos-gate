@@ -19,18 +19,18 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ */
+
 /*
  * Copyright (c) 1996, by Sun Microsystems, Inc.
  * All rights reserved.
  */
-							    
-#pragma ident	"%Z%%M%	%I%	%E% SMI" /* mods by OpCom */
 
 #include <rpc/rpc.h>
 #include <rpcsvc/yppasswd.h>
-
-extern bool_t xdr_uid_t(XDR *, uid_t *);
-extern bool_t xdr_gid_t(XDR *, gid_t *);
 
 bool_t
 xdr_passwd(XDR *xdrs, struct passwd *pw)
