@@ -1,12 +1,14 @@
 '\" te
+.\" Copyright (c) 2014, Nexenta Systems, Inc. All Rights Reserved.
 .\" Copyright (c) 2006, Sun Microsystems, Inc. All Rights Reserved.
 .\" Copyright 1989 AT&T
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH CMN_ERR 9F "Jan 16, 2006"
+.TH CMN_ERR 9F "Oct 28, 2014"
 .SH NAME
-cmn_err, vcmn_err, zcmn_err \- display an error message or panic the system
+cmn_err, dev_err, vcmn_err, zcmn_err, vzcmn_err \-
+display an error message or panic the system
 .SH SYNOPSIS
 .LP
 .nf
@@ -16,7 +18,12 @@ cmn_err, vcmn_err, zcmn_err \- display an error message or panic the system
 
 
 
-\fBvoid\fR \fBcmn_err\fR(\fBint\fR \fIlevel\fR, \fBchar *\fR\fIformat\fR...
+\fBvoid\fR \fBcmn_err\fR(\fBint\fR \fIlevel\fR, \fBchar *\fR\fIformat\fR, ...);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBdev_err\fR(\fBdev_info_t\fR \fI*dip\fR, \fBint\fR \fIlevel\fR, \fBchar *\fR\fIformat\fR, ...);
 .fi
 
 .LP
@@ -34,16 +41,19 @@ cmn_err, vcmn_err, zcmn_err \- display an error message or panic the system
 
 
 
-\fBvoid\fR \fBzcmn_err\fR(\fBzoneid_t\fR \fIzoneid\fR, \fBint\fR \fIlevel\fR, \fBchar *\fR\fIformat\fR...);
+\fBvoid\fR \fBzcmn_err\fR(\fBzoneid_t\fR \fIzoneid\fR, \fBint\fR \fIlevel\fR, \fBchar *\fR\fIformat\fR, ...);
+.fi
+
+.LP
+.nf
+\fBvoid\fR \fBvzcmn_err\fR(\fBzoneid_t\fR \fIzoneid\fR, \fBint\fR \fIlevel\fR, \fBchar *\fR\fIformat\fR, \fBva_list\fR \fIap\fR);
 .fi
 
 .SH INTERFACE LEVEL
-.sp
 .LP
 Architecture independent level 1 (DDI/DKI).
 .SH PARAMETERS
 .SS "cmn_err(\|)"
-.sp
 .ne 2
 .na
 \fB\fIlevel\fR\fR
@@ -61,8 +71,20 @@ A constant indicating the severity of the error condition.
 Message to be displayed.
 .RE
 
-.SS "vcmn_err(\|)"
+.SS "dev_err(\|)"
+.LP
+The \fBdev_err()\fR function works exactly like \fBcmn_err()\fR, but includes
+an additional argument:
 .sp
+.ne 2
+.na
+\fB\fIdip\fR\fR
+.ad
+.RS 10n
+A pointer to the device's \fBdev_info\fR structure.
+.RE
+
+.SS "vcmn_err(\|)"
 .LP
 The \fBvcmn_err()\fR function takes \fIlevel\fR and \fIformat\fR as described
 for \fBcmn_err()\fR, but its third argument is different:
@@ -76,7 +98,6 @@ Variable argument list passed to the function.
 .RE
 
 .SS "zcmn_err(\|)"
-.sp
 .LP
 The \fBzcmn_err()\fR function works exactly like \fBcmn_err()\fR, but includes
 an additional argument:
@@ -89,9 +110,21 @@ an additional argument:
 Zone to which log messages should be directed. See \fBzones\fR(5).
 .RE
 
+.SS "vzcmn_err(\|)"
+.LP
+The \fBvzcmn_err()\fR function works exactly like \fBvcmn_err()\fR, but includes
+an additional argument:
+.sp
+.ne 2
+.na
+\fB\fIzoneid\fR\fR
+.ad
+.RS 10n
+Zone to which log messages should be directed. See \fBzones\fR(5).
+.RE
+
 .SH DESCRIPTION
 .SS "cmn_err(\|)"
-.sp
 .LP
 The \fBcmn_err()\fR function displays a specified message on the console.
 \fBcmn_err()\fR can also panic the system. When the system panics, it attempts
@@ -280,7 +313,6 @@ log, but is only written to the console when the system has been booted in
 verbose mode. See \fBkernel\fR(1M). If neither condition is met, the '?\|'
 character has no effect and is simply ignored.
 .RE
-
 .sp
 .LP
 Refer to \fBsyslogd\fR(1M) to determine where the system log is written.
@@ -289,8 +321,14 @@ Refer to \fBsyslogd\fR(1M) to determine where the system log is written.
 The \fBcmn_err()\fR function sends log messages to the log of the global zone.
 \fBcmn_err()\fR appends a \fB\en\fR to each \fIformat\fR, except when
 \fIlevel\fR is \fBCE_CONT\fR.
+.SS "dev_err(\|)"
+.LP
+With the exception of its first argument (\fBdip\fR), \fBdev_err()\fR is
+identical to \fBcmn_err()\fR. \fBdip\fR is a pointer to a device's
+\fBdev_info\fR structure, which is used to prepend the driver name and
+instance number to the message. The driver name and instance number are
+retrieved using \fBddi_driver_name\fR(9F) and \fBddi_get_instance\fR(9F).
 .SS "vcmn_err(\|)"
-.sp
 .LP
 The \fBvcmn_err()\fR function is identical to \fBcmn_err()\fR except that its
 last argument, \fIap\fR, is a pointer to a variable list of arguments. \fIap\fR
@@ -300,7 +338,6 @@ contains the list of arguments used by the conversion specifications in
 the list. Multiple traversals of the argument list, each bracketed by
 \fBva_start\fR(9F) and \fBva_end\fR(9F), are possible.
 .SS "zcmn_err(\|)"
-.sp
 .LP
 With the exception of its first argument (\fBzoneid\fR), \fBzcmn_err()\fR is
 identical to \fBcmn_err()\fR. \fBzoneid\fR is the numeric ID of the zone to
@@ -311,8 +348,12 @@ than the log in the global zone. This is accomplished by the message being
 received and processed by the \fBsyslogd\fR(1M) process running in the
 specified zone instead of the one running in the global zone. You can retrieve
 a process zone ID from its credential structure using \fBcrgetzoneid\fR(9F).
+.SS "vzcmn_err(\|)"
+.LP
+With the exception of its first argument (\fBzoneid\fR), \fBvzcmn_err()\fR is
+identical to \fBvcmn_err()\fR. See the description of \fBzcmn_err()\fR
+above for an explanation on how the \fBzoneid\fR argument is handled.
 .SH RETURN VALUES
-.sp
 .LP
 None. However, if an unknown \fIlevel\fR is passed to \fBcmn_err()\fR, the
 following panic error message is displayed:
@@ -325,7 +366,6 @@ panic: unknown level in cmn_err (level=\fIlevel\fR, msg=format)
 .sp
 
 .SH CONTEXT
-.sp
 .LP
 The \fBcmn_err()\fR function can be called from user, kernel, interrupt, or
 high-level interrupt context.
@@ -458,27 +498,25 @@ messages should instead be sent to the global zone using \fBcmn_err()\fR.
 .sp
 .in +2
 .nf
-zcmn_err(crgetzoneid(ddi_get_cred()), CE_NOTE, "out of processes0);
+zcmn_err(crgetzoneid(ddi_get_cred()), CE_NOTE, "out of processes");
 .fi
 .in -2
 
 .SH SEE ALSO
-.sp
 .LP
 \fBdmesg\fR(1M), \fBkernel\fR(1M), \fBprintf\fR(3C), \fBzones\fR(5),
-\fBddi_binding_name\fR(9F), \fBddi_cred\fR(9F), \fBsprintf\fR(9F),
-\fBva_arg\fR(9F), \fBva_end\fR(9F), \fBva_start\fR(9F), \fBvsprintf\fR(9F)
+\fBddi_binding_name\fR(9F), \fBddi_cred\fR(9F), \fBddi_driver_name\fR(9F),
+\fBddi_get_instance\fR(9F), \fBsprintf\fR(9F), \fBva_arg\fR(9F),
+\fBva_end\fR(9F), \fBva_start\fR(9F), \fBvsprintf\fR(9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR
 .SH WARNINGS
-.sp
 .LP
 The \fBcmn_err()\fR function with the \fBCE_CONT\fR argument can be used by
 driver developers as a driver code debugging tool. However, using
 \fBcmn_err()\fR in this capacity can change system timing characteristics.
 .SH NOTES
-.sp
 .LP
 Messages of arbitrary length can be generated using \fBcmn_err()\fR, but if the
 call to \fBcmn_err()\fR is made from high-level interrupt context and
