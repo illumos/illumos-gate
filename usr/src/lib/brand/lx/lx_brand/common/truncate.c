@@ -40,8 +40,10 @@
 long
 lx_truncate(uintptr_t path, uintptr_t length)
 {
+#if defined(_ILP32)
 	if ((off_t)length >= 0xffffffffUL)
 		return (-EFBIG);
+#endif
 
 	return (truncate((const char *)path, (off_t)length) == 0 ? 0 : -errno);
 }
@@ -51,8 +53,10 @@ lx_ftruncate(uintptr_t fd, uintptr_t length)
 {
 	int r;
 
+#if defined(_ILP32)
 	if ((off_t)length >= 0xffffffffUL)
 		return (-EFBIG);
+#endif
 
 	r = ftruncate((int)fd, (off_t)length);
 	/*

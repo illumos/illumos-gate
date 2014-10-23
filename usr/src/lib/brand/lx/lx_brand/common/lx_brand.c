@@ -1192,8 +1192,8 @@ static struct lx_sysent sysents[] = {
 	{"flock",	lx_flock,		0,		2}, /* 73 */
 	{"fsync",	lx_fsync,		0,		1}, /* 74 */
 	{"fdatasync",	lx_fdatasync,		0,		1}, /* 75 */
-	{"truncate",	lx_truncate64,		0,		2}, /* 76 */
-	{"ftruncate",	lx_ftruncate64,		0,		2}, /* 77 */
+	{"truncate",	lx_truncate,		0,		2}, /* 76 */
+	{"ftruncate",	lx_ftruncate,		0,		2}, /* 77 */
 	{"getdents",	lx_getdents,		0,		3}, /* 78 */
 	{"getcwd",	lx_getcwd,		0,		2}, /* 79 */
 	{"chdir",	lx_chdir,		0,		1}, /* 80 */
