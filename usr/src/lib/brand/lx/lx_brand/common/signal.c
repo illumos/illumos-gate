@@ -36,6 +36,7 @@
 #include <sys/lx_misc.h>
 #include <sys/lx_debug.h>
 #include <sys/lx_signal.h>
+#include <sys/lx_sigstack.h>
 #include <sys/lx_syscall.h>
 #include <sys/lx_thread.h>
 #include <sys/syscall.h>
@@ -280,42 +281,6 @@ static int lx_setcontext(const ucontext_t *ucp);
  * location originally interrupted by receipt of the signal.
  */
 
-/*
- * Two flavors of Linux signal stacks:
- *
- * lx_sigstack - used for "modern" signal handlers, in practice those
- *               that have the sigaction(2) flag SA_SIGINFO set
- *
- * lx_oldsigstack - used for legacy signal handlers, those that do not have
- *		    the sigaction(2) flag SA_SIGINFO set or that were setup via
- *		    the signal(2) call.
- *
- * NOTE: Since these structures will be placed on the stack and stack math will
- *	 be done with their sizes, for the 32-bit code they must be word
- *	 aligned in size (4 bytes) so the stack remains word aligned per the
- *	 i386 ABI, or, for 64-bit code they must be 16 byte aligned as per the
- *	 AMD64 ABI.
- */
-#if defined(_LP64)
-struct lx_sigstack {
-	void (*retaddr)();	/* address of real lx_rt_sigreturn code */
-	lx_siginfo_t si;	/* saved signal information */
-	lx_ucontext_t uc;	/* saved user context */
-	lx_fpstate_t fpstate;	/* saved FP state */
-	char pad[2];		/* stack alignment */
-};
-#else
-struct lx_sigstack {
-	void (*retaddr)();	/* address of real lx_rt_sigreturn code */
-	int sig;		/* signal number */
-	lx_siginfo_t *sip;	/* points to "si" if valid, NULL if not */
-	lx_ucontext_t *ucp;	/* points to "uc" */
-	lx_siginfo_t si;	/* saved signal information */
-	lx_ucontext_t uc;	/* saved user context */
-	lx_fpstate_t fpstate;	/* saved FP state */
-	char trampoline[8];	/* code for trampoline to lx_rt_sigreturn() */
-};
-#endif
 
 struct lx_oldsigstack {
 	void (*retaddr)();	/* address of real lx_sigreturn code */
@@ -1438,7 +1403,10 @@ lx_build_signal_frame(int lx_sig, siginfo_t *sip, void *p, void *sp)
 	 * This should only return an error if the signum is invalid but that
 	 * also gets converted into a LX_SIGKILL by this function.
 	 */
-	(void) stol_siginfo(sip, &lx_ssp->si);
+	if (sip != NULL)
+		(void) stol_siginfo(sip, &lx_ssp->si);
+	else
+		bzero(&lx_ssp->si, sizeof (lx_siginfo_t));
 
 	/* convert FP regs if present */
 	if (ucp->uc_flags & UC_FPU) {
