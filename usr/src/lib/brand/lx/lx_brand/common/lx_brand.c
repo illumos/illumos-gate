@@ -1253,8 +1253,8 @@ static struct lx_sysent sysents[] = {
 	{"uselib",	NULL,			NOSYS_KERNEL,	0}, /* 134 */
 	{"personality",	lx_personality,		0,		1}, /* 135 */
 	{"ustat",	NULL,			NOSYS_OBSOLETE,	2}, /* 136 */
-	{"statfs",	lx_statfs64,		0,		2}, /* 137 */
-	{"fstatfs",	lx_fstatfs64,		0,		2}, /* 138 */
+	{"statfs",	lx_statfs,		0,		2}, /* 137 */
+	{"fstatfs",	lx_fstatfs,		0,		2}, /* 138 */
 	{"sysfs",	lx_sysfs, 		0,		3}, /* 139 */
 	{"getpriority",	lx_getpriority,		0,		2}, /* 140 */
 	{"setpriority",	lx_setpriority,		0,		3}, /* 141 */
