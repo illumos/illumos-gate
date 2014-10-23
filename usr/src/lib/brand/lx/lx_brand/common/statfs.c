@@ -226,7 +226,7 @@ lx_statfs(uintptr_t p1, uintptr_t p2)
 	struct statvfs vfs;
 	int err;
 
-	lx_debug("\tfstatvfs(%s, 0x%p)", path, fs);
+	lx_debug("\tstatvfs(%s, 0x%p)", path, fs);
 	if (statvfs(path, &vfs) != 0)
 		return (-errno);
 

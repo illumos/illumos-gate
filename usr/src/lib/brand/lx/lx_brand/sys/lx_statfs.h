@@ -34,17 +34,17 @@ extern "C" {
 extern int lx_statfs_init(void);
 
 struct lx_statfs {
-	int		f_type;
-	int		f_bsize;
+	size_t		f_type;
+	size_t		f_bsize;
 	ulong_t		f_blocks;
 	ulong_t		f_bfree;
 	ulong_t		f_bavail;
 	ulong_t		f_files;
 	ulong_t		f_ffree;
 	u_longlong_t	f_fsid;
-	int		f_namelen;
-	int		f_frsize;
-	int		f_spare[5];
+	size_t		f_namelen;
+	size_t		f_frsize;
+	size_t		f_spare[5];
 };
 
 struct lx_statfs64 {
