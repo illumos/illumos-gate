@@ -216,6 +216,7 @@ static lxpr_dirent_t lx_procdir[] = {
 	{ LXPR_KMSG,		"kmsg" },
 	{ LXPR_LOADAVG,		"loadavg" },
 	{ LXPR_MEMINFO,		"meminfo" },
+	{ LXPR_MODULES,		"modules" },
 	{ LXPR_MOUNTS,		"mounts" },
 	{ LXPR_NETDIR,		"net" },
 	{ LXPR_PARTITIONS,	"partitions" },
@@ -427,6 +428,7 @@ static void (*lxpr_read_function[LXPR_NFILES])() = {
 	lxpr_read_kmsg,			/* /proc/kmsg		*/
 	lxpr_read_loadavg,		/* /proc/loadavg	*/
 	lxpr_read_meminfo,		/* /proc/meminfo	*/
+	lxpr_read_empty,		/* /proc/modules	*/
 	lxpr_read_mounts,		/* /proc/mounts		*/
 	lxpr_read_isdir,		/* /proc/net		*/
 	lxpr_read_net_arp,		/* /proc/net/arp	*/
@@ -497,6 +499,7 @@ static vnode_t *(*lxpr_lookup_function[LXPR_NFILES])() = {
 	lxpr_lookup_not_a_dir,		/* /proc/kmsg		*/
 	lxpr_lookup_not_a_dir,		/* /proc/loadavg	*/
 	lxpr_lookup_not_a_dir,		/* /proc/meminfo	*/
+	lxpr_lookup_not_a_dir,		/* /proc/modules	*/
 	lxpr_lookup_not_a_dir,		/* /proc/mounts		*/
 	lxpr_lookup_netdir,		/* /proc/net		*/
 	lxpr_lookup_not_a_dir,		/* /proc/net/arp	*/
@@ -567,6 +570,7 @@ static int (*lxpr_readdir_function[LXPR_NFILES])() = {
 	lxpr_readdir_not_a_dir,		/* /proc/kmsg		*/
 	lxpr_readdir_not_a_dir,		/* /proc/loadavg	*/
 	lxpr_readdir_not_a_dir,		/* /proc/meminfo	*/
+	lxpr_readdir_not_a_dir,		/* /proc/modules	*/
 	lxpr_readdir_not_a_dir,		/* /proc/mounts		*/
 	lxpr_readdir_netdir,		/* /proc/net		*/
 	lxpr_readdir_not_a_dir,		/* /proc/net/arp	*/
