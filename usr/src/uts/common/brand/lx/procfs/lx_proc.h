@@ -127,6 +127,7 @@ typedef enum lxpr_nodetype {
 	LXPR_KMSG,		/* /proc/kmsg		*/
 	LXPR_LOADAVG,		/* /proc/loadavg	*/
 	LXPR_MEMINFO,		/* /proc/meminfo	*/
+	LXPR_MODULES,		/* /proc/modules	*/
 	LXPR_MOUNTS,		/* /proc/mounts		*/
 	LXPR_NETDIR,		/* /proc/net		*/
 	LXPR_NET_ARP,		/* /proc/net/arp	*/
