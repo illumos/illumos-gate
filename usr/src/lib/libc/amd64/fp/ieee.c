@@ -24,63 +24,11 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "lint.h"
 #include "base_conversion.h"
 #include <sys/isa_defs.h>
 
 #define	CSR_DEFAULT 0x1f80
-
-/* The following should be coded as inline expansion templates.	 */
-
-/*
- * Multiplies two normal or subnormal doubles, returns result and exceptions.
- */
-double
-__mul_set(double x, double y, int *pe) {
-	extern void _putmxcsr(), _getmxcsr();
-	int csr;
-	double z;
-
-	_putmxcsr(CSR_DEFAULT);
-	z = x * y;
-	_getmxcsr(&csr);
-	if ((csr & 0x3f) == 0) {
-		*pe = 0;
-	} else {
-		/* Result may not be exact. */
-		*pe = 1;
-	}
-	return (z);
-}
-
-/*
- * Divides two normal or subnormal doubles x/y, returns result and exceptions.
- */
-double
-__div_set(double x, double y, int *pe) {
-	extern void _putmxcsr(), _getmxcsr();
-	int csr;
-	double z;
-
-	_putmxcsr(CSR_DEFAULT);
-	z = x / y;
-	_getmxcsr(&csr);
-	if ((csr & 0x3f) == 0) {
-		*pe = 0;
-	} else {
-		*pe = 1;
-	}
-	return (z);
-}
-
-double
-__dabs(double *d)
-{
-	/* should use hardware fabs instruction */
-	return ((*d < 0.0) ? -*d : *d);
-}
 
 /*
  * Returns IEEE mode/status and

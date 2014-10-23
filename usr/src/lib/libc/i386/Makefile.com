@@ -70,17 +70,18 @@ FPOBJS=				\
 	_X_cplx_lr_div_ix.o	\
 	_X_cplx_lr_div_rx.o	\
 	_X_cplx_mul.o		\
-	_base_il.o		\
 	fpgetmask.o		\
 	fpgetround.o		\
 	fpgetsticky.o		\
 	fpsetmask.o		\
 	fpsetround.o		\
 	fpsetsticky.o		\
-	fpstart.o
+	fpstart.o		\
+	ieee.o
 
 FPASMOBJS=			\
 	__xgetRD.o		\
+	_base_il.o		\
 	_xtoll.o		\
 	_xtoull.o		\
 	fpcw.o

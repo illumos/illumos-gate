@@ -24,60 +24,8 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "lint.h"
 #include "base_conversion.h"
-
-/* The following should be coded as inline expansion templates.	 */
-
-/*
- * Multiplies two normal or subnormal doubles, returns result and exceptions.
- */
-double
-__mul_set(double x, double y, int *pe) {
-	extern void _putsw(), _getsw();
-	int sw;
-	double z;
-
-	_putsw(0);
-	z = x * y;
-	_getsw(&sw);
-	if ((sw & 0x3f) == 0) {
-		*pe = 0;
-	} else {
-		/* Result may not be exact. */
-		*pe = 1;
-	}
-	return (z);
-}
-
-/*
- * Divides two normal or subnormal doubles x/y, returns result and exceptions.
- */
-double
-__div_set(double x, double y, int *pe) {
-	extern void _putsw(), _getsw();
-	int sw;
-	double z;
-
-	_putsw(0);
-	z = x / y;
-	_getsw(&sw);
-	if ((sw & 0x3f) == 0) {
-		*pe = 0;
-	} else {
-		*pe = 1;
-	}
-	return (z);
-}
-
-double
-__dabs(double *d)
-{
-	/* should use hardware fabs instruction */
-	return ((*d < 0.0) ? -*d : *d);
-}
 
 /*
  * Returns IEEE mode/status and
