@@ -331,13 +331,15 @@ lx_sigreturn_tolibc(uintptr_t sp)
 	movq	-16(%rbp), %rsi
 	cmp	$0, %rsi
 	je	1f
-	movq	8(%rsp), %rsi
+	movq	%rsp, %rsi
+	addq	$SI, %rsi
 1:
 	/*
-	 * arg2 %rdx is ptr to converted ucontext on stk
-	 * LX_SI_MAX_SIZE + sizeof (void *)
+	 * arg2 %rdx is ptr to converted ucontext on stk (uc member of
+	 * lx_sigstack).
 	 */
-	movq    136(%rsp), %rdx
+	movq	%rsp, %rdx
+	addq	$UC, %rdx
 
 	movq	-48(%rbp), %r9		/* fetch signal handler ptr */
 	jmp	*%r9			/* jmp to the Linux signal handler */

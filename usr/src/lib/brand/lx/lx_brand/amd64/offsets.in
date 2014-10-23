@@ -12,6 +12,7 @@
 \
 
 #include <sys/lx_brand.h>
+#include <sys/lx_sigstack.h>
 
 lx_regs_t	SIZEOF_LX_REGS_T
 	lxr_fs
@@ -33,3 +34,10 @@ lx_regs_t	SIZEOF_LX_REGS_T
 	lxr_r15
 	lxr_rip
 	lxr_orig_rax
+
+lx_sigstack_t	SIZEOF_LX_SIGSTACK_T
+	retaddr
+	si
+	uc
+	fpstate
+	pad
