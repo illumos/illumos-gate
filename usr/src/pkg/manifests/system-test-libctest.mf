@@ -43,6 +43,11 @@ $(i386_ONLY)file path=opt/libc-tests/tests/wcsrtombs_test.amd64 mode=0555
 $(i386_ONLY)file path=opt/libc-tests/tests/wcsrtombs_test.i386 mode=0555
 $(sparc_ONLY)file path=opt/libc-tests/tests/wcsrtombs_test.sparc mode=0555
 $(sparc_ONLY)file path=opt/libc-tests/tests/wcsrtombs_test.sparcv9 mode=0555
+file path=opt/libc-tests/tests/wctype_test mode=0555
+$(i386_ONLY)file path=opt/libc-tests/tests/wctype_test.amd64 mode=0555
+$(i386_ONLY)file path=opt/libc-tests/tests/wctype_test.i386 mode=0555
+$(sparc_ONLY)file path=opt/libc-tests/tests/wctype_test.sparc mode=0555
+$(sparc_ONLY)file path=opt/libc-tests/tests/wctype_test.sparcv9 mode=0555
 license lic_CDDL license=lic_CDDL
 depend fmri=locale/de type=require
 depend fmri=locale/en type=require
