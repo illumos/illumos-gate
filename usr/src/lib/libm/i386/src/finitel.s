@@ -29,8 +29,6 @@
         .file "finitel.s"
 
 #include "libm.h"
-LIBM_ANSI_PRAGMA_WEAK(finitel,function)
-#include "libm_synonyms.h"
 
 	ENTRY(finitel)
 	movl    12(%esp),%eax		/ %ax <-- sign&bexp(x)

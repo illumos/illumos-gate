@@ -28,7 +28,6 @@
  */
 
 #include <sys/isa_defs.h>
-#include "libm_synonyms.h"
 #include "libm_inlines.h"
 
 #ifdef _LITTLE_ENDIAN
@@ -67,10 +66,7 @@
  *	results.
  */
 
-#define sqrt __sqrt
-
 extern double sqrt(double);
-
 extern double fabs(double);
 
 static const int __vlibm_TBL_rhypot[] = {
@@ -428,4 +424,3 @@ start2:
 		}
 	}
 }
-

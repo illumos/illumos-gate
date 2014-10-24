@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak lroundl = __lroundl
+#pragma weak __lroundl = lroundl
 
 #include <sys/isa_defs.h>	/* _ILP32 */
 #include "libm.h"

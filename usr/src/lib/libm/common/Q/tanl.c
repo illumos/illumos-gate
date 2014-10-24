@@ -58,7 +58,7 @@
  *	computer TRIG(x) returns trig(x) nearly rounded.
  */
 
-#pragma weak tanl = __tanl
+#pragma weak __tanl = tanl
 
 #include "libm.h"
 #include "longdouble.h"

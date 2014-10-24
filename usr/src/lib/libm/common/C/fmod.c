@@ -26,7 +26,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak fmod = __fmod
+#pragma weak __fmod = fmod
 
 #include "libm.h"
 

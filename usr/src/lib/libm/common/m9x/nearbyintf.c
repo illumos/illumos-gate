@@ -30,7 +30,6 @@
 #pragma weak nearbyintf = __nearbyintf
 
 #include "libm.h"
-#include "fenv_synonyms.h"
 #include <fenv.h>
 
 float

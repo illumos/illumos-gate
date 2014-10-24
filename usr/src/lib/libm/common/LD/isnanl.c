@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak isnanl = __isnanl
+#pragma weak __isnanl = isnanl
 
 #include "libm.h"
 

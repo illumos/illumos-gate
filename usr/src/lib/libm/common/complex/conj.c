@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak conj = __conj
+#pragma weak __conj = conj
 
 #include "libm.h"
 #include "complex_wrapper.h"

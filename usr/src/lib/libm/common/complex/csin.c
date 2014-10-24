@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak csin = __csin
+#pragma weak __csin = csin
 
 /* INDENT OFF */
 /*

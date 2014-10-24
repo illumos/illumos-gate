@@ -26,8 +26,6 @@
  * Use is subject to license terms.
  */
 
-#pragma weak atan2pif = __atan2pif
-
 #include "libm.h"
 
 static const double invpi = 0.3183098861837906715377675;

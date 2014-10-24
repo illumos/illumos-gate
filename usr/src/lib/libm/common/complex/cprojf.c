@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak cprojf = __cprojf
+#pragma weak __cprojf = cprojf
 
 #include "libm.h"
 #include "complex_wrapper.h"

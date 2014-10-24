@@ -27,8 +27,8 @@
  * Use is subject to license terms.
  */
 
-#pragma weak jn = __jn
-#pragma weak yn = __yn
+#pragma weak __jn = jn
+#pragma weak __yn = yn
 
 /*
  * floating point Bessel's function of the 1st and 2nd kind

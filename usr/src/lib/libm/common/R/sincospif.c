@@ -27,8 +27,6 @@
  * Use is subject to license terms.
  */
 
-#pragma weak sincospif = __sincospif
-
 #include "libm.h"
 
 extern void sincospi(double, double *, double *);

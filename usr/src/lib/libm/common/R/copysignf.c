@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak copysignf = __copysignf
+#pragma weak __copysignf = copysignf
 
 #include "libm.h"
 

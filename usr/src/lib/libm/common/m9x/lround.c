@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak lround = __lround
+#pragma weak __lround = lround
 
 /*
  * lround(x) rounds its argument to the nearest integer, rounding ties

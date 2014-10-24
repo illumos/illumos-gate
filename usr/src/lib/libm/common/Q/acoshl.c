@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak acoshl = __acoshl
+#pragma weak __acoshl = acoshl
 
 #include "libm.h"
 

@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak significandl = __significandl
+#pragma weak __significandl = significandl
 
 #include "libm.h"
 

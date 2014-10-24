@@ -49,7 +49,6 @@
  */
 
 #include "libm.h"
-#include "libm_synonyms.h"
 #include "longdouble.h"
 
 static long double neg(long double, int *);

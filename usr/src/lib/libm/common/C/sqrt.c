@@ -26,7 +26,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak sqrt = __sqrt
+#pragma weak __sqrt = sqrt
 
 #include "libm.h"
 

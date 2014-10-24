@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak log1pl = __log1pl
+#pragma weak __log1pl = log1pl
 
 /*
  * log1pl(x)

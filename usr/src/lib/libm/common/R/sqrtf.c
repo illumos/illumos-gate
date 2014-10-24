@@ -26,7 +26,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak sqrtf = __sqrtf
+#pragma weak __sqrtf = sqrtf
 
 #include "libm.h"
 

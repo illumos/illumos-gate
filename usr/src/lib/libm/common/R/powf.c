@@ -26,7 +26,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak powf = __powf
+#pragma weak __powf = powf
 
 #include "libm.h"
 #include "xpg6.h"	/* __xpg6 */

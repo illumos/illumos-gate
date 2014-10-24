@@ -29,13 +29,6 @@
         .file "rndintl.s"
 
 #include "libm.h"
-LIBM_ANSI_PRAGMA_WEAK(aintl,function)
-LIBM_ANSI_PRAGMA_WEAK(irintl,function)
-LIBM_ANSI_PRAGMA_WEAK(anintl,function)
-LIBM_ANSI_PRAGMA_WEAK(nintl,function)
-#include "libm_synonyms.h"
-
-#undef fabs
 
 	ENTRY(aintl)
 	movq	%rsp,%rax

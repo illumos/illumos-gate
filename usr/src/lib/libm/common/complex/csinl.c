@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak csinl = __csinl
+#pragma weak __csinl = csinl
 
 #include "libm.h"
 #include "complex_wrapper.h"

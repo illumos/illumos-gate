@@ -26,7 +26,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak scalbn = __scalbn
+#pragma weak __scalbn = scalbn
 
 #include "libm.h"
 

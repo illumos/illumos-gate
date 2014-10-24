@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak tgamma = __tgamma
+#pragma weak __tgamma = tgamma
 
 /* INDENT OFF */
 /*

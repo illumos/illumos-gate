@@ -26,9 +26,8 @@
  * Use is subject to license terms.
  */
 
-#pragma weak cabs = __cabs
+#pragma weak __cabs = cabs
 
-#include "libm_synonyms.h"
 #include <math.h>
 #include "complex_wrapper.h"
 

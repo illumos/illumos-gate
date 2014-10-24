@@ -52,9 +52,9 @@
 #if defined(__sparc)
 
 #define	LIBM_ANSI_PRAGMA_WEAK(sym,stype) \
-	.weak sym; \
-	.type sym,#stype; \
-sym	= __/**/sym
+	.weak __/**/sym;		 \
+	.type __/**/sym,#stype;		 \
+__/**/sym	= sym
 
 #ifndef SET_FILE
 #define	SET_FILE(x) \
@@ -151,9 +151,9 @@ sym	= __/**/sym
 #elif defined(__x86)
 
 #define	LIBM_ANSI_PRAGMA_WEAK(sym,stype) \
-	.weak sym; \
-	.type sym,@stype; \
-sym	= __/**/sym
+	.weak __/**/sym;		 \
+	.type __/**/sym,@stype;		 \
+__/**/sym	= sym
 
 #ifdef PIC
 #if defined(__amd64)
@@ -196,7 +196,6 @@ sym	= __/**/sym
 #else	/* defined(_ASM) */
 
 #include "libm_macros.h"
-#include "libm_synonyms.h"
 #include "libm_protos.h"
 #include "libm_inlines.h"
 #include <math.h>

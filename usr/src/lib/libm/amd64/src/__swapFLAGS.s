@@ -29,7 +29,6 @@
 	.file	"__swapFLAGS.s"
 
 #include "libm.h"
-#include "libm_synonyms.h"
 
 /*
  * swap exception masks

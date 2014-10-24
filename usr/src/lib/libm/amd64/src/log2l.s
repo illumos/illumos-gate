@@ -30,7 +30,6 @@
 
 #include "libm.h"
 LIBM_ANSI_PRAGMA_WEAK(log2l,function)
-#include "libm_synonyms.h"
 
 	ENTRY(log2l)
 	fld1			/ push 1.0

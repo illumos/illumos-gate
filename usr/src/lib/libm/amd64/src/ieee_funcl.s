@@ -29,12 +29,6 @@
         .file "ieee_funcl.s"
 
 #include "libm.h"
-LIBM_ANSI_PRAGMA_WEAK(isinfl,function)
-LIBM_ANSI_PRAGMA_WEAK(isnormall,function)
-LIBM_ANSI_PRAGMA_WEAK(issubnormall,function)
-LIBM_ANSI_PRAGMA_WEAK(iszerol,function)
-LIBM_ANSI_PRAGMA_WEAK(signbitl,function)
-#include "libm_synonyms.h"
 
 	ENTRY(isinfl)
 	movl	16(%rsp),%eax		/ ax <-- sign and bexp of x 

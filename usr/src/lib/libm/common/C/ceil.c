@@ -26,7 +26,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak ceil = __ceil
+#pragma weak __ceil = ceil
 
 /*
  * ceil(x) returns the least integral value bigger than or equal to x.

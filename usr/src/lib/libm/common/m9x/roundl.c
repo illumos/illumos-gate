@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak roundl = __roundl
+#pragma weak __roundl = roundl
 
 #include "libm.h"
 

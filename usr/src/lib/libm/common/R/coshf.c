@@ -26,7 +26,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak coshf = __coshf
+#pragma weak __coshf = coshf
 
 #include "libm.h"
 

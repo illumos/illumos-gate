@@ -31,7 +31,6 @@
 #include "libm.h"
 LIBM_ANSI_PRAGMA_WEAK(ceill,function)
 LIBM_ANSI_PRAGMA_WEAK(floorl,function)
-#include "libm_synonyms.h"
 
 	ENTRY(ceill)
 	subl	$8,%esp

@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak clogl = __clogl
+#pragma weak __clogl = clogl
 
 #include "libm.h"	/* atan2l/fabsl/isinfl/log1pl/logl/__k_clog_rl */
 #include "complex_wrapper.h"

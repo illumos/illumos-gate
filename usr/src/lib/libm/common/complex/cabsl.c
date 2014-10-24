@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak cabsl = __cabsl
+#pragma weak __cabsl = cabsl
 
 #include "libm.h"
 #include "complex_wrapper.h"

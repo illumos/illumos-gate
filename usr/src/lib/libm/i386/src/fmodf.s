@@ -30,7 +30,6 @@
 
 #include "libm.h"
 LIBM_ANSI_PRAGMA_WEAK(fmodf,function)
-#include "libm_synonyms.h"
 
 	ENTRY(fmodf)
 	flds	8(%esp)			/ load arg y

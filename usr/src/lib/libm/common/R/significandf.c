@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak significandf = __significandf
+#pragma weak __significandf = significandf
 
 #include "libm.h"
 

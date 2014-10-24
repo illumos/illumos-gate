@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak scalbnf = __scalbnf
+#pragma weak __scalbnf = scalbnf
 
 #include "libm.h"
 #include <float.h>		/* FLT_MAX, FLT_MIN */

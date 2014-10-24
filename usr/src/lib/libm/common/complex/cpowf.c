@@ -26,7 +26,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak cpowf = __cpowf
+#pragma weak __cpowf = cpowf
 
 #include "libm.h"
 #include "complex_wrapper.h"

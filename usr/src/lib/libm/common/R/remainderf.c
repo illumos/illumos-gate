@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak remainderf = __remainderf
+#pragma weak __remainderf = remainderf
 
 #include "libm.h"
 

@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak tanhl = __tanhl
+#pragma weak __tanhl = tanhl
 
 /*
  * tanhl(x) returns the hyperbolic tangent of x

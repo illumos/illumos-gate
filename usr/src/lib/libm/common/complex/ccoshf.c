@@ -26,7 +26,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak ccoshf = __ccoshf
+#pragma weak __ccoshf = ccoshf
 
 #include "libm.h"
 #include "complex_wrapper.h"

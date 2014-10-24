@@ -39,7 +39,7 @@
  *	LOG2(x) = n + (1/ln2)*log(x)
  */
 
-#pragma weak log2l = __log2l
+#pragma weak __log2l = log2l
 
 #include "libm.h"
 #include "longdouble.h"

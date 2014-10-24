@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak cacoshl = __cacoshl
+#pragma weak __cacoshl = cacoshl
 
 #include "libm.h"	/* fabsl/isnanl/isinfl/signbitl */
 #include "complex_wrapper.h"

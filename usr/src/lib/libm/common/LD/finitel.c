@@ -27,8 +27,6 @@
  * Use is subject to license terms.
  */
 
-#pragma weak finitel = __finitel
-
 #include "libm.h"
 
 #if defined(__sparc)

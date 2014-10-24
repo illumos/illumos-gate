@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak lrintl = __lrintl
+#pragma weak __lrintl = lrintl
 
 #include <sys/isa_defs.h>	/* _ILP32 */
 #include "libm.h"

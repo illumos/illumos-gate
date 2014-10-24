@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak cimagf = __cimagf
+#pragma weak __cimagf = cimagf
 
 #include "libm.h"
 #include "complex_wrapper.h"

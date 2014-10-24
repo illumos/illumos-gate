@@ -30,7 +30,6 @@
 
 #include "libm.h"
 LIBM_ANSI_PRAGMA_WEAK(copysignl,function)
-#include "libm_synonyms.h"
 
 	ENTRY(copysignl)
 	movl    12(%esp),%eax		/ sign and bexp of x

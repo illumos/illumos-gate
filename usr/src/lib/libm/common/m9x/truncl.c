@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak truncl = __truncl
+#pragma weak __truncl = truncl
 
 #include "libm.h"
 

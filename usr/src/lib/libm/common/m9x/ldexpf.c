@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak ldexpf = __ldexpf
+#pragma weak __ldexpf = ldexpf
 
 #include "libm.h"
 

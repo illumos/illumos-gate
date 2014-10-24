@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak remquo = __remquo
+#pragma weak __remquo = remquo
 
 /* INDENT OFF */
 /*
@@ -40,7 +40,6 @@
 /* INDENT ON */
 
 #include "libm.h"
-#include "libm_synonyms.h"
 #include "libm_protos.h"
 #include <math.h>		/* fabs() */
 #include <sys/isa_defs.h>

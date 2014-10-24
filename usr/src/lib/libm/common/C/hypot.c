@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak hypot = __hypot
+#pragma weak __hypot = hypot
 
 /* INDENT OFF */
 /*

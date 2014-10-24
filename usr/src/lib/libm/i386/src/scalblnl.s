@@ -30,7 +30,6 @@
 
 #include "libm.h"
 LIBM_ANSI_PRAGMA_WEAK(scalblnl,function)
-#include "libm_synonyms.h"
 
 	ENTRY(scalblnl)
 	fildl	16(%esp)		/ convert 32-bit integer N

@@ -30,7 +30,6 @@
 
 #include "libm.h"
 LIBM_ANSI_PRAGMA_WEAK(ilogbf,function)
-#include "libm_synonyms.h"
 #include "xpg6.h"
 
 	.data

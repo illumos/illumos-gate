@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak expm1 = __expm1
+#pragma weak __expm1 = expm1
 
 /* INDENT OFF */
 /*
@@ -127,7 +127,6 @@
  */
 /* INDENT ON */
 
-#include "libm_synonyms.h"	/* __expm1 */
 #include "libm_macros.h"
 #include <math.h>
 

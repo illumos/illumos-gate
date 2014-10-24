@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak lrint = __lrint
+#pragma weak __lrint = lrint
 
 /*
  * lrint(x) rounds its argument to the nearest integer according

@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak tgammal = __tgammal
+#pragma weak __tgammal = tgammal
 
 #include "libm.h"
 #include <sys/isa_defs.h>

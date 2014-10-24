@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak signgamf = __signgamf
+#pragma weak __signgamf = signgamf
 
 #include "libm.h"
 

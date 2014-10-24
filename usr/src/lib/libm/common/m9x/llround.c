@@ -27,10 +27,10 @@
  * Use is subject to license terms.
  */
 
-#pragma weak llround = __llround
+#pragma weak __llround = llround
 #if defined(__sparcv9) || defined(__amd64)
-#pragma weak lround = __llround
-#pragma weak __lround = __llround
+#pragma weak lround = llround
+#pragma weak __lround = llround
 #endif
 
 /*

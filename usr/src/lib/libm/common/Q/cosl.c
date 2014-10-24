@@ -59,7 +59,7 @@
  *	computer TRIG(x) returns trig(x) nearly rounded.
  */
 
-#pragma weak cosl = __cosl
+#pragma weak __cosl = cosl
 
 #include "libm.h"
 #include "longdouble.h"

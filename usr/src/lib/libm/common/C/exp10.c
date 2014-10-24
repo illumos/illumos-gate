@@ -26,8 +26,6 @@
  * Use is subject to license terms.
  */
 
-#pragma weak exp10 = __exp10
-
 /* INDENT OFF */
 /*
  * exp10(x)

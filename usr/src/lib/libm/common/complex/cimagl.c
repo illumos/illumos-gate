@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak cimagl = __cimagl
+#pragma weak __cimagl = cimagl
 
 #include "libm.h"
 #include "complex_wrapper.h"

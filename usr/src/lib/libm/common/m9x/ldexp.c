@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak ldexp = __ldexp
+#pragma weak __ldexp = ldexp
 
 #include "libm.h"
 #include <errno.h>

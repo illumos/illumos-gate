@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak fabsl = __fabsl
+#pragma weak __fabsl = fabsl
 
 #include "libm.h"
 

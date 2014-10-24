@@ -59,11 +59,8 @@
 
 #include "libm.h"
 LIBM_ANSI_PRAGMA_WEAK(pow,function)
-#include "libm_synonyms.h"
 #include "libm_protos.h"
 #include "xpg6.h"
-
-#undef fabs
 
 	.data
 	.align	4

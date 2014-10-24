@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak log10l = __log10l
+#pragma weak __log10l = log10l
 
 /*
  * log10l(X)

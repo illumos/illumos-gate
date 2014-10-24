@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak nextafterf = __nextafterf
+#pragma weak __nextafterf = nextafterf
 
 #include "libm.h"
 

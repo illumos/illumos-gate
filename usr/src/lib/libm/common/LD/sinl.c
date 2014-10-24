@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak sinl = __sinl
+#pragma weak __sinl = sinl
 
 /* INDENT OFF */
 /* sinl(x)
@@ -63,7 +63,6 @@
 /* INDENT ON */
 
 #include "libm.h"
-#include "libm_synonyms.h"
 #include "longdouble.h"
 
 #include <sys/isa_defs.h>

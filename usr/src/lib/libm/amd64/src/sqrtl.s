@@ -30,7 +30,6 @@
 
 #include "libm.h"
 LIBM_ANSI_PRAGMA_WEAK(sqrtl,function)
-#include "libm_synonyms.h"
 
 	ENTRY(sqrtl)
 	fldt	8(%rsp)

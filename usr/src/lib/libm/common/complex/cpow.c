@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak cpow = __cpow
+#pragma weak __cpow = cpow
 
 /* INDENT OFF */
 /*

@@ -28,7 +28,6 @@
  */
 
 #include <sys/isa_defs.h>
-#include "libm_synonyms.h"
 #include "libm_inlines.h"
 
 #ifdef _LITTLE_ENDIAN
@@ -65,8 +64,6 @@
  *	Maximum error observed: less than 0.872 ulp after 16.777.216.000
  *	results.
  */
-
-#define sqrt __sqrt
 
 extern double sqrt(double);
 extern double fabs(double);
@@ -394,4 +391,3 @@ __vhypot_n(int n, double * restrict px, int stridex, double * restrict py,
 		pz += stridez;
 	}
 }
-

@@ -27,10 +27,10 @@
  * Use is subject to license terms.
  */
 
-#pragma weak llrintf = __llrintf
+#pragma weak __llrintf = llrintf
 #if defined(__sparcv9) || defined(__amd64)
-#pragma weak lrintf = __llrintf
-#pragma weak __lrintf = __llrintf
+#pragma weak lrintf = llrintf
+#pragma weak __lrintf = llrintf
 #endif
 
 #include "libm.h"

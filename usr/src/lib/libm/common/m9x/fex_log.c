@@ -27,13 +27,12 @@
  * Use is subject to license terms.
  */
 
-#pragma weak fex_get_log = __fex_get_log
-#pragma weak fex_set_log = __fex_set_log
-#pragma weak fex_get_log_depth = __fex_get_log_depth
-#pragma weak fex_set_log_depth = __fex_set_log_depth
-#pragma weak fex_log_entry = __fex_log_entry
+#pragma weak __fex_get_log = fex_get_log
+#pragma weak __fex_set_log = fex_set_log
+#pragma weak __fex_get_log_depth = fex_get_log_depth
+#pragma weak __fex_set_log_depth = fex_set_log_depth
+#pragma weak __fex_log_entry = fex_log_entry
 
-#include "fenv_synonyms.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>

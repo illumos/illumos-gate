@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak nexttowardl = __nexttowardl
+#pragma weak __nexttowardl = nexttowardl
 
 #include "libm.h"
 #include <float.h>		/* LDBL_MAX, LDBL_MIN */

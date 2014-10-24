@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak pow = __pow
+#pragma weak __pow = pow
 
 /*
  * pow(x,y) return x**y

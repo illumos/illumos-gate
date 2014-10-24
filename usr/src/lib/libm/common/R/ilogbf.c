@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak ilogbf = __ilogbf
+#pragma weak __ilogbf = ilogbf
 
 #include "libm.h"
 #include "xpg6.h"	/* __xpg6 */

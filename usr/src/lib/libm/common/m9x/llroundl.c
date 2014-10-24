@@ -27,10 +27,10 @@
  * Use is subject to license terms.
  */
 
-#pragma weak llroundl = __llroundl
+#pragma weak __llroundl = llroundl
 #if defined(__sparcv9) || defined(__amd64)
-#pragma weak lroundl = __llroundl
-#pragma weak __lroundl = __llroundl
+#pragma weak lroundl = llroundl
+#pragma weak __lroundl = llroundl
 #endif
 
 #include "libm.h"

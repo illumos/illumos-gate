@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak asinl = __asinl
+#pragma weak __asinl = asinl
 
 /*
  *	asinl(x) = atan2l(x,sqrt(1-x*x));

@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak logbl = __logbl
+#pragma weak __logbl = logbl
 
 #include "libm.h"
 #include "xpg6.h"	/* __xpg6 */

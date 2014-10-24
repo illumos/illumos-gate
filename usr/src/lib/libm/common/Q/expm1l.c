@@ -27,7 +27,8 @@
  * Use is subject to license terms.
  */
 
-#pragma weak expm1l = __expm1l
+#pragma weak __expm1l = expm1l
+
 #if !defined(__sparc)
 #error Unsupported architecture
 #endif

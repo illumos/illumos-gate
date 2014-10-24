@@ -27,7 +27,6 @@
  * Use is subject to license terms.
  */
 
-#include "fenv_synonyms.h"
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>

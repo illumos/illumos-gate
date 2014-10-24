@@ -26,7 +26,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak sinh = __sinh
+#pragma weak __sinh = sinh
 
 /* INDENT OFF */
 /*

@@ -26,7 +26,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak csinhf = __csinhf
+#pragma weak __csinhf = csinhf
 
 #include "libm.h"
 #include "complex_wrapper.h"

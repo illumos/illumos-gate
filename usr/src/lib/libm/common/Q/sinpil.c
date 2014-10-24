@@ -27,8 +27,6 @@
  * Use is subject to license terms.
  */
 
-#pragma weak sinpil = __sinpil
-
 /*
  * long double sinpil(long double x),
  * return long double precision sinl(pi*x).

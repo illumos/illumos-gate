@@ -26,7 +26,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak asinf = __asinf
+#pragma weak __asinf = asinf
 
 #include "libm.h"
 

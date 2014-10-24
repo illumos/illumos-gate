@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak sqrtl = __sqrtl
+#pragma weak __sqrtl = sqrtl
 
 #include "libm.h"
 #include "longdouble.h"

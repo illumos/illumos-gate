@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak scalbnl = __scalbnl
+#pragma weak __scalbnl = scalbnl
 
 #include "libm.h"
 #include <float.h>		/* LDBL_MAX, LDBL_MIN */

@@ -30,7 +30,6 @@
 
 #include "libm.h"
 LIBM_ANSI_PRAGMA_WEAK(log10l,function)
-#include "libm_synonyms.h"
 
 	ENTRY(log10l)
 	fldlg2	

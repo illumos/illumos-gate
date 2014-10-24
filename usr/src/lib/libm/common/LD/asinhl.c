@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak asinhl = __asinhl
+#pragma weak __asinhl = asinhl
 
 #include "libm.h"
 

@@ -27,7 +27,6 @@
  * Use is subject to license terms.
  */
 
-#include "fenv_synonyms.h"
 #undef lint
 #include <signal.h>
 #include <siginfo.h>

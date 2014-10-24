@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak creal = __creal
+#pragma weak __creal = creal
 
 #include "libm.h"
 #include "complex_wrapper.h"

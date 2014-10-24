@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak catanh = __catanh
+#pragma weak __catanh = catanh
 
 /* INDENT OFF */
 /*

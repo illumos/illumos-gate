@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak round = __round
+#pragma weak __round = round
 
 #include "libm.h"
 

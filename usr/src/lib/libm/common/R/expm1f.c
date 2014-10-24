@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak expm1f = __expm1f
+#pragma weak __expm1f = expm1f
 
 #include "libm.h"
 

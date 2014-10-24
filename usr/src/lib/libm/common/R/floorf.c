@@ -27,8 +27,8 @@
  * Use is subject to license terms.
  */
 
-#pragma weak ceilf = __ceilf
-#pragma weak floorf = __floorf
+#pragma weak __ceilf = ceilf
+#pragma weak __floorf = floorf
 
 /* INDENT OFF */
 /*

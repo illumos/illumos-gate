@@ -26,7 +26,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak sinf = __sinf
+#pragma weak __sinf = sinf
 
 /*
  * See sincosf.c

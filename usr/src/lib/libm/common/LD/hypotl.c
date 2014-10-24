@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak hypotl = __hypotl
+#pragma weak __hypotl = hypotl
 
 /*
  * hypotl(x,y)

@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak cexpl = __cexpl
+#pragma weak __cexpl = cexpl
 
 #include "libm.h"		/* expl/isinfl/iszerol/scalbnl/sincosl */
 #include "complex_wrapper.h"

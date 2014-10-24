@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak ccosl = __ccosl
+#pragma weak __ccosl = ccosl
 
 #include "libm.h"
 #include "complex_wrapper.h"
