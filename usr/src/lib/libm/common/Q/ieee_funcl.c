@@ -27,13 +27,11 @@
  * Use is subject to license terms.
  */
 
-#if defined(ELFOBJ)
 #pragma weak isinfl = __isinfl
 #pragma weak isnormall = __isnormall
 #pragma weak issubnormall = __issubnormall
 #pragma weak iszerol = __iszerol
 #pragma weak signbitl = __signbitl
-#endif
 
 #include "libm.h"
 

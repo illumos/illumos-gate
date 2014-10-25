@@ -27,9 +27,7 @@
  * Use is subject to license terms.
  */
 
-#if defined(ELFOBJ)
 #pragma weak log10l = __log10l
-#endif
 
 /*
  * log10l(X)

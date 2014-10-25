@@ -27,9 +27,7 @@
  * Use is subject to license terms.
  */
 
-#if defined(ELFOBJ)
 #pragma weak ldexp = __ldexp
-#endif
 
 #include "libm.h"
 #include <errno.h>

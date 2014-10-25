@@ -177,8 +177,6 @@ LINTFLAGS64     += -errchk=longptr64
 CLAGS		+= $(LINTERROFF)
 CFLAGS64	+= $(LINTERROFF)
 
-ASDEF		+= -DLIBMVEC_SO_BUILD
-
 FLTRPATH_sparc		= $$ORIGIN/cpu/$$ISALIST/libmvec_isa.so.1
 FLTRPATH_sparcv9	= $$ORIGIN/../cpu/$$ISALIST/sparcv9/libmvec_isa.so.1
 FLTRPATH_i386		= $$ORIGIN/libmvec/$$HWCAP
@@ -187,8 +185,6 @@ FLTRPATH		= $(FLTRPATH_$(TARGET_ARCH))
 sparc_CFLAGS += -_cc=-W0,-xintrinsic
 sparcv9_CFLAGS += -_cc=-W0,-xintrinsic
 CPPFLAGS_i386	+= -Dfabs=__fabs
-
-CPPFLAGS	+= -DLIBMVEC_SO_BUILD
 
 SRCS_mvec_i386 = \
 	../common/__vsqrtf.c \

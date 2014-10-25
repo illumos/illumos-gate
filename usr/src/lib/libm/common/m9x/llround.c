@@ -27,12 +27,10 @@
  * Use is subject to license terms.
  */
 
-#if defined(ELFOBJ)
 #pragma weak llround = __llround
 #if defined(__sparcv9) || defined(__amd64)
 #pragma weak lround = __llround
 #pragma weak __lround = __llround
-#endif
 #endif
 
 /*

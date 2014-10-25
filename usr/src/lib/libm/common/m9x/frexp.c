@@ -27,9 +27,7 @@
  * Use is subject to license terms.
  */
 
-#if defined(ELFOBJ)
 #pragma weak frexp = __frexp
-#endif
 
 /*
  * frexp(x, exp) returns the normalized significand of x and sets

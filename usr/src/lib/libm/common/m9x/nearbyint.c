@@ -27,9 +27,7 @@
  * Use is subject to license terms.
  */
 
-#if defined(ELFOBJ)
 #pragma weak nearbyint = __nearbyint
-#endif
 
 /*
  * nearbyint(x) returns the nearest fp integer to x in the direction

@@ -29,11 +29,9 @@
 	.file	"__vlog_ultra3.S"
 
 #include "libm.h"
-#if defined(LIBMVEC_SO_BUILD)
 	.weak	__vlog
 	.type	__vlog,#function
 	__vlog = __vlog_ultra3
-#endif
 
 /*
  * ELEVENBIT table and order 5 POLYNOMIAL no explicit correction t

@@ -27,9 +27,7 @@
  * Use is subject to license terms.
  */
 
-#if defined(ELFOBJ)
 #pragma weak lround = __lround
-#endif
 
 /*
  * lround(x) rounds its argument to the nearest integer, rounding ties

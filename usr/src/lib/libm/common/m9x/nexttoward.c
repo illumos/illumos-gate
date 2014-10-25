@@ -27,9 +27,7 @@
  * Use is subject to license terms.
  */
 
-#if defined(ELFOBJ)
 #pragma weak nexttoward = __nexttoward
-#endif
 
 /*
  * nexttoward(x, y) delivers the next representable number after x

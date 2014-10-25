@@ -30,7 +30,7 @@
 #ifndef _LIBM_SYNONYMS_H
 #define	_LIBM_SYNONYMS_H
 
-#if defined(ELFOBJ) && !defined(lint)
+#if !defined(lint)
 
 #define	cabs			__cabs			/* C99 <complex.h> */
 #define	cabsf			__cabsf			/* C99 <complex.h> */
@@ -744,6 +744,6 @@
 #define	thr_setspecific		_thr_setspecific
 #endif
 
-#endif /* defined(ELFOBJ) && !defined(lint) */
+#endif /* !defined(lint) */
 
 #endif	/* _LIBM_SYNONYMS_H */

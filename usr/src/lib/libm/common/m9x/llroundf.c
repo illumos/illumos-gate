@@ -27,12 +27,10 @@
  * Use is subject to license terms.
  */
 
-#if defined(ELFOBJ)
 #pragma weak llroundf = __llroundf
 #if defined(__sparcv9) || defined(__amd64)
 #pragma weak lroundf = __llroundf
 #pragma weak __lroundf = __llroundf
-#endif
 #endif
 
 #include "libm.h"

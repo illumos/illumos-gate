@@ -27,9 +27,7 @@
  * Use is subject to license terms.
  */
 
-#if defined(ELFOBJ)
 #pragma weak expm1l = __expm1l
-#endif
 #if !defined(__sparc)
 #error Unsupported architecture
 #endif
