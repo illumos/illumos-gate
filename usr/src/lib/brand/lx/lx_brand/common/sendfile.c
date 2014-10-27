@@ -106,6 +106,7 @@ lx_sendfile64(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4)
 	sfv.sfv_flag = 0;
 	sfv.sfv_off = off;
 	sfv.sfv_len = sz;
+	xferred = 0;
 	error = __systemcall(&rval, SYS_sendfilev, SENDFILEV64, p1, &sfv,
 	    1, &xferred);
 
