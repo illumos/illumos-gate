@@ -171,6 +171,24 @@ lx_open(uintptr_t p1, uintptr_t p2, uintptr_t p3)
 	mode_t mode = 0;
 	char *path = (char *)p1;
 
+	/*
+	 * We'll check the file type again after opening the file (see the
+	 * explanation in lx_open_postprocess), but we also need to check BEFORE
+	 * to avoid the very hang O_DIRECTORY is trying to avoid for opendir(3)
+	 * when given a FIFO.
+	 */
+	if (p2 & LX_O_DIRECTORY) {
+		struct stat64 statbuf;
+
+		if (lstat64(path, &statbuf) < 0) {
+			return (-errno);
+		}
+
+		if (!S_ISDIR(statbuf.st_mode)) {
+			return (-ENOTDIR);
+		}
+	}
+
 	flags = ltos_open_flags(p2);
 
 	if (flags & O_CREAT) {
