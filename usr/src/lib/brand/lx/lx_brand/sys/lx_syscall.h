@@ -86,6 +86,8 @@ extern long lx_fadvise64_64(uintptr_t, off64_t, off64_t, uintptr_t);
 extern long lx_read(uintptr_t, uintptr_t, uintptr_t);
 extern long lx_readv(uintptr_t, uintptr_t, uintptr_t);
 extern long lx_writev(uintptr_t, uintptr_t, uintptr_t);
+extern long lx_pread(uintptr_t, uintptr_t, uintptr_t, uintptr_t);
+extern long lx_pwrite(uintptr_t, uintptr_t, uintptr_t, uintptr_t);
 extern long lx_pread64(uintptr_t, uintptr_t, uintptr_t, uintptr_t,
     uintptr_t);
 extern long lx_pwrite64(uintptr_t, uintptr_t, uintptr_t, uintptr_t,

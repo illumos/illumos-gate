@@ -65,6 +65,61 @@ lx_read(uintptr_t p1, uintptr_t p2, uintptr_t p3)
 	return (ret);
 }
 
+#if defined(_LP64)
+long
+lx_pread(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4)
+{
+	int 		fd = (int)p1;
+	void		*buf = (void *)p2;
+	size_t		nbyte = (size_t)p3;
+	off64_t		off = (off64_t)p4;
+	ssize_t		ret;
+
+	if (lx_is_directory(fd))
+		return (-EISDIR);
+
+	ret = pread64(fd, buf, nbyte, off);
+
+	if (ret < 0)
+		return (-errno);
+
+	return (ret);
+}
+
+/*
+ * On Linux, the pwrite(2) system call behaves identically to Solaris except
+ * in the case of the file being opened with O_APPEND. In that case Linux's
+ * pwrite(2) ignores the offset parameter and instead appends the data to the
+ * file without modifying the current seek pointer.
+ */
+long
+lx_pwrite(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4)
+{
+	int fd = (int)p1;
+	void *buf = (void *)p2;
+	size_t nbyte = (size_t)p3;
+	off64_t off = (off64_t)p4;
+	ssize_t ret;
+	int rval;
+	struct stat64 statbuf;
+
+	if ((rval = fcntl(fd, F_GETFL, 0)) < 0)
+		return (-errno);
+
+	if (!(rval & O_APPEND)) {
+		ret = pwrite64(fd, buf, nbyte, off);
+	} else if ((ret = fstat64(fd, &statbuf)) == 0) {
+		ret = pwrite64(fd, buf, nbyte, statbuf.st_size);
+	}
+
+	if (ret < 0)
+		return (-errno);
+
+	return (ret);
+}
+
+#else /* 32 bit */
+
 long
 lx_pread64(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4, uintptr_t p5)
 {
@@ -120,6 +175,7 @@ lx_pwrite64(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 
 	return (ret);
 }
+#endif
 
 /*
  * Implementation of Linux readv() and writev() system calls.
