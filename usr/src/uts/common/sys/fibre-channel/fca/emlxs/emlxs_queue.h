@@ -5,8 +5,8 @@
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
  *
- * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or http://www.opensolaris.org/os/licensing.
+ * You can obtain a copy of the license at
+ * http://www.opensource.org/licenses/cddl1.txt.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2010 Emulex.  All rights reserved.
+ * Copyright (c) 2004-2012 Emulex. All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -141,7 +141,7 @@ typedef struct CQE_UnsolRcv
 	uint32_t	FCFId: 6;
 
 	uint32_t	Valid: 1;	/* Word 3 */
-	uint32_t	port: 1;
+	uint32_t	Rsvd3: 1;
 	uint32_t	hdr_size: 6;
 	uint32_t	Code: 8;
 	uint32_t	eof: 8;
@@ -162,10 +162,51 @@ typedef struct CQE_UnsolRcv
 	uint32_t	eof: 8;
 	uint32_t	Code: 8;
 	uint32_t	hdr_size: 6;
-	uint32_t	port: 1;
+	uint32_t	Rsvd3: 1;
 	uint32_t	Valid: 1;	/* Word 3 */
 #endif
 } CQE_UnsolRcv_t;
+
+
+typedef struct CQE_UnsolRcvV1
+{
+#ifdef EMLXS_BIG_ENDIAN
+	uint16_t	RQindex;	/* Word 0 */
+	uint8_t		Status;
+	uint8_t		Rsvd1;
+
+	uint32_t	Rsvd2: 26;	/* Word 1 */
+	uint32_t	FCFId: 6;
+
+	uint16_t	data_size;	/* Word 2 */
+	uint16_t	RQid;
+
+	uint32_t	Valid: 1;	/* Word 3 */
+	uint32_t	Rsvd3: 1;
+	uint32_t	hdr_size: 6;
+	uint32_t	Code: 8;
+	uint32_t	eof: 8;
+	uint32_t	sof: 8;
+#endif
+#ifdef EMLXS_LITTLE_ENDIAN
+	uint8_t		Rsvd1;
+	uint8_t		Status;
+	uint16_t	RQindex;	/* Word 0 */
+
+	uint32_t	FCFId: 6;
+	uint32_t	Rsvd2: 26;	/* Word 1 */
+
+	uint16_t	RQid;
+	uint16_t	data_size;	/* Word 2 */
+
+	uint32_t	sof: 8;
+	uint32_t	eof: 8;
+	uint32_t	Code: 8;
+	uint32_t	hdr_size: 6;
+	uint32_t	Rsvd3: 1;
+	uint32_t	Valid: 1;	/* Word 3 */
+#endif
+} CQE_UnsolRcvV1_t;
 
 /* Status defines */
 #define	RQ_STATUS_SUCCESS		0x10
@@ -223,6 +264,7 @@ typedef struct CQE_XRI_Abort
 #define	CQE_TYPE_RELEASE_WQE	2
 #define	CQE_TYPE_UNSOL_RCV	4
 #define	CQE_TYPE_XRI_ABORTED	5
+#define	CQE_TYPE_UNSOL_RCV_V1	9
 
 
 typedef struct CQE_ASYNC_FCOE
@@ -301,6 +343,73 @@ typedef struct CQE_ASYNC_GRP_5_QOS
 #endif
 } CQE_ASYNC_GRP_5_QOS_t;
 
+
+typedef struct CQE_ASYNC_FC_LINK_ATT
+{
+#ifdef EMLXS_BIG_ENDIAN
+	uint8_t		port_speed;	/* Word 0 */
+	uint8_t		topology;
+	uint8_t		att_type;
+	uint8_t		link_number;
+
+	uint16_t	link_speed;	/* Word 1 */
+	uint8_t		shared_link_status;
+	uint8_t		port_fault;
+
+	uint32_t	event_tag;	/* Word 2 */
+#endif
+#ifdef EMLXS_LITTLE_ENDIAN
+	uint8_t		link_number;
+	uint8_t		att_type;
+	uint8_t		topology;
+	uint8_t		port_speed;	/* Word 0 */
+
+	uint8_t		port_fault;
+	uint8_t		shared_link_status;
+	uint16_t	link_speed;	/* Word 1 */
+
+	uint32_t	event_tag;	/* Word 2 */
+#endif
+} CQE_ASYNC_FC_LINK_ATT_t;
+
+typedef struct CQE_ASYNC_PORT
+{
+	uint8_t		link_status[4];
+	uint32_t	data_word2;
+	uint32_t	Rsvd;
+} CQE_ASYNC_PORT_t;
+
+/* topology */
+#define	TOPOLOGY_UNKNOWN	0
+#define	TOPOLOGY_NPORT		1
+#define	TOPOLOGY_LPORT		2
+#define	TOPOLOGY_INTERNAL_LB	3
+#define	TOPOLOGY_SERDES_LB	4
+
+/* att_type */
+#define	ATT_TYPE_LINK_UP	1
+#define	ATT_TYPE_LINK_DOWN	2
+#define	ATT_TYPE_NO_HARD_ALPA	3
+
+/* shared_link_status */
+#define	SHARED_STATUS_NONE			0
+#define	SHARED_STATUS_LD_UNUSABLE		1
+#define	SHARED_STATUS_LD_TRAN_FAULT		2
+#define	SHARED_STATUS_LD_NO_SIGNAL		3
+#define	SHARED_STATUS_LD_MGMT_DISABLED		4
+#define	SHARED_STATUS_LU_FAILED_P2P		5
+#define	SHARED_STATUS_LU_FAILED_FLOGI_TMO	6
+#define	SHARED_STATUS_LU_FAILED_NO_FPORT	7
+#define	SHARED_STATUS_LU_FAILED_NO_NPIV		8
+#define	SHARED_STATUS_LU_FAILED_FLOGO		9
+#define	SHARED_STATUS_LU_LOOPBACK		20
+#define	SHARED_STATUS_LU_NORMAL			40
+
+/* port_fault */
+#define	PORT_FAULT_NONE		0
+#define	PORT_FAULT_LOCAL	1
+#define	PORT_FAULT_REMOTE	2
+
 typedef struct CQE_ASYNC
 {
 	/* Words 0-2 */
@@ -309,6 +418,8 @@ typedef struct CQE_ASYNC
 		CQE_ASYNC_LINK_STATE_t	link;
 		CQE_ASYNC_FCOE_t	fcoe;
 		CQE_ASYNC_GRP_5_QOS_t	qos;
+		CQE_ASYNC_FC_LINK_ATT_t fc;
+		CQE_ASYNC_PORT_t 	port;
 	} un;
 
 #ifdef EMLXS_BIG_ENDIAN
@@ -334,10 +445,19 @@ typedef struct CQE_ASYNC
 #define	PHY_10GHZ_LINK			4
 
 /* event_code defines */
-#define	ASYNC_EVENT_CODE_LINK_STATE	1
-#define	ASYNC_EVENT_CODE_FCOE_FIP	2
-#define	ASYNC_EVENT_CODE_DCBX		3
-#define	ASYNC_EVENT_CODE_GRP_5		5
+#define	ASYNC_EVENT_CODE_FCOE_LINK_STATE	0x01
+#define	ASYNC_EVENT_CODE_FCOE_FIP		0x02
+#define	ASYNC_EVENT_CODE_DCBX			0x03
+#define	ASYNC_EVENT_CODE_ISCSI			0x04
+#define	ASYNC_EVENT_CODE_GRP_5			0x05
+#define	ASYNC_EVENT_CODE_FC_EVENT		0x10
+#define	ASYNC_EVENT_CODE_PORT			0x11
+#define	ASYNC_EVENT_CODE_VF			0x12
+#define	ASYNC_EVENT_CODE_MR			0x13
+
+/* FC Event */
+#define	ASYNC_EVENT_FC_LINK_ATT		1
+#define	ASYNC_EVENT_FC_SHARED_LINK_ATT	2
 
 /* LINK_STATE - link_status defines */
 #define	ASYNC_EVENT_PHYS_LINK_DOWN	0
@@ -354,6 +474,9 @@ typedef struct CQE_ASYNC
 
 /* GRP_5 - evt_type defines */
 #define	ASYNC_EVENT_QOS_SPEED		1
+
+/* PORT - evt_type defines */
+#define	ASYNC_EVENT_MISCONFIG_PORT	9
 
 typedef struct CQE_MBOX
 {
@@ -400,6 +523,7 @@ typedef union
 	CQE_CmplWQ_t	cqCmplEntry;
 	CQE_RelWQ_t	cqRelEntry;
 	CQE_UnsolRcv_t	cqUnsolRcvEntry;
+	CQE_UnsolRcvV1_t cqUnsolRcvEntryV1;
 	CQE_XRI_Abort_t	cqXRIEntry;
 } CQE_u;
 
@@ -415,24 +539,31 @@ typedef struct RQE
 /* Definitions for WQEs */
 typedef struct
 {
+	/* Word 0 - 2 */
 	ULP_BDE64	Payload;
+
+	/* Word 3 */
 	uint32_t	PayloadLength;
 
 #ifdef EMLXS_BIG_ENDIAN
+	/* Word 4 */
 	uint32_t	Rsvd1: 6;
 	uint32_t	VF: 1;
 	uint32_t	SP: 1;
 	uint32_t	LocalId: 24;
 
+	/* Word 5 */
 	uint32_t	Rsvd2:  8;
 	uint32_t	RemoteId: 24;
 #endif
 #ifdef EMLXS_LITTLE_ENDIAN
+	/* Word 4 */
 	uint32_t	LocalId: 24;
 	uint32_t	SP: 1;
 	uint32_t	VF: 1;
 	uint32_t	Rsvd1: 6;
 
+	/* Word 5 */
 	uint32_t	RemoteId: 24;
 	uint32_t	Rsvd2:  8;
 #endif
@@ -441,14 +572,22 @@ typedef struct
 
 typedef struct
 {
+	/* Word 0 - 2 */
 	ULP_BDE64	Payload;
-	uint32_t	Rsvd1[2];
+
+	/* Word 3 */
+	uint32_t	PayloadLength;
+
+	/* Word 4 */
+	uint32_t	Rsvd1;
 
 #ifdef EMLXS_BIG_ENDIAN
+	/* Word 5 */
 	uint32_t	Rsvd2: 8;
 	uint32_t	RemoteId: 24;
 #endif
 #ifdef EMLXS_LITTLE_ENDIAN
+	/* Word 5 */
 	uint32_t	RemoteId: 24;
 	uint32_t	Rsvd2: 8;
 #endif
@@ -457,12 +596,17 @@ typedef struct
 
 typedef struct
 {
+	/* Word 0 - 2 */
 	ULP_BDE64	Payload;
+
+	/* Word 3 */
 	uint32_t	PayloadLength;
 
+	/* Word 4 */
 	uint32_t	Parameter;
 
 #ifdef EMLXS_BIG_ENDIAN
+	/* Word 5 */
 	uint32_t	Rctl: 8;
 	uint32_t	Type: 8;
 	uint32_t	DFctl: 8;
@@ -471,6 +615,7 @@ typedef struct
 	uint32_t	Rsvd2: 3;
 #endif
 #ifdef EMLXS_LITTLE_ENDIAN
+	/* Word 5 */
 	uint32_t	Rsvd2: 3;
 	uint32_t	la: 1;
 	uint32_t	Rsvd1: 4;
@@ -483,26 +628,34 @@ typedef struct
 
 typedef struct
 {
+	/* Word 0 - 2 */
 	ULP_BDE64	Payload;
-	uint32_t	PayloadLength;
 
+	/* Word 3 */
+	uint32_t	Rsvd0;
+
+	/* Word 4 */
 	uint32_t	Parameter;
 
 #ifdef EMLXS_BIG_ENDIAN
+	/* Word 5 */
 	uint32_t	Rctl: 8;
 	uint32_t	Type: 8;
 	uint32_t	DFctl: 8;
 	uint32_t	ls: 1;
-	uint32_t	Rsvd1: 3;
-	uint32_t	la: 1;
+	uint32_t	xo: 1;
+	uint32_t	Rsvd1: 2;
+	uint32_t	ft: 1;
 	uint32_t	si: 1;
 	uint32_t	Rsvd2: 2;
 #endif
 #ifdef EMLXS_LITTLE_ENDIAN
+	/* Word 5 */
 	uint32_t	Rsvd2: 2;
 	uint32_t	si: 1;
-	uint32_t	la: 1;
-	uint32_t	Rsvd1: 3;
+	uint32_t	ft: 1;
+	uint32_t	Rsvd1: 2;
+	uint32_t	xo: 1;
 	uint32_t	ls: 1;
 	uint32_t	DFctl: 8;
 	uint32_t	Type: 8;
@@ -513,10 +666,16 @@ typedef struct
 
 typedef struct
 {
-	ULP_BDE64	Payload;
-	uint32_t	PayloadLength;
+	/* Word 0 - 2 */
+	ULP_BDE64	  Payload;
 
+	/* Word 3 */
+	uint32_t	  PayloadLength;
+
+	/* Word 4 */
 	uint32_t	TotalTransferCount;
+
+	/* Word 5 */
 	uint32_t	Rsvd1;
 
 } FCP_WQE;
@@ -524,21 +683,25 @@ typedef struct
 
 typedef struct
 {
+	/* Word 0 - 2 */
 	uint32_t	Rsvd1[3];
 
 #ifdef EMLXS_BIG_ENDIAN
+	/* Word 3 */
 	uint32_t	Rsvd2: 16;
 	uint32_t	Criteria: 8;
 	uint32_t	Rsvd3: 7;
 	uint32_t	IA: 1;
 #endif
 #ifdef EMLXS_LITTLE_ENDIAN
+	/* Word 3 */
 	uint32_t	IA: 1;
 	uint32_t	Rsvd3: 7;
 	uint32_t	Criteria: 8;
 	uint32_t	Rsvd2: 16;
 #endif
 
+	/* Word 4 - 5 */
 	uint32_t	Rsvd4[2];
 
 } ABORT_WQE;
@@ -550,41 +713,58 @@ typedef struct
 typedef struct
 {
 #ifdef EMLXS_BIG_ENDIAN
+	/* Word 0 */
 	uint8_t		Payload0;
 	uint8_t		Payload1;
 	uint8_t		Payload2;
 	uint8_t		Payload3;
 
+	/* Word 1 */
 	uint32_t	OXId: 16;
 	uint32_t	RXId: 16;
 
+	/* Word 2 */
 	uint32_t	SeqCntLow: 16;
 	uint32_t	SeqCntHigh: 16;
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-	uint8_t		Payload3;
-	uint8_t		Payload2;
-	uint8_t		Payload1;
-	uint8_t		Payload0;
 
-	uint32_t	RXId: 16;
-	uint32_t	OXId: 16;
+	/* Word 3 */
+	uint32_t	Rsvd1;
 
-	uint32_t	SeqCntHigh: 16;
-	uint32_t	SeqCntLow: 16;
-#endif
-	uint32_t	Rsvd1[2];
-#ifdef EMLXS_BIG_ENDIAN
+	/* Word 4 */
+	uint32_t	Rsvd2: 8;
+	uint32_t	LocalId: 24;
+
+	/* Word 5 */
 	uint32_t	XO: 1;
 	uint32_t	AR: 1;
-	uint32_t	PT: 1;
-	uint32_t	Rsvd2: 5;
+	uint32_t	Rsvd3: 6;
 	uint32_t	RemoteId: 24;
 #endif
 #ifdef EMLXS_LITTLE_ENDIAN
+	/* Word 0 */
+	uint8_t		Payload3;
+	uint8_t		Payload2;
+	uint8_t		Payload1;
+	uint8_t		Payload0;
+
+	/* Word 1 */
+	uint32_t	RXId: 16;
+	uint32_t	OXId: 16;
+
+	/* Word 2 */
+	uint32_t	SeqCntHigh: 16;
+	uint32_t	SeqCntLow: 16;
+
+	/* Word 3 */
+	uint32_t	Rsvd1;
+
+	/* Word 4 */
+	uint32_t	LocalId: 24;
+	uint32_t	Rsvd2: 8;
+
+	/* Word 5 */
 	uint32_t	RemoteId: 24;
-	uint32_t	Rsvd2: 5;
-	uint32_t	PT: 1;
+	uint32_t	Rsvd3: 6;
 	uint32_t	AR: 1;
 	uint32_t	XO: 1;
 #endif
@@ -594,16 +774,17 @@ typedef struct
 
 typedef struct
 {
+	/* Word 0 - 4 */
 	uint32_t	Rsvd1[5];
 
 #ifdef EMLXS_BIG_ENDIAN
+	/* Word 5 */
 	uint32_t	XO: 1;
-	uint32_t	Rsvd2: 7;
-	uint32_t	RemoteId: 24;
+	uint32_t	Rsvd2: 31;
 #endif
 #ifdef EMLXS_LITTLE_ENDIAN
-	uint32_t	RemoteId: 24;
-	uint32_t	Rsvd2: 7;
+	/* Word 5 */
+	uint32_t	Rsvd2: 31;
 	uint32_t	XO: 1;
 #endif
 
@@ -631,15 +812,16 @@ typedef struct emlxs_wqe
 	uint16_t	XRITag;		/* XRItag */
 	/* Word 7 */
 	uint32_t	Timer: 8;	/* TOV */
-	uint32_t	Rsvd2: 1;
+	uint32_t	Rsvd1: 1;
 	uint32_t	ERP: 1;		/* ERP */
 	uint32_t	PU: 2;		/* PU */
-	uint32_t	Rsvd1: 1;
+	uint32_t	AR: 1;		/* Auto Response */
 	uint32_t	Class: 3;	/* COS */
 	uint32_t	Command: 8;	/* Command Code */
-	uint32_t	Status: 4;	/* Final Status */
+	uint32_t	Rsvd0: 1;
+	uint32_t	BsType: 3;	/* DIF Block Size type */
 	uint32_t	ContextType: 2;	/* Context Type */
-	uint32_t	Rsvd0: 2;
+	uint32_t	DIF: 2;
 	/* Word 8 */
 	uint32_t	AbortTag;	/* Abort Tag */
 	/* Word 9 */
@@ -648,19 +830,28 @@ typedef struct emlxs_wqe
 	/* Word 10 */
 	uint32_t	CCP: 8;		/* CCP */
 	uint32_t	CCPE: 1;	/* CCPEnabled */
-	uint32_t	Rsvd6: 1;
+	uint32_t	CMD: 1;
 	uint32_t	XC: 1;		/* Exchange Create */
 	uint32_t	Rsvd5: 1;
 	uint32_t	PV: 1;		/* PRIValid */
 	uint32_t	PRI: 3;		/* PRI */
-	uint32_t	Rsvd4: 16;
+					/* The following 16 bits may be */
+					/* overwritten by PHWQ */
+	uint32_t	WQES: 1;	/* WQE specify XBL */
+	uint32_t	DBDE: 1;	/* Data type for BDE 0 */
+	uint32_t	IOd: 1;		/* IO direction */
+	uint32_t	Rsvd4: 1;
+	uint32_t	XBL: 1;		/* Explicit Buffer List */
+	uint32_t	Rsvd3: 1;
+	uint32_t	QOSd: 1;	/* QOS disable */
+	uint32_t	LenLoc: 2;	/* Length Location */
+	uint32_t	Rsvd2: 3;
+	uint32_t	EBDEcnt: 4;	/* Extended BDE cnt */
 	/* Word 11 */
-	uint32_t	Rsvd9: 6;
-	uint32_t	CQId: 10;	/* CompletionQueueID */
+	uint32_t	CQId: 16;	/* CompletionQueueID */
 	uint32_t	Rsvd8: 8;
 	uint32_t	WQEC: 1;	/* Request WQE consumed CQE */
-	uint32_t	Rsvd7: 1;
-	uint32_t	ELSId: 2;
+	uint32_t	ELSId: 3;
 	uint32_t	CmdType: 4;	/* Command Type */
 #endif
 #ifdef EMLXS_LITTLE_ENDIAN
@@ -668,15 +859,16 @@ typedef struct emlxs_wqe
 	uint16_t	XRITag;		/* XRItag */
 	uint16_t	ContextTag;	/* Context Tag */
 	/* Word 7 */
-	uint32_t	Rsvd0: 2;
+	uint32_t	DIF: 2;
 	uint32_t	ContextType: 2;	/* Context Type */
-	uint32_t	Status: 4;	/* Final Status */
+	uint32_t	BsType: 3;	/* DIF Block Size type */
+	uint32_t	Rsvd0: 1;
 	uint32_t	Command: 8;	/* Command Code */
 	uint32_t	Class: 3;	/* COS */
-	uint32_t	Rsvd1: 1;
+	uint32_t	AR: 1;		/* Auto Response */
 	uint32_t	PU: 2;		/* PU */
 	uint32_t	ERP: 1;		/* ERP */
-	uint32_t	Rsvd2: 1;
+	uint32_t	Rsvd1: 1;
 	uint32_t	Timer: 8;	/* TOV */
 	/* Word 8 */
 	uint32_t	AbortTag;	/* Abort Tag */
@@ -684,27 +876,49 @@ typedef struct emlxs_wqe
 	uint16_t	RequestTag;	/* Request Tag */
 	uint16_t	OXId;		/* OXId on xmitted rsp */
 	/* Word 10 */
-	uint32_t	Rsvd4: 16;
+					/* The following 16 bits may be */
+					/* overwritten by PHWQ */
+	uint32_t	EBDEcnt: 4;	/* Extended BDE cnt */
+	uint32_t	Rsvd2: 3;
+	uint32_t	LenLoc: 2;	/* Length Location */
+	uint32_t	QOSd: 1;	/* QOS disable */
+	uint32_t	Rsvd3: 1;
+	uint32_t	XBL: 1;		/* Explicit Buffer List */
+	uint32_t	Rsvd4: 1;
+	uint32_t	IOd: 1;		/* IO direction */
+	uint32_t	DBDE: 1;	/* Data type for BDE 0 */
+	uint32_t	WQES: 1;	/* WQE specify XBL */
 	uint32_t	PRI: 3;		/* PRI */
 	uint32_t	PV: 1;		/* PRIValid */
 	uint32_t	Rsvd5: 1;
 	uint32_t	XC: 1;		/* Exchange Create */
-	uint32_t	Rsvd6: 1;
+	uint32_t	CMD: 1;
 	uint32_t	CCPE: 1;	/* CCPEnabled */
 	uint32_t	CCP: 8;		/* CCP */
 	/* Word 11 */
 	uint32_t	CmdType: 4;	/* Command Type */
-	uint32_t	ELSId: 2;
-	uint32_t	Rsvd7: 1;
+	uint32_t	ELSId: 3;
 	uint32_t	WQEC: 1;	/* Request WQE consumed CQE */
 	uint32_t	Rsvd8: 8;
-	uint32_t	CQId: 10;	/* CompletionQueueID */
-	uint32_t	Rsvd9: 6;
+	uint32_t	CQId: 16;	/* CompletionQueueID */
 #endif
 
-	/* Words 12-15 */
-	uint32_t	CmdSpecific[4];	/* Word12-15: commandspecific */
+	/* Words 12 */
+	uint32_t	CmdSpecific;	/* Command specific information */
+
+	/* Words 13-15 */
+	ULP_BDE64	FirstData;
 } emlxs_wqe_t;
+
+/* Used if PHWQ is enabled */
+#ifdef EMLXS_BIG_ENDIAN
+#define	WQE_PHWQ_WQID(wqe, qid)  *(((uint16_t *)(wqe)) + 21) = \
+				    ((qid << 1) & 0xfffe);
+#endif
+#ifdef EMLXS_LITTLE_ENDIAN
+#define	WQE_PHWQ_WQID(wqe, qid)  *(((uint16_t *)(wqe)) + 20) = \
+				    ((qid << 1) & 0xfffe);
+#endif
 
 /* Defines for ContextType */
 #define	WQE_RPI_CONTEXT		0
@@ -715,16 +929,21 @@ typedef struct emlxs_wqe
 /* Defines for CmdType */
 #define	WQE_TYPE_FCP_DATA_IN	0x00
 #define	WQE_TYPE_FCP_DATA_OUT	0x01
-#define	WQE_TYPE_ELS		0x0C
+#define	WQE_TYPE_TRECEIVE	0x02
+#define	WQE_TYPE_TRSP		0x03
+#define	WQE_TYPE_SRR_RSP	0x06
+#define	WQE_TYPE_TSEND		0x07
 #define	WQE_TYPE_GEN		0x08
 #define	WQE_TYPE_ABORT		0x08
+#define	WQE_TYPE_ELS		0x0C
 #define	WQE_TYPE_MASK_FIP	0x01
 
 /* Defines for ELSId */
+#define	WQE_ELSID_PLOGI		0x04
 #define	WQE_ELSID_FLOGI		0x03
 #define	WQE_ELSID_FDISC		0x02
 #define	WQE_ELSID_LOGO		0x01
-#define	WQE_ELSID_CMD		0x0
+#define	WQE_ELSID_CMD		0x00
 
 /* RQB */
 #define	RQB_HEADER_SIZE		32
@@ -732,13 +951,20 @@ typedef struct emlxs_wqe
 #define	RQB_COUNT		256
 
 #define	EMLXS_NUM_WQ_PAGES	4
+#define	WQE_SIZE		64
+
+#define	EMLXS_NUM_CQ_PAGES_V2	4
+#define	CQE_SIZE		16
 
 #define	EQ_DEPTH		1024
 #define	CQ_DEPTH		256
-#define	WQ_DEPTH		(64 * EMLXS_NUM_WQ_PAGES)
+#define	CQ_DEPTH_V2	((4096/CQE_SIZE) * EMLXS_NUM_CQ_PAGES_V2) /* 1024 */
+#define	WQ_DEPTH	((4096/WQE_SIZE) * EMLXS_NUM_WQ_PAGES) /* 256 */
 #define	MQ_DEPTH		16
 #define	RQ_DEPTH		512 /* Multiple of RQB_COUNT */
 #define	RQ_DEPTH_EXPONENT	9
+
+#define	EMLXS_MAX_WQS_PER_EQ	4
 
 
 /* Principal doorbell register layouts */

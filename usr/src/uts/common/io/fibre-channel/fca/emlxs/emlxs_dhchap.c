@@ -5,8 +5,8 @@
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
  *
- * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or http://www.opensolaris.org/os/licensing.
+ * You can obtain a copy of the license at
+ * http://www.opensource.org/licenses/cddl1.txt.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -20,10 +20,9 @@
  */
 
 /*
- * Copyright 2010 Emulex.  All rights reserved.
+ * Copyright (c) 2004-2011 Emulex. All rights reserved.
  * Use is subject to license terms.
  */
-
 
 #include <emlxs.h>
 
@@ -31,19 +30,10 @@
 
 #include <md5.h>
 #include <sha1.h>
-#ifdef S10
-#include <sha1_consts.h>
-#else
 #include <sys/sha1_consts.h>
-#endif /* S10 */
 #include <bignum.h>
 #include <sys/time.h>
 
-#ifdef	S10
-#define	BIGNUM_CHUNK_32
-#define	BIG_CHUNK_TYPE			uint32_t
-#define	CHARLEN2BIGNUMLEN(_val)		(_val/4)
-#endif	/* S10 */
 
 #define	RAND
 
@@ -405,7 +395,7 @@ emlxs_dhc_event_xlate(uint32_t state)
 		}
 	}
 
-	(void) sprintf(buffer, "event=0x%x", state);
+	(void) snprintf(buffer, sizeof (buffer), "event=0x%x", state);
 	return (buffer);
 
 } /* emlxs_dhc_event_xlate() */
@@ -760,7 +750,7 @@ emlxs_dhc_pstate_xlate(uint32_t state)
 		}
 	}
 
-	(void) sprintf(buffer, "state=0x%x", state);
+	(void) snprintf(buffer, sizeof (buffer), "state=0x%x", state);
 	return (buffer);
 
 } /* emlxs_dhc_pstate_xlate() */
@@ -780,7 +770,7 @@ emlxs_dhc_nstate_xlate(uint32_t state)
 		}
 	}
 
-	(void) sprintf(buffer, "state=0x%x", state);
+	(void) snprintf(buffer, sizeof (buffer), "state=0x%x", state);
 	return (buffer);
 
 } /* emlxs_dhc_nstate_xlate() */
@@ -866,7 +856,7 @@ emlxs_check_dhgp(
 	}
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_detail_msg,
-	    "emlxs_check_dhgp: dhgp_id=0x%x", *dhgp_id);
+	    "check_dhgp: dhgp_id=0x%x", *dhgp_id);
 
 	return (rc);
 } /* emlxs_check_dhgp */
@@ -1050,7 +1040,7 @@ uint32_t evt)
 	emlxs_node_dhc_t *node_dhc = &ndlp->node_dhc;
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_detail_msg,
-	    "emlxs_disc_neverdev: did=0x%x.",
+	    "disc_neverdev: did=0x%x.",
 	    ndlp->nlp_DID);
 
 	emlxs_dhc_state(port, ndlp, NODE_STATE_UNKNOWN, 0, 0);
@@ -1082,15 +1072,15 @@ emlxs_cmpl_dhchap_challenge_issue(fc_packet_t *pkt)
 	ndlp = sbp->node;
 
 	if (!ndlp) {
-		ndlp = emlxs_node_find_did(port, did);
+		ndlp = emlxs_node_find_did(port, did, 1);
 	}
 	if (pkt->pkt_state != FC_PKT_SUCCESS) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_detail_msg,
-		    "emlxs_cmpl_dhchap_challenge_issue: did=0x%x state=%x",
+		    "cmpl_dhchap_challenge_issue: did=0x%x state=%x",
 		    did, pkt->pkt_state);
 	} else {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_detail_msg,
-		    "emlxs_cmpl_dhchap_challenge_issue: did=0x%x. Succcess.",
+		    "cmpl_dhchap_challenge_issue: did=0x%x. Succcess.",
 		    did);
 	}
 
@@ -1130,15 +1120,15 @@ emlxs_cmpl_dhchap_success_issue(fc_packet_t *pkt)
 	ndlp = sbp->node;
 
 	if (!ndlp) {
-		ndlp = emlxs_node_find_did(port, did);
+		ndlp = emlxs_node_find_did(port, did, 1);
 	}
 	if (pkt->pkt_state != FC_PKT_SUCCESS) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_detail_msg,
-		    "emlxs_cmpl_dhchap_success_issue: 0x%x %x. No retry.",
+		    "cmpl_dhchap_success_issue: 0x%x %x. No retry.",
 		    did, pkt->pkt_state);
 	} else {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_detail_msg,
-		    "emlxs_cmpl_dhchap_success_issue: did=0x%x. Succcess.",
+		    "cmpl_dhchap_success_issue: did=0x%x. Succcess.",
 		    did);
 	}
 
@@ -1180,7 +1170,7 @@ emlxs_issue_dhchap_success(
 	uint32_t ret;
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_detail_msg,
-	    "emlxs_issue_dhchap_success: did=0x%x", ndlp->nlp_DID);
+	    "issue_dhchap_success: did=0x%x", ndlp->nlp_DID);
 
 	if (ndlp->nlp_DID == FABRIC_DID) {
 		if (node_dhc->nlp_auth_hashid == AUTH_MD5)
@@ -1231,7 +1221,7 @@ emlxs_issue_dhchap_success(
 	 * entity in transaction.
 	 */
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_detail_msg,
-	    "emlxs_issue_dhchap_success: 0x%x 0x%x 0x%x 0x%x 0x%x %p",
+	    "issue_dhchap_success: 0x%x 0x%x 0x%x 0x%x 0x%x %p",
 	    ndlp->nlp_DID, node_dhc->nlp_auth_hashid,
 	    node_dhc->nlp_auth_tranid_rsp,
 	    node_dhc->nlp_auth_tranid_ini, cmdsize, rsp);
@@ -1263,7 +1253,7 @@ emlxs_issue_dhchap_success(
 			    LE_SWAP32(node_dhc->nlp_auth_tranid_ini);
 		} else {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_debug_msg,
-			    "emlxs_is_dhch_success: (1) 0x%x 0x%x 0x%x 0x%x",
+			    "is_dhch_success: (1) 0x%x 0x%x 0x%x 0x%x",
 			    ndlp->nlp_DID, node_dhc->nlp_auth_flag,
 			    node_dhc->nlp_auth_tranid_rsp,
 			    node_dhc->nlp_auth_tranid_ini);
@@ -1278,7 +1268,7 @@ emlxs_issue_dhchap_success(
 
 	if (ret != FC_SUCCESS) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_detail_msg,
-		    "emlxs_issue_dhchap_success: Unable to send packet. 0x%x",
+		    "issue_dhchap_success: Unable to send packet. 0x%x",
 		    ret);
 
 		emlxs_pkt_free(pkt);
@@ -1311,15 +1301,15 @@ emlxs_cmpl_auth_reject_issue(fc_packet_t *pkt)
 	ndlp = sbp->node;
 
 	if (!ndlp) {
-		ndlp = emlxs_node_find_did(port, did);
+		ndlp = emlxs_node_find_did(port, did, 1);
 	}
 	if (pkt->pkt_state != FC_PKT_SUCCESS) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_detail_msg,
-		    "emlxs_cmpl_auth_reject_issue: 0x%x %x. No retry.",
+		    "cmpl_auth_reject_issue: 0x%x %x. No retry.",
 		    did, pkt->pkt_state);
 	} else {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_detail_msg,
-		    "emlxs_cmpl_auth_reject_issue: did=0x%x. Succcess.",
+		    "cmpl_auth_reject_issue: did=0x%x. Succcess.",
 		    did);
 	}
 
@@ -1418,11 +1408,11 @@ emlxs_issue_auth_reject(
 
 		return (1);
 	}
-	(void) sprintf(info,
+	(void) snprintf(info, sizeof (info),
 	    "Auth-Reject: ReasonCode=0x%x, ReasonCodeExplanation=0x%x",
 	    ReasonCode, ReasonCodeExplanation);
 
-	emlxs_log_auth_event(port, ndlp, ESC_EMLXS_28, info);
+	emlxs_log_auth_event(port, ndlp, "issue_auth_reject", info);
 
 	return (0);
 
@@ -1485,7 +1475,7 @@ static fc_packet_t *
  */
 /* ARGSUSED */
 static int
-	emlxs_issue_auth_negotiate(
+emlxs_issue_auth_negotiate(
 	emlxs_port_t *port,
 	emlxs_node_t *ndlp,
 	uint8_t retry)
@@ -1893,15 +1883,15 @@ emlxs_cmpl_auth_negotiate_issue(fc_packet_t *pkt)
 	node_dhc = &ndlp->node_dhc;
 
 	if (!ndlp) {
-		ndlp = emlxs_node_find_did(port, did);
+		ndlp = emlxs_node_find_did(port, did, 1);
 	}
 	if (pkt->pkt_state != FC_PKT_SUCCESS) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_detail_msg,
-		    "emlxs_cmpl_dhchap_negotiate_issue: 0x%x %x. Noretry.",
+		    "cmpl_dhchap_negotiate_issue: 0x%x %x. Noretry.",
 		    did, pkt->pkt_state);
 	} else {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_detail_msg,
-		    "emlxs_cmpl_dhchap_negotiate_issue: did=0x%x. Succcess.",
+		    "cmpl_dhchap_negotiate_issue: did=0x%x. Succcess.",
 		    did);
 	}
 
@@ -1957,7 +1947,7 @@ uint32_t evt)
 	emlxs_node_dhc_t *node_dhc = &ndlp->node_dhc;
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_detail_msg,
-	    "emlxs_cmpl_auth_msg_auth_negotiate_issue: did=0x%x",
+	    "cmpl_auth_msg_auth_negotiate_issue: did=0x%x",
 	    ndlp->nlp_DID);
 
 	/* start the emlxs_dhc_authrsp_timeout timer */
@@ -2023,7 +2013,7 @@ uint32_t evt)
 	uint8_t ReasonCodeExplanation;
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_detail_msg,
-	    "emlxs_rcv_auth_msg_auth_negotiate_issue: did=0x%x",
+	    "rcv_auth_msg_auth_negotiate_issue: did=0x%x",
 	    ndlp->nlp_DID);
 
 	/* Anyway we accept it first and then send auth_reject */
@@ -2064,15 +2054,15 @@ emlxs_cmpl_dhchap_reply_issue(fc_packet_t *pkt)
 	ndlp = sbp->node;
 
 	if (!ndlp) {
-		ndlp = emlxs_node_find_did(port, did);
+		ndlp = emlxs_node_find_did(port, did, 1);
 	}
 	if (pkt->pkt_state != FC_PKT_SUCCESS) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_detail_msg,
-		    "emlxs_cmpl_dhchap_reply_issue: 0x%x %x. No retry.",
+		    "cmpl_dhchap_reply_issue: 0x%x %x. No retry.",
 		    did, pkt->pkt_state);
 	} else {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_detail_msg,
-		    "emlxs_cmpl_dhchap_reply_issue: did=0x%x. Succcess.",
+		    "cmpl_dhchap_reply_issue: did=0x%x. Succcess.",
 		    did);
 	}
 
@@ -2134,7 +2124,7 @@ emlxs_issue_dhchap_challenge(
 	 * parameters for challenge. for now, we create our own challenge.
 	 */
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_detail_msg,
-	    "emlxs_issue_dhchap_challenge: did=0x%x hashlist=[%x,%x,%x,%x]",
+	    "issue_dhchap_challenge: did=0x%x hashlist=[%x,%x,%x,%x]",
 	    ndlp->nlp_DID, node_dhc->auth_cfg.hash_priority[0],
 	    node_dhc->auth_cfg.hash_priority[1],
 	    node_dhc->auth_cfg.hash_priority[2],
@@ -2180,7 +2170,7 @@ emlxs_issue_dhchap_challenge(
 
 	default:
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_error_msg,
-		    "emlxs_issue_dhchap_challenge: Invalid dhgp_id=0x%x",
+		    "issue_dhchap_challenge: Invalid dhgp_id=0x%x",
 		    dhgp_id);
 		return (1);
 	}
@@ -2201,7 +2191,7 @@ emlxs_issue_dhchap_challenge(
 	tran_id = *(uint32_t *)tmp;
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_detail_msg,
-	    "emlxs_issue_dhchap_challenge: 0x%x 0x%x 0x%x %d 0x%x 0x%x 0x%x",
+	    "issue_dhchap_challenge: 0x%x 0x%x 0x%x %d 0x%x 0x%x 0x%x",
 	    ndlp->nlp_DID, node_dhc->nlp_auth_tranid_ini,
 	    node_dhc->nlp_auth_tranid_rsp,
 	    cmdsize, tran_id, hash_id, dhgp_id);
@@ -2378,7 +2368,7 @@ emlxs_issue_dhchap_challenge(
 			emlxs_pkt_free(pkt);
 
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_error_msg,
-			    "emlxs_issue_dhchap_challenge: error. 0x%x",
+			    "issue_dhchap_challenge: error. 0x%x",
 			    err);
 
 			return (1);
@@ -2396,7 +2386,7 @@ emlxs_issue_dhchap_challenge(
 		}
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_detail_msg,
-		    "emlxs_issue_dhchap_challenge: 0x%x: 0x%x 0x%x",
+		    "issue_dhchap_challenge: 0x%x: 0x%x 0x%x",
 		    ndlp->nlp_DID, *(uint32_t *)tmp, dhval_len);
 
 		tmp += sizeof (uint32_t);
@@ -2427,7 +2417,7 @@ emlxs_issue_dhchap_challenge(
 
 		if (err != BIG_OK) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_error_msg,
-			    "emlxs_issue_dhchap_challenge: error. 0x%x",
+			    "issue_dhchap_challenge: error. 0x%x",
 			    err);
 
 			emlxs_pkt_free(pkt);
@@ -2446,7 +2436,7 @@ emlxs_issue_dhchap_challenge(
 		}
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_detail_msg,
-		    "emlxs_issue_dhchap_challenge: did=0x%x: pubkey_len=0x%x",
+		    "issue_dhchap_challenge: did=0x%x: pubkey_len=0x%x",
 		    ndlp->nlp_DID, *(uint32_t *)tmp);
 
 		tmp += sizeof (uint32_t);
@@ -2467,13 +2457,13 @@ emlxs_issue_dhchap_challenge(
 #endif	/* RAND */
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_detail_msg,
-	    "emlxs_issue_dhchap_challenge: 0x%x 0x%x 0x%x 0x%x 0x%x",
+	    "issue_dhchap_challenge: 0x%x 0x%x 0x%x 0x%x 0x%x",
 	    ndlp->nlp_DID, node_dhc->nlp_auth_tranid_ini,
 	    node_dhc->nlp_auth_tranid_rsp,
 	    chal->cnul.hash_id, chal->cnul.dhgp_id);
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_detail_msg,
-	    "emlxs_issue_dhchap_challenge: 0x%x 0x%x 0x%x 0x%x",
+	    "issue_dhchap_challenge: 0x%x 0x%x 0x%x 0x%x",
 	    ndlp->nlp_DID, tran_id, node_dhc->nlp_auth_hashid,
 	    node_dhc->nlp_auth_dhgpid);
 
@@ -2483,7 +2473,7 @@ emlxs_issue_dhchap_challenge(
 		emlxs_pkt_free(pkt);
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_error_msg,
-		    "emlxs_issue_dhchap_challenge: Unable to send fc packet.");
+		    "issue_dhchap_challenge: Unable to send fc packet.");
 
 		return (1);
 	}
@@ -2573,7 +2563,7 @@ emlxs_issue_dhchap_reply(
 	if ((pkt = emlxs_prep_els_fc_pkt(port, ndlp->nlp_DID, cmd_size,
 	    rsp_size, 0, KM_NOSLEEP)) == NULL) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_error_msg,
-		    "emlxs_issue_dhchap_reply failed: did=0x%x size=%x,%x",
+		    "issue_dhchap_reply failed: did=0x%x size=%x,%x",
 		    ndlp->nlp_DID, cmd_size, rsp_size);
 
 		return (1);
@@ -2691,14 +2681,14 @@ emlxs_issue_dhchap_reply(
 	pkt->pkt_comp = emlxs_cmpl_dhchap_reply_issue;
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_detail_msg,
-	    "emlxs_issue_dhchap_reply: did=0x%x  (%x,%x,%x,%x,%x,%x)",
+	    "issue_dhchap_reply: did=0x%x  (%x,%x,%x,%x,%x,%x)",
 	    ndlp->nlp_DID, dhval_len, arg2_len, cmdsize,
 	    node_dhc->hash_id, node_dhc->nlp_auth_hashid,
 	    LE_SWAP32(ap->tran_id));
 
 	if (emlxs_pkt_send(pkt, 1) != FC_SUCCESS) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_error_msg,
-		    "emlxs_issue_dhchap_reply failed: Unable to send packet.");
+		    "issue_dhchap_reply failed: Unable to send packet.");
 
 		emlxs_pkt_free(pkt);
 
@@ -2767,7 +2757,7 @@ uint32_t evt)
 	AUTH_RJT *rjt;
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_detail_msg,
-	    "emlxs_rcv_auth_msg_auth_negotiate_cmpl_wait4next: did=0x%x",
+	    "rcv_auth_msg_auth_negotiate_cmpl_wait4next: did=0x%x",
 	    ndlp->nlp_DID);
 
 	emlxs_dhc_state(port, ndlp, NODE_STATE_DHCHAP_REPLY_ISSUE, 0, 0);
@@ -2848,7 +2838,7 @@ uint32_t evt)
 	}
 	if (ncval->msg_hdr.auth_msg_code != DHCHAP_CHALLENGE) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_error_msg,
-		    "emlxs_rcv_auth_msg_auth_negotiate_cmpl_wait4next: 0x%x.%x",
+		    "rcv_auth_msg_auth_negotiate_cmpl_wait4next: 0x%x.%x",
 		    ndlp->nlp_DID, ncval->msg_hdr.auth_msg_code);
 
 		ReasonCode = AUTHRJT_FAILURE;
@@ -2918,7 +2908,7 @@ uint32_t evt)
 
 	} else {
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_error_msg,
-	    "emlxs_rcv_auth_msg_auth_negotiate_cmpl_wait4next: 0x%x %x",
+	    "rcv_auth_msg_auth_negotiate_cmpl_wait4next: 0x%x %x",
 	    ndlp->nlp_DID, ncval->hash_id);
 
 		ReasonCode = AUTHRJT_FAILURE;
@@ -3160,7 +3150,7 @@ uint32_t evt)
 	emlxs_node_dhc_t *node_dhc = &ndlp->node_dhc;
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_detail_msg,
-	    "emlxs_cmpl_auth_msg_dhchap_reply_issue: did=0x%x",
+	    "cmpl_auth_msg_dhchap_reply_issue: did=0x%x",
 	    ndlp->nlp_DID);
 
 	/* start the emlxs_dhc_authrsp_timeout timer now */
@@ -3255,7 +3245,7 @@ uint32_t evt)
 		ReasonCodeExplanation = auth_rjt->ReasonCodeExplanation;
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_detail_msg,
-	    "emlxs_rcv_auth_msg_dhchap_reply_cmpl_wait4next: 0x%x.(%x,%x)",
+	    "rcv_auth_msg_dhchap_reply_cmpl_wait4next: 0x%x.(%x,%x)",
 	    ndlp->nlp_DID, ReasonCode, ReasonCodeExplanation);
 
 		switch (ReasonCode) {
@@ -3331,7 +3321,8 @@ uint32_t evt)
 
 			emlxs_dhc_state(port, ndlp,
 			    NODE_STATE_AUTH_SUCCESS, 0, 0);
-			emlxs_log_auth_event(port, ndlp, ESC_EMLXS_20,
+			emlxs_log_auth_event(port, ndlp,
+			    "rcv_auth_msg_dhchap_reply_cmpl_wait4next",
 			    "Host-initiated-unidir-auth-success");
 			emlxs_dhc_auth_complete(port, ndlp, 0);
 		} else {
@@ -3395,7 +3386,7 @@ uint32_t evt)
 				if (hash_val != NULL) {
 					/* not identical */
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_detail_msg,
-	    "emlxs_rcv_auth_msg_dhchap_reply_cmpl_wait4next: 0x%x.failed. %x",
+	    "rcv_auth_msg_dhchap_reply_cmpl_wait4next: 0x%x.failed. %x",
 	    ndlp->nlp_DID, *(uint32_t *)hash_val);
 				}
 				ReasonCode = AUTHRJT_FAILURE;
@@ -3421,11 +3412,12 @@ AUTH_Reject:
 
 	return (node_dhc->state);
 out:
-	(void) sprintf(info,
+	(void) snprintf(info, sizeof (info),
 	    "Auth Failed: ReasonCode=0x%x, ReasonCodeExplanation=0x%x",
 	    ReasonCode, ReasonCodeExplanation);
 
-	emlxs_log_auth_event(port, ndlp, ESC_EMLXS_20, info);
+	emlxs_log_auth_event(port, ndlp,
+	    "rcv_auth_msg_dhchap_reply_cmpl_wait4next", info);
 	emlxs_dhc_auth_complete(port, ndlp, 1);
 
 	return (node_dhc->state);
@@ -3539,7 +3531,8 @@ uint32_t evt)
 	node_dhc->flag |= NLP_SET_REAUTH_TIME;
 
 	emlxs_dhc_state(port, ndlp, NODE_STATE_AUTH_SUCCESS, 0, 0);
-	emlxs_log_auth_event(port, ndlp, ESC_EMLXS_25,
+	emlxs_log_auth_event(port, ndlp,
+	    "cmpl_auth_msg_dhchap_success_issue_wait4next",
 	    "Host-initiated-bidir-auth-success");
 	emlxs_dhc_auth_complete(port, ndlp, 0);
 
@@ -4043,7 +4036,8 @@ uint32_t evt)
 		node_dhc->flag &= ~NLP_REMOTE_AUTH;
 
 		emlxs_dhc_state(port, ndlp, NODE_STATE_AUTH_SUCCESS, 0, 0);
-		emlxs_log_auth_event(port, ndlp, ESC_EMLXS_22,
+		emlxs_log_auth_event(port, ndlp,
+		    "cmpl_auth_msg_dhchap_success_issue",
 		    "Node-initiated-unidir-reauth-success");
 		emlxs_dhc_auth_complete(port, ndlp, 0);
 	}
@@ -4066,7 +4060,7 @@ emlxs_device_recov_unmapped_node(
 	NODELIST *ndlp = (NODELIST *)arg4;
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_error_msg,
-	    "emlxs_device_recov_unmapped_node called. 0x%x. Not implemented.",
+	    "device_recov_unmapped_node called. 0x%x. Not implemented.",
 	    ndlp->nlp_DID);
 
 	return (0);
@@ -4088,7 +4082,7 @@ emlxs_device_rm_npr_node(
 	NODELIST *ndlp = (NODELIST *)arg4;
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_error_msg,
-	    "emlxs_device_rm_npr_node called. 0x%x. Not implemented.",
+	    "device_rm_npr_node called. 0x%x. Not implemented.",
 	    ndlp->nlp_DID);
 
 	return (0);
@@ -4109,7 +4103,7 @@ emlxs_device_recov_npr_node(
 	NODELIST *ndlp = (NODELIST *)arg4;
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_error_msg,
-	    "emlxs_device_recov_npr_node called. 0x%x. Not implemented.",
+	    "device_recov_npr_node called. 0x%x. Not implemented.",
 	    ndlp->nlp_DID);
 
 	return (0);
@@ -4131,7 +4125,7 @@ uint32_t evt)
 	emlxs_node_dhc_t *node_dhc = &ndlp->node_dhc;
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_detail_msg,
-	    "emlxs_device_rem_auth: 0x%x.",
+	    "device_rem_auth: 0x%x.",
 	    ndlp->nlp_DID);
 
 	emlxs_dhc_state(port, ndlp, NODE_STATE_UNKNOWN, 0, 0);
@@ -4158,7 +4152,7 @@ uint32_t evt)
 	emlxs_node_dhc_t *node_dhc = &ndlp->node_dhc;
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_detail_msg,
-	    "emlxs_device_recov_auth: 0x%x.",
+	    "device_recov_auth: 0x%x.",
 	    ndlp->nlp_DID);
 
 	node_dhc->nlp_authrsp_tmo = 0;
@@ -4205,7 +4199,7 @@ uint32_t evt)
 	lp = (uint32_t *)bp;
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_detail_msg,
-	    "emlxs_rcv_auth_msg_dhchap_success_cmpl_wait4next: did=0x%x",
+	    "rcv_auth_msg_dhchap_success_cmpl_wait4next: did=0x%x",
 	    ndlp->nlp_DID);
 
 	dh_success = (DHCHAP_SUCCESS_HDR *)((uint8_t *)lp);
@@ -4281,7 +4275,8 @@ uint32_t evt)
 		node_dhc->flag |= NLP_REMOTE_AUTH;
 
 		emlxs_dhc_state(port, ndlp, NODE_STATE_AUTH_SUCCESS, 0, 0);
-		emlxs_log_auth_event(port, ndlp, ESC_EMLXS_26,
+		emlxs_log_auth_event(port, ndlp,
+		    "rcv_auth_msg_dhchap_success_cmpl_wait4next",
 		    "Node-initiated-bidir-reauth-success");
 		emlxs_dhc_auth_complete(port, ndlp, 0);
 	} else {
@@ -4377,7 +4372,7 @@ emlxs_port_t *port,
 	lp = (uint32_t *)bp;
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_detail_msg,
-	    "emlxs_rcv_auth_msg_npr_node:");
+	    "rcv_auth_msg_npr_node:");
 
 	/*
 	 * 1. process the auth msg, should acc first no matter what. 2.
@@ -4398,7 +4393,7 @@ emlxs_port_t *port,
 		/* ReasonCodeExplanation = AUTHEXP_BAD_PAYLOAD; */
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_error_msg,
-		    "emlxs_rcv_auth_msg_npr_node: payload(1)=0x%x",
+		    "rcv_auth_msg_npr_node: payload(1)=0x%x",
 		    (*(uint32_t *)temp));
 
 		goto AUTH_Reject;
@@ -4410,7 +4405,7 @@ emlxs_port_t *port,
 		/* ReasonCodeExplanation = AUTHEXP_BAD_PAYLOAD; */
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_error_msg,
-		    "emlxs_rcv_auth_msg_npr_node: payload(2)=0x%x",
+		    "rcv_auth_msg_npr_node: payload(2)=0x%x",
 		    (*(uint32_t *)temp));
 
 		goto AUTH_Reject;
@@ -4422,7 +4417,7 @@ emlxs_port_t *port,
 		/* ReasonCodeExplanation = AUTHEXP_BAD_PAYLOAD; */
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_error_msg,
-		    "emlxs_rcv_auth_msg_npr_node: payload(3)=0x%x",
+		    "rcv_auth_msg_npr_node: payload(3)=0x%x",
 		    (*(uint32_t *)temp));
 
 		goto AUTH_Reject;
@@ -4438,7 +4433,7 @@ emlxs_port_t *port,
 		/* ReasonCodeExplanation = AUTHEXP_BAD_PROTOCOL; */
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_error_msg,
-		    "emlxs_rcv_auth_msg_npr_node: payload(4)=0x%x",
+		    "rcv_auth_msg_npr_node: payload(4)=0x%x",
 		    (*(uint32_t *)temp));
 
 		goto AUTH_Reject;
@@ -4451,7 +4446,7 @@ emlxs_port_t *port,
 		/* ReasonCodeExplanation = AUTHEXP_BAD_PAYLOAD; */
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_error_msg,
-		    "emlxs_rcv_auth_msg_npr_node: payload(5)=0x%x",
+		    "rcv_auth_msg_npr_node: payload(5)=0x%x",
 		    (LE_SWAP32(*(uint32_t *)temp) & 0xFFFF0000) >> 16);
 
 		goto AUTH_Reject;
@@ -4468,7 +4463,7 @@ emlxs_port_t *port,
 		/* ReasonCodeExplanation = AUTHEXP_HASHFUNC_UNUSABLE; */
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_error_msg,
-		    "emlxs_rcv_auth_msg_npr_node: payload(6)=0x%x",
+		    "rcv_auth_msg_npr_node: payload(6)=0x%x",
 		    (*(uint32_t *)temp));
 
 		goto AUTH_Reject;
@@ -4484,7 +4479,7 @@ emlxs_port_t *port,
 			/* ReasonCodeExplanation = AUTHEXP_HASHFUNC_UNUSABLE; */
 
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_error_msg,
-			    "emlxs_rcv_auth_msg_npr_node: payload(7)=0x%x",
+			    "rcv_auth_msg_npr_node: payload(7)=0x%x",
 			    (*(uint32_t *)temp));
 
 			goto AUTH_Reject;
@@ -4494,7 +4489,7 @@ emlxs_port_t *port,
 			/* ReasonCodeExplanation = AUTHEXP_BAD_PAYLOAD; */
 
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_error_msg,
-			    "emlxs_rcv_auth_msg_npr_node: payload(8)=0x%x",
+			    "rcv_auth_msg_npr_node: payload(8)=0x%x",
 			    (*(uint32_t *)temp));
 
 			goto AUTH_Reject;
@@ -4504,7 +4499,7 @@ emlxs_port_t *port,
 		/* ReasonCodeExplanation = AUTHEXP_BAD_PAYLOAD; */
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_error_msg,
-		    "emlxs_rcv_auth_msg_npr_node: payload(9)=0x%x",
+		    "rcv_auth_msg_npr_node: payload(9)=0x%x",
 		    (*(uint32_t *)(temp - sizeof (uint32_t))));
 
 		goto AUTH_Reject;
@@ -4526,7 +4521,7 @@ emlxs_port_t *port,
 			/* ReasonCodeExplanation = AUTHEXP_HASHFUNC_UNUSABLE; */
 
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_error_msg,
-			    "emlxs_rcv_auth_msg_npr_node: payload(10)=0x%lx",
+			    "rcv_auth_msg_npr_node: payload(10)=0x%lx",
 			    (*(uint32_t *)temp));
 
 			goto AUTH_Reject;
@@ -4547,7 +4542,7 @@ emlxs_port_t *port,
 		/* ReasonCodeExplanation = AUTHEXP_BAD_PAYLOAD; */
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_error_msg,
-		    "emlxs_rcv_auth_msg_npr_node: payload(11)=0x%lx",
+		    "rcv_auth_msg_npr_node: payload(11)=0x%lx",
 		    (*(uint32_t *)temp));
 
 		goto AUTH_Reject;
@@ -4560,7 +4555,7 @@ emlxs_port_t *port,
 		/* ReasonCodeExplanation = AUTHEXP_BAD_PAYLOAD; */
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_error_msg,
-		    "emlxs_rcv_auth_msg_npr_node: payload(12)=0x%lx",
+		    "rcv_auth_msg_npr_node: payload(12)=0x%lx",
 		    (*(uint32_t *)temp));
 
 		goto AUTH_Reject;
@@ -4578,7 +4573,7 @@ emlxs_port_t *port,
 		/* ReasonCodeExplanation = AUTHEXP_DHGROUP_UNUSABLE; */
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_error_msg,
-		    "emlxs_rcv_auth_msg_npr_node: payload(13)=0x%lx",
+		    "rcv_auth_msg_npr_node: payload(13)=0x%lx",
 		    (*(uint32_t *)temp));
 
 		goto AUTH_Reject;
@@ -4587,7 +4582,7 @@ emlxs_port_t *port,
 		/* ReasonCodeExplanation = AUTHEXP_BAD_PAYLOAD; */
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_error_msg,
-		    "emlxs_rcv_auth_msg_npr_node: payload(14)=0x%lx",
+		    "rcv_auth_msg_npr_node: payload(14)=0x%lx",
 		    (*(uint32_t *)temp));
 
 		goto AUTH_Reject;
@@ -4616,7 +4611,7 @@ emlxs_port_t *port,
 AUTH_Reject:
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_detail_msg,
-	    "emlxs_rcv_auth_msg_npr_node: AUTH_Reject it.");
+	    "rcv_auth_msg_npr_node: AUTH_Reject it.");
 
 	return (node_dhc->state);
 
@@ -4644,7 +4639,7 @@ uint32_t evt)
 	 */
 	/* we goto change the hba state back to where it used to be */
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_detail_msg,
-	    "emlxs_cmpl_auth_msg_npr_node: 0x%x 0x%x prev_state=0x%x\n",
+	    "cmpl_auth_msg_npr_node: 0x%x 0x%x prev_state=0x%x\n",
 	    ndlp->nlp_DID, node_dhc->state, node_dhc->prev_state);
 
 	return (node_dhc->state);
@@ -4720,7 +4715,7 @@ emlxs_port_t *port,
 	 * for anything else.
 	 */
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_detail_msg,
-	    "emlxs_rcv_auth_msg_unmapped_node: Sending ACC: did=0x%x",
+	    "rcv_auth_msg_unmapped_node: Sending ACC: did=0x%x",
 	    ndlp->nlp_DID);
 
 	(void) emlxs_els_reply(port, iocbq, ELS_CMD_ACC, ELS_CMD_AUTH, 0, 0);
@@ -4741,7 +4736,7 @@ emlxs_port_t *port,
 		ReasonCodeExplanation = AUTHEXP_BAD_PAYLOAD;
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_detail_msg,
-		    "emlxs_rcv_auth_msg_unmapped_node: payload(1)=0x%x",
+		    "rcv_auth_msg_unmapped_node: payload(1)=0x%x",
 		    (*(uint32_t *)temp));
 
 		goto AUTH_Reject;
@@ -4753,7 +4748,7 @@ emlxs_port_t *port,
 		ReasonCodeExplanation = AUTHEXP_BAD_PAYLOAD;
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_detail_msg,
-		    "emlxs_rcv_auth_msg_unmapped_node: payload(2)=0x%x",
+		    "rcv_auth_msg_unmapped_node: payload(2)=0x%x",
 		    (*(uint32_t *)temp));
 
 		goto AUTH_Reject;
@@ -4765,7 +4760,7 @@ emlxs_port_t *port,
 		ReasonCodeExplanation = AUTHEXP_BAD_PAYLOAD;
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_detail_msg,
-		    "emlxs_rcv_auth_msg_unmapped_node: payload(3)=0x%x",
+		    "rcv_auth_msg_unmapped_node: payload(3)=0x%x",
 		    (*(uint32_t *)temp));
 
 		goto AUTH_Reject;
@@ -4782,7 +4777,7 @@ emlxs_port_t *port,
 		ReasonCodeExplanation = AUTHEXP_BAD_PROTOCOL;
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_detail_msg,
-		    "emlxs_rcv_auth_msg_unmapped_node: payload(4)=0x%x",
+		    "rcv_auth_msg_unmapped_node: payload(4)=0x%x",
 		    (*(uint32_t *)temp));
 
 		goto AUTH_Reject;
@@ -4795,7 +4790,7 @@ emlxs_port_t *port,
 		ReasonCodeExplanation = AUTHEXP_BAD_PAYLOAD;
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_detail_msg,
-		    "emlxs_rcv_auth_msg_unmapped_node: payload(5)=0x%x",
+		    "rcv_auth_msg_unmapped_node: payload(5)=0x%x",
 		    (LE_SWAP32(*(uint32_t *)temp) & 0xFFFF0000) >> 16);
 
 		goto AUTH_Reject;
@@ -4812,7 +4807,7 @@ emlxs_port_t *port,
 		ReasonCodeExplanation = AUTHEXP_HASHFUNC_UNUSABLE;
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_detail_msg,
-		    "emlxs_rcv_auth_msg_unmapped_node: payload(6)=0x%x",
+		    "rcv_auth_msg_unmapped_node: payload(6)=0x%x",
 		    (*(uint32_t *)temp));
 
 		goto AUTH_Reject;
@@ -4828,7 +4823,7 @@ emlxs_port_t *port,
 			ReasonCodeExplanation = AUTHEXP_HASHFUNC_UNUSABLE;
 
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_detail_msg,
-			    "emlxs_rcv_auth_msg_unmapped_node: payload(7)=0x%x",
+			    "rcv_auth_msg_unmapped_node: payload(7)=0x%x",
 			    (*(uint32_t *)temp));
 
 			goto AUTH_Reject;
@@ -4838,7 +4833,7 @@ emlxs_port_t *port,
 			ReasonCodeExplanation = AUTHEXP_BAD_PAYLOAD;
 
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_detail_msg,
-			    "emlxs_rcv_auth_msg_unmapped_node: payload(8)=0x%x",
+			    "rcv_auth_msg_unmapped_node: payload(8)=0x%x",
 			    (*(uint32_t *)temp));
 
 			goto AUTH_Reject;
@@ -4848,7 +4843,7 @@ emlxs_port_t *port,
 		ReasonCodeExplanation = AUTHEXP_BAD_PAYLOAD;
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_detail_msg,
-		    "emlxs_rcv_auth_msg_unmapped_node: payload(9)=0x%x",
+		    "rcv_auth_msg_unmapped_node: payload(9)=0x%x",
 		    (*(uint32_t *)(temp - sizeof (uint32_t))));
 
 		goto AUTH_Reject;
@@ -4870,7 +4865,7 @@ emlxs_port_t *port,
 			ReasonCodeExplanation = AUTHEXP_HASHFUNC_UNUSABLE;
 
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_detail_msg,
-			    "emlxs_rcv_auth_msg_unmapped_node: pload(10)=0x%x",
+			    "rcv_auth_msg_unmapped_node: pload(10)=0x%x",
 			    (*(uint32_t *)temp));
 
 			goto AUTH_Reject;
@@ -4891,7 +4886,7 @@ emlxs_port_t *port,
 		ReasonCodeExplanation = AUTHEXP_BAD_PAYLOAD;
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_detail_msg,
-		    "emlxs_rcv_auth_msg_unmapped_node: payload(11)=0x%x",
+		    "rcv_auth_msg_unmapped_node: payload(11)=0x%x",
 		    (*(uint32_t *)temp));
 
 		goto AUTH_Reject;
@@ -4904,7 +4899,7 @@ emlxs_port_t *port,
 		ReasonCodeExplanation = AUTHEXP_BAD_PAYLOAD;
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_detail_msg,
-		    "emlxs_rcv_auth_msg_unmapped_node: payload(12)=0x%x",
+		    "rcv_auth_msg_unmapped_node: payload(12)=0x%x",
 		    (*(uint32_t *)temp));
 
 		goto AUTH_Reject;
@@ -4922,7 +4917,7 @@ emlxs_port_t *port,
 		ReasonCodeExplanation = AUTHEXP_DHGROUP_UNUSABLE;
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_detail_msg,
-		    "emlxs_rcv_auth_msg_unmapped_node: payload(13)=0x%x",
+		    "rcv_auth_msg_unmapped_node: payload(13)=0x%x",
 		    (*(uint32_t *)temp));
 
 		goto AUTH_Reject;
@@ -4931,13 +4926,13 @@ emlxs_port_t *port,
 		ReasonCodeExplanation = AUTHEXP_BAD_PAYLOAD;
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_detail_msg,
-		    "emlxs_rcv_auth_msg_unmapped_node: payload(14)=0x%x",
+		    "rcv_auth_msg_unmapped_node: payload(14)=0x%x",
 		    (*(uint32_t *)temp));
 
 		goto AUTH_Reject;
 	}
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_detail_msg,
-	    "emlxs_rcv_auth_msg_unmapped_node: 0x%x 0x%x 0x%x 0x%x 0x%x",
+	    "rcv_auth_msg_unmapped_node: 0x%x 0x%x 0x%x 0x%x 0x%x",
 	    hash_id, dhgp_id, msg->auth_msg_code, msglen, msg->tran_id);
 
 	/*
@@ -4970,7 +4965,7 @@ emlxs_port_t *port,
 		if (node_dhc->nlp_reauth_status ==
 		    NLP_HOST_REAUTH_IN_PROGRESS) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_detail_msg,
-		    "emlxs_rcv_auth_msg_unmapped_node: Ht reauth inprgress.");
+		    "rcv_auth_msg_unmapped_node: Ht reauth inprgress.");
 
 			ReasonCode = AUTHRJT_LOGIC_ERR;
 			ReasonCodeExplanation = AUTHEXP_AUTHTRAN_STARTED;
@@ -5053,7 +5048,7 @@ emlxs_hash_vrf(
 	}
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_detail_msg,
-	    "emlxs_hash_vrf: 0x%x 0x%x 0x%x tran_id=0x%x",
+	    "hash_vrf: 0x%x 0x%x 0x%x tran_id=0x%x",
 	    ndlp->nlp_DID, hash_id, dhgp_id, mytran_id);
 
 	if (dhgp_id == 0) {
@@ -5263,7 +5258,7 @@ uint32_t dhvallen)
 	mytran_id = (uint8_t)(LE_SWAP32(tran_id));
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_detail_msg,
-	    "emlxs_hash_rsp: 0x%x 0x%x 0x%x 0x%x dhvallen=0x%x",
+	    "hash_rsp: 0x%x 0x%x 0x%x 0x%x dhvallen=0x%x",
 	    ndlp->nlp_DID, hash_id, dhgp_id, mytran_id, dhvallen);
 
 	if (ndlp->nlp_DID == FABRIC_DID) {
@@ -5563,13 +5558,13 @@ emlxs_BIGNUM_get_pubkey(
 	 */
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_detail_msg,
-	    "emlxs_BIGNUM_get_pubkey: 0x%x 0x%x 0x%x 0x%x",
+	    "BIGNUM_get_pubkey: 0x%x 0x%x 0x%x 0x%x",
 	    ndlp->nlp_DID, *dhvallen, hash_size, dhgp_id);
 
 	/* size should be in the unit of (BIG_CHUNK_TYPE) words */
 	if (big_init(&a, CHARLEN2BIGNUMLEN(*dhvallen))  != BIG_OK) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_error_msg,
-		    "emlxs_BIGNUM_get_pubkey: big_init failed. a size=%d",
+		    "BIGNUM_get_pubkey: big_init failed. a size=%d",
 		    CHARLEN2BIGNUMLEN(*dhvallen));
 
 		err = BIG_NO_MEM;
@@ -5585,7 +5580,7 @@ emlxs_BIGNUM_get_pubkey(
 
 	if (big_init(&e, CHARLEN2BIGNUMLEN(hash_size)) != BIG_OK) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_error_msg,
-		    "emlxs_BIGNUM_get_pubkey: big_init failed. e size=%d",
+		    "BIGNUM_get_pubkey: big_init failed. e size=%d",
 		    CHARLEN2BIGNUMLEN(hash_size));
 
 		err = BIG_NO_MEM;
@@ -5644,7 +5639,7 @@ emlxs_BIGNUM_get_pubkey(
 
 	if (big_init(&n, CHARLEN2BIGNUMLEN(plen)) != BIG_OK) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_error_msg,
-		    "emlxs_BIGNUM_get_pubkey: big_init failed. n size=%d",
+		    "BIGNUM_get_pubkey: big_init failed. n size=%d",
 		    CHARLEN2BIGNUMLEN(plen));
 		err = BIG_NO_MEM;
 		goto ret2;
@@ -5653,7 +5648,7 @@ emlxs_BIGNUM_get_pubkey(
 
 	if (big_init(&result, CHARLEN2BIGNUMLEN(512)) != BIG_OK) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_error_msg,
-		    "emlxs_BIGNUM_get_pubkey: big_init failed. result size=%d",
+		    "BIGNUM_get_pubkey: big_init failed. result size=%d",
 		    CHARLEN2BIGNUMLEN(512));
 
 		err = BIG_NO_MEM;
@@ -5661,7 +5656,7 @@ emlxs_BIGNUM_get_pubkey(
 	}
 	if (big_cmp_abs(&a, &n) > 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_error_msg,
-		    "emlxs_BIGNUM_get_pubkey: big_cmp_abs error.");
+		    "BIGNUM_get_pubkey: big_cmp_abs error.");
 		err = BIG_GENERAL_ERR;
 		goto ret4;
 	}
@@ -5671,7 +5666,7 @@ emlxs_BIGNUM_get_pubkey(
 
 	if (big_modexp(&result, &a, &e, &n, NULL) != BIG_OK) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_error_msg,
-		    "emlxs_BIGNUM_get_pubkey: big_modexp result error");
+		    "BIGNUM_get_pubkey: big_modexp result error");
 		err = BIG_NO_MEM;
 		goto ret4;
 	}
@@ -5701,7 +5696,7 @@ emlxs_BIGNUM_get_pubkey(
 	}
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_detail_msg,
-	    "emlxs_BIGNUM_get_pubkey: after seskey cal: 0x%x 0x%x 0x%x",
+	    "BIGNUM_get_pubkey: after seskey cal: 0x%x 0x%x 0x%x",
 	    node_dhc->nlp_auth_misc.seskey_len, result.size, result.len);
 
 
@@ -5709,14 +5704,14 @@ emlxs_BIGNUM_get_pubkey(
 
 	if (big_init(&g, 1) != BIG_OK) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_error_msg,
-		    "emlxs_BIGNUM_get_pubkey: big_init failed. g size=1");
+		    "BIGNUM_get_pubkey: big_init failed. g size=1");
 
 		err = BIG_NO_MEM;
 		goto ret4;
 	}
 	if (big_init(&result1, CHARLEN2BIGNUMLEN(512)) != BIG_OK) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_error_msg,
-		    "emlxs_BIGNUM_get_pubkey: big_init failed. result1 size=%d",
+		    "BIGNUM_get_pubkey: big_init failed. result1 size=%d",
 		    CHARLEN2BIGNUMLEN(512));
 		err = BIG_NO_MEM;
 		goto ret5;
@@ -5727,7 +5722,7 @@ emlxs_BIGNUM_get_pubkey(
 
 	if (big_modexp(&result1, &g, &e, &n, NULL) != BIG_OK) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_error_msg,
-		    "emlxs_BIGNUM_get_pubkey: big_modexp result1 error");
+		    "BIGNUM_get_pubkey: big_modexp result1 error");
 		err = BIG_NO_MEM;
 		goto ret6;
 	}
@@ -5753,7 +5748,7 @@ emlxs_BIGNUM_get_pubkey(
 	}
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_detail_msg,
-	    "emlxs_BIGNUM_get_pubkey: after pubkey cal: 0x%x 0x%x 0x%x",
+	    "BIGNUM_get_pubkey: after pubkey cal: 0x%x 0x%x 0x%x",
 	    node_dhc->nlp_auth_misc.pubkey_len, result1.size, result1.len);
 
 
@@ -5804,12 +5799,12 @@ uint32_t privkey_len)
 	BIG_ERR_CODE err = BIG_OK;
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_detail_msg,
-	    "emlxs_BIGNUM_get_dhval: did=0x%x privkey_len=0x%x dhgp_id=0x%x",
+	    "BIGNUM_get_dhval: did=0x%x privkey_len=0x%x dhgp_id=0x%x",
 	    ndlp->nlp_DID, privkey_len, dhgp_id);
 
 	if (big_init(&result1, CHARLEN2BIGNUMLEN(512)) != BIG_OK) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_error_msg,
-		    "emlxs_BIGNUM_get_dhval: big_init failed. result1 size=%d",
+		    "BIGNUM_get_dhval: big_init failed. result1 size=%d",
 		    CHARLEN2BIGNUMLEN(512));
 
 		err = BIG_NO_MEM;
@@ -5817,7 +5812,7 @@ uint32_t privkey_len)
 	}
 	if (big_init(&g, 1) != BIG_OK) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_error_msg,
-		    "emlxs_BIGNUM_get_dhval: big_init failed. g size=1");
+		    "BIGNUM_get_dhval: big_init failed. g size=1");
 
 		err = BIG_NO_MEM;
 		goto ret1;
@@ -5827,7 +5822,7 @@ uint32_t privkey_len)
 
 	if (big_init(&e, CHARLEN2BIGNUMLEN(privkey_len)) != BIG_OK) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_error_msg,
-		    "emlxs_BIGNUM_get_dhval: big_init failed. e size=%d",
+		    "BIGNUM_get_dhval: big_init failed. e size=%d",
 		    CHARLEN2BIGNUMLEN(privkey_len));
 
 		err = BIG_NO_MEM;
@@ -5860,7 +5855,7 @@ uint32_t privkey_len)
 
 	if (big_init(&n, CHARLEN2BIGNUMLEN(plen)) != BIG_OK) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_error_msg,
-		    "emlxs_BIGNUM_get_dhval: big_init failed. n size=%d",
+		    "BIGNUM_get_dhval: big_init failed. n size=%d",
 		    CHARLEN2BIGNUMLEN(plen));
 
 		err = BIG_NO_MEM;
@@ -5872,7 +5867,7 @@ uint32_t privkey_len)
 	/* to cal: (g^x mod p) */
 	if (big_modexp(&result1, &g, &e, &n, NULL) != BIG_OK) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_error_msg,
-		    "emlxs_BIGNUM_get_dhval: big_modexp result1 error");
+		    "BIGNUM_get_dhval: big_modexp result1 error");
 
 		err = BIG_GENERAL_ERR;
 		goto ret4;
@@ -5946,12 +5941,12 @@ emlxs_BIGNUM_pubkey(
 	BIG_ERR_CODE err = BIG_OK;
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_detail_msg,
-	    "emlxs_BIGNUM_pubkey: dhvallen=0x%x dhgp_id=0x%x",
+	    "BIGNUM_pubkey: dhvallen=0x%x dhgp_id=0x%x",
 	    dhvallen, dhgp_id);
 
 	if (big_init(&a, CHARLEN2BIGNUMLEN(dhvallen)) != BIG_OK) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_error_msg,
-		    "emlxs_BIGNUM_pubkey: big_init failed. a size=%d",
+		    "BIGNUM_pubkey: big_init failed. a size=%d",
 		    CHARLEN2BIGNUMLEN(dhvallen));
 
 		err = BIG_NO_MEM;
@@ -5962,7 +5957,7 @@ emlxs_BIGNUM_pubkey(
 
 	if (big_init(&e, CHARLEN2BIGNUMLEN(key_size)) != BIG_OK) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_error_msg,
-		    "emlxs_BIGNUM_pubkey: big_init failed. e size=%d",
+		    "BIGNUM_pubkey: big_init failed. e size=%d",
 		    CHARLEN2BIGNUMLEN(key_size));
 
 		err = BIG_NO_MEM;
@@ -5995,7 +5990,7 @@ emlxs_BIGNUM_pubkey(
 
 	if (big_init(&n, CHARLEN2BIGNUMLEN(plen)) != BIG_OK) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_error_msg,
-		    "emlxs_BIGNUM_pubkey: big_init failed. n size=%d",
+		    "BIGNUM_pubkey: big_init failed. n size=%d",
 		    CHARLEN2BIGNUMLEN(plen));
 
 		err = BIG_NO_MEM;
@@ -6005,7 +6000,7 @@ emlxs_BIGNUM_pubkey(
 
 	if (big_init(&result, CHARLEN2BIGNUMLEN(512)) != BIG_OK) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_error_msg,
-		    "emlxs_BIGNUM_pubkey: big_init failed. result size=%d",
+		    "BIGNUM_pubkey: big_init failed. result size=%d",
 		    CHARLEN2BIGNUMLEN(512));
 
 		err = BIG_NO_MEM;
@@ -6013,14 +6008,14 @@ emlxs_BIGNUM_pubkey(
 	}
 	if (big_cmp_abs(&a, &n) > 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_error_msg,
-		    "emlxs_BIGNUM_pubkey: big_cmp_abs error");
+		    "BIGNUM_pubkey: big_cmp_abs error");
 
 		err = BIG_GENERAL_ERR;
 		goto ret4;
 	}
 	if (big_modexp(&result, &a, &e, &n, NULL) != BIG_OK) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_error_msg,
-		    "emlxs_BIGNUM_pubkey: big_modexp result error");
+		    "BIGNUM_pubkey: big_modexp result error");
 
 		err = BIG_NO_MEM;
 		goto ret4;
@@ -6079,7 +6074,7 @@ emlxs_hash_Cai(
 
 	key_size = cval_len;
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_detail_msg,
-	    "emlxs_hash_Cai: 0x%x 0x%x 0x%x 0x%x 0x%x",
+	    "hash_Cai: 0x%x 0x%x 0x%x 0x%x 0x%x",
 	    ndlp->nlp_DID, hash_id, dhgp_id, tran_id, dhvallen);
 
 	if (hash_id == AUTH_MD5) {
@@ -6096,7 +6091,7 @@ emlxs_hash_Cai(
 
 		if (err != BIG_OK) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_error_msg,
-			    "emlxs_hash_Cai: MD5 BIGNUM_pubkey error: 0x%x",
+			    "hash_Cai: MD5 BIGNUM_pubkey error: 0x%x",
 			    err);
 
 			err = BIG_GENERAL_ERR;
@@ -6104,7 +6099,7 @@ emlxs_hash_Cai(
 		}
 		if (pubkey_len == 0) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_error_msg,
-			    "emlxs_hash_Cai: MD5 BIGNUM_pubkey error: len=0");
+			    "hash_Cai: MD5 BIGNUM_pubkey error: len=0");
 
 			err = BIG_GENERAL_ERR;
 			return (err);
@@ -6142,7 +6137,7 @@ emlxs_hash_Cai(
 
 		if (err != BIG_OK) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_error_msg,
-			    "emlxs_hash_Cai: SHA1 BIGNUM_pubkey error: 0x%x",
+			    "hash_Cai: SHA1 BIGNUM_pubkey error: 0x%x",
 			    err);
 
 			err = BIG_GENERAL_ERR;
@@ -6150,7 +6145,7 @@ emlxs_hash_Cai(
 		}
 		if (pubkey_len == 0) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_error_msg,
-			    "emlxs_hash_Cai: SA1 BUM_pubkey error: key_len=0");
+			    "hash_Cai: SA1 BUM_pubkey error: key_len=0");
 
 			err = BIG_GENERAL_ERR;
 			return (err);
@@ -6247,7 +6242,7 @@ emlxs_hash_verification(
 	}
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_detail_msg,
-	    "emlxs_hash_verification: 0x%x 0x%x hash_id=0x%x dhgp_id=0x%x",
+	    "hash_verification: 0x%x 0x%x hash_id=0x%x dhgp_id=0x%x",
 	    ndlp->nlp_DID, mytran_id, hash_id, dhgp_id);
 
 	if (dhval_len == 0) {
@@ -6285,7 +6280,7 @@ emlxs_hash_verification(
 			    KM_NOSLEEP);
 			if (hash_val == NULL) {
 				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_error_msg,
-				    "emlxs_hash_verification: alloc failed");
+				    "hash_verification: alloc failed");
 
 				return (NULL);
 			} else {
@@ -6322,7 +6317,7 @@ emlxs_hash_verification(
 			    KM_NOSLEEP);
 			if (hash_val == NULL) {
 				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_error_msg,
-				    "emlxs_hash_verification: alloc failed");
+				    "hash_verification: alloc failed");
 
 				return (NULL);
 			} else {
@@ -6331,7 +6326,7 @@ emlxs_hash_verification(
 			}
 		}
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_detail_msg,
-		    "emlxs_hash_verification: hash_val=0x%x",
+		    "hash_verification: hash_val=0x%x",
 		    *(uint32_t *)hash_val);
 
 		return ((uint32_t *)hash_val);
@@ -6379,7 +6374,7 @@ emlxs_hash_verification(
 		}
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_detail_msg,
-		    "emlxs_hash_verification: N-Null gp. 0x%x 0x%x",
+		    "hash_verification: N-Null gp. 0x%x 0x%x",
 		    ndlp->nlp_DID, cval_len);
 
 		err = emlxs_hash_Cai(port, port_dhc, ndlp, (void *)Cai,
@@ -6389,7 +6384,7 @@ emlxs_hash_verification(
 
 		if (err != BIG_OK) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_error_msg,
-			    "emlxs_hash_verification: Cai error. ret=0x%x",
+			    "hash_verification: Cai error. ret=0x%x",
 			    err);
 
 			return (NULL);
@@ -6418,7 +6413,7 @@ emlxs_hash_verification(
 			    KM_NOSLEEP);
 			if (hash_val == NULL) {
 				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_error_msg,
-				    "emlxs_hash_vf: alloc failed(Non-NULL dh)");
+				    "hash_vf: alloc failed(Non-NULL dh)");
 
 				return (NULL);
 			} else {
@@ -6448,7 +6443,7 @@ emlxs_hash_verification(
 			    KM_NOSLEEP);
 			if (hash_val == NULL) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_error_msg,
-			    "emlxs_hash_vf: val alloc failed (Non-NULL dh)");
+			    "hash_vf: val alloc failed (Non-NULL dh)");
 
 				return (NULL);
 			} else {
@@ -6457,7 +6452,7 @@ emlxs_hash_verification(
 			}
 		}
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_detail_msg,
-		    "emlxs_hash_verification: hash_val=0x%x",
+		    "hash_verification: hash_val=0x%x",
 		    *(uint32_t *)hash_val);
 
 		return ((uint32_t *)hash_val);
@@ -6536,7 +6531,7 @@ emlxs_hash_get_R2(
 	mytran_id = (uint8_t)(LE_SWAP32(tran_id));
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_detail_msg,
-	    "emlxs_hash_get_R2:0x%x 0x%x dhgp_id=0x%x mytran_id=0x%x",
+	    "hash_get_R2:0x%x 0x%x dhgp_id=0x%x mytran_id=0x%x",
 	    ndlp->nlp_DID, hash_id, dhgp_id, mytran_id);
 
 	if (ndlp->nlp_DID == FABRIC_DID) {
@@ -6643,7 +6638,7 @@ emlxs_hash_get_R2(
 
 		if (err != BIG_OK) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_error_msg,
-			    "emlxs_hash_get_R2: emlxs_hash_Cai error. ret=0x%x",
+			    "hash_get_R2: hash_Cai error. ret=0x%x",
 			    err);
 
 			return (NULL);
@@ -6674,7 +6669,7 @@ emlxs_hash_get_R2(
 			    KM_NOSLEEP);
 			if (hash_val == NULL) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_error_msg,
-			    "emlxs_hash_get_R2: hash_val MD5 alloc failed.");
+			    "hash_get_R2: hash_val MD5 alloc failed.");
 
 				return (NULL);
 			} else {
@@ -6704,7 +6699,7 @@ emlxs_hash_get_R2(
 			    KM_NOSLEEP);
 			if (hash_val == NULL) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_error_msg,
-			    "emlxs_hash_get_R2: hash_val SHA1 alloc failed.");
+			    "hash_get_R2: hash_val SHA1 alloc failed.");
 
 				return (NULL);
 			} else {
@@ -6719,9 +6714,6 @@ emlxs_hash_get_R2(
 } /* emlxs_hash_get_R2 */
 
 
-
-/*
- */
 static void
 emlxs_log_auth_event(
 	emlxs_port_t *port,
@@ -6735,13 +6727,12 @@ emlxs_log_auth_event(
 	dev_info_t *dip = hba->dip;
 	emlxs_auth_cfg_t *auth_cfg;
 	char *tmp = "No_more_logging_information_available";
-
 	uint8_t lwwn[8];
 	uint8_t rwwn[8];
-	char *lwwn_tmp = NULL;
-	char *rwwn_tmp = NULL;
-	char *mytmp_lwwn, *mytmp_rwwn;
-	int i;
+	char *lwwn_str = NULL;
+	char *rwwn_str = NULL;
+	char ext_subclass[128];
+	char ext_class[32];
 
 	auth_cfg = &(node_dhc->auth_cfg);
 
@@ -6749,52 +6740,49 @@ emlxs_log_auth_event(
 		info = tmp;
 	}
 	bcopy((void *) &auth_cfg->local_entity, (void *)lwwn, 8);
-	lwwn_tmp = (char *)kmem_zalloc(32, KM_NOSLEEP);
-	if (lwwn_tmp == NULL) {
+	lwwn_str = (char *)kmem_zalloc(32, KM_NOSLEEP);
+	if (lwwn_str == NULL) {
 		return;
 	}
-	mytmp_lwwn = lwwn_tmp;
-
-	for (i = 0; i < 8; i++) {
-		lwwn_tmp = (char *)sprintf((char *)lwwn_tmp, "%02X", lwwn[i]);
-		lwwn_tmp += 2;
-	}
-	mytmp_lwwn[16] = '\0';
+	(void) snprintf(lwwn_str, 32, "%02X%02X%02X%02X%02X%02X%02X%02X",
+	    lwwn[0], lwwn[1], lwwn[2], lwwn[3], lwwn[4], lwwn[5], lwwn[6],
+	    lwwn[7]);
 
 	bcopy((void *)&auth_cfg->remote_entity, (void *)rwwn, 8);
-	rwwn_tmp = (char *)kmem_zalloc(32, KM_NOSLEEP);
-
-	mytmp_rwwn = rwwn_tmp;
-
-	if (rwwn_tmp == NULL) {
-		kmem_free(mytmp_lwwn, 32);
+	rwwn_str = (char *)kmem_zalloc(32, KM_NOSLEEP);
+	if (rwwn_str == NULL) {
+		kmem_free(lwwn_str, 32);
 		return;
 	}
-	for (i = 0; i < 8; i++) {
-		rwwn_tmp = (char *)sprintf((char *)rwwn_tmp, "%02X", rwwn[i]);
-		rwwn_tmp += 2;
-	}
-	mytmp_rwwn[16] = '\0';
+
+	(void) snprintf(rwwn_str, 32, "%02X%02X%02X%02X%02X%02X%02X%02X",
+	    rwwn[0], rwwn[1], rwwn[2], rwwn[3], rwwn[4], rwwn[5], rwwn[6],
+	    rwwn[7]);
+
+	(void) snprintf(ext_subclass, sizeof (ext_subclass),
+	    "ESC_%s_%s", DRIVER_NAME, subclass);
+	(void) snprintf(ext_class, sizeof (ext_class),
+	    "EC_%s", DRIVER_NAME);
 
 	if (nvlist_alloc(&attr_list, NV_UNIQUE_NAME_TYPE, KM_NOSLEEP)
 	    == DDI_SUCCESS) {
 		if ((nvlist_add_uint32(attr_list, "instance",
 		    ddi_get_instance(dip)) == DDI_SUCCESS) &&
 		    (nvlist_add_string(attr_list, "lwwn",
-		    (char *)mytmp_lwwn) == DDI_SUCCESS) &&
+		    lwwn_str) == DDI_SUCCESS) &&
 		    (nvlist_add_string(attr_list, "rwwn",
-		    (char *)mytmp_rwwn) == DDI_SUCCESS) &&
+		    rwwn_str) == DDI_SUCCESS) &&
 		    (nvlist_add_string(attr_list, "Info",
 		    info) == DDI_SUCCESS) &&
 		    (nvlist_add_string(attr_list, "Class",
-		    "EC_emlx") == DDI_SUCCESS) &&
+		    ext_class) == DDI_SUCCESS) &&
 		    (nvlist_add_string(attr_list, "SubClass",
-		    subclass) == DDI_SUCCESS)) {
+		    ext_subclass) == DDI_SUCCESS)) {
 
 			(void) ddi_log_sysevent(dip,
-			    DDI_VENDOR_EMLX,
-			    EC_EMLXS,
-			    subclass,
+			    emlxs_strtoupper(DRIVER_NAME),
+			    ext_class,
+			    ext_subclass,
 			    attr_list,
 			    NULL,
 			    DDI_NOSLEEP);
@@ -6802,8 +6790,8 @@ emlxs_log_auth_event(
 		nvlist_free(attr_list);
 		attr_list = NULL;
 	}
-	kmem_free(mytmp_lwwn, 32);
-	kmem_free(mytmp_rwwn, 32);
+	kmem_free(lwwn_str, 32);
+	kmem_free(rwwn_str, 32);
 
 	return;
 
@@ -7299,13 +7287,9 @@ emlxs_dhc_auth_complete(
 extern void
 emlxs_dhc_attach(emlxs_hba_t *hba)
 {
-	char buf[32];
+	mutex_init(&hba->auth_lock, NULL, MUTEX_DRIVER, NULL);
 
-	(void) sprintf(buf, "%s_auth_lock mutex", DRIVER_NAME);
-	mutex_init(&hba->auth_lock, buf, MUTEX_DRIVER, NULL);
-
-	(void) sprintf(buf, "%s_dhc_lock mutex", DRIVER_NAME);
-	mutex_init(&hba->dhc_lock, buf, MUTEX_DRIVER, NULL);
+	mutex_init(&hba->dhc_lock, NULL, MUTEX_DRIVER, NULL);
 
 	emlxs_auth_cfg_init(hba);
 
@@ -7864,8 +7848,10 @@ emlxs_auth_cfg_print(emlxs_hba_t *hba, emlxs_auth_cfg_t *auth_cfg)
 	EMLXS_MSGF(EMLXS_CONTEXT,
 	    &emlxs_fcsp_detail_msg,
 	    "%s:%s:%x:%x:%x:%x%x%x%x:%x%x%x%x:%x%x%x%x%x%x%x%x:%x",
-	    emlxs_wwn_xlate(s_lwwpn, (uint8_t *)&auth_cfg->local_entity),
-	    emlxs_wwn_xlate(s_rwwpn, (uint8_t *)&auth_cfg->remote_entity),
+	    emlxs_wwn_xlate(s_lwwpn, sizeof (s_lwwpn),
+	    (uint8_t *)&auth_cfg->local_entity),
+	    emlxs_wwn_xlate(s_rwwpn, sizeof (s_rwwpn),
+	    (uint8_t *)&auth_cfg->remote_entity),
 	    auth_cfg->authentication_timeout,
 	    auth_cfg->authentication_mode,
 	    auth_cfg->bidirectional,
@@ -8015,7 +8001,8 @@ emlxs_auth_cfg_read(emlxs_hba_t *hba)
 	uint32_t i;
 
 	/* Check for the per adapter setting */
-	(void) sprintf(buffer, "%s%d-auth-cfgs", DRIVER_NAME, hba->ddiinst);
+	(void) snprintf(buffer, sizeof (buffer), "%s%d-auth-cfgs", DRIVER_NAME,
+	    hba->ddiinst);
 	cnt = 0;
 	arrayp = NULL;
 	rval = ddi_prop_lookup_string_array(DDI_DEV_T_ANY, hba->dip,
@@ -8531,8 +8518,10 @@ emlxs_auth_key_print(emlxs_hba_t *hba, emlxs_auth_key_t *auth_key)
 	EMLXS_MSGF(EMLXS_CONTEXT,
 	    &emlxs_fcsp_detail_msg,
 	    "auth-key> %s:%s:%x:*%d chars*:%x:*%d chars*",
-	    emlxs_wwn_xlate(s_lwwpn, (uint8_t *)&auth_key->local_entity),
-	    emlxs_wwn_xlate(s_rwwpn, (uint8_t *)&auth_key->remote_entity),
+	    emlxs_wwn_xlate(s_lwwpn, sizeof (s_lwwpn),
+	    (uint8_t *)&auth_key->local_entity),
+	    emlxs_wwn_xlate(s_rwwpn, sizeof (s_rwwpn),
+	    (uint8_t *)&auth_key->remote_entity),
 	    auth_key->local_password_type, auth_key->local_password_length,
 	    auth_key->remote_password_type, auth_key->remote_password_length);
 
@@ -8666,7 +8655,8 @@ emlxs_auth_key_read(emlxs_hba_t *hba)
 	uint32_t i;
 
 	/* Check for the per adapter setting */
-	(void) sprintf(buffer, "%s%d-auth-keys", DRIVER_NAME, hba->ddiinst);
+	(void) snprintf(buffer, sizeof (buffer), "%s%d-auth-keys", DRIVER_NAME,
+	    hba->ddiinst);
 	cnt = 0;
 	arrayp = NULL;
 	rval = ddi_prop_lookup_string_array(DDI_DEV_T_ANY, hba->dip,
@@ -9063,7 +9053,7 @@ emlxs_dhc_init_auth(emlxs_hba_t *hba, uint8_t *lwwpn, uint8_t *rwwpn)
 	if (cfg[CFG_AUTH_ENABLE].current == 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT,
 		    &emlxs_fcsp_debug_msg,
-		    "emlxs_dhc_init_auth. Auth disabled.");
+		    "dhc_init_auth. Auth disabled.");
 
 		return (DFC_AUTH_AUTHENTICATION_DISABLED);
 	}
@@ -9082,27 +9072,27 @@ emlxs_dhc_init_auth(emlxs_hba_t *hba, uint8_t *lwwpn, uint8_t *rwwpn)
 	if (vpi == MAX_VPORTS) {
 		EMLXS_MSGF(EMLXS_CONTEXT,
 		    &emlxs_dfc_error_msg,
-		    "emlxs_dhc_init_auth: lwwpn not found. %s",
-		    emlxs_wwn_xlate(s_wwpn, lwwpn));
+		    "dhc_init_auth: lwwpn not found. %s",
+		    emlxs_wwn_xlate(s_wwpn, sizeof (s_wwpn), lwwpn));
 
 		return (DFC_AUTH_WWN_NOT_FOUND);
 	}
 	if (bcmp(rwwpn, emlxs_fabric_wwn, 8) == 0) {
 		/* Scan for fabric node */
-		if ((ndlp = emlxs_node_find_did(port, FABRIC_DID)) == NULL) {
+		if ((ndlp = emlxs_node_find_did(port, FABRIC_DID, 1)) == NULL) {
 			EMLXS_MSGF(EMLXS_CONTEXT,
 			    &emlxs_dfc_error_msg,
-			    "emlxs_dhc_init_auth: fabric node not found.");
+			    "dhc_init_auth: fabric node not found.");
 
 			return (DFC_AUTH_WWN_NOT_FOUND);
 		}
 	} else {
 		/* Scan for rwwpn match */
-		if ((ndlp = emlxs_node_find_wwpn(port, rwwpn)) == NULL) {
+		if ((ndlp = emlxs_node_find_wwpn(port, rwwpn, 1)) == NULL) {
 			EMLXS_MSGF(EMLXS_CONTEXT,
 			    &emlxs_dfc_error_msg,
-			    "emlxs_dhc_init_auth: rwwpn not found. %s",
-			    emlxs_wwn_xlate(s_wwpn, rwwpn));
+			    "dhc_init_auth: rwwpn not found. %s",
+			    emlxs_wwn_xlate(s_wwpn, sizeof (s_wwpn), rwwpn));
 
 			return (DFC_AUTH_WWN_NOT_FOUND);
 		}
@@ -9142,7 +9132,7 @@ emlxs_dhc_get_auth_cfg(emlxs_hba_t *hba, dfc_fcsp_config_t *fcsp_cfg)
 	if (cfg[CFG_AUTH_ENABLE].current == 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT,
 		    &emlxs_fcsp_debug_msg,
-		    "emlxs_dhc_get_auth_cfg. Auth disabled.");
+		    "dhc_get_auth_cfg. Auth disabled.");
 
 		return (DFC_AUTH_AUTHENTICATION_DISABLED);
 	}
@@ -9154,10 +9144,10 @@ emlxs_dhc_get_auth_cfg(emlxs_hba_t *hba, dfc_fcsp_config_t *fcsp_cfg)
 	if (!auth_cfg) {
 		EMLXS_MSGF(EMLXS_CONTEXT,
 		    &emlxs_dfc_error_msg,
-		    "emlxs_dhc_get_auth_cfg: entry not found. %s:%s",
-		    emlxs_wwn_xlate(s_lwwpn,
+		    "dhc_get_auth_cfg: entry not found. %s:%s",
+		    emlxs_wwn_xlate(s_lwwpn, sizeof (s_lwwpn),
 		    (uint8_t *)&fcsp_cfg->lwwpn),
-		    emlxs_wwn_xlate(s_rwwpn,
+		    emlxs_wwn_xlate(s_rwwpn, sizeof (s_rwwpn),
 		    (uint8_t *)&fcsp_cfg->rwwpn));
 
 		mutex_exit(&hba->auth_lock);
@@ -9206,7 +9196,7 @@ emlxs_dhc_add_auth_cfg(
 	if (cfg[CFG_AUTH_ENABLE].current == 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT,
 		    &emlxs_fcsp_debug_msg,
-		    "emlxs_dhc_add_auth_cfg. Auth disabled.");
+		    "dhc_add_auth_cfg. Auth disabled.");
 
 		return (DFC_AUTH_AUTHENTICATION_DISABLED);
 	}
@@ -9226,7 +9216,7 @@ emlxs_dhc_add_auth_cfg(
 		    dfc_pwd->length)) {
 			EMLXS_MSGF(EMLXS_CONTEXT,
 			    &emlxs_dfc_error_msg,
-			    "emlxs_dhc_add_auth_cfg: Invalid local password.");
+			    "dhc_add_auth_cfg: Invalid local password.");
 
 			mutex_exit(&hba->auth_lock);
 
@@ -9241,7 +9231,7 @@ emlxs_dhc_add_auth_cfg(
 	if (!auth_cfg) {
 		EMLXS_MSGF(EMLXS_CONTEXT,
 		    &emlxs_dfc_error_msg,
-		    "emlxs_dhc_add_auth_cfg: Out of memory.");
+		    "dhc_add_auth_cfg: Out of memory.");
 
 		mutex_exit(&hba->auth_lock);
 
@@ -9286,13 +9276,13 @@ emlxs_dhc_add_auth_cfg(
 		    emlxs_fabric_wwn, 8) == 0) {
 			/* Scan for fabric node */
 			if ((ndlp = emlxs_node_find_did(port,
-			    FABRIC_DID)) == NULL) {
+			    FABRIC_DID, 1)) == NULL) {
 				break;
 			}
 		} else {
 			/* Scan for rwwpn match */
 			if ((ndlp = emlxs_node_find_wwpn(port,
-			    (uint8_t *)&fcsp_cfg->rwwpn)) == NULL) {
+			    (uint8_t *)&fcsp_cfg->rwwpn, 1)) == NULL) {
 				break;
 			}
 		}
@@ -9327,7 +9317,7 @@ emlxs_dhc_delete_auth_cfg(
 	if (cfg[CFG_AUTH_ENABLE].current == 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT,
 		    &emlxs_fcsp_debug_msg,
-		    "emlxs_dhc_delete_auth_cfg. Auth disabled.");
+		    "dhc_delete_auth_cfg. Auth disabled.");
 
 		return (DFC_AUTH_AUTHENTICATION_DISABLED);
 	}
@@ -9350,7 +9340,7 @@ emlxs_dhc_delete_auth_cfg(
 
 			EMLXS_MSGF(EMLXS_CONTEXT,
 			    &emlxs_dfc_error_msg,
-			    "emlxs_dhc_delete_auth_cfg: Ivld local pwd.");
+			    "dhc_delete_auth_cfg: Ivld local pwd.");
 
 			mutex_exit(&hba->auth_lock);
 
@@ -9363,9 +9353,11 @@ emlxs_dhc_delete_auth_cfg(
 	if (!auth_cfg) {
 		EMLXS_MSGF(EMLXS_CONTEXT,
 		    &emlxs_dfc_error_msg,
-		    "emlxs_dhc_delete_auth_cfg: entry not found. %s:%s",
-		    emlxs_wwn_xlate(s_lwwpn, (uint8_t *)&fcsp_cfg->lwwpn),
-		    emlxs_wwn_xlate(s_rwwpn, (uint8_t *)&fcsp_cfg->rwwpn));
+		    "dhc_delete_auth_cfg: entry not found. %s:%s",
+		    emlxs_wwn_xlate(s_lwwpn, sizeof (s_lwwpn),
+		    (uint8_t *)&fcsp_cfg->lwwpn),
+		    emlxs_wwn_xlate(s_rwwpn, sizeof (s_rwwpn),
+		    (uint8_t *)&fcsp_cfg->rwwpn));
 
 		mutex_exit(&hba->auth_lock);
 
@@ -9398,7 +9390,7 @@ emlxs_dhc_get_auth_key(emlxs_hba_t *hba, dfc_auth_password_t *dfc_auth_pwd)
 	if (cfg[CFG_AUTH_ENABLE].current == 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT,
 		    &emlxs_fcsp_debug_msg,
-		    "emlxs_dhc_get_auth_key. Auth disabled.");
+		    "dhc_get_auth_key. Auth disabled.");
 
 		return (DFC_AUTH_AUTHENTICATION_DISABLED);
 	}
@@ -9411,9 +9403,11 @@ emlxs_dhc_get_auth_key(emlxs_hba_t *hba, dfc_auth_password_t *dfc_auth_pwd)
 	if (!auth_key) {
 		EMLXS_MSGF(EMLXS_CONTEXT,
 		    &emlxs_dfc_error_msg,
-		    "emlxs_dhc_get_auth_key: entry not found. %s:%s",
-		    emlxs_wwn_xlate(s_lwwpn, (uint8_t *)&dfc_auth_pwd->lwwpn),
-		    emlxs_wwn_xlate(s_rwwpn, (uint8_t *)&dfc_auth_pwd->rwwpn));
+		    "dhc_get_auth_key: entry not found. %s:%s",
+		    emlxs_wwn_xlate(s_lwwpn, sizeof (s_lwwpn),
+		    (uint8_t *)&dfc_auth_pwd->lwwpn),
+		    emlxs_wwn_xlate(s_rwwpn, sizeof (s_rwwpn),
+		    (uint8_t *)&dfc_auth_pwd->rwwpn));
 
 		mutex_exit(&hba->auth_lock);
 
@@ -9467,7 +9461,7 @@ emlxs_dhc_set_auth_key(emlxs_hba_t *hba, dfc_auth_password_t *dfc_pwd)
 	if (cfg[CFG_AUTH_ENABLE].current == 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT,
 		    &emlxs_fcsp_debug_msg,
-		    "emlxs_dhc_set_auth_key. Auth disabled.");
+		    "dhc_set_auth_key. Auth disabled.");
 
 		return (DFC_AUTH_AUTHENTICATION_DISABLED);
 	}
@@ -9483,7 +9477,7 @@ emlxs_dhc_set_auth_key(emlxs_hba_t *hba, dfc_auth_password_t *dfc_pwd)
 		    dfc_pwd->lpw_new.length) == 0) {
 			EMLXS_MSGF(EMLXS_CONTEXT,
 			    &emlxs_fcsp_debug_msg,
-			    "emlxs_dhc_set_auth_key. nlpwd==nrpwd");
+			    "dhc_set_auth_key. nlpwd==nrpwd");
 
 			return (DFC_AUTH_LOCAL_REMOTE_PWD_EQUAL);
 		}
@@ -9504,7 +9498,7 @@ emlxs_dhc_set_auth_key(emlxs_hba_t *hba, dfc_auth_password_t *dfc_pwd)
 		if (!auth_key) {
 			EMLXS_MSGF(EMLXS_CONTEXT,
 			    &emlxs_dfc_error_msg,
-			    "emlxs_dhc_set_auth_key: Out of memory.");
+			    "dhc_set_auth_key: Out of memory.");
 
 			mutex_exit(&hba->auth_lock);
 
@@ -9528,7 +9522,7 @@ emlxs_dhc_set_auth_key(emlxs_hba_t *hba, dfc_auth_password_t *dfc_pwd)
 			    dfc_pwd->lpw.length)) {
 			EMLXS_MSGF(EMLXS_CONTEXT,
 			    &emlxs_dfc_error_msg,
-			    "emlxs_dhc_set_auth_key: Invalid local password.");
+			    "dhc_set_auth_key: Invalid local password.");
 
 				mutex_exit(&hba->auth_lock);
 
@@ -9549,7 +9543,7 @@ emlxs_dhc_set_auth_key(emlxs_hba_t *hba, dfc_auth_password_t *dfc_pwd)
 			    dfc_pwd->lpw_new.length) == 0)) {
 			EMLXS_MSGF(EMLXS_CONTEXT,
 			    &emlxs_dfc_error_msg,
-			    "emlxs_dhc_set_auth_key: nlpwd==crpwd");
+			    "dhc_set_auth_key: nlpwd==crpwd");
 
 				mutex_exit(&hba->auth_lock);
 
@@ -9582,7 +9576,7 @@ emlxs_dhc_set_auth_key(emlxs_hba_t *hba, dfc_auth_password_t *dfc_pwd)
 			    dfc_pwd->rpw.length)) {
 			EMLXS_MSGF(EMLXS_CONTEXT,
 			    &emlxs_dfc_error_msg,
-			    "emlxs_dhc_set_auth_key: Invalid remote password.");
+			    "dhc_set_auth_key: Invalid remote password.");
 
 				mutex_exit(&hba->auth_lock);
 
@@ -9603,7 +9597,7 @@ emlxs_dhc_set_auth_key(emlxs_hba_t *hba, dfc_auth_password_t *dfc_pwd)
 			    dfc_pwd->rpw_new.length) == 0)) {
 			EMLXS_MSGF(EMLXS_CONTEXT,
 			    &emlxs_dfc_error_msg,
-			    "emlxs_dhc_set_auth_key: nrpwd==clpwd");
+			    "dhc_set_auth_key: nrpwd==clpwd");
 
 				mutex_exit(&hba->auth_lock);
 
@@ -9662,7 +9656,7 @@ emlxs_dhc_get_auth_status(emlxs_hba_t *hba, dfc_auth_status_t *fcsp_status)
 	/* Return is authentication is not enabled */
 	if (cfg[CFG_AUTH_ENABLE].current == 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_debug_msg,
-		    "emlxs_dhc_get_auth_status. Auth disabled.");
+		    "dhc_get_auth_status. Auth disabled.");
 
 		return (DFC_AUTH_AUTHENTICATION_DISABLED);
 	}
@@ -9673,9 +9667,11 @@ emlxs_dhc_get_auth_status(emlxs_hba_t *hba, dfc_auth_status_t *fcsp_status)
 
 	if (!auth_cfg) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "emlxs_dhc_get_auth_status: entry not found. %s:%s",
-		    emlxs_wwn_xlate(s_lwwpn, (uint8_t *)&fcsp_status->lwwpn),
-		    emlxs_wwn_xlate(s_rwwpn, (uint8_t *)&fcsp_status->rwwpn));
+		    "dhc_get_auth_status: entry not found. %s:%s",
+		    emlxs_wwn_xlate(s_lwwpn, sizeof (s_lwwpn),
+		    (uint8_t *)&fcsp_status->lwwpn),
+		    emlxs_wwn_xlate(s_rwwpn, sizeof (s_rwwpn),
+		    (uint8_t *)&fcsp_status->rwwpn));
 
 		mutex_exit(&hba->auth_lock);
 
@@ -9685,7 +9681,7 @@ emlxs_dhc_get_auth_status(emlxs_hba_t *hba, dfc_auth_status_t *fcsp_status)
 	    (uint8_t *)emlxs_fabric_wwn, 8) == 0) {
 		auth_status = &port->port_dhc.auth_status;
 		auth_time = port->port_dhc.auth_time;
-		ndlp = emlxs_node_find_did(port, FABRIC_DID);
+		ndlp = emlxs_node_find_did(port, FABRIC_DID, 1);
 	} else {
 		auth_status = &auth_cfg->auth_status;
 		auth_time = auth_cfg->auth_time;
@@ -9742,7 +9738,7 @@ emlxs_dhc_get_auth_cfg_table(emlxs_hba_t *hba, dfc_fcsp_config_t *fcsp_cfg)
 	if (cfg[CFG_AUTH_ENABLE].current == 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT,
 		    &emlxs_fcsp_debug_msg,
-		    "emlxs_dhc_get_auth_cfg_table. Auth disabled.");
+		    "dhc_get_auth_cfg_table. Auth disabled.");
 
 		return (DFC_AUTH_AUTHENTICATION_DISABLED);
 	}
@@ -9795,7 +9791,7 @@ emlxs_dhc_get_auth_key_table(emlxs_hba_t *hba, dfc_auth_password_t *auth_pwd)
 	if (cfg[CFG_AUTH_ENABLE].current == 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT,
 		    &emlxs_fcsp_debug_msg,
-		    "emlxs_dhc_get_auth_key_table. Auth disabled.");
+		    "dhc_get_auth_key_table. Auth disabled.");
 
 		return (DFC_AUTH_AUTHENTICATION_DISABLED);
 	}

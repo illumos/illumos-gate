@@ -5,8 +5,8 @@
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
  *
- * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or http://www.opensolaris.org/os/licensing.
+ * You can obtain a copy of the license at
+ * http://www.opensource.org/licenses/cddl1.txt.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2010 Emulex.  All rights reserved.
+ * Copyright (c) 2004-2011 Emulex. All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1000,6 +1000,7 @@ typedef struct dfc_drvinfo
 #define	DFC_DRVINFO_FEATURE_FCOE		0x00000200
 #define	DFC_DRVINFO_FEATURE_PERSISTLINK		0x00000400
 #define	DFC_DRVINFO_FEATURE_TARGET_MODE		0x00000800
+#define	DFC_DRVINFO_FEATURE_EXT_MBOX		0x00001000
 
 #endif /* >= DFC_DRVINFO_VERSION4 */
 } dfc_drvinfo_t;
@@ -1039,6 +1040,10 @@ typedef struct dfc_regevent
 #ifdef SAN_DIAG_SUPPORT
 	HBA_WWN		portname;
 #endif /* SAN_DIAG_SUPPORT */
+
+	pthread_t ptid;
+	uint32_t board;
+
 } dfc_regevent_t;
 
 
@@ -1828,10 +1833,11 @@ typedef struct dfc_send_scsi_fcp_cmd_info
 	uint32_t	ver;
 } dfc_send_scsi_fcp_cmd_info_t;
 
-#define	SCSI_RSP_CNT(x)		x.cnt1
-#define	SCSI_SNS_CNT(x)		x.cnt2
-#define	FC_DATA_CNT(x)		x.cnt1
-#define	FC_RSP_CNT(x)		x.cnt2
+#define	SCSI_RSP_CNT(x)		x->cnt1
+#define	SCSI_SNS_CNT(x)		x->cnt2
+#define	FC_DATA_CNT(x)		x->cnt1
+#define	FC_RSP_CNT(x)		x->cnt2
+
 #define	DFC_SEND_SCSI_FCP_V1	1
 #define	DFC_SEND_SCSI_FCP_V2	2
 

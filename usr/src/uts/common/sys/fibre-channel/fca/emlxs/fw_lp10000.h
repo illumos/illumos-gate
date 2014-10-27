@@ -1,10 +1,5 @@
 /*
- * Copyright 2009 Emulex.  All rights reserved.
- * Use is subject to license terms.
- */
-
-/*
- * COPYRIGHT (c) 2004-2009 Emulex. All rights reserved.
+ * Copyright (c) 2004-2011 Emulex. All rights reserved.
  * Copying, access, use or distribution is under the terms
  * given in License 2 of LICENSE.txt file.
  */

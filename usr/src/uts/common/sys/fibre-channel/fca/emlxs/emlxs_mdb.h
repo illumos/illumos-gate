@@ -5,8 +5,8 @@
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
  *
- * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or http://www.opensolaris.org/os/licensing.
+ * You can obtain a copy of the license at
+ * http://www.opensource.org/licenses/cddl1.txt.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Emulex.  All rights reserved.
+ * Copyright (c) 2004-2011 Emulex. All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,13 +31,14 @@
 extern "C" {
 #endif
 
+#define	DRIVER_NAME		"emlxs"
+
 #include <sys/kmem.h>
 #include <sys/types.h>
 #include <sys/mdb_modapi.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 
-#define	DRIVER_NAME		"emlxs"
 #define	MAX_FC_BRDS		256	/* Maximum # boards per system */
 
 void emlxs_msgbuf_help();

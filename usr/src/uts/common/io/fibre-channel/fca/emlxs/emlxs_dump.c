@@ -5,8 +5,8 @@
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
  *
- * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or http://www.opensolaris.org/os/licensing.
+ * You can obtain a copy of the license at
+ * http://www.opensource.org/licenses/cddl1.txt.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -20,10 +20,9 @@
  */
 
 /*
- * Copyright 2010 Emulex.  All rights reserved.
+ * Copyright (c) 2004-2012 Emulex. All rights reserved.
  * Use is subject to license terms.
  */
-
 
 #include <emlxs.h>
 
@@ -48,7 +47,7 @@ emlxs_menlo_set_mode(
 	menlo_rsp_t *rsp_buf = NULL;
 	uint32_t rval = 0;
 
-	if (hba->model_info.device_id != PCI_DEVICE_ID_LP21000_M) {
+	if (hba->model_info.device_id != PCI_DEVICE_ID_HORNET) {
 		return (DFC_INVALID_ADAPTER);
 	}
 
@@ -69,7 +68,7 @@ emlxs_menlo_set_mode(
 	if (rval = emlxs_send_menlo_cmd(hba, (uint8_t *)cmd_buf, cmd_size,
 	    (uint8_t *)rsp_buf, &rsp_size)) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-		    "emlxs_menlo_set_mode: Unable to send command.");
+		    "menlo_set_mode: Unable to send command.");
 		goto done;
 	}
 #ifdef EMLXS_BIG_ENDIAN
@@ -78,7 +77,7 @@ emlxs_menlo_set_mode(
 
 	if (rsp_buf->code != 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-		    "emlxs_menlo_set_mode: Menlo command error. code=%d.\n",
+		    "menlo_set_mode: Menlo command error. code=%d.\n",
 		    rsp_buf->code);
 	}
 
@@ -111,7 +110,7 @@ emlxs_menlo_reset(
 	menlo_rsp_t *rsp_buf = NULL;
 	uint32_t rval = 0;
 
-	if (hba->model_info.device_id != PCI_DEVICE_ID_LP21000_M) {
+	if (hba->model_info.device_id != PCI_DEVICE_ID_HORNET) {
 		return (DFC_INVALID_ADAPTER);
 	}
 
@@ -131,7 +130,7 @@ emlxs_menlo_reset(
 	if (rval = emlxs_send_menlo_cmd(hba, (uint8_t *)cmd_buf, cmd_size,
 	    (uint8_t *)rsp_buf, &rsp_size)) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-		    "emlxs_menlo_reset: Unable to send command.");
+		    "menlo_reset: Unable to send command.");
 		goto done;
 	}
 #ifdef EMLXS_BIG_ENDIAN
@@ -140,7 +139,7 @@ emlxs_menlo_reset(
 
 	if (rsp_buf->code != 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-		    "emlxs_menlo_reset: Menlo command error. code=%d.\n",
+		    "menlo_reset: Menlo command error. code=%d.\n",
 		    rsp_buf->code);
 	}
 
@@ -172,7 +171,7 @@ emlxs_menlo_get_cfg(
 	menlo_cmd_t *cmd_buf = NULL;
 	uint32_t rval = 0;
 
-	if (hba->model_info.device_id != PCI_DEVICE_ID_LP21000_M) {
+	if (hba->model_info.device_id != PCI_DEVICE_ID_HORNET) {
 		return (DFC_INVALID_ADAPTER);
 	}
 
@@ -192,7 +191,7 @@ emlxs_menlo_get_cfg(
 	if (rval = emlxs_send_menlo_cmd(hba, (uint8_t *)cmd_buf, cmd_size,
 	    (uint8_t *)rsp_buf, &rsp_size)) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-		    "emlxs_menlo_get_cfg: Unable to send command.");
+		    "menlo_get_cfg: Unable to send command.");
 		goto done;
 	}
 #ifdef EMLXS_BIG_ENDIAN
@@ -201,7 +200,7 @@ emlxs_menlo_get_cfg(
 
 	if (rsp_buf->code != 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-		    "emlxs_menlo_get_cfg: Menlo command error. code=%d.\n",
+		    "menlo_get_cfg: Menlo command error. code=%d.\n",
 		    rsp_buf->code);
 	}
 
@@ -230,7 +229,7 @@ emlxs_menlo_get_logcfg(
 	menlo_cmd_t *cmd_buf = NULL;
 	uint32_t rval = 0;
 
-	if (hba->model_info.device_id != PCI_DEVICE_ID_LP21000_M) {
+	if (hba->model_info.device_id != PCI_DEVICE_ID_HORNET) {
 		return (DFC_INVALID_ADAPTER);
 	}
 
@@ -248,7 +247,7 @@ emlxs_menlo_get_logcfg(
 	if (rval = emlxs_send_menlo_cmd(hba, (uint8_t *)cmd_buf, cmd_size,
 	    (uint8_t *)rsp_buf, &rsp_size)) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-		    "emlxs_menlo_get_logcfg: Unable to send command.");
+		    "menlo_get_logcfg: Unable to send command.");
 		goto done;
 	}
 #ifdef EMLXS_BIG_ENDIAN
@@ -257,7 +256,7 @@ emlxs_menlo_get_logcfg(
 
 	if (rsp_buf->code != 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-		    "emlxs_menlo_get_logcfg: Menlo command error. code=%d.\n",
+		    "menlo_get_logcfg: Menlo command error. code=%d.\n",
 		    rsp_buf->code);
 	}
 
@@ -286,7 +285,7 @@ emlxs_menlo_get_log(
 	menlo_cmd_t *cmd_buf = NULL;
 	uint32_t rval = 0;
 
-	if (hba->model_info.device_id != PCI_DEVICE_ID_LP21000_M) {
+	if (hba->model_info.device_id != PCI_DEVICE_ID_HORNET) {
 		return (DFC_INVALID_ADAPTER);
 	}
 
@@ -304,7 +303,7 @@ emlxs_menlo_get_log(
 	if (rval = emlxs_send_menlo_cmd(hba, (uint8_t *)cmd_buf, cmd_size,
 	    (uint8_t *)rsp_buf, &rsp_size)) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-		    "emlxs_menlo_get_log: Unable to send command.");
+		    "menlo_get_log: Unable to send command.");
 		goto done;
 	}
 #ifdef EMLXS_BIG_ENDIAN
@@ -313,7 +312,7 @@ emlxs_menlo_get_log(
 
 	if (rsp_buf->code != 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-		    "emlxs_menlo_get_log: Menlo command error. code=%d.\n",
+		    "menlo_get_log: Menlo command error. code=%d.\n",
 		    rsp_buf->code);
 	}
 
@@ -341,7 +340,7 @@ emlxs_menlo_get_paniclog(
 	menlo_cmd_t *cmd_buf = NULL;
 	uint32_t rval = 0;
 
-	if (hba->model_info.device_id != PCI_DEVICE_ID_LP21000_M) {
+	if (hba->model_info.device_id != PCI_DEVICE_ID_HORNET) {
 		return (DFC_INVALID_ADAPTER);
 	}
 
@@ -359,7 +358,7 @@ emlxs_menlo_get_paniclog(
 	if (rval = emlxs_send_menlo_cmd(hba, (uint8_t *)cmd_buf, cmd_size,
 	    (uint8_t *)rsp_buf, &rsp_size)) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-		    "emlxs_menlo_get_paniclog: Unable to send command.");
+		    "menlo_get_paniclog: Unable to send command.");
 		goto done;
 	}
 #ifdef EMLXS_BIG_ENDIAN
@@ -368,7 +367,7 @@ emlxs_menlo_get_paniclog(
 
 	if (rsp_buf->code != 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-		    "emlxs_menlo_get_paniclog: Menlo command error. code=%d.\n",
+		    "menlo_get_paniclog: Menlo command error. code=%d.\n",
 		    rsp_buf->code);
 	}
 
@@ -476,7 +475,7 @@ emlxs_fprintf(
 	uint32_t length;
 
 	va_start(valist, fmt);
-	(void) vsprintf(va_str, fmt, valist);
+	(void) vsnprintf(va_str, sizeof (va_str), fmt, valist);
 	va_end(valist);
 
 	length = emlxs_fwrite((uint8_t *)va_str, strlen(va_str), 1, fp);
@@ -612,7 +611,7 @@ emlxs_get_dump(
 
 	if (!buflen) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fw_dump_msg,
-		    "emlxs_get_dump: Buffer length = 0");
+		    "get_dump: Buffer length = 0");
 		return (1);
 	}
 
@@ -651,7 +650,7 @@ emlxs_get_dump(
 
 	if (*buflen < size) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fw_dump_msg,
-		    "emlxs_get_dump: Buffer length too small. %d < %d",
+		    "get_dump: Buffer length too small. %d < %d",
 		    *buflen, size);
 
 		*buflen = 0;
@@ -727,6 +726,10 @@ emlxs_read_cfg_region(
 	uint32_t Offset;	/* Offset into Config Region, for each dump */
 	uint8_t *pLocalBuf;	/* ptr to buffer to receive each dump */
 
+	if (! ByteCount) {
+		return (0);
+	}
+
 	mbq =
 	    (MAILBOXQ *)kmem_zalloc(sizeof (MAILBOXQ), KM_SLEEP);
 
@@ -786,7 +789,7 @@ emlxs_read_cfg_region(
 
 			if (CopyCount > ByteCountReq) {
 				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_init_debug_msg,
-				    "emlxs_read_cfg_region: " \
+				    "read_cfg_region: " \
 				    "Byte count too big. %d > %d\n",
 				    CopyCount, ByteCountReq);
 
@@ -836,7 +839,7 @@ emlxs_read_cfg_region(
 
 			if (CopyCount > ByteCountReq) {
 				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_init_debug_msg,
-				    "emlxs_read_cfg_region: " \
+				    "read_cfg_region: " \
 				    "Byte count too big. %d > %d\n",
 				    CopyCount, ByteCountReq);
 
@@ -935,11 +938,12 @@ emlxs_dump_word_txtfile(
 		buf2[0] = 0;
 
 		if ((j & 0x03) == 0) {
-			(void) sprintf(buf1, "\n%04x:", j * 4);
-			(void) strcat(buf2, buf1);
+			(void) snprintf(buf1, sizeof (buf1), "\n%04x:", j * 4);
+			(void) strlcat(buf2, buf1, sizeof (buf2));
 		}
-		(void) sprintf(buf1, " %08x", ptr[j]);	/* print 1 word */
-		(void) strcat(buf2, buf1);
+		/* print 1 word */
+		(void) snprintf(buf1, sizeof (buf1), " %08x", ptr[j]);
+		(void) strlcat(buf2, buf1, sizeof (buf2));
 		(void) emlxs_fwrite((uint8_t *)buf2, strlen(buf2), 1,
 		    fpTxtFile);
 	}
@@ -1378,19 +1382,19 @@ emlxs_dump_parm_table(
 	buf2 = (char *)kmem_zalloc(8192, KM_SLEEP);
 
 	/* Driver Parameters Heading */
-	(void) sprintf(buf1,
+	(void) snprintf(buf1, 8192,
 	    "IDX                     string      Low     "\
 	    "High      Def      Cur  Exp  Dyn");
 
 	/* Build the buffer containing all the Driver Params */
 	for (i = 0; i < NUM_CFG_PARAM; i++) {
-		(void) sprintf(buf2,
+		(void) snprintf(buf2, 8192,
 		    "\n  %02x: %25s %8x %8x %8x %8x %4x %4x", i,
 		    cfg[i].string, cfg[i].low, cfg[i].hi, cfg[i].def,
 		    cfg[i].current, (cfg[i].flags & PARM_HIDDEN) ? 0 : 1,
 		    (cfg[i].flags & PARM_DYNAMIC) ? 1 : 0);
 
-		(void) strcat(buf1, buf2);
+		(void) strlcat(buf1, buf2, 8192);
 	}
 
 	status =
@@ -1423,14 +1427,14 @@ emlxs_dump_model(
 	char buf2[512];
 
 	/* Write the Model into the buffer */
-	(void) sprintf(buf2, "%s", vpd->model);
-	(void) strcpy(buf1, "Model: ");
-	(void) strcat(buf1, buf2);
+	(void) snprintf(buf2, sizeof (buf2), "%s", vpd->model);
+	(void) strlcpy(buf1, "Model: ", sizeof (buf1));
+	(void) strlcat(buf1, buf2, sizeof (buf1));
 
 	/* Write the Model Description into the buffer */
-	(void) sprintf(buf2, "%s", vpd->model_desc);
-	(void) strcat(buf1, "\n Description: ");
-	(void) strcat(buf1, buf2);
+	(void) snprintf(buf2, sizeof (buf2), "%s", vpd->model_desc);
+	(void) strlcat(buf1, "\n Description: ", sizeof (buf1));
+	(void) strlcat(buf1, buf2, sizeof (buf1));
 
 	status =
 	    emlxs_dump_string_txtfile(fpTxtFile, buf1, LEGEND_HBA_INFO,
@@ -1460,24 +1464,24 @@ emlxs_dump_wwn(
 	uint8_t *p;
 
 	/* Write the WWPN into the buffer */
-	(void) strcpy(buf1, "Port WWN: ");
+	(void) strlcpy(buf1, "Port WWN: ", sizeof (buf1));
 	p = (uint8_t *)&hba->wwpn;
 	for (i = 0; i < 7; i++) {
-		(void) sprintf(buf2, "%02x:", *p++);
-		(void) strcat(buf1, buf2);
+		(void) snprintf(buf2, sizeof (buf2), "%02x:", *p++);
+		(void) strlcat(buf1, buf2, sizeof (buf1));
 	}
-	(void) sprintf(buf2, "%02x", *p++);
-	(void) strcat(buf1, buf2);
+	(void) snprintf(buf2, sizeof (buf2), "%02x", *p++);
+	(void) strlcat(buf1, buf2, sizeof (buf1));
 
 	/* Write the WWNN into the buffer */
-	(void) strcat(buf1, "\n Node WWN: ");
+	(void) strlcat(buf1, "\n Node WWN: ", sizeof (buf1));
 	p = (uint8_t *)&hba->wwnn;
 	for (i = 0; i < 7; i++) {
-		(void) sprintf(buf2, "%02x:", *p++);
-		(void) strcat(buf1, buf2);
+		(void) snprintf(buf2, sizeof (buf2), "%02x:", *p++);
+		(void) strlcat(buf1, buf2, sizeof (buf1));
 	}
-	(void) sprintf(buf2, "%02x", *p++);
-	(void) strcat(buf1, buf2);
+	(void) snprintf(buf2, sizeof (buf2), "%02x", *p++);
+	(void) strlcat(buf1, buf2, sizeof (buf1));
 
 	status =
 	    emlxs_dump_string_txtfile(fpTxtFile, buf1, LEGEND_HBA_INFO,
@@ -1506,10 +1510,10 @@ emlxs_dump_serial_number(
 	char buf2[512];
 
 	/* Write the Serial Number into the buffer */
-	(void) sprintf(buf2, "%s", vpd->serial_num);
-	(void) strcpy(buf1, LEGEND_HBA_SN);
-	(void) strcat(buf1, ": ");
-	(void) strcat(buf1, buf2);
+	(void) snprintf(buf2, sizeof (buf2), "%s", vpd->serial_num);
+	(void) strlcpy(buf1, LEGEND_HBA_SN, sizeof (buf1));
+	(void) strlcat(buf1, ": ", sizeof (buf1));
+	(void) strlcat(buf1, buf2, sizeof (buf1));
 
 	status =
 	    emlxs_dump_string_txtfile(fpTxtFile, buf1, LEGEND_HBA_INFO,
@@ -1545,45 +1549,45 @@ emlxs_dump_fw_version(
 	buf2 = (char *)kmem_zalloc(buf2_size, KM_SLEEP);
 
 	/* Write the Firmware Version into the buffer */
-	(void) sprintf(buf2, "%s", vpd->fw_version);
-	(void) strcpy(buf1, LEGEND_HBA_FW_VERSION);
-	(void) strcat(buf1, ": ");
-	(void) strcat(buf1, buf2);
+	(void) snprintf(buf2, buf2_size, "%s", vpd->fw_version);
+	(void) strlcpy(buf1, LEGEND_HBA_FW_VERSION, buf1_size);
+	(void) strlcat(buf1, ": ", buf1_size);
+	(void) strlcat(buf1, buf2, buf1_size);
 
 	/* Write the Operational FW Version into the buffer */
-	(void) sprintf(buf2, "%s", vpd->opFwName);
-	(void) strcat(buf1, "\n ");
-	(void) strcat(buf1, LEGEND_HBA_FW_OPVERSION);
-	(void) strcat(buf1, ": ");
-	(void) strcat(buf1, buf2);
+	(void) snprintf(buf2, buf2_size, "%s", vpd->opFwName);
+	(void) strlcat(buf1, "\n ", buf1_size);
+	(void) strlcat(buf1, LEGEND_HBA_FW_OPVERSION, buf1_size);
+	(void) strlcat(buf1, ": ", buf1_size);
+	(void) strlcat(buf1, buf2, buf1_size);
 
 	/* Write the SLI-1 FW Version into the buffer */
-	(void) sprintf(buf2, "%s", vpd->sli1FwName);
-	(void) strcat(buf1, "\n ");
-	(void) strcat(buf1, LEGEND_HBA_FW_SLI1VERSION);
-	(void) strcat(buf1, ": ");
-	(void) strcat(buf1, buf2);
+	(void) snprintf(buf2, buf2_size, "%s", vpd->sli1FwName);
+	(void) strlcat(buf1, "\n ", buf1_size);
+	(void) strlcat(buf1, LEGEND_HBA_FW_SLI1VERSION, buf1_size);
+	(void) strlcat(buf1, ": ", buf1_size);
+	(void) strlcat(buf1, buf2, buf1_size);
 
 	/* Write the SLI-2 FW Version into the buffer */
-	(void) sprintf(buf2, "%s", vpd->sli2FwName);
-	(void) strcat(buf1, "\n ");
-	(void) strcat(buf1, LEGEND_HBA_FW_SLI2VERSION);
-	(void) strcat(buf1, ": ");
-	(void) strcat(buf1, buf2);
+	(void) snprintf(buf2, buf2_size, "%s", vpd->sli2FwName);
+	(void) strlcat(buf1, "\n ", buf1_size);
+	(void) strlcat(buf1, LEGEND_HBA_FW_SLI2VERSION, buf1_size);
+	(void) strlcat(buf1, ": ", buf1_size);
+	(void) strlcat(buf1, buf2, buf1_size);
 
 	/* Write the SLI-3 FW Version into the buffer */
-	(void) sprintf(buf2, "%s", vpd->sli3FwName);
-	(void) strcat(buf1, "\n ");
-	(void) strcat(buf1, LEGEND_HBA_FW_SLI3VERSION);
-	(void) strcat(buf1, ": ");
-	(void) strcat(buf1, buf2);
+	(void) snprintf(buf2, buf2_size, "%s", vpd->sli3FwName);
+	(void) strlcat(buf1, "\n ", buf1_size);
+	(void) strlcat(buf1, LEGEND_HBA_FW_SLI3VERSION, buf1_size);
+	(void) strlcat(buf1, ": ", buf1_size);
+	(void) strlcat(buf1, buf2, buf1_size);
 
 	/* Write the Kernel FW Version into the buffer */
-	(void) sprintf(buf2, "%s", vpd->postKernName);
-	(void) strcat(buf1, "\n ");
-	(void) strcat(buf1, LEGEND_HBA_FW_KERNELVERSION);
-	(void) strcat(buf1, ": ");
-	(void) strcat(buf1, buf2);
+	(void) snprintf(buf2, buf2_size, "%s", vpd->postKernName);
+	(void) strlcat(buf1, "\n ", buf1_size);
+	(void) strlcat(buf1, LEGEND_HBA_FW_KERNELVERSION, buf1_size);
+	(void) strlcat(buf1, ": ", buf1_size);
+	(void) strlcat(buf1, buf2, buf1_size);
 
 	status =
 	    emlxs_dump_string_txtfile(fpTxtFile, buf1, LEGEND_HBA_INFO,
@@ -1634,26 +1638,27 @@ emlxs_dump_boot_version(
 	}
 
 	/* Write the Boot Bios State into the buffer */
-	(void) sprintf(buf2, " %d", state);
-	(void) strcpy(buf1, LEGEND_HBA_BB_STATE);
-	(void) strcat(buf1, ": ");
-	(void) strcat(buf1, buf2);
+	(void) snprintf(buf2, buf2_size, " %d", state);
+	(void) strlcpy(buf1, LEGEND_HBA_BB_STATE, buf1_size);
+	(void) strlcat(buf1, ": ", buf1_size);
+	(void) strlcat(buf1, buf2, buf1_size);
 
 	/* Write the Boot Bios Version into the buffer */
 	if (state == 2) {
-		(void) sprintf(buf2, "%s", "unknown");
+		(void) snprintf(buf2, buf2_size, "%s", "unknown");
 	} else {
 #ifdef EMLXS_SPARC
-		(void) sprintf(buf2, "%s (FCode)", vpd->fcode_version);
+		(void) snprintf(buf2, buf2_size, "%s (FCode)",
+		    vpd->fcode_version);
 #else
-		(void) sprintf(buf2, "%s", vpd->boot_version);
+		(void) snprintf(buf2, buf2_size, "%s", vpd->boot_version);
 #endif /* EMLXS_SPARC */
 	}
 
-	(void) strcat(buf1, "\n ");
-	(void) strcat(buf1, LEGEND_HBA_BB_VERSION);
-	(void) strcat(buf1, ": ");
-	(void) strcat(buf1, buf2);
+	(void) strlcat(buf1, "\n ", buf1_size);
+	(void) strlcat(buf1, LEGEND_HBA_BB_VERSION, buf1_size);
+	(void) strlcat(buf1, ": ", buf1_size);
+	(void) strlcat(buf1, buf2, buf1_size);
 
 	status =
 	    emlxs_dump_string_txtfile(fpTxtFile, buf1, LEGEND_HBA_INFO,
@@ -1693,43 +1698,51 @@ emlxs_dump_cfg_region4_decoded(
 	buf2 = (char *)kmem_zalloc(buf2_size, KM_SLEEP);
 
 	/* Write the Initial ID into the buffer */
-	(void) sprintf(buf2, "%s: %08x %08x", LEGEND_CR4_INITIAL_LOAD,
+	(void) snprintf(buf2, buf2_size, "%s: %08x %08x",
+	    LEGEND_CR4_INITIAL_LOAD,
 	    pBuffer->InitialId[0], pBuffer->InitialId[1]);
-	(void) strcat(buf1, buf2);
+	(void) strlcat(buf1, buf2, buf1_size);
 
 	/* Write the Flags Word into the buffer */
-	(void) sprintf(buf2, "\n %s: %08x", LEGEND_CR4_FLAGS, pBuffer->Flags);
-	(void) strcat(buf1, buf2);
+	(void) snprintf(buf2, buf2_size, "\n %s: %08x", LEGEND_CR4_FLAGS,
+	    pBuffer->Flags);
+	(void) strlcat(buf1, buf2, buf1_size);
 
 	/* Write the Boot Bios ID into the buffer */
-	(void) sprintf(buf2, "\n %s: %08x %08x", LEGEND_CR4_BOOT_BIOS_ID,
+	(void) snprintf(buf2, buf2_size, "\n %s: %08x %08x",
+	    LEGEND_CR4_BOOT_BIOS_ID,
 	    pBuffer->BootBiosId[0], pBuffer->BootBiosId[1]);
-	(void) strcat(buf1, buf2);
+	(void) strlcat(buf1, buf2, buf1_size);
 
 	/* Write the SLI1 ID into the buffer */
-	(void) sprintf(buf2, "\n %s: %08x %08x", LEGEND_CR4_SLI1_ID,
+	(void) snprintf(buf2, buf2_size, "\n %s: %08x %08x",
+	    LEGEND_CR4_SLI1_ID,
 	    pBuffer->Sli1Id[0], pBuffer->Sli1Id[1]);
-	(void) strcat(buf1, buf2);
+	(void) strlcat(buf1, buf2, buf1_size);
 
 	/* Write the SLI2 ID into the buffer */
-	(void) sprintf(buf2, "\n %s: %08x %08x", LEGEND_CR4_SLI2_ID,
+	(void) snprintf(buf2, buf2_size, "\n %s: %08x %08x",
+	    LEGEND_CR4_SLI2_ID,
 	    pBuffer->Sli2Id[0], pBuffer->Sli2Id[1]);
-	(void) strcat(buf1, buf2);
+	(void) strlcat(buf1, buf2, buf1_size);
 
 	/* Write the SLI3 ID into the buffer */
-	(void) sprintf(buf2, "\n %s: %08x %08x", LEGEND_CR4_SLI3_ID,
+	(void) snprintf(buf2, buf2_size, "\n %s: %08x %08x",
+	    LEGEND_CR4_SLI3_ID,
 	    pBuffer->Sli3Id[0], pBuffer->Sli3Id[1]);
-	(void) strcat(buf1, buf2);
+	(void) strlcat(buf1, buf2, buf1_size);
 
 	/* Write the SLI4 ID into the buffer */
-	(void) sprintf(buf2, "\n %s: %08x %08x", LEGEND_CR4_SLI4_ID,
+	(void) snprintf(buf2, buf2_size, "\n %s: %08x %08x",
+	    LEGEND_CR4_SLI4_ID,
 	    pBuffer->Sli4Id[0], pBuffer->Sli4Id[1]);
-	(void) strcat(buf1, buf2);
+	(void) strlcat(buf1, buf2, buf1_size);
 
 	/* Write the Erom ID into the buffer */
-	(void) sprintf(buf2, "\n %s: %08x %08x", LEGEND_CR4_EROM_ID,
+	(void) snprintf(buf2, buf2_size, "\n %s: %08x %08x",
+	    LEGEND_CR4_EROM_ID,
 	    pBuffer->EromId[0], pBuffer->EromId[1]);
-	(void) strcat(buf1, buf2);
+	(void) strlcat(buf1, buf2, buf1_size);
 
 	status =
 	    emlxs_dump_string_txtfile(fpTxtFile, buf1, LEGEND_CONFIG_REGION,
@@ -1799,8 +1812,8 @@ emlxs_dump_cfg_region14_decoded(
 	/* The cast fixes it. */
 
 	if (((unsigned char)pBuffer[0]) != VPD_TAG_82) {
-		(void) sprintf(buf1, "Bad VPD Data: (w0=0x%08x)",
-		    *(uint32_t *)pBuffer);
+		(void) snprintf(buf1, buf1_size,
+		    "Bad VPD Data: (w0=0x%08x)", *(uint32_t *)pBuffer);
 	} else {	/* begin good data */
 		i = 0;
 		while (!fDone) {
@@ -1815,8 +1828,8 @@ emlxs_dump_cfg_region14_decoded(
 				buf2[length >
 				    (buf2_size - 1) ? (buf2_size -
 				    1) : length] = 0;
-				(void) strcat(buf1, "Name: ");
-				(void) strcat(buf1, buf2);
+				(void) strlcat(buf1, "Name: ", buf1_size);
+				(void) strlcat(buf1, buf2, buf1_size);
 				i += length;
 				break;
 
@@ -1837,16 +1850,18 @@ emlxs_dump_cfg_region14_decoded(
 					}
 
 					length2 = pBuffer[i++];
-					(void) sprintf(buf2, "\n %s: ",
-					    mnemonic);
-					(void) strcat(buf1, buf2);
+					(void) snprintf(buf2, buf2_size,
+					    "\n %s: ", mnemonic);
+					(void) strlcat(buf1, buf2,
+					    buf1_size);
 					(void) strncpy(buf2, &pBuffer[i],
 					    length2 >
 					    buf2_size ? buf2_size : length2);
 					buf2[length2 >
 					    (buf2_size - 1) ? (buf2_size -
 					    1) : length2] = 0;
-					(void) strcat(buf1, buf2);
+					(void) strlcat(buf1, buf2,
+					    buf1_size);
 					i += length2;
 				}
 				break;
@@ -1917,11 +1932,11 @@ emlxs_dump_cfg_region(
 	/* Write the Data into the buffer */
 	for (i = 0; i < (int)RetByteCount / 4; i++) {
 		if ((i % 8 == 0) && (i != 0)) {
-			(void) strcat((char *)buf1, "\n ");
+			(void) strlcat((char *)buf1, "\n ", buf1_size);
 		}
 
-		(void) sprintf(buf2, "%08x, ", buffer[i]);
-		(void) strcat((char *)buf1, buf2);
+		(void) snprintf(buf2, buf2_size, "%08x, ", buffer[i]);
+		(void) strlcat((char *)buf1, buf2, buf1_size);
 	}
 
 	status =
@@ -2119,11 +2134,11 @@ emlxs_dump_os_version(
 	buf2 = (char *)kmem_zalloc(buf2_size, KM_SLEEP);
 
 	/* First, write the OS Name string into the buffer */
-	(void) strcpy(buf1, utsname.sysname);
+	(void) strlcpy(buf1, utsname.sysname, buf1_size);
 
 	/* Second, write the Version Info into the buffer */
-	(void) sprintf(buf2, ", %s", utsname.release);
-	(void) strcat(buf1, buf2);
+	(void) snprintf(buf2, buf2_size, ", %s", utsname.release);
+	(void) strlcat(buf1, buf2, buf1_size);
 
 	status =
 	    emlxs_dump_string_txtfile(fpTxtFile, buf1, LEGEND_REV_INFO,
@@ -2161,18 +2176,18 @@ emlxs_dump_drv_version(
 	buf2 = (char *)kmem_zalloc(buf2_size, KM_SLEEP);
 
 	/* Write the Driver Type into the buffer */
-	(void) strcpy(buf1, "Driver Type: ");
-	(void) strcat(buf1, DUMP_DRV_LEADVILLE);
+	(void) strlcpy(buf1, "Driver Type: ", buf1_size);
+	(void) strlcat(buf1, DUMP_DRV_LEADVILLE, buf1_size);
 
 	/* Write the Driver Name into the buffer */
-	(void) sprintf(buf2, "%s", DRIVER_NAME);
-	(void) strcat(buf1, "\n Driver Name: ");
-	(void) strcat(buf1, buf2);
+	(void) snprintf(buf2, buf2_size, "%s", DRIVER_NAME);
+	(void) strlcat(buf1, "\n Driver Name: ", buf1_size);
+	(void) strlcat(buf1, buf2, buf1_size);
 
 	/* Write the Driver Version into the buffer */
-	(void) sprintf(buf2, "%s", emlxs_version);
-	(void) strcat(buf1, "\n Driver Version: ");
-	(void) strcat(buf1, buf2);
+	(void) snprintf(buf2, buf2_size, "%s", emlxs_version);
+	(void) strlcat(buf1, "\n Driver Version: ", buf1_size);
+	(void) strlcat(buf1, buf2, buf1_size);
 
 	status =
 	    emlxs_dump_string_txtfile(fpTxtFile, buf1, LEGEND_REV_INFO,
@@ -2207,7 +2222,7 @@ emlxs_dump_file_create(
 	if (fpCeeFile) {
 		*fpCeeFile = NULL;
 
-		if ((hba->model_info.device_id == PCI_DEVICE_ID_LP21000_M) ||
+		if ((hba->model_info.device_id == PCI_DEVICE_ID_HORNET) ||
 		    (hba->model_info.chip == EMLXS_BE2_CHIP) ||
 		    (hba->model_info.chip == EMLXS_BE3_CHIP)) {
 			if ((*fpCeeFile =
@@ -2262,7 +2277,7 @@ emlxs_dump_file_terminate(
 	}
 
 	if (fpCeeFile) {
-		if (hba->model_info.device_id == PCI_DEVICE_ID_LP21000_M) {
+		if (hba->model_info.device_id == PCI_DEVICE_ID_HORNET) {
 			(void) emlxs_fprintf(fpCeeFile, "Dump File End\n");
 		}
 
@@ -2555,8 +2570,9 @@ emlxs_dump_table_read(
 			return (1);
 		}
 
-		(void) sprintf(buf2, "\n Addr=%08x: ", mb->un.varDmp.base_adr);
-		(void) strcat(buf1, buf2);
+		(void) snprintf(buf2, sizeof (buf2), "\n Addr=%08x: ",
+		    mb->un.varDmp.base_adr);
+		(void) strlcat(buf1, buf2, size);
 
 		entry.un.PortBlock.un.w[0] = mb->un.varWords[4];
 		*pDumpTableEntry++ = mb->un.varWords[4];
@@ -2564,9 +2580,9 @@ emlxs_dump_table_read(
 		switch (entry.un.PortBlock.un.s.sid) {
 			/* New Dump Table */
 		case SID_ID01:
-			(void) sprintf(buf2, "w0=%08x",
+			(void) snprintf(buf2, sizeof (buf2), "w0=%08x",
 			    entry.un.PortBlock.un.w[0]);
-			(void) strcat(buf1, buf2);
+			(void) strlcat(buf1, buf2, size);
 			DumpTableAddr += 4;
 			break;
 
@@ -2574,27 +2590,27 @@ emlxs_dump_table_read(
 		/* New Dump Table */
 		case SID_ID02:
 		case SID_ID03:
-			(void) sprintf(buf2, "w0=%08x",
+			(void) snprintf(buf2, sizeof (buf2), "w0=%08x",
 			    entry.un.PortBlock.un.w[0]);
-			(void) strcat(buf1, buf2);
+			(void) strlcat(buf1, buf2, size);
 			DumpTableAddr += 4;
 			break;
 #else
 			/* New Dump Table */
 		case SID_ID02:
 		case SID_ID03:
-			(void) sprintf(buf2, "w0=%08x",
+			(void) snprintf(buf2, sizeof (buf2), "w0=%08x",
 			    entry.un.PortBlock.un.w[0]);
-			(void) strcat(buf1, buf2);
+			(void) strlcat(buf1, buf2, size);
 			fDone = TRUE;
 			break;
 #endif /* CC_DUMP_USE_ALL_TABLES */
 
 			/* Dump Table(s) Termination - all done */
 		case SID_TERM:
-			(void) sprintf(buf2, "w0=%08x",
+			(void) snprintf(buf2, sizeof (buf2), "w0=%08x",
 			    entry.un.PortBlock.un.w[0]);
-			(void) strcat(buf1, buf2);
+			(void) strlcat(buf1, buf2, size);
 			fDone = TRUE;
 			break;
 
@@ -2603,10 +2619,10 @@ emlxs_dump_table_read(
 			entry.un.PortBlock.un.w[1] = mb->un.varWords[5];
 			*pDumpTableEntry++ = mb->un.varWords[5];
 
-			(void) sprintf(buf2, "w0=%08x, w1=%08x",
+			(void) snprintf(buf2, sizeof (buf2), "w0=%08x, w1=%08x",
 			    entry.un.PortBlock.un.w[0],
 			    entry.un.PortBlock.un.w[1]);
-			(void) strcat(buf1, buf2);
+			(void) strlcat(buf1, buf2, size);
 			DumpTableAddr += 8;
 			break;
 		}
@@ -2657,7 +2673,7 @@ emlxs_dump_hba_memory(
 	uint8_t *p1;
 	uint32_t portAddr;
 	int fSwap = FALSE;
-	uint32_t offset;
+	uint32_t offset = 0;
 	uint32_t wcount;
 	uint32_t total = 0;
 
@@ -3246,7 +3262,7 @@ emlxs_dump_menlo_log(
 	uint32_t PanicLogEntryCount;
 	uint32_t PanicLogEntrySize;
 
-	if (hba->model_info.device_id != PCI_DEVICE_ID_LP21000_M) {
+	if (hba->model_info.device_id != PCI_DEVICE_ID_HORNET) {
 		return (DFC_INVALID_ADAPTER);
 	}
 
@@ -3280,20 +3296,21 @@ emlxs_dump_menlo_log(
 	pLcEntry = (menlo_log_t *)&pLcBuf->log_cfg.data;
 
 	buf1[0] = 0;
-	(void) sprintf(buf2, "LogId   Entries   Size   Name");
-	(void) strcat(buf1, buf2);
-	(void) sprintf(buf2, "\n-----   -------   ----   ----");
-	(void) strcat(buf1, buf2);
+	(void) snprintf(buf2, sizeof (buf2), "LogId   Entries   Size   Name");
+	(void) strlcat(buf1, buf2, sizeof (buf1));
+	(void) snprintf(buf2, sizeof (buf2), "\n-----   -------   ----   ----");
+	(void) strlcat(buf1, buf2, sizeof (buf1));
 
 	RmStatus = emlxs_dump_string_txtfile(fpCeeFile, buf1, 0, 0, 1);
 
 	for (i = 0; i < (int)NumLogs; i++) {
 		buf1[0] = 0;
-		(void) sprintf(buf2, "\n %2d      %4d    %4d    %s",
+		(void) snprintf(buf2, sizeof (buf2),
+		    "\n %2d      %4d    %4d    %s",
 		    pLcEntry[i].id,
 		    pLcEntry[i].num_entries,
 		    pLcEntry[i].entry_size, pLcEntry[i].name);
-		(void) strcat(buf1, buf2);
+		(void) strlcat(buf1, buf2, sizeof (buf1));
 		RmStatus =
 		    emlxs_dump_string_txtfile(fpCeeFile, buf1, 0, 0, 1);
 	}
@@ -3315,17 +3332,17 @@ emlxs_dump_menlo_log(
 
 		/* print a caption for the current log */
 		buf1[0] = 0;
-		(void) sprintf(buf2, "\n\nLog %d:", i);
-		(void) strcat(buf1, buf2);
-		(void) sprintf(buf2, " %s", pLcEntry[i].name);
-		(void) strcat(buf1, buf2);
-		(void) sprintf(buf2, "\n");
+		(void) snprintf(buf2, sizeof (buf2), "\n\nLog %d:", i);
+		(void) strlcat(buf1, buf2, sizeof (buf1));
+		(void) snprintf(buf2, sizeof (buf2), " %s", pLcEntry[i].name);
+		(void) strlcat(buf1, buf2, sizeof (buf1));
+		(void) snprintf(buf2, sizeof (buf2), "\n");
 
 		for (j = 0; j < 75; j++) {
-			(void) strcat(buf2, "-");
+			(void) strlcat(buf2, "-", sizeof (buf2));
 		}
 
-		(void) strcat(buf1, buf2);
+		(void) strlcat(buf1, buf2, sizeof (buf1));
 		RmStatus =
 		    emlxs_dump_string_txtfile(fpCeeFile, buf1, 0, 0, 1);
 
@@ -3349,9 +3366,9 @@ emlxs_dump_menlo_log(
 				    (char *)&(pLogEntry[j *
 				    pLcEntry[i].entry_size]);
 				buf1[0] = 0;
-				(void) sprintf(buf2, "\n%3d: %s", j,
-				    pLogString);
-				(void) strcat(buf1, buf2);
+				(void) snprintf(buf2, sizeof (buf2),
+				    "\n%3d: %s", j, pLogString);
+				(void) strlcat(buf1, buf2, sizeof (buf1));
 				RmStatus =
 				    emlxs_dump_string_txtfile(fpCeeFile, buf1,
 				    0, 0, 1);
@@ -3364,8 +3381,9 @@ emlxs_dump_menlo_log(
 			pLogString =
 			    (char *)&(pLogEntry[j * pLcEntry[i].entry_size]);
 			buf1[0] = 0;
-			(void) sprintf(buf2, "\n%3d: %s", j, pLogString);
-			(void) strcat(buf1, buf2);
+			(void) snprintf(buf2, sizeof (buf2), "\n%3d: %s", j,
+			    pLogString);
+			(void) strlcat(buf1, buf2, sizeof (buf1));
 			RmStatus =
 			    emlxs_dump_string_txtfile(fpCeeFile, buf1, 0, 0,
 			    1);
@@ -3375,12 +3393,12 @@ emlxs_dump_menlo_log(
 	/* Now issue a GetPanicLog command, which gives us the Panic Log */
 
 	/* print a caption for the current log */
-	(void) strcpy(buf1, LEGEND_MENLO_LOG_PANIC_REGS);
+	(void) strlcpy(buf1, LEGEND_MENLO_LOG_PANIC_REGS, sizeof (buf1));
 	buf2[0] = 0;
 	for (j = 0; j < 75; j++) {
-		(void) strcat(buf2, "-");
+		(void) strlcat(buf2, "-", sizeof (buf2));
 	}
-	(void) strcat(buf1, buf2);
+	(void) strlcat(buf1, buf2, sizeof (buf1));
 	RmStatus = emlxs_dump_string_txtfile(fpCeeFile, buf1, 0, 0, 1);
 
 	pPlBuf = (menlo_rsp_t *)kmem_zalloc(PlBufSize, KM_SLEEP);
@@ -3389,55 +3407,57 @@ emlxs_dump_menlo_log(
 
 	if (RmStatus == 0) {
 		buf1[0] = 0;
-		(void) sprintf(buf2, "\nType         = %x",
+		(void) snprintf(buf2, sizeof (buf2), "\nType         = %x",
 		    pPlBuf->panic_log.type);
-		(void) strcat(buf1, buf2);
-		(void) sprintf(buf2, "\nRegsEpc      = %08x",
+		(void) strlcat(buf1, buf2, sizeof (buf1));
+		(void) snprintf(buf2, sizeof (buf2), "\nRegsEpc      = %08x",
 		    pPlBuf->panic_log.regs_epc);
-		(void) strcat(buf1, buf2);
-		(void) sprintf(buf2, "\nRegsCp0Cause = %08x",
+		(void) strlcat(buf1, buf2, sizeof (buf1));
+		(void) snprintf(buf2, sizeof (buf2), "\nRegsCp0Cause = %08x",
 		    pPlBuf->panic_log.regs_cp0_cause);
-		(void) strcat(buf1, buf2);
-		(void) sprintf(buf2, "\nRegsCp0Stat  = %08x",
+		(void) strlcat(buf1, buf2, sizeof (buf1));
+		(void) snprintf(buf2, sizeof (buf2), "\nRegsCp0Stat  = %08x",
 		    pPlBuf->panic_log.regs_cp0_status);
-		(void) strcat(buf1, buf2);
+		(void) strlcat(buf1, buf2, sizeof (buf1));
 		RmStatus =
 		    emlxs_dump_string_txtfile(fpCeeFile, buf1, 0, 0, 1);
 
 		buf1[0] = 0;
 		for (i = 0; i < MENLO_NUM_GP_REGS; i++) {
-			(void) sprintf(buf2, "\nRegsGp[%02x]   = %08x", i,
+			(void) snprintf(buf2, sizeof (buf2),
+			    "\nRegsGp[%02x]   = %08x", i,
 			    pPlBuf->panic_log.regs_gp[i]);
-			(void) strcat(buf1, buf2);
+			(void) strlcat(buf1, buf2, sizeof (buf1));
 		}
 		RmStatus =
 		    emlxs_dump_string_txtfile(fpCeeFile, buf1, 0, 0, 1);
 
 		buf1[0] = 0;
-		(void) sprintf(buf2, "\nLogPresent   = %08x",
+		(void) snprintf(buf2, sizeof (buf2), "\nLogPresent   = %08x",
 		    pPlBuf->panic_log.log_present);
-		(void) strcat(buf1, buf2);
+		(void) strlcat(buf1, buf2, sizeof (buf1));
 		PanicLogEntryCount = pPlBuf->panic_log.num_entries;
-		(void) sprintf(buf2, "\nNumEntries   = %08x",
+		(void) snprintf(buf2, sizeof (buf2), "\nNumEntries   = %08x",
 		    PanicLogEntryCount);
-		(void) strcat(buf1, buf2);
+		(void) strlcat(buf1, buf2, sizeof (buf1));
 		PanicLogEntrySize = pPlBuf->panic_log.entry_size;
-		(void) sprintf(buf2, "\nEntrySize    = %d.",
+		(void) snprintf(buf2, sizeof (buf2), "\nEntrySize    = %d.",
 		    PanicLogEntrySize);
-		(void) strcat(buf1, buf2);
-		(void) sprintf(buf2, "\nHead Entry   = %d.",
+		(void) strlcat(buf1, buf2, sizeof (buf1));
+		(void) snprintf(buf2, sizeof (buf2), "\nHead Entry   = %d.",
 		    pPlBuf->panic_log.head);
-		(void) strcat(buf1, buf2);
+		(void) strlcat(buf1, buf2, sizeof (buf1));
 		RmStatus =
 		    emlxs_dump_string_txtfile(fpCeeFile, buf1, 0, 0, 1);
 
 		/* print a caption for the current log */
-		(void) strcpy(buf1, LEGEND_MENLO_LOG_PANIC_LOGS);
+		(void) strlcpy(buf1, LEGEND_MENLO_LOG_PANIC_LOGS,
+		    sizeof (buf1));
 		buf2[0] = 0;
 		for (j = 0; j < 75; j++) {
-			(void) strcat(buf2, "-");
+			(void) strlcat(buf2, "-", sizeof (buf2));
 		}
-		(void) strcat(buf1, buf2);
+		(void) strlcat(buf1, buf2, sizeof (buf2));
 		RmStatus =
 		    emlxs_dump_string_txtfile(fpCeeFile, buf1, 0, 0, 1);
 
@@ -3459,9 +3479,9 @@ emlxs_dump_menlo_log(
 				    (char *)&(pLogEntry[j *
 				    PanicLogEntrySize]);
 				buf1[0] = 0;
-				(void) sprintf(buf2, "\n%3d: %s", j,
-				    pLogString);
-				(void) strcat(buf1, buf2);
+				(void) snprintf(buf2, sizeof (buf2),
+				    "\n%3d: %s", j, pLogString);
+				(void) strlcat(buf1, buf2, sizeof (buf2));
 				RmStatus =
 				    emlxs_dump_string_txtfile(fpCeeFile, buf1,
 				    0, 0, 1);
@@ -3473,8 +3493,9 @@ emlxs_dump_menlo_log(
 			pLogString =
 			    (char *)&(pLogEntry[j * PanicLogEntrySize]);
 			buf1[0] = 0;
-			(void) sprintf(buf2, "\n%3d: %s", j, pLogString);
-			(void) strcat(buf1, buf2);
+			(void) snprintf(buf2, sizeof (buf2), "\n%3d: %s", j,
+			    pLogString);
+			(void) strlcat(buf1, buf2, sizeof (buf2));
 			RmStatus =
 			    emlxs_dump_string_txtfile(fpCeeFile, buf1, 0, 0,
 			    1);
@@ -3649,7 +3670,7 @@ emlxs_dump_saturn_log(
 	    != DDI_FM_OK) {
 		EMLXS_MSGF(EMLXS_CONTEXT,
 		    &emlxs_invalid_dma_handle_msg,
-		    "emlxs_dump_saturn_log: hdl=%p",
+		    "dump_saturn_log: hdl=%p",
 		    mp->dma_handle);
 		status = 1;
 	}
@@ -3963,27 +3984,29 @@ emlxs_dump_temp_event(
 	/* keep trying to dump more stuff. */
 
 	/* Write a warning at the top of the file */
-	(void) strcpy(sBuf1, "WARNING: HBA Temperature Event:\n");
+	(void) strlcpy(sBuf1, "WARNING: HBA Temperature Event:\n",
+	    sizeof (sBuf1));
 	switch (tempType) {
 	case TEMP_TYPE_CRITICAL:
-		(void) sprintf(sBuf2, " Event Type  = %d (Critical)\n",
-		    tempType);
+		(void) snprintf(sBuf2, sizeof (sBuf2),
+		    " Event Type  = %d (Critical)\n", tempType);
 		break;
 	case TEMP_TYPE_THRESHOLD:
-		(void) sprintf(sBuf2, " Event Type  = %d (Threshold)\n",
-		    tempType);
+		(void) snprintf(sBuf2, sizeof (sBuf2),
+		    " Event Type  = %d (Threshold)\n", tempType);
 		break;
 	case TEMP_TYPE_NORMAL:
-		(void) sprintf(sBuf2, " Event Type  = %d (Normal)\n",
-		    tempType);
+		(void) snprintf(sBuf2, sizeof (sBuf2),
+		    " Event Type  = %d (Normal)\n", tempType);
 		break;
 	default:
-		(void) sprintf(sBuf2, " Unknown Event Type  = %d\n", tempType);
+		(void) snprintf(sBuf2, sizeof (sBuf2),
+		    " Unknown Event Type  = %d\n", tempType);
 		break;
 	}
-	(void) sprintf(sBuf3, " Temperature = %d\n\n", temp);
-	(void) strcat(sBuf1, sBuf2);
-	(void) strcat(sBuf1, sBuf3);
+	(void) snprintf(sBuf3, sizeof (sBuf3), " Temperature = %d\n\n", temp);
+	(void) strlcat(sBuf1, sBuf2, sizeof (sBuf1));
+	(void) strlcat(sBuf1, sBuf3, sizeof (sBuf1));
 
 	(void) emlxs_dump_string_txtfile(fpTxtFile, sBuf1, 0, 0, 0);
 
@@ -4044,7 +4067,9 @@ emlxs_dump_drv_event(
 
 	(void) emlxs_dump_hba(hba, fpTxtFile, fpDmpFile);
 
-	(void) emlxs_set_hba_mode(hba, DDI_ONDI);
+	if (hba->sli_mode <= EMLXS_HBA_SLI3_MODE) {
+		(void) emlxs_set_hba_mode(hba, DDI_ONDI);
+	}
 
 	status = emlxs_menlo_set_mode(hba, MENLO_MAINTENANCE_MODE_ENABLE);
 	if (status == 0) {
@@ -4145,7 +4170,7 @@ emlxs_dump(emlxs_hba_t *hba, uint32_t type, uint32_t temp_type, uint32_t temp)
 		mutex_exit(&EMLXS_PORT_LOCK);
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fw_dump_msg,
-		    "emlxs_dump: Dump disabled.");
+		    "dump: Dump disabled.");
 
 		return;
 	}
@@ -4155,7 +4180,7 @@ emlxs_dump(emlxs_hba_t *hba, uint32_t type, uint32_t temp_type, uint32_t temp)
 		mutex_exit(&EMLXS_PORT_LOCK);
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fw_dump_msg,
-		    "emlxs_dump: Dump already in progress.");
+		    "dump: Dump already in progress.");
 
 		return;
 	}
@@ -4174,7 +4199,7 @@ emlxs_dump(emlxs_hba_t *hba, uint32_t type, uint32_t temp_type, uint32_t temp)
 			mutex_exit(&EMLXS_PORT_LOCK);
 
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fw_dump_msg,
-			    "emlxs_dump: Unable to allocate temp object.");
+			    "dump: Unable to allocate temp object.");
 
 			return;
 		}
@@ -4188,7 +4213,7 @@ emlxs_dump(emlxs_hba_t *hba, uint32_t type, uint32_t temp_type, uint32_t temp)
 		mutex_exit(&EMLXS_PORT_LOCK);
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fw_dump_msg,
-		    "emlxs_dump: Error: Unknown dump type. (%x)",
+		    "dump: Error: Unknown dump type. (%x)",
 		    type);
 
 		return;
@@ -4223,7 +4248,7 @@ emlxs_dump_wait(emlxs_hba_t *hba)
 {
 	/* Wait for the Dump flag to clear */
 	while ((hba->flag & FC_DUMP_ACTIVE)) {
-		DELAYMS(1000);
+		BUSYWAIT_MS(1000);
 	}
 
 } /* emlxs_dump_wait() */

@@ -5,8 +5,8 @@
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
  *
- * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or http://www.opensolaris.org/os/licensing.
+ * You can obtain a copy of the license at
+ * http://www.opensource.org/licenses/cddl1.txt.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2010 Emulex.  All rights reserved.
+ * Copyright (c) 2004-2011 Emulex. All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -192,73 +192,6 @@ extern "C" {
 /* name tag from Table 103 v 1.8 pp 123 */
 #define	AUTH_NODE_NAME		0x0002
 #define	AUTH_PORT_NAME		0x0003
-
-/*
- * Sysevent support
- */
-/* ddi_log_sysevent() vendors */
-#define	DDI_VENDOR_EMLX		"EMLXS"
-
-/* Class */
-#define	EC_EMLXS	"EC_emlxs"
-
-/* Subclass */
-#define	ESC_EMLXS_01	"ESC_emlxs_issue_auth_negotiate"
-#define	ESC_EMLXS_02	"ESC_emlxs_cmpl_auth_negotiate_issue"
-
-#define	ESC_EMLXS_03	"ESC_emlxs_rcv_auth_msg_auth_negotiate_issue"
-#define	ESC_EMLXS_04	"ESC_emlxs_cmpl_auth_msg_auth_negotiate_issue"
-
-#define	ESC_EMLXS_05	"ESC_emlxs_rcv_auth_msg_unmapped_node"
-#define	ESC_EMLXS_06	"ESC_emlxs_issue_dhchap_challenge"
-#define	ESC_EMLXS_07	"ESC_emlxs_cmpl_dhchap_challenge_issue"
-
-#define	ESC_EMLXS_08	"ESC_emlxs_rcv_auth_msg_dhchap_challenge_cmpl_wait4next"
-
-#define	ESC_EMLXS_09	"ESC_emlxs_rcv_auth_msg_auth_negotiate_rcv"
-#define	ESC_EMLXS_10	"ESC_emlxs_cmpl_auth_msg_auth_negotiate_rcv"
-
-#define	ESC_EMLXS_11 	"ESC_emlxs_cmpl_cmpl_dhchap_reply_issue"
-#define	ESC_EMLXS_12	"ESC_emlxs_cmpl_dhchap_reply_issue"
-#define	ESC_EMLXS_13	"ESC_emlxs_cmpl_auth_msg_dhchap_reply_issue"
-
-#define	ESC_EMLXS_14	"ESC_emlxs_cmpl_auth_msg_auth_negotiate_cmpl_wait4next"
-
-#define	ESC_EMLXS_15	"ESC_emlxs_issue_dhchap_success"
-
-#define	ESC_EMLXS_16	"ESC_emlxs_rcv_auth_msg_dhchap_challenge_issue"
-#define	ESC_EMLXS_17	"ESC_emlxs_cmpl_auth_msg_dhchap_challenge_issue"
-
-#define	ESC_EMLXS_18	"ESC_emlxs_rcv_auth_msg_dhchap_reply_issue"
-
-#define	ESC_EMLXS_19 \
-	"ESC_emlxs_cmpl_auth_msg_dhchap_challenge_cmpl_wait4next"
-
-#define	ESC_EMLXS_20	"ESC_emlxs_rcv_auth_msg_dhchap_reply_cmpl_wait4next"
-#define	ESC_EMLXS_21	"ESC_emlxs_cmpl_dhchap_success_issue"
-#define	ESC_EMLXS_22	"ESC_emlxs_cmpl_auth_msg_dhchap_success_issue"
-
-#define	ESC_EMLXS_23	"ESC_emlxs_cmpl_auth_msg_dhchap_reply_cmpl_wait4next"
-
-#define	ESC_EMLXS_24	"ESC_emlxs_rcv_auth_msg_dhchap_success_issue_wait4next"
-#define	ESC_EMLXS_25	"ESC_emlxs_cmpl_auth_msg_dhchap_success_issue_wait4next"
-
-#define	ESC_EMLXS_26	"ESC_emlxs_rcv_auth_msg_dhchap_success_cmpl_wait4next"
-#define	ESC_EMLXS_27	"ESC_emlxs_cmpl_auth_msg_dhchap_success_cmpl_wait4next"
-
-#define	ESC_EMLXS_28	"ESC_emlxs_issue_auth_reject"
-#define	ESC_EMLXS_29	"ESC_emlxs_cmpl_auth_reject_issue"
-
-#define	ESC_EMLXS_30	"ESC_emlxs_rcv_auth_msg_npr_node"
-
-#define	ESC_EMLXS_31	"ESC_emlxs_dhc_reauth_timeout"
-
-#define	ESC_EMLXS_32	"ESC_emlxs_dhc_authrsp_timeout"
-
-#define	ESC_EMLXS_33	"ESC_emlxs_ioctl_auth_setcfg"
-#define	ESC_EMLXS_34	"ESC_emlxs_ioctl_auth_setpwd"
-#define	ESC_EMLXS_35	"ESC_emlxs_ioctl_auth_delcfg"
-#define	ESC_EMLXS_36	"ESC_emlxs_ioctl_auth_delpwd"
 
 
 /* From HBAnyware dfc lib FC-SP */

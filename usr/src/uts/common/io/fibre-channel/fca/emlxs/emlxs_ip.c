@@ -5,8 +5,8 @@
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
  *
- * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or http://www.opensolaris.org/os/licensing.
+ * You can obtain a copy of the license at
+ * http://www.opensource.org/licenses/cddl1.txt.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -20,10 +20,9 @@
  */
 
 /*
- * Copyright 2010 Emulex.  All rights reserved.
+ * Copyright (c) 2004-2011 Emulex. All rights reserved.
  * Use is subject to license terms.
  */
-
 
 #include <emlxs.h>
 
@@ -198,7 +197,7 @@ emlxs_ip_handle_unsol_req(emlxs_port_t *port, CHANNEL *cp, IOCBQ *iocbq,
 	for (i = 0; i < MAX_VPORTS; i++) {
 		port = &VPORT(i);
 
-		if (!(port->flag & EMLXS_PORT_BOUND) ||
+		if (!(port->flag & EMLXS_INI_BOUND) ||
 		    !(port->flag & EMLXS_PORT_IP_UP)) {
 			continue;
 		}
@@ -384,6 +383,7 @@ emlxs_handle_create_xri(emlxs_hba_t *hba, CHANNEL *cp, IOCBQ *iocbq)
 	NODELIST *ndlp;
 	fc_packet_t *pkt;
 	emlxs_buf_t *sbp;
+	int32_t rval = 0;
 
 	cmd = &iocbq->iocb;
 
@@ -391,7 +391,8 @@ emlxs_handle_create_xri(emlxs_hba_t *hba, CHANNEL *cp, IOCBQ *iocbq)
 
 	if (!sbp) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_stray_ip_completion_msg,
-		    "create_xri: cmd=0x%x iotag=0x%x status=0x%x w4=0x%x",
+		    "create_xri: cmd=0x%x iotag=0x%x status=0x%x w4=0x%x. "
+		    "NULL sbp found.",
 		    cmd->ULPCOMMAND, cmd->ULPIOTAG, cmd->ULPSTATUS,
 		    cmd->un.ulpWord[4]);
 
@@ -401,9 +402,21 @@ emlxs_handle_create_xri(emlxs_hba_t *hba, CHANNEL *cp, IOCBQ *iocbq)
 	/* check for first xmit completion in sequence */
 	ndlp = (NODELIST *)sbp->node;
 
+	if (!ndlp) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_bad_ip_completion_msg,
+		    "create_xri: cmd=0x%x iotag=0x%x status=0x%x w4=0x%x. "
+		    "NULL node found.",
+		    cmd->ULPCOMMAND, cmd->ULPIOTAG, cmd->ULPSTATUS,
+		    cmd->un.ulpWord[4]);
+
+		rval = EIO;
+		goto done;
+	}
+
 	if (cmd->ULPSTATUS) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_bad_ip_completion_msg,
-		    "create_xri: cmd=0x%x iotag=0x%x status=0x%x w4=0x%x",
+		    "create_xri: cmd=0x%x iotag=0x%x status=0x%x w4=0x%x. "
+		    "Completion error.",
 		    cmd->ULPCOMMAND, cmd->ULPIOTAG, cmd->ULPSTATUS,
 		    cmd->un.ulpWord[4]);
 
@@ -411,7 +424,8 @@ emlxs_handle_create_xri(emlxs_hba_t *hba, CHANNEL *cp, IOCBQ *iocbq)
 		ndlp->nlp_flag[cp->channelno] &= ~NLP_RPI_XRI;
 		mutex_exit(&EMLXS_TX_CHANNEL_LOCK);
 
-		return (EIO);
+		rval = EIO;
+		goto done;
 	}
 
 	mutex_enter(&EMLXS_TX_CHANNEL_LOCK);
@@ -423,10 +437,13 @@ emlxs_handle_create_xri(emlxs_hba_t *hba, CHANNEL *cp, IOCBQ *iocbq)
 	    "create_xri completed: DID=0x%x Xri=0x%x iotag=0x%x",
 	    ndlp->nlp_DID, ndlp->nlp_Xri, cmd->ULPIOTAG);
 
+done:
 	pkt = sbp->pkt;
-	emlxs_pkt_free(pkt);
+	if (pkt) {
+		emlxs_pkt_free(pkt);
+	}
 
-	return (0);
+	return (rval);
 
 } /* emlxs_handle_create_xri()  */
 

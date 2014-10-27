@@ -5,8 +5,8 @@
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
  *
- * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or http://www.opensolaris.org/os/licensing.
+ * You can obtain a copy of the license at
+ * http://www.opensource.org/licenses/cddl1.txt.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2010 Emulex.  All rights reserved.
+ * Copyright (c) 2004-2011 Emulex. All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -130,6 +130,9 @@ extern "C" {
 /*
  * Miscellaneous stuff....
  */
+
+#define	MAX_NODE_THROTTLE	2048
+
 /* HBA Mgmt */
 #define	FDMI_DID		((uint32_t)0xfffffa)
 #define	NAMESERVER_DID		((uint32_t)0xfffffc)
@@ -149,10 +152,6 @@ extern "C" {
 
 
 /* defines for type field in fc header */
-#define	FC_ELS_DATA		0x01
-#define	FC_LLC_SNAP		0x05
-#define	FC_FCP_DATA		0x08
-#define	FC_CT_TYPE		0x20
 #define	EMLXS_MENLO_TYPE	0xFE
 
 /* defines for rctl field in fc header */
@@ -446,7 +445,6 @@ typedef SliCtRequest_t SLI_CT_REQUEST;
 /* General PCI Register Definitions */
 /* Refer To The PCI Specification For Detailed Explanations */
 
-/* Register Offsets in little endian format */
 #define	PCI_VENDOR_ID_REGISTER		0x00	/* PCI Vendor ID Reg */
 #define	PCI_DEVICE_ID_REGISTER		0x02	/* PCI Device ID Reg */
 #define	PCI_CONFIG_ID_REGISTER		0x00	/* PCI Configuration ID Reg */
@@ -469,10 +467,30 @@ typedef SliCtRequest_t SLI_CT_REQUEST;
 #define	PCI_SSDID_REGISTER		0x2E
 #define	PCI_EXPANSION_ROM		0x30	/* PCI Expansion ROM Base Reg */
 #define	PCI_CAP_POINTER			0x34
-/* PCI capatability registers are defined in pci.h */
 
-/* PCI Express cap register */
-#define	PCIE_DEVCTL_OFFSET	8
+/* PCI capatability registers are defined in pci.h */
+#define	PCI_CAP_ID_SHIFT			0
+#define	PCI_CAP_ID_MASK				0xff
+#define	PCI_CAP_NEXT_PTR_SHIFT			8
+#define	PCI_CAP_NEXT_PTR_MASK			0xff
+
+/* PCI extended capatability registers are defined in pcie.h */
+#define	PCI_EXT_CAP_MAX_PTR		0x30
+
+#define	PCI_EXT_CAP_ID_MRIOV		0x0000 /* ??? */
+#define	PCI_EXT_CAP_ID_SRIOV		0x0010
+#define	PCI_EXT_CAP_ID_11		0x0011
+#define	PCI_EXT_CAP_ID_12		0x0012
+#define	PCI_EXT_CAP_ID_13		0x0013
+#define	PCI_EXT_CAP_ID_14		0x0014
+#define	PCI_EXT_CAP_ID_15		0x0015
+#define	PCI_EXT_CAP_ID_16		0x0016
+#define	PCI_EXT_CAP_ID_TPH		0x0017
+#define	PCI_EXT_CAP_ID_18		0x0018
+#define	PCI_EXT_CAP_ID_SEC_PCI		0x0019
+
+/* Vendor Specific (VS) register */
+#define	PCI_VS_SLI_INTF_OFFSET	4
 
 /* PCI access methods */
 #define	P_CONF_T1	1
@@ -702,10 +720,46 @@ typedef SliCtRequest_t SLI_CT_REQUEST;
 /* MPU EP Semaphore register (ARM POST) */
 #define	CSR_MPU_EP_SEMAPHORE_OFFSET	0x00AC
 
+/* SLI Status register */
+#define	SLI_STATUS_ERROR		0x80000000
+#define	SLI_STATUS_BE			0x40000000
+#define	SLI_STATUS_OTI			0x20000000
+#define	SLI_STATUS_DUMP_LOCATION	0x04000000
+#define	SLI_STATUS_DUMP_IMAGE_PRESENT	0x02000000
+#define	SLI_STATUS_RESET_NEEDED		0x01000000
+#define	SLI_STATUS_READY		0x00800000
+#define	SLI_STATUS_INTERRUPT_DISABLE	0x00400000
+
+/* SLI Control register */
+#define	SLI_CNTL_BE		0x40000000
+#define	SLI_CNTL_INIT_PORT	0x08000000
+
+/* SLI PHYDEV Control register */
+#define	SLI_PHYDEV_RERROR	0x80000000
+#define	SLI_PHYDEV_INP		0x40000000
+#define	SLI_PHYDEV_IPLD		0x00008000
+#define	SLI_PHYDEV_GPC		0x00004000
+#define	SLI_PHYDEV_GP		0x00002000
+
+#define	SLI_PHYDEV_RC_MASK	0x00000700
+#define	SLI_PHYDEV_RC_UNKNOWN	0x00000000
+#define	SLI_PHYDEV_RC_PROFILE	0x00000100
+#define	SLI_PHYDEV_RC_FACTORY	0x00000200
+
+#define	SLI_PHYDEV_FRL_MASK	0x000000F0
+#define	SLI_PHYDEV_FRL_ALL	0x00000000
+#define	SLI_PHYDEV_FRL_FCOE	0x00000010
+
+#define	SLI_PHYDEV_LC		0x00000008
+#define	SLI_PHYDEV_DD		0x00000004
+#define	SLI_PHYDEV_FRST		0x00000002
+#define	SLI_PHYDEV_DRST		0x00000001
+
 /* POST Stages of interest */
 #define	ARM_POST_FATAL	0x80000000
 #define	ARM_POST_READY	0xc000
 #define	ARM_POST_MASK	0xffff
+#define	ARM_UNRECOVERABLE_ERROR	0xf000
 
 #define	MPU_EP_DL	0x04000000	/* Driverloadedbitmask */
 #define	MPU_EP_ORI	0x08000000	/* OptionROMinstalledbitmask */
@@ -717,14 +771,18 @@ typedef SliCtRequest_t SLI_CT_REQUEST;
 /* BAR2 offsets for principal doorbell registers */
 
 #define	PD_RQ_DB_OFFSET	0x00A0	/* Doorbell notify of posted RQEs */
-
 #define	PD_WQ_DB_OFFSET	0x0040	/* Doorbell notify of posted WQEs */
-
 #define	PD_CQ_DB_OFFSET	0x0120	/* Doorbell notify of processed CQEs or EQEs */
-
 #define	PD_MQ_DB_OFFSET	0x0140	/* Doorbell notify of posted MQEs */
-
 #define	PD_MB_DB_OFFSET	0x0160	/* Doorbell Bootstrap Mailbox */
+
+#define	SLIPORT_SEMAPHORE_OFFSET	0x0400
+#define	SLIPORT_STATUS_OFFSET		0x0404
+#define	SLIPORT_CONTROL_OFFSET		0x0408
+#define	SLIPORT_ERROR1_OFFSET		0x040C
+#define	SLIPORT_ERROR2_OFFSET		0x0410
+#define	PHYSDEV_CONTROL_OFFSET		0x0414
+
 
 /* Doorbell definitions */
 
@@ -752,9 +810,11 @@ typedef SliCtRequest_t SLI_CT_REQUEST;
 /* Sizeof bootstrap mailbox */
 #define	EMLXS_BOOTSTRAP_MB_SIZE	256
 
-#define	MQE_SPECIAL_WORD0	0xFF1234FF	/* Initialize bootstrap wd 0 */
-#define	MQE_SPECIAL_WORD1	0xFF5678FF	/* Initialize bootstrap wd 1 */
+#define	FW_INITIALIZE_WORD0	0xFF1234FF /* Initialize bootstrap wd 0 */
+#define	FW_INITIALIZE_WORD1	0xFF5678FF /* Initialize bootstrap wd 1 */
 
+#define	FW_DEINITIALIZE_WORD0	0xFFAABBFF /* DeInitialize bootstrap wd 0 */
+#define	FW_DEINITIALIZE_WORD1	0xFFCCDDFF /* DeInitialize bootstrap wd 1 */
 
 /* ===================================================================== */
 
@@ -1063,6 +1123,13 @@ typedef struct emlxs_name_type
 } emlxs_name_type_t;
 typedef emlxs_name_type_t NAME_TYPE;
 
+
+/*
+ * Word 1 Bit 31 in common service parameter is overloaded.
+ * Word 1 Bit 31 in FLOGI/FDISC request is multiple NPort request
+ * Word 1 Bit 31 in FLOGI/FDISC response is clean address bit
+ */
+#define	CLEAN_ADDRESS_BIT reqMultipleNPort /* Word 1, bit 31 */
 
 typedef struct emlxs_csp
 {
@@ -1790,18 +1857,28 @@ typedef struct ULP_SGE_64
 	uint32_t	addrLow;	/* Address 0:31 */
 #ifdef EMLXS_BIG_ENDIAN
 	uint32_t	last:1;		/* Last entry in SGL */
-	uint32_t	reserved:11;
-	uint32_t	offset:20;
+	uint32_t	type:4;
+	uint32_t	offset:27;
 #endif
 #ifdef EMLXS_LITTLE_ENDIAN
-	uint32_t	offset:20;
-	uint32_t	reserved:11;
+	uint32_t	offset:27;
+	uint32_t	type:4;
 	uint32_t	last:1;		/* Last entry in SGL */
 #endif
+#define	EMLXS_SGE_TYPE_DATA	0x0
+#define	EMLXS_SGE_TYPE_DIF	0x4
+#define	EMLXS_SGE_TYPE_LSP	0x5
+#define	EMLXS_SGE_TYPE_ENC_DIF	0x6
+#define	EMLXS_SGE_TYPE_ENC_SEED	0x7
+#define	EMLXS_SGE_TYPE_SEED	0x8
+#define	EMLXS_SGE_TYPE_ENC	0x9
+#define	EMLXS_SGE_TYPE_SKIP	0xC
+
 	uint32_t	length;
 #define	EMLXS_MAX_SGE_SIZE	0x10000	/* 64K max length */
 } ULP_SGE64;
 
+#define	EMLXS_XFER_RDY_SIZE	12  /* Payload size of a FCP Transfer Ready */
 
 typedef	struct _BE_PHYS_ADDR
 {
@@ -1826,6 +1903,10 @@ typedef struct
 #define	MAP_POOL_ALLOCATED	0x00000001
 #define	MAP_BUF_ALLOCATED	0x00000002
 #define	MAP_TABLE_ALLOCATED	0x00000004
+
+#ifdef SFCT_SUPPORT
+	void		*fct_private;
+#endif /* SFCT_SUPPORT */
 } MATCHMAP;
 
 
@@ -2143,6 +2224,10 @@ typedef struct emlxs_fw_image
 #define	SLI_FCODE_REVISION_CHECK(x, y)	(x == y)
 
 
+/* ************ OBJ firmware ************** */
+#define	OBJ_MAX_XFER_SIZE	32768
+
+
 /* ************ BladeEngine ************** */
 #define	BE_SIGNATURE		"ServerEngines"
 #define	BE_DIR_SIGNATURE	"*** SE FLAS"
@@ -2312,20 +2397,26 @@ typedef struct emlxs_be2_flash_dir
 
 
 /* FLASH ENTRY TYPES */
-#define	BE_FLASHTYPE_NCSI_FIRMWARE	0x10 /* BE3 */
-#define	BE_FLASHTYPE_PXE_BIOS		0x20
-#define	BE_FLASHTYPE_FCOE_BIOS		0x21
-#define	BE_FLASHTYPE_ISCSI_BIOS		0x22
-#define	BE_FLASHTYPE_FLASH_ISM		0x30 /* BE3 */
-#define	BE_FLASHTYPE_ISCSI_FIRMWARE	0xA0
-#define	BE_FLASHTYPE_ISCSI_BACKUP	0xB0
-#define	BE_FLASHTYPE_FCOE_FIRMWARE	0xA2
-#define	BE_FLASHTYPE_FCOE_BACKUP	0xB2
-#define	BE_FLASHTYPE_REDBOOT		0xE0
+#define	BE_FLASHTYPE_NCSI_FIRMWARE		0x10 /* BE3 */
+#define	BE_FLASHTYPE_PXE_BIOS			0x20
+#define	BE_FLASHTYPE_FCOE_BIOS			0x21
+#define	BE_FLASHTYPE_ISCSI_BIOS			0x22
+#define	BE_FLASHTYPE_FLASH_ISM			0x30 /* BE3 */
+#define	BE_FLASHTYPE_ISCSI_FIRMWARE		0xA0
+#define	BE_FLASHTYPE_ISCSI_FIRMWARE_COMP	0xA1
+#define	BE_FLASHTYPE_FCOE_FIRMWARE		0xA2
+#define	BE_FLASHTYPE_FCOE_FIRMWARE_COMP		0xA3
+#define	BE_FLASHTYPE_ISCSI_BACKUP		0xB0
+#define	BE_FLASHTYPE_ISCSI_BACKUP_COMP		0xB1
+#define	BE_FLASHTYPE_FCOE_BACKUP		0xB2
+#define	BE_FLASHTYPE_FCOE_BACKUP_COMP		0xB3
+#define	BE_FLASHTYPE_PHY_FIRMWARE		0xC0 /* 10Base-T */
+#define	BE_FLASHTYPE_REDBOOT			0xE0
 
 /* Flash types in download order */
 typedef enum emlxs_be_flashtypes
 {
+	PHY_FIRMWARE_FLASHTYPE,
 	NCSI_FIRMWARE_FLASHTYPE,
 	ISCSI_FIRMWARE_FLASHTYPE,
 	ISCSI_BACKUP_FLASHTYPE,
@@ -2367,6 +2458,42 @@ typedef struct emlxs_be_fw_image
 
 	emlxs_be_fw_file_t file[BE_MAX_FLASHTYPES];
 } emlxs_be_fw_image_t;
+
+
+typedef struct emlxs_obj_header
+{
+	uint32_t 	FileSize;
+
+#ifdef EMLXS_BIG_ENDIAN
+	uint16_t 	MagicNumHi;
+	uint16_t 	MagicNumLo;
+
+	uint32_t 	FileType:8;
+	uint32_t 	Id:8;
+	uint32_t 	rsvd0:16;
+#endif
+
+#ifdef EMLXS_LITTLE_ENDIAN
+	uint16_t 	MagicNumLo;
+	uint16_t 	MagicNumHi;
+
+	uint32_t 	rsvd0:16;
+	uint32_t 	Id:8;
+	uint32_t 	FileType:8;
+#endif
+
+#define	OBJ_MAGIC_NUM_HI		0xFEAA
+#define	OBJ_MAGIC_NUM_LO		0x0001
+
+#define	OBJ_GRP_FILE_TYPE		0xF7
+
+#define	OBJ_LANCER_ID			0xA2
+
+	char		RevName[128];
+	char		Date[12];
+	char		Revision[32];
+} emlxs_obj_header_t;
+
 
 #ifdef	__cplusplus
 }
