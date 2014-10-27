@@ -1133,8 +1133,8 @@ static struct lx_sysent sysents[] = {
 	{"rt_sigprocmask", lx_rt_sigprocmask,	0,		4}, /* 14 */
 	{"rt_sigreturn", lx_rt_sigreturn,	0,		0}, /* 15 */
 	{"ioctl",	lx_ioctl,		0,		3}, /* 16 */
-	{"pread64",	lx_pread64,		0,		5}, /* 17 */
-	{"pwrite64",	lx_pwrite64,		0,		5}, /* 18 */
+	{"pread64",	lx_pread,		0,		4}, /* 17 */
+	{"pwrite64",	lx_pwrite,		0,		4}, /* 18 */
 	{"readv",	lx_readv,		0,		3}, /* 19 */
 	{"writev",	lx_writev,		0,		3}, /* 20 */
 	{"access",	lx_access,		0,		2}, /* 21 */
