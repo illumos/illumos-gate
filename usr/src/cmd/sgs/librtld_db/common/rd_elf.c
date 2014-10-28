@@ -303,26 +303,28 @@ _rd_reset32(struct rd_agent *rap)
 	while ((ps_pbrandname != NULL) &&
 	    (ps_pbrandname(php, brandname, MAXPATHLEN) == PS_OK)) {
 		const char *isa = "";
-		const char *nroot = zone_get_nroot();
 
 #ifdef _LP64
 		isa = MSG_ORIG(MSG_DB_64BIT_PREFIX);
 #endif /* _LP64 */
 
-		if (nroot == NULL)
-			nroot = "";
-
-		if (rtld_db_helper_path[0] != '\0')
+		if (rtld_db_helper_path[0] != '\0') {
 			(void) snprintf(brandlib, MAXPATHLEN,
 			    MSG_ORIG(MSG_DB_BRAND_HELPERPATH_PREFIX),
-			    nroot, rtld_db_helper_path,
+			    rtld_db_helper_path,
 			    MSG_ORIG(MSG_DB_HELPER_PREFIX), brandname, isa,
 			    brandname);
-		else
+		} else {
+			const char *nroot = zone_get_nroot();
+
+			if (nroot == NULL)
+				nroot = "";
+
 			(void) snprintf(brandlib, MAXPATHLEN,
 			    MSG_ORIG(MSG_DB_BRAND_HELPERPATH), nroot,
 			    MSG_ORIG(MSG_DB_HELPER_PREFIX), brandname, isa,
 			    brandname);
+		}
 
 		rap->rd_helper.rh_dlhandle = dlopen(brandlib,
 		    RTLD_LAZY | RTLD_LOCAL);

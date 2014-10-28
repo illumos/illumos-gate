@@ -107,7 +107,7 @@
 			 state=%d)"
 @ MSG_DB_RDOBJPADE	"rtld_db: rd_objpad_enable(padsize=0x%llx)"
 @ MSG_DB_64BIT_PREFIX	"64/"
-@ MSG_DB_BRAND_HELPERPATH_PREFIX "%s/%s/%s/%s/%s%s_librtld_db.so.1"
+@ MSG_DB_BRAND_HELPERPATH_PREFIX "%s/%s/%s/%s%s_librtld_db.so.1"
 @ MSG_DB_BRAND_HELPERPATH "%s/%s/%s/%s%s_librtld_db.so.1"
 @ MSG_DB_HELPERNOOPS	"rtld_db: helper lib loaded but ops not preset"
 @ MSG_DB_HELPERLOADED	"rtld_db: helper library loaded for brand \"%s\""
