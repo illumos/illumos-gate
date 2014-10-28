@@ -1209,6 +1209,16 @@ lx_recvfrom(int sockfd, void *buf, size_t len, int flags, void *from,
 	lx_debug("\trecvfrom(%d, 0x%p, 0x%d, 0x%x, 0x%p, 0x%p)", sockfd, buf,
 	    len, flags, from, from_lenp);
 
+	/* LTP expects EINVAL when from_len == -1 */
+	if (from_lenp != NULL) {
+		int flen;
+
+		if (uucopy(from_lenp, &flen, sizeof (int)) != 0)
+			return (-errno);
+		if (flen == -1)
+			return (-EINVAL);
+	}
+
 	flags = convert_sockflags(flags, "recvfrom");
 
 	/*
