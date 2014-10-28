@@ -504,11 +504,6 @@ lx_emulate(lx_regs_t *rp)
 
 #if defined(_LP64)
 	syscall_num = rp->lxr_rax;
-	extern long lx_fsbchk();
-	extern long lx_fschk();
-	lx_fsb = lx_fsbchk();
-	lx_fs = lx_fschk();
-	(void) syscall(SYS_brand, B_TRUSS_POINT, lx_fsb, lx_fs, syscall_num);
 #else
 	syscall_num = rp->lxr_eax;
 #endif

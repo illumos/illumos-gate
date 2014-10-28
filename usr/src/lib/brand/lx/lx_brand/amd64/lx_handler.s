@@ -345,17 +345,6 @@ lx_sigreturn_tolibc(uintptr_t sp)
 	jmp	*%r9			/* jmp to the Linux signal handler */
 	SET_SIZE(lx_sigdeliver)
 
-	ENTRY_NP(lx_fsbchk)
-	movq	%fs:0, %rax
-	ret
-	SET_SIZE(lx_fsbchk)
-
-	ENTRY_NP(lx_fschk)
-	xorq	%rax, %rax
-	mov	%fs, %rax
-	ret
-	SET_SIZE(lx_fsbchk)
-
 	/*
 	 * The libc routine that calls user signal handlers ends with a
 	 * setcontext, so we would never return here even if we used a call
