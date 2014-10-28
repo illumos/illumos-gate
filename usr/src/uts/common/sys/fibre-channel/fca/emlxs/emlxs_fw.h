@@ -5,8 +5,8 @@
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
  *
- * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or http://www.opensolaris.org/os/licensing.
+ * You can obtain a copy of the license at
+ * http://www.opensource.org/licenses/cddl1.txt.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Emulex.  All rights reserved.
+ * Copyright (c) 2004-2011 Emulex. All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,9 +37,9 @@ extern "C" {
 
 #define	EMLXS_FW_IMAGE_DEF	/* Causes the firmware image to be */
 				/* defined in the firmware table. */
-#endif
+#endif /* 0 */
 
-#define	EMLXS_FW_MODULE  "misc/emlxs/emlxs_fw"
+#define	EMLXS_FW_MODULE		"misc/"DRIVER_NAME"/"DRIVER_NAME"_fw"
 
 /* Unique id for each firmware image */
 typedef enum emlxs_fwid

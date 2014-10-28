@@ -5,8 +5,8 @@
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
  *
- * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or http://www.opensolaris.org/os/licensing.
+ * You can obtain a copy of the license at
+ * http://www.opensource.org/licenses/cddl1.txt.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2010 Emulex.  All rights reserved.
+ * Copyright (c) 2004-2012 Emulex. All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -58,7 +58,11 @@ extern "C" {
 #define	EMLXS_DFC_COMMAND		(EMLXS_DIAG | 211)
 #define	EMLXS_SET_BOOT_STATE		(EMLXS_DIAG | 212)
 #define	EMLXS_GET_BOOT_STATE		(EMLXS_DIAG | 213)
-#define	EMLXS_GET_DFC_REV   		(EMLXS_DIAG | 214)
+#define	EMLXS_GET_DFC_REV		(EMLXS_DIAG | 214)
+#define	EMLXS_PHY_GET			(EMLXS_DIAG | 215)
+#define	EMLXS_SET_THROTTLE		(EMLXS_DIAG | 216)
+#define	EMLXS_GET_THROTTLE		(EMLXS_DIAG | 217)
+#define	EMLXS_VPD_GET_V2   		(EMLXS_DIAG | 218)
 
 #define	EMLXS_BAR_IO			(EMLXS_DIAG | 253)
 #define	EMLXS_TEST_CODE   		(EMLXS_DIAG | 254)
@@ -94,7 +98,9 @@ extern "C" {
 								/* code image */
 #define	EMLXS_OP_NOT_SUP		(EMLXS_ERRNO_START + 6)	/* Operation */
 								/* not supp */
-#define	EMLXS_ERRNO_END			(EMLXS_ERRNO_START + 6)
+#define	EMLXS_REBOOT_REQUIRED		(EMLXS_ERRNO_START + 7)	/* Reboot */
+								/* required */
+#define	EMLXS_ERRNO_END			(EMLXS_ERRNO_START + 7)
 
 
 typedef struct emlxs_parm
@@ -132,6 +138,35 @@ typedef struct emlxs_vpd_desc
 	char	prog_types[80];
 } emlxs_vpd_desc_t;
 
+typedef struct emlxs_vpd_desc_v2
+{
+	char	id[256];
+	char	part_num[256];
+	char	eng_change[256];
+	char	manufacturer[256];
+	char	serial_num[256];
+	char	model[256];
+	char	model_desc[256];
+	char	port_num[256];
+	char	prog_types[256];
+} emlxs_vpd_desc_v2_t;
+
+typedef struct emlxs_phy_desc
+{
+	uint32_t phy_type;
+	uint32_t interface_type;
+	uint32_t misc_params;
+	uint32_t rsvd[4];
+
+} emlxs_phy_desc_t;
+
+typedef struct emlxs_throttle_desc
+{
+	uint8_t wwpn[8];
+	uint32_t throttle;
+
+} emlxs_throttle_desc_t;
+
 typedef struct emlxs_log_req
 {
 	uint32_t	first;	/* First msg id requested */
@@ -158,6 +193,101 @@ typedef struct emlxs_log_resp
 				/* string buffers MAX_MSG_LENGTH in size */
 #define	MAX_LOG_MSG_LENGTH	160
 } emlxs_log_resp_t;
+
+typedef struct FCIO_EQ_DESC
+{
+	uint32_t	host_index;
+	uint32_t	max_index;
+	uint32_t	qid;
+	uint32_t	msix_vector;
+
+	uint32_t	phys;	/* specifies physical buffer pointer */
+	uint32_t	virt;	/* specifies virtual buffer pointer */
+	uint32_t	virt_hi; /* specifies virtual buffer pointer */
+
+	/* Statistics */
+	uint32_t	max_proc;
+	uint32_t	isr_count;
+	uint32_t	num_proc;
+} FCIO_EQ_DESC_t;
+
+
+typedef struct FCIO_CQ_DESC
+{
+	uint32_t	host_index;
+	uint32_t	max_index;
+	uint32_t	qid;
+	uint32_t	eqid;
+	uint32_t	type;
+
+	uint32_t	phys;	/* specifies physical buffer pointer */
+	uint32_t	virt;	/* specifies virtual buffer pointer */
+	uint32_t	virt_hi; /* specifies virtual buffer pointer */
+
+	/* Statistics */
+	uint32_t	max_proc;
+	uint32_t	isr_count;
+	uint32_t	num_proc;
+	uint32_t	rsvd;
+} FCIO_CQ_DESC_t;
+
+
+typedef struct FCIO_WQ_DESC
+{
+	uint32_t	host_index;
+	uint32_t	max_index;
+	uint32_t	port_index;
+	uint32_t	release_depth;
+	uint32_t	qid;
+	uint32_t	cqid;
+
+	uint32_t	phys;	/* specifies physical buffer pointer */
+	uint32_t	virt;	/* specifies virtual buffer pointer */
+	uint32_t	virt_hi; /* specifies virtual buffer pointer */
+
+	/* Statistics */
+	uint32_t	num_proc;
+	uint32_t	num_busy;
+	uint32_t	rsvd;
+} FCIO_WQ_DESC_t;
+
+
+typedef struct FCIO_RQ_DESC
+{
+	uint32_t	host_index;
+	uint32_t	max_index;
+	uint32_t	qid;
+	uint32_t	cqid;
+
+	uint32_t	phys;	/* specifies physical buffer pointer */
+	uint32_t	virt;	/* specifies virtual buffer pointer */
+	uint32_t	virt_hi; /* specifies virtual buffer pointer */
+
+	/* Statistics */
+	uint32_t	num_proc;
+} FCIO_RQ_DESC_t;
+
+
+#define	FCIO_MSI_MAX_INTRS	8
+#define	FCIO_MAX_WQS_PER_EQ	4
+#define	FCIO_MAX_EQS	FCIO_MSI_MAX_INTRS
+#define	FCIO_MAX_WQS	FCIO_MAX_WQS_PER_EQ * FCIO_MAX_EQS
+#define	FCIO_MAX_RQS	2	/* ONLY 1 pair is allowed */
+
+/* One CQ for each WQ & (RQ pair) plus one for the MQ */
+#define	FCIO_MAX_CQS	(FCIO_MAX_WQS + (FCIO_MAX_RQS/2) + 1)
+
+typedef struct FCIO_Q_STAT
+{
+	FCIO_EQ_DESC_t	eq[FCIO_MAX_EQS];
+	FCIO_CQ_DESC_t	cq[FCIO_MAX_CQS];
+	FCIO_WQ_DESC_t	wq[FCIO_MAX_WQS];
+	FCIO_RQ_DESC_t	rq[FCIO_MAX_RQS];
+	uint32_t	que_start_timer;
+	uint32_t	que_current_timer;
+	uint32_t	intr_count;
+} FCIO_Q_STAT_t;
+
 
 #ifdef	__cplusplus
 }

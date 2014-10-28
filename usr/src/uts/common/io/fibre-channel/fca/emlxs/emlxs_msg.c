@@ -5,8 +5,8 @@
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
  *
- * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or http://www.opensolaris.org/os/licensing.
+ * You can obtain a copy of the license at
+ * http://www.opensource.org/licenses/cddl1.txt.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -20,10 +20,9 @@
  */
 
 /*
- * Copyright 2010 Emulex.  All rights reserved.
+ * Copyright (c) 2004-2012 Emulex. All rights reserved.
  * Use is subject to license terms.
  */
-
 
 #define	DEF_MSG_STRUCT	/* Needed for emlxs_messages.h in emlxs_msg.h */
 #include <emlxs.h>
@@ -44,7 +43,6 @@ emlxs_msg_log_create(emlxs_hba_t *hba)
 {
 	emlxs_msg_log_t *log = &LOG;
 	uint32_t size = sizeof (emlxs_msg_entry_t) * emlxs_log_size;
-	char buf[40];
 	ddi_iblock_cookie_t iblock;
 
 	/* Check if log is already created */
@@ -65,20 +63,18 @@ emlxs_msg_log_create(emlxs_hba_t *hba)
 	log->instance = hba->ddiinst;
 	log->start_time = emlxs_device.log_timestamp;
 
-	(void) sprintf(buf, "?%s%d_log_lock mutex", DRIVER_NAME, hba->ddiinst);
-
 	if (!(hba->intr_flags & EMLXS_MSI_ENABLED)) {
 		/* Get the current interrupt block cookie */
 		(void) ddi_get_iblock_cookie(hba->dip, (uint_t)EMLXS_INUMBER,
 		    &iblock);
 
 		/* Create the log mutex lock */
-		mutex_init(&log->lock, buf, MUTEX_DRIVER, (void *)iblock);
+		mutex_init(&log->lock, NULL, MUTEX_DRIVER, (void *)iblock);
 	}
 #ifdef  MSI_SUPPORT
 	else {
 		/* Create the temporary log mutex lock */
-		mutex_init(&log->lock, buf, MUTEX_DRIVER, NULL);
+		mutex_init(&log->lock, NULL, MUTEX_DRIVER, NULL);
 	}
 #endif
 
@@ -91,7 +87,6 @@ void
 emlxs_msg_lock_reinit(emlxs_hba_t *hba)
 {
 	emlxs_msg_log_t *log = &LOG;
-	char buf[40];
 
 	/* Check if log is already destroyed */
 	if (!log->entry) {
@@ -106,8 +101,7 @@ emlxs_msg_lock_reinit(emlxs_hba_t *hba)
 	mutex_destroy(&log->lock);
 
 	/* Re-create the log mutex lock */
-	(void) sprintf(buf, "?%s%d_log_lock mutex", DRIVER_NAME, hba->ddiinst);
-	mutex_init(&log->lock, buf, MUTEX_DRIVER, DDI_INTR_PRI(hba->intr_arg));
+	mutex_init(&log->lock, NULL, MUTEX_DRIVER, DDI_INTR_PRI(hba->intr_arg));
 
 	return;
 
@@ -160,19 +154,7 @@ emlxs_msg_log(emlxs_port_t *port, const uint32_t fileno, const uint32_t line,
 
 	/* Check if log is initialized */
 	if (log->entry == NULL) {
-
-		if (port->vpi == 0) {
-			cmn_err(CE_WARN,
-			    "?%s%d: message log not created. log=%p",
-			    DRIVER_NAME, hba->ddiinst, (void *)log);
-		} else {
-			cmn_err(CE_WARN,
-			    "?%s%d.%d: message log not created. log=%p",
-			    DRIVER_NAME, hba->ddiinst, port->vpi,
-			    (void *)log);
-		}
-
-		return (1);
+		return (0);
 	}
 
 	mutex_enter(&log->lock);
@@ -208,10 +190,6 @@ emlxs_msg_log(emlxs_port_t *port, const uint32_t fileno, const uint32_t line,
 		}
 
 		switch (entry->msg->level) {
-		case EMLXS_DEBUG:
-			msg2 = &emlxs_debug_msg;
-			break;
-
 		case EMLXS_NOTICE:
 			msg2 = &emlxs_notice_msg;
 			break;
@@ -227,6 +205,11 @@ emlxs_msg_log(emlxs_port_t *port, const uint32_t fileno, const uint32_t line,
 		case EMLXS_PANIC:
 			msg2 = &emlxs_panic_msg;
 			break;
+
+		case EMLXS_DEBUG:
+		default:
+			msg2 = &emlxs_debug_msg;
+			break;
 		}
 
 		/* Initialize */
@@ -238,7 +221,7 @@ emlxs_msg_log(emlxs_port_t *port, const uint32_t fileno, const uint32_t line,
 		entry2->vpi = port->vpi;
 
 		/* Save the additional info buffer */
-		(void) sprintf(entry2->buffer,
+		(void) snprintf(entry2->buffer, MAX_LOG_INFO_LENGTH,
 		    "Last message repeated %d time(s).",
 		    log->repeat);
 
@@ -405,7 +388,7 @@ emlxs_msg_printf(emlxs_port_t *port, const uint32_t fileno,
 
 	if (fmt) {
 		va_start(valist, fmt);
-		(void) vsprintf(va_str, fmt, valist);
+		(void) vsnprintf(va_str, sizeof (va_str), fmt, valist);
 		va_end(valist);
 	}
 
@@ -459,33 +442,33 @@ emlxs_msg_printf(emlxs_port_t *port, const uint32_t fileno,
 		}
 
 		if (port->vpi == 0) {
-			(void) sprintf(driver, "%s%d", DRIVER_NAME,
-			    hba->ddiinst);
+			(void) snprintf(driver, sizeof (driver), "%s%d",
+			    DRIVER_NAME, hba->ddiinst);
 		} else {
-			(void) sprintf(driver, "%s%d.%d", DRIVER_NAME,
-			    hba->ddiinst, port->vpi);
+			(void) snprintf(driver, sizeof (driver), "%s%d.%d",
+			    DRIVER_NAME, hba->ddiinst, port->vpi);
 		}
 
 		/* Generate the message string */
 		if (msg->buffer[0] != 0) {
 			if (va_str[0] != 0) {
-				(void) sprintf(msg_str,
+				(void) snprintf(msg_str, sizeof (msg_str),
 				    "[%2X.%04X]%s:%7s:%4d: %s (%s)\n", fileno,
 				    line, driver, level, msg->id, msg->buffer,
 				    va_str);
 			} else {
-				(void) sprintf(msg_str,
+				(void) snprintf(msg_str, sizeof (msg_str),
 				    "[%2X.%04X]%s:%7s:%4d: %s\n",
 				    fileno, line, driver, level, msg->id,
 				    msg->buffer);
 			}
 		} else {
 			if (va_str[0] != 0) {
-				(void) sprintf(msg_str,
+				(void) snprintf(msg_str, sizeof (msg_str),
 				    "[%2X.%04X]%s:%7s:%4d: (%s)\n", fileno,
 				    line, driver, level, msg->id, va_str);
 			} else {
-				(void) sprintf(msg_str,
+				(void) snprintf(msg_str, sizeof (msg_str),
 				    "[%2X.%04X]%s:%7s:%4d\n",
 				    fileno, line, driver, level, msg->id);
 			}
@@ -660,36 +643,37 @@ emlxs_msg_sprintf(char *buffer, emlxs_msg_entry_t *entry)
 	}
 
 	if (entry->vpi == 0) {
-		(void) sprintf(driver, "%s%d", DRIVER_NAME, entry->instance);
+		(void) snprintf(driver, sizeof (driver), "%s%d", DRIVER_NAME,
+		    entry->instance);
 	} else {
-		(void) sprintf(driver, "%s%d.%d", DRIVER_NAME, entry->instance,
-		    entry->vpi);
+		(void) snprintf(driver, sizeof (driver), "%s%d.%d", DRIVER_NAME,
+		    entry->instance, entry->vpi);
 	}
 
 	/* Generate the message string */
 	if (msg->buffer[0] != 0) {
 		if (entry->buffer[0] != 0) {
-			(void) sprintf(buf,
+			(void) snprintf(buf, sizeof (buf),
 			    "%8d.%02d: %6d:[%2X.%04X]%s:%7s:%4d: %s (%s)\n",
 			    secs, hsecs, entry->id, entry->fileno,
 			    entry->line, driver, level, msg->id, msg->buffer,
 			    entry->buffer);
 
 		} else {
-			(void) sprintf(buf,
+			(void) snprintf(buf, sizeof (buf),
 			    "%8d.%02d: %6d:[%2X.%04X]%s:%7s:%4d: %s\n", secs,
 			    hsecs, entry->id, entry->fileno, entry->line,
 			    driver, level, msg->id, msg->buffer);
 		}
 	} else {
 		if (entry->buffer[0] != 0) {
-			(void) sprintf(buf,
+			(void) snprintf(buf, sizeof (buf),
 			    "%8d.%02d: %6d:[%2X.%04X]%s:%7s:%4d: (%s)\n",
 			    secs, hsecs, entry->id, entry->fileno,
 			    entry->line, driver, level, msg->id,
 			    entry->buffer);
 		} else {
-			(void) sprintf(buf,
+			(void) snprintf(buf, sizeof (buf),
 			    "%8d.%02d: %6d:[%2X.%04X]%s:%7s:%4d\n",
 			    secs, hsecs, entry->id, entry->fileno,
 			    entry->line, driver, level, msg->id);

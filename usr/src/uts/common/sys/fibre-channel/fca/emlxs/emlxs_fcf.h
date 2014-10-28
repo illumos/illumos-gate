@@ -5,8 +5,8 @@
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
  *
- * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or http://www.opensolaris.org/os/licensing.
+ * You can obtain a copy of the license at
+ * http://www.opensource.org/licenses/cddl1.txt.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2010 Emulex.  All rights reserved.
+ * Copyright (c) 2004-2012 Emulex. All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -48,22 +48,25 @@ extern "C" {
 #define	FCF_EVENT_FCF_CHANGED		8
 
 /* Internal async events */
-#define	FCF_EVENT_FCFI_ONLINE		9
-#define	FCF_EVENT_FCFI_OFFLINE		10
-#define	FCF_EVENT_FCFI_PAUSE		11
+#define	FCF_EVENT_FCFTAB_ONLINE		9
+#define	FCF_EVENT_FCFTAB_OFFLINE	10
 
-#define	FCF_EVENT_VFI_ONLINE		12
-#define	FCF_EVENT_VFI_OFFLINE		13
-#define	FCF_EVENT_VFI_PAUSE		14
+#define	FCF_EVENT_FCFI_ONLINE		11
+#define	FCF_EVENT_FCFI_OFFLINE		12
+#define	FCF_EVENT_FCFI_PAUSE		13
 
-#define	FCF_EVENT_VPI_ONLINE		15
-#define	FCF_EVENT_VPI_OFFLINE		16
-#define	FCF_EVENT_VPI_PAUSE		17
+#define	FCF_EVENT_VFI_ONLINE		14
+#define	FCF_EVENT_VFI_OFFLINE		15
+#define	FCF_EVENT_VFI_PAUSE		16
 
-#define	FCF_EVENT_RPI_ONLINE		18
-#define	FCF_EVENT_RPI_OFFLINE		19
-#define	FCF_EVENT_RPI_PAUSE		20
-#define	FCF_EVENT_RPI_RESUME		21
+#define	FCF_EVENT_VPI_ONLINE		17
+#define	FCF_EVENT_VPI_OFFLINE		18
+#define	FCF_EVENT_VPI_PAUSE		19
+
+#define	FCF_EVENT_RPI_ONLINE		20
+#define	FCF_EVENT_RPI_OFFLINE		21
+#define	FCF_EVENT_RPI_PAUSE		22
+#define	FCF_EVENT_RPI_RESUME		23
 
 /* State change reason codes */		  /* explan */
 #define	FCF_REASON_NONE			0
@@ -74,14 +77,17 @@ extern "C" {
 #define	FCF_REASON_NO_BUFFER		5
 #define	FCF_REASON_SEND_FAILED		6 /* status */
 #define	FCF_REASON_MBOX_FAILED		7 /* status */
-#define	FCF_REASON_NO_FCFI		8
-#define	FCF_REASON_NO_VFI		9
-#define	FCF_REASON_ONLINE_FAILED	10
-#define	FCF_REASON_OFFLINE_FAILED	11
-#define	FCF_REASON_OP_FAILED		12 /* attempts */
-#define	FCF_REASON_NO_PKT		13
-#define	FCF_REASON_NO_NODE		14
-#define	FCF_REASON_NOT_ALLOWED		15
+#define	FCF_REASON_MBOX_BUSY		8 /* status */
+#define	FCF_REASON_NO_FCFI		9
+#define	FCF_REASON_NO_VFI		10
+#define	FCF_REASON_ONLINE_FAILED	11
+#define	FCF_REASON_OFFLINE_FAILED	12
+#define	FCF_REASON_OP_FAILED		13 /* attempts */
+#define	FCF_REASON_NO_PKT		14
+#define	FCF_REASON_NO_NODE		15
+#define	FCF_REASON_NOT_ALLOWED		16
+#define	FCF_REASON_UNUSED		17
+#define	FCF_REASON_INVALID		18
 
 typedef struct XRIobj
 {
@@ -96,12 +102,22 @@ typedef struct XRIobj
 	uint16_t	iotag;
 	MBUF_INFO	SGList;
 	struct RPIobj	*rpip;
+	struct RPIobj	*reserved_rpip;
 	emlxs_buf_t	*sbp;
 	uint32_t 	rx_id; /* Used for unsol exchanges */
 	uint32_t 	flag;
 #define	EMLXS_XRI_RESERVED		0x00000001
 #define	EMLXS_XRI_PENDING_IO		0x00000002
-#define	EMLXS_XRI_ABORT_INP		0x00000004
+#define	EMLXS_XRI_BUSY			0x00000004
+
+	uint32_t 	type;
+#define	EMLXS_XRI_SOL_FCP_TYPE		1
+#define	EMLXS_XRI_UNSOL_FCP_TYPE	2
+#define	EMLXS_XRI_SOL_CT_TYPE		3
+#define	EMLXS_XRI_UNSOL_CT_TYPE		4
+#define	EMLXS_XRI_SOL_ELS_TYPE		5
+#define	EMLXS_XRI_UNSOL_ELS_TYPE	6
+#define	EMLXS_XRI_SOL_BLS_TYPE		7
 
 } XRIobj_t;
 
@@ -118,6 +134,8 @@ typedef struct emlxs_deferred_cmpl
 } emlxs_deferred_cmpl_t;
 
 
+#define	FABRIC_RPI		0xffff
+
 typedef struct RPIobj
 {
 	uint16_t	index;
@@ -129,23 +147,25 @@ typedef struct RPIobj
 	uint16_t	reason;
 	uint16_t	state;
 #define	RPI_STATE_FREE			0
-#define	RPI_STATE_OFFLINE		1
 
-#define	RPI_STATE_UNREG_CMPL		2
-#define	RPI_STATE_UNREG_FAILED		3
-#define	RPI_STATE_UNREG			4
+#define	RPI_STATE_RESERVED		1
+#define	RPI_STATE_OFFLINE		2
 
-#define	RPI_STATE_REG			5
-#define	RPI_STATE_REG_FAILED		6
-#define	RPI_STATE_REG_CMPL		7
+#define	RPI_STATE_UNREG_CMPL		3
+#define	RPI_STATE_UNREG_FAILED		4
+#define	RPI_STATE_UNREG			5
 
-#define	RPI_STATE_PAUSED		8
+#define	RPI_STATE_REG			6
+#define	RPI_STATE_REG_FAILED		7
+#define	RPI_STATE_REG_CMPL		8
 
-#define	RPI_STATE_RESUME		9
-#define	RPI_STATE_RESUME_FAILED		10
-#define	RPI_STATE_RESUME_CMPL		11
+#define	RPI_STATE_PAUSED		9
 
-#define	RPI_STATE_ONLINE		12
+#define	RPI_STATE_RESUME		10
+#define	RPI_STATE_RESUME_FAILED		11
+#define	RPI_STATE_RESUME_CMPL		12
+
+#define	RPI_STATE_ONLINE		13
 
 
 	uint32_t	flag;
@@ -157,6 +177,8 @@ typedef struct RPIobj
 
 	uint32_t	attempts;
 	uint32_t	xri_count;  /* Managed by XRIobj_t */
+
+	uint32_t	idle_timer;
 
 	struct VPIobj 	*vpip;
 
@@ -221,14 +243,14 @@ typedef struct VPIobj
 #define	EMLXS_VPI_REG			0x00000080
 #define	EMLXS_VPI_PORT_ONLINE		0x00000100
 #define	EMLXS_VPI_LOGI			0x00000200
+#define	EMLXS_VPI_PORT_UNBIND		0x40000000
 #define	EMLXS_VPI_PORT_ENABLED		0x80000000
 
 	uint32_t	attempts;
 
-	RPIobj_t	fcf_rpi; /* Reserved Fabric RPI object */
-	RPIobj_t	*rpip;   /* Fabric RPI pointer (&fcf_rpi) */
-
-	emlxs_buf_t	*flogi_sbp;
+	RPIobj_t	fabric_rpi;	/* Reserved Fabric RPI object */
+	RPIobj_t	*fabric_rpip;	/* Fabric RPI pointer (&fabric_rpi) */
+	RPIobj_t	*p2p_rpip;
 
 	struct emlxs_port *port;
 
@@ -282,13 +304,15 @@ typedef struct VFIobj
 #define	EMLXS_VFI_INIT			0x00000020
 #define	EMLXS_VFI_REG			0x00000040
 
+	SERV_PARM	sparam;		/* Last registered sparams */
+
 	uint32_t	attempts;
 
-	SERV_PARM	fcf_sparam;
+	struct FCFIobj 	*fcfp;		/* Managed by FCFIobj_t */
 
-	struct FCFIobj 	*fcfp; /* Managed by FCFIobj_t */
-	uint32_t	vpi_online; /* Managed by VPIobj_t */
-	uint32_t 	logi_count; /* Managed by VPIobj_t */
+	uint32_t	vpi_online;	/* Managed by VPIobj_t */
+	uint32_t 	logi_count;	/* Managed by VPIobj_t */
+	struct VPIobj 	*flogi_vpip;	/* Managed by VPIobj_t */
 
 } VFIobj_t;
 
@@ -327,9 +351,13 @@ typedef struct FCFIobj
 #define	FCFI_STATE_PAUSED		12
 #define	FCFI_STATE_ONLINE		13
 
+
+	uint16_t 	pad;
+	uint16_t 	generation;
+
 	uint32_t 	offline_timer;
 	uint32_t 	attempts;
-	uint32_t 	generation;
+
 	uint32_t	event_tag;
 	uint32_t	flag;
 #define	EMLXS_FCFI_ONLINE_REQ		0x00000001
@@ -386,35 +414,74 @@ typedef struct FCFTable
 
 	uint16_t 	reason;
 	uint16_t 	state;
-#define	FCFTAB_STATE_SHUTDOWN		0
-#define	FCFTAB_STATE_OFFLINE		1
+/* Common states */
+#define	FCFTAB_STATE_SHUTDOWN			0
+#define	FCFTAB_STATE_OFFLINE			1
 
-#define	FCFTAB_STATE_SOLICIT		2
-#define	FCFTAB_STATE_SOLICIT_FAILED	3
-#define	FCFTAB_STATE_SOLICIT_CMPL	4
+/* FCOE states */
+#define	FCOE_FCFTAB_STATE_SHUTDOWN		FCFTAB_STATE_SHUTDOWN
+#define	FCOE_FCFTAB_STATE_OFFLINE		FCFTAB_STATE_OFFLINE
 
-#define	FCFTAB_STATE_READ		5
-#define	FCFTAB_STATE_READ_FAILED	6
-#define	FCFTAB_STATE_READ_CMPL		7
+#define	FCOE_FCFTAB_STATE_SOLICIT		2
+#define	FCOE_FCFTAB_STATE_SOLICIT_FAILED	3
+#define	FCOE_FCFTAB_STATE_SOLICIT_CMPL		4
 
-#define	FCFTAB_STATE_FCFI_OFFLINE_CMPL	8
-#define	FCFTAB_STATE_FCFI_OFFLINE	9
+#define	FCOE_FCFTAB_STATE_READ			5
+#define	FCOE_FCFTAB_STATE_READ_FAILED		6
+#define	FCOE_FCFTAB_STATE_READ_CMPL		7
 
-#define	FCFTAB_STATE_FCFI_ONLINE	10
-#define	FCFTAB_STATE_FCFI_ONLINE_CMPL	11
+#define	FCOE_FCFTAB_STATE_FCFI_OFFLINE_CMPL	8
+#define	FCOE_FCFTAB_STATE_FCFI_OFFLINE		9
 
-#define	FCFTAB_STATE_ONLINE		12
+#define	FCOE_FCFTAB_STATE_FCFI_ONLINE		10
+#define	FCOE_FCFTAB_STATE_FCFI_ONLINE_CMPL	11
 
-	uint32_t 	generation;
+#define	FCOE_FCFTAB_STATE_ONLINE		12
 
-	uint32_t 	read_timer;
-	uint32_t 	index; /* Used for read operations */
+
+/* FC states */
+#define	FC_FCFTAB_STATE_SHUTDOWN		FCFTAB_STATE_SHUTDOWN
+#define	FC_FCFTAB_STATE_OFFLINE			FCFTAB_STATE_OFFLINE
+
+#define	FC_FCFTAB_STATE_TOPO			2
+#define	FC_FCFTAB_STATE_TOPO_FAILED		3
+#define	FC_FCFTAB_STATE_TOPO_CMPL		4
+
+#define	FC_FCFTAB_STATE_CFGLINK			5
+#define	FC_FCFTAB_STATE_CFGLINK_FAILED		6
+#define	FC_FCFTAB_STATE_CFGLINK_CMPL		7
+
+#define	FC_FCFTAB_STATE_SPARM			8
+#define	FC_FCFTAB_STATE_SPARM_FAILED		9
+#define	FC_FCFTAB_STATE_SPARM_CMPL		10
+
+#define	FC_FCFTAB_STATE_FCFI_OFFLINE_CMPL	11
+#define	FC_FCFTAB_STATE_FCFI_OFFLINE		12
+
+#define	FC_FCFTAB_STATE_FCFI_ONLINE		13
+#define	FC_FCFTAB_STATE_FCFI_ONLINE_CMPL	14
+
+#define	FC_FCFTAB_STATE_ONLINE			15
+
+
+	uint16_t 	TID;
+	uint16_t 	generation;
+
 	uint32_t 	flag;
-#define	EMLXS_FCFTAB_SOL_REQ		0x00000001
-#define	EMLXS_FCFTAB_READ_REQ		0x00000002
-#define	EMLXS_FCFTAB_OFFLINE_REQ	0x00000004
-#define	EMLXS_FCFTAB_REQ_MASK		0x0000000F
-#define	EMLXS_FCFTAB_SHUTDOWN		0x80000000
+/* Common flags */
+#define	EMLXS_FCFTAB_REQ_MASK			0x0000000F
+#define	EMLXS_FCFTAB_SHUTDOWN			0x80000000
+
+/* FCOE flags */
+#define	EMLXS_FCOE_FCFTAB_SOL_REQ		0x00000001
+#define	EMLXS_FCOE_FCFTAB_READ_REQ		0x00000002
+#define	EMLXS_FCOE_FCFTAB_OFFLINE_REQ		0x00000004
+
+/* FC flags */
+#define	EMLXS_FC_FCFTAB_TOPO_REQ		0x00000001
+#define	EMLXS_FC_FCFTAB_CFGLINK_REQ		0x00000002
+#define	EMLXS_FC_FCFTAB_SPARM_REQ		0x00000004
+#define	EMLXS_FC_FCFTAB_OFFLINE_REQ		0x00000008
 
 	uint32_t 	attempts;
 
@@ -426,7 +493,10 @@ typedef struct FCFTable
 	FCFIobj_t	*table;
 	uint16_t	table_count;
 
-	uint32_t 	sol_timer;
+	uint32_t 	online_timer;	/* FC */
+
+	uint32_t 	sol_timer;	/* FCOE */
+	uint32_t 	read_timer;	/* FCOE */
 
 } FCFTable_t;
 #define	FCFTAB_READ_ALL		(void*)0xffff

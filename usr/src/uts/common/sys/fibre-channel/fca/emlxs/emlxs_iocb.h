@@ -5,8 +5,8 @@
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
  *
- * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or http://www.opensolaris.org/os/licensing.
+ * You can obtain a copy of the license at
+ * http://www.opensource.org/licenses/cddl1.txt.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2010 Emulex.  All rights reserved.
+ * Copyright (c) 2004-2011 Emulex. All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -240,7 +240,7 @@ typedef struct
 #define	IOERR_MISSING_HBQ_ENTRY		0x2B
 #define	IOERR_ABORT_EXT_REQ		0x2C
 #define	IOERR_CLOSE_EXT_REQ		0x2D
-/* RESERVED 0x2E */
+#define	IOERR_INVALID_VPI		0x2E
 /* RESERVED 0x2F */
 
 #define	IOERR_XRIBUF_MISSING		0x30
@@ -555,8 +555,10 @@ typedef struct
 
 typedef struct
 {
-	uint32_t	hdr3;		/* word 8 */
 #ifdef EMLXS_BIG_ENDIAN
+	uint16_t	oxid;		/* word 8 */
+	uint16_t	seq_cnt;
+
 	uint16_t	vpi;		/* word 9 */
 	uint16_t	buddy_xri;
 
@@ -565,6 +567,9 @@ typedef struct
 	uint32_t	rsvd:23;
 #endif
 #ifdef EMLXS_LITTLE_ENDIAN
+	uint16_t	seq_cnt;	/* word 8 */
+	uint16_t	oxid;
+
 	uint16_t	buddy_xri;	/* word 9 */
 	uint16_t	vpi;
 
@@ -575,7 +580,6 @@ typedef struct
 	uint32_t	seq_len;	/* received sequence length */
 	ULP_BDL		bde2;		/* total 4 words */
 } RCV_SEQ_ELS_64_SLI3_EXT;
-
 
 
 typedef volatile struct emlxs_iocb
@@ -767,7 +771,7 @@ typedef volatile struct emlxs_iocb
 #define	IOCB_IP			2	/* IOCB is used for IP ELS cmds */
 #define	PARM_UNUSED		0	/* PU field (Word 4) not used */
 #define	PARM_REL_OFF		1	/* PU field (Word 4) = R. O. */
-#define	PARM_READ_CHECK		2	/* PU field (Word 4) = Data Xfer Len */
+#define	PARM_XFER_CHECK		2	/* PU field (Word 4) = Data Xfer Len */
 #define	CLASS1			0	/* Class 1 */
 #define	CLASS2			1	/* Class 2 */
 #define	CLASS3			2	/* Class 3 */
@@ -793,6 +797,7 @@ typedef volatile struct emlxs_iocb
 /* Special error codes */
 #define	IOSTAT_DATA_OVERRUN		0x10	/* Added for resid handling */
 #define	IOSTAT_DATA_UNDERRUN		0x11	/* Added for resid handling */
+#define	IOSTAT_RSP_INVALID		0x12	/* Added for resp checking */
 } emlxs_iocb_t;
 typedef emlxs_iocb_t IOCB;
 

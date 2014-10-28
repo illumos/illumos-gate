@@ -27,3 +27,5 @@ outputdir = /var/tmp/test_results
 [/opt/libc-tests/tests/nl_langinfo_test]
 
 [/opt/libc-tests/tests/wcsrtombs_test]
+
+[/opt/libc-tests/tests/wctype_test]

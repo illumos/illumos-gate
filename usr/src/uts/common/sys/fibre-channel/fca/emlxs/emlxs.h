@@ -5,8 +5,8 @@
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
  *
- * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or http://www.opensolaris.org/os/licensing.
+ * You can obtain a copy of the license at
+ * http://www.opensource.org/licenses/cddl1.txt.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -20,12 +20,18 @@
  */
 
 /*
- * Copyright 2009 Emulex.  All rights reserved.
+ * Copyright (c) 2004-2012 Emulex. All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_EMLXS_H
 #define	_EMLXS_H
+
+#ifdef	__cplusplus
+extern "C" {
+#endif
+
+#define	DRIVER_NAME		"emlxs"
 
 #include <emlxs_os.h>
 #include <emlxs_fcio.h>
@@ -67,10 +73,6 @@
 #endif /* MENLO_SUPPORT */
 
 #include <emlxs_extern.h>
-
-#ifdef	__cplusplus
-extern "C" {
-#endif
 
 #ifdef	__cplusplus
 }
