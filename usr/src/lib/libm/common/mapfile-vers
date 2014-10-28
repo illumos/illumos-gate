@@ -718,7 +718,7 @@ SYMBOL_VERSION SUNW_1.1 {
 		log10;
 		log1p;
 		logb;
-		matherr;
+		matherr { FLAGS = NODIRECT };
 		nextafter;
 		pow;
 		remainder;
