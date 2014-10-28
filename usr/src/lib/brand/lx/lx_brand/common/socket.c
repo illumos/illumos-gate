@@ -1071,6 +1071,10 @@ lx_getpeername(int sockfd, void *np, int *nlp)
 	lx_debug("\tgetpeername(%d, 0x%p, 0x%p (=%d))", sockfd,
 	    (struct sockaddr *)np, nlp, namelen);
 
+	/* LTP can pass -1 but we'll limit the allocation to a page */
+	if ((uint32_t)namelen > 4096)
+		return (-EINVAL);
+
 	/*
 	 * Linux returns EFAULT in this case, even if the namelen parameter
 	 * is 0 (some test cases use -1, so we check for that too).  This check
