@@ -396,6 +396,9 @@ static lx_proto_opts_t raw_sockopts_tbl = PROTO_SOCKOPTS(ltos_raw_sockopts);
 #define	_CMSG_HDR_ALIGNMENT	4
 #define	_CMSG_HDR_ALIGN(x)	(((uintptr_t)(x) + _CMSG_HDR_ALIGNMENT - 1) & \
 				    ~(_CMSG_HDR_ALIGNMENT - 1))
+#define	_CMSG_DATA_ALIGN(x)						\
+	(((uintptr_t)(x) + sizeof (int) - 1) & ~(sizeof (int) - 1))
+
 #define	CMSG_FIRSTHDR(m)						\
 	(((m)->msg_controllen < sizeof (struct cmsghdr)) ?		\
 	    (struct cmsghdr *)0 : (struct cmsghdr *)((m)->msg_control))
@@ -409,6 +412,12 @@ static lx_proto_opts_t raw_sockopts_tbl = PROTO_SOCKOPTS(ltos_raw_sockopts);
 	((struct cmsghdr *)0) :						\
 	((struct cmsghdr *)_CMSG_HDR_ALIGN((char *)(c) +		\
 	    ((struct cmsghdr *)(c))->cmsg_len))))
+
+#define	CMSG_LEN(l)							\
+	((unsigned int)_CMSG_DATA_ALIGN(sizeof (struct cmsghdr)) + (l))
+
+#define	CMSG_DATA(c)							\
+	((unsigned char *)_CMSG_DATA_ALIGN((struct cmsghdr *)(c) + 1))
 
 #define	LX_TO_SOL	1
 #define	SOL_TO_LX	2
@@ -424,13 +433,140 @@ typedef struct {
 	uint32_t	nl_groups;
 } lx_sockaddr_nl_t;
 
+#if defined(_LP64)
+/*
+ * For 32-bit code the Illumos and Linux cmsghdr structure definition is the
+ * same, but for 64-bit Linux code the cmsg_len value is a long instead of an
+ * int. As a result, we need to go through a bunch of work to transform the
+ * csmgs back and forth.
+ */
+typedef struct {
+	long	cmsg_len;
+	int	cmsg_level;
+	int	cmsg_type;
+} lx_cmsghdr64_t;
+
+/*
+ * When converting from Illumos to Linux we don't know in advance how many
+ * control msgs we recv, but we do know that the Linux header is 4 bytes
+ * bigger, plus any additional alignment bytes. We'll take a guess and assume
+ * there is not 64 msgs (1 is common) and alloc an extra 256 bytes.
+ */
+#define	LX_CMSG_EXTRA	256
+
+#define	LX_CMSG_HDR_ALIGN(x)						\
+	(((uintptr_t)(x) + sizeof (long) - 1) & ~(sizeof (long) - 1))
+
+#define	LX_CMSG_DATA_ALIGN(x)						\
+	(((uintptr_t)(x) + sizeof (int) - 1) & ~(sizeof (int)  - 1))
+
+#define	LX_CMSG_DATA(c)							\
+	((unsigned char *)LX_CMSG_DATA_ALIGN((lx_cmsghdr64_t *)(c) + 1))
+
+#define	LX_CMSG_FIRSTHDR(m) 						\
+	(((m)->msg_controllen < sizeof (lx_cmsghdr64_t)) ?		\
+	(lx_cmsghdr64_t *)NULL : (lx_cmsghdr64_t *)((m)->msg_control))
+
+#define	LX_CMSG_LEN(l) (LX_CMSG_HDR_ALIGN(sizeof (lx_cmsghdr64_t)) + (l))
+
+#define	LX_CMSG_NXTHDR(m, c)						\
+	(((c) == 0) ? LX_CMSG_FIRSTHDR(m) :				\
+	((((uintptr_t)LX_CMSG_HDR_ALIGN((char *)(c) +			\
+	((lx_cmsghdr64_t *)(c))->cmsg_len) + sizeof (lx_cmsghdr64_t)) >	\
+	(((uintptr_t)((struct lx_msghdr *)(m))->msg_control) +		\
+	((uintptr_t)((struct lx_msghdr *)(m))->msg_controllen))) ?	\
+	((lx_cmsghdr64_t *)0) :						\
+	((lx_cmsghdr64_t *)LX_CMSG_HDR_ALIGN((char *)(c) +		\
+	((lx_cmsghdr64_t *)(c))->cmsg_len))))
+
+
+static void
+ltos_xform_cmsgs(struct lx_msghdr *msg, struct cmsghdr *ntv_cmsg)
+{
+	lx_cmsghdr64_t *lcmsg, *last;
+	struct cmsghdr *cmsg, *lp;
+	int nlen = 0;
+
+	cmsg = ntv_cmsg;
+	lcmsg = LX_CMSG_FIRSTHDR(msg);
+	while (lcmsg != NULL) {
+		cmsg->cmsg_len =
+		    CMSG_LEN(lcmsg->cmsg_len - sizeof (lx_cmsghdr64_t));
+		cmsg->cmsg_level = lcmsg->cmsg_level;
+		cmsg->cmsg_type = lcmsg->cmsg_type;
+
+		bcopy((void *)LX_CMSG_DATA(lcmsg), (void *)CMSG_DATA(cmsg),
+		    lcmsg->cmsg_len - sizeof (lx_cmsghdr64_t));
+
+		last = lcmsg;
+		lcmsg = LX_CMSG_NXTHDR(msg, last);
+
+		lp = cmsg;
+		cmsg = CMSG_NXTHDR(msg, lp);
+
+		nlen += (int)((uint64_t)cmsg - (uint64_t)lp);
+	}
+
+	msg->msg_control = ntv_cmsg;
+	msg->msg_controllen = nlen;
+}
+
 static int
-convert_cmsgs(int direction, struct lx_msghdr *msg, char *caller)
+stol_xform_cmsgs(struct lx_msghdr *msg, lx_cmsghdr64_t *lx_cmsg)
+{
+	lx_cmsghdr64_t *lcmsg, *last;
+	struct cmsghdr *cmsg, *lp;
+	int nlen = 0;
+	int err = 0;
+
+	lcmsg = lx_cmsg;
+	cmsg = CMSG_FIRSTHDR(msg);
+	while (cmsg != NULL && err == 0) {
+		lcmsg->cmsg_len =
+		    LX_CMSG_LEN(cmsg->cmsg_len - sizeof (struct cmsghdr));
+		lcmsg->cmsg_level = cmsg->cmsg_level;
+		lcmsg->cmsg_type = cmsg->cmsg_type;
+
+		bcopy((void *)CMSG_DATA(cmsg), (void *)LX_CMSG_DATA(lcmsg),
+		    cmsg->cmsg_len - sizeof (struct cmsghdr));
+
+		lp = cmsg;
+		cmsg = CMSG_NXTHDR(msg, lp);
+
+		last = lcmsg;
+		lcmsg = LX_CMSG_NXTHDR(msg, last);
+
+		nlen += (int)((uint64_t)lcmsg - (uint64_t)last);
+
+		if (nlen > (msg->msg_controllen + LX_CMSG_EXTRA))
+			err = ENOTSUP;
+	}
+
+	if (err) {
+		lx_unsupported("stol_xform_cmsgs exceeded the allocation "
+		    "%d %d\n", nlen, (msg->msg_controllen + LX_CMSG_EXTRA));
+	} else {
+		msg->msg_control = lx_cmsg;
+		msg->msg_controllen = nlen;
+	}
+	return (err);
+}
+#endif
+
+static int
+convert_cmsgs(int direction, struct lx_msghdr *msg, void *new_cmsg,
+    char *caller)
 {
 	struct cmsghdr *cmsg, *last;
 	int err = 0;
 	int level = 0;
 	int type = 0;
+
+#if defined(_LP64)
+	if (direction == LX_TO_SOL) {
+		ltos_xform_cmsgs(msg, (struct cmsghdr *)new_cmsg);
+	}
+#endif
 
 	cmsg = CMSG_FIRSTHDR(msg);
 	while (cmsg != NULL && err == 0) {
@@ -473,6 +609,12 @@ convert_cmsgs(int direction, struct lx_msghdr *msg, char *caller)
 	if (err)
 		lx_unsupported("Unsupported socket control message %d "
 		    "(%d) in %s\n.", type, level, caller);
+
+#if defined(_LP64)
+	if (direction == SOL_TO_LX && err == 0) {
+		err = stol_xform_cmsgs(msg, (lx_cmsghdr64_t *)new_cmsg);
+	}
+#endif
 
 	return (err);
 }
@@ -1526,6 +1668,7 @@ lx_sendmsg(int sockfd, void *lmp, int flags)
 {
 	struct lx_msghdr msg;
 	struct cmsghdr *cmsg;
+	void *new_cmsg = NULL;
 	int r;
 
 	int nosigpipe = flags & LX_MSG_NOSIGNAL;
@@ -1552,12 +1695,25 @@ lx_sendmsg(int sockfd, void *lmp, int flags)
 			cmsg = SAFE_ALLOCA(msg.msg_controllen);
 			if (cmsg == NULL)
 				return (-EINVAL);
+#if defined(_LP64)
+			/*
+			 * We don't know in advance how many control msgs
+			 * there are, but we do know that the native header is
+			 * 4 bytes smaller than the Linux header, so allocating
+			 * the same size will over-estimate what we actually
+			 * need.
+			 */
+			new_cmsg = SAFE_ALLOCA(msg.msg_controllen);
+			if (new_cmsg == NULL)
+				return (-EINVAL);
+#endif
 		}
 		if ((uucopy(msg.msg_control, cmsg,
 		    msg.msg_controllen)) != 0)
 			return (-errno);
 		msg.msg_control = cmsg;
-		if ((r = convert_cmsgs(LX_TO_SOL, &msg, "sendmsg()")) != 0)
+		if ((r = convert_cmsgs(LX_TO_SOL, &msg, new_cmsg,
+		    "sendmsg()")) != 0)
 			return (-r);
 	}
 
@@ -1606,6 +1762,7 @@ lx_recvmsg(int sockfd, void *lmp, int flags)
 {
 	struct lx_msghdr msg;
 	struct cmsghdr *cmsg = NULL;
+	void *new_cmsg = NULL;
 	int r, err;
 
 	int nosigpipe = flags & LX_MSG_NOSIGNAL;
@@ -1631,6 +1788,12 @@ lx_recvmsg(int sockfd, void *lmp, int flags)
 			msg.msg_control = SAFE_ALLOCA(msg.msg_controllen);
 			if (msg.msg_control == NULL)
 				return (-EINVAL);
+#if defined(_LP64)
+			new_cmsg = SAFE_ALLOCA(msg.msg_controllen +
+			    LX_CMSG_EXTRA);
+			if (new_cmsg == NULL)
+				return (-EINVAL);
+#endif
 		}
 	}
 
@@ -1665,7 +1828,8 @@ lx_recvmsg(int sockfd, void *lmp, int flags)
 		 * If there are control messages bundled in this message,
 		 * we need to convert them from Linux to Solaris.
 		 */
-		if ((err = convert_cmsgs(SOL_TO_LX, &msg, "recvmsg()")) != 0)
+		if ((err = convert_cmsgs(SOL_TO_LX, &msg, new_cmsg,
+		    "recvmsg()")) != 0)
 			return (-err);
 
 		if ((uucopy(msg.msg_control, cmsg,
