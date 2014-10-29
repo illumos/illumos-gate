@@ -26,6 +26,8 @@
 
 #include <errno.h>
 #include <unistd.h>
+#include <fcntl.h>
+#include <procfs.h>
 #include <sys/mman.h>
 #include <sys/param.h>
 #include <sys/lx_debug.h>
@@ -245,4 +247,126 @@ lx_mprotect(uintptr_t start, uintptr_t len, uintptr_t prot)
 	prot &= ~(LX_PROT_GROWSUP | LX_PROT_GROWSDOWN);
 
 	return (mprotect((void *)start, len, prot) ? -errno : 0);
+}
+
+#define	LX_MREMAP_MAYMOVE	1	/* mapping can be moved */
+#define	LX_MREMAP_FIXED		2	/* address is fixed */
+
+long
+lx_remap(uintptr_t old_address, uintptr_t old_size,
+    uintptr_t new_size, uintptr_t flags, uintptr_t new_address)
+{
+	int prot = 0, oflags, mflags = 0, fd;
+	prmap_t map;
+	uintptr_t rval;
+	char path[256], buf[MAXPATHLEN];
+
+	/*
+	 * The kernel doesn't actually support mremap(), so to emulate it,
+	 * we're going to mmap() the underlying object with the new size.
+	 * We don't actually have a file descriptor (and indeed, the mapped
+	 * file may not exist in any file system name space), so we'll
+	 * find the path via the object's entry in /proc/self/path.  There are
+	 * many reasons why this might fail; generally, we'll return EINVAL,
+	 * but in some cases we'll return ENOMEM.
+	 */
+	if ((fd = open("/native/proc/self/map", O_RDONLY)) == -1)
+		return (-EINVAL);
+
+	do {
+		if (read(fd, &map, sizeof (map)) < sizeof (map)) {
+			/*
+			 * This is either a short read or we've hit the end
+			 * of the mappings.  Either way, our passed mapping is
+			 * invalid; return EINVAL.
+			 */
+			(void) close(fd);
+			return (-EINVAL);
+		}
+	} while (map.pr_vaddr != old_address || map.pr_size != old_size);
+
+	(void) close(fd);
+
+	if (!(map.pr_mflags & MA_SHARED)) {
+		/*
+		 * If this is a private mapping, we're not going to remap it.
+		 */
+		return (-EINVAL);
+	}
+
+	if (map.pr_mflags & (MA_ISM | MA_SHM)) {
+		/*
+		 * If this is either ISM or System V shared memory, we're not
+		 * going to remap it.
+		 */
+		return (-EINVAL);
+	}
+
+	if (!(flags & LX_MREMAP_MAYMOVE)) {
+		/*
+		 * If we're not allowed to move this mapping, we're going to
+		 * act as if we can't expand it.
+		 */
+		return (-ENOMEM);
+	}
+
+	oflags = (map.pr_mflags & MA_WRITE) ? O_RDWR : O_RDONLY;
+
+	if (map.pr_mapname[0] == '\0') {
+		/*
+		 * This is likely an anonymous mapping.
+		 */
+		return (-EINVAL);
+	}
+
+	(void) snprintf(path, sizeof (path),
+	    "/native/proc/self/path/%s", map.pr_mapname);
+
+	if (readlink(path, buf, sizeof (buf) - 1) == -1) {
+		/*
+		 * If we failed to read the link, the path might not exist.
+		 */
+		return (-EINVAL);
+	}
+
+	if ((fd = open(buf, oflags)) == -1) {
+		/*
+		 * If we failed to open the object, it may be because it's
+		 * not named (i.e., it's anonymous) or because we somehow
+		 * don't have permissions.  Either way, we're going to kick
+		 * it back with EINVAL.
+		 */
+		return (-EINVAL);
+	}
+
+	if (map.pr_mflags & MA_WRITE)
+		prot |= PROT_WRITE;
+
+	if (map.pr_mflags & MA_READ)
+		prot |= PROT_READ;
+
+	if (map.pr_mflags & MA_EXEC)
+		prot |= PROT_EXEC;
+
+	mflags = MAP_SHARED;
+
+	if (new_address != NULL && (flags & LX_MREMAP_FIXED)) {
+		mflags |= MAP_FIXED;
+	} else {
+		new_address = NULL;
+	}
+
+	rval = (uintptr_t)mmap((void *)new_address, new_size,
+	    prot, mflags, fd, map.pr_offset);
+	(void) close(fd);
+
+	if ((void *)rval == MAP_FAILED)
+		return ((long)-ENOMEM);
+
+	/*
+	 * Our mapping succeeded; we're now going to rip down the old mapping.
+	 */
+	(void) munmap((void *)old_address, old_size);
+
+	return (rval);
 }
