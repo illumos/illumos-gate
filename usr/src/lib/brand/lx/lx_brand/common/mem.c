@@ -256,10 +256,10 @@ long
 lx_remap(uintptr_t old_address, uintptr_t old_size,
     uintptr_t new_size, uintptr_t flags, uintptr_t new_address)
 {
-	int prot = 0, oflags, mflags = 0, fd;
+	int prot = 0, oflags, mflags = 0, len, fd;
 	prmap_t map;
 	uintptr_t rval;
-	char path[256], buf[MAXPATHLEN];
+	char path[256], buf[MAXPATHLEN + 1];
 
 	/*
 	 * The kernel doesn't actually support mremap(), so to emulate it,
@@ -322,12 +322,14 @@ lx_remap(uintptr_t old_address, uintptr_t old_size,
 	(void) snprintf(path, sizeof (path),
 	    "/native/proc/self/path/%s", map.pr_mapname);
 
-	if (readlink(path, buf, sizeof (buf) - 1) == -1) {
+	if ((len = readlink(path, buf, sizeof (buf))) == -1 ||
+	    len == sizeof (buf)) {
 		/*
 		 * If we failed to read the link, the path might not exist.
 		 */
 		return (-EINVAL);
 	}
+	buf[len] = '\0';
 
 	if ((fd = open(buf, oflags)) == -1) {
 		/*
