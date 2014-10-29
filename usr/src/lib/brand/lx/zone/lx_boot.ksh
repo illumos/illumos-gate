@@ -120,7 +120,9 @@ setup_native_cmd() {
 # Determine the distro.
 #
 distro=""
-if [[ -f $ZONEROOT/etc/redhat-release ]]; then
+if [[ $(zonecfg -z $ZONENAME info attr name=docker) =~ "value: true" ]]; then
+	distro="docker"
+elif [[ -f $ZONEROOT/etc/redhat-release ]]; then
 	distro="redhat"
 elif [[ -f $ZONEROOT/etc/lsb-release ]]; then
 	if egrep -s Ubuntu $ZONEROOT/etc/lsb-release; then
@@ -170,8 +172,8 @@ safe_dir /lib
 safe_dir /bin
 safe_dir /sbin
 safe_dir /etc
-safe_dir /etc/init
-safe_dir /etc/update-motd.d
+safe_opt_dir /etc/init
+safe_opt_dir /etc/update-motd.d
 
 #
 # STEP TWO
