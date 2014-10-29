@@ -1103,6 +1103,19 @@ lx_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 #endif /* amd64 */
 		return (getsetcontext(SETCONTEXT, (void *)arg1));
 
+	case B_UNWIND_NTV_SYSC_FLAG:
+#if defined(__amd64)
+		/*
+		 * Used when exiting to support the setcontext back to the
+		 * getcontext we performed in lx_init. We need to unwin
+		 * whatever signal state is in br_scms since we are exiting.
+		 * This sets us up for the B_SIGNAL_RETURN from lx_setcontext.
+		 */
+		lwpd = ttolxlwp(curthread);
+		lwpd->br_scms = 1;
+#endif
+		return (0);
+
 	default:
 		ike_call = cmd - B_IKE_SYSCALL;
 		if (ike_call > 0 && ike_call <= LX_N_IKE_FUNCS) {

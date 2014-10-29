@@ -159,7 +159,12 @@ lx_exit(uintptr_t p1)
 	/*
 	 * This thread is exiting.  Restore the state of the thread to
 	 * what it was before we started running linux code.
+	 * For 64-bit code, since we know we are unwinding the stack back to
+	 * lx_init, we need to unwind the syscall mode flag "stack" as well.
 	 */
+#if defined(_LP64)
+	(void) syscall(SYS_brand, B_UNWIND_NTV_SYSC_FLAG);
+#endif
 	(void) setcontext(&lx_tsd->lxtsd_exit_context);
 
 	/*
@@ -204,7 +209,12 @@ lx_group_exit(uintptr_t p1)
 	/*
 	 * This thread is exiting.  Restore the state of the thread to
 	 * what it was before we started running linux code.
+	 * For 64-bit code, since we know we are unwinding the stack back to
+	 * lx_init, we need to unwind the syscall mode flag "stack" as well.
 	 */
+#if defined(_LP64)
+	(void) syscall(SYS_brand, B_UNWIND_NTV_SYSC_FLAG);
+#endif
 	(void) setcontext(&lx_tsd->lxtsd_exit_context);
 
 	/*
