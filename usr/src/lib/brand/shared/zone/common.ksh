@@ -97,9 +97,27 @@ vlog()
 safe_dir()
 {
 	typeset dir="$1"
+	typeset pwd_dir=""
 
-	if [[ -h $ZONEROOT/$dir || ! -d $ZONEROOT/$dir ]]; then
-		fatal "$e_baddir" "$dir"
+	if [[ -d $ZONEROOT/$dir ]]; then
+		if [[ -h $ZONEROOT/$dir ]]; then
+			#
+			# When dir is a symlink to a directory, we 'cd' to that
+			# directory to ensure that's under $ZONEROOT. We use pwd
+			# from /usr/bin instead of built-in because they give
+			# different results.
+			#
+			pwd_dir=$(cd $ZONEROOT/$dir && /usr/bin/pwd)
+			if [[ $pwd_dir =~ "^$ZONEROOT" ]]; then
+				return;
+			else
+				fatal \
+				    "$e_baddir: symlink out of zoneroot" "$dir"
+			fi
+		else
+			# it's a dir and not a symlink, so that's ok.
+			return
+		fi
 	fi
 }
 
@@ -110,9 +128,7 @@ safe_opt_dir()
 
 	[[ ! -e $ZONEROOT/$dir ]] && return
 
-	if [[ -h $ZONEROOT/$dir || ! -d $ZONEROOT/$dir ]]; then
-		fatal "$e_baddir" "$dir"
-	fi
+	safe_dir $dir
 }
 
 # Only make a copy if we haven't already done so.
