@@ -222,6 +222,7 @@ extern long lx_mmap(uintptr_t, uintptr_t, uintptr_t, uintptr_t,
     uintptr_t, uintptr_t);
 extern long lx_mmap2(uintptr_t, uintptr_t, uintptr_t, uintptr_t,
     uintptr_t, uintptr_t);
+extern long lx_remap(uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t);
 
 extern long lx_mount(uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t);
 extern long lx_umount(uintptr_t);

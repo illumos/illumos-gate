@@ -1136,7 +1136,7 @@ static struct lx_sysent sysents[] = {
 	{"pipe",	lx_pipe,		0,		1}, /* 22 */
 	{"select",	lx_select,		0,		5}, /* 23 */
 	{"sched_yield",	lx_yield,		0,		0}, /* 24 */
-	{"mremap",	NULL,			NOSYS_NO_EQUIV,	0}, /* 25 */
+	{"mremap",	lx_remap,		0,		5}, /* 25 */
 	{"msync",	lx_msync,		0,		3}, /* 26 */
 	{"mincore",	lx_mincore,		0,		3}, /* 27 */
 	{"madvise",	lx_madvise,		0,		3}, /* 28 */
@@ -1599,7 +1599,7 @@ static struct lx_sysent sysents[] = {
 	{"sched_get_priority_min", lx_sched_get_priority_min, 0, 1}, /* 160 */
 	{"sched_rr_get_interval", lx_sched_rr_get_interval, 0,	2},  /* 161 */
 	{"nanosleep",	lx_nanosleep,	0,		2},	/* 162 */
-	{"mremap",	NULL,		NOSYS_NO_EQUIV,	0},	/* 163 */
+	{"mremap",	lx_remap,	0,		5},	/* 163 */
 	{"setresuid16",	lx_setresuid16, 0,		3},	/* 164 */
 	{"getresuid16",	lx_getresuid16,	0,		3},	/* 165 */
 	{"vm86",	NULL,		NOSYS_NO_EQUIV,	0},	/* 166 */
