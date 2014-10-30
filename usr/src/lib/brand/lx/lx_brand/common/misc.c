@@ -48,6 +48,7 @@
 #include <sys/lx_thunk_server.h>
 #include <sys/lx_fcntl.h>
 #include <sys/inotify.h>
+#include <thread.h>
 #include <unistd.h>
 #include <libintl.h>
 #include <zone.h>
@@ -570,6 +571,18 @@ lx_prctl(int option, uintptr_t arg2, uintptr_t arg3,
 		lx_unsupported("prctl option %d", option);
 		return (-ENOSYS);
 	}
+
+	/*
+	 * In Linux, PR_SET_NAME sets the name of the thread, not the process.
+	 * Due to the historical quirks of Linux's asinine thread model, this
+	 * name is effectively the name of the process (as visible via ps(1))
+	 * if the thread is the first of its task group.  The first thread is
+	 * therefore special, and to best mimic Linux semantics (and absent a
+	 * notion of per-LWP names), we do nothing (but return success) on LWPs
+	 * other than LWP 1.
+	 */
+	if (thr_self() != 1)
+		return (0);
 
 	if (uucopy((void *)arg2, psinfo.pr_fname,
 	    MIN(LX_PR_SET_NAME_NAMELEN, fnamelen)) != 0)
