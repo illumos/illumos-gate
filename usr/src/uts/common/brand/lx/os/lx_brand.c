@@ -855,15 +855,29 @@ lx_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 
 	case B_SYSENTRY:
 		if (lx_systrace_enabled) {
-			uintptr_t args[6];
-
 			ASSERT(lx_systrace_entry_ptr != NULL);
 
-			if (copyin((void *)arg2, args, sizeof (args)) != 0)
-				return (EFAULT);
+			if (get_udatamodel() == DATAMODEL_NATIVE) {
+				uintptr_t a[6];
 
-			(*lx_systrace_entry_ptr)(arg1, args[0], args[1],
-			    args[2], args[3], args[4], args[5]);
+				if (copyin((void *)arg2, a, sizeof (a)) != 0)
+					return (EFAULT);
+
+				(*lx_systrace_entry_ptr)(arg1, a[0], a[1],
+				    a[2], a[3], a[4], a[5]);
+			}
+#if defined(_LP64)
+			else {
+				/* 32-bit userland on 64-bit kernel */
+				uint32_t a[6];
+
+				if (copyin((void *)arg2, a, sizeof (a)) != 0)
+					return (EFAULT);
+
+				(*lx_systrace_entry_ptr)(arg1, a[0], a[1],
+				    a[2], a[3], a[4], a[5]);
+			}
+#endif
 		}
 
 		lx_ptrace_fire();
