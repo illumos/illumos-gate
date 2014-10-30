@@ -134,9 +134,13 @@ struct lx_msginfo {
 struct lx_semid_ds {
 	struct lx_ipc_perm	sem_perm;
 	time_t			sem_otime;
+#if defined(_ILP32)
 	ulong_t			_unused1;
+#endif
 	time_t			sem_ctime;
+#if defined(_ILP32)
 	ulong_t			_unused2;
+#endif
 	ulong_t			sem_nsems;
 	ulong_t			_unused3;
 	ulong_t			_unused4;
@@ -180,11 +184,17 @@ struct lx_shmid_ds {
 	struct lx_ipc_perm	shm_perm;
 	size_t			shm_segsz;
 	time_t			shm_atime;
+#if defined(_ILP32)
 	ulong_t			_unused1;
+#endif
 	time_t			shm_dtime;
+#if defined(_ILP32)
 	ulong_t			_unused2;
+#endif
 	time_t			shm_ctime;
+#if defined(_ILP32)
 	ulong_t			_unused3;
+#endif
 	pid_t			shm_cpid;
 	pid_t			shm_lpid;
 	ushort_t		shm_nattch;
