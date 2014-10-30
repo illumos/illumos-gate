@@ -21,6 +21,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2014 Joyent, Inc.  All rights reserved.
  */
 
 /*
@@ -264,7 +265,7 @@ next_fmt:
 
 		if (sign && pad == '0')
 			ADDCHAR('-');
-		while (width-- > sign)
+		while ((!left_align) && (width-- > sign))
 			ADDCHAR(pad);
 		if (sign && pad == ' ')
 			ADDCHAR('-');
@@ -279,6 +280,10 @@ next_fmt:
 			sp--;
 			ADDCHAR(*sp);
 		}
+
+		/* add left-alignment padding */
+		while (width-- > sign)
+			ADDCHAR(' ');
 
 		if (c == 'b' && ul != 0) {
 			int any = 0;
