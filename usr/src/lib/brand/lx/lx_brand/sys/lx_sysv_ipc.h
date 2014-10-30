@@ -212,11 +212,11 @@ struct lx_shm_info {
 };
 
 struct lx_shminfo {
-	int	shmmax;
-	int	shmmin;
-	int	shmmni;
-	int	shmseg;
-	int	shmall;
+	long	shmmax;
+	long	shmmin;
+	long	shmmni;
+	long	shmseg;
+	long	shmall;
 };
 
 #ifdef	__cplusplus
