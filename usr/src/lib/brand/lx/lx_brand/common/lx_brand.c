@@ -1181,7 +1181,7 @@ static struct lx_sysent sysents[] = {
 	{"shmdt",	lx_shmdt,		0,		1}, /* 67 */
 	{"msgget",	lx_msgget,		0,		2}, /* 68 */
 	{"msgsnd",	lx_msgsnd,		0,		4}, /* 69 */
-	{"msgrcv",	lx_msgrcv,		0,		4}, /* 70 */
+	{"msgrcv",	lx_msgrcv,		0,		5}, /* 70 */
 	{"msgctl",	lx_msgctl,		0,		3}, /* 71 */
 	{"fcntl",	lx_fcntl64,		0,		3}, /* 72 */
 	{"flock",	lx_flock,		0,		2}, /* 73 */

@@ -412,27 +412,13 @@ lx_msgsnd(int id, void *p1, size_t sz, int flag)
 }
 
 long
-lx_msgrcv(int id, void *p1, size_t sz, int flag)
+lx_msgrcv(int id, void *msgp, size_t sz, long msgtype, int flag)
 {
 	int sol_flag = 0;
-	struct {
-		void *msgp;
-		long msgtype;
-	} args;
 	ssize_t r;
-	struct msgbuf *buf = (struct msgbuf *)p1;
-
-	/*
-	 * Rather than passing 5 args into ipc(2) directly, glibc passes 4
-	 * args and uses the buf argument to point to a structure
-	 * containing two args: a pointer to the message and the message
-	 * type.
-	 */
-	if (uucopy(buf, &args, sizeof (args)))
-		return (-errno);
 
 	lx_debug("\tlx_msgrcv(%d, 0x%p, %d, %d, %ld, %d)\n",
-	    id, args.msgp, sz, args.msgtype, flag);
+	    id, msgp, sz, msgtype, flag);
 
 	/*
 	 * Check for a negative sz parameter.
@@ -448,7 +434,7 @@ lx_msgrcv(int id, void *p1, size_t sz, int flag)
 	if (flag & LX_IPC_NOWAIT)
 		sol_flag |= IPC_NOWAIT;
 
-	r = msgrcv(id, args.msgp, sz, args.msgtype, sol_flag);
+	r = msgrcv(id, msgp, sz, msgtype, sol_flag);
 	return (r < 0 ? -errno : r);
 }
 
@@ -867,7 +853,23 @@ lx_ipc(uintptr_t cmd, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3,
 		r = lx_msgsnd((int)arg1, bufptr, (size_t)arg2, (int)arg3);
 		break;
 	case LX_MSGRCV:
-		r = lx_msgrcv((int)arg1, bufptr, (size_t)arg2, (int)arg3);
+		{
+			struct {
+				void *msgp;
+				long msgtype;
+			} args;
+
+			/*
+			 * Rather than passing 5 args into ipc(2) directly,
+			 * glibc passes 4 args and uses the buf argument to
+			 * point to a structure containing two args: a pointer
+			 * to the message and the message type.
+			 */
+			if (uucopy(bufptr, &args, sizeof (args)))
+				return (-errno);
+			r = lx_msgrcv((int)arg1, args.msgp, (size_t)arg2,
+			    args.msgtype, (int)arg3);
+		}
 		break;
 	case LX_MSGCTL:
 		r = lx_msgctl((int)arg1, (int)arg2, bufptr);
