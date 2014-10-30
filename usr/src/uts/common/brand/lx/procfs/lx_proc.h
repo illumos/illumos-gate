@@ -107,6 +107,7 @@ typedef enum lxpr_nodetype {
 	LXPR_PID_CURDIR,	/* /proc/<pid>/cwd	*/
 	LXPR_PID_ENV,		/* /proc/<pid>/environ	*/
 	LXPR_PID_EXE,		/* /proc/<pid>/exe	*/
+	LXPR_PID_LIMITS,	/* /proc/<pid>/limits	*/
 	LXPR_PID_MAPS,		/* /proc/<pid>/maps	*/
 	LXPR_PID_MEM,		/* /proc/<pid>/mem	*/
 	LXPR_PID_MOUNTINFO,	/* /proc/<pid>/mountinfo */
