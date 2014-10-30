@@ -18,15 +18,15 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2014 Joyent, Inc. All rights reserved.
  */
 
 #ifndef	_LX_MOUNT_H
 #define	_LX_MOUNT_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -52,11 +52,14 @@ extern "C" {
 #define	LX_MS_NOATIME		0x00000400
 #define	LX_MS_NODIRATIME	0x00000800
 #define	LX_MS_BIND		0x00001000
+#define	LX_MS_MOVE		0x00002000
+#define	LX_MS_REC		0x00004000
+#define	LX_MS_SILENT		0x00008000
 #define	LX_MS_SUPPORTED		(LX_MS_MGC_VAL | \
 				LX_MS_RDONLY | LX_MS_NOSUID | \
 				LX_MS_NODEV | LX_MS_NOEXEC | \
 				LX_MS_REMOUNT | LX_MS_NOATIME | \
-				LX_MS_BIND)
+				LX_MS_BIND | LX_MS_SILENT)
 
 /*
  * support for nfs mounts
