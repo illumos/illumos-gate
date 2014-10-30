@@ -22,12 +22,11 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2014 Joyent, Inc.  All rights reserved.
  */
 
 #ifndef _LX_SYSV_IPC_H
 #define	_LX_SYSV_IPC_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -86,11 +85,17 @@ struct lx_ipc_perm {
 struct lx_msqid_ds {
 	struct lx_ipc_perm	msg_perm;
 	time_t			msg_stime;
+#if defined(_ILP32)
 	ulong_t			_unused1;
+#endif
 	time_t			msg_rtime;
+#if defined(_ILP32)
 	ulong_t			_unused2;
+#endif
 	time_t			msg_ctime;
+#if defined(_ILP32)
 	ulong_t			_unused3;
+#endif
 	ulong_t			msg_cbytes;
 	ulong_t			msg_qnum;
 	ulong_t			msg_qbytes;
