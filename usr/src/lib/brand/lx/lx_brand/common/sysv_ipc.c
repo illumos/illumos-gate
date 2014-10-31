@@ -259,7 +259,7 @@ lx_semctl_semstat(int slot, void *buf)
  * values to be sure it is legal.
  */
 static int
-lx_semctl_setall(int semid, union lx_semun *arg)
+lx_semctl_setall(int semid, ushort_t *arg)
 {
 	struct semid_ds semds;
 	ushort_t *vals;
@@ -275,7 +275,7 @@ lx_semctl_setall(int semid, union lx_semun *arg)
 	sz = semds.sem_nsems * sizeof (ushort_t);
 	if ((vals = SAFE_ALLOCA(sz)) == NULL)
 		return (-ENOMEM);
-	if (uucopy(arg->sems, vals, sz))
+	if (uucopy(arg, vals, sz))
 		return (-errno);
 
 	/* Validate each of the values. */
@@ -283,7 +283,7 @@ lx_semctl_setall(int semid, union lx_semun *arg)
 		if (vals[i] > LX_SEMVMX)
 			return (-ERANGE);
 
-	r = semctl(semid, 0, SETALL, arg->sems);
+	r = semctl(semid, 0, SETALL, arg);
 
 	return ((r < 0) ? -errno : r);
 }
@@ -291,13 +291,17 @@ lx_semctl_setall(int semid, union lx_semun *arg)
 long
 lx_semctl(int semid, int semnum, int cmd, void *ptr)
 {
+#if defined(_ILP32)
 	union lx_semun arg;
+#endif
 	int rval;
 	int opt = cmd & ~LX_IPC_64;
 	int use_errno = 0;
+	uint_t val;
 
 	lx_debug("\nsemctl(%d, %d, %d, 0x%p)\n", semid, semnum, cmd, ptr);
 
+#if defined(_ILP32)
 	/*
 	 * The final arg to semctl() is a pointer to a union.  For some
 	 * commands we can hand that pointer directly to the kernel.  For
@@ -309,6 +313,7 @@ lx_semctl(int semid, int semnum, int cmd, void *ptr)
 	    opt == LX_IPC_INFO || opt == LX_SEM_INFO)
 		if (uucopy(ptr, &arg, sizeof (arg)))
 			return (-errno);
+#endif
 
 	switch (opt) {
 	case LX_GETVAL:
@@ -316,12 +321,16 @@ lx_semctl(int semid, int semnum, int cmd, void *ptr)
 		rval = semctl(semid, semnum, GETVAL, NULL);
 		break;
 	case LX_SETVAL:
-		if (arg.val > LX_SEMVMX) {
-			rval = -ERANGE;
-			break;
+#if defined(_ILP32)
+		val = arg.val;
+#else
+		val = (uint_t)(uintptr_t)ptr;
+#endif
+		if (val > LX_SEMVMX) {
+			return (-ERANGE);
 		}
 		use_errno = 1;
-		rval = semctl(semid, semnum, SETVAL, arg.val);
+		rval = semctl(semid, semnum, SETVAL, val);
 		break;
 	case LX_GETPID:
 		use_errno = 1;
@@ -337,33 +346,57 @@ lx_semctl(int semid, int semnum, int cmd, void *ptr)
 		break;
 	case LX_GETALL:
 		use_errno = 1;
+#if defined(_ILP32)
 		rval = semctl(semid, semnum, GETALL, arg.sems);
+#else
+		rval = semctl(semid, semnum, GETALL, ptr);
+#endif
 		break;
 	case LX_SETALL:
-		rval = lx_semctl_setall(semid, &arg);
+#if defined(_ILP32)
+		rval = lx_semctl_setall(semid, arg.sems);
+#else
+		rval = lx_semctl_setall(semid, ptr);
+#endif
 		break;
 	case LX_IPC_RMID:
 		use_errno = 1;
 		rval = semctl(semid, semnum, IPC_RMID, NULL);
 		break;
 	case LX_SEM_STAT:
+#if defined(_ILP32)
 		rval = lx_semctl_semstat(semid, arg.semds);
+#else
+		rval = lx_semctl_semstat(semid, ptr);
+#endif
 		break;
 	case LX_IPC_STAT:
+#if defined(_ILP32)
 		rval = lx_semctl_ipcstat(semid, arg.semds);
+#else
+		rval = lx_semctl_ipcstat(semid, ptr);
+#endif
 		break;
 
 	case LX_IPC_SET:
+#if defined(_ILP32)
 		rval = lx_semctl_ipcset(semid, arg.semds);
+#else
+		rval = lx_semctl_ipcset(semid, ptr);
+#endif
 		break;
 
 	case LX_IPC_INFO:
 	case LX_SEM_INFO:
+#if defined(_ILP32)
 		rval = lx_semctl_ipcinfo(arg.semds);
+#else
+		rval = lx_semctl_ipcinfo(ptr);
+#endif
 		break;
 
 	default:
-		rval = -EINVAL;
+		return (-EINVAL);
 	}
 
 	if (use_errno == 1 && rval < 0)
