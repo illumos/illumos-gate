@@ -51,6 +51,8 @@
 	    directory="/native/etc/netconfig" type="lofs" opt="ro" />
 	<global_mount special="/sbin"
 	    directory="/native/sbin" opt="ro,nodevices" type="lofs" />
+	<global_mount special="/usr/lib/brand/lx/ld" directory="/var/ld"
+	    opt="ro" type="lofs" />
 
 	<!-- Local filesystems to mount when booting the zone -->
 	<mount special="/native/dev" directory="/dev" type="lofs" />
