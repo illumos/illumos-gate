@@ -51,6 +51,13 @@ $(POFILE): $(POFILES)
 _msg: $(MSGDOMAINPOFILE)
 
 install: $(PROGS) $(ROOTXMLDOCS) $(ROOTTEMPLATES) $(ROOTPROGS) $(SUBDIRS)
+	mkdir -p $(ROOT)/usr/lib/brand/lx/ld/64
+	crle -c $(ROOT)/usr/lib/brand/lx/ld/ld.config \
+		-l /native/lib:/native/usr/lib \
+		-s /native/lib/secure:/native/usr/lib/secure
+	crle -64 -c $(ROOT)/usr/lib/brand/lx/ld/64/ld.config \
+		-l /native/lib/64:/native/usr/lib/64 \
+		-s /native/lib/secure/64:/native/usr/lib/secure/64
 
 lint:
 
