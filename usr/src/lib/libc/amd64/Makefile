@@ -47,12 +47,12 @@ CRTOBJS=			\
 DYNOBJS=
 
 FPOBJS=				\
-	_base_il.o		\
 	fpgetmask.o		\
 	fpgetround.o		\
 	fpsetmask.o		\
 	fpsetround.o		\
-	fpstart.o
+	fpstart.o		\
+	ieee.o
 
 I386FPOBJS=			\
 	_D_cplx_div.o		\
@@ -81,6 +81,7 @@ FPASMOBJS=			\
 	__xgetRD.o		\
 	_xtoll.o		\
 	_xtoull.o		\
+	_base_il.o		\
 	fpcw.o			\
 	fpgetsticky.o		\
 	fpsetsticky.o
