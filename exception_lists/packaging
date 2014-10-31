@@ -25,6 +25,7 @@
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2016 Toomas Soome <tsoome@me.com>
+# Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 #
 
 #
@@ -353,6 +354,7 @@ usr/platform/sun4u/include/sys/fcode.h				sparc
 #
 # Private net80211 headers
 #
+usr/include/sys/net80211_amrr.h
 usr/include/sys/net80211_crypto.h
 usr/include/sys/net80211_ht.h
 usr/include/sys/net80211_proto.h

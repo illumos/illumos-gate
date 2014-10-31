@@ -411,6 +411,7 @@ CHKHDRS=			\
 	ndifm.h			\
 	ndi_impldefs.h		\
 	net80211.h		\
+	net80211_amrr.h		\
 	net80211_crypto.h	\
 	net80211_ht.h		\
 	net80211_proto.h	\
