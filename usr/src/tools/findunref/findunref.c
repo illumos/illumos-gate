@@ -53,19 +53,19 @@ typedef struct {
 } pnset_t;
 
 /*
- * Data associated with the current Mercurial manifest.
+ * Data associated with the current SCM manifest.
  */
-typedef struct hgdata {
+typedef struct scmdata {
 	pnset_t		*manifest;
-	char		hgpath[MAXPATHLEN];
+	char		metapath[MAXPATHLEN];
 	char		root[MAXPATHLEN];
 	unsigned int	rootlen;
 	boolean_t	rootwarn;
-} hgdata_t;
+} scmdata_t;
 
 /*
  * Hooks used to check if a given unreferenced file is known to an SCM
- * (currently Mercurial and TeamWare).
+ * (currently Git, Mercurial and TeamWare).
  */
 typedef int checkscm_func_t(const char *, const struct FTW *);
 typedef void chdirscm_func_t(const char *);
@@ -76,7 +76,7 @@ typedef struct {
 	chdirscm_func_t	*chdirfunc;
 } scm_t;
 
-static checkscm_func_t check_tw, check_hg, check_git;
+static checkscm_func_t check_tw, check_scmdata;
 static chdirscm_func_t chdir_hg, chdir_git;
 static int	pnset_add(pnset_t *, const char *);
 static int	pnset_check(const pnset_t *, const char *);
@@ -90,15 +90,14 @@ static void	die(const char *, ...);
 static const scm_t scms[] = {
 	{ "tw",		check_tw,	NULL		},
 	{ "teamware",	check_tw,	NULL		},
-	{ "hg",		check_hg,	chdir_hg 	},
-	{ "mercurial",	check_hg,	chdir_hg	},
-	{ "git",	check_git,	chdir_git	},
+	{ "hg",		check_scmdata,	chdir_hg 	},
+	{ "mercurial",	check_scmdata,	chdir_hg	},
+	{ "git",	check_scmdata,	chdir_git	},
 	{ NULL,		NULL, 		NULL		}
 };
 
 static const scm_t	*scm;
-static hgdata_t		hgdata;
-static pnset_t		*gitmanifest = NULL;
+static scmdata_t	scmdata;
 static time_t		tstamp;		/* timestamp to compare files to */
 static pnset_t		*exsetp;	/* pathname globs to ignore */
 static const char	*progname;
@@ -193,7 +192,7 @@ usage:		(void) fprintf(stderr, "usage: %s [-s <subtree>] "
  * Load and return a pnset for the manifest for the Mercurial repo at `hgroot'.
  */
 static pnset_t *
-load_manifest(const char *hgroot)
+hg_manifest(const char *hgroot)
 {
 	FILE	*fp = NULL;
 	char	*hgcmd = NULL;
@@ -231,130 +230,145 @@ fail:
 	return (NULL);
 }
 
-static void
-chdir_git(const char *path)
+/*
+ * Load and return a pnset for the manifest for the Git repo at `gitroot'.
+ */
+static pnset_t *
+git_manifest(const char *gitroot)
 {
-	FILE *fp = NULL;
-	char *gitcmd = NULL;
-	char *newline;
-	char fn[MAXPATHLEN];
-	pnset_t *pnsetp;
+	FILE	*fp = NULL;
+	char	*gitcmd = NULL;
+	char	*newline;
+	pnset_t	*pnsetp;
+	char	path[MAXPATHLEN];
 
 	pnsetp = calloc(sizeof (pnset_t), 1);
-	if ((pnsetp == NULL) ||
-	    (asprintf(&gitcmd, "git ls-files %s", path) == -1))
+	if (pnsetp == NULL ||
+	    asprintf(&gitcmd, "git --git-dir=%s/.git ls-files", gitroot) == -1)
 		goto fail;
 
-	if ((fp = popen(gitcmd, "r")) == NULL)
+	fp = popen(gitcmd, "r");
+	if (fp == NULL)
 		goto fail;
 
-	while (fgets(fn, sizeof (fn), fp) != NULL) {
-		if ((newline = strrchr(fn, '\n')) != NULL)
+	while (fgets(path, sizeof (path), fp) != NULL) {
+		newline = strrchr(path, '\n');
+		if (newline != NULL)
 			*newline = '\0';
 
-		if (pnset_add(pnsetp, fn) == 0)
+		if (pnset_add(pnsetp, path) == 0)
 			goto fail;
 	}
 
 	(void) pclose(fp);
 	free(gitcmd);
-	gitmanifest = pnsetp;
-	return;
+	return (pnsetp);
 fail:
-	warn("cannot load git manifest");
+	warn("cannot load git manifest at %s", gitroot);
 	if (fp != NULL)
 		(void) pclose(fp);
-	if (pnsetp != NULL)
-		free(pnsetp);
-	if (gitcmd != NULL)
-		free(gitcmd);
+	free(gitcmd);
+	pnset_free(pnsetp);
+	return (NULL);
 }
 
 /*
  * If necessary, change our active manifest to be appropriate for `path'.
  */
 static void
-chdir_hg(const char *path)
+chdir_scmdata(const char *path, const char *meta,
+    pnset_t *(*manifest_func)(const char *path))
 {
-	char hgpath[MAXPATHLEN];
+	char scmpath[MAXPATHLEN];
 	char basepath[MAXPATHLEN];
 	char *slash;
 
-	(void) snprintf(hgpath, MAXPATHLEN, "%s/.hg", path);
+	(void) snprintf(scmpath, MAXPATHLEN, "%s/%s", path, meta);
 
 	/*
 	 * Change our active manifest if any one of the following is true:
 	 *
-	 *   1. No manifest is loaded.  Find the nearest hgroot to load from.
+	 *   1. No manifest is loaded.  Find the nearest SCM root to load from.
 	 *
 	 *   2. A manifest is loaded, but we've moved into a directory with
-	 *	its own hgroot (e.g., usr/closed).  Load from its hgroot.
+	 *	its own metadata directory (e.g., usr/closed).  Load from its
+	 *	root.
 	 *
 	 *   3. A manifest is loaded, but no longer applies (e.g., the manifest
 	 *	under usr/closed is loaded, but we've moved to usr/src).
 	 */
-	if (hgdata.manifest == NULL ||
-	    strcmp(hgpath, hgdata.hgpath) != 0 && access(hgpath, X_OK) == 0 ||
-	    strncmp(path, hgdata.root, hgdata.rootlen - 1) != 0) {
-		pnset_free(hgdata.manifest);
-		hgdata.manifest = NULL;
+	if (scmdata.manifest == NULL ||
+	    (strcmp(scmpath, scmdata.metapath) != 0 &&
+	    access(scmpath, X_OK) == 0) ||
+	    strncmp(path, scmdata.root, scmdata.rootlen - 1) != 0) {
+		pnset_free(scmdata.manifest);
+		scmdata.manifest = NULL;
 
 		(void) strlcpy(basepath, path, MAXPATHLEN);
 
 		/*
-		 * Walk up the directory tree looking for .hg subdirectories.
+		 * Walk up the directory tree looking for metadata
+		 * subdirectories.
 		 */
-		while (access(hgpath, X_OK) == -1) {
+		while (access(scmpath, X_OK) == -1) {
 			slash = strrchr(basepath, '/');
 			if (slash == NULL) {
-				if (!hgdata.rootwarn) {
-					warn("no hg root for \"%s\"\n", path);
-					hgdata.rootwarn = B_TRUE;
+				if (!scmdata.rootwarn) {
+					warn("no metadata directory "
+					    "for \"%s\"\n", path);
+					scmdata.rootwarn = B_TRUE;
 				}
 				return;
 			}
 			*slash = '\0';
-			(void) snprintf(hgpath, MAXPATHLEN, "%s/.hg", basepath);
+			(void) snprintf(scmpath, MAXPATHLEN, "%s/%s", basepath,
+			    meta);
 		}
 
 		/*
-		 * We found a directory with an .hg subdirectory; record it
-		 * and load its manifest.
+		 * We found a directory with an SCM metadata directory; record
+		 * it and load its manifest.
 		 */
-		(void) strlcpy(hgdata.hgpath, hgpath, MAXPATHLEN);
-		(void) strlcpy(hgdata.root, basepath, MAXPATHLEN);
-		hgdata.manifest = load_manifest(hgdata.root);
+		(void) strlcpy(scmdata.metapath, scmpath, MAXPATHLEN);
+		(void) strlcpy(scmdata.root, basepath, MAXPATHLEN);
+		scmdata.manifest = manifest_func(scmdata.root);
 
 		/*
-		 * The logic in check_hg() depends on hgdata.root having a
-		 * single trailing slash, so only add it if it's missing.
+		 * The logic in check_scmdata() depends on scmdata.root having
+		 * a single trailing slash, so only add it if it's missing.
 		 */
-		if (hgdata.root[strlen(hgdata.root) - 1] != '/')
-			(void) strlcat(hgdata.root, "/", MAXPATHLEN);
-		hgdata.rootlen = strlen(hgdata.root);
+		if (scmdata.root[strlen(scmdata.root) - 1] != '/')
+			(void) strlcat(scmdata.root, "/", MAXPATHLEN);
+		scmdata.rootlen = strlen(scmdata.root);
 	}
 }
 
 /*
- * Check if a file is under Mercurial control by checking against the manifest.
+ * If necessary, change our active manifest to be appropriate for `path'.
  */
+static void
+chdir_git(const char *path)
+{
+	chdir_scmdata(path, ".git", git_manifest);
+}
+
+static void
+chdir_hg(const char *path)
+{
+	chdir_scmdata(path, ".hg", hg_manifest);
+}
+
 /* ARGSUSED */
 static int
-check_hg(const char *path, const struct FTW *ftwp)
+check_scmdata(const char *path, const struct FTW *ftwp)
 {
 	/*
 	 * The manifest paths are relative to the manifest root; skip past it.
 	 */
-	path += hgdata.rootlen;
+	path += scmdata.rootlen;
 
-	return (hgdata.manifest != NULL && pnset_check(hgdata.manifest, path));
-}
-/* ARGSUSED */
-static int
-check_git(const char *path, const struct FTW *ftwp)
-{
-	path += 2;		/* Skip "./" */
-	return (gitmanifest != NULL && pnset_check(gitmanifest, path));
+	return (scmdata.manifest != NULL && pnset_check(scmdata.manifest,
+	    path));
 }
 
 /*
