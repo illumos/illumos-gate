@@ -164,7 +164,6 @@ _MANFILES=	6to4relay.1m		\
 		getdevpolicy.1m		\
 		getdgrp.1m		\
 		getent.1m		\
-		gettable.1m		\
 		getty.1m		\
 		getvol.1m		\
 		groupadd.1m		\
@@ -181,7 +180,6 @@ _MANFILES=	6to4relay.1m		\
 		halt.1m			\
 		hextoalabel.1m		\
 		hostconfig.1m		\
-		htable.1m		\
 		ickey.1m		\
 		id.1m			\
 		idmap.1m		\
