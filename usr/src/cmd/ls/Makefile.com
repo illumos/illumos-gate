@@ -35,8 +35,6 @@ include ../../Makefile.cmd
 
 LDLIBS += -lsec -lnvpair -lcmdutils -lcurses
 CFLAGS	+=	$(CCVERBOSE)
-CERRWARN +=	-_gcc=-Wno-parentheses
-CERRWARN +=	-_gcc=-Wno-uninitialized
 $(XPG4) := CFLAGS += -DXPG4
 
 # Include all XPG4 changes in the XPG6 version
