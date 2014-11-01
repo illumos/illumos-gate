@@ -33,6 +33,7 @@
  * Use is subject to license terms.
  */
 
+#include <sys/sysmacros.h>
 #include "drmP.h"
 #include "drm.h"
 #include "i915_drm.h"
@@ -246,7 +247,7 @@ i915_tiling_ok(struct drm_device *dev, int stride, int size, int tiling_mode)
 	if (stride < tile_width)
 		return 0;
 
-	if (stride & (stride - 1))
+	if (!ISP2(stride))
 		return 0;
 
 	/* We don't handle the aperture area covered by the fence being bigger

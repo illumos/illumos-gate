@@ -337,7 +337,7 @@ segmap_create(struct seg *seg, void *argsp)
 		"%d, using %d", nfreelist, max_ncpus);
 		nfreelist = max_ncpus;
 	}
-	if (nfreelist & (nfreelist - 1)) {
+	if (!ISP2(nfreelist)) {
 		/* round up nfreelist to the next power of two. */
 		nfreelist = 1 << (highbit(nfreelist));
 	}

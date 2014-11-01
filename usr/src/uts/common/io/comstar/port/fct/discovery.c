@@ -22,6 +22,7 @@
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
+#include <sys/sysmacros.h>
 #include <sys/conf.h>
 #include <sys/file.h>
 #include <sys/ddi.h>
@@ -219,7 +220,7 @@ fct_li_to_txt(fct_link_info_t *li, char *topology, char *speed)
 		(void) strcpy(topology, topologies[li->port_topology]);
 	}
 
-	if ((s == 0) || ((s & 0xf00) != 0) || ((s & (s - 1)) != 0)) {
+	if ((s == 0) || ((s & 0xf00) != 0) || !ISP2(s)) {
 		speed[0] = '?';
 	} else if (s == PORT_SPEED_10G) {
 		speed[0] = '1';

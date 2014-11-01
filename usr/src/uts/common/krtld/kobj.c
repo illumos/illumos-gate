@@ -3787,7 +3787,7 @@ kobj_comp_setup(struct _buf *file, struct compinfo *cip)
 	hdr = kobj_comphdr(file);
 	if (hdr->ch_magic != CH_MAGIC_ZLIB || hdr->ch_version != CH_VERSION ||
 	    hdr->ch_algorithm != CH_ALG_ZLIB || hdr->ch_fsize == 0 ||
-	    (hdr->ch_blksize & (hdr->ch_blksize - 1)) != 0) {
+	    !ISP2(hdr->ch_blksize)) {
 		kobj_free(file->_dbuf, cip->fsize);
 		return (-1);
 	}

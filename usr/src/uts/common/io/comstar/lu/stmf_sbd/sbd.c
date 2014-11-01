@@ -25,6 +25,7 @@
  * Copyright (c) 2013 by Delphix. All rights reserved.
  */
 
+#include <sys/sysmacros.h>
 #include <sys/conf.h>
 #include <sys/file.h>
 #include <sys/ddi.h>
@@ -1836,7 +1837,7 @@ sbd_create_register_lu(sbd_create_and_reg_lu_t *slu, int struct_sz,
 		sl->sl_flags |= SL_WRITE_PROTECTED;
 	}
 	if (slu->slu_blksize_valid) {
-		if ((slu->slu_blksize & (slu->slu_blksize - 1)) ||
+		if (!ISP2(slu->slu_blksize) ||
 		    (slu->slu_blksize > (32 * 1024)) ||
 		    (slu->slu_blksize == 0)) {
 			*err_ret = SBD_RET_INVALID_BLKSIZE;

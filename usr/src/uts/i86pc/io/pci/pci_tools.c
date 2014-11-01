@@ -22,6 +22,7 @@
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
+#include <sys/sysmacros.h>
 #include <sys/types.h>
 #include <sys/mkdev.h>
 #include <sys/stat.h>
@@ -588,7 +589,7 @@ pcitool_cfg_access(pcitool_reg_t *prg, boolean_t write_flag,
 	pci_cfgacc_req_t req;
 	uint32_t max_offset;
 
-	if ((size <= 0) || (size > 8) || ((size & (size - 1)) != 0)) {
+	if ((size <= 0) || (size > 8) || !ISP2(size)) {
 		prg->status = PCITOOL_INVALID_SIZE;
 		return (ENOTSUP);
 	}

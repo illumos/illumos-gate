@@ -1288,10 +1288,10 @@ segkmem_alloc_lp(vmem_t *vmp, size_t *sizep, size_t align, int vmflag)
 			 * backoff at trying large pages and reaping
 			 */
 			if (lpthrt > segkmem_lpthrottle_start &&
-			    (lpthrt & (lpthrt - 1))) {
+			    !ISP2(lpthrt)) {
 				lpcb->allocs_throttled++;
 				lpthrt--;
-				if ((lpthrt & (lpthrt - 1)) == 0)
+				if (ISP2(lpthrt))
 					kmem_reap();
 				return (segkmem_alloc(vmp, size, vmflag));
 			}
@@ -1475,15 +1475,13 @@ segkmem_lpsetup()
 	}
 
 	/* set heap_lp quantum if necessary */
-	if (segkmem_heaplp_quantum == 0 ||
-	    (segkmem_heaplp_quantum & (segkmem_heaplp_quantum - 1)) ||
+	if (segkmem_heaplp_quantum == 0 || !ISP2(segkmem_heaplp_quantum) ||
 	    P2PHASE(segkmem_heaplp_quantum, segkmem_lpsize)) {
 		segkmem_heaplp_quantum = segkmem_lpsize;
 	}
 
 	/* set kmem_lp quantum if necessary */
-	if (segkmem_kmemlp_quantum == 0 ||
-	    (segkmem_kmemlp_quantum & (segkmem_kmemlp_quantum - 1)) ||
+	if (segkmem_kmemlp_quantum == 0 || !ISP2(segkmem_kmemlp_quantum) ||
 	    segkmem_kmemlp_quantum > segkmem_heaplp_quantum) {
 		segkmem_kmemlp_quantum = segkmem_heaplp_quantum;
 	}

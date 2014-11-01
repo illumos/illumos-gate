@@ -13039,7 +13039,7 @@ dtrace_dof_slurp(dof_hdr_t *dof, dtrace_vstate_t *vstate, cred_t *cr,
 		if (!(sec->dofs_flags & DOF_SECF_LOAD))
 			continue; /* just ignore non-loadable sections */
 
-		if (sec->dofs_align & (sec->dofs_align - 1)) {
+		if (!ISP2(sec->dofs_align)) {
 			dtrace_dof_error(dof, "bad section alignment");
 			return (-1);
 		}
