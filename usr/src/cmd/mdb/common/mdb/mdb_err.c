@@ -113,7 +113,8 @@ static const char *const _mdb_errlist[] = {
 	"too many enabled watchpoints for this machine", /* EMDB_WPTOOMANY */
 	"DTrace is active",				/* EMDB_DTACTIVE */
 	"boot-loaded module cannot be unloaded",	/* EMDB_KMODNOUNLOAD */
-	"unexpected short write",			/* EMDB_SHORTWRITE */
+	"stack frame pointer is invalid",		/* EMDB_STKFRAME */
+	"unexpected short write"			/* EMDB_SHORTWRITE */
 };
 
 static const int _mdb_nerr = sizeof (_mdb_errlist) / sizeof (_mdb_errlist[0]);

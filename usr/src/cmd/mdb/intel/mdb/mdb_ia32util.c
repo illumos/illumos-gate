@@ -24,6 +24,7 @@
  */
 /*
  * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -194,6 +195,7 @@ mdb_ia32_kvm_stack_iter(mdb_tgt_t *t, const mdb_tgt_gregset_t *gsp,
 	mdb_tgt_gregset_t gregs;
 	kreg_t *kregs = &gregs.kregs[0];
 	int got_pc = (gsp->kregs[KREG_EIP] != 0);
+	int err;
 
 	struct {
 		uintptr_t fr_savfp;
@@ -203,7 +205,7 @@ mdb_ia32_kvm_stack_iter(mdb_tgt_t *t, const mdb_tgt_gregset_t *gsp,
 
 	uintptr_t fp = gsp->kregs[KREG_EBP];
 	uintptr_t pc = gsp->kregs[KREG_EIP];
-	uintptr_t lastfp;
+	uintptr_t lastfp = 0;
 
 	ssize_t size;
 	uint_t argc;
@@ -219,16 +221,25 @@ mdb_ia32_kvm_stack_iter(mdb_tgt_t *t, const mdb_tgt_gregset_t *gsp,
 
 	while (fp != 0) {
 
-		if (fp & (STACK_ALIGN - 1))
-			return (set_errno(EMDB_STKALIGN));
-
+		/*
+		 * Ensure progress (increasing fp), and prevent
+		 * endless loop with the same FP.
+		 */
+		if (fp <= lastfp) {
+			err = EMDB_STKFRAME;
+			goto badfp;
+		}
+		if (fp & (STACK_ALIGN - 1)) {
+			err = EMDB_STKALIGN;
+			goto badfp;
+		}
 		if ((size = mdb_tgt_vread(t, &fr, sizeof (fr), fp)) >=
 		    (ssize_t)(2 * sizeof (uintptr_t))) {
 			size -= (ssize_t)(2 * sizeof (uintptr_t));
 			argc = kvm_argcount(t, fr.fr_savpc, size);
 		} else {
-			bzero(&fr, sizeof (fr));
-			argc = 0;
+			err = EMDB_NOMAP;
+			goto badfp;
 		}
 
 		if (got_pc && func(arg, pc, argc, fr.fr_argv, &gregs) != 0)
@@ -257,6 +268,10 @@ mdb_ia32_kvm_stack_iter(mdb_tgt_t *t, const mdb_tgt_gregset_t *gsp,
 	}
 
 	return (0);
+
+badfp:
+	mdb_printf("%p [%s]", fp, mdb_strerror(err));
+	return (set_errno(err));
 }
 
 /*
