@@ -32,10 +32,13 @@
 #define	LX_SYS_rt_sigreturn	15
 
 /*
- * Each JMP must occupy 16 bytes
+ * Each JMP must occupy 16 bytes.
+ * The syscall offset is stored immediately above the red zone to avoid
+ * clobbering data there.  Once lx_handler is reached, the stack will be
+ * advanced to account for both the red zone and the stored syscall offset.
  */
 #define	JMP	\
-	pushq	$_CONST(. - lx_handler_table); \
+	movl	$_CONST(. - lx_handler_table), -136(%rsp); \
 	jmp	lx_handler;	\
 	.align	16;
 
@@ -49,7 +52,7 @@
  * the normal emulation routine.
  */
 #define	TJMP	\
-	pushq	$_CONST(. - lx_handler_trace_table); \
+	movl	$_CONST(. - lx_handler_trace_table), -136(%rsp); \
 	jmp	lx_handler_trace;	\
 	.align	16;
 
@@ -126,12 +129,12 @@ lx_sigreturn_tolibc(uintptr_t sp)
 	SET_SIZE(lx_handler_table)
 
 	ENTRY_NP(lx_handler_trace)
-	subq	$128, %rsp		/* skip red zone */
+	subq	$136, %rsp		/* skip red zone + syscall offset */
 	pushq	%rsi
 	movq    lx_traceflag@GOTPCREL(%rip), %rsi
 	movq	$1, (%rsi)
 	popq	%rsi
-	addq	$128, %rsp
+	addq	$136, %rsp
 	/*
 	 * While we could just fall through to lx_handler(), we "tail-call" it
 	 * instead to make ourselves a little more comprehensible to trace
@@ -144,9 +147,19 @@ lx_sigreturn_tolibc(uintptr_t sp)
 	/*
 	 * We are running on the Linux process's stack here so we have to
 	 * account for the AMD64 ABI red zone of 128 bytes past the %rsp which
-	 * the process can use as scratch space.
+	 * the process can use as scratch space.  In addition to the red zone,
+	 * the syscall offset stored by the handler tables above must be
+	 * accounted for.  To that end, rsp is advanced by a further 8 bytes to
+	 * include the syscall offset.
 	 */
-	subq	$128, %rsp
+	subq	$136, %rsp /* red zone + syscall offset */
+
+	/*
+	 * In order to keep the hander_table entries within 16 bytes, only 4
+	 * bytes of the syscall offset are stored during dispatch.
+	 * The upper 4 bytes are zeroed here to account for that.
+	 */
+	movl	$0, 4(%rsp)
 
 	/*
 	 * %rbp isn't always going to be a frame pointer on Linux, but when
@@ -190,13 +203,14 @@ lx_sigreturn_tolibc(uintptr_t sp)
 
 	/*
 	 * The kernel drops us into the middle of one of the tables above
-	 * that then pushes that table offset onto the stack, and calls into
-	 * lx_handler. That offset indicates the system call number while
-	 * %rax holds the return address for the system call. We replace the
-	 * value on the stack with the return address, and use the value to
-	 * compute the system call number by dividing by the table entry size.
+	 * that then stores the table offset immediately above the 128 byte
+	 * red zone and calls into lx_handler.  That offset indicates the
+	 * syscall number while %rax holds the return address for the syscall.
+	 * We replace the value on the stack with the return address, and use
+	 * the value to compute the system call number by dividing by the table
+	 * entry size.
 	 */
-	xchgq	136(%rbp), %rax		/* 128 byte red zone + rbp we pushed */
+	xchgq	8(%rbp), %rax		/* just after the rbp we pushed */
 	shrq	$4, %rax
 	movq	%rax, LXR_RAX(%rsp)
 
@@ -239,8 +253,16 @@ lx_sigreturn_tolibc(uintptr_t sp)
 	movq	%rbp, %rsp
 	popq	%rbp
 
-	addq	$128, %rsp		/* red zone */
-	ret
+	/*
+	 * Returning from lx_handler is complicated by our preservation of the
+	 * red zone on the stack.  The return address resides just above the
+	 * red zone making it impossible to use 'retq' and return rsp to the
+	 * correct value.  Instead, rsp is manually moved to its original
+	 * position and we jmp using the return address at the known stack
+	 * offset above the red zone.
+	 */
+	addq	$136, %rsp		/* red zone + return address */
+	jmpq	*-136(%rsp)
 	SET_SIZE(lx_handler)
 
 	/*
