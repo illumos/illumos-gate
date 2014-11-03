@@ -2698,6 +2698,8 @@ zone_init(void)
 static void
 zone_free(zone_t *zone)
 {
+	zone_dl_t *zdl;
+
 	ASSERT(zone != global_zone);
 	ASSERT(zone->zone_ntasks == 0);
 	ASSERT(zone->zone_nlwps == 0);
@@ -2726,6 +2728,19 @@ zone_free(zone_t *zone)
 	list_destroy(&zone->zone_ref_list);
 	zone_free_zsd(zone);
 	zone_free_datasets(zone);
+
+	/*
+	 * While dlmgmtd should have removed all of these, it could have left
+	 * something behind or crashed. In which case it's not safe for us to
+	 * assume that the list is empty which list_destroy() will ASSERT. We
+	 * clean up for our userland comrades which may have crashed, or worse,
+	 * been disabled by SMF.
+	 */
+	while ((zdl = list_remove_head(&zone->zone_dl_list)) != NULL) {
+		if (zdl->zdl_net != NULL)
+			nvlist_free(zdl->zdl_net);
+		kmem_free(zdl, sizeof (zone_dl_t));
+	}
 	list_destroy(&zone->zone_dl_list);
 
 	if (zone->zone_rootvp != NULL)

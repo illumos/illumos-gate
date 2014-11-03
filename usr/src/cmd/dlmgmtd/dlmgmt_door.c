@@ -384,6 +384,11 @@ dlmgmt_upcall_destroy(void *argp, void *retp, size_t *sz, zoneid_t zoneid,
 	if ((err = dlmgmt_checkprivs(linkp->ll_class, cred)) != 0)
 		goto done;
 
+	if (linkp->ll_tomb == B_TRUE) {
+		err = EINPROGRESS;
+		goto done;
+	}
+
 	if (((linkp->ll_flags & flags) & DLMGMT_ACTIVE) != 0) {
 		if ((err = dlmgmt_delete_db_entry(linkp, DLMGMT_ACTIVE)) != 0)
 			goto done;
@@ -657,6 +662,12 @@ dlmgmt_remapid(void *argp, void *retp, size_t *sz, zoneid_t zoneid,
 	if ((err = dlmgmt_checkprivs(linkp->ll_class, cred)) != 0)
 		goto done;
 
+	if (linkp->ll_tomb == B_TRUE) {
+		err = EBUSY;
+		goto done;
+	}
+
+
 	if (link_by_name(remapid->ld_link, linkp->ll_zoneid) != NULL) {
 		err = EEXIST;
 		goto done;
@@ -717,6 +728,11 @@ dlmgmt_upid(void *argp, void *retp, size_t *sz, zoneid_t zoneid,
 
 	if ((err = dlmgmt_checkprivs(linkp->ll_class, cred)) != 0)
 		goto done;
+
+	if (linkp->ll_tomb == B_TRUE) {
+		err = EBUSY;
+		goto done;
+	}
 
 	if (linkp->ll_flags & DLMGMT_ACTIVE) {
 		err = EINVAL;
@@ -1225,6 +1241,11 @@ dlmgmt_setzoneid(void *argp, void *retp, size_t *sz, zoneid_t zoneid,
 	if ((err = dlmgmt_checkprivs(linkp->ll_class, cred)) != 0)
 		goto done;
 
+	if (linkp->ll_tomb == B_TRUE) {
+		err = EBUSY;
+		goto done;
+	}
+
 	/* We can only assign an active link to a zone. */
 	if (!(linkp->ll_flags & DLMGMT_ACTIVE)) {
 		err = EINVAL;
@@ -1341,24 +1362,19 @@ dlmgmt_zonehalt(void *argp, void *retp, size_t *sz, zoneid_t zoneid,
 			err = EINVAL;
 		} else {
 			/*
-			 * dlmgmt_db_fini makes ioctls which lead to the
-			 * following kernel stack:
-			 *     vnic_ioc_delete
-			 *     vnic_dev_delete
-			 *     dls_devnet_destroy
-			 * dls_devnet_destroy calls mac_perim_enter_by_mh
-			 * which could lead to deadlock if another process is
-			 * holding the mac perimeter then made an upcall to
-			 * dlmgmtd.  To try to avoid this, we serialize zone
-			 * activity on the /etc/dladm/zone.lck file.
+			 * dls and mac don't honor the locking rules defined in
+			 * mac. In order to try and make that case less likely
+			 * to happen, we try to serialize some of the zone
+			 * activity here between dlmgmtd and the brands on
+			 * /etc/dladm/zone.lck
 			 */
 			int fd;
 
 			while ((fd = open(ZONE_LOCK, O_WRONLY |
 			    O_CREAT | O_EXCL, S_IRUSR | S_IWUSR)) < 0)
-				(void) sleep(1);
-			(void) write(fd, my_pid, sizeof(my_pid));
-        		(void) close(fd);
+			(void) sleep(1);
+			(void) write(fd, my_pid, sizeof (my_pid));
+			(void) close(fd);
 
 			dlmgmt_table_lock(B_TRUE);
 			dlmgmt_db_fini(zonehalt->ld_zoneid);

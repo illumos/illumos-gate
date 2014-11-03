@@ -68,6 +68,7 @@ typedef struct dlmgmt_link_s {
 	avl_node_t		ll_loan_node;
 	uint32_t		ll_flags;
 	uint32_t		ll_gen;		/* generation number */
+	boolean_t		ll_tomb;	/* tombstombed */
 } dlmgmt_link_t;
 
 /*
@@ -85,7 +86,7 @@ typedef struct dlmgmt_dlconf_s {
 	avl_node_t		ld_node;
 } dlmgmt_dlconf_t;
 
-#define ZONE_LOCK	"/etc/dladm/zone.lck"
+#define	ZONE_LOCK	"/etc/dladm/zone.lck"
 
 extern boolean_t	debug;
 extern const char	*progname;

@@ -1019,7 +1019,6 @@ zone_bootup(zlog_t *zlogp, const char *bootargs, int zstate, boolean_t debug)
 	fs_callback_t cb;
 	brand_handle_t bh;
 	zone_iptype_t iptype;
-	boolean_t links_loaded = B_FALSE;
 	dladm_status_t status;
 	char errmsg[DLADM_STRSIZE];
 	int err;
@@ -1122,7 +1121,6 @@ zone_bootup(zlog_t *zlogp, const char *bootargs, int zstate, boolean_t debug)
 			    " %s", dladm_status2str(status, errmsg));
 			goto bad;
 		}
-		links_loaded = B_TRUE;
 	}
 
 	/*
@@ -1177,8 +1175,7 @@ bad:
 	 * state, RUNNING, and then invoke the hook as if we're halting.
 	 */
 	(void) brand_poststatechg(zlogp, ZONE_STATE_RUNNING, Z_HALT, debug);
-	if (links_loaded)
-		(void) dladm_zone_halt(dld_handle, zoneid);
+
 	return (-1);
 }
 

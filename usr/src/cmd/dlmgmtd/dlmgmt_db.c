@@ -45,6 +45,7 @@
 #include <libcontract_priv.h>
 #include <sys/contract/process.h>
 #include <sys/vnic.h>
+#include <zone.h>
 #include "dlmgmt_impl.h"
 
 typedef enum dlmgmt_db_op {
@@ -720,11 +721,13 @@ parse_linkprops(char *buf, dlmgmt_link_t *linkp)
 	char			attr_name[MAXLINKATTRLEN];
 	size_t			attr_buf_len = 0;
 	void			*attr_buf = NULL;
+	boolean_t		rename;
 
 	curr = buf;
 	len = strlen(buf);
 	attr_name[0] = '\0';
 	for (i = 0; i < len; i++) {
+		rename = B_FALSE;
 		char		c = buf[i];
 		boolean_t	match = (c == '=' ||
 		    (c == ',' && !found_type) || c == ';');
@@ -774,6 +777,21 @@ parse_linkprops(char *buf, dlmgmt_link_t *linkp)
 					goto parse_fail;
 				linkp->ll_media =
 				    (uint32_t)*(int64_t *)attr_buf;
+			} else if (strcmp(attr_name, "zone") == 0) {
+				if (read_str(curr, &attr_buf) == 0)
+					goto parse_fail;
+				linkp->ll_zoneid = getzoneidbyname(attr_buf);
+				if (linkp->ll_zoneid == -1) {
+					if (errno == EFAULT)
+						abort();
+					/*
+					 * If we can't find the zone, assign the
+					 * link to the GZ and mark it for being
+					 * renamed.
+					 */
+					linkp->ll_zoneid = 0;
+					rename = B_TRUE;
+				}
 			} else {
 				attr_buf_len = translators[type].read_func(curr,
 				    &attr_buf);
@@ -816,6 +834,16 @@ parse_linkprops(char *buf, dlmgmt_link_t *linkp)
 				goto parse_fail;
 
 			(void) snprintf(attr_name, MAXLINKATTRLEN, "%s", curr);
+		}
+
+		/*
+		 * The zone that this link belongs to has died, we are
+		 * reparenting it to the GZ and renaming it to avoid name
+		 * collisions.
+		 */
+		if (rename == B_TRUE) {
+			(void) snprintf(linkp->ll_link, MAXLINKNAMELEN,
+			    "SUNWorphan%u", (uint16_t)(gethrtime() / 1000));
 		}
 		curr = buf + i + 1;
 	}
@@ -1228,12 +1256,19 @@ generate_link_line(dlmgmt_link_t *linkp, boolean_t persist, char *buf)
 
 	ptr += snprintf(ptr, BUFLEN(lim, ptr), "%s\t", linkp->ll_link);
 	if (!persist) {
+		char zname[ZONENAME_MAX];
 		/*
-		 * We store the linkid in the active database so that dlmgmtd
-		 * can recover in the event that it is restarted.
+		 * We store the linkid and the zone name in the active database
+		 * so that dlmgmtd can recover in the event that it is
+		 * restarted.
 		 */
 		u64 = linkp->ll_linkid;
 		ptr += write_uint64(ptr, BUFLEN(lim, ptr), "linkid", &u64);
+
+		if (getzonenamebyid(linkp->ll_zoneid, zname,
+		    sizeof (zname)) != -1) {
+			ptr += write_str(ptr, BUFLEN(lim, ptr), "zone", zname);
+		}
 	}
 	u64 = linkp->ll_class;
 	ptr += write_uint64(ptr, BUFLEN(lim, ptr), "class", &u64);
@@ -1498,6 +1533,11 @@ done:
 
 /*
  * Remove all links in the given zoneid.
+ *
+ * We do this work in two different passes. In the first pass, we remove any
+ * entry that hasn't been loaned and mark every entry that has been loaned as
+ * something that is going to be tombstomed. In the second pass, we drop the
+ * table lock for every entry and remove the tombstombed entry for our zone.
  */
 void
 dlmgmt_db_fini(zoneid_t zoneid)
@@ -1507,30 +1547,66 @@ dlmgmt_db_fini(zoneid_t zoneid)
 	while (linkp != NULL) {
 		next_linkp = AVL_NEXT(&dlmgmt_name_avl, linkp);
 		if (linkp->ll_zoneid == zoneid) {
-			vnic_ioc_delete_t ioc;
-			boolean_t onloan;
-
-			ioc.vd_vnic_id = linkp->ll_linkid;
-			onloan = linkp->ll_onloan;
+			boolean_t onloan = linkp->ll_onloan;
 
 			/*
 			 * Cleanup any VNICs that were loaned to the zone
 			 * before the zone goes away and we can no longer
 			 * refer to the VNIC by the name/zoneid.
 			 */
-			if (onloan)
+			if (onloan) {
 				(void) dlmgmt_delete_db_entry(linkp,
 				    DLMGMT_ACTIVE);
+				linkp->ll_tomb = B_TRUE;
+			} else {
+				(void) dlmgmt_destroy_common(linkp,
+				    DLMGMT_ACTIVE | DLMGMT_PERSIST);
+			}
 
-			(void) dlmgmt_destroy_common(linkp,
-			    DLMGMT_ACTIVE | DLMGMT_PERSIST);
-
-			if (onloan && ioctl(dladm_dld_fd(dld_handle),
-			    VNIC_IOC_DELETE, &ioc) < 0)
-				dlmgmt_log(LOG_WARNING, "dlmgmt_db_fini "
-				    "delete VNIC ioctl failed %d %d",
-				    ioc.vd_vnic_id, errno);
 		}
 		linkp = next_linkp;
 	}
+
+again:
+	linkp = avl_first(&dlmgmt_name_avl);
+	while (linkp != NULL) {
+		vnic_ioc_delete_t ioc;
+
+		next_linkp = AVL_NEXT(&dlmgmt_name_avl, linkp);
+
+		if (linkp->ll_zoneid != zoneid) {
+			linkp = next_linkp;
+			continue;
+		}
+		ioc.vd_vnic_id = linkp->ll_linkid;
+		if (linkp->ll_tomb != B_TRUE)
+			abort();
+
+		/*
+		 * We have to drop the table lock while going up into the
+		 * kernel. If we hold the table lock while deleting a vnic, we
+		 * may get blocked on the mac perimeter and the holder of it may
+		 * want something from dlmgmtd.
+		 */
+		dlmgmt_table_unlock();
+
+		if (ioctl(dladm_dld_fd(dld_handle),
+		    VNIC_IOC_DELETE, &ioc) < 0)
+			dlmgmt_log(LOG_WARNING, "dlmgmt_db_fini "
+			    "delete VNIC ioctl failed %d %d",
+			    ioc.vd_vnic_id, errno);
+
+		/*
+		 * Even though we've dropped the lock, we know that nothing else
+		 * could have removed us. Therefore, it should be safe to go
+		 * through and delete ourselves, but do nothing else. We'll have
+		 * to restart iteration from the beginning. This can be painful.
+		 */
+		dlmgmt_table_lock(B_TRUE);
+
+		(void) dlmgmt_destroy_common(linkp,
+		    DLMGMT_ACTIVE | DLMGMT_PERSIST);
+		goto again;
+	}
+
 }
