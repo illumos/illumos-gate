@@ -22,6 +22,8 @@ timeout = 60
 post =
 outputdir = /var/tmp/test_results
 
+[/opt/libc-tests/tests/fpround_test]
+
 [/opt/libc-tests/tests/newlocale_test]
 
 [/opt/libc-tests/tests/nl_langinfo_test]

@@ -10,11 +10,15 @@
 #
 
 #
-# Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 #
 
-SUBDIRS = fpround newlocale nl_langinfo wcsrtombs wctype
-
 include $(SRC)/Makefile.master
-include $(SRC)/test/Makefile.com
+
+PROG = fpround_test
+ARCHPROG = fpround_test
+
+include ../Makefile.com
+
+LDLIBS += -lm
+LDLIBS64 += -lm
