@@ -10347,7 +10347,6 @@ f usr/sbin/fuser 0555 root bin
 f usr/sbin/fwflash 0555 root bin
 f usr/sbin/getdevpolicy 0555 root sys
 f usr/sbin/getmajor 0755 root sys
-f usr/sbin/gettable 0555 root bin
 f usr/sbin/groupadd 0555 root sys
 f usr/sbin/groupdel 0555 root sys
 f usr/sbin/groupmod 0555 root sys
@@ -10357,7 +10356,6 @@ f usr/sbin/gsscred 0555 root sys
 f usr/sbin/halt 0755 root bin
 s usr/sbin/hostconfig=../../sbin/hostconfig
 f usr/sbin/hotplug 0555 root bin
-f usr/sbin/htable 0555 root bin
 d usr/sbin/i86 0755 root bin
 f usr/sbin/idmap 0555 root bin
 f usr/sbin/if_mpadm 0555 root bin
@@ -11943,7 +11941,6 @@ f usr/share/man/man1m/getdev.1m 0444 root bin
 f usr/share/man/man1m/getdevpolicy.1m 0444 root bin
 f usr/share/man/man1m/getdgrp.1m 0444 root bin
 f usr/share/man/man1m/getent.1m 0444 root bin
-f usr/share/man/man1m/gettable.1m 0444 root bin
 f usr/share/man/man1m/getty.1m 0444 root bin
 f usr/share/man/man1m/getvol.1m 0444 root bin
 f usr/share/man/man1m/groupadd.1m 0444 root bin
@@ -11954,7 +11951,6 @@ f usr/share/man/man1m/gsscred.1m 0444 root bin
 f usr/share/man/man1m/gssd.1m 0444 root bin
 f usr/share/man/man1m/halt.1m 0444 root bin
 f usr/share/man/man1m/hostconfig.1m 0444 root bin
-f usr/share/man/man1m/htable.1m 0444 root bin
 f usr/share/man/man1m/id.1m 0444 root bin
 f usr/share/man/man1m/idmap.1m 0444 root bin
 f usr/share/man/man1m/idmapd.1m 0444 root bin
@@ -19163,6 +19159,7 @@ f usr/share/man/man9f/devmap_set_ctx_timeout.9f 0444 root bin
 f usr/share/man/man9f/devmap_setup.9f 0444 root bin
 s usr/share/man/man9f/devmap_umem_setup.9f=devmap_devmem_setup.9f
 f usr/share/man/man9f/devmap_unload.9f 0444 root bin
+s usr/share/man/man9f/dev_err.9f=cmn_err.9f
 f usr/share/man/man9f/disksort.9f 0444 root bin
 f usr/share/man/man9f/dlbindack.9f 0444 root bin
 s usr/share/man/man9f/dlerrorack.9f=dlbindack.9f
@@ -19721,6 +19718,7 @@ s usr/share/man/man9f/va_copy.9f=va_arg.9f
 s usr/share/man/man9f/va_end.9f=va_arg.9f
 s usr/share/man/man9f/va_start.9f=va_arg.9f
 s usr/share/man/man9f/vcmn_err.9f=cmn_err.9f
+s usr/share/man/man9f/vzcmn_err.9f=cmn_err.9f
 f usr/share/man/man9f/vsprintf.9f 0444 root bin
 s usr/share/man/man9f/wr.9f=WR.9f
 s usr/share/man/man9f/zcmn_err.9f=cmn_err.9f
