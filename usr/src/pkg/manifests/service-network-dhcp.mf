@@ -21,72 +21,9 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2014 Garrett D'Amore <garrett@damore.org>
 #
 
 set name=pkg.fmri value=pkg:/service/network/dhcp@$(PKGVERS)
-set name=pkg.description \
-    value="Usr filesystem portion of the SunOS BOOTP/DHCP service, which uses the BOOT Protocol and/or Dynamic Host Configuration Protocol to provide network configuration parameters to BOOTP/DHCP clients. Administration utilities for the service are included."
-set name=pkg.summary value="BOOTP/DHCP Server Services"
-set name=info.classification \
-    value=org.opensolaris.category.2008:System/Services
+set name=pkg.obsolete value=true
 set name=variant.arch value=$(ARCH)
-dir path=etc group=sys
-dir path=etc/inet group=sys
-dir path=etc/init.d group=sys
-dir path=lib
-dir path=lib/svc
-dir path=lib/svc/manifest group=sys
-dir path=lib/svc/manifest/network group=sys
-dir path=usr group=sys
-dir path=usr/include
-dir path=usr/lib
-dir path=usr/lib/inet
-dir path=usr/lib/inet/dhcp
-dir path=usr/lib/inet/dhcp/nsu
-dir path=usr/lib/inet/dhcp/svc
-dir path=usr/lib/inet/dhcp/svcadm
-dir path=usr/sbin
-dir path=usr/share/man
-dir path=usr/share/man/man1m
-dir path=usr/share/man/man5
-file path=etc/init.d/dhcp group=sys mode=0744
-file path=lib/svc/manifest/network/dhcp-server.xml group=sys mode=0444
-file path=usr/include/dhcp_svc_public.h
-file path=usr/lib/inet/dhcp/nsu/rfc2136.so.1
-file path=usr/lib/inet/dhcp/svc/ds_SUNWfiles.so.0
-file path=usr/lib/inet/dhcp/svc/ds_SUNWfiles.so.1
-file path=usr/lib/inet/dhcp/svcadm/dhcpcli.jar mode=0444
-file path=usr/lib/inet/dhcp/svcadm/dhcpcommon.jar mode=0444
-file path=usr/lib/inet/dhcp/svcadm/dhcpconfig mode=0555
-file path=usr/lib/inet/dhcp/svcadm/dhcpsvc.jar mode=0444
-file path=usr/lib/inet/dhcp/svcadm/dhtadm mode=0555
-file path=usr/lib/inet/dhcp/svcadm/pntadm mode=0555
-file path=usr/lib/inet/dsvclockd mode=0555
-file path=usr/lib/inet/in.dhcpd mode=0555
-file path=usr/lib/libdhcpsvc.so.1
-file path=usr/sbin/dhcpconfig mode=0555
-file path=usr/sbin/dhtadm mode=0555
-file path=usr/sbin/pntadm mode=0555
-file path=usr/share/man/man1m/dhcpconfig.1m
-file path=usr/share/man/man1m/dhtadm.1m
-file path=usr/share/man/man1m/dsvclockd.1m
-file path=usr/share/man/man1m/in.dhcpd.1m
-file path=usr/share/man/man1m/pntadm.1m
-file path=usr/share/man/man4/dhcp_network.4
-file path=usr/share/man/man4/dhcpsvc.conf.4
-file path=usr/share/man/man4/dhcptab.4
-file path=usr/share/man/man5/dhcp_modules.5
-legacy pkg=SUNWdhcsr \
-    desc="Root filesystem portion of the SunOS BOOTP/DHCP service, which uses the BOOT Protocol and/or Dynamic Host Configuration Protocol to provide network configuration parameters to BOOTP/DHCP clients. Administration utilities for the service are included." \
-    name="BOOTP/DHCP Server Services, (Root)"
-legacy pkg=SUNWdhcsu \
-    desc="Usr filesystem portion of the SunOS BOOTP/DHCP service, which uses the BOOT Protocol and/or Dynamic Host Configuration Protocol to provide network configuration parameters to BOOTP/DHCP clients. Administration utilities for the service are included." \
-    name="BOOTP/DHCP Server Services, (Usr)"
-license cr_Sun license=cr_Sun
-license lic_CDDL license=lic_CDDL
-license usr/src/cmd/cmd-inet/usr.lib/in.dhcpd/THIRDPARTYLICENSE \
-    license=usr/src/cmd/cmd-inet/usr.lib/in.dhcpd/THIRDPARTYLICENSE
-link path=usr/lib/inet/dhcp/svc/ds_SUNWfiles.so target=./ds_SUNWfiles.so.1
-depend fmri=network/dhcp/dhcpmgr type=require
-depend fmri=network/ftp type=require
-depend fmri=runtime/java type=require

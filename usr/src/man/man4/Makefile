@@ -57,9 +57,6 @@ _MANFILES=	Intro.4				\
 		devices.4			\
 		dfstab.4			\
 		dhcp_inittab.4			\
-		dhcp_network.4			\
-		dhcpsvc.conf.4			\
-		dhcptab.4			\
 		dialups.4			\
 		dir_ufs.4			\
 		driver.conf.4			\

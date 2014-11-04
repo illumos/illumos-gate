@@ -1,13 +1,13 @@
 '\" te
+.\" Copyright 2014 Garrett D'Amore <garrett@damore.org>
 .\" Copyright (c) 2001, Sun Microsystems, Inc. All Rights Reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DHCP 5 "Jan 5, 2007"
+.TH DHCP 5 "Aug 15, 2014"
 .SH NAME
 dhcp \- Dynamic Host Configuration Protocol
 .SH DESCRIPTION
-.sp
 .LP
 Dynamic Host Configuration Protocol (\fBDHCP\fR) enables host systems in a
 \fBTCP/IP\fR network to be configured automatically for the network as they
@@ -15,28 +15,23 @@ boot. \fBDHCP\fR uses a client/server mechanism: servers store configuration
 information for clients, and provide that information upon a client's request.
 The information can include the client's \fBIP\fR address and information about
 network services available to the client.
-.sp
 .LP
-This manual page provides a brief summary of the Solaris \fBDHCP\fR
+This manual page provides a brief summary of the \fBDHCP\fR
 implementation.
-.SS "Solaris DHCP Client"
-.sp
+.SS "DHCP Client"
 .LP
-The Solaris DHCP client is implemented as background daemon,
+The DHCP client is implemented as background daemon,
 \fBdhcpagent\fR(1M).
-.sp
 .LP
 For IPv4, this daemon is started automatically during bootup if there exists at
 least one \fBdhcp.\fR\fIinterface\fR file in \fB/etc\fR. Only interfaces with a
 corresponding \fB\fR\fB/etc/dhcp.\fR\fB\fIinterface\fR\fR file are
 automatically configured during boot.
-.sp
 .LP
 For IPv6, this daemon is started automatically when commanded by \fBin.ndpd\fR
 (based on IPv6 Routing Advertisement messages). No
 \fB/etc/dhcp\fR.\fIinterface\fR file is necessary, but such a file can be used
 to specify an interface as "primary," provided that IPv4 DHCP is also in use.
-.sp
 .LP
 Network parameters needed for system configuration during bootup are extracted
 from the information received by the daemon through the use of the
@@ -44,80 +39,30 @@ from the information received by the daemon through the use of the
 changing the tunables in the \fB/etc/default/dhcpagent\fR file. The daemon is
 controlled by the \fBifconfig\fR(1M) utility. Check the status of the daemon
 using the \fBnetstat\fR(1M) and \fBifconfig\fR(1M) commands.
-.SS "Solaris DHCP Server"
-.sp
-.LP
-The Solaris \fBDHCP\fR server is implemented as a background daemon,
-\fBin.dhcpd\fR(1M). This daemon can deliver network configuration information
-to either \fBBOOTP\fR or \fBDHCP\fR clients. The Solaris \fBDHCP\fR service can
-be managed using the \fBdhcpmgr\fR(1M) \fBGUI\fR or the command line utilities
-\fBdhcpconfig\fR(1M), \fBdhtadm\fR(1M), and \fBpntadm\fR(1M).
-.SS "DHCP Configuration Tables"
-.sp
-.LP
-The Solaris \fBDHCP\fR server stores client configuration information in the
-following two types of tables:
-.sp
-.ne 2
-.na
-\fB\fBdhcptab\fR tables\fR
-.ad
-.RS 23n
-Contain macros and options (also known as symbols), used to construct a package
-of configuration information to send to each \fBDHCP\fR client. There exists
-only one \fBdhcptab\fR for the \fBDHCP\fR service. The \fBdhcptab\fR(4) can be
-viewed and modified using the \fBdhtadm\fR(1M) command or \fBdhcpmgr\fR(1M)
-graphical utility. See \fBdhcptab\fR(4) for more information about the syntax
-of \fBdhcptab\fR records. See \fBdhcp_inittab\fR(4) for more information about
-the \fBDHCP\fR options and symbols.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBDHCP\fR network tables\fR
-.ad
-.RS 23n
-\fBDHCP\fR network tables, which contain mappings of client \fBID\fRs to
-\fBIP\fR addresses and parameters associated with those addresses. Network
-tables are named with the \fBIP\fR address of the network, and can be created,
-viewed, and modified using the \fBpntadm\fR command or \fBdhcpmgr\fR graphical
-utility. See \fBdhcp_network\fR(4) for more information about network tables.
-.RE
-
 .SH SEE ALSO
-.sp
 .LP
-\fBdhcpinfo\fR(1), \fBdhcpagent\fR(1M), \fBdhcpconfig\fR(1M),
-\fBdhcpmgr\fR(1M), \fBdhtadm\fR(1M), \fBifconfig\fR(1M), \fBin.dhcpd\fR(1M),
-\fBin.ndpd\fR(1M), \fBnetstat\fR(1M), \fBpntadm\fR(1M), \fBsyslog\fR(3C),
+\fBdhcpinfo\fR(1), \fBdhcpagent\fR(1M),
+\fBifconfig\fR(1M),
+\fBin.ndpd\fR(1M), \fBnetstat\fR(1M),
+\fBsyslog\fR(3C),
 \fBdhcp_network\fR(4), \fBdhcptab\fR(4), \fBdhcpsvc.conf\fR(4),
 \fBdhcp_inittab\fR(4), \fBndpd.conf\fR(4), \fBdhcp_modules\fR(5)
-.sp
-.LP
-\fISolaris DHCP Service Developer\&'s Guide\fR
-.sp
 .LP
 Alexander, S., and R. Droms. \fIRFC 2132, DHCP Options and BOOTP Vendor
 Extensions\fR. Silicon Graphics, Inc. Bucknell University. March 1997.
-.sp
 .LP
 Droms, R. \fIRFC 1534, Interoperation Between DHCP and BOOTP\fR. Bucknell
 University. October 1993.
-.sp
 .LP
 Droms, R. \fIRFC 2131, Dynamic Host Configuration Protocol\fR. Bucknell
 University. March 1997.
-.sp
 .LP
 Wimer, W. \fIRFC 1542, Clarifications and Extensions for the Bootstrap
 Protocol\fR. Carnegie Mellon University. October 1993.
-.sp
 .LP
 Lemon, T. and B. Sommerfeld. \fIRFC 4361, Node-specific Client Identifiers for
 Dynamic Host Configuration Protocol Version Four (DHCPv4)\fR. Nominum and Sun
 Microsystems. February 2006.
-.sp
 .LP
 Droms, R. \fIRFC 3315, Dynamic Host Configuration Protocol for IPv6
 (DHCPv6)\fR. Cisco Systems. July 2003.

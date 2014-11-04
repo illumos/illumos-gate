@@ -20,13 +20,14 @@
 #
 #
 # Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2014 Garrett D'Amore <garrett@damore.org>
 #
 
 include		../Makefile.cmd
 
 SUBDIRS=	etc lib sbin usr.bin usr.sbin usr.lib usr.sadm
-MSGSUBDIRS=	usr.bin usr.sbin usr.lib usr.sadm
-POFILES=	usr.bin/usr.bin.po usr.sbin/usr.sbin.po usr.sadm/usr.sadm.po
+MSGSUBDIRS=	usr.bin usr.sbin usr.lib
+POFILES=	usr.bin/usr.bin.po usr.sbin/usr.sbin.po
 POFILE=		cmd-inet.po
 
 all:=		TARGET= all
