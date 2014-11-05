@@ -45,6 +45,12 @@ struct lx_old_dirent {
 	char 		d_name[LX_NAMEMAX];
 };
 
+/*
+ * The positioning of d_type depends on d_reclen, since it follows
+ * d_name which varies in size.  Because d_type is not being emulated
+ * beyond DT_UNKNOWN (0), this can be achieved by zero-filling the
+ * structure to d_reclen bytes after the end of d_name.
+ */
 struct lx_dirent {
 	long		d_ino;
 	long		d_off;
@@ -61,8 +67,20 @@ typedef struct {
 	char		d_name[1];
 } lx_linux_dirent_t;
 
+/*
+ * Record must be long enough to house d_name string, null terminator and
+ * d_type field.  It's then padded to nearest 8-byte boundary
+ */
 #define	LX_RECLEN(namelen)	\
-	((offsetof(struct lx_dirent, d_name) + 1 + (namelen) + 7) & ~7)
+	((offsetof(struct lx_dirent, d_name) + 2 + (namelen) + 7) & ~7)
+
+/*
+ * Bytes after d_name string until d_reclen should be zeroed.
+ * Includes zero-terminating d_name
+ */
+#define	LX_ZEROLEN(namelen)	\
+	(LX_RECLEN(namelen) - \
+	((offsetof(struct lx_dirent, d_name) + (namelen))))
 
 struct lx_dirent64 {
 	uint64_t	d_ino;
@@ -165,10 +183,13 @@ lx_getdents(uintptr_t p1, uintptr_t p2, uintptr_t p3)
 			namelen = LX_NAMEMAX - 1;
 		ld->d_ino = (uint64_t)sd->d_ino;
 		ld->d_off = (int64_t)sd->d_off;
-		ld->d_type = 0;
 
 		(void) strncpy(ld->d_name, sd->d_name, namelen);
-		ld->d_name[namelen] = 0;
+		/*
+		 * Zero out the rest of the record.
+		 * This effective sets ld->d_type = 0 and zero-terminates d_name
+		 */
+		memset(ld->d_name + namelen, '\0', LX_ZEROLEN(namelen));
 		ld->d_reclen = (ushort_t)LX_RECLEN(namelen);
 
 		bytes -= (int)sd->d_reclen;
