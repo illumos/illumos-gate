@@ -149,6 +149,11 @@ typedef enum {
 #define	SMB2_SESSION_FLAG_ENCRYPT_DATA	0x0004
 
 /*
+ * Client wants to bind an existing session to a new connection
+ */
+#define	SMB2_SESSION_FLAG_BINDING	0x01
+
+/*
  * SMB2 Tree connect, disconnect
  */
 

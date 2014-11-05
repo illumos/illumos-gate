@@ -69,6 +69,24 @@ fksmbd_adjust_config(smb_ioc_header_t *ioc_hdr)
 	smbd_report("maxconnections=%d, maxworkers=%d",
 	    ioc->maxconnections, ioc->maxworkers);
 
+	if ((s = getenv("SMB_MAX_PROTOCOL")) != NULL) {
+		switch (s[0]) {
+		case '1':
+			ioc->max_protocol = SMB_VERS_1;
+			break;
+		case '2':
+			ioc->max_protocol = SMB_VERS_2_1;
+			break;
+		case '3':
+			ioc->max_protocol = SMB_VERS_3_0;
+			break;
+		default:
+			smbd_report("env SMB_MAX_PROTOCOL invalid");
+			break;
+		}
+	}
+	smbd_report("max_protocol=0x%x", ioc->max_protocol);
+
 	if ((s = getenv("SMB_SIGNING")) != NULL) {
 		ioc->signing_enable = 0;
 		ioc->signing_required = 0;
