@@ -518,6 +518,7 @@ static vnode_t *(*lxpr_lookup_function[LXPR_NFILES])() = {
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/cwd	*/
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/environ	*/
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/exe	*/
+	lxpr_lookup_not_a_dir,		/* /proc/<pid>/limits	*/
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/maps	*/
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/mem	*/
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/mountinfo */
@@ -590,6 +591,7 @@ static int (*lxpr_readdir_function[LXPR_NFILES])() = {
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/cwd	*/
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/environ	*/
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/exe	*/
+	lxpr_readdir_not_a_dir,		/* /proc/<pid>/limits	*/
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/maps	*/
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/mem	*/
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/mountinfo */
