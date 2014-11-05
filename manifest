@@ -6130,7 +6130,6 @@ s usr/lib/libdevid.so=../../lib/libdevid.so.1
 s usr/lib/libdevinfo.so.1=../../lib/libdevinfo.so.1
 s usr/lib/libdevinfo.so=../../lib/libdevinfo.so.1
 s usr/lib/libdhcpagent.so.1=../../lib/libdhcpagent.so.1
-f usr/lib/libdhcpsvc.so.1 0755 root bin
 s usr/lib/libdhcputil.so.1=../../lib/libdhcputil.so.1
 f usr/lib/libdisasm.so.1 0755 root bin
 s usr/lib/libdisasm.so=libdisasm.so.1
