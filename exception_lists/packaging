@@ -23,6 +23,7 @@
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2012 OmniTI Computer Consulting, Inc.  All rights reserved.
+# Copyright 2014 Garrett D'Amore <garrett@damore.org>
 #
 
 #
@@ -65,14 +66,8 @@ usr/lib/sparcv9/llib-lsoftcrypto.ln	sparc
 # standalone's DHCP implementation, and the kernel (nfs_dlboot).
 # They contain interfaces which are currently private.
 #
-usr/include/dhcp_svc_confkey.h
-usr/include/dhcp_svc_confopt.h
-usr/include/dhcp_svc_private.h
 usr/include/dhcp_symbol.h
 usr/include/sys/sunos_dhcp_class.h
-usr/lib/libdhcpsvc.so
-usr/lib/llib-ldhcpsvc
-usr/lib/llib-ldhcpsvc.ln
 #
 # Private MAC driver header files
 #

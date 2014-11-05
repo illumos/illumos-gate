@@ -21,31 +21,10 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2014 Garrett D'Amore <garrett@damore.org>
 #
 
 set name=pkg.fmri \
     value=pkg:/service/network/dhcp/datastore/binfiles@$(PKGVERS)
-set name=pkg.description \
-    value="Binary File Format Public module exporting Version 1 of the Service Provider Interface. Used to store DHCP data, this module has much better performance than the ASCII files and nisplus public modules."
-set name=pkg.summary \
-    value="Binary File Format Data Module for BOOTP/DHCP Services"
-set name=info.classification \
-    value=org.opensolaris.category.2008:System/Services
+set name=pkg.obsolete value=true
 set name=variant.arch value=$(ARCH)
-dir path=usr group=sys
-dir path=usr/lib
-dir path=usr/lib/inet
-dir path=usr/lib/inet/dhcp
-dir path=usr/lib/inet/dhcp/svc
-dir path=usr/sadm
-dir path=usr/sadm/admin
-dir path=usr/sadm/admin/dhcpmgr
-file path=usr/lib/inet/dhcp/svc/ds_SUNWbinfiles.so.1
-file path=usr/sadm/admin/dhcpmgr/SUNWbinfiles.jar mode=0444
-legacy pkg=SUNWdhcsb \
-    desc="Binary File Format Public module exporting Version 1 of the Service Provider Interface. Used to store DHCP data, this module has much better performance than the ASCII files and nisplus public modules." \
-    name="Binary File Format Data Module for BOOTP/DHCP Services"
-license cr_Sun license=cr_Sun
-license lic_CDDL license=lic_CDDL
-link path=usr/lib/inet/dhcp/svc/ds_SUNWbinfiles.so \
-    target=./ds_SUNWbinfiles.so.1

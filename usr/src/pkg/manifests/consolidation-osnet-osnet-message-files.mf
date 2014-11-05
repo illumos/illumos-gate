@@ -20,6 +20,7 @@
 #
 
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2014 Garrett D'Amore <garrett@damore.org>
 
 set name=pkg.fmri \
     value=pkg:/consolidation/osnet/osnet-message-files@$(PKGVERS)
@@ -54,22 +55,6 @@ dir path=usr/share/lib/locale/com/sun
 dir path=usr/share/lib/locale/com/sun/admin
 dir path=usr/share/lib/locale/com/sun/admin/pm
 dir path=usr/share/lib/locale/com/sun/admin/pm/client
-dir path=usr/share/lib/locale/com/sun/dhcpmgr
-dir path=usr/share/lib/locale/com/sun/dhcpmgr/bridge
-dir path=usr/share/lib/locale/com/sun/dhcpmgr/cli
-dir path=usr/share/lib/locale/com/sun/dhcpmgr/cli/common
-dir path=usr/share/lib/locale/com/sun/dhcpmgr/cli/dhcpbatch
-dir path=usr/share/lib/locale/com/sun/dhcpmgr/cli/dhcpconfig
-dir path=usr/share/lib/locale/com/sun/dhcpmgr/cli/dhtadm
-dir path=usr/share/lib/locale/com/sun/dhcpmgr/cli/pntadm
-dir path=usr/share/lib/locale/com/sun/dhcpmgr/client
-dir path=usr/share/lib/locale/com/sun/dhcpmgr/client/SUNWbinfiles
-dir path=usr/share/lib/locale/com/sun/dhcpmgr/client/SUNWfiles
-dir path=usr/share/lib/locale/com/sun/dhcpmgr/client/help
-dir path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/art
-dir path=usr/share/lib/locale/com/sun/dhcpmgr/common
-dir path=usr/share/lib/locale/com/sun/dhcpmgr/data
-dir path=usr/share/lib/locale/com/sun/dhcpmgr/ui
 dir path=usr/share/lib/locale/com/sun/slp
 file path=usr/lib/help/auths/locale/AllSolAuthsHeader.html
 file path=usr/lib/help/auths/locale/AuditHeader.html
@@ -338,112 +323,6 @@ file path=usr/share/lib/locale/com/sun/admin/pm/client/pmHelpResources.java \
     group=lp
 file path=usr/share/lib/locale/com/sun/admin/pm/client/pmResources.java \
     group=lp
-file \
-    path=usr/share/lib/locale/com/sun/dhcpmgr/bridge/ResourceBundle.properties
-file \
-    path=usr/share/lib/locale/com/sun/dhcpmgr/cli/common/ResourceBundle.properties
-file \
-    path=usr/share/lib/locale/com/sun/dhcpmgr/cli/dhcpbatch/ResourceBundle.properties
-file \
-    path=usr/share/lib/locale/com/sun/dhcpmgr/cli/dhcpconfig/ResourceBundle.properties
-file \
-    path=usr/share/lib/locale/com/sun/dhcpmgr/cli/dhtadm/ResourceBundle.properties
-file \
-    path=usr/share/lib/locale/com/sun/dhcpmgr/cli/pntadm/ResourceBundle.properties
-file \
-    path=usr/share/lib/locale/com/sun/dhcpmgr/client/OptionDescriptions.properties
-file \
-    path=usr/share/lib/locale/com/sun/dhcpmgr/client/ResourceBundle.properties
-file \
-    path=usr/share/lib/locale/com/sun/dhcpmgr/client/SUNWbinfiles/ResourceBundle.properties
-file \
-    path=usr/share/lib/locale/com/sun/dhcpmgr/client/SUNWfiles/ResourceBundle.properties
-file path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/art/bannersmc.gif
-file path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/art/dot1.gif
-file path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/art/dot2.gif
-file path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/art/folder.gif
-file path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/art/macro2.gif
-file path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/art/macroflow.gif
-file path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/art/tip2.gif
-file \
-    path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_addr_create.html
-file path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_addr_del.html
-file path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_addr_dup.html
-file path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_addr_how.html
-file path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_addr_mod.html
-file \
-    path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_addr_multi.html
-file path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_addr_ref.html
-file path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_addr_rel.html
-file path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_addr_view.html
-file path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_addr_wiz.html
-file \
-    path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_config_wiz.html
-file \
-    path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_convert_wiz.html
-file \
-    path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_export_wiz.html
-file \
-    path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_import_wiz.html
-file \
-    path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_macro_create.html
-file path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_macro_del.html
-file path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_macro_dup.html
-file path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_macro_how.html
-file path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_macro_mod.html
-file path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_macro_ref.html
-file \
-    path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_macro_view.html
-file \
-    path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_macros_about.html
-file path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_main_hlp.html
-file path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_main_how.html
-file path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_main_idx.html
-file \
-    path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_main_menus.html
-file path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_main_top.html
-file path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_net_del.html
-file path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_net_ref.html
-file path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_net_wiz.html
-file \
-    path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_option_create.html
-file \
-    path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_option_del.html
-file \
-    path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_option_dup.html
-file \
-    path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_option_how.html
-file \
-    path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_option_mod.html
-file \
-    path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_option_ref.html
-file \
-    path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_option_tags.html
-file \
-    path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_option_view.html
-file \
-    path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_relay_choose.html
-file \
-    path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_relay_config.html
-file path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_relay_dis.html
-file \
-    path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_relay_enable.html
-file path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_relay_how.html
-file path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_relay_ref.html
-file \
-    path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_relay_serv.html
-file \
-    path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_relay_unconfig.html
-file \
-    path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_server_serv.html
-file \
-    path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_server_unconfig.html
-file \
-    path=usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_solaris_about.html
-file \
-    path=usr/share/lib/locale/com/sun/dhcpmgr/common/ResourceBundle.properties
-file path=usr/share/lib/locale/com/sun/dhcpmgr/data/ResourceBundle.properties
-file path=usr/share/lib/locale/com/sun/dhcpmgr/ui/ResourceBundle.properties
 file path=usr/share/lib/locale/com/sun/slp/ClientLib_en.properties group=sys
 file path=usr/share/lib/locale/com/sun/slp/Server_en.properties group=sys
 legacy pkg=SUNW0on arch=all \

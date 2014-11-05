@@ -21,15 +21,15 @@
 
 #
 # Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2014 Garrett D'Amore <garrett@damore.org>
 #
 
 SYNCPROG=	syncinit syncloop syncstat
-DHCPPROG=	dhcpconfig dhtadm pntadm
 
-PROG=		6to4relay arp gettable if_mpadm \
+PROG=		6to4relay arp if_mpadm \
 		in.comsat in.fingerd in.rarpd in.rexecd in.rlogind \
 		in.rshd in.rwhod in.telnetd in.tftpd ipaddrsel \
-		ndd $(SYNCPROG) $(DHCPPROG) wanbootutil
+		ndd $(SYNCPROG) wanbootutil
 
 MANIFEST=	rarp.xml telnet.xml comsat.xml finger.xml \
 		login.xml shell.xml rexec.xml socket-filter-kssl.xml
@@ -41,10 +41,10 @@ SBINLINKS=	hostconfig route
 RPCSVCPROG=	hostconfig
 AUDITPROG=	in.rexecd in.rlogind in.rshd in.telnetd
 PAMPROG=	in.rexecd in.rlogind in.rshd in.telnetd
-SOCKETPROG=	6to4relay arp gettable hostconfig if_mpadm in.comsat \
+SOCKETPROG=	6to4relay arp hostconfig if_mpadm in.comsat \
 		in.fingerd in.rarpd in.rexecd in.rlogind in.rshd \
 		in.rwhod in.telnetd in.tftpd ipaddrsel route
-NSLPROG=	6to4relay arp gettable hostconfig in.comsat in.rarpd \
+NSLPROG=	6to4relay arp hostconfig in.comsat in.rarpd \
 		in.rexecd in.rlogind in.rshd in.rwhod in.telnetd \
 		in.tftpd ipaddrsel route
 CMDPROG=	in.telnetd
@@ -61,12 +61,12 @@ K5RSHDOBJS=	in.rshd.o
 K5TELNETOBJS=	in.telnetd.o
 SRCS=		$(PROGSRCS) $(OTHERSRC)
 
-SUBDIRS=	bootconfchk htable ifconfig ilbadm in.rdisc in.routed \
+SUBDIRS=	bootconfchk ifconfig ilbadm in.rdisc in.routed \
 		in.talkd inetadm inetconv ipadm ipmpstat ipqosconf ipsecutils \
 		kssl/kssladm kssl/ksslcfg nwamadm nwamcfg ping routeadm \
 		snoop sppptun traceroute wificonfig
 
-MSGSUBDIRS=	bootconfchk htable ifconfig ilbadm in.routed in.talkd \
+MSGSUBDIRS=	bootconfchk ifconfig ilbadm in.routed in.talkd \
 		inetadm inetconv ipadm ipmpstat ipqosconf ipsecutils \
 		kssl/ksslcfg nwamadm nwamcfg routeadm sppptun snoop wificonfig
 
@@ -160,7 +160,7 @@ if_mpadm		:=	LDLIBS += -linetutil -lipmp
 if_mpadm.po		:=	XGETFLAGS += -a
 route			:=	CPPFLAGS += -DNDEBUG
 ndd			:=	LDLIBS += -ldladm -lipadm
-gettable in.comsat	:=	LDFLAGS += $(MAPFILE.NGB:%=-M%)
+in.comsat		:=	LDFLAGS += $(MAPFILE.NGB:%=-M%)
 
 .KEEP_STATE:
 

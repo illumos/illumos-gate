@@ -866,6 +866,7 @@ link path=usr/share/man/man9f/ddi_umem_free.9f target=ddi_umem_alloc.9f
 link path=usr/share/man/man9f/ddi_umem_unlock.9f target=ddi_umem_lock.9f
 link path=usr/share/man/man9f/ddi_unmap_regs.9f target=ddi_map_regs.9f
 link path=usr/share/man/man9f/desballoc.9f target=esballoc.9f
+link path=usr/share/man/man9f/dev_err.9f target=cmn_err.9f
 link path=usr/share/man/man9f/devmap_load.9f target=devmap_unload.9f
 link path=usr/share/man/man9f/devmap_umem_setup.9f \
     target=devmap_devmem_setup.9f
@@ -1233,5 +1234,6 @@ link path=usr/share/man/man9f/va_copy.9f target=va_arg.9f
 link path=usr/share/man/man9f/va_end.9f target=va_arg.9f
 link path=usr/share/man/man9f/va_start.9f target=va_arg.9f
 link path=usr/share/man/man9f/vcmn_err.9f target=cmn_err.9f
+link path=usr/share/man/man9f/vzcmn_err.9f target=cmn_err.9f
 link path=usr/share/man/man9f/wr.9f target=WR.9f
 link path=usr/share/man/man9f/zcmn_err.9f target=cmn_err.9f

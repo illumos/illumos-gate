@@ -1,4 +1,5 @@
 '\" te
+.\" Copyright 2014 Garrett D'Amore <garrett@damore.org>
 .\"  Copyright (c) 1992, X/Open Company Limited  All Rights Reserved  Portions Copyright (c) 2002, Sun Microsystems, Inc.  All Rights Reserved
 .\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
@@ -7,10 +8,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH WCSTRING 3C "Aug 14, 2002"
+.TH WCSTRING 3C "Aug 15, 2014"
 .SH NAME
 wcstring, wcscat, wscat, wcsncat, wsncat, wcscmp, wscmp, wcsncmp, wsncmp,
-wcscpy, wscpy, wcsncpy, wsncpy, wcslen, wslen, wcschr, wschr, wcsrchr, wsrchr,
+wcscpy, wscpy, wcsncpy, wsncpy, wslen, wcschr, wschr, wcsrchr, wsrchr,
 windex, wrindex, wcspbrk, wspbrk, wcswcs, wcsspn, wsspn, wcscspn, wscspn,
 wcstok, wstok \- wide-character string operations
 .SH SYNOPSIS
@@ -46,11 +47,6 @@ wcstok, wstok \- wide-character string operations
 .nf
 \fBwchar_t *\fR\fBwcsncpy\fR(\fBwchar_t *restrict\fR \fIws1\fR, \fBconst wchar_t *restrict\fR \fIws2\fR,
      \fBsize_t\fR \fIn\fR);
-.fi
-
-.LP
-.nf
-\fBsize_t\fR \fBwcslen\fR(\fBconst wchar_t *\fR\fIws\fR);
 .fi
 
 .LP
@@ -208,7 +204,6 @@ wcstok, wstok \- wide-character string operations
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 These functions operate on wide-character strings terminated by \fBwchar_t\fR
 \fINULL\fR characters. During appending or copying, these routines do not check
@@ -216,7 +211,6 @@ for an overflow condition of the receiving string. In the following, \fIws\fR,
 \fIws1\fR, and \fIws2\fR point to wide-character strings terminated by a
 \fBwchar_t NULL\fR.
 .SS "wcscat(\|), wscat(\|)"
-.sp
 .LP
 The \fBwcscat()\fR and \fBwscat()\fR functions append a copy of the
 wide-character string pointed to by \fIws2\fR (including the terminating null
@@ -226,7 +220,6 @@ wide-character code at the end of \fIws1\fR. If copying takes place between
 objects that overlap, the behavior is undefined. Both functions return
 \fIs1\fR; no return value is reserved to indicate an error.
 .SS "wcsncat(\|), wsncat(\|)"
-.sp
 .LP
 The \fBwcsncat()\fR and \fBwsncat()\fR functions append not more than \fIn\fR
 wide-character codes (a null wide-character code and wide-character codes that
@@ -237,7 +230,6 @@ end of \fIws1\fR. A terminating null wide-character code is always appended to
 the result. Both functions return \fIws1\fR; no return value is reserved to
 indicate an error.
 .SS "wcscmp(\|), wscmp(\|)"
-.sp
 .LP
 The \fBwcscmp()\fR and \fBwscmp()\fR functions compare the wide-character
 string pointed to by \fIws1\fR to the wide-character string pointed to by
@@ -248,7 +240,6 @@ integer greater than, equal to, or less than zero, if the wide-character string
 pointed to by \fIws1\fR is greater than, equal to, or less than the
 wide-character string pointed to by \fIws2\fR.
 .SS "wcsncmp(\|), wsncmp(\|)"
-.sp
 .LP
 The \fBwcsncmp()\fR and \fBwsncmp()\fR functions compare not more than \fIn\fR
 wide-character codes (wide-character codes that follow a null wide character
@@ -261,7 +252,6 @@ than zero, if the possibly null-terminated array pointed to by \fIws1\fR is
 greater than, equal to, or less than the possibly null-terminated array pointed
 to by \fIws2\fR.
 .SS "wcscpy(\|), wscpy(\|)"
-.sp
 .LP
 The \fBwcscpy()\fR and \fBwscpy()\fR functions copy the wide-character string
 pointed to by \fIws2\fR (including the terminating null wide-character code)
@@ -269,7 +259,6 @@ into the array pointed to by \fIws1\fR. If copying takes place between objects
 that overlap, the behavior is undefined. Both functions return \fIws1\fR; no
 return value is reserved to indicate an error.
 .SS "wcsncpy(\|), wsncpy(\|)"
-.sp
 .LP
 The \fBwcsncpy()\fR and \fBwsncpy()\fR functions  copy not more than \fIn\fR
 wide-character codes (wide-character codes that follow a null wide character
@@ -280,15 +269,13 @@ wide-character string that is shorter than \fIn\fR wide-character codes, null
 wide-character codes are appended to the copy in the array pointed to by
 \fIws1\fR, until a total \fIn\fR wide-character codes are written. Both
 functions return \fI ws1\fR; no return value is reserved to indicate an error.
-.SS "wcslen(\|), wslen(\|)"
-.sp
+.SS "wslen(\|)"
 .LP
-The \fBwcslen()\fR and \fBwslen()\fR functions compute the number of
+The \fBwslen()\fR function computes the number of
 wide-character codes in the wide-character string to which \fIws\fR points, not
-including the terminating null wide-character code. Both functions return
+including the terminating null wide-character code. It returns
 \fIws\fR; no return value is reserved to indicate an error.
 .SS "wcschr(\|), wschr(\|)"
-.sp
 .LP
 The \fBwcschr()\fR and \fBwschr()\fR functions locate the first occurrence of
 \fIwc\fR in the wide-character string pointed to by \fIws\fR. The value of
@@ -298,7 +285,6 @@ The terminating null wide-character code is considered to be part of the
 wide-character string. Upon completion, both functions return a pointer to the
 wide-character code, or a null pointer if the wide-character code is not found.
 .SS "wcsrchr(\|), wsrchr(\|)"
-.sp
 .LP
 The \fBwcsrchr()\fR and \fBwsrchr()\fR functions locate the last occurrence of
 \fIwc\fR in the wide-character string pointed to by \fIws\fR. The value of
@@ -309,12 +295,10 @@ wide-character string. Upon successful completion, both functions return a
 pointer to the wide-character code, or a null pointer if \fIwc\fR does not
 occur in the wide-character string.
 .SS "windex(\|), wrindex(\|)"
-.sp
 .LP
 The \fBwindex()\fR and \fBwrindex()\fR functions behave the same as
 \fBwschr()\fR and \fBwsrchr()\fR, respectively.
 .SS "wcspbrk(\|), wspbrk(\|)"
-.sp
 .LP
 The \fBwcspbrk()\fR and \fBwspbrk()\fR functions locate the first occurrence in
 the wide character string pointed to by \fIws1\fR of any wide-character code
@@ -322,7 +306,6 @@ from the wide-character string pointed to by \fIws2\fR. Upon successful
 completion, the function returns a pointer to the wide-character code, or a
 null pointer if no wide-character code from \fIws2\fR occurs in \fIws1\fR.
 .SS "wcswcs(\|)"
-.sp
 .LP
 The \fBwcswcs()\fR function locates the first occurrence in the wide-character
 string pointed to by \fIws1\fR of the sequence of wide-character codes
@@ -332,7 +315,6 @@ returns a pointer to the located wide-character string, or a null pointer if
 the wide-character string is not found. If \fIws2\fR points to a wide-character
 string with zero length, the function returns \fIws1\fR.
 .SS "wcsspn(\|), wsspn(\|)"
-.sp
 .LP
 The \fBwcsspn()\fR and \fBwsspn()\fR functions compute the length of the
 maximum initial segment of the wide-character string pointed to by \fIws1\fR
@@ -340,7 +322,6 @@ which consists entirely of wide-character codes from the wide-character string
 pointed to by \fIws2\fR. Both functions return the length \fIws1\fR; no return
 value is reserved to indicate an error.
 .SS "wcscspn(\|), wscspn(\|)"
-.sp
 .LP
 The \fBwcscspn()\fR and \fBwscspn()\fR functions compute the length of the
 maximum initial segment of the wide-character string pointed to by \fIws1\fR
@@ -349,26 +330,22 @@ wide-character string pointed to by \fIws2\fR. Both functions return the length
 of the initial substring of \fIws1\fR; no return value is reserved to indicate
 an error.
 .SS "wcstok(\|), wstok(\|)"
-.sp
 .LP
 A sequence of calls to the \fBwcstok()\fR and \fBwstok()\fR functions break the
 wide-character string pointed to by \fIws1\fR into a sequence of tokens, each
 of which is delimited by a wide-character code from the wide-character string
 pointed to by \fIws2\fR.
 .SS "Default and other standards"
-.sp
 .LP
 The third argument points to a caller-provided \fBwchar_t\fR pointer into which
 the \fBwcstok()\fR function stores information necessary for it to continue
 scanning the same wide-character string. This argument is not available with
 the XPG4 and SUS versions of \fBwcstok()\fR, nor is it available with the
 \fBwstok()\fR function.  See \fBstandards\fR(5).
-.sp
 .LP
 The first call in the sequence has \fIws1\fR as its first argument, and is
 followed by calls with a null pointer as their first argument. The separator
 string pointed to by \fIws2\fR may be different from call to call.
-.sp
 .LP
 The first call in the sequence searches the wide-character string pointed to by
 \fIws1\fR for the first wide-character code that is \fInot\fR contained in the
@@ -376,7 +353,6 @@ current separator string pointed to by \fIws2\fR. If no such wide-character
 code is found, then there are no tokens in the wide-character string pointed to
 by \fIws1\fR, and \fBwcstok()\fR and \fBwstok()\fR return a null pointer. If
 such a wide-character code is found, it is the start of the first token.
-.sp
 .LP
 The \fBwcstok()\fR and \fBwstok()\fR functions then search from that point for
 a wide-character code that \fIis\fR contained in the current separator string.
@@ -386,17 +362,14 @@ for a token will return a null pointer. If such a wide-character code is found,
 it is overwritten by a null wide character, which terminates the current token.
 The \fBwcstok()\fR and \fBwstok()\fR functions save a pointer to the following
 wide-character code, from which the next search for a token will start.
-.sp
 .LP
 Each subsequent call, with a null pointer as the value of the first argument,
 starts searching from the saved pointer and behaves as described above.
-.sp
 .LP
 Upon successful completion, both functions return a pointer to the first
 wide-character code of a token. Otherwise, if there is no token, a null pointer
 is returned.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -416,15 +389,20 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
-\fBmalloc\fR(3C), \fBstring\fR(3C), \fBwcswidth\fR(3C), \fBwcwidth\fR(3C),
-\fBattributes\fR(5), \fBstandards\fR(5)
+\fBmalloc\fR(3C),
+\fBstring\fR(3C),
+\fBwcscasecmp\fR(3C),
+\fBwcsdup\fR(3C),
+\fBwcslen\fR(3C),
+\fBwcswidth\fR(3C),
+\fBwcwidth\fR(3C),
+\fBattributes\fR(5),
+\fBstandards\fR(5)
 .SH NOTES
-.sp
 .LP
 The \fBwcscat()\fR, \fBwcsncat()\fR, \fBwcscmp()\fR, \fBwcsncmp()\fR,
-\fBwcscpy()\fR, \fBwcsncpy()\fR, \fBwcslen()\fR, \fBwcschr()\fR,
+\fBwcscpy()\fR, \fBwcsncpy()\fR, \fBwcschr()\fR,
 \fBwcsrchr()\fR, \fBwcspbrk()\fR, \fBwcswcs()\fR, \fBwcsspn()\fR,
 \fBwcscspn()\fR, and \fBwcstok()\fR functions are Standard. The \fBwscat()\fR,
 \fBwsncat()\fR, \fBwscmp()\fR, \fBwsncmp()\fR, \fBwscpy()\fR, \fBwsncpy()\fR,

@@ -5,11 +5,10 @@
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
 .\" Copyright 2011 by Delphix.  All rights reserved.
-.TH LIBC 3LIB "Jul 1, 2014"
+.TH LIBC 3LIB "Aug 15, 2014"
 .SH NAME
 libc \- C library
 .SH DESCRIPTION
-.sp
 .LP
 Functions in this library provide various facilities defined by System V, ANSI
 C, POSIX, and so on.  See \fBstandards\fR(5). In addition, those facilities
@@ -17,7 +16,6 @@ previously defined in the internationalization and the wide-character libraries
 are now defined in this library, as are the facilities previously defined in
 the multithreading libraries, \fBlibthread\fR and \fBlibpthread\fR.
 .SH INTERFACES
-.sp
 .LP
 The shared object \fBlibc.so.1\fR provides the public interfaces defined below.
 See \fBIntro\fR(3) for additional information on shared object interfaces.
@@ -770,13 +768,16 @@ l l .
 \fBwaitid\fR	\fBwaitpid\fR
 \fBwalkcontext\fR	\fBwarn\fR
 \fBwarnx\fR	\fBwatoll\fR
+\fBwcpcpy\fR	\fBwcpncpy\fR
 \fBwcrtomb\fR	\fBwcrtomb_l\fR
+\fBwcscasecmp\fR	\fBwcscasecmp_l\fR
 \fBwcscat\fR
 \fBwcschr\fR	\fBwcscmp\fR
 \fBwcscoll\fR	\fBwcscoll_l\fR
-\fBwcscpy\fR
-\fBwcscspn\fR	\fBwcsftime\fR
+\fBwcscpy\fR	\fBwcscspn\fR
+\fBwcsdup\fR	\fBwcsftime\fR
 \fBwcslen\fR	\fBwcsncat\fR
+\fBwcsncasecmp\fR	\fBwcsncasecmp_l\fR
 \fBwcsncmp\fR	\fBwcsncpy\fR
 \fBwcsnrtombs\fR	\fBwcsnrtombs_l\fR
 \fBwcspbrk\fR	\fBwcsrchr\fR
@@ -937,7 +938,6 @@ l l .
 .TE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/lib/libc.so.1\fR\fR
@@ -976,7 +976,6 @@ symbols
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -991,17 +990,14 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBpvs\fR(1), \fBIntro\fR(2), \fBIntro\fR(3), \fBattributes\fR(5),
 \fBlf64\fR(5), \fBstandards\fR(5)
 .SH NOTES
-.sp
 .LP
 The synonyms compatibility library, \fBc_synonyms.so.1\fR, provides a mechanism
 to support old applications and libraries that were mistakenly built using
 now-obsolete synonym symbols from \fBlibc\fR.
-.sp
 .LP
 Before the advent of direct binding (-B direct) \fBlibc\fR provided many
 functions with two names.  For example, \fBgetpwent()\fR and \fB_getpwent()\fR.
@@ -1010,7 +1006,6 @@ leading-underscore symbol was intended to be used by system libraries in order
 to avoid conflicting with an application that might define its own version of
 \fBgetpwent()\fR with completely different semantics. Standard-conforming
 applications may not define and use function names with leading underscores.
-.sp
 .LP
 Solaris system libraries are now built with direct binding. This means that a
 system library that calls \fBgetpwent()\fR will bind directly to the instance
@@ -1019,7 +1014,6 @@ linked defines a different \fBgetpwent()\fR for its own use. The application
 binds to its instance of \fBgetpwent()\fR and there is no resulting conflict.
 The direct binding mechanism is equally available to libraries not delivered
 with Solaris.
-.sp
 .LP
 As a result of this evolution, most of the leading-underscore synonym symbols
 have been removed from \fBlibc\fR.  This means that applications that call
@@ -1050,7 +1044,6 @@ $ LD_PRELOAD=c_synonyms.so.1 ./application
 .in -2
 .sp
 
-.sp
 .LP
 The synonyms compatibility library is intended neither to enable the generation
 of applications that call the obsolete leading-underscore synonym functions,

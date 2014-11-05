@@ -22,6 +22,7 @@
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2014 Garrett D'Amore <garrett@damore.org>
 #
 
 set name=pkg.fmri value=pkg:/system/network/nis@$(PKGVERS)
@@ -71,8 +72,6 @@ file path=usr/lib/netsvc/yp/ypbind mode=0555
 file path=usr/lib/netsvc/yp/ypstart mode=0555
 file path=usr/lib/netsvc/yp/ypstop mode=0555
 file path=usr/lib/netsvc/yp/ypxfr mode=0555
-file path=usr/sbin/gettable mode=0555
-file path=usr/sbin/htable mode=0555
 file path=usr/sbin/ldapaddent mode=0555
 file path=usr/sbin/ldapclient mode=0555
 file path=usr/sbin/newkey group=sys mode=0555
@@ -87,8 +86,6 @@ file path=usr/share/man/man1/ypcat.1
 file path=usr/share/man/man1/ypmatch.1
 file path=usr/share/man/man1/yppasswd.1
 file path=usr/share/man/man1/ypwhich.1
-file path=usr/share/man/man1m/gettable.1m
-file path=usr/share/man/man1m/htable.1m
 file path=usr/share/man/man1m/idsconfig.1m
 file path=usr/share/man/man1m/ldap_cachemgr.1m
 file path=usr/share/man/man1m/ldapaddent.1m

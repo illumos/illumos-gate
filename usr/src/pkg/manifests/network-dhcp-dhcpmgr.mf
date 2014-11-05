@@ -21,87 +21,9 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2014 Garrett D'Amore <garrett@damore.org>
 #
 
 set name=pkg.fmri value=pkg:/network/dhcp/dhcpmgr@$(PKGVERS)
-set name=pkg.description \
-    value="Graphical management interface for the DHCP server"
-set name=pkg.summary value="DHCP Manager"
-set name=info.classification \
-    value=org.opensolaris.category.2008:System/Services
+set name=pkg.obsolete value=true
 set name=variant.arch value=$(ARCH)
-dir path=usr group=sys
-dir path=usr/sadm
-dir path=usr/sadm/admin
-dir path=usr/sadm/admin/bin
-dir path=usr/sadm/admin/dhcpmgr
-dir path=usr/sadm/admin/dhcpmgr/help
-dir path=usr/sadm/admin/dhcpmgr/help/art
-dir path=usr/share/man/man1m
-file path=usr/sadm/admin/bin/dhcpmgr mode=0555
-file path=usr/sadm/admin/dhcpmgr/SUNWfiles.jar mode=0444
-file path=usr/sadm/admin/dhcpmgr/dhcpmgr.jar mode=0444
-file path=usr/sadm/admin/dhcpmgr/dhcpmgr.so.1 mode=0755
-file path=usr/sadm/admin/dhcpmgr/help/art/bannersmc.gif mode=0444
-file path=usr/sadm/admin/dhcpmgr/help/art/dot1.gif mode=0444
-file path=usr/sadm/admin/dhcpmgr/help/art/dot2.gif mode=0444
-file path=usr/sadm/admin/dhcpmgr/help/art/folder.gif mode=0444
-file path=usr/sadm/admin/dhcpmgr/help/art/macro2.gif mode=0444
-file path=usr/sadm/admin/dhcpmgr/help/art/macroflow.gif mode=0444
-file path=usr/sadm/admin/dhcpmgr/help/art/tip2.gif mode=0444
-file path=usr/sadm/admin/dhcpmgr/help/dhcp_addr_create.html mode=0444
-file path=usr/sadm/admin/dhcpmgr/help/dhcp_addr_del.html mode=0444
-file path=usr/sadm/admin/dhcpmgr/help/dhcp_addr_dup.html mode=0444
-file path=usr/sadm/admin/dhcpmgr/help/dhcp_addr_how.html mode=0444
-file path=usr/sadm/admin/dhcpmgr/help/dhcp_addr_mod.html mode=0444
-file path=usr/sadm/admin/dhcpmgr/help/dhcp_addr_multi.html mode=0444
-file path=usr/sadm/admin/dhcpmgr/help/dhcp_addr_ref.html mode=0444
-file path=usr/sadm/admin/dhcpmgr/help/dhcp_addr_rel.html mode=0444
-file path=usr/sadm/admin/dhcpmgr/help/dhcp_addr_view.html mode=0444
-file path=usr/sadm/admin/dhcpmgr/help/dhcp_addr_wiz.html mode=0444
-file path=usr/sadm/admin/dhcpmgr/help/dhcp_config_wiz.html mode=0444
-file path=usr/sadm/admin/dhcpmgr/help/dhcp_convert_wiz.html mode=0444
-file path=usr/sadm/admin/dhcpmgr/help/dhcp_export_wiz.html mode=0444
-file path=usr/sadm/admin/dhcpmgr/help/dhcp_import_wiz.html mode=0444
-file path=usr/sadm/admin/dhcpmgr/help/dhcp_macro_create.html mode=0444
-file path=usr/sadm/admin/dhcpmgr/help/dhcp_macro_del.html mode=0444
-file path=usr/sadm/admin/dhcpmgr/help/dhcp_macro_dup.html mode=0444
-file path=usr/sadm/admin/dhcpmgr/help/dhcp_macro_how.html mode=0444
-file path=usr/sadm/admin/dhcpmgr/help/dhcp_macro_mod.html mode=0444
-file path=usr/sadm/admin/dhcpmgr/help/dhcp_macro_ref.html mode=0444
-file path=usr/sadm/admin/dhcpmgr/help/dhcp_macro_view.html mode=0444
-file path=usr/sadm/admin/dhcpmgr/help/dhcp_macros_about.html mode=0444
-file path=usr/sadm/admin/dhcpmgr/help/dhcp_main_hlp.html mode=0444
-file path=usr/sadm/admin/dhcpmgr/help/dhcp_main_how.html mode=0444
-file path=usr/sadm/admin/dhcpmgr/help/dhcp_main_idx.html mode=0444
-file path=usr/sadm/admin/dhcpmgr/help/dhcp_main_menus.html mode=0444
-file path=usr/sadm/admin/dhcpmgr/help/dhcp_main_top.html mode=0444
-file path=usr/sadm/admin/dhcpmgr/help/dhcp_net_del.html mode=0444
-file path=usr/sadm/admin/dhcpmgr/help/dhcp_net_ref.html mode=0444
-file path=usr/sadm/admin/dhcpmgr/help/dhcp_net_wiz.html mode=0444
-file path=usr/sadm/admin/dhcpmgr/help/dhcp_option_create.html mode=0444
-file path=usr/sadm/admin/dhcpmgr/help/dhcp_option_del.html mode=0444
-file path=usr/sadm/admin/dhcpmgr/help/dhcp_option_dup.html mode=0444
-file path=usr/sadm/admin/dhcpmgr/help/dhcp_option_how.html mode=0444
-file path=usr/sadm/admin/dhcpmgr/help/dhcp_option_mod.html mode=0444
-file path=usr/sadm/admin/dhcpmgr/help/dhcp_option_ref.html mode=0444
-file path=usr/sadm/admin/dhcpmgr/help/dhcp_option_tags.html mode=0444
-file path=usr/sadm/admin/dhcpmgr/help/dhcp_option_view.html mode=0444
-file path=usr/sadm/admin/dhcpmgr/help/dhcp_relay_choose.html mode=0444
-file path=usr/sadm/admin/dhcpmgr/help/dhcp_relay_config.html mode=0444
-file path=usr/sadm/admin/dhcpmgr/help/dhcp_relay_dis.html mode=0444
-file path=usr/sadm/admin/dhcpmgr/help/dhcp_relay_enable.html mode=0444
-file path=usr/sadm/admin/dhcpmgr/help/dhcp_relay_how.html mode=0444
-file path=usr/sadm/admin/dhcpmgr/help/dhcp_relay_ref.html mode=0444
-file path=usr/sadm/admin/dhcpmgr/help/dhcp_relay_serv.html mode=0444
-file path=usr/sadm/admin/dhcpmgr/help/dhcp_relay_unconfig.html mode=0444
-file path=usr/sadm/admin/dhcpmgr/help/dhcp_server_serv.html mode=0444
-file path=usr/sadm/admin/dhcpmgr/help/dhcp_server_unconfig.html mode=0444
-file path=usr/sadm/admin/dhcpmgr/help/dhcp_solaris_about.html mode=0444
-file path=usr/share/man/man1m/dhcpmgr.1m
-legacy pkg=SUNWdhcm desc="Graphical management interface for the DHCP server" \
-    name="DHCP Manager"
-license cr_Sun license=cr_Sun
-license lic_CDDL license=lic_CDDL
-link path=usr/sbin/dhcpmgr target=../sadm/admin/bin/dhcpmgr
-depend fmri=runtime/java type=require

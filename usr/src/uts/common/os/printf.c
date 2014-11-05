@@ -22,7 +22,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/param.h>
@@ -70,8 +70,8 @@ static char ce_suffix[CE_IGNORE][2] = { "", "\n", "\n", "" };
 
 static void
 cprintf(const char *fmt, va_list adx, int sl, const char *prefix,
-	const char *suffix, void *site, int mid, int sid, int level,
-	zoneid_t zoneid)
+    const char *suffix, void *site, int mid, int sid, int level,
+    zoneid_t zoneid, dev_info_t *dip)
 {
 	uint32_t msgid;
 	size_t bufsize = LOG_MSGSIZE;
@@ -112,6 +112,9 @@ retry:
 	    "%s: [ID %u FACILITY_AND_PRIORITY] ",
 	    mod_containing_pc(site), msgid);
 	msgp += snprintf(msgp, bufend - msgp, prefix);
+	if (dip != NULL)
+		msgp += snprintf(msgp, bufend - msgp, "%s%d: ",
+		    ddi_driver_name(dip), ddi_get_instance(dip));
 	msgp += vsnprintf(msgp, bufend - msgp, fmt, adx);
 	msgp += snprintf(msgp, bufend - msgp, suffix);
 	len = strlen(body);
@@ -178,7 +181,7 @@ void
 vzprintf(zoneid_t zoneid, const char *fmt, va_list adx)
 {
 	cprintf(fmt, adx, SL_CONSOLE | SL_NOTE, "", "", caller(), 0, 0, 0,
-	    zoneid);
+	    zoneid, NULL);
 }
 
 void
@@ -195,7 +198,7 @@ printf(const char *fmt, ...)
 
 	va_start(adx, fmt);
 	cprintf(fmt, adx, SL_CONSOLE | SL_NOTE, "", "", caller(), 0, 0, 0,
-	    GLOBAL_ZONEID);
+	    GLOBAL_ZONEID, NULL);
 	va_end(adx);
 }
 
@@ -207,7 +210,7 @@ zprintf(zoneid_t zoneid, const char *fmt, ...)
 
 	va_start(adx, fmt);
 	cprintf(fmt, adx, SL_CONSOLE | SL_NOTE, "", "", caller(), 0, 0, 0,
-	    zoneid);
+	    zoneid, NULL);
 	va_end(adx);
 }
 
@@ -219,12 +222,12 @@ vuprintf(const char *fmt, va_list adx)
 
 	/* Message the user tty, if any, and the global zone syslog */
 	cprintf(fmt, adx, SL_CONSOLE | SL_LOGONLY | SL_USER | SL_NOTE,
-	    "", "", caller(), 0, 0, 0, GLOBAL_ZONEID);
+	    "", "", caller(), 0, 0, 0, GLOBAL_ZONEID, NULL);
 
 	/* Now message the local zone syslog */
 	if (!INGLOBALZONE(curproc))
 		cprintf(fmt, adxcp, SL_CONSOLE | SL_LOGONLY | SL_NOTE,
-		    "", "", caller(), 0, 0, 0, getzoneid());
+		    "", "", caller(), 0, 0, 0, getzoneid(), NULL);
 
 	va_end(adxcp);
 }
@@ -242,21 +245,28 @@ uprintf(const char *fmt, ...)
 	va_end(adx);
 }
 
-void
-vzcmn_err(zoneid_t zoneid, int ce, const char *fmt, va_list adx)
+static void
+vzdcmn_err(zoneid_t zoneid, int ce, const char *fmt, va_list adx,
+    dev_info_t *dip)
 {
 	if (ce == CE_PANIC)
 		vpanic(fmt, adx);
 	if ((uint_t)ce < CE_IGNORE)
 		cprintf(fmt, adx, ce_to_sl[ce] | SL_CONSOLE,
 		    ce_prefix[ce], ce_suffix[ce], caller(), 0, 0, 0,
-		    zoneid);
+		    zoneid, dip);
+}
+
+void
+vzcmn_err(zoneid_t zoneid, int ce, const char *fmt, va_list adx)
+{
+	vzdcmn_err(zoneid, ce, fmt, adx, NULL);
 }
 
 void
 vcmn_err(int ce, const char *fmt, va_list adx)
 {
-	vzcmn_err(GLOBAL_ZONEID, ce, fmt, adx);
+	vzdcmn_err(GLOBAL_ZONEID, ce, fmt, adx, NULL);
 }
 
 /*PRINTFLIKE2*/
@@ -266,12 +276,7 @@ cmn_err(int ce, const char *fmt, ...)
 	va_list adx;
 
 	va_start(adx, fmt);
-	if (ce == CE_PANIC)
-		vpanic(fmt, adx);
-	if ((uint_t)ce < CE_IGNORE)
-		cprintf(fmt, adx, ce_to_sl[ce] | SL_CONSOLE,
-		    ce_prefix[ce], ce_suffix[ce], caller(), 0, 0, 0,
-		    GLOBAL_ZONEID);
+	vzdcmn_err(GLOBAL_ZONEID, ce, fmt, adx, NULL);
 	va_end(adx);
 }
 
@@ -282,11 +287,7 @@ zcmn_err(zoneid_t zoneid, int ce, const char *fmt, ...)
 	va_list adx;
 
 	va_start(adx, fmt);
-	if (ce == CE_PANIC)
-		vpanic(fmt, adx);
-	if ((uint_t)ce < CE_IGNORE)
-		cprintf(fmt, adx, ce_to_sl[ce] | SL_CONSOLE, ce_prefix[ce],
-		    ce_suffix[ce], caller(), 0, 0, 0, zoneid);
+	vzdcmn_err(zoneid, ce, fmt, adx, NULL);
 	va_end(adx);
 }
 
@@ -294,15 +295,11 @@ zcmn_err(zoneid_t zoneid, int ce, const char *fmt, ...)
 void
 dev_err(dev_info_t *dip, int ce, char *fmt, ...)
 {
-	va_list ap;
-	char buf[LOG_MSGSIZE];
+	va_list adx;
 
-	(void) snprintf(buf, sizeof (buf), "%s%d: %s",
-	    ddi_driver_name(dip), ddi_get_instance(dip), fmt);
-
-	va_start(ap, fmt);
-	vcmn_err(ce, buf, ap);
-	va_end(ap);
+	va_start(adx, fmt);
+	vzdcmn_err(GLOBAL_ZONEID, ce, fmt, adx, dip);
+	va_end(adx);
 }
 
 int
@@ -343,7 +340,7 @@ strlog(short mid, short sid, char level, ushort_t sl, char *fmt, ...)
 		va_list adx;
 		va_start(adx, fmt);
 		cprintf(fmt, adx, sl, "", "", caller(), mid, sid, level,
-		    GLOBAL_ZONEID);
+		    GLOBAL_ZONEID, NULL);
 		va_end(adx);
 	}
 	return (1);
@@ -354,6 +351,6 @@ vstrlog(short mid, short sid, char level, ushort_t sl, char *fmt, va_list adx)
 {
 	if (sl & log_global.lz_active)
 		cprintf(fmt, adx, sl, "", "", caller(), mid, sid, level,
-		    GLOBAL_ZONEID);
+		    GLOBAL_ZONEID, NULL);
 	return (1);
 }
