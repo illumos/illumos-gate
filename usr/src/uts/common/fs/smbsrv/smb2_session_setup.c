@@ -60,6 +60,19 @@ smb2_session_setup(smb_request_t *sr)
 		return (SDRC_ERROR);
 
 	/*
+	 * SMB3 multi-channel features are not supported.
+	 * Once they are, this will check the dialect and
+	 * whether multi-channel was negotiated, i.e.
+	 *	if (sr->session->dialect < SMB_VERS_3_0 ||
+	 *	    s->IsMultiChannelCapable == False)
+	 *		return (error...)
+	 */
+	if (Flags & SMB2_SESSION_FLAG_BINDING) {
+		status = NT_STATUS_REQUEST_NOT_ACCEPTED;
+		goto errout;
+	}
+
+	/*
 	 * We're normally positioned at the security buffer now,
 	 * but there could be some padding before it.
 	 */
@@ -115,6 +128,7 @@ smb2_session_setup(smb_request_t *sr)
 		break;
 
 	default:
+errout:
 		SecBufLength = 0;
 		sr->smb2_status = status;
 		break;

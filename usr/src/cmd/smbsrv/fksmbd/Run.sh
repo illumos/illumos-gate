@@ -12,7 +12,7 @@
 #
 
 #
-# Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 #
 
 # Helper program to run fksmbd (user-space smbd for debugging)
@@ -54,6 +54,10 @@ export SMB_SHARE_DNAME="/tmp/fksmbshare_door"
 
 LD_LIBRARY_PATH=$ROOT/usr/lib/smbsrv:$ROOT/usr/lib:$ROOT/lib
 export LD_LIBRARY_PATH
+
+# Enable everything, for debugging
+export SMB_MAX_PROTOCOL=3
+export SMB_SIGNING=require
 
 # normally runs with cwd=/ but this is more careful
 cd /var/smb

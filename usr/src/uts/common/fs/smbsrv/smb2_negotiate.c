@@ -67,6 +67,7 @@ uint32_t smb2_old_rwsize = (1<<16);	/* 64KB */
 static uint16_t smb2_versions[] = {
 	0x202,	/* SMB 2.002 */
 	0x210,	/* SMB 2.1 */
+	0x300,	/* SMB 3.0 */
 };
 static uint16_t smb2_nversions =
     sizeof (smb2_versions) / sizeof (smb2_versions[0]);
@@ -324,6 +325,13 @@ smb2_negotiate_common(smb_request_t *sr, uint16_t version)
 		/* smb2_send_reply(sr); in caller */
 		return (-1); /* will drop */
 	}
+
+	/*
+	 * If the version is 0x2FF, we haven't completed negotiate.
+	 * Don't initialize until we have our final request.
+	 */
+	if (version != 0x2FF)
+		smb2_sign_init_mech(s);
 
 	/*
 	 * See notes above smb2_max_rwsize, smb2_old_rwsize

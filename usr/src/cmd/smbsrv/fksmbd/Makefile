@@ -20,7 +20,7 @@
 #
 #
 # Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 #
 
 
@@ -76,11 +76,11 @@ CPPFLAGS += -Dsyslog=smb_syslog
 CPPFLAGS += -D_LARGEFILE64_SOURCE=1
 CPPFLAGS += -DFKSMBD
 # Always debug here
-CPPFLAGS += -DDEBUG 
+CPPFLAGS += -DDEBUG
 CPPFLAGS += $(INCS)
 
 LDFLAGS += $(ZNOLAZYLOAD)
-LDFLAGS += -R/usr/lib/smbsrv
+LDFLAGS += '-R$$ORIGIN' '-R$$ORIGIN/..'
 LDLIBS += -L$(ROOT)/usr/lib/smbsrv
 LDLIBS += -lfksmbsrv -lfakekernel
 # prefer to keep libs ordered by dependence

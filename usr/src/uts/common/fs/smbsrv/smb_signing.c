@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 /*
  * These routines provide the SMB MAC signing for the SMB server.
@@ -119,7 +119,7 @@ smb_sign_fini(smb_session_t *s)
  * NTLM response and store it in the signing structure.
  * This is what begins SMB signing.
  */
-int
+void
 smb_sign_begin(smb_request_t *sr, smb_token_t *token)
 {
 	smb_arg_sessionsetup_t *sinfo = sr->sr_ssetup;
@@ -135,7 +135,7 @@ smb_sign_begin(smb_request_t *sr, smb_token_t *token)
 	 * session key, in which case: just don't sign.
 	 */
 	if (token->tkn_ssnkey.val == NULL || token->tkn_ssnkey.len == 0)
-		return (0);
+		return;
 
 	/*
 	 * Session-level initialization (once per session)
@@ -148,7 +148,7 @@ smb_sign_begin(smb_request_t *sr, smb_token_t *token)
 	 */
 	if (sign->mackey != NULL) {
 		smb_rwx_rwexit(&session->s_lock);
-		return (0);
+		return;
 	}
 
 	/*
@@ -160,7 +160,7 @@ smb_sign_begin(smb_request_t *sr, smb_token_t *token)
 		if (rc != 0) {
 			kmem_free(mech, sizeof (*mech));
 			smb_rwx_rwexit(&session->s_lock);
-			return (rc);
+			return;
 		}
 		session->sign_mech = mech;
 		session->sign_fini = smb_sign_fini;
@@ -194,7 +194,6 @@ smb_sign_begin(smb_request_t *sr, smb_token_t *token)
 	}
 
 	smb_rwx_rwexit(&session->s_lock);
-	return (0);
 }
 
 /*
