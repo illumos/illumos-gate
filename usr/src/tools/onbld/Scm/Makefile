@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2014, Joyent, Inc.
 #
 
 include $(SRC)/Makefile.master
@@ -29,6 +30,7 @@ include ../../Makefile.tools
 PYSRCS = \
 	__init__.py	\
 	Backup.py	\
+	Ignore.py	\
 	Version.py	\
 	WorkSpace.py
 

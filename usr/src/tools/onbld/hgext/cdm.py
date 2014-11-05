@@ -17,6 +17,7 @@
 # Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2008, 2011 Richard Lowe
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
+# Copyright (c) 2014, Joyent, Inc.
 #
 
 '''OpenSolaris extensions to Mercurial
@@ -93,6 +94,7 @@ sys.path.insert(1, os.path.join(os.path.dirname(__file__), "..", "..", "..",
 sys.path.insert(2, os.path.join(os.path.dirname(__file__), "..", ".."))
 
 from onbld.Scm import Version
+from onbld.Scm import Ignore
 from mercurial import util
 
 try:
@@ -100,7 +102,7 @@ try:
 except Version.VersionMismatch, badversion:
     raise util.Abort("Version Mismatch:\n %s\n" % badversion)
 
-from mercurial import cmdutil, ignore, node, patch
+from mercurial import cmdutil, node, patch
 
 from onbld.Scm.WorkSpace import WorkSpace, WorkList
 from onbld.Scm.Backup import CdmBackup
@@ -168,7 +170,7 @@ def not_check(repo, cmd):
             ignorefiles.append(f)
 
     if ignorefiles:
-        ign = ignore.ignore(repo.root, ignorefiles, repo.ui.warn)
+        ign = Ignore.ignore(repo.root, ignorefiles)
         return canonified_check(ign)
     else:
         return util.never

@@ -18,6 +18,7 @@
 # Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2008, 2012 Richard Lowe
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
+# Copyright (c) 2014, Joyent, Inc.
 #
 
 import getopt
@@ -28,10 +29,6 @@ import sys
 import tempfile
 
 from cStringIO import StringIO
-
-# This is necessary because, in a fit of pique, we used hg-format ignore lists
-# for NOT files.
-from mercurial import ignore
 
 #
 # Adjust the load path based on our location and the version of python into
@@ -48,6 +45,7 @@ sys.path.insert(1, os.path.join(os.path.dirname(__file__), "..", "lib",
 #
 sys.path.insert(2, os.path.join(os.path.dirname(__file__), ".."))
 
+from onbld.Scm import Ignore
 from onbld.Checks import Comments, Copyright, CStyle, HdrChk
 from onbld.Checks import JStyle, Keywords, ManLint, Mapfile
 
@@ -178,10 +176,7 @@ def not_check(root, cmd):
     ignorefiles = filter(os.path.exists,
                          [os.path.join(root, ".git", "%s.NOT" % cmd),
                           os.path.join(root, "exception_lists", cmd)])
-    if len(ignorefiles) > 0:
-        return ignore.ignore(root, ignorefiles, sys.stderr.write)
-    else:
-        return lambda x: False
+    return Ignore.ignore(root, ignorefiles)
 
 
 def gen_files(root, parent, paths, exclude):
