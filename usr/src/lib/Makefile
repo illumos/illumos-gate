@@ -24,6 +24,7 @@
 # Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright (c) 2012, Joyent, Inc. All rights reserved.
 # Copyright (c) 2013 Gary Mills
+# Copyright 2014 Garrett D'Amore <garrett@damore.org>
 
 include ../Makefile.master
 
@@ -173,7 +174,6 @@ SUBDIRS += \
 	libvolmgt	\
 	libdevice	\
 	libdevid	\
-	libdhcpsvc	\
 	libc_db		\
 	libndmp		\
 	libsec		\
@@ -181,7 +181,6 @@ SUBDIRS += \
 	libtnf		\
 	libtnfctl	\
 	libdhcpagent	\
-	libdhcpdu	\
 	libdhcputil	\
 	libxnet		\
 	libipsecutil	\
@@ -312,7 +311,6 @@ MSGSUBDIRS=		\
 	libcmd		\
 	libcontract	\
 	libcurses	\
-	libdhcpsvc 	\
 	libdhcputil	\
 	libipsecutil	\
 	libdiskmgt	\
@@ -391,7 +389,6 @@ HDRSUBDIRS=		\
 	libdll		\
 	libdlpi		\
 	libdhcpagent	\
-	libdhcpsvc	\
 	libdhcputil	\
 	libdisasm	\
 	libdns_sd	\
@@ -569,7 +566,6 @@ libcontract:	libnvpair
 libdevid:	libdevinfo
 libdevinfo:	libnvpair libsec
 libdhcpagent:	libsocket libdhcputil libuuid libdlpi libcontract
-libdhcpsvc:	libinetutil
 libdhcputil:	libnsl libgen libinetutil libdlpi
 libdladm:	libdevinfo libinetutil libsocket libscf librcm libnvpair \
 		libexacct libnsl libkstat libcurses

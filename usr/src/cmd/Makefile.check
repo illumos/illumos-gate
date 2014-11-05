@@ -20,6 +20,7 @@
 #
 
 # Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2014 Garrett D'Amore <garrett@damore.org>
 
 include ../Makefile.master
 
@@ -82,7 +83,6 @@ MANIFEST_SUBDIRS=			\
 	cmd-inet/usr.lib/ilbd		\
 	cmd-inet/usr.lib/in.chargend	\
 	cmd-inet/usr.lib/in.daytimed	\
-	cmd-inet/usr.lib/in.dhcpd	\
 	cmd-inet/usr.lib/in.discardd	\
 	cmd-inet/usr.lib/in.echod	\
 	cmd-inet/usr.lib/in.ndpd	\

@@ -25,12 +25,11 @@
 #
 
 SYNCPROG=	syncinit syncloop syncstat
-DHCPPROG=	dhcpconfig dhtadm pntadm
 
 PROG=		6to4relay arp if_mpadm \
 		in.comsat in.fingerd in.rarpd in.rexecd in.rlogind \
 		in.rshd in.rwhod in.telnetd in.tftpd ipaddrsel \
-		ndd $(SYNCPROG) $(DHCPPROG) wanbootutil
+		ndd $(SYNCPROG) wanbootutil
 
 MANIFEST=	rarp.xml telnet.xml comsat.xml finger.xml \
 		login.xml shell.xml rexec.xml socket-filter-kssl.xml

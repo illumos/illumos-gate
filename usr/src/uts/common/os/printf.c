@@ -112,7 +112,7 @@ retry:
 	    "%s: [ID %u FACILITY_AND_PRIORITY] ",
 	    mod_containing_pc(site), msgid);
 	msgp += snprintf(msgp, bufend - msgp, prefix);
-	if (dip)
+	if (dip != NULL)
 		msgp += snprintf(msgp, bufend - msgp, "%s%d: ",
 		    ddi_driver_name(dip), ddi_get_instance(dip));
 	msgp += vsnprintf(msgp, bufend - msgp, fmt, adx);

@@ -349,7 +349,6 @@ f etc/init.d/PRESERVE 0744 root sys
 f etc/init.d/README 0644 root sys
 f etc/init.d/acct 0744 root sys
 f etc/init.d/devlinks 0744 root sys
-f etc/init.d/dhcp 0744 root sys
 f etc/init.d/dodatadm.udaplt 0744 root sys
 f etc/init.d/drvconfig 0744 root sys
 f etc/init.d/ldap.client 0744 root sys
@@ -1334,9 +1333,7 @@ s lib/libdevid.so=libdevid.so.1
 f lib/libdevinfo.so.1 0755 root bin
 s lib/libdevinfo.so=libdevinfo.so.1
 f lib/libdhcpagent.so.1 0755 root bin
-s lib/libdhcpagent.so=libdhcpagent.so.1
 f lib/libdhcputil.so.1 0755 root bin
-s lib/libdhcputil.so=libdhcputil.so.1
 f lib/libdl.so.1 0755 root bin
 s lib/libdl.so=libdl.so.1
 f lib/libdladm.so.1 0755 root bin
@@ -2621,19 +2618,6 @@ f usr/include/device_info.h 0644 root bin
 f usr/include/devid.h 0644 root bin
 f usr/include/devmgmt.h 0644 root bin
 f usr/include/devpoll.h 0644 root bin
-f usr/include/dhcp_hostconf.h 0644 root bin
-f usr/include/dhcp_impl.h 0644 root bin
-f usr/include/dhcp_inittab.h 0644 root bin
-f usr/include/dhcp_stable.h 0644 root bin
-f usr/include/dhcp_svc_confkey.h 0644 root bin
-f usr/include/dhcp_svc_confopt.h 0644 root bin
-f usr/include/dhcp_svc_private.h 0644 root bin
-f usr/include/dhcp_svc_public.h 0644 root bin
-f usr/include/dhcp_symbol.h 0644 root bin
-f usr/include/dhcp_symbol_common.h 0644 root bin
-f usr/include/dhcpagent_ipc.h 0644 root bin
-f usr/include/dhcpagent_util.h 0644 root bin
-f usr/include/dhcpmsg.h 0644 root bin
 f usr/include/dial.h 0644 root bin
 f usr/include/directory.h 0644 root bin
 f usr/include/dirent.h 0644 root bin
@@ -4260,7 +4244,6 @@ f usr/include/sys/sunldi.h 0644 root bin
 f usr/include/sys/sunldi_impl.h 0644 root bin
 f usr/include/sys/sunmdi.h 0644 root bin
 f usr/include/sys/sunndi.h 0644 root bin
-f usr/include/sys/sunos_dhcp_class.h 0644 root bin
 f usr/include/sys/sunpm.h 0644 root bin
 f usr/include/sys/suntpi.h 0644 root bin
 f usr/include/sys/suntty.h 0644 root bin
@@ -5978,23 +5961,12 @@ f usr/lib/inet/amd64/in.iked 0555 root bin
 f usr/lib/inet/certdb 0555 root bin
 f usr/lib/inet/certlocal 0555 root bin
 f usr/lib/inet/certrldb 0555 root bin
-d usr/lib/inet/dhcp 0755 root bin
-d usr/lib/inet/dhcp/nsu 0755 root bin
-f usr/lib/inet/dhcp/nsu/rfc2136.so.1 0755 root bin
-d usr/lib/inet/dhcp/svc 0755 root bin
-f usr/lib/inet/dhcp/svc/ds_SUNWbinfiles.so.1 0755 root bin
-s usr/lib/inet/dhcp/svc/ds_SUNWbinfiles.so=ds_SUNWbinfiles.so.1
-f usr/lib/inet/dhcp/svc/ds_SUNWfiles.so.0 0755 root bin
-f usr/lib/inet/dhcp/svc/ds_SUNWfiles.so.1 0755 root bin
-s usr/lib/inet/dhcp/svc/ds_SUNWfiles.so=ds_SUNWfiles.so.1
-f usr/lib/inet/dsvclockd 0555 root bin
 d usr/lib/inet/i86 0755 root bin
 d usr/lib/inet/ilb 0755 root bin
 f usr/lib/inet/ilb/ilb_probe 0555 root bin
 f usr/lib/inet/ilbd 0555 root bin
 f usr/lib/inet/in.chargend 0555 root bin
 f usr/lib/inet/in.daytimed 0555 root bin
-f usr/lib/inet/in.dhcpd 0555 root bin
 f usr/lib/inet/in.discardd 0555 root bin
 f usr/lib/inet/in.echod 0555 root bin
 h usr/lib/inet/in.iked=usr/lib/isaexec
@@ -6158,11 +6130,8 @@ s usr/lib/libdevid.so=../../lib/libdevid.so.1
 s usr/lib/libdevinfo.so.1=../../lib/libdevinfo.so.1
 s usr/lib/libdevinfo.so=../../lib/libdevinfo.so.1
 s usr/lib/libdhcpagent.so.1=../../lib/libdhcpagent.so.1
-s usr/lib/libdhcpagent.so=../../lib/libdhcpagent.so.1
 f usr/lib/libdhcpsvc.so.1 0755 root bin
-s usr/lib/libdhcpsvc.so=libdhcpsvc.so.1
 s usr/lib/libdhcputil.so.1=../../lib/libdhcputil.so.1
-s usr/lib/libdhcputil.so=../../lib/libdhcputil.so.1
 f usr/lib/libdisasm.so.1 0755 root bin
 s usr/lib/libdisasm.so=libdisasm.so.1
 f usr/lib/libdiskmgt.so.1 0755 root bin
@@ -13707,8 +13676,12 @@ s usr/share/man/man3c/watof.3c=wcstod.3c
 s usr/share/man/man3c/watoi.3c=wcstol.3c
 s usr/share/man/man3c/watol.3c=wcstol.3c
 s usr/share/man/man3c/watoll.3c=wcstol.3c
+f usr/share/man/man3c/wcpcpy.3c 0444 root bin
+s usr/share/man/man3c/wcpncpy.3c=wcpcpy.3c
 f usr/share/man/man3c/wcrtomb.3c 0444 root bin
 s usr/share/man/man3c/wcrtomb_l.3c=wcrtomb.3c
+f usr/share/man/man3c/wcscasecmp.3c 0444 root bin
+s usr/share/man/man3c/wcscasecmp_l.3c=wcscasecmp.3c
 s usr/share/man/man3c/wcscat.3c=wcstring.3c
 s usr/share/man/man3c/wcschr.3c=wcstring.3c
 s usr/share/man/man3c/wcscmp.3c=wcstring.3c
@@ -13716,12 +13689,16 @@ f usr/share/man/man3c/wcscoll.3c 0444 root bin
 s usr/share/man/man3c/wcscoll_l.3c=wcscoll.3c
 s usr/share/man/man3c/wcscpy.3c=wcstring.3c
 s usr/share/man/man3c/wcscspn.3c=wcstring.3c
+f usr/share/man/man3c/wcsdup.3c 0444 root bin
 s usr/share/man/man3c/wcsetno.3c=cset.3c
 f usr/share/man/man3c/wcsftime.3c 0444 root bin
-s usr/share/man/man3c/wcslen.3c=wcstring.3c
+f usr/share/man/man3c/wcslen.3c 0444 root bin
+s usr/share/man/man3c/wcsncasecmp.3c=wcscasecmp.3c
+s usr/share/man/man3c/wcsncasecmp_l.3c=wcscasecmp.3c
 s usr/share/man/man3c/wcsncat.3c=wcstring.3c
 s usr/share/man/man3c/wcsncmp.3c=wcstring.3c
 s usr/share/man/man3c/wcsncpy.3c=wcstring.3c
+s usr/share/man/man3c/wcsnlen.3c=wcslen.3c
 s usr/share/man/man3c/wcsnrtombs.3c=wcsrtombs.3c
 s usr/share/man/man3c/wcsnrtombs_l.3c=wcsrtombs.3c
 s usr/share/man/man3c/wcspbrk.3c=wcstring.3c
@@ -17957,9 +17934,6 @@ s usr/share/man/man4/devid_cache.4=devices.4
 s usr/share/man/man4/devname_cache.4=devices.4
 f usr/share/man/man4/dfstab.4 0444 root bin
 f usr/share/man/man4/dhcp_inittab.4 0444 root bin
-f usr/share/man/man4/dhcp_network.4 0444 root bin
-f usr/share/man/man4/dhcpsvc.conf.4 0444 root bin
-f usr/share/man/man4/dhcptab.4 0444 root bin
 f usr/share/man/man4/dialups.4 0444 root bin
 s usr/share/man/man4/dir.4=dir_ufs.4
 f usr/share/man/man4/dir_ufs.4 0444 root bin
@@ -18177,7 +18151,6 @@ f usr/share/man/man5/crypt_sunmd5.5 0444 root bin
 f usr/share/man/man5/crypt_unix.5 0444 root bin
 f usr/share/man/man5/device_clean.5 0444 root bin
 f usr/share/man/man5/dhcp.5 0444 root bin
-f usr/share/man/man5/dhcp_modules.5 0444 root bin
 f usr/share/man/man5/environ.5 0444 root bin
 f usr/share/man/man5/epoll.5 0444 root bin
 f usr/share/man/man5/eqn.5 0444 root bin

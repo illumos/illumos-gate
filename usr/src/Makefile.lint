@@ -74,9 +74,7 @@ COMMON_SUBDIRS = \
 	cmd/cmd-inet/sbin \
 	cmd/cmd-inet/usr.bin \
 	cmd/cmd-inet/usr.lib/bridged \
-	cmd/cmd-inet/usr.lib/dsvclockd \
 	cmd/cmd-inet/usr.lib/ilbd \
-	cmd/cmd-inet/usr.lib/in.dhcpd \
 	cmd/cmd-inet/usr.lib/in.mpathd \
 	cmd/cmd-inet/usr.lib/in.ndpd \
 	cmd/cmd-inet/usr.lib/inetd \
@@ -367,8 +365,6 @@ COMMON_SUBDIRS = \
 	lib/libdevid \
 	lib/libdevinfo \
 	lib/libdhcpagent \
-	lib/libdhcpdu \
-	lib/libdhcpsvc \
 	lib/libdhcputil \
 	lib/libdisasm \
 	lib/libdiskmgt \
