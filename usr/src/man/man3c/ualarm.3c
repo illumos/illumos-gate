@@ -1,71 +1,108 @@
-'\" te
+.\" Copyright 2014 Garrett D'Amore <garrett@damore.org>
 .\"  Copyright (c) 1980 Regents of the University of California.  All rights reserved.  The Berkeley software License Agreement specifies the terms and conditions for redistribution.  Copyright (c) 2002, Sun Microsystems, Inc.  All Rights Reserved  Portions Copyright (c) 1992,
 .\" X/Open Company Limited  All Rights Reserved
 .\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
-.TH UALARM 3C "Aug 14, 2002"
-.SH NAME
-ualarm \- schedule signal after interval in microseconds
-.SH SYNOPSIS
-.LP
-.nf
-#include <unistd.h>
-
-\fBuseconds_t\fR \fBualarm\fR(\fBuseconds_t\fR \fIuseconds\fR, \fBuseconds_t\fR \fIinterval\fR);
-.fi
-
-.SH DESCRIPTION
-.sp
-.LP
-The \fBualarm()\fR function causes the \fBSIGALRM\fR signal to be generated for
+.Dd "Aug 16, 2014"
+.Dt UALARM 3C
+.Os
+.Sh NAME
+.Nm ualarm
+.Nd schedule signal after interval in microseconds
+.Sh SYNOPSIS
+.In unistd.h
+.Ft useconds_t
+.Fn ualarm "useconds_t useconds" "useconds_t interval"
+.Sh DESCRIPTION
+The
+.Fn ualarm
+function causes the
+.Dv SIGALRM
+signal to be generated for
 the calling process after the number of real-time microseconds specified by the
-\fIuseconds\fR argument has elapsed.  When the \fIinterval\fR argument is
+.Fa useconds
+argument has elapsed.  When the
+.Fa interval
+argument is
 non-zero, repeated timeout notification occurs with a period in microseconds
 specified by the \fIinterval\fR argument. If the notification signal,
-\fBSIGALRM\fR, is not caught or ignored, the calling process is terminated.
-.sp
-.LP
+.Dv SIGALRM ,
+is not caught or ignored, the calling process is terminated.
+.Lp
 Because of scheduling delays, resumption of execution when the signal is caught
 may be delayed an arbitrary amount of time.
-.sp
-.LP
-Interactions between \fBualarm()\fR and either \fBalarm\fR(2) or
-\fBsleep\fR(3C) are unspecified.
-.SH RETURN VALUES
-.sp
-.LP
-The \fBualarm()\fR function returns the number of microseconds remaining from
-the previous \fBualarm()\fR call.  If no timeouts are pending or if
-\fBualarm()\fR has not previously been called, \fBualarm()\fR returns \fB0\fR.
-.SH ERRORS
-.sp
-.LP
+.Lp
+Interactions between
+.Fn ualarm
+and either
+.Xr alarm 2
+or
+.Xr sleep 3C
+are unspecified.
+.Sh RETURN VALUES
+The
+.Fn ualarm
+function returns the number of microseconds remaining from
+the previous
+.Fn ualarm
+call.  If no timeouts are pending or if
+.Fn ualarm
+has not previously been called,
+.Fn ualarm
+returns 0.
+.Sh ERRORS
 No errors are defined.
-.SH USAGE
-.sp
-.LP
-The \fBualarm()\fR function is a simplified interface to \fBsetitimer\fR(2),
-and uses the \fBITIMER_REAL\fR interval timer.
-.SH ATTRIBUTES
-.sp
-.LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-Interface Stability	Standard
-.TE
-
-.SH SEE ALSO
-.sp
-.LP
-\fBalarm\fR(2), \fBsetitimer\fR(2), \fBsighold\fR(3C), \fBsignal\fR(3C),
-\fBsleep\fR(3C), \fBusleep\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)
+.Sh USAGE
+The
+.Fn ualarm
+function is a simplified interface to
+.Xr setitimer 2 ,
+and uses the
+.Dv ITIMER_REAL
+interval timer. It's use has been deprecated in favor of the
+.Xr timer_create 3C
+family of functions.
+.Sh INTERFACE STABILITY
+.Sy Obsolete Standard .
+.Sh SEE ALSO
+.Xr alarm 2 ,
+.Xr setitimer 2 ,
+.Xr sighold 3C ,
+.Xr signal 3C ,
+.Xr sleep 3C ,
+.Xr timer_create 3C ,
+.Xr usleep 3C ,
+.Xr unistd.h 3HEAD ,
+.Xr standards 5
+.Sh STANDARDS
+The
+.Fn ualarm
+function is available in the following compilation environments.  See
+.Xr standards 5 .
+.Lp
+.Bl -bullet -compact
+.\".It
+.\".St -p1003.1-90
+.\".It
+.\".St -p1003.1b-93
+.\".It
+.\".St -p1003.1c-95
+.\".It
+.\".St -p1003.1-2001
+.\".It
+.\".St -xpg3
+.\".It
+.\".St -xpg4
+.It
+.St -xpg4.2
+.It
+.St -susv2
+.It
+.St -susv3
+.El
+.Lp
+It is marked obsolete in
+.St -susv3 , and was removed from
+.St -p1003.1-2008 .
