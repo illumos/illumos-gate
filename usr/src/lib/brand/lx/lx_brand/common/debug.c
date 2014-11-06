@@ -93,6 +93,7 @@ lx_debug(const char *msg, ...)
 	char		*buf;
 	int		rv, fd, n;
 	int		errno_backup;
+	int		size = LX_MSG_MAXLEN + 1;
 
 	if (lx_debug_enabled == 0)
 		return;
@@ -102,21 +103,20 @@ lx_debug(const char *msg, ...)
 	 * footprint.  The buffer allocation is thus done conditionally,
 	 * rather than as regular automatic storage.
 	 */
-	if ((buf = SAFE_ALLOCA(LX_MSG_MAXLEN + 1)) == NULL)
+	if ((buf = SAFE_ALLOCA(size)) == NULL)
 		return;
 
 	errno_backup = errno;
 
 	/* prefix the message with pid/tid */
-	if ((n = snprintf(buf, sizeof (buf), "%u/%u: ",
-	    getpid(), thr_self())) == -1) {
+	if ((n = snprintf(buf, size, "%u/%u: ", getpid(), thr_self())) == -1) {
 		errno = errno_backup;
 		return;
 	}
 
 	/* format the message */
 	va_start(ap, msg);
-	rv = vsnprintf(&buf[n], sizeof (buf) - n, msg, ap);
+	rv = vsnprintf(&buf[n], size - n, msg, ap);
 	va_end(ap);
 	if (rv == -1) {
 		errno = errno_backup;
@@ -125,7 +125,7 @@ lx_debug(const char *msg, ...)
 
 	/* add a carrige return if there isn't one already */
 	if ((buf[strlen(buf) - 1] != '\n') &&
-	    (strlcat(buf, "\n", sizeof (buf)) >= sizeof (buf))) {
+	    (strlcat(buf, "\n", size) >= size)) {
 		errno = errno_backup;
 		return;
 	}
