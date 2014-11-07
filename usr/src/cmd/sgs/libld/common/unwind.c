@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.
  */
 
 #include	<string.h>
@@ -409,15 +410,10 @@ ld_unwind_make_hdr(Ofl_desc *ofl)
 				 */
 				if (id == 0) {
 					uint_t	cieversion;
-					/*
-					 * The only CIE version supported
-					 * is '1' - quick sanity check
-					 * here.
-					 */
 					cieversion = data[off + ndx];
 					ndx += 1;
 					/* BEGIN CSTYLED */
-					if (cieversion != 1) {
+					if (cieversion != 1 && cieversion != 3) {
 					    ld_eprintf(ofl, ERR_FATAL,
 						MSG_INTL(MSG_UNW_BADCIEVERS),
 						isp->is_file->ifl_name,
@@ -582,6 +578,7 @@ ld_unwind_populate_hdr(Ofl_desc *ofl)
 			if (id == 0) {
 				char	*cieaugstr;
 				uint_t	cieaugndx;
+				uint_t	cieversion;
 
 				ciePflag = 0;
 				cieRflag = 0;
@@ -592,10 +589,8 @@ ld_unwind_populate_hdr(Ofl_desc *ofl)
 				 * are encoded.
 				 */
 
-				/*
-				 * burn through version
-				 */
-				ndx++;
+				cieversion = data[off + ndx];
+				ndx += 1;
 
 				/*
 				 * augstr
@@ -612,8 +607,10 @@ ld_unwind_populate_hdr(Ofl_desc *ofl)
 				/*
 				 * retreg
 				 */
-				ndx++;
-
+				if (cieversion == 1)
+					ndx++;
+				else
+					(void) uleb_extract(&data[off], &ndx);
 				/*
 				 * we walk through the augmentation
 				 * section now looking for the Rflag

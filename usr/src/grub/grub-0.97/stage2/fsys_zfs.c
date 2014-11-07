@@ -1048,6 +1048,7 @@ static const char *spa_feature_names[] = {
 	"com.delphix:hole_birth",
 	"com.delphix:extensible_dataset",
 	"com.delphix:embedded_data",
+	"org.open-zfs:large_blocks",
 	NULL
 };
 
@@ -1835,6 +1836,17 @@ zfs_read(char *buf, int len)
 	}
 
 	blksz = DNODE->dn_datablkszsec << SPA_MINBLOCKSHIFT;
+
+	/*
+	 * Note: for GRUB, SPA_MAXBLOCKSIZE is 128KB.  There is not enough
+	 * memory to allocate the new max blocksize (16MB), so while
+	 * GRUB understands the large_blocks on-disk feature, it can't
+	 * actually read large blocks.
+	 */
+	if (blksz > SPA_MAXBLOCKSIZE) {
+		grub_printf("blocks larger than 128K are not supported\n");
+		return (0);
+	}
 
 	/*
 	 * Entire Dnode is too big to fit into the space available.  We
