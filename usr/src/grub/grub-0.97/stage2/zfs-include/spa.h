@@ -56,16 +56,13 @@
 	BF64_SET(x, low, len, ((val) >> (shift)) - (bias))
 
 /*
- * We currently support nine block sizes, from 512 bytes to 128K.
- * We could go higher, but the benefits are near-zero and the cost
- * of COWing a giant block to modify one byte would become excessive.
+ * Note: GRUB can't actually read blocks larger than 128KB, due to lack
+ * of memory.  Therefore its SPA_MAXBLOCKSIZE is still 128KB.
  */
 #define	SPA_MINBLOCKSHIFT	9
 #define	SPA_MAXBLOCKSHIFT	17
 #define	SPA_MINBLOCKSIZE	(1ULL << SPA_MINBLOCKSHIFT)
 #define	SPA_MAXBLOCKSIZE	(1ULL << SPA_MAXBLOCKSHIFT)
-
-#define	SPA_BLOCKSIZES		(SPA_MAXBLOCKSHIFT - SPA_MINBLOCKSHIFT + 1)
 
 /*
  * Size of block to hold the configuration data (a packed nvlist)
