@@ -17,7 +17,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE
 #
-# Copyright (c) 2013, Joyent Inc. All rights reserved.
+# Copyright (c) 2014, Joyent, Inc.
 #
 
 '''

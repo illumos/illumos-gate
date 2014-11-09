@@ -18,7 +18,7 @@
 # Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2008, 2012 Richard Lowe
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
-# Copyright (c) 2013, Joyent Inc. All rights reserved.
+# Copyright (c) 2014, Joyent, Inc.
 #
 
 import getopt
