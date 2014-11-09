@@ -52,6 +52,7 @@
 #include <unistd.h>
 #include <libintl.h>
 #include <zone.h>
+#include <priv.h>
 
 extern int sethostname(char *, int);
 
@@ -503,6 +504,12 @@ lx_execve(uintptr_t p1, uintptr_t p2, uintptr_t p3)
 
 	lx_ptrace_stop_if_option(LX_PTRACE_O_TRACEEXEC);
 
+	/*
+	 * Emulate PR_SET_KEEPCAPS which is reset on execve. If this is not done
+	 * the emulated capabilities could be reduced more than expected.
+	 */
+	(void) setpflags(PRIV_AWARE_RESET, 1);
+
 	/* This is a normal exec call. */
 	(void) execve(filename, argv, envp);
 
@@ -561,9 +568,17 @@ lx_prctl(int option, uintptr_t arg2, uintptr_t arg3,
 
 	if (option == LX_PR_SET_KEEPCAPS) {
 		/*
-		 * See lx_capget and lx_capset. We totally punt on capabilities
-		 * so do the same here.
+		 * The closest illumos analog to SET_KEEPCAPS is the PRIV_AWARE
+		 * flag.  There are probably some cases where it's not exactly
+		 * the same, but this will do for a first try.
 		 */
+		if (arg2 == 0) {
+			if (setpflags(PRIV_AWARE_RESET, 1) != 0)
+				return (-errno);
+		} else {
+			if (setpflags(PRIV_AWARE, 1) != 0)
+				return (-errno);
+		}
 		return (0);
 	}
 
