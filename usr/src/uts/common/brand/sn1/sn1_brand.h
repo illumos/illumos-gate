@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2014, Joyent, Inc. All rights reserved.
  */
 
 #ifndef _SN1_BRAND_H
@@ -37,20 +38,14 @@ extern "C" {
 #define	SN1_VERSION		SN1_VERSION_1
 
 #define	SN1_LIB_NAME		"sn1_brand.so.1"
-#define	SN1_LINKER_NAME		"ld.so.1"
 
 #define	SN1_LIB32		BRAND_NATIVE_DIR "usr/lib/" SN1_LIB_NAME
-#define	SN1_LINKER32		"/lib/" SN1_LINKER_NAME
-
 #define	SN1_LIB64		BRAND_NATIVE_DIR "usr/lib/64/" SN1_LIB_NAME
-#define	SN1_LINKER64		"/lib/64/" SN1_LINKER_NAME
 
 #if defined(_LP64)
 #define	SN1_LIB		SN1_LIB64
-#define	SN1_LINKER	SN1_LINKER64
 #else /* !_LP64 */
 #define	SN1_LIB		SN1_LIB32
-#define	SN1_LINKER	SN1_LINKER32
 #endif /* !_LP64 */
 
 #if defined(_KERNEL)

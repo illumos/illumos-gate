@@ -404,7 +404,7 @@ s10_elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 {
 	return (brand_solaris_elfexec(vp, uap, args, idatap, level, execsz,
 	    setid, exec_file, cred, brand_action, &s10_brand, S10_BRANDNAME,
-	    S10_LIB, S10_LIB32, S10_LINKER, S10_LINKER32));
+	    S10_LIB, S10_LIB32));
 }
 
 void

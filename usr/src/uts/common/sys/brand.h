@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2014 Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2014, Joyent, Inc. All rights reserved.
  */
 
 #ifndef _SYS_BRAND_H
@@ -186,7 +186,7 @@ extern void	brand_solaris_copy_procdata(proc_t *, proc_t *,
 		    struct brand *);
 extern int	brand_solaris_elfexec(vnode_t *, execa_t *, uarg_t *,
 		    intpdata_t *, int, long *, int, caddr_t, cred_t *, int,
-		    struct brand *, char *, char *, char *, char *, char *);
+		    struct brand *, char *, char *, char *);
 extern void	brand_solaris_exec(struct brand *);
 extern int	brand_solaris_fini(char **, struct modlinkage *,
 		    struct brand *);

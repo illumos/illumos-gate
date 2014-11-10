@@ -1226,7 +1226,7 @@ lx_elfexec(struct vnode *vp, struct execa *uap, struct uarg *args,
 	Ehdr		ehdr;
 	Addr		uphdr_vaddr;
 	intptr_t	voffset;
-	int		interp;
+	char		*interp;
 	uintptr_t	ldaddr = NULL;
 	int		i;
 	proc_t		*p = ttoproc(curthread);
@@ -1238,19 +1238,16 @@ lx_elfexec(struct vnode *vp, struct execa *uap, struct uarg *args,
 	lx_elf_data_t	*edp =
 	    &((lx_proc_data_t *)ttoproc(curthread)->p_brand_data)->l_elf_data;
 	char		*lib_path = NULL;
-	char		*lx_linker_path = NULL;
 
 	ASSERT(ttoproc(curthread)->p_brand == &lx_brand);
 	ASSERT(ttoproc(curthread)->p_brand_data != NULL);
 
 	if (args->to_model == DATAMODEL_NATIVE) {
 		lib_path = LX_LIB_PATH;
-		lx_linker_path = LX_LINKER;
 	}
 #if defined(_LP64)
 	else {
 		lib_path = LX_LIB_PATH32;
-		lx_linker_path = LX_LINKER32;
 	}
 #endif
 
@@ -1339,6 +1336,10 @@ lx_elfexec(struct vnode *vp, struct execa *uap, struct uarg *args,
 #endif
 	if (error != 0) {
 		restoreexecenv(&origenv, &orig_sigaltstack);
+
+		if (interp != NULL)
+			kmem_free(interp, MAXPATHLEN);
+
 		return (error);
 	}
 
@@ -1353,7 +1354,7 @@ lx_elfexec(struct vnode *vp, struct execa *uap, struct uarg *args,
 	edp->ed_phent = ehdr.e_phentsize;
 	edp->ed_phnum = ehdr.e_phnum;
 
-	if (interp) {
+	if (interp != NULL) {
 		if (ehdr.e_type == ET_DYN) {
 			/*
 			 * This is a shared object executable, so we need to
@@ -1369,19 +1370,23 @@ lx_elfexec(struct vnode *vp, struct execa *uap, struct uarg *args,
 		 * store relevant information about it in the aux vector, where
 		 * the brand library can find it.
 		 */
-		if ((error = lookupname(lx_linker_path, UIO_SYSSPACE, FOLLOW,
+		if ((error = lookupname(interp, UIO_SYSSPACE, FOLLOW,
 		    NULLVPP, &nvp))) {
-			uprintf("%s: not found.", lx_linker_path);
+			uprintf("%s: not found.", interp);
 			restoreexecenv(&origenv, &orig_sigaltstack);
+			kmem_free(interp, MAXPATHLEN);
 			return (error);
 		}
+
+		kmem_free(interp, MAXPATHLEN);
+		interp = NULL;
 
 		/*
 		 * map in the Linux linker
 		 */
 		if (args->to_model == DATAMODEL_NATIVE) {
 			error = mapexec_brand(nvp, args, &ehdr,
-			    &uphdr_vaddr, &voffset, exec_file, &interp, NULL,
+			    &uphdr_vaddr, &voffset, exec_file, NULL, NULL,
 			    NULL, NULL, NULL, &ldaddr);
 		}
 #if defined(_LP64)
@@ -1390,7 +1395,7 @@ lx_elfexec(struct vnode *vp, struct execa *uap, struct uarg *args,
 			Elf32_Addr	uphdr_vaddr32;
 
 			error = mapexec32_brand(nvp, args, &ehdr32,
-			    &uphdr_vaddr32, &voffset, exec_file, &interp, NULL,
+			    &uphdr_vaddr32, &voffset, exec_file, NULL, NULL,
 			    NULL, NULL, NULL, &ldaddr);
 
 			Ehdr32to64(&ehdr32, &ehdr);

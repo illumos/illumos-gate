@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2012, Joyent, Inc. All rights reserved.
+ * Copyright 2014, Joyent, Inc. All rights reserved.
  */
 
 #ifndef _SNGL_BRAND_H
@@ -37,20 +37,13 @@ extern "C" {
 #define	SNGL_VERSION		1
 
 #define	SNGL_LIB_NAME		"sngl_brand.so.1"
-#define	SNGL_LINKER_NAME	"ld.so.1"
-
 #define	SNGL_LIB32		"/system/usr/lib/" SNGL_LIB_NAME
-#define	SNGL_LINKER32		"/lib/" SNGL_LINKER_NAME
-
 #define	SNGL_LIB64		"/system/usr/lib/64/" SNGL_LIB_NAME
-#define	SNGL_LINKER64		"/lib/64/" SNGL_LINKER_NAME
 
 #if defined(_LP64)
 #define	SNGL_LIB	SNGL_LIB64
-#define	SNGL_LINKER	SNGL_LINKER64
 #else /* !_LP64 */
 #define	SNGL_LIB	SNGL_LIB32
-#define	SNGL_LINKER	SNGL_LINKER32
 #endif /* !_LP64 */
 
 #if defined(_KERNEL)

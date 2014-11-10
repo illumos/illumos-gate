@@ -219,7 +219,7 @@ sngl_elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 {
 	return (brand_solaris_elfexec(vp, uap, args, idatap, level, execsz,
 	    setid, exec_file, cred, brand_action, &sngl_brand, SNGL_BRANDNAME,
-	    SNGL_LIB, SNGL_LIB32, SNGL_LINKER, SNGL_LINKER32));
+	    SNGL_LIB, SNGL_LIB32));
 }
 
 int
