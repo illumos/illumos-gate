@@ -31,6 +31,8 @@
 #include <sys/lx_brand.h>
 #include <sys/lx_ldt.h>
 #include <lx_signum.h>
+#include <sys/x86_archext.h>
+#include <sys/controlregs.h>
 
 #define	LX_CSIGNAL		0x000000ff
 #define	LX_CLONE_VM		0x00000100
@@ -55,7 +57,7 @@
  */
 /* ARGSUSED */
 long
-lx_clone(int flags, void *stkp, void *ptidp, void *ldtinfo, void *ctidp)
+lx_clone(int flags, void *stkp, void *ptidp, void *tls, void *ctidp)
 {
 	struct lx_lwp_data *lwpd = ttolxlwp(curthread);
 	struct lx_proc_data *lproc = ttolxproc(curthread);
@@ -73,29 +75,37 @@ lx_clone(int flags, void *stkp, void *ptidp, void *ldtinfo, void *ctidp)
 		lproc->l_signal = signo;
 	} else {
 		if (flags & LX_CLONE_SETTLS) {
-			if (copyin((caddr_t)ldtinfo, &info, sizeof (info)))
-				return (set_errno(EFAULT));
+			if (get_udatamodel() == DATAMODEL_ILP32) {
+				if (copyin((caddr_t)tls, &info, sizeof (info)))
+					return (set_errno(EFAULT));
 
-			if (LDT_INFO_EMPTY(&info))
-				return (set_errno(EINVAL));
+				if (LDT_INFO_EMPTY(&info))
+					return (set_errno(EINVAL));
 
-			entry = info.entry_number;
-			if (entry < GDT_TLSMIN || entry > GDT_TLSMAX)
-				return (set_errno(EINVAL));
+				entry = info.entry_number;
+				if (entry < GDT_TLSMIN || entry > GDT_TLSMAX)
+					return (set_errno(EINVAL));
 
-			tls_index = entry - GDT_TLSMIN;
+				tls_index = entry - GDT_TLSMIN;
 
-			/*
-			 * Convert the user-space structure into a real x86
-			 * descriptor and copy it into this LWP's TLS array.  We
-			 * also load it into the GDT.
-			 */
-			LDT_INFO_TO_DESC(&info, &descr);
-			bcopy(&descr, &lwpd->br_tls[tls_index], sizeof (descr));
-			lx_set_gdt(entry, &lwpd->br_tls[tls_index]);
-		} else {
-			tls_index = -1;
-			bzero(&descr, sizeof (descr));
+				/*
+				 * Convert the user-space structure into a real
+				 * x86 descriptor and copy it into this LWP's
+				 * TLS array.  We also load it into the GDT.
+				 */
+				LDT_INFO_TO_DESC(&info, &descr);
+				bcopy(&descr, &lwpd->br_tls[tls_index],
+				    sizeof (descr));
+				lx_set_gdt(entry, &lwpd->br_tls[tls_index]);
+			} else {
+				/*
+				 * For 64-bit, we need to set %fsbase -- which
+				 * requires us to save the native %fsbase and
+				 * set our LX %fsbase.
+				 */
+				lwpd->br_lx_fsbase = (uintptr_t)tls;
+				lwpd->br_ntv_fsbase = rdmsr(MSR_AMD_FSBASE);
+			}
 		}
 
 		lwpd->br_clear_ctidp =
