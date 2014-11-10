@@ -167,7 +167,7 @@ dtrace_safe_phdr(Phdr *phdrp, struct uarg *args, uintptr_t base)
  */
 int
 mapexec_brand(vnode_t *vp, uarg_t *args, Ehdr *ehdr, Addr *uphdr_vaddr,
-    intptr_t *voffset, caddr_t exec_file, int *interp, caddr_t *bssbase,
+    intptr_t *voffset, caddr_t exec_file, char **interpp, caddr_t *bssbase,
     caddr_t *brkbase, size_t *brksize, uintptr_t *lddatap, uintptr_t *minaddrp)
 {
 	size_t		len;
@@ -180,6 +180,7 @@ mapexec_brand(vnode_t *vp, uarg_t *args, Ehdr *ehdr, Addr *uphdr_vaddr,
 	Phdr		*junk = NULL;
 	Phdr		*dynphdr = NULL;
 	Phdr		*dtrphdr = NULL;
+	char		*interp = NULL;
 	uintptr_t	lddata;
 	long		execsz;
 	intptr_t	minaddr;
@@ -223,17 +224,49 @@ mapexec_brand(vnode_t *vp, uarg_t *args, Ehdr *ehdr, Addr *uphdr_vaddr,
 		*minaddrp = minaddr;
 
 	/*
-	 * Inform our caller if the executable needs an interpreter.
+	 * If the executable requires an interpreter, determine its name.
 	 */
-	*interp = (dynphdr == NULL) ? 0 : 1;
+	if (dynphdr != NULL) {
+		ssize_t	resid;
+
+		if (dynphdr->p_filesz > MAXPATHLEN || dynphdr->p_filesz == 0) {
+			uprintf("%s: Invalid interpreter\n", exec_file);
+			kmem_free(phdrbase, phdrsize);
+			return (ENOEXEC);
+		}
+
+		interp = kmem_alloc(MAXPATHLEN, KM_SLEEP);
+
+		if ((error = vn_rdwr(UIO_READ, vp, interp, dynphdr->p_filesz,
+		    (offset_t)dynphdr->p_offset, UIO_SYSSPACE, 0,
+		    (rlim64_t)0, CRED(), &resid)) != 0 || resid != 0 ||
+		    interp[dynphdr->p_filesz - 1] != '\0') {
+			uprintf("%s: Cannot obtain interpreter pathname\n",
+			    exec_file);
+			kmem_free(interp, MAXPATHLEN);
+			kmem_free(phdrbase, phdrsize);
+			return (error != 0 ? error : ENOEXEC);
+		}
+	}
 
 	/*
 	 * If this is a statically linked executable, voffset should indicate
 	 * the address of the executable itself (it normally holds the address
 	 * of the interpreter).
 	 */
-	if (ehdr->e_type == ET_EXEC && *interp == 0)
+	if (ehdr->e_type == ET_EXEC && interp == NULL)
 		*voffset = minaddr;
+
+	/*
+	 * If the caller has asked for the interpreter name, return it (it's
+	 * up to the caller to free it); if the caller hasn't asked for it,
+	 * free it ourselves.
+	 */
+	if (interpp != NULL) {
+		*interpp = interp;
+	} else if (interp != NULL) {
+		kmem_free(interp, MAXPATHLEN);
+	}
 
 	if (uphdr != NULL) {
 		*uphdr_vaddr = uphdr->p_vaddr;

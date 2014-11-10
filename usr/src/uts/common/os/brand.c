@@ -604,14 +604,14 @@ int
 brand_solaris_elfexec(vnode_t *vp, execa_t *uap, uarg_t *args,
     intpdata_t *idatap, int level, long *execsz, int setid, caddr_t exec_file,
     cred_t *cred, int brand_action, struct brand *pbrand, char *bname,
-    char *brandlib, char *brandlib32, char *brandlinker, char *brandlinker32)
+    char *brandlib, char *brandlib32)
 {
 
 	vnode_t		*nvp;
 	Ehdr		ehdr;
 	Addr		uphdr_vaddr;
 	intptr_t	voffset;
-	int		interp;
+	char		*interp;
 	int		i, err;
 	struct execenv	env;
 	struct execenv	origenv;
@@ -621,7 +621,6 @@ brand_solaris_elfexec(vnode_t *vp, execa_t *uap, uarg_t *args,
 	klwp_t		*lwp = ttolwp(curthread);
 	brand_proc_data_t	*spd;
 	brand_elf_data_t sed, *sedp;
-	char		*linker;
 	uintptr_t	lddata; /* lddata of executable's linker */
 
 	ASSERT(curproc->p_brand == pbrand);
@@ -638,12 +637,10 @@ brand_solaris_elfexec(vnode_t *vp, execa_t *uap, uarg_t *args,
 	 */
 	if (args->to_model == DATAMODEL_NATIVE) {
 		args->emulator = brandlib;
-		linker = brandlinker;
 	}
 #if defined(_LP64)
 	else {
 		args->emulator = brandlib32;
-		linker = brandlinker32;
 	}
 #endif  /* _LP64 */
 
@@ -746,6 +743,10 @@ brand_solaris_elfexec(vnode_t *vp, execa_t *uap, uarg_t *args,
 #endif  /* _LP64 */
 	if (err != 0) {
 		restoreexecenv(&origenv, &orig_sigaltstack);
+
+		if (interp != NULL)
+			kmem_free(interp, MAXPATHLEN);
+
 		return (err);
 	}
 
@@ -763,7 +764,7 @@ brand_solaris_elfexec(vnode_t *vp, execa_t *uap, uarg_t *args,
 	sedp->sed_phent = ehdr.e_phentsize;
 	sedp->sed_phnum = ehdr.e_phnum;
 
-	if (interp) {
+	if (interp != NULL) {
 		if (ehdr.e_type == ET_DYN) {
 			/*
 			 * This is a shared object executable, so we
@@ -779,12 +780,16 @@ brand_solaris_elfexec(vnode_t *vp, execa_t *uap, uarg_t *args,
 		 * it in and store relevant information about it in the
 		 * aux vector, where the brand library can find it.
 		 */
-		if ((err = lookupname(linker, UIO_SYSSPACE,
+		if ((err = lookupname(interp, UIO_SYSSPACE,
 		    FOLLOW, NULLVPP, &nvp)) != 0) {
-			uprintf("%s: not found.", brandlinker);
+			uprintf("%s: not found.", interp);
 			restoreexecenv(&origenv, &orig_sigaltstack);
+			kmem_free(interp, MAXPATHLEN);
 			return (err);
 		}
+
+		kmem_free(interp, MAXPATHLEN);
+
 		if (args->to_model == DATAMODEL_NATIVE) {
 			err = mapexec_brand(nvp, args, &ehdr,
 			    &uphdr_vaddr, &voffset, exec_file, &interp,
@@ -936,9 +941,9 @@ brand_solaris_elfexec(vnode_t *vp, execa_t *uap, uarg_t *args,
 
 	/*
 	 * Third, the /proc aux vectors set up by elfexec() point to
-	 * brand emulation library and it's linker.  Copy these to the
+	 * brand emulation library and its linker.  Copy these to the
 	 * /proc brand specific aux vector, and update the regular
-	 * /proc aux vectors to point to the executable (and it's
+	 * /proc aux vectors to point to the executable (and its
 	 * linker).  This will enable debuggers to access the
 	 * executable via the usual /proc or elf notes aux vectors.
 	 *

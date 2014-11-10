@@ -52,19 +52,14 @@ extern "C" {
 #define	LX_UNAME_MACHINE32	"i686"
 #define	LX_UNAME_MACHINE64	"x86_64"
 
-#define	LX_LINKER32	"/lib/ld-linux.so.2"
-#define	LX_LINKER64	"/lib64/ld-linux-x86-64.so.2"
-
 #define	LX_LIB_PATH32	"/native/usr/lib/lx_brand.so.1"
 #define	LX_LIB_PATH64	"/native/usr/lib/amd64/lx_brand.so.1"
 
 #if defined(_LP64)
 #define	LX_LIB_PATH		LX_LIB_PATH64
-#define	LX_LINKER		LX_LINKER64
 #define	LX_UNAME_MACHINE	LX_UNAME_MACHINE64
 #else
 #define	LX_LIB_PATH		LX_LIB_PATH32
-#define	LX_LINKER		LX_LINKER32
 #define	LX_UNAME_MACHINE	LX_UNAME_MACHINE32
 #endif
 

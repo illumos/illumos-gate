@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved.
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2014, Joyent, Inc. All rights reserved.
  */
 
 #ifndef _S10_BRAND_H
@@ -42,17 +43,12 @@ extern "C" {
 #define	S10_LINKER_NAME		"ld.so.1"
 
 #define	S10_LIB32		BRAND_NATIVE_DIR "usr/lib/" S10_LIB_NAME
-#define	S10_LINKER32		"/lib/" S10_LINKER_NAME
-
 #define	S10_LIB64		BRAND_NATIVE_DIR "usr/lib/64/" S10_LIB_NAME
-#define	S10_LINKER64		"/lib/64/" S10_LINKER_NAME
 
 #if defined(_LP64)
 #define	S10_LIB		S10_LIB64
-#define	S10_LINKER	S10_LINKER64
 #else /* !_LP64 */
 #define	S10_LIB		S10_LIB32
-#define	S10_LINKER	S10_LINKER32
 #endif /* !_LP64 */
 
 /*
