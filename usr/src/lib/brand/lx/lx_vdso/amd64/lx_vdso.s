@@ -21,7 +21,7 @@
  * lx vDSO emulation library
  *
  * This so needs to look like the correct Linux vDSO elf library. We cannot
- * use any native symbols or link with any native libraries, partiulary libc.
+ * use any native symbols or link with any native libraries, particularly libc.
  */
 
 #define	LX_SYS_gettimeofday	96
@@ -62,17 +62,17 @@ __vdso_getcpu(void *cpu, void *np, void *cp)
 	movq $LX_SYS_time, %rax
 	syscall
 	ret
-	SET_SIZE(__vdso_gettimeofday)
+	SET_SIZE(__vdso_time)
 
 	ENTRY_NP(__vdso_clock_gettime)
 	movq $LX_SYS_clock_gettime, %rax
 	syscall
 	ret
-	SET_SIZE(__vdso_gettimeofday)
+	SET_SIZE(__vdso_clock_gettime)
 
 	ENTRY_NP(__vdso_getcpu)
 	movq $LX_SYS_getcpu, %rax
 	syscall
 	ret
-	SET_SIZE(__vdso_gettimeofday)
+	SET_SIZE(__vdso_getcpu)
 #endif
