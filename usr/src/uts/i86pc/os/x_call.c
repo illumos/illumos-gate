@@ -281,7 +281,7 @@ xc_flush_cpu(struct cpu *cpup)
 	 * This is used to work around a race condition window in xc_common()
 	 * between checking CPU_READY flag and increasing working item count.
 	 */
-	pause_cpus(cpup);
+	pause_cpus(cpup, NULL);
 	start_cpus();
 
 	for (i = 0; i < XC_FLUSH_MAX_WAITS; i++) {

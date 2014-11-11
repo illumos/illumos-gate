@@ -167,12 +167,11 @@ static struct _cpu_pause_info {
 	int		cp_count;	/* # of CPUs to pause */
 	ksema_t		cp_sem;		/* synch pause_cpus & cpu_pause */
 	kthread_id_t	cp_paused;
+	void		*(*cp_func)(void *);
 } cpu_pause_info;
 
 static kmutex_t pause_free_mutex;
 static kcondvar_t pause_free_cv;
-
-void *(*cpu_pause_func)(void *) = NULL;
 
 
 static struct cpu_sys_stats_ks_data {
@@ -792,15 +791,15 @@ cpu_pause(int index)
 		 */
 		s = splhigh();
 		/*
-		 * if cpu_pause_func() has been set then call it using
-		 * index as the argument, currently only used by
-		 * cpr_suspend_cpus().  This function is used as the
-		 * code to execute on the "paused" cpu's when a machine
-		 * comes out of a sleep state and CPU's were powered off.
-		 * (could also be used for hotplugging CPU's).
+		 * if cp_func has been set then call it using index as the
+		 * argument, currently only used by cpr_suspend_cpus().
+		 * This function is used as the code to execute on the
+		 * "paused" cpu's when a machine comes out of a sleep state
+		 * and CPU's were powered off.  (could also be used for
+		 * hotplugging CPU's).
 		 */
-		if (cpu_pause_func != NULL)
-			(*cpu_pause_func)((void *)lindex);
+		if (cpi->cp_func != NULL)
+			(*cpi->cp_func)((void *)lindex);
 
 		mach_cpu_pause(safe);
 
@@ -988,7 +987,7 @@ cpu_pause_start(processorid_t cpu_id)
  * context.
  */
 void
-pause_cpus(cpu_t *off_cp)
+pause_cpus(cpu_t *off_cp, void *(*func)(void *))
 {
 	processorid_t	cpu_id;
 	int		i;
@@ -1001,6 +1000,8 @@ pause_cpus(cpu_t *off_cp)
 	for (i = 0; i < NCPU; i++)
 		safe_list[i] = PAUSE_IDLE;
 	kpreempt_disable();
+
+	cpi->cp_func = func;
 
 	/*
 	 * If running on the cpu that is going offline, get off it.
@@ -1206,7 +1207,7 @@ cpu_online(cpu_t *cp)
 	error = mp_cpu_start(cp);	/* arch-dep hook */
 	if (error == 0) {
 		pg_cpupart_in(cp, cp->cpu_part);
-		pause_cpus(NULL);
+		pause_cpus(NULL, NULL);
 		cpu_add_active_internal(cp);
 		if (cp->cpu_flags & CPU_FAULTED) {
 			cp->cpu_flags &= ~CPU_FAULTED;
@@ -1405,7 +1406,7 @@ again:	for (loop_count = 0; (*bound_func)(cp, 0); loop_count++) {
 		 * Put all the cpus into a known safe place.
 		 * No mutexes can be entered while CPUs are paused.
 		 */
-		pause_cpus(cp);
+		pause_cpus(cp, NULL);
 		/*
 		 * Repeat the operation, if necessary, to make sure that
 		 * all outstanding low-level interrupts run to completion
@@ -1758,7 +1759,7 @@ cpu_add_unit(cpu_t *cp)
 	 * adding the cpu to the list.
 	 */
 	cp->cpu_part = &cp_default;
-	(void) pause_cpus(NULL);
+	pause_cpus(NULL, NULL);
 	cp->cpu_next = cpu_list;
 	cp->cpu_prev = cpu_list->cpu_prev;
 	cpu_list->cpu_prev->cpu_next = cp;
@@ -1853,7 +1854,7 @@ cpu_del_unit(int cpuid)
 	 * has been updated so that we don't waste time
 	 * trying to pause the cpu we're trying to delete.
 	 */
-	(void) pause_cpus(NULL);
+	pause_cpus(NULL, NULL);
 
 	cpnext = cp->cpu_next;
 	cp->cpu_prev->cpu_next = cp->cpu_next;
@@ -1925,7 +1926,7 @@ cpu_add_active(cpu_t *cp)
 {
 	pg_cpupart_in(cp, cp->cpu_part);
 
-	pause_cpus(NULL);
+	pause_cpus(NULL, NULL);
 	cpu_add_active_internal(cp);
 	start_cpus();
 

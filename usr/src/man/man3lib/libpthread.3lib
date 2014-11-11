@@ -1,9 +1,10 @@
 '\" te
+.\" Copyright (c) 2014, Joyent, Inc.
 .\" Copyright (c) 2004, Sun Microsystems, Inc.  All Rights Reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LIBPTHREAD 3LIB "Mar 24, 2004"
+.TH LIBPTHREAD 3LIB "Oct 1, 2014"
 .SH NAME
 libpthread \- POSIX threads library
 .SH SYNOPSIS
@@ -13,18 +14,15 @@ cc -mt [ \fIflag\fR... ] \fIfile\fR... \fB-lpthread\fR [ \fB -lrt \fR \fIlibrary
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 Historically, functions in this library provided POSIX threading support. See
 \fBstandards\fR(5). This functionality now resides in \fBlibc\fR(3LIB).
-.sp
 .LP
 This library is maintained to provide backward compatibility for both runtime
 and compilation environments. The shared object is implemented as a filter on
 \fBlibc.so.1\fR. New application development need not specify \fB-lpthread\fR
 although doing so has no effect.
 .SH INTERFACES
-.sp
 .LP
 The shared object \fBlibpthread.so.1\fR provides the public interfaces defined
 below. See \fBIntro\fR(3) for additional information on shared object
@@ -80,7 +78,6 @@ l l .
 .TE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/lib/libpthread.so.1\fR\fR
@@ -99,7 +96,6 @@ a filter on \fB/lib/64/libc.so.1\fR
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -115,7 +111,6 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBpvs\fR(1), \fBIntro\fR(2), \fBIntro\fR(3), \fBlibc\fR(3LIB),
 \fBlibc_db\fR(3LIB), \fBlibthread\fR(3LIB), \fBattributes\fR(5),

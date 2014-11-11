@@ -948,8 +948,7 @@ decompvp(struct vnode *vp, cred_t *cred, caller_context_t *ctp)
 	if (error || hdr->ch_magic != CH_MAGIC_ZLIB ||
 	    hdr->ch_version != CH_VERSION || hdr->ch_algorithm != CH_ALG_ZLIB ||
 	    hdr->ch_fsize == 0 || hdr->ch_blksize < PAGESIZE ||
-	    hdr->ch_blksize > ptob(DCCACHESIZE) ||
-	    (hdr->ch_blksize & (hdr->ch_blksize - 1)) != 0)
+	    hdr->ch_blksize > ptob(DCCACHESIZE) || !ISP2(hdr->ch_blksize))
 		return (NULL);
 
 	/* get underlying file size */

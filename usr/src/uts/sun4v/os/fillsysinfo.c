@@ -465,7 +465,7 @@ cpu_setup_common(char **cpu_module_isa_set)
 
 	ASSERT(ra_limit != 0);
 
-	kpm_size_shift = (ra_limit & (ra_limit - 1)) != 0 ?
+	kpm_size_shift = !ISP2(ra_limit) ?
 	    highbit(ra_limit) : highbit(ra_limit) - 1;
 
 	/*
@@ -850,7 +850,7 @@ get_single_q_size(md_t *mdp, mde_cookie_t cpu_node_cookie,
 
 	entries = MIN(entries, max_entries);
 	/* If not a power of 2, truncate to a power of 2. */
-	if ((entries & (entries - 1)) != 0) {
+	if (!ISP2(entries)) {
 		entries = 1 << (highbit(entries) - 1);
 	}
 

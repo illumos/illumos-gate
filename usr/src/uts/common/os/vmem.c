@@ -920,7 +920,7 @@ vmem_canalloc(vmem_t *vmp, size_t size)
 	int flist = 0;
 	ASSERT(MUTEX_HELD(&vmp->vm_lock));
 
-	if ((size & (size - 1)) == 0)
+	if (ISP2(size))
 		flist = lowbit(P2ALIGN(vmp->vm_freemap, size));
 	else if ((hb = highbit(size)) < VMEM_FREELISTS)
 		flist = lowbit(P2ALIGN(vmp->vm_freemap, 1UL << hb));
@@ -959,8 +959,7 @@ vmem_xalloc(vmem_t *vmp, size_t size, size_t align_arg, size_t phase,
 		    (void *)vmp, size, align_arg, phase, nocross,
 		    minaddr, maxaddr, vmflag);
 
-	if (phase >= align || (align & (align - 1)) != 0 ||
-	    (nocross & (nocross - 1)) != 0)
+	if (phase >= align || !ISP2(align) || !ISP2(nocross))
 		panic("vmem_xalloc(%p, %lu, %lu, %lu, %lu, %p, %p, %x): "
 		    "parameters inconsistent or invalid",
 		    (void *)vmp, size, align_arg, phase, nocross,
@@ -994,7 +993,7 @@ do_alloc:
 		 *
 		 * (4)	We're doing a best-fit or first-fit allocation.
 		 */
-		if ((size & (size - 1)) == 0) {
+		if (ISP2(size)) {
 			flist = lowbit(P2ALIGN(vmp->vm_freemap, size));
 		} else {
 			hb = highbit(size);
@@ -1290,7 +1289,7 @@ vmem_alloc(vmem_t *vmp, size_t size, int vmflag)
 	mutex_enter(&vmp->vm_lock);
 
 	if (vmp->vm_nsegfree >= VMEM_MINFREE || vmem_populate(vmp, vmflag)) {
-		if ((size & (size - 1)) == 0)
+		if (ISP2(size))
 			flist = lowbit(P2ALIGN(vmp->vm_freemap, size));
 		else if ((hb = highbit(size)) < VMEM_FREELISTS)
 			flist = lowbit(P2ALIGN(vmp->vm_freemap, 1UL << hb));

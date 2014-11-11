@@ -19,6 +19,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include <sys/sysmacros.h>
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/signal.h>
@@ -2645,12 +2646,8 @@ arn_setup_ht_cap(struct arn_softc *sc)
 
 	/* set up supported mcs set */
 	(void) memset(&ht_info->rx_mcs_mask, 0, sizeof (ht_info->rx_mcs_mask));
-	tx_streams =
-	    !(sc->sc_ah->ah_caps.tx_chainmask &
-	    (sc->sc_ah->ah_caps.tx_chainmask - 1)) ? 1 : 2;
-	rx_streams =
-	    !(sc->sc_ah->ah_caps.rx_chainmask &
-	    (sc->sc_ah->ah_caps.rx_chainmask - 1)) ? 1 : 2;
+	tx_streams = ISP2(sc->sc_ah->ah_caps.tx_chainmask) ? 1 : 2;
+	rx_streams = ISP2(sc->sc_ah->ah_caps.rx_chainmask) ? 1 : 2;
 
 	ht_info->rx_mcs_mask[0] = 0xff;
 	if (rx_streams >= 2)

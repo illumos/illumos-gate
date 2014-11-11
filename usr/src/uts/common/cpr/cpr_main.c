@@ -90,7 +90,6 @@ pfn_t curthreadpfn;
 int curthreadremapped;
 
 extern cpuset_t cpu_ready_set;
-extern void *(*cpu_pause_func)(void *);
 
 extern processorid_t i_cpr_bootcpuid(void);
 extern cpu_t *i_cpr_bootcpu(void);
@@ -416,8 +415,7 @@ cpr_suspend_cpus(void)
 	/*
 	 * pause all other running CPUs and save the CPU state at the sametime
 	 */
-	cpu_pause_func = i_cpr_save_context;
-	pause_cpus(NULL);
+	pause_cpus(NULL, i_cpr_save_context);
 
 	mutex_exit(&cpu_lock);
 
@@ -792,12 +790,6 @@ cpr_resume_cpus(void)
 
 	mutex_enter(&cpu_lock);
 	/*
-	 * Restore this cpu to use the regular cpu_pause(), so that
-	 * online and offline will work correctly
-	 */
-	cpu_pause_func = NULL;
-
-	/*
 	 * clear the affinity set in cpr_suspend_cpus()
 	 */
 	affinity_clear();
@@ -820,13 +812,6 @@ cpr_unpause_cpus(void)
 	PMD(PMD_SX, ("cpr_unpause_cpus: restoring system\n"))
 
 	mutex_enter(&cpu_lock);
-
-	/*
-	 * Restore this cpu to use the regular cpu_pause(), so that
-	 * online and offline will work correctly
-	 */
-	cpu_pause_func = NULL;
-
 	/*
 	 * Restart the paused cpus
 	 */
@@ -1094,7 +1079,7 @@ rb_suspend_devices:
 	 */
 	if (cpr_resume_uniproc) {
 		mutex_enter(&cpu_lock);
-		pause_cpus(NULL);
+		pause_cpus(NULL, NULL);
 		mutex_exit(&cpu_lock);
 	}
 #endif

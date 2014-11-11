@@ -2142,7 +2142,7 @@ myri10ge_start_locked(struct myri10ge_priv *mgp)
 	 * buffer/pkt, and the mtu will prevent overruns
 	 */
 	big_pow2 = myri10ge_mtu + MXGEFW_PAD;
-	while ((big_pow2 & (big_pow2 - 1)) != 0)
+	while (!ISP2(big_pow2))
 		big_pow2++;
 
 	/* now give firmware buffers sizes, and MTU */
@@ -5505,7 +5505,7 @@ myri10ge_probe_slices(struct myri10ge_priv *mgp)
 	 */
 	while (mgp->num_slices > 1) {
 		/* make sure it is a power of two */
-		while (mgp->num_slices & (mgp->num_slices - 1))
+		while (!ISP2(mgp->num_slices))
 			mgp->num_slices--;
 		if (mgp->num_slices == 1)
 			return (0);

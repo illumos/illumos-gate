@@ -23,6 +23,7 @@
  * Use is subject to license terms.
  */
 
+#include <sys/sysmacros.h>
 #include <sys/machsystm.h>
 #include <sys/cpu.h>
 #include <sys/intreg.h>
@@ -98,7 +99,7 @@ cpu_intrq_setup(struct cpu *cpu)
 	 * contig_mem_alloc() requires size to be a power of 2.
 	 * Increase size to a power of 2 if necessary.
 	 */
-	if ((size & (size - 1)) != 0) {
+	if (!ISP2(size)) {
 		size = 1 << highbit(size);
 	}
 
@@ -208,7 +209,7 @@ cpu_intrq_cleanup(struct cpu *cpu)
 	 * contig_mem_alloc() requires size to be a power of 2.
 	 * Increase size to a power of 2 if necessary.
 	 */
-	if ((cpu_list_size & (cpu_list_size - 1)) != 0) {
+	if (!ISP2(cpu_list_size)) {
 		cpu_list_size = 1 << highbit(cpu_list_size);
 	}
 

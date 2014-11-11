@@ -283,7 +283,7 @@ mdboot(int cmd, int fcn, char *mdep, boolean_t invoke_cb)
 	(void) spl6();
 	if (!panicstr) {
 		mutex_enter(&cpu_lock);
-		pause_cpus(NULL);
+		pause_cpus(NULL, NULL);
 		mutex_exit(&cpu_lock);
 	}
 

@@ -404,13 +404,12 @@ hermon_qp_alloc(hermon_state_t *state, hermon_qp_info_t *qpinfo,
 	 */
 	log_qp_sq_size = highbit(attr_p->qp_sizes.cs_sq + qp->qp_sq_hdrmwqes);
 	/* if the total is a power of two, reduce it */
-	if (((attr_p->qp_sizes.cs_sq + qp->qp_sq_hdrmwqes)  &
-	    (attr_p->qp_sizes.cs_sq + qp->qp_sq_hdrmwqes - 1)) == 0)	{
+	if (ISP2(attr_p->qp_sizes.cs_sq + qp->qp_sq_hdrmwqes))	{
 		log_qp_sq_size = log_qp_sq_size - 1;
 	}
 
 	log_qp_rq_size = highbit(attr_p->qp_sizes.cs_rq);
-	if ((attr_p->qp_sizes.cs_rq & (attr_p->qp_sizes.cs_rq - 1)) == 0) {
+	if (ISP2(attr_p->qp_sizes.cs_rq)) {
 		log_qp_rq_size = log_qp_rq_size - 1;
 	}
 
@@ -921,11 +920,11 @@ hermon_special_qp_alloc(hermon_state_t *state, hermon_qp_info_t *qpinfo,
 	attr_p->qp_sizes.cs_rq =
 	    max(attr_p->qp_sizes.cs_rq, HERMON_QP_MIN_SIZE);
 	log_qp_sq_size = highbit(attr_p->qp_sizes.cs_sq);
-	if ((attr_p->qp_sizes.cs_sq & (attr_p->qp_sizes.cs_sq - 1)) == 0) {
+	if (ISP2(attr_p->qp_sizes.cs_sq)) {
 		log_qp_sq_size = log_qp_sq_size - 1;
 	}
 	log_qp_rq_size = highbit(attr_p->qp_sizes.cs_rq);
-	if ((attr_p->qp_sizes.cs_rq & (attr_p->qp_sizes.cs_rq - 1)) == 0) {
+	if (ISP2(attr_p->qp_sizes.cs_rq)) {
 		log_qp_rq_size = log_qp_rq_size - 1;
 	}
 
@@ -1521,13 +1520,12 @@ for_each_qp:
 	 */
 	log_qp_sq_size = highbit(attr_p->qp_sizes.cs_sq + qp->qp_sq_hdrmwqes);
 	/* if the total is a power of two, reduce it */
-	if (((attr_p->qp_sizes.cs_sq + qp->qp_sq_hdrmwqes)  &
-	    (attr_p->qp_sizes.cs_sq + qp->qp_sq_hdrmwqes - 1)) == 0)	{
+	if (ISP2(attr_p->qp_sizes.cs_sq + qp->qp_sq_hdrmwqes))	{
 		log_qp_sq_size = log_qp_sq_size - 1;
 	}
 
 	log_qp_rq_size = highbit(attr_p->qp_sizes.cs_rq);
-	if ((attr_p->qp_sizes.cs_rq & (attr_p->qp_sizes.cs_rq - 1)) == 0) {
+	if (ISP2(attr_p->qp_sizes.cs_rq)) {
 		log_qp_rq_size = log_qp_rq_size - 1;
 	}
 
@@ -2831,7 +2829,7 @@ hermon_qp_sgl_to_logwqesz(hermon_state_t *state, uint_t num_sgl,
 		 */
 		max_size = (HERMON_QP_WQE_MLX_SND_HDRS + (num_sgl << 4));
 		log2 = highbit(max_size);
-		if ((max_size & (max_size - 1)) == 0) {
+		if (ISP2(max_size)) {
 			log2 = log2 - 1;
 		}
 
@@ -2851,7 +2849,7 @@ hermon_qp_sgl_to_logwqesz(hermon_state_t *state, uint_t num_sgl,
 		 */
 		max_size = (HERMON_QP_WQE_MLX_SND_HDRS + (num_sgl << 4));
 		log2 = highbit(max_size);
-		if ((max_size & (max_size - 1)) == 0) {
+		if (ISP2(max_size)) {
 			log2 = log2 - 1;
 		}
 
@@ -2868,7 +2866,7 @@ hermon_qp_sgl_to_logwqesz(hermon_state_t *state, uint_t num_sgl,
 		 */
 		max_size = (HERMON_QP_WQE_MLX_RCV_HDRS + (num_sgl << 4));
 		log2 = highbit(max_size);
-		if ((max_size & (max_size - 1)) == 0) {
+		if (ISP2(max_size)) {
 			log2 = log2 - 1;
 		}
 
@@ -2888,7 +2886,7 @@ hermon_qp_sgl_to_logwqesz(hermon_state_t *state, uint_t num_sgl,
 		 */
 		max_size = (HERMON_QP_WQE_MLX_QP0_HDRS + (num_sgl << 4));
 		log2 = highbit(max_size);
-		if ((max_size & (max_size - 1)) == 0) {
+		if (ISP2(max_size)) {
 			log2 = log2 - 1;
 		}
 
@@ -2910,7 +2908,7 @@ hermon_qp_sgl_to_logwqesz(hermon_state_t *state, uint_t num_sgl,
 		 */
 		max_size = (HERMON_QP_WQE_MLX_QP1_HDRS + (num_sgl << 4));
 		log2 = highbit(max_size);
-		if ((max_size & (max_size - 1)) == 0) {
+		if (ISP2(max_size)) {
 			log2 = log2 - 1;
 		}
 

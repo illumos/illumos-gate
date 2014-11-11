@@ -357,7 +357,7 @@ cmt_hier_promote(pg_cmt_t *pg, cpu_pg_t *pgdata)
 	 * We're changing around the hierarchy, which is actively traversed
 	 * by the dispatcher. Pause CPUS to ensure exclusivity.
 	 */
-	pause_cpus(NULL);
+	pause_cpus(NULL, NULL);
 
 	/*
 	 * If necessary, update the parent's sibling set, replacing parent
@@ -1557,7 +1557,7 @@ pg_cmt_prune(pg_cmt_t *pg_bad, pg_cmt_t **lineage, int *sz, cpu_pg_t *pgdata)
 	 * We're operating on the PG hierarchy. Pause CPUs to ensure
 	 * exclusivity with respect to the dispatcher.
 	 */
-	pause_cpus(NULL);
+	pause_cpus(NULL, NULL);
 
 	/*
 	 * Prune all PG instances of the hardware sharing relationship
@@ -1677,7 +1677,7 @@ pg_cmt_disable(void)
 
 	ASSERT(MUTEX_HELD(&cpu_lock));
 
-	pause_cpus(NULL);
+	pause_cpus(NULL, NULL);
 	cpu = cpu_list;
 
 	do {

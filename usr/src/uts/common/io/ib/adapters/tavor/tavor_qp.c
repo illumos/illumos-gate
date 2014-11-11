@@ -317,11 +317,11 @@ tavor_qp_alloc(tavor_state_t *state, tavor_qp_info_t *qpinfo,
 	attr_p->qp_sizes.cs_sq = max(attr_p->qp_sizes.cs_sq, TAVOR_QP_MIN_SIZE);
 	attr_p->qp_sizes.cs_rq = max(attr_p->qp_sizes.cs_rq, TAVOR_QP_MIN_SIZE);
 	log_qp_sq_size = highbit(attr_p->qp_sizes.cs_sq);
-	if ((attr_p->qp_sizes.cs_sq & (attr_p->qp_sizes.cs_sq - 1)) == 0) {
+	if (ISP2(attr_p->qp_sizes.cs_sq)) {
 		log_qp_sq_size = log_qp_sq_size - 1;
 	}
 	log_qp_rq_size = highbit(attr_p->qp_sizes.cs_rq);
-	if ((attr_p->qp_sizes.cs_rq & (attr_p->qp_sizes.cs_rq - 1)) == 0) {
+	if (ISP2(attr_p->qp_sizes.cs_rq)) {
 		log_qp_rq_size = log_qp_rq_size - 1;
 	}
 
@@ -803,11 +803,11 @@ tavor_special_qp_alloc(tavor_state_t *state, tavor_qp_info_t *qpinfo,
 	attr_p->qp_sizes.cs_sq = max(attr_p->qp_sizes.cs_sq, TAVOR_QP_MIN_SIZE);
 	attr_p->qp_sizes.cs_rq = max(attr_p->qp_sizes.cs_rq, TAVOR_QP_MIN_SIZE);
 	log_qp_sq_size = highbit(attr_p->qp_sizes.cs_sq);
-	if ((attr_p->qp_sizes.cs_sq & (attr_p->qp_sizes.cs_sq - 1)) == 0) {
+	if (ISP2(attr_p->qp_sizes.cs_sq)) {
 		log_qp_sq_size = log_qp_sq_size - 1;
 	}
 	log_qp_rq_size = highbit(attr_p->qp_sizes.cs_rq);
-	if ((attr_p->qp_sizes.cs_rq & (attr_p->qp_sizes.cs_rq - 1)) == 0) {
+	if (ISP2(attr_p->qp_sizes.cs_rq)) {
 		log_qp_rq_size = log_qp_rq_size - 1;
 	}
 
@@ -1991,7 +1991,7 @@ tavor_qp_sgl_to_logwqesz(tavor_state_t *state, uint_t num_sgl,
 		 */
 		max_size = (TAVOR_QP_WQE_MLX_SND_HDRS + (num_sgl << 4));
 		log2 = highbit(max_size);
-		if ((max_size & (max_size - 1)) == 0) {
+		if (ISP2(max_size)) {
 			log2 = log2 - 1;
 		}
 
@@ -2008,7 +2008,7 @@ tavor_qp_sgl_to_logwqesz(tavor_state_t *state, uint_t num_sgl,
 		 */
 		max_size = (TAVOR_QP_WQE_MLX_RCV_HDRS + (num_sgl << 4));
 		log2 = highbit(max_size);
-		if ((max_size & (max_size - 1)) == 0) {
+		if (ISP2(max_size)) {
 			log2 = log2 - 1;
 		}
 
@@ -2028,7 +2028,7 @@ tavor_qp_sgl_to_logwqesz(tavor_state_t *state, uint_t num_sgl,
 		 */
 		max_size = (TAVOR_QP_WQE_MLX_QP0_HDRS + (num_sgl << 4));
 		log2 = highbit(max_size);
-		if ((max_size & (max_size - 1)) == 0) {
+		if (ISP2(max_size)) {
 			log2 = log2 - 1;
 		}
 
@@ -2050,7 +2050,7 @@ tavor_qp_sgl_to_logwqesz(tavor_state_t *state, uint_t num_sgl,
 		 */
 		max_size = (TAVOR_QP_WQE_MLX_QP1_HDRS + (num_sgl << 4));
 		log2 = highbit(max_size);
-		if ((max_size & (max_size - 1)) == 0) {
+		if (ISP2(max_size)) {
 			log2 = log2 - 1;
 		}
 

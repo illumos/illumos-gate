@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -348,6 +348,11 @@ netr_server_samlogon(mlsvc_handle_t *netr_handle, netr_info_t *netr_info,
 		break;
 
 	case NETR_NETWORK_LOGON:
+		if (user_info->lg_challenge_key.len < 8 ||
+		    user_info->lg_challenge_key.val == NULL) {
+			ndr_rpc_release(netr_handle);
+			return (NT_STATUS_INVALID_PARAMETER);
+		}
 		netr_setup_identity(heap, user_info, &info2.identity);
 		netr_network_samlogon(heap, netr_info, user_info, &info2);
 		arg.logon_info.ru.info2 = &info2;
@@ -433,7 +438,13 @@ netr_network_samlogon(ndr_heap_t *heap, netr_info_t *netr_info,
 {
 	uint32_t len;
 
-	bcopy(user_info->lg_challenge_key.val, info2->lm_challenge.data, 8);
+	if (user_info->lg_challenge_key.len >= 8 &&
+	    user_info->lg_challenge_key.val != 0) {
+		bcopy(user_info->lg_challenge_key.val,
+		    info2->lm_challenge.data, 8);
+	} else {
+		bzero(info2->lm_challenge.data, 8);
+	}
 
 	if ((len = user_info->lg_nt_password.len) != 0) {
 		ndr_heap_mkvcb(heap, user_info->lg_nt_password.val, len,

@@ -25,6 +25,7 @@
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
+#include <sys/sysmacros.h>
 #include <sys/types.h>
 #include <sys/stream.h>
 #include <sys/stropts.h>
@@ -4384,7 +4385,7 @@ udp_stack_init(netstackid_t stackid, netstack_t *ns)
 	us->us_bind_fanout_size = udp_bind_fanout_size;
 
 	/* Roundup variable that might have been modified in /etc/system */
-	if (us->us_bind_fanout_size & (us->us_bind_fanout_size - 1)) {
+	if (!ISP2(us->us_bind_fanout_size)) {
 		/* Not a power of two. Round up to nearest power of two */
 		for (i = 0; i < 31; i++) {
 			if (us->us_bind_fanout_size < (1 << i))

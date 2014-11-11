@@ -205,7 +205,7 @@ vpm_init()
 	/*
 	 * Round it up to the next power of 2
 	 */
-	if (vpm_nfreelist & (vpm_nfreelist - 1)) {
+	if (!ISP2(vpm_nfreelist)) {
 		vpm_nfreelist = 1 << (highbit(vpm_nfreelist));
 	}
 	vpmd_freemsk = vpm_nfreelist - 1;
