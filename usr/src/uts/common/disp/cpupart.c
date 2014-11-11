@@ -441,7 +441,7 @@ again:
 		return (EBUSY);
 	}
 
-	pause_cpus(cp);
+	pause_cpus(cp, NULL);
 
 	if (move_threads) {
 		/*
@@ -865,7 +865,7 @@ cpupart_create(psetid_t *psid)
 	 * the clock thread (which traverses the list without holding
 	 * cpu_lock) isn't running.
 	 */
-	pause_cpus(NULL);
+	pause_cpus(NULL, NULL);
 	pp->cp_next = cp_list_head;
 	pp->cp_prev = cp_list_head->cp_prev;
 	cp_list_head->cp_prev->cp_next = pp;
@@ -1011,7 +1011,7 @@ cpupart_destroy(psetid_t psid)
 	 * the clock thread (which traverses the list without holding
 	 * cpu_lock) isn't running.
 	 */
-	pause_cpus(NULL);
+	pause_cpus(NULL, NULL);
 	pp->cp_prev->cp_next = pp->cp_next;
 	pp->cp_next->cp_prev = pp->cp_prev;
 	if (cp_list_head == pp)

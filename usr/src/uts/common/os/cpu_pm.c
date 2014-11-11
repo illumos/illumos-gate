@@ -188,7 +188,7 @@ cpupm_set_policy(cpupm_policy_t new_policy)
 	 */
 	switch (new_policy) {
 	case CPUPM_POLICY_DISABLED:
-		pause_cpus(NULL);
+		pause_cpus(NULL, NULL);
 		cpupm_policy = CPUPM_POLICY_DISABLED;
 		start_cpus();
 
@@ -228,7 +228,7 @@ cpupm_set_policy(cpupm_policy_t new_policy)
 			gov_init = 1;
 		}
 
-		pause_cpus(NULL);
+		pause_cpus(NULL, NULL);
 		cpupm_policy = CPUPM_POLICY_ELASTIC;
 		start_cpus();
 

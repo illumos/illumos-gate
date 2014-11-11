@@ -872,7 +872,7 @@ dr_suspend(dr_sr_handle_t *srh)
 	srh->sr_suspend_state = DR_SRSTATE_FULL;
 
 	mutex_enter(&cpu_lock);
-	pause_cpus(NULL);
+	pause_cpus(NULL, NULL);
 	dr_stop_intr();
 
 	return (rc);

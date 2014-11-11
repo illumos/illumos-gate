@@ -63,7 +63,6 @@ extern void real_mode_stop_cpu_stage1(void);
 extern void real_mode_stop_cpu_stage1_end(void);
 extern void real_mode_stop_cpu_stage2(void);
 extern void real_mode_stop_cpu_stage2_end(void);
-extern void *(*cpu_pause_func)(void *);
 
 void rmp_gdt_init(rm_platter_t *);
 

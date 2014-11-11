@@ -737,7 +737,7 @@ i_cpr_stop_other_cpus(void)
 		mutex_exit(&cpu_lock);
 		return;
 	}
-	pause_cpus(NULL);
+	pause_cpus(NULL, NULL);
 	cpu_are_paused = 1;
 
 	mutex_exit(&cpu_lock);

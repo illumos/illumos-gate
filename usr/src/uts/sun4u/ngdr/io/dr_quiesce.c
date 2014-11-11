@@ -935,7 +935,7 @@ dr_suspend(dr_sr_handle_t *srh)
 	CPU_SIGNATURE(OS_SIG, SIGST_QUIESCED, SIGSUBST_NULL, CPU->cpu_id);
 
 	mutex_enter(&cpu_lock);
-	pause_cpus(NULL);
+	pause_cpus(NULL, NULL);
 	dr_stop_intr();
 
 	return (rc);
