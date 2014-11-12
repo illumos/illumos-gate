@@ -2525,8 +2525,6 @@ Pfgrab_core(int core_fd, const char *aout_path, int *perr)
 		/* set representative thread */
 		(void) memcpy(&P->status.pr_lwp, &lwp->lwp_status,
 		    sizeof (P->status.pr_lwp));
-
-		lwp = list_next(&core_info->core_lwp_head);
 	}
 
 	if (nleft != 0) {
