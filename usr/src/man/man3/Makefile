@@ -11,7 +11,7 @@
 
 #
 # Copyright 2011, Richard Lowe
-# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
 #
 
 include		$(SRC)/Makefile.master
@@ -22,11 +22,17 @@ MANFILES= 	Intro.3		\
 		hosts_access.3
 
 MANLINKS=	intro.3		\
-		libwrap.3
+		hosts_ctl.3	\
+		libwrap.3	\
+		request_init.3	\
+		request_set.3
 
 intro.3		:= LINKSRC = Intro.3
 
+hosts_ctl.3	:= LINKSRC = hosts_access.3
 libwrap.3	:= LINKSRC = hosts_access.3
+request_init.3	:= LINKSRC = hosts_access.3
+request_set.3	:= LINKSRC = hosts_access.3
 
 .KEEP_STATE:
 
