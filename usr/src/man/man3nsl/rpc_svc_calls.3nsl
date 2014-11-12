@@ -180,10 +180,11 @@ descriptors associated with the value of \fIrdfds\fR have been serviced. This
 function macro is Unsafe in multithreaded applications.
 .sp
 .LP
-The \fBsvc_getrpccaller()\fR function is the approved way of getting the
+The \fBsvc_getrpccaller()\fR function macro is the approved way of getting the
 network address of the caller of a procedure associated with the \fBRPC\fR
-service transport handle \fIxprt\fR. This function macro is Safe in
-multithreaded applications.
+service transport handle \fIxprt\fR. The returned pointer to struct netbuf
+shouldn't be deallocated by the svc_getrpccaller() caller. This function macro
+is Safe in multithreaded applications.
 .sp
 .LP
 In single-threaded mode, the \fBsvc_run()\fR
