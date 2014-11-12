@@ -186,7 +186,7 @@ service transport handle \fIxprt\fR. This function macro is Safe in
 multithreaded applications.
 .sp
 .LP
-The \fBsvc_run()\fR function never returns. In single-threaded mode, the
+In single-threaded mode, the \fBsvc_run()\fR
 function waits for \fBRPC\fR requests to arrive. When an RPC request arrives,
 the \fBsvc_run()\fR function calls the appropriate service procedure. This
 procedure is usually waiting for the \fBpoll\fR(2) library call to return.
