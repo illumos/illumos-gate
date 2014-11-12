@@ -2201,6 +2201,7 @@ Pfgrab_core(int core_fd, const char *aout_path, int *perr)
 	struct stat64 stbuf;
 	void *phbuf, *php;
 	size_t nbytes;
+	boolean_t from_linux = B_FALSE;
 
 	elf_file_t aout;
 	elf_file_t core;
@@ -2444,6 +2445,13 @@ Pfgrab_core(int core_fd, const char *aout_path, int *perr)
 				*perr = G_NOTE;
 				goto err;
 			}
+			/*
+			 * The presence of either of these notes indicates that
+			 * the dump was generated on Linux.
+			 */
+			if (nhdr.n_type == NT_PRSTATUS ||
+			    nhdr.n_type == NT_PRPSINFO)
+				from_linux = B_TRUE;
 		} else {
 			(void) note_notsup(P, nhdr.n_descsz);
 		}
@@ -2465,7 +2473,7 @@ Pfgrab_core(int core_fd, const char *aout_path, int *perr)
 		nleft -= sizeof (nhdr) + namesz + descsz;
 	}
 
-	if (core_info->core_osabi == ELFOSABI_NONE) {
+	if (from_linux) {
 		size_t tcount, pid;
 		lwp_info_t *lwp;
 
@@ -2517,8 +2525,6 @@ Pfgrab_core(int core_fd, const char *aout_path, int *perr)
 		/* set representative thread */
 		(void) memcpy(&P->status.pr_lwp, &lwp->lwp_status,
 		    sizeof (P->status.pr_lwp));
-
-		lwp = list_next(&core_info->core_lwp_head);
 	}
 
 	if (nleft != 0) {
