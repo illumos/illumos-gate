@@ -20,6 +20,7 @@
 #
 #
 # Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2011, Joyent, Inc. All rights reserved.
 # Copyright 2014 Nexenta Systems, Inc. All rights reserved.
 #
 
@@ -78,6 +79,7 @@ SYMBOL_VERSION SUNWprivate {
 	brand_platform_iter_gmounts;
 	brand_platform_iter_link;
 	brand_platform_iter_mounts;
+	brand_restartinit;
     local:
 	*;
 };

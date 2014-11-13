@@ -103,6 +103,7 @@ extern "C" {
 #define	ZONE_ATTR_HOSTID	15
 #define	ZONE_ATTR_FS_ALLOWED	16
 #define	ZONE_ATTR_NETWORK	17
+#define	ZONE_ATTR_INITNORESTART	20
 
 /* Start of the brand-specific attribute namespace */
 #define	ZONE_ATTR_BRAND_ATTRS	32768
