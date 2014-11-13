@@ -1193,6 +1193,27 @@ ict_tiocgpgrp(int fd, struct stat *stat, int cmd, char *cmd_str, intptr_t arg)
 
 static int
 /*ARGSUSED*/
+ict_tiocspgrp(int fd, struct stat *stat, int cmd, char *cmd_str, intptr_t arg)
+{
+	pid_t	lpid, spid;
+	int	ret;
+
+	assert(cmd == LX_TIOCSPGRP);
+	lx_debug("\tioctl(%d, 0x%x - %s, ...)",
+	    fd, TIOCSPGRP, "TIOCSPGRP");
+
+	/* Converting to the illumos pid is necessary */
+	if (uucopy((pid_t *)arg, &lpid, sizeof (lpid)) < 0)
+		return (-errno);
+	if ((ret = lx_lpid_to_spid(lpid, &spid)) < 0)
+		return (ret);
+
+	ret = ioctl(fd, TIOCSPGRP, &spid);
+	return ((ret < 0) ? -errno : ret);
+}
+
+static int
+/*ARGSUSED*/
 ict_sptlock(int fd, struct stat *stat, int cmd, char *cmd_str, intptr_t arg)
 {
 	assert(cmd == LX_TIOCSPTLCK);
@@ -2458,7 +2479,7 @@ static oss_fmt_translator_t oft_table[] = {
 	IOC_CMD_TRANSLATOR_NONE(TCFLSH)					\
 	IOC_CMD_TRANSLATOR_NONE(TIOCEXCL)				\
 	IOC_CMD_TRANSLATOR_NONE(TIOCNXCL)				\
-	IOC_CMD_TRANSLATOR_NONE(TIOCSPGRP)				\
+	IOC_CMD_TRANSLATOR_CUSTOM(LX_TIOCSPGRP,		ict_tiocspgrp)	\
 	IOC_CMD_TRANSLATOR_NONE(TIOCSTI)				\
 	IOC_CMD_TRANSLATOR_NONE(TIOCSWINSZ)				\
 	IOC_CMD_TRANSLATOR_NONE(TIOCMBIS)				\
