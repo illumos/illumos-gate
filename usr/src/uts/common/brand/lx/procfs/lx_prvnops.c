@@ -855,11 +855,11 @@ lxpr_read_pid_maps(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	char *buf;
 	int buflen = MAXPATHLEN;
 	struct print_data {
-		caddr_t saddr;
-		caddr_t eaddr;
+		uintptr_t saddr;
+		uintptr_t eaddr;
 		int type;
 		char prot[5];
-		uint32_t offset;
+		uintptr_t offset;
 		vnode_t *vp;
 		struct print_data *next;
 	} *print_head = NULL;
@@ -891,8 +891,8 @@ lxpr_read_pid_maps(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 
 		pbuf = kmem_alloc(sizeof (*pbuf), KM_SLEEP);
 
-		pbuf->saddr = seg->s_base;
-		pbuf->eaddr = seg->s_base+seg->s_size;
+		pbuf->saddr = (uintptr_t)seg->s_base;
+		pbuf->eaddr = pbuf->saddr + seg->s_size;
 		pbuf->type = SEGOP_GETTYPE(seg, seg->s_base);
 
 		/*
@@ -917,7 +917,7 @@ lxpr_read_pid_maps(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 			pbuf->vp = NULL;
 		}
 
-		pbuf->offset = (uint32_t)SEGOP_GETOFFSET(seg, pbuf->saddr);
+		pbuf->offset = SEGOP_GETOFFSET(seg, (caddr_t)pbuf->saddr);
 
 		pbuf->next = NULL;
 		*print_tail = pbuf;
@@ -952,16 +952,17 @@ lxpr_read_pid_maps(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 			VN_RELE(pbuf->vp);
 		}
 
-		if (*buf != '\0') {
+		if (p->p_model == DATAMODEL_LP64) {
 			lxpr_uiobuf_printf(uiobuf,
-			    "%08x-%08x %s %08x %02d:%03d %lld %s\n",
+			    "%016llx-%16llx %s %016llx %02d:%03d %lld%s%s\n",
 			    pbuf->saddr, pbuf->eaddr, pbuf->prot, pbuf->offset,
-			    maj, min, inode, buf);
+			    maj, min, inode, *buf != '\0' ? " " : "", buf);
 		} else {
 			lxpr_uiobuf_printf(uiobuf,
-			    "%08x-%08x %s %08x %02d:%03d %lld\n",
-			    pbuf->saddr, pbuf->eaddr, pbuf->prot, pbuf->offset,
-			    maj, min, inode);
+			    "%08x-%08x %s %08x %02d:%03d %lld%s%s\n",
+			    (uint32_t)pbuf->saddr, (uint32_t)pbuf->eaddr,
+			    pbuf->prot, (uint32_t)pbuf->offset, maj, min,
+			    inode, *buf != '\0' ? " " : "", buf);
 		}
 
 		pbuf_next = pbuf->next;
