@@ -185,6 +185,15 @@ lx_proc_exit(proc_t *p, klwp_t *lwp)
 	 */
 	if (lwp != NULL)
 		lx_exitlwp(lwp);
+
+	/*
+	 * The call path here is:
+	 *    proc_exit -> brand_clearbrand -> b_proc_exit
+	 * and then brand_clearbrand will set p_brand to be the native brand.
+	 * We are done with our brand data but we don't free it here since
+	 * that is done for us by proc_exit due to the fact that we have a
+	 * b_exit_with_sig handler setup.
+	 */
 	p->p_exit_data = sig;
 }
 
