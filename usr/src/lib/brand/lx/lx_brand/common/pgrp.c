@@ -104,6 +104,21 @@ lx_setpgid(uintptr_t p1, uintptr_t p2)
 
 	ret = setpgid(spid, spgid);
 
+	if (ret != 0 && errno == EPERM) {
+		/*
+		 * On Linux, calling setpgid with a desired pgid that is equal
+		 * to the current pgid of the process, no error is emitted.
+		 * This differs slightly from illumos which will return EPERM.
+		 *
+		 * To emulate the Linux behavior, we check specifically for
+		 * matching pgids if an EPERM is encountered.
+		 */
+		if (spgid == getpgid(spid))
+			return (0);
+		else
+			return (-EPERM);
+	}
+
 	return ((ret == 0) ? 0 : -errno);
 }
 
