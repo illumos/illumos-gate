@@ -576,12 +576,12 @@ main(int argc, char **argv)
 	char		xauthority[MAXPATHLEN + 12] = "XAUTHORITY=";
 	struct passwd 	*pw;
 
-	(void *) signal(SIGHUP, SIG_IGN);
-	(void *) signal(SIGINT, SIG_IGN);
-	(void *) signal(SIGQUIT, SIG_IGN);
-	(void *) signal(SIGTSTP, SIG_IGN);
-	(void *) signal(SIGTTIN, SIG_IGN);
-	(void *) signal(SIGTTOU, SIG_IGN);
+	(void) signal(SIGHUP, SIG_IGN);
+	(void) signal(SIGINT, SIG_IGN);
+	(void) signal(SIGQUIT, SIG_IGN);
+	(void) signal(SIGTSTP, SIG_IGN);
+	(void) signal(SIGTTIN, SIG_IGN);
+	(void) signal(SIGTTOU, SIG_IGN);
 
 	/*
 	 * If suspend is invoked from a daemon (case 1 above), it
@@ -721,7 +721,7 @@ main(int argc, char **argv)
 	 * In case of "suspend" being called from daemon "powerd",
 	 * signal SIGALRM is blocked so use "sigset()" instead of "signal()".
 	 */
-	(void *) sigset(SIGALRM, alarm_handler);
+	(void) sigset(SIGALRM, alarm_handler);
 
 	/* Call the "suspend" function to do the last of the work */
 	pm_suspend();

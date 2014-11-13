@@ -32,11 +32,11 @@
 
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
  * SMB Session Setup, and related.
- * Copied from the driver: smb_smb.c
  */
 
 #include <errno.h>
@@ -88,7 +88,7 @@ smb_ssnsetup_null(struct smb_ctx *ctx)
 	uint32_t ntstatus;
 	uint16_t action = 0;
 
-	if (ctx->ct_sopt.sv_caps & SMB_CAP_EXT_SECURITY) {
+	if (ctx->ct_clnt_caps & SMB_CAP_EXT_SECURITY) {
 		/* Should not get here with... */
 		err = EINVAL;
 		goto out;
@@ -118,7 +118,7 @@ smb_ssnsetup_ntlm1(struct smb_ctx *ctx)
 	uint32_t ntstatus;
 	uint16_t action = 0;
 
-	if (ctx->ct_sopt.sv_caps & SMB_CAP_EXT_SECURITY) {
+	if (ctx->ct_clnt_caps & SMB_CAP_EXT_SECURITY) {
 		/* Should not get here with... */
 		err = EINVAL;
 		goto out;
@@ -133,30 +133,11 @@ smb_ssnsetup_ntlm1(struct smb_ctx *ctx)
 	if (err)
 		goto out;
 
-	/*
-	 * If we negotiated signing, compute the MAC key
-	 * and start signing messages, but only on the
-	 * first non-null session login.
-	 */
-	if ((ctx->ct_vcflags & SMBV_WILL_SIGN) &&
+	if ((ctx->ct_vcflags & SMBV_WILL_SIGN) != 0 &&
 	    (ctx->ct_hflags2 & SMB_FLAGS2_SECURITY_SIGNATURE) == 0) {
-		struct mbuf *m = nt_mbc.mb_top;
-		char *p;
-
-		/*
-		 * MAC_key = concat(session_key, nt_response)
-		 */
-		ctx->ct_mackeylen = NTLM_HASH_SZ + m->m_len;
-		ctx->ct_mackey = malloc(ctx->ct_mackeylen);
-		if (ctx->ct_mackey == NULL) {
-			ctx->ct_mackeylen = 0;
-			err = ENOMEM;
+		err = ntlm_build_mac_key(ctx, &nt_mbc);
+		if (err)
 			goto out;
-		}
-		p = ctx->ct_mackey;
-		memcpy(p, ctx->ct_ssn_key, NTLM_HASH_SZ);
-		memcpy(p + NTLM_HASH_SZ, m->m_data, m->m_len);
-
 		/* OK, start signing! */
 		ctx->ct_hflags2 |= SMB_FLAGS2_SECURITY_SIGNATURE;
 	}
@@ -187,7 +168,7 @@ smb_ssnsetup_ntlm2(struct smb_ctx *ctx)
 	uint32_t ntstatus;
 	uint16_t action = 0;
 
-	if (ctx->ct_sopt.sv_caps & SMB_CAP_EXT_SECURITY) {
+	if (ctx->ct_clnt_caps & SMB_CAP_EXT_SECURITY) {
 		/* Should not get here with... */
 		err = EINVAL;
 		goto out;
@@ -208,30 +189,11 @@ smb_ssnsetup_ntlm2(struct smb_ctx *ctx)
 	if (err)
 		goto out;
 
-	/*
-	 * If we negotiated signing, compute the MAC key
-	 * and start signing messages, but only on the
-	 * first non-null session login.
-	 */
-	if ((ctx->ct_vcflags & SMBV_WILL_SIGN) &&
+	if ((ctx->ct_vcflags & SMBV_WILL_SIGN) != 0 &&
 	    (ctx->ct_hflags2 & SMB_FLAGS2_SECURITY_SIGNATURE) == 0) {
-		struct mbuf *m = nt_mbc.mb_top;
-		char *p;
-
-		/*
-		 * MAC_key = concat(session_key, nt_response)
-		 */
-		ctx->ct_mackeylen = NTLM_HASH_SZ + m->m_len;
-		ctx->ct_mackey = malloc(ctx->ct_mackeylen);
-		if (ctx->ct_mackey == NULL) {
-			ctx->ct_mackeylen = 0;
-			err = ENOMEM;
+		err = ntlm_build_mac_key(ctx, &nt_mbc);
+		if (err)
 			goto out;
-		}
-		p = ctx->ct_mackey;
-		memcpy(p, ctx->ct_ssn_key, NTLM_HASH_SZ);
-		memcpy(p + NTLM_HASH_SZ, m->m_data, m->m_len);
-
 		/* OK, start signing! */
 		ctx->ct_hflags2 |= SMB_FLAGS2_SECURITY_SIGNATURE;
 	}
@@ -334,20 +296,7 @@ smb__ssnsetup(struct smb_ctx *ctx,
 	uint16_t bc, len1, len2, sblen;
 	uint8_t wc;
 
-	/*
-	 * Some of the "capability" bits we offer will be copied
-	 * from those offered by the server, with a mask applied.
-	 * This is the mask of capabilies copied from the server.
-	 * Some others get special handling below.
-	 */
-	static const uint32_t caps_mask =
-	    SMB_CAP_UNICODE |
-	    SMB_CAP_LARGE_FILES |
-	    SMB_CAP_NT_SMBS |
-	    SMB_CAP_STATUS32 |
-	    SMB_CAP_EXT_SECURITY;
-
-	caps = ctx->ct_sopt.sv_caps & caps_mask;
+	caps = ctx->ct_clnt_caps;
 	uc = ctx->ct_hflags2 & SMB_FLAGS2_UNICODE;
 
 	err = smb_rq_init(ctx, SMB_COM_SESSION_SETUP_ANDX, &rqp);

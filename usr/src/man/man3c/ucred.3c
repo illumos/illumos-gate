@@ -3,9 +3,9 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH UCRED_GET 3C "Apr 4, 2008"
+.TH UCRED 3C "Nov 6, 2014"
 .SH NAME
-ucred_get, ucred_free, ucred_geteuid, ucred_getruid, ucred_getsuid,
+ucred, ucred_get, ucred_free, ucred_geteuid, ucred_getruid, ucred_getsuid,
 ucred_getegid, ucred_getrgid, ucred_getsgid, ucred_getgroups, ucred_getprivset,
 ucred_getpid, ucred_getprojid, ucred_getzoneid, ucred_getpflags,
 ucred_getlabel, ucred_size \- user credential functions
@@ -94,7 +94,6 @@ ucred_getlabel, ucred_size \- user credential functions
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 These functions return or act on a user credential, \fBucred_t\fR. User
 credentials are returned by various functions and describe the credentials of a
@@ -169,11 +168,9 @@ is constant only until the next boot, at which time it could change. The
 needed to receive a credential option with \fBSO_RECVUCRED\fR. See
 \fBsocket.h\fR(3HEAD).
 .SH RETURN VALUES
-.sp
 .LP
 See DESCRIPTION.
 .SH ERRORS
-.sp
 .LP
 The \fBucred_get()\fR function will fail if:
 .sp
@@ -269,7 +266,6 @@ credential.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -287,7 +283,6 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBgetpflags\fR(2), \fBgetppriv\fR(2), \fBdoor_ucred\fR(3C),
 \fBgetpeerucred\fR(3C), \fBpriv_set\fR(3C), \fBsocket.h\fR(3HEAD),

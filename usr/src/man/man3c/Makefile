@@ -482,7 +482,7 @@ MANFILES= 	__fbufsize.3c					\
 	 	u8_validate.3c					\
 	 	ualarm.3c					\
 	 	uconv_u16tou32.3c				\
-	 	ucred_get.3c					\
+	 	ucred.3c					\
 	 	ungetc.3c					\
 	 	ungetwc.3c					\
 	 	unlockpt.3c					\
@@ -1198,6 +1198,7 @@ MANLINKS=	FD_CLR.3c				\
 	 	uconv_u8tou16.3c			\
 	 	uconv_u8tou32.3c			\
 	 	ucred_free.3c				\
+	 	ucred_get.3c				\
 	 	ucred_getegid.3c			\
 	 	ucred_geteuid.3c			\
 	 	ucred_getgroups.3c			\
@@ -2212,21 +2213,22 @@ uconv_u32tou8.3c			:= LINKSRC = uconv_u16tou32.3c
 uconv_u8tou16.3c			:= LINKSRC = uconv_u16tou32.3c
 uconv_u8tou32.3c			:= LINKSRC = uconv_u16tou32.3c
 
-ucred_free.3c				:= LINKSRC = ucred_get.3c
-ucred_getegid.3c			:= LINKSRC = ucred_get.3c
-ucred_geteuid.3c			:= LINKSRC = ucred_get.3c
-ucred_getgroups.3c			:= LINKSRC = ucred_get.3c
-ucred_getlabel.3c			:= LINKSRC = ucred_get.3c
-ucred_getpflags.3c			:= LINKSRC = ucred_get.3c
-ucred_getpid.3c				:= LINKSRC = ucred_get.3c
-ucred_getprivset.3c			:= LINKSRC = ucred_get.3c
-ucred_getprojid.3c			:= LINKSRC = ucred_get.3c
-ucred_getrgid.3c			:= LINKSRC = ucred_get.3c
-ucred_getruid.3c			:= LINKSRC = ucred_get.3c
-ucred_getsgid.3c			:= LINKSRC = ucred_get.3c
-ucred_getsuid.3c			:= LINKSRC = ucred_get.3c
-ucred_getzoneid.3c			:= LINKSRC = ucred_get.3c
-ucred_size.3c				:= LINKSRC = ucred_get.3c
+ucred_free.3c				:= LINKSRC = ucred.3c
+ucred_get.3c				:= LINKSRC = ucred.3c
+ucred_getegid.3c			:= LINKSRC = ucred.3c
+ucred_geteuid.3c			:= LINKSRC = ucred.3c
+ucred_getgroups.3c			:= LINKSRC = ucred.3c
+ucred_getlabel.3c			:= LINKSRC = ucred.3c
+ucred_getpflags.3c			:= LINKSRC = ucred.3c
+ucred_getpid.3c				:= LINKSRC = ucred.3c
+ucred_getprivset.3c			:= LINKSRC = ucred.3c
+ucred_getprojid.3c			:= LINKSRC = ucred.3c
+ucred_getrgid.3c			:= LINKSRC = ucred.3c
+ucred_getruid.3c			:= LINKSRC = ucred.3c
+ucred_getsgid.3c			:= LINKSRC = ucred.3c
+ucred_getsuid.3c			:= LINKSRC = ucred.3c
+ucred_getzoneid.3c			:= LINKSRC = ucred.3c
+ucred_size.3c				:= LINKSRC = ucred.3c
 
 vswprintf.3c				:= LINKSRC = vfwprintf.3c
 vwprintf.3c				:= LINKSRC = vfwprintf.3c

@@ -471,7 +471,7 @@ file path=usr/share/man/man3c/u8_textprep_str.3c
 file path=usr/share/man/man3c/u8_validate.3c
 file path=usr/share/man/man3c/ualarm.3c
 file path=usr/share/man/man3c/uconv_u16tou32.3c
-file path=usr/share/man/man3c/ucred_get.3c
+file path=usr/share/man/man3c/ucred.3c
 file path=usr/share/man/man3c/ungetc.3c
 file path=usr/share/man/man3c/ungetwc.3c
 file path=usr/share/man/man3c/unlockpt.3c
@@ -1258,21 +1258,22 @@ link path=usr/share/man/man3c/uconv_u32tou16.3c target=uconv_u16tou32.3c
 link path=usr/share/man/man3c/uconv_u32tou8.3c target=uconv_u16tou32.3c
 link path=usr/share/man/man3c/uconv_u8tou16.3c target=uconv_u16tou32.3c
 link path=usr/share/man/man3c/uconv_u8tou32.3c target=uconv_u16tou32.3c
-link path=usr/share/man/man3c/ucred_free.3c target=ucred_get.3c
-link path=usr/share/man/man3c/ucred_getegid.3c target=ucred_get.3c
-link path=usr/share/man/man3c/ucred_geteuid.3c target=ucred_get.3c
-link path=usr/share/man/man3c/ucred_getgroups.3c target=ucred_get.3c
-link path=usr/share/man/man3c/ucred_getlabel.3c target=ucred_get.3c
-link path=usr/share/man/man3c/ucred_getpflags.3c target=ucred_get.3c
-link path=usr/share/man/man3c/ucred_getpid.3c target=ucred_get.3c
-link path=usr/share/man/man3c/ucred_getprivset.3c target=ucred_get.3c
-link path=usr/share/man/man3c/ucred_getprojid.3c target=ucred_get.3c
-link path=usr/share/man/man3c/ucred_getrgid.3c target=ucred_get.3c
-link path=usr/share/man/man3c/ucred_getruid.3c target=ucred_get.3c
-link path=usr/share/man/man3c/ucred_getsgid.3c target=ucred_get.3c
-link path=usr/share/man/man3c/ucred_getsuid.3c target=ucred_get.3c
-link path=usr/share/man/man3c/ucred_getzoneid.3c target=ucred_get.3c
-link path=usr/share/man/man3c/ucred_size.3c target=ucred_get.3c
+link path=usr/share/man/man3c/ucred_free.3c target=ucred.3c
+link path=usr/share/man/man3c/ucred_get.3c target=ucred.3c
+link path=usr/share/man/man3c/ucred_getegid.3c target=ucred.3c
+link path=usr/share/man/man3c/ucred_geteuid.3c target=ucred.3c
+link path=usr/share/man/man3c/ucred_getgroups.3c target=ucred.3c
+link path=usr/share/man/man3c/ucred_getlabel.3c target=ucred.3c
+link path=usr/share/man/man3c/ucred_getpflags.3c target=ucred.3c
+link path=usr/share/man/man3c/ucred_getpid.3c target=ucred.3c
+link path=usr/share/man/man3c/ucred_getprivset.3c target=ucred.3c
+link path=usr/share/man/man3c/ucred_getprojid.3c target=ucred.3c
+link path=usr/share/man/man3c/ucred_getrgid.3c target=ucred.3c
+link path=usr/share/man/man3c/ucred_getruid.3c target=ucred.3c
+link path=usr/share/man/man3c/ucred_getsgid.3c target=ucred.3c
+link path=usr/share/man/man3c/ucred_getsuid.3c target=ucred.3c
+link path=usr/share/man/man3c/ucred_getzoneid.3c target=ucred.3c
+link path=usr/share/man/man3c/ucred_size.3c target=ucred.3c
 link path=usr/share/man/man3c/ulckpwdf.3c target=lckpwdf.3c
 link path=usr/share/man/man3c/ulltostr.3c target=strtol.3c
 link path=usr/share/man/man3c/unordered.3c target=isnand.3c

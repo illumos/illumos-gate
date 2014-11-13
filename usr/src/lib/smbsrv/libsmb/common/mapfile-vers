@@ -19,7 +19,7 @@
 #
 #
 # Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
 #
 
 #
@@ -79,7 +79,6 @@ SYMBOL_VERSION SUNWprivate {
 	smb_auth_ntlm_hash;
 	smb_auth_ntlmv2_hash;
 	smb_auth_qnd_unicode;
-	smb_auth_set_info;
 	smb_auth_validate_lm;
 	smb_auth_validate_nt;
 	smb_buf32_xdr;
