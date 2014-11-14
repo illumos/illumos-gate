@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2014 Nexenta Systems, Inc. All rights reserved.
- * Copyright 2013, Joyent Inc. All rights reserved.
+ * Copyright 2014, Joyent Inc. All rights reserved.
  */
 
 /*
@@ -3946,10 +3946,10 @@ cleanup_zonepath(char *zonepath, boolean_t all)
 			 * exist if the zone was force-attached after a
 			 * migration.
 			 */
-	char		*std_entries[] = {"dev", "lu", "root",
+	char		*std_entries[] = {"dev", "lastexited", "lu", "root",
 			    "SUNWattached.xml", NULL};
-			/* (MAXPATHLEN * 3) is for the 3 std_entries dirs */
-	char		cmdbuf[sizeof (RMCOMMAND) + (MAXPATHLEN * 3) + 64];
+			/* (MAXPATHLEN * 5) is for the 5 std_entries dirs */
+	char		cmdbuf[sizeof (RMCOMMAND) + (MAXPATHLEN * 5) + 64];
 
 	/*
 	 * We shouldn't need these checks but lets be paranoid since we

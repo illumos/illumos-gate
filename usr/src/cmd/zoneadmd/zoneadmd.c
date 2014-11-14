@@ -69,6 +69,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/sysmacros.h>
+#include <sys/time.h>
 
 #include <bsm/adt.h>
 #include <bsm/adt_event.h>
@@ -1387,6 +1388,39 @@ audit_put_record(zlog_t *zlogp, ucred_t *uc, int return_val,
 }
 
 /*
+ * Log the exit time and status of the zone's init process into
+ * {zonepath}/lastexited. If the zone shutdown normally, the exit status will
+ * be -1, otherwise it will be the exit status as described in wait.3c.
+ * If the zone is configured to restart init, then nothing will be logged if
+ * init exits unexpectedly (the kernel will never upcall in this case).
+ */
+static void
+log_init_exit(int status)
+{
+	char zpath[MAXPATHLEN];
+	char p[MAXPATHLEN];
+	char buf[128];
+	struct timeval t;
+	int fd;
+
+	if (zone_get_zonepath(zone_name, zpath, sizeof (zpath)) != Z_OK)
+		return;
+	if (snprintf(p, sizeof (p), "%s/lastexited", zpath) > sizeof (p))
+		return;
+	if (gettimeofday(&t, NULL) != 0)
+		return;
+	if (snprintf(buf, sizeof (buf), "%ld.%ld %d\n", t.tv_sec, t.tv_usec,
+	    status) > sizeof (buf))
+		return;
+	if ((fd = open(p, O_WRONLY | O_CREAT | O_TRUNC, 0644)) < 0)
+		return;
+
+	(void) write(fd, buf, strlen(buf));
+
+	(void) close(fd);
+}
+
+/*
  * The main routine for the door server that deals with zone state transitions.
  */
 /* ARGSUSED */
@@ -1400,6 +1434,7 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 	zone_state_t zstate;
 	zone_cmd_t cmd;
 	boolean_t debug;
+	int init_status;
 	zone_cmd_arg_t *zargp;
 
 	boolean_t kernelcall = B_TRUE;
@@ -1453,6 +1488,7 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 	}
 	cmd = zargp->cmd;
 	debug = zargp->debug;
+	init_status = zargp->status;
 
 	if (door_ucred(&uc) != 0) {
 		zerror(&logsys, B_TRUE, "door_ucred");
@@ -1781,6 +1817,11 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 			rval = 0;
 			break;
 		case Z_HALT:
+			if (kernelcall) {
+				log_init_exit(init_status);
+			} else {
+				log_init_exit(-1);
+			}
 			if ((rval = zone_halt(zlogp, B_FALSE, B_FALSE, zstate,
 			    debug)) != 0)
 				break;
