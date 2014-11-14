@@ -36,7 +36,9 @@
  *   loop between parent and child processes takes care of the interactive
  *   session.  In this mode, login(1) (and its -c option, which means
  *   "already authenticated") is employed to take care of the initialization
- *   of the user's session.
+ *   of the user's session.  Interactive login can also be forced when running
+ *   a specific command by specifying the -i option; for example, the user
+ *   could issue 'zlogin -i my-zone /bin/sh'.
  *
  * - "non-interactive login" is similar to su(1M); the user could issue
  *   'zlogin my-zone ls -l' and the command would be run as specified.
@@ -154,7 +156,7 @@ static boolean_t forced_login = B_FALSE;
 static void
 usage(void)
 {
-	(void) fprintf(stderr, gettext("usage: %s [ -nQCES ] [ -e cmdchar ] "
+	(void) fprintf(stderr, gettext("usage: %s [ -inQCES ] [ -e cmdchar ] "
 	    "[-l user] zonename [command [args ...] ]\n"), pname);
 	exit(2);
 }
@@ -1757,6 +1759,7 @@ main(int argc, char **argv)
 	zoneid_t zoneid;
 	zone_state_t st;
 	char *login = "root";
+	int iflag = 0;
 	int lflag = 0;
 	int nflag = 0;
 	char *zonename = NULL;
@@ -1781,7 +1784,7 @@ main(int argc, char **argv)
 	(void) getpname(argv[0]);
 	username = get_username();
 
-	while ((arg = getopt(argc, argv, "nECR:Se:l:Q")) != EOF) {
+	while ((arg = getopt(argc, argv, "inECR:Se:l:Q")) != EOF) {
 		switch (arg) {
 		case 'C':
 			console = 1;
@@ -1809,6 +1812,9 @@ main(int argc, char **argv)
 			break;
 		case 'e':
 			set_cmdchar(optarg);
+			break;
+		case 'i':
+			iflag = 1;
 			break;
 		case 'l':
 			login = optarg;
@@ -1850,6 +1856,11 @@ main(int argc, char **argv)
 
 	}
 
+	if (iflag !=0 && nflag != 0) {
+		zerror(gettext("-i and -n flags are incompatible"));
+		usage();
+	}
+
 	if (failsafe != 0 && lflag != 0) {
 		zerror(gettext("-l may not be specified for failsafe login"));
 		usage();
@@ -1877,7 +1888,8 @@ main(int argc, char **argv)
 		/* zone name and process name, and possibly some args */
 		zonename = argv[optind];
 		proc_args = &argv[optind + 1];
-		interactive = 0;
+		if (iflag && isatty(STDIN_FILENO))
+			interactive = 1;
 	} else {
 		usage();
 	}

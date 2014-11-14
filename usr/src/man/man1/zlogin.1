@@ -13,6 +13,7 @@
 .\" Portions Copyright [yyyy] [name of copyright owner]
 .\" Copyright 2013 DEY Storage Systems, Inc.
 .\" Copyright (c) 2014 Gary Mills
+.\" Copyright (c) 2014, Joyent, Inc. All Rights Reserved
 .TH ZLOGIN 1 "Jan 22, 2014"
 .SH NAME
 zlogin \- enter a zone
@@ -24,7 +25,7 @@ zlogin \- enter a zone
 
 .LP
 .nf
-\fBzlogin\fR [\fB-nEQS\fR] [\fB-e\fR \fIc\fR] [\fB-l\fR \fIusername\fR] \fIzonename\fR \fIutility\fR
+\fBzlogin\fR [\fB-inEQS\fR] [\fB-e\fR \fIc\fR] [\fB-l\fR \fIusername\fR] \fIzonename\fR \fIutility\fR
      [\fIargument\fR]...
 .fi
 
@@ -43,12 +44,12 @@ utility.
 \fBInteractive Mode\fR
 .ad
 .RS 24n
-If no utility argument is given and the stdin file descriptor for the
-\fBzlogin\fR process is a tty device, \fBzlogin\fR operates in \fBinteractive
-mode\fR. In this mode, \fBzlogin\fR creates a new pseudo terminal for use
-within the login session. Programs requiring a tty device, for example,
-\fBvi\fR(1), work properly in this mode. In this mode, \fBzlogin\fR invokes
-\fBlogin\fR(1) to provide a suitable login session.
+If no utility argument is given or if the \fB-i\fR option is specified, and the
+stdin file descriptor for the \fBzlogin\fR process is a tty device, \fBzlogin\fR
+operates in \fBinteractive mode\fR. In this mode, \fBzlogin\fR creates a new
+pseudo terminal for use within the login session. Programs requiring a tty
+device, for example, \fBvi\fR(1), work properly in this mode. In this mode,
+\fBzlogin\fR invokes \fBlogin\fR(1) to provide a suitable login session.
 .RE
 
 .sp
@@ -57,11 +58,12 @@ within the login session. Programs requiring a tty device, for example,
 \fBNon-Interactive Mode\fR
 .ad
 .RS 24n
-If a utility is specified, \fBzlogin\fR operates in \fBnon-interactive mode\fR.
-This mode can be useful for script authors since stdin, stdout, and stderr are
-preserved and the exit status of \fIutility\fR is returned upon termination. In
-this mode, \fBzlogin\fR invokes \fBsu\fR(1M) in order to set up the user's
-environment and to provide a login environment.
+If a utility is specified and the \fB-i\fR option is not specified, \fBzlogin\fR
+operates in \fBnon-interactive mode\fR.  This mode can be useful for script
+authors since stdin, stdout, and stderr are preserved and the exit status of
+\fIutility\fR is returned upon termination. In this mode, \fBzlogin\fR invokes
+\fBsu\fR(1M) in order to set up the user's environment and to provide a login
+environment.
 .sp
 The specified command is passed as a string and interpreted by a shell running
 in the non-global zone. See \fBrsh\fR(1).
@@ -113,6 +115,16 @@ Disables the ability to access extended functions or to disconnect from the
 login by using the escape sequence character.
 .RE
 
+.sp
+.ne 2
+.na
+\fB\fB-i\fR\fR
+.ad
+.RS 15n
+Forces interactive mode when a utility argument is specified.
+.RE
+
+.sp
 .sp
 .ne 2
 .na
