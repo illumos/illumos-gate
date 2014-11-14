@@ -469,18 +469,6 @@ format_diskette(int fd, char *real_name, struct vtoc *fd_vtoc,
 	struct fd_char save_fdchar;	/* original diskette characteristics */
 	struct dk_allmap save_allmap;	/* original diskette partition info */
 
-
-	/* FDIOCMD ioctl command structure for formatting */
-	/* LINTED */
-	struct fd_cmd fcmd_fmt = {
-		FDCMD_FORMAT_TRACK,
-		0xA5,
-		0,
-		1,
-		0,
-		0
-	};
-
 	/* FDRAW ioctl command structures for seeking and formatting */
 	struct fd_raw fdr_seek = {
 		FDRAW_SEEK, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -816,15 +804,16 @@ format_diskette(int fd, char *real_name, struct vtoc *fd_vtoc,
 	if (x_flag)
 		goto skipformat;
 
-	if (!(q_flag && f_flag))
-		if (interleave != 1)
+	if (!(q_flag && f_flag)) {
+		if (interleave != 1) {
 			(void) printf(gettext(
 "Formatting %s, %d cylinders, %d sectors per trk, interleave=%d in %s\n"),
 			    capacity, num_cyl, spt, interleave, real_name);
-		else
+		} else {
 			(void) printf(gettext("Formatting %s in %s\n"),
 			    capacity, real_name);
-
+		}
+	}
 	if (!f_flag) {
 		(void) printf(
 		    gettext("Press return to start formatting floppy."));
@@ -872,29 +861,7 @@ format_diskette(int fd, char *real_name, struct vtoc *fd_vtoc,
 	/*
 	 * do the format, a track at a time
 	 */
-	fcmd_fmt.fdc_blkno = 0;
 	for (cyl = 0; cyl < (z_flag ? 1 : (int)num_cyl); cyl++) {
-#if 0
-		/*
-		 * This should be the ioctl used to format the floppy.
-		 * The device driver should do do the work,
-		 * instead of this program mucking with a lot
-		 * of low-level, device-dependent code.
-		 */
-		for (hd = 0; hd < fdchar.fdc_nhead; hd++) {
-			if (ioctl(fd, FDIOCMD, &fcmd_fmt) == -1) {
-				(void) fprintf(stderr,
-			gettext("%s: format of cyl %d head %d failed\n"),
-				    myname, cyl, hd);
-
-				/* restore the default characteristics */
-				restore_default_chars(fd, save_fdchar,
-								save_allmap);
-				exit(3);
-			}
-			fcmd_fmt.fdc_blkno += spt;
-		}
-#else
 		/*
 		 * This is not the optimal ioctl to format the floppy.
 		 * The device driver should do do the work,
@@ -976,7 +943,6 @@ format_diskette(int fd, char *real_name, struct vtoc *fd_vtoc,
 			}
 
 		}
-#endif
 
 		/*
 		 *  do a quick verify
@@ -1458,7 +1424,7 @@ valid_DOS_boot(char *bootfile, uchar_t **bootloadp)
 	int	err;
 	char	*nullstring = "";
 
-	if (err = stat(bootfile, &status)) {
+	if ((err = stat(bootfile, &status)) != 0) {
 		(void) fprintf(stderr, gettext("%s: \"%s\" stat error %d\n"),
 		    myname, bootfile, err);
 		return (0);
