@@ -67,6 +67,7 @@
 #include <stdbool.h>
 #include <string.h>
 #include <libproc.h>
+#include <errno.h>
 
 #include "avl.h"
 
@@ -2000,7 +2001,6 @@ gcore_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	char		core_name[MAXNAMELEN];
 	mdb_proc_t	p;
 	mdb_pid_t	pid;
-	int		error;
 
 	if (!gcore_initialized) {
 		mdb_warn("gcore unavailable\n");
@@ -2030,8 +2030,8 @@ gcore_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	(void) snprintf(core_name, sizeof (core_name), "core.%s.%d",
 	    p.p_user.u_comm, pid.pid_id);
 
-	if ((error = Pgcore(P, core_name, CC_CONTENT_DEFAULT)) != 0) {
-		mdb_warn("Failed to generate core file: %d", error);
+	if (Pgcore(P, core_name, CC_CONTENT_DEFAULT) != 0) {
+		mdb_warn("Failed to generate core file: %d", errno);
 		Pfree(P);
 		return (DCMD_ERR);
 	}
