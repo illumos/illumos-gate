@@ -1887,23 +1887,6 @@ lx_accept4(int sockfd, void *name, int *nlp, int lx_flags)
 	return (r);
 }
 
-/*ARGSUSED*/
-long
-lx_recvmmsg(int sockfd, void *msgvec, uint_t vlen, uint_t flags,
-    struct timespec *timeout)
-{
-	lx_unsupported("Unsupported socketcall: recvmmsg\n.");
-	return (-EINVAL);
-}
-
-/*ARGSUSED*/
-long
-lx_sendmmsg(int sockfd, void *msgvec, uint_t vlen, uint_t flags)
-{
-	lx_unsupported("Unsupported socketcall: sendmmsg\n.");
-	return (-EINVAL);
-}
-
 #ifdef __i386
 
 static int
