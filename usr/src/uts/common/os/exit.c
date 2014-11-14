@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2011, 2014 Joyent, Inc. All rights reserved.
+ * Copyright 2014 Joyent, Inc. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -372,9 +372,11 @@ proc_exit(int why, int what)
 	DTRACE_PROC1(exit, int, why);
 
 	/*
-	 * Will perform any brand specific proc exit processing, since this
-	 * is always the last lwp, will also perform lwp_exit and free brand
-	 * data
+	 * Will perform any brand specific proc exit processing. Since this
+	 * is always the last lwp, will also perform lwp_exit and free
+	 * brand_data, except in the case that the brand has a b_exit_with_sig
+	 * handler. In this case we free the brand_data later within this
+	 * function.
 	 */
 	mutex_enter(&p->p_lock);
 	if (PROC_IS_BRANDED(p)) {
@@ -401,10 +403,10 @@ proc_exit(int why, int what)
 			if (z->zone_restart_init == B_TRUE) {
 				if (restart_init(what, why) == 0)
 					return (0);
-			} else {
-				(void) zone_kadmin(A_SHUTDOWN, AD_HALT, NULL,
-				    CRED());
 			}
+
+			z->zone_init_status = wstat(why, what);
+			(void) zone_kadmin(A_SHUTDOWN, AD_HALT, NULL, CRED());
 		}
 
 		/*
