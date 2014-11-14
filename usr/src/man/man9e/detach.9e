@@ -14,15 +14,13 @@ detach \- detach or suspend a device
 
 
 
-\fBint prefix\fR \fBdetach\fR(\fBdev_info_t\fR \fIdip\fR, \fBddi_detach_cmd_t\fR \fIcmd\fR);
+\fBint prefix\fR \fBdetach\fR(\fBdev_info_t *\fR \fIdip\fR, \fBddi_detach_cmd_t\fR \fIcmd\fR);
 .fi
 
 .SH INTERFACE LEVEL
-.sp
 .LP
 Solaris DDI specific (Solaris DDI)
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIdip\fR\fR
@@ -42,11 +40,9 @@ than \fBDDI_DETACH\fR or \fBDDI_SUSPEND\fR is passed to it.
 .RE
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBdetach()\fR function complements the \fBattach\fR(9E) routine.
 .SS "DDI_DETACH"
-.sp
 .LP
 If \fIcmd\fR is set to \fBDDI_DETACH\fR, \fBdetach()\fR is used to remove the
 state associated with a given instance of a device node prior to the removal of
@@ -83,7 +79,6 @@ The system guarantees that the function will only be called for a particular
 will only be called when there are no outstanding \fBopen\fR(9E) calls on the
 device.
 .SS "DDI_SUSPEND"
-.sp
 .LP
 The \fBDDI_SUSPEND\fR \fIcmd\fR is issued when the entire system is being
 suspended and power removed from it or when the system must be made quiescent.
@@ -122,7 +117,6 @@ driver threads quiescent.
 If \fBDDI_FAILURE\fR is returned for the \fBDDI_SUSPEND\fR \fIcmd\fR, either
 the operation to suspend the system or to make it quiescent will be aborted.
 .SH RETURN VALUES
-.sp
 .ne 2
 .na
 \fB\fBDDI_SUCCESS\fR\fR
@@ -144,11 +138,9 @@ unchanged.
 .RE
 
 .SH CONTEXT
-.sp
 .LP
 This function is called from user context only.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -164,7 +156,6 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBcpr\fR(7), \fBpm\fR(7D), \fBpm\fR(9P), \fBpm-components\fR(9P),
 \fBattach\fR(9E), \fBdump\fR(9E), \fBopen\fR(9E), \fBpower\fR(9E),
