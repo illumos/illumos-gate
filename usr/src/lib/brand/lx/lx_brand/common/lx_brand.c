@@ -1410,7 +1410,7 @@ static struct lx_sysent sysents[] = {
 	{"pwritev",	NULL,			NOSYS_NULL,	0}, /* 296 */
 	{"rt_tgsigqueueinfo", lx_rt_tgsigqueueinfo, 0,		4}, /* 297 */
 	{"perf_event_open", NULL,		NOSYS_NULL,	0}, /* 298 */
-	{"recvmmsg",	lx_recvmmsg,		0,		5}, /* 299 */
+	{"recvmmsg",	NULL,			NOSYS_NULL,	0}, /* 299 */
 	{"fanotify_init", NULL,			NOSYS_NULL,	0}, /* 300 */
 	{"fanotify_mark", NULL,			NOSYS_NULL,	0}, /* 301 */
 	{"prlimit64",	lx_prlimit64,		0,		4}, /* 302 */
@@ -1418,7 +1418,7 @@ static struct lx_sysent sysents[] = {
 	{"open_by_handle_at", NULL,		NOSYS_NULL,	0}, /* 304 */
 	{"clock_adjtime", NULL,			NOSYS_NULL,	0}, /* 305 */
 	{"syncfs",	NULL,			NOSYS_NULL,	0}, /* 306 */
-	{"sendmmsg",	lx_sendmmsg,		0,		4}, /* 307 */
+	{"sendmmsg",	NULL,			NOSYS_NULL,	0}, /* 307 */
 	{"setns",	NULL,			NOSYS_NULL,	0}, /* 309 */
 	{"getcpu",	NULL,			NOSYS_NULL,	0}, /* 309 */
 	{"process_vm_readv", NULL,		NOSYS_NULL,	0}, /* 310 */
