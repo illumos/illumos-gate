@@ -367,6 +367,9 @@ list_print(list_t *list)
 	double loadavg[3] = {0, 0, 0};
 	int i, lwpid;
 
+	if (list->l_size == 0)
+		return;
+
 	if (foreach_element(&set_tbl, &loadavg, psetloadavg) == 0) {
 		/*
 		 * If processor sets aren't specified, we display system-wide
@@ -1160,7 +1163,10 @@ setmovecur()
 		return;
 	}
 	if (opts.o_outpmode & OPT_SPLIT) {
-		n = opts.o_ntop + opts.o_nbottom + 2;
+		if (opts.o_ntop == 0)
+			n = opts.o_nbottom + 1;
+		else
+			n = opts.o_ntop + opts.o_nbottom + 2;
 	} else {
 		if (opts.o_outpmode & OPT_USERS)
 			n = opts.o_nbottom + 1;
@@ -1434,6 +1440,8 @@ main(int argc, char **argv)
 			opts.o_ntop = Atoi(p);
 			if (p = strtok(NULL, ","))
 				opts.o_nbottom = Atoi(p);
+			else if (opts.o_ntop == 0)
+				opts.o_nbottom = 5;
 			opts.o_outpmode &= ~OPT_FULLSCREEN;
 			break;
 		case 's':
@@ -1499,7 +1507,9 @@ main(int argc, char **argv)
 	if ((opts.o_outpmode & OPT_USERS) &&
 	    !(opts.o_outpmode & OPT_SPLIT))
 		opts.o_nbottom = opts.o_ntop;
-	if (opts.o_ntop == 0 || opts.o_nbottom == 0)
+	if (!(opts.o_outpmode & OPT_SPLIT) && opts.o_ntop == 0)
+		Die(gettext("invalid argument for -n\n"));
+	if (opts.o_nbottom == 0)
 		Die(gettext("invalid argument for -n\n"));
 	if (!(opts.o_outpmode & OPT_SPLIT) && (opts.o_outpmode & OPT_USERS) &&
 	    ((opts.o_outpmode & (OPT_PSINFO | OPT_MSACCT))))
