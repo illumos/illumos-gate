@@ -504,6 +504,7 @@ stol_siginfo(siginfo_t *siginfop, lx_siginfo_t *lx_siginfop)
 		case LX_SIGILL:
 		case LX_SIGBUS:
 		case LX_SIGFPE:
+		case LX_SIGSEGV:
 			lx_siginfo.lsi_addr = siginfop->si_addr;
 			break;
 
