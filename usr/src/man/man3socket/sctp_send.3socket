@@ -19,7 +19,6 @@ sctp_send \- send message from an SCTP socket
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBsctp_send()\fR function sends messages from one-to-one and one-to-many
 style SCTP endpoints. The following parameters can be set:
@@ -61,12 +60,10 @@ parameter to send a message to the association represented in the ID.
 .LP
 Flags supported for \fBsctp_send()\fR are reserved for future use.
 .SH RETURN VALUES
-.sp
 .LP
 Upon successful completion, the \fBsctp_send()\fR function returns the number
 of bytes sent. The function returns \fB-1\fR if an error occurs.
 .SH ERRORS
-.sp
 .LP
 The \fBsctp_send()\fR function fails under the following conditions.
 .sp
@@ -163,7 +160,6 @@ or \fBAF_INET6\fR.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -181,7 +177,6 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBaccept\fR(3SOCKET), \fBbind\fR(3SOCKET), \fBconnect\fR(3SOCKET),
 \fBin.h\fR(3HEAD), \fBlibsctp\fR(3LIB), \fBlisten\fR(3SOCKET),

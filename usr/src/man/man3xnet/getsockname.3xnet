@@ -21,7 +21,6 @@ getsockname \- get the socket name
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBgetsockname()\fR function retrieves the locally-bound name of the
 specified socket, stores this address in the \fBsockaddr\fR structure pointed
@@ -36,14 +35,12 @@ If the actual length of the address is greater than the length of the supplied
 If the socket has not been bound to a local name, the value stored in the
 object pointed to by \fIaddress\fR is unspecified.
 .SH RETURN VALUES
-.sp
 .LP
 Upon successful completion, 0 is returned, the \fIaddress\fR argument points to
 the address of the socket, and the \fIaddress_len\fR argument points to the
 length of the address.  Otherwise, \(mi1 is returned and \fBerrno\fR is set to
 indicate the error.
 .SH ERRORS
-.sp
 .LP
 The \fBgetsockname()\fR function will fail:
 .sp
@@ -115,7 +112,6 @@ complete.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -133,7 +129,7 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
+\fBsockaddr\fR(3SOCKET),
 \fBaccept\fR(3XNET), \fBbind\fR(3XNET), \fBgetpeername\fR(3XNET),
 \fBsocket\fR(3XNET) \fBattributes\fR(5), \fBstandards\fR(5)

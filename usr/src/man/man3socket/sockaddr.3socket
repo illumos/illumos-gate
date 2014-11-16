@@ -1,0 +1,562 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright (c) 2014, Joyent, Inc.
+.\"
+.Dd Nov 13, 2014
+.Dt SOCKADDR 3SOCKET
+.Os
+.Sh NAME
+.Nm sockaddr ,
+.Nm sockaddr_dl ,
+.Nm sockaddr_in ,
+.Nm sockaddr_in6 ,
+.Nm sockaddr_ll ,
+.Nm sockaddr_storage ,
+.Nm sockaddr_un
+.Nd Socket Address Structures
+.Sh SYNOPSIS
+.In sys/socket.h
+.Lp
+.Sy struct sockaddr
+.Em sock ;
+.Lp
+.In sys/socket.h
+.In net/if_dl.h
+.Lp
+.Sy struct sockaddr_dl
+.Em dl_sock ;
+.Lp
+.In sys/socket.h
+.In netinet/in.h
+.Lp
+.Sy struct sockaddr_in
+.Em in_sock ;
+.Lp
+.In sys/socket.h
+.In netinet/in6.h
+.Lp
+.Sy struct sockaddr_in6
+.Em in6_sock ;
+.Lp
+.In sys/socket.h
+.Lp
+.Sy struct sockaddr_ll
+.Em ll_sock ;
+.Lp
+.In sys/socket.h
+.Lp
+.Sy struct sockaddr_storage
+.Em storage_sock ;
+.Lp
+.In sys/un.h
+.Lp
+.Sy struct sockaddr_un
+.Em un_sock ;
+.Sh DESCRIPTION
+The
+.Nm
+family of structures are designed to represent network addresses for
+different networking protocols. The structure
+.Sy struct sockaddr
+is a generic structure that is used across calls to various socket
+library routines
+.Po
+.Xr libsocket 3LIB
+.Pc
+such as
+.Xr accept 3SOCKET
+and
+.Xr bind 3SOCKET .
+Applications do not use the
+.Sy struct sockaddr
+directly, but instead cast the appropriate networking family specific
+.Nm
+structure to a
+.Sy struct sockaddr * .
+.Lp
+Every structure in the
+.Nm
+family begins with a member of the same type, the
+.Sy sa_family_t ,
+though the different structures all have different names for the member.
+For example, the structure
+.Sy struct sockaddr
+has the following members defined:
+.Bd -literal -offset indent
+sa_family_t	sa_family	/* address family */
+char		sa_data[]	/* socket address (variable-length data) */
+.Ed
+.Lp
+The member
+.Em sa_family
+corresponds to the socket family that's actually in use. The following
+table describes the mapping between the address family and the
+corresponding socket structure that's used. Note that both the generic
+.Sy struct sockaddr
+and the
+.Sy struct sockaddr_storage
+are not included, because these are both generic structures. More on the
+.Sy struct sockaddr_storage
+can be found in the next section.
+.Bl -column -offset indent ".Sy Socket Structure" ".Sy Address Family"
+.It Sy Socket Structure Ta Sy Address Family
+.It struct sockaddr_dl Ta AF_LINK
+.It struct sockaddr_in Ta AF_INET
+.It struct sockaddr_in6 Ta AF_INET6
+.It struct sockaddr_ll Ta AF_PACKET
+.It struct sockaddr_un Ta AF_UNIX
+.El
+.Ss struct sockaddr_storage
+The
+.Sy sockaddr_storage
+structure is a
+.Nm
+that is not associated with an address family. Instead, it is large
+enough to hold the contents of any of the other
+.Nm
+structures. It can be used to embed sufficient storage for a
+.Sy sockaddr
+of any type within a larger structure.
+.Lp
+The structure only has a single member defined. While there are other
+members that are used to pad out the size of the
+.Sy struct sockaddr_storage ,
+they are not defined and must not be consumed. The only valid
+member is:
+.Bd -literal -offset indent
+sa_family_t	ss_family	/* address family */
+.Ed
+.Lp
+For example,
+.Sy struct sockaddr_storage
+is useful when running a service that accepts traffic over both
+.Sy IPv4
+and
+.Sy IPv6
+where it is common to use a single socket for both address families. In that
+case, rather than guessing whether a
+.Sy struct sockaddr_in
+or a
+.Sy struct sockaddr_in6
+is more appropriate, one can simply use a
+.Sy struct sockaddr_storage
+and cast to the appropriate family-specific structure type based on the
+value of the member
+.Em ss_family .
+.Ss struct sockaddr_in
+The
+.Sy sockaddr_in
+is the socket type which is used for for the Internet Protocol version
+four (IPv4). It has the following members defined:
+.Bd -literal -offset indent
+sa_family_t	sin_family	/* address family */
+in_port_t	sin_port	/* IP port */
+struct in_addr	sin_addr	/* IP address */
+.Ed
+.Lp
+The member
+.Em sin_family
+must always have the value
+.Sy AF_INET
+for
+.Sy IPv4 .
+The members
+.Em sin_port
+and
+.Em sin_addr
+describe the IP address and IP port to use. In the case of a call to
+.Xr connect 3SOCKET
+these represent the remote IP address and port to which the connection
+is being made. In the case of
+.Xr bind 3SOCKET
+these represent the IP address and port on the local host to which the socket
+is to be bound. In the case of
+.Xr accept 3SOCKET
+these represent the remote IP address and port of the machine whose
+connection was accepted.
+.Lp
+The member
+.Em sin_port
+is always stored in
+.Sy Network Byte Order .
+On many systems, this differs from the native host byte order.
+Applications should read from the member with the function
+.Xr ntohs 3SOCKET
+and write to the member with the function
+.Xr htons 3SOCKET .
+The member
+.Em sin_addr
+is the four byte IPv4 address. It is also stored in network byte order.
+The common way to write out the address is to use the function
+.Xr inet_pton 3SOCKET
+which converts between a human readable IP address such as "10.1.2.3"
+and the corresponding representation.
+.Lp
+Example 1 shows how to prepare an IPv4 socket and deal with
+network byte-order. See
+.Xr inet 7P
+and
+.Xr ip 7P
+for more information on IPv4, socket options, etc.
+.Ss struct sockaddr_in6
+The
+.Sy sockaddr_in6
+structure is the
+.Nm
+for the Internet Protocol version six (IPv6). Unlike the
+.Sy struct sockaddr_in ,
+the
+.Sy struct sockaddr_in6
+has additional members beyond those shown here which are required to be
+initialized to zero through a function such as
+.Xr bzero 3C
+or
+.Xr memset 3C .
+If the entire
+.Sy struct sockaddr_in6
+is not zeroed before use, applications will experience undefined behavior. The
+.Sy struct sockaddr_in6
+has the following public members:
+.Bd -literal -offset indent
+sa_family_t	sin6_family	/* address family */
+in_port_t	sin6_port	/* IPv6 port */
+struct in6_addr	sin6_addr	/* IPv6 address */
+uint32_t	sin6_flowinfo;	/* traffic class and flow info */
+uint32_t	sin6_scope_id;	/* interface scope */
+.Ed
+.Lp
+The member
+.Em sin6_family
+must always have the value
+.Sy AF_INET6 .
+The members
+.Em sin6_port
+and
+.Em sin6_addr
+are the IPv6 equivalents of the
+.Sy struct sockaddr_in
+.Em sin_port
+and
+.Em sin_addr .
+Like their IPv4 counterparts, both of these members must be in network
+byte order. The member
+.Em sin6_port
+describes the IPv6 port and should be manipulated with the functions
+.Xr ntohs 3SOCKET
+and
+.Xr htons 3SOCKET .
+The member
+.Em sin6_addr
+describes the 16-byte IPv6 address. In addition to the function
+.Xr inet_pton 3SOCKET ,
+the header file
+.In netinet/in.h
+defines many macros for manipulating and testing IPv6 addresses.
+.Lp
+The member
+.Em sin6_flowinfo
+contains the traffic class and flow label associated with the IPv6
+header. The member
+.Em sin6_scope_id
+may contain an identifier which varies based on the scope of the address
+in
+.Em sin6_addr .
+Applications do not need to initialize
+.Em sin6_scope_id ;
+it will be populated by the operating system as a result of various library
+calls.
+.Lp
+Example 2 shows how to prepare an IPv6 socket. For more information on
+IPv6, please see
+.Xr inet6 7P
+and
+.Xr ip6 7P .
+.Ss struct sockaddr_un
+The
+.Sy sockaddr_un
+structure specifies the address of a socket used to communicate between
+processes running on a single system, commonly known as a
+.Em UNIX domain socket .
+Sockets of this type are identified by a path in the file system. The
+.Sy struct sockaddr_un
+has the following members:
+.Bd -literal -offset indent
+sa_family_t	sun_family	/* address family */
+char		sun_path[108]	/* path name */
+.Ed
+.Lp
+The member
+.Em sun_family
+must always have the value
+.Sy AF_UNIX .
+The member
+.Em sun_path
+is populated with a
+.Sy NUL
+terminated array of characters that specify a file system path. The maximum
+length of any such path, including the
+.Sy NUL
+terminator, is 108 bytes.
+.Ss struct sockaddr_dl
+The
+.Sy sockaddr_dl
+structure is used to describe a layer 2 link-level address. This is used
+as part of various socket ioctls, such as those for
+.Xr arp 7P .
+The structure has the following members:
+.Bd -literal -offset indent
+ushort_t	sdl_family;	/* address family */
+ushort_t	sdl_index;	/* if != 0, system interface index */
+uchar_t		sdl_type;	/* interface type */
+uchar_t		sdl_nlen;	/* interface name length */
+uchar_t		sdl_alen;	/* link level address length */
+uchar_t		sdl_slen;	/* link layer selector length */
+char		sdl_data[244];	/* contains both if name and ll address
+.Ed
+.Lp
+The member
+.Em sdl_family
+must always have the value
+.Sy AF_LINK .
+When the member
+.Em sdl_index
+is non-zero this refers to the interface identifier that corresponds to
+the
+.Sy struct sockaddr_dl .
+This identifier is the same identifier that's shown by tools like
+.Xr ifconfig 1M
+and used in the SIOC* set of socket ioctls. The member
+.Em sdl_type
+refers to the media that is used for the socket. The most common case is
+that the medium for the interface is Ethernet which has the value
+.Sy IFT_ETHER .
+The full set of types is derived from RFC1573 and recorded in the file
+.In net/if_types.h .
+The member
+.Em sdl_slen
+describes the length of a selector, if it exists, for the specified
+medium. This is used in protocols such as Trill.
+.Lp
+The
+.Em sdl_data ,
+.Em sdl_nlen
+and
+.Em sdl_alen
+members together describe a character string containing the interface name and
+the link-layer network address. The name starts at the beginning of
+.Em sdl_data ,
+i.e. at
+.Em sdl_data[0] .
+The name of the interface occupies the next
+.Em sdl_nlen
+bytes and is not
+.Sy NUL
+terminated. The link-layer network address begins immediately after the
+interface name, and is
+.Em sdl_alen
+bytes long. The macro
+.Sy LLADDR(struct sockaddr_dl *)
+returns the start of the link-layer network address.
+The interpretation of the link-layer address depends on the value of
+.Em sdl_type .
+For example, if the type is
+.Sy IFT_ETHER
+then the address is expressed as a 6-byte MAC address.
+.Ss struct sockaddr_ll
+The
+.Sy sockaddr_ll
+is used as part of a socket type which is responsible for packet
+capture:
+.Sy AF_PACKET
+sockets. It is generally designed for use with Ethernet networks. The members
+of the
+.Sy struct sockaddr_ll
+are:
+.Bd -literal -offset indent
+uint16_t        sll_family;	/* address family */
+uint16_t        sll_protocol;	/* link layer protocol */
+int32_t         sll_ifindex;	/* interface index */
+uint16_t        sll_hatype;	/* ARP hardware type */
+uint8_t         sll_pkttype;	/* packet type */
+uint8_t         sll_halen;	/* hardware address length */
+uint8_t         sll_addr[8];	/* hardware type */
+.Ed
+.Lp
+The member
+.Em sll_family
+must be
+.Sy AF_PACKET .
+The member
+.Em sll_protocol
+refers to a link-layer protocol. For example, when capturing Ethernet frames
+the value of
+.Em sll_protocol
+is the Ethertype. This member is written in network byte order and
+applications should use
+.Xr htons 3SOCKET
+and
+.Xr ntohs 3SOCKET
+to read and write the member.
+.Lp
+The member
+.Em sll_ifindex
+is the interface's index. It is used as an identifier in various ioctls
+and included in the output of
+.Xr ifconfig 1M .
+When calling
+.Xr bind 3SOCKET
+it should be filled in with the index that corresponds to the interface
+for which packets should be captured on.
+.Lp
+The member
+.Em sll_pkttype
+describes the type of the packet based on a list of types in the header
+file
+.In netpacket/packet.h .
+These types include:
+.Sy PACKET_OUTGOING ,
+a packet that was leaving the host and has been looped back for packet capture;
+.Sy PACKET_HOST ,
+a packet that was destined for this host;
+.Sy PACKET_BROADCAST ,
+a packet that was broadcast across the link-layer;
+.Sy PACKET_MULTICAST ,
+a packet that was sent to a link-layer multicast address; and
+.Sy PACKET_OTHERHOST ,
+a packet that was captured only because the device in question was in
+promiscuous mode.
+.Lp
+The member
+.Em sll_hatype
+contains the hardware type as defined by
+.Xr arp 7P .
+The list of types can be found in
+.In net/if_arp.h .
+The member
+.Em sll_halen
+contains the length, in bytes, of the hardware address, while the member
+.Em sll_addr
+contains the actual address in network byte order.
+.Sh EXAMPLES
+.Sy Example 1
+Preparing an IPv4
+.Sy sockaddr_in
+to connect to a remote host
+.Lp
+The following example shows how one would open a socket and prepare it
+to connect to the remote host whose address is the IP address 127.0.0.1
+on port 80. This program should be compiled with the C compiler
+.Sy cc
+and linked against the libraries libsocket and libnsl. If this example
+was named ip4.c, then the full link line would be
+.Ic cc ip4.c -lsocket -lnsl .
+.Bd -literal
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <stdio.h>
+#include <netinet/in.h>
+#include <inttypes.h>
+#include <strings.h>
+
+int
+main(void)
+{
+	int sock;
+	struct sockaddr_in in;
+
+	if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+		perror("socket");
+		return (1);
+	}
+
+	bzero(&in, sizeof (struct sockaddr_in));
+	in.sin_family = AF_INET;
+	in.sin_port = htons(80);
+	if (inet_pton(AF_INET, "127.0.0.1", &in.sin_addr) != 1) {
+		perror("inet_pton");
+		return (1);
+	}
+
+	if (connect(sock, (struct sockaddr *)&in,
+	    sizeof (struct sockaddr_in)) != 0) {
+		perror("connect");
+		return (1);
+	}
+
+	/* use socket */
+
+	return (0);
+}
+.Ed
+.Lp
+.Sy Example 2
+Preparing an IPv6
+.Sy sockaddr_in6
+to bind to a local address
+.Lp
+The following example shows how one would open a socket and prepare it
+to bind to the local IPv6 address ::1 port on port 12345. This program
+should be compiled with the C compiler
+.Sy cc
+and linked aginst the libraries libsocket and libnsl. If this example
+was named ip6.c, then the full compiler line would be
+.Ic cc ip6.c -lsocket -lnsl .
+.Bd -literal
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <stdio.h>
+#include <netinet/in.h>
+#include <inttypes.h>
+#include <strings.h>
+
+int
+main(void)
+{
+	int sock6;
+	struct sockaddr_in6 in6;
+
+	if ((sock6 = socket(AF_INET6, SOCK_STREAM, 0)) < 0) {
+		perror("socket");
+		return (1);
+	}
+
+	bzero(&in6, sizeof (struct sockaddr_in6));
+	in6.sin6_family = AF_INET6;
+	in6.sin6_port = htons(12345);
+	if (inet_pton(AF_INET6, "::1", &in6.sin6_addr) != 1) {
+		perror("inet_pton");
+		return (1);
+	}
+
+	if (bind(sock6, (struct sockaddr *)&in6,
+	    sizeof (struct sockaddr_in6)) != 0) {
+		perror("bind");
+		return (1);
+	}
+
+	/* use server socket */
+
+	return (0);
+}
+.Ed
+.Sh SEE ALSO
+.Xr socket 3HEAD ,
+.Xr uh.h 3HEAD ,
+.Xr accept 3SOCKET ,
+.Xr bind 3SOCKET ,
+.Xr connect 3SOCKET ,
+.Xr socket 3SOCKET ,
+.Xr arp 7P ,
+.Xr inet 7P ,
+.Xr inet6 7P ,
+.Xr ip 7P ,
+.Xr ip6 7P ,

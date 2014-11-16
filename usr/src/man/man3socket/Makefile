@@ -52,6 +52,7 @@ MANFILES= 	accept.3socket		\
 		sctp_send.3socket	\
 		sctp_sendmsg.3socket	\
 		send.3socket		\
+		sockaddr.3socket	\
 		shutdown.3socket	\
 		socket.3socket		\
 		socketpair.3socket	\
@@ -136,7 +137,13 @@ MANLINKS=	accept4.3socket			\
 		setprotoent.3socket		\
 		setservent.3socket		\
 		setsockopt.3socket		\
-		setsourcefilter.3socket
+		setsourcefilter.3socket		\
+		sockaddr_dl.3socket		\
+		sockaddr_in.3socket		\
+		sockaddr_in6.3socket		\
+		sockaddr_ll.3socket		\
+		sockaddr_storage.3socket	\
+		sockaddr_un.3socket
 
 accept4.3socket			:= LINKSRC = accept.3socket
 
@@ -238,6 +245,13 @@ sctp_freepaddrs.3socket		:= LINKSRC = sctp_getpaddrs.3socket
 
 sendmsg.3socket			:= LINKSRC = send.3socket
 sendto.3socket			:= LINKSRC = send.3socket
+
+sockaddr_dl.3socket		:= LINKSRC = sockaddr.3socket
+sockaddr_in.3socket		:= LINKSRC = sockaddr.3socket
+sockaddr_in6.3socket		:= LINKSRC = sockaddr.3socket
+sockaddr_ll.3socket		:= LINKSRC = sockaddr.3socket
+sockaddr_storage.3socket	:= LINKSRC = sockaddr.3socket
+sockaddr_un.3socket		:= LINKSRC = sockaddr.3socket
 
 .KEEP_STATE:
 
