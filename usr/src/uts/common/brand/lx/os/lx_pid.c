@@ -18,9 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2014, Joyent, Inc. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -99,7 +101,7 @@ lx_pid_remove_hash(pid_t pid, id_t tid)
 	return (lpidp);
 }
 
-struct pid * pid_find(pid_t pid);
+struct pid *pid_find(pid_t pid);
 
 /*
  * given a solaris pid/tid pair, create a linux pid
@@ -115,7 +117,14 @@ lx_pid_assign(kthread_t *t)
 	lx_lwp_data_t *lwpd = ttolxlwp(t);
 	pid_t newpid;
 
-	if (p->p_lwpcnt > 0) {
+	/*
+	 * When lx_initlwp is called from lx_setbrand, p_lwpcnt will already be
+	 * equal to 1. Since lx_initlwp is being called against an lwp that
+	 * already exists, pid_allocate is not necessary.
+	 *
+	 * We check for this by testing br_ppid == 0.
+	 */
+	if (p->p_lwpcnt > 0 && lwpd->br_ppid != 0) {
 		/*
 		 * Allocate a pid for any thread other than the first
 		 */
