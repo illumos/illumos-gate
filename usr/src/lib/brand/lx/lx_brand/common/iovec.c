@@ -48,23 +48,6 @@ lx_is_directory(int fd)
 	return ((sbuf.st_mode & S_IFMT) == S_IFDIR);
 }
 
-long
-lx_read(uintptr_t p1, uintptr_t p2, uintptr_t p3)
-{
-	int 		fd = (int)p1;
-	void		*buf = (void *)p2;
-	size_t		nbyte = (size_t)p3;
-	ssize_t		ret;
-
-	if (lx_is_directory(fd))
-		return (-EISDIR);
-
-	if ((ret = read(fd, buf, nbyte)) < 0)
-		return (-errno);
-
-	return (ret);
-}
-
 #if defined(_LP64)
 long
 lx_pread(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4)

@@ -288,6 +288,7 @@ LX_BRAND_OBJS  =		\
 	lx_modify_ldt.o		\
 	lx_pid.o		\
 	lx_pipe.o		\
+	lx_rw.o			\
 	lx_sched.o		\
 	lx_signum.o		\
 	lx_syscall.o		\
