@@ -29,6 +29,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright (c) 2014, Joyent, Inc.
+ */
+
 #ifndef	lint
 static const char __idstring[] =
 	"@(#)$Id: myri10ge.c,v 1.186 2009-06-29 13:47:22 gallatin Exp $";
