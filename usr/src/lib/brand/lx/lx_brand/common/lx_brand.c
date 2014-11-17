@@ -1106,6 +1106,7 @@ IN_KERNEL_EMULATION(get_thread_area, LX_EMUL_get_thread_area)
 IN_KERNEL_EMULATION(set_tid_address, LX_EMUL_set_tid_address)
 IN_KERNEL_EMULATION(arch_prctl, LX_EMUL_arch_prctl)
 IN_KERNEL_EMULATION(tgkill, LX_EMUL_tgkill)
+IN_KERNEL_EMULATION(read, LX_EMUL_read)
 
 #if defined(_LP64)
 /* The following is the 64-bit syscall table */
