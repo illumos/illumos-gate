@@ -33,12 +33,20 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
+
+#ifndef _SMB_CRYPT_H
+#define	_SMB_CRYPT_H
 
 /*
  * Various crypto stuff.
  * from the driver: smb_crypt.c
  */
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 int
 smb_encrypt_DES(uchar_t *Result, int ResultLen,
@@ -46,4 +54,15 @@ smb_encrypt_DES(uchar_t *Result, int ResultLen,
     const uchar_t *Data, int DataLen);
 
 int
+smb_encrypt_RC4(uchar_t *Result, int ResultLen,
+    const uchar_t *Key, int KeyLen,
+    const uchar_t *Data, int DataLen);
+
+int
 smb_get_urandom(void *data, size_t dlen);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* _SMB_CRYPT_H */

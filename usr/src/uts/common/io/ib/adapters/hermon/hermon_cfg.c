@@ -31,6 +31,7 @@
  *    down the list of Hermon configuration information.
  */
 
+#include <sys/sysmacros.h>
 #include <sys/types.h>
 #include <sys/conf.h>
 #include <sys/ddi.h>
@@ -437,7 +438,7 @@ hermon_cfg_wqe_sizes(hermon_state_t *state, hermon_cfg_profile_t *cp)
 	 */
 	max_size = (HERMON_QP_WQE_MLX_QP1_HDRS + (max_sgl << 4));
 	log2 = highbit(max_size);
-	if ((max_size & (max_size - 1)) == 0) {
+	if (ISP2(max_size)) {
 		log2 = log2 - 1;
 	}
 	max_size = (1 << log2);

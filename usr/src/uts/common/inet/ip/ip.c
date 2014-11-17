@@ -12120,7 +12120,6 @@ ip_xmit_attach_llhdr(mblk_t *mp, nce_t *nce)
 		    priority;
 	}
 	return (mp1);
-#undef rptr
 }
 
 /*

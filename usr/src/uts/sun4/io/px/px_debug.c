@@ -23,11 +23,10 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * PCI nexus driver general debug support
  */
+#include <sys/sysmacros.h>
 #include <sys/async.h>
 #include <sys/sunddi.h>		/* dev_info_t */
 #include <sys/ddi_impldefs.h>
@@ -256,7 +255,11 @@ px_dbg_attach(dev_info_t *dip, ddi_softint_handle_t *dbg_hdl)
 		int size = px_dbg_msg_size;
 
 		/* Check if px_dbg_msg_size is ^2 */
-		size = (size & (size - 1)) ? ((size | ~size) + 1) : size;
+		/*
+		 * WARNING: The bellow statement makes no sense.  If size is
+		 * not a power of 2, it will set size to zero.
+		 */
+		size = !ISP2(size) ? ((size | ~size) + 1) : size;
 		px_dbg_msg_size = size;
 		px_dbg_qmask = size - 1;
 		px_dbg_msgq = kmem_zalloc(sizeof (px_dbg_msg_t) * size,

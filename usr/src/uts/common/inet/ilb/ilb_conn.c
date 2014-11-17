@@ -24,6 +24,7 @@
  * Use is subject to license terms.
  */
 
+#include <sys/sysmacros.h>
 #include <sys/types.h>
 #include <sys/conf.h>
 #include <sys/time.h>
@@ -300,7 +301,7 @@ ilb_conn_hash_init(ilb_stack_t *ilbs)
 	 * If ilbs->ilbs_conn_hash_size is not a power of 2, bump it up to
 	 * the next power of 2.
 	 */
-	if (ilbs->ilbs_conn_hash_size & (ilbs->ilbs_conn_hash_size - 1)) {
+	if (!ISP2(ilbs->ilbs_conn_hash_size)) {
 		for (i = 0; i < 31; i++) {
 			if (ilbs->ilbs_conn_hash_size < (1 << i))
 				break;
@@ -1359,7 +1360,7 @@ ilb_sticky_hash_init(ilb_stack_t *ilbs)
 	char tq_name[TASKQ_NAMELEN];
 	ilb_timer_t *tm;
 
-	if (ilbs->ilbs_sticky_hash_size & (ilbs->ilbs_sticky_hash_size - 1)) {
+	if (!ISP2(ilbs->ilbs_sticky_hash_size)) {
 		for (i = 0; i < 31; i++) {
 			if (ilbs->ilbs_sticky_hash_size < (1 << i))
 				break;

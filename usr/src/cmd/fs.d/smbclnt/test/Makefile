@@ -19,41 +19,63 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
 #
 
-FSTYPE=		smbfs
-LIBPROG=	testnp
-ROOTFS_PROG=	$(LIBPROG)
+include $(SRC)/cmd/Makefile.cmd
 
-include		../../Makefile.fstype
+PROG=	srvenum srvinfo tconn
+OBJS = $(PROG:%=%.o)
+SRCS = $(OBJS:%.o=%.c)
 
-OBJS=	$(LIBPROG).o
-SRCS=	$(LIBPROG).c $(FSLIBSRC)
+# ROOTFS_PROG=	$(LIBPROG)
+# include		../../Makefile.fstype
 
+ROOTOPTPKG = $(ROOT)/opt/smbcl-tests
+TESTDIR = $(ROOTOPTPKG)/tests
+INST_CMDS = $(PROG:%=$(TESTDIR)/%)
+
+# OBJS=	$(LIBPROG).o
+# SRCS=	$(LIBPROG).c $(FSLIBSRC)
+
+CPPFLAGS += -I../../../../uts/common
+CPPFLAGS += -I../../../../lib/libsmbfs
+
+LDLIBS += -R '$$ORIGIN/../../../usr/lib'
 LDLIBS += -lsmbfs
+LINTLIBS= -L$(ROOTLIB) -lsmbfs
 
 CFLAGS += $(CCVERBOSE)
 CERRWARN += -_gcc=-Wno-unused-variable
 C99MODE= $(C99_ENABLE)
 
-CLOBBERFILES	+= $(LIBPROG)
+LINTFLAGS += -erroff=E_FUNC_RET_ALWAYS_IGNOR2
 
-# uncomment these for dbx debugging
-#COPTFLAG = -g
-#CTF_FLAGS =
-#CTFCONVERT_O=
-#CTFMERGE_LIB=
+# CLOBBERFILES	+= $(LIBPROG)
 
-all:	$(ROOTFS_PROG)
+all:	$(PROG)
 
-install:	$(ROOTLIBFSTYPEPROG)
+install: all $(ROOTOPTPKG) $(TESTDIR) $(INST_CMDS)
 
-lint:	lint_SRCS
+lint:
+	for f in $(SRCS); do ;\
+	$(LINT.c) $$f $(LINTLIBS) ; done
+
+clobber: clean
+	-$(RM) $(PROG)
 
 clean:     
-	$(RM) $(OBJS)
+	-$(RM) $(OBJS)
+
+$(ROOTOPTPKG):
+	$(INS.dir)
+
+$(TESTDIR):
+	$(INS.dir)
+
+$(TESTDIR)/%: %
+	$(INS.file)
 
 .KEEP_STATE:

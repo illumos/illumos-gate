@@ -28,6 +28,7 @@
 #include <sys/types.h>
 #include <sys/socketvar.h>
 #include <sys/sdt.h>
+#include <sys/random.h>
 #include <smbsrv/netbios.h>
 #include <smbsrv/smb_kproto.h>
 #include <smbsrv/string.h>
@@ -45,6 +46,7 @@ static smb_user_t *smb_session_lookup_user(smb_session_t *, char *, char *);
 static void smb_session_logoff(smb_session_t *);
 static void smb_request_init_command_mbuf(smb_request_t *sr);
 void dump_smb_inaddr(smb_inaddr_t *ipaddr);
+static void smb_session_genkey(smb_session_t *);
 
 void
 smb_session_timers(smb_llist_t *ll)
@@ -643,6 +645,8 @@ smb_session_create(ksocket_t new_so, uint16_t port, smb_server_t *sv,
 	session->keep_alive = smb_keep_alive;
 	session->activity_timestamp = now;
 
+	smb_session_genkey(session);
+
 	smb_slist_constructor(&session->s_req_list, sizeof (smb_request_t),
 	    offsetof(smb_request_t, sr_session_lnd));
 
@@ -1213,4 +1217,18 @@ smb_session_oplock_break(smb_session_t *session,
 		SMB_PANIC();
 	}
 	smb_rwx_rwexit(&session->s_lock);
+}
+
+static void
+smb_session_genkey(smb_session_t *session)
+{
+	uint8_t		tmp_key[SMB_CHALLENGE_SZ];
+
+	(void) random_get_pseudo_bytes(tmp_key, SMB_CHALLENGE_SZ);
+	bcopy(tmp_key, &session->challenge_key, SMB_CHALLENGE_SZ);
+	session->challenge_len = SMB_CHALLENGE_SZ;
+
+	(void) random_get_pseudo_bytes(tmp_key, 4);
+	session->sesskey = tmp_key[0] | tmp_key[1] << 8 |
+	    tmp_key[2] << 16 | tmp_key[3] << 24;
 }

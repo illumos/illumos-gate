@@ -26,3 +26,8 @@ outputdir = /var/tmp/test_results
 [/opt/util-tests/tests/allowed-ips]
 
 [/opt/util-tests/tests/xargs_test]
+
+[/opt/util-tests/tests/libnvpair_json]
+tests = ['json_00_blank', 'json_01_boolean', 'json_02_numbers',
+    'json_03_empty_arrays', 'json_04_number_arrays', 'json_05_strings',
+    'json_06_nested', 'json_07_nested_arrays']

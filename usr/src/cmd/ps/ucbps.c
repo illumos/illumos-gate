@@ -396,7 +396,7 @@ ucbmain(int argc, char **argv)
 	psname[pdlen++] = '/';
 
 	/* for each active process --- */
-	while (dentp = readdir(dirp)) {
+	while ((dentp = readdir(dirp)) != NULL) {
 		int	psfd;	/* file descriptor for /proc/nnnnn/psinfo */
 		int	asfd;	/* file descriptor for /proc/nnnnn/as */
 

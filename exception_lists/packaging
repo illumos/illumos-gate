@@ -21,8 +21,8 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2012 OmniTI Computer Consulting, Inc.  All rights reserved.
+# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 #
 
@@ -821,7 +821,7 @@ usr/lib/sparcv9/llib-lsmbfs.ln		sparc
 #
 usr/lib/fs/smbfs/chacl
 usr/lib/fs/smbfs/lsacl
-usr/lib/fs/smbfs/testnp
+opt/smbcl-tests
 #
 # FC related files
 kernel/kmdb/fcip		i386

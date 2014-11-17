@@ -3766,7 +3766,7 @@ kmem_cache_create(
 	if (align < KMEM_ALIGN)
 		cflags |= KMC_NOTOUCH;
 
-	if ((align & (align - 1)) != 0 || align > vmp->vm_quantum)
+	if (!ISP2(align) || align > vmp->vm_quantum)
 		panic("kmem_cache_create: bad alignment %lu", align);
 
 	mutex_enter(&kmem_flags_lock);

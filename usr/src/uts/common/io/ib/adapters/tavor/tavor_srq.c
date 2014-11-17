@@ -32,6 +32,7 @@
  *    modifying and posting shared receive queues.
  */
 
+#include <sys/sysmacros.h>
 #include <sys/types.h>
 #include <sys/conf.h>
 #include <sys/ddi.h>
@@ -172,7 +173,7 @@ tavor_srq_alloc(tavor_state_t *state, tavor_srq_info_t *srqinfo,
 	 */
 	sizes->srq_wr_sz = max(sizes->srq_wr_sz, TAVOR_SRQ_MIN_SIZE);
 	log_srq_size = highbit(sizes->srq_wr_sz);
-	if ((sizes->srq_wr_sz & (sizes->srq_wr_sz - 1)) == 0) {
+	if (ISP2(sizes->srq_wr_sz)) {
 		log_srq_size = log_srq_size - 1;
 	}
 
@@ -686,7 +687,7 @@ tavor_srq_modify(tavor_state_t *state, tavor_srqhdl_t srq, uint_t size,
 	 */
 	size = max(size, TAVOR_SRQ_MIN_SIZE);
 	log_srq_size = highbit(size);
-	if ((size & (size - 1)) == 0) {
+	if (ISP2(size)) {
 		log_srq_size = log_srq_size - 1;
 	}
 
@@ -1099,7 +1100,7 @@ tavor_srq_sgl_to_logwqesz(tavor_state_t *state, uint_t num_sgl,
 		 */
 		max_size = (TAVOR_QP_WQE_MLX_RCV_HDRS + (num_sgl << 4));
 		log2 = highbit(max_size);
-		if ((max_size & (max_size - 1)) == 0) {
+		if (ISP2(max_size)) {
 			log2 = log2 - 1;
 		}
 

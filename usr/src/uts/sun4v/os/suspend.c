@@ -389,7 +389,7 @@ update_cpu_mappings(void)
 	 * inactive in their PGs and shouldn't be reactivated, so we must
 	 * not call pg_cpu_inactive or pg_cpu_active for those CPUs.
 	 */
-	pause_cpus(NULL);
+	pause_cpus(NULL, NULL);
 	for (id = 0; id < NCPU; id++) {
 		if ((cp = cpu_get(id)) == NULL)
 			continue;
@@ -430,7 +430,7 @@ update_cpu_mappings(void)
 	 * system, replace the bootstrapped PG structure with the
 	 * initialized PG structure and call pg_cpu_active for each CPU.
 	 */
-	pause_cpus(NULL);
+	pause_cpus(NULL, NULL);
 	for (id = 0; id < NCPU; id++) {
 		if ((cp = cpu_get(id)) == NULL)
 			continue;
@@ -615,7 +615,7 @@ suspend_start(char *error_reason, size_t max_reason_len)
 	mutex_exit(&tod_lock);
 
 	/* Pause all other CPUs */
-	pause_cpus(NULL);
+	pause_cpus(NULL, NULL);
 	DBG_PROM("suspend: CPUs paused\n");
 
 	/* Suspend cyclics */

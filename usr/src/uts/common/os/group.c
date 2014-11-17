@@ -23,6 +23,7 @@
  * Use is subject to license terms.
  */
 
+#include <sys/sysmacros.h>
 #include <sys/systm.h>
 #include <sys/param.h>
 #include <sys/debug.h>
@@ -131,8 +132,7 @@ group_remove(group_t *g, void *e, int gflag)
 	g->grp_size--;
 
 	if ((gflag & GRP_RESIZE) &&
-	    g->grp_size > GRP_SET_SIZE_DEFAULT &&
-	    ((g->grp_size - 1) & g->grp_size) == 0)
+	    g->grp_size > GRP_SET_SIZE_DEFAULT && ISP2(g->grp_size))
 		group_shrink_set(g);
 
 	return (0);

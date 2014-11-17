@@ -96,6 +96,14 @@
 			name='value_authorization'
 			type='astring'
 			value='solaris.smf.value.idmap' />
+		<propval
+			name='id_cache_timeout'
+			type='count'
+			value='86400' />
+		<propval
+			name='name_cache_timeout'
+			type='count'
+			value='604800' />
 	</property_group>
 
 	<property_group name='debug' type='application' >

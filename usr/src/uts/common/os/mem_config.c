@@ -3302,7 +3302,7 @@ memseg_cpu_vm_flush()
 	vm_cpu_data_t *vc;
 
 	mutex_enter(&cpu_lock);
-	pause_cpus(NULL);
+	pause_cpus(NULL, NULL);
 
 	cp = cpu_list;
 	do {

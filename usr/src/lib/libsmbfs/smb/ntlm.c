@@ -34,6 +34,7 @@
 
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -62,10 +63,11 @@
 /*
  * ntlm_compute_lm_hash
  *
- * Compute an LM hash given a password
+ * Given a password, compute the LM hash.
+ * a.k.a. ResponseKeyLM in [MS-NLMP]
  *
  * Output:
- *	hash: 16-byte "LanMan" (LM) hash.
+ *	hash: 16-byte "LanMan" (LM) hash (normally ctx->ct_lmhash)
  * Inputs:
  *	ucpw: User's password, upper-case UTF-8 string.
  *
@@ -102,10 +104,11 @@ ntlm_compute_lm_hash(uchar_t *hash, const char *pass)
 /*
  * ntlm_compute_nt_hash
  *
- * Compute an NT hash given a password in UTF-8.
+ * Given a password, compute the NT hash.
+ * a.k.a. the ResponseKeyNT in [MS-NLMP]
  *
  * Output:
- *	hash: 16-byte "NT" hash.
+ *	hash: 16-byte "NT" hash (normally ctx->ct_nthash)
  * Inputs:
  *	upw: User's password, mixed-case UCS-2LE.
  *	pwlen: Size (in bytes) of upw
@@ -134,6 +137,7 @@ ntlm_compute_nt_hash(uchar_t *hash, const char *pass)
 
 /*
  * ntlm_v1_response
+ * a.k.a. DESL() in [MS-NLMP]
  *
  * Create an LM response from the given LM hash and challenge,
  * or an NTLM repsonse from a given NTLM hash and challenge.
@@ -194,32 +198,103 @@ ntlm_put_v1_responses(struct smb_ctx *ctx,
 		return (err);
 
 	/*
-	 * Compute the LM response, derived
-	 * from the challenge and the ASCII
-	 * password (if authflags allow).
-	 */
-	err = mb_fit(lm_mbp, NTLM_V1_RESP_SZ, (char **)&lmresp);
-	if (err)
-		return (err);
-	bzero(lmresp, NTLM_V1_RESP_SZ);
-	if (ctx->ct_authflags & SMB_AT_LM1) {
-		/* They asked to send the LM hash too. */
-		err = ntlm_v1_response(lmresp, ctx->ct_lmhash,
-		    ctx->ct_ntlm_chal, NTLM_CHAL_SZ);
-		if (err)
-			return (err);
-	}
-
-	/*
 	 * Compute the NTLM response, derived from
-	 * the challenge and the NT hash.
+	 * the challenge and the NT hash (a.k.a ResponseKeyNT)
 	 */
 	err = mb_fit(nt_mbp, NTLM_V1_RESP_SZ, (char **)&ntresp);
 	if (err)
 		return (err);
 	bzero(ntresp, NTLM_V1_RESP_SZ);
 	err = ntlm_v1_response(ntresp, ctx->ct_nthash,
-	    ctx->ct_ntlm_chal, NTLM_CHAL_SZ);
+	    ctx->ct_srv_chal, NTLM_CHAL_SZ);
+
+	/*
+	 * Compute the LM response, derived from
+	 * the challenge and the ASCII password.
+	 * Per. [MS-NLMP 3.3.1] if NoLmResponse,
+	 * send the NT response for both NT+LM.
+	 */
+	err = mb_fit(lm_mbp, NTLM_V1_RESP_SZ, (char **)&lmresp);
+	if (err)
+		return (err);
+	memcpy(lmresp, ntresp, NTLM_V1_RESP_SZ);
+	if (ctx->ct_authflags & SMB_AT_LM1) {
+		/* They asked to send the LM hash too. */
+		err = ntlm_v1_response(lmresp, ctx->ct_lmhash,
+		    ctx->ct_srv_chal, NTLM_CHAL_SZ);
+		if (err)
+			return (err);
+	}
+
+	/*
+	 * Compute the session key
+	 */
+	ntlm_v1_session_key(ctx->ct_ssn_key, ctx->ct_nthash);
+
+	return (err);
+}
+
+/*
+ * Compute both the LM(v1x) response and the NTLM(v1x) response,
+ * and put them in the mbdata chains passed.  "v1x" here refers to
+ * NTLMSSP_NEGOTIATE_EXTENDED_SESSIONSECURITY used with NTLMSSP,
+ * also known by its shorter alias NTLMSSP_NEGOTIATE_NTLM2.
+ * [MS-NLMP 3.3.1]
+ *
+ * This allocates mbuf chains in the output args (caller frees).
+ */
+int
+ntlm_put_v1x_responses(struct smb_ctx *ctx,
+	struct mbdata *lm_mbp, struct mbdata *nt_mbp)
+{
+	MD5_CTX context;
+	uchar_t challenges[2 * NTLM_CHAL_SZ];
+	uchar_t digest[NTLM_HASH_SZ];
+	uchar_t *lmresp, *ntresp;
+	int err;
+
+	/* Get mbuf chain for the LM response. */
+	if ((err = mb_init_sz(lm_mbp, NTLM_V1_RESP_SZ)) != 0)
+		return (err);
+
+	/* Get mbuf chain for the NT response. */
+	if ((err = mb_init_sz(nt_mbp, NTLM_V1_RESP_SZ)) != 0)
+		return (err);
+
+	/*
+	 * challenges = ConcatenationOf(ServerChallenge, ClientChallenge)
+	 */
+	memcpy(challenges, ctx->ct_srv_chal, NTLM_CHAL_SZ);
+	memcpy(challenges + NTLM_CHAL_SZ, ctx->ct_clnonce, NTLM_CHAL_SZ);
+
+	/*
+	 * digest = MD5(challenges)
+	 */
+	MD5Init(&context);
+	MD5Update(&context, challenges, sizeof (challenges));
+	MD5Final(digest, &context);
+
+	/*
+	 * Compute the NTLM response, derived from the
+	 * NT hash (a.k.a ResponseKeyNT) and the first
+	 * 8 bytes of the MD5 digest of the challenges.
+	 */
+	err = mb_fit(nt_mbp, NTLM_V1_RESP_SZ, (char **)&ntresp);
+	if (err)
+		return (err);
+	bzero(ntresp, NTLM_V1_RESP_SZ);
+	err = ntlm_v1_response(ntresp, ctx->ct_nthash,
+	    digest, NTLM_CHAL_SZ);
+
+	/*
+	 * With "Extended Session Security", the LM response
+	 * is simply the client challenge (nonce) padded out.
+	 */
+	err = mb_fit(lm_mbp, NTLM_V1_RESP_SZ, (char **)&lmresp);
+	if (err)
+		return (err);
+	bzero(lmresp, NTLM_V1_RESP_SZ);
+	memcpy(lmresp, ctx->ct_clnonce, NTLM_CHAL_SZ);
 
 	/*
 	 * Compute the session key
@@ -410,22 +485,22 @@ ntlm_put_v2_responses(struct smb_ctx *ctx, struct mbdata *ti_mbp,
 	uchar_t v2hash[NTLM_HASH_SZ];
 	struct mbuf *tim = ti_mbp->mb_top;
 
-	if ((err = mb_init(lm_mbp)) != 0)
-		return (err);
-	if ((err = mb_init(nt_mbp)) != 0)
-		return (err);
-
 	/*
 	 * Convert the user name to upper-case, as
 	 * that's what's used when computing LMv2
 	 * and NTLMv2 responses.  Note that the
 	 * domain name is NOT upper-cased!
 	 */
+	if (ctx->ct_user[0] == '\0')
+		return (EINVAL);
 	ucuser = utf8_str_toupper(ctx->ct_user);
-	if (ucuser == NULL) {
-		err = ENOMEM;
+	if (ucuser == NULL)
+		return (ENOMEM);
+
+	if ((err = mb_init(lm_mbp)) != 0)
 		goto out;
-	}
+	if ((err = mb_init(nt_mbp)) != 0)
+		goto out;
 
 	/*
 	 * Compute the NTLMv2 hash
@@ -444,10 +519,9 @@ ntlm_put_v2_responses(struct smb_ctx *ctx, struct mbdata *ti_mbp,
 	 *	1: 16-byte response hash
 	 *	2: Client nonce
 	 */
-	lmresp = (uchar_t *)lm_mbp->mb_pos;
-	mb_put_mem(lm_mbp, NULL, NTLM_HASH_SZ, MB_MSYSTEM);
+	lmresp = mb_reserve(lm_mbp, NTLM_HASH_SZ);
 	err = ntlm_v2_resp_hash(lmresp,
-	    v2hash, ctx->ct_ntlm_chal,
+	    v2hash, ctx->ct_srv_chal,
 	    ctx->ct_clnonce, NTLM_CHAL_SZ);
 	if (err)
 		goto out;
@@ -462,10 +536,9 @@ ntlm_put_v2_responses(struct smb_ctx *ctx, struct mbdata *ti_mbp,
 	 *	1: 16-byte response hash
 	 *	2: "target info." blob
 	 */
-	ntresp = (uchar_t *)nt_mbp->mb_pos;
-	mb_put_mem(nt_mbp, NULL, NTLM_HASH_SZ, MB_MSYSTEM);
+	ntresp = mb_reserve(nt_mbp, NTLM_HASH_SZ);
 	err = ntlm_v2_resp_hash(ntresp,
-	    v2hash, ctx->ct_ntlm_chal,
+	    v2hash, ctx->ct_srv_chal,
 	    (uchar_t *)tim->m_data, tim->m_len);
 	if (err)
 		goto out;
@@ -533,14 +606,6 @@ ntlm_build_target_info(struct smb_ctx *ctx, struct mbuf *names,
 		return (err);
 
 	/*
-	 * Construct the client nonce by getting
-	 * some random data from /dev/urandom
-	 */
-	err = smb_get_urandom(ctx->ct_clnonce, NTLM_CHAL_SZ);
-	if (err)
-		goto out;
-
-	/*
 	 * Get the "NT time" for the target info header.
 	 */
 	(void) gettimeofday(&now, 0);
@@ -582,4 +647,49 @@ ntlm_build_target_info(struct smb_ctx *ctx, struct mbuf *names,
 out:
 	free(ucdom);
 	return (err);
+}
+
+/*
+ * Build the MAC key (for SMB signing)
+ */
+int
+ntlm_build_mac_key(struct smb_ctx *ctx, struct mbdata *ntresp_mbp)
+{
+	struct mbuf *m;
+	size_t len;
+	char *p;
+
+	/*
+	 * MAC_key = concat(session_key, nt_response)
+	 */
+	m = ntresp_mbp->mb_top;
+	len = NTLM_HASH_SZ + m->m_len;
+	if ((p = malloc(len)) == NULL)
+		return (ENOMEM);
+	ctx->ct_mackeylen = len;
+	ctx->ct_mackey = p;
+	memcpy(p, ctx->ct_ssn_key, NTLM_HASH_SZ);
+	memcpy(p + NTLM_HASH_SZ, m->m_data, m->m_len);
+
+	return (0);
+}
+
+/*
+ * Helper for ntlmssp_put_type3 - Build the "key exchange key"
+ * used when we have both NTLM(v1) and NTLMSSP_NEGOTIATE_NTLM2.
+ * HMAC_MD5(SessionBaseKey, concat(ServerChallenge, LmResponse[0..7]))
+ */
+void
+ntlm2_kxkey(struct smb_ctx *ctx, struct mbdata *lm_mbp, uchar_t *kxkey)
+{
+	uchar_t data[NTLM_HASH_SZ];
+	uchar_t *p = mtod(lm_mbp->mb_top, uchar_t *);
+
+	/* concat(ServerChallenge, LmResponse[0..7]) */
+	memcpy(data, ctx->ct_srv_chal, NTLM_CHAL_SZ);
+	memcpy(data + NTLM_CHAL_SZ, p, NTLM_CHAL_SZ);
+
+	/* HMAC_MD5(SessionBaseKey, concat(...)) */
+	HMACT64(kxkey, ctx->ct_ssn_key, NTLM_HASH_SZ,
+	    data, NTLM_HASH_SZ);
 }

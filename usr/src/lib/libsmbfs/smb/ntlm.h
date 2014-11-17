@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _NTLM_H
@@ -59,7 +60,17 @@ ntlm_put_v1_responses(struct smb_ctx *ctx,
 	struct mbdata *lm_mbp, struct mbdata *nt_mbp);
 
 int
+ntlm_put_v1x_responses(struct smb_ctx *ctx,
+	struct mbdata *lm_mbp, struct mbdata *nt_mbp);
+
+int
 ntlm_put_v2_responses(struct smb_ctx *ctx, struct mbdata *ti_mbp,
 	struct mbdata *lm_mbp, struct mbdata *nt_mbp);
+
+int
+ntlm_build_mac_key(struct smb_ctx *ctx, struct mbdata *ntresp_mbp);
+
+void
+ntlm2_kxkey(struct smb_ctx *ctx, struct mbdata *lm_mbp, uchar_t *kxkey);
 
 #endif /* _NTLM_H */

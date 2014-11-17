@@ -269,7 +269,7 @@ i_cpr_mp_setup(void)
 		for (cp = CPU->cpu_next; cp != CPU; cp = cp->cpu_next)
 			restart_other_cpu(cp->cpu_id);
 
-		pause_cpus(NULL);
+		pause_cpus(NULL, NULL);
 		mutex_exit(&cpu_lock);
 
 		i_cpr_xcall(i_cpr_clear_entries);

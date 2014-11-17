@@ -408,7 +408,7 @@ console_exit(int busy, int spl)
 void
 promsafe_pause_cpus(void)
 {
-	pause_cpus(NULL);
+	pause_cpus(NULL, NULL);
 
 	/* If some other cpu is entering or is in the prom, spin */
 	while (prom_cpu || mutex_owner(&prom_mutex)) {
@@ -421,7 +421,7 @@ promsafe_pause_cpus(void)
 			cv_wait(&prom_cv, &prom_mutex);
 
 		mutex_exit(&prom_mutex);
-		pause_cpus(NULL);
+		pause_cpus(NULL, NULL);
 	}
 
 	/* At this point all cpus are paused and none are in the prom */

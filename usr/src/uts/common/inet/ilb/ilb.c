@@ -24,6 +24,7 @@
  * Use is subject to license terms.
  */
 
+#include <sys/sysmacros.h>
 #include <sys/kmem.h>
 #include <sys/ksynch.h>
 #include <sys/systm.h>
@@ -284,7 +285,7 @@ ilb_rule_hash_init(ilb_stack_t *ilbs)
 	 * If ilbs->ilbs_rule_hash_size is not a power of 2, bump it up to
 	 * the next power of 2.
 	 */
-	if (ilbs->ilbs_rule_hash_size & (ilbs->ilbs_rule_hash_size - 1)) {
+	if (!ISP2(ilbs->ilbs_rule_hash_size)) {
 		for (i = 0; i < 31; i++) {
 			if (ilbs->ilbs_rule_hash_size < (1 << i))
 				break;

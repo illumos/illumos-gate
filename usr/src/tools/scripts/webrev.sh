@@ -22,11 +22,11 @@
 
 #
 # Copyright (c) 2002, 2010, Oracle and/or its affiliates. All rights reserved.
-#
-
 # Copyright 2008, 2010, Richard Lowe
 # Copyright 2012 Marcel Telka <marcel@telka.sk>
 # Copyright 2014 Bart Coddens <bart.coddens@gmail.com>
+# Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+#
 
 #
 # This script takes a file list and a workspace and builds a set of html files
@@ -143,6 +143,61 @@ span.new {
     font-weight: normal;
 }
 </style>
+'
+
+#
+# CSS for the HTML version of the man pages.
+#
+MANCSS='
+html { max-width: 880px; margin-left: 1em; }
+body { font-size: smaller; font-family: Helvetica,Arial,sans-serif; }
+h1 { margin-bottom: 1ex; font-size: 110%; margin-left: -4ex; }
+h2 { margin-bottom: 1ex; font-size: 105%; margin-left: -2ex; }
+table { width: 100%; margin-top: 0ex; margin-bottom: 0ex; }
+td { vertical-align: top; }
+blockquote { margin-left: 5ex; margin-top: 0ex; margin-bottom: 0ex; }
+div.section { margin-bottom: 2ex; margin-left: 5ex; }
+table.foot { font-size: smaller; margin-top: 1em;
+    border-top: 1px dotted #dddddd; }
+td.foot-date { width: 50%; }
+td.foot-os { width: 50%; text-align: right; }
+table.head { font-size: smaller; margin-bottom: 1em;
+    border-bottom: 1px dotted #dddddd; }
+td.head-ltitle { width: 10%; }
+td.head-vol { width: 80%; text-align: center; }
+td.head-rtitle { width: 10%; text-align: right; }
+.emph { font-style: italic; font-weight: normal; }
+.symb { font-style: normal; font-weight: bold; }
+.lit { font-style: normal; font-weight: normal; font-family: monospace; }
+i.addr { font-weight: normal; }
+i.arg { font-weight: normal; }
+b.cmd { font-style: normal; }
+b.config { font-style: normal; }
+b.diag { font-style: normal; }
+i.farg { font-weight: normal; }
+i.file { font-weight: normal; }
+b.flag { font-style: normal; }
+b.fname { font-style: normal; }
+i.ftype { font-weight: normal; }
+b.includes { font-style: normal; }
+i.link-sec { font-weight: normal; }
+b.macro { font-style: normal; }
+b.name { font-style: normal; }
+i.ref-book { font-weight: normal; }
+i.ref-issue { font-weight: normal; }
+i.ref-jrnl { font-weight: normal; }
+span.ref-title { text-decoration: underline; }
+span.type { font-style: italic; font-weight: normal; }
+b.utility { font-style: normal; }
+b.var { font-style: normal; }
+dd.list-ohang { margin-left: 0ex; }
+ul.list-bul { list-style-type: disc; padding-left: 1em; }
+ul.list-dash { list-style-type: none; padding-left: 0em; }
+li.list-dash:before { content: "\2014  "; }
+ul.list-hyph { list-style-type: none; padding-left: 0em; }
+li.list-hyph:before { content: "\2013  "; }
+ul.list-item { list-style-type: none; padding-left: 0em; }
+ol.list-enum { padding-left: 2em; }
 '
 
 #
@@ -2123,6 +2178,8 @@ PATH=$(/bin/dirname "$(whence $0)"):$PATH
 [[ -z $MKTEMP ]] && MKTEMP=`look_for_prog mktemp`
 [[ -z $GREP ]] && GREP=`look_for_prog grep`
 [[ -z $FIND ]] && FIND=`look_for_prog find`
+[[ -z $MANDOC ]] && MANDOC=`look_for_prog mandoc`
+[[ -z $COL ]] && COL=`look_for_prog col`
 
 # set name of trash directory for remote webrev deletion
 TRASH_DIR=".trash"
@@ -3032,12 +3089,9 @@ do
 	#	- renames must be handled specially: we emit a 'remove'
 	#	  diff and an 'add' diff
 	#	- new files and deleted files must be handled specially
-	#	- Solaris patch(1m) can't cope with file creation
-	#	  (and hence renames) as of this writing.
-	#       - To make matters worse, gnu patch doesn't interpret the
-	#	  output of Solaris diff properly when it comes to
-	#	  adds and deletes.  We need to do some "cleansing"
-	#         transformations:
+	#       - GNU patch doesn't interpret the output of illumos diff
+	#	  properly when it comes to adds and deletes.  We need to
+	#	  do some "cleansing" transformations:
 	#	    [to add a file] @@ -1,0 +X,Y @@  -->  @@ -0,0 +X,Y @@
 	#	    [to del a file] @@ -X,Y +1,0 @@  -->  @@ -X,Y +0,0 @@
 	#
@@ -3068,11 +3122,9 @@ do
 	# whole wad.
 	#
 	cat $WDIR/$DIR/$F.patch >> $WDIR/$WNAME.patch
-
 	print " patch\c"
 
 	if [[ -f $ofile && -f $nfile && -z $mv_but_nodiff ]]; then
-
 		${CDIFFCMD:-diff -bt -C 5} $ofile $nfile > $WDIR/$DIR/$F.cdiff
 		diff_to_html $F $DIR/$F "C" "$COMM" < $WDIR/$DIR/$F.cdiff \
 		    > $WDIR/$DIR/$F.cdiff.html
@@ -3081,7 +3133,6 @@ do
 		${UDIFFCMD:-diff -bt -U 5} $ofile $nfile > $WDIR/$DIR/$F.udiff
 		diff_to_html $F $DIR/$F "U" "$COMM" < $WDIR/$DIR/$F.udiff \
 		    > $WDIR/$DIR/$F.udiff.html
-
 		print " udiffs\c"
 
 		if [[ -x $WDIFF ]]; then
@@ -3098,13 +3149,10 @@ do
 		sdiff_to_html $ofile $nfile $F $DIR "$COMM" \
 		    > $WDIR/$DIR/$F.sdiff.html
 		print " sdiffs\c"
-
 		print " frames\c"
 
 		rm -f $WDIR/$DIR/$F.cdiff $WDIR/$DIR/$F.udiff
-
 		difflines $ofile $nfile > $WDIR/$DIR/$F.count
-
 	elif [[ -f $ofile && -f $nfile && -n $mv_but_nodiff ]]; then
 		# renamed file: may also have differences
 		difflines $ofile $nfile > $WDIR/$DIR/$F.count
@@ -3114,6 +3162,53 @@ do
 	elif [[ -f $ofile ]]; then
 		# old file: count deleted lines
 		difflines $ofile /dev/null > $WDIR/$DIR/$F.count
+	fi
+
+	#
+	# Check if it's man page, and create plain text, html and raw (ascii)
+	# output for the new version, as well as diffs against old version.
+	#
+	if [[ -f "$nfile" && "$nfile" = *.+([0-9])*([a-zA-Z]) && \
+	    -x $MANDOC && -x $COL ]]; then
+		$MANDOC -Tutf8 $nfile | $COL -b > $nfile.man.txt
+		source_to_html txt < $nfile.man.txt > $nfile.man.txt.html
+		print " man-txt\c"
+		print "$MANCSS" > $WDIR/raw_files/new/$DIR/man.css
+		$MANDOC -Thtml -Ostyle=man.css $nfile > $nfile.man.html
+		print " man-html\c"
+		$MANDOC -Tascii $nfile > $nfile.man.raw
+		print " man-raw\c"
+		if [[ -f "$ofile" && -z $mv_but_nodiff ]]; then
+			$MANDOC -Tutf8 $ofile | $COL -b > $ofile.man.txt
+			${CDIFFCMD:-diff -bt -C 5} $ofile.man.txt \
+			    $nfile.man.txt > $WDIR/$DIR/$F.man.cdiff
+			diff_to_html $F $DIR/$F "C" "$COMM" < \
+			    $WDIR/$DIR/$F.man.cdiff > \
+			    $WDIR/$DIR/$F.man.cdiff.html
+			print " man-cdiffs\c"
+			${UDIFFCMD:-diff -bt -U 5} $ofile.man.txt \
+			    $nfile.man.txt > $WDIR/$DIR/$F.man.udiff
+			diff_to_html $F $DIR/$F "U" "$COMM" < \
+			    $WDIR/$DIR/$F.man.udiff > \
+			    $WDIR/$DIR/$F.man.udiff.html
+			print " man-udiffs\c"
+			if [[ -x $WDIFF ]]; then
+				$WDIFF -c "$COMM" -t "$WNAME Wdiff $DIR/$F" \
+				    $ofile.man.txt $nfile.man.txt > \
+				    $WDIR/$DIR/$F.man.wdiff.html 2>/dev/null
+				if [[ $? -eq 0 ]]; then
+					print " man-wdiffs\c"
+				else
+					print " man-wdiffs[fail]\c"
+				fi
+			fi
+			sdiff_to_html $ofile.man.txt $nfile.man.txt $F.man $DIR \
+			    "$COMM" > $WDIR/$DIR/$F.man.sdiff.html
+			print " man-sdiffs\c"
+			print " man-frames\c"
+		fi
+		rm -f $ofile.man.txt $nfile.man.txt
+		rm -f $WDIR/$DIR/$F.man.cdiff $WDIR/$DIR/$F.man.udiff
 	fi
 
 	#
@@ -3303,27 +3398,22 @@ do
 	if [[ -f $F.cdiff.html ]]; then
 		cdiff_url="$(print $P.cdiff.html | url_encode)"
 		udiff_url="$(print $P.udiff.html | url_encode)"
+		sdiff_url="$(print $P.sdiff.html | url_encode)"
+		frames_url="$(print $P.frames.html | url_encode)"
 		print "<a href=\"$cdiff_url\">Cdiffs</a>"
 		print "<a href=\"$udiff_url\">Udiffs</a>"
-
 		if [[ -f $F.wdiff.html && -x $WDIFF ]]; then
 			wdiff_url="$(print $P.wdiff.html | url_encode)"
 			print "<a href=\"$wdiff_url\">Wdiffs</a>"
 		fi
-
-		sdiff_url="$(print $P.sdiff.html | url_encode)"
 		print "<a href=\"$sdiff_url\">Sdiffs</a>"
-
-		frames_url="$(print $P.frames.html | url_encode)"
 		print "<a href=\"$frames_url\">Frames</a>"
 	else
-		print " ------ ------ ------"
-
+		print " ------ ------"
 		if [[ -x $WDIFF ]]; then
 			print " ------"
 		fi
-
-		print " ------"
+		print " ------ ------"
 	fi
 
 	# If there's an old file, make the link
@@ -3380,9 +3470,7 @@ do
 		print " <i>(deleted)</i>"
 	fi
 
-	#
 	# Check for usr/closed and deleted_files/usr/closed
-	#
 	if [ ! -z "$Oflag" ]; then
 		if [[ $P == usr/closed/* || \
 		    $P == deleted_files/usr/closed/* ]]; then
@@ -3391,19 +3479,56 @@ do
 		fi
 	fi
 
-	print "</p>"
-	# Insert delta comments
+	manpage=
+	if [[ -f $F.man.cdiff.html || \
+	    -f $WDIR/raw_files/new/$P.man.txt.html ]]; then
+		manpage=1
+		print "<br/>man:"
+	fi
 
+	if [[ -f $F.man.cdiff.html ]]; then
+		mancdiff_url="$(print $P.man.cdiff.html | url_encode)"
+		manudiff_url="$(print $P.man.udiff.html | url_encode)"
+		mansdiff_url="$(print $P.man.sdiff.html | url_encode)"
+		manframes_url="$(print $P.man.frames.html | url_encode)"
+		print "<a href=\"$mancdiff_url\">Cdiffs</a>"
+		print "<a href=\"$manudiff_url\">Udiffs</a>"
+		if [[ -f $F.man.wdiff.html && -x $WDIFF ]]; then
+			manwdiff_url="$(print $P.man.wdiff.html | url_encode)"
+			print "<a href=\"$manwdiff_url\">Wdiffs</a>"
+		fi
+		print "<a href=\"$mansdiff_url\">Sdiffs</a>"
+		print "<a href=\"$manframes_url\">Frames</a>"
+	elif [[ -n $manpage ]]; then
+		print " ------ ------"
+		if [[ -x $WDIFF ]]; then
+			print " ------"
+		fi
+		print " ------ ------"
+	fi
+
+	if [[ -f $WDIR/raw_files/new/$P.man.txt.html ]]; then
+		mantxt_url="$(print raw_files/new/$P.man.txt.html | url_encode)"
+		print "<a href=\"$mantxt_url\">TXT</a>"
+		manhtml_url="$(print raw_files/new/$P.man.html | url_encode)"
+		print "<a href=\"$manhtml_url\">HTML</a>"
+		manraw_url="$(print raw_files/new/$P.man.raw | url_encode)"
+		print "<a href=\"$manraw_url\">Raw</a>"
+	elif [[ -n $manpage ]]; then
+		print " --- ---- ---"
+	fi
+
+	print "</p>"
+
+	# Insert delta comments
 	print "<blockquote><pre>"
 	getcomments html $P $PP
 	print "</pre>"
 
 	# Add additional comments comment
-
 	print "<!-- Add comments to explain changes in $P here -->"
 
 	# Add count of changes.
-
 	if [[ -f $F.count ]]; then
 	    cat $F.count
 	    rm $F.count
@@ -3411,12 +3536,10 @@ do
 
 	if [[ $SCM_MODE == "mercurial" ||
 	    $SCM_MODE == "unknown" ]]; then
-
 		# Include warnings for important file mode situations:
 		# 1) New executable files
 		# 2) Permission changes of any kind
 		# 3) Existing executable files
-
 		old_mode=
 		if [[ -f $WDIR/raw_files/old/$PP ]]; then
 			old_mode=`get_file_mode $WDIR/raw_files/old/$PP`

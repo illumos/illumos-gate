@@ -472,7 +472,7 @@ xen_suspend_domain(void)
 	kpreempt_disable();
 
 	if (ncpus > 1)
-		pause_cpus(NULL);
+		pause_cpus(NULL, NULL);
 	/*
 	 * We can grab the ec_lock as it's a spinlock with a high SPL. Hence
 	 * any holder would have dropped it to get through pause_cpus().

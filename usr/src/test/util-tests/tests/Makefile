@@ -15,5 +15,6 @@
 #
 
 SUBDIRS = dladm printf xargs
+SUBDIRS = dladm libnvpair_json printf xargs
 
 include $(SRC)/test/Makefile.com

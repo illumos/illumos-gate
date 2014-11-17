@@ -66,7 +66,7 @@ static char *
 getinput(int noecho)
 {
 	struct termio tty;
-	unsigned short tty_flags;
+	unsigned short tty_flags = 0;
 	char input[PAM_MAX_RESP_SIZE + 1];
 	int c;
 	int i = 0;

@@ -1297,7 +1297,7 @@ lgrp_mem_init(int mnode, lgrp_handle_t hand, boolean_t is_copy_rename)
 		klgrpset_add(my_lgrp->lgrp_set[LGRP_RSRC_MEM], lgrpid);
 
 		if (need_synch)
-			pause_cpus(NULL);
+			pause_cpus(NULL, NULL);
 		count = lgrp_leaf_add(my_lgrp, lgrp_table, lgrp_alloc_max + 1,
 		    &changed);
 		if (need_synch)
@@ -1316,7 +1316,7 @@ lgrp_mem_init(int mnode, lgrp_handle_t hand, boolean_t is_copy_rename)
 		    lgrpid))
 			klgrpset_add(my_lgrp->lgrp_set[LGRP_RSRC_MEM], lgrpid);
 		if (need_synch)
-			pause_cpus(NULL);
+			pause_cpus(NULL, NULL);
 		count = lgrp_leaf_add(my_lgrp, lgrp_table, lgrp_alloc_max + 1,
 		    &changed);
 		if (need_synch)
@@ -1477,7 +1477,7 @@ lgrp_mem_fini(int mnode, lgrp_handle_t hand, boolean_t is_copy_rename)
 		 * Delete lgroup when no more resources
 		 */
 		if (need_synch)
-			pause_cpus(NULL);
+			pause_cpus(NULL, NULL);
 		count = lgrp_leaf_delete(my_lgrp, lgrp_table,
 		    lgrp_alloc_max + 1, &changed);
 		ASSERT(count > 0);

@@ -29,6 +29,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright (c) 2014, Joyent, Inc.
+ */
+
 #ifndef	lint
 static const char __idstring[] =
 	"@(#)$Id: myri10ge.c,v 1.186 2009-06-29 13:47:22 gallatin Exp $";
@@ -41,6 +45,8 @@ static const char __idstring[] =
 #include "mcp_gen_header.h"
 
 #define	MYRI10GE_MAX_ETHER_MTU 9014
+#define	MYRI10GE_MAX_GLD_MTU	9000
+#define	MYRI10GE_MIN_GLD_MTU	1500
 
 #define	MYRI10GE_ETH_STOPPED 0
 #define	MYRI10GE_ETH_STOPPING 1
@@ -193,8 +199,10 @@ static void myri10ge_watchdog(void *arg);
 
 #ifdef MYRICOM_PRIV
 int myri10ge_mtu = MYRI10GE_MAX_ETHER_MTU + MXGEFW_PAD + VLAN_TAGSZ;
+#define	MYRI10GE_DEFAULT_GLD_MTU	MYRI10GE_MAX_GLD_MTU
 #else
 int myri10ge_mtu = ETHERMAX + MXGEFW_PAD + VLAN_TAGSZ;
+#define	MYRI10GE_DEFAULT_GLD_MTU	MYRI10GE_MIN_GLD_MTU
 #endif
 int myri10ge_bigbufs_initial = 1024;
 int myri10ge_bigbufs_max = 4096;
@@ -2138,7 +2146,7 @@ myri10ge_start_locked(struct myri10ge_priv *mgp)
 	 * buffer/pkt, and the mtu will prevent overruns
 	 */
 	big_pow2 = myri10ge_mtu + MXGEFW_PAD;
-	while ((big_pow2 & (big_pow2 - 1)) != 0)
+	while (!ISP2(big_pow2))
 		big_pow2++;
 
 	/* now give firmware buffers sizes, and MTU */
@@ -4697,7 +4705,8 @@ myri10ge_get_props(dev_info_t *dip)
 	myri10ge_mtu_override = ddi_prop_get_int(DDI_DEV_T_ANY, dip, 0,
 	    "myri10ge_mtu_override", myri10ge_mtu_override);
 
-	if (myri10ge_mtu_override >= 1500 && myri10ge_mtu_override <= 9000)
+	if (myri10ge_mtu_override >= MYRI10GE_MIN_GLD_MTU &&
+	    myri10ge_mtu_override <= MYRI10GE_MAX_GLD_MTU)
 		myri10ge_mtu = myri10ge_mtu_override +
 		    sizeof (struct ether_header) + MXGEFW_PAD + VLAN_TAGSZ;
 	else if (myri10ge_mtu_override != 0) {
@@ -5367,8 +5376,66 @@ myri10ge_m_stat(void *arg, uint_t stat, uint64_t *val)
 	return (0);
 }
 
+/* ARGSUSED */
+static void
+myri10ge_m_propinfo(void *arg, const char *pr_name,
+    mac_prop_id_t pr_num, mac_prop_info_handle_t prh)
+{
+	switch (pr_num) {
+	case MAC_PROP_MTU:
+		mac_prop_info_set_default_uint32(prh, MYRI10GE_DEFAULT_GLD_MTU);
+		mac_prop_info_set_range_uint32(prh, MYRI10GE_MIN_GLD_MTU,
+		    MYRI10GE_MAX_GLD_MTU);
+		break;
+	default:
+		break;
+	}
+}
+
+/*ARGSUSED*/
+static int
+myri10ge_m_setprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
+    uint_t pr_valsize, const void *pr_val)
+{
+	int err = 0;
+	struct myri10ge_priv *mgp = arg;
+
+	switch (pr_num) {
+	case MAC_PROP_MTU: {
+		uint32_t mtu;
+		if (pr_valsize < sizeof (mtu)) {
+			err = EINVAL;
+			break;
+		}
+		bcopy(pr_val, &mtu, sizeof (mtu));
+		if (mtu > MYRI10GE_MAX_GLD_MTU ||
+		    mtu < MYRI10GE_MIN_GLD_MTU) {
+			err = EINVAL;
+			break;
+		}
+
+		mutex_enter(&mgp->intrlock);
+		if (mgp->running != MYRI10GE_ETH_STOPPED) {
+			err = EBUSY;
+			mutex_exit(&mgp->intrlock);
+			break;
+		}
+
+		myri10ge_mtu = mtu + sizeof (struct ether_header) +
+		    MXGEFW_PAD + VLAN_TAGSZ;
+		mutex_exit(&mgp->intrlock);
+		break;
+	}
+	default:
+		err = ENOTSUP;
+		break;
+	}
+
+	return (err);
+}
+
 static mac_callbacks_t myri10ge_m_callbacks = {
-	(MC_IOCTL | MC_GETCAPAB),
+	(MC_IOCTL | MC_GETCAPAB | MC_SETPROP | MC_PROPINFO),
 	myri10ge_m_stat,
 	myri10ge_m_start,
 	myri10ge_m_stop,
@@ -5378,7 +5445,12 @@ static mac_callbacks_t myri10ge_m_callbacks = {
 	NULL,
 	NULL,
 	myri10ge_m_ioctl,
-	myri10ge_m_getcapab
+	myri10ge_m_getcapab,
+	NULL,
+	NULL,
+	myri10ge_m_setprop,
+	NULL,
+	myri10ge_m_propinfo
 };
 
 
@@ -5437,7 +5509,7 @@ myri10ge_probe_slices(struct myri10ge_priv *mgp)
 	 */
 	while (mgp->num_slices > 1) {
 		/* make sure it is a power of two */
-		while (mgp->num_slices & (mgp->num_slices - 1))
+		while (!ISP2(mgp->num_slices))
 			mgp->num_slices--;
 		if (mgp->num_slices == 1)
 			return (0);

@@ -32,6 +32,7 @@
  *    down the list of Tavor configuration information.
  */
 
+#include <sys/sysmacros.h>
 #include <sys/types.h>
 #include <sys/conf.h>
 #include <sys/ddi.h>
@@ -657,7 +658,7 @@ tavor_cfg_wqe_sizes(tavor_cfg_profile_t *cp)
 	 */
 	max_size = (TAVOR_QP_WQE_MLX_QP1_HDRS + (max_sgl << 4));
 	log2 = highbit(max_size);
-	if ((max_size & (max_size - 1)) == 0) {
+	if (ISP2(max_size)) {
 		log2 = log2 - 1;
 	}
 	max_size = (1 << log2);

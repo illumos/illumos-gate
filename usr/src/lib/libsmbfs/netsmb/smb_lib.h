@@ -33,8 +33,8 @@
  */
 
 /*
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _NETSMB_SMB_LIB_H_
@@ -115,10 +115,11 @@ struct smb_ctx {
 	/* Strings from the SMB negotiate response. */
 	char		*ct_srv_OS;
 	char		*ct_srv_LM;
+	uint32_t	ct_clnt_caps;
 
 	/* NTLM auth. stuff */
 	uchar_t		ct_clnonce[NTLM_CHAL_SZ];
-	uchar_t		ct_ntlm_chal[NTLM_CHAL_SZ];
+	uchar_t		ct_srv_chal[NTLM_CHAL_SZ];
 	char		ct_password[SMBIOC_MAX_NAME];
 
 	/* See ssp.c */
