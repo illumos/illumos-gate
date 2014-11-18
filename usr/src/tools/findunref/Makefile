@@ -31,9 +31,6 @@ LINTFLAGS += -ux
 
 include ../Makefile.tools
 
-CERRWARN += -_gcc=-Wno-unused
-CERRWARN += -_gcc=-Wno-parentheses
-
 $(ROOTONBLDMAN1FILES) := FILEMODE=      644
 
 EXCEPTION_SRC= common open
