@@ -161,6 +161,7 @@
 			 range (0 - %d): %d\n";
 @ MSG_ERR_BADSIDYNTAG	"%s: [%d: %s][%d]: dynamic element \
 			 [%d: %s][%d] should have type %s: %s\n";
+@ MSG_ERR_BADCIEFDELEN	"%s: %s: invalid CIE/FDE length: %#llx at %#llx\n"                         
 
 
 @ MSG_WARN_INVINTERP1	"%s: PT_INTERP header has no associated section\n"
@@ -180,6 +181,10 @@
 
 @ MSG_INFO_LINUXOSABI	"%s: %s object has Linux .note.ABI-tag section. \
 			Assuming %s\n"
+
+@ MSG_ERR_DWOVRFLW	"%s: %s: encoded DWARF data exceeds section size\n"
+@ MSG_ERR_DWBADENC	"%s: %s: bad DWARF encoding: %#x\n"
+@ MSG_ERR_DWNOCIE	"%s: %s: no CIE prior to FDE\n"
 
 # exception_range_entry table entries.
 # TRANSLATION_NOTE - the following entries provide for a series of one or more
@@ -303,6 +308,7 @@
 			 architecture: %s\n"
 @ MSG_NOTE_BADCOREDATA	"%s: elfdump core file note data truncated or \
 			 otherwise malformed\n"
+@ MSG_NOTE_BADCORETYPE	"%s: unknown note type %#x\n"
 
 @ _END_
 
@@ -396,7 +402,7 @@
 @ MSG_UNW_CIECALGN	" codealign: %#llx  dataalign: %lld  \
 			  retaddr: %d"
 @ MSG_UNW_CIEAXVAL	" Augmentation Data:"
-@ MSG_UNW_CIEAXSIZ	"   size: %d"
+@ MSG_UNW_CIEAXSIZ	"   size: %lld"
 @ MSG_UNW_CIEAXPERS	"   personality:"
 @ MSG_UNW_CIEAXPERSENC	"       encoding: 0x%02x %s"
 @ MSG_UNW_CIEAXPERSRTN	"       routine:  %#08llx"

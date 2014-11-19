@@ -40,6 +40,8 @@
  * Data from eh_frame section used by dump_cfi()
  */
 typedef struct {
+	const char	*file;
+	const char	*sh_name;
 	Half		e_machine;	/* ehdr->e_machine */
 	uchar_t		*e_ident;	/* ehdr->e_ident */
 	uint64_t	sh_addr;	/* Address of eh_frame section */
@@ -70,12 +72,18 @@ typedef struct {
  *	The requested datum is extracted, byte swapped if necessary,
  *	and returned.
  */
-static uint64_t
-dwarf_extract_uint(uchar_t *data, uint64_t *ndx, int size, int do_swap)
+static dwarf_error_t
+dwarf_extract_uint(uchar_t *data, size_t len, uint64_t *ndx, int size,
+    int do_swap, uint64_t *ret)
 {
+	if (((*ndx + size) > len) ||
+	    ((*ndx + size) < *ndx))
+		return (DW_OVERFLOW);
+
 	switch (size) {
 	case 1:
-		return (data[(*ndx)++]);
+		*ret = (data[(*ndx)++]);
+		return (DW_SUCCESS);
 	case 2:
 		{
 			Half	r;
@@ -88,7 +96,8 @@ dwarf_extract_uint(uchar_t *data, uint64_t *ndx, int size, int do_swap)
 				UL_ASSIGN_HALF(p, data);
 
 			(*ndx) += 2;
-			return (r);
+			*ret = r;
+			return (DW_SUCCESS);
 		}
 	case 4:
 		{
@@ -102,7 +111,8 @@ dwarf_extract_uint(uchar_t *data, uint64_t *ndx, int size, int do_swap)
 				UL_ASSIGN_WORD(p, data);
 
 			(*ndx) += 4;
-			return (r);
+			*ret = r;
+			return (DW_SUCCESS);
 		}
 
 	case 8:
@@ -117,13 +127,14 @@ dwarf_extract_uint(uchar_t *data, uint64_t *ndx, int size, int do_swap)
 				UL_ASSIGN_LWORD(p, data);
 
 			(*ndx) += 8;
-			return (r);
+			*ret = r;
+			return (DW_SUCCESS);
 		}
+	default:
+		return (DW_BAD_ENCODING);
 	}
 
-	/* If here, an invalid size was specified */
-	assert(0);
-	return (0);
+	/* NOTREACHED */
 }
 
 /*
@@ -176,7 +187,7 @@ dwarf_regname(Half mach, int regno, char *buf, size_t bufsize)
  *	data - Address of base of eh_frame section being processed
  *	off - Offset of current FDE within eh_frame
  *	ndx - Index of current position within current FDE
- *	len - Length of eh_frame section
+ *	len - Length of FDE
  *	state - Object, CIE, and FDE state for current request
  *	msg - Header message to issue before producing output.
  *	indent - # of indentation characters issued for each line of output.
@@ -263,10 +274,17 @@ dump_cfi(uchar_t *data, uint64_t off, uint64_t *ndx, uint_t len,
 			continue;
 
 		case 0x2:		/* v2: DW_CFA_offset, reg, offset */
-			soper = uleb_extract(&data[off], ndx) *
-			    state->ciedalign;
+			if (uleb_extract(&data[off], ndx, len, &oper1) ==
+			    DW_OVERFLOW) {
+				(void) fprintf(stderr,
+				    MSG_INTL(MSG_ERR_DWOVRFLW),
+				    state->file, state->sh_name);
+				return;
+			}
+
+			oper1 *= state->ciedalign;
 			dbg_print(0, MSG_ORIG(MSG_CFA_CFAOFF), PREFIX,
-			    REGNAME(LOW_OP(op), rbuf1), EC_SXWORD(soper));
+			    REGNAME(LOW_OP(op), rbuf1), EC_XWORD(oper1));
 			continue;
 
 		case 0x3:		/* v2: DW_CFA_restore, reg */
@@ -301,9 +319,23 @@ dump_cfi(uchar_t *data, uint64_t off, uint64_t *ndx, uint_t len,
 			break;
 
 		case 0x01:		/* v2: DW_CFA_set_loc, address */
-			cur_pc = dwarf_ehe_extract(&data[off], ndx,
-			    state->cieRflag, state->e_ident, B_FALSE,
-			    state->sh_addr, off + *ndx, state->gotaddr);
+			switch (dwarf_ehe_extract(&data[off], len, ndx,
+			    &cur_pc, state->cieRflag, state->e_ident, B_FALSE,
+			    state->sh_addr, off + *ndx, state->gotaddr)) {
+			case DW_OVERFLOW:
+				(void) fprintf(stderr,
+				    MSG_INTL(MSG_ERR_DWOVRFLW),
+				    state->file, state->sh_name);
+				return;
+			case DW_BAD_ENCODING:
+				(void) fprintf(stderr,
+				    MSG_INTL(MSG_ERR_DWBADENC),
+				    state->file, state->sh_name,
+				    state->cieRflag);
+				return;
+			case DW_SUCCESS:
+				break;
+			}
 			dbg_print(0, MSG_ORIG(MSG_CFA_CFASET), PREFIX,
 			    EC_XWORD(cur_pc));
 			break;
@@ -317,8 +349,23 @@ dump_cfi(uchar_t *data, uint64_t off, uint64_t *ndx, uint_t len,
 			 * the code.
 			 */
 			i = 1 << (op - 0x02);
-			oper1 = dwarf_extract_uint(data + off, ndx, i,
-			    state->do_swap) * state->ciecalign;
+			switch (dwarf_extract_uint(data + off, len,
+			    ndx, i, state->do_swap, &oper1)) {
+			case DW_BAD_ENCODING:
+				(void) fprintf(stderr,
+				    MSG_INTL(MSG_ERR_DWBADENC),
+				    state->file, state->sh_name,
+				    i);
+				return;
+			case DW_OVERFLOW:
+				(void) fprintf(stderr,
+				    MSG_INTL(MSG_ERR_DWOVRFLW),
+				    state->file, state->sh_name);
+				return;
+			case DW_SUCCESS:
+				break;
+			}
+			oper1 *= state->ciecalign;
 			cur_pc += oper1;
 			dbg_print(0, MSG_ORIG(MSG_CFA_ADV_LOC), PREFIX,
 			    loc_str, EC_XWORD(oper1), EC_XWORD(cur_pc));
@@ -326,9 +373,23 @@ dump_cfi(uchar_t *data, uint64_t off, uint64_t *ndx, uint_t len,
 			break;
 
 		case 0x05:		/* v2: DW_CFA_offset_extended,reg,off */
-			oper1 = uleb_extract(&data[off], ndx);
-			soper = uleb_extract(&data[off], ndx) *
-			    state->ciedalign;
+			if (uleb_extract(&data[off], ndx, len, &oper1) ==
+			    DW_OVERFLOW) {
+				(void) fprintf(stderr,
+				    MSG_INTL(MSG_ERR_DWOVRFLW),
+				    state->file, state->sh_name);
+				return;
+			}
+
+			if (sleb_extract(&data[off], ndx, len, &soper) ==
+			    DW_OVERFLOW) {
+				(void) fprintf(stderr,
+				    MSG_INTL(MSG_ERR_DWOVRFLW),
+				    state->file, state->sh_name);
+				return;
+			}
+
+			soper *= state->ciedalign;
 			dbg_print(0, MSG_ORIG(MSG_CFA_CFAOFF), PREFIX,
 			    REGNAME(oper1, rbuf1), EC_SXWORD(soper));
 			break;
@@ -337,34 +398,79 @@ dump_cfi(uchar_t *data, uint64_t off, uint64_t *ndx, uint_t len,
 		case 0x0d:		/* v2: DW_CFA_def_cfa_register, reg */
 		case 0x08:		/* v2: DW_CFA_same_value, reg */
 		case 0x07:		/* v2: DW_CFA_undefined, reg */
-			oper1 = uleb_extract(&data[off], ndx);
+			if (uleb_extract(&data[off], ndx, len, &oper1) ==
+			    DW_OVERFLOW) {
+				(void) fprintf(stderr,
+				    MSG_INTL(MSG_ERR_DWOVRFLW),
+				    state->file, state->sh_name);
+				return;
+			}
+
 			dbg_print(0, MSG_ORIG(MSG_CFA_REG), PREFIX,
 			    REGNAME(oper1, rbuf1));
 			break;
 
 
 		case 0x09:		/* v2: DW_CFA_register, reg, reg */
-			oper1 = uleb_extract(&data[off], ndx);
-			oper2 = uleb_extract(&data[off], ndx);
+			if (uleb_extract(&data[off], ndx, len, &oper1) ==
+			    DW_OVERFLOW) {
+				(void) fprintf(stderr,
+				    MSG_INTL(MSG_ERR_DWOVRFLW),
+				    state->file, state->sh_name);
+				return;
+			}
+
+			if (uleb_extract(&data[off], ndx, len, &oper2) ==
+			    DW_OVERFLOW) {
+				(void) fprintf(stderr,
+				    MSG_INTL(MSG_ERR_DWOVRFLW),
+				    state->file, state->sh_name);
+				return;
+			}
 			dbg_print(0, MSG_ORIG(MSG_CFA_REG_REG), PREFIX,
 			    REGNAME(oper1, rbuf1), REGNAME(oper2, rbuf2));
 			break;
 
 		case 0x0c:		/* v2: DW_CFA_def_cfa, reg, offset */
-			oper1 = uleb_extract(&data[off], ndx);
-			oper2 = uleb_extract(&data[off], ndx);
+			if (uleb_extract(&data[off], ndx, len, &oper1) ==
+			    DW_OVERFLOW) {
+				(void) fprintf(stderr,
+				    MSG_INTL(MSG_ERR_DWOVRFLW),
+				    state->file, state->sh_name);
+				return;
+			}
+
+			if (uleb_extract(&data[off], ndx, len, &oper2) ==
+			    DW_OVERFLOW) {
+				(void) fprintf(stderr,
+				    MSG_INTL(MSG_ERR_DWOVRFLW),
+				    state->file, state->sh_name);
+				return;
+			}
 			dbg_print(0, MSG_ORIG(MSG_CFA_REG_OFFLLU), PREFIX,
 			    REGNAME(oper1, rbuf1), EC_XWORD(oper2));
 			break;
 
 		case 0x0e:		/* v2: DW_CFA_def_cfa_offset, offset */
-			oper1 = uleb_extract(&data[off], ndx);
+			if (uleb_extract(&data[off], ndx, len, &oper1) ==
+			    DW_OVERFLOW) {
+				(void) fprintf(stderr,
+				    MSG_INTL(MSG_ERR_DWOVRFLW),
+				    state->file, state->sh_name);
+				return;
+			}
 			dbg_print(0, MSG_ORIG(MSG_CFA_LLU), PREFIX,
 			    EC_XWORD(oper1));
 			break;
 
 		case 0x0f:		/* v3: DW_CFA_def_cfa_expression, blk */
-			oper1 = uleb_extract(&data[off], ndx);
+			if (uleb_extract(&data[off], ndx, len, &oper1) ==
+			    DW_OVERFLOW) {
+				(void) fprintf(stderr,
+				    MSG_INTL(MSG_ERR_DWOVRFLW),
+				    state->file, state->sh_name);
+				return;
+			}
 			dbg_print(0, MSG_ORIG(MSG_CFA_EBLK), PREFIX,
 			    EC_XWORD(oper1));
 			/* We currently do not decode the expression block */
@@ -373,8 +479,21 @@ dump_cfi(uchar_t *data, uint64_t off, uint64_t *ndx, uint_t len,
 
 		case 0x10:		/* v3: DW_CFA_expression, reg, blk */
 		case 0x16:		/* v3: DW_CFA_val_expression,reg,blk */
-			oper1 = uleb_extract(&data[off], ndx);
-			oper2 = uleb_extract(&data[off], ndx);
+			if (uleb_extract(&data[off], ndx, len, &oper1) ==
+			    DW_OVERFLOW) {
+				(void) fprintf(stderr,
+				    MSG_INTL(MSG_ERR_DWOVRFLW),
+				    state->file, state->sh_name);
+				return;
+			}
+
+			if (uleb_extract(&data[off], ndx, len, &oper2) ==
+			    DW_OVERFLOW) {
+				(void) fprintf(stderr,
+				    MSG_INTL(MSG_ERR_DWOVRFLW),
+				    state->file, state->sh_name);
+				return;
+			}
 			dbg_print(0, MSG_ORIG(MSG_CFA_REG_EBLK), PREFIX,
 			    REGNAME(oper1, rbuf1), EC_XWORD(oper2));
 			/* We currently do not decode the expression block */
@@ -382,47 +501,125 @@ dump_cfi(uchar_t *data, uint64_t off, uint64_t *ndx, uint_t len,
 			break;
 
 		case 0x11:	/* v3: DW_CFA_offset_extended_sf, reg, off */
-			oper1 = uleb_extract(&data[off], ndx);
-			soper = sleb_extract(&data[off], ndx) *
-			    state->ciedalign;
+			if (uleb_extract(&data[off], ndx, len, &oper1) ==
+			    DW_OVERFLOW) {
+				(void) fprintf(stderr,
+				    MSG_INTL(MSG_ERR_DWOVRFLW),
+				    state->file, state->sh_name);
+				return;
+			}
+
+			if (sleb_extract(&data[off], ndx, len, &soper) ==
+			    DW_OVERFLOW) {
+				(void) fprintf(stderr,
+				    MSG_INTL(MSG_ERR_DWOVRFLW),
+				    state->file, state->sh_name);
+				return;
+			}
+
+			soper *= state->ciedalign;
 			dbg_print(0, MSG_ORIG(MSG_CFA_CFAOFF), PREFIX,
 			    REGNAME(oper1, rbuf1), EC_SXWORD(soper));
 			break;
 
 		case 0x12:		/* v3: DW_CFA_def_cfa_sf, reg, offset */
-			oper1 = uleb_extract(&data[off], ndx);
-			soper = sleb_extract(&data[off], ndx) *
-			    state->ciedalign;
+			if (uleb_extract(&data[off], ndx, len, &oper1) ==
+			    DW_OVERFLOW) {
+				(void) fprintf(stderr,
+				    MSG_INTL(MSG_ERR_DWOVRFLW),
+				    state->file, state->sh_name);
+				return;
+			}
+
+			if (sleb_extract(&data[off], ndx, len, &soper) ==
+			    DW_OVERFLOW) {
+				(void) fprintf(stderr,
+				    MSG_INTL(MSG_ERR_DWOVRFLW),
+				    state->file, state->sh_name);
+				return;
+			}
+
+			soper *= state->ciedalign;
 			dbg_print(0, MSG_ORIG(MSG_CFA_REG_OFFLLD), PREFIX,
 			    REGNAME(oper1, rbuf1), EC_SXWORD(soper));
 			break;
 
 		case 0x13:		/* DW_CFA_def_cfa_offset_sf, offset */
-			soper = sleb_extract(&data[off], ndx) *
-			    state->ciedalign;
+			if (sleb_extract(&data[off], ndx, len, &soper) ==
+			    DW_OVERFLOW) {
+				(void) fprintf(stderr,
+				    MSG_INTL(MSG_ERR_DWOVRFLW),
+				    state->file, state->sh_name);
+				return;
+			}
+
+			soper *= state->ciedalign;
 			dbg_print(0, MSG_ORIG(MSG_CFA_LLD), PREFIX,
 			    EC_SXWORD(soper));
 			break;
 
 		case 0x14:		/* v3: DW_CFA_val_offset, reg, offset */
-			oper1 = uleb_extract(&data[off], ndx);
-			soper = uleb_extract(&data[off], ndx) *
-			    state->ciedalign;
+			if (uleb_extract(&data[off], ndx, len, &oper1) ==
+			    DW_OVERFLOW) {
+				(void) fprintf(stderr,
+				    MSG_INTL(MSG_ERR_DWOVRFLW),
+				    state->file, state->sh_name);
+				return;
+			}
+
+			if (sleb_extract(&data[off], ndx, len, &soper) ==
+			    DW_OVERFLOW) {
+				(void) fprintf(stderr,
+				    MSG_INTL(MSG_ERR_DWOVRFLW),
+				    state->file, state->sh_name);
+				return;
+			}
+
+			soper *= state->ciedalign;
 			dbg_print(0, MSG_ORIG(MSG_CFA_REG_OFFLLD), PREFIX,
 			    REGNAME(oper1, rbuf1), EC_SXWORD(soper));
 			break;
 
 		case 0x15:	/* v3: DW_CFA_val_offset_sf, reg, offset */
-			oper1 = uleb_extract(&data[off], ndx);
-			soper = sleb_extract(&data[off], ndx) *
-			    state->ciedalign;
+			if (uleb_extract(&data[off], ndx, len, &oper1) ==
+			    DW_OVERFLOW) {
+				(void) fprintf(stderr,
+				    MSG_INTL(MSG_ERR_DWOVRFLW),
+				    state->file, state->sh_name);
+				return;
+			}
+
+			if (sleb_extract(&data[off], ndx, len, &soper) ==
+			    DW_OVERFLOW) {
+				(void) fprintf(stderr,
+				    MSG_INTL(MSG_ERR_DWOVRFLW),
+				    state->file, state->sh_name);
+				return;
+			}
+
+			soper *= state->ciedalign;
 			dbg_print(0, MSG_ORIG(MSG_CFA_REG_OFFLLD), PREFIX,
 			    REGNAME(oper1, rbuf1), EC_SXWORD(soper));
 			break;
 
 		case 0x1d:	/* GNU: DW_CFA_MIPS_advance_loc8, delta */
-			oper1 = dwarf_extract_uint(data + off, ndx, i,
-			    state->do_swap) * state->ciecalign;
+			switch (dwarf_extract_uint(data + off, len,
+			    ndx, 8, state->do_swap, &oper1)) {
+			case DW_BAD_ENCODING:
+				(void) fprintf(stderr,
+				    MSG_INTL(MSG_ERR_DWBADENC),
+				    state->file, state->sh_name,
+				    8);
+				return;
+			case DW_OVERFLOW:
+				(void) fprintf(stderr,
+				    MSG_INTL(MSG_ERR_DWOVRFLW),
+				    state->file, state->sh_name);
+				return;
+			case DW_SUCCESS:
+				break;
+			}
+			oper1 *= state->ciecalign;
 			cur_pc += oper1;
 			dbg_print(0, MSG_ORIG(MSG_CFA_ADV_LOC), PREFIX,
 			    loc_str, EC_XWORD(oper1), EC_XWORD(cur_pc));
@@ -430,16 +627,37 @@ dump_cfi(uchar_t *data, uint64_t off, uint64_t *ndx, uint_t len,
 			break;
 
 		case 0x2e:		/* GNU: DW_CFA_GNU_args_size, size */
-			oper1 = uleb_extract(&data[off], ndx);
+			if (uleb_extract(&data[off], ndx, len, &oper1) ==
+			    DW_OVERFLOW) {
+				(void) fprintf(stderr,
+				    MSG_INTL(MSG_ERR_DWOVRFLW),
+				    state->file, state->sh_name);
+				return;
+			}
+
 			dbg_print(0, MSG_ORIG(MSG_CFA_LLU), PREFIX,
 			    EC_XWORD(oper1));
 
 			break;
 
 		case 0x2f: /* GNU:DW_CFA_GNU_negative_offset_extended,reg,off */
-			oper1 = uleb_extract(&data[off], ndx);
-			soper = -uleb_extract(&data[off], ndx) *
-			    state->ciedalign;
+			if (uleb_extract(&data[off], ndx, len, &oper1) ==
+			    DW_OVERFLOW) {
+				(void) fprintf(stderr,
+				    MSG_INTL(MSG_ERR_DWOVRFLW),
+				    state->file, state->sh_name);
+				return;
+			}
+
+			if (sleb_extract(&data[off], ndx, len, &soper) ==
+			    DW_OVERFLOW) {
+				(void) fprintf(stderr,
+				    MSG_INTL(MSG_ERR_DWOVRFLW),
+				    state->file, state->sh_name);
+				return;
+			}
+			soper = -soper * state->ciedalign;
+			soper *= state->ciedalign;
 			dbg_print(0, MSG_ORIG(MSG_CFA_CFAOFF), PREFIX,
 			    REGNAME(oper1, rbuf1), EC_SXWORD(soper));
 			break;
@@ -465,17 +683,21 @@ dump_cfi(uchar_t *data, uint64_t off, uint64_t *ndx, uint_t len,
 }
 
 void
-dump_eh_frame(uchar_t *data, size_t datasize, uint64_t sh_addr,
-    Half e_machine, uchar_t *e_ident, uint64_t gotaddr)
+dump_eh_frame(const char *file, char *sh_name, uchar_t *data, size_t datasize,
+    uint64_t sh_addr, Half e_machine, uchar_t *e_ident, uint64_t gotaddr)
 {
 	Conv_dwarf_ehe_buf_t	dwarf_ehe_buf;
 	dump_cfi_state_t	cfi_state;
-	uint64_t	off, ndx;
+	uint64_t	off, ndx, length, id;
 	uint_t		cieid, cielength, cieversion, cieretaddr;
-	int		ciePflag, cieZflag, cieLflag, cieLflag_present;
-	uint_t		cieaugndx, length, id;
-	char		*cieaugstr;
+	int		ciePflag = 0, cieZflag = 0, cieLflag = 0;
+	int		cieLflag_present = 0;
+	uint_t		cieaugndx;
+	char		*cieaugstr = NULL;
+	boolean_t	have_cie = B_FALSE;
 
+	cfi_state.file = file;
+	cfi_state.sh_name = sh_name;
 	cfi_state.e_machine = e_machine;
 	cfi_state.e_ident = e_ident;
 	cfi_state.sh_addr = sh_addr;
@@ -496,28 +718,52 @@ dump_eh_frame(uchar_t *data, size_t datasize, uint64_t sh_addr,
 		 * zero length CIE, thus any information that does follow is
 		 * ignored by ld(1), and is therefore questionable.
 		 */
-		length = (uint_t)dwarf_extract_uint(data + off, &ndx,
-		    4, cfi_state.do_swap);
+		if (dwarf_extract_uint(data + off, datasize - off,
+		    &ndx, 4, cfi_state.do_swap, &length) == DW_OVERFLOW) {
+			(void) fprintf(stderr,
+			    MSG_INTL(MSG_ERR_DWOVRFLW),
+			    file, sh_name);
+			return;
+		}
+
 		if (length == 0) {
 			dbg_print(0, MSG_ORIG(MSG_UNW_ZEROTERM));
 			off += 4;
 			continue;
 		}
 
+		if (length > (datasize - off)) {
+			(void) fprintf(stderr, MSG_INTL(MSG_ERR_BADCIEFDELEN),
+			    file, sh_name, EC_XWORD(length),
+			    EC_XWORD(sh_addr + off));
+			/*
+			 * If length is wrong, we have no means to find the
+			 * next entry, just give up
+			 */
+			return;
+		}
+
 		/*
 		 * extract CIE id in native format
 		 */
-		id = (uint_t)dwarf_extract_uint(data + off, &ndx,
-		    4, cfi_state.do_swap);
+		if (dwarf_extract_uint(data + off, datasize - off, &ndx,
+		    4, cfi_state.do_swap, &id) == DW_OVERFLOW) {
+			(void) fprintf(stderr,
+			    MSG_INTL(MSG_ERR_DWOVRFLW),
+			    file, sh_name);
+			return;
+		}
 
 		/*
 		 * A CIE record has an id of '0', otherwise this is a
 		 * FDE entry and the 'id' is the CIE pointer.
 		 */
 		if (id == 0) {
-			uint64_t	persVal, ndx_save;
-			uint_t		axsize;
+			uint64_t	persVal, ndx_save = 0;
+			uint64_t	axsize;
 
+
+			have_cie = B_TRUE;
 			cielength = length;
 			cieid = id;
 			ciePflag = cfi_state.cieRflag = cieZflag = 0;
@@ -536,8 +782,21 @@ dump_eh_frame(uchar_t *data, size_t datasize, uint64_t sh_addr,
 			dbg_print(0, MSG_ORIG(MSG_UNW_CIEVERS),
 			    cieversion, cieaugstr);
 
-			cfi_state.ciecalign = uleb_extract(&data[off], &ndx);
-			cfi_state.ciedalign = sleb_extract(&data[off], &ndx);
+			if (uleb_extract(&data[off], &ndx, datasize - off,
+			    &cfi_state.ciecalign) == DW_OVERFLOW) {
+				(void) fprintf(stderr,
+				    MSG_INTL(MSG_ERR_DWOVRFLW),
+				    file, sh_name);
+				return;
+			}
+
+			if (sleb_extract(&data[off], &ndx, datasize - off,
+			    &cfi_state.ciedalign) == DW_OVERFLOW) {
+				(void) fprintf(stderr,
+				    MSG_INTL(MSG_ERR_DWOVRFLW),
+				    file, sh_name);
+				return;
+			}
 			cieretaddr = data[off + ndx];
 			ndx += 1;
 
@@ -551,9 +810,17 @@ dump_eh_frame(uchar_t *data, size_t datasize, uint64_t sh_addr,
 			for (cieaugndx = 0; cieaugstr[cieaugndx]; cieaugndx++) {
 				switch (cieaugstr[cieaugndx]) {
 				case 'z':
-					axsize = uleb_extract(&data[off], &ndx);
+					if (uleb_extract(&data[off], &ndx,
+					    datasize - off, &axsize) ==
+					    DW_OVERFLOW) {
+						(void) fprintf(stderr,
+						    MSG_INTL(MSG_ERR_DWOVRFLW),
+						    file, sh_name);
+						return;
+					}
+
 					dbg_print(0, MSG_ORIG(MSG_UNW_CIEAXSIZ),
-					    axsize);
+					    EC_XWORD(axsize));
 					cieZflag = 1;
 					/*
 					 * The auxiliary section can contain
@@ -569,9 +836,23 @@ dump_eh_frame(uchar_t *data, size_t datasize, uint64_t sh_addr,
 					ciePflag = data[off + ndx];
 					ndx += 1;
 
-					persVal = dwarf_ehe_extract(&data[off],
-					    &ndx, ciePflag, e_ident, B_FALSE,
-					    sh_addr, off + ndx, gotaddr);
+					switch (dwarf_ehe_extract(&data[off],
+					    datasize - off, &ndx, &persVal,
+					    ciePflag, e_ident, B_FALSE, sh_addr,
+					    off + ndx, gotaddr)) {
+					case DW_OVERFLOW:
+						(void) fprintf(stderr,
+						    MSG_INTL(MSG_ERR_DWOVRFLW),
+						    file, sh_name);
+						return;
+					case DW_BAD_ENCODING:
+						(void) fprintf(stderr,
+						    MSG_INTL(MSG_ERR_DWBADENC),
+						    file, sh_name, ciePflag);
+						return;
+					case DW_SUCCESS:
+						break;
+					}
 					dbg_print(0,
 					    MSG_ORIG(MSG_UNW_CIEAXPERS));
 					dbg_print(0,
@@ -629,30 +910,68 @@ dump_eh_frame(uchar_t *data, size_t datasize, uint64_t sh_addr,
 			int	    fdecieptr = id;
 			uint64_t    fdeaddrrange;
 
+			if (!have_cie) {
+				(void) fprintf(stderr,
+				    MSG_INTL(MSG_ERR_DWNOCIE), file, sh_name);
+				return;
+			}
+
 			dbg_print(0, MSG_ORIG(MSG_UNW_FDE),
 			    EC_XWORD(sh_addr + off));
 			dbg_print(0, MSG_ORIG(MSG_UNW_FDELNGTH),
 			    fdelength, fdecieptr);
 
-			cfi_state.fdeinitloc = dwarf_ehe_extract(&data[off],
-			    &ndx, cfi_state.cieRflag, e_ident, B_FALSE,
-			    sh_addr, off + ndx, gotaddr);
-			fdeaddrrange = dwarf_ehe_extract(&data[off], &ndx,
-			    (cfi_state.cieRflag & ~DW_EH_PE_pcrel),
-			    e_ident, B_FALSE, sh_addr, off + ndx, gotaddr);
+			switch (dwarf_ehe_extract(&data[off], datasize - off,
+			    &ndx, &cfi_state.fdeinitloc, cfi_state.cieRflag,
+			    e_ident, B_FALSE, sh_addr, off + ndx, gotaddr)) {
+			case DW_OVERFLOW:
+				(void) fprintf(stderr,
+				    MSG_INTL(MSG_ERR_DWOVRFLW), file, sh_name);
+				return;
+			case DW_BAD_ENCODING:
+				(void) fprintf(stderr,
+				    MSG_INTL(MSG_ERR_DWBADENC), file, sh_name,
+				    cfi_state.cieRflag);
+				return;
+			case DW_SUCCESS:
+				break;
+			}
+
+			switch (dwarf_ehe_extract(&data[off], datasize - off,
+			    &ndx, &fdeaddrrange,
+			    (cfi_state.cieRflag & ~DW_EH_PE_pcrel), e_ident,
+			    B_FALSE, sh_addr, off + ndx, gotaddr)) {
+			case DW_OVERFLOW:
+				(void) fprintf(stderr,
+				    MSG_INTL(MSG_ERR_DWOVRFLW), file, sh_name);
+				return;
+			case DW_BAD_ENCODING:
+				(void) fprintf(stderr,
+				    MSG_INTL(MSG_ERR_DWBADENC), file, sh_name,
+				    (cfi_state.cieRflag & ~DW_EH_PE_pcrel));
+				return;
+			case DW_SUCCESS:
+				break;
+			}
 
 			dbg_print(0, MSG_ORIG(MSG_UNW_FDEINITLOC),
 			    EC_XWORD(cfi_state.fdeinitloc),
 			    EC_XWORD(fdeaddrrange),
 			    EC_XWORD(cfi_state.fdeinitloc + fdeaddrrange - 1));
 
-			if (cieaugstr[0])
+			if ((cieaugstr != NULL) && (cieaugstr[0] != '\0'))
 				dbg_print(0, MSG_ORIG(MSG_UNW_FDEAXVAL));
 			if (cieZflag) {
 				uint64_t    val;
 				uint64_t    lndx;
 
-				val = uleb_extract(&data[off], &ndx);
+				if (uleb_extract(&data[off], &ndx,
+				    datasize - off, &val) == DW_OVERFLOW) {
+					(void) fprintf(stderr,
+					    MSG_INTL(MSG_ERR_DWOVRFLW),
+					    file, sh_name);
+					return;
+				}
 				lndx = ndx;
 				ndx += val;
 				dbg_print(0, MSG_ORIG(MSG_UNW_FDEAXSIZE),
@@ -660,10 +979,23 @@ dump_eh_frame(uchar_t *data, size_t datasize, uint64_t sh_addr,
 				if (val && cieLflag_present) {
 					uint64_t    lsda;
 
-					lsda = dwarf_ehe_extract(&data[off],
-					    &lndx, cieLflag, e_ident,
-					    B_FALSE, sh_addr, off + lndx,
-					    gotaddr);
+					switch (dwarf_ehe_extract(&data[off],
+					    datasize - off, &lndx, &lsda,
+					    cieLflag, e_ident, B_FALSE, sh_addr,
+					    off + lndx, gotaddr)) {
+					case DW_OVERFLOW:
+						(void) fprintf(stderr,
+						    MSG_INTL(MSG_ERR_DWOVRFLW),
+						    file, sh_name);
+						return;
+					case DW_BAD_ENCODING:
+						(void) fprintf(stderr,
+						    MSG_INTL(MSG_ERR_DWBADENC),
+						    file, sh_name, cieLflag);
+						return;
+					case DW_SUCCESS:
+						break;
+					}
 					dbg_print(0,
 					    MSG_ORIG(MSG_UNW_FDEAXLSDA),
 					    EC_XWORD(lsda));

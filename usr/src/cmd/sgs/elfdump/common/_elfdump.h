@@ -223,8 +223,8 @@ typedef enum {
 #endif
 
 extern	corenote_ret_t	corenote(Half, int, Word, const char *, Word);
-extern	void	dump_eh_frame(uchar_t *, size_t, uint64_t, Half e_machine,
-		    uchar_t *e_ident, uint64_t gotaddr);
+extern	void	dump_eh_frame(const char *, char *, uchar_t *, size_t, uint64_t,
+		    Half e_machine, uchar_t *e_ident, uint64_t gotaddr);
 extern	void	dump_hex_bytes(const void *, size_t, int, int, int);
 
 extern	int	fake_shdr_cache32(const char *, int, Elf *, Elf32_Ehdr *,
