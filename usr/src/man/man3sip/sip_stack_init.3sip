@@ -16,7 +16,6 @@ sip_stack_init \- initializes SIP stack
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBsip_stack_init()\fR function is used to initialize the \fBSIP\fR stack.
 The stack can be initialized by a process only once. Any shared library that is
@@ -60,7 +59,6 @@ all.
 .RE
 
 .SS "Upper Layer Registrations"
-.sp
 .LP
 These include callbacks that are invoked to deliver incoming messages or error
 notification.
@@ -177,7 +175,6 @@ If these callback routines are registered, the stack invokes
 .RE
 
 .SS "Connection Manager Interface"
-.sp
 .LP
 The connection manager interfaces must be registered by the application to
 provide I/O related functionality to the stack. These interfaces act on a
@@ -324,7 +321,6 @@ retransmit interval - default \fB32\fR \fBsecs\fR).
 .RE
 
 .SS "Custom \fBSIP\fR headers"
-.sp
 .LP
 In addition to the \fBSIP\fR headers supported by the stack, an application can
 optionally provide a table of custom headers and associated parsing functions.
@@ -414,7 +410,6 @@ application.
 .RE
 
 .SH RETURN VALUES
-.sp
 .LP
 On success \fBsip_stack_init()\fR returns \fB0\fR. Otherwise, the function
 returns the error value.
@@ -423,7 +418,6 @@ returns the error value.
 The value of \fBerrno\fR is not changed by these calls in the event of an
 error.
 .SH ERRORS
-.sp
 .LP
 On failure, the \fBsip_stack_init()\fR function returns the following error
 value:
@@ -438,7 +432,6 @@ missing.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -456,6 +449,5 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
-\fBlibsip\fR(3LIB)
+\fBlibsip\fR(3LIB), \fBsockaddr\fR(3SOCKET)

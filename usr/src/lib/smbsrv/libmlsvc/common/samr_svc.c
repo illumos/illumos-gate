@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -1141,15 +1142,15 @@ samr_s_CreateUser(void *arg, ndr_xa_t *mxa)
 }
 
 /*
- * samr_s_ChangeUserPasswd
+ * samr_s_ChangePasswordUser2
  */
 /*ARGSUSED*/
 static int
-samr_s_ChangeUserPasswd(void *arg, ndr_xa_t *mxa)
+samr_s_ChangePasswordUser2(void *arg, ndr_xa_t *mxa)
 {
-	struct samr_ChangeUserPasswd *param = arg;
+	struct samr_ChangePasswordUser2 *param = arg;
 
-	bzero(param, sizeof (struct samr_ChangeUserPasswd));
+	bzero(param, sizeof (*param));
 	param->status = NT_SC_ERROR(NT_STATUS_ACCESS_DENIED);
 	return (NDR_DRC_OK);
 }
@@ -1860,7 +1861,7 @@ static ndr_stub_table_t samr_stub_table[] = {
 	{ samr_s_Connect2,		SAMR_OPNUM_Connect2 },
 	{ samr_s_GetUserPwInfo,		SAMR_OPNUM_GetUserPwInfo },
 	{ samr_s_CreateUser,		SAMR_OPNUM_CreateUser },
-	{ samr_s_ChangeUserPasswd,	SAMR_OPNUM_ChangeUserPasswd },
+	{ samr_s_ChangePasswordUser2,	SAMR_OPNUM_ChangePasswordUser2 },
 	{ samr_s_GetDomainPwInfo,	SAMR_OPNUM_GetDomainPwInfo },
 	{ samr_s_SetUserInfo,		SAMR_OPNUM_SetUserInfo },
 	{ samr_s_Connect4,		SAMR_OPNUM_Connect4 },

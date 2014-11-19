@@ -113,6 +113,9 @@ extern idmap_stat idmap_getwinnamebyuid(uid_t, int, char **, char **);
 /* Given GID, get Windows name */
 extern idmap_stat idmap_getwinnamebygid(gid_t, int, char **, char **);
 
+/* Given PID, get Windows name */
+extern idmap_stat idmap_getwinnamebypid(uid_t, int, int, char **, char **);
+
 /* Given Windows name, get UID */
 extern idmap_stat idmap_getuidbywinname(const char *, const char *,
 	int, uid_t *);

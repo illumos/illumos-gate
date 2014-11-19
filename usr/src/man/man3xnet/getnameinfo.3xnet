@@ -24,7 +24,6 @@ getnameinfo \- get name information
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBgetnameinfo()\fR function translates a socket address to a node name and
 service location, all of which are defined as in \fBgetaddrinfo\fR(3XNET).
@@ -94,7 +93,6 @@ datagram service (\fBSOCK_DGRAM\fR). The default behavior assumes that the
 service is a stream service (\fBSOCK_STREAM\fR).
 .RE
 .SH RETURN VALUES
-.sp
 .LP
 A 0 return value for \fBgetnameinfo()\fR indicates successful completion; a
 non-zero return value indicates failure. The possible values for the failures
@@ -105,7 +103,6 @@ Upon successful completion, \fBgetnameinfo()\fR returns the node and service
 names, if requested, in the buffers provided. The returned names are always
 null-terminated strings.
 .SH ERRORS
-.sp
 .LP
 The \fBgetnameinfo()\fR function will fail if:
 .sp
@@ -175,7 +172,6 @@ A system error occurred. The error code can be found in \fBerrno\fR.
 .RE
 
 .SH USAGE
-.sp
 .LP
 If the returned values are to be used as part of any further name resolution
 (for example, passed to \fBgetaddrinfo()\fR), applications should provide
@@ -186,7 +182,6 @@ Given the IPv4-mapped IPv6 address "::ffff:1.2.3.4", the implementation
 performs a lookup as if the socket address structure contains the IPv4 address
 "1.2.3.4".
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -204,13 +199,12 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
+\fBsockaddr\fR(3SOCKET),
 \fBgai_strerror\fR(3XNET), \fBgetaddrinfo\fR(3XNET),
 \fBgetservbyname\fR(3XNET), \fBsocket\fR(3XNET), \fBattributes\fR(5),
 \fBstandards\fR(5)
 .SH NOTES
-.sp
 .LP
 The IPv6 unspecified address ("::") and the IPv6 loopback address ("::1") are
 not IPv4-compatible addresses. If the address is the IPv6 unspecified address

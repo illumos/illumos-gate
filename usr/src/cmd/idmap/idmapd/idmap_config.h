@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _IDMAP_CONFIG_H
@@ -108,6 +108,7 @@ typedef struct idmap_pg_config {
 	char		*nldap_winname_attr;
 	int		directory_based_mapping;	/* enum */
 	boolean_t	eph_map_unres_sids;
+	boolean_t	use_ads;
 	boolean_t	use_lsa;
 	boolean_t	disable_cross_forest_trusts;
 } idmap_pg_config_t;

@@ -17229,6 +17229,13 @@ s usr/share/man/man3socket/setservent.3socket=getservbyname.3socket
 s usr/share/man/man3socket/setsockopt.3socket=getsockopt.3socket
 s usr/share/man/man3socket/setsourcefilter.3socket=getsourcefilter.3socket
 f usr/share/man/man3socket/shutdown.3socket 0444 root bin
+f usr/share/man/man3socket/sockaddr.3socket 0444 root bin
+s usr/share/man/man3socket/sockaddr_dl.3socket=sockaddr.3socket
+s usr/share/man/man3socket/sockaddr_in.3socket=sockaddr.3socket
+s usr/share/man/man3socket/sockaddr_in6.3socket=sockaddr.3socket
+s usr/share/man/man3socket/sockaddr_ll.3socket=sockaddr.3socket
+s usr/share/man/man3socket/sockaddr_storage.3socket=sockaddr.3socket
+s usr/share/man/man3socket/sockaddr_un.3socket=sockaddr.3socket
 f usr/share/man/man3socket/socket.3socket 0444 root bin
 f usr/share/man/man3socket/socketpair.3socket 0444 root bin
 f usr/share/man/man3socket/spray.3socket 0444 root bin

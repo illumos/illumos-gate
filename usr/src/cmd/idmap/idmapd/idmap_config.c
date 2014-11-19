@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 
@@ -1455,6 +1455,11 @@ idmap_cfg_load_smf(idmap_cfg_handles_t *handles, idmap_pg_config_t *pgcfg,
 	if (rc != 0)
 		(*errors)++;
 
+	rc = get_val_bool(handles, "use_ads",
+	    &pgcfg->use_ads, B_TRUE);
+	if (rc != 0)
+		(*errors)++;
+
 	rc = get_val_bool(handles, "use_lsa",
 	    &pgcfg->use_lsa, B_TRUE);
 	if (rc != 0)
@@ -1797,6 +1802,12 @@ idmap_cfg_discover(idmap_cfg_handles_t *handles, idmap_pg_config_t *pgcfg)
 {
 	ad_disc_t ad_ctx = handles->ad_ctx;
 
+	if (pgcfg->use_ads == B_FALSE) {
+		if (DBG(CONFIG, 1))
+			idmapdlog(LOG_DEBUG, "ADS disabled.");
+		return;
+	}
+
 	if (DBG(CONFIG, 1))
 		idmapdlog(LOG_DEBUG, "Running discovery.");
 
@@ -1915,6 +1926,9 @@ idmap_cfg_load(idmap_cfg_t *cfg, int flags)
 
 	changed += update_bool(&live_pgcfg->eph_map_unres_sids,
 	    &new_pgcfg.eph_map_unres_sids, "unresolvable_sid_mapping");
+
+	changed += update_bool(&live_pgcfg->use_ads,
+	    &new_pgcfg.use_ads, "use_ads");
 
 	changed += update_bool(&live_pgcfg->use_lsa,
 	    &new_pgcfg.use_lsa, "use_lsa");

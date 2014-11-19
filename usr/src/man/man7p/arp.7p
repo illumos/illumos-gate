@@ -39,7 +39,6 @@ arp, ARP \- Address Resolution Protocol
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 ARP is a protocol used to map  dynamically between Internet Protocol (IP) and
 Ethernet addresses. It is used by all Ethernet datalink providers (network
@@ -57,7 +56,6 @@ caches the new mapping and transmits any pending message. \fBARP\fR will queue
 a maximum of four packets while awaiting a response to a mapping  request. ARP
 keeps only the first four transmitted packets.
 .SH APPLICATION PROGRAMMING INTERFACE
-.sp
 .LP
 The STREAMS device \fB/dev/arp\fR is not a Transport Level Interface
 (\fBTLI\fR) transport provider and may not be used with the \fBTLI\fR
@@ -280,7 +278,6 @@ excess of conflicts.
 ARP also  handles UNARP messages received  from other nodes. It does not
 generate these messages.
 .SH PACKET EVENTS
-.sp
 .LP
 The \fBarp\fR driver registers itself with the netinfo  interface. To gain
 access to  these events, a handle from net_protocol_lookup must be acquired by
@@ -348,7 +345,6 @@ Pointer to the mblk_t with the ARP header in it.
 .RE
 
 .SH NETWORK INTERFACE EVENTS
-.sp
 .LP
 In addition  to events describing packets as they  move through the system, it
 is also possible to receive notification of events relating to network
@@ -375,10 +371,9 @@ A network interface is no longer  associated with ARP.
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
-\fBarp\fR(1M), \fBifconfig\fR(1M), \fBprivileges\fR(5), \fBif_tcp\fR(7P),
-\fBinet\fR(7P), \fBnetinfo\fR(9F)
+\fBarp\fR(1M), \fBifconfig\fR(1M), \fBsockaddr\fR(3SOCKET), \fBprivileges\fR(5),
+\fBif_tcp\fR(7P), \fBinet\fR(7P), \fBnetinfo\fR(9F)
 .sp
 .LP
 Plummer, Dave, \fIAn Ethernet Address Resolution Protocol\fR or \fIConverting
@@ -388,7 +383,6 @@ Ethernet  Hardware\fR, RFC  826, STD 0037, November 1982.
 .LP
 Malkin,  Gary, \fIARP  Extension  - UNARP, RFC 1868\fR, November, 1995
 .SH DIAGNOSTICS
-.sp
 .LP
 Several messages can be written to the system  logs (by the IP module) when
 errors occur. In the following examples, the hardware address strings include

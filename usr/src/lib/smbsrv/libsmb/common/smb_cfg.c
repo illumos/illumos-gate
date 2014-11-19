@@ -739,6 +739,32 @@ smb_config_get_fg_flag()
 }
 
 /*
+ * smb_config_get_ads_enable
+ *
+ * Returns value of the "config/use_ads" parameter
+ * from the IDMAP SMF configuration repository.
+ *
+ */
+boolean_t
+smb_config_get_ads_enable(void)
+{
+	smb_scfhandle_t *handle = NULL;
+	uint8_t vbool;
+	int rc = 0;
+
+	handle = smb_smf_scf_init(IDMAP_FMRI_PREFIX);
+	if (handle == NULL)
+		return (B_FALSE);
+
+	rc = smb_smf_create_service_pgroup(handle, IDMAP_PG_NAME);
+	if (rc == SMBD_SMF_OK)
+		rc = smb_smf_get_boolean_property(handle, "use_ads", &vbool);
+	smb_smf_scf_fini(handle);
+
+	return ((rc == SMBD_SMF_OK) ? (vbool == 1) : B_FALSE);
+}
+
+/*
  * smb_config_get_localsid
  *
  * Returns value of the "config/machine_sid" parameter

@@ -49,6 +49,7 @@ file path=usr/share/man/man3socket/sctp_send.3socket
 file path=usr/share/man/man3socket/sctp_sendmsg.3socket
 file path=usr/share/man/man3socket/send.3socket
 file path=usr/share/man/man3socket/shutdown.3socket
+file path=usr/share/man/man3socket/sockaddr.3socket
 file path=usr/share/man/man3socket/socket.3socket
 file path=usr/share/man/man3socket/socketpair.3socket
 file path=usr/share/man/man3socket/spray.3socket
@@ -181,3 +182,11 @@ link path=usr/share/man/man3socket/setsockopt.3socket \
     target=getsockopt.3socket
 link path=usr/share/man/man3socket/setsourcefilter.3socket \
     target=getsourcefilter.3socket
+link path=usr/share/man/man3socket/sockaddr_dl.3socket target=sockaddr.3socket
+link path=usr/share/man/man3socket/sockaddr_in.3socket target=sockaddr.3socket
+link path=usr/share/man/man3socket/sockaddr_in6.3socket \
+    target=sockaddr.3socket
+link path=usr/share/man/man3socket/sockaddr_ll.3socket target=sockaddr.3socket
+link path=usr/share/man/man3socket/sockaddr_storage.3socket \
+    target=sockaddr.3socket
+link path=usr/share/man/man3socket/sockaddr_un.3socket target=sockaddr.3socket

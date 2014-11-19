@@ -22,9 +22,8 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/md4.h>
 #include <sys/types.h>
@@ -35,6 +34,29 @@
 #include <smbsrv/libsmb.h>
 
 static void smb_initlmkey(unsigned char *keyin, unsigned char *keyout);
+
+/*
+ * randomize
+ *
+ * Randomize the contents of the specified buffer.
+ */
+void
+randomize(char *data, unsigned len)
+{
+	char *p = data;
+
+	if (pkcs11_get_random(data, len) == 0)
+		return;
+
+	/*
+	 * Implement a "fall back", because current callers
+	 * don't expect an error from this.  In practice,
+	 * we never use this fall back.
+	 */
+	while (len--) {
+		*p++ = (random() >> 24);
+	}
+}
 
 /*
  * smb_auth_md4
@@ -122,13 +144,21 @@ smb_auth_DES(unsigned char *Result, int ResultLen,
 	int K, D;
 	int k, d;
 
-	/* Calculate proper number of iterations */
+	/*
+	 * Calculate proper number of iterations.
+	 * Known call cases include:
+	 *   ResultLen=16, KeyLen=14, DataLen=8
+	 *   ResultLen=24, KeyLen=21, DataLen=8
+	 *   ResultLen=16, KeyLen=14, DataLen=16
+	 */
 	K = KeyLen / 7;
 	D = DataLen / 8;
-
-	if (ResultLen < (K * 8 * D)) {
-		return (SMBAUTH_FAILURE);
-	}
+	if ((KeyLen % 7) || (DataLen % 8))
+		return (EINVAL);
+	if (K == 0 || D == 0)
+		return (EINVAL);
+	if (ResultLen < (K * 8))
+		return (EINVAL);
 
 	/*
 	 * Use SUNW convenience function to initialize the cryptoki
@@ -143,7 +173,10 @@ smb_auth_DES(unsigned char *Result, int ResultLen,
 		return (SMBAUTH_FAILURE);
 	}
 
-	for (k = 0; k < K; k++) {
+	for (d = k = 0; k < K; k++, d++) {
+		/* Cycle the input again, as necessary. */
+		if (d == D)
+			d = 0;
 		smb_initlmkey(&Key[k * 7], des_key);
 		rv = SUNW_C_KeyToObject(hSession, mechanism.mechanism,
 		    des_key, 8, &hKey);
@@ -157,18 +190,18 @@ smb_auth_DES(unsigned char *Result, int ResultLen,
 			error = 1;
 			goto exit_encrypt;
 		}
-		ciphertext_len = DataLen;
-		for (d = 0; d < D; d++) {
-			/* Read in the data and encrypt this portion */
-			rv = C_EncryptUpdate(hSession,
-			    (CK_BYTE_PTR)Data + (d * 8), 8,
-			    &Result[(k * (8 * D)) + (d * 8)],
-			    &ciphertext_len);
-			if (rv != CKR_OK) {
-				error = 1;
-				goto exit_encrypt;
-			}
+		ciphertext_len = 8;
+
+		/* Read in the data and encrypt this portion */
+		rv = C_EncryptUpdate(hSession,
+		    (CK_BYTE_PTR)Data + (d * 8), 8,
+		    (CK_BYTE_PTR)Result + (k * 8),
+		    &ciphertext_len);
+		if (rv != CKR_OK) {
+			error = 1;
+			goto exit_encrypt;
 		}
+
 		(void) C_DestroyObject(hSession, hKey);
 	}
 	goto exit_session;
@@ -203,4 +236,57 @@ smb_initlmkey(unsigned char *keyin, unsigned char *keyout)
 
 	for (i = 0; i < 8; i++)
 		keyout[i] = (keyout[i] << 1) & 0xfe;
+}
+
+/*
+ * CKM_RC4
+ */
+int
+smb_auth_RC4(uchar_t *Result, int ResultLen,
+	uchar_t *Key, int KeyLen,
+	uchar_t *Data, int DataLen)
+{
+	CK_RV rv;
+	CK_MECHANISM mechanism;
+	CK_OBJECT_HANDLE hKey;
+	CK_SESSION_HANDLE hSession;
+	CK_ULONG ciphertext_len;
+	int error = SMBAUTH_FAILURE;
+
+	/*
+	 * Use SUNW convenience function to initialize the cryptoki
+	 * library, and open a session with a slot that supports
+	 * the mechanism we plan on using.
+	 */
+	mechanism.mechanism = CKM_RC4;
+	mechanism.pParameter = NULL;
+	mechanism.ulParameterLen = 0;
+	rv = SUNW_C_GetMechSession(mechanism.mechanism, &hSession);
+	if (rv != CKR_OK) {
+		return (SMBAUTH_FAILURE);
+	}
+
+	rv = SUNW_C_KeyToObject(hSession, mechanism.mechanism,
+	    Key, KeyLen, &hKey);
+	if (rv != CKR_OK)
+		goto exit_session;
+
+	/* Initialize the encryption operation in the session */
+	rv = C_EncryptInit(hSession, &mechanism, hKey);
+	if (rv != CKR_OK)
+		goto exit_encrypt;
+
+	ciphertext_len = ResultLen;
+	rv = C_EncryptUpdate(hSession,
+	    (CK_BYTE_PTR)Data, DataLen,
+	    (CK_BYTE_PTR)Result, &ciphertext_len);
+	if (rv == CKR_OK)
+		error = 0;
+
+exit_encrypt:
+	(void) C_DestroyObject(hSession, hKey);
+exit_session:
+	(void) C_CloseSession(hSession);
+
+	return (error);
 }

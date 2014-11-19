@@ -21,7 +21,6 @@ connect \- initiate a connection on a socket
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The parameter \fIs\fR is a socket. If it is of type \fBSOCK_DGRAM\fR,
 \fBconnect()\fR specifies the peer with which the socket is to be associated.
@@ -37,12 +36,10 @@ Generally, stream sockets can successfully \fBconnect()\fR only once. Datagram
 sockets can use \fBconnect()\fR multiple times to change their association.
 Datagram sockets can dissolve the association by connecting to a null address.
 .SH RETURN VALUES
-.sp
 .LP
 If the connection or binding succeeds, \fB0\fR is returned. Otherwise,
 \fB\(mi1\fR is returned and sets \fBerrno\fR to indicate the error.
 .SH ERRORS
-.sp
 .LP
 The call fails if:
 .sp
@@ -288,7 +285,6 @@ type \fIs\fR. For example, \fIs\fR is a \fBSOCK_DGRAM\fR socket, while
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -304,8 +300,7 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBclose\fR(2), \fBaccept\fR(3SOCKET), \fBgetsockname\fR(3SOCKET),
-\fBselect\fR(3C), \fBsocket\fR(3SOCKET), \fBsocket.h\fR(3HEAD),
-\fBattributes\fR(5)
+\fBselect\fR(3C), \fBsocket\fR(3SOCKET), \fBsockaddr\fR(3SOCKET),
+\fBsocket.h\fR(3HEAD), \fBattributes\fR(5)

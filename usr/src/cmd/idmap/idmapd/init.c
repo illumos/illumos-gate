@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -119,8 +120,12 @@ reload_gcs()
 	int		num_trustfor = pgcfg->num_trusted_forests;
 	ad_disc_domainsinforest_t *domain_in_forest;
 
-	if (pgcfg->domain_name == NULL) {
-		/* No domain name specified - workgroup mode. */
+	if (pgcfg->use_ads == B_FALSE ||
+	    pgcfg->domain_name == NULL) {
+		/*
+		 * ADS disabled, or no domain name specified.
+		 * Not using adutils. (but still can use lsa)
+		 */
 		new_gcs = NULL;
 		new_num_gcs = 0;
 		goto out;
@@ -248,8 +253,12 @@ reload_dcs(void)
 	int		old_num_dcs = _idmapdstate.num_dcs;
 	idmap_pg_config_t *pgcfg = &_idmapdstate.cfg->pgcfg;
 
-	if (pgcfg->domain_name == NULL) {
-		/* No domain name specified - workgroup mode. */
+	if (pgcfg->use_ads == B_FALSE ||
+	    pgcfg->domain_name == NULL) {
+		/*
+		 * ADS disabled, or no domain name specified.
+		 * Not using adutils. (but still can use lsa)
+		 */
 		new_dcs = NULL;
 		new_num_dcs = 0;
 		goto out;

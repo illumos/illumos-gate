@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -104,6 +105,12 @@ netlogon_auth(char *server, mlsvc_handle_t *netr_handle, DWORD flags)
 	if ((rc = netr_server_req_challenge(netr_handle, netr_info)) == 0) {
 		rc = netr_server_authenticate2(netr_handle, netr_info);
 		if (rc == 0) {
+			/*
+			 * TODO: (later)  When joining a domain using a
+			 * pre-created machine account, should do:
+			 * netr_server_password_set(&netr_handle, netr_info);
+			 * Nexenta issue 11960
+			 */
 			smb_update_netlogon_seqnum();
 			netr_info->flags |= NETR_FLG_VALID;
 
@@ -490,7 +497,7 @@ netr_server_password_set(mlsvc_handle_t *netr_handle, netr_info_t *netr_info)
 
 	arg.servername = (unsigned char *)netr_info->server;
 	arg.account_name = (unsigned char *)account_name;
-	arg.account_type = NETR_WKSTA_TRUST_ACCOUNT_TYPE;
+	arg.sec_chan_type = NETR_WKSTA_TRUST_ACCOUNT_TYPE;
 	arg.hostname = (unsigned char *)netr_info->hostname;
 
 	/*
@@ -509,7 +516,7 @@ netr_server_password_set(mlsvc_handle_t *netr_handle, netr_info_t *netr_info)
 		return (-1);
 	}
 
-	(void) memcpy(&arg.uas_new_password, &new_password,
+	(void) memcpy(&arg.owf_password, &new_password,
 	    NETR_OWF_PASSWORD_SZ);
 
 	if (ndr_rpc_call(netr_handle, opnum, &arg) != 0)
@@ -569,3 +576,8 @@ netr_gen_password(BYTE *session_key, BYTE *old_password, BYTE *new_password)
 	    NETR_DESKEY_LEN, &old_password[8], 8);
 	return (rv);
 }
+
+/*
+ * Todo: need netr_server_password_set2()
+ * used by "unsecure join". (NX 11960)
+ */

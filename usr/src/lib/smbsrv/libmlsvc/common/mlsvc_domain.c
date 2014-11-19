@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <syslog.h>
@@ -65,7 +65,7 @@ static pthread_t smb_dclocator_thr;
 
 static void *smb_ddiscover_service(void *);
 static void smb_ddiscover_main(char *, char *);
-static boolean_t smb_ddiscover_dns(char *, char *, smb_domainex_t *);
+static uint32_t smb_ddiscover_dns(char *, char *, smb_domainex_t *);
 static boolean_t smb_ddiscover_nbt(char *, char *, smb_domainex_t *);
 static boolean_t smb_ddiscover_domain_match(char *, char *, uint32_t);
 static uint32_t smb_ddiscover_qinfo(char *, char *, smb_domainex_t *);
@@ -235,26 +235,27 @@ static void
 smb_ddiscover_main(char *domain, char *server)
 {
 	smb_domainex_t dxi;
-	boolean_t discovered;
+	uint32_t status;
 
 	bzero(&dxi, sizeof (smb_domainex_t));
 
 	if (smb_domain_start_update() != SMB_DOMAIN_SUCCESS)
 		return;
 
-	if (SMB_IS_FQDN(domain))
-		discovered = smb_ddiscover_dns(domain, server, &dxi);
-	else
-		discovered = smb_ddiscover_nbt(domain, server, &dxi);
+	status = smb_ddiscover_dns(domain, server, &dxi);
+	if (status != 0 && !SMB_IS_FQDN(domain)) {
+		if (smb_ddiscover_nbt(domain, server, &dxi))
+			status = 0;
+	}
 
-	if (discovered)
+	if (status == 0)
 		smb_domain_update(&dxi);
 
 	smb_domain_end_update();
 
 	smb_domainex_free(&dxi);
 
-	if (discovered)
+	if (status == 0)
 		smb_domain_save();
 }
 
@@ -262,16 +263,16 @@ smb_ddiscover_main(char *domain, char *server)
  * Discovers a DC for the specified domain via DNS. If a DC is found
  * primary and trusted domains information will be queried.
  */
-static boolean_t
+static uint32_t
 smb_ddiscover_dns(char *domain, char *server, smb_domainex_t *dxi)
 {
 	uint32_t status;
 
 	if (!smb_ads_lookup_msdcs(domain, server, dxi->d_dc, MAXHOSTNAMELEN))
-		return (B_FALSE);
+		return (NT_STATUS_DOMAIN_CONTROLLER_NOT_FOUND);
 
 	status = smb_ddiscover_qinfo(domain, dxi->d_dc, dxi);
-	return (status == NT_STATUS_SUCCESS);
+	return (status);
 }
 
 /*

@@ -20,19 +20,16 @@ bind \- bind a name to a socket
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBbind()\fR function assigns a name to an unnamed socket. When a socket is
 created with \fBsocket\fR(3SOCKET), it exists in a name space (address family)
 but has no name assigned. The \fBbind()\fR function requests that the name
 pointed to by \fIname\fR be assigned to the socket.
 .SH RETURN VALUES
-.sp
 .LP
 Upon successful completion \fB0\fR is returned. Otherwise, \fB\(mi1\fR is
 returned and \fBerrno\fR is set to indicate the error.
 .SH ERRORS
-.sp
 .LP
 The \fBbind()\fR function will fail if:
 .sp
@@ -174,7 +171,6 @@ The inode would reside on a read-only file system.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -190,12 +186,10 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
-\fBunlink\fR(2), \fBsocket\fR(3SOCKET), \fBattributes\fR(5),
-\fBprivileges\fR(5), \fBsocket.h\fR(3HEAD)
+\fBunlink\fR(2), \fBsocket\fR(3SOCKET), \fBsockaddr\fR(3SOCKET),
+\fBattributes\fR(5), \fBprivileges\fR(5), \fBsocket.h\fR(3HEAD)
 .SH NOTES
-.sp
 .LP
 Binding a name in the UNIX domain creates a socket in the file system that must
 be deleted by the caller when it is no longer needed by using \fBunlink\fR(2).

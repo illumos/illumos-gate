@@ -36,7 +36,6 @@ name and address
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 These functions perform translations from node name to address and from address
 to node name in a protocol-independent manner.
@@ -295,7 +294,6 @@ TCP.
 These \fBNI_\fR* flags are defined in <\fBnetdb.h\fR> along with the \fBAI_\fR*
 flags already defined for \fBgetaddrinfo()\fR.
 .SH RETURN VALUES
-.sp
 .LP
 For \fBgetaddrinfo()\fR, if the query is successful, a pointer to a linked list
 of one or more \fBaddrinfo\fR structures is returned by the fourth argument and
@@ -310,7 +308,6 @@ pointer to a string containing an error message appropriate for the \fBEAI_\fR*
 errors is returned. If \fIerrcode\fR is not one of the \fBEAI_\fR* values, a
 pointer to a string indicating an unknown error is returned.
 .SS "Address Ordering"
-.sp
 .LP
 AF_INET6 addresses returned by the fourth argument of \fBgetaddrinfo()\fR are
 ordered according to the algorithm described in \fIRFC 3484, Default Address
@@ -371,7 +368,6 @@ T}
 .TE
 
 .SH ERRORS
-.sp
 .LP
 The following names are the error values returned by \fBgetaddrinfo()\fR and
 are defined in <\fBnetdb.h\fR>:
@@ -484,7 +480,6 @@ System error was returned in \fIerrno\fR.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/inet/hosts\fR\fR
@@ -512,7 +507,6 @@ configuration file for the name service switch
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for description of the following attributes:
 .sp
@@ -532,17 +526,15 @@ Standard	See \fBstandards\fR(5).
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBipaddrsel\fR(1M), \fBgethostbyname\fR(3NSL), \fBgetipnodebyname\fR(3SOCKET),
-\fBhtonl\fR(3SOCKET), \fBinet\fR(3SOCKET), \fBnetdb.h\fR(3HEAD),
-\fBsocket\fR(3SOCKET), \fBhosts\fR(4), \fBnsswitch.conf\fR(4),
-\fBattributes\fR(5), \fBstandards\fR(5), \fBinet6\fR(7P)
+\fBhtonl\fR(3SOCKET), \fBinet\fR(3SOCKET), \fBsockaddr\fR(3SOCKET),
+\fBnetdb.h\fR(3HEAD), \fBsocket\fR(3SOCKET), \fBhosts\fR(4),
+\fBnsswitch.conf\fR(4), \fBattributes\fR(5), \fBstandards\fR(5), \fBinet6\fR(7P)
 .sp
 .LP
 Draves, R. \fIRFC 3484, Default Address Selection for Internet Protocol version
 6 (IPv6)\fR. Network Working Group. February 2003.
 .SH NOTES
-.sp
 .LP
 IPv4-mapped addresses are not recommended.
