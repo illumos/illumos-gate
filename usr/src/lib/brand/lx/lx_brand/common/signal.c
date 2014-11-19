@@ -856,9 +856,9 @@ lx_rt_sigwaitinfo(uintptr_t set, uintptr_t sinfo, uintptr_t setsize)
 		return (-errno);
 
 	if (s_sinfop == NULL)
-		return (rc);
+		return (stol_signo[rc]);
 
-	return ((stol_siginfo(s_sinfop, sinfop) != 0) ? -errno : rc);
+	return ((stol_siginfo(s_sinfop, sinfop) != 0) ? -errno : stol_signo[rc]);
 }
 
 long
@@ -880,14 +880,18 @@ lx_rt_sigtimedwait(uintptr_t set, uintptr_t sinfo, uintptr_t toutp,
 
 	s_sinfop = (sinfop == NULL) ? NULL : &s_sinfo;
 
+	/*
+	 * "If timeout is the NULL pointer, the behavior is unspecified."
+	 * Match what LTP expects.
+	 */
 	if ((rc = sigtimedwait(&s_set, s_sinfop,
 	    (struct timespec *)toutp)) == -1)
-		return (-errno);
+		return (toutp == NULL ? -EINTR : -errno);
 
 	if (s_sinfop == NULL)
-		return (rc);
+		return (stol_signo[rc]);
 
-	return ((stol_siginfo(s_sinfop, sinfop) != 0) ? -errno : rc);
+	return ((stol_siginfo(s_sinfop, sinfop) != 0) ? -errno : stol_signo[rc]);
 }
 
 #if defined(_ILP32)
