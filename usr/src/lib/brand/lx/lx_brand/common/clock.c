@@ -54,6 +54,9 @@ lx_clock_gettime(int clock, struct timespec *tp)
 	if (clock < 0 || clock > LX_CLOCK_MAX)
 		return (-EINVAL);
 
+	if (tp == NULL)
+		return (-EFAULT);
+
 	if (clock_gettime(ltos_clock[clock], &ts) < 0)
 		return (-errno);
 
