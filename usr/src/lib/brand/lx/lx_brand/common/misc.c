@@ -778,9 +778,7 @@ lx_getcpu(unsigned int *cpu, uintptr_t p2, uintptr_t p3)
 {
 	psinfo_t psinfo;
 	int procfd;
-
-	if (cpu == NULL)
-		return (-EFAULT);
+	unsigned int curcpu;
 
 	if ((procfd = open("/native/proc/self/psinfo", O_RDONLY)) == -1)
 		return (-errno);
@@ -788,8 +786,9 @@ lx_getcpu(unsigned int *cpu, uintptr_t p2, uintptr_t p3)
 	if (read(procfd, &psinfo, sizeof (psinfo_t)) == -1)
 		return (-errno);
 
-	*cpu = psinfo.pr_lwp.pr_onpro;
-	return (0);
+	curcpu = psinfo.pr_lwp.pr_onpro;
+
+	return ((uucopy(&curcpu, cpu, sizeof (curcpu)) != 0) ? -errno : 0);
 }
 
 long
