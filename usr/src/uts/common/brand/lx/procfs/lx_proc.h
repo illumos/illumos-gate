@@ -152,6 +152,7 @@ typedef enum lxpr_nodetype {
 	LXPR_PARTITIONS,	/* /proc/partitions	*/
 	LXPR_SELF,		/* /proc/self		*/
 	LXPR_STAT,		/* /proc/stat		*/
+	LXPR_SWAPS,		/* /proc/swaps		*/
 	LXPR_SYSDIR,		/* /proc/sys/		*/
 	LXPR_SYS_FSDIR,		/* /proc/sys/fs/	*/
 	LXPR_SYS_FS_INOTIFYDIR,	/* /proc/sys/fs/inotify	*/

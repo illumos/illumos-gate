@@ -132,6 +132,7 @@ static void lxpr_read_meminfo(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_mounts(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_partitions(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_stat(lxpr_node_t *, lxpr_uiobuf_t *);
+static void lxpr_read_swaps(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_uptime(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_version(lxpr_node_t *, lxpr_uiobuf_t *);
 
@@ -226,6 +227,7 @@ static lxpr_dirent_t lx_procdir[] = {
 	{ LXPR_PARTITIONS,	"partitions" },
 	{ LXPR_SELF,		"self" },
 	{ LXPR_STAT,		"stat" },
+	{ LXPR_SWAPS,		"swaps" },
 	{ LXPR_SYSDIR,		"sys" },
 	{ LXPR_UPTIME,		"uptime" },
 	{ LXPR_VERSION,		"version" }
@@ -490,6 +492,7 @@ static void (*lxpr_read_function[LXPR_NFILES])() = {
 	lxpr_read_partitions,		/* /proc/partitions	*/
 	lxpr_read_invalid,		/* /proc/self		*/
 	lxpr_read_stat,			/* /proc/stat		*/
+	lxpr_read_swaps,		/* /proc/swaps		*/
 	lxpr_read_invalid,		/* /proc/sys		*/
 	lxpr_read_invalid,		/* /proc/sys/fs		*/
 	lxpr_read_invalid,		/* /proc/sys/fs/inotify	*/
@@ -563,6 +566,7 @@ static vnode_t *(*lxpr_lookup_function[LXPR_NFILES])() = {
 	lxpr_lookup_not_a_dir,		/* /proc/partitions	*/
 	lxpr_lookup_not_a_dir,		/* /proc/self		*/
 	lxpr_lookup_not_a_dir,		/* /proc/stat		*/
+	lxpr_lookup_not_a_dir,		/* /proc/swaps		*/
 	lxpr_lookup_sysdir,		/* /proc/sys		*/
 	lxpr_lookup_sys_fsdir,		/* /proc/sys/fs		*/
 	lxpr_lookup_sys_fs_inotifydir,	/* /proc/sys/fs/inotify	*/
@@ -636,6 +640,7 @@ static int (*lxpr_readdir_function[LXPR_NFILES])() = {
 	lxpr_readdir_not_a_dir,		/* /proc/partitions	*/
 	lxpr_readdir_not_a_dir,		/* /proc/self		*/
 	lxpr_readdir_not_a_dir,		/* /proc/stat		*/
+	lxpr_readdir_not_a_dir,		/* /proc/swaps		*/
 	lxpr_readdir_sysdir,		/* /proc/sys		*/
 	lxpr_readdir_sys_fsdir,		/* /proc/sys/fs		*/
 	lxpr_readdir_sys_fs_inotifydir,	/* /proc/sys/fs/inotify	*/
@@ -2196,6 +2201,21 @@ lxpr_read_stat(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 		    boot_time,
 		    forks_cum);
 	}
+}
+
+/*
+ * lxpr_read_swaps():
+ *
+ * We don't support swap files or partitions, so just provide a dummy file with
+ * the necessary header.
+ */
+/* ARGSUSED */
+static void
+lxpr_read_swaps(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
+{
+	lxpr_uiobuf_printf(uiobuf,
+	    "Filename                                "
+	    "Type            Size    Used    Priority\n");
 }
 
 /*
