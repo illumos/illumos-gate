@@ -1421,7 +1421,7 @@ static struct lx_sysent sysents[] = {
 	{"syncfs",	NULL,			NOSYS_NULL,	0}, /* 306 */
 	{"sendmmsg",	NULL,			NOSYS_NULL,	0}, /* 307 */
 	{"setns",	NULL,			NOSYS_NULL,	0}, /* 309 */
-	{"getcpu",	NULL,			NOSYS_NULL,	0}, /* 309 */
+	{"getcpu",	lx_getcpu,		0,		3}, /* 309 */
 	{"process_vm_readv", NULL,		NOSYS_NULL,	0}, /* 310 */
 	{"process_vm_writev", NULL,		NOSYS_NULL,	0}, /* 311 */
 	{"kcmp",	NULL,			NOSYS_NULL,	0}, /* 312 */
@@ -1757,7 +1757,7 @@ static struct lx_sysent sysents[] = {
 	{"tee",		NULL,		NOSYS_NULL,	0},	/* 315 */
 	{"vmsplice",	NULL,		NOSYS_NULL,	0},	/* 316 */
 	{"move_pages",	NULL,		NOSYS_NULL,	0},	/* 317 */
-	{"getcpu",	NULL,		NOSYS_NULL,	0},	/* 318 */
+	{"getcpu",	lx_getcpu,	0,		3},	/* 318 */
 	{"epoll_pwait",	lx_epoll_pwait, 0,		5},	/* 319 */
 	{"utimensat",	lx_utimensat,	0,		4},	/* 320 */
 	{"signalfd",	NULL,		NOSYS_NULL,	0},	/* 321 */
