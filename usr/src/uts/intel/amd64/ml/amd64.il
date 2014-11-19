@@ -64,15 +64,6 @@
 	.end
 
 /
-/ find the low order bit in a word
-/
-	.inline lowbit,4
-	movq	$-1, %rax
-	bsfq	%rdi, %rax
-	incq	%rax
-	.end
-
-/
 / Networking byte order functions (too bad, Intel has the wrong byte order)
 /
 

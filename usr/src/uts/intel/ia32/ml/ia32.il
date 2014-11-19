@@ -66,24 +66,6 @@
 	.end
 
 /
-/ find the low order bit in a word
-/
-	.inline lowbit,4
-	movl	$-1, %eax
-	bsfl	(%esp), %eax
-	incl	%eax
-	.end
-
-/
-/ find the high order bit in a word
-/
-	.inline highbit,4
-	movl	$-1, %eax
-	bsrl	(%esp), %eax
-	incl	%eax
-	.end
-
-/
 / Networking byte order functions (too bad, Intel has the wrong byte order)
 /
 	.inline	htonll,4
