@@ -769,6 +769,29 @@ lx_fchmod(int fildes, mode_t mode)
 	return ((r == -1) ? -errno : r);
 }
 
+/*
+ * We support neither the second argument (NUMA node), nor the third (obsolete
+ * pre-2.6.24 caching functionality which was ultimately broken).
+ */
+long
+lx_getcpu(unsigned int *cpu, uintptr_t p2, uintptr_t p3)
+{
+	psinfo_t psinfo;
+	int procfd;
+
+	if (cpu == NULL)
+		return (-EFAULT);
+
+	if ((procfd = open("/native/proc/self/psinfo", O_RDONLY)) == -1)
+		return (-errno);
+
+	if (read(procfd, &psinfo, sizeof (psinfo_t)) == -1)
+		return (-errno);
+
+	*cpu = psinfo.pr_lwp.pr_onpro;
+	return (0);
+}
+
 long
 lx_getgid(void)
 {
