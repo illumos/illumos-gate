@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH GETUTXENT 3C "Jul 27, 2004"
+.TH GETUTXENT 3C "Nov 21, 2014"
 .SH NAME
 getutxent, getutxid, getutxline, pututxline, setutxent, endutxent, utmpxname,
 getutmp, getutmpx, updwtmp, updwtmpx \- user accounting database functions
@@ -66,7 +66,6 @@ getutmp, getutmpx, updwtmp, updwtmpx \- user accounting database functions
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 These functions provide access to the user accounting database, \fButmpx\fR
 (see \fButmpx\fR(4)). Entries in the database are described by the definitions
@@ -108,13 +107,11 @@ short   e_exit;          /* exit status */
 .in -2
 
 .SS "\fBgetutxent()\fR"
-.sp
 .LP
 The \fBgetutxent()\fR function reads in the next entry from a \fButmpx\fR
 database. If the database is not already open, it opens it. If it reaches the
 end of the database, it fails.
 .SS "\fBgetutxid()\fR"
-.sp
 .LP
 The \fBgetutxid()\fR function searches forward from the current point in the
 \fButmpx\fR database until it finds an entry with a \fBut_type\fR matching
@@ -126,7 +123,6 @@ pointer to the first entry whose type is one of these four and whose
 \fBut_id\fR member matches \fIid\fR->\fBut_id\fR. If the end of database is
 reached without a match, it fails.
 .SS "\fBgetutxline()\fR"
-.sp
 .LP
 The \fBgetutxline()\fR function searches forward from the current point in the
 \fButmpx\fR database until it finds an entry of the type \fBLOGIN_PROCESS\fR or
@@ -134,7 +130,6 @@ The \fBgetutxline()\fR function searches forward from the current point in the
 \fIline\fR->\fBut_line\fR string.  If the end of the database is reached
 without a match, it fails.
 .SS "\fBpututxline()\fR"
-.sp
 .LP
 The \fBpututxline()\fR function writes the supplied \fButmpx\fR structure into
 the \fButmpx\fR database.  It uses \fBgetutxid()\fR to search forward for the
@@ -151,17 +146,14 @@ actual user name associated with the process; the  \fBut_type\fR member must be
 either \fBUSER_PROCESS\fR or \fBDEAD_PROCESS\fR; and the \fBut_line\fR member
 must be a device special file and be writable by the user.
 .SS "\fBsetutxent()\fR"
-.sp
 .LP
 The \fBsetutxent()\fR function resets the input stream to the beginning. This
 should be done before each search for a new entry if it is desired that the
 entire database be examined.
 .SS "\fBendutxent()\fR"
-.sp
 .LP
 The \fBendutxent()\fR function closes the currently open database.
 .SS "\fButmpxname()\fR"
-.sp
 .LP
 The \fButmpxname()\fR function allows the user to change the name of the
 database file examined from \fB/var/adm/utmpx\fR to any other file, most often
@@ -173,7 +165,6 @@ character to allow the name of the corresponding \fButmp\fR file to be easily
 obtainable.; otherwise, an error value of \fB0\fR is returned. The function
 returns \fB1\fR on success.
 .SS "\fBgetutmp()\fR"
-.sp
 .LP
 The \fBgetutmp()\fR function copies the information stored in the members of
 the \fButmpx\fR structure to the corresponding members of the \fButmp\fR
@@ -181,13 +172,11 @@ structure. If the information in any member of  \fButmpx\fR does not fit in the
 corresponding \fButmp\fR member, the data is silently truncated. (See
 \fBgetutent\fR(3C) for  \fButmp\fR structure)
 .SS "\fBgetutmpx()\fR"
-.sp
 .LP
 The \fBgetutmpx()\fR function copies the information stored in the members of
 the \fButmp\fR structure to the corresponding members of the \fButmpx\fR
 structure. (See \fBgetutent\fR(3C) for  \fButmp\fR structure)
 .SS "\fBupdwtmp()\fR"
-.sp
 .LP
 The \fBupdwtmp()\fR function can be used in two ways.
 .sp
@@ -203,12 +192,10 @@ If \fIwfile\fR is a file other than \fB/var/adm/wtmp\fR, it is assumed to be an
 old file in \fButmp\fR format and is updated directly with the \fButmp\fR
 format record supplied by the caller.
 .SS "\fBupdwtmpx()\fR"
-.sp
 .LP
 The \fBupdwtmpx()\fR function writes the contents of the \fButmpx\fR structure
 pointed to by \fIutmpx\fR to the database.
 .SS "\fButmpx\fR structure"
-.sp
 .LP
 The values of the \fBe_termination\fR and \fBe_exit\fR members of the
 \fBut_exit\fR structure are valid only for records of type \fBDEAD_PROCESS\fR.
@@ -235,16 +222,15 @@ The \fBut_session\fR member is not acted upon by the operating system. It is
 used by applications interested in creating \fButmpx\fR entries.
 .sp
 .LP
-For records of type \fBUSER_PROCESS\fR, the \fBnonuser()\fR and
-\fBnonuserx()\fR macros use the value of the \fBut_exit.e_exit\fR member to
-mark \fButmpx\fR entries as real logins (as opposed to multiple xterms started
-by the same user on a window system).  This allows the system utilities that
-display users to obtain an accurate indication of the number of actual users,
-while still permitting each \fBpty\fR to have a \fButmpx\fR record (as most
-applications expect.). The \fBNONROOT_USER\fR macro defines the value that
-\fBlogin\fR places in the \fBut_exit.e_exit\fR member.
+For records of type \fBUSER_PROCESS\fR, the \fBnonuserx()\fR macro uses
+value of the \fBut_exit.e_exit\fR member to mark \fButmpx\fR entries as real
+logins (as opposed to multiple xterms started by the same user on a window
+system). This allows the system utilities that display users to obtain an
+accurate indication of the number of actual users, while still permitting each
+\fBpty\fR to have a \fButmpx\fR record (as most applications expect). The
+\fBNONROOT_USRX\fR macro defines the value that \fBlogin\fR places in the
+\fBut_exit.e_exit\fR member.
 .SH RETURN VALUES
-.sp
 .LP
 Upon successful completion, \fBgetutxent()\fR, \fBgetutxid()\fR, and
 \fBgetutxline()\fR each return a pointer to a \fButmpx\fR structure containing
@@ -267,7 +253,6 @@ The \fBendutxent()\fR and \fBsetutxent()\fR functions return no value.
 A null pointer is returned upon failure to read, whether for permissions or
 having reached the end of file, or upon failure to write.
 .SH USAGE
-.sp
 .LP
 These functions use buffered standard I/O for input, but \fBpututxline()\fR
 uses an unbuffered write to avoid race conditions between processes trying to
@@ -278,7 +263,6 @@ Applications should not access the \fButmpx\fR and \fBwtmpx\fR databases
 directly, but should use these functions to ensure that these databases are
 maintained consistently.
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/var/adm/utmpx\fR\fR
@@ -297,7 +281,6 @@ history of user access and accounting information
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -319,12 +302,10 @@ MT-Level	Unsafe
 The \fBendutxent()\fR, \fBgetutxent()\fR, \fBgetutxid()\fR, \fBgetutxline()\fR,
 \fBpututxline()\fR, and \fBsetutxent()\fR functions are Standard.
 .SH SEE ALSO
-.sp
 .LP
 \fBgetutent\fR(3C), \fBttyslot\fR(3C), \fBwait\fR(3C), \fBwait.h\fR(3HEAD),
 \fButmpx\fR(4), \fBattributes\fR(5), \fBstandards\fR(5)
 .SH NOTES
-.sp
 .LP
 The most current entry is saved in a static structure.  Multiple accesses
 require that it be copied before further accesses are made. On each call to
