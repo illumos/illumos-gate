@@ -127,9 +127,10 @@ extern void setpwent(void);
 #ifdef __PRAGMA_REDEFINE_EXTNAME
 #pragma redefine_extname getpwuid_r __posix_getpwuid_r
 #pragma redefine_extname getpwnam_r __posix_getpwnam_r
-extern int getpwuid_r(uid_t, struct passwd *, char *, int, struct passwd **);
+extern int getpwuid_r(uid_t, struct passwd *, char *,
+    size_t, struct passwd **);
 extern int getpwnam_r(const char *, struct passwd *, char *,
-							int, struct passwd **);
+    size_t, struct passwd **);
 #else  /* __PRAGMA_REDEFINE_EXTNAME */
 
 extern int __posix_getpwuid_r(uid_t, struct passwd *, char *, size_t,
@@ -145,13 +146,13 @@ extern int __posix_getpwnam_r(const char *, struct passwd *, char *,
 #else	/* !__lint */
 
 static int
-getpwuid_r(uid_t __uid, struct passwd *__pwd, char *__buf, int __len,
+getpwuid_r(uid_t __uid, struct passwd *__pwd, char *__buf, size_t __len,
     struct passwd **__res)
 {
 	return (__posix_getpwuid_r(__uid, __pwd, __buf, __len, __res));
 }
 static int
-getpwnam_r(const char *__cb, struct passwd *__pwd, char *__buf, int __len,
+getpwnam_r(const char *__cb, struct passwd *__pwd, char *__buf, size_t __len,
     struct passwd **__res)
 {
 	return (__posix_getpwnam_r(__cb, __pwd, __buf, __len, __res));
