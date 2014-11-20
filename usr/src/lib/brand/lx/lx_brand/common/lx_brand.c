@@ -1553,7 +1553,7 @@ static struct lx_sysent sysents[] = {
 	{"vm86old",	NULL,		NOSYS_OBSOLETE,	0},	/* 113 */
 	{"wait4",	lx_wait4,	0,		4},	/* 114 */
 	{"swapoff",	NULL,		NOSYS_KERNEL,	0},	/* 115 */
-	{"sysinfo",	lx_sysinfo,	0,		1},	/* 116 */
+	{"sysinfo",	lx_sysinfo32,	0,		1},	/* 116 */
 	{"ipc",		lx_ipc,		0,		5},	/* 117 */
 	{"fsync",	lx_fsync,	0,		1},	/* 118 */
 	{"sigreturn",	lx_sigreturn,	0,		1},	/* 119 */
