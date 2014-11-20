@@ -26,6 +26,7 @@
 #include <Python.h>
 #include <zone.h>
 #include <libintl.h>
+#include <idmap.h>
 #include <directory.h>
 
 #ifdef __lint
@@ -62,36 +63,32 @@ py_sid_to_id(PyObject *self, PyObject *args)
 static PyObject *
 py_sid_to_name(PyObject *self, PyObject *args)
 {
-	int isuser;
+	int isuser, err, flag = IDMAP_REQ_FLG_USE_CACHE;
 	char *name, *sid;
-	directory_error_t e;
-	uint64_t classes;
+	idmap_stat stat;
+	uid_t pid;
 	PyObject *ret;
 
 	if (!PyArg_ParseTuple(args, "si", &sid, &isuser))
 		return (NULL);
-	e = directory_name_from_sid(NULL, sid, &name, &classes);
-	if (e != NULL) {
-		directory_error_free(e);
+
+	err = sid_to_id(sid, isuser, &pid);
+	if (err) {
 		PyErr_SetString(PyExc_KeyError, sid);
 		return (NULL);
 	}
+	if (isuser)
+		stat = idmap_getwinnamebyuid(pid, flag, &name, NULL);
+	else
+		stat = idmap_getwinnamebygid(pid, flag, &name, NULL);
+	if (stat < 0) {
+		PyErr_SetString(PyExc_KeyError, sid);
+		return (NULL);
+	}
+
 	if (name == NULL) {
 		PyErr_SetString(PyExc_KeyError, sid);
 		return (NULL);
-	}
-	if (isuser) {
-		if (!(classes & DIRECTORY_CLASS_USER)) {
-			free(name);
-			PyErr_SetString(PyExc_KeyError, sid);
-			return (NULL);
-		}
-	} else {
-		if (!(classes & DIRECTORY_CLASS_GROUP)) {
-			free(name);
-			PyErr_SetString(PyExc_KeyError, sid);
-			return (NULL);
-		}
 	}
 
 	ret = PyString_FromString(name);

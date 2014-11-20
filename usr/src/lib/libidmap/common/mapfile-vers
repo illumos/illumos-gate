@@ -83,6 +83,7 @@ SYMBOL_VERSION SUNWprivate {
 	idmap_getgidbywinname;
 	idmap_getuidbywinname;
 	idmap_getwinnamebygid;
+	idmap_getwinnamebypid;
 	idmap_getwinnamebyuid;
 	idmap_how_clear;
 	idmap_info_free;

@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _SAMLIB_H
@@ -71,9 +72,9 @@ DWORD sam_check_user(char *, char *, char *);
 /*
  * samr_open.c
  */
-int samr_open(char *, char *, char *, DWORD, mlsvc_handle_t *);
-int samr_connect(char *, char *, char *, DWORD, mlsvc_handle_t *);
-int samr_close_handle(mlsvc_handle_t *);
+DWORD samr_open(char *, char *, char *, DWORD, mlsvc_handle_t *);
+DWORD samr_connect(char *, char *, char *, DWORD, mlsvc_handle_t *);
+void samr_close_handle(mlsvc_handle_t *);
 DWORD samr_open_domain(mlsvc_handle_t *, DWORD, struct samr_sid *,
     mlsvc_handle_t *);
 DWORD samr_open_user(mlsvc_handle_t *, DWORD, DWORD, mlsvc_handle_t *);
@@ -112,7 +113,7 @@ union samr_user_info {
 	} info9;
 
 	struct info16 {
-		DWORD unknown;
+		DWORD acct_ctrl;
 	} info16;
 };
 
@@ -120,16 +121,39 @@ union samr_user_info {
 smb_sid_t *samr_lookup_domain(mlsvc_handle_t *, char *);
 DWORD samr_enum_local_domains(mlsvc_handle_t *);
 uint32_t samr_lookup_domain_names(mlsvc_handle_t *, char *, smb_account_t *);
-int samr_query_user_info(mlsvc_handle_t *, WORD, union samr_user_info *);
+DWORD samr_query_user_info(mlsvc_handle_t *, WORD, union samr_user_info *);
 DWORD samr_get_user_pwinfo(mlsvc_handle_t *);
 
-typedef struct oem_password {
-	BYTE data[512];
-	DWORD length;
-} oem_password_t;
+DWORD
+samr_change_password(
+	mlsvc_handle_t *handle,
+	char *server,
+	char *account,
+	struct samr_encr_passwd *newpw,
+	struct samr_encr_hash *oldpw);
 
+DWORD
+samr_set_user_info(
+	mlsvc_handle_t *user_handle,
+	int info_level,
+	void *info_buf);
 
-int sam_oem_password(oem_password_t *, unsigned char *, unsigned char *);
+DWORD
+netr_set_user_control(
+	mlsvc_handle_t *user_handle,
+	DWORD UserAccountControl);
+
+DWORD
+netr_set_user_password(
+	mlsvc_handle_t *user_handle,
+	char *new_pw_clear);
+
+DWORD
+netr_change_password(
+	char *server,
+	char *account,
+	char *old_password,
+	char *new_password);
 
 #ifdef __cplusplus
 }

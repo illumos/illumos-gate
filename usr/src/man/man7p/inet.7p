@@ -19,7 +19,6 @@ inet \- Internet protocol family
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The Internet protocol family implements a collection of protocols which are
 centered around the Internet Protocol ("\fBIP\fR") and which share a common
@@ -29,7 +28,6 @@ interface, where they support the \fBSOCK_STREAM\fR, \fBSOCK_DGRAM\fR, and
 support the connectionless (\fBT_CLTS\fR)  and connection oriented
 (\fBT_COTS_ORD\fR) service types.
 .SH PROTOCOLS
-.sp
 .LP
 The Internet protocol family is comprised of the Internet Protocol
 ("\fBIP\fR"), the Address Resolution Protocol ("\fBARP\fR"), the Internet
@@ -83,7 +81,6 @@ Get interface network mask.
 .RE
 
 .SH ADDRESSING
-.sp
 .LP
 \fBIP\fR addresses are four byte quantities, stored in network byte order.
 \fBIP\fR addresses should be manipulated using the byte order conversion
@@ -155,19 +152,18 @@ restriction by setting the \fBSO_REUSEADDR\fR socket option with
 numbers. These semantics apply when Internet family protocols are used using
 the \fBTLI\fR.
 .SH SEE ALSO
-.sp
 .LP
 \fBioctl\fR(2), \fBbind\fR(3SOCKET), \fBbyteorder\fR(3SOCKET),
 \fBconnect\fR(3SOCKET), \fBgethostbyname\fR(3NSL), \fBgetnetbyname\fR(3SOCKET),
 \fBgetprotobyname\fR(3SOCKET), \fBgetservbyname\fR(3SOCKET),
-\fBgetsockopt\fR(3SOCKET), \fBsend\fR(3SOCKET), \fBsocket\fR(3SOCKET),
-\fBarp\fR(7P), \fBicmp\fR(7P), \fBip\fR(7P), \fBtcp\fR(7P), \fBudp\fR(7P)
+\fBgetsockopt\fR(3SOCKET), \fBsend\fR(3SOCKET), \fBsockaddr\fR(3SOCKET),
+\fBsocket\fR(3SOCKET), \fBarp\fR(7P), \fBicmp\fR(7P), \fBip\fR(7P),
+\fBtcp\fR(7P), \fBudp\fR(7P)
 .sp
 .LP
 Network Information Center, \fIDDN Protocol Handbook\fR (3 vols.), Network
 Information Center, \fBSRI\fR International, Menlo Park, Calif., 1985.
 .SH NOTES
-.sp
 .LP
 The Internet protocol support is subject to change as the Internet protocols
 develop.  Users should not depend on details of the current implementation, but

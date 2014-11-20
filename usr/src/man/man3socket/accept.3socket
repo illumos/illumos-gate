@@ -22,7 +22,6 @@ accept \- accept a connection on a socket
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The argument \fIs\fR is a socket that has been created with
 \fBsocket\fR(3SOCKET) and bound to an address with \fBbind\fR(3SOCKET), and
@@ -103,12 +102,10 @@ an \fBaccept()\fR by selecting or polling it for a read. However, this will
 only indicate when a connect indication is pending; it is still necessary to
 call \fBaccept()\fR.
 .SH RETURN VALUES
-.sp
 .LP
 The \fBaccept()\fR function returns \fB\(mi1\fR on error. If it succeeds, it
 returns a non-negative integer that is a descriptor for the accepted socket.
 .SH ERRORS
-.sp
 .LP
 \fBaccept()\fR and \fBaccept4()\fR will fail if:
 .sp
@@ -239,7 +236,6 @@ bitwise inclusive-OR of \fBSOCK_CLOEXEC\fR, \fBSOCK_NONBLOCK\fR, and
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -255,9 +251,8 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBpoll\fR(2), \fBbind\fR(3SOCKET), \fBconnect\fR(3SOCKET),
-\fBlisten\fR(3SOCKET), \fBselect\fR(3C), \fBsocket.h\fR(3HEAD),
-\fBsocket\fR(3SOCKET), \fBnetconfig\fR(4), \fBattributes\fR(5),
-\fBfcntl.h(3HEAD)\fR, \fBfcntl(2)\fR, \fBstandards(5)\fR
+\fBlisten\fR(3SOCKET), \fBsockaddr\fR(3SOCKET), \fBselect\fR(3C),
+\fBsocket.h\fR(3HEAD), \fBsocket\fR(3SOCKET), \fBnetconfig\fR(4),
+\fBattributes\fR(5), \fBfcntl.h(3HEAD)\fR, \fBfcntl(2)\fR, \fBstandards(5)\fR

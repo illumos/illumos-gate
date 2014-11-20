@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -88,7 +89,8 @@ static void lsar_set_trusted_domains(struct mslsa_EnumTrustedDomainBuf *,
  *
  * On success 0 is returned. Otherwise a -ve error code.
  */
-int lsar_open(char *server, char *domain, char *username,
+int
+lsar_open(char *server, char *domain, char *username,
     mlsvc_handle_t *domain_handle)
 {
 	if (server == NULL || domain == NULL)
@@ -108,11 +110,6 @@ int lsar_open(char *server, char *domain, char *username,
  * not need the double backslash prefix; it is added here. Call this
  * function via lsar_open to ensure that the appropriate connection is
  * in place.
- *
- * I'm not sure if it makes a difference whether we use GENERIC_EXECUTE
- * or STANDARD_RIGHTS_EXECUTE. For a long time I used the standard bit
- * and then I added the generic bit while working on privileges because
- * NT sets that bit. I don't think it matters.
  *
  * Returns 0 on success. Otherwise non-zero to indicate a failure.
  */
@@ -141,15 +138,7 @@ lsar_open_policy2(char *server, char *domain, char *username,
 
 	(void) snprintf((char *)arg.servername, len, "\\\\%s", server);
 	arg.attributes.length = sizeof (struct mslsa_object_attributes);
-
-	if (ndr_rpc_server_os(lsa_handle) == NATIVE_OS_WIN2000) {
-		arg.desiredAccess = MAXIMUM_ALLOWED;
-	} else {
-		arg.desiredAccess = GENERIC_EXECUTE
-		    | STANDARD_RIGHTS_EXECUTE
-		    | POLICY_VIEW_LOCAL_INFORMATION
-		    | POLICY_LOOKUP_NAMES;
-	}
+	arg.desiredAccess = MAXIMUM_ALLOWED;
 
 	if ((rc = ndr_rpc_call(lsa_handle, opnum, &arg)) != 0) {
 		ndr_rpc_unbind(lsa_handle);

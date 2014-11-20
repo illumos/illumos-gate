@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -51,8 +52,6 @@
 #include <smbsrv/smb_sid.h>
 #include <samlib.h>
 
-/*LINTED E_STATIC_UNUSED*/
-static DWORD samr_connect1(char *, char *, char *, DWORD, mlsvc_handle_t *);
 static DWORD samr_connect2(char *, char *, char *, DWORD, mlsvc_handle_t *);
 static DWORD samr_connect4(char *, char *, char *, DWORD, mlsvc_handle_t *);
 static DWORD samr_connect5(char *, char *, char *, DWORD, mlsvc_handle_t *);
@@ -62,9 +61,6 @@ typedef DWORD (*samr_connop_t)(char *, char *, char *, DWORD,
 
 static int samr_setup_user_info(WORD, struct samr_QueryUserInfo *,
     union samr_user_info *);
-static void samr_set_user_unknowns(struct samr_SetUserInfo23 *);
-static void samr_set_user_logon_hours(struct samr_SetUserInfo *);
-static int samr_set_user_password(unsigned char *, BYTE *);
 
 /*
  * samr_open
@@ -78,17 +74,16 @@ static int samr_set_user_password(unsigned char *, BYTE *);
  *
  * On success 0 is returned. Otherwise a -ve error code.
  */
-int
+DWORD
 samr_open(char *server, char *domain, char *username, DWORD access_mask,
     mlsvc_handle_t *samr_handle)
 {
 	smb_domainex_t di;
-	int rc;
+	DWORD status;
 
 	if (server == NULL || domain == NULL) {
 		if (!smb_domain_getinfo(&di))
-			return (-1);
-
+			return (NT_STATUS_INTERNAL_ERROR);
 		server = di.d_dc;
 		domain = di.d_primary.di_nbname;
 	}
@@ -96,8 +91,10 @@ samr_open(char *server, char *domain, char *username, DWORD access_mask,
 	if (username == NULL)
 		username = MLSVC_ANON_USER;
 
-	rc = samr_connect(server, domain, username, access_mask, samr_handle);
-	return (rc);
+	status = samr_connect(server, domain, username, access_mask,
+	    samr_handle);
+
+	return (status);
 }
 
 
@@ -116,7 +113,7 @@ samr_open(char *server, char *domain, char *username, DWORD access_mask,
  * something other than an RPC protocol error.  We don't use the original
  * connect call because all supported servers should support SamrConnect2.
  */
-int
+DWORD
 samr_connect(char *server, char *domain, char *username, DWORD access_mask,
     mlsvc_handle_t *samr_handle)
 {
@@ -130,60 +127,19 @@ samr_connect(char *server, char *domain, char *username, DWORD access_mask,
 	DWORD	status;
 	int	i;
 
-	if (ndr_rpc_bind(samr_handle, server, domain, username, "SAMR") < 0)
-		return (-1);
+	status = ndr_rpc_bind(samr_handle, server, domain, username, "SAMR");
+	if (status)
+		return (status);
 
 	for (i = 0; i < n_op; ++i) {
 		status = (*samr_connop[i])(server, domain, username,
 		    access_mask, samr_handle);
 
 		if (status == NT_STATUS_SUCCESS)
-			return (0);
+			return (status);
 	}
 
 	ndr_rpc_unbind(samr_handle);
-	return (-1);
-}
-
-/*
- * samr_connect1
- *
- * Original SAMR connect call; probably used on Windows NT 3.51.
- * Windows 95 uses this call with the srvmgr tools update.
- * Servername appears to be a dword rather than a string.
- * The first word contains '\' and the second word contains 0x001,
- * (which is probably uninitialized junk: 0x0001005c.
- */
-/*ARGSUSED*/
-static DWORD
-samr_connect1(char *server, char *domain, char *username, DWORD access_mask,
-    mlsvc_handle_t *samr_handle)
-{
-	struct samr_Connect arg;
-	int opnum;
-	DWORD status;
-
-	bzero(&arg, sizeof (struct samr_Connect));
-	opnum = SAMR_OPNUM_Connect;
-	status = NT_STATUS_SUCCESS;
-
-	arg.servername = ndr_rpc_malloc(samr_handle, sizeof (DWORD));
-	*(arg.servername) = 0x0001005c;
-	arg.access_mask = access_mask;
-
-	if (ndr_rpc_call(samr_handle, opnum, &arg) != 0) {
-		status = NT_STATUS_UNSUCCESSFUL;
-	} else if (arg.status != 0) {
-		status = NT_SC_VALUE(arg.status);
-	} else {
-		(void) memcpy(&samr_handle->handle, &arg.handle,
-		    sizeof (ndr_hdid_t));
-
-		if (ndr_is_null_handle(samr_handle))
-			status = NT_STATUS_INVALID_HANDLE;
-	}
-
-	ndr_rpc_release(samr_handle);
 	return (status);
 }
 
@@ -293,23 +249,14 @@ samr_connect5(char *server, char *domain, char *username, DWORD access_mask,
 	int len;
 	int opnum;
 	DWORD status;
-	smb_domainex_t dinfo;
 
 	bzero(&arg, sizeof (struct samr_Connect5));
 	opnum = SAMR_OPNUM_Connect5;
 	status = NT_STATUS_SUCCESS;
 
-	if (!smb_domain_getinfo(&dinfo))
-		return (NT_STATUS_CANT_ACCESS_DOMAIN_INFO);
-
-	len = strlen(server) + strlen(dinfo.d_primary.di_fqname) + 4;
+	len = strlen(server) + 4;
 	arg.servername = ndr_rpc_malloc(samr_handle, len);
-
-	if (*dinfo.d_primary.di_fqname != '\0')
-		(void) snprintf((char *)arg.servername, len, "\\\\%s.%s",
-		    server, dinfo.d_primary.di_fqname);
-	else
-		(void) snprintf((char *)arg.servername, len, "\\\\%s", server);
+	(void) snprintf((char *)arg.servername, len, "\\\\%s", server);
 
 	arg.access_mask = SAM_ENUM_LOCAL_DOMAIN;
 	arg.unknown2_00000001 = 0x00000001;
@@ -342,14 +289,14 @@ samr_connect5(char *server, char *domain, char *username, DWORD access_mask,
  * If the handle being closed is the top level connect handle, we unbind.
  * Then we zero out the handle to invalidate it.
  */
-int
+void
 samr_close_handle(mlsvc_handle_t *samr_handle)
 {
 	struct samr_CloseHandle arg;
 	int opnum;
 
 	if (ndr_is_null_handle(samr_handle))
-		return (-1);
+		return;
 
 	opnum = SAMR_OPNUM_CloseHandle;
 	bzero(&arg, sizeof (struct samr_CloseHandle));
@@ -362,7 +309,6 @@ samr_close_handle(mlsvc_handle_t *samr_handle)
 		ndr_rpc_unbind(samr_handle);
 
 	bzero(samr_handle, sizeof (mlsvc_handle_t));
-	return (0);
 }
 
 /*
@@ -591,8 +537,8 @@ samr_create_user(mlsvc_handle_t *domain_handle, char *username,
 		status = NT_SC_VALUE(arg.status);
 
 		if (status != NT_STATUS_USER_EXISTS) {
-			smb_tracef("SamrCreateUser[%s]: %s", username,
-			    xlate_nt_status(status));
+			smb_tracef("SamrCreateUser[%s]: %s",
+			    username, xlate_nt_status(status));
 		}
 	} else {
 		ndr_inherit_handle(user_handle, domain_handle);
@@ -637,8 +583,7 @@ samr_lookup_domain(mlsvc_handle_t *samr_handle, char *domain_name)
 	    sizeof (samr_handle_t));
 
 	length = smb_wcequiv_strlen(domain_name);
-	if (ndr_rpc_server_os(samr_handle) == NATIVE_OS_WIN2000)
-		length += sizeof (smb_wchar_t);
+	length += sizeof (smb_wchar_t);
 
 	arg.domain_name.length = length;
 	arg.domain_name.allosize = length;
@@ -727,8 +672,7 @@ samr_lookup_domain_names(mlsvc_handle_t *domain_handle, char *name,
 	arg.total = 1;
 
 	length = smb_wcequiv_strlen(name);
-	if (ndr_rpc_server_os(domain_handle) == NATIVE_OS_WIN2000)
-		length += sizeof (smb_wchar_t);
+	length += sizeof (smb_wchar_t);
 
 	arg.name.length = length;
 	arg.name.allosize = length;
@@ -760,18 +704,17 @@ samr_lookup_domain_names(mlsvc_handle_t *domain_handle, char *name,
  * Query information on a specific user. The handle must be a valid
  * user handle obtained via samr_open_user.
  *
- * Returns 0 on success, otherwise returns -ve error code.
+ * Returns 0 on success, otherwise returns NT status code.
  */
-int
+DWORD
 samr_query_user_info(mlsvc_handle_t *user_handle, WORD switch_value,
     union samr_user_info *user_info)
 {
 	struct samr_QueryUserInfo	arg;
 	int	opnum;
-	int	rc;
 
 	if (ndr_is_null_handle(user_handle) || user_info == 0)
-		return (-1);
+		return (NT_STATUS_INTERNAL_ERROR);
 
 	opnum = SAMR_OPNUM_QueryUserInfo;
 	bzero(&arg, sizeof (struct samr_QueryUserInfo));
@@ -780,18 +723,13 @@ samr_query_user_info(mlsvc_handle_t *user_handle, WORD switch_value,
 	    sizeof (samr_handle_t));
 	arg.switch_value = switch_value;
 
-	if (ndr_rpc_call(user_handle, opnum, &arg) != 0) {
-		ndr_rpc_release(user_handle);
-		return (-1);
-	}
+	if (ndr_rpc_call(user_handle, opnum, &arg) != 0)
+		arg.status = RPC_NT_CALL_FAILED;
 
-	if (arg.status != 0)
-		rc = -1;
-	else
-		rc = samr_setup_user_info(switch_value, &arg, user_info);
+	if (arg.status == 0)
+		(void) samr_setup_user_info(switch_value, &arg, user_info);
 
-	ndr_rpc_release(user_handle);
-	return (rc);
+	return (arg.status);
 }
 
 /*
@@ -846,6 +784,8 @@ samr_setup_user_info(WORD switch_value,
 		return (0);
 
 	case 16:
+		user_info->info16.acct_ctrl =
+		    arg->ru.info16.UserAccountControl;
 		return (0);
 
 	default:
@@ -945,6 +885,10 @@ samr_get_user_pwinfo(mlsvc_handle_t *user_handle)
 	return (status);
 }
 
+DECL_FIXUP_STRUCT(samr_SetUserInfo_u);
+DECL_FIXUP_STRUCT(samr_SetUserInfo_s);
+DECL_FIXUP_STRUCT(samr_SetUserInfo);
+
 /*
  * samr_set_user_info
  *
@@ -952,138 +896,129 @@ samr_get_user_pwinfo(mlsvc_handle_t *user_handle)
  * NT status codes observed so far:
  *	NT_STATUS_WRONG_PASSWORD
  */
-/*ARGSUSED*/
 DWORD
-samr_set_user_info(mlsvc_handle_t *user_handle)
+samr_set_user_info(
+	mlsvc_handle_t *user_handle,
+	int info_level,
+	void *info_buf)
 {
-	unsigned char ssn_key[SMBAUTH_SESSION_KEY_SZ];
 	struct samr_SetUserInfo arg;
+	uint16_t usize, tsize;
 	int opnum;
-	DWORD status = 0;
 
 	if (ndr_is_null_handle(user_handle))
-		return (NT_STATUS_INVALID_PARAMETER);
+		return (NT_STATUS_INTERNAL_ERROR);
 
-	if (ndr_rpc_get_ssnkey(user_handle, ssn_key, sizeof (ssn_key)))
-		return (NT_STATUS_INVALID_PARAMETER);
-
-	opnum = SAMR_OPNUM_SetUserInfo;
-	bzero(&arg, sizeof (struct samr_SetUserInfo));
-	(void) memcpy(&arg.user_handle, &user_handle->handle,
-	    sizeof (samr_handle_t));
-
-	arg.info.index = SAMR_SET_USER_INFO_23;
-	arg.info.switch_value = SAMR_SET_USER_INFO_23;
-
-	samr_set_user_unknowns(&arg.info.ru.info23);
-	samr_set_user_logon_hours(&arg);
-
-	if (samr_set_user_password(ssn_key, arg.info.ru.info23.password) < 0)
-		status = NT_STATUS_INTERNAL_ERROR;
-
-	if (ndr_rpc_call(user_handle, opnum, &arg) != 0) {
-		status = NT_STATUS_INVALID_PARAMETER;
-	} else if (arg.status != 0) {
-		ndr_rpc_status(user_handle, opnum, arg.status);
-		status = NT_SC_VALUE(arg.status);
+	/*
+	 * Only support a few levels
+	 * MS-SAMR: UserInternal4Information
+	 */
+	switch (info_level) {
+	case 16: /* samr_SetUserInfo16 */
+		usize = sizeof (struct samr_SetUserInfo16);
+		break;
+	case 21: /* samr_SetUserInfo21 */
+		usize = sizeof (struct samr_SetUserInfo21);
+		break;
+	case 23: /* samr_SetUserInfo23 */
+		usize = sizeof (struct samr_SetUserInfo23);
+		break;
+	case 24: /* samr_SetUserInfo24 */
+		usize = sizeof (struct samr_SetUserInfo24);
+		break;
+	default:
+		return (NT_STATUS_INVALID_LEVEL);
 	}
 
+	/*
+	 * OK, now this gets really ugly, because
+	 * ndrgen doesn't do unions correctly.
+	 */
+	FIXUP_PDU_SIZE(samr_SetUserInfo_u, usize);
+	tsize = usize + (2 * sizeof (WORD));
+	FIXUP_PDU_SIZE(samr_SetUserInfo_s, tsize);
+	tsize += sizeof (ndr_request_hdr_t) + sizeof (DWORD);
+	FIXUP_PDU_SIZE(samr_SetUserInfo, tsize);
+
+	opnum = SAMR_OPNUM_SetUserInfo;
+	bzero(&arg, sizeof (arg));
+	(void) memcpy(&arg.user_handle, &user_handle->handle,
+	    sizeof (samr_handle_t));
+	arg.info.info_level = info_level;
+	arg.info.switch_value = info_level;
+	(void) memcpy(&arg.info.ru, info_buf, usize);
+
+	if (ndr_rpc_call(user_handle, opnum, &arg) != 0)
+		arg.status = RPC_NT_CALL_FAILED;
+	else if (arg.status != 0)
+		ndr_rpc_status(user_handle, opnum, arg.status);
+
 	ndr_rpc_release(user_handle);
-	return (status);
-}
-
-static void
-samr_set_user_unknowns(struct samr_SetUserInfo23 *info)
-{
-	bzero(info, sizeof (struct samr_SetUserInfo23));
-
-	info->sd.length = 0;
-	info->sd.data = 0;
-	info->user_rid = 0;
-	info->group_rid = DOMAIN_GROUP_RID_USERS;
-
-	/*
-	 * The trust account value used here should probably
-	 * match the one used to create the trust account.
-	 */
-	info->acct_info = SAMR_AF_WORKSTATION_TRUST_ACCOUNT;
-	info->flags = 0x09F827FA;
+	return (arg.status);
 }
 
 /*
- * samr_set_user_logon_hours
- *
- * SamrSetUserInfo appears to contain some logon hours information, which
- * looks like a varying, conformant array. The top level contains a value
- * (units), which probably indicates the how to interpret the array. The
- * array definition looks like it contains a maximum size, an initial
- * offset and a bit length (units/8), followed by the bitmap.
- *
- *  (info)
- * +-------+
- * | units |
- * +-------+    (hours)
- * | hours |-->+-----------+
- * +-------+   | max_is    |
- *             +-----------+
- *             | first_is  |
- *             +-----------+
- *             | length_is |
- *             +------------------------+
- *             | bitmap[length_is]      |
- *             +---------+--------------+
- *
- * 10080 minutes/week => 10080/8 = 1260 (0x04EC) bytes.
- * 168 hours/week => 168/8 = 21 (0xA8) bytes.
- * In the netmon examples seen so far, all bits are set to 1, i.e.
- * an array containing 0xff. This is probably the default setting.
- *
- * ndrgen has a problem with complex [size_is] statements (length/8).
- * So, for now, we fake it using two separate components.
+ * Client side wrapper for SamrUnicodeChangePasswordUser2
+ * [MS-SAMR 3.1.5.10.3]
  */
-static void
-samr_set_user_logon_hours(struct samr_SetUserInfo *sui)
+
+DWORD
+samr_change_password(
+	mlsvc_handle_t *handle,
+	char *server,
+	char *account,
+	struct samr_encr_passwd *newpw,
+	struct samr_encr_hash *oldpw)
 {
-	sui->logon_hours.size = SAMR_HOURS_MAX_SIZE;
-	sui->logon_hours.first = 0;
-	sui->logon_hours.length = SAMR_SET_USER_HOURS_SZ;
-	(void) memset(sui->logon_hours.bitmap, 0xFF, SAMR_SET_USER_HOURS_SZ);
+	static struct samr_encr_passwd zero_newpw;
+	static struct samr_encr_hash zero_oldpw;
+	struct samr_ChangePasswordUser2 arg;
+	int opnum = SAMR_OPNUM_ChangePasswordUser2;
+	char *slashserver;
+	int len;
 
-	sui->info.ru.info23.logon_info.units = SAMR_HOURS_PER_WEEK;
-	sui->info.ru.info23.logon_info.hours =
-	    (DWORD)(uintptr_t)sui->logon_hours.bitmap;
-}
+	(void) memset(&arg, 0, sizeof (arg));
 
-/*
- * samr_set_user_password
- *
- * Set the initial password for the user.
- *
- * Returns 0 if everything goes well, -1 if there is trouble generating a
- * key.
- */
-static int
-samr_set_user_password(unsigned char *nt_key, BYTE *oem_password)
-{
-	char hostname[NETBIOS_NAME_SZ];
+	/* Need server name with slashes */
+	len = 2 + strlen(server) + 1;
+	slashserver = ndr_rpc_malloc(handle, len);
+	if (slashserver == NULL)
+		return (NT_STATUS_NO_MEMORY);
+	(void) snprintf(slashserver, len, "\\\\%s", server);
 
-	randomize((char *)oem_password, SAMR_SET_USER_DATA_SZ);
+	arg.servername = ndr_rpc_malloc(handle, sizeof (samr_string_t));
+	if (arg.servername == NULL)
+		return (NT_STATUS_NO_MEMORY);
+	len = smb_wcequiv_strlen(slashserver);
+	if (len < 1)
+		return (NT_STATUS_INVALID_PARAMETER);
+	len += 2;	/* the WC null */
+	arg.servername->length = len;
+	arg.servername->allosize = len;
+	arg.servername->str = (uint8_t *)slashserver;
 
-	/*
-	 * The new password is going to be the NetBIOS name of the system
-	 * in lower case.
-	 */
-	if (smb_getnetbiosname(hostname, sizeof (hostname)) != 0)
-		return (-1);
+	arg.username = ndr_rpc_malloc(handle, sizeof (samr_string_t));
+	if (arg.username == NULL)
+		return (NT_STATUS_NO_MEMORY);
+	len = smb_wcequiv_strlen(account);
+	if (len < 1)
+		return (NT_STATUS_INVALID_PARAMETER);
+	len += 2;	/* the WC null */
+	arg.username->length = len;
+	arg.username->allosize = len;
+	arg.username->str = (uint8_t *)account;
 
-	(void) smb_strlwr(hostname);
+	arg.nt_newpw = newpw;
+	arg.nt_oldpw = oldpw;
 
-	/*
-	 * Generate the OEM password from the hostname and the user session
-	 * key(nt_key).
-	 */
-	/*LINTED E_BAD_PTR_CAST_ALIGN*/
-	(void) sam_oem_password((oem_password_t *)oem_password,
-	    (unsigned char *)hostname, nt_key);
-	return (0);
+	arg.lm_newpw = &zero_newpw;
+	arg.lm_oldpw = &zero_oldpw;
+
+	if (ndr_rpc_call(handle, opnum, &arg) != 0)
+		arg.status = RPC_NT_CALL_FAILED;
+	else if (arg.status != 0)
+		ndr_rpc_status(handle, opnum, arg.status);
+
+	ndr_rpc_release(handle);
+	return (arg.status);
 }

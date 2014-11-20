@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/errno.h>
@@ -60,7 +60,7 @@ mlsvc_init(void)
 		return (rc);
 
 	smb_quota_init();
-	ndr_rpc_init();
+	smbrdr_initialize();
 	srvsvc_initialize();
 	wkssvc_initialize();
 	lsarpc_initialize();
@@ -89,7 +89,6 @@ mlsvc_fini(void)
 	svcctl_finalize();
 	logr_finalize();
 	netdfs_finalize();
-	ndr_rpc_fini();
 	smb_quota_fini();
 }
 

@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <ctype.h>
@@ -325,29 +325,6 @@ trim_whitespace(char *buf)
 	}
 
 	return (buf);
-}
-
-/*
- * randomize
- *
- * Randomize the contents of the specified buffer.
- */
-void
-randomize(char *data, unsigned len)
-{
-	unsigned dwlen = len / 4;
-	unsigned remlen = len % 4;
-	unsigned tmp;
-	unsigned i; /*LINTED E_BAD_PTR_CAST_ALIGN*/
-	unsigned *p = (unsigned *)data;
-
-	for (i = 0; i < dwlen; ++i)
-		*p++ = random();
-
-	if (remlen) {
-		tmp = random();
-		(void) memcpy(p, &tmp, remlen);
-	}
 }
 
 /*

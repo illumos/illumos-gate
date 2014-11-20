@@ -21,12 +21,17 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
  * This module provides the high level interface to the SAM RPC
  * functions.
  */
+
+#include <sys/types.h>
+#include <sys/isa_defs.h>
+#include <sys/byteorder.h>
 
 #include <alloca.h>
 
@@ -36,128 +41,32 @@
 #include <lsalib.h>
 #include <samlib.h>
 
+#ifdef _LITTLE_ENDIAN
+/* little-endian values on little-endian */
+#define	htolel(x)	((uint32_t)(x))
+#define	letohl(x)	((uint32_t)(x))
+#else	/* (BYTE_ORDER == LITTLE_ENDIAN) */
+/* little-endian values on big-endian (swap) */
+#define	letohl(x) 	BSWAP_32(x)
+#define	htolel(x) 	BSWAP_32(x)
+#endif	/* (BYTE_ORDER == LITTLE_ENDIAN) */
+
 /*
  * Valid values for the OEM OWF password encryption.
  */
-#define	SAM_PASSWORD_516	516
 #define	SAM_KEYLEN		16
 
-extern DWORD samr_set_user_info(mlsvc_handle_t *);
-static struct samr_sid *sam_get_domain_sid(mlsvc_handle_t *, char *, char *);
-
-/*
- * sam_create_trust_account
- *
- * Create a trust account for this system.
- *
- *	SAMR_AF_WORKSTATION_TRUST_ACCOUNT: servers and workstations.
- *	SAMR_AF_SERVER_TRUST_ACCOUNT: domain controllers.
- *
- * Returns NT status codes.
- */
-DWORD
-sam_create_trust_account(char *server, char *domain)
-{
-	char account_name[SMB_SAMACCT_MAXLEN];
-	DWORD status;
-
-	if (smb_getsamaccount(account_name, SMB_SAMACCT_MAXLEN) != 0)
-		return (NT_STATUS_INTERNAL_ERROR);
-
-	/*
-	 * The trust account value here should match
-	 * the value that will be used when the user
-	 * information is set on this account.
-	 */
-	status = sam_create_account(server, domain, account_name,
-	    SAMR_AF_WORKSTATION_TRUST_ACCOUNT);
-
-	/*
-	 * Based on network traces, a Windows 2000 client will
-	 * always try to create the computer account first.
-	 * If it existed, then check the user permission to join
-	 * the domain.
-	 */
-
-	if (status == NT_STATUS_USER_EXISTS)
-		status = sam_check_user(server, domain, account_name);
-
-	return (status);
-}
+static void samr_fill_userpw(struct samr_user_password *, const char *);
+static void samr_make_encrypted_password(
+	struct samr_encr_passwd *epw,
+	char *new_pw_clear,
+	uint8_t *crypt_key);
 
 
 /*
- * sam_create_account
- *
- * Create the specified domain account in the SAM database on the
- * domain controller.
- *
- * Account flags:
- *		SAMR_AF_NORMAL_ACCOUNT
- *		SAMR_AF_WORKSTATION_TRUST_ACCOUNT
- *		SAMR_AF_SERVER_TRUST_ACCOUNT
- *
- * Returns NT status codes.
+ * Todo: Implement "unjoin" domain, which would use the
+ * sam_remove_trust_account code below.
  */
-DWORD
-sam_create_account(char *server, char *domain_name, char *account_name,
-    DWORD account_flags)
-{
-	mlsvc_handle_t samr_handle;
-	mlsvc_handle_t domain_handle;
-	mlsvc_handle_t user_handle;
-	union samr_user_info sui;
-	struct samr_sid *sid;
-	DWORD rid;
-	DWORD status;
-	int rc;
-	char user[SMB_USERNAME_MAXLEN];
-
-	smb_ipc_get_user(user, SMB_USERNAME_MAXLEN);
-
-	rc = samr_open(server, domain_name, user, SAM_CONNECT_CREATE_ACCOUNT,
-	    &samr_handle);
-
-	if (rc != 0) {
-		status = NT_STATUS_OPEN_FAILED;
-		smb_tracef("SamCreateAccount[%s\\%s]: %s",
-		    domain_name, account_name, xlate_nt_status(status));
-		return (status);
-	}
-
-	sid = sam_get_domain_sid(&samr_handle, server, domain_name);
-
-	status = samr_open_domain(&samr_handle,
-	    SAM_DOMAIN_CREATE_ACCOUNT, sid, &domain_handle);
-
-	if (status == NT_STATUS_SUCCESS) {
-		status = samr_create_user(&domain_handle, account_name,
-		    account_flags, &rid, &user_handle);
-
-		if (status == NT_STATUS_SUCCESS) {
-			(void) samr_query_user_info(&user_handle,
-			    SAMR_QUERY_USER_CONTROL_INFO, &sui);
-
-			(void) samr_get_user_pwinfo(&user_handle);
-			(void) samr_set_user_info(&user_handle);
-			(void) samr_close_handle(&user_handle);
-		} else if (status != NT_STATUS_USER_EXISTS) {
-			smb_tracef("SamCreateAccount[%s]: %s",
-			    account_name, xlate_nt_status(status));
-		}
-
-		(void) samr_close_handle(&domain_handle);
-	} else {
-		smb_tracef("SamCreateAccount[%s]: open domain failed",
-		    account_name);
-		status = (NT_STATUS_CANT_ACCESS_DOMAIN_INFO);
-	}
-
-	(void) samr_close_handle(&samr_handle);
-	free(sid);
-	return (status);
-}
-
 
 /*
  * sam_remove_trust_account
@@ -194,7 +103,7 @@ sam_delete_account(char *server, char *domain_name, char *account_name)
 	mlsvc_handle_t domain_handle;
 	mlsvc_handle_t user_handle;
 	smb_account_t ainfo;
-	struct samr_sid *sid;
+	smb_sid_t *sid;
 	DWORD access_mask;
 	DWORD status;
 	int rc;
@@ -204,92 +113,43 @@ sam_delete_account(char *server, char *domain_name, char *account_name)
 
 	rc = samr_open(server, domain_name, user, SAM_LOOKUP_INFORMATION,
 	    &samr_handle);
-
 	if (rc != 0)
-		return (NT_STATUS_OPEN_FAILED);
+		return (NT_STATUS_CANT_ACCESS_DOMAIN_INFO);
 
-	sid = sam_get_domain_sid(&samr_handle, server, domain_name);
-	status = samr_open_domain(&samr_handle, SAM_LOOKUP_INFORMATION, sid,
-	    &domain_handle);
-	free(sid);
-	if (status != NT_STATUS_SUCCESS) {
-		(void) samr_close_handle(&samr_handle);
-		return (status);
+	sid = samr_lookup_domain(&samr_handle, domain_name);
+	if (sid == NULL) {
+		status = NT_STATUS_CANT_ACCESS_DOMAIN_INFO;
+		goto out_samr_hdl;
 	}
+
+	status = samr_open_domain(&samr_handle, SAM_LOOKUP_INFORMATION,
+	    (struct samr_sid *)sid, &domain_handle);
+	if (status != NT_STATUS_SUCCESS)
+		goto out_sid_ptr;
 
 	status = samr_lookup_domain_names(&domain_handle, account_name, &ainfo);
-	if (status == NT_STATUS_SUCCESS) {
-		access_mask = STANDARD_RIGHTS_EXECUTE | DELETE;
-		status = samr_open_user(&domain_handle, access_mask,
-		    ainfo.a_rid, &user_handle);
-		if (status == NT_STATUS_SUCCESS) {
-			if (samr_delete_user(&user_handle) != 0)
-				(void) samr_close_handle(&user_handle);
-		}
-	}
+	if (status != NT_STATUS_SUCCESS)
+		goto out_dom_hdl;
 
+	access_mask = STANDARD_RIGHTS_EXECUTE | DELETE;
+	status = samr_open_user(&domain_handle, access_mask,
+	    ainfo.a_rid, &user_handle);
+	if (status != NT_STATUS_SUCCESS)
+		goto out_dom_hdl;
+
+	status = samr_delete_user(&user_handle);
+
+	(void) samr_close_handle(&user_handle);
+out_dom_hdl:
 	(void) samr_close_handle(&domain_handle);
+out_sid_ptr:
+	free(sid);
+out_samr_hdl:
 	(void) samr_close_handle(&samr_handle);
+
 	return (status);
 }
 
-/*
- * sam_check_user
- *
- * Check to see if user have permission to access computer account.
- * The user being checked is the specified user for joining the Solaris
- * host to the domain.
- */
-DWORD
-sam_check_user(char *server, char *domain_name, char *account_name)
-{
-	mlsvc_handle_t samr_handle;
-	mlsvc_handle_t domain_handle;
-	mlsvc_handle_t user_handle;
-	smb_account_t ainfo;
-	struct samr_sid *sid;
-	DWORD access_mask;
-	DWORD status;
-	int rc;
-	char user[SMB_USERNAME_MAXLEN];
-
-	smb_ipc_get_user(user, SMB_USERNAME_MAXLEN);
-
-	rc = samr_open(server, domain_name, user, SAM_LOOKUP_INFORMATION,
-	    &samr_handle);
-
-	if (rc != 0)
-		return (NT_STATUS_OPEN_FAILED);
-
-	sid = sam_get_domain_sid(&samr_handle, server, domain_name);
-	status = samr_open_domain(&samr_handle, SAM_LOOKUP_INFORMATION, sid,
-	    &domain_handle);
-	free(sid);
-	if (status != NT_STATUS_SUCCESS) {
-		(void) samr_close_handle(&samr_handle);
-		return (status);
-	}
-
-	status = samr_lookup_domain_names(&domain_handle, account_name, &ainfo);
-	if (status == NT_STATUS_SUCCESS) {
-		/*
-		 * Win2000 client uses this access mask.  The
-		 * following SAMR user specific rights bits are
-		 * set: set password, set attributes, and get
-		 * attributes.
-		 */
-
-		access_mask = 0xb0;
-		status = samr_open_user(&domain_handle,
-		    access_mask, ainfo.a_rid, &user_handle);
-		if (status == NT_STATUS_SUCCESS)
-			(void) samr_close_handle(&user_handle);
-	}
-
-	(void) samr_close_handle(&domain_handle);
-	(void) samr_close_handle(&samr_handle);
-	return (status);
-}
 
 /*
  * sam_lookup_name
@@ -372,54 +232,169 @@ sam_get_local_domains(char *server, char *domain_name)
 }
 
 /*
- * sam_oem_password
- *
- * Generate an OEM password.
+ * Set the account control flags on some account for which we
+ * have already opened a SAM handle with appropriate rights,
+ * passed in here as sam_handle, along with the new flags.
  */
-int
-sam_oem_password(oem_password_t *oem_password, unsigned char *new_password,
-    unsigned char *old_password)
+DWORD
+netr_set_user_control(
+	mlsvc_handle_t *user_handle,
+	DWORD UserAccountControl)
 {
-	smb_wchar_t *unicode_password;
-	int length;
+	struct samr_SetUserInfo16 info;
 
-#ifdef PBSHORTCUT
-	assert(sizeof (oem_password_t) == SAM_PASSWORD_516);
-#endif /* PBSHORTCUT */
-
-	length = strlen((char const *)new_password);
-	unicode_password = alloca((length + 1) * sizeof (smb_wchar_t));
-
-	length = smb_auth_qnd_unicode((unsigned short *)unicode_password,
-	    (char *)new_password, length);
-	oem_password->length = length;
-
-	(void) memcpy(&oem_password->data[512 - length],
-	    unicode_password, length);
-
-	rand_hash((unsigned char *)oem_password, sizeof (oem_password_t),
-	    old_password, SAM_KEYLEN);
-
-	return (0);
+	info.UserAccountControl = UserAccountControl;
+	return (samr_set_user_info(user_handle, 16, &info));
 }
 
-static struct samr_sid *
-sam_get_domain_sid(mlsvc_handle_t *samr_handle, char *server, char *domain_name)
+/*
+ * Set the password on some account, for which we have already
+ * opened a SAM handle with appropriate rights, passed in here
+ * as sam_handle, along with the new password as cleartext.
+ *
+ * This builds a struct SAMPR_USER_INTERNAL5_INFORMATION [MS-SAMR]
+ * containing the new password, encrypted with our session key.
+ */
+DWORD
+netr_set_user_password(
+	mlsvc_handle_t *user_handle,
+	char *new_pw_clear)
 {
-	smb_sid_t *sid = NULL;
-	smb_domainex_t domain;
+	unsigned char ssn_key[SMBAUTH_HASH_SZ];
+	struct samr_SetUserInfo24 info;
 
-	if (ndr_rpc_server_os(samr_handle) == NATIVE_OS_WIN2000) {
-		if (!smb_domain_getinfo(&domain)) {
-			if (lsa_query_account_domain_info(server, domain_name,
-			    &domain.d_primary) != NT_STATUS_SUCCESS)
-				return (NULL);
-		}
+	if (ndr_rpc_get_ssnkey(user_handle, ssn_key, SMBAUTH_HASH_SZ))
+		return (NT_STATUS_INTERNAL_ERROR);
 
-		sid = smb_sid_fromstr(domain.d_primary.di_sid);
-	} else {
-		sid = samr_lookup_domain(samr_handle, domain_name);
-	}
+	(void) memset(&info, 0, sizeof (info));
+	samr_make_encrypted_password(&info.encr_pw, new_pw_clear, ssn_key);
 
-	return ((struct samr_sid *)sid);
+	/* Rather not leave the session key around. */
+	(void) memset(ssn_key, 0, sizeof (ssn_key));
+
+	return (samr_set_user_info(user_handle, 24, &info));
+}
+
+/*
+ * Change a password like NetUserChangePassword(),
+ * but where we already know which AD server to use,
+ * so we don't request the domain name or search for
+ * an AD server for that domain here.
+ */
+DWORD
+netr_change_password(
+	char *server,
+	char *account,
+	char *old_pw_clear,
+	char *new_pw_clear)
+{
+	struct samr_encr_passwd epw;
+	struct samr_encr_hash old_hash;
+	uint8_t old_nt_hash[SAMR_PWHASH_LEN];
+	uint8_t new_nt_hash[SAMR_PWHASH_LEN];
+	mlsvc_handle_t handle;
+	DWORD rc;
+
+	/*
+	 * Create an RPC handle to this server, bound to SAMR.
+	 */
+	rc = ndr_rpc_bind(&handle, server, "", "", "SAMR");
+	if (rc)
+		return (RPC_NT_SERVER_UNAVAILABLE);
+
+	/*
+	 * Encrypt the new p/w (plus random filler) with the
+	 * old password, and send the old p/w encrypted with
+	 * the new p/w hash to prove we know the old p/w.
+	 * Details:  [MS-SAMR 3.1.5.10.3]
+	 */
+	(void) smb_auth_ntlm_hash(old_pw_clear, old_nt_hash);
+	(void) smb_auth_ntlm_hash(new_pw_clear, new_nt_hash);
+	samr_make_encrypted_password(&epw, new_pw_clear, old_nt_hash);
+
+	(void) smb_auth_DES(old_hash.data, SAMR_PWHASH_LEN,
+	    new_nt_hash, 14, /* key */
+	    old_nt_hash, SAMR_PWHASH_LEN);
+
+	/*
+	 * Finally, ready to try the OtW call.
+	 */
+	rc = samr_change_password(
+	    &handle, server, account,
+	    &epw, &old_hash);
+
+	/* Avoid leaving cleartext (or equivalent) around. */
+	(void) memset(old_nt_hash, 0, sizeof (old_nt_hash));
+	(void) memset(new_nt_hash, 0, sizeof (new_nt_hash));
+
+	ndr_rpc_unbind(&handle);
+	return (rc);
+}
+
+/*
+ * Build an encrypted password, as used by samr_set_user_info
+ * and samr_change_password.  Note: This builds the unencrypted
+ * form in one union arm, and encrypts it in the other union arm.
+ */
+void
+samr_make_encrypted_password(
+	struct samr_encr_passwd *epw,
+	char *new_pw_clear,
+	uint8_t *crypt_key)
+{
+	union {
+		struct samr_user_password u;
+		struct samr_encr_passwd e;
+	} pwu;
+
+	samr_fill_userpw(&pwu.u, new_pw_clear);
+
+	(void) smb_auth_RC4(pwu.e.data, sizeof (pwu.e.data),
+	    crypt_key, SAMR_PWHASH_LEN,
+	    pwu.e.data, sizeof (pwu.e.data));
+
+	(void) memcpy(epw->data, pwu.e.data, sizeof (pwu.e.data));
+	(void) memset(pwu.e.data, 0, sizeof (pwu.e.data));
+}
+
+/*
+ * This fills in a samr_user_password (a.k.a. SAMPR_USER_PASSWORD
+ * in the MS Net API) which has the new password "right justified"
+ * in the buffer, and any space on the left filled with random junk
+ * to improve the quality of the encryption that is subsequently
+ * applied to this buffer before it goes over the wire.
+ */
+static void
+samr_fill_userpw(struct samr_user_password *upw, const char *new_pw)
+{
+	smb_wchar_t *pbuf;
+	uint32_t pwlen_bytes;
+	size_t pwlen_wchars;
+
+	/*
+	 * First fill the whole buffer with the random junk.
+	 * (Slightly less random when debugging:)
+	 */
+#ifdef DEBUG
+	(void) memset(upw->Buffer, '*', sizeof (upw->Buffer));
+#else
+	randomize((char *)upw->Buffer, sizeof (upw->Buffer));
+#endif
+
+	/*
+	 * Now overwrite the last pwlen characters of
+	 * that buffer with the password, and set the
+	 * length field so the receiving end knows where
+	 * the junk ends and the real password starts.
+	 */
+	pwlen_wchars = smb_wcequiv_strlen(new_pw) / 2;
+	if (pwlen_wchars > SAMR_USER_PWLEN)
+		pwlen_wchars = SAMR_USER_PWLEN;
+	pwlen_bytes = pwlen_wchars * 2;
+
+	pbuf = &upw->Buffer[SAMR_USER_PWLEN - pwlen_wchars];
+	(void) smb_mbstowcs(pbuf, new_pw, pwlen_wchars);
+
+	/* Yes, this is in Bytes, not wchars. */
+	upw->Length = htolel(pwlen_bytes);
 }

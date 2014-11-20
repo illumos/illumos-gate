@@ -74,6 +74,7 @@ SYMBOL_VERSION SUNWprivate {
 	smb_acl_sort;
 	smb_acl_to_zfs;
 	smb_auth_DES;
+	smb_auth_RC4;
 	smb_auth_gen_session_key;
 	smb_auth_hmac_md5;
 	smb_auth_ntlm_hash;
@@ -97,6 +98,7 @@ SYMBOL_VERSION SUNWprivate {
 	smb_common_decode;
 	smb_common_encode;
 	smb_config_get;
+	smb_config_get_ads_enable;
 	smb_config_get_execinfo;
 	smb_config_get_fg_flag;
 	smb_config_get_localsid;
@@ -175,6 +177,7 @@ SYMBOL_VERSION SUNWprivate {
 	smb_fsacl_free;
 	smb_fssd_init;
 	smb_fssd_term;
+	smb_gen_random_passwd;
 	smb_get_dcinfo;
 	smb_get_nameservers;
 	smb_get_txid;

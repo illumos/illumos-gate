@@ -36,7 +36,6 @@ getifaddrs, freeifaddrs \- get interface addresses
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBgetifaddrs\fR() function is used to obtain the list of network
 interfaces on the local machine.  A reference to a linked list of \fBifaddrs\fR
@@ -106,20 +105,17 @@ The memory used by \fBgetifaddrs\fR() to back the list is dynamically allocated.
 It should be freed using \fBfreeifaddrs\fR().
 
 .SH RETURN VALUES
-.sp
 .LP
 If successful, \fBgetifaddrs\fR() returns the value \fB0\fR; otherwise it
 returns \fB\(mi1\fR and sets \fIerrno\fR to indicate the error.
 
 .SH ERRORS
-.sp
 .LP
 The \fBgetifaddrs\fR() function may fail and set \fIerrno\fR for any of the
 errors specified for the library routines \fBioctl\fR(2),
 \fBsocket\fR(3SOCKET), and \fBmalloc\fR(3C).
 
 .SH ATTRIBUTES
-.sp
 .TS
 box;
 c | c
@@ -132,20 +128,17 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBipadm\fR(1M), \fBifconfig\fR(1M), \fBioctl\fR(2), \fBmalloc\fR(3C),
-\fBsocket\fR(3SOCKET), \fBsocket.h\fR(3HEAD), \fBif_tcp\fR(7P),
-\fBattributes\fR(5)
+\fBsocket\fR(3SOCKET), \fBsockaddr\fR(3SOCKET), \fBsocket.h\fR(3HEAD),
+\fBif_tcp\fR(7P), \fBattributes\fR(5)
 
 .SH NOTES
-.sp
 .LP
 On an illumos system, this function lists only interfaces with the \fBIFF_UP\fR
 flag set; see \fBif_tcp\fR(7P) and \fBifconfig\fR(1M) for more information.
 
 .SH BUGS
-.sp
 .LP
 At present, this function only lists addresses from the \fBAF_INET\fR and
 \fBAF_INET6\fR families.  Other families, such as \fBAF_LINK\fR, are not

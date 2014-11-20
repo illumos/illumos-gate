@@ -14,7 +14,6 @@ inet6 \- Internet protocol family for Internet Protocol version 6
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBinet6\fR protocol family implements a collection of protocols that are
 centered around the Internet Protocol version 6 (\fBIPv6\fR) and share a common
@@ -24,7 +23,6 @@ and \fBSOCK_RAW\fR socket types, or the Transport Level Interface (\fBTLI\fR),
 where it supports  the connectionless (\fBT_CLTS\fR) and connection oriented
 (\fBT_COTS_ORD\fR) service types.
 .SH PROTOCOLS
-.sp
 .LP
 The Internet protocol family for \fBIPv6\fR included the Internet Protocol
 Version 6 (\fBIPv6\fR), the Neighbor Discovery Protocol (\fBNDP\fR), the
@@ -162,7 +160,6 @@ The last 64 bits are the interface \fBID\fR. This will most often be the
 hardware address of the link in \fBIEEE EUI-64\fR format.
 .RE
 .SH ADDRESSING
-.sp
 .LP
 \fBIPv6\fR addresses are sixteen byte quantities, stored in network byte order.
 The socket \fBAPI\fR uses the \fBsockaddr_in6\fR structure when passing
@@ -242,7 +239,6 @@ In addition, the same port may be bound by two separate sockets if one is an
 numbers. These semantics apply when Internet family protocols are used using
 the \fBTLI\fR.
 .SH SOURCE ADDRESS SELECTION
-.sp
 .LP
 IPv6 source address selection is done on a per destination basis, and utilizes
 a list of rules from which the best source address is selected from candidate
@@ -373,14 +369,13 @@ If SB ^ D < SA ^ D, then prefer SB.
 Applications can override this algorithm by calling  \fBbind\fR(3SOCKET) and
 specifying an address.
 .SH SEE ALSO
-.sp
 .LP
 \fBioctl\fR(2), \fBbind\fR(3SOCKET), \fBconnect\fR(3SOCKET),
 \fBgetipnodebyaddr\fR(3SOCKET),
 \fBgetipnodebyname\fR(3SOCKET),\fBgetprotobyname\fR(3SOCKET),
 \fBgetservbyname\fR(3SOCKET), \fBgetsockopt\fR(3SOCKET), \fBinet\fR(3SOCKET),
-\fBsend\fR(3SOCKET), \fBicmp6\fR(7P), \fBip6\fR(7P), \fBtcp\fR(7P),
-\fBudp\fR(7P)
+\fBsend\fR(3SOCKET), \fBsockaddr\fR(3SOCKET),
+\fBicmp6\fR(7P), \fBip6\fR(7P), \fBtcp\fR(7P), \fBudp\fR(7P)
 .sp
 .LP
 Conta, A. and Deering, S., \fIInternet Control Message Protocol (ICMPv6) for
@@ -403,7 +398,6 @@ Society.  February 2003.
 Narten, T., and Draves, R. \fIRFC 3041, Privacy Extensions for Stateless
 Address Autoconfiguration in IPv6.\fR The Internet Society.  January 2001.
 .SH NOTES
-.sp
 .LP
 The \fBIPv6\fR support is subject to change as the Internet protocols develop.
 Users should not depend on details of the current implementation, but rather

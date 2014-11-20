@@ -21,7 +21,6 @@ sendto \- send a message on a socket
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBsendto()\fR function sends a message through a connection-mode or
 connectionless-mode socket.  If the socket is connectionless-mode, the message
@@ -53,7 +52,6 @@ descriptor does have \fBO_NONBLOCK\fR set, \fBsendto()\fR will fail.
 The socket in use may require the process to have appropriate privileges to use
 the \fBsendto()\fR function.
 .SH PARAMETERS
-.sp
 .LP
 The function takes the following arguments:
 .sp
@@ -133,17 +131,14 @@ Specifies the length of the \fBsockaddr\fR structure pointed to by the
 .RE
 
 .SH USAGE
-.sp
 .LP
 The \fBselect\fR(3C) and \fBpoll\fR(2) functions can be used to determine when
 it is possible to send more data.
 .SH RETURN VALUES
-.sp
 .LP
 Upon successful completion, \fBsendto()\fR returns the number of bytes sent.
 Otherwise, \fB-1\fR is returned and \fBerrno\fR is set to indicate the error.
 .SH ERRORS
-.sp
 .LP
 The \fBsendto()\fR function will fail if:
 .sp
@@ -427,7 +422,6 @@ length exceeds \fIPATH_MAX\fR.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -445,9 +439,9 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
-\fBpoll\fR(2), \fBgetsockopt\fR(3XNET), \fBrecv\fR(3XNET),
+\fBpoll\fR(2), \fBsockaddr\fR(3SOCKET),
+\fBgetsockopt\fR(3XNET), \fBrecv\fR(3XNET),
 \fBrecvfrom\fR(3XNET), \fBrecvmsg\fR(3XNET), \fBselect\fR(3C),
 \fBsend\fR(3XNET), \fBsendmsg\fR(3XNET), \fBsetsockopt\fR(3XNET),
 \fBshutdown\fR(3XNET), \fBsocket\fR(3XNET), \fBattributes\fR(5),
