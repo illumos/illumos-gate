@@ -31,17 +31,18 @@
 #include <sys/time.h>
 
 struct lx_sysinfo {
-	int32_t si_uptime;	/* Seconds since boot */
-	uint32_t si_loads[3];	/* 1, 5, and 15 minute avg runq length */
-	uint32_t si_totalram;	/* Total memory size */
-	uint32_t si_freeram;	/* Available memory */
-	uint32_t si_sharedram;	/* Shared memory */
-	uint32_t si_bufferram;	/* Buffer memory */
-	uint32_t si_totalswap;	/* Total swap space */
-	uint32_t si_freeswap;	/* Avail swap space */
+	int64_t si_uptime;	/* Seconds since boot */
+	uint64_t si_loads[3];	/* 1, 5, and 15 minute avg runq length */
+	uint64_t si_totalram;	/* Total memory size */
+	uint64_t si_freeram;	/* Available memory */
+	uint64_t si_sharedram;	/* Shared memory */
+	uint64_t si_bufferram;	/* Buffer memory */
+	uint64_t si_totalswap;	/* Total swap space */
+	uint64_t si_freeswap;	/* Avail swap space */
 	uint16_t si_procs;	/* Process count */
-	uint32_t si_totalhigh;	/* High memory size */
-	uint32_t si_freehigh;	/* Avail high memory */
+	uint16_t si_pad;	/* Padding */
+	uint64_t si_totalhigh;	/* High memory size */
+	uint64_t si_freehigh;	/* Avail high memory */
 	uint32_t si_mem_unit;	/* Unit size of memory fields */
 };
 
@@ -56,14 +57,9 @@ lx_sysinfo(struct lx_sysinfo *sip)
 
 	si.si_uptime = gethrestime_sec() - zone->zone_boot_time;
 
-	/*
-	 * We scale down the load in avenrun to allow larger load averages
-	 * to fit in 32 bits.  Linux doesn't, so we remove the scaling
-	 * here.
-	 */
-	si.si_loads[0] = zone->zone_avenrun[0] << FSHIFT;
-	si.si_loads[1] = zone->zone_avenrun[1] << FSHIFT;
-	si.si_loads[2] = zone->zone_avenrun[2] << FSHIFT;
+	si.si_loads[0] = zone->zone_hp_avenrun[0];
+	si.si_loads[1] = zone->zone_hp_avenrun[1];
+	si.si_loads[2] = zone->zone_hp_avenrun[2];
 
 	/*
 	 * In linux each thread looks like a process, so we conflate the
