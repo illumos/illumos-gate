@@ -270,30 +270,6 @@ lx_initlwp(klwp_t *lwp)
 		/* The child inherits the 2 fsbase values from the parent */
 		lwpd->br_lx_fsbase = plwpd->br_lx_fsbase;
 		lwpd->br_ntv_fsbase = plwpd->br_ntv_fsbase;
-
-#if defined(__amd64)
-		pcb_t *pcb = &lwp->lwp_pcb;
-		DTRACE_PROBE2(brand__lx__initlwp,
-		    uintptr_t, pcb->pcb_fsbase,
-		    uintptr_t, rdmsr(MSR_AMD_FSBASE));
-#ifdef DEBUG
-		ulong_t curr_base = rdmsr(MSR_AMD_FSBASE);
-
-		if (curr_base != 0 && lwpd->br_ntv_fsbase != 0 &&
-		    lwpd->br_ntv_fsbase != curr_base) {
-			DTRACE_PROBE2(brand__lx__initlwp__ntv__fsb,
-			    uintptr_t, lwpd->br_lx_fsbase,
-			    uintptr_t, curr_base);
-		}
-
-		if (pcb->pcb_fsbase != 0 && lwpd->br_ntv_fsbase != 0 &&
-		    lwpd->br_ntv_fsbase != pcb->pcb_fsbase) {
-			DTRACE_PROBE2(brand__lx__initlwp__ntv__pcb,
-			    uintptr_t, lwpd->br_ntv_fsbase,
-			    uintptr_t, pcb->pcb_fsbase);
-		}
-#endif
-#endif
 	} else {
 		/*
 		 * Oddball case: the parent thread isn't a Linux process.
@@ -357,6 +333,11 @@ lx_save(klwp_t *t)
 
 /*
  * When switching a Linux process on the CPU, set its GDT entries.
+ *
+ * For 64-bit code we don't have to worry about explicitly setting the
+ * %fsbase via wrmsr(MSR_AMD_FSBASE) here. Instead, that should happen
+ * automatically in update_sregs if we are executing in user-land. If this
+ * is the case then pcb_rupdate should be set.
  */
 static void
 lx_restore(klwp_t *t)

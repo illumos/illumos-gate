@@ -45,7 +45,10 @@
 long
 lx_arch_prctl(int code, ulong_t addr)
 {
+#if defined(__amd64)
 	struct lx_lwp_data *llwp = ttolxlwp(curthread);
+	pcb_t *pcb;
+
 
 	/* We currently only support [g|s]et_fs */
 	switch (code) {
@@ -56,12 +59,19 @@ lx_arch_prctl(int code, ulong_t addr)
 		break;
 	case LX_ARCH_SET_FS:
 		llwp->br_lx_fsbase = addr;
-		/* save current native libc fsbase */
-		llwp->br_ntv_fsbase = rdmsr(MSR_AMD_FSBASE);
+		/*
+		 * Save current native libc fsbase. Don't use rdmsr since the
+		 * value might get changed before we get to this code. We
+		 * use the value from the pcb which the native libc should
+		 * have already setup via syslwp_private.
+		 */
+		pcb = (pcb_t *)&curthread->t_lwp->lwp_pcb;
+		llwp->br_ntv_fsbase = pcb->pcb_fsbase;
 		break;
 	default:
 		return (set_errno(EINVAL));
 	}
+#endif
 
 	return (0);
 }
