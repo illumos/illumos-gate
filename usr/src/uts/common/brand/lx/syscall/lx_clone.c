@@ -101,10 +101,18 @@ lx_clone(int flags, void *stkp, void *ptidp, void *tls, void *ctidp)
 				/*
 				 * For 64-bit, we need to set %fsbase -- which
 				 * requires us to save the native %fsbase and
-				 * set our LX %fsbase.
+				 * set our LX %fsbase. Don't use rdmsr since
+				 * the value might get changed before we get to
+				 * this code. We use the value from the pcb
+				 * which the native libc should have already
+				 * setup via syslwp_private.
 				 */
+#if defined(__amd64)
+				pcb_t *pcb;
+				pcb = (pcb_t *)&curthread->t_lwp->lwp_pcb;
+				lwpd->br_ntv_fsbase = pcb->pcb_fsbase;
+#endif
 				lwpd->br_lx_fsbase = (uintptr_t)tls;
-				lwpd->br_ntv_fsbase = rdmsr(MSR_AMD_FSBASE);
 			}
 		}
 
