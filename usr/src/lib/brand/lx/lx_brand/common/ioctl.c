@@ -721,6 +721,36 @@ ict_einval(int fd, struct stat *stat, int cmd, char *cmd_str, intptr_t arg)
 }
 
 static int
+/* ARGSUSED */
+ict_fionbio(int fd, struct stat *stat, int cmd, char *cmd_str, intptr_t arg)
+{
+	int flags;
+	int opt, *optp = (int *)arg;
+
+	assert(cmd == FIONBIO);
+
+	if (uucopy(optp, &opt, sizeof (opt)) != 0)
+		return (-errno);
+
+	/*
+	 * Emulate FIONBIO in terms of O_NONBLOCK, as Linux does.
+	 *
+	 * The get/set behavior is a potential race and should be moved into
+	 * the kernel for safe locking at some point.
+	 */
+	if ((flags = fcntl(fd, F_GETFL) < 0))
+		return (-errno);
+	if (opt == 0)
+		flags = flags & ~(O_NONBLOCK);
+	else
+		flags = flags | O_NONBLOCK;
+	if (fcntl(fd, F_SETFL, flags) < 0)
+		return (-errno);
+
+	return (0);
+}
+
+static int
 /*ARGSUSED*/
 ict_pass(int fd, struct stat *stat, int cmd, char *cmd_str, intptr_t arg)
 {
@@ -2471,7 +2501,7 @@ static oss_fmt_translator_t oft_table[] = {
 /* All files will need to support these ioctls. */
 #define	IOC_CMD_TRANSLATORS_ALL						\
 	IOC_CMD_TRANSLATOR_NONE(FIONREAD)				\
-	IOC_CMD_TRANSLATOR_NONE(FIONBIO)
+	IOC_CMD_TRANSLATOR_FILTER(FIONBIO,		ict_fionbio)
 
 /* Any files supporting streams semantics will need these ioctls. */
 #define	IOC_CMD_TRANSLATORS_STREAMS					\
