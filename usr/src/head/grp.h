@@ -114,9 +114,10 @@ extern struct group *getgrent(void);		/* MT-unsafe */
 #ifdef __PRAGMA_REDEFINE_EXTNAME
 #pragma redefine_extname getgrgid_r __posix_getgrgid_r
 #pragma redefine_extname getgrnam_r __posix_getgrnam_r
-extern int getgrgid_r(gid_t, struct group *, char *, int, struct group **);
-extern int getgrnam_r(const char *, struct group *, char *, int,
-							struct group **);
+extern int getgrgid_r(gid_t, struct group *, char *,
+    size_t, struct group **);
+extern int getgrnam_r(const char *, struct group *, char *,
+    size_t, struct group **);
 #else  /* __PRAGMA_REDEFINE_EXTNAME */
 
 extern int __posix_getgrgid_r(gid_t, struct group *, char *, size_t,
@@ -132,13 +133,13 @@ extern int __posix_getgrnam_r(const char *, struct group *, char *, size_t,
 #else	/* !__lint */
 
 static int
-getgrgid_r(gid_t __gid, struct group *__grp, char *__buf, int __len,
+getgrgid_r(gid_t __gid, struct group *__grp, char *__buf, size_t __len,
     struct group **__res)
 {
 	return (__posix_getgrgid_r(__gid, __grp, __buf, __len, __res));
 }
 static int
-getgrnam_r(const char *__cb, struct group *__grp, char *__buf, int __len,
+getgrnam_r(const char *__cb, struct group *__grp, char *__buf, size_t __len,
     struct group **__res)
 {
 	return (__posix_getgrnam_r(__cb, __grp, __buf, __len, __res));
