@@ -8079,7 +8079,7 @@ link_call:
 		if (IS_SHADOW(ovp, trp))
 			tovp = RTOV4(trp);
 
-		vnevent_rename_src(tvp, odvp, onm, ct);
+		vnevent_rename_src(tovp, odvp, onm, ct);
 
 		trp = VTOR4(ndvp);
 		tvp = ndvp;
