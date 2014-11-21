@@ -643,7 +643,7 @@ struct sysent sysent[NSYSCALL] =
 			SYSENT_NOSYS(),
 			SYSENT_C("llseek",	llseek32,	4)),
 	/* 176 */ SYSENT_LOADABLE(),		/* inst_sync */
-	/* 177 */ SYSENT_CI("brandsys",		brandsys,	7),
+	/* 177 */ SYSENT_CI("brandsys",		brandsys,	6),
 	/* 178 */ SYSENT_LOADABLE(),		/* kaio */
 	/* 179 */ SYSENT_LOADABLE(),		/* cpc */
 	/* 180 */ SYSENT_CI("lgrpsys",		lgrpsys,	3),
@@ -998,7 +998,7 @@ struct sysent sysent32[NSYSCALL] =
 	/* 174 */ SYSENT_CI("pwrite",		pwrite32,		4),
 	/* 175 */ SYSENT_C("llseek",		llseek32,	4),
 	/* 176 */ SYSENT_LOADABLE32(),		/* inst_sync */
-	/* 177 */ SYSENT_CI("brandsys",		brandsys,	7),
+	/* 177 */ SYSENT_CI("brandsys",		brandsys,	6),
 	/* 178 */ SYSENT_LOADABLE32(),		/* kaio */
 	/* 179 */ SYSENT_LOADABLE32(),		/* cpc */
 	/* 180 */ SYSENT_CI("lgrpsys",		lgrpsys,	3),

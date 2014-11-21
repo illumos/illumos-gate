@@ -52,7 +52,7 @@ void	s10_setbrand(proc_t *);
 int	s10_getattr(zone_t *, int, void *, size_t *);
 int	s10_setattr(zone_t *, int, void *, size_t);
 int	s10_brandsys(int, int64_t *, uintptr_t, uintptr_t, uintptr_t,
-		uintptr_t, uintptr_t, uintptr_t);
+		uintptr_t, uintptr_t);
 void	s10_copy_procdata(proc_t *, proc_t *);
 void	s10_proc_exit(struct proc *, klwp_t *);
 void	s10_exec();
@@ -262,7 +262,7 @@ s10_native(void *cmd, void *args)
 /*ARGSUSED*/
 int
 s10_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
-    uintptr_t arg3, uintptr_t arg4, uintptr_t arg5, uintptr_t arg6)
+    uintptr_t arg3, uintptr_t arg4, uintptr_t arg5)
 {
 	proc_t	*p = curproc;
 	int	res;
