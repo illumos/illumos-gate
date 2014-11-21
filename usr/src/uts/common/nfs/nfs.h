@@ -18,10 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -938,7 +939,7 @@ extern int	nfslookup(vnode_t *, char *, vnode_t **, struct pathname *, int,
     vnode_t *, cred_t *, int);
 extern void	sv_free(struct servinfo *);
 extern int	nfsauth_access(struct exportinfo *, struct svc_req *, cred_t *,
-    uid_t *, gid_t *);
+    uid_t *, gid_t *, uint_t *, gid_t **);
 extern void	nfsauth_init(void);
 extern void	nfsauth_fini(void);
 extern int	nfs_setopts(vnode_t *, model_t, struct nfs_args *);
