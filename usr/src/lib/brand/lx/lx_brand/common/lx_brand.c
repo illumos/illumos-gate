@@ -108,8 +108,8 @@
  *
  * The lx brand interposes on _all_ system calls. Linux system calls that need
  * special handling in the kernel are redirected back to the kernel via the
- * IN_KERNEL_EMULATION macro which uses a range of the brand system call
- * command number to determine which in-kernel lx function to invoke.
+ * in-kernel emulation (IKE) mechanism which uses a range of the brand system
+ * call command number to determine which in-kernel lx function to invoke.
  *
  * *** DTrace
  *
@@ -188,19 +188,29 @@ struct lx_locale_ending {
  */
 int lx_traceflag;
 
-/* Offsets for nosys_msgs */
+#define	LX_SYS_NOSYS_REASON	0x07
+#define	LX_SYS_EBPARG6		0x08
+#define	LX_SYS_IKE		0x10
+
+#define	LX_IKE(sysnum)		((long(*)(void))LX_EMUL_##sysnum)
+
+/*
+ * Flags that denote the specific reason that we don't have a particular
+ * system call.  These reasons are only valid if the function is NULL.
+ */
 #define	NOSYS_NULL		0
 #define	NOSYS_NONE		1
 #define	NOSYS_NO_EQUIV		2
 #define	NOSYS_KERNEL		3
 #define	NOSYS_UNDOC		4
 #define	NOSYS_OBSOLETE		5
+#define	NOSYS_MAX		5
 
-#if defined(_ILP32)
-#define	EBP_HAS_ARG6		0x01
+#if NOSYS_MAX > LX_SYS_NOSYS_REASON
+#error NOSYS reason codes must fit in LX_SYS_NOSYS_REASON
 #endif
 
-static char *nosys_msgs[] = {
+static char *nosys_reasons[] = {
 	"Not done yet",
 	"No such Linux system call",
 	"No equivalent Solaris functionality",
@@ -474,7 +484,7 @@ lx_emulate_args(lx_regs_t *rp, struct lx_sysent *s, uintptr_t *args)
 	 * memory at the address contained in %ebx. Except for some syscalls
 	 * which store the 6th argument in %ebp.
 	 */
-	if (s->sy_narg == 6 && !(s->sy_flags & EBP_HAS_ARG6)) {
+	if (s->sy_narg == 6 && !(s->sy_flags & LX_SYS_EBPARG6)) {
 		if (uucopy((void *)rp->lxr_ebx, args,
 		    sizeof (args[0]) * 6) != 0)
 			return (-stol_errno[errno]);
@@ -557,8 +567,9 @@ lx_emulate(lx_regs_t *rp)
 	}
 
 	if (s->sy_callc == NULL) {
+		int reason = s->sy_flags & LX_SYS_NOSYS_REASON;
 		lx_unsupported("unimplemented syscall #%d (%s): %s\n",
-		    syscall_num, s->sy_name, nosys_msgs[(int)s->sy_flags]);
+		    syscall_num, s->sy_name, nosys_reasons[reason]);
 		ret = -stol_errno[ENOTSUP];
 		goto out;
 	}
@@ -636,8 +647,17 @@ lx_emulate(lx_regs_t *rp)
 	}
 #endif /* _ILP32 */
 
-	ret = s->sy_callc(args[0], args[1], args[2], args[3], args[4],
-	    args[5]);
+	if (s->sy_flags & LX_SYS_IKE) {
+		lx_debug("\tsyscall %d re-vectoring to lx kernel module "
+		    "for %s()", syscall_num, s->sy_name);
+
+		if ((ret = syscall(SYS_brand, B_IKE_SYSCALL,
+		    (uintptr_t)s->sy_callc, args)) == -1)
+			ret = -errno;
+	} else {
+		ret = s->sy_callc(args[0], args[1], args[2],
+		    args[3], args[4], args[5]);
+	}
 
 	if (ret > -65536 && ret < 65536)
 		lx_debug("\t= %d", ret);
@@ -1071,48 +1091,11 @@ lx_fd_to_path(int fd, char *buf, int buf_size)
 	return (buf);
 }
 
-/*
- * Create a translation function that calls an in-kernel emulation function
- * vectored through the brand's in-kernel translation table.
- */
-#define	IN_KERNEL_EMULATION(name, num)					\
-long									\
-lx_##name(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,	\
-	uintptr_t p5, uintptr_t p6)					\
-{									\
-	long r;								\
-	lx_debug("\tsyscall %d re-vectoring to lx kernel module "	\
-	    "for " #name "()", num);					\
-	r = syscall(SYS_brand, B_IKE_SYSCALL + num,			\
-	    p1, p2, p3, p4, p5, p6);					\
-	return ((r == -1) ? -errno : r);				\
-}
-
-IN_KERNEL_EMULATION(kill, LX_EMUL_kill)
-IN_KERNEL_EMULATION(pipe, LX_EMUL_pipe)
-IN_KERNEL_EMULATION(brk, LX_EMUL_brk)
-IN_KERNEL_EMULATION(getppid, LX_EMUL_getppid)
-IN_KERNEL_EMULATION(sysinfo, LX_EMUL_sysinfo)
-IN_KERNEL_EMULATION(modify_ldt, LX_EMUL_modify_ldt)
-IN_KERNEL_EMULATION(setresuid16, LX_EMUL_setresuid16)
-IN_KERNEL_EMULATION(setresgid16, LX_EMUL_setresgid16)
-IN_KERNEL_EMULATION(setresuid, LX_EMUL_setresuid)
-IN_KERNEL_EMULATION(setresgid, LX_EMUL_setresgid)
-IN_KERNEL_EMULATION(gettid, LX_EMUL_gettid)
-IN_KERNEL_EMULATION(tkill, LX_EMUL_tkill)
-IN_KERNEL_EMULATION(futex, LX_EMUL_futex)
-IN_KERNEL_EMULATION(set_thread_area, LX_EMUL_set_thread_area)
-IN_KERNEL_EMULATION(get_thread_area, LX_EMUL_get_thread_area)
-IN_KERNEL_EMULATION(set_tid_address, LX_EMUL_set_tid_address)
-IN_KERNEL_EMULATION(arch_prctl, LX_EMUL_arch_prctl)
-IN_KERNEL_EMULATION(tgkill, LX_EMUL_tgkill)
-IN_KERNEL_EMULATION(read, LX_EMUL_read)
-
 #if defined(_LP64)
 /* The following is the 64-bit syscall table */
 
 static struct lx_sysent sysents[] = {
-	{"read",	lx_read,		0,		3}, /* 0 */
+	{"read",	LX_IKE(read),		LX_SYS_IKE,	3}, /* 0 */
 	{"write",	lx_write,		0,		3}, /* 1 */
 	{"open",	lx_open,		0,		3}, /* 2 */
 	{"close",	lx_close,		0,		1}, /* 3 */
@@ -1124,7 +1107,7 @@ static struct lx_sysent sysents[] = {
 	{"mmap",	lx_mmap,		0,		6}, /* 9 */
 	{"mprotect",	lx_mprotect,		0,		3}, /* 10 */
 	{"munmap",	lx_munmap,		0,		2}, /* 11 */
-	{"brk",		lx_brk,			0,		1}, /* 12 */
+	{"brk",		LX_IKE(brk),		LX_SYS_IKE,	1}, /* 12 */
 	{"rt_sigaction", lx_rt_sigaction,	0,		4}, /* 13 */
 	{"rt_sigprocmask", lx_rt_sigprocmask,	0,		4}, /* 14 */
 	{"rt_sigreturn", lx_rt_sigreturn,	0,		0}, /* 15 */
@@ -1134,7 +1117,7 @@ static struct lx_sysent sysents[] = {
 	{"readv",	lx_readv,		0,		3}, /* 19 */
 	{"writev",	lx_writev,		0,		3}, /* 20 */
 	{"access",	lx_access,		0,		2}, /* 21 */
-	{"pipe",	lx_pipe,		0,		1}, /* 22 */
+	{"pipe",	LX_IKE(pipe),		LX_SYS_IKE,	1}, /* 22 */
 	{"select",	lx_select,		0,		5}, /* 23 */
 	{"sched_yield",	lx_yield,		0,		0}, /* 24 */
 	{"mremap",	lx_remap,		0,		5}, /* 25 */
@@ -1174,7 +1157,7 @@ static struct lx_sysent sysents[] = {
 	{"execve",	lx_execve,		0,		3}, /* 59 */
 	{"exit",	lx_exit,		0,		1}, /* 60 */
 	{"wait4",	lx_wait4,		0,		4}, /* 61 */
-	{"kill",	lx_kill,		0,		2}, /* 62 */
+	{"kill",	LX_IKE(kill),		LX_SYS_IKE,	2}, /* 62 */
 	{"uname",	lx_uname,		0,		1}, /* 63 */
 	{"semget",	lx_semget,		0,		3}, /* 64 */
 	{"semop",	lx_semop,		0,		3}, /* 65 */
@@ -1211,7 +1194,7 @@ static struct lx_sysent sysents[] = {
 	{"gettimeofday", lx_gettimeofday,	0,		2}, /* 96 */
 	{"getrlimit",	lx_getrlimit,		0,		2}, /* 97 */
 	{"getrusage",	lx_getrusage,		0,		2}, /* 98 */
-	{"sysinfo",	lx_sysinfo,		0,		1}, /* 99 */
+	{"sysinfo",	LX_IKE(sysinfo),	LX_SYS_IKE,	1}, /* 99 */
 	{"times",	lx_times,		0,		1}, /* 100 */
 	{"ptrace",	lx_ptrace,		0,		4}, /* 101 */
 	{"getuid",	lx_getuid,		0,		0}, /* 102 */
@@ -1222,16 +1205,16 @@ static struct lx_sysent sysents[] = {
 	{"geteuid",	lx_geteuid,		0,		0}, /* 107 */
 	{"getegid",	lx_getegid,		0,		0}, /* 108 */
 	{"setpgid",	lx_setpgid,		0,		2}, /* 109 */
-	{"getppid",	lx_getppid,		0,		0}, /* 110 */
+	{"getppid",	LX_IKE(getppid),	LX_SYS_IKE,	0}, /* 110 */
 	{"getpgrp",	lx_getpgrp,		0,		0}, /* 111 */
 	{"setsid",	lx_setsid,		0,		0}, /* 112 */
 	{"setreuid",	lx_setreuid,		0,		0}, /* 113 */
 	{"setregid",	lx_setregid,		0,		0}, /* 114 */
 	{"getgroups",	lx_getgroups,		0,		2}, /* 115 */
 	{"setgroups",	lx_setgroups,		0,		2}, /* 116 */
-	{"setresuid",	lx_setresuid,		0,		3}, /* 117 */
+	{"setresuid",	LX_IKE(setresuid),	LX_SYS_IKE,	3}, /* 117 */
 	{"getresuid",	lx_getresuid,		0,		3}, /* 118 */
-	{"setresgid",	lx_setresgid,		0,		3}, /* 119 */
+	{"setresgid",	LX_IKE(setresgid),	LX_SYS_IKE,	3}, /* 119 */
 	{"getresgid",	lx_getresgid,		0,		3}, /* 120 */
 	{"getpgid",	lx_getpgid,		0,		1}, /* 121 */
 	{"setfsuid",	lx_setfsuid,		0,		1}, /* 122 */
@@ -1266,11 +1249,11 @@ static struct lx_sysent sysents[] = {
 	{"mlockall",	lx_mlockall,		0,		1}, /* 151 */
 	{"munlockall",	lx_munlockall,		0,		0}, /* 152 */
 	{"vhangup",	lx_vhangup,		0,		0}, /* 153 */
-	{"modify_ldt",	lx_modify_ldt,		0,		3}, /* 154 */
+	{"modify_ldt",	LX_IKE(modify_ldt),	LX_SYS_IKE,	3}, /* 154 */
 	{"pivot_root",	NULL,			NOSYS_KERNEL,	0}, /* 155 */
 	{"sysctl",	lx_sysctl,		0,		1}, /* 156 */
 	{"prctl",	lx_prctl,		0,		5}, /* 157 */
-	{"arch_prctl",	lx_arch_prctl,		0,		2}, /* 158 */
+	{"arch_prctl",	LX_IKE(arch_prctl),	LX_SYS_IKE,	2}, /* 158 */
 	{"adjtimex",	lx_adjtimex,		0,		1}, /* 159 */
 	{"setrlimit",	lx_setrlimit,		0,		2}, /* 160 */
 	{"chroot",	lx_chroot,		0,		1}, /* 161 */
@@ -1298,7 +1281,7 @@ static struct lx_sysent sysents[] = {
 	{"afs_syscall",	NULL,			NOSYS_KERNEL,	0}, /* 183 */
 	{"tux",		NULL,			NOSYS_NO_EQUIV,	0}, /* 184 */
 	{"security",	NULL,			NOSYS_NO_EQUIV,	0}, /* 185 */
-	{"gettid",	lx_gettid,		0,		0}, /* 186 */
+	{"gettid",	LX_IKE(gettid),		LX_SYS_IKE,	0}, /* 186 */
 	{"readahead",	NULL,			NOSYS_NO_EQUIV,	0}, /* 187 */
 	{"setxattr",	NULL,			NOSYS_NO_EQUIV,	0}, /* 188 */
 	{"lsetxattr",	NULL,			NOSYS_NO_EQUIV,	0}, /* 189 */
@@ -1312,25 +1295,25 @@ static struct lx_sysent sysents[] = {
 	{"removexattr",	lx_xattr2,		0,		2}, /* 197 */
 	{"lremovexattr", lx_xattr2,		0,		2}, /* 198 */
 	{"fremovexattr", lx_xattr2,		0,		2}, /* 199 */
-	{"tkill",	lx_tkill,		0,		2}, /* 200 */
+	{"tkill",	LX_IKE(tkill),		LX_SYS_IKE,	2}, /* 200 */
 	{"time",	lx_time,		0,		1}, /* 201 */
-	{"futex",	lx_futex,		0,		6}, /* 202 */
+	{"futex",	LX_IKE(futex),		LX_SYS_IKE,	6}, /* 202 */
 	{"sched_setaffinity", lx_sched_setaffinity, 0,		3}, /* 203 */
 	{"sched_getaffinity", lx_sched_getaffinity, 0,		3}, /* 204 */
-	{"set_thread_area", lx_set_thread_area,	0,		1}, /* 205 */
+	{"set_thread_area", LX_IKE(set_thread_area), LX_SYS_IKE, 1}, /* 205 */
 	{"io_setup",	NULL,			NOSYS_NO_EQUIV,	0}, /* 206 */
 	{"io_destroy",	NULL,			NOSYS_NO_EQUIV,	0}, /* 207 */
 	{"io_getevents", NULL,			NOSYS_NO_EQUIV,	0}, /* 208 */
 	{"io_submit",	NULL,			NOSYS_NO_EQUIV,	0}, /* 209 */
 	{"io_cancel",	NULL,			NOSYS_NO_EQUIV,	0}, /* 210 */
-	{"get_thread_area", lx_get_thread_area,	0,		1}, /* 211 */
+	{"get_thread_area", LX_IKE(get_thread_area), LX_SYS_IKE, 1}, /* 211 */
 	{"lookup_dcookie", NULL,		NOSYS_NO_EQUIV,	0}, /* 212 */
 	{"epoll_create", lx_epoll_create,	0,		1}, /* 213 */
 	{"epoll_ctl_old", NULL,			NOSYS_NULL,	0}, /* 214 */
 	{"epoll_wait_old", NULL,		NOSYS_NULL,	0}, /* 215 */
 	{"remap_file_pages", NULL,		NOSYS_NO_EQUIV,	0}, /* 216 */
 	{"getdents64",	lx_getdents64,		0,		3}, /* 217 */
-	{"set_tid_address", lx_set_tid_address, 0,		1}, /* 218 */
+	{"set_tid_address", LX_IKE(set_tid_address), LX_SYS_IKE, 1}, /* 218 */
 	{"restart_syscall", NULL,		NOSYS_NULL,	0}, /* 219 */
 	{"semtimedop",	lx_semtimedop,		0,		4}, /* 220 */
 	{"fadvise64",	lx_fadvise64_64,	0,		4}, /* 221 */
@@ -1346,7 +1329,7 @@ static struct lx_sysent sysents[] = {
 	{"exit_group",	lx_group_exit,		0,		1}, /* 231 */
 	{"epoll_wait",	lx_epoll_wait,		0,		4}, /* 232 */
 	{"epoll_ctl",	lx_epoll_ctl,		0,		4}, /* 233 */
-	{"tgkill",	lx_tgkill,		0,		3}, /* 234 */
+	{"tgkill",	LX_IKE(tgkill),		LX_SYS_IKE,	3}, /* 234 */
 	{"utimes",	lx_utimes,		0,		2}, /* 235 */
 	{"vserver",	NULL,			NOSYS_NULL,	0}, /* 236 */
 	{"mbind",	NULL,			NOSYS_NULL,	0}, /* 237 */
@@ -1440,7 +1423,7 @@ static struct lx_sysent sysents[] = {
 	{"nosys",	NULL,		NOSYS_NONE,	0},	/*  0 */
 	{"exit",	lx_exit,	0,		1},	/*  1 */
 	{"fork",	lx_fork,	0,		0},	/*  2 */
-	{"read",	lx_read,	0,		3},	/*  3 */
+	{"read",	LX_IKE(read),	LX_SYS_IKE,	3},	/*  3 */
 	{"write",	lx_write,	0,		3},	/*  4 */
 	{"open",	lx_open,	0,		3},	/*  5 */
 	{"close",	lx_close,	0,		1},	/*  6 */
@@ -1474,15 +1457,15 @@ static struct lx_sysent sysents[] = {
 	{"nice",	lx_nice,	0,		1},	/* 34 */
 	{"ftime",	NULL,		NOSYS_OBSOLETE,	0},	/* 35 */
 	{"sync",	lx_sync, 	0, 		0},	/* 36 */
-	{"kill",	lx_kill,	0,		2},	/* 37 */
+	{"kill",	LX_IKE(kill),	LX_SYS_IKE,	2},	/* 37 */
 	{"rename",	lx_rename,	0,		2},	/* 38 */
 	{"mkdir",	lx_mkdir,	0,		2},	/* 39 */
 	{"rmdir",	lx_rmdir,	0,		1},	/* 40 */
 	{"dup",		lx_dup,		0,		1},	/* 41 */
-	{"pipe",	lx_pipe,	0,		1},	/* 42 */
+	{"pipe",	LX_IKE(pipe),	LX_SYS_IKE,	1},	/* 42 */
 	{"times",	lx_times,	0,		1},	/* 43 */
 	{"prof",	NULL,		NOSYS_OBSOLETE,	0},	/* 44 */
-	{"brk",		lx_brk,		0,		1},	/* 45 */
+	{"brk",		LX_IKE(brk),	LX_SYS_IKE,	1},	/* 45 */
 	{"setgid16",	lx_setgid16,	0,		1},	/* 46 */
 	{"getgid16",	lx_getgid16,	0,		0},	/* 47 */
 	{"signal",	lx_signal,	0,		2},	/* 48 */
@@ -1501,7 +1484,7 @@ static struct lx_sysent sysents[] = {
 	{"chroot",	lx_chroot,	0,		1},	/* 61 */
 	{"ustat",	NULL,		NOSYS_OBSOLETE,	2},	/* 62 */
 	{"dup2",	lx_dup2,	0,		2},	/* 63 */
-	{"getppid",	lx_getppid,	0,		0},	/* 64 */
+	{"getppid",	LX_IKE(getppid), LX_SYS_IKE,	0},	/* 64 */
 	{"getpgrp",	lx_getpgrp,	0,		0},	/* 65 */
 	{"setsid",	lx_setsid,	0,		0},	/* 66 */
 	{"sigaction",	lx_sigaction,	0,		3},	/* 67 */
@@ -1560,7 +1543,7 @@ static struct lx_sysent sysents[] = {
 	{"clone",	lx_clone,	0,		5},	/* 120 */
 	{"setdomainname", lx_setdomainname, 0,		2},	/* 121 */
 	{"uname",	lx_uname,	0,		1},	/* 122 */
-	{"modify_ldt",	lx_modify_ldt,	0,		3},	/* 123 */
+	{"modify_ldt",	LX_IKE(modify_ldt), LX_SYS_IKE,	3},	/* 123 */
 	{"adjtimex",	lx_adjtimex,	0,		1},	/* 124 */
 	{"mprotect",	lx_mprotect,	0,		3},	/* 125 */
 	{"sigprocmask",	lx_sigprocmask,	0,		3},	/* 126 */
@@ -1601,13 +1584,13 @@ static struct lx_sysent sysents[] = {
 	{"sched_rr_get_interval", lx_sched_rr_get_interval, 0,	2},  /* 161 */
 	{"nanosleep",	lx_nanosleep,	0,		2},	/* 162 */
 	{"mremap",	lx_remap,	0,		5},	/* 163 */
-	{"setresuid16",	lx_setresuid16, 0,		3},	/* 164 */
+	{"setresuid16",	LX_IKE(setresuid16), LX_SYS_IKE, 3},	/* 164 */
 	{"getresuid16",	lx_getresuid16,	0,		3},	/* 165 */
 	{"vm86",	NULL,		NOSYS_NO_EQUIV,	0},	/* 166 */
 	{"query_module", lx_query_module, NOSYS_KERNEL,	5},	/* 167 */
 	{"poll",	lx_poll,	0,		3},	/* 168 */
 	{"nfsservctl",	NULL,		NOSYS_KERNEL,	0},	/* 169 */
-	{"setresgid16",	lx_setresgid16, 0,		3},	/* 170 */
+	{"setresgid16",	LX_IKE(setresgid16), LX_SYS_IKE, 3},	/* 170 */
 	{"getresgid16",	lx_getresgid16,	0,		3},	/* 171 */
 	{"prctl",	lx_prctl,	0,		5},	/* 172 */
 	{"rt_sigreturn", lx_rt_sigreturn, 0,		0},	/* 173 */
@@ -1629,7 +1612,7 @@ static struct lx_sysent sysents[] = {
 	{"putpmsg",	NULL,		NOSYS_OBSOLETE,	0},	/* 189 */
 	{"vfork",	lx_vfork,	0,		0},	/* 190 */
 	{"getrlimit",	lx_getrlimit,	0,		2},	/* 191 */
-	{"mmap2",	lx_mmap2,	EBP_HAS_ARG6,	6},	/* 192 */
+	{"mmap2",	lx_mmap2,	LX_SYS_EBPARG6,	6},	/* 192 */
 	{"truncate64",	lx_truncate64,	0,		3},	/* 193 */
 	{"ftruncate64",	lx_ftruncate64,	0,		3},	/* 194 */
 	{"stat64",	lx_stat64,	0,		2},	/* 195 */
@@ -1645,9 +1628,9 @@ static struct lx_sysent sysents[] = {
 	{"getgroups",	lx_getgroups,	0,		2},	/* 205 */
 	{"setgroups",	lx_setgroups,	0,		2},	/* 206 */
 	{"fchown",	lx_fchown,	0,		3},	/* 207 */
-	{"setresuid",	lx_setresuid,	0,		3},	/* 208 */
+	{"setresuid",	LX_IKE(setresuid), LX_SYS_IKE,	3},	/* 208 */
 	{"getresuid",	lx_getresuid,	0,		3},	/* 209 */
-	{"setresgid",	lx_setresgid,	0,		3},	/* 210 */
+	{"setresgid",	LX_IKE(setresgid), LX_SYS_IKE,	3},	/* 210 */
 	{"getresgid",	lx_getresgid,	0,		3},	/* 211 */
 	{"chown",	lx_chown,	0,		3},	/* 212 */
 	{"setuid",	lx_setuid,	0,		1},	/* 213 */
@@ -1661,7 +1644,7 @@ static struct lx_sysent sysents[] = {
 	{"fcntl64",	lx_fcntl64,	0,		3},	/* 221 */
 	{"tux",		NULL,		NOSYS_NO_EQUIV,	0},	/* 222 */
 	{"security",	NULL,		NOSYS_NO_EQUIV,	0},	/* 223 */
-	{"gettid",	lx_gettid,	0,		0},	/* 224 */
+	{"gettid",	LX_IKE(gettid),	LX_SYS_IKE,	0},	/* 224 */
 	{"readahead",	NULL,		NOSYS_NO_EQUIV,	0},	/* 225 */
 	{"setxattr",	NULL,		NOSYS_NO_EQUIV,	0},	/* 226 */
 	{"lsetxattr",	NULL,		NOSYS_NO_EQUIV,	0},	/* 227 */
@@ -1675,13 +1658,13 @@ static struct lx_sysent sysents[] = {
 	{"removexattr",	lx_xattr2,	0,		2},	/* 235 */
 	{"lremovexattr", lx_xattr2,	0,		2},	/* 236 */
 	{"fremovexattr", lx_xattr2,	0,		2},	/* 237 */
-	{"tkill",	lx_tkill,	0,		2},	/* 238 */
+	{"tkill",	LX_IKE(tkill),	LX_SYS_IKE,	2},	/* 238 */
 	{"sendfile64",	lx_sendfile64,	0,		4},	/* 239 */
-	{"futex",	lx_futex,	EBP_HAS_ARG6,	6},	/* 240 */
+	{"futex", LX_IKE(futex), LX_SYS_IKE | LX_SYS_EBPARG6, 6}, /* 240 */
 	{"sched_setaffinity", lx_sched_setaffinity, 0,	3},	/* 241 */
 	{"sched_getaffinity", lx_sched_getaffinity, 0,	3},	/* 242 */
-	{"set_thread_area", lx_set_thread_area, 0,	1},	/* 243 */
-	{"get_thread_area", lx_get_thread_area, 0,	1},	/* 244 */
+	{"set_thread_area", LX_IKE(set_thread_area), LX_SYS_IKE, 1}, /* 243 */
+	{"get_thread_area", LX_IKE(get_thread_area), LX_SYS_IKE, 1}, /* 244 */
 	{"io_setup",	NULL,		NOSYS_NO_EQUIV,	0},	/* 245 */
 	{"io_destroy",	NULL,		NOSYS_NO_EQUIV,	0},	/* 246 */
 	{"io_getevents", NULL,		NOSYS_NO_EQUIV,	0},	/* 247 */
@@ -1695,7 +1678,7 @@ static struct lx_sysent sysents[] = {
 	{"epoll_ctl",	lx_epoll_ctl,	0,		4},	/* 255 */
 	{"epoll_wait",	lx_epoll_wait,	0,		4},	/* 256 */
 	{"remap_file_pages", NULL,	NOSYS_NO_EQUIV,	0},	/* 257 */
-	{"set_tid_address", lx_set_tid_address, 0,	1},	/* 258 */
+	{"set_tid_address", LX_IKE(set_tid_address), LX_SYS_IKE, 1}, /* 258 */
 	{"timer_create", NULL,		NOSYS_UNDOC,	0},	/* 259 */
 	{"timer_settime", NULL,		NOSYS_UNDOC,	0},	/* 260 */
 	{"timer_gettime", NULL,		NOSYS_UNDOC,	0},	/* 261 */
@@ -1707,7 +1690,7 @@ static struct lx_sysent sysents[] = {
 	{"clock_nanosleep", lx_clock_nanosleep,	0,	4},	/* 267 */
 	{"statfs64",	lx_statfs64,	0,		2},	/* 268 */
 	{"fstatfs64",	lx_fstatfs64,	0,		2},	/* 269 */
-	{"tgkill",	lx_tgkill,	0,		3},	/* 270 */
+	{"tgkill",	LX_IKE(tgkill),	LX_SYS_IKE,	3},	/* 270 */
 
 	/* The following system calls only exist in kernel 2.6 and greater */
 	{"utimes",	lx_utimes,	0,		2},	/* 271 */
@@ -1747,7 +1730,7 @@ static struct lx_sysent sysents[] = {
 	{"readlinkat",	lx_readlinkat,	0,		4},	/* 305 */
 	{"fchmodat",	lx_fchmodat,	0,		4},	/* 306 */
 	{"faccessat",	lx_faccessat,	0,		4},	/* 307 */
-	{"pselect6",	lx_pselect6,	EBP_HAS_ARG6,	6},	/* 308 */
+	{"pselect6",	lx_pselect6,	LX_SYS_EBPARG6,	6},	/* 308 */
 	{"ppoll",	NULL,		NOSYS_NULL,	0},	/* 309 */
 	{"unshare",	NULL,		NOSYS_NULL,	0},	/* 310 */
 	{"set_robust_list", NULL,	NOSYS_NULL,	0},	/* 311 */

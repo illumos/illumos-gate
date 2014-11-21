@@ -697,7 +697,7 @@ lx_sysinfo32(uintptr_t arg)
 	struct lx_sysinfo sil;
 	int i;
 
-	if (lx_sysinfo(&sil) != 0)
+	if (syscall(SYS_brand, B_IKE_SYSCALL + LX_EMUL_sysinfo, &sil) != 0)
 		return (-errno);
 
 	si.si_uptime = sil.si_uptime;

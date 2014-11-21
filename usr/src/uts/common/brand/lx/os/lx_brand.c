@@ -70,7 +70,7 @@ void	lx_setbrand(proc_t *);
 int	lx_getattr(zone_t *, int, void *, size_t *);
 int	lx_setattr(zone_t *, int, void *, size_t);
 int	lx_brandsys(int, int64_t *, uintptr_t, uintptr_t, uintptr_t,
-		uintptr_t, uintptr_t, uintptr_t);
+		uintptr_t, uintptr_t);
 void	lx_set_kern_version(zone_t *, char *);
 void	lx_copy_procdata(proc_t *, proc_t *);
 
@@ -652,7 +652,7 @@ lx_unsupported(char *dmsg)
  */
 int
 lx_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
-    uintptr_t arg3, uintptr_t arg4, uintptr_t arg5, uintptr_t arg6)
+    uintptr_t arg3, uintptr_t arg4, uintptr_t arg5)
 {
 	kthread_t *t = curthread;
 	proc_t *p = ttoproc(t);
@@ -1090,11 +1090,38 @@ lx_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 #endif
 		return (0);
 
+	case B_IKE_SYSCALL:
+		if (arg1 > LX_N_IKE_FUNCS)
+			return (EINVAL);
+
+		if (get_udatamodel() == DATAMODEL_NATIVE) {
+			uintptr_t a[6];
+
+			if (copyin((void *)arg2, a, sizeof (a)) != 0)
+				return (EFAULT);
+
+			*rval = lx_emulate_syscall(arg1, a[0], a[1],
+			    a[2], a[3], a[4], a[5]);
+#if defined(_LP64)
+		} else {
+			/* 32-bit userland on 64-bit kernel */
+			uint32_t a[6];
+
+			if (copyin((void *)arg2, a, sizeof (a)) != 0)
+				return (EFAULT);
+
+			*rval = lx_emulate_syscall(arg1, a[0], a[1],
+			    a[2], a[3], a[4], a[5]);
+#endif
+		}
+
+		return (0);
+
 	default:
 		ike_call = cmd - B_IKE_SYSCALL;
 		if (ike_call > 0 && ike_call <= LX_N_IKE_FUNCS) {
 			*rval = lx_emulate_syscall(ike_call, arg1, arg2,
-			    arg3, arg4, arg5, arg6);
+			    arg3, arg4, arg5, 0xbadbeef);
 			return (0);
 		}
 	}
