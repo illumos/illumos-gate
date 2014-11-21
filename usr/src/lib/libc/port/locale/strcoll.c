@@ -55,9 +55,6 @@ strcoll_l(const char *s1, const char *s2, locale_t loc)
 	size_t sz1, sz2;
 	const struct lc_collate *lcc = loc->collate;
 
-	mbstate_t mbs1 = { 0 };	/* initial states */
-	mbstate_t mbs2 = { 0 };
-
 	if (lcc->lc_is_posix)
 		return (strcmp(s1, s2));
 
@@ -89,10 +86,10 @@ strcoll_l(const char *s1, const char *s2, locale_t loc)
 			goto error;
 	}
 
-	if ((mbsrtowcs_l(w1, &s1, sz1, &mbs1, loc)) == (size_t)-1)
+	if ((mbstowcs_l(w1, s1, sz1, loc)) == (size_t)-1)
 		goto error;
 
-	if ((mbsrtowcs_l(w2, &s2, sz2, &mbs2, loc)) == (size_t)-1)
+	if ((mbstowcs_l(w2, s2, sz2, loc)) == (size_t)-1)
 		goto error;
 
 	ret = wcscoll_l(w1, w2, loc);
