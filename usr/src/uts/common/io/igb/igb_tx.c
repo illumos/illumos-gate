@@ -60,9 +60,9 @@ igb_tx_ring_send(void *arg, mblk_t *mp)
 
 	igb = tx_ring->igb;
 
-	if ((tx_ring->igb->igb_state & IGB_SUSPENDED) ||
-	    (tx_ring->igb->igb_state & IGB_ERROR) ||
-	    !(tx_ring->igb->igb_state & IGB_STARTED) ||
+	if ((igb->igb_state & IGB_SUSPENDED) ||
+	    (igb->igb_state & IGB_ERROR) ||
+	    !(igb->igb_state & IGB_STARTED) ||
 	    igb->link_state != LINK_STATE_UP) {
 		freemsg(mp);
 		return (NULL);
