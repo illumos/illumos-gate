@@ -105,8 +105,10 @@ ixgbe_ring_tx(void *arg, mblk_t *mp)
 	if ((ixgbe->ixgbe_state & IXGBE_SUSPENDED) ||
 	    (ixgbe->ixgbe_state & IXGBE_ERROR) ||
 	    (ixgbe->ixgbe_state & IXGBE_OVERTEMP) ||
-	    !(ixgbe->ixgbe_state & IXGBE_STARTED)) {
-		return (mp);
+	    !(ixgbe->ixgbe_state & IXGBE_STARTED) ||
+	    ixgbe->link_state != LINK_STATE_UP) {
+		freemsg(mp);
+		return (NULL);
 	}
 
 	copy_thresh = ixgbe->tx_copy_thresh;

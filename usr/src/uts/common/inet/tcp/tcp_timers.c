@@ -23,6 +23,7 @@
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2011 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2011 Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2014 by Delphix. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -1066,11 +1067,9 @@ timer_rexmit:
 	/*
 	 * When slow start after retransmission begins, start with
 	 * this seq no.  tcp_rexmit_max marks the end of special slow
-	 * start phase.  tcp_snd_burst controls how many segments
-	 * can be sent because of an ack.
+	 * start phase.
 	 */
 	tcp->tcp_rexmit_nxt = tcp->tcp_suna;
-	tcp->tcp_snd_burst = TCP_CWND_SS;
 	if ((tcp->tcp_valid_bits & TCP_FSS_VALID) &&
 	    (tcp->tcp_unsent == 0)) {
 		tcp->tcp_rexmit_max = tcp->tcp_fss;

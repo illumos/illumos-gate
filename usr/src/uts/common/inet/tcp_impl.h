@@ -22,7 +22,7 @@
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2011, Joyent Inc. All rights reserved.
  * Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved.
- * Copyright (c) 2013 by Delphix. All rights reserved.
+ * Copyright (c) 2013, 2014 by Delphix. All rights reserved.
  */
 
 #ifndef	_INET_TCP_IMPL_H
@@ -439,11 +439,6 @@ extern uint32_t tcp_early_abort;
 #define	IP_ADDR_CACHE_SIZE	2048
 #define	IP_ADDR_CACHE_HASH(faddr)					\
 	(ntohl(faddr) & (IP_ADDR_CACHE_SIZE -1))
-
-/* TCP cwnd burst factor. */
-#define	TCP_CWND_INFINITE	65535
-#define	TCP_CWND_SS		3
-#define	TCP_CWND_NORMAL		5
 
 /*
  * TCP reassembly macros.  We hide starting and ending sequence numbers in

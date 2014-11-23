@@ -26,6 +26,7 @@
 /*
  * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
  * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright (c) 2013 by Delphix. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -194,22 +195,6 @@ mdb_amd64_printregs(const mdb_tgt_gregset_t *gregs)
 	mdb_printf("   %%err = 0x%x\n", kregs[KREG_ERR]);
 }
 
-/*
- * We expect all proper Solaris core files to have STACK_ALIGN-aligned stacks.
- * Hence the name.  However, if the core file resulted from a
- * hypervisor-initiated panic, the hypervisor's frames may only be 64-bit
- * aligned instead of 128.
- */
-static int
-fp_is_aligned(uintptr_t fp, int xpv_panic)
-{
-	if (!xpv_panic && (fp & (STACK_ALIGN -1)))
-		return (0);
-	if ((fp & sizeof (uintptr_t) - 1))
-		return (0);
-	return (1);
-}
-
 int
 mdb_amd64_kvm_stack_iter(mdb_tgt_t *t, const mdb_tgt_gregset_t *gsp,
     mdb_tgt_stack_f *func, void *arg)
@@ -258,10 +243,6 @@ mdb_amd64_kvm_stack_iter(mdb_tgt_t *t, const mdb_tgt_gregset_t *gsp,
 		 */
 		if (fp <= lastfp) {
 			err = EMDB_STKFRAME;
-			goto badfp;
-		}
-		if (!fp_is_aligned(fp, xpv_panic)) {
-			err = EMDB_STKALIGN;
 			goto badfp;
 		}
 		if (mdb_tgt_vread(t, &fr, sizeof (fr), fp) != sizeof (fr)) {

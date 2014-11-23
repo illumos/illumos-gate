@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * NOTE: this file is compiled into the kernel, cprboot, and savecore.
  * Therefore it must compile in kernel, boot, and userland source context;
@@ -118,6 +116,7 @@
  */
 
 #include <sys/types.h>
+#include <sys/param.h>
 
 #define	MATCH_BITS	6
 #define	MATCH_MIN	3
@@ -130,7 +129,7 @@ compress(void *s_start, void *d_start, size_t s_len)
 {
 	uchar_t *src = s_start;
 	uchar_t *dst = d_start;
-	uchar_t *cpy, *copymap;
+	uchar_t *cpy, *copymap = NULL;
 	int copymask = 1 << (NBBY - 1);
 	int mlen, offset;
 	uint16_t *hp;
@@ -181,7 +180,7 @@ decompress(void *s_start, void *d_start, size_t s_len, size_t d_len)
 	uchar_t *dst = d_start;
 	uchar_t *s_end = (uchar_t *)s_start + s_len;
 	uchar_t *d_end = (uchar_t *)d_start + d_len;
-	uchar_t *cpy, copymap;
+	uchar_t *cpy, copymap = '\0';
 	int copymask = 1 << (NBBY - 1);
 
 	if (s_len >= d_len) {
