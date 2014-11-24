@@ -456,8 +456,8 @@ build_dump_map(int corefd, const pfn_t *pfn_table)
 	for (i = 0; i < corehdr.dump_nvtop; i++) {
 		long first = 0;
 		long last = corehdr.dump_npages - 1;
-		long middle;
-		pfn_t pfn;
+		long middle = 0;
+		pfn_t pfn = 0;
 		uintptr_t h;
 
 		Fread(&vtop, sizeof (mem_vtop_t), in);
@@ -1183,7 +1183,7 @@ decompress_pages(int corefd)
 	char *cpage = NULL;
 	char *dpage = NULL;
 	char *out;
-	pgcnt_t curpage;
+	pgcnt_t curpage = 0;
 	block_t *b;
 	FILE *dumpf;
 	FILE *tracef = NULL;
@@ -1195,7 +1195,7 @@ decompress_pages(int corefd)
 	dumpcsize_t dcsize;
 	int nstreams = datahdr.dump_nstreams;
 	int maxcsize = datahdr.dump_maxcsize;
-	int nout, tag, doflush;
+	int nout = 0, tag, doflush;
 
 	dumpf = fdopen(dup(dumpfd), "rb");
 	if (dumpf == NULL)
