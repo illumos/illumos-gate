@@ -236,8 +236,6 @@ lx_sigreturn_tolibc(uintptr_t sp)
 	movl	LXR_EAX(%esp), %eax
 	movw	LXR_GS(%esp), %gs
 
-	addl	$SIZEOF_LX_REGS_T, %esp
-
 	movl	%ebp, %esp
 	popl	%ebp
 	ret
