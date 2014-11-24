@@ -248,8 +248,6 @@ lx_sigreturn_tolibc(uintptr_t sp)
 	movq	LXR_R15(%rsp), %r15
 	/* XXX movw	LXR_FS(%rsp), %fs */
 
-	/* addq	$SIZEOF_LX_REGS_T, %rsp	not needed due to next instr. */
-
 	movq	%rbp, %rsp
 	popq	%rbp
 
