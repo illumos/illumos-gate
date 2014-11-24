@@ -166,6 +166,37 @@ typedef struct lx_user_fpxregs {
 /*
  * This corresponds to the user_regs_struct Linux structure.
  */
+#if defined(_LP64)
+typedef struct lx_user_regs {
+	long lxur_r15;
+	long lxur_r14;
+	long lxur_r13;
+	long lxur_r12;
+	long lxur_rbp;
+	long lxur_rbx;
+	long lxur_r11;
+	long lxur_r10;
+	long lxur_r9;
+	long lxur_r8;
+	long lxur_rax;
+	long lxur_rcx;
+	long lxur_rdx;
+	long lxur_rsi;
+	long lxur_rdi;
+	long lxur_orig_rax;
+	long lxur_rip;
+	long lxur_xcs;
+	long lxur_rflags;
+	long lxur_rsp;
+	long lxur_xss;
+	long lxur_xfs_base;
+	long lxur_xgs_base;
+	long lxur_xds;
+	long lxur_xes;
+	long lxur_xfs;
+	long lxur_xgs;
+} lx_user_regs_t;
+#else
 typedef struct lx_user_regs {
 	long lxur_ebx;
 	long lxur_ecx;
@@ -185,6 +216,7 @@ typedef struct lx_user_regs {
 	long lxur_esp;
 	long lxur_xss;
 } lx_user_regs_t;
+#endif
 
 typedef struct lx_user {
 	lx_user_regs_t lxu_regs;
@@ -308,7 +340,11 @@ syscall_regs(int fd, uintptr_t fp, pid_t pid)
 	struct frame fr;
 	auxv_t auxv;
 	int afd;
+#if defined(_LP64)
+	Elf64_Phdr phdr;
+#elif defined(_ILP32)
 	Elf32_Phdr phdr;
+#endif
 
 	/*
 	 * Try to walk the stack looking for a return address that corresponds
@@ -367,10 +403,18 @@ syscall_regs(int fd, uintptr_t fp, pid_t pid)
 	 * immediately preceeding the return address.
 	 */
 	addr += sizeof (fr);
+
+	/*
+	 * On i386 we need to perform an additional read as we used the stack
+	 * to pass the argument to lx_emulate.  On amd64 we passed the argument
+	 * in %rdi so addr already contains the correct address.
+	 */
+#if defined(_ILP32)
 	if (pread(fd, &addr, sizeof (addr), addr) != sizeof (addr)) {
 		lx_debug("ptrace stack failed to read register set address");
 		return (0);
 	}
+#endif
 
 	return (addr);
 }
@@ -393,7 +437,7 @@ getregs(pid_t pid, lwpid_t lwpid, lx_user_regs_t *rp)
 	 * syscall, use the register set at given address. Otherwise, use the
 	 * registers as reported by /proc.
 	 */
-	if ((addr = syscall_regs(fd, status.pr_reg[EBP], pid)) != 0) {
+	if ((addr = syscall_regs(fd, status.pr_reg[REG_FP], pid)) != 0) {
 		lx_regs_t regs;
 
 		if (pread(fd, &regs, sizeof (regs), addr) != sizeof (regs)) {
@@ -404,7 +448,35 @@ getregs(pid_t pid, lwpid_t lwpid, lx_user_regs_t *rp)
 
 		(void) close(fd);
 
-#if defined(_ILP32)
+#if defined(_LP64)
+		rp->lxur_r15 = regs.lxr_r15;
+		rp->lxur_r14 = regs.lxr_r14;
+		rp->lxur_r13 = regs.lxr_r13;
+		rp->lxur_r12 = regs.lxr_r12;
+		rp->lxur_rbp = regs.lxr_rbp;
+		rp->lxur_rbx = regs.lxr_rbx;
+		rp->lxur_r11 = regs.lxr_r11;
+		rp->lxur_r10 = regs.lxr_r10;
+		rp->lxur_r9 = regs.lxr_r9;
+		rp->lxur_r8 = regs.lxr_r8;
+		rp->lxur_rax = regs.lxr_rax;
+		rp->lxur_rcx = regs.lxr_rcx;
+		rp->lxur_rdx = regs.lxr_rdx;
+		rp->lxur_rsi = regs.lxr_rsi;
+		rp->lxur_rdi = regs.lxr_rdi;
+		rp->lxur_orig_rax = regs.lxr_orig_rax;
+		rp->lxur_rip = regs.lxr_rip;
+		rp->lxur_xcs = status.pr_reg[REG_CS];
+		rp->lxur_rflags = status.pr_reg[REG_RFL];
+		rp->lxur_rsp = regs.lxr_rsp;
+		rp->lxur_xss = status.pr_reg[REG_SS];
+		rp->lxur_xfs_base = status.pr_reg[REG_FSBASE];
+		rp->lxur_xgs_base = status.pr_reg[REG_GSBASE];
+		rp->lxur_xds = status.pr_reg[REG_DS];
+		rp->lxur_xes = status.pr_reg[REG_ES];
+		rp->lxur_xfs = regs.lxr_fs;
+		rp->lxur_xgs = status.pr_reg[REG_GS];
+#elif defined(_ILP32)
 		rp->lxur_ebx = regs.lxr_ebx;
 		rp->lxur_ecx = regs.lxr_ecx;
 		rp->lxur_edx = regs.lxr_edx;
@@ -427,7 +499,35 @@ getregs(pid_t pid, lwpid_t lwpid, lx_user_regs_t *rp)
 	} else {
 		(void) close(fd);
 
-#if defined(_ILP32)
+#if defined(_LP64)
+		rp->lxur_r15 = status.pr_reg[REG_R15];
+		rp->lxur_r14 = status.pr_reg[REG_R14];
+		rp->lxur_r13 = status.pr_reg[REG_R13];
+		rp->lxur_r12 = status.pr_reg[REG_R12];
+		rp->lxur_rbp = status.pr_reg[REG_RBP];
+		rp->lxur_rbx = status.pr_reg[REG_RBX];
+		rp->lxur_r11 = status.pr_reg[REG_R11];
+		rp->lxur_r10 = status.pr_reg[REG_R10];
+		rp->lxur_r9 = status.pr_reg[REG_R9];
+		rp->lxur_r8 = status.pr_reg[REG_R8];
+		rp->lxur_rax = status.pr_reg[REG_RAX];
+		rp->lxur_rcx = status.pr_reg[REG_RCX];
+		rp->lxur_rdx = status.pr_reg[REG_RDX];
+		rp->lxur_rsi = status.pr_reg[REG_RSI];
+		rp->lxur_rdi = status.pr_reg[REG_RDI];
+		rp->lxur_orig_rax = 0;
+		rp->lxur_rip = status.pr_reg[REG_RIP];
+		rp->lxur_xcs = status.pr_reg[REG_CS];
+		rp->lxur_rflags = status.pr_reg[REG_RFL];
+		rp->lxur_rsp = status.pr_reg[REG_RSP];
+		rp->lxur_xss = status.pr_reg[REG_SS];
+		rp->lxur_xfs = status.pr_reg[REG_FSBASE];
+		rp->lxur_xgs = status.pr_reg[REG_GSBASE];
+		rp->lxur_xds = status.pr_reg[REG_DS];
+		rp->lxur_xes = status.pr_reg[REG_ES];
+		rp->lxur_xfs = status.pr_reg[REG_FSBASE];
+		rp->lxur_xgs = status.pr_reg[REG_GSBASE];
+#elif defined(_ILP32)
 		rp->lxur_ebx = status.pr_reg[EBX];
 		rp->lxur_ecx = status.pr_reg[ECX];
 		rp->lxur_edx = status.pr_reg[EDX];
@@ -445,6 +545,7 @@ getregs(pid_t pid, lwpid_t lwpid, lx_user_regs_t *rp)
 		rp->lxur_eflags = status.pr_reg[EFL];
 		rp->lxur_esp = status.pr_reg[UESP];
 		rp->lxur_xss = status.pr_reg[SS];
+#endif
 
 		/*
 		 * If the target process has just returned from exec, it's not
@@ -455,10 +556,14 @@ getregs(pid_t pid, lwpid_t lwpid, lx_user_regs_t *rp)
 		 */
 		if (status.pr_why == PR_SYSEXIT &&
 		    status.pr_what == SYS_execve) {
+#if defined(_LP64)
+			rp->lxur_rax = 0;
+			rp->lxur_orig_rax = LX_SYS_execve;
+#elif defined(_ILP32)
 			rp->lxur_eax = 0;
 			rp->lxur_orig_eax = LX_SYS_execve;
-		}
 #endif
+		}
 	}
 
 	return (0);
@@ -484,7 +589,7 @@ setregs(pid_t pid, lwpid_t lwpid, const lx_user_regs_t *rp)
 	 * remaining registers through the /proc interface. Otherwise just use
 	 * the /proc interface to set register values;
 	 */
-	if ((addr = syscall_regs(fd, status.pr_reg[EBP], pid)) != 0) {
+	if ((addr = syscall_regs(fd, status.pr_reg[REG_FP], pid)) != 0) {
 #if defined(_ILP32)
 		lx_regs_t regs;
 
@@ -974,10 +1079,11 @@ ptrace_traceme(void)
  * Read a word of data from the given address.  Because this is a process-wide
  * action, we don't need the lwpid.
  */
-static int
-ptrace_peek(pid_t pid, uintptr_t addr, int *ret)
+static long
+ptrace_peek(pid_t pid, uintptr_t addr, long *ret)
 {
-	int fd, data;
+	int fd;
+	long data;
 
 	if (!is_traced(pid))
 		return (-ESRCH);
@@ -1806,7 +1912,7 @@ lx_ptrace(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4)
 
 	case LX_PTRACE_PEEKTEXT:
 	case LX_PTRACE_PEEKDATA:
-		return (ptrace_peek(pid, p3, (int *)p4));
+		return (ptrace_peek(pid, p3, (long *)p4));
 
 	case LX_PTRACE_PEEKUSER:
 		return (ptrace_peek_user(pid, lwpid, p3, (int *)p4));
