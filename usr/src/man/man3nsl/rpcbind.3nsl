@@ -1,9 +1,10 @@
 '\" te
+.\" Copyright 2014 Nexenta Systems, Inc.  All Rights Reserved.
 .\"  Copyright 1989 AT&T  Copyright (c) 1997, Sun Microsystems, Inc.  All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH RPCBIND 3NSL "Dec 27, 2013"
+.TH RPCBIND 3NSL "Nov 24, 2014"
 .SH NAME
 rpcbind, rpcb_getmaps, rpcb_getaddr, rpcb_gettime, rpcb_rmtcall, rpcb_set,
 rpcb_unset \- library routines for RPC bind service
@@ -53,13 +54,11 @@ rpcb_unset \- library routines for RPC bind service
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 These routines allow client C programs to make procedure calls to the RPC
 binder service. \fBrpcbind\fR maintains a list of mappings between programs and
 their universal addresses. See \fBrpcbind\fR(1M).
 .SS "Routines"
-.sp
 .ne 2
 .na
 \fB\fBrpcb_getmaps()\fR\fR
@@ -135,7 +134,7 @@ the triple [\fIprognum\fR, \fIversnum\fR, \fInetconf\fR->\fInc_netid]\fR and
 \fIsvcaddr\fR on the machine's \fBrpcbind\fR service. The value of
 \fInc_netid\fR must correspond to a network identifier that is defined by the
 netconfig database. This routine returns \fBTRUE\fR if it succeeds, \fBFALSE\fR
-otherwise. See also \fBsvc_reg()\fR in \fBrpc_svc_calls\fR(3NSL). If there
+otherwise. See also \fBsvc_reg()\fR in \fBrpc_svc_reg\fR(3NSL). If there
 already exists such an entry with \fBrpcbind\fR, \fBrpcb_set()\fR will fail.
 .RE
 
@@ -153,11 +152,10 @@ the address on the machine's \fBrpcbind\fR service. If  \fInetconf\fR is
 machine's \fBrpcbind\fR service. This routine returns \fBTRUE\fR if it
 succeeds,  \fBFALSE\fR otherwise. Only the owner of the service or the
 super-user can destroy the mapping. See also \fBsvc_unreg()\fR in
-\fBrpc_svc_calls\fR(3NSL).
+\fBrpc_svc_reg\fR(3NSL).
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -173,7 +171,6 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBrpcbind\fR(1M), \fBrpcinfo\fR(1M), \fBrpc_clnt_calls\fR(3NSL),
 \fBrpc_clnt_create\fR(3NSL), \fBrpc_svc_calls\fR(3NSL), \fBattributes\fR(5)

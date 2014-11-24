@@ -135,8 +135,8 @@ other than the User MT mode.
 The \fBsvc_exit()\fR function when called by any of the RPC server procedures
 or otherwise, destroys all services registered by the server and causes
 \fBsvc_run()\fR to return. If RPC server activity is to be resumed, services
-must be reregistered with the RPC library either through one of the
-\fBrpc_svc_create\fR(3NSL) functions, or using \fBxprt_register\fR(3NSL). The
+must be reregistered with the RPC library through one of the
+\fBrpc_svc_reg\fR(3NSL) functions. The
 \fBsvc_exit()\fR function has global scope and ends all RPC server activity.
 .sp
 .LP
@@ -284,4 +284,4 @@ multithreaded applications and should be called only from the main thread.
 \fBrpcgen\fR(1), \fBpoll\fR(2), \fBgetpeerucred\fR(3C), \fBrpc\fR(3NSL),
 \fBrpc_control\fR(3NSL), \fBrpc_svc_create\fR(3NSL), \fBrpc_svc_err\fR(3NSL),
 \fBrpc_svc_reg\fR(3NSL), \fBselect\fR(3C), \fBucred_free\fR(3C),
-\fBxprt_register\fR(3NSL), \fBattributes\fR(5)
+\fBattributes\fR(5)
