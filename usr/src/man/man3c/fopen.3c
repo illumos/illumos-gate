@@ -1,4 +1,5 @@
 '\" te
+.\" Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
 .\" Copyright 1989 AT&T.
 .\" Copyright (c) 2006, Sun Microsystems, Inc.  All Rights Reserved.
 .\" Portions Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
@@ -11,7 +12,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH FOPEN 3C "Nov 06, 2013"
+.TH FOPEN 3C "Nov 24, 2014"
 .SH NAME
 fopen \- open a stream
 .SH SYNOPSIS
@@ -23,7 +24,6 @@ fopen \- open a stream
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBfopen()\fR function opens the file whose pathname is the string pointed
 to by \fIfilename\fR, and associates a stream with it.
@@ -131,13 +131,13 @@ to refer to an interactive device. The error and end-of-file indicators for the
 stream are cleared.
 .sp
 .LP
-If \fImode\fR begins with \fIw\fR or \fBa\fR and the file did not previously
+If \fImode\fR begins with \fBw\fR or \fBa\fR and the file did not previously
 exist, upon successful completion, \fBfopen()\fR function will mark for update
 the \fBst_atime\fR, \fBst_ctime\fR and \fBst_mtime\fR fields of the file and
 the \fBst_ctime\fR and \fBst_mtime\fR fields of the parent directory.
 .sp
 .LP
-If \fImode\fR begins with \fIw\fR and the file did previously exist, upon
+If \fImode\fR begins with \fBw\fR and the file did previously exist, upon
 successful completion, \fBfopen()\fR will mark for update the \fBst_ctime\fR
 and \fBst_mtime\fR fields of the file.  The \fBfopen()\fR function will
 allocate a file descriptor as \fBopen\fR(2) does.
@@ -165,7 +165,6 @@ The largest value that can be represented correctly in an object of type
 \fBoff_t\fR will be established as the offset maximum in the open file
 description.
 .SH RETURN VALUES
-.sp
 .LP
 Upon successful completion, \fBfopen()\fR returns a pointer to the object
 controlling the stream.  Otherwise, a null pointer is returned and \fBerrno\fR
@@ -175,7 +174,6 @@ is set to indicate the error.
 The \fBfopen()\fR function may fail and not set \fBerrno\fR if there are no
 free \fBstdio\fR streams.
 .SH ERRORS
-.sp
 .LP
 The \fBfopen()\fR function will fail if:
 .sp
@@ -358,7 +356,6 @@ The file is a pure procedure (shared text) file that is being executed and
 .RE
 
 .SH USAGE
-.sp
 .LP
 A process is allowed to have at least {\fBFOPEN_MAX\fR} \fBstdio\fR streams
 open at a time. For 32-bit applications, however, the underlying ABIs formerly
@@ -383,7 +380,6 @@ access \fBFILE\fR structure contents.
 The \fBfopen()\fR function has a transitional interface for 64-bit file
 offsets.  See \fBlf64\fR(5).
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -405,7 +401,6 @@ MT-Level	MT-Safe
 The \fBF\fR character in the \fImode\fR argument is Evolving. In all other
 respects this function is Standard.
 .SH SEE ALSO
-.sp
 .LP
 \fBenable_extended_FILE_stdio\fR(3C), \fBfclose\fR(3C), \fBfdopen\fR(3C),
 \fBfflush\fR(3C), \fBfreopen\fR(3C), \fBfsetpos\fR(3C), \fBrewind\fR(3C),
