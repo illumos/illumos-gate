@@ -1,9 +1,10 @@
 '\" te
+.\" Copyright 2014 Nexenta Systems, Inc.  All Rights Reserved.
 .\" Copyright (c) 2005, Sun Microsystems, Inc. All Rights Reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ACL_TRIVIAL 3SEC "Oct 6, 2005"
+.TH ACL_TRIVIAL 3SEC "Nov 24, 2014"
 .SH NAME
 acl_trivial \- determine whether a file has a trivial ACL
 .SH SYNOPSIS
@@ -16,23 +17,21 @@ cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lsec\fR [ \fIlibrary\fR\&.\|.
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBacl_trivial()\fR function is used to determine whether a file has a
 trivial ACL. Whether an ACL is trivial depends on the type of the ACL. A POSIX
-draft ACL is trivial if it has greater than \fBMIN_ACL_ENTRIES\fR. An
-NFSv4/ZFS-style ACL is trivial if it either has entries other than
-\fBowner@\fR, \fBgroup@\fR, and \fBeveryone@\fR, has inheritance flags set, or
-is not ordered in a manner that meets POSIX access control requirements.
+draft ACL is trivial if it does not have more than \fBMIN_ACL_ENTRIES\fR
+entries. An NFSv4/ZFS-style ACL is trivial if it does not have entries other
+than \fBowner@\fR, \fBgroup@\fR, and \fBeveryone@\fR, does not have inheritance
+flags set, and is ordered in a manner that meets POSIX access control
+requirements.
 .SH RETURN VALUES
-.sp
 .LP
 Upon successful completion, \fBacl_trivial()\fR returns 0 if the file's ACL is
 trivial and 1 if the file's ACL is not trivial. If it could not be determined
 whether a file's ACL is trivial, -1 is returned and \fBerrno\fR is set to
 indicate the error.
 .SH ERRORS
-.sp
 .LP
 The \fBacl_trivial()\fR function will fail if:
 .sp
@@ -55,7 +54,6 @@ empty string.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -73,6 +71,5 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBacl\fR(5), \fBattributes\fR(5)

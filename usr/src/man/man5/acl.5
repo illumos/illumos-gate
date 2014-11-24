@@ -713,12 +713,7 @@ int acl_trivial(const char *path);
 .sp
 .LP
 The \fBacl_trivial()\fR function is used to determine whether a file has a
-trivial ACL. The trivialness of a file's ACL depends on the type of ACL it is.
-For POSIX-draft ACLs, it implies the ACL has greater than
-\fBMIN_ACL_ENTRIES\fR. For NFSv4/ZFS style ACLs, it implies that the ACL has
-entries other than \fBowner@\fR, \fBgroup@\fR and \fBeveryone@\fR, inheritance
-flags are set, or the ACL is not ordered in a manner that meets POSIX access
-control requirements.
+trivial ACL.
 .SS "Removing all \fBACL\fRs from a file"
 .in +2
 .nf
