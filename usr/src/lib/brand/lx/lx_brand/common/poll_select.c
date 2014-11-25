@@ -160,7 +160,7 @@ lx_poll(uintptr_t p1, uintptr_t p2, uintptr_t p3)
 	}
 
 	/*
-	 * Note: we are assuming that the Linux and Solaris pollfd
+	 * Note: we are assuming that the Linux and Illumos pollfd
 	 * structures are identical.  Copy in the linux poll structure.
 	 */
 	fds_size = sizeof (struct pollfd) * nfds;
@@ -172,13 +172,13 @@ lx_poll(uintptr_t p1, uintptr_t p2, uintptr_t p3)
 
 	/*
 	 * The poll system call modifies the poll structures passed in
-	 * so we'll need to make an exra copy of them.
+	 * so we'll need to make an extra copy of them.
 	 */
 	sfds = (struct pollfd *)SAFE_ALLOCA(fds_size);
 	if (sfds == NULL)
 		return (-ENOMEM);
 
-	/* Convert the Linux events bitmask into the Solaris equivalent. */
+	/* Convert the Linux events bitmask into the Illumos equivalent. */
 	for (i = 0; i < nfds; i++) {
 		/*
 		 * If the caller is polling for an unsupported event, we
@@ -196,6 +196,8 @@ lx_poll(uintptr_t p1, uintptr_t p2, uintptr_t p3)
 			sfds[i].events |= POLLWRNORM;
 		if (lfds[i].events & LX_POLLWRBAND)
 			sfds[i].events |= POLLWRBAND;
+		if (lfds[i].events & LX_POLLRDHUP)
+			sfds[i].events |= POLLRDHUP;
 		sfds[i].revents = 0;
 	}
 
@@ -204,15 +206,17 @@ lx_poll(uintptr_t p1, uintptr_t p2, uintptr_t p3)
 	if ((rval = poll(sfds, nfds, (int)p3)) < 0)
 		return (-errno);
 
-	/* Convert the Solaris revents bitmask into the Linux equivalent */
+	/* Convert the Illumos revents bitmask into the Linux equivalent */
 	for (i = 0; i < nfds; i++) {
 		revents = sfds[i].revents & LX_POLL_COMMON_EVENTS;
 		if (sfds[i].revents & POLLWRBAND)
 			revents |= LX_POLLWRBAND;
+		if (sfds[i].revents & POLLRDHUP)
+			revents |= LX_POLLRDHUP;
 
 		/*
-		 * Be carefull because on solaris POLLOUT and POLLWRNORM
-		 * are defined to the same values but on linux they
+		 * Be careful because on Illumos POLLOUT and POLLWRNORM
+		 * are defined to the same values but on Linux they
 		 * are not.
 		 */
 		if (sfds[i].revents & POLLOUT) {

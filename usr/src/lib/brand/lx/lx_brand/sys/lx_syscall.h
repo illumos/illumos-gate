@@ -114,6 +114,7 @@ extern long lx_select(uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t);
 extern long lx_pselect6(uintptr_t, uintptr_t, uintptr_t, uintptr_t,
     uintptr_t, uintptr_t);
 extern long lx_poll(uintptr_t, uintptr_t, uintptr_t);
+extern long lx_ppoll(uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t);
 extern long lx_epoll_ctl(uintptr_t, uintptr_t, uintptr_t, uintptr_t);
 extern long lx_oldgetrlimit(uintptr_t, uintptr_t);
 extern long lx_getrlimit(uintptr_t, uintptr_t);

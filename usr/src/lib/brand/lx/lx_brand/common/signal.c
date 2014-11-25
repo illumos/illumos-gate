@@ -35,6 +35,7 @@
 #include <sys/lx_brand.h>
 #include <sys/lx_misc.h>
 #include <sys/lx_debug.h>
+#include <sys/lx_poll.h>
 #include <sys/lx_signal.h>
 #include <sys/lx_sigstack.h>
 #include <sys/lx_syscall.h>
@@ -42,6 +43,8 @@
 #include <sys/syscall.h>
 #include <assert.h>
 #include <errno.h>
+#include <poll.h>
+#include <rctl.h>
 #include <signal.h>
 #include <stdlib.h>
 #include <string.h>
@@ -315,6 +318,12 @@ void (*libc_sigacthandler)(int, siginfo_t *, void*);
  * lx_sighandlers global, we automatically get the correct behavior.
  */
 static lx_sighandlers_t lx_sighandlers;
+
+/*
+ * Cache result of process.max-file-descriptor to avoid calling getrctl()
+ * for each lx_ppoll().
+ */
+static rlim_t maxfd = 0;
 
 /*
  * stol_stack() and ltos_stack() convert between Illumos and Linux stack_t
@@ -1964,6 +1973,145 @@ lx_siginit(void)
 
 	lx_debug("interposition handler setup for SIGPWR");
 	return (0);
+}
+
+/*
+ * This code stongly resemebles lx_poll(), but is here to be able to take
+ * advantage of the Linux signal helper routines.
+ */
+long
+lx_ppoll(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4, uintptr_t p5)
+{
+	struct pollfd   *lfds, *sfds;
+	nfds_t		nfds = (nfds_t)p2;
+	timespec_t	ts, *tsp = NULL;
+	int		fds_size, i, rval, revents;
+	lx_sigset_t	lxsig, *lxsigp = NULL;
+	sigset_t	sigset, *sp = NULL;
+	rctlblk_t	*rblk;
+
+	lx_debug("\tppoll(0x%p, %d, 0x%p, 0x%p, %d)", p1, p2, p3, p4, p5);
+
+	if (p3 != NULL) {
+		if (uucopy((void *)p3, &ts, sizeof (ts)) != 0)
+			return (-errno);
+
+		tsp = &ts;
+	}
+
+	if (p4 != NULL) {
+		if (uucopy((void *)p4, &lxsig, sizeof (lxsig)) != 0)
+			return (-errno);
+
+		lxsigp = &lxsig;
+		if ((size_t)p5 != sizeof (lx_sigset_t))
+			return (-EINVAL);
+
+		if (lxsigp) {
+			if ((rval = ltos_sigset(lxsigp, &sigset)) != 0)
+				return (rval);
+
+			sp = &sigset;
+		}
+	}
+
+	/*
+	 * Deal with the NULL fds[] case.
+	 */
+	if (nfds == 0 || p1 == NULL) {
+		if ((rval = ppoll(NULL, 0, tsp, sp)) < 0)
+			return (-errno);
+
+		return (rval);
+	}
+
+	if (maxfd == 0) {
+		if ((rblk = (rctlblk_t *)SAFE_ALLOCA(rctlblk_size())) == NULL)
+			return (-ENOMEM);
+
+		if (getrctl("process.max-file-descriptor", NULL, rblk,
+		    RCTL_FIRST) == -1)
+			return (-EINVAL);
+
+		maxfd = rctlblk_get_value(rblk);
+	}
+
+	if (nfds > maxfd)
+		return (-EINVAL);
+
+	/*
+	 * Note: we are assuming that the Linux and Illumos pollfd
+	 * structures are identical.  Copy in the Linux poll structure.
+	 */
+	fds_size = sizeof (struct pollfd) * nfds;
+	lfds = (struct pollfd *)SAFE_ALLOCA(fds_size);
+	if (lfds == NULL)
+		return (-ENOMEM);
+	if (uucopy((void *)p1, lfds, fds_size) != 0)
+		return (-errno);
+
+	/*
+	 * The poll system call modifies the poll structures passed in
+	 * so we'll need to make an extra copy of them.
+	 */
+	sfds = (struct pollfd *)SAFE_ALLOCA(fds_size);
+	if (sfds == NULL)
+		return (-ENOMEM);
+
+	/* Convert the Linux events bitmask into the Illumos equivalent. */
+	for (i = 0; i < nfds; i++) {
+		/*
+		 * If the caller is polling for an unsupported event, we
+		 * have to bail out.
+		 */
+		if (lfds[i].events & ~LX_POLL_SUPPORTED_EVENTS) {
+			lx_unsupported("unsupported poll events requested: "
+			    "events=0x%x", lfds[i].events);
+			return (-ENOTSUP);
+		}
+
+		sfds[i].fd = lfds[i].fd;
+		sfds[i].events = lfds[i].events & LX_POLL_COMMON_EVENTS;
+		if (lfds[i].events & LX_POLLWRNORM)
+			sfds[i].events |= POLLWRNORM;
+		if (lfds[i].events & LX_POLLWRBAND)
+			sfds[i].events |= POLLWRBAND;
+		if (lfds[i].events & LX_POLLRDHUP)
+			sfds[i].events |= POLLRDHUP;
+		sfds[i].revents = 0;
+	}
+
+	if ((rval = ppoll(sfds, nfds, tsp, sp) < 0))
+		return (-errno);
+
+	/* Convert the Illumos revents bitmask into the Linux equivalent */
+	for (i = 0; i < nfds; i++) {
+		revents = sfds[i].revents & LX_POLL_COMMON_EVENTS;
+		if (sfds[i].revents & POLLWRBAND)
+			revents |= LX_POLLWRBAND;
+		if (sfds[i].revents & POLLRDHUP)
+			revents |= LX_POLLRDHUP;
+
+		/*
+		 * Be careful because on Illumos POLLOUT and POLLWRNORM
+		 * are defined to the same values but on Linux they
+		 * are not.
+		 */
+		if (sfds[i].revents & POLLOUT) {
+			if ((lfds[i].events & LX_POLLOUT) == 0)
+				revents &= ~LX_POLLOUT;
+			if (lfds[i].events & LX_POLLWRNORM)
+				revents |= LX_POLLWRNORM;
+		}
+
+		lfds[i].revents = revents;
+	}
+
+	/* Copy out the results */
+	if (uucopy(lfds, (void *)p1, fds_size) != 0)
+		return (-errno);
+
+	return (rval);
 }
 
 /*
