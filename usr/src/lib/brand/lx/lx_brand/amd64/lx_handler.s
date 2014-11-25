@@ -264,17 +264,35 @@ lx_sigreturn_tolibc(uintptr_t sp)
 	SET_SIZE(lx_handler)
 
 	/*
-	 * lx_setup_clone(uintptr_t %gs, void *retaddr, void *stack)
-	 * ignore arg0 (%rdi) on 64-bit
+	 * lx_setup_clone(lx_regs_t *regp, void *retaddr, void *stack)
+	 * Restore the register state using arg0 (%rdi).
 	 * Return to Linux app using arg1 (%rsi) with the Linux stack we got
 	 * in arg2 (%rdx).
 	 */
 	ENTRY_NP(lx_setup_clone)
+	/*
+	 * arg0 is a ptr to an lx_regs_t struct. The AMD64 ABI says that the
+	 * kernel clobbers %rcx and %r11 so we use those for working registers.
+	 */
+	movq	%rdi, %rcx	/* arg0, use rcx as ptr */
+	movq	%rsi, %r11	/* arg1, the return addr */
+	movq	LXR_RDI(%rcx), %rdi
+	movq	LXR_RSI(%rcx), %rsi
+	movq	LXR_RBX(%rcx), %rbx
+	movq	LXR_R8(%rcx), %r8
+	movq	LXR_R9(%rcx), %r9
+	movq	LXR_R10(%rcx), %r10
+	movq	LXR_R12(%rcx), %r12
+	movq	LXR_R13(%rcx), %r13
+	movq	LXR_R14(%rcx), %r14
+	movq	LXR_R15(%rcx), %r15
+
 	xorq	%rbp, %rbp	/* terminating stack */
 	popq	%rax		/* pop the clone_start() return address */
 	movq	%rdx, %rsp	/* arg2 is new stack pointer */
+	movq	LXR_RDX(%rcx), %rdx
 	xorq	%rax, %rax	/* child returns 0 to SYS_clone() */
-	jmp	*%rsi		/* return to Linux app. using arg1 addr. */
+	jmp	*%r11		/* return to Linux app. using arg1 addr. */
 	SET_SIZE(lx_setup_clone)
 
 	/*

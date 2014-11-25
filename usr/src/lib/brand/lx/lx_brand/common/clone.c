@@ -108,7 +108,9 @@ struct clone_state {
 	void 		*c_ptidp;
 	struct lx_desc	*c_ldtinfo;	/* thread-specific segment */
 	void		*c_ctidp;
-#if defined(_ILP32)
+#if defined(_LP64)
+	lx_regs_t	c_regs;		/* original register state */
+#else
 	uintptr_t	c_gs;		/* Linux's %gs */
 #endif
 	sigset_t	c_sigmask;	/* signal mask */
@@ -326,7 +328,8 @@ clone_start(void *arg)
 
 #if defined(_LP64)
 		(void) syscall(SYS_brand, B_CLR_NTV_SYSC_FLAG);
-		lx_setup_clone(0, cs->c_retaddr, cs->c_stk);
+		lx_setup_clone((uintptr_t)&cs->c_regs, cs->c_retaddr,
+		    cs->c_stk);
 #else
 		lx_setup_clone(cs->c_gs, cs->c_retaddr, cs->c_stk);
 #endif
@@ -499,7 +502,8 @@ lx_clone(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 		if (cldstk) {
 #if defined(_LP64)
 			(void) syscall(SYS_brand, B_CLR_NTV_SYSC_FLAG);
-			lx_setup_clone(0, (void *)rp->lxr_rip, cldstk);
+			lx_setup_clone((uintptr_t)rp, (void *)rp->lxr_rip,
+			    cldstk);
 #else
 			lx_setup_clone(rp->lxr_gs, (void *)rp->lxr_eip, cldstk);
 #endif
@@ -550,7 +554,26 @@ lx_clone(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 	cs->c_ldtinfo = ldtinfo;
 	cs->c_ctidp = ctidp;
 	cs->c_clone_res = &clone_res;
-#if defined(_ILP32)
+#if defined(_LP64)
+	/*
+	 * The AMD64 ABI says that the kernel clobbers %rcx and %r11. We
+	 * return a value in %rax. The new %rsp and %rip will be setup in
+	 * lx_setup_clone. Thus, we don't worry about passing/restoring those
+	 * registers.
+	 */
+	cs->c_regs.lxr_rdi = rp->lxr_rdi;
+	cs->c_regs.lxr_rsi = rp->lxr_rsi;
+	cs->c_regs.lxr_rbx = rp->lxr_rbx;
+	cs->c_regs.lxr_rdx = rp->lxr_rdx;
+	cs->c_regs.lxr_rdi = rp->lxr_rdi;
+	cs->c_regs.lxr_r8 = rp->lxr_r8;
+	cs->c_regs.lxr_r9 = rp->lxr_r9;
+	cs->c_regs.lxr_r10 = rp->lxr_r10;
+	cs->c_regs.lxr_r12 = rp->lxr_r12;
+	cs->c_regs.lxr_r13 = rp->lxr_r13;
+	cs->c_regs.lxr_r14 = rp->lxr_r14;
+	cs->c_regs.lxr_r15 = rp->lxr_r15;
+#else
 	cs->c_gs = rp->lxr_gs;
 #endif
 
