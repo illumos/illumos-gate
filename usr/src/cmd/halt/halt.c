@@ -1211,8 +1211,13 @@ parse_fastboot_args(char *bootargs_buf, size_t buf_size,
 	}
 
 	if (is_zfs && (buflen != 0 || bename != NULL))	{
-		/* LINTED E_SEC_SPRINTF_UNBOUNDED_COPY */
-		off += sprintf(bootargs_buf + off, "%s ", bootfs_arg);
+		/* do not copy existing zfs boot args */
+		if (strstr(&bootargs_saved[rootlen], "-B") == NULL ||
+		    strstr(&bootargs_saved[rootlen], "zfs-bootfs=") == NULL ||
+		    (strstr(&bootargs_saved[rootlen], "bootpath=") == NULL &&
+		    strstr(&bootargs_saved[rootlen], "diskdevid=") == NULL))
+			/* LINTED E_SEC_SPRINTF_UNBOUNDED_COPY */
+			off += sprintf(bootargs_buf + off, "%s ", bootfs_arg);
 	}
 
 	/*

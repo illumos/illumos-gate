@@ -1,10 +1,11 @@
 '\" te
+.\" Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
 .\"  Copyright 1989 AT&T
 .\" Copyright (C) 2004 Sun Microsystems, Inc. All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH RPC_SVC_CALLS 3NSL "Oct 28, 2013"
+.TH RPC_SVC_CALLS 3NSL "Nov 24, 2014"
 .SH NAME
 rpc_svc_calls, svc_dg_enablecache, svc_done, svc_exit, svc_fdset, svc_freeargs,
 svc_getargs, svc_getreq_common, svc_getreq_poll, svc_getreqset,
@@ -79,13 +80,17 @@ svc_getcallerucred, svc_fd_negotiate_ucred \- library routines for RPC servers
 .LP
 .nf
 \fBbool_t\fR \fBsvc_sendreply\fR(\fBconst SVCXPRT *\fR\fIxprt\fR, \fBconst xdrproc_t\fR \fIoutproc\fR,
-     \fBcaddr_t\fR \fIout\fRint svc_max_pollfd;
+     \fBcaddr_t\fR \fIout\fR);
+.fi
+
+.LP
+.nf
+int svc_max_pollfd;
 fd_set svc_fdset;
 pollfd_t *svc_pollfd;
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 These routines are part of the \fBRPC\fR library which allows C language
 programs to make procedure calls on other machines across the network.
@@ -130,8 +135,8 @@ other than the User MT mode.
 The \fBsvc_exit()\fR function when called by any of the RPC server procedures
 or otherwise, destroys all services registered by the server and causes
 \fBsvc_run()\fR to return. If RPC server activity is to be resumed, services
-must be reregistered with the RPC library either through one of the
-\fBrpc_svc_create\fR(3NSL) functions, or using \fBxprt_register\fR(3NSL). The
+must be reregistered with the RPC library through one of the
+\fBrpc_svc_reg\fR(3NSL) functions. The
 \fBsvc_exit()\fR function has global scope and ends all RPC server activity.
 .sp
 .LP
@@ -175,13 +180,14 @@ descriptors associated with the value of \fIrdfds\fR have been serviced. This
 function macro is Unsafe in multithreaded applications.
 .sp
 .LP
-The \fBsvc_getrpccaller()\fR function is the approved way of getting the
+The \fBsvc_getrpccaller()\fR function macro is the approved way of getting the
 network address of the caller of a procedure associated with the \fBRPC\fR
-service transport handle \fIxprt\fR. This function macro is Safe in
-multithreaded applications.
+service transport handle \fIxprt\fR. The returned pointer to struct netbuf
+shouldn't be deallocated by the svc_getrpccaller() caller. This function macro
+is Safe in multithreaded applications.
 .sp
 .LP
-The \fBsvc_run()\fR function never returns. In single-threaded mode, the
+In single-threaded mode, the \fBsvc_run()\fR
 function waits for \fBRPC\fR requests to arrive. When an RPC request arrives,
 the \fBsvc_run()\fR function calls the appropriate service procedure. This
 procedure is usually waiting for the \fBpoll\fR(2) library call to return.
@@ -199,8 +205,8 @@ descriptor bit mask. This is only of interest if service implementors do not
 call \fBsvc_run()\fR, but rather do their own asynchronous event processing.
 This variable is read-only may change after calls to \fBsvc_getreqset()\fR or
 after any creation routine. Do not pass its address to \fBselect\fR(3C).
-Instead, pass the address of a copy. multithreaded applications executing in
-either the Automatic MT mode or the user MT mode should never read this
+Instead, pass the address of a copy. Multithreaded applications executing in
+either the Automatic MT mode or the User MT mode should never read this
 variable. They should use auxiliary threads to do asynchronous event
 processing. The \fBsvc_fdset\fR variable is limited to 1024 file descriptors
 and is considered obsolete. Use of \fBsvc_pollfd\fR is recommended instead.
@@ -213,8 +219,8 @@ but rather do their own asynchronous event processing. This variable is
 read-only, and it may change after calls to \fBsvc_getreg_poll()\fR or any
 creation routines. Do no pass its address to \fBpoll\fR(2). Instead, pass the
 address of a copy. By default, \fBsvc_pollfd\fR is limited to 1024 entries. Use
-\fBrpc_control\fR(3NSL) to remove this limitation. multithreaded applications
-executing in either the Automatic MT mode or the user MT mode should never be
+\fBrpc_control\fR(3NSL) to remove this limitation. Multithreaded applications
+executing in either the Automatic MT mode or the User MT mode should never be
 read this variable. They should use auxiliary threads to do asynchronous event
 processing.
 .sp
@@ -250,7 +256,6 @@ memory location is non-null, the function reuses the existing \fBucred_t\fR.
 When \fIucred\fR is no longer needed, a credential allocated by
 \fBsvc_getcallerucred()\fR should be freed with \fBucred_free\fR(3C).
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of attribute types and values.
 .sp
@@ -275,9 +280,8 @@ the Automatic or the User MT mode. The \fBsvc_getreq_common()\fR,
 \fBsvc_getreqset()\fR, and \fBsvc_getreq_poll()\fR functions are Unsafe in
 multithreaded applications and should be called only from the main thread.
 .SH SEE ALSO
-.sp
 .LP
 \fBrpcgen\fR(1), \fBpoll\fR(2), \fBgetpeerucred\fR(3C), \fBrpc\fR(3NSL),
 \fBrpc_control\fR(3NSL), \fBrpc_svc_create\fR(3NSL), \fBrpc_svc_err\fR(3NSL),
 \fBrpc_svc_reg\fR(3NSL), \fBselect\fR(3C), \fBucred_free\fR(3C),
-\fBxprt_register\fR(3NSL), \fBattributes\fR(5)
+\fBattributes\fR(5)

@@ -1,4 +1,5 @@
 '\" te
+.\" Copyright 2014 Nexenta Systems, Inc.  All Rights Reserved.
 .\" Copyright 1989 AT&T
 .\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved
 .\" Portions Copyright (c) 1992, X/Open Company Limited All Rights Reserved
@@ -10,7 +11,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LS 1 "Jun 3, 2009"
+.TH LS 1 "Nov 24, 2014"
 .SH NAME
 ls \- list contents of directory
 .SH SYNOPSIS
@@ -39,7 +40,6 @@ ls \- list contents of directory
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 For each \fIfile\fR that is a directory, \fBls\fR lists the contents of the
 directory. For each \fIfile\fR that is an ordinary file, \fBls\fR repeats its
@@ -177,13 +177,14 @@ looks as follows:
 .nf
 $ls -/ c  file
 -rw-r--r--   1 root     root           0 May 10 14:17 file
-                {AHRSadim-u}
+                {AHRSadim-u--}
 
 $ls -/ v file
 -rw-r--r--   1 root     root           0 May 10 14:17 file
-                {archive,hidden,readonly,system,appendonly\e
-                 nodump,immutable, av_modified,\e
-                 noav_quarantined,nounlink}
+                {archive,hidden,readonly,system,\e
+                 appendonly,nodump,immutable,av_modified,\e
+                 noav_quarantined,nounlink,nooffline,\e
+                 nosparse}
 
 $ls -l -% all file
 -rw-r--r--   1 root     root           0 May 10 14:17 file
@@ -317,7 +318,6 @@ The 1000 bit is turned on, and execution is off (undefined bit-state).
 .RE
 
 .SS "/usr/bin/ls"
-.sp
 .ne 2
 .na
 \fB\fBl\fR\fR
@@ -329,7 +329,6 @@ is on and the group execution bit is off).
 .RE
 
 .SS "/usr/xpg4/bin/ls and /usr/xpg6/bin/ls"
-.sp
 .ne 2
 .na
 \fB\fBL\fR\fR
@@ -359,7 +358,6 @@ permissions during access.
 For others permissions, the third position can be occupied by \fBt\fR or
 \fBT\fR. These refer to the state of the sticky bit and execution permissions.
 .SS "Color Output"
-.sp
 .LP
 If color output is enabled, the environment variable LS_COLORS is checked.  If
 it exists, it's contents are used to control the colors used to display
@@ -817,11 +815,9 @@ The appropriate color codes are chosen by selecting the most specific match,
 starting with the file suffixes and proceeding with the file types until a
 match is found. The \fBno\fR (normal file) type matches any file.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .SS "/usr/bin/ls, /usr/xpg4/bin/ls, and /usr/xpg6/bin/ls"
-.sp
 .LP
 The following options are supported for all three versions:
 .sp
@@ -1610,7 +1606,7 @@ either \fBfile_inherit\fR and or \fBdir_inherit\fR also being specified.
 .ad
 .sp .6
 .RS 4n
-Indicates if an alarm or audit record should be initiated upon successful
+Indicates whether an alarm or audit record should be initiated upon successful
 accesses. Used with audit/alarm ACE types.
 .RE
 
@@ -1621,8 +1617,8 @@ accesses. Used with audit/alarm ACE types.
 .ad
 .sp .6
 .RS 4n
-Indicates if an alarm or audit record should be initiated when access fails.
-Used with audit/alarm ACE types.
+Indicates whether an alarm or audit record should be initiated when access
+fails. Used with audit/alarm ACE types.
 .RE
 
 .sp
@@ -1773,7 +1769,7 @@ for files that have extended attributes.
 .sp
 .ne 2
 .na
-\fB\fB-c\fR | \fB-v\fR\fR
+\fB\fB-/ c\fR | \fBv\fR\fR
 .ad
 .sp .6
 .RS 4n
@@ -1888,6 +1884,17 @@ when attempting to unlink or rename files and directories that are marked as
 .sp
 .ne 2
 .na
+\fB\fBoffline\fR\fR
+.ad
+.sp .6
+.RS 4n
+Indicate that a file is offline.  Solaris systems have no special semantics for
+this attribute.
+.RE
+
+.sp
+.ne 2
+.na
 \fB\fBreadonly\fR\fR
 .ad
 .sp .6
@@ -1895,6 +1902,19 @@ when attempting to unlink or rename files and directories that are marked as
 Marks a file as \fBreadonly\fR. Once a file is marked as \fBreadonly\fR the
 content data of the file cannot be modified. Other metadata for the file can
 still be modified.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBsparse\fR\fR
+.ad
+.sp .6
+.RS 4n
+Indicate that a file can be interpreted as sparse.  It does not indicate that
+the file is actually sparse or not.  The sparse attribute is cleared when the
+file is truncated to zero length.  Solaris systems have no other special
+semantics for this attribute.
 .RE
 
 .sp
@@ -1926,13 +1946,15 @@ immutable          i
 av_modified        m
 av_quarantined     q
 nounlink           u
+offline            O
+sparse             s
 .fi
 .in -2
 .sp
 
 .sp
 .LP
-The display in verbose mode (/ v) uses full attribute names when it is set and
+The display in verbose mode (\fB-/ v\fR) uses full attribute names when it is set and
 the name prefixed by 'no' when it is not set.
 .sp
 .LP
@@ -1949,17 +1971,19 @@ The display positions are as follows:
 .sp
 .in +2
 .nf
-{||||||||||}
- |||||||||+- u (nounlink)
- ||||||||+-- q (av_quarantined)
- |||||||+--- m (av_modified)
- ||||||+---- i (immutable)
- |||||+----- d (nodump)
- ||||+------ a (appendonly)
- |||+------- S (system)
- ||+-------- R (readonly)
- |+--------- H (hidden)
- +---------- A (archive)
+{||||||||||||}
+ |||||||||||+- s (sparse)
+ ||||||||||+-- O (offline)
+ |||||||||+--- u (nounlink)
+ ||||||||+---- q (av_quarantined)
+ |||||||+----- m (av_modified)
+ ||||||+------ i (immutable)
+ |||||+------- d (nodump)
+ ||||+-------- a (appendonly)
+ |||+--------- S (system)
+ ||+---------- R (readonly)
+ |+----------- H (hidden)
+ +------------ A (archive)
 .fi
 .in -2
 .sp
@@ -2019,9 +2043,9 @@ If extended system attributes are not supported or if the user does not have
 not set, \fBcrtime\fR is treated as a synonym for \fBmtime\fR.
 .sp
 .LP
-When option argument \fB-all\fR is specified, all available timestamps are
-printed which includes \fB-atime\fR, \fB-ctime\fR, \fB-mtime\fR and on the
-extended system attribute supporting file systems, \fB-crtime\fR (create time).
+When option argument \fBall\fR is specified, all available timestamps are
+printed which includes \fBatime\fR, \fBctime\fR, \fBmtime\fR and on the
+extended system attribute supporting file systems, \fBcrtime\fR (create time).
 The option \fB-% all\fR does not effect which timestamp is displayed in long
 format and does not affect sorting.
 .sp
@@ -2205,7 +2229,6 @@ all files.
 .RE
 
 .SS "/usr/bin/ls"
-.sp
 .ne 2
 .na
 \fB\fB-F\fR\fR
@@ -2247,7 +2270,6 @@ groups is not considered an error: \fB-C\fR and \fB-1\fR (one), \fB-H\fR and
 determines the timestamps used for sorting or in long format listings. The last
 option \fB-t\fR, \fB-S\fR, or \fB-U\fR determines the sorting behavior.
 .SS "/usr/xpg4/bin/ls"
-.sp
 .ne 2
 .na
 \fB\fB-F\fR\fR
@@ -2284,7 +2306,6 @@ option specifying a specific timestamp (\fB-c\fR, \fB-u\fR, \fB-% atime\fR ,
 used for sorting or in long format listings. The last \fB-t\fR, \fB-S\fR, or
 \fB-U\fR option determines the sorting behavior.
 .SS "/usr/xpg6/bin/ls"
-.sp
 .ne 2
 .na
 \fB\fB-F\fR\fR
@@ -2323,7 +2344,6 @@ crtime\fR, \fB-% ctime\fR, and \fB-% mtime\fR) determines the timestamps used
 for sorting or in long format listings. The last \fB-t\fR, \fB-S\fR, or
 \fB-U\fR option determines the sorting behavior.
 .SH OPERANDS
-.sp
 .LP
 The following operand is supported:
 .sp
@@ -2338,7 +2358,6 @@ diagnostic message is output on standard error.
 .RE
 
 .SH USAGE
-.sp
 .LP
 See \fBlargefile\fR(5) for the description of the behavior of \fBls\fR when
 encountering files greater than or equal to 2 Gbyte ( 2^31 bytes).
@@ -2517,22 +2536,24 @@ including indirect blocks, is printed.
 .nf
 example% ls -/ c file    (extended system attribute in compact mode)
 -rw-r--r--   1 root     root           0 May 10 14:17 file
-                         {AHRSadim-u}
+                         {AHRSadim-u--}
 .fi
 .in -2
 .sp
 
 .sp
 .LP
-In this example, \fBav_quarantined\fR is not set.
+In this example, \fBav_quarantined\fR, \fBoffline\fR, and \fBsparse\fR
+are not set.
 .sp
 .in +2
 .nf
 example% ls -/ v file (extended system attribute in verbose mode)
 -rw-r--r--   1 root     root           0 May 10 14:17 file
-                {archive,hidden,readonly,system,appendonly\e
-                 nodump,immutable,av_modified,\e
-                 noav_quarantined,nounlink}
+		{archive,hidden,readonly,system,\e
+		 appendonly,nodump,immutable,av_modified,\e
+		 noav_quarantined,nounlink,nooffline,\e
+		 nosparse}
 
 example% ls -/ v file     (no extended system attribute)
 -rw-r--r--  1 root    staff        0 May 16 14:48 file
@@ -2542,7 +2563,7 @@ example% ls -/ c file        (extended system attribute
                               supported file system)
 
 -rw-r--r--  1 root staff        3 Jun  4 22:04 file
-               {A------m--}
+               {A------m----}
 .fi
 .in -2
 .sp
@@ -2557,7 +2578,7 @@ extended system attribute supported file.
 example% ls -/ c  -%crtime file
 
 -rw-r--r--    root     root          0 May 10 14:17 file
-               {AHRSadim-u}
+               {AHRSadim-u--}
 .fi
 .in -2
 .sp
@@ -2588,7 +2609,6 @@ example% ls -%crtime -tl file*
 .LP
 In this example the files are sorted by creation time.
 .SH ENVIRONMENT VARIABLES
-.sp
 .LP
 See \fBenviron\fR(5) for descriptions of the following environment variables
 that affect the execution of \fBls\fR: \fBLANG\fR, \fBLC_ALL\fR,
@@ -2634,7 +2654,6 @@ is generated regardless of the value of the --color option.
 .RE
 
 .SH EXIT STATUS
-.sp
 .ne 2
 .na
 \fB\fB0\fR\fR
@@ -2653,7 +2672,6 @@ An error occurred.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/group\fR\fR
@@ -2684,13 +2702,10 @@ terminal information database
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .SS "/usr/bin/ls"
-.sp
 
-.sp
 .TS
 box;
 c | c
@@ -2715,9 +2730,7 @@ For all options except \fB-A\fR, \fB-b\fR, \fB-e\fR, \fB-E,\fR \fB-h\fR,
 \fB--numeric-uid-gid\fR, \fB--reverse\fR, \fB--recursive\fR, \fB--si\fR,
 \fB--size\fR, and \fB--time-style\fR, see \fBstandards\fR(5).
 .SS "/usr/xpg4/bin/ls"
-.sp
 
-.sp
 .TS
 box;
 c | c
@@ -2742,9 +2755,7 @@ For all options except \fB-A\fR, \fB-b\fR, \fB-e\fR, \fB-E,\fR \fB-h\fR,
 \fB--numeric-uid-gid\fR, \fB--reverse\fR, \fB--recursive\fR, \fB--si\fR,
 \fB--size\fR, and \fB--time-style\fR, see \fBstandards\fR(5).
 .SS "/usr/xpg6/bin/ls"
-.sp
 
-.sp
 .TS
 box;
 c | c
@@ -2769,13 +2780,11 @@ For all options except \fB-A\fR, \fB-b\fR, \fB-e\fR, \fB-E,\fR \fB-h\fR,
 \fB--numeric-uid-gid\fR, \fB--reverse\fR, \fB--recursive\fR, \fB--si\fR,
 \fB--size\fR, and \fB--time-style\fR, see \fBstandards\fR(5).
 .SH SEE ALSO
-.sp
 .LP
 \fBchmod\fR(1), \fBcp\fR(1), \fBsetfacl\fR(1), \fBfgetattr\fR(3C),
 \fBstrftime\fR(3C), \fBterminfo\fR(4), \fBacl\fR(5), \fBattributes\fR(5),
 \fBenviron\fR(5), \fBfsattr\fR(5), \fBlargefile\fR(5), \fBstandards\fR(5)
 .SH NOTES
-.sp
 .LP
 Unprintable characters in file names can confuse the columnar output options.
 .sp

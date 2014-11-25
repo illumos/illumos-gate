@@ -1,14 +1,14 @@
 '\" te
+.\" Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
 .\"  Copyright 1989 AT&T  Copyright (c) 1995 Sun Microsystems, Inc.   All Rights Reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH RPC_SVC_REG 3NSL "Feb 20, 1998"
+.TH RPC_SVC_REG 3NSL "Nov 24, 2014"
 .SH NAME
 rpc_svc_reg, rpc_reg, svc_reg, svc_unreg, svc_auth_reg, xprt_register,
 xprt_unregister \- library routines for registering servers
 .SH DESCRIPTION
-.sp
 .LP
 These routines are a part of the \fBRPC\fR library which allows the \fBRPC\fR
 servers to register themselves with \fBrpcbind()\fR (see  \fBrpcbind\fR(1M)),
@@ -16,7 +16,6 @@ and associate the given program and version number with the dispatch function.
 When the RPC server receives a RPC request, the library invokes the dispatch
 routine with the appropriate arguments.
 .SS "Routines"
-.sp
 .LP
 See \fBrpc\fR(3NSL) for the definition of the  \fBSVCXPRT\fR data structure.
 .sp
@@ -121,8 +120,8 @@ registered for it, and \fB\(mi1\fR otherwise.
 .RS 4n
 After \fBRPC\fR service transport handle \fIxprt\fR is created, it is
 registered with the \fBRPC\fR service package. This routine modifies the global
-variable \fBsvc_fdset\fR (see \fBrpc_svc_calls\fR(3NSL)). Service implementors
-usually do not need this routine.
+variables \fBsvc_fdset\fR and \fBsvc_pollfd\fR (see \fBrpc_svc_calls\fR(3NSL)).
+Service implementors usually do not need this routine.
 .RE
 
 .sp
@@ -134,12 +133,12 @@ usually do not need this routine.
 .RS 4n
 Before an \fBRPC\fR service transport handle \fIxprt\fR is destroyed, it
 unregisters itself with the \fBRPC\fR service package. This routine modifies
-the global variable \fBsvc_fdset\fR (see \fBrpc_svc_calls\fR(3NSL)). Service
-implementors usually do not need this routine.
+the global variables \fBsvc_fdset\fR and \fBsvc_pollfd\fR (see
+\fBrpc_svc_calls\fR(3NSL)). Service implementors usually do not need this
+routine.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -155,7 +154,6 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBinetd\fR(1M), \fBrpcbind\fR(1M), \fBrpc\fR(3NSL), \fBrpc_svc_calls\fR(3NSL),
 \fBrpc_svc_create\fR(3NSL), \fBrpc_svc_err\fR(3NSL), \fBrpcbind\fR(3NSL),
