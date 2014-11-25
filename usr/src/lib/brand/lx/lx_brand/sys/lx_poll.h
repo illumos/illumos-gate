@@ -50,11 +50,13 @@ extern "C" {
 /*
  * These events differ between Linux and Solaris
  */
-#define	LX_POLLWRNORM	0x100
-#define	LX_POLLWRBAND	0x200
+#define	LX_POLLWRNORM	0x0100
+#define	LX_POLLWRBAND	0x0200
+#define	LX_POLLRDHUP	0x2000
+
 
 #define	LX_POLL_SUPPORTED_EVENTS	\
-	(LX_POLL_COMMON_EVENTS | LX_POLLWRNORM | LX_POLLWRBAND)
+	(LX_POLL_COMMON_EVENTS | LX_POLLWRNORM | LX_POLLWRBAND | LX_POLLRDHUP)
 
 #ifdef	__cplusplus
 }

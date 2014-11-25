@@ -1366,7 +1366,7 @@ static struct lx_sysent sysents[] = {
 	{"fchmodat",	lx_fchmodat,		0,		4}, /* 268 */
 	{"faccessat",	lx_faccessat,		0,		4}, /* 269 */
 	{"pselect6",	lx_pselect6,		0,		6}, /* 270 */
-	{"ppoll",	NULL,			NOSYS_NULL,	0}, /* 271 */
+	{"ppoll",	lx_ppoll,		0,		5}, /* 271 */
 	{"unshare",	NULL,			NOSYS_NULL,	0}, /* 272 */
 	{"set_robust_list", NULL,		NOSYS_NULL,	0}, /* 273 */
 	{"get_robust_list", NULL,		NOSYS_NULL,	0}, /* 274 */
@@ -1731,7 +1731,7 @@ static struct lx_sysent sysents[] = {
 	{"fchmodat",	lx_fchmodat,	0,		4},	/* 306 */
 	{"faccessat",	lx_faccessat,	0,		4},	/* 307 */
 	{"pselect6",	lx_pselect6,	LX_SYS_EBPARG6,	6},	/* 308 */
-	{"ppoll",	NULL,		NOSYS_NULL,	0},	/* 309 */
+	{"ppoll",	lx_ppoll,	0,		5},	/* 309 */
 	{"unshare",	NULL,		NOSYS_NULL,	0},	/* 310 */
 	{"set_robust_list", NULL,	NOSYS_NULL,	0},	/* 311 */
 	{"get_robust_list", NULL,	NOSYS_NULL,	0},	/* 312 */
