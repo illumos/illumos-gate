@@ -1090,6 +1090,11 @@ lx_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 #endif
 		return (0);
 
+	case B_EXIT_AS_SIG:
+		exit(CLD_KILLED, (int)arg1);
+		/* NOTREACHED */
+		break;
+
 	case B_IKE_SYSCALL:
 		if (arg1 > LX_N_IKE_FUNCS)
 			return (EINVAL);

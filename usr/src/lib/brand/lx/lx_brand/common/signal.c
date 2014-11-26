@@ -1495,8 +1495,13 @@ lx_call_user_handler(int sig, siginfo_t *sip, void *p)
 	lx_debug("lxsap @ 0x%p", lxsap);
 
 	if ((sig == SIGPWR) && (lxsap->lxsa_handler == SIG_DFL)) {
-		/* Linux SIG_DFL for SIGPWR is to terminate */
-		exit(LX_SIGPWR | 0x80);
+		/*
+		 * Linux SIG_DFL for SIGPWR is to terminate. The lx wait
+		 * emulation will translate SIGPWR to LX_SIGPWR.
+		 */
+		(void) syscall(SYS_brand, B_EXIT_AS_SIG, SIGPWR);
+		/* This should never return */
+		assert(0);
 	}
 
 	if (lxsap->lxsa_handler == SIG_DFL || lxsap->lxsa_handler == SIG_IGN)
