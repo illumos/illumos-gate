@@ -18,9 +18,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -256,8 +257,12 @@ struct auth_cache {
 	int			auth_flavor;
 	uid_t			auth_clnt_uid;
 	gid_t			auth_clnt_gid;
+	uint_t			auth_clnt_ngids;
+	gid_t			*auth_clnt_gids;
 	uid_t			auth_srv_uid;
 	gid_t			auth_srv_gid;
+	uint_t			auth_srv_ngids;
+	gid_t			*auth_srv_gids;
 	int			auth_access;
 	time_t			auth_time;
 	time_t			auth_freshness;
@@ -542,12 +547,12 @@ typedef struct exp_visible exp_visible_t;
 #define	rdonly4(req, cs)  \
 	(vn_is_readonly((cs)->vp) || \
 	    (nfsauth4_access((cs)->exi, (cs)->vp, (req), (cs)->basecr, NULL, \
-	    NULL) & (NFSAUTH_RO | NFSAUTH_LIMITED)))
+	    NULL, NULL, NULL) & (NFSAUTH_RO | NFSAUTH_LIMITED)))
 
 extern int	nfsauth4_access(struct exportinfo *, vnode_t *,
-				struct svc_req *, cred_t *, uid_t *, gid_t *);
+    struct svc_req *, cred_t *, uid_t *, gid_t *, uint_t *, gid_t **);
 extern int	nfsauth4_secinfo_access(struct exportinfo *,
-				struct svc_req *, int, int, cred_t *);
+    struct svc_req *, int, int, cred_t *);
 extern int	nfs_fhbcmp(char *, char *, int);
 extern int	nfs_exportinit(void);
 extern void	nfs_exportfini(void);

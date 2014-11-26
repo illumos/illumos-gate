@@ -2020,6 +2020,8 @@ checkauth(struct exportinfo *exi, struct svc_req *req, cred_t *cr, int anon_ok,
 
 	uid_t uid;
 	gid_t gid;
+	uint_t ngids;
+	gid_t *gids;
 
 	/*
 	 * Check for privileged port number
@@ -2078,7 +2080,7 @@ checkauth(struct exportinfo *exi, struct svc_req *req, cred_t *cr, int anon_ok,
 	/*
 	 * Check if the auth flavor is valid for this export
 	 */
-	access = nfsauth_access(exi, req, cr, &uid, &gid);
+	access = nfsauth_access(exi, req, cr, &uid, &gid, &ngids, &gids);
 	if (access & NFSAUTH_DROP)
 		return (-1);	/* drop the request */
 
@@ -2113,6 +2115,9 @@ checkauth(struct exportinfo *exi, struct svc_req *req, cred_t *cr, int anon_ok,
 		 */
 		return (0);
 	}
+
+	if (rpcflavor != AUTH_SYS)
+		kmem_free(gids, ngids * sizeof (gid_t));
 
 	switch (rpcflavor) {
 	case AUTH_NONE:
@@ -2153,7 +2158,11 @@ checkauth(struct exportinfo *exi, struct svc_req *req, cred_t *cr, int anon_ok,
 				    exi->exi_export.ex_anon,
 				    exi->exi_export.ex_anon);
 			(void) crsetgroups(cr, 0, NULL);
+		} else if (access & NFSAUTH_GROUPS) {
+			(void) crsetgroups(cr, ngids, gids);
 		}
+
+		kmem_free(gids, ngids * sizeof (gid_t));
 
 		break;
 
@@ -2272,6 +2281,8 @@ checkauth4(struct compound_state *cs, struct svc_req *req)
 
 	uid_t uid;
 	gid_t gid;
+	uint_t ngids;
+	gid_t *gids;
 
 	exi = cs->exi;
 	cr = cs->cr;
@@ -2312,7 +2323,8 @@ checkauth4(struct compound_state *cs, struct svc_req *req)
 	 * Check the access right per auth flavor on the vnode of
 	 * this export for the given request.
 	 */
-	access = nfsauth4_access(cs->exi, cs->vp, req, cr, &uid, &gid);
+	access = nfsauth4_access(cs->exi, cs->vp, req, cr, &uid, &gid, &ngids,
+	    &gids);
 
 	if (access & NFSAUTH_WRONGSEC)
 		return (-2);	/* no access for this security flavor */
@@ -2341,6 +2353,9 @@ checkauth4(struct compound_state *cs, struct svc_req *req)
 	 * XXX probably need to redo some of it for nfsv4?
 	 * return 1 on success or 0 on failure
 	 */
+
+	if (rpcflavor != AUTH_SYS)
+		kmem_free(gids, ngids * sizeof (gid_t));
 
 	switch (rpcflavor) {
 	case AUTH_NONE:
@@ -2381,7 +2396,11 @@ checkauth4(struct compound_state *cs, struct svc_req *req)
 				    exi->exi_export.ex_anon,
 				    exi->exi_export.ex_anon);
 			(void) crsetgroups(cr, 0, NULL);
+		} if (access & NFSAUTH_GROUPS) {
+			(void) crsetgroups(cr, ngids, gids);
 		}
+
+		kmem_free(gids, ngids * sizeof (gid_t));
 
 		break;
 

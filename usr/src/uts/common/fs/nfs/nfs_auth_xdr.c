@@ -70,6 +70,10 @@ xdr_nfsauth_arg(XDR *xdrs, nfsauth_arg_t *argp)
 		return (FALSE);
 	if (!xdr_gid_t(xdrs, &argp->areq.req_clnt_gid))
 		return (FALSE);
+	if (!xdr_array(xdrs, (caddr_t *)&argp->areq.req_clnt_gids.val,
+	    &argp->areq.req_clnt_gids.len, NGROUPS_UMAX, (uint_t)sizeof (gid_t),
+	    xdr_gid_t))
+		return (FALSE);
 	return (TRUE);
 }
 
@@ -83,6 +87,10 @@ xdr_nfsauth_res(XDR *xdrs, nfsauth_res_t *argp)
 	if (!xdr_uid_t(xdrs, &argp->ares.auth_srv_uid))
 		return (FALSE);
 	if (!xdr_gid_t(xdrs, &argp->ares.auth_srv_gid))
+		return (FALSE);
+	if (!xdr_array(xdrs, (caddr_t *)&argp->ares.auth_srv_gids.val,
+	    &argp->ares.auth_srv_gids.len, NGROUPS_UMAX, (uint_t)sizeof (gid_t),
+	    xdr_gid_t))
 		return (FALSE);
 	return (TRUE);
 }
