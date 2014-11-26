@@ -1,11 +1,12 @@
 '\" te
 .\" Copyright (C) 2005, Sun Microsystems, Inc.
 .\" All Rights Reserved
+.\" Copyright (c) 2014, Joyent, Inc.
 .\" Copyright 1989 AT&T  All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH CONNECT 3SOCKET "Mar 08, 2005"
+.TH CONNECT 3SOCKET "Nov 25, 2014"
 .SH NAME
 connect \- initiate a connection on a socket
 .SH SYNOPSIS
@@ -35,6 +36,173 @@ will be bound to an address selected by the underlying transport provider.
 Generally, stream sockets can successfully \fBconnect()\fR only once. Datagram
 sockets can use \fBconnect()\fR multiple times to change their association.
 Datagram sockets can dissolve the association by connecting to a null address.
+.SS Non-blocking Sockets
+When a socket is created, it is by default a \fBblocking\fR socket. A socket may
+be configured to be \fBnon-blocking\fR either at socket creation time or through
+the use of \fBfcntl\fR(2). When a socket is set to be \fBnon-blocking\fR, a call
+to connect initiates an asynchronous connection. If the connection cannot be
+completed without blocking, such as when making a TCP connection to a remote
+server, then  the connection attempt is made in the background and \fBconnect\fR
+returns -1 and errno is set to \fBEINPROGRESS\fR.
+.LP
+Applications can obtain the state of this connection attempt by polling the
+socket's file descriptor for \fBPOLLOUT\fR. The event ports facility is the
+preferred means of polling on the file descriptor, see \fBport_create\fR(3C) and
+\fBport_get\fR(3C) for more information on event ports; however, applications
+may also use traditional portable routines like \fBpoll\fR(2) and
+\fBselect\fR(3C).
+.LP
+When an asynchronous connection has completed, the application must call
+\fBgetsockopt\fR(3SOCKET) using the macro \fBSOL_SOCKET\fR as the \fIlevel\fR
+argument and the macro \fBSO_ERROR\fR as the value of the \fIoption\fR argument.
+If the value of the \fBSO_ERROR\fR socket option is zero, then the
+connect was successfully established. Otherwise, the connection could not be
+established and the value is the corresponding error code that would be commonly
+found in \fBerrno\fR.
+.LP
+Even when a socket is in \fBnon-blocking\fR mode, a call to \fBconnect\fR may
+fail synchronously. If any error other \fBEINPROGRESS\fR or \fBEINTR\fR occurs,
+then there is no need for the application to poll for asynchronous completion.
+Similarly, if a call to \fBconnect\fR returns successfully, then the socket
+connection will be established and there is no need to poll for completion.
+.SH EXAMPLES
+.LP
+\fBExample 1\fR  Performing an asynchronous connection
+.sp
+.LP
+The following sample C program shows how to create and connect to a remote host
+using TCP. The program should be compiled and linked against libnsl and
+libsocket. For example, if the contents of this example where in a file called
+example.c, one would run cc example.c -lnsl -lsocket.
+.sp
+.in +2
+.nf
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <inttypes.h>
+#include <stdio.h>
+#include <strings.h>
+#include <stdlib.h>
+#include <errno.h>
+#include <port.h>
+#include <unistd.h>
+#include <assert.h>
+
+int
+main(int argc, char *argv[])
+{
+	char *eptr;
+	long port;
+	int sock, ret, eport;
+	struct sockaddr_in6 sin6;
+
+	if (argc != 3) {
+		fprintf(stderr, "connect: <IP> <port>\\n");
+		return (1);
+	}
+
+	bzero(&sin6, sizeof (struct sockaddr_in6));
+	sin6.sin6_family = AF_INET6;
+
+	/*
+	 * Try to parse as an IPv6 address and then try v4.
+	 */
+	ret = inet_pton(AF_INET6, argv[1], &sin6.sin6_addr);
+	if (ret == -1) {
+		perror("inet_pton");
+		return (1);
+	} else if (ret == 0) {
+		struct in_addr v4;
+		ret = inet_pton(AF_INET, argv[1], &v4);
+		if (ret == -1) {
+			perror("inet_pton");
+			return (1);
+		} else if (ret == 0) {
+			fprintf(stderr, "connect: %s is not a valid "
+			    "IPv4 or IPv6 address\\n", argv[1]);
+			return (1);
+		}
+		/* N.B. Not a portable macro */
+		IN6_INADDR_TO_V4MAPPED(&v4, &sin6.sin6_addr);
+	}
+
+	errno = 0;
+	port = strtol(argv[2], &eptr, 10);
+	if (errno != 0 || *eptr != '\0') {
+		fprintf(stderr, "failed to parse port %s\\n", argv[2]);
+		return (1);
+	}
+	if (port <= 0 || port > UINT16_MAX) {
+		fprintf(stderr, "invalid port: %ld\\n", port);
+		return (1);
+	}
+	sin6.sin6_port = htons(port);
+
+	sock = socket(AF_INET6, SOCK_STREAM | SOCK_NONBLOCK, 0);
+	if (sock < 0) {
+		perror("socket");
+		return (1);
+	}
+
+	eport = port_create();
+	if (eport < 0) {
+		perror("port_create");
+		(void) close(sock);
+		return (1);
+	}
+
+	ret = connect(sock, (struct sockaddr *)&sin6,
+	    sizeof (struct sockaddr_in6));
+	if (ret != 0 && errno != EINPROGRESS && errno != EINTR) {
+		perror("connect");
+		(void) close(sock);
+		(void) close(eport);
+		return (1);
+	}
+
+	if (ret != 0) {
+		port_event_t pe;
+		int err;
+		socklen_t sz = sizeof (err);
+		if (port_associate(eport, PORT_SOURCE_FD, sock, POLLOUT,
+		    NULL) != 0) {
+			perror("port_associate");
+			(void) close(sock);
+			(void) close(eport);
+			return (1);
+		}
+		if (port_get(eport, &pe, NULL) != 0) {
+			perror("port_get");
+			(void) close(sock);
+			(void) close(eport);
+			return (1);
+		}
+		assert(pe.portev_source == PORT_SOURCE_FD);
+		assert(pe.portev_object == (uintptr_t)sock);
+		if (getsockopt(sock, SOL_SOCKET, SO_ERROR, &err, &sz) != 0) {
+			perror("getsockopt");
+			(void) close(sock);
+			(void) close(eport);
+			return (1);
+		}
+		if (err != 0) {
+			/* Asynch connect failed */
+			fprintf(stderr, "asnchronous connect: %s\\n",
+			    strerror(err));
+			(void) close(sock);
+			(void) close(eport);
+			return (1);
+		}
+	}
+
+	/* Read and write to the socket and then clean up */
+
+	return (0);
+}
+.fi
+.in -2
 .SH RETURN VALUES
 .LP
 If the connection or binding succeeds, \fB0\fR is returned. Otherwise,
@@ -116,8 +284,7 @@ call to obtain a new descriptor before attempting another \fBconnect()\fR call.
 .ad
 .RS 17n
 The socket is non-blocking, and the connection cannot be completed immediately.
-You can use  \fBselect\fR(3C) to complete the connection by selecting the
-socket for writing.
+See the section on \fBNon-blocking Sockets\fR for more information.
 .RE
 
 .sp
