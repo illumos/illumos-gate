@@ -28,7 +28,6 @@
  */
 
 #include "libm.h"
-#include "libm_synonyms.h"
 
 long double __poly_libmq(x,n,p)
 long double x,p[];

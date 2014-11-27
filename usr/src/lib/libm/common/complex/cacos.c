@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak cacos = __cacos
+#pragma weak __cacos = cacos
 
 /* INDENT OFF */
 /*

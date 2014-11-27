@@ -26,7 +26,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak rint = __rint
+#pragma weak __rint = rint
 
 /*
  * rint(x) return x rounded to integral according to the rounding direction

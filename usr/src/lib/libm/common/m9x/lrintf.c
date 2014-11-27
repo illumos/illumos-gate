@@ -27,9 +27,7 @@
  * Use is subject to license terms.
  */
 
-#if defined(ELFOBJ)
-#pragma weak lrintf = __lrintf
-#endif
+#pragma weak __lrintf = lrintf
 
 #include <sys/isa_defs.h>	/* _ILP32 */
 #include "libm.h"

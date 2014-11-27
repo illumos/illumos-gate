@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak cexp = __cexp
+#pragma weak __cexp = cexp
 
 /* INDENT OFF */
 /*

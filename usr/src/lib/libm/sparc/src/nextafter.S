@@ -33,16 +33,7 @@ LIBM_ANSI_PRAGMA_WEAK(nextafter,function)
 	.weak _nextafter
 	.type _nextafter,#function
 _nextafter	= __nextafter
-#include "libm_synonyms.h"
 #include "libm_protos.h"
-
-#if defined(LIBM_BUILD)	&& !defined(ELFOBJ)
-#define	mENTRY(x)	ENTRY(__libm/**/x)
-#define	mNAME(x)	NAME(__libm/**/x)
-#else
-#define	mENTRY(x)	ENTRY(x)
-#define	mNAME(x)	NAME(x)
-#endif
 
 	RO_DATA
 	.align	8
@@ -110,7 +101,7 @@ y 	= -0x10
 	cmp	%i2,%l3
 	bne,a	9f			! next_return
 	ldd	[%fp+x],%f0
-	call	mNAME(_SVID_libm_err)	! overflow
+	call	NAME(_SVID_libm_err)	! overflow
 	or	%g0,46,%o4
 	ba	9f
 	nop

@@ -27,10 +27,8 @@
  * Use is subject to license terms.
  */
 
-#if defined(ELFOBJ)
-#pragma weak isnanf = __isnanf
-#pragma weak _isnanf = __isnanf
-#endif
+#pragma weak __isnanf = isnanf
+#pragma weak _isnanf = isnanf
 
 #include "libm.h"
 

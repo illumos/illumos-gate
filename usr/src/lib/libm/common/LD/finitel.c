@@ -27,10 +27,6 @@
  * Use is subject to license terms.
  */
 
-#if defined(ELFOBJ)
-#pragma weak finitel = __finitel
-#endif
-
 #include "libm.h"
 
 #if defined(__sparc)

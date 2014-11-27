@@ -27,10 +27,8 @@
  * Use is subject to license terms.
  */
 
-#if defined(ELFOBJ)
 #pragma weak modf = __modf
 #pragma weak _modf = __modf
-#endif
 
 /*
  * modf(x, iptr) decomposes x into an integral part and a fractional

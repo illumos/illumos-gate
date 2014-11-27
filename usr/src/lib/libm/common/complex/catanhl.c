@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak catanhl = __catanhl
+#pragma weak __catanhl = catanhl
 
 #include "libm.h"
 #include "complex_wrapper.h"

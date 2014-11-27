@@ -27,8 +27,6 @@
  * Use is subject to license terms.
  */
 
-#pragma weak exp10l = __exp10l
-
 #include "libm.h"
 #include "longdouble.h"
 

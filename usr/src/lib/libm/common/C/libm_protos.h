@@ -29,90 +29,15 @@
 #ifndef _C_LIBM_PROTOS_H
 #define	_C_LIBM_PROTOS_H
 
-#ifdef LIBMOPT_BUILD
-#define	_TBL_cos	__libmopt_TBL_cos
-#define	_TBL_exp2_512	__libmopt_TBL_exp2_512
-#define	_TBL_ipio2_inf	__libmopt_TBL_ipio2_inf
-#define	_TBL_jlog_n1	__libmopt_TBL_jlog_n1
-#define	_TBL_jlog_n2	__libmopt_TBL_jlog_n2
-#define	_TBL_jlog_p1	__libmopt_TBL_jlog_p1
-#define	_TBL_jlog_p2	__libmopt_TBL_jlog_p2
-#define	_TBL_log10	__libmopt_TBL_log10
-#define	_TBL_log2_14	__libmopt_TBL_log2_14
-#define	_TBL_log2_9	__libmopt_TBL_log2_9
-#define	_TBL_sin	__libmopt_TBL_sin
-#define	_TBL_sincosx	__libmopt_TBL_sincosx
-#define	_TBL_xexp	__libmopt_TBL_xexp
-#define	_TBL_xlog	__libmopt_TBL_xlog
-#define	__k_cos_	__libmopt__k_cos_
-#define	__k_sin_	__libmopt__k_sin_
-#define	__k_sincos_	__libmopt__k_sincos_
-#define	__reduction	__libmopt__reduction
-#define	__rem_pio2	__libmopt__rem_pio2
-#define	__rem_pio2m	__libmopt__rem_pio2m
-#else	/* defined(LIBMOPT_BUILD) */
-#ifdef LIBM_BUILD
-#define	_SVID_libm_err	__libm_SVID_libm_err	/* not used by -lsunmath */
-#define	_TBL_atan	__libm_TBL_atan
-#define	_TBL_atan1	__libm_TBL_atan1
-#define	_TBL_atan_hi	__libm_TBL_atan_hi	/* not used by -lsunmath */
-#define	_TBL_atan_lo	__libm_TBL_atan_lo	/* not used by -lsunmath */
-#define	_TBL_exp2_hi	__libm_TBL_exp2_hi	/* not used by -lsunmath */
-#define	_TBL_exp2_lo	__libm_TBL_exp2_lo	/* not used by -lsunmath */
-#define	_TBL_ipio2_inf	__libm_TBL_ipio2_inf
-#define	_TBL_log	__libm_TBL_log
-#define	_TBL_log2_hi	__libm_TBL_log2_hi	/* not used by -lsunmath */
-#define	_TBL_log2_lo	__libm_TBL_log2_lo	/* not used by -lsunmath */
-#define	_TBL_log_hi	__libm_TBL_log_hi	/* not used by -lsunmath */
-#define	_TBL_log_lo	__libm_TBL_log_lo	/* not used by -lsunmath */
-#define	_TBL_sincos	__libm_TBL_sincos
-#define	_TBL_sincosx	__libm_TBL_sincosx
-#define	_TBL_tan_hi	__libm_TBL_tan_hi	/* not used by -lsunmath */
-#define	_TBL_tan_lo	__libm_TBL_tan_lo	/* not used by -lsunmath */
-#define	__k_cexp	__libm__k_cexp		/* C99 libm */
-#define	__k_cexpl	__libm__k_cexpl		/* C99 libm */
-#define	__k_clog_r	__libm__k_clog_r	/* C99 libm */
-#define	__k_clog_rl	__libm__k_clog_rl	/* C99 libm */
-#define	__k_atan2	__libm__k_atan2		/* C99 libm */
-#define	__k_atan2l	__libm__k_atan2l	/* C99 libm */
-#define	__k_cos		__libm__k_cos
-#define	__k_lgamma	__libm__k_lgamma
-#define	__k_sin		__libm__k_sin
-#define	__k_sincos	__libm__k_sincos
-#define	__k_tan		__libm__k_tan
-#define	__reduction	__libm__reduction	/* i386 only */
+/*
+ * Many symbols used to be namespaced with __libm to prevent collisions.  All
+ * but these two were otherwise scoped local and directly bound, so that
+ * collision could not occur.
+ *
+ * For reasons unknown, these two are global (but private).
+ */
 #define	__rem_pio2	__libm__rem_pio2
 #define	__rem_pio2m	__libm__rem_pio2m
-#define	__k_cosf	__libm__k_cosf		/* C99 libm */
-#define	__k_cosl	__libm__k_cosl		/* C99 libm */
-#define	__k_lgammal	__libm__k_lgammal	/* C99 libm */
-#define	__k_sincosf	__libm__k_sincosf	/* C99 libm */
-#define	__k_sincosl	__libm__k_sincosl	/* C99 libm */
-#define	__k_sinf	__libm__k_sinf		/* C99 libm */
-#define	__k_sinl	__libm__k_sinl		/* C99 libm */
-#define	__k_tanf	__libm__k_tanf		/* C99 libm */
-#define	__k_tanl	__libm__k_tanl		/* C99 libm */
-#define	__poly_libmq	__libm__poly_libmq	/* C99 libm */
-#define	__rem_pio2l	__libm__rem_pio2l	/* C99 libm */
-#define	_TBL_atanl_hi	__libm_TBL_atanl_hi	/* C99 libm */
-#define	_TBL_atanl_lo	__libm_TBL_atanl_lo	/* C99 libm */
-#define	_TBL_cosl_hi	__libm_TBL_cosl_hi	/* C99 libm */
-#define	_TBL_cosl_lo	__libm_TBL_cosl_lo	/* C99 libm */
-#define	_TBL_expl_hi	__libm_TBL_expl_hi	/* C99 libm */
-#define	_TBL_expl_lo	__libm_TBL_expl_lo	/* C99 libm */
-#define	_TBL_expm1l	__libm_TBL_expm1l	/* C99 libm */
-#define	_TBL_expm1lx	__libm_TBL_expm1lx	/* C99 libm */
-#define	_TBL_ipio2l_inf	__libm_TBL_ipio2l_inf	/* C99 libm */
-#define	_TBL_logl_hi	__libm_TBL_logl_hi	/* C99 libm */
-#define	_TBL_logl_lo	__libm_TBL_logl_lo	/* C99 libm */
-#define	_TBL_r_atan_hi	__libm_TBL_r_atan_hi	/* C99 libm */
-#define	_TBL_r_atan_lo	__libm_TBL_r_atan_lo	/* C99 libm */
-#define	_TBL_sinl_hi	__libm_TBL_sinl_hi	/* C99 libm */
-#define	_TBL_sinl_lo	__libm_TBL_sinl_lo	/* C99 libm */
-#define	_TBL_tanl_hi	__libm_TBL_tanl_hi	/* C99 libm */
-#define	_TBL_tanl_lo	__libm_TBL_tanl_lo	/* C99 libm */
-#endif	/* defined(LIBM_BUILD) */
-#endif	/* defined(LIBMOPT_BUILD) */
 
 #ifndef _ASM
 #ifdef __STDC__

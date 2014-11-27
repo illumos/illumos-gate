@@ -26,7 +26,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak lgamma = __lgamma
+#pragma weak __lgamma = lgamma
 
 #include "libm.h"
 

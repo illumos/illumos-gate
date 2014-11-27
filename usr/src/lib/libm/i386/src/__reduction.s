@@ -39,9 +39,7 @@
 /     ----------------------------------------------------------
 
 #include "libm.h"
-#include "libm_synonyms.h"
 #include "libm_protos.h"
-#undef fabs
 
 	ENTRY(__reduction)
 #ifndef PIC

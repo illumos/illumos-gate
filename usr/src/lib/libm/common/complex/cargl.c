@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak cargl = __cargl
+#pragma weak __cargl = cargl
 
 #include "libm.h"
 #include "complex_wrapper.h"

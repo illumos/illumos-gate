@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak coshl = __coshl
+#pragma weak __coshl = coshl
 
 #include "libm.h"
 #include "longdouble.h"

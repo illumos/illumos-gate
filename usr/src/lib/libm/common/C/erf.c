@@ -27,8 +27,8 @@
  * Use is subject to license terms.
  */
 
-#pragma weak erf = __erf
-#pragma weak erfc = __erfc
+#pragma weak __erf = erf
+#pragma weak __erfc = erfc
 
 /* INDENT OFF */
 /*
@@ -127,7 +127,6 @@
  */
 /* INDENT ON */
 
-#include "libm_synonyms.h"	/* __erf, __erfc, __exp */
 #include "libm_macros.h"
 #include <math.h>
 

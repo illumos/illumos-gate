@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak csinhl = __csinhl
+#pragma weak __csinhl = csinhl
 
 #include "libm.h"	/* coshl/expl/fabsl/scalbnl/sincosl/sinhl/__k_cexpl */
 #include "complex_wrapper.h"

@@ -30,7 +30,6 @@
 
 #include "libm.h"
 LIBM_ANSI_PRAGMA_WEAK(rint,function)
-#include "libm_synonyms.h"
 
 	ENTRY(rint)
 	fldl	4(%esp)			/ load x

@@ -27,9 +27,7 @@
  * Use is subject to license terms.
  */
 
-#if defined(ELFOBJ)
 #pragma weak nan = __nan
-#endif
 
 /*
  *  nan(c) returns a NaN.  This implementation ignores c.

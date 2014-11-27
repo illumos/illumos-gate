@@ -26,7 +26,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak log10f = __log10f
+#pragma weak __log10f = log10f
 
 #include "libm.h"
 

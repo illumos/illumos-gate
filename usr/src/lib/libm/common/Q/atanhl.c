@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak atanhl = __atanhl
+#pragma weak __atanhl = atanhl
 
 #include "libm.h"
 

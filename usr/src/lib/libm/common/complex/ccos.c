@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak ccos = __ccos
+#pragma weak __ccos = ccos
 
 /* INDENT OFF */
 /*

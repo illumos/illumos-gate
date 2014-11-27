@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak ctanhl = __ctanhl
+#pragma weak __ctanhl = ctanhl
 
 #include "libm.h"	/* expl/expm1l/fabsl/isinfl/isnanl/sincosl/sinl/tanhl */
 #include "complex_wrapper.h"

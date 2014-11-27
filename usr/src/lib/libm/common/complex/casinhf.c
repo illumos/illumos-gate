@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak casinhf = __casinhf
+#pragma weak __casinhf = casinhf
 
 #include "libm.h"
 #include "complex_wrapper.h"

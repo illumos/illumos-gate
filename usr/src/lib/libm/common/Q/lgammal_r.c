@@ -31,7 +31,7 @@
  * long double lgammal_r(long double x, int *signgamlp);
  */
 
-#pragma weak lgammal_r = __lgammal_r
+#pragma weak __lgammal_r = lgammal_r
 
 #include "libm.h"
 #include "longdouble.h"

@@ -27,16 +27,14 @@
  * Use is subject to license terms.
  */
 
-#if defined(ELFOBJ)
-#pragma weak logb = __logb
-#pragma weak _logb = __logb
-#endif
+#pragma weak __logb = logb
+#pragma weak _logb = logb
 
 #include "libm.h"
 #include "xpg6.h"	/* __xpg6 */
 #define	_C99SUSv3_logb	_C99SUSv3_logb_subnormal_is_like_ilogb
 
-#if defined(USE_FPSCALE) || defined(__x86)
+#if defined(__x86)
 static const double two52 = 4503599627370496.0;
 #else
 /*
@@ -59,7 +57,7 @@ ilogb_subnormal(unsigned v, unsigned w) {
 	v <<= 1;
 	return (r + ((0xffffaa50 >> v) & 0x3));
 }
-#endif	/* defined(USE_FPSCALE) */
+#endif	/* defined(__x86) */
 
 double
 logb(double x) {
@@ -69,7 +67,7 @@ logb(double x) {
 		if ((px[LOWORD] | k) == 0)
 			return (_SVID_libm_err(x, x, 45));
 		else if ((__xpg6 & _C99SUSv3_logb) != 0) {
-#if defined(USE_FPSCALE) || defined(__x86)
+#if defined(__x86)
 			x *= two52;
 			return ((double) (((px[HIWORD] & 0x7ff00000) >> 20)
 				- 1075));

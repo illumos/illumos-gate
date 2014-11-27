@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak catanl = __catanl
+#pragma weak __catanl = catanl
 
 /* INDENT OFF */
 /*

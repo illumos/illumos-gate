@@ -29,8 +29,6 @@
         .file "finitef.s"
 
 #include "libm.h"
-LIBM_ANSI_PRAGMA_WEAK(finitef,function)
-#include "libm_synonyms.h"
 
 	ENTRY(finitef)
         movl    4(%esp),%eax		/ eax <-- x

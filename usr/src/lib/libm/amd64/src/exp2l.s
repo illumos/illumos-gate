@@ -30,7 +30,6 @@
 
 #include "libm.h"
 LIBM_ANSI_PRAGMA_WEAK(exp2l,function)
-#include "libm_synonyms.h"
 
 	ENTRY(exp2l)
 	movl	16(%rsp),%ecx		/ cx <--sign&bexp(x)

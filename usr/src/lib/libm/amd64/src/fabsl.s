@@ -30,11 +30,9 @@
 
 #include "libm.h"
 LIBM_ANSI_PRAGMA_WEAK(fabsl,function)
-#include "libm_synonyms.h"
 
 	ENTRY(fabsl)
 	fldt    8(%rsp)
-#undef	fabs
 	fabs
 	ret
 	.align	16

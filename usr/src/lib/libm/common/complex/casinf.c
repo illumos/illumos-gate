@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak casinf = __casinf
+#pragma weak __casinf = casinf
 
 #include "libm.h"
 #include "complex_wrapper.h"

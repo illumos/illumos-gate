@@ -31,7 +31,7 @@ ASSUFFIX	= $(ASSUFFIX_$(MACH))
 # compatibility.
 C99MODE		=
 
-M4FLAGS		= -D__STDC__ -DELFOBJ -DPIC
+M4FLAGS		= -D__STDC__ -DPIC
 
 LDBLDIR_sparc	= Q
 LDBLDIR_i386	= LD
@@ -39,13 +39,11 @@ LDBLDIR		= $(LDBLDIR_$(MACH))
 
 LM_IL		= $(LIBMDIR)/$(TARGET_ARCH)/src/locallibm.il
 
-CFLAGS		+= $(C_PICFLAGS) -D__INLINE $(XSTRCONST) $(LM_IL)
-CFLAGS64	+= $(C_PICFLAGS) -D__INLINE $(XSTRCONST) $(LM_IL)
+CFLAGS		+= $(C_PICFLAGS) $(XSTRCONST) $(LM_IL)
+CFLAGS64	+= $(C_PICFLAGS) $(XSTRCONST) $(LM_IL)
 sparc_CFLAGS	+= -Wa,-xarch=v8plus
 
-CPPFLAGS	+= -DELFOBJ \
-		-DLIBM_MT_FEX_SYNC \
-		-I$(LIBMSRC)/C \
+CPPFLAGS	+= -I$(LIBMSRC)/C \
 		-I$(LIBMSRC)/$(LDBLDIR) -I$(LIBMDIR)/$(TARGET_ARCH)/src
 
 # GCC needs __C99FEATURES__ such that the implementations of isunordered,

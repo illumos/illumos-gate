@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak acos = __acos
+#pragma weak __acos = acos
 
 /* INDENT OFF */
 /*
@@ -56,7 +56,6 @@
  */
 /* INDENT ON */
 
-#include "libm_synonyms.h"	/* __acos, __sqrt, __isnan */
 #include "libm_protos.h"	/* _SVID_libm_error */
 #include "libm_macros.h"
 #include <math.h>

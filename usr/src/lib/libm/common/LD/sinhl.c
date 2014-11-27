@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak sinhl = __sinhl
+#pragma weak __sinhl = sinhl
 
 #include "libm.h"
 #include "longdouble.h"
@@ -37,14 +37,14 @@
  *
  * Method :
  *	1. reduce x to non-negative by SINH(-x) = - SINH(x).
- *	2. 
+ *	2.
  *
  *	                                      EXPM1(x) + EXPM1(x)/(EXPM1(x)+1)
  *	    0 <= x <= lnovft     : SINH(x) := --------------------------------
  *			       		                      2
  *
  *     lnovft <= x <  INF	 : SINH(x) := EXP(x-MEP1*ln2)*2**ME
- *	
+ *
  * here
  *	lnovft		logarithm of the overflow threshold
  *			= MEP1*ln2 chopped to machine precision.

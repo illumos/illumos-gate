@@ -26,7 +26,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak sinhf = __sinhf
+#pragma weak __sinhf = sinhf
 
 #include "libm.h"
 

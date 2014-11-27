@@ -26,7 +26,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak floor = __floor
+#pragma weak __floor = floor
 
 /*
  * floor(x) returns the biggest integral value less than or equal to x.

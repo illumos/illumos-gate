@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak tgammaf = __tgammaf
+#pragma weak __tgammaf = tgammaf
 
 /*
  * True gamma function
@@ -40,7 +40,6 @@
  */
 
 #include "libm.h"
-#include "libm_synonyms.h"
 #include <math.h>
 #if defined(__SUNPRO_C)
 #include <sunmath.h>

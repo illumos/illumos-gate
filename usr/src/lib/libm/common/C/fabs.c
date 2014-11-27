@@ -27,10 +27,9 @@
  * Use is subject to license terms.
  */
 
-#pragma weak fabs = __fabs
+#pragma weak __fabs = fabs
 
 #include "libm.h"
-#include "libm_synonyms.h"
 #include "libm_macros.h"
 #include <math.h>
 

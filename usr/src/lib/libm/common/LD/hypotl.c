@@ -27,9 +27,7 @@
  * Use is subject to license terms.
  */
 
-#if defined(ELFOBJ)
-#pragma weak hypotl = __hypotl
-#endif
+#pragma weak __hypotl = hypotl
 
 /*
  * hypotl(x,y)

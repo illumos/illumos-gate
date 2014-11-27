@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak signgaml = __signgaml
+#pragma weak __signgaml = signgaml
 
 #include "libm.h"
 

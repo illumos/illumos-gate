@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak cprojl = __cprojl
+#pragma weak __cprojl = cprojl
 
 #include "libm.h"		/* fabsl */
 #include "complex_wrapper.h"

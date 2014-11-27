@@ -27,9 +27,7 @@
  * Use is subject to license terms.
  */
 
-#if defined(ELFOBJ)
-#pragma weak asinl = __asinl
-#endif
+#pragma weak __asinl = asinl
 
 /*
  *	asinl(x) = atan2l(x,sqrt(1-x*x));

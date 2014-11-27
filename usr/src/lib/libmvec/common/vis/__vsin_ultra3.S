@@ -29,11 +29,9 @@
 	.file	"__vsin_ultra3.S"
 
 #include "libm.h"
-#if defined(LIBMVEC_SO_BUILD)
 	.weak	__vsin
 	.type	__vsin,#function
 	__vsin = __vsin_ultra3
-#endif
 
 	RO_DATA
 	.align	64

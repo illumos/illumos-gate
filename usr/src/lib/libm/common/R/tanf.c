@@ -26,7 +26,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak tanf = __tanf
+#pragma weak __tanf = tanf
 
 #include "libm.h"
 

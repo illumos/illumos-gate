@@ -26,7 +26,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak remainder = __remainder
+#pragma weak __remainder = remainder
 
 /*
  * remainder(x,p)

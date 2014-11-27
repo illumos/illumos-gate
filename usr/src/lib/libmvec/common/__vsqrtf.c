@@ -33,10 +33,7 @@
 #define restrict
 #endif
 
-#include "libm_synonyms.h"
 #include "libm_inlines.h"
-
-#define sqrtf __sqrtf
 
 extern float sqrtf(float);
 
@@ -50,4 +47,3 @@ __vsqrtf(int n, float * restrict x, int stridex, float * restrict y, int stridey
 		y += stridey;
 	}
 }
-

@@ -234,12 +234,21 @@ $endif
 		__lgammaf_r;			#LSARC/2003/279
 		__lgammal;
 		__lgammal_r;			#LSARC/2003/279
+$if amd64 || sparcv9
+		__llrint	{ FLAGS = NODYNSORT };
+		__llrintf	{ FLAGS = NODYNSORT };
+		__llrintl	{ FLAGS = NODYNSORT };
+		__llround	{ FLAGS = NODYNSORT };
+		__llroundf	{ FLAGS = NODYNSORT };
+		__llroundl	{ FLAGS = NODYNSORT };
+$else
 		__llrint;
 		__llrintf;
 		__llrintl;
 		__llround;
 		__llroundf;
 		__llroundl;
+$endif
 		__log1pf;
 		__log1pl;
 		__log2;
@@ -709,7 +718,7 @@ SYMBOL_VERSION SUNW_1.1 {
 		log10;
 		log1p;
 		logb;
-		matherr;
+		matherr { FLAGS = NODIRECT };
 		nextafter;
 		pow;
 		remainder;

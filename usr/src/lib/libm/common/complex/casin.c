@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak casin = __casin
+#pragma weak __casin = casin
 
 /* INDENT OFF */
 /*

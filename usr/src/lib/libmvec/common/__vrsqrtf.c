@@ -27,7 +27,6 @@
  * Use is subject to license terms.
  */
 
-#include "libm_synonyms.h"
 #include "libm_inlines.h"
 
 #ifdef __RESTRICT
@@ -70,8 +69,6 @@
  *	Maximum error observed: less than 0.534 ulp for the
  *	whole float type range.
  */
-
-#define sqrtf __sqrtf
 
 extern float sqrtf(float);
 
@@ -503,4 +500,3 @@ __vrsqrtf_n(int n, float * restrict px, int stridex, float * restrict py, int st
 		py += stridey;
 	}
 }
-

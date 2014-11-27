@@ -30,7 +30,6 @@
 
 #include "libm.h"
 LIBM_ANSI_PRAGMA_WEAK(fabs,function)
-#include "libm_synonyms.h"
 
 	ENTRY(fabs)
 	sethi	%hi(0x80000000),%o2

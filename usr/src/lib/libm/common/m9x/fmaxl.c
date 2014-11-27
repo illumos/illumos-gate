@@ -27,9 +27,7 @@
  * Use is subject to license terms.
  */
 
-#if defined(ELFOBJ)
 #pragma weak fmaxl = __fmaxl
-#endif
 
 #include "libm.h"	/* for isgreaterequal macro */
 

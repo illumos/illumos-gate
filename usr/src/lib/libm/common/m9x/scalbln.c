@@ -27,15 +27,13 @@
  * Use is subject to license terms.
  */
 
-#if defined(ELFOBJ)
-#pragma weak scalbln = __scalbln
-#endif
+#pragma weak __scalbln = scalbln
 
 #include "libm.h"
 #include <float.h>		/* DBL_MAX, DBL_MIN */
 
 static const double twom54 = 5.5511151231257827021181583404541015625e-17;
-#if defined(USE_FPSCALE) || defined(__x86)
+#if defined(__x86)
 static const double two52 = 4503599627370496.0;
 #else
 /*
@@ -69,7 +67,7 @@ ilogb_biased(unsigned *px) {
 	px[LOWORD] = w;
 	return (1 - s);
 }
-#endif	/* defined(USE_FPSCALE) */
+#endif	/* defined(__x86) */
 
 double
 scalbln(double x, long n) {
@@ -87,7 +85,7 @@ scalbln(double x, long n) {
 	if ((px[LOWORD] | ix) == 0 || n == 0)
 		return (x);
 	if (k == 0) {
-#if defined(USE_FPSCALE) || defined(__x86)
+#if defined(__x86)
 		x *= two52;
 		k = ((px[HIWORD] & ~0x80000000) >> 20) - 52;
 #else

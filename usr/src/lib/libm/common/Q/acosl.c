@@ -44,7 +44,7 @@
  *	if |x|>1, return NaN with invalid signal.
  */
 
-#pragma weak acosl = __acosl
+#pragma weak __acosl = acosl
 
 #include "libm.h"
 

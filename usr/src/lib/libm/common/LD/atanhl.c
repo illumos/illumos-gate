@@ -27,10 +27,9 @@
  * Use is subject to license terms.
  */
 
-#pragma weak atanhl = __atanhl
+#pragma weak __atanhl = atanhl
 
 #include "libm.h"
-#include "libm_synonyms.h"
 
 #define GENERIC	long double
 #define	ATANH 	atanhl
@@ -40,7 +39,7 @@
  *	ATANH(x) = --- * LOG(1 + -------) = 0.5 * LOG1P(2 * --------)
  *                  2             1 - x                      1 - x
  * Note: to guarantee ATANH(-x) = -ATANH(x), we use
- *                 sign(x)             |x|  
+ *                 sign(x)             |x|
  *	ATANH(x) = ------- * LOG1P(2*-------).
  *                    2              1 - |x|
  *
@@ -65,7 +64,7 @@ one	= (GENERIC) 1.0;
 
 GENERIC ATANH(x)
 GENERIC x;
-{	
+{
 	GENERIC t;
 	t = FABS(x);
 	if (t == one) return x/zero;

@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak log2f = __log2f
+#pragma weak __log2f = log2f
 
 #include "libm.h"
 

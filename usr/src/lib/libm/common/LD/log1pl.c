@@ -27,9 +27,7 @@
  * Use is subject to license terms.
  */
 
-#if defined(ELFOBJ)
-#pragma weak log1pl = __log1pl
-#endif
+#pragma weak __log1pl = log1pl
 
 /*
  * log1pl(x)

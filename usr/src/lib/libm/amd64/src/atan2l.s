@@ -30,7 +30,6 @@
 
 #include "libm.h"
 LIBM_ANSI_PRAGMA_WEAK(atan2l,function)
-#include "libm_synonyms.h"
 
 	ENTRY(atan2l)
 	fldt	8(%rsp)			/ push y

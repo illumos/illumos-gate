@@ -26,7 +26,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak logf = __logf
+#pragma weak __logf = logf
 
 /*
  * Algorithm:

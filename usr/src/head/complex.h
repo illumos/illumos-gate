@@ -33,8 +33,6 @@
 extern "C" {
 #endif
 
-/* #if !defined(__cplusplus) */
-
 /*
  * Compilation environments for Solaris must provide the _Imaginary datatype
  * and the compiler intrinsics _Complex_I and _Imaginary_I
@@ -126,9 +124,7 @@ extern long double complex csqrtl(long double complex);
 extern long double complex ctanhl(long double complex);
 extern long double complex ctanl(long double complex);
 
-/* #endif */	/* !defined(__cplusplus) */
 #ifdef	__cplusplus
 }
 #endif
-
 #endif	/* _COMPLEX_H */

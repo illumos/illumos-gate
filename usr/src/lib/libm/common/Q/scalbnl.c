@@ -27,9 +27,7 @@
  * Use is subject to license terms.
  */
 
-#if defined(ELFOBJ)
-#pragma weak scalbnl = __scalbnl
-#endif
+#pragma weak __scalbnl = scalbnl
 
 #include "libm.h"
 #include <float.h>		/* LDBL_MAX, LDBL_MIN */

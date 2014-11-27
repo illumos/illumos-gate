@@ -30,7 +30,6 @@
 
 #include "libm.h"
 LIBM_ANSI_PRAGMA_WEAK(trunc,function)
-#include "libm_synonyms.h"
 
 	ENTRY(trunc)
 	movl	%esp,%eax

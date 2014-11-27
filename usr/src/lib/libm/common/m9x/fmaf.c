@@ -27,9 +27,7 @@
  * Use is subject to license terms.
  */
 
-#if defined(ELFOBJ)
 #pragma weak fmaf = __fmaf
-#endif
 
 #include "libm.h"
 #include "fma.h"

@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak atanl = __atanl
+#pragma weak __atanl = atanl
 
 /*
  * atanl(x)

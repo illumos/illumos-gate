@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak ccosf = __ccosf
+#pragma weak __ccosf = ccosf
 
 #include "libm.h"
 #include "complex_wrapper.h"

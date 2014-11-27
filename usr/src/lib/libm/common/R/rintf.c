@@ -27,13 +27,7 @@
  * Use is subject to license terms.
  */
 
-#if defined(ELFOBJ)
-#pragma weak aintf = __aintf
-#pragma weak anintf = __anintf
-#pragma weak irintf = __irintf
-#pragma weak nintf = __nintf
-#pragma weak rintf = __rintf
-#endif
+#pragma weak __rintf = rintf
 
 /* INDENT OFF */
 /*

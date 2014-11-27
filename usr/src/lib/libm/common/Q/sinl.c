@@ -59,7 +59,7 @@
  *	computer TRIG(x) returns trig(x) nearly rounded.
  */
 
-#pragma weak sinl = __sinl
+#pragma weak __sinl = sinl
 
 #include "libm.h"
 #include "longdouble.h"

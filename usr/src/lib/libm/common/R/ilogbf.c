@@ -27,14 +27,12 @@
  * Use is subject to license terms.
  */
 
-#if defined(ELFOBJ)
-#pragma weak ilogbf = __ilogbf
-#endif
+#pragma weak __ilogbf = ilogbf
 
 #include "libm.h"
 #include "xpg6.h"	/* __xpg6 */
 
-#if defined(USE_FPSCALE) || defined(__x86)
+#if defined(__x86)
 static const float two25 = 33554432.0F;
 #else
 /*
@@ -53,7 +51,7 @@ ilogbf_subnormal(unsigned v) {
 	v <<= 1;
 	return (r + ((0xffffaa50 >> v) & 0x3));
 }
-#endif	/* defined(USE_FPSCALE) */
+#endif	/* defined(__x86) */
 
 static int
 raise_invalid(int v) {	/* SUSv3 requires ilogbf(0,+/-Inf,NaN) raise invalid */
@@ -76,7 +74,7 @@ ilogbf(float x) {
 		if (k == 0)
 			return (raise_invalid(0x80000001));
 		else {
-#if defined(USE_FPSCALE) || defined(__x86)
+#if defined(__x86)
 			x *= two25;
 			return (((*((int *) &x) & 0x7f800000) >> 23) - 152);
 #else

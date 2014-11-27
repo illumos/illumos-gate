@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak cbrtf = __cbrtf
+#pragma weak __cbrtf = cbrtf
 
 #include "libm.h"
 

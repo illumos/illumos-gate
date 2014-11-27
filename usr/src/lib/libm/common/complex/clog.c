@@ -60,7 +60,6 @@
  */
 /* INDENT ON */
 
-#include "libm_synonyms.h"
 #include <math.h>		/* atan2/fabs/log/log1p */
 #include "complex_wrapper.h"
 #include "libm_protos.h"	/* __k_clog_r */
@@ -69,7 +68,7 @@
 static const double half = 0.5, one = 1.0;
 
 dcomplex
-clog(dcomplex z) {
+__clog(dcomplex z) {
 	dcomplex	ans;
 	double		x, y, t, ax, ay, w;
 	int		n, ix, iy, hx, hy;

@@ -27,12 +27,10 @@
  * Use is subject to license terms.
  */
 
-#if defined(ELFOBJ)
-#pragma weak llrint = __llrint
+#pragma weak __llrint = llrint
 #if defined(__sparcv9) || defined(__amd64)
-#pragma weak lrint = __llrint
-#pragma weak __lrint = __llrint
-#endif
+#pragma weak lrint = llrint
+#pragma weak __lrint = llrint
 #endif
 
 /*

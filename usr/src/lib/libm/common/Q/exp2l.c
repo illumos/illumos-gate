@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak exp2l = __exp2l
+#pragma weak __exp2l = exp2l
 
 #include "libm.h"
 #include "longdouble.h"

@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak scalbl = __scalbl
+#pragma weak __scalbl = scalbl
 
 /*
  * scalbl(x,n): return x * 2**n by manipulating exponent.

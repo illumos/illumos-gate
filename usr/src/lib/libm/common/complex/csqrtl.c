@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak csqrtl = __csqrtl
+#pragma weak __csqrtl = csqrtl
 
 #include "libm.h"		/* fabsl/isinfl/sqrtl */
 #include "complex_wrapper.h"

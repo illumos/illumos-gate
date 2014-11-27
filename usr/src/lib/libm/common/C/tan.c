@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak tan = __tan
+#pragma weak __tan = tan
 
 /* INDENT OFF */
 /*
@@ -41,7 +41,6 @@
 /* INDENT ON */
 
 #include "libm.h"
-#include "libm_synonyms.h"
 #include "libm_protos.h"
 #include <math.h>
 

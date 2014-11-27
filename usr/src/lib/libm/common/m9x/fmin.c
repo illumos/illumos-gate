@@ -27,9 +27,7 @@
  * Use is subject to license terms.
  */
 
-#if defined(ELFOBJ)
 #pragma weak fmin = __fmin
-#endif
 
 /*
  * fmin(x,y) returns the smaller of x and y.  If just one of the

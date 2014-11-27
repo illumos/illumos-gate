@@ -27,13 +27,11 @@
  * Use is subject to license terms.
  */
 
-#pragma weak fegetround = __fegetround
-#pragma weak fesetround = __fesetround
+#pragma weak __fegetround = fegetround
+#pragma weak __fesetround = fesetround
 
 #pragma weak fegetround96 = __fegetround
-#pragma weak fesetround96 = __fesetround96
 
-#include "fenv_synonyms.h"
 #include <fenv.h>
 #include <ucontext.h>
 #include <thread.h>

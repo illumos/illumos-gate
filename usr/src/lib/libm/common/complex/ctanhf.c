@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak ctanhf = __ctanhf
+#pragma weak __ctanhf = ctanhf
 
 #include "libm.h"		/* expf/expm1f/fabsf/sincosf/sinf/tanhf */
 #include "complex_wrapper.h"

@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak rintl = __rintl
+#pragma weak __rintl = rintl
 
 /*
  * rintl(long double x) return x rounded to integral according to

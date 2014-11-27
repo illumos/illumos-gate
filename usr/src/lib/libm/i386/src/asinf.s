@@ -30,10 +30,7 @@
 
 #include "libm.h"
 LIBM_ANSI_PRAGMA_WEAK(asinf,function)
-#include "libm_synonyms.h"
 #include "libm_protos.h"
-
-#undef fabs
 
 	ENTRY(asinf)
 	flds	4(%esp)			/ push x

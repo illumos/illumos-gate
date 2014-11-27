@@ -27,7 +27,6 @@
  * Use is subject to license terms.
  */
 
-#include "fenv_synonyms.h"
 #undef lint
 #include <signal.h>
 #include <siginfo.h>
@@ -57,10 +56,8 @@ extern int sigismember(const sigset_t *, int);
 void (*__mt_fex_sync)() = NULL; /* for synchronization with libmtsk */
 #pragma weak __mt_fex_sync
 
-#ifdef LIBM_MT_FEX_SYNC
 void (*__libm_mt_fex_sync)() = NULL; /* new, improved version of above */
 #pragma weak __libm_mt_fex_sync
-#endif
 
 /* private variables */
 static fex_handler_t main_handlers;
@@ -145,7 +142,6 @@ __fex_sync_with_libmtsk(int begin, int master)
 		__fex_update_te();
 }
 
-#ifdef LIBM_MT_FEX_SYNC
 /*
 *  The following function may be used for synchronization with any
 *  internal project that manages multiple threads
@@ -204,7 +200,6 @@ __fex_sync_with_threads(enum __libm_mt_fex_sync_actions action,
 		break;
 	}
 }
-#endif
 
 #if defined(__sparc)
 
@@ -842,8 +837,6 @@ __fex_update_te()
 	/* synchronize with libmtsk */
 	__mt_fex_sync = __fex_sync_with_libmtsk;
 
-#ifdef LIBM_MT_FEX_SYNC
 	/* synchronize with other projects */
 	__libm_mt_fex_sync = __fex_sync_with_threads;
-#endif
 }

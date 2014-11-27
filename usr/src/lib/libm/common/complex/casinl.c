@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak casinl = __casinl
+#pragma weak __casinl = casinl
 
 #include "libm.h"		/* asinl/atanl/fabsl/isinfl/log1pl/logl/sqrtl */
 #include "complex_wrapper.h"

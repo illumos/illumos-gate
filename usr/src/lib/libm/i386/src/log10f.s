@@ -30,7 +30,6 @@
 
 #include "libm.h"
 LIBM_ANSI_PRAGMA_WEAK(log10f,function)
-#include "libm_synonyms.h"
 #include "libm_protos.h"
 
 	ENTRY(log10f)

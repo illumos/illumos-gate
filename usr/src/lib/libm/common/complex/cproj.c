@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak cproj = __cproj
+#pragma weak __cproj = cproj
 
 /* INDENT OFF */
 /*

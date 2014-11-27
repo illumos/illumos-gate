@@ -27,9 +27,7 @@
  * Use is subject to license terms.
  */
 
-#if defined(ELFOBJ)
-#pragma weak nextafterf = __nextafterf
-#endif
+#pragma weak __nextafterf = nextafterf
 
 #include "libm.h"
 

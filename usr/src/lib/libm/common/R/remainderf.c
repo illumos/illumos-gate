@@ -27,9 +27,7 @@
  * Use is subject to license terms.
  */
 
-#if defined(ELFOBJ)
-#pragma weak remainderf = __remainderf
-#endif
+#pragma weak __remainderf = remainderf
 
 #include "libm.h"
 

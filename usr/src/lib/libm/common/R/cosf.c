@@ -26,7 +26,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak cosf = __cosf
+#pragma weak __cosf = cosf
 
 /*
  * See sincosf.c

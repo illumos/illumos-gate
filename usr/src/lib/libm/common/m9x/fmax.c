@@ -27,9 +27,7 @@
  * Use is subject to license terms.
  */
 
-#if defined(ELFOBJ)
 #pragma weak fmax = __fmax
-#endif
 
 /*
  * fmax(x,y) returns the larger of x and y.  If just one of the

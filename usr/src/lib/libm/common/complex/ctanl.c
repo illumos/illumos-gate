@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak ctanl = __ctanl
+#pragma weak __ctanl = ctanl
 
 #include "libm.h"
 #include "complex_wrapper.h"

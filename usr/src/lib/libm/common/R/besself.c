@@ -26,12 +26,12 @@
  * Use is subject to license terms.
  */
 
-#pragma weak j0f = __j0f
-#pragma weak j1f = __j1f
-#pragma weak jnf = __jnf
-#pragma weak y0f = __y0f
-#pragma weak y1f = __y1f
-#pragma weak ynf = __ynf
+#pragma weak __j0f = j0f
+#pragma weak __j1f = j1f
+#pragma weak __jnf = jnf
+#pragma weak __y0f = y0f
+#pragma weak __y1f = y1f
+#pragma weak __ynf = ynf
 
 #include "libm.h"
 #include <float.h>

@@ -28,7 +28,6 @@
  */
 
 #include <sys/isa_defs.h>
-#include "libm_synonyms.h"
 #include "libm_inlines.h"
 
 #ifdef _LITTLE_ENDIAN
@@ -218,8 +217,6 @@ static const double __vlibm_TBL_rhypotf[] = {
  5.0793650793650790831e-01, 1.7817416127494958844e-01,
  5.0393700787401574104e-01, 1.7747130188322274291e-01,
 };
-
-#define	fabsf	__fabsf
 
 extern float fabsf(float);
 
@@ -462,4 +459,3 @@ __vrhypotf_n(int n, float * restrict px, int stridex, float * restrict py,
 		pz += stridez;
 	}
 }
-

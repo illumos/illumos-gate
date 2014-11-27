@@ -27,12 +27,12 @@
  * Use is subject to license terms.
  */
 
-#pragma weak cpowl = __cpowl
+#pragma weak __cpowl = cpowl
 
 #include "libm.h"				/* __k_clog_rl/__k_atan2l */
 /* atan2l/atan2pil/exp2l/expl/fabsl/hypotl/isinfl/logl/powl/sincosl/sincospil */
 #include "complex_wrapper.h"
-#include "longdouble.h" 
+#include "longdouble.h"
 
 #if defined(__sparc)
 #define	HALF(x)  ((int *) &x)[3] = 0; ((int *) &x)[2] &= 0xfe000000

@@ -92,8 +92,7 @@ mvecOBJS	= \
 		vz_abs_.o \
 		vz_exp_.o \
 		vz_log_.o \
-		vz_pow_.o \
-		#end
+		vz_pow_.o
 
 mvecvisCOBJS	= \
 		__vTBL_atan1.o \
@@ -108,8 +107,7 @@ mvecvisCOBJS	= \
 		__vsinbig.o \
 		__vsinbigf.o \
 		__vsincosbig.o \
-		__vsincosbigf.o \
-		#end
+		__vsincosbigf.o
 
 mvecvisSOBJS	= \
 		__vatan.o \
@@ -135,8 +133,7 @@ mvecvisSOBJS	= \
 		__vsincosf.o \
 		__vsinf.o \
 		__vsqrt.o \
-		__vsqrtf.o \
-		#end
+		__vsqrtf.o
 
 mvecvis2COBJS	= \
 		__vTBL_sincos.o \
@@ -146,15 +143,13 @@ mvecvis2COBJS	= \
 		__vcosbig_ultra3.o \
 		__vrem_pio2m.o \
 		__vsinbig.o \
-		__vsinbig_ultra3.o \
-		#end
+		__vsinbig_ultra3.o
 
 mvecvis2SOBJS	= \
 		__vcos_ultra3.o \
 		__vlog_ultra3.o \
 		__vsin_ultra3.o \
-		__vsqrtf_ultra3.o \
-		#end
+		__vsqrtf_ultra3.o
 
 include		$(SRC)/lib/Makefile.lib
 include		$(SRC)/lib/Makefile.rootfs
@@ -162,7 +157,7 @@ include		$(LIBMDIR)/Makefile.libm.com
 
 LIBS		= $(DYNLIB)
 SRCDIR		= ../common/
-DYNFLAGS	+= -zignore
+DYNFLAGS	+= $(ZIGNORE)
 
 LINTERROFF	= -erroff=E_FP_DIVISION_BY_ZERO 
 LINTERROFF	+= -erroff=E_FP_INVALID
@@ -177,8 +172,6 @@ LINTFLAGS64     += -errchk=longptr64
 CLAGS		+= $(LINTERROFF)
 CFLAGS64	+= $(LINTERROFF)
 
-ASDEF		+= -DLIBMVEC_SO_BUILD
-
 FLTRPATH_sparc		= $$ORIGIN/cpu/$$ISALIST/libmvec_isa.so.1
 FLTRPATH_sparcv9	= $$ORIGIN/../cpu/$$ISALIST/sparcv9/libmvec_isa.so.1
 FLTRPATH_i386		= $$ORIGIN/libmvec/$$HWCAP
@@ -188,18 +181,12 @@ sparc_CFLAGS += -_cc=-W0,-xintrinsic
 sparcv9_CFLAGS += -_cc=-W0,-xintrinsic
 CPPFLAGS_i386	+= -Dfabs=__fabs
 
-CPPFLAGS	+= -DLIBMVEC_SO_BUILD
+SRCS_mvec_i386 = ../common/__vsqrtf.c
 
-SRCS_mvec_i386 = \
-	../common/__vsqrtf.c \
-	#end
+SRCS_mvec_sparc = $(SRCS_mvec_i386)
 
-SRCS_mvec_sparc = \
-	$(SRCS_mvec_i386) \
-	#end
-SRCS_mvec_sparcv9 = \
-	$(SRCS_mvec_i386) \
-	#end
+SRCS_mvec_sparcv9 = $(SRCS_mvec_i386)
+
 
 SRCS_mvec = \
 	$(SRCS_mvec_$(TARGETMACH)) \
@@ -278,8 +265,7 @@ SRCS_mvec = \
 	../common/vz_abs_.c \
 	../common/vz_exp_.c \
 	../common/vz_log_.c \
-	../common/vz_pow_.c \
-	#end
+	../common/vz_pow_.c
 
 .KEEP_STATE:
 

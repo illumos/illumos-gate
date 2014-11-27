@@ -67,7 +67,7 @@
  * hexadecimal values.
  */
 
-#pragma weak expl = __expl
+#pragma weak __expl = expl
 
 #include "libm.h"
 

@@ -27,9 +27,7 @@
  * Use is subject to license terms.
  */
 
-#if defined(ELFOBJ)
-#pragma weak copysignl = __copysignl
-#endif
+#pragma weak __copysignl = copysignl
 
 #include "libm.h"
 

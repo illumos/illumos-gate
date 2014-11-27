@@ -27,9 +27,7 @@
  * Use is subject to license terms.
  */
 
-#if defined(ELFOBJ)
-#pragma weak coshl = __coshl
-#endif
+#pragma weak __coshl = coshl
 
 #include "libm.h"
 #include "longdouble.h"

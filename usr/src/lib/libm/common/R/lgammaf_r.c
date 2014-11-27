@@ -26,7 +26,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak lgammaf_r = __lgammaf_r
+#pragma weak __lgammaf_r = lgammaf_r
 
 #include "libm.h"
 

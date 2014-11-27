@@ -26,9 +26,8 @@
  * Use is subject to license terms.
  */
 
-#pragma weak carg = __carg
+#pragma weak __carg = carg
 
-#include "libm_synonyms.h"
 #include <math.h>		/* atan2 */
 #include "complex_wrapper.h"
 

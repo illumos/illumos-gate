@@ -30,7 +30,6 @@
 
 #include "libm.h"
 LIBM_ANSI_PRAGMA_WEAK(tan,function)
-#include "libm_synonyms.h"
 #include "libm_protos.h"
 
 	ENTRY(tan)

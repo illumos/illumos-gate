@@ -46,7 +46,7 @@ $(ROOTVARSMB)/smbpasswd :=	FILEMODE =	0400
 .KEEP_STATE:
 
 $(ROOTETCFTPUSERSLINK):	$(ROOTETCFTPDFILES)
-	$(SYMLINK) ftpd/ftpusers $@
+	$(RM) $@; $(SYMLINK) ftpd/ftpusers $@
 
 all: $(ETCFILES) $(KVMFILES) $(SMBFILES) $(FTPDFILES)
 

@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak remainderl = __remainderl
+#pragma weak __remainderl = remainderl
 
 #include "libm.h"
 #include "longdouble.h"

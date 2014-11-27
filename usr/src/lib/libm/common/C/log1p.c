@@ -26,7 +26,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak log1p = __log1p
+#pragma weak __log1p = log1p
 
 /* INDENT OFF */
 /*

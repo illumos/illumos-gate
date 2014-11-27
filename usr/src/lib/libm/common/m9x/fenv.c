@@ -27,19 +27,17 @@
  * Use is subject to license terms.
  */
 
-#pragma weak fex_merge_flags = __fex_merge_flags
+#pragma weak __fex_merge_flags = fex_merge_flags
 
-#pragma weak feholdexcept = __feholdexcept
-#pragma weak feupdateenv = __feupdateenv
-#pragma weak fegetenv = __fegetenv
-#pragma weak fesetenv = __fesetenv
+#pragma weak __feholdexcept = feholdexcept
+#pragma weak __feupdateenv = feupdateenv
+#pragma weak __fegetenv = fegetenv
+#pragma weak __fesetenv = fesetenv
 
-#pragma weak feholdexcept96 = __feholdexcept96
-#pragma weak feupdateenv96 = __feupdateenv
-#pragma weak fegetenv96 = __fegetenv
-#pragma weak fesetenv96 = __fesetenv
+#pragma weak feupdateenv96 = feupdateenv
+#pragma weak fegetenv96 = fegetenv
+#pragma weak fesetenv96 = fesetenv
 
-#include "fenv_synonyms.h"
 #include <fenv.h>
 #include <ucontext.h>
 #include <thread.h>

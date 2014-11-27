@@ -26,7 +26,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak atan2f = __atan2f
+#pragma weak __atan2f = atan2f
 
 #include "libm.h"
 

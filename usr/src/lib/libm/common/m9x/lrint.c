@@ -27,9 +27,7 @@
  * Use is subject to license terms.
  */
 
-#if defined(ELFOBJ)
-#pragma weak lrint = __lrint
-#endif
+#pragma weak __lrint = lrint
 
 /*
  * lrint(x) rounds its argument to the nearest integer according

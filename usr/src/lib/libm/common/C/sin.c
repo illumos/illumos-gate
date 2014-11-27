@@ -26,7 +26,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak sin = __sin
+#pragma weak __sin = sin
 
 /* INDENT OFF */
 /*
