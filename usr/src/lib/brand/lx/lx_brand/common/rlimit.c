@@ -31,6 +31,7 @@
 #include <sys/systm.h>
 #include <sys/sysconfig.h>
 #include <rctl.h>
+#include <limits.h>
 #include <sys/lx_types.h>
 #include <sys/lx_misc.h>
 #include <sys/lx_syscall.h>
@@ -93,11 +94,11 @@ static char *l_to_rctl[LX_RLIMIT_NLIMITS] = {
  * Magic values Linux uses to indicate infinity
  */
 #define	LX_RLIM_INFINITY_O	(0x7fffffffUL)
-#define	LX_RLIM_INFINITY_N	(0xffffffffUL)
+#define	LX_RLIM_INFINITY_N	ULONG_MAX
 #define	LX_RLIM64_INFINITY	(~0ULL)
 
 #define	BIG_INFINITY_O		(0x7fffffffLL)
-#define	BIG_INFINITY_N		(0xffffffffLL)
+#define	BIG_INFINITY_N		ULONG_MAX
 
 /*
  * Array to store the rlimits that we track but do not enforce.
@@ -186,6 +187,29 @@ getrlimit_common(int resource, uint64_t *rlim_curp, uint64_t *rlim_maxp)
 		max = LX_RLIM64_INFINITY;
 	if (cur == -1)
 		cur = max;
+
+	if (resource == LX_RLIMIT_STACK && cur > LX_RLIM_INFINITY_O) {
+		/*
+		 * Stunningly, Linux has somehow managed to confuse the concept
+		 * of a "limit" with that of a "default" -- and the value of
+		 * RLIMIT_STACK is used by NPTL as the _default_ stack size if
+		 * it isn't specified. (!!)  Even for a system that prides
+		 * itself on slapdash castles of junk, this is an amazingly
+		 * willful act of incompetence -- and one that is gleefully
+		 * confessed in the pthread_create() man page: "if the
+		 * RLIMIT_STACK soft resource limit at the time the program
+		 * started has any value other than 'unlimited', then it
+		 * determines the default stack size of new threads."  A
+		 * typical stack limit for us is 32TB; if it needs to be said,
+		 * setting the default stack size to be 32TB doesn't work so
+		 * well!  Of course, glibc dropping a deuce in its pants
+		 * becomes our problem -- so to prevent smelly accidents we
+		 * tell Linux that any stack limit over the old (32-bit) values
+		 * for infinity are just infinitely large.
+		 */
+		cur_inf = B_TRUE;
+		max_inf = B_TRUE;
+	}
 
 	if (cur_inf)
 		*rlim_curp = LX_RLIM64_INFINITY;
