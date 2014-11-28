@@ -19,7 +19,10 @@
  * CDDL HEADER END
  */
 
-/* Copyright 2013 OmniTI Computer Consulting, Inc. All rights reserved. */
+/*
+ * Copyright 2013 OmniTI Computer Consulting, Inc. All rights reserved.
+ * Copyright (c) 2014, Joyent, Inc. All rights reserved.
+ */
 
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
@@ -52,6 +55,7 @@
 #include <sys/fcntl.h>
 #include <sys/lwpchan_impl.h>
 #include <sys/nbmlock.h>
+#include <sys/brand.h>
 
 #include <vm/hat.h>
 #include <vm/as.h>
@@ -542,6 +546,20 @@ choose_addr(struct as *as, caddr_t *addrp, size_t len, offset_t off,
 	return (0);
 }
 
+static caddr_t
+userlimit(proc_t *pp, struct as *as, int flags)
+{
+	if (flags & _MAP_LOW32) {
+		if (PROC_IS_BRANDED(pp) && BROP(pp)->b_map32limit != NULL) {
+			return ((caddr_t)(uintptr_t)BROP(pp)->b_map32limit());
+		} else {
+			return ((caddr_t)_userlimit32);
+		}
+	}
+
+	return (as->a_userlimit);
+}
+
 
 /*
  * Used for MAP_ANON - fast way to get anonymous pages
@@ -557,8 +575,6 @@ zmap(struct as *as, caddr_t *addrp, size_t len, uint_t uprot, int flags,
 		return (EACCES);
 
 	if ((flags & MAP_FIXED) != 0) {
-		caddr_t userlimit;
-
 		/*
 		 * Use the user address.  First verify that
 		 * the address to be used is page aligned.
@@ -567,9 +583,8 @@ zmap(struct as *as, caddr_t *addrp, size_t len, uint_t uprot, int flags,
 		if (((uintptr_t)*addrp & PAGEOFFSET) != 0)
 			return (EINVAL);
 
-		userlimit = flags & _MAP_LOW32 ?
-		    (caddr_t)USERLIMIT32 : as->a_userlimit;
-		switch (valid_usr_range(*addrp, len, uprot, as, userlimit)) {
+		switch (valid_usr_range(*addrp, len, uprot, as,
+		    userlimit(as->a_proc, as, flags))) {
 		case RANGE_OKAY:
 			break;
 		case RANGE_BADPROT:
@@ -737,8 +752,6 @@ smmap_common(caddr_t *addrp, size_t len,
 	 * If the user specified an address, do some simple checks here
 	 */
 	if ((flags & MAP_FIXED) != 0) {
-		caddr_t userlimit;
-
 		/*
 		 * Use the user address.  First verify that
 		 * the address to be used is page aligned.
@@ -746,10 +759,8 @@ smmap_common(caddr_t *addrp, size_t len,
 		 */
 		if (((uintptr_t)*addrp & PAGEOFFSET) != 0)
 			return (EINVAL);
-
-		userlimit = flags & _MAP_LOW32 ?
-		    (caddr_t)USERLIMIT32 : as->a_userlimit;
-		switch (valid_usr_range(*addrp, len, uprot, as, userlimit)) {
+		switch (valid_usr_range(*addrp, len, uprot, as,
+		    userlimit(curproc, as, flags))) {
 		case RANGE_OKAY:
 			break;
 		case RANGE_BADPROT:

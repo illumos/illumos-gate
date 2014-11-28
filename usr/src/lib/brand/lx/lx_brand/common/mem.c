@@ -49,6 +49,7 @@ int pagesize;	/* needed for mmap2() */
 #define	LX_MAP_ANONYMOUS	0x00020
 #define	LX_MAP_LOCKED		0x02000
 #define	LX_MAP_NORESERVE	0x04000
+#define	LX_MAP_32BIT		0x00040
 
 #define	LX_MADV_REMOVE		9
 #define	LX_MADV_DONTFORK	10
@@ -66,10 +67,16 @@ ltos_mmap_flags(int flags)
 	int new_flags;
 
 	new_flags = flags & (MAP_TYPE | MAP_FIXED);
+
 	if (flags & LX_MAP_ANONYMOUS)
 		new_flags |= MAP_ANONYMOUS;
 	if (flags & LX_MAP_NORESERVE)
 		new_flags |= MAP_NORESERVE;
+
+#if defined(_LP64)
+	if (flags & LX_MAP_32BIT)
+		new_flags |= MAP_32BIT;
+#endif
 
 	return (new_flags);
 }

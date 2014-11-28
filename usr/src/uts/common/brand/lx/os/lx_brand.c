@@ -102,6 +102,7 @@ static int lx_elfexec(struct vnode *vp, struct execa *uap, struct uarg *args,
 
 static boolean_t lx_native_exec(uint8_t, const char **);
 static void lx_ptrace_exectrap(proc_t *);
+static uint32_t lx_map32limit();
 
 /* lx brand */
 struct brand_ops lx_brops = {
@@ -127,7 +128,8 @@ struct brand_ops lx_brops = {
 	lx_exit_with_sig,
 	lx_wait_filter,
 	lx_native_exec,
-	lx_ptrace_exectrap
+	lx_ptrace_exectrap,
+	lx_map32limit
 };
 
 struct brand_mach_ops lx_mops = {
@@ -488,6 +490,18 @@ lx_ptrace_exectrap(proc_t *p)
 	    !(lpdp->l_ptrace_opts & LX_PTRACE_O_TRACEEXEC)) {
 		psignal(p, SIGTRAP);
 	}
+}
+
+uint32_t
+lx_map32limit()
+{
+	/*
+	 * To be bug-for-bug compatible with Linux, we have MAP_32BIT only
+	 * allow mappings in the first 31 bits.  This was a nuance in the
+	 * original Linux implementation circa 2002, and applications have
+	 * come to depend on its behavior.
+	 */
+	return (1 << 31);
 }
 
 void
