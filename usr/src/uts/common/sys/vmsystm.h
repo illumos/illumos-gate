@@ -19,6 +19,9 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright (c) 2014, Joyent, Inc. All rights reserved.
+ */
+/*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -158,6 +161,8 @@ extern	void	dcache_flushall(void);
 extern	void	*boot_virt_alloc(void *addr, size_t size);
 
 extern	size_t	exec_get_spslew(void);
+
+extern	caddr_t	map_userlimit(proc_t *pp, struct as *as, int flags);
 
 #endif	/* _KERNEL */
 

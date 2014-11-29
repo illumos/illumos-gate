@@ -131,7 +131,7 @@ struct brand_ops {
 	boolean_t (*b_wait_filter)(proc_t *, proc_t *);
 	boolean_t (*b_native_exec)(uint8_t, const char **);
 	void (*b_ptrace_exectrap)(proc_t *);
-	uint32_t (*b_map32limit)();
+	uint32_t (*b_map32limit)(proc_t *);
 };
 
 /*

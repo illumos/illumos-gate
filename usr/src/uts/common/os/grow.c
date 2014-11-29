@@ -546,12 +546,12 @@ choose_addr(struct as *as, caddr_t *addrp, size_t len, offset_t off,
 	return (0);
 }
 
-static caddr_t
-userlimit(proc_t *pp, struct as *as, int flags)
+caddr_t
+map_userlimit(proc_t *pp, struct as *as, int flags)
 {
 	if (flags & _MAP_LOW32) {
 		if (PROC_IS_BRANDED(pp) && BROP(pp)->b_map32limit != NULL) {
-			return ((caddr_t)(uintptr_t)BROP(pp)->b_map32limit());
+			return ((caddr_t)(uintptr_t)BROP(pp)->b_map32limit(pp));
 		} else {
 			return ((caddr_t)_userlimit32);
 		}
@@ -584,7 +584,7 @@ zmap(struct as *as, caddr_t *addrp, size_t len, uint_t uprot, int flags,
 			return (EINVAL);
 
 		switch (valid_usr_range(*addrp, len, uprot, as,
-		    userlimit(as->a_proc, as, flags))) {
+		    map_userlimit(as->a_proc, as, flags))) {
 		case RANGE_OKAY:
 			break;
 		case RANGE_BADPROT:
@@ -760,7 +760,7 @@ smmap_common(caddr_t *addrp, size_t len,
 		if (((uintptr_t)*addrp & PAGEOFFSET) != 0)
 			return (EINVAL);
 		switch (valid_usr_range(*addrp, len, uprot, as,
-		    userlimit(curproc, as, flags))) {
+		    map_userlimit(curproc, as, flags))) {
 		case RANGE_OKAY:
 			break;
 		case RANGE_BADPROT:
