@@ -24,6 +24,7 @@
 /*
  * Copyright (c) 2010, Intel Corporation.
  * All rights reserved.
+ * Copyright (c) 2014, Joyent, Inc. All rights reserved.
  */
 
 /* Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T */
@@ -623,10 +624,8 @@ void
 map_addr(caddr_t *addrp, size_t len, offset_t off, int vacalign, uint_t flags)
 {
 	struct proc *p = curproc;
-	caddr_t userlimit = (flags & _MAP_LOW32) ?
-	    (caddr_t)_userlimit32 : p->p_as->a_userlimit;
-
-	map_addr_proc(addrp, len, off, vacalign, userlimit, curproc, flags);
+	map_addr_proc(addrp, len, off, vacalign,
+	    map_userlimit(p, p->p_as, flags), curproc, flags);
 }
 
 /*ARGSUSED*/

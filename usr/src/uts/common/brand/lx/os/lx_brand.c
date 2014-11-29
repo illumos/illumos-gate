@@ -45,6 +45,7 @@
 #include <sys/lx_pid.h>
 #include <sys/lx_futex.h>
 #include <sys/lx_brand.h>
+#include <sys/param.h>
 #include <sys/termios.h>
 #include <sys/sunddi.h>
 #include <sys/ddi.h>
@@ -102,7 +103,7 @@ static int lx_elfexec(struct vnode *vp, struct execa *uap, struct uarg *args,
 
 static boolean_t lx_native_exec(uint8_t, const char **);
 static void lx_ptrace_exectrap(proc_t *);
-static uint32_t lx_map32limit();
+static uint32_t lx_map32limit(proc_t *);
 
 /* lx brand */
 struct brand_ops lx_brops = {
@@ -493,15 +494,20 @@ lx_ptrace_exectrap(proc_t *p)
 }
 
 uint32_t
-lx_map32limit()
+lx_map32limit(proc_t *p)
 {
 	/*
 	 * To be bug-for-bug compatible with Linux, we have MAP_32BIT only
 	 * allow mappings in the first 31 bits.  This was a nuance in the
 	 * original Linux implementation circa 2002, and applications have
 	 * come to depend on its behavior.
+	 *
+	 * This is only relevant for 64-bit processes.
 	 */
-	return (1 << 31);
+	if (p->p_model == DATAMODEL_LP64)
+		return (1 << 31);
+
+	return ((uint32_t)USERLIMIT32);
 }
 
 void
