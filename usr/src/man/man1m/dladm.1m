@@ -9,7 +9,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\" See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DLADM 1M "Jul 17, 2014"
+.TH DLADM 1M "Dec 03, 2014"
 .SH NAME
 dladm \- administer data links
 .SH SYNOPSIS
@@ -22,7 +22,7 @@ dladm \- administer data links
 .LP
 .nf
 \fBdladm delete-phys\fR \fIphys-link\fR
-\fBdladm show-phys\fR [\fB-P\fR] [\fB-m\fR] [[\fB-p\fR] \fB-o\fR \fIfield\fR[,...]] [\fB-H\fR] [\fIphys-link\fR]
+\fBdladm show-phys\fR [\fB-m\fR | \fB-H\fR | \fB-P\fR] [[\fB-p\fR] \fB-o\fR \fIfield\fR[,...]] [\fIphys-link\fR]
 .fi
 
 .LP
@@ -144,7 +144,6 @@ dladm \- administer data links
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBdladm\fR command is used to administer data-links. A data-link is
 represented in the system as a \fBSTREAMS DLPI\fR (v2) interface which can be
@@ -298,7 +297,6 @@ characters.
 .RE
 
 .SS "Options"
-.sp
 .LP
 Each \fBdladm\fR subcommand has its own set of options. However, many of the
 subcommands have the following as a common option:
@@ -314,7 +312,6 @@ deletion, or renaming-should apply.
 .RE
 
 .SS "SUBCOMMANDS"
-.sp
 .LP
 The following subcommands are supported:
 .sp
@@ -607,8 +604,8 @@ the \fBEXAMPLES\fR section.
 .sp
 .ne 2
 .na
-\fB\fBdladm show-phys\fR [\fB-P\fR] [[\fB-p\fR] \fB-o\fR \fIfield\fR[,...]]
-[\fB-H\fR] [\fIphys-link\fR]\fR
+\fB\fBdladm show-phys\fR [\fB-m\fR | \fB-H\fR | \fB-P\fR] [[\fB-p\fR] \fB-o\fR \fIfield\fR[,...]]
+[\fIphys-link\fR]\fR
 .ad
 .sp .6
 .RS 4n
@@ -680,13 +677,72 @@ MAC clients that are using the rings within a group.
 .sp
 .ne 2
 .na
+\fB\fB-m\fR\fR
+.ad
+.sp .6
+.RS 4n
+Show MAC addresses and related information. Output from \fB-m\fR
+displays the following elements:
+.sp
+.ne 2
+.na
+\fB\fBLINK\fR\fR
+.ad
+.sp .6
+.RS 4n
+A physical device corresponding to a NIC driver.
+.RE
+.sp
+.ne 2
+.na
+\fB\fBSLOT\fR\fR
+.ad
+.sp .6
+.RS 4n
+When a given physical device has multiple factory MAC addresses, this
+indicates the slot of the corresponding MAC address which can be used as
+part of a call to \fBcreate-vnic\fR.
+.RE
+.sp
+.ne 2
+.na
+\fB\fBADDRESS\fR\fR
+.ad
+.sp .6
+.RS 4n
+Displays the MAC address of the device.
+.RE
+.sp
+.ne 2
+.na
+\fB\fBINUSE\fR\fR
+.ad
+.sp .6
+.RS 4n
+Displays whether or not a MAC Address is actively being used.
+.RE
+.sp
+.ne 2
+.na
+\fB\fBCLIENT\fR\fR
+.ad
+.sp .6
+.RS 4n
+MAC clients that are using the address.
+.RE
+.RE
+.sp
+.ne 2
+.na
 \fB\fB-o\fR \fIfield\fR, \fB--output\fR=\fIfield\fR\fR
 .ad
 .sp .6
 .RS 4n
 A case-insensitive, comma-separated list of output fields to display. The field
 name must be one of the fields listed below, or the special value \fBall\fR, to
-display all fields. For each link, the following fields can be displayed:
+display all fields. Note that if either \fB-H\fR or \fB-m\fR are specified, then
+the valid options are those described in their respective sections. For each
+link, the following fields can be displayed:
 .sp
 .ne 2
 .na
@@ -4347,7 +4403,6 @@ display network usage for all links.
 .RE
 
 .SS "Parseable Output Format"
-.sp
 .LP
 Many \fBdladm\fR subcommands have an option that displays output in a
 machine-parseable format. The output format is one or more lines of colon
@@ -4364,7 +4419,6 @@ by using shell \fBread\fR(1) functions with the environment variable
 \fBIFS=:\fR (see \fBEXAMPLES\fR, below). Note that escaping is not done when
 you request only a single field.
 .SS "General Link Properties"
-.sp
 .LP
 The following general link properties are supported:
 .sp
@@ -4621,7 +4675,6 @@ currently running on the system. By default, the zone binding is as per
 .RE
 
 .SS "Wifi Link Properties"
-.sp
 .LP
 The following \fBWiFi\fR link properties are supported. Note that the ability
 to set a given property to a given value depends on the driver and hardware.
@@ -4674,7 +4727,6 @@ is no fixed speed.
 .RE
 
 .SS "Ethernet Link Properties"
-.sp
 .LP
 The following MII Properties, as documented in \fBieee802.3\fR(5), are
 supported in read-only mode:
@@ -4890,7 +4942,6 @@ The default value is \fBvlanonly\fR.
 .RE
 
 .SS "IP Tunnel Link Properties"
-.sp
 .LP
 The following IP tunnel link properties are supported.
 .sp
@@ -5393,7 +5444,6 @@ interface. See \fBifconfig\fR(1M) for a description of how IPv6 addresses are
 configured on 6to4 tunnel links.
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -5427,13 +5477,11 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBacctadm\fR(1M), \fBautopush\fR(1M), \fBifconfig\fR(1M), \fBipsecconf\fR(1M),
 \fBndd\fR(1M), \fBpsrset\fR(1M), \fBwpad\fR(1M), \fBzonecfg\fR(1M),
 \fBattributes\fR(5), \fBieee802.3\fR(5), \fBdlpi\fR(7P)
 .SH NOTES
-.sp
 .LP
 The preferred method of referring to an aggregation in the aggregation
 subcommands is by its link name. Referring to an aggregation by its integer
