@@ -69,7 +69,7 @@ extern "C" {
 #define	LX_NSYSCALLS		352
 
 /* The number of In-Kernel Emulation functions */
-#define	LX_N_IKE_FUNCS		28
+#define	LX_N_IKE_FUNCS		29
 
 /*
  * brand(2) subcommands

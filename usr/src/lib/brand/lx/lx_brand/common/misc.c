@@ -1096,3 +1096,14 @@ lx_yield(void)
 	yield();
 	return (0);
 }
+
+long
+lx_vhangup(void)
+{
+	if (geteuid() != 0)
+		return (-EPERM);
+
+	vhangup();
+
+	return (0);
+}
