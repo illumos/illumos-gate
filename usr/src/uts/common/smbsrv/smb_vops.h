@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _SMBSRV_SMB_VOPS_H
@@ -93,15 +94,30 @@ typedef struct smb_attr {
 #define	SMB_AT_CRTIME	0x00200000
 #define	SMB_AT_ALLOCSZ	0x00400000
 
-#define	SMB_AT_SMB	(SMB_AT_DOSATTR|SMB_AT_CRTIME|SMB_AT_ALLOCSZ)
+/*
+ * Some useful combinations, for convenience.  Some of the sets are
+ * based on the info levels of SMB Query File Info.
+ */
 
-#define	SMB_AT_ALL	(SMB_AT_TYPE|SMB_AT_MODE|SMB_AT_UID|SMB_AT_GID|\
-			SMB_AT_FSID|SMB_AT_NODEID|SMB_AT_NLINK|SMB_AT_SIZE|\
-			SMB_AT_ATIME|SMB_AT_MTIME|SMB_AT_CTIME|SMB_AT_RDEV|\
-			SMB_AT_BLKSIZE|SMB_AT_NBLOCKS|SMB_AT_SEQ|SMB_AT_SMB)
+#define	SMB_AT_SMB	(SMB_AT_DOSATTR|SMB_AT_CRTIME|SMB_AT_ALLOCSZ)
 
 #define	SMB_AT_TIMES	(SMB_AT_ATIME | SMB_AT_MTIME |\
 			SMB_AT_CTIME | SMB_AT_CRTIME)
+
+/* See SMB_FILE_BASIC_INFORMATION */
+#define	SMB_AT_BASIC	(SMB_AT_DOSATTR | SMB_AT_TIMES)
+
+/* SMB_FILE_STANDARD_INFORMATION (also delete-on-close flag) */
+#define	SMB_AT_STANDARD	(SMB_AT_TYPE | SMB_AT_NLINK |\
+			SMB_AT_SIZE | SMB_AT_ALLOCSZ)
+
+/*
+ * SMB_FILE_ALL_INFORMATION
+ * Note: does not include: SMB_AT_UID, SMB_AT_GID, etc.
+ * It's not literally "all", but "all SMB cares about"
+ * in vattr_t for any of the file query/set info calls.
+ */
+#define	SMB_AT_ALL	(SMB_AT_BASIC | SMB_AT_STANDARD | SMB_AT_NODEID)
 
 int fhopen(const struct smb_node *, int);
 

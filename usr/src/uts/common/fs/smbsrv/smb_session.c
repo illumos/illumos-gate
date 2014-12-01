@@ -337,25 +337,14 @@ smb_session_xprt_puthdr(smb_session_t *session, smb_xprt_t *hdr,
 static void
 smb_request_init_command_mbuf(smb_request_t *sr)
 {
-	MGET(sr->command.chain, 0, MT_DATA);
 
 	/*
-	 * Setup mbuf, mimic MCLGET but use the complete packet buffer.
+	 * Setup mbuf using the buffer we allocated.
 	 */
-	sr->command.chain->m_ext.ext_buf = sr->sr_request_buf;
-	sr->command.chain->m_data = sr->command.chain->m_ext.ext_buf;
-	sr->command.chain->m_len = sr->sr_req_length;
-	sr->command.chain->m_flags |= M_EXT;
-	sr->command.chain->m_ext.ext_size = sr->sr_req_length;
-	sr->command.chain->m_ext.ext_ref = &mclrefnoop;
+	MBC_ATTACH_BUF(&sr->command, sr->sr_request_buf, sr->sr_req_length);
 
-	/*
-	 * Initialize the rest of the mbuf_chain fields
-	 */
 	sr->command.flags = 0;
-	sr->command.shadow_of = 0;
-	sr->command.max_bytes = sr->sr_req_length;
-	sr->command.chain_offset = 0;
+	sr->command.shadow_of = NULL;
 }
 
 /*

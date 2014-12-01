@@ -314,7 +314,7 @@ sendmes_tozone(zoneid_t zid, int aflag) {
 		/*
 		 * if (-a option OR NOT pty window login), send the message
 		 */
-		if (aflag || !nonuser(*p))
+		if (aflag || !nonuserx(*p))
 			sendmes(p, zid);
 	}
 	endutxent();

@@ -20,8 +20,8 @@
  */
 
 /*
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -43,7 +43,7 @@ volatile uint32_t smb_fids = 0;
 static uint32_t smb_open_subr(smb_request_t *);
 extern uint32_t smb_is_executable(char *);
 static void smb_delete_new_object(smb_request_t *);
-static int smb_set_open_timestamps(smb_request_t *, smb_ofile_t *, boolean_t);
+static int smb_set_open_attributes(smb_request_t *, smb_ofile_t *);
 static void smb_open_oplock_break(smb_request_t *, smb_node_t *);
 static boolean_t smb_open_attr_only(smb_arg_open_t *);
 static boolean_t smb_open_overwrite(smb_arg_open_t *);
@@ -461,8 +461,13 @@ smb_open_subr(smb_request_t *sr)
 
 	if (rc == 0) {
 		last_comp_found = B_TRUE;
-		rc = smb_node_getattr(sr, op->fqi.fq_fnode,
-		    &op->fqi.fq_fattr);
+		/*
+		 * Need the DOS attributes below, where we
+		 * check the search attributes (sattr).
+		 */
+		op->fqi.fq_fattr.sa_mask = SMB_AT_DOSATTR;
+		rc = smb_node_getattr(sr, op->fqi.fq_fnode, kcred,
+		    NULL, &op->fqi.fq_fattr);
 		if (rc != 0) {
 			smb_node_release(op->fqi.fq_fnode);
 			smb_node_release(op->fqi.fq_dnode);
@@ -831,17 +836,27 @@ smb_open_subr(smb_request_t *sr)
 
 	/*
 	 * This MUST be done after ofile creation, so that explicitly
-	 * set timestamps can be remembered on the ofile.
+	 * set timestamps can be remembered on the ofile, and the
+	 * readonly flag will be stored "pending" on the node.
 	 */
 	if (status == NT_STATUS_SUCCESS) {
-		if ((rc = smb_set_open_timestamps(sr, of, created)) != 0) {
+		if ((rc = smb_set_open_attributes(sr, of)) != 0) {
 			smbsr_errno(sr, rc);
 			status = sr->smb_error.status;
 		}
 	}
 
 	if (status == NT_STATUS_SUCCESS) {
-		if (smb_node_getattr(sr, node,  &op->fqi.fq_fattr) != 0) {
+		/*
+		 * We've already done access checks above,
+		 * and want this call to succeed even when
+		 * !(desired_access & FILE_READ_ATTRIBUTES),
+		 * so pass kcred here.
+		 */
+		op->fqi.fq_fattr.sa_mask = SMB_AT_ALL;
+		rc = smb_node_getattr(sr, node, kcred, of,
+		    &op->fqi.fq_fattr);
+		if (rc != 0) {
 			smbsr_error(sr, NT_STATUS_INTERNAL_ERROR,
 			    ERRDOS, ERROR_INTERNAL_ERROR);
 			status = NT_STATUS_INTERNAL_ERROR;
@@ -969,60 +984,61 @@ smb_open_overwrite(smb_arg_open_t *op)
 	}
 	return (B_FALSE);
 }
+
 /*
- * smb_set_open_timestamps
+ * smb_set_open_attributes
  *
  * Last write time:
  * - If the last_write time specified in the open params is not 0 or -1,
  *   use it as file's mtime. This will be considered an explicitly set
  *   timestamps, not reset by subsequent writes.
  *
- * Opening existing file (not directory):
- * - If opening an existing file for overwrite set initial ATIME, MTIME
- *   & CTIME to now. (This is achieved by setting them as pending then forcing
- *   an smb_node_setattr() to apply pending times.)
+ * DOS attributes
+ * - If we created_readonly, we now store the real DOS attributes
+ *   (including the readonly bit) so subsequent opens will see it.
  *
- * - Note  If opening an existing file NOT for overwrite, windows would
- *   set the atime on file close, however setting the atime would cause
- *   the ARCHIVE attribute to be set, which does not occur on windows,
- *   so we do not do the atime update.
+ * Both are stored "pending" rather than in the file system.
  *
  * Returns: errno
  */
 static int
-smb_set_open_timestamps(smb_request_t *sr, smb_ofile_t *of, boolean_t created)
+smb_set_open_attributes(smb_request_t *sr, smb_ofile_t *of)
 {
-	int		rc = 0;
+	smb_attr_t	attr;
 	smb_arg_open_t	*op = &sr->sr_open;
 	smb_node_t	*node = of->f_node;
-	boolean_t	existing_file, set_times;
-	smb_attr_t	attr;
+	int		rc = 0;
 
 	bzero(&attr, sizeof (smb_attr_t));
-	set_times = B_FALSE;
+
+	if (op->created_readonly) {
+		attr.sa_dosattr = op->dattr | FILE_ATTRIBUTE_READONLY;
+		attr.sa_mask |= SMB_AT_DOSATTR;
+	}
 
 	if ((op->mtime.tv_sec != 0) && (op->mtime.tv_sec != UINT_MAX)) {
-		attr.sa_mask = SMB_AT_MTIME;
 		attr.sa_vattr.va_mtime = op->mtime;
-		set_times = B_TRUE;
+		attr.sa_mask |= SMB_AT_MTIME;
 	}
 
-	existing_file = !(created || smb_node_is_dir(node));
-	if (existing_file) {
-		switch (op->create_disposition) {
-		case FILE_SUPERSEDE:
-		case FILE_OVERWRITE_IF:
-		case FILE_OVERWRITE:
-			smb_ofile_set_write_time_pending(of);
-			set_times = B_TRUE;
-			break;
-		default:
-			break;
-		}
-	}
+	/*
+	 * Used to have code here to set mtime, ctime, atime
+	 * when the open op->create_disposition is any of:
+	 * FILE_SUPERSEDE, FILE_OVERWRITE_IF, FILE_OVERWRITE.
+	 * We know that in those cases we will have set the
+	 * file size, in which case the file system will
+	 * update those times, so we don't have to.
+	 *
+	 * However, keep track of the fact that we modified
+	 * the file via this handle, so we can do the evil,
+	 * gratuitious mtime update on close that Windows
+	 * clients appear to expect.
+	 */
+	if (op->action_taken == SMB_OACT_TRUNCATED)
+		of->f_written = B_TRUE;
 
-	if (set_times)
-		rc = smb_node_setattr(sr, node, sr->user_cr, of, &attr);
+	if (attr.sa_mask != 0)
+		rc = smb_node_setattr(sr, node, of->f_cr, of, &attr);
 
 	return (rc);
 }

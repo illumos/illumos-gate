@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/synch.h>
@@ -437,6 +437,9 @@ smb_common_rename(smb_request_t *sr, smb_fqi_t *src_fqi, smb_fqi_t *dst_fqi)
 	}
 
 	if (dst_fqi->fq_fnode) {
+		/*
+		 * Destination already exists.  Do delete checks.
+		 */
 		dst_fnode = dst_fqi->fq_fnode;
 
 		if (!(sr->arg.dirop.flags && SMB_RENAME_FLAG_OVERWRITE)) {
@@ -449,26 +452,48 @@ smb_common_rename(smb_request_t *sr, smb_fqi_t *src_fqi, smb_fqi_t *dst_fqi)
 		(void) smb_oplock_break(sr, dst_fnode,
 		    SMB_OPLOCK_BREAK_TO_NONE | SMB_OPLOCK_BREAK_BATCH);
 
-		for (count = 0; count <= 3; count++) {
-			if (count) {
-				smb_node_end_crit(dst_fnode);
-				delay(MSEC_TO_TICK(400));
-			}
-
-			smb_node_start_crit(dst_fnode, RW_READER);
+		/*
+		 * Wait (a little) for the oplock break to be
+		 * responded to by clients closing handles.
+		 * Hold node->n_lock as reader to keep new
+		 * ofiles from showing up after we check.
+		 */
+		smb_node_rdlock(dst_fnode);
+		for (count = 0; count <= 12; count++) {
 			status = smb_node_delete_check(dst_fnode);
-
 			if (status != NT_STATUS_SHARING_VIOLATION)
 				break;
+			smb_node_unlock(dst_fnode);
+			delay(MSEC_TO_TICK(100));
+			smb_node_rdlock(dst_fnode);
+		}
+		if (status != NT_STATUS_SUCCESS) {
+			smb_node_unlock(dst_fnode);
+			smb_rename_release_src(sr);
+			smb_node_release(dst_fnode);
+			smb_node_release(dst_dnode);
+			return (EACCES);
 		}
 
-		if (status != NT_STATUS_SHARING_VIOLATION)
-			status = smb_range_check(sr, dst_fnode,
-			    0, UINT64_MAX, B_TRUE);
+		/*
+		 * Note, the combination of these two:
+		 *	smb_node_rdlock(node);
+		 *	nbl_start_crit(node->vp, RW_READER);
+		 * is equivalent to this call:
+		 *	smb_node_start_crit(node, RW_READER)
+		 *
+		 * Cleanup after this point should use:
+		 *	smb_node_end_crit(dst_fnode)
+		 */
+		nbl_start_crit(dst_fnode->vp, RW_READER);
 
+		/*
+		 * This checks nbl_share_conflict, nbl_lock_conflict
+		 */
+		status = smb_nbl_conflict(dst_fnode, 0, UINT64_MAX, NBL_REMOVE);
 		if (status != NT_STATUS_SUCCESS) {
-			smb_rename_release_src(sr);
 			smb_node_end_crit(dst_fnode);
+			smb_rename_release_src(sr);
 			smb_node_release(dst_fnode);
 			smb_node_release(dst_dnode);
 			return (EACCES);
@@ -704,41 +729,61 @@ smb_rename_lookup_src(smb_request_t *sr)
 	}
 
 	/*
-	 * Break BATCH oplock before access checks. If a client
+	 * Break BATCH oplock before ofile checks. If a client
 	 * has a file open, this will force a flush or close,
 	 * which may affect the outcome of any share checking.
 	 */
 	(void) smb_oplock_break(sr, src_node,
 	    SMB_OPLOCK_BREAK_TO_LEVEL_II | SMB_OPLOCK_BREAK_BATCH);
 
-	for (count = 0; count <= 3; count++) {
-		if (count) {
-			smb_node_end_crit(src_node);
-			delay(MSEC_TO_TICK(400));
-		}
-
-		smb_node_start_crit(src_node, RW_READER);
-
+	/*
+	 * Wait (a little) for the oplock break to be
+	 * responded to by clients closing handles.
+	 * Hold node->n_lock as reader to keep new
+	 * ofiles from showing up after we check.
+	 */
+	smb_node_rdlock(src_node);
+	for (count = 0; count <= 12; count++) {
 		status = smb_node_rename_check(src_node);
 		if (status != NT_STATUS_SHARING_VIOLATION)
 			break;
+		smb_node_unlock(src_node);
+		delay(MSEC_TO_TICK(100));
+		smb_node_rdlock(src_node);
 	}
-
-	if (status == NT_STATUS_SHARING_VIOLATION) {
-		smb_node_end_crit(src_node);
+	if (status != NT_STATUS_SUCCESS) {
+		smb_node_unlock(src_node);
 		smb_node_release(src_fqi->fq_fnode);
 		smb_node_release(src_fqi->fq_dnode);
 		return (EPIPE); /* = ERRbadshare */
 	}
 
-	status = smb_range_check(sr, src_node, 0, UINT64_MAX, B_TRUE);
+	/*
+	 * Note, the combination of these two:
+	 *	smb_node_rdlock(node);
+	 *	nbl_start_crit(node->vp, RW_READER);
+	 * is equivalent to this call:
+	 *	smb_node_start_crit(node, RW_READER)
+	 *
+	 * Cleanup after this point should use:
+	 *	smb_node_end_crit(src_node)
+	 */
+	nbl_start_crit(src_node->vp, RW_READER);
+
+	/*
+	 * This checks nbl_share_conflict, nbl_lock_conflict
+	 */
+	status = smb_nbl_conflict(src_node, 0, UINT64_MAX, NBL_RENAME);
 	if (status != NT_STATUS_SUCCESS) {
 		smb_node_end_crit(src_node);
 		smb_node_release(src_fqi->fq_fnode);
 		smb_node_release(src_fqi->fq_dnode);
+		if (status == NT_STATUS_SHARING_VIOLATION)
+			return (EPIPE); /* = ERRbadshare */
 		return (EACCES);
 	}
 
+	/* NB: Caller expects holds on src_fqi fnode, dnode */
 	return (0);
 }
 
@@ -761,8 +806,10 @@ smb_rename_check_attr(smb_request_t *sr, smb_node_t *node, uint16_t sattr)
 {
 	smb_attr_t attr;
 
-	if (smb_node_getattr(sr, node, &attr) != 0)
-		return (EIO);
+	bzero(&attr, sizeof (attr));
+	attr.sa_mask = SMB_AT_DOSATTR;
+	if (smb_node_getattr(sr, node, kcred, NULL, &attr) != 0)
+		return (EACCES);
 
 	if ((attr.sa_dosattr & FILE_ATTRIBUTE_HIDDEN) &&
 	    !(SMB_SEARCH_HIDDEN(sattr)))

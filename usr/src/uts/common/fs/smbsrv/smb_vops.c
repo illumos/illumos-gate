@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -828,6 +829,20 @@ smb_vop_commit(vnode_t *vp, cred_t *cr)
 {
 	return (VOP_FSYNC(vp, 1, cr, &smb_ct));
 }
+
+/*
+ * Some code in smb_node.c needs to know which DOS attributes
+ * we can actually store.  Let's define a mask here of all the
+ * DOS attribute flags supported by the following function.
+ */
+const uint32_t
+smb_vop_dosattr_settable =
+	FILE_ATTRIBUTE_ARCHIVE |
+	FILE_ATTRIBUTE_SYSTEM |
+	FILE_ATTRIBUTE_HIDDEN |
+	FILE_ATTRIBUTE_READONLY |
+	FILE_ATTRIBUTE_OFFLINE |
+	FILE_ATTRIBUTE_SPARSE_FILE;
 
 static void
 smb_vop_setup_xvattr(smb_attr_t *smb_attr, xvattr_t *xvattr)

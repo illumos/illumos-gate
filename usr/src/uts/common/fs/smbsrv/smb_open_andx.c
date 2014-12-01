@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <smbsrv/smb_kproto.h>
@@ -241,7 +242,7 @@ smb_sdrc_t
 smb_com_open(smb_request_t *sr)
 {
 	struct open_param *op = &sr->arg.open;
-	smb_node_t *node;
+	smb_ofile_t *of;
 	smb_attr_t attr;
 	uint16_t file_attr;
 	int rc;
@@ -265,25 +266,33 @@ smb_com_open(smb_request_t *sr)
 	}
 	op->op_oplock_levelII = B_FALSE;
 
+	if (smb_open_dsize_check && op->dsize > UINT_MAX) {
+		smbsr_error(sr, 0, ERRDOS, ERRbadaccess);
+		return (SDRC_ERROR);
+	}
+
 	if (smb_common_open(sr) != NT_STATUS_SUCCESS)
 		return (SDRC_ERROR);
+
+	/*
+	 * NB: after the above smb_common_open() success,
+	 * we have a handle allocated (sr->fid_ofile).
+	 * If we don't return success, we must close it.
+	 */
+	of = sr->fid_ofile;
 
 	if (op->op_oplock_level == SMB_OPLOCK_NONE) {
 		sr->smb_flg &=
 		    ~(SMB_FLAGS_OPLOCK | SMB_FLAGS_OPLOCK_NOTIFY_ANY);
 	}
 
-	if (smb_open_dsize_check && op->dsize > UINT_MAX) {
-		smbsr_error(sr, 0, ERRDOS, ERRbadaccess);
-		return (SDRC_ERROR);
-	}
-
-	file_attr = op->dattr  & FILE_ATTRIBUTE_MASK;
-	node = sr->fid_ofile->f_node;
-	if (smb_node_getattr(sr, node, &attr) != 0) {
-		smbsr_error(sr, NT_STATUS_INTERNAL_ERROR,
-		    ERRDOS, ERROR_INTERNAL_ERROR);
-		return (SDRC_ERROR);
+	file_attr = op->dattr & FILE_ATTRIBUTE_MASK;
+	bzero(&attr, sizeof (attr));
+	attr.sa_mask = SMB_AT_MTIME;
+	rc = smb_node_getattr(sr, of->f_node, of->f_cr, of, &attr);
+	if (rc != 0) {
+		smbsr_errno(sr, rc);
+		goto errout;
 	}
 
 	rc = smbsr_encode_result(sr, 7, 0, "bwwllww",
@@ -295,7 +304,12 @@ smb_com_open(smb_request_t *sr)
 	    op->omode,
 	    (uint16_t)0);	/* bcc */
 
-	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
+	if (rc == 0)
+		return (SDRC_SUCCESS);
+
+errout:
+	smb_ofile_close(of, 0);
+	return (SDRC_ERROR);
 }
 
 /*
@@ -354,7 +368,7 @@ smb_sdrc_t
 smb_com_open_andx(smb_request_t *sr)
 {
 	struct open_param	*op = &sr->arg.open;
-	smb_node_t		*node;
+	smb_ofile_t		*of;
 	uint16_t		file_attr;
 	smb_attr_t		attr;
 	int rc;
@@ -374,13 +388,20 @@ smb_com_open_andx(smb_request_t *sr)
 
 	op->op_oplock_levelII = B_FALSE;
 
-	if (smb_common_open(sr) != NT_STATUS_SUCCESS)
-		return (SDRC_ERROR);
-
 	if (smb_open_dsize_check && op->dsize > UINT_MAX) {
 		smbsr_error(sr, 0, ERRDOS, ERRbadaccess);
 		return (SDRC_ERROR);
 	}
+
+	if (smb_common_open(sr) != NT_STATUS_SUCCESS)
+		return (SDRC_ERROR);
+
+	/*
+	 * NB: after the above smb_common_open() success,
+	 * we have a handle allocated (sr->fid_ofile).
+	 * If we don't return success, we must close it.
+	 */
+	of = sr->fid_ofile;
 
 	if (op->op_oplock_level != SMB_OPLOCK_NONE)
 		op->action_taken |= SMB_OACT_LOCK;
@@ -388,15 +409,16 @@ smb_com_open_andx(smb_request_t *sr)
 		op->action_taken &= ~SMB_OACT_LOCK;
 
 	file_attr = op->dattr & FILE_ATTRIBUTE_MASK;
+	bzero(&attr, sizeof (attr));
 
 	switch (sr->tid_tree->t_res_type & STYPE_MASK) {
 	case STYPE_DISKTREE:
 	case STYPE_PRINTQ:
-		node = sr->fid_ofile->f_node;
-		if (smb_node_getattr(sr, node, &attr) != 0) {
-			smbsr_error(sr, NT_STATUS_INTERNAL_ERROR,
-			    ERRDOS, ERROR_INTERNAL_ERROR);
-			return (SDRC_ERROR);
+		attr.sa_mask = SMB_AT_MTIME;
+		rc = smb_node_getattr(sr, of->f_node, of->f_cr, of, &attr);
+		if (rc != 0) {
+			smbsr_errno(sr, rc);
+			goto errout;
 		}
 
 		rc = smbsr_encode_result(sr, 15, 0,
@@ -431,10 +453,15 @@ smb_com_open_andx(smb_request_t *sr)
 	default:
 		smbsr_error(sr, NT_STATUS_INVALID_DEVICE_REQUEST,
 		    ERRDOS, ERROR_INVALID_FUNCTION);
-		return (SDRC_ERROR);
+		goto errout;
 	}
 
-	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
+	if (rc == 0)
+		return (SDRC_SUCCESS);
+
+errout:
+	smb_ofile_close(of, 0);
+	return (SDRC_ERROR);
 }
 
 smb_sdrc_t

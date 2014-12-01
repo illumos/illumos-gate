@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/sid.h>
@@ -1213,6 +1213,10 @@ smb_fsop_setattr(
 	 * The file system cannot detect pending READDONLY
 	 * (i.e. if the file has been opened readonly but
 	 * not yet closed) so we need to test READONLY here.
+	 *
+	 * Note that file handle that were opened before the
+	 * READONLY flag was set in the node (or the FS) are
+	 * immune to that change, and remain writable.
 	 */
 	if (sr && (set_attr->sa_mask & SMB_AT_SIZE)) {
 		if (sr->fid_ofile) {
@@ -1363,6 +1367,11 @@ smb_fsop_write(
     int ioflag)
 {
 	caller_context_t ct;
+	smb_attr_t attr;
+	smb_node_t *u_node;
+	vnode_t *u_vp = NULL;
+	smb_ofile_t *of;
+	vnode_t *vp;
 	int svmand;
 	int rc;
 
@@ -1373,18 +1382,19 @@ smb_fsop_write(
 
 	ASSERT(sr);
 	ASSERT(sr->tid_tree);
-	ASSERT(sr->fid_ofile);
+	of = sr->fid_ofile;
+	vp = snode->vp;
 
 	if (SMB_TREE_IS_READONLY(sr))
 		return (EROFS);
 
-	if (SMB_OFILE_IS_READONLY(sr->fid_ofile) ||
+	if (SMB_OFILE_IS_READONLY(of) ||
 	    SMB_TREE_HAS_ACCESS(sr, ACE_WRITE_DATA | ACE_APPEND_DATA) == 0)
 		return (EACCES);
 
-	rc = smb_ofile_access(sr->fid_ofile, cr, FILE_WRITE_DATA);
+	rc = smb_ofile_access(of, cr, FILE_WRITE_DATA);
 	if (rc != NT_STATUS_SUCCESS) {
-		rc = smb_ofile_access(sr->fid_ofile, cr, FILE_APPEND_DATA);
+		rc = smb_ofile_access(of, cr, FILE_APPEND_DATA);
 		if (rc != NT_STATUS_SUCCESS)
 			return (EACCES);
 	}
@@ -1395,19 +1405,24 @@ smb_fsop_write(
 	 * rejection by FS due to lack of permission on the actual
 	 * extended attr kcred is passed for streams.
 	 */
-	if (SMB_IS_STREAM(snode))
+	u_node = SMB_IS_STREAM(snode);
+	if (u_node != NULL) {
+		ASSERT(u_node->n_magic == SMB_NODE_MAGIC);
+		ASSERT(u_node->n_state != SMB_NODE_STATE_DESTROYING);
+		u_vp = u_node->vp;
 		cr = kcred;
+	}
 
-	smb_node_start_crit(snode, RW_READER);
-	rc = nbl_svmand(snode->vp, kcred, &svmand);
+	smb_node_start_crit(snode, RW_WRITER);
+	rc = nbl_svmand(vp, kcred, &svmand);
 	if (rc) {
 		smb_node_end_crit(snode);
 		return (rc);
 	}
 
 	ct = smb_ct;
-	ct.cc_pid = sr->fid_ofile->f_uniqid;
-	rc = nbl_lock_conflict(snode->vp, NBL_WRITE, uio->uio_loffset,
+	ct.cc_pid = of->f_uniqid;
+	rc = nbl_lock_conflict(vp, NBL_WRITE, uio->uio_loffset,
 	    uio->uio_iov->iov_len, svmand, &ct);
 
 	if (rc) {
@@ -1415,7 +1430,25 @@ smb_fsop_write(
 		return (ERANGE);
 	}
 
-	rc = smb_vop_write(snode->vp, uio, ioflag, lcount, cr);
+	rc = smb_vop_write(vp, uio, ioflag, lcount, cr);
+
+	/*
+	 * Once the mtime has been set via this ofile, the
+	 * automatic mtime changes from writes via this ofile
+	 * should cease, preserving the mtime that was set.
+	 * See: [MS-FSA] 2.1.5.14 and smb_node_setattr.
+	 *
+	 * The VFS interface does not offer a way to ask it to
+	 * skip the mtime updates, so we simulate the desired
+	 * behavior by re-setting the mtime after writes on a
+	 * handle where the mtime has been set.
+	 */
+	if (of->f_pending_attr.sa_mask & SMB_AT_MTIME) {
+		bcopy(&of->f_pending_attr, &attr, sizeof (attr));
+		attr.sa_mask = SMB_AT_MTIME;
+		(void) smb_vop_setattr(vp, u_vp, &attr, 0, kcred);
+	}
+
 	smb_node_end_crit(snode);
 
 	return (rc);
