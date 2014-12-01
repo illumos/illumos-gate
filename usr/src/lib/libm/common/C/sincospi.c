@@ -27,8 +27,6 @@
  * Use is subject to license terms.
  */
 
-#pragma weak sincospi = __sincospi
-
 /* INDENT OFF */
 /*
  * void sincospi(double x, double *s, double *c)
@@ -72,7 +70,6 @@
  */
 
 #include "libm.h"
-#include "libm_synonyms.h"
 #include "libm_protos.h"
 #include "libm_macros.h"
 #include <math.h>

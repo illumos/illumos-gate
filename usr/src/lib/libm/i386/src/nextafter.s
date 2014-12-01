@@ -33,7 +33,6 @@ LIBM_ANSI_PRAGMA_WEAK(nextafter,function)
 	.weak _nextafter
 	.type _nextafter,@function
 _nextafter	= __nextafter
-#include "libm_synonyms.h"
 #include "libm_protos.h"
 
 	.data

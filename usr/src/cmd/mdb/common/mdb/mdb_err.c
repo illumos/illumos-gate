@@ -113,7 +113,8 @@ static const char *const _mdb_errlist[] = {
 	"too many enabled watchpoints for this machine", /* EMDB_WPTOOMANY */
 	"DTrace is active",				/* EMDB_DTACTIVE */
 	"boot-loaded module cannot be unloaded",	/* EMDB_KMODNOUNLOAD */
-	"stack frame pointer is invalid"		/* EMDB_STKFRAME */
+	"stack frame pointer is invalid",		/* EMDB_STKFRAME */
+	"unexpected short write"			/* EMDB_SHORTWRITE */
 
 };
 

@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdio_ext.h>
@@ -139,7 +137,8 @@ gcore(struct ps_prochandle *P, const char *fname, core_content_t content,
 		(void) printf("%s: %s dumped\n", pname, fname);
 	} else {
 		(void) fprintf(stderr, "%s: %s dump failed: %s\n", pname,
-		    fname, strerror(errno));
+		    fname, errno == EBADE ? "unexpected short write" :
+		    strerror(errno));
 		(*errp)++;
 	}
 }

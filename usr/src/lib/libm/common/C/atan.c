@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak atan = __atan
+#pragma weak __atan = atan
 
 /* INDENT OFF */
 /*
@@ -82,7 +82,6 @@
 /* INDENT ON */
 
 #include "libm.h"
-#include "libm_synonyms.h"
 #include "libm_protos.h"
 
 extern const double _TBL_atan[];

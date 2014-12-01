@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak catan = __catan
+#pragma weak __catan = catan
 
 /* INDENT OFF */
 /*

@@ -93,8 +93,8 @@
  *	   erfc(inf) = 0
  */
 
-#pragma weak erfl = __erfl
-#pragma weak erfcl = __erfcl
+#pragma weak __erfl = erfl
+#pragma weak __erfcl = erfcl
 
 #include "libm.h"
 #include "longdouble.h"

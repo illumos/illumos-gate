@@ -29,46 +29,11 @@
 
 extern void __vsqrtf(int, float *, int, float *, int);
 
-#if !defined(LIBMVEC_SO_BUILD)
-#if defined(ARCH_v8plusa) || defined(ARCH_v8plusb) || defined(ARCH_v9a) || defined(ARCH_v9b)
-#define CHECK_ULTRA3
-#endif
-#endif	/* !defined(LIBMVEC_SO_BUILD) */
-
-#ifdef CHECK_ULTRA3
-#include <strings.h>
-#define sysinfo _sysinfo
-#include <sys/systeminfo.h>
-
-#define BUFLEN	257
-
-static int use_ultra3 = 0;
-
-extern void __vsqrtf_ultra3(int, float *, int, float *, int);
-#endif
-
 #pragma weak vsqrtf_ = __vsqrtf_
 
 /* just invoke the serial function */
 void
 __vsqrtf_(int *n, float *x, int *stridex, float *y, int *stridey)
 {
-#ifdef CHECK_ULTRA3
-	int		u;
-	char	buf[BUFLEN];
-
-	u = use_ultra3;
-	if (!u) {
-		/* use __vsqrtf_ultra3 on Cheetah (and ???) */
-		if (sysinfo(SI_ISALIST, buf, BUFLEN) > 0 && !strncmp(buf, "sparcv9+vis2", 12))
-			u = 3;
-		else
-			u = 1;
-		use_ultra3 = u;
-	}
-	if (u & 2)
-		__vsqrtf_ultra3(*n, x, *stridex, y, *stridey);
-	else
-#endif
 	__vsqrtf(*n, x, *stridex, y, *stridey);
 }

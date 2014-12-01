@@ -27,8 +27,6 @@
  * Use is subject to license terms.
  */
 
-#pragma weak exp10f = __exp10f
-
 #include "libm.h"
 
 extern double exp10(double);

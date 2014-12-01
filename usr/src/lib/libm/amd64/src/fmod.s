@@ -30,7 +30,6 @@
 
 #include "libm.h"
 LIBM_ANSI_PRAGMA_WEAK(fmod,function)
-#include "libm_synonyms.h"
 #include "libm_protos.h"
 
 	ENTRY(fmod)

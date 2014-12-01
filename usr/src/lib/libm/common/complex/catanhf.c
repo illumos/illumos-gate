@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak catanhf = __catanhf
+#pragma weak __catanhf = catanhf
 
 #include "libm.h"
 #include "complex_wrapper.h"

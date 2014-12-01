@@ -27,9 +27,7 @@
  * Use is subject to license terms.
  */
 
-#if defined(ELFOBJ)
 #pragma weak fdiml = __fdiml
-#endif
 
 #include "libm.h"	/* for islessequal macro */
 

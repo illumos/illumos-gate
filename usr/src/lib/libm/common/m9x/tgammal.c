@@ -27,9 +27,7 @@
  * Use is subject to license terms.
  */
 
-#if defined(ELFOBJ)
-#pragma weak tgammal = __tgammal
-#endif
+#pragma weak __tgammal = tgammal
 
 #include "libm.h"
 #include <sys/isa_defs.h>

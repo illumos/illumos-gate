@@ -39,7 +39,6 @@ _isnand	= __isnan
 	.weak isnand
 	.type isnand,@function
 isnand	= __isnan
-#include "libm_synonyms.h"
 
 	ENTRY(isnan)
 	movl    8(%esp),%eax		/ eax <-- hi_32(x)

@@ -29,8 +29,6 @@
         .file "exp10l.s"
 
 #include "libm.h"
-LIBM_ANSI_PRAGMA_WEAK(exp10l,function)
-#include "libm_synonyms.h"
 
 	.data
 	.align	4

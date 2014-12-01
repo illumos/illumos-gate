@@ -27,9 +27,7 @@
  * Use is subject to license terms.
  */
 
-#if defined(ELFOBJ)
-#pragma weak isnanl = __isnanl
-#endif
+#pragma weak __isnanl = isnanl
 
 #include "libm.h"
 

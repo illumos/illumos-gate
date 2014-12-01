@@ -26,8 +26,6 @@
  * Use is subject to license terms.
  */
 
-#pragma weak atan2pi = __atan2pi
-
 /*
  * atan2pi(x) = atan2(x)/pi
  */

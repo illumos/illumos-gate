@@ -30,8 +30,6 @@
 
 #include "libm.h"
 LIBM_ANSI_PRAGMA_WEAK(roundl,function)
-#include "libm_synonyms.h"
-#undef fabs
 
 	.section .rodata
 	.align	4

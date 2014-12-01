@@ -27,9 +27,7 @@
  * Use is subject to license terms.
  */
 
-#if defined(ELFOBJ)
-#pragma weak powl = __powl
-#endif
+#pragma weak __powl = powl
 
 #include "libm.h"
 #include "xpg6.h"	/* __xpg6 */

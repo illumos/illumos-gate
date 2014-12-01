@@ -18,7 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 1983, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 Milan Jurik. All rights reserved.
  */
@@ -591,10 +593,6 @@ param_calc(int platform_max_nprocs)
 		maxusers = MAX_MAXUSERS;
 		cmn_err(CE_NOTE, "maxusers limited to %d", MAX_MAXUSERS);
 	}
-
-	if (ngroups_max > NGROUPS_MAX_DEFAULT)
-		cmn_err(CE_WARN, "ngroups_max of %d > %d, NFS AUTH_SYS will"
-		    " not work properly", ngroups_max, NGROUPS_MAX_DEFAULT);
 
 #ifdef DEBUG
 	/*

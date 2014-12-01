@@ -26,7 +26,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak expf = __expf
+#pragma weak __expf = expf
 
 /* INDENT OFF */
 /*

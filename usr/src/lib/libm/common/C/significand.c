@@ -27,9 +27,7 @@
  * Use is subject to license terms.
  */
 
-#if defined(ELFOBJ)
-#pragma weak significand = __significand
-#endif
+#pragma weak __significand = significand
 
 #include "libm.h"
 

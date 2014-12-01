@@ -27,12 +27,9 @@
  * Use is subject to license terms.
  */
 
-#if defined(ELFOBJ)
 #pragma weak nearbyintf = __nearbyintf
-#endif
 
 #include "libm.h"
-#include "fenv_synonyms.h"
 #include <fenv.h>
 
 float

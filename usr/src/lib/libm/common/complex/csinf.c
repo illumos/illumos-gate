@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak csinf = __csinf
+#pragma weak __csinf = csinf
 
 #include "libm.h"
 #include "complex_wrapper.h"

@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <smbsrv/smb_kproto.h>
@@ -251,6 +252,7 @@ smb_query_by_fid(smb_request_t *sr, smb_xa_t *xa, uint16_t infolev)
 		return (-1);
 	}
 
+	sr->user_cr = smb_ofile_getcred(sr->fid_ofile);
 	qinfo = kmem_alloc(sizeof (smb_queryinfo_t), KM_SLEEP);
 
 	switch (sr->fid_ofile->f_ftype) {
@@ -297,6 +299,21 @@ smb_query_by_path(smb_request_t *sr, smb_xa_t *xa, uint16_t infolev)
 	smb_node_t	*node, *dnode;
 	smb_pathname_t	*pn;
 	int		rc;
+
+	/*
+	 * The function smb_query_fileinfo is used here and in
+	 * smb_query_by_fid.  That common function needs this
+	 * one to call it with a NULL fid_ofile, so check here.
+	 * Note: smb_query_by_fid enforces the opposite.
+	 *
+	 * In theory we could ASSERT this, but whether we have
+	 * fid_ofile set here depends on what sequence of SMB
+	 * commands the client has sent in this message, so
+	 * let's be cautious and handle it as an error.
+	 */
+	if (sr->fid_ofile != NULL)
+		return (-1);
+
 
 	/* VALID, but not yet supported */
 	if (infolev == SMB_FILE_ACCESS_INFORMATION) {
@@ -781,7 +798,11 @@ smb_query_fileinfo(smb_request_t *sr, smb_node_t *node, uint16_t infolev,
 
 	(void) bzero(qinfo, sizeof (smb_queryinfo_t));
 
-	if (smb_node_getattr(sr, node, &qinfo->qi_attr) != 0) {
+	/* See: smb_query_encode_response */
+	qinfo->qi_attr.sa_mask = SMB_AT_ALL;
+	rc = smb_node_getattr(sr, node, sr->user_cr, sr->fid_ofile,
+	    &qinfo->qi_attr);
+	if (rc != 0) {
 		smbsr_error(sr, NT_STATUS_INTERNAL_ERROR,
 		    ERRDOS, ERROR_INTERNAL_ERROR);
 		return (-1);

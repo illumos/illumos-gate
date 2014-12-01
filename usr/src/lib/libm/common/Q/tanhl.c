@@ -27,9 +27,7 @@
  * Use is subject to license terms.
  */
 
-#if defined(ELFOBJ)
-#pragma weak tanhl = __tanhl
-#endif
+#pragma weak __tanhl = tanhl
 
 /*
  * tanhl(x) returns the hyperbolic tangent of x

@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <smbsrv/smb_kproto.h>
@@ -148,7 +149,7 @@ smb_nt_trans_ioctl_set_sparse(smb_request_t *sr, smb_xa_t *xa)
 {
 	int		rc = 0;
 	uint8_t		set = 1;
-	smb_node_t	*node;
+	smb_ofile_t	*of;
 	smb_attr_t	attr;
 
 	if (SMB_TREE_IS_READONLY(sr))
@@ -166,8 +167,8 @@ smb_nt_trans_ioctl_set_sparse(smb_request_t *sr, smb_xa_t *xa)
 		return (NT_STATUS_INVALID_PARAMETER);
 	}
 
-	node = sr->fid_ofile->f_node;
-	if (smb_node_is_dir(node)) {
+	of = sr->fid_ofile;
+	if (smb_node_is_dir(of->f_node)) {
 		smbsr_release_file(sr);
 		return (NT_STATUS_INVALID_PARAMETER);
 	}
@@ -179,9 +180,14 @@ smb_nt_trans_ioctl_set_sparse(smb_request_t *sr, smb_xa_t *xa)
 		}
 	}
 
+	/*
+	 * Using kcred because we just want the DOS attrs
+	 * and don't want access errors for this.
+	 */
 	bzero(&attr, sizeof (smb_attr_t));
 	attr.sa_mask = SMB_AT_DOSATTR;
-	if ((rc = smb_node_getattr(sr, node, &attr)) != 0) {
+	rc = smb_node_getattr(sr, of->f_node, kcred, of, &attr);
+	if (rc != 0) {
 		smbsr_errno(sr, rc);
 		smbsr_release_file(sr);
 		return (sr->smb_error.status);
@@ -199,7 +205,7 @@ smb_nt_trans_ioctl_set_sparse(smb_request_t *sr, smb_xa_t *xa)
 	}
 
 	if (attr.sa_mask != 0) {
-		rc = smb_node_setattr(sr, node, sr->user_cr, NULL, &attr);
+		rc = smb_node_setattr(sr, of->f_node, of->f_cr, of, &attr);
 		if (rc != 0) {
 			smbsr_errno(sr, rc);
 			smbsr_release_file(sr);
@@ -260,7 +266,7 @@ smb_nt_trans_ioctl_query_alloc_ranges(smb_request_t *sr, smb_xa_t *xa)
 {
 	int		rc;
 	uint64_t	offset, len;
-	smb_node_t	*node;
+	smb_ofile_t	*of;
 	smb_attr_t	attr;
 
 	if (STYPE_ISIPC(sr->tid_tree->t_res_type))
@@ -275,8 +281,8 @@ smb_nt_trans_ioctl_query_alloc_ranges(smb_request_t *sr, smb_xa_t *xa)
 		return (NT_STATUS_INVALID_PARAMETER);
 	}
 
-	node = sr->fid_ofile->f_node;
-	if (smb_node_is_dir(node)) {
+	of = sr->fid_ofile;
+	if (smb_node_is_dir(of->f_node)) {
 		smbsr_release_file(sr);
 		return (NT_STATUS_INVALID_PARAMETER);
 	}
@@ -284,7 +290,8 @@ smb_nt_trans_ioctl_query_alloc_ranges(smb_request_t *sr, smb_xa_t *xa)
 	/* If zero size file don't return any data */
 	bzero(&attr, sizeof (smb_attr_t));
 	attr.sa_mask = SMB_AT_SIZE;
-	if ((rc = smb_node_getattr(sr, node, &attr)) != 0) {
+	rc = smb_node_getattr(sr, of->f_node, of->f_cr, of, &attr);
+	if (rc != 0) {
 		smbsr_errno(sr, rc);
 		smbsr_release_file(sr);
 		return (sr->smb_error.status);

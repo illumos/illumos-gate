@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak atanf = __atanf
+#pragma weak __atanf = atanf
 
 /* INDENT OFF */
 /*

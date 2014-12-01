@@ -30,7 +30,6 @@
 
 #include "libm.h"
 LIBM_ANSI_PRAGMA_WEAK(expl,function)
-#include "libm_synonyms.h"
 
 	.data
 	.align	4

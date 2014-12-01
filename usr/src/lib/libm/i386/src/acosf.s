@@ -30,10 +30,7 @@
 
 #include "libm.h"
 LIBM_ANSI_PRAGMA_WEAK(acosf,function)
-#include "libm_synonyms.h"
 #include "libm_protos.h"
-
-#undef fabs
 
 	ENTRY(acosf)
 	flds	4(%esp)			/ push x

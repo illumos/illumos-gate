@@ -26,7 +26,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak cosh = __cosh
+#pragma weak __cosh = cosh
 
 /* INDENT OFF */
 /*

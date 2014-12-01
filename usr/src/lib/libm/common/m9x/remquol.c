@@ -27,10 +27,9 @@
  * Use is subject to license terms.
  */
 
-#pragma weak remquol = __remquol
+#pragma weak __remquol = remquol
 
 #include "libm.h"
-#include "libm_synonyms.h"
 #if defined(__SUNPRO_C)
 #include <sunmath.h>			/* fabsl */
 #endif

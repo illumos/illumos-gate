@@ -28,7 +28,6 @@
  */
 
 #if defined(__sparc)
-#include "fenv_synonyms.h"
 #include <stdio.h>
 #include <unistd.h>
 #include <string.h>

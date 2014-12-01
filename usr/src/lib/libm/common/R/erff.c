@@ -26,8 +26,8 @@
  * Use is subject to license terms.
  */
 
-#pragma weak erff = __erff
-#pragma weak erfcf = __erfcf
+#pragma weak __erff = erff
+#pragma weak __erfcf = erfcf
 
 #include "libm.h"
 

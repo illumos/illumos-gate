@@ -27,16 +27,14 @@
  * Use is subject to license terms.
  */
 
-#if defined(ELFOBJ)
-#pragma weak scalbnf = __scalbnf
-#endif
+#pragma weak __scalbnf = scalbnf
 
 #include "libm.h"
 #include <float.h>		/* FLT_MAX, FLT_MIN */
 #include <stdlib.h>		/* abs */
 
 static const float twom25f = 2.98023223876953125e-8F;
-#if defined(USE_FPSCALE) || defined(__x86)
+#if defined(__x86)
 static const float two23f = 8388608.0F;
 #else
 /*
@@ -55,7 +53,7 @@ ilogbf_biased(unsigned v) {
 	v <<= 1;
 	return (r + ((0xffffaa50 >> v) & 0x3));
 }
-#endif	/* defined(USE_FPSCALE) */
+#endif	/* defined(__x86) */
 
 float
 scalbnf(float x, int n) {
@@ -72,7 +70,7 @@ scalbnf(float x, int n) {
 	if (ix == 0 || n == 0)
 		return (x);
 	if (k == 0) {
-#if defined(USE_FPSCALE) || defined(__x86)
+#if defined(__x86)
 		x *= two23f;
 		k = ((*px & ~0x80000000) >> 23) - 23;
 #else

@@ -26,11 +26,6 @@
  * Use is subject to license terms.
  */
 
-#pragma weak aintl = __aintl
-#pragma weak anintl = __anintl
-#pragma weak irintl = __irintl
-#pragma weak nintl = __nintl
-
 /*
  * aintl(x)	return x chopped to integral value
  * anintl(x)	return sign(x)*(|x|+0.5) chopped to integral value

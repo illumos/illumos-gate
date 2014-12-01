@@ -26,7 +26,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak clogf = __clogf
+#pragma weak __clogf = clogf
 
 #include "libm.h"
 #include "complex_wrapper.h"

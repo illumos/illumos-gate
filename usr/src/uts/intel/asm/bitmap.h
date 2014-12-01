@@ -48,29 +48,33 @@ extern "C" {
 extern __GNU_INLINE int
 highbit(ulong_t i)
 {
-	long value = -1l;
+	long value;
+	uint8_t zf;
 
 	__asm__(
-	    "bsr" __SUF " %1,%0"
-	    : "+r" (value)
-	    : "r" (i)
+	    "bsr" __SUF " %2,%0;"
+	    "setz %1"
+	    : "=r" (value), "=q" (zf)
+	    : "mr" (i)
 	    : "cc");
 
-	return ((int)(value + 1));
+	return (zf ? 0 : (value + 1));
 }
 
 extern __GNU_INLINE int
 lowbit(ulong_t i)
 {
-	long value = -1l;
+	long value;
+	uint8_t zf;
 
 	__asm__(
-	    "bsf" __SUF " %1,%0"
-	    : "+r" (value)
-	    : "r" (i)
+	    "bsf" __SUF " %2,%0;"
+	    "setz %1"
+	    : "=r" (value), "=q" (zf)
+	    : "mr" (i)
 	    : "cc");
 
-	return ((int)(value + 1));
+	return (zf ? 0 : (value + 1));
 }
 
 extern __GNU_INLINE uint_t

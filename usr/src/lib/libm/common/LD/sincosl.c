@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak sincosl = __sincosl
+#pragma weak __sincosl = sincosl
 
 /* INDENT OFF */
 /* cosl(x)
@@ -62,7 +62,6 @@
 /* INDENT ON */
 
 #include "libm.h"
-#include "libm_synonyms.h"
 #include "longdouble.h"
 
 #include <sys/isa_defs.h>

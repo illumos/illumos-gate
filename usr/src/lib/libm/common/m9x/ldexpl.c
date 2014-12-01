@@ -27,9 +27,7 @@
  * Use is subject to license terms.
  */
 
-#if defined(ELFOBJ)
-#pragma weak ldexpl = __ldexpl
-#endif
+#pragma weak __ldexpl = ldexpl
 
 #include "libm.h"
 

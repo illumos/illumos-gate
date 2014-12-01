@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak csqrtf = __csqrtf
+#pragma weak __csqrtf = csqrtf
 
 #include "libm.h"		/* sqrt/fabsf/sqrtf */
 #include "complex_wrapper.h"

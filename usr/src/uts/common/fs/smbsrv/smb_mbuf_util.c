@@ -236,7 +236,7 @@ void
 MBC_SETUP(struct mbuf_chain *MBC, uint32_t max_bytes)
 {
 	bzero((MBC), sizeof (struct mbuf_chain));
-	(MBC)->max_bytes = max_bytes ? max_bytes : smb_maxbufsize;
+	(MBC)->max_bytes = max_bytes;
 }
 
 void
@@ -306,7 +306,7 @@ MBC_ATTACH_BUF(struct mbuf_chain *MBC, unsigned char *BUF, int LEN)
 	(MBC)->chain->m_ext.ext_buf = (caddr_t)(BUF);
 	(MBC)->chain->m_len = (LEN);
 	(MBC)->chain->m_ext.ext_size = (LEN);
-	(MBC)->chain->m_ext.ext_ref = smb_noop;
+	(MBC)->chain->m_ext.ext_ref = mclrefnoop;
 	(MBC)->max_bytes = (LEN);
 }
 

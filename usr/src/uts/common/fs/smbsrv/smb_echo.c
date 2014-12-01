@@ -47,6 +47,8 @@ smb_post_echo(smb_request_t *sr)
 	DTRACE_SMB_1(op__Echo__done, smb_request_t *, sr);
 }
 
+static unsigned short smb_max_echo = 10;
+
 smb_sdrc_t
 smb_com_echo(struct smb_request *sr)
 {
@@ -59,6 +61,13 @@ smb_com_echo(struct smb_request *sr)
 	if (smbsr_decode_vwv(sr, "w", &necho) != 0)
 		return (SDRC_ERROR);
 
+	/*
+	 * Don't let the client fool us into doing
+	 * more work than is "reasonable".
+	 */
+	if (necho > smb_max_echo)
+		necho = smb_max_echo;
+
 	nbytes = sr->smb_bcc;
 	data = smb_srm_zalloc(sr, nbytes);
 
@@ -66,6 +75,14 @@ smb_com_echo(struct smb_request *sr)
 		return (SDRC_ERROR);
 
 	for (i = 1; i <= necho; ++i) {
+
+		/*
+		 * According to [MS-CIFS] 3.3.5.32 echo is
+		 * subject to cancellation.
+		 */
+		if (sr->sr_state != SMB_REQ_STATE_ACTIVE)
+			break;
+
 		MBC_INIT(&reply, SMB_HEADER_ED_LEN + 10 + nbytes);
 
 		(void) smb_mbc_encodef(&reply, SMB_HEADER_ED_FMT,
@@ -89,6 +106,8 @@ smb_com_echo(struct smb_request *sr)
 			smb_sign_reply(sr, &reply);
 
 		(void) smb_session_send(sr->session, 0, &reply);
+
+		delay(MSEC_TO_TICK(100));
 	}
 
 	return (SDRC_NO_REPLY);

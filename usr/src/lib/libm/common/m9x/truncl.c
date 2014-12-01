@@ -27,9 +27,7 @@
  * Use is subject to license terms.
  */
 
-#if defined(ELFOBJ)
-#pragma weak truncl = __truncl
-#endif
+#pragma weak __truncl = truncl
 
 #include "libm.h"
 

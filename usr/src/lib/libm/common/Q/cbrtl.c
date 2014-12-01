@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak cbrtl = __cbrtl
+#pragma weak __cbrtl = cbrtl
 
 #include "libm.h"
 #include "longdouble.h"

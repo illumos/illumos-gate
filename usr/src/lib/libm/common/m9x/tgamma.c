@@ -27,9 +27,7 @@
  * Use is subject to license terms.
  */
 
-#if defined(ELFOBJ)
-#pragma weak tgamma = __tgamma
-#endif
+#pragma weak __tgamma = tgamma
 
 /* INDENT OFF */
 /*

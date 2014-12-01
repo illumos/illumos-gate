@@ -27,9 +27,8 @@
  * Use is subject to license terms.
  */
 
-#pragma weak signgam = __signgam
+#pragma weak __signgam = signgam
 
-#include "libm_synonyms.h"
 #include <math.h>
 
 int signgam = 0;

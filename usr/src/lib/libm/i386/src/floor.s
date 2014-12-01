@@ -30,7 +30,6 @@
 
 #include "libm.h"
 LIBM_ANSI_PRAGMA_WEAK(floor,function)
-#include "libm_synonyms.h"
 
 	ENTRY(floor)
 	subl	$8,%esp

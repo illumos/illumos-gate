@@ -27,9 +27,7 @@
  * Use is subject to license terms.
  */
 
-#if defined(ELFOBJ)
-#pragma weak asinhl = __asinhl
-#endif
+#pragma weak __asinhl = asinhl
 
 #include "libm.h"
 

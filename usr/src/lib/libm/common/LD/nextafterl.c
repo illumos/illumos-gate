@@ -27,9 +27,7 @@
  * Use is subject to license terms.
  */
 
-#if defined(ELFOBJ)
-#pragma weak nextafterl = __nextafterl
-#endif
+#pragma weak __nextafterl = nextafterl
 
 #include "libm.h"
 #include <float.h>		/* LDBL_MAX, LDBL_MIN */

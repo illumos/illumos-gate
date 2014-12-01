@@ -27,12 +27,10 @@
  * Use is subject to license terms.
  */
 
-#if defined(ELFOBJ)
-#pragma weak llrintl = __llrintl
+#pragma weak __llrintl = llrintl
 #if defined(__sparcv9) || defined(__amd64)
-#pragma weak lrintl = __llrintl
-#pragma weak __lrintl = __llrintl
-#endif
+#pragma weak lrintl = llrintl
+#pragma weak __lrintl = llrintl
 #endif
 
 #include "libm.h"

@@ -27,9 +27,7 @@
  * Use is subject to license terms.
  */
 
-#if defined(ELFOBJ)
-#pragma weak cbrtl = __cbrtl
-#endif
+#pragma weak __cbrtl = cbrtl
 
 #include "libm.h"
 #include "longdouble.h"

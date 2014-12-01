@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak acosh = __acosh
+#pragma weak __acosh = acosh
 
 /* INDENT OFF */
 /*
@@ -46,7 +46,6 @@
  */
 /* INDENT ON */
 
-#include "libm_synonyms.h"	/* __acosh, __log, __log1p */
 #include "libm_protos.h"	/* _SVID_libm_error */
 #include "libm_macros.h"
 #include <math.h>

@@ -27,9 +27,7 @@
  * Use is subject to license terms.
  */
 
-#if defined(ELFOBJ)
-#pragma weak pow = __pow
-#endif
+#pragma weak __pow = pow
 
 /*
  * pow(x,y) return x**y

@@ -2801,7 +2801,8 @@ lowbit(ulong_t i)
 
 	ENTRY(lowbit)
 	movl	$-1, %eax
-	bsfq	%rdi, %rax
+	bsfq	%rdi, %rdi
+	cmovnz	%edi, %eax
 	incl	%eax
 	ret
 	SET_SIZE(lowbit)
@@ -2809,9 +2810,12 @@ lowbit(ulong_t i)
 #elif defined(__i386)
 
 	ENTRY(lowbit)
-	movl	$-1, %eax
 	bsfl	4(%esp), %eax
+	jz	0f
 	incl	%eax
+	ret
+0:
+	xorl	%eax, %eax
 	ret
 	SET_SIZE(lowbit)
 
@@ -2825,31 +2829,6 @@ int
 highbit(ulong_t i)
 { return (0); }
 
-#else	/* __lint */
-
-#if defined(__amd64)
-
-	ENTRY(highbit)
-	movl	$-1, %eax
-	bsrq	%rdi, %rax
-	incl	%eax
-	ret
-	SET_SIZE(highbit)
-
-#elif defined(__i386)
-
-	ENTRY(highbit)
-	movl	$-1, %eax
-	bsrl	4(%esp), %eax
-	incl	%eax
-	ret
-	SET_SIZE(highbit)
-
-#endif	/* __i386 */
-#endif	/* __lint */
-
-#if defined(__lint)
-
 /*ARGSUSED*/
 int
 highbit64(uint64_t i)
@@ -2859,26 +2838,32 @@ highbit64(uint64_t i)
 
 #if defined(__amd64)
 
-	ENTRY(highbit64)
+	ENTRY(highbit)
+	ALTENTRY(highbit64)
 	movl	$-1, %eax
-	bsrq	%rdi, %rax
+	bsrq	%rdi, %rdi
+	cmovnz	%edi, %eax
 	incl	%eax
 	ret
 	SET_SIZE(highbit64)
+	SET_SIZE(highbit)
 
 #elif defined(__i386)
 
+	ENTRY(highbit)
+	bsrl	4(%esp), %eax
+	jz	0f
+	incl	%eax
+	ret
+0:
+	xorl	%eax, %eax
+	ret    
+	SET_SIZE(highbit)
+
 	ENTRY(highbit64)
 	bsrl	8(%esp), %eax
-	jz	.lowbit
-	addl	$32, %eax
-	jmp	.done
-
-.lowbit:
-	movl	$-1, %eax
-	bsrl	4(%esp), %eax
-.done:
-	incl	%eax
+	jz	highbit
+	addl	$33, %eax
 	ret
 	SET_SIZE(highbit64)
 

@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak cacosl = __cacosl
+#pragma weak __cacosl = cacosl
 
 #include "libm.h"		/* acosl/atanl/fabsl/isinfl/log1pl/logl/sqrtl */
 #include "complex_wrapper.h"

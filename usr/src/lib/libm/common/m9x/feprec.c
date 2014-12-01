@@ -27,10 +27,9 @@
  * Use is subject to license terms.
  */
 
-#pragma weak fegetprec = __fegetprec
-#pragma weak fesetprec = __fesetprec
+#pragma weak __fegetprec = fegetprec
+#pragma weak __fesetprec = fesetprec
 
-#include "fenv_synonyms.h"
 #include <fenv.h>
 #include <ucontext.h>
 #include <thread.h>

@@ -27,14 +27,13 @@
  * Use is subject to license terms.
  */
 
-#pragma weak lgammal = __lgammal
+#pragma weak __lgammal = lgammal
 
 /*
  * long double lgammal(long double x);
  */
 
 #include "libm.h"
-#include "libm_synonyms.h"
 #include "longdouble.h"
 
 extern int signgam;

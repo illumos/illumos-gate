@@ -27,9 +27,7 @@
  * Use is subject to license terms.
  */
 
-#if defined(ELFOBJ)
 #pragma weak nearbyintl = __nearbyintl
-#endif
 
 #include "libm.h"
 #include "fma.h"

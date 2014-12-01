@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak cargf = __cargf
+#pragma weak __cargf = cargf
 
 #include "libm.h"			/* atan2f */
 #include "complex_wrapper.h"

@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak log2 = __log2
+#pragma weak __log2 = log2
 
 /* INDENT OFF */
 /*
@@ -88,7 +88,6 @@
 /* INDENT ON */
 
 #include "libm.h"
-#include "libm_synonyms.h"
 #include "libm_protos.h"
 
 extern const double _TBL_log[];

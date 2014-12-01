@@ -27,9 +27,7 @@
  * Use is subject to license terms.
  */
 
-#if defined(ELFOBJ)
-#pragma weak logbl = __logbl
-#endif
+#pragma weak __logbl = logbl
 
 #include "libm.h"
 #include "xpg6.h"	/* __xpg6 */

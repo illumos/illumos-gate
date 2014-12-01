@@ -26,7 +26,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak cos = __cos
+#pragma weak __cos = cos
 
 /* INDENT OFF */
 /*

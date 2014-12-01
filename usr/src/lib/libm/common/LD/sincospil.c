@@ -27,8 +27,6 @@
  * Use is subject to license terms.
  */
 
-#pragma weak sincospil = __sincospil
-
 /*
  * void sincospil(long double x, long double *s, long double *c)
  * *s = sinl(pi*x); *c = cosl(pi*x);
@@ -71,7 +69,6 @@
  */
 
 #include "libm.h"
-#include "libm_synonyms.h"
 #include "longdouble.h"
 
 #include <sys/isa_defs.h>

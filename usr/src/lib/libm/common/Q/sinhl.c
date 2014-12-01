@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak sinhl = __sinhl
+#pragma weak __sinhl = sinhl
 
 #include "libm.h"
 #include "longdouble.h"

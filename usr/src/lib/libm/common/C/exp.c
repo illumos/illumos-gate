@@ -26,7 +26,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak exp = __exp
+#pragma weak __exp = exp
 
 /*
  * exp(x)

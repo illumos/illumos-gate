@@ -56,7 +56,7 @@
  * shown.
  */
 
-#pragma weak atan2l = __atan2l
+#pragma weak __atan2l = atan2l
 
 #include "libm.h"
 #include "longdouble.h"

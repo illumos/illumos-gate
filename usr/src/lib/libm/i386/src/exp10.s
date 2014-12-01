@@ -29,8 +29,6 @@
         .file "exp10.s"
 
 #include "libm.h"
-LIBM_ANSI_PRAGMA_WEAK(exp10,function)
-#include "libm_synonyms.h"
 
 	ENTRY(exp10)
 	movl	8(%esp),%ecx		/ ecx <-- hi_32(x)

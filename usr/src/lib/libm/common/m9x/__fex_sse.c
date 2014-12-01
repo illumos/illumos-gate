@@ -27,7 +27,6 @@
  * Use is subject to license terms.
  */
 
-#include "fenv_synonyms.h"
 #include <ucontext.h>
 #include <fenv.h>
 #if defined(__SUNPRO_C)

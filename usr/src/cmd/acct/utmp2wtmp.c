@@ -26,11 +26,11 @@
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
 /*
  *	create entries for users who are still logged on when accounting
  *	is being run. Look at utmpx, and update the time stamp. New info
- *	goes to wtmpx. Called by runacct. 
+ *	goes to wtmpx. Called by runacct.
  */
 
 #include <stdio.h>
@@ -55,9 +55,9 @@ main(int argc, char **argv)
 	}
 
 	while ((utmpx = getutxent()) != NULL) {
-		if ((utmpx->ut_type == USER_PROCESS) && !(nonuser(*utmpx))) {
+		if ((utmpx->ut_type == USER_PROCESS) && !(nonuserx(*utmpx))) {
 			time(&utmpx->ut_xtime);
-			fwrite(utmpx, sizeof(*utmpx), 1, fp);
+			fwrite(utmpx, sizeof (*utmpx), 1, fp);
 		}
 	}
 	fclose(fp);

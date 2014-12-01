@@ -36,11 +36,10 @@
  *	y0(-ve)=y1(-ve)=yn(n,-ve) are NaN with invalid signal.
  */
 
-#pragma weak j1 = __j1
-#pragma weak y1 = __y1
+#pragma weak __j1 = j1
+#pragma weak __y1 = y1
 
 #include "libm.h"
-#include "libm_synonyms.h"
 #include "libm_protos.h"
 #include <math.h>
 #include <values.h>

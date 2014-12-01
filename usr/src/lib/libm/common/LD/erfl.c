@@ -32,7 +32,7 @@
  *			     x
  *		      2      |\
  *     erf(x)  =  ---------  | exp(-t*t)dt
- *	 	   sqrt(pi) \| 
+ *	 	   sqrt(pi) \|
  *			     0
  *
  *     erfc(x) =  1-erf(x)
@@ -40,14 +40,14 @@
  * method:
  * 	Since erf(-x) = -erf(x), we assume x>=0.
  *	For x near 0, we have the expansion
- * 
+ *
  *     	    erf(x) = (2/sqrt(pi))*(x - x^3/3 + x^5/10 - x^7/42 + ....).
  *
  * 	Since 2/sqrt(pi) = 1.128379167095512573896158903121545171688,
  *	we use x + x*P(x^2) to approximate erf(x). This formula will
  *	guarantee the error less than one ulp where x is not too far
  *	away from 0. We note that erf(x)=x at x = 0.6174...... After
- *	some experiment, we choose the following approximation on 
+ *	some experiment, we choose the following approximation on
  *	interval [0,0.84375].
  *
  *	For x in [0,0.84375]
@@ -59,17 +59,17 @@
  *		   = 0.5 + ((0.5-x)-x*P)  if x in [0.25,0.84375]
  *	precision: |P(x^2)-(erf(x)-x)/x| <= 2**-122.50
  *
- *	For x in [0.84375,1.25], let s = x - 1, and 
+ *	For x in [0.84375,1.25], let s = x - 1, and
  *	c = 0.84506291151 rounded to single (24 bits)
  *	   erf(x)  = c  + P1(s)/Q1(s)
- *	   erfc(x) = (1-c)  - P1(s)/Q1(s) 
+ *	   erfc(x) = (1-c)  - P1(s)/Q1(s)
  *	precision: |P1/Q1 - (erf(x)-c)| <= 2**-118.41
- *	
  *
- *	For x in [1.25,1.75], let s = x - 1.5, and 
+ *
+ *	For x in [1.25,1.75], let s = x - 1.5, and
  *	c = 0.95478588343 rounded to single (24 bits)
  *	   erf(x)  = c  + P2(s)/Q2(s)
- *	   erfc(x) = (1-c)  - P2(s)/Q2(s) 
+ *	   erfc(x) = (1-c)  - P2(s)/Q2(s)
  *	precision: |P1/Q1 - (erf(x)-c)| <= 2**-123.83
  *
  *
@@ -84,16 +84,16 @@
  *	precision: absolute error of R2/S2 is bounded by 2**-120.07
  *
  *	Else if inf > x >= 107
- *	   erf(x)  = 1 with inexact 
+ *	   erf(x)  = 1 with inexact
  *	   erfc(x) = 0 with underflow
- *	
+ *
  *	Special case:
  *	   erf(inf)  = 1
  *	   erfc(inf) = 0
  */
 
-#pragma weak erfl = __erfl
-#pragma weak erfcl = __erfcl
+#pragma weak __erfl = erfl
+#pragma weak __erfcl = erfcl
 
 #include "libm.h"
 #include "longdouble.h"
@@ -132,7 +132,7 @@ static long double P[] = { 	/* 21 coeffs */
    8.069088733716068462496835658928566920933e-0021L,
 };
 
-/* 
+/*
  * Rational erf(x) = ((float)0.84506291151) + P1(x-1)/Q1(x-1) on [0.84375,1.25]
  */
 static long double C1   = (long double)((float)0.84506291151);
@@ -164,7 +164,7 @@ static long double Q1[] = { 	/*  12 bottom coeffs with leading 1.0 hidden */
    4.753866999959432971956781228148402971454e-0006L,
   -1.002287602111660026053981728549540200683e-0006L,
 };
-/* 
+/*
  * Rational erf(x) = ((float)0.95478588343) + P2(x-1.5)/Q2(x-1.5)
  * on [1.25,1.75]
  */
@@ -274,7 +274,7 @@ static long double S2[] = { 	/* 16 coefficients */
    1.000L,
 };
 
-long double erfl(x) 
+long double erfl(x)
 long double x;
 {
 	long double erfcl(long double),s,y,t;
@@ -299,7 +299,7 @@ long double x;
 	    s = y-onehalf;
 	    t = C2+__poly_libmq(s,12,P2)/(one+s*__poly_libmq(s,13,Q2));
 	    return (signbitl(x))? -t: t;
-	} 
+	}
 	if (y<=9.0L) t = erfcl(y); else t = tiny;
 	return (signbitl(x))? t-one: one-t;
 }
@@ -331,7 +331,7 @@ long double x;
 	    s = x-onehalf;
 	    t = one-C2;
 	    return t - __poly_libmq(s,12,P2)/(one+s*__poly_libmq(s,13,Q2));
-	} 
+	}
 	if (x>=107.0L) return nearunfl*nearunfl;		/* underflow */
 	else if (x >= L16_3) {
 	    y = __poly_libmq(x,15,R2);

@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak hypotf = __hypotf
+#pragma weak __hypotf = hypotf
 
 #include "libm.h"
 

@@ -27,9 +27,7 @@
  * Use is subject to license terms.
  */
 
-#if defined(ELFOBJ)
-#pragma weak acoshl = __acoshl
-#endif
+#pragma weak __acoshl = acoshl
 
 #include "libm.h"
 

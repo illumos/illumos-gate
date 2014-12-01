@@ -27,9 +27,7 @@
  * Use is subject to license terms.
  */
 
-#if defined(ELFOBJ)
 #pragma weak fdim = __fdim
-#endif
 
 /*
  * fdim(x,y) returns x - y if x > y, +0 if x <= y, and NaN if x and

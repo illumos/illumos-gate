@@ -248,6 +248,7 @@ void	 chan_mark_dead(Channel *);
 /* channel events */
 
 void	 chan_rcvd_oclose(Channel *);
+void	 chan_rcvd_eow(Channel *);      /* SSH2-only */
 void	 chan_read_failed(Channel *);
 void	 chan_ibuf_empty(Channel *);
 

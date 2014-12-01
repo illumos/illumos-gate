@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak remquof = __remquof
+#pragma weak __remquof = remquof
 
 /* INDENT OFF */
 /*
@@ -39,7 +39,6 @@
  */
 
 #include "libm.h"
-#include "libm_synonyms.h"
 #include "libm_protos.h"
 #include <math.h>
 extern float fabsf(float);

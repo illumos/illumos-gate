@@ -27,9 +27,7 @@
  * Use is subject to license terms.
  */
 
-#if defined(ELFOBJ)
-#pragma weak roundf = __roundf
-#endif
+#pragma weak __roundf = roundf
 
 #include "libm.h"
 

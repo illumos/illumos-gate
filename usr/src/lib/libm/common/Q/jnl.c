@@ -27,10 +27,8 @@
  * Use is subject to license terms.
  */
 
-#if defined(ELFOBJ)
-#pragma weak jnl = __jnl
-#pragma weak ynl = __ynl
-#endif
+#pragma weak __jnl = jnl
+#pragma weak __ynl = ynl
 
 /*
  * floating point Bessel's function of the 1st and 2nd kind

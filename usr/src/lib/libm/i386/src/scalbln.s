@@ -30,7 +30,6 @@
 
 #include "libm.h"
 LIBM_ANSI_PRAGMA_WEAK(scalbln,function)
-#include "libm_synonyms.h"
 
 	ENTRY(scalbln)
 	fildl	12(%esp)		/ convert N to extended

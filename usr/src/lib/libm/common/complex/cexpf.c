@@ -26,7 +26,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak cexpf = __cexpf
+#pragma weak __cexpf = cexpf
 
 #include "libm.h"
 #include "complex_wrapper.h"

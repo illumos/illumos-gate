@@ -35,8 +35,8 @@
  * with the same sign as x's,  including 0.0.
  */
 
-#pragma weak ceill = __ceill
-#pragma weak floorl = __floorl
+#pragma weak __ceill = ceill
+#pragma weak __floorl = floorl
 
 #include "libm.h"
 #include "longdouble.h"

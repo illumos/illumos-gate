@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak gammal = __gammal
+#pragma weak __gammal = gammal
 
 /*
  * long double gammal(long double x);

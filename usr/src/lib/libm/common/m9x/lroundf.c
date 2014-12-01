@@ -27,9 +27,7 @@
  * Use is subject to license terms.
  */
 
-#if defined(ELFOBJ)
-#pragma weak lroundf = __lroundf
-#endif
+#pragma weak __lroundf = lroundf
 
 #include <sys/isa_defs.h>	/* _ILP32 */
 #include "libm.h"

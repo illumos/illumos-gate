@@ -26,8 +26,8 @@
  * Use is subject to license terms.
  */
 
-#pragma weak nextafter = __nextafter
-#pragma weak _nextafter = __nextafter
+#pragma weak __nextafter = nextafter
+#pragma weak _nextafter = nextafter
 
 #include "libm.h"
 #include <float.h>		/* DBL_MIN */

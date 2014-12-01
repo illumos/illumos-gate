@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak csinh = __csinh
+#pragma weak __csinh = csinh
 
 /* INDENT OFF */
 /*

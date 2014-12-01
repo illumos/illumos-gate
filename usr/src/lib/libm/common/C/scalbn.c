@@ -26,7 +26,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak scalbn = __scalbn
+#pragma weak __scalbn = scalbn
 
 #include "libm.h"
 
@@ -36,7 +36,7 @@ static const double
 	tiny	= 1.0e-300,
 	twom54	= 5.5511151231257827021181583404541015625e-17;
 
-#if defined(USE_FPSCALE) || defined(__x86)
+#if defined(__x86)
 static const double two52 = 4503599627370496.0;
 #else
 /*
@@ -70,7 +70,7 @@ ilogb_biased(unsigned *px) {
 	px[LOWORD] = w;
 	return (1 - s);
 }
-#endif	/* defined(USE_FPSCALE) */
+#endif	/* defined(__x86) */
 
 double
 scalbn(double x, int n) {
@@ -87,7 +87,7 @@ scalbn(double x, int n) {
 	if (k == 0) {
 		if ((hx | px[LOWORD]) == 0 || n == 0)
 			return (x);
-#if defined(USE_FPSCALE) || defined(__x86)
+#if defined(__x86)
 		x *= two52;
 		ix = px[HIWORD];
 		k = ((ix & ~0x80000000) >> 20) - 52;

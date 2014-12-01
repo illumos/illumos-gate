@@ -1,17 +1,17 @@
 '\" te
+.\" Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
 .\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ACL 5 "Sep 10, 2013"
+.TH ACL 5 "Nov 24, 2014"
 .SH NAME
 acl \- Access Control Lists
 .SH DESCRIPTION
-.sp
 .LP
 Access control lists (ACLs) are discretionary access control mechanisms that
 grant and deny access to files and directories. Two different ACL models are
-supported in the Solaris release:POSIX-draft ACLs and NFSv4 ACLs.
+supported in the Solaris release: POSIX-draft ACLs and NFSv4 ACLs.
 .sp
 .LP
 The older, POSIX-draft model is supported by the UFS file system. This model is
@@ -24,7 +24,6 @@ approved standard from the Internet Engineering Task Force (IETF). The ZFS file
 system uses the NFSv4 model, and provides richer semantics and finer grained
 permission capabilities than the POSIX-draft model.
 .SS "\fBPOSIX\fR-draft \fBACL\fRs"
-.sp
 .LP
 POSIX-draft ACLs provide an alternative security mechanism to basic UNIX file
 permissions in the Solaris release. Their purpose is to further restrict access
@@ -106,7 +105,6 @@ user:joe:rw-
 .sp
 
 .SS "\fBNFS\fRv4 \fBACL\fRs"
-.sp
 .LP
 NFSv4 ACL model is based loosely on the Windows NT ACL model. NFSv4 ACLs
 provide a much richer ACL model than POSIX-draft ACLs.
@@ -343,7 +341,7 @@ writes. Currently, this permission is not supported.
 
 .sp
 .LP
-The following inheritance flags are supported by NFSv4:
+The following inheritance flags are supported by NFSv4 ACLs:
 .sp
 .ne 2
 .na
@@ -369,8 +367,8 @@ Inherit to all newly created directories in a directory.
 .ad
 .RS 26n
 Placed on a directory, but does not apply to the directory itself, only to
-newly created created files and directories. This flag requires file_inherit
-and or dir_inherit to indicate what to inherit.
+newly created files and directories. This flag requires file_inherit
+and/or dir_inherit to indicate what to inherit.
 .RE
 
 .sp
@@ -380,17 +378,17 @@ and or dir_inherit to indicate what to inherit.
 .ad
 .RS 26n
 Placed on directories and indicates that ACL entries should only be inherited
-one level of the tree. This flag requires file_inherit and or dir_inherit to
+one level of the tree. This flag requires file_inherit and/or dir_inherit to
 indicate what to inherit.
 .RE
 
 .sp
 .ne 2
 .na
-\fBsuccessful_access (\fBS)\fR)\fR
+\fBsuccessful_access (\fBS\fR)\fR
 .ad
 .RS 26n
-Indicates if an alarm or audit record should be initiated upon successful
+Indicates whether an alarm or audit record should be initiated upon successful
 accesses. Used with audit/alarm ACE types.
 .RE
 
@@ -400,8 +398,8 @@ accesses. Used with audit/alarm ACE types.
 \fBfailed_access (\fBF\fR)\fR
 .ad
 .RS 26n
-Indicates if an alarm or audit record should be initiated when access fails.
-Used with audit/alarm ACE types.
+Indicates whether an alarm or audit record should be initiated when access
+fails. Used with audit/alarm ACE types.
 .RE
 
 .sp
@@ -433,8 +431,11 @@ An NFSv4 ACL is expressed using the following syntax:
     owner@:<perms>[:inheritance flags]:<allow|deny>
     group@:<perms>[:inheritance flags]:<allow|deny>
     everyone@:<perms>[:inheritance flags]:<allow|deny>
-    user:<username>[:inheritance flags]:<allow|deny>
-    group:<groupname>[:inheritance flags]:<allow|deny>
+    user:<username>:<perms>[:inheritance flags]:<allow|deny>
+    usersid:<sid string>:<perms>[:inheritance flags]:<allow|deny>
+    group:<groupname>:<perms>[:inheritance flags]:<allow|deny>
+    groupsid:<sid string>:<perms>[:inheritance flags]:<allow|deny>
+    sid:<sid string>:<perms>[:inheritance flags]:<allow|deny>
 .fi
 .in -2
 
@@ -540,7 +541,6 @@ user:fred:rwR:f------:allow
 .sp
 
 .SS "Shell-level Solaris \fBAPI\fR"
-.sp
 .LP
 The Solaris command interface supports the manipulation of ACLs. The following
 Solaris utilities accommodate both ACL models:
@@ -657,13 +657,11 @@ information.
 .RE
 
 .SS "Application-level \fBAPI\fR"
-.sp
 .LP
 The primary interfaces required to access file system ACLs at the programmatic
 level are the \fBacl_get()\fR and \fBacl_set()\fR functions. These functions
 support both POSIX draft ACLs and NFSv4 ACLs.
 .SS "Retrieving a file's \fBACL\fR"
-.sp
 .in +2
 .nf
 int acl_get(const char *path, int flag, acl_t **aclp);
@@ -679,7 +677,6 @@ fd. The flag argument specifies whether a trivial ACL should be retrieved. When
 the flag argument equals \fBACL_NO_TRIVIAL\fR then only ACLs that are not
 trivial are retrieved. The ACL is returned in the \fBaclp\fR argument.
 .SS "Freeing \fBACL\fR structure"
-.sp
 .in +2
 .nf
 void acl_free(acl_t *aclp)s;
@@ -691,7 +688,6 @@ void acl_free(acl_t *aclp)s;
 The \fBacl_free()\fR function frees up memory allocated for the argument
 \fBaclp;\fR.
 .SS "Setting an \fBACL\fR on a file"
-.sp
 .in +2
 .nf
 int acl_set(const char *path, acl_t *aclp);
@@ -708,7 +704,6 @@ descriptor \fBfd\fR. The \fBaclp\fR argument specifies the ACL to set. The
 target file systems supports NFSv4 ACLs. No translation is performed when
 trying to set an NFSv4 ACL on a POSIX-draft ACL supported file system.
 .SS "Determining an \fBACL\fR's trivialness"
-.sp
 .in +2
 .nf
 int acl_trivial(const char *path);
@@ -718,14 +713,8 @@ int acl_trivial(const char *path);
 .sp
 .LP
 The \fBacl_trivial()\fR function is used to determine whether a file has a
-trivial ACL. The trivialness of a file's ACL depends on the type of ACL it is.
-For POSIX-draft ACLs, it implies the ACL has greater than
-\fBMIN_ACL_ENTRIES\fR. For NFSv4/ZFS style ACLs, it implies that the ACL has
-entries other than \fBowner@\fR, \fBgroup@\fR and \fBeveryone@\fR, inheritance
-flags are set, or the ACL is not ordered in a manner that meets POSIX access
-control requirements.
+trivial ACL.
 .SS "Removing all \fBACL\fRs from a file"
-.sp
 .in +2
 .nf
 int acl_strip(const char *path, uid_t uid, gid_t gid, mode_t mode);
@@ -739,7 +728,6 @@ with a trivial ACL based off of the passed in argument mode. After replacing
 the ACL the owner and group of the file are set to the values specified in the
 uid and gid parameters.
 .SS "Converting \fBACL\fRs to/from external representation"
-.sp
 .in +2
 .nf
 int acl_fromtext(const char *path, acl_t **aclp);
@@ -749,7 +737,7 @@ char *acl_totext(acl_t *aclp, int flags);
 
 .sp
 .LP
-The \fBacl_text()\fR function converts an internal ACL representation pointed
+The \fBacl_totext()\fR function converts an internal ACL representation pointed
 to by aclp into an external representation. See \fBDESCRIPTION\fR for details
 about external representation.
 .sp
@@ -758,7 +746,6 @@ The \fBacl_fromtext()\fR functions converts and external representation into an
 internal representation. See \fBDESCRIPTION\fR for details about external
 representation.
 .SH EXAMPLES
-.sp
 .LP
 The following examples demonstrate how the API can be used to perform basic
 operations on ACLs.
@@ -774,8 +761,10 @@ Use the following to retrieve an ACL and set it on another file:
 error = acl_get("file", ACL_NO_TRIVIAL, &aclp);
 
 if (error == 0 && aclp != NULL) {
-error = acl_set("file2", aclp)
+.in +8
+error = acl_set("file2", aclp);
 acl_free(aclp);
+.in -8
 }
 \&...
 .fi
@@ -793,8 +782,10 @@ another file:
 .nf
 error = acl_get("file3", 0, &aclp);
 if (error == 0) {
-error = acl_set("file4", aclp)
+.in +8
+error = acl_set("file4", aclp);
 acl_free(aclp);
+.in -8
 }
 \&...
 .fi
@@ -809,12 +800,17 @@ Use the following to determine if a file has a trivial ACL:
 .sp
 .in +2
 .nf
-istrivial = acl_trivial("file")
+char *file = "file5";
+istrivial = acl_trivial(file);
 
 if (istrivial == 0)
+.in +8
 printf("file %s has a trivial ACL\en", file);
+.in -8
 else
+.in +8
 printf("file %s has a NON-trivial ACL\en", file);
+.in -8
 \&...
 .fi
 .in -2
@@ -835,10 +831,9 @@ error = acl_strip("file", 10, 100, 0644);
 .in -2
 
 .SH SEE ALSO
-.sp
 .LP
 \fBchgrp\fR(1), \fBchmod\fR(1), \fBchown\fR(1), \fBcp\fR(1), \fBcpio\fR(1),
 \fBfind\fR(1), \fBls\fR(1), \fBmv\fR(1), \fBtar\fR(1), \fBsetfacl\fR(1),
-\fBchmod\fR(2), \fBacl\fR(2),\fBstat\fR(2),\fBacl_get\fR(3SEC),
+\fBchmod\fR(2), \fBacl\fR(2), \fBstat\fR(2), \fBacl_get\fR(3SEC),
 \fBaclsort\fR(3SEC), \fBacl_fromtext\fR(3SEC), \fBacl_free\fR(3SEC),
 \fBacl_strip\fR(3SEC), \fBacl_trivial\fR(3SEC)

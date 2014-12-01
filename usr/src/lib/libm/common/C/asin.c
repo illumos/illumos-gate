@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak asin = __asin
+#pragma weak __asin = asin
 
 /* INDENT OFF */
 /*
@@ -62,7 +62,6 @@
  */
 /* INDENT ON */
 
-#include "libm_synonyms.h"	/* __asin, __sqrt, __isnan */
 #include "libm_protos.h"	/* _SVID_libm_error */
 #include "libm_macros.h"
 #include <math.h>

@@ -27,19 +27,18 @@
  * Use is subject to license terms.
  */
 
-#pragma weak feclearexcept = __feclearexcept
-#pragma weak feraiseexcept = __feraiseexcept
-#pragma weak fetestexcept = __fetestexcept
-#pragma weak fegetexceptflag = __fegetexceptflag
-#pragma weak fesetexceptflag = __fesetexceptflag
+#pragma weak __feclearexcept = feclearexcept
+#pragma weak __feraiseexcept = feraiseexcept
+#pragma weak __fetestexcept = fetestexcept
+#pragma weak __fegetexceptflag = fegetexceptflag
+#pragma weak __fesetexceptflag = fesetexceptflag
 
-#pragma weak feclearexcept96 = __feclearexcept
-#pragma weak feraiseexcept96 = __feraiseexcept
-#pragma weak fetestexcept96 = __fetestexcept
-#pragma weak fegetexceptflag96 = __fegetexceptflag
-#pragma weak fesetexceptflag96 = __fesetexceptflag
+#pragma weak feclearexcept96 = feclearexcept
+#pragma weak feraiseexcept96 = feraiseexcept
+#pragma weak fetestexcept96 = fetestexcept
+#pragma weak fegetexceptflag96 = fegetexceptflag
+#pragma weak fesetexceptflag96 = fesetexceptflag
 
-#include "fenv_synonyms.h"
 #include <fenv.h>
 #include <sys/ieeefp.h>
 #include <ucontext.h>

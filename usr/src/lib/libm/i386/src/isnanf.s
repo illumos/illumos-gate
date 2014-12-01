@@ -33,7 +33,6 @@ LIBM_ANSI_PRAGMA_WEAK(isnanf,function)
 	.weak _isnanf
 	.type _isnanf,@function
 _isnanf	= __isnanf
-#include "libm_synonyms.h"
 
 	ENTRY(isnanf)
 	movl    4(%esp),%eax		/ eax <-- x

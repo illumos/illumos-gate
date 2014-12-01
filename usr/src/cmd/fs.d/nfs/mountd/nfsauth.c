@@ -20,11 +20,12 @@
  */
 
 /*
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ */
+
+/*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- */
-/*
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <stdio.h>
@@ -49,6 +50,7 @@
 #include <netdir.h>
 #include <nfs/auth.h>
 #include <sharefs/share.h>
+#include <alloca.h>
 #include "../lib/sharetab.h"
 #include "mountd.h"
 
@@ -118,8 +120,10 @@ nfsauth_access(auth_req *argp, auth_res *result)
 	}
 
 	result->auth_perm = check_client(sh, &nbuf, clnames, argp->req_flavor,
-	    argp->req_clnt_uid, argp->req_clnt_gid, &result->auth_srv_uid,
-	    &result->auth_srv_gid);
+	    argp->req_clnt_uid, argp->req_clnt_gid, argp->req_clnt_gids.len,
+	    argp->req_clnt_gids.val, &result->auth_srv_uid,
+	    &result->auth_srv_gid, &result->auth_srv_gids.len,
+	    &result->auth_srv_gids.val);
 
 	sharefree(sh);
 
@@ -141,20 +145,16 @@ nfsauth_func(void *cookie, char *dataptr, size_t arg_size,
 {
 	nfsauth_arg_t	*ap;
 	nfsauth_res_t	 res = {0};
-	nfsauth_res_t	*rp = &res;
 	XDR		 xdrs_a;
 	XDR		 xdrs_r;
-	caddr_t		 abuf = dataptr;
-	size_t		 absz = arg_size;
-	size_t		 rbsz = (size_t)(BYTES_PER_XDR_UNIT * 4);
-	char		 result[BYTES_PER_XDR_UNIT * 4];
-	caddr_t		 rbuf = (caddr_t)&result;
+	size_t		 rbsz;
+	caddr_t		 rbuf;
 	varg_t		 varg = {0};
 
 	/*
 	 * Decode the inbound door data, so we can look at the cmd.
 	 */
-	xdrmem_create(&xdrs_a, abuf, absz, XDR_DECODE);
+	xdrmem_create(&xdrs_a, dataptr, arg_size, XDR_DECODE);
 	if (!xdr_varg(&xdrs_a, &varg)) {
 		/*
 		 * If the arguments can't be decoded, bail.
@@ -173,10 +173,11 @@ nfsauth_func(void *cookie, char *dataptr, size_t arg_size,
 		ap = &varg.arg_u.arg;
 		break;
 
-		/* Additional arguments versions go here */
+	/* Additional arguments versions go here */
 
 	default:
 		syslog(LOG_ERR, gettext("Invalid args version"));
+		res.stat = NFSAUTH_DR_DECERR;
 		goto encres;
 	}
 
@@ -184,40 +185,48 @@ nfsauth_func(void *cookie, char *dataptr, size_t arg_size,
 	 * Call the specified cmd
 	 */
 	switch (ap->cmd) {
-		case NFSAUTH_ACCESS:
-			nfsauth_access(&ap->areq, &rp->ares);
-			rp->stat = NFSAUTH_DR_OKAY;
-			break;
-		default:
-			rp->stat = NFSAUTH_DR_BADCMD;
-			break;
+	case NFSAUTH_ACCESS:
+		nfsauth_access(&ap->areq, &res.ares);
+		res.stat = NFSAUTH_DR_OKAY;
+		break;
+	default:
+		res.stat = NFSAUTH_DR_BADCMD;
+		break;
 	}
 
 encres:
 	/*
 	 * Free space used to decode the args
 	 */
-	xdrs_a.x_op = XDR_FREE;
-	(void) xdr_varg(&xdrs_a, &varg);
+	xdr_free(xdr_varg, (char *)&varg);
 	xdr_destroy(&xdrs_a);
 
 	/*
 	 * Encode the results before passing thru door.
-	 *
-	 * The result (nfsauth_res_t) is always two int's, so we don't
-	 * have to dynamically size (or allocate) the results buffer.
 	 */
+	rbsz = xdr_sizeof(xdr_nfsauth_res, &res);
+	if (rbsz == 0)
+		goto failed;
+	rbuf = alloca(rbsz);
+
 	xdrmem_create(&xdrs_r, rbuf, rbsz, XDR_ENCODE);
-	if (!xdr_nfsauth_res(&xdrs_r, rp)) {
+	if (!xdr_nfsauth_res(&xdrs_r, &res)) {
+		xdr_destroy(&xdrs_r);
+failed:
+		xdr_free(xdr_nfsauth_res, (char *)&res);
 		/*
 		 * return only the status code
 		 */
-		rp->stat = NFSAUTH_DR_EFAIL;
+		res.stat = NFSAUTH_DR_EFAIL;
 		rbsz = sizeof (uint_t);
-		*rbuf = (uint_t)rp->stat;
+		rbuf = (caddr_t)&res.stat;
+
+		goto out;
 	}
 	xdr_destroy(&xdrs_r);
+	xdr_free(xdr_nfsauth_res, (char *)&res);
 
+out:
 	(void) door_return((char *)rbuf, rbsz, NULL, 0);
 	(void) door_return(NULL, 0, NULL, 0);
 	/* NOTREACHED */

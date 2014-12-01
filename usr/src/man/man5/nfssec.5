@@ -1,13 +1,13 @@
 '\" te
+.\" Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
 .\" Copyright (c) 2001, Sun Microsystems, Inc. All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\" See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH NFSSEC 5 "Mar 16, 2009"
+.TH NFSSEC 5 "Nov 20, 2014"
 .SH NAME
 nfssec \- overview of NFS security modes
 .SH DESCRIPTION
-.sp
 .LP
 The \fBmount_nfs\fR(1M) and \fBshare_nfs\fR(1M) commands each provide a way to
 specify the security mode to be used on an \fBNFS\fR file system through the
@@ -53,6 +53,13 @@ passed in the clear on the network, unauthenticated by the \fBNFS\fR server.
 This is the simplest security method and requires no additional administration.
 It is the default used by Solaris \fBNFS\fR Version 2 clients and Solaris
 \fBNFS\fR servers.
+.sp
+According to the ONC RPC specification (RFC 5531), \fBAUTH_SYS\fR
+authentication supports up to 16 groups for a user only.  To workaround this
+limitation, in the case where the \fBNFS\fR client supplied 16 groups in
+\fBAUTH_SYS\fR and \fBNGROUPS_MAX\fR is more than 16, the \fBNFS\fR server
+will lookup the user's groups on the server instead of relying on the list of
+groups provided by the \fBNFS\fR client via \fBAUTH_SYS\fR.
 .RE
 
 .sp
@@ -109,13 +116,12 @@ Use null authentication (\fBAUTH_NONE\fR). \fBNFS\fR clients using
 \fBnobody\fR by \fBNFS\fR servers. A client using a security mode other than
 the one with which a Solaris \fBNFS\fR server shares the file system has its
 security mode mapped to \fBAUTH_NONE.\fR In this case, if the file system is
-shared with \fBsec=\fR\fInone,\fR users from the client are mapped to the
+shared with \fBsec=none,\fR users from the client are mapped to the
 anonymous user. The \fBNFS\fR security mode \fBnone\fR is supported by
 \fBshare_nfs\fR(1M), but not by \fBmount_nfs\fR(1M) or \fBautomount\fR(1M).
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/nfssec.conf\fR\fR
@@ -125,13 +131,11 @@ anonymous user. The \fBNFS\fR security mode \fBnone\fR is supported by
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBautomount\fR(1M), \fBkclient\fR(1M), \fBmount_nfs\fR(1M),
 \fBshare_nfs\fR(1M), \fBrpc_clnt_auth\fR(3NSL), \fBsecure_rpc\fR(3NSL),
 \fBnfssec.conf\fR(4), \fBattributes\fR(5), \fBkerberos\fR(5)
 .SH NOTES
-.sp
 .LP
 \fB/etc/nfssec.conf\fR lists the \fBNFS\fR security services. Do not edit this
 file. It is not intended to be user-configurable. See \fBkclient\fR(1M).

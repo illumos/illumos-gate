@@ -1,4 +1,5 @@
 '\" te
+.\" Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
 .\" Copyright 1989 AT&T.
 .\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved.
 .\" Portions Copyright (c) 1992, X/Open Company Limited All Rights Reserved
@@ -10,7 +11,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH CHMOD 1 "Dec 11, 2008"
+.TH CHMOD 1 "Nov 24, 2014"
 .SH NAME
 chmod \- change the permissions mode of a file
 .SH SYNOPSIS
@@ -35,7 +36,6 @@ chmod \- change the permissions mode of a file
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBchmod\fR utility changes or assigns the mode of a file.
 .sp
@@ -44,7 +44,6 @@ The \fBchmod\fR utility changes or assigns the mode of a file.
 directories, and to modify boolean read-write system attributes on regular
 files, directories, and opaque extended attribute files.
 .SS "Absolute Mode"
-.sp
 .LP
 An absolute mode command line has the following format:
 .sp
@@ -213,7 +212,6 @@ For directories, the \fBsetgid\fR bit cannot be set (or cleared) in absolute
 mode; it must be set (or cleared) in symbolic mode using \fBg+s\fR (or
 \fBg-s\fR).
 .SS "Symbolic Mode"
-.sp
 .LP
 A symbolic mode command line has the following format:
 .sp
@@ -483,7 +481,6 @@ set.
 .RE
 
 .SS "ACL Operation"
-.sp
 .LP
 An ACL Operation command line has the following format:
 .sp
@@ -1088,6 +1085,35 @@ either \fBfile_inherit\fR and or \fBdir_inherit\fR also being specified.
 .RE
 
 .sp
+.ne 2
+.na
+\fBsuccessful_access (\fBS\fR)\fR
+.ad
+.RS 20n
+Indicates whether an alarm or audit record should be initiated upon successful
+accesses. Used with audit/alarm ACE types.
+.RE
+
+.sp
+.ne 2
+.na
+\fBfailed_access (\fBF\fR)\fR
+.ad
+.RS 20n
+Indicates whether an alarm or audit record should be initiated when access
+fails. Used with audit/alarm ACE types.
+.RE
+
+.sp
+.ne 2
+.na
+\fBinherited (\fBI\fR)\fR
+.ad
+.RS 20n
+ACE was inherited.
+.RE
+
+.sp
 .LP
 The inheritance flags listed can also be specified in the compact format or as
 positional arguments similar to the \fBls\fR \fB-V\fR format. A hyphen
@@ -1108,7 +1134,7 @@ file_inherit/dir_inherit/no_propagate
 .sp
 .in +2
 .nf
-fd-n--
+fd-n---
 .fi
 .in -2
 .sp
@@ -1135,7 +1161,6 @@ user:bob:read_data:allow
 .sp
 
 .SS "Attribute Operation"
-.sp
 .LP
 An attribute operation command line has the following format:
 .sp
@@ -1368,8 +1393,25 @@ The following is a list of \fBAttribute Names and Abbreviation Characters\fR:
 \fBm\fR
 .RE
 
-.SH OPTIONS
 .sp
+.ne 2
+.na
+\fB\fBoffline\fR\fR
+.ad
+.RS 18n
+\fBO\fR
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBsparse\fR\fR
+.ad
+.RS 18n
+\fBs\fR
+.RE
+
+.SH OPTIONS
 .LP
 The following options are supported:
 .sp
@@ -1414,7 +1456,6 @@ attribute file of the file operand and the file operand itself.
 .RE
 
 .SH OPERANDS
-.sp
 .LP
 The following operands are supported:
 .sp
@@ -1479,10 +1520,9 @@ A path name of a file whose file mode bits are to be modified.
 .RE
 
 .SH USAGE
-.sp
 .LP
 See \fBlargefile\fR(5) for the description of the behavior of \fBchmod\fR when
-encountering files greater than or equal to 2 Gbyte ( 2^31 bytes).
+encountering files greater than or equal to 2 Gbyte (2^31 bytes).
 .SH EXAMPLES
 .LP
 \fBExample 1 \fRDenying \fBexecute\fR Permission
@@ -1691,13 +1731,13 @@ First, display the ACL to pick a location to insert a new ACE.
 .nf
 % ls -V file.1
 -rw-r--r--+  1 root     root           0 Oct  6 12:16 file.1
-     user:lp:rw------------:------:allow
-      owner@:--x-----------:------:deny
-      owner@:rw-p---A-W-Co-:------:allow
-      group@:-wxp----------:------:deny
-      group@:r-------------:------:allow
-   everyone@:-wxp---A-W-Co-:------:deny
-   everyone@:r-----a-R-c--s:------:allow
+     user:lp:rw------------:-------:allow
+      owner@:--x-----------:-------:deny
+      owner@:rw-p---A-W-Co-:-------:allow
+      group@:-wxp----------:-------:deny
+      group@:r-------------:-------:allow
+   everyone@:-wxp---A-W-Co-:-------:deny
+   everyone@:r-----a-R-c--s:-------:allow
 .fi
 .in -2
 .sp
@@ -1728,14 +1768,14 @@ Display the new ACL:
 .nf
 $ ls -V file.1
 -rw-r--r--+  1 root     staff          0 Feb  3 14:13 file.1
-     user:lp:rw------------:------:allow
-      owner@:--x-----------:------:deny
-      owner@:rw-p---A-W-Co-:------:allow
-  user:marks:r-------------:------:deny
-      group@:-wxp----------:------:deny
-      group@:r-------------:------:allow
-   everyone@:-wxp---A-W-Co-:------:deny
-   everyone@:r-----a-R-c--s:------:allow
+     user:lp:rw------------:-------:allow
+      owner@:--x-----------:-------:deny
+      owner@:rw-p---A-W-Co-:-------:allow
+  user:marks:r-------------:-------:deny
+      group@:-wxp----------:-------:deny
+      group@:r-------------:-------:allow
+   everyone@:-wxp---A-W-Co-:-------:deny
+   everyone@:r-----a-R-c--s:-------:allow
 .fi
 .in -2
 .sp
@@ -2219,7 +2259,7 @@ The following examples replace system attributes of a ZFS file:
 .nf
 $ chmod S=v{archive,hidden,readonly,system,appendonly,\e
      nonodump,immutable,noav_modified,noav_quarantined,\e
-     nounlink} file1
+     nounlink,nooffline,nosparse} file1
 .fi
 .in -2
 .sp
@@ -2243,7 +2283,7 @@ or
 .sp
 .in +2
 .nf
-$ chmod S=c{AHRSa-i--u} file1
+$ chmod S=c{AHRSa-i--u--} file1
 .fi
 .in -2
 .sp
@@ -2278,8 +2318,8 @@ Assuming appropriate privileges, this results in the following system
 attributes of \fBfile1\fR being set: \fBarchive\fR, \fBhidden\fR,
 \fBreadonly\fR, \fBsystem\fR, \fBappendonly\fR, \fBimmutable\fR, and
 \fBnounlink\fR. Assuming appropriate privileges, the following system
-attributes of \fBfile1\fR are cleared: \fBnodump\fR, \fBav_modified\fR, and
-\fBav_quarantined\fR.
+attributes of \fBfile1\fR are cleared: \fBnodump\fR, \fBav_modified\fR,
+\fBav_quarantined\fR, \fBoffline\fR, and \fBsparse\fR.
 
 .LP
 \fBExample 21 \fRClearing All System Attributes of a ZFS File
@@ -2439,7 +2479,7 @@ or
 .sp
 .in +2
 .nf
-$ chmod S+c{-HS--------} file1
+$ chmod S+c{-H-S--------} file1
 .fi
 .in -2
 .sp
@@ -2550,13 +2590,11 @@ set are also set on \fBfile2\fR. All system attributes of \fBfile1\fR that are
 cleared are also cleared on \fBfile2\fR.
 
 .SH ENVIRONMENT VARIABLES
-.sp
 .LP
 See \fBenviron\fR(5) for descriptions of the following environment variables
 that affect the execution of \fBchmod\fR: \fBLANG\fR, \fBLC_ALL\fR,
 \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -2578,7 +2616,6 @@ An error occurred.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -2596,13 +2633,11 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBgetfacl\fR(1), \fBls\fR(1), \fBsetfacl\fR(1), \fBchmod\fR(2),
 \fBfgetattr\fR(3C), \fBacl\fR(5), \fBattributes\fR(5), \fBenviron\fR(5),
 \fBfsattr\fR(5), \fBlargefile\fR(5), \fBstandards\fR(5)
 .SH NOTES
-.sp
 .LP
 Absolute changes do not work for the set-group-\fBID\fR bit of a directory. You
 must use \fBg+s\fR or \fBg-s\fR.
@@ -2622,5 +2657,5 @@ with \fBACL\fR entries, both the file group owner permissions and the \fBACL\fR
 mask are changed to the new permissions. Be aware that the new \fBACL\fR mask
 permissions can change the effective permissions for additional users and
 groups who have \fBACL\fR entries on the file. Use the \fBgetfacl\fR(1) or
-\fBls\fR(1)command to make sure the appropriate permissions are set for all
+\fBls\fR(1) command to make sure the appropriate permissions are set for all
 \fBACL\fR entries.

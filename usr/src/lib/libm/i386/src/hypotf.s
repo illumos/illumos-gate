@@ -30,10 +30,7 @@
 
 #include "libm.h"
 LIBM_ANSI_PRAGMA_WEAK(hypotf,function)
-#include "libm_synonyms.h"
 #include "libm_protos.h"
-
-#undef fabs
 
 	ENTRY(hypotf)
 	movl	4(%esp),%eax		/ eax <-- x

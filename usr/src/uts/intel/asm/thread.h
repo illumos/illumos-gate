@@ -22,6 +22,7 @@
 /*
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _ASM_THREAD_H
@@ -48,7 +49,7 @@ struct _kthread;
 extern __GNU_INLINE struct _kthread
 *threadp(void)
 {
-	void *__value;
+	struct _kthread *__value;
 
 #if defined(__amd64)
 	__asm__ __volatile__(

@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak csqrt = __csqrt
+#pragma weak __csqrt = csqrt
 
 /* INDENT OFF */
 /*

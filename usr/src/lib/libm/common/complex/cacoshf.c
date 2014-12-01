@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak cacoshf = __cacoshf
+#pragma weak __cacoshf = cacoshf
 
 #include "libm.h"
 #include "complex_wrapper.h"

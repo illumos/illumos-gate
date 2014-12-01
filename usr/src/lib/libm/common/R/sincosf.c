@@ -26,7 +26,7 @@
  * Use is subject to license terms.
  */
 
-#pragma weak sincosf = __sincosf
+#pragma weak __sincosf = sincosf
 
 /* INDENT OFF */
 /*

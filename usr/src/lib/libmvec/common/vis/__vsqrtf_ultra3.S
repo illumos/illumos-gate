@@ -29,11 +29,9 @@
 	.file	"__vsqrtf_ultra3.S"
 
 #include "libm.h"
-#if defined(LIBMVEC_SO_BUILD)
 	.weak	__vsqrtf
 	.type	__vsqrtf,#function
 	__vsqrtf = __vsqrtf_ultra3
-#endif
 
 	RO_DATA
 	.align	64

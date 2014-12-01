@@ -27,7 +27,6 @@
  * Use is subject to license terms.
  */
 
-#include "libm_synonyms.h"
 #include "libm_inlines.h"
 
 #ifdef __RESTRICT
@@ -35,8 +34,6 @@
 #else
 #define restrict
 #endif
-
-#define sqrt __sqrt
 
 extern double sqrt(double);
 
