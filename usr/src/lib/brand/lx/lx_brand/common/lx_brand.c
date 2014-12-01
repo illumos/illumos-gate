@@ -69,7 +69,6 @@
 #include <sys/lx_types.h>
 #include <sys/lx_stat.h>
 #include <sys/lx_statfs.h>
-#include <sys/lx_ioctl.h>
 #include <sys/lx_signal.h>
 #include <sys/lx_syscall.h>
 #include <sys/lx_thread.h>
@@ -888,9 +887,6 @@ lx_init(int argc, char *argv[], char *envp[])
 	if (syscall(SYS_brand, B_ELFDATA, (void *)&edp))
 		lx_err_fatal("failed to get required ELF data from the kernel");
 
-	if (lx_ioctl_init() != 0)
-		lx_err_fatal("failed to setup the ioctl translator");
-
 	if (lx_stat_init() != 0)
 		lx_err_fatal("failed to setup the stat translator");
 
@@ -1111,7 +1107,7 @@ static struct lx_sysent sysents[] = {
 	{"rt_sigaction", lx_rt_sigaction,	0,		4}, /* 13 */
 	{"rt_sigprocmask", lx_rt_sigprocmask,	0,		4}, /* 14 */
 	{"rt_sigreturn", lx_rt_sigreturn,	0,		0}, /* 15 */
-	{"ioctl",	lx_ioctl,		0,		3}, /* 16 */
+	{"ioctl",	LX_IKE(ioctl),		LX_SYS_IKE,	3}, /* 16 */
 	{"pread64",	lx_pread,		0,		4}, /* 17 */
 	{"pwrite64",	lx_pwrite,		0,		4}, /* 18 */
 	{"readv",	lx_readv,		0,		3}, /* 19 */
@@ -1474,7 +1470,7 @@ static struct lx_sysent sysents[] = {
 	{"acct",	NULL,		NOSYS_NO_EQUIV,	0},	/* 51 */
 	{"umount2",	lx_umount2,	0,		2},	/* 52 */
 	{"lock",	NULL,		NOSYS_OBSOLETE,	0},	/* 53 */
-	{"ioctl",	lx_ioctl,	0,		3},	/* 54 */
+	{"ioctl",	LX_IKE(ioctl),	LX_SYS_IKE,	3},	/* 54 */
 	{"fcntl",	lx_fcntl,	0,		3},	/* 55 */
 	{"mpx",		NULL,		NOSYS_OBSOLETE,	0},	/* 56 */
 	{"setpgid",	lx_setpgid,	0,		2},	/* 57 */

@@ -22,6 +22,9 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2014 Joyent, Inc.  All rights reserved.
+ */
 
 
 /*
@@ -51,7 +54,6 @@
 #include <sys/file.h>
 #include <sys/filio.h>
 #include <sys/kstr.h>
-#include <sys/ldlinux.h>
 #include <sys/lx_ptm.h>
 #include <sys/modctl.h>
 #include <sys/pathname.h>
@@ -178,7 +180,6 @@ static char *lx_pts_mods[] = {
 	"ptem",
 	"ldterm",
 	"ttcompat",
-	LDLINUX_MOD,
 	NULL
 };
 

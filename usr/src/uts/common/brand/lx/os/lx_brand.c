@@ -90,6 +90,9 @@ extern boolean_t lx_wait_filter(proc_t *, proc_t *);
 extern greg_t lx_fixsegreg(greg_t, model_t);
 extern int lx_sched_affinity(int, uintptr_t, int, uintptr_t, int64_t *);
 
+extern void lx_ioctl_init();
+extern void lx_ioctl_fini();
+
 int lx_systrace_brand_enabled;
 
 lx_systrace_f *lx_systrace_entry_ptr;
@@ -1588,8 +1591,12 @@ _init(void)
 	/* pid/tid conversion hash tables */
 	lx_pid_init();
 
+	/* for lx_ioctl() */
+	lx_ioctl_init();
+
 	/* for lx_futex() */
 	lx_futex_init();
+
 
 	err = mod_install(&modlinkage);
 	if (err != 0) {
@@ -1603,6 +1610,7 @@ _init(void)
 		 * thus no way for these data structures to be modified.
 		 */
 		lx_pid_fini();
+		lx_ioctl_fini();
 		if (lx_futex_fini())
 			panic("lx brand module cannot be loaded or unloaded.");
 	}
@@ -1629,6 +1637,7 @@ _fini(void)
 		return (EBUSY);
 
 	lx_pid_fini();
+	lx_ioctl_fini();
 
 	if ((err = lx_futex_fini()) != 0)
 		goto done;

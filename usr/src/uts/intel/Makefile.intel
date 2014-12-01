@@ -521,7 +521,6 @@ MISC_KMODS	+= md_sp
 #
 BRAND_KMODS	+= sn1_brand sngl_brand s10_brand lx_brand
 DRV_KMODS	+= lx_systrace lx_ptm lx_audio lx_netlink
-STRMOD_KMODS	+= ldlinux 
 
 #
 #	Exec Class Modules (/kernel/exec):

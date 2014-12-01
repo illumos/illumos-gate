@@ -37,7 +37,6 @@ COBJS	=	capabilities.o			\
 		fcntl.o			\
 		fork.o			\
 		id.o			\
-		ioctl.o			\
 		iovec.o			\
 		lx_brand.o		\
 		lx_thunk_server.o	\

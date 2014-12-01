@@ -46,6 +46,7 @@ extern long lx_modify_ldt();
 extern long lx_pipe();
 extern long lx_pipe2();
 extern long lx_read();
+extern long lx_ioctl();
 extern long lx_gettid();
 extern long lx_futex();
 extern long lx_get_thread_area();

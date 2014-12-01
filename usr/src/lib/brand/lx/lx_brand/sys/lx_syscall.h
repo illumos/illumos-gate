@@ -384,7 +384,8 @@ extern long lx_yield(void);
 #define	LX_EMUL_rt_tgsigqueueinfo	25
 #define	LX_EMUL_arch_prctl		26
 #define	LX_EMUL_tgkill			27
-#define	LX_EMUL_read			LX_N_IKE_FUNCS
+#define	LX_EMUL_read			28
+#define	LX_EMUL_ioctl			LX_N_IKE_FUNCS
 
 /* Note: adjust LX_N_IKE_FUNCS when adding new in-kernel functions */
 
