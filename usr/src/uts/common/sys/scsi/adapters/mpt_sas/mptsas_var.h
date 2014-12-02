@@ -253,7 +253,7 @@ typedef struct mptsas_cache_frames {
 	ddi_dma_handle_t m_dma_hdl;
 	ddi_acc_handle_t m_acc_hdl;
 	caddr_t m_frames_addr;
-	uint32_t m_phys_addr;
+	uint64_t m_phys_addr;
 } mptsas_cache_frames_t;
 
 typedef struct	mptsas_cmd {
@@ -1128,11 +1128,11 @@ _NOTE(DATA_READABLE_WITHOUT_LOCK(mptsas::m_instance))
 			(uint32_t *)(mpt->m_devaddr + NREG_DSPS)))
 
 
-#define	MPTSAS_START_CMD(mpt, req_desc_lo, req_desc_hi) \
-	ddi_put32(mpt->m_datap, &mpt->m_reg->RequestDescriptorPostLow,\
-	    req_desc_lo);\
-	ddi_put32(mpt->m_datap, &mpt->m_reg->RequestDescriptorPostHigh,\
-	    req_desc_hi);
+#define	MPTSAS_START_CMD(mpt, req_desc) \
+	ddi_put32(mpt->m_datap, &mpt->m_reg->RequestDescriptorPostLow,	\
+	    req_desc & 0xffffffffu);					\
+	ddi_put32(mpt->m_datap, &mpt->m_reg->RequestDescriptorPostHigh,	\
+	    (req_desc >> 32) & 0xffffffffu);
 
 #define	INTPENDING(mpt) \
 	(MPTSAS_GET_ISTAT(mpt) & MPI2_HIS_REPLY_DESCRIPTOR_INTERRUPT)
@@ -1275,14 +1275,6 @@ void mptsas_waitq_add(mptsas_t *mpt, mptsas_cmd_t *cmd);
 void mptsas_log(struct mptsas *mpt, int level, char *fmt, ...);
 int mptsas_poll(mptsas_t *mpt, mptsas_cmd_t *poll_cmd, int polltime);
 int mptsas_do_dma(mptsas_t *mpt, uint32_t size, int var, int (*callback)());
-int mptsas_send_config_request_msg(mptsas_t *mpt, uint8_t action,
-	uint8_t pagetype, uint32_t pageaddress, uint8_t pagenumber,
-	uint8_t pageversion, uint8_t pagelength, uint32_t
-	SGEflagslength, uint32_t SGEaddress32);
-int mptsas_send_extended_config_request_msg(mptsas_t *mpt, uint8_t action,
-	uint8_t extpagetype, uint32_t pageaddress, uint8_t pagenumber,
-	uint8_t pageversion, uint16_t extpagelength,
-	uint32_t SGEflagslength, uint32_t SGEaddress32);
 int mptsas_update_flash(mptsas_t *mpt, caddr_t ptrbuffer, uint32_t size,
 	uint8_t type, int mode);
 int mptsas_check_flash(mptsas_t *mpt, caddr_t origfile, uint32_t size,
@@ -1314,11 +1306,11 @@ int mptsas_get_handshake_msg(mptsas_t *mpt, caddr_t memp, int numbytes,
 int mptsas_send_config_request_msg(mptsas_t *mpt, uint8_t action,
     uint8_t pagetype, uint32_t pageaddress, uint8_t pagenumber,
     uint8_t pageversion, uint8_t pagelength, uint32_t SGEflagslength,
-    uint32_t SGEaddress32);
+    uint64_t SGEaddress);
 int mptsas_send_extended_config_request_msg(mptsas_t *mpt, uint8_t action,
     uint8_t extpagetype, uint32_t pageaddress, uint8_t pagenumber,
     uint8_t pageversion, uint16_t extpagelength,
-    uint32_t SGEflagslength, uint32_t SGEaddress32);
+    uint32_t SGEflagslength, uint64_t SGEaddress);
 
 int mptsas_request_from_pool(mptsas_t *mpt, mptsas_cmd_t **cmd,
     struct scsi_pkt **pkt);
