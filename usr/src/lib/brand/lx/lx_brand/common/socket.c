@@ -1365,6 +1365,12 @@ lx_recvfrom(int sockfd, void *buf, size_t len, int flags, void *from,
 			return (-EINVAL);
 	}
 
+	/*
+	 * LTP sometimes passes -1 for the flags but expects a different
+	 * failure result for something else that is wrong.
+	 */
+	if (flags != -1 && flags & LX_MSG_ERRQUEUE)
+		return (-EAGAIN);
 	flags = convert_sockflags(flags, "recvfrom");
 
 	/*
@@ -1770,6 +1776,12 @@ lx_recvmsg(int sockfd, void *lmp, int flags)
 
 	lx_debug("\trecvmsg(%d, 0x%p, 0x%x)", sockfd, lmp, flags);
 
+	/*
+	 * LTP sometimes passes -1 for the flags but expects a different
+	 * failure result for something else that is wrong.
+	 */
+	if (flags != -1 && flags & LX_MSG_ERRQUEUE)
+		return (-EAGAIN);
 	flags = convert_sockflags(flags, "recvmsg");
 
 	if ((uucopy(lmp, &msg, sizeof (msg))) != 0)
@@ -2002,6 +2014,12 @@ lx_recv(ulong_t *args)
 
 	lx_debug("\trecv(%d, 0x%p, 0x%d, 0x%x)", sockfd, buf, len, flags);
 
+	/*
+	 * LTP sometimes passes -1 for the flags but expects a different
+	 * failure result for something else that is wrong.
+	 */
+	if (flags != -1 && flags & LX_MSG_ERRQUEUE)
+		return (-EAGAIN);
 	flags = convert_sockflags(flags, "recv");
 
 	/*
