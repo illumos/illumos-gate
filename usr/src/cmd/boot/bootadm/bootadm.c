@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc. All rights reserved.
  */
 
 /*
@@ -121,7 +121,7 @@ typedef struct {
 #define	GRUB_MENU		"/boot/grub/menu.lst"
 #define	MENU_TMP		"/boot/grub/menu.lst.tmp"
 #define	GRUB_BACKUP_MENU	"/etc/lu/GRUB_backup_menu"
-#define	RAMDISK_SPECIAL		"/ramdisk"
+#define	RAMDISK_SPECIAL		"/dev/ramdisk/"
 #define	STUBBOOT		"/stubboot"
 #define	MULTIBOOT		"/platform/i86pc/multiboot"
 #define	GRUBSIGN_DIR		"/boot/grub/bootsign"
@@ -3466,7 +3466,8 @@ is_ramdisk(char *root)
 		return (0);
 	}
 
-	if (strstr(mnt.mnt_special, RAMDISK_SPECIAL) != NULL) {
+	if (strncmp(mnt.mnt_special, RAMDISK_SPECIAL,
+	    strlen(RAMDISK_SPECIAL)) == 0) {
 		if (bam_verbose)
 			bam_error(IS_RAMDISK, bam_root);
 		(void) fclose(fp);
