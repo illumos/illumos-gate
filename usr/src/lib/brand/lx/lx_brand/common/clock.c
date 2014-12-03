@@ -196,6 +196,8 @@ long
 lx_clock_nanosleep(int clock, int flags, struct timespec *rqtp,
     struct timespec *rmtp)
 {
+	int ret = 0;
+	int err;
 	struct timespec rqt, rmt;
 
 	if (clock < 0 || clock > LX_CLOCK_MAX)
@@ -205,8 +207,16 @@ lx_clock_nanosleep(int clock, int flags, struct timespec *rqtp,
 		return (-EFAULT);
 
 	/* the TIMER_RELTIME and TIMER_ABSTIME flags are the same on Linux */
-	if (clock_nanosleep(ltos_clock[clock], flags, &rqt, &rmt) < 0)
-		return (-errno);
+	if ((err = clock_nanosleep(ltos_clock[clock], flags, &rqt, &rmt))
+	    != 0) {
+		if (err != EINTR)
+			return (-err);
+		ret = -EINTR;
+		/*
+		 * We fall through in case we have to pass back the remaining
+		 * time.
+		 */
+	}
 
 	/*
 	 * Only copy values to rmtp if the timer is TIMER_RELTIME and rmtp is
@@ -216,7 +226,7 @@ lx_clock_nanosleep(int clock, int flags, struct timespec *rqtp,
 	    (uucopy(&rmt, rmtp, sizeof (struct timespec)) < 0))
 		return (-EFAULT);
 
-	return (0);
+	return (ret);
 }
 
 /*ARGSUSED*/
