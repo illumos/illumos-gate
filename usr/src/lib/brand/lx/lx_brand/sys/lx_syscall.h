@@ -166,6 +166,12 @@ extern long lx_clock_getres(int, struct timespec *);
 extern long lx_clock_nanosleep(int, int flags, struct timespec *,
     struct timespec *);
 extern long lx_adjtimex(void *);
+extern long lx_timer_create(int, struct sigevent *, timer_t *);
+extern long lx_timer_settime(timer_t, int, struct itimerspec *,
+    struct itimerspec *);
+extern long lx_timer_gettime(timer_t, struct itimerspec *);
+extern long lx_timer_getoverrun(timer_t);
+extern long lx_timer_delete(timer_t);
 
 extern long lx_truncate(uintptr_t, uintptr_t);
 extern long lx_ftruncate(uintptr_t, uintptr_t);
