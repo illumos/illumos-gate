@@ -1317,11 +1317,11 @@ static struct lx_sysent sysents[] = {
 	{"restart_syscall", NULL,		NOSYS_NULL,	0}, /* 219 */
 	{"semtimedop",	lx_semtimedop,		0,		4}, /* 220 */
 	{"fadvise64",	lx_fadvise64_64,	0,		4}, /* 221 */
-	{"timer_create", NULL,			NOSYS_UNDOC,	0}, /* 222 */
-	{"timer_settime", NULL,			NOSYS_UNDOC,	0}, /* 223 */
-	{"timer_gettime", NULL,			NOSYS_UNDOC,	0}, /* 224 */
-	{"timer_getoverrun", NULL,		NOSYS_UNDOC,	0}, /* 225 */
-	{"timer_delete", NULL,			NOSYS_UNDOC,	0}, /* 226 */
+	{"timer_create", lx_timer_create,	0,		3}, /* 222 */
+	{"timer_settime", lx_timer_settime,	0,		4}, /* 223 */
+	{"timer_gettime", lx_timer_gettime,	0,		2}, /* 224 */
+	{"timer_getoverrun", lx_timer_getoverrun, 0,		1}, /* 225 */
+	{"timer_delete", lx_timer_delete,	0,		1}, /* 226 */
 	{"clock_settime", lx_clock_settime,	0,		2}, /* 227 */
 	{"clock_gettime", lx_clock_gettime,	0,		2}, /* 228 */
 	{"clock_getres", lx_clock_getres,	0,		2}, /* 229 */
@@ -1679,11 +1679,11 @@ static struct lx_sysent sysents[] = {
 	{"epoll_wait",	lx_epoll_wait,	0,		4},	/* 256 */
 	{"remap_file_pages", NULL,	NOSYS_NO_EQUIV,	0},	/* 257 */
 	{"set_tid_address", LX_IKE(set_tid_address), LX_SYS_IKE, 1}, /* 258 */
-	{"timer_create", NULL,		NOSYS_UNDOC,	0},	/* 259 */
-	{"timer_settime", NULL,		NOSYS_UNDOC,	0},	/* 260 */
-	{"timer_gettime", NULL,		NOSYS_UNDOC,	0},	/* 261 */
-	{"timer_getoverrun", NULL,	NOSYS_UNDOC,	0},	/* 262 */
-	{"timer_delete", NULL,		NOSYS_UNDOC,	0},	/* 263 */
+	{"timer_create", lx_timer_create, 0,		3},	/* 259 */
+	{"timer_settime", lx_timer_settime, 0,		4},	/* 260 */
+	{"timer_gettime", lx_timer_gettime, 0,		2},	/* 261 */
+	{"timer_getoverrun", lx_timer_getoverrun, 0,	1},	/* 262 */
+	{"timer_delete", lx_timer_delete, 0,		1},	/* 263 */
 	{"clock_settime", lx_clock_settime,	0,	2},	/* 264 */
 	{"clock_gettime", lx_clock_gettime,	0,	2},	/* 265 */
 	{"clock_getres", lx_clock_getres,	0,	2},	/* 266 */
