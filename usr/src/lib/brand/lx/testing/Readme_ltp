@@ -43,7 +43,7 @@ which now work.
 
 As root:
     cd /opt/ltp
-    /opt/ltp/runltp -f syscalls,nptl,ipc,pipes,pty \
+    /opt/ltp/runltp -f syscalls,nptl,ipc,pipes,pty,math,crashme \
         -S /native/usr/lib/brand/lx/ltp_skiplist -p >~/test.log
 
 When the test run has finished, the results will be logged in a date/time
@@ -73,13 +73,13 @@ the -f option in the runltp command shown above). A complete list of the groups
 can be seen in LTP source tree under the runtest directory. Some of these
 groups are obviously not applicable when running in an lx zone. The remaining
 groups still need work before they can be run. The groups shown in the runltp
-command above are expected to work when the skip list is used.
+command above are expected to work when the skip list is used. The 'syscalls'
+command file runs the majority of the actual system call tests which we are
+interested in.
 
-The 'syscalls' command file runs the majority of the actual system call tests
-which we are interested in. The following table indicates why specific syscall
-subtests are being skipped. Also note that the following tests pass in a 64-bit
-lx zone, but fail in a zone installed with a 32-bit Linux build: mmap15, open12,
-openat02 and sendfile09.
+The following table indicates why specific subtests are being skipped. Also
+note that the following tests pass in a 64-bit lx zone, but fail in a zone
+installed with a 32-bit Linux build: mmap15, open12, openat02 and sendfile09.
 
     Legend:
 	x = never in a zone
@@ -174,6 +174,7 @@ x getrusage03	we don't fill in the ru_maxrss field
 - lchown03_16
 - linkat02	needs dev
 - link08	needs dev
+x mem01		crashme test which expects OOM killer to save the day
 - mkdir03	needs dev
 - mkdirat02	needs dev
 x mknod01	makes block and chr devs
