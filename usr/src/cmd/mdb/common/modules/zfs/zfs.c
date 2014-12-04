@@ -21,7 +21,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
- * Copyright (c) 2012, 2014 by Delphix. All rights reserved.
+ * Copyright (c) 2011, 2014 by Delphix. All rights reserved.
  */
 
 /* Portions Copyright 2010 Robert Milkowski */
@@ -958,6 +958,7 @@ arc_print(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	static const char *bytestats[] = {
 		"p", "c", "c_min", "c_max", "size", "duplicate_buffers_size",
 		"arc_meta_used", "arc_meta_limit", "arc_meta_max",
+		"arc_meta_min", "hdr_size", "data_size", "other_size",
 		NULL
 	};
 

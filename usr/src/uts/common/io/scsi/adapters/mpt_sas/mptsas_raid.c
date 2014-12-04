@@ -22,6 +22,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2014, Tegile Systems Inc. All rights reserved.
  */
 
 /*
@@ -572,7 +573,8 @@ mptsas_raid_action_system_shutdown(mptsas_t *mpt)
 	mptsas_slots_t			*slots = mpt->m_active;
 	int				config, vol;
 	mptsas_cmd_t			*cmd;
-	uint32_t			request_desc_low, reply_addr;
+	uint32_t			reply_addr;
+	uint64_t			request_desc;
 	int				cnt;
 	pMpi2ReplyDescriptorsUnion_t	reply_desc_union;
 	pMPI2DefaultReply_t		reply;
@@ -631,9 +633,9 @@ mptsas_raid_action_system_shutdown(mptsas_t *mpt)
 	 */
 	(void) ddi_dma_sync(mpt->m_dma_req_frame_hdl, 0, 0,
 	    DDI_DMA_SYNC_FORDEV);
-	request_desc_low = (cmd->cmd_slot << 16) +
+	request_desc = (cmd->cmd_slot << 16) +
 	    MPI2_REQ_DESCRIPT_FLAGS_DEFAULT_TYPE;
-	MPTSAS_START_CMD(mpt, request_desc_low, 0);
+	MPTSAS_START_CMD(mpt, request_desc);
 
 	/*
 	 * Even though reply does not matter because the system is shutting

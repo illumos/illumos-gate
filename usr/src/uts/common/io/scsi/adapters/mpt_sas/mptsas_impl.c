@@ -203,7 +203,8 @@ mptsas_start_config_page_access(mptsas_t *mpt, mptsas_cmd_t *cmd)
 	struct scsi_pkt		*pkt = cmd->cmd_pkt;
 	mptsas_config_request_t	*config = pkt->pkt_ha_private;
 	uint8_t			direction;
-	uint32_t		length, flagslength, request_desc_low;
+	uint32_t		length, flagslength;
+	uint64_t		request_desc;
 
 	ASSERT(mutex_owned(&mpt->m_mutex));
 
@@ -277,10 +278,10 @@ mptsas_start_config_page_access(mptsas_t *mpt, mptsas_cmd_t *cmd)
 
 	(void) ddi_dma_sync(mpt->m_dma_req_frame_hdl, 0, 0,
 	    DDI_DMA_SYNC_FORDEV);
-	request_desc_low = (cmd->cmd_slot << 16) +
+	request_desc = (cmd->cmd_slot << 16) +
 	    MPI2_REQ_DESCRIPT_FLAGS_DEFAULT_TYPE;
 	cmd->cmd_rfm = NULL;
-	MPTSAS_START_CMD(mpt, request_desc_low, 0);
+	MPTSAS_START_CMD(mpt, request_desc);
 	if ((mptsas_check_dma_handle(mpt->m_dma_req_frame_hdl) !=
 	    DDI_SUCCESS) ||
 	    (mptsas_check_acc_handle(mpt->m_acc_req_frame_hdl) !=
@@ -390,7 +391,7 @@ mptsas_access_config_page(mptsas_t *mpt, uint8_t action, uint8_t page_type,
 		(void) ddi_dma_sync(mpt->m_dma_reply_frame_hdl, 0, 0,
 		    DDI_DMA_SYNC_FORCPU);
 		reply = (pMpi2ConfigReply_t)(mpt->m_reply_frame + (cmd->cmd_rfm
-		    - mpt->m_reply_frame_dma_addr));
+		    - (mpt->m_reply_frame_dma_addr & 0xffffffffu)));
 		config.page_type = ddi_get8(mpt->m_acc_reply_frame_hdl,
 		    &reply->Header.PageType);
 		config.page_number = ddi_get8(mpt->m_acc_reply_frame_hdl,
@@ -535,7 +536,7 @@ mptsas_access_config_page(mptsas_t *mpt, uint8_t action, uint8_t page_type,
 		(void) ddi_dma_sync(cmd->cmd_dmahandle, 0, 0,
 		    DDI_DMA_SYNC_FORCPU);
 		reply = (pMpi2ConfigReply_t)(mpt->m_reply_frame + (cmd->cmd_rfm
-		    - mpt->m_reply_frame_dma_addr));
+		    - (mpt->m_reply_frame_dma_addr & 0xffffffffu)));
 		iocstatus = ddi_get16(mpt->m_acc_reply_frame_hdl,
 		    &reply->IOCStatus);
 		iocstatus = MPTSAS_IOCSTATUS(iocstatus);
@@ -612,7 +613,7 @@ page_done:
 int
 mptsas_send_config_request_msg(mptsas_t *mpt, uint8_t action, uint8_t pagetype,
 	uint32_t pageaddress, uint8_t pagenumber, uint8_t pageversion,
-	uint8_t pagelength, uint32_t SGEflagslength, uint32_t SGEaddress32)
+	uint8_t pagelength, uint32_t SGEflagslength, uint64_t SGEaddress)
 {
 	pMpi2ConfigRequest_t	config;
 	int			send_numbytes;
@@ -629,7 +630,10 @@ mptsas_send_config_request_msg(mptsas_t *mpt, uint8_t action, uint8_t pagetype,
 	ddi_put32(mpt->m_hshk_acc_hdl,
 	    &config->PageBufferSGE.MpiSimple.FlagsLength, SGEflagslength);
 	ddi_put32(mpt->m_hshk_acc_hdl,
-	    &config->PageBufferSGE.MpiSimple.u.Address32, SGEaddress32);
+	    &config->PageBufferSGE.MpiSimple.u.Address64.Low, SGEaddress);
+	ddi_put32(mpt->m_hshk_acc_hdl,
+	    &config->PageBufferSGE.MpiSimple.u.Address64.High,
+	    SGEaddress >> 32);
 	send_numbytes = sizeof (MPI2_CONFIG_REQUEST);
 
 	/*
@@ -646,7 +650,7 @@ int
 mptsas_send_extended_config_request_msg(mptsas_t *mpt, uint8_t action,
 	uint8_t extpagetype, uint32_t pageaddress, uint8_t pagenumber,
 	uint8_t pageversion, uint16_t extpagelength,
-	uint32_t SGEflagslength, uint32_t SGEaddress32)
+	uint32_t SGEflagslength, uint64_t SGEaddress)
 {
 	pMpi2ConfigRequest_t	config;
 	int			send_numbytes;
@@ -665,7 +669,10 @@ mptsas_send_extended_config_request_msg(mptsas_t *mpt, uint8_t action,
 	ddi_put32(mpt->m_hshk_acc_hdl,
 	    &config->PageBufferSGE.MpiSimple.FlagsLength, SGEflagslength);
 	ddi_put32(mpt->m_hshk_acc_hdl,
-	    &config->PageBufferSGE.MpiSimple.u.Address32, SGEaddress32);
+	    &config->PageBufferSGE.MpiSimple.u.Address64.Low, SGEaddress);
+	ddi_put32(mpt->m_hshk_acc_hdl,
+	    &config->PageBufferSGE.MpiSimple.u.Address64.High,
+	    SGEaddress >> 32);
 	send_numbytes = sizeof (MPI2_CONFIG_REQUEST);
 
 	/*
@@ -1093,7 +1100,7 @@ mptsas_ioc_task_management(mptsas_t *mpt, int task_type, uint16_t dev_handle,
 	mptsas_cmd_t				*cmd;
 	struct scsi_pkt				*pkt;
 	mptsas_slots_t				*slots = mpt->m_active;
-	uint32_t				request_desc_low, i;
+	uint64_t				request_desc, i;
 	pMPI2DefaultReply_t			reply_msg;
 
 	/*
@@ -1149,9 +1156,9 @@ mptsas_ioc_task_management(mptsas_t *mpt, int task_type, uint16_t dev_handle,
 	 */
 	(void) ddi_dma_sync(mpt->m_dma_req_frame_hdl, 0, 0,
 	    DDI_DMA_SYNC_FORDEV);
-	request_desc_low = (cmd->cmd_slot << 16) +
+	request_desc = (cmd->cmd_slot << 16) +
 	    MPI2_REQ_DESCRIPT_FLAGS_HIGH_PRIORITY;
-	MPTSAS_START_CMD(mpt, request_desc_low, 0);
+	MPTSAS_START_CMD(mpt, request_desc);
 	rval = mptsas_poll(mpt, cmd, MPTSAS_POLL_TIME);
 
 	if (pkt->pkt_reason == CMD_INCOMPLETE)
@@ -1167,7 +1174,7 @@ mptsas_ioc_task_management(mptsas_t *mpt, int task_type, uint16_t dev_handle,
 		    DDI_DMA_SYNC_FORCPU);
 		reply_msg = (pMPI2DefaultReply_t)
 		    (mpt->m_reply_frame + (cmd->cmd_rfm -
-		    mpt->m_reply_frame_dma_addr));
+		    (mpt->m_reply_frame_dma_addr & 0xffffffffu)));
 		if (reply_size > sizeof (MPI2_SCSI_TASK_MANAGE_REPLY)) {
 			reply_size = sizeof (MPI2_SCSI_TASK_MANAGE_REPLY);
 		}
@@ -1303,7 +1310,7 @@ mptsas_update_flash(mptsas_t *mpt, caddr_t ptrbuffer, uint32_t size,
 	struct scsi_pkt		*pkt;
 	int			i;
 	int			rvalue = 0;
-	uint32_t		request_desc_low;
+	uint64_t		request_desc;
 
 	if (mpt->m_MPI25 && !mptsas_enable_mpi25_flashupdate) {
 		/*
@@ -1389,10 +1396,10 @@ mptsas_update_flash(mptsas_t *mpt, caddr_t ptrbuffer, uint32_t size,
 	 */
 	(void) ddi_dma_sync(mpt->m_dma_req_frame_hdl, 0, 0,
 	    DDI_DMA_SYNC_FORDEV);
-	request_desc_low = (cmd->cmd_slot << 16) +
+	request_desc = (cmd->cmd_slot << 16) +
 	    MPI2_REQ_DESCRIPT_FLAGS_DEFAULT_TYPE;
 	cmd->cmd_rfm = NULL;
-	MPTSAS_START_CMD(mpt, request_desc_low, 0);
+	MPTSAS_START_CMD(mpt, request_desc);
 
 	rvalue = 0;
 	(void) cv_reltimedwait(&mpt->m_fw_cv, &mpt->m_mutex,
@@ -2004,7 +2011,7 @@ mptsas_get_sas_io_unit_page_hndshk(mptsas_t *mpt)
 			    MPI2_SGE_FLAGS_END_OF_BUFFER |
 			    MPI2_SGE_FLAGS_SIMPLE_ELEMENT |
 			    MPI2_SGE_FLAGS_SYSTEM_ADDRESS |
-			    MPI2_SGE_FLAGS_32_BIT_ADDRESSING |
+			    MPI2_SGE_FLAGS_64_BIT_ADDRESSING |
 			    MPI2_SGE_FLAGS_IOC_TO_HOST |
 			    MPI2_SGE_FLAGS_END_OF_LIST) <<
 			    MPI2_SGE_FLAGS_SHIFT);
@@ -2020,7 +2027,7 @@ mptsas_get_sas_io_unit_page_hndshk(mptsas_t *mpt)
 			    MPI2_SGE_FLAGS_END_OF_BUFFER |
 			    MPI2_SGE_FLAGS_SIMPLE_ELEMENT |
 			    MPI2_SGE_FLAGS_SYSTEM_ADDRESS |
-			    MPI2_SGE_FLAGS_32_BIT_ADDRESSING |
+			    MPI2_SGE_FLAGS_64_BIT_ADDRESSING |
 			    MPI2_SGE_FLAGS_IOC_TO_HOST |
 			    MPI2_SGE_FLAGS_END_OF_LIST) <<
 			    MPI2_SGE_FLAGS_SHIFT);
@@ -2064,7 +2071,7 @@ mptsas_get_sas_io_unit_page_hndshk(mptsas_t *mpt)
 		    MPI2_CONFIG_EXTPAGETYPE_SAS_IO_UNIT, 0, page_number,
 		    ddi_get8(recv_accessp, &configreply->Header.PageVersion),
 		    ddi_get16(recv_accessp, &configreply->ExtPageLength),
-		    flags_length, page_cookie.dmac_address)) {
+		    flags_length, page_cookie.dmac_laddress)) {
 			goto cleanup;
 		}
 
@@ -2314,6 +2321,8 @@ mptsas_get_manufacture_page5(mptsas_t *mpt)
 
 	bzero(page_memp, sizeof (MPI2_CONFIG_PAGE_MAN_5));
 	m5 = (pMpi2ManufacturingPage5_t)page_memp;
+	NDBG20(("mptsas_get_manufacture_page5: paddr 0x%p",
+	    (void *)(uintptr_t)page_cookie.dmac_laddress));
 
 	/*
 	 * Give reply address to IOC to store config page in and send
@@ -2323,7 +2332,7 @@ mptsas_get_manufacture_page5(mptsas_t *mpt)
 	flagslength = sizeof (MPI2_CONFIG_PAGE_MAN_5);
 	flagslength |= ((uint32_t)(MPI2_SGE_FLAGS_LAST_ELEMENT |
 	    MPI2_SGE_FLAGS_END_OF_BUFFER | MPI2_SGE_FLAGS_SIMPLE_ELEMENT |
-	    MPI2_SGE_FLAGS_SYSTEM_ADDRESS | MPI2_SGE_FLAGS_32_BIT_ADDRESSING |
+	    MPI2_SGE_FLAGS_SYSTEM_ADDRESS | MPI2_SGE_FLAGS_64_BIT_ADDRESSING |
 	    MPI2_SGE_FLAGS_IOC_TO_HOST |
 	    MPI2_SGE_FLAGS_END_OF_LIST) << MPI2_SGE_FLAGS_SHIFT);
 
@@ -2332,7 +2341,7 @@ mptsas_get_manufacture_page5(mptsas_t *mpt)
 	    MPI2_CONFIG_PAGETYPE_MANUFACTURING, 0, 5,
 	    ddi_get8(recv_accessp, &configreply->Header.PageVersion),
 	    ddi_get8(recv_accessp, &configreply->Header.PageLength),
-	    flagslength, page_cookie.dmac_address)) {
+	    flagslength, page_cookie.dmac_laddress)) {
 		rval = DDI_FAILURE;
 		goto done;
 	}
@@ -2699,7 +2708,7 @@ mptsas_get_manufacture_page0(mptsas_t *mpt)
 	flagslength = sizeof (MPI2_CONFIG_PAGE_MAN_0);
 	flagslength |= ((uint32_t)(MPI2_SGE_FLAGS_LAST_ELEMENT |
 	    MPI2_SGE_FLAGS_END_OF_BUFFER | MPI2_SGE_FLAGS_SIMPLE_ELEMENT |
-	    MPI2_SGE_FLAGS_SYSTEM_ADDRESS | MPI2_SGE_FLAGS_32_BIT_ADDRESSING |
+	    MPI2_SGE_FLAGS_SYSTEM_ADDRESS | MPI2_SGE_FLAGS_64_BIT_ADDRESSING |
 	    MPI2_SGE_FLAGS_IOC_TO_HOST |
 	    MPI2_SGE_FLAGS_END_OF_LIST) << MPI2_SGE_FLAGS_SHIFT);
 
@@ -2708,7 +2717,7 @@ mptsas_get_manufacture_page0(mptsas_t *mpt)
 	    MPI2_CONFIG_PAGETYPE_MANUFACTURING, 0, 0,
 	    ddi_get8(recv_accessp, &configreply->Header.PageVersion),
 	    ddi_get8(recv_accessp, &configreply->Header.PageLength),
-	    flagslength, page_cookie.dmac_address)) {
+	    flagslength, page_cookie.dmac_laddress)) {
 		rval = DDI_FAILURE;
 		goto done;
 	}
