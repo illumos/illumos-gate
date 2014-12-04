@@ -1807,9 +1807,6 @@ lxpr_read_meminfo(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	}
 
 	lxpr_uiobuf_printf(uiobuf,
-	    "        total:     used:    free:  shared: buffers:  cached:\n"
-	    "Mem:  %8lu %8lu %8lu %8u %8u %8u\n"
-	    "Swap: %8lu %8lu %8lu\n"
 	    "MemTotal:  %8lu kB\n"
 	    "MemFree:   %8lu kB\n"
 	    "MemShared: %8u kB\n"
@@ -1824,8 +1821,6 @@ lxpr_read_meminfo(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	    "LowFree:   %8u kB\n"
 	    "SwapTotal: %8lu kB\n"
 	    "SwapFree:  %8lu kB\n",
-	    total_mem, total_mem - free_mem, free_mem, 0, 0, 0,
-	    total_swap, used_swap, total_swap - used_swap,
 	    btok(total_mem),				/* MemTotal */
 	    btok(free_mem),				/* MemFree */
 	    0,						/* MemShared */
