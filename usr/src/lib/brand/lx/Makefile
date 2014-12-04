@@ -33,7 +33,7 @@ include Makefile.lx
 .PARALLEL:
 
 SUBDIRS=	cmd librtld_db lx_support lx_brand lx_thunk netfiles zone \
-		lx_vdso .WAIT lx_nametoaddr
+		lx_vdso testing .WAIT lx_nametoaddr
 MSGSUBDIRS=	lx_brand lx_support zone
 
 all :=		TARGET= all

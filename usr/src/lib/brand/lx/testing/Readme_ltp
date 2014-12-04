@@ -1,0 +1,313 @@
+The Linux Test Project (LTP) provides the basis for testing the lx API
+implementation. The project webpage is at http://linux-test-project.github.io/
+and the source is available on GitHub at
+https://github.com/linux-test-project/ltp.git.
+
+LTP should be built and run from within an lx zone.
+
+To build
+--------
+As root first make sure you have the tools installed:
+    apt-get install build-essential autoconf automake git quota
+
+As a normal user:
+    git clone https://github.com/linux-test-project/ltp.git
+    cd ltp
+    make autotools
+    ./configure
+    make all
+
+As root:
+    make install
+
+The tests can be built in both a zone that has been installed with a 32-bit
+version of Linux and another zone that has been installed with a 64-bit version
+of the same release. When testing the 64-bit zone, a copy of the 32-bit build
+can be run in the 64-bit zone to ensure that 32-bit applications work
+correctly on a 64-bit install.
+
+Running the tests
+-----------------
+The LTP source tree provides detailed documentation on using the test suite, so
+this readme only give a short summary.
+
+Because many of the tests are targetted at kernel functionality which does not
+apply to Illumos, or test capabilities which are not available from within a
+zone, or test system call functionality which has not yet been completed, a
+skip list is used during the test run to bypass tests which are known to fail.
+
+The skip list lives in this directory and is delivered on the system. It is
+available from within the lx zone as /native/usr/lib/brand/lx/ltp_skiplist. As
+new functionality is completed, the skip list should be updated to remove tests
+which now work.
+
+As root:
+    cd /opt/ltp
+    /opt/ltp/runltp -f syscalls,nptl,ipc,pipes,pty \
+        -S /native/usr/lib/brand/lx/ltp_skiplist -p >~/test.log
+
+When the test run has finished, the results will be logged in a date/time
+stamped file under /opt/ltp/results. The summary at the end of the log file
+should show "Total Failures: 0". If not, something is wrong.
+
+Running tests for development
+-----------------------------
+The source for the tests can be found under the testcases directory. The
+largest and most useful set for lx live under testcases/kernel/syscalls. 
+
+For development purposes, an individual test (or tests) can be run by listing
+them in a command file, one per line. For example, with a command file named
+~/tcmds, to run the read01 test you setup the file so it looks like this:
+    read01 read01
+
+You can run that specific test as follows:
+    /opt/ltp/runltp -f ~/tcmds -p -l ~/read.log
+
+Test status
+-----------
+This section provides a short summary of the rationale for why tests are being
+skipped.
+
+LTP groups tests into command files (i.e. syscalls, nptl, etc. provided with
+the -f option in the runltp command shown above). A complete list of the groups
+can be seen in LTP source tree under the runtest directory. Some of these
+groups are obviously not applicable when running in an lx zone. The remaining
+groups still need work before they can be run. The groups shown in the runltp
+command above are expected to work when the skip list is used.
+
+The 'syscalls' command file runs the majority of the actual system call tests
+which we are interested in. The following table indicates why specific syscall
+subtests are being skipped. Also note that the following tests pass in a 64-bit
+lx zone, but fail in a zone installed with a 32-bit Linux build: mmap15, open12,
+openat02 and sendfile09.
+
+    Legend:
+	x = never in a zone
+	* = fails on kvm and bare metal too
+	# = emulation not implemented yet
+	- = could enable with a test zone config change
+
+- access06	wants a block device
+x acct01	enables bsd process accounting
+# add_key01
+# add_key02
+x adjtimex01
+x adjtimex02
+x bdflush01
+x cacheflush01
+x chmod03	need PRIV_SYS_CONFIG to set sticky bit on reg file
+- chmod06	needs dev
+x chmod07	need PRIV_SYS_CONFIG to set sticky bit on reg file
+- chown04	needs dev
+- chown04_16	needs dev
+# clone02
+# clone08
+- creat06	wants to mount a ro fs
+x creat07	we don't behave this way for ETXTBSY
+x creat08	sets euid to 'nobody', loses PRIV_FILE_SETID to set sgid
+# eventfd01
+# eventfd2_01
+# eventfd2_02
+# eventfd2_03
+x execve04	we don't behave this way for ETXTBSY
+# fallocate01
+# fallocate02
+# fallocate03
+x fchmod02	need PRIV_SYS_CONFIG to set sticky bit on reg file
+x fchmod03	need PRIV_SYS_CONFIG to set sticky bit on reg file
+- fchmod06	needs dev
+# fchown04	mounts
+# fchown04_16
+# fcntl06	not supported on linux
+# fcntl06_64
+# fcntl23	leases not implemented
+# fcntl23_64	"
+# fcntl24	"
+# fcntl24_64	"
+# fcntl25	"
+# fcntl25_64	"
+# fcntl26	"
+# fcntl26_64	"
+# fcntl30
+# fcntl30_64
+# fcntl31	setown/getown not impl
+# fcntl31_64
+# flock01	OS-2868
+# flock03	"
+# flock04	"
+# flock06	"
+# fork05	asm into %fs reg
+- fork09	needs a swap cap of ~9GB
+# fork13	decided not to support this
+# fork14	"
+# ftruncate04	need a mnt with mandatory locking
+# ftruncate04_64
+x getcpu01
+# getdents02	wrong errno on test 4 - perf. impact too high
+# getdents02_64
+# get_mempolicy01
+# get_robust_list01	OS-3224
+x getrusage03	we don't fill in the ru_maxrss field
+- getxattr01	need attr/xattr.h at build time
+- getxattr02
+- getxattr03
+# ioctl03	needs /dev/net/tun
+# io_cancel01	libaio stuff not done
+# io_destroy01
+# io_getevents01
+# io_setup01
+# io_submit01
+# inotify_init1_01
+# inotify_init1_02
+# inotify01
+# inotify02
+# inotify03
+# inotify04
+# inotify05
+# fanotify01	don't have fanotify
+# fanotify02
+# fanotify03
+# fanotify04
+# fanotify05
+# keyctl01	no kernel keyring support
+- lchown03	needs to mount ro fs
+- lchown03_16
+- linkat02	needs dev
+- link08	needs dev
+- mkdir03	needs dev
+- mkdirat02	needs dev
+x mknod01	makes block and chr devs
+- mknod07	needs dev
+- mknodat02	needs dev
+# mmap13	expects "invalid access" to SIGBUS
+- mount01	needs dev
+- mount02	needs dev
+x mount03	mounts ext2
+- mount04	needs dev
+x mount05	mounts ext2
+x mount06	mounts ext2
+# mq_notify01
+# mq_notify02
+# mq_open01
+# mq_timedreceive01
+# mq_timedsend01
+# mq_unlink01
+x mremap01
+x mremap02
+x mremap03
+x mremap04
+x mremap05
+# msgctl12	uses MSG_STAT   
+# msgrcv07	MSG_EXCEPT subtest - not avail.
+x open01	need PRIV_SYS_CONFIG to set sticky bit on reg file
+# open02	expects NOATIME to cause err for unpriv user
+# open10	setgid on sgid subdir behavior
+x open11	makes device
+# ppoll01
+# prctl01	get/set deathsig    
+# prctl02	more deathsig
+# process_vm_readv01
+# process_vm_readv02
+# process_vm_readv03
+# process_vm_writev01
+# process_vm_writev02
+# prot_hsymlinks	/proc/sys/fs/protected_hardlinks
+x ptrace04	not supp on our arch
+# ptrace05	OS-3307
+# read02	checks errno for O_DIRECT
+# readahead01
+# readahead02
+# readdir21	dir perf. issue
+- rename11	needs dev
+- renameat01	needs dev
+- rmdir02	needs dev
+x sched_getparam01	assumes Linux SCHED_OTHER return value
+x sched_getparam02	assumes Linux SCHED_OTHER return value 
+# sched_rr_get_interval01
+# sched_rr_get_interval02
+# sched_rr_get_interval03
+x sched_setparam02	tries to set Linux policies
+x sched_setparam03	tries to set Linux policies
+# sched_getscheduler01
+# sched_getscheduler02
+x sched_setscheduler01
+x sched_setaffinity01
+x sched_getaffinity01
+# semctl01	all pass but SEM_STAT - linux specific
+# semop02	last test fails errno - expensive
+# sendfile02	OS-3296  
+# sendfile02_64	"
+# sendfile04	"
+# sendfile04_64	"
+# sendfile06	"
+# sendfile06_64	"
+# sendfile07	"
+# sendfile07_64	"
+sendmsg01	OS-3295 - tests actually pass 
+x setfsuid04	no real equiv. and only for NFS server
+x setfsuid04_16
+# sgetmask01	obsolete   
+# setgroups04_16	expects sig11 for certain err
+# setns01
+# setns02
+# setpgid02	all pass but one, expects pid 0 to be there
+* setregid02	fails on bare metal, expects to lookup group "nobody" which
+* setregid02_16	doesn't exist. it is "nogroup" on ubuntu at least
+# setrlimit01	all pass but one, expects to set proc limit
+# set_robust_list01	OS-3224
+x settimeofday01
+# setxattr01
+# setxattr02
+# setxattr03
+# shmget05	OS-3326
+# sighold02	fails on sig 63 OS-3307
+# signalfd01
+# signalfd4_01
+# signalfd4_02
+# sigrelse01	fails on sig 63 OS-3307
+# splice01
+# splice02
+# splice03
+# tee01
+# tee02
+# ssetmask01	obsolete
+x stime01
+x switch01
+# sync_file_range01
+# sysconf01	most pass but see OS-3305
+# sysctl01	the build compiled this out,
+# sysctl03	this syscall is basically obsolete
+# sysctl04	obsolete 
+# sysctl05
+# syslog01
+# syslog02
+# syslog03
+# syslog04
+# syslog05
+# syslog06
+# syslog07
+# syslog08
+# syslog09
+# syslog10
+# syslog11
+# syslog12
+# timerfd01
+# timerfd02
+# timerfd03
+# timerfd_create01
+# timerfd_gettime01
+# timerfd_settime01
+# unshare01
+# unshare02
+- umount01	needs dev
+- umount02	needs dev
+- umount03	needs dev
+x ustat01	obsolete call to stat FS   
+x ustat02	obsolete call to stat FS
+- utime06	needs dev
+- utimes01	needs dev
+# utimensat01	many subtests pass but see OS-3328 for the rest
+# vmsplice01
+# vmsplice02
+# perf_event_open01
+# perf_event_open02
