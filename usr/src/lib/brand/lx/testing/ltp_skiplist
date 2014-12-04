@@ -20,6 +20,7 @@ iopl01
 iopl02
 isofs
 mbind01
+mem01
 migrate_pages01
 migrate_pages02
 mknod01
@@ -199,8 +200,6 @@ sendfile06
 sendfile06_64
 sendfile07
 sendfile07_64
-sendfile09
-sendfile09_64
 sendmsg01
 setgroups04_16
 setns01
