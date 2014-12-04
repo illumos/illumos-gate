@@ -150,7 +150,7 @@ cfork(int isvfork, int isfork1, int flags)
 	 */
 	if ((flags & ~(FORK_NOSIGCHLD | FORK_WAITPID)) != 0) {
 		error = EINVAL;
-		atomic_add_32(&curproc->p_zone->zone_ffmisc, 1);
+		atomic_inc_32(&curproc->p_zone->zone_ffmisc);
 		goto forkerr;
 	}
 
@@ -159,12 +159,12 @@ cfork(int isvfork, int isfork1, int flags)
 	 */
 	if (curthread == p->p_agenttp) {
 		error = ENOTSUP;
-		atomic_add_32(&curproc->p_zone->zone_ffmisc, 1);
+		atomic_inc_32(&curproc->p_zone->zone_ffmisc);
 		goto forkerr;
 	}
 
 	if ((error = secpolicy_basic_fork(CRED())) != 0) {
-		atomic_add_32(&p->p_zone->zone_ffmisc, 1);
+		atomic_inc_32(&p->p_zone->zone_ffmisc);
 		goto forkerr;
 	}
 
@@ -180,7 +180,7 @@ cfork(int isvfork, int isfork1, int flags)
 	if (!holdlwps(isfork1 ? SHOLDFORK1 : SHOLDFORK)) {
 		aston(curthread);
 		error = EINTR;
-		atomic_add_32(&p->p_zone->zone_ffmisc, 1);
+		atomic_inc_32(&p->p_zone->zone_ffmisc);
 		goto forkerr;
 	}
 
@@ -296,7 +296,7 @@ cfork(int isvfork, int isfork1, int flags)
 			 * map all others to EAGAIN.
 			 */
 			error = (error == ENOMEM) ? ENOMEM : EAGAIN;
-			atomic_add_32(&p->p_zone->zone_ffnomem, 1);
+			atomic_inc_32(&p->p_zone->zone_ffnomem);
 			goto forkerr;
 		}
 
@@ -432,7 +432,7 @@ cfork(int isvfork, int isfork1, int flags)
 	 * a member of.  Fails if the parent has been SIGKILLed.
 	 */
 	if (contract_process_fork(NULL, cp, p, B_TRUE) == NULL) {
-		atomic_add_32(&p->p_zone->zone_ffmisc, 1);
+		atomic_inc_32(&p->p_zone->zone_ffmisc);
 		goto forklwperr;
 	}
 
@@ -969,7 +969,7 @@ getproc(proc_t **cpp, pid_t pid, uint_t flags)
 		if (rctlfail) {
 			mutex_exit(&zone->zone_nlwps_lock);
 			mutex_exit(&pp->p_lock);
-			atomic_add_32(&zone->zone_ffcap, 1);
+			atomic_inc_32(&zone->zone_ffcap);
 			goto punish;
 		}
 	}
@@ -1243,7 +1243,7 @@ bad:
 	proj->kpj_nprocs--;
 	zone->zone_nprocs--;
 	mutex_exit(&zone->zone_nlwps_lock);
-	atomic_add_32(&zone->zone_ffnoproc, 1);
+	atomic_inc_32(&zone->zone_ffnoproc);
 
 punish:
 	/*

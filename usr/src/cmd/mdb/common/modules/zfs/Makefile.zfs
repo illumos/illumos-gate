@@ -20,23 +20,13 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2014 Spectra Logic Corporation.  All rights reserved.
 # Use is subject to license terms.
 #
 
-MODULE = zfs.so
-MDBTGT = kvm
-
-MODSRCS = zfs.c
-
-include ../../../../Makefile.cmd
-include ../../Makefile.ia32
-include ../../../Makefile.module
-include ../../../common/modules/zfs/Makefile.zfs
-
-CPPFLAGS += -I../../../../../uts/common/fs/zfs
-
-C99MODE=	-xc99=%all
-C99LMODE=	-Xc99=%all
-
-CERRWARN 	+= -_gcc=-Wno-type-limits
+# lint complains about unused inline functions, even though
+# they are "inline", not "static inline", with "extern inline"
+# implementations provided where needed in libraries and the
+# kernel.
+LINTFLAGS += -erroff=E_STATIC_UNUSED
+LINTFLAGS64 += -erroff=E_STATIC_UNUSED

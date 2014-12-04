@@ -2269,6 +2269,7 @@ zone_misc_kstat_create(zone_t *zone)
 	kstat_named_init(&zmp->zm_ffnomem, "forkfail_nomem", KSTAT_DATA_UINT32);
 	kstat_named_init(&zmp->zm_ffmisc, "forkfail_misc", KSTAT_DATA_UINT32);
 
+
 	ksp->ks_update = zone_misc_kstat_update;
 	ksp->ks_private = zone;
 

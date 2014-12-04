@@ -146,7 +146,7 @@ lwp_create(void (*proc)(), caddr_t arg, size_t len, proc_t *p,
 	if (rctlfail) {
 		mutex_exit(&p->p_zone->zone_nlwps_lock);
 		mutex_exit(&p->p_lock);
-		atomic_add_32(&p->p_zone->zone_ffcap, 1);
+		atomic_inc_32(&p->p_zone->zone_ffcap);
 		return (NULL);
 	}
 	p->p_task->tk_nlwps++;
@@ -205,7 +205,7 @@ lwp_create(void (*proc)(), caddr_t arg, size_t len, proc_t *p,
 			p->p_zone->zone_nlwps--;
 			mutex_exit(&p->p_zone->zone_nlwps_lock);
 			mutex_exit(&p->p_lock);
-			atomic_add_32(&p->p_zone->zone_ffnomem, 1);
+			atomic_inc_32(&p->p_zone->zone_ffnomem);
 			return (NULL);
 		}
 	} else {
@@ -219,7 +219,7 @@ lwp_create(void (*proc)(), caddr_t arg, size_t len, proc_t *p,
 			p->p_zone->zone_nlwps--;
 			mutex_exit(&p->p_zone->zone_nlwps_lock);
 			mutex_exit(&p->p_lock);
-			atomic_add_32(&p->p_zone->zone_ffnomem, 1);
+			atomic_inc_32(&p->p_zone->zone_ffnomem);
 			return (NULL);
 		}
 	}
@@ -586,7 +586,7 @@ grow:
 			t->t_cid = cid;
 		}
 		if (err) {
-			atomic_add_32(&p->p_zone->zone_ffmisc, 1);
+			atomic_inc_32(&p->p_zone->zone_ffmisc);
 			goto error;
 		} else {
 			bufp = NULL;
@@ -617,7 +617,7 @@ grow:
 				 * All lwpids are allocated; fail the request.
 				 */
 				err = 1;
-				atomic_add_32(&p->p_zone->zone_ffnoproc, 1);
+				atomic_inc_32(&p->p_zone->zone_ffnoproc);
 				goto error;
 			}
 			/*
@@ -637,7 +637,7 @@ grow:
 	if (PROC_IS_BRANDED(p)) {
 		if (BROP(p)->b_initlwp(lwp)) {
 			err = 1;
-			atomic_add_32(&p->p_zone->zone_ffmisc, 1);
+			atomic_inc_32(&p->p_zone->zone_ffmisc);
 			goto error;
 		}
 		branded = 1;
