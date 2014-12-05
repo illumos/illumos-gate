@@ -4703,6 +4703,7 @@ f usr/lib/amd64/libbsdmalloc.so.1 0755 root bin
 s usr/lib/amd64/libbsdmalloc.so=libbsdmalloc.so.1
 s usr/lib/amd64/libbsm.so.1=../../../lib/amd64/libbsm.so.1
 s usr/lib/amd64/libbsm.so=../../../lib/amd64/libbsm.so.1
+f usr/lib/amd64/libbunyan.so.1 0755 root bin
 s usr/lib/amd64/libc.so.1=../../../lib/amd64/libc.so.1
 s usr/lib/amd64/libc.so=../../../lib/amd64/libc.so.1
 s usr/lib/amd64/libc_db.so.1=../../../lib/amd64/libc_db.so.1
@@ -6096,6 +6097,7 @@ f usr/lib/libbsdmalloc.so.1 0755 root bin
 s usr/lib/libbsdmalloc.so=libbsdmalloc.so.1
 s usr/lib/libbsm.so.1=../../lib/libbsm.so.1
 s usr/lib/libbsm.so=../../lib/libbsm.so.1
+f usr/lib/libbunyan.so.1 0755 root bin
 d usr/lib/libc 0755 root bin
 s usr/lib/libc.so.1=../../lib/libc.so.1
 s usr/lib/libc.so=../../lib/libc.so.1

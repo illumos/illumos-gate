@@ -244,6 +244,8 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	dump_nvlist;
 	nvlist_add_hrtime;
 	nvlist_lookup_hrtime;
+	nvlist_dump_json;
+	nvlist_dump_json_free;
 	nvlist_print;
 	nvlist_print_json;
 	nvlist_prt;

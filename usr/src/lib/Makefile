@@ -162,7 +162,8 @@ SUBDIRS += \
 	libm1		\
 	libm		\
 	libmvec		\
-	libvnd
+	libvnd		\
+	libbunyan
 
 SUBDIRS += \
 	passwdutil	\
@@ -371,6 +372,7 @@ HDRSUBDIRS=		\
 	libast		\
 	libbrand	\
 	libbsm		\
+	libbunyan	\
 	libc		\
 	libcmd		\
 	libcmdutils	\
@@ -662,6 +664,7 @@ libprtdiag:	libm
 libsqlite:	libm
 libstmf:	libm
 libvscan: 	libm
+libbunyan:	libnvpair
 
 
 $(INTEL_BUILD)libdiskmgt:libfdisk

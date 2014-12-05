@@ -49,6 +49,8 @@ extern int nvpair_value_match_regex(nvpair_t *, int, char *, regex_t *,
 extern void nvlist_print(FILE *, nvlist_t *);
 extern int nvlist_print_json(FILE *, nvlist_t *);
 extern void dump_nvlist(nvlist_t *, int);
+extern int nvlist_dump_json(nvlist_t *, char **);
+extern void nvlist_dump_json_free(nvlist_t *, char *);
 
 /*
  * Private nvlist printing interface that allows the caller some control
