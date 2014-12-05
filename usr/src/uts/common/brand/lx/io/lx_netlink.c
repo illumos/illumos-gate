@@ -31,6 +31,7 @@
 #include <sys/brand.h>
 #include <inet/ip.h>
 #include <inet/ip_impl.h>
+#include <sys/lx_misc.h>
 
 /*
  * Flags in netlink header
@@ -683,6 +684,7 @@ lx_netlink_getlink_lifreq(lx_netlink_reply_t *reply, struct lifreq *lifr)
 {
 	lx_netlink_ifinfomsg_t ifi;
 	int i;
+	char if_name[IFNAMSIZ];
 
 	struct {
 		int native;
@@ -721,8 +723,10 @@ lx_netlink_getlink_lifreq(lx_netlink_reply_t *reply, struct lifreq *lifr)
 
 	lx_netlink_reply_msg(reply, &ifi, sizeof (lx_netlink_ifinfomsg_t));
 
-	lx_netlink_reply_attr_string(reply,
-	    LX_NETLINK_IFLA_IFNAME, lifr->lifr_name);
+	/* output a Linux-friendly name */
+	(void) strlcpy(if_name, lifr->lifr_name, IFNAMSIZ);
+	lx_ifname_convert(if_name, LX_IFNAME_FROMNATIVE);
+	lx_netlink_reply_attr_string(reply, LX_NETLINK_IFLA_IFNAME, if_name);
 
 	if (lx_netlink_reply_ioctl(reply, SIOCGLIFMTU, lifr) != 0)
 		return;

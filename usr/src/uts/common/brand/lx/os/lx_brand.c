@@ -42,6 +42,7 @@
 #include <sys/lx_impl.h>
 #include <sys/machbrand.h>
 #include <sys/lx_syscalls.h>
+#include <sys/lx_misc.h>
 #include <sys/lx_pid.h>
 #include <sys/lx_futex.h>
 #include <sys/lx_brand.h>
@@ -77,17 +78,8 @@ void	lx_copy_procdata(proc_t *, proc_t *);
 
 extern int getsetcontext(int, void *);
 
-extern void lx_setrval(klwp_t *, int, int);
 extern void lx_proc_exit(proc_t *, klwp_t *);
-extern void lx_exec();
-extern int lx_initlwp(klwp_t *);
-extern void lx_forklwp(klwp_t *, klwp_t *);
-extern void lx_exitlwp(klwp_t *);
-extern void lx_freelwp(klwp_t *);
-extern void lx_exit_with_sig(proc_t *, sigqueue_t *, void *);
 static void lx_psig_to_proc(proc_t *, kthread_t *, int);
-extern boolean_t lx_wait_filter(proc_t *, proc_t *);
-extern greg_t lx_fixsegreg(greg_t, model_t);
 extern int lx_sched_affinity(int, uintptr_t, int, uintptr_t, int64_t *);
 
 extern void lx_ioctl_init();

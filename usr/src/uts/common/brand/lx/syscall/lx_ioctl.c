@@ -29,6 +29,7 @@
 #include <sys/cred.h>
 #include <sys/cred_impl.h>
 #include <sys/sysmacros.h>
+#include <sys/lx_misc.h>
 #include <sys/lx_ptm.h>
 #include <sys/sunddi.h>
 #include <sys/thread.h>
@@ -164,7 +165,6 @@ struct lx_termios {
 static uint_t lx_ioctl_vsd = 0;
 
 extern int lx_lpid_to_spair(pid_t l_pid, pid_t *s_pid, id_t *s_tid);
-
 
 /* Terminal helpers */
 
@@ -354,20 +354,6 @@ get_lx_cc(vnode_t *vp, struct lx_cc *lio)
 }
 
 /* Socket helpers */
-
-static void
-ifname_l2s(char *ifname)
-{
-	if (strncmp(ifname, "lo", IFNAMSIZ) == 0)
-		(void) strlcpy(ifname, "lo0", IFNAMSIZ);
-}
-
-static void
-ifname_s2l(char *ifname)
-{
-	if (strncmp(ifname, "lo0", IFNAMSIZ) == 0)
-		(void) strlcpy(ifname, "lo", IFNAMSIZ);
-}
 
 typedef struct lx_ifreq32 {
 	char	ifr_name[IFNAMSIZ];
@@ -854,7 +840,7 @@ ict_sioifreq(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 
 	if (copyin((struct ifreq *)arg, &req, len) != 0)
 		return (set_errno(EFAULT));
-	ifname_l2s(req.ifr_name);
+	lx_ifname_convert(req.ifr_name, LX_IFNAME_TONATIVE);
 
 	switch (cmd) {
 	case SIOCGIFFLAGS:
@@ -885,7 +871,7 @@ ict_sioifreq(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 	if (error != 0)
 		return (set_errno(error));
 
-	ifname_s2l(req.ifr_name);
+	lx_ifname_convert(req.ifr_name, LX_IFNAME_FROMNATIVE);
 	if (copyout(&req, (struct ifreq *)arg, len) != 0)
 		return (set_errno(EFAULT));
 
@@ -935,7 +921,7 @@ ict_siocgifconf32(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 	oreq = (lx_ifreq32_t *)kmem_alloc(buf_len, KM_SLEEP);
 	for (i = 0; i < sconf.ifc_len / sizeof (struct ifreq); i++) {
 		bcopy(&sconf.ifc_req[i], oreq + i, sizeof (lx_ifreq32_t));
-		ifname_s2l(oreq[i].ifr_name);
+		lx_ifname_convert(oreq[i].ifr_name, LX_IFNAME_FROMNATIVE);
 	}
 	conf.if_len = i * sizeof (*oreq);
 	kmem_free(sconf.ifc_req, ifcount * sizeof (struct ifreq));
@@ -992,7 +978,7 @@ ict_siocgifconf64(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 	oreq = (lx_ifreq64_t *)kmem_alloc(buf_len, KM_SLEEP);
 	for (i = 0; i < sconf.ifc_len / sizeof (struct ifreq); i++) {
 		bcopy(&sconf.ifc_req[i], oreq + i, sizeof (lx_ifreq64_t));
-		ifname_s2l(oreq[i].ifr_name);
+		lx_ifname_convert(oreq[i].ifr_name, LX_IFNAME_FROMNATIVE);
 	}
 	conf.if_len = i * sizeof (*oreq);
 	kmem_free(sconf.ifc_req, ifcount * sizeof (struct ifreq));

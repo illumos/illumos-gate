@@ -36,6 +36,7 @@
 #include <sys/sem.h>
 #include <sys/brand.h>
 #include <sys/lx_brand.h>
+#include <sys/lx_misc.h>
 #include <sys/lx_pid.h>
 #include <sys/lx_futex.h>
 #include <sys/cmn_err.h>
@@ -46,6 +47,8 @@
 #include <lx_signum.h>
 #include <lx_syscall.h>
 #include <sys/proc.h>
+#include <net/if.h>
+#include <sys/sunddi.h>
 
 /* Linux specific functions and definitions */
 void lx_setrval(klwp_t *, int, int);
@@ -372,12 +375,6 @@ lx_nosys()
 	return (set_errno(ENOSYS));
 }
 
-longlong_t
-lx_opnotsupp()
-{
-	return (set_errno(EOPNOTSUPP));
-}
-
 /*
  * Brand-specific routine to check if given non-Solaris standard segment
  * register values should be modified to other values.
@@ -414,7 +411,7 @@ lx_fixsegreg(greg_t sr, model_t datamodel)
  * These two functions simulate winfo and post_sigcld for the lx brand. The
  * difference is delivering a designated signal as opposed to always SIGCLD.
  */
-void
+static void
 lx_winfo(proc_t *pp, k_siginfo_t *ip, struct lx_proc_data *dat)
 {
 	ASSERT(MUTEX_HELD(&pidlock));
@@ -429,7 +426,7 @@ lx_winfo(proc_t *pp, k_siginfo_t *ip, struct lx_proc_data *dat)
 	ip->si_utime = pp->p_utime;
 }
 
-void
+static void
 lx_post_exit_sig(proc_t *cp, sigqueue_t *sqp, struct lx_proc_data *dat)
 {
 	proc_t *pp = cp->p_parent;
@@ -545,5 +542,20 @@ lx_wait_filter(proc_t *pp, proc_t *cp)
 		return (ret);
 	} else {
 		return (B_TRUE);
+	}
+}
+
+void
+lx_ifname_convert(char *ifname, int flag)
+{
+	ASSERT(flag == LX_IFNAME_FROMNATIVE ||
+	    flag == LX_IFNAME_TONATIVE);
+
+	if (flag == LX_IFNAME_TONATIVE) {
+		if (strncmp(ifname, "lo", IFNAMSIZ) == 0)
+			(void) strlcpy(ifname, "lo0", IFNAMSIZ);
+	} else if (flag == LX_IFNAME_FROMNATIVE) {
+		if (strncmp(ifname, "lo0", IFNAMSIZ) == 0)
+			(void) strlcpy(ifname, "lo", IFNAMSIZ);
 	}
 }

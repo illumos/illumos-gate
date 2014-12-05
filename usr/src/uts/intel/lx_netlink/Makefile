@@ -41,7 +41,7 @@ LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 CPPFLAGS	+= -I$(UTSBASE)/common/brand/lx
-LDFLAGS		+= -dy -Ndrv/ip -Nfs/sockfs
+LDFLAGS		+= -dy -Ndrv/ip -Nfs/sockfs -Nbrand/lx_brand
 
 #
 #	Default build targets.
