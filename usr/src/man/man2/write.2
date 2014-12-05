@@ -9,7 +9,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH WRITE 2 "Jan 29, 2008"
+.TH WRITE 2 "Dec 03, 2014"
 .SH NAME
 write, pwrite, writev \- write on a file
 .SH SYNOPSIS
@@ -34,7 +34,6 @@ write, pwrite, writev \- write on a file
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBwrite()\fR function attempts to write \fInbyte\fR bytes from the buffer
 pointed to by \fIbuf\fR to the file associated with the open file descriptor,
@@ -258,7 +257,6 @@ processed an asynchronous error before the call.  In this case, the value of
 \fBerrno\fR does not reflect the result of \fBwrite()\fR or \fBwritev()\fR but
 reflects the prior error.
 .SS "\fBpwrite()\fR"
-.sp
 .LP
 The \fBpwrite()\fR function is equivalent to \fBwrite()\fR, except that it
 writes into a given position and does not change the file offset (regardless of
@@ -266,7 +264,6 @@ whether \fBO_APPEND\fR is set). The first three arguments to \fBpwrite()\fR are
 the same as \fBwrite()\fR, with the addition of a fourth argument \fIoffset\fR
 for the desired position inside the file.
 .SS "\fBwritev()\fR"
-.sp
 .LP
 The \fBwritev()\fR function performs the same action as \fBwrite()\fR, but
 gathers the output data from the \fIiovcnt\fR buffers specified by the members
@@ -300,7 +297,6 @@ have no other effect.  For other file types, the behavior is unspecified.
 If the sum of the \fBiov_len\fR values is greater than \fBSSIZE_MAX\fR, the
 operation fails and no data is transferred.
 .SH RETURN VALUES
-.sp
 .LP
 Upon successful completion, \fBwrite()\fR returns the number of bytes actually
 written to the file associated with \fIfildes\fR. This number is never greater
@@ -312,7 +308,6 @@ Upon successful completion, \fBwritev()\fR returns the number of bytes actually
 written.  Otherwise, it returns  \fB\(mi1\fR, the file-pointer remains
 unchanged, and \fBerrno\fR is set to indicate an error.
 .SH ERRORS
-.sp
 .LP
 The \fBwrite()\fR, \fBpwrite()\fR, and \fBwritev()\fR functions will fail if:
 .sp
@@ -335,6 +330,17 @@ requested and less than \fInbytes\fR of free space is available.
 .ad
 .RS 11n
 The \fIfildes\fR argument is not a valid file descriptor open for writing.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBECONNRESET\fR\fR
+.ad
+.RS 11n
+The \fIfiledes\fR argument refers to a connection oriented socket and the
+connection was forcibly closed by the peer and is no longer valid.  I/O can no
+longer be performed to \fIfiledes\fR.
 .RE
 
 .sp
@@ -557,12 +563,10 @@ overflowed an \fBssize_t\fR.
 .RE
 
 .SH USAGE
-.sp
 .LP
 The \fBpwrite()\fR function has a transitional interface for 64-bit file
 offsets.  See \fBlf64\fR(5).
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -582,7 +586,6 @@ Standard	See \fBstandards\fR(5).
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBIntro\fR(2), \fBchmod\fR(2), \fBcreat\fR(2), \fBdup\fR(2), \fBfcntl\fR(2),
 \fBgetrlimit\fR(2), \fBioctl\fR(2), \fBlseek\fR(2), \fBopen\fR(2),
