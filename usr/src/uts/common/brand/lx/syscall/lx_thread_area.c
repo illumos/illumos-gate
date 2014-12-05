@@ -33,6 +33,7 @@
 #include <sys/brand.h>
 #include <sys/lx_brand.h>
 #include <sys/lx_ldt.h>
+#include <sys/lx_misc.h>
 #include <sys/x86_archext.h>
 #include <sys/controlregs.h>
 

@@ -22,11 +22,12 @@
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2014 Joyent, Inc.  All rights reserved.
+ */
 
 #ifndef _SYS_LINUX_LDT_H
 #define	_SYS_LINUX_LDT_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/segments.h>
 
@@ -82,9 +83,6 @@ struct ldt_info {
 	(info)->limit_in_pages = (desc)->usd_gran;			\
 	(info)->useable = (desc)->usd_avl;				\
 }
-
-extern void lx_set_gdt(int, user_desc_t *);
-extern void lx_clear_gdt(int);
 
 #ifdef	__cplusplus
 }
