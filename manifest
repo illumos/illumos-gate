@@ -4583,9 +4583,6 @@ f usr/kernel/sched/amd64/RT_DPTBL 0755 root sys
 d usr/kernel/socketmod 0755 root sys
 d usr/kernel/socketmod/amd64 0755 root sys
 f usr/kernel/socketmod/amd64/sockpfp 0755 root sys
-d usr/kernel/strmod 0755 root sys
-d usr/kernel/strmod/amd64 0755 root sys
-f usr/kernel/strmod/amd64/ldlinux 0755 root sys
 d usr/kernel/sys 0755 root sys
 d usr/kernel/sys/amd64 0755 root sys
 f usr/kernel/sys/amd64/acctctl 0755 root sys
