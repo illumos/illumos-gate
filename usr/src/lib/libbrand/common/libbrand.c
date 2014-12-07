@@ -21,8 +21,8 @@
 
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2014 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2011, Joyent, Inc. All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <assert.h>
@@ -537,7 +537,7 @@ brand_restartinit(brand_handle_t bh)
 	char val[80];
 
 	if (brand_get_value(bhp, NULL, NULL, NULL, NULL,
-	    val, 80, DTD_ELEM_RESTARTINIT, B_FALSE, B_FALSE) != 0)
+	    val, sizeof (val), DTD_ELEM_RESTARTINIT, B_FALSE, B_FALSE) != 0)
 		return (B_TRUE);
 
 	if (strcmp(val, "false") == 0)

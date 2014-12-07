@@ -5,7 +5,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PRSTAT 1M "Jun 5, 2013"
+.TH PRSTAT 1M "Nov 14, 2014"
 .SH NAME
 prstat \- report active process statistics
 .SH SYNOPSIS
@@ -19,7 +19,6 @@ prstat \- report active process statistics
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBprstat\fR utility iteratively examines all active processes on the
 system and reports statistics based on the selected output mode and sort order.
@@ -36,7 +35,6 @@ separated by commas or enclosed in quotes and separated by commas or spaces.
 If you do not specify an option, \fBprstat\fR examines all processes and
 reports statistics sorted by \fBCPU\fR usage.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -417,7 +415,6 @@ to fit the column.
 .RE
 
 .SH OUTPUT
-.sp
 .LP
 The following list defines the column headings and the meanings of a
 \fBprstat\fR report:
@@ -782,7 +779,6 @@ The home \fIlgroup\fR of the process or lwp.
 .RE
 
 .SH OPERANDS
-.sp
 .LP
 The following operands are supported:
 .sp
@@ -857,7 +853,6 @@ example% prstat -S rss -n 5 -vc -u root,john
 .sp
 
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -881,14 +876,12 @@ An error occurred.
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBdate\fR(1), \fBlgrpinfo\fR(1), \fBplgrp\fR(1), \fBproc\fR(1), \fBps\fR(1),
 \fBtime\fR(2), \fBpsrinfo\fR(1M), \fBpsrset\fR(1M), \fBsar\fR(1M),
 \fBpset_getloadavg\fR(3C), \fBproc\fR(4), \fBproject\fR(4),
 \fBattributes\fR(5), \fBresource_controls\fR(5), \fBzones\fR(5)
 .SH NOTES
-.sp
 .LP
 The snapshot of system usage displayed by \fBprstat\fR is true only for a
 split-second, and it may not be accurate by the time it is displayed. When the

@@ -14474,7 +14474,7 @@ mptsas_update_driver_data(struct mptsas *mpt)
 	 * targets that are still present and reassociate them with
 	 * their potentially new devhdls.  Leaving the targets around in
 	 * this fashion allows them to be used on the tx waitq even
-	 * while IOC reset it occurring.
+	 * while IOC reset is occurring.
 	 */
 	for (tp = refhash_first(mpt->m_targets); tp != NULL;
 	    tp = refhash_next(mpt->m_targets, tp)) {
