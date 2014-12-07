@@ -106,6 +106,7 @@
 #define	LX_SIOCSIFMTU		0x8922
 #define	LX_SIOCSIFHWADDR	0x8924
 #define	LX_SIOCGIFHWADDR	0x8927
+#define	LX_SIOCGIFINDEX		0x8933
 
 #define	FLUSER(fp)	fp->f_flag | get_udatamodel()
 #define	FLFAKE(fp)	fp->f_flag | FKIOCTL
@@ -857,6 +858,7 @@ ict_sioifreq(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 	case SIOCSIFMETRIC:
 	case SIOCGIFMTU:
 	case SIOCSIFMTU:
+	case SIOCGIFINDEX:
 		error = VOP_IOCTL(fp->f_vnode, cmd, (intptr_t)&req,
 		    FLFAKE(fp), fp->f_cred, &rv, NULL);
 		break;
@@ -1081,6 +1083,7 @@ static ioc_cmd_translator_t ioc_translators[] = {
 	IOC_CMD_TRANSLATOR_FILTER(SIOCSIFMTU,		ict_sioifreq)
 	IOC_CMD_TRANSLATOR_CUSTOM(LX_SIOCGIFHWADDR,	ict_sioifreq)
 	IOC_CMD_TRANSLATOR_CUSTOM(LX_SIOCSIFHWADDR,	ict_sioifreq)
+	IOC_CMD_TRANSLATOR_FILTER(SIOCGIFINDEX,		ict_sioifreq)
 	IOC_CMD_TRANSLATOR_FILTER(SIOCGIFCONF,		ict_siocgifconf)
 
 	IOC_CMD_TRANSLATOR_END
