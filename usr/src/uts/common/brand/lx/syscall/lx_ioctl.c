@@ -644,7 +644,7 @@ ict_tcsbrkp(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 static int
 ict_tiocgpgrp(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 {
-	pid_t	ttysid, mysid;
+	pid_t	ttysid;
 	int	error, rv;
 
 	error = VOP_IOCTL(fp->f_vnode, TIOCGSID, (intptr_t)&ttysid,
