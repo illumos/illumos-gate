@@ -737,11 +737,13 @@ ict_tiocsctty(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 	mysid = p->p_sessp->s_sid;
 	mutex_exit(&p->p_splock);
 
+	/*
+	 * Report success if we already control the tty.
+	 * If no one controls it, TIOCSCTTY will change that later.
+	 */
 	error = VOP_IOCTL(fp->f_vnode, TIOCGSID, (intptr_t)&ttysid,
 	    FLFAKE(fp), fp->f_cred, &rv, NULL);
-	if (error != 0)
-		return (set_errno(error));
-	else if (ttysid == mysid)
+	if (error == 0 && ttysid == mysid)
 		return (0);
 
 	/*
@@ -1061,7 +1063,7 @@ static ioc_cmd_translator_t ioc_translators[] = {
 	IOC_CMD_TRANSLATOR_FILTER(TIOCGPGRP,		ict_tiocgpgrp)
 	IOC_CMD_TRANSLATOR_CUSTOM(LX_TIOCSPTLCK,	ict_sptlock)
 	IOC_CMD_TRANSLATOR_CUSTOM(LX_TIOCGPTN,		ict_gptn)
-	IOC_CMD_TRANSLATOR_CUSTOM(LX_TIOCSCTTY,		ict_tiocsctty)
+	IOC_CMD_TRANSLATOR_FILTER(TIOCSCTTY,		ict_tiocsctty)
 
 	/* socket related */
 	IOC_CMD_TRANSLATOR_PASS(SIOCSPGRP)
