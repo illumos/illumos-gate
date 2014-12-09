@@ -702,6 +702,7 @@ lx_ptm_close(dev_t dev, int flag, int otyp, cred_t *credp)
 	minor_t		min, lastmin;
 	uint_t		index;
 	int		err;
+	int		i;
 
 	index = DEVT_TO_INDEX(dev);
 
@@ -720,19 +721,26 @@ lx_ptm_close(dev_t dev, int flag, int otyp, cred_t *credp)
 	maj = lps.lps_pts_major;
 	min = index;
 	lastmin = 0;
-	do {
+	for (i = 0; i < 5; i++) {
 		/*
 		 * we loop here because we don't want to release this ptm
 		 * node if autopush can't be disabled on the associated
 		 * slave device because then bad things could happen if
 		 * another brand were to get this terminal allocated
-		 * to them.
-		 *
-		 * XXX should we ever give up?
+		 * to them. If we keep failing we eventually drive on so that
+		 * things don't hang.
 		 */
 		err = kstr_autopush(CLR_AUTOPUSH, &maj, &min, &lastmin,
 		    0, NULL);
-	} while (err != 0);
+		if (err == 0)
+			break;
+
+		cmn_err(CE_WARN, "lx zoneid %d: error %d on kstr_autopush",
+		    getzoneid(), err);
+
+		/* wait one second and try again */
+		delay(drv_usectohz(1000000));
+	}
 
 	err = ldi_close(lh, flag, credp);
 
