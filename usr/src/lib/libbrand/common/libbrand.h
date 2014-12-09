@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011, Joyent, Inc. All rights reserved.
  * Copyright 2014 Nexenta Systems, Inc. All rights reserved.
  */
 
@@ -60,6 +61,7 @@ extern int brand_get_shutdown(brand_handle_t, const char *, const char *,
 extern int brand_get_halt(brand_handle_t, const char *, const char *,
     char *, size_t);
 extern int brand_get_initname(brand_handle_t, char *, size_t);
+extern boolean_t brand_restartinit(brand_handle_t);
 extern int brand_get_install(brand_handle_t, const char *, const char *,
     char *, size_t);
 extern int brand_get_installopts(brand_handle_t, char *, size_t);

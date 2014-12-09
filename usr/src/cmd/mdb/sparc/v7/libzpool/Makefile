@@ -32,6 +32,7 @@ MODSRCS = zfs.c list.c
 include ../../../../Makefile.cmd
 include ../../Makefile.sparcv7
 include ../../../Makefile.module
+include ../../../common/modules/zfs/Makefile.zfs
 
 MODSRCS_DIR = ../../../common/modules/zfs
 GENUNIX_DIR = ../../../common/modules/genunix

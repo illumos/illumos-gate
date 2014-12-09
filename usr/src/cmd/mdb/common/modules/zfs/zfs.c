@@ -591,6 +591,7 @@ zap_leaf(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	char buf[16*1024];
 	int verbose = B_FALSE;
 	int four = B_FALSE;
+	dmu_buf_t l_dbuf;
 	zap_leaf_t l;
 	zap_leaf_phys_t *zlp = (void *)buf;
 	int i;
@@ -601,7 +602,8 @@ zap_leaf(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    NULL) != argc)
 		return (DCMD_USAGE);
 
-	l.l_phys = zlp;
+	l_dbuf.db_data = zlp;
+	l.l_dbuf = &l_dbuf;
 	l.l_bs = 14; /* assume 16k blocks */
 	if (four)
 		l.l_bs = 12;

@@ -1358,6 +1358,12 @@ mptsas_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		goto fail;
 	}
 
+	mpt->m_targets = refhash_create(MPTSAS_TARGET_BUCKET_COUNT,
+	    mptsas_target_addr_hash, mptsas_target_addr_cmp,
+	    mptsas_target_free, sizeof (mptsas_target_t),
+	    offsetof(mptsas_target_t, m_link),
+	    offsetof(mptsas_target_t, m_addr), KM_SLEEP);
+
 	/*
 	 * Fill in the phy_info structure and get the base WWID
 	 */
@@ -12857,12 +12863,6 @@ mptsas_init_chip(mptsas_t *mpt, int first_time)
 		goto fail;
 	}
 
-	mpt->m_targets = refhash_create(MPTSAS_TARGET_BUCKET_COUNT,
-	    mptsas_target_addr_hash, mptsas_target_addr_cmp,
-	    mptsas_target_free, sizeof (mptsas_target_t),
-	    offsetof(mptsas_target_t, m_link),
-	    offsetof(mptsas_target_t, m_addr), KM_SLEEP);
-
 	if (mptsas_alloc_active_slots(mpt, KM_SLEEP)) {
 		goto fail;
 	}
@@ -14467,14 +14467,14 @@ mptsas_update_driver_data(struct mptsas *mpt)
 	 * 3. call sas_device_page/expander_page to update hash table
 	 */
 	mptsas_update_phymask(mpt);
+
 	/*
-	 * Invalid the existing entries
-	 *
-	 * XXX - It seems like we should just delete everything here.  We are
-	 * holding the lock and are about to refresh all the targets in both
-	 * hashes anyway.  Given the path we're in, what outstanding async
-	 * event could possibly be trying to reference one of these things
-	 * without taking the lock, and how would that be useful anyway?
+	 * Remove all the devhdls for existing entries but leave their
+	 * addresses alone.  In update_hashtab() below, we'll find all
+	 * targets that are still present and reassociate them with
+	 * their potentially new devhdls.  Leaving the targets around in
+	 * this fashion allows them to be used on the tx waitq even
+	 * while IOC reset is occurring.
 	 */
 	for (tp = refhash_first(mpt->m_targets); tp != NULL;
 	    tp = refhash_next(mpt->m_targets, tp)) {

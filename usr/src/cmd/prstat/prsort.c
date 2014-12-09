@@ -22,9 +22,8 @@
 /*
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 Joyent, Inc.  All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <libintl.h>
 #include <stdlib.h>
@@ -38,10 +37,11 @@
 void
 list_alloc(list_t *list, int size)
 {
-	if (size > 0) {
-		list->l_size = size;
+	list->l_size = size;
+	if (size > 0)
 		list->l_ptrs = Zalloc(sizeof (void *) * (size + 1));
-	}
+	else
+		list->l_ptrs = NULL;
 }
 
 void
@@ -208,8 +208,11 @@ list_preinsert(list_t *list, void *ptr)
 void
 list_sort(list_t *list)
 {
-	(void) memset(list->l_ptrs, 0, sizeof (void *) * list->l_size);
 	list->l_used = 0;
+	if (list->l_size == 0)
+		return;
+
+	(void) memset(list->l_ptrs, 0, sizeof (void *) * list->l_size);
 
 	if (list->l_type == LT_LWPS) {
 		lwp_info_t *lwp = list->l_head;

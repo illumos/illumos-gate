@@ -337,7 +337,8 @@ static cmd_t	cmds[] = {
 	{ "delete-phys",	do_delete_phys,
 	    "    delete-phys      <link>"				},
 	{ "show-phys",		do_show_phys,
-	    "    show-phys        [-pP] [-o <field>,..] [-H] [<link>]\n"},
+	    "    show-phys        [-m | -H | -P] [[-p] [-o <field>[,...]] "
+	    "[<link>]\n"						},
 	{ "init-phys",		do_init_phys,		NULL		},
 	{ "show-linkmap",	do_show_linkmap,	NULL		},
 	{ "create-vnic",	do_create_vnic,
