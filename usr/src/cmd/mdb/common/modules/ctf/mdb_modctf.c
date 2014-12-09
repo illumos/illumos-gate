@@ -73,7 +73,8 @@ mdb_ctf_idhash_walk_step(mdb_walk_state_t *wsp)
 
 static const mdb_walker_t walkers[] = {
 	{ "ctf_idhash", "walk entries in a ctf idhash",
-		mdb_ctf_idhash_walk_init, mdb_ctf_idhash_walk_step }
+		mdb_ctf_idhash_walk_init, mdb_ctf_idhash_walk_step },
+	{ NULL }
 };
 
 static const mdb_modinfo_t modinfo = { MDB_API_VERSION, NULL, walkers };
