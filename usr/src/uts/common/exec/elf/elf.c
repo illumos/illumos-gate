@@ -482,12 +482,12 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 		 *	AT_BASE
 		 *	AT_FLAGS
 		 *	AT_PAGESZ
-		 *	AT_RANDOM
-		 *	AT_SUN_LDSECURE
+		 *	AT_RANDOM	(added in stk_copyout)
+		 *	AT_SUN_AUXFLAGS
 		 *	AT_SUN_HWCAP
 		 *	AT_SUN_HWCAP2
-		 *	AT_SUN_PLATFORM
-		 *	AT_SUN_EXECNAME
+		 *	AT_SUN_PLATFORM	(added in stk_copyout)
+		 *	AT_SUN_EXECNAME	(added in stk_copyout)
 		 *	AT_NULL
 		 *
 		 * total == 10
@@ -575,6 +575,8 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 	aux = bigwad->elfargs;
 	/*
 	 * Move args to the user's stack.
+	 * This can fill in the AT_SUN_PLATFORM, AT_SUN_EXECNAME and AT_RANDOM
+	 * aux entries.
 	 */
 	if ((error = exec_args(uap, args, idatap, (void **)&aux)) != 0) {
 		if (error == -1) {
@@ -796,8 +798,8 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 	if (hasauxv) {
 		int auxf = AF_SUN_HWCAPVERIFY;
 		/*
-		 * Note: AT_SUN_PLATFORM and AT_RANDOM were filled in via
-		 * exec_args()
+		 * Note: AT_SUN_PLATFORM, AT_SUN_EXECNAME and AT_RANDOM were
+		 * filled in via exec_args()
 		 */
 		ADDAUX(aux, AT_BASE, voffset)
 		ADDAUX(aux, AT_FLAGS, at_flags)
@@ -872,7 +874,20 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 
 		ADDAUX(aux, AT_NULL, 0)
 		postfixsize = (char *)aux - (char *)bigwad->elfargs;
-		ASSERT(postfixsize == args->auxsize);
+
+		/*
+		 * We make assumptions above when we determine how many aux
+		 * vector entries we will be adding. However, if we have an
+		 * invalid elf file, it is possible that mapelfexec might
+		 * behave differently (but not return an error), in which case
+		 * the number of aux entries we actually add will be different.
+		 * We detect that now and error out.
+		 */
+		if (postfixsize != args->auxsize) {
+			DTRACE_PROBE2(elfexec_badaux, int, postfixsize,
+			    int, args->auxsize);
+			goto bad;
+		}
 		ASSERT(postfixsize <= __KERN_NAUXV_IMPL * sizeof (aux_entry_t));
 	}
 

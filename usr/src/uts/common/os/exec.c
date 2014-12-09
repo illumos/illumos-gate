@@ -26,7 +26,7 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 /*
- * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
+ * Copyright 2014, Joyent, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -1270,6 +1270,33 @@ execmap(struct vnode *vp, caddr_t addr, size_t len, size_t zfodlen,
 			/*
 			 * Before we go to zero the remaining space on the last
 			 * page, make sure we have write permission.
+			 *
+			 * Normal illumos binaries don't even hit the case
+			 * where we have to change permission on the last page
+			 * since their protection is typically either
+			 *    PROT_USER | PROT_WRITE | PROT_READ
+			 * or
+			 *    PROT_ZFOD (same as PROT_ALL).
+			 *
+			 * We need to be careful how we zero-fill the last page
+			 * if the segment protection does not include
+			 * PROT_WRITE. We don't want to use as_setprot() to
+			 * temporarily change the last page's prot to enable
+			 * PROT_WRITE, since that can cause the VM segment code
+			 * to call seg*_vpage(), which will allocate a page
+			 * struct for each page in the segment. If we have a
+			 * very large segment, this will either use a large
+			 * amount of kernel memory, or possibly never finish
+			 * because page_resv() will never obtain enough free
+			 * pages.
+			 *
+			 * Instead, we temporarily change the protection on the
+			 * entire segment so that we can zero-fill the last
+			 * page, then change the protection back.
+			 *
+			 * Because we are working with the entire segement, the
+			 * VM code does not need to allocate per-page structs
+			 * to keep track of permissions.
 			 */
 
 			AS_LOCK_ENTER(as, &as->a_lock, RW_READER);
@@ -1280,23 +1307,32 @@ execmap(struct vnode *vp, caddr_t addr, size_t len, size_t zfodlen,
 			AS_LOCK_EXIT(as, &as->a_lock);
 
 			if (seg != NULL && (zprot & PROT_WRITE) == 0) {
-				(void) as_setprot(as, (caddr_t)end,
-				    zfoddiff - 1, zprot | PROT_WRITE);
+				AS_LOCK_ENTER(as, &as->a_lock, RW_WRITER);
+				(void) SEGOP_SETPROT(seg, seg->s_base,
+				    seg->s_size, zprot | PROT_WRITE);
+				AS_LOCK_EXIT(as, &as->a_lock);
 			}
 
 			if (on_fault(&ljb)) {
 				no_fault();
-				if (seg != NULL && (zprot & PROT_WRITE) == 0)
-					(void) as_setprot(as, (caddr_t)end,
-					    zfoddiff - 1, zprot);
+				if (seg != NULL && (zprot & PROT_WRITE) == 0) {
+					AS_LOCK_ENTER(as, &as->a_lock,
+					    RW_WRITER);
+					(void) SEGOP_SETPROT(seg, seg->s_base,
+					    seg->s_size, zprot);
+					AS_LOCK_EXIT(as, &as->a_lock);
+				}
 				error = EFAULT;
 				goto bad;
 			}
 			uzero((void *)end, zfoddiff);
 			no_fault();
-			if (seg != NULL && (zprot & PROT_WRITE) == 0)
-				(void) as_setprot(as, (caddr_t)end,
-				    zfoddiff - 1, zprot);
+			if (seg != NULL && (zprot & PROT_WRITE) == 0) {
+				AS_LOCK_ENTER(as, &as->a_lock, RW_WRITER);
+				(void) SEGOP_SETPROT(seg, seg->s_base,
+				    seg->s_size, zprot);
+				AS_LOCK_EXIT(as, &as->a_lock);
+			}
 		}
 		if (zfodlen > zfoddiff) {
 			struct segvn_crargs crargs =
