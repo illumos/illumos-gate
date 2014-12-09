@@ -110,6 +110,7 @@ extern "C" {
 #define	LX_IPPROTO_IGMP		2
 #define	LX_IPPROTO_TCP		6
 #define	LX_IPPROTO_UDP		17
+#define	LX_IPPROTO_IPV6		41
 #define	LX_IPPROTO_RAW		255
 
 /*
@@ -158,6 +159,52 @@ extern "C" {
 #define	LX_MCAST_MSFILTER	48
 #define	LX_IP_MULTICAST_ALL	49
 #define	LX_IP_UNICAST_IF	50
+
+
+/*
+ * Options for use with [gs]etsockopt at the IP level.
+ * IPPROTO_IPV6
+ */
+
+#define	LX_IPV6_ADDRFORM	1
+#define	LX_IPV6_2292PKTINFO	2
+#define	LX_IPV6_2292HOPOPTS	3
+#define	LX_IPV6_2292DSTOPTS	4
+#define	LX_IPV6_2292RTHDR	5
+#define	LX_IPV6_2292PKTOPTIONS	6
+#define	LX_IPV6_CHECKSUM	7
+#define	LX_IPV6_2292HOPLIMIT	8
+#define	LX_IPV6_NEXTHOP		9
+#define	LX_IPV6_AUTHHDR		10
+#define	LX_IPV6_UNICAST_HOPS	16
+#define	LX_IPV6_MULTICAST_IF	17
+#define	LX_IPV6_MULTICAST_HOPS	18
+#define	LX_IPV6_MULTICAST_LOOP	19
+#define	LX_IPV6_JOIN_GROUP	20
+#define	LX_IPV6_LEAVE_GROUP	21
+#define	LX_IPV6_ROUTER_ALERT	22
+#define	LX_IPV6_MTU_DISCOVER	23
+#define	LX_IPV6_MTU		24
+#define	LX_IPV6_RECVERR		25
+#define	LX_IPV6_V6ONLY		26
+#define	LX_IPV6_JOIN_ANYCAST	27
+#define	LX_IPV6_LEAVE_ANYCAST	28
+#define	LX_IPV6_IPSEC_POLICY	34
+#define	LX_IPV6_XFRM_POLICY	35
+
+#define	LX_IPV6_RECVPKTINFO	49
+#define	LX_IPV6_PKTINFO		50
+#define	LX_IPV6_RECVHOPLIMIT	51
+#define	LX_IPV6_HOPLIMIT	52
+#define	LX_IPV6_RECVHOPOPTS	53
+#define	LX_IPV6_HOPOPTS		54
+#define	LX_IPV6_RTHDRDSTOPTS	55
+#define	LX_IPV6_RECVRTHDR	56
+#define	LX_IPV6_RTHDR		57
+#define	LX_IPV6_RECVDSTOPTS	58
+#define	LX_IPV6_DSTOPTS		59
+#define	LX_IPV6_RECVTCLASS	66
+#define	LX_IPV6_TCLASS		67
 
 /*
  * Options for use with [gs]etsockopt at the TCP level.
