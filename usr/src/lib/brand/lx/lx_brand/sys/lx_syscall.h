@@ -321,6 +321,8 @@ extern long lx_epoll_pwait(int, void *, int, int, const sigset_t *);
 extern long lx_epoll_create(int);
 extern long lx_epoll_create1(int);
 extern long lx_epoll_wait(int, void *, int, int);
+extern long lx_eventfd(unsigned int);
+extern long lx_eventfd2(unsigned int, int);
 extern long lx_fchdir(int);
 extern long lx_fchmod(int, mode_t);
 extern long lx_getgid(void);

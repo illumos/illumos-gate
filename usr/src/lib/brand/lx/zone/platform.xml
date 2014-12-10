@@ -68,6 +68,7 @@
 	<device match="arp" />
 	<device match="dtrace/*" />
 	<device match="dtrace/provider/*" />
+	<device match="eventfd" />
 	<device match="inotify" />
 	<device match="ipnet" />
 	<device match="kstat" />
