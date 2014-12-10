@@ -1945,6 +1945,9 @@ exec_args(execa_t *uap, uarg_t *args, intpdata_t *intp, void **auxvpp)
 		usrstack = (char *)USRSTACK32;
 	}
 
+	if (args->maxstack != 0 && (uintptr_t)usrstack > args->maxstack)
+		usrstack = (char *)args->maxstack;
+
 	ASSERT(P2PHASE((uintptr_t)usrstack, args->stk_align) == 0);
 
 #if defined(__sparc)

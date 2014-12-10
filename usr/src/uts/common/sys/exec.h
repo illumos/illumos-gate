@@ -111,6 +111,7 @@ typedef struct uarg {
 	char	*auxp_brand; /* address of first brand auxv on user stack */
 	cred_t	*pfcred;
 	boolean_t scrubenv;
+	uintptr_t maxstack;
 } uarg_t;
 
 /*
