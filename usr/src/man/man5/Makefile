@@ -45,6 +45,7 @@ MANFILES=	Intro.5			\
 		epoll.5			\
 		eqn.5			\
 		eqnchar.5		\
+		eventfd.5		\
 		extendedFILE.5		\
 		filesystem.5		\
 		fnmatch.5		\

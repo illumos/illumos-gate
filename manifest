@@ -3556,6 +3556,7 @@ f usr/include/sys/esunddi.h 0644 root bin
 f usr/include/sys/ethernet.h 0644 root bin
 f usr/include/sys/euc.h 0644 root bin
 f usr/include/sys/eucioctl.h 0644 root bin
+f usr/include/sys/eventfd.h 0644 root bin
 f usr/include/sys/exacct.h 0644 root bin
 f usr/include/sys/exacct_catalog.h 0644 root bin
 f usr/include/sys/exacct_impl.h 0644 root bin
@@ -4523,6 +4524,7 @@ d usr/kernel/drv 0755 root sys
 d usr/kernel/drv/amd64 0755 root sys
 f usr/kernel/drv/amd64/bpf 0755 root sys
 f usr/kernel/drv/amd64/dump 0755 root sys
+f usr/kernel/drv/amd64/eventfd 0755 root sys
 f usr/kernel/drv/amd64/fssnap 0755 root sys
 f usr/kernel/drv/amd64/ipf 0755 root sys
 f usr/kernel/drv/amd64/ipmi 0755 root sys
@@ -4544,6 +4546,7 @@ f usr/kernel/drv/amd64/sppptun 0755 root sys
 f usr/kernel/drv/amd64/zcons 0755 root sys
 f usr/kernel/drv/bpf.conf 0644 root sys
 f usr/kernel/drv/dump.conf 0644 root sys
+f usr/kernel/drv/eventfd.conf 0644 root sys
 f usr/kernel/drv/fssnap.conf 0644 root sys
 f usr/kernel/drv/inotify.conf 0644 root sys
 f usr/kernel/drv/ipf.conf 0644 root sys
@@ -12782,6 +12785,9 @@ s usr/share/man/man3c/etext.3c=end.3c
 s usr/share/man/man3c/euccol.3c=euclen.3c
 f usr/share/man/man3c/euclen.3c 0444 root bin
 s usr/share/man/man3c/eucscol.3c=euclen.3c
+f usr/share/man/man3c/eventfd.3c 0444 root bin
+s usr/share/man/man3c/eventfd_read.3c=eventfd.3c
+s usr/share/man/man3c/eventfd_write.3c=eventfd.3c
 f usr/share/man/man3c/exit.3c 0444 root bin
 s usr/share/man/man3c/extended_to_decimal.3c=floating_to_decimal.3c
 f usr/share/man/man3c/fattach.3c 0444 root bin
@@ -18164,6 +18170,7 @@ f usr/share/man/man5/environ.5 0444 root bin
 f usr/share/man/man5/epoll.5 0444 root bin
 f usr/share/man/man5/eqn.5 0444 root bin
 f usr/share/man/man5/eqnchar.5 0444 root bin
+f usr/share/man/man5/eventfd.5 0444 root bin
 f usr/share/man/man5/extendedFILE.5 0444 root bin
 f usr/share/man/man5/filesystem.5 0444 root bin
 f usr/share/man/man5/fnmatch.5 0444 root bin

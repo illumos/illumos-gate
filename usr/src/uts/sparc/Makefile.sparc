@@ -238,6 +238,7 @@ DRV_KMODS	+= bridge trill
 DRV_KMODS	+= bpf
 DRV_KMODS	+= dca
 DRV_KMODS	+= inotify
+DRV_KMODS	+= eventfd
 
 #
 #       Hardware Drivers in common space

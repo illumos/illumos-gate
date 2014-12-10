@@ -2815,6 +2815,9 @@ $endif
 	epoll_pwait;
 	_errfp;
 	_errxfp;
+	eventfd;
+	eventfd_read;
+	eventfd_write;
 	exportfs;
 	_F_cplx_div;
 	_F_cplx_div_ix;

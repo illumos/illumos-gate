@@ -858,6 +858,7 @@ PORTSYS=			\
 	execl.o			\
 	execle.o		\
 	execv.o			\
+	eventfd.o		\
 	fcntl.o			\
 	getpagesizes.o		\
 	getpeerucred.o		\

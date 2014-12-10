@@ -221,6 +221,7 @@ CHKHDRS=			\
 	ethernet.h		\
 	euc.h			\
 	eucioctl.h		\
+	eventfd.h		\
 	exacct.h		\
 	exacct_catalog.h	\
 	exacct_impl.h		\

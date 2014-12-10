@@ -242,6 +242,7 @@ DRV_KMODS	+= dr_sas
 DRV_KMODS	+= dump
 DRV_KMODS	+= ecpp
 DRV_KMODS	+= emlxs
+DRV_KMODS	+= eventfd
 DRV_KMODS	+= fd
 DRV_KMODS	+= fdc
 DRV_KMODS	+= fm

@@ -113,6 +113,7 @@ MANFILES= 	__fbufsize.3c					\
 	 	epoll_wait.3c					\
 	 	err.3c						\
 	 	euclen.3c					\
+		eventfd.3c					\
 	 	exit.3c						\
 	 	fattach.3c					\
 	 	fclose.3c					\

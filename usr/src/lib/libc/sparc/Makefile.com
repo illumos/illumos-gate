@@ -926,6 +926,7 @@ PORTSYS=			\
 	chown.o			\
 	corectl.o		\
 	epoll.o			\
+	eventfd.o		\
 	exacctsys.o		\
 	execl.o			\
 	execle.o		\

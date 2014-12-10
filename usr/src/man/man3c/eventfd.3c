@@ -1,0 +1,161 @@
+'\" te
+.\"  Copyright (c) 2014, Joyent, Inc. All Rights Reserved.
+.\"  This file and its contents are supplied under the terms of the
+.\"  Common Development and Distribution License ("CDDL"), version 1.0.
+.\"  You may only use this file in accordance with the terms of version
+.\"  1.0 of the CDDL.
+.\" 
+.\"  A full copy of the text of the CDDL should have accompanied this
+.\"  source.  A copy of the CDDL is also available via the Internet at
+.\"  http://www.illumos.org/license/CDDL.
+.TH EVENTFD 3C "Dec 3, 2014"
+.SH NAME
+eventfd \- create a file descriptor for event notification
+.SH SYNOPSIS
+
+.LP
+.nf
+#include <sys/eventfd.h>
+
+\fBint\fR \fBeventfd\fR(\fBunsigned int\fR \fIinitval\fR, \fBint\fR \fIflags\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBeventfd()\fR function creates an \fBeventfd\fR(5) instance that
+has an associated 64-bit unsigned counter. It returns a file descriptor
+that can be operated upon via \fBread\fR(2), \fBwrite\fR(2) and the facilities
+that notify of file descriptor activity (e.g., \fBpoll\fR(2),
+\fBport_get\fR(3C), \fBepoll_wait\fR(3C)). To dispose of the instance,
+\fBclose\fR(2) should be called on the file descriptor.
+
+The \fIinitval\fR argument specifies the
+initial value of the 64-bit counter associated with the instance.  (Note
+that this limits the initial value to be a 32-bit quantity despite the
+fact that the underlying counter is 64-bit.)
+
+The \fIflags\fR argument specifies additional parameters for the
+instance, and can have any of the following values:
+
+.sp
+.ne 2
+.na
+\fBEFD_CLOEXEC\fR
+.ad
+.RS 12n
+Instance will be closed upon an
+\fBexec\fR(2); see \fBopen\fR(2)'s description of \fBO_CLOEXEC\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fBEFD_NONBLOCK\fR
+.ad
+.RS 12n
+Instance will be set to be non-blocking.  A \fBread\fR(2) on an
+\fBeventfd\fR instance that has been initialized with
+\fBEFD_NONBLOCK\fR will return \fBEAGAIN\fR in lieu of blocking if the
+count associated with the instance is zero.
+.RE
+
+.sp
+.ne 2
+.na
+\fBEFD_SEMAPHORE\fR
+.ad
+.RS 12n
+Provide counting semaphore semantics whereby a \fBread\fR(2) will 
+atomically decrement rather than atomically clear the count when it
+becomes non-zero. See below for details on \fBread\fR(2) semantics.
+.RE
+
+.sp
+The following operations can be performed upon an \fBeventfd\fR instance:
+
+.sp
+.ne 2
+.na
+\fBread\fR(2)
+.ad
+.RS 12n
+Atomically reads and modifies the value of the 64-bit counter associated
+with the instance.  The precise semantics
+of \fBread\fR(2) depend on the disposition of \fBEFD_SEMAPHORE\fR with
+respect to the instance: if \fBEFD_SEMAPHORE\fR was set when the instance
+was created, \fBread\fR(2) will \fIatomically decrement\fR the counter if
+(and when)
+it is non-zero, copying the value 1 to the eight byte buffer passed to
+the system call; if \fBEFD_SEMAPHORE\fR was not set, \fBread\fR(2) will
+\fIatomically clear\fR the counter if (and when) it is non-zero, copying
+the former value of the counter to the eight byte buffer passed to the
+system call.  In either case, \fBread\fR(2) will block if the counter is
+zero (or return \fBEAGAIN\fR if the instance was created with
+\fBEFD_NONBLOCK\fR). If the buffer specified to \fBread\fR(2) is less than
+eight bytes in length, \fBEINVAL\fR will be returned.
+
+.RE
+
+.sp
+.ne 2
+.na
+\fBwrite\fR(2)
+.ad
+.RS 12n
+Atomically adds the 64-bit value pointed to by the buffer to the 64-bit
+counter associated with the instance.  If the resulting value would overflow,
+the \fBwrite\fR(2) will block until the value would not overflow
+(or return \fBEAGAIN\fR if the instance was created with
+\fBEFD_NONBLOCK\fR).  If the buffer specified to \fBwrite\fR(2) is less than
+eight bytes in length, \fBEINVAL\fR will be returned.
+
+.RE
+
+.sp
+.ne 2
+.na
+\fBpoll\fR(2), \fBport_get\fR(3C), \fBepoll_wait\fR(3C)
+.ad
+.RS 12n
+Provide notification when the 64-bit counter associated
+with the instance is ready for reading or writing, as specified.
+If the 64-bit value associated with the instance is non-zero, \fBPOLLIN\fR
+and \fBPOLLRDNORM\fR will be set; if the value 1 can be added the value
+without blocking, \fBPOLLOUT\fR and \fBPOLLWRNORM\fR will be set.
+.RE
+
+.SH RETURN VALUES
+.sp
+.LP
+Upon succesful completion, a file descriptor associated with the instance
+is returned. Otherwise, -1 is returned and errno
+is set to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBeventfd()\fR function will fail if:
+.sp
+.ne 2
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+The \fIflags\fR are invalid.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBEMFILE\fR\fR
+.ad
+.RS 10n
+There are currently {\fBOPEN_MAX\fR} file descriptors open in the calling
+process.
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBpoll\fR(2), \fBport_get\fR(3C), \fBepoll_wait\fR(3C), \fBeventfd\fR(5)
+
