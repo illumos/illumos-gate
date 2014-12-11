@@ -69,6 +69,17 @@ const struct in6_addr in6addr_loopback = IN6ADDR_LOOPBACK_INIT;
 #define	AI_MASK		(AI_PASSIVE | AI_CANONNAME | AI_NUMERICHOST \
 	| AI_ADDRCONFIG | AI_NUMERICSERV | AI_V4MAPPED | AI_ALL)
 #define	ANY		0
+
+/*
+ * This is a private, undocumented, flag that getaddrinfo() uses for
+ * getipnodebyname(). In the case of AI_ADDRCONFIG && AI_V4MAPPED, if there are
+ * no IPv6 addresses, getaddrinfo() should return non-IPv4 mapped addresses. On
+ * the flip side, getipnodebyname() is defined by RFC 2553 to explicitly do so.
+ * Therefore this private flag indicates to getaddrinfo that we shouldn't do
+ * this.
+ */
+#define	AI_ADDRINFO	0x8000
+
 /* function prototypes for used by getaddrinfo() routine */
 static int get_addr(int family, const char *hostname, struct addrinfo *aip,
 	struct addrinfo *cur, ushort_t port, int version);
@@ -602,7 +613,7 @@ get_addr(int family, const char *hostname, struct addrinfo *aip, struct
 	/* if hostname argument is literal, name service doesn't get called */
 	if (family == PF_UNSPEC) {
 		hp = getipnodebyname(_hostname, AF_INET6, AI_ALL |
-		    aip->ai_flags | AI_V4MAPPED, &errnum);
+		    aip->ai_flags | AI_V4MAPPED | AI_ADDRINFO, &errnum);
 	} else {
 		hp = getipnodebyname(_hostname, family, aip->ai_flags, &errnum);
 	}

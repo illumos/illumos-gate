@@ -73,6 +73,8 @@
  * IPNODE_LOOKUPIPNODES	getipnodebyname() needs to lookup the name in ipnodes.
  * IPNODE_LOOKUPHOSTS	getipnodebyname() needs to lookup the name in hosts.
  * IPNODE_ISLITERAL	The name supplied is a literal address string.
+ * IPNODE_UNMAP		The user doesn't want v4 mapped addresses if no IPv6
+ * 			interfaces are plumbed on the system.
  */
 #define	IPNODE_WANTIPV6		0x00000001u
 #define	IPNODE_WANTIPV4		0x00000002u
@@ -80,7 +82,14 @@
 #define	IPNODE_LOOKUPIPNODES	0x00000008u
 #define	IPNODE_LOOKUPHOSTS	0x00000010u
 #define	IPNODE_LITERAL		0x00000020u
+#define	IPNODE_UNMAP		0x00000040u
 #define	IPNODE_IPV4		(IPNODE_WANTIPV4 | IPNODE_IPV4IFNOIPV6)
+
+/*
+ * The private flag between libsocket and libnsl. See
+ * lib/libsocket/inet/getaddrinfo.c for more information.
+ */
+#define	AI_ADDRINFO	0x8000
 
 /*
  * The default set of bits corresponding to a getipnodebyname() flags
@@ -161,6 +170,10 @@ getipnodebyname_processflags(const char *name, int af, int flags)
 				ipnode_bits &= ~IPNODE_IPV4;
 			} else if (flags & AI_ALL) {
 				ipnode_bits &= ~IPNODE_IPV4IFNOIPV6;
+			}
+			if ((flags & AI_ADDRCONFIG) && !ipv6configured &&
+			    (flags & AI_ADDRINFO)) {
+				ipnode_bits |= IPNODE_UNMAP;
 			}
 		} else {
 			ipnode_bits &= ~IPNODE_IPV4;
@@ -343,7 +356,18 @@ getipnodebyname(const char *name, int af, int flags, int *error_num)
 			else if (!(ipnode_bits & IPNODE_WANTIPV6))
 				hp = __filter_addresses(AF_INET6, buf6->result);
 
-			if (hp == NULL)
+			/*
+			 * We've been asked to unmap v4 addresses. This
+			 * situation implies IPNODE_WANTIPV4 and
+			 * !IPNODE_WANTIPV6.
+			 */
+			if (hp != NULL && (ipnode_bits & IPNODE_UNMAP)) {
+				/*
+				 * Just set hp to a new value, cleanup: will
+				 * free the old one
+				 */
+				hp = __mappedtov4(hp, error_num);
+			} else if (hp == NULL)
 				*error_num = NO_ADDRESS;
 		}
 

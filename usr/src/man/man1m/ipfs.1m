@@ -2,47 +2,47 @@
 .\" To view license terms, attribution, and copyright for IP Filter, the default path is /usr/lib/ipf/IPFILTER.LICENCE. If the Solaris operating environment has been installed anywhere other than the default, modify the given path to access the file at the installed
 .\" location.
 .\" Portions Copyright (c) 2008, Sun Microsystems Inc. All Rights Reserved.
-.TH IPFS 1M "Apr 3, 2008"
+.\" Portions Copyright (c) 2013, Joyent, Inc. All Rights Reserved.
+.TH IPFS 1M "Oct 30, 2013"
 .SH NAME
 ipfs \- saves and restores information for NAT and state tables
 .SH SYNOPSIS
 .LP
 .nf
-\fBipfs\fR [\fB-nv\fR] \fB-l\fR
+\fBipfs\fR [\fB-G\fR | \fB-z\fR \fIzonename\fR] [\fB-nv\fR] \fB-l\fR
 .fi
 
 .LP
 .nf
-\fBipfs\fR [\fB-nv\fR] \fB-u\fR
+\fBipfs\fR [\fB-G\fR | \fB-z\fR \fIzonename\fR] [\fB-nv\fR] \fB-u\fR
 .fi
 
 .LP
 .nf
-\fBipfs\fR [\fB-nv\fR] [\fB-d\fR \fIdirname\fR] \fB-R\fR
+\fBipfs\fR [\fB-G\fR | \fB-z\fR \fIzonename\fR] [\fB-nv\fR] [\fB-d\fR \fIdirname\fR] \fB-R\fR
 .fi
 
 .LP
 .nf
-\fBipfs\fR [\fB-nv\fR] [\fB-d\fR \fIdirname\fR] \fB-W\fR
+\fBipfs\fR [\fB-G\fR | \fB-z\fR \fIzonename\fR] [\fB-nv\fR] [\fB-d\fR \fIdirname\fR] \fB-W\fR
 .fi
 
 .LP
 .nf
-\fBipfs\fR [\fB-nNSv\fR] [\fB-f\fR \fIfilename\fR] \fB-r\fR
+\fBipfs\fR [\fB-G\fR | \fB-z\fR \fIzonename\fR] [\fB-nNSv\fR] [\fB-f\fR \fIfilename\fR] \fB-r\fR
 .fi
 
 .LP
 .nf
-\fBipfs\fR [\fB-nNSv\fR] [\fB-f\fR \fIfilename\fR] \fB-w\fR
+\fBipfs\fR [\fB-G\fR | \fB-z\fR \fIzonename\fR] [\fB-nNSv\fR] [\fB-f\fR \fIfilename\fR] \fB-w\fR
 .fi
 
 .LP
 .nf
-\fBipfs\fR [\fB-nNSv\fR] \fB-f\fR \fIfilename\fR \fB-i\fR \fI<if1>\fR,\fI<if2>\fR
+\fBipfs\fR [\fB-G\fR | \fB-z\fR \fIzonename\fR] [\fB-nNSv\fR] \fB-f\fR \fIfilename\fR \fB-i\fR \fI<if1>\fR,\fI<if2>\fR
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBipfs\fR utility enables the saving of state information across reboots.
 Specifically, the utility allows state information created for NAT entries and
@@ -50,7 +50,6 @@ rules using "keep state" to be locked (modification prevented) and then saved
 to disk. Then, after a reboot, that information is restored. The result of this
 state-saving is that connections are not interrupted.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -164,6 +163,30 @@ can be changed with the \fB-d\fR option. The state tables are locked at the
 beginning of this operation and unlocked once complete.
 .RE
 
+.sp
+.ne 2
+.na
+\fB\fB-z\fR \fIzonename\fR\fR
+.ad
+.RS 6n
+Operate on the in-zone state information for the specified zone. If neither
+this option nor \fB-G\fR is specified, the current zone is used. This command
+is only available in the Global Zone. See \fBZONES\fR in \fBipf\fR(1m) for
+more information.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-G\fR \fIzonename\fR\fR
+.ad
+.RS 6n
+Operate on the global zone controlled state information for the specified
+zone. If neither this option nor \fB-z\fR is specified, the current zone is
+used. This command is only available in the Global Zone. See \fBZONES\fR in
+\fBipf\fR(1m) for more information.
+.RE
+
 .SH FILES
 .RS +4
 .TP
@@ -196,7 +219,6 @@ beginning of this operation and unlocked once complete.
 \fB/dev/ipnat\fR
 .RE
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -212,11 +234,10 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
-\fBipf\fR(1M), \fBipmon\fR(1M), \fBipnat\fR(1M), \fBattributes\fR(5)
+\fBipf\fR(1M), \fBipmon\fR(1M), \fBipnat\fR(1M), \fBattributes\fR(5),
+\fBzones(5)\fR
 .SH DIAGNOSTICS
-.sp
 .LP
 Arguably, the \fB-W\fR and \fB-R\fR operations should set the locking and,
 rather than undo it, restore it to what it was previously.

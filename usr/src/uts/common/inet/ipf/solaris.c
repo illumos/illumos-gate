@@ -5,6 +5,50 @@
  *
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
+ */
+
+/*
+ * ipfilter kernel module mutexes and locking:
+ *
+ * Enabling ipfilter creates a per-netstack ipf_stack_t object that is
+ * stored in the ipf_stacks list, which is protected by ipf_stack_lock.
+ * ipf_stack_t objects are accessed in three contexts:
+ *
+ * 1) administering that filter (eg: ioctls handled with iplioctl())
+ * 2) reading log data (eg: iplread() / iplwrite())
+ * 3) filtering packets (eg: ipf_hook4_* and ipf_hook6_* pfhooks
+ *    functions)
+ *
+ * Each ipf_stack_t has a RW lock, ifs_ipf_global, protecting access to the
+ * whole structure. The structure also has locks protecting the various
+ * data structures used for filtering. The following guidelines should be
+ * followed for ipf_stack_t locks:
+ *
+ * - ipf_stack_lock must be held when accessing the ipf_stacks list
+ * - ipf_stack_lock should be held before acquiring ifs_ipf_global for
+ *   a stack (the exception to this is ipf_stack_destroy(), which removes
+ *   the ipf_stack_t from the list, then drops ipf_stack_lock before
+ *   acquiring ifs_ipf_global)
+ * - ifs_ipf_global must be held when accessing an ipf_stack_t in that list:
+ *   - The write lock is held only during stack creation / destruction
+ *   - The read lock should be held for all other accesses
+ * - To alter the filtering data in the administrative context, one must:
+ *   - acquire the read lock for ifs_ipf_global
+ *   - then acquire the write lock for the data in question
+ * - In the filtering path, the read lock needs to be held for each type of
+ *   filtering data used
+ * - ifs_ipf_global does not need to be held in the filtering path:
+ *   - The filtering hooks don't need to modify the stack itself
+ *   - The ipf_stack_t will not be destroyed until the hooks are unregistered.
+ *     This requires a write lock on the hook, ensuring that no active hooks
+ *     (eg: the filtering path) are running, and that the hooks won't be run
+ *     afterward.
+ *
+ * Note that there is a deadlock possible when calling net_hook_register()
+ * or net_hook_unregister() with ifs_ipf_global held: see the comments in
+ * iplattach() and ipldetach() for details.
  */
 
 #include <sys/systm.h>
@@ -73,7 +117,8 @@ static	int	ipf_property_g_update __P((dev_info_t *));
 static	char	*ipf_devfiles[] = { IPL_NAME, IPNAT_NAME, IPSTATE_NAME,
 				    IPAUTH_NAME, IPSYNC_NAME, IPSCAN_NAME,
 				    IPLOOKUP_NAME, NULL };
-
+extern void 	*ipf_state;	/* DDI state */
+extern vmem_t	*ipf_minor;	/* minor number arena */
 
 static struct cb_ops ipf_cb_ops = {
 	iplopen,
@@ -221,10 +266,11 @@ static const filter_kstats_t ipf_kstat_tmp = {
 static int	ipf_kstat_update(kstat_t *ksp, int rwflag);
 
 static void
-ipf_kstat_init(ipf_stack_t *ifs)
+ipf_kstat_init(ipf_stack_t *ifs, boolean_t from_gz)
 {
-	ifs->ifs_kstatp[0] = net_kstat_create(ifs->ifs_netid, "ipf", 0,
-	    "inbound", "net", KSTAT_TYPE_NAMED,
+	ifs->ifs_kstatp[0] = net_kstat_create(ifs->ifs_netid,
+	    (from_gz ? "ipf_gz" : "ipf"),
+	    0, "inbound", "net", KSTAT_TYPE_NAMED,
 	    sizeof (filter_kstats_t) / sizeof (kstat_named_t), 0);
 	if (ifs->ifs_kstatp[0] != NULL) {
 		bcopy(&ipf_kstat_tmp, ifs->ifs_kstatp[0]->ks_data,
@@ -234,8 +280,9 @@ ipf_kstat_init(ipf_stack_t *ifs)
 		kstat_install(ifs->ifs_kstatp[0]);
 	}
 
-	ifs->ifs_kstatp[1] = net_kstat_create(ifs->ifs_netid, "ipf", 0,
-	    "outbound", "net", KSTAT_TYPE_NAMED,
+	ifs->ifs_kstatp[1] = net_kstat_create(ifs->ifs_netid,
+	    (from_gz ? "ipf_gz" : "ipf"),
+	    0, "outbound", "net", KSTAT_TYPE_NAMED,
 	    sizeof (filter_kstats_t) / sizeof (kstat_named_t), 0);
 	if (ifs->ifs_kstatp[1] != NULL) {
 		bcopy(&ipf_kstat_tmp, ifs->ifs_kstatp[1]->ks_data,
@@ -369,12 +416,14 @@ dev_info_t *dip;
  * Initialize things for IPF for each stack instance
  */
 static void *
-ipf_stack_create(const netid_t id)
+ipf_stack_create_one(const netid_t id, const zoneid_t zid, boolean_t from_gz,
+    ipf_stack_t *ifs_gz)
 {
 	ipf_stack_t	*ifs;
 
 #ifdef IPFDEBUG
-	cmn_err(CE_NOTE, "IP Filter:stack_create id=%d", id);
+	cmn_err(CE_NOTE, "IP Filter:stack_create_one id=%d global=%d", id,
+	    global);
 #endif
 
 	ifs = (ipf_stack_t *)kmem_alloc(sizeof (*ifs), KM_SLEEP);
@@ -398,8 +447,11 @@ ipf_stack_create(const netid_t id)
 	RWLOCK_INIT(&ifs->ifs_ipf_mutex, "ipf filter rwlock");
 	RWLOCK_INIT(&ifs->ifs_ipf_frcache, "ipf cache rwlock");
 	ifs->ifs_netid = id;
-	ifs->ifs_zone = net_getzoneidbynetid(id);
-	ipf_kstat_init(ifs);
+	ifs->ifs_zone = zid;
+	ifs->ifs_gz_controlled = from_gz;
+	ifs->ifs_gz_cont_ifs = ifs_gz;
+
+	ipf_kstat_init(ifs, from_gz);
 
 #ifdef IPFDEBUG
 	cmn_err(CE_CONT, "IP Filter:stack_create zone=%d", ifs->ifs_zone);
@@ -427,30 +479,83 @@ ipf_stack_create(const netid_t id)
 	return (ifs);
 }
 
+static void *
+ipf_stack_create(const netid_t id)
+{
+	ipf_stack_t	*ifs = NULL;
+	zoneid_t	zid = net_getzoneidbynetid(id);
+
+	/*
+	 * Create two ipfilter stacks for a zone - the first can only be
+	 * controlled from the global zone, and the second is owned by
+	 * the zone itself. There is no need to create a GZ-controlled
+	 * stack for the global zone, since we're already in the global
+	 * zone. See the "GZ-controlled and per-zone stacks" comment block in
+	 * ip_fil_solaris.c for details.
+	 */
+	if (zid != GLOBAL_ZONEID)
+		ifs = ipf_stack_create_one(id, zid, B_TRUE, NULL);
+
+	return (ipf_stack_create_one(id, zid, B_FALSE, ifs));
+}
 
 /*
- * This function should only ever be used to find the pointer to the
- * ipfilter stack structure for the zone that is currently being
- * executed... so if you're running in the context of zone 1, you
- * should not attempt to find the ipf_stack_t for zone 0 or 2 or
- * anything else but 1.  In that way, the returned pointer is safe
- * as it will only be nuked when the instance is destroyed as part
- * of the final shutdown of a zone.
+ * Find an ipfilter stack for the given zone. Return the GZ-controlled or
+ * per-zone stack if set by an earlier SIOCIPFZONESET ioctl call. See the
+ * "GZ-controlled and per-zone stacks" comment block in ip_fil_solaris.c for
+ * details.
+ *
+ * This function returns with the ipf_stack_t's ifs_ipf_global
+ * read lock held (if the stack is found). See the "ipfilter kernel module
+ * mutexes and locking" comment block at the top of this file.
  */
 ipf_stack_t *
-ipf_find_stack(const zoneid_t zone)
+ipf_find_stack(const zoneid_t orig_zone, ipf_devstate_t *isp)
 {
 	ipf_stack_t *ifs;
+	boolean_t gz_stack;
+	zoneid_t zone;
+
+	/*
+	 * If we're in the GZ, determine if we're acting on a zone's stack,
+	 * and whether or not that stack is the GZ-controlled or in-zone
+	 * one.  See the "GZ and per-zone stacks" note at the top of this
+	 * file.
+	 */
+	if (orig_zone == GLOBAL_ZONEID &&
+	    (isp->ipfs_zoneid != IPFS_ZONE_UNSET)) {
+		/* Global zone, and we've set the zoneid for this fd already */
+
+		if (orig_zone == isp->ipfs_zoneid) {
+			/* There's only a per-zone stack for the GZ */
+			gz_stack = B_FALSE;
+		} else {
+			gz_stack = isp->ipfs_gz;
+		}
+
+		zone = isp->ipfs_zoneid;
+	} else {
+		/*
+		 * Non-global zone or GZ without having set a zoneid: act on
+		 * the per-zone stack of the zone that this ioctl originated
+		 * from.
+		 */
+		gz_stack = B_FALSE;
+		zone = orig_zone;
+	}
 
 	mutex_enter(&ipf_stack_lock);
 	for (ifs = ipf_stacks; ifs != NULL; ifs = ifs->ifs_next) {
-		if (ifs->ifs_zone == zone)
+		if (ifs->ifs_zone == zone && ifs->ifs_gz_controlled == gz_stack)
 			break;
+	}
+
+	if (ifs != NULL) {
+		READ_ENTER(&ifs->ifs_ipf_global);
 	}
 	mutex_exit(&ipf_stack_lock);
 	return (ifs);
 }
-
 
 static int ipf_detach_check_zone(ipf_stack_t *ifs)
 {
@@ -495,7 +600,8 @@ static int ipf_detach_check_all()
 
 
 /*
- * Destroy things for ipf for one stack.
+ * Remove ipf kstats for both the per-zone ipf stack and the
+ * GZ-controlled stack for the same zone, if it exists.
  */
 /* ARGSUSED */
 static void
@@ -503,6 +609,15 @@ ipf_stack_shutdown(const netid_t id, void *arg)
 {
 	ipf_stack_t *ifs = (ipf_stack_t *)arg;
 
+	/*
+	 * The GZ-controlled stack
+	 */
+	if (ifs->ifs_gz_cont_ifs != NULL)
+		ipf_kstat_fini(ifs->ifs_gz_cont_ifs);
+
+	/*
+	 * The per-zone stack
+	 */
 	ipf_kstat_fini(ifs);
 }
 
@@ -512,13 +627,12 @@ ipf_stack_shutdown(const netid_t id, void *arg)
  */
 /* ARGSUSED */
 static void
-ipf_stack_destroy(const netid_t id, void *arg)
+ipf_stack_destroy_one(const netid_t id, ipf_stack_t *ifs)
 {
-	ipf_stack_t *ifs = (ipf_stack_t *)arg;
 	timeout_id_t tid;
 
 #ifdef IPFDEBUG
-	(void) printf("ipf_stack_destroy(%p)\n", (void *)ifs);
+	(void) printf("ipf_stack_destroy_one(%p)\n", (void *)ifs);
 #endif
 
 	/*
@@ -546,7 +660,7 @@ ipf_stack_destroy(const netid_t id, void *arg)
 
 	WRITE_ENTER(&ifs->ifs_ipf_global);
 	if (ipldetach(ifs) != 0) {
-		printf("ipf_stack_destroy: ipldetach failed\n");
+		printf("ipf_stack_destroy_one: ipldetach failed\n");
 	}
 
 	ipftuneable_free(ifs);
@@ -557,6 +671,30 @@ ipf_stack_destroy(const netid_t id, void *arg)
 	RW_DESTROY(&ifs->ifs_ipf_global);
 
 	KFREE(ifs);
+}
+
+
+/*
+ * Destroy things for ipf for both the per-zone ipf stack and the
+ * GZ-controlled stack for the same zone, if it exists. See the "GZ-controlled
+ * and per-zone stacks" comment block in ip_fil_solaris.c for details.
+ */
+/* ARGSUSED */
+static void
+ipf_stack_destroy(const netid_t id, void *arg)
+{
+	ipf_stack_t *ifs = (ipf_stack_t *)arg;
+
+	/*
+	 * The GZ-controlled stack
+	 */
+	if (ifs->ifs_gz_cont_ifs != NULL)
+		ipf_stack_destroy_one(id, ifs->ifs_gz_cont_ifs);
+
+	/*
+	 * The per-zone stack
+	 */
+	ipf_stack_destroy_one(id, ifs);
 }
 
 
@@ -586,27 +724,39 @@ ddi_attach_cmd_t cmd;
 
 		(void) ipf_property_g_update(dip);
 
+		if (ddi_soft_state_init(&ipf_state, sizeof (ipf_devstate_t), 1)
+		    != 0) {
+			ddi_prop_remove_all(dip);
+			return (DDI_FAILURE);
+		}
+
 		for (i = 0; ((s = ipf_devfiles[i]) != NULL); i++) {
 			s = strrchr(s, '/');
 			if (s == NULL)
 				continue;
 			s++;
 			if (ddi_create_minor_node(dip, s, S_IFCHR, i,
-			    DDI_PSEUDO, 0) ==
-			    DDI_FAILURE) {
-				ddi_remove_minor_node(dip, NULL);
+			    DDI_PSEUDO, 0) == DDI_FAILURE)
 				goto attach_failed;
-			}
 		}
 
 		ipf_dev_info = dip;
 
 		ipfncb = net_instance_alloc(NETINFO_VERSION);
+		if (ipfncb == NULL)
+			goto attach_failed;
+
 		ipfncb->nin_name = "ipf";
 		ipfncb->nin_create = ipf_stack_create;
 		ipfncb->nin_destroy = ipf_stack_destroy;
 		ipfncb->nin_shutdown = ipf_stack_shutdown;
-		i = net_instance_register(ipfncb);
+		if (net_instance_register(ipfncb) == DDI_FAILURE) {
+			net_instance_free(ipfncb);
+			goto attach_failed;
+		}
+
+		ipf_minor = vmem_create("ipf_minor", (void *)1, UINT32_MAX - 1,
+		    1, NULL, NULL, NULL, 0, VM_SLEEP | VMC_IDENTIFIER);
 
 #ifdef IPFDEBUG
 		cmn_err(CE_CONT, "IP Filter:stack_create callback_reg=%d", i);
@@ -619,7 +769,9 @@ ddi_attach_cmd_t cmd;
 	}
 
 attach_failed:
+	ddi_remove_minor_node(dip, NULL);
 	ddi_prop_remove_all(dip);
+	ddi_soft_state_fini(&ipf_state);
 	return (DDI_FAILURE);
 }
 
@@ -651,6 +803,9 @@ ddi_detach_cmd_t cmd;
 			cmn_err(CE_CONT, "IP Filter: still attached (%d)\n", i);
 			return (DDI_FAILURE);
 		}
+
+		vmem_destroy(ipf_minor);
+		ddi_soft_state_fini(&ipf_state);
 
 		(void) net_instance_unregister(ipfncb);
 		net_instance_free(ipfncb);

@@ -2,17 +2,17 @@
 .\" To view license terms, attribution, and copyright for IP Filter, the default path is /usr/lib/ipf/IPFILTER.LICENCE. If the Solaris operating environment has been installed anywhere other than the default, modify the given path to access the file at the installed
 .\" location.
 .\" Portions Copyright (c) 2008, Sun Microsystems Inc. All Rights Reserved.
-.TH IPNAT 1M "Apr 3, 2008"
+.\" Portions Copyright (c) 2013, Joyent, Inc. All Rights Reserved.
+.TH IPNAT 1M "Oct 30, 2013"
 .SH NAME
 ipnat \- user interface to the NAT subsystem
 .SH SYNOPSIS
 .LP
 .nf
-\fBipnat\fR [\fB-CdFhlnRrsv\fR] \fB-f\fR \fIfilename\fR
+\fBipnat\fR [\fB-CdFhlnRrsv\fR] [\fB-G\fR | \fB-z\fR \fIzonename\fR] \fB-f\fR \fIfilename\fR
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBipnat\fR utility opens a specified file (treating \fB-\fR as stdin) and
 parses it for a set of rules that are to be added or removed from the IP NAT.
@@ -32,7 +32,6 @@ require \fBipnat\fR to be run as root for all operations.
 permissions of \fB/dev/ipnat\fR require \fBipnat\fR to be run as root for all
 operations.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -140,8 +139,31 @@ Turn verbose mode on. Displays information relating to rule processing and
 active rules/table entries.
 .RE
 
-.SH FILES
 .sp
+.ne 2
+.na
+\fB\fB-z\fR \fIzonename\fR\fR
+.ad
+.RS 15n
+Operate on the in-zone IP NAT for the specified zone. If neither this option
+nor \fB-G\fR is specified, the current zone is used. This command is only
+available in the Global Zone. See \fBZONES\fR in \fBipf\fR(1m) for more
+information.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-G\fR \fIzonename\fR\fR
+.ad
+.RS 15n
+Operate on the global zone controlled IP NAT for the specified zone. If
+neither this option nor \fB-z\fR is specified, the current zone is used. This
+command is only available in the Global Zone. See \fBZONES\fR in \fBipf\fR(1m)
+for more information.
+.RE
+
+.SH FILES
 .ne 2
 .na
 \fB\fB/dev/ipnat\fR\fR
@@ -182,7 +204,6 @@ Contains numerous IP Filter examples.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -198,6 +219,6 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
-\fBipf\fR(1M), \fBipfstat\fR(1M), \fBipnat\fR(4), \fBattributes\fR(5)
+\fBipf\fR(1M), \fBipfstat\fR(1M), \fBipnat\fR(4), \fBattributes\fR(5),
+\fBzones(5)\fR
