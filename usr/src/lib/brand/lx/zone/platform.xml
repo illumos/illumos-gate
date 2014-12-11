@@ -133,6 +133,7 @@
 	<symlink source="stdin" target="../proc/self/fd/0" />
 	<symlink source="stdout" target="../proc/self/fd/1" />
 	<symlink source="systty" target="console" />
+	<symlink source="kmsg" target="console" />
 
 	<!-- Create a mount point for for the /dev/initctl fifo -->
 	<device match="null" name="initctl" />
