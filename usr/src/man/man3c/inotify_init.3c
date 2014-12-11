@@ -55,7 +55,7 @@ Instance should be closed upon an
 \fBIN_NONBLOCK\fR
 .ad
 .RS 12n
-Instance be set to be non-blocking.  A \fBread\fR(2) on an
+Instance will be set to be non-blocking.  A \fBread\fR(2) on an
 \fBinotify\fR instance that has been initialized with
 \fBIN_NONBLOCK\fR will return \fBEAGAIN\fR if there are
 no events enqueued in lieu of blocking.

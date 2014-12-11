@@ -511,7 +511,7 @@ inotify_watch_event(inotify_watch_t *watch, uint64_t mask, char *name)
 
 	state->ins_tail = event;
 	state->ins_nevents++;
-	state->ins_size += sizeof (inotify_kevent_t) + len;
+	state->ins_size += sizeof (event->ine_event) + len;
 
 	if ((watch->inw_mask & IN_ONESHOT) && !watch->inw_fired) {
 		/*
@@ -1145,7 +1145,7 @@ inotify_read(dev_t dev, uio_t *uio, cred_t *cr)
 		state->ins_nevents--;
 
 		VERIFY(state->ins_size > 0);
-		state->ins_size -= INOTIFY_EVENT_LENGTH(event);
+		state->ins_size -= len;
 
 		if ((state->ins_head = event->ine_next) == NULL) {
 			VERIFY(event == state->ins_tail);
@@ -1174,7 +1174,7 @@ inotify_poll(dev_t dev, short events, int anyyet, short *reventsp,
 	mutex_enter(&state->ins_lock);
 
 	if (state->ins_head != NULL) {
-		*reventsp = POLLRDNORM | POLLIN;
+		*reventsp = events & (POLLRDNORM | POLLIN);
 	} else {
 		*reventsp = 0;
 
@@ -1241,12 +1241,18 @@ inotify_ioctl(dev_t dev, int cmd, intptr_t arg, int md, cred_t *cr, int *rv)
 	case INOTIFYIOC_ACTIVATE:
 		return (inotify_activate(state, arg));
 
-	case FIONREAD:
+	case FIONREAD: {
+		int32_t size;
+
 		mutex_enter(&state->ins_lock);
-		*rv = state->ins_size;
+		size = state->ins_size;
 		mutex_exit(&state->ins_lock);
 
+		if (copyout(&size, (void *)arg, sizeof (size)) != 0)
+			return (EFAULT);
+
 		return (0);
+	}
 
 	default:
 		break;
