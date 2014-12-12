@@ -204,9 +204,7 @@ eventfd_poll(dev_t dev, short events, int anyyet, short *reventsp,
 	if (state->efd_value < EVENTFD_VALMAX)
 		revents |= POLLWRNORM | POLLOUT;
 
-	*reventsp = revents & events;
-
-	if (!revents && !anyyet)
+	if (!(*reventsp = revents & events) && !anyyet)
 		*phpp = &state->efd_pollhd;
 
 	mutex_exit(&state->efd_lock);

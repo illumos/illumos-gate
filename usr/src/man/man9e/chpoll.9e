@@ -181,7 +181,7 @@ called:
 .sp
 .in +2
 .nf
-if (events_are_satisfied_now) {
+if (specified_events_are_satisfied_now) {
       *reventsp = satisfied_events & events;
 } else {
       *reventsp = 0;
