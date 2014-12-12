@@ -366,6 +366,11 @@ fake_elf32(struct ps_prochandle *P, file_info_t *fptr, uintptr_t addr,
 		hnchains = hash[1];
 	}
 
+	if ((d[DI_HASH] == NULL) || (hnbuckets == 0) || (hnchains == 0)) {
+		dprintf("empty or missing .hash\n");
+		goto bad;
+	}
+
 	/*
 	 * .dynsym and .SUNW_ldynsym sections.
 	 *
