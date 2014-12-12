@@ -314,7 +314,8 @@ _elf_phdr(Elf * elf, int inplace)
 	ELFACCESSDATA(work, _elf_work)
 	msz = _elf_msize(ELF_T_PHDR, work) * eh->e_phnum;
 	if ((eh->e_phoff == 0) ||
-	    ((fsz + eh->e_phoff) > elf->ed_fsz)) {
+	    (elf->ed_fsz <= eh->e_phoff) ||
+	    (elf->ed_fsz - eh->e_phoff < fsz)) {
 		_elf_seterr(EFMT_PHTAB, 0);
 		return (-1);
 	}
