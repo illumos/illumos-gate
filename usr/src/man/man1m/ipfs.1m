@@ -43,7 +43,6 @@ ipfs \- saves and restores information for NAT and state tables
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBipfs\fR utility enables the saving of state information across reboots.
 Specifically, the utility allows state information created for NAT entries and
@@ -51,7 +50,6 @@ rules using "keep state" to be locked (modification prevented) and then saved
 to disk. Then, after a reboot, that information is restored. The result of this
 state-saving is that connections are not interrupted.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -221,7 +219,6 @@ used. This command is only available in the Global Zone. See \fBZONES\fR in
 \fB/dev/ipnat\fR
 .RE
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -237,12 +234,10 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBipf\fR(1M), \fBipmon\fR(1M), \fBipnat\fR(1M), \fBattributes\fR(5),
 \fBzones(5)\fR
 .SH DIAGNOSTICS
-.sp
 .LP
 Arguably, the \fB-W\fR and \fB-R\fR operations should set the locking and,
 rather than undo it, restore it to what it was previously.

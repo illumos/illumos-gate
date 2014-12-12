@@ -5,7 +5,7 @@
  *
  * $Id: load_poolnode.c,v 1.3.2.1 2004/03/06 14:33:29 darrenr Exp $
  *
- * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
  */
 
 #include <fcntl.h>
@@ -13,10 +13,7 @@
 #include "ipf.h"
 #include "netinet/ip_lookup.h"
 #include "netinet/ip_pool.h"
-
-#if SOLARIS
 #include "ipfzone.h"
-#endif
 
 static int poolfd = -1;
 
@@ -35,12 +32,10 @@ ioctlfunc_t iocfunc;
 		poolfd = open(IPLOOKUP_NAME, O_RDWR);
 	if ((poolfd == -1) && ((opts & OPT_DONOTHING) == 0))
 		return -1;
-#if SOLARIS
 	if (setzone(poolfd) != 0) {
 		close(poolfd);
 		return -1;
 	}
-#endif
 
 	op.iplo_unit = role;
 	op.iplo_type = IPLT_POOL;

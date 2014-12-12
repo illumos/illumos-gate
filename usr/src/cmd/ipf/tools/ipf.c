@@ -6,7 +6,7 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
  */
 
 #ifdef	__FreeBSD__
@@ -22,10 +22,7 @@
 #include <fcntl.h>
 #include <sys/ioctl.h>
 #include "netinet/ipl.h"
-
-#ifdef SOLARIS
 #include "ipfzone.h"
-#endif
 
 #if !defined(lint)
 static const char sccsid[] = "@(#)ipf.c	1.23 6/5/96 (C) 1993-2000 Darren Reed";
@@ -70,12 +67,7 @@ static void usage()
 {
 	fprintf(stderr, "usage: ipf [-6AdDEGInoPrRsvVyzZ] %s %s %s",
 		"[-l block|pass|nomatch|state|nat]", "[-cc] [-F i|o|a|s|S|u]",
-		"[-f filename] [-T <tuneopts>]");
-#if SOLARIS
-	fprintf(stderr, " [zonename]\n");
-#else
-	fprintf(stderr, "\n");
-#endif
+		"[-f filename] [-T <tuneopts>] [zonename]\n");
 	exit(1);
 }
 
@@ -90,13 +82,14 @@ char *argv[];
 	if (argc < 2)
 		usage();
 
-#if SOLARIS
 	/*
 	 * We need to set the zone name before calling the functions
-	 * in the switch statement below
+	 * in the switch statement below. Note that ipf.c differs from the other
+	 * tools in the ipfilter suite: the zone name is specified as the
+	 * last argument, while the other tools use the -z option. ipf
+	 * already has a -z option, so the last argument is used instead.
 	 */
 	getzonearg(argc, argv, optstr);
-#endif
 
 	while ((c = getopt(argc, argv, optstr)) != -1) {
 		switch (c)
@@ -130,6 +123,9 @@ char *argv[];
 			break;
 		case 'F' :
 			flushfilter(optarg);
+			break;
+		case 'G' :
+			/* Already handled by getzonearg() above */
 			break;
 		case 'I' :
 			opts ^= OPT_INACTIVE;
@@ -208,12 +204,10 @@ int check;
 			if ((fd = open(ipfdev, O_RDONLY)) == -1)
 				perror("open device");
 
-#if SOLARIS
 	if (setzone(fd) != 0) {
 		close(fd);
-		return -1;
+		return -2;
 	}
-#endif
 
 	return fd;
 }
@@ -335,12 +329,10 @@ char	*opt;
 		if (opts & OPT_VERBOSE)
 			printf("set state log flag\n");
 		xfd = open(IPSTATE_NAME, O_RDWR);
-#if SOLARIS
 		if (xfd >= 0 && setzone(xfd) != 0) {
 			close(xfd);
 			xfd = -1;
 		}
-#endif
 
 		if (xfd >= 0) {
 			logopt = 0;
@@ -359,12 +351,10 @@ char	*opt;
 		if (opts & OPT_VERBOSE)
 			printf("set nat log flag\n");
 		xfd = open(IPNAT_NAME, O_RDWR);
-#if SOLARIS
 		if (xfd >= 0 && setzone(xfd) != 0) {
 			close(xfd);
 			xfd = -1;
 		}
-#endif
 
 		if (xfd >= 0) {
 			logopt = 0;
@@ -558,13 +548,10 @@ static int showversion()
 		return 1;
 	}
 
-#if SOLARIS
 	if (setzone(vfd) != 0) {
 		close(vfd);
 		return 1;
 	}
-#endif
-
 
 	if (ioctl(vfd, SIOCGETFS, &ipfo)) {
 		perror("ioctl(SIOCGETFS)");

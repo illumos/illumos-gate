@@ -22,6 +22,8 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2013 Joyent, Inc. All rights reserved
+#
 
 hook4_vnd_in
 hook4_vnd_out
@@ -31,6 +33,26 @@ fr_availfuncs
 fr_features
 fr_objbytes
 hdrsizes
+hook4_in
+hook4_in_gz
+hook4_loop_in
+hook4_loop_in_gz
+hook4_loop_out
+hook4_loop_out_gz
+hook4_nicevents
+hook4_nicevents_gz
+hook4_out
+hook4_out_gz
+hook6_in
+hook6_in_gz
+hook6_loop_in
+hook6_loop_in_gz
+hook6_loop_out
+hook6_loop_out_gz
+hook6_nicevents
+hook6_nicevents_gz
+hook6_out
+hook6_out_gz
 icmpreplytype4
 icmpreplytype6
 icmptoicmp6types
@@ -41,10 +63,12 @@ ipf_cb_ops
 ipf_dev_info
 ipf_devfiles
 ipf_kstat_tmp
+ipf_minor
 ipf_ops
 ipf_proxy_debug
 ipf_stack_lock
 ipf_stacks
+ipf_state
 ipfilter_version
 ipfncb
 ipl_magic
@@ -60,9 +84,9 @@ rcsid
 sccsid
 secopt
 tcpopts
+lastx
 _drand48_a
 _drand48_c
 _drand48_x
 init48done
 seed_lock
-lastx

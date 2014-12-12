@@ -8,7 +8,7 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
  */
 
 #include <sys/param.h>
@@ -575,7 +575,9 @@ ipf_stack_t *ifs;
 	while (ifs->ifs_iplt[unit] == NULL) {
 # if SOLARIS && defined(_KERNEL)
 		/*
-		 * Prevent a deadlock with ipldetach()
+		 * Prevent a deadlock with ipldetach() - see the "ipfilter
+		 * kernel module mutexes and locking" comment block in solaris.c
+		 * for details.
 		 */
 		RWLOCK_EXIT(&ifs->ifs_ipf_global);
 		if (!cv_wait_sig(&ifs->ifs_iplwait, &ifs->ifs_ipl_mutex.ipf_lk)) {

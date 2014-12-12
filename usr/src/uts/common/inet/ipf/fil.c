@@ -5,7 +5,7 @@
  *
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  *
- * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
  */
 
 #if defined(KERNEL) || defined(_KERNEL)
@@ -136,7 +136,7 @@ struct file;
 # endif
 #endif
 #include "netinet/ipl.h"
-#if defined(SOLARIS) && defined(_KERNEL)
+#if defined(_KERNEL)
 #include <sys/sunddi.h>
 #endif
 /* END OF INCLUDES */
@@ -5709,7 +5709,7 @@ static	int	fr_objbytes[NUM_OBJ_TYPES][2] = {
 /* Set the zone ID in idsp based on the zone name in ipfzoneobj.  Further   */
 /* ioctls will act on the IPF stack for that zone ID.                       */
 /* ------------------------------------------------------------------------ */
-#if defined(SOLARIS) && defined(_KERNEL)
+#if defined(_KERNEL)
 int fr_setzoneid(idsp, data)
 ipf_devstate_t *idsp;
 void *data;
@@ -5724,6 +5724,13 @@ void *data;
 
 	if (memchr(ipfzo.ipfz_zonename, '\0', ZONENAME_MAX) == NULL)
 		return EFAULT;
+
+	/*
+	 * The global zone doesn't have a GZ-controlled stack, so no
+	 * sense in going any further
+	 */
+	if (strcmp(ipfzo.ipfz_zonename, "global") == 0)
+		return ENODEV;
 
 	if ((zone = zone_find_by_name(ipfzo.ipfz_zonename)) == NULL)
 		return ENODEV;

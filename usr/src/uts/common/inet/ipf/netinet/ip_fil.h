@@ -8,13 +8,14 @@
  *
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  *
- * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
  */
 
 #ifndef	__IP_FIL_H__
 #define	__IP_FIL_H__
 
 #include "netinet/ip_compat.h"
+#include <sys/zone.h>
 
 #ifndef	SOLARIS
 # define SOLARIS (defined(sun) && (defined(__svr4__) || defined(__SVR4)))
@@ -108,10 +109,7 @@
 #define	SIOCADDFR	SIOCADAFR
 #define	SIOCDELFR	SIOCRMAFR
 #define	SIOCINSFR	SIOCINAFR
-
-#ifdef SOLARIS
 # define	SIOCIPFZONESET	_IOWR('r', 97, struct ipfzoneobj)
-#endif
 
 /*
  * What type of table is getting flushed?
@@ -1171,23 +1169,24 @@ typedef	struct	ipfobj	{
 	u_char	ipfo_xxxpad[32];	/* reserved for future use */
 } ipfobj_t;
 
-#if defined(SOLARIS)
-
-#include <sys/zone.h>
-
+/*
+ * ioctl struct for setting what zone further ioctls will act on. ipfz_gz is a
+ * boolean: set it to 1 to operate on the GZ-controlled stack.
+ */
 typedef	struct	ipfzoneobj	{
-	u_32_t		ipfz_gz;			/* GZ stack */
+	u_32_t		ipfz_gz;			/* GZ stack boolean */
 	char		ipfz_zonename[ZONENAME_MAX];	/* zone to act on */
 } ipfzoneobj_t;
 
 #if defined(_KERNEL)
+/* Set ipfs_zoneid to this if no zone has been set: */
+#define IPFS_ZONE_UNSET	-2
+
 typedef	struct	ipf_devstate	{
 	zoneid_t	ipfs_zoneid;
 	minor_t		ipfs_minor;
 	boolean_t	ipfs_gz;
 } ipf_devstate_t;
-#endif
-
 #endif
 
 #define	IPFOBJ_FRENTRY		0	/* struct frentry */
@@ -1377,7 +1376,6 @@ extern	void	ipfilterattach __P((int));
 extern	int	ipl_enable __P((void));
 extern	int	ipl_disable __P((void));
 # ifdef MENTAT
-extern	ipf_stack_t *ipf_find_stack(const zoneid_t zone, boolean_t gz);
 extern	int	fr_check __P((struct ip *, int, void *, int, void *,
 			      mblk_t **, ipf_stack_t *));
 #  if SOLARIS
@@ -1390,6 +1388,7 @@ extern	int	iplioctl __P((dev_t, int, int *, int, cred_t *, int *));
 extern	int	fr_make_rst __P((fr_info_t *));
 extern	int	fr_make_icmp __P((fr_info_t *));
 extern	void	fr_calc_chksum __P((fr_info_t *, mb_t *));
+extern	ipf_stack_t *ipf_find_stack(const zoneid_t, ipf_devstate_t *);
 #   endif
 extern	int	iplopen __P((dev_t *, int, int, cred_t *));
 extern	int	iplclose __P((dev_t, int, int, cred_t *));
@@ -1601,7 +1600,7 @@ extern	int		ipf_earlydrop __P((int, ipftq_t *, int, ipf_stack_t *));
 extern	u_32_t		ipf_random __P((void));
 #endif
 
-#if defined(SOLARIS) && defined(_KERNEL)
+#if defined(_KERNEL)
 extern	int	fr_setzoneid __P((ipf_devstate_t *, void *));
 #endif
 

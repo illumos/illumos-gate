@@ -4,6 +4,8 @@
  * See the IPFILTER.LICENCE file for details on licencing.
  *
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+ *
+ * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
  */
 
 #if defined(KERNEL) || defined(_KERNEL)

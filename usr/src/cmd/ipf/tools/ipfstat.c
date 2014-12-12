@@ -6,7 +6,7 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
  */
 
 #ifdef __FreeBSD__
@@ -73,6 +73,7 @@
 #if defined(__NetBSD__) || (__OpenBSD__)
 # include <paths.h>
 #endif
+#include "ipfzone.h"
 
 #if !defined(lint)
 static const char sccsid[] = "@(#)fils.c	1.21 4/20/96 (C) 1993-2000 Darren Reed";
@@ -183,9 +184,7 @@ char *name;
 #else
 	fprintf(stderr, "       %s -t [-C] ", name);
 #endif
-#ifdef	SOLARIS
 	fprintf(stderr, "[-G|-z zonename] ");
-#endif
 	fprintf(stderr, "[-D destination address] [-P protocol] [-S source address] [-T refresh time]\n");
 	exit(1);
 }
@@ -240,11 +239,7 @@ char *argv[];
 		switch (c)
 		{
 		case 'G' :
-#if SOLARIS
 			setzonename_global(optarg);
-#else
-			usage(argv[0]);
-#endif
 			break;
 		case 'M' :
 			memf = optarg;
@@ -255,11 +250,7 @@ char *argv[];
 			live_kernel = 0;
 			break;
 		case 'z' :
-#if SOLARIS
 			setzonename(optarg);
-#else
-			usage(argv[0]);
-#endif
 			break;
 		}
 	}
@@ -270,23 +261,22 @@ char *argv[];
 			perror("open(IPSTATE_NAME)");
 			exit(-1);
 		}
-#if SOLARIS
+
 		if (setzone(state_fd) != 0) {
 			close(state_fd);
 			exit(-1);
 		}
-#endif
+
 		if ((ipf_fd = open(device, O_RDONLY)) == -1) {
 			fprintf(stderr, "open(%s)", device);
 			perror("");
 			exit(-1);
 		}
-#if SOLARIS
+
 		if (setzone(ipf_fd) != 0) {
 			close(ipf_fd);
 			exit(-1);
 		}
-#endif
 	}
 
 	if (kern != NULL || memf != NULL) {
@@ -334,6 +324,7 @@ char *argv[];
 			opts |= OPT_GROUPS;
 			break;
 		case 'G' :
+			/* Already handled by getzoneopt() above */
 			break;
 		case 'h' :
 			opts |= OPT_HITS;
@@ -398,6 +389,7 @@ char *argv[];
 			opts |= OPT_UNDEF;
 			break;
 		case 'z' :
+			/* Already handled by getzoneopt() above */
 			break;
 		default :
 			usage(argv[0]);
@@ -521,12 +513,10 @@ u_32_t *frfp;
 			exit(-1);
 		}
 
-#if SOLARIS
 		if (setzone(ipf_fd) != 0) {
 			close(ipf_fd);
 			exit(-1);
 		}
-#endif
 
 		bzero((caddr_t)&ipfo, sizeof(ipfo));
 		ipfo.ipfo_rev = IPFILTER_VERSION;

@@ -6,7 +6,7 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
  */
 
 
@@ -80,9 +80,7 @@
 #include "netinet/ip_state.h"
 #include "netinet/ip_proxy.h"
 #include "ipmon.h"
-#if SOLARIS
 #include "ipfzone.h"
-#endif
 
 #if !defined(lint)
 static const char sccsid[] = "@(#)ipmon.c	1.21 6/5/96 (C)1993-2000 Darren Reed";
@@ -1345,15 +1343,10 @@ printipflog:
 static void usage(prog)
 char *prog;
 {
-#if SOLARIS
-	const char *zoneopt = " [-G|-z zonename]";
-#else
-	const char *zoneopt = "";
-#endif
-	fprintf(stderr, "%s: [-abDFhnpstvxX]%s %s %s %s %s %s %s\n",
-		prog, zoneopt, "[-N device]", "[ [-o [NSI]] [-O [NSI]]",
-		"[-P pidfile]", "[-S device]", "[-f device]",
-		"filename");
+	fprintf(stderr, "%s: [-abDFhnpstvxX] %s %s %s %s %s %s %s\n",
+		prog, "[-G|-z zonename]", "[-N device]",
+		"[ [-o [NSI]] [-O [NSI]]", "[-P pidfile]", "[-S device]",
+		"[-f device]", "filename");
 	exit(1);
 }
 
@@ -1390,12 +1383,10 @@ FILE *log;
 		exit(1);
 	}
 
-#if SOLARIS
 	if (setzone(fd) != 0) {
 		close(fd);
 		exit(1);
 	}
-#endif
 
 	if (ioctl(fd, SIOCIPFFB, &flushed) == 0) {
 		printf("%d bytes flushed from log buffer\n",
@@ -1469,13 +1460,11 @@ char *argv[];
 	iplfile[1] = IPNAT_NAME;
 	iplfile[2] = IPSTATE_NAME;
 
-#if SOLARIS
 	/*
 	 * We need to set the zone name before calling openlog in
 	 * the switch statement below
 	 */
 	getzoneopt(argc, argv, optstr);
-#endif
 
 	while ((c = getopt(argc, argv, optstr)) != -1)
 		switch (c)
@@ -1509,11 +1498,9 @@ char *argv[];
 			flushlogs(iplfile[1], log);
 			flushlogs(iplfile[2], log);
 			break;
-#if SOLARIS
 		case 'G' :
 			/* Already handled by getzoneopt() above */
 			break;
-#endif
 		case 'n' :
 			opts |= OPT_RESOLVE;
 			break;
@@ -1566,11 +1553,9 @@ char *argv[];
 		case 'X' :
 			opts |= OPT_HEXHDR;
 			break;
-#if SOLARIS
 		case 'z' :
 			/* Already handled by getzoneopt() above */
 			break;
-#endif
 		default :
 		case 'h' :
 		case '?' :
@@ -1608,12 +1593,11 @@ char *argv[];
 				/* NOTREACHED */
 			}
 
-#if SOLARIS
 			if (setzone(fd[i]) != 0) {
 				close(fd[i]);
 				exit(1);
 			}
-#endif
+
 			if (!(regular[i] = !S_ISCHR(sb.st_mode)))
 				devices++;
 		}

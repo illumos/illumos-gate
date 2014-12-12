@@ -6,10 +6,8 @@
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/time.h>
@@ -43,10 +41,7 @@
 #include "netinet/ip_pool.h"
 #include "netinet/ip_htable.h"
 #include "kmem.h"
-
-#if SOLARIS
 #include "ipfzone.h"
-#endif
 
 extern	int	ippool_yyparse __P((void));
 extern	int	ippool_yydebug;
@@ -77,11 +72,7 @@ int	use_inet6 = 0;
 void usage(prog)
 char *prog;
 {
-#if SOLARIS
 	const char *zoneopt = "[-G|-z zonename] ";
-#else
-	const char *zoneopt = "";
-#endif
 	fprintf(stderr, "Usage:\t%s\n", prog);
 	fprintf(stderr, "\t\t\t-a [-dnv] %s[-m <name>] [-o <role>] -i <ipaddr>[/netmask]\n",
 	    zoneopt);
@@ -164,11 +155,7 @@ char *argv[];
 			ippool_yydebug++;
 			break;
 		case 'G' :
-#if SOLARIS
 			setzonename_global(optarg);
-#else
-			usage(argv[0]);
-#endif
 			break;
 		case 'i' :
 			s = strchr(optarg, '/');
@@ -206,11 +193,7 @@ char *argv[];
 			opts |= OPT_VERBOSE;
 			break;
 		case 'z' :
-#if SOLARIS
 			setzonename(optarg);
-#else
-			usage(argv[0]);
-#endif
 			break;
 		}
 
@@ -257,11 +240,8 @@ char *argv[];
 			ippool_yydebug++;
 			break;
 		case 'G' :
-#if SOLARIS
 			setzonename_global(optarg);
-#else
-			usage(argv[0]);
-#endif
+			break;
 		case 'm' :
 			poolname = optarg;
 			break;
@@ -292,11 +272,7 @@ char *argv[];
 			opts |= OPT_VERBOSE;
 			break;
 		case 'z' :
-#if SOLARIS
 			setzonename(optarg);
-#else
-			usage(argv[0]);
-#endif
 			break;
 		}
 
@@ -359,11 +335,7 @@ char *argv[], *infile;
 			ippool_yydebug++;
 			break;
 		case 'G' :
-#if SOLARIS
 			setzonename_global(optarg);
-#else
-			usage(argv[0]);
-#endif
 			break;
 		case 'n' :
 			opts |= OPT_DONOTHING;
@@ -378,11 +350,7 @@ char *argv[], *infile;
 			opts |= OPT_VERBOSE;
 			break;
 		case 'z' :
-#if SOLARIS
 			setzonename(optarg);
-#else
-			usage(argv[0]);
-#endif
 			break;
 		}
 
@@ -395,12 +363,11 @@ char *argv[], *infile;
 			perror("open(IPLOOKUP_NAME)");
 			exit(1);
 		}
-#if SOLARIS
+
 		if (setzone(fd) != 0) {
 			close(fd);
 			exit(1);
 		}
-#endif
 	}
 
 	if (ippool_parsefile(fd, infile, ioctl) != 0)
@@ -435,11 +402,7 @@ char *argv[];
 			opts |= OPT_DEBUG;
 			break;
 		case 'G' :
-#if SOLARIS
 			setzonename_global(optarg);
-#else
-			usage(argv[0]);
-#endif
 			break;
 		case 'm' :
 			poolname = optarg;
@@ -473,11 +436,7 @@ char *argv[];
 			opts |= OPT_VERBOSE;
 			break;
 		case 'z' :
-#if SOLARIS
 			setzonename(optarg);
-#else
-			usage(argv[0]);
-#endif
 			break;
 		}
 
@@ -490,12 +449,11 @@ char *argv[];
 			perror("open(IPLOOKUP_NAME)");
 			exit(1);
 		}
-#if SOLARIS
+
 		if (setzone(fd) != 0) {
 			close(fd);
 			exit(1);
 		}
-#endif
 	}
 
 	bzero((char *)&op, sizeof(op));
@@ -705,11 +663,7 @@ char *argv[];
 			opts |= OPT_DEBUG;
 			break;
 		case 'G' :
-#if SOLARIS
 			setzonename_global(optarg);
-#else
-			usage(argv[0]);
-#endif
 			break;
 		case 'M' :
 			live_kernel = 0;
@@ -738,11 +692,7 @@ char *argv[];
 			opts |= OPT_VERBOSE;
 			break;
 		case 'z' :
-#if SOLARIS
 			setzonename(optarg);
-#else
-			usage(argv[0]);
-#endif
 			break;
 		}
 
@@ -755,12 +705,11 @@ char *argv[];
 			perror("open(IPLOOKUP_NAME)");
 			exit(1);
 		}
-#if SOLARIS
+
 		if (setzone(fd) != 0) {
 			close(fd);
 			exit(1);
 		}
-#endif
 	}
 
 	if (type == IPLT_ALL || type == IPLT_POOL) {
@@ -832,11 +781,7 @@ char *argv[];
 			opts |= OPT_VERBOSE;
 			break;
 		case 'z' :
-#if SOLARIS
 			setzonename(optarg);
-#else
-			usage(argv[0]);
-#endif
 			break;
 		}
 
@@ -849,12 +794,11 @@ char *argv[];
 			perror("open(IPLOOKUP_NAME)");
 			exit(1);
 		}
-#if SOLARIS
+
 		if (setzone(fd) != 0) {
 			close(fd);
 			exit(1);
 		}
-#endif
 	}
 
 	bzero((char *)&flush, sizeof(flush));

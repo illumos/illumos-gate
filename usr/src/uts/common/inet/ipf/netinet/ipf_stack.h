@@ -43,10 +43,10 @@
 struct ipf_stack {
 	struct ipf_stack	*ifs_next;
 	struct ipf_stack	**ifs_pnext;
-	struct ipf_stack	*ifs_pgz;
+	struct ipf_stack	*ifs_gz_cont_ifs;
 	netid_t			ifs_netid;
 	zoneid_t		ifs_zone;
-	boolean_t		ifs_gz;
+	boolean_t		ifs_gz_controlled;
 
 	/* ipf module */
 	fr_info_t		ifs_frcache[2][8];

@@ -36,6 +36,16 @@
 #include <ifaddrs.h>
 #include <net/if.h>
 
+#pragma weak	dn_expand
+#pragma weak	res_ninit
+#pragma weak	res_ndestroy
+#pragma weak	res_nsearch
+#pragma weak	res_nclose
+#pragma weak	ns_get16
+#pragma weak	ns_get32
+#pragma weak	__ns_get16
+#pragma weak	__ns_get32
+
 #define	DNS_ALIASES	0
 #define	DNS_ADDRLIST	1
 #define	DNS_MAPDLIST	2
@@ -318,16 +328,15 @@ name_is_alias(char *aliases_ptr, char *name_ptr) {
 	return (NSS_NOTFOUND);
 }
 
-
 static int
-_nss_has_interfaces(int *v4, int *v6)
+_nss_has_interfaces(boolean_t *v4, boolean_t *v6)
 {
 	struct ifaddrs *ifp, *i;
 	struct in_addr in4;
 	struct in6_addr in6;
 	const struct in6_addr in6addr_any = IN6ADDR_ANY_INIT;
 
-	*v4 = *v6 = 0;
+	*v4 = *v6 = B_FALSE;
 
 	if (getifaddrs(&ifp) != 0)
 		return (-1);
@@ -339,24 +348,24 @@ _nss_has_interfaces(int *v4, int *v6)
 			continue;
 
 		if (i->ifa_addr->sa_family == AF_INET) {
-			if (*v4 != 0)
+			if (*v4 != B_FALSE)
 				continue;
 
 			if (((struct sockaddr_in *)i->ifa_addr)->
 			    sin_addr.s_addr == INADDR_ANY)
 				continue;
-			*v4 = 1;
+			*v4 = B_TRUE;
 		}
 
 		if (i->ifa_addr->sa_family == AF_INET6) {
-			if (*v6 != 0)
+			if (*v6 != B_FALSE)
 				continue;
 
 			if (memcmp(&in6addr_any,
 			    &((struct sockaddr_in6 *)i->ifa_addr)->sin6_addr,
 			    sizeof (struct in6_addr)) == 0)
 				continue;
-			*v6 = 1;
+			*v6 = B_TRUE;
 		}
 	}
 
@@ -420,7 +429,7 @@ _nss_dns_gethost_withttl(void *buffer, size_t bufsize, int ipnode)
 	int		af;
 	char		*ap, *apc;
 	int		hlen = 0, alen, iplen, len, isans;
-	int		has_v4 = 0, has_v6 = 0;
+	boolean_t	has_v4 = B_FALSE, has_v6 = B_FALSE;
 	int		flags, family, pass2 = 0;
 
 	statp = &stat;
@@ -502,11 +511,11 @@ _nss_dns_gethost_withttl(void *buffer, size_t bufsize, int ipnode)
 					return (NSS_ERROR);
 				}
 				/* Impossible situations... */
-				if (family == AF_INET && has_v4 == 0) {
+				if (family == AF_INET && has_v4 == B_FALSE) {
 					res_ndestroy(statp);
 					return (NSS_NOTFOUND);
 				}
-				if (family == AF_INET6 && has_v6 == 0 &&
+				if (family == AF_INET6 && has_v6 == B_FALSE &&
 				    !(flags & AI_V4MAPPED)) {
 					res_ndestroy(statp);
 					return (NSS_NOTFOUND);
@@ -514,10 +523,10 @@ _nss_dns_gethost_withttl(void *buffer, size_t bufsize, int ipnode)
 				if (family == AF_INET6 && has_v6)
 					qtype = T_AAAA;
 				if (family == AF_INET || (family == AF_INET6 &&
-				    has_v6 == 0 && flags & AI_V4MAPPED))
+				    has_v6 == B_FALSE && flags & AI_V4MAPPED))
 					qtype = T_A;
 			} else {
-				has_v4 = has_v6 = 1;
+				has_v4 = has_v6 = B_TRUE;
 				if (family == AF_INET6)
 					qtype = T_AAAA;
 				else
@@ -556,6 +565,13 @@ searchagain:
 		if (pass2 == 2)
 			goto out;
 
+		/*
+		 * If we're on the second pass (eg. we need to check both for A
+		 * and AAAA records), or we were only ever doing a search for
+		 * one type of record and are not supposed to do a second pass,
+		 * then we need to return that we couldn't find anything to the
+		 * user.
+		 */
 		if (pass2 == 1 || flags == 0 || family == AF_INET ||
 		    (family == AF_INET6 && !(flags & AI_V4MAPPED))) {
 			pbuf->p_herrno = HOST_NOT_FOUND;
@@ -564,8 +580,14 @@ searchagain:
 			res_ndestroy(statp);
 			return (NSS_NOTFOUND);
 		}
+
+		/*
+		 * If we were only requested to search for flags on an IPv6
+		 * interface or we have no IPv4 interface, we stick to only
+		 * doing a single pass and bail now.
+		 */
 		if ((flags & AI_ADDRCONFIG) && !(flags & AI_ALL) &&
-		    has_v4 == 0) {
+		    has_v4 == B_FALSE) {
 			pbuf->p_herrno = HOST_NOT_FOUND;
 			pbuf->p_status = NSS_NOTFOUND;
 			pbuf->data_len = 0;
@@ -727,7 +749,8 @@ searchagain:
 
 	/* Depending on our flags we may need to go back another time. */
 	if (qtype == T_AAAA && family == AF_INET6 &&
-	    ((flags & AI_V4MAPPED) != 0) && ((flags & AI_ALL) != 0) && has_v4) {
+	    ((flags & AI_V4MAPPED) != 0) && ((flags & AI_ALL) != 0) &&
+	    has_v4 == B_TRUE) {
 		qtype = T_A;
 		pass2 = 2; /* Indicate that we found data this pass */
 		goto searchagain;

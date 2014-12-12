@@ -268,8 +268,9 @@ static int	ipf_kstat_update(kstat_t *ksp, int rwflag);
 static void
 ipf_kstat_init(ipf_stack_t *ifs, boolean_t from_gz)
 {
-	ifs->ifs_kstatp[0] = net_kstat_create(ifs->ifs_netid, "ipf", 0,
-	    (from_gz ? "inbound_gz" : "inbound"), "net", KSTAT_TYPE_NAMED,
+	ifs->ifs_kstatp[0] = net_kstat_create(ifs->ifs_netid,
+	    (from_gz ? "ipf_gz" : "ipf"),
+	    0, "inbound", "net", KSTAT_TYPE_NAMED,
 	    sizeof (filter_kstats_t) / sizeof (kstat_named_t), 0);
 	if (ifs->ifs_kstatp[0] != NULL) {
 		bcopy(&ipf_kstat_tmp, ifs->ifs_kstatp[0]->ks_data,
@@ -279,8 +280,9 @@ ipf_kstat_init(ipf_stack_t *ifs, boolean_t from_gz)
 		kstat_install(ifs->ifs_kstatp[0]);
 	}
 
-	ifs->ifs_kstatp[1] = net_kstat_create(ifs->ifs_netid, "ipf", 0,
-	    (from_gz ? "outbound_gz" : "outbound"), "net", KSTAT_TYPE_NAMED,
+	ifs->ifs_kstatp[1] = net_kstat_create(ifs->ifs_netid,
+	    (from_gz ? "ipf_gz" : "ipf"),
+	    0, "outbound", "net", KSTAT_TYPE_NAMED,
 	    sizeof (filter_kstats_t) / sizeof (kstat_named_t), 0);
 	if (ifs->ifs_kstatp[1] != NULL) {
 		bcopy(&ipf_kstat_tmp, ifs->ifs_kstatp[1]->ks_data,
@@ -446,8 +448,8 @@ ipf_stack_create_one(const netid_t id, const zoneid_t zid, boolean_t from_gz,
 	RWLOCK_INIT(&ifs->ifs_ipf_frcache, "ipf cache rwlock");
 	ifs->ifs_netid = id;
 	ifs->ifs_zone = zid;
-	ifs->ifs_gz = from_gz;
-	ifs->ifs_pgz = ifs_gz;
+	ifs->ifs_gz_controlled = from_gz;
+	ifs->ifs_gz_cont_ifs = ifs_gz;
 
 	ipf_kstat_init(ifs, from_gz);
 
@@ -486,28 +488,65 @@ ipf_stack_create(const netid_t id)
 	/*
 	 * Create two ipfilter stacks for a zone - the first can only be
 	 * controlled from the global zone, and the second is owned by
-	 * the zone itself.  There is no need to create a GZ-controlled
+	 * the zone itself. There is no need to create a GZ-controlled
 	 * stack for the global zone, since we're already in the global
-	 * zone.
+	 * zone. See the "GZ-controlled and per-zone stacks" comment block in
+	 * ip_fil_solaris.c for details.
 	 */
 	if (zid != GLOBAL_ZONEID)
 		ifs = ipf_stack_create_one(id, zid, B_TRUE, NULL);
 
-	return ipf_stack_create_one(id, zid, B_FALSE, ifs);
+	return (ipf_stack_create_one(id, zid, B_FALSE, ifs));
 }
 
 /*
+ * Find an ipfilter stack for the given zone. Return the GZ-controlled or
+ * per-zone stack if set by an earlier SIOCIPFZONESET ioctl call. See the
+ * "GZ-controlled and per-zone stacks" comment block in ip_fil_solaris.c for
+ * details.
+ *
  * This function returns with the ipf_stack_t's ifs_ipf_global
- * read lock held (if the stack is found).
+ * read lock held (if the stack is found). See the "ipfilter kernel module
+ * mutexes and locking" comment block at the top of this file.
  */
 ipf_stack_t *
-ipf_find_stack(const zoneid_t zone, const boolean_t gz)
+ipf_find_stack(const zoneid_t orig_zone, ipf_devstate_t *isp)
 {
 	ipf_stack_t *ifs;
+	boolean_t gz_stack;
+	zoneid_t zone;
+
+	/*
+	 * If we're in the GZ, determine if we're acting on a zone's stack,
+	 * and whether or not that stack is the GZ-controlled or in-zone
+	 * one.  See the "GZ and per-zone stacks" note at the top of this
+	 * file.
+	 */
+	if (orig_zone == GLOBAL_ZONEID &&
+	    (isp->ipfs_zoneid != IPFS_ZONE_UNSET)) {
+		/* Global zone, and we've set the zoneid for this fd already */
+
+		if (orig_zone == isp->ipfs_zoneid) {
+			/* There's only a per-zone stack for the GZ */
+			gz_stack = B_FALSE;
+		} else {
+			gz_stack = isp->ipfs_gz;
+		}
+
+		zone = isp->ipfs_zoneid;
+	} else {
+		/*
+		 * Non-global zone or GZ without having set a zoneid: act on
+		 * the per-zone stack of the zone that this ioctl originated
+		 * from.
+		 */
+		gz_stack = B_FALSE;
+		zone = orig_zone;
+	}
 
 	mutex_enter(&ipf_stack_lock);
 	for (ifs = ipf_stacks; ifs != NULL; ifs = ifs->ifs_next) {
-		if (ifs->ifs_zone == zone && ifs->ifs_gz == gz)
+		if (ifs->ifs_zone == zone && ifs->ifs_gz_controlled == gz_stack)
 			break;
 	}
 
@@ -517,7 +556,6 @@ ipf_find_stack(const zoneid_t zone, const boolean_t gz)
 	mutex_exit(&ipf_stack_lock);
 	return (ifs);
 }
-
 
 static int ipf_detach_check_zone(ipf_stack_t *ifs)
 {
@@ -574,8 +612,8 @@ ipf_stack_shutdown(const netid_t id, void *arg)
 	/*
 	 * The GZ-controlled stack
 	 */
-	if (ifs->ifs_pgz != NULL)
-		ipf_kstat_fini(ifs->ifs_pgz);
+	if (ifs->ifs_gz_cont_ifs != NULL)
+		ipf_kstat_fini(ifs->ifs_gz_cont_ifs);
 
 	/*
 	 * The per-zone stack
@@ -637,7 +675,8 @@ ipf_stack_destroy_one(const netid_t id, ipf_stack_t *ifs)
 
 /*
  * Destroy things for ipf for both the per-zone ipf stack and the
- * GZ-controlled stack for the same zone, if it exists.
+ * GZ-controlled stack for the same zone, if it exists. See the "GZ-controlled
+ * and per-zone stacks" comment block in ip_fil_solaris.c for details.
  */
 /* ARGSUSED */
 static void
@@ -648,8 +687,8 @@ ipf_stack_destroy(const netid_t id, void *arg)
 	/*
 	 * The GZ-controlled stack
 	 */
-	if (ifs->ifs_pgz != NULL)
-		ipf_stack_destroy_one(id, ifs->ifs_pgz);
+	if (ifs->ifs_gz_cont_ifs != NULL)
+		ipf_stack_destroy_one(id, ifs->ifs_gz_cont_ifs);
 
 	/*
 	 * The per-zone stack

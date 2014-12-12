@@ -2,11 +2,11 @@
 .\" To view license terms, attribution, and copyright for IP Filter, the default path is /usr/lib/ipf/IPFILTER.LICENCE. If the Solaris operating environment has been installed anywhere other than the default, modify the given path to access the file at the installed
 .\" location.
 .\" Portions Copyright (c) 2009, Sun Microsystems Inc. All Rights Reserved.
-.TH IPFILTER 5 "May 20, 2009"
+.\" Portions Copyright (c) 2014, Joyent, Inc. All Rights Reserved.
+.TH IPFILTER 5 "Oct 7, 2014"
 .SH NAME
 ipfilter \- IP packet filtering software
 .SH DESCRIPTION
-.sp
 .LP
 IP Filter is software that provides packet filtering capabilities on a Solaris
 system. On a properly setup system, it can be used to build a firewall.
@@ -16,7 +16,6 @@ Solaris IP Filter is installed with the Solaris operating system. However,
 packet filtering is not enabled by default. See \fBipf\fR(1M) for a procedure
 to enable and activate the IP Filter feature.
 .SH HOST-BASED FIREWALL
-.sp
 .LP
 To simplify IP Filter configuration management, a firewall framework is created
 to allow users to configure IP Filter by expressing firewall policy at system
@@ -34,14 +33,13 @@ Users can still specify their own ipf rule file if they choose not to take
 advantage of the framework. See \fBipf\fR(1M) and \fBipf\fR(4).
 .RE
 .SS "Model"
-.sp
 .LP
 This section describes the host-based firewall framework. See svc.ipfd(1M) for
 details on how to configure firewall policies.
 .sp
 .LP
-A three-layer approach with different precedence levels helps the user achieve
-the desired behaviors.
+In a given zone, a three-layer approach with different precedence levels helps
+the user achieve the desired behaviors.
 .sp
 .ne 2
 .na
@@ -127,7 +125,6 @@ Deny all incoming traffic but allow from specified source(s).
 .RE
 
 .SS "Layers in Detail"
-.sp
 .LP
 The first system-wide layer, Global Default, defines a firewall policy that
 applies to \fBany\fR incoming traffic, for example, allowing or blocking all
@@ -157,7 +154,6 @@ overrides policies in the other layers, specifically overriding the needs of
 network services. The example is when it is desirable to block known malicious
 source(s) regardless of services' policies.
 .SS "User Interaction"
-.sp
 .LP
 This framework leverages IP Filter functionality and is active only when
 \fBsvc:/network/ipfilter\fR is enabled and inactive when \fBnetwork/ipfilter\fR
@@ -207,9 +203,94 @@ network service
 .el o
 changes to system-wide or per-service firewall policy results in an update to
 the system's firewall rules
-.RE
-.SH ATTRIBUTES
+
+.SS "In-Zone and Global Zone Controlled firewalls"
+.LP
+Each non-global zone in the system can potentially have two firewalls
+configured: the in-zone firewall and the Global Zone controlled (GZ-controlled)
+firewall. The in-zone firewall can be controlled and observed inside the zone
+using the framework detailed above, or from the Global Zone. The GZ-controlled
+firewall can only be controlled and observed from the Global Zone. The
+GZ-controlled firewall is always "outermost" with respect to the zone.
 .sp
+.LP
+For inbound traffic (from an external source to the zone), the traffic flow looks
+like the following diagram. Traffic blocked by the GZ-controlled firewall will
+not be processed by the in-zone firewall.
+.sp
+.in +2
+.nf
+  External Source
+        |
+        |
+GZ-controlled Firewall
+        |
+        |
+  In-Zone Firewall
+        |
+        |
+      Zone
+.fi
+.in -2
+.sp
+.LP
+For outbound traffic (from the zone to an external destination), the traffic
+flow looks like the following diagram. Traffic blocked by the in-zone firewall
+will not be processed by the GZ-controlled firewall.
+.sp
+.in +2
+.nf
+      Zone
+        |
+        |
+  In-Zone Firewall
+        |
+        |
+GZ-controlled Firewall
+        |
+        |
+ External Destination
+.fi
+.in -2
+.sp
+.LP
+Either of the in-Zone or GZ-controlled firewalls can be enabled, or both at the
+same time.
+.sp
+.LP
+The Global Zone does not have a GZ-controlled firewall, only an
+in-zone firewall.  For inbound traffic (from an external source to the global
+zone), the traffic flow therefore looks like the following diagram.
+.sp
+.in +2
+.nf
+  External Source
+        |
+        |
+  In-Zone Firewall
+        |
+        |
+      Zone
+.fi
+.in -2
+.sp
+.LP
+For outbound traffic (from the global zone to an external destination), the
+traffic flow looks like the following diagram.
+.sp
+.in +2
+.nf
+      Zone
+        |
+        |
+  In-Zone Firewall
+        |
+        |
+ External Destination
+.fi
+.in -2
+
+.SH ATTRIBUTES
 .LP
 See \fBattributes\fR(5) for a description of the following attributes:
 .sp
@@ -225,7 +306,6 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBsvcs\fR(1), \fBipf\fR(1M), \fBipnat\fR(1M), \fBsvcadm\fR(1M),
 \fBsvc.ipfd\fR(1M), \fBipf\fR(4), \fBipnat\fR(4), \fBattributes\fR(5),
@@ -234,7 +314,6 @@ Interface Stability	Committed
 .LP
 \fISystem Administration Guide: IP Services\fR
 .SH NOTES
-.sp
 .LP
 The \fBipfilter\fR service is managed by the service management facility,
 \fBsmf\fR(5), under the service identifier:

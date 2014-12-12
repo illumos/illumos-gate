@@ -8,7 +8,7 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
  */
 
 #include <stdio.h>
@@ -57,10 +57,7 @@
 #include "ipf.h"
 #include "netinet/ipl.h"
 #include "kmem.h"
-
-#if SOLARIS
 #include "ipfzone.h"
-#endif
 
 #ifdef	__hpux
 # define	nlist	nlist64
@@ -102,11 +99,7 @@ void usage(name)
 char *name;
 {
 	fprintf(stderr, "Usage: %s [-CdFhlnrRsv] [-f filename]", name);
-#if SOLARIS
 	fprintf(stderr, " [-G|-z zonename]\n");
-#else
-	fprintf(stderr, "\n");
-#endif
 	exit(1);
 }
 
@@ -143,11 +136,9 @@ char *argv[];
 		case 'F' :
 			opts |= OPT_FLUSH;
 			break;
-#if SOLARIS
 		case 'G' :
 			setzonename_global(optarg);
 			break;
-#endif
 		case 'h' :
 			opts |=OPT_HITS;
 			break;
@@ -178,11 +169,9 @@ char *argv[];
 		case 'v' :
 			opts |= OPT_VERBOSE;
 			break;
-#if SOLARIS
 		case 'z' :
 			setzonename(optarg);
 			break;
-#endif
 		default :
 			usage(argv[0]);
 		}
@@ -215,12 +204,11 @@ char *argv[];
 				STRERROR(errno));
 			exit(1);
 		}
-#if SOLARIS
+
 		if (setzone(fd) != 0) {
 			close(fd);
 			exit(1);
 		}
-#endif
 
 		bzero((char *)&obj, sizeof(obj));
 		obj.ipfo_rev = IPFILTER_VERSION;
