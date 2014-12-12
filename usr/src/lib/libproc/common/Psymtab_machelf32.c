@@ -249,7 +249,7 @@ fake_elf32(struct ps_prochandle *P, file_info_t *fptr, uintptr_t addr,
 	int dynstr_shndx;
 	Ehdr *ep;
 	Shdr *sp;
-	Dyn *dp;
+	Dyn *dp = NULL;
 	Dyn *d[DI_NENT] = { 0 };
 	uint_t i;
 	Off off;
