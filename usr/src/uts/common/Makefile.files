@@ -1861,6 +1861,8 @@ IWH_OBJS += iwh.o
 
 IWK_OBJS += iwk2.o
 
+IWN_OBJS += if_iwn.o
+
 IWP_OBJS += iwp.o
 
 MWL_OBJS += mwl.o
