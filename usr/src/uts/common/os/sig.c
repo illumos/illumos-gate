@@ -1761,7 +1761,8 @@ post_sigcld(proc_t *cp, sigqueue_t *sqp)
 			 * (See call to sigcld(q, NULL) in exit().)
 			 * Use KM_NOSLEEP to avoid deadlock.
 			 */
-			ASSERT(pp == proc_init);
+			ASSERT(pp->p_pidp->pid_id ==
+			    cp->p_zone->zone_proc_initpid);
 			winfo(cp, &info, 0);
 			sigaddq(pp, NULL, &info, KM_NOSLEEP);
 		} else {

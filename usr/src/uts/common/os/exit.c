@@ -660,10 +660,22 @@ proc_exit(int why, int what)
 	if ((q = p->p_child) != NULL && p != proc_init) {
 		struct proc	*np;
 		struct proc	*initp = proc_init;
+		pid_t		zone_initpid = 1;
+		struct proc	*zoneinitp = NULL;
 		boolean_t	setzonetop = B_FALSE;
 
-		if (!INGLOBALZONE(curproc))
-			setzonetop = B_TRUE;
+		if (!INGLOBALZONE(curproc)) {
+			zone_initpid = curproc->p_zone->zone_proc_initpid;
+
+			ASSERT(MUTEX_HELD(&pidlock));
+			zoneinitp = prfind(zone_initpid);
+			if (zoneinitp != NULL) {
+				initp = zoneinitp;
+			} else {
+				zone_initpid = 1;
+				setzonetop = B_TRUE;
+			}
+		}
 
 		pgdetach(p);
 
@@ -675,7 +687,8 @@ proc_exit(int why, int what)
 			 */
 			delete_ns(q->p_parent, q);
 
-			q->p_ppid = 1;
+			q->p_ppid = zone_initpid;
+
 			q->p_pidflag &= ~(CLDNOSIGCHLD | CLDWAITPID);
 			if (setzonetop) {
 				mutex_enter(&q->p_lock);
