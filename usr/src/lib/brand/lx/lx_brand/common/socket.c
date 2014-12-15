@@ -267,14 +267,14 @@ static const int ltos_ip_sockopts[LX_IP_UNICAST_IF + 1] = {
  * IPV6_2292DSTOPTS	4
  * IPV6_2292RTHDR	5
  * IPV6_2292PKTOPTIONS	6
- * IPV6_CHECKSUM	7
+ * IPV6_CHECKSUM	7	IPV6_CHECKSUM  0x18
  * IPV6_2292HOPLIMIT	8
  * IPV6_NEXTHOP		9
  * IPV6_AUTHHDR		10
- * IPV6_UNICAST_HOPS	16
- * IPV6_MULTICAST_IF	17
- * IPV6_MULTICAST_HOPS	18
- * IPV6_MULTICAST_LOOP	19
+ * IPV6_UNICAST_HOPS	16	IPV6_UNICAST_HOPS  0x5
+ * IPV6_MULTICAST_IF	17	IPV6_MULTICAST_IF  0x6
+ * IPV6_MULTICAST_HOPS	18	IPV6_MULTICAST_HOPS  0x7
+ * IPV6_MULTICAST_LOOP	19	IPV6_MULTICAST_LOOP  0x8
  * IPV6_JOIN_GROUP	20
  * IPV6_LEAVE_GROUP	21
  * IPV6_ROUTER_ALERT	22
@@ -288,9 +288,9 @@ static const int ltos_ip_sockopts[LX_IP_UNICAST_IF + 1] = {
  * IPV6_XFRM_POLICY	35
  *
  * IPV6_RECVPKTINFO	49	IPV6_RECVPKTINFO  0x12
- * IPV6_PKTINFO		50
- * IPV6_RECVHOPLIMIT	51
- * IPV6_HOPLIMIT	52
+ * IPV6_PKTINFO		50	IPV6_PKTINFO  0xb
+ * IPV6_RECVHOPLIMIT	51	IPV6_RECVHOPLIMIT  0x13
+ * IPV6_HOPLIMIT	52	IPV6_HOPLIMIT  0xc
  * IPV6_RECVHOPOPTS	53
  * IPV6_HOPOPTS		54
  * IPV6_RTHDRDSTOPTS	55
@@ -299,15 +299,17 @@ static const int ltos_ip_sockopts[LX_IP_UNICAST_IF + 1] = {
  * IPV6_RECVDSTOPTS	58
  * IPV6_DSTOPTS		59
  * IPV6_RECVTCLASS	66
- * IPV6_TCLASS		67
+ * IPV6_TCLASS		67	IPV6_TCLASS  0x26
  */
+
 
 static const int ltos_ipv6_sockopts[LX_IPV6_TCLASS + 1] = {
 	OPTNOTSUP, OPTNOTSUP, OPTNOTSUP, OPTNOTSUP,		/* 3 */
-	OPTNOTSUP, OPTNOTSUP, OPTNOTSUP, OPTNOTSUP,		/* 7 */
+	OPTNOTSUP, OPTNOTSUP, OPTNOTSUP, IPV6_CHECKSUM,		/* 7 */
 	OPTNOTSUP, OPTNOTSUP, OPTNOTSUP, OPTNOTSUP,		/* 11 */
 	OPTNOTSUP, OPTNOTSUP, OPTNOTSUP, OPTNOTSUP,		/* 15 */
-	OPTNOTSUP, OPTNOTSUP, OPTNOTSUP, OPTNOTSUP,		/* 19 */
+	IPV6_UNICAST_HOPS, IPV6_MULTICAST_IF,			/* 17 */
+	IPV6_MULTICAST_HOPS, IPV6_MULTICAST_LOOP,		/* 19 */
 	OPTNOTSUP, OPTNOTSUP, OPTNOTSUP, OPTNOTSUP,		/* 23 */
 	OPTNOTSUP, OPTNOTSUP, IPV6_V6ONLY, OPTNOTSUP,		/* 27 */
 	OPTNOTSUP, OPTNOTSUP, OPTNOTSUP, OPTNOTSUP,		/* 31 */
@@ -315,11 +317,12 @@ static const int ltos_ipv6_sockopts[LX_IPV6_TCLASS + 1] = {
 	OPTNOTSUP, OPTNOTSUP, OPTNOTSUP, OPTNOTSUP,		/* 39 */
 	OPTNOTSUP, OPTNOTSUP, OPTNOTSUP, OPTNOTSUP,		/* 43 */
 	OPTNOTSUP, OPTNOTSUP, OPTNOTSUP, OPTNOTSUP,		/* 47 */
-	OPTNOTSUP, IPV6_RECVPKTINFO, OPTNOTSUP, OPTNOTSUP,	/* 51 */
-	OPTNOTSUP, OPTNOTSUP, OPTNOTSUP, OPTNOTSUP,		/* 55 */
+	OPTNOTSUP, IPV6_RECVPKTINFO,				/* 49 */
+	IPV6_PKTINFO, IPV6_RECVHOPLIMIT,			/* 51 */
+	IPV6_HOPLIMIT, OPTNOTSUP, OPTNOTSUP, OPTNOTSUP,		/* 55 */
 	OPTNOTSUP, OPTNOTSUP, OPTNOTSUP, OPTNOTSUP,		/* 59 */
 	OPTNOTSUP, OPTNOTSUP, OPTNOTSUP, OPTNOTSUP,		/* 63 */
-	OPTNOTSUP, OPTNOTSUP, OPTNOTSUP, OPTNOTSUP,		/* 67 */
+	OPTNOTSUP, OPTNOTSUP, OPTNOTSUP, IPV6_TCLASS,		/* 67 */
 };
 
 /*
@@ -1516,7 +1519,7 @@ lx_sendto(int sockfd, void *buf, size_t len, int flags, void *lto, int tolen)
 			    "emulate LX_MSG_NOSIGNAL");
 	}
 
-	r = sendto(sockfd, buf, len, flags, to, tolen);
+	r = sendto(sockfd, buf, len, flags, to, tlen);
 
 	if ((nosigpipe) && (sigaction(SIGPIPE, &oact, NULL) < 0))
 		lx_err_fatal("sendto(): could not reset SIGPIPE handler to "
@@ -1537,9 +1540,14 @@ lx_sendto(int sockfd, void *buf, size_t len, int flags, void *lto, int tolen)
 
 long
 lx_recvfrom(int sockfd, void *buf, size_t len, int flags, void *from,
-    int *from_lenp)
+    socklen_t *from_lenp)
 {
-	ssize_t r;
+
+	struct sockaddr *orig_name = NULL;
+	struct sockaddr sname;
+	socklen_t nlen, orig_len = 0;
+
+	ssize_t r, err;
 
 	int nosigpipe = flags & LX_MSG_NOSIGNAL;
 	struct sigaction newact, oact;
@@ -1549,12 +1557,25 @@ lx_recvfrom(int sockfd, void *buf, size_t len, int flags, void *from,
 
 	/* LTP expects EINVAL when from_len == -1 */
 	if (from_lenp != NULL) {
-		int flen;
-
-		if (uucopy(from_lenp, &flen, sizeof (int)) != 0)
+		if (uucopy(from_lenp, &nlen, sizeof (nlen)) != 0)
 			return (-errno);
-		if (flen == -1)
+		if (nlen == -1)
 			return (-EINVAL);
+	}
+
+	/*
+	 * Allocate a temporary buffer for msg_name.  This is to account for
+	 * sockaddrs that differ in size between LX and illumos.
+	 */
+	if (from != NULL) {
+		orig_len = nlen;
+		orig_name = from;
+		nlen = sizeof (struct sockaddr);
+		if (getsockname(sockfd, &sname, &nlen) < 0)
+			nlen = sizeof (struct sockaddr);
+		if ((from = SAFE_ALLOCA(nlen)) == NULL)
+			return (-ENOMEM);
+		bzero(from, nlen);
 	}
 
 	/*
@@ -1586,11 +1607,19 @@ lx_recvfrom(int sockfd, void *buf, size_t len, int flags, void *from,
 	}
 
 	r = recvfrom(sockfd, buf, len, flags, (struct sockaddr *)from,
-	    from_lenp);
+	    &nlen);
 
 	if ((nosigpipe) && (sigaction(SIGPIPE, &oact, NULL) < 0))
 		lx_err_fatal("recvfrom(): could not reset SIGPIPE handler to "
 		    "emulate LX_MSG_NOSIGNAL");
+
+	/* Copy out the locally buffered name/len, if needed */
+	if (orig_name != NULL) {
+		err = stol_sockaddr(orig_name, from_lenp,
+		    (struct sockaddr *)from, nlen, orig_len);
+		if (err != 0)
+			return (-err);
+	}
 
 	return ((r < 0) ? -errno : r);
 }
@@ -2310,7 +2339,7 @@ static ssize_t
 lx_recvfrom32(ulong_t *args)
 {
 	return (lx_recvfrom((int)args[0], (void *)args[1], (size_t)args[2],
-	    (int)args[3], (struct sockaddr *)args[4], (int *)args[5]));
+	    (int)args[3], (struct sockaddr *)args[4], (socklen_t *)args[5]));
 }
 
 static int
