@@ -4,17 +4,19 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH YPINIT 1M "Dec 20, 2007"
+.\" Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+.TH YPINIT 1M "Dec 15, 2014"
 .SH NAME
 ypinit \- set up NIS client
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/sbin/ypinit\fR [\fB-c\fR] [\fB-m\fR] [\fB-s\fR \fImaster_server\fR]
+\fB/usr/sbin/ypinit\fR \fB-m\fR
+\fB/usr/sbin/ypinit\fR \fB-s\fR [\fImaster_server\fR]
+\fB/usr/sbin/ypinit\fR \fB-c\fR [\fIserver_name...\fR]
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 \fBypinit\fR can be used to set up an \fBNIS\fR client system. You must be the
 superuser to run this command. This script need not be used at all if
@@ -40,14 +42,15 @@ name.
 \fB/var/yp/binding/\fIdomain\fR/ypservers\fR. This file is used by \fBypbind\fR
 when run without the \fB-broadcast\fR option.
 .SH OPTIONS
-.sp
 .ne 2
 .na
-\fB\fB-c\fR\fR
+\fB\fB-c\fR\fR [\fIserver_name...\fR]
 .ad
 .sp .6
 .RS 4n
-Set up a \fBypclient\fR system.
+Set up a \fBypclient\fR system. If \fIserver_name\fR is specified, it will
+replace currently configured list of servers. \fIserver_name\fR could be
+represented by IPv4/v6 address as well as by hostname.
 .RE
 
 .sp
@@ -72,7 +75,6 @@ Slave data base. \fImaster_server\fR must be the same master configured in the
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/hosts\fR\fR
@@ -93,12 +95,10 @@ Lists the servers to which the NIS client is allowed to bind.
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBsvcs\fR(1), \fBypwhich\fR(1), \fBsvcadm\fR(1M), \fBypbind\fR(1M),
 \fBsysinfo\fR(2), \fBhosts\fR(4), \fBattributes\fR(5), \fBsmf\fR(5)
 .SH NOTES
-.sp
 .LP
 The \fBNIS client\fR service is managed by the service management facility,
 \fBsmf\fR(5), under the service identifier:
@@ -116,7 +116,6 @@ Administrative actions on this service, such as enabling, disabling, or
 requesting restart, can be performed using \fBsvcadm\fR(1M). The service's
 status can be queried using the \fBsvcs\fR(1) command.
 .SH BUGS
-.sp
 .LP
 \fBypinit\fR sets up the list of \fBNIS\fR servers only for the current domain
 on the system when it is run, that is, the domain returned by the
