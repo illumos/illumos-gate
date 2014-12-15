@@ -1585,8 +1585,7 @@ hsfs_getpage(
 
 	/* does not support write */
 	if (rw == S_WRITE) {
-		panic("write attempt on READ ONLY HSFS");
-		/*NOTREACHED*/
+		return (EROFS);
 	}
 
 	if (vp->v_flag & VNOMAP) {
@@ -1796,6 +1795,9 @@ hsfs_map(
 	/* VFS_RECORD(vp->v_vfsp, VS_MAP, VS_CALL); */
 
 	if (vp->v_flag & VNOMAP)
+		return (ENOSYS);
+
+	if (prot & PROT_WRITE)
 		return (ENOSYS);
 
 	if (off > HS_MAXFILEOFF || off < 0 ||
