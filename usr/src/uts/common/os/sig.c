@@ -1759,10 +1759,12 @@ post_sigcld(proc_t *cp, sigqueue_t *sqp)
 			/*
 			 * This can only happen when the parent is init.
 			 * (See call to sigcld(q, NULL) in exit().)
-			 * Use KM_NOSLEEP to avoid deadlock.
+			 * Use KM_NOSLEEP to avoid deadlock. The child procs
+			 * initpid can be 1 for zlogin.
 			 */
 			ASSERT(pp->p_pidp->pid_id ==
-			    cp->p_zone->zone_proc_initpid);
+			    cp->p_zone->zone_proc_initpid ||
+			    pp->p_pidp->pid_id == 1);
 			winfo(cp, &info, 0);
 			sigaddq(pp, NULL, &info, KM_NOSLEEP);
 		} else {
