@@ -101,7 +101,7 @@ extern long lx_getpeername(int, void *, int *);
 extern long lx_getsockname(int, void *, int *);
 extern long lx_getsockopt(int, int, int, void *, int *);
 extern long lx_listen(int, int);
-extern long lx_recvfrom(int, void *, size_t, int, void *, int *);
+extern long lx_recvfrom(int, void *, size_t, int, void *, socklen_t *);
 extern long lx_recvmsg(int, void *, int);
 extern long lx_sendmsg(int, void *, int);
 extern long lx_sendto(int, void *, size_t, int, void *, int);
