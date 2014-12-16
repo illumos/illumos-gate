@@ -4045,11 +4045,19 @@ static struct builtin builtin_savedefault =
 static int
 serial_func (char *arg, int flags)
 {
-  unsigned short port = serial_hw_get_port (0);
+  int i;
+  int units[SERIAL_MAX_PORTS];
+  unsigned short ports[SERIAL_MAX_PORTS];
   unsigned int speed = 9600;
   int word_len = UART_8BITS_WORD;
   int parity = UART_NO_PARITY;
   int stop_bit_len = UART_1_STOP_BIT;
+
+  for (i = 0; i < SERIAL_MAX_PORTS; ++i)
+    {
+      units[i] = -1;
+      ports[i] = 0;
+    }
 
   /* Process GNU-style long options.
      FIXME: We should implement a getopt-like function, to avoid
@@ -4060,17 +4068,28 @@ serial_func (char *arg, int flags)
 	{
 	  char *p = arg + sizeof ("--unit=") - 1;
 	  int unit;
-	  
-	  if (! safe_parse_maxint (&p, &unit))
-	    return 1;
-	  
-	  if (unit < 0 || unit > 3)
-	    {
-	      errnum = ERR_DEV_VALUES;
-	      return 1;
-	    }
 
-	  port = serial_hw_get_port (unit);
+	  i = 0;
+	  do
+	    {
+	      if (i >= SERIAL_MAX_PORTS)
+		{
+		  errnum = ERR_DEV_FORMAT;
+		  return 1;
+		}
+
+	      if (! safe_parse_maxint (&p, &unit))
+	        return 1;
+	  
+	      if (unit < 0 || unit > 3)
+	        {
+	          errnum = ERR_DEV_VALUES;
+	          return 1;
+	        }
+
+	      units[i++] = unit;
+	    }
+	  while (*p++ == ',');
 	}
       else if (grub_memcmp (arg, "--speed=", sizeof ("--speed=") - 1) == 0)
 	{
@@ -4086,11 +4105,28 @@ serial_func (char *arg, int flags)
 	{
 	  char *p = arg + sizeof ("--port=") - 1;
 	  int num;
-	  
-	  if (! safe_parse_maxint (&p, &num))
-	    return 1;
 
-	  port = (unsigned short) num;
+	  i = 0;
+	  do
+	    {
+	      if (i >= SERIAL_MAX_PORTS)
+		{
+		  errnum = ERR_DEV_FORMAT;
+		  return 1;
+		}
+
+	      if (! safe_parse_maxint (&p, &num))
+	        return 1;
+
+	      if (num > 0xffff || num <= 0)
+		{
+		  errnum = ERR_DEV_VALUES;
+		  return 1;
+		}
+
+	      ports[i++] = (unsigned short) num;
+	    }
+	  while (*p++ == ',');
 	}
       else if (grub_memcmp (arg, "--word=", sizeof ("--word=") - 1) == 0)
 	{
@@ -4166,8 +4202,21 @@ serial_func (char *arg, int flags)
       arg = skip_to (0, arg);
     }
 
-  /* Initialize the serial unit.  */
-  if (! serial_hw_init (port, speed, word_len, parity, stop_bit_len))
+  if (units[0] == -1 && ports[0] == 0)
+    units[0] = 0;
+
+  for (i = 0; i < SERIAL_MAX_PORTS; ++i)
+    {
+      if (units[i] != -1)
+	ports[i] = serial_hw_get_port (units[i]);
+      if (ports[i] == 0)
+	continue;
+
+      if (serial_hw_init (ports[i], speed, word_len, parity, stop_bit_len))
+	break;
+    }
+
+  if (i >= SERIAL_MAX_PORTS)
     {
       errnum = ERR_BAD_ARGUMENT;
       return 1;
@@ -4181,14 +4230,17 @@ static struct builtin builtin_serial =
   "serial",
   serial_func,
   BUILTIN_MENU | BUILTIN_CMDLINE | BUILTIN_HELP_LIST,
-  "serial [--unit=UNIT] [--port=PORT] [--speed=SPEED] [--word=WORD] [--parity=PARITY] [--stop=STOP] [--device=DEV]",
+  "serial [[--unit=UNIT[,UNIT...]] | [--port=PORT[,PORT...]]] [--speed=SPEED] [--word=WORD] [--parity=PARITY] [--stop=STOP] [--device=DEV]",
   "Initialize a serial device. UNIT is a digit that specifies which serial"
-  " device is used (e.g. 0 == COM1). If you need to specify the port number,"
-  " set it by --port. SPEED is the DTE-DTE speed. WORD is the word length,"
+  " device is used (e.g. 0 == ttya (aka COM1)). If you need to specify the port"
+  " number, set it by --port. Either but not both of --unit and --port is"
+  " permitted; --unit takes precedence. Multiple devices may be specified,"
+  " separated by commas; the first working device in the list will be used"
+  " and the rest ignored. SPEED is the DTE-DTE speed. WORD is the word length,"
   " PARITY is the type of parity, which is one of `no', `odd' and `even'."
   " STOP is the length of stop bit(s). The option --device can be used only"
   " in the grub shell, which specifies the file name of a tty device. The"
-  " default values are COM1, 9600, 8N1."
+  " default values are ttya, 9600, 8N1."
 };
 #endif /* SUPPORT_SERIAL */
 
