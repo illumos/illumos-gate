@@ -59,6 +59,7 @@ MANFILES= 	ASSERT.9f				\
 	 	bufcall.9f				\
 	 	bzero.9f				\
 	 	canput.9f				\
+	 	canputnext.9f				\
 	 	clrbuf.9f				\
 	 	cmn_err.9f				\
 	 	condvar.9f				\
@@ -627,6 +628,7 @@ MANLINKS=	SIZEOF_PTR.9f				\
 	 	atomic_swap_uint.9f			\
 	 	atomic_swap_ulong.9f			\
 	 	atomic_swap_ushort.9f			\
+	 	bcanputnext.9f				\
 	 	crgetgid.9f				\
 	 	crgetgroups.9f				\
 	 	crgetngroups.9f				\
@@ -1372,6 +1374,8 @@ ddi_ptob.9f				:= LINKSRC = ddi_btop.9f
 ddi_cb_unregister.9f			:= LINKSRC = ddi_cb_register.9f
 
 ddi_check_dma_handle.9f			:= LINKSRC = ddi_check_acc_handle.9f
+
+bcanputnext.9f				:= LINKSRC = canputnext.9f
 
 crgetgid.9f				:= LINKSRC = ddi_cred.9f
 crgetgroups.9f				:= LINKSRC = ddi_cred.9f
