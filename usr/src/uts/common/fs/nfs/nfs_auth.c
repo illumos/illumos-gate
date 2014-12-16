@@ -783,7 +783,7 @@ nfsauth_cache_get(struct exportinfo *exi, struct svc_req *req, int flavor,
 	struct netbuf		*claddr;
 	struct auth_cache	**head;
 	struct auth_cache	*p;
-	struct auth_cache	*prev = NULL;
+	struct auth_cache	*prev;
 	int			access;
 	time_t			refresh;
 
@@ -818,7 +818,9 @@ nfsauth_cache_get(struct exportinfo *exi, struct svc_req *req, int flavor,
 
 	rw_enter(&exi->exi_cache_lock, RW_READER);
 	head = &exi->exi_cache[hash(&addr)];
-	for (p = *head; p; p = p->auth_next) {
+retry:
+	prev = NULL;
+	for (p = *head; p != NULL; p = p->auth_next) {
 		if (EQADDR(&addr, &p->auth_addr) && flavor == p->auth_flavor &&
 		    crgetuid(cr) == p->auth_clnt_uid &&
 		    crgetgid(cr) == p->auth_clnt_gid)
@@ -831,44 +833,65 @@ nfsauth_cache_get(struct exportinfo *exi, struct svc_req *req, int flavor,
 		 * In a case the client's supplemental groups changed we need
 		 * to discard the auth_cache entry and re-retrieve it.
 		 */
-		mutex_enter(&p->auth_lock);
 		if (p->auth_clnt_ngids != crgetngroups(cr) ||
 		    bcmp(p->auth_clnt_gids, crgetgroups(cr),
 		    p->auth_clnt_ngids * sizeof (gid_t))) {
-			auth_state_t prev_state = p->auth_state;
+			struct auth_cache *next;
 
-			p->auth_state = NFS_AUTH_INVALID;
-			mutex_exit(&p->auth_lock);
-
-			if (prev_state == NFS_AUTH_FRESH) {
+			/*
+			 * To remove the auth_cache entry from exi we need to
+			 * hold the exi_cache_lock for write.  If we do not
+			 * have it yet, we will try to upgrade, or re-lock as a
+			 * last resort.  In a case of re-lock we will retry the
+			 * search for the auth_cache entry because it might
+			 * changed in the meantime.
+			 */
+			ASSERT(RW_LOCK_HELD(&exi->exi_cache_lock));
+			if (rw_read_locked(&exi->exi_cache_lock) != 0) {
 				if (rw_tryupgrade(&exi->exi_cache_lock) == 0) {
-					struct auth_cache *tmp;
-
 					rw_exit(&exi->exi_cache_lock);
 					rw_enter(&exi->exi_cache_lock,
 					    RW_WRITER);
 
-					prev = NULL;
-					for (tmp = *head; tmp != NULL;
-					    tmp = tmp->auth_next) {
-						if (p == tmp)
-							break;
-						prev = p;
-					}
+					goto retry;
 				}
+			}
 
-				if (prev == NULL)
-					exi->exi_cache[hash(&addr)] =
-					    p->auth_next;
-				else
-					prev->auth_next = p->auth_next;
+			/*
+			 * Now, remove the entry from exi and free it, or place
+			 * it at the dead list.
+			 */
+			next = p->auth_next;
+			mutex_enter(&p->auth_lock);
+			if (p->auth_state != NFS_AUTH_FRESH) {
+				p->auth_state = NFS_AUTH_INVALID;
+				mutex_exit(&p->auth_lock);
 
+				mutex_enter(&refreshq_lock);
+				p->auth_next = refreshq_dead_entries;
+				refreshq_dead_entries = p;
+				mutex_exit(&refreshq_lock);
+			} else {
+				mutex_exit(&p->auth_lock);
 				nfsauth_free_node(p);
 			}
 
+			/*
+			 * Finally, disconnect the entry from exi
+			 */
+			if (prev == NULL)
+				*head = next;
+			else
+				prev->auth_next = next;
+
 			goto retrieve;
 		}
-		mutex_exit(&p->auth_lock);
+
+		/*
+		 * If we hold the lock for write, downgrade
+		 */
+		if (rw_read_locked(&exi->exi_cache_lock) == 0)
+			rw_downgrade(&exi->exi_cache_lock);
 
 		nfsauth_cache_hit++;
 
