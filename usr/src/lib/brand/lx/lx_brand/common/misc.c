@@ -601,6 +601,18 @@ lx_prctl(int option, uintptr_t arg2, uintptr_t arg3,
 	size_t psargslen = sizeof (psinfo.pr_psargs);
 	int fd;
 
+	if (option == LX_PR_GET_DUMPABLE) {
+		/* Indicate that process is always dumpable */
+		return (1);
+	}
+
+	if (option == LX_PR_SET_DUMPABLE) {
+		if (arg2 != 1 && arg2 != 0)
+			return (-EINVAL);
+		/* Lie about altering process dumpability */
+		return (0);
+	}
+
 	if (option == LX_PR_SET_KEEPCAPS) {
 		/*
 		 * The closest illumos analog to SET_KEEPCAPS is the PRIV_AWARE
