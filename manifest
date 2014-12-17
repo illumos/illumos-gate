@@ -18706,6 +18706,7 @@ s usr/share/man/man9f/atomic_swap_ulong.9f=atomic_swap.9f
 s usr/share/man/man9f/atomic_swap_ushort.9f=atomic_swap.9f
 f usr/share/man/man9f/backq.9f 0444 root bin
 f usr/share/man/man9f/bcanput.9f 0444 root bin
+s usr/share/man/man9f/bcanputnext.9f=canputnext.9f
 f usr/share/man/man9f/bcmp.9f 0444 root bin
 f usr/share/man/man9f/bcopy.9f 0444 root bin
 f usr/share/man/man9f/bioclone.9f 0444 root bin
