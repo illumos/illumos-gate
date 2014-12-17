@@ -18726,6 +18726,7 @@ f usr/share/man/man9f/btopr.9f 0444 root bin
 f usr/share/man/man9f/bufcall.9f 0444 root bin
 f usr/share/man/man9f/bzero.9f 0444 root bin
 f usr/share/man/man9f/canput.9f 0444 root bin
+f usr/share/man/man9f/canputnext.9f 0444 root bin
 f usr/share/man/man9f/clrbuf.9f 0444 root bin
 f usr/share/man/man9f/cmn_err.9f 0444 root bin
 f usr/share/man/man9f/condvar.9f 0444 root bin
