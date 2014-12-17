@@ -857,6 +857,11 @@ convertBEInfoToDictionary(be_node_list_t *be, PyObject **listDict)
 		return (B_FALSE);
 	}
 
+	if (PyDict_SetItemString(*listDict, BE_ATTR_GLOBAL_ACTIVE,
+	    (be->be_global_active ? Py_True : Py_False)) != 0) {
+		return (B_FALSE);
+	}
+
 	if (be->be_space_used != 0) {
 		if (PyDict_SetItemString(*listDict, BE_ATTR_SPACE,
 		    PyLong_FromUnsignedLongLong(be->be_space_used)) != 0) {

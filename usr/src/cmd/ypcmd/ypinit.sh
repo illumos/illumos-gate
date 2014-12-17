@@ -19,6 +19,7 @@
 #
 # CDDL HEADER END
 #
+# Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
 #
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -28,8 +29,6 @@
 
 # Portions of this source code were derived from Berkeley 4.3 BSD
 # under license from the Regents of the University of California.
-
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 # set -xv
 YPXFR=/usr/lib/netsvc/yp/ypxfr
@@ -50,6 +49,7 @@ def_dom=""
 master=""
 got_host_list=F
 first_time=T
+non_interactive=F
 exit_on_error=F
 errors_in_setup=F
 
@@ -84,12 +84,13 @@ export PATH
 # To do cleanup
 trap '/usr/bin/rm -f $hf' 0 1 2 3 15
 
+# Check out total number of arguments
 case $# in
 1)	case $1 in
 	-c)	clientp=T;;
 	-m)	masterp=T;;
 	*)	echo 'usage:'
-		echo '	ypinit -c'
+		echo '	ypinit -c [server_name...]'
 		echo '	ypinit -m'
 		echo '	ypinit -s master_server'
 		echo ""
@@ -111,48 +112,43 @@ master_server must be an existing reachable yp server."
 			echo "server not found in $hosts_file or $hosts6_file"
 			exit 1
 		fi;;
-		
-	*)	echo 'usage:'
-		echo '	ypinit -c'
-		echo '	ypinit -m'
-		echo '	ypinit -s master_server'
-		echo ""
-		echo "\
-where -c is used to set up a yp client, -m is used to build a master "
-                echo "\
-yp server data base, and -s is used for a slave data base."
-		echo "\
-master_server must be an existing reachable yp server."
-		exit 1;;
-	esac;;
-3)	case $1 in
-	-c)	clientp=T;;
-	*)	echo 'usage:'
-		echo '	ypinit -c'
-		echo '	ypinit -m'
-		echo '	ypinit -s master_server'
-		echo ""
-		echo "\
-where -c is used to set up a yp client, -m is used to build a master "
-                echo "\
-yp server data base, and -s is used for a slave data base."
-		echo "\
-master_server must be an existing reachable yp server."
-		exit 1;;
-	esac;;
 
-*)	echo 'usage:'
-	echo '	ypinit -c'
-	echo '	ypinit -m'
-	echo '	ypinit -s master_server'
-	echo ""
-	echo "\
+	# the case with more than one argument with the '-c' option
+	# is a subject to enter non-interactive mode
+	-c)	clientp=T; non_interactive=T;
+		;;
+	*)	echo 'usage:'
+		echo '	ypinit -c [server_name...]'
+		echo '	ypinit -m'
+		echo '	ypinit -s master_server'
+		echo ""
+		echo "\
 where -c is used to set up a yp client, -m is used to build a master "
-	echo "\
+                echo "\
 yp server data base, and -s is used for a slave data base."
-	echo "\
+		echo "\
 master_server must be an existing reachable yp server."
-	exit 1;;
+		exit 1;;
+	esac;;
+*)	case $1 in
+
+	# the case with more than one argument with the '-c' option
+	# is a subject to enter non-interactive mode
+	-c)	clientp=T; non_interactive=T;
+		;;
+	*)	echo 'usage:'
+		echo '	ypinit -c [server_name...]'
+		echo '	ypinit -m'
+		echo '	ypinit -s master_server'
+		echo ""
+		echo "\
+where -c is used to set up a yp client, -m is used to build a master "
+                echo "\
+yp server data base, and -s is used for a slave data base."
+		echo "\
+master_server must be an existing reachable yp server."
+		exit 1;;
+	esac;;
 esac
 
 if [ $? -ne 0 ]
@@ -222,97 +218,114 @@ fi
 
 if [ $slavep = F ]
 then
-	while [ $got_host_list = F ]; do
-		touch $hf    # make sure file exists
-		echo ""
-		echo "\
+	if [ $non_interactive = F ]
+	then
+		while [ $got_host_list = F ]; do
+			touch $hf    # make sure file exists
+			echo ""
+			echo "\
 In order for NIS to operate sucessfully, we have to construct a list of the "
-		echo "\
+			echo "\
 NIS servers.  Please continue to add the names for YP servers in order of"
-		echo "\
+			echo "\
 preference, one per line.  When you are done with the list, type a <control D>"
-		echo "\
+			echo "\
 or a return on a line by itself."
-		if [ $masterp = T ]
-		then
-			echo $host > $hf
-			echo "\tnext host to add:  $host"
-		elif [ -f $binding_file ]
-		then
-			if [ $first_time = T ]
+			if [ $masterp = T ]
 			then
-				for h in `cat $binding_file`
-				do
-					echo $h >> $hf
-					echo "\tnext host to add:  $h"
-				done
+				echo $host > $hf
+				echo "\tnext host to add:  $host"
+			elif [ -f $binding_file ]
+			then
+				if [ $first_time = T ]
+				then
+					for h in `cat $binding_file`
+					do
+						echo $h >> $hf
+						echo "\tnext host to add:  $h"
+					done
+				fi
 			fi
-		fi
 
-		echo  "\tnext host to add:  \c"
+			echo  "\tnext host to add:  \c"
 
-		while read h ; test -n "$h"
-		do
-			#
-			# Host should be in the v4 or v6 hosts file or
-			# reasonably resemble an IP address.  We'll do a
-			# sanity check that a v4 addr is one word consisting
-			# of only numbers and the "." character,
-			# which should guard against fully qualified
-			# hostnames and most malformed entries.  IPv6
-			# addresses can be numbers, hex letters, and have
-			# at least one ":" character and possibly one or
-			# more "." characters for embedded v4 addresses
-			#
-			if ( grep $h $hosts_file $hosts6_file > /dev/null ) || \
-			    ( test $clientp = T && `is_valid_ipaddr $h` )
+			while read h ; test -n "$h"
+			do
+				#
+				# Host should be in the v4 or v6 hosts file or
+				# reasonably resemble an IP address.  We'll do a
+				# sanity check that a v4 addr is one word consisting
+				# of only numbers and the "." character,
+				# which should guard against fully qualified
+				# hostnames and most malformed entries.  IPv6
+				# addresses can be numbers, hex letters, and have
+				# at least one ":" character and possibly one or
+				# more "." characters for embedded v4 addresses
+				#
+				if ( grep $h $hosts_file $hosts6_file > /dev/null ) || \
+				    ( test $clientp = T && `is_valid_ipaddr $h` )
+				then
+					echo $h >> $hf
+					echo  "\tnext host to add:  \c"
+				else
+					echo "host $h not found in $hosts_file or" \
+					    "$hosts6_file.\nNot added to the list."
+					echo ""
+					echo  "Do you wish to abort [y/n: y]  \c"
+					read cont_ok
+
+					case $cont_ok in
+					n*)	echo "\tnext host to add:  \c";;
+					N*)	echo "\tnext host to add:  \c";;
+					*)	exit 1;;
+					esac
+				fi
+			done
+
+			echo ""
+			if [ -s $hf ]
 			then
-				echo $h >> $hf
-				echo  "\tnext host to add:  \c"
+				echo "The current list of yp servers looks like this:"
+				echo ""
+				cat $hf
+				echo ""
+				echo "Is this correct?  [y/n: y]  \c"
 			else
-				echo "host $h not found in $hosts_file or" \
+				echo "You have not added any server information."
+				echo ""
+				echo "Do you still wish to exit? [y/n: y]  \c"
+			fi
+
+			read hlist_ok
+
+			case $hlist_ok in
+			n*)	got_host_list=F
+				first_time=F
+				rm $hf
+				echo "Let's try the whole thing again...";;
+			N*)	got_host_list=F
+				first_time=F
+				rm $hf
+				echo "Let's try the whole thing again...";;
+			*)	got_host_list=T;;
+			esac
+		done
+	else
+		shift
+		> $hf
+		while [[ $# > 0 ]]; do
+			if ( grep $1 $hosts_file $hosts6_file > /dev/null ) || \
+			    ( `is_valid_ipaddr $1` )
+			then
+				echo $1 >> $hf
+			else
+				echo "host $1 not found in $hosts_file or" \
 				    "$hosts6_file.\nNot added to the list."
 				echo ""
-				echo  "Do you wish to abort [y/n: y]  \c"
-				read cont_ok
-
-				case $cont_ok in
-				n*)	echo "\tnext host to add:  \c";;	
-				N*)	echo "\tnext host to add:  \c";;	
-				*)	exit 1;;
-				esac
 			fi
-
+			shift
 		done
-
-		echo ""
-		if [ -s $hf ]
-		then
-			echo "The current list of yp servers looks like this:"
-			echo ""
-			cat $hf
-			echo ""
-			echo "Is this correct?  [y/n: y]  \c"
-		else
-			echo "You have not added any server information."
-			echo ""
-			echo "Do you still wish to exit? [y/n: y]  \c"
-		fi
-
-		read hlist_ok
-
-		case $hlist_ok in
-		n*)	got_host_list=F
-			first_time=F
-			rm $hf
-			echo "Let's try the whole thing again...";;
-		N*)	got_host_list=F
-			first_time=F
-			rm $hf
-			echo "Let's try the whole thing again...";;
-		*)	got_host_list=T;;
-		esac
-	done
+	fi
 
 	if [ -s $hf ]
 	then

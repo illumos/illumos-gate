@@ -1,0 +1,81 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2014 Garrett D'Amore <garrett@damore.org>
+.\"
+.Dd "Dec 15, 2014"
+.Dt CANPUTNEXT 9F
+.Os
+.Sh NAME
+.Nm canputnext ,
+.Nm bcanputnext
+.Nd test for room in next message queue
+.Sh SYNOPSIS
+.In sys/stream.h
+.
+.Ft int
+.Fo canputnext
+.Fa "queue_t *q"
+.Fc
+.
+.Ft int
+.Fo bcanputnext
+.Fa "queue_t *q"
+.Fa "unsigned char pri"
+.Fc
+.
+.Sh DESCRIPTION
+The
+.Fn canputnext
+and
+.Fn bcanputnext
+functions atomically test for available space in the next
+linked queue or priority band.
+They are preferable to and safer than calling
+.Xr canput 9F
+and
+.Xr bcanput 9F
+directly on the the queue linked to by
+.Fa q Ns No -> Ns Fa q_next .
+.Lp
+Drivers and modules should call these routines to ensure that room
+on the next queue exists before calling
+.Xr putnext 9F .
+.Sh INTERFACE LEVEL
+Architecture independent (DDI/DDK).
+.Sh PARAMETERS
+.Bl -tag -width Ds
+.It Fa q
+STREAMS queue.
+.It Fa pri
+Priority band to test.
+.El
+.Sh CONTEXT
+These functions may be called in user, kernel, or interrupt
+context.
+.Sh RETURN VALUES
+.Bl -tag -width Ds
+.It 1
+If the next message queue is not full.
+.It 0
+If the next message queue is full.
+.El
+.Sh SEE ALSO
+.Rs
+.%B "STREAMS Programming Guide"
+.Re
+.Rs
+.%B "Writing Device Drivers"
+.Re
+.Pp
+.Xr bcanput 9F ,
+.Xr canput 9F ,
+.Xr putnext 9F ,
