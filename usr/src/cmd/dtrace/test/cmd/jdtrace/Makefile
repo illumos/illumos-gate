@@ -23,7 +23,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 PROG = jdtrace
 SRCS = jdtrace.c
@@ -75,9 +74,8 @@ $(PROG): $(SRCS)
 	$(LINK.c) -o $@ $(SRCS) $(LDLIBS)
 	$(POST_PROCESS) ; $(STRIP_STABS)
 
-JFLAGS= -g -cp $(CLASSPATH) -d $(CLASSDIR) -deprecation
-JFLAGS += -target 1.5
-JFLAGS += -Xlint
+JFLAGS= -g -cp $(CLASSPATH) -d $(CLASSDIR)
+JFLAGS += -source 1.5 -target 1.6 -Xlint:all,-options
 COMPILE.java=$(JAVAC) $(JFLAGS)
 JAVASRC= JDTrace.java Getopt.java
 

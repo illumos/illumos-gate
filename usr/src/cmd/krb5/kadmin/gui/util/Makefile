@@ -23,13 +23,10 @@
 # Copyright (c) 1999-2001 by Sun Microsystems, Inc.
 # All rights reserved.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 include ../../../../../Makefile.master
 include ../../../../Makefile.cmd
 
-JAVAFLAGS= -nowarn -O
 
 GUIDIR=$(SRC)/cmd/krb5/kadmin/gui
 

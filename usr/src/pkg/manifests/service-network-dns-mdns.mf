@@ -132,7 +132,12 @@ file path=usr/share/lib/java/javadoc/dnssd/api/index-all.html group=other
 file path=usr/share/lib/java/javadoc/dnssd/api/index.html group=other
 file path=usr/share/lib/java/javadoc/dnssd/api/overview-tree.html group=other
 file path=usr/share/lib/java/javadoc/dnssd/api/package-list group=other
-file path=usr/share/lib/java/javadoc/dnssd/api/resources/inherit.gif \
+file path=usr/share/lib/java/javadoc/dnssd/api/resources/background.gif \
+    group=other
+file path=usr/share/lib/java/javadoc/dnssd/api/resources/tab.gif group=other
+file path=usr/share/lib/java/javadoc/dnssd/api/resources/titlebar.gif \
+    group=other
+file path=usr/share/lib/java/javadoc/dnssd/api/resources/titlebar_end.gif \
     group=other
 file path=usr/share/lib/java/javadoc/dnssd/api/serialized-form.html \
     group=other

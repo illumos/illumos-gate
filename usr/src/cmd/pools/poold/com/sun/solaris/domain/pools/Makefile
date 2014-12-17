@@ -27,7 +27,6 @@
 include $(SRC)/cmd/Makefile.cmd
 
 CLASSPATH =	$(SRC)/cmd/pools/poold
-JAVAFLAGS +=	-target 5
 
 SOURCE =	Move.java \
 		Expression.java \

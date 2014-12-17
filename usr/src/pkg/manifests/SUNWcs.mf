@@ -275,9 +275,6 @@ dir path=var/news
 dir path=var/opt group=sys
 dir path=var/preserve mode=1777
 dir path=var/run group=sys
-dir path=var/sadm group=sys
-dir path=var/sadm/system group=sys
-dir path=var/sadm/system/admin group=sys
 dir path=var/saf
 dir path=var/saf/zsmon group=sys
 dir path=var/spool
@@ -1463,7 +1460,6 @@ file path=var/adm/utmpx preserve=true
 file path=var/adm/wtmpx group=adm owner=adm preserve=true
 file path=var/log/authlog group=sys mode=0600 preserve=true
 file path=var/log/syslog group=sys preserve=true
-file path=var/sadm/system/admin/default_java group=sys mode=0444
 file path=var/saf/zsmon/log group=sys preserve=true
 file path=var/spool/cron/crontabs/adm group=sys mode=0600 preserve=true
 file path=var/spool/cron/crontabs/root group=sys mode=0600 preserve=true
