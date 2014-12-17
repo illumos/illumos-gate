@@ -757,7 +757,7 @@ expand(char *name)
 		if (debug) fprintf(stderr, "%s\n", name);
 		return (name);
 	}
-	if (wordexp(name, &wrdexp_buf, 0) != 0) {
+	if (wordexp(name, &wrdexp_buf, WRDE_NOCMD) != 0) {
 		fprintf(stderr, gettext("Syntax error in \"%s\"\n"), name);
 		fflush(stderr);
 		return (NOSTR);
