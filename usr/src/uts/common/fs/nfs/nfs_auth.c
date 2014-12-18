@@ -1107,6 +1107,27 @@ nfsauth_access(struct exportinfo *exi, struct svc_req *req, cred_t *cr,
 	int authnone_entry = -1;
 
 	/*
+	 * By default root is mapped to anonymous user.
+	 * This might get overriden later in nfsauth_cache_get().
+	 */
+	if (crgetuid(cr) == 0) {
+		if (uid != NULL)
+			*uid = exi->exi_export.ex_anon;
+		if (gid != NULL)
+			*gid = exi->exi_export.ex_anon;
+	} else {
+		if (uid != NULL)
+			*uid = crgetuid(cr);
+		if (gid != NULL)
+			*gid = crgetgid(cr);
+	}
+
+	if (ngids != NULL)
+		*ngids = 0;
+	if (gids != NULL)
+		*gids = NULL;
+
+	/*
 	 *  Get the nfs flavor number from xprt.
 	 */
 	flavor = (int)(uintptr_t)req->rq_xprt->xp_cookie;
@@ -1140,27 +1161,6 @@ nfsauth_access(struct exportinfo *exi, struct svc_req *req, cred_t *cr,
 		mapaccess = NFSAUTH_MAPNONE;
 		i = authnone_entry;
 	}
-
-	/*
-	 * By default root is mapped to anonymous user.
-	 * This might get overriden later in nfsauth_cache_get().
-	 */
-	if (crgetuid(cr) == 0) {
-		if (uid != NULL)
-			*uid = exi->exi_export.ex_anon;
-		if (gid != NULL)
-			*gid = exi->exi_export.ex_anon;
-	} else {
-		if (uid != NULL)
-			*uid = crgetuid(cr);
-		if (gid != NULL)
-			*gid = crgetgid(cr);
-	}
-
-	if (ngids != NULL)
-		*ngids = 0;
-	if (gids != NULL)
-		*gids = NULL;
 
 	/*
 	 * If the flavor is in the ex_secinfo list, but not an explicitly

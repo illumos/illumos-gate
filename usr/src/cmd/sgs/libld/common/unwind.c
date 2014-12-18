@@ -634,7 +634,7 @@ ld_unwind_populate_hdr(Ofl_desc *ofl)
 						 * field.
 						 */
 					    (void) dwarf_ehe_extract(
-						&data[off + ndx],
+						&data[off],
 						&ndx, ciePflag,
 						ofl->ofl_dehdr->e_ident, B_FALSE,
 						shdr->sh_addr, off + ndx, 0);
