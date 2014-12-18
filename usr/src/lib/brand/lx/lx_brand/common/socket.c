@@ -1372,10 +1372,16 @@ lx_getsockname(int sockfd, void *np, int *nlp)
 	lx_debug("\tgetsockname(%d, 0x%p, 0x%p (=%d))", sockfd,
 	    (struct sockaddr *)np, nlp, namelen);
 
+	/*
+	 * Use sizeof (struct sockaddr_in6) as the minimum temporary
+	 * name allocation.  This will allow families such as AF_INET6
+	 * to work properly when their namelen differs between LX and
+	 * illumos.
+	 */
 	if (namelen <= 0)
 		return (-EFAULT);
-	else if (namelen < sizeof (struct sockaddr))
-		namelen = sizeof (struct sockaddr);
+	else if (namelen < sizeof (struct sockaddr_in6))
+		namelen = sizeof (struct sockaddr_in6);
 
 	if ((name = SAFE_ALLOCA(namelen)) == NULL)
 		return (-ENOMEM);
@@ -1399,10 +1405,12 @@ long
 lx_getpeername(int sockfd, void *np, int *nlp)
 {
 	struct sockaddr *name;
-	socklen_t namelen;
+	socklen_t namelen, namelen_orig;
+	int err;
 
 	if (uucopy((void *)nlp, &namelen, sizeof (socklen_t)) != 0)
 		return (-errno);
+	namelen_orig = namelen;
 
 	lx_debug("\tgetpeername(%d, 0x%p, 0x%p (=%d))", sockfd,
 	    (struct sockaddr *)np, nlp, namelen);
@@ -1421,16 +1429,27 @@ lx_getpeername(int sockfd, void *np, int *nlp)
 	if (np == NULL || np == (void *)-1)
 		return (-EFAULT);
 
-	if ((name = SAFE_ALLOCA(namelen)) == NULL)
+	/*
+	 * Use sizeof (struct sockaddr_in6) as the minimum temporary
+	 * name allocation.  This will allow families such as AF_INET6
+	 * to work properly when their namelen differs between LX and
+	 * illumos.
+	 */
+	if (namelen < sizeof (struct sockaddr_in6))
+		namelen = sizeof (struct sockaddr_in6);
+
+	name = SAFE_ALLOCA(namelen);
+	if (name == NULL)
 		return (-EINVAL);
+	bzero(name, namelen);
+
 	if ((getpeername(sockfd, name, &namelen)) < 0)
 		return (-errno);
 
-	if (uucopy(name, np, namelen) != 0)
-		return (-errno);
-
-	if (uucopy(&namelen, (void *)nlp, sizeof (socklen_t)) != 0)
-		return (-errno);
+	err = stol_sockaddr((struct sockaddr *)np, (socklen_t *)nlp,
+	    name, namelen, namelen_orig);
+	if (err != 0)
+		return (-err);
 
 	return (0);
 }
@@ -2144,19 +2163,37 @@ lx_recvmsg(int sockfd, void *lmp, int flags)
  * See internal comments in that function for more explanation.
  */
 long
-lx_accept4(int sockfd, void *name, int *nlp, int lx_flags)
+lx_accept4(int sockfd, void *np, int *nlp, int lx_flags)
 {
-	socklen_t namelen = 0;
+	socklen_t namelen, namelen_orig;
+	struct sockaddr *name = NULL;
 	int flags = 0;
-	int r;
+	int r, err;
 
-	lx_debug("\taccept4(%d, 0x%p, 0x%p 0x%x", sockfd, name, nlp, lx_flags);
+	lx_debug("\taccept4(%d, 0x%p, 0x%p 0x%x", sockfd, np, nlp, lx_flags);
 
-	if ((name != NULL) &&
+	if ((np != NULL) &&
 	    (uucopy((void *)nlp, &namelen, sizeof (socklen_t)) != 0))
 		return ((errno == EFAULT) ? -EINVAL : -errno);
 
+	namelen_orig = namelen;
 	lx_debug("\taccept4 namelen = %d", namelen);
+
+	if (np != NULL) {
+		/*
+		 * Use sizeof (struct sockaddr_in6) as the minimum temporary
+		 * name allocation.  This will allow families such as AF_INET6
+		 * to work properly when their namelen differs between LX and
+		 * illumos.
+		 */
+		if (namelen < sizeof (struct sockaddr_in6))
+			namelen = sizeof (struct sockaddr_in6);
+
+		name = SAFE_ALLOCA(namelen);
+		if (name == NULL)
+			return (-EINVAL);
+		bzero(name, namelen);
+	}
 
 	if (lx_flags & LX_SOCK_NONBLOCK)
 		flags |= SOCK_NONBLOCK;
@@ -2164,15 +2201,19 @@ lx_accept4(int sockfd, void *name, int *nlp, int lx_flags)
 	if (lx_flags & LX_SOCK_CLOEXEC)
 		flags |= SOCK_CLOEXEC;
 
-	if ((r = accept4(sockfd, (struct sockaddr *)name, &namelen, flags)) < 0)
+	if ((r = accept4(sockfd, name, &namelen, flags)) < 0)
 		return ((errno == EFAULT) ? -EINVAL : -errno);
 
 	lx_debug("\taccept4 namelen returned %d bytes", namelen);
 
-	if ((name != NULL) && (namelen != 0) &&
-	    (uucopy(&namelen, (void *)nlp, sizeof (socklen_t)) != 0))
-		return ((errno == EFAULT) ? -EINVAL : -errno);
-
+	if (np != NULL && namelen != 0) {
+		err = stol_sockaddr((struct sockaddr *)np, (socklen_t *)nlp,
+		    name, namelen, namelen_orig);
+		if (err != 0) {
+			close(r);
+			return ((err == EFAULT) ? -EINVAL : -err);
+		}
+	}
 	return (r);
 }
 
