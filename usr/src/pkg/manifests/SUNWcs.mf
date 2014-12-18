@@ -1833,6 +1833,12 @@ link path=usr/tmp target=../var/tmp
 link path=var/ld/32 target=.
 link path=var/ld/64 target=$(ARCH64)
 #
+# cross zone dependency on linked image metadata
+# ifconfig, etc, dependencies on running kernel version
+#
+depend fmri=feature/package/dependency/self type=parent \
+    variant.opensolaris.zone=nonglobal
+#
 # The bootadm binary needs the etc/release file.
 #
 depend fmri=release/name type=require

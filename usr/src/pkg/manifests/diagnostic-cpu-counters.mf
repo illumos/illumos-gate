@@ -227,3 +227,7 @@ link path=usr/share/man/man3cpc/cpc_walk_requests.3cpc \
 link path=usr/share/man/man3cpc/pctx_create.3cpc target=pctx_capture.3cpc
 link path=usr/share/man/man3cpc/pctx_release.3cpc target=pctx_capture.3cpc
 link path=usr/share/man/man3cpc/pctx_run.3cpc target=pctx_capture.3cpc
+# cross zone dependency on linked image metadata
+# libcpc dependency on running kernel version
+depend fmri=feature/package/dependency/self type=parent \
+    variant.opensolaris.zone=nonglobal

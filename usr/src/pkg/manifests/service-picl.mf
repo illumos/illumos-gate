@@ -947,3 +947,7 @@ link path=usr/share/man/man3picltree/ptree_get_propval_by_name.3picltree \
     target=ptree_get_propval.3picltree
 link path=usr/share/man/man3picltree/ptree_update_propval_by_name.3picltree \
     target=ptree_update_propval.3picltree
+# cross zone dependency on linked image metadata
+# needs to match running kernel
+depend fmri=feature/package/dependency/self type=parent \
+    variant.opensolaris.zone=nonglobal

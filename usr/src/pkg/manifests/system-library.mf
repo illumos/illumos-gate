@@ -1301,6 +1301,10 @@ link path=usr/lib/straddr.so target=./straddr.so.2
 link path=usr/xpg4/lib/$(ARCH64)/libcurses.so target=libcurses.so.2
 link path=usr/xpg4/lib/64 target=$(ARCH64)
 link path=usr/xpg4/lib/libcurses.so target=./libcurses.so.2
+# cross zone dependency on linked image metadata
+# due to libc, libdlpi, libdladm, etc, dependency on running kernel version
+depend fmri=feature/package/dependency/self type=parent \
+    variant.opensolaris.zone=nonglobal
 #
 # libses.so needs to dlopen(3C) plugins from usr/lib/scsi/plugins/ses/vendor/,
 # a dependency which cannot be automatically derived

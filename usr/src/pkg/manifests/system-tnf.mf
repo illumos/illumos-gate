@@ -70,3 +70,6 @@ link path=usr/lib/$(ARCH64)/libtnfctl.so target=libtnfctl.so.1
 link path=usr/lib/$(ARCH64)/libtnfprobe.so target=libtnfprobe.so.1
 link path=usr/lib/libtnfctl.so target=./libtnfctl.so.1
 link path=usr/lib/libtnfprobe.so target=./libtnfprobe.so.1
+# cross zone dependency on linked image metadata
+depend fmri=feature/package/dependency/self type=parent \
+    variant.opensolaris.zone=nonglobal

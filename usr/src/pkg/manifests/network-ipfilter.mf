@@ -140,3 +140,7 @@ link path=usr/share/man/man4/ipf6.conf.4 target=./ipf.4
 link path=usr/share/man/man4/ipmon.conf.4 target=./ipmon.4
 link path=usr/share/man/man4/ipnat.conf.4 target=./ipnat.4
 link path=usr/share/man/man4/ippool.conf.4 target=./ippool.4
+# cross zone dependency on linked image metadata
+# ipfilter needs to match running kernel
+depend fmri=feature/package/dependency/self type=parent \
+    variant.opensolaris.zone=nonglobal

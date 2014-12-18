@@ -122,4 +122,8 @@ link path=usr/lib/nfs/libmapid.so target=libmapid.so.1
 link path=usr/sbin/showmount target=../lib/fs/nfs/showmount
 user username=unknown ftpuser=false gcos-field="Unknown Remote UID" \
     group=unknown uid=96
+# cross zone dependency on linked image metadata
+# needs to match running kernel
+depend fmri=feature/package/dependency/self type=parent \
+    variant.opensolaris.zone=nonglobal
 depend fmri=system/kernel/secure-rpc type=require

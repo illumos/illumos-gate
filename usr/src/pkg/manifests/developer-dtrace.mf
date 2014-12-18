@@ -671,3 +671,7 @@ link path=usr/lib/$(ARCH64)/libdtrace.so target=libdtrace.so.1
 link path=usr/lib/$(ARCH64)/libdtrace_jni.so target=libdtrace_jni.so.1
 link path=usr/lib/libdtrace.so target=libdtrace.so.1
 link path=usr/lib/libdtrace_jni.so target=libdtrace_jni.so.1
+# cross zone dependency on linked image metadata
+# libdtrace depends on running kernel version
+depend fmri=feature/package/dependency/self type=parent \
+    variant.opensolaris.zone=nonglobal
