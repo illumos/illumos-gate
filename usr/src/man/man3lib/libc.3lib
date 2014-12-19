@@ -408,7 +408,8 @@ l l .
 \fBmembar_producer\fR	\fBmemccpy\fR
 \fBmemchr\fR	\fBmemcmp\fR
 \fBmemcntl\fR	\fBmemcpy\fR
-\fBmeminfo\fR	\fBmemmove\fR
+\fBmeminfo\fR	\fBmemmem\fR
+\fBmemmove\fR
 \fBmemset\fR	\fBmincore\fR
 \fBmkdir\fR	\fBmkfifo\fR
 \fBmknod\fR	\fBmkstemp\fR
@@ -1009,13 +1010,13 @@ to avoid conflicting with an application that might define its own version of
 \fBgetpwent()\fR with completely different semantics. Standard-conforming
 applications may not define and use function names with leading underscores.
 .LP
-Solaris system libraries are now built with direct binding. This means that a
+illumos system libraries are now built with direct binding. This means that a
 system library that calls \fBgetpwent()\fR will bind directly to the instance
 of \fBgetpwent()\fR in \fBlibc\fR, even if the application to which it is
 linked defines a different \fBgetpwent()\fR for its own use. The application
 binds to its instance of \fBgetpwent()\fR and there is no resulting conflict.
 The direct binding mechanism is equally available to libraries not delivered
-with Solaris.
+with illumos.
 .LP
 As a result of this evolution, most of the leading-underscore synonym symbols
 have been removed from \fBlibc\fR.  This means that applications that call

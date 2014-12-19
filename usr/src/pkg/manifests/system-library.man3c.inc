@@ -915,6 +915,7 @@ link path=usr/share/man/man3c/memccpy.3c target=memory.3c
 link path=usr/share/man/man3c/memchr.3c target=memory.3c
 link path=usr/share/man/man3c/memcmp.3c target=memory.3c
 link path=usr/share/man/man3c/memcpy.3c target=memory.3c
+link path=usr/share/man/man3c/memmem.3c target=memory.3c
 link path=usr/share/man/man3c/memmove.3c target=memory.3c
 link path=usr/share/man/man3c/memset.3c target=memory.3c
 link path=usr/share/man/man3c/minor.3c target=makedev.3c
