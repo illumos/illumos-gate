@@ -39,6 +39,11 @@ size_t
 mbsrtowcs_l(wchar_t *_RESTRICT_KYWD dst, const char **_RESTRICT_KYWD src,
     size_t len, mbstate_t *_RESTRICT_KYWD ps, locale_t loc)
 {
+	static mbstate_t mbs;
+
+	if (ps == NULL)
+		ps = &mbs;
+
 	return (loc->ctype->lc_mbsnrtowcs(dst, src, ULONG_MAX, len, ps));
 }
 
