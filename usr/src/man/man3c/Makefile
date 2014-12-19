@@ -668,6 +668,7 @@ MANLINKS=	FD_CLR.3c				\
 	 	btowc_l.3c				\
 	 	bzero.3c				\
 	 	calloc.3c				\
+		canonicalize_file_name.3c		\
 	 	catclose.3c				\
 	 	cfgetospeed.3c				\
 	 	cfsetospeed.3c				\
@@ -1435,6 +1436,8 @@ bcopy.3c				:= LINKSRC = bstring.3c
 bzero.3c				:= LINKSRC = bstring.3c
 
 btowc_l.3c				:= LINKSRC = btowc.3c
+
+canonicalize_file_name.3c		:= LINKSRC = realpath.3c
 
 catclose.3c				:= LINKSRC = catopen.3c
 

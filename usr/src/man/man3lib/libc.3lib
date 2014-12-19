@@ -156,6 +156,7 @@ l l .
 \fBbsearch\fR
 \fBbtowc\fR	\fBbtowc_l\fR
 \fBbzero\fR	\fBcalloc\fR
+\fBcanonicalize_file_name\fR
 \fBcatclose\fR	\fBcatgets\fR
 \fBcatopen\fR	\fBcfgetispeed\fR
 \fBcfgetospeed\fR	\fBcfsetispeed\fR

@@ -663,6 +663,7 @@ link path=usr/share/man/man3c/bindtextdomain.3c target=gettext.3c
 link path=usr/share/man/man3c/btowc_l.3c target=btowc.3c
 link path=usr/share/man/man3c/bzero.3c target=bstring.3c
 link path=usr/share/man/man3c/calloc.3c target=malloc.3c
+link path=usr/share/man/man3c/canonicalize_file_name.3c target=realpath.3c
 link path=usr/share/man/man3c/catclose.3c target=catopen.3c
 link path=usr/share/man/man3c/cfgetospeed.3c target=cfgetispeed.3c
 link path=usr/share/man/man3c/cfsetospeed.3c target=cfsetispeed.3c
