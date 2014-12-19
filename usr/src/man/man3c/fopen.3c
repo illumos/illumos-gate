@@ -4,7 +4,7 @@
 .\" Copyright (c) 2006, Sun Microsystems, Inc.  All Rights Reserved.
 .\" Portions Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
 .\" Portions Copyright (c) 2013, OmniTI Computer Consulting, Inc.  All Rights Reserved.
-.\" Portions Copyright (c) 2013, Joyent, Inc.  All Rights Reserved.
+.\" Portions Copyright (c) 2014, Joyent, Inc.  All Rights Reserved.
 .\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
@@ -402,6 +402,7 @@ The \fBF\fR character in the \fImode\fR argument is Evolving. In all other
 respects this function is Standard.
 .SH SEE ALSO
 .LP
-\fBenable_extended_FILE_stdio\fR(3C), \fBfclose\fR(3C), \fBfdopen\fR(3C),
-\fBfflush\fR(3C), \fBfreopen\fR(3C), \fBfsetpos\fR(3C), \fBrewind\fR(3C),
-\fBopen\fR(2), \fBattributes\fR(5), \fBlf64\fR(5), \fBstandards\fR(5)
+\fBenable_extended_FILE_stdio\fR(3C), \fBfclose\fR(3C),
+\fRfcloseall\fR(3C), \fBfdopen\fR(3C), \fBfflush\fR(3C),
+\fBfreopen\fR(3C), \fBfsetpos\fR(3C), \fBrewind\fR(3C), \fBopen\fR(2),
+\fBattributes\fR(5), \fBlf64\fR(5), \fBstandards\fR(5)

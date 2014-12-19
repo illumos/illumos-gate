@@ -224,9 +224,9 @@ l l .
 \fBfchdir\fR	\fBfchmod\fR
 \fBfchown\fR	\fBfchownat\fR
 \fBfchroot\fR	\fBfclose\fR
-\fBfcntl\fR	\fBfconvert\fR
-\fBfcvt\fR	\fBfdatasync\fR
-\fBfdetach\fR	
+\fBfcloseall\fR	\fBfcntl\fR
+\fBfconvert\fR	\fBfcvt\fR
+\fBfdatasync\fR	\fBfdetach\fR	
 \fBfdopen\fR	\fBfdopendir\fR
 \fBfdwalk\fR	\fBfeof\fR
 \fBferror\fR	\fBfflush\fR

@@ -113,6 +113,7 @@ MANFILES= 	__fbufsize.3c					\
 	 	exit.3c						\
 	 	fattach.3c					\
 	 	fclose.3c					\
+		fcloseall.3c					\
 	 	fdatasync.3c					\
 	 	fdetach.3c					\
 	 	fdopen.3c					\

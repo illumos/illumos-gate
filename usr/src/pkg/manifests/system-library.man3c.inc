@@ -109,6 +109,7 @@ file path=usr/share/man/man3c/euclen.3c
 file path=usr/share/man/man3c/exit.3c
 file path=usr/share/man/man3c/fattach.3c
 file path=usr/share/man/man3c/fclose.3c
+file path=usr/share/man/man3c/fcloseall.3c
 file path=usr/share/man/man3c/fdatasync.3c
 file path=usr/share/man/man3c/fdetach.3c
 file path=usr/share/man/man3c/fdopen.3c
