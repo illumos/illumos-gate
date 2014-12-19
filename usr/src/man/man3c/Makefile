@@ -60,6 +60,7 @@ MANFILES= 	__fbufsize.3c					\
 	 	catopen.3c					\
 	 	cfgetispeed.3c					\
 	 	cfsetispeed.3c					\
+		clearenv.3c					\
 	 	clock.3c					\
 	 	clock_nanosleep.3c				\
 	 	clock_settime.3c				\

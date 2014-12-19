@@ -163,7 +163,8 @@ l l .
 \fBcfsetospeed\fR	\fBcftime\fR
 \fBchdir\fR	\fBchmod\fR
 \fBchown\fR	\fBchroot\fR
-\fBclearerr\fR	\fBclock\fR
+\fBclearerr\fR	\fBclearenv\fR
+\fBclock\fR
 \fBclock_getres\fR	\fBclock_gettime\fR
 \fBclock_nanosleep\fR	\fBclock_settime\fR
 \fBclose\fR	\fBclosedir\fR

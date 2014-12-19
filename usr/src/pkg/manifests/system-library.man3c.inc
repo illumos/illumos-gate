@@ -56,6 +56,7 @@ file path=usr/share/man/man3c/catgets.3c
 file path=usr/share/man/man3c/catopen.3c
 file path=usr/share/man/man3c/cfgetispeed.3c
 file path=usr/share/man/man3c/cfsetispeed.3c
+file path=usr/share/man/man3c/clearenv.3c
 file path=usr/share/man/man3c/clock.3c
 file path=usr/share/man/man3c/clock_nanosleep.3c
 file path=usr/share/man/man3c/clock_settime.3c
