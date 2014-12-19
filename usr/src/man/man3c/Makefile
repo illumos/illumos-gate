@@ -1141,6 +1141,7 @@ MANLINKS=	FD_CLR.3c				\
 	 	strncmp.3c				\
 	 	strncpy.3c				\
 	 	strnlen.3c				\
+		strnstr.3c				\
 	 	strpbrk.3c				\
 	 	strptime_l.3c				\
 	 	strrchr.3c				\
@@ -2125,6 +2126,7 @@ strncat.3c				:= LINKSRC = string.3c
 strncmp.3c				:= LINKSRC = string.3c
 strncpy.3c				:= LINKSRC = string.3c
 strnlen.3c				:= LINKSRC = string.3c
+strnstr.3c				:= LINKSRC = string.3c
 strpbrk.3c				:= LINKSRC = string.3c
 strrchr.3c				:= LINKSRC = string.3c
 strsep.3c				:= LINKSRC = string.3c

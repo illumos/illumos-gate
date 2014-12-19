@@ -1210,6 +1210,7 @@ link path=usr/share/man/man3c/strncat.3c target=string.3c
 link path=usr/share/man/man3c/strncmp.3c target=string.3c
 link path=usr/share/man/man3c/strncpy.3c target=string.3c
 link path=usr/share/man/man3c/strnlen.3c target=string.3c
+link path=usr/share/man/man3c/strnstr.3c target=string.3c
 link path=usr/share/man/man3c/strpbrk.3c target=string.3c
 link path=usr/share/man/man3c/strptime_l.3c target=strptime.3c
 link path=usr/share/man/man3c/strrchr.3c target=string.3c

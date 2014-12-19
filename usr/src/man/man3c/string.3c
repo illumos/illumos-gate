@@ -1,5 +1,6 @@
 '\" te
 .\" Copyright 2014 Garrett D'Amore <garrett@damore.org>
+.\" Copyright (c) 2014, Joyent, Inc.
 .\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved.
 .\" Copyright 1989 AT&T
 .\" Portions Copyright (c) 1994 Man-cgi 1.15, Panagiotis Christias (christia@softlab.ntua.gr)
@@ -17,7 +18,7 @@
 string, strcasecmp, strcasecmp_l, strncasecmp, strncasecmp_l, strcat, strncat,
 strlcat, strchr, strrchr,
 strcmp, strncmp, strcpy, strncpy, strlcpy, strcspn, strspn, strdup, strlen,
-strnlen, strpbrk, strsep, strstr, strtok, strtok_r \- string operations
+strnlen, strpbrk, strsep, strstr, strnstr, strtok, strtok_r \- string operations
 .SH SYNOPSIS
 .LP
 .nf
@@ -113,6 +114,10 @@ strnlen, strpbrk, strsep, strstr, strtok, strtok_r \- string operations
 .fi
 .LP
 .nf
+\fBchar *\fR\fBstrnstr\fR(\fBconst char *\fR\fIs1\fR, \fBconst char *\fR\fIs2\fR, \fBsize_t\fR \fIn\fR);
+.fi
+.LP
+.nf
 \fBchar *\fR\fBstrtok\fR(\fBchar *restrict\fR \fIs1\fR, \fBconst char *restrict\fR \fIs2\fR);
 .fi
 .LP
@@ -166,7 +171,6 @@ characters terminated by a null character). The \fBstrcat()\fR,
 all alter their first argument. Additionally, the \fBstrcat()\fR and
 \fBstrcpy()\fR functions do not check for overflow of the array.
 .SS "\fBstrcasecmp()\fR, \fBstrncasecmp()\fR"
-.sp
 .LP
 The \fBstrcasecmp()\fR and \fBstrncasecmp()\fR functions are case-insensitive
 versions of  \fBstrcmp()\fR and \fBstrncmp()\fR respectively, described below.
@@ -276,7 +280,6 @@ passed to \fBfree()\fR. The space for the new string is obtained using
 returned and \fBerrno\fR may be set to \fBENOMEM\fR to indicate that the
 storage space available is insufficient.
 .SS "\fBstrlen()\fR, \fBstrnlen()\fR"
-.sp
 The \fBstrlen()\fR function returns the number of bytes in \fIs\fR, not
 including the terminating null character.
 .LP
@@ -303,13 +306,15 @@ detected by comparing the location referenced by the pointer returned by
 \fBstrsep()\fR to `\e0'.
 .LP
 If *\fIstringp\fR is initially \fINULL\fR, \fBstrsep()\fR returns \fINULL\fR.
-.SS "\fBstrstr()\fR"
+.SS "\fBstrstr()\fR, \fBstrnstr()\fR"
 .LP
 The \fBstrstr()\fR function locates the first occurrence of the string \fIs2\fR
 (excluding the terminating null character) in string \fIs1\fR and returns a
 pointer to the located string, or a null pointer if the string is not found. If
 \fIs2\fR points to a string with zero length (that is, the string \fB""\fR),
-the function returns  \fIs1\fR.
+the function returns  \fIs1\fR. The \fBstrnstr()\fR function performs the same
+search as \fBstrstr()\fR, but only considers up to \fIn\fR bytes of \fIs1\fR.
+Bytes following a null byte are not compared.
 .SS "\fBstrtok()\fR"
 .LP
 A sequence of calls to \fBstrtok()\fR breaks the string pointed to by \fIs1\fR

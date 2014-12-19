@@ -671,10 +671,10 @@ l l .
 \fBstrftime\fR	\fBstrftime_l\fR
 \fBstring_to_decimal\fR
 \fBstrlcat\fR	\fBstrlcpy\fR
-\fBstrlen\fR
-\fBstrncasecmp\fR	\fBstrncasecmp_l\fR
-\fBstrncat\fR	\fBstrncmp\fR
-\fBstrncpy\fR	\fBstrpbrk\fR
+\fBstrlen\fR	\fBstrncasecmp\fR
+\fBstrncasecmp_l\fR	\fBstrncat\fR
+\fBstrncmp\fR	\fBstrncpy\fR
+\fBstrnstr\fR	\fBstrpbrk\fR
 \fBstrptime\fR	\fBstrptime_l\fR
 \fBstrrchr\fR	\fBstrsep\fR	
 \fBstrsignal\fR	\fBstrspn\fR
