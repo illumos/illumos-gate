@@ -93,7 +93,7 @@ mmap_common(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 	off64_t off = p6;
 	void *ret;
 
-	if (lx_debug_enabled != 0) {
+	if (LX_DEBUG_ISENABLED) {
 		char *path, path_buf[MAXPATHLEN];
 
 		path = lx_fd_to_path(fd, path_buf, sizeof (path_buf));

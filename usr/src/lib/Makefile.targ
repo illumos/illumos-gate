@@ -20,6 +20,7 @@
 #
 #
 # Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2014, Joyent, Inc.
 #
 
 #
@@ -90,7 +91,7 @@ $(LIBRARY): objs .WAIT $$(OBJS)
 
 $(DYNLIB): $$(MAPFILES)
 
-$(DYNLIB): pics .WAIT $$(PICS) $$(ALTPICS) $$(EXTPICS)
+$(DYNLIB): pics $(USDT_HEADERS) .WAIT $$(PICS) $$(ALTPICS) $$(EXTPICS) .WAIT $(USDT_PICS)
 	$(BUILD.SO)
 	$(POST_PROCESS_SO)
 
@@ -111,5 +112,5 @@ clobber: clean
 	-$(RM) $(CLOBBERTARGFILES)
 
 clean:
-	-$(RM) $(OBJS)
+	-$(RM) $(OBJS) $(USDT_HEADERS) $(USDT_PICS)
 	-$(RM) $(PICS) $(DUPLICATE_SRC) $(LINTOUT) $(LINTLIB) $(CLEANFILES)

@@ -21,6 +21,7 @@
 #
 # Copyright (c) 1997, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
+# Copyright (c) 2014 Joyent, Inc.  All rights reserved.
 #
 
 # rebind basic build macros to 64-bit versions
@@ -68,7 +69,7 @@ REAL_CC=	$(CW_CC_CMD:sh)
 REAL_CCC=	$(CW_CCC_CMD:sh)
 
 BUILD.SO=	$(CC) $(CFLAGS) -o $@ $(GSHARED) $(DYNFLAGS) \
-		$(PICS) $(EXTPICS) -L $(ROOTLIBDIR64) $(LDLIBS)
+		$(PICS) $(EXTPICS) $(USDT_PICS) -L $(ROOTLIBDIR64) $(LDLIBS)
 
 #
 # ld(1) requires the -64 option to create a 64-bit filter solely from a mapfile

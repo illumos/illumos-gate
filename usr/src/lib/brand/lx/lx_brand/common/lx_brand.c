@@ -292,7 +292,7 @@ i_lx_msg(int fd, char *msg, va_list ap)
 		return;
 
 	/* if debugging is enabled, send this message to debug output */
-	if (lx_debug_enabled != 0)
+	if (LX_DEBUG_ISENABLED)
 		lx_debug(buf);
 
 	if (fd == 2) {
@@ -573,7 +573,7 @@ lx_emulate(lx_regs_t *rp)
 		goto out;
 	}
 
-	if (lx_debug_enabled != 0) {
+	if (LX_DEBUG_ISENABLED) {
 		const char *fmt = NULL;
 
 		switch (s->sy_narg) {
@@ -892,6 +892,8 @@ lx_init(int argc, char *argv[], char *envp[])
 
 	if (lx_statfs_init() != 0)
 		lx_err_fatal("failed to setup the statfs translator");
+
+	lx_ptrace_init();
 
 #if defined(_LP64)
 	vdso_hdr = map_vdso();

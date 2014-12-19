@@ -259,9 +259,8 @@ extern void *_START_;
 
 static sigset_t blockable_sigs;
 
-#pragma init(ptrace_init)
 void
-ptrace_init(void)
+lx_ptrace_init(void)
 {
 	(void) sigfillset(&blockable_sigs);
 	(void) sigdelset(&blockable_sigs, SIGKILL);

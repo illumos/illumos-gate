@@ -19,6 +19,7 @@
 # CDDL HEADER END
 #
 # Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2014, Joyent, Inc.
 #
 #
 # Definitions common to libraries.
@@ -134,6 +135,23 @@ SONAME=		$(DYNLIB)
 # combining relocations into one relocation table reduces startup costs.
 # All options are tunable to allow overload/omission from lower makefiles.
 
+#
+# DTrace related rules
+#
+# These allow for multiple USDT providers to be specified by a library.
+# If a library needs to break up the set of objects that are passed to
+# the dtrace -G invocation, then they can place the following in heir
+# Makefile.com:
+#
+# pics/<provider>.o	:= USDT_G_PICS = <files>
+#
+# <provider> should be replaced with the basename of one of the USDT
+# providers specified in USDT_PROVIDERS in their Makefile.com.
+#
+USDT_HEADERS=	$(USDT_PROVIDERS:%.d=%_impl.h)
+USDT_PICS=	$(USDT_PROVIDERS:%.d=pics/%.o)
+USDT_G_PICS=	$(PICS)
+
 
 HSONAME=	-h$(SONAME)
 DYNFLAGS=	$(HSONAME) $(ZTEXT) $(ZDEFS) $(BDIRECT) \
@@ -155,7 +173,8 @@ SRCS=		$(OBJECTS:%.o=$(SRCDIR)/%.c)
 # default build of an archive and a shared object,
 # overridden locally when extra processing is needed
 BUILD.AR=	$(AR) $(ARFLAGS) $@ $(AROBJS)
-BUILD.SO=	$(CC) -o $@ $(GSHARED) $(DYNFLAGS) $(PICS) $(EXTPICS) $(LDLIBS)
+BUILD.SO=	$(CC) -o $@ $(GSHARED) $(DYNFLAGS) $(PICS) $(EXTPICS) \
+		$(USDT_PICS) $(LDLIBS)
 BUILDCCC.SO=	$(CCC) -o $@ $(GSHARED) $(DYNFLAGS) $(PICS) $(EXTPICS) $(LDLIBS)
 
 # default dynamic library symlink
