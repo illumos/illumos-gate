@@ -68,6 +68,8 @@
 #include <sys/param.h>
 #include <sys/utsname.h>
 #include <sys/rctl.h>
+#include <sys/kstat.h>
+#include <sys/lx_misc.h>
 
 /* Dependent on procfs */
 extern kthread_t *prchoose(proc_t *);
@@ -1547,21 +1549,154 @@ lxpr_read_net_arp(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
 }
 
+struct lxpr_ifstat {
+	uint64_t rx_bytes;
+	uint64_t rx_packets;
+	uint64_t rx_errors;
+	uint64_t rx_drop;
+	uint64_t tx_bytes;
+	uint64_t tx_packets;
+	uint64_t tx_errors;
+	uint64_t tx_drop;
+	uint64_t collisions;
+	uint64_t rx_multicast;
+};
+
+static void *
+lxpr_kstat_read(kid_t kid, size_t *size, int *num)
+{
+	kstat_t *kp;
+	int i, nrec = 0;
+	size_t bufsize;
+	void *buf = NULL;
+
+	kp = kstat_hold_bykid(kid, getzoneid());
+	if (kp == NULL)
+		return (NULL);
+
+	bufsize = kp->ks_data_size;
+	kstat_rele(kp);
+
+	/*
+	 * The kstat in question is released so that kmem_alloc(KM_SLEEP) is
+	 * performed without it held.  After the alloc, the kstat is reacquired
+	 * and its size is checked again. If the buffer is no longer large
+	 * enough, the alloc and check are repeated up to three times.
+	 */
+	for (i = 0; i < 2; i++) {
+		buf = kmem_alloc(bufsize + 1, KM_SLEEP);
+
+		/* Check if bufsize still appropriate */
+		kp = kstat_hold_bykid(kid, getzoneid());
+		if (kp == NULL) {
+			kmem_free(buf, bufsize + 1);
+			return (NULL);
+		}
+		KSTAT_ENTER(kp);
+		if (bufsize < kp->ks_data_size) {
+			kmem_free(buf, bufsize + 1);
+			bufsize = kp->ks_data_size;
+			KSTAT_EXIT(kp);
+			kstat_rele(kp);
+			continue;
+		} else {
+			(void) KSTAT_UPDATE(kp, KSTAT_READ);
+			if (KSTAT_SNAPSHOT(kp, buf, KSTAT_READ) != 0) {
+				kmem_free(buf, bufsize + 1);
+				buf = NULL;
+			}
+			nrec = kp->ks_ndata;
+			KSTAT_EXIT(kp);
+			kstat_rele(kp);
+			break;
+		}
+	}
+
+	if (buf != NULL) {
+		*size = bufsize + 1;
+		*num = nrec;
+	}
+	return (buf);
+}
+
+static int
+lxpr_kstat_ifstat(kid_t kid, struct lxpr_ifstat *ifs)
+{
+	kstat_named_t *kp;
+	int i, num;
+	size_t size;
+
+	bzero(ifs, sizeof (*ifs));
+	kp = (kstat_named_t *)lxpr_kstat_read(kid, &size, &num);
+	if (kp == NULL)
+		return (-1);
+	for (i = 0; i < num; i++) {
+		if (strncmp(kp[i].name, "rbytes64", KSTAT_STRLEN) == 0)
+			ifs->rx_bytes = kp[i].value.ui64;
+		else if (strncmp(kp[i].name, "ipackets64", KSTAT_STRLEN) == 0)
+			ifs->rx_packets = kp[i].value.ui64;
+		else if (strncmp(kp[i].name, "ierrors", KSTAT_STRLEN) == 0)
+			ifs->rx_errors = kp[i].value.ui32;
+		else if (strncmp(kp[i].name, "norcvbuf", KSTAT_STRLEN) == 0)
+			ifs->rx_drop = kp[i].value.ui32;
+		else if (strncmp(kp[i].name, "multircv", KSTAT_STRLEN) == 0)
+			ifs->rx_multicast = kp[i].value.ui32;
+		else if (strncmp(kp[i].name, "obytes64", KSTAT_STRLEN) == 0)
+			ifs->tx_bytes = kp[i].value.ui64;
+		else if (strncmp(kp[i].name, "opackets64", KSTAT_STRLEN) == 0)
+			ifs->tx_packets = kp[i].value.ui64;
+		else if (strncmp(kp[i].name, "oerrors", KSTAT_STRLEN) == 0)
+			ifs->tx_errors = kp[i].value.ui32;
+		else if (strncmp(kp[i].name, "noxmtbuf", KSTAT_STRLEN) == 0)
+			ifs->tx_drop = kp[i].value.ui32;
+		else if (strncmp(kp[i].name, "collisions", KSTAT_STRLEN) == 0)
+			ifs->collisions = kp[i].value.ui32;
+	}
+	kmem_free(kp, size);
+	return (0);
+}
+
 /* ARGSUSED */
 static void
 lxpr_read_net_dev(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
+	kstat_t *ksr;
+	int i, nidx;
+	size_t sidx;
+	struct lxpr_ifstat ifs;
+
 	lxpr_uiobuf_printf(uiobuf, "Inter-|   Receive                   "
 	    "                             |  Transmit\n");
 	lxpr_uiobuf_printf(uiobuf, " face |bytes    packets errs drop fifo"
 	    " frame compressed multicast|bytes    packets errs drop fifo"
 	    " colls carrier compressed\n");
 
-	/*
-	 * Data about each interface should go here, but that shouldn't be added
-	 * unless there is an lxproc reader that actually makes use of it (and
-	 * doesn't need anything else that we refuse to provide)...
-	 */
+	ksr = (kstat_t *)lxpr_kstat_read(0, &sidx, &nidx);
+	if (ksr == NULL)
+		return;
+
+	for (i = 1; i < nidx; i++) {
+		if (strncmp(ksr[i].ks_module, "link", KSTAT_STRLEN) == 0 ||
+		    strncmp(ksr[i].ks_module, "lo", KSTAT_STRLEN) == 0) {
+			if (lxpr_kstat_ifstat(ksr[i].ks_kid, &ifs) != 0)
+				continue;
+
+			/* Overwriting the name is ok in the local snapshot */
+			lx_ifname_convert(ksr[i].ks_name, LX_IFNAME_FROMNATIVE);
+			lxpr_uiobuf_printf(uiobuf, "%6s: %7llu %7llu %4lu "
+			    "%4lu %4u %5u %10u %9lu %8llu %7llu %4lu %4lu %4u "
+			    "%5lu %7u %10u\n",
+			    ksr[i].ks_name,
+			    ifs.rx_bytes, ifs.rx_packets,
+			    ifs.rx_errors, ifs.rx_drop,
+			    0, 0, 0, ifs.rx_multicast,
+			    ifs.tx_bytes, ifs.tx_packets,
+			    ifs.tx_errors, ifs.tx_drop,
+			    0, ifs.collisions, 0, 0);
+		}
+	}
+
+	kmem_free(ksr, sidx);
 }
 
 /* ARGSUSED */
