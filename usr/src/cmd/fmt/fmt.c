@@ -86,7 +86,7 @@ int 	h_lines;		/* index into lines of hdrbuf */
 
 void (*(split))(wchar_t []);
 extern int scrwidth(wchar_t);
-extern int ishead(char []);
+extern boolean_t is_headline(const char *);
 
 
 static void fill_hdrbuf(wchar_t []);
@@ -240,13 +240,13 @@ fmt(FILE *fi)
 			}
 			/*
 			 * Need to convert string from wchar_t to char,
-			 * since this is what ishead() expects.  Since we
+			 * since this is what is_headline() expects.  Since we
 			 * only want to make sure cp points to a "From" line
 			 * of the email, we don't have to alloc
 			 * BUFSIZ * MB_LEN_MAX to cbuf.
 			 */
 			wcstombs(cbuf, cp, (BUFSIZ - 1));
-			if (ishead(cbuf)) {
+			if (is_headline(cbuf) == B_TRUE) {
 				hdr_state = in_hdr;
 				fill_hdrbuf(canonb);
 			} else {

@@ -21,14 +21,16 @@
  */
 
 /*
+ * Copyright 2014 Joyent, Inc.
+ */
+
+/*
  * Copyright 1999 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-#pragma	ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "rcv.h"
 #include <locale.h>
@@ -174,7 +176,7 @@ setptr(register FILE *ibuf)
 		}
 
 		/* Look for a From line that starts a new message */
-		if (blankline && linebuf[0] == 'F' && ishead(linebuf)) {
+		if (blankline && linebuf[0] == 'F' && is_headline(linebuf)) {
 			if (msgCount > 0 && !newmail) {
 				message[msgCount-1].m_size = s;
 				message[msgCount-1].m_lines = l;

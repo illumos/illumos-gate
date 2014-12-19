@@ -25,6 +25,9 @@
 /*
  * Copyright (c) 2013 RackTop Systems.
  */
+/*
+ * Copyright 2014 Joyent, Inc.
+ */
 
 /*
  * Declarations for the functions in libcmdutils.
@@ -139,6 +142,46 @@ extern int findnextuid(uid_t, uid_t, uid_t *);
  * Used to get the next available group id in given range.
  */
 extern int findnextgid(gid_t, gid_t, gid_t *);
+
+
+
+		/* dynamic string utilities */
+
+typedef struct custr custr_t;
+
+/*
+ * Allocate and free a "custr_t" dynamic string object.  Returns 0 on success
+ * and -1 otherwise.
+ */
+extern int custr_alloc(custr_t **);
+extern void custr_free(custr_t *);
+
+/*
+ * Append a single character, or a NUL-terminated string of characters, to a
+ * dynamic string.  Returns 0 on success and -1 otherwise.  The dynamic string
+ * will be unmodified if the function returns -1.
+ */
+extern int custr_appendc(custr_t *, char);
+extern int custr_append(custr_t *, const char *);
+
+/*
+ * Determine the length in bytes, not including the NUL terminator, of the
+ * dynamic string.
+ */
+extern size_t custr_len(custr_t *);
+
+/*
+ * Clear the contents of a dynamic string.  Does not free the underlying
+ * memory.
+ */
+extern void custr_reset(custr_t *);
+
+/*
+ * Retrieve a const pointer to a NUL-terminated string version of the contents
+ * of the dynamic string.  Storage for this string should not be freed, and
+ * the pointer will be invalidated by any mutations to the dynamic string.
+ */
+extern const char *custr_cstr(custr_t *str);
 
 #ifdef	__cplusplus
 }

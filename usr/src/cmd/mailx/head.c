@@ -19,6 +19,11 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2014 Joyent, Inc.
+ */
+
 /*
  * Copyright 1995 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -38,7 +43,7 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#include <err.h>
 
 #include "rcv.h"
 
@@ -49,115 +54,188 @@
  * Routines for processing and detecting headlines.
  */
 
-static char	*copyin(char src[], char **space);
-static char	*nextword(char wp[], char wbuf[]);
+static int nextword(const char *, custr_t *, const char **);
 
 /*
  * See if the passed line buffer is a mail header.
  * Return true if yes.
  */
-
-int 
-ishead(char linebuf[])
+boolean_t
+is_headline(const char *linebuf)
 {
-	register char *cp;
-	struct headline hl;
-	char parbuf[BUFSIZ];
+	headline_t *hl;
+	boolean_t ret;
 
-	cp = linebuf;
-	if (strncmp("From ", cp, 5) != 0)
-		return(0);
-	parse(cp, &hl, parbuf);
-	if (hl.l_from == NOSTR) {
-		return(0);
+	if (strncmp("From ", linebuf, 5) != 0) {
+		return (B_FALSE);
 	}
-	return(1);
+
+	if (headline_alloc(&hl) != 0 || parse_headline(linebuf, hl) != 0) {
+		err(1, "could not parse headline");
+	}
+
+	ret = custr_len(hl->hl_from) > 0 ? B_TRUE : B_FALSE;
+
+	headline_free(hl);
+	return (ret);
 }
 
 /*
- * Split a headline into its useful components.
- * Copy the line into dynamic string space, then set
- * pointers into the copied line in the passed headline
- * structure.  Actually, it scans.
+ * Manage headline_t objects:
  */
-void 
-parse(char line[], struct headline *hl, char pbuf[])
+void
+headline_free(headline_t *hl)
 {
-	register char *cp, *dp;
-	char *sp;
-	char word[LINESIZE];
+	custr_free(hl->hl_from);
+	custr_free(hl->hl_tty);
+	custr_free(hl->hl_date);
+	free(hl);
+}
 
-	hl->l_from = NOSTR;
-	hl->l_date = NOSTR;
-	cp = line;
-	sp = pbuf;
+int
+headline_alloc(headline_t **hl)
+{
+	int en;
+	headline_t *t;
+
+	if ((t = calloc(1, sizeof (*t))) == NULL) {
+		return (-1);
+	}
+
+	if (custr_alloc(&t->hl_from) != 0 || custr_alloc(&t->hl_tty) != 0 ||
+	    custr_alloc(&t->hl_date) != 0) {
+		en = errno;
+
+		headline_free(t);
+
+		errno = en;
+		return (-1);
+	}
+
+	*hl = t;
+	return (0);
+}
+
+/*
+ * Clear all of the strings in a headline_t:
+ */
+void
+headline_reset(headline_t *hl)
+{
+	custr_reset(hl->hl_from);
+	custr_reset(hl->hl_tty);
+	custr_reset(hl->hl_date);
+}
+
+int
+parse_headline(const char *line, headline_t *hl)
+{
+	const char *c = line;
+
+	headline_reset(hl);
 
 	/*
-	 * Skip the first "word" of the line, which should be "From"
-	 * anyway.
+	 * Load the first word from the line and ensure that it is "From".
 	 */
-
-	cp = nextword(cp, word);
-	dp = nextword(cp, word);
-	if (!equal(word, ""))
-		hl->l_from = copyin(word, &sp);
-	if (dp != NOSTR)
-		hl->l_date = copyin(dp, &sp);
-}
-
-/*
- * Copy the string on the left into the string on the right
- * and bump the right (reference) string pointer by the length.
- * Thus, dynamically allocate space in the right string, copying
- * the left string into it.
- */
-
-static char *
-copyin(char src[], char **space)
-{
-	register char *cp, *top;
-	register int s;
-
-	s = strlen(src);
-	cp = *space;
-	top = cp;
-	strcpy(cp, src);
-	cp += s + 1;
-	*space = cp;
-	return(top);
-}
-
-/*
- * Collect a liberal (space, tab delimited) word into the word buffer
- * passed.  Also, return a pointer to the next word following that,
- * or NOSTR if none follow.
- */
-
-static char *
-nextword(char wp[], char wbuf[])
-{
-	register char *cp, *cp2;
-
-	if ((cp = wp) == NOSTR) {
-		copy("", wbuf);
-		return(NOSTR);
+	if (nextword(c, hl->hl_from, &c) != 0) {
+		return (-1);
 	}
-	cp2 = wbuf;
-	while (!any(*cp, " \t") && *cp != '\0')
-		if (*cp == '"') {
-			*cp2++ = *cp++;
-			while (*cp != '\0' && *cp != '"')
-				*cp2++ = *cp++;
-			if (*cp == '"')
-				*cp2++ = *cp++;
-		} else
-			*cp2++ = *cp++;
-	*cp2 = '\0';
-	while (any(*cp, " \t"))
-		cp++;
-	if (*cp == '\0')
-		return(NOSTR);
-	return(cp);
+	if (strcmp(custr_cstr(hl->hl_from), "From") != 0) {
+		errno = EINVAL;
+		return (-1);
+	}
+	custr_reset(hl->hl_from);
+
+	/*
+	 * The next word will be the From address.
+	 */
+	if (nextword(c, hl->hl_from, &c) != 0) {
+		return (-1);
+	}
+
+	/*
+	 * If there is a next word, the rest of the string is the Date.
+	 */
+	if (c != NULL) {
+		if (custr_append(hl->hl_date, c) != 0) {
+			return (-1);
+		}
+	}
+
+	errno = 0;
+	return (0);
+}
+
+/*
+ * Collect a space- or tab-delimited word into the word buffer, if one is
+ * passed.  The double quote character (") can be used to include whitespace
+ * within a word.  Set "nextword" to the location of the first character of the
+ * _next_ word, or NULL if there were no more words.  Returns 0 on success or
+ * -1 otherwise.
+ */
+static int
+nextword(const char *input, custr_t *word, const char **nextword)
+{
+	boolean_t in_quotes = B_FALSE;
+	const char *c = input != NULL ? input : "";
+
+	/*
+	 * Collect the first word into the word buffer, if one is provided.
+	 */
+	for (;;) {
+		if (*c == '\0') {
+			/*
+			 * We have reached the end of the string.
+			 */
+			*nextword = NULL;
+			return (0);
+		}
+
+		if (*c == '"') {
+			/*
+			 * Either beginning or ending a quoted string.
+			 */
+			in_quotes = in_quotes ? B_FALSE : B_TRUE;
+		}
+
+		if (!in_quotes && (*c == ' ' || *c == '\t')) {
+			/*
+			 * We have reached a whitespace region.
+			 */
+			break;
+		}
+
+		/*
+		 * Copy this character into the word buffer.
+		 */
+		if (word != NULL) {
+			if (custr_appendc(word, *c) != 0) {
+				return (-1);
+			}
+		}
+		c++;
+	}
+
+	/*
+	 * Find the beginning of the next word, if there is one.
+	 */
+	for (;;) {
+		if (*c == '\0') {
+			/*
+			 * We have reached the end of the string.
+			 */
+			*nextword = NULL;
+			return (0);
+
+		} else if (*c != ' ' && *c != '\t') {
+			/*
+			 * We have located the next word.
+			 */
+			*nextword = c;
+			return (0);
+		}
+		c++;
+	}
 }
 
 /*
