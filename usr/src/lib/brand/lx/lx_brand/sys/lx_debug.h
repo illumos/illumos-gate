@@ -23,10 +23,14 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright (c) 2014 Joyent, Inc.  All rights reserved.
+ */
+
 #ifndef	_LX_DEBUG_H
 #define	_LX_DEBUG_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#include <lx_provider_impl.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -38,8 +42,10 @@ extern void lx_debug_init(void);
 /* printf() style debug message functionality */
 extern void lx_debug(const char *, ...);
 
-/* set non-zero if the debugging subsystem is enabled */
 extern int lx_debug_enabled;
+
+#define	LX_DEBUG_ISENABLED	\
+	(lx_debug_enabled || LX_DEBUG_ENABLED())
 
 #ifdef	__cplusplus
 }

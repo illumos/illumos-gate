@@ -46,6 +46,8 @@
 static char	*lx_debug_path = NULL;		/* debug output file path */
 static char	lx_debug_path_buf[MAXPATHLEN];
 
+int		lx_dtrace_lazyload = 1;		/* patchable; see below */
+
 void
 lx_debug_enable(void)
 {
@@ -57,6 +59,24 @@ lx_debug_enable(void)
 void
 lx_debug_init(void)
 {
+	/*
+	 * Our DTrace USDT provider is loaded in our .init section, which is
+	 * not run by our e_entry ELF entry point (_start, which calls into
+	 * lx_init()).  We exploit this to only actually load our USDT provider
+	 * if LX_DTRACE is set, assuring that we don't compromise fork()
+	 * performance in the (common) case that DTrace of lx_brand.so.1 itself
+	 * isn't enabled or desired. (As with all USDT providers, it can always
+	 * be loaded by explicitly specifying the full provider name).  Note
+	 * that we also allow this behavior to be set via a manual override,
+	 * lx_dtrace_lazyload -- allowing for USDT probes to be automatically
+	 * provided in situations where setting an environment variable is
+	 * tedious or otherwise impossible.
+	 */
+	if (getenv("LX_DTRACE") != NULL || !lx_dtrace_lazyload) {
+		extern void _init(void);
+		_init();
+	}
+
 	if (getenv("LX_DEBUG") == NULL)
 		return;
 
@@ -95,7 +115,7 @@ lx_debug(const char *msg, ...)
 	int		errno_backup;
 	int		size = LX_MSG_MAXLEN + 1;
 
-	if (lx_debug_enabled == 0)
+	if (lx_debug_enabled == 0 && !LX_DEBUG_ENABLED())
 		return;
 
 	/*
@@ -129,6 +149,11 @@ lx_debug(const char *msg, ...)
 		errno = errno_backup;
 		return;
 	}
+
+	LX_DEBUG(buf);
+
+	if (!lx_debug_enabled)
+		return;
 
 	/*
 	 * Open the debugging output file.  note that we don't protect

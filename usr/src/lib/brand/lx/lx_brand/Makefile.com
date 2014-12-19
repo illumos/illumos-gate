@@ -67,6 +67,8 @@ CMNOBJS =	lx_signum.o
 ASOBJS	=	lx_handler.o lx_runexe.o lx_crt.o
 OBJECTS	=	$(CMNOBJS) $(COBJS) $(ASOBJS)
 
+USDT_PROVIDERS =	lx_provider.d
+
 include ../../Makefile.lx
 include ../../../../Makefile.lib
 
@@ -82,7 +84,7 @@ LDLIBS +=	-lc -lsocket -lmapmalloc -lproc -lrtld_db
 DYNFLAGS +=	$(DYNFLAGS_$(CLASS))
 DYNFLAGS +=	$(BLOCAL) $(ZNOVERSION) -Wl,-e_start -M../common/mapfile
 CFLAGS +=	$(CCVERBOSE)
-CPPFLAGS +=	-D_REENTRANT -I../ -I$(UTSBASE)/common/brand/lx -I$(LX_CMN)
+CPPFLAGS +=	-D_REENTRANT -I. -I../ -I$(UTSBASE)/common/brand/lx -I$(LX_CMN)
 ASFLAGS =	-P $(ASFLAGS_$(CURTYPE)) -D_ASM -I../	\
 			-I$(UTSBASE)/common/brand/lx
 
@@ -93,6 +95,7 @@ all: $(LIBS)
 lint: lintcheck
 
 include ../../../../Makefile.targ
+include ../../../../Makefile.usdt
 
 pics/%.o: $(ISASRCDIR)/%.s
 	$(COMPILE.s) -o $@ $<

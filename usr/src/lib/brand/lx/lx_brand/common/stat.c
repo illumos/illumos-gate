@@ -56,6 +56,7 @@
 #include <sys/lx_audio.h>
 #include <sys/lx_fcntl.h>
 #include <sys/lx_syscall.h>
+#include <sys/lx_debug.h>
 #include <sys/modctl.h>
 
 /* define _KERNEL to get the devt manipulation macros */
@@ -242,7 +243,7 @@ s2l_dev_report(dev_t dev, lx_dev_t jdev)
 	minor_t			min;
 	int			lx_maj, lx_min;
 
-	if (lx_debug_enabled == 0)
+	if (!LX_DEBUG_ISENABLED)
 		return;
 
 	maj = getmajor(dev);
@@ -410,7 +411,7 @@ lx_fstat(uintptr_t p1, uintptr_t p2)
 	struct stat	sbuf;
 	char		*path, path_buf[MAXPATHLEN];
 
-	if (lx_debug_enabled != 0) {
+	if (LX_DEBUG_ISENABLED) {
 		path = lx_fd_to_path(fd, path_buf, sizeof (path_buf));
 		if (path == NULL)
 			path = "?";

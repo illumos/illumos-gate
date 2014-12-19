@@ -41,6 +41,7 @@
 #include <sys/lx_syscall.h>
 #include <sys/lx_thread.h>
 #include <sys/syscall.h>
+#include <lx_provider_impl.h>
 #include <assert.h>
 #include <errno.h>
 #include <poll.h>
@@ -1096,6 +1097,7 @@ lx_rt_sigreturn(void)
 	ucp = (ucontext_t *)(*(ssize_t *)(sp + 24));
 
 	lx_ucp = &lx_ssp->uc;
+	LX_SIGRETURN(lx_ucp, ucp, sp);
 
 	/*
 	 * General register layout is completely different.
@@ -1447,6 +1449,8 @@ lx_build_signal_frame(int lx_sig, siginfo_t *sip, void *p, void *sp)
 	bcopy((void *)lx_rt_sigreturn_tramp, lx_ssp->trampoline,
 	    sizeof (lx_ssp->trampoline));
 #endif
+
+	LX_SIGDELIVER(lx_sig, lxsap, lx_ssp, lx_ucp);
 
 #if defined(_LP64)
 	/*
