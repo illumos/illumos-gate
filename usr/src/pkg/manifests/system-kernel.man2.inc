@@ -189,6 +189,7 @@ link path=usr/share/man/man2/forkx.2 target=fork.2
 link path=usr/share/man/man2/fstat.2 target=stat.2
 link path=usr/share/man/man2/fstatat.2 target=stat.2
 link path=usr/share/man/man2/fstatvfs.2 target=statvfs.2
+link path=usr/share/man/man2/futimens.2 target=utimes.2
 link path=usr/share/man/man2/futimesat.2 target=utimes.2
 link path=usr/share/man/man2/getaudit_addr.2 target=getaudit.2
 link path=usr/share/man/man2/getegid.2 target=getuid.2
@@ -237,6 +238,7 @@ link path=usr/share/man/man2/shmdt.2 target=shmop.2
 link path=usr/share/man/man2/sigsendset.2 target=sigsend.2
 link path=usr/share/man/man2/umount2.2 target=umount.2
 link path=usr/share/man/man2/unlinkat.2 target=unlink.2
+link path=usr/share/man/man2/utimensat.2 target=utimes.2
 link path=usr/share/man/man2/vforkx.2 target=vfork.2
 link path=usr/share/man/man2/wracct.2 target=getacct.2
 link path=usr/share/man/man2/writev.2 target=write.2

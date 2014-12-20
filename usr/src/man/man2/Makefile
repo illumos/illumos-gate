@@ -195,6 +195,7 @@ MANLINKS=	_Exit.2				\
 	 	fstatat.2			\
 	 	fstatvfs.2			\
 	 	futimesat.2			\
+		futimens.2			\
 	 	getaudit_addr.2			\
 	 	getegid.2			\
 	 	geteuid.2			\
@@ -242,6 +243,7 @@ MANLINKS=	_Exit.2				\
 	 	sigsendset.2			\
 	 	umount2.2			\
 	 	unlinkat.2			\
+		utimensat.2			\
 	 	vforkx.2			\
 	 	wracct.2			\
 	 	writev.2
@@ -374,7 +376,9 @@ umount2.2			:= LINKSRC = umount.2
 
 unlinkat.2			:= LINKSRC = unlink.2
 
+futimens.2			:= LINKSRC = utimes.2
 futimesat.2			:= LINKSRC = utimes.2
+utimensat.2			:= LINKSRC = utimes.2
 
 vforkx.2			:= LINKSRC = vfork.2
 
