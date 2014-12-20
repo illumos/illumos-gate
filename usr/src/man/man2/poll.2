@@ -1,4 +1,5 @@
 '\" te
+.\" Copyright (c) 2014, Joyent, Inc.
 .\"  Copyright 1989 AT&T  Copyright (c) 2001, Sun Microsystems, Inc.  All Rights Reserved  Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
 .\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
@@ -16,18 +17,41 @@ poll \- input/output multiplexing
 #include <poll.h>
 
 \fBint\fR \fBpoll\fR(\fBstruct pollfd\fR \fIfds[]\fR, \fBnfds_t\fR \fInfds\fR, \fBint\fR \fItimeout\fR);
+
+\fBint\fR \fBppoll\fR(\fBstruct pollfd *restrict\fR \fIfds\fR, \fBnfds_t\fR \fInfds\fR,
+    \fBconst struct timespec *restrict\fR \fItsp\fR, \fBconst sigset_t *restrict\fR \fIsigmask\fR);
 .fi
 
 .SH DESCRIPTION
+.LP
+The \fBpoll()\fR and \fBppoll()\fR functions provides applications with a
+mechanism for multiplexing input/output over a set of file descriptors.  For
+each member of the array pointed to by \fIfds\fR, \fBpoll()\fR and \fBppoll()\fR
+examine the given file descriptor for the event(s) specified in \fIevents\fR.
+The number of \fBpollfd\fR structures in the \fIfds\fR array is specified by
+\fInfds\fR. The \fBpoll()\fR and \fBppoll()\fR functions identify those file
+descriptors on which an application can read or write data, or on which certain
+events have occurred.
 .sp
 .LP
-The \fBpoll()\fR function provides applications with a mechanism for
-multiplexing input/output over a set of file descriptors.  For each member of
-the array pointed to by \fIfds\fR, \fBpoll()\fR examines the given file
-descriptor for the event(s) specified in \fIevents\fR. The number of
-\fBpollfd\fR structures in the \fIfds\fR array is specified by \fInfds\fR. The
-\fBpoll()\fR function identifies those file descriptors on which an application
-can read or write data, or on which certain events have occurred.
+The \fBppoll()\fR function behaves identically to \fBpoll()\fR, except as follows:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+For the \fBppoll\fR function, the timeout period is given in seconds and
+nanoseconds in an argument of type \fBstruct timespec\fR, where as \fBpoll()\fR
+takes a timeout in milliseconds in the form of an integer argument.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The \fBppoll()\fR function takes an optional \fIsigmask\fR argument. When a
+non-\fBNULL\fR pointer is passed, the calling threads signal mask is replaced by
+the one specified in \fIsigset\fR before examining file descriptors, and
+restored before returning.
+.RE
 .sp
 .LP
 The \fIfds\fR argument specifies the file descriptors to be examined and the
@@ -152,35 +176,36 @@ valid in the \fBrevents\fR member; it is not used in the \fBevents\fR member.
 .sp
 .LP
 If the value \fBfd\fR is less than 0, \fBevents\fR is ignored and \fBrevents\fR
-is set to 0 in that entry on return from  \fBpoll()\fR.
+is set to 0 in that entry on return from \fBpoll()\fR and \fBppoll()\fR.
 .sp
 .LP
-The results of the \fBpoll()\fR query are stored in the \fBrevents\fR member in
-the \fBpollfd\fR structure. Bits are set in the \fBrevents\fR bitmask to
-indicate which of the requested events are true. If none are true, none of the
-specified bits are set in \fBrevents\fR when the \fBpoll()\fR call returns. The
-event flags  \fBPOLLHUP\fR, \fBPOLLERR\fR, and  \fBPOLLNVAL\fR are always  set
-in \fBrevents\fR if the conditions they indicate are true; this occurs even
-though these flags were not present in \fBevents\fR.
+The results of the \fBpoll()\fR or \fBppoll()\fR query are stored in the
+\fBrevents\fR member in the \fBpollfd\fR structure. Bits are set in the
+\fBrevents\fR bitmask to indicate which of the requested events are true. If
+none are true, none of the specified bits are set in \fBrevents\fR when either
+the \fBpoll()\fR or \fBppoll()\fR call returns. The event flags  \fBPOLLHUP\fR,
+\fBPOLLERR\fR, and  \fBPOLLNVAL\fR are always  set in \fBrevents\fR if the
+conditions they indicate are true; this occurs even though these flags were not
+present in \fBevents\fR.
 .sp
 .LP
 If none of the defined events have occurred on any selected file descriptor,
-\fBpoll()\fR waits at least \fItimeout\fR milliseconds for an event to occur on
-any of the selected file descriptors. On a computer where millisecond timing
-accuracy is not available, \fItimeout\fR is rounded up to the nearest legal
-value available on that system. If the value \fItimeout\fR is 0, \fBpoll()\fR
-returns immediately. If the value of \fItimeout\fR is  \(mi1, \fBpoll()\fR
-blocks until a requested event occurs or until the call is interrupted.  The
-\fBpoll()\fR function is not affected by the \fBO_NDELAY\fR and
-\fBO_NONBLOCK\fR flags.
+\fBpoll()\fR and \fBppoll()\fR wait at least \fItimeout\fR milliseconds for an
+event to occur on any of the selected file descriptors. On a computer where
+millisecond timing accuracy is not available, \fItimeout\fR is rounded up to the
+nearest legal value available on that system. If the value \fItimeout\fR is 0,
+\fBpoll()\fR returns immediately. If the value of \fItimeout\fR is  \(mi1,
+\fBpoll()\fR blocks until a requested event occurs or until the call is
+interrupted. If the value of \fBtsp\fR is \fBNULL\fR, then \fBppoll()\fR blocks
+until a requested event occurs or until the call is interrupted. The
+\fBpoll()\fR and \fBppoll()\fR functions are not affected by the \fBO_NDELAY\fR
+and \fBO_NONBLOCK\fR flags.
 .sp
 .LP
-The \fBpoll()\fR function supports regular files, terminal and pseudo-terminal
-devices, streams-based files, FIFOs and pipes.  The behavior of \fBpoll()\fR on
-elements of \fIfds\fR that refer to other types of file is unspecified.
-.sp
-.LP
-The \fBpoll()\fR function supports sockets.
+The \fBpoll()\fR and \fBppoll()\fR functions support regular files, terminal and
+pseudo-terminal devices, streams-based files, FIFOs, pipes, and sockets.  The
+behavior of \fBpoll()\fR and \fBppoll()\fR on elements of \fIfds\fR that refer
+to other types of file is unspecified.
 .sp
 .LP
 A file descriptor for a socket that is listening for connections will indicate
@@ -189,9 +214,9 @@ descriptor for a socket that is connecting asynchronously will indicate that it
 is ready for writing, once a connection has been established.
 .sp
 .LP
-Regular files always \fBpoll()\fR \fBTRUE\fR for reading and writing.
+Regular files always \fBpoll()\fR and \fBppoll()\fR \fBTRUE\fR for reading and
+writing.
 .SH RETURN VALUES
-.sp
 .LP
 Upon successful completion, a non-negative value is returned. A positive value
 indicates the total number of file descriptors that has been selected (that is,
@@ -200,9 +225,8 @@ file descriptors for which the \fBrevents\fR member is non-zero). A value of
 selected. Upon failure, \fB\(mi1\fR is returned and \fBerrno\fR is set to
 indicate the error.
 .SH ERRORS
-.sp
 .LP
-The \fBpoll()\fR function will fail if:
+The \fBpoll()\fR and \fBppoll()\fR functions will fail if:
 .sp
 .ne 2
 .na
@@ -228,7 +252,7 @@ Some argument points to an illegal address.
 \fB\fBEINTR\fR\fR
 .ad
 .RS 10n
-A signal was caught during the \fBpoll()\fR function.
+A signal was caught during the \fBpoll()\fR or \fBppoll()\fR function.
 .RE
 
 .sp
@@ -243,7 +267,6 @@ indirectly) downstream from a multiplexer.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -259,7 +282,6 @@ Interface Stability	Standard
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBIntro\fR(2), \fBgetmsg\fR(2), \fBgetrlimit\fR(2), \fBputmsg\fR(2),
 \fBread\fR(2), \fBwrite\fR(2), \fBselect\fR(3C), \fBattributes\fR(5),
@@ -268,7 +290,6 @@ Interface Stability	Standard
 .LP
 \fISTREAMS Programming Guide\fR
 .SH NOTES
-.sp
 .LP
 Non-STREAMS drivers use  \fBchpoll\fR(9E) to implement  \fBpoll()\fR on these
 devices.

@@ -207,6 +207,7 @@ link path=usr/share/man/man2/lstat.2 target=stat.2
 link path=usr/share/man/man2/openat.2 target=open.2
 link path=usr/share/man/man2/pathconf.2 target=fpathconf.2
 link path=usr/share/man/man2/pipe2.2 target=pipe.2
+link path=usr/share/man/man2/ppoll.2 target=poll.2
 link path=usr/share/man/man2/pread.2 target=read.2
 link path=usr/share/man/man2/pset_assign.2 target=pset_create.2
 link path=usr/share/man/man2/pset_destroy.2 target=pset_create.2

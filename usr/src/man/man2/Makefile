@@ -212,6 +212,7 @@ MANLINKS=	_Exit.2				\
 	 	openat.2			\
 	 	pathconf.2			\
 		pipe2.2				\
+		ppoll.2				\
 	 	pread.2				\
 	 	pset_assign.2			\
 	 	pset_destroy.2			\
@@ -332,6 +333,8 @@ setustack.2			:= LINKSRC = getustack.2
 openat.2			:= LINKSRC = open.2
 
 pipe2.2				:= LINKSRC = pipe.2
+
+ppoll.2				:= LINKSRC = poll.2
 
 pset_assign.2			:= LINKSRC = pset_create.2
 pset_destroy.2			:= LINKSRC = pset_create.2
