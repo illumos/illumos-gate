@@ -107,6 +107,7 @@ file path=usr/share/man/man1/keylogout.1
 file path=usr/share/man/man1/kill.1
 file path=usr/share/man/man1/kmfcfg.1
 file path=usr/share/man/man1/ksh93.1
+file path=usr/share/man/man1/kvmstat.1
 file path=usr/share/man/man1/ld.so.1.1
 file path=usr/share/man/man1/let.1
 file path=usr/share/man/man1/limit.1
