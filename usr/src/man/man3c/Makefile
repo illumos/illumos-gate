@@ -1128,15 +1128,21 @@ MANLINKS=	FD_CLR.3c				\
 		stderr.3c				\
 		stdin.3c				\
 		stdout.3c				\
+		stpcpy.3c				\
+		stpncpy.3c				\
 	 	strcasecmp.3c				\
 	 	strcasecmp_l.3c				\
+		strcasestr.3c				\
+		strcasestr_l.3c				\
 	 	strcat.3c				\
 	 	strchr.3c				\
+		strchrnul.3c				\
 	 	strcmp.3c				\
 	 	strcoll_l.3c				\
 	 	strcpy.3c				\
 	 	strcspn.3c				\
 	 	strdup.3c				\
+	 	strdupa.3c				\
 	 	strerror_r.3c				\
 	 	strfmon_l.3c				\
 	 	strftime_l.3c				\
@@ -1148,6 +1154,8 @@ MANLINKS=	FD_CLR.3c				\
 	 	strncat.3c				\
 	 	strncmp.3c				\
 	 	strncpy.3c				\
+		strndup.3c				\
+		strndupa.3c				\
 	 	strnlen.3c				\
 		strnstr.3c				\
 	 	strpbrk.3c				\
@@ -2124,14 +2132,20 @@ ascftime.3c				:= LINKSRC = strftime.3c
 cftime.3c				:= LINKSRC = strftime.3c
 strftime_l.3c				:= LINKSRC = strftime.3c
 
+stpcpy.3c				:= LINKSRC = string.3c
+stpncpy.3c				:= LINKSRC = string.3c
 strcasecmp.3c				:= LINKSRC = string.3c
 strcasecmp_l.3c				:= LINKSRC = string.3c
+strcasestr.3c				:= LINKSRC = string.3c
+strcasestr_l.3c				:= LINKSRC = string.3c
 strcat.3c				:= LINKSRC = string.3c
 strchr.3c				:= LINKSRC = string.3c
+strchrnul.3c				:= LINKSRC = string.3c
 strcmp.3c				:= LINKSRC = string.3c
 strcpy.3c				:= LINKSRC = string.3c
 strcspn.3c				:= LINKSRC = string.3c
 strdup.3c				:= LINKSRC = string.3c
+strdupa.3c				:= LINKSRC = string.3c
 strlcat.3c				:= LINKSRC = string.3c
 strlcpy.3c				:= LINKSRC = string.3c
 strlen.3c				:= LINKSRC = string.3c
@@ -2140,6 +2154,8 @@ strncasecmp_l.3c			:= LINKSRC = string.3c
 strncat.3c				:= LINKSRC = string.3c
 strncmp.3c				:= LINKSRC = string.3c
 strncpy.3c				:= LINKSRC = string.3c
+strndup.3c				:= LINKSRC = string.3c
+strndupa.3c				:= LINKSRC = string.3c
 strnlen.3c				:= LINKSRC = string.3c
 strnstr.3c				:= LINKSRC = string.3c
 strpbrk.3c				:= LINKSRC = string.3c
