@@ -735,6 +735,8 @@ link path=usr/share/man/man3c/fcvt.3c target=ecvt.3c
 link path=usr/share/man/man3c/fdopendir.3c target=opendir.3c
 link path=usr/share/man/man3c/fdwalk.3c target=closefrom.3c
 link path=usr/share/man/man3c/feof.3c target=ferror.3c
+link path=usr/share/man/man3c/ffsl.3c target=ffs.3c
+link path=usr/share/man/man3c/ffsll.3c target=ffs.3c
 link path=usr/share/man/man3c/fgetgrent.3c target=getgrnam.3c
 link path=usr/share/man/man3c/fgetgrent_r.3c target=getgrnam.3c
 link path=usr/share/man/man3c/fgetpwent.3c target=getpwnam.3c
@@ -747,6 +749,9 @@ link path=usr/share/man/man3c/fgetws.3c target=getws.3c
 link path=usr/share/man/man3c/file_to_decimal.3c target=string_to_decimal.3c
 link path=usr/share/man/man3c/fileno.3c target=ferror.3c
 link path=usr/share/man/man3c/finite.3c target=isnand.3c
+link path=usr/share/man/man3c/fls.3c target=ffs.3c
+link path=usr/share/man/man3c/flsl.3c target=ffs.3c
+link path=usr/share/man/man3c/flsll.3c target=ffs.3c
 link path=usr/share/man/man3c/fpclass.3c target=isnand.3c
 link path=usr/share/man/man3c/fpgetmask.3c target=fpgetround.3c
 link path=usr/share/man/man3c/fpgetsticky.3c target=fpgetround.3c

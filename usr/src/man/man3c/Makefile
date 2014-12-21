@@ -734,6 +734,8 @@ MANLINKS=	FD_CLR.3c				\
 	 	fdopendir.3c				\
 	 	fdwalk.3c				\
 	 	feof.3c					\
+		ffsl.3c					\
+		ffsll.3c				\
 	 	fgetgrent.3c				\
 	 	fgetgrent_r.3c				\
 	 	fgetpwent.3c				\
@@ -746,6 +748,9 @@ MANLINKS=	FD_CLR.3c				\
 	 	file_to_decimal.3c			\
 	 	fileno.3c				\
 	 	finite.3c				\
+		fls.3c					\
+		flsl.3c					\
+		flsll.3c				\
 	 	fpclass.3c				\
 	 	fpgetmask.3c				\
 	 	fpgetsticky.3c				\
@@ -1564,6 +1569,12 @@ _exithandle.3c				:= LINKSRC = exit.3c
 clearerr.3c				:= LINKSRC = ferror.3c
 feof.3c					:= LINKSRC = ferror.3c
 fileno.3c				:= LINKSRC = ferror.3c
+
+ffsl.3c					:= LINKSRC = ffs.3c
+ffsll.3c				:= LINKSRC = ffs.3c
+fls.3c					:= LINKSRC = ffs.3c
+flsl.3c					:= LINKSRC = ffs.3c
+flsll.3c				:= LINKSRC = ffs.3c
 
 fsetattr.3c				:= LINKSRC = fgetattr.3c
 getattrat.3c				:= LINKSRC = fgetattr.3c

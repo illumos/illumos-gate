@@ -230,8 +230,10 @@ l l .
 \fBfdopen\fR	\fBfdopendir\fR
 \fBfdwalk\fR	\fBfeof\fR
 \fBferror\fR	\fBfflush\fR
-\fBffs\fR	\fBfgetattr\fR
-\fBfgetc\fR	
+\fBffs\fR	\fBffsl\fR
+\fBffsll\fR	\fBfls\fR
+\fBflsl\fR	\fBflsll\fR
+\fBfgetattr\fR	\fBfgetc\fR	
 \fBfgetgrent\fR	\fBfgetgrent_r\fR
 \fBfgetpos\fR	\fBfgetpwent\fR
 \fBfgetpwent_r\fR	\fBfgets\fR
