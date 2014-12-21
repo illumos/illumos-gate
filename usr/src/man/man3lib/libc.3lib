@@ -290,6 +290,7 @@ l l .
 \fBgetloadavg\fR	\fBgetlogin\fR
 \fBgetlogin_r\fR	\fBgetmntany\fR
 \fBgetmntent\fR	\fBgetmsg\fR
+\fBget_nprocs\fR	\fBget_nprocs_conf\fR
 \fBgetnetgrent\fR	\fBgetnetgrent_r\fR
 \fBgetopt\fR	\fBgetopt_clip\fR
 \fBgetopt_long\fR	\fBgetopt_long_only\fR

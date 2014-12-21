@@ -157,6 +157,7 @@ file path=usr/share/man/man3c/getloadavg.3c
 file path=usr/share/man/man3c/getlogin.3c
 file path=usr/share/man/man3c/getmntent.3c
 file path=usr/share/man/man3c/getnetgrent.3c
+file path=usr/share/man/man3c/get_nprocs.3c
 file path=usr/share/man/man3c/getopt.3c
 file path=usr/share/man/man3c/getpagesize.3c
 file path=usr/share/man/man3c/getpagesizes.3c
@@ -789,6 +790,7 @@ link path=usr/share/man/man3c/gethrvtime.3c target=gethrtime.3c
 link path=usr/share/man/man3c/getlogin_r.3c target=getlogin.3c
 link path=usr/share/man/man3c/getmntany.3c target=getmntent.3c
 link path=usr/share/man/man3c/getnetgrent_r.3c target=getnetgrent.3c
+link path=usr/share/man/man3c/get_nprocs_conf.3c target=get_nprocs.3c
 link path=usr/share/man/man3c/getpassphrase.3c target=getpass.3c
 link path=usr/share/man/man3c/getpwent.3c target=getpwnam.3c
 link path=usr/share/man/man3c/getpwent_r.3c target=getpwnam.3c

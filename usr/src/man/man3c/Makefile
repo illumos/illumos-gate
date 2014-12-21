@@ -161,6 +161,7 @@ MANFILES= 	__fbufsize.3c					\
 	 	getlogin.3c					\
 	 	getmntent.3c					\
 	 	getnetgrent.3c					\
+		get_nprocs.3c					\
 	 	getopt.3c					\
 	 	getpagesize.3c					\
 	 	getpagesizes.3c					\
@@ -788,6 +789,7 @@ MANLINKS=	FD_CLR.3c				\
 	 	getlogin_r.3c				\
 	 	getmntany.3c				\
 	 	getnetgrent_r.3c			\
+		get_nprocs_conf.3c			\
 	 	getpassphrase.3c			\
 	 	getpwent.3c				\
 	 	getpwent_r.3c				\
@@ -1664,6 +1666,8 @@ endnetgrent.3c				:= LINKSRC = getnetgrent.3c
 getnetgrent_r.3c			:= LINKSRC = getnetgrent.3c
 innetgr.3c				:= LINKSRC = getnetgrent.3c
 setnetgrent.3c				:= LINKSRC = getnetgrent.3c
+
+get_nprocs_conf.3c			:= LINKSRC = get_nprocs.3c
 
 getpassphrase.3c			:= LINKSRC = getpass.3c
 
