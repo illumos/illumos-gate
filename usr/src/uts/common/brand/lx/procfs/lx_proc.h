@@ -134,6 +134,7 @@ typedef enum lxpr_nodetype {
 	LXPR_NET_ARP,		/* /proc/net/arp	*/
 	LXPR_NET_DEV,		/* /proc/net/dev	*/
 	LXPR_NET_DEV_MCAST,	/* /proc/net/dev_mcast	*/
+	LXPR_NET_IF_INET6,	/* /proc/net/if_inet6	*/
 	LXPR_NET_IGMP,		/* /proc/net/igmp	*/
 	LXPR_NET_IP_MR_CACHE,	/* /proc/net/ip_mr_cache */
 	LXPR_NET_IP_MR_VIF,	/* /proc/net/ip_mr_vif	*/
