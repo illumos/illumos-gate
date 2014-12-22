@@ -1,0 +1,87 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright (c) 2014, Joyent, Inc. 
+.\"
+.Dd "Dec 22, 2014"
+.Dt PTHREAD_MUTEX_CONSISTENT 3C
+.Os
+.Sh NAME
+.Nm pthread_mutex_consistent
+.Nd mark state protected by robust mutex as consistent
+.Sh SYNOPSIS
+.In pthread.h
+.Ft int
+.Fo pthread_mutex_consistent
+.Fa "pthread_mutex_t *mutex"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn pthread_mutex_consistent
+function is used to indicate that a robust lock that is in an
+inconsistent state no longer is.
+.Lp
+A robust lock enters into an inconsistent state when a process or thread
+holding a robust lock exits, such as by calling
+.Xr exit 2
+or
+.Xr thr_exit 3C ,
+or crashes without unlocking the lock. At that point, if another process
+or thread is currently in a call, or calls
+.Xr pthread_mutex_lock 3C ,
+it will obtain the lock; however, the error code
+.Er EOWNERDEAD
+will be returned. In such cases, that thread will own the lock and must
+check and clean up any inconsistent state that is protected by the lock.
+When finished, it must call
+.Fn pthread_mutex_consistent
+to indicate that it is in a consistent state again.
+.Lp
+If a process or thread obtains a robust lock while it is in an
+inconsistent state and it crashes or terminates before marking the lock
+as consistent, the next process or thread that obtains the lock will
+receive
+.Er EOWNERDEAD .
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn pthread_mutex_consistent
+returns zero and marks
+.Va mutex
+as consistent. Callers of
+.Fn pthread_mutex_lock
+will not have
+.Er EOWNERDEAD
+returned until another process or thread exits without unlocking. Upon
+failure, an error will be returned which corresponds to one of the
+errors listed below.
+.Sh ERRORS
+The
+.Fn pthread_mutex_consistent
+function will fail if:
+.Bl -tag -width Er
+.It Er EINVAL
+.Va mutex
+is an uninitialized mutex, not a robust mutex, or not in an inconsistent
+state.
+.El
+.Sh INTERFACE STABILITY
+.Sy Committed
+.Sh MT-LEVEL
+.Sy MT-Safe
+.Sh SEE ALSO
+.Xr pthread_mutexattr_getrobust 3C ,
+.Xr pthread_mutex_destroy 3C ,
+.Xr pthread_mutex_lock 3C ,
+.Xr pthread_mutex_init 3C ,
+.Xr pthread 3HEAD ,
+.Xr libpthread 3LIB ,
+.Xr attributes 5 ,
+.Xr mutex 5

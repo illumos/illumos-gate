@@ -317,6 +317,7 @@ MANFILES= 	__fbufsize.3c					\
 	 	pthread_key_create.3c				\
 	 	pthread_key_delete.3c				\
 	 	pthread_kill.3c					\
+		pthread_mutex_consistent.3c			\
 	 	pthread_mutex_getprioceiling.3c			\
 	 	pthread_mutex_init.3c				\
 	 	pthread_mutex_lock.3c				\
@@ -324,6 +325,7 @@ MANFILES= 	__fbufsize.3c					\
 	 	pthread_mutexattr_getprioceiling.3c		\
 	 	pthread_mutexattr_getprotocol.3c		\
 	 	pthread_mutexattr_getpshared.3c			\
+		pthread_mutexattr_getrobust.3c			\
 	 	pthread_mutexattr_gettype.3c			\
 	 	pthread_mutexattr_init.3c			\
 	 	pthread_once.3c					\
@@ -1017,6 +1019,7 @@ MANLINKS=	FD_CLR.3c				\
 	 	pthread_mutexattr_setprioceiling.3c	\
 	 	pthread_mutexattr_setprotocol.3c	\
 	 	pthread_mutexattr_setpshared.3c		\
+	 	pthread_mutexattr_setrobust.3c		\
 	 	pthread_mutexattr_settype.3c		\
 	 	pthread_rwlock_destroy.3c		\
 	 	pthread_rwlock_reltimedrdlock_np.3c	\
@@ -2004,6 +2007,8 @@ pthread_mutexattr_setprioceiling.3c	:= LINKSRC = pthread_mutexattr_getprioceilin
 pthread_mutexattr_setprotocol.3c	:= LINKSRC = pthread_mutexattr_getprotocol.3c
 
 pthread_mutexattr_setpshared.3c		:= LINKSRC = pthread_mutexattr_getpshared.3c
+
+pthread_mutexattr_setrobust.3c		:= LINKSRC = pthread_mutexattr_getrobust.3c
 
 pthread_mutexattr_settype.3c		:= LINKSRC = pthread_mutexattr_gettype.3c
 
