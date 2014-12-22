@@ -164,6 +164,7 @@ file path=usr/share/man/man3c/getpagesizes.3c
 file path=usr/share/man/man3c/getpass.3c
 file path=usr/share/man/man3c/getpeerucred.3c
 file path=usr/share/man/man3c/getpriority.3c
+file path=usr/share/man/man3c/getprogname.3c
 file path=usr/share/man/man3c/getpw.3c
 file path=usr/share/man/man3c/getpwnam.3c
 file path=usr/share/man/man3c/getrusage.3c
@@ -1164,6 +1165,7 @@ link path=usr/share/man/man3c/setlinebuf.3c target=setbuffer.3c
 link path=usr/share/man/man3c/setlogmask.3c target=syslog.3c
 link path=usr/share/man/man3c/setnetgrent.3c target=getnetgrent.3c
 link path=usr/share/man/man3c/setpriority.3c target=getpriority.3c
+link path=usr/share/man/man3c/setprogname.3c target=getprogname.3c
 link path=usr/share/man/man3c/setpwent.3c target=getpwnam.3c
 link path=usr/share/man/man3c/setspent.3c target=getspnam.3c
 link path=usr/share/man/man3c/setstate.3c target=random.3c

@@ -168,6 +168,7 @@ MANFILES= 	__fbufsize.3c					\
 	 	getpass.3c					\
 	 	getpeerucred.3c					\
 	 	getpriority.3c					\
+		getprogname.3c					\
 	 	getpw.3c					\
 	 	getpwnam.3c					\
 	 	getrusage.3c					\
@@ -1096,6 +1097,7 @@ MANLINKS=	FD_CLR.3c				\
 	 	setlogmask.3c				\
 	 	setnetgrent.3c				\
 	 	setpriority.3c				\
+		setprogname.3c				\
 	 	setpwent.3c				\
 	 	setspent.3c				\
 	 	setstate.3c				\
@@ -1672,6 +1674,8 @@ get_nprocs_conf.3c			:= LINKSRC = get_nprocs.3c
 getpassphrase.3c			:= LINKSRC = getpass.3c
 
 setpriority.3c				:= LINKSRC = getpriority.3c
+
+setprogname.3c				:= LINKSRC = getprogname.3c
 
 endpwent.3c				:= LINKSRC = getpwnam.3c
 fgetpwent.3c				:= LINKSRC = getpwnam.3c

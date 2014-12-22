@@ -300,7 +300,8 @@ l l .
 \fBgetpgid\fR	\fBgetpgrp\fR
 \fBgetpid\fR	\fBgetpmsg\fR
 \fBgetppid\fR	\fBgetppriv\fR
-\fBgetpriority\fR	\fBgetprojid\fR
+\fBgetpriority\fR	\fbgetprogname\fR
+\fBgetprojid\fR
 \fBgetpw\fR	\fBgetpwent\fR
 \fBgetpwent_r\fR	\fBgetpwnam\fR
 \fBgetpwnam_r\fR	\fBgetpwuid\fR
@@ -629,7 +630,8 @@ l l .
 \fBsetlogmask\fR	\fBsetnetgrent\fR
 \fBsetpflags\fR	\fBsetpgid\fR
 \fBsetpgrp\fR	\fBsetppriv\fR
-\fBsetpriority\fR	\fBsetpwent\fR
+\fBsetpriority\fR	\fBsetprogname\fR
+\fBsetpwent\fR
 \fBsetrctl\fR	\fBsetregid\fR
 \fBsetreuid\fR	\fBsetrlimit\fR
 \fBsetsid\fR	\fBsetspent\fR
