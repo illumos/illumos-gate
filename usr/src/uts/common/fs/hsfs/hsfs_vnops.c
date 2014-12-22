@@ -1797,7 +1797,7 @@ hsfs_map(
 	if (vp->v_flag & VNOMAP)
 		return (ENOSYS);
 
-	if (prot & PROT_WRITE)
+	if ((prot & PROT_WRITE) && (flags & MAP_SHARED))
 		return (ENOSYS);
 
 	if (off > HS_MAXFILEOFF || off < 0 ||
