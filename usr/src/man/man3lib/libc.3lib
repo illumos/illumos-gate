@@ -659,7 +659,8 @@ l l .
 \fBsigstack\fR	\fBsigsuspend\fR
 \fBsigtimedwait\fR	\fBsigwait\fR
 \fBsigwaitinfo\fR	\fBsingle_to_decimal\fR
-\fBsleep\fR	\fBsnprintf\fR
+\fBsleep\fR	\fBsmt_pause\fR
+\fBsnprintf\fR
 \fBsprintf\fR	\fBsrand\fR
 \fBsrand48\fR	\fBsrandom\fR
 \fBsscanf\fR	\fBssignal\fR

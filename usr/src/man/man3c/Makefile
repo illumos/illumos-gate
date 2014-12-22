@@ -410,6 +410,7 @@ MANFILES= 	__fbufsize.3c					\
 	 	sigwaitinfo.3c					\
 	 	sleep.3c					\
 	 	ssignal.3c					\
+		smt_pause.3c					\
 	 	stack_getbounds.3c				\
 	 	stack_inbounds.3c				\
 	 	stack_setbounds.3c				\

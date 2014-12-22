@@ -1,0 +1,38 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright (c) 2014, Joyent, Inc. 
+.\"
+.Dd "Dec 22, 2014"
+.Dt SMT_PAUSE 3C
+.Os
+.Sh NAME
+.Nm smt_pause
+.Nd hardware-aware busy wait
+.Sh SYNOPSIS
+.In synch.h
+.Ft void
+.Fo smt_pause
+.Fa void
+.Fc
+.Sh DESCRIPTION
+The
+.Fn smt_pause
+function performs a busy-wait for an implementation defined period of
+time. On hardware platforms that support it, it notifies the hardware
+that this is occurring in an effort to minimize resource usage. This is
+commonly used in the implementation of spin loops.
+.Sh INTERFACE STABILITY
+.Sy Committed
+.Sh MT-LEVEL
+.Sy MT-Safe
+.Sh SEE ALSO
+.Xr attributes 5

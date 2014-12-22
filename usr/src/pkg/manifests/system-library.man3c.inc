@@ -405,6 +405,7 @@ file path=usr/share/man/man3c/sigsetops.3c
 file path=usr/share/man/man3c/sigstack.3c
 file path=usr/share/man/man3c/sigwaitinfo.3c
 file path=usr/share/man/man3c/sleep.3c
+file path=usr/share/man/man3c/smt_pause.3c
 file path=usr/share/man/man3c/ssignal.3c
 file path=usr/share/man/man3c/stack_getbounds.3c
 file path=usr/share/man/man3c/stack_inbounds.3c
