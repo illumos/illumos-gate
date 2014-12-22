@@ -70,6 +70,10 @@
 #include <sys/rctl.h>
 #include <sys/kstat.h>
 #include <sys/lx_misc.h>
+#include <inet/ip.h>
+#include <inet/ip_ire.h>
+#include <inet/ip6.h>
+#include <inet/ip_if.h>
 
 /* Dependent on procfs */
 extern kthread_t *prchoose(proc_t *);
@@ -149,6 +153,7 @@ static void lxpr_read_pid_status(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_net_arp(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_net_dev(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_net_dev_mcast(lxpr_node_t *, lxpr_uiobuf_t *);
+static void lxpr_read_net_if_inet6(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_net_igmp(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_net_ip_mr_cache(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_net_ip_mr_vif(lxpr_node_t *, lxpr_uiobuf_t *);
@@ -297,6 +302,7 @@ static lxpr_dirent_t netdir[] = {
 	{ LXPR_NET_ARP,		"arp" },
 	{ LXPR_NET_DEV,		"dev" },
 	{ LXPR_NET_DEV_MCAST,	"dev_mcast" },
+	{ LXPR_NET_IF_INET6,	"if_inet6" },
 	{ LXPR_NET_IGMP,	"igmp" },
 	{ LXPR_NET_IP_MR_CACHE,	"ip_mr_cache" },
 	{ LXPR_NET_IP_MR_VIF,	"ip_mr_vif" },
@@ -476,6 +482,7 @@ static void (*lxpr_read_function[LXPR_NFILES])() = {
 	lxpr_read_net_arp,		/* /proc/net/arp	*/
 	lxpr_read_net_dev,		/* /proc/net/dev	*/
 	lxpr_read_net_dev_mcast,	/* /proc/net/dev_mcast	*/
+	lxpr_read_net_if_inet6,		/* /proc/net/if_inet6	*/
 	lxpr_read_net_igmp,		/* /proc/net/igmp	*/
 	lxpr_read_net_ip_mr_cache,	/* /proc/net/ip_mr_cache */
 	lxpr_read_net_ip_mr_vif,	/* /proc/net/ip_mr_vif	*/
@@ -550,6 +557,7 @@ static vnode_t *(*lxpr_lookup_function[LXPR_NFILES])() = {
 	lxpr_lookup_not_a_dir,		/* /proc/net/arp	*/
 	lxpr_lookup_not_a_dir,		/* /proc/net/dev	*/
 	lxpr_lookup_not_a_dir,		/* /proc/net/dev_mcast	*/
+	lxpr_lookup_not_a_dir,		/* /proc/net/if_inet6	*/
 	lxpr_lookup_not_a_dir,		/* /proc/net/igmp	*/
 	lxpr_lookup_not_a_dir,		/* /proc/net/ip_mr_cache */
 	lxpr_lookup_not_a_dir,		/* /proc/net/ip_mr_vif	*/
@@ -624,6 +632,7 @@ static int (*lxpr_readdir_function[LXPR_NFILES])() = {
 	lxpr_readdir_not_a_dir,		/* /proc/net/arp	*/
 	lxpr_readdir_not_a_dir,		/* /proc/net/dev	*/
 	lxpr_readdir_not_a_dir,		/* /proc/net/dev_mcast	*/
+	lxpr_readdir_not_a_dir,		/* /proc/net/if_inet6	*/
 	lxpr_readdir_not_a_dir,		/* /proc/net/igmp	*/
 	lxpr_readdir_not_a_dir,		/* /proc/net/ip_mr_cache */
 	lxpr_readdir_not_a_dir,		/* /proc/net/ip_mr_vif	*/
@@ -1723,6 +1732,62 @@ lxpr_read_net_dev(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 static void
 lxpr_read_net_dev_mcast(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
+}
+
+static void
+lxpr_inet6_out(in6_addr_t addr, char buf[33])
+{
+	uint8_t *ip = addr.s6_addr;
+	char digits[] = "0123456789abcdef";
+	int i;
+	for (i = 0; i < 16; i++) {
+		buf[2 * i] = digits[ip[i] >> 4];
+		buf[2 * i + 1] = digits[ip[i] & 0xf];
+	}
+	buf[32] = '\0';
+}
+
+/* ARGSUSED */
+static void
+lxpr_read_net_if_inet6(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
+{
+	netstack_t *ns;
+	ip_stack_t *ipst;
+	ill_t *ill;
+	ipif_t *ipif;
+	ill_walk_context_t	ctx;
+	char ifname[LIFNAMSIZ], ip6out[33];
+
+	ns = netstack_get_current();
+	if (ns == NULL)
+		return;
+	ipst = ns->netstack_ip;
+
+	rw_enter(&ipst->ips_ill_g_lock, RW_READER);
+	ill = ILL_START_WALK_V6(&ctx, ipst);
+
+	for (; ill != NULL; ill = ill_next(&ctx, ill)) {
+		for (ipif = ill->ill_ipif; ipif != NULL;
+		    ipif = ipif->ipif_next) {
+			uint_t index = ill->ill_phyint->phyint_ifindex;
+			int plen = ip_mask_to_plen_v6(&ipif->ipif_v6net_mask);
+			in6addr_scope_t scope = ip_addr_scope_v6(
+			    &ipif->ipif_v6lcl_addr);
+			/* Always report PERMANENT flag */
+			int flag = 0x80;
+
+			ipif_get_name(ipif, ifname, sizeof (ifname));
+			lx_ifname_convert(ifname, LX_IFNAME_FROMNATIVE);
+			lxpr_inet6_out(ipif->ipif_v6lcl_addr, ip6out);
+			/* Scope output is shifted on Linux */
+			scope = scope << 4;
+
+			lxpr_uiobuf_printf(uiobuf, "%32s %02x %02x %02x %02x"
+			    " %8s\n", ip6out, index, plen, scope, flag, ifname);
+		}
+	}
+	rw_exit(&ipst->ips_ill_g_lock);
+	netstack_rele(ns);
 }
 
 /* ARGSUSED */
