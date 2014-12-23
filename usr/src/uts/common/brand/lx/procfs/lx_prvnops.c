@@ -1563,18 +1563,26 @@ struct lxpr_ifstat {
 };
 
 static void *
-lxpr_kstat_read(kid_t kid, size_t *size, int *num)
+lxpr_kstat_read(kstat_t *kn, boolean_t byname, size_t *size, int *num)
 {
 	kstat_t *kp;
 	int i, nrec = 0;
 	size_t bufsize;
 	void *buf = NULL;
 
-	kp = kstat_hold_bykid(kid, getzoneid());
+	if (byname == B_TRUE)
+		kp = kstat_hold_byname(kn->ks_module, kn->ks_instance,
+		    kn->ks_name, getzoneid());
+	else
+		kp = kstat_hold_bykid(kn->ks_kid, getzoneid());
 	if (kp == NULL)
 		return (NULL);
+	if (kp->ks_flags & KSTAT_FLAG_INVALID) {
+		kstat_rele(kp);
+		return (NULL);
+	}
 
-	bufsize = kp->ks_data_size;
+	bufsize = kp->ks_data_size + 1;
 	kstat_rele(kp);
 
 	/*
@@ -1584,25 +1592,31 @@ lxpr_kstat_read(kid_t kid, size_t *size, int *num)
 	 * enough, the alloc and check are repeated up to three times.
 	 */
 	for (i = 0; i < 2; i++) {
-		buf = kmem_alloc(bufsize + 1, KM_SLEEP);
+		buf = kmem_alloc(bufsize, KM_SLEEP);
 
 		/* Check if bufsize still appropriate */
-		kp = kstat_hold_bykid(kid, getzoneid());
-		if (kp == NULL) {
-			kmem_free(buf, bufsize + 1);
+		if (byname == B_TRUE)
+			kp = kstat_hold_byname(kn->ks_module, kn->ks_instance,
+			    kn->ks_name, getzoneid());
+		else
+			kp = kstat_hold_bykid(kn->ks_kid, getzoneid());
+		if (kp == NULL || kp->ks_flags & KSTAT_FLAG_INVALID) {
+			if (kp != NULL)
+				kstat_rele(kp);
+			kmem_free(buf, bufsize);
 			return (NULL);
 		}
 		KSTAT_ENTER(kp);
+		(void) KSTAT_UPDATE(kp, KSTAT_READ);
 		if (bufsize < kp->ks_data_size) {
-			kmem_free(buf, bufsize + 1);
-			bufsize = kp->ks_data_size;
+			kmem_free(buf, bufsize);
+			bufsize = kp->ks_data_size + 1;
 			KSTAT_EXIT(kp);
 			kstat_rele(kp);
 			continue;
 		} else {
-			(void) KSTAT_UPDATE(kp, KSTAT_READ);
 			if (KSTAT_SNAPSHOT(kp, buf, KSTAT_READ) != 0) {
-				kmem_free(buf, bufsize + 1);
+				kmem_free(buf, bufsize);
 				buf = NULL;
 			}
 			nrec = kp->ks_ndata;
@@ -1613,21 +1627,25 @@ lxpr_kstat_read(kid_t kid, size_t *size, int *num)
 	}
 
 	if (buf != NULL) {
-		*size = bufsize + 1;
+		*size = bufsize;
 		*num = nrec;
 	}
 	return (buf);
 }
 
 static int
-lxpr_kstat_ifstat(kid_t kid, struct lxpr_ifstat *ifs)
+lxpr_kstat_ifstat(kstat_t *kn, struct lxpr_ifstat *ifs)
 {
 	kstat_named_t *kp;
 	int i, num;
 	size_t size;
 
+	/*
+	 * Search by name instead of by kid since there's a small window to
+	 * race against kstats being added/removed.
+	 */
 	bzero(ifs, sizeof (*ifs));
-	kp = (kstat_named_t *)lxpr_kstat_read(kid, &size, &num);
+	kp = (kstat_named_t *)lxpr_kstat_read(kn, B_TRUE, &size, &num);
 	if (kp == NULL)
 		return (-1);
 	for (i = 0; i < num; i++) {
@@ -1661,6 +1679,7 @@ static void
 lxpr_read_net_dev(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
 	kstat_t *ksr;
+	kstat_t ks0;
 	int i, nidx;
 	size_t sidx;
 	struct lxpr_ifstat ifs;
@@ -1671,14 +1690,15 @@ lxpr_read_net_dev(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	    " frame compressed multicast|bytes    packets errs drop fifo"
 	    " colls carrier compressed\n");
 
-	ksr = (kstat_t *)lxpr_kstat_read(0, &sidx, &nidx);
+	ks0.ks_kid = 0;
+	ksr = (kstat_t *)lxpr_kstat_read(&ks0, B_FALSE, &sidx, &nidx);
 	if (ksr == NULL)
 		return;
 
 	for (i = 1; i < nidx; i++) {
 		if (strncmp(ksr[i].ks_module, "link", KSTAT_STRLEN) == 0 ||
 		    strncmp(ksr[i].ks_module, "lo", KSTAT_STRLEN) == 0) {
-			if (lxpr_kstat_ifstat(ksr[i].ks_kid, &ifs) != 0)
+			if (lxpr_kstat_ifstat(&ksr[i], &ifs) != 0)
 				continue;
 
 			/* Overwriting the name is ok in the local snapshot */
