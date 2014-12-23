@@ -1,12 +1,13 @@
 '\" te
 .\" Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright (c) 2014, Joyent, Inc.
 .\"  Copyright 1989 AT&T
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
 .TH LINK 2 "May 18, 2007"
 .SH NAME
-link \- link to a file
+link, linkat \- link to a file
 .SH SYNOPSIS
 .LP
 .nf
@@ -14,14 +15,19 @@ link \- link to a file
 
 \fBint\fR \fBlink\fR(\fBconst char *\fR\fIexisting\fR, \fBconst char *\fR\fInew\fR);
 .fi
+.LP
+.nf
+\fBint\fR \fBlinkat\fR(\fBint\fR \fIefd\fR, \fBconst char *\fR\fIexisting\fR, \fBint\fR \fInfd\fR,
+    \fBconst char *\fR\fInew\fR, \fBint\fR \fIflag\fR);
+.fi
 
 .SH DESCRIPTION
-.sp
 .LP
-The \fBlink()\fR function creates a new link (directory entry) for the existing
-file and increments its link count by one.  The \fIexisting\fR argument points
-to a path name naming an existing file.  The \fInew\fR argument points to a
-pathname naming the new directory entry to be created.
+The \fBlink()\fR and \fBlinkat()\fR functions create a new link (directory
+entry) for the existing file and increments its link count by one.  The
+\fIexisting\fR argument points to a path name naming an existing file.  The
+\fInew\fR argument points to a pathname naming the new directory entry to be
+created.
 .sp
 .LP
 To create hard links, both files must be on the same file system. Both the old
@@ -30,18 +36,29 @@ Privileged processes can make multiple links to a directory. Unless the caller
 is privileged, the file named by \fIexisting\fR must not be a directory.
 .sp
 .LP
-Upon successful completion, \fBlink()\fR marks for update the \fBst_ctime\fR
-field of the file. Also, the \fBst_ctime\fR and \fBst_mtime\fR fields of the
-directory that contains the new entry are marked for update.
-.SH RETURN VALUES
+The \fBlinkat()\fR function is similar to \fBlink()\fR. If the path
+\fIexisting\fR is a relative path, then the directory represented by \fIefd\fR
+will be used as the starting point to resolve \fIexisting\fR. If the path
+\fInew\fR is a relative path, then the directory represented by \fInfd\fR will
+be used as the starting point to resolve \fInew\fR. Both \fIefd\fR and \fInfd\fR
+may be the special value \fBAT_FDCWD\fR which causes the current working
+directory to be used as the starting point for path resolution.
 .sp
+.LP
+By default, \fBlinkat()\fR does not follow symbolic links. To cause it to follow
+symbolic links, the value of \fIflag\fR should be \fBAT_SYMLINK_FOLLOW\fR.
+.sp
+.LP
+Upon successful completion, \fBlink()\fR and \fBlinkat()\fR mark for update the
+\fBst_ctime\fR field of the file. Also, the \fBst_ctime\fR and \fBst_mtime\fR
+fields of the directory that contains the new entry are marked for update.
+.SH RETURN VALUES
 .LP
 Upon successful completion, \fB0\fR is returned. Otherwise, \fB\(mi1\fR is
 returned, no link is created, and \fBerrno\fR is set to indicate the error.
 .SH ERRORS
-.sp
 .LP
-The \fBlink()\fR function will fail if:
+The \fBlink()\fR and \fBlinkat()\fR functions will fail if:
 .sp
 .ne 2
 .na
@@ -97,7 +114,8 @@ file names where all characters are part of the UTF-8 character codeset.
 \fB\fBEINTR\fR\fR
 .ad
 .RS 16n
-A signal was caught during the execution of the \fBlink()\fR function.
+A signal was caught during the execution of the \fBlink()\fR or \fBlinkat()\fR
+functions.
 .RE
 
 .sp
@@ -202,8 +220,41 @@ The link named by \fInew\fR and the file named by \fIexisting\fR are on
 different logical devices (file systems).
 .RE
 
-.SH ATTRIBUTES
 .sp
+.LP
+The \fBlinkat()\fR functions will fail if:
+.sp
+.ne 2
+.na
+.B EBADF
+.ad
+.RS 16n
+If either \fIexisting\fR or \fInew\fR is a relative path and \fIefd\fR or
+\fInfd\fR respectively are not a valid file descriptor or the value
+\fBAT_FDCWD\fR.
+.RE
+
+.sp
+.ne 2
+.na
+.B EINVAL
+.ad
+.RS 16n
+An invalid value is set in \fIflag\fR. The only valid values are \fB0\fR and
+\fBfBAT_SYMLINK_FOLLOW\fR.
+.RE
+
+.sp
+.ne 2
+.na
+.B ENOTDIR
+.ad
+.RS 16n
+If either \fIexisting\fR or \fInew\fR is a relative path and \fIefd\fR or
+\fInfd\fR respectively refer to a valid descriptor which is not a directory.
+.RE
+
+.SH ATTRIBUTES
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -221,7 +272,6 @@ MT-Level	Async-Signal-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBsymlink\fR(2), \fBunlink\fR(2), \fBattributes\fR(5), \fBprivileges\fR(5),
 \fBstandards\fR(5)

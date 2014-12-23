@@ -1,5 +1,6 @@
 '\" te
 .\" Copyright (c) 2005, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright (c) 2014, Joyent, Inc.
 .\" Copyright 1989 AT&T.
 .\" Portions Copyright (c) 2001, the Institute of Electrical and Electronics Engineers, Inc. and The Open Group. All Rights Reserved.
 .\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
@@ -9,9 +10,9 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH CHMOD 2 "Sep 12, 2005"
+.TH CHMOD 2 "Dec 22, 2014"
 .SH NAME
-chmod, fchmod \- change access permission mode of file
+chmod, fchmod, fchmodat \- change access permission mode of file
 .SH SYNOPSIS
 .LP
 .nf
@@ -26,13 +27,17 @@ chmod, fchmod \- change access permission mode of file
 \fBint\fR \fBfchmod\fR(\fBint\fR \fIfildes\fR, \fBmode_t\fR \fImode\fR);
 .fi
 
-.SH DESCRIPTION
-.sp
 .LP
-The \fBchmod()\fR and \fBfchmod()\fR functions set the access permission
-portion of the mode of the file whose name is given by \fIpath\fR or referenced
-by the open file descriptor \fIfildes\fR to the bit pattern contained in
-\fImode\fR. Access permission bits are interpreted as follows:
+.nf
+\fBint\fR \fBfchmodat\fR(\fBint\fR \fIfildes\fR, \fBconst char *\fR\fIpath\fR, \fBmode_t\fR \fImode\fR, \fBint\fR \fIflag\fR);
+.fi
+
+.SH DESCRIPTION
+.LP
+The \fBchmod()\fR, \fBfchmod()\fR, and \fBfchmodat()\fR functions set the access
+permission portion of the mode of the file whose name is given by \fIpath\fR or
+referenced by the open file descriptor \fIfildes\fR to the bit pattern contained
+in \fImode\fR. Access permission bits are interpreted as follows:
 .sp
 
 .sp
@@ -142,18 +147,27 @@ system name space with \fBfattach\fR(3C), the \fBfchmod()\fR call performs no
 action and returns successfully.
 .sp
 .LP
-Upon successful completion, \fBchmod()\fR and \fBfchmod()\fR mark for update
-the \fBst_ctime\fR field of the file.
-.SH RETURN VALUES
+The \fBfchmodat()\fR function behaves similarly to \fBchmod()\fR, except when
+\fIpath\fR is a relative path, it is resolved relative to the directory
+specified by \fIfiledes\fR. If \fBfiledes\fR has the value \fBAT_FDCWD\fR, then
+\fBpath\fR will be resolved relative to the current working directory. The
+argument \fIflag\fR should be zero, but may include the value
+\fBAT_SYMLINK_NOFOLLOW\fR, which indicates that if \fIpath\fR refers to a
+symbolic link, then permissions should be changed on the symbolic link itself.
+However, changing permissions of symbolic links is not supported on illumos, and
+will result in an error.
 .sp
+.LP
+Upon successful completion, \fBchmod()\fR, \fBfchmod()\fR, \fBfchmodat()\fR mark
+for update the \fBst_ctime\fR field of the file.
+.SH RETURN VALUES
 .LP
 Upon successful completion, \fB0\fR is returned. Otherwise, \fB\(mi1\fR is
 returned, the file mode is unchanged, and \fBerrno\fR is set to indicate the
 error.
 .SH ERRORS
-.sp
 .LP
-The \fBchmod()\fR and \fBfchmod()\fR functions will fail if:
+The \fBchmod()\fR, \fBfchmod()\fR, and \fBfchmodat()\fR functions will fail if:
 .sp
 .ne 2
 .na
@@ -183,14 +197,15 @@ apply. See \fBprivileges\fR(5).
 
 .sp
 .LP
-The \fBchmod()\fR function will fail if:
+The \fBchmod()\fR and \fBfchmodat()\fR functions will fail if:
 .sp
 .ne 2
 .na
 \fB\fBEACCES\fR\fR
 .ad
 .RS 16n
-Search permission is denied on a component of the path prefix of \fIpath\fR.
+Search permission is denied on a component of the path prefix of \fIpath\fR and
+for \fBfchmodat()\fR, \fBfiledes\fR was not opened with \fBO_SEARCH\fR requsted.
 The privilege {\fBFILE_DAC_SEARCH\fR} overrides file permissions restrictions
 in that case.
 .RE
@@ -317,7 +332,49 @@ The value of the \fImode\fR argument is invalid.
 
 .sp
 .LP
-The \fBchmod()\fR function may fail if:
+The \fBfchmodat()\fR will fail if:
+.sp
+.ne 2
+.na
+.B EBADF
+.ad
+.RS 16n
+The argument \fIpath\fR is a relative path and \fIfiledes\fR is not an open file
+descriptor or the value \fBAT_FDCWD\fR.
+.RE
+
+.sp
+.ne 2
+.na
+.B EINVAL
+.ad
+.RS 16n
+The argument \fIflags\fR has a non-zero value other than
+\fBAT_SYMLINK_NOFOLLOW\fR.
+.RE
+
+.sp
+.ne 2
+.na
+.B ENOTDIR
+.ad
+.RS 16n
+The argument \fIpath\fR is a relative path and \fIfiledes\fR is a valid file
+descriptor which does not refer to a file.
+.RE
+
+.sp
+.ne 2
+.na
+.B EOPNOTSUPP
+.ad
+.RS 16n
+The \fBAT_SYMLINK_NOFOLLOW\fR bit is set in the \fIflags\fR argument.
+.RE
+
+.sp
+.LP
+The \fBchmod()\fR and \fBfchmodat()\fR functions may fail if:
 .sp
 .ne 2
 .na
@@ -334,7 +391,7 @@ resolution of the \fIpath\fR argument.
 \fB\fBENAMETOOLONG\fR\fR
 .ad
 .RS 16n
-As a result of encountering a symbolic link in resolution of the\fIpath\fR
+As a result of encountering a symbolic link in resolution of the \fIpath\fR
 argument, the length of the substituted pathname strings exceeds
 {\fBPATH_MAX\fR}.
 .RE
@@ -425,7 +482,6 @@ status = stat("home/cnd/mod1", &buffer;);
 .in -2
 
 .SH USAGE
-.sp
 .LP
 If \fBchmod()\fR or \fBfchmod()\fR is used to change the file group owner
 permissions on a file with non-trivial ACL entries, only the ACL mask is set to
@@ -435,7 +491,6 @@ one whose meaning cannot be represented in the file's mode field alone. The new
 ACL mask permissions  might change the effective permissions for additional
 users and groups that have ACL entries on the file.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -453,7 +508,6 @@ MT-Level	Async-Signal-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBchmod\fR(1), \fBchown\fR(2), \fBcreat\fR(2), \fBfcntl\fR(2), \fBmknod\fR(2),
 \fBopen\fR(2), \fBread\fR(2), \fBrename\fR(2), \fBstat\fR(2), \fBwrite\fR(2),

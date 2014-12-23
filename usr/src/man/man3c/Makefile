@@ -930,6 +930,7 @@ MANLINKS=	FD_CLR.3c				\
 	 	memset.3c				\
 	 	minor.3c				\
 	 	mkdtemp.3c				\
+		mkfifoat.3c				\
 		mkostemp.3c				\
 		mkostemps.3c				\
 	 	mkstemps.3c				\
@@ -1846,6 +1847,8 @@ memcpy.3c				:= LINKSRC = memory.3c
 memmem.3c				:= LINKSRC = memory.3c
 memmove.3c				:= LINKSRC = memory.3c
 memset.3c				:= LINKSRC = memory.3c
+
+mkfifoat.3c				:= LINKSRC = mkfifo.3c
 
 mkdtemp.3c				:= LINKSRC = mkstemp.3c
 mkostemp.3c				:= LINKSRC = mkstemp.3c

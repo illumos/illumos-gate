@@ -930,6 +930,7 @@ link path=usr/share/man/man3c/memmem.3c target=memory.3c
 link path=usr/share/man/man3c/memmove.3c target=memory.3c
 link path=usr/share/man/man3c/memset.3c target=memory.3c
 link path=usr/share/man/man3c/minor.3c target=makedev.3c
+link path=usr/share/man/man3c/mkfifoat.3c target=mkfifo.3c
 link path=usr/share/man/man3c/mkdtemp.3c target=mkstemp.3c
 link path=usr/share/man/man3c/mkostemp.3c target=mkstemp.3c
 link path=usr/share/man/man3c/mkostemps.3c target=mkstemp.3c

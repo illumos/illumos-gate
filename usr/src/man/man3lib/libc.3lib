@@ -222,6 +222,7 @@ l l .
 \fBfaccessat\fR	
 \fBfacl\fR	\fBfattach\fR
 \fBfchdir\fR	\fBfchmod\fR
+\fBfchmodat\fR
 \fBfchown\fR	\fBfchownat\fR
 \fBfchroot\fR	\fBfclose\fR
 \fBfcloseall\fR	\fBfcntl\fR
@@ -385,8 +386,8 @@ l l .
 \fBlcong48\fR	\fBldexp\fR
 \fBldivide\fR	\fBlexp10\fR
 \fBlfind\fR	\fBlfmt\fR
-\fBlink\fR	\fBlio_listio\fR
-\fBllabs\fR	
+\fBlink\fR	\fBlinkat\fR
+\fBlio_listio\fR	\fBllabs\fR	
 \fBlldiv\fR	\fBllog10\fR
 \fBllseek\fR	\fBlltostr\fR
 \fBlocaleconv\fR	\fBlocaltime\fR
@@ -415,8 +416,10 @@ l l .
 \fBmeminfo\fR	\fBmemmem\fR
 \fBmemmove\fR
 \fBmemset\fR	\fBmincore\fR
-\fBmkdir\fR	\fBmkfifo\fR
-\fBmknod\fR	\fBmkstemp\fR
+\fBmkdir\fR	\fBmkdirat\fR
+\fBmkfifo\fR	\fBmkfifoat\fR
+\fBmknod\fR	\fBmknodat\fR
+\fBmkstemp\fR
 \fBmktemp\fR	\fBmktime\fR
 \fBmlock\fR	\fBmlockall\fR
 \fBmmap\fR	\fBmmapobj\fR
@@ -581,6 +584,7 @@ l l .
 \fBre_comp\fR	\fBre_exec\fR
 \fBread\fR	\fBreaddir\fR
 \fBreaddir_r\fR	\fBreadlink\fR
+\fBreadlinkat\fR
 \fBreadv\fR	\fBrealloc\fR
 \fBrealpath\fR	\fBreboot\fR
 \fBregcmp\fR	\fBregcomp\fR
@@ -696,6 +700,7 @@ l l .
 \fBswab\fR	\fBswapcontext\fR
 \fBswapctl\fR	\fBswprintf\fR
 \fBswscanf\fR	\fBsymlink\fR
+\fBsymlinkat\fR
 \fBsync\fR	\fBsync_instruction_memory\fR
 \fBsysconf\fR	\fBsysfs\fR
 \fBsysinfo\fR	\fBsyslog\fR
