@@ -1084,6 +1084,8 @@ QLGE_OBJS += qlge.o qlge_dbg.o qlge_flash.o qlge_fm.o qlge_gld.o qlge_mpi.o
 
 ZCONS_OBJS += zcons.o
 
+ZFD_OBJS += zfd.o
+
 NV_SATA_OBJS += nv_sata.o
 
 SI3124_OBJS += si3124.o

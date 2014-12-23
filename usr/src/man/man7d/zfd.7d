@@ -1,0 +1,39 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2014, Joyent, Inc. All rights reserved.
+.\"
+.Dd "Dec 22, 2014"
+.Dt ZFD 7D
+.Os
+.Sh NAME
+.Nm zfd
+.Nd Zone file descriptor driver
+.Sh DESCRIPTION
+The
+.Nm zfd
+character driver exports up to three file descriptors into the zone. These can
+be used by a standalone process within the zone as
+.Vt stdin ,
+.Vt stdout ,
+and
+.Vt stderr .
+The
+.Nm zfd
+driver behaves in a similar manner as the
+.Nm zcons(7D)
+device.
+Inside a zone, the slave side file descriptors appear as
+.Nm /dev/zfd/[0-2] .
+.Sh SEE ALSO
+.Xr zlogin 1 ,
+.Xr zoneadmd 1M ,
+.Xr zcons 7D

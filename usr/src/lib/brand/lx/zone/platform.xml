@@ -121,6 +121,9 @@
 	<!-- Renamed devices to create under /dev -->
 	<device match="brand/lx/ptmx" name="ptmx" />
 	<device match="zcons/%z/zoneconsole" name="console" />
+	<device match="zfd/%z/slave/0" name="zfd/0" />
+	<device match="zfd/%z/slave/1" name="zfd/1" />
+	<device match="zfd/%z/slave/2" name="zfd/2" />
 
 	<!-- Audio devices to create under /dev -->
 	<device match="brand/lx/dsp" name="dsp" />
