@@ -446,6 +446,7 @@ lxs_verify(char *xmlfile)
 	boolean_t		audio, restart;
 	char			*idev, *odev, *kvers;
 	char			hostidp[HW_HOSTID_LEN];
+	zone_iptype_t		iptype;
 
 	if ((handle = zonecfg_init_handle()) == NULL)
 		lxs_err(gettext("internal libzonecfg.so.1 error"), 0);
@@ -461,6 +462,15 @@ lxs_verify(char *xmlfile)
 	if (zonecfg_get_hostid(handle, hostidp, sizeof (hostidp)) == Z_OK) {
 		zonecfg_fini_handle(handle);
 		lxs_err(gettext("lx zones do not support hostid emulation"));
+	}
+
+	/*
+	 * Only exclusive stack is supported.
+	 */
+	if (zonecfg_get_iptype(handle, &iptype) != Z_OK ||
+	    iptype != ZS_EXCLUSIVE) {
+		zonecfg_fini_handle(handle);
+		lxs_err(gettext("lx zones do not support shared IP stacks"));
 	}
 
 	/* Extract any relevant attributes from the config file. */
