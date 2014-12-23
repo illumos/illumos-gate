@@ -13,6 +13,7 @@
 # Copyright 2011, Richard Lowe
 # Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
+# Copyright 2014 Joyent, Inc. All rights reserved.
 #
 
 include		$(SRC)/Makefile.master
@@ -151,7 +152,8 @@ _MANFILES=	aac.7d		\
 		xge.7d		\
 		yge.7d		\
 		zcons.7d	\
-		zero.7d
+		zero.7d		\
+		zfd.7d
 
 sparc_MANFILES=	audiocs.7d	\
 		bbc_beep.7d	\

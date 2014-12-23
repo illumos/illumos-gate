@@ -659,6 +659,7 @@ CHKHDRS=			\
 	watchpoint.h		\
 	winlockio.h		\
 	zcons.h			\
+	zfd.h			\
 	zone.h			\
 	xti_inet.h		\
 	xti_osi.h		\

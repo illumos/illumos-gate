@@ -32,6 +32,7 @@
 #include <limits.h>
 #include <sys/zone.h>
 #include <sys/zcons.h>
+#include <sys/zfd.h>
 #include <sys/cpuid_drv.h>
 
 static int display(di_minor_t minor, di_node_t node);
@@ -53,6 +54,7 @@ static int av_create(di_minor_t minor, di_node_t node);
 static int tsalarm_create(di_minor_t minor, di_node_t node);
 static int ntwdt_create(di_minor_t minor, di_node_t node);
 static int zcons_create(di_minor_t minor, di_node_t node);
+static int zfd_create(di_minor_t minor, di_node_t node);
 static int cpuid(di_minor_t minor, di_node_t node);
 static int glvc(di_minor_t minor, di_node_t node);
 static int ses_callback(di_minor_t minor, di_node_t node);
@@ -177,6 +179,9 @@ static devfsadm_create_t misc_cbt[] = {
 	{ "pseudo", "ddi_pseudo", "zcons",
 	    TYPE_EXACT | DRV_EXACT, ILEVEL_0, zcons_create,
 	},
+	{ "pseudo", "ddi_pseudo", "zfd",
+	    TYPE_EXACT | DRV_EXACT, ILEVEL_0, zfd_create,
+	},
 	{ "pseudo", "ddi_pseudo", CPUID_DRIVER_NAME,
 	    TYPE_EXACT | DRV_EXACT, ILEVEL_0, cpuid,
 	},
@@ -223,6 +228,9 @@ static devfsadm_remove_t misc_remove_cbt[] = {
 	},
 	{ "pseudo", "^zcons/" ZONENAME_REGEXP "/(" ZCONS_MASTER_NAME "|"
 		ZCONS_SLAVE_NAME ")$",
+	    RM_PRE | RM_HOT | RM_ALWAYS, ILEVEL_0, devfsadm_rm_all
+	},
+	{ "pseudo", "^zfd/" ZONENAME_REGEXP "/(master|slave)/[0-9]+$",
 	    RM_PRE | RM_HOT | RM_ALWAYS, ILEVEL_0, devfsadm_rm_all
 	},
 	{ "pseudo", "^" CPUID_SELF_NAME "$", RM_ALWAYS | RM_PRE | RM_HOT,
@@ -667,6 +675,35 @@ zcons_create(di_minor_t minor, di_node_t node)
 
 	(void) snprintf(path, sizeof (path), "zcons/%s/%s", zonename,
 	    minor_str);
+	(void) devfsadm_mklink(path, node, minor, 0);
+
+	return (DEVFSADM_CONTINUE);
+}
+
+static int
+zfd_create(di_minor_t minor, di_node_t node)
+{
+	char	*minor_str;
+	char	*zonename;
+	int	*id;
+	char	path[MAXPATHLEN];
+
+	minor_str = di_minor_name(minor);
+
+	if (di_prop_lookup_strings(DDI_DEV_T_ANY, node, "zfd_zname",
+	    &zonename) == -1)
+		return (DEVFSADM_CONTINUE);
+
+	if (di_prop_lookup_ints(DDI_DEV_T_ANY, node, "zfd_id", &id) == -1)
+		return (DEVFSADM_CONTINUE);
+
+	if (strncmp(minor_str, "slave", 5) == 0) {
+		(void) snprintf(path, sizeof (path), "zfd/%s/slave/%d",
+		    zonename, id[0]);
+	} else {
+		(void) snprintf(path, sizeof (path), "zfd/%s/master/%d",
+		    zonename, id[0]);
+	}
 	(void) devfsadm_mklink(path, node, minor, 0);
 
 	return (DEVFSADM_CONTINUE);

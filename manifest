@@ -4434,6 +4434,7 @@ f usr/include/sys/xti_inet.h 0644 root bin
 f usr/include/sys/xti_osi.h 0644 root bin
 f usr/include/sys/xti_xtiopt.h 0644 root bin
 f usr/include/sys/zcons.h 0644 root bin
+f usr/include/sys/zfd.h 0644 root bin
 f usr/include/sys/zmod.h 0644 root bin
 f usr/include/sys/zone.h 0644 root bin
 f usr/include/sysexits.h 0644 root bin
@@ -4544,6 +4545,7 @@ f usr/kernel/drv/amd64/smbsrv 0755 root sys
 f usr/kernel/drv/amd64/sppp 0755 root sys
 f usr/kernel/drv/amd64/sppptun 0755 root sys
 f usr/kernel/drv/amd64/zcons 0755 root sys
+f usr/kernel/drv/amd64/zfd 0755 root sys
 f usr/kernel/drv/bpf.conf 0644 root sys
 f usr/kernel/drv/dump.conf 0644 root sys
 f usr/kernel/drv/eventfd.conf 0644 root sys
@@ -18394,6 +18396,7 @@ f usr/share/man/man7d/xge.7d 0444 root bin
 f usr/share/man/man7d/yge.7d 0444 root bin
 f usr/share/man/man7d/zcons.7d 0444 root bin
 f usr/share/man/man7d/zero.7d 0444 root bin
+f usr/share/man/man7d/zfd.7d 0444 root bin
 d usr/share/man/man7fs 0755 root bin
 f usr/share/man/man7fs/bootfs.7fs 0444 root bin
 f usr/share/man/man7fs/ctfs.7fs 0444 root bin

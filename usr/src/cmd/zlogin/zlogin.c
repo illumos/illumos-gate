@@ -156,7 +156,7 @@ static boolean_t forced_login = B_FALSE;
 static void
 usage(void)
 {
-	(void) fprintf(stderr, gettext("usage: %s [ -inQCES ] [ -e cmdchar ] "
+	(void) fprintf(stderr, gettext("usage: %s [-inQCIES] [-e cmdchar] "
 	    "[-l user] zonename [command [args ...] ]\n"), pname);
 	exit(2);
 }
@@ -256,7 +256,7 @@ postfork_dropprivs()
  * with it to determine whether it will allow us to connect.
  */
 static int
-get_console_master(const char *zname)
+get_interactive_master(const char *zname, int notcons)
 {
 	int sockfd = -1;
 	struct sockaddr_un servaddr;
@@ -264,20 +264,32 @@ get_console_master(const char *zname)
 	char handshake[MAXPATHLEN], c;
 	int msglen;
 	int i = 0, err = 0;
+	char *sock_str;
 
 	if ((sockfd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
 		zperror(gettext("could not create socket"));
 		return (-1);
 	}
 
+	if (notcons) {
+		sock_str = "%s/%s.server_sock";
+	} else {
+		sock_str = "%s/%s.console_sock";
+	}
+
 	bzero(&servaddr, sizeof (servaddr));
 	servaddr.sun_family = AF_UNIX;
 	(void) snprintf(servaddr.sun_path, sizeof (servaddr.sun_path),
-	    "%s/%s.console_sock", ZONES_TMPDIR, zname);
+	    sock_str, ZONES_TMPDIR, zname);
 
 	if (connect(sockfd, (struct sockaddr *)&servaddr,
 	    sizeof (servaddr)) == -1) {
-		zperror(gettext("Could not connect to zone console"));
+		if (errno == ENOENT && notcons)
+			(void) fprintf(stderr, "%s: %s\n", pname,
+			    gettext("Could not connect to zone (is interactive "
+			    "mode enabled?)"));
+		else
+			zperror(gettext("Could not connect to zone"));
 		goto bad;
 	}
 	masterfd = sockfd;
@@ -315,15 +327,14 @@ get_console_master(const char *zname)
 	 * the server died off.
 	 */
 	if (err == -1) {
-		zperror(gettext("Could not connect to zone console"));
+		zperror(gettext("Could not connect to zone"));
 		goto bad;
 	}
 
 	if (strncmp(handshake, "OK", sizeof (handshake)) == 0)
 		return (0);
 
-	zerror(gettext("Console is already in use by process ID %s."),
-	    handshake);
+	zerror(gettext("Zone is already in use by process ID %s."), handshake);
 bad:
 	(void) close(sockfd);
 	masterfd = -1;
@@ -1752,10 +1763,40 @@ get_username()
 	return (nptr->pw_name);
 }
 
+static boolean_t
+is_standalone_int_mode(char *zonename)
+{
+	boolean_t sa = B_FALSE;
+	zone_dochandle_t handle;
+	struct zone_attrtab attr;
+
+	if ((handle = zonecfg_init_handle()) == NULL)
+		return (sa);
+
+	if (zonecfg_get_handle(zonename, handle) != Z_OK)
+		goto done;
+
+	if (zonecfg_setattrent(handle) != Z_OK)
+		goto done;
+	while (zonecfg_getattrent(handle, &attr) == Z_OK) {
+		if (strcmp("zlog-mode", attr.zone_attr_name) == 0) {
+			if (strncmp("int", attr.zone_attr_value, 3) == 0)
+				sa = B_TRUE;
+			break;
+		}
+	}
+	(void) zonecfg_endattrent(handle);
+
+done:
+	zonecfg_fini_handle(handle);
+	return (sa);
+}
+
+
 int
 main(int argc, char **argv)
 {
-	int arg, console = 0;
+	int arg, console = 0, imode = 0;
 	zoneid_t zoneid;
 	zone_state_t st;
 	char *login = "root";
@@ -1784,13 +1825,21 @@ main(int argc, char **argv)
 	(void) getpname(argv[0]);
 	username = get_username();
 
-	while ((arg = getopt(argc, argv, "inECR:Se:l:Q")) != EOF) {
+	while ((arg = getopt(argc, argv, "inECIR:Se:l:Q")) != EOF) {
 		switch (arg) {
 		case 'C':
 			console = 1;
 			break;
 		case 'E':
 			nocmdchar = 1;
+			break;
+		case 'I':
+			/*
+			 * interactive mode is just a slight variation on the
+			 * console mode.
+			 */
+			console = 1;
+			imode = 1;
 			break;
 		case 'R':	/* undocumented */
 			if (*optarg != '/') {
@@ -1856,7 +1905,7 @@ main(int argc, char **argv)
 
 	}
 
-	if (iflag !=0 && nflag != 0) {
+	if (iflag != 0 && nflag != 0) {
 		zerror(gettext("-i and -n flags are incompatible"));
 		usage();
 	}
@@ -1975,10 +2024,15 @@ main(int argc, char **argv)
 	}
 
 	/*
-	 * The console is a separate case from the rest of the code; handle
-	 * it first.
+	 * The console (or standalong interactive mode) is a separate case from
+	 * the rest of the code; handle it first.
 	 */
 	if (console) {
+		if (imode && !is_standalone_int_mode(zonename)) {
+			zerror(gettext("the zlog-mode is not interactive"));
+			return (1);
+		}
+
 		/*
 		 * Ensure that zoneadmd for this zone is running.
 		 */
@@ -1988,15 +2042,19 @@ main(int argc, char **argv)
 		/*
 		 * Make contact with zoneadmd.
 		 */
-		if (get_console_master(zonename) == -1)
+		if (get_interactive_master(zonename, imode) == -1)
 			return (1);
 
-		if (!quiet)
-			(void) printf(
-			    gettext("[Connected to zone '%s' console]\n"),
-			    zonename);
+		if (!quiet) {
+			if (imode)
+				(void) printf(gettext("[Connected to zone '%s' "
+				    "interactively]\n"), zonename);
+			else
+				(void) printf(gettext("[Connected to zone '%s' "
+				    "console]\n"), zonename);
+		}
 
-		if (set_tty_rawmode(STDIN_FILENO) == -1) {
+		if (!imode && set_tty_rawmode(STDIN_FILENO) == -1) {
 			reset_tty();
 			zperror(gettext("failed to set stdin pty to raw mode"));
 			return (1);
@@ -2009,11 +2067,17 @@ main(int argc, char **argv)
 		 * Run the I/O loop until we get disconnected.
 		 */
 		doio(masterfd, -1, masterfd, -1, -1, B_FALSE);
-		reset_tty();
-		if (!quiet)
-			(void) printf(
-			    gettext("\n[Connection to zone '%s' console "
-			    "closed]\n"), zonename);
+		if (!imode)
+			reset_tty();
+		if (!quiet) {
+			if (imode)
+				(void) printf(gettext("\n[Interactive "
+				    "connection to zone '%s' closed]\n"),
+				    zonename);
+			else
+				(void) printf(gettext("\n[Connection to zone "
+				    "'%s' console closed]\n"), zonename);
+		}
 
 		return (0);
 	}

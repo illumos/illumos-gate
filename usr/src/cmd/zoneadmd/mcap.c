@@ -139,8 +139,6 @@ uint64_t	prev_fast_rss = 0;
 uint64_t	fast_rss = 0;
 uint64_t	accurate_rss = 0;
 
-static char	zonename[ZONENAME_MAX];
-static char	zonepath[MAXPATHLEN];
 static char	zoneproc[MAXPATHLEN];
 static char	debug_log[MAXPATHLEN];
 static zoneid_t	zid;
@@ -907,7 +905,7 @@ get_mcap_tunables()
 	if ((handle = zonecfg_init_handle()) == NULL)
 		return;
 
-	if (zonecfg_get_handle(zonename, handle) != Z_OK)
+	if (zonecfg_get_handle(zone_name, handle) != Z_OK)
 		goto done;
 
 	/* Reset to defaults in case rebooting and settings have changed */
@@ -1146,22 +1144,13 @@ void
 create_mcap_thread(zlog_t *zlogp, zoneid_t id)
 {
 	int		res;
-	char		brandname[MAXNAMELEN];
 
 	shutting_down = 0;
 	zid = id;
 	logp = zlogp;
-	(void) getzonenamebyid(zid, zonename, sizeof (zonename));
-
-	if (zone_get_zonepath(zonename, zonepath, sizeof (zonepath)) != 0)
-		zerror(zlogp, B_FALSE, "zone %s missing zonepath", zonename);
-
-	brandname[0] = '\0';
-	if (zone_get_brand(zonename, brandname, sizeof (brandname)) != 0)
-		zerror(zlogp, B_FALSE, "zone %s missing brand", zonename);
 
 	/* all but the lx brand currently use /proc */
-	if (strcmp(brandname, "lx") == 0) {
+	if (strcmp(brand_name, "lx") == 0) {
 		(void) snprintf(zoneproc, sizeof (zoneproc),
 		    "%s/root/native/proc", zonepath);
 	} else {

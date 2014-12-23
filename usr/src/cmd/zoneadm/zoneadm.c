@@ -3946,8 +3946,8 @@ cleanup_zonepath(char *zonepath, boolean_t all)
 			 * exist if the zone was force-attached after a
 			 * migration.
 			 */
-	char		*std_entries[] = {"dev", "lastexited", "lu", "root",
-			    "SUNWattached.xml", NULL};
+	char		*std_entries[] = {"dev", "lastexited", "logs", "lu",
+			    "root", "SUNWattached.xml", NULL};
 			/* (MAXPATHLEN * 5) is for the 5 std_entries dirs */
 	char		cmdbuf[sizeof (RMCOMMAND) + (MAXPATHLEN * 5) + 64];
 

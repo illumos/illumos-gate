@@ -14,13 +14,13 @@
 .\" Copyright 2013 DEY Storage Systems, Inc.
 .\" Copyright (c) 2014 Gary Mills
 .\" Copyright (c) 2014, Joyent, Inc. All Rights Reserved
-.TH ZLOGIN 1 "Jan 22, 2014"
+.TH ZLOGIN 1 "Dec 22, 2014"
 .SH NAME
 zlogin \- enter a zone
 .SH SYNOPSIS
 .LP
 .nf
-\fBzlogin\fR [\fB-CEQ\fR] [\fB-e\fR \fIc\fR] [\fB-l\fR \fIusername\fR] \fIzonename\fR
+\fBzlogin\fR [\fB-CEIQ\fR] [\fB-e\fR \fIc\fR] [\fB-l\fR \fIusername\fR] \fIzonename\fR
 .fi
 
 .LP
@@ -37,7 +37,7 @@ system zone. Only a superuser operating in the global system zone can use this
 utility.
 .sp
 .LP
-\fBzlogin\fR operates in one of three modes:
+\fBzlogin\fR operates in one of four modes:
 .sp
 .ne 2
 .na
@@ -81,6 +81,16 @@ available once the zone is in the installed  state. Connections to the console
 are persistent across reboot of the zone.
 .RE
 
+.sp
+.ne 2
+.na
+\fBStandalone-processs Interactive Mode\fR
+.ad
+.RS 24n
+If the \fB-I\fR option is specified the user is connected to the zone's stdin,
+stdout and stderr \fBzfd(7D)\fR devices.
+.RE
+
 .SH OPTIONS
 .sp
 .LP
@@ -122,6 +132,15 @@ login by using the escape sequence character.
 .ad
 .RS 15n
 Forces interactive mode when a utility argument is specified.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-I\fR\fR
+.ad
+.RS 15n
+Connects to the zone's \fBzfd(7D)\fR devices.
 .RE
 
 .sp

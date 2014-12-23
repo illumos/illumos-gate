@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2013, Joyent Inc. All rights reserved.
+ * Copyright 2014, Joyent Inc. All rights reserved.
  */
 
 /*
@@ -1691,7 +1691,6 @@ static int
 mount_filesystems(zlog_t *zlogp, zone_mnt_t mount_cmd)
 {
 	char rootpath[MAXPATHLEN];
-	char zonepath[MAXPATHLEN];
 	char brand[MAXNAMELEN];
 	char luroot[MAXPATHLEN];
 	int i, num_fs = 0;
@@ -1706,11 +1705,6 @@ mount_filesystems(zlog_t *zlogp, zone_mnt_t mount_cmd)
 		    "zone must be in '%s' or '%s' state to mount file-systems",
 		    zone_state_str(ZONE_STATE_READY),
 		    zone_state_str(ZONE_STATE_MOUNTED));
-		goto bad;
-	}
-
-	if (zone_get_zonepath(zone_name, zonepath, sizeof (zonepath)) != Z_OK) {
-		zerror(zlogp, B_TRUE, "unable to determine zone path");
 		goto bad;
 	}
 
@@ -3601,16 +3595,10 @@ validate_rootds_label(zlog_t *zlogp, char *rootpath, m_label_t *zone_sl)
 	zfs_handle_t	*zhp;
 	libzfs_handle_t	*hdl;
 	m_label_t	ds_sl;
-	char		zonepath[MAXPATHLEN];
 	char		ds_hexsl[MAXNAMELEN];
 
 	if (!is_system_labeled())
 		return (0);
-
-	if (zone_get_zonepath(zone_name, zonepath, sizeof (zonepath)) != Z_OK) {
-		zerror(zlogp, B_TRUE, "unable to determine zone path");
-		return (-1);
-	}
 
 	if (!is_zonepath_zfs(zonepath))
 		return (0);
@@ -4843,7 +4831,7 @@ write_index_file(zoneid_t zoneid)
 int
 vplat_bringup(zlog_t *zlogp, zone_mnt_t mount_cmd, zoneid_t zoneid)
 {
-	char zonepath[MAXPATHLEN];
+	char zpath[MAXPATHLEN];
 
 	if (mount_cmd == Z_MNT_BOOT && validate_datasets(zlogp) != 0) {
 		lofs_discard_mnttab();
@@ -4854,15 +4842,11 @@ vplat_bringup(zlog_t *zlogp, zone_mnt_t mount_cmd, zoneid_t zoneid)
 	 * Before we try to mount filesystems we need to create the
 	 * attribute backing store for /dev
 	 */
-	if (zone_get_zonepath(zone_name, zonepath, sizeof (zonepath)) != Z_OK) {
-		lofs_discard_mnttab();
-		return (-1);
-	}
-	resolve_lofs(zlogp, zonepath, sizeof (zonepath));
+	(void) strlcpy(zpath, zonepath, sizeof (zpath));
+	resolve_lofs(zlogp, zpath, sizeof (zpath));
 
 	/* Make /dev directory owned by root, grouped sys */
-	if (make_one_dir(zlogp, zonepath, "/dev", DEFAULT_DIR_MODE,
-	    0, 3) != 0) {
+	if (make_one_dir(zlogp, zpath, "/dev", DEFAULT_DIR_MODE, 0, 3) != 0) {
 		lofs_discard_mnttab();
 		return (-1);
 	}
@@ -4981,7 +4965,6 @@ vplat_teardown(zlog_t *zlogp, boolean_t unmount_cmd, boolean_t rebooting,
 	zoneid_t zoneid;
 	int res;
 	char pool_err[128];
-	char zpath[MAXPATHLEN];
 	char cmdbuf[MAXPATHLEN];
 	brand_handle_t bh = NULL;
 	dladm_status_t status;
@@ -5033,12 +5016,6 @@ vplat_teardown(zlog_t *zlogp, boolean_t unmount_cmd, boolean_t rebooting,
 		goto error;
 	}
 
-	/* Get the zonepath of this zone */
-	if (zone_get_zonepath(zone_name, zpath, sizeof (zpath)) != Z_OK) {
-		zerror(zlogp, B_FALSE, "unable to determine zone path");
-		goto error;
-	}
-
 	/* Get a handle to the brand info for this zone */
 	if ((bh = brand_open(brand_name)) == NULL) {
 		zerror(zlogp, B_FALSE, "unable to determine zone brand");
@@ -5049,7 +5026,7 @@ vplat_teardown(zlog_t *zlogp, boolean_t unmount_cmd, boolean_t rebooting,
 	 * brand a chance to cleanup any custom configuration.
 	 */
 	(void) strcpy(cmdbuf, EXEC_PREFIX);
-	if (brand_get_halt(bh, zone_name, zpath, cmdbuf + EXEC_LEN,
+	if (brand_get_halt(bh, zone_name, zonepath, cmdbuf + EXEC_LEN,
 	    sizeof (cmdbuf) - EXEC_LEN) < 0) {
 		brand_close(bh);
 		zerror(zlogp, B_FALSE, "unable to determine branded zone's "

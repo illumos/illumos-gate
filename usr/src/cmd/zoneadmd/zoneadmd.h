@@ -91,6 +91,7 @@ extern mutex_t msglock;
 extern boolean_t in_death_throes;
 extern boolean_t bringup_failure_recovery;
 extern char *zone_name;
+extern char zonepath[MAXNAMELEN];
 extern zone_dochandle_t snap_hndl;
 extern char pool_name[MAXNAMELEN];
 extern char brand_name[MAXNAMELEN];
@@ -162,6 +163,12 @@ extern void zcons_statechanged();
  */
 extern void create_mcap_thread(zlog_t *, zoneid_t);
 extern void destroy_mcap_thread();
+
+/*
+ * Zone FD log thread creation.
+ */
+extern void create_log_thread(zlog_t *, zoneid_t);
+extern void destroy_log_thread();
 
 /*
  * Contract handling.
