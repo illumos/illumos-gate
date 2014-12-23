@@ -19,6 +19,11 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2014 Joyent, Inc.
+ */
+
 /*
  * Copyright 1998 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -38,7 +43,7 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#include <err.h>
 
 #include "rcv.h"
 
@@ -47,11 +52,11 @@ static int		icsubstr(char *s1, char *s2);
 void 
 receipt(struct message *mp)
 {
-	struct headline	hl;
 	char	head[LINESIZE];
 	char	buf[BUFSIZ];
 	FILE	*pp, *fp;
 	char	*mail, *s;
+
 
 	if ((mail = value("sendmail")) == 0)
 #ifdef SENDMAIL
@@ -63,16 +68,27 @@ receipt(struct message *mp)
 	 || icsubstr(hfield(">to", mp, addto), "/receipt")) {
 		snprintf(buf, sizeof (buf), "%s %s", mail, skin(nameof(mp)));
 		if (pp = npopen(buf, "w")) {
+			headline_t *hl;
+
+			if (headline_alloc(&hl) != 0) {
+				err(1, "could not allocate memory");
+			}
+
 			fp = setinput(mp);
 			readline(fp, head);
-			parse(head, &hl, buf);
-			if (hl.l_date != NOSTR)
-				fprintf(pp, "Original-Date: %s\n", hl.l_date);
+			if (parse_headline(head, hl) != 0) {
+				headline_reset(hl);
+			}
+			if (custr_len(hl->hl_date) > 0) {
+				fprintf(pp, "Original-Date: %s\n",
+				    custr_cstr(hl->hl_date));
+			}
 			if (s = hfield("message-id", mp, addone))
 				fprintf(pp, "Original-Message-ID: %s\n", s);
 			s = hfield("subject", mp, addone);
 			fprintf(pp, "Subject: RR: %s\n", s ? s : "(none)");
 			npclose(pp);
+			headline_free(hl);
 		}
 	}
 }

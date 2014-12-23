@@ -37,8 +37,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "rcv.h"
 #ifndef preSVr4
 #include <locale.h>
@@ -104,7 +102,6 @@ main(int argc, char **argv)
 	progname = argv[0];
 	if (progname[strlen(progname) - 1] != 'x') {
 		assign("bsdcompat", "");
-		assign("escapeok", "");		/* XXX */
 	}
 	myegid = getegid();
 	myrgid = getgid();

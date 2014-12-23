@@ -824,6 +824,7 @@ fs.d: fstyp
 ksh:	shcomp isaexec
 mdb:	terminfo
 print:	lp
+fmt:	mailx
 
 $(FIRST_SUBDIRS) $(BWOSDIRS) $(SUBDIRS) $(AUDITSUBDIRS): FRC
 	@if [ -f $@/Makefile  ]; then \

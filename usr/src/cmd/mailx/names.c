@@ -191,7 +191,7 @@ outpre(struct name *to)
 /*
  * For each recipient in the passed name list with a /
  * in the name, append the message to the end of the named file
- * and remove him from the recipient list.
+ * and remove them from the recipient list.
  *
  * Recipients whose name begins with | are piped through the given
  * program and removed.
@@ -211,6 +211,9 @@ outof(struct name *names, FILE *fo)
 #ifdef preSVr4
 	char line[BUFSIZ];
 #endif
+
+	if (value("expandaddr") == NOSTR)
+		return (nout);
 
 	for (np = names; np != NIL; np = np->n_flink) {
 		if (!isfileaddr(np->n_name) && np->n_name[0] != '|')
@@ -599,14 +602,15 @@ unpack(struct name *np)
 		panic("No names to unpack");
 
 	/*
-	 * Compute the number of extra arguments we will need.
-	 * We need at least 2 extra -- one for "mail" and one for
-	 * the terminating 0 pointer.
-	 * Additional spots may be needed to pass along -r and -f to
-	 * the host mailer.
+	 * Compute the number of extra arguments we will need.  We need at least
+	 * 3 extra -- one for "mail", one for a terminating -- to stop sendmail
+	 * option processing, and one for the terminating 0 pointer.
+	 *
+	 * Additional spots may be needed to pass along -r and -f to the host
+	 * mailer.
 	 */
 
-	extra = 2;
+	extra = 3;
 
 	if (rflag != NOSTR)
 		extra += 2;
@@ -636,6 +640,7 @@ unpack(struct name *np)
 		snprintf(hbuf, sizeof (hbuf), "%d", hflag);
 		*ap++ = savestr(hbuf);
 	}
+	*ap++ = "--";
 	while (n != NIL) {
 		if (n->n_type & GDEL) {
 			n = n->n_flink;
