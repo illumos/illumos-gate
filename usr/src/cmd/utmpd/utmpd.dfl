@@ -2,6 +2,5 @@
 # Copyright 1994 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 SCAN_PERIOD=300

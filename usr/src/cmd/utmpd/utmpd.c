@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2014 Shruti V Sampat <shrutisampat@gmail.com>
+ * Copyright 2014, 2015 Shruti V Sampat <shrutisampat@gmail.com>
  */
 
 /*
@@ -78,6 +78,7 @@
 #include	<deflt.h>
 #include	<procfs.h>
 #include	<sys/resource.h>
+#include	<limits.h>
 
 #define	dprintf(x)	if (Debug) (void) printf x
 
@@ -108,10 +109,10 @@
 /*
  * pd_type's
  */
-#define	ADDPID  1
-#define	REMPID  2
+#define	ADDPID	1
+#define	REMPID	2
 
-struct  pidrec {
+struct	pidrec {
 	int	pd_type;		/* Command type */
 	pid_t	pd_pid;			/* pid to add or remove */
 };
@@ -125,9 +126,9 @@ struct  pidrec {
  * open fd.  These tables are kept sorted by process ID for quick lookups.
  */
 
-struct  pidentry {
+struct	pidentry {
 	pid_t	pl_pid;			/* pid to watch for */
-	int 	pl_status;		/* Exit status of proc */
+	int	pl_status;		/* Exit status of proc */
 };
 
 static struct pidentry *pidtable = NULL;
@@ -139,7 +140,7 @@ static char	*prog_name;		/* To save the invocation name away */
 static char	*UTMPPIPE_DIR =	"/var/run";
 static char	*UTMPPIPE = "/var/run/utmppipe";
 static int	Pfd = -1;		/* File descriptor of named pipe */
-static int 	Poll_timeout = POLL_TIMEOUT;
+static int	Poll_timeout = POLL_TIMEOUT;
 static int	WTMPXfd = -1;		/* File descriptor of WTMPX_FILE */
 static int	WTMPX_ufreq = WTMPX_UFREQ;
 static int	Debug = 0;		/* Set by command line argument */
@@ -151,7 +152,7 @@ static int	Max_fds		= MAX_FDS;
  *		   (Uses a named pipe to get messages)
  *	Watcher	 - Use poll(2) to watch for processes to die so they
  *		   can be cleaned up (get marked as DEAD_PROCESS)
- *	Scanner  - periodically scans the utmpx file for stale entries
+ *	Scanner	 - periodically scans the utmpx file for stale entries
  *		   or live entries that we don't know about.
  */
 
@@ -176,6 +177,9 @@ static void print_tables();	/* Prints out internal tables for Debug */
 static int proc_is_alive(pid_t pid);	/* Check if a process is alive */
 static void warn_utmp(void);
 
+/* Validate defaults from file and assign */
+static int validate_default(char *defp, int *flag);
+
 /*
  * main()  - Main does basic setup and calls wait_for_pids() to do the work
  */
@@ -187,6 +191,7 @@ main(int argc, char *argv[])
 	struct rlimit rlim;
 	int i;
 	time_t curtime, now;
+	char msg[256];
 
 	prog_name = argv[0];			/* Save invocation name */
 
@@ -210,28 +215,40 @@ main(int argc, char *argv[])
 	}
 
 	/*
-	 * Read defaults file for poll timeout
+	 * Read defaults file for poll timeout, WTMPX update frequency
+	 * and maximum number of processes to monitor.
 	 */
 	if (defopen(UTMP_DEFAULT) == 0) {
-		if ((defp = defread("SCAN_PERIOD=")) != NULL) {
-			Poll_timeout = atol(defp);
-			dprintf(("Poll timeout set to %d\n", Poll_timeout));
-		}
+		if ((defp = defread("SCAN_PERIOD=")) != NULL)
+			if (validate_default(defp, &Poll_timeout) == -1) {
+				(void) snprintf(msg, sizeof (msg), "SCAN_PERIOD"
+				    " should be a positive integer, found %s",
+				    defp);
+				nonfatal(msg);
+			}
+		dprintf(("Poll timeout set to %d\n", Poll_timeout));
 
-		if ((defp = defread("WTMPX_UPDATE_FREQ=")) != NULL) {
-			WTMPX_ufreq = atol(defp);
-			dprintf(("WTMPX update frequency set to %d\n",
-			    WTMPX_ufreq));
-		}
+		if ((defp = defread("WTMPX_UPDATE_FREQ=")) != NULL)
+			if (validate_default(defp, &WTMPX_ufreq) == -1) {
+				(void) snprintf(msg, sizeof (msg),
+				    "WTMPX_UPDATE_FREQ should be a positive "
+				    "integer, found %s", defp);
+				nonfatal(msg);
+			}
+		dprintf(("WTMPX update frequency set to %d\n", WTMPX_ufreq));
 
 		/*
 		 * Paranoia - if polling on large number of FDs is expensive /
 		 * buggy the number can be set lower in the field.
 		 */
-		if ((defp = defread("MAX_FDS=")) != NULL) {
-			Max_fds = atol(defp);
-			dprintf(("Max_fds set to %d\n", Max_fds));
-		}
+		if ((defp = defread("MAX_FDS=")) != NULL)
+			if (validate_default(defp, &Max_fds) == -1) {
+				(void) snprintf(msg, sizeof (msg), "MAX_FDS "
+				    "should be a positive integer, found %s",
+				    defp);
+				nonfatal(msg);
+			}
+		dprintf(("Max fds set to %d\n", Max_fds));
 		(void) defopen((char *)NULL);
 	}
 
@@ -281,7 +298,7 @@ main(int argc, char *argv[])
 	(void) enable_extended_FILE_stdio(-1, -1);
 
 	if ((WTMPXfd = open(WTMPX_FILE, O_RDONLY)) < 0)
-		nonfatal("WARNING: unable to open " WTMPX_FILE "for update.");
+		nonfatal("WARNING: unable to open " WTMPX_FILE " for update.");
 
 	/*
 	 * Loop here scanning the utmpx file and waiting for processes
@@ -682,8 +699,7 @@ drain_pipe()
  *
  */
 static void
-add_pid(pid)
-	pid_t pid;
+add_pid(pid_t pid)
 {
 	int fd = 0;
 	int i = 0, move_amt;
@@ -740,9 +756,9 @@ add_pid(pid)
 			 */
 			if (move_amt != 0) {
 				(void) memmove(&pidtable[i+1], &pidtable[i],
-					move_amt * sizeof (struct pidentry));
+				    move_amt * sizeof (struct pidentry));
 				(void) memmove(&fdtable[i+1], &fdtable[i],
-					move_amt * sizeof (pollfd_t));
+				    move_amt * sizeof (pollfd_t));
 			}
 		}
 	}
@@ -761,7 +777,7 @@ add_pid(pid)
 
 	pidcnt++;			/* Bump the pid count */
 	dprintf(("  add_pid: pid = %d fd = %d index = %d pidcnt = %d\n",
-		(int)pid, fd, i, pidcnt));
+	    (int)pid, fd, i, pidcnt));
 }
 
 
@@ -769,13 +785,16 @@ add_pid(pid)
  * rem_pid	- Remove an entry from the table and check to see if its
  *		  not in the utmpx file.
  *		  If i != -1 don't look up the pid, use i as index
+ *
+ * pid          - Pid of process to clean or 0 if we don't know it
+ *
+ * i            - Index into table or -1 if we need to look it up
+ *
+ * clean_it     - Clean the entry, or just remove from table?
  */
 
 static void
-rem_pid(pid, i, clean_it)
-	pid_t pid;	/* Pid of process to clean or 0 if we don't know it */
-	int i;		/* Index into table or -1 if we need to look it up */
-	int clean_it;	/* Clean the entry, or just remove from table? */
+rem_pid(pid_t pid, int i, int clean_it)
 {
 	int move_amt;
 
@@ -802,10 +821,10 @@ rem_pid(pid, i, clean_it)
 		 * Remove entries from the tables.
 		 */
 		(void) memmove(&pidtable[i], &pidtable[i+1],
-			move_amt * sizeof (struct pidentry));
+		    move_amt * sizeof (struct pidentry));
 
 		(void) memmove(&fdtable[i], &fdtable[i+1],
-			move_amt * sizeof (pollfd_t));
+		    move_amt * sizeof (pollfd_t));
 
 		/*
 		 * decrement the pid count - one less pid to worry about
@@ -823,9 +842,7 @@ rem_pid(pid, i, clean_it)
  */
 
 static int
-find_pid(pid, i)
-	pid_t pid;
-	int *i;
+find_pid(pid_t pid, int *i)
 {
 	struct pidentry pe;
 	struct pidentry *p;
@@ -847,8 +864,7 @@ find_pid(pid, i)
  */
 
 static int
-pidcmp(a, b)
-	struct pidentry *a, *b;
+pidcmp(struct pidentry *a, struct pidentry *b)
 {
 	if (b == NULL || a == NULL)
 		return (0);
@@ -861,8 +877,7 @@ pidcmp(a, b)
  *		  /proc file for the specified process.
  */
 static int
-proc_to_fd(pid)
-	pid_t pid;
+proc_to_fd(pid_t pid)
 {
 	char procname[64];
 	int fd, dfd;
@@ -911,8 +926,7 @@ proc_to_fd(pid)
  *		  into the pid_table.
  */
 static void
-clean_entry(i)
-	int i;
+clean_entry(int i)
 {
 	struct utmpx *u;
 
@@ -925,8 +939,8 @@ clean_entry(i)
 	 * Double check if the process is dead.
 	 */
 	if (proc_is_alive(pidtable[i].pl_pid)) {
-		dprintf(("      Bad attempt to clean %d\n", \
-			(int)pidtable[i].pl_pid));
+		dprintf(("      Bad attempt to clean %d\n",
+		    (int)pidtable[i].pl_pid));
 		return;
 	}
 
@@ -951,8 +965,7 @@ clean_entry(i)
  */
 
 static void
-clean_utmpx_ent(u)
-	struct utmpx *u;
+clean_utmpx_ent(struct utmpx *u)
 {
 	dprintf(("      clean_utmpx_ent: %d\n", (int)u->ut_pid));
 	u->ut_type = DEAD_PROCESS;
@@ -1033,8 +1046,7 @@ print_tables()
  */
 
 static int
-proc_is_alive(pid)
-	pid_t pid;
+proc_is_alive(pid_t pid)
 {
 	char psinfoname[64];
 	int fd;
@@ -1082,4 +1094,30 @@ warn_utmp()
 		nonfatal("WARNING: /var/adm/utmp exists!\nSee "
 		    "utmp(4) for more information");
 	}
+}
+
+/*
+ * validate_default - validate and assign defaults.
+ */
+
+static int
+validate_default(char *defp, int *flag)
+{
+	long lval;
+	char *endptr;
+
+	errno = 0;
+	lval = strtol(defp, &endptr, 10);
+
+	if (errno != 0 || lval > INT_MAX || lval <= 0)
+		return (-1);
+
+	while (isspace(*endptr) != 0)
+		endptr++;
+
+	if (*endptr != '\0')
+		return (-1);
+
+	*flag = lval;
+	return (0);
 }
