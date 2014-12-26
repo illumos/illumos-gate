@@ -328,6 +328,7 @@ int	getsockopt(int, int, int, void *, socklen_t *, int);
 int	setsockopt(int, int, int, void *, socklen_t *, int);
 int	sockconfig(int, void *, void *, void *, void *);
 ssize_t	sendfilev(int, int, const struct sendfilevec *, int, size_t *);
+int	getrandom(void *, size_t, int);
 
 typedef int64_t	(*llfcn_t)();	/* for casting one-word returns */
 
@@ -582,7 +583,7 @@ struct sysent sysent[NSYSCALL] =
 	/* 123 */ SYSENT_CL("preadv",		preadv,		5),
 	/* 124 */ SYSENT_CL("pwritev",		pwritev,	5),
 	/* 125 */ SYSENT_LOADABLE(),			/* (was fxstat) */
-	/* 126 */ SYSENT_LOADABLE(),			/* (was xmknod) */
+	/* 126 */ SYSENT_CI("getrandom",	getrandom,	3),
 	/* 127 */ SYSENT_CI("mmapobj",		mmapobjsys,	5),
 	/* 128 */ IF_LP64(
 			SYSENT_CI("setrlimit",	setrlimit64,	2),
@@ -947,7 +948,7 @@ struct sysent sysent32[NSYSCALL] =
 	/* 123 */ SYSENT_CI("preadv",		preadv,		5),
 	/* 124 */ SYSENT_CI("pwritev",		pwritev,	5),
 	/* 125 */ SYSENT_LOADABLE32(),		/*	was fxstat32	*/
-	/* 126 */ SYSENT_LOADABLE32(),		/*	was xmknod	*/
+	/* 126 */ SYSENT_CI("getrandom",	getrandom,	3),
 	/* 127 */ SYSENT_CI("mmapobj",		mmapobjsys,	5),
 	/* 128 */ SYSENT_CI("setrlimit",	setrlimit32,	2),
 	/* 129 */ SYSENT_CI("getrlimit",	getrlimit32,	2),

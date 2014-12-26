@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DRAND48 3C "Jul 24, 2002"
+.TH DRAND48 3C "Feb 11, 2015"
 .SH NAME
 drand48, erand48, lrand48, nrand48, mrand48, jrand48, srand48, seed48, lcong48
 \- generate uniformly distributed pseudo-random numbers
@@ -57,7 +57,6 @@ drand48, erand48, lrand48, nrand48, mrand48, jrand48, srand48, seed48, lcong48
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 This family of functions generates pseudo-random numbers using the well-known
 linear congruential algorithm and 48-bit integer arithmetic.
@@ -150,8 +149,10 @@ the multiplier \fIa\fR, and \fIparam\fR[6] specifies the 16-bit addend \fIc\fR.
 After \fBlcong48()\fR has been called, a subsequent call to either
 \fBsrand48()\fR or \fBseed48()\fR will restore the ``standard'' multiplier and
 addend values, \fIa\fR and \fIc\fR, specified above.
-.SH ATTRIBUTES
 .sp
+.LP
+For a more powerful random number generator, see \fBarc4random\fR(3C).
+.SH ATTRIBUTES
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -169,6 +170,5 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
-\fBrand\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)
+\fBarc4random\fR(3C), \fBrand\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)

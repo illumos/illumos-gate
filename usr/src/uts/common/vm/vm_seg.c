@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2015, Joyent, Inc.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -1850,4 +1851,14 @@ seg_swresv(struct seg *seg)
 			swap = svd->swresv;
 	}
 	return (swap);
+}
+
+/*
+ * General not supported function for SEGOP_INHERIT
+ */
+/* ARGSUSED */
+int
+seg_inherit_notsup(struct seg *seg, caddr_t addr, size_t len, uint_t op)
+{
+	return (ENOTSUP);
 }

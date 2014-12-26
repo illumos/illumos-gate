@@ -2861,6 +2861,7 @@ $endif
 	_getfp;
 	_getgroupsbymember;
 	_getlogin_r;
+	getrandom;
 	_getsp;
 	__gettsp;
 	getvmusage;
@@ -3175,6 +3176,17 @@ $if i386
 	___tls_get_addr;
 	__udivrem64;
 $endif
+
+#
+# The following functions should become public symbols when they get
+# upstreamed to illumos and become part of their own appropriate symbol
+# version.
+#
+	arc4random;
+	arc4random_buf;
+	arc4random_uniform;
+	explicit_bzero;
+	getentropy;
 
 # The following functions should not be exported from libc,
 # but /lib/libm.so.2, some older versions of the Studio

@@ -25,6 +25,7 @@ dir path=opt/libc-tests
 dir path=opt/libc-tests/bin
 dir path=opt/libc-tests/runfiles
 dir path=opt/libc-tests/tests
+dir path=opt/libc-tests/tests/random
 file path=opt/libc-tests/README mode=0444
 file path=opt/libc-tests/bin/libctest mode=0555
 file path=opt/libc-tests/runfiles/default.run mode=0444
@@ -43,6 +44,25 @@ $(i386_ONLY)file path=opt/libc-tests/tests/nl_langinfo_test.amd64 mode=0555
 $(i386_ONLY)file path=opt/libc-tests/tests/nl_langinfo_test.i386 mode=0555
 $(sparc_ONLY)file path=opt/libc-tests/tests/nl_langinfo_test.sparc mode=0555
 $(sparc_ONLY)file path=opt/libc-tests/tests/nl_langinfo_test.sparcv9 mode=0555
+file path=opt/libc-tests/tests/random/arc4key.ksh mode=0555
+file path=opt/libc-tests/tests/random/arc4random mode=0555
+file path=opt/libc-tests/tests/random/arc4random_fork mode=0555
+file path=opt/libc-tests/tests/random/arc4random_forkall mode=0555
+file path=opt/libc-tests/tests/random/arc4random_forksig mode=0555
+file path=opt/libc-tests/tests/random/arc4random_prefork mode=0555
+file path=opt/libc-tests/tests/random/arc4random_preforkall mode=0555
+file path=opt/libc-tests/tests/random/arc4random_preforksig mode=0555
+file path=opt/libc-tests/tests/random/arc4random_rekey mode=0555
+file path=opt/libc-tests/tests/random/chacha mode=0555
+file path=opt/libc-tests/tests/random/getentropy mode=0555
+file path=opt/libc-tests/tests/random/getrandom mode=0555
+file path=opt/libc-tests/tests/random/inz_child mode=0555
+file path=opt/libc-tests/tests/random/inz_inval mode=0555
+file path=opt/libc-tests/tests/random/inz_mlock mode=0555
+file path=opt/libc-tests/tests/random/inz_region mode=0555
+file path=opt/libc-tests/tests/random/inz_split mode=0555
+file path=opt/libc-tests/tests/random/inz_split_vpp mode=0555
+file path=opt/libc-tests/tests/random/inz_vpp mode=0555
 file path=opt/libc-tests/tests/wcsrtombs_test mode=0555
 $(i386_ONLY)file path=opt/libc-tests/tests/wcsrtombs_test.amd64 mode=0555
 $(i386_ONLY)file path=opt/libc-tests/tests/wcsrtombs_test.i386 mode=0555

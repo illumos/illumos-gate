@@ -1,11 +1,12 @@
 '\" te
 .\"  Copyright (c) 2002, Sun Microsystems, Inc. All Rights Reserved
+.\" Copyright (c) 2015, Joyent, Inc.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH BSTRING 3C "Apr 15, 2002"
+.TH BSTRING 3C "Dec 31, 2014"
 .SH NAME
-bstring, bcopy, bcmp, bzero \- memory operations
+bstring, bcopy, bcmp, bzero, explicit_bzero \- memory operations
 .SH SYNOPSIS
 .LP
 .nf
@@ -24,8 +25,12 @@ bstring, bcopy, bcmp, bzero \- memory operations
 \fBvoid\fR \fBbzero\fR(\fBvoid *\fR\fIs\fR, \fBsize_t\fR \fIn\fR);
 .fi
 
+.LP
+.nf
+\fBvoid\fR \fBexplicit_bzero\fR(\fBvoid *\fR\fIs\fR, \fBsize_t\fR \fIn\fR);
+.fi
+
 .SH DESCRIPTION
-.sp
 .LP
 The  \fBbcopy()\fR, \fBbcmp()\fR, and \fBbzero()\fR functions operate as
 efficiently as possible on memory areas (arrays of bytes bounded by a count,
@@ -46,13 +51,15 @@ always returns 0 when \fIn\fR is 0.
 .LP
 The \fBbzero()\fR function sets the first \fIn\fR bytes in memory area \fIs\fR
 to 0.
-.SH WARNINGS
 .sp
 .LP
-The \fBbcopy()\fR function takes parameters backwards from \fBmemcmp()\fR.  See
-\fBmemory\fR(3C).
+The \fBexplicit_bzero()\fR function behaves the same as \fBbzero()\fR, except it
+should not be removed by the compiler's optimization passes.
+.SH WARNINGS
+.LP
+The \fBbcopy()\fR and \fBexplicit_bzero()\fR functions take parameters backwards
+from \fBmemcmp()\fR.  See \fBmemory\fR(3C).
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -64,12 +71,15 @@ c | c
 l | l .
 ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface Stability	Standard
+Interface Stability	See NOTES
 _
 MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBmemory\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)
+.SH NOTES
+.LP
+\fBbcopy\fR(), \fBbcmp\fR(), and \fBbzero\fR() are \fBSTANDARD\fR.
+\fBexplicit_bzero\fR() is \fBCOMMITTED\fR.

@@ -24,6 +24,7 @@
  */
 /*
  * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright (c) 2015, Joyent, Inc.
  */
 
 #ifndef	_SYS_RANDOM_H
@@ -61,9 +62,18 @@ typedef struct swrand_stats {
 
 extern int random_add_entropy(uint8_t *, size_t, uint_t);
 extern int random_get_bytes(uint8_t *, size_t);
+extern int random_get_blocking_bytes(uint8_t *, size_t);
 extern int random_get_pseudo_bytes(uint8_t *, size_t);
 
 #endif /* _KERNEL */
+
+/*
+ * Flags for the getrandom system call. Note, we may want to move these
+ * definitions if we expose getrandom(2) into a public system call.
+ */
+#define	GRND_NONBLOCK	0x0001		/* O_NONBLOCK equiv */
+#define	GRND_RANDOM	0x0002		/* Use /dev/random, not /dev/urandom */
+extern int getrandom(void *, size_t, int);
 
 #ifdef	__cplusplus
 }

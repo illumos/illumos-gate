@@ -21,14 +21,12 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2012 Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2015 Joyent, Inc.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/bitmap.h>
@@ -388,6 +386,10 @@ memcntl(caddr_t addr, size_t len, int cmd, caddr_t arg, int attr, int mask)
 				(void) set_errno(error);
 			return (error);
 		}
+		break;
+	case MC_INHERIT_ZERO:
+		if (arg != 0 || attr != NULL || mask != 0)
+			return (set_errno(EINVAL));
 		break;
 	default:
 		return (set_errno(EINVAL));

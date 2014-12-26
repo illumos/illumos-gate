@@ -21,6 +21,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2015, Joyent, Inc.  All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -39,8 +40,6 @@
 #ifndef	_VM_VPAGE_H
 #define	_VM_VPAGE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -57,9 +56,10 @@ struct vpage {
  * This was changed from a bitfield to flags/macros in order
  * to conserve space (uchar_t bitfields are not ANSI).  This could
  * have been condensed to a uchar_t, but at the expense of complexity.
- * We've stolen two bits from the top of nvp_advice: the first to store
- * pplock, and the second to identify pages for which we have reserved
- * swap space, but have not necessarily allocated anon slots.
+ * We've stolen three bits from the top of nvp_advice: the first to store
+ * pplock, the second to identify pages for which we have reserved
+ * swap space, but have not necessarily allocated anon slots, and the third to
+ * indicate that the page should be zeroed on fork.
  *
  * WARNING: VPP_SETADVICE(vpp, x) evaluates vpp twice, and VPP_PLOCK(vpp)
  * returns a positive integer when the lock is held, not necessarily (1).
@@ -69,6 +69,7 @@ struct vpage {
 #define	VP_PPLOCK_SHIFT	(0x07)	/* offset of lock hiding inside nvp_advice */
 #define	VP_SWAPRES_MASK	(0x40)	/* Swap space has been reserved, but we */
 				/* might not have allocated an anon slot */
+#define	VP_INHZERO_MASK	(0x20)	/* zero page on fork() */
 
 #define	VPP_PROT(vpp)	((vpp)->nvp_prot)
 #define	VPP_ADVICE(vpp)	((vpp)->nvp_advice & VP_ADVICE_MASK)
@@ -76,6 +77,8 @@ struct vpage {
 	((uchar_t)((vpp)->nvp_advice & VP_PPLOCK_MASK))
 #define	VPP_ISSWAPRES(vpp) \
 	((uchar_t)((vpp)->nvp_advice & VP_SWAPRES_MASK))
+#define	VPP_ISINHZERO(vpp) \
+	((uchar_t)((vpp)->nvp_advice & VP_INHZERO_MASK))
 
 #define	VPP_SETPROT(vpp, x)	((vpp)->nvp_prot = (x))
 #define	VPP_SETADVICE(vpp, x) \
@@ -85,6 +88,8 @@ struct vpage {
 #define	VPP_CLRPPLOCK(vpp)	((vpp)->nvp_advice &= ~VP_PPLOCK_MASK)
 #define	VPP_SETSWAPRES(vpp)	((vpp)->nvp_advice |= VP_SWAPRES_MASK)
 #define	VPP_CLRSWAPRES(vpp)	((vpp)->nvp_advice &= ~VP_SWAPRES_MASK)
+#define	VPP_SETINHZERO(vpp)	((vpp)->nvp_advice |= VP_INHZERO_MASK)
+#define	VPP_CLRINHZERO(vpp)	((vpp)->nvp_advice &= ~VP_INHZERO_MASK)
 
 #ifdef	__cplusplus
 }

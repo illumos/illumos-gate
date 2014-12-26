@@ -117,6 +117,7 @@ readv			121
 writev			122
 preadv			123
 pwritev			124
+getrandom		126
 mmapobj			127
 setrlimit		128
 getrlimit		129

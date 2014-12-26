@@ -1,0 +1,65 @@
+.\"	$OpenBSD: getentropy.2,v 1.7 2014/12/10 19:19:00 schwarze Exp $
+.\"
+.\" Copyright (c) 2014 Theo de Raadt
+.\" Copyright (c) 2015 Joyent, Inc.
+.\"
+.\" Permission to use, copy, modify, and distribute this software for any
+.\" purpose with or without fee is hereby granted, provided that the above
+.\" copyright notice and this permission notice appear in all copies.
+.\"
+.\" THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+.\" WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+.\" MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+.\" ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+.\" WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+.\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+.\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+.\"
+.Dd "Dec 31, 2014"
+.Dt GETENTROPY 3C
+.Os
+.Sh NAME
+.Nm getentropy
+.Nd get entropy
+.Sh SYNOPSIS
+.Fd #include <unistd.h>
+.Ft int
+.Fn getentropy "void *buf" "size_t buflen"
+.Sh DESCRIPTION
+.Nm
+fills a buffer with high-quality entropy, which can be used
+as input for process-context pseudorandom generators like
+.Xr arc4random 3C .
+.Pp
+The maximum buffer size permitted is 256 bytes.
+If
+.Va buflen
+exceeds this, an error of
+.Er EIO
+will be indicated.
+.Pp
+.Nm
+is not intended for regular code; please use the
+.Xr arc4random 3C
+family of functions instead.
+.Sh RETURN VALUES
+.Rv -std
+.Sh ERRORS
+.Fn getentropy
+will succeed unless:
+.Bl -tag -width Er
+.It Er EFAULT
+The
+.Fa buf
+parameter points to an
+invalid address.
+.It Er EIO
+Too many bytes requested, or some other fatal error occurred.
+.El
+.Sh INTERFACE STABILITY
+.Sy Comitted
+.Sh MT-LEVEL
+.Sy Async-Signal-Safe
+.Sh SEE ALSO
+.Xr arc4random 3C
+.Xr attributes 5
