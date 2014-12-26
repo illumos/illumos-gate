@@ -1023,6 +1023,18 @@ validate_zonepath(char *path, int cmd_num)
 		(void) fprintf(stderr, gettext("%s is not owned by root.\n"),
 		    rpath);
 		err = B_TRUE;
+
+		/* Try to change owner */
+		if (cmd_num != CMD_VERIFY) {
+			(void) fprintf(stderr, gettext("%s: changing owner "
+			    "to root.\n"), rpath);
+			if (chown(rpath, 0, -1) != 0) {
+				zperror(rpath, B_FALSE);
+				return (Z_ERR);
+			} else {
+				err = B_FALSE;
+			}
+		}
 	}
 	err |= bad_mode_bit(stbuf.st_mode, S_IRUSR, B_TRUE, rpath);
 	err |= bad_mode_bit(stbuf.st_mode, S_IWUSR, B_TRUE, rpath);
@@ -1033,6 +1045,17 @@ validate_zonepath(char *path, int cmd_num)
 	err |= bad_mode_bit(stbuf.st_mode, S_IROTH, B_FALSE, rpath);
 	err |= bad_mode_bit(stbuf.st_mode, S_IWOTH, B_FALSE, rpath);
 	err |= bad_mode_bit(stbuf.st_mode, S_IXOTH, B_FALSE, rpath);
+
+	/* If the group perms are wrong, fix them */
+	if (err && (cmd_num != CMD_VERIFY)) {
+		(void) fprintf(stderr, gettext("%s: changing permissions "
+		    "to 0700.\n"), rpath);
+		if (chmod(rpath, S_IRWXU) != 0) {
+			zperror(path, B_FALSE);
+		} else {
+			err = B_FALSE;
+		}
+	}
 
 	(void) snprintf(ppath, sizeof (ppath), "%s/..", path);
 	if ((res = resolvepath(ppath, rppath, sizeof (rppath))) == -1) {
