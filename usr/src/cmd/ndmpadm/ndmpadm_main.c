@@ -616,14 +616,14 @@ ndmp_enable_auth(int argc, char **argv, ndmp_command_t *cur_cmd)
 		if (strncmp(auth_type, ndmp_auth_table[i].auth_type,
 		    strlen(ndmp_auth_table[i].auth_type)) == 0) {
 			auth_type_flag = 1;
-			if ((ndmp_set_prop((char *)ndmp_auth_table[i].username,
+			if ((ndmp_set_prop(ndmp_auth_table[i].username,
 			    username)) == -1) {
 				(void) fprintf(stdout,
 				    gettext("Could not set username - %s\n"),
 				    ndmp_strerror(ndmp_errno));
 				continue;
 			}
-			if ((ndmp_set_prop((char *)ndmp_auth_table[i].password,
+			if ((ndmp_set_prop(ndmp_auth_table[i].password,
 			    enc_password)) == -1) {
 				(void) fprintf(stdout,
 				    gettext("Could not set password - %s\n"),
@@ -677,14 +677,14 @@ ndmp_disable_auth(int argc, char **argv, ndmp_command_t *cur_cmd)
 		if (strncmp(auth_type, ndmp_auth_table[i].auth_type,
 		    strlen(ndmp_auth_table[i].auth_type)) == 0) {
 			auth_type_flag = 1;
-			if ((ndmp_set_prop((char *)ndmp_auth_table[i].username,
+			if ((ndmp_set_prop(ndmp_auth_table[i].username,
 			    "")) == -1) {
 				(void) fprintf(stdout,
 				    gettext("Could not clear username - %s\n"),
 				    ndmp_strerror(ndmp_errno));
 				continue;
 			}
-			if ((ndmp_set_prop((char *)ndmp_auth_table[i].password,
+			if ((ndmp_set_prop(ndmp_auth_table[i].password,
 			    "")) == -1) {
 				(void) fprintf(stdout,
 				    gettext("Could not clear password - %s\n"),
