@@ -19,6 +19,10 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2014 Shruti V Sampat <shrutisampat@gmail.com>
+ */
+
+/*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -177,8 +181,7 @@ static void warn_utmp(void);
  */
 
 int
-main(argc, argv)
-	char **argv;
+main(int argc, char *argv[])
 {
 	char *defp;
 	struct rlimit rlim;
@@ -189,7 +192,7 @@ main(argc, argv)
 
 	if (getuid() != 0)  {
 		(void) fprintf(stderr,
-			"You must be root to run this program\n");
+		    "You must be root to run this program\n");
 		fatal("You must be root to run this program");
 	}
 
@@ -199,9 +202,9 @@ main(argc, argv)
 			Debug = 1;
 		} else {
 			(void) fprintf(stderr,
-				"%s: Wrong number of arguments\n", prog_name);
+			    "%s: Wrong number of arguments\n", prog_name);
 			(void) fprintf(stderr,
-				"Usage: %s [-debug]\n", prog_name);
+			    "Usage: %s [-debug]\n", prog_name);
 			exit(2);
 		}
 	}
@@ -349,7 +352,7 @@ wait_for_pids()
 	register struct pollfd *pfd;
 	register int i;
 	pid_t pid;
-	int ret_val;
+	int ret_val = 0;
 	int timeout;
 	static time_t last_timeout  = 0;
 	static int bad_error  = 0;	/* Count of POLL errors */
