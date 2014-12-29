@@ -1,4 +1,5 @@
 '\" te
+.\" Copyright (c) 2014, Joyent, Inc.
 .\" Copyright (c) 2009, Sun Microsystems, Inc.  All Rights Reserved.
 .\" Copyright 1989 AT&T
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
@@ -6,7 +7,7 @@
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
 .TH MEMORY 3C "Feb 4, 2009"
 .SH NAME
-memory, memccpy, memchr, memcmp, memcpy, memmove, memset \- memory operations
+memory, memccpy, memchr, memcmp, memcpy, memmem, memmove, memset \- memory operations
 .SH SYNOPSIS
 .LP
 .nf
@@ -29,6 +30,11 @@ memory, memccpy, memchr, memcmp, memcpy, memmove, memset \- memory operations
 .LP
 .nf
 \fBvoid *\fR\fBmemcpy\fR(\fBvoid *restrict\fR \fIs1\fR, \fBconst void *restrict\fR \fIs2\fR, \fBsize_t\fR \fIn\fR);
+.fi
+
+.LP
+.nf
+\fBvoid *\fR\fBmemmem\fR(\fBconst void *\fR\fIl\fR, \fBsize_t\fR \fIl_len\fR, \fBconst void *\fR\fIs\fR, \fBsize_t\fR \fIs_len\fR);
 .fi
 
 .LP
@@ -57,7 +63,6 @@ memory, memccpy, memchr, memcmp, memcpy, memmove, memset \- memory operations
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 These functions operate as efficiently as possible on memory areas (arrays of
 bytes bounded by a count, not terminated by a null character). They do not
@@ -90,6 +95,13 @@ The \fBmemcpy()\fR function copies \fIn\fR bytes from memory area \fIs2\fR to
 overlap, the behavior is undefined.
 .sp
 .LP
+The \fBmemmem()\fR function searches for the \fIs_len\fR long byte pattern
+\fIs\fR in the memory region starting at \fBl\fR for \fl_len\fR bytes. If a
+match is found, a pointer to the starting location in \fIl\fR is returned. If no
+match is found, \fIl_len\fR is zero, \fIs_len\fR is zero, or \fIl_len\fR is less
+than \fIs_len\fR, then a null pointer is return.
+.sp
+.LP
 The \fBmemmove()\fR function copies \fIn\fR bytes from memory area \fIs2\fR to
 memory area \fIs1\fR. Copying between objects that overlap will take place
 correctly. It returns \fIs1\fR.
@@ -99,12 +111,10 @@ The \fBmemset()\fR function sets the first \fIn\fR bytes in memory area \fIs\fR
 to the value of \fIc\fR (converted to an \fBunsigned char\fR). It returns
 \fIs\fR.
 .SH USAGE
-.sp
 .LP
 Using \fBmemcpy()\fR might be faster than using \fBmemmove()\fR if the
 application knows that the objects being copied do not overlap.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -124,11 +134,9 @@ Standard	See \fBstandards\fR(5).
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBstring\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)
 .SH NOTES
-.sp
 .LP
 Overlap between objects being copied can arise even when their (virtual)
 address ranges appear to be disjoint; for example, as a result of

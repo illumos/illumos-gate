@@ -183,6 +183,7 @@ MANFILES=	acctcom.1			\
 	 	krb5-config.1			\
 	 	ksh93.1				\
 	 	ktutil.1			\
+		kvmstat.1			\
 	 	lari.1				\
 	 	last.1				\
 	 	lastcomm.1			\

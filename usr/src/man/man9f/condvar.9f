@@ -1,5 +1,6 @@
 '\" te
 .\"  Copyright (c) 2003, Sun Microsystems, Inc.  All Rights Reserved
+.\"  Copyright (c) 2014, Joyent, Inc.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
@@ -52,12 +53,22 @@ cv_timedwait, cv_timedwait_sig \- condition variable routines
 \fBclock_t\fR \fBcv_timedwait_sig\fR(\fBkcondvar_t *\fR\fIcvp\fR, \fBkmutex_t *\fR\fImp\fR, \fBclock_t\fR \fItimeout\fR);
 .fi
 
+.LP
+.nf
+\fBclock_t\fR \fBcv_reltimedwait\fR(\fBkcondvar_t *\fR\fIcvp\fR, \fBkmutex_t *\fR\fImp\fR, \fBclock_t\fR \fIdelta\fR,
+    \fBtime_res_t\fR \fIres\fR);
+.fi
+
+.LP
+.nf
+\fBclock_t\fR \fBcv_reltimedwait_sig\fR(\fBkcondvar_t *\fR\fIcvp\fR, \fBkmutex_t *\fR\fImp\fR, \fBclock_t\fR \fIdelta\fR,
+    \fBtime_res_t\fR \fIres\fR);
+.fi
+
 .SH INTERFACE LEVEL
-.sp
 .LP
 Solaris DDI specific (Solaris DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIcvp\fR\fR
@@ -114,8 +125,56 @@ A time, in absolute ticks since boot, when \fBcv_timedwait()\fR or
 \fBcv_timedwait_sig()\fR should return.
 .RE
 
-.SH DESCRIPTION
 .sp
+.ne 2
+.na
+\fB\fIres\fR\fR
+.ad
+.RS 11n
+A value which describes the requested accuracy of the timeout argument.
+The system may anticipate or defer the timeout based on the requested
+accuracy to prevent unnecessary wakeups. The following identifiers are
+valid arguments for this type:
+.LP
+.RS 4n
+.B TR_NANOSEC
+.RS 16n
+Nanosecond granularity
+.RE
+.RE
+.RS 4n
+.B TR_MICROSEC
+.RS 16n
+Microsecond granularity
+.RE
+.RE
+.RS 4n
+.B TR_MILLISEC
+.RS 16n
+Millisecond granularity
+.RE
+.RE
+.RS 4n
+.B TR_SEC
+.RS 16n
+Second granularity
+.RE
+.RE
+.RS 4n
+.B TR_CLOCK_TICK
+.RS 16n
+Granularity of a kernel clock tick, commonly 100 or 1000 Hz.
+.RE
+.RE
+.LP
+Note that the granularity of these functions is in clock ticks,
+therefore the only values which will have an effect are:
+.B TR_SEC
+and
+.B TR_CLOCK_TICK .
+.RE
+
+.SH DESCRIPTION
 .LP
 Condition variables are a standard form of thread synchronization. They are
 designed to be used with mutual exclusion locks (mutexes). The associated mutex
@@ -168,16 +227,32 @@ being signaled after the timeout time has been reached, or \fB0\fR if a signal
 For both \fBcv_timedwait()\fR and \fBcv_timedwait_sig()\fR, time is in absolute
 clock ticks since the last system reboot. The current time may be found by
 calling \fBddi_get_lbolt\fR(9F).
-.SH RETURN VALUES
 .sp
+.LP
+The functions
+.B cv_reltimedwait()
+and
+.B cv_reltimedwait_sig()
+behave similarly to
+.B cv_timedwait() and
+.B cv_timedwait_sig()
+respectively, except instead of taking a time in absolute clock ticks,
+they take a relative number of clock ticks to wait. In addition, both
+functions take an additional argument
+.I res,
+which specifies the desired granularity that the system should default
+to, generally the value
+.B TR_CLOCK_TICK .
+.SH RETURN VALUES
 .ne 2
 .na
 \fB\fB0\fR\fR
 .ad
 .RS 9n
-For \fBcv_wait_sig()\fR and \fBcv_timedwait_sig()\fR indicates that the
-condition was not necessarily signaled and the function returned because a
-signal (as in \fBkill\fR(2)) was pending.
+For \fBcv_wait_sig()\fR, \fBcv_timedwait_sig()\fR, and
+\fBcv_reltimedwait_sig()\fR indicates that the condition was not necessarily
+signaled and the function returned because a signal (as in \fBkill\fR(2)) was
+pending.
 .RE
 
 .sp
@@ -186,9 +261,9 @@ signal (as in \fBkill\fR(2)) was pending.
 \fB\fB\(mi1\fR\fR
 .ad
 .RS 9n
-For \fBcv_timedwait()\fR and \fBcv_timedwait_sig()\fR indicates that the
-condition was not necessarily signaled and the function returned because the
-timeout time was reached.
+For \fBcv_timedwait()\fR, \fBcv_timedwait_sig()\fR, \fBcv_reltimedwait()\fR, and
+\fBcv_reltimedwait_sig()\fR, indicates that the condition was not necessarily
+signaled and the function returned because the timeout time was reached.
 .RE
 
 .sp
@@ -197,23 +272,24 @@ timeout time was reached.
 \fB\fB>0\fR\fR
 .ad
 .RS 9n
-For \fBcv_wait_sig()\fR, \fBcv_timedwait()\fR or \fBcv_timedwait_sig()\fR
-indicates that the condition was met and the function returned due to a call to
-\fBcv_signal()\fR or \fBcv_broadcast()\fR, or due to a premature wakeup (see
-NOTES).
+For \fBcv_wait_sig()\fR, \fBcv_timedwait()\fR, \fBcv_timedwait_sig()\fR,
+\fBcv_reltimedwait()\fR, and \fBcv_reltimedwait_sig()\fR, indicates that the
+condition was met and the function returned due to a call to \fBcv_signal()\fR
+or \fBcv_broadcast()\fR, or due to a premature wakeup (see NOTES).
 .RE
 
 .SH CONTEXT
-.sp
 .LP
 These functions can be called from user, kernel or interrupt context. In most
-cases, however, \fBcv_wait()\fR, \fBcv_timedwait()\fR, \fBcv_wait_sig()\fR, and
-\fBcv_timedwait_sig()\fR should not be called from interrupt context, and
+cases, however, \fBcv_wait()\fR, \fBcv_timedwait()\fR, \fBcv_wait_sig()\fR,
+\fBcv_timedwait_sig()\fR, \fBcv_reltimedwait()\fR, and
+\fBcv_reltimedwait_sig()\fR, should not be called from interrupt context, and
 cannot be called from a high-level interrupt context.
 .sp
 .LP
-If \fBcv_wait()\fR, \fBcv_timedwait()\fR, \fBcv_wait_sig()\fR, or
-\fBcv_timedwait_sig()\fR are used from interrupt context, lower-priority
+If \fBcv_wait()\fR, \fBcv_timedwait()\fR, \fBcv_wait_sig()\fR,
+\fBcv_timedwait_sig()\fR, \fBcv_reltimedwait()\fR, or
+\fBcv_reltimedwait_sig()\fR, are used from interrupt context, lower-priority
 interrupts will not be serviced during the wait. This means that if the thread
 that will eventually perform the wakeup becomes blocked on anything that
 requires the lower-priority interrupt, the system will hang.
@@ -264,16 +340,16 @@ mutex_exit(&un->un_lock);
 .in -2
 
 .SH NOTES
-.sp
 .LP
 It is possible for \fBcv_wait()\fR, \fBcv_wait_sig()\fR, \fBcv_timedwait()\fR,
-and \fBcv_timedwait_sig()\fR to return prematurely, that is, not due to a call
-to \fBcv_signal()\fR or \fBcv_broadcast()\fR. This occurs most commonly in the
-case of \fBcv_wait_sig()\fR and \fBcv_timedwait_sig()\fR when the thread is
-stopped and restarted by job control signals or by a debugger, but can happen
-in other cases as well, even for \fBcv_wait()\fR. Code that calls these
-functions must always recheck the reason for blocking and call again if the
-reason for blocking is still true.
+\fBcv_timedwait_sig()\fR, \fBcv_reltimedwait()\fR, and
+\fBcv_reltimedwait_sig()\fR to return prematurely, that is, not due to a call to
+\fBcv_signal()\fR or \fBcv_broadcast()\fR. This occurs most commonly in the case
+of \fBcv_wait_sig()\fR and \fBcv_timedwait_sig()\fR when the thread is stopped
+and restarted by job control signals or by a debugger, but can happen in other
+cases as well, even for \fBcv_wait()\fR. Code that calls these functions must
+always recheck the reason for blocking and call again if the reason for blocking
+is still true.
 .sp
 .LP
 If your driver needs to wait on behalf of processes that have real-time
@@ -284,13 +360,13 @@ priority inversions.
 .LP
 Not all threads can receive signals from user level processes. In cases where
 such reception is impossible (such as during execution of \fBclose\fR(9E) due
-to \fBexit\fR(2)), \fBcv_wait_sig()\fR behaves as \fBcv_wait()\fR, and
-\fBcv_timedwait_sig()\fR behaves as \fBcv_timedwait()\fR. To avoid unkillable
+to \fBexit\fR(2)), \fBcv_wait_sig()\fR behaves as \fBcv_wait()\fR,
+\fBcv_timedwait_sig()\fR behaves as \fBcv_timedwait()\fR, and
+\fBcv_reltimedwait_sig()\fR behaves as \fBcv_reltimedwait()\fR. To avoid unkillable
 processes, users of these functions may need to protect against waiting
 indefinitely for events that might not occur. The \fBddi_can_receive_sig\fR(9F)
 function is provided to detect when signal reception is possible.
 .SH SEE ALSO
-.sp
 .LP
 \fBkill\fR(2), \fBddi_can_receive_sig\fR(9F), \fBddi_get_lbolt\fR(9F),
 \fBmutex\fR(9F), \fBmutex_init\fR(9F)

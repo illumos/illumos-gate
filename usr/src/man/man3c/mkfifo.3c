@@ -1,5 +1,6 @@
 '\" te
 .\" Copyright (c) 2002, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright (c) 2014, Joyent, Inc.
 .\" Copyright 1989 AT&T
 .\" Portions Copyright (c) 2001, the Institute of Electrical and Electronics Engineers, Inc. and The Open Group. All Rights Reserved.
 .\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
@@ -11,7 +12,7 @@
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
 .TH MKFIFO 3C "Apr 24, 2002"
 .SH NAME
-mkfifo \- make a FIFO special file
+mkfifo, mkfifoat \- make a FIFO special file
 .SH SYNOPSIS
 .LP
 .nf
@@ -20,19 +21,23 @@ mkfifo \- make a FIFO special file
 
 \fBint\fR \fBmkfifo\fR(\fBconst char *\fR\fIpath\fR, \fBmode_t\fR \fImode\fR);
 .fi
+.LP
+.nf
+\fBint\fR \fBmkfifoat\fR(\fBint\fR \fIfd\fR, \fBconst char *\fR\fIpath\fR, \fBmode_t\fR \fImode\fR);
+.fi
 
 .SH DESCRIPTION
+.LP
+The \fBmkfifo()\fR and \fBmkfifoat()\fR functions create a new FIFO special file
+named by the pathname pointed to by \fIpath\fR.  The file permission bits of the
+new FIFO are initialized from \fImode\fR.  The file permission bits of the
+\fImode\fR argument are modified by the process's file creation mask (see
+\fBumask\fR(2)).  Bits other than the file permission bits in \fImode\fR are
+ignored.
 .sp
 .LP
-The \fBmkfifo()\fR function creates a new FIFO special file named by the
-pathname pointed to by \fIpath\fR.  The file permission bits of the new FIFO
-are initialized from \fImode\fR.  The file permission bits of the \fImode\fR
-argument are modified by the process's file creation mask (see \fBumask\fR(2)).
-Bits other than the file permission bits in \fImode\fR are ignored.
-.sp
-.LP
-If \fIpath\fR names a symbolic link, \fBmkfifo()\fR fails and sets \fBerrno\fR
-to \fBEEXIST\fR.
+If \fIpath\fR names a symbolic link, \fBmkfifo()\fR and \fBmkfifoat()\fR fail
+and set \fBerrno\fR to \fBEEXIST\fR.
 .sp
 .LP
 The FIFO's user ID is set to the process's effective user ID. The FIFO's group
@@ -40,22 +45,28 @@ ID is set to the group ID of the parent directory or to the effective group ID
 of the process.
 .sp
 .LP
-The \fBmkfifo()\fR function calls \fBmknod\fR(2) to create the file.
+The \fBmkfifoat()\fR function is equivalent to \fBmkfifo()\fR; however, if
+\fIpath\fr is a relative path, then it is resolved start at the directory
+represented by \fIfd\fR. \fIfd\fR may be set to the special value of
+\fBAT_FDCWD\fR which indicates that the current working directory should be used
+to start resolving \fIpath\fR.
 .sp
 .LP
-Upon successful completion, \fBmkfifo()\fR marks for update the \fBst_atime\fR,
-\fBst_ctime\fR, and \fBst_mtime\fR fields of the file. Also, the \fBst_ctime\fR
-and \fBst_mtime\fR fields of the directory that contains the new entry are
-marked for update.
-.SH RETURN VALUES
+The \fBmkfifo()\fR function calls \fBmknod\fR(2) to create the file. The
+\fBmkfifoat()\fR function calls \fBmknodat\fR(2) to create the file.
 .sp
+.LP
+Upon successful completion, \fBmkfifo()\fR and \fBmkfifoat()\fR mark for update
+the \fBst_atime\fR, \fBst_ctime\fR, and \fBst_mtime\fR fields of the file. Also,
+the \fBst_ctime\fR and \fBst_mtime\fR fields of the directory that contains the
+new entry are marked for update.
+.SH RETURN VALUES
 .LP
 Upon successful completion, \fB0\fR is returned.  Otherwise, \fB\(mi1\fR is
 returned and \fBerrno\fR is set to indicate the error.
 .SH ERRORS
-.sp
 .LP
-The \fBmkfifo()\fR function will fail if:
+The \fBmkfifo()\fR and \fBmkfifoat()\fR functions will fail if:
 .sp
 .ne 2
 .na
@@ -121,7 +132,9 @@ system is out of file-allocation resources.
 \fB\fBENOTDIR\fR\fR
 .ad
 .RS 16n
-A component of the path prefix is not a directory.
+A component of the path prefix is not a directory. For \fBmkfifoat()\fR,
+\fIpath\fR is a relative path and \fIfd\fR is a valid file descriptor which is
+not a directory.
 .RE
 
 .sp
@@ -131,6 +144,19 @@ A component of the path prefix is not a directory.
 .ad
 .RS 16n
 The named file resides on a read-only file system.
+.RE
+
+.sp
+.LP
+The \fBmkfifoat()\fR function will fail if:
+.sp
+.ne 2
+.na
+.B EBADF
+.ad
+.RS 16n
+The \fIpath\fR argument is a relative path and \fIfd\fR is not a valid file
+descriptor or the value \fBAT_FDCWD\fR.
 .RE
 
 .sp
@@ -177,7 +203,6 @@ status = mkfifo("/home/cnd/mod_done", S_IWUSR | S_IRUSR |
 .in -2
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -195,7 +220,6 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBmkdir\fR(1), \fBchmod\fR(2), \fBexec\fR(2), \fBmknod\fR(2), \fBumask\fR(2),
 \fBstat.h\fR(3HEAD), \fBufs\fR(7FS), \fBattributes\fR(5), \fBstandards\fR(5)

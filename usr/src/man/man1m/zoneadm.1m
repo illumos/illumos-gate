@@ -5,7 +5,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ZONEADM 1M "Oct 30, 2013"
+.TH ZONEADM 1M "Dec 26, 2014"
 .SH NAME
 zoneadm \- administer zones
 .SH SYNOPSIS
@@ -27,17 +27,14 @@ zoneadm \- administer zones
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBzoneadm\fR utility is used to administer system zones. A zone is an
 application container that is maintained by the operating system runtime.
 .SH SECURITY
-.sp
 .LP
 Once a process has been placed in a zone other than zone \fB0\fR, the process
 or any of its children cannot change zones.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -75,7 +72,6 @@ String identifier for a zone.
 .RE
 
 .SH SUBCOMMANDS
-.sp
 .LP
 Subcommands which can result in destructive actions or loss of work have a
 \fB-F\fR flag to force the action. If input is from a terminal device, the user
@@ -295,8 +291,8 @@ Display general help. If you specify \fIsubcommand\fR, displays help on
 .sp .6
 .RS 4n
 Install the specified zone on the system. This subcommand automatically
-attempts to verify first. It refuses to install if the verify step fails. See
-the \fBverify\fR subcommand.
+attempts to verify first, most verification errors are fatal. See the
+\fBverify\fR subcommand.
 .sp
 .ne 2
 .na
@@ -619,7 +615,6 @@ The following command illustrates the use of the \fB-s\fR option.
 .sp
 
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -653,7 +648,6 @@ Invalid usage.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -669,7 +663,6 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBread\fR(1), \fBsvcs\fR(1), \fBzlogin\fR(1), \fBzonename\fR(1),
 \fBinit\fR(1M), \fBkernel\fR(1M), \fBsvcadm\fR(1M), \fBsvc.startd\fR(1M),
@@ -677,7 +670,6 @@ Interface Stability	Committed
 \fBattributes\fR(5), \fBbrands\fR(5), \fBnative\fR(5), \fBsmf\fR(5),
 \fBzones\fR(5)
 .SH NOTES
-.sp
 .LP
 The \fBzones\fR(5) service is managed by the service management facility,
 \fBsmf\fR(5), under the service identifier:

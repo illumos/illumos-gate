@@ -156,13 +156,15 @@ l l .
 \fBbsearch\fR
 \fBbtowc\fR	\fBbtowc_l\fR
 \fBbzero\fR	\fBcalloc\fR
+\fBcanonicalize_file_name\fR
 \fBcatclose\fR	\fBcatgets\fR
 \fBcatopen\fR	\fBcfgetispeed\fR
 \fBcfgetospeed\fR	\fBcfsetispeed\fR
 \fBcfsetospeed\fR	\fBcftime\fR
 \fBchdir\fR	\fBchmod\fR
 \fBchown\fR	\fBchroot\fR
-\fBclearerr\fR	\fBclock\fR
+\fBclearerr\fR	\fBclearenv\fR
+\fBclock\fR
 \fBclock_getres\fR	\fBclock_gettime\fR
 \fBclock_nanosleep\fR	\fBclock_settime\fR
 \fBclose\fR	\fBclosedir\fR
@@ -220,16 +222,19 @@ l l .
 \fBfaccessat\fR	
 \fBfacl\fR	\fBfattach\fR
 \fBfchdir\fR	\fBfchmod\fR
+\fBfchmodat\fR
 \fBfchown\fR	\fBfchownat\fR
 \fBfchroot\fR	\fBfclose\fR
-\fBfcntl\fR	\fBfconvert\fR
-\fBfcvt\fR	\fBfdatasync\fR
-\fBfdetach\fR	
+\fBfcloseall\fR	\fBfcntl\fR
+\fBfconvert\fR	\fBfcvt\fR
+\fBfdatasync\fR	\fBfdetach\fR	
 \fBfdopen\fR	\fBfdopendir\fR
 \fBfdwalk\fR	\fBfeof\fR
 \fBferror\fR	\fBfflush\fR
-\fBffs\fR	\fBfgetattr\fR
-\fBfgetc\fR	
+\fBffs\fR	\fBffsl\fR
+\fBffsll\fR	\fBfls\fR
+\fBflsl\fR	\fBflsll\fR
+\fBfgetattr\fR	\fBfgetc\fR	
 \fBfgetgrent\fR	\fBfgetgrent_r\fR
 \fBfgetpos\fR	\fBfgetpwent\fR
 \fBfgetpwent_r\fR	\fBfgets\fR
@@ -286,6 +291,7 @@ l l .
 \fBgetloadavg\fR	\fBgetlogin\fR
 \fBgetlogin_r\fR	\fBgetmntany\fR
 \fBgetmntent\fR	\fBgetmsg\fR
+\fBget_nprocs\fR	\fBget_nprocs_conf\fR
 \fBgetnetgrent\fR	\fBgetnetgrent_r\fR
 \fBgetopt\fR	\fBgetopt_clip\fR
 \fBgetopt_long\fR	\fBgetopt_long_only\fR
@@ -295,7 +301,8 @@ l l .
 \fBgetpgid\fR	\fBgetpgrp\fR
 \fBgetpid\fR	\fBgetpmsg\fR
 \fBgetppid\fR	\fBgetppriv\fR
-\fBgetpriority\fR	\fBgetprojid\fR
+\fBgetpriority\fR	\fbgetprogname\fR
+\fBgetprojid\fR
 \fBgetpw\fR	\fBgetpwent\fR
 \fBgetpwent_r\fR	\fBgetpwnam\fR
 \fBgetpwnam_r\fR	\fBgetpwuid\fR
@@ -379,8 +386,8 @@ l l .
 \fBlcong48\fR	\fBldexp\fR
 \fBldivide\fR	\fBlexp10\fR
 \fBlfind\fR	\fBlfmt\fR
-\fBlink\fR	\fBlio_listio\fR
-\fBllabs\fR	
+\fBlink\fR	\fBlinkat\fR
+\fBlio_listio\fR	\fBllabs\fR	
 \fBlldiv\fR	\fBllog10\fR
 \fBllseek\fR	\fBlltostr\fR
 \fBlocaleconv\fR	\fBlocaltime\fR
@@ -406,10 +413,13 @@ l l .
 \fBmembar_producer\fR	\fBmemccpy\fR
 \fBmemchr\fR	\fBmemcmp\fR
 \fBmemcntl\fR	\fBmemcpy\fR
-\fBmeminfo\fR	\fBmemmove\fR
+\fBmeminfo\fR	\fBmemmem\fR
+\fBmemmove\fR
 \fBmemset\fR	\fBmincore\fR
-\fBmkdir\fR	\fBmkfifo\fR
-\fBmknod\fR	\fBmkstemp\fR
+\fBmkdir\fR	\fBmkdirat\fR
+\fBmkfifo\fR	\fBmkfifoat\fR
+\fBmknod\fR	\fBmknodat\fR
+\fBmkstemp\fR
 \fBmktemp\fR	\fBmktime\fR
 \fBmlock\fR	\fBmlockall\fR
 \fBmmap\fR	\fBmmapobj\fR
@@ -574,6 +584,7 @@ l l .
 \fBre_comp\fR	\fBre_exec\fR
 \fBread\fR	\fBreaddir\fR
 \fBreaddir_r\fR	\fBreadlink\fR
+\fBreadlinkat\fR
 \fBreadv\fR	\fBrealloc\fR
 \fBrealpath\fR	\fBreboot\fR
 \fBregcmp\fR	\fBregcomp\fR
@@ -623,7 +634,8 @@ l l .
 \fBsetlogmask\fR	\fBsetnetgrent\fR
 \fBsetpflags\fR	\fBsetpgid\fR
 \fBsetpgrp\fR	\fBsetppriv\fR
-\fBsetpriority\fR	\fBsetpwent\fR
+\fBsetpriority\fR	\fBsetprogname\fR
+\fBsetpwent\fR
 \fBsetrctl\fR	\fBsetregid\fR
 \fBsetreuid\fR	\fBsetrlimit\fR
 \fBsetsid\fR	\fBsetspent\fR
@@ -651,7 +663,8 @@ l l .
 \fBsigstack\fR	\fBsigsuspend\fR
 \fBsigtimedwait\fR	\fBsigwait\fR
 \fBsigwaitinfo\fR	\fBsingle_to_decimal\fR
-\fBsleep\fR	\fBsnprintf\fR
+\fBsleep\fR	\fBsmt_pause\fR
+\fBsnprintf\fR
 \fBsprintf\fR	\fBsrand\fR
 \fBsrand48\fR	\fBsrandom\fR
 \fBsscanf\fR	\fBssignal\fR
@@ -670,10 +683,10 @@ l l .
 \fBstrftime\fR	\fBstrftime_l\fR
 \fBstring_to_decimal\fR
 \fBstrlcat\fR	\fBstrlcpy\fR
-\fBstrlen\fR
-\fBstrncasecmp\fR	\fBstrncasecmp_l\fR
-\fBstrncat\fR	\fBstrncmp\fR
-\fBstrncpy\fR	\fBstrpbrk\fR
+\fBstrlen\fR	\fBstrncasecmp\fR
+\fBstrncasecmp_l\fR	\fBstrncat\fR
+\fBstrncmp\fR	\fBstrncpy\fR
+\fBstrnstr\fR	\fBstrpbrk\fR
 \fBstrptime\fR	\fBstrptime_l\fR
 \fBstrrchr\fR	\fBstrsep\fR	
 \fBstrsignal\fR	\fBstrspn\fR
@@ -687,6 +700,7 @@ l l .
 \fBswab\fR	\fBswapcontext\fR
 \fBswapctl\fR	\fBswprintf\fR
 \fBswscanf\fR	\fBsymlink\fR
+\fBsymlinkat\fR
 \fBsync\fR	\fBsync_instruction_memory\fR
 \fBsysconf\fR	\fBsysfs\fR
 \fBsysinfo\fR	\fBsyslog\fR
@@ -1007,13 +1021,13 @@ to avoid conflicting with an application that might define its own version of
 \fBgetpwent()\fR with completely different semantics. Standard-conforming
 applications may not define and use function names with leading underscores.
 .LP
-Solaris system libraries are now built with direct binding. This means that a
+illumos system libraries are now built with direct binding. This means that a
 system library that calls \fBgetpwent()\fR will bind directly to the instance
 of \fBgetpwent()\fR in \fBlibc\fR, even if the application to which it is
 linked defines a different \fBgetpwent()\fR for its own use. The application
 binds to its instance of \fBgetpwent()\fR and there is no resulting conflict.
 The direct binding mechanism is equally available to libraries not delivered
-with Solaris.
+with illumos.
 .LP
 As a result of this evolution, most of the leading-underscore synonym symbols
 have been removed from \fBlibc\fR.  This means that applications that call

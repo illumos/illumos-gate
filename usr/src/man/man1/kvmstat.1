@@ -1,0 +1,118 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright (c) 2014, Joyent, Inc.
+.\"
+.Dd Dec 20, 2014
+.Dt KVMSTAT 1
+.Os
+.Sh NAME
+.Nm kvmstat
+.Nd report KVM statistics
+.Sh SYNOPSIS
+.Nm kvmstat
+.Oo
+.Ar interval
+.Op Ar count
+.Oc
+.Sh DESCRIPTION
+.Nm
+reports the activity of running KVM virtual machines and their exit activity,
+injected interrupts, emulations, and more, on a per virtual CPU basis.
+.Lp
+.Nm
+should be used when trying to get a rough sense of guest activity from the
+hypervisor's perspective, and allows one to understand from a low-level
+perspective, what kind of activity is going on inside of the virtual machine. In
+addition,
+.Nm
+is useful for diagnosing reports of pathological or faulty behavior inside of
+guests. While there is no expected range of values for the fields displayed as
+that varies with the use of virtual machines, if all of the virtual CPUs for a
+given virtual machine are consistently zero, then that may indicate that a
+problem has occurred, for example, a panic inside of the guest or a bug in the
+hypervisor.
+.Lp
+If no operands are specified, then
+.Nm
+will display statistics every second until the program is terminated.
+.Ss Output Fields
+Every
+.Ar interval
+.Nm
+will report data with the following fields:
+.Bl -tag -width Ds
+.It Nm pid
+Identifier of the process controlling the virtual CPU.
+.It Nm vcpu
+Virtual CPU identifier relative to its virtual machine.
+.It Nm exits
+Count of all virtual machine exits for the virtual CPU over
+.Ar interval .
+.It Nm haltx
+Count of virtual machine exits due to the guest executing the
+.Sy HLT
+instruction for the virtual CPU over
+.Ar interval .
+.It Nm irqx
+Count of virtual machine exits due to a pending external interrupt arriving
+on the physical CPU that the virtual CPU was actively running on over
+.Ar interval .
+.It Nm irqwx
+Count of virtual machine exits due to an open interrupt window on the
+virtual CPU over
+.Ar interval .
+.It Nm iox
+Count of virtual machine exits due to the execution of an I/O instruction,
+such as
+.Sy inb ,
+on the virtual CPU over
+.Ar interval .
+.It Nm mmiox
+Count of virtual machine exits due to performing memory mapped I/O on the
+virtual CPU over
+.Ar interval .
+.It Nm irqs
+Count of interrupts injected into the virtual CPU over
+.Ar interval .
+.It Nm emul
+Count of instructions the hypervisor had to emulate on behalf of the guest
+virtual CPU over
+.Ar interval .
+.It Nm eptv
+Count of extended page table violations serviced on the virtual CPU over
+.Ar interval .
+.El
+.Sh OPERANDS
+The following operands are supported:
+.Bl -hang -width Ds
+.It Ar count
+.Bd -filled -compact
+Specifies the number of times that the statistics are repeated. If not
+specified,
+.Nm
+will continue until it is terminated.
+.Ed
+.It Ar interval
+.Bd -filled -compact
+Specifies the number of seconds between reports of statistics. If not specified,
+reports are generated every second.
+.Ed
+.El
+.Sh STABILITY
+The arguments are
+.Sy committed ,
+while the output format is
+.Sy Not an interface .
+.Sh SEE ALSO
+.Xr iostat 1M ,
+.Xr mpstat 1M ,
+.Xr attributes 5

@@ -1,4 +1,5 @@
 '\" te
+.\" Copyright (c) 2014, Joyent, Inc.
 .\" Copyright 1989 AT&T.  Copyright (c) 2003, Sun Microsystems, Inc.  All Rights Reserved.  Portions Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
 .\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
@@ -7,7 +8,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH REALPATH 3C "Oct 9, 2003"
+.TH REALPATH 3C "Dec 20, 2014"
 .SH NAME
 realpath \- resolve pathname
 .SH SYNOPSIS
@@ -17,10 +18,11 @@ realpath \- resolve pathname
 
 \fBchar *\fR\fBrealpath\fR(\fBconst char *restrict\fR \fIfile_name\fR,
      \fBchar *restrict\fR \fIresolved_name\fR);
+
+\fBchar *\fR\fBcanonicalize_file_name\fR(\fBconst char *\fR\fIpath\fR);
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBrealpath()\fR function derives, from the pathname pointed to by
 \fIfile_name\fR, an absolute pathname that names the same file, whose
@@ -28,15 +30,18 @@ resolution does not involve "\fB\&.\fR", "\fB\&..\fR", or symbolic links. The
 generated pathname is stored as a null-terminated string, up to a maximum of
 {\fBPATH_MAX\fR} bytes (defined in \fBlimits.h\fR(3HEAD)), in the buffer
 pointed to by \fIresolved_name\fR.
-.SH RETURN VALUES
 .sp
+.LP
+The \fBcanonicalize_file_name()\fR function is equivalent to calling
+\fBrealpath\fR(\fIpath\fR, \fINULL\fR). This function is only provided for
+compatibility.
+.SH RETURN VALUES
 .LP
 On successful completion, \fBrealpath()\fR returns a pointer to the resolved
 name.  Otherwise, \fBrealpath()\fR returns a null pointer and sets \fBerrno\fR
 to indicate the error, and the contents of the buffer pointed to by
 \fIresolved_name\fR are left in an indeterminate state.
 .SH ERRORS
-.sp
 .LP
 The \fBrealpath()\fR function will fail if:
 .sp
@@ -137,7 +142,6 @@ Insufficient storage space is available.
 .RE
 
 .SH USAGE
-.sp
 .LP
 The \fBrealpath()\fR function operates on null-terminated strings.
 .sp
@@ -149,7 +153,6 @@ resolved path.
 The \fBrealpath()\fR function might fail to return to the current directory if
 an error occurs.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -167,7 +170,6 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBgetcwd\fR(3C), \fBlimits.h\fR(3HEAD), \fBsysconf\fR(3C),
 \fBattributes\fR(5), \fBstandards\fR(5)

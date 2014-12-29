@@ -1,4 +1,5 @@
 '\" te
+.\" Copyright (c) 2014, Joyent, Inc.
 .\"  Copyright 1989 AT&T  Copyright (c) 2002, Sun Microsystems, Inc.  All Rights Reserved  Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
 .\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
@@ -15,26 +16,41 @@ ffs \- find first set bit
 .nf
 #include <strings.h>
 
-\fBint\fR \fBffs\fR(\fBconst int\fR \fIi\fR);
+\fBint\fR \fBffs\fR(\fBint\fR \fIi\fR);
+
+\fBint\fR \fBffsl\fR(\flong\fR \fIi\fR);
+
+\fBint\fR \fBffsll\fR(\fBlong long\fR \fIi\fR);
+
+\fBint\fR \fBfls\fR(\fBint\fR \fIi\fR);
+
+\fBint\fR \fBflsl\fR(\fBlong\fR \fIi\fR);
+
+\fBint\fR \fBflsl\fR(\fBlong long\fR \fIi\fR);
 .fi
 
 .SH DESCRIPTION
+.LP
+The \fBffs()\fR, \fBffsl()\, and \fBffsll()\fR functions finds the first bit set
+(beginning with the least significant bit) and return the index of that bit.
+Bits are numbered starting at one (the least significant bit).
 .sp
 .LP
-The \fBffs()\fR function finds the first bit set (beginning with the least
-significant bit) and returns the index of that bit.  Bits are numbered starting
-at one (the least significant bit).
+The \fBfls()\fR, \fBflsl()\fR, and \fBflsll()\fR functions find the last bit set
+(beginning with the most significant bit) and return the index of that bit.
+Bits are numbered starting at one (the least significant bit).
 .SH RETURN VALUES
+.LP
+The \fBffs()\fR, \fBffsl()\fR, and \fBffsll()\fR functions returns the index of
+the first bit set.  If \fIi\fR is 0, then they return 0.
 .sp
 .LP
-The \fBffs()\fR function returns the index of the first bit set.  If \fIi\fR is
-0, then \fBffs()\fR returns 0.
+The \fBfls()\fR, \fBflsl()\fR, and \fBflsll()\fR functions return the index of
+the last bit set.  If \fIi\fR is 0, then they return 0.
 .SH ERRORS
-.sp
 .LP
 No errors are defined.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -46,12 +62,11 @@ c | c
 l | l .
 ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface Stability	Standard
+Interface Stability	Committed
 _
 MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBattributes\fR(5), \fBstandards\fR(5)

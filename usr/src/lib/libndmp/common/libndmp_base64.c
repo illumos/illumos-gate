@@ -36,6 +36,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+/* Copyright 2014 Nexenta Systems, Inc.  All rights reserved. */
 
 #include <stdio.h>
 #include <sys/types.h>
@@ -46,9 +47,6 @@
 
 #define	NDMP_ENC_LEN	1024
 #define	NDMP_DEC_LEN	256
-
-char *ndmp_base64_encode(char *);
-char *ndmp_base64_decode(char *);
 
 static boolean_t ndmp_is_base64(unsigned char);
 
@@ -61,9 +59,9 @@ ndmp_is_base64(unsigned char c)
 	return (isalnum(c) || (c == '+') || (c == '/'));
 }
 
-/* caller should use the encloded string and then free the string. */
+/* caller should use the encoded string and then free the string. */
 char *
-ndmp_base64_encode(char *str_to_encode)
+ndmp_base64_encode(const char *str_to_encode)
 {
 	int ret_cnt = 0;
 	int i = 0, j = 0;
@@ -115,7 +113,7 @@ ndmp_base64_encode(char *str_to_encode)
 }
 
 char *
-ndmp_base64_decode(char *encoded_str)
+ndmp_base64_decode(const char *encoded_str)
 {
 	int len = strlen(encoded_str);
 	int i = 0, j = 0;
@@ -136,8 +134,10 @@ ndmp_base64_decode(char *encoded_str)
 		en_ind++;
 		if (i == 4) {
 			for (i = 0; i < 4; i++) {
-				if ((p = strchr(b64_data, arr_4[i])) == NULL)
+				if ((p = strchr(b64_data, arr_4[i])) == NULL) {
+					free(ret);
 					return (NULL);
+				}
 
 				arr_4[i] = (int)(p - b64_data);
 			}
@@ -161,8 +161,10 @@ ndmp_base64_decode(char *encoded_str)
 			arr_4[j] = 0;
 
 		for (j = 0; j < 4; j++) {
-			if ((p = strchr(b64_data, arr_4[j])) == NULL)
+			if ((p = strchr(b64_data, arr_4[j])) == NULL) {
+				free(ret);
 				return (NULL);
+			}
 
 			arr_4[j] = (int)(p - b64_data);
 		}
