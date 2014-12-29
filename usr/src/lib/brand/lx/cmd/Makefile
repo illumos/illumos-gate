@@ -25,7 +25,7 @@
 # Copyright 2014 Joyent, Inc.  All rights reserved.
 #
 
-PROGS =	lx_lockd lx_native lx_isaexec_wrapper lx_statd lx_thunk ifconfig
+PROGS =	lx_lockd lx_native lx_isaexec_wrapper lx_statd lx_thunk
 
 include ../Makefile.lx
 

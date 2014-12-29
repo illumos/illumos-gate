@@ -5052,7 +5052,6 @@ d usr/lib/brand/lx/ld/64 0755 root root
 f usr/lib/brand/lx/ld/64/ld.config 0755 root root
 f usr/lib/brand/lx/etc_default_nfs 0444 root root
 f usr/lib/brand/lx/etc_netconfig 0444 root root
-f usr/lib/brand/lx/ifconfig 0755 root root
 f usr/lib/brand/lx/ltp_skiplist 0444 root root
 f usr/lib/brand/lx/lx_boot 0755 root root
 f usr/lib/brand/lx/lx_boot_zone_ubuntu 0755 root root
