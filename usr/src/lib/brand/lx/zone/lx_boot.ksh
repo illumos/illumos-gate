@@ -192,17 +192,6 @@ setup_native_cmd /sbin/route /native/usr/sbin/route
 setup_native_cmd /bin/netstat /native/usr/bin/netstat
 
 #
-# When plumbing and configuring the NICs the native ifconfig needs to use
-# the thunk library, so we setup for that as ifconfig-native. However, the
-# thunk library does a chroot so that means a non-root user can't use the
-# native ifconfig to look at the NICs. Thus, we provide a basic shell script
-# which can display NICs in the Linux style.
-# 
-if [ ! -h $ZONEROOT/sbin/ifconfig ]; then
-    cp /usr/lib/brand/lx/ifconfig $ZONEROOT/sbin/ifconfig
-fi
-
-#
 # STEP THREE
 #
 # Perform distro-specific customization.
