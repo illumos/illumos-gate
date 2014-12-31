@@ -116,8 +116,12 @@ lx_fcntl(uintptr_t p1, uintptr_t p2, uintptr_t p3)
 
 	rc = lx_fcntl_com(fd, cmd, arg);
 
-	if (lk)
-		stol_flock(&fl, (struct lx_flock *)p3);
+	if (lk && rc >= 0) {
+		stol_flock(&fl, &lxflk);
+		if (uucopy((void *)&lxflk, (void *)p3,
+		    sizeof (struct lx_flock)) != 0)
+			return (-errno);
+	}
 
 	return (rc);
 }
@@ -145,7 +149,12 @@ lx_fcntl64(uintptr_t p1, uintptr_t p2, uintptr_t p3)
 			return (-errno);
 		ltos_flock(&lxflk, &fl);
 		rc = lx_fcntl_com(fd, cmd, (ulong_t)&fl);
-		stol_flock(&fl, (struct lx_flock *)p3);
+		if (rc >= 0) {
+			stol_flock(&fl, &lxflk);
+			if (uucopy((void *)&lxflk, (void *)p3,
+			    sizeof (struct lx_flock)) != 0)
+				return (-errno);
+		}
 	} else if (cmd == LX_F_GETLK64 || cmd == LX_F_SETLKW64 || \
 	    cmd == LX_F_SETLK64) {
 		if (uucopy((void *)p3, (void *)&lxflk64,
@@ -153,7 +162,12 @@ lx_fcntl64(uintptr_t p1, uintptr_t p2, uintptr_t p3)
 			return (-errno);
 		ltos_flock64(&lxflk64, &fl64);
 		rc = lx_fcntl_com(fd, cmd, (ulong_t)&fl64);
-		stol_flock64(&fl64, (struct lx_flock64 *)p3);
+		if (rc >= 0) {
+			stol_flock64(&fl64, &lxflk64);
+			if (uucopy((void *)&lxflk64, (void *)p3,
+			    sizeof (struct lx_flock64)) != 0)
+				return (-errno);
+		}
 	} else {
 		rc = lx_fcntl_com(fd, cmd, (ulong_t)p3);
 	}
