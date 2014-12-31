@@ -45,6 +45,7 @@
 #include <sys/un.h>
 #include <netinet/tcp.h>
 #include <netinet/igmp.h>
+#include <netinet/icmp6.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/lx_debug.h>
@@ -326,6 +327,17 @@ static const int ltos_ipv6_sockopts[LX_IPV6_TCLASS + 1] = {
 };
 
 /*
+ * Linux			Illumos
+ * -----			-------
+ *
+ * ICMP6_FILTER	1		ICMP6_FILTER	1
+ */
+
+static const int ltos_icmpv6_sockopts[LX_ICMP6_FILTER + 1] = {
+	OPTNOTSUP, ICMP6_FILTER
+};
+
+/*
  *
  * TCP socket option mapping:
  *
@@ -454,8 +466,9 @@ static const int ltos_socket_sockopts[LX_SO_BPF_EXTENSIONS + 1] = {
  * See the Linux raw.7 man page for description of the socket options.
  *    In Linux ICMP_FILTER is defined as 1 in include/uapi/linux/icmp.h
  */
-static const int ltos_raw_sockopts[LX_ICMP_FILTER + 1] = {
-	OPTNOTSUP, OPTNOTSUP
+static const int ltos_raw_sockopts[LX_IPV6_CHECKSUM + 1] = {
+	OPTNOTSUP, OPTNOTSUP, OPTNOTSUP, OPTNOTSUP,
+	OPTNOTSUP, OPTNOTSUP, OPTNOTSUP, OPTNOTSUP
 };
 
 #define	PROTO_SOCKOPTS(opts)    \
@@ -466,6 +479,8 @@ static const int ltos_raw_sockopts[LX_ICMP_FILTER + 1] = {
  */
 static lx_proto_opts_t ip_sockopts_tbl = PROTO_SOCKOPTS(ltos_ip_sockopts);
 static lx_proto_opts_t ipv6_sockopts_tbl = PROTO_SOCKOPTS(ltos_ipv6_sockopts);
+static lx_proto_opts_t icmpv6_sockopts_tbl =
+    PROTO_SOCKOPTS(ltos_icmpv6_sockopts);
 static lx_proto_opts_t socket_sockopts_tbl =
     PROTO_SOCKOPTS(ltos_socket_sockopts);
 static lx_proto_opts_t igmp_sockopts_tbl = PROTO_SOCKOPTS(ltos_igmp_sockopts);
@@ -1663,6 +1678,7 @@ get_proto_opt_tbl(int level)
 	case LX_IPPROTO_IGMP:	return (&igmp_sockopts_tbl);
 	case LX_IPPROTO_TCP:	return (&tcp_sockopts_tbl);
 	case LX_IPPROTO_IPV6:	return (&ipv6_sockopts_tbl);
+	case LX_IPPROTO_ICMPV6:	return (&icmpv6_sockopts_tbl);
 	case LX_IPPROTO_RAW:	return (&raw_sockopts_tbl);
 	default:
 		lx_unsupported("Unsupported sockopt level %d", level);
@@ -1756,6 +1772,24 @@ lx_setsockopt(int sockfd, int level, int optname, void *optval, int optlen)
 		 */
 		if (optname == LX_IPV6_MTU)
 			return (0);
+	} else if (level == LX_IPPROTO_ICMPV6) {
+		if (optname == LX_ICMP6_FILTER && optval != NULL) {
+			int i;
+			icmp6_filter_t *filter;
+			/*
+			 * Surprise! Linux's ICMP6_FILTER is inverted, when
+			 * compared to illumos
+			 */
+			if (optlen != sizeof (icmp6_filter_t))
+				return (-EINVAL);
+			if ((filter = SAFE_ALLOCA(optlen)) == NULL)
+				return (-ENOMEM);
+			if (uucopy(optval, filter, optlen) != 0)
+				return (-EFAULT);
+			for (i = 0; i < 8; i++)
+				filter->__icmp6_filt[i] ^= 0xffffffff;
+			optval = filter;
+		}
 	} else if (level == LX_SOL_SOCKET) {
 		/* Linux ignores this option. */
 		if (optname == LX_SO_BSDCOMPAT)
@@ -1769,6 +1803,14 @@ lx_setsockopt(int sockfd, int level, int optname, void *optval, int optlen)
 		 */
 		if (optname == LX_ICMP_FILTER &&
 		    strcmp(lx_cmd_name, "ping") == 0)
+			return (0);
+		/*
+		 * Ping6 tries to set the IPV6_CHECKSUM offset in a way that
+		 * illumos won't allow.  Quietly ignore this to prevent it from
+		 * complaining.
+		 */
+		if (optname == LX_IPV6_CHECKSUM &&
+		    strcmp(lx_cmd_name, "ping6") == 0)
 			return (0);
 	}
 
@@ -1875,6 +1917,33 @@ lx_getsockopt(int sockfd, int level, int optname, void *optval, int *optlenp)
 			return (-errno);
 		r = sizeof (lx_ucred);
 		if ((uucopy(&r, optlenp, sizeof (int))) != 0)
+			return (-errno);
+		return (0);
+	}
+	if ((level == LX_IPPROTO_ICMPV6) && (optname == LX_ICMP6_FILTER)) {
+		icmp6_filter_t *filter;
+		int i;
+
+		/* Verify there's going to be enough room for the results. */
+		if (uucopy(optlenp, &r, sizeof (int)) != 0)
+			return (-errno);
+		if (r < sizeof (icmp6_filter_t))
+			return (-EINVAL);
+		if ((filter = SAFE_ALLOCA(sizeof (icmp6_filter_t))) == NULL)
+			return (-ENOMEM);
+
+		r = getsockopt(sockfd, IPPROTO_ICMPV6, ICMP6_FILTER, filter,
+		    optlenp);
+		if (r != 0)
+			return (-errno);
+
+		/*
+		 * ICMP6_FILTER is inverted on Linux. Make it so before copying
+		 * back to caller's buffer.
+		 */
+		for (i = 0; i < 8; i++)
+			filter->__icmp6_filt[i] ^= 0xffffffff;
+		if ((uucopy(filter, optval, sizeof (icmp6_filter_t))) != 0)
 			return (-errno);
 		return (0);
 	}

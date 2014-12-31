@@ -111,6 +111,7 @@ extern "C" {
 #define	LX_IPPROTO_TCP		6
 #define	LX_IPPROTO_UDP		17
 #define	LX_IPPROTO_IPV6		41
+#define	LX_IPPROTO_ICMPV6	58
 #define	LX_IPPROTO_RAW		255
 
 /*
@@ -205,6 +206,13 @@ extern "C" {
 #define	LX_IPV6_DSTOPTS		59
 #define	LX_IPV6_RECVTCLASS	66
 #define	LX_IPV6_TCLASS		67
+
+/*
+ * Options for use with [gs]etsockopt at the IP level.
+ * IPPROTO_ICMPV6
+ */
+
+#define	LX_ICMP6_FILTER		1
 
 /*
  * Options for use with [gs]etsockopt at the TCP level.
