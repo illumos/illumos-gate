@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2015, Joyent, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -893,3 +894,13 @@ lbolt_softint_post(void)
 {
 	setsoftint(lbolt_softint_inum);
 }
+
+void
+thread_splitstack_run(caddr_t addr, void (*func)(void *), void *)
+{
+	panic("thread_splitstack() not supported on SPARC");
+}
+
+void
+thread_splitstack_cleanup(void)
+{}

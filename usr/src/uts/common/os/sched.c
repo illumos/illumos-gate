@@ -27,6 +27,10 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved	*/
 
+/*
+ * Copyright (c) 2015, Joyent, Inc.  All rights reserved.
+ */
+
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/sysmacros.h>
@@ -646,16 +650,17 @@ top:
 		klwp_t *lwp = ttolwp(tp);
 
 		/*
-		 * Swapout eligible lwps (specified by the scheduling
-		 * class) which don't have TS_DONT_SWAP set.  Set the
-		 * "intent to swap" flag (TS_SWAPENQ) on threads
-		 * which have TS_DONT_SWAP set so that they can be
+		 * Swapout eligible lwps (specified by the scheduling class)
+		 * which don't have TS_DONT_SWAP set.  Set the "intent to swap"
+		 * flag (TS_SWAPENQ) on threads which have either TS_DONT_SWAP
+		 * set or are currently on a split stack so that they can be
 		 * swapped if and when they reach a safe point.
 		 */
 		thread_lock(tp);
 		thread_pri = CL_SWAPOUT(tp, swapflags);
 		if (thread_pri != -1) {
-			if (tp->t_schedflag & TS_DONT_SWAP) {
+			if ((tp->t_schedflag & TS_DONT_SWAP) ||
+			    (tp->t_flag & T_SPLITSTK)) {
 				tp->t_schedflag |= TS_SWAPENQ;
 				tp->t_trapret = 1;
 				aston(tp);

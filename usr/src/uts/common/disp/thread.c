@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2015, Joyent, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -74,6 +74,10 @@
 #include <sys/waitq.h>
 #include <sys/cpucaps.h>
 #include <sys/kiconv.h>
+
+#ifndef	STACK_GROWTH_DOWN
+#error Stacks do not grow downward; 3b2 zombie attack detected!
+#endif
 
 struct kmem_cache *thread_cache;	/* cache of free threads */
 struct kmem_cache *lwp_cache;		/* cache of free lwps */
@@ -372,7 +376,7 @@ thread_create(
 		if (stksize <= sizeof (kthread_t) + PTR24_ALIGN)
 			cmn_err(CE_PANIC, "thread_create: proposed stack size"
 			    " too small to hold thread.");
-#ifdef STACK_GROWTH_DOWN
+
 		stksize -= SA(sizeof (kthread_t) + PTR24_ALIGN - 1);
 		stksize &= -PTR24_ALIGN;	/* make thread aligned */
 		t = (kthread_t *)(stk + stksize);
@@ -381,13 +385,6 @@ thread_create(
 			audit_thread_create(t);
 		t->t_stk = stk + stksize;
 		t->t_stkbase = stk;
-#else	/* stack grows to larger addresses */
-		stksize -= SA(sizeof (kthread_t));
-		t = (kthread_t *)(stk);
-		bzero(t, sizeof (kthread_t));
-		t->t_stk = stk + sizeof (kthread_t);
-		t->t_stkbase = stk + stksize + sizeof (kthread_t);
-#endif	/* STACK_GROWTH_DOWN */
 		t->t_flag |= T_TALLOCSTK;
 		t->t_swap = stk;
 	} else {
@@ -400,13 +397,8 @@ thread_create(
 		 * Initialize t_stk to the kernel stack pointer to use
 		 * upon entry to the kernel
 		 */
-#ifdef STACK_GROWTH_DOWN
 		t->t_stk = stk + stksize;
 		t->t_stkbase = stk;
-#else
-		t->t_stk = stk;			/* 3b2-like */
-		t->t_stkbase = stk + stksize;
-#endif /* STACK_GROWTH_DOWN */
 	}
 
 	if (kmem_stackinfo != 0) {
@@ -588,6 +580,9 @@ thread_exit(void)
 
 	if ((t->t_proc_flag & TP_ZTHREAD) != 0)
 		cmn_err(CE_PANIC, "thread_exit: zthread_exit() not called");
+
+	if ((t->t_flag & T_SPLITSTK) != 0)
+		cmn_err(CE_PANIC, "thread_exit: called when stack is split");
 
 	tsd_exit();		/* Clean up this thread's TSD */
 
@@ -1889,6 +1884,103 @@ thread_change_pri(kthread_t *t, pri_t disp_pri, int front)
 	}
 	schedctl_set_cidpri(t);
 	return (on_rq);
+}
+
+
+/*
+ * There are occasions in the kernel when we need much more stack than we
+ * allocate by default, but we do not wish to have that work done
+ * asynchronously by another thread.  To accommodate these scenarios, we allow
+ * for a split stack (also known as a "segmented stack") whereby a new stack
+ * is dynamically allocated and the current thread jumps onto it for purposes
+ * of executing the specified function.  After the specified function returns,
+ * the stack is deallocated and control is returned to the caller.  This
+ * functionality is implemented by thread_splitstack(), below; there are a few
+ * constraints on its use:
+ *
+ * - The caller must be in a context where it is safe to block for memory.
+ * - The caller cannot be in a t_onfault context
+ * - The called function must not call thread_exit() while on the split stack
+ *
+ * The code will explicitly panic if these constraints are violated.  Notably,
+ * however, thread_splitstack() _can_ be called on a split stack -- there
+ * is no limit to the level that split stacks can nest.
+ *
+ * When the stack is split, it is constructed such that stack backtraces
+ * from kernel debuggers continue to function -- though note that DTrace's
+ * stack() action and stackdepth function will only show the stack up to and
+ * including thread_splitstack_run(); DTrace explicitly bounds itself to
+ * pointers that exist within the current declared stack as a safety
+ * mechanism.
+ */
+void
+thread_splitstack(void (*func)(void *), void *arg, size_t stksize)
+{
+	kthread_t *t = curthread;
+	caddr_t ostk, ostkbase, stk;
+	ushort_t otflag;
+
+	if (t->t_onfault != NULL)
+		panic("thread_splitstack: called with non-NULL t_onfault");
+
+	ostk = t->t_stk;
+	ostkbase = t->t_stkbase;
+	otflag = t->t_flag;
+
+	stksize = roundup(stksize, PAGESIZE);
+
+	if (stksize < default_stksize)
+		stksize = default_stksize;
+
+	if (stksize == default_stksize) {
+		stk = (caddr_t)segkp_cache_get(segkp_thread);
+	} else {
+		stksize = roundup(stksize, PAGESIZE);
+		stk = (caddr_t)segkp_get(segkp, stksize,
+		    (KPD_HASREDZONE | KPD_NO_ANON | KPD_LOCKED));
+	}
+
+	/*
+	 * We're going to lock ourselves before we set T_SPLITSTK to assure
+	 * that we're not swapped out in the meantime.  (Note that we don't
+	 * bother to set t_swap, as we're not going to be swapped out.)
+	 */
+	thread_lock(t);
+
+	if (!(otflag & T_SPLITSTK))
+		t->t_flag |= T_SPLITSTK;
+
+	t->t_stk = stk + stksize;
+	t->t_stkbase = stk;
+
+	thread_unlock(t);
+
+	/*
+	 * Now actually run on the new (split) stack...
+	 */
+	thread_splitstack_run(t->t_stk, func, arg);
+
+	/*
+	 * We're back onto our own stack; lock ourselves and restore our
+	 * pre-split state.
+	 */
+	thread_lock(t);
+
+	t->t_stk = ostk;
+	t->t_stkbase = ostkbase;
+
+	if (!(otflag & T_SPLITSTK))
+		t->t_flag &= ~T_SPLITSTK;
+
+	thread_unlock(t);
+
+	/*
+	 * Now that we are entirely back on our own stack, call back into
+	 * the platform layer to perform any platform-specific cleanup.
+	 */
+	thread_splitstack_cleanup();
+
+	segkp_release(segkp, stk);
 }
 
 /*

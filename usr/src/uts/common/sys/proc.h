@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2014 Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2015 Joyent, Inc.  All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -722,6 +722,10 @@ extern	void	freepctx(proc_t *, int);
 extern	kthread_t *thread_unpin(void);
 extern	void	thread_init(void);
 extern	void	thread_load(kthread_t *, void (*)(), caddr_t, size_t);
+
+extern	void	thread_splitstack(void (*)(void *), void *, size_t);
+extern	void	thread_splitstack_run(caddr_t, void (*)(void *), void *);
+extern	void	thread_splitstack_cleanup(void);
 
 extern	void	tsd_create(uint_t *, void (*)(void *));
 extern	void	tsd_destroy(uint_t *);

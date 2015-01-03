@@ -23,6 +23,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright (c) 2015, Joyent, Inc.  All rights reserved.
+ */
+
 #include <sys/types.h>
 #include <sys/atomic.h>
 #include <sys/kmem.h>
@@ -33,11 +37,12 @@
 #include <sys/systm.h>
 #include <sys/cmn_err.h>
 #include <sys/debug.h>
-
 #include <sys/fem.h>
 #include <sys/vfs.h>
 #include <sys/vnode.h>
 #include <sys/vfs_opreg.h>
+#include <sys/stack.h>
+#include <sys/archsystm.h>
 
 #define	NNODES_DEFAULT	8	/* Default number of nodes in a fem_list */
 /*
@@ -290,6 +295,536 @@ _op_find(femarg_t *ap, void **fp, int offs0, int offs1)
 	return (ptr);
 }
 #endif
+
+/*
+ * File event monitoring handoffs
+ *
+ * File event monitoring relies on being able to inject stack frames between
+ * vnode consumers and the underlying file systems.  This becomes problematic
+ * when there exist many monitors, as kernel stack depth is finite.  The model
+ * very much encodes this injected frame:  the flow of control deliberately
+ * lies with the monitor, not with the monitoring system.  While we could
+ * conceivably address this by allowing each subsystem to install at most
+ * one monitor per vnode (and impose on subsystems that they handle any
+ * of their own consumer multiplexing internally), this in fact exports a
+ * substantial amount of run-time complexity to deal with an uncommon case
+ * (and, it must be said, assumes a small number of consuming subsystems).
+ * To allow our abstraction to remain clean, we instead check our remaining
+ * stack in every vnext_*() call; if the amount of stack remaining is lower
+ * than a threshold (fem_stack_needed), we call thread_splitstack() to carry
+ * on the execution of the monitors and the underlying vnode operation on a
+ * split stack.  Because we can only pass a single argument to our split stack
+ * function, we must marshal our arguments, the mechanics of which are somewhat
+ * ornate in terms of the code: to marshal in a type-safe manner, we define a
+ * baton that is a union of payload structures for each kind of operation,
+ * loading the per-operation payload explicitly and calling into common handoff
+ * code that itself calls thread_splitstack().  The function passed to
+ * thread_splitstack() is a per-entry point function that continues monitor
+ * processing given the specified (marshalled) arguments.  While this method
+ * is a little verbose to implement, it has the advantage of being relatively
+ * robust (that is, broadly type-safe) while imposing minimal burden on each
+ * vnext_*() entry point.
+ *
+ * In terms of the implementation:
+ *
+ * - The FEM_BATON_n macros define the per-entry point baton structures
+ * - The fem_baton_payload_t contains the union of these structures
+ * - The FEM_VNEXTn_DECL macros declare the post-handoff entry point
+ * - The FEM_VNEXTn macros constitute the per-handoff entry point
+ *
+ * Note that we don't use variadic macros -- we define a variant of these
+ * macros for each of our relevant argument counts.  This may seem overly
+ * explicit, but it is deliberate:  the object here is to minimize the
+ * future maintenance burden by minimizing the likelihood of introduced
+ * error --  not to minimize the number of characters in this source file.
+ */
+
+#ifndef STACK_GROWTH_DOWN
+#error Downward stack growth assumed.
+#endif
+
+int fem_stack_toodeep;
+uintptr_t fem_stack_needed = 8 * 1024;
+size_t fem_handoff_stacksize = 128 * 1024;
+
+#define	FEM_TOODEEP() (STACK_BIAS + (uintptr_t)getfp() - \
+	(uintptr_t)curthread->t_stkbase < fem_stack_needed)
+
+#define	FEM_BATON_1(what, t0, l0)					\
+	struct {							\
+		void *fb_##what##_arg0;					\
+		caller_context_t *fb_##what##_ct;			\
+		t0 fb_##what##_##l0;					\
+	} fb_##what
+
+#define	FEM_BATON_2(what, t0, l0, t1, l1)				\
+	struct {							\
+		void *fb_##what##_arg0;					\
+		caller_context_t *fb_##what##_ct;			\
+		t0 fb_##what##_##l0;					\
+		t1 fb_##what##_##l1;					\
+	} fb_##what
+
+#define	FEM_BATON_3(what, t0, l0, t1, l1, t2, l2)			\
+	struct {							\
+		void *fb_##what##_arg0;					\
+		caller_context_t *fb_##what##_ct;			\
+		t0 fb_##what##_##l0;					\
+		t1 fb_##what##_##l1;					\
+		t2 fb_##what##_##l2;					\
+	} fb_##what
+
+#define	FEM_BATON_4(what, t0, l0, t1, l1, t2, l2, t3, l3)		\
+	struct {							\
+		void *fb_##what##_arg0;					\
+		caller_context_t *fb_##what##_ct;			\
+		t0 fb_##what##_##l0;					\
+		t1 fb_##what##_##l1;					\
+		t2 fb_##what##_##l2;					\
+		t3 fb_##what##_##l3;					\
+	} fb_##what
+
+#define	FEM_BATON_5(what, t0, l0, t1, l1, t2, l2, t3, l3, t4, l4)	\
+	struct {							\
+		void *fb_##what##_arg0;					\
+		caller_context_t *fb_##what##_ct;			\
+		t0 fb_##what##_##l0;					\
+		t1 fb_##what##_##l1;					\
+		t2 fb_##what##_##l2;					\
+		t3 fb_##what##_##l3;					\
+		t4 fb_##what##_##l4;					\
+	} fb_##what
+
+#define	FEM_BATON_6(what, t0, l0, t1, l1, t2, l2, t3, l3, t4, l4, t5, l5) \
+	struct {							\
+		void *fb_##what##_arg0;					\
+		caller_context_t *fb_##what##_ct;			\
+		t0 fb_##what##_##l0;					\
+		t1 fb_##what##_##l1;					\
+		t2 fb_##what##_##l2;					\
+		t3 fb_##what##_##l3;					\
+		t4 fb_##what##_##l4;					\
+		t5 fb_##what##_##l5;					\
+	} fb_##what
+
+#define	FEM_BATON_8(what, t0, l0, t1, l1, t2, l2, t3, l3, t4, l4, t5, l5, \
+    t6, l6, t7, l7) \
+	struct {							\
+		void *fb_##what##_arg0;					\
+		caller_context_t *fb_##what##_ct;			\
+		t0 fb_##what##_##l0;					\
+		t1 fb_##what##_##l1;					\
+		t2 fb_##what##_##l2;					\
+		t3 fb_##what##_##l3;					\
+		t4 fb_##what##_##l4;					\
+		t5 fb_##what##_##l5;					\
+		t6 fb_##what##_##l6;					\
+		t7 fb_##what##_##l7;					\
+	} fb_##what
+
+#define	FEM_BATON_9(what, t0, l0, t1, l1, t2, l2, t3, l3, t4, l4, t5, l5, \
+    t6, l6, t7, l7, t8, l8) \
+	struct {							\
+		void *fb_##what##_arg0;					\
+		caller_context_t *fb_##what##_ct;			\
+		t0 fb_##what##_##l0;					\
+		t1 fb_##what##_##l1;					\
+		t2 fb_##what##_##l2;					\
+		t3 fb_##what##_##l3;					\
+		t4 fb_##what##_##l4;					\
+		t5 fb_##what##_##l5;					\
+		t6 fb_##what##_##l6;					\
+		t7 fb_##what##_##l7;					\
+		t8 fb_##what##_##l8;					\
+	} fb_##what
+
+typedef union {
+	FEM_BATON_2(open, int, mode, cred_t *, cr);
+	FEM_BATON_4(close, int, flag, int, count,
+	    offset_t, offset, cred_t *, cr);
+	FEM_BATON_3(read, uio_t *, uiop, int, ioflag, cred_t *, cr);
+	FEM_BATON_3(write, uio_t *, uiop, int, ioflag, cred_t *, cr);
+	FEM_BATON_5(ioctl, int, cmd, intptr_t, arg,
+	    int, flag, cred_t *, cr, int *, rvalp);
+	FEM_BATON_3(setfl, int, oflags, int, nflags, cred_t *, cr);
+	FEM_BATON_3(getattr, vattr_t *, vap, int, flags, cred_t *, cr);
+	FEM_BATON_3(setattr, vattr_t *, vap, int, flags, cred_t *, cr);
+	FEM_BATON_3(access, int, mode, int, flags, cred_t *, cr);
+	FEM_BATON_8(lookup, char *, nm, vnode_t **, vpp,
+	    pathname_t *, pnp, int, flags, vnode_t *, rdir,
+	    cred_t *, cr, int *, direntflags, pathname_t *, realpnp);
+	FEM_BATON_8(create, char *, name, vattr_t *, vap,
+	    vcexcl_t, excl, int, mode, vnode_t **, vpp,
+	    cred_t *, cr, int, flag, vsecattr_t *, vsecp);
+	FEM_BATON_3(remove, char *, nm, cred_t *, cr, int, flags);
+	FEM_BATON_4(link, vnode_t *, svp, char *, tnm,
+	    cred_t *, cr, int, flags);
+	FEM_BATON_5(rename, char *, snm, vnode_t *, tdvp,
+	    char *, tnm, cred_t *, cr, int, flags);
+	FEM_BATON_6(mkdir, char *, dirname, vattr_t *, vap,
+	    vnode_t **, vpp, cred_t *, cr, int, flags,
+	    vsecattr_t *, vsecp);
+	FEM_BATON_4(rmdir, char *, nm, vnode_t *, cdir,
+	    cred_t *, cr, int, flags);
+	FEM_BATON_4(readdir, uio_t *, uiop, cred_t *, cr,
+	    int *, eofp, int, flags);
+	FEM_BATON_5(symlink, char *, linkname, vattr_t *, vap,
+	    char *, target, cred_t *, cr, int, flags);
+	FEM_BATON_2(readlink, uio_t *, uiop, cred_t *, cr);
+	FEM_BATON_2(fsync, int, syncflag, cred_t *, cr);
+	FEM_BATON_1(inactive, cred_t *, cr);
+	FEM_BATON_1(fid, fid_t *, fidp);
+	FEM_BATON_1(rwlock, int, write_lock);
+	FEM_BATON_1(rwunlock, int, write_lock);
+	FEM_BATON_2(seek, offset_t, ooff, offset_t *, noffp);
+	FEM_BATON_1(cmp, vnode_t *, vp2);
+	FEM_BATON_6(frlock, int, cmd, struct flock64 *, bfp,
+	    int, flag, offset_t, offset, struct flk_callback *, flk_cbp,
+	    cred_t *, cr);
+	FEM_BATON_5(space, int, cmd, struct flock64 *, bfp,
+	    int, flag, offset_t, offset, cred_t *, cr);
+	FEM_BATON_1(realvp, vnode_t **, vpp);
+	FEM_BATON_9(getpage, offset_t, off, size_t, len,
+	    uint_t *, protp, struct page **, plarr, size_t, plsz,
+	    struct seg *, seg, caddr_t, addr, enum seg_rw, rw,
+	    cred_t *, cr);
+	FEM_BATON_4(putpage, offset_t, off, size_t, len,
+	    int, flags, cred_t *, cr);
+	FEM_BATON_8(map, offset_t, off, struct as *, as,
+	    caddr_t *, addrp, size_t, len, uchar_t, prot,
+	    uchar_t, maxprot, uint_t, flags, cred_t *, cr);
+	FEM_BATON_8(addmap, offset_t, off, struct as *, as,
+	    caddr_t, addr, size_t, len, uchar_t, prot,
+	    uchar_t, maxprot, uint_t, flags, cred_t *, cr);
+	FEM_BATON_8(delmap, offset_t, off, struct as *, as,
+	    caddr_t, addr, size_t, len, uint_t, prot,
+	    uint_t, maxprot, uint_t, flags, cred_t *, cr);
+	FEM_BATON_4(poll, short, events, int, anyyet,
+	    short *, reventsp, struct pollhead **, phpp);
+	FEM_BATON_3(dump, caddr_t, addr, offset_t, lbdn, offset_t, dblks);
+	FEM_BATON_3(pathconf, int, cmd, ulong_t *, valp, cred_t *, cr);
+	FEM_BATON_5(pageio, struct page *, pp, u_offset_t, io_off,
+	    size_t, io_len, int, flags, cred_t *, cr);
+	FEM_BATON_2(dumpctl, int, action, offset_t *, blkp);
+	FEM_BATON_4(dispose, struct page *, pp, int, flag,
+	    int, dn, cred_t *, cr);
+	FEM_BATON_3(setsecattr, vsecattr_t *, vsap, int, flag, cred_t *, cr);
+	FEM_BATON_3(getsecattr, vsecattr_t *, vsap, int, flag, cred_t *, cr);
+	FEM_BATON_4(shrlock, int, cmd, struct shrlock *, shr,
+	    int, flag, cred_t *, cr);
+	FEM_BATON_3(vnevent, vnevent_t, vnevent, vnode_t *, dvp, char *, cname);
+	FEM_BATON_3(reqzcbuf, enum uio_rw, ioflag,
+	    xuio_t *, xuiop, cred_t *, cr);
+	FEM_BATON_2(retzcbuf, xuio_t *, xuiop, cred_t *, cr);
+} fem_baton_payload_t;
+
+typedef struct {
+	fem_baton_payload_t fb_payload;
+	int (*fb_func)();
+	void (*fb_handoff)();
+	int fb_rval;
+} fem_baton_t;
+
+static int
+fem_handoff(fem_baton_t *bp)
+{
+	fem_stack_toodeep++;
+	thread_splitstack(bp->fb_handoff, bp, fem_handoff_stacksize);
+
+	return (bp->fb_rval);
+}
+
+#define	FEM_VNEXT3_DECL(what, a0, a1, a2)				\
+void									\
+fem_handoff_##what(fem_baton_t *bp)					\
+{									\
+	bp->fb_rval = bp->fb_func(					\
+	    bp->fb_payload.fb_##what.fb_##what##_##a0,			\
+	    bp->fb_payload.fb_##what.fb_##what##_##a1,			\
+	    bp->fb_payload.fb_##what.fb_##what##_##a2);			\
+}
+
+#define	FEM_VNEXT4_DECL(what, a0, a1, a2, a3)				\
+void									\
+fem_handoff_##what(fem_baton_t *bp)					\
+{									\
+	bp->fb_rval = bp->fb_func(					\
+	    bp->fb_payload.fb_##what.fb_##what##_##a0,			\
+	    bp->fb_payload.fb_##what.fb_##what##_##a1,			\
+	    bp->fb_payload.fb_##what.fb_##what##_##a2,			\
+	    bp->fb_payload.fb_##what.fb_##what##_##a3);			\
+}
+
+#define	FEM_VNEXT5_DECL(what, a0, a1, a2, a3, a4)			\
+void									\
+fem_handoff_##what(fem_baton_t *bp)					\
+{									\
+	bp->fb_rval = bp->fb_func(					\
+	    bp->fb_payload.fb_##what.fb_##what##_##a0,			\
+	    bp->fb_payload.fb_##what.fb_##what##_##a1,			\
+	    bp->fb_payload.fb_##what.fb_##what##_##a2,			\
+	    bp->fb_payload.fb_##what.fb_##what##_##a3,			\
+	    bp->fb_payload.fb_##what.fb_##what##_##a4);			\
+}
+
+#define	FEM_VNEXT6_DECL(what, a0, a1, a2, a3, a4, a5)			\
+void									\
+fem_handoff_##what(fem_baton_t *bp)					\
+{									\
+	bp->fb_rval = bp->fb_func(					\
+	    bp->fb_payload.fb_##what.fb_##what##_##a0,			\
+	    bp->fb_payload.fb_##what.fb_##what##_##a1,			\
+	    bp->fb_payload.fb_##what.fb_##what##_##a2,			\
+	    bp->fb_payload.fb_##what.fb_##what##_##a3,			\
+	    bp->fb_payload.fb_##what.fb_##what##_##a4,			\
+	    bp->fb_payload.fb_##what.fb_##what##_##a5);			\
+}
+
+#define	FEM_VNEXT7_DECL(what, a0, a1, a2, a3, a4, a5, a6)		\
+void									\
+fem_handoff_##what(fem_baton_t *bp)					\
+{									\
+	bp->fb_rval = bp->fb_func(					\
+	    bp->fb_payload.fb_##what.fb_##what##_##a0,			\
+	    bp->fb_payload.fb_##what.fb_##what##_##a1,			\
+	    bp->fb_payload.fb_##what.fb_##what##_##a2,			\
+	    bp->fb_payload.fb_##what.fb_##what##_##a3,			\
+	    bp->fb_payload.fb_##what.fb_##what##_##a4,			\
+	    bp->fb_payload.fb_##what.fb_##what##_##a5,			\
+	    bp->fb_payload.fb_##what.fb_##what##_##a6);			\
+}
+
+#define	FEM_VNEXT8_DECL(what, a0, a1, a2, a3, a4, a5, a6, a7)		\
+void									\
+fem_handoff_##what(fem_baton_t *bp)					\
+{									\
+	bp->fb_rval = bp->fb_func(					\
+	    bp->fb_payload.fb_##what.fb_##what##_##a0,			\
+	    bp->fb_payload.fb_##what.fb_##what##_##a1,			\
+	    bp->fb_payload.fb_##what.fb_##what##_##a2,			\
+	    bp->fb_payload.fb_##what.fb_##what##_##a3,			\
+	    bp->fb_payload.fb_##what.fb_##what##_##a4,			\
+	    bp->fb_payload.fb_##what.fb_##what##_##a5,			\
+	    bp->fb_payload.fb_##what.fb_##what##_##a6,			\
+	    bp->fb_payload.fb_##what.fb_##what##_##a7);			\
+}
+
+#define	FEM_VNEXT10_DECL(what, a0, a1, a2, a3, a4, a5, a6, a7, a8, a9)	\
+void									\
+fem_handoff_##what(fem_baton_t *bp)					\
+{									\
+	bp->fb_rval = bp->fb_func(					\
+	    bp->fb_payload.fb_##what.fb_##what##_##a0,			\
+	    bp->fb_payload.fb_##what.fb_##what##_##a1,			\
+	    bp->fb_payload.fb_##what.fb_##what##_##a2,			\
+	    bp->fb_payload.fb_##what.fb_##what##_##a3,			\
+	    bp->fb_payload.fb_##what.fb_##what##_##a4,			\
+	    bp->fb_payload.fb_##what.fb_##what##_##a5,			\
+	    bp->fb_payload.fb_##what.fb_##what##_##a6,			\
+	    bp->fb_payload.fb_##what.fb_##what##_##a7,			\
+	    bp->fb_payload.fb_##what.fb_##what##_##a8,			\
+	    bp->fb_payload.fb_##what.fb_##what##_##a9);			\
+}
+
+#define	FEM_VNEXT11_DECL(what, a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10) \
+void									\
+fem_handoff_##what(fem_baton_t *bp)					\
+{									\
+	bp->fb_rval = bp->fb_func(					\
+	    bp->fb_payload.fb_##what.fb_##what##_##a0,			\
+	    bp->fb_payload.fb_##what.fb_##what##_##a1,			\
+	    bp->fb_payload.fb_##what.fb_##what##_##a2,			\
+	    bp->fb_payload.fb_##what.fb_##what##_##a3,			\
+	    bp->fb_payload.fb_##what.fb_##what##_##a4,			\
+	    bp->fb_payload.fb_##what.fb_##what##_##a5,			\
+	    bp->fb_payload.fb_##what.fb_##what##_##a6,			\
+	    bp->fb_payload.fb_##what.fb_##what##_##a7,			\
+	    bp->fb_payload.fb_##what.fb_##what##_##a8,			\
+	    bp->fb_payload.fb_##what.fb_##what##_##a9,			\
+	    bp->fb_payload.fb_##what.fb_##what##_##a10);		\
+}
+
+#define	FEM_VNEXT3(what, func, a0, a1, a2)				\
+	if (FEM_TOODEEP()) {						\
+		fem_baton_t *baton;					\
+		int rval;						\
+									\
+		baton = kmem_alloc(sizeof (fem_baton_t), KM_SLEEP);	\
+		baton->fb_payload.fb_##what.fb_##what##_##a0 = a0;	\
+		baton->fb_payload.fb_##what.fb_##what##_##a1 = a1;	\
+		baton->fb_payload.fb_##what.fb_##what##_##a2 = a2;	\
+		baton->fb_handoff = fem_handoff_##what;			\
+		baton->fb_func = func;					\
+									\
+		rval = fem_handoff(baton);				\
+		kmem_free(baton, sizeof (fem_baton_t));			\
+									\
+		return (rval);						\
+	}								\
+	return (func(a0, a1, a2))
+
+#define	FEM_VNEXT4(what, func, a0, a1, a2, a3)				\
+	if (FEM_TOODEEP()) {						\
+		fem_baton_t *baton;					\
+		int rval;						\
+									\
+		baton = kmem_alloc(sizeof (fem_baton_t), KM_SLEEP);	\
+		baton->fb_payload.fb_##what.fb_##what##_##a0 = a0;	\
+		baton->fb_payload.fb_##what.fb_##what##_##a1 = a1;	\
+		baton->fb_payload.fb_##what.fb_##what##_##a2 = a2;	\
+		baton->fb_payload.fb_##what.fb_##what##_##a3 = a3;	\
+		baton->fb_handoff = fem_handoff_##what;			\
+		baton->fb_func = func;					\
+									\
+		rval = fem_handoff(baton);				\
+		kmem_free(baton, sizeof (fem_baton_t));			\
+									\
+		return (rval);						\
+	}								\
+	return (func(a0, a1, a2, a3))
+
+#define	FEM_VNEXT5(what, func, a0, a1, a2, a3, a4)			\
+	if (FEM_TOODEEP()) {						\
+		fem_baton_t *baton;					\
+		int rval;						\
+									\
+		baton = kmem_alloc(sizeof (fem_baton_t), KM_SLEEP);	\
+		baton->fb_payload.fb_##what.fb_##what##_##a0 = a0;	\
+		baton->fb_payload.fb_##what.fb_##what##_##a1 = a1;	\
+		baton->fb_payload.fb_##what.fb_##what##_##a2 = a2;	\
+		baton->fb_payload.fb_##what.fb_##what##_##a3 = a3;	\
+		baton->fb_payload.fb_##what.fb_##what##_##a4 = a4;	\
+		baton->fb_handoff = fem_handoff_##what;			\
+		baton->fb_func = func;					\
+									\
+		rval = fem_handoff(baton);				\
+		kmem_free(baton, sizeof (fem_baton_t));			\
+									\
+		return (rval);						\
+	}								\
+	return (func(a0, a1, a2, a3, a4))
+
+#define	FEM_VNEXT6(what, func, a0, a1, a2, a3, a4, a5)			\
+	if (FEM_TOODEEP()) {						\
+		fem_baton_t *baton;					\
+		int rval;						\
+									\
+		baton = kmem_alloc(sizeof (fem_baton_t), KM_SLEEP);	\
+		baton->fb_payload.fb_##what.fb_##what##_##a0 = a0;	\
+		baton->fb_payload.fb_##what.fb_##what##_##a1 = a1;	\
+		baton->fb_payload.fb_##what.fb_##what##_##a2 = a2;	\
+		baton->fb_payload.fb_##what.fb_##what##_##a3 = a3;	\
+		baton->fb_payload.fb_##what.fb_##what##_##a4 = a4;	\
+		baton->fb_payload.fb_##what.fb_##what##_##a5 = a5;	\
+		baton->fb_handoff = fem_handoff_##what;			\
+		baton->fb_func = func;					\
+									\
+		rval = fem_handoff(baton);				\
+		kmem_free(baton, sizeof (fem_baton_t));			\
+									\
+		return (rval);						\
+	}								\
+	return (func(a0, a1, a2, a3, a4, a5))
+
+#define	FEM_VNEXT7(what, func, a0, a1, a2, a3, a4, a5, a6)		\
+	if (FEM_TOODEEP()) {						\
+		fem_baton_t *baton;					\
+		int rval;						\
+									\
+		baton = kmem_alloc(sizeof (fem_baton_t), KM_SLEEP);	\
+		baton->fb_payload.fb_##what.fb_##what##_##a0 = a0;	\
+		baton->fb_payload.fb_##what.fb_##what##_##a1 = a1;	\
+		baton->fb_payload.fb_##what.fb_##what##_##a2 = a2;	\
+		baton->fb_payload.fb_##what.fb_##what##_##a3 = a3;	\
+		baton->fb_payload.fb_##what.fb_##what##_##a4 = a4;	\
+		baton->fb_payload.fb_##what.fb_##what##_##a5 = a5;	\
+		baton->fb_payload.fb_##what.fb_##what##_##a6 = a6;	\
+		baton->fb_handoff = fem_handoff_##what;			\
+		baton->fb_func = func;					\
+									\
+		rval = fem_handoff(baton);				\
+		kmem_free(baton, sizeof (fem_baton_t));			\
+									\
+		return (rval);						\
+	}								\
+	return (func(a0, a1, a2, a3, a4, a5, a6))
+
+#define	FEM_VNEXT8(what, func, a0, a1, a2, a3, a4, a5, a6, a7)		\
+	if (FEM_TOODEEP()) {						\
+		fem_baton_t *baton;					\
+		int rval;						\
+									\
+		baton = kmem_alloc(sizeof (fem_baton_t), KM_SLEEP);	\
+		baton->fb_payload.fb_##what.fb_##what##_##a0 = a0;	\
+		baton->fb_payload.fb_##what.fb_##what##_##a1 = a1;	\
+		baton->fb_payload.fb_##what.fb_##what##_##a2 = a2;	\
+		baton->fb_payload.fb_##what.fb_##what##_##a3 = a3;	\
+		baton->fb_payload.fb_##what.fb_##what##_##a4 = a4;	\
+		baton->fb_payload.fb_##what.fb_##what##_##a5 = a5;	\
+		baton->fb_payload.fb_##what.fb_##what##_##a6 = a6;	\
+		baton->fb_payload.fb_##what.fb_##what##_##a7 = a7;	\
+		baton->fb_handoff = fem_handoff_##what;			\
+		baton->fb_func = func;					\
+									\
+		rval = fem_handoff(baton);				\
+		kmem_free(baton, sizeof (fem_baton_t));			\
+									\
+		return (rval);						\
+	}								\
+	return (func(a0, a1, a2, a3, a4, a5, a6, a7))
+
+#define	FEM_VNEXT10(what, func, a0, a1, a2, a3, a4, a5, a6, a7, a8, a9)	\
+	if (FEM_TOODEEP()) {						\
+		fem_baton_t *baton;					\
+		int rval;						\
+									\
+		baton = kmem_alloc(sizeof (fem_baton_t), KM_SLEEP);	\
+		baton->fb_payload.fb_##what.fb_##what##_##a0 = a0;	\
+		baton->fb_payload.fb_##what.fb_##what##_##a1 = a1;	\
+		baton->fb_payload.fb_##what.fb_##what##_##a2 = a2;	\
+		baton->fb_payload.fb_##what.fb_##what##_##a3 = a3;	\
+		baton->fb_payload.fb_##what.fb_##what##_##a4 = a4;	\
+		baton->fb_payload.fb_##what.fb_##what##_##a5 = a5;	\
+		baton->fb_payload.fb_##what.fb_##what##_##a6 = a6;	\
+		baton->fb_payload.fb_##what.fb_##what##_##a7 = a7;	\
+		baton->fb_payload.fb_##what.fb_##what##_##a8 = a8;	\
+		baton->fb_payload.fb_##what.fb_##what##_##a9 = a9;	\
+		baton->fb_handoff = fem_handoff_##what;			\
+		baton->fb_func = func;					\
+									\
+		rval = fem_handoff(baton);				\
+		kmem_free(baton, sizeof (fem_baton_t));			\
+									\
+		return (rval);						\
+	}								\
+	return (func(a0, a1, a2, a3, a4, a5, a6, a7, a8, a9))
+
+#define	FEM_VNEXT11(what, func, a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10) \
+	if (FEM_TOODEEP()) {						\
+		fem_baton_t *baton;					\
+		int rval;						\
+									\
+		baton = kmem_alloc(sizeof (fem_baton_t), KM_SLEEP);	\
+		baton->fb_payload.fb_##what.fb_##what##_##a0 = a0;	\
+		baton->fb_payload.fb_##what.fb_##what##_##a1 = a1;	\
+		baton->fb_payload.fb_##what.fb_##what##_##a2 = a2;	\
+		baton->fb_payload.fb_##what.fb_##what##_##a3 = a3;	\
+		baton->fb_payload.fb_##what.fb_##what##_##a4 = a4;	\
+		baton->fb_payload.fb_##what.fb_##what##_##a5 = a5;	\
+		baton->fb_payload.fb_##what.fb_##what##_##a6 = a6;	\
+		baton->fb_payload.fb_##what.fb_##what##_##a7 = a7;	\
+		baton->fb_payload.fb_##what.fb_##what##_##a8 = a8;	\
+		baton->fb_payload.fb_##what.fb_##what##_##a9 = a9;	\
+		baton->fb_payload.fb_##what.fb_##what##_##a10 = a10;	\
+		baton->fb_handoff = fem_handoff_##what;			\
+		baton->fb_func = func;					\
+									\
+		rval = fem_handoff(baton);				\
+		kmem_free(baton, sizeof (fem_baton_t));			\
+									\
+		return (rval);						\
+	}								\
+	return (func(a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10))
 
 static fem_t *
 fem_alloc()
@@ -2036,9 +2571,59 @@ static struct fs_operation_def fshead_vfs_spec[]  = {
  * 5.  Return by invoking the base operation with the base object.
  *
  * for each classification, there needs to be at least one "next" operation
- * for each "head"operation.
- *
+ * for each "head" operation.  Note that we also use the FEM_VNEXTn_DECL macros
+ * to define the function to run when the stack is split; see the discussion
+ * on "File event monitoring handoffs", above.
  */
+
+FEM_VNEXT4_DECL(open, arg0, mode, cr, ct)
+FEM_VNEXT6_DECL(close, arg0, flag, count, offset, cr, ct)
+FEM_VNEXT5_DECL(read, arg0, uiop, ioflag, cr, ct)
+FEM_VNEXT5_DECL(write, arg0, uiop, ioflag, cr, ct)
+FEM_VNEXT7_DECL(ioctl, arg0, cmd, arg, flag, cr, rvalp, ct)
+FEM_VNEXT5_DECL(setfl, arg0, oflags, nflags, cr, ct)
+FEM_VNEXT5_DECL(getattr, arg0, vap, flags, cr, ct)
+FEM_VNEXT5_DECL(setattr, arg0, vap, flags, cr, ct)
+FEM_VNEXT5_DECL(access, arg0, mode, flags, cr, ct)
+FEM_VNEXT10_DECL(lookup, arg0, nm, vpp, pnp, flags, rdir,
+    cr, ct, direntflags, realpnp)
+FEM_VNEXT10_DECL(create, arg0, name, vap, excl, mode, vpp, cr, flag, ct, vsecp)
+FEM_VNEXT5_DECL(remove, arg0, nm, cr, ct, flags)
+FEM_VNEXT6_DECL(link, arg0, svp, tnm, cr, ct, flags)
+FEM_VNEXT7_DECL(rename, arg0, snm, tdvp, tnm, cr, ct, flags)
+FEM_VNEXT8_DECL(mkdir, arg0, dirname, vap, vpp, cr, ct, flags, vsecp)
+FEM_VNEXT6_DECL(rmdir, arg0, nm, cdir, cr, ct, flags)
+FEM_VNEXT6_DECL(readdir, arg0, uiop, cr, eofp, ct, flags)
+FEM_VNEXT7_DECL(symlink, arg0, linkname, vap, target, cr, ct, flags)
+FEM_VNEXT4_DECL(readlink, arg0, uiop, cr, ct)
+FEM_VNEXT4_DECL(fsync, arg0, syncflag, cr, ct)
+FEM_VNEXT3_DECL(fid, arg0, fidp, ct)
+FEM_VNEXT3_DECL(rwlock, arg0, write_lock, ct)
+FEM_VNEXT4_DECL(seek, arg0, ooff, noffp, ct)
+FEM_VNEXT3_DECL(cmp, arg0, vp2, ct)
+FEM_VNEXT8_DECL(frlock, arg0, cmd, bfp, flag, offset, flk_cbp, cr, ct)
+FEM_VNEXT7_DECL(space, arg0, cmd, bfp, flag, offset, cr, ct)
+FEM_VNEXT3_DECL(realvp, arg0, vpp, ct)
+FEM_VNEXT11_DECL(getpage, arg0, off, len, protp, plarr, plsz,
+    seg, addr, rw, cr, ct)
+FEM_VNEXT6_DECL(putpage, arg0, off, len, flags, cr, ct)
+FEM_VNEXT10_DECL(map, arg0, off, as, addrp, len, prot, maxprot,
+    flags, cr, ct)
+FEM_VNEXT10_DECL(addmap, arg0, off, as, addr, len, prot, maxprot,
+    flags, cr, ct)
+FEM_VNEXT10_DECL(delmap, arg0, off, as, addr, len, prot, maxprot,
+    flags, cr, ct)
+FEM_VNEXT6_DECL(poll, arg0, events, anyyet, reventsp, phpp, ct)
+FEM_VNEXT5_DECL(dump, arg0, addr, lbdn, dblks, ct)
+FEM_VNEXT5_DECL(pathconf, arg0, cmd, valp, cr, ct)
+FEM_VNEXT7_DECL(pageio, arg0, pp, io_off, io_len, flags, cr, ct)
+FEM_VNEXT4_DECL(dumpctl, arg0, action, blkp, ct)
+FEM_VNEXT5_DECL(setsecattr, arg0, vsap, flag, cr, ct)
+FEM_VNEXT5_DECL(getsecattr, arg0, vsap, flag, cr, ct)
+FEM_VNEXT6_DECL(shrlock, arg0, cmd, shr, flag, cr, ct)
+FEM_VNEXT5_DECL(vnevent, arg0, vnevent, dvp, cname, ct)
+FEM_VNEXT5_DECL(reqzcbuf, arg0, ioflag, xuiop, cr, ct)
+FEM_VNEXT4_DECL(retzcbuf, arg0, xuiop, cr, ct)
 
 int
 vnext_open(femarg_t *vf, int mode, cred_t *cr, caller_context_t *ct)
@@ -2051,7 +2636,7 @@ vnext_open(femarg_t *vf, int mode, cred_t *cr, caller_context_t *ct)
 	vsop_find(vf, &func, int, &arg0, vop_open, femop_open);
 	ASSERT(func != NULL);
 	ASSERT(arg0 != NULL);
-	return ((*func)(arg0, mode, cr, ct));
+	FEM_VNEXT4(open, func, arg0, mode, cr, ct);
 }
 
 int
@@ -2066,7 +2651,7 @@ vnext_close(femarg_t *vf, int flag, int count, offset_t offset, cred_t *cr,
 	vsop_find(vf, &func, int, &arg0, vop_close, femop_close);
 	ASSERT(func != NULL);
 	ASSERT(arg0 != NULL);
-	return ((*func)(arg0, flag, count, offset, cr, ct));
+	FEM_VNEXT6(close, func, arg0, flag, count, offset, cr, ct);
 }
 
 int
@@ -2081,7 +2666,7 @@ vnext_read(femarg_t *vf, uio_t *uiop, int ioflag, cred_t *cr,
 	vsop_find(vf, &func, int, &arg0, vop_read, femop_read);
 	ASSERT(func != NULL);
 	ASSERT(arg0 != NULL);
-	return ((*func)(arg0, uiop, ioflag, cr, ct));
+	FEM_VNEXT5(read, func, arg0, uiop, ioflag, cr, ct);
 }
 
 int
@@ -2096,7 +2681,7 @@ vnext_write(femarg_t *vf, uio_t *uiop, int ioflag, cred_t *cr,
 	vsop_find(vf, &func, int, &arg0, vop_write, femop_write);
 	ASSERT(func != NULL);
 	ASSERT(arg0 != NULL);
-	return ((*func)(arg0, uiop, ioflag, cr, ct));
+	FEM_VNEXT5(write, func, arg0, uiop, ioflag, cr, ct);
 }
 
 int
@@ -2111,7 +2696,7 @@ vnext_ioctl(femarg_t *vf, int cmd, intptr_t arg, int flag, cred_t *cr,
 	vsop_find(vf, &func, int, &arg0, vop_ioctl, femop_ioctl);
 	ASSERT(func != NULL);
 	ASSERT(arg0 != NULL);
-	return ((*func)(arg0, cmd, arg, flag, cr, rvalp, ct));
+	FEM_VNEXT7(ioctl, func, arg0, cmd, arg, flag, cr, rvalp, ct);
 }
 
 int
@@ -2126,7 +2711,7 @@ vnext_setfl(femarg_t *vf, int oflags, int nflags, cred_t *cr,
 	vsop_find(vf, &func, int, &arg0, vop_setfl, femop_setfl);
 	ASSERT(func != NULL);
 	ASSERT(arg0 != NULL);
-	return ((*func)(arg0, oflags, nflags, cr, ct));
+	FEM_VNEXT5(setfl, func, arg0, oflags, nflags, cr, ct);
 }
 
 int
@@ -2141,7 +2726,7 @@ vnext_getattr(femarg_t *vf, vattr_t *vap, int flags, cred_t *cr,
 	vsop_find(vf, &func, int, &arg0, vop_getattr, femop_getattr);
 	ASSERT(func != NULL);
 	ASSERT(arg0 != NULL);
-	return ((*func)(arg0, vap, flags, cr, ct));
+	FEM_VNEXT5(getattr, func, arg0, vap, flags, cr, ct);
 }
 
 int
@@ -2156,7 +2741,7 @@ vnext_setattr(femarg_t *vf, vattr_t *vap, int flags, cred_t *cr,
 	vsop_find(vf, &func, int, &arg0, vop_setattr, femop_setattr);
 	ASSERT(func != NULL);
 	ASSERT(arg0 != NULL);
-	return ((*func)(arg0, vap, flags, cr, ct));
+	FEM_VNEXT5(setattr, func, arg0, vap, flags, cr, ct);
 }
 
 int
@@ -2171,7 +2756,7 @@ vnext_access(femarg_t *vf, int mode, int flags, cred_t *cr,
 	vsop_find(vf, &func, int, &arg0, vop_access, femop_access);
 	ASSERT(func != NULL);
 	ASSERT(arg0 != NULL);
-	return ((*func)(arg0, mode, flags, cr, ct));
+	FEM_VNEXT5(access, func, arg0, mode, flags, cr, ct);
 }
 
 int
@@ -2187,8 +2772,8 @@ vnext_lookup(femarg_t *vf, char *nm, vnode_t **vpp, pathname_t *pnp,
 	vsop_find(vf, &func, int, &arg0, vop_lookup, femop_lookup);
 	ASSERT(func != NULL);
 	ASSERT(arg0 != NULL);
-	return ((*func)(arg0, nm, vpp, pnp, flags, rdir, cr, ct,
-	    direntflags, realpnp));
+	FEM_VNEXT10(lookup, func, arg0, nm, vpp, pnp, flags, rdir, cr, ct,
+	    direntflags, realpnp);
 }
 
 int
@@ -2204,7 +2789,8 @@ vnext_create(femarg_t *vf, char *name, vattr_t *vap, vcexcl_t excl,
 	vsop_find(vf, &func, int, &arg0, vop_create, femop_create);
 	ASSERT(func != NULL);
 	ASSERT(arg0 != NULL);
-	return ((*func)(arg0, name, vap, excl, mode, vpp, cr, flag, ct, vsecp));
+	FEM_VNEXT10(create, func, arg0, name, vap, excl,
+	    mode, vpp, cr, flag, ct, vsecp);
 }
 
 int
@@ -2219,7 +2805,7 @@ vnext_remove(femarg_t *vf, char *nm, cred_t *cr, caller_context_t *ct,
 	vsop_find(vf, &func, int, &arg0, vop_remove, femop_remove);
 	ASSERT(func != NULL);
 	ASSERT(arg0 != NULL);
-	return ((*func)(arg0, nm, cr, ct, flags));
+	FEM_VNEXT5(remove, func, arg0, nm, cr, ct, flags);
 }
 
 int
@@ -2234,7 +2820,7 @@ vnext_link(femarg_t *vf, vnode_t *svp, char *tnm, cred_t *cr,
 	vsop_find(vf, &func, int, &arg0, vop_link, femop_link);
 	ASSERT(func != NULL);
 	ASSERT(arg0 != NULL);
-	return ((*func)(arg0, svp, tnm, cr, ct, flags));
+	FEM_VNEXT6(link, func, arg0, svp, tnm, cr, ct, flags);
 }
 
 int
@@ -2249,7 +2835,7 @@ vnext_rename(femarg_t *vf, char *snm, vnode_t *tdvp, char *tnm, cred_t *cr,
 	vsop_find(vf, &func, int, &arg0, vop_rename, femop_rename);
 	ASSERT(func != NULL);
 	ASSERT(arg0 != NULL);
-	return ((*func)(arg0, snm, tdvp, tnm, cr, ct, flags));
+	FEM_VNEXT7(rename, func, arg0, snm, tdvp, tnm, cr, ct, flags);
 }
 
 int
@@ -2264,7 +2850,7 @@ vnext_mkdir(femarg_t *vf, char *dirname, vattr_t *vap, vnode_t **vpp,
 	vsop_find(vf, &func, int, &arg0, vop_mkdir, femop_mkdir);
 	ASSERT(func != NULL);
 	ASSERT(arg0 != NULL);
-	return ((*func)(arg0, dirname, vap, vpp, cr, ct, flags, vsecp));
+	FEM_VNEXT8(mkdir, func, arg0, dirname, vap, vpp, cr, ct, flags, vsecp);
 }
 
 int
@@ -2279,7 +2865,7 @@ vnext_rmdir(femarg_t *vf, char *nm, vnode_t *cdir, cred_t *cr,
 	vsop_find(vf, &func, int, &arg0, vop_rmdir, femop_rmdir);
 	ASSERT(func != NULL);
 	ASSERT(arg0 != NULL);
-	return ((*func)(arg0, nm, cdir, cr, ct, flags));
+	FEM_VNEXT6(rmdir, func, arg0, nm, cdir, cr, ct, flags);
 }
 
 int
@@ -2294,7 +2880,7 @@ vnext_readdir(femarg_t *vf, uio_t *uiop, cred_t *cr, int *eofp,
 	vsop_find(vf, &func, int, &arg0, vop_readdir, femop_readdir);
 	ASSERT(func != NULL);
 	ASSERT(arg0 != NULL);
-	return ((*func)(arg0, uiop, cr, eofp, ct, flags));
+	FEM_VNEXT6(readdir, func, arg0, uiop, cr, eofp, ct, flags);
 }
 
 int
@@ -2309,7 +2895,7 @@ vnext_symlink(femarg_t *vf, char *linkname, vattr_t *vap, char *target,
 	vsop_find(vf, &func, int, &arg0, vop_symlink, femop_symlink);
 	ASSERT(func != NULL);
 	ASSERT(arg0 != NULL);
-	return ((*func)(arg0, linkname, vap, target, cr, ct, flags));
+	FEM_VNEXT7(symlink, func, arg0, linkname, vap, target, cr, ct, flags);
 }
 
 int
@@ -2323,7 +2909,7 @@ vnext_readlink(femarg_t *vf, uio_t *uiop, cred_t *cr, caller_context_t *ct)
 	vsop_find(vf, &func, int, &arg0, vop_readlink, femop_readlink);
 	ASSERT(func != NULL);
 	ASSERT(arg0 != NULL);
-	return ((*func)(arg0, uiop, cr, ct));
+	FEM_VNEXT4(readlink, func, arg0, uiop, cr, ct);
 }
 
 int
@@ -2337,7 +2923,7 @@ vnext_fsync(femarg_t *vf, int syncflag, cred_t *cr, caller_context_t *ct)
 	vsop_find(vf, &func, int, &arg0, vop_fsync, femop_fsync);
 	ASSERT(func != NULL);
 	ASSERT(arg0 != NULL);
-	return ((*func)(arg0, syncflag, cr, ct));
+	FEM_VNEXT4(fsync, func, arg0, syncflag, cr, ct);
 }
 
 void
@@ -2365,7 +2951,7 @@ vnext_fid(femarg_t *vf, fid_t *fidp, caller_context_t *ct)
 	vsop_find(vf, &func, int, &arg0, vop_fid, femop_fid);
 	ASSERT(func != NULL);
 	ASSERT(arg0 != NULL);
-	return ((*func)(arg0, fidp, ct));
+	FEM_VNEXT3(fid, func, arg0, fidp, ct);
 }
 
 int
@@ -2379,7 +2965,7 @@ vnext_rwlock(femarg_t *vf, int write_lock, caller_context_t *ct)
 	vsop_find(vf, &func, int, &arg0, vop_rwlock, femop_rwlock);
 	ASSERT(func != NULL);
 	ASSERT(arg0 != NULL);
-	return ((*func)(arg0, write_lock, ct));
+	FEM_VNEXT3(rwlock, func, arg0, write_lock, ct);
 }
 
 void
@@ -2407,7 +2993,7 @@ vnext_seek(femarg_t *vf, offset_t ooff, offset_t *noffp, caller_context_t *ct)
 	vsop_find(vf, &func, int, &arg0, vop_seek, femop_seek);
 	ASSERT(func != NULL);
 	ASSERT(arg0 != NULL);
-	return ((*func)(arg0, ooff, noffp, ct));
+	FEM_VNEXT4(seek, func, arg0, ooff, noffp, ct);
 }
 
 int
@@ -2421,7 +3007,7 @@ vnext_cmp(femarg_t *vf, vnode_t *vp2, caller_context_t *ct)
 	vsop_find(vf, &func, int, &arg0, vop_cmp, femop_cmp);
 	ASSERT(func != NULL);
 	ASSERT(arg0 != NULL);
-	return ((*func)(arg0, vp2, ct));
+	FEM_VNEXT3(cmp, func, arg0, vp2, ct);
 }
 
 int
@@ -2437,7 +3023,7 @@ vnext_frlock(femarg_t *vf, int cmd, struct flock64 *bfp, int flag,
 	vsop_find(vf, &func, int, &arg0, vop_frlock, femop_frlock);
 	ASSERT(func != NULL);
 	ASSERT(arg0 != NULL);
-	return ((*func)(arg0, cmd, bfp, flag, offset, flk_cbp, cr, ct));
+	FEM_VNEXT8(frlock, func, arg0, cmd, bfp, flag, offset, flk_cbp, cr, ct);
 }
 
 int
@@ -2452,7 +3038,7 @@ vnext_space(femarg_t *vf, int cmd, struct flock64 *bfp, int flag,
 	vsop_find(vf, &func, int, &arg0, vop_space, femop_space);
 	ASSERT(func != NULL);
 	ASSERT(arg0 != NULL);
-	return ((*func)(arg0, cmd, bfp, flag, offset, cr, ct));
+	FEM_VNEXT7(space, func, arg0, cmd, bfp, flag, offset, cr, ct);
 }
 
 int
@@ -2466,7 +3052,7 @@ vnext_realvp(femarg_t *vf, vnode_t **vpp, caller_context_t *ct)
 	vsop_find(vf, &func, int, &arg0, vop_realvp, femop_realvp);
 	ASSERT(func != NULL);
 	ASSERT(arg0 != NULL);
-	return ((*func)(arg0, vpp, ct));
+	FEM_VNEXT3(realvp, func, arg0, vpp, ct);
 }
 
 int
@@ -2482,8 +3068,8 @@ vnext_getpage(femarg_t *vf, offset_t off, size_t len, uint_t *protp,
 	vsop_find(vf, &func, int, &arg0, vop_getpage, femop_getpage);
 	ASSERT(func != NULL);
 	ASSERT(arg0 != NULL);
-	return ((*func)(arg0, off, len, protp, plarr, plsz, seg, addr, rw,
-	    cr, ct));
+	FEM_VNEXT11(getpage, func, arg0, off, len, protp,
+	    plarr, plsz, seg, addr, rw, cr, ct);
 }
 
 int
@@ -2498,7 +3084,7 @@ vnext_putpage(femarg_t *vf, offset_t off, size_t len, int flags,
 	vsop_find(vf, &func, int, &arg0, vop_putpage, femop_putpage);
 	ASSERT(func != NULL);
 	ASSERT(arg0 != NULL);
-	return ((*func)(arg0, off, len, flags, cr, ct));
+	FEM_VNEXT6(putpage, func, arg0, off, len, flags, cr, ct);
 }
 
 int
@@ -2514,8 +3100,8 @@ vnext_map(femarg_t *vf, offset_t off, struct as *as, caddr_t *addrp,
 	vsop_find(vf, &func, int, &arg0, vop_map, femop_map);
 	ASSERT(func != NULL);
 	ASSERT(arg0 != NULL);
-	return ((*func)(arg0, off, as, addrp, len, prot, maxprot, flags,
-	    cr, ct));
+	FEM_VNEXT10(map, func, arg0, off, as, addrp, len, prot, maxprot, flags,
+	    cr, ct);
 }
 
 int
@@ -2531,8 +3117,8 @@ vnext_addmap(femarg_t *vf, offset_t off, struct as *as, caddr_t addr,
 	vsop_find(vf, &func, int, &arg0, vop_addmap, femop_addmap);
 	ASSERT(func != NULL);
 	ASSERT(arg0 != NULL);
-	return ((*func)(arg0, off, as, addr, len, prot, maxprot, flags,
-	    cr, ct));
+	FEM_VNEXT10(addmap, func, arg0, off, as, addr, len, prot, maxprot,
+	    flags, cr, ct);
 }
 
 int
@@ -2548,8 +3134,8 @@ vnext_delmap(femarg_t *vf, offset_t off, struct as *as, caddr_t addr,
 	vsop_find(vf, &func, int, &arg0, vop_delmap, femop_delmap);
 	ASSERT(func != NULL);
 	ASSERT(arg0 != NULL);
-	return ((*func)(arg0, off, as, addr, len, prot, maxprot, flags,
-	    cr, ct));
+	FEM_VNEXT10(delmap, func, arg0, off, as, addr, len, prot, maxprot,
+	    flags, cr, ct);
 }
 
 int
@@ -2564,7 +3150,7 @@ vnext_poll(femarg_t *vf, short events, int anyyet, short *reventsp,
 	vsop_find(vf, &func, int, &arg0, vop_poll, femop_poll);
 	ASSERT(func != NULL);
 	ASSERT(arg0 != NULL);
-	return ((*func)(arg0, events, anyyet, reventsp, phpp, ct));
+	FEM_VNEXT6(poll, func, arg0, events, anyyet, reventsp, phpp, ct);
 }
 
 int
@@ -2579,7 +3165,7 @@ vnext_dump(femarg_t *vf, caddr_t addr, offset_t lbdn, offset_t dblks,
 	vsop_find(vf, &func, int, &arg0, vop_dump, femop_dump);
 	ASSERT(func != NULL);
 	ASSERT(arg0 != NULL);
-	return ((*func)(arg0, addr, lbdn, dblks, ct));
+	FEM_VNEXT5(dump, func, arg0, addr, lbdn, dblks, ct);
 }
 
 int
@@ -2594,7 +3180,7 @@ vnext_pathconf(femarg_t *vf, int cmd, ulong_t *valp, cred_t *cr,
 	vsop_find(vf, &func, int, &arg0, vop_pathconf, femop_pathconf);
 	ASSERT(func != NULL);
 	ASSERT(arg0 != NULL);
-	return ((*func)(arg0, cmd, valp, cr, ct));
+	FEM_VNEXT5(pathconf, func, arg0, cmd, valp, cr, ct);
 }
 
 int
@@ -2609,7 +3195,7 @@ vnext_pageio(femarg_t *vf, struct page *pp, u_offset_t io_off,
 	vsop_find(vf, &func, int, &arg0, vop_pageio, femop_pageio);
 	ASSERT(func != NULL);
 	ASSERT(arg0 != NULL);
-	return ((*func)(arg0, pp, io_off, io_len, flags, cr, ct));
+	FEM_VNEXT7(pageio, func, arg0, pp, io_off, io_len, flags, cr, ct);
 }
 
 int
@@ -2623,7 +3209,7 @@ vnext_dumpctl(femarg_t *vf, int action, offset_t *blkp, caller_context_t *ct)
 	vsop_find(vf, &func, int, &arg0, vop_dumpctl, femop_dumpctl);
 	ASSERT(func != NULL);
 	ASSERT(arg0 != NULL);
-	return ((*func)(arg0, action, blkp, ct));
+	FEM_VNEXT4(dumpctl, func, arg0, action, blkp, ct);
 }
 
 void
@@ -2653,7 +3239,7 @@ vnext_setsecattr(femarg_t *vf, vsecattr_t *vsap, int flag, cred_t *cr,
 	vsop_find(vf, &func, int, &arg0, vop_setsecattr, femop_setsecattr);
 	ASSERT(func != NULL);
 	ASSERT(arg0 != NULL);
-	return ((*func)(arg0, vsap, flag, cr, ct));
+	FEM_VNEXT5(setsecattr, func, arg0, vsap, flag, cr, ct);
 }
 
 int
@@ -2668,7 +3254,7 @@ vnext_getsecattr(femarg_t *vf, vsecattr_t *vsap, int flag, cred_t *cr,
 	vsop_find(vf, &func, int, &arg0, vop_getsecattr, femop_getsecattr);
 	ASSERT(func != NULL);
 	ASSERT(arg0 != NULL);
-	return ((*func)(arg0, vsap, flag, cr, ct));
+	FEM_VNEXT5(getsecattr, func, arg0, vsap, flag, cr, ct);
 }
 
 int
@@ -2683,7 +3269,7 @@ vnext_shrlock(femarg_t *vf, int cmd, struct shrlock *shr, int flag,
 	vsop_find(vf, &func, int, &arg0, vop_shrlock, femop_shrlock);
 	ASSERT(func != NULL);
 	ASSERT(arg0 != NULL);
-	return ((*func)(arg0, cmd, shr, flag, cr, ct));
+	FEM_VNEXT6(shrlock, func, arg0, cmd, shr, flag, cr, ct);
 }
 
 int
@@ -2698,7 +3284,7 @@ vnext_vnevent(femarg_t *vf, vnevent_t vnevent, vnode_t *dvp, char *cname,
 	vsop_find(vf, &func, int, &arg0, vop_vnevent, femop_vnevent);
 	ASSERT(func != NULL);
 	ASSERT(arg0 != NULL);
-	return ((*func)(arg0, vnevent, dvp, cname, ct));
+	FEM_VNEXT5(vnevent, func, arg0, vnevent, dvp, cname, ct);
 }
 
 int
@@ -2713,7 +3299,7 @@ vnext_reqzcbuf(femarg_t *vf, enum uio_rw ioflag, xuio_t *xuiop, cred_t *cr,
 	vsop_find(vf, &func, int, &arg0, vop_reqzcbuf, femop_reqzcbuf);
 	ASSERT(func != NULL);
 	ASSERT(arg0 != NULL);
-	return ((*func)(arg0, ioflag, xuiop, cr, ct));
+	FEM_VNEXT5(reqzcbuf, func, arg0, ioflag, xuiop, cr, ct);
 }
 
 int
@@ -2727,7 +3313,7 @@ vnext_retzcbuf(femarg_t *vf, xuio_t *xuiop, cred_t *cr, caller_context_t *ct)
 	vsop_find(vf, &func, int, &arg0, vop_retzcbuf, femop_retzcbuf);
 	ASSERT(func != NULL);
 	ASSERT(arg0 != NULL);
-	return ((*func)(arg0, xuiop, cr, ct));
+	FEM_VNEXT4(retzcbuf, func, arg0, xuiop, cr, ct);
 }
 
 int

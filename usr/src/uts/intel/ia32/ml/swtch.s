@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2015, Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -337,13 +337,12 @@ resume(kthread_t *t)
 
 .setup_cpu:
 	/*
-	 * Setup rsp0 (kernel stack) in TSS to curthread's stack.
-	 * (Note: Since we don't have saved 'regs' structure for all
-	 *	  the threads we can't easily determine if we need to
-	 *	  change rsp0. So, we simply change the rsp0 to bottom 
-	 *	  of the thread stack and it will work for all cases.)
-	 *
-	 * XX64 - Is this correct?
+	 * Setup rsp0 (kernel stack) in TSS to curthread's saved regs
+	 * structure.  If this thread doesn't have a regs structure above
+	 * the stack -- that is, if lwp_stk_init() was never called for the
+	 * thread -- this will set rsp0 to the wrong value, but it's harmless
+	 * as it's a kernel thread, and it won't actually attempt to implicitly
+	 * use the rsp0 via a privilege change.
 	 */
 	movq	CPU_TSS(%r13), %r14
 	movq	T_STACK(%r12), %rax
@@ -504,11 +503,12 @@ resume_return:
 	jne	.L5_2
 .L5_1:
 	/*
-	 * Setup esp0 (kernel stack) in TSS to curthread's stack.
-	 * (Note: Since we don't have saved 'regs' structure for all
-	 *	  the threads we can't easily determine if we need to
-	 *	  change esp0. So, we simply change the esp0 to bottom 
-	 *	  of the thread stack and it will work for all cases.)
+	 * Setup esp0 (kernel stack) in TSS to curthread's stack.  If this
+	 * thread doesn't have a regs structure above the stack -- that is, if
+	 * lwp_stk_init() was never called for the thread -- this will set
+	 * esp0 to the wrong value, but it's harmless as it's a kernel thread,
+	 * and it won't actually attempt to implicitly use the esp0 via a
+	 * privilege change.
 	 */
 	movl	CPU_TSS(%esi), %ecx
 	addl	$REGSIZE+MINFRAME, %eax	/* to the bottom of thread stack */
@@ -887,6 +887,84 @@ thread_start(void)
 	call	thread_exit	/* destroy thread if it returns. */
 	/*NOTREACHED*/
 	SET_SIZE(thread_start)
+
+#endif	/* __i386 */
+
+#endif  /* __lint */
+
+#if defined(__lint)
+
+void
+thread_splitstack_run(caddr_t stack, void (*func)(void *), void *arg)
+{}
+
+void
+thread_splitstack_cleanup(void)
+{}
+
+#else   /* __lint */
+
+#if defined(__amd64)
+
+	ENTRY(thread_splitstack_run)
+	pushq	%rbp			/* push base pointer */
+	movq	%rsp, %rbp		/* construct frame */
+	movq	%rdi, %rsp		/* set stack pinter */
+	movq	%rdx, %rdi		/* load arg */
+	call	*%rsi			/* call specified function */
+	leave				/* pop base pointer */
+	ret
+	SET_SIZE(thread_splitstack_run)
+
+	/*
+	 * Once we're back on our own stack, we need to be sure to set the
+	 * value of rsp0 in the TSS back to our original stack:  if we gave
+	 * up the CPU at all while on our split stack, the rsp0 will point
+	 * to that stack from resume (above); if were to try to return to
+	 * userland in that state, we will die absolutely horribly (namely,
+	 * trying to iretq back to registers in a bunch of freed segkp).  We
+	 * are expecting this to be called after T_STACK has been restored,
+	 * but before we return.  It's okay if we are preempted in this code:
+	 * when the new CPU picks us up, they will automatically set rsp0
+	 * correctly, which is all we're trying to do here.
+	 */
+	ENTRY(thread_splitstack_cleanup)
+	LOADCPU(%r8)
+	movq	CPU_TSS(%r8), %r9
+	movq 	CPU_THREAD(%r8), %r10
+	movq	T_STACK(%r10), %rax
+	addq    $REGSIZE+MINFRAME, %rax
+	movq	%rax, TSS_RSP0(%r9)
+	ret
+	SET_SIZE(thread_splitstack_cleanup)
+
+#elif defined(__i386)
+
+	ENTRY(thread_splitstack_run)
+	pushl	%ebp			/* push base pointer */
+	movl	%esp, %ebp		/* construct frame */
+	movl	8(%ebp), %esp		/* set stack pointer */
+	movl	12(%ebp), %eax		/* load func */
+	movl	16(%ebp), %edx		/* load arg */
+	pushl	%edx			/* push arg */
+	call	*%eax			/* call specifed function */
+	addl	$4, %esp		/* restore stack pointer */
+	leave				/* pop base pointer */
+	ret
+	SET_SIZE(thread_splitstack_run)
+
+	/*
+	 * See comment in the amd64 code, above.
+	 */
+	ENTRY(thread_splitstack_cleanup)
+	LOADCPU(%eax)
+	movl	CPU_TSS(%eax), %ecx
+	movl 	CPU_THREAD(%eax), %edx
+	movl	T_STACK(%edx), %edx
+	addl    $REGSIZE+MINFRAME, %edx
+	movl	%edx, TSS_ESP0(%ecx)
+	ret
+	SET_SIZE(thread_splitstack_cleanup)
 
 #endif	/* __i386 */
 
