@@ -37,6 +37,7 @@
  */
 /* Copyright (c) 2007, The Storage Networking Industry Association. */
 /* Copyright (c) 1996, 1997 PDC, Network Appliance. All Rights Reserved */
+/* Copyright 2014 Nexenta Systems, Inc.  All rights reserved. */
 #ifndef	_LIBNDMP_H
 #define	_LIBNDMP_H
 
@@ -347,11 +348,11 @@ extern int ndmp_terminate_session(int);
 extern int ndmp_set_dbglevel(int);
 extern const char *ndmp_strerror(int);
 extern int ndmp_door_status(void);
-extern int ndmp_get_prop(char *, char **);
-extern int ndmp_set_prop(char *, char *);
+extern int ndmp_get_prop(const char *, char **);
+extern int ndmp_set_prop(const char *, const char *);
 extern int ndmp_service_refresh(void);
-extern char *ndmp_base64_encode(char *);
-extern char *ndmp_base64_decode(char *);
+extern char *ndmp_base64_encode(const char *);
+extern char *ndmp_base64_decode(const char *);
 extern ndmp_door_ctx_t *ndmp_door_decode_start(char *, int);
 extern int ndmp_door_decode_finish(ndmp_door_ctx_t *);
 extern ndmp_door_ctx_t *ndmp_door_encode_start(char *, int);

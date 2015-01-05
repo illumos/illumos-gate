@@ -19,7 +19,6 @@ fclose \- close a stream
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBfclose()\fR function causes the stream pointed to by \fIstream\fR to be
 flushed and the associated file to be closed. Any unwritten buffered data for
@@ -42,12 +41,10 @@ behavior.
 The \fBfclose()\fR function is performed automatically for all open files upon
 calling \fBexit\fR(2).
 .SH RETURN VALUES
-.sp
 .LP
 Upon successful completion, \fBfclose()\fR returns \fB0\fR. Otherwise, it
 returns \fBEOF\fR and sets \fBerrno\fR to indicate the error.
 .SH ERRORS
-.sp
 .LP
 The \fBfclose()\fR function will fail if:
 .sp
@@ -135,7 +132,6 @@ limits of the device.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -153,7 +149,7 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBclose\fR(2), \fBexit\fR(2), \fBgetrlimit\fR(2), \fBulimit\fR(2),
-\fBfopen\fR(3C), \fBstdio\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)
+\fBfcloseall\fR(3C), \fBfopen\fR(3C), \fBstdio\fR(3C),
+\fBattributes\fR(5), \fBstandards\fR(5)

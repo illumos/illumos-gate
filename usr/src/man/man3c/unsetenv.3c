@@ -8,7 +8,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH UNSETENV 3C "Nov 1, 2003"
+.TH UNSETENV 3C "Dec 20, 2014"
 .SH NAME
 unsetenv \- remove an environment variable
 .SH SYNOPSIS
@@ -20,7 +20,6 @@ unsetenv \- remove an environment variable
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBunsetenv()\fR function removes an environment variable from the
 environment of the calling process. The \fIname\fR argument points to a string
@@ -34,12 +33,10 @@ If the application modifies \fIenviron\fR or the pointers to which it points,
 the behavior of \fBunsetenv()\fR is undefined. The \fBunsetenv()\fR function
 updates the list of pointers to which \fIenviron\fR points.
 .SH RETURN VALUES
-.sp
 .LP
 Upon successful completion, 0 is returned. Otherwise, -1 is returned,
 \fBerrno\fR set to indicate the error, and the environment is left unchanged.
 .SH ERRORS
-.sp
 .LP
 The \fBunsetenv()\fR function will fail if:
 .sp
@@ -53,7 +50,6 @@ to a string containing an '=' character.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -71,6 +67,6 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
-\fBgetenv\fR(3C), \fBsetenv\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)
+\fBclearenv\fR(3C), \fBgetenv\fR(3C), \fBsetenv\fR(3C), \fBattributes\fR(5),
+\fBstandards\fR(5)

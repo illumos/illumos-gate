@@ -1,5 +1,6 @@
 '\" te
 .\" Copyright 2014 Garrett D'Amore <garrett@damore.org>
+.\" Copyright (c) 2014, Joyent, Inc.
 .\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved.
 .\" Copyright 1989 AT&T
 .\" Portions Copyright (c) 1994 Man-cgi 1.15, Panagiotis Christias (christia@softlab.ntua.gr)
@@ -12,12 +13,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH STRING 3C "Jun 21, 2013"
+.TH STRING 3C "Dec 20, 2014"
 .SH NAME
 string, strcasecmp, strcasecmp_l, strncasecmp, strncasecmp_l, strcat, strncat,
-strlcat, strchr, strrchr,
-strcmp, strncmp, strcpy, strncpy, strlcpy, strcspn, strspn, strdup, strlen,
-strnlen, strpbrk, strsep, strstr, strtok, strtok_r \- string operations
+strlcat, strchr, strchrnul, strrchr, strcmp, strncmp, stpcpy, stpncpy, strcpy,
+strncpy, strlcpy, strcspn, strspn, strdup, strndup, strdupa, strndupa, strlen,
+strnlen, strpbrk, strsep, strstr, strnstr, strcasestr, strtok, strtok_r \-
+string operations
 .SH SYNOPSIS
 .LP
 .nf
@@ -69,6 +71,14 @@ strnlen, strpbrk, strsep, strstr, strtok, strtok_r \- string operations
 .fi
 .LP
 .nf
+\fBchar *\fR\fBstpcpy\fR(\fBchar *restrict\fR \fIs1\fR, \fBconst char *restrict\fR \fIs2\fR);
+.fi
+.LP
+.nf
+\fBchar *\fR\fBstpncpy\fR(\fBchar *restrict\fR \fIs1\fR, \fBconst char *restrict\fR \fIs2\fR, \fBsize_t\fR \fIn\fR);
+.fi
+.LP
+.nf
 \fBchar *\fR\fBstrcpy\fR(\fBchar *restrict\fR \fIs1\fR, \fBconst char *restrict\fR \fIs2\fR);
 .fi
 .LP
@@ -93,6 +103,18 @@ strnlen, strpbrk, strsep, strstr, strtok, strtok_r \- string operations
 .fi
 .LP
 .nf
+\fBchar *\fR\fBstrndup\fR(\fBconst char *\fR\fIs1\fR, \fBsize_t\fR \fIn\fR);
+.fi
+.LP
+.nf
+\fBchar *\fR\fBstrdupa\fR(\fBconst char *\fR\fIs1\fR);
+.fi
+.LP
+.nf
+\fBchar *\fR\fBstrndupa\fR(\fBconst char *\fR\fIs1\fR, \fBsize_t\fR \fIn\fR);
+.fi
+.LP
+.nf
 \fBsize_t\fR \fBstrlen\fR(\fBconst char *\fR\fIs\fR);
 .fi
 .LP
@@ -113,6 +135,18 @@ strnlen, strpbrk, strsep, strstr, strtok, strtok_r \- string operations
 .fi
 .LP
 .nf
+\fBchar *\fR\fBstrnstr\fR(\fBconst char *\fR\fIs1\fR, \fBconst char *\fR\fIs2\fR, \fBsize_t\fR \fIn\fR);
+.fi
+.LP
+.nf
+\fBchar *\fR\fBstrcasestr\fR(\fBconst char *\fR\fIs1\fR, \fBconst char *\fR\fIs2\fR);
+.fi
+.LP
+.nf
+\fBchar *\fR\fBstrcasestr_l\fR(\fBconst char *\fR\fIs1\fR, \fBconst char *\fR\fIs2\fR, \fBlocale_t\fR \fIloc\fR);
+.fi
+.LP
+.nf
 \fBchar *\fR\fBstrtok\fR(\fBchar *restrict\fR \fIs1\fR, \fBconst char *restrict\fR \fIs2\fR);
 .fi
 .LP
@@ -126,6 +160,10 @@ strnlen, strpbrk, strsep, strstr, strtok, strtok_r \- string operations
 #include <string.h>
 
 \fBconst char *\fR\fBstrchr\fR(\fBconst char *\fR\fIs\fR, \fBint\fR \fIc\fR);
+.fi
+.LP
+.nf
+\fBconst char *\fR\fBstrchrnul\fR(\fBconst char *\fR\fIs\fR, \fBint\fR \fIc\fR);
 .fi
 .LP
 .nf
@@ -160,13 +198,13 @@ strnlen, strpbrk, strsep, strstr, strtok, strtok_r \- string operations
 .SH DESCRIPTION
 .LP
 The arguments \fIs\fR, \fIs1\fR, and \fIs2\fR point to strings (arrays of
-characters terminated by a null character). The \fBstrcat()\fR,
-\fBstrncat()\fR, \fBstrlcat()\fR, \fBstrcpy()\fR, \fBstrncpy()\fR,
-\fBstrlcpy()\fR, \fBstrsep()\fR, \fBstrtok()\fR, and \fBstrtok_r()\fR functions
-all alter their first argument. Additionally, the \fBstrcat()\fR and
-\fBstrcpy()\fR functions do not check for overflow of the array.
+characters terminated by a null character). The \fBstrcat()\fR, \fBstrncat()\fR,
+\fBstrlcat()\fR, \fBstrcpy()\fR, \fBstpcpy()\fR, \fBstpncpy()\fR,
+\fBstrncpy()\fR, \fBstrlcpy()\fR, \fBstrsep()\fR, \fBstrtok()\fR, and
+\fBstrtok_r()\fR functions all alter their first argument. Additionally, the
+\fBstrcat()\fR, \fBstpcpy()\fR, and \fBstrcpy()\fR functions do not check for
+overflow of the array.
 .SS "\fBstrcasecmp()\fR, \fBstrncasecmp()\fR"
-.sp
 .LP
 The \fBstrcasecmp()\fR and \fBstrncasecmp()\fR functions are case-insensitive
 versions of  \fBstrcmp()\fR and \fBstrncmp()\fR respectively, described below.
@@ -220,13 +258,16 @@ if (strlcat(dst, src, dstsize) >= dstsize)
         return \(mi1;
 .fi
 .in -2
-.SS "\fBstrchr()\fR, \fBstrrchr()\fR"
+.SS "\fBstrchr()\fR, \fBstrrchr()\fR, \fBstrchrnul()\fR"
 .LP
 The \fBstrchr()\fR function returns a pointer to the first occurrence of
 \fIc\fR (converted to a  \fBchar\fR) in string \fIs\fR, or a null pointer if
 \fIc\fR does not occur in the string. The \fBstrrchr()\fR function returns a
 pointer to the last occurrence of \fIc\fR. The null character terminating a
-string is considered to be part of the string.
+string is considered to be part of the string. The \fBstrchrnul()\fR function
+behaves similarly to \fBstrchr()\fR, except when the character \fBc\fR is not
+found, it returns a pointer to the null terminator of the string \fBs\fR and not
+a null pointer.
 .SS "\fBstrcmp()\fR, \fBstrncmp()\fR"
 .LP
 The \fBstrcmp()\fR function compares two strings byte-by-byte, according to the
@@ -260,23 +301,35 @@ if (strlcpy(dst, src, dstsize) >= dstsize)
         return \(mi1;
 .fi
 .in -2
-
+.SS "\fBstpcpy()\fR, \fBstpncpy()\fR"
+.LP
+The \fBstpcpy()\fR and \fBstpncpy()\fR functions behave identically to
+\fBstrcpy()\fR and \fBstrncpy()\fR respectively; however, instead of returning a
+pointer to the beginning of \fIs1\fR, they return a pointer to the terminating
+null character.
 .SS "\fBstrcspn()\fR, \fBstrspn()\fR"
 .LP
 The \fBstrcspn()\fR function returns the length of the initial segment of
 string \fIs1\fR that consists entirely of characters not from string \fIs2\fR.
 The \fBstrspn()\fR function returns the length of the initial segment of string
 \fIs1\fR that consists entirely of characters from string \fIs2\fR.
-.SS "\fBstrdup()\fR"
+.SS "\fBstrdup()\fR, \fBstrndup()\fR, \fBstrdupa()\fR, \fBstrndupa()\fR"
 .LP
 The \fBstrdup()\fR function returns a pointer to a new string that is a
 duplicate of the string pointed to by  \fIs1\fR. The returned pointer can be
 passed to \fBfree()\fR. The space for the new string is obtained using
 \fBmalloc\fR(3C). If the new string cannot be created, a null pointer is
 returned and \fBerrno\fR may be set to \fBENOMEM\fR to indicate that the
-storage space available is insufficient.
+storage space available is insufficient. The \fBstrndup()\fR function is
+identical to \fBstrdup()\fR, execept it copies at most \fIn\fR bytes from
+\fBs1\fR and ensures the copied string is awlays null terminated.
+.LP
+The functions \fBstrdupa()\fR and \fBstrndupa()\fR behave identically to
+\fBstrdup()\fr and \fBstrndup()\fR respectively; however, instead of allocating
+memory using \fBmalloc\fR(3C), they use \fBalloca\fR(3C). These functions are
+provided for compatibility only, their use is strongly discouraged due to their
+use of \fBalloca\fR(3C).
 .SS "\fBstrlen()\fR, \fBstrnlen()\fR"
-.sp
 The \fBstrlen()\fR function returns the number of bytes in \fIs\fR, not
 including the terminating null character.
 .LP
@@ -303,13 +356,22 @@ detected by comparing the location referenced by the pointer returned by
 \fBstrsep()\fR to `\e0'.
 .LP
 If *\fIstringp\fR is initially \fINULL\fR, \fBstrsep()\fR returns \fINULL\fR.
-.SS "\fBstrstr()\fR"
+.SS "\fBstrstr()\fR, \fBstrnstr()\fR, \fBstrcasestr()\fR, \fBstrcasestr_l()\fR"
 .LP
 The \fBstrstr()\fR function locates the first occurrence of the string \fIs2\fR
 (excluding the terminating null character) in string \fIs1\fR and returns a
 pointer to the located string, or a null pointer if the string is not found. If
 \fIs2\fR points to a string with zero length (that is, the string \fB""\fR),
-the function returns  \fIs1\fR.
+the function returns  \fIs1\fR. The \fBstrnstr()\fR function performs the same
+search as \fBstrstr()\fR, but only considers up to \fIn\fR bytes of \fIs1\fR.
+Bytes following a null byte are not compared.
+.sp
+.LP
+The \fBstrcasestr()\fR and \fBstrcasestr_l()\fR functions are similar to
+\fBstrstr()\fR, but both functions ignore the case of both \fBs1\fR and
+\fBs2\fR. Where as the \fBstrcasestr()\fR function operates in the current
+locale, the \fBstrcasestr_l()\fR function operates in the locale specified by
+\fIloc\fR.
 .SS "\fBstrtok()\fR"
 .LP
 A sequence of calls to \fBstrtok()\fR breaks the string pointed to by \fIs1\fR
@@ -487,8 +549,8 @@ The
 \fBstrlcat()\fR, \fBstrlcpy()\fR, and \fBstrsep()\fR functions are Committed.
 All the rest are Standard.
 .LP
-The \fBstrtok()\fR and \fBstrdup()\fR functions are MT-Safe. The remaining
-functions are Async-Signal-Safe.
+The \fBstrtok()\fR, \fBstrdup()\fR, and \fBstrndup()\fR functions are MT-Safe.
+The remaining functions are Async-Signal-Safe.
 .LP
 For all except \fBstrlcat()\fR, \fBstrlcpy()\fR, and \fBstrsep()\fR, see
 \fBstandards\fR(5).

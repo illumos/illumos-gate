@@ -960,7 +960,16 @@ arc_print(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	static const char *bytestats[] = {
 		"p", "c", "c_min", "c_max", "size", "duplicate_buffers_size",
 		"arc_meta_used", "arc_meta_limit", "arc_meta_max",
-		"arc_meta_min", "hdr_size", "data_size", "other_size",
+		"arc_meta_min", "hdr_size", "data_size", "metadata_size",
+		"other_size", "anon_size", "anon_evictable_data",
+		"anon_evictable_metadata", "mru_size", "mru_evictable_data",
+		"mru_evictable_metadata", "mru_ghost_size",
+		"mru_ghost_evictable_data", "mru_ghost_evictable_metadata",
+		"mfu_size", "mfu_evictable_data", "mfu_evictable_metadata",
+		"mfu_ghost_size", "mfu_ghost_evictable_data",
+		"mfu_ghost_evictable_metadata", "evict_l2_cached",
+		"evict_l2_eligible", "evict_l2_ineligible", "l2_read_bytes",
+		"l2_write_bytes", "l2_size", "l2_asize", "l2_hdr_size",
 		NULL
 	};
 

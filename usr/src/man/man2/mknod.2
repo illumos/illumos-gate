@@ -1,4 +1,5 @@
 '\" te
+.\" Copright (c) 2014, Joyent, Inc.
 .\"  Copyright 1989 AT&T.  Copyright (c) 2004 Sun Microsystems, Inc.  All Rights Reserved.  Portions Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
 .\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
@@ -9,7 +10,7 @@
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
 .TH MKNOD 2 "Feb 19, 2004"
 .SH NAME
-mknod \- make a directory, a special file, or a regular file
+mknod, mknodat \- make a directory, a special file, or a regular file
 .SH SYNOPSIS
 .LP
 .nf
@@ -17,13 +18,16 @@ mknod \- make a directory, a special file, or a regular file
 
 \fBint\fR \fBmknod\fR(\fBconst char *\fR\fIpath\fR, \fBmode_t\fR \fImode\fR, \fBdev_t\fR \fIdev\fR);
 .fi
+.LP
+.nf
+\fBint\fR \fBmknodat(\fBint\fR \fIfd\fR, \fBconst char *\fR\fIpath\fR, \fBmode_t\fR \fImode\fR, \fBdev_t\fR \fIdev\fR);
+.fi
 
 .SH DESCRIPTION
-.sp
 .LP
-The \fBmknod()\fR function creates a new file named by the path name pointed to
-by \fIpath\fR. The file type and permissions of the new file are initialized
-from \fImode\fR.
+The \fBmknod()\fR and \fBmknodat()\fR function creates a new file named by the
+path name pointed to by \fIpath\fR. The file type and permissions of the new
+file are initialized from \fImode\fR.
 .sp
 .LP
 The file type is specified in \fImode\fR by the \fBS_IFMT\fR bits, which must
@@ -126,16 +130,20 @@ or character special device, \fIdev\fR is ignored. See \fBmakedev\fR(3C).
 .sp
 .LP
 If \fIpath\fR is a symbolic link, it is not followed.
+.sp
+.LP
+The \fBmknodat()\fR function is similar to \fBmknod()\fR; however, when
+\fIpath\fR is a relative path, it is resolved starting at the directory
+represented by the file descriptor \fIfd\fR. To start at the current working
+directory, \fIfd\fR may be set to the special value \fBAT_FDCWD\fR.
 .SH RETURN VALUES
-.sp
 .LP
-Upon successful completion, \fBmknod()\fR returns \fB0\fR. Otherwise, it
-returns \fB\(mi1\fR, the new file is not created, and \fBerrno\fR is set to
-indicate the error.
+Upon successful completion, \fBmknod()\fR and \fBmknodat()\fR return \fB0\fR.
+Otherwise, they return \fB\(mi1\fR, the new file is not created, and \fBerrno\fR
+is set to indicate the error.
 .SH ERRORS
-.sp
 .LP
-The \fBmknod()\fR function will fail if:
+The \fBmknod()\fR and \fBmknodat()\fR functions will fail if:
 .sp
 .ne 2
 .na
@@ -259,7 +267,9 @@ system is out of file allocation resources.
 \fB\fBENOTDIR\fR\fR
 .ad
 .RS 16n
-A component of the path prefix is not a directory.
+A component of the path prefix is not a directory. In addition, when calling
+\fBmknodat()\fR, if \fIpath\fR is a relative path and \fIfd\fR is a valid file
+descriptor which does not refer to a directory.
 .RE
 
 .sp
@@ -283,6 +293,19 @@ system.
 
 .sp
 .LP
+The \fBmknodat()\fR function will fail if:
+.sp
+.ne 2
+.na
+.B EBADF
+.ad
+.RS 16n
+The \fIpath\fR argument is a relative path and \fIfd\fR is not a valid open file
+descriptor or the special value \fBAT_FDCWD\fR.
+.RE
+
+.sp
+.LP
 The \fBmknod()\fR function may fail if:
 .sp
 .ne 2
@@ -295,7 +318,6 @@ length exceeds {\fBPATH_MAX\fR}.
 .RE
 
 .SH USAGE
-.sp
 .LP
 Applications should use the \fBmkdir\fR(2) function to create a directory
 because appropriate permissions are not required and because \fBmknod()\fR
@@ -310,7 +332,6 @@ system using \fBfattach\fR(3C). Symbolic links can be created using
 \fBsymlink\fR(2). An endpoint for communication can be created using
 \fBsocket\fR(3SOCKET).
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -328,7 +349,6 @@ MT-Level	Async-Signal-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBchmod\fR(2), \fBcreat\fR(2), \fBexec\fR(2), \fBmkdir\fR(2), \fBopen\fR(2),
 \fBstat\fR(2), \fBsymlink\fR(2), \fBumask\fR(2), \fBdoor_create\fR(3C),

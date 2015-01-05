@@ -1,5 +1,6 @@
 '\" te
 .\" Copyright (c) 2009, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright (c) 2014, Joyent, Inc.
 .\" Portions Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
 .\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at  http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text
@@ -9,7 +10,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH UTIMES 2 "Sep 1, 2009"
+.TH UTIMES 2 "Dec 20, 2014"
 .SH NAME
 utimes, futimesat \- set file access and modification times
 .SH SYNOPSIS
@@ -26,8 +27,16 @@ utimes, futimesat \- set file access and modification times
      \fBconst struct timeval\fR \fItimes\fR[2]);
 .fi
 
+.LP
+.nf
+#include <sys/stat.h>
+
+\fBint\fR \fBfutimens\fR(\fBint\fR \fIfiledes\fR, \fBconst timespec_t\fR \fInstimes[2]\fR);
+
+\fBint\fR \fButimensat\fR(\fBint\fR \fIfiledes\fR, \fBconst char *\fR\fIpath\fR,
+    \fBconst timespec_t\fR \fInstimes[2]\fR, \fBint\fR \fIflag\fR);
+
 .SH DESCRIPTION
-.sp
 .LP
 The \fButimes()\fR function sets the access and modification times of the file
 pointed to by the \fIpath\fR argument to the value of the \fItimes\fR argument.
@@ -58,16 +67,35 @@ the process must be the same as the owner of the file, or must have write
 access to the file or the {\fBPRIV_FILE_OWNER\fR} privilege to use this call in
 this manner. Upon completion, \fButimes()\fR will mark the time of the last
 file status change, \fBst_ctime\fR, for update.
-.SH RETURN VALUES
 .sp
+.LP
+The \fBfutimens()\fR and \fButimensat()\fR functions also set access and
+modification times; however, instead of taking \fBstruct timeval\fR, they take
+\fBtimespec_t\fR which allows for nanosecond granularity. The \fBfutimens()\fR
+function sets the access and modification times on the file descriptor
+referenced by \fIfiledes\fR.
+.sp
+.LP
+The \fButimensat()\fR function determines the file to set the access and
+modification times in an similar way to \fBfutemsat()\fR. If the argument
+\fIpath\fR is an absolute path, then the argument \fIfiledes\fR is ignored;
+otherwise, \fIpath\fR is interpreted as a path relative to the directory
+specified by \fIfiledes\fR. If \fIfiledes\fR is set to \fBAT_FDCWD\fR, then
+\fIpath\fR is resolved relative to the current working directory. The behavior
+when encountering symbolic links may be controlled by the value of the
+\fIflag\fR argument. If the value of flag is the constant
+\fBAT_SYMLINK_NOFOLLOW\fR, then when a symbolic link is encountered while
+resoloving a path, it will not be followed. Otherwise, the value of \fIflag\fR
+should be \fB0\fR.
+.SH RETURN VALUES
 .LP
 Upon successful completion, \fB0\fR is returned.  Otherwise, \fB\(mi1\fR is
 returned, \fBerrno\fR is set to indicate the error, and the file times will not
 be affected.
 .SH ERRORS
-.sp
 .LP
-The \fButimes()\fR and \fBfutimesat()\fR functions will fail if:
+The \fButimes()\fR, \fBfutimesat()\fR, \fBfutimens()\fR, and \fButimensat()\fR
+functions will fail if:
 .sp
 .ne 2
 .na
@@ -96,7 +124,8 @@ The \fIpath\fR or \fItimes\fR argument points to an illegal address. For
 \fB\fBEINTR\fR\fR
 .ad
 .RS 16n
-A signal was caught during the execution of the \fButimes()\fR function.
+A signal was caught during the execution of the \fButimes()\fR,
+\fBfutimesat()\fR, \fBfutimens()\fR, or \fButimensat()\fR functions.
 .RE
 
 .sp
@@ -107,7 +136,9 @@ A signal was caught during the execution of the \fButimes()\fR function.
 .RS 16n
 The number of microseconds specified in one or both of the \fBtimeval\fR
 structures pointed to by \fItimes\fR was greater than or equal to 1,000,000 or
-less than 0.
+less than 0. The number of nanoseconds specified in one or both of the
+\fBtimespec_t\fR structures pointed to by \fInstimes\fR was greater than or
+equal to 1,000,000,000 or less than 0.
 .RE
 
 .sp
@@ -192,7 +223,8 @@ The file system containing the file is read-only.
 
 .sp
 .LP
-The \fButimes()\fR and \fBfutimesat()\fR functions may fail if:
+The \fButimes()\fR, \fBfutimesat()\fR, and \fButimensat()\fR functions may fail
+if:
 .sp
 .ne 2
 .na
@@ -204,7 +236,6 @@ length exceeds {\fIPATH_MAX\fR}.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -223,9 +254,8 @@ Standard	See below.
 
 .sp
 .LP
-For \fButimes()\fR, see \fBstandards\fR(5).
+For \fButimes()\fR, \fButimensat()\fR and \fBfutimensat()\fR, see \fBstandards\fR(5).
 .SH SEE ALSO
-.sp
 .LP
 \fBfutimens\fR(2), \fBstat\fR(2), \fButime\fR(2), \fBattributes\fR(5),
 \fBfsattr\fR(5), \fBstandards\fR(5)

@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-#
+# Copyright 2014 Shruti V Sampat <shrutisampat@gmail.com>
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -33,8 +33,6 @@ include ../Makefile.cmd
 ROOTMANIFESTDIR = $(ROOTSVCSYSTEM)
 
 FILEMODE = 555
-
-CERRWARN += -_gcc=-Wno-extra
 
 .KEEP_STATE:
 

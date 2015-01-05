@@ -1,0 +1,59 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright (c) 2014 Joyent, Inc.
+.\"
+.Dd "Dec 21, 2014"
+.Dt GET_NPROCS 3C
+.Os
+.Sh NAME
+.Nm get_nprocs ,
+.Nm get_nprocs_conf
+.Nd get number of processors
+.Sh SYNOPSIS
+.In unistd.h
+.Ft int
+.Fo get_nprocs
+.Fa void
+.Fc
+.Ft int
+.Fo get_nprocs_conf
+.Fa void
+.Fc
+.Sh DESCRIPTION
+The
+.Fn get_nprocs
+and
+.Fn get_nprocs_conf
+functions are provided for compatibility with other systems and are
+equivalent to calling
+.Fn sysconf _SC_NPROCESSORS_ONLN
+and
+.Fn sysconf _SC_NPROCESSORS_CONF
+respectively.
+.Sh RETURN VALUES
+The
+.Fn get_nprocs
+function returns the number of processors that are currently online. The
+.Fn get_nprocs_conf
+function returns the number of processors that the operating system has
+configured.
+.Sh INTERFACE STABILITY
+.Sy Committed .
+.Sh MT-LEVEL
+.Sy MT-Safe ,
+.Sy Async-Signal-Safe
+.Sh SEE ALSO
+.Xr psrinfo 1M ,
+.Xr processor_info 2 ,
+.Xr sysconf 3C ,
+.Xr attributes 5 ,
+.Xr standards 5

@@ -60,6 +60,7 @@ MANFILES= 	__fbufsize.3c					\
 	 	catopen.3c					\
 	 	cfgetispeed.3c					\
 	 	cfsetispeed.3c					\
+		clearenv.3c					\
 	 	clock.3c					\
 	 	clock_nanosleep.3c				\
 	 	clock_settime.3c				\
@@ -112,6 +113,7 @@ MANFILES= 	__fbufsize.3c					\
 	 	exit.3c						\
 	 	fattach.3c					\
 	 	fclose.3c					\
+		fcloseall.3c					\
 	 	fdatasync.3c					\
 	 	fdetach.3c					\
 	 	fdopen.3c					\
@@ -159,12 +161,14 @@ MANFILES= 	__fbufsize.3c					\
 	 	getlogin.3c					\
 	 	getmntent.3c					\
 	 	getnetgrent.3c					\
+		get_nprocs.3c					\
 	 	getopt.3c					\
 	 	getpagesize.3c					\
 	 	getpagesizes.3c					\
 	 	getpass.3c					\
 	 	getpeerucred.3c					\
 	 	getpriority.3c					\
+		getprogname.3c					\
 	 	getpw.3c					\
 	 	getpwnam.3c					\
 	 	getrusage.3c					\
@@ -313,6 +317,7 @@ MANFILES= 	__fbufsize.3c					\
 	 	pthread_key_create.3c				\
 	 	pthread_key_delete.3c				\
 	 	pthread_kill.3c					\
+		pthread_mutex_consistent.3c			\
 	 	pthread_mutex_getprioceiling.3c			\
 	 	pthread_mutex_init.3c				\
 	 	pthread_mutex_lock.3c				\
@@ -320,6 +325,7 @@ MANFILES= 	__fbufsize.3c					\
 	 	pthread_mutexattr_getprioceiling.3c		\
 	 	pthread_mutexattr_getprotocol.3c		\
 	 	pthread_mutexattr_getpshared.3c			\
+		pthread_mutexattr_getrobust.3c			\
 	 	pthread_mutexattr_gettype.3c			\
 	 	pthread_mutexattr_init.3c			\
 	 	pthread_once.3c					\
@@ -404,6 +410,7 @@ MANFILES= 	__fbufsize.3c					\
 	 	sigwaitinfo.3c					\
 	 	sleep.3c					\
 	 	ssignal.3c					\
+		smt_pause.3c					\
 	 	stack_getbounds.3c				\
 	 	stack_inbounds.3c				\
 	 	stack_setbounds.3c				\
@@ -668,6 +675,7 @@ MANLINKS=	FD_CLR.3c				\
 	 	btowc_l.3c				\
 	 	bzero.3c				\
 	 	calloc.3c				\
+		canonicalize_file_name.3c		\
 	 	catclose.3c				\
 	 	cfgetospeed.3c				\
 	 	cfsetospeed.3c				\
@@ -731,6 +739,8 @@ MANLINKS=	FD_CLR.3c				\
 	 	fdopendir.3c				\
 	 	fdwalk.3c				\
 	 	feof.3c					\
+		ffsl.3c					\
+		ffsll.3c				\
 	 	fgetgrent.3c				\
 	 	fgetgrent_r.3c				\
 	 	fgetpwent.3c				\
@@ -743,6 +753,9 @@ MANLINKS=	FD_CLR.3c				\
 	 	file_to_decimal.3c			\
 	 	fileno.3c				\
 	 	finite.3c				\
+		fls.3c					\
+		flsl.3c					\
+		flsll.3c				\
 	 	fpclass.3c				\
 	 	fpgetmask.3c				\
 	 	fpgetsticky.3c				\
@@ -780,6 +793,7 @@ MANLINKS=	FD_CLR.3c				\
 	 	getlogin_r.3c				\
 	 	getmntany.3c				\
 	 	getnetgrent_r.3c			\
+		get_nprocs_conf.3c			\
 	 	getpassphrase.3c			\
 	 	getpwent.3c				\
 	 	getpwent_r.3c				\
@@ -911,10 +925,12 @@ MANLINKS=	FD_CLR.3c				\
 	 	memchr.3c				\
 	 	memcmp.3c				\
 	 	memcpy.3c				\
+	 	memmem.3c				\
 	 	memmove.3c				\
 	 	memset.3c				\
 	 	minor.3c				\
 	 	mkdtemp.3c				\
+		mkfifoat.3c				\
 		mkostemp.3c				\
 		mkostemps.3c				\
 	 	mkstemps.3c				\
@@ -1005,6 +1021,7 @@ MANLINKS=	FD_CLR.3c				\
 	 	pthread_mutexattr_setprioceiling.3c	\
 	 	pthread_mutexattr_setprotocol.3c	\
 	 	pthread_mutexattr_setpshared.3c		\
+	 	pthread_mutexattr_setrobust.3c		\
 	 	pthread_mutexattr_settype.3c		\
 	 	pthread_rwlock_destroy.3c		\
 	 	pthread_rwlock_reltimedrdlock_np.3c	\
@@ -1085,6 +1102,7 @@ MANLINKS=	FD_CLR.3c				\
 	 	setlogmask.3c				\
 	 	setnetgrent.3c				\
 	 	setpriority.3c				\
+		setprogname.3c				\
 	 	setpwent.3c				\
 	 	setspent.3c				\
 	 	setstate.3c				\
@@ -1119,15 +1137,21 @@ MANLINKS=	FD_CLR.3c				\
 		stderr.3c				\
 		stdin.3c				\
 		stdout.3c				\
+		stpcpy.3c				\
+		stpncpy.3c				\
 	 	strcasecmp.3c				\
 	 	strcasecmp_l.3c				\
+		strcasestr.3c				\
+		strcasestr_l.3c				\
 	 	strcat.3c				\
 	 	strchr.3c				\
+		strchrnul.3c				\
 	 	strcmp.3c				\
 	 	strcoll_l.3c				\
 	 	strcpy.3c				\
 	 	strcspn.3c				\
 	 	strdup.3c				\
+	 	strdupa.3c				\
 	 	strerror_r.3c				\
 	 	strfmon_l.3c				\
 	 	strftime_l.3c				\
@@ -1139,7 +1163,10 @@ MANLINKS=	FD_CLR.3c				\
 	 	strncat.3c				\
 	 	strncmp.3c				\
 	 	strncpy.3c				\
+		strndup.3c				\
+		strndupa.3c				\
 	 	strnlen.3c				\
+		strnstr.3c				\
 	 	strpbrk.3c				\
 	 	strptime_l.3c				\
 	 	strrchr.3c				\
@@ -1436,6 +1463,8 @@ bzero.3c				:= LINKSRC = bstring.3c
 
 btowc_l.3c				:= LINKSRC = btowc.3c
 
+canonicalize_file_name.3c		:= LINKSRC = realpath.3c
+
 catclose.3c				:= LINKSRC = catopen.3c
 
 cfgetospeed.3c				:= LINKSRC = cfgetispeed.3c
@@ -1558,6 +1587,12 @@ clearerr.3c				:= LINKSRC = ferror.3c
 feof.3c					:= LINKSRC = ferror.3c
 fileno.3c				:= LINKSRC = ferror.3c
 
+ffsl.3c					:= LINKSRC = ffs.3c
+ffsll.3c				:= LINKSRC = ffs.3c
+fls.3c					:= LINKSRC = ffs.3c
+flsl.3c					:= LINKSRC = ffs.3c
+flsll.3c				:= LINKSRC = ffs.3c
+
 fsetattr.3c				:= LINKSRC = fgetattr.3c
 getattrat.3c				:= LINKSRC = fgetattr.3c
 setattrat.3c				:= LINKSRC = fgetattr.3c
@@ -1639,9 +1674,13 @@ getnetgrent_r.3c			:= LINKSRC = getnetgrent.3c
 innetgr.3c				:= LINKSRC = getnetgrent.3c
 setnetgrent.3c				:= LINKSRC = getnetgrent.3c
 
+get_nprocs_conf.3c			:= LINKSRC = get_nprocs.3c
+
 getpassphrase.3c			:= LINKSRC = getpass.3c
 
 setpriority.3c				:= LINKSRC = getpriority.3c
+
+setprogname.3c				:= LINKSRC = getprogname.3c
 
 endpwent.3c				:= LINKSRC = getpwnam.3c
 fgetpwent.3c				:= LINKSRC = getpwnam.3c
@@ -1805,8 +1844,11 @@ memccpy.3c				:= LINKSRC = memory.3c
 memchr.3c				:= LINKSRC = memory.3c
 memcmp.3c				:= LINKSRC = memory.3c
 memcpy.3c				:= LINKSRC = memory.3c
+memmem.3c				:= LINKSRC = memory.3c
 memmove.3c				:= LINKSRC = memory.3c
 memset.3c				:= LINKSRC = memory.3c
+
+mkfifoat.3c				:= LINKSRC = mkfifo.3c
 
 mkdtemp.3c				:= LINKSRC = mkstemp.3c
 mkostemp.3c				:= LINKSRC = mkstemp.3c
@@ -1970,6 +2012,8 @@ pthread_mutexattr_setprotocol.3c	:= LINKSRC = pthread_mutexattr_getprotocol.3c
 
 pthread_mutexattr_setpshared.3c		:= LINKSRC = pthread_mutexattr_getpshared.3c
 
+pthread_mutexattr_setrobust.3c		:= LINKSRC = pthread_mutexattr_getrobust.3c
+
 pthread_mutexattr_settype.3c		:= LINKSRC = pthread_mutexattr_gettype.3c
 
 pthread_mutexattr_destroy.3c		:= LINKSRC = pthread_mutexattr_init.3c
@@ -2105,14 +2149,20 @@ ascftime.3c				:= LINKSRC = strftime.3c
 cftime.3c				:= LINKSRC = strftime.3c
 strftime_l.3c				:= LINKSRC = strftime.3c
 
+stpcpy.3c				:= LINKSRC = string.3c
+stpncpy.3c				:= LINKSRC = string.3c
 strcasecmp.3c				:= LINKSRC = string.3c
 strcasecmp_l.3c				:= LINKSRC = string.3c
+strcasestr.3c				:= LINKSRC = string.3c
+strcasestr_l.3c				:= LINKSRC = string.3c
 strcat.3c				:= LINKSRC = string.3c
 strchr.3c				:= LINKSRC = string.3c
+strchrnul.3c				:= LINKSRC = string.3c
 strcmp.3c				:= LINKSRC = string.3c
 strcpy.3c				:= LINKSRC = string.3c
 strcspn.3c				:= LINKSRC = string.3c
 strdup.3c				:= LINKSRC = string.3c
+strdupa.3c				:= LINKSRC = string.3c
 strlcat.3c				:= LINKSRC = string.3c
 strlcpy.3c				:= LINKSRC = string.3c
 strlen.3c				:= LINKSRC = string.3c
@@ -2121,7 +2171,10 @@ strncasecmp_l.3c			:= LINKSRC = string.3c
 strncat.3c				:= LINKSRC = string.3c
 strncmp.3c				:= LINKSRC = string.3c
 strncpy.3c				:= LINKSRC = string.3c
+strndup.3c				:= LINKSRC = string.3c
+strndupa.3c				:= LINKSRC = string.3c
 strnlen.3c				:= LINKSRC = string.3c
+strnstr.3c				:= LINKSRC = string.3c
 strpbrk.3c				:= LINKSRC = string.3c
 strrchr.3c				:= LINKSRC = string.3c
 strsep.3c				:= LINKSRC = string.3c

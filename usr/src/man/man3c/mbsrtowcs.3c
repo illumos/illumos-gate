@@ -10,7 +10,7 @@
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
 .TH MBSRTOWCS 3C "Jun 28, 2014"
 .SH NAME
-mbsnrtwocs, mbsnrtowcs_l, mbsrtowcs, mbsrtowcs_l \- convert a character string
+mbsnrtowcs, mbsnrtowcs_l, mbsrtowcs, mbsrtowcs_l \- convert a character string
 to a wide-character string (restartable)
 .SH SYNOPSIS
 .LP

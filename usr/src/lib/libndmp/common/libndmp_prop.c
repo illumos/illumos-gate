@@ -75,15 +75,17 @@ typedef struct ndmp_scfhandle {
 } ndmp_scfhandle_t;
 
 static int ndmp_config_saveenv(ndmp_scfhandle_t *);
-static ndmp_scfhandle_t *ndmp_smf_scf_init(char *);
+static ndmp_scfhandle_t *ndmp_smf_scf_init(const char *);
 static void ndmp_smf_scf_fini(ndmp_scfhandle_t *);
 static int ndmp_smf_start_transaction(ndmp_scfhandle_t *);
 static int ndmp_smf_end_transaction(ndmp_scfhandle_t *);
-static int ndmp_smf_set_property(ndmp_scfhandle_t *, char *, char *);
-static int ndmp_smf_get_property(ndmp_scfhandle_t *, char *, char *, size_t);
-static int ndmp_smf_create_service_pgroup(ndmp_scfhandle_t *, char *);
-static int ndmp_smf_delete_property(ndmp_scfhandle_t *, char *);
-static int ndmp_smf_get_pg_name(ndmp_scfhandle_t *, char *, char **);
+static int ndmp_smf_set_property(ndmp_scfhandle_t *, const char *,
+		const char *);
+static int ndmp_smf_get_property(ndmp_scfhandle_t *, const char *, char *,
+		size_t);
+static int ndmp_smf_create_service_pgroup(ndmp_scfhandle_t *, const char *);
+static int ndmp_smf_delete_property(ndmp_scfhandle_t *, const char *);
+static int ndmp_smf_get_pg_name(ndmp_scfhandle_t *, const char *, char **);
 
 /*
  * This routine send a refresh signal to ndmpd service which cause ndmpd
@@ -105,7 +107,7 @@ ndmp_service_refresh(void)
  * defined otherwise it would be NULL.
  */
 int
-ndmp_get_prop(char *prop, char **value)
+ndmp_get_prop(const char *prop, char **value)
 {
 	ndmp_scfhandle_t *handle = NULL;
 	char *lval = (char *)malloc(NDMP_PROP_LEN);
@@ -141,7 +143,7 @@ ndmp_get_prop(char *prop, char **value)
 }
 
 int
-ndmp_set_prop(char *env, char *env_val)
+ndmp_set_prop(const char *env, const char *env_val)
 {
 	ndmp_scfhandle_t *handle = NULL;
 	char *pgname;
@@ -176,7 +178,7 @@ ndmp_set_prop(char *env, char *env_val)
 }
 
 static int
-ndmp_smf_get_pg_name(ndmp_scfhandle_t *h, char *pname, char **pgname)
+ndmp_smf_get_pg_name(ndmp_scfhandle_t *h, const char *pname, char **pgname)
 {
 	scf_value_t *value;
 	scf_property_t *prop;
@@ -250,7 +252,7 @@ ndmp_smf_scf_fini(ndmp_scfhandle_t *handle)
  * ndmp_scfhandle_t pointer if success.
  */
 static ndmp_scfhandle_t *
-ndmp_smf_scf_init(char *svc_name)
+ndmp_smf_scf_init(const char *svc_name)
 {
 	ndmp_scfhandle_t *handle;
 
@@ -301,7 +303,7 @@ err:
  * Create a new property group at service level.
  */
 static int
-ndmp_smf_create_service_pgroup(ndmp_scfhandle_t *handle, char *pgroup)
+ndmp_smf_create_service_pgroup(ndmp_scfhandle_t *handle, const char *pgroup)
 {
 	int err;
 
@@ -397,7 +399,7 @@ ndmp_smf_end_transaction(ndmp_scfhandle_t *handle)
  * Deletes property in current pg
  */
 static int
-ndmp_smf_delete_property(ndmp_scfhandle_t *handle, char *propname)
+ndmp_smf_delete_property(ndmp_scfhandle_t *handle, const char *propname)
 {
 	scf_transaction_entry_t *entry = NULL;
 
@@ -430,7 +432,7 @@ ndmp_smf_delete_property(ndmp_scfhandle_t *handle, char *propname)
  */
 static int
 ndmp_smf_set_property(ndmp_scfhandle_t *handle,
-    char *propname, char *valstr)
+    const char *propname, const char *valstr)
 {
 	int ret = 0;
 	scf_value_t *value = NULL;
@@ -516,7 +518,7 @@ ndmp_smf_set_property(ndmp_scfhandle_t *handle,
  * memory allocated.
  */
 static int
-ndmp_smf_get_property(ndmp_scfhandle_t *handle, char *propname,
+ndmp_smf_get_property(ndmp_scfhandle_t *handle, const char *propname,
     char *valstr, size_t sz)
 {
 	int ret = 0;

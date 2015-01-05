@@ -21,8 +21,6 @@
 # Copyright 2000 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # The following 3 settings produce the familiar Solaris behavior.
 set appenddeadletter
 unset pipeignore
@@ -44,8 +42,6 @@ else
 	set LISTER="ls -LF"
 	# default is to allow editing of message windows
 	set editmessagewindow
-	# have to allow ~ escapes even though not using tty
-	set escapeok
 endif
 
 # most mail headers are uninteresting to most people.  here we ignore all

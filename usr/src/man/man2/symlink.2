@@ -14,9 +14,12 @@ symlink \- make a symbolic link to a file
 
 \fBint\fR \fBsymlink\fR(\fBconst char *\fR\fIname1\fR, \fBconst char *\fR\fIname2\fR);
 .fi
+.LP
+.nf
+\fBint\fR \fBsymlinkat\fR(\fBconst char *\fR\fIname1\fR, \fBint\fR \fIfd\fR, \fBconst char *\fR\fIname2\fR);
+.fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBsymlink()\fR function creates a symbolic link \fIname2\fR to the file
 \fIname1\fR. Either name may be an arbitrary pathname, the files need not be on
@@ -30,16 +33,21 @@ returns information about the link itself.  See \fBstat\fR(2). Unexpected
 results may occur when a symbolic link is made to a directory. To avoid
 confusion in applications, the \fBreadlink\fR(2) call can be used to read the
 contents of a symbolic link.
-.SH RETURN VALUES
 .sp
+.LP
+The \fBsymlinkat()\fR function behaves similarly to \fBsymlink()\fR; however,
+when \fIpath2\fR is a relative path, then it will be looked up relative to the
+directory specified by the file descriptor \fIfd\fR. To look up something in the
+current working directory, the special value \fBAT_FDCWD\fR may be passed into
+\fIfd\fR.
+.SH RETURN VALUES
 .LP
 Upon successful completion, \fB0\fR is returned.  Otherwise, \fB\(mi1\fR is
 returned, \fBerrno\fR is set to indicate the error, and the symbolic link is
 not made.
 .SH ERRORS
-.sp
 .LP
-The \fBsymlink()\fR function will fail if:
+The \fBsymlink()\fR and \fBsymlinkat()\fR functions will fail if:
 .sp
 .ne 2
 .na
@@ -157,7 +165,9 @@ The file system does not support symbolic links.
 \fB\fBENOTDIR\fR\fR
 .ad
 .RS 16n
-A component of the path prefix of \fIname2\fR is not a directory.
+A component of the path prefix of \fIname2\fR is not a directory. For
+\fBsymlinkat()\fR, if \fIpath2\fR refers to a relative path and \fIfd\fR is a
+valid file descriptor that is not a directory.
 .RE
 
 .sp
@@ -169,8 +179,20 @@ A component of the path prefix of \fIname2\fR is not a directory.
 The file \fIname2\fR would reside on a read-only file system.
 .RE
 
-.SH ATTRIBUTES
 .sp
+.LP
+The \fBsymlinkat()\fR function will fail if:
+.sp
+.ne 2
+.na
+.B EBADF
+.ad
+.RS 16n
+The \fIpath2\fR argument is a relative path, and \fIfd\fR is not a valid, open
+file descriptor or the special value \fBAT_FDCWD\fR.
+.RE
+
+.SH ATTRIBUTES
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -186,7 +208,6 @@ Interface Stability	Standard
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBcp\fR(1), \fBlink\fR(2), \fBopen\fR(2), \fBreadlink\fR(2), \fBstat\fR(2),
 \fBunlink\fR(2), \fBattributes\fR(5)
