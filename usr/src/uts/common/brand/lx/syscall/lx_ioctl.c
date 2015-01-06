@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2014 Joyent, Inc.  All rights reserved.
+ * Copyright 2015 Joyent, Inc.  All rights reserved.
  */
 
 #include <sys/errno.h>
@@ -23,6 +23,7 @@
 #include <sys/termios.h>
 #include <sys/ptyvar.h>
 #include <net/if.h>
+#include <net/if_dl.h>
 #include <sys/sockio.h>
 #include <sys/stropts.h>
 #include <sys/ptms.h>
@@ -875,7 +876,13 @@ ict_siolifreq(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 			lreq.lifr_addr.ss_family = 772;
 			error = 0;
 		} else if (error == 0) {
-			/* Default to Ethernet for all successes */
+			/* convert illumos sockaddr to Linux */
+			struct sockaddr_dl *src =
+			    (struct sockaddr_dl *)&lreq.lifr_addr;
+			caddr_t dst = (caddr_t)&lreq.lifr_addr +
+			    sizeof (lreq.lifr_addr.ss_family);
+			bcopy(LLADDR(src), dst, src->sdl_alen);
+			/* Default to Ethernet type for all successes */
 			lreq.lifr_addr.ss_family = 1;
 		}
 		break;
