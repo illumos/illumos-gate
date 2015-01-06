@@ -78,6 +78,8 @@
 #
 # CDDL HEADER END
 #
+# Copyright 2015 Joyent, Inc. All rights reserved.
+#
 # Author: Brendan Gregg  [Sydney, Australia]
 #
 # 18-Jul-2004   Brendan Gregg   Created this.
@@ -136,7 +138,7 @@ $main::opt_h = 0;
 $| = 1;                      # autoflush
 
 # kstat "link" module includes:
-my @Network = qw(dmfe bge be bnx ce eri external ge hme igb ige internal ixgbe le net ppp qfe rtls);
+my @Network = qw(dmfe bge be bnx ce eri eth external ge hme igb ige internal ixgbe le net ppp qfe rtls);
 my %Network;
 $Network{$_} = 1 foreach (@Network);
 my $ZONENAME = `/usr/bin/zonename`;
