@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright 2014 Joyent, Inc. All rights reserved.
+ * Copyright 2015 Joyent, Inc. All rights reserved.
  */
 
 #ifndef _LX_BRAND_H
@@ -91,6 +91,7 @@ extern "C" {
 #define	B_SIGNAL_RETURN		139
 #define	B_UNWIND_NTV_SYSC_FLAG	140
 #define	B_EXIT_AS_SIG		141
+#define	B_PTRACE_GETEVENTMSG	142
 
 #define	B_IKE_SYSCALL		192
 
@@ -98,6 +99,7 @@ extern "C" {
 #define	 B_PTRACE_EXT_OPTS_SET	1
 #define	 B_PTRACE_EXT_OPTS_GET	2
 #define	 B_PTRACE_EXT_OPTS_EVT	3
+#define	 B_PTRACE_DETACH	4
 
 /*
  * Support for Linux PTRACE_SETOPTIONS handling.
@@ -110,6 +112,16 @@ extern "C" {
 #define	LX_PTRACE_O_TRACEVFORKDONE	0x0020
 #define	LX_PTRACE_O_TRACEEXIT		0x0040
 #define	LX_PTRACE_O_TRACESECCOMP	0x0080
+/*
+ * lx emulation-specific flag to indicate this is a child process being stopped
+ * due to one of the PTRACE_SETOPTIONS above.
+ */
+#define	EMUL_PTRACE_O_CHILD		0x8000
+/*
+ * lx emulation-specific flag to determine via B_PTRACE_EXT_OPTS_GET if a process
+ * is being traced because of one of the PTRACE_SETOPTIONS above.
+ */
+#define	EMUL_PTRACE_IS_TRACED		0x8000
 
 /* siginfo si_status for traced events */
 #define	LX_PTRACE_EVENT_FORK		0x100
@@ -246,6 +258,8 @@ typedef struct lx_proc_data {
 	uint64_t l_ptrace;	/* process being observed with ptrace */
 	uint_t l_ptrace_opts;	/* process's extended ptrace options */
 	uint_t l_ptrace_event;	/* extended ptrace option trap event */
+	uint_t l_ptrace_is_traced; /* set if traced due to ptrace setoptions */
+	ulong_t l_ptrace_eventmsg; /* extended ptrace event msg */
 	lx_elf_data_t l_elf_data; /* ELF data for linux executable */
 	int l_signal;		/* signal to deliver to parent when this */
 				/* thread group dies */

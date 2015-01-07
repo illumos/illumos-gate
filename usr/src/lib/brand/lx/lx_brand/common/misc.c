@@ -21,7 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2014 Joyent, Inc.  All rights reserved.
+ * Copyright 2015 Joyent, Inc.  All rights reserved.
  */
 
 #include <assert.h>
@@ -537,7 +537,7 @@ lx_execve(uintptr_t p1, uintptr_t p2, uintptr_t p3)
 	if (argv == NULL)
 		argv = nullist;
 
-	lx_ptrace_stop_if_option(LX_PTRACE_O_TRACEEXEC);
+	lx_ptrace_stop_if_option(LX_PTRACE_O_TRACEEXEC, B_FALSE, 0);
 
 	/*
 	 * Emulate PR_SET_KEEPCAPS which is reset on execve. If this is not done

@@ -25,7 +25,7 @@
  */
 
 /*
- * Copyright (c) 2014, Joyent, Inc. All rights reserved.
+ * Copyright 2015, Joyent, Inc. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -278,9 +278,10 @@ lx_getattr(zone_t *zone, int attr, void *buf, size_t *bufsize)
 }
 
 /*
- * Enable ptrace system call tracing for the given LWP. This is done by
- * both setting the flag in that LWP's brand data (in the kernel) and setting
- * the process-wide trace flag (in the brand library of the traced process).
+ * Enable/disable ptrace system call tracing for the given LWP. Enabling is
+ * done by both setting the flag in that LWP's brand data (in the kernel) and
+ * setting the process-wide trace flag (in the brand library of the traced
+ * process).
  */
 static int
 lx_ptrace_syscall_set(pid_t pid, id_t lwpid, int set)
@@ -383,14 +384,15 @@ lx_ptrace_ext_opts(int cmd, pid_t pid, uintptr_t val, int64_t *rval)
 	lx_proc_data_t *lpdp;
 	uint_t ret;
 
-	if (cmd != B_PTRACE_EXT_OPTS_SET && cmd != B_PTRACE_EXT_OPTS_GET &&
-	    cmd != B_PTRACE_EXT_OPTS_EVT)
-		return (set_errno(EINVAL));
-
 	if ((p = sprlock(pid)) == NULL)
 		return (ESRCH);
 
-	if (priv_proc_cred_perm(curproc->p_cred, p, NULL, VWRITE) != 0) {
+	/*
+	 * Note that priv_proc_cred_perm can disallow access to ourself if
+	 * the proc's SNOCD p_flag is set, so we skip that check for ourself.
+	 */
+	if (curproc != p &&
+	    priv_proc_cred_perm(curproc->p_cred, p, NULL, VWRITE) != 0) {
 		sprunlock(p);
 		return (EPERM);
 	}
@@ -400,20 +402,34 @@ lx_ptrace_ext_opts(int cmd, pid_t pid, uintptr_t val, int64_t *rval)
 		return (ESRCH);
 	}
 
-	if (cmd == B_PTRACE_EXT_OPTS_SET) {
+	switch (cmd) {
+	case B_PTRACE_EXT_OPTS_SET:
 		lpdp->l_ptrace_opts = (uint_t)val;
+		break;
 
-	} else if (cmd == B_PTRACE_EXT_OPTS_GET) {
+	case B_PTRACE_EXT_OPTS_GET:
 		ret = lpdp->l_ptrace_opts;
+		if (lpdp->l_ptrace_is_traced)
+			ret |= EMUL_PTRACE_IS_TRACED;
+		break;
 
-	} else /* B_PTRACE_EXT_OPTS_EVT */ {
+	case B_PTRACE_EXT_OPTS_EVT:
 		ret = lpdp->l_ptrace_event;
 		lpdp->l_ptrace_event = 0;
+		break;
+
+	case B_PTRACE_DETACH:
+		lpdp->l_ptrace_is_traced = 0;
+		break;
+
+	default:
+		sprunlock(p);
+		return (EINVAL);
 	}
 
 	sprunlock(p);
 
-	if (cmd != B_PTRACE_EXT_OPTS_SET) {
+	if (cmd == B_PTRACE_EXT_OPTS_GET || cmd == B_PTRACE_EXT_OPTS_EVT) {
 		if (copyout(&ret, (void *)val, sizeof (uint_t)) != 0)
 			return (EFAULT);
 	}
@@ -429,43 +445,75 @@ lx_ptrace_ext_opts(int cmd, pid_t pid, uintptr_t val, int64_t *rval)
  * 'waits' on this process.
  */
 static void
-lx_ptrace_stop_for_option(int option)
+lx_ptrace_stop_for_option(int option, ulong_t msg)
 {
 	proc_t *p = ttoproc(curthread);
 	sigqueue_t *sqp;
 	lx_proc_data_t *lpdp;
+	boolean_t child = B_FALSE;
 
 	if ((lpdp = p->p_brand_data) == NULL) {
 		/* this should never happen but just to be safe */
 		return;
 	}
 
+	if (option & EMUL_PTRACE_O_CHILD) {
+		child = B_TRUE;
+		option &= ~EMUL_PTRACE_O_CHILD;
+	}
+
+	lpdp->l_ptrace_is_traced = 1;
+
 	/* Track the event as the reason for stopping */
 	switch (option) {
 	case LX_PTRACE_O_TRACEFORK:
-		lpdp->l_ptrace_event = LX_PTRACE_EVENT_FORK;
+		if (!child) {
+			lpdp->l_ptrace_event = LX_PTRACE_EVENT_FORK;
+			lpdp->l_ptrace_eventmsg = msg;
+		}
 		break;
 	case LX_PTRACE_O_TRACEVFORK:
-		lpdp->l_ptrace_event = LX_PTRACE_EVENT_VFORK;
+		if (!child) {
+			lpdp->l_ptrace_event = LX_PTRACE_EVENT_VFORK;
+			lpdp->l_ptrace_eventmsg = msg;
+		}
 		break;
 	case LX_PTRACE_O_TRACECLONE:
-		lpdp->l_ptrace_event = LX_PTRACE_EVENT_CLONE;
+		if (!child) {
+			lpdp->l_ptrace_event = LX_PTRACE_EVENT_CLONE;
+			lpdp->l_ptrace_eventmsg = msg;
+		}
 		break;
 	case LX_PTRACE_O_TRACEEXEC:
 		lpdp->l_ptrace_event = LX_PTRACE_EVENT_EXEC;
 		break;
 	case LX_PTRACE_O_TRACEVFORKDONE:
 		lpdp->l_ptrace_event = LX_PTRACE_EVENT_VFORK_DONE;
+		lpdp->l_ptrace_eventmsg = msg;
 		break;
 	case LX_PTRACE_O_TRACEEXIT:
 		lpdp->l_ptrace_event = LX_PTRACE_EVENT_EXIT;
+		lpdp->l_ptrace_eventmsg = msg;
 		break;
 	case LX_PTRACE_O_TRACESECCOMP:
 		lpdp->l_ptrace_event = LX_PTRACE_EVENT_SECCOMP;
 		break;
 	}
 
-	/* Post the required signal to ourselves so that we stop. */
+	/*
+	 * Post the required signal to ourselves so that we stop.
+	 *
+	 * Although Linux will send a SIGSTOP to a child process which is
+	 * stopped due to PTRACE_O_TRACEFORK, etc., we do not send that signal
+	 * since that leads us down the code path in the kernel which calls
+	 * stop(PR_JOBCONTROL, SIGSTOP), which in turn means that the TS_XSTART
+	 * flag gets turned off on the thread and this makes it complex to
+	 * actually get this process going when the userland application wants
+	 * to detach. Since consumers don't seem to depend on the specific
+	 * signal, we'll just stop both the parent and child the same way. We
+	 * do keep track of both the parant and child via the
+	 * EMUL_PTRACE_O_CHILD bit, in case we need to revisit this later.
+	 */
 	psignal(p, SIGTRAP);
 
 	/*
@@ -479,6 +527,38 @@ lx_ptrace_stop_for_option(int option)
 	p->p_wcode = CLD_STOPPED;
 	sigcld(p, sqp);
 	mutex_exit(&pidlock);
+}
+
+static int
+lx_ptrace_geteventmsg(pid_t pid, ulong_t *msgp)
+{
+	proc_t *p;
+	lx_proc_data_t *lpdp;
+	ulong_t msg;
+
+	if ((p = sprlock(pid)) == NULL)
+		return (ESRCH);
+
+	if (curproc != p &&
+	    priv_proc_cred_perm(curproc->p_cred, p, NULL, VREAD) != 0) {
+		sprunlock(p);
+		return (EPERM);
+	}
+
+	if ((lpdp = p->p_brand_data) == NULL) {
+		sprunlock(p);
+		return (ESRCH);
+	}
+
+	msg = lpdp->l_ptrace_eventmsg;
+	lpdp->l_ptrace_eventmsg = 0;
+
+	sprunlock(p);
+
+	if (copyout(&msg, (void *)msgp, sizeof (ulong_t)) != 0)
+		return (EFAULT);
+
+	return (0);
 }
 
 /*
@@ -951,7 +1031,11 @@ lx_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 		return (lx_ptrace_ext_opts((int)arg1, (pid_t)arg2, arg3, rval));
 
 	case B_PTRACE_STOP_FOR_OPT:
-		lx_ptrace_stop_for_option((int)arg1);
+		lx_ptrace_stop_for_option((int)arg1, (ulong_t)arg2);
+		return (0);
+
+	case B_PTRACE_GETEVENTMSG:
+		lx_ptrace_geteventmsg((pid_t)arg1, (ulong_t *)arg2);
 		return (0);
 
 	case B_UNSUPPORTED:
