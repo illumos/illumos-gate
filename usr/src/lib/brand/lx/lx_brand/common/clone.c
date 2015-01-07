@@ -22,7 +22,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2014 Joyent, Inc.  All rights reserved.
+ * Copyright 2015 Joyent, Inc.  All rights reserved.
  */
 
 #include <assert.h>
@@ -150,7 +150,8 @@ lx_exit(uintptr_t p1)
 	lx_tsd->lxtsd_exit = LX_EXIT;
 	lx_tsd->lxtsd_exit_status = status;
 
-	lx_ptrace_stop_if_option(LX_PTRACE_O_TRACEEXIT);
+	lx_ptrace_stop_if_option(LX_PTRACE_O_TRACEEXIT, B_FALSE,
+	    (ulong_t)status);
 
 	/*
 	 * Block all signals in the exit context to avoid taking any signals
@@ -354,6 +355,26 @@ clone_start(void *arg)
 }
 
 /*
+ * The way Linux handles stopping for FORK vs. CLONE does not map exactly to
+ * which syscall was used. Instead, it has to do with which signal is set in
+ * the low byte of the clone flag. The only time the CLONE event is emitted is
+ * if the clone signal (the low byte of the flags argument) is set to something
+ * other than SIGCHLD (see the Linux src in kernel/fork.c do_fork() for the
+ * actual code).
+ */
+static int
+ptrace_clone_event(int flags)
+{
+	if (flags & LX_CLONE_VFORK)
+		return (LX_PTRACE_O_TRACEVFORK);
+
+	if ((flags & LX_CSIGNAL) != LX_SIGCHLD)
+		return (LX_PTRACE_O_TRACECLONE);
+
+	return (LX_PTRACE_O_TRACEFORK);
+}
+
+/*
  * See glibc sysdeps/unix/sysv/linux/x86_64/clone.S code for x64 argument order
  * and the Linux kernel/fork.c code for the various ways arguments can be passed
  * to the clone syscall (CONFIG_CLONE_BACKWARDS, et al).
@@ -381,6 +402,7 @@ lx_clone(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 	lx_regs_t *rp;
 	sigset_t sigmask;
 	int fork_flags = 0;
+	int ptrace_event;
 
 	if (flags & LX_CLONE_SETTLS) {
 		lx_debug("lx_clone(flags=0x%x stk=0x%p ptidp=0x%p ldt=0x%p "
@@ -429,6 +451,8 @@ lx_clone(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 			return (-EFAULT);
 	}
 
+	ptrace_event = ptrace_clone_event(flags);
+
 	/* See if this is a fork() operation or a thr_create().  */
 	if (IS_FORK(flags) || IS_VFORK(flags)) {
 		if (flags & LX_CLONE_PARENT) {
@@ -476,8 +500,12 @@ lx_clone(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 		}
 
 		/* Parent just returns */
-		if (rval != 0)
+		if (rval != 0) {
+			if (rval > 0)
+				lx_ptrace_stop_if_option(ptrace_event, B_FALSE,
+				    (ulong_t)rval);
 			return ((rval < 0) ? -errno : rval);
+		}
 
 
 		/*
@@ -494,7 +522,7 @@ lx_clone(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 		 * lx_setup_clone() doesn't return below, so stop now, if
 		 * necessary.
 		 */
-		lx_ptrace_stop_if_option(LX_PTRACE_O_TRACECLONE);
+		lx_ptrace_stop_if_option(ptrace_event, B_TRUE, 0);
 
 		/*
 		 * If provided, the child needs its new stack set up.
@@ -619,10 +647,8 @@ lx_clone(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 			;
 
 		rval = clone_res;
+		lx_ptrace_stop_if_option(ptrace_event, B_TRUE, 0);
 	}
-
-	if (rval == 0)
-		lx_ptrace_stop_if_option(LX_PTRACE_O_TRACECLONE);
 
 	return (rval);
 }

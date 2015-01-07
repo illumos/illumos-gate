@@ -22,7 +22,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2014 Joyent, Inc.  All rights reserved.
+ * Copyright 2015 Joyent, Inc.  All rights reserved.
  */
 
 #include <errno.h>
@@ -122,6 +122,7 @@
 #define	LX_PTRACE_SETFPXREGS	19
 #define	LX_PTRACE_SYSCALL	24
 #define	LX_PTRACE_SETOPTIONS	0x4200
+#define	LX_PTRACE_GETEVENTMSG	0x4201
 
 /* execve syscall numbers for 64-bit vs. 32-bit */
 #if defined(_LP64)
@@ -961,6 +962,7 @@ is_traced(pid_t pid)
 	ptrace_monitor_map_t *p;
 	pstatus_t status;
 	uint_t curr_opts;
+	pid_t mypid;
 
 	/*
 	 * First get the stop options since that is an indication that the
@@ -970,11 +972,39 @@ is_traced(pid_t pid)
 	    &curr_opts) != 0)
 		return (0);
 
+	mypid = getpid();
+
 	if (get_status(pid, &status) != 0)
 		return (0);
 
-	if ((status.pr_flags & PR_PTRACE || curr_opts != 0) &&
-	    (status.pr_ppid == getpid()) &&
+	/*
+	 * When we look to see if we are tracing a process we have to take the
+	 * PTRACE_SETOPTIONS handling into account. In particular, if we are
+	 * tracing with PTRACE_O_TRACEFORK, etc. then we may be dealing with
+	 * the child of a child that we started tracing. We can determine this
+	 * by checking the EMUL_PTRACE_IS_TRACED flag and checking the parent
+	 * of the parent. We cannot check for the presence of the options since
+	 * those will be cleared during the process of detaching from a tracee.
+	 */
+	if (curr_opts & EMUL_PTRACE_IS_TRACED && status.pr_ppid != mypid) {
+		pstatus_t par_status;
+		pid_t chkpid = status.pr_ppid;
+
+		if (get_status(status.pr_ppid, &par_status) == 0) {
+			chkpid = par_status.pr_ppid;
+		} else {
+			/* parent is gone, re-get our ppid */
+			if (get_status(pid, &par_status) == 0)
+				chkpid = par_status.pr_ppid;
+		}
+
+		if (chkpid == mypid)
+			return (1);
+	}
+
+	if ((status.pr_flags & PR_PTRACE ||
+	    curr_opts & EMUL_PTRACE_IS_TRACED) &&
+	    (status.pr_ppid == mypid) &&
 	    (status.pr_lwp.pr_flags & PR_ISTOP))
 		return (1);
 
@@ -1758,6 +1788,9 @@ ptrace_detach(pid_t lxpid, pid_t pid, lwpid_t lwpid, int sig)
 	if ((fd = open_lwpfile(pid, lwpid, O_WRONLY, "lwpctl")) < 0)
 		return (-ESRCH);
 
+	if (syscall(SYS_brand, B_PTRACE_EXT_OPTS, B_PTRACE_DETACH, pid, 0) != 0)
+		return (-ESRCH);
+
 	/*
 	 * The /proc ptrace flag may not be set, but we clear it
 	 * unconditionally since doing so doesn't hurt anything.
@@ -1841,11 +1874,24 @@ ptrace_setoptions(pid_t pid, int options)
 		return (-errno);
 
 	/* since we're doing option tracing now, only catch sigtrap */
-	if (error == 0) {
-		ctl.cmd = PCSTRACE;
-		premptyset(&ctl.arg.signals);
-		praddset(&ctl.arg.signals, SIGTRAP);
-		size = sizeof (long) + sizeof (sigset_t);
+	ctl.cmd = PCSTRACE;
+	premptyset(&ctl.arg.signals);
+	praddset(&ctl.arg.signals, SIGTRAP);
+	size = sizeof (long) + sizeof (sigset_t);
+	if (write(fd, &ctl, size) != size) {
+		error = -errno;
+	} else {
+		/*
+		 * If we're tracing fork, set inherit-on-fork, otherwise clear
+		 * it.
+		 */
+		if (options & LX_PTRACE_O_TRACEFORK) {
+			ctl.cmd = PCSET;
+		} else {
+			ctl.cmd = PCUNSET;
+		}
+		ctl.arg.flags = PR_FORK;
+		size = sizeof (long) + sizeof (long);
 		if (write(fd, &ctl, size) != size)
 			error = -errno;
 	}
@@ -1858,11 +1904,11 @@ ptrace_setoptions(pid_t pid, int options)
 	ret = syscall(SYS_brand, B_PTRACE_EXT_OPTS, B_PTRACE_EXT_OPTS_SET, pid,
 	    options);
 
-	return (-ret);
+	return ((ret != 0) ? -errno : 0);
 }
 
 void
-lx_ptrace_stop_if_option(int option)
+lx_ptrace_stop_if_option(int option, boolean_t child, ulong_t msg)
 {
 	pid_t pid;
 	uint_t curr_opts;
@@ -1876,23 +1922,44 @@ lx_ptrace_stop_if_option(int option)
 	    &curr_opts) != 0)
 		return;
 
-	/*
-	 * If we just forked/cloned, then the trace flags only carry over to
-	 * the child if the specific flag was enabled on the parent. For
-	 * example, if only TRACEFORK is enabled and we clone, then we must
-	 * clear the trace flags. If TRACEFORK is enabled and we fork, then we
-	 * keep the flags.
-	 */
-	if ((option == LX_PTRACE_O_TRACECLONE ||
-	    option == LX_PTRACE_O_TRACEFORK ||
-	    option == LX_PTRACE_O_TRACEVFORK) && (curr_opts & option) == 0) {
-		(void) syscall(SYS_brand, B_PTRACE_EXT_OPTS,
-		    B_PTRACE_EXT_OPTS_SET, pid, 0);
+	if (child) {
+		/*
+		 * If we just forked/cloned, then the trace flags only carry
+		 * over to the child if the specific flag was enabled on the
+		 * parent. For example, if only TRACEFORK is enabled and we
+		 * clone, then we must clear the trace flags. If TRACEFORK is
+		 * enabled and we fork, then we keep the flags.
+		 */
+		if (option == LX_PTRACE_O_TRACECLONE ||
+		    option == LX_PTRACE_O_TRACEFORK ||
+		    option == LX_PTRACE_O_TRACEVFORK) {
+
+			if ((curr_opts & option) == 0)
+				(void) syscall(SYS_brand, B_PTRACE_EXT_OPTS,
+				    B_PTRACE_EXT_OPTS_SET, pid, 0);
+
+			/*
+			 * Since we know we're the child we have to modify how
+			 * we stop. Set the emulation's child flag in the
+			 * option.
+			 */
+			option |= EMUL_PTRACE_O_CHILD;
+		}
 	}
 
 	/* now if the option is/was set, this brand call will stop us */
 	if (curr_opts & option)
-		(void) syscall(SYS_brand, B_PTRACE_STOP_FOR_OPT, option);
+		(void) syscall(SYS_brand, B_PTRACE_STOP_FOR_OPT, option, msg);
+}
+
+static int
+ptrace_geteventmsg(pid_t pid, ulong_t *msgp)
+{
+	int ret;
+
+	ret = syscall(SYS_brand, B_PTRACE_GETEVENTMSG, pid, msgp);
+
+	return ((ret != 0) ? -errno : 0);
 }
 
 long
@@ -1961,6 +2028,9 @@ lx_ptrace(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4)
 
 	case LX_PTRACE_SETOPTIONS:
 		return (ptrace_setoptions(pid, (int)p4));
+
+	case LX_PTRACE_GETEVENTMSG:
+		return (ptrace_geteventmsg(pid, (ulong_t *)p4));
 
 	default:
 		return (-EINVAL);
@@ -2218,7 +2288,10 @@ lx_ptrace_wait(siginfo_t *infop)
 		/*
 		 * If the traced process got a SIGTRAP then Linux ptrace
 		 * options might have been set, so setup the extended
-		 * si_status to contain the (possible) event.
+		 * si_status to contain the (possible) event. Note that
+		 * our definitions for the ptrace events (e.g.
+		 * LX_PTRACE_EVENT_FORK) is already shifted <<8 as documented
+		 * on the Linux ptrace(2) man page.
 		 */
 		if (infop->si_status == SIGTRAP) {
 			uint_t event;
