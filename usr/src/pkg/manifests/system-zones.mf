@@ -46,6 +46,7 @@ dir path=usr/lib
 dir path=usr/lib/$(ARCH64)
 dir path=usr/lib/brand
 dir path=usr/lib/brand/ipkg group=bin
+dir path=usr/lib/brand/lipkg group=bin
 dir path=usr/lib/brand/shared group=sys
 dir path=usr/lib/zones
 dir path=usr/sbin
@@ -82,6 +83,8 @@ file path=usr/lib/$(ARCH64)/libzonecfg.so.1
 file path=usr/lib/$(ARCH64)/libzonestat.so.1
 file path=usr/lib/brand/ipkg/config.xml mode=0444
 file path=usr/lib/brand/ipkg/platform.xml mode=0444
+file path=usr/lib/brand/lipkg/config.xml mode=0444
+file path=usr/lib/brand/lipkg/platform.xml mode=0444
 file path=usr/lib/brand/shared/common.ksh mode=0444
 file path=usr/lib/brand/shared/query mode=0755
 file path=usr/lib/brand/shared/uninstall.ksh mode=0444

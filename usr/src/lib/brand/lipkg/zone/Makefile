@@ -18,35 +18,25 @@
 #
 # CDDL HEADER END
 #
-#
-# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
-#
-# lib/brand/Makefile
-#
-# include global definitions
-include ../../Makefile.master
 
 #
-# Build everything in parallel; use .WAIT for dependencies
-.PARALLEL:
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+# Copyright 2015 OmniTI Computer Consulting, Inc. All rights reserved.
+#
 
-SUBDIRS= shared .WAIT sn1 solaris10 ipkg labeled lipkg $($(MACH)_SUBDIRS)
-MSGSUBDIRS= solaris10 shared $($(MACH)_MSGSUBDIRS)
+XMLDOCS=	config.xml platform.xml
+CLOBBERFILES=	$(ROOTXMLDOCS)
 
-all :=		TARGET= all
-install :=	TARGET= install
-clean :=	TARGET= clean
-clobber :=	TARGET= clobber
-lint :=		TARGET= lint
-_msg :=		TARGET= _msg
+all:
 
-.KEEP_STATE:
+include $(SRC)/cmd/Makefile.cmd
+include ../Makefile.lipkg
 
-all install clean clobber lint: $(SUBDIRS)
+install: $(ROOTXMLDOCS)
 
-_msg: $(MSGSUBDIRS)
+clean:
 
-$(SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
+lint:
 
-FRC:
+include $(SRC)/cmd/Makefile.targ

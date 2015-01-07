@@ -116,7 +116,7 @@ update_zone()
 	fi
 
 	brand=`echo $zone | cut -d: -f 6`
-	if [ $brand != "ipkg" ]; then
+	if [ $brand != "ipkg" && $brand != "lipkg" ]; then
 		return
 	fi
 
