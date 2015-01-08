@@ -25,7 +25,7 @@
  */
 
 /*
- * Copyright (c) 2014, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2015, Joyent, Inc. All rights reserved.
  */
 
 #include <assert.h>
@@ -150,9 +150,10 @@ lx_poll(uintptr_t p1, uintptr_t p2, uintptr_t p3)
 	int		fds_size, i, rval, revents;
 
 	/*
-	 * Deal with the NULL fds[] case.
+	 * Little emulation is needed if nfds == 0.
+	 * If p1 happens to be NULL, it'll be dealt with later.
 	 */
-	if (nfds == 0 && p1 == NULL) {
+	if (nfds == 0) {
 		if ((rval = poll(NULL, 0, (int)p3)) < 0)
 			return (-errno);
 
