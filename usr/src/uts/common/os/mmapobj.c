@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2014 Joyent, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -1126,10 +1127,23 @@ mmapobj_map_ptload(struct vnode *vp, caddr_t addr, size_t len, size_t zfodlen,
 		zfodbase = (caddr_t)P2ROUNDUP(end, PAGESIZE);
 		zfoddiff = (uintptr_t)zfodbase - end;
 		if (zfoddiff) {
+			/*
+			 * Before we go to zero the remaining space on the last
+			 * page, make sure we have write permission.
+			 *
+			 * We need to be careful how we zero-fill the last page
+			 * if the protection does not include PROT_WRITE. Using
+			 * as_setprot() can cause the VM segment code to call
+			 * segvn_vpage(), which must allocate a page struct for
+			 * each page in the segment. If we have a very large
+			 * segment, this may fail, so we check for that, even
+			 * though we ignore other return values from as_setprot.
+			 */
 			MOBJ_STAT_ADD(zfoddiff);
 			if ((prot & PROT_WRITE) == 0) {
-				(void) as_setprot(as, (caddr_t)end,
-				    zfoddiff, prot | PROT_WRITE);
+				if (as_setprot(as, (caddr_t)end, zfoddiff,
+				    prot | PROT_WRITE) == ENOMEM)
+					return (ENOMEM);
 				MOBJ_STAT_ADD(zfoddiff_nowrite);
 			}
 			if (on_fault(&ljb)) {

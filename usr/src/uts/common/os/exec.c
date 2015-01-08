@@ -26,7 +26,7 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 /*
- * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
+ * Copyright 2014, Joyent, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -1255,6 +1255,22 @@ execmap(struct vnode *vp, caddr_t addr, size_t len, size_t zfodlen,
 			/*
 			 * Before we go to zero the remaining space on the last
 			 * page, make sure we have write permission.
+			 *
+			 * Normal illumos binaries don't even hit the case
+			 * where we have to change permission on the last page
+			 * since their protection is typically either
+			 *    PROT_USER | PROT_WRITE | PROT_READ
+			 * or
+			 *    PROT_ZFOD (same as PROT_ALL).
+			 *
+			 * We need to be careful how we zero-fill the last page
+			 * if the segment protection does not include
+			 * PROT_WRITE. Using as_setprot() can cause the VM
+			 * segment code to call segvn_vpage(), which must
+			 * allocate a page struct for each page in the segment.
+			 * If we have a very large segment, this may fail, so
+			 * we have to check for that, even though we ignore
+			 * other return values from as_setprot.
 			 */
 
 			AS_LOCK_ENTER(as, &as->a_lock, RW_READER);
@@ -1265,8 +1281,11 @@ execmap(struct vnode *vp, caddr_t addr, size_t len, size_t zfodlen,
 			AS_LOCK_EXIT(as, &as->a_lock);
 
 			if (seg != NULL && (zprot & PROT_WRITE) == 0) {
-				(void) as_setprot(as, (caddr_t)end,
-				    zfoddiff - 1, zprot | PROT_WRITE);
+				if (as_setprot(as, (caddr_t)end, zfoddiff - 1,
+				    zprot | PROT_WRITE) == ENOMEM) {
+					error = ENOMEM;
+					goto bad;
+				}
 			}
 
 			if (on_fault(&ljb)) {
