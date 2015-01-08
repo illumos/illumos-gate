@@ -511,20 +511,24 @@ lx_ptrace_stop_for_option(int option, ulong_t msg)
 	 * actually get this process going when the userland application wants
 	 * to detach. Since consumers don't seem to depend on the specific
 	 * signal, we'll just stop both the parent and child the same way. We
-	 * do keep track of both the parant and child via the
+	 * do keep track of both the parent and child via the
 	 * EMUL_PTRACE_O_CHILD bit, in case we need to revisit this later.
 	 */
 	psignal(p, SIGTRAP);
 
 	/*
-	 * Since we're stopping, we need to post the SIGCHLD to the parent.
-	 * The code in sigcld expects the following two process values to be
-	 * setup specifically before it can send the signal, so do that here.
+	 * Since we're stopping, we need to post the SIGCHLD to the parent. The
+	 * code in sigcld expects p_wdata to be set to SIGTRAP before it can
+	 * send the signal, so do that here. We also need p_wcode to be set as
+	 * if we are ptracing, even though we're not really (see the code in
+	 * stop() when procstop is set and p->p_proc_flag has the P_PR_PTRACE
+	 * bit set). This is needed so that when the application calls waitid,
+	 * it will properly retrieve the process.
 	 */
 	sqp = kmem_zalloc(sizeof (sigqueue_t), KM_SLEEP);
 	mutex_enter(&pidlock);
 	p->p_wdata = SIGTRAP;
-	p->p_wcode = CLD_STOPPED;
+	p->p_wcode = CLD_TRAPPED;
 	sigcld(p, sqp);
 	mutex_exit(&pidlock);
 }
