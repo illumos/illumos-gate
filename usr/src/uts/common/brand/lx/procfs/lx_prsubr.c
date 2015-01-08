@@ -21,7 +21,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2014 Joyent, Inc.  All rights reserved.
+ * Copyright 2015 Joyent, Inc.  All rights reserved.
  */
 
 /*
@@ -199,6 +199,7 @@ lxpr_lock(pid_t pid)
 {
 	proc_t *p;
 	kmutex_t *mp;
+	pid_t find_pid;
 
 	ASSERT(!MUTEX_HELD(&pidlock));
 
@@ -206,10 +207,17 @@ lxpr_lock(pid_t pid)
 		mutex_enter(&pidlock);
 
 		/*
-		 * If the pid is 1, we really want the zone's init process
+		 * If the pid is 1, we really want the zone's init process;
+		 * if 0 we want zsched.
 		 */
-		p = prfind((pid == 1) ?
-		    curproc->p_zone->zone_proc_initpid : pid);
+		if (pid == 1) {
+			find_pid = curproc->p_zone->zone_proc_initpid;
+		} else if (pid == 0) {
+			find_pid = curproc->p_zone->zone_zsched->p_pid;
+		} else {
+			find_pid = pid;
+		}
+		p = prfind(find_pid);
 
 		if (p == NULL || p->p_stat == SIDL) {
 			mutex_exit(&pidlock);
@@ -313,8 +321,11 @@ lxpr_node_destructor(void *buf, void *un)
 ino_t
 lxpr_inode(lxpr_nodetype_t type, pid_t pid, int fd)
 {
-	if (pid == 1)
+	if (pid == 1) {
 		pid = curproc->p_zone->zone_proc_initpid;
+	} else if (pid == 0) {
+		pid = curproc->p_zone->zone_zsched->p_pid;
+	}
 
 	switch (type) {
 	case LXPR_PIDDIR:
@@ -375,8 +386,13 @@ lxpr_getnode(vnode_t *dp, lxpr_nodetype_t type, proc_t *p, int fd)
 	lxpnp->lxpr_parent = dp;
 	VN_HOLD(dp);
 	if (p != NULL) {
-		lxpnp->lxpr_pid = ((p->p_pid ==
-		    curproc->p_zone->zone_proc_initpid) ? 1 : p->p_pid);
+		if (p->p_pid == curproc->p_zone->zone_proc_initpid) {
+			lxpnp->lxpr_pid = 1;
+		} else if (p->p_pid == curproc->p_zone->zone_zsched->p_pid) {
+			lxpnp->lxpr_pid = 0;
+		} else {
+			lxpnp->lxpr_pid = p->p_pid;
+		}
 
 		lxpnp->lxpr_time = PTOU(p)->u_start;
 		lxpnp->lxpr_uid = crgetruid(p->p_cred);
