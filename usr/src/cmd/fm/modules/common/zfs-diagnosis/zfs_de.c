@@ -18,7 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -292,12 +294,16 @@ zpool_find_load_time(zpool_handle_t *zhp, void *arg)
 	nvlist_t *config;
 	uint_t nelem;
 
-	if (lta->lt_found)
+	if (lta->lt_found) {
+		zpool_close(zhp);
 		return (0);
+	}
 
 	pool_guid = zpool_get_prop_int(zhp, ZPOOL_PROP_GUID, NULL);
-	if (pool_guid != lta->lt_guid)
+	if (pool_guid != lta->lt_guid) {
+		zpool_close(zhp);
 		return (0);
+	}
 
 	if ((config = zpool_get_config(zhp, NULL)) == NULL) {
 		zpool_close(zhp);
@@ -310,6 +316,8 @@ zpool_find_load_time(zpool_handle_t *zhp, void *arg)
 		lta->lt_time->ertv_sec = tod[0];
 		lta->lt_time->ertv_nsec = tod[1];
 	}
+
+	zpool_close(zhp);
 
 	return (0);
 }
