@@ -22,7 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2014 Joyent, Inc. All rights reserved.
+ * Copyright 2015 Joyent, Inc. All rights reserved.
  */
 
 #include <unistd.h>
@@ -53,6 +53,7 @@
 #include <sys/lx_socket.h>
 #include <sys/lx_brand.h>
 #include <sys/lx_misc.h>
+#include <netpacket/packet.h>
 
 /*
  * This string is used to prefix all abstract namespace Unix sockets, ie all
@@ -135,13 +136,14 @@ static const int ltos_family[LX_AF_MAX + 1] =  {
 	AF_NOTSUPPORTED, AF_NOTSUPPORTED, AF_NOTSUPPORTED, AF_NOTSUPPORTED,
 	AF_NOTSUPPORTED, AF_INET6, AF_NOTSUPPORTED, AF_NOTSUPPORTED,
 	AF_NOTSUPPORTED, AF_NOTSUPPORTED, AF_NOTSUPPORTED, AF_LX_NETLINK,
-	AF_NOTSUPPORTED, AF_NOTSUPPORTED, AF_NOTSUPPORTED, AF_NOTSUPPORTED,
+	AF_PACKET, AF_NOTSUPPORTED, AF_NOTSUPPORTED, AF_NOTSUPPORTED,
 	AF_NOTSUPPORTED, AF_NOTSUPPORTED, AF_NOTSUPPORTED, AF_NOTSUPPORTED,
 	AF_NOTSUPPORTED, AF_NOTSUPPORTED, AF_NOTSUPPORTED, AF_NOTSUPPORTED,
 	AF_NOTSUPPORTED, AF_NOTSUPPORTED, AF_NOTSUPPORTED, AF_NOTSUPPORTED
 };
 
 #define	LX_AF_INET6	10
+#define	LX_AF_PACKET	17
 
 static const int stol_family[LX_AF_MAX + 1] =  {
 	AF_UNSPEC, AF_UNIX, AF_INET, AF_NOTSUPPORTED, AF_NOTSUPPORTED,
@@ -151,7 +153,7 @@ static const int stol_family[LX_AF_MAX + 1] =  {
 	AF_NOTSUPPORTED, AF_NOTSUPPORTED, AF_NOTSUPPORTED, AF_NOTSUPPORTED,
 	AF_NOTSUPPORTED, AF_NOTSUPPORTED, AF_NOTSUPPORTED, AF_NOTSUPPORTED,
 	AF_NOTSUPPORTED, LX_AF_INET6, AF_NOTSUPPORTED, AF_NOTSUPPORTED,
-	AF_NOTSUPPORTED, AF_NOTSUPPORTED, AF_NOTSUPPORTED, AF_NOTSUPPORTED
+	AF_NOTSUPPORTED, AF_NOTSUPPORTED, AF_NOTSUPPORTED, LX_AF_PACKET
 };
 
 #define	LTOS_FAMILY(d) ((d) <= LX_AF_MAX ? ltos_family[(d)] : AF_INVAL)
@@ -471,6 +473,22 @@ static const int ltos_raw_sockopts[LX_IPV6_CHECKSUM + 1] = {
 	OPTNOTSUP, OPTNOTSUP, OPTNOTSUP, OPTNOTSUP
 };
 
+/*
+ * PF_PACKET sockopts
+ * Linux				Illumos
+ * -----				-------
+ * PACKET_ADD_MEMBERSHIP	1	PACKET_ADD_MEMBERSHIP	0x2
+ * PACKET_DROP_MEMBERSHIP	2	PACKET_DROP_MEMBERSHIP	0x3
+ * PACKET_RECV_OUTPUT		3
+ * PACKET_RX_RING		5
+ * PACKET_STATISTICS		6	PACKET_STATISTICS	0x5
+ */
+
+static const int ltos_packet_sockopts[LX_PACKET_STATISTICS + 1] = {
+	OPTNOTSUP, PACKET_ADD_MEMBERSHIP, PACKET_DROP_MEMBERSHIP, OPTNOTSUP,
+	OPTNOTSUP, OPTNOTSUP, PACKET_STATISTICS
+};
+
 #define	PROTO_SOCKOPTS(opts)    \
 	{ (opts), sizeof ((opts)) / sizeof ((opts)[0]) }
 
@@ -486,6 +504,15 @@ static lx_proto_opts_t socket_sockopts_tbl =
 static lx_proto_opts_t igmp_sockopts_tbl = PROTO_SOCKOPTS(ltos_igmp_sockopts);
 static lx_proto_opts_t tcp_sockopts_tbl = PROTO_SOCKOPTS(ltos_tcp_sockopts);
 static lx_proto_opts_t raw_sockopts_tbl = PROTO_SOCKOPTS(ltos_raw_sockopts);
+static lx_proto_opts_t packet_sockopts_tbl =
+    PROTO_SOCKOPTS(ltos_packet_sockopts);
+
+
+/* Needed for SO_ATTACH_FILTER */
+struct lx_bpf_program {
+    unsigned short bf_len;
+    caddr_t bf_insns;
+};
 
 /*
  * Lifted from socket.h, since these definitions are contained within
@@ -781,6 +808,26 @@ calc_addr_size(struct sockaddr *a, int nlen, lx_addr_type_t *type)
 	return (nlen);
 }
 
+static int
+convert_pkt_proto(int protocol)
+{
+	switch (ntohs(protocol)) {
+	case LX_ETH_P_802_2:
+		return (ETH_P_802_2);
+	case LX_ETH_P_IP:
+		return (ETH_P_IP);
+	case LX_ETH_P_ARP:
+		return (ETH_P_ARP);
+	case LX_ETH_P_IPV6:
+		return (ETH_P_IPV6);
+	case LX_ETH_P_ALL:
+	case LX_ETH_P_802_3:
+		return (ETH_P_ALL);
+	default:
+		return (-1);
+	}
+}
+
 /*
  * If inaddr is an abstract namespace Unix socket, this function expects addr
  * to have enough memory to hold the expanded socket name, ie it must be of
@@ -792,6 +839,8 @@ ltos_sockaddr(struct sockaddr *addr, socklen_t *len,
     struct sockaddr *inaddr, socklen_t inlen, lx_addr_type_t type)
 {
 	sa_family_t family;
+	struct sockaddr_ll *sll;
+	int proto;
 	int size;
 	int i, orig_len;
 
@@ -916,6 +965,14 @@ ltos_sockaddr(struct sockaddr *addr, socklen_t *len,
 			}
 			break;
 
+		case AF_PACKET:
+			sll = (struct sockaddr_ll *)addr;
+			if ((proto = convert_pkt_proto(sll->sll_protocol)) < 0)
+				return (-EINVAL);
+			sll->sll_protocol = proto;
+			*len = inlen;
+			break;
+
 		default:
 			*len = inlen;
 	}
@@ -983,10 +1040,9 @@ stol_sockaddr(struct sockaddr *addr, socklen_t *len,
 	return (0);
 }
 
-
 static int
 convert_sock_args(int in_dom, int in_type, int in_protocol, int *out_dom,
-    int *out_type, int *out_options)
+    int *out_type, int *out_options, int *out_protocol)
 {
 	int domain, type, options;
 
@@ -1018,9 +1074,18 @@ convert_sock_args(int in_dom, int in_type, int in_protocol, int *out_dom,
 	if (in_type & LX_SOCK_CLOEXEC)
 		options |= SOCK_CLOEXEC;
 
+	/*
+	 * The protocol definitions for PF_PACKET differ between Linux and
+	 * illumos.
+	 */
+	if (domain == PF_PACKET &&
+	    (in_protocol = convert_pkt_proto(in_protocol)) < 0)
+		return (EINVAL);
+
 	*out_dom = domain;
 	*out_type = type;
 	*out_options = options;
+	*out_protocol = in_protocol;
 	return (0);
 }
 
@@ -1146,7 +1211,7 @@ lx_socket(int domain, int type, int protocol)
 	int err;
 
 	err = convert_sock_args(domain, type, protocol,
-	    &domain, &type, &options);
+	    &domain, &type, &options, &protocol);
 	if (err != 0)
 		return (err);
 
@@ -1476,7 +1541,8 @@ lx_socketpair(int domain, int type, int protocol, int *sv)
 	int fds[2];
 	int r;
 
-	r = convert_sock_args(domain, type, protocol, &domain, &type, &options);
+	r = convert_sock_args(domain, type, protocol, &domain, &type, &options,
+	    &protocol);
 	if (r != 0)
 		return (r);
 
@@ -1680,6 +1746,7 @@ get_proto_opt_tbl(int level)
 	case LX_IPPROTO_IPV6:	return (&ipv6_sockopts_tbl);
 	case LX_IPPROTO_ICMPV6:	return (&icmpv6_sockopts_tbl);
 	case LX_IPPROTO_RAW:	return (&raw_sockopts_tbl);
+	case LX_SOL_PACKET:	return (&packet_sockopts_tbl);
 	default:
 		lx_unsupported("Unsupported sockopt level %d", level);
 		return (NULL);
@@ -1705,7 +1772,7 @@ lx_setsockopt(int sockfd, int level, int optname, void *optval, int optlen)
 	if (optval == NULL)
 		return (-EFAULT);
 
-	if (level > LX_IPPROTO_RAW || level == LX_IPPROTO_UDP)
+	if (level > LX_SOL_PACKET || level == LX_IPPROTO_UDP)
 		return (-ENOPROTOOPT);
 
 	if ((proto_opts = get_proto_opt_tbl(level)) == NULL)
@@ -1795,6 +1862,22 @@ lx_setsockopt(int sockfd, int level, int optname, void *optval, int optlen)
 		if (optname == LX_SO_BSDCOMPAT)
 			return (0);
 
+		/* Convert bpf program struct */
+		if (optname == LX_SO_ATTACH_FILTER) {
+			struct lx_bpf_program *lbp;
+			struct bpf_program *bp;
+			if (optlen != sizeof (*lbp))
+				return (-EINVAL);
+			if ((bp = SAFE_ALLOCA(sizeof (*bp))) == NULL ||
+			    (lbp = SAFE_ALLOCA(sizeof (*lbp))) == NULL)
+				return (-ENOMEM);
+			if (uucopy(optval, lbp, sizeof (*lbp)) != 0)
+				return (-errno);
+			bp->bf_len = lbp->bf_len;
+			bp->bf_insns = (struct bpf_insn *)lbp->bf_insns;
+			optval = bp;
+		}
+
 		level = SOL_SOCKET;
 	} else if (level == LX_IPPROTO_RAW) {
 		/*
@@ -1812,6 +1895,21 @@ lx_setsockopt(int sockfd, int level, int optname, void *optval, int optlen)
 		if (optname == LX_IPV6_CHECKSUM &&
 		    strcmp(lx_cmd_name, "ping6") == 0)
 			return (0);
+	} else if (level == LX_SOL_PACKET) {
+		level = SOL_PACKET;
+		if (optname == LX_PACKET_ADD_MEMBERSHIP ||
+		    optname == LX_PACKET_DROP_MEMBERSHIP) {
+			/* Convert Linux mr_type to illumos */
+			struct packet_mreq *mr;
+			if (optlen != sizeof (*mr))
+				return (-EINVAL);
+			mr = SAFE_ALLOCA(sizeof (*mr));
+			if (uucopy(optval, mr, sizeof (*mr)) != 0)
+				return (-errno);
+			if (--mr->mr_type > PACKET_MR_ALLMULTI)
+				return (-EINVAL);
+			optval = mr;
+		}
 	}
 
 	if (!converted) {
@@ -1852,7 +1950,7 @@ lx_getsockopt(int sockfd, int level, int optname, void *optval, int *optlenp)
 	if (optval == NULL)
 		return (-EFAULT);
 
-	if (level > LX_IPPROTO_RAW || level == LX_IPPROTO_UDP)
+	if (level > LX_SOL_PACKET || level == LX_IPPROTO_UDP)
 		return (-EOPNOTSUPP);
 
 	if ((proto_opts = get_proto_opt_tbl(level)) == NULL)
@@ -1947,6 +2045,10 @@ lx_getsockopt(int sockfd, int level, int optname, void *optval, int *optlenp)
 			return (-errno);
 		return (0);
 	}
+	if (level == LX_SOL_PACKET)
+		level = SOL_PACKET;
+	else if (level == LX_SOL_SOCKET)
+		level = SOL_SOCKET;
 
 	orig_optname = optname;
 
@@ -1956,9 +2058,6 @@ lx_getsockopt(int sockfd, int level, int optname, void *optval, int *optlenp)
 		    orig_optname, level);
 		return (-ENOPROTOOPT);
 	}
-
-	if (level == LX_SOL_SOCKET)
-		level = SOL_SOCKET;
 
 	r = getsockopt(sockfd, level, optname, optval, optlenp);
 

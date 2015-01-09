@@ -21,7 +21,7 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.	All rights reserved.
  * Use is subject to license terms.
- * Copyright 2014 Joyent, Inc. All rights reserved.
+ * Copyright 2015 Joyent, Inc. All rights reserved.
  */
 
 #ifndef _SYS_LX_SOCKET_H
@@ -101,6 +101,16 @@ extern "C" {
 
 #define	SOCK_NOTSUPPORTED	-1
 #define	SOCK_INVAL		-2
+
+/*
+ * PF_PACKET protocol definitions.
+ */
+#define	LX_ETH_P_802_3	0x0001
+#define	LX_ETH_P_ALL	0x0003
+#define	LX_ETH_P_802_2	0x0004
+#define	LX_ETH_P_IP	0x0800
+#define	LX_ETH_P_ARP	0x0806
+#define	LX_ETH_P_IPV6	0x86DD
 
 /*
  * IP Protocol levels. Some of these match the Illumos IPPROTO_* values.
@@ -332,6 +342,20 @@ extern "C" {
  * IPPROTO_RAW
  */
 #define	LX_ICMP_FILTER				1
+
+/*
+ * Options for use with [gs]etsockopt at the PACKET level.
+ * SOL_PACKET
+ */
+#define	LX_SOL_PACKET				263
+
+#define	LX_PACKET_ADD_MEMBERSHIP		1
+#define	LX_PACKET_DROP_MEMBERSHIP		2
+#define	LX_PACKET_RECV_OUTPUT			3
+#define	LX_PACKET_RX_RING			5
+#define	LX_PACKET_STATISTICS			6
+
+
 
 /*
  * Linux socketcall indices.
