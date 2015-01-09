@@ -26,7 +26,7 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 /*
- * Copyright (c) 2014, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2015, Joyent, Inc. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -1263,7 +1263,7 @@ mapelfexec(
 	size_t *brksize)
 {
 	Phdr *phdr;
-	int i, prot, error;
+	int i, prot, error, lastprot = 0;
 	caddr_t addr = NULL;
 	size_t zfodsz;
 	int ptload = 0;
@@ -1271,6 +1271,7 @@ mapelfexec(
 	off_t offset;
 	int hsize = ehdr->e_phentsize;
 	caddr_t mintmp = (caddr_t)-1;
+	uintptr_t lastaddr = NULL;
 	extern int use_brk_lpg;
 
 	if (ehdr->e_type == ET_DYN) {
@@ -1326,6 +1327,41 @@ mapelfexec(
 			 */
 			if (addr < mintmp)
 				mintmp = addr;
+
+			/*
+			 * Segments need not correspond to page boundaries:
+			 * they are permitted to share a page.  If two PT_LOAD
+			 * segments share the same page, and the permissions
+			 * of the segments differ, the behavior is historically
+			 * that the permissions of the latter segment are used
+			 * for the page that the two segments share.  This is
+			 * also historically a non-issue:  binaries generated
+			 * by most anything will make sure that two PT_LOAD
+			 * segments with differing permissions don't actually
+			 * share any pages.  However, there exist some crazy
+			 * things out there (including at least an obscure
+			 * Portuguese teaching language called G-Portugol) that
+			 * actually do the wrong thing and expect it to work:
+			 * they have a segment with execute permission share
+			 * a page with a subsequent segment that does not
+			 * have execute permissions and expect the resulting
+			 * shared page to in fact be executable.  To accommodate
+			 * such broken link editors, we take advantage of a
+			 * latitude explicitly granted to the loader:  it is
+			 * permitted to make _any_ PT_LOAD segment executable
+			 * (provided that it is readable or writable).  If we
+			 * see that we're sharing a page and that the previous
+			 * page was executable, we will add execute permissions
+			 * to our segment.
+			 */
+			if (btop(lastaddr) == btop((uintptr_t)addr) &&
+			    (phdr->p_flags & (PF_R | PF_W)) &&
+			    (lastprot & PROT_EXEC)) {
+				prot |= PROT_EXEC;
+			}
+
+			lastaddr = (uintptr_t)addr + phdr->p_filesz;
+			lastprot = prot;
 
 			zfodsz = (size_t)phdr->p_memsz - phdr->p_filesz;
 
