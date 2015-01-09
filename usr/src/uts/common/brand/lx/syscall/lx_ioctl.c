@@ -89,6 +89,7 @@
 #define	LX_FIOGETOWN		0x8903
 #define	LX_SIOCGPGRP		0x8904
 #define	LX_SIOCATMARK		0x8905
+#define	LX_SIOCGSTAMP		0x8906
 #define	LX_SIOCGIFCONF		0x8912
 #define	LX_SIOCGIFFLAGS		0x8913
 #define	LX_SIOCSIFFLAGS		0x8914
@@ -838,7 +839,6 @@ ict_siolifreq(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 	case SIOCSIFMETRIC:
 	case SIOCGIFMTU:
 	case SIOCSIFMTU:
-	case SIOCGIFINDEX:
 		/*
 		 * Convert cmd from SIO*IF* to SIO*LIF*.
 		 * This is needed since Linux allows ifreq operations on ipv6
@@ -846,6 +846,11 @@ ict_siolifreq(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 		 */
 		cmd = ((cmd & IOC_INOUT) |
 		    _IOW('i', ((cmd & 0xff) + 100), struct lifreq));
+		error = VOP_IOCTL(fp->f_vnode, cmd, (intptr_t)&lreq,
+		    FLFAKE(fp), fp->f_cred, &rv, NULL);
+		break;
+	case SIOCGIFINDEX:
+		cmd = SIOCGLIFINDEX;
 		error = VOP_IOCTL(fp->f_vnode, cmd, (intptr_t)&lreq,
 		    FLFAKE(fp), fp->f_cred, &rv, NULL);
 		break;
@@ -1098,6 +1103,7 @@ static ioc_cmd_translator_t ioc_translators[] = {
 	/* socket related */
 	IOC_CMD_TRANSLATOR_PASS(SIOCSPGRP)
 	IOC_CMD_TRANSLATOR_PASS(SIOCGPGRP)
+	IOC_CMD_TRANSLATOR_PASS(SIOCGSTAMP)
 	IOC_CMD_TRANSLATOR_FILTER(SIOCATMARK,		ict_siocatmark)
 	IOC_CMD_TRANSLATOR_FILTER(SIOCGIFFLAGS,		ict_siolifreq)
 	IOC_CMD_TRANSLATOR_FILTER(SIOCSIFFLAGS,		ict_siolifreq)
