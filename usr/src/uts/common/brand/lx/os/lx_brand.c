@@ -1330,7 +1330,7 @@ lx_elfexec(struct vnode *vp, struct execa *uap, struct uarg *args,
 	Ehdr		ehdr;
 	Addr		uphdr_vaddr;
 	intptr_t	voffset;
-	char		*interp;
+	char		*interp = NULL;
 	uintptr_t	ldaddr = NULL;
 	int		i;
 	proc_t		*p = ttoproc(curthread);
