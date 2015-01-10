@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <assert.h>
@@ -34,11 +34,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <errno.h>
 #include <sys/mnttab.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <fcntl.h>
 #include <unistd.h>
+#include <sys/efi_partition.h>
 
 #include <libbe.h>
 #include <libbe_priv.h>
@@ -50,6 +53,9 @@ char	*mnttab = MNTTAB;
  */
 static int set_bootfs(char *boot_rpool, char *be_root_ds);
 static int set_canmount(be_node_list_t *, char *);
+static boolean_t be_do_installgrub_mbr(char *, nvlist_t *);
+static int be_do_installgrub_helper(zpool_handle_t *, nvlist_t *, char *,
+    char *);
 static int be_do_installgrub(be_transaction_data_t *);
 static int be_get_grub_vers(be_transaction_data_t *, char **, char **);
 static int get_ver_from_capfile(char *, char **);
@@ -750,6 +756,136 @@ get_ver_from_capfile(char *file, char **vers)
 }
 
 /*
+ * To be able to boot EFI labeled disks, GRUB stage1 needs to be written
+ * into the MBR. We do not do this if we're on disks with a traditional
+ * fdisk partition table only, or if any foreign EFI partitions exist.
+ * In the trivial case of a whole-disk vdev we always write stage1 into
+ * the MBR.
+ */
+static boolean_t
+be_do_installgrub_mbr(char *diskname, nvlist_t *child)
+{
+	struct uuid allowed_uuids[] = {
+		EFI_UNUSED,
+		EFI_RESV1,
+		EFI_BOOT,
+		EFI_ROOT,
+		EFI_SWAP,
+		EFI_USR,
+		EFI_BACKUP,
+		EFI_RESV2,
+		EFI_VAR,
+		EFI_HOME,
+		EFI_ALTSCTR,
+		EFI_RESERVED,
+		EFI_SYSTEM,
+		EFI_BIOS_BOOT,
+		EFI_SYMC_PUB,
+		EFI_SYMC_CDS
+	};
+
+	uint64_t whole;
+	struct dk_gpt *gpt;
+	struct uuid *u;
+	int fd, npart, i, j;
+
+	(void) nvlist_lookup_uint64(child, ZPOOL_CONFIG_WHOLE_DISK,
+	    &whole);
+
+	if (whole)
+		return (B_TRUE);
+
+	if ((fd = open(diskname, O_RDONLY|O_NDELAY)) < 0)
+		return (B_FALSE);
+
+	if ((npart = efi_alloc_and_read(fd, &gpt)) <= 0)
+		return (B_FALSE);
+
+	for (i = 0; i != npart; i++) {
+		int match = 0;
+
+		u = &gpt->efi_parts[i].p_guid;
+
+		for (j = 0;
+		    j != sizeof (allowed_uuids) / sizeof (struct uuid);
+		    j++)
+			if (bcmp(u, &allowed_uuids[j],
+			    sizeof (struct uuid)) == 0)
+				match++;
+
+		if (match == 0)
+			return (B_FALSE);
+	}
+
+	return (B_TRUE);
+}
+
+static int
+be_do_installgrub_helper(zpool_handle_t *zphp, nvlist_t *child, char *stage1,
+    char *stage2)
+{
+	char installgrub_cmd[MAXPATHLEN];
+	char be_run_cmd_errbuf[BUFSIZ];
+	char diskname[MAXPATHLEN];
+	char *vname;
+	char *path, *dsk_ptr;
+	char *m_flag = "";
+
+	if (nvlist_lookup_string(child, ZPOOL_CONFIG_PATH, &path) != 0) {
+		be_print_err(gettext("be_do_installgrub: "
+		    "failed to get device path\n"));
+		return (BE_ERR_NODEV);
+	}
+
+	/*
+	 * Modify the vdev path to point to the raw disk.
+	 */
+	path = strdup(path);
+	if (path == NULL)
+		return (BE_ERR_NOMEM);
+
+	dsk_ptr = strstr(path, "/dsk/");
+	if (dsk_ptr != NULL) {
+		*dsk_ptr = '\0';
+		dsk_ptr++;
+	} else {
+		dsk_ptr = "";
+	}
+
+	(void) snprintf(diskname, sizeof (diskname), "%s/r%s", path, dsk_ptr);
+	free(path);
+
+	if (be_do_installgrub_mbr(diskname, child))
+		m_flag = "-m -f";
+
+	vname = zpool_vdev_name(g_zfs, zphp, child, B_FALSE);
+	if (vname == NULL) {
+		be_print_err(gettext("be_do_installgrub: "
+		    "failed to get device name: %s\n"),
+		    libzfs_error_description(g_zfs));
+		return (zfs_err_to_be_err(g_zfs));
+	}
+
+	(void) snprintf(installgrub_cmd, sizeof (installgrub_cmd),
+	    "%s %s %s %s %s", BE_INSTALL_GRUB, m_flag, stage1, stage2,
+	    diskname);
+	if (be_run_cmd(installgrub_cmd, be_run_cmd_errbuf, BUFSIZ, NULL, 0)
+	    != BE_SUCCESS) {
+		be_print_err(gettext("be_do_installgrub: installgrub "
+		    "failed for device %s.\n"), vname);
+		/* Assume localized cmd err output. */
+		be_print_err(gettext("  Command: \"%s\"\n"),
+		    installgrub_cmd);
+		be_print_err("%s", be_run_cmd_errbuf);
+		free(vname);
+		return (BE_ERR_BOOTFILE_INST);
+	}
+	free(vname);
+
+	return (BE_SUCCESS);
+}
+
+/*
  * Function:	be_do_installgrub
  * Description:	This function runs installgrub using the grub loader files
  *              from the BE we're activating and installing them on the
@@ -782,9 +918,7 @@ be_do_installgrub(be_transaction_data_t *bt)
 	char zpool_cap_file[MAXPATHLEN];
 	char stage1[MAXPATHLEN];
 	char stage2[MAXPATHLEN];
-	char installgrub_cmd[MAXPATHLEN];
 	char *vname;
-	char be_run_cmd_errbuf[BUFSIZ];
 	int ret = BE_SUCCESS;
 	int err = 0;
 	boolean_t be_mounted = B_FALSE;
@@ -868,6 +1002,7 @@ be_do_installgrub(be_transaction_data_t *bt)
 			goto done;
 		}
 		if (strcmp(vname, "mirror") == 0 || vname[0] != 'c') {
+			free(vname);
 
 			if (nvlist_lookup_nvlist_array(child[c],
 			    ZPOOL_CONFIG_CHILDREN, &nvchild, &nchildren) != 0) {
@@ -879,56 +1014,18 @@ be_do_installgrub(be_transaction_data_t *bt)
 			}
 
 			for (i = 0; i < nchildren; i++) {
-				vname = zpool_vdev_name(g_zfs, zphp,
-				    nvchild[i], B_FALSE);
-				if (vname == NULL) {
-					be_print_err(gettext(
-					    "be_do_installgrub: "
-					    "failed to get device name: %s\n"),
-					    libzfs_error_description(g_zfs));
-					ret = zfs_err_to_be_err(g_zfs);
+				ret = be_do_installgrub_helper(zphp, nvchild[i],
+				    stage1, stage2);
+				if (ret != BE_SUCCESS)
 					goto done;
-				}
-
-				(void) snprintf(installgrub_cmd,
-				    sizeof (installgrub_cmd),
-				    "%s %s %s /dev/rdsk/%s",
-				    BE_INSTALL_GRUB, stage1, stage2, vname);
-				if (be_run_cmd(installgrub_cmd,
-				    be_run_cmd_errbuf, BUFSIZ, NULL, 0) !=
-				    BE_SUCCESS) {
-					be_print_err(gettext(
-					    "be_do_installgrub: installgrub "
-					    "failed for device %s.\n"), vname);
-					/* Assume localized cmd err output. */
-					be_print_err(gettext(
-					    "  Command: \"%s\"\n"),
-					    installgrub_cmd);
-					be_print_err("%s", be_run_cmd_errbuf);
-					free(vname);
-					ret = BE_ERR_BOOTFILE_INST;
-					goto done;
-				}
-				free(vname);
 			}
 		} else {
-			(void) snprintf(installgrub_cmd,
-			    sizeof (installgrub_cmd), "%s %s %s /dev/rdsk/%s",
-			    BE_INSTALL_GRUB, stage1, stage2, vname);
-			if (be_run_cmd(installgrub_cmd, be_run_cmd_errbuf,
-			    BUFSIZ, NULL, 0) != BE_SUCCESS) {
-				be_print_err(gettext(
-				    "be_do_installgrub: installgrub "
-				    "failed for device %s.\n"), vname);
-				/* Assume localized cmd err output. */
-				be_print_err(gettext("  Command: \"%s\"\n"),
-				    installgrub_cmd);
-				be_print_err("%s", be_run_cmd_errbuf);
-				free(vname);
-				ret = BE_ERR_BOOTFILE_INST;
-				goto done;
-			}
 			free(vname);
+
+			ret = be_do_installgrub_helper(zphp, child[c], stage1,
+			    stage2);
+			if (ret != BE_SUCCESS)
+				goto done;
 		}
 	}
 
