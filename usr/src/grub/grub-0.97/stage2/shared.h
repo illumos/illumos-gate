@@ -1021,7 +1021,9 @@ int next_partition (unsigned long drive, unsigned long dest,
 		    unsigned long *partition, int *type,
 		    unsigned long *start, unsigned long *len,
 		    unsigned long *offset, int *entry,
-		    unsigned long *ext_offset, char *buf);
+                   unsigned long *ext_offset,
+                   unsigned long *gpt_offset, int *gpt_count,
+                   int *gpt_size, char *buf);
 
 /* Sets device to the one represented by the SAVED_* parameters. */
 int make_saved_active (void);
