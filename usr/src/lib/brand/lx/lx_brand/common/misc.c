@@ -1157,15 +1157,22 @@ lx_vhangup(void)
 long
 lx_eventfd(unsigned int initval)
 {
-	int r = eventfd(initval, 0);
-
-	return (r == -1 ? -errno : r);
+	return (lx_eventfd2(initval, 0));
 }
 
 long
 lx_eventfd2(unsigned int initval, int flags)
 {
 	int r = eventfd(initval, flags);
+
+	/*
+	 * eventfd(3C) may fail with ENOENT if /dev/eventfd is not available.
+	 * It is less jarring to Linux programs to tell them that the system
+	 * call is not supported than to report an error number they are not
+	 * expecting.
+	 */
+	if (r == -1 && errno == ENOENT)
+		return (-ENOTSUP);
 
 	return (r == -1 ? -errno : r);
 }
