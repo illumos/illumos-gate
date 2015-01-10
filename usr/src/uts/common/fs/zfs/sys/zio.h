@@ -420,6 +420,7 @@ struct zio {
 	hrtime_t	io_timestamp;	/* time I/O entered zio pipeline */
 	hrtime_t	io_dispatched;	/* time I/O was dispatched to disk */
 	avl_node_t	io_queue_node;
+	avl_node_t	io_offset_node;
 
 	/* Internal pipeline state */
 	enum zio_flag	io_flags;

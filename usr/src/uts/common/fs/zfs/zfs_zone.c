@@ -898,7 +898,7 @@ get_sched_pri_cb(zone_t *zonep, void *arg)
  * if something should go wrong.
  */
 static zio_t *
-get_next_zio(vdev_queue_class_t *vqc, int qdepth, zio_priority_t p)
+get_next_zio(avl_tree_t *tree, int qdepth, zio_priority_t p)
 {
 	zone_q_bump_t qbump;
 	zio_t *zp = NULL, *zphead;
@@ -911,12 +911,12 @@ get_next_zio(vdev_queue_class_t *vqc, int qdepth, zio_priority_t p)
 	qbump.zq_queue = p;
 	(void) zone_walk(get_sched_pri_cb, &qbump);
 
-	zphead = avl_first(&vqc->vqc_queued_tree);
+	zphead = avl_first(tree);
 
 	/* Check if the scheduler didn't pick a zone for some reason!? */
 	if (qbump.zq_zoneid != 0) {
-		for (zp = avl_first(&vqc->vqc_queued_tree); zp != NULL;
-		    zp = avl_walk(&vqc->vqc_queued_tree, zp, AVL_AFTER)) {
+		for (zp = avl_first(tree); zp != NULL;
+		    zp = avl_walk(tree, zp, AVL_AFTER)) {
 			if (zp->io_zoneid == qbump.zq_zoneid)
 				break;
 			cnt++;
@@ -1251,9 +1251,9 @@ zfs_zone_zio_enqueue(zio_t *zp)
  * can safely access the "last zone" variable on the queue.
  */
 zio_t *
-zfs_zone_schedule(vdev_queue_t *vq, zio_priority_t p, avl_index_t idx)
+zfs_zone_schedule(vdev_queue_t *vq, zio_priority_t p, avl_index_t idx,
+    avl_tree_t *tree)
 {
-	vdev_queue_class_t *vqc = &vq->vq_class[p];
 	uint_t cnt;
 	zoneid_t last_zone;
 	zio_t *zio;
@@ -1262,12 +1262,12 @@ zfs_zone_schedule(vdev_queue_t *vq, zio_priority_t p, avl_index_t idx)
 
 	/* Don't change the order on the LBA ordered queues. */
 	if (p != ZIO_PRIORITY_SYNC_READ && p != ZIO_PRIORITY_SYNC_WRITE)
-		return (avl_nearest(&vqc->vqc_queued_tree, idx, AVL_AFTER));
+		return (avl_nearest(tree, idx, AVL_AFTER));
 
 	/* We depend on p being defined as either 0 or 1 */
 	ASSERT(p < 2);
 
-	cnt = avl_numnodes(&vqc->vqc_queued_tree);
+	cnt = avl_numnodes(tree);
 	last_zone = vq->vq_last_zone_id;
 
 	/*
@@ -1276,9 +1276,9 @@ zfs_zone_schedule(vdev_queue_t *vq, zio_priority_t p, avl_index_t idx)
 	 * scheduling to get the next zio.
 	 */
 	if (!zfs_zone_schedule_enable || cnt < zfs_zone_schedule_thresh)
-		zio = avl_nearest(&vqc->vqc_queued_tree, idx, AVL_AFTER);
+		zio = avl_nearest(tree, idx, AVL_AFTER);
 	else
-		zio = get_next_zio(vqc, cnt, p);
+		zio = get_next_zio(tree, cnt, p);
 
 	vq->vq_last_zone_id = zio->io_zoneid;
 

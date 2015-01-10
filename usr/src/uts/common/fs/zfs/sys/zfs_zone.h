@@ -52,7 +52,8 @@ extern void zfs_zone_zio_enqueue(zio_t *);
 extern void zfs_zone_report_txg_sync(void *);
 extern hrtime_t zfs_zone_txg_delay();
 #ifdef _KERNEL
-extern zio_t *zfs_zone_schedule(vdev_queue_t *, zio_priority_t, avl_index_t);
+extern zio_t *zfs_zone_schedule(vdev_queue_t *, zio_priority_t, avl_index_t,
+    avl_tree_t *);
 #endif
 
 #ifdef	__cplusplus
