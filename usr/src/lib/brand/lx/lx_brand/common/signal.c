@@ -25,7 +25,7 @@
  */
 
 /*
- * Copyright 2014 Joyent, Inc. All rights reserved.
+ * Copyright 2015 Joyent, Inc. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -1141,7 +1141,8 @@ lx_rt_sigreturn(void)
 	 */
 	ucp = (ucontext_t *)(*(ssize_t *)sp);
 
-	lx_ucp = lx_ssp->ucp;
+	lx_ucp = &lx_ssp->uc;
+	LX_SIGRETURN(lx_ucp, ucp, sp);
 
 	/*
 	 * Illumos and Linux both follow the SysV i386 ABI layout for the
