@@ -17,7 +17,10 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
+ */
+
+/*
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -26,6 +29,7 @@
 #include <nfs/nfs.h>
 #include <nfs/export.h>
 #include <sys/cmn_err.h>
+#include <sys/avl.h>
 
 #define	PSEUDOFS_SUFFIX		" (pseudo)"
 
@@ -145,6 +149,7 @@ pseudo_exportfs(vnode_t *vp, fid_t *fid, struct exp_visible *vis_head,
 	struct exportdata *kex;
 	fsid_t fsid;
 	int vpathlen;
+	int i;
 
 	ASSERT(RW_WRITE_HELD(&exported_lock));
 
@@ -186,8 +191,14 @@ pseudo_exportfs(vnode_t *vp, fid_t *fid, struct exp_visible *vis_head,
 		srv_secinfo_exp2pseu(&exi->exi_export, exdata);
 
 	/*
-	 * Initialize auth cache lock
+	 * Initialize auth cache and auth cache lock
 	 */
+	for (i = 0; i < AUTH_TABLESIZE; i++) {
+		exi->exi_cache[i] = kmem_alloc(sizeof (avl_tree_t), KM_SLEEP);
+		avl_create(exi->exi_cache[i], nfsauth_cache_clnt_compar,
+		    sizeof (struct auth_cache_clnt),
+		    offsetof(struct auth_cache_clnt, authc_link));
+	}
 	rw_init(&exi->exi_cache_lock, NULL, RW_DEFAULT, NULL);
 
 	/*
