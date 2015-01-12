@@ -1,8 +1,8 @@
 #
 #	List of PCI ID's
 #
-#	Version: 2014.09.04
-#	Date:    2014-09-04 03:15:01
+#	Version: 2015.01.05
+#	Date:    2015-01-05 03:15:01
 #
 #	Maintained by Martin Mares <mj@ucw.cz> and other volunteers from the
 #	PCI ID Project at http://pci-ids.ucw.cz/.
@@ -257,6 +257,7 @@
 		4c53 1300  P017 mezzanine (32-bit PMC)
 		4c53 1310  P017 mezzanine (64-bit PMC)
 	002f  MegaRAID SAS 2208 IOV [Thunderbolt]
+		1028 1f39  SPERC8-e
 		1028 1f3e  SPERC 8
 	0030  53c1030 PCI-X Fusion-MPT Dual Ultra320 SCSI
 		0e11 00da  ProLiant ML 350
@@ -488,7 +489,7 @@
 	0096  SAS3004 PCI-Express Fusion-MPT SAS-3
 	0097  SAS3008 PCI-Express Fusion-MPT SAS-3
 		1028 1f45  12GB/s HBA internal
-		1028 1f46  12GB/s HBA external
+		1028 1f46  12Gbps HBA
 	0407  MegaRAID
 		1000 0530  MegaRAID 530 SCSI 320-0X RAID Controller
 		1000 0531  MegaRAID 531 SCSI 320-4X RAID Controller
@@ -1444,7 +1445,9 @@
 	6604  Opal XT [Radeon R7 M265]
 	6605  Opal PRO [Radeon R7 M260]
 	6606  Mars XTX [Radeon HD 8790M]
+		1028 0684  FirePro W4170M
 	6607  Mars LE [Radeon HD 8530M / R5 M240]
+	6608  Oland GL [FirePro W2100]
 	6610  Oland XT [Radeon HD 8670 / R7 250]
 		1019 0030  Radeon HD 8670
 		1028 2120  Radeon R7 250
@@ -1977,6 +1980,7 @@
 		1002 0310  FirePro S9000
 		1002 0420  Radeon Sky 700
 		1002 0422  Radeon Sky 900
+		1002 0710  FirePro S9050
 		1002 0b0e  FirePro S10000 Passive
 		1002 0b2a  FirePro S10000
 		1028 030c  FirePro W8000
@@ -1998,6 +2002,8 @@
 		1043 9999  ARES II
 		1092 3000  Tahiti XT2 [Radeon HD 7970 GHz Edition]
 		1458 2261  Tahiti XT2 [Radeon HD 7970 GHz Edition OC]
+# GV-R928XOC-3GD
+		1458 3001  Tahiti XTL [Radeon R9 280X OC]
 		1462 2774  MSI R7970 TF 3GD5/OC BE
 		1682 3211  Double D HD 7970 Black Edition
 # FX-797A-TNBC
@@ -2012,6 +2018,7 @@
 		1002 0b01  Radeon HD 8950 OEM
 		1002 3000  Tahiti PRO2 [Radeon HD 7950 Boost]
 		1462 3000  Radeon HD 8950 OEM
+		174b a003  Radeon R9 280
 	679b  Malta [Radeon HD 7990]
 		1002 0b28  Radeon HD 8990 OEM
 		1002 0b2a  Radeon HD 7990
@@ -2063,6 +2070,10 @@
 	6822  Venus PRO [Radeon E8860]
 	6823  Venus PRO [Radeon HD 8850M / R9 M265X]
 	6825  Heathrow XT [Radeon HD 7870M]
+		1028 053f  FirePro M6000
+		1028 05cd  FirePro M6000
+		1028 15cd  FirePro M6000
+		103c 176c  FirePro M6000
 		8086 2111  Chelsea PRO
 	6826  Chelsea LP [Radeon HD 7700M Series]
 	6827  Heathrow PRO [Radeon HD 7850M/8850M]
@@ -2070,6 +2081,7 @@
 	6829  Cape Verde
 	682a  Venus PRO
 	682b  Venus LE [Radeon HD 8830M]
+	682c  Cape Verde GL [FirePro W4100]
 	682d  Chelsea XT GL [FirePro M4000]
 	682f  Chelsea LP [Radeon HD 7730M]
 		103c 1851  Radeon HD 7750M
@@ -2115,6 +2127,7 @@
 		1028 05a3  Radeon HD 7670M
 		1028 05b9  Radeon HD 7670M
 		1028 05bb  Radeon HD 7670M
+		103c 1789  FirePro M2000
 		103c 17f1  Radeon HD 7570M
 		103c 17f4  Radeon HD 7650M
 		103c 1813  Radeon HD 7590M
@@ -2664,12 +2677,16 @@
 	68fe  Cedar LE
 	6900  Topaz XT [Radeon R7 M260/M265]
 		1028 0640  Radeon R7 M265
+		103c 2269  Radeon R7 M260
+		103c 22c8  Radeon R7 M260
+		1179 f903  Radeon R7 M260
 		1179 f934  Radeon R7 M260
 	6901  Topaz PRO [Radeon R5 M255]
 	6920  Tonga
 	6921  Amethyst XT [Radeon R9 M295X]
-	692b  Tonga XT GL [FirePro W8100]
+	692b  Tonga PRO GL [FirePro W7100]
 	692f  Tonga XT GL [FirePro W8100]
+	6938  Amethyst XT [Radeon R9 M295X Mac Edition]
 	6939  Tonga PRO [Radeon R9 285]
 	700f  RS100 AGP Bridge
 	7010  RS200/RS250 AGP Bridge
@@ -2980,6 +2997,7 @@
 	95c6  RV620 LE [Radeon HD 3450 AGP]
 	95c9  RV620 LE [Radeon HD 3450 PCI]
 	95cc  RV620 GL [FirePro V3700]
+	95cd  RV620 [FirePro 2450]
 	95cf  RV620 GL [FirePro 2260]
 	960f  RS780 HDMI Audio [Radeon (HD) 3000 Series]
 	9610  RS780 [Radeon HD 3200]
@@ -3047,9 +3065,9 @@
 	9851  Mullins [Radeon R4/R5 Graphics]
 	9852  Mullins [Radeon R2 Graphics]
 	9853  Mullins [Radeon R2 Graphics]
-	9854  Mullins [Radeon R3 Graphics]
+	9854  Mullins [Radeon R3E Graphics]
 	9855  Mullins [Radeon R6 Graphics]
-	9856  Mullins [Radeon R2 Graphics]
+	9856  Mullins [Radeon R1E/R2E Graphics]
 	9857  Mullins [Radeon APU XX-2200M with R2 Graphics]
 	9858  Mullins
 	9859  Mullins
@@ -4007,6 +4025,8 @@
 		1028 1f03  PERC 5/i Integrated RAID Controller
 	0016  PowerEdge Expandable RAID controller S300
 		1028 1f24  PERC S300 Controller
+# NV-RAM Adapter used in Dell DR appliances
+	0073  NV-RAM Adapter
 1029  Siemens Nixdorf IS
 102a  LSI Logic
 	0000  HYDRA
@@ -4697,21 +4717,21 @@
 		103c 3211  Smart Array E200i
 		103c 3212  Smart Array E200
 	3239  Smart Array Gen9 Controllers
-		103c 21bd  Smart Array
+		103c 21bd  P244br
 		103c 21be  Smart Array
-		103c 21bf  Smart Array
-		103c 21c0  Smart Array
+		103c 21bf  H240ar
+		103c 21c0  P440ar
 		103c 21c1  Smart Array
-		103c 21c2  Smart Array
-		103c 21c3  Smart Array
+		103c 21c2  P440
+		103c 21c3  P441
 		103c 21c4  Smart Array
 		103c 21c5  Smart Array
-		103c 21c6  Smart Array
-		103c 21c7  Smart Array
-		103c 21c8  Smart Array
+		103c 21c6  H244br
+		103c 21c7  H240
+		103c 21c8  H241
 		103c 21c9  Smart Array
 		103c 21ca  Smart Array
-		103c 21cb  Smart Array
+		103c 21cb  P840
 		103c 21cc  Smart Array
 		103c 21cd  Smart Array
 		103c 21ce  Smart Array
@@ -5688,6 +5708,7 @@
 	8000  10GbE Converged Network Adapter (TCP/IP Networking)
 	8001  10GbE Converged Network Adapter (FCoE)
 	8020  cLOM8214 1/10GbE Controller
+		1028 1f64  QMD8262-k 10G DP bNDC KR
 		103c 3346  CN1000Q Dual Port Converged Network Adapter
 		103c 3733  NC523SFP 10Gb 2-port Server Adapter
 		1077 0203  8200 Series Single Port 10GbE Converged Network Adapter (TCP/IP Networking)
@@ -7076,6 +7097,7 @@
 		1369 c001  LX6464ES
 		1369 c201  LX1616ES
 		14b4 d10a  DekTec DTA-110T
+		14b4 d128  Dektec DTA-140
 		14b4 d140  Dektec DTA-140
 		1a0e 006f  Dektec DTA-111
 	9060  PCI9060 32-bit 33MHz PCI <-> IOBus Bridge
@@ -9318,6 +9340,8 @@
 	0beb  GF104 High Definition Audio Controller
 		1462 2322  N460GTX Cyclone 1GD5/OC
 	0bee  GF116 High Definition Audio Controller
+	0bf0  Tegra2 PCIe x4 Bridge
+	0bf1  Tegra2 PCIe x2 Bridge
 	0ca0  GT215 [GeForce GT 330]
 	0ca2  GT215 [GeForce GT 320]
 	0ca3  GT215 [GeForce GT 240]
@@ -9412,10 +9436,13 @@
 	0e0a  GK104 HDMI Audio Controller
 	0e0b  GK106 HDMI Audio Controller
 	0e0c  GF114 HDMI Audio Controller
+	0e0f  GK208 HDMI/DP Audio Controller
 	0e1a  GK110 HDMI Audio
 	0e1b  GK107 HDMI Audio Controller
 		103c 197b  ZBook 15
 		1043 8428  GTX650-DC-1GD5
+	0e1c  Tegra3+ PCIe x4 Bridge
+	0e1d  Tegra3+ PCIe x2 Bridge
 	0e22  GF104 [GeForce GTX 460]
 		1462 2322  N460GTX Cyclone 1GD5/OC
 	0e23  GF104 [GeForce GTX 460 SE]
@@ -9427,6 +9454,7 @@
 	0f00  GF108 [GeForce GT 630]
 	0f01  GF108 [GeForce GT 620]
 	0f02  GF108 [GeForce GT 730]
+	0fbb  GM204 High Definition Audio Controller
 	0fc0  GK107 [GeForce GT 640 OEM]
 	0fc1  GK107 [GeForce GT 640]
 	0fc2  GK107 [GeForce GT 630 OEM]
@@ -9521,7 +9549,7 @@
 	1028  GK110GL [Tesla K20m]
 	1029  GK110BGL [Tesla K40s]
 	102a  GK110BGL [Tesla K40t]
-	102d  GK110BGL [Tesla K80]
+	102d  GK210GL [Tesla K80]
 	102e  GK110BGL [Tesla K40d]
 	103a  GK110GL [Quadro K6000]
 	103c  GK110GL [Quadro K5200]
@@ -9961,6 +9989,7 @@
 	1284  GK208 [GeForce GT 630 Rev. 2]
 	1286  GK208 [GeForce GT 720]
 	1287  GK208 [GeForce GT 730]
+	1288  GK208 [GeForce GT 720]
 	1290  GK208M [GeForce GT 730M]
 		103c 2afa  GeForce GT 730A
 		103c 2b04  GeForce GT 730A
@@ -10004,6 +10033,15 @@
 	13ba  GM107GL [Quadro K2200]
 	13bb  GM107GL [Quadro K620]
 	13bd  GM107GL [Tesla M40]
+	13c0  GM204 [GeForce GTX 980]
+		1043 8504  GTX980-4GD5
+	13c1  GM204
+	13c2  GM204 [GeForce GTX 970]
+	13c3  GM204
+	13d7  GM204M [GeForce GTX 980M]
+	13d8  GM204M [GeForce GTX 970M]
+	13d9  GM204M [GeForce GTX 965M]
+	17f0  GM200GL [Quadro M6000]
 10df  Emulex Corporation
 	0720  OneConnect NIC (Skyhawk)
 		17aa 1056  ThinkServer OCm14102-UX-L AnyFabric
@@ -10131,6 +10169,7 @@
 	8406  PCIcanx/PCIcan CAN interface [Kvaser AB]
 	8407  PCIcan II CAN interface (A1021, PCB-07, PCB-08) [Kvaser AB]
 	8851  S5933 on Innes Corp FM Radio Capture card
+	e004  X-Gene PCIe bridge
 10e9  Alps Electric Co., Ltd.
 10ea  Integraphics
 	1680  IGA-1680
@@ -10464,6 +10503,7 @@
 	0622  RocketRAID 622 2 Port SATA-III Controller
 	0640  RocketRAID 640 4 Port SATA-III Controller
 	0644  RocketRAID 644 4 Port SATA-III Controller (eSATA)
+	0645  RocketRAID 644L 4 Port SATA-III Controller (eSATA)
 	1720  RocketRAID 1720 (2x SATA II RAID Controller)
 	1740  RocketRAID 1740
 	1742  RocketRAID 1742
@@ -11530,6 +11570,8 @@
 		153b 1176  Cinergy 1200 DVB-C (MK3)
 		1894 0020  KNC One DVB-C V1.0
 		1894 0023  TVStation DVB-C plus
+# http://www.knc1.com/gb.htm
+		1894 0054  TV-Station DVB-S
 	7160  SAA7160
 		1458 9009  E8000 DVB-T/Analog TV/FM tuner
 		1461 1455  AVerTV Hybrid Speedy PCI-E (H788)
@@ -11671,12 +11713,22 @@
 1137  Cisco Systems Inc
 	0023  VIC 81 PCIe Upstream Port
 	0040  VIC PCIe Upstream Port
+		1137 004f  VIC 1280 Dual 40Gb Mezzanine
+		1137 0084  VIC 1240 Dual 40Gb MLOM
+		1137 0085  VIC 1225 Dual 10Gb SFP+ PCIe
+		1137 00cd  VIC 1285 Dual 40Gb QSFP+ PCIe
+		1137 00ce  VIC 1225T Dual 10GBaseT PCIe
+		1137 012a  VIC M4308 Dual 40Gb
+		1137 012c  VIC 1340 Dual 40Gb MLOM
+		1137 012e  VIC 1227 Dual 10Gb SFP+ PCIe
+		1137 0137  VIC 1380 Dual 40Gb Mezzanine
 	0041  VIC PCIe Downstream Port
 	0042  VIC Management Controller
 		1137 0047  VIC P81E PCIe Management Controller
 		1137 0085  VIC 1225 PCIe Management Controller
 		1137 00cd  VIC 1285 PCIe Management Controller
 		1137 00ce  VIC 1225T PCIe Management Controller
+		1137 012e  VIC 1227 PCIe Management Controller
 	0043  VIC Ethernet NIC
 		1137 0047  VIC P81E PCIe Ethernet NIC
 		1137 0048  VIC M81KR Mezzanine Ethernet NIC
@@ -11685,6 +11737,10 @@
 		1137 0085  VIC 1225 PCIe Ethernet NIC
 		1137 00cd  VIC 1285 PCIe Ethernet NIC
 		1137 00ce  VIC 1225T PCIe Ethernet NIC
+		1137 012a  VIC M4308 Ethernet NIC
+		1137 012c  VIC 1340 MLOM Ethernet NIC
+		1137 012e  VIC 1227 PCIe Ethernet NIC
+		1137 0137  VIC 1380 Mezzanine Ethernet NIC
 	0044  VIC Ethernet NIC Dynamic
 		1137 0047  VIC P81E PCIe Ethernet NIC Dynamic
 		1137 0048  VIC M81KR Mezzanine Ethernet NIC Dynamic
@@ -11693,6 +11749,10 @@
 		1137 0085  VIC 1225 PCIe Ethernet NIC Dynamic
 		1137 00cd  VIC 1285 PCIe Ethernet NIC Dynamic
 		1137 00ce  VIC 1225T PCIe Ethernet NIC Dynamic
+		1137 012a  VIC M4308 Ethernet NIC Dynamic
+		1137 012c  VIC 1340 MLOM Ethernet NIC Dynamic
+		1137 012e  VIC 1227 PCIe Ethernet NIC Dynamic
+		1137 0137  VIC 1380 Mezzanine Ethernet NIC Dynamic
 	0045  VIC FCoE HBA
 		1137 0047  VIC P81E PCIe FCoE HBA
 		1137 0048  VIC M81KR Mezzanine FCoE HBA
@@ -11701,9 +11761,28 @@
 		1137 0085  VIC 1225 PCIe FCoE HBA
 		1137 00cd  VIC 1285 PCIe FCoE HBA
 		1137 00ce  VIC 1225T PCIe FCoE HBA
+		1137 012a  VIC M4308 FCoE HBA
+		1137 012c  VIC 1340 MLOM FCoE HBA
+		1137 012e  VIC 1227 PCIe FCoE HBA
+		1137 0137  VIC 1380 Mezzanine FCoE HBA
+	0046  VIC SCSI Controller
+		1137 012a  VIC M4308 SCSI Controller
 	004e  VIC 82 PCIe Upstream Port
 	0071  VIC SR-IOV VF
+	007a  VIC 1300 PCIe Upstream Port
+		1137 012a  VIC M4308 Dual 40Gb
+		1137 012c  VIC 1340 Dual 40Gb MLOM
+		1137 0137  VIC 1380 Dual 40Gb Mezzanine
 	00cf  VIC Userspace NIC
+		1137 004f  VIC 1280 Mezzanine Userspace NIC
+		1137 0084  VIC 1240 MLOM Userspace NIC
+		1137 0085  VIC 1225 PCIe Userspace NIC
+		1137 00cd  VIC 1285 PCIe Userspace NIC
+		1137 00ce  VIC 1225T PCIe Userspace NIC
+		1137 012a  VIC M4308 Userspace NIC
+		1137 012c  VIC 1340 MLOM Userspace NIC
+		1137 012e  VIC 1227 PCIe Userspace NIC
+		1137 0137  VIC 1380 Mezzanine Userspace NIC
 1138  Ziatech Corporation
 	8905  8905 [STD 32 Bridge]
 1139  Dynamic Pictures, Inc
@@ -12099,13 +12178,18 @@
 117a  A-Trend Technology
 117b  L G Electronics, Inc.
 117c  ATTO Technology, Inc.
-	002c  SAS RAID Adapter
+	002c  ExpressSAS R380
+	002d  ExpressSAS R348
 	0030  Ultra320 SCSI Host Adapter
 		117c 8013  ExpressPCI UL4D
 		117c 8014  ExpressPCI UL4S
 		117c 8027  ExpressPCI UL5D
 		117c 802f  ExpressPCI UL5D Low Profile
 	0033  SAS Adapter
+	0041  ExpressSAS R30F
+	8013  ExpressPCI UL4D
+	8014  ExpressPCI UL4S
+	8027  ExpressPCI UL5D
 117d  Becton & Dickinson
 117e  T/R Systems
 117f  Integrated Circuit Systems
@@ -12571,6 +12655,7 @@
 	7810  MV78100 [Discovery Innovation] ARM SoC
 	7820  MV78200 [Discovery Innovation] ARM SoC
 	7823  MV78230 [Armada XP] ARM SoC
+	7846  88F6820 [Armada 385] ARM SoC
 	f003  GT-64010 Primary Image Piranha Image Generator
 11ac  Canon Information Systems Research Aust.
 11ad  Lite-On Communications Inc
@@ -12592,6 +12677,7 @@
 	0002  V300PSC
 	0292  V292PBC [Am29030/40 Bridge]
 	0960  V96xPBC
+	880a  Deltacast Delta-HD-22
 	c960  V96DPC
 11b1  Apricot Computers
 11b2  Eastman Kodak
@@ -15048,9 +15134,14 @@
 	5015  T502-BT Unified Wire Ethernet Controller
 	5080  T540-5080 Unified Wire Ethernet Controller
 	5081  T540-5081 Unified Wire Ethernet Controller
+	5082  T504-5082 Unified Wire Ethernet Controller
 	5083  T540-5083 Unified Wire Ethernet Controller
 	5084  T580-5084 Unified Wire Ethernet Controller
 	5085  T580-5085 Unified Wire Ethernet Controller
+	5086  T580-5086 Unified Wire Ethernet Controller
+	5087  T580-5087 Unified Wire Ethernet Controller
+	5088  T570-5088 Unified Wire Ethernet Controller
+	5089  T520-5089 Unified Wire Ethernet Controller
 	5401  T520-CR Unified Wire Ethernet Controller
 	5402  T522-CR Unified Wire Ethernet Controller
 	5403  T540-CR Unified Wire Ethernet Controller
@@ -15074,9 +15165,14 @@
 	5415  T502-BT Unified Wire Ethernet Controller
 	5480  T540-5080 Unified Wire Ethernet Controller
 	5481  T540-5081 Unified Wire Ethernet Controller
+	5482  T504-5082 Unified Wire Ethernet Controller
 	5483  T540-5083 Unified Wire Ethernet Controller
 	5484  T580-5084 Unified Wire Ethernet Controller
 	5485  T580-5085 Unified Wire Ethernet Controller
+	5486  T580-5086 Unified Wire Ethernet Controller
+	5487  T580-5087 Unified Wire Ethernet Controller
+	5488  T570-5088 Unified Wire Ethernet Controller
+	5489  T520-5089 Unified Wire Ethernet Controller
 	5501  T520-CR Unified Wire Storage Controller
 	5502  T522-CR Unified Wire Storage Controller
 	5503  T540-CR Unified Wire Storage Controller
@@ -15100,9 +15196,14 @@
 	5515  T502-BT Unified Wire Storage Controller
 	5580  T540-5080 Unified Wire Storage Controller
 	5581  T540-5081 Unified Wire Storage Controller
+	5582  T504-5082 Unified Wire Storage Controller
 	5583  T540-5083 Unified Wire Storage Controller
 	5584  T580-5084 Unified Wire Storage Controller
 	5585  T580-5085 Unified Wire Storage Controller
+	5586  T580-5086 Unified Wire Storage Controller
+	5587  T580-5087 Unified Wire Storage Controller
+	5588  T570-5088 Unified Wire Storage Controller
+	5589  T520-5089 Unified Wire Storage Controller
 	5601  T520-CR Unified Wire Storage Controller
 	5602  T522-CR Unified Wire Storage Controller
 	5603  T540-CR Unified Wire Storage Controller
@@ -15126,9 +15227,14 @@
 	5615  T502-BT Unified Wire Storage Controller
 	5680  T540-5080 Unified Wire Storage Controller
 	5681  T540-5081 Unified Wire Storage Controller
+	5682  T504-5082 Unified Wire Storage Controller
 	5683  T540-5083 Unified Wire Storage Controller
 	5684  T580-5084 Unified Wire Storage Controller
 	5685  T580-5085 Unified Wire Storage Controller
+	5686  T580-5086 Unified Wire Storage Controller
+	5687  T580-5087 Unified Wire Storage Controller
+	5688  T570-5088 Unified Wire Storage Controller
+	5689  T520-5089 Unified Wire Storage Controller
 	5701  T520-CR Unified Wire Ethernet Controller
 	5702  T522-CR Unified Wire Ethernet Controller
 	5703  T540-CR Unified Wire Ethernet Controller
@@ -15152,9 +15258,14 @@
 	5715  T502-BT Unified Wire Ethernet Controller
 	5780  T540-5080 Unified Wire Ethernet Controller
 	5781  T540-5081 Unified Wire Ethernet Controller
+	5782  T504-5082 Unified Wire Ethernet Controller
 	5783  T540-5083 Unified Wire Ethernet Controller
 	5784  T580-5084 Unified Wire Ethernet Controller
 	5785  T580-5085 Unified Wire Ethernet Controller
+	5786  T580-5086 Unified Wire Ethernet Controller
+	5787  T580-5087 Unified Wire Ethernet Controller
+	5788  T570-5088 Unified Wire Ethernet Controller
+	5789  T520-5089 Unified Wire Ethernet Controller
 	5801  T520-CR Unified Wire Ethernet Controller [VF]
 	5802  T522-CR Unified Wire Ethernet Controller [VF]
 	5803  T540-CR Unified Wire Ethernet Controller [VF]
@@ -15178,9 +15289,14 @@
 	5815  T502-BT Unified Wire Ethernet Controller [VF]
 	5880  T540-5080 Unified Wire Ethernet Controller [VF]
 	5881  T540-5081 Unified Wire Ethernet Controller [VF]
+	5882  T504-5082 Unified Wire Ethernet Controller [VF]
 	5883  T540-5083 Unified Wire Ethernet Controller [VF]
 	5884  T580-5084 Unified Wire Ethernet Controller [VF]
 	5885  T580-5085 Unified Wire Ethernet Controller [VF]
+	5886  T580-5086 Unified Wire Ethernet Controller [VF]
+	5887  T580-5087 Unified Wire Ethernet Controller [VF]
+	5888  T570-5088 Unified Wire Ethernet Controller [VF]
+	5889  T520-5089 Unified Wire Ethernet Controller [VF]
 	a000  PE10K Unified Wire Ethernet Controller
 1426  Storage Technology Corp.
 1427  Better On-Line Solutions
@@ -15428,6 +15544,8 @@
 14c2  DTK Computer
 14c3  MEDIATEK Corp.
 	7630  MT7630e 802.11bgn Wireless Network Adapter
+# MT7612E too?
+	7662  MT7662E 802.11ac PCI Express Wireless Network Adapter
 14c4  IWASAKI Information Systems Co Ltd
 14c5  Automation Products AB
 14c6  Data Race Inc
@@ -15651,6 +15769,7 @@
 	1655  NetXtreme BCM5717 Gigabit Ethernet PCIe
 	1656  NetXtreme BCM5718 Gigabit Ethernet PCIe
 	1657  NetXtreme BCM5719 Gigabit Ethernet PCIe
+		103c 169d  Ethernet 1Gb 4-port 331FLR Adapter
 	1659  NetXtreme BCM5721 Gigabit Ethernet PCI Express
 		1014 02c6  eServer xSeries server mainboard
 		1028 01e6  PowerEdge 860
@@ -16056,6 +16175,7 @@
 	4333  Serial (EDGE/GPRS modem part of Option GT Combo Edge)
 	4344  EDGE/GPRS data and 802.11b/g combo cardbus [GC89]
 	4350  BCM43222 Wireless Network Adapter
+	4351  BCM43222 802.11abgn Wireless Network Adapter
 	4353  BCM43224 802.11a/b/g/n
 		1028 000e  Wireless 1520 Half-size Mini PCIe Card
 		103c 1509  WMIB-275N Half-size Mini PCIe Card
@@ -16072,9 +16192,18 @@
 	4365  BCM43142 802.11b/g/n
 		1028 0016  Wireless 1704 802.11n + BT 4.0
 	43a0  BCM4360 802.11ac Wireless Network Adapter
+	43a1  BCM4360 802.11ac Wireless Network Adapter
+	43a2  BCM4360 802.11ac Wireless Network Adapter
 	43a9  BCM43217 802.11b/g/n
 	43aa  BCM43131 802.11b/g/n
 	43b1  BCM4352 802.11ac Wireless Network Adapter
+	43ba  BCM43602 802.11ac Wireless LAN SoC
+	43bb  BCM43602 802.11ac Wireless LAN SoC
+	43bc  BCM43602 802.11ac Wireless LAN SoC
+	43d3  BCM43567 802.11ac Wireless Network Adapter
+	43d9  BCM43570 802.11ac Wireless Network Adapter
+	43df  BCM4354 802.11ac Wireless LAN SoC
+	43ec  BCM4356 802.11ac Wireless Network Adapter
 	4401  BCM4401 100Base-T
 		1025 0035  TravelMate 660
 		103c 08b0  tc1100 tablet
@@ -16236,6 +16365,8 @@
 	1815  HCF 56k Modem
 		0e11 0022  Grizzly
 		0e11 0042  Yogi
+# Integrated in CX86111/CX86113 processors
+	1830  CX861xx Integrated Host Bridge
 	2003  HSF 56k Data/Fax Modem
 	2004  HSF 56k Data/Fax/Voice Modem
 	2005  HSF 56k Data/Fax/Voice/Spkp (w/Handset) Modem
@@ -16402,11 +16533,17 @@
 		5654 2388  GoTView PCI Hybrid Audio Capture Device
 	8852  CX23885 PCI Video and Audio Decoder
 		0070 8010  WinTV HVR-1400 ExpressCard
+		0070 f038  WinTV HVR-5525
 		107d 6f22  WinFast PxTV1200
+		13c2 3013  TT-budget CT2-4500 CI
 		1461 c039  AVerTV Hybrid Express (A577)
 		153b 117e  Cinergy T PCIe Dual
 		18ac db78  FusionHDTV DVB-T Dual Express
+		4254 0950  S950
+		4254 0952  S952
+		4254 0982  T982
 		4254 9580  T9580
+		4254 980c  T980C
 	8880  CX23887/8 PCIe Broadcast Audio and Video Decoder with 3D Comb
 		0070 c108  WinTV-HVR-4400-HD model 1278
 		5654 2389  GoTView X5 DVD Hybrid PCI-E
@@ -16765,8 +16902,12 @@
 	0191  MT25408 [ConnectX IB Flash Recovery]
 	01f6  MT27500 Family [ConnectX-3 Flash Recovery]
 	01ff  MT27600 Family [Connect-IB Flash Recovery]
+	0209  MT27700 Family [ConnectX-4 Flash Recovery]
 	1002  MT25400 Family [ConnectX-2 Virtual Function]
 	1003  MT27500 Family [ConnectX-3]
+		103c 1777  InfiniBand FDR/EN 10/40Gb Dual Port 544FLR-QSFP Adapter (Rev Cx)
+		103c 17c9  Infiniband QDR/Ethernet 10Gb 2-port 544i Adapter
+		103c 18d6  InfiniBand FDR/EN 10/40Gb Dual Port 544QSFP Adapter
 	1004  MT27500/MT27520 Family [ConnectX-3/ConnectX-3 Pro Virtual Function]
 	1005  MT27510 Family
 	1006  MT27511 Family
@@ -16781,8 +16922,8 @@
 	1010  MT27561 Family
 	1011  MT27600 [Connect-IB]
 	1012  MT27600 Family [Connect-IB Virtual Function]
-	1013  MT27620 Family
-	1014  MT27621 Family
+	1013  MT27700 Family [ConnectX-4]
+	1014  MT27700 Family [ConnectX-4 Virtual Function]
 	1015  MT27630 Family
 	1016  MT27631 Family
 	1017  MT27640 Family
@@ -17249,6 +17390,7 @@
 	002c  AR2427 802.11bg Wireless Network Adapter (PCI-Express)
 	002d  AR9227 Wireless Network Adapter
 	002e  AR9287 Wireless Network Adapter (PCI-Express)
+		105b e034  T77H167.00
 	0030  AR93xx Wireless Network Adapter
 		103c 1627  AR9380/HB112 802.11abgn 3×3 Wi-Fi Adapter
 		106b 009a  AirPort Extreme
@@ -17257,6 +17399,7 @@
 		1a56 2001  Killer Wireless-N 1103 Half-size Mini PCIe Card [AR9380]
 	0032  AR9485 Wireless Network Adapter
 		103c 1838  AR9485/HB125 802.11bgn 1×1 Wi-Fi Adapter
+		105b e044  Unex DHXA-225
 	0033  AR9580 Wireless Network Adapter
 	0034  AR9462 Wireless Network Adapter
 		1a56 2003  Killer Wireless-N 1202 Half-size Mini PCIe Card
@@ -17265,6 +17408,8 @@
 # Also used as Gigabyte GC-WB150 on a PCIe-to-mini-PCIe converter
 		1a3b 2100  AW-NB100H 802.11n Wireless Mini PCIe Card
 	003c  QCA988x 802.11ac Wireless Network Adapter
+# all QCA6174 devices?
+	003e  Killer N1525 Wireless-AC
 	0207  AR5210 Wireless Network Adapter [AR5000 802.11a]
 	1014  AR5212 802.11abg NIC
 		1014 058a  ThinkPad 11a/b/g Wireless LAN Mini Express Adapter (AR5BXB6)
@@ -17440,6 +17585,7 @@
 1760  TEDIA spol. s r. o.
 	0101  PCD-7004 Digital Bi-Directional Ports PCI Card
 	0102  PCD-7104 Digital Input & Output PCI Card
+	0303  PCD-7006C Digital Input & Output PCI Card
 1771  InnoVISION Multimedia Ltd.
 # nee SBS Technologies
 1775  GE Intelligent Platforms
@@ -17668,6 +17814,8 @@
 		1468 0305  T60N871 802.11g Mini PCI Wireless Adapter
 		1737 0029  WPC54G v4 802.11g Wireless-G Notebook Adapter
 17ff  Benq Corporation
+1800  Qualcore Logic Inc.
+	1100  Nanospeed Trading Gateway
 1803  ProdaSafe GmbH
 1805  Euresys S.A.
 1809  Lumanate, Inc.
@@ -17799,8 +17947,9 @@
 	0612  AD612 Data Acquisition Device
 	0614  MF614 Multifunction I/O Card
 	0622  AD622 Data Acquisition Device
-	0624  MF624 Multifunction I/O Card
+	0624  MF624 Multifunction I/O PCI Card
 	0625  MF625 3-phase Motor Driver
+	0634  MF634 Multifunction I/O PCIe Card
 186f  WiNRADiO Communications
 1876  L-3 Communications
 	a101  VigraWATCH PCI
@@ -18089,6 +18238,8 @@
 		1924 800b  SFN7x42Q-R1 Flareon Ultra 7000 Series 10/40G Adapter
 	1803  SFC9020 Virtual Function [Solarstorm]
 	1813  SFL9021 Virtual Function [Solarstorm]
+	1903  SFC9120 Virtual Function
+	1923  SFC9140 Virtual Function
 	6703  SFC4000 rev A iSCSI/Onload [Solarstorm]
 		10b8 0102  SMC10GPCIe-10BT (A2) [TigerCard]
 		10b8 0103  SMC10GPCIe-10BT (A3) [TigerCard]
@@ -18201,6 +18352,14 @@
 	0401  P4080
 	0408  P4040E
 	0409  P4040
+	0440  T4240 with security
+	0441  T4240 without security
+	0446  T4160 with security
+	0447  T4160 without security
+	0830  T2080 with security
+	0831  T2080 without security
+	0838  T2081 with security
+	0839  T2081 without security
 	580c  MPC5121e
 	7010  MPC8641 PCI Host Bridge
 	7011  MPC8641D PCI Host Bridge
@@ -18489,8 +18648,11 @@
 	0200  Wil6200 PCI Express Port
 	0201  Wil6200 Wireless PCI Express Port
 	0301  Wil6200 802.11ad Wireless Network Adapter
+	0302  Wil6200 802.11ad Wireless Network Adapter
+	0310  Wil6200 802.11ad Wireless Network Adapter
 1aec  Wolfson Microelectronics
-1aed  Fusion-io
+# nee Fusion-io
+1aed  SanDisk
 	1003  ioDimm3 (v1.2)
 	1005  ioDimm3
 		1014 03c3  High IOPS SSD PCIe Adapter
@@ -18555,6 +18717,9 @@
 		1af4 1100  QEMU Virtual Machine
 1b37  Signal Processing Devices Sweden AB
 	0014  ADQ412
+# now owned by HGST (a Western Digital subsidiary)
+1b39  sTec, Inc.
+	0001  S1120 PCIe Accelerator SSD
 1b3a  Westar Display Technologies
 	7589  HRED J2000 - JPEG 2000 Video Codec Device
 1b3e  Teradata Corp.
@@ -18594,6 +18759,8 @@
 # 2xHDMI and 2xHD-SDI inputs
 	e5f4  MPEG2 and H264 Encoder-Transcoder
 	f1c4  Dual ASI-RX/TX-CI card
+1b66  Deltacast
+	0007  Delta-3G-elp-11 SDI I/O Board
 1b6f  Etron Technology, Inc.
 	7023  EJ168 USB 3.0 Host Controller
 	7052  EJ188/EJ198 USB 3.0 Host Controller
@@ -18610,6 +18777,7 @@
 	d430  D410/430 Quad-port E1/T1 card
 1b85  OCZ Technology Group, Inc.
 	1041  RevoDrive 3 X2 PCI-Express SSD 240 GB (Marvell Controller)
+	8788  RevoDrive Hybrid
 1b96  Western Digital
 1b9a  XAVi Technologies Corp.
 1bad  ReFLEX CES
@@ -18637,6 +18805,8 @@
 1bfd  EeeTOP
 1c1c  Symphony
 	0001  82C101
+1c28  Lite-On IT Corp. / Plextor
+	0122  M6e PCI Express SSD [Marvell 88SS9183]
 1c2c  Fiberblaze
 	000a  Capture
 	000f  SmartNIC
@@ -18656,6 +18826,8 @@
 	0300  Telas 2.V
 1c44  Enmotus Inc
 	8000  8000 Storage IO Controller
+1c7e  TTTech Computertechnik AG
+	0200  zFAS Debug Port
 1c7f  Elektrobit Austria GmbH
 	5100  EB5100
 1c8a  TSF5 Corporation
@@ -18663,6 +18835,8 @@
 1cb1  Collion UG & Co.KG
 1cc5  Embedded Intelligence, Inc.
 	0100  CAN-PCIe-02
+1cd2  SesKion GmbH
+	0301  Simulyzer-RT CompactPCI Serial DIO-1 card
 1ce4  Exablaze
 	0001  ExaNIC X4
 	0002  ExaNIC X2
@@ -19222,6 +19396,9 @@
 5700  Netpower
 584d  AuzenTech Co., Ltd.
 5851  Exacq Technologies
+	8008  tDVR8008 8-port video capture card
+	8016  tDVR8016 16-chan video capture card
+	8032  tDVR8032 32-chan video capture card
 5853  XenSource, Inc.
 	0001  Xen Platform Device
 # Virtual device surfaced in guests to provide HID events.
@@ -19263,6 +19440,8 @@
 	3000  HD-3000
 	5500  HD5500 HDTV
 7284  HT OMEGA Inc.
+7401  EndRun Technologies
+	e100  PTP3100 PCIe PTP Slave Clock
 7604  O.N. Electronic Co Ltd.
 7bde  MIDAC Corporation
 7fed  PowerTV
@@ -19576,101 +19755,202 @@
 		8086 1015  Centrino Wireless-N 100 BGN
 		8086 1017  Centrino Wireless-N 100 BG
 	08b1  Wireless 7260
-# Wilkins Peak 2 2x2 AGN + BT
+# Wilkins Peak 2
+		8086 4020  Dual Band Wireless-N 7260
+# Wilkins Peak 2
+		8086 402a  Dual Band Wireless-N 7260
+# Wilkins Peak 2
 		8086 4060  Dual Band Wireless-N 7260
-# Wilkins Peak 2 BGN + BT
+# Wilkins Peak 2
 		8086 4062  Wireless-N 7260
-# Wilkins Peak 2 2x2 80MHz + BT
+# Wilkins Peak 2
+		8086 406a  Dual Band Wireless-N 7260
+# Wilkins Peak 2
 		8086 4070  Dual Band Wireless-AC 7260
-# Wilkins Peak 2 2x2 AGN + BT
+# Wilkins Peak 2
+		8086 4072  Dual Band Wireless-AC 7260
+# Wilkins Peak 2
 		8086 4160  Dual Band Wireless-N 7260
-# Wilkins Peak 2 BGN + BT
+# Wilkins Peak 2
 		8086 4162  Wireless-N 7260
-# Wilkins Peak 2 2x2 80MHz + BT
+# Wilkins Peak 2
 		8086 4170  Dual Band Wireless-AC 7260
-# Wilkins Peak 2 AGN + BT
+# Wilkins Peak 2
+		8086 4420  Dual Band Wireless-N 7260
+# Wilkins Peak 2
 		8086 4460  Dual Band Wireless-N 7260
-# Wilkins Peak 2 BGN + BT
+# Wilkins Peak 2
 		8086 4462  Wireless-N 7260
-# Wilkins Peak 2 2x2 80MHz + BT
+# Wilkins Peak 2
+		8086 446a  Dual Band Wireless-N 7260
+# Wilkins Peak 2
 		8086 4470  Dual Band Wireless-AC 7260
-# Wilkins Peak 2 2x2 80MHz + BT
+# Wilkins Peak 2
+		8086 4472  Dual Band Wireless-AC 7260
+# Wilkins Peak 2
+		8086 4560  Dual Band Wireless-N 7260
+# Wilkins Peak 2
+		8086 4570  Dual Band Wireless-AC 7260
+# Wilkins Peak 2
 		8086 486e  Dual Band Wireless-AC 7260
-# Wilkins Peak 2 2x2 80MHz + BT
+# Wilkins Peak 2
 		8086 4870  Dual Band Wireless-AC 7260
-# Wilkins Peak 2 2x2 80MHz + BT
+# Wilkins Peak 2
 		8086 4a6c  Dual Band Wireless-AC 7260
-# Wilkins Peak 2 2x2 80MHz + BT
+# Wilkins Peak 2
 		8086 4a6e  Dual Band Wireless-AC 7260
-# Wilkins Peak 2 2x2 80MHz + BT
+# Wilkins Peak 2
 		8086 4a70  Dual Band Wireless-AC 7260
-# Wilkins Peak 2 2x2 80MHz (No BT)
+# Wilkins Peak 2
+		8086 4c60  Dual Band Wireless-AC 7260
+# Wilkins Peak 2
+		8086 4c70  Dual Band Wireless-AC 7260
+# Wilkins Peak 2
+		8086 5070  Dual Band Wireless-AC 7260
+# Wilkins Peak 2
+		8086 5072  Dual Band Wireless-AC 7260
+# Wilkins Peak 2
+		8086 5170  Dual Band Wireless-AC 7260
+# Wilkins Peak 2
+		8086 5770  Dual Band Wireless-AC 7260
+# Wilkins Peak 2
 		8086 c020  Dual Band Wireless-N 7260
-# Wilkins Peak 2 2x2 AGN + BT
+# Wilkins Peak 2
+		8086 c02a  Dual Band Wireless-N 7260
+# Wilkins Peak 2
 		8086 c060  Dual Band Wireless-N 7260
-# Wilkins Peak 2 BGN + BT
+# Wilkins Peak 2
 		8086 c062  Wireless-N 7260
-# Wilkins Peak 2 2x2 80MHz + BT
+# Wilkins Peak 2
+		8086 c06a  Dual Band Wireless-N 7260
+# Wilkins Peak 2
 		8086 c070  Dual Band Wireless-AC 7260
-# Wilkins Peak 2 2x2 AGN + BT
+# Wilkins Peak 2
+		8086 c072  Dual Band Wireless-AC 7260
+# Wilkins Peak 2
 		8086 c160  Dual Band Wireless-N 7260
-# Wilkins Peak 2 BGN + BT
+# Wilkins Peak 2
 		8086 c162  Wireless-N 7260
-# Wilkins Peak 2 2x2 80MHz + BT
+# Wilkins Peak 2
 		8086 c170  Dual Band Wireless-AC 7260
-# Wilkins Peak 2 2x2 AGN (No BT) - Dell
+# Wilkins Peak 2
+		8086 c360  Dual Band Wireless-N 7260
+# Wilkins Peak 2
 		8086 c420  Dual Band Wireless-N 7260
-# Wilkins Peak 2 AGN + BT
+# Wilkins Peak 2
 		8086 c460  Dual Band Wireless-N 7260
-# Wilkins Peak 2 BGN + BT
+# Wilkins Peak 2
 		8086 c462  Wireless-N 7260
-# Wilkins Peak 2 2x2 80MHz + BT
+# Wilkins Peak 2
 		8086 c470  Dual Band Wireless-AC 7260
+# Wilkins Peak 2
+		8086 c472  Dual Band Wireless-AC 7260
+# Wilkins Peak 2
+		8086 c560  Dual Band Wireless-N 7260
+# Wilkins Peak 2
+		8086 c570  Dual Band Wireless-AC 7260
+# Wilkins Peak 2
+		8086 c760  Dual Band Wireless-N 7260
+# Wilkins Peak 2
+		8086 c770  Dual Band Wireless-AC 7260
+# Wilkins Peak 2
+		8086 cc60  Dual Band Wireless-AC 7260
+# Wilkins Peak 2
+		8086 cc70  Dual Band Wireless-AC 7260
 	08b2  Wireless 7260
-# Wilkins Peak 2 2x2 AGN (No BT) - Lenovo/HP
+# Wilkins Peak 2
 		8086 4220  Dual Band Wireless-N 7260
-# Wilkins Peak 2 2x2 AGN + BT - Lenovo/HP
+# Wilkins Peak 2
 		8086 4260  Dual Band Wireless-N 7260
-# Wilkins Peak 2 2x2 BGN + BT - Dell
+# Wilkins Peak 2
 		8086 4262  Wireless-N 7260
-# Wilkins Peak 2 2x2 80MHz + BT - Lenovo/HP
-		8086 4270  Dual Band Wireless-AC 7260
-# Wilkins Peak 2 2x2 80MHz (No BT) - Lenovo/HP
+# Wilkins Peak 2
+		8086 426a  Dual Band Wireless-N 7260
+# Wilkins Peak 2
+		8086 4270  Wireless-N 7260
+# Wilkins Peak 2
+		8086 4272  Dual Band Wireless-AC 7260
+# Wilkins Peak 2
+		8086 4360  Dual Band Wireless-N 7260
+# Wilkins Peak 2
+		8086 4370  Dual Band Wireless-AC 7260
+# Wilkins Peak 2
 		8086 c220  Dual Band Wireless-N 7260
-# Wilkins Peak 2 2x2 AGN + BT - Lenovo/HP
+# Wilkins Peak 2
 		8086 c260  Dual Band Wireless-N 7260
-# Wilkins Peak 2 2x2 BGN + BT - Dell
+# Wilkins Peak 2
 		8086 c262  Wireless-N 7260
-# Wilkins Peak 2 2x2 80MHz + BT - Lenovo/HP
+# Wilkins Peak 2
+		8086 c26a  Dual Band Wireless-N 7260
+# Wilkins Peak 2
 		8086 c270  Dual Band Wireless-AC 7260
+# Wilkins Peak 2
+		8086 c272  Dual Band Wireless-AC 7260
+# Wilkins Peak 2
+		8086 c370  Dual Band Wireless-AC 7260
 	08b3  Wireless 3160
-# Wilkins Peak 1 1x1 AGN + BT
+# Wilkins Peak 1
 		8086 0060  Dual Band Wireless-N 3160
-# Wilkins Peak 1 1x1 BGN + BT
+# Wilkins Peak 1
 		8086 0062  Wireless-N 3160
-# Wilkins Peak 1 1x1 80Mhz + BT
+# Wilkins Peak 1
 		8086 0070  Dual Band Wireless-AC 3160
-# Wilkins Peak 1 1x1 80Mhz + BT
+# Wilkins Peak 1
+		8086 0072  Dual Band Wireless-AC 3160
+# Wilkins Peak 1
 		8086 0170  Dual Band Wireless-AC 3160
-# Wilkins Peak 1 1x1 80Mhz + BT
+# Wilkins Peak 1
+		8086 0172  Dual Band Wireless-AC 3160
+# Wilkins Peak 1
+		8086 0260  Dual Band Wireless-N 3160
+# Wilkins Peak 1
 		8086 0470  Dual Band Wireless-AC 3160
-# Wilkins Peak 1 1x1 AGN + BT
+# Wilkins Peak 1
+		8086 0472  Dual Band Wireless-AC 3160
+# Wilkins Peak 1
+		8086 1070  Dual Band Wireless-AC 3160
+# Wilkins Peak 1
+		8086 1170  Dual Band Wireless-AC 3160
+# Wilkins Peak 1
 		8086 8060  Dual Band Wireless N-3160
-# Wilkins Peak 1 1x1 BGN + BT
+# Wilkins Peak 1
 		8086 8062  Wireless N-3160
-# Wilkins Peak 1 1x1 80Mhz + BT
+# Wilkins Peak 1
 		8086 8070  Dual Band Wireless AC 3160
-# Wilkins Peak 1 1x1 80Mhz + BT
+# Wilkins Peak 1
+		8086 8072  Dual Band Wireless AC 3160
+# Wilkins Peak 1
 		8086 8170  Dual Band Wireless AC 3160
-# Wilkins Peak 1 1x1 80Mhz + BT
+# Wilkins Peak 1
+		8086 8172  Dual Band Wireless AC 3160
+# Wilkins Peak 1
 		8086 8470  Dual Band Wireless AC 3160
+# Wilkins Peak 1
+		8086 8570  Dual Band Wireless AC 3160
 	08b4  Wireless 3160
-# Wilkins Peak 1 1x1 80Mhz + BT - lenovo/HP
+# Wilkins Peak 1
 		8086 0270  Dual Band Wireless-AC 3160
-# Wilkins Peak 1 1x1 80Mhz + BT - lenovo/HP
+# Wilkins Peak 1
+		8086 0272  Dual Band Wireless-AC 3160
+# Wilkins Peak 1
+		8086 0370  Dual Band Wireless-AC 3160
+# Wilkins Peak 1
+		8086 8260  Dual Band Wireless AC 3160
+# Wilkins Peak 1
 		8086 8270  Dual Band Wireless AC 3160
+# Wilkins Peak 1
+		8086 8272  Dual Band Wireless AC 3160
+# Wilkins Peak 1
+		8086 8370  Dual Band Wireless AC 3160
 # PowerVR SGX 545
 	08cf  Atom Processor Z2760 Integrated Graphics Controller
+	0953  PCIe Data Center SSD
+		8086 3702  DC P3700 SSD
+		8086 3703  DC P3700 SSD [2.5" SFF]
+		8086 3704  DC P3500 SSD [Add-in Card]
+		8086 3705  DC P3500 SSD [2.5" SFF]
+		8086 3709  DC P3600 SSD [Add-in Card]
+		8086 370a  DC P3600 SSD [2.5" SFF]
 	095a  Wireless 7265
 # Stone Peak 2 AC
 		8086 1010  Dual Band Wireless-AC 7265
@@ -19692,6 +19972,8 @@
 		8086 5090  Dual Band Wireless-AC 7265
 # Stone Peak 2 AGN
 		8086 5100  Dual Band Wireless-AC 7265
+# Stone Peak 2 BGN
+		8086 5102  Wireless-N 7265
 # Stone Peak 2 AGN
 		8086 510a  Dual Band Wireless-AC 7265
 # Stone Peak 2 AC
@@ -19704,12 +19986,20 @@
 		8086 5400  Dual Band Wireless-AC 7265
 # Stone Peak 2 AC
 		8086 5410  Dual Band Wireless-AC 7265
+# Stone Peak 2 AC
+		8086 5412  Dual Band Wireless-AC 7265
 # Stone Peak 2 AGN
 		8086 5420  Dual Band Wireless-N 7265
 # Maple Peak AC
 		8086 5490  Dual Band Wireless-AC 7265
+# Stone Peak 2 AC
+		8086 5510  Dual Band Wireless-AC 7265
 # Maple Peak AC
 		8086 5590  Dual Band Wireless-AC 7265
+# Stone Peak 2 AGN
+		8086 9000  Dual Band Wireless-AC 7265
+# Stone Peak 2 AGN
+		8086 900a  Dual Band Wireless-AC 7265
 # Stone Peak 2 AC
 		8086 9010  Dual Band Wireless-AC 7265
 # Stone Peak 2 AC
@@ -19722,6 +20012,8 @@
 		8086 9210  Dual Band Wireless-AC 7265
 # Stone Peak 2 AC
 		8086 9310  Dual Band Wireless-AC 7265
+# Stone Peak 2 AGN
+		8086 9400  Dual Band Wireless-AC 7265
 # Stone Peak 2 AC
 		8086 9410  Dual Band Wireless-AC 7265
 # Stone Peak 2 AC
@@ -19731,14 +20023,20 @@
 		8086 5200  Dual Band Wireless-N 7265
 # Stone Peak 2 BGN
 		8086 5202  Wireless-N 7265
+# Stone Peak 2 AGN
+		8086 520a  Dual Band Wireless-N 7265
 # Stone Peak 2 AC
 		8086 5210  Dual Band Wireless-AC 7265
+# Stone Peak 2 AC
+		8086 5212  Dual Band Wireless-AC 7265
 # Maple Peak AC
 		8086 5290  Dual Band Wireless-AC 7265
 # Stone Peak 2 BGN
-		8086 5302  Dual Band Wireless-AC 7265
+		8086 5302  Wireless-N 7265
 # Stone Peak 2 AC
 		8086 5310  Dual Band Wireless-AC 7265
+# Stone Peak 2 AGN
+		8086 9200  Dual Band Wireless-AC 7265
 	0960  80960RP (i960RP) Microprocessor/Bridge
 	0962  80960RM (i960RM) Bridge
 	0964  80960RP (i960RP) Microprocessor/Bridge
@@ -20376,6 +20674,7 @@
 	10cd  82567LF-2 Gigabit Network Connection
 	10ce  82567V-2 Gigabit Network Connection
 	10d3  82574L Gigabit Network Connection
+		103c 1785  NC112i 1-port Ethernet Server Adapter
 		103c 3250  NC112T PCI Express single Port Gigabit Server Adapter
 		1043 8369  Motherboard
 		1093 76e9  PCIe-8233 Ethernet Adapter
@@ -20794,6 +21093,7 @@
 		103c 0003  Ethernet I210-T1 GbE NIC
 		1093 7706  Compact Vision System Ethernet Adapter
 		10a9 802c  UV300 BaseIO single-port GbE
+		10a9 802d  UV3000 BaseIO GbE Network
 		17aa 1100  ThinkServer Ethernet Server Adapter
 		8086 0001  Ethernet Server Adapter I210-T1
 		8086 0002  Ethernet Server Adapter I210-T1
@@ -20833,6 +21133,8 @@
 	1571  XL710/X710 Virtual Function
 	1572  Ethernet Controller X710 for 10GbE SFP+
 		1028 1f99  Ethernet 10G 4P X710/I350 rNDC
+		17aa 0000  ThinkServer XL710 AnyFabric
+		17aa 4001  ThinkServer XL710-4 AnyFabric
 		8086 0000  Ethernet Converged Network Adapter X710
 		8086 0001  Ethernet Converged Network Adapter X710-4
 		8086 0002  Ethernet Converged Network Adapter X710-4
@@ -20900,6 +21202,25 @@
 	163b  Broadwell-U Integrated Graphics
 	163d  Broadwell-U Integrated Graphics
 	163e  Broadwell-U Integrated Graphics
+	1900  Sky Lake Host Bridge/DRAM Registers
+	1901  Sky Lake PCIe Controller (x16)
+	1904  Sky Lake Host Bridge/DRAM Registers
+	1905  Sky Lake PCIe Controller (x8)
+	1908  Sky Lake Host Bridge/DRAM Registers
+	1909  Sky Lake PCIe Controller (x4)
+	190c  Sky Lake Host Bridge/DRAM Registers
+	190f  Sky Lake Host Bridge/DRAM Registers
+	1910  Sky Lake Host Bridge/DRAM Registers
+	1911  Sky Lake Gaussian Mixture Model
+	1912  Sky Lake Integrated Graphics
+	1916  Sky Lake Integrated Graphics
+	1918  Sky Lake Host Bridge/DRAM Registers
+	1919  Sky Lake Imaging Unit
+	191e  Sky Lake Integrated Graphics
+	191f  Sky Lake Host Bridge/DRAM Registers
+	1926  Sky Lake Integrated Graphics
+	1932  Sky Lake Integrated Graphics
+	193b  Sky Lake Integrated Graphics
 	1960  80960RP (i960RP) Microprocessor
 		101e 0431  MegaRAID 431 RAID Controller
 		101e 0438  MegaRAID 438 Ultra2 LVD RAID Controller
@@ -20955,6 +21276,7 @@
 		1028 04da  Vostro 3750
 		8086 7270  Apple MacBookPro8,2 [Core i7, 15", 2011]
 	1c04  6 Series/C200 Series Chipset Family SATA RAID Controller
+		103c 3118  Smart Array B110i SATA RAID Controller
 	1c05  6 Series/C200 Series Chipset Family SATA RAID Controller
 	1c08  6 Series/C200 Series Chipset Family 2 port SATA IDE Controller
 	1c09  6 Series/C200 Series Chipset Family 2 port SATA IDE Controller
@@ -21302,6 +21624,42 @@
 	1f42  Atom processor C2000 GbE
 	1f44  Atom processor C2000 GbE Virtual Function
 	1f45  Ethernet Connection I354 2.5 GbE Backplane
+	2014  Sky Lake-E Ubox Registers
+	2015  Sky Lake-E Ubox Registers
+	2016  Sky Lake-E Ubox Registers
+	2018  Sky Lake-E M2PCI Registers
+	201a  Sky Lake-E Non-Transparent Bridge Registers
+	201c  Sky Lake-E Non-Transparent Bridge Registers
+	2021  Sky Lake-E CBDMA Registers
+	2024  Sky Lake-E MM/Vt-d Configuration Registers
+	2030  Sky Lake-E PCI Express Root Port 1A
+	2031  Sky Lake-E PCI Express Root Port 1B
+	2032  Sky Lake-E PCI Express Root Port 1C
+	2033  Sky Lake-E PCI Express Root Port 1D
+	2035  Sky Lake-E RAS Configuration Registers
+	204c  Sky Lake-E M3KTI Registers
+	204d  Sky Lake-E M3KTI Registers
+	204e  Sky Lake-E M3KTI Registers
+	2054  Sky Lake-E CHA Registers
+	2055  Sky Lake-E CHA Registers
+	2056  Sky Lake-E CHA Registers
+	2057  Sky Lake-E CHA Registers
+	2068  Sky Lake-E DDRIO Registers
+	2069  Sky Lake-E DDRIO Registers
+	206a  Sky Lake-E IOxAPIC Configuration Registers
+	206e  Sky Lake-E DDRIO Registers
+	206f  Sky Lake-E DDRIO Registers
+	2078  Sky Lake-E PCU Registers
+	207a  Sky Lake-E PCU Registers
+	2080  Sky Lake-E PCU Registers
+	2081  Sky Lake-E PCU Registers
+	2082  Sky Lake-E PCU Registers
+	2083  Sky Lake-E PCU Registers
+	2084  Sky Lake-E PCU Registers
+	2085  Sky Lake-E PCU Registers
+	2086  Sky Lake-E PCU Registers
+	208d  Sky Lake-E CHA Registers
+	208e  Sky Lake-E CHA Registers
 	2250  Xeon Phi coprocessor 5100 series
 	225c  Xeon Phi coprocessor SE10/7120 series
 	225d  Xeon Phi coprocessor 3120 series 
@@ -22798,17 +23156,17 @@
 		1028 01da  OptiPlex 745
 		1462 7235  P965 Neo MS-7235 mainboard
 	2821  82801HR/HO/HH (ICH8R/DO/DH) 6 port SATA Controller [AHCI mode]
-	2822  82801 SATA Controller [RAID mode]
+	2822  SATA Controller [RAID mode]
 		1028 020d  Inspiron 530
 		103c 2a6f  Asus IPIBL-LB Motherboard
-	2823  Wellsburg sSATA RAID Controller
+	2823  C610/X99 series chipset sSATA Controller [RAID mode]
 	2824  82801HB (ICH8) 4 port SATA Controller [AHCI mode]
 		1043 81ec  P5B
 	2825  82801HR/HO/HH (ICH8R/DO/DH) 2 port SATA Controller [IDE mode]
 		1028 01da  OptiPlex 745
 		1462 7235  P965 Neo MS-7235 mainboard
 	2826  C600/X79 series chipset SATA RAID Controller
-	2827  Wellsburg sSATA RAID Controller
+	2827  C610/X99 series chipset sSATA Controller [RAID mode]
 	2828  82801HM/HEM (ICH8M/ICH8M-E) SATA Controller [IDE mode]
 		1028 01f3  Inspiron 1420
 		103c 30c0  Compaq 6710b
@@ -23610,165 +23968,170 @@
 	2e94  4 Series Chipset HECI Controller
 	2e95  4 Series Chipset HECI Controller
 	2e96  4 Series Chipset PT IDER Controller
-	2f00  Haswell-E DMI2
-	2f01  Haswell-E PCI Express Root Port 0
-	2f02  Haswell-E PCI Express Root Port 1
-	2f03  Haswell-E PCI Express Root Port 1
-	2f04  Haswell-E PCI Express Root Port 2
-	2f05  Haswell-E PCI Express Root Port 2
-	2f06  Haswell-E PCI Express Root Port 2
-	2f07  Haswell-E PCI Express Root Port 2
-	2f08  Haswell-E PCI Express Root Port 3
-	2f09  Haswell-E PCI Express Root Port 3
-	2f0a  Haswell-E PCI Express Root Port 3
-	2f0b  Haswell-E PCI Express Root Port 3
-	2f10  Haswell-E IIO Debug
-	2f11  Haswell-E IIO Debug
-	2f12  Haswell-E IIO Debug
-	2f13  Haswell-E IIO Debug
-	2f14  Haswell-E IIO Debug
-	2f15  Haswell-E IIO Debug
-	2f16  Haswell-E IIO Debug
-	2f17  Haswell-E IIO Debug
-	2f18  Haswell-E IIO Debug
-	2f19  Haswell-E IIO Debug
-	2f1a  Haswell-E IIO Debug
-	2f1b  Haswell-E IIO Debug
-	2f1c  Haswell-E IIO Debug
-	2f1d  Haswell-E PCIe Ring Interface
-	2f1e  Haswell-E Scratchpad & Semaphore Registers
-	2f1f  Haswell-E Scratchpad & Semaphore Registers
-	2f20  Haswell-E DMA Channel 0
-	2f21  Haswell-E DMA Channel 1
-	2f22  Haswell-E DMA Channel 2
-	2f23  Haswell-E DMA Channel 3
-	2f24  Haswell-E DMA Channel 4
-	2f25  Haswell-E DMA Channel 5
-	2f26  Haswell-E DMA Channel 6
-	2f27  Haswell-E DMA Channel 7
-	2f28  Haswell-E Address Map, VTd_Misc, System Management
-	2f29  Haswell-E Hot Plug
-	2f2a  Haswell-E RAS, Control Status and Global Errors
-	2f2c  Haswell-E I/O Apic
-	2f2e  Haswell-E RAID 5/6
-	2f2f  Haswell-E RAID 5/6
-	2f30  Haswell-E Home Agent 0
-	2f32  Haswell-E QPI Link 0
-	2f33  Haswell-E QPI Link 1
-	2f34  Haswell-E PCIe Ring Interface
-	2f36  Haswell-E R3 QPI Link 0 & 1 Monitoring
-	2f37  Haswell-E R3 QPI Link 0 & 1 Monitoring
-	2f38  Haswell-E Home Agent 1
-	2f39  Haswell-E I/O Performance Monitoring
-	2f3a  Haswell-E QPI Link 2
-	2f3e  Haswell-E R3 QPI Link 2 Monitoring
-	2f3f  Haswell-E R3 QPI Link 2 Monitoring
-	2f40  Haswell-E QPI Link 2
-	2f41  Haswell-E R3 QPI Link 2 Monitoring
-	2f43  Haswell-E QPI Link 2
-	2f45  Haswell-E QPI Link 2 Debug
-	2f46  Haswell-E QPI Link 2 Debug
-	2f47  Haswell-E QPI Link 2 Debug
-	2f60  Haswell-E Home Agent 1
-	2f68  Haswell-E Integrated Memory Controller 1 Target Address, Thermal & RAS Registers
-	2f6a  Haswell-E Integrated Memory Controller 1 Channel Target Address Decoder
-	2f6b  Haswell-E Integrated Memory Controller 1 Channel Target Address Decoder
-	2f6c  Haswell-E Integrated Memory Controller 1 Channel Target Address Decoder
-	2f6d  Haswell-E Integrated Memory Controller 1 Channel Target Address Decoder
-	2f6e  Haswell-E DDRIO Channel 2/3 Broadcast
-	2f6f  Haswell-E DDRIO Global Broadcast
-	2f70  Haswell-E Home Agent 0 Debug
-	2f71  Haswell-E Integrated Memory Controller 0 Target Address, Thermal & RAS Registers
-	2f76  Haswell-E E3 QPI Link Debug
-	2f78  Haswell-E Home Agent 1 Debug
-	2f79  Haswell-E Integrated Memory Controller 1 Target Address, Thermal & RAS Registers
-	2f7d  Haswell-E Scratchpad & Semaphore Registers
-	2f7e  Haswell-E E3 QPI Link Debug
-	2f80  Haswell-E QPI Link 0
-	2f81  Haswell-E R3 QPI Link 0 & 1 Monitoring
-	2f83  Haswell-E QPI Link 0
-	2f85  Haswell-E QPI Link 0 Debug
-	2f86  Haswell-E QPI Link 0 Debug
-	2f87  Haswell-E QPI Link 0 Debug
-	2f88  Haswell-E VCU
-	2f8a  Haswell-E VCU
-	2f90  Haswell-E QPI Link 1
-	2f93  Haswell-E QPI Link 1
-	2f95  Haswell-E QPI Link 1 Debug
-	2f96  Haswell-E QPI Link 1 Debug
-	2f98  Haswell-E Power Control Unit
-	2f99  Haswell-E Power Control Unit
-	2f9a  Haswell-E Power Control Unit
-	2f9c  Haswell-E Power Control Unit
-	2fa0  Haswell-E Home Agent 0
-	2fa8  Haswell-E Integrated Memory Controller 0 Target Address, Thermal & RAS Registers
-	2faa  Haswell-E Integrated Memory Controller 0 Channel Target Address Decoder
-	2fab  Haswell-E Integrated Memory Controller 0 Channel Target Address Decoder
-	2fac  Haswell-E Integrated Memory Controller 0 Channel Target Address Decoder
-	2fad  Haswell-E Integrated Memory Controller 0 Channel Target Address Decoder
-	2fae  Haswell-E DDRIO Channel 0/1 Broadcast
-	2faf  Haswell-E DDRIO Global Broadcast
-	2fb0  Haswell-E Integrated Memory Controller 0 Channel 0 Thermal Control
-	2fb1  Haswell-E Integrated Memory Controller 0 Channel 1 Thermal Control
-	2fb2  Haswell-E Integrated Memory Controller 0 Channel 0 ERROR Registers
-	2fb3  Haswell-E Integrated Memory Controller 0 Channel 1 ERROR Registers
-	2fb4  Haswell-E Integrated Memory Controller 0 Channel 2 Thermal Control
-	2fb5  Haswell-E Integrated Memory Controller 0 Channel 3 Thermal Control
-	2fb6  Haswell-E Integrated Memory Controller 0 Channel 2 ERROR Registers
-	2fb7  Haswell-E Integrated Memory Controller 0 Channel 3 ERROR Registers
-	2fb8  Haswell-E DDRIO (VMSE) 2 & 3
-	2fb9  Haswell-E DDRIO (VMSE) 2 & 3
-	2fba  Haswell-E DDRIO (VMSE) 2 & 3
-	2fbb  Haswell-E DDRIO (VMSE) 2 & 3
-	2fbc  Haswell-E DDRIO (VMSE) 0 & 1
-	2fbd  Haswell-E DDRIO (VMSE) 0 & 1
-	2fbe  Haswell-E DDRIO (VMSE) 0 & 1
-	2fbf  Haswell-E DDRIO (VMSE) 0 & 1
-	2fc0  Haswell-E Power Control Unit
-	2fc1  Haswell-E Power Control Unit
-	2fc2  Haswell-E Power Control Unit
-	2fc3  Haswell-E Power Control Unit
-	2fc4  Haswell-E Power Control Unit
-	2fc5  Haswell-E Power Control Unit
-	2fd0  Haswell-E Integrated Memory Controller 1 Channel 0 Thermal Control
-	2fd1  Haswell-E Integrated Memory Controller 1 Channel 1 Thermal Control
-	2fd2  Haswell-E Integrated Memory Controller 1 Channel 0 ERROR Registers
-	2fd3  Haswell-E Integrated Memory Controller 1 Channel 1 ERROR Registers
-	2fd4  Haswell-E Integrated Memory Controller 1 Channel 2 Thermal Control
-	2fd5  Haswell-E Integrated Memory Controller 1 Channel 3 Thermal Control
-	2fd6  Haswell-E Integrated Memory Controller 1 Channel 2 ERROR Registers
-	2fd7  Haswell-E Integrated Memory Controller 1 Channel 3 ERROR Registers
-	2fe0  Haswell-E Unicast Registers
-	2fe1  Haswell-E Unicast Registers
-	2fe2  Haswell-E Unicast Registers
-	2fe3  Haswell-E Unicast Registers
-	2fe4  Haswell-E Unicast Registers
-	2fe5  Haswell-E Unicast Registers
-	2fe6  Haswell-E Unicast Registers
-	2fe7  Haswell-E Unicast Registers
-	2fe8  Haswell-E Unicast Registers
-	2fe9  Haswell-E Unicast Registers
-	2fea  Haswell-E Unicast Registers
-	2feb  Haswell-E Unicast Registers
-	2fec  Haswell-E Unicast Registers
-	2fed  Haswell-E Unicast Registers
-	2fee  Haswell-E Unicast Registers
-	2fef  Haswell-E Unicast Registers
-	2ff0  Haswell-E Unicast Registers
-	2ff1  Haswell-E Unicast Registers
-	2ff2  Haswell-E Unicast Registers
-	2ff3  Haswell-E Unicast Registers
-	2ff4  Haswell-E Unicast Registers
-	2ff5  Haswell-E Unicast Registers
-	2ff6  Haswell-E Unicast Registers
-	2ff7  Haswell-E Unicast Registers
-	2ff8  Haswell-E Buffered Ring Agent
-	2ff9  Haswell-E Buffered Ring Agent
-	2ffa  Haswell-E Buffered Ring Agent
-	2ffb  Haswell-E Buffered Ring Agent
-	2ffc  Haswell-E System Address Decoder & Broadcast Registers
-	2ffd  Haswell-E System Address Decoder & Broadcast Registers
-	2ffe  Haswell-E System Address Decoder & Broadcast Registers
+	2f00  Xeon E5 v3/Core i7 DMI2
+	2f01  Xeon E5 v3/Core i7 PCI Express Root Port 0
+	2f02  Xeon E5 v3/Core i7 PCI Express Root Port 1
+	2f03  Xeon E5 v3/Core i7 PCI Express Root Port 1
+	2f04  Xeon E5 v3/Core i7 PCI Express Root Port 2
+	2f05  Xeon E5 v3/Core i7 PCI Express Root Port 2
+	2f06  Xeon E5 v3/Core i7 PCI Express Root Port 2
+	2f07  Xeon E5 v3/Core i7 PCI Express Root Port 2
+	2f08  Xeon E5 v3/Core i7 PCI Express Root Port 3
+	2f09  Xeon E5 v3/Core i7 PCI Express Root Port 3
+	2f0a  Xeon E5 v3/Core i7 PCI Express Root Port 3
+	2f0b  Xeon E5 v3/Core i7 PCI Express Root Port 3
+	2f10  Xeon E5 v3/Core i7 IIO Debug
+	2f11  Xeon E5 v3/Core i7 IIO Debug
+	2f12  Xeon E5 v3/Core i7 IIO Debug
+	2f13  Xeon E5 v3/Core i7 IIO Debug
+	2f14  Xeon E5 v3/Core i7 IIO Debug
+	2f15  Xeon E5 v3/Core i7 IIO Debug
+	2f16  Xeon E5 v3/Core i7 IIO Debug
+	2f17  Xeon E5 v3/Core i7 IIO Debug
+	2f18  Xeon E5 v3/Core i7 IIO Debug
+	2f19  Xeon E5 v3/Core i7 IIO Debug
+	2f1a  Xeon E5 v3/Core i7 IIO Debug
+	2f1b  Xeon E5 v3/Core i7 IIO Debug
+	2f1c  Xeon E5 v3/Core i7 IIO Debug
+	2f1d  Xeon E5 v3/Core i7 PCIe Ring Interface
+	2f1e  Xeon E5 v3/Core i7 Scratchpad & Semaphore Registers
+	2f1f  Xeon E5 v3/Core i7 Scratchpad & Semaphore Registers
+	2f20  Xeon E5 v3/Core i7 DMA Channel 0
+	2f21  Xeon E5 v3/Core i7 DMA Channel 1
+	2f22  Xeon E5 v3/Core i7 DMA Channel 2
+	2f23  Xeon E5 v3/Core i7 DMA Channel 3
+	2f24  Xeon E5 v3/Core i7 DMA Channel 4
+	2f25  Xeon E5 v3/Core i7 DMA Channel 5
+	2f26  Xeon E5 v3/Core i7 DMA Channel 6
+	2f27  Xeon E5 v3/Core i7 DMA Channel 7
+	2f28  Xeon E5 v3/Core i7 Address Map, VTd_Misc, System Management
+	2f29  Xeon E5 v3/Core i7 Hot Plug
+	2f2a  Xeon E5 v3/Core i7 RAS, Control Status and Global Errors
+	2f2c  Xeon E5 v3/Core i7 I/O APIC
+	2f2e  Xeon E5 v3/Core i7 RAID 5/6
+	2f2f  Xeon E5 v3/Core i7 RAID 5/6
+	2f30  Xeon E5 v3/Core i7 Home Agent 0
+	2f32  Xeon E5 v3/Core i7 QPI Link 0
+	2f33  Xeon E5 v3/Core i7 QPI Link 1
+	2f34  Xeon E5 v3/Core i7 PCIe Ring Interface
+	2f36  Xeon E5 v3/Core i7 R3 QPI Link 0 & 1 Monitoring
+	2f37  Xeon E5 v3/Core i7 R3 QPI Link 0 & 1 Monitoring
+	2f38  Xeon E5 v3/Core i7 Home Agent 1
+	2f39  Xeon E5 v3/Core i7 I/O Performance Monitoring
+	2f3a  Xeon E5 v3/Core i7 QPI Link 2
+	2f3e  Xeon E5 v3/Core i7 R3 QPI Link 2 Monitoring
+	2f3f  Xeon E5 v3/Core i7 R3 QPI Link 2 Monitoring
+	2f40  Xeon E5 v3/Core i7 QPI Link 2
+	2f41  Xeon E5 v3/Core i7 R3 QPI Link 2 Monitoring
+	2f43  Xeon E5 v3/Core i7 QPI Link 2
+	2f45  Xeon E5 v3/Core i7 QPI Link 2 Debug
+	2f46  Xeon E5 v3/Core i7 QPI Link 2 Debug
+	2f47  Xeon E5 v3/Core i7 QPI Link 2 Debug
+	2f60  Xeon E5 v3/Core i7 Home Agent 1
+	2f68  Xeon E5 v3/Core i7 Integrated Memory Controller 1 Target Address, Thermal & RAS Registers
+	2f6a  Xeon E5 v3/Core i7 Integrated Memory Controller 1 Channel Target Address Decoder
+	2f6b  Xeon E5 v3/Core i7 Integrated Memory Controller 1 Channel Target Address Decoder
+	2f6c  Xeon E5 v3/Core i7 Integrated Memory Controller 1 Channel Target Address Decoder
+	2f6d  Xeon E5 v3/Core i7 Integrated Memory Controller 1 Channel Target Address Decoder
+	2f6e  Xeon E5 v3/Core i7 DDRIO Channel 2/3 Broadcast
+	2f6f  Xeon E5 v3/Core i7 DDRIO Global Broadcast
+	2f70  Xeon E5 v3/Core i7 Home Agent 0 Debug
+	2f71  Xeon E5 v3/Core i7 Integrated Memory Controller 0 Target Address, Thermal & RAS Registers
+	2f76  Xeon E5 v3/Core i7 E3 QPI Link Debug
+	2f78  Xeon E5 v3/Core i7 Home Agent 1 Debug
+	2f79  Xeon E5 v3/Core i7 Integrated Memory Controller 1 Target Address, Thermal & RAS Registers
+	2f7d  Xeon E5 v3/Core i7 Scratchpad & Semaphore Registers
+	2f7e  Xeon E5 v3/Core i7 E3 QPI Link Debug
+	2f80  Xeon E5 v3/Core i7 QPI Link 0
+	2f81  Xeon E5 v3/Core i7 R3 QPI Link 0 & 1 Monitoring
+	2f83  Xeon E5 v3/Core i7 QPI Link 0
+	2f85  Xeon E5 v3/Core i7 QPI Link 0 Debug
+	2f86  Xeon E5 v3/Core i7 QPI Link 0 Debug
+	2f87  Xeon E5 v3/Core i7 QPI Link 0 Debug
+	2f88  Xeon E5 v3/Core i7 VCU
+	2f8a  Xeon E5 v3/Core i7 VCU
+	2f90  Xeon E5 v3/Core i7 QPI Link 1
+	2f93  Xeon E5 v3/Core i7 QPI Link 1
+	2f95  Xeon E5 v3/Core i7 QPI Link 1 Debug
+	2f96  Xeon E5 v3/Core i7 QPI Link 1 Debug
+	2f98  Xeon E5 v3/Core i7 Power Control Unit
+	2f99  Xeon E5 v3/Core i7 Power Control Unit
+	2f9a  Xeon E5 v3/Core i7 Power Control Unit
+	2f9c  Xeon E5 v3/Core i7 Power Control Unit
+	2fa0  Xeon E5 v3/Core i7 Home Agent 0
+	2fa8  Xeon E5 v3/Core i7 Integrated Memory Controller 0 Target Address, Thermal & RAS Registers
+	2faa  Xeon E5 v3/Core i7 Integrated Memory Controller 0 Channel Target Address Decoder
+	2fab  Xeon E5 v3/Core i7 Integrated Memory Controller 0 Channel Target Address Decoder
+	2fac  Xeon E5 v3/Core i7 Integrated Memory Controller 0 Channel Target Address Decoder
+	2fad  Xeon E5 v3/Core i7 Integrated Memory Controller 0 Channel Target Address Decoder
+	2fae  Xeon E5 v3/Core i7 DDRIO Channel 0/1 Broadcast
+	2faf  Xeon E5 v3/Core i7 DDRIO Global Broadcast
+	2fb0  Xeon E5 v3/Core i7 Integrated Memory Controller 0 Channel 0 Thermal Control
+	2fb1  Xeon E5 v3/Core i7 Integrated Memory Controller 0 Channel 1 Thermal Control
+	2fb2  Xeon E5 v3/Core i7 Integrated Memory Controller 0 Channel 0 ERROR Registers
+	2fb3  Xeon E5 v3/Core i7 Integrated Memory Controller 0 Channel 1 ERROR Registers
+	2fb4  Xeon E5 v3/Core i7 Integrated Memory Controller 0 Channel 2 Thermal Control
+	2fb5  Xeon E5 v3/Core i7 Integrated Memory Controller 0 Channel 3 Thermal Control
+	2fb6  Xeon E5 v3/Core i7 Integrated Memory Controller 0 Channel 2 ERROR Registers
+	2fb7  Xeon E5 v3/Core i7 Integrated Memory Controller 0 Channel 3 ERROR Registers
+	2fb8  Xeon E5 v3/Core i7 DDRIO (VMSE) 2 & 3
+	2fb9  Xeon E5 v3/Core i7 DDRIO (VMSE) 2 & 3
+	2fba  Xeon E5 v3/Core i7 DDRIO (VMSE) 2 & 3
+	2fbb  Xeon E5 v3/Core i7 DDRIO (VMSE) 2 & 3
+	2fbc  Xeon E5 v3/Core i7 DDRIO (VMSE) 0 & 1
+	2fbd  Xeon E5 v3/Core i7 DDRIO (VMSE) 0 & 1
+	2fbe  Xeon E5 v3/Core i7 DDRIO (VMSE) 0 & 1
+	2fbf  Xeon E5 v3/Core i7 DDRIO (VMSE) 0 & 1
+	2fc0  Xeon E5 v3/Core i7 Power Control Unit
+	2fc1  Xeon E5 v3/Core i7 Power Control Unit
+	2fc2  Xeon E5 v3/Core i7 Power Control Unit
+	2fc3  Xeon E5 v3/Core i7 Power Control Unit
+	2fc4  Xeon E5 v3/Core i7 Power Control Unit
+	2fc5  Xeon E5 v3/Core i7 Power Control Unit
+	2fd0  Xeon E5 v3/Core i7 Integrated Memory Controller 1 Channel 0 Thermal Control
+	2fd1  Xeon E5 v3/Core i7 Integrated Memory Controller 1 Channel 1 Thermal Control
+	2fd2  Xeon E5 v3/Core i7 Integrated Memory Controller 1 Channel 0 ERROR Registers
+	2fd3  Xeon E5 v3/Core i7 Integrated Memory Controller 1 Channel 1 ERROR Registers
+	2fd4  Xeon E5 v3/Core i7 Integrated Memory Controller 1 Channel 2 Thermal Control
+	2fd5  Xeon E5 v3/Core i7 Integrated Memory Controller 1 Channel 3 Thermal Control
+	2fd6  Xeon E5 v3/Core i7 Integrated Memory Controller 1 Channel 2 ERROR Registers
+	2fd7  Xeon E5 v3/Core i7 Integrated Memory Controller 1 Channel 3 ERROR Registers
+	2fe0  Xeon E5 v3/Core i7 Unicast Registers
+	2fe1  Xeon E5 v3/Core i7 Unicast Registers
+	2fe2  Xeon E5 v3/Core i7 Unicast Registers
+	2fe3  Xeon E5 v3/Core i7 Unicast Registers
+	2fe4  Xeon E5 v3/Core i7 Unicast Registers
+	2fe5  Xeon E5 v3/Core i7 Unicast Registers
+	2fe6  Xeon E5 v3/Core i7 Unicast Registers
+	2fe7  Xeon E5 v3/Core i7 Unicast Registers
+	2fe8  Xeon E5 v3/Core i7 Unicast Registers
+	2fe9  Xeon E5 v3/Core i7 Unicast Registers
+	2fea  Xeon E5 v3/Core i7 Unicast Registers
+	2feb  Xeon E5 v3/Core i7 Unicast Registers
+	2fec  Xeon E5 v3/Core i7 Unicast Registers
+	2fed  Xeon E5 v3/Core i7 Unicast Registers
+	2fee  Xeon E5 v3/Core i7 Unicast Registers
+	2fef  Xeon E5 v3/Core i7 Unicast Registers
+	2ff0  Xeon E5 v3/Core i7 Unicast Registers
+	2ff1  Xeon E5 v3/Core i7 Unicast Registers
+	2ff2  Xeon E5 v3/Core i7 Unicast Registers
+	2ff3  Xeon E5 v3/Core i7 Unicast Registers
+	2ff4  Xeon E5 v3/Core i7 Unicast Registers
+	2ff5  Xeon E5 v3/Core i7 Unicast Registers
+	2ff6  Xeon E5 v3/Core i7 Unicast Registers
+	2ff7  Xeon E5 v3/Core i7 Unicast Registers
+	2ff8  Xeon E5 v3/Core i7 Buffered Ring Agent
+	2ff9  Xeon E5 v3/Core i7 Buffered Ring Agent
+	2ffa  Xeon E5 v3/Core i7 Buffered Ring Agent
+	2ffb  Xeon E5 v3/Core i7 Buffered Ring Agent
+	2ffc  Xeon E5 v3/Core i7 System Address Decoder & Broadcast Registers
+	2ffd  Xeon E5 v3/Core i7 System Address Decoder & Broadcast Registers
+	2ffe  Xeon E5 v3/Core i7 System Address Decoder & Broadcast Registers
+	3165  Wireless 3165
+# Stone Peak 1x1
+		8086 4010  Dual Band Wireless AC 3165
+# Stone Peak 1x1
+		8086 4210  Dual Band Wireless AC 3165
 	3200  GD31244 PCI-X SATA HBA
 		1775 c200  C2K onboard SATA host bus adapter
 	3310  IOP348 I/O Processor
@@ -25013,68 +25376,68 @@
 	8cc3  9 Series Chipset Family HM97 LPC Controller
 	8cc4  9 Series Chipset Family Z97 LPC Controller
 	8cc6  9 Series Chipset Family H97 Controller
-	8d00  Wellsburg 4-port SATA Controller [IDE mode]
-	8d02  Wellsburg 6-Port SATA Controller [AHCI mode]
-	8d04  Wellsburg SATA Controller [RAID mode]
-	8d06  Wellsburg SATA Controller [RAID mode]
+	8d00  C610/X99 series chipset 4-port SATA Controller [IDE mode]
+	8d02  C610/X99 series chipset 6-Port SATA Controller [AHCI mode]
+	8d04  C610/X99 series chipset SATA Controller [RAID mode]
+	8d06  C610/X99 series chipset SATA Controller [RAID mode]
 		17aa 1031  ThinkServer RAID 110i
-	8d08  Wellsburg 2-port SATA Controller [IDE mode]
-	8d0e  Wellsburg SATA Controller [RAID mode]
-	8d10  Wellsburg PCI Express Root Port #1
-	8d11  Wellsburg PCI Express Root Port #1
-	8d12  Wellsburg PCI Express Root Port #2
-	8d13  Wellsburg PCI Express Root Port #2
-	8d14  Wellsburg PCI Express Root Port #3
-	8d15  Wellsburg PCI Express Root Port #3
-	8d16  Wellsburg PCI Express Root Port #4
-	8d17  Wellsburg PCI Express Root Port #4
-	8d18  Wellsburg PCI Express Root Port #5
-	8d19  Wellsburg PCI Express Root Port #5
-	8d1a  Wellsburg PCI Express Root Port #6
-	8d1b  Wellsburg PCI Express Root Port #6
-	8d1c  Wellsburg PCI Express Root Port #7
-	8d1d  Wellsburg PCI Express Root Port #7
-	8d1e  Wellsburg PCI Express Root Port #8
-	8d1f  Wellsburg PCI Express Root Port #8
-	8d20  Wellsburg HD Audio Controller
-	8d21  Wellsburg HD Audio Controller
-	8d22  Wellsburg SMBus Controller
-	8d24  Wellsburg Thermal Subsystem
-	8d26  Wellsburg USB Enhanced Host Controller #1
-	8d2d  Wellsburg USB Enhanced Host Controller #2
-	8d31  Wellsburg USB xHCI Host Controller
-	8d33  Wellsburg LAN Controller
-	8d34  Wellsburg NAND Controller
-	8d3a  Wellsburg MEI Controller #1
-	8d3b  Wellsburg MEI Controller #2
-	8d3c  Wellsburg IDE-r Controller
-	8d3d  Wellsburg KT Controller
-	8d40  Wellsburg LPC Controller
-	8d41  Wellsburg LPC Controller
-	8d42  Wellsburg LPC Controller
-	8d43  Wellsburg LPC Controller
-	8d44  Wellsburg LPC Controller
-	8d45  Wellsburg LPC Controller
-	8d46  Wellsburg LPC Controller
-	8d47  Wellsburg LPC Controller
-	8d48  Wellsburg LPC Controller
-	8d49  Wellsburg LPC Controller
-	8d4a  Wellsburg LPC Controller
-	8d4b  Wellsburg LPC Controller
-	8d4c  Wellsburg LPC Controller
-	8d4d  Wellsburg LPC Controller
-	8d4e  Wellsburg LPC Controller
-	8d4f  Wellsburg LPC Controller
-	8d60  Wellsburg sSATA Controller [IDE mode]
-	8d62  Wellsburg sSATA Controller [AHCI mode]
-	8d64  Wellsburg sSATA Controller [RAID mode]
-	8d66  Wellsburg sSATA Controller [RAID mode]
-	8d68  Wellsburg sSATA Controller [IDE mode]
-	8d6e  Wellsburg sSATA Controller [RAID mode]
-	8d7c  Wellsburg SPSR
-	8d7d  Wellsburg MS SMBus 0
-	8d7e  Wellsburg MS SMBus 1
-	8d7f  Wellsburg MS SMBus 2
+	8d08  C610/X99 series chipset 2-port SATA Controller [IDE mode]
+	8d0e  C610/X99 series chipset SATA Controller [RAID mode]
+	8d10  C610/X99 series chipset PCI Express Root Port #1
+	8d11  C610/X99 series chipset PCI Express Root Port #1
+	8d12  C610/X99 series chipset PCI Express Root Port #2
+	8d13  C610/X99 series chipset PCI Express Root Port #2
+	8d14  C610/X99 series chipset PCI Express Root Port #3
+	8d15  C610/X99 series chipset PCI Express Root Port #3
+	8d16  C610/X99 series chipset PCI Express Root Port #4
+	8d17  C610/X99 series chipset PCI Express Root Port #4
+	8d18  C610/X99 series chipset PCI Express Root Port #5
+	8d19  C610/X99 series chipset PCI Express Root Port #5
+	8d1a  C610/X99 series chipset PCI Express Root Port #6
+	8d1b  C610/X99 series chipset PCI Express Root Port #6
+	8d1c  C610/X99 series chipset PCI Express Root Port #7
+	8d1d  C610/X99 series chipset PCI Express Root Port #7
+	8d1e  C610/X99 series chipset PCI Express Root Port #8
+	8d1f  C610/X99 series chipset PCI Express Root Port #8
+	8d20  C610/X99 series chipset HD Audio Controller
+	8d21  C610/X99 series chipset HD Audio Controller
+	8d22  C610/X99 series chipset SMBus Controller
+	8d24  C610/X99 series chipset Thermal Subsystem
+	8d26  C610/X99 series chipset USB Enhanced Host Controller #1
+	8d2d  C610/X99 series chipset USB Enhanced Host Controller #2
+	8d31  C610/X99 series chipset USB xHCI Host Controller
+	8d33  C610/X99 series chipset LAN Controller
+	8d34  C610/X99 series chipset NAND Controller
+	8d3a  C610/X99 series chipset MEI Controller #1
+	8d3b  C610/X99 series chipset MEI Controller #2
+	8d3c  C610/X99 series chipset IDE-r Controller
+	8d3d  C610/X99 series chipset KT Controller
+	8d40  C610/X99 series chipset LPC Controller
+	8d41  C610/X99 series chipset LPC Controller
+	8d42  C610/X99 series chipset LPC Controller
+	8d43  C610/X99 series chipset LPC Controller
+	8d44  C610/X99 series chipset LPC Controller
+	8d45  C610/X99 series chipset LPC Controller
+	8d46  C610/X99 series chipset LPC Controller
+	8d47  C610/X99 series chipset LPC Controller
+	8d48  C610/X99 series chipset LPC Controller
+	8d49  C610/X99 series chipset LPC Controller
+	8d4a  C610/X99 series chipset LPC Controller
+	8d4b  C610/X99 series chipset LPC Controller
+	8d4c  C610/X99 series chipset LPC Controller
+	8d4d  C610/X99 series chipset LPC Controller
+	8d4e  C610/X99 series chipset LPC Controller
+	8d4f  C610/X99 series chipset LPC Controller
+	8d60  C610/X99 series chipset sSATA Controller [IDE mode]
+	8d62  C610/X99 series chipset sSATA Controller [AHCI mode]
+	8d64  C610/X99 series chipset sSATA Controller [RAID mode]
+	8d66  C610/X99 series chipset sSATA Controller [RAID mode]
+	8d68  C610/X99 series chipset sSATA Controller [IDE mode]
+	8d6e  C610/X99 series chipset sSATA Controller [RAID mode]
+	8d7c  C610/X99 series chipset SPSR
+	8d7d  C610/X99 series chipset MS SMBus 0
+	8d7e  C610/X99 series chipset MS SMBus 1
+	8d7f  C610/X99 series chipset MS SMBus 2
 	9000  IXP2000 Family Network Processor
 	9001  IXP2400 Network Processor
 	9002  IXP2300 Network Processor
@@ -25203,6 +25566,87 @@
 	a012  Atom Processor D4xx/D5xx/N4xx/N5xx Integrated Graphics Controller
 		144d c072  Notebook N150P
 	a013  Atom Processor D4xx/D5xx/N4xx/N5xx CHAPS counter
+	a103  Sunrise Point-H SATA Controller [AHCI mode]
+	a105  Sunrise Point-H SATA Controller [RAID mode]
+	a107  Sunrise Point-H SATA Controller [RAID mode]
+	a10f  Sunrise Point-H SATA Controller [RAID mode]
+	a110  Sunrise Point-H PCI Express Root Port #1
+	a111  Sunrise Point-H PCI Express Root Port #2
+	a112  Sunrise Point-H PCI Express Root Port #3
+	a113  Sunrise Point-H PCI Express Root Port #4
+	a114  Sunrise Point-H PCI Express Root Port #5
+	a115  Sunrise Point-H PCI Express Root Port #6
+	a116  Sunrise Point-H PCI Express Root Port #7
+	a117  Sunrise Point-H PCI Express Root Port #8
+	a118  Sunrise Point-H PCI Express Root Port #9
+	a119  Sunrise Point-H PCI Express Root Port #10
+	a11a  Sunrise Point-H PCI Express Root Port #11
+	a11b  Sunrise Point-H PCI Express Root Port #12
+	a11c  Sunrise Point-H PCI Express Root Port #13
+	a11d  Sunrise Point-H PCI Express Root Port #14
+	a11e  Sunrise Point-H PCI Express Root Port #15
+	a11f  Sunrise Point-H PCI Express Root Port #16
+	a120  Sunrise Point-H P2SB
+	a121  Sunrise Point-H PMC
+	a122  Sunrise Point-H cAVS
+	a123  Sunrise Point-H SMBus
+	a124  Sunrise Point-H SPI Controller
+	a125  Sunrise Point-H Gigabit Ethernet Controller
+	a126  Sunrise Point-H Northpeak
+	a127  Sunrise Point-H LPSS UART #0
+	a128  Sunrise Point-H LPSS UART #1
+	a129  Sunrise Point-H LPSS SPI #0
+	a12a  Sunrise Point-H LPSS SPI #1
+	a12f  Sunrise Point-H USB 3.0 xHCI Controller
+	a130  Sunrise Point-H USB Device Controller (OTG)
+	a131  Sunrise Point-H Thermal subsystem
+	a133  Sunrise Point-H Northpeak ACPI Function
+	a135  Sunrise Point-H Integrated Sensor Hub
+	a13a  Sunrise Point-H CSME HECI #1
+	a13b  Sunrise Point-H CSME HECI #2
+	a13c  Sunrise Point-H CSME IDE Redirection
+	a13d  Sunrise Point-H KT Redirection
+	a13e  Sunrise Point-H CSME HECI #3
+	a140  Sunrise Point-H LPC Controller
+	a141  Sunrise Point-H LPC Controller
+	a142  Sunrise Point-H LPC Controller
+	a143  Sunrise Point-H LPC Controller
+	a144  Sunrise Point-H LPC Controller
+	a145  Sunrise Point-H LPC Controller
+	a146  Sunrise Point-H LPC Controller
+	a147  Sunrise Point-H LPC Controller
+	a148  Sunrise Point-H LPC Controller
+	a149  Sunrise Point-H LPC Controller
+	a14a  Sunrise Point-H LPC Controller
+	a14b  Sunrise Point-H LPC Controller
+	a14c  Sunrise Point-H LPC Controller
+	a14d  Sunrise Point-H LPC Controller
+	a14e  Sunrise Point-H LPC Controller
+	a14f  Sunrise Point-H LPC Controller
+	a150  Sunrise Point-H LPC Controller
+	a151  Sunrise Point-H LPC Controller
+	a152  Sunrise Point-H LPC Controller
+	a153  Sunrise Point-H LPC Controller
+	a154  Sunrise Point-H LPC Controller
+	a155  Sunrise Point-H LPC Controller
+	a156  Sunrise Point-H LPC Controller
+	a157  Sunrise Point-H LPC Controller
+	a158  Sunrise Point-H LPC Controller
+	a159  Sunrise Point-H LPC Controller
+	a15a  Sunrise Point-H LPC Controller
+	a15b  Sunrise Point-H LPC Controller
+	a15c  Sunrise Point-H LPC Controller
+	a15d  Sunrise Point-H LPC Controller
+	a15e  Sunrise Point-H LPC Controller
+	a15f  Sunrise Point-H LPC Controller
+	a160  Sunrise Point-H LPSS I2C Controller #0
+	a161  Sunrise Point-H LPSS I2C Controller #1
+	a166  Sunrise Point-H LPSS UART Controller #2
+	a167  Sunrise Point-H PCI Root Port #17
+	a168  Sunrise Point-H PCI Root Port #18
+	a169  Sunrise Point-H PCI Root Port #19
+	a16a  Sunrise Point-H PCI Root Port #20
+	a170  Sunrise Point-H HD Audio
 	a620  6400/6402 Advanced Memory Buffer (AMB)
 	b152  21152 PCI-to-PCI Bridge
 		8086 b152  21152 PCI-to-PCI Bridge
@@ -25732,6 +26176,7 @@ bdbd  Blackmagic Design
 	a11c  DeckLink HD Extreme 3
 	a11d  DeckLink Studio
 	a11e  DeckLink Optical Fibre
+	a120  Decklink Studio 2
 	a121  DeckLink HD Extreme 3D/3D+
 	a124  Intensity Extreme
 	a126  Intensity Shuttle
@@ -25743,6 +26188,7 @@ bdbd  Blackmagic Design
 	a12f  DeckLink Mini Monitor
 	a130  DeckLink Mini Recorder
 	a132  UltraStudio 4K
+	a138  Decklink SDI 4K
 c001  TSI Telsys
 c0a9  Micron/Crucial Technology
 c0de  Motorola
@@ -25774,6 +26220,7 @@ d161  Digium, Inc.
 	1205  Wildcard TE205P/TE207P dual-span T1/E1/J1 card 5.0V (u1)
 	1220  Wildcard TE220 dual-span T1/E1/J1 card 3.3V (PCI-Express) (5th gen)
 	1405  Wildcard TE405P/TE407P quad-span T1/E1/J1 card 5.0V (u1)
+	1410  Wildcard TE410P quad-span T1/E1/J1 card 3.3V (5th Gen)
 	1420  Wildcard TE420 quad-span T1/E1/J1 card 3.3V (PCI-Express) (5th gen)
 	1820  Wildcard TE820 octal-span T1/E1/J1 card 3.3V (PCI-Express)
 	2400  Wildcard TDM2400P 24-port analog card
@@ -25934,7 +26381,11 @@ eace  Endace Measurement Systems, Ltd
 	820f  DAG 8.2X 10G Ethernet (2nd bus)
 	8400  DAG 8.4I Infiniband x4 SDR
 	8500  DAG 8.5I Infiniband x4 DDR
+	9200  DAG 9.2SX2 10G Ethernet
 	920e  DAG 9.2X2 10G Ethernet
+	a120  DAG 10X2-P 10G Ethernet
+	a12e  DAG 10X2-S 10G Ethernet
+	a140  DAG 10X4-P 10G Ethernet
 ec80  Belkin Corporation
 	ec00  F5D6000
 ecc0  Echo Digital Audio Corporation
@@ -25951,6 +26402,7 @@ f1d0  AJA Video
 	c0ff  Kona/Xena 2
 	cafe  Kona SD
 	cfee  Xena LS/SD-22-DA/SD-DA
+	daff  KONA LHi
 	dcaf  Kona HD
 	dfee  Xena HD-DA
 	efac  Xena SD-MM/SD-22-MM
