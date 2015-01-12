@@ -859,9 +859,9 @@ dump_prgregset(note_state_t *state, const char *title)
 	Conv_inv_buf_t	inv_buf1, inv_buf2;
 	Word		w;
 
+	fdesc1 = fdesc2 = state->ns_arch->prgregset->elt0;
 	indent_enter(state, title, &fdesc1);
 
-	fdesc1 = fdesc2 = state->ns_arch->prgregset->elt0;
 	for (w = 0; w < fdesc1.slf_nelts; ) {
 		if (w == (fdesc1.slf_nelts - 1)) {
 			/* One last register is left */
@@ -927,12 +927,12 @@ dump_lwpstatus(note_state_t *state, const char *title)
 		w = extract_as_word(state, &layout->pr_why);
 		print_str(state, MSG_ORIG(MSG_CNOTE_T_PR_WHY),
 		    conv_cnote_pr_why(w, 0, &conv_buf.inv));
-	}
 
-	if (data_present(state, &layout->pr_what)) {
-		w2 = extract_as_word(state, &layout->pr_what);
-		print_str(state, MSG_ORIG(MSG_CNOTE_T_PR_WHAT),
-		    conv_cnote_pr_what(w, w2, 0, &conv_buf.inv));
+		if (data_present(state, &layout->pr_what)) {
+			w2 = extract_as_word(state, &layout->pr_what);
+			print_str(state, MSG_ORIG(MSG_CNOTE_T_PR_WHAT),
+			    conv_cnote_pr_what(w, w2, 0, &conv_buf.inv));
+		}
 	}
 
 	if (data_present(state, &layout->pr_cursig)) {
@@ -1132,12 +1132,13 @@ dump_prstatus(note_state_t *state, const char *title)
 		w = extract_as_word(state, &layout->pr_why);
 		print_str(state, MSG_ORIG(MSG_CNOTE_T_PR_WHY),
 		    conv_cnote_pr_why(w, 0, &conv_buf.inv));
-	}
 
-	if (data_present(state, &layout->pr_what)) {
-		w2 = extract_as_word(state, &layout->pr_what);
-		print_str(state, MSG_ORIG(MSG_CNOTE_T_PR_WHAT),
-		    conv_cnote_pr_what(w, w2, 0, &conv_buf.inv));
+
+		if (data_present(state, &layout->pr_what)) {
+			w2 = extract_as_word(state, &layout->pr_what);
+			print_str(state, MSG_ORIG(MSG_CNOTE_T_PR_WHAT),
+			    conv_cnote_pr_what(w, w2, 0, &conv_buf.inv));
+		}
 	}
 
 	PRINT_SUBTYPE(MSG_ORIG(MSG_CNOTE_T_PR_INFO), pr_info, dump_siginfo);
