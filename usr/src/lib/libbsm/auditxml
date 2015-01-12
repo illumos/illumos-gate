@@ -53,6 +53,9 @@ my $appDebug = 0; # used after return from "new auditxml";
 
 # Process command-line options
 our ($opt_d, $opt_e, $opt_i, $opt_o);
+$opt_e = "";
+$opt_i = "";
+$opt_o = "";
 if (!getopts('de:i:o:') || $#ARGV != 0) {
     die $usage;
 }
@@ -707,7 +710,7 @@ sub generateTableC {
 	}
 	my ($xlate, $jni) =
 	  formatTableEntry ('', $tokenId, $eventId, '', 0, 0,
-			    $tokenOrder[$sequence], 'NULL', $omit);
+			    $tokenOrder[$sequence], 'NULL', '', $omit);
 	push (@xlateEntryList, $xlate);
       }
       else {
