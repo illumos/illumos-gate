@@ -23,6 +23,7 @@
  * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
+ * Copyright (c) 2015, Joyent, Inc.  All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -507,8 +508,8 @@ typedef struct {	/* return values from system call */
 
 #if !defined(_KERNEL)
 
-extern int	syscall(int, ...);
-extern int	__systemcall(sysret_t *, int, ...);
+extern long	syscall(int, ...);
+extern long	__systemcall(sysret_t *, int, ...);
 extern int	__set_errno(int);
 
 #endif	/* _KERNEL */
