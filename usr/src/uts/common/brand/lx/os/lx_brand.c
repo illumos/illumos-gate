@@ -144,6 +144,7 @@ struct brand_mach_ops lx_mops = {
 	lx_brand_syscall_callback,	/* 64-bit common entry point */
 	NULL,
 	lx_fixsegreg,
+	lx_fsbase
 };
 
 struct brand lx_brand = {

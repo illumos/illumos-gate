@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2014, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2015, Joyent, Inc. All rights reserved.
  */
 
 #include <sys/kmem.h>
@@ -46,7 +46,7 @@ struct brand_mach_ops native_mach_ops  = {
 };
 #else /* !__sparcv9 */
 struct brand_mach_ops native_mach_ops  = {
-		NULL, NULL, NULL, NULL, NULL, NULL
+		NULL, NULL, NULL, NULL, NULL, NULL, NULL
 };
 #endif /* !__sparcv9 */
 

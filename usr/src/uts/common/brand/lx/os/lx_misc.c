@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright (c) 2014, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2015, Joyent, Inc. All rights reserved.
  */
 
 #include <sys/errno.h>
@@ -405,6 +405,21 @@ lx_fixsegreg(greg_t sr, model_t datamodel)
 	datamodel = datamodel;  /* datamodel currently unused for 32-bit */
 	return (sr | SEL_TI_LDT | SEL_UPL);
 #endif	/* __amd64 */
+}
+
+/*
+ * Brand-specific function to convert the fsbase as pulled from the regsiter
+ * into a native fsbase suitable for locating the ulwp_t from the kernel.
+ */
+uintptr_t
+lx_fsbase(klwp_t *lwp, uintptr_t fsbase)
+{
+	lx_lwp_data_t *lwpd = lwp->lwp_brand;
+
+	if (lwpd->br_ntv_syscall || lwpd->br_ntv_fsbase == NULL)
+		return (fsbase);
+
+	return (lwpd->br_ntv_fsbase);
 }
 
 /*
