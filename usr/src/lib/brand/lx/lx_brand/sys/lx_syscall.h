@@ -25,7 +25,7 @@
  */
 
 /*
- * Copyright 2014 Joyent, Inc. All rights reserved.
+ * Copyright 2015 Joyent, Inc. All rights reserved.
  */
 
 #ifndef _SYS_LX_SYSCALL_H
@@ -390,6 +390,14 @@ extern long lx_yield(void);
 #define	LX_EMUL_ioctl			LX_N_IKE_FUNCS
 
 /* Note: adjust LX_N_IKE_FUNCS when adding new in-kernel functions */
+
+/* Linux vsyscall addresses */
+
+#if defined(_LP64)
+#define	LX_VSYS_gettimeofday	(uintptr_t)0xffffffffff600000
+#define	LX_VSYS_time		(uintptr_t)0xffffffffff600400
+#define	LX_VSYS_getcpu		(uintptr_t)0xffffffffff600800
+#endif
 
 #ifdef	__cplusplus
 }
