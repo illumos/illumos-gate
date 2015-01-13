@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2014 Joyent, Inc. All rights reserved.
+ * Copyright 2015 Joyent, Inc. All rights reserved.
  */
 
 #include <sys/errno.h>
@@ -104,6 +104,7 @@ struct brand_mach_ops sn1_mops = {
 	sn1_brand_int91_callback,
 	sn1_brand_syscall_callback,
 	sn1_brand_syscall32_callback,
+	NULL,
 	NULL
 };
 
@@ -114,6 +115,7 @@ struct brand_mach_ops sn1_mops = {
 	NULL,
 	NULL,
 	sn1_brand_syscall_callback,
+	NULL,
 	NULL,
 	NULL
 };

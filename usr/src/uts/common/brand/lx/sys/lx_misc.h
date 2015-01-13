@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2014 Joyent, Inc.  All rights reserved.
+ * Copyright 2015 Joyent, Inc.  All rights reserved.
  */
 
 #ifndef _SYS__LX_MISC_H
@@ -37,6 +37,7 @@ extern void lx_clear_gdt(int);
 extern longlong_t lx_nosys();
 
 extern greg_t lx_fixsegreg(greg_t, model_t);
+extern uintptr_t lx_fsbase(klwp_t *, uintptr_t);
 extern void lx_exit_with_sig(proc_t *, sigqueue_t *, void *);
 extern boolean_t lx_wait_filter(proc_t *, proc_t *);
 

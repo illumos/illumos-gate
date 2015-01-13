@@ -24,7 +24,9 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 2015, Joyent, Inc. All rights reserved.
+ */
 
 #include <sys/fasttrap_isa.h>
 #include <sys/fasttrap_impl.h>
@@ -38,6 +40,9 @@
 #include <sys/sysmacros.h>
 #include <sys/trap.h>
 #include <sys/archsystm.h>
+#include <sys/proc.h>
+#include <sys/brand.h>
+#include <sys/machbrand.h>
 
 /*
  * Lossless User-Land Tracing on x86
@@ -1394,6 +1399,13 @@ fasttrap_pid_probe(struct regs *rp)
 #if defined(__amd64)
 		if (p->p_model == DATAMODEL_LP64) {
 			addr = lwp->lwp_pcb.pcb_fsbase;
+
+			/*
+			 * If we're branded, convert the fsbase from the				 * brand's fsbase to the native fsbase.
+			 */
+			if (PROC_IS_BRANDED(p) && BRMOP(p)->b_fsbase != NULL)
+				addr = BRMOP(p)->b_fsbase(lwp, addr);
+
 			addr += sizeof (void *);
 		} else {
 			addr = lwp->lwp_pcb.pcb_gsbase;

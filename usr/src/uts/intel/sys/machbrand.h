@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2015, Joyent, Inc. All rights reserved.
  */
 
 #ifndef _SYS_MACHBRAND_H
@@ -40,6 +41,7 @@ struct brand_mach_ops {
 	void	(*b_syscall)(void);
 	void	(*b_syscall32)(void);
 	greg_t	(*b_fixsegreg)(greg_t, model_t);
+	uintptr_t (*b_fsbase)(klwp_t *, uintptr_t);
 };
 
 #endif	/* _ASM */

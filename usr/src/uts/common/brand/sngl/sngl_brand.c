@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2014, Joyent, Inc. All rights reserved.
+ * Copyright 2015, Joyent, Inc. All rights reserved.
  */
 
 #include <sys/errno.h>
@@ -94,7 +94,8 @@ struct brand_mach_ops sngl_mops = {
 	sngl_brand_sysenter_callback,
 	sngl_brand_int91_callback,
 	sngl_brand_syscall_callback,
-	sngl_brand_syscall32_callback
+	sngl_brand_syscall32_callback,
+	NULL
 };
 
 #else	/* ! __amd64 */
@@ -103,6 +104,7 @@ struct brand_mach_ops sngl_mops = {
 	sngl_brand_sysenter_callback,
 	NULL,
 	sngl_brand_syscall_callback,
+	NULL,
 	NULL
 };
 #endif	/* __amd64 */
