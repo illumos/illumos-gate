@@ -26,6 +26,7 @@
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
  * Copyright (c) 2014, Joyent, Inc. All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
+ * Copyright 2015 Gary Mills
  */
 
 #include <sys/types.h>
@@ -49,7 +50,9 @@
 #include "Pcontrol.h"
 #include "P32ton.h"
 #include "Putil.h"
+#ifdef __x86
 #include "Pcore_linux.h"
+#endif
 
 /*
  * Pcore.c - Code to initialize a ps_prochandle from a core dump.  We
@@ -219,7 +222,7 @@ Pfini_core(struct ps_prochandle *P, void *data)
 			free(core->core_ppii);
 		if (core->core_zonename != NULL)
 			free(core->core_zonename);
-#if defined(__i386) || defined(__amd64)
+#ifdef __x86
 		if (core->core_ldt != NULL)
 			free(core->core_ldt);
 #endif
@@ -271,7 +274,7 @@ Pzonename_core(struct ps_prochandle *P, char *s, size_t n, void *data)
 	return (s);
 }
 
-#if defined(__i386) || defined(__amd64)
+#ifdef __x86
 /*ARGSUSED*/
 static int
 Pldt_core(struct ps_prochandle *P, struct ssd *pldt, int nldt, void *data)
@@ -305,7 +308,7 @@ static const ps_ops_t P_core_ops = {
 	.pop_platform	= Pplatform_core,
 	.pop_uname	= Puname_core,
 	.pop_zonename	= Pzonename_core,
-#if defined(__i386) || defined(__amd64)
+#ifdef __x86
 	.pop_ldt	= Pldt_core
 #endif
 };
@@ -430,6 +433,8 @@ err:
 	dprintf("Pgrab_core: failed to read NT_LWPSTATUS\n");
 	return (-1);
 }
+
+#ifdef __x86
 
 static void
 lx_prpsinfo32_to_psinfo(lx_prpsinfo32_t *p32, psinfo_t *psinfo)
@@ -629,6 +634,8 @@ err:
 	return (-1);
 }
 
+#endif /* __x86 */
+
 static int
 note_psinfo(struct ps_prochandle *P, size_t nbytes)
 {
@@ -827,7 +834,7 @@ note_cred(struct ps_prochandle *P, size_t nbytes)
 	return (0);
 }
 
-#if defined(__i386) || defined(__amd64)
+#ifdef __x86
 static int
 note_ldt(struct ps_prochandle *P, size_t nbytes)
 {
@@ -1125,9 +1132,17 @@ note_notsup(struct ps_prochandle *P, size_t nbytes)
  */
 static int (*nhdlrs[])(struct ps_prochandle *, size_t) = {
 	note_notsup,		/*  0	unassigned		*/
+#ifdef __x86
 	note_linux_prstatus,		/*  1	NT_PRSTATUS (old)	*/
+#else
+	note_notsup,		/*  1	NT_PRSTATUS (old)	*/
+#endif
 	note_notsup,		/*  2	NT_PRFPREG (old)	*/
+#ifdef __x86
 	note_linux_psinfo,		/*  3	NT_PRPSINFO (old)	*/
+#else
+	note_notsup,		/*  3	NT_PRPSINFO (old)	*/
+#endif
 #ifdef __sparc
 	note_xreg,		/*  4	NT_PRXREG		*/
 #else
@@ -1146,7 +1161,7 @@ static int (*nhdlrs[])(struct ps_prochandle *, size_t) = {
 	note_notsup,		/*  7	NT_GWINDOWS		*/
 	note_notsup,		/*  8	NT_ASRS			*/
 #endif
-#if defined(__i386) || defined(__amd64)
+#ifdef __x86
 	note_ldt,		/*  9	NT_LDT			*/
 #else
 	note_notsup,		/*  9	NT_LDT			*/
@@ -2201,7 +2216,9 @@ Pfgrab_core(int core_fd, const char *aout_path, int *perr)
 	struct stat64 stbuf;
 	void *phbuf, *php;
 	size_t nbytes;
+#ifdef __x86
 	boolean_t from_linux = B_FALSE;
+#endif
 
 	elf_file_t aout;
 	elf_file_t core;
@@ -2449,9 +2466,11 @@ Pfgrab_core(int core_fd, const char *aout_path, int *perr)
 			 * The presence of either of these notes indicates that
 			 * the dump was generated on Linux.
 			 */
+#ifdef __x86
 			if (nhdr.n_type == NT_PRSTATUS ||
 			    nhdr.n_type == NT_PRPSINFO)
 				from_linux = B_TRUE;
+#endif
 		} else {
 			(void) note_notsup(P, nhdr.n_descsz);
 		}
@@ -2473,6 +2492,7 @@ Pfgrab_core(int core_fd, const char *aout_path, int *perr)
 		nleft -= sizeof (nhdr) + namesz + descsz;
 	}
 
+#ifdef __x86
 	if (from_linux) {
 		size_t tcount, pid;
 		lwp_info_t *lwp;
@@ -2526,6 +2546,7 @@ Pfgrab_core(int core_fd, const char *aout_path, int *perr)
 		(void) memcpy(&P->status.pr_lwp, &lwp->lwp_status,
 		    sizeof (P->status.pr_lwp));
 	}
+#endif /* __x86 */
 
 	if (nleft != 0) {
 		dprintf("Pgrab_core: note section malformed\n");
