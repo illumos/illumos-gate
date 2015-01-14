@@ -22,7 +22,7 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2014 Joyent, Inc.  All rights reserved.
+ * Copyright 2015 Joyent, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -230,11 +230,20 @@ lx_fcntl_com(int fd, int cmd, ulong_t arg)
 		break;
 
 	case LX_F_SETOWN:
+		if ((int)arg == 1) {
+			/* Setown for the init process uses the real pid. */
+			arg = (ulong_t)zoneinit_pid;
+		}
+
 		rc = fcntl(fd, F_SETOWN, arg);
 		break;
 
 	case LX_F_GETOWN:
 		rc = fcntl(fd, F_GETOWN, arg);
+		if (rc == zoneinit_pid) {
+			/* Getown for the init process returns 1. */
+			rc = 1;
+		}
 		break;
 
 	default:
