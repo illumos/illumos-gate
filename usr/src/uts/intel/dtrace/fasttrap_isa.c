@@ -1401,7 +1401,8 @@ fasttrap_pid_probe(struct regs *rp)
 			addr = lwp->lwp_pcb.pcb_fsbase;
 
 			/*
-			 * If we're branded, convert the fsbase from the				 * brand's fsbase to the native fsbase.
+			 * If we're branded, convert the fsbase from the
+			 * brand's fsbase to the native fsbase.
 			 */
 			if (PROC_IS_BRANDED(p) && BRMOP(p)->b_fsbase != NULL)
 				addr = BRMOP(p)->b_fsbase(lwp, addr);
