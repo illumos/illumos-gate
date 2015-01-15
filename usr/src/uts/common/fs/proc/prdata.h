@@ -23,15 +23,11 @@
  * Use is subject to license terms.
  */
 
-/*
- * Copyright (c) 2013, Joyent, Inc. All rights reserved.
- */
-
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 /*
- * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ * Copyright 2015, Joyent, Inc.
  */
 
 #ifndef _SYS_PROC_PRDATA_H
@@ -127,6 +123,7 @@ typedef enum prnodetype {
 #if defined(__i386) || defined(__amd64)
 	PR_LDT,			/* /proc/<pid>/ldt			*/
 #endif
+	PR_ARGV,		/* /proc/<pid>/argv			*/
 	PR_USAGE,		/* /proc/<pid>/usage			*/
 	PR_LUSAGE,		/* /proc/<pid>/lusage			*/
 	PR_PAGEDATA,		/* /proc/<pid>/pagedata			*/
@@ -351,6 +348,7 @@ extern	int	pr_unset(proc_t *, long);
 extern	void	pr_sethold(prnode_t *, sigset_t *);
 extern	void	pr_setfault(proc_t *, fltset_t *);
 extern	int	prusrio(proc_t *, enum uio_rw, struct uio *, int);
+extern	int	prreadargv(proc_t *, char *, size_t, size_t *);
 extern	int	prwritectl(vnode_t *, struct uio *, cred_t *);
 extern	int	prlock(prnode_t *, int);
 extern	void	prunmark(proc_t *);
