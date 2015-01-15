@@ -43,8 +43,10 @@ SYMBOL_VERSION SUNWprivate_1.1 {
     global:
 	add_tnode;
 	custr_alloc;
+	custr_alloc_buf;
 	custr_append;
 	custr_appendc;
+	custr_append_printf;
 	custr_cstr;
 	custr_free;
 	custr_len;
