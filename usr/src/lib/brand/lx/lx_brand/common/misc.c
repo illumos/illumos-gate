@@ -997,6 +997,15 @@ lx_mincore(caddr_t addr, size_t len, char *vec)
 	int r;
 
 	r = mincore(addr, len, vec);
+	if (r == -1 && errno == EINVAL) {
+		/*
+		 * LTP mincore01 expects mincore with a huge len to fail with
+		 * ENOMEM on a modern kernel but on Linux 2.6.11 and earlier it
+		 * returns EINVAL.
+		 */
+		if (strcmp(lx_release, "2.6.11") > 0 && (long)len < 0)
+			errno = ENOMEM;
+	}
 	return ((r == -1) ? -errno : r);
 }
 
