@@ -22,6 +22,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2015, Joyent, Inc.  All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -31,8 +32,6 @@
  * Portions of this source code were derived from Berkeley 4.3 BSD
  * under license from the Regents of the University of California.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/isa_defs.h>
@@ -923,6 +922,397 @@ out:
 	return (count);
 }
 
+ssize_t
+preadv(int fdes, struct iovec *iovp, int iovcnt, off_t offset,
+    off_t extended_offset)
+{
+	struct uio auio;
+	struct iovec aiov[DEF_IOV_MAX];
+	file_t *fp;
+	register vnode_t *vp;
+	struct cpu *cp;
+	int fflag, ioflag, rwflag;
+	ssize_t count, bcount;
+	int error = 0;
+	int i;
+
+#if defined(_SYSCALL32_IMPL) || defined(_ILP32)
+	u_offset_t fileoff = ((u_offset_t)extended_offset << 32) |
+	    (u_offset_t)offset;
+#else /* _SYSCALL32_IMPL || _ILP32 */
+	u_offset_t fileoff = (u_offset_t)(ulong_t)offset;
+#endif /* _SYSCALL32_IMPR || _ILP32 */
+#ifdef _SYSCALL32_IMPL
+	const u_offset_t maxoff = get_udatamodel() == DATAMODEL_ILP32 &&
+	    extended_offset == 0?
+	    MAXOFF32_T : MAXOFFSET_T;
+#else /* _SYSCALL32_IMPL */
+	const u_offset_t maxoff = MAXOFF32_T;
+#endif /* _SYSCALL32_IMPL */
+
+	int in_crit = 0;
+
+	if (iovcnt <= 0 || iovcnt > DEF_IOV_MAX)
+		return (set_errno(EINVAL));
+
+#ifdef _SYSCALL32_IMPL
+	/*
+	 * 32-bit callers need to have their iovec expanded,
+	 * while ensuring that they can't move more than 2Gbytes
+	 * of data in a single call.
+	 */
+	if (get_udatamodel() == DATAMODEL_ILP32) {
+		struct iovec32 aiov32[DEF_IOV_MAX];
+		ssize32_t count32;
+
+		if (copyin(iovp, aiov32, iovcnt * sizeof (struct iovec32)))
+			return (set_errno(EFAULT));
+
+		count32 = 0;
+		for (i = 0; i < iovcnt; i++) {
+			ssize32_t iovlen32 = aiov32[i].iov_len;
+			count32 += iovlen32;
+			if (iovlen32 < 0 || count32 < 0)
+				return (set_errno(EINVAL));
+			aiov[i].iov_len = iovlen32;
+			aiov[i].iov_base =
+			    (caddr_t)(uintptr_t)aiov32[i].iov_base;
+		}
+	} else
+#endif /* _SYSCALL32_IMPL */
+		if (copyin(iovp, aiov, iovcnt * sizeof (struct iovec)))
+			return (set_errno(EFAULT));
+
+	count = 0;
+	for (i = 0; i < iovcnt; i++) {
+		ssize_t iovlen = aiov[i].iov_len;
+		count += iovlen;
+		if (iovlen < 0 || count < 0)
+			return (set_errno(EINVAL));
+	}
+
+	if ((bcount = (ssize_t)count) < 0)
+		return (set_errno(EINVAL));
+	if ((fp = getf(fdes)) == NULL)
+		return (set_errno(EBADF));
+	if (((fflag = fp->f_flag) & FREAD) == 0) {
+		error = EBADF;
+		goto out;
+	}
+	vp = fp->f_vnode;
+	rwflag = 0;
+	if (vp->v_type == VREG) {
+
+		if (bcount == 0)
+			goto out;
+
+		/*
+		 * return EINVAL for offsets that cannot be
+		 * represented in an off_t.
+		 */
+		if (fileoff > maxoff) {
+			error = EINVAL;
+			goto out;
+		}
+
+		if (fileoff + bcount > maxoff)
+			bcount = (ssize_t)((u_offset_t)maxoff - fileoff);
+	} else if (vp->v_type == VFIFO) {
+		error = ESPIPE;
+		goto out;
+	}
+	/*
+	 * We have to enter the critical region before calling VOP_RWLOCK
+	 * to avoid a deadlock with ufs.
+	 */
+	if (nbl_need_check(vp)) {
+		int svmand;
+
+		nbl_start_crit(vp, RW_READER);
+		in_crit = 1;
+		error = nbl_svmand(vp, fp->f_cred, &svmand);
+		if (error != 0)
+			goto out;
+		if (nbl_conflict(vp, NBL_WRITE, fileoff, count, svmand,
+		    NULL)) {
+			error = EACCES;
+			goto out;
+		}
+	}
+
+	(void) VOP_RWLOCK(vp, rwflag, NULL);
+
+	/*
+	 * Behaviour is same as read(2). Please see comments in
+	 * read(2).
+	 */
+
+	if ((vp->v_type == VREG) && (fileoff >= OFFSET_MAX(fp))) {
+		struct vattr va;
+		va.va_mask = AT_SIZE;
+		if ((error =
+		    VOP_GETATTR(vp, &va, 0, fp->f_cred, NULL)))  {
+			VOP_RWUNLOCK(vp, rwflag, NULL);
+			goto out;
+		}
+		if (fileoff >= va.va_size) {
+			VOP_RWUNLOCK(vp, rwflag, NULL);
+			count = 0;
+			goto out;
+		} else {
+			VOP_RWUNLOCK(vp, rwflag, NULL);
+			error = EOVERFLOW;
+			goto out;
+		}
+	}
+	if ((vp->v_type == VREG) &&
+	    (fileoff + count > OFFSET_MAX(fp))) {
+		count = (ssize_t)(OFFSET_MAX(fp) - fileoff);
+	}
+	auio.uio_loffset = fileoff;
+	auio.uio_iov = aiov;
+	auio.uio_iovcnt = iovcnt;
+	auio.uio_resid = bcount = count;
+	auio.uio_segflg = UIO_USERSPACE;
+	auio.uio_llimit = MAXOFFSET_T;
+	auio.uio_fmode = fflag;
+	if (bcount <= copyout_max_cached)
+		auio.uio_extflg = UIO_COPY_CACHED;
+	else
+		auio.uio_extflg = UIO_COPY_DEFAULT;
+
+	ioflag = auio.uio_fmode & (FAPPEND|FSYNC|FDSYNC|FRSYNC);
+	error = VOP_READ(vp, &auio, ioflag, fp->f_cred, NULL);
+	count -= auio.uio_resid;
+	CPU_STATS_ENTER_K();
+	cp = CPU;
+	CPU_STATS_ADDQ(cp, sys, sysread, 1);
+	CPU_STATS_ADDQ(cp, sys, readch, (ulong_t)count);
+	CPU_STATS_EXIT_K();
+	ttolwp(curthread)->lwp_ru.ioch += (ulong_t)count;
+
+	VOP_RWUNLOCK(vp, rwflag, NULL);
+
+	if (error == EINTR && count != 0)
+		error = 0;
+out:
+	if (in_crit)
+		nbl_end_crit(vp);
+	releasef(fdes);
+	if (error)
+		return (set_errno(error));
+	return (count);
+}
+
+ssize_t
+pwritev(int fdes, struct iovec *iovp, int iovcnt, off_t offset,
+    off_t extended_offset)
+{
+	struct uio auio;
+	struct iovec aiov[DEF_IOV_MAX];
+	file_t *fp;
+	register vnode_t *vp;
+	struct cpu *cp;
+	int fflag, ioflag, rwflag;
+	ssize_t count, bcount;
+	int error = 0;
+	int i;
+
+#if defined(_SYSCALL32_IMPL) || defined(_ILP32)
+	u_offset_t fileoff = ((u_offset_t)extended_offset << 32) |
+	    (u_offset_t)offset;
+#else /* _SYSCALL32_IMPL || _ILP32 */
+	u_offset_t fileoff = (u_offset_t)(ulong_t)offset;
+#endif /* _SYSCALL32_IMPR || _ILP32 */
+#ifdef _SYSCALL32_IMPL
+	const u_offset_t maxoff = get_udatamodel() == DATAMODEL_ILP32 &&
+	    extended_offset == 0?
+	    MAXOFF32_T : MAXOFFSET_T;
+#else /* _SYSCALL32_IMPL */
+	const u_offset_t maxoff = MAXOFF32_T;
+#endif /* _SYSCALL32_IMPL */
+
+	int in_crit = 0;
+
+	if (iovcnt <= 0 || iovcnt > DEF_IOV_MAX)
+		return (set_errno(EINVAL));
+
+#ifdef _SYSCALL32_IMPL
+	/*
+	 * 32-bit callers need to have their iovec expanded,
+	 * while ensuring that they can't move more than 2Gbytes
+	 * of data in a single call.
+	 */
+	if (get_udatamodel() == DATAMODEL_ILP32) {
+		struct iovec32 aiov32[DEF_IOV_MAX];
+		ssize32_t count32;
+
+		if (copyin(iovp, aiov32, iovcnt * sizeof (struct iovec32)))
+			return (set_errno(EFAULT));
+
+		count32 = 0;
+		for (i = 0; i < iovcnt; i++) {
+			ssize32_t iovlen32 = aiov32[i].iov_len;
+			count32 += iovlen32;
+			if (iovlen32 < 0 || count32 < 0)
+				return (set_errno(EINVAL));
+			aiov[i].iov_len = iovlen32;
+			aiov[i].iov_base =
+			    (caddr_t)(uintptr_t)aiov32[i].iov_base;
+		}
+	} else
+#endif /* _SYSCALL32_IMPL */
+		if (copyin(iovp, aiov, iovcnt * sizeof (struct iovec)))
+			return (set_errno(EFAULT));
+
+	count = 0;
+	for (i = 0; i < iovcnt; i++) {
+		ssize_t iovlen = aiov[i].iov_len;
+		count += iovlen;
+		if (iovlen < 0 || count < 0)
+			return (set_errno(EINVAL));
+	}
+
+	if ((bcount = (ssize_t)count) < 0)
+		return (set_errno(EINVAL));
+	if ((fp = getf(fdes)) == NULL)
+		return (set_errno(EBADF));
+	if (((fflag = fp->f_flag) & FWRITE) == 0) {
+		error = EBADF;
+		goto out;
+	}
+	vp = fp->f_vnode;
+	rwflag = 1;
+	if (vp->v_type == VREG) {
+
+		if (bcount == 0)
+			goto out;
+
+		/*
+		 * return EINVAL for offsets that cannot be
+		 * represented in an off_t.
+		 */
+		if (fileoff > maxoff) {
+			error = EINVAL;
+			goto out;
+		}
+		/*
+		 * Take appropriate action if we are trying
+		 * to write above the resource limit.
+		 */
+		if (fileoff >= curproc->p_fsz_ctl) {
+			mutex_enter(&curproc->p_lock);
+			/*
+			 * Return value ignored because it lists
+			 * actions taken, but we are in an error case.
+			 * We don't have any actions that depend on
+			 * what could happen in this call, so we ignore
+			 * the return value.
+			 */
+			(void) rctl_action(
+			    rctlproc_legacy[RLIMIT_FSIZE],
+			    curproc->p_rctls, curproc,
+			    RCA_UNSAFE_SIGINFO);
+			mutex_exit(&curproc->p_lock);
+
+			error = EFBIG;
+			goto out;
+		}
+		/*
+		 * Don't allow pwritev to cause file sizes to exceed
+		 * maxoff.
+		 */
+		if (fileoff == maxoff) {
+			error = EFBIG;
+			goto out;
+		}
+
+		if (fileoff + bcount > maxoff)
+			bcount = (ssize_t)((u_offset_t)maxoff - fileoff);
+	} else if (vp->v_type == VFIFO) {
+		error = ESPIPE;
+		goto out;
+	}
+	/*
+	 * We have to enter the critical region before calling VOP_RWLOCK
+	 * to avoid a deadlock with ufs.
+	 */
+	if (nbl_need_check(vp)) {
+		int svmand;
+
+		nbl_start_crit(vp, RW_READER);
+		in_crit = 1;
+		error = nbl_svmand(vp, fp->f_cred, &svmand);
+		if (error != 0)
+			goto out;
+		if (nbl_conflict(vp, NBL_WRITE, fileoff, count, svmand,
+		    NULL)) {
+			error = EACCES;
+			goto out;
+		}
+	}
+
+	(void) VOP_RWLOCK(vp, rwflag, NULL);
+
+
+	/*
+	 * Behaviour is same as write(2). Please see comments for
+	 * write(2).
+	 */
+
+	if (vp->v_type == VREG) {
+		if (fileoff >= curproc->p_fsz_ctl) {
+			VOP_RWUNLOCK(vp, rwflag, NULL);
+			mutex_enter(&curproc->p_lock);
+			/* see above rctl_action comment */
+			(void) rctl_action(
+			    rctlproc_legacy[RLIMIT_FSIZE],
+			    curproc->p_rctls,
+			    curproc, RCA_UNSAFE_SIGINFO);
+			mutex_exit(&curproc->p_lock);
+			error = EFBIG;
+			goto out;
+		}
+		if (fileoff >= OFFSET_MAX(fp)) {
+			VOP_RWUNLOCK(vp, rwflag, NULL);
+			error = EFBIG;
+			goto out;
+		}
+		if (fileoff + count > OFFSET_MAX(fp))
+			count = (ssize_t)(OFFSET_MAX(fp) - fileoff);
+	}
+
+	auio.uio_loffset = fileoff;
+	auio.uio_iov = aiov;
+	auio.uio_iovcnt = iovcnt;
+	auio.uio_resid = bcount = count;
+	auio.uio_segflg = UIO_USERSPACE;
+	auio.uio_llimit = curproc->p_fsz_ctl;
+	auio.uio_fmode = fflag;
+	auio.uio_extflg = UIO_COPY_CACHED;
+	ioflag = auio.uio_fmode & (FSYNC|FDSYNC|FRSYNC);
+	error = VOP_WRITE(vp, &auio, ioflag, fp->f_cred, NULL);
+	count -= auio.uio_resid;
+	CPU_STATS_ENTER_K();
+	cp = CPU;
+	CPU_STATS_ADDQ(cp, sys, syswrite, 1);
+	CPU_STATS_ADDQ(cp, sys, writech, (ulong_t)count);
+	CPU_STATS_EXIT_K();
+	ttolwp(curthread)->lwp_ru.ioch += (ulong_t)count;
+
+	VOP_RWUNLOCK(vp, rwflag, NULL);
+
+	if (error == EINTR && count != 0)
+		error = 0;
+out:
+	if (in_crit)
+		nbl_end_crit(vp);
+	releasef(fdes);
+	if (error)
+		return (set_errno(error));
+	return (count);
+}
+
 #if defined(_SYSCALL32_IMPL) || defined(_ILP32)
 
 /*
@@ -1240,5 +1630,4 @@ writev32(int32_t fdes, caddr32_t iovp, int32_t iovcnt)
 {
 	return (writev(fdes, (void *)(uintptr_t)iovp, iovcnt));
 }
-
 #endif	/* _SYSCALL32_IMPL */

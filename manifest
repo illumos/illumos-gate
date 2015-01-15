@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright (c) 2014, Joyent, Inc. All rights reserved.
+# Copyright 2015, Joyent, Inc. All rights reserved.
 #
 # This lists all the files that illumos-joyent delivers as part of a build.
 # Keep this sorted as by LC_ALL=C sort -u -k2.
@@ -12325,6 +12325,7 @@ s usr/share/man/man2/pipe2.2=pipe.2
 f usr/share/man/man2/poll.2 0444 root bin
 s usr/share/man/man2/ppoll.2=poll.2
 s usr/share/man/man2/pread.2=read.2
+s usr/share/man/man2/preadv.2=read.2
 f usr/share/man/man2/priocntl.2 0444 root bin
 f usr/share/man/man2/priocntlset.2 0444 root bin
 f usr/share/man/man2/processor_bind.2 0444 root bin
@@ -12342,6 +12343,7 @@ s usr/share/man/man2/putacct.2=getacct.2
 f usr/share/man/man2/putmsg.2 0444 root bin
 s usr/share/man/man2/putpmsg.2=putmsg.2
 s usr/share/man/man2/pwrite.2=write.2
+s usr/share/man/man2/pwritev.2=write.2
 f usr/share/man/man2/read.2 0444 root bin
 f usr/share/man/man2/readlink.2 0444 root bin
 s usr/share/man/man2/readlinkat.2=readlink.2

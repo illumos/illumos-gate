@@ -13,6 +13,7 @@
 # Copyright 2011, Richard Lowe
 # Copyright 2013, OmniTI Computer Consulting, Inc
 # Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+# Copyright (c) 2015, Joyent, Inc.  All rights reserved.
 #
 
 include		$(SRC)/Makefile.master
@@ -219,12 +220,14 @@ MANLINKS=	_Exit.2				\
 		pipe2.2				\
 		ppoll.2				\
 	 	pread.2				\
+		preadv.2			\
 	 	pset_assign.2			\
 	 	pset_destroy.2			\
 	 	pset_getattr.2			\
 	 	putacct.2			\
 	 	putpmsg.2			\
 	 	pwrite.2			\
+		pwritev.2			\
 		readlinkat.2			\
 	 	readv.2				\
 	 	renameat.2			\
@@ -360,6 +363,7 @@ putpmsg.2			:= LINKSRC = putmsg.2
 
 pread.2				:= LINKSRC = read.2
 readv.2				:= LINKSRC = read.2
+preadv.2			:= LINKSRC = read.2
 
 readlinkat.2			:= LINKSRC = readlink.2
 
@@ -401,6 +405,7 @@ vforkx.2			:= LINKSRC = vfork.2
 
 pwrite.2			:= LINKSRC = write.2
 writev.2			:= LINKSRC = write.2
+pwritev.2			:= LINKSRC = write.2
 
 .KEEP_STATE:
 

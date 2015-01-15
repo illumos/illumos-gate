@@ -115,6 +115,8 @@ vfork			119
 fchdir			120
 readv			121
 writev			122
+preadv			123
+pwritev			124
 mmapobj			127
 setrlimit		128
 getrlimit		129

@@ -20,9 +20,9 @@
 #
 #
 # Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2015, Joyent, Inc.  All rights reserved.
 # Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved.
 # Copyright 2013 Garrett D'Amore <garrett@damore.org>
-# Copyright (c) 2014, Joyent, Inc.  All rights reserved.
 #
 # Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -256,6 +256,7 @@ COMSYSOBJS=			\
 	pipe2.o			\
 	pollsys.o		\
 	pread.o			\
+	preadv.o		\
 	priocntlset.o		\
 	processor_bind.o	\
 	processor_info.o	\
@@ -263,6 +264,7 @@ COMSYSOBJS=			\
 	putmsg.o		\
 	putpmsg.o		\
 	pwrite.o		\
+	pwritev.o		\
 	read.o			\
 	readv.o			\
 	resolvepath.o		\

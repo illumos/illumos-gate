@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2015, Joyent, Inc.  All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -344,8 +345,8 @@ const struct systable systable[] = {
 {"fchdir",	1, DEC, NOV, DEC},				/* 120 */
 {"readv",	3, DEC, NOV, DEC, HEX, DEC},			/* 121 */
 {"writev",	3, DEC, NOV, DEC, HEX, DEC},			/* 122 */
-{ NULL,		8, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX},
-{ NULL,		8, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX},
+{"preadv",	4, DEC, NOV, DEC, HEX, DEC, DEC},		/* 123 */
+{"pwritev",	4, DEC, NOV, DEC, HEX, DEC, DEC},		/* 124 */
 { NULL,		8, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX},
 { NULL,		8, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX},
 {"mmapobj",	5, DEC, NOV, DEC, MOB, HEX, HEX, HEX},		/* 127 */

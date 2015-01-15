@@ -1,11 +1,12 @@
 '\" te
 .\" Copyright 2014 Garrett D'Amore <garrett@damore.org>
 .\" Copyright (c) 2009, Sun Microsystems, Inc.  All rights reserved.
+.\" Copyright (c) 2015, Joyent, Inc.  All rights reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
 .\" Copyright 2011 by Delphix.  All rights reserved.
-.TH LIBC 3LIB "Aug 15, 2014"
+.TH LIBC 3LIB "Jan 14, 2014"
 .SH NAME
 libc \- C library
 .SH DESCRIPTION
@@ -482,7 +483,8 @@ l l .
 \fBposix_spawnattr_setschedparam\fR	\fBposix_spawnattr_setschedpolicy\fR
 \fBposix_spawnattr_setsigdefault\fR	\fBposix_spawnattr_setsigignore_np\fR
 \fBposix_spawnattr_setsigmask\fR	\fBposix_spawnp\fR
-\fBpread\fR	\fBprintf\fR
+\fBpread\fR	\fBpreadv\fR
+\fBprintf\fR
 \fBprintstack\fR	\fBpriocntl\fR
 \fBpriocntlset\fR	\fBpriv_addset\fR
 \fBpriv_allocset\fR	\fBpriv_copyset\fR
@@ -567,6 +569,7 @@ l l .
 \fBpututxline\fR	\fBputw\fR
 \fBputwc\fR	\fBputwchar\fR
 \fBputws\fR	\fBpwrite\fR
+\fBpwritev\fR
 \fBqeconvert\fR	\fBqecvt\fR
 \fBqfconvert\fR	\fBqfcvt\fR
 \fBqgconvert\fR	\fBqgcvt\fR
@@ -862,8 +865,9 @@ l l .
 \fBlseek64\fR	\fBlstat64\fR
 \fBmkstemp64\fR	\fBmmap64\fR
 \fBnftw64\fR	\fBopen64\fR
-\fBpread64\fR	\fBptrace\fR
-\fBpwrite64\fR	\fBreaddir64\fR
+\fBpread64\fR	\fBpreadv64\fR
+\fBptrace\fR	\fBpwrite64\fR
+\fBpwritev64\fR	\fBreaddir64\fR
 \fBreaddir64_r\fR	\fBs_fcntl\fR
 \fBs_ioctl\fR	\fBselect_large_fdset\fR
 \fBsetrlimit64\fR	\fBstat64\fR
