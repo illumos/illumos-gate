@@ -25,6 +25,7 @@
 # Copyright (c) 2011, 2014 by Delphix. All rights reserved.
 # Copyright (c) 2013 by Saso Kiselkov. All rights reserved.
 # Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2015, Joyent, Inc.
 #
 
 #
@@ -1312,8 +1313,8 @@ SMBSRV_OBJS +=	$(SMBSRV_SHARED_OBJS)			\
 PCFS_OBJS +=	pc_alloc.o	pc_dir.o	pc_node.o	pc_subr.o \
 		pc_vfsops.o	pc_vnops.o
 
-PROC_OBJS +=	prcontrol.o	prioctl.o	prsubr.o	prusrio.o \
-		prvfsops.o	prvnops.o
+PROC_OBJS +=	prargv.o	prcontrol.o	prioctl.o	prsubr.o \
+		prusrio.o	prvfsops.o	prvnops.o
 
 MNTFS_OBJS +=	mntvfsops.o	mntvnops.o
 

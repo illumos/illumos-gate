@@ -77,6 +77,7 @@
 
 /* Dependent on procfs */
 extern kthread_t *prchoose(proc_t *);
+extern int prreadargv(proc_t *, char *, size_t, size_t *);
 
 #include "lx_proc.h"
 
@@ -191,6 +192,12 @@ static void lxpr_read_sys_kernel_threads_max(lxpr_node_t *, lxpr_uiobuf_t *);
 extern rctl_hndl_t rc_zone_msgmni;
 extern rctl_hndl_t rc_zone_shmmax;
 #define	FOURGB	4294967295
+
+/*
+ * The maximum length of the concatenation of argument vector strings we
+ * will return to the user via the branded procfs:
+ */
+int lxpr_maxargvlen = 4096;
 
 /*
  * The lx /proc vnode operations vector
@@ -761,33 +768,34 @@ lxpr_read_empty(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 }
 
 /*
- * lxpr_read_pid_cmdline():
- *
- * This is not precisely compatible with Linux: the Linux cmdline returns argv
- * with the correct separation using \0 between the arguments, but we cannot do
- * that without copying the real argv from the correct process context.  This
- * is too difficult to attempt so we pretend that the entire cmdline is just
- * argv[0]. This is good enough for ps and htop to display correctly, but might
- * cause some other things not to work correctly.
+ * lxpr_read_pid_cmdline(): read argument vector from process
  */
 static void
 lxpr_read_pid_cmdline(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
 	proc_t *p;
 	char *buf;
+	size_t asz = lxpr_maxargvlen, sz;
 
 	ASSERT(lxpnp->lxpr_type == LXPR_PID_CMDLINE);
+
+	buf = kmem_alloc(asz, KM_SLEEP);
 
 	p = lxpr_lock(lxpnp->lxpr_pid);
 	if (p == NULL) {
 		lxpr_uiobuf_seterr(uiobuf, EINVAL);
+		kmem_free(buf, asz);
 		return;
 	}
 
-	buf = PTOU(p)->u_argv != 0 ? PTOU(p)->u_psargs : PTOU(p)->u_comm;
+	if (prreadargv(p, buf, asz, &sz) != 0) {
+		lxpr_uiobuf_seterr(uiobuf, EINVAL);
+	} else {
+		lxpr_uiobuf_write(uiobuf, buf, sz);
+	}
 
-	lxpr_uiobuf_write(uiobuf, buf, strlen(buf) + 1);
 	lxpr_unlock(p);
+	kmem_free(buf, asz);
 }
 
 /*

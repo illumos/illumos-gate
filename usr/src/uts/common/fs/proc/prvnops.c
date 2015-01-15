@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2014, Joyent, Inc. All rights reserved.
+ * Copyright 2015, Joyent, Inc.
  */
 
 /*	Copyright (c) 1984,	 1986, 1987, 1988, 1989 AT&T	*/
@@ -96,6 +96,11 @@ struct prdirect {
 #define	PRSDSIZE	(sizeof (struct prdirect))
 
 /*
+ * Maximum length of the /proc/$$/argv file:
+ */
+int prmaxargvlen = 4096;
+
+/*
  * Directory characteristics.
  */
 typedef struct prdirent {
@@ -166,6 +171,8 @@ static prdirent_t piddir[] = {
 	{ PR_LDT,	27 * sizeof (prdirent_t), sizeof (prdirent_t),
 		"ldt" },
 #endif
+	{ PR_ARGV,	28 * sizeof (prdirent_t), sizeof (prdirent_t),
+		"argv" },
 };
 
 #define	NPIDDIRFILES	(sizeof (piddir) / sizeof (piddir[0]) - 2)
@@ -582,6 +589,7 @@ static int pr_read_inval(), pr_read_as(), pr_read_status(),
 #if defined(__x86)
 	pr_read_ldt(),
 #endif
+	pr_read_argv(),
 	pr_read_usage(), pr_read_lusage(), pr_read_pagedata(),
 	pr_read_watch(), pr_read_lwpstatus(), pr_read_lwpsinfo(),
 	pr_read_lwpusage(), pr_read_xregs(), pr_read_priv(),
@@ -610,6 +618,7 @@ static int (*pr_read_function[PR_NFILES])() = {
 #if defined(__x86)
 	pr_read_ldt,		/* /proc/<pid>/ldt			*/
 #endif
+	pr_read_argv,		/* /proc/<pid>/argv			*/
 	pr_read_usage,		/* /proc/<pid>/usage			*/
 	pr_read_lusage,		/* /proc/<pid>/lusage			*/
 	pr_read_pagedata,	/* /proc/<pid>/pagedata			*/
@@ -667,6 +676,41 @@ pr_uioread(void *base, long count, uio_t *uiop)
 		error = uiomove((char *)base + uiop->uio_offset,
 		    count, UIO_READ, uiop);
 	}
+
+	return (error);
+}
+
+static int
+pr_read_argv(prnode_t *pnp, uio_t *uiop)
+{
+	char *args;
+	int error;
+	size_t asz = prmaxargvlen, sz;
+
+	/*
+	 * Allocate a scratch buffer for collection of the process arguments.
+	 */
+	args = kmem_alloc(asz, KM_SLEEP);
+
+	ASSERT(pnp->pr_type == PR_ARGV);
+
+	if ((error = prlock(pnp, ZNO)) != 0) {
+		kmem_free(args, asz);
+		return (error);
+	}
+
+	if ((error = prreadargv(pnp->pr_common->prc_proc, args, asz,
+	    &sz)) != 0) {
+		prunlock(pnp);
+		kmem_free(args, asz);
+		return (error);
+	}
+
+	prunlock(pnp);
+
+	error = pr_uioread(args, sz, uiop);
+
+	kmem_free(args, asz);
 
 	return (error);
 }
@@ -1767,6 +1811,7 @@ static int (*pr_read_function_32[PR_NFILES])() = {
 #if defined(__x86)
 	pr_read_ldt,		/* /proc/<pid>/ldt			*/
 #endif
+	pr_read_argv,		/* /proc/<pid>/argv			*/
 	pr_read_usage_32,	/* /proc/<pid>/usage			*/
 	pr_read_lusage_32,	/* /proc/<pid>/lusage			*/
 	pr_read_pagedata_32,	/* /proc/<pid>/pagedata			*/
@@ -3147,6 +3192,13 @@ prgetattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 	case PR_AUXV:
 		vap->va_size = __KERN_NAUXV_IMPL * PR_OBJSIZE(auxv32_t, auxv_t);
 		break;
+	case PR_ARGV:
+		if ((p->p_flag & SSYS) || p->p_as == &kas) {
+			vap->va_size = PSARGSZ;
+		} else {
+			vap->va_size = prmaxargvlen;
+		}
+		break;
 #if defined(__x86)
 	case PR_LDT:
 		mutex_exit(&p->p_lock);
@@ -3322,6 +3374,7 @@ praccess(vnode_t *vp, int mode, int flags, cred_t *cr, caller_context_t *ct)
 	case PR_USAGE:
 	case PR_LUSAGE:
 	case PR_LWPUSAGE:
+	case PR_ARGV:
 		p = pr_p_lock(pnp);
 		mutex_exit(&pr_pidlock);
 		if (p == NULL)
@@ -3407,6 +3460,7 @@ static vnode_t *(*pr_lookup_function[PR_NFILES])() = {
 #if defined(__x86)
 	pr_lookup_notdir,	/* /proc/<pid>/ldt			*/
 #endif
+	pr_lookup_notdir,	/* /proc/<pid>/argv			*/
 	pr_lookup_notdir,	/* /proc/<pid>/usage			*/
 	pr_lookup_notdir,	/* /proc/<pid>/lusage			*/
 	pr_lookup_notdir,	/* /proc/<pid>/pagedata			*/
@@ -4654,6 +4708,7 @@ prgetnode(vnode_t *dp, prnodetype_t type)
 	case PR_USAGE:
 	case PR_LUSAGE:
 	case PR_LWPUSAGE:
+	case PR_ARGV:
 		pnp->pr_mode = 0444;	/* read-only by all */
 		break;
 
@@ -4759,6 +4814,7 @@ static int (*pr_readdir_function[PR_NFILES])() = {
 #if defined(__x86)
 	pr_readdir_notdir,	/* /proc/<pid>/ldt			*/
 #endif
+	pr_readdir_notdir,	/* /proc/<pid>/argv			*/
 	pr_readdir_notdir,	/* /proc/<pid>/usage			*/
 	pr_readdir_notdir,	/* /proc/<pid>/lusage			*/
 	pr_readdir_notdir,	/* /proc/<pid>/pagedata			*/
@@ -4908,6 +4964,7 @@ pr_readdir_piddir(prnode_t *pnp, uio_t *uiop, int *eofp)
 			case PR_PROCDIR:
 			case PR_PSINFO:
 			case PR_USAGE:
+			case PR_ARGV:
 				break;
 			default:
 				continue;
