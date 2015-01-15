@@ -1443,6 +1443,7 @@ lx_getsockname(int sockfd, void *np, int *nlp)
 {
 	struct sockaddr *name = NULL;
 	socklen_t namelen, namelen_orig;
+	struct stat sb;
 	int err;
 
 	if (uucopy((void *)nlp, &namelen, sizeof (socklen_t)) != 0)
@@ -1452,6 +1453,9 @@ lx_getsockname(int sockfd, void *np, int *nlp)
 	lx_debug("\tgetsockname(%d, 0x%p, 0x%p (=%d))", sockfd,
 	    (struct sockaddr *)np, nlp, namelen);
 
+	if (fstat(sockfd, &sb) == 0 && !S_ISSOCK(sb.st_mode))
+		return (-ENOTSOCK);
+
 	/*
 	 * Use sizeof (struct sockaddr_in6) as the minimum temporary
 	 * name allocation.  This will allow families such as AF_INET6
@@ -1459,7 +1463,7 @@ lx_getsockname(int sockfd, void *np, int *nlp)
 	 * illumos.
 	 */
 	if (namelen <= 0)
-		return (-EFAULT);
+		return (-EBADF);
 	else if (namelen < sizeof (struct sockaddr_in6))
 		namelen = sizeof (struct sockaddr_in6);
 
