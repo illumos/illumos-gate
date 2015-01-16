@@ -22,6 +22,9 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2014 by Delphix. All rights reserved.
+ */
 
 #ifndef	_VM_HAT_I86_H
 #define	_VM_HAT_I86_H
@@ -227,7 +230,7 @@ extern void hat_kern_alloc(caddr_t segmap_base, size_t segmap_size,
 extern void hat_kern_setup(void);
 extern void hat_tlb_inval(struct hat *hat, uintptr_t va);
 extern void hat_pte_unmap(htable_t *ht, uint_t entry, uint_t flags,
-	x86pte_t old_pte, void *pte_ptr);
+	x86pte_t old_pte, void *pte_ptr, boolean_t tlb);
 extern void hat_init_finish(void);
 extern caddr_t hat_kpm_pfn2va(pfn_t pfn);
 extern pfn_t hat_kpm_va2pfn(caddr_t);

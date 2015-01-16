@@ -28,6 +28,7 @@
 /*
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2014 Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2014, 2015 by Delphix. All rights reserved.
  */
 
 /*
@@ -1929,6 +1930,7 @@ hati_demap_func(xc_arg_t a1, xc_arg_t a2, xc_arg_t a3)
 {
 	hat_t	*hat = (hat_t *)a1;
 	caddr_t	addr = (caddr_t)a2;
+	size_t len = (size_t)a3;
 
 	/*
 	 * If the target hat isn't the kernel and this CPU isn't operating
@@ -1938,10 +1940,11 @@ hati_demap_func(xc_arg_t a1, xc_arg_t a2, xc_arg_t a3)
 		return (0);
 
 	/*
-	 * For a normal address, we just flush one page mapping
+	 * For a normal address, we flush a range of contiguous mappings
 	 */
 	if ((uintptr_t)addr != DEMAP_ALL_ADDR) {
-		mmu_tlbflush_entry(addr);
+		for (size_t i = 0; i < len; i += MMU_PAGESIZE)
+			mmu_tlbflush_entry(addr + i);
 		return (0);
 	}
 
@@ -2036,7 +2039,7 @@ tlb_service(void)
  * all CPUs using a given hat.
  */
 void
-hat_tlb_inval(hat_t *hat, uintptr_t va)
+hat_tlb_inval_range(hat_t *hat, uintptr_t va, size_t len)
 {
 	extern int	flushes_require_xcalls;	/* from mp_startup.c */
 	cpuset_t	justme;
@@ -2069,12 +2072,15 @@ hat_tlb_inval(hat_t *hat, uintptr_t va)
 	 */
 	if (panicstr || !flushes_require_xcalls) {
 #ifdef __xpv
-		if (va == DEMAP_ALL_ADDR)
+		if (va == DEMAP_ALL_ADDR) {
 			xen_flush_tlb();
-		else
-			xen_flush_va((caddr_t)va);
+		} else {
+			for (size_t i = 0; i < len; i += MMU_PAGESIZE)
+				xen_flush_va((caddr_t)(va + i));
+		}
 #else
-		(void) hati_demap_func((xc_arg_t)hat, (xc_arg_t)va, NULL);
+		(void) hati_demap_func((xc_arg_t)hat,
+		    (xc_arg_t)va, (xc_arg_t)len);
 #endif
 		return;
 	}
@@ -2125,29 +2131,42 @@ hat_tlb_inval(hat_t *hat, uintptr_t va)
 	    CPUSET_ISEQUAL(cpus_to_shootdown, justme)) {
 
 #ifdef __xpv
-		if (va == DEMAP_ALL_ADDR)
+		if (va == DEMAP_ALL_ADDR) {
 			xen_flush_tlb();
-		else
-			xen_flush_va((caddr_t)va);
+		} else {
+			for (size_t i = 0; i < len; i += MMU_PAGESIZE)
+				xen_flush_va((caddr_t)(va + i));
+		}
 #else
-		(void) hati_demap_func((xc_arg_t)hat, (xc_arg_t)va, NULL);
+		(void) hati_demap_func((xc_arg_t)hat,
+		    (xc_arg_t)va, (xc_arg_t)len);
 #endif
 
 	} else {
 
 		CPUSET_ADD(cpus_to_shootdown, CPU->cpu_id);
 #ifdef __xpv
-		if (va == DEMAP_ALL_ADDR)
+		if (va == DEMAP_ALL_ADDR) {
 			xen_gflush_tlb(cpus_to_shootdown);
-		else
-			xen_gflush_va((caddr_t)va, cpus_to_shootdown);
+		} else {
+			for (size_t i = 0; i < len; i += MMU_PAGESIZE) {
+				xen_gflush_va((caddr_t)(va + i),
+				    cpus_to_shootdown);
+			}
+		}
 #else
-		xc_call((xc_arg_t)hat, (xc_arg_t)va, NULL,
+		xc_call((xc_arg_t)hat, (xc_arg_t)va, (xc_arg_t)len,
 		    CPUSET2BV(cpus_to_shootdown), hati_demap_func);
 #endif
 
 	}
 	kpreempt_enable();
+}
+
+void
+hat_tlb_inval(hat_t *hat, uintptr_t va)
+{
+	hat_tlb_inval_range(hat, va, MMU_PAGESIZE);
 }
 
 /*
@@ -2161,7 +2180,8 @@ hat_pte_unmap(
 	uint_t		entry,
 	uint_t		flags,
 	x86pte_t	old_pte,
-	void		*pte_ptr)
+	void		*pte_ptr,
+	boolean_t	tlb)
 {
 	hat_t		*hat = ht->ht_hat;
 	hment_t		*hm = NULL;
@@ -2203,7 +2223,7 @@ hat_pte_unmap(
 			x86_hm_enter(pp);
 		}
 
-		old_pte = x86pte_inval(ht, entry, old_pte, pte_ptr);
+		old_pte = x86pte_inval(ht, entry, old_pte, pte_ptr, tlb);
 
 		/*
 		 * If the page hadn't changed we've unmapped it and can proceed
@@ -2284,7 +2304,7 @@ hat_kmap_unload(caddr_t addr, size_t len, uint_t flags)
 		/*
 		 * use mostly common code to unmap it.
 		 */
-		hat_pte_unmap(ht, entry, flags, old_pte, pte_ptr);
+		hat_pte_unmap(ht, entry, flags, old_pte, pte_ptr, B_TRUE);
 	}
 }
 
@@ -2321,19 +2341,26 @@ typedef struct range_info {
 	level_t		rng_level;
 } range_info_t;
 
+/*
+ * Invalidate the TLB, and perform the callback to the upper level VM system,
+ * for the specified ranges of contiguous pages.
+ */
 static void
-handle_ranges(hat_callback_t *cb, uint_t cnt, range_info_t *range)
+handle_ranges(hat_t *hat, hat_callback_t *cb, uint_t cnt, range_info_t *range)
 {
-	/*
-	 * do callbacks to upper level VM system
-	 */
-	while (cb != NULL && cnt > 0) {
+	while (cnt > 0) {
+		size_t len;
+
 		--cnt;
-		cb->hcb_start_addr = (caddr_t)range[cnt].rng_va;
-		cb->hcb_end_addr = cb->hcb_start_addr;
-		cb->hcb_end_addr +=
-		    range[cnt].rng_cnt << LEVEL_SIZE(range[cnt].rng_level);
-		cb->hcb_function(cb);
+		len = range[cnt].rng_cnt << LEVEL_SHIFT(range[cnt].rng_level);
+		hat_tlb_inval_range(hat, (uintptr_t)range[cnt].rng_va, len);
+
+		if (cb != NULL) {
+			cb->hcb_start_addr = (caddr_t)range[cnt].rng_va;
+			cb->hcb_end_addr = cb->hcb_start_addr;
+			cb->hcb_end_addr += len;
+			cb->hcb_function(cb);
+		}
 	}
 }
 
@@ -2377,8 +2404,10 @@ hat_unload_callback(
 	if (cb == NULL && len == MMU_PAGESIZE) {
 		ht = htable_getpte(hat, vaddr, &entry, &old_pte, 0);
 		if (ht != NULL) {
-			if (PTE_ISVALID(old_pte))
-				hat_pte_unmap(ht, entry, flags, old_pte, NULL);
+			if (PTE_ISVALID(old_pte)) {
+				hat_pte_unmap(ht, entry, flags, old_pte,
+				    NULL, B_TRUE);
+			}
 			htable_release(ht);
 		}
 		XPV_ALLOW_MIGRATE();
@@ -2401,7 +2430,7 @@ hat_unload_callback(
 		if (vaddr != contig_va ||
 		    (r_cnt > 0 && r[r_cnt - 1].rng_level != ht->ht_level)) {
 			if (r_cnt == MAX_UNLOAD_CNT) {
-				handle_ranges(cb, r_cnt, r);
+				handle_ranges(hat, cb, r_cnt, r);
 				r_cnt = 0;
 			}
 			r[r_cnt].rng_va = vaddr;
@@ -2411,10 +2440,16 @@ hat_unload_callback(
 		}
 
 		/*
-		 * Unload one mapping from the page tables.
+		 * Unload one mapping (for a single page) from the page tables.
+		 * Note that we do not remove the mapping from the TLB yet,
+		 * as indicated by the tlb=FALSE argument to hat_pte_unmap().
+		 * handle_ranges() will clear the TLB entries with one call to
+		 * hat_tlb_inval_range() per contiguous range.  This is
+		 * safe because the page can not be reused until the
+		 * callback is made (or we return).
 		 */
 		entry = htable_va2entry(vaddr, ht);
-		hat_pte_unmap(ht, entry, flags, old_pte, NULL);
+		hat_pte_unmap(ht, entry, flags, old_pte, NULL, B_FALSE);
 		ASSERT(ht->ht_level <= mmu.max_page_level);
 		vaddr += LEVEL_SIZE(ht->ht_level);
 		contig_va = vaddr;
@@ -2427,7 +2462,7 @@ hat_unload_callback(
 	 * handle last range for callbacks
 	 */
 	if (r_cnt > 0)
-		handle_ranges(cb, r_cnt, r);
+		handle_ranges(hat, cb, r_cnt, r);
 	XPV_ALLOW_MIGRATE();
 }
 
@@ -3315,7 +3350,7 @@ hati_page_unmap(page_t *pp, htable_t *ht, uint_t entry)
 	/*
 	 * Invalidate the PTE and remove the hment.
 	 */
-	old_pte = x86pte_inval(ht, entry, 0, NULL);
+	old_pte = x86pte_inval(ht, entry, 0, NULL, B_TRUE);
 	if (PTE2PFN(old_pte, ht->ht_level) != pfn) {
 		panic("x86pte_inval() failure found PTE = " FMT_PTE
 		    " pfn being unmapped is %lx ht=0x%lx entry=0x%x",
@@ -4085,7 +4120,7 @@ clear_boot_mappings(uintptr_t low, uintptr_t high)
 		/*
 		 * Unload the mapping from the page tables.
 		 */
-		(void) x86pte_inval(ht, entry, 0, NULL);
+		(void) x86pte_inval(ht, entry, 0, NULL, B_TRUE);
 		ASSERT(ht->ht_valid_cnt > 0);
 		HTABLE_DEC(ht->ht_valid_cnt);
 		PGCNT_DEC(ht->ht_hat, ht->ht_level);
