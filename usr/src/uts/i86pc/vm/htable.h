@@ -22,6 +22,9 @@
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2014 by Delphix. All rights reserved.
+ */
 
 #ifndef	_VM_HTABLE_H
 #define	_VM_HTABLE_H
@@ -271,7 +274,7 @@ extern x86pte_t	x86pte_get(htable_t *, uint_t entry);
 extern x86pte_t	x86pte_set(htable_t *, uint_t entry, x86pte_t new, void *);
 
 extern x86pte_t x86pte_inval(htable_t *ht, uint_t entry,
-	x86pte_t old, x86pte_t *ptr);
+	x86pte_t old, x86pte_t *ptr, boolean_t tlb);
 
 extern x86pte_t x86pte_update(htable_t *ht, uint_t entry,
 	x86pte_t old, x86pte_t new);
