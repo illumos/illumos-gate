@@ -1,33 +1,33 @@
 /*
- * CDDL HEADER START
+ * This file and its contents are supplied under the terms of the
+ * Common Development and Distribution License ("CDDL"), version 1.0.
+ * You may only use this file in accordance with the terms of version
+ * 1.0 of the CDDL.
  *
- * The contents of this file are subject to the terms of the
- * Common Development and Distribution License (the "License").
- * You may not use this file except in compliance with the License.
- *
- * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or http://www.opensolaris.org/os/licensing.
- * See the License for the specific language governing permissions
- * and limitations under the License.
- *
- * When distributing Covered Code, include this CDDL HEADER in each
- * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
- * If applicable, add the following below this CDDL HEADER, with the
- * fields enclosed by brackets "[]" replaced with your own identifying
- * information: Portions Copyright [yyyy] [name of copyright owner]
- *
- * CDDL HEADER END
+ * A full copy of the text of the CDDL should have accompanied this
+ * source.  A copy of the CDDL is also available via the Internet at
+ * http://www.illumos.org/license/CDDL.
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright 2015, Joyent, Inc.
  */
 
-/*	Copyright (c) 1990, 1991 UNIX System Laboratories, Inc.	*/
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989, 1990 AT&T	*/
-/*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * The microfind() routine is used to calibrate the delay provided by
+ * tenmicrosec().  Early in boot gethrtime() is not yet configured and
+ * available for accurate delays, but some drivers still need to be able to
+ * pause execution for rough increments of ten microseconds.  To that end,
+ * microfind() will measure the wall time elapsed during a simple delay loop
+ * using the Intel 8254 Programmable Interval Timer (PIT), and attempt to find
+ * a loop count that approximates a ten microsecond delay.
+ *
+ * This mechanism is accurate enough when running unvirtualised on real CPUs,
+ * but is somewhat less efficacious in a virtual machine.  In a virtualised
+ * guest the relationship between instruction completion and elapsed wall time
+ * is, at best, variable; on such machines the calibration is merely a rough
+ * guess.
+ */
 
 #include <sys/types.h>
 #include <sys/dl.h>
@@ -41,175 +41,241 @@
 #include <sys/systm.h>
 #include <sys/machsystm.h>
 
-#define	PIT_COUNTDOWN	(PIT_READMODE | PIT_NDIVMODE)
-#define	MICROCOUNT	0x2000
-
 /*
  * Loop count for 10 microsecond wait.  MUST be initialized for those who
  * insist on calling "tenmicrosec" before the clock has been initialized.
  */
 unsigned int microdata = 50;
 
-void
-microfind(void)
+/*
+ * These values, used later in microfind(), are stored in globals to allow them
+ * to be adjusted more easily via kmdb.
+ */
+unsigned int microdata_trial_count = 7;
+unsigned int microdata_allowed_failures = 3;
+
+
+static void
+microfind_pit_reprogram_for_bios(void)
 {
-	uint64_t max, count = MICROCOUNT;
+	/*
+	 * Restore PIT counter 0 for BIOS use in mode 3 -- "Square Wave
+	 * Generator".
+	 */
+	outb(PITCTL_PORT, PIT_C0 | PIT_LOADMODE | PIT_SQUAREMODE);
 
 	/*
-	 * The algorithm tries to guess a loop count for tenmicrosec such
-	 * that found will be 0xf000 PIT counts, but because it is only a
-	 * rough guess there is no guarantee that tenmicrosec will take
-	 * exactly 0xf000 PIT counts. min is set initially to 0xe000 and
-	 * represents the number of PIT counts that must elapse in
-	 * tenmicrosec for microfind to calculate the correct loop count for
-	 * tenmicrosec. The algorith will successively set count to better
-	 * approximations until the number of PIT counts elapsed are greater
-	 * than min. Ideally the first guess should be correct, but as cpu's
-	 * become faster MICROCOUNT may have to be increased to ensure
-	 * that the first guess for count is correct. There is no harm
-	 * leaving MICRCOUNT at 0x2000, the results will be correct, it just
-	 * may take longer to calculate the correct value for the loop
-	 * count used by tenmicrosec. In some cases min may be reset as the
-	 * algorithm progresses in order to facilitate faster cpu's.
+	 * Load an initial counter value of zero.
 	 */
-	unsigned long found, min = 0xe000;
-	ulong_t s;
+	outb(PITCTR0_PORT, 0);
+	outb(PITCTR0_PORT, 0);
+}
+
+/*
+ * Measure the run time of tenmicrosec() using the Intel 8254 Programmable
+ * Interval Timer.  The timer operates at 1.193182 Mhz, so each timer tick
+ * represents 0.8381 microseconds of wall time.  This function returns the
+ * number of such ticks that passed while tenmicrosec() was running, or
+ * -1 if the delay was too long to measure with the PIT.
+ */
+static int
+microfind_pit_delta(void)
+{
 	unsigned char status;
+	int count;
 
-	s = clear_int_flag();		/* disable interrupts */
+	/*
+	 * Configure PIT counter 0 in mode 0 -- "Interrupt On Terminal Count".
+	 * In this mode, the PIT will count down from the loaded value and
+	 * set its output bit high once it reaches zero.  The PIT will pause
+	 * until we write the low byte and then the high byte to the counter
+	 * port.
+	 */
+	outb(PITCTL_PORT, PIT_LOADMODE);
 
-	/*CONSTCOND*/
-	while (1) {
+	/*
+	 * Load the maximum counter value, 0xffff, into the counter port.
+	 */
+	outb(PITCTR0_PORT, 0xff);
+	outb(PITCTR0_PORT, 0xff);
 
+	/*
+	 * Run the delay function.
+	 */
+	tenmicrosec();
+
+	/*
+	 * Latch the counter value and status for counter 0 with the read
+	 * back command.
+	 */
+	outb(PITCTL_PORT, PIT_READBACK | PIT_READBACKC0);
+
+	/*
+	 * In read back mode, three values are read from the counter port
+	 * in order: the status byte, followed by the low byte and high
+	 * byte of the counter value.
+	 */
+	status = inb(PITCTR0_PORT);
+	count = inb(PITCTR0_PORT);
+	count |= inb(PITCTR0_PORT) << 8;
+
+	/*
+	 * Verify that the counter started counting down.  The null count
+	 * flag in the status byte is set when we load a value, and cleared
+	 * when counting operation begins.
+	 */
+	if (status & (1 << PITSTAT_NULLCNT)) {
 		/*
-		 * microdata is the loop count used in tenmicrosec. The first
-		 * time around microdata is set to 1 to make tenmicrosec
-		 * return quickly. The purpose of this while loop is to
-		 * warm the cache for the next time around when the number
-		 * of PIT counts are measured.
+		 * The counter did not begin.  This means the loop count
+		 * used by tenmicrosec is too small for this CPU.  We return
+		 * a zero count to represent that the delay was too small
+		 * to measure.
 		 */
-		microdata = 1;
-
-		/*CONSTCOND*/
-		while (1) {
-			/* Put counter 0 in mode 0 */
-			outb(PITCTL_PORT, PIT_LOADMODE);
-			/* output a count of -1 to counter 0 */
-			outb(PITCTR0_PORT, 0xff);
-			outb(PITCTR0_PORT, 0xff);
-			tenmicrosec();
-
-			/* READ BACK counter 0 to latch status and count */
-			outb(PITCTL_PORT, PIT_READBACK|PIT_READBACKC0);
-
-			/* Read status of counter 0 */
-			status = inb(PITCTR0_PORT);
-
-			/* Read the value left in the counter */
-			found = inb(PITCTR0_PORT) | (inb(PITCTR0_PORT) << 8);
-
-			if (microdata != 1)
-				break;
-
-			microdata = count;
-		}
-
-		/* verify that the counter began the count-down */
-		if (status & (1 << PITSTAT_NULLCNT)) {
-			/* microdata is too small */
-			count = count << 1;
-
-			/*
-			 * If the cpu is so fast that it cannot load the
-			 * counting element of the PIT with a very large
-			 * value for the loop used in tenmicrosec, then
-			 * the algorithm will not work for this cpu.
-			 * It is very unlikely there will ever be such
-			 * an x86.
-			 */
-			if (count > 0x100000000)
-				panic("microfind: cpu is too fast");
-
-			continue;
-		}
-
-		/* verify that the counter did not wrap around */
-		if (status & (1 << PITSTAT_OUTPUT)) {
-			/*
-			 * microdata is too large. Since there are counts
-			 * that would have been appropriate for the PIT
-			 * not to wrap on even a lowly AT, count will never
-			 * decrease to 1.
-			 */
-			count = count >> 1;
-			continue;
-		}
-
-		/* mode 0 is an n + 1 counter */
-		found = 0x10000 - found;
-		if (found > min)
-			break;
-
-		/* verify that the cpu is slow enough to count to 0xf000 */
-		count *= 0xf000;
-		max = 0x100000001 * found;
-
-		/*
-		 * It is possible that at some point cpu's will become
-		 * sufficiently fast such that the PIT will not be able to
-		 * count to 0xf000 within the maximum loop count used in
-		 * tenmicrosec. In that case the loop count in tenmicrosec
-		 * may be set to the maximum value because it is unlikely
-		 * that the cpu will be so fast that tenmicrosec with the
-		 * maximum loop count will take more than ten microseconds.
-		 * If the cpu is indeed too fast for the current
-		 * implementation of tenmicrosec, then there is code below
-		 * intended to catch that situation.
-		 */
-		if (count >= max) {
-			/* cpu is fast, just make it count as high it can */
-			count = 0x100000000;
-			min = 0;
-			continue;
-		}
-
-		/*
-		 * Count in the neighborhood of 0xf000 next time around
-		 * There is no risk of dividing by zero since found is in the
-		 * range of 0x1 to 0x1000.
-		 */
-		count = count / found;
+		return (0);
 	}
 
 	/*
-	 * Formula for delaycount is :
-	 *  (loopcount * timer clock speed) / (counter ticks * 1000)
-	 *  Note also that 1000 is for figuring out milliseconds
+	 * Verify that the counter did not wrap around.  The output pin is
+	 * reset when we load a new counter value, and set once the counter
+	 * reaches zero.
 	 */
-	count *= PIT_HZ;
-	max = ((uint64_t)found) * 100000;
-	count = count / max;	/* max is never zero */
-
-	if (count >= 0x100000001)
+	if (status & (1 << PITSTAT_OUTPUT)) {
 		/*
-		 * This cpu is too fast for the current implementation of
-		 * tenmicrosec. It is unlikely such a fast x86 will exist.
+		 * The counter reached zero before we were able to read the
+		 * value.  This means the loop count used by tenmicrosec is too
+		 * large for this CPU.
 		 */
-		panic("microfind: cpu is too fast");
+		return (-1);
+	}
 
-	if (count != 0)
-		microdata = count;
-	else
-		microdata = 1;
+	/*
+	 * The PIT counts from our initial load value of 0xffff down to zero.
+	 * Return the number of timer ticks that passed while tenmicrosec was
+	 * running.
+	 */
+	VERIFY(count <= 0xffff);
+	return (0xffff - count);
+}
 
-	/* Restore timer channel 0 for BIOS use */
+static int
+microfind_pit_delta_avg(int trials, int allowed_failures)
+{
+	int tc = 0;
+	int failures = 0;
+	long long int total = 0;
 
-	/* write mode to 3, square-wave */
-	outb(PITCTL_PORT, PIT_C0 | PIT_LOADMODE | PIT_SQUAREMODE);
+	while (tc < trials) {
+		int d;
 
-	/* write 16 bits of 0 for initial count */
-	outb(PITCTR0_PORT, 0);
-	outb(PITCTR0_PORT, 0);
+		if ((d = microfind_pit_delta()) < 0) {
+			/*
+			 * If the counter wrapped, we cannot use this
+			 * data point in the average.  Record the failure
+			 * and try again.
+			 */
+			if (++failures > allowed_failures) {
+				/*
+				 * Too many failures.
+				 */
+				return (-1);
+			}
+			continue;
+		}
 
-	restore_int_flag(s);		/* restore interrupt state */
+		total += d;
+		tc++;
+	}
+
+	return (total / tc);
+}
+
+void
+microfind(void)
+{
+	int ticks = -1;
+	ulong_t s;
+
+	/*
+	 * Disable interrupts while we measure the speed of the CPU.
+	 */
+	s = clear_int_flag();
+
+	/*
+	 * Start at the smallest loop count, i.e. 1, and keep doubling
+	 * until a delay of ~10ms can be measured.
+	 */
+	microdata = 1;
+	for (;;) {
+		int ticksprev = ticks;
+
+		/*
+		 * We use a trial count of 7 to attempt to smooth out jitter
+		 * caused by the scheduling of virtual machines.  We only allow
+		 * three failures, as each failure represents a wrapped counter
+		 * and an expired wall time of at least ~55ms.
+		 */
+		if ((ticks = microfind_pit_delta_avg(microdata_trial_count,
+		    microdata_allowed_failures)) < 0) {
+			/*
+			 * The counter wrapped.  Halve the counter, restore the
+			 * previous ticks count and break out of the loop.
+			 */
+			if (microdata <= 1) {
+				/*
+				 * If the counter wrapped on the first try,
+				 * then we have some serious problems.
+				 */
+				panic("microfind: pit counter always wrapped");
+			}
+			microdata = microdata >> 1;
+			ticks = ticksprev;
+			break;
+		}
+
+		if (ticks > 0x3000) {
+			/*
+			 * The loop ran for at least ~10ms worth of 0.8381us
+			 * PIT ticks.
+			 */
+			break;
+		} else if (microdata > (UINT_MAX >> 1)) {
+			/*
+			 * Doubling the loop count again would cause an
+			 * overflow.  Use what we have.
+			 */
+			break;
+		} else {
+			/*
+			 * Double and try again.
+			 */
+			microdata = microdata << 1;
+		}
+	}
+
+	if (ticks < 1) {
+		/*
+		 * If we were unable to measure a positive PIT tick count, then
+		 * we will be unable to scale the value of "microdata"
+		 * correctly.
+		 */
+		panic("microfind: could not calibrate delay loop");
+	}
+
+	/*
+	 * Calculate the loop count based on the final PIT tick count and the
+	 * loop count.  Each PIT tick represents a duration of ~0.8381us, so we
+	 * want to adjust microdata to represent a duration of 12 ticks, or
+	 * ~10us.
+	 */
+	microdata = (long long)microdata * 12LL / (long long)ticks;
+
+	/*
+	 * Try and leave things as we found them.
+	 */
+	microfind_pit_reprogram_for_bios();
+
+	/*
+	 * Restore previous interrupt state.
+	 */
+	restore_int_flag(s);
 }
