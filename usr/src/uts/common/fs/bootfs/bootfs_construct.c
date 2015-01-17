@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright (c) 2014 Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2015 Joyent, Inc.  All rights reserved.
  */
 
 /*
@@ -56,14 +56,14 @@ static const vattr_t bootfs_vattr_reg = {
 	0,					/* va_gid */
 	0,					/* va_fsid */
 	0,					/* va_nodeid */
-	2,					/* va_nlink */
-	2,					/* va_size */
+	1,					/* va_nlink */
+	0,					/* va_size */
 	0,					/* va_atime */
 	0,					/* va_mtime */
 	0,					/* va_ctime */
 	0,					/* va_rdev */
 	0,					/* va_blksize */
-	1,					/* va_nblocks */
+	0,					/* va_nblocks */
 	0					/* va_seq */
 };
 
@@ -199,6 +199,7 @@ bootfs_mknode(bootfs_t *bfs, bootfs_node_t *parent, bootfs_node_t **outp,
 		bfs->bfs_stat.bfss_nfiles.value.ui32++;
 		bfs->bfs_stat.bfss_nbytes.value.ui64 += size;
 		bnp->bvn_attr.va_nblocks = P2ROUNDUP(size, 512) >> 9;
+		bnp->bvn_attr.va_size = size;
 	}
 
 	vn_exists(bnp->bvn_vnp);
