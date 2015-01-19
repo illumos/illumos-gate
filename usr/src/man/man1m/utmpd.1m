@@ -1,10 +1,11 @@
 '\" te
+.\" Copyright 2015 Shruti V Sampat <shrutisampat@gmail.com>
 .\" Copyright (c) 2004, Sun Microsystems, Inc.  All Rights Reserved
 .\" Copyright 1989 AT&T
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH UTMPD 1M "Jun 4, 2008"
+.TH UTMPD 1M "Jan 01, 2015"
 .SH NAME
 utmpd \- utmpx monitoring daemon
 .SH SYNOPSIS
@@ -14,7 +15,6 @@ utmpd \- utmpx monitoring daemon
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fButmpd\fR daemon monitors the \fB/var/adm/utmpx\fR file. See
 \fButmpx\fR(4) (and \fButmp\fR(4) for historical information).
@@ -29,7 +29,6 @@ terminated, it checks that the process has removed its \fButmpx\fR entry from
 \fB/var/adm/utmpx\fR file, \fButmpd\fR also monitors processes that are not in
 its table.
 .SH OPTIONS
-.sp
 .ne 2
 .na
 \fB\fB-debug\fR\fR
@@ -41,7 +40,6 @@ Write debugging information to standard output.
 .RE
 
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -65,7 +63,6 @@ An error occurred.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/default/utmpd\fR\fR
@@ -74,6 +71,10 @@ An error occurred.
 .RS 4n
 You can set default values for the flags listed below. For example:
 \fBSCAN_PERIOD=600\fR
+.sp
+The values for these flags should be greater than 0. If values read
+from the file are found to be less than or equal to 0, or containing
+invalid characters, the default values mentioned below are retained.
 .sp
 .ne 2
 .na
@@ -134,13 +135,11 @@ monitored.
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBsvcs\fR(1), \fBinit\fR(1M), \fBsvcadm\fR(1M), \fBpoll\fR(2),
 \fBpututxline\fR(3C), \fBproc\fR(4), \fButmp\fR(4), \fButmpx\fR(4),
 \fBattributes\fR(5), \fBsmf\fR(5)
 .SH NOTES
-.sp
 .LP
 If the filesystem holding \fB/var/adm/wtmpx\fR is mounted with options which
 inhibit or defer access time updates, an unknown amount of error will be
