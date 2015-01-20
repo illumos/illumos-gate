@@ -27,25 +27,15 @@
 #ifndef _SYS_SPL_H
 #define	_SYS_SPL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
-
-/*
- * Convert system interrupt priorities (0-7) into a psr for splx.
- * In general, the processor priority (0-15) should be 2 times
- * the system pririty.
- */
-#define	pritospl(n)	((n) << 1)
 
 /*
  * on x86 platform these are identity functions
  */
 #define	ipltospl(n)	(n)
 #define	spltoipl(n)	(n)
-#define	spltopri(n)	(n)
 
 /*
  * Hardware spl levels
