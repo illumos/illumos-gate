@@ -267,7 +267,7 @@ make_tty(zlog_t *zlogp, int id)
 /*
  * init_zfd_devs() drives the device-tree configuration of the zone fd devices.
  * The general strategy is to use the libdevice (devctl) interfaces to
- * instantiate 2 or 3 new zone fd nodes.  We do a lot of sanity checking, and
+ * instantiate 3 new zone fd nodes.  We do a lot of sanity checking, and
  * are careful to reuse a dev if one exists.
  *
  * Once the devices are in the device tree, we kick devfsadm via
@@ -327,7 +327,7 @@ error:
 }
 
 static int
-init_zfd_devs(zlog_t *zlogp, int start)
+init_zfd_devs(zlog_t *zlogp, zlog_mode_t mode)
 {
 	devctl_hdl_t bus_hdl = NULL;
 	di_devlink_handle_t dl = NULL;
@@ -340,7 +340,7 @@ init_zfd_devs(zlog_t *zlogp, int start)
 	 * skip ahead to making devlinks, which we do for sanity's sake.
 	 */
 	ndevs = count_zfd_devs(zlogp);
-	if (ndevs == (3 - start))
+	if (ndevs == 3)
 		goto devlinks;
 
 	if (ndevs > 0 || ndevs == -1) {
@@ -356,7 +356,7 @@ init_zfd_devs(zlog_t *zlogp, int start)
 		goto error;
 	}
 
-	for (i = start; i < 3; i++) {
+	for (i = 0; i < 3; i++) {
 		if (init_zfd_dev(zlogp, bus_hdl, i) != 0)
 			goto error;
 	}
@@ -370,12 +370,9 @@ devlinks:
 	(void) di_devlink_fini(&dl);
 	rv = 0;
 
-	/*
-	 * We know that start is 0 when we're interactive and that is the
-	 * only time we want to look like a tty.
-	 */
-	if (start == 0) {
-		for (i = start; i < 3; i++)
+	if (mode == ZLOG_INTERACTIVE) {
+		/* We want to look like a tty. */
+		for (i = 0; i < 3; i++)
 			make_tty(zlogp, i);
 	}
 
@@ -664,11 +661,14 @@ wr_log_msg(char *buf, int len, int from)
 }
 
 /*
- * This routine drives the interactive I/O loop. It polls for input from the
- * zone side of the fd (output to stdout/stderr), and from the client
- * (input to the zone's stdin).  Additionally, it polls on the server fd,
- * and disconnects any clients that might try to hook up with the zone while
- * the fd's are in use.
+ * This routine drives the logging and interactive I/O loop. It polls for
+ * input from the zone side of the fd (output to stdout/stderr), and from the
+ * client (input to the zone's stdin).  Additionally, it polls on the server
+ * fd, and disconnects any clients that might try to hook up with the zone
+ * while the fd's are in use.
+ *
+ * Data from the zone's stdout and stderr is formatted in json and written to
+ * the log file whether an interactive client is connected or not.
  *
  * When the client first calls us up, it is expected to send a line giving its
  * "identity"; this consists of the string 'IDENT <pid> <locale>'. This is so
@@ -758,12 +758,14 @@ do_zfd_io(int servfd, int stdinfd, int stdoutfd, int stderrfd)
 				if (cc <= 0 && (errno != EINTR) &&
 				    (errno != EAGAIN))
 					break;
+				if (cc > 0) {
+					wr_log_msg(ibuf, cc, 1);
+				}
 				/*
 				 * Lose I/O if no one is listening, otherwise
-				 * pass it on and log it as well.
+				 * pass it on.
 				 */
 				if (clifd != -1 && cc > 0) {
-					wr_log_msg(ibuf, cc, 1);
 					(void) write(clifd, ibuf, cc);
 				}
 			} else {
@@ -784,12 +786,14 @@ do_zfd_io(int servfd, int stdinfd, int stdoutfd, int stderrfd)
 				if (cc <= 0 && (errno != EINTR) &&
 				    (errno != EAGAIN))
 					break;
+				if (cc > 0) {
+					wr_log_msg(ibuf, cc, 2);
+				}
 				/*
 				 * Lose I/O if no one is listening, otherwise
-				 * pass it on and log it as well.
+				 * pass it on.
 				 */
 				if (clifd != -1 && cc > 0) {
-					wr_log_msg(ibuf, cc, 2);
 					(void) write(clifd, ibuf, cc);
 				}
 			} else {
@@ -844,96 +848,6 @@ do_zfd_io(int servfd, int stdinfd, int stdoutfd, int stderrfd)
 		(void) shutdown(clifd, SHUT_RDWR);
 		(void) close(clifd);
 	}
-}
-
-/*
- * This routine runs the log file I/O loop.  It polls for input from the
- * zone's stdout and stderr, formats the msg in json and writes it to the
- * log file.
- */
-static void
-do_zfd_logging(int stdoutfd, int stderrfd)
-{
-	struct pollfd pollfds[3];
-	char ibuf[BUFSIZ];
-	int cc, ret;
-	int pollerr = 0;
-
-	/* stdout, watch for read events */
-	pollfds[0].fd = stdoutfd;
-	pollfds[0].events = POLLIN | POLLRDNORM | POLLRDBAND |
-	    POLLPRI | POLLERR | POLLHUP | POLLNVAL;
-
-	/* stderr, watch for read events */
-	pollfds[1].fd = stderrfd;
-	pollfds[1].events = pollfds[0].events;
-
-	/* the eventstream; any input means the zone is halting */
-	pollfds[2].fd = eventstream[1];
-	pollfds[2].events = pollfds[0].events;
-
-	while (!shutting_down) {
-		pollfds[0].revents = 0;
-		pollfds[1].revents = 0;
-		pollfds[2].revents = 0;
-
-		ret = poll(pollfds, 3, -1);
-		if (ret == -1 && errno != EINTR) {
-			zerror(zlogp, B_TRUE, "poll failed");
-			/* we are hosed, shutdown logger */
-			break;
-		}
-
-		/* event from zone's stdout */
-		if (pollfds[0].revents) {
-			if (pollfds[0].revents &
-			    (POLLIN | POLLRDNORM | POLLRDBAND | POLLPRI)) {
-				errno = 0;
-				cc = read(stdoutfd, ibuf, BUFSIZ);
-				if (cc <= 0 && errno != EINTR &&
-				    errno != EAGAIN)
-					break;
-				if (cc > 0)
-					wr_log_msg(ibuf, cc, 1);
-			} else {
-				pollerr = pollfds[0].revents;
-				zerror(zlogp, B_FALSE, "closing connection "
-				    "with zfd stdin, pollerr %d\n", pollerr);
-				break;
-			}
-		}
-
-		/* event from zone's stderr */
-		if (pollfds[1].revents) {
-			if (pollfds[1].revents &
-			    (POLLIN | POLLRDNORM | POLLRDBAND | POLLPRI)) {
-				errno = 0;
-				cc = read(stderrfd, ibuf, BUFSIZ);
-				if (cc <= 0 && errno != EINTR &&
-				    errno != EAGAIN)
-					break;
-				if (cc > 0)
-					wr_log_msg(ibuf, cc, 2);
-			} else {
-				pollerr = pollfds[1].revents;
-				zerror(zlogp, B_FALSE, "closing connection "
-				    "with zfd stderr, pollerr %d\n", pollerr);
-				break;
-			}
-		}
-
-
-		/*
-		 * Watch for events on the eventstream. This is how we get
-		 * notified of the zone halting. It provides us a "wakeup"
-		 * from poll.
-		 */
-		if (pollfds[2].revents)
-			break;
-	}
-
-	(void) close(logfd);
-	logfd = -1;
 }
 
 static int
@@ -994,15 +908,15 @@ hup_handler(int i)
 }
 
 /*
- * Body of the worker thread to perform interactive IO to the stdin, stdout and
- * stderr zfd's.
+ * Body of the worker thread to log the zfd's stdout and stderr to a log file
+ * and to perform interactive IO to the stdin, stdout and stderr zfd's.
  *
  * The stdin, stdout and stderr are from the perspective of the process inside
  * the zone, so the zoneadmd view is opposite (i.e. we write to the stdin fd
  * and read from the stdout/stderr fds).
  */
 static void
-interactive()
+srvr()
 {
 	int serverfd = -1;
 	int stdinfd = -1;
@@ -1025,8 +939,8 @@ interactive()
 
 	if (!shutting_down) {
 		if (pipe(eventstream) != 0) {
-			zerror(zlogp, B_TRUE, "failed to open interactive "
-			    "control pipe");
+			zerror(zlogp, B_TRUE, "failed to open logger control "
+			    "pipe");
 			return;
 		}
 	}
@@ -1101,86 +1015,7 @@ death:
 	eventstream[0] = -1;
 	(void) close(eventstream[1]);
 	eventstream[1] = -1;
-}
-
-/*
- * Body of the worker thread to log the zfd's stdout and stderr to a log file.
- *
- * The stdout and stderr are from the perspective of the process inside the
- * zone, so the zoneadmd view is opposite (i.e. we read from the stdout/stderr
- * fds). Since this is the logger worker we ignore the zone's stdin fd.
- */
-static void
-logger()
-{
-	int stdoutfd = -1;
-	int stderrfd = -1;
-	sigset_t blockset;
-
-	if (!shutting_down) {
-		open_logfile();
-	}
-
-	/*
-	 * This thread should receive SIGHUP so that it can close the log
-	 * file, and reopen it, during log rotation.
-	 */
-	sigset(SIGHUP, hup_handler);
-	(void) sigfillset(&blockset);
-	(void) sigdelset(&blockset, SIGHUP);
-	(void) thr_sigsetmask(SIG_BLOCK, &blockset, NULL);
-
-	if (!shutting_down) {
-		if (pipe(eventstream) != 0) {
-			zerror(zlogp, B_TRUE, "failed to open logger control "
-			    "pipe");
-			goto death;
-		}
-	}
-
-	if (!shutting_down) {
-		if ((stdoutfd = open_fd(1)) == -1) {
-			zerror(zlogp, B_TRUE, "failed to open stdout zfd");
-			goto death;
-		}
-
-		/*
-		 * Setting RPROTDIS on the stream means that the control
-		 * portion of messages received (which we don't care about)
-		 * will be discarded by the stream head.  If we allowed such
-		 * messages, we wouldn't be able to use read(2), as it fails
-		 * (EBADMSG) when a message with a control element is received.
-		 */
-		if (ioctl(stdoutfd, I_SRDOPT, RNORM|RPROTDIS) == -1) {
-			zerror(zlogp, B_TRUE, "failed to set options on "
-			    "stdout zfd");
-			goto death;
-		}
-	}
-
-	if (!shutting_down) {
-		if ((stderrfd = open_fd(2)) == -1) {
-			zerror(zlogp, B_TRUE, "failed to open stderr zfd");
-			goto death;
-		}
-
-		if (ioctl(stderrfd, I_SRDOPT, RNORM|RPROTDIS) == -1) {
-			zerror(zlogp, B_TRUE, "failed to set options on "
-			    "stderr zfd");
-			goto death;
-		}
-	}
-
-	do_zfd_logging(stdoutfd, stderrfd);
-
-death:
-	(void) close(eventstream[0]);
-	eventstream[0] = -1;
-	(void) close(eventstream[1]);
-	eventstream[1] = -1;
 	(void) close(logfd);
-	(void) close(stdoutfd);
-	(void) close(stderrfd);
 }
 
 static zlog_mode_t
@@ -1220,9 +1055,7 @@ void
 create_log_thread(zlog_t *logp, zoneid_t id)
 {
 	int res;
-	int zdev_start;
 	zlog_mode_t mode;
-	void *(*worker) (void*);
 
 	shutting_down = 0;
 	zlogp = logp;
@@ -1231,21 +1064,14 @@ create_log_thread(zlog_t *logp, zoneid_t id)
 	if (mode == ZLOG_NONE)
 		return;
 
-	if (mode == ZLOG_INTERACTIVE) {
-		worker = (void *(*)(void *))interactive;
-		zdev_start = 0;
-	} else {
-		worker = (void *(*)(void *))logger;
-		zdev_start = 1;
-	}
-
-	if (init_zfd_devs(zlogp, zdev_start) == -1) {
+	if (init_zfd_devs(zlogp, mode) == -1) {
 		zerror(zlogp, B_FALSE,
 		    "zfd setup: device initialization failed");
 		return;
 	}
 
-	res = thr_create(NULL, NULL, worker, NULL, NULL, &logger_tid);
+	res = thr_create(NULL, NULL, (void * (*)(void *))srvr, NULL, NULL,
+	    &logger_tid);
 	if (res != 0) {
 		zerror(zlogp, B_FALSE, "error %d creating logger thread", res);
 		logger_tid = 0;

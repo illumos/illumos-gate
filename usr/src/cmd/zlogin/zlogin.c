@@ -27,7 +27,7 @@
  */
 
 /*
- * zlogin provides four types of login which allow users in the global
+ * zlogin provides five types of login which allow users in the global
  * zone to access non-global zones.
  *
  * - "interactive login" is similar to rlogin(1); for example, the user could
@@ -56,6 +56,9 @@
  *   socket.  If zoneadmd is not running, it starts it.  This allows the
  *   console to be available anytime the zone is installed, regardless of
  *   whether it is running.
+ *
+ * - "standalone-processs interactive" is specified with -I and connects to
+ *   the zone's stdin, stdout and stderr zfd(7D) devices.
  */
 
 #include <sys/socket.h>
@@ -1796,36 +1799,6 @@ get_username()
 	return (nptr->pw_name);
 }
 
-static boolean_t
-is_standalone_int_mode(char *zonename)
-{
-	boolean_t sa = B_FALSE;
-	zone_dochandle_t handle;
-	struct zone_attrtab attr;
-
-	if ((handle = zonecfg_init_handle()) == NULL)
-		return (sa);
-
-	if (zonecfg_get_handle(zonename, handle) != Z_OK)
-		goto done;
-
-	if (zonecfg_setattrent(handle) != Z_OK)
-		goto done;
-	while (zonecfg_getattrent(handle, &attr) == Z_OK) {
-		if (strcmp("zlog-mode", attr.zone_attr_name) == 0) {
-			if (strncmp("int", attr.zone_attr_value, 3) == 0)
-				sa = B_TRUE;
-			break;
-		}
-	}
-	(void) zonecfg_endattrent(handle);
-
-done:
-	zonecfg_fini_handle(handle);
-	return (sa);
-}
-
-
 int
 main(int argc, char **argv)
 {
@@ -2060,11 +2033,6 @@ main(int argc, char **argv)
 	 * the rest of the code; handle it first.
 	 */
 	if (console) {
-		if (imode && !is_standalone_int_mode(zonename)) {
-			zerror(gettext("the zlog-mode is not interactive"));
-			return (1);
-		}
-
 		/*
 		 * Ensure that zoneadmd for this zone is running.
 		 */
