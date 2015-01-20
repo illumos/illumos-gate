@@ -26,6 +26,7 @@
 
 /*
  * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/param.h>
@@ -1426,8 +1427,8 @@ pcfs_readdir(
 
 
 /*
- * Called from pvn_getpages or pcfs_getpage to get a particular page.
- * When we are called the pcfs is already locked.
+ * Called from pvn_getpages to get a particular page.  When we are called
+ * the pcfs is already locked.
  */
 /*ARGSUSED*/
 static int
@@ -1601,13 +1602,9 @@ pcfs_getpage(
 		*protp = PROT_ALL;
 
 	ASSERT((off & PAGEOFFSET) == 0);
-	if (len <= PAGESIZE) {
-		err = pcfs_getapage(vp, off, len, protp, pl,
-		    plsz, seg, addr, rw, cr);
-	} else {
-		err = pvn_getpages(pcfs_getapage, vp, off,
-		    len, protp, pl, plsz, seg, addr, rw, cr);
-	}
+	err = pvn_getpages(pcfs_getapage, vp, off, len, protp, pl, plsz,
+	    seg, addr, rw, cr);
+
 	pc_unlockfs(fsp);
 	return (err);
 }
