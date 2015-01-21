@@ -25,7 +25,7 @@
  */
 
 /*
- * Copyright 2014 Joyent, Inc. All rights reserved.
+ * Copyright 2015 Joyent, Inc. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -1388,8 +1388,8 @@ static struct lx_sysent sysents[] = {
 	{"dup3",	lx_dup3,		0,		3}, /* 292 */
 	{"pipe2",	lx_pipe2,		0,		2}, /* 293 */
 	{"inotify_init1", lx_inotify_init1,	0,		1}, /* 294 */
-	{"preadv",	NULL,			NOSYS_NULL,	0}, /* 295 */
-	{"pwritev",	NULL,			NOSYS_NULL,	0}, /* 296 */
+	{"preadv",	lx_preadv,		0,		4}, /* 295 */
+	{"pwritev",	lx_pwritev,		0,		4}, /* 296 */
 	{"rt_tgsigqueueinfo", lx_rt_tgsigqueueinfo, 0,		4}, /* 297 */
 	{"perf_event_open", NULL,		NOSYS_NULL,	0}, /* 298 */
 	{"recvmmsg",	NULL,			NOSYS_NULL,	0}, /* 299 */
@@ -1753,8 +1753,8 @@ static struct lx_sysent sysents[] = {
 	{"dup3",	lx_dup3,	0,		3},	/* 330 */
 	{"pipe2",	lx_pipe2,	0,		2},	/* 331 */
 	{"inotify_init1", lx_inotify_init1, 0,		1},	/* 332 */
-	{"preadv",	NULL,		NOSYS_NULL,	0},	/* 333 */
-	{"pwritev",	NULL,		NOSYS_NULL,	0},	/* 334 */
+	{"preadv",	lx_preadv,	0,		4},	/* 333 */
+	{"pwritev",	lx_pwritev,	0,		4},	/* 334 */
 	{"rt_tgsigqueueinfo", lx_rt_tgsigqueueinfo, 0,	4},	/* 335 */
 	{"perf_event_open", NULL,	NOSYS_NULL,	0},	/* 336 */
 	{"recvmmsg",	NULL,		NOSYS_NULL,	0},	/* 337 */
