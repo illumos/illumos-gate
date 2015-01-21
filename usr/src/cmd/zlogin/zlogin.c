@@ -282,7 +282,7 @@ get_interactive_master(const char *zname, int notcons)
 	}
 
 	if (notcons) {
-		sock_str = "%s/%s.server_sock";
+		sock_str = "%s/%s.server_out";
 	} else {
 		sock_str = "%s/%s.console_sock";
 	}
@@ -351,6 +351,37 @@ bad:
 	return (-1);
 }
 
+/*
+ * Create the unix domain stderr socket and connect to the zoneadmd server.
+ */
+static int
+get_interactive_stderr(const char *zname)
+{
+	int sockfd = -1;
+	struct sockaddr_un servaddr;
+	char *sock_str;
+
+	if ((sockfd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
+		zperror(gettext("could not create socket"));
+		return (-1);
+	}
+
+	sock_str = "%s/%s.server_err";
+
+	bzero(&servaddr, sizeof (servaddr));
+	servaddr.sun_family = AF_UNIX;
+	(void) snprintf(servaddr.sun_path, sizeof (servaddr.sun_path),
+	    sock_str, ZONES_TMPDIR, zname);
+
+	if (connect(sockfd, (struct sockaddr *)&servaddr,
+	    sizeof (servaddr)) == -1) {
+		zperror(gettext("Could not connect to zone's stderr"));
+		(void) close(sockfd);
+		return (-1);
+	}
+
+	return (sockfd);
+}
 
 /*
  * Routines to handle pty creation upon zone entry and to shuttle I/O back
@@ -2033,6 +2064,8 @@ main(int argc, char **argv)
 	 * the rest of the code; handle it first.
 	 */
 	if (console) {
+		int gz_stderr_fd = -1;
+
 		/*
 		 * Ensure that zoneadmd for this zone is running.
 		 */
@@ -2044,6 +2077,10 @@ main(int argc, char **argv)
 		 */
 		if (get_interactive_master(zonename, imode) == -1)
 			return (1);
+
+		if (imode) {
+			gz_stderr_fd = get_interactive_stderr(zonename);
+		}
 
 		if (!quiet) {
 			if (imode)
@@ -2066,7 +2103,7 @@ main(int argc, char **argv)
 		/*
 		 * Run the I/O loop until we get disconnected.
 		 */
-		doio(masterfd, -1, masterfd, -1, -1, B_FALSE);
+		doio(masterfd, -1, masterfd, gz_stderr_fd, -1, B_FALSE);
 		if (!imode)
 			reset_tty();
 		if (!quiet) {

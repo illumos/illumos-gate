@@ -84,7 +84,7 @@ static int eventstream[2] = {-1, -1};
 #define	ZLOG_MODE		"zlog-mode"
 #define	ZFDNEX_DEVTREEPATH	"/pseudo/zfdnex@2"
 #define	ZFDNEX_FILEPATH		"/devices/pseudo/zfdnex@2"
-#define	SERVER_SOCKPATH		ZONES_TMPDIR "/%s.server_sock"
+#define	SERVER_SOCKPATH		ZONES_TMPDIR "/%s.server_%s"
 #define	ZTTY_RETRY		5
 
 typedef enum {
@@ -383,48 +383,78 @@ error:
 }
 
 static int
-init_server_sock(zlog_t *zlogp)
+init_server_socks(zlog_t *zlogp, int *stdoutfd, int *stderrfd)
 {
-	int servfd;
+	int outfd = -1, errfd = -1;
 	struct sockaddr_un servaddr;
 
 	bzero(&servaddr, sizeof (servaddr));
 	servaddr.sun_family = AF_UNIX;
 	(void) snprintf(servaddr.sun_path, sizeof (servaddr.sun_path),
-	    SERVER_SOCKPATH, zone_name);
+	    SERVER_SOCKPATH, zone_name, "out");
 
-	if ((servfd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
+	if ((outfd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
 		zerror(zlogp, B_TRUE, "server setup: could not create socket");
-		return (-1);
+		goto err;
 	}
 	(void) unlink(servaddr.sun_path);
 
-	if (bind(servfd, (struct sockaddr *)&servaddr,
-	    sizeof (servaddr)) == -1) {
+	if (bind(outfd, (struct sockaddr *)&servaddr, sizeof (servaddr))
+	    == -1) {
 		zerror(zlogp, B_TRUE,
 		    "server setup: could not bind to socket");
-		goto out;
+		goto err;
 	}
 
-	if (listen(servfd, 4) == -1) {
+	if (listen(outfd, 4) == -1) {
 		zerror(zlogp, B_TRUE,
 		    "server setup: could not listen on socket");
-		goto out;
+		goto err;
 	}
-	return (servfd);
 
-out:
+	bzero(&servaddr, sizeof (servaddr));
+	servaddr.sun_family = AF_UNIX;
+	(void) snprintf(servaddr.sun_path, sizeof (servaddr.sun_path),
+	    SERVER_SOCKPATH, zone_name, "err");
+
+	if ((errfd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
+		zerror(zlogp, B_TRUE, "server setup: could not create socket");
+		goto err;
+	}
 	(void) unlink(servaddr.sun_path);
-	(void) close(servfd);
+
+	if (bind(errfd, (struct sockaddr *)&servaddr, sizeof (servaddr))
+	    == -1) {
+		zerror(zlogp, B_TRUE,
+		    "server setup: could not bind to socket");
+		goto err;
+	}
+
+	if (listen(errfd, 4) == -1) {
+		zerror(zlogp, B_TRUE,
+		    "server setup: could not listen on socket");
+		goto err;
+	}
+
+	*stdoutfd = outfd;
+	*stderrfd = errfd;
+	return (0);
+
+err:
+	(void) unlink(servaddr.sun_path);
+	if (outfd != -1)
+		(void) close(outfd);
+	if (errfd != -1)
+		(void) close(errfd);
 	return (-1);
 }
 
 static void
-destroy_server_sock(int servfd)
+destroy_server_sock(int servfd, char *nm)
 {
 	char path[MAXPATHLEN];
 
-	(void) snprintf(path, sizeof (path), SERVER_SOCKPATH, zone_name);
+	(void) snprintf(path, sizeof (path), SERVER_SOCKPATH, zone_name, nm);
 	(void) unlink(path);
 	(void) shutdown(servfd, SHUT_RDWR);
 	(void) close(servfd);
@@ -506,12 +536,14 @@ accept_client(int servfd, pid_t *pid, char *locale, size_t locale_len)
 	connfd = accept(servfd, (struct sockaddr *)&cliaddr, &clilen);
 	if (connfd == -1)
 		return (-1);
-	if (get_client_ident(connfd, pid, locale, locale_len) == -1) {
-		(void) shutdown(connfd, SHUT_RDWR);
-		(void) close(connfd);
-		return (-1);
+	if (pid != NULL) {
+		if (get_client_ident(connfd, pid, locale, locale_len) == -1) {
+			(void) shutdown(connfd, SHUT_RDWR);
+			(void) close(connfd);
+			return (-1);
+		}
+		(void) write(connfd, "OK\n", 3);
 	}
-	(void) write(connfd, "OK\n", 3);
 
 	flags = fcntl(connfd, F_GETFD, 0);
 	if (flags != -1)
@@ -571,7 +603,7 @@ escape_json(char *sbuf, int slen, char *dbuf, int dlen)
 
 	bzero(&mbr, sizeof (mbr));
 
-	sbuf[slen - 1] = '\0';
+	sbuf[slen] = '\0';
 	i = 0;
 	while (i < dlen && (sz = mbrtowc(&c, sbuf, MB_CUR_MAX, &mbr)) > 0) {
 		switch (c) {
@@ -683,12 +715,13 @@ wr_log_msg(char *buf, int len, int from)
  * to stdin, we won't get blocked.
  */
 static void
-do_zfd_io(int servfd, int stdinfd, int stdoutfd, int stderrfd)
+do_zfd_io(int gzservfd, int gzerrfd, int stdinfd, int stdoutfd, int stderrfd)
 {
-	struct pollfd pollfds[5];
-	char ibuf[BUFSIZ];
+	struct pollfd pollfds[6];
+	char ibuf[BUFSIZ + 1];
 	int cc, ret;
 	int clifd = -1;
+	int clierrfd = -1;
 	int pollerr = 0;
 	char clilocale[MAXPATHLEN];
 	pid_t clipid = 0;
@@ -706,20 +739,24 @@ do_zfd_io(int servfd, int stdinfd, int stdoutfd, int stderrfd)
 	pollfds[2].fd = stderrfd;
 	pollfds[2].events = pollfds[0].events;
 
-	/* the server socket; watch for events (new connections) */
-	pollfds[3].fd = servfd;
+	/* the server stdin/out socket; watch for events (new connections) */
+	pollfds[3].fd = gzservfd;
 	pollfds[3].events = pollfds[0].events;
 
-	/* the eventstram; any input means the zone is halting */
-	pollfds[4].fd = eventstream[1];
+	/* the server stderr socket; watch for events (new connections) */
+	pollfds[4].fd = gzerrfd;
 	pollfds[4].events = pollfds[0].events;
+
+	/* the eventstream; any input means the zone is halting */
+	pollfds[5].fd = eventstream[1];
+	pollfds[5].events = pollfds[0].events;
 
 	while (!shutting_down) {
 		pollfds[0].revents = pollfds[1].revents = 0;
 		pollfds[2].revents = pollfds[3].revents = 0;
-		pollfds[4].revents = 0;
+		pollfds[4].revents = pollfds[5].revents = 0;
 
-		ret = poll(pollfds, 5, -1);
+		ret = poll(pollfds, 6, -1);
 		if (ret == -1 && errno != EINTR) {
 			zerror(zlogp, B_TRUE, "poll failed");
 			/* we are hosed, close connection */
@@ -760,13 +797,13 @@ do_zfd_io(int servfd, int stdinfd, int stdoutfd, int stderrfd)
 					break;
 				if (cc > 0) {
 					wr_log_msg(ibuf, cc, 1);
-				}
-				/*
-				 * Lose I/O if no one is listening, otherwise
-				 * pass it on.
-				 */
-				if (clifd != -1 && cc > 0) {
-					(void) write(clifd, ibuf, cc);
+
+					/*
+					 * Lose output if no one is listening,
+					 * otherwise pass it on.
+					 */
+					if (clifd != -1)
+						(void) write(clifd, ibuf, cc);
 				}
 			} else {
 				pollerr = pollfds[1].revents;
@@ -788,13 +825,14 @@ do_zfd_io(int servfd, int stdinfd, int stdoutfd, int stderrfd)
 					break;
 				if (cc > 0) {
 					wr_log_msg(ibuf, cc, 2);
-				}
-				/*
-				 * Lose I/O if no one is listening, otherwise
-				 * pass it on.
-				 */
-				if (clifd != -1 && cc > 0) {
-					(void) write(clifd, ibuf, cc);
+
+					/*
+					 * Lose output if no one is listening,
+					 * otherwise pass it on.
+					 */
+					if (clierrfd != -1)
+						(void) write(clierrfd, ibuf,
+						    cc);
 				}
 			} else {
 				pollerr = pollfds[2].revents;
@@ -805,7 +843,7 @@ do_zfd_io(int servfd, int stdinfd, int stdoutfd, int stderrfd)
 			}
 		}
 
-		/* event from server socket */
+		/* event from primary server stdin/out socket */
 		if (pollfds[3].revents &&
 		    (pollfds[3].revents & (POLLIN | POLLRDNORM))) {
 			if (clifd != -1) {
@@ -822,11 +860,41 @@ do_zfd_io(int servfd, int stdinfd, int stdoutfd, int stderrfd)
 					break;
 				}
 				/* we're already handling a client */
-				reject_client(servfd, clipid);
+				reject_client(gzservfd, clipid);
 
-			} else if ((clifd = accept_client(servfd, &clipid,
+			} else if ((clifd = accept_client(gzservfd, &clipid,
 			    clilocale, sizeof (clilocale))) != -1) {
 				pollfds[0].fd = clifd;
+
+			} else {
+				break;
+			}
+		}
+
+		/* connection event from server stderr socket */
+		if (pollfds[4].revents &&
+		    (pollfds[4].revents & (POLLIN | POLLRDNORM))) {
+			if (clifd == -1) {
+				/*
+				 * This shouldn't happen since the client is
+				 * expected to connect on the primary socket
+				 * first. If we see this, tear everything down
+				 * and start over.
+				 */
+				zerror(zlogp, B_FALSE, "GZ zfd stderr "
+				    "connection attempt with no GZ primary\n");
+				break;
+			}
+
+			assert(clierrfd == -1);
+			if ((clierrfd = accept_client(gzerrfd, NULL, NULL, 0))
+			    != -1) {
+				/*
+				 * Once connected, we no longer poll on the
+				 * gzerrfd since the CLI handshake takes place
+				 * on the primary gzservfd.
+				 */
+				pollfds[4].fd = -1;
 
 			} else {
 				break;
@@ -839,7 +907,7 @@ do_zfd_io(int servfd, int stdinfd, int stdoutfd, int stderrfd)
 		 * "wakeup" from poll when important things happen, which
 		 * is good.
 		 */
-		if (pollfds[4].revents) {
+		if (pollfds[5].revents) {
 			break;
 		}
 	}
@@ -847,6 +915,11 @@ do_zfd_io(int servfd, int stdinfd, int stdoutfd, int stderrfd)
 	if (clifd != -1) {
 		(void) shutdown(clifd, SHUT_RDWR);
 		(void) close(clifd);
+	}
+
+	if (clierrfd != -1) {
+		(void) shutdown(clierrfd, SHUT_RDWR);
+		(void) close(clierrfd);
 	}
 }
 
@@ -918,7 +991,8 @@ hup_handler(int i)
 static void
 srvr()
 {
-	int serverfd = -1;
+	int gzoutfd = -1;
+	int gzerrfd = -1;
 	int stdinfd = -1;
 	int stdoutfd = -1;
 	int stderrfd = -1;
@@ -946,7 +1020,7 @@ srvr()
 	}
 
 	while (!shutting_down) {
-		if ((serverfd = init_server_sock(zlogp)) == -1) {
+		if (init_server_socks(zlogp, &gzoutfd, &gzerrfd) == -1) {
 			zerror(zlogp, B_FALSE,
 			    "server setup: socket initialization failed");
 			goto death;
@@ -1002,9 +1076,10 @@ srvr()
 			}
 		}
 
-		do_zfd_io(serverfd, stdinfd, stdoutfd, stderrfd);
+		do_zfd_io(gzoutfd, gzerrfd, stdinfd, stdoutfd, stderrfd);
 death:
-		destroy_server_sock(serverfd);
+		destroy_server_sock(gzoutfd, "out");
+		destroy_server_sock(gzerrfd, "err");
 
 		(void) close(stdinfd);
 		(void) close(stdoutfd);
