@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -35,6 +35,7 @@
 #include <sys/vnode.h>
 #include <nfs/nfs4.h>
 #include <sys/kiconv.h>
+#include <sys/avl.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -216,34 +217,83 @@ struct ex_vol_rename {
 #endif /* VOLATILE_FH_TEST */
 
 /*
- * An auth cache entry can exist in 4 active states, with the inactive
- * state being indicated by no entry in the cache.
+ * An auth cache client entry.  This is the umbrella structure and contains all
+ * related auth_cache entries in the authc_tree AVL tree.
+ */
+struct auth_cache_clnt {
+	avl_node_t		authc_link;
+	struct netbuf		authc_addr;	/* address of the client */
+	krwlock_t		authc_lock;	/* protects authc_tree */
+	avl_tree_t		authc_tree;	/* auth_cache entries */
+};
+
+/*
+ * An auth cache entry can exist in 6 states.
  *
- * A FRESH entry is one which is either new or has been refreshed at
- * least once.
+ * A NEW entry was recently allocated and added to the cache.  It does not
+ * contain the valid auth state yet.
  *
- * A STALE entry is one which has been detected to be too old. The
- * transistion from FRESH to STALE prevents multiple threads from
- * submitting refresh requests.
+ * A WAITING entry is one which is actively engaging the user land mountd code
+ * to authenticate or re-authenticate it.  The auth state might not be valid
+ * yet.  The other threads should wait on auth_cv until the retrieving thread
+ * finishes the retrieval and changes the auth cache entry to FRESH, or NEW (in
+ * a case this entry had no valid auth state yet).
  *
- * A REFRESHING entry is one which is actively engaging the user land
- * mountd code to re-authenticate the cache entry.
+ * A REFRESHING entry is one which is actively engaging the user land mountd
+ * code to re-authenticate the cache entry.  There is currently no other thread
+ * waiting for the results of the refresh.
  *
- * An INVALID entry was one which was either STALE or REFRESHING
- * and was deleted out of the encapsulating exi. Since we can't
- * delete it yet, we mark it as INVALID, which lets the refreshq
- * know not to work on it.
+ * A FRESH entry is one which is valid (it is either newly retrieved or has
+ * been refreshed at least once).
  *
- * Note that the auth state of the entry is always valid, even if the
- * entry is STALE. Just as you can eat stale bread, you can consume
- * a stale cache entry. The only time the contents change could be
- * during the transistion from REFRESHING to FRESH.
+ * A STALE entry is one which has been detected to be too old.  The transition
+ * from FRESH to STALE prevents multiple threads from submitting refresh
+ * requests.
+ *
+ * An INVALID entry is one which was either STALE or REFRESHING and was deleted
+ * out of the encapsulating exi.  Since we can't delete it yet, we mark it as
+ * INVALID, which lets the refresh thread know not to work on it and free it
+ * instead.
+ *
+ * Note that the auth state of the entry is valid, even if the entry is STALE.
+ * Just as you can eat stale bread, you can consume a stale cache entry. The
+ * only time the contents change could be during the transition from REFRESHING
+ * or WAITING to FRESH.
+ *
+ * Valid state transitions:
+ *
+ *          alloc
+ *            |
+ *            v
+ *         +-----+
+ *    +--->| NEW |------>free
+ *    |    +-----+
+ *    |       |
+ *    |       v
+ *    |  +---------+
+ *    +<-| WAITING |
+ *    ^  +---------+
+ *    |       |
+ *    |       v
+ *    |       +<--------------------------+<---------------+
+ *    |       |                           ^                |
+ *    |       v                           |                |
+ *    |   +-------+    +-------+    +------------+    +---------+
+ *    +---| FRESH |--->| STALE |--->| REFRESHING |--->| WAITING |
+ *        +-------+    +-------+    +------------+    +---------+
+ *            |            |              |
+ *            |            v              |
+ *            v       +---------+         |
+ *          free<-----| INVALID |<--------+
+ *                    +---------+
  */
 typedef enum auth_state {
 	NFS_AUTH_FRESH,
 	NFS_AUTH_STALE,
 	NFS_AUTH_REFRESHING,
-	NFS_AUTH_INVALID
+	NFS_AUTH_INVALID,
+	NFS_AUTH_NEW,
+	NFS_AUTH_WAITING
 } auth_state_t;
 
 /*
@@ -253,7 +303,8 @@ typedef enum auth_state {
  * contents or auth_lock must be held.
  */
 struct auth_cache {
-	struct netbuf		auth_addr;
+	avl_node_t		auth_link;
+	struct auth_cache_clnt	*auth_clnt;
 	int			auth_flavor;
 	uid_t			auth_clnt_uid;
 	gid_t			auth_clnt_gid;
@@ -267,9 +318,8 @@ struct auth_cache {
 	time_t			auth_time;
 	time_t			auth_freshness;
 	auth_state_t		auth_state;
-	char			*auth_netid;
 	kmutex_t		auth_lock;
-	struct auth_cache	*auth_next;
+	kcondvar_t		auth_cv;
 };
 
 #define	AUTH_TABLESIZE	32
@@ -453,6 +503,8 @@ struct exp_hash {
  * should not use va_fsid for a GETATTR(FATTR4_FSID) reply.  It must
  * use exi_fsid because it is guaranteed to be persistent.  This isn't
  * in any way related to NFS4 volatile filehandles.
+ *
+ * The exi_cache_lock protects the exi_cache AVL trees.
  */
 struct exportinfo {
 	struct exportdata	exi_export;
@@ -467,7 +519,7 @@ struct exportinfo {
 	uint_t			exi_count;
 	vnode_t			*exi_vp;
 	vnode_t			*exi_dvp;
-	struct auth_cache	*exi_cache[AUTH_TABLESIZE];
+	avl_tree_t		*exi_cache[AUTH_TABLESIZE];
 	struct log_buffer	*exi_logbuffer;
 	struct exp_visible	*exi_visible;
 	struct charset_cache	*exi_charset;
@@ -553,6 +605,7 @@ extern int	nfsauth4_access(struct exportinfo *, vnode_t *,
     struct svc_req *, cred_t *, uid_t *, gid_t *, uint_t *, gid_t **);
 extern int	nfsauth4_secinfo_access(struct exportinfo *,
     struct svc_req *, int, int, cred_t *);
+extern int	nfsauth_cache_clnt_compar(const void *, const void *);
 extern int	nfs_fhbcmp(char *, char *, int);
 extern int	nfs_exportinit(void);
 extern void	nfs_exportfini(void);
