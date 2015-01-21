@@ -22,17 +22,12 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 #
 # We build each flavor in a separate make invocation to improve clarity(!) in
 # Makefile.com.  The subordinate makes have $(CURTYPE) set to indicate the
 # flavor they're supposed to build.  This causes the correct set of source
 # files and compiler and linker flags to be selected.
-#
-# The SPARC library is built from the closed gate.  This Makefile is shared
-# between both environments, so all paths must be absolute.
 #
 
 install: $(TYPES:%=install.%)

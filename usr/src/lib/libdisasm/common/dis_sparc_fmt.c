@@ -27,6 +27,7 @@
 /*
  * Copyright 2009 Jason King.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 Joshua M. Clulow <josh@sysmgr.org>
  */
 
 
@@ -48,8 +49,6 @@ extern int strcmp(const char *, const char *);
 extern int strncmp(const char *, const char *, size_t);
 extern size_t strlcat(char *, const char *, size_t);
 extern size_t strlcpy(char *, const char *, size_t);
-extern int snprintf(char *, size_t, const char *, ...);
-extern int vsnprintf(char *, size_t, const char *, va_list);
 
 /*
  * This file has the functions that do all the dirty work of outputting the
@@ -698,6 +697,7 @@ prt_binary(uint32_t val, int bitlen)
 int
 fmt_call(dis_handle_t *dhp, uint32_t instr, const inst_t *inp, int idx)
 {
+	dis_handle_sparc_t *dhx = dhp->dh_arch_private;
 	ifmt_t *f = (ifmt_t *)&instr;
 
 	int32_t disp;
@@ -705,7 +705,7 @@ fmt_call(dis_handle_t *dhp, uint32_t instr, const inst_t *inp, int idx)
 
 	int octal = ((dhp->dh_flags & DIS_OCTAL) != 0);
 
-	if ((dhp->dh_debug & DIS_DEBUG_PRTFMT) != 0) {
+	if ((dhx->dhx_debug & DIS_DEBUG_PRTFMT) != 0) {
 		prt_field("op", f->f1.op, 2);
 		prt_field("disp30", f->f1.disp30, 30);
 	}
@@ -718,13 +718,13 @@ fmt_call(dis_handle_t *dhp, uint32_t instr, const inst_t *inp, int idx)
 	    (disp < 0) ? "-" : "+",
 	    (disp < 0) ? (-disp) : disp);
 
-	(void) strlcat(dhp->dh_buf, " <", dhp->dh_buflen);
+	(void) strlcat(dhx->dhx_buf, " <", dhx->dhx_buflen);
 
-	curlen = strlen(dhp->dh_buf);
+	curlen = strlen(dhx->dhx_buf);
 	dhp->dh_lookup(dhp->dh_data, dhp->dh_addr + (int64_t)disp,
-	    dhp->dh_buf + curlen, dhp->dh_buflen - curlen - 1, NULL,
+	    dhx->dhx_buf + curlen, dhx->dhx_buflen - curlen - 1, NULL,
 	    NULL);
-	(void) strlcat(dhp->dh_buf, ">", dhp->dh_buflen);
+	(void) strlcat(dhx->dhx_buf, ">", dhx->dhx_buflen);
 
 
 	return (0);
@@ -733,9 +733,10 @@ fmt_call(dis_handle_t *dhp, uint32_t instr, const inst_t *inp, int idx)
 int
 fmt_sethi(dis_handle_t *dhp, uint32_t instr, const inst_t *inp, int idx)
 {
+	dis_handle_sparc_t *dhx = dhp->dh_arch_private;
 	ifmt_t *f = (ifmt_t *)&instr;
 
-	if ((dhp->dh_debug & DIS_DEBUG_PRTFMT) != 0) {
+	if ((dhx->dhx_debug & DIS_DEBUG_PRTFMT) != 0) {
 		prt_field("op", f->f2.op, 2);
 		prt_field("op2", f->f2.op2, 3);
 		prt_field("rd", f->f2.rd, 5);
@@ -771,6 +772,7 @@ fmt_sethi(dis_handle_t *dhp, uint32_t instr, const inst_t *inp, int idx)
 int
 fmt_branch(dis_handle_t *dhp, uint32_t instr, const inst_t *inp, int idx)
 {
+	dis_handle_sparc_t *dhx = dhp->dh_arch_private;
 	const char *name = inp->in_data.in_def.in_name;
 	const char *r = NULL;
 	const char *annul = "";
@@ -785,7 +787,7 @@ fmt_branch(dis_handle_t *dhp, uint32_t instr, const inst_t *inp, int idx)
 	uint32_t flags = inp->in_data.in_def.in_flags;
 	int octal = ((dhp->dh_flags & DIS_OCTAL) != 0);
 
-	if ((dhp->dh_debug & DIS_DEBUG_PRTFMT) != 0) {
+	if ((dhx->dhx_debug & DIS_DEBUG_PRTFMT) != 0) {
 		prt_field("op", f->f2.op, 2);
 		prt_field("op2", f->f2.op2, 3);
 
@@ -816,7 +818,7 @@ fmt_branch(dis_handle_t *dhp, uint32_t instr, const inst_t *inp, int idx)
 	}
 
 	if (f->f2b.op2 == 0x01 && idx == 0x00 && f->f2b.p == 1 &&
-	    f->f2b.cc == 0x02 && ((dhp->dh_debug & DIS_DEBUG_SYN_ALL) != 0)) {
+	    f->f2b.cc == 0x02 && ((dhx->dhx_debug & DIS_DEBUG_SYN_ALL) != 0)) {
 		name = "iprefetch";
 		flags = FLG_RS1(REG_NONE)|FLG_DISP(DISP19);
 	}
@@ -854,12 +856,12 @@ fmt_branch(dis_handle_t *dhp, uint32_t instr, const inst_t *inp, int idx)
 		if (f->f2b.p == 0) {
 			pred = ",pn";
 		} else {
-			if ((dhp->dh_debug & DIS_DEBUG_COMPAT) != 0)
+			if ((dhx->dhx_debug & DIS_DEBUG_COMPAT) != 0)
 				pred = ",pt";
 		}
 	}
 
-	(void) snprintf(buf, sizeof (buf), "%s%s%s", name, annul, pred);
+	(void) dis_snprintf(buf, sizeof (buf), "%s%s%s", name, annul, pred);
 	prt_name(dhp, buf, 1);
 
 
@@ -888,11 +890,11 @@ fmt_branch(dis_handle_t *dhp, uint32_t instr, const inst_t *inp, int idx)
 		break;
 	}
 
-	curlen = strlen(dhp->dh_buf);
+	curlen = strlen(dhx->dhx_buf);
 	dhp->dh_lookup(dhp->dh_data, dhp->dh_addr + (int64_t)disp,
-	    dhp->dh_buf + curlen, dhp->dh_buflen - curlen - 1, NULL, NULL);
+	    dhx->dhx_buf + curlen, dhx->dhx_buflen - curlen - 1, NULL, NULL);
 
-	(void) strlcat(dhp->dh_buf, ">", dhp->dh_buflen);
+	(void) strlcat(dhx->dhx_buf, ">", dhx->dhx_buflen);
 
 	return (0);
 }
@@ -915,13 +917,14 @@ fmt_branch(dis_handle_t *dhp, uint32_t instr, const inst_t *inp, int idx)
 static int
 fmt_cas(dis_handle_t *dhp, uint32_t instr, const char *name)
 {
+	dis_handle_sparc_t *dhx = dhp->dh_arch_private;
 	ifmt_t *f = (ifmt_t *)&instr;
 	const char *asistr = NULL;
 	int noasi = 0;
 
 	asistr = get_asi_name(f->f3.asi);
 
-	if ((dhp->dh_debug & (DIS_DEBUG_SYN_ALL|DIS_DEBUG_COMPAT)) != 0) {
+	if ((dhx->dhx_debug & (DIS_DEBUG_SYN_ALL|DIS_DEBUG_COMPAT)) != 0) {
 		if (f->f3.op3 == 0x3c && f->f3.i == 0) {
 			if (f->f3.asi == 0x80) {
 				noasi = 1;
@@ -952,7 +955,7 @@ fmt_cas(dis_handle_t *dhp, uint32_t instr, const char *name)
 	bprintf(dhp, "[%s]", reg_names[f->f3.rs1]);
 
 	if (noasi == 0) {
-		(void) strlcat(dhp->dh_buf, " ", dhp->dh_buflen);
+		(void) strlcat(dhx->dhx_buf, " ", dhx->dhx_buflen);
 		prt_asi(dhp, instr);
 	}
 
@@ -999,6 +1002,7 @@ fmt_cas(dis_handle_t *dhp, uint32_t instr, const char *name)
 int
 fmt_ls(dis_handle_t *dhp, uint32_t instr, const inst_t *inp, int idx)
 {
+	dis_handle_sparc_t *dhx = dhp->dh_arch_private;
 	ifmt_t *f = (ifmt_t *)&instr;
 	const char *regstr = NULL;
 	const char *asistr = NULL;
@@ -1006,7 +1010,7 @@ fmt_ls(dis_handle_t *dhp, uint32_t instr, const inst_t *inp, int idx)
 	const char *iname = inp->in_data.in_def.in_name;
 	uint32_t flags = inp->in_data.in_def.in_flags;
 
-	if ((dhp->dh_debug & DIS_DEBUG_PRTFMT) != 0) {
+	if ((dhx->dhx_debug & DIS_DEBUG_PRTFMT) != 0) {
 		prt_field("op", f->f3.op, 2);
 		prt_field("op3", f->f3.op3, 6);
 		prt_field("rs1", f->f3.rs1, 5);
@@ -1029,16 +1033,16 @@ fmt_ls(dis_handle_t *dhp, uint32_t instr, const inst_t *inp, int idx)
 		prt_address(dhp, instr, 0);
 
 		if (idx == 0x3d) {
-			(void) strlcat(dhp->dh_buf, " ", dhp->dh_buflen);
+			(void) strlcat(dhx->dhx_buf, " ", dhx->dhx_buflen);
 			prt_asi(dhp, instr);
 		}
 
-		(void) strlcat(dhp->dh_buf, ", ", dhp->dh_buflen);
+		(void) strlcat(dhx->dhx_buf, ", ", dhx->dhx_buflen);
 
 		/* fcn field is the same as rd */
 		if (prefetch_str[f->f3.rd] != NULL)
-			(void) strlcat(dhp->dh_buf, prefetch_str[f->f3.rd],
-			    dhp->dh_buflen);
+			(void) strlcat(dhx->dhx_buf, prefetch_str[f->f3.rd],
+			    dhx->dhx_buflen);
 		else
 			prt_imm(dhp, f->f3.rd, 0);
 
@@ -1059,18 +1063,18 @@ fmt_ls(dis_handle_t *dhp, uint32_t instr, const inst_t *inp, int idx)
 	switch (idx) {
 	case 0x00:
 		/* ld */
-		if ((dhp->dh_debug & DIS_DEBUG_COMPAT) == 0)
+		if ((dhx->dhx_debug & DIS_DEBUG_COMPAT) == 0)
 			iname = "lduw";
 		break;
 
 	case 0x03:
-		if ((dhp->dh_debug & DIS_DEBUG_COMPAT) == 0)
+		if ((dhx->dhx_debug & DIS_DEBUG_COMPAT) == 0)
 			iname = "ldtw";
 		break;
 
 	case 0x04:
 		/* stw */
-		if ((dhp->dh_debug & DIS_DEBUG_COMPAT) == 0)
+		if ((dhx->dhx_debug & DIS_DEBUG_COMPAT) == 0)
 			iname = "stuw";
 
 		if ((dhp->dh_flags & (DIS_DEBUG_COMPAT|DIS_DEBUG_SYN_ALL))
@@ -1108,7 +1112,7 @@ fmt_ls(dis_handle_t *dhp, uint32_t instr, const inst_t *inp, int idx)
 		break;
 
 	case 0x07:
-		if ((dhp->dh_debug & DIS_DEBUG_COMPAT) == 0)
+		if ((dhx->dhx_debug & DIS_DEBUG_COMPAT) == 0)
 			iname = "sttw";
 		break;
 
@@ -1127,14 +1131,14 @@ fmt_ls(dis_handle_t *dhp, uint32_t instr, const inst_t *inp, int idx)
 
 	case 0x13:
 		/* ldtwa */
-		if (((dhp->dh_debug & DIS_DEBUG_COMPAT) == 0) &&
+		if (((dhx->dhx_debug & DIS_DEBUG_COMPAT) == 0) &&
 		    ((dhp->dh_flags & (DIS_SPARC_V9|DIS_SPARC_V9_SGI)) != 0))
 			iname = "ldtwa";
 		break;
 
 	case 0x17:
 		/* sttwa */
-		if (((dhp->dh_debug & DIS_DEBUG_COMPAT) == 0) &&
+		if (((dhx->dhx_debug & DIS_DEBUG_COMPAT) == 0) &&
 		    ((dhp->dh_flags & (DIS_SPARC_V9|DIS_SPARC_V9_SGI)) != 0))
 			iname = "sttwa";
 		break;
@@ -1212,25 +1216,25 @@ fmt_ls(dis_handle_t *dhp, uint32_t instr, const inst_t *inp, int idx)
 
 	if ((flags & FLG_STORE) != 0) {
 		if (regstr[0] != '\0') {
-			(void) strlcat(dhp->dh_buf, regstr, dhp->dh_buflen);
-			(void) strlcat(dhp->dh_buf, ", ", dhp->dh_buflen);
+			(void) strlcat(dhx->dhx_buf, regstr, dhx->dhx_buflen);
+			(void) strlcat(dhx->dhx_buf, ", ", dhx->dhx_buflen);
 		}
 
 		prt_address(dhp, instr, 0);
 		if ((flags & FLG_ASI) != 0) {
-			(void) strlcat(dhp->dh_buf, " ", dhp->dh_buflen);
+			(void) strlcat(dhx->dhx_buf, " ", dhx->dhx_buflen);
 			prt_asi(dhp, instr);
 		}
 	} else {
 		prt_address(dhp, instr, 0);
 		if ((flags & FLG_ASI) != 0) {
-			(void) strlcat(dhp->dh_buf, " ", dhp->dh_buflen);
+			(void) strlcat(dhx->dhx_buf, " ", dhx->dhx_buflen);
 			prt_asi(dhp, instr);
 		}
 
 		if (regstr[0] != '\0') {
-			(void) strlcat(dhp->dh_buf, ", ", dhp->dh_buflen);
-			(void) strlcat(dhp->dh_buf, regstr, dhp->dh_buflen);
+			(void) strlcat(dhx->dhx_buf, ", ", dhx->dhx_buflen);
+			(void) strlcat(dhx->dhx_buf, regstr, dhx->dhx_buflen);
 		}
 	}
 
@@ -1243,10 +1247,11 @@ fmt_ls(dis_handle_t *dhp, uint32_t instr, const inst_t *inp, int idx)
 static int
 fmt_cpop(dis_handle_t *dhp, uint32_t instr, const inst_t *inp)
 {
+	dis_handle_sparc_t *dhx = dhp->dh_arch_private;
 	ifmt_t *f = (ifmt_t *)&instr;
 	int flags = FLG_P1(REG_CP)|FLG_P2(REG_CP)|FLG_NOIMM|FLG_P3(REG_CP);
 
-	if ((dhp->dh_debug & DIS_DEBUG_PRTFMT) != 0) {
+	if ((dhx->dhx_debug & DIS_DEBUG_PRTFMT) != 0) {
 		prt_field("op", f->fcp.op, 2);
 		prt_field("op3", f->fcp.op3, 6);
 		prt_field("opc", f->fcp.opc, 9);
@@ -1258,7 +1263,7 @@ fmt_cpop(dis_handle_t *dhp, uint32_t instr, const inst_t *inp)
 	prt_name(dhp, inp->in_data.in_def.in_name, 1);
 	prt_imm(dhp, f->fcp.opc, 0);
 
-	(void) strlcat(dhp->dh_buf, ", ", dhp->dh_buflen);
+	(void) strlcat(dhx->dhx_buf, ", ", dhx->dhx_buflen);
 	(void) prt_aluargs(dhp, instr, flags);
 
 	return (0);
@@ -1267,6 +1272,7 @@ fmt_cpop(dis_handle_t *dhp, uint32_t instr, const inst_t *inp)
 static int
 dis_fmt_rdwr(dis_handle_t *dhp, uint32_t instr, const inst_t *inp, int idx)
 {
+	dis_handle_sparc_t *dhx = dhp->dh_arch_private;
 	const char *psr_str = "%psr";
 	const char *wim_str = "%wim";
 	const char *tbr_str = "%tbr";
@@ -1392,7 +1398,7 @@ dis_fmt_rdwr(dis_handle_t *dhp, uint32_t instr, const inst_t *inp, int idx)
 		}
 
 		/* synth: mov */
-		if ((dhp->dh_debug & (DIS_DEBUG_COMPAT|DIS_DEBUG_SYN_ALL))
+		if ((dhx->dhx_debug & (DIS_DEBUG_COMPAT|DIS_DEBUG_SYN_ALL))
 		    == 0)
 			break;
 
@@ -1464,12 +1470,12 @@ dis_fmt_rdwr(dis_handle_t *dhp, uint32_t instr, const inst_t *inp, int idx)
 				prt_imm(dhp, sign_extend(f->f3a.simm13, 13),
 				    IMM_SIGNED);
 			else
-				(void) strlcat(dhp->dh_buf,
-				    reg_names[f->f3.rs2], dhp->dh_buflen);
-			(void) strlcat(dhp->dh_buf, ", ", dhp->dh_buflen);
+				(void) strlcat(dhx->dhx_buf,
+				    reg_names[f->f3.rs2], dhx->dhx_buflen);
+			(void) strlcat(dhx->dhx_buf, ", ", dhx->dhx_buflen);
 		}
 
-		(void) strlcat(dhp->dh_buf, regstr, dhp->dh_buflen);
+		(void) strlcat(dhx->dhx_buf, regstr, dhx->dhx_buflen);
 	}
 
 	return (0);
@@ -1479,6 +1485,7 @@ dis_fmt_rdwr(dis_handle_t *dhp, uint32_t instr, const inst_t *inp, int idx)
 int
 fmt_trap(dis_handle_t *dhp, uint32_t instr, const inst_t *inp, int idx)
 {
+	dis_handle_sparc_t *dhx = dhp->dh_arch_private;
 	ifmt_t *f = (ifmt_t *)&instr;
 
 	int v9 = ((dhp->dh_flags & (DIS_SPARC_V9|DIS_SPARC_V9_SGI)) != 0);
@@ -1497,7 +1504,7 @@ fmt_trap(dis_handle_t *dhp, uint32_t instr, const inst_t *inp, int idx)
 		return (-1);
 
 	p_rs1 = ((f->ftcc.rs1 != 0) ||
-	    ((dhp->dh_debug & (DIS_DEBUG_COMPAT|DIS_DEBUG_SYN_ALL)) == 0));
+	    ((dhx->dhx_debug & (DIS_DEBUG_COMPAT|DIS_DEBUG_SYN_ALL)) == 0));
 
 	if (f->ftcc.i == 0) {
 		p_t = (f->f3.rs2 != 0 || p_rs1 == 0);
@@ -1555,10 +1562,11 @@ prt_shift(dis_handle_t *dhp, uint32_t instr, const inst_t *inp)
 static int
 prt_jmpl(dis_handle_t *dhp, uint32_t instr, const inst_t *inp, int idx)
 {
+	dis_handle_sparc_t *dhx = dhp->dh_arch_private;
 	const char *name = inp->in_data.in_def.in_name;
 	ifmt_t *f = (ifmt_t *)&instr;
 
-	if (f->f3.rd == 15 && ((dhp->dh_debug & DIS_DEBUG_COMPAT) == 0))
+	if (f->f3.rd == 15 && ((dhx->dhx_debug & DIS_DEBUG_COMPAT) == 0))
 		name = "call";
 
 	if (f->f3.rd == 0) {
@@ -1583,7 +1591,7 @@ prt_jmpl(dis_handle_t *dhp, uint32_t instr, const inst_t *inp, int idx)
 	if (f->f3.rd == 0)
 		return (0);
 
-	if (f->f3.rd == 15 && ((dhp->dh_debug & DIS_DEBUG_COMPAT) == 0))
+	if (f->f3.rd == 15 && ((dhx->dhx_debug & DIS_DEBUG_COMPAT) == 0))
 		return (0);
 
 	bprintf(dhp, ", %s", reg_names[f->f3.rd]);
@@ -1594,13 +1602,14 @@ prt_jmpl(dis_handle_t *dhp, uint32_t instr, const inst_t *inp, int idx)
 int
 fmt_alu(dis_handle_t *dhp, uint32_t instr, const inst_t *inp, int idx)
 {
+	dis_handle_sparc_t *dhx = dhp->dh_arch_private;
 	ifmt_t *f = (ifmt_t *)&instr;
 
 	const char *name = inp->in_data.in_def.in_name;
 	int flags = inp->in_data.in_def.in_flags;
 	int arg = 0;
 
-	if ((dhp->dh_debug & DIS_DEBUG_PRTFMT) != 0) {
+	if ((dhx->dhx_debug & DIS_DEBUG_PRTFMT) != 0) {
 		prt_field("op", f->f3.op, 2);
 		prt_field("op3", f->f3.op3, 6);
 		prt_field("rs1", f->f3.rs1, 5);
@@ -1623,7 +1632,7 @@ fmt_alu(dis_handle_t *dhp, uint32_t instr, const inst_t *inp, int idx)
 	case 0x00:
 		/* add */
 
-		if ((dhp->dh_debug & DIS_DEBUG_SYN_ALL) == 0)
+		if ((dhx->dhx_debug & DIS_DEBUG_SYN_ALL) == 0)
 			break;
 
 		if (f->f3.rs1 == f->f3.rd && f->f3.i == 1 &&
@@ -1644,11 +1653,11 @@ fmt_alu(dis_handle_t *dhp, uint32_t instr, const inst_t *inp, int idx)
 	case 0x02:
 		/* or */
 
-		if ((dhp->dh_debug & (DIS_DEBUG_SYN_ALL|DIS_DEBUG_COMPAT))
+		if ((dhx->dhx_debug & (DIS_DEBUG_SYN_ALL|DIS_DEBUG_COMPAT))
 		    == 0)
 			break;
 
-		if ((dhp->dh_debug & DIS_DEBUG_SYN_ALL) != 0) {
+		if ((dhx->dhx_debug & DIS_DEBUG_SYN_ALL) != 0) {
 			if (f->f3.rs1 == f->f3.rd) {
 				name = "bset";
 				flags = FLG_P1(REG_NONE);
@@ -1674,7 +1683,7 @@ fmt_alu(dis_handle_t *dhp, uint32_t instr, const inst_t *inp, int idx)
 	case 0x04:
 		/* sub */
 
-		if ((dhp->dh_debug & (DIS_DEBUG_SYN_ALL|DIS_DEBUG_COMPAT))
+		if ((dhx->dhx_debug & (DIS_DEBUG_SYN_ALL|DIS_DEBUG_COMPAT))
 		    == 0)
 			break;
 
@@ -1690,7 +1699,7 @@ fmt_alu(dis_handle_t *dhp, uint32_t instr, const inst_t *inp, int idx)
 			break;
 		}
 
-		if ((dhp->dh_debug & DIS_DEBUG_SYN_ALL) == 0)
+		if ((dhx->dhx_debug & DIS_DEBUG_SYN_ALL) == 0)
 			break;
 
 		if (f->f3.rs1 == f->f3.rd && f->f3.i == 1 &&
@@ -1711,7 +1720,7 @@ fmt_alu(dis_handle_t *dhp, uint32_t instr, const inst_t *inp, int idx)
 	case 0x07:
 		/* xnor */
 
-		if ((dhp->dh_debug & (DIS_DEBUG_SYN_ALL|DIS_DEBUG_COMPAT))
+		if ((dhx->dhx_debug & (DIS_DEBUG_SYN_ALL|DIS_DEBUG_COMPAT))
 		    == 0)
 			break;
 
@@ -1737,7 +1746,7 @@ fmt_alu(dis_handle_t *dhp, uint32_t instr, const inst_t *inp, int idx)
 	case 0x10:
 		/* addcc */
 
-		if ((dhp->dh_debug & DIS_DEBUG_SYN_ALL) == 0)
+		if ((dhx->dhx_debug & DIS_DEBUG_SYN_ALL) == 0)
 			break;
 
 		if (f->f3.rs1 == f->f3.rd && f->f3.i == 1 &&
@@ -1761,11 +1770,11 @@ fmt_alu(dis_handle_t *dhp, uint32_t instr, const inst_t *inp, int idx)
 		if (f->f3.rd != 0)
 			break;
 
-		if ((dhp->dh_debug & (DIS_DEBUG_COMPAT|DIS_DEBUG_SYN_ALL))
+		if ((dhx->dhx_debug & (DIS_DEBUG_COMPAT|DIS_DEBUG_SYN_ALL))
 		    == 0)
 			break;
 
-		if (((dhp->dh_debug & DIS_DEBUG_COMPAT) != 0) &&
+		if (((dhx->dhx_debug & DIS_DEBUG_COMPAT) != 0) &&
 		    ((dhp->dh_flags & (DIS_SPARC_V9|DIS_SPARC_V9_SGI)) == 0))
 			break;
 
@@ -1777,7 +1786,7 @@ fmt_alu(dis_handle_t *dhp, uint32_t instr, const inst_t *inp, int idx)
 	case 0x12:
 		/* orcc */
 
-		if ((dhp->dh_debug & (DIS_DEBUG_SYN_ALL|DIS_DEBUG_COMPAT))
+		if ((dhx->dhx_debug & (DIS_DEBUG_SYN_ALL|DIS_DEBUG_COMPAT))
 		    == 0)
 			break;
 
@@ -1798,7 +1807,7 @@ fmt_alu(dis_handle_t *dhp, uint32_t instr, const inst_t *inp, int idx)
 	case 0x14:
 		/* subcc */
 
-		if ((dhp->dh_debug & (DIS_DEBUG_SYN_ALL|DIS_DEBUG_COMPAT))
+		if ((dhx->dhx_debug & (DIS_DEBUG_SYN_ALL|DIS_DEBUG_COMPAT))
 		    == 0)
 			break;
 
@@ -1808,7 +1817,7 @@ fmt_alu(dis_handle_t *dhp, uint32_t instr, const inst_t *inp, int idx)
 			break;
 		}
 
-		if ((dhp->dh_debug & DIS_DEBUG_COMPAT) != 0)
+		if ((dhx->dhx_debug & DIS_DEBUG_COMPAT) != 0)
 			break;
 
 		if (f->f3.rs1 == f->f3.rd && f->f3.i == 1 &&
@@ -1868,14 +1877,14 @@ fmt_alu(dis_handle_t *dhp, uint32_t instr, const inst_t *inp, int idx)
 	case 0x3c:
 	case 0x3d:
 		/* save / restore */
-		if ((dhp->dh_debug & (DIS_DEBUG_SYN_ALL|DIS_DEBUG_COMPAT))
+		if ((dhx->dhx_debug & (DIS_DEBUG_SYN_ALL|DIS_DEBUG_COMPAT))
 		    == 0)
 			break;
 
 		if (f->f3.rs1 != 0 || f->f3.rs2 != 0 || f->f3.rd != 0)
 			break;
 
-		if (f->f3.i != 0 && ((dhp->dh_debug & DIS_DEBUG_COMPAT) != 0))
+		if (f->f3.i != 0 && ((dhx->dhx_debug & DIS_DEBUG_COMPAT) != 0))
 			break;
 
 		prt_name(dhp, name, 0);
@@ -1919,10 +1928,11 @@ fmt_trap_ret(dis_handle_t *dhp, uint32_t instr, const inst_t *inp, int idx)
 int
 fmt_movcc(dis_handle_t *dhp, uint32_t instr, const inst_t *inp, int idx)
 {
+	dis_handle_sparc_t *dhx = dhp->dh_arch_private;
 	ifmt_t *f = (ifmt_t *)&instr;
 	const char **regs = NULL;
 
-	if ((dhp->dh_debug & DIS_DEBUG_PRTFMT) != 0) {
+	if ((dhx->dhx_debug & DIS_DEBUG_PRTFMT) != 0) {
 		prt_field("op", f->f3c.op, 2);
 		prt_field("op3", f->f3c.op3, 6);
 		prt_field("cond", f->f3c.cond, 4);
@@ -1953,8 +1963,8 @@ fmt_movcc(dis_handle_t *dhp, uint32_t instr, const inst_t *inp, int idx)
 	if (f->f3c.i == 1)
 		prt_imm(dhp, sign_extend(f->f3c.simm11, 11), IMM_SIGNED);
 	else
-		(void) strlcat(dhp->dh_buf, reg_names[f->f3.rs2],
-		    dhp->dh_buflen);
+		(void) strlcat(dhx->dhx_buf, reg_names[f->f3.rs2],
+		    dhx->dhx_buflen);
 
 	bprintf(dhp, ", %s", reg_names[f->f3.rd]);
 
@@ -1965,6 +1975,7 @@ fmt_movcc(dis_handle_t *dhp, uint32_t instr, const inst_t *inp, int idx)
 int
 fmt_movr(dis_handle_t *dhp, uint32_t instr, const inst_t *inp, int idx)
 {
+	dis_handle_sparc_t *dhx = dhp->dh_arch_private;
 	ifmt_t *f = (ifmt_t *)&instr;
 
 	prt_name(dhp, inp->in_data.in_def.in_name, 1);
@@ -1974,8 +1985,8 @@ fmt_movr(dis_handle_t *dhp, uint32_t instr, const inst_t *inp, int idx)
 	if (f->f3d.i == 1)
 		prt_imm(dhp, sign_extend(f->f3d.simm10, 10), IMM_SIGNED);
 	else
-		(void) strlcat(dhp->dh_buf, reg_names[f->f3.rs2],
-		    dhp->dh_buflen);
+		(void) strlcat(dhx->dhx_buf, reg_names[f->f3.rs2],
+		    dhx->dhx_buflen);
 
 	bprintf(dhp, ", %s", reg_names[f->f3.rd]);
 
@@ -1986,12 +1997,13 @@ fmt_movr(dis_handle_t *dhp, uint32_t instr, const inst_t *inp, int idx)
 int
 fmt_fpop1(dis_handle_t *dhp, uint32_t instr, const inst_t *inp, int idx)
 {
+	dis_handle_sparc_t *dhx = dhp->dh_arch_private;
 	ifmt_t *f = (ifmt_t *)&instr;
 	int flags = inp->in_data.in_def.in_flags;
 
 	flags |= FLG_NOIMM;
 
-	if ((dhp->dh_debug & DIS_DEBUG_PRTFMT) != 0) {
+	if ((dhx->dhx_debug & DIS_DEBUG_PRTFMT) != 0) {
 		prt_field("op", f->f3.op, 2);
 		prt_field("op3", f->f3.op3, 6);
 		prt_field("opf", f->fcmp.opf, 9);
@@ -2019,6 +2031,7 @@ fmt_fpop2(dis_handle_t *dhp, uint32_t instr, const inst_t *inp, int idx)
 		"a", "e",  "ue", "ge", "uge", "le", "ule", "o"
 	};
 
+	dis_handle_sparc_t *dhx = dhp->dh_arch_private;
 	ifmt_t *f = (ifmt_t *)&instr;
 	const char *ccstr = "";
 	char name[15];
@@ -2028,13 +2041,13 @@ fmt_fpop2(dis_handle_t *dhp, uint32_t instr, const inst_t *inp, int idx)
 	    idx == 0x55 || idx == 0x56 || idx == 0x57);
 	int is_fmov = (idx & 0x3f);
 	int is_v9 = ((dhp->dh_flags & (DIS_SPARC_V9|DIS_SPARC_V9_SGI)) != 0);
-	int is_compat = ((dhp->dh_debug & DIS_DEBUG_COMPAT) != 0);
+	int is_compat = ((dhx->dhx_debug & DIS_DEBUG_COMPAT) != 0);
 
 	int p_cc = 0;
 
 	is_fmov = (is_fmov == 0x1 || is_fmov == 0x2 || is_fmov == 0x3);
 
-	if ((dhp->dh_debug & DIS_DEBUG_PRTFMT) != 0) {
+	if ((dhx->dhx_debug & DIS_DEBUG_PRTFMT) != 0) {
 		prt_field("op", f->f3.op, 2);
 		prt_field("op3", f->f3.op3, 6);
 		prt_field("opf", f->fcmp.opf, 9);
@@ -2104,10 +2117,11 @@ fmt_fpop2(dis_handle_t *dhp, uint32_t instr, const inst_t *inp, int idx)
 int
 fmt_vis(dis_handle_t *dhp, uint32_t instr, const inst_t *inp, int idx)
 {
+	dis_handle_sparc_t *dhx = dhp->dh_arch_private;
 	ifmt_t *f = (ifmt_t *)&instr;
 	int flags = inp->in_data.in_def.in_flags;
 
-	if ((dhp->dh_debug & DIS_DEBUG_PRTFMT) != 0) {
+	if ((dhx->dhx_debug & DIS_DEBUG_PRTFMT) != 0) {
 		prt_field("op", f->f3.op, 2);
 		prt_field("op3", f->f3.op3, 6);
 		prt_field("opf", f->fcmp.opf, 9);
@@ -2251,6 +2265,7 @@ prt_imm(dis_handle_t *dhp, uint32_t val, int format)
 static const char *
 get_regname(dis_handle_t *dhp, int regset, uint32_t idx)
 {
+	dis_handle_sparc_t *dhx = dhp->dh_arch_private;
 	const char *regname = NULL;
 
 	switch (regset) {
@@ -2263,7 +2278,7 @@ get_regname(dis_handle_t *dhp, int regset, uint32_t idx)
 		break;
 
 	case REG_FPD:
-		if (((dhp->dh_debug & DIS_DEBUG_COMPAT) == 0) ||
+		if (((dhx->dhx_debug & DIS_DEBUG_COMPAT) == 0) ||
 		    ((dhp->dh_flags & (DIS_SPARC_V9|DIS_SPARC_V9_SGI)) != 0))
 			regname = fdreg_names[idx];
 		else
@@ -2272,7 +2287,7 @@ get_regname(dis_handle_t *dhp, int regset, uint32_t idx)
 		break;
 
 	case REG_FPQ:
-		if ((dhp->dh_debug & DIS_DEBUG_COMPAT) == 0)
+		if ((dhx->dhx_debug & DIS_DEBUG_COMPAT) == 0)
 			regname = fqreg_names[idx];
 		else
 			regname = freg_names[idx];
@@ -2350,11 +2365,12 @@ prt_asi(dis_handle_t *dhp, uint32_t instr)
 static void
 prt_address(dis_handle_t *dhp, uint32_t instr, int nobrackets)
 {
+	dis_handle_sparc_t *dhx = dhp->dh_arch_private;
 	ifmt_t *f = (ifmt_t *)&instr;
 	int32_t simm13;
 	int octal = ((dhp->dh_flags & DIS_OCTAL) != 0);
-	int p1 = ((dhp->dh_debug & (DIS_DEBUG_COMPAT|DIS_DEBUG_SYN_ALL)) == 0);
-	int p2 = ((dhp->dh_debug & (DIS_DEBUG_COMPAT|DIS_DEBUG_SYN_ALL)) == 0);
+	int p1 = ((dhx->dhx_debug & (DIS_DEBUG_COMPAT|DIS_DEBUG_SYN_ALL)) == 0);
+	int p2 = ((dhx->dhx_debug & (DIS_DEBUG_COMPAT|DIS_DEBUG_SYN_ALL)) == 0);
 
 	if (f->f3a.i == 0) {
 		p1 |= ((f->f3a.rs1 != 0) || f->f3.rs2 == 0);
@@ -2421,6 +2437,7 @@ prt_address(dis_handle_t *dhp, uint32_t instr, int nobrackets)
 static void
 prt_aluargs(dis_handle_t *dhp, uint32_t instr, uint32_t flags)
 {
+	dis_handle_sparc_t *dhx = dhp->dh_arch_private;
 	ifmt_t *f = (ifmt_t *)&instr;
 	const char *r1, *r2, *r3;
 	int p1, p2, p3;
@@ -2447,30 +2464,30 @@ prt_aluargs(dis_handle_t *dhp, uint32_t instr, uint32_t flags)
 		opf = f->fcmp.opf;
 
 	if ((opf == 0x151) || (opf == 0x152)) {
-		(void) strlcat(dhp->dh_buf, r3, dhp->dh_buflen);
-		(void) strlcat(dhp->dh_buf, ", ", dhp->dh_buflen);
+		(void) strlcat(dhx->dhx_buf, r3, dhx->dhx_buflen);
+		(void) strlcat(dhx->dhx_buf, ", ", dhx->dhx_buflen);
 		p3 = 0;
 	}
 
 	if (p1 != 0) {
-		(void) strlcat(dhp->dh_buf, r1, dhp->dh_buflen);
+		(void) strlcat(dhx->dhx_buf, r1, dhx->dhx_buflen);
 		if (p2 != 0 || p3 != 0)
-			(void) strlcat(dhp->dh_buf, ", ", dhp->dh_buflen);
+			(void) strlcat(dhx->dhx_buf, ", ", dhx->dhx_buflen);
 	}
 
 	if (p2 != 0) {
 		if (f->f3.i == 0 || ((flags & FLG_NOIMM) != 0))
-			(void) strlcat(dhp->dh_buf, r2, dhp->dh_buflen);
+			(void) strlcat(dhx->dhx_buf, r2, dhx->dhx_buflen);
 		else
 			prt_imm(dhp, sign_extend(f->f3a.simm13, 13),
 			    IMM_SIGNED);
 
 		if (p3 != 0)
-			(void) strlcat(dhp->dh_buf, ", ", dhp->dh_buflen);
+			(void) strlcat(dhx->dhx_buf, ", ", dhx->dhx_buflen);
 	}
 
 	if (p3 != 0)
-		(void) strlcat(dhp->dh_buf, r3, dhp->dh_buflen);
+		(void) strlcat(dhx->dhx_buf, r3, dhx->dhx_buflen);
 }
 
 static const char *
@@ -2742,13 +2759,14 @@ get_asi_name(uint8_t asi)
 static void
 bprintf(dis_handle_t *dhp, const char *fmt, ...)
 {
+	dis_handle_sparc_t *dhx = dhp->dh_arch_private;
 	size_t curlen;
 	va_list ap;
 
-	curlen = strlen(dhp->dh_buf);
+	curlen = strlen(dhx->dhx_buf);
 
 	va_start(ap, fmt);
-	(void) vsnprintf(dhp->dh_buf + curlen, dhp->dh_buflen - curlen, fmt,
-	    ap);
+	(void) dis_vsnprintf(dhx->dhx_buf + curlen, dhx->dhx_buflen -
+	    curlen, fmt, ap);
 	va_end(ap);
 }

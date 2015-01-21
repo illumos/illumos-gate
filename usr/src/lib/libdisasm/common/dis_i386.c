@@ -22,25 +22,20 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 Joshua M. Clulow <josh@sysmgr.org>
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <libdisasm.h>
-#include <stdlib.h>
-#include <stdio.h>
 
 #include "dis_tables.h"
 #include "libdisasm_impl.h"
 
-struct dis_handle {
-	void		*dh_data;
-	int		dh_flags;
-	dis_lookup_f	dh_lookup;
-	dis_read_f	dh_read;
-	int		dh_mode;
-	dis86_t		dh_dis;
-	uint64_t	dh_addr;
-	uint64_t	dh_end;
-};
+typedef struct dis_handle_i386 {
+	int		dhx_mode;
+	dis86_t		dhx_dis;
+	uint64_t	dhx_end;
+} dis_handle_i386_t;
 
 /*
  * Returns true if we are near the end of a function.  This is a cheap hack at
@@ -87,111 +82,95 @@ do_lookup(void *data, uint64_t addr, char *buf, size_t buflen)
 	return (dhp->dh_lookup(dhp->dh_data, addr, buf, buflen, NULL, NULL));
 }
 
-dis_handle_t *
-dis_handle_create(int flags, void *data, dis_lookup_f lookup_func,
-    dis_read_f read_func)
+static void
+dis_i386_handle_detach(dis_handle_t *dhp)
 {
-	dis_handle_t *dhp;
+	dis_free(dhp->dh_arch_private, sizeof (dis_handle_i386_t));
+	dhp->dh_arch_private = NULL;
+}
+
+static int
+dis_i386_handle_attach(dis_handle_t *dhp)
+{
+	dis_handle_i386_t *dhx;
 
 	/*
 	 * Validate architecture flags
 	 */
-	if (flags & ~(DIS_X86_SIZE16 | DIS_X86_SIZE32 | DIS_X86_SIZE64 |
+	if (dhp->dh_flags & ~(DIS_X86_SIZE16 | DIS_X86_SIZE32 | DIS_X86_SIZE64 |
 	    DIS_OCTAL | DIS_NOIMMSYM)) {
 		(void) dis_seterrno(E_DIS_INVALFLAG);
-		return (NULL);
+		return (-1);
 	}
 
 	/*
 	 * Create and initialize the internal structure
 	 */
-	if ((dhp = dis_zalloc(sizeof (struct dis_handle))) == NULL) {
+	if ((dhx = dis_zalloc(sizeof (dis_handle_i386_t))) == NULL) {
 		(void) dis_seterrno(E_DIS_NOMEM);
-		return (NULL);
+		return (-1);
 	}
-
-	dhp->dh_lookup = lookup_func;
-	dhp->dh_read = read_func;
-	dhp->dh_flags = flags;
-	dhp->dh_data = data;
+	dhp->dh_arch_private = dhx;
 
 	/*
 	 * Initialize x86-specific architecture structure
 	 */
-	if (flags & DIS_X86_SIZE16)
-		dhp->dh_mode = SIZE16;
-	else if (flags & DIS_X86_SIZE64)
-		dhp->dh_mode = SIZE64;
+	if (dhp->dh_flags & DIS_X86_SIZE16)
+		dhx->dhx_mode = SIZE16;
+	else if (dhp->dh_flags & DIS_X86_SIZE64)
+		dhx->dhx_mode = SIZE64;
 	else
-		dhp->dh_mode = SIZE32;
+		dhx->dhx_mode = SIZE32;
 
-	if (flags & DIS_OCTAL)
-		dhp->dh_dis.d86_flags = DIS_F_OCTAL;
+	if (dhp->dh_flags & DIS_OCTAL)
+		dhx->dhx_dis.d86_flags = DIS_F_OCTAL;
 
-	dhp->dh_dis.d86_sprintf_func = snprintf;
-	dhp->dh_dis.d86_get_byte = get_byte;
-	dhp->dh_dis.d86_sym_lookup = do_lookup;
-	dhp->dh_dis.d86_check_func = check_func;
+	dhx->dhx_dis.d86_sprintf_func = dis_snprintf;
+	dhx->dhx_dis.d86_get_byte = get_byte;
+	dhx->dhx_dis.d86_sym_lookup = do_lookup;
+	dhx->dhx_dis.d86_check_func = check_func;
 
-	dhp->dh_dis.d86_data = dhp;
+	dhx->dhx_dis.d86_data = dhp;
 
-	return (dhp);
+	return (0);
 }
 
-int
-dis_disassemble(dis_handle_t *dhp, uint64_t addr, char *buf, size_t buflen)
+static int
+dis_i386_disassemble(dis_handle_t *dhp, uint64_t addr, char *buf,
+    size_t buflen)
 {
+	dis_handle_i386_t *dhx = dhp->dh_arch_private;
 	dhp->dh_addr = addr;
 
 	/* DIS_NOIMMSYM might not be set until now, so update */
 	if (dhp->dh_flags & DIS_NOIMMSYM)
-		dhp->dh_dis.d86_flags |= DIS_F_NOIMMSYM;
+		dhx->dhx_dis.d86_flags |= DIS_F_NOIMMSYM;
 	else
-		dhp->dh_dis.d86_flags &= ~DIS_F_NOIMMSYM;
+		dhx->dhx_dis.d86_flags &= ~DIS_F_NOIMMSYM;
 
-	if (dtrace_disx86(&dhp->dh_dis, dhp->dh_mode) != 0)
+	if (dtrace_disx86(&dhx->dhx_dis, dhx->dhx_mode) != 0)
 		return (-1);
 
 	if (buf != NULL)
-		dtrace_disx86_str(&dhp->dh_dis, dhp->dh_mode, addr, buf,
+		dtrace_disx86_str(&dhx->dhx_dis, dhx->dhx_mode, addr, buf,
 		    buflen);
 
 	return (0);
 }
 
-void
-dis_handle_destroy(dis_handle_t *dhp)
-{
-	dis_free(dhp, sizeof (dis_handle_t));
-}
-
-void
-dis_set_data(dis_handle_t *dhp, void *data)
-{
-	dhp->dh_data = data;
-}
-
-void
-dis_flags_set(dis_handle_t *dhp, int f)
-{
-	dhp->dh_flags |= f;
-}
-
-void
-dis_flags_clear(dis_handle_t *dhp, int f)
-{
-	dhp->dh_flags &= ~f;
-}
-
-
 /* ARGSUSED */
-int
-dis_max_instrlen(dis_handle_t *dhp)
+static int
+dis_i386_max_instrlen(dis_handle_t *dhp)
 {
 	return (15);
 }
 
-#define	MIN(a, b)	((a) < (b) ? (a) : (b))
+/* ARGSUSED */
+static int
+dis_i386_min_instrlen(dis_handle_t *dhp)
+{
+	return (1);
+}
 
 /*
  * Return the previous instruction.  On x86, we have no choice except to
@@ -199,8 +178,8 @@ dis_max_instrlen(dis_handle_t *dhp)
  * reached our instruction address.  If we're not in the middle of a known
  * symbol, then we return the same address to indicate failure.
  */
-uint64_t
-dis_previnstr(dis_handle_t *dhp, uint64_t pc, int n)
+static uint64_t
+dis_i386_previnstr(dis_handle_t *dhp, uint64_t pc, int n)
 {
 	uint64_t *hist, addr, start;
 	int cur, nseen;
@@ -244,11 +223,34 @@ done:
 	return (res);
 }
 
-int
-dis_instrlen(dis_handle_t *dhp, uint64_t pc)
+static int
+dis_i386_supports_flags(int flags)
+{
+	int archflags = flags & DIS_ARCH_MASK;
+
+	if (archflags == DIS_X86_SIZE16 || archflags == DIS_X86_SIZE32 ||
+	    archflags == DIS_X86_SIZE64)
+		return (1);
+
+	return (0);
+}
+
+static int
+dis_i386_instrlen(dis_handle_t *dhp, uint64_t pc)
 {
 	if (dis_disassemble(dhp, pc, NULL, 0) != 0)
 		return (-1);
 
 	return (dhp->dh_addr - pc);
 }
+
+dis_arch_t dis_arch_i386 = {
+	dis_i386_supports_flags,
+	dis_i386_handle_attach,
+	dis_i386_handle_detach,
+	dis_i386_disassemble,
+	dis_i386_previnstr,
+	dis_i386_min_instrlen,
+	dis_i386_max_instrlen,
+	dis_i386_instrlen,
+};

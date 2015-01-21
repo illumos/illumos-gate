@@ -29,8 +29,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifndef _DIS_SPARC_FMT_H
 #define	_DIS_SPARC_FMT_H
 

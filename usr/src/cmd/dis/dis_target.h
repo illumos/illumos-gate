@@ -54,9 +54,7 @@ const char *dis_find_section(dis_tgt_t *, uint64_t, off_t *);
 const char *dis_tgt_name(dis_tgt_t *);
 const char *dis_tgt_member(dis_tgt_t *);
 void dis_tgt_ehdr(dis_tgt_t *, GElf_Ehdr *);
-#if !defined(__sparc)
 off_t dis_tgt_next_symbol(dis_tgt_t *, uint64_t);
-#endif
 dis_tgt_t *dis_tgt_next(dis_tgt_t *);
 
 /*
