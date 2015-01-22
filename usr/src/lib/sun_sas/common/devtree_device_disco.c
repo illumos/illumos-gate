@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include	<sun_sas.h>
@@ -587,19 +588,22 @@ get_attached_devices_info(di_node_t node, struct sun_sas_port *port_ptr)
 			guidStr = devid_to_guid(devid);
 			if (guidStr != NULL) {
 				(void) strlcpy(mapping_ptr->entry.LUID.buffer,
-				    guidStr, 256);
+				    guidStr,
+				    sizeof (mapping_ptr->entry.LUID.buffer));
 				devid_free_guid(guidStr);
 			} else {
 				/*
 				 * Note:
 				 * if logical unit associated page 83 id
 				 * descriptor is not avaialble for the device
-				 * devid_to_guid returns NULl with errno 0.
+				 * devid_to_guid returns NULL with errno 0.
 				 */
 				log(LOG_DEBUG, ROUTINE,
 				    "failed to get devid guid on (%s) : %s",
 				    devpath, strerror(errno));
 			}
+
+			devid_free(devid);
 		} else {
 			/*
 			 * device may not support proper page 83 id descriptor.
@@ -1005,7 +1009,7 @@ get_attached_paths_info(di_path_t path, struct sun_sas_port *port_ptr)
 				 * Note:
 				 * if logical unit associated page 83 id
 				 * descriptor is not avaialble for the device
-				 * devid_to_guid returns NULl with errno 0.
+				 * devid_to_guid returns NULL with errno 0.
 				 */
 				log(LOG_DEBUG, ROUTINE,
 				    "failed to get devid guid on (%s)",
@@ -1015,6 +1019,8 @@ get_attached_paths_info(di_path_t path, struct sun_sas_port *port_ptr)
 				    "(missing device path)",
 				    strerror(errno));
 			}
+
+			devid_free(devid);
 		} else {
 			/*
 			 * device may not support proper page 83 id descriptor.
