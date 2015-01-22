@@ -917,19 +917,6 @@ doio(int stdin_fd, int appin_fd, int stdout_fd, int stderr_fd, int sig_fd,
 			break;
 		}
 
-		/* event from master side stdout */
-		if (pollfds[0].revents) {
-			if (pollfds[0].revents &
-			    (POLLIN | POLLRDNORM | POLLRDBAND | POLLPRI)) {
-				if (process_output(stdout_fd, STDOUT_FILENO)
-				    != 0)
-					break;
-			} else {
-				pollerr = pollfds[0].revents;
-				break;
-			}
-		}
-
 		/* event from master side stderr */
 		if (pollfds[1].revents) {
 			if (pollfds[1].revents &
@@ -939,6 +926,19 @@ doio(int stdin_fd, int appin_fd, int stdout_fd, int stderr_fd, int sig_fd,
 					break;
 			} else {
 				pollerr = pollfds[1].revents;
+				break;
+			}
+		}
+
+		/* event from master side stdout */
+		if (pollfds[0].revents) {
+			if (pollfds[0].revents &
+			    (POLLIN | POLLRDNORM | POLLRDBAND | POLLPRI)) {
+				if (process_output(stdout_fd, STDOUT_FILENO)
+				    != 0)
+					break;
+			} else {
+				pollerr = pollfds[0].revents;
 				break;
 			}
 		}
@@ -2091,7 +2091,7 @@ main(int argc, char **argv)
 				    "console]\n"), zonename);
 		}
 
-		if (!imode && set_tty_rawmode(STDIN_FILENO) == -1) {
+		if (set_tty_rawmode(STDIN_FILENO) == -1) {
 			reset_tty();
 			zperror(gettext("failed to set stdin pty to raw mode"));
 			return (1);
@@ -2104,8 +2104,7 @@ main(int argc, char **argv)
 		 * Run the I/O loop until we get disconnected.
 		 */
 		doio(masterfd, -1, masterfd, gz_stderr_fd, -1, B_FALSE);
-		if (!imode)
-			reset_tty();
+		reset_tty();
 		if (!quiet) {
 			if (imode)
 				(void) printf(gettext("\n[Interactive "
