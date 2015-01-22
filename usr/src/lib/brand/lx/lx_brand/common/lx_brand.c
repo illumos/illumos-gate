@@ -1241,7 +1241,7 @@ static struct lx_sysent sysents[] = {
 	{"pivot_root",	NULL,			NOSYS_KERNEL,	0}, /* 155 */
 	{"sysctl",	lx_sysctl,		0,		1}, /* 156 */
 	{"prctl",	lx_prctl,		0,		5}, /* 157 */
-	{"arch_prctl",	LX_IKE(arch_prctl),	LX_SYS_IKE,	2}, /* 158 */
+	{"arch_prctl",	lx_arch_prctl,		0,		2}, /* 158 */
 	{"adjtimex",	lx_adjtimex,		0,		1}, /* 159 */
 	{"setrlimit",	lx_setrlimit,		0,		2}, /* 160 */
 	{"chroot",	lx_chroot,		0,		1}, /* 161 */

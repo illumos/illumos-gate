@@ -22,7 +22,7 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.	All rights reserved.
  * Use is subject to license terms.
- * Copyright 2014 Joyent, Inc. All rights reserved.
+ * Copyright 2015 Joyent, Inc
  */
 
 #ifndef _SYS_LX_THREAD_H
@@ -38,6 +38,9 @@ typedef struct lx_tsd {
 #if defined(_ILP32)
 	/* 32-bit thread-specific Linux %gs value */
 	uintptr_t	lxtsd_gs;
+#else
+	/* 64-bit thread-specific Linux %fsbase value */
+	uintptr_t	lxtsd_fsbase;
 #endif
 	int		lxtsd_exit;
 	int		lxtsd_exit_status;
