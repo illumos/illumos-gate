@@ -21,7 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2014 Joyent, Inc.  All rights reserved.
+ * Copyright 2015 Joyent, Inc.  All rights reserved.
  */
 
 /*
@@ -52,7 +52,6 @@
 #include <locale.h>
 
 #include <libzonecfg.h>
-#include <sys/lx_audio.h>
 #include <sys/lx_brand.h>
 
 static void lxs_err(char *msg, ...) __NORETURN;
@@ -61,8 +60,6 @@ static void usage(void) __NORETURN;
 #define	CP_CMD		"/usr/bin/cp"
 #define	MOUNT_CMD	"/sbin/mount"
 
-#define	LXA_AUDIO_DEV		"/dev/brand/lx/audio_devctl"
-#define	INTSTRLEN		32
 #define	KVSTRLEN		10
 
 static char *bname = NULL;
@@ -178,8 +175,8 @@ lxs_remove_autofsck()
  * Extract any lx-supported attributes from the zone configuration file.
  */
 static void
-lxs_getattrs(zone_dochandle_t zdh, boolean_t *restart, boolean_t *audio,
-    char **idev, char **odev, char **kvers)
+lxs_getattrs(zone_dochandle_t zdh, boolean_t *restart, boolean_t *appcont,
+    char **kvers)
 {
 	struct zone_attrtab	attrtab;
 	int			err;
@@ -190,34 +187,20 @@ lxs_getattrs(zone_dochandle_t zdh, boolean_t *restart, boolean_t *audio,
 		lxs_err(gettext("error accessing zone configuration"));
 	}
 
-	*idev = (char *)malloc(INTSTRLEN);
-	*odev = (char *)malloc(INTSTRLEN);
 	*kvers = (char *)malloc(KVSTRLEN);
-	if (*idev == NULL || *odev == NULL || *kvers == NULL)
+	if (*kvers == NULL)
 		lxs_err(gettext("out of memory"));
 
-	*audio = B_FALSE;
+	*appcont = B_FALSE;
 	*restart = B_FALSE;
-	bzero(*idev, INTSTRLEN);
-	bzero(*odev, INTSTRLEN);
 	bzero(*kvers, KVSTRLEN);
 	while ((err = zonecfg_getattrent(zdh, &attrtab)) == Z_OK) {
 		if ((strcmp(attrtab.zone_attr_name, "init-restart") == 0) &&
 		    (zonecfg_get_attr_boolean(&attrtab, restart) != Z_OK))
 			lxs_err(gettext("invalid type for zone attribute: %s"),
 			    attrtab.zone_attr_name);
-		if ((strcmp(attrtab.zone_attr_name, "audio") == 0) &&
-		    (zonecfg_get_attr_boolean(&attrtab, audio) != Z_OK))
-			lxs_err(gettext("invalid type for zone attribute: %s"),
-			    attrtab.zone_attr_name);
-		if ((strcmp(attrtab.zone_attr_name, "audio-inputdev") == 0) &&
-		    (zonecfg_get_attr_string(&attrtab, *idev,
-		    INTSTRLEN) != Z_OK))
-			lxs_err(gettext("invalid type for zone attribute: %s"),
-			    attrtab.zone_attr_name);
-		if ((strcmp(attrtab.zone_attr_name, "audio-outputdev") == 0) &&
-		    (zonecfg_get_attr_string(&attrtab, *odev,
-		    INTSTRLEN) != Z_OK))
+		if ((strcmp(attrtab.zone_attr_name, "docker") == 0) &&
+		    (zonecfg_get_attr_boolean(&attrtab, appcont) != Z_OK))
 			lxs_err(gettext("invalid type for zone attribute: %s"),
 			    attrtab.zone_attr_name);
 		if ((strcmp(attrtab.zone_attr_name, "kernel-version") == 0) &&
@@ -238,119 +221,12 @@ lxs_getattrs(zone_dochandle_t zdh, boolean_t *restart, boolean_t *audio,
 }
 
 static int
-lxs_iodev_ok(char *dev)
-{
-	int i, j;
-
-	if ((j = strlen(dev)) == 0)
-		return (1);
-	if (strcmp(dev, "default") == 0)
-		return (1);
-	if (strcmp(dev, "none") == 0)
-		return (1);
-	for (i = 0; i < j; i++) {
-		if (!isdigit(dev[i]))
-			return (0);
-	}
-	return (1);
-}
-
-/*
- * The audio configuration settings are read from the zone configuration
- * file.  Audio configuration is specified via the following attributes
- * (settable via zonecfg):
- * 	attr name: audio
- * 	attr type: boolean
- *
- * 	attr name: audio-inputdev
- * 	attr type: string
- * 	attr values: "none" | [0-9]+
- *
- * 	attr name: audio-outputdev
- * 	attr type: string
- * 	attr values: "none" | [0-9]+
- *
- * The user can enable linux brand audio device (ie /dev/dsp and /dev/mixer)
- * for a zone by setting the "audio" attribute to true.  (The absence of
- * this attribute leads to an assumed value of false.)
- *
- * If the "audio" attribute is set to true and "audio-inputdev" and
- * "audio-outputdev" are not set, then when a linux applications access
- * audio devices these access will be mapped to the system default audio
- * device, ie /dev/audio and/dev/audioctl.
- *
- * If "audio-inputdev" is set to none, then audio input will be disabled.
- * If "audio-inputdev" is set to an integer, then when a Linux application
- * attempts to access audio devices these access will be mapped to
- * /dev/sound/<audio-inputdev attribute value>.  The same behavior will
- * apply to the "audio-outputdev" attribute for linux audio output
- * device accesses.
- *
- * If "audio-inputdev" or "audio-outputdev" exist but the audio attribute
- * is missing (or set to false) audio will not be enabled for the zone.
- */
-static void
-lxs_init_audio(char *idev, char *odev)
-{
-	int			err, fd;
-	lxa_zone_reg_t		lxa_zr;
-
-	/* sanity check the input and output device properties */
-	if (!lxs_iodev_ok(idev))
-		lxs_err(gettext("invalid value for zone attribute: %s"),
-		    "audio-inputdev");
-
-	if (!lxs_iodev_ok(odev))
-		lxs_err(gettext("invalid value for zone attribute: %s"),
-		    "audio-outputdev");
-
-	/* initialize the zone name in the ioctl request */
-	bzero(&lxa_zr, sizeof (lxa_zr));
-	(void) strlcpy(lxa_zr.lxa_zr_zone_name, zonename,
-	    sizeof (lxa_zr.lxa_zr_zone_name));
-
-	/* initialize the input device property in the ioctl request */
-	(void) strlcpy(lxa_zr.lxa_zr_inputdev, idev,
-	    sizeof (lxa_zr.lxa_zr_inputdev));
-	if (lxa_zr.lxa_zr_inputdev[0] == '\0') {
-		/*
-		 * if no input device was specified, set the input device
-		 * to "default"
-		 */
-		(void) strlcpy(lxa_zr.lxa_zr_inputdev, "default",
-		    sizeof (lxa_zr.lxa_zr_inputdev));
-	}
-
-	/* initialize the output device property in the ioctl request */
-	(void) strlcpy(lxa_zr.lxa_zr_outputdev, odev,
-	    sizeof (lxa_zr.lxa_zr_outputdev));
-	if (lxa_zr.lxa_zr_outputdev[0] == '\0') {
-		/*
-		 * if no output device was specified, set the output device
-		 * to "default"
-		 */
-		(void) strlcpy(lxa_zr.lxa_zr_outputdev, "default",
-		    sizeof (lxa_zr.lxa_zr_outputdev));
-	}
-
-	/* open the audio device control node */
-	if ((fd = open(LXA_AUDIO_DEV, O_RDWR)) < 0)
-		lxs_err(gettext("error accessing lx_audio device"));
-
-	/* enable audio for this zone */
-	err = ioctl(fd, LXA_IOC_ZONE_REG, &lxa_zr);
-	(void) close(fd);
-	if (err != 0)
-		lxs_err(gettext("error configuring lx_audio device"));
-}
-
-static int
 lxs_boot()
 {
 	zoneid_t	zoneid;
 	zone_dochandle_t zdh;
-	boolean_t	audio, restart;
-	char		*idev, *odev, *kvers;
+	boolean_t	appcont, restart;
+	char		*kvers;
 
 	lxs_make_initctl();
 	lxs_remove_autofsck();
@@ -364,12 +240,8 @@ lxs_boot()
 	}
 
 	/* Extract any relevant attributes from the config file. */
-	lxs_getattrs(zdh, &restart, &audio, &idev, &odev, &kvers);
+	lxs_getattrs(zdh, &restart, &appcont, &kvers);
 	zonecfg_fini_handle(zdh);
-
-	/* Configure the zone's audio support (if any). */
-	if (audio == B_TRUE)
-		lxs_init_audio(idev, odev);
 
 	/*
 	 * Let the kernel know whether or not this zone's init process
@@ -400,42 +272,6 @@ lxs_boot()
 static int
 lxs_halt()
 {
-	lxa_zone_reg_t	lxa_zr;
-	int		fd, rv;
-
-	/*
-	 * We don't bother to check if audio is configured for this zone
-	 * before issuing a request to unconfigure it.  There's no real
-	 * reason to do this, it would require looking up the xml zone and
-	 * brand configuration information (which could have been changed
-	 * since the zone was booted), and it would involve more library
-	 * calls there by increasing chances for failure.
-	 */
-
-	/* initialize the zone name in the ioctl request */
-	bzero(&lxa_zr, sizeof (lxa_zr));
-	(void) strlcpy(lxa_zr.lxa_zr_zone_name, zonename,
-	    sizeof (lxa_zr.lxa_zr_zone_name));
-
-	/* open the audio device control node */
-	if ((fd = open(LXA_AUDIO_DEV, O_RDWR)) < 0)
-		lxs_err(gettext("error accessing lx_audio device"));
-
-	/*
-	 * disable audio for this zone
-	 *
-	 * we ignore ENOENT errors here because it's possible that
-	 * audio is not configured for this zone.  (either it was
-	 * already unconfigured or someone could have added the
-	 * audio resource to this zone after it was booted.)
-	 */
-	rv = ioctl(fd, LXA_IOC_ZONE_UNREG, &lxa_zr);
-	(void) close(fd);
-	if ((rv == 0) || (errno == ENOENT))
-		return (0);
-	lxs_err(gettext("error unconfiguring lx_audio device: %s"),
-	    strerror(errno));
-	/*NOTREACHED*/
 	return (0);
 }
 
@@ -443,8 +279,8 @@ static int
 lxs_verify(char *xmlfile)
 {
 	zone_dochandle_t	handle;
-	boolean_t		audio, restart;
-	char			*idev, *odev, *kvers;
+	boolean_t		appcont, restart;
+	char			*kvers;
 	char			hostidp[HW_HOSTID_LEN];
 	zone_iptype_t		iptype;
 
@@ -474,19 +310,9 @@ lxs_verify(char *xmlfile)
 	}
 
 	/* Extract any relevant attributes from the config file. */
-	lxs_getattrs(handle, &restart, &audio, &idev, &odev, &kvers);
+	lxs_getattrs(handle, &restart, &appcont, &kvers);
 	zonecfg_fini_handle(handle);
 
-	if (audio) {
-		/* sanity check the input and output device properties */
-		if (!lxs_iodev_ok(idev))
-			lxs_err(gettext("invalid value for zone attribute: %s"),
-			    "audio-inputdev");
-
-		if (!lxs_iodev_ok(odev))
-			lxs_err(gettext("invalid value for zone attribute: %s"),
-			    "audio-outputdev");
-	}
 	if (kvers) {
 		if (strlen(kvers) > (LX_VERS_MAX - 1) ||
 		    (strncmp(kvers, "2.4", 3) != 0 &&
