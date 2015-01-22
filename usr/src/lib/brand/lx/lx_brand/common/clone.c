@@ -280,6 +280,8 @@ clone_start(void *arg)
 	bzero(&lx_tsd, sizeof (lx_tsd));
 #if defined(_ILP32)
 	lx_tsd.lxtsd_gs = cs->c_gs;
+#else
+	lx_tsd.lxtsd_fsbase = (uintptr_t)cs->c_ldtinfo;
 #endif
 
 	/*

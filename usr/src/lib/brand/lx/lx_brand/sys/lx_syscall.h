@@ -312,6 +312,7 @@ extern long lx_shmat(int, void *, int);
 extern long lx_shmctl(int, int, void *);
 
 extern long lx_prctl(int, uintptr_t, uintptr_t, uintptr_t, uintptr_t);
+extern long lx_arch_prctl(int, uintptr_t);
 
 extern long lx_alarm(unsigned int);
 extern long lx_close(int);

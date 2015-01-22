@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2014 Joyent, Inc.  All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  */
 
 #ifndef	_LX_SYSCALL_H
@@ -38,6 +38,12 @@ extern "C" {
 typedef struct lx_waitid_args {
 	int waitid_flags;
 } lx_waitid_args_t;
+
+/* For arch_prctl(2) */
+#define	LX_ARCH_SET_GS	0x1001
+#define	LX_ARCH_SET_FS	0x1002
+#define	LX_ARCH_GET_FS	0x1003
+#define	LX_ARCH_GET_GS	0x1004
 
 
 #ifdef	__cplusplus
