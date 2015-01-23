@@ -175,8 +175,7 @@ lxs_remove_autofsck()
  * Extract any lx-supported attributes from the zone configuration file.
  */
 static void
-lxs_getattrs(zone_dochandle_t zdh, boolean_t *restart, boolean_t *appcont,
-    char **kvers)
+lxs_getattrs(zone_dochandle_t zdh, char **kvers)
 {
 	struct zone_attrtab	attrtab;
 	int			err;
@@ -191,18 +190,8 @@ lxs_getattrs(zone_dochandle_t zdh, boolean_t *restart, boolean_t *appcont,
 	if (*kvers == NULL)
 		lxs_err(gettext("out of memory"));
 
-	*appcont = B_FALSE;
-	*restart = B_FALSE;
 	bzero(*kvers, KVSTRLEN);
 	while ((err = zonecfg_getattrent(zdh, &attrtab)) == Z_OK) {
-		if ((strcmp(attrtab.zone_attr_name, "init-restart") == 0) &&
-		    (zonecfg_get_attr_boolean(&attrtab, restart) != Z_OK))
-			lxs_err(gettext("invalid type for zone attribute: %s"),
-			    attrtab.zone_attr_name);
-		if ((strcmp(attrtab.zone_attr_name, "docker") == 0) &&
-		    (zonecfg_get_attr_boolean(&attrtab, appcont) != Z_OK))
-			lxs_err(gettext("invalid type for zone attribute: %s"),
-			    attrtab.zone_attr_name);
 		if ((strcmp(attrtab.zone_attr_name, "kernel-version") == 0) &&
 		    (zonecfg_get_attr_string(&attrtab, *kvers,
 		    KVSTRLEN) != Z_OK))
@@ -225,7 +214,6 @@ lxs_boot()
 {
 	zoneid_t	zoneid;
 	zone_dochandle_t zdh;
-	boolean_t	appcont, restart;
 	char		*kvers;
 
 	lxs_make_initctl();
@@ -240,7 +228,7 @@ lxs_boot()
 	}
 
 	/* Extract any relevant attributes from the config file. */
-	lxs_getattrs(zdh, &restart, &appcont, &kvers);
+	lxs_getattrs(zdh, &kvers);
 	zonecfg_fini_handle(zdh);
 
 	/*
@@ -249,9 +237,6 @@ lxs_boot()
 	 */
 	if ((zoneid = getzoneidbyname(zonename)) < 0)
 		lxs_err(gettext("unable to get zoneid"));
-	if (zone_setattr(zoneid, LX_ATTR_RESTART_INIT, &restart,
-	    sizeof (boolean_t)) == -1)
-		lxs_err(gettext("error setting zone's restart_init property"));
 
 	if (kvers != NULL) {
 		/* Backward compatability with incomplete version attr */
@@ -279,7 +264,6 @@ static int
 lxs_verify(char *xmlfile)
 {
 	zone_dochandle_t	handle;
-	boolean_t		appcont, restart;
 	char			*kvers;
 	char			hostidp[HW_HOSTID_LEN];
 	zone_iptype_t		iptype;
@@ -310,7 +294,7 @@ lxs_verify(char *xmlfile)
 	}
 
 	/* Extract any relevant attributes from the config file. */
-	lxs_getattrs(handle, &restart, &appcont, &kvers);
+	lxs_getattrs(handle, &kvers);
 	zonecfg_fini_handle(handle);
 
 	if (kvers) {
