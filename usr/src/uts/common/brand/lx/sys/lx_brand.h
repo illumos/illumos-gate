@@ -118,8 +118,8 @@ extern "C" {
  */
 #define	EMUL_PTRACE_O_CHILD		0x8000
 /*
- * lx emulation-specific flag to determine via B_PTRACE_EXT_OPTS_GET if a process
- * is being traced because of one of the PTRACE_SETOPTIONS above.
+ * lx emulation-specific flag to determine via B_PTRACE_EXT_OPTS_GET if a
+ * process is being traced because of one of the PTRACE_SETOPTIONS above.
  */
 #define	EMUL_PTRACE_IS_TRACED		0x8000
 
@@ -135,8 +135,7 @@ extern "C" {
 #define	LX_VERSION_1		1
 #define	LX_VERSION		LX_VERSION_1
 
-#define	LX_ATTR_RESTART_INIT	ZONE_ATTR_BRAND_ATTRS
-#define	LX_KERN_VERSION_NUM	(ZONE_ATTR_BRAND_ATTRS + 1)
+#define	LX_KERN_VERSION_NUM	ZONE_ATTR_BRAND_ATTRS
 
 /*
  * Aux vector containing phdr of Linux executable and ehdr of interpreter

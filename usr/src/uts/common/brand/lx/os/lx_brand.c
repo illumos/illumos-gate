@@ -230,19 +230,9 @@ lx_setbrand(proc_t *p)
 int
 lx_setattr(zone_t *zone, int attr, void *buf, size_t bufsize)
 {
-	boolean_t val;
 	char vers[LX_VERS_MAX];
 
-	if (attr == LX_ATTR_RESTART_INIT) {
-		if (bufsize > sizeof (boolean_t))
-			return (ERANGE);
-		if (copyin(buf, &val, sizeof (val)) != 0)
-			return (EFAULT);
-		if (val != B_TRUE && val != B_FALSE)
-			return (EINVAL);
-		zone->zone_restart_init = val;
-		return (0);
-	} else if (attr == LX_KERN_VERSION_NUM) {
+	if (attr == LX_KERN_VERSION_NUM) {
 		if (bufsize > (LX_VERS_MAX - 1))
 			return (ERANGE);
 		bzero(vers, LX_VERS_MAX);
@@ -258,15 +248,7 @@ lx_setattr(zone_t *zone, int attr, void *buf, size_t bufsize)
 int
 lx_getattr(zone_t *zone, int attr, void *buf, size_t *bufsize)
 {
-	if (attr == LX_ATTR_RESTART_INIT) {
-		if (*bufsize < sizeof (boolean_t))
-			return (ERANGE);
-		if (copyout(&zone->zone_restart_init, buf,
-		    sizeof (boolean_t)) != 0)
-			return (EFAULT);
-		*bufsize = sizeof (boolean_t);
-		return (0);
-	} else if (attr == LX_KERN_VERSION_NUM) {
+	if (attr == LX_KERN_VERSION_NUM) {
 		if (*bufsize < LX_VERS_MAX)
 			return (ERANGE);
 		if (copyout(lx_get_zone_kern_version(curzone), buf,
