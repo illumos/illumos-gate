@@ -24,7 +24,7 @@
  * Use is subject to license terms.
  */
 /*
- * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  */
 
 /*
@@ -2109,7 +2109,7 @@ static const mdb_dcmd_t pt_dcmds[] = {
 	{ "$i", NULL, "print signals that are ignored", pt_ignored },
 	{ "$l", NULL, "print the representative thread's lwp id", pt_lwpid },
 	{ "$L", NULL, "print list of the active lwp ids", pt_lwpids },
-	{ "$r", "?", "print general-purpose registers", pt_regs },
+	{ "$r", "?[-u]", "print general-purpose registers", pt_regs },
 	{ "$x", "?", "print floating point registers", pt_fpregs },
 	{ "$X", "?", "print floating point registers", pt_fpregs },
 	{ "$y", "?", "print floating point registers", pt_fpregs },
@@ -2129,7 +2129,7 @@ static const mdb_dcmd_t pt_dcmds[] = {
 	{ "kill", NULL, "forcibly kill and release target", pt_kill },
 	{ "release", "[-a]",
 	    "release the previously attached process", pt_detach },
-	{ "regs", "?", "print general-purpose registers", pt_regs },
+	{ "regs", "?[-u]", "print general-purpose registers", pt_regs },
 	{ "fpregs", "?[-dqs]", "print floating point registers", pt_fpregs },
 	{ "setenv", "name=value", "set an environment variable", pt_setenv },
 	{ "stack", "?[cnt]", "print stack backtrace", pt_stack },
