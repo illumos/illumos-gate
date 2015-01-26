@@ -18,6 +18,11 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ */
+
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -149,6 +154,7 @@ nfs4_readdir_getvp(vnode_t *dvp, char *d_name, vnode_t **vpp,
 		VN_HOLD(pre_tvp);
 
 		if ((error = traverse(&vp)) != 0) {
+			VN_RELE(vp);
 			VN_RELE(pre_tvp);
 			return (error);
 		}
