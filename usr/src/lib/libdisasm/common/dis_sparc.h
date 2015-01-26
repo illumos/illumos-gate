@@ -33,8 +33,6 @@
 #ifndef _DIS_SPARC_H
 #define	_DIS_SPARC_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -49,17 +47,11 @@ extern "C" {
 
 #define	DIS_DEBUG_ALL DIS_DEBUG_SYN_ALL|DIS_DEBUG_PRTBIN|DIS_DEBUG_PRTFMT
 
-struct dis_handle {
-	void		*dh_data;
-	dis_lookup_f	dh_lookup;
-	dis_read_f	dh_read;
-	int		dh_flags;
-
-	char		*dh_buf;
-	size_t		dh_buflen;
-	uint64_t	dh_addr;
-	int		dh_debug;
-};
+typedef struct dis_handle_sparc {
+	char		*dhx_buf;
+	size_t		dhx_buflen;
+	int		dhx_debug;
+} dis_handle_sparc_t;
 
 /* different types of things we can have in inst_t */
 #define	INST_NONE	0x00

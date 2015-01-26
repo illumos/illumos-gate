@@ -46,6 +46,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	dis_handle_destroy;
 	dis_instrlen;
 	dis_max_instrlen;
+	dis_min_instrlen;
 	dis_previnstr;
 	dis_set_data;
 	dis_flags_set;

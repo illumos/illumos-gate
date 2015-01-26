@@ -27,6 +27,7 @@
 /*
  * Copyright 2007 Jason King.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 Joshua M. Clulow <josh@sysmgr.org>
  */
 
 /*
@@ -102,44 +103,49 @@ static uint32_t dis_get_bits(uint32_t, int, int);
 static void do_binary(uint32_t);
 #endif /* DIS_STANDALONE */
 
-dis_handle_t *
-dis_handle_create(int flags, void *data, dis_lookup_f lookup_func,
-    dis_read_f read_func)
+static void
+dis_sparc_handle_detach(dis_handle_t *dhp)
 {
+	dis_free(dhp->dh_arch_private, sizeof (dis_handle_sparc_t));
+	dhp->dh_arch_private = NULL;
+}
+
+static int
+dis_sparc_handle_attach(dis_handle_t *dhp)
+{
+	dis_handle_sparc_t *dhx;
 
 #if !defined(DIS_STANDALONE)
 	char *opt = NULL;
 	char *opt2, *save, *end;
 #endif
-	dis_handle_t *dhp;
 
-	if ((flags & (DIS_SPARC_V8|DIS_SPARC_V9|DIS_SPARC_V9_SGI)) == 0) {
+	/* Validate architecture flags */
+	if ((dhp->dh_flags & (DIS_SPARC_V8|DIS_SPARC_V9|DIS_SPARC_V9_SGI))
+	    == 0) {
 		(void) dis_seterrno(E_DIS_INVALFLAG);
-		return (NULL);
+		return (-1);
 	}
 
-	if ((dhp = dis_zalloc(sizeof (struct dis_handle))) == NULL) {
+	if ((dhx = dis_zalloc(sizeof (dis_handle_sparc_t))) == NULL) {
 		(void) dis_seterrno(E_DIS_NOMEM);
 		return (NULL);
 	}
-
-	dhp->dh_lookup = lookup_func;
-	dhp->dh_read = read_func;
-	dhp->dh_flags = flags;
-	dhp->dh_data = data;
-	dhp->dh_debug = DIS_DEBUG_COMPAT;
+	dhx->dhx_debug = DIS_DEBUG_COMPAT;
+	dhp->dh_arch_private = dhx;
 
 #if !defined(DIS_STANDALONE)
 
 	opt = getenv("_LIBDISASM_DEBUG");
 	if (opt == NULL)
-		return (dhp);
+		return (0);
 
 	opt2 = strdup(opt);
 	if (opt2 == NULL) {
 		dis_handle_destroy(dhp);
+		dis_free(dhx, sizeof (dis_handle_sparc_t));
 		(void) dis_seterrno(E_DIS_NOMEM);
-		return (NULL);
+		return (-1);
 	}
 	save = opt2;
 
@@ -150,60 +156,43 @@ dis_handle_create(int flags, void *data, dis_lookup_f lookup_func,
 			*end++ = '\0';
 
 		if (strcasecmp("synth-all", opt2) == 0)
-			dhp->dh_debug |= DIS_DEBUG_SYN_ALL;
+			dhx->dhx_debug |= DIS_DEBUG_SYN_ALL;
 
 		if (strcasecmp("compat", opt2) == 0)
-			dhp->dh_debug |= DIS_DEBUG_COMPAT;
+			dhx->dhx_debug |= DIS_DEBUG_COMPAT;
 
 		if (strcasecmp("synth-none", opt2) == 0)
-			dhp->dh_debug &= ~(DIS_DEBUG_SYN_ALL|DIS_DEBUG_COMPAT);
+			dhx->dhx_debug &= ~(DIS_DEBUG_SYN_ALL|DIS_DEBUG_COMPAT);
 
 		if (strcasecmp("binary", opt2) == 0)
-			dhp->dh_debug |= DIS_DEBUG_PRTBIN;
+			dhx->dhx_debug |= DIS_DEBUG_PRTBIN;
 
 		if (strcasecmp("format", opt2) == 0)
-			dhp->dh_debug |= DIS_DEBUG_PRTFMT;
+			dhx->dhx_debug |= DIS_DEBUG_PRTFMT;
 
 		if (strcasecmp("all", opt2) == 0)
-			dhp->dh_debug = DIS_DEBUG_ALL;
+			dhx->dhx_debug = DIS_DEBUG_ALL;
 
 		if (strcasecmp("none", opt2) == 0)
-			dhp->dh_debug = DIS_DEBUG_NONE;
+			dhx->dhx_debug = DIS_DEBUG_NONE;
 
 		opt2 = end;
 	}
 	free(save);
 #endif /* DIS_STANDALONE */
-	return (dhp);
-}
-
-void
-dis_handle_destroy(dis_handle_t *dhp)
-{
-	dis_free(dhp, sizeof (dis_handle_t));
-}
-
-void
-dis_set_data(dis_handle_t *dhp, void *data)
-{
-	dhp->dh_data = data;
-}
-
-void
-dis_flags_set(dis_handle_t *dhp, int f)
-{
-	dhp->dh_flags |= f;
-}
-
-void
-dis_flags_clear(dis_handle_t *dhp, int f)
-{
-	dhp->dh_flags &= ~f;
+	return (0);
 }
 
 /* ARGSUSED */
-int
-dis_max_instrlen(dis_handle_t *dhp)
+static int
+dis_sparc_max_instrlen(dis_handle_t *dhp)
+{
+	return (4);
+}
+
+/* ARGSUSED */
+static int
+dis_sparc_min_instrlen(dis_handle_t *dhp)
 {
 	return (4);
 }
@@ -214,8 +203,8 @@ dis_max_instrlen(dis_handle_t *dhp)
  * nth previous instruction.
  */
 /* ARGSUSED */
-uint64_t
-dis_previnstr(dis_handle_t *dhp, uint64_t pc, int n)
+static uint64_t
+dis_sparc_previnstr(dis_handle_t *dhp, uint64_t pc, int n)
 {
 	if (n <= 0)
 		return (pc);
@@ -227,15 +216,17 @@ dis_previnstr(dis_handle_t *dhp, uint64_t pc, int n)
 }
 
 /* ARGSUSED */
-int
-dis_instrlen(dis_handle_t *dhp, uint64_t pc)
+static int
+dis_sparc_instrlen(dis_handle_t *dhp, uint64_t pc)
 {
 	return (4);
 }
 
-int
-dis_disassemble(dis_handle_t *dhp, uint64_t addr, char *buf, size_t buflen)
+static int
+dis_sparc_disassemble(dis_handle_t *dhp, uint64_t addr, char *buf,
+    size_t buflen)
 {
+	dis_handle_sparc_t *dhx = dhp->dh_arch_private;
 	const table_t *tp = &initial_table;
 	const inst_t *inp = NULL;
 
@@ -246,17 +237,19 @@ dis_disassemble(dis_handle_t *dhp, uint64_t addr, char *buf, size_t buflen)
 	    sizeof (instr))
 		return (-1);
 
-	dhp->dh_buf    = buf;
-	dhp->dh_buflen = buflen;
-	dhp->dh_addr   = addr;
+	dhx->dhx_buf    = buf;
+	dhx->dhx_buflen = buflen;
+	dhp->dh_addr    = addr;
 
 	buf[0] = '\0';
 
 	/* this allows sparc code to be tested on x86 */
+#if !defined(DIS_STANDALONE)
 	instr = BE_32(instr);
+#endif /* DIS_STANDALONE */
 
 #if !defined(DIS_STANDALONE)
-	if ((dhp->dh_debug & DIS_DEBUG_PRTBIN) != 0)
+	if ((dhx->dhx_debug & DIS_DEBUG_PRTBIN) != 0)
 		do_binary(instr);
 #endif /* DIS_STANDALONE */
 
@@ -284,7 +277,7 @@ dis_disassemble(dis_handle_t *dhp, uint64_t addr, char *buf, size_t buflen)
 
 error:
 
-	(void) snprintf(buf, buflen,
+	(void) dis_snprintf(buf, buflen,
 	    ((dhp->dh_flags & DIS_OCTAL) != 0) ? "0%011lo" : "0x%08lx",
 	    instr);
 
@@ -341,3 +334,26 @@ do_binary(uint32_t instr)
 	(void) fprintf(stderr, "\n");
 }
 #endif /* DIS_STANDALONE */
+
+static int
+dis_sparc_supports_flags(int flags)
+{
+	int archflags = flags & DIS_ARCH_MASK;
+
+	if (archflags == DIS_SPARC_V8 ||
+	    (archflags & (DIS_SPARC_V9 | DIS_SPARC_V8)) == DIS_SPARC_V9)
+		return (1);
+
+	return (0);
+}
+
+const dis_arch_t dis_arch_sparc = {
+	dis_sparc_supports_flags,
+	dis_sparc_handle_attach,
+	dis_sparc_handle_detach,
+	dis_sparc_disassemble,
+	dis_sparc_previnstr,
+	dis_sparc_min_instrlen,
+	dis_sparc_max_instrlen,
+	dis_sparc_instrlen
+};
