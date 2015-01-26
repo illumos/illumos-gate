@@ -18,9 +18,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -50,6 +51,7 @@
 #include <sys/utsname.h>
 #include <sys/sdt.h>
 #include <netinet/in.h>
+#include <sys/avl.h>
 
 #include <rpc/types.h>
 #include <rpc/auth.h>
@@ -798,6 +800,7 @@ int
 nfs_exportinit(void)
 {
 	int error;
+	int i;
 
 	rw_init(&exported_lock, NULL, RW_DEFAULT, NULL);
 
@@ -827,6 +830,18 @@ nfs_exportinit(void)
 		return (error);
 	}
 
+	/*
+	 * Initialize auth cache and auth cache lock
+	 */
+	for (i = 0; i < AUTH_TABLESIZE; i++) {
+		exi_root->exi_cache[i] = kmem_alloc(sizeof (avl_tree_t),
+		    KM_SLEEP);
+		avl_create(exi_root->exi_cache[i], nfsauth_cache_clnt_compar,
+		    sizeof (struct auth_cache_clnt),
+		    offsetof(struct auth_cache_clnt, authc_link));
+	}
+	rw_init(&exi_root->exi_cache_lock, NULL, RW_DEFAULT, NULL);
+
 	/* setup the fhandle template */
 	exi_root->exi_fh.fh_fsid = rootdir->v_vfsp->vfs_fsid;
 	exi_root->exi_fh.fh_xlen = exi_rootfid.fid_len;
@@ -852,12 +867,19 @@ nfs_exportinit(void)
 void
 nfs_exportfini(void)
 {
+	int i;
+
 	/*
 	 * Deallocate the place holder for the public file handle.
 	 */
 	srv_secinfo_list_free(exi_root->exi_export.ex_secinfo,
 	    exi_root->exi_export.ex_seccnt);
 	mutex_destroy(&exi_root->exi_lock);
+	rw_destroy(&exi_root->exi_cache_lock);
+	for (i = 0; i < AUTH_TABLESIZE; i++) {
+		avl_destroy(exi_root->exi_cache[i]);
+		kmem_free(exi_root->exi_cache[i], sizeof (avl_tree_t));
+	}
 	kmem_free(exi_root, sizeof (*exi_root));
 
 	rw_destroy(&exported_lock);
@@ -1171,8 +1193,14 @@ exportfs(struct exportfs_args *args, model_t model, cred_t *cr)
 	exi->exi_dvp = dvp;
 
 	/*
-	 * Initialize auth cache lock
+	 * Initialize auth cache and auth cache lock
 	 */
+	for (i = 0; i < AUTH_TABLESIZE; i++) {
+		exi->exi_cache[i] = kmem_alloc(sizeof (avl_tree_t), KM_SLEEP);
+		avl_create(exi->exi_cache[i], nfsauth_cache_clnt_compar,
+		    sizeof (struct auth_cache_clnt),
+		    offsetof(struct auth_cache_clnt, authc_link));
+	}
 	rw_init(&exi->exi_cache_lock, NULL, RW_DEFAULT, NULL);
 
 	/*
@@ -1588,7 +1616,13 @@ out1:
 		VN_RELE(dvp);
 	mutex_destroy(&exi->exi_lock);
 	rw_destroy(&exi->exi_cache_lock);
+	for (i = 0; i < AUTH_TABLESIZE; i++) {
+		avl_destroy(exi->exi_cache[i]);
+		kmem_free(exi->exi_cache[i], sizeof (avl_tree_t));
+	}
+
 	kmem_free(exi, sizeof (*exi));
+
 	return (error);
 }
 
@@ -2484,6 +2518,7 @@ exportfree(struct exportinfo *exi)
 {
 	struct exportdata *ex;
 	struct charset_cache *cache;
+	int i;
 
 	ex = &exi->exi_export;
 
@@ -2531,6 +2566,15 @@ exportfree(struct exportinfo *exi)
 
 	mutex_destroy(&exi->exi_lock);
 	rw_destroy(&exi->exi_cache_lock);
+	/*
+	 * All nodes in the exi_cache AVL trees were removed and freed in the
+	 * nfsauth_cache_free() call above.  We will just destroy and free the
+	 * empty AVL trees here.
+	 */
+	for (i = 0; i < AUTH_TABLESIZE; i++) {
+		avl_destroy(exi->exi_cache[i]);
+		kmem_free(exi->exi_cache[i], sizeof (avl_tree_t));
+	}
 
 	kmem_free(exi, sizeof (*exi));
 }

@@ -24,16 +24,14 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file is used to verify that the standalone's external dependencies
  * haven't changed in a way that'll break things that use it.
  */
 
 void mdb_free(void) {}
-void snprintf(void) {}
-void vsnprintf(void) {}
+void mdb_snprintf(void) {}
+void mdb_iob_vsnprintf(void) {}
 void mdb_zalloc(void) {}
 void strcmp(void) {}
 void strlen(void) {}
