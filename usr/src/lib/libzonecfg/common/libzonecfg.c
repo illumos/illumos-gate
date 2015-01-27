@@ -23,6 +23,7 @@
  * Copyright 2014 Gary Mills
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2015, Joyent Inc. All rights reserved.
  */
 
 #include <libsysevent.h>
@@ -1274,7 +1275,6 @@ zonecfg_save_impl(zone_dochandle_t handle, char *filename)
 			/*
 			 * Try to restore from our backup.
 			 */
-			(void) unlink(filename);
 			(void) rename(bakfile, filename);
 		} else {
 			/*
