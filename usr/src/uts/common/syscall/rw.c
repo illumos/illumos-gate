@@ -22,7 +22,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright (c) 2015, Joyent, Inc.  All rights reserved.
+ * Copyright 2015, Joyent, Inc.  All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -50,6 +50,7 @@
 #include <sys/debug.h>
 #include <sys/rctl.h>
 #include <sys/nbmlock.h>
+#include <sys/limits.h>
 
 #define	COPYOUT_MAX_CACHE	(1<<17)		/* 128K */
 
@@ -607,19 +608,12 @@ out:
 	return (bcount);
 }
 
-/*
- * XXX -- The SVID refers to IOV_MAX, but doesn't define it.  Grrrr....
- * XXX -- However, SVVS expects readv() and writev() to fail if
- * XXX -- iovcnt > 16 (yes, it's hard-coded in the SVVS source),
- * XXX -- so I guess that's the "interface".
- */
-#define	DEF_IOV_MAX	16
-
 ssize_t
 readv(int fdes, struct iovec *iovp, int iovcnt)
 {
 	struct uio auio;
-	struct iovec aiov[DEF_IOV_MAX];
+	struct iovec buf[IOV_MAX_STACK], *aiov = buf;
+	int aiovlen = 0;
 	file_t *fp;
 	register vnode_t *vp;
 	struct cpu *cp;
@@ -630,8 +624,13 @@ readv(int fdes, struct iovec *iovp, int iovcnt)
 	u_offset_t fileoff;
 	int in_crit = 0;
 
-	if (iovcnt <= 0 || iovcnt > DEF_IOV_MAX)
+	if (iovcnt <= 0 || iovcnt > IOV_MAX)
 		return (set_errno(EINVAL));
+
+	if (iovcnt > IOV_MAX_STACK) {
+		aiovlen = iovcnt * sizeof (iovec_t);
+		aiov = kmem_alloc(aiovlen, KM_SLEEP);
+	}
 
 #ifdef _SYSCALL32_IMPL
 	/*
@@ -640,36 +639,63 @@ readv(int fdes, struct iovec *iovp, int iovcnt)
 	 * of data in a single call.
 	 */
 	if (get_udatamodel() == DATAMODEL_ILP32) {
-		struct iovec32 aiov32[DEF_IOV_MAX];
+		struct iovec32 buf32[IOV_MAX_STACK], *aiov32 = buf32;
+		int aiov32len;
 		ssize32_t count32;
 
-		if (copyin(iovp, aiov32, iovcnt * sizeof (struct iovec32)))
+		aiov32len = iovcnt * sizeof (iovec32_t);
+		if (aiovlen != 0)
+			aiov32 = kmem_alloc(aiov32len, KM_SLEEP);
+
+		if (copyin(iovp, aiov32, aiov32len)) {
+			if (aiovlen != 0) {
+				kmem_free(aiov32, aiov32len);
+				kmem_free(aiov, aiovlen);
+			}
 			return (set_errno(EFAULT));
+		}
 
 		count32 = 0;
 		for (i = 0; i < iovcnt; i++) {
 			ssize32_t iovlen32 = aiov32[i].iov_len;
 			count32 += iovlen32;
-			if (iovlen32 < 0 || count32 < 0)
+			if (iovlen32 < 0 || count32 < 0) {
+				if (aiovlen != 0) {
+					kmem_free(aiov32, aiov32len);
+					kmem_free(aiov, aiovlen);
+				}
 				return (set_errno(EINVAL));
+			}
 			aiov[i].iov_len = iovlen32;
 			aiov[i].iov_base =
 			    (caddr_t)(uintptr_t)aiov32[i].iov_base;
 		}
+
+		if (aiovlen != 0)
+			kmem_free(aiov32, aiov32len);
 	} else
 #endif
-	if (copyin(iovp, aiov, iovcnt * sizeof (struct iovec)))
+	if (copyin(iovp, aiov, iovcnt * sizeof (iovec_t))) {
+		if (aiovlen != 0)
+			kmem_free(aiov, aiovlen);
 		return (set_errno(EFAULT));
+	}
 
 	count = 0;
 	for (i = 0; i < iovcnt; i++) {
 		ssize_t iovlen = aiov[i].iov_len;
 		count += iovlen;
-		if (iovlen < 0 || count < 0)
+		if (iovlen < 0 || count < 0) {
+			if (aiovlen != 0)
+				kmem_free(aiov, aiovlen);
 			return (set_errno(EINVAL));
+		}
 	}
-	if ((fp = getf(fdes)) == NULL)
+	if ((fp = getf(fdes)) == NULL) {
+		if (aiovlen != 0)
+			kmem_free(aiov, aiovlen);
 		return (set_errno(EBADF));
+	}
 	if (((fflag = fp->f_flag) & FREAD) == 0) {
 		error = EBADF;
 		goto out;
@@ -768,6 +794,8 @@ out:
 	if (in_crit)
 		nbl_end_crit(vp);
 	releasef(fdes);
+	if (aiovlen != 0)
+		kmem_free(aiov, aiovlen);
 	if (error)
 		return (set_errno(error));
 	return (count);
@@ -777,7 +805,8 @@ ssize_t
 writev(int fdes, struct iovec *iovp, int iovcnt)
 {
 	struct uio auio;
-	struct iovec aiov[DEF_IOV_MAX];
+	struct iovec buf[IOV_MAX_STACK], *aiov = buf;
+	int aiovlen = 0;
 	file_t *fp;
 	register vnode_t *vp;
 	struct cpu *cp;
@@ -788,8 +817,13 @@ writev(int fdes, struct iovec *iovp, int iovcnt)
 	u_offset_t fileoff;
 	int in_crit = 0;
 
-	if (iovcnt <= 0 || iovcnt > DEF_IOV_MAX)
+	if (iovcnt <= 0 || iovcnt > IOV_MAX)
 		return (set_errno(EINVAL));
+
+	if (iovcnt > IOV_MAX_STACK) {
+		aiovlen = iovcnt * sizeof (iovec_t);
+		aiov = kmem_alloc(aiovlen, KM_SLEEP);
+	}
 
 #ifdef _SYSCALL32_IMPL
 	/*
@@ -798,36 +832,62 @@ writev(int fdes, struct iovec *iovp, int iovcnt)
 	 * of data in a single call.
 	 */
 	if (get_udatamodel() == DATAMODEL_ILP32) {
-		struct iovec32 aiov32[DEF_IOV_MAX];
+		struct iovec32 buf32[IOV_MAX_STACK], *aiov32 = buf32;
+		int aiov32len;
 		ssize32_t count32;
 
-		if (copyin(iovp, aiov32, iovcnt * sizeof (struct iovec32)))
+		aiov32len = iovcnt * sizeof (iovec32_t);
+		if (aiovlen != 0)
+			aiov32 = kmem_alloc(aiov32len, KM_SLEEP);
+
+		if (copyin(iovp, aiov32, aiov32len)) {
+			if (aiovlen != 0) {
+				kmem_free(aiov32, aiov32len);
+				kmem_free(aiov, aiovlen);
+			}
 			return (set_errno(EFAULT));
+		}
 
 		count32 = 0;
 		for (i = 0; i < iovcnt; i++) {
 			ssize32_t iovlen = aiov32[i].iov_len;
 			count32 += iovlen;
-			if (iovlen < 0 || count32 < 0)
+			if (iovlen < 0 || count32 < 0) {
+				if (aiovlen != 0) {
+					kmem_free(aiov32, aiov32len);
+					kmem_free(aiov, aiovlen);
+				}
 				return (set_errno(EINVAL));
+			}
 			aiov[i].iov_len = iovlen;
 			aiov[i].iov_base =
 			    (caddr_t)(uintptr_t)aiov32[i].iov_base;
 		}
+		if (aiovlen != 0)
+			kmem_free(aiov32, aiov32len);
 	} else
 #endif
-	if (copyin(iovp, aiov, iovcnt * sizeof (struct iovec)))
+	if (copyin(iovp, aiov, iovcnt * sizeof (iovec_t))) {
+		if (aiovlen != 0)
+			kmem_free(aiov, aiovlen);
 		return (set_errno(EFAULT));
+	}
 
 	count = 0;
 	for (i = 0; i < iovcnt; i++) {
 		ssize_t iovlen = aiov[i].iov_len;
 		count += iovlen;
-		if (iovlen < 0 || count < 0)
+		if (iovlen < 0 || count < 0) {
+			if (aiovlen != 0)
+				kmem_free(aiov, aiovlen);
 			return (set_errno(EINVAL));
+		}
 	}
-	if ((fp = getf(fdes)) == NULL)
+	if ((fp = getf(fdes)) == NULL) {
+		if (aiovlen != 0)
+			kmem_free(aiov, aiovlen);
 		return (set_errno(EBADF));
+	}
 	if (((fflag = fp->f_flag) & FWRITE) == 0) {
 		error = EBADF;
 		goto out;
@@ -917,6 +977,8 @@ out:
 	if (in_crit)
 		nbl_end_crit(vp);
 	releasef(fdes);
+	if (aiovlen != 0)
+		kmem_free(aiov, aiovlen);
 	if (error)
 		return (set_errno(error));
 	return (count);
@@ -927,7 +989,8 @@ preadv(int fdes, struct iovec *iovp, int iovcnt, off_t offset,
     off_t extended_offset)
 {
 	struct uio auio;
-	struct iovec aiov[DEF_IOV_MAX];
+	struct iovec buf[IOV_MAX_STACK], *aiov = buf;
+	int aiovlen = 0;
 	file_t *fp;
 	register vnode_t *vp;
 	struct cpu *cp;
@@ -952,8 +1015,13 @@ preadv(int fdes, struct iovec *iovp, int iovcnt, off_t offset,
 
 	int in_crit = 0;
 
-	if (iovcnt <= 0 || iovcnt > DEF_IOV_MAX)
+	if (iovcnt <= 0 || iovcnt > IOV_MAX)
 		return (set_errno(EINVAL));
+
+	if (iovcnt > IOV_MAX_STACK) {
+		aiovlen = iovcnt * sizeof (iovec_t);
+		aiov = kmem_alloc(aiovlen, KM_SLEEP);
+	}
 
 #ifdef _SYSCALL32_IMPL
 	/*
@@ -962,39 +1030,68 @@ preadv(int fdes, struct iovec *iovp, int iovcnt, off_t offset,
 	 * of data in a single call.
 	 */
 	if (get_udatamodel() == DATAMODEL_ILP32) {
-		struct iovec32 aiov32[DEF_IOV_MAX];
+		struct iovec32 buf32[IOV_MAX_STACK], *aiov32 = buf32;
+		int aiov32len;
 		ssize32_t count32;
 
-		if (copyin(iovp, aiov32, iovcnt * sizeof (struct iovec32)))
+		aiov32len = iovcnt * sizeof (iovec32_t);
+		if (aiovlen != 0)
+			aiov32 = kmem_alloc(aiov32len, KM_SLEEP);
+
+		if (copyin(iovp, aiov32, aiov32len)) {
+			if (aiovlen != 0) {
+				kmem_free(aiov32, aiov32len);
+				kmem_free(aiov, aiovlen);
+			}
 			return (set_errno(EFAULT));
+		}
 
 		count32 = 0;
 		for (i = 0; i < iovcnt; i++) {
 			ssize32_t iovlen32 = aiov32[i].iov_len;
 			count32 += iovlen32;
-			if (iovlen32 < 0 || count32 < 0)
+			if (iovlen32 < 0 || count32 < 0) {
+				if (aiovlen != 0) {
+					kmem_free(aiov32, aiov32len);
+					kmem_free(aiov, aiovlen);
+				}
 				return (set_errno(EINVAL));
+			}
 			aiov[i].iov_len = iovlen32;
 			aiov[i].iov_base =
 			    (caddr_t)(uintptr_t)aiov32[i].iov_base;
 		}
+		if (aiovlen != 0)
+			kmem_free(aiov32, aiov32len);
 	} else
 #endif /* _SYSCALL32_IMPL */
-		if (copyin(iovp, aiov, iovcnt * sizeof (struct iovec)))
+		if (copyin(iovp, aiov, iovcnt * sizeof (iovec_t))) {
+			if (aiovlen != 0)
+				kmem_free(aiov, aiovlen);
 			return (set_errno(EFAULT));
+		}
 
 	count = 0;
 	for (i = 0; i < iovcnt; i++) {
 		ssize_t iovlen = aiov[i].iov_len;
 		count += iovlen;
-		if (iovlen < 0 || count < 0)
+		if (iovlen < 0 || count < 0) {
+			if (aiovlen != 0)
+				kmem_free(aiov, aiovlen);
 			return (set_errno(EINVAL));
+		}
 	}
 
-	if ((bcount = (ssize_t)count) < 0)
+	if ((bcount = (ssize_t)count) < 0) {
+		if (aiovlen != 0)
+			kmem_free(aiov, aiovlen);
 		return (set_errno(EINVAL));
-	if ((fp = getf(fdes)) == NULL)
+	}
+	if ((fp = getf(fdes)) == NULL) {
+		if (aiovlen != 0)
+			kmem_free(aiov, aiovlen);
 		return (set_errno(EBADF));
+	}
 	if (((fflag = fp->f_flag) & FREAD) == 0) {
 		error = EBADF;
 		goto out;
@@ -1099,6 +1196,8 @@ out:
 	if (in_crit)
 		nbl_end_crit(vp);
 	releasef(fdes);
+	if (aiovlen != 0)
+		kmem_free(aiov, aiovlen);
 	if (error)
 		return (set_errno(error));
 	return (count);
@@ -1109,7 +1208,8 @@ pwritev(int fdes, struct iovec *iovp, int iovcnt, off_t offset,
     off_t extended_offset)
 {
 	struct uio auio;
-	struct iovec aiov[DEF_IOV_MAX];
+	struct iovec buf[IOV_MAX_STACK], *aiov = buf;
+	int aiovlen = 0;
 	file_t *fp;
 	register vnode_t *vp;
 	struct cpu *cp;
@@ -1134,8 +1234,13 @@ pwritev(int fdes, struct iovec *iovp, int iovcnt, off_t offset,
 
 	int in_crit = 0;
 
-	if (iovcnt <= 0 || iovcnt > DEF_IOV_MAX)
+	if (iovcnt <= 0 || iovcnt > IOV_MAX)
 		return (set_errno(EINVAL));
+
+	if (iovcnt > IOV_MAX_STACK) {
+		aiovlen = iovcnt * sizeof (iovec_t);
+		aiov = kmem_alloc(aiovlen, KM_SLEEP);
+	}
 
 #ifdef _SYSCALL32_IMPL
 	/*
@@ -1144,39 +1249,68 @@ pwritev(int fdes, struct iovec *iovp, int iovcnt, off_t offset,
 	 * of data in a single call.
 	 */
 	if (get_udatamodel() == DATAMODEL_ILP32) {
-		struct iovec32 aiov32[DEF_IOV_MAX];
+		struct iovec32 buf32[IOV_MAX_STACK], *aiov32 = buf32;
+		int aiov32len;
 		ssize32_t count32;
 
-		if (copyin(iovp, aiov32, iovcnt * sizeof (struct iovec32)))
+		aiov32len = iovcnt * sizeof (iovec32_t);
+		if (aiovlen != 0)
+			aiov32 = kmem_alloc(aiov32len, KM_SLEEP);
+
+		if (copyin(iovp, aiov32, aiov32len)) {
+			if (aiovlen != 0) {
+				kmem_free(aiov32, aiov32len);
+				kmem_free(aiov, aiovlen);
+			}
 			return (set_errno(EFAULT));
+		}
 
 		count32 = 0;
 		for (i = 0; i < iovcnt; i++) {
 			ssize32_t iovlen32 = aiov32[i].iov_len;
 			count32 += iovlen32;
-			if (iovlen32 < 0 || count32 < 0)
+			if (iovlen32 < 0 || count32 < 0) {
+				if (aiovlen != 0) {
+					kmem_free(aiov32, aiov32len);
+					kmem_free(aiov, aiovlen);
+				}
 				return (set_errno(EINVAL));
+			}
 			aiov[i].iov_len = iovlen32;
 			aiov[i].iov_base =
 			    (caddr_t)(uintptr_t)aiov32[i].iov_base;
 		}
+		if (aiovlen != 0)
+			kmem_free(aiov32, aiov32len);
 	} else
 #endif /* _SYSCALL32_IMPL */
-		if (copyin(iovp, aiov, iovcnt * sizeof (struct iovec)))
+		if (copyin(iovp, aiov, iovcnt * sizeof (iovec_t))) {
+			if (aiovlen != 0)
+				kmem_free(aiov, aiovlen);
 			return (set_errno(EFAULT));
+		}
 
 	count = 0;
 	for (i = 0; i < iovcnt; i++) {
 		ssize_t iovlen = aiov[i].iov_len;
 		count += iovlen;
-		if (iovlen < 0 || count < 0)
+		if (iovlen < 0 || count < 0) {
+			if (aiovlen != 0)
+				kmem_free(aiov, aiovlen);
 			return (set_errno(EINVAL));
+		}
 	}
 
-	if ((bcount = (ssize_t)count) < 0)
+	if ((bcount = (ssize_t)count) < 0) {
+		if (aiovlen != 0)
+			kmem_free(aiov, aiovlen);
 		return (set_errno(EINVAL));
-	if ((fp = getf(fdes)) == NULL)
+	}
+	if ((fp = getf(fdes)) == NULL) {
+		if (aiovlen != 0)
+			kmem_free(aiov, aiovlen);
 		return (set_errno(EBADF));
+	}
 	if (((fflag = fp->f_flag) & FWRITE) == 0) {
 		error = EBADF;
 		goto out;
@@ -1308,6 +1442,8 @@ out:
 	if (in_crit)
 		nbl_end_crit(vp);
 	releasef(fdes);
+	if (aiovlen != 0)
+		kmem_free(aiov, aiovlen);
 	if (error)
 		return (set_errno(error));
 	return (count);

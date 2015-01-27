@@ -25,6 +25,7 @@
 # Copyright 2013 Garrett D'Amore <garrett@damore.org>
 # Copyright 2013 Saso Kiselkov. All rights reserved.
 # Copyright 2015 Igor Kozhukhov <ikozhukhov@gmail.com>
+# Copyright 2015, Joyent, Inc. All rights reserved.
 # Copyright 2016 Nexenta Systems, Inc.
 #
 
@@ -344,6 +345,7 @@ CHKHDRS=			\
 	lgrp.h			\
 	lgrp_user.h		\
 	libc_kernel.h		\
+	limits.h		\
 	link.h			\
 	list.h			\
 	list_impl.h		\
