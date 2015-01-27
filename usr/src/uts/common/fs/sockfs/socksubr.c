@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1995, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2015, Joyent, Inc. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -1879,7 +1880,7 @@ ssize_t
 soreadfile(file_t *fp, uchar_t *buf, u_offset_t fileoff, int *err, size_t size)
 {
 	struct uio auio;
-	struct iovec aiov[MSG_MAXIOVLEN];
+	struct iovec aiov[1];
 	register vnode_t *vp;
 	int ioflag, rwflag;
 	ssize_t cnt;

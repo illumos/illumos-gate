@@ -22,7 +22,7 @@
 # Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2013, Joyent, Inc. All rights reserved.
 # Copyright 2013 Garrett D'Amore <garrett@damore.org>
-# Copyright (c) 2014, Joyent, Inc. All rights reserved.
+# Copyright 2015, Joyent, Inc. All rights reserved.
 #
 
 include $(SRC)/uts/Makefile.uts
@@ -341,6 +341,7 @@ CHKHDRS=			\
 	lgrp.h			\
 	lgrp_user.h		\
 	libc_kernel.h		\
+	limits.h		\
 	link.h			\
 	list.h			\
 	list_impl.h		\

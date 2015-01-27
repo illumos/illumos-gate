@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2015 Joyent, Inc.  All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -627,16 +628,11 @@ struct stroptions {
 /*
  * Structure for rw (read/write) procedure calls. A pointer
  * to a struiod_t is passed as a parameter to the rwnext() call.
- *
- * Note: DEF_IOV_MAX is defined and used as it is in "fs/vncalls.c"
- *	 as there isn't a formal definition of IOV_MAX ???
  */
-#define	DEF_IOV_MAX	16
-
 typedef struct struiod {
 	mblk_t		*d_mp;		/* pointer to mblk (chain) */
 	uio_t		d_uio;		/* uio info */
-	iovec_t d_iov[DEF_IOV_MAX];	/* iov referenced by uio */
+	iovec_t 	*d_iov;		/* iov referenced by uio */
 } struiod_t;
 
 /*

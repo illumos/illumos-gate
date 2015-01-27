@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 1995, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved.
- * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
+ * Copyright 2015, Joyent, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -51,6 +51,7 @@
 #include <sys/cmn_err.h>
 #include <sys/vmsystm.h>
 #include <sys/policy.h>
+#include <sys/limits.h>
 
 #include <sys/socket.h>
 #include <sys/socketvar.h>
@@ -81,14 +82,6 @@ extern int 	xnet_truncate_print;
 
 extern void	nl7c_init(void);
 extern int	sockfs_defer_nl7c_init;
-
-/*
- * For dated (and stupid) reasons, MSG_MAXIOVLEN is 16 -- but it's 1024 on most
- * other systems.  This becomes a problem when running binaries from these
- * other systems, and we therefore need to support an iov length of up to 1024,
- * regardless of the advertised constant for maximum length.
- */
-#define	MSG_MAXMAXIOVLEN	1024
 
 /*
  * Kernel component of socket creation.
@@ -1025,7 +1018,7 @@ recvmsg(int sock, struct nmsghdr *msg, int flags)
 	STRUCT_HANDLE(nmsghdr, umsgptr);
 	struct nmsghdr lmsg;
 	struct uio auio;
-	struct iovec buf[MSG_MAXIOVLEN], *aiov = buf;
+	struct iovec buf[IOV_MAX_STACK], *aiov = buf;
 	ssize_t iovsize = 0;
 	int iovcnt;
 	ssize_t len, rval;
@@ -1071,12 +1064,12 @@ recvmsg(int sock, struct nmsghdr *msg, int flags)
 
 	iovcnt = lmsg.msg_iovlen;
 
-	if (iovcnt <= 0 || iovcnt > MSG_MAXMAXIOVLEN) {
+	if (iovcnt <= 0 || iovcnt > IOV_MAX) {
 		return (set_errno(EMSGSIZE));
 	}
 
-	if (iovcnt > MSG_MAXIOVLEN) {
-		iovsize = MSG_MAXMAXIOVLEN * sizeof (struct iovec);
+	if (iovcnt > IOV_MAX_STACK) {
+		iovsize = iovcnt * sizeof (struct iovec);
 		aiov = kmem_alloc(iovsize, KM_SLEEP);
 	}
 
@@ -1086,16 +1079,17 @@ recvmsg(int sock, struct nmsghdr *msg, int flags)
 	 * that they can't move more than 2Gbytes of data in a single call.
 	 */
 	if (model == DATAMODEL_ILP32) {
-		struct iovec32 buf32[MSG_MAXIOVLEN], *aiov32 = buf32;
+		struct iovec32 buf32[IOV_MAX_STACK], *aiov32 = buf32;
+		ssize_t iov32size;
 		ssize32_t count32;
 
+		iov32size = iovcnt * sizeof (struct iovec32);
 		if (iovsize != 0)
-			aiov32 = kmem_alloc(iovsize, KM_SLEEP);
+			aiov32 = kmem_alloc(iov32size, KM_SLEEP);
 
-		if (copyin((struct iovec32 *)lmsg.msg_iov, aiov32,
-		    iovcnt * sizeof (struct iovec32))) {
+		if (copyin((struct iovec32 *)lmsg.msg_iov, aiov32, iov32size)) {
 			if (iovsize != 0) {
-				kmem_free(aiov32, iovsize);
+				kmem_free(aiov32, iov32size);
 				kmem_free(aiov, iovsize);
 			}
 
@@ -1110,7 +1104,7 @@ recvmsg(int sock, struct nmsghdr *msg, int flags)
 			count32 += iovlen32;
 			if (iovlen32 < 0 || count32 < 0) {
 				if (iovsize != 0) {
-					kmem_free(aiov32, iovsize);
+					kmem_free(aiov32, iov32size);
 					kmem_free(aiov, iovsize);
 				}
 
@@ -1123,7 +1117,7 @@ recvmsg(int sock, struct nmsghdr *msg, int flags)
 		}
 
 		if (iovsize != 0)
-			kmem_free(aiov32, iovsize);
+			kmem_free(aiov32, iov32size);
 	} else
 #endif /* _SYSCALL32_IMPL */
 	if (copyin(lmsg.msg_iov, aiov, iovcnt * sizeof (struct iovec))) {
@@ -1305,7 +1299,7 @@ sendmsg(int sock, struct nmsghdr *msg, int flags)
 	struct nmsghdr lmsg;
 	STRUCT_DECL(nmsghdr, u_lmsg);
 	struct uio auio;
-	struct iovec buf[MSG_MAXIOVLEN], *aiov = buf;
+	struct iovec buf[IOV_MAX_STACK], *aiov = buf;
 	ssize_t iovsize = 0;
 	int iovcnt;
 	ssize_t len, rval;
@@ -1351,7 +1345,7 @@ sendmsg(int sock, struct nmsghdr *msg, int flags)
 
 	iovcnt = lmsg.msg_iovlen;
 
-	if (iovcnt <= 0 || iovcnt > MSG_MAXMAXIOVLEN) {
+	if (iovcnt <= 0 || iovcnt > IOV_MAX) {
 		/*
 		 * Unless this is XPG 4.2 we allow iovcnt == 0 to
 		 * be compatible with SunOS 4.X and 4.4BSD.
@@ -1360,8 +1354,8 @@ sendmsg(int sock, struct nmsghdr *msg, int flags)
 			return (set_errno(EMSGSIZE));
 	}
 
-	if (iovcnt > MSG_MAXIOVLEN) {
-		iovsize = MSG_MAXMAXIOVLEN * sizeof (struct iovec);
+	if (iovcnt > IOV_MAX_STACK) {
+		iovsize = iovcnt * sizeof (struct iovec);
 		aiov = kmem_alloc(iovsize, KM_SLEEP);
 	}
 
@@ -1371,17 +1365,18 @@ sendmsg(int sock, struct nmsghdr *msg, int flags)
 	 * that they can't move more than 2Gbytes of data in a single call.
 	 */
 	if (model == DATAMODEL_ILP32) {
-		struct iovec32 buf32[MSG_MAXIOVLEN], *aiov32 = buf32;
+		struct iovec32 buf32[IOV_MAX_STACK], *aiov32 = buf32;
+		ssize_t iov32size;
 		ssize32_t count32;
 
+		iov32size = iovcnt * sizeof (struct iovec32);
 		if (iovsize != 0)
-			aiov32 = kmem_alloc(iovsize, KM_SLEEP);
+			aiov32 = kmem_alloc(iov32size, KM_SLEEP);
 
 		if (iovcnt != 0 &&
-		    copyin((struct iovec32 *)lmsg.msg_iov, aiov32,
-		    iovcnt * sizeof (struct iovec32))) {
+		    copyin((struct iovec32 *)lmsg.msg_iov, aiov32, iov32size)) {
 			if (iovsize != 0) {
-				kmem_free(aiov32, iovsize);
+				kmem_free(aiov32, iov32size);
 				kmem_free(aiov, iovsize);
 			}
 
@@ -1396,7 +1391,7 @@ sendmsg(int sock, struct nmsghdr *msg, int flags)
 			count32 += iovlen32;
 			if (iovlen32 < 0 || count32 < 0) {
 				if (iovsize != 0) {
-					kmem_free(aiov32, iovsize);
+					kmem_free(aiov32, iov32size);
 					kmem_free(aiov, iovsize);
 				}
 
@@ -1409,7 +1404,7 @@ sendmsg(int sock, struct nmsghdr *msg, int flags)
 		}
 
 		if (iovsize != 0)
-			kmem_free(aiov32, iovsize);
+			kmem_free(aiov32, iov32size);
 	} else
 #endif /* _SYSCALL32_IMPL */
 	if (iovcnt != 0 &&
