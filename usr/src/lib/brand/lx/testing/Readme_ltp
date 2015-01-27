@@ -43,8 +43,8 @@ which now work.
 
 As root:
     cd /opt/ltp
-    /opt/ltp/runltp -f syscalls,nptl,ipc,pipes,pty,math,crashme \
-        -S /native/usr/lib/brand/lx/ltp_skiplist -p >~/test.log
+    /opt/ltp/runltp -f `cat /native/usr/lib/brand/lx/ltp_tests` \
+        -S /native/usr/lib/brand/lx/ltp_skiplist -p >/tmp/test.log
 
 When the test run has finished, the results will be logged in a date/time
 stamped file under /opt/ltp/results. The summary at the end of the log file

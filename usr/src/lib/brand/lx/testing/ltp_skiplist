@@ -111,6 +111,7 @@ add_key01
 add_key02
 clone02
 clone08
+crash02
 eventfd01
 eventfd2_01
 eventfd2_02
