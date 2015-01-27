@@ -25,7 +25,7 @@
 
 /*
  * Copyright (c) 2012 by Delphix. All rights reserved.
- * Copyright (c) 2014, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2015, Joyent, Inc. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -714,19 +714,34 @@ dpwrite(dev_t dev, struct uio *uiop, cred_t *credp)
 			continue;
 		pdp = pcache_lookup_fd(pcp, fd);
 		if (pfdp->events != POLLREMOVE) {
+
+			fp = NULL;
+
 			if (pdp == NULL) {
 				pdp = pcache_alloc_fd(0);
 				pdp->pd_fd = fd;
 				pdp->pd_pcache = pcp;
 				pcache_insert_fd(pcp, pdp, pollfdnum);
 			} else {
+				/*
+				 * epoll semantics demand that we error out if
+				 * a file descriptor is added twice, which we
+				 * check (imperfectly) by checking if we both
+				 * have the file descriptor cached and the
+				 * file pointer that correponds to the file
+				 * descriptor matches our cached value.  (If
+				 * there is a pointer mismatch, the file
+				 * descriptor was closed without being removed
+				 * -- though the converse is clearly not true,
+				 * and represents a window whereby EEXIST can
+				 * spuriously be returned.)
+				 */
 				if ((dpep->dpe_flag & DP_ISEPOLLCOMPAT) &&
-				    pdp->pd_fp != NULL) {
-					/*
-					 * epoll semantics demand that we error
-					 * out in this case.
-					 */
+				    pdp->pd_fp != NULL &&
+				    (fp = getf(fd)) != NULL &&
+				    fp == pdp->pd_fp) {
 					error = EEXIST;
+					releasef(fd);
 					break;
 				}
 			}
@@ -747,7 +762,7 @@ dpwrite(dev_t dev, struct uio *uiop, cred_t *credp)
 			if (fd > pcp->pc_mapend) {
 				pcp->pc_mapend = fd;
 			}
-			if ((fp = getf(fd)) == NULL) {
+			if (fp == NULL && (fp = getf(fd)) == NULL) {
 				/*
 				 * The fd is not valid. Since we can't pass
 				 * this error back in the write() call, set
@@ -763,7 +778,7 @@ dpwrite(dev_t dev, struct uio *uiop, cred_t *credp)
 			 * same poll events.
 			 */
 			if ((pdp->pd_events == pfdp->events) &&
-			    (pdp->pd_fp != NULL)) {
+			    (pdp->pd_fp == fp)) {
 				/*
 				 * the events are already cached
 				 */
