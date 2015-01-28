@@ -1152,16 +1152,9 @@ zone_login_cmd(brand_handle_t bh, const char *login)
  * 'login -z <from_zonename> -f' (-z is an undocumented option which tells
  * login that we're coming from another zone, and to disregard its CONSOLE
  * checks).
- *
- * The 'interactive' parameter (-i option) indicates that we're running a
- * command interactively. In this case we do not prepend the 'su root -c'
- * preamble to the command invocation since the 'su' command typically will
- * execute a setpgrp which will disassociate the actual command from the
- * controlling terminal that we (zlogin) setup.
  */
 static char **
-prep_args(brand_handle_t bh, char *zonename, const char *login, char **argv,
-    int interactive)
+prep_args(brand_handle_t bh, char *zonename, const char *login, char **argv)
 {
 	int argc = 0, a = 0, i, n = -1;
 	char **new_argv;
@@ -1187,8 +1180,6 @@ prep_args(brand_handle_t bh, char *zonename, const char *login, char **argv,
 
 		if (failsafe) {
 			n = 4;
-		} else if (interactive) {
-			n = 2;
 		} else {
 			n = 6;
 		}
@@ -1199,7 +1190,7 @@ prep_args(brand_handle_t bh, char *zonename, const char *login, char **argv,
 		if (failsafe) {
 			new_argv[a++] = FAILSAFESHELL;
 			new_argv[a++] = "-c";
-		} else if (!interactive) {
+		} else {
 			struct stat sb;
 			char zonepath[MAXPATHLEN];
 			char supath[MAXPATHLEN];
@@ -2181,12 +2172,23 @@ main(int argc, char **argv)
 		return (1);
 	}
 
-	if ((new_args = prep_args(bh, zonename, login, proc_args, iflag))
-	    == NULL) {
-		zperror(gettext("could not assemble new arguments"));
-		brand_close(bh);
-		return (1);
+	/*
+	 * The 'interactive' parameter (-i option) indicates that we're running
+	 * a command interactively. In this case we skip prep_args so that we
+	 * don't prepend the 'su root -c' preamble to the command invocation
+	 * since the 'su' command typically will execute a setpgrp which will
+	 * disassociate the actual command from the controlling terminal that
+	 * we (zlogin) setup.
+	 */
+	if (!iflag) {
+		if ((new_args = prep_args(bh, zonename, login, proc_args))
+		    == NULL) {
+			zperror(gettext("could not assemble new arguments"));
+			brand_close(bh);
+			return (1);
+		}
 	}
+
 	/*
 	 * Get the brand specific user_cmd.  This command is used to get
 	 * a passwd(4) entry for login.
@@ -2399,7 +2401,11 @@ main(int argc, char **argv)
 			return (1);
 		}
 
-		(void) execve(new_args[0], new_args, new_env);
+		if (iflag) {
+			(void) execve(proc_args[0], proc_args, new_env);
+		} else {
+			(void) execve(new_args[0], new_args, new_env);
+		}
 		zperror("exec failure");
 		return (1);
 	}
