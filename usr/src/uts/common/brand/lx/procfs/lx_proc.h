@@ -21,7 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2014 Joyent, Inc.  All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  */
 
 #ifndef	_LXPROC_H
@@ -148,7 +148,9 @@ typedef enum lxpr_nodetype {
 	LXPR_NET_SNMP,		/* /proc/net/snmp	*/
 	LXPR_NET_STAT,		/* /proc/net/stat	*/
 	LXPR_NET_TCP,		/* /proc/net/tcp	*/
+	LXPR_NET_TCP6,		/* /proc/net/tcp6	*/
 	LXPR_NET_UDP,		/* /proc/net/udp	*/
+	LXPR_NET_UDP6,		/* /proc/net/udp6	*/
 	LXPR_NET_UNIX,		/* /proc/net/unix	*/
 	LXPR_PARTITIONS,	/* /proc/partitions	*/
 	LXPR_SELF,		/* /proc/self		*/

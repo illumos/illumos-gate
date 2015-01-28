@@ -70,10 +70,15 @@
 #include <sys/rctl.h>
 #include <sys/kstat.h>
 #include <sys/lx_misc.h>
+#include <sys/cred_impl.h>
+#include <sys/tihdr.h>
 #include <inet/ip.h>
 #include <inet/ip_ire.h>
 #include <inet/ip6.h>
 #include <inet/ip_if.h>
+#include <inet/tcp.h>
+#include <inet/udp_impl.h>
+#include <inet/ipclassifier.h>
 
 /* Dependent on procfs */
 extern kthread_t *prchoose(proc_t *);
@@ -168,7 +173,9 @@ static void lxpr_read_net_sockstat(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_net_snmp(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_net_stat(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_net_tcp(lxpr_node_t *, lxpr_uiobuf_t *);
+static void lxpr_read_net_tcp6(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_net_udp(lxpr_node_t *, lxpr_uiobuf_t *);
+static void lxpr_read_net_udp6(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_net_unix(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_fs_inotify_max_queued_events(lxpr_node_t *,
     lxpr_uiobuf_t *);
@@ -323,7 +330,9 @@ static lxpr_dirent_t netdir[] = {
 	{ LXPR_NET_SNMP,	"snmp" },
 	{ LXPR_NET_STAT,	"stat" },
 	{ LXPR_NET_TCP,		"tcp" },
+	{ LXPR_NET_TCP6,	"tcp6" },
 	{ LXPR_NET_UDP,		"udp" },
+	{ LXPR_NET_UDP6,	"udp6" },
 	{ LXPR_NET_UNIX,	"unix" }
 };
 
@@ -503,7 +512,9 @@ static void (*lxpr_read_function[LXPR_NFILES])() = {
 	lxpr_read_net_snmp,		/* /proc/net/snmp	*/
 	lxpr_read_net_stat,		/* /proc/net/stat	*/
 	lxpr_read_net_tcp,		/* /proc/net/tcp	*/
+	lxpr_read_net_tcp6,		/* /proc/net/tcp6	*/
 	lxpr_read_net_udp,		/* /proc/net/udp	*/
+	lxpr_read_net_udp6,		/* /proc/net/udp6	*/
 	lxpr_read_net_unix,		/* /proc/net/unix	*/
 	lxpr_read_partitions,		/* /proc/partitions	*/
 	lxpr_read_invalid,		/* /proc/self		*/
@@ -578,7 +589,9 @@ static vnode_t *(*lxpr_lookup_function[LXPR_NFILES])() = {
 	lxpr_lookup_not_a_dir,		/* /proc/net/snmp	*/
 	lxpr_lookup_not_a_dir,		/* /proc/net/stat	*/
 	lxpr_lookup_not_a_dir,		/* /proc/net/tcp	*/
+	lxpr_lookup_not_a_dir,		/* /proc/net/tcp6	*/
 	lxpr_lookup_not_a_dir,		/* /proc/net/udp	*/
+	lxpr_lookup_not_a_dir,		/* /proc/net/udp6	*/
 	lxpr_lookup_not_a_dir,		/* /proc/net/unix	*/
 	lxpr_lookup_not_a_dir,		/* /proc/partitions	*/
 	lxpr_lookup_not_a_dir,		/* /proc/self		*/
@@ -653,7 +666,9 @@ static int (*lxpr_readdir_function[LXPR_NFILES])() = {
 	lxpr_readdir_not_a_dir,		/* /proc/net/snmp	*/
 	lxpr_readdir_not_a_dir,		/* /proc/net/stat	*/
 	lxpr_readdir_not_a_dir,		/* /proc/net/tcp	*/
+	lxpr_readdir_not_a_dir,		/* /proc/net/tcp6	*/
 	lxpr_readdir_not_a_dir,		/* /proc/net/udp	*/
+	lxpr_readdir_not_a_dir,		/* /proc/net/udp6	*/
 	lxpr_readdir_not_a_dir,		/* /proc/net/unix	*/
 	lxpr_readdir_not_a_dir,		/* /proc/partitions	*/
 	lxpr_readdir_not_a_dir,		/* /proc/self		*/
@@ -1880,16 +1895,268 @@ lxpr_read_net_stat(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
 }
 
+static int
+lxpr_convert_tcp_state(int st)
+{
+	/*
+	 * Derived from the enum located in the Linux kernel sources:
+	 * include/net/tcp_states.h
+	 */
+	switch (st) {
+	case TCPS_ESTABLISHED:
+		return (1);
+	case TCPS_SYN_SENT:
+		return (2);
+	case TCPS_SYN_RCVD:
+		return (3);
+	case TCPS_FIN_WAIT_1:
+		return (4);
+	case TCPS_FIN_WAIT_2:
+		return (5);
+	case TCPS_TIME_WAIT:
+		return (6);
+	case TCPS_CLOSED:
+		return (7);
+	case TCPS_CLOSE_WAIT:
+		return (8);
+	case TCPS_LAST_ACK:
+		return (9);
+	case TCPS_LISTEN:
+		return (10);
+	case TCPS_CLOSING:
+		return (11);
+	default:
+		/* No translation for TCPS_IDLE, TCPS_BOUND or anything else */
+		return (0);
+	}
+}
+
+static void
+lxpr_format_tcp(lxpr_uiobuf_t *uiobuf, ushort_t ipver)
+{
+	int i, sl = 0;
+	connf_t *connfp;
+	conn_t *connp;
+	netstack_t *ns;
+	ip_stack_t *ipst;
+
+	ASSERT(ipver == IPV4_VERSION || ipver == IPV6_VERSION);
+	if (ipver == IPV4_VERSION) {
+		lxpr_uiobuf_printf(uiobuf, "  sl  local_address rem_address   "
+		    "st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout "
+		    "inode\n");
+	} else {
+		lxpr_uiobuf_printf(uiobuf, "  sl  "
+		    "local_address                         "
+		    "remote_address                        "
+		    "st tx_queue rx_queue tr tm->when retrnsmt   "
+		    "uid  timeout inode\n");
+	}
+	/*
+	 * Due to differences between the Linux and illumos TCP
+	 * implementations, some data will be omitted from the output here.
+	 *
+	 * Valid fields:
+	 *  - local_address
+	 *  - remote_address
+	 *  - st
+	 *  - tx_queue
+	 *  - rx_queue
+	 *  - uid
+	 *
+	 * Omitted/invalid fields
+	 *  - tr
+	 *  - tm->when
+	 *  - retrnsmt
+	 *  - timeout
+	 *  - inode
+	 */
+
+	ns = netstack_get_current();
+	if (ns == NULL)
+		return;
+	ipst = ns->netstack_ip;
+
+	for (i = 0; i < CONN_G_HASH_SIZE; i++) {
+		connfp = &ipst->ips_ipcl_globalhash_fanout[i];
+		connp = NULL;
+		while ((connp =
+		    ipcl_get_next_conn(connfp, connp, IPCL_TCPCONN)) != NULL) {
+			tcp_t *tcp;
+			if (connp->conn_ipversion != ipver)
+				continue;
+			tcp = connp->conn_tcp;
+			if (ipver == IPV4_VERSION) {
+				lxpr_uiobuf_printf(uiobuf,
+				    "%4d: %08X:%04X %08X:%04X ",
+				    ++sl,
+				    connp->conn_laddr_v4,
+				    ntohs(connp->conn_lport),
+				    connp->conn_faddr_v4,
+				    ntohs(connp->conn_fport));
+			} else {
+				lxpr_uiobuf_printf(uiobuf, "%4d: "
+				    "%08X%08X%08X%08X:%04X "
+				    "%08X%08X%08X%08X:%04X ",
+				    ++sl,
+				    connp->conn_laddr_v6.s6_addr32[0],
+				    connp->conn_laddr_v6.s6_addr32[1],
+				    connp->conn_laddr_v6.s6_addr32[2],
+				    connp->conn_laddr_v6.s6_addr32[3],
+				    ntohs(connp->conn_lport),
+				    connp->conn_faddr_v6.s6_addr32[0],
+				    connp->conn_faddr_v6.s6_addr32[1],
+				    connp->conn_faddr_v6.s6_addr32[2],
+				    connp->conn_faddr_v6.s6_addr32[3],
+				    ntohs(connp->conn_fport));
+			}
+			lxpr_uiobuf_printf(uiobuf,
+			    "%02X %08X:%08X %02X:%08X %08X "
+			    "%5u %8d %u %d %p %u %u %u %u %d\n",
+			    lxpr_convert_tcp_state(tcp->tcp_state),
+			    tcp->tcp_rcv_cnt, tcp->tcp_unsent, /* rx/tx queue */
+			    0, 0, /* tr, when */
+			    0, /* per-connection rexmits aren't tracked today */
+			    connp->conn_cred->cr_uid,
+			    0, /* timeout */
+			    /* inode + more */
+			    0, 0, NULL, 0, 0, 0, 0, 0);
+		}
+	}
+	netstack_rele(ns);
+}
+
 /* ARGSUSED */
 static void
 lxpr_read_net_tcp(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
+	lxpr_format_tcp(uiobuf, IPV4_VERSION);
+}
+
+/* ARGSUSED */
+static void
+lxpr_read_net_tcp6(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
+{
+	lxpr_format_tcp(uiobuf, IPV6_VERSION);
+}
+
+static void
+lxpr_format_udp(lxpr_uiobuf_t *uiobuf, ushort_t ipver)
+{
+	int i, sl = 0;
+	connf_t *connfp;
+	conn_t *connp;
+	netstack_t *ns;
+	ip_stack_t *ipst;
+
+	ASSERT(ipver == IPV4_VERSION || ipver == IPV6_VERSION);
+	if (ipver == IPV4_VERSION) {
+		lxpr_uiobuf_printf(uiobuf, "  sl  local_address rem_address"
+		    "   st tx_queue rx_queue tr tm->when retrnsmt   uid"
+		    "  timeout inode ref pointer drops\n");
+	} else {
+		lxpr_uiobuf_printf(uiobuf, "  sl  "
+		    "local_address                         "
+		    "remote_address                        "
+		    "st tx_queue rx_queue tr tm->when retrnsmt   "
+		    "uid  timeout inode ref pointer drops\n");
+	}
+	/*
+	 * Due to differences between the Linux and illumos UDP
+	 * implementations, some data will be omitted from the output here.
+	 *
+	 * Valid fields:
+	 *  - local_address
+	 *  - remote_address
+	 *  - st: limited
+	 *  - uid
+	 *
+	 * Omitted/invalid fields
+	 *  - tx_queue
+	 *  - rx_queue
+	 *  - tr
+	 *  - tm->when
+	 *  - retrnsmt
+	 *  - timeout
+	 *  - inode
+	 */
+
+	ns = netstack_get_current();
+	if (ns == NULL)
+		return;
+	ipst = ns->netstack_ip;
+
+	for (i = 0; i < CONN_G_HASH_SIZE; i++) {
+		connfp = &ipst->ips_ipcl_globalhash_fanout[i];
+		connp = NULL;
+		while ((connp =
+		    ipcl_get_next_conn(connfp, connp, IPCL_UDPCONN)) != NULL) {
+			udp_t *udp;
+			int state = 0;
+			if (connp->conn_ipversion != ipver)
+				continue;
+			udp = connp->conn_udp;
+			if (ipver == IPV4_VERSION) {
+				lxpr_uiobuf_printf(uiobuf,
+				    "%4d: %08X:%04X %08X:%04X ",
+				    ++sl,
+				    connp->conn_laddr_v4,
+				    ntohs(connp->conn_lport),
+				    connp->conn_faddr_v4,
+				    ntohs(connp->conn_fport));
+			} else {
+				lxpr_uiobuf_printf(uiobuf, "%4d: "
+				    "%08X%08X%08X%08X:%04X "
+				    "%08X%08X%08X%08X:%04X ",
+				    ++sl,
+				    connp->conn_laddr_v6.s6_addr32[0],
+				    connp->conn_laddr_v6.s6_addr32[1],
+				    connp->conn_laddr_v6.s6_addr32[2],
+				    connp->conn_laddr_v6.s6_addr32[3],
+				    ntohs(connp->conn_lport),
+				    connp->conn_faddr_v6.s6_addr32[0],
+				    connp->conn_faddr_v6.s6_addr32[1],
+				    connp->conn_faddr_v6.s6_addr32[2],
+				    connp->conn_faddr_v6.s6_addr32[3],
+				    ntohs(connp->conn_fport));
+			}
+			switch (udp->udp_state) {
+			case TS_UNBND:
+			case TS_IDLE:
+				state = 7;
+				break;
+			case TS_DATA_XFER:
+				state = 1;
+				break;
+			}
+			lxpr_uiobuf_printf(uiobuf,
+			    "%02X %08X:%08X %02X:%08X %08X "
+			    "%5u %8d %u %d %p %d\n",
+			    state,
+			    0, 0, /* rx/tx queue */
+			    0, 0, /* tr, when */
+			    0, /* retrans */
+			    connp->conn_cred->cr_uid,
+			    0, /* timeout */
+			    /* inode, ref, pointer, drops */
+			    0, 0, NULL, 0);
+		}
+	}
+	netstack_rele(ns);
 }
 
 /* ARGSUSED */
 static void
 lxpr_read_net_udp(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
+	lxpr_format_udp(uiobuf, IPV4_VERSION);
+}
+
+/* ARGSUSED */
+static void
+lxpr_read_net_udp6(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
+{
+	lxpr_format_udp(uiobuf, IPV6_VERSION);
 }
 
 /* ARGSUSED */
