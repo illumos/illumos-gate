@@ -398,11 +398,6 @@ typedef struct {
 	kstat_named_t	zm_avenrun1;
 	kstat_named_t	zm_avenrun5;
 	kstat_named_t	zm_avenrun15;
-	kstat_named_t	zm_run_ticks;
-	kstat_named_t	zm_run_wait;
-	kstat_named_t	zm_fss_shr_pct;
-	kstat_named_t	zm_fss_pri_hi;
-	kstat_named_t	zm_fss_pri_avg;
 	kstat_named_t	zm_ffcap;
 	kstat_named_t	zm_ffnoproc;
 	kstat_named_t	zm_ffnomem;
