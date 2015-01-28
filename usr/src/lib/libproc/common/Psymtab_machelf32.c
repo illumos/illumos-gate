@@ -249,7 +249,7 @@ fake_elf32(struct ps_prochandle *P, file_info_t *fptr, uintptr_t addr,
 	int dynstr_shndx;
 	Ehdr *ep;
 	Shdr *sp;
-	Dyn *dp;
+	Dyn *dp = NULL;
 	Dyn *d[DI_NENT] = { 0 };
 	uint_t i;
 	Off off;
@@ -364,6 +364,11 @@ fake_elf32(struct ps_prochandle *P, file_info_t *fptr, uintptr_t addr,
 
 		hnbuckets = hash[0];
 		hnchains = hash[1];
+	}
+
+	if ((d[DI_HASH] == NULL) || (hnbuckets == 0) || (hnchains == 0)) {
+		dprintf("empty or missing .hash\n");
+		goto bad;
 	}
 
 	/*
