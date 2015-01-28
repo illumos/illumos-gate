@@ -23,6 +23,7 @@
  * Copyright 2015 Joyent, Inc. All rights reserved.
  * Copyright 2014 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2014 Igor Kozhukhov <ikozhukhov@gmail.com>.
+ * Copyright 2015, Joyent, Inc. All rights reserved.
  */
 
 #ifndef _SYS_ZONE_H
