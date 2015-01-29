@@ -208,7 +208,7 @@ mdb_amd64_kvm_stack_iter(mdb_tgt_t *t, const mdb_tgt_gregset_t *gsp,
 	int err;
 	int i;
 
-	struct {
+	struct fr {
 		uintptr_t fr_savfp;
 		uintptr_t fr_savpc;
 	} fr;
@@ -225,6 +225,8 @@ mdb_amd64_kvm_stack_iter(mdb_tgt_t *t, const mdb_tgt_gregset_t *gsp,
 	mdb_syminfo_t sip;
 	mdb_ctf_funcinfo_t mfp;
 	int xpv_panic = 0;
+	int advance_tortoise = 1;
+	uintptr_t tortoise_fp = 0;
 #ifndef	_KMDB
 	int xp;
 
@@ -237,18 +239,37 @@ mdb_amd64_kvm_stack_iter(mdb_tgt_t *t, const mdb_tgt_gregset_t *gsp,
 	while (fp != 0) {
 		int args_style = 0;
 
-		/*
-		 * Ensure progress (increasing fp), and prevent
-		 * endless loop with the same FP.
-		 */
-		if (fp <= lastfp) {
-			err = EMDB_STKFRAME;
-			goto badfp;
-		}
 		if (mdb_tgt_vread(t, &fr, sizeof (fr), fp) != sizeof (fr)) {
 			err = EMDB_NOMAP;
 			goto badfp;
 		}
+
+		if (tortoise_fp == 0) {
+			tortoise_fp = fp;
+		} else {
+			/*
+			 * Advance tortoise_fp every other frame, so we detect
+			 * cycles with Floyd's tortoise/hare.
+			 */
+			if (advance_tortoise != 0) {
+				struct fr tfr;
+
+				if (mdb_tgt_vread(t, &tfr, sizeof (tfr),
+				    tortoise_fp) != sizeof (tfr)) {
+					err = EMDB_NOMAP;
+					goto badfp;
+				}
+
+				tortoise_fp = tfr.fr_savfp;
+			}
+
+			if (fp == tortoise_fp) {
+				err = EMDB_STKFRAME;
+				goto badfp;
+			}
+		}
+
+		advance_tortoise = !advance_tortoise;
 
 		if ((mdb_tgt_lookup_by_addr(t, pc, MDB_TGT_SYM_FUZZY,
 		    NULL, 0, &s, &sip) == 0) &&
