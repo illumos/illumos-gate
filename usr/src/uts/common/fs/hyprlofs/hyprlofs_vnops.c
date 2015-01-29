@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2014 Joyent, Inc.  All rights reserved.
+ * Copyright 2015 Joyent, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -286,12 +286,20 @@ hyprlofs_ioctl(vnode_t *vp, int cmd, intptr_t data, int flag,
 	return (ENOTTY);
 }
 
-/*ARGSUSED2*/
 static int
 hyprlofs_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
     caller_context_t *ct)
 {
 	hlnode_t *tp = (hlnode_t *)VTOHLN(vp);
+	vattr_t tmp_va;
+
+	if (tp->hln_looped == 1) {
+		int error;
+
+		if ((error = VOP_GETATTR(REALVP(vp), &tmp_va, flags, cr,
+		    ct)) != 0)
+			return (error);
+	}
 
 	mutex_enter(&tp->hln_tlock);
 	vap->va_type = vp->v_type;
@@ -309,7 +317,12 @@ hyprlofs_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 	vap->va_rdev = tp->hln_rdev;
 	vap->va_seq = tp->hln_seq;
 
-	vap->va_nblocks = (fsblkcnt64_t)btodb(ptob(btopr(vap->va_size)));
+	if (tp->hln_looped == 1) {
+		vap->va_nblocks = tmp_va.va_nblocks;
+	} else {
+		vap->va_nblocks =
+		    (fsblkcnt64_t)btodb(ptob(btopr(vap->va_size)));
+	}
 	mutex_exit(&tp->hln_tlock);
 	return (0);
 }
