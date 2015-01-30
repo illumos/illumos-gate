@@ -154,6 +154,8 @@ extern "C" {
 
 #ifndef	_ASM
 
+extern struct brand lx_brand;
+
 typedef struct lx_brand_registration {
 	uint_t lxbr_version;		/* version number */
 	void *lxbr_handler;		/* base address of handler */
@@ -336,8 +338,13 @@ typedef struct lx_zone_data {
 
 #define	ttolxlwp(t)	((struct lx_lwp_data *)ttolwpbrand(t))
 #define	lwptolxlwp(l)	((struct lx_lwp_data *)lwptolwpbrand(l))
-#define	ttolxproc(t)	((struct lx_proc_data *)(t)->t_procp->p_brand_data)
-#define	ptolxproc(p)	((struct lx_proc_data *)(p)->p_brand_data)
+#define	ttolxproc(t)	\
+	(((t)->t_procp->p_brand == &lx_brand) ? \
+	(struct lx_proc_data *)(t)->t_procp->p_brand_data : NULL)
+#define	ptolxproc(p)	\
+	(((p)->p_brand == &lx_brand) ? \
+	(struct lx_proc_data *)(p)->p_brand_data : NULL)
+
 /* Macro for converting to system call arguments. */
 #define	LX_ARGS(scall) ((struct lx_##scall##_args *)\
 	(ttolxlwp(curthread)->br_scall_args))
