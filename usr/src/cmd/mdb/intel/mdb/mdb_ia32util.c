@@ -197,7 +197,7 @@ mdb_ia32_kvm_stack_iter(mdb_tgt_t *t, const mdb_tgt_gregset_t *gsp,
 	int got_pc = (gsp->kregs[KREG_EIP] != 0);
 	int err;
 
-	struct {
+	struct fr {
 		uintptr_t fr_savfp;
 		uintptr_t fr_savpc;
 		long fr_argv[32];
@@ -210,6 +210,8 @@ mdb_ia32_kvm_stack_iter(mdb_tgt_t *t, const mdb_tgt_gregset_t *gsp,
 	ssize_t size;
 	uint_t argc;
 	int detect_exception_frames = 0;
+	int advance_tortoise = 1;
+	uintptr_t tortoise_fp = 0;
 #ifndef	_KMDB
 	int xp;
 
@@ -220,15 +222,6 @@ mdb_ia32_kvm_stack_iter(mdb_tgt_t *t, const mdb_tgt_gregset_t *gsp,
 	bcopy(gsp, &gregs, sizeof (gregs));
 
 	while (fp != 0) {
-
-		/*
-		 * Ensure progress (increasing fp), and prevent
-		 * endless loop with the same FP.
-		 */
-		if (fp <= lastfp) {
-			err = EMDB_STKFRAME;
-			goto badfp;
-		}
 		if (fp & (STACK_ALIGN - 1)) {
 			err = EMDB_STKALIGN;
 			goto badfp;
@@ -241,6 +234,33 @@ mdb_ia32_kvm_stack_iter(mdb_tgt_t *t, const mdb_tgt_gregset_t *gsp,
 			err = EMDB_NOMAP;
 			goto badfp;
 		}
+
+		if (tortoise_fp == 0) {
+			tortoise_fp = fp;
+		} else {
+			/*
+			 * Advance tortoise_fp every other frame, so we detect
+			 * cycles with Floyd's tortoise/hare.
+			 */
+			if (advance_tortoise != 0) {
+				struct fr tfr;
+
+				if (mdb_tgt_vread(t, &tfr, sizeof (tfr),
+				    tortoise_fp) != sizeof (tfr)) {
+					err = EMDB_NOMAP;
+					goto badfp;
+				}
+
+				tortoise_fp = tfr.fr_savfp;
+			}
+
+			if (fp == tortoise_fp) {
+				err = EMDB_STKFRAME;
+				goto badfp;
+			}
+		}
+
+		advance_tortoise = !advance_tortoise;
 
 		if (got_pc && func(arg, pc, argc, fr.fr_argv, &gregs) != 0)
 			break;

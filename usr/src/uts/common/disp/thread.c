@@ -87,7 +87,7 @@ struct kmem_cache *turnstile_cache;	/* cache of free turnstiles */
  * allthreads is only for use by kmem_readers.  All kernel loops can use
  * the current thread as a start/end point.
  */
-static kthread_t *allthreads = &t0;	/* circular list of all threads */
+kthread_t *allthreads = &t0;	/* circular list of all threads */
 
 static kcondvar_t reaper_cv;		/* synchronization var */
 kthread_t	*thread_deathrow;	/* circular list of reapable threads */
