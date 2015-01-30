@@ -21,7 +21,7 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2014 Joyent, Inc.  All rights reserved.
+ * Copyright 2015 Joyent, Inc.  All rights reserved.
  */
 
 #ifndef _SYS_LX_TYPES_H
@@ -40,8 +40,10 @@ extern "C" {
 
 #if defined(_LP64)
 #define	LONG_MAX	9223372036854775807L
+#define	ULONG_MAX	18446744073709551615UL
 #else
 #define	LONG_MAX	2147483647L	/* max value of a 32-bit "long int" */
+#define	ULONG_MAX	4294967295UL	/* max value of a 32-bit "ulong int" */
 #endif
 
 #define	LX_SYS_UTS_LN	65
