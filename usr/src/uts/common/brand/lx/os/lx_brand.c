@@ -169,7 +169,7 @@ lx_proc_exit(proc_t *p, klwp_t *lwp)
 	zone_t *z = p->p_zone;
 	int sig = ptolxproc(p)->l_signal;
 
-	ASSERT(p->p_brand != NULL);
+	ASSERT(p->p_brand == &lx_brand);
 	ASSERT(p->p_brand_data != NULL);
 
 	/*
@@ -290,7 +290,7 @@ lx_ptrace_syscall_set(pid_t pid, id_t lwpid, int set)
 		return (ESRCH);
 	}
 
-	if ((lpdp = p->p_brand_data) == NULL ||
+	if ((lpdp = ptolxproc(p)) == NULL ||
 	    (lldp = lwp->lwp_brand) == NULL) {
 		sprunlock(p);
 		return (ESRCH);
@@ -380,7 +380,7 @@ lx_ptrace_ext_opts(int cmd, pid_t pid, uintptr_t val, int64_t *rval)
 		return (EPERM);
 	}
 
-	if ((lpdp = p->p_brand_data) == NULL) {
+	if ((lpdp = ptolxproc(p)) == NULL) {
 		sprunlock(p);
 		return (ESRCH);
 	}
@@ -435,7 +435,7 @@ lx_ptrace_stop_for_option(int option, ulong_t msg)
 	lx_proc_data_t *lpdp;
 	boolean_t child = B_FALSE;
 
-	if ((lpdp = p->p_brand_data) == NULL) {
+	if ((lpdp = ptolxproc(p)) == NULL) {
 		/* this should never happen but just to be safe */
 		return;
 	}
@@ -532,7 +532,7 @@ lx_ptrace_geteventmsg(pid_t pid, ulong_t *msgp)
 		return (EPERM);
 	}
 
-	if ((lpdp = p->p_brand_data) == NULL) {
+	if ((lpdp = ptolxproc(p)) == NULL) {
 		sprunlock(p);
 		return (ESRCH);
 	}
@@ -558,7 +558,7 @@ lx_ptrace_exectrap(proc_t *p)
 {
 	lx_proc_data_t *lpdp;
 
-	if ((lpdp = p->p_brand_data) == NULL ||
+	if ((lpdp = ptolxproc(p)) == NULL ||
 	    !(lpdp->l_ptrace_opts & LX_PTRACE_O_TRACEEXEC)) {
 		psignal(p, SIGTRAP);
 	}
@@ -1254,6 +1254,7 @@ lx_copy_procdata(proc_t *child, proc_t *parent)
 	ppd = parent->p_brand_data;
 
 	ASSERT(ppd != NULL);
+	ASSERT(parent->p_brand == &lx_brand);
 
 	cpd = kmem_alloc(sizeof (lx_proc_data_t), KM_SLEEP);
 	*cpd = *ppd;
@@ -1322,12 +1323,13 @@ lx_elfexec(struct vnode *vp, struct execa *uap, struct uarg *args,
 	struct execenv	origenv;
 	stack_t		orig_sigaltstack;
 	struct user	*up = PTOU(ttoproc(curthread));
-	lx_elf_data_t	*edp =
-	    &((lx_proc_data_t *)ttoproc(curthread)->p_brand_data)->l_elf_data;
+	lx_elf_data_t	*edp;
 	char		*lib_path = NULL;
 
 	ASSERT(ttoproc(curthread)->p_brand == &lx_brand);
 	ASSERT(ttoproc(curthread)->p_brand_data != NULL);
+
+	edp = &ttolxproc(curthread)->l_elf_data;
 
 	if (args->to_model == DATAMODEL_NATIVE) {
 		lib_path = LX_LIB_PATH;

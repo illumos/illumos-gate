@@ -80,7 +80,7 @@ lx_exec()
 	klwp_t *lwp = ttolwp(curthread);
 	struct lx_lwp_data *lwpd = lwptolxlwp(lwp);
 	proc_t *p = ttoproc(curthread);
-	lx_proc_data_t *pd = p->p_brand_data;
+	lx_proc_data_t *pd = ptolxproc(p);
 	int err;
 
 	/*
