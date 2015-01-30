@@ -482,8 +482,12 @@ lxpr_getnode(vnode_t *dp, lxpr_nodetype_t type, proc_t *p, int fd)
 	case LXPR_PID_FD_FD:
 		ASSERT(p != NULL);
 		/* lxpr_realvp is set after we return */
-		vp->v_type = VLNK;
 		lxpnp->lxpr_mode = 0700;	/* read-write-exe owner only */
+		/*
+		 * Set the type as VNON for now to enable weird vfs behavior.
+		 * See lxpr_readlink for more details.
+		 */
+		vp->v_type = VNON;
 		break;
 
 	case LXPR_PID_FDDIR:

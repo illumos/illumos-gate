@@ -79,6 +79,7 @@
 #include <inet/tcp.h>
 #include <inet/udp_impl.h>
 #include <inet/ipclassifier.h>
+#include <sys/socketvar.h>
 
 /* Dependent on procfs */
 extern kthread_t *prchoose(proc_t *);
@@ -108,6 +109,7 @@ static int lxpr_lookup(vnode_t *, char *, vnode_t **,
 static int lxpr_readdir(vnode_t *, uio_t *, cred_t *, int *,
     caller_context_t *, int);
 static int lxpr_readlink(vnode_t *, uio_t *, cred_t *, caller_context_t *);
+static int lxpr_readlink_pid_fd(lxpr_node_t *lxpnp, char *bp, size_t len);
 static int lxpr_cmp(vnode_t *, vnode_t *, caller_context_t *);
 static int lxpr_realvp(vnode_t *, vnode_t **, caller_context_t *);
 static int lxpr_sync(void);
@@ -163,6 +165,7 @@ static void lxpr_read_net_if_inet6(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_net_igmp(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_net_ip_mr_cache(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_net_ip_mr_vif(lxpr_node_t *, lxpr_uiobuf_t *);
+static void lxpr_read_net_ipv6_route(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_net_mcfilter(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_net_netstat(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_net_raw(lxpr_node_t *, lxpr_uiobuf_t *);
@@ -320,6 +323,7 @@ static lxpr_dirent_t netdir[] = {
 	{ LXPR_NET_IGMP,	"igmp" },
 	{ LXPR_NET_IP_MR_CACHE,	"ip_mr_cache" },
 	{ LXPR_NET_IP_MR_VIF,	"ip_mr_vif" },
+	{ LXPR_NET_IPV6_ROUTE,	"ipv6_route" },
 	{ LXPR_NET_MCFILTER,	"mcfilter" },
 	{ LXPR_NET_NETSTAT,	"netstat" },
 	{ LXPR_NET_RAW,		"raw" },
@@ -502,6 +506,7 @@ static void (*lxpr_read_function[LXPR_NFILES])() = {
 	lxpr_read_net_igmp,		/* /proc/net/igmp	*/
 	lxpr_read_net_ip_mr_cache,	/* /proc/net/ip_mr_cache */
 	lxpr_read_net_ip_mr_vif,	/* /proc/net/ip_mr_vif	*/
+	lxpr_read_net_ipv6_route,	/* /proc/net/ipv6_route	*/
 	lxpr_read_net_mcfilter,		/* /proc/net/mcfilter	*/
 	lxpr_read_net_netstat,		/* /proc/net/netstat	*/
 	lxpr_read_net_raw,		/* /proc/net/raw	*/
@@ -579,6 +584,7 @@ static vnode_t *(*lxpr_lookup_function[LXPR_NFILES])() = {
 	lxpr_lookup_not_a_dir,		/* /proc/net/igmp	*/
 	lxpr_lookup_not_a_dir,		/* /proc/net/ip_mr_cache */
 	lxpr_lookup_not_a_dir,		/* /proc/net/ip_mr_vif	*/
+	lxpr_lookup_not_a_dir,		/* /proc/net/ipv6_route	*/
 	lxpr_lookup_not_a_dir,		/* /proc/net/mcfilter	*/
 	lxpr_lookup_not_a_dir,		/* /proc/net/netstat	*/
 	lxpr_lookup_not_a_dir,		/* /proc/net/raw	*/
@@ -656,6 +662,7 @@ static int (*lxpr_readdir_function[LXPR_NFILES])() = {
 	lxpr_readdir_not_a_dir,		/* /proc/net/igmp	*/
 	lxpr_readdir_not_a_dir,		/* /proc/net/ip_mr_cache */
 	lxpr_readdir_not_a_dir,		/* /proc/net/ip_mr_vif	*/
+	lxpr_readdir_not_a_dir,		/* /proc/net/ipv6_route	*/
 	lxpr_readdir_not_a_dir,		/* /proc/net/mcfilter	*/
 	lxpr_readdir_not_a_dir,		/* /proc/net/netstat	*/
 	lxpr_readdir_not_a_dir,		/* /proc/net/raw	*/
@@ -1768,9 +1775,9 @@ lxpr_read_net_dev_mcast(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 }
 
 static void
-lxpr_inet6_out(in6_addr_t addr, char buf[33])
+lxpr_inet6_out(const in6_addr_t *addr, char buf[33])
 {
-	uint8_t *ip = addr.s6_addr;
+	const uint8_t *ip = addr->s6_addr;
 	char digits[] = "0123456789abcdef";
 	int i;
 	for (i = 0; i < 16; i++) {
@@ -1811,7 +1818,7 @@ lxpr_read_net_if_inet6(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 
 			ipif_get_name(ipif, ifname, sizeof (ifname));
 			lx_ifname_convert(ifname, LX_IFNAME_FROMNATIVE);
-			lxpr_inet6_out(ipif->ipif_v6lcl_addr, ip6out);
+			lxpr_inet6_out(&ipif->ipif_v6lcl_addr, ip6out);
 			/* Scope output is shifted on Linux */
 			scope = scope << 4;
 
@@ -1841,6 +1848,66 @@ lxpr_read_net_ip_mr_vif(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
 }
 
+static void
+lxpr_format_route_ipv6(ire_t *ire, lxpr_uiobuf_t *uiobuf)
+{
+	uint32_t flags;
+	char name[IFNAMSIZ];
+	char ipv6addr[33];
+
+	lxpr_inet6_out(&ire->ire_addr_v6, ipv6addr);
+	lxpr_uiobuf_printf(uiobuf, "%s %02x ", ipv6addr,
+	    ip_mask_to_plen_v6(&ire->ire_mask_v6));
+
+	/* punt on this for now */
+	lxpr_uiobuf_printf(uiobuf, "%s %02x ",
+	    "00000000000000000000000000000000", 0);
+
+	lxpr_inet6_out(&ire->ire_gateway_addr_v6, ipv6addr);
+	lxpr_uiobuf_printf(uiobuf, "%s", ipv6addr);
+
+	flags = ire->ire_flags &
+	    (RTF_UP|RTF_GATEWAY|RTF_HOST|RTF_DYNAMIC|RTF_MODIFIED);
+	/* Linux's RTF_LOCAL equivalent */
+	if (ire->ire_metrics.iulp_local)
+		flags |= 0x80000000;
+
+	if (ire->ire_ill != NULL) {
+		ill_get_name(ire->ire_ill, name, sizeof (name));
+		lx_ifname_convert(name, LX_IFNAME_FROMNATIVE);
+	} else {
+		name[0] = '\0';
+	}
+
+	lxpr_uiobuf_printf(uiobuf, " %08x %08x %08x %08x %8s\n",
+	    0, /* metric */
+	    ire->ire_refcnt,
+	    0,
+	    flags,
+	    name);
+}
+
+/* ARGSUSED */
+static void
+lxpr_read_net_ipv6_route(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
+{
+	netstack_t *ns;
+	ip_stack_t *ipst;
+
+	ns = netstack_get_current();
+	if (ns == NULL)
+		return;
+	ipst = ns->netstack_ip;
+
+	/*
+	 * LX branded zones are expected to have exclusive IP stack, hence
+	 * using ALL_ZONES as the zoneid filter.
+	 */
+	ire_walk_v6(&lxpr_format_route_ipv6, uiobuf, ALL_ZONES, ipst);
+
+	netstack_rele(ns);
+}
+
 /* ARGSUSED */
 static void
 lxpr_read_net_mcfilter(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
@@ -1859,10 +1926,97 @@ lxpr_read_net_raw(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
 }
 
+#define	LXPR_SKIP_ROUTE(type)	\
+	(((IRE_IF_CLONE | IRE_BROADCAST | IRE_MULTICAST | \
+	IRE_NOROUTE | IRE_LOOPBACK | IRE_LOCAL) & type) != 0)
+
+static void
+lxpr_format_route_ipv4(ire_t *ire, lxpr_uiobuf_t *uiobuf)
+{
+	uint32_t flags;
+	char name[IFNAMSIZ];
+	ill_t *ill;
+	ire_t *nire;
+	ipif_t *ipif;
+	ipaddr_t gateway;
+
+	if (LXPR_SKIP_ROUTE(ire->ire_type) || ire->ire_testhidden != 0)
+		return;
+
+	/* These route flags have direct Linux equivalents */
+	flags = ire->ire_flags &
+	    (RTF_UP|RTF_GATEWAY|RTF_HOST|RTF_DYNAMIC|RTF_MODIFIED);
+
+	/*
+	 * Search for a suitable IRE for naming purposes.
+	 * On Linux, the default route is typically associated with the
+	 * interface used to access gateway.  The default IRE on Illumos
+	 * typically lacks an ill reference but its parent might have one.
+	 */
+	nire = ire;
+	do {
+		ill = nire->ire_ill;
+		nire = nire->ire_dep_parent;
+	} while (ill == NULL && nire != NULL);
+	if (ill != NULL) {
+		ill_get_name(ill, name, sizeof (name));
+		lx_ifname_convert(name, LX_IFNAME_FROMNATIVE);
+	} else {
+		name[0] = '*';
+		name[1] = '\0';
+	}
+
+	/*
+	 * Linux suppresses the gateway address for directly connected
+	 * interface networks.  To emulate this behavior, we walk all addresses
+	 * of a given route interface.  If one matches the gateway, it is
+	 * displayed as NULL.
+	 */
+	gateway = ire->ire_gateway_addr;
+	if ((ill = ire->ire_ill) != NULL) {
+		for (ipif = ill->ill_ipif; ipif != NULL;
+		    ipif = ipif->ipif_next) {
+			if (ipif->ipif_lcl_addr == gateway) {
+				gateway = 0;
+				break;
+			}
+		}
+	}
+
+	lxpr_uiobuf_printf(uiobuf, "%s\t%08X\t%08X\t%04X\t%d\t%u\t"
+	    "%d\t%08X\t%d\t%u\t%u\n",
+	    name,
+	    ire->ire_addr,
+	    gateway,
+	    flags, 0, 0,
+	    0, /* priority */
+	    ire->ire_mask,
+	    0, 0, /* mss, window */
+	    ire->ire_metrics.iulp_rtt);
+}
+
 /* ARGSUSED */
 static void
 lxpr_read_net_route(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
+	netstack_t *ns;
+	ip_stack_t *ipst;
+
+	lxpr_uiobuf_printf(uiobuf, "Iface\tDestination\tGateway \tFlags\t"
+	    "RefCnt\tUse\tMetric\tMask\t\tMTU\tWindow\tIRTT\n");
+
+	ns = netstack_get_current();
+	if (ns == NULL)
+		return;
+	ipst = ns->netstack_ip;
+
+	/*
+	 * LX branded zones are expected to have exclusive IP stack, hence
+	 * using ALL_ZONES as the zoneid filter.
+	 */
+	ire_walk_v4(&lxpr_format_route_ipv4, uiobuf, ALL_ZONES, ipst);
+
+	netstack_rele(ns);
 }
 
 /* ARGSUSED */
@@ -1963,13 +2117,13 @@ lxpr_format_tcp(lxpr_uiobuf_t *uiobuf, ushort_t ipver)
 	 *  - tx_queue
 	 *  - rx_queue
 	 *  - uid
+	 *  - inode
 	 *
 	 * Omitted/invalid fields
 	 *  - tr
 	 *  - tm->when
 	 *  - retrnsmt
 	 *  - timeout
-	 *  - inode
 	 */
 
 	ns = netstack_get_current();
@@ -1983,6 +2137,9 @@ lxpr_format_tcp(lxpr_uiobuf_t *uiobuf, ushort_t ipver)
 		while ((connp =
 		    ipcl_get_next_conn(connfp, connp, IPCL_TCPCONN)) != NULL) {
 			tcp_t *tcp;
+			vattr_t attr;
+			vnode_t *vp = ((struct sonode *)
+			    connp->conn_upper_handle)->so_vnode;
 			if (connp->conn_ipversion != ipver)
 				continue;
 			tcp = connp->conn_tcp;
@@ -2010,9 +2167,15 @@ lxpr_format_tcp(lxpr_uiobuf_t *uiobuf, ushort_t ipver)
 				    connp->conn_faddr_v6.s6_addr32[3],
 				    ntohs(connp->conn_fport));
 			}
+
+			/* fetch the simulated inode for the socket */
+			if (vp == NULL ||
+			    VOP_GETATTR(vp, &attr, 0, CRED(), NULL) != 0)
+				attr.va_nodeid = 0;
+
 			lxpr_uiobuf_printf(uiobuf,
 			    "%02X %08X:%08X %02X:%08X %08X "
-			    "%5u %8d %u %d %p %u %u %u %u %d\n",
+			    "%5u %8d %lu %d %p %u %u %u %u %d\n",
 			    lxpr_convert_tcp_state(tcp->tcp_state),
 			    tcp->tcp_rcv_cnt, tcp->tcp_unsent, /* rx/tx queue */
 			    0, 0, /* tr, when */
@@ -2020,7 +2183,7 @@ lxpr_format_tcp(lxpr_uiobuf_t *uiobuf, ushort_t ipver)
 			    connp->conn_cred->cr_uid,
 			    0, /* timeout */
 			    /* inode + more */
-			    0, 0, NULL, 0, 0, 0, 0, 0);
+			    (ino_t)attr.va_nodeid, 0, NULL, 0, 0, 0, 0, 0);
 		}
 	}
 	netstack_rele(ns);
@@ -2093,6 +2256,9 @@ lxpr_format_udp(lxpr_uiobuf_t *uiobuf, ushort_t ipver)
 		    ipcl_get_next_conn(connfp, connp, IPCL_UDPCONN)) != NULL) {
 			udp_t *udp;
 			int state = 0;
+			vattr_t attr;
+			vnode_t *vp = ((struct sonode *)
+			    connp->conn_upper_handle)->so_vnode;
 			if (connp->conn_ipversion != ipver)
 				continue;
 			udp = connp->conn_udp;
@@ -2120,6 +2286,7 @@ lxpr_format_udp(lxpr_uiobuf_t *uiobuf, ushort_t ipver)
 				    connp->conn_faddr_v6.s6_addr32[3],
 				    ntohs(connp->conn_fport));
 			}
+
 			switch (udp->udp_state) {
 			case TS_UNBND:
 			case TS_IDLE:
@@ -2129,9 +2296,15 @@ lxpr_format_udp(lxpr_uiobuf_t *uiobuf, ushort_t ipver)
 				state = 1;
 				break;
 			}
+
+			/* fetch the simulated inode for the socket */
+			if (vp == NULL ||
+			    VOP_GETATTR(vp, &attr, 0, CRED(), NULL) != 0)
+				attr.va_nodeid = 0;
+
 			lxpr_uiobuf_printf(uiobuf,
 			    "%02X %08X:%08X %02X:%08X %08X "
-			    "%5u %8d %u %d %p %d\n",
+			    "%5u %8d %lu %d %p %d\n",
 			    state,
 			    0, 0, /* rx/tx queue */
 			    0, 0, /* tr, when */
@@ -2139,7 +2312,7 @@ lxpr_format_udp(lxpr_uiobuf_t *uiobuf, ushort_t ipver)
 			    connp->conn_cred->cr_uid,
 			    0, /* timeout */
 			    /* inode, ref, pointer, drops */
-			    0, 0, NULL, 0);
+			    (ino_t)attr.va_nodeid, 0, NULL, 0);
 		}
 	}
 	netstack_rele(ns);
@@ -3170,6 +3343,13 @@ lxpr_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 		vap->va_uid = crgetruid(curproc->p_cred);
 		vap->va_gid = crgetrgid(curproc->p_cred);
 		break;
+	case LXPR_PID_FD_FD:
+		/*
+		 * Restore VLNK type for lstat-type activity.
+		 * See lxpr_readlink for more details.
+		 */
+		if ((flags & FOLLOW) == 0)
+			vap->va_type = VLNK;
 	default:
 		break;
 	}
@@ -3451,17 +3631,6 @@ lxpr_lookup_fddir(vnode_t *dp, char *comp)
 		 */
 		lxpnp->lxpr_realvp = vp;
 		VN_HOLD(lxpnp->lxpr_realvp);
-		if (lxpnp->lxpr_realvp->v_type == VFIFO) {
-			/*
-			 * lxpr_getnode initially sets the type to be VLNK for
-			 * the LXPR_PID_FD_FD option, but that breaks fifo
-			 * file descriptors (which are unlinked named pipes).
-			 * We set this as a regular file so that open.2 comes
-			 * into lxpr_open so we can do more work.
-			 */
-			dp = LXPTOV(lxpnp);
-			dp->v_type = VREG;
-		}
 	}
 
 	mutex_enter(&p->p_lock);
@@ -4053,16 +4222,41 @@ lxpr_readlink(vnode_t *vp, uio_t *uiop, cred_t *cr, caller_context_t *ct)
 	pid_t pid;
 	int error = 0;
 
-	/* must be a symbolic link file */
-	if (vp->v_type != VLNK)
+	/*
+	 * Linux does something very "clever" for /proc/<pid>/fd/<num> entries.
+	 * Open FDs are represented as symlinks, the link contents
+	 * corresponding to the open resource.  For plain files or devices,
+	 * this isn't absurd since one can dereference the symlink to query
+	 * the underlying resource.  For sockets or pipes, it becomes ugly in a
+	 * hurry.  To maintain this human-readable output, those FD symlinks
+	 * point to bogus targets such as "socket:[<inodenum>]".  This requires
+	 * circumventing vfs since the stat/lstat behavior on those FD entries
+	 * will be unusual. (A stat must retrieve information about the open
+	 * socket or pipe.  It cannot fail because the link contents point to
+	 * an absent file.)
+	 *
+	 * To accomplish this, lxpr_getnode returns an vnode typed VNON for FD
+	 * entries.  This bypasses code paths which would normally
+	 * short-circuit on symlinks and allows us to emulate the vfs behavior
+	 * expected by /proc consumers.
+	 */
+	if (vp->v_type != VLNK && lxpnp->lxpr_type != LXPR_PID_FD_FD)
 		return (EINVAL);
 
 	/* Try to produce a symlink name for anything that has a realvp */
 	if (rvp != NULL) {
 		if ((error = lxpr_access(vp, VREAD, 0, CRED(), ct)) != 0)
 			return (error);
-		if ((error = vnodetopath(NULL, rvp, bp, buflen, CRED())) != 0)
-			return (error);
+		if ((error = vnodetopath(NULL, rvp, bp, buflen, CRED())) != 0) {
+			/*
+			 * Special handling possible for /proc/<pid>/fd/<num>
+			 * Generate <type>:[<inode>] links, if allowed.
+			 */
+			if (lxpnp->lxpr_type != LXPR_PID_FD_FD ||
+			    lxpr_readlink_pid_fd(lxpnp, bp, buflen) != 0) {
+				return (error);
+			}
+		}
 	} else {
 		switch (lxpnp->lxpr_type) {
 		case LXPR_SELF:
@@ -4101,6 +4295,32 @@ lxpr_readlink(vnode_t *vp, uio_t *uiop, cred_t *cr, caller_context_t *ct)
 
 	/* copy the link data to user space */
 	return (uiomove(bp, strlen(bp), UIO_READ, uiop));
+}
+
+/*
+ * Attempt to create Linux-proc-style fake symlinks contents for supported
+ * /proc/<pid>/fd/<#> entries.
+ */
+static int
+lxpr_readlink_pid_fd(lxpr_node_t *lxpnp, char *bp, size_t len)
+{
+	vnode_t *rvp = lxpnp->lxpr_realvp;
+	vattr_t attr;
+
+	/* Fetch the inode of the underlying vnode */
+	if (VOP_GETATTR(rvp, &attr, 0, CRED(), NULL) != 0)
+		return (-1);
+
+	switch (rvp->v_type) {
+	case VSOCK:
+		(void) snprintf(bp, len, "socket:[%lu]", (ino_t)attr.va_nodeid);
+		return (0);
+	case VFIFO:
+		(void) snprintf(bp, len, "pipe:[%lu]", (ino_t)attr.va_nodeid);
+		return (0);
+	default:
+		return (-1);
+	}
 }
 
 /*
