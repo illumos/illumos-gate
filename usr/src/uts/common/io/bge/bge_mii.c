@@ -20,7 +20,13 @@
  */
 
 /*
- * Copyright (c) 2002, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2010-2013, by Broadcom, Inc.
+ * All Rights Reserved.
+ */
+
+/*
+ * Copyright (c) 2002, 2010, Oracle and/or its affiliates.
+ * All rights reserved.
  */
 
 #include "bge_impl.h"
@@ -143,6 +149,23 @@ bge_phydump(bge_t *bgep, uint16_t mii_status, uint16_t aux)
 
 #endif	/* BGE_DEBUGGING */
 
+static void
+bge_phy_toggle_auxctl_smdsp(bge_t *bgep,
+                            boolean_t enable)
+{
+	uint16_t val;
+
+	val = bge_mii_get16(bgep, MII_AUX_CONTROL);
+
+	if (enable) {
+		val |= MII_AUX_CTRL_SMDSP_ENA;
+	} else {
+		val &= ~MII_AUX_CTRL_SMDSP_ENA;
+	}
+
+	bge_mii_put16(bgep, MII_AUX_CONTROL, (val | MII_AUX_CTRL_TX_6DB));
+}
+
 /*
  * Basic low-level function to probe for a PHY
  *
@@ -153,6 +176,7 @@ bge_phy_probe(bge_t *bgep)
 {
 	uint16_t miicfg;
 	uint32_t nicsig, niccfg;
+	int i;
 
 	BGE_TRACE(("bge_phy_probe($%p)", (void *)bgep));
 
@@ -174,8 +198,10 @@ bge_phy_probe(bge_t *bgep)
 		 * order to clear any sticky bits (but they should
 		 * have been cleared by the RESET, I think).
 		 */
-		miicfg = bge_mii_get16(bgep, MII_STATUS);
-		miicfg = bge_mii_get16(bgep, MII_STATUS);
+		for (i = 0; i < 100; i++) {
+			drv_usecwait(40);
+			miicfg = bge_mii_get16(bgep, MII_STATUS);
+		}
 		BGE_DEBUG(("bge_phy_probe: status 0x%x", miicfg));
 
 		/*
@@ -190,7 +216,7 @@ bge_phy_probe(bge_t *bgep)
 		case 0xffff:
 			return (B_FALSE);
 
-		default :
+		default:
 			return (B_TRUE);
 		}
 	}
@@ -527,7 +553,7 @@ bge_phy_bit_err_fix(bge_t *bgep)
 }
 
 /*
- * End of Broadcom-derived workaround code				*
+ * End of Broadcom-derived workaround code
  */
 
 static int
@@ -536,12 +562,13 @@ bge_restart_copper(bge_t *bgep, boolean_t powerdown)
 	uint16_t phy_status;
 	boolean_t reset_ok;
 	uint16_t extctrl, auxctrl;
+	int i;
 
 	BGE_TRACE(("bge_restart_copper($%p, %d)", (void *)bgep, powerdown));
 
 	ASSERT(mutex_owned(bgep->genlock));
 
-	switch (MHCR_CHIP_ASIC_REV(bgep->chipid.asic_rev)) {
+	switch (MHCR_CHIP_ASIC_REV(bgep)) {
 	default:
 		/*
 		 * Shouldn't happen; it means we don't recognise this chip.
@@ -559,7 +586,7 @@ bge_restart_copper(bge_t *bgep, boolean_t powerdown)
 	case MHCR_CHIP_ASIC_REV_5906:
 	case MHCR_CHIP_ASIC_REV_5700:
 	case MHCR_CHIP_ASIC_REV_5701:
-	case MHCR_CHIP_ASIC_REV_5723:
+	case MHCR_CHIP_ASIC_REV_5723: /* 5717 and 5725 series as well */
 	case MHCR_CHIP_ASIC_REV_5721_5751:
 		/*
 		 * Just a plain reset; the "check" code breaks these chips
@@ -588,7 +615,7 @@ bge_restart_copper(bge_t *bgep, boolean_t powerdown)
 		break;
 	}
 
-	switch (MHCR_CHIP_ASIC_REV(bgep->chipid.asic_rev)) {
+	switch (MHCR_CHIP_ASIC_REV(bgep)) {
 	case MHCR_CHIP_ASIC_REV_5705:
 	case MHCR_CHIP_ASIC_REV_5721_5751:
 		bge_phy_bit_err_fix(bgep);
@@ -623,8 +650,10 @@ bge_restart_copper(bge_t *bgep, boolean_t powerdown)
 	 * order to clear any sticky bits (but they should
 	 * have been cleared by the RESET, I think).
 	 */
-	phy_status = bge_mii_get16(bgep, MII_STATUS);
-	phy_status = bge_mii_get16(bgep, MII_STATUS);
+	for (i = 0; i < 100; i++) {
+		drv_usecwait(40);
+		phy_status = bge_mii_get16(bgep, MII_STATUS);
+	}
 	BGE_DEBUG(("bge_restart_copper: status 0x%x", phy_status));
 
 	/*
@@ -633,6 +662,232 @@ bge_restart_copper(bge_t *bgep, boolean_t powerdown)
 	if (powerdown)
 		bge_phy_powerdown(bgep);
 	return (DDI_SUCCESS);
+}
+
+boolean_t
+bge_eee_cap(bge_t * bgep)
+{
+	if (!(DEVICE_5717_SERIES_CHIPSETS(bgep) ||
+	    DEVICE_5725_SERIES_CHIPSETS(bgep))) {
+		/* EEE is not supported on this chip */
+		BGE_DEBUG(("bge_eee: eee not supported (device 0x%x)",
+		    bgep->chipid.device));
+		return (B_FALSE);
+	}
+
+	switch (CHIP_ASIC_REV_PROD_ID(bgep)) {
+	case CHIP_ASIC_REV_5717_B0: /* = CHIP_ASIC_REV_5718_B0 */
+	case CHIP_ASIC_REV_5717_C0:
+	/* case CHIP_ASIC_REV_5718_B0: */
+	case CHIP_ASIC_REV_5719_A0:
+	case CHIP_ASIC_REV_5719_A1:
+	case CHIP_ASIC_REV_5720_A0:
+	case CHIP_ASIC_REV_5725_A0:
+	case CHIP_ASIC_REV_5727_B0:
+		return (B_TRUE);
+
+	default:
+		/* EEE is not supported on this asic rev */
+		BGE_DEBUG(("bge_eee: eee not supported (asic rev 0x%08x)",
+		    bgep->chipid.asic_rev));
+		return (B_FALSE);
+	}
+}
+
+void
+bge_eee_init(bge_t * bgep)
+{
+	uint32_t val;
+
+	BGE_TRACE(("bge_eee_init($%p)", (void *)bgep));
+
+	ASSERT(mutex_owned(bgep->genlock));
+
+	if (!bge_eee_cap(bgep)) {
+		return;
+	}
+
+	/* Enable MAC control of LPI */
+
+	val = (EEE_LINK_IDLE_PCIE_NL0 | EEE_LINK_IDLE_UART_IDL);
+	if (DEVICE_5725_SERIES_CHIPSETS(bgep))
+		val |= EEE_LINK_IDLE_APE_TX_MT;
+	bge_reg_put32(bgep, EEE_LINK_IDLE_CONTROL_REG, val);
+
+	bge_reg_put32(bgep, EEE_CONTROL_REG, EEE_CONTROL_EXIT_20_1_US);
+
+	val = EEE_MODE_ERLY_L1_XIT_DET | EEE_MODE_LPI_IN_TX |
+	    EEE_MODE_LPI_IN_RX | EEE_MODE_EEE_ENABLE;
+
+	if (bgep->chipid.device != DEVICE_ID_5717)
+		val |= EEE_MODE_SND_IDX_DET_EN;
+
+	//val |= EEE_MODE_APE_TX_DET_EN;
+
+	if (!bgep->chipid.eee) {
+		val = 0;
+	}
+
+	bge_reg_put32(bgep, EEE_MODE_REG, val);
+
+	/* Set EEE timer debounce values */
+
+	bge_reg_put32(bgep, EEE_DEBOUNCE_T1_CONTROL_REG,
+	    EEE_DEBOUNCE_T1_PCIEXIT_2047US | EEE_DEBOUNCE_T1_LNKIDLE_2047US);
+
+	bge_reg_put32(bgep, EEE_DEBOUNCE_T2_CONTROL_REG,
+	    EEE_DEBOUNCE_T2_APE_TX_2047US | EEE_DEBOUNCE_T2_TXIDXEQ_2047US);
+}
+
+void
+bge_eee_autoneg(bge_t * bgep, boolean_t adv_100fdx, boolean_t adv_1000fdx)
+{
+	uint32_t val;
+	uint16_t mii_val;
+
+	BGE_TRACE(("bge_eee_autoneg($%p)", (void *)bgep));
+
+	ASSERT(mutex_owned(bgep->genlock));
+
+	if (!bge_eee_cap(bgep)) {
+		return;
+	}
+
+	/* Disable LPI Requests */
+	val = bge_reg_get32(bgep, EEE_MODE_REG);
+	val &= ~EEE_MODE_LPI_ENABLE;
+	bge_reg_put32(bgep, EEE_MODE_REG, val);
+
+	bge_phy_toggle_auxctl_smdsp(bgep, B_TRUE);
+
+	mii_val = 0;
+
+	if (bgep->chipid.eee) {
+		if (adv_100fdx) {
+			mii_val |= EEE_CL45_D7_RESULT_STAT_LP_100TX;
+		}
+		if (adv_1000fdx) {
+			mii_val |= EEE_CL45_D7_RESULT_STAT_LP_1000T;
+		}
+	}
+
+	/* Enable EEE advertisement for the specified mode(s)... */
+	bge_mii_put16(bgep, MII_MMD_CTRL, MDIO_MMD_AN);
+	bge_mii_put16(bgep, MII_MMD_ADDRESS_DATA, MDIO_AN_EEE_ADV);
+	bge_mii_put16(bgep, MII_MMD_CTRL,
+	    MII_MMD_CTRL_DATA_NOINC | MDIO_MMD_AN);
+	bge_mii_put16(bgep, MII_MMD_ADDRESS_DATA, mii_val);
+
+	/* Setup PHY DSP for EEE */
+	switch (bgep->chipid.device) {
+	case DEVICE_ID_5717:
+	case DEVICE_ID_5718:
+	case DEVICE_ID_5719:
+		/* If we advertised any EEE advertisements above... */
+		if (mii_val) {
+			mii_val = (MII_DSP_TAP26_ALNOKO |
+			    MII_DSP_TAP26_RMRXSTO |
+			    MII_DSP_TAP26_OPCSINPT);
+		}
+		bge_phydsp_write(bgep, MII_DSP_TAP26, mii_val);
+		/* fall through */
+	case DEVICE_ID_5720:
+	case DEVICE_ID_5725:
+	case DEVICE_ID_5727:
+		mii_val = bge_phydsp_read(bgep, MII_DSP_CH34TP2);
+		bge_phydsp_write(bgep, MII_DSP_CH34TP2,
+		    (mii_val | MII_DSP_CH34TP2_HIBW01));
+	}
+
+	bge_phy_toggle_auxctl_smdsp(bgep, B_FALSE);
+}
+
+void
+bge_eee_adjust(bge_t * bgep)
+{
+	uint32_t val;
+	uint16_t mii_val;
+
+	BGE_TRACE(("bge_eee_adjust($%p, %d)", (void *)bgep));
+
+	ASSERT(mutex_owned(bgep->genlock));
+
+	if (!bge_eee_cap(bgep)) {
+		return;
+	}
+
+	bgep->eee_lpi_wait = 0;
+
+	/* Check for PHY link status */
+	if (bgep->param_link_up) {
+		BGE_DEBUG(("bge_eee_adjust: link status up"));
+
+		/*
+		 * XXX if duplex full and speed is 1000 or 100 then do the
+		 * following...
+		 */
+
+		if (bgep->param_link_speed == 1000) {
+			BGE_DEBUG(("bge_eee_adjust: eee timing for 1000Mb"));
+			bge_reg_put32(bgep, EEE_CONTROL_REG,
+			    EEE_CONTROL_EXIT_16_5_US);
+		} else if (bgep->param_link_speed == 100) {
+			BGE_DEBUG(("bge_eee_adjust: eee timing for 100Mb"));
+			bge_reg_put32(bgep, EEE_CONTROL_REG,
+			    EEE_CONTROL_EXIT_36_US);
+		}
+
+		/* Read PHY's EEE negotiation status */
+		bge_mii_put16(bgep, MII_MMD_CTRL, MDIO_MMD_AN);
+		bge_mii_put16(bgep, MII_MMD_ADDRESS_DATA,
+		    EEE_CL45_D7_RESULT_STAT);
+		bge_mii_put16(bgep, MII_MMD_CTRL,
+		    MII_MMD_CTRL_DATA_NOINC | MDIO_MMD_AN);
+		mii_val = bge_mii_get16(bgep, MII_MMD_ADDRESS_DATA);
+
+		/* Enable EEE LPI request if EEE negotiated */
+		if ((mii_val == EEE_CL45_D7_RESULT_STAT_LP_1000T) ||
+		    (mii_val == EEE_CL45_D7_RESULT_STAT_LP_100TX)) {
+			BGE_DEBUG(("bge_eee_adjust: eee negotiaton success, lpi scheduled"));
+			bgep->eee_lpi_wait = 2;
+		} else {
+			BGE_DEBUG(("bge_eee_adjust: eee negotiation failed"));
+		}
+	} else {
+		BGE_DEBUG(("bge_eee_adjust: link status down"));
+	}
+
+	if (!bgep->eee_lpi_wait) {
+		if (bgep->param_link_up) {
+			bge_phy_toggle_auxctl_smdsp(bgep, B_TRUE);
+			bge_phydsp_write(bgep, MII_DSP_TAP26, 0);
+			bge_phy_toggle_auxctl_smdsp(bgep, B_FALSE);
+		}
+
+		/* Disable LPI requests */
+		val = bge_reg_get32(bgep, EEE_MODE_REG);
+		val &= ~EEE_MODE_LPI_ENABLE;
+		bge_reg_put32(bgep, EEE_MODE_REG, val);
+	}
+}
+
+void
+bge_eee_enable(bge_t * bgep)
+{
+	uint32_t val;
+
+	/* XXX check for EEE for 5717 family... */
+
+	if (bgep->param_link_speed == 1000) {
+		bge_phy_toggle_auxctl_smdsp(bgep, B_TRUE);
+		bge_phydsp_write(bgep, MII_DSP_TAP26,
+		    MII_DSP_TAP26_ALNOKO | MII_DSP_TAP26_RMRXSTO);
+		bge_phy_toggle_auxctl_smdsp(bgep, B_FALSE);
+	}
+
+	val = bge_reg_get32(bgep, EEE_MODE_REG);
+	val |= EEE_MODE_LPI_ENABLE;
+	bge_reg_put32(bgep, EEE_MODE_REG, val);
 }
 
 /*
@@ -866,6 +1121,10 @@ bge_update_copper(bge_t *bgep)
 		break;
 	}
 #endif	/* BGE_COPPER_WIRESPEED */
+
+	/* enable EEE on those chips that support it */
+	bge_eee_autoneg(bgep, adv_100fdx, adv_1000fdx);
+
 	return (DDI_SUCCESS);
 }
 
@@ -877,13 +1136,17 @@ bge_check_copper(bge_t *bgep, boolean_t recheck)
 	uint16_t aux;
 	uint_t mode;
 	boolean_t linkup;
+	int i;
 
 	/*
 	 * Step 10: read the status from the PHY (which is self-clearing
 	 * on read!); also read & clear the main (Ethernet) MAC status
 	 * (the relevant bits of this are write-one-to-clear).
 	 */
-	mii_status = bge_mii_get16(bgep, MII_STATUS);
+	for (i = 0; i < 100; i++) {
+		drv_usecwait(40);
+		mii_status = bge_mii_get16(bgep, MII_STATUS);
+	}
 	emac_status = bge_reg_get32(bgep, ETHERNET_MAC_STATUS_REG);
 	bge_reg_put32(bgep, ETHERNET_MAC_STATUS_REG, emac_status);
 
@@ -897,14 +1160,19 @@ bge_check_copper(bge_t *bgep, boolean_t recheck)
 	 * we not forcing a recheck (i.e. the link state was already
 	 * known), there's nothing to do.
 	 */
-	if (mii_status == bgep->phy_gen_status && !recheck)
+	if (mii_status == bgep->phy_gen_status && !recheck) {
+		BGE_DEBUG(("bge_check_copper: no link change"));
 		return (B_FALSE);
+	}
 
 	do {
 		/*
 		 * Step 11: read AUX STATUS register to find speed/duplex
 		 */
-		aux = bge_mii_get16(bgep, MII_AUX_STATUS);
+		for (i = 0; i < 2000; i++) {
+			drv_usecwait(10);
+			aux = bge_mii_get16(bgep, MII_AUX_STATUS);
+		}
 		BGE_CDB(bge_phydump, (bgep, mii_status, aux));
 
 		/*
@@ -935,7 +1203,12 @@ bge_check_copper(bge_t *bgep, boolean_t recheck)
 		 */
 		bgep->phy_aux_status = aux;
 		bgep->phy_gen_status = mii_status;
-		mii_status = bge_mii_get16(bgep, MII_STATUS);
+
+		for (i = 0; i < 100; i++)
+		{
+			drv_usecwait(40);
+			mii_status = bge_mii_get16(bgep, MII_STATUS);
+		}
 	} while (mii_status != bgep->phy_gen_status);
 
 	/*
@@ -1014,10 +1287,12 @@ bge_check_copper(bge_t *bgep, boolean_t recheck)
 		bgep->param_link_duplex = bge_copper_link_duplex[mode];
 	}
 
-	BGE_DEBUG(("bge_check_copper: link now %s speed %d duplex %d",
-	    UPORDOWN(bgep->param_link_up),
-	    bgep->param_link_speed,
-	    bgep->param_link_duplex));
+	bge_eee_adjust(bgep);
+
+	bge_log(bgep, "bge_check_copper: link now %s speed %d duplex %d",
+	        UPORDOWN(bgep->param_link_up),
+	        bgep->param_link_speed,
+	        bgep->param_link_duplex);
 
 	return (B_TRUE);
 }
@@ -1054,13 +1329,13 @@ bge_restart_serdes(bge_t *bgep, boolean_t powerdown)
 	 * appropriately for the SerDes interface ...
 	 */
 	macmode = bge_reg_get32(bgep, ETHERNET_MAC_MODE_REG);
-	if (DEVICE_5714_SERIES_CHIPSETS(bgep)) {
-		macmode |= ETHERNET_MODE_LINK_POLARITY;
-		macmode &= ~ETHERNET_MODE_PORTMODE_MASK;
+	macmode &= ~ETHERNET_MODE_LINK_POLARITY;
+	macmode &= ~ETHERNET_MODE_PORTMODE_MASK;
+	if (DEVICE_5717_SERIES_CHIPSETS(bgep) ||
+	    DEVICE_5725_SERIES_CHIPSETS(bgep) ||
+	    DEVICE_5714_SERIES_CHIPSETS(bgep)) {
 		macmode |= ETHERNET_MODE_PORTMODE_GMII;
 	} else {
-		macmode &= ~ETHERNET_MODE_LINK_POLARITY;
-		macmode &= ~ETHERNET_MODE_PORTMODE_MASK;
 		macmode |= ETHERNET_MODE_PORTMODE_TBI;
 	}
 	bge_reg_put32(bgep, ETHERNET_MAC_MODE_REG, macmode);
@@ -1288,21 +1563,34 @@ bge_check_serdes(bge_t *bgep, boolean_t recheck)
 		 * to BCM5705, BCM5788, BCM5721, BCM5751, BCM5752,
 		 * BCM5714, and BCM5715 devices.
 		 */
-		if (DEVICE_5714_SERIES_CHIPSETS(bgep)) {
+		if (DEVICE_5717_SERIES_CHIPSETS(bgep) ||
+		    DEVICE_5725_SERIES_CHIPSETS(bgep) ||
+		    DEVICE_5714_SERIES_CHIPSETS(bgep)) {
 			tx_status = bge_reg_get32(bgep,
 			    TRANSMIT_MAC_STATUS_REG);
 			linkup = BIS(tx_status, TRANSMIT_STATUS_LINK_UP);
 			emac_status = bge_reg_get32(bgep,
 			    ETHERNET_MAC_STATUS_REG);
 			bgep->serdes_status = emac_status;
+			/* clear write-one-to-clear bits in MAC status */
+			if ((emac_status & ETHERNET_STATUS_MI_COMPLETE) &&
+			    (DEVICE_5717_SERIES_CHIPSETS(bgep) ||
+			     DEVICE_5725_SERIES_CHIPSETS(bgep))) {
+				emac_status |= ETHERNET_STATUS_SYNC_CHANGED |
+				    ETHERNET_STATUS_CFG_CHANGED;
+			}
+			bge_reg_put32(bgep,
+			    ETHERNET_MAC_STATUS_REG, emac_status);
+			/*
+			 * If the link status has not changed then then
+			 * break. If it has loop around and recheck again.
+			 * Keep looping until the link status has not
+			 * changed.
+			 */
 			if ((linkup && linkup_old) ||
 			    (!linkup && !linkup_old)) {
-				emac_status &= ~ETHERNET_STATUS_LINK_CHANGED;
-				emac_status &= ~ETHERNET_STATUS_RECEIVING_CFG;
 				break;
 			}
-			emac_status |= ETHERNET_STATUS_LINK_CHANGED;
-			emac_status |= ETHERNET_STATUS_RECEIVING_CFG;
 			if (linkup)
 				linkup_old = B_TRUE;
 			else
@@ -1467,10 +1755,10 @@ bge_check_serdes(bge_t *bgep, boolean_t recheck)
 	}
 	bgep->link_state = LINK_STATE_UNKNOWN;
 
-	BGE_DEBUG(("bge_check_serdes: link now %s speed %d duplex %d",
-	    UPORDOWN(bgep->param_link_up),
-	    bgep->param_link_speed,
-	    bgep->param_link_duplex));
+	bge_log(bgep, "bge_check_serdes: link now %s speed %d duplex %d",
+	        UPORDOWN(bgep->param_link_up),
+	        bgep->param_link_speed,
+	        bgep->param_link_duplex);
 
 	return (B_TRUE);
 }
@@ -1495,6 +1783,8 @@ static const phys_ops_t serdes_ops = {
 int
 bge_phys_init(bge_t *bgep)
 {
+	uint32_t regval;
+
 	BGE_TRACE(("bge_phys_init($%p)", (void *)bgep));
 
 	mutex_enter(bgep->genlock);
@@ -1506,13 +1796,12 @@ bge_phys_init(bge_t *bgep)
 	 * BCM800x PHY.
 	 */
 	bgep->phy_mii_addr = 1;
+
 	if (DEVICE_5717_SERIES_CHIPSETS(bgep)) {
-		int regval = bge_reg_get32(bgep, CPMU_STATUS_REG);
-		if (regval & CPMU_STATUS_FUN_NUM)
-			bgep->phy_mii_addr += 1;
+		bgep->phy_mii_addr = (bgep->pci_func + 1);
 		regval = bge_reg_get32(bgep, SGMII_STATUS_REG);
 		if (regval & MEDIA_SELECTION_MODE)
-			bgep->phy_mii_addr += 7;
+			bgep->phy_mii_addr += 7; /* sgmii */
 	}
 
 	if (bge_phy_probe(bgep)) {
@@ -1606,18 +1895,15 @@ bge_phys_update(bge_t *bgep)
 boolean_t
 bge_phys_check(bge_t *bgep)
 {
-	int32_t orig_state;
-	boolean_t recheck;
-
 	BGE_TRACE(("bge_phys_check($%p)", (void *)bgep));
 
 	ASSERT(mutex_owned(bgep->genlock));
 
-	orig_state = bgep->link_state;
-	recheck = orig_state == LINK_STATE_UNKNOWN;
-	recheck = (*bgep->physops->phys_check)(bgep, recheck);
-	if (!recheck)
-		return (B_FALSE);
-
-	return (B_TRUE);
+	/*
+	 * Force a link recheck if current state is unknown.
+	 * phys_check() returns TRUE if the link status changed,
+	 * FALSE otherwise.
+	 */
+	return ((*bgep->physops->phys_check)(bgep,
+	    (bgep->link_state == LINK_STATE_UNKNOWN)));
 }
