@@ -21,7 +21,7 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2014 Joyent, Inc.  All rights reserved.
+ * Copyright 2015 Joyent, Inc.  All rights reserved.
  */
 
 #include <errno.h>
@@ -48,7 +48,7 @@
 #define	SLOT_MSG	2
 
 static int
-get_rctlval(rctlblk_t *rblk, char *name)
+get_rctlval(rctlblk_t *rblk, char *name, ulong_t limit, uint64_t *val)
 {
 	rctl_qty_t r;
 
@@ -56,9 +56,11 @@ get_rctlval(rctlblk_t *rblk, char *name)
 		return (-errno);
 
 	r = rctlblk_get_value(rblk);
-	if (r > MAXINT)
+	if (r > limit)
 		return (-EOVERFLOW);
-	return (r);
+
+	*val = r;
+	return (0);
 }
 
 /*
@@ -206,18 +208,26 @@ lx_semctl_ipcinfo(void *buf)
 	int rblksz;
 	uint_t nids;
 	int idbuf;
+	int err;
+	uint64_t val;
 
 	rblksz = rctlblk_size();
 	if ((rblk = (rctlblk_t *)SAFE_ALLOCA(rblksz)) == NULL)
 		return (-ENOMEM);
 
 	bzero(&i, sizeof (i));
-	if ((i.semmni = get_rctlval(rblk, "project.max-sem-ids")) < 0)
-		return (i.semmni);
-	if ((i.semmsl = get_rctlval(rblk, "process.max-sem-nsems")) < 0)
-		return (i.semmsl);
-	if ((i.semopm = get_rctlval(rblk, "process.max-sem-ops")) < 0)
-		return (i.semopm);
+	err = get_rctlval(rblk, "project.max-sem-ids", (ulong_t)MAXINT, &val);
+	if (err < 0)
+		return (err);
+	i.semmni = (int)val;
+	err = get_rctlval(rblk, "process.max-sem-nsems", (ulong_t)MAXINT, &val);
+	if (err < 0)
+		return (err);
+	i.semmsl = (int)val;
+	err = get_rctlval(rblk, "process.max-sem-ops", (ulong_t)MAXINT, &val);
+	if (err < 0)
+		return (err);
+	i.semopm = (int)val;
 
 	/*
 	 * We don't have corresponding rctls for these fields.  The values
@@ -516,21 +526,30 @@ lx_msgctl_ipcinfo(int cmd, void *buf)
 	int idbuf, rblksz, msgseg, maxmsgs;
 	uint_t nids;
 	int rval;
+	int err;
+	uint64_t val;
 
 	rblksz = rctlblk_size();
 	if ((rblk = (rctlblk_t *)SAFE_ALLOCA(rblksz)) == NULL)
 		return (-ENOMEM);
 
 	bzero(&m, sizeof (m));
-	if ((m.msgmni = get_rctlval(rblk, "project.max-msg-ids")) < 0)
-		return (m.msgmni);
-	if ((m.msgmnb = get_rctlval(rblk, "process.max-msg-qbytes")) < 0)
-		return (m.msgmnb);
+	err = get_rctlval(rblk, "project.max-msg-ids", (ulong_t)MAXINT, &val);
+	if (err < 0)
+		return (err);
+	m.msgmni = (int)val;
+	err = get_rctlval(rblk, "process.max-msg-qbytes", (ulong_t)MAXINT,
+	    &val);
+	if (err < 0)
+		return (err);
+	m.msgmnb = (int)val;
 
 	if (cmd == LX_IPC_INFO) {
-		if ((maxmsgs = get_rctlval(rblk,
-		    "process.max-msg-messages")) < 0)
-			return (maxmsgs);
+		err = get_rctlval(rblk, "process.max-msg-messages",
+		    (ulong_t)MAXINT, &val);
+		if (err < 0)
+			return (err);
+		maxmsgs = (int)val;
 		m.msgtql = maxmsgs * m.msgmni;
 		m.msgmap = m.msgmnb;
 		m.msgpool = m.msgmax * m.msgmnb;
@@ -693,16 +712,22 @@ lx_shmctl_ipcinfo(void *buf)
 	struct lx_shminfo s;
 	rctlblk_t *rblk;
 	int rblksz;
+	int err;
+	uint64_t val;
 
 	rblksz = rctlblk_size();
 	if ((rblk = (rctlblk_t *)SAFE_ALLOCA(rblksz)) == NULL)
 		return (-ENOMEM);
 
 	bzero(&s, sizeof (s));
-	if ((s.shmmni = get_rctlval(rblk, "project.max-shm-ids")) < 0)
-		return (s.shmmni);
-	if ((s.shmmax = get_rctlval(rblk, "project.max-shm-memory")) < 0)
-		return (s.shmmax);
+	err = get_rctlval(rblk, "project.max-shm-ids", ULONG_MAX, &val);
+	if (err < 0)
+		return (err);
+	s.shmmni = val;
+	err = get_rctlval(rblk, "project.max-shm-memory", ULONG_MAX, &val);
+	if (err < 0)
+		return (err);
+	s.shmmax = val;
 
 	/*
 	 * We don't have corresponding rctls for these fields.  The values
@@ -711,7 +736,7 @@ lx_shmctl_ipcinfo(void *buf)
 	 * coherent about it.
 	 */
 	s.shmmin = 1;
-	s.shmseg = INT_MAX;
+	s.shmseg = ULONG_MAX;
 	s.shmall = s.shmmax / getpagesize();
 
 	if (uucopy(&s, buf, sizeof (s)))
