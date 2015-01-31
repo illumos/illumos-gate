@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 1997, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2015, Joyent, Inc. All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
  */
 
@@ -43,6 +43,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/sysmacros.h>
+#include <sys/crc32.h>
 
 #include "libproc.h"
 #include "Pcontrol.h"
@@ -61,6 +62,7 @@ static int read_ehdr32(struct ps_prochandle *, Elf32_Ehdr *, uint_t *,
 static int read_ehdr64(struct ps_prochandle *, Elf64_Ehdr *, uint_t *,
     uintptr_t);
 #endif
+static uint32_t psym_crc32[] = { CRC32_TABLE };
 
 #define	DATA_TYPES	\
 	((1 << STT_OBJECT) | (1 << STT_FUNC) | \
@@ -184,6 +186,7 @@ file_info_new(struct ps_prochandle *P, map_info_t *mptr)
 	mptr->map_file = fptr;
 	fptr->file_ref = 1;
 	fptr->file_fd = -1;
+	fptr->file_dbgfile = -1;
 	P->num_files++;
 
 	/*
@@ -274,6 +277,10 @@ file_info_free(struct ps_prochandle *P, file_info_t *fptr)
 			free(fptr->file_elfmem);
 		if (fptr->file_fd >= 0)
 			(void) close(fptr->file_fd);
+		if (fptr->file_dbgelf)
+			(void) elf_end(fptr->file_dbgelf);
+		if (fptr->file_dbgfile >= 0)
+			(void) close(fptr->file_dbgfile);
 		if (fptr->file_ctfp) {
 			ctf_close(fptr->file_ctfp);
 			free(fptr->file_ctf_buf);
@@ -1567,6 +1574,170 @@ build_fake_elf(struct ps_prochandle *P, file_info_t *fptr, GElf_Ehdr *ehdr,
 }
 
 /*
+ * Try and find the file described by path in the file system and validate that
+ * it matches our CRC before we try and process it for symbol information.
+ *
+ * Before we valiate if it's a crc, we check to ensure that it's a normal file
+ * and not anything else.
+ */
+static boolean_t
+build_alt_debug(file_info_t *fptr, const char *path, uint32_t crc)
+{
+	int fd;
+	struct stat st;
+	Elf *elf;
+	Elf_Scn *scn;
+	GElf_Shdr symshdr, strshdr;
+	Elf_Data *symdata, *strdata;
+	uint32_t c = -1U;
+
+	if ((fd = open(path, O_RDONLY)) < 0)
+		return (B_FALSE);
+
+	if (fstat(fd, &st) != 0) {
+		(void) close(fd);
+		return (B_FALSE);
+	}
+
+	if (S_ISREG(st.st_mode) == 0) {
+		(void) close(fd);
+		return (B_FALSE);
+	}
+
+	for (;;) {
+		char buf[4096];
+		ssize_t ret = read(fd, buf, sizeof (buf));
+		if (ret == -1) {
+			if (ret == EINTR)
+				continue;
+			(void) close(fd);
+			return (B_FALSE);
+		}
+		if (ret == 0) {
+			c = ~c;
+			if (c != crc) {
+				dprintf("crc mismatch, found: 0x%x "
+				    "expected 0x%x\n", c, crc);
+				(void) close(fd);
+				return (B_FALSE);
+			}
+			break;
+		}
+		CRC32(c, buf, ret, c, psym_crc32);
+	}
+
+	elf = elf_begin(fd, ELF_C_READ, NULL);
+	if (elf == NULL) {
+		(void) close(fd);
+		return (B_FALSE);
+	}
+
+	if (elf_kind(elf) != ELF_K_ELF) {
+		goto fail;
+	}
+
+	/*
+	 * Do two passes, first see if we have a symbol header, then see if we
+	 * can find the corresponding linked string table.
+	 */
+	scn = NULL;
+	for (scn = elf_nextscn(elf, scn); scn != NULL;
+	    scn = elf_nextscn(elf, scn)) {
+
+		if (gelf_getshdr(scn, &symshdr) == NULL)
+			goto fail;
+
+		if (symshdr.sh_type != SHT_SYMTAB)
+			continue;
+
+		if ((symdata = elf_getdata(scn, NULL)) == NULL)
+			goto fail;
+
+		break;
+	}
+	if (scn == NULL)
+		goto fail;
+
+	if ((scn = elf_getscn(elf, symshdr.sh_link)) == NULL)
+		goto fail;
+
+	if (gelf_getshdr(scn, &strshdr) == NULL)
+		goto fail;
+
+	if ((strdata = elf_getdata(scn, NULL)) == NULL)
+		goto fail;
+
+	fptr->file_symtab.sym_data_pri = symdata;
+	fptr->file_symtab.sym_symn += symshdr.sh_size / symshdr.sh_entsize;
+	fptr->file_symtab.sym_strs = strdata->d_buf;
+	fptr->file_symtab.sym_strsz = strdata->d_size;
+	fptr->file_symtab.sym_hdr_pri = symshdr;
+	fptr->file_symtab.sym_strhdr = strshdr;
+
+	dprintf("successfully loaded additional debug symbols for %s from %s\n",
+	    fptr->file_rname, path);
+
+	fptr->file_dbgfile = fd;
+	fptr->file_dbgelf = elf;
+	return (B_TRUE);
+fail:
+	(void) elf_end(elf);
+	(void) close(fd);
+	return (B_FALSE);
+}
+
+/*
+ * We're here because the object in question has no symbol information, that's a
+ * bit unfortunate. However, we've found that there's a .gnu_debuglink sitting
+ * around. By convention that means that given the current location of the
+ * object on disk, and the debug name that we found in the binary we need to
+ * search the following locations for a matching file.
+ *
+ * <dirname>/.debug/<debug-name>
+ * /usr/lib/debug/<dirname>/<debug-name>
+ *
+ * In the future, we should consider supporting looking in the prefix's
+ * lib/debug directory for a matching object.
+ */
+static void
+find_alt_debug(file_info_t *fptr, const char *name, uint32_t crc)
+{
+	boolean_t r;
+	char *dup = NULL, *path = NULL, *dname;
+
+	dprintf("find_alt_debug: looking for %s, crc 0x%x\n", name, crc);
+	if (fptr->file_rname == NULL) {
+		dprintf("find_alt_debug: encountered null file_rname\n");
+		return;
+	}
+
+	dup = strdup(fptr->file_rname);
+	if (dup == NULL)
+		return;
+
+	dname = dirname(dup);
+	if (asprintf(&path, "%s/.debug/%s", dname, name) != -1) {
+		dprintf("attempting to load alternate debug information "
+		    "from %s\n", path);
+		r = build_alt_debug(fptr, path, crc);
+		free(path);
+		if (r == B_TRUE)
+			goto out;
+	}
+
+	if (asprintf(&path, "/usr/lib/debug/%s/%s", dname, name) != -1) {
+		dprintf("attempting to load alternate debug information "
+		    "from %s\n", path);
+		r = build_alt_debug(fptr, path, crc);
+		free(path);
+		if (r == B_TRUE)
+			goto out;
+	}
+out:
+	free(dup);
+}
+
+/*
  * Build the symbol table for the given mapped file.
  */
 void
@@ -1587,7 +1758,8 @@ Pbuild_file_symtab(struct ps_prochandle *P, file_info_t *fptr)
 		GElf_Shdr c_shdr;
 		Elf_Data *c_data;
 		const char *c_name;
-	} *cp, *cache = NULL, *dyn = NULL, *plt = NULL, *ctf = NULL;
+	} *cp, *cache = NULL, *dyn = NULL, *plt = NULL, *ctf = NULL,
+	*dbglink = NULL;
 
 	if (fptr->file_init)
 		return;	/* We've already processed this file */
@@ -1813,7 +1985,67 @@ Pbuild_file_symtab(struct ps_prochandle *P, file_info_t *fptr)
 				continue;
 			}
 			ctf = cp;
+		} else if (strcmp(cp->c_name, ".gnu_debuglink") == 0) {
+			dprintf("found .gnu_debuglink section for %s\n",
+			    fptr->file_rname);
+			/*
+			 * Let's make sure of a few things before we do this.
+			 */
+			if (cp->c_shdr.sh_type == SHT_PROGBITS &&
+			    cp->c_data->d_buf != NULL) {
+				dprintf(".gnu_debuglink pases initial "
+				    "sanity\n");
+				dbglink = cp;
+			}
 		}
+	}
+
+	/*
+	 * If we haven't found any symbol table information and we have found a
+	 * .gnu_debuglink, it's time to try and figure out where we might find
+	 * this. To do so, we're going to first verify that the elf data seems
+	 * somewhat sane, eg. the elf data should be a string, so we want to
+	 * verify we have a null-terminator.
+	 */
+	if (fptr->file_symtab.sym_data_pri == NULL && dbglink != NULL) {
+		char *c = dbglink->c_data->d_buf;
+		size_t i;
+		boolean_t found = B_FALSE;
+		Elf_Data *ed = dbglink->c_data;
+		uint32_t crc;
+
+		for (i = 0; i < ed->d_size; i++) {
+			if (c[i] == '\0') {
+				uintptr_t off;
+				dprintf("got .gnu_debuglink terminator at "
+				    "offset %lu\n", (unsigned long)i);
+				/*
+				 * After the null terminator, there should be
+				 * padding, followed by a 4 byte CRC of the
+				 * file. If we don't see this, we're going to
+				 * assume this is bogus.
+				 */
+				if ((i % sizeof (uint32_t)) == 0)
+					i += 4;
+				else
+					i += i % sizeof (uint32_t);
+				if (i + sizeof (uint32_t) ==
+				    dbglink->c_data->d_size) {
+					found = B_TRUE;
+					off = (uintptr_t)ed->d_buf + i;
+					crc = *(uint32_t *)off;
+				} else {
+					dprintf(".gnu_debuglink size mismatch, "
+					    "expected: %lu, found: %lu\n",
+					    (unsigned long)i,
+					    (unsigned long)ed->d_size);
+				}
+				break;
+			}
+		}
+
+		if (found == B_TRUE)
+			find_alt_debug(fptr, dbglink->c_data->d_buf, crc);
 	}
 
 	/*
@@ -1943,7 +2175,13 @@ bad:
 		fptr->file_elfmem = NULL;
 	}
 	(void) close(fptr->file_fd);
+	if (fptr->file_dbgelf != NULL)
+		(void) elf_end(fptr->file_dbgelf);
+	fptr->file_dbgelf = NULL;
+	if (fptr->file_dbgfile >= 0)
+		(void) close(fptr->file_dbgfile);
 	fptr->file_fd = -1;
+	fptr->file_dbgfile = -1;
 }
 
 /*
