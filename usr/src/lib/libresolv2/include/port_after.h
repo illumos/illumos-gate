@@ -46,7 +46,6 @@
 #undef NEED_PSELECT
 #undef HAVE_SA_LEN
 #undef HAVE_MINIMUM_IFREQ
-#define NEED_DAEMON 1
 #undef NEED_STRSEP
 #undef NEED_STRERROR
 #ifdef NEED_STRERROR
@@ -290,10 +289,6 @@ extern const struct in6_addr isc_in6addr_loopback;
 
 #ifndef MAX
 #define MAX(x,y) (((x) >= (y)) ? (x) : (y))
-#endif
-
-#ifdef NEED_DAEMON
-int daemon(int nochdir, int noclose);
 #endif
 
 #ifdef NEED_STRSEP
