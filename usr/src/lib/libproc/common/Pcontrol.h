@@ -24,7 +24,7 @@
  */
 /*
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
- * Copyright (c) 2014, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2015, Joyent, Inc. All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
  */
 
@@ -96,6 +96,7 @@ typedef struct file_info {	/* symbol information for a mapped file */
 	struct map_info *file_map;	/* primary (text) mapping */
 	int	file_ref;	/* references from map_info_t structures */
 	int	file_fd;	/* file descriptor for the mapped file */
+	int	file_dbgfile;	/* file descriptor for the debug file */
 	int	file_init;	/* 0: initialization yet to be performed */
 	GElf_Half file_etype;	/* ELF e_type from ehdr */
 	GElf_Half file_class;	/* ELF e_ident[EI_CLASS] from ehdr */
@@ -105,6 +106,7 @@ typedef struct file_info {	/* symbol information for a mapped file */
 	char	*file_rname;	/* resolved on-disk object pathname */
 	char	*file_rbase;	/* pointer to basename of file_rname */
 	Elf	*file_elf;	/* ELF handle so we can close */
+	Elf	*file_dbgelf;	/* Debug ELF handle so we can close */
 	void	*file_elfmem;	/* data for faked-up ELF handle */
 	sym_tbl_t file_symtab;	/* symbol table */
 	sym_tbl_t file_dynsym;	/* dynamic symbol table */
