@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2014, Joyent Inc. All rights reserved.
+ * Copyright 2015, Joyent Inc. All rights reserved.
  */
 
 /*
@@ -162,6 +162,19 @@ static m_label_t *zid_label = NULL;
 static priv_set_t *zprivs = NULL;
 
 static const char *DFLT_FS_ALLOWED = "hsfs,smbfs,nfs,nfs3,nfs4,nfsdyn";
+
+typedef struct zone_proj_rctl_map {
+	char *zpr_zone_rctl;
+	char *zpr_project_rctl;
+} zone_proj_rctl_map_t;
+
+static zone_proj_rctl_map_t zone_proj_rctl_map[] = {
+	{"zone.max-msg-ids",	"project.max-msg-ids"},
+	{"zone.max-sem-ids",	"project.max-sem-ids"},
+	{"zone.max-shm-ids",	"project.max-shm-ids"},
+	{"zone.max-shm-memory",	"project.max-shm-memory"},
+	{NULL,			NULL}
+};
 
 /* from libsocket, not in any header file */
 extern int getnetmaskbyaddr(struct in_addr, struct in_addr *);
@@ -3245,6 +3258,19 @@ get_privset(zlog_t *zlogp, priv_set_t *privs, zone_mnt_t mount_cmd)
 	return (error);
 }
 
+static char *
+zone_proj_rctl(const char *name)
+{
+	int i;
+
+	for (i = 0; zone_proj_rctl_map[i].zpr_zone_rctl != NULL; i++) {
+		if (strcmp(name, zone_proj_rctl_map[i].zpr_zone_rctl) == 0) {
+			return (zone_proj_rctl_map[i].zpr_project_rctl);
+		}
+	}
+	return (NULL);
+}
+
 static int
 get_rctls(zlog_t *zlogp, char **bufp, size_t *bufsizep)
 {
@@ -3298,6 +3324,7 @@ get_rctls(zlog_t *zlogp, char **bufp, size_t *bufsizep)
 		struct zone_rctlvaltab *rctlval;
 		uint_t i, count;
 		const char *name = rctltab.zone_rctl_name;
+		char *proj_nm;
 
 		/* zoneadm should have already warned about unknown rctls. */
 		if (!zonecfg_is_rctl(name)) {
@@ -3364,6 +3391,26 @@ get_rctls(zlog_t *zlogp, char **bufp, size_t *bufsizep)
 		}
 		zonecfg_free_rctl_value_list(rctltab.zone_rctl_valptr);
 		rctltab.zone_rctl_valptr = NULL;
+
+		/*
+		 * With no action on our part we will start zsched with the
+		 * project rctl values for our (zoneadmd) current project. For
+		 * brands running a variant of Illumos, that's not a problem
+		 * since they will setup their own projects, but for a
+		 * non-native brand like lx, where there are no projects, we
+		 * want to start things up with the same project rctls as the
+		 * corresponding zone rctls, since nothing within the zone will
+		 * ever change the project rctls.
+		 */
+		if ((proj_nm = zone_proj_rctl(name)) != NULL) {
+			if (nvlist_add_nvlist_array(nvl, proj_nm, nvlv, count)
+			    != 0) {
+				zerror(zlogp, B_FALSE,
+				    "nvlist_add_nvlist_arrays failed");
+				goto out;
+			}
+		}
+
 		if (nvlist_add_nvlist_array(nvl, (char *)name, nvlv, count)
 		    != 0) {
 			zerror(zlogp, B_FALSE, "%s failed",

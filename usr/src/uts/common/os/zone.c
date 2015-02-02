@@ -4669,8 +4669,9 @@ parse_rctls(caddr_t ubuf, size_t buflen, nvlist_t **nvlp)
 
 		error = EINVAL;
 		name = nvpair_name(nvp);
-		if (strncmp(nvpair_name(nvp), "zone.", sizeof ("zone.") - 1)
-		    != 0 || nvpair_type(nvp) != DATA_TYPE_NVLIST_ARRAY) {
+		if ((strncmp(name, "zone.", sizeof ("zone.") - 1) != 0 &&
+		    strncmp(name, "project.", sizeof ("project.") - 1) != 0) ||
+		    nvpair_type(nvp) != DATA_TYPE_NVLIST_ARRAY) {
 			goto out;
 		}
 		if ((hndl = rctl_hndl_lookup(name)) == -1) {
@@ -5045,8 +5046,8 @@ zone_create(const char *zone_name, const char *zone_root,
 	/*
 	 * The process, task, and project rctls are probably wrong;
 	 * we need an interface to get the default values of all rctls,
-	 * and initialize zsched appropriately.  I'm not sure that that
-	 * makes much of a difference, though.
+	 * and initialize zsched appropriately. However, we allow zoneadmd
+	 * to pass down both zone and project rctls for the zone's init.
 	 */
 	error = newproc(zsched, (void *)&zarg, syscid, minclsyspri, NULL, 0);
 	if (error != 0) {
