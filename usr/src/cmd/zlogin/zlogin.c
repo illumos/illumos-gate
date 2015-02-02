@@ -1821,6 +1821,35 @@ get_username()
 	return (nptr->pw_name);
 }
 
+static boolean_t
+zlog_mode_logging(char *zonename)
+{
+	boolean_t lm = B_FALSE;
+	zone_dochandle_t handle;
+	struct zone_attrtab attr;
+
+	if ((handle = zonecfg_init_handle()) == NULL)
+		return (lm);
+
+	if (zonecfg_get_handle(zonename, handle) != Z_OK)
+		goto done;
+
+	if (zonecfg_setattrent(handle) != Z_OK)
+		goto done;
+	while (zonecfg_getattrent(handle, &attr) == Z_OK) {
+		if (strcmp("zlog-mode", attr.zone_attr_name) == 0) {
+			if (strncmp("log", attr.zone_attr_value, 3) == 0)
+				lm = B_TRUE;
+			break;
+		}
+	}
+	(void) zonecfg_endattrent(handle);
+
+done:
+	zonecfg_fini_handle(handle);
+	return (lm);
+}
+
 int
 main(int argc, char **argv)
 {
@@ -2056,6 +2085,10 @@ main(int argc, char **argv)
 	 */
 	if (console) {
 		int gz_stderr_fd = -1;
+		boolean_t set_raw = B_TRUE;
+
+		if (imode && zlog_mode_logging(zonename))
+			set_raw = B_FALSE;
 
 		/*
 		 * Ensure that zoneadmd for this zone is running.
@@ -2082,7 +2115,7 @@ main(int argc, char **argv)
 				    "console]\n"), zonename);
 		}
 
-		if (set_tty_rawmode(STDIN_FILENO) == -1) {
+		if (set_raw && set_tty_rawmode(STDIN_FILENO) == -1) {
 			reset_tty();
 			zperror(gettext("failed to set stdin pty to raw mode"));
 			return (1);
