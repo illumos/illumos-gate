@@ -789,6 +789,19 @@ lx_sigprocmask_common(uintptr_t how, uintptr_t l_setp, uintptr_t l_osetp,
 
 		if (err != 0)
 			return (err);
+
+#if defined(_LP64)
+		/*
+		 * To assure that vsyscall operates correctly, we must never
+		 * block SIGSEGV.  (Fortunately, SIGSEGV is a synchronous
+		 * signal for which the default disposition is to nuke the
+		 * process -- it would be hard for a correctly-written program
+		 * to rely upon its ability to block SIGSEGV.)
+		 */
+		if (how == SIG_BLOCK || how == SIG_SETMASK)
+			sigdelset(s_setp, SIGSEGV);
+#endif
+
 	}
 
 	s_osetp = (l_osetp ? &oset : NULL);
@@ -1510,6 +1523,13 @@ lx_vsyscall_return(long ret, ucontext_t *ucp)
 	    &ucp->uc_mcontext.gregs[REG_RIP], sizeof (void*));
 	lx_debug("\tvsyscall return to %p", ucp->uc_mcontext.gregs[REG_RIP]);
 	ucp->uc_mcontext.gregs[REG_RSP] += sizeof (void*);
+
+	/*
+	 * Make sure that libc's ul_sigmask reflects what the sigmask is about
+	 * to become.
+	 */
+	thr_sigsetmask(SIG_SETMASK, &ucp->uc_sigmask, NULL);
+
 	(void) syscall(SYS_brand, B_SIGNAL_RETURN, ucp);
 }
 #endif
@@ -1801,6 +1821,15 @@ lx_sigaction_common(int lx_sig, struct lx_sigaction *lxsp,
 					    NULL);
 					return (-err);
 				}
+
+#if defined(_LP64)
+				/*
+				 * To assure that vsyscall can operate properly
+				 * from within signal handlers, we (implicitly)
+				 * disallow blocking SEGV in any signal handler.
+				 */
+				sigdelset(&sa.sa_mask, SIGSEGV);
+#endif
 
 				lx_debug("interposing handler @ 0x%p for "
 				    "signal %d (lx %d), flags 0x%x",
@@ -2236,7 +2265,7 @@ lx_ppoll(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4, uintptr_t p5)
 		sfds[i].revents = 0;
 	}
 
-	if ((rval = ppoll(sfds, nfds, tsp, sp) < 0))
+	if ((rval = ppoll(sfds, nfds, tsp, sp)) < 0)
 		return (-errno);
 
 	/* Convert the Illumos revents bitmask into the Linux equivalent */
