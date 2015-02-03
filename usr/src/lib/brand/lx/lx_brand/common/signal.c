@@ -1625,9 +1625,8 @@ lx_call_user_handler(int sig, siginfo_t *sip, void *p)
 		 * 64bit for vsyscall emulation, there are certain cases
 		 * where a SIGSEGV is ignored or forces an exit.
 		 */
-		if (lxsap->lxsa_handler == SIG_IGN) {
-			return;
-		} else if (lxsap->lxsa_handler == SIG_DFL ||
+		if (lxsap->lxsa_handler == SIG_DFL ||
+		    lxsap->lxsa_handler == SIG_IGN ||
 		    ((lxsap->lxsa_flags & LX_SA_NODEFER) == 0 &&
 		    lx_sigsegv_depth > 0)) {
 			(void) syscall(SYS_brand, B_EXIT_AS_SIG, SIGSEGV);
@@ -1845,6 +1844,16 @@ lx_sigaction_common(int lx_sig, struct lx_sigaction *lxsp,
 					    NULL);
 					return (-err);
 				}
+#if defined(_LP64)
+			} else if (sig == SIGSEGV) {
+				/*
+				 * If user code attempts to set SIGSEGV to
+				 * SIG_IGN or SIG_DFL, the interposing handler
+				 * is still required to handle vsyscalls.
+				 */
+				lx_debug("interposing handler maintained "
+				    "for SIGSEGV");
+#endif
 			} else if ((sig != SIGPWR) ||
 			    ((sig == SIGPWR) &&
 			    (lxsa.lxsa_handler == SIG_IGN))) {
