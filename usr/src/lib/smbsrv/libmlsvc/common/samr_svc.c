@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -1618,18 +1618,22 @@ samr_s_QueryAliasInfo(void *arg, ndr_xa_t *mxa)
 	}
 
 	switch (param->level) {
-	case SAMR_QUERY_ALIAS_INFO_1:
+	case SAMR_QUERY_ALIAS_INFO_GENERAL:
 		param->ru.info1.level = param->level;
 		(void) NDR_MSTRING(mxa, name,
 		    (ndr_mstring_t *)&param->ru.info1.name);
-
 		(void) NDR_MSTRING(mxa, desc,
 		    (ndr_mstring_t *)&param->ru.info1.desc);
-
-		param->ru.info1.unknown = 1;
+		param->ru.info1.member_count = 1;
 		break;
 
-	case SAMR_QUERY_ALIAS_INFO_3:
+	case SAMR_QUERY_ALIAS_INFO_NAME:
+		param->ru.info2.level = param->level;
+		(void) NDR_MSTRING(mxa, name,
+		    (ndr_mstring_t *)&param->ru.info2.name);
+		break;
+
+	case SAMR_QUERY_ALIAS_INFO_COMMENT:
 		param->ru.info3.level = param->level;
 		(void) NDR_MSTRING(mxa, desc,
 		    (ndr_mstring_t *)&param->ru.info3.desc);
@@ -1902,11 +1906,18 @@ fixup_samr_QueryAliasInfo(struct samr_QueryAliasInfo *val)
 	unsigned short size3 = 0;
 
 	switch (val->level) {
-		CASE_INFO_ENT(samr_QueryAliasInfo, 1);
-		CASE_INFO_ENT(samr_QueryAliasInfo, 3);
+	case SAMR_QUERY_ALIAS_INFO_GENERAL:
+		size1 = sizeof (struct samr_QueryAliasInfoGeneral);
+		break;
+	case SAMR_QUERY_ALIAS_INFO_NAME:
+		size1 = sizeof (struct samr_QueryAliasInfoName);
+		break;
+	case SAMR_QUERY_ALIAS_INFO_COMMENT:
+		size1 = sizeof (struct samr_QueryAliasInfoComment);
+		break;
 
-		default:
-			return;
+	default:
+		return;
 	};
 
 	size2 = size1 + (2 * sizeof (DWORD));
