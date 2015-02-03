@@ -19,18 +19,12 @@
 # CDDL HEADER END
 #
 # Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2014, Joyent, Inc. All rights reserved.
 #
 # cmd/fs.d/nfs/mount/Makefile
 
 FSTYPE=		nfs
 LIBPROG=	mount
-ROOTFS_PROG=	$(LIBPROG)
-
-# duplicate ROOTLIBFSTYPE value needed for installation rule
-# we must define this before including Makefile.fstype
-ROOTLIBFSTYPE = $(ROOT)/usr/lib/fs/$(FSTYPE)
-$(ROOTLIBFSTYPE)/%:	$(ROOTLIBFSTYPE) %
-	$(RM) $@; $(SYMLINK) ../../../../etc/fs/$(FSTYPE)/$(LIBPROG) $@
 
 include		../../Makefile.fstype
 
@@ -65,7 +59,7 @@ CLOBBERFILES	+= $(LIBPROG)
 
 .KEEP_STATE:
 
-all:	$(ROOTFS_PROG)
+all:	$(LIBPROG)
 
 $(LIBPROG):	webnfs.h $(OBJS)
 		$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
@@ -114,7 +108,9 @@ $(POFILE): $(SRCS)
 	sed "/^domain/d"        messages.po     > $@
 	$(RM) $(POFILE).i messages.po
 
-install:	$(ROOTETCPROG)
+install: all $(FSTYPEPROG)
+	$(RM) $(ROOTETCPROG)
+	$(SYMLINK) ../../../usr/lib/fs/$(FSTYPE)/$(LIBPROG) $(ROOTETCPROG)
 
 lint:	webnfs.h webnfs_xdr.c webnfs_client.c lint_SRCS
 

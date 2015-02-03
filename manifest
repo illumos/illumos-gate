@@ -310,7 +310,7 @@ f etc/fs/dev/mount 0555 root bin
 d etc/fs/hsfs 0755 root sys
 f etc/fs/hsfs/mount 0555 root bin
 d etc/fs/nfs 0755 root sys
-f etc/fs/nfs/mount 0555 root bin
+s etc/fs/nfs/mount=../../../usr/lib/fs/nfs/mount
 d etc/fs/ufs 0755 root sys
 f etc/fs/ufs/mount 0555 root bin
 d etc/fs/zfs 0755 root sys
@@ -5407,7 +5407,7 @@ f usr/lib/fs/nfs/dfmounts 0555 root bin
 h usr/lib/fs/nfs/dfshares=usr/lib/fs/nfs/dfmounts
 f usr/lib/fs/nfs/libshare_nfs.so.1 0755 root sys
 s usr/lib/fs/nfs/libshare_nfs.so=libshare_nfs.so.1
-s usr/lib/fs/nfs/mount=../../../../etc/fs/nfs/mount
+f usr/lib/fs/nfs/mount 0555 root bin
 f usr/lib/fs/nfs/nfsfind 0555 root sys
 f usr/lib/fs/nfs/showmount 0555 root bin
 f usr/lib/fs/nfs/umount 0555 root bin
