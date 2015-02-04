@@ -21,13 +21,12 @@
 
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
-# Copyright 2014 Joyent, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright 2015 Joyent, Inc.  All rights reserved.
 #
 
 PROGS =	lx_install lx_distro_install lx_init_zone lx_boot
 PROGS += lx_init_zone_debian lx_init_zone_redhat lx_init_zone_ubuntu
-PROGS += lx_networking lx_boot_zone_ubuntu
+PROGS += lx_networking lx_boot_zone_redhat lx_boot_zone_ubuntu
 SUBDIRS = distros
 XMLDOCS =	config.xml platform.xml
 TEMPLATES =	SUNWlx.xml SUNWlx26.xml
