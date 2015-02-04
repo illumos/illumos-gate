@@ -29,6 +29,7 @@
 #include <strings.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <setjmp.h>
 #include <sys/types.h>
 #include <sys/signal.h>
@@ -618,6 +619,10 @@ cap_open_read(const char *name)
 
 	if (fstat(capfile_in, &st) < 0)
 		pr_err("couldn't stat %s: %m", name);
+	if (st.st_size > INT_MAX)
+		pr_err("input file size (%llu bytes) exceeds maximum "
+		    "supported size (%d bytes)",
+		    (unsigned long long)st.st_size, INT_MAX);
 	cap_len = st.st_size;
 
 	cap_buffp = mmap(0, cap_len, PROT_READ, MAP_PRIVATE, capfile_in, 0);
