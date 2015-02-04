@@ -18,10 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -869,7 +870,7 @@ static nfsstat4
 do_rfs4_op_secinfo(struct compound_state *cs, char *nm, SECINFO4res *resp)
 {
 	int error, different_export = 0;
-	vnode_t *dvp, *vp, *tvp;
+	vnode_t *dvp, *vp;
 	struct exportinfo *exi = NULL;
 	fid_t fid;
 	uint_t count, i;
@@ -950,14 +951,12 @@ do_rfs4_op_secinfo(struct compound_state *cs, char *nm, SECINFO4res *resp)
 	 * If it's a mountpoint, then traverse it.
 	 */
 	if (vn_ismntpt(vp)) {
-		tvp = vp;
-		if ((error = traverse(&tvp)) != 0) {
+		if ((error = traverse(&vp)) != 0) {
 			VN_RELE(vp);
 			return (puterrno4(error));
 		}
 		/* remember that we had to traverse mountpoint */
 		did_traverse = TRUE;
-		vp = tvp;
 		different_export = 1;
 	} else if (vp->v_vfsp != dvp->v_vfsp) {
 		/*
@@ -2610,7 +2609,7 @@ do_rfs4_op_lookup(char *nm, struct svc_req *req, struct compound_state *cs)
 {
 	int error;
 	int different_export = 0;
-	vnode_t *vp, *tvp, *pre_tvp = NULL, *oldvp = NULL;
+	vnode_t *vp, *pre_tvp = NULL, *oldvp = NULL;
 	struct exportinfo *exi = NULL, *pre_exi = NULL;
 	nfsstat4 stat;
 	fid_t fid;
@@ -2708,13 +2707,11 @@ do_rfs4_op_lookup(char *nm, struct svc_req *req, struct compound_state *cs)
 		 * need pre_tvp below if checkexport4 fails
 		 */
 		VN_HOLD(pre_tvp);
-		tvp = vp;
-		if ((error = traverse(&tvp)) != 0) {
+		if ((error = traverse(&vp)) != 0) {
 			VN_RELE(vp);
 			VN_RELE(pre_tvp);
 			return (puterrno4(error));
 		}
-		vp = tvp;
 		different_export = 1;
 	} else if (vp->v_vfsp != cs->vp->v_vfsp) {
 		/*

@@ -20,6 +20,7 @@
  */
 
 /*
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -217,7 +218,6 @@ lookuppnvp(
 	cred_t *cr)			/* user's credential */
 {
 	vnode_t *cvp;	/* current component vp */
-	vnode_t *tvp;	/* addressable temp ptr */
 	char component[MAXNAMELEN];	/* buffer for component (incl null) */
 	int error;
 	int nlink;
@@ -373,7 +373,7 @@ checkforroot:
 	/*
 	 * Perform a lookup in the current directory.
 	 */
-	error = VOP_LOOKUP(vp, component, &tvp, pnp, lookup_flags,
+	error = VOP_LOOKUP(vp, component, &cvp, pnp, lookup_flags,
 	    rootvp, cr, NULL, NULL, pp);
 
 	/*
@@ -391,10 +391,9 @@ checkforroot:
 	 *			directory inside NFS FS.
 	 */
 	if ((error == EACCES) && retry_with_kcred)
-		error = VOP_LOOKUP(vp, component, &tvp, pnp, lookup_flags,
+		error = VOP_LOOKUP(vp, component, &cvp, pnp, lookup_flags,
 		    rootvp, zone_kcred(), NULL, NULL, pp);
 
-	cvp = tvp;
 	if (error) {
 		cvp = NULL;
 		/*
@@ -440,20 +439,8 @@ checkforroot:
 	 *	be atomic!)
 	 */
 	if (vn_mountedvfs(cvp) != NULL) {
-		tvp = cvp;
-		if ((error = traverse(&tvp)) != 0) {
-			/*
-			 * It is required to assign cvp here, because
-			 * traverse() will return a held vnode which
-			 * may different than the vnode that was passed
-			 * in (even in the error case).  If traverse()
-			 * changes the vnode it releases the original,
-			 * and holds the new one.
-			 */
-			cvp = tvp;
+		if ((error = traverse(&cvp)) != 0)
 			goto bad;
-		}
-		cvp = tvp;
 	}
 
 	/*
