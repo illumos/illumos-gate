@@ -2138,8 +2138,8 @@ lxpr_format_tcp(lxpr_uiobuf_t *uiobuf, ushort_t ipver)
 		    ipcl_get_next_conn(connfp, connp, IPCL_TCPCONN)) != NULL) {
 			tcp_t *tcp;
 			vattr_t attr;
-			vnode_t *vp = ((struct sonode *)
-			    connp->conn_upper_handle)->so_vnode;
+			sonode_t *so = (sonode_t *)connp->conn_upper_handle;
+			vnode_t *vp = (so != NULL) ? so->so_vnode : NULL;
 			if (connp->conn_ipversion != ipver)
 				continue;
 			tcp = connp->conn_tcp;
@@ -2257,8 +2257,8 @@ lxpr_format_udp(lxpr_uiobuf_t *uiobuf, ushort_t ipver)
 			udp_t *udp;
 			int state = 0;
 			vattr_t attr;
-			vnode_t *vp = ((struct sonode *)
-			    connp->conn_upper_handle)->so_vnode;
+			sonode_t *so = (sonode_t *)connp->conn_upper_handle;
+			vnode_t *vp = (so != NULL) ? so->so_vnode : NULL;
 			if (connp->conn_ipversion != ipver)
 				continue;
 			udp = connp->conn_udp;
