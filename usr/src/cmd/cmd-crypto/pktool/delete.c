@@ -736,7 +736,7 @@ pk_delete(int argc, char *argv[])
 	int		rv = 0;
 	char			*find_criteria = NULL;
 	KMF_CERT_VALIDITY	find_criteria_flag = KMF_ALL_CERTS;
-	KMF_CREDENTIAL	tokencred = {NULL, 0};
+	KMF_CREDENTIAL	tokencred = { NULL, 0 };
 
 	/* Parse command line options.  Do NOT i18n/l10n. */
 	while ((opt = getopt_av(argc, argv,

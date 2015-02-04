@@ -1656,7 +1656,7 @@ KMF_RETURN
 kmf_get_cert_id_str(const KMF_DATA *SignedCert,	char **idstr)
 {
 	KMF_RETURN ret;
-	KMF_DATA ID = {NULL, 0};
+	KMF_DATA ID = { 0, NULL };
 	char tmpstr[256];
 	int i;
 
@@ -1759,7 +1759,7 @@ kmf_set_cert_pubkey(KMF_HANDLE_T handle,
 	KMF_RETURN ret = KMF_OK;
 	KMF_X509_SPKI *spki_ptr;
 	KMF_PLUGIN *plugin;
-	KMF_DATA KeyData = {NULL, 0};
+	KMF_DATA KeyData = { 0, NULL };
 
 	CLEAR_ERROR(handle, ret);
 	if (ret != KMF_OK)

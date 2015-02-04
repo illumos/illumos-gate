@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
@@ -378,7 +376,7 @@ pk_genkey(int argc, char *argv[])
 	KMF_HANDLE_T kmfhandle = NULL;
 	KMF_KEY_ALG keyAlg = KMF_GENERIC_SECRET;
 	boolean_t print_hex = B_FALSE;
-	KMF_CREDENTIAL tokencred = {NULL, 0};
+	KMF_CREDENTIAL tokencred = { NULL, 0 };
 
 	while ((opt = getopt_av(argc, argv,
 	    "k:(keystore)l:(label)T:(token)d:(dir)p:(prefix)"
