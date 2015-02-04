@@ -983,7 +983,7 @@ lxpr_read_pid_maps(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 
 		int maj = 0;
 		int min = 0;
-		u_longlong_t inode = 0;
+		ino_t inode = 0;
 
 		*buf = '\0';
 		if (pbuf->vp != NULL) {
@@ -1000,12 +1000,12 @@ lxpr_read_pid_maps(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 
 		if (p->p_model == DATAMODEL_LP64) {
 			lxpr_uiobuf_printf(uiobuf,
-			    "%016llx-%16llx %s %016llx %02d:%03d %lld%s%s\n",
+			    "%08llx-%08llx %s %08llx %02x:%02x %llu%s%s\n",
 			    pbuf->saddr, pbuf->eaddr, pbuf->prot, pbuf->offset,
 			    maj, min, inode, *buf != '\0' ? " " : "", buf);
 		} else {
 			lxpr_uiobuf_printf(uiobuf,
-			    "%08x-%08x %s %08x %02d:%03d %lld%s%s\n",
+			    "%08x-%08x %s %08x %02x:%02x %llu%s%s\n",
 			    (uint32_t)pbuf->saddr, (uint32_t)pbuf->eaddr,
 			    pbuf->prot, (uint32_t)pbuf->offset, maj, min,
 			    inode, *buf != '\0' ? " " : "", buf);
