@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2013 Gary Mills
  * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2014, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2015, Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -250,7 +250,7 @@ log_init(void)
 	 */
 	printf("\rSunOS Release %s Version %s %u-bit\n",
 	    utsname.release, utsname.version, NBBY * (uint_t)sizeof (void *));
-	printf("Copyright (c) 2010-2014, Joyent Inc. All rights reserved.\n");
+	printf("Copyright (c) 2010-2015, Joyent Inc. All rights reserved.\n");
 #ifdef DEBUG
 	printf("DEBUG enabled\n");
 #endif
