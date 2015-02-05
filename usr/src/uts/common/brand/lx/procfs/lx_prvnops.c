@@ -80,6 +80,7 @@
 #include <inet/udp_impl.h>
 #include <inet/ipclassifier.h>
 #include <sys/socketvar.h>
+#include <fs/sockfs/socktpi.h>
 
 /* Dependent on procfs */
 extern kthread_t *prchoose(proc_t *);
@@ -2336,6 +2337,95 @@ lxpr_read_net_udp6(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 static void
 lxpr_read_net_unix(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
+	sonode_t *so;
+	zoneid_t zoneid = getzoneid();
+
+	lxpr_uiobuf_printf(uiobuf, "Num       RefCount Protocol Flags    Type "
+	    "St Inode Path\n");
+
+	mutex_enter(&socklist.sl_lock);
+	for (so = socklist.sl_list; so != NULL;
+	    so = _SOTOTPI(so)->sti_next_so) {
+		vnode_t *vp = so->so_vnode;
+		vattr_t attr;
+		sotpi_info_t *sti;
+		const char *name = NULL;
+		int status = 0;
+		int type = 0;
+		int flags = 0;
+
+		/* Only process active sonodes in this zone */
+		if (so->so_count == 0 || so->so_zoneid != zoneid)
+			continue;
+
+		/*
+		 * Grab the inode, if possible.
+		 * This must be done before entering so_lock.
+		 */
+		if (vp == NULL ||
+		    VOP_GETATTR(vp, &attr, 0, CRED(), NULL) != 0)
+			attr.va_nodeid = 0;
+
+		mutex_enter(&so->so_lock);
+		sti = _SOTOTPI(so);
+
+		if (sti->sti_laddr_sa != NULL)
+			name = sti->sti_laddr_sa->sa_data;
+		else if (sti->sti_faddr_sa != NULL)
+			name = sti->sti_faddr_sa->sa_data;
+
+		/*
+		 * Derived from enum values in Linux kernel source:
+		 * include/uapi/linux/net.h
+		 */
+		if ((so->so_state & SS_ISDISCONNECTING) != 0) {
+			status = 4;
+		} else if ((so->so_state & SS_ISCONNECTING) != 0) {
+			status = 2;
+		} else if ((so->so_state & SS_ISCONNECTED) != 0) {
+			status = 3;
+		} else {
+			status = 1;
+			/* Add ACC flag for stream-type server sockets */
+			if (so->so_type != SOCK_DGRAM &&
+			    sti->sti_laddr_sa != NULL)
+				flags |= 0x10000;
+		}
+
+		/* Convert to Linux type */
+		switch (so->so_type) {
+		case SOCK_DGRAM:
+			type = 2;
+			break;
+		case SOCK_SEQPACKET:
+			type = 5;
+			break;
+		default:
+			type = 1;
+		}
+
+		lxpr_uiobuf_printf(uiobuf, "%p: %08X %08X %08X %04X %02X %5llu",
+		    so,
+		    so->so_count,
+		    0, /* proto, always 0 */
+		    flags,
+		    type,
+		    status,
+		    (ino_t)attr.va_nodeid);
+
+		/*
+		 * Due to shortcomings in the abstract socket emulation, they
+		 * cannot be properly represented here (as @<path>).
+		 *
+		 * This will be the case until they are better implemented.
+		 */
+		if (name != NULL)
+			lxpr_uiobuf_printf(uiobuf, " %s\n", name);
+		else
+			lxpr_uiobuf_printf(uiobuf, "\n");
+		mutex_exit(&so->so_lock);
+	}
+	mutex_exit(&socklist.sl_lock);
 }
 
 /*
