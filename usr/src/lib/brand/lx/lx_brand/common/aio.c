@@ -299,7 +299,7 @@ lx_io_getevents(lx_aio_context_t *ctx, long min_nr, long nr,
 	assert(ctx->lxaio_waiters > 0);
 	ctx->lxaio_waiters--;
 
-	if (rval == -1 || nget == 0 ||
+	if ((rval == -1 && err != ETIME) || nget == 0 ||
 	    (nget == 1 && list[0].portev_source == PORT_SOURCE_ALERT)) {
 		/*
 		 * If we're being destroyed, kick our waiter and clear out with
@@ -312,7 +312,7 @@ lx_io_getevents(lx_aio_context_t *ctx, long min_nr, long nr,
 
 		mutex_unlock(&ctx->lxaio_lock);
 
-		return (nget == 0 || err == ETIME ? 0 : -err);
+		return (nget == 0 ? 0 : -err);
 	}
 
 	out = SAFE_ALLOCA(nget * sizeof (lx_io_event_t));
