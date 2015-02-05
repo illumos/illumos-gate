@@ -565,7 +565,7 @@ static	char	*myname;
 static	char	*xtract_chdir = NULL;
 static	int	checkflag = 0;
 static	int	Xflag, Fflag, iflag, hflag, Bflag, Iflag;
-static	int	rflag, xflag, vflag, tflag, mt, svmt, cflag, mflag, pflag;
+static	int	rflag, xflag, vflag, tflag, mt, cflag, mflag, pflag;
 static	int	uflag;
 static	int	errflag;
 static	int	oflag;
@@ -643,6 +643,8 @@ static	int	charset_type = 0;
 
 static	u_longlong_t	xhdr_flgs;	/* Bits set determine which items */
 					/*   need to be in extended header. */
+static	pid_t	comp_pid = 0;
+
 #define	_X_DEVMAJOR	0x1
 #define	_X_DEVMINOR	0x2
 #define	_X_GID		0x4
@@ -725,8 +727,6 @@ main(int argc, char *argv[])
 	char		*cp;
 	char		*tmpdirp;
 	pid_t		thispid;
-	pid_t		pid;
-	int		wstat;
 
 	(void) setlocale(LC_ALL, "");
 #if !defined(TEXT_DOMAIN)	/* Should be defined by cc -D */
@@ -1114,10 +1114,8 @@ main(int argc, char *argv[])
 		if (Aflag && vflag)
 			(void) printf(
 			gettext("Suppressing absolute pathnames\n"));
-		if (cflag && compress_opt != NULL) {
-			pid = compress_file();
-			wait_pid(pid);
-		}
+		if (cflag && compress_opt != NULL)
+			comp_pid = compress_file();
 		dorep(argv);
 		if (rflag && !cflag && (compress_opt != NULL))
 			compress_back();
@@ -1168,10 +1166,8 @@ main(int argc, char *argv[])
 
 		if (strcmp(usefile, "-") != 0) {
 			check_compression();
-			if (compress_opt != NULL) {
-				pid = uncompress_file();
-				wait_pid(pid);
-			}
+			if (compress_opt != NULL)
+				comp_pid = uncompress_file();
 		}
 		if (xflag) {
 			if (xtract_chdir != NULL) {
@@ -4876,6 +4872,13 @@ done(int n)
 			exit(2);
 		}
 	}
+	/*
+	 * If we have a compression child, we should have a child process that
+	 * we're waiting for to finish compressing or uncompressing the tar
+	 * stream.
+	 */
+	if (comp_pid != 0)
+		wait_pid(comp_pid);
 	exit(n);
 }
 
@@ -6109,7 +6112,6 @@ check_prefix(char **namep, char **dirp, char **compp)
 	if ((tflag || xflag) && !Pflag) {
 		if (is_absolute(fullname) || has_dot_dot(fullname)) {
 			char *stripped_prefix;
-			size_t prefix_len = 0;
 
 			(void) strcpy(savename, fullname);
 			strcpy(fullname,
@@ -7891,7 +7893,7 @@ xattrs_put(char *longname, char *shortname, char *parent, char *attrparent)
 		return;
 	}
 
-	while (dp = readdir(dirp)) {
+	while ((dp = readdir(dirp)) != NULL) {
 		if (strcmp(dp->d_name, "..") == 0) {
 			continue;
 		} else if (strcmp(dp->d_name, ".") == 0) {
@@ -9191,9 +9193,6 @@ static void
 compress_back()
 {
 	pid_t	pid;
-	int status;
-	int wret;
-	struct	stat statb;
 
 	if (vflag) {
 		(void) fprintf(vfile,
@@ -9299,9 +9298,6 @@ void
 decompress_file(void)
 {
 	pid_t 	pid;
-	int	status;
-	char	cmdstr[PATH_MAX];
-	char	fname[PATH_MAX];
 	char	*added_suffix;
 
 
@@ -9344,7 +9340,7 @@ compress_file(void)
 	if (pipe(fd) < 0) {
 		vperror(1, gettext("Could not create pipe"));
 	}
-	if (pid = fork() > 0) {
+	if ((pid = fork()) > 0) {
 		mt = fd[1];
 		(void) close(fd[0]);
 		return (pid);
@@ -9373,7 +9369,7 @@ uncompress_file(void)
 	if (pipe(fd) < 0) {
 		vperror(1, gettext("Could not create pipe"));
 	}
-	if (pid = fork() > 0) {
+	if ((pid = fork()) > 0) {
 		mt = fd[0];
 		(void) close(fd[1]);
 		return (pid);

@@ -23,9 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -125,11 +122,14 @@ yes_no(int (*func)(char *))
 	char    ans[LINE_MAX + 1];
 
 	/* Get user's answer */
-	for (i = 0; b = getchar(); i++) {
+	i = 0;
+	for (;;) {
+		b = getchar();
 		if (b == '\n' || b == '\0' || b == EOF)
 			break;
 		if (i < LINE_MAX)
 			ans[i] = b;
+		i++;
 	}
 	if (i >= LINE_MAX)
 		ans[LINE_MAX] = '\0';
