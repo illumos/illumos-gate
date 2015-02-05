@@ -62,6 +62,7 @@
 #include <sys/sdt.h>
 #include <sys/x86_archext.h>
 #include <sys/controlregs.h>
+#include <sys/core.h>
 #include <lx_signum.h>
 
 int	lx_debug = 0;
@@ -752,6 +753,8 @@ lx_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 	struct termios *termios;
 	uint_t termios_len;
 	int error;
+	int code;
+	int sig;
 	lx_brand_registration_t reg;
 	lx_lwp_data_t *lwpd;
 
@@ -1186,7 +1189,19 @@ lx_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 		return (0);
 
 	case B_EXIT_AS_SIG:
-		exit(CLD_KILLED, (int)arg1);
+		code = CLD_KILLED;
+		sig = (int)arg1;
+		proc_is_exiting(p);
+		if (exitlwps(1) != 0) {
+			mutex_enter(&p->p_lock);
+			lwp_exit();
+		}
+		ttolwp(curthread)->lwp_cursig = sig;
+		if (sig == SIGSEGV) {
+			if (core(sig, 0) == 0)
+				code = CLD_DUMPED;
+		}
+		exit(code, sig);
 		/* NOTREACHED */
 		break;
 
