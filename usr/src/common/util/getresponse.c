@@ -125,7 +125,7 @@ yes_no(int (*func)(char *))
 	char    ans[LINE_MAX + 1];
 
 	/* Get user's answer */
-	for (i = 0; b = getchar(); i++) {
+	for (i = 0; (b = getchar()) != 0; i++) {
 		if (b == '\n' || b == '\0' || b == EOF)
 			break;
 		if (i < LINE_MAX)
