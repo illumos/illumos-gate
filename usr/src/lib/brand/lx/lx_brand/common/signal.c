@@ -1625,7 +1625,11 @@ lx_call_user_handler(int sig, siginfo_t *sip, void *p)
 		 * 64bit for vsyscall emulation, there are certain cases
 		 * where a SIGSEGV is ignored or forces an exit.
 		 */
-		if (lxsap->lxsa_handler == SIG_DFL ||
+		if (lxsap->lxsa_handler == SIG_IGN &&
+		    sip->si_code == SI_USER) {
+			/* Safely ignore a user-sent signal */
+			return;
+		} else if (lxsap->lxsa_handler == SIG_DFL ||
 		    lxsap->lxsa_handler == SIG_IGN ||
 		    ((lxsap->lxsa_flags & LX_SA_NODEFER) == 0 &&
 		    lx_sigsegv_depth > 0)) {
