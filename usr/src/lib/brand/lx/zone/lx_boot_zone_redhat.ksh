@@ -37,6 +37,7 @@ setup_net()
 {
     zonecfg -z $ZONENAME info net >/tmp/$ZONENAME.$$
     zonecfg -z $ZONENAME info attr name=resolvers >>/tmp/$ZONENAME.$$
+    rm -f $ZONEROOT/tmp/.lx_net_up
 
     awk '
         BEGIN {
