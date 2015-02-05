@@ -216,6 +216,7 @@ setxattr03
 sgetmask01
 shmget05
 sighold02
+signal_test_05
 signalfd01
 signalfd4_01
 signalfd4_02
