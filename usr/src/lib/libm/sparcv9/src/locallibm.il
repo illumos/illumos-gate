@@ -39,11 +39,11 @@
 	fsqrtd	%f0,%f0
 	.end
 
-	.inline	__sqrtf,1
+	.inline	sqrtf,1
 	fsqrts	%f1,%f0
 	.end
 
-	.inline	__sqrt,1
+	.inline	sqrt,1
 	fsqrtd	%f0,%f0
 	.end
 
@@ -420,7 +420,7 @@
 	.nonvolatile
 	.end
 
-	.inline	__fp_class,1
+	.inline	fp_class,1
 	fabsd	%f0,%f0
 	std	%f0,[%sp+0x87f]
 	ldx	[%sp+0x87f],%o0
@@ -460,7 +460,7 @@
 2:
 	.end
 
-	.inline	__fp_classf,1
+	.inline	fp_classf,1
 	fabss	%f1,%f1
 	st	%f1,[%sp+0x87f]
 	ld	[%sp+0x87f],%o0
@@ -676,11 +676,11 @@
 	sra	%o0,0,%o0
 	.end
 
-	.inline	__fabs,1
+	.inline	fabs,1
 	fabsd	%f0,%f0
 	.end
 
-	.inline	__fabsf,1
+	.inline	fabsf,1
 	fabss	%f1,%f0
 	.end
 !

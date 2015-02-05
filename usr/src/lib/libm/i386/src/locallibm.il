@@ -127,7 +127,7 @@
 	addl	$8,%esp
 	.end
 
-	.inline	__ceil,0
+	.inline	ceil,0
 	subl	$8,%esp
 	fstcw	(%esp)
 	fldl	8(%esp)			///
@@ -148,7 +148,7 @@
 	addl	$8,%esp
 	.end
 
-	.inline	__copysign,0
+	.inline	copysign,0
 	movl	4(%esp),%eax		/// eax <-- hi_32(x)
 	movl	12(%esp),%ecx		/// ecx <-- hi_32(y)
 	andl	$0x7fffffff,%eax	/ eax <-- hi_32(abs(x))
@@ -170,17 +170,17 @@
 	fsqrt
 	.end
 
-	.inline	__fabs,0
+	.inline	fabs,0
 	fldl	(%esp)			///
 	fabs
 	.end
 
-	.inline	__fabsf,0
+	.inline	fabsf,0
 	flds	(%esp)
 	fabs
 	.end
 
-	.inline	__fabsl,0
+	.inline	fabsl,0
 	fldt	(%esp)
 	fabs
 	.end
@@ -188,7 +188,7 @@
 /
 /	branchless _finite
 /
-	.inline	_finite,0
+	.inline	finite,0
         movl    4(%esp),%eax		/// eax <-- hi_32(x)
         notl	%eax			/ not(bexp) = 0 iff bexp = all 1's
         andl    $0x7ff00000,%eax
@@ -196,7 +196,7 @@
 	shrl	$31,%eax
         .end
 
-	.inline	__floor,0
+	.inline	floor,0
 	subl	$8,%esp
 	fstcw	(%esp)
 	fldl	8(%esp)			///
@@ -217,7 +217,7 @@
 	addl	$8,%esp
 	.end
 
-	.inline	__isnanf,0
+	.inline	isnanf,0
 	movl	(%esp),%eax
 	andl	$0x7fffffff,%eax
 	negl	%eax
@@ -278,7 +278,7 @@
 	fsqrt
 	.end
 
-	.inline	__rint,0
+	.inline	rint,0
 	fldl	(%esp)
         movl	4(%esp),%eax
         andl	$0x7fffffff,%eax
@@ -289,39 +289,39 @@
 	fwait			/ in case we jumped around frndint
 	.end
 
-	.inline	__scalbn,0
+	.inline	scalbn,0
 	fildl	8(%esp)			/// convert N to extended
 	fldl	(%esp)			/// push x
 	fscale
 	fstp	%st(1)
 	.end
 
-	.inline	__signbit,0
+	.inline	signbit,0
 	movl	4(%esp),%eax		/// high part of x
 	shrl	$31,%eax
 	.end
 
-	.inline	__signbitf,0
+	.inline	signbitf,0
 	movl	(%esp),%eax
 	shrl	$31,%eax
 	.end
 
-	.inline	__sqrt,0
+	.inline	sqrt,0
 	fldl	(%esp)
 	fsqrt
 	.end
 
-	.inline	__sqrtf,0
+	.inline	sqrtf,0
 	flds	(%esp)
 	fsqrt
 	.end
 
-	.inline	__sqrtl,0
+	.inline	sqrtl,0
 	fldt	(%esp)
 	fsqrt
 	.end
 
-	.inline	__isnanl,0
+	.inline	isnanl,0
 	movl    8(%esp),%eax            / ax <-- sign bit and __exp
 	andl    $0x00007fff,%eax
 	jz      1f                      / jump if __exp is all 0
