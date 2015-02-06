@@ -251,9 +251,9 @@ main(int argc, char *argv[])
 	if (errcnt != 0 || opts->dohelp ||
 	    (opts->nsets = cpc_setgrp_numsets(opts->master)) == 0) {
 		(void) fprintf(opts->dohelp ? stdout : stderr, gettext(
-		    "Usage:\n\t%s [-c events] [-p period] [-nstD] "
-		    "[-T d|u] [interval [count]]\n\n"
-		    "\t-c events specify processor events to be monitored\n"
+		    "Usage:\n\t%s -c spec [-c spec]... [-p period] [-T u|d]\n"
+		    "\t\t[-sntD] [interval [count]]\n\n"
+		    "\t-c spec\t  specify processor events to be monitored\n"
 		    "\t-n\t  suppress titles\n"
 		    "\t-p period cycle through event list periodically\n"
 		    "\t-s\t  run user soaker thread for system-only events\n"

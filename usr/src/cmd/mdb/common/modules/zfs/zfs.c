@@ -449,6 +449,7 @@ blkptr(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 typedef struct mdb_dmu_buf_impl {
 	struct {
 		uint64_t db_object;
+		uintptr_t db_data;
 	} db;
 	uintptr_t db_objset;
 	uint64_t db_level;
@@ -1691,8 +1692,12 @@ typedef struct mdb_spa {
 	uintptr_t spa_root_vdev;
 } mdb_spa_t;
 
+typedef struct mdb_dsl_pool {
+	uintptr_t dp_root_dir;
+} mdb_dsl_pool_t;
+
 typedef struct mdb_dsl_dir {
-	uintptr_t dd_phys;
+	uintptr_t dd_dbuf;
 	int64_t dd_space_towrite[TXG_SIZE];
 } mdb_dsl_dir_t;
 
@@ -1772,11 +1777,10 @@ static int
 spa_space(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	mdb_spa_t spa;
-	uintptr_t dp_root_dir;
+	mdb_dsl_pool_t dp;
 	mdb_dsl_dir_t dd;
+	mdb_dmu_buf_impl_t db;
 	mdb_dsl_dir_phys_t dsp;
-	uint64_t children;
-	uintptr_t childaddr;
 	space_data_t sd;
 	int shift = 20;
 	char *suffix = "M";
@@ -1793,21 +1797,16 @@ spa_space(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		suffix = "";
 	}
 
-	if (GETMEMB(addr, "spa", spa_dsl_pool, spa.spa_dsl_pool) ||
-	    GETMEMB(addr, "spa", spa_root_vdev, spa.spa_root_vdev) ||
-	    GETMEMB(spa.spa_root_vdev, "vdev", vdev_children, children) ||
-	    GETMEMB(spa.spa_root_vdev, "vdev", vdev_child, childaddr) ||
-	    GETMEMB(spa.spa_dsl_pool, "dsl_pool",
-	    dp_root_dir, dp_root_dir) ||
-	    GETMEMB(dp_root_dir, "dsl_dir", dd_phys, dd.dd_phys) ||
-	    GETMEMB(dp_root_dir, "dsl_dir",
-	    dd_space_towrite, dd.dd_space_towrite) ||
-	    GETMEMB(dd.dd_phys, "dsl_dir_phys",
-	    dd_used_bytes, dsp.dd_used_bytes) ||
-	    GETMEMB(dd.dd_phys, "dsl_dir_phys",
-	    dd_compressed_bytes, dsp.dd_compressed_bytes) ||
-	    GETMEMB(dd.dd_phys, "dsl_dir_phys",
-	    dd_uncompressed_bytes, dsp.dd_uncompressed_bytes)) {
+	if (mdb_ctf_vread(&spa, ZFS_STRUCT "spa", "mdb_spa_t",
+	    addr, 0) == -1 ||
+	    mdb_ctf_vread(&dp, ZFS_STRUCT "dsl_pool", "mdb_dsl_pool_t",
+	    spa.spa_dsl_pool, 0) == -1 ||
+	    mdb_ctf_vread(&dd, ZFS_STRUCT "dsl_dir", "mdb_dsl_dir_t",
+	    dp.dp_root_dir, 0) == -1 ||
+	    mdb_ctf_vread(&db, ZFS_STRUCT "dmu_buf_impl", "mdb_dmu_buf_impl_t",
+	    dd.dd_dbuf, 0) == -1 ||
+	    mdb_ctf_vread(&dsp, ZFS_STRUCT "dsl_dir_phys",
+	    "mdb_dsl_dir_phys_t", db.db.db_data, 0) == -1) {
 		return (DCMD_ERR);
 	}
 
