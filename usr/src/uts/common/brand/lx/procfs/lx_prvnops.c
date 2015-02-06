@@ -3631,6 +3631,15 @@ lxpr_lookup_fddir(vnode_t *dp, char *comp)
 		 */
 		lxpnp->lxpr_realvp = vp;
 		VN_HOLD(lxpnp->lxpr_realvp);
+		/*
+		 * For certain entries (sockets, pipes, etc), Linux expects a
+		 * bogus-named symlink.  If that's the case, report the type as
+		 * VNON to bypass link-following elsewhere in the vfs system.
+		 *
+		 * See lxpr_readlink for more details.
+		 */
+		if (lxpr_readlink_pid_fd(lxpnp, NULL, 0) == 0)
+			LXPTOV(lxpnp)->v_type = VNON;
 	}
 
 	mutex_enter(&p->p_lock);
@@ -4304,23 +4313,28 @@ lxpr_readlink(vnode_t *vp, uio_t *uiop, cred_t *cr, caller_context_t *ct)
 static int
 lxpr_readlink_pid_fd(lxpr_node_t *lxpnp, char *bp, size_t len)
 {
+	const char *format;
 	vnode_t *rvp = lxpnp->lxpr_realvp;
 	vattr_t attr;
+
+	switch (rvp->v_type) {
+	case VSOCK:
+		format = "socket:[%lu]";
+		break;
+	case VFIFO:
+		format = "pipe:[%lu]";
+		break;
+	default:
+		return (-1);
+	}
 
 	/* Fetch the inode of the underlying vnode */
 	if (VOP_GETATTR(rvp, &attr, 0, CRED(), NULL) != 0)
 		return (-1);
 
-	switch (rvp->v_type) {
-	case VSOCK:
-		(void) snprintf(bp, len, "socket:[%lu]", (ino_t)attr.va_nodeid);
-		return (0);
-	case VFIFO:
-		(void) snprintf(bp, len, "pipe:[%lu]", (ino_t)attr.va_nodeid);
-		return (0);
-	default:
-		return (-1);
-	}
+	if (bp != NULL)
+		(void) snprintf(bp, len, format, (ino_t)attr.va_nodeid);
+	return (0);
 }
 
 /*
