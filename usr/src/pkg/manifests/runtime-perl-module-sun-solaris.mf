@@ -22,10 +22,8 @@
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2014 Racktop Systems.
+# Copyright 2015, OmniTI Computer Consulting, Inc. All rights reserved.
 #
-
-$(i386_ONLY)<transform file dir path=.*PLAT.* -> edit path PLAT i86pc>
-$(sparc_ONLY)<transform file dir path=.*PLAT.* -> edit path PLAT sun4>
 
 <transform file path=.*\.(pm|bs) -> default mode 0444>
 <transform file path=.*\.so -> default mode 0555>
@@ -39,51 +37,41 @@ dir path=usr group=sys
 dir path=usr/perl5
 dir path=usr/perl5/$(PERL_VERSION)
 dir path=usr/perl5/$(PERL_VERSION)/lib
-dir path=usr/perl5/$(PERL_VERSION)/lib/PLAT-solaris-64int
-dir path=usr/perl5/$(PERL_VERSION)/lib/PLAT-solaris-64int/Sun
-dir path=usr/perl5/$(PERL_VERSION)/lib/PLAT-solaris-64int/Sun/Solaris
-dir path=usr/perl5/$(PERL_VERSION)/lib/PLAT-solaris-64int/auto
-dir path=usr/perl5/$(PERL_VERSION)/lib/PLAT-solaris-64int/auto/Sun
-dir path=usr/perl5/$(PERL_VERSION)/lib/PLAT-solaris-64int/auto/Sun/Solaris
-dir \
-    path=usr/perl5/$(PERL_VERSION)/lib/PLAT-solaris-64int/auto/Sun/Solaris/Intrs
-dir \
-    path=usr/perl5/$(PERL_VERSION)/lib/PLAT-solaris-64int/auto/Sun/Solaris/Kstat
-dir \
-    path=usr/perl5/$(PERL_VERSION)/lib/PLAT-solaris-64int/auto/Sun/Solaris/Lgrp
-dir \
-    path=usr/perl5/$(PERL_VERSION)/lib/PLAT-solaris-64int/auto/Sun/Solaris/Project
-dir \
-    path=usr/perl5/$(PERL_VERSION)/lib/PLAT-solaris-64int/auto/Sun/Solaris/Task
-dir \
-    path=usr/perl5/$(PERL_VERSION)/lib/PLAT-solaris-64int/auto/Sun/Solaris/Utils
+dir path=usr/perl5/$(PERL_VERSION)/lib/$(PERL_ARCH)
+dir path=usr/perl5/$(PERL_VERSION)/lib/$(PERL_ARCH)/Sun
+dir path=usr/perl5/$(PERL_VERSION)/lib/$(PERL_ARCH)/Sun/Solaris
+dir path=usr/perl5/$(PERL_VERSION)/lib/$(PERL_ARCH)/auto
+dir path=usr/perl5/$(PERL_VERSION)/lib/$(PERL_ARCH)/auto/Sun
+dir path=usr/perl5/$(PERL_VERSION)/lib/$(PERL_ARCH)/auto/Sun/Solaris
+dir path=usr/perl5/$(PERL_VERSION)/lib/$(PERL_ARCH)/auto/Sun/Solaris/Intrs
+dir path=usr/perl5/$(PERL_VERSION)/lib/$(PERL_ARCH)/auto/Sun/Solaris/Kstat
+dir path=usr/perl5/$(PERL_VERSION)/lib/$(PERL_ARCH)/auto/Sun/Solaris/Lgrp
+dir path=usr/perl5/$(PERL_VERSION)/lib/$(PERL_ARCH)/auto/Sun/Solaris/Project
+dir path=usr/perl5/$(PERL_VERSION)/lib/$(PERL_ARCH)/auto/Sun/Solaris/Task
+dir path=usr/perl5/$(PERL_VERSION)/lib/$(PERL_ARCH)/auto/Sun/Solaris/Utils
 dir path=usr/perl5/$(PERL_VERSION)/lib/Sun
 dir path=usr/perl5/$(PERL_VERSION)/lib/Sun/Solaris
 dir path=usr/perl5/$(PERL_VERSION)/lib/Sun/Solaris/BSM
 dir path=usr/share/man
 dir path=usr/share/man/man3perl
+file path=usr/perl5/$(PERL_VERSION)/lib/$(PERL_ARCH)/Sun/Solaris/Intrs.pm
+file path=usr/perl5/$(PERL_VERSION)/lib/$(PERL_ARCH)/Sun/Solaris/Kstat.pm
+file path=usr/perl5/$(PERL_VERSION)/lib/$(PERL_ARCH)/Sun/Solaris/Lgrp.pm
+file path=usr/perl5/$(PERL_VERSION)/lib/$(PERL_ARCH)/Sun/Solaris/Project.pm
+file path=usr/perl5/$(PERL_VERSION)/lib/$(PERL_ARCH)/Sun/Solaris/Task.pm
+file path=usr/perl5/$(PERL_VERSION)/lib/$(PERL_ARCH)/Sun/Solaris/Utils.pm
 file \
-    path=usr/perl5/$(PERL_VERSION)/lib/PLAT-solaris-64int/Sun/Solaris/Intrs.pm
+    path=usr/perl5/$(PERL_VERSION)/lib/$(PERL_ARCH)/auto/Sun/Solaris/Intrs/Intrs.so
 file \
-    path=usr/perl5/$(PERL_VERSION)/lib/PLAT-solaris-64int/Sun/Solaris/Kstat.pm
-file path=usr/perl5/$(PERL_VERSION)/lib/PLAT-solaris-64int/Sun/Solaris/Lgrp.pm
+    path=usr/perl5/$(PERL_VERSION)/lib/$(PERL_ARCH)/auto/Sun/Solaris/Kstat/Kstat.so
 file \
-    path=usr/perl5/$(PERL_VERSION)/lib/PLAT-solaris-64int/Sun/Solaris/Project.pm
-file path=usr/perl5/$(PERL_VERSION)/lib/PLAT-solaris-64int/Sun/Solaris/Task.pm
+    path=usr/perl5/$(PERL_VERSION)/lib/$(PERL_ARCH)/auto/Sun/Solaris/Lgrp/Lgrp.so
 file \
-    path=usr/perl5/$(PERL_VERSION)/lib/PLAT-solaris-64int/Sun/Solaris/Utils.pm
+    path=usr/perl5/$(PERL_VERSION)/lib/$(PERL_ARCH)/auto/Sun/Solaris/Project/Project.so
 file \
-    path=usr/perl5/$(PERL_VERSION)/lib/PLAT-solaris-64int/auto/Sun/Solaris/Intrs/Intrs.so
+    path=usr/perl5/$(PERL_VERSION)/lib/$(PERL_ARCH)/auto/Sun/Solaris/Task/Task.so
 file \
-    path=usr/perl5/$(PERL_VERSION)/lib/PLAT-solaris-64int/auto/Sun/Solaris/Kstat/Kstat.so
-file \
-    path=usr/perl5/$(PERL_VERSION)/lib/PLAT-solaris-64int/auto/Sun/Solaris/Lgrp/Lgrp.so
-file \
-    path=usr/perl5/$(PERL_VERSION)/lib/PLAT-solaris-64int/auto/Sun/Solaris/Project/Project.so
-file \
-    path=usr/perl5/$(PERL_VERSION)/lib/PLAT-solaris-64int/auto/Sun/Solaris/Task/Task.so
-file \
-    path=usr/perl5/$(PERL_VERSION)/lib/PLAT-solaris-64int/auto/Sun/Solaris/Utils/Utils.so
+    path=usr/perl5/$(PERL_VERSION)/lib/$(PERL_ARCH)/auto/Sun/Solaris/Utils/Utils.so
 file path=usr/perl5/$(PERL_VERSION)/lib/Sun/Solaris/BSM/_BSMparse.pm
 file path=usr/perl5/$(PERL_VERSION)/lib/Sun/Solaris/Pg.pm
 file path=usr/share/man/man3perl/Kstat.3perl

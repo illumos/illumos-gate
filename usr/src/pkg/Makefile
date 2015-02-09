@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2015, OmniTI Computer Consulting, Inc. All rights reserved.
 #
 
 include $(SRC)/Makefile.master
@@ -176,6 +177,7 @@ PKGMOG_DEFINES= \
 	PKGVERS_BUILTON=$(PKGVERS_BUILTON) \
 	PKGVERS_BRANCH=$(PKGVERS_BRANCH) \
 	PKGVERS=$(PKGVERS) \
+	PERL_ARCH=$(PERL_ARCH) \
 	PERL_VERSION=$(PERL_VERSION) \
 	PERL_PKGVERS=$(PERL_PKGVERS)
 
