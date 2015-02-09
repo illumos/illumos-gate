@@ -2695,6 +2695,7 @@ Pfgrab_core(int core_fd, const char *aout_path, int *perr)
 
 			fp->file_ref = 1;
 			fp->file_fd = -1;
+			fp->file_dbgfile = -1;
 
 			fp->file_lo = malloc(sizeof (rd_loadobj_t));
 			fp->file_lname = strdup(execname);
