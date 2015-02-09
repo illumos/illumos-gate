@@ -179,7 +179,6 @@ FLTRPATH		= $(FLTRPATH_$(TARGET_ARCH))
 
 sparc_CFLAGS += -_cc=-W0,-xintrinsic
 sparcv9_CFLAGS += -_cc=-W0,-xintrinsic
-CPPFLAGS_i386	+= -Dfabs=__fabs
 
 SRCS_mvec_i386 = ../common/__vsqrtf.c
 

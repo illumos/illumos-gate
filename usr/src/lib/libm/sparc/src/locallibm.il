@@ -311,13 +311,13 @@
 	fsqrtd	%f0,%f0
 	.end
 
-	.inline	__sqrtf,1
+	.inline	sqrtf,1
 	st	%o0,[%sp+0x44]
 	ld	[%sp+0x44],%f0
 	fsqrts	%f0,%f0
 	.end
 
-	.inline	__sqrt,2
+	.inline	sqrt,2
 	std	%o0,[%sp+0x48]		! store to 8-aligned address
 	ldd	[%sp+0x48],%f0
 	fsqrtd	%f0,%f0
@@ -814,7 +814,7 @@
 	.nonvolatile
 	.end
 
-	.inline	__fp_class,2
+	.inline	fp_class,2
 	sethi	%hi(0x80000000),%o2	! o2 gets 80000000
 	andn	%o0,%o2,%o0		! o0-o1 gets abs(x)
 	orcc	%o0,%o1,%g0		! set cc as x is zero/nonzero
@@ -859,7 +859,7 @@
 2:
 	.end
 
-	.inline	__fp_classf,1
+	.inline	fp_classf,1
 	sethi	%hi(0x80000000),%o2
 	andncc	%o0,%o2,%o0
 	bne	1f
@@ -1229,14 +1229,14 @@
         sub	%o0,%o1,%o0
         .end
 
-	.inline	__fabs,2
+	.inline	fabs,2
 	st	%o0,[%sp+0x48]
 	st	%o1,[%sp+0x4c]
 	ldd	[%sp+0x48],%f0
 	fabsd	%f0,%f0
 	.end
 
-	.inline	__fabsf,1
+	.inline	fabsf,1
 	st	%o0,[%sp+0x44]
 	ld	[%sp+0x44],%f0
 	fabss	%f0,%f0

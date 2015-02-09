@@ -24,9 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-
 #include <stdio.h>
 #include <sys/param.h>
 #include <fcntl.h>
@@ -424,7 +421,7 @@ read_pkginfo(const char *protodir, short *arch, char *basedir)
 	(void) fclose(pkginfo_fp);
 
 	if (architecture[0])
-		if ((*arch = assign_arch(architecture)) == NULL) {
+		if ((*arch = assign_arch(architecture)) == 0) {
 			(void) fprintf(stderr,
 			    "warning: Unknown architecture %s found in %s\n",
 			    architecture, pkginfofile);
