@@ -91,7 +91,7 @@
 1:	movl	%edi,%eax
 	.end
 
-	.inline	__copysign,0
+	.inline	copysign,0
 	movq	$0x7fffffffffffffff,%rax
 	movdq	%rax,%xmm2
 	andpd	%xmm2,%xmm0
@@ -99,19 +99,19 @@
 	orpd	%xmm2,%xmm0
 	.end
 
-	.inline	__fabs,0
+	.inline	fabs,0
 	movq	$0x7fffffffffffffff,%rax
 	movdq	%rax,%xmm1
 	andpd	%xmm1,%xmm0
 	.end
 
-	.inline	__fabsf,0
+	.inline	fabsf,0
 	movl	$0x7fffffff,%eax
 	movdl	%eax,%xmm1
 	andps	%xmm1,%xmm0
 	.end
 
-	.inline	_finite,0
+	.inline	finite,0
 	subq	$16,%rsp
 	movlpd	%xmm0,(%rsp)
 	movq	(%rsp),%rcx
@@ -123,16 +123,16 @@
 	addq	$16,%rsp
 	.end
 
-	.inline	__signbit,0
+	.inline	signbit,0
 	movmskpd %xmm0,%eax
 	andq	$1,%rax
 	.end
 
-	.inline	__sqrt,0
+	.inline	sqrt,0
 	sqrtsd	%xmm0,%xmm0
 	.end
 
-	.inline	__sqrtf,0
+	.inline	sqrtf,0
 	sqrtss	%xmm0,%xmm0
 	.end
 

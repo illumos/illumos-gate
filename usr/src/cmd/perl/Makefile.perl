@@ -15,15 +15,9 @@
 
 include $(SRC)/lib/Makefile.lib
 
-# PERL_VERSION used to be set here,
+# PERL_VERSION and PERL_ARCH used to be set here,
 # but as it is also needed in usr/src/pkg/Makefile, 
 # the definition was moved to usr/src/Makefile.master
-
-PERL_ARCH = i86pc-solaris-thread-multi-64int
-$(SPARC_BLD)PERL_ARCH = sun4-solaris-thread-multi-64int
-PERL_ARCH64 = i86pc-solaris-thread-multi-64
-$(SPARC_BLD)PERL_ARCH64 = sun4-solaris-thread-multi-64
-
 
 PERLDIR = $(ADJUNCT_PROTO)/usr/perl5/$(PERL_VERSION)
 PERLLIBDIR = $(PERLDIR)/lib/$(PERL_ARCH)

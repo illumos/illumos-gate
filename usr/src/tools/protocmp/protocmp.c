@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <fcntl.h>
 #include <stdlib.h>
@@ -685,7 +683,7 @@ main(int argc, char **argv)
 {
 	int	errflg = 0;
 	int	i, c;
-	int	list_filtered_exceptions = NULL;
+	int	list_filtered_exceptions = 0;
 	int	n_proto_refs = 0;
 	int	n_exception_files = 0;
 	char	*proto_refs[MAX_PROTO_REFS];
@@ -729,7 +727,7 @@ main(int argc, char **argv)
 				errflg++;
 				(void) fprintf(stderr,
 				    "Only %d exception files supported\n",
-					MAX_EXCEPTION_FILES);
+				    MAX_EXCEPTION_FILES);
 			} else {
 				exception_files[n_exception_files++] = optarg;
 			}
@@ -745,7 +743,7 @@ main(int argc, char **argv)
 				errflg++;
 				(void) fprintf(stderr,
 				    "Only %d proto references supported\n",
-					MAX_PROTO_REFS);
+				    MAX_PROTO_REFS);
 			} else {
 				proto_refs[n_proto_refs++] = optarg;
 			}
