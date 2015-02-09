@@ -226,6 +226,7 @@ Pgrab_file(const char *fname, int *perr)
 	}
 
 	fp->file_fd = fd;
+	fp->file_dbgfile = -1;
 	fp->file_lo->rl_lmident = LM_ID_BASE;
 	if ((fp->file_lname = strdup(fp->file_pname)) == NULL) {
 		*perr = G_STRANGE;
