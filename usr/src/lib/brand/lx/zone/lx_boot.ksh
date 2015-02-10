@@ -21,7 +21,7 @@
 #
 #
 # Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2014, Joyent, Inc. All rights reserved.
+# Copyright 2015, Joyent, Inc.
 #
 # lx boot script.
 #
@@ -60,15 +60,12 @@ EXIT_CODE=1
 # kernel runs the linker at /lib/ld.so.1, which doesn't exist in an lx zone.
 # In lx, the linker is ld-linux.so.N. Hence when we run the native executable
 # from the wrappers, we explicitly specify /native/lib/ld.so.1 as our 32-bit
-# linker (or /native/lib/64/ld.so.1 as our 64-bit linker). 
-
-# Setup a native command which uses the thunk library to access the Linux
-# nameservices within the zone.
+# linker (or /native/lib/64/ld.so.1 as our 64-bit linker).
 #
 # $1 is lx cmd, $2 is native cmd, $3 is an optional inclusion in the script
 # the lx cmd path must have already be verified with safe_dir
 #
-setup_native_thunk_cmd() {
+setup_native_chroot_cmd() {
 	cmd_name=$ZONEROOT/$1
 
 	if [ -h $cmd_name -o \( -e $cmd_name -a ! -f $cmd_name \) ]; then
@@ -80,10 +77,9 @@ setup_native_thunk_cmd() {
 	#!/bin/sh
 
 	$3
-	exec /native/usr/lib/brand/lx/lx_native \
-	    /native/lib/ld.so.1 -e LD_NOENVIRON=1 -e LD_NOCONFIG=1 \
-	    -e LD_PRELOAD_32=/native/usr/lib/brand/lx/lx_thunk.so.1 \
-	    -e LD_LIBRARY_PATH_32="/native/lib:/native/usr/lib" $2 "\$@"
+	exec /native/usr/sbin/chroot /native \
+	    /lib/ld.so.1 -e LD_NOENVIRON=1 -e LD_NOCONFIG=1 \
+	    $2 "\$@"
 	DONE
 
 	chmod 755 $ZONEROOT/$1
@@ -180,14 +176,11 @@ safe_opt_dir /etc/update-motd.d
 #
 # Replace Linux binaries with native binaries.
 #
-# XXX The lx_thunk code will perform a chroot, so these commands will not work
-# if they are run by a non-privileged user.
-#
-setup_native_thunk_cmd /sbin/ipmgmtd /native/lib/inet/ipmgmtd \
+setup_native_chroot_cmd /sbin/ipmgmtd /lib/inet/ipmgmtd \
 	"export SMF_FMRI=\"svc:/network/ip-interface-management:default\""
-setup_native_thunk_cmd /sbin/ifconfig-native /native/sbin/ifconfig
-setup_native_thunk_cmd /sbin/dladm /native/usr/sbin/dladm
+setup_native_chroot_cmd /sbin/dladm /usr/sbin/dladm
 
+setup_native_cmd /sbin/ifconfig-native /native/sbin/ifconfig
 setup_native_cmd /sbin/route /native/usr/sbin/route
 setup_native_cmd /bin/netstat /native/usr/bin/netstat
 
