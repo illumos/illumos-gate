@@ -23,6 +23,7 @@
 # Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
+# Copyright 2015, OmniTI Computer Consulting, Inc. All rights reserved.
 #
 
 #
@@ -168,6 +169,8 @@ FIND=		/usr/bin/find
 PERL=		/usr/bin/perl
 PERL_VERSION=	5.12
 PERL_PKGVERS=	-512
+PERL_ARCH =		i86pc-solaris-64int
+$(SPARC_BLD)PERL_ARCH =	sun4-solaris-64int
 PYTHON_26=	/usr/bin/python2.6
 PYTHON=		$(PYTHON_26)
 SORT=		/usr/bin/sort
