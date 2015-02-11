@@ -179,8 +179,8 @@ safe_opt_dir /etc/update-motd.d
 setup_native_chroot_cmd /sbin/ipmgmtd /lib/inet/ipmgmtd \
 	"export SMF_FMRI=\"svc:/network/ip-interface-management:default\""
 setup_native_chroot_cmd /sbin/dladm /usr/sbin/dladm
+setup_native_chroot_cmd /sbin/ifconfig-native /sbin/ifconfig
 
-setup_native_cmd /sbin/ifconfig-native /native/sbin/ifconfig
 setup_native_cmd /sbin/route /native/usr/sbin/route
 setup_native_cmd /bin/netstat /native/usr/bin/netstat
 

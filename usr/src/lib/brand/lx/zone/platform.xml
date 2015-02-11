@@ -47,7 +47,7 @@
 	    opt="ro" type="lofs" />
 	<global_mount special="/usr/lib/brand/lx/etc_default_nfs"
 	    directory="/native/etc/default/nfs" type="lofs" opt="ro" />
-	<global_mount special="/usr/lib/brand/lx/etc_netconfig"
+	<global_mount special="/etc/netconfig"
 	    directory="/native/etc/netconfig" type="lofs" opt="ro" />
 	<global_mount special="/sbin"
 	    directory="/native/sbin" opt="ro,nodevices" type="lofs" />
