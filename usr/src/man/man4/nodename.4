@@ -1,9 +1,10 @@
 '\" te
+.\" Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 .\" Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH NODENAME 4 "Feb 9, 2004"
+.TH NODENAME 4 "Feb 7, 2015"
 .SH NAME
 nodename \- local source for system name
 .SH SYNOPSIS
@@ -13,7 +14,6 @@ nodename \- local source for system name
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 When a machine is standalone or its IP address is configured locally, the
 \fB/etc/nodename\fR file contains the system name. By convention, the system
@@ -24,11 +24,6 @@ network interface, for example, \fBhostname.hme0\fR.
 If the machine's network configuration is delivered by the RPC bootparams
 protocol, the \fB/etc/nodename\fR file is not used, as the system name is
 delivered by the remote service.
-.sp
-.LP
-Given a system name value, regardless of source, the \fBuname\fR utility
-invoked with the \fB-S\fR option is used to set the system name of the running
-system.
 .sp
 .LP
 If the machine's network configuration is delivered by the DHCP protocol, the
@@ -60,12 +55,10 @@ myhost
 .in -2
 
 .SH SEE ALSO
-.sp
 .LP
 \fBNIS+\fR(1), \fBuname\fR(1), \fBnamed\fR(1M), \fBypbind\fR(1M),
 \fBattributes\fR(5)
 .SH NOTES
-.sp
 .LP
 The \fBnodename\fR file is modified by Solaris installation and de-installation
 scripts.

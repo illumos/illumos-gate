@@ -1,9 +1,10 @@
 '\" te
+.\" Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 .\" Copyright (C) 2001, Sun Microsystems, Inc. All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH RPC_SOC 3NSL "Jun 7, 2001"
+.TH RPC_SOC 3NSL "Feb 7, 2015"
 .SH NAME
 rpc_soc, authdes_create, authunix_create, authunix_create_default, callrpc,
 clnt_broadcast, clntraw_create, clnttcp_create, clntudp_bufcreate,
@@ -184,7 +185,6 @@ int svc_fds;
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 \fBRPC\fR routines allow C programs to make procedure calls on other machines
 across the network. First, the client calls a procedure to send a request to
@@ -198,7 +198,6 @@ routines. The preferred routine is given after the description of the routine.
 New programs should use the preferred routines, as support for the older
 interfaces may be dropped in future releases.
 .SS "File Descriptors"
-.sp
 .LP
 Transport independent  \fBRPC\fR uses  \fBTLI\fR as its transport interface
 instead of sockets.
@@ -212,7 +211,6 @@ with both  \fBlibrpcsoc\fR and \fBlibnsl\fR. If the user passed
 \fBlibnsl\fR only, then the routine will return a  \fBTLI\fR file descriptor
 and not a socket.
 .SS "Routines"
-.sp
 .LP
 The following routines require that the header \fB<rpc/rpc.h>\fR be included.
 The symbol \fBPORTMAP\fR should be defined so that the appropriate function
@@ -618,7 +616,7 @@ resultant read file descriptor bit mask. The routine returns when all file
 descriptors associated with the value of \fIrdfds\fR have been serviced. This
 routine is similar to \fBsvc_getreqset()\fR but is limited to 32 descriptors.
 .sp
-This interface is made obsolete by \fBsvc_getreqset()\fR
+This interface is made obsolete by \fBsvc_getreqset()\fR.
 .RE
 
 .sp
@@ -801,7 +799,6 @@ This routine exists for backward compatibility only, and is made obsolete by
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -817,7 +814,6 @@ MT-Level	Unsafe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBkeyserv\fR(1M), \fBrpcbind\fR(1M), \fBrpcinfo\fR(1M), \fBnetdir\fR(3NSL),
 \fBnetdir_getbyname\fR(3NSL), \fBrpc\fR(3NSL), \fBrpc_clnt_auth\fR(3NSL),
@@ -827,7 +823,6 @@ MT-Level	Unsafe
 \fBsecure_rpc\fR(3NSL), \fBselect\fR(3C), \fBxdr_authsys_parms\fR(3NSL),
 \fBlibnsl\fR(3LIB), \fBlibrpcsoc\fR(3LIBUCB), \fBattributes\fR(5)
 .SH NOTES
-.sp
 .LP
 These interfaces are unsafe in multithreaded applications.  Unsafe interfaces
 should be called only from the main thread.

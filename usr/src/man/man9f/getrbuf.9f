@@ -1,10 +1,11 @@
 '\" te
+.\" Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 .\" Copyright 1989 AT&T
 .\" Copyright (c) 2006 Sun Microsystems, Inc.  All Rights Reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH GETRBUF 9F "Jan 16, 2006"
+.TH GETRBUF 9F "Jan 27, 2015"
 .SH NAME
 getrbuf \- get a raw buffer header
 .SH SYNOPSIS
@@ -20,11 +21,9 @@ getrbuf \- get a raw buffer header
 .fi
 
 .SH INTERFACE LEVEL
-.sp
 .LP
 Architecture independent level 1 (DDI/DKI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIsleepflag\fR\fR
@@ -34,7 +33,6 @@ Indicates whether driver should sleep for free space.
 .RE
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBgetrbuf()\fR function allocates the space for a buffer header to the
 caller. It is used in cases where a block driver is performing raw (character
@@ -43,25 +41,22 @@ the buffer cache.
 .sp
 .LP
 The \fBgetrbuf()\fR function calls \fBkmem_alloc\fR(9F) to perform the memory
-allocation. \fBkmem_alloc()\fRrequires the information included in the
+allocation. \fBkmem_alloc()\fR requires the information included in the
 \fIsleepflag\fR argument. If \fIsleepflag\fR is set to \fBKM_SLEEP\fR, the
 driver may sleep until the space is freed up. If \fIsleepflag\fR is set to
 \fBKM_NOSLEEP\fR, the driver will not sleep.  In either case, a pointer to the
 allocated space is returned or \fBNULL\fR to indicate that no space was
 available.
 .SH RETURN VALUES
-.sp
 .LP
 The \fBgetrbuf()\fR function returns a pointer to the allocated buffer header,
 or \fBNULL\fR if no space is available.
 .SH CONTEXT
-.sp
 .LP
 The \fBgetrbuf()\fR function can be called from user, interrupt, or kernel
 context. (Drivers must not allow \fBgetrbuf()\fR to sleep if called from an
 interrupt routine.)
 .SH SEE ALSO
-.sp
 .LP
 \fBbioinit\fR(9F), \fBfreerbuf\fR(9F), \fBkmem_alloc\fR(9F),
 \fBkmem_free\fR(9F)
