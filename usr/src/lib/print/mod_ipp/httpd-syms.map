@@ -1,0 +1,43 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+#
+
+#
+# These are the symbols in Apache (httpd) that this module needs
+# to bind with.  By explicitly telling the linker these are external,
+# we can detect any other binding problems at link time.
+#
+
+$mapfile_version 2
+
+SYMBOL_SCOPE {
+	core_module			{ TYPE = data; FLAGS = extern };
+
+	ap_discard_request_body		{ TYPE = function; FLAGS = extern };
+	ap_get_client_block		{ TYPE = function; FLAGS = extern };
+	ap_get_remote_host		{ TYPE = function; FLAGS = extern };
+	ap_get_server_name		{ TYPE = function; FLAGS = extern };
+	ap_get_server_port		{ TYPE = function; FLAGS = extern };
+	ap_hook_default_port		{ TYPE = function; FLAGS = extern };
+	ap_hook_handler			{ TYPE = function; FLAGS = extern };
+	ap_hook_http_scheme		{ TYPE = function; FLAGS = extern };
+	ap_log_rerror			{ TYPE = function; FLAGS = extern };
+	ap_rwrite			{ TYPE = function; FLAGS = extern };
+	ap_setup_client_block		{ TYPE = function; FLAGS = extern };
+	ap_should_client_block		{ TYPE = function; FLAGS = extern };
+
+	apr_os_sock_get			{ TYPE = function; FLAGS = extern };
+	apr_palloc			{ TYPE = function; FLAGS = extern };
+	apr_table_get			{ TYPE = function; FLAGS = extern };
+};

@@ -43,7 +43,6 @@
 # Plugins are not required to have versioned file names, and are not required
 # to be internally versioned.
 #
-PLUGIN		^usr/apache/libexec
 PLUGIN		^usr/lib/devfsadm
 PLUGIN		^usr/lib/efcode/.*\.so$
 PLUGIN		^usr/lib/elfedit
@@ -53,6 +52,7 @@ PLUGIN		^usr/lib/fm/topo/plugins
 PLUGIN		^usr/lib/fwflash
 PLUGIN		^usr/lib/iconv
 PLUGIN		^usr/lib/inet/ppp
+PLUGIN		^usr/lib/lp/ipp
 PLUGIN		^usr/lib/mdb
 PLUGIN		^usr/lib/pci
 PLUGIN		^usr/lib/picl/plugins

@@ -31,23 +31,24 @@ set name=info.classification \
     value=org.opensolaris.category.2008:System/Printing
 set name=variant.arch value=$(ARCH)
 dir path=etc group=sys
-dir path=etc/apache
+dir path=etc/lp group=lp mode=0775 owner=lp
+dir path=etc/lp/ipp group=lp mode=0755 owner=lp
 dir path=lib
 dir path=lib/svc
 dir path=lib/svc/manifest group=sys
 dir path=lib/svc/manifest/application group=sys
 dir path=lib/svc/manifest/application/print group=sys
 dir path=usr group=sys
-dir path=usr/apache
-dir path=usr/apache/libexec
+dir path=usr/lib
+dir path=usr/lib/lp group=lp
+dir path=usr/lib/lp/ipp group=lp
 dir path=var group=sys
 dir path=var/lp group=lp mode=0775 owner=lp
 dir path=var/lp/ipp-listener
-file path=etc/apache/httpd-standalone-ipp.conf \
-    original_name=SUNWippl:etc/apache/httpd-standalone-ipp.conf preserve=true
+file path=etc/lp/ipp/httpd-standalone-ipp.conf preserve=true
 file path=lib/svc/manifest/application/print/ipp-listener.xml group=sys \
     mode=0444
-file path=usr/apache/libexec/mod_ipp.so mode=0555
+file path=usr/lib/lp/ipp/mod_ipp.so mode=0555
 file path=var/lp/ipp-listener/index.html mode=0444
 legacy pkg=SUNWipplr \
     desc="Internet Printing Protocol(IPP) Apache configuration for service module" \
