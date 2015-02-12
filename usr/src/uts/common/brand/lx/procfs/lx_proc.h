@@ -251,4 +251,11 @@ void lxpr_unlock(proc_t *);
 }
 #endif
 
+#ifndef islower
+#define	islower(x)	(((unsigned)(x) >= 'a') && ((unsigned)(x) <= 'z'))
+#endif
+#ifndef toupper
+#define	toupper(x)	(islower(x) ? (x) - 'a' + 'A' : (x))
+#endif
+
 #endif /* _LXPROC_H */

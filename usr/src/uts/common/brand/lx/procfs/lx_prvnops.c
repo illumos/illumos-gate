@@ -2038,10 +2038,146 @@ lxpr_read_net_sockstat(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
 }
 
+typedef struct lxpr_snmp_table {
+	const char *lst_proto;
+	const char *lst_fields[];
+} lxpr_snmp_table_t;
+
+static lxpr_snmp_table_t lxpr_snmp_ip = { "ip",
+	{
+	"forwarding", "defaultTTL", "inReceives", "inHdrErrors",
+	"inAddrErrors", "forwDatagrams", "inUnknownProtos", "inDiscards",
+	"inDelivers", "outRequests", "outDiscards", "outNoRoutes",
+	"reasmTimeout", "reasmReqds", "reasmOKs", "reasmFails", "fragOKs",
+	"fragFails", "fragCreates",
+	NULL
+	}
+};
+static lxpr_snmp_table_t lxpr_snmp_icmp = { "icmp",
+	{
+	"inMsgs", "inErrors", "inCsumErrors", "inDestUnreachs", "inTimeExcds",
+	"inParmProbs", "inSrcQuenchs", "inRedirects", "inEchos", "inEchoReps",
+	"inTimestamps", "inTimestampReps", "inAddrMasks", "inAddrMaskReps",
+	"outMsgs", "outErrors", "outDestUnreachs", "outTimeExcds",
+	"outParmProbs", "outSrcQuenchs", "outRedirects", "outEchos",
+	"outEchoReps", "outTimestamps", "outTimestampReps", "outAddrMasks",
+	"outAddrMaskReps",
+	NULL
+	}
+};
+static lxpr_snmp_table_t lxpr_snmp_tcp = { "tcp",
+	{
+	"rtoAlgorithm", "rtoMin", "rtoMax", "maxConn", "activeOpens",
+	"passiveOpens", "attemptFails", "estabResets", "currEstab", "inSegs",
+	"outSegs", "retransSegs", "inErrs", "outRsts", "inCsumErrors",
+	NULL
+	}
+};
+static lxpr_snmp_table_t lxpr_snmp_udp = { "udp",
+	{
+	"inDatagrams", "noPorts", "inErrors", "outDatagrams", "rcvbufErrors",
+	"sndbufErrors", "inCsumErrors",
+	NULL
+	}
+};
+
+static lxpr_snmp_table_t *lxpr_net_snmptab[] = {
+	&lxpr_snmp_ip,
+	&lxpr_snmp_icmp,
+	&lxpr_snmp_tcp,
+	&lxpr_snmp_udp,
+	NULL
+};
+
+static void
+lxpr_kstat_print_tab(lxpr_uiobuf_t *uiobuf, lxpr_snmp_table_t *table,
+    kstat_t *kn)
+{
+	kstat_named_t *klist;
+	char upname[KSTAT_STRLEN], upfield[KSTAT_STRLEN];
+	int i, j, num;
+	size_t size;
+
+	klist = (kstat_named_t *)lxpr_kstat_read(kn, B_TRUE, &size, &num);
+	if (klist == NULL)
+		return;
+
+	/* Print the header line, fields capitalized */
+	(void) strncpy(upname, table->lst_proto, KSTAT_STRLEN);
+	upname[0] = toupper(upname[0]);
+	lxpr_uiobuf_printf(uiobuf, "%s:", upname);
+	for (i = 0; table->lst_fields[i] != NULL; i++) {
+		(void) strncpy(upfield, table->lst_fields[i], KSTAT_STRLEN);
+		upfield[0] = toupper(upfield[0]);
+		lxpr_uiobuf_printf(uiobuf, " %s", upfield);
+	}
+	lxpr_uiobuf_printf(uiobuf, "\n%s:", upname);
+
+	/* Then loop back through to print the value line. */
+	for (i = 0; table->lst_fields[i] != NULL; i++) {
+		kstat_named_t *kpoint = NULL;
+		for (j = 0; j < num; j++) {
+			if (strncmp(klist[j].name, table->lst_fields[i],
+			    KSTAT_STRLEN) == 0) {
+				kpoint = &klist[j];
+				break;
+			}
+		}
+		if (kpoint == NULL) {
+			/* Output 0 for unknown fields */
+			lxpr_uiobuf_printf(uiobuf, " 0");
+		} else {
+			switch (kpoint->data_type) {
+			case KSTAT_DATA_INT32:
+				lxpr_uiobuf_printf(uiobuf, " %d",
+				    kpoint->value.i32);
+				break;
+			case KSTAT_DATA_UINT32:
+				lxpr_uiobuf_printf(uiobuf, " %u",
+				    kpoint->value.ui32);
+				break;
+			case KSTAT_DATA_INT64:
+				lxpr_uiobuf_printf(uiobuf, " %ld",
+				    kpoint->value.l);
+				break;
+			case KSTAT_DATA_UINT64:
+				lxpr_uiobuf_printf(uiobuf, " %lu",
+				    kpoint->value.ul);
+				break;
+			}
+		}
+	}
+	lxpr_uiobuf_printf(uiobuf, "\n");
+	kmem_free(klist, size);
+}
+
 /* ARGSUSED */
 static void
 lxpr_read_net_snmp(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
+	kstat_t *ksr;
+	kstat_t ks0;
+	lxpr_snmp_table_t **table = lxpr_net_snmptab;
+	int i, t, nidx;
+	size_t sidx;
+
+	ks0.ks_kid = 0;
+	ksr = (kstat_t *)lxpr_kstat_read(&ks0, B_FALSE, &sidx, &nidx);
+	if (ksr == NULL)
+		return;
+
+	for (t = 0; table[t] != NULL; t++) {
+		for (i = 0; i < nidx; i++) {
+			if (strncmp(ksr[i].ks_class, "mib2", KSTAT_STRLEN) != 0)
+				continue;
+			if (strncmp(ksr[i].ks_name, table[t]->lst_proto,
+			    KSTAT_STRLEN) == 0) {
+				lxpr_kstat_print_tab(uiobuf, table[t], &ksr[i]);
+				break;
+			}
+		}
+	}
+	kmem_free(ksr, sidx);
 }
 
 /* ARGSUSED */
