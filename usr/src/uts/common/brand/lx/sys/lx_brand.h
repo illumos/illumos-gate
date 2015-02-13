@@ -80,10 +80,10 @@ extern "C" {
 #define	B_LPID_TO_SPAIR		128
 #define	B_SYSENTRY		129
 #define	B_SYSRETURN		130
-#define	B_PTRACE_SYSCALL	131
+#define	B_PTRACE_KERNEL		131
 #define	B_SET_AFFINITY_MASK	132
 #define	B_GET_AFFINITY_MASK	133
-#define	B_PTRACE_EXT_OPTS	134
+#define	B_PTRACE_CLONE_BEGIN	134
 #define	B_PTRACE_STOP_FOR_OPT	135
 #define	B_UNSUPPORTED		136
 #define	B_STORE_ARGS		137
@@ -91,37 +91,31 @@ extern "C" {
 #define	B_SIGNAL_RETURN		139
 #define	B_UNWIND_NTV_SYSC_FLAG	140
 #define	B_EXIT_AS_SIG		141
-#define	B_PTRACE_GETEVENTMSG	142
+#define	B_HELPER_WAITID		142
 
 #define	B_IKE_SYSCALL		192
 
-/* B_PTRACE_EXT_OPTS subcommands */
-#define	 B_PTRACE_EXT_OPTS_SET	1
-#define	 B_PTRACE_EXT_OPTS_GET	2
-#define	 B_PTRACE_EXT_OPTS_EVT	3
-#define	 B_PTRACE_DETACH	4
-
+#ifndef _ASM
 /*
  * Support for Linux PTRACE_SETOPTIONS handling.
  */
-#define	LX_PTRACE_O_TRACESYSGOOD	0x0001
-#define	LX_PTRACE_O_TRACEFORK		0x0002
-#define	LX_PTRACE_O_TRACEVFORK		0x0004
-#define	LX_PTRACE_O_TRACECLONE		0x0008
-#define	LX_PTRACE_O_TRACEEXEC		0x0010
-#define	LX_PTRACE_O_TRACEVFORKDONE	0x0020
-#define	LX_PTRACE_O_TRACEEXIT		0x0040
-#define	LX_PTRACE_O_TRACESECCOMP	0x0080
-/*
- * lx emulation-specific flag to indicate this is a child process being stopped
- * due to one of the PTRACE_SETOPTIONS above.
- */
-#define	EMUL_PTRACE_O_CHILD		0x8000
-/*
- * lx emulation-specific flag to determine via B_PTRACE_EXT_OPTS_GET if a
- * process is being traced because of one of the PTRACE_SETOPTIONS above.
- */
-#define	EMUL_PTRACE_IS_TRACED		0x8000
+typedef enum lx_ptrace_options {
+	LX_PTRACE_O_TRACESYSGOOD =	0x0001,
+	LX_PTRACE_O_TRACEFORK =		0x0002,
+	LX_PTRACE_O_TRACEVFORK =	0x0004,
+	LX_PTRACE_O_TRACECLONE =	0x0008,
+	LX_PTRACE_O_TRACEEXEC =		0x0010,
+	LX_PTRACE_O_TRACEVFORKDONE =	0x0020,
+	LX_PTRACE_O_TRACEEXIT =		0x0040,
+	LX_PTRACE_O_TRACESECCOMP =	0x0080
+} lx_ptrace_options_t;
+
+#define	LX_PTRACE_O_ALL							\
+	(LX_PTRACE_O_TRACESYSGOOD | LX_PTRACE_O_TRACEFORK | 		\
+	LX_PTRACE_O_TRACEVFORK | LX_PTRACE_O_TRACECLONE | 		\
+	LX_PTRACE_O_TRACEEXEC | LX_PTRACE_O_TRACEVFORKDONE |		\
+	LX_PTRACE_O_TRACEEXIT | LX_PTRACE_O_TRACESECCOMP)
+#endif /* !_ASM */
 
 /* siginfo si_status for traced events */
 #define	LX_PTRACE_EVENT_FORK		0x100
@@ -131,6 +125,17 @@ extern "C" {
 #define	LX_PTRACE_EVENT_VFORK_DONE	0x500
 #define	LX_PTRACE_EVENT_EXIT		0x600
 #define	LX_PTRACE_EVENT_SECCOMP		0x700
+
+/*
+ * Brand-private values for the "pr_what" member of lwpstatus, for use with the
+ * PR_BRAND stop reason.  These reasons are validated in lx_stop_notify();
+ * update it if you add new reasons here.
+ */
+#define	LX_PR_SYSENTRY		1
+#define	LX_PR_SYSEXIT		2
+#define	LX_PR_SIGNALLED		3
+#define	LX_PR_EVENT		4
+
 
 #define	LX_VERSION_1		1
 #define	LX_VERSION		LX_VERSION_1
@@ -257,10 +262,6 @@ typedef struct lx_proc_data {
 	uintptr_t l_traceflag;	/* address of 32-bit tracing flag */
 	pid_t l_ppid;		/* pid of originating parent proc */
 	uint64_t l_ptrace;	/* process being observed with ptrace */
-	uint_t l_ptrace_opts;	/* process's extended ptrace options */
-	uint_t l_ptrace_event;	/* extended ptrace option trap event */
-	uint_t l_ptrace_is_traced; /* set if traced due to ptrace setoptions */
-	ulong_t l_ptrace_eventmsg; /* extended ptrace event msg */
 	lx_elf_data_t l_elf_data; /* ELF data for linux executable */
 	int l_signal;		/* signal to deliver to parent when this */
 				/* thread group dies */
@@ -282,10 +283,70 @@ typedef ulong_t lx_affmask_t[LX_AFF_ULONGS];
 
 #ifdef	_KERNEL
 
+typedef struct lx_lwp_data lx_lwp_data_t;
+
+/*
+ * Flag values for "lxpa_flags" on a ptrace(2) accord.
+ */
+typedef enum lx_accord_flags {
+	LX_ACC_TOMBSTONE = 0x01
+} lx_accord_flags_t;
+
+/*
+ * Flags values for "br_ptrace_flags" in the LWP-specific data.
+ */
+typedef enum lx_ptrace_state {
+	LX_PTRACE_SYSCALL = 0x01,
+	LX_PTRACE_EXITING = 0x02,
+	LX_PTRACE_STOPPING = 0x04,
+	LX_PTRACE_INHERIT = 0x08,
+	LX_PTRACE_STOPPED = 0x10,
+	LX_PTRACE_PARENT_WAIT = 0x20,
+	LX_PTRACE_CLDPEND = 0x40,
+	LX_PTRACE_CLONING = 0x80
+} lx_ptrace_state_t;
+
+/*
+ * A ptrace(2) accord represents the relationship between a tracer LWP and the
+ * set of LWPs that it is tracing: the tracees.  This data structure belongs
+ * primarily to the tracer, but is reference counted so that it may be freed by
+ * whoever references it last.
+ */
+typedef struct lx_ptrace_accord {
+	kmutex_t		lxpa_lock;
+	uint_t			lxpa_refcnt;
+	lx_accord_flags_t	lxpa_flags;
+
+	/*
+	 * The tracer must hold "pidlock" while clearing these fields for
+	 * exclusion of waitid(), etc.
+	 */
+	lx_lwp_data_t		*lxpa_tracer;
+	kcondvar_t		*lxpa_cvp;
+
+	/*
+	 * The "lxpa_tracees_lock" mutex protects the tracee list.
+	 */
+	kmutex_t		lxpa_tracees_lock;
+	list_t			lxpa_tracees;
+} lx_ptrace_accord_t;
+
+/*
+ * These values are stored in the per-LWP data for a tracee when it is attached
+ * to a tracer.  They record the method that was used to attach.
+ */
+typedef enum lx_ptrace_attach {
+	LX_PTA_NONE = 0x00,		/* not attached */
+	LX_PTA_ATTACH = 0x01,		/* due to tracer using PTRACE_ATTACH */
+	LX_PTA_TRACEME = 0x02,		/* due to child using PTRACE_TRACEME */
+	LX_PTA_INHERIT_CLONE = 0x04,	/* due to PTRACE_CLONE clone(2) flag */
+	LX_PTA_INHERIT_OPTIONS = 0x08	/* due to PTRACE_SETOPTIONS options */
+} lx_ptrace_attach_t;
+
 /*
  * lx-specific data in the klwp_t
  */
-typedef struct lx_lwp_data {
+struct lx_lwp_data {
 	uint_t	br_ntv_syscall;		/* 1 = syscall from native libc */
 	uint_t	br_lwp_flags;		/* misc. flags */
 	klwp_t	*br_lwp;		/* back pointer to container lwp */
@@ -319,8 +380,26 @@ typedef struct lx_lwp_data {
 	void	*br_scall_args;
 	int	br_args_size; /* size in bytes of br_scall_args */
 
-	uint_t	br_ptrace;		/* ptrace is active for this LWP */
-} lx_lwp_data_t;
+	boolean_t br_waitid_emulate;
+	int br_waitid_flags;
+
+	lx_ptrace_state_t br_ptrace_flags; /* ptrace state for this LWP */
+	lx_ptrace_options_t br_ptrace_options; /* PTRACE_SETOPTIONS options */
+	lx_ptrace_options_t br_ptrace_clone_option; /* current clone(2) type */
+
+	lx_ptrace_attach_t br_ptrace_attach; /* how did we get attached */
+	lx_ptrace_accord_t *br_ptrace_accord; /* accord for this tracer LWP */
+	lx_ptrace_accord_t *br_ptrace_tracer; /* accord tracing this LWP */
+	list_node_t br_ptrace_linkage;	/* linkage for lxpa_tracees list */
+
+	ushort_t br_ptrace_whystop; 	/* stop reason, 0 for no stop */
+	ushort_t br_ptrace_whatstop;	/* stop sub-reason */
+
+	int32_t br_ptrace_stopsig;	/* stop signal, 0 for no signal */
+
+	uint_t	br_ptrace_event;
+	ulong_t	br_ptrace_eventmsg;
+};
 
 /*
  * Upper limit on br_args_size, low because this value can persist until

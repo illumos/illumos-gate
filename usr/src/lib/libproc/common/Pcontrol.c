@@ -26,6 +26,7 @@
  * Portions Copyright 2007 Chad Mynhier
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
+ * Copyright 2015, Joyent, Inc.
  */
 
 #include <assert.h>
@@ -1758,6 +1759,9 @@ prldump(const char *caller, lwpstatus_t *lsp)
 	case PR_SUSPENDED:
 		dprintf("%s: SUSPENDED\n", caller);
 		break;
+	case PR_BRAND:
+		dprintf("%s: BRANDPRIVATE (%d)\n", caller, lsp->pr_what);
+		break;
 	default:
 		dprintf("%s: Unknown\n", caller);
 		break;
@@ -1937,6 +1941,7 @@ Pstopstatus(struct ps_prochandle *P,
 	case PR_FAULTED:
 	case PR_JOBCONTROL:
 	case PR_SUSPENDED:
+	case PR_BRAND:
 		break;
 	default:
 		errno = EPROTO;
@@ -3511,6 +3516,7 @@ Lstopstatus(struct ps_lwphandle *L,
 	case PR_FAULTED:
 	case PR_JOBCONTROL:
 	case PR_SUSPENDED:
+	case PR_BRAND:
 		break;
 	default:
 		errno = EPROTO;

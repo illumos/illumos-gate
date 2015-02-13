@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ * Copyright 2015, Joyent, Inc.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -201,6 +201,7 @@ prchoose(proc_t *p)
 			case PR_SYSEXIT:
 			case PR_SIGNALLED:
 			case PR_FAULTED:
+			case PR_BRAND:
 				/*
 				 * Make an lwp calling exit() be the
 				 * last lwp seen in the process.

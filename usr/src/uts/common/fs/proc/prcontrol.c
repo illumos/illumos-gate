@@ -25,7 +25,7 @@
  */
 
 /*
- * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
+ * Copyright 2015, Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -1481,7 +1481,7 @@ pr_setsig(prnode_t *pnp, siginfo_t *sip)
 		} else if (t->t_state == TS_STOPPED && sig == SIGKILL) {
 			/* If SIGKILL, set stopped lwp running */
 			p->p_stopsig = 0;
-			t->t_schedflag |= TS_XSTART | TS_PSTART;
+			t->t_schedflag |= TS_XSTART | TS_PSTART | TS_BSTART;
 			t->t_dtrace_stop = 0;
 			setrun_locked(t);
 		}

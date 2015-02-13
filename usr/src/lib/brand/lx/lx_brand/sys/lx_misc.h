@@ -55,6 +55,13 @@ extern int lx_rpm_delay;
 extern boolean_t lx_is_rpm;
 
 /*
+ * These thread-specific variables allow the signal interposition code
+ * to communicate restart disposition for any interrupting signals.
+ */
+extern __thread int lx_had_sigchild;
+extern __thread int lx_do_syscall_restart;
+
+/*
  * Values Linux expects for init
  */
 #define	LX_INIT_PGID	0
@@ -173,6 +180,7 @@ extern void lx_ptrace_init();
 extern int lx_ptrace_wait(siginfo_t *);
 extern void lx_ptrace_fork(void);
 extern void lx_ptrace_stop_if_option(int, boolean_t, ulong_t msg);
+extern void lx_ptrace_clone_begin(int, boolean_t);
 
 extern int lx_check_alloca(size_t);
 #define	SAFE_ALLOCA(sz)	(lx_check_alloca(sz) ? alloca(sz) : NULL)

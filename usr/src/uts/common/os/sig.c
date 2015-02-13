@@ -22,7 +22,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2014, Joyent, Inc.  All rights reserved.
+ * Copyright 2015, Joyent, Inc.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -201,7 +201,7 @@ eat_signal(kthread_t *t, int sig)
 		    !(ttoproc(t)->p_proc_flag & P_PR_LOCK)) {
 			ttoproc(t)->p_stopsig = 0;
 			t->t_dtrace_stop = 0;
-			t->t_schedflag |= TS_XSTART | TS_PSTART;
+			t->t_schedflag |= TS_XSTART | TS_PSTART | TS_BSTART;
 			setrun_locked(t);
 		} else if (t != curthread && t->t_state == TS_ONPROC) {
 			aston(t);	/* make it do issig promptly */
@@ -624,6 +624,21 @@ issig_forreal(void)
 		}
 
 		/*
+		 * Allow the brand the chance to alter (or suppress) delivery
+		 * of this signal.
+		 */
+		if (PROC_IS_BRANDED(p) && BROP(p)->b_issig_stop != NULL) {
+			/*
+			 * The brand hook will return 0 if it would like
+			 * us to drive on, or -1 if we should restart
+			 * the loop to check other conditions.
+			 */
+			if (BROP(p)->b_issig_stop(p, lwp) != 0) {
+				continue;
+			}
+		}
+
+		/*
 		 * Honor requested stop before dealing with the
 		 * current signal; a debugger may change it.
 		 * Do not want to go back to loop here since this is a special
@@ -955,6 +970,16 @@ stop(int why, int what)
 		}
 		break;
 
+	case PR_BRAND:
+		/*
+		 * We have been stopped by the brand code for a brand-private
+		 * reason.  This is an asynchronous stop affecting only this
+		 * LWP.
+		 */
+		VERIFY(PROC_IS_BRANDED(p));
+		flags &= ~TS_BSTART;
+		break;
+
 	default:	/* /proc stop */
 		flags &= ~TS_PSTART;
 		/*
@@ -1066,7 +1091,7 @@ stop(int why, int what)
 		}
 	}
 
-	if (why != PR_JOBCONTROL && why != PR_CHECKPOINT) {
+	if (why != PR_JOBCONTROL && why != PR_CHECKPOINT && why != PR_BRAND) {
 		/*
 		 * Do process-level notification when all lwps are
 		 * either stopped on events of interest to /proc
@@ -1172,6 +1197,13 @@ stop(int why, int what)
 	if (why == PR_CHECKPOINT)
 		del_one_utstop();
 
+	/*
+	 * Allow the brand to post notification of this stop condition.
+	 */
+	if (PROC_IS_BRANDED(p) && BROP(p)->b_stop_notify != NULL) {
+		BROP(p)->b_stop_notify(p, lwp, why, what);
+	}
+
 	thread_lock(t);
 	ASSERT((t->t_schedflag & TS_ALLSTART) == 0);
 	t->t_schedflag |= flags;
@@ -1193,7 +1225,7 @@ stop(int why, int what)
 		    (p->p_flag & (SEXITLWPS|SKILLED))) {
 			p->p_stopsig = 0;
 			thread_lock(t);
-			t->t_schedflag |= TS_XSTART | TS_PSTART;
+			t->t_schedflag |= TS_XSTART | TS_PSTART | TS_BSTART;
 			setrun_locked(t);
 			thread_unlock_nopreempt(t);
 		} else if (why == PR_JOBCONTROL) {
@@ -1811,6 +1843,15 @@ sigcld_repost()
 
 	sqp = kmem_zalloc(sizeof (sigqueue_t), KM_SLEEP);
 	mutex_enter(&pidlock);
+	if (PROC_IS_BRANDED(pp) && BROP(pp)->b_sigcld_repost != NULL) {
+		/*
+		 * Allow the brand to inject synthetic SIGCLD signals.
+		 */
+		if (BROP(pp)->b_sigcld_repost(pp, sqp) == 0) {
+			mutex_exit(&pidlock);
+			return;
+		}
+	}
 	for (cp = pp->p_child; cp; cp = cp->p_sibling) {
 		if (cp->p_pidflag & CLDPEND) {
 			post_sigcld(cp, sqp);
