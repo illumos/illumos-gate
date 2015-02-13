@@ -22,6 +22,8 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
+#
 
 # Scripts that generate IPfilter rules for SMB server
 
@@ -32,7 +34,7 @@ create_ipf_rules()
 {
 	FMRI=$1
 	file=`fmri_to_file $FMRI $IPF_SUFFIX`
-	ip=any
+	file6=`fmri_to_file $FMRI $IPF6_SUFFIX`
 	policy=`get_policy ${FMRI}`
 	iana_names="microsoft-ds netbios-ns netbios-dgm netbios-ssn"
 
@@ -40,13 +42,16 @@ create_ipf_rules()
 	# Enforce policy on each port
 	#
 	echo "# $FMRI" >$file
+	echo "# $FMRI" >$file6
 	for name in $iana_names; do
 		port=`$SERVINFO -p -s $name 2>/dev/null`
 		if [ -z "$port" ]; then
 			continue;
 		fi
-		generate_rules $FMRI $policy "tcp" $ip $port $file
-		generate_rules $FMRI $policy "udp" $ip $port $file
+		generate_rules $FMRI $policy "tcp" $port $file
+		generate_rules $FMRI $policy "tcp" $port $file6 _6
+		generate_rules $FMRI $policy "udp" $port $file
+		generate_rules $FMRI $policy "udp" $port $file6 _6
 	done
 }
 

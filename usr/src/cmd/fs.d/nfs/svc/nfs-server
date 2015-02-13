@@ -21,8 +21,9 @@
 #
 
 #
-# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 # Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 #
 
 # Start/stop processes required for server NFS
@@ -47,7 +48,8 @@ zone=`smf_zonename`
 configure_ipfilter()
 {
 	ipfile=`fmri_to_file $SMF_FMRI $IPF_SUFFIX`
-	[ -f "$ipfile" ] && return 0
+	ip6file=`fmri_to_file $SMF_FMRI $IPF6_SUFFIX`
+	[ -f "$ipfile" -a -f "$ip6file" ] && return 0
 
         #
 	# Nothing to do if:
@@ -129,20 +131,22 @@ case "$1" in
 	#  - nfs/rquota
 	#
 	# The following services are enabled for both nfs client and
-	# server so we'll treat them as client services and simply
-	# allow incoming traffic.
+	# server, if nfs/client is enabled we'll treat them as client
+	# services and simply allow incoming traffic.
 	#  - nfs/status
 	#  - nfs/nlockmgr
 	#  - nfs/cbd
 	#
 	NFS_FMRI="svc:/network/nfs/server:default"
+	NFSCLI_FMRI="svc:/network/nfs/client:default"
 	RQUOTA_FMRI="svc:/network/nfs/rquota:default"
 	FMRI=$2
 
 	file=`fmri_to_file $FMRI $IPF_SUFFIX`
+	file6=`fmri_to_file $FMRI $IPF6_SUFFIX`
 	echo "# $FMRI" >$file
+	echo "# $FMRI" >$file6
 	policy=`get_policy $NFS_FMRI`
-	ip="any"
 
 	#
 	# nfs/server configuration is processed in the start method.
@@ -157,52 +161,107 @@ case "$1" in
 		nfs_name=`svcprop -p $FW_CONTEXT_PG/name $FMRI 2>/dev/null`
 		tport=`$SERVINFO -p -t -s $nfs_name 2>/dev/null`
 		if [ -n "$tport" ]; then
-			generate_rules $FMRI $policy "tcp" $ip $tport $file
+			generate_rules $FMRI $policy "tcp" $tport $file
+		fi
+
+		tport6=`$SERVINFO -p -t6 -s $nfs_name 2>/dev/null`
+		if [ -n "$tport6" ]; then
+			generate_rules $FMRI $policy "tcp" $tport6 $file6 _6
 		fi
 
 		uport=`$SERVINFO -p -u -s $nfs_name 2>/dev/null`
 		if [ -n "$uport" ]; then
-			generate_rules $FMRI $policy "udp" $ip $uport $file
+			generate_rules $FMRI $policy "udp" $uport $file
 		fi
 
+		uport6=`$SERVINFO -p -u6 -s $nfs_name 2>/dev/null`
+		if [ -n "$uport6" ]; then
+			generate_rules $FMRI $policy "udp" $uport6 $file6 _6
+		fi
+
+		# mountd IPv6 ports are also reachable through IPv4, so include
+		# them when generating IPv4 rules.
 		tports=`$SERVINFO -R -p -t -s "mountd" 2>/dev/null`
-		if [ -n "$tports" ]; then
+		tports6=`$SERVINFO -R -p -t6 -s "mountd" 2>/dev/null`
+		if [ -n "$tports" -o -n "$tports6" ]; then
+			tports=`unique_ports $tports $tports6`
 			for tport in $tports; do
-				generate_rules $FMRI $policy "tcp" $ip \
+				generate_rules $FMRI $policy "tcp" \
 				    $tport $file
 			done
 		fi
 
+		if [ -n "$tports6" ]; then
+			for tport6 in $tports6; do
+				generate_rules $FMRI $policy "tcp" \
+				    $tport6 $file6 _6
+			done
+		fi
+
 		uports=`$SERVINFO -R -p -u -s "mountd" 2>/dev/null`
-		if [ -n "$uports" ]; then
+		uports6=`$SERVINFO -R -p -u6 -s "mountd" 2>/dev/null`
+		if [ -n "$uports" -o -n "$uports6" ]; then
+			uports=`unique_ports $uports $uports6`
 			for uport in $uports; do
-				generate_rules $FMRI $policy "udp" $ip \
+				generate_rules $FMRI $policy "udp" \
 				    $uport $file
+			done
+		fi
+
+		if [ -n "$uports6" ]; then
+			for uport6 in $uports6; do
+				generate_rules $FMRI $policy "udp" \
+				    $uport6 $file6 _6
 			done
 		fi
 
 	elif [ "$FMRI" = "$RQUOTA_FMRI" ]; then
 		iana_name=`svcprop -p inetd/name $FMRI`
 
+		# rquota IPv6 ports are also reachable through IPv4, so include
+		# them when generating IPv4 rules.
 		tports=`$SERVINFO -R -p -t -s $iana_name 2>/dev/null`
-		if [ -n "$tports" ]; then
+		tports6=`$SERVINFO -R -p -t6 -s $iana_name 2>/dev/null`
+		if [ -n "$tports" -o -n "$tports6" ]; then
+			tports=`unique_ports $tports $tports6`
 			for tport in $tports; do
 				generate_rules $NFS_FMRI $policy "tcp" \
-				    $ip $tport $file
+				    $tport $file
+			done
+		fi
+
+		if [ -n "$tports6" ]; then
+			for tport6 in $tports6; do
+				generate_rules $NFS_FMRI $policy "tcp" \
+				    $tport6 $file6 _6
 			done
 		fi
 
 		uports=`$SERVINFO -R -p -u -s $iana_name 2>/dev/null`
-		if [ -n "$uports" ]; then
+		uports6=`$SERVINFO -R -p -u6 -s $iana_name 2>/dev/null`
+		if [ -n "$uports" -o -n "$uports6" ]; then
+			uports=`unique_ports $uports $uports6`
 			for uport in $uports; do
 				generate_rules $NFS_FMRI $policy "udp" \
-				    $ip $uport $file
+				    $uport $file
+			done
+		fi
+
+		if [ -n "$uports6" ]; then
+			for uport6 in $uports6; do
+				generate_rules $NFS_FMRI $policy "udp" \
+				    $uport6 $file6 _6
 			done
 		fi
 	else
 		#
 		# Handle the client services here
 		#
+		if service_check_state $NFSCLI_FMRI $SMF_ONLINE; then
+			policy=none
+			ip=any
+		fi
+
 		restarter=`svcprop -p general/restarter $FMRI 2>/dev/null`
 		if [ "$restarter" = "$INETDFMRI" ]; then
 			iana_name=`svcprop -p inetd/name $FMRI`
@@ -214,24 +273,41 @@ case "$1" in
 
 		if [ "$isrpc" = "true" ]; then
 			tports=`$SERVINFO -R -p -t -s $iana_name 2>/dev/null`
+			tports6=`$SERVINFO -R -p -t6 -s $iana_name 2>/dev/null`
 			uports=`$SERVINFO -R -p -u -s $iana_name 2>/dev/null`
+			uports6=`$SERVINFO -R -p -u6 -s $iana_name 2>/dev/null`
 		else
 			tports=`$SERVINFO -p -t -s $iana_name 2>/dev/null`
+			tports6=`$SERVINFO -p -t6 -s $iana_name 2>/dev/null`
 			uports=`$SERVINFO -p -u -s $iana_name 2>/dev/null`
+			uports6=`$SERVINFO -p -u6 -s $iana_name 2>/dev/null`
 		fi
 
-		if [ -n "$tports" ]; then
+		# IPv6 ports are also reachable through IPv4, so include
+		# them when generating IPv4 rules.
+		if [ -n "$tports" -o -n "$tports6" ]; then
+			tports=`unique_ports $tports $tports6`
 			for tport in $tports; do
-				echo "pass in log quick proto tcp from any" \
-				    "to any port = ${tport} flags S " \
-				    "keep state" >>${file}
+				generate_rules $FMRI $policy "tcp" $tport $file
 			done
 		fi
 
-		if [ -n "$uports" ]; then
+		if [ -n "$tports6" ]; then
+			for tport6 in $tports6; do
+				generate_rules $FMRI $policy "tcp" $tport6 $file6 _6
+			done
+		fi
+
+		if [ -n "$uports" -o -n "$uports6" ]; then
+			uports=`unique_ports $uports $uports6`
 			for uport in $uports; do
-				echo "pass in log quick proto udp from any" \
-				    "to any port = ${uport}" >>${file}
+				generate_rules $FMRI $policy "udp" $uport $file
+			done
+		fi
+
+		if [ -n "$uports6" ]; then
+			for uport6 in $uports6; do
+				generate_rules $FMRI $policy "udp" $uport6 $file6 _6
 			done
 		fi
 	fi
