@@ -820,8 +820,8 @@ smb_open_subr(smb_request_t *sr)
 
 	status = NT_STATUS_SUCCESS;
 
-	of = smb_ofile_open(sr->tid_tree, node, sr->smb_pid, op, SMB_FTYPE_DISK,
-	    uniq_fid, &err);
+	of = smb_ofile_open(sr, node, sr->smb_pid, op, SMB_FTYPE_DISK, uniq_fid,
+	    &err);
 	if (of == NULL) {
 		smbsr_error(sr, err.status, err.errcls, err.errcode);
 		status = err.status;

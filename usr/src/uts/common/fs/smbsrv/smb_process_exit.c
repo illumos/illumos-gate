@@ -85,11 +85,11 @@ smb_com_process_exit(smb_request_t *sr)
 	 * to be the only thing that sends this request these days and
 	 * it doesn't provide a TID.
 	 */
-	sr->tid_tree = smb_user_lookup_tree(sr->uid_user, sr->smb_tid);
+	sr->tid_tree = smb_session_lookup_tree(sr->session, sr->smb_tid);
 	if (sr->tid_tree != NULL)
 		smb_tree_close_pid(sr->tid_tree, sr->smb_pid);
 	else
-		smb_user_close_pid(sr->uid_user, sr->smb_pid);
+		smb_session_close_pid(sr->session, sr->smb_pid);
 
 	rc = smbsr_encode_empty_result(sr);
 	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);

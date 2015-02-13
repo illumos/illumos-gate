@@ -662,7 +662,7 @@ smb_encode_stream_info(smb_request_t *sr, smb_xa_t *xa, smb_queryinfo_t *qinfo)
 
 	odid = smb_odir_openat(sr, fnode);
 	if (odid != 0)
-		od = smb_tree_lookup_odir(sr->tid_tree, odid);
+		od = smb_tree_lookup_odir(sr, odid);
 	if (od != NULL)
 		rc = smb_odir_read_streaminfo(sr, od, sinfo, &eos);
 

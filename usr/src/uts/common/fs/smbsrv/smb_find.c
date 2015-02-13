@@ -306,7 +306,7 @@ smb_com_search(smb_request_t *sr)
 		}
 	}
 
-	od = smb_tree_lookup_odir(sr->tid_tree, odid);
+	od = smb_tree_lookup_odir(sr, odid);
 	if (od == NULL) {
 		smbsr_error(sr, NT_STATUS_INVALID_HANDLE,
 		    ERRDOS, ERROR_INVALID_HANDLE);
@@ -452,7 +452,7 @@ smb_com_find(smb_request_t *sr)
 		}
 	}
 
-	od = smb_tree_lookup_odir(sr->tid_tree, odid);
+	od = smb_tree_lookup_odir(sr, odid);
 	if (od == NULL) {
 		smbsr_error(sr, NT_STATUS_INVALID_HANDLE,
 		    ERRDOS, ERROR_INVALID_HANDLE);
@@ -575,7 +575,7 @@ smb_com_find_close(smb_request_t *sr)
 		return (SDRC_ERROR);
 	}
 
-	od = smb_tree_lookup_odir(sr->tid_tree, odid);
+	od = smb_tree_lookup_odir(sr, odid);
 	if (od == NULL) {
 		smbsr_error(sr, NT_STATUS_INVALID_HANDLE,
 		    ERRDOS, ERROR_INVALID_HANDLE);
@@ -649,7 +649,7 @@ smb_com_find_unique(struct smb_request *sr)
 	odid = smb_odir_open(sr, pn->pn_path, sattr, 0);
 	if (odid == 0)
 		return (SDRC_ERROR);
-	od = smb_tree_lookup_odir(sr->tid_tree, odid);
+	od = smb_tree_lookup_odir(sr, odid);
 	if (od == NULL)
 		return (SDRC_ERROR);
 

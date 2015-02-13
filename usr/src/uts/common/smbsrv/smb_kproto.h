@@ -521,6 +521,15 @@ void smb_session_disconnect_from_share(smb_llist_t *, char *);
 smb_user_t *smb_session_dup_user(smb_session_t *, char *, char *);
 smb_user_t *smb_session_lookup_uid(smb_session_t *, uint16_t);
 void smb_session_post_user(smb_session_t *, smb_user_t *);
+void smb_session_post_tree(smb_session_t *, smb_tree_t *);
+smb_tree_t *smb_session_lookup_tree(smb_session_t *, uint16_t);
+smb_tree_t *smb_session_lookup_share(smb_session_t *, const char *,
+    smb_tree_t *);
+smb_tree_t *smb_session_lookup_volume(smb_session_t *, const char *,
+    smb_tree_t *);
+void smb_session_close_pid(smb_session_t *, uint16_t);
+void smb_session_disconnect_owned_trees(smb_session_t *, smb_user_t *);
+void smb_session_disconnect_trees(smb_session_t *);
 void smb_session_disconnect_share(smb_session_t *, const char *);
 void smb_session_getclient(smb_session_t *, char *, size_t);
 boolean_t smb_session_isclient(smb_session_t *, const char *);
@@ -539,10 +548,10 @@ void smb_request_free(smb_request_t *);
 /*
  * ofile functions (file smb_ofile.c)
  */
-smb_ofile_t *smb_ofile_lookup_by_fid(smb_tree_t *, uint16_t);
+smb_ofile_t *smb_ofile_lookup_by_fid(smb_request_t *, uint16_t);
 smb_ofile_t *smb_ofile_lookup_by_uniqid(smb_tree_t *, uint32_t);
 boolean_t smb_ofile_disallow_fclose(smb_ofile_t *);
-smb_ofile_t *smb_ofile_open(smb_tree_t *, smb_node_t *, uint16_t,
+smb_ofile_t *smb_ofile_open(smb_request_t *, smb_node_t *, uint16_t,
     smb_arg_open_t *, uint16_t, uint32_t, smb_error_t *);
 void smb_ofile_close(smb_ofile_t *, int32_t);
 void smb_ofile_delete(void *);
@@ -603,18 +612,11 @@ smb_user_t *smb_user_login(smb_session_t *, cred_t *,
 smb_user_t *smb_user_dup(smb_user_t *);
 void smb_user_logoff(smb_user_t *);
 void smb_user_delete(void *);
-void smb_user_post_tree(smb_user_t *, smb_tree_t *);
-smb_tree_t *smb_user_lookup_tree(smb_user_t *, uint16_t);
-smb_tree_t *smb_user_lookup_share(smb_user_t *, const char *, smb_tree_t *);
-smb_tree_t *smb_user_lookup_volume(smb_user_t *, const char *, smb_tree_t *);
 boolean_t smb_user_is_admin(smb_user_t *);
 boolean_t smb_user_namecmp(smb_user_t *, const char *);
 int smb_user_enum(smb_user_t *, smb_svcenum_t *);
-void smb_user_close_pid(smb_user_t *, uint16_t);
-void smb_user_disconnect_trees(smb_user_t *user);
-void smb_user_disconnect_share(smb_user_t *, const char *);
-int smb_user_fclose(smb_user_t *, uint32_t);
 boolean_t smb_user_hold(smb_user_t *);
+void smb_user_hold_internal(smb_user_t *);
 void smb_user_release(smb_user_t *);
 cred_t *smb_user_getcred(smb_user_t *);
 cred_t *smb_user_getprivcred(smb_user_t *);
@@ -637,7 +639,7 @@ int smb_tree_enum(smb_tree_t *, smb_svcenum_t *);
 int smb_tree_fclose(smb_tree_t *, uint32_t);
 boolean_t smb_tree_hold(smb_tree_t *);
 void smb_tree_release(smb_tree_t *);
-smb_odir_t *smb_tree_lookup_odir(smb_tree_t *, uint16_t);
+smb_odir_t *smb_tree_lookup_odir(smb_request_t *, uint16_t);
 boolean_t smb_tree_is_connected(smb_tree_t *);
 #define	SMB_TREE_GET_TID(tree)		((tree)->t_tid)
 

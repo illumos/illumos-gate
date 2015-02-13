@@ -130,8 +130,8 @@ smb_opipe_open(smb_request_t *sr)
 
 	op->create_options = 0;
 
-	of = smb_ofile_open(sr->tid_tree, NULL, sr->smb_pid, op,
-	    SMB_FTYPE_MESG_PIPE, SMB_UNIQ_FID(), &err);
+	of = smb_ofile_open(sr, NULL, sr->smb_pid, op, SMB_FTYPE_MESG_PIPE,
+	    SMB_UNIQ_FID(), &err);
 
 	if (of == NULL)
 		return (err.status);
