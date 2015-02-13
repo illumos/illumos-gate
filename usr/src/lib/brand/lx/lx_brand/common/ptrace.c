@@ -51,82 +51,17 @@
 #include <ieeefp.h>
 #include <assert.h>
 #include <libintl.h>
+#include <lx_syscall.h>
 
 /*
- * Linux ptrace compatibility.
- *
- * The brand support for ptrace(2) is built on top of the Solaris /proc
- * interfaces, mounted at /native/proc in the zone.  This gets quite
- * complicated due to the way ptrace works and the Solaris realization of the
- * Linux threading model.
- *
- * ptrace can only interact with a process if we are tracing it, and it is
- * currently stopped. There are two ways a process can begin tracing another
- * process:
- *
- *   PTRACE_TRACEME
- *
- *   A child process can use PTRACE_TRACEME to indicate that it wants to be
- *   traced by the parent. This sets the ptrace compatibility flag in /proc
- *   which causes ths ptrace consumer to be notified through the wait(2)
- *   system call of events of interest. PTRACE_TRACEME is typically used by
- *   the debugger by forking a process, using PTRACE_TRACEME, and finally
- *   doing an exec of the specified program.
- *
- *
- *   PTRACE_ATTACH
- *
- *   We can attach to a process using PTRACE_ATTACH. This is considerably
- *   more complicated than the previous case. On Linux, the traced process is
- *   effectively reparented to the ptrace consumer so that event notification
- *   can go through the normal wait(2) system call. Solaris has no such
- *   ability to reparent a process (nor should it) so some trickery was
- *   required.
- *
- *   When the ptrace consumer uses PTRACE_ATTACH it forks a monitor child
- *   process. The monitor enables the /proc ptrace flag for itself and uses
- *   the native /proc mechanisms to observe the traced process and wait for
- *   events of interest. When the traced process stops, the monitor process
- *   sends itself a SIGTRAP thus rousting its parent process (the ptrace
- *   consumer) out of wait(2). We then translate the process id and status
- *   code from wait(2) to those of the traced process.
- *
- *   To detach from the process we just have to clean up tracing flags and
- *   clean up the monitor.
- *
- * ptrace can only interact with a process if we have traced it, and it is
- * currently stopped (see is_traced()). For threads, there's no way to
- * distinguish whether ptrace() has been called for all threads or some
- * subset. Since most clients will be tracing all threads, and erroneously
- * allowing ptrace to access a non-traced thread is non-fatal (or at least
- * would be fatal on linux), we ignore this aspect of the problem.
+ * Much of the Linux ptrace(2) emulation is performed in the kernel, and there
+ * is a block comment in "lx_ptrace.c" that describes the facility in some
+ * detail.
  */
-
-#define	LX_PTRACE_TRACEME	0
-#define	LX_PTRACE_PEEKTEXT	1
-#define	LX_PTRACE_PEEKDATA	2
-#define	LX_PTRACE_PEEKUSER	3
-#define	LX_PTRACE_POKETEXT	4
-#define	LX_PTRACE_POKEDATA	5
-#define	LX_PTRACE_POKEUSER	6
-#define	LX_PTRACE_CONT		7
-#define	LX_PTRACE_KILL		8
-#define	LX_PTRACE_SINGLESTEP	9
-#define	LX_PTRACE_GETREGS	12
-#define	LX_PTRACE_SETREGS	13
-#define	LX_PTRACE_GETFPREGS	14
-#define	LX_PTRACE_SETFPREGS	15
-#define	LX_PTRACE_ATTACH	16
-#define	LX_PTRACE_DETACH	17
-#define	LX_PTRACE_GETFPXREGS	18
-#define	LX_PTRACE_SETFPXREGS	19
-#define	LX_PTRACE_SYSCALL	24
-#define	LX_PTRACE_SETOPTIONS	0x4200
-#define	LX_PTRACE_GETEVENTMSG	0x4201
 
 /* execve syscall numbers for 64-bit vs. 32-bit */
 #if defined(_LP64)
-#define	LX_SYS_execve	520
+#define	LX_SYS_execve	59
 #else
 #define	LX_SYS_execve	11
 #endif
@@ -237,28 +172,20 @@ typedef struct lx_user {
 	int lxu_debugreg[8];
 } lx_user_t;
 
-typedef struct ptrace_monitor_map {
-	struct ptrace_monitor_map *pmm_next;	/* next pointer */
-	pid_t pmm_monitor;			/* monitor child process */
-	pid_t pmm_target;			/* traced Linux pid */
-	pid_t pmm_pid;				/* Solaris pid */
-	lwpid_t pmm_lwpid;			/* Solaris lwpid */
-	uint_t pmm_exiting;			/* detached */
-} ptrace_monitor_map_t;
-
 typedef struct ptrace_state_map {
 	struct ptrace_state_map *psm_next;	/* next pointer */
 	pid_t		psm_pid;		/* Solaris pid */
 	uintptr_t	psm_debugreg[8];	/* debug registers */
 } ptrace_state_map_t;
 
-static ptrace_monitor_map_t *ptrace_monitor_map = NULL;
 static ptrace_state_map_t *ptrace_state_map = NULL;
 static mutex_t ptrace_map_mtx = DEFAULTMUTEX;
 
 extern void *_START_;
 
 static sigset_t blockable_sigs;
+
+static long lx_ptrace_kernel(int, pid_t, uintptr_t, uintptr_t);
 
 void
 lx_ptrace_init(void)
@@ -295,24 +222,6 @@ open_lwpfile(pid_t pid, lwpid_t lwpid, int mode, const char *name)
 	    pid, lwpid, name);
 
 	return (open(path, mode));
-}
-
-static int
-get_status(pid_t pid, pstatus_t *psp)
-{
-	int fd;
-
-	if ((fd = open_procfile(pid, O_RDONLY, "status")) < 0)
-		return (-ESRCH);
-
-	if (read(fd, psp, sizeof (pstatus_t)) != sizeof (pstatus_t)) {
-		(void) close(fd);
-		return (-EIO);
-	}
-
-	(void) close(fd);
-
-	return (0);
 }
 
 static int
@@ -869,22 +778,6 @@ debug_registers(pid_t pid)
 	return (p != NULL? p->psm_debugreg : NULL);
 }
 
-static void
-free_debug_registers(pid_t pid)
-{
-	ptrace_state_map_t **pp;
-	ptrace_state_map_t *p;
-
-	/* ASSERT(MUTEX_HELD(&ptrace_map_mtx) */
-	for (pp = &ptrace_state_map; (p = *pp) != NULL; pp = &p->psm_next) {
-		if (p->psm_pid == pid) {
-			*pp = p->psm_next;
-			free(p);
-			break;
-		}
-	}
-}
-
 static int
 setup_watchpoints(pid_t pid, uintptr_t *debugreg)
 {
@@ -952,156 +845,33 @@ setup_watchpoints(pid_t pid, uintptr_t *debugreg)
 }
 
 /*
- * Returns TRUE if the process is traced, FALSE otherwise.  This is only true
- * if the process is currently stopped, and has been traced using
- * PTRACE_TRACEME, PTRACE_ATTACH or one of the Linux-specific trace options.
+ * Returns B_TRUE if the target LWP, identified by its Linux pid, is traced by
+ * this LWP and is waiting in "ptrace-stop".  Returns B_FALSE otherwise.
  */
-static int
-is_traced(pid_t pid)
+static boolean_t
+is_ptrace_stopped(pid_t lxpid)
 {
-	ptrace_monitor_map_t *p;
-	pstatus_t status;
-	uint_t curr_opts;
-	pid_t mypid;
+	ulong_t dummy;
 
 	/*
-	 * First get the stop options since that is an indication that the
-	 * process is being traced.
+	 * We attempt a PTRACE_GETEVENTMSG request to determine if the tracee
+	 * is stopped appropriately.  As we are not in the kernel, this is not
+	 * an atomic check; the process is not guaranteed to remain stopped
+	 * once we have dropped the locks protecting that state and left the
+	 * kernel.
 	 */
-	if (syscall(SYS_brand, B_PTRACE_EXT_OPTS, B_PTRACE_EXT_OPTS_GET, pid,
-	    &curr_opts) != 0)
-		return (0);
-
-	mypid = getpid();
-
-	if (get_status(pid, &status) != 0)
-		return (0);
+	if (lx_ptrace_kernel(LX_PTRACE_GETEVENTMSG, lxpid, NULL,
+	    (uintptr_t)&dummy) == 0) {
+		return (B_TRUE);
+	}
 
 	/*
-	 * When we look to see if we are tracing a process we have to take the
-	 * PTRACE_SETOPTIONS handling into account. In particular, if we are
-	 * tracing with PTRACE_O_TRACEFORK, etc. then we may be dealing with
-	 * the child of a child that we started tracing. We can determine this
-	 * by checking the EMUL_PTRACE_IS_TRACED flag and checking the parent
-	 * of the parent. We cannot check for the presence of the options since
-	 * those will be cleared during the process of detaching from a tracee.
+	 * This call should only fail with ESRCH, which tells us that the
+	 * a tracee with that pid was not found in the stopped condition.
 	 */
-	if (curr_opts & EMUL_PTRACE_IS_TRACED && status.pr_ppid != mypid) {
-		pstatus_t par_status;
-		pid_t chkpid = status.pr_ppid;
+	assert(errno == ESRCH);
 
-		if (get_status(status.pr_ppid, &par_status) == 0) {
-			chkpid = par_status.pr_ppid;
-		} else {
-			/* parent is gone, re-get our ppid */
-			if (get_status(pid, &par_status) == 0)
-				chkpid = par_status.pr_ppid;
-		}
-
-		if (chkpid == mypid)
-			return (1);
-	}
-
-	if ((status.pr_flags & PR_PTRACE ||
-	    curr_opts & EMUL_PTRACE_IS_TRACED) &&
-	    (status.pr_ppid == mypid) &&
-	    (status.pr_lwp.pr_flags & PR_ISTOP))
-		return (1);
-
-	(void) mutex_lock(&ptrace_map_mtx);
-	for (p = ptrace_monitor_map; p != NULL; p = p->pmm_next) {
-		if (p->pmm_target == pid) {
-			(void) mutex_unlock(&ptrace_map_mtx);
-			return (1);
-		}
-	}
-	(void) mutex_unlock(&ptrace_map_mtx);
-
-	return (0);
-}
-
-static int
-ptrace_trace_common(int fd)
-{
-	struct {
-		long cmd;
-		union {
-			long flags;
-			sigset_t signals;
-			fltset_t faults;
-		} arg;
-	} ctl;
-	size_t size;
-
-	ctl.cmd = PCSTRACE;
-	prfillset(&ctl.arg.signals);
-	size = sizeof (long) + sizeof (sigset_t);
-	if (write(fd, &ctl, size) != size)
-		return (-1);
-
-	ctl.cmd = PCSFAULT;
-	premptyset(&ctl.arg.faults);
-	size = sizeof (long) + sizeof (fltset_t);
-	if (write(fd, &ctl, size) != size)
-		return (-1);
-
-	ctl.cmd = PCUNSET;
-	ctl.arg.flags = PR_FORK;
-	size = sizeof (long) + sizeof (long);
-	if (write(fd, &ctl, size) != size)
-		return (-1);
-
-	return (0);
-}
-
-/*
- * Notify that parent that we wish to be traced.  This is the equivalent of:
- *
- * 	1. Stop on all signals, and nothing else
- * 	2. Turn off inherit-on-fork flag
- * 	3. Set ptrace compatible flag
- *
- * If we are not the main thread, then the client is trying to request behavior
- * by which one of its own thread is to be traced.  We don't support this mode
- * of operation.
- */
-static int
-ptrace_traceme(void)
-{
-	int fd, ret;
-	int error;
-	long ctl[2];
-	pstatus_t status;
-	pid_t pid = getpid();
-
-	if (_lwp_self() != 1) {
-		lx_unsupported("thread %d calling PTRACE_TRACEME is "
-		    "unsupported", _lwp_self());
-		return (-ENOTSUP);
-	}
-
-	if ((ret = get_status(pid, &status)) != 0)
-		return (ret);
-
-	/*
-	 * Why would a process try to do this twice? I'm not sure, but there's
-	 * a conformance test which wants this to fail just so.
-	 */
-	if (status.pr_flags & PR_PTRACE)
-		return (-EPERM);
-
-	if ((fd = open_procfile(pid, O_WRONLY, "ctl")) < 0)
-		return (-errno);
-
-	ctl[0] = PCSET;
-	ctl[1] = PR_PTRACE;
-	error = 0;
-	if (write(fd, ctl, sizeof (ctl)) != sizeof (ctl) ||
-	    ptrace_trace_common(fd) != 0)
-		error = -errno;
-
-	(void) close(fd);
-	return (error);
+	return (B_FALSE);
 }
 
 /*
@@ -1113,9 +883,6 @@ ptrace_peek(pid_t pid, uintptr_t addr, long *ret)
 {
 	int fd;
 	long data;
-
-	if (!is_traced(pid))
-		return (-ESRCH);
 
 	if ((fd = open_procfile(pid, O_RDONLY, "as")) < 0)
 		return (-ESRCH);
@@ -1142,9 +909,6 @@ ptrace_peek_user(pid_t pid, lwpid_t lwpid, uintptr_t off, int *ret)
 	int err, data;
 	uintptr_t *debugreg;
 	int dreg;
-
-	if (!is_traced(pid))
-		return (-ESRCH);
 
 	/*
 	 * The offset specified by the user is an offset into the Linux
@@ -1239,9 +1003,6 @@ ptrace_poke(pid_t pid, uintptr_t addr, int data)
 {
 	int fd;
 
-	if (!is_traced(pid))
-		return (-ESRCH);
-
 	if (addr & 0x3)
 		return (-EINVAL);
 
@@ -1264,9 +1025,6 @@ ptrace_poke_user(pid_t pid, lwpid_t lwpid, uintptr_t off, int data)
 	int err = 0;
 	uintptr_t *debugreg;
 	int dreg;
-
-	if (!is_traced(pid))
-		return (-ESRCH);
 
 	if (off & 0x3)
 		return (-EINVAL);
@@ -1300,187 +1058,13 @@ ptrace_poke_user(pid_t pid, lwpid_t lwpid, uintptr_t off, int data)
 }
 
 static int
-ptrace_cont_common(int fd, int sig, int run, int step)
-{
-	long ctl[1 + 1 + sizeof (siginfo_t) / sizeof (long) + 2];
-	long *ctlp = ctl;
-	size_t size;
-
-	assert(0 <= sig && sig <= LX_NSIG);
-	assert(!step || run);
-
-	/*
-	 * Clear the current signal.
-	 */
-	*ctlp++ = PCCSIG;
-
-	/*
-	 * Send a signal if one was specified.
-	 */
-	if (sig != 0 && sig != LX_SIGSTOP) {
-		siginfo_t *infop;
-
-		*ctlp++ = PCSSIG;
-		infop = (siginfo_t *)ctlp;
-		bzero(infop, sizeof (siginfo_t));
-		infop->si_signo = ltos_signo[sig];
-
-		ctlp += sizeof (siginfo_t) / sizeof (long);
-	}
-
-	/*
-	 * If run is true, set the lwp running.
-	 */
-	if (run) {
-		*ctlp++ = PCRUN;
-		*ctlp++ = step ? PRSTEP : 0;
-	}
-
-	size = (char *)ctlp - (char *)&ctl[0];
-	assert(size <= sizeof (ctl));
-
-	if (write(fd, ctl, size) != size) {
-		lx_debug("failed to continue %s", strerror(errno));
-		return (-EIO);
-	}
-
-	return (0);
-}
-
-static int
-ptrace_cont_monitor(ptrace_monitor_map_t *p)
-{
-	long ctl[2];
-	int fd;
-
-	fd = open_procfile(p->pmm_monitor, O_WRONLY, "ctl");
-	if (fd < 0) {
-		lx_debug("failed to open monitor ctl %d",
-		    errno);
-		return (-EIO);
-	}
-
-	ctl[0] = PCRUN;
-	ctl[1] = PRCSIG;
-	if (write(fd, ctl, sizeof (ctl)) != sizeof (ctl)) {
-		(void) close(fd);
-		return (-EIO);
-	}
-
-	(void) close(fd);
-
-	return (0);
-}
-
-static int
-ptrace_cont(pid_t lxpid, pid_t pid, lwpid_t lwpid, int sig, int step)
-{
-	ptrace_monitor_map_t *p;
-	uintptr_t *debugreg;
-	int fd, ret;
-
-	if (!is_traced(pid))
-		return (-ESRCH);
-
-	if (sig < 0 || sig > LX_NSIG)
-		return (-EINVAL);
-
-	if ((fd = open_lwpfile(pid, lwpid, O_WRONLY, "lwpctl")) < 0)
-		return (-ESRCH);
-
-	if ((ret = ptrace_cont_common(fd, sig, 1, step)) != 0) {
-		(void) close(fd);
-		return (ret);
-	}
-
-	(void) close(fd);
-
-	/* kludge: use debugreg[4] to remember the single-step flag */
-	if ((debugreg = debug_registers(pid)) != NULL)
-		debugreg[4] = step;
-
-	/*
-	 * Check for a monitor and get it moving if we find it. If any of the
-	 * /proc operations fail, we're kind of sunk so just return an error.
-	 */
-	(void) mutex_lock(&ptrace_map_mtx);
-	for (p = ptrace_monitor_map; p != NULL; p = p->pmm_next) {
-		if (p->pmm_target == lxpid) {
-			if ((ret = ptrace_cont_monitor(p)) != 0)
-				return (ret);
-			break;
-		}
-	}
-	(void) mutex_unlock(&ptrace_map_mtx);
-
-	return (0);
-}
-
-/*
- * If a monitor exists for this traced process, dispose of it.
- * First turn off its ptrace flag so we won't be notified of its
- * impending demise.  We ignore errors for this step since they
- * indicate only that the monitor has been damaged due to pilot
- * error.  Then kill the monitor, and wait for it.  If the wait
- * succeeds we can dispose of the corpse, otherwise another thread's
- * wait call has collected it and we need to set a flag in the
- * structure so that if can be picked up in wait.
- */
-static void
-monitor_kill(pid_t lxpid, pid_t pid)
-{
-	ptrace_monitor_map_t *p, **pp;
-	pid_t mpid;
-	int fd;
-	long ctl[2];
-
-	(void) mutex_lock(&ptrace_map_mtx);
-	free_debug_registers(pid);
-	for (pp = &ptrace_monitor_map; (p = *pp) != NULL; pp = &p->pmm_next) {
-		if (p->pmm_target == lxpid) {
-			mpid = p->pmm_monitor;
-			if ((fd = open_procfile(mpid, O_WRONLY, "ctl")) >= 0) {
-				ctl[0] = PCUNSET;
-				ctl[1] = PR_PTRACE;
-				(void) write(fd, ctl, sizeof (ctl));
-				(void) close(fd);
-			}
-
-			(void) kill(mpid, SIGKILL);
-
-			if (waitpid(mpid, NULL, 0) == mpid) {
-				*pp = p->pmm_next;
-				free(p);
-			} else {
-				p->pmm_exiting = 1;
-			}
-
-			break;
-		}
-	}
-	(void) mutex_unlock(&ptrace_map_mtx);
-}
-
-static int
-ptrace_kill(pid_t lxpid, pid_t pid)
+ptrace_kill(pid_t pid)
 {
 	int ret;
 
-	if (!is_traced(pid))
-		return (-ESRCH);
-
 	ret = kill(pid, SIGKILL);
 
-	/* kill off the monitor process, if any */
-	monitor_kill(lxpid, pid);
-
-	return (ret);
-}
-
-static int
-ptrace_step(pid_t lxpid, pid_t pid, lwpid_t lwpid, int sig)
-{
-	return (ptrace_cont(lxpid, pid, lwpid, sig, 1));
+	return (ret == 0 ? ret : -errno);
 }
 
 static int
@@ -1488,9 +1072,6 @@ ptrace_getregs(pid_t pid, lwpid_t lwpid, uintptr_t addr)
 {
 	lx_user_regs_t regs;
 	int ret;
-
-	if (!is_traced(pid))
-		return (-ESRCH);
 
 	if ((ret = getregs(pid, lwpid, &regs)) != 0)
 		return (ret);
@@ -1506,9 +1087,6 @@ ptrace_setregs(pid_t pid, lwpid_t lwpid, uintptr_t addr)
 {
 	lx_user_regs_t regs;
 
-	if (!is_traced(pid))
-		return (-ESRCH);
-
 	if (uucopy((void *)addr, &regs, sizeof (regs)) != 0)
 		return (-errno);
 
@@ -1520,9 +1098,6 @@ ptrace_getfpregs(pid_t pid, lwpid_t lwpid, uintptr_t addr)
 {
 	lx_user_fpregs_t regs;
 	int ret;
-
-	if (!is_traced(pid))
-		return (-ESRCH);
 
 	if ((ret = getfpregs(pid, lwpid, &regs)) != 0)
 		return (ret);
@@ -1538,9 +1113,6 @@ ptrace_setfpregs(pid_t pid, lwpid_t lwpid, uintptr_t addr)
 {
 	lx_user_fpregs_t regs;
 
-	if (!is_traced(pid))
-		return (-ESRCH);
-
 	if (uucopy((void *)addr, &regs, sizeof (regs)) != 0)
 		return (-errno);
 
@@ -1552,9 +1124,6 @@ ptrace_getfpxregs(pid_t pid, lwpid_t lwpid, uintptr_t addr)
 {
 	lx_user_fpxregs_t regs;
 	int ret;
-
-	if (!is_traced(pid))
-		return (-ESRCH);
 
 	if ((ret = getfpxregs(pid, lwpid, &regs)) != 0)
 		return (ret);
@@ -1570,412 +1139,124 @@ ptrace_setfpxregs(pid_t pid, lwpid_t lwpid, uintptr_t addr)
 {
 	lx_user_fpxregs_t regs;
 
-	if (!is_traced(pid))
-		return (-ESRCH);
-
 	if (uucopy((void *)addr, &regs, sizeof (regs)) != 0)
 		return (-errno);
 
 	return (setfpxregs(pid, lwpid, &regs));
 }
 
-static void __NORETURN
-ptrace_monitor(int fd)
-{
-	struct {
-		long cmd;
-		union {
-			long flags;
-			sigset_t signals;
-			fltset_t faults;
-		} arg;
-	} ctl;
-	size_t size;
-	int monfd;
-	int rv;
-
-	monfd = open_procfile(getpid(), O_WRONLY, "ctl");
-
-	ctl.cmd = PCSTRACE;	/* trace only SIGTRAP */
-	premptyset(&ctl.arg.signals);
-	praddset(&ctl.arg.signals, SIGTRAP);
-	size = sizeof (long) + sizeof (sigset_t);
-	(void) write(monfd, &ctl, size);	/* can't fail */
-
-	ctl.cmd = PCSFAULT;
-	premptyset(&ctl.arg.faults);
-	size = sizeof (long) + sizeof (fltset_t);
-	(void) write(monfd, &ctl, size);	/* can't fail */
-
-	ctl.cmd = PCUNSET;
-	ctl.arg.flags = PR_FORK;
-	size = sizeof (long) + sizeof (long);
-	(void) write(monfd, &ctl, size);	/* can't fail */
-
-	ctl.cmd = PCSET;	/* wait()able by the parent */
-	ctl.arg.flags = PR_PTRACE;
-	size = sizeof (long) + sizeof (long);
-	(void) write(monfd, &ctl, size);	/* can't fail */
-
-	(void) close(monfd);
-
-	ctl.cmd = PCWSTOP;
-	size = sizeof (long);
-
-	for (;;) {
-		/*
-		 * Wait for the traced process to stop.
-		 */
-		if (write(fd, &ctl, size) != size) {
-			rv = (errno == ENOENT)? 0 : 1;
-			lx_debug("monitor failed to wait for LWP to stop: %s",
-			    strerror(errno));
-			_exit(rv);
-		}
-
-		lx_debug("monitor caught traced LWP");
-
-		/*
-		 * Pull the ptrace trigger by sending ourself a SIGTRAP. This
-		 * will cause this, the monitor process, to stop which will
-		 * cause the parent's waitid(2) call to return this process
-		 * id. In lx_wait(), we remap the monitor process's pid and
-		 * status to those of the traced LWP. When the parent process
-		 * uses ptrace to resume the traced LWP, it will additionally
-		 * restart this process.
-		 */
-		(void) _lwp_kill(_lwp_self(), SIGTRAP);
-
-		lx_debug("monitor was resumed");
-	}
-}
-
-static int
-ptrace_attach_common(int fd, pid_t lxpid, pid_t pid, lwpid_t lwpid, int run)
-{
-	pid_t child;
-	ptrace_monitor_map_t *p;
-	sigset_t unblock;
-	pstatus_t status;
-	long ctl[1 + sizeof (sysset_t) / sizeof (long) + 2];
-	long *ctlp = ctl;
-	size_t size;
-	sysset_t *sysp;
-	int ret;
-
-	/*
-	 * We're going to need this structure so better to fail now before its
-	 * too late to turn back.
-	 */
-	if ((p = malloc(sizeof (ptrace_monitor_map_t))) == NULL)
-		return (-EIO);
-
-	if ((ret = get_status(pid, &status)) != 0) {
-		free(p);
-		return (ret);
-	}
-
-	/*
-	 * If this process is already traced, bail.
-	 */
-	if (status.pr_flags & PR_PTRACE) {
-		free(p);
-		return (-EPERM);
-	}
-
-	/*
-	 * Turn on the appropriate tracing flags. It's exceedingly unlikely
-	 * that this operation will fail; any failure would probably be due
-	 * to another /proc consumer mucking around.
-	 */
-	if (ptrace_trace_common(fd) != 0) {
-		free(p);
-		return (-EIO);
-	}
-
-	/*
-	 * Native ptrace automatically catches processes when they exec so we
-	 * have to do that explicitly here.
-	 */
-	*ctlp++ = PCSEXIT;
-	sysp = (sysset_t *)ctlp;
-	ctlp += sizeof (sysset_t) / sizeof (long);
-	premptyset(sysp);
-	praddset(sysp, SYS_execve);
-	if (run) {
-		*ctlp++ = PCRUN;
-		*ctlp++ = 0;
-	}
-
-	size = (char *)ctlp - (char *)&ctl[0];
-
-	if (write(fd, ctl, size) != size) {
-		free(p);
-		return (-EIO);
-	}
-
-	/*
-	 * Spawn the monitor proceses to notify this process of events of
-	 * interest in the traced process. We block signals here both so
-	 * we're not interrupted during this operation and so that the
-	 * monitor process doesn't accept signals.
-	 */
-	(void) sigprocmask(SIG_BLOCK, &blockable_sigs, &unblock);
-	if ((child = fork1()) == 0)
-		ptrace_monitor(fd);
-	(void) sigprocmask(SIG_SETMASK, &unblock, NULL);
-
-	if (child == -1) {
-		lx_debug("failed to fork monitor process\n");
-		free(p);
-		return (-EIO);
-	}
-
-	p->pmm_monitor = child;
-	p->pmm_target = lxpid;
-	p->pmm_pid = pid;
-	p->pmm_lwpid = lwpid;
-	p->pmm_exiting = 0;
-
-	(void) mutex_lock(&ptrace_map_mtx);
-	p->pmm_next = ptrace_monitor_map;
-	ptrace_monitor_map = p;
-	(void) mutex_unlock(&ptrace_map_mtx);
-
-	return (0);
-}
-
-static int
-ptrace_attach(pid_t lxpid, pid_t pid, lwpid_t lwpid)
-{
-	int fd, ret;
-	long ctl;
-
-	/*
-	 * Linux doesn't let you trace process 1 -- go figure.
-	 */
-	if (lxpid == 1)
-		return (-EPERM);
-
-	if ((fd = open_lwpfile(pid, lwpid, O_WRONLY | O_EXCL, "lwpctl")) < 0)
-		return (errno == EBUSY ? -EPERM : -ESRCH);
-
-	ctl = PCSTOP;
-	if (write(fd, &ctl, sizeof (ctl)) != sizeof (ctl)) {
-		lx_err("failed to stop %d/%d\n", (int)pid, (int)lwpid);
-		assert(0);
-	}
-
-	ret = ptrace_attach_common(fd, lxpid, pid, lwpid, 0);
-
-	(void) close(fd);
-
-	return (ret);
-}
-
-static int
-ptrace_detach(pid_t lxpid, pid_t pid, lwpid_t lwpid, int sig)
-{
-	long ctl[2];
-	int fd, ret;
-
-	if (!is_traced(pid))
-		return (-ESRCH);
-
-	if (sig < 0 || sig > LX_NSIG)
-		return (-EINVAL);
-
-	if ((fd = open_lwpfile(pid, lwpid, O_WRONLY, "lwpctl")) < 0)
-		return (-ESRCH);
-
-	if (syscall(SYS_brand, B_PTRACE_EXT_OPTS, B_PTRACE_DETACH, pid, 0) != 0)
-		return (-ESRCH);
-
-	/*
-	 * The /proc ptrace flag may not be set, but we clear it
-	 * unconditionally since doing so doesn't hurt anything.
-	 */
-	ctl[0] = PCUNSET;
-	ctl[1] = PR_PTRACE;
-	if (write(fd, ctl, sizeof (ctl)) != sizeof (ctl)) {
-		(void) close(fd);
-		return (-EIO);
-	}
-
-	/*
-	 * Clear the brand-specific system call tracing flag to ensure that
-	 * the target doesn't stop unexpectedly some time in the future.
-	 */
-	if ((ret = syscall(SYS_brand, B_PTRACE_SYSCALL, pid, lwpid, 0)) != 0) {
-		(void) close(fd);
-		return (-ret);
-	}
-
-	/* kill off the monitor process, if any */
-	monitor_kill(lxpid, pid);
-
-	/*
-	 * Turn on the run-on-last-close flag so that all tracing flags will be
-	 * cleared when we close the control file descriptor.
-	 */
-	ctl[0] = PCSET;
-	ctl[1] = PR_RLC;
-	if (write(fd, ctl, sizeof (ctl)) != sizeof (ctl)) {
-		(void) close(fd);
-		return (-EIO);
-	}
-
-	/*
-	 * Clear the current signal (if any) and possibly send the traced
-	 * process a new signal.
-	 */
-	ret = ptrace_cont_common(fd, sig, 0, 0);
-
-	(void) close(fd);
-
-	return (ret);
-}
-
-static int
-ptrace_syscall(pid_t lxpid, pid_t pid, lwpid_t lwpid, int sig)
-{
-	int ret;
-
-	if (!is_traced(pid))
-		return (-ESRCH);
-
-	if ((ret = syscall(SYS_brand, B_PTRACE_SYSCALL, pid, lwpid, 1)) != 0)
-		return (-ret);
-
-	return (ptrace_cont(lxpid, pid, lwpid, sig, 0));
-}
-
-static int
-ptrace_setoptions(pid_t pid, int options)
-{
-	int ret;
-	int fd;
-	int error = 0;
-	struct {
-		long cmd;
-		union {
-			long flags;
-			sigset_t signals;
-			fltset_t faults;
-		} arg;
-	} ctl;
-	size_t size;
-	pstatus_t status;
-
-	if ((ret = get_status(pid, &status)) != 0)
-		return (ret);
-
-	if ((fd = open_procfile(pid, O_WRONLY, "ctl")) < 0)
-		return (-errno);
-
-	/* since we're doing option tracing now, only catch sigtrap */
-	ctl.cmd = PCSTRACE;
-	premptyset(&ctl.arg.signals);
-	praddset(&ctl.arg.signals, SIGTRAP);
-	size = sizeof (long) + sizeof (sigset_t);
-	if (write(fd, &ctl, size) != size) {
-		error = -errno;
-	} else {
-		/*
-		 * If we're tracing fork, set inherit-on-fork, otherwise clear
-		 * it.
-		 */
-		if (options & LX_PTRACE_O_TRACEFORK) {
-			ctl.cmd = PCSET;
-		} else {
-			ctl.cmd = PCUNSET;
-		}
-		ctl.arg.flags = PR_FORK;
-		size = sizeof (long) + sizeof (long);
-		if (write(fd, &ctl, size) != size)
-			error = -errno;
-	}
-
-	(void) close(fd);
-
-	if (error != 0)
-		return (error);
-
-	ret = syscall(SYS_brand, B_PTRACE_EXT_OPTS, B_PTRACE_EXT_OPTS_SET, pid,
-	    options);
-
-	return ((ret != 0) ? -errno : 0);
-}
-
 void
 lx_ptrace_stop_if_option(int option, boolean_t child, ulong_t msg)
 {
-	pid_t pid;
-	uint_t curr_opts;
-
-	pid = getpid();
-	if (pid == 1)
-		pid = zoneinit_pid;
-
-	/* first we have to see if the stop option is set for this process */
-	if (syscall(SYS_brand, B_PTRACE_EXT_OPTS, B_PTRACE_EXT_OPTS_GET, pid,
-	    &curr_opts) != 0)
-		return;
-
-	if (child) {
-		/*
-		 * If we just forked/cloned, then the trace flags only carry
-		 * over to the child if the specific flag was enabled on the
-		 * parent. For example, if only TRACEFORK is enabled and we
-		 * clone, then we must clear the trace flags. If TRACEFORK is
-		 * enabled and we fork, then we keep the flags.
-		 */
-		if (option == LX_PTRACE_O_TRACECLONE ||
-		    option == LX_PTRACE_O_TRACEFORK ||
-		    option == LX_PTRACE_O_TRACEVFORK) {
-
-			if ((curr_opts & option) == 0)
-				(void) syscall(SYS_brand, B_PTRACE_EXT_OPTS,
-				    B_PTRACE_EXT_OPTS_SET, pid, 0);
-
+	/*
+	 * We call into the kernel to see if we need to stop for specific
+	 * ptrace(2) events.
+	 */
+	lx_debug("lx_ptrace_stop_if_option(%d, %s, %lu)", option,
+	    child ? "TRUE [child]" : "FALSE [parent]", msg);
+	if (syscall(SYS_brand, B_PTRACE_STOP_FOR_OPT, option, child,
+	    msg) != 0) {
+		if (errno != ESRCH) {
 			/*
-			 * Since we know we're the child we have to modify how
-			 * we stop. Set the emulation's child flag in the
-			 * option.
+			 * This should _only_ fail if we are not traced, or do
+			 * not have this option set.
 			 */
-			option |= EMUL_PTRACE_O_CHILD;
+			lx_err_fatal("B_PTRACE_STOP_FOR_OPT failed: %s",
+			    strerror(errno));
 		}
 	}
-
-	/* now if the option is/was set, this brand call will stop us */
-	if (curr_opts & option)
-		(void) syscall(SYS_brand, B_PTRACE_STOP_FOR_OPT, option, msg);
 }
 
-static int
-ptrace_geteventmsg(pid_t pid, ulong_t *msgp)
+/*
+ * Signal to the in-kernel ptrace(2) subsystem that the next native fork() or
+ * thr_create() is part of an emulated fork(2) or clone(2).  If PTRACE_CLONE
+ * was passed to clone(2), inherit_flag should be B_TRUE.
+ */
+void
+lx_ptrace_clone_begin(int option, boolean_t inherit_flag)
+{
+	lx_debug("lx_ptrace_clone_begin(%d, %sPTRACE_CLONE)", option,
+	    inherit_flag ? "" : "!");
+	if (syscall(SYS_brand, B_PTRACE_CLONE_BEGIN, option,
+	    inherit_flag) != 0) {
+		lx_err_fatal("B_PTRACE_CLONE_BEGIN failed: %s",
+		    strerror(errno));
+	}
+}
+
+static long
+lx_ptrace_kernel(int ptrace_op, pid_t lxpid, uintptr_t addr, uintptr_t data)
 {
 	int ret;
 
-	ret = syscall(SYS_brand, B_PTRACE_GETEVENTMSG, pid, msgp);
+	/*
+	 * Call into the in-kernel ptrace(2) emulation code.
+	 */
+	lx_debug("revectoring to B_PTRACE_KERNEL(%d, %d, %p, %p)", ptrace_op,
+	    lxpid, addr, data);
+	ret = syscall(SYS_brand, B_PTRACE_KERNEL, ptrace_op, lxpid, addr,
+	    data);
+	if (ret == 0) {
+		lx_debug("\t= %d", ret);
+	} else {
+		lx_debug("\t= %d (%s)", ret, strerror(errno));
+	}
 
-	return ((ret != 0) ? -errno : 0);
+	return (ret == 0 ? ret : -errno);
 }
 
 long
 lx_ptrace(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4)
 {
+	int ptrace_op = (int)p1;
 	pid_t pid, lxpid = (pid_t)p2;
 	lwpid_t lwpid;
 
-	if ((p1 != LX_PTRACE_TRACEME) &&
-	    (lx_lpid_to_spair(lxpid, &pid, &lwpid) < 0))
-		return (-ESRCH);
-
-	switch (p1) {
+	/*
+	 * Some PTRACE_* requests are emulated entirely in the kernel.
+	 */
+	switch (ptrace_op) {
+	/*
+	 * PTRACE_TRACEME and PTRACE_ATTACH operations induce the tracing of
+	 * one LWP by another.  The target LWP must not be traced already.
+	 * Both `data' and `addr' are ignored in both cases.
+	 */
 	case LX_PTRACE_TRACEME:
-		return (ptrace_traceme());
+		return (lx_ptrace_kernel(ptrace_op, 0, 0, 0));
 
+	case LX_PTRACE_ATTACH:
+		return (lx_ptrace_kernel(ptrace_op, lxpid, 0, 0));
+
+	/*
+	 * PTRACE_DETACH, PTRACE_SYSCALL, PTRACE_SINGLESTEP and PTRACE_CONT
+	 * are all restarting actions.  They are only allowed when attached
+	 * to the target LWP and when that target LWP is in a "ptrace-stop"
+	 * condition.
+	 */
+	case LX_PTRACE_DETACH:
+	case LX_PTRACE_SYSCALL:
+	case LX_PTRACE_CONT:
+	case LX_PTRACE_SINGLESTEP:
+	/*
+	 * These actions also require the LWP to be traced and stopped, but do
+	 * not restart the target LWP.
+	 */
+	case LX_PTRACE_SETOPTIONS:
+	case LX_PTRACE_GETEVENTMSG:
+		return (lx_ptrace_kernel(ptrace_op, lxpid, p3, p4));
+	}
+
+	/*
+	 * The rest of the emulated PTRACE_* actions are emulated in userland.
+	 * They require the target LWP to be traced and in currently
+	 * "ptrace-stop", but do not subsequently restart the target LWP.
+	 */
+	if (lx_lpid_to_spair(lxpid, &pid, &lwpid) < 0 ||
+	    !is_ptrace_stopped(lxpid)) {
+		return (-ESRCH);
+	}
+
+	switch (ptrace_op) {
 	case LX_PTRACE_PEEKTEXT:
 	case LX_PTRACE_PEEKDATA:
 		return (ptrace_peek(pid, p3, (long *)p4));
@@ -1990,14 +1271,8 @@ lx_ptrace(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4)
 	case LX_PTRACE_POKEUSER:
 		return (ptrace_poke_user(pid, lwpid, p3, (int)p4));
 
-	case LX_PTRACE_CONT:
-		return (ptrace_cont(lxpid, pid, lwpid, (int)p4, 0));
-
 	case LX_PTRACE_KILL:
-		return (ptrace_kill(lxpid, pid));
-
-	case LX_PTRACE_SINGLESTEP:
-		return (ptrace_step(lxpid, pid, lwpid, (int)p4));
+		return (ptrace_kill(pid));
 
 	case LX_PTRACE_GETREGS:
 		return (ptrace_getregs(pid, lwpid, p4));
@@ -2011,419 +1286,13 @@ lx_ptrace(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4)
 	case LX_PTRACE_SETFPREGS:
 		return (ptrace_setfpregs(pid, lwpid, p4));
 
-	case LX_PTRACE_ATTACH:
-		return (ptrace_attach(lxpid, pid, lwpid));
-
-	case LX_PTRACE_DETACH:
-		return (ptrace_detach(lxpid, pid, lwpid, (int)p4));
-
 	case LX_PTRACE_GETFPXREGS:
 		return (ptrace_getfpxregs(pid, lwpid, p4));
 
 	case LX_PTRACE_SETFPXREGS:
 		return (ptrace_setfpxregs(pid, lwpid, p4));
 
-	case LX_PTRACE_SYSCALL:
-		return (ptrace_syscall(lxpid, pid, lwpid, (int)p4));
-
-	case LX_PTRACE_SETOPTIONS:
-		return (ptrace_setoptions(pid, (int)p4));
-
-	case LX_PTRACE_GETEVENTMSG:
-		return (ptrace_geteventmsg(pid, (ulong_t *)p4));
-
 	default:
 		return (-EINVAL);
 	}
-}
-
-void
-lx_ptrace_fork(void)
-{
-	/*
-	 * Send a special signal (that has no Linux equivalent) to indicate
-	 * that we're in this particularly special case. The signal will be
-	 * ignored by this process, but noticed by /proc consumers tracing
-	 * this process.
-	 */
-	(void) _lwp_kill(_lwp_self(), SIGWAITING);
-}
-
-static void
-ptrace_catch_fork(pid_t pid, int monitor)
-{
-	long ctl[14 + 2 * sizeof (sysset_t) / sizeof (long)];
-	long *ctlp;
-	sysset_t *sysp;
-	size_t size;
-	pstatus_t ps;
-	pid_t child;
-	int fd, err;
-
-	/*
-	 * If any of this fails, we're really sunk since the child
-	 * will be stuck in the middle of lx_ptrace_fork().
-	 * Fortunately it's practically assured to succeed unless
-	 * something is seriously wrong on the system.
-	 */
-	if ((fd = open_procfile(pid, O_WRONLY, "ctl")) < 0) {
-		lx_debug("lx_catch_fork: failed to control %d",
-		    (int)pid);
-		return;
-	}
-
-	/*
-	 * Turn off the /proc PR_PTRACE flag so the parent doesn't get
-	 * spurious wake ups while we're working our dark magic. Arrange to
-	 * catch the process when it exits from fork, and turn on the /proc
-	 * inherit-on-fork flag so we catcht the child as well. We then run
-	 * the process, wait for it to stop on the fork1(2) call and reset
-	 * the tracing flags to their original state.
-	 */
-	ctlp = ctl;
-	*ctlp++ = PCCSIG;
-	if (!monitor) {
-		*ctlp++ = PCUNSET;
-		*ctlp++ = PR_PTRACE;
-	}
-	*ctlp++ = PCSET;
-	*ctlp++ = PR_FORK;
-	*ctlp++ = PCSEXIT;
-	sysp = (sysset_t *)ctlp;
-	ctlp += sizeof (sysset_t) / sizeof (long);
-	premptyset(sysp);
-	praddset(sysp, SYS_forksys);	/* fork1() is forksys(0, 0) */
-	*ctlp++ = PCRUN;
-	*ctlp++ = 0;
-	*ctlp++ = PCWSTOP;
-	if (!monitor) {
-		*ctlp++ = PCSET;
-		*ctlp++ = PR_PTRACE;
-	}
-	*ctlp++ = PCUNSET;
-	*ctlp++ = PR_FORK;
-	*ctlp++ = PCSEXIT;
-	sysp = (sysset_t *)ctlp;
-	ctlp += sizeof (sysset_t) / sizeof (long);
-	premptyset(sysp);
-	if (monitor)
-		praddset(sysp, SYS_execve);
-
-	size = (char *)ctlp - (char *)&ctl[0];
-	assert(size <= sizeof (ctl));
-
-	if (write(fd, ctl, size) != size) {
-		(void) close(fd);
-		lx_debug("lx_catch_fork: failed to set %d running",
-		    (int)pid);
-		return;
-	}
-
-	/*
-	 * Get the status so we can find the value returned from fork1() --
-	 * the child process's pid.
-	 */
-	if (get_status(pid, &ps) != 0) {
-		(void) close(fd);
-		lx_debug("lx_catch_fork: failed to get status for %d",
-		    (int)pid);
-		return;
-	}
-
-	child = (pid_t)ps.pr_lwp.pr_reg[R_R0];
-
-	/*
-	 * We're done with the parent -- off you go.
-	 */
-	ctl[0] = PCRUN;
-	ctl[1] = 0;
-	size = 2 * sizeof (long);
-
-	if (write(fd, ctl, size) != size) {
-		(void) close(fd);
-		lx_debug("lx_catch_fork: failed to set %d running",
-		    (int)pid);
-		return;
-	}
-
-	(void) close(fd);
-
-	/*
-	 * If fork1(2) failed, we're done.
-	 */
-	if (child < 0) {
-		lx_debug("lx_catch_fork: fork1 failed");
-		return;
-	}
-
-	/*
-	 * Now we need to screw with the child process.
-	 */
-	if ((fd = open_lwpfile(child, 1, O_WRONLY, "lwpctl")) < 0) {
-		lx_debug("lx_catch_fork: failed to control %d",
-		    (int)child);
-		return;
-	}
-
-	ctlp = ctl;
-	*ctlp++ = PCUNSET;
-	*ctlp++ = PR_FORK;
-	*ctlp++ = PCSEXIT;
-	sysp = (sysset_t *)ctlp;
-	ctlp += sizeof (sysset_t) / sizeof (long);
-	premptyset(sysp);
-	size = (char *)ctlp - (char *)&ctl[0];
-
-	if (write(fd, ctl, size) != size) {
-		(void) close(fd);
-		lx_debug("lx_catch_fork: failed to clear trace flags for  %d",
-		    (int)child);
-		return;
-	}
-
-	/*
-	 * Now treat the child as though we had attached to it explicitly.
-	 */
-	err = ptrace_attach_common(fd, child, child, 1, 1);
-	assert(err == 0);
-
-	(void) close(fd);
-}
-
-static void
-set_dr6(pid_t pid, siginfo_t *infop)
-{
-	uintptr_t *debugreg;
-	uintptr_t addr;
-	uintptr_t base;
-	size_t size = NULL;
-	int dr7;
-	int lrw;
-	int i;
-
-	if ((debugreg = debug_registers(pid)) == NULL)
-		return;
-
-	debugreg[6] = 0xffff0ff0;	/* read as ones */
-	switch (infop->si_code) {
-	case TRAP_TRACE:
-		debugreg[6] |= 0x4000;	/* single-step */
-		break;
-	case TRAP_RWATCH:
-	case TRAP_WWATCH:
-	case TRAP_XWATCH:
-		dr7 = debugreg[7];
-		addr = (uintptr_t)infop->si_addr;
-		for (i = 0; i < 4; i++) {
-			if ((dr7 & (1 << (2 * i))) == 0)	/* enabled? */
-				continue;
-			lrw = (dr7 >> (16 + (4 * i))) & 0xf;
-			switch (lrw >> 2) {	/* length */
-			case 0: size = 1; break;
-			case 1: size = 2; break;
-			case 2: size = 8; break;
-			case 3: size = 4; break;
-			}
-			base = debugreg[i];
-			if (addr >= base && addr < base + size)
-				debugreg[6] |= (1 << i);
-		}
-		/*
-		 * Were we also attempting a single-step?
-		 * (kludge: we use debugreg[4] for this flag.)
-		 */
-		if (debugreg[4])
-			debugreg[6] |= 0x4000;
-		break;
-	default:
-		break;
-	}
-}
-
-/*
- * This is called from the emulation of the wait4, waitpid and waitid system
- * calls to take into account:
- *  - the monitor processes which we spawn to observe other processes from
- *    ptrace_attach().
- *  - the extended si_status result we can get when extended ptrace options
- *    are enabled.
- */
-int
-lx_ptrace_wait(siginfo_t *infop)
-{
-	ptrace_monitor_map_t *p, **pp;
-	pid_t lxpid, pid = infop->si_pid;
-	lwpid_t lwpid;
-	int fd;
-	pstatus_t status;
-
-	/*
-	 * If the process observed by waitid(2) corresponds to the monitor
-	 * process for a traced thread, we need to rewhack the siginfo_t to
-	 * look like it came from the traced thread with the flags set
-	 * according to the current state.
-	 */
-	(void) mutex_lock(&ptrace_map_mtx);
-	for (pp = &ptrace_monitor_map; (p = *pp) != NULL; pp = &p->pmm_next) {
-		if (p->pmm_monitor == pid) {
-			assert(infop->si_code == CLD_EXITED ||
-			    infop->si_code == CLD_KILLED ||
-			    infop->si_code == CLD_DUMPED ||
-			    infop->si_code == CLD_TRAPPED);
-			goto found;
-		}
-	}
-	(void) mutex_unlock(&ptrace_map_mtx);
-
-	if (infop->si_code == CLD_TRAPPED) {
-		/*
-		 * If the traced process got a SIGWAITING, we must be in the
-		 * middle of a clone(2) with CLONE_PTRACE set.
-		 */
-		if (infop->si_status == SIGWAITING) {
-			ptrace_catch_fork(pid, 0);
-			return (-1);
-		}
-
-		/*
-		 * If the traced process got a SIGTRAP then Linux ptrace
-		 * options might have been set, so setup the extended
-		 * si_status to contain the (possible) event. Note that
-		 * our definitions for the ptrace events (e.g.
-		 * LX_PTRACE_EVENT_FORK) is already shifted <<8 as documented
-		 * on the Linux ptrace(2) man page.
-		 */
-		if (infop->si_status == SIGTRAP) {
-			uint_t event;
-
-			if (syscall(SYS_brand, B_PTRACE_EXT_OPTS,
-			    B_PTRACE_EXT_OPTS_EVT, pid, &event) == 0)
-				infop->si_status |= event;
-		}
-	}
-
-	if (get_status(pid, &status) == 0 &&
-	    (status.pr_lwp.pr_flags & PR_STOPPED) &&
-	    status.pr_lwp.pr_why == PR_SIGNALLED &&
-	    status.pr_lwp.pr_info.si_signo == SIGTRAP)
-		set_dr6(pid, &status.pr_lwp.pr_info);
-
-	return (0);
-
-found:
-	/*
-	 * If the monitor is in the exiting state, ignore the event and free
-	 * the monitor structure if the monitor has exited. By returning -1 we
-	 * indicate to the caller that this was a spurious return from
-	 * waitid(2) and that it should ignore the result and try again.
-	 */
-	if (p->pmm_exiting) {
-		if (infop->si_code == CLD_EXITED ||
-		    infop->si_code == CLD_KILLED ||
-		    infop->si_code == CLD_DUMPED) {
-			*pp = p->pmm_next;
-			(void) mutex_unlock(&ptrace_map_mtx);
-			free(p);
-		}
-		return (-1);
-	}
-
-	lxpid = p->pmm_target;
-	pid = p->pmm_pid;
-	lwpid = p->pmm_lwpid;
-	(void) mutex_unlock(&ptrace_map_mtx);
-
-	/*
-	 * If we can't find the traced process, kill off its monitor.
-	 */
-	if ((fd = open_lwpfile(pid, lwpid, O_RDONLY, "lwpstatus")) < 0) {
-		assert(errno == ENOENT);
-		monitor_kill(lxpid, pid);
-		infop->si_code = CLD_EXITED;
-		infop->si_status = 0;
-		infop->si_pid = lxpid;
-		return (0);
-	}
-
-	if (read(fd, &status.pr_lwp, sizeof (status.pr_lwp)) !=
-	    sizeof (status.pr_lwp)) {
-		lx_err("read lwpstatus failed %d %s", fd, strerror(errno));
-		assert(0);
-	}
-
-	(void) close(fd);
-
-	/*
-	 * If the traced process isn't stopped, this is a truly spurious
-	 * event probably caused by another /proc consumer tracing the
-	 * monitor.
-	 */
-	if (!(status.pr_lwp.pr_flags & PR_STOPPED)) {
-		(void) ptrace_cont_monitor(p);
-		return (-1);
-	}
-
-	switch (status.pr_lwp.pr_why) {
-	case PR_SIGNALLED:
-		/*
-		 * If the traced process got a SIGWAITING, we must be in the
-		 * middle of a clone(2) with CLONE_PTRACE set.
-		 */
-		if (status.pr_lwp.pr_what == SIGWAITING) {
-			ptrace_catch_fork(lxpid, 1);
-			(void) ptrace_cont_monitor(p);
-			return (-1);
-		}
-		infop->si_code = CLD_TRAPPED;
-		infop->si_status = status.pr_lwp.pr_what;
-		if (status.pr_lwp.pr_info.si_signo == SIGTRAP)
-			set_dr6(pid, &status.pr_lwp.pr_info);
-		break;
-
-	case PR_REQUESTED:
-		/*
-		 * Make it look like the traced process stopped on an
-		 * event of interest.
-		 */
-		infop->si_code = CLD_TRAPPED;
-		infop->si_status = SIGTRAP;
-		break;
-
-	case PR_JOBCONTROL:
-		/*
-		 * Ignore this as it was probably caused by another /proc
-		 * consumer tracing the monitor.
-		 */
-		(void) ptrace_cont_monitor(p);
-		return (-1);
-
-	case PR_SYSEXIT:
-		/*
-		 * Processes traced via a monitor (rather than using the
-		 * native Solaris ptrace support) explicitly trace returns
-		 * from exec system calls since it's an implicit ptrace
-		 * trace point. Accordingly we need to present a process
-		 * in that state as though it had reached the ptrace trace
-		 * point.
-		 */
-		if (status.pr_lwp.pr_what == SYS_execve) {
-			infop->si_code = CLD_TRAPPED;
-			infop->si_status = SIGTRAP;
-			break;
-		}
-
-		/*FALLTHROUGH*/
-
-	case PR_SYSENTRY:
-	case PR_FAULTED:
-	case PR_SUSPENDED:
-	default:
-		lx_err("didn't expect %d (%d %d)", status.pr_lwp.pr_why,
-		    status.pr_lwp.pr_what, status.pr_lwp.pr_flags);
-		assert(0);
-	}
-
-	infop->si_pid = lxpid;
-
-	return (0);
 }

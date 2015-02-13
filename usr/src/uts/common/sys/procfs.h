@@ -25,6 +25,7 @@
  */
 /*
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
+ * Copyright 2015, Joyent, Inc.
  */
 
 #ifndef _SYS_PROCFS_H
@@ -233,6 +234,7 @@ typedef struct pstatus {
 #define	PR_FAULTED	6
 #define	PR_SUSPENDED	7
 #define	PR_CHECKPOINT	8
+#define	PR_BRAND	9
 
 /*
  * lwp ps(1) information file.  /proc/<pid>/lwp/<lwpid>/lwpsinfo

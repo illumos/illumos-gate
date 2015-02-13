@@ -22,7 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright (c) 2014, Joyent, Inc. All rights reserved.
+ * Copyright 2015, Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -221,6 +221,28 @@ int
 lx_lpid_to_spair(pid_t l_pid, pid_t *s_pid, id_t *s_tid)
 {
 	struct lx_pid *hp;
+
+	if (l_pid == 1) {
+		pid_t initpid;
+
+		/*
+		 * We are trying to look up the Linux init process for the
+		 * current zone, which we pretend has pid 1.
+		 */
+		if ((initpid = curzone->zone_proc_initpid) == -1) {
+			/*
+			 * We could not find the init process for this zone.
+			 */
+			return (-1);
+		}
+
+		if (s_pid != NULL)
+			*s_pid = initpid;
+		if (s_tid != NULL)
+			*s_tid = 1;
+
+		return (0);
+	}
 
 	mutex_enter(&hash_lock);
 	for (hp = ltos_pid_hash[LTOS_HASH(l_pid)]; hp; hp = hp->ltos_next) {

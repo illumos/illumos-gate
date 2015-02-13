@@ -41,18 +41,36 @@
 long
 lx_fork(void)
 {
-	int ret = fork1();
+	int ret;
 
-	if (ret == 0) {
-		if (lx_is_rpm)
+	/*
+	 * Inform the in-kernel ptrace(2) subsystem that we are about to
+	 * emulate fork(2).
+	 */
+	lx_ptrace_clone_begin(LX_PTRACE_O_TRACEFORK, B_FALSE);
+
+	switch (ret = fork1()) {
+	case -1:
+		return (-errno);
+
+	case 0:
+		/*
+		 * Returning in the new child.
+		 */
+		if (lx_is_rpm) {
 			(void) sleep(lx_rpm_delay);
+		}
 		lx_ptrace_stop_if_option(LX_PTRACE_O_TRACEFORK, B_TRUE, 0);
-	} else if (ret != -1) {
+		return (0);
+
+	default:
+		/*
+		 * Returning in the new parent.
+		 */
 		lx_ptrace_stop_if_option(LX_PTRACE_O_TRACEFORK, B_FALSE,
 		    (ulong_t)ret);
+		return (ret);
 	}
-
-	return (ret == -1 ? -errno : ret);
 }
 
 /*
@@ -65,14 +83,31 @@ lx_fork(void)
 long
 lx_vfork(void)
 {
-	int ret = fork1();
+	int ret;
 
-	if (ret == 0) {
+	/*
+	 * Inform the in-kernel ptrace(2) subsystem that we are about to
+	 * emulate vfork(2).
+	 */
+	lx_ptrace_clone_begin(LX_PTRACE_O_TRACEVFORK, B_FALSE);
+
+	switch (ret = fork1()) {
+	case -1:
+		return (-errno);
+
+	case 0:
+		/*
+		 * Returning in the new child.
+		 */
 		lx_ptrace_stop_if_option(LX_PTRACE_O_TRACEVFORK, B_TRUE, 0);
-	} else if (ret != -1) {
+		return (0);
+
+	default:
+		/*
+		 * Returning in the new parent.
+		 */
 		lx_ptrace_stop_if_option(LX_PTRACE_O_TRACEVFORK, B_FALSE,
 		    (ulong_t)ret);
+		return (ret);
 	}
-
-	return (ret == -1 ? -errno : ret);
 }

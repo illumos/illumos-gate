@@ -665,6 +665,18 @@ the process. \fBpr_what\fR is unused in this case.
 .RE
 
 .sp
+.ne 2
+.na
+\fB\fBPR_BRAND\fR\fR
+.ad
+.RS 17n
+indicates that the lwp stopped for a brand-specific reason.  Interpretation
+of the value of \fBpr_what\fR depends on which zone brand is in use.  It is
+not generally expected that an lwp stopped in this state will be restarted
+by native \fBproc\fR(4) consumers.
+.RE
+
+.sp
 .LP
 \fBpr_cursig\fR names the current signal, that is, the next signal to be
 delivered to the lwp, if any. \fBpr_info\fR, when the lwp is in a

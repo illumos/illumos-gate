@@ -49,23 +49,7 @@
 #include <sys/lx_debug.h>
 #include <sys/lx_thread.h>
 #include <sys/fork.h>
-
-#define	LX_CSIGNAL		0x000000ff
-#define	LX_CLONE_VM		0x00000100
-#define	LX_CLONE_FS		0x00000200
-#define	LX_CLONE_FILES		0x00000400
-#define	LX_CLONE_SIGHAND	0x00000800
-#define	LX_CLONE_PID		0x00001000
-#define	LX_CLONE_PTRACE		0x00002000
-#define	LX_CLONE_VFORK		0x00004000
-#define	LX_CLONE_PARENT		0x00008000
-#define	LX_CLONE_THREAD		0x00010000
-#define	LX_CLONE_SYSVSEM	0x00040000
-#define	LX_CLONE_SETTLS		0x00080000
-#define	LX_CLONE_PARENT_SETTID	0x00100000
-#define	LX_CLONE_CHILD_CLEARTID	0x00200000
-#define	LX_CLONE_DETACH		0x00400000
-#define	LX_CLONE_CHILD_SETTID	0x01000000
+#include <lx_syscall.h>
 
 #define	SHARED_AS	\
 	(LX_CLONE_VM | LX_CLONE_FS | LX_CLONE_FILES | LX_CLONE_SIGHAND	\
@@ -116,6 +100,7 @@ struct clone_state {
 	sigset_t	c_sigmask;	/* signal mask */
 	lx_affmask_t	c_affmask;	/* CPU affinity mask */
 	volatile int	*c_clone_res;	/* pid/error returned to cloner */
+	int		c_ptrace_event;	/* ptrace(2) event for child stop */
 };
 
 extern void lx_setup_clone(uintptr_t, void *, void *);
@@ -147,7 +132,7 @@ lx_exit(uintptr_t p1)
 
 	assert(lx_tsd != 0);
 
-	lx_tsd->lxtsd_exit = LX_EXIT;
+	lx_tsd->lxtsd_exit = LX_ET_EXIT;
 	lx_tsd->lxtsd_exit_status = status;
 
 	lx_ptrace_stop_if_option(LX_PTRACE_O_TRACEEXIT, B_FALSE,
@@ -200,7 +185,7 @@ lx_group_exit(uintptr_t p1)
 
 	assert(lx_tsd != 0);
 
-	lx_tsd->lxtsd_exit = LX_EXIT_GROUP;
+	lx_tsd->lxtsd_exit = LX_ET_EXIT_GROUP;
 	lx_tsd->lxtsd_exit_status = status;
 
 	/*
@@ -315,7 +300,7 @@ clone_start(void *arg)
 	 * Do the final stack twiddling, reset %gs, and return to the
 	 * clone(2) path.
 	 */
-	if (lx_tsd.lxtsd_exit == 0) {
+	if (lx_tsd.lxtsd_exit == LX_ET_NONE) {
 		if (sigprocmask(SIG_SETMASK, &cs->c_sigmask, NULL) < 0) {
 			*(cs->c_clone_res) = -errno;
 
@@ -328,6 +313,11 @@ clone_start(void *arg)
 		 * completed.
 		 */
 		*(cs->c_clone_res) = rval;
+
+		/*
+		 * Fire the ptrace(2) event stop in the new thread:
+		 */
+		lx_ptrace_stop_if_option(cs->c_ptrace_event, B_TRUE, 0);
 
 #if defined(_LP64)
 		(void) syscall(SYS_brand, B_CLR_NTV_SYSC_FLAG);
@@ -347,12 +337,7 @@ clone_start(void *arg)
 	 * setcontext() to jump to the thread context state saved in
 	 * getcontext(), above.
 	 */
-	if (lx_tsd.lxtsd_exit == LX_EXIT)
-		thr_exit((void *)(long)lx_tsd.lxtsd_exit_status);
-	else
-		exit(lx_tsd.lxtsd_exit_status);
-
-	assert(0);
+	lx_exit_common(lx_tsd.lxtsd_exit, lx_tsd.lxtsd_exit_status);
 	/*NOTREACHED*/
 }
 
@@ -455,6 +440,12 @@ lx_clone(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 
 	ptrace_event = ptrace_clone_event(flags);
 
+	/*
+	 * Inform the in-kernel ptrace(2) subsystem that we are about to
+	 * emulate a fork(2), vfork(2) or clone(2) system call.
+	 */
+	lx_ptrace_clone_begin(ptrace_event, !!(flags & LX_CLONE_PTRACE));
+
 	/* See if this is a fork() operation or a thr_create().  */
 	if (IS_FORK(flags) || IS_VFORK(flags)) {
 		if (flags & LX_CLONE_PARENT) {
@@ -462,9 +453,6 @@ lx_clone(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 			    "for threads.\n");
 			return (-ENOTSUP);
 		}
-
-		if (flags & LX_CLONE_PTRACE)
-			lx_ptrace_fork();
 
 		if ((flags & LX_CSIGNAL) == 0)
 			fork_flags |= FORK_NOSIGCHLD;
@@ -508,7 +496,6 @@ lx_clone(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 				    (ulong_t)rval);
 			return ((rval < 0) ? -errno : rval);
 		}
-
 
 		/*
 		 * Set up additional data in the lx_proc_data structure as
@@ -584,6 +571,7 @@ lx_clone(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 	cs->c_ldtinfo = ldtinfo;
 	cs->c_ctidp = ctidp;
 	cs->c_clone_res = &clone_res;
+	cs->c_ptrace_event = ptrace_event;
 #if defined(_LP64)
 	/*
 	 * The AMD64 ABI says that the kernel clobbers %rcx and %r11. We
@@ -649,7 +637,7 @@ lx_clone(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 			;
 
 		rval = clone_res;
-		lx_ptrace_stop_if_option(ptrace_event, B_TRUE, 0);
+		lx_ptrace_stop_if_option(ptrace_event, B_FALSE, (ulong_t)rval);
 	}
 
 	return (rval);

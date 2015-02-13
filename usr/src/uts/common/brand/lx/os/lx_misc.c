@@ -113,6 +113,13 @@ lx_exec()
 		lx_pid_reassign(curthread);
 	}
 
+	/*
+	 * Inform ptrace(2) that we are processing an execve(2) call so that if
+	 * we are traced we can post either the PTRACE_EVENT_EXEC event or the
+	 * legacy SIGTRAP.
+	 */
+	(void) lx_ptrace_stop_for_option(LX_PTRACE_O_TRACEEXEC, B_FALSE, 0);
+
 	/* clear the fsbase values until the app. can reinitialize them */
 	lwpd->br_lx_fsbase = NULL;
 	lwpd->br_ntv_fsbase = NULL;
@@ -137,14 +144,20 @@ void
 lx_exitlwp(klwp_t *lwp)
 {
 	struct lx_lwp_data *lwpd = lwptolxlwp(lwp);
-	proc_t *p;
+	proc_t *p = lwptoproc(lwp);
 	kthread_t *t;
 	sigqueue_t *sqp = NULL;
 	pid_t ppid;
 	id_t ptid;
 
+	VERIFY(MUTEX_NOT_HELD(&p->p_lock));
+
 	if (lwpd == NULL)
 		return;		/* second time thru' */
+
+	mutex_enter(&p->p_lock);
+	lx_ptrace_exit(p, lwp);
+	mutex_exit(&p->p_lock);
 
 	if (lwpd->br_clear_ctidp != NULL) {
 		(void) suword32(lwpd->br_clear_ctidp, 0);
@@ -226,9 +239,17 @@ lx_freelwp(klwp_t *lwp)
 	if (lwpd != NULL) {
 		(void) removectx(lwptot(lwp), lwp, lx_save, lx_restore,
 		    NULL, NULL, lx_save, NULL);
-		if (lwpd->br_pid != 0)
+		if (lwpd->br_pid != 0) {
 			lx_pid_rele(lwptoproc(lwp)->p_pid,
 			    lwptot(lwp)->t_tid);
+		}
+
+		/*
+		 * Ensure that lx_ptrace_exit() has been called to detach
+		 * ptrace(2) tracers and tracees.
+		 */
+		VERIFY(lwpd->br_ptrace_tracer == NULL);
+		VERIFY(lwpd->br_ptrace_accord == NULL);
 
 		lwp->lwp_brand = NULL;
 		kmem_free(lwpd, sizeof (struct lx_lwp_data));
@@ -238,8 +259,8 @@ lx_freelwp(klwp_t *lwp)
 int
 lx_initlwp(klwp_t *lwp)
 {
-	struct lx_lwp_data *lwpd;
-	struct lx_lwp_data *plwpd;
+	lx_lwp_data_t *lwpd;
+	lx_lwp_data_t *plwpd = ttolxlwp(curthread);
 	kthread_t *tp = lwptot(lwp);
 
 	lwpd = kmem_zalloc(sizeof (struct lx_lwp_data), KM_SLEEP);
@@ -265,8 +286,7 @@ lx_initlwp(klwp_t *lwp)
 	if (tp->t_next == tp) {
 		lwpd->br_ppid = tp->t_procp->p_ppid;
 		lwpd->br_ptid = -1;
-	} else if (ttolxlwp(curthread) != NULL) {
-		plwpd = ttolxlwp(curthread);
+	} else if (plwpd != NULL) {
 		bcopy(plwpd->br_tls, lwpd->br_tls, sizeof (lwpd->br_tls));
 		lwpd->br_ppid = plwpd->br_pid;
 		lwpd->br_ptid = curthread->t_tid;
@@ -291,6 +311,14 @@ lx_initlwp(klwp_t *lwp)
 
 	installctx(lwptot(lwp), lwp, lx_save, lx_restore, NULL, NULL,
 	    lx_save, NULL);
+
+	/*
+	 * If the parent LWP has a ptrace(2) tracer, the new LWP may
+	 * need to inherit that same tracer.
+	 */
+	if (plwpd != NULL) {
+		lx_ptrace_inherit_tracer(plwpd, lwpd);
+	}
 
 	return (0);
 }
@@ -524,10 +552,7 @@ lx_exit_with_sig(proc_t *cp, sigqueue_t *sqp, void *brand_data)
  *   SIGCHLD         X           -
  *
  * This is an XOR of __WCLONE being set, and SIGCHLD being the signal sent on
- * process exit.  Since (flags & __WCLONE) is not guaranteed to have the
- * least-significant bit set when the flags is enabled, !! is used to place
- * that bit into the least significant bit. Then, the bitwise XOR can be
- * used, because there is no logical XOR in the C language.
+ * process exit.
  *
  * More information on wait in lx brands can be found at
  * usr/src/lib/brand/lx/lx_brand/common/wait.c.
@@ -535,29 +560,45 @@ lx_exit_with_sig(proc_t *cp, sigqueue_t *sqp, void *brand_data)
 boolean_t
 lx_wait_filter(proc_t *pp, proc_t *cp)
 {
-	int flags;
+	lx_lwp_data_t *lwpd = ttolxlwp(curthread);
+	int flags = lwpd->br_waitid_flags;
 	boolean_t ret;
 
-	if (LX_ARGS(waitid) != NULL) {
-		flags = LX_ARGS(waitid)->waitid_flags;
-		mutex_enter(&cp->p_lock);
-		if (flags & LX_WALL) {
-			ret = B_TRUE;
-		} else if (cp->p_stat == SZOMB ||
-		    cp->p_brand == &native_brand) {
-			ret = (((!!(flags & LX_WCLONE)) ^
-			    (stol_signo[SIGCHLD] == cp->p_exit_data))
-			    ? B_TRUE : B_FALSE);
-		} else {
-			ret = (((!!(flags & LX_WCLONE)) ^
-			    (stol_signo[SIGCHLD] == ptolxproc(cp)->l_signal))
-			    ? B_TRUE : B_FALSE);
-		}
-		mutex_exit(&cp->p_lock);
-		return (ret);
-	} else {
+	if (!lwpd->br_waitid_emulate) {
 		return (B_TRUE);
 	}
+
+	mutex_enter(&cp->p_lock);
+	if (flags & LX_WALL) {
+		ret = B_TRUE;
+
+	} else {
+		int exitsig;
+		boolean_t is_clone, _wclone;
+
+		/*
+		 * Determine the exit signal for this process:
+		 */
+		if (cp->p_stat == SZOMB || cp->p_brand == &native_brand) {
+			exitsig = cp->p_exit_data;
+		} else {
+			exitsig = ptolxproc(cp)->l_signal;
+		}
+
+		/*
+		 * To enable the bitwise XOR to stand in for the absent C
+		 * logical XOR, we use the logical NOT operator twice to
+		 * ensure the least significant bit is populated with the
+		 * __WCLONE flag status.
+		 */
+		_wclone = !!(flags & LX_WCLONE);
+		is_clone = (stol_signo[SIGCHLD] == exitsig);
+
+		ret = (_wclone ^ is_clone) ? B_TRUE : B_FALSE;
+	}
+	mutex_exit(&cp->p_lock);
+
+	return (ret);
 }
 
 void

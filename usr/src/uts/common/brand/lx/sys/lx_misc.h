@@ -46,6 +46,20 @@ extern boolean_t lx_wait_filter(proc_t *, proc_t *);
 
 extern void lx_ifname_convert(char *, int);
 
+extern boolean_t lx_ptrace_stop(ushort_t);
+extern void lx_stop_notify(proc_t *, klwp_t *, ushort_t, ushort_t);
+extern void lx_ptrace_init(void);
+extern void lx_ptrace_fini(void);
+extern int lx_ptrace_kernel(int, pid_t, uintptr_t, uintptr_t);
+extern int lx_waitid_helper(idtype_t, id_t, k_siginfo_t *, int, boolean_t *,
+    int *);
+extern void lx_ptrace_exit(proc_t *, klwp_t *);
+extern void lx_ptrace_inherit_tracer(lx_lwp_data_t *, lx_lwp_data_t *);
+extern int lx_ptrace_stop_for_option(int, boolean_t, ulong_t);
+extern int lx_ptrace_set_clone_inherit(int, boolean_t);
+extern int lx_sigcld_repost(proc_t *, sigqueue_t *);
+extern int lx_issig_stop(proc_t *, klwp_t *);
+
 #endif
 
 #ifdef	__cplusplus

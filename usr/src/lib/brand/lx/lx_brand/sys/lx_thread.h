@@ -34,6 +34,12 @@ extern "C" {
 
 #include <thread.h>
 
+typedef enum lx_exit_type {
+	LX_ET_NONE = 0,
+	LX_ET_EXIT,
+	LX_ET_EXIT_GROUP
+} lx_exit_type_t;
+
 typedef struct lx_tsd {
 #if defined(_ILP32)
 	/* 32-bit thread-specific Linux %gs value */
@@ -42,7 +48,7 @@ typedef struct lx_tsd {
 	/* 64-bit thread-specific Linux %fsbase value */
 	uintptr_t	lxtsd_fsbase;
 #endif
-	int		lxtsd_exit;
+	lx_exit_type_t	lxtsd_exit;
 	int		lxtsd_exit_status;
 	ucontext_t	lxtsd_exit_context;
 } lx_tsd_t;
@@ -50,6 +56,8 @@ typedef struct lx_tsd {
 extern thread_key_t	lx_tsd_key;
 
 extern void		lx_swap_gs(long, long *);
+
+extern void		lx_exit_common(lx_exit_type_t, uintptr_t) __NORETURN;
 
 #ifdef	__cplusplus
 }

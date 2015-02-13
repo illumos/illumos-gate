@@ -22,7 +22,7 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2014 Joyent, Inc.  All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  */
 
 /*
@@ -70,6 +70,7 @@
 #include <sys/wait.h>
 #include <sys/lx_types.h>
 #include <sys/lx_signal.h>
+#include <sys/lx_debug.h>
 #include <sys/lx_misc.h>
 #include <sys/lx_syscall.h>
 #include <sys/syscall.h>
@@ -100,32 +101,23 @@
 
 extern long max_pid;
 
+/*
+ * Split the passed waitpid/waitid options into two separate variables:
+ * those for the native illumos waitid(2), and the extra Linux-specific
+ * options we will handle in our brand-specific code.
+ */
 static int
-ltos_options(uintptr_t options)
+ltos_options(uintptr_t options, int *native_options, int *extra_options)
 {
 	int newoptions = 0;
-	int rval;
-	lx_waitid_args_t extra;
 
 	if (((options) & ~(LX_WNOHANG | LX_WUNTRACED | LX_WEXITED |
 	    LX_WCONTINUED | LX_WNOWAIT | LX_WNOTHREAD | LX_WALL |
 	    LX_WCLONE)) != 0) {
 		return (-1);
 	}
-	/*
-	 * We use the B_STORE_ARGS command to store any of LX_WNOTHREAD,
-	 * LX_WALL, and LX_WCLONE that have been set as options on this waitid
-	 * call. These flags are stored as part of the lwp_brand_data, so that
-	 * when there is a later syscall to waitid, the brand code there can
-	 * detect that we added extra flags here and use them as appropriate.
-	 * We pass them in here rather than the normal channel for flags to
-	 * prevent polluting the namespace.
-	 */
-	extra.waitid_flags = options & (LX_WNOTHREAD | LX_WALL | LX_WCLONE);
-	rval = syscall(SYS_brand, B_STORE_ARGS, &extra,
-	    sizeof (lx_waitid_args_t), NULL, NULL, NULL, NULL);
-	if (rval < 0)
-		return (rval);
+
+	*extra_options = options & (LX_WNOTHREAD | LX_WALL | LX_WCLONE);
 
 	if (options & LX_WNOHANG)
 		newoptions |= WNOHANG;
@@ -138,10 +130,13 @@ ltos_options(uintptr_t options)
 	if (options & LX_WNOWAIT)
 		newoptions |= WNOWAIT;
 
-	/* The trapped option is implicit on Linux */
+	/*
+	 * The trapped option is implicit on Linux.
+	 */
 	newoptions |= WTRAPPED;
 
-	return (newoptions);
+	*native_options = newoptions;
+	return (0);
 }
 
 static int
@@ -164,10 +159,7 @@ lx_wstat(int code, int status)
 		break;
 	case CLD_TRAPPED:
 	case CLD_STOPPED:
-		stat = stol_signo[status];
-		assert(stat != -1);
-		stat <<= 8;
-		stat |= WSTOPFLG;
+		stat = (stol_status(status) << 8) | WSTOPFLG;
 		break;
 	case CLD_CONTINUED:
 		stat = WCONTFLG;
@@ -177,33 +169,31 @@ lx_wstat(int code, int status)
 	return (stat);
 }
 
-/* wrapper to make solaris waitid work properly with ptrace */
 static int
-lx_waitid_helper(idtype_t idtype, id_t id, siginfo_t *info, int options)
+lx_waitid_helper(idtype_t idtype, id_t id, siginfo_t *sip, int native_options,
+    int extra_options)
 {
-	do {
-		/*
-		 * It's possible that we return EINVAL here if the idtype is
-		 * P_PID or P_PGID and id is out of bounds for a valid pid or
-		 * pgid, but Linux expects to see ECHILD. No good way occurs to
-		 * handle this so we'll punt for now.
-		 */
-		if (waitid(idtype, id, info, options) < 0)
-			return (-errno);
+	/*
+	 * Call into our in-kernel waitid() wrapper:
+	 */
+restart:
+	lx_had_sigchild = 0;
+	if (syscall(SYS_brand, B_HELPER_WAITID, idtype, id, sip,
+	    native_options, extra_options) != 0) {
+		if (errno == EINTR && (lx_had_sigchild ||
+		    lx_do_syscall_restart)) {
+			/*
+			 * If we handled a SIGCLD while blocked in waitid(),
+			 * or the SA_RESTART flag was set, we should wait
+			 * again.
+			 */
+			lx_debug("lx_waitid_helper() restarting due to"
+			    " interrupted system call");
+			goto restart;
+		}
+		return (-1);
+	}
 
-		/*
-		 * If the WNOHANG flag was specified and no child was found
-		 * return 0.
-		 */
-		if ((options & WNOHANG) && info->si_pid == 0)
-			return (0);
-
-		/*
-		 * It's possible that we may have a spurious return for one of
-		 * the child processes created by the ptrace subsystem. If
-		 * that's the case, we simply try again.
-		 */
-	} while (lx_ptrace_wait(info) == -1);
 	return (0);
 }
 
@@ -214,11 +204,12 @@ lx_wait4(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4)
 	struct rusage ru = { 0 };
 	idtype_t idtype;
 	id_t id;
-	int options, status = 0;
+	int status = 0;
 	pid_t pid = (pid_t)p1;
 	int rval;
+	int native_options, extra_options;
 
-	if ((options = ltos_options(p3)) == -1)
+	if (ltos_options(p3, &native_options, &extra_options) == -1)
 		return (-EINVAL);
 
 	if (pid > max_pid)
@@ -260,14 +251,17 @@ lx_wait4(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4)
 		id = pid;
 	}
 
-	options |= WEXITED | WTRAPPED;
+	native_options |= WEXITED | WTRAPPED;
 
-	if ((rval = lx_waitid_helper(idtype, id, &info, options)) < 0)
-		return (rval);
+	if (lx_waitid_helper(idtype, id, &info, native_options,
+	    extra_options) == -1) {
+		return (-errno);
+	}
+
 	/*
 	 * If the WNOHANG flag was specified and no child was found return 0.
 	 */
-	if ((options & WNOHANG) && info.si_pid == 0)
+	if ((native_options & WNOHANG) && info.si_pid == 0)
 		return (0);
 
 	status = lx_wstat(info.si_code, info.si_status);
@@ -297,9 +291,10 @@ lx_waitpid(uintptr_t p1, uintptr_t p2, uintptr_t p3)
 long
 lx_waitid(uintptr_t idtype, uintptr_t id, uintptr_t infop, uintptr_t opt)
 {
-	int rval, options;
+	int native_options, extra_options;
 	siginfo_t s_info = {0};
-	if ((options = ltos_options(opt)) == -1)
+
+	if (ltos_options(opt, &native_options, &extra_options) == -1)
 		return (-EINVAL);
 
 	if (((opt) & (LX_WEXITED | LX_WSTOPPED | LX_WCONTINUED)) == 0)
@@ -318,11 +313,14 @@ lx_waitid(uintptr_t idtype, uintptr_t id, uintptr_t infop, uintptr_t opt)
 	default:
 		return (-EINVAL);
 	}
-	if ((rval = lx_waitid_helper(idtype, (id_t)id, &s_info, options)) < 0)
-		return (rval);
+
+	if (lx_waitid_helper(idtype, id, &s_info, native_options,
+	    extra_options) == -1) {
+		return (-errno);
+	}
 
 	/* If the WNOHANG flag was specified and no child was found return 0. */
-	if ((options & WNOHANG) && s_info.si_pid == 0)
+	if ((native_options & WNOHANG) && s_info.si_pid == 0)
 		return (0);
 
 	return (stol_siginfo(&s_info, (lx_siginfo_t *)infop));

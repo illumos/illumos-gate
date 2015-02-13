@@ -21,7 +21,7 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2014 Joyent, Inc.  All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -32,24 +32,9 @@
 #include <sys/lx_ldt.h>
 #include <sys/lx_misc.h>
 #include <lx_signum.h>
+#include <lx_syscall.h>
 #include <sys/x86_archext.h>
 #include <sys/controlregs.h>
-
-#define	LX_CSIGNAL		0x000000ff
-#define	LX_CLONE_VM		0x00000100
-#define	LX_CLONE_FS		0x00000200
-#define	LX_CLONE_FILES		0x00000400
-#define	LX_CLONE_SIGHAND	0x00000800
-#define	LX_CLONE_PID		0x00001000
-#define	LX_CLONE_PTRACE		0x00002000
-#define	LX_CLONE_PARENT		0x00008000
-#define	LX_CLONE_THREAD		0x00010000
-#define	LX_CLONE_SYSVSEM	0x00040000
-#define	LX_CLONE_SETTLS		0x00080000
-#define	LX_CLONE_PARENT_SETTID	0x00100000
-#define	LX_CLONE_CHILD_CLEARTID 0x00200000
-#define	LX_CLONE_DETACH		0x00400000
-#define	LX_CLONE_CHILD_SETTID	0x01000000
 
 /*
  * Our lwp has already been created at this point, so this routine is

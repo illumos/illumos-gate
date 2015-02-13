@@ -172,6 +172,9 @@ struct lx_locale_ending {
 	int		se_size;	/* solaris ending string length */
 };
 
+__thread int lx_do_syscall_restart;
+__thread int lx_had_sigchild;
+
 #define	l2s_locale(lname, sname) \
 	{(lname), (sname), sizeof ((lname)) - 1, sizeof ((sname)) - 1}
 
@@ -647,6 +650,7 @@ lx_emulate(lx_regs_t *rp)
 	}
 #endif /* _ILP32 */
 
+restart_syscall:
 	if (s->sy_flags & LX_SYS_IKE) {
 		lx_debug("\tsyscall %d re-vectoring to lx kernel module "
 		    "for %s()", syscall_num, s->sy_name);
@@ -677,6 +681,12 @@ lx_emulate(lx_regs_t *rp)
 		}
 
 		ret = -stol_errno[-ret];
+	}
+
+	if (lx_do_syscall_restart && ret == -stol_errno[EINTR]) {
+		lx_debug("restarting system call due to signal interruption");
+		lx_do_syscall_restart = 0;
+		goto restart_syscall;
 	}
 
 out:
@@ -962,7 +972,7 @@ lx_init(int argc, char *argv[], char *envp[])
 		lx_err_fatal("Unable to initialize thread-specific exit "
 		    "context: %s", strerror(errno));
 
-	if (lx_tsd.lxtsd_exit == 0) {
+	if (lx_tsd.lxtsd_exit == LX_ET_NONE) {
 #if defined(_LP64)
 		/* Switch to Linux syscall mode */
 		(void) syscall(SYS_brand, B_CLR_NTV_SYSC_FLAG);
@@ -978,15 +988,34 @@ lx_init(int argc, char *argv[], char *envp[])
 	 * exit_group() system call.  In turn the brand library did a
 	 * setcontext() to jump to the thread context state we saved above.
 	 */
-	if (lx_tsd.lxtsd_exit == 1)
-		thr_exit((void *)(long)lx_tsd.lxtsd_exit_status);
-	else
-		exit(lx_tsd.lxtsd_exit_status);
-
-	assert(0);
-
+	lx_exit_common(lx_tsd.lxtsd_exit, lx_tsd.lxtsd_exit_status);
 	/*NOTREACHED*/
 	return (0);
+}
+
+void
+lx_exit_common(lx_exit_type_t exit_type, uintptr_t exit_value)
+{
+	int ev = 0xff & exit_value;
+
+	switch (exit_type) {
+	case LX_ET_EXIT:
+		/*
+		 * The native thread return value is never seen so we pass
+		 * NULL.
+		 */
+		thr_exit(NULL);
+		break;
+
+	case LX_ET_EXIT_GROUP:
+		exit(ev);
+		break;
+
+	default:
+		abort();
+	}
+
+	abort();
 }
 
 /*

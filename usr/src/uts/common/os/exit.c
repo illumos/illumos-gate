@@ -400,14 +400,36 @@ proc_exit(int why, int what)
 		if (z->zone_boot_err == 0 &&
 		    zone_status_get(z) < ZONE_IS_SHUTTING_DOWN &&
 		    zone_status_get(global_zone) < ZONE_IS_SHUTTING_DOWN) {
-			if (z->zone_restart_init == B_TRUE) {
-				if (restart_init(what, why) == 0)
-					return (0);
-			}
 
-			z->zone_init_status = wstat(why, what);
-			(void) zone_kadmin(A_SHUTDOWN, AD_HALT, NULL,
-			    zone_kcred());
+			/*
+			 * If the init process should be restarted, the
+			 * "zone_restart_init" member will be set.  Some init
+			 * programs in branded zones do not tolerate a restart
+			 * in the traditional manner; setting the
+			 * "zone_reboot_on_init_exit" member will cause the
+			 * entire zone to be rebooted instead.  If neither of
+			 * these flags is set the zone will shut down.
+			 */
+			if (z->zone_reboot_on_init_exit == B_TRUE &&
+			    z->zone_restart_init == B_TRUE) {
+				/*
+				 * Trigger a zone reboot and continue
+				 * with exit processing.
+				 */
+				z->zone_init_status = wstat(why, what);
+				(void) zone_kadmin(A_REBOOT, 0, NULL,
+				    zone_kcred());
+
+			} else {
+				if (z->zone_restart_init == B_TRUE) {
+					if (restart_init(what, why) == 0)
+						return (0);
+				}
+
+				z->zone_init_status = wstat(why, what);
+				(void) zone_kadmin(A_SHUTDOWN, AD_HALT, NULL,
+				    zone_kcred());
+			}
 		}
 
 		/*
@@ -995,10 +1017,9 @@ winfo(proc_t *pp, k_siginfo_t *ip, int waitflag)
 int
 waitid(idtype_t idtype, id_t id, k_siginfo_t *ip, int options)
 {
-	int found;
 	proc_t *cp, *pp;
-	int proc_gone;
 	int waitflag = !(options & WNOWAIT);
+	boolean_t have_brand_helper = B_FALSE;
 
 	/*
 	 * Obsolete flag, defined here only for binary compatibility
@@ -1047,10 +1068,37 @@ waitid(idtype_t idtype, id_t id, k_siginfo_t *ip, int options)
 		return (ECHILD);
 	}
 
-	while (pp->p_child != NULL) {
+	if (PROC_IS_BRANDED(pp) && BROP(pp)->b_waitid_helper != NULL) {
+		have_brand_helper = B_TRUE;
+	}
 
-		proc_gone = 0;
+	while (pp->p_child != NULL || have_brand_helper) {
+		boolean_t brand_wants_wait = B_FALSE;
+		int proc_gone = 0;
+		int found = 0;
 
+		/*
+		 * Give the brand a chance to return synthetic results from
+		 * this waitid() call before we do the real thing.
+		 */
+		if (have_brand_helper) {
+			int ret;
+
+			if (BROP(pp)->b_waitid_helper(idtype, id, ip, options,
+			    &brand_wants_wait, &ret) == 0) {
+				mutex_exit(&pidlock);
+				return (ret);
+			}
+
+			if (pp->p_child == NULL) {
+				goto no_real_children;
+			}
+		}
+
+		/*
+		 * Look for interesting children in the newstate list.
+		 */
+		VERIFY(pp->p_child != NULL);
 		for (cp = pp->p_child_ns; cp != NULL; cp = cp->p_sibling_ns) {
 			if (idtype != P_PID && (cp->p_pidflag & CLDWAITPID))
 				continue;
@@ -1107,7 +1155,6 @@ waitid(idtype_t idtype, id_t id, k_siginfo_t *ip, int options)
 		 * Wow! None of the threads on the p_sibling_ns list were
 		 * interesting threads. Check all the kids!
 		 */
-		found = 0;
 		for (cp = pp->p_child; cp != NULL; cp = cp->p_sibling) {
 			if (idtype == P_PID && id != cp->p_pid)
 				continue;
@@ -1186,11 +1233,12 @@ waitid(idtype_t idtype, id_t id, k_siginfo_t *ip, int options)
 				break;
 		}
 
+no_real_children:
 		/*
 		 * If we found no interesting processes at all,
 		 * break out and return ECHILD.
 		 */
-		if (found + proc_gone == 0)
+		if (!brand_wants_wait && (found + proc_gone == 0))
 			break;
 
 		if (options & WNOHANG) {
@@ -1209,7 +1257,7 @@ waitid(idtype_t idtype, id_t id, k_siginfo_t *ip, int options)
 		 * change state while we wait, we don't wait at all.
 		 * Get out with ECHILD according to SVID.
 		 */
-		if (found == proc_gone)
+		if (!brand_wants_wait && (found == proc_gone))
 			break;
 
 		if (!cv_wait_sig_swap(&pp->p_cv, &pidlock)) {

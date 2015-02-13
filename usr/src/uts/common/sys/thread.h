@@ -419,8 +419,9 @@ typedef struct _kthread {
 #define	TS_RESUME	0x1000	/* setrun() by CPR resume process */
 #define	TS_CREATE	0x2000	/* setrun() by syslwp_create() */
 #define	TS_RUNQMATCH	0x4000	/* exact run queue balancing by setbackdq() */
+#define	TS_BSTART	0x8000	/* setrun() by brand */
 #define	TS_ALLSTART	\
-	(TS_CSTART|TS_UNPAUSE|TS_XSTART|TS_PSTART|TS_RESUME|TS_CREATE)
+	(TS_CSTART|TS_UNPAUSE|TS_XSTART|TS_PSTART|TS_RESUME|TS_CREATE|TS_BSTART)
 #define	TS_ANYWAITQ	(TS_PROJWAITQ|TS_ZONEWAITQ)
 
 /*
@@ -447,6 +448,10 @@ typedef struct _kthread {
 /* True if thread is stopped on an event of interest */
 #define	ISTOPPED(t) ((t)->t_state == TS_STOPPED && \
 			!((t)->t_schedflag & TS_PSTART))
+
+/* True if thread is stopped for a brand-specific reason */
+#define	BSTOPPED(t)	((t)->t_state == TS_STOPPED && \
+			    !((t)->t_schedflag & TS_BSTART))
 
 /* True if thread is asleep and wakeable */
 #define	ISWAKEABLE(t) (((t)->t_state == TS_SLEEP && \

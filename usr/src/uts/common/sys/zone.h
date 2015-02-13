@@ -594,6 +594,7 @@ typedef struct zone {
 	tsol_mlp_list_t zone_mlps;	/* MLPs on zone-private addresses */
 
 	boolean_t	zone_restart_init;	/* Restart init if it dies? */
+	boolean_t	zone_reboot_on_init_exit; /* Reboot if init dies? */
 	struct brand	*zone_brand;		/* zone's brand */
 	void 		*zone_brand_data;	/* store brand specific data */
 	id_t		zone_defaultcid;	/* dflt scheduling class id */

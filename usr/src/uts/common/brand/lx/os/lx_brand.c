@@ -78,6 +78,10 @@ void	lx_set_kern_version(zone_t *, char *);
 void	lx_copy_procdata(proc_t *, proc_t *);
 
 extern int getsetcontext(int, void *);
+extern int waitsys(idtype_t, id_t, siginfo_t *, int);
+#if defined(_SYSCALL32_IMPL)
+extern int waitsys32(idtype_t, id_t, siginfo_t *, int);
+#endif
 
 extern void lx_proc_exit(proc_t *, klwp_t *);
 static void lx_psig_to_proc(proc_t *, kthread_t *, int);
@@ -107,35 +111,38 @@ static int lx_elfexec(struct vnode *vp, struct execa *uap, struct uarg *args,
     caddr_t exec_file, struct cred *cred, int brand_action);
 
 static boolean_t lx_native_exec(uint8_t, const char **);
-static void lx_ptrace_exectrap(proc_t *);
 static uint32_t lx_map32limit(proc_t *);
 
 /* lx brand */
 struct brand_ops lx_brops = {
-	lx_init_brand_data,
-	lx_free_brand_data,
-	lx_brandsys,
-	lx_setbrand,
-	lx_getattr,
-	lx_setattr,
-	lx_copy_procdata,
-	lx_proc_exit,
-	lx_exec,
-	lx_setrval,
-	lx_initlwp,
-	lx_forklwp,
-	lx_freelwp,
-	lx_exitlwp,
-	lx_elfexec,
-	NULL,
-	NULL,
-	lx_psig_to_proc,
-	NSIG,
-	lx_exit_with_sig,
-	lx_wait_filter,
-	lx_native_exec,
-	lx_ptrace_exectrap,
-	lx_map32limit
+	lx_init_brand_data,		/* b_init_brand_data */
+	lx_free_brand_data,		/* b_free_brand_data */
+	lx_brandsys,			/* b_brandsys */
+	lx_setbrand,			/* b_setbrand */
+	lx_getattr,			/* b_getattr */
+	lx_setattr,			/* b_setattr */
+	lx_copy_procdata,		/* b_copy_procdata */
+	lx_proc_exit,			/* b_proc_exit */
+	lx_exec,			/* b_exec */
+	lx_setrval,			/* b_lwp_setrval */
+	lx_initlwp,			/* b_initlwp */
+	lx_forklwp,			/* b_forklwp */
+	lx_freelwp,			/* b_freelwp */
+	lx_exitlwp,			/* b_lwpexit */
+	lx_elfexec,			/* b_elfexec */
+	NULL,				/* b_sigset_native_to_brand */
+	NULL,				/* b_sigset_brand_to_native */
+	lx_psig_to_proc,		/* b_psig_to_proc */
+	NSIG,				/* b_nsig */
+	lx_exit_with_sig,		/* b_exit_with_sig */
+	lx_wait_filter,			/* b_wait_filter */
+	lx_native_exec,			/* b_native_exec */
+	NULL,				/* b_ptrace_exectrap */
+	lx_map32limit,			/* b_map32limit */
+	lx_stop_notify,			/* b_stop_notify */
+	lx_waitid_helper,		/* b_waitid_helper */
+	lx_sigcld_repost,		/* b_sigcld_repost */
+	lx_issig_stop			/* b_issig_stop */
 };
 
 struct brand_mach_ops lx_mops = {
@@ -167,33 +174,39 @@ static struct modlinkage modlinkage = {
 void
 lx_proc_exit(proc_t *p, klwp_t *lwp)
 {
-	zone_t *z = p->p_zone;
 	int sig = ptolxproc(p)->l_signal;
 
-	ASSERT(p->p_brand == &lx_brand);
-	ASSERT(p->p_brand_data != NULL);
-
-	/*
-	 * If init is dying and we aren't explicitly shutting down the zone
-	 * or the system, then Solaris is about to restart init.  The Linux
-	 * init is not designed to handle a restart, which it interprets as
-	 * a reboot.  To give it a sane environment in which to run, we
-	 * reboot the zone.
-	 */
-	if (p->p_pid == z->zone_proc_initpid) {
-		if (z->zone_boot_err == 0 &&
-		    z->zone_restart_init &&
-		    zone_status_get(z) < ZONE_IS_SHUTTING_DOWN &&
-		    zone_status_get(global_zone) < ZONE_IS_SHUTTING_DOWN)
-			(void) zone_kadmin(A_REBOOT, 0, NULL, CRED());
-	}
+	VERIFY(p->p_brand == &lx_brand);
+	VERIFY(p->p_brand_data != NULL);
 
 	/*
 	 * We might get here if fork failed (e.g. ENOMEM) so we don't always
 	 * have an lwp (see brand_clearbrand).
 	 */
-	if (lwp != NULL)
+	if (lwp != NULL) {
+		boolean_t reenter_mutex = B_FALSE;
+
+		/*
+		 * This brand entry point is called variously with and without
+		 * the process p_lock held.  It would be possible to refactor
+		 * the brand infrastructure so that proc_exit() explicitly
+		 * calls this hook (b_lwpexit/lx_exitlwp) for the last LWP in a
+		 * process prior to detaching the brand with
+		 * brand_clearbrand().  Absent such refactoring, we
+		 * conditionally exit the mutex for the duration of the call.
+		 *
+		 * The atomic replacement of both "p_brand" and "p_brand_data"
+		 * is not affected by dropping and reacquiring the mutex here.
+		 */
+		if (mutex_owned(&p->p_lock) != 0) {
+			mutex_exit(&p->p_lock);
+			reenter_mutex = B_TRUE;
+		}
 		lx_exitlwp(lwp);
+		if (reenter_mutex) {
+			mutex_enter(&p->p_lock);
+		}
+	}
 
 	/*
 	 * The call path here is:
@@ -259,310 +272,6 @@ lx_getattr(zone_t *zone, int attr, void *buf, size_t *bufsize)
 		return (0);
 	}
 	return (-EINVAL);
-}
-
-/*
- * Enable/disable ptrace system call tracing for the given LWP. Enabling is
- * done by both setting the flag in that LWP's brand data (in the kernel) and
- * setting the process-wide trace flag (in the brand library of the traced
- * process).
- */
-static int
-lx_ptrace_syscall_set(pid_t pid, id_t lwpid, int set)
-{
-	proc_t *p;
-	kthread_t *t;
-	klwp_t *lwp;
-	lx_proc_data_t *lpdp;
-	lx_lwp_data_t *lldp;
-	uintptr_t addr;
-	int ret, flag = 1;
-
-	if ((p = sprlock(pid)) == NULL)
-		return (ESRCH);
-
-	if (priv_proc_cred_perm(curproc->p_cred, p, NULL, VWRITE) != 0) {
-		sprunlock(p);
-		return (EPERM);
-	}
-
-	if ((t = idtot(p, lwpid)) == NULL || (lwp = ttolwp(t)) == NULL) {
-		sprunlock(p);
-		return (ESRCH);
-	}
-
-	if ((lpdp = ptolxproc(p)) == NULL ||
-	    (lldp = lwp->lwp_brand) == NULL) {
-		sprunlock(p);
-		return (ESRCH);
-	}
-
-	if (set) {
-		/*
-		 * Enable the ptrace flag for this LWP and this process. Note
-		 * that we will turn off the LWP's ptrace flag, but we don't
-		 * turn off the process's ptrace flag.
-		 */
-		lldp->br_ptrace = 1;
-		lpdp->l_ptrace = 1;
-
-		addr = lpdp->l_traceflag;
-
-		mutex_exit(&p->p_lock);
-
-		/*
-		 * This can fail only in some rare corner cases where the
-		 * process is exiting or we're completely out of memory. In
-		 * these cases, it's sufficient to return an error to the ptrace
-		 * consumer and leave the process-wide flag set.
-		 */
-		ret = uwrite(p, &flag, sizeof (flag), addr);
-
-		mutex_enter(&p->p_lock);
-
-		/*
-		 * If we couldn't set the trace flag, unset the LWP's ptrace
-		 * flag as there ptrace consumer won't expect this LWP to stop.
-		 */
-		if (ret != 0)
-			lldp->br_ptrace = 0;
-	} else {
-		lldp->br_ptrace = 0;
-		ret = 0;
-	}
-
-	sprunlock(p);
-
-	if (ret != 0)
-		ret = EIO;
-
-	return (ret);
-}
-
-static void
-lx_ptrace_fire(void)
-{
-	kthread_t *t = curthread;
-	klwp_t *lwp = ttolwp(t);
-	lx_lwp_data_t *lldp = lwp->lwp_brand;
-
-	/*
-	 * The ptrace flag only applies until the next event is encountered
-	 * for the given LWP. If it's set, turn off the flag and poke the
-	 * controlling process by raising a signal.
-	 */
-	if (lldp->br_ptrace) {
-		lldp->br_ptrace = 0;
-		tsignal(t, SIGTRAP);
-	}
-}
-
-/*
- * Supports Linux PTRACE_SETOPTIONS handling which is similar to PTRACE_TRACEME
- * but return an event in the second byte of si_status.
- */
-static int
-lx_ptrace_ext_opts(int cmd, pid_t pid, uintptr_t val, int64_t *rval)
-{
-	proc_t *p;
-	lx_proc_data_t *lpdp;
-	uint_t ret;
-
-	if ((p = sprlock(pid)) == NULL)
-		return (ESRCH);
-
-	/*
-	 * Note that priv_proc_cred_perm can disallow access to ourself if
-	 * the proc's SNOCD p_flag is set, so we skip that check for ourself.
-	 */
-	if (curproc != p &&
-	    priv_proc_cred_perm(curproc->p_cred, p, NULL, VWRITE) != 0) {
-		sprunlock(p);
-		return (EPERM);
-	}
-
-	if ((lpdp = ptolxproc(p)) == NULL) {
-		sprunlock(p);
-		return (ESRCH);
-	}
-
-	switch (cmd) {
-	case B_PTRACE_EXT_OPTS_SET:
-		lpdp->l_ptrace_opts = (uint_t)val;
-		break;
-
-	case B_PTRACE_EXT_OPTS_GET:
-		ret = lpdp->l_ptrace_opts;
-		if (lpdp->l_ptrace_is_traced)
-			ret |= EMUL_PTRACE_IS_TRACED;
-		break;
-
-	case B_PTRACE_EXT_OPTS_EVT:
-		ret = lpdp->l_ptrace_event;
-		lpdp->l_ptrace_event = 0;
-		break;
-
-	case B_PTRACE_DETACH:
-		lpdp->l_ptrace_is_traced = 0;
-		break;
-
-	default:
-		sprunlock(p);
-		return (EINVAL);
-	}
-
-	sprunlock(p);
-
-	if (cmd == B_PTRACE_EXT_OPTS_GET || cmd == B_PTRACE_EXT_OPTS_EVT) {
-		if (copyout(&ret, (void *)val, sizeof (uint_t)) != 0)
-			return (EFAULT);
-	}
-
-	*rval = 0;
-	return (0);
-}
-
-/*
- * Used to support Linux PTRACE_SETOPTIONS handling and similar to
- * PTRACE_TRACEME. We signal ourselves to stop on return from this syscall and
- * setup the event reason so the emulation can pull this out when someone
- * 'waits' on this process.
- */
-static void
-lx_ptrace_stop_for_option(int option, ulong_t msg)
-{
-	proc_t *p = ttoproc(curthread);
-	sigqueue_t *sqp;
-	lx_proc_data_t *lpdp;
-	boolean_t child = B_FALSE;
-
-	if ((lpdp = ptolxproc(p)) == NULL) {
-		/* this should never happen but just to be safe */
-		return;
-	}
-
-	if (option & EMUL_PTRACE_O_CHILD) {
-		child = B_TRUE;
-		option &= ~EMUL_PTRACE_O_CHILD;
-	}
-
-	lpdp->l_ptrace_is_traced = 1;
-
-	/* Track the event as the reason for stopping */
-	switch (option) {
-	case LX_PTRACE_O_TRACEFORK:
-		if (!child) {
-			lpdp->l_ptrace_event = LX_PTRACE_EVENT_FORK;
-			lpdp->l_ptrace_eventmsg = msg;
-		}
-		break;
-	case LX_PTRACE_O_TRACEVFORK:
-		if (!child) {
-			lpdp->l_ptrace_event = LX_PTRACE_EVENT_VFORK;
-			lpdp->l_ptrace_eventmsg = msg;
-		}
-		break;
-	case LX_PTRACE_O_TRACECLONE:
-		if (!child) {
-			lpdp->l_ptrace_event = LX_PTRACE_EVENT_CLONE;
-			lpdp->l_ptrace_eventmsg = msg;
-		}
-		break;
-	case LX_PTRACE_O_TRACEEXEC:
-		lpdp->l_ptrace_event = LX_PTRACE_EVENT_EXEC;
-		break;
-	case LX_PTRACE_O_TRACEVFORKDONE:
-		lpdp->l_ptrace_event = LX_PTRACE_EVENT_VFORK_DONE;
-		lpdp->l_ptrace_eventmsg = msg;
-		break;
-	case LX_PTRACE_O_TRACEEXIT:
-		lpdp->l_ptrace_event = LX_PTRACE_EVENT_EXIT;
-		lpdp->l_ptrace_eventmsg = msg;
-		break;
-	case LX_PTRACE_O_TRACESECCOMP:
-		lpdp->l_ptrace_event = LX_PTRACE_EVENT_SECCOMP;
-		break;
-	}
-
-	/*
-	 * Post the required signal to ourselves so that we stop.
-	 *
-	 * Although Linux will send a SIGSTOP to a child process which is
-	 * stopped due to PTRACE_O_TRACEFORK, etc., we do not send that signal
-	 * since that leads us down the code path in the kernel which calls
-	 * stop(PR_JOBCONTROL, SIGSTOP), which in turn means that the TS_XSTART
-	 * flag gets turned off on the thread and this makes it complex to
-	 * actually get this process going when the userland application wants
-	 * to detach. Since consumers don't seem to depend on the specific
-	 * signal, we'll just stop both the parent and child the same way. We
-	 * do keep track of both the parent and child via the
-	 * EMUL_PTRACE_O_CHILD bit, in case we need to revisit this later.
-	 */
-	psignal(p, SIGTRAP);
-
-	/*
-	 * Since we're stopping, we need to post the SIGCHLD to the parent. The
-	 * code in sigcld expects p_wdata to be set to SIGTRAP before it can
-	 * send the signal, so do that here. We also need p_wcode to be set as
-	 * if we are ptracing, even though we're not really (see the code in
-	 * stop() when procstop is set and p->p_proc_flag has the P_PR_PTRACE
-	 * bit set). This is needed so that when the application calls waitid,
-	 * it will properly retrieve the process.
-	 */
-	sqp = kmem_zalloc(sizeof (sigqueue_t), KM_SLEEP);
-	mutex_enter(&pidlock);
-	p->p_wdata = SIGTRAP;
-	p->p_wcode = CLD_TRAPPED;
-	sigcld(p, sqp);
-	mutex_exit(&pidlock);
-}
-
-static int
-lx_ptrace_geteventmsg(pid_t pid, ulong_t *msgp)
-{
-	proc_t *p;
-	lx_proc_data_t *lpdp;
-	ulong_t msg;
-
-	if ((p = sprlock(pid)) == NULL)
-		return (ESRCH);
-
-	if (curproc != p &&
-	    priv_proc_cred_perm(curproc->p_cred, p, NULL, VREAD) != 0) {
-		sprunlock(p);
-		return (EPERM);
-	}
-
-	if ((lpdp = ptolxproc(p)) == NULL) {
-		sprunlock(p);
-		return (ESRCH);
-	}
-
-	msg = lpdp->l_ptrace_eventmsg;
-	lpdp->l_ptrace_eventmsg = 0;
-
-	sprunlock(p);
-
-	if (copyout(&msg, (void *)msgp, sizeof (ulong_t)) != 0)
-		return (EFAULT);
-
-	return (0);
-}
-
-/*
- * Brand entry to allow us to optionally generate the ptrace SIGTRAP on exec().
- * This will only be called if ptrace is enabled -- and we only generate the
- * SIGTRAP if LX_PTRACE_O_TRACEEXEC hasn't been set.
- */
-void
-lx_ptrace_exectrap(proc_t *p)
-{
-	lx_proc_data_t *lpdp;
-
-	if ((lpdp = ptolxproc(p)) == NULL ||
-	    !(lpdp->l_ptrace_opts & LX_PTRACE_O_TRACEEXEC)) {
-		psignal(p, SIGTRAP);
-	}
 }
 
 uint32_t
@@ -719,6 +428,12 @@ lx_init_brand_data(zone_t *zone)
 	(void) strlcpy(data->lxzd_kernel_version, "2.4.21", LX_VERS_MAX);
 	data->lxzd_max_syscall = LX_NSYSCALLS;
 	zone->zone_brand_data = data;
+
+	/*
+	 * In Linux, if the init(1) process terminates the system panics.
+	 * The zone must reboot to simulate this behaviour.
+	 */
+	zone->zone_reboot_on_init_exit = B_TRUE;
 }
 
 void
@@ -835,6 +550,16 @@ lx_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 		lwpd->br_scms = 1;
 #endif
 
+		if (pd->l_traceflag != NULL && pd->l_ptrace != 0) {
+			/*
+			 * If ptrace(2) is active on this process, it is likely
+			 * that we just finished an emulated execve(2) in a
+			 * traced child.  The usermode traceflag will have been
+			 * clobbered by the exec, so we set it again here:
+			 */
+			(void) suword32((void *)pd->l_traceflag, 1);
+		}
+
 		*rval = 0;
 		return (0);
 	case B_TTYMODES:
@@ -934,11 +659,6 @@ lx_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 			return (0);
 		}
 
-	case B_PTRACE_SYSCALL:
-		*rval = lx_ptrace_syscall_set((pid_t)arg1, (id_t)arg2,
-		    (int)arg3);
-		return (0);
-
 	case B_SYSENTRY:
 		if (lx_systrace_enabled) {
 			ASSERT(lx_systrace_entry_ptr != NULL);
@@ -966,7 +686,7 @@ lx_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 #endif
 		}
 
-		lx_ptrace_fire();
+		(void) lx_ptrace_stop(LX_PR_SYSENTRY);
 
 		pd = p->p_brand_data;
 
@@ -987,7 +707,7 @@ lx_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 			(*lx_systrace_return_ptr)(arg1, arg2, arg2, 0, 0, 0, 0);
 		}
 
-		lx_ptrace_fire();
+		(void) lx_ptrace_stop(LX_PR_SYSEXIT);
 
 		pd = p->p_brand_data;
 
@@ -1013,20 +733,55 @@ lx_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 		 */
 		return (lx_sched_affinity(cmd, arg1, arg2, arg3, rval));
 
-	case B_PTRACE_EXT_OPTS:
-		/*
-		 * Set or get the ptrace extended options or get the event
-		 * reason for the stop.
-		 */
-		return (lx_ptrace_ext_opts((int)arg1, (pid_t)arg2, arg3, rval));
-
 	case B_PTRACE_STOP_FOR_OPT:
-		lx_ptrace_stop_for_option((int)arg1, (ulong_t)arg2);
-		return (0);
+		return (lx_ptrace_stop_for_option((int)arg1, arg2 == 0 ?
+		    B_FALSE : B_TRUE, (ulong_t)arg3));
 
-	case B_PTRACE_GETEVENTMSG:
-		lx_ptrace_geteventmsg((pid_t)arg1, (ulong_t *)arg2);
+	case B_PTRACE_CLONE_BEGIN:
+		return (lx_ptrace_set_clone_inherit((int)arg1, arg2 == 0 ?
+		    B_FALSE : B_TRUE));
+
+	case B_PTRACE_KERNEL:
+		return (lx_ptrace_kernel((int)arg1, (pid_t)arg2, arg3, arg4));
+
+	case B_HELPER_WAITID: {
+		idtype_t idtype = (idtype_t)arg1;
+		id_t id = (id_t)arg2;
+		siginfo_t *infop = (siginfo_t *)arg3;
+		int options = (int)arg4;
+
+		lwpd = ttolxlwp(curthread);
+
+		/*
+		 * Our brand-specific waitid helper only understands a subset of
+		 * the possible idtypes.  Ensure we keep to that subset here:
+		 */
+		if (idtype != P_ALL && idtype != P_PID && idtype != P_PGID) {
+			return (EINVAL);
+		}
+
+		/*
+		 * Enable the return of emulated ptrace(2) stop conditions
+		 * through lx_waitid_helper, and stash the Linux-specific
+		 * extra waitid() flags.
+		 */
+		lwpd->br_waitid_emulate = B_TRUE;
+		lwpd->br_waitid_flags = (int)arg5;
+
+#if defined(_SYSCALL32_IMPL)
+		if (get_udatamodel() != DATAMODEL_NATIVE) {
+			return (waitsys32(idtype, id, infop, options));
+		} else
+#endif
+		{
+			return (waitsys(idtype, id, infop, options));
+		}
+
+		lwpd->br_waitid_emulate = B_FALSE;
+		lwpd->br_waitid_flags = 0;
+
 		return (0);
+	}
 
 	case B_UNSUPPORTED:
 		{
@@ -1702,6 +1457,7 @@ _init(void)
 	/* for lx_futex() */
 	lx_futex_init();
 
+	lx_ptrace_init();
 
 	err = mod_install(&modlinkage);
 	if (err != 0) {
@@ -1741,6 +1497,7 @@ _fini(void)
 	if (brand_zone_count(&lx_brand))
 		return (EBUSY);
 
+	lx_ptrace_fini();
 	lx_pid_fini();
 	lx_ioctl_fini();
 

@@ -21,7 +21,7 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2014 Joyent, Inc.  All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  */
 
 #ifndef _SYS_LX_SIGNAL_H
@@ -396,6 +396,7 @@ extern void lx_sigdeliver(int, siginfo_t *, void *, size_t, void (*)(),
     void (*)(), uintptr_t);
 
 extern int stol_siginfo(siginfo_t *siginfop, lx_siginfo_t *lx_siginfop);
+extern int stol_status(int);
 
 #endif	/* !defined(_ASM) */
 

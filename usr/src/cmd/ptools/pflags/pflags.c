@@ -25,7 +25,7 @@
  */
 
 /*
- * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ * Copyright 2015, Joyent, Inc.
  */
 
 #include <stdio.h>
@@ -468,6 +468,9 @@ prwhy(int why)
 		break;
 	case PR_SUSPENDED:
 		str = "PR_SUSPENDED";
+		break;
+	case PR_BRAND:
+		str = "PR_BRAND";
 		break;
 	default:
 		str = buf;

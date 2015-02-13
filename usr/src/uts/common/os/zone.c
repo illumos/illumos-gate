@@ -2624,6 +2624,7 @@ zone_init(void)
 	zone0.zone_ntasks = 1;
 	mutex_exit(&p0.p_lock);
 	zone0.zone_restart_init = B_TRUE;
+	zone0.zone_reboot_on_init_exit = B_FALSE;
 	zone0.zone_init_status = -1;
 	zone0.zone_brand = &native_brand;
 	rctl_prealloc_destroy(gp);
@@ -4820,6 +4821,7 @@ zone_create(const char *zone_name, const char *zone_root,
 	zone->zone_ncpus = 0;
 	zone->zone_ncpus_online = 0;
 	zone->zone_restart_init = B_TRUE;
+	zone->zone_reboot_on_init_exit = B_FALSE;
 	zone->zone_init_status = -1;
 	zone->zone_brand = &native_brand;
 	zone->zone_initname = NULL;

@@ -345,6 +345,14 @@ static int lx_sigsegv_depth = 0;
 #endif
 
 /*
+ * Setting LX_NO_ABORT_HANDLER in the environment will prevent the emulated
+ * Linux program from modifying the signal handling disposition for SIGSEGV or
+ * SIGABRT.  Useful for debugging programs which fall over themselves to
+ * prevent useful core files being generated.
+ */
+static int lx_no_abort_handler = 0;
+
+/*
  * Cache result of process.max-file-descriptor to avoid calling getrctl()
  * for each lx_ppoll().
  */
@@ -497,6 +505,29 @@ ltos_sigcode(int si_code)
 	}
 }
 
+/*
+ * Convert the "status" field of a SIGCLD siginfo_t.  We need to extract the
+ * illumos signal number and convert it to a Linux signal number while leaving
+ * the ptrace(2) event bits intact.
+ */
+int
+stol_status(int s)
+{
+	/*
+	 * We mask out the top bit here in case PTRACE_O_TRACESYSGOOD
+	 * is in use and 0x80 has been ORed with the signal number.
+	 */
+	int stat = stol_signo[s & 0x7f];
+	assert(stat != -1);
+
+	/*
+	 * We must mix in the ptrace(2) event which may be stored in
+	 * the second byte of the status code.  We also re-include the
+	 * PTRACE_O_TRACESYSGOOD bit.
+	 */
+	return ((s & 0xff80) | stat);
+}
+
 int
 stol_siginfo(siginfo_t *siginfop, lx_siginfo_t *lx_siginfop)
 {
@@ -530,7 +561,8 @@ stol_siginfo(siginfo_t *siginfop, lx_siginfo_t *lx_siginfop)
 
 		case LX_SIGCHLD:
 			lx_siginfo.lsi_pid = siginfop->si_pid;
-			lx_siginfo.lsi_status = siginfop->si_status;
+			lx_siginfo.lsi_status = stol_status(
+			    siginfop->si_status);
 			lx_siginfo.lsi_utime = siginfop->si_utime;
 			lx_siginfo.lsi_stime = siginfop->si_stime;
 			break;
@@ -1552,6 +1584,17 @@ lx_call_user_handler(int sig, siginfo_t *sip, void *p)
 	size_t stksize;
 	int lx_sig;
 
+	switch (sig) {
+	case SIGCLD:
+		/*
+		 * Signal to an interrupted waitpid() that it was interrupted
+		 * by a SIGCLD, and should restart to grab the wait status
+		 * this signal represented.
+		 */
+		lx_had_sigchild = 1;
+		break;
+	}
+
 	/*
 	 * If Illumos signal has no Linux equivalent, effectively ignore it.
 	 */
@@ -1566,6 +1609,18 @@ lx_call_user_handler(int sig, siginfo_t *sip, void *p)
 
 	lxsap = &lx_sighandlers.lx_sa[lx_sig];
 	lx_debug("lxsap @ 0x%p", lxsap);
+
+	/*
+	 * If the delivery of this signal interrupted a system call, we must
+	 * only restart it if sigaction(2) was used to set the SA_RESTART flag
+	 * for this signal.  The lx_emulate() function checks this per-thread
+	 * variable to discover the restart disposition of the most recently
+	 * handled signal.
+	 *
+	 * NOTE: this mechanism may not stand up to close scrutiny in the face
+	 * of nested asynchronous signal delivery.
+	 */
+	lx_do_syscall_restart = !!(lxsap->lxsa_flags & LX_SA_RESTART);
 
 	/*
 	 * Emulate vsyscall support.
@@ -1740,6 +1795,18 @@ lx_sigaction_common(int lx_sig, struct lx_sigaction *lxsp,
 			return (-errno);
 
 		if ((sig = ltos_signo[lx_sig]) != -1) {
+			if (lx_no_abort_handler != 0) {
+				/*
+				 * If LX_NO_ABORT_HANDLER has been set, we will
+				 * not allow the emulated program to do
+				 * anything hamfisted with SIGSEGV or SIGABRT
+				 * signals.
+				 */
+				if (sig == SIGSEGV || sig == SIGABRT) {
+					return (0);
+				}
+			}
+
 			/*
 			 * Block this signal while messing with its dispostion
 			 */
@@ -2067,6 +2134,10 @@ lx_siginit(void)
 	struct sigaction sa;
 	sigset_t new_set, oset;
 	int lx_sig, sig;
+
+	if (getenv("LX_NO_ABORT_HANDLER") != NULL) {
+		lx_no_abort_handler = 1;
+	}
 
 	/*
 	 * Block all signals possible while setting up the signal imposition
