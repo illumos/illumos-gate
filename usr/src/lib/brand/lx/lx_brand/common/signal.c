@@ -561,8 +561,12 @@ stol_siginfo(siginfo_t *siginfop, lx_siginfo_t *lx_siginfop)
 
 		case LX_SIGCHLD:
 			lx_siginfo.lsi_pid = siginfop->si_pid;
-			lx_siginfo.lsi_status = stol_status(
-			    siginfop->si_status);
+			if (siginfop->si_code == CLD_EXITED) {
+				lx_siginfo.lsi_status = siginfop->si_status;
+			} else {
+				lx_siginfo.lsi_status = stol_status(
+				    siginfop->si_status);
+			}
 			lx_siginfo.lsi_utime = siginfop->si_utime;
 			lx_siginfo.lsi_stime = siginfop->si_stime;
 			break;
