@@ -24,7 +24,9 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 2014, Joyent, Inc. All rights reserved.
+ */
 
 /*
  * av1394 asynchronous module
@@ -359,9 +361,10 @@ av1394_async_poll(av1394_inst_t *avp, short events, int anyyet, short *reventsp,
 	AV1394_TNF_ENTER(av1394_async_poll);
 
 	if (events & POLLIN) {
-		if (av1394_peekq(rq)) {
+		if (av1394_peekq(rq))
 			*reventsp |= POLLIN;
-		} else if (!anyyet) {
+
+		if ((!*reventsp && !anyyet) || (events & POLLET)) {
 			mutex_enter(&ap->a_mutex);
 			ap->a_pollevents |= POLLIN;
 			*phpp = &ap->a_pollhead;
@@ -438,8 +441,8 @@ av1394_async_create_minor_node(av1394_inst_t *avp)
 	int	ret;
 
 	ret = ddi_create_minor_node(avp->av_dip, "async",
-		S_IFCHR, AV1394_ASYNC_INST2MINOR(avp->av_instance),
-		DDI_NT_AV_ASYNC, NULL);
+	    S_IFCHR, AV1394_ASYNC_INST2MINOR(avp->av_instance),
+	    DDI_NT_AV_ASYNC, NULL);
 	if (ret != DDI_SUCCESS) {
 		TNF_PROBE_0(av1394_async_create_minor_node_error,
 		    AV1394_TNF_ASYNC_ERROR, "");

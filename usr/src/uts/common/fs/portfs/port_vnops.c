@@ -24,6 +24,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
+ */
+
 #include <sys/types.h>
 #include <sys/vnode.h>
 #include <sys/vfs_opreg.h>
@@ -294,14 +298,10 @@ port_poll(vnode_t *vp, short events, int anyyet, short *reventsp,
 		levents |= POLLOUT;
 	levents &= events;
 	*reventsp = levents;
-	if (levents == 0) {
-		if (!anyyet) {
-			*phpp = &pp->port_pollhd;
-			portq->portq_flags |=
-			    events & POLLIN ? PORTQ_POLLIN : 0;
-			portq->portq_flags |=
-			    events & POLLOUT ? PORTQ_POLLOUT : 0;
-		}
+	if ((levents == 0 && !anyyet) || (events & POLLET)) {
+		*phpp = &pp->port_pollhd;
+		portq->portq_flags |= events & POLLIN ? PORTQ_POLLIN : 0;
+		portq->portq_flags |= events & POLLOUT ? PORTQ_POLLOUT : 0;
 	}
 	mutex_exit(&portq->portq_mutex);
 	return (0);

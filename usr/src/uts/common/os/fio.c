@@ -1209,7 +1209,8 @@ f_getfl(int fd, int *flagp)
 			error = EBADF;
 		else {
 			vnode_t *vp = fp->f_vnode;
-			int flag = fp->f_flag | (fp->f_flag2 << 16);
+			int flag = fp->f_flag |
+			    ((fp->f_flag2 & ~FEPOLLED) << 16);
 
 			/*
 			 * BSD fcntl() FASYNC compatibility.

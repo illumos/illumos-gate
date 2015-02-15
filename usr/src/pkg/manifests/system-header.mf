@@ -954,6 +954,7 @@ file path=usr/include/sys/elf_amd64.h
 file path=usr/include/sys/elf_notes.h
 file path=usr/include/sys/elftypes.h
 file path=usr/include/sys/epm.h
+file path=usr/include/sys/epoll.h
 file path=usr/include/sys/errno.h
 file path=usr/include/sys/errorq.h
 file path=usr/include/sys/errorq_impl.h

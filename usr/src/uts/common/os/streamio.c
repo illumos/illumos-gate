@@ -24,6 +24,7 @@
 
 /*
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2014, Joyent, Inc. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -8311,7 +8312,7 @@ chkrd:
 	}
 
 	*reventsp = (short)retevents;
-	if (retevents) {
+	if (retevents && !(events & POLLET)) {
 		if (headlocked)
 			mutex_exit(&stp->sd_lock);
 		return (0);

@@ -105,6 +105,9 @@ file path=usr/share/man/man3c/ecvt.3c
 file path=usr/share/man/man3c/enable_extended_FILE_stdio.3c
 file path=usr/share/man/man3c/encrypt.3c
 file path=usr/share/man/man3c/end.3c
+file path=usr/share/man/man3c/epoll_create.3c
+file path=usr/share/man/man3c/epoll_ctl.3c
+file path=usr/share/man/man3c/epoll_wait.3c
 file path=usr/share/man/man3c/err.3c
 file path=usr/share/man/man3c/euclen.3c
 file path=usr/share/man/man3c/eventfd.3c
@@ -732,6 +735,8 @@ link path=usr/share/man/man3c/endspent.3c target=getspnam.3c
 link path=usr/share/man/man3c/endusershell.3c target=getusershell.3c
 link path=usr/share/man/man3c/endutent.3c target=getutent.3c
 link path=usr/share/man/man3c/endutxent.3c target=getutxent.3c
+link path=usr/share/man/man3c/epoll_create1.3c target=epoll_create.3c
+link path=usr/share/man/man3c/epoll_pwait.3c target=epoll_wait.3c
 link path=usr/share/man/man3c/erand48.3c target=drand48.3c
 link path=usr/share/man/man3c/errno.3c target=perror.3c
 link path=usr/share/man/man3c/errx.3c target=err.3c

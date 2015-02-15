@@ -52,6 +52,16 @@ include $(UTSBASE)/intel/Makefile.intel
 CERRWARN	+= -_gcc=-Wno-uninitialized
 
 #
+# It's unfortunate that we have to disable this; however, it's lint's fault. We
+# have a line which only causes a lint warning on a 64-bit build. If we suppress
+# it, then the 32-bit lint build complains about it being unnecessarily
+# suppressed. Therefore, the only thing it seems like we can do is disable the
+# lint warning completely.
+#
+
+LINTTAGS      += -erroff=E_BAD_PTR_CAST_ALIGN
+
+#
 #	Define targets
 #
 ALL_TARGET	= $(BINARY) $(SRC_CONFILE)

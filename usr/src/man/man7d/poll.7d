@@ -17,7 +17,6 @@ int n = ioctl(int fd, DP_ISPOLLED, struct pollfd* pfd);\fR
 .fi
 
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIfd\fR \fR
@@ -72,15 +71,6 @@ Pointer to \fBpollfd\fR structure.
 .RE
 
 .SH DESCRIPTION
-.LP
-Note -
-.sp
-.RS 2
-The \fB/dev/poll\fR device, associated driver and corresponding manpages may be
-removed in a future Solaris release. For similar functionality in the event
-ports framework, see \fBport_create\fR(3C).
-.RE
-.sp
 .LP
 The  \fB/dev/poll\fR driver is a special driver that enables you to monitor
 multiple sets  of polled file descriptors. By using the  \fB/dev/poll\fR
@@ -165,7 +155,6 @@ currently polled \fBevents\fR. The ioctl returns  \fB0\fR if the file
 descriptor is not in the set. The  \fBpollfd\fR structure pointed by  \fIpfd\fR
 is not modified. The ioctl returns a  \fB-1\fR if the call fails.
 .SH EXAMPLES
-.sp
 .LP
 The following example shows how  \fB/dev/poll\fR may be used.
 .sp
@@ -293,7 +282,6 @@ The following example is part of a test program which shows how
 .in -2
 
 .SH ERRORS
-.sp
 .ne 2
 .na
 \fB\fBEACCES\fR \fR
@@ -347,7 +335,6 @@ special file does not exist.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for a description of the following attributes:
 .sp
@@ -364,11 +351,9 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBopen\fR(2), \fBpoll\fR(2), \fBwrite\fR(2), \fBattributes\fR(5)
 .SH NOTES
-.sp
 .LP
 The \fB/dev/poll\fR API is particularly beneficial to applications that poll a
 large number of file descriptors repeatedly.  Applications will exhibit the

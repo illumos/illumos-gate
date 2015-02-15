@@ -23,7 +23,7 @@
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
  * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
- * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2014, Joyent, Inc. All rights reserved.
  * Copyright (c) 2014, OmniTI Computer Consulting, Inc. All rights reserved.
  */
 
@@ -703,6 +703,8 @@ const struct ioc {
 	/* /dev/poll ioctl() control codes */
 	{ (uint_t)DP_POLL,	"DP_POLL",	NULL },
 	{ (uint_t)DP_ISPOLLED,	"DP_ISPOLLED",	NULL },
+	{ (uint_t)DP_PPOLL,	"DP_PPOLL",	NULL },
+	{ (uint_t)DP_EPOLLCOMPAT, "DP_EPOLLCOMPAT",	NULL },
 	/* the old /proc ioctl() control codes */
 #define	PIOC	('q'<<8)
 	{ (uint_t)(PIOC|1),	"PIOCSTATUS",	NULL },

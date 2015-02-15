@@ -41,6 +41,7 @@ MANFILES=	Intro.5			\
 		device_clean.5		\
 		dhcp.5			\
 		environ.5		\
+		epoll.5			\
 		eqn.5			\
 		eqnchar.5		\
 		eventfd.5		\

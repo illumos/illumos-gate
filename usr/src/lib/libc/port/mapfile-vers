@@ -93,6 +93,15 @@ $if _x86 && _ELF64
 $add amd64
 $endif
 
+SYMBOL_VERSION ILLUMOS_0.15 {	# epoll(3C)
+    protected:
+	epoll_create;
+	epoll_create1;
+	epoll_ctl;
+	epoll_wait;
+	epoll_pwait;
+} ILLUMOS_0.14;
+
 SYMBOL_VERSION ILLUMOS_0.14 {	# strerror_l
     protected:
 	strerror_l;
