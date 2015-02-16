@@ -1,10 +1,10 @@
 <?xml version='1.0'?>
 <!DOCTYPE service_bundle SYSTEM '/usr/share/lib/xml/dtd/service_bundle.dtd.1'>
 <!--
+	Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+
 	Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 	Use is subject to license terms.
-
-	pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 	NOTE:  This service manifest is not editable; its contents will
 	be overwritten by package or patch operations, including
@@ -26,6 +26,13 @@
 	<restarter>
 		<service_fmri value='svc:/network/inetd:default' />
 	</restarter>
+
+	<dependency name='rpcbind'
+	    grouping='require_all'
+	    restart_on='restart'
+	    type='service'>
+		<service_fmri value='svc:/network/rpc/bind' />
+	</dependency>
 
 	<exec_method
 		type='method'

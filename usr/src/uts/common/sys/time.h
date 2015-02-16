@@ -59,7 +59,7 @@ struct timeval {
 
 #define	TIMEVAL_TO_TIMEVAL32(tv32, tv)	{		\
 	(tv32)->tv_sec = (time32_t)(tv)->tv_sec;	\
-	(tv32)->tv_usec = (tv)->tv_usec;		\
+	(tv32)->tv_usec = (int32_t)(tv)->tv_usec;	\
 }
 
 #define	TIME32_MAX	INT32_MAX

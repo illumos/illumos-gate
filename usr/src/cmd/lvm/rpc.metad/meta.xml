@@ -1,6 +1,8 @@
 <?xml version='1.0'?>
 <!DOCTYPE service_bundle SYSTEM '/usr/share/lib/xml/dtd/service_bundle.dtd.1'>
 <!--
+ Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+
  Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  Use is subject to license terms.
 
@@ -46,7 +48,7 @@
 
 	<dependency name='rpcbind'
 	    grouping='require_all'
-	    restart_on='error'
+	    restart_on='restart'
 	    type='service'>
 		<service_fmri value='svc:/network/rpc/bind' />
 	</dependency>

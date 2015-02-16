@@ -165,6 +165,14 @@ static int accepted_protos[3][2] = {
 int sockmod_pfp_rcvbuf_max = 1024 * 1024 * 4;
 
 /*
+ * This sets an upper bound on the size of the receive buffer for a PF_PACKET
+ * socket. More properly, this should be controlled through ipadm, ala TCP, UDP,
+ * SCTP, etc. Until that's done, this provides a hard cap of 4 MB and allows an
+ * opportunity for it to be changed, should it be needed.
+ */
+int sockmod_pfp_rcvbuf_max = 1024 * 1024 * 4;
+
+/*
  * Module linkage information for the kernel.
  */
 static struct modlsockmod modlsockmod = {
@@ -949,7 +957,6 @@ sdpfp_ioctl(sock_lower_handle_t handle, int cmd, intptr_t arg, int mod,
 		}
 #endif
 		return (error);
-		break;
 	}
 
 	error =  mac_open_by_linkid(linkid, &mh);
