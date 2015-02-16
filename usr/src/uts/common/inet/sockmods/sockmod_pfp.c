@@ -162,8 +162,6 @@ static int accepted_protos[3][2] = {
 	{ ETH_P_803_3,	0 },
 };
 
-int sockmod_pfp_rcvbuf_max = 1024 * 1024 * 4;
-
 /*
  * This sets an upper bound on the size of the receive buffer for a PF_PACKET
  * socket. More properly, this should be controlled through ipadm, ala TCP, UDP,
