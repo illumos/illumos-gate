@@ -908,7 +908,9 @@ typedef struct smb_session {
 	smb_slist_t		s_req_list;
 	smb_llist_t		s_xa_list;
 	smb_llist_t		s_user_list;
+	smb_llist_t		s_tree_list;
 	smb_idpool_t		s_uid_pool;
+	smb_idpool_t		s_tid_pool;
 	smb_txlst_t		s_txlst;
 
 	volatile uint32_t	s_tree_cnt;
@@ -975,9 +977,6 @@ typedef struct smb_user {
 	cred_t			*u_cred;
 	cred_t			*u_privcred;
 
-	smb_llist_t		u_tree_list;
-	smb_idpool_t		u_tid_pool;
-
 	uint32_t		u_refcnt;
 	uint32_t		u_flags;
 	uint32_t		u_privileges;
@@ -1028,7 +1027,11 @@ typedef struct smb_tree {
 
 	struct smb_server	*t_server;
 	smb_session_t		*t_session;
-	smb_user_t		*t_user;
+	/*
+	 * user whose uid was in the tree connect message
+	 * ("owner" in MS-CIFS parlance, see section 2.2.1.6 definition of FID)
+	 */
+	smb_user_t		*t_owner;
 	smb_node_t		*t_snode;
 
 	smb_llist_t		t_ofile_list;
@@ -1259,6 +1262,7 @@ typedef struct smb_odir {
 	list_node_t		d_lnd;
 	smb_odir_state_t	d_state;
 	smb_session_t		*d_session;
+	smb_user_t		*d_user;
 	smb_tree_t		*d_tree;
 	smb_node_t		*d_dnode;
 	cred_t			*d_cred;

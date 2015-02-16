@@ -76,7 +76,7 @@ extern size_t	wscspn(const wchar_t *, const wchar_t *);
 extern int	wscoll(const wchar_t *, const wchar_t *);
 extern size_t	wsxfrm(wchar_t *, const wchar_t *, size_t);
 
-#if !defined(_STRICT_STDC) && !defined(__XOPEN_OR_POSIX)
+#if !defined(_STRICT_SYMBOLS)
 
 extern wchar_t	*wsdup(const wchar_t *);
 extern int	wscol(const wchar_t *);
@@ -89,7 +89,7 @@ extern int	wsprintf(wchar_t *, const char *, ...);
 extern long long	wstoll(const wchar_t *, wchar_t **, int);
 #endif	/* defined(_LONGLONG_TYPE) */
 
-#endif /* !defined(_STRICT_STDC) && !defined(__XOPEN_OR_POSIX) */
+#endif /* !defined(_STRICT_SYMBOLS) */
 
 /* Returns the code set number for the process code c. */
 #define	WCHAR_SHIFT	7

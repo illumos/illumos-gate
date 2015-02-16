@@ -173,8 +173,7 @@ smb_nt_transact_create(smb_request_t *sr, smb_xa_t *xa)
 	if (op->rootdirfid == 0) {
 		op->fqi.fq_dnode = sr->tid_tree->t_snode;
 	} else {
-		op->dir = smb_ofile_lookup_by_fid(sr->tid_tree,
-		    (uint16_t)op->rootdirfid);
+		op->dir = smb_ofile_lookup_by_fid(sr, (uint16_t)op->rootdirfid);
 		if (op->dir == NULL) {
 			smbsr_error(sr, NT_STATUS_INVALID_HANDLE,
 			    ERRDOS, ERRbadfid);

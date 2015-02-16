@@ -1,9 +1,13 @@
 '\" te
-.\"  Copyright (c) 1999, Sun Microsystems, Inc.  All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DEVID_GET 3DEVID "Nov 30, 2001"
+.\"
+.\"
+.\" Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+.\" Copyright (c) 1999, Sun Microsystems, Inc.  All Rights Reserved
+.\"
+.TH DEVID_GET 3DEVID "Jan 12, 2015"
 .SH NAME
 devid_get, devid_compare, devid_deviceid_to_nmlist, devid_free,
 devid_free_nmlist, devid_get_minor_name, devid_sizeof, devid_str_decode,
@@ -71,7 +75,6 @@ applications
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 These functions provide unique identifiers (device \fBID\fRs) for devices.
 Applications and device drivers use these functions to identify and locate
@@ -102,7 +105,7 @@ The \fBdevid_deviceid_to_nmlist()\fR function returns an array of
 \fIdevid_nmlist\fR structures, where each entry matches the \fIdevid\fR and
 \fIminor_name\fR passed in. If the \fIminor_name\fR specified is one of the
 special values (\fBDEVID_MINOR_NAME_ALL\fR, \fBDEVID_MINOR_NAME_ALL_CHR\fR, or
-\fBDEVID_MINOR_NAME_ALL_BLK\fR) , then all minor names associated with
+\fBDEVID_MINOR_NAME_ALL_BLK\fR), then all minor names associated with
 \fIdevid\fR which also meet the special \fIminor_name\fR filtering requirements
 are returned. The \fIdevid_nmlist\fR structure contains the device name and
 device number. The last entry of the array contains a null pointer for the
@@ -116,7 +119,7 @@ complete if called with the device ID of an unattached device.
 .sp
 .LP
 The \fBdevid_free_nmlist()\fR function frees the memory allocated by the
-\fBdevid_deviceid_to_nmlist()\fR function.
+\fBdevid_deviceid_to_nmlist()\fR function and returned in the \fIretlist\fR.
 .sp
 .LP
 The \fBdevid_compare()\fR function compares two device \fBID\fRs and determines
@@ -170,9 +173,8 @@ function. A non-null returned minor name must be freed by calling
 .LP
 The \fBdevid_str_free()\fR function frees the character string returned by
 \fBdevid_str_encode()\fR and the \fIretminor_name\fR argument returned by
-\fBdevid_str_decode()\fR.
+\fBdevid_str_decode()\fR and \fBdevid_get_minor_name()\fR.
 .SH RETURN VALUES
-.sp
 .LP
 Upon successful completion, the \fBdevid_get()\fR,
 \fBdevid_get_minor_name()\fR, \fBdevid_str_decode()\fR, and
@@ -283,7 +285,6 @@ devid_free_nmlist(list);
 .in -2
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for description of the following attributes:
 .sp
@@ -301,7 +302,6 @@ Interface Stability	Stable
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBfree\fR(3C), \fBlibdevid\fR(3LIB), \fBattributes\fR(5),
 \fBddi_devid_compare\fR(9F)

@@ -1,4 +1,5 @@
 '\" te
+.\" Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 .\"  Copyright 1994, The X/Open Company Ltd.  All Rights Reserved  Portions Copyright 1989 AT&T  Portions Copyright (c) 1998, Sun Microsystems, Inc.  All Rights Reserved
 .\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
@@ -7,7 +8,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH T_OPEN 3NSL "May 7, 1998"
+.TH T_OPEN 3NSL "Jan 27, 2015"
 .SH NAME
 t_open \- establish a transport endpoint
 .SH SYNOPSIS
@@ -23,7 +24,6 @@ t_open \- establish a transport endpoint
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 This routine is part of the \fBXTI\fR interfaces which evolved from the
 \fBTLI\fR interfaces. \fBXTI\fR represents the future evolution of these
@@ -234,16 +234,13 @@ time.
 If \fIinfo\fR is set to a null pointer by the transport user, no protocol
 information is returned by \fBt_open()\fR.
 .SH RETURN VALUES
-.sp
 .LP
 A valid file descriptor is returned upon successful completion.  Otherwise, a
 value of -1 is returned and \fBt_errno\fR is set to indicate an error.
 .SH VALID STATES
-.sp
 .LP
 \fBT_UNINIT\fR.
 .SH ERRORS
-.sp
 .LP
 On failure, \fBt_errno\fR is set to the following:
 .sp
@@ -285,27 +282,23 @@ A system error has occurred during execution of this function.
 .RE
 
 .SH TLI COMPATIBILITY
-.sp
 .LP
 The \fBXTI\fR and \fBTLI\fR interface definitions have common names but use
 different header files. This and other semantic differences between the two
 interfaces are described in the subsections below.
 .SS "Interface Header"
-.sp
 .LP
-The \fBXTI\fR interfaces use the \fBxti.h\fR \fBTLI\fR interfaces should
+The \fBXTI\fR interfaces use the \fBxti.h\fR. \fBTLI\fR interfaces should
 \fInot\fR use this header.  They should use the header:
 .br
 .in +2
 #include <tiuser.h>
 .in -2
 .SS "Error Description Values"
-.sp
 .LP
 The \fBt_errno\fR values \fBTPROTO\fR and \fBTBADNAME\fR can be set by the
 \fBXTI\fR interface but cannot be set by the \fBTLI\fR interface.
 .SS "Notes"
-.sp
 .LP
 For \fBTLI\fR , the \fBt_info\fR structure referenced by \fIinfo\fR lacks the
 following structure member:
@@ -329,7 +322,6 @@ data, and disconnection data. The corresponding structure members are
 \fBaddr\fR, \fBoptions\fR, \fBtsdu\fR, \fBestdu\fR, \fBconnect\fR, and
 \fBdiscon\fR, respectively.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5)  for descriptions of the following attributes:
 .sp
@@ -345,6 +337,5 @@ MT Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBopen\fR(2), \fBattributes\fR(5)

@@ -805,7 +805,7 @@ smb_fsop_remove_streams(smb_request_t *sr, cred_t *cr, smb_node_t *fnode)
 		return (-1);
 	}
 
-	if ((od = smb_tree_lookup_odir(sr->tid_tree, odid)) == NULL) {
+	if ((od = smb_tree_lookup_odir(sr, odid)) == NULL) {
 		smbsr_errno(sr, ENOENT);
 		return (-1);
 	}

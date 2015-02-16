@@ -39,15 +39,15 @@
  * +-------------------+       +-------------------+      +-------------------+
  * |     SESSION       |<----->|     SESSION       |......|      SESSION      |
  * +-------------------+       +-------------------+      +-------------------+
- *          |
- *          |
- *          v
- * +-------------------+       +-------------------+      +-------------------+
- * |       USER        |<----->|       USER        |......|       USER        |
- * +-------------------+       +-------------------+      +-------------------+
- *          |
- *          |
- *          v
+ *   |          |
+ *   |          |
+ *   |          v
+ *   |  +-------------------+     +-------------------+   +-------------------+
+ *   |  |       USER        |<--->|       USER        |...|       USER        |
+ *   |  +-------------------+     +-------------------+   +-------------------+
+ *   |
+ *   |
+ *   v
  * +-------------------+       +-------------------+      +-------------------+
  * |       TREE        |<----->|       TREE        |......|       TREE        |
  * +-------------------+       +-------------------+      +-------------------+
@@ -175,7 +175,7 @@ static void smb_ofile_netinfo_fini(smb_netfileinfo_t *);
  */
 smb_ofile_t *
 smb_ofile_open(
-    smb_tree_t		*tree,
+    smb_request_t	*sr,
     smb_node_t		*node,
     uint16_t		pid,
     struct open_param	*op,
@@ -183,10 +183,13 @@ smb_ofile_open(
     uint32_t		uniqid,
     smb_error_t		*err)
 {
+	smb_tree_t	*tree = sr->tid_tree;
 	smb_ofile_t	*of;
 	uint16_t	fid;
 	smb_attr_t	attr;
 	int		rc;
+	enum errstates { EMPTY, FIDALLOC, CRHELD, MUTEXINIT };
+	enum errstates	state = EMPTY;
 
 	if (smb_idpool_alloc(&tree->t_fid_pool, &fid)) {
 		err->status = NT_STATUS_TOO_MANY_OPENED_FILES;
@@ -194,6 +197,7 @@ smb_ofile_open(
 		err->errcode = ERROR_TOO_MANY_OPEN_FILES;
 		return (NULL);
 	}
+	state = FIDALLOC;
 
 	of = kmem_cache_alloc(tree->t_server->si_cache_ofile, KM_SLEEP);
 	bzero(of, sizeof (smb_ofile_t));
@@ -206,16 +210,23 @@ smb_ofile_open(
 	of->f_share_access = op->share_access;
 	of->f_create_options = op->create_options;
 	of->f_cr = (op->create_options & FILE_OPEN_FOR_BACKUP_INTENT) ?
-	    smb_user_getprivcred(tree->t_user) : tree->t_user->u_cred;
+	    smb_user_getprivcred(sr->uid_user) : sr->uid_user->u_cred;
 	crhold(of->f_cr);
+	state = CRHELD;
 	of->f_ftype = ftype;
 	of->f_server = tree->t_server;
-	of->f_session = tree->t_user->u_session;
-	of->f_user = tree->t_user;
+	of->f_session = tree->t_session;
+	/*
+	 * grab a ref for of->f_user
+	 * released in smb_ofile_delete()
+	 */
+	smb_user_hold_internal(sr->uid_user);
+	of->f_user = sr->uid_user;
 	of->f_tree = tree;
 	of->f_node = node;
 
 	mutex_init(&of->f_mutex, NULL, MUTEX_DEFAULT, NULL);
+	state = MUTEXINIT;
 	of->f_state = SMB_OFILE_STATE_OPEN;
 
 	if (ftype == SMB_FTYPE_MESG_PIPE) {
@@ -232,15 +243,10 @@ smb_ofile_open(
 		attr.sa_mask = SMB_AT_UID | SMB_AT_DOSATTR;
 		rc = smb_node_getattr(NULL, node, of->f_cr, NULL, &attr);
 		if (rc != 0) {
-			of->f_magic = 0;
-			mutex_destroy(&of->f_mutex);
-			crfree(of->f_cr);
-			smb_idpool_free(&tree->t_fid_pool, of->f_fid);
-			kmem_cache_free(tree->t_server->si_cache_ofile, of);
 			err->status = NT_STATUS_INTERNAL_ERROR;
 			err->errcls = ERRDOS;
 			err->errcode = ERROR_INTERNAL_ERROR;
-			return (NULL);
+			goto errout;
 		}
 		if (crgetuid(of->f_cr) == attr.sa_vattr.va_uid) {
 			/*
@@ -254,16 +260,10 @@ smb_ofile_open(
 			of->f_mode =
 			    smb_fsop_amask_to_omode(of->f_granted_access);
 			if (smb_fsop_open(node, of->f_mode, of->f_cr) != 0) {
-				of->f_magic = 0;
-				mutex_destroy(&of->f_mutex);
-				crfree(of->f_cr);
-				smb_idpool_free(&tree->t_fid_pool, of->f_fid);
-				kmem_cache_free(tree->t_server->si_cache_ofile,
-				    of);
 				err->status = NT_STATUS_ACCESS_DENIED;
 				err->errcls = ERRDOS;
 				err->errcode = ERROR_ACCESS_DENIED;
-				return (NULL);
+				goto errout;
 			}
 		}
 
@@ -290,6 +290,25 @@ smb_ofile_open(
 	atomic_inc_32(&tree->t_open_files);
 	atomic_inc_32(&of->f_session->s_file_cnt);
 	return (of);
+
+errout:
+	switch (state) {
+	case MUTEXINIT:
+		mutex_destroy(&of->f_mutex);
+		smb_user_release(of->f_user);
+		/*FALLTHROUGH*/
+	case CRHELD:
+		crfree(of->f_cr);
+		of->f_magic = 0;
+		kmem_cache_free(tree->t_server->si_cache_ofile, of);
+		/*FALLTHROUGH*/
+	case FIDALLOC:
+		smb_idpool_free(&tree->t_fid_pool, fid);
+		/*FALLTHROUGH*/
+	case EMPTY:
+		break;
+	}
+	return (NULL);
 }
 
 /*
@@ -601,9 +620,10 @@ smb_ofile_request_complete(smb_ofile_t *of)
  */
 smb_ofile_t *
 smb_ofile_lookup_by_fid(
-    smb_tree_t		*tree,
+    smb_request_t	*sr,
     uint16_t		fid)
 {
+	smb_tree_t	*tree = sr->tid_tree;
 	smb_llist_t	*of_list;
 	smb_ofile_t	*of;
 
@@ -616,19 +636,32 @@ smb_ofile_lookup_by_fid(
 	while (of) {
 		ASSERT(of->f_magic == SMB_OFILE_MAGIC);
 		ASSERT(of->f_tree == tree);
-		if (of->f_fid == fid) {
-			mutex_enter(&of->f_mutex);
-			if (of->f_state != SMB_OFILE_STATE_OPEN) {
-				mutex_exit(&of->f_mutex);
-				smb_llist_exit(of_list);
-				return (NULL);
-			}
-			of->f_refcnt++;
-			mutex_exit(&of->f_mutex);
+		if (of->f_fid == fid)
 			break;
-		}
 		of = smb_llist_next(of_list, of);
 	}
+	if (of == NULL)
+		goto out;
+
+	/*
+	 * Only allow use of a given FID with the same UID that
+	 * was used to open it.  MS-CIFS 3.3.5.14
+	 */
+	if (of->f_user != sr->uid_user) {
+		of = NULL;
+		goto out;
+	}
+
+	mutex_enter(&of->f_mutex);
+	if (of->f_state != SMB_OFILE_STATE_OPEN) {
+		mutex_exit(&of->f_mutex);
+		of = NULL;
+		goto out;
+	}
+	of->f_refcnt++;
+	mutex_exit(&of->f_mutex);
+
+out:
 	smb_llist_exit(of_list);
 	return (of);
 }
@@ -921,6 +954,7 @@ smb_ofile_delete(void *arg)
 	of->f_magic = (uint32_t)~SMB_OFILE_MAGIC;
 	mutex_destroy(&of->f_mutex);
 	crfree(of->f_cr);
+	smb_user_release(of->f_user);
 	kmem_cache_free(of->f_tree->t_server->si_cache_ofile, of);
 }
 

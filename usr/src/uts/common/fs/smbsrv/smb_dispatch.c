@@ -20,8 +20,8 @@
  */
 
 /*
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -694,16 +694,13 @@ andx_more:
 		}
 
 		sr->user_cr = smb_user_getcred(sr->uid_user);
-
-		if (!(sdd->sdt_flags & SDDF_SUPPRESS_TID) &&
-		    (sr->tid_tree == NULL)) {
-			sr->tid_tree = smb_user_lookup_tree(
-			    sr->uid_user, sr->smb_tid);
-			if (sr->tid_tree == NULL) {
-				smbsr_error(sr, 0, ERRSRV, ERRinvnid);
-				smbsr_cleanup(sr);
-				goto report_error;
-			}
+	}
+	if (!(sdd->sdt_flags & SDDF_SUPPRESS_TID) && (sr->tid_tree == NULL)) {
+		sr->tid_tree = smb_session_lookup_tree(session, sr->smb_tid);
+		if (sr->tid_tree == NULL) {
+			smbsr_error(sr, 0, ERRSRV, ERRinvnid);
+			smbsr_cleanup(sr);
+			goto report_error;
 		}
 	}
 
@@ -1116,8 +1113,7 @@ void
 smbsr_lookup_file(smb_request_t *sr)
 {
 	if (sr->fid_ofile == NULL)
-		sr->fid_ofile = smb_ofile_lookup_by_fid(sr->tid_tree,
-		    sr->smb_fid);
+		sr->fid_ofile = smb_ofile_lookup_by_fid(sr, sr->smb_fid);
 }
 
 static int

@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2015 Joyent, Inc. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -57,8 +58,9 @@ static void pfp_close(mac_handle_t, mac_client_handle_t);
 static int pfp_dl_to_arphrd(int);
 static int pfp_getpacket_sockopt(sock_lower_handle_t, int, void *,
     socklen_t *);
-static int pfp_ifreq_getlinkid(intptr_t, struct ifreq *, datalink_id_t *);
-static int pfp_lifreq_getlinkid(intptr_t, struct lifreq *, datalink_id_t *);
+static int pfp_ifreq_getlinkid(intptr_t, struct ifreq *, datalink_id_t *, int);
+static int pfp_lifreq_getlinkid(intptr_t, struct lifreq *, datalink_id_t *,
+    int);
 static int pfp_open_index(int, mac_handle_t *, mac_client_handle_t *,
     cred_t *);
 static void pfp_packet(void *, mac_resource_handle_t, mblk_t *, boolean_t);
@@ -159,6 +161,14 @@ static int accepted_protos[3][2] = {
 	{ ETH_P_802_2,	LLC_SNAP_SAP },
 	{ ETH_P_803_3,	0 },
 };
+
+/*
+ * This sets an upper bound on the size of the receive buffer for a PF_PACKET
+ * socket. More properly, this should be controlled through ipadm, ala TCP, UDP,
+ * SCTP, etc. Until that's done, this provides a hard cap of 4 MB and allows an
+ * opportunity for it to be changed, should it be needed.
+ */
+int sockmod_pfp_rcvbuf_max = 1024 * 1024 * 4;
 
 /*
  * Module linkage information for the kernel.
@@ -539,6 +549,8 @@ pfp_packet(void *arg, mac_resource_handle_t mrh, mblk_t *mp, boolean_t flag)
 
 	linkb(mp0, mp);
 
+	(void) gethrestime(&ps->ps_timestamp);
+
 	ps->ps_upcalls->su_recv(ps->ps_upper, mp0, hdr.mhi_pktsize, 0,
 	    &error, NULL);
 
@@ -644,18 +656,33 @@ static int
 sdpfp_getsockopt(sock_lower_handle_t handle, int level, int option_name,
     void *optval, socklen_t *optlenp, struct cred *cred)
 {
+	struct pfpsock *ps;
 	int error = 0;
+
+	ps = (struct pfpsock *)handle;
 
 	switch (level) {
 	case SOL_PACKET :
 		error = pfp_getpacket_sockopt(handle, option_name, optval,
 		    optlenp);
 		break;
+
+	case SOL_SOCKET :
+		if (option_name == SO_RCVBUF) {
+			if (*optlenp < sizeof (int32_t))
+				return (EINVAL);
+			*((int32_t *)optval) = ps->ps_rcvbuf;
+			*optlenp = sizeof (int32_t);
+		} else {
+			error = ENOPROTOOPT;
+		}
+		break;
+
 	default :
 		/*
 		 * If sockfs code receives this error in return from the
 		 * getsockopt downcall it handles the option locally, if
-		 * it can. This implements SO_RCVBUF, etc.
+		 * it can.
 		 */
 		error = ENOPROTOOPT;
 		break;
@@ -870,11 +897,7 @@ static int
 sdpfp_ioctl(sock_lower_handle_t handle, int cmd, intptr_t arg, int mod,
     int32_t *rval, struct cred *cr)
 {
-#if defined(_SYSCALL32)
-	struct timeval32 tival;
-#else
 	struct timeval tival;
-#endif
 	mac_client_promisc_type_t mtype;
 	struct sockaddr_dl *sock;
 	datalink_id_t linkid;
@@ -882,8 +905,9 @@ sdpfp_ioctl(sock_lower_handle_t handle, int cmd, intptr_t arg, int mod,
 	struct ifreq ifreq;
 	struct pfpsock *ps;
 	mac_handle_t mh;
-	timespec_t tv;
 	int error;
+
+	ps = (struct pfpsock *)handle;
 
 	switch (cmd) {
 	/*
@@ -894,7 +918,7 @@ sdpfp_ioctl(sock_lower_handle_t handle, int cmd, intptr_t arg, int mod,
 	case SIOCGLIFFLAGS :
 	case SIOCGLIFMTU :
 	case SIOCGLIFHWADDR :
-		error = pfp_lifreq_getlinkid(arg, &lifreq, &linkid);
+		error = pfp_lifreq_getlinkid(arg, &lifreq, &linkid, mod);
 		if (error != 0)
 			return (error);
 		break;
@@ -910,17 +934,32 @@ sdpfp_ioctl(sock_lower_handle_t handle, int cmd, intptr_t arg, int mod,
 	case SIOCGIFFLAGS :
 	case SIOCGIFMTU :
 	case SIOCGIFHWADDR :
-		error = pfp_ifreq_getlinkid(arg, &ifreq, &linkid);
+		error = pfp_ifreq_getlinkid(arg, &ifreq, &linkid, mod);
 		if (error != 0)
 			return (error);
 		break;
+
+	case SIOCGSTAMP :
+		tival.tv_sec = (time_t)ps->ps_timestamp.tv_sec;
+		tival.tv_usec = ps->ps_timestamp.tv_nsec / 1000;
+		if (get_udatamodel() == DATAMODEL_NATIVE) {
+			error = ddi_copyout(&tival, (void *)arg,
+			    sizeof (tival), mod);
+		}
+#ifdef _SYSCALL32_IMPL
+		else {
+			struct timeval32 tv32;
+			TIMEVAL_TO_TIMEVAL32(&tv32, &tival);
+			error = ddi_copyout(&tv32, (void *)arg,
+			    sizeof (tv32), mod);
+		}
+#endif
+		return (error);
 	}
 
 	error =  mac_open_by_linkid(linkid, &mh);
 	if (error != 0)
 		return (error);
-
-	ps = (struct pfpsock *)handle;
 
 	switch (cmd) {
 	case SIOCGLIFINDEX :
@@ -1026,13 +1065,6 @@ sdpfp_ioctl(sock_lower_handle_t handle, int cmd, intptr_t arg, int mod,
 		}
 		break;
 
-	case SIOCGSTAMP :
-		(void) gethrestime(&tv);
-		tival.tv_sec = (time_t)tv.tv_sec;
-		tival.tv_usec = tv.tv_nsec / 1000;
-		error = ddi_copyout(&tival, (void *)arg, sizeof (tival), 0);
-		break;
-
 	default :
 		break;
 	}
@@ -1049,7 +1081,7 @@ sdpfp_ioctl(sock_lower_handle_t handle, int cmd, intptr_t arg, int mod,
 		case SIOCGLIFMTU :
 		case SIOCGLIFHWADDR :
 			error = ddi_copyout(&lifreq, (void *)arg,
-			    sizeof (lifreq), 0);
+			    sizeof (lifreq), mod);
 			break;
 
 		case SIOCGIFINDEX :
@@ -1057,7 +1089,7 @@ sdpfp_ioctl(sock_lower_handle_t handle, int cmd, intptr_t arg, int mod,
 		case SIOCGIFMTU :
 		case SIOCGIFHWADDR :
 			error = ddi_copyout(&ifreq, (void *)arg,
-			    sizeof (ifreq), 0);
+			    sizeof (ifreq), mod);
 			break;
 		default :
 			break;
@@ -1107,12 +1139,12 @@ sdpfp_close(sock_lower_handle_t handle, int flag, struct cred *cr)
  */
 static int
 pfp_ifreq_getlinkid(intptr_t arg, struct ifreq *ifreqp,
-    datalink_id_t *linkidp)
+    datalink_id_t *linkidp, int mode)
 {
 	char name[IFNAMSIZ + 1];
 	int error;
 
-	if (ddi_copyin((void *)arg, ifreqp, sizeof (*ifreqp), 0) != 0)
+	if (ddi_copyin((void *)arg, ifreqp, sizeof (*ifreqp), mode) != 0)
 		return (EFAULT);
 
 	(void) strlcpy(name, ifreqp->ifr_name, sizeof (name));
@@ -1132,12 +1164,12 @@ pfp_ifreq_getlinkid(intptr_t arg, struct ifreq *ifreqp,
  */
 static int
 pfp_lifreq_getlinkid(intptr_t arg, struct lifreq *lifreqp,
-    datalink_id_t *linkidp)
+    datalink_id_t *linkidp, int mode)
 {
 	char name[LIFNAMSIZ + 1];
 	int error;
 
-	if (ddi_copyin((void *)arg, lifreqp, sizeof (*lifreqp), 0) != 0)
+	if (ddi_copyin((void *)arg, lifreqp, sizeof (*lifreqp), mode) != 0)
 		return (EFAULT);
 
 	(void) strlcpy(name, lifreqp->lifr_name, sizeof (name));
@@ -1162,6 +1194,7 @@ pfp_getpacket_sockopt(sock_lower_handle_t handle, int option_name,
     void *optval, socklen_t *optlenp)
 {
 	struct pfpsock *ps;
+	struct tpacket_stats_short tpss;
 	int error = 0;
 
 	ps = (struct pfpsock *)handle;
@@ -1174,6 +1207,16 @@ pfp_getpacket_sockopt(sock_lower_handle_t handle, int option_name,
 		}
 		*optlenp = sizeof (ps->ps_stats);
 		bcopy(&ps->ps_stats, optval, sizeof (ps->ps_stats));
+		break;
+	case PACKET_STATISTICS_SHORT :
+		if (*optlenp < sizeof (tpss)) {
+			error = EINVAL;
+			break;
+		}
+		*optlenp = sizeof (tpss);
+		tpss.tp_packets = ps->ps_stats.tp_packets;
+		tpss.tp_drops = ps->ps_stats.tp_drops;
+		bcopy(&tpss, optval, sizeof (tpss));
 		break;
 	default :
 		error = EINVAL;
@@ -1282,9 +1325,7 @@ pfp_setpacket_sockopt(sock_lower_handle_t handle, int option_name,
 
 /*
  * There are only two special setsockopt's for SOL_SOCKET with PF_PACKET:
- * SO_ATTACH_FILTER and SO_DETACH_FILTER. All other setsockopt requests
- * that are for SOL_SOCKET are passed back to the socket layer for its
- * generic implementation.
+ * SO_ATTACH_FILTER and SO_DETACH_FILTER.
  *
  * Both of these setsockopt values are candidates for being handled by the
  * socket layer itself in future, however this requires understanding how
@@ -1297,6 +1338,7 @@ pfp_setsocket_sockopt(sock_lower_handle_t handle, int option_name,
 	struct bpf_program prog;
 	struct bpf_insn *fcode;
 	struct pfpsock *ps;
+	struct sock_proto_props sopp;
 	int error = 0;
 	int size;
 
@@ -1318,6 +1360,8 @@ pfp_setsocket_sockopt(sock_lower_handle_t handle, int option_name,
 		} else if (optlen != sizeof (struct bpf_program)) {
 			return (EINVAL);
 		}
+		if (prog.bf_len > BPF_MAXINSNS)
+			return (EINVAL);
 
 		size = prog.bf_len * sizeof (*prog.bf_insns);
 		fcode = kmem_alloc(size, KM_SLEEP);
@@ -1342,12 +1386,18 @@ pfp_setsocket_sockopt(sock_lower_handle_t handle, int option_name,
 	case SO_DETACH_FILTER :
 		pfp_release_bpf(ps);
 		break;
+
+	case SO_RCVBUF :
+		size = *(int32_t *)optval;
+		if (size > sockmod_pfp_rcvbuf_max || size < 0)
+			return (ENOBUFS);
+		sopp.sopp_flags = SOCKOPT_RCVHIWAT;
+		sopp.sopp_rxhiwat = size;
+		ps->ps_upcalls->su_set_proto_props(ps->ps_upper, &sopp);
+		ps->ps_rcvbuf = size;
+		break;
+
 	default :
-		/*
-		 * If sockfs code receives this error in return from the
-		 * getsockopt downcall it handles the option locally, if
-		 * it can. This implements SO_RCVBUF, etc.
-		 */
 		error = ENOPROTOOPT;
 		break;
 	}
@@ -1391,7 +1441,7 @@ pfp_open_index(int index, mac_handle_t *mhp, mac_client_handle_t *mcip,
 		mac_perim_handle_t perim;
 
 		mac_perim_enter_by_mh(mh, &perim);
-		error = dls_link_getzid(mac_client_name(mch), &ifzoneid);
+		error = dls_link_getzid(mac_name(mh), &ifzoneid);
 		mac_perim_exit(perim);
 		if (error != 0)
 			goto bad_open;
