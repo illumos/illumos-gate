@@ -220,6 +220,7 @@ typedef HBA_UINT32 HBA_SASPHYSPEED;
 #define	HBA_SASSPEED_1_5GBIT	    0x08 /*  1.5 GBit/sec */
 #define	HBA_SASSPEED_3GBIT	    0x09 /*  3 GBit/sec */
 #define	HBA_SASSPEED_6GBIT	    0x0a /*  6 GBit/sec */
+#define	HBA_SASSPEED_12GBIT	    0x0b /* 12 GBit/sec */
 
 /* SM-HBA  6.5.5 SAS Phy Attribute */
 typedef struct SMHBA_SAS_Phy {
