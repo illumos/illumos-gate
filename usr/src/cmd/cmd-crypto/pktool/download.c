@@ -51,8 +51,8 @@ pk_download(int argc, char *argv[])
 	KMF_ENCODE_FORMAT format;
 	KMF_RETURN ch_rv = KMF_OK;
 	char *fullpath = NULL;
-	KMF_DATA cert = {NULL, 0};
-	KMF_DATA cert_der = {NULL, 0};
+	KMF_DATA cert = { 0, NULL };
+	KMF_DATA cert_der = { 0, NULL };
 
 	while ((opt = getopt_av(argc, argv,
 	    "t:(objtype)u:(url)h:(http_proxy)o:(outfile)d:(dir)")) != EOF) {

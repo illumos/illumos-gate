@@ -513,7 +513,7 @@ kmf_sign_cert(KMF_HANDLE_T handle, int numattr, KMF_ATTRIBUTE *attrlist)
 	KMF_DATA *signer_cert = NULL;
 	KMF_DATA *tbs_cert = NULL;  /* to be signed cert */
 	KMF_DATA *signed_cert = NULL;
-	KMF_DATA unsignedCert = {NULL, 0};
+	KMF_DATA unsignedCert = { 0, NULL };
 	KMF_KEY_HANDLE sign_key, *sign_key_ptr;
 	int freethekey = 0;
 	KMF_POLICY_RECORD *policy;
@@ -666,7 +666,7 @@ kmf_sign_data(KMF_HANDLE_T handle, int numattr,
 	KMF_DATA *output = NULL;
 	KMF_KEY_HANDLE sign_key, *sign_key_ptr;
 	KMF_ALGORITHM_INDEX AlgId = KMF_ALGID_NONE;
-	KMF_DATA	signature = {0, NULL};
+	KMF_DATA	signature = { 0, NULL };
 	KMF_OID *oid;
 	KMF_POLICY_RECORD *policy;
 
@@ -831,7 +831,7 @@ kmf_verify_data(KMF_HANDLE_T handle,
 	KMF_PLUGIN *plugin;
 	KMF_KEYSTORE_TYPE kstype;
 	uint32_t len;
-	KMF_DATA	derkey = {0, NULL};
+	KMF_DATA	derkey = { 0, NULL };
 	KMF_KEY_HANDLE *KMFKey;
 	KMF_ALGORITHM_INDEX sigAlg = KMF_ALGID_NONE;
 	KMF_DATA *indata;
@@ -983,7 +983,7 @@ KMF_RETURN
 kmf_verify_cert(KMF_HANDLE_T handle, int numattr, KMF_ATTRIBUTE *attrlist)
 {
 	KMF_RETURN	ret;
-	KMF_DATA	derkey = {0, NULL};
+	KMF_DATA	derkey = { 0, NULL };
 	KMF_PLUGIN	*plugin;
 	KMF_KEY_HANDLE *KMFKey;
 	KMF_DATA *CertToBeVerified;
@@ -2128,7 +2128,7 @@ find_issuer_cert(KMF_HANDLE_T handle, KMF_KEYSTORE_TYPE *kstype,
 	time_t t_notbefore;
 	time_t t_notafter;
 	time_t latest;
-	KMF_DATA tmp_cert = {0, NULL};
+	KMF_DATA tmp_cert = { 0, NULL };
 	KMF_ATTRIBUTE fc_attrlist[16];
 	int fc_numattr = 0;
 	char *dir = "./";
@@ -2397,8 +2397,8 @@ kmf_validate_cert(KMF_HANDLE_T handle, int numattr, KMF_ATTRIBUTE *attrlist)
 	char *slotlabel = NULL;
 	char *dirpath = NULL;
 	KMF_DATA *ocsp_response = NULL;
-	KMF_DATA ta_cert = {0, NULL};
-	KMF_DATA issuer_cert = {0, NULL};
+	KMF_DATA ta_cert = { 0, NULL };
+	KMF_DATA issuer_cert = { 0, NULL };
 	char *user_issuer = NULL, *user_subject = NULL;
 	KMF_X509_NAME user_issuerDN, user_subjectDN;
 	boolean_t	self_signed = B_FALSE;
@@ -2650,7 +2650,7 @@ kmf_create_cert_file(const KMF_DATA *certdata, KMF_ENCODE_FORMAT format,
 {
 	KMF_RETURN rv = KMF_OK;
 	int fd = -1;
-	KMF_DATA pemdata = {NULL, 0};
+	KMF_DATA pemdata = { 0, NULL };
 
 	if (certdata == NULL || certfile == NULL)
 		return (KMF_ERR_BAD_PARAMETER);
@@ -2708,7 +2708,7 @@ kmf_is_cert_data(KMF_DATA *data, KMF_ENCODE_FORMAT *fmt)
 {
 	KMF_RETURN rv = KMF_OK;
 	KMF_X509_CERTIFICATE *x509 = NULL;
-	KMF_DATA oldpem = {0, NULL};
+	KMF_DATA oldpem = { 0, NULL };
 	uchar_t *d = NULL;
 	int len = 0;
 
@@ -3005,8 +3005,8 @@ sign_cert(KMF_HANDLE_T handle,
 	KMF_DATA	*SignedCert)
 {
 	KMF_X509_CERTIFICATE	*subj_cert = NULL;
-	KMF_DATA		data_to_sign = {0, NULL};
-	KMF_DATA		signed_data = {0, NULL};
+	KMF_DATA		data_to_sign = { 0, NULL };
+	KMF_DATA		signed_data = { 0, NULL };
 	KMF_RETURN		ret = KMF_OK;
 	KMF_ALGORITHM_INDEX	algid;
 	int i = 0;
@@ -3164,8 +3164,8 @@ verify_cert_with_key(KMF_HANDLE_T handle,
 	KMF_RETURN ret = KMF_OK;
 	KMF_X509_CERTIFICATE *signed_cert = NULL;
 	KMF_X509_SPKI	spki;
-	KMF_DATA	data_to_verify = {0, NULL};
-	KMF_DATA	signed_data = {0, NULL};
+	KMF_DATA	data_to_verify = { 0, NULL };
+	KMF_DATA	signed_data = { 0, NULL };
 	KMF_DATA	signature = { 0, NULL };
 	KMF_ALGORITHM_INDEX	algid;
 
@@ -3255,8 +3255,8 @@ verify_cert_with_cert(KMF_HANDLE_T handle,
 	KMF_RETURN ret = KMF_OK;
 	KMF_X509_CERTIFICATE *SignerCert = NULL;
 	KMF_X509_CERTIFICATE *ToBeVerifiedCert = NULL;
-	KMF_DATA	data_to_verify = {0, NULL};
-	KMF_DATA	signed_data = {0, NULL};
+	KMF_DATA	data_to_verify = { 0, NULL };
+	KMF_DATA	signed_data = { 0, NULL };
 	KMF_DATA	signature;
 	KMF_ALGORITHM_INDEX	algid;
 	KMF_POLICY_RECORD	*policy;

@@ -446,7 +446,7 @@ PKCS_VerifyData(KMF_HANDLE_T handle,
 	CK_ATTRIBUTE	subprime = { CKA_SUBPRIME, NULL, 0 };
 	CK_BYTE		*dataptr;
 	CK_ULONG	datalen;
-	KMF_DATA	hashData = {NULL, 0};
+	KMF_DATA	hashData = { 0, NULL };
 	uchar_t		digest[1024];
 
 	if (AlgorithmId == KMF_ALGID_NONE)

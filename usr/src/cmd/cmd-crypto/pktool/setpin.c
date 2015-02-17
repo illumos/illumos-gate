@@ -44,8 +44,8 @@ setpin_nss(KMF_HANDLE_T handle,
 	char *token_spec, char *dir, char *prefix)
 {
 	int rv = 0;
-	KMF_CREDENTIAL		oldcred = {NULL, 0};
-	KMF_CREDENTIAL		newpincred = {NULL, 0};
+	KMF_CREDENTIAL		oldcred = { NULL, 0 };
+	KMF_CREDENTIAL		newpincred = { NULL, 0 };
 	CK_UTF8CHAR_PTR		old_pin = NULL, new_pin = NULL;
 	CK_ULONG		old_pinlen = 0, new_pinlen = 0;
 	KMF_ATTRIBUTE		setpinattrs[6];
@@ -119,8 +119,8 @@ setpin_pkcs11(KMF_HANDLE_T handle, char *token_spec, boolean_t souser)
 	CK_RV			rv = CKR_OK;
 	char			*token_name = NULL;
 	CK_TOKEN_INFO		token_info;
-	KMF_CREDENTIAL		newpincred = {NULL, 0};
-	KMF_CREDENTIAL		oldcred = {NULL, 0};
+	KMF_CREDENTIAL		newpincred = { NULL, 0 };
+	KMF_CREDENTIAL		oldcred = { NULL, 0 };
 	KMF_KEYSTORE_TYPE	kstype = KMF_KEYSTORE_PK11TOKEN;
 	KMF_ATTRIBUTE		attrlist[6];
 	CK_USER_TYPE		user = CKU_USER;
