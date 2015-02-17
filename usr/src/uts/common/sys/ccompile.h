@@ -23,6 +23,9 @@
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2015 EveryCity Ltd. All rights reserved.
+ */
 
 #ifndef	_SYS_CCOMPILE_H
 #define	_SYS_CCOMPILE_H
@@ -117,6 +120,16 @@ extern "C" {
  */
 #define	__sun_attr___packed__	__attribute__((__packed__))
 
+/*
+ * This attribute, attached to a variable, means that the variable is meant to
+ * be possibly unused. GCC will not produce a warning for this variable.
+ */
+#if __GNUC_VERSION >= 20700
+#define	__sun_attr___unused__	__attribute__((__unused__))
+#else
+#define	__sun_attr___unused__
+#endif
+
 #define	___sun_attr_inner(__a)	__sun_attr_##__a
 #define	__sun_attr__(__a)	___sun_attr_inner __a
 
@@ -139,7 +152,7 @@ extern "C" {
 #define	__RETURNS_TWICE		__sun_attr__((__returns_twice__))
 #define	__CONST			__sun_attr__((__const__))
 #define	__PURE			__sun_attr__((__pure__))
-#define	__GNU_UNUSED	__attribute__((__unused__))
+#define	__GNU_UNUSED		__sun_attr__((__unused__))
 
 #ifdef	__cplusplus
 }
