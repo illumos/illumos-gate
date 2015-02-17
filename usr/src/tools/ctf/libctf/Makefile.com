@@ -16,7 +16,9 @@
 include $(SRC)/lib/libctf/Makefile.shared.com
 include ../../Makefile.ctf
 
-CPPFLAGS += -include ../../common/ctf_headers.h -DCTF_OLD_VERSIONS
+CPPFLAGS += -include ../../common/ctf_headers.h \
+		-DCTF_OLD_VERSIONS \
+		-DCTF_TOOLS_BUILD
 LDLIBS += -lc -lelf
 
 .KEEP_STATE:

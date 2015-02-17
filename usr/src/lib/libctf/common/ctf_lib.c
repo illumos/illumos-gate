@@ -37,6 +37,7 @@
 #include <dlfcn.h>
 #include <gelf.h>
 #include <zlib.h>
+#include <zone.h>
 
 #ifdef _LP64
 static const char *_libctf_zlib = "/usr/lib/64/libz.so.1";
@@ -79,15 +80,36 @@ _libctf_init(void)
 void *
 ctf_zopen(int *errp)
 {
-	ctf_dprintf("decompressing CTF data using %s\n", _libctf_zlib);
+	char buf[MAXPATHLEN];
+	const char *path = _libctf_zlib, *zroot;
 
 	if (zlib.z_dlp != NULL)
 		return (zlib.z_dlp); /* library is already loaded */
 
-	if (access(_libctf_zlib, R_OK) == -1)
+	/*
+	 * Get the zone native root.  For the tools build, we don't need
+	 * this (it seems fair to impose that we always build the system in
+	 * a native zone), and we want to allow build machines that are older
+	 * that the notion of the native root, so we only actually make this
+	 * call if we're not the tools build.
+	 */
+#ifndef	CTF_TOOLS_BUILD
+	zroot = zone_get_nroot();
+#else
+	zroot = NULL;
+#endif
+
+	if (zroot != NULL) {
+		(void) snprintf(buf, MAXPATHLEN, "%s/%s", zroot, _libctf_zlib);
+		path = buf;
+	}
+
+	ctf_dprintf("decompressing CTF data using %s\n", path);
+
+	if (access(path, R_OK) == -1)
 		return (ctf_set_open_errno(errp, ECTF_ZMISSING));
 
-	if ((zlib.z_dlp = dlopen(_libctf_zlib, RTLD_LAZY | RTLD_LOCAL)) == NULL)
+	if ((zlib.z_dlp = dlopen(path, RTLD_LAZY | RTLD_LOCAL)) == NULL)
 		return (ctf_set_open_errno(errp, ECTF_ZINIT));
 
 	zlib.z_uncompress = (int (*)()) dlsym(zlib.z_dlp, "uncompress");

@@ -64,7 +64,7 @@ SRCS = \
 	$(LIST_OBJS:%.o=$(SRC)/common/list/%.c) \
 	
 LIBS = $(DYNLIB) $(LINTLIB)
-LDLIBS = -lc -lelf
+LDLIBS += -lc -lelf
 
 C99MODE=	-xc99=%all
 C99LMODE=	-Xc99=%all
