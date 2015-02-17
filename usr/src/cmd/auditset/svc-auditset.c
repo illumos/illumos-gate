@@ -30,6 +30,7 @@
 #include <audit_scf.h>
 #include <bsm/adt.h>
 #include <bsm/libbsm.h>
+#include <zone.h>
 #include <errno.h>
 #include <locale.h>
 #include <stdio.h>
@@ -67,6 +68,7 @@ main(void)
 {
 	char		*auditset_fmri;
 	char		*mask_cfg;
+	uint32_t	policy;
 
 	(void) setlocale(LC_ALL, "");
 	(void) textdomain(TEXT_DOMAIN);
@@ -91,6 +93,16 @@ main(void)
 #endif
 		return (SMF_EXIT_OK);
 	}
+
+	/* check the audit policy */
+	if (auditon(A_GETPOLICY, (caddr_t)&policy, 0) == -1) {
+		(void) printf("Could not read audit policy: %s\n",
+		    strerror(errno));
+		return (SMF_EXIT_ERR_OTHER);
+	}
+
+	if (!(policy & AUDIT_PERZONE) && (getzoneid() != GLOBAL_ZONEID))
+		return (SMF_EXIT_OK);
 
 	/* update attributable mask */
 	if (!do_getflags_scf(&mask_cfg) || mask_cfg == NULL) {
