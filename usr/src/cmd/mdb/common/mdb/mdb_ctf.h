@@ -24,7 +24,7 @@
  */
 /*
  * Copyright (c) 2013 by Delphix. All rights reserved.
- * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2015, Joyent, Inc.
  */
 
 #ifndef	_MDB_CTF_H
@@ -151,10 +151,12 @@ extern int mdb_ctf_readsym(void *, const char *, const char *, uint_t);
 extern ctf_file_t *mdb_ctf_open(const char *, int *);		/* Internal */
 extern ctf_file_t *mdb_ctf_bufopen(const void *, size_t,	/* Internal */
     const void *, Shdr *, const void *, Shdr *, int *);
+extern int mdb_ctf_write(const char *, ctf_file_t *fp);		/* Internal */
 extern void mdb_ctf_close(ctf_file_t *fp);			/* Internal */
 extern int mdb_ctf_synthetics_init(void);			/* Internal */
 extern void mdb_ctf_synthetics_fini(void);			/* Internal */
 extern int mdb_ctf_synthetics_from_file(const char *);		/* Internal */
+extern int mdb_ctf_synthetics_to_file(const char *);		/* Internal */
 
 #endif
 
