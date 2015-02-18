@@ -1,9 +1,10 @@
+.\" Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 .\" Copyright 2014 Garrett D'Amore <garrett@damore.org>
 .\" Copyright (c) 1995, Sun Microsystems, Inc.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.Dd "Jul 30, 2014"
+.Dd "Feb 18, 2015"
 .Dt MAN 5
 .Os
 .Sh NAME
@@ -123,7 +124,7 @@ A typical manual page for a command or function is laid out as follows:
 The name of the command or function, which serves as the title of the manual
 page. This is followed by the number of the section in which it appears.
 .
-.It Nm SH NAME
+.It Nm \&.SH NAME
 .
 The name, or list of names, by which the command is called, followed by a dash
 and then a one-line summary of the action performed. All in roman font, this
@@ -134,7 +135,7 @@ It is used to generate the database used by the
 .Xr whatis 1
 command.
 .
-.It Nm SH SYNOPSIS
+.It Nm \&.SH SYNOPSIS
 .Bl -tag -width "Functions:"
 .It Sy Commands:
 The syntax of the command and its arguments, as typed on the command line.
@@ -247,7 +248,7 @@ package should be used instead.
 .Xr troff 1 ,
 .Xr tbl 1 ,
 .Xr whatis 1 ,
-.Xr mdoc 5 ,
+.Xr mdoc 5
 .Rs
 .%A Dale Dougherty and Tim O'Reilly
 .%B Unix Text Processing
