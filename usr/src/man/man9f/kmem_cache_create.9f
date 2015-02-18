@@ -1,9 +1,10 @@
 '\" te
+.\" Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 .\" Copyright (c) 2002, Sun Microsystems, Inc. All Rights Reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH KMEM_CACHE_CREATE 9F "Jun 24, 2008"
+.TH KMEM_CACHE_CREATE 9F "Feb 18, 2015"
 .SH NAME
 kmem_cache_create, kmem_cache_alloc, kmem_cache_free, kmem_cache_destroy,
 kmem_cache_set_move \- kernel memory cache allocator operations
@@ -62,11 +63,9 @@ kmem_cache_set_move \- kernel memory cache allocator operations
 .fi
 
 .SH INTERFACE LEVEL
-.sp
 .LP
 Solaris DDI specific (Solaris DDI)
 .SH PARAMETERS
-.sp
 .LP
 The parameters for the \fBkmem_cache_*\fR functions are as follows:
 .sp
@@ -300,7 +299,6 @@ typically a pointer to the \fBsoft-state\fR structure.
 .RE
 
 .SH DESCRIPTION
-.sp
 .LP
 In many cases, the cost of initializing and destroying an object exceeds the
 cost of allocating and freeing memory for it. The functions described here
@@ -336,7 +334,7 @@ requirement is that the client must free the object (using
 this, so programming errors will lead to hard-to-find bugs.
 .sp
 .LP
-A driver should call \fBkmem_cache_create()\fR at the time of \fB_fini\fR(9E)
+A driver should call \fBkmem_cache_create()\fR at the time of \fB_init\fR(9E)
 or \fBattach\fR(9E), and call the corresponding \fBkmem_cache_destroy()\fR at
 the time of \fB_fini\fR(9E) or \fBdetach\fR(9E).
 .sp
@@ -564,7 +562,6 @@ it.
 .RE
 
 .SH CONTEXT
-.sp
 .LP
 Constructors can be invoked during any call to \fBkmem_cache_alloc()\fR, and
 will run in that context. Similarly, destructors can be invoked during any call
@@ -718,7 +715,6 @@ kmem_cache_set_move(object_cache, object_move);
 .in -2
 
 .SH RETURN VALUES
-.sp
 .LP
 If successful, the constructor function must return \fB0\fR. If KM_NOSLEEP is
 set and memory cannot be allocated without sleeping, the constructor must
@@ -732,7 +728,6 @@ If successful, \fBkmem_cache_alloc()\fR returns a pointer to the allocated
 object. If \fBKM_NOSLEEP\fR is set and memory cannot be allocated without
 sleeping, \fBkmem_cache_alloc()\fR returns \fBNULL\fR.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -748,7 +743,6 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBcondvar\fR(9F), \fBkmem_alloc\fR(9F), \fBmutex\fR(9F), \fBkstat\fR(9S)
 .sp
@@ -764,7 +758,6 @@ J.; USENIX Summer 1994 Technical Conference (1994).
 Resources\fR, Bonwick, J. and Adams, J.; USENIX 2001 Technical Conference
 (2001).
 .SH NOTES
-.sp
 .LP
 The constructor must be immediately reversible by the destructor, since the
 allocator may call the constructor and destructor on objects still under its
