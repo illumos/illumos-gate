@@ -2840,6 +2840,7 @@ $endif
 	_findiop;
 	__fini_daemon_priv;
 	_finite;
+	flock;
 	_fork1			{ FLAGS = NODYNSORT };
 	_forkall		{ FLAGS = NODYNSORT };
 	_fpclass;

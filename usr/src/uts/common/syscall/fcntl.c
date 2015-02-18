@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved.
+ * Copyright 2015, Joyent, Inc.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -271,11 +272,12 @@ fcntl(int fdes, int cmd, intptr_t arg)
 	 * The file system and vnode layers understand and implement
 	 * locking with flock64 structures. So here once we pass through
 	 * the test for compatibility as defined by LFS API, (for F_SETLK,
-	 * F_SETLKW, F_GETLK, F_GETLKW, F_FREESP) we transform
-	 * the flock structure to a flock64 structure and send it to the
-	 * lower layers. Similarly in case of GETLK the returned flock64
-	 * structure is transformed to a flock structure if everything fits
-	 * in nicely, otherwise we return EOVERFLOW.
+	 * F_SETLKW, F_GETLK, F_GETLKW, F_OFD_GETLK, F_OFD_SETLK, F_OFD_SETLKW,
+	 * F_FREESP) we transform the flock structure to a flock64 structure
+	 * and send it to the lower layers. Similarly in case of GETLK and
+	 * OFD_GETLK the returned flock64 structure is transformed to a flock
+	 * structure if everything fits in nicely, otherwise we return
+	 * EOVERFLOW.
 	 */
 
 	case F_GETLK:
@@ -283,6 +285,11 @@ fcntl(int fdes, int cmd, intptr_t arg)
 	case F_SETLK:
 	case F_SETLKW:
 	case F_SETLK_NBMAND:
+	case F_OFD_GETLK:
+	case F_OFD_SETLK:
+	case F_OFD_SETLKW:
+	case F_FLOCK:
+	case F_FLOCKW:
 
 		/*
 		 * Copy in input fields only.
@@ -345,20 +352,65 @@ fcntl(int fdes, int cmd, intptr_t arg)
 		if ((error = flock_check(vp, &bf, offset, maxoffset)) != 0)
 			break;
 
+		if (cmd == F_FLOCK || cmd == F_FLOCKW) {
+			/* FLOCK* locking is always over the entire file. */
+			if (bf.l_whence != 0 || bf.l_start != 0 ||
+			    bf.l_len != 0) {
+				error = EINVAL;
+				break;
+			}
+			if (bf.l_type < F_RDLCK || bf.l_type > F_UNLCK) {
+				error = EINVAL;
+				break;
+			}
+		}
+
+		if (cmd == F_OFD_SETLK || cmd == F_OFD_SETLKW) {
+			/*
+			 * TBD OFD-style locking is currently limited to
+			 * covering the entire file.
+			 */
+			if (bf.l_whence != 0 || bf.l_start != 0 ||
+			    bf.l_len != 0) {
+				error = EINVAL;
+				break;
+			}
+		}
+
 		/*
 		 * Not all of the filesystems understand F_O_GETLK, and
 		 * there's no need for them to know.  Map it to F_GETLK.
+		 *
+		 * The *_frlock functions in the various file systems basically
+		 * do some validation and then funnel everything through the
+		 * fs_frlock function. For OFD-style locks fs_frlock will do
+		 * nothing so that once control returns here we can call the
+		 * ofdlock function with the correct fp. For OFD-style locks
+		 * the unsupported remote file systems, such as NFS, detect and
+		 * reject the OFD-style cmd argument.
 		 */
 		if ((error = VOP_FRLOCK(vp, (cmd == F_O_GETLK) ? F_GETLK : cmd,
 		    &bf, flag, offset, NULL, fp->f_cred, NULL)) != 0)
 			break;
 
+		if (cmd == F_FLOCK || cmd == F_FLOCKW || cmd == F_OFD_GETLK ||
+		    cmd == F_OFD_SETLK || cmd == F_OFD_SETLKW) {
+			/*
+			 * This is an OFD-style lock so we need to handle it
+			 * here. Because OFD-style locks are associated with
+			 * the file_t we didn't have enough info down the
+			 * VOP_FRLOCK path immediately above.
+			 */
+			if ((error = ofdlock(fp, cmd, &bf, flag, offset)) != 0)
+				break;
+		}
+
 		/*
 		 * If command is GETLK and no lock is found, only
 		 * the type field is changed.
 		 */
-		if ((cmd == F_O_GETLK || cmd == F_GETLK) &&
-		    bf.l_type == F_UNLCK) {
+		if ((cmd == F_O_GETLK || cmd == F_GETLK ||
+		    cmd == F_OFD_GETLK) && bf.l_type == F_UNLCK) {
 			/* l_type always first entry, always a short */
 			if (copyout(&bf.l_type, &((struct flock *)arg)->l_type,
 			    sizeof (bf.l_type)))
@@ -387,7 +439,7 @@ fcntl(int fdes, int cmd, intptr_t arg)
 			obf.l_pid = (int16_t)bf.l_pid;
 			if (copyout(&obf, (void *)arg, sizeof (obf)))
 				error = EFAULT;
-		} else if (cmd == F_GETLK) {
+		} else if (cmd == F_GETLK || cmd == F_OFD_GETLK) {
 			/*
 			 * Copy out SVR4 flock.
 			 */
@@ -591,6 +643,11 @@ fcntl(int fdes, int cmd, intptr_t arg)
 	case F_SETLK64:
 	case F_SETLKW64:
 	case F_SETLK64_NBMAND:
+	case F_OFD_GETLK64:
+	case F_OFD_SETLK64:
+	case F_OFD_SETLKW64:
+	case F_FLOCK64:
+	case F_FLOCKW64:
 		/*
 		 * Large Files: Here we set cmd as *LK and send it to
 		 * lower layers. *LK64 is only for the user land.
@@ -611,6 +668,16 @@ fcntl(int fdes, int cmd, intptr_t arg)
 			cmd = F_SETLKW;
 		else if (cmd == F_SETLK64_NBMAND)
 			cmd = F_SETLK_NBMAND;
+		else if (cmd == F_OFD_GETLK64)
+			cmd = F_OFD_GETLK;
+		else if (cmd == F_OFD_SETLK64)
+			cmd = F_OFD_SETLK;
+		else if (cmd == F_OFD_SETLKW64)
+			cmd = F_OFD_SETLKW;
+		else if (cmd == F_FLOCK64)
+			cmd = F_FLOCK;
+		else if (cmd == F_FLOCKW64)
+			cmd = F_FLOCKW;
 
 		/*
 		 * Note that the size of flock64 is different in the ILP32
@@ -636,18 +703,65 @@ fcntl(int fdes, int cmd, intptr_t arg)
 		if ((error = flock_check(vp, &bf, offset, MAXOFFSET_T)) != 0)
 			break;
 
+		if (cmd == F_FLOCK || cmd == F_FLOCKW) {
+			/* FLOCK* locking is always over the entire file. */
+			if (bf.l_whence != 0 || bf.l_start != 0 ||
+			    bf.l_len != 0) {
+				error = EINVAL;
+				break;
+			}
+			if (bf.l_type < F_RDLCK || bf.l_type > F_UNLCK) {
+				error = EINVAL;
+				break;
+			}
+		}
+
+		if (cmd == F_OFD_SETLK || cmd == F_OFD_SETLKW) {
+			/*
+			 * TBD OFD-style locking is currently limited to
+			 * covering the entire file.
+			 */
+			if (bf.l_whence != 0 || bf.l_start != 0 ||
+			    bf.l_len != 0) {
+				error = EINVAL;
+				break;
+			}
+		}
+
+		/*
+		 * The *_frlock functions in the various file systems basically
+		 * do some validation and then funnel everything through the
+		 * fs_frlock function. For OFD-style locks fs_frlock will do
+		 * nothing so that once control returns here we can call the
+		 * ofdlock function with the correct fp. For OFD-style locks
+		 * the unsupported remote file systems, such as NFS, detect and
+		 * reject the OFD-style cmd argument.
+		 */
 		if ((error = VOP_FRLOCK(vp, cmd, &bf, flag, offset,
 		    NULL, fp->f_cred, NULL)) != 0)
 			break;
 
-		if ((cmd == F_GETLK) && bf.l_type == F_UNLCK) {
+		if (cmd == F_FLOCK || cmd == F_FLOCKW || cmd == F_OFD_GETLK ||
+		    cmd == F_OFD_SETLK || cmd == F_OFD_SETLKW) {
+			/*
+			 * This is an OFD-style lock so we need to handle it
+			 * here. Because OFD-style locks are associated with
+			 * the file_t we didn't have enough info down the
+			 * VOP_FRLOCK path immediately above.
+			 */
+			if ((error = ofdlock(fp, cmd, &bf, flag, offset)) != 0)
+				break;
+		}
+
+		if ((cmd == F_GETLK || cmd == F_OFD_GETLK) &&
+		    bf.l_type == F_UNLCK) {
 			if (copyout(&bf.l_type, &((struct flock *)arg)->l_type,
 			    sizeof (bf.l_type)))
 				error = EFAULT;
 			break;
 		}
 
-		if (cmd == F_GETLK) {
+		if (cmd == F_GETLK || cmd == F_OFD_GETLK) {
 			int i;
 
 			/*

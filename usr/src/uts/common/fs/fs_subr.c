@@ -25,6 +25,7 @@
 /*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  */
 
 /*
@@ -246,6 +247,7 @@ fs_frlock(register vnode_t *vp, int cmd, struct flock64 *bfp, int flag,
 	int frcmd;
 	int nlmid;
 	int error = 0;
+	boolean_t skip_lock = B_FALSE;
 	flk_callback_t serialize_callback;
 	int serialize = 0;
 	v_mode_t mode;
@@ -263,6 +265,17 @@ fs_frlock(register vnode_t *vp, int cmd, struct flock64 *bfp, int flag,
 			bfp->l_pid = ttoproc(curthread)->p_pid;
 			bfp->l_sysid = 0;
 		}
+		break;
+
+	case F_OFD_GETLK:
+		/*
+		 * TBD we do not support remote OFD locks at this time.
+		 */
+		if (flag & (F_REMOTELOCK | F_PXFSLOCK)) {
+			error = EINVAL;
+			goto done;
+		}
+		skip_lock = B_TRUE;
 		break;
 
 	case F_SETLK_NBMAND:
@@ -326,6 +339,20 @@ fs_frlock(register vnode_t *vp, int cmd, struct flock64 *bfp, int flag,
 		}
 		break;
 
+	case F_OFD_SETLK:
+	case F_OFD_SETLKW:
+	case F_FLOCK:
+	case F_FLOCKW:
+		/*
+		 * TBD we do not support remote OFD locks at this time.
+		 */
+		if (flag & (F_REMOTELOCK | F_PXFSLOCK)) {
+			error = EINVAL;
+			goto done;
+		}
+		skip_lock = B_TRUE;
+		break;
+
 	case F_HASREMOTELOCKS:
 		nlmid = GETNLMID(bfp->l_sysid);
 		if (nlmid != 0) {	/* booted as a cluster */
@@ -354,7 +381,8 @@ fs_frlock(register vnode_t *vp, int cmd, struct flock64 *bfp, int flag,
 		flk_cbp = &serialize_callback;
 	}
 
-	error = reclock(vp, bfp, frcmd, flag, offset, flk_cbp);
+	if (!skip_lock)
+		error = reclock(vp, bfp, frcmd, flag, offset, flk_cbp);
 
 done:
 	if (serialize)

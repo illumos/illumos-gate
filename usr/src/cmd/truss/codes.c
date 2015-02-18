@@ -23,7 +23,7 @@
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
  * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
- * Copyright (c) 2014, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2015, Joyent, Inc. All rights reserved.
  * Copyright (c) 2014, OmniTI Computer Consulting, Inc. All rights reserved.
  */
 
@@ -108,7 +108,7 @@
 #include "proto.h"
 
 #define	FCNTLMIN	F_DUPFD
-#define	FCNTLMAX	F_BADFD
+#define	FCNTLMAX	F_FLOCKW
 const char *const FCNTLname[] = {
 	"F_DUPFD",
 	"F_GETFD",
@@ -156,7 +156,15 @@ const char *const FCNTLname[] = {
 	"F_SHARE_NBMAND",
 	"F_SETLK64_NBMAND",
 	NULL,		/* 45 */
-	"F_BADFD"
+	"F_BADFD",
+	"F_OFD_GETLK",
+	"F_OFD_SETLK",
+	"F_OFD_SETLKW",
+	NULL,		/* 50 */
+	NULL,		/* 51 */
+	NULL,		/* 52 */
+	"F_FLOCK",
+	"F_FLOCKW"
 };
 
 #define	SYSFSMIN	GETFSIND
