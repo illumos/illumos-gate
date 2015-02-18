@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright (c) 2013 Joyent, Inc. All rights reserved.
+ * Copyright (c) 2015 Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -556,7 +556,18 @@ typedef_readfile(const char *file)
 
 	ret = mdb_ctf_synthetics_from_file(file);
 	if (ret != DCMD_OK)
-		mdb_warn("failed to create synthetics from file\n");
+		mdb_warn("failed to create synthetics from file %s\n", file);
+	return (ret);
+}
+
+static int
+typedef_writefile(const char *file)
+{
+	int ret;
+
+	ret = mdb_ctf_synthetics_to_file(file);
+	if (ret != DCMD_OK)
+		mdb_warn("failed to write synthetics to file %s", file);
 	return (ret);
 }
 
@@ -567,7 +578,7 @@ cmd_typedef(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	mdb_ctf_id_t id;
 	int i;
 	int destroy = 0, list = 0;
-	const char *cmode = NULL, *rfile = NULL;
+	const char *cmode = NULL, *rfile = NULL, *wfile = NULL;
 	const char *dst, *src;
 	char *dup;
 	parse_root_t *pr;
@@ -579,7 +590,8 @@ cmd_typedef(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    'd', MDB_OPT_SETBITS, TRUE, &destroy,
 	    'l', MDB_OPT_SETBITS, TRUE, &list,
 	    'c', MDB_OPT_STR, &cmode,
-	    'r', MDB_OPT_STR, &rfile, NULL);
+	    'r', MDB_OPT_STR, &rfile,
+	    'w', MDB_OPT_STR, &wfile, NULL);
 
 	argc -= i;
 	argv += i;
@@ -596,10 +608,13 @@ cmd_typedef(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		i++;
 	if (rfile != NULL)
 		i++;
+	if (wfile != NULL)
+		i++;
 	if (i > 1)
 		return (DCMD_USAGE);
 
-	if ((destroy || cmode != NULL || list || rfile != NULL) && argc != 0)
+	if ((destroy || cmode != NULL || list || rfile != NULL ||
+	    wfile != NULL) && argc != 0)
 		return (DCMD_USAGE);
 
 	if (destroy)
@@ -613,6 +628,9 @@ cmd_typedef(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	if (rfile)
 		return (typedef_readfile(rfile));
+
+	if (wfile)
+		return (typedef_writefile(wfile));
 
 	if (argc < 2)
 		return (DCMD_USAGE);
@@ -702,22 +720,29 @@ static char typedef_desc[] =
 "  o packed structures (all structures currently use their natural alignment)\n"
 "\n"
 "::typedef also allows you to read type definitions from a file. Definitions\n"
-"can be read from any ELF file that has a CTF section that libctf can parse.\n"
+"can be read from any ELF file that has a CTF section that libctf can parse\n"
+"or any raw CTF data files, such as those that can be created with ::typedef.\n"
 "You can check if a file has such a section with elfdump(1). If a binary or\n"
 "core dump does not have any type information, but you do have it elsewhere,\n"
 "then you can use ::typedef -r to read in that type information.\n"
+"\n"
+"All built up definitions may be exported as a valid CTF container that can\n"
+"be used again with ::typedef -r or anything that uses libctf. To write them\n"
+"out, use ::typedef -w and specify the name of a file. For more information\n"
+"on the CTF file format, see ctf(4).\n"
 "\n";
 
 static char typedef_opts[] =
 "  -c model   create intrinsic types based on the specified data model.\n"
 "             The INTRINSICS section lists the built-in types and typedefs.\n"
 "             The following data models are supported:\n"
-"                 o LP64  - Traditional illumos 64-bit program\n"
+"                 o LP64  - Traditional illumos 64-bit program.\n"
 "                 o LP32  - Traditional illumos 32-bit program.\n"
 "                 o ILP32 - An alternate name for LP32.\n"
 "  -d         delete all synthetic types\n"
 "  -l         list all synthetic types\n"
 "  -r file    import type definitions (CTF) from another ELF file\n"
+"  -w file    write all synthetic type definitions out to file\n"
 "\n";
 
 static char typedef_examps[] =
@@ -729,6 +754,7 @@ static char typedef_examps[] =
 "  ::typedef \"struct list { struct list *l_next; struct list *l_prev; }\" "
 "list_t\n"
 "  ::typedef -r /var/tmp/qemu-system-x86_64\n"
+"  ::typedef -w defs.ctf"
 "\n";
 
 static char typedef_intrins[] =

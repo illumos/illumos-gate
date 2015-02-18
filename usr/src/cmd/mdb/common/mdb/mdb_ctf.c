@@ -2142,3 +2142,29 @@ cleanup:
 		(void) ctf_discard(syn);
 	return (ret);
 }
+
+int
+mdb_ctf_synthetics_to_file(const char *file)
+{
+	int err;
+	ctf_file_t *fp = mdb.m_synth;
+
+	if (fp == NULL) {
+		mdb_warn("synthetic types are disabled, not writing "
+		    "anything\n");
+		return (DCMD_ERR);
+	}
+
+	err = mdb_ctf_write(file, fp);
+	if (err != 0) {
+		if (err == CTF_ERR)
+			(void) set_errno(ctf_to_errno(ctf_errno(fp)));
+		else
+			(void) set_errno(err);
+		err = DCMD_ERR;
+	} else {
+		err = DCMD_OK;
+	}
+
+	return (err);
+}

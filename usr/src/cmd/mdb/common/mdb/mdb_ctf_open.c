@@ -22,9 +22,8 @@
 /*
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2015, Joyent, Inc.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * libctf open/close interposition layer
@@ -36,6 +35,11 @@
 
 #include <mdb/mdb_ctf.h>
 #include <libctf.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <errno.h>
+#include <unistd.h>
 
 ctf_file_t *
 mdb_ctf_open(const char *filename, int *errp)
@@ -47,4 +51,23 @@ void
 mdb_ctf_close(ctf_file_t *fp)
 {
 	ctf_close(fp);
+}
+
+int
+mdb_ctf_write(const char *filename, ctf_file_t *fp)
+{
+	int fd, ret;
+
+	if ((fd = open(filename, O_RDWR | O_CREAT | O_TRUNC, 0644)) < 0)
+		return (errno);
+
+	if (ctf_write(fp, fd) == CTF_ERR) {
+		(void) close(fd);
+		return (CTF_ERR);
+	}
+
+	ret = close(fd);
+	if (ret != 0)
+		ret = errno;
+	return (ret);
 }
