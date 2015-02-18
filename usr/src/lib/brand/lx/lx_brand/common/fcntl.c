@@ -384,8 +384,6 @@ lx_fcntl_setfl(int fd, ulong_t arg)
  * flock() applies or removes an advisory lock on the file
  * associated with the file descriptor fd.
  *
- * Stolen verbatim from usr/src/ucblib/libucb/port/sys/flock.c
- *
  * operation is: LX_LOCK_SH, LX_LOCK_EX, LX_LOCK_UN, LX_LOCK_NB
  */
 long
@@ -397,12 +395,12 @@ lx_flock(uintptr_t p1, uintptr_t p2)
 	int			cmd;
 	int			ret;
 
-	/* In non-blocking lock, use F_SETLK for cmd, F_SETLKW otherwise */
 	if (operation & LX_LOCK_NB) {
-		cmd = F_SETLK;
+		cmd = F_FLOCK;
 		operation &= ~LX_LOCK_NB; /* turn off this bit */
-	} else
-		cmd = F_SETLKW;
+	} else {
+		cmd = F_FLOCKW;
+	}
 
 	switch (operation) {
 		case LX_LOCK_UN:
@@ -421,11 +419,10 @@ lx_flock(uintptr_t p1, uintptr_t p2)
 	fl.l_whence = 0;
 	fl.l_start = 0;
 	fl.l_len = 0;
+	fl.l_sysid = 0;
+	fl.l_pid = 0;
 
 	ret = fcntl(fd, cmd, &fl);
-
-	if (ret == -1 && errno == EACCES)
-		return (-EWOULDBLOCK);
 
 	return ((ret == -1) ? -errno : ret);
 }

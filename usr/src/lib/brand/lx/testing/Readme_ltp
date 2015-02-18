@@ -132,10 +132,6 @@ x fchmod03	need PRIV_SYS_CONFIG to set sticky bit on reg file
 # fcntl30_64
 # fcntl31	setown/getown not impl
 # fcntl31_64
-# flock01	OS-2868
-# flock03	"
-# flock04	"
-# flock06	"
 # fork05	asm into %fs reg
 - fork09	needs a swap cap of ~9GB
 # fork13	decided not to support this

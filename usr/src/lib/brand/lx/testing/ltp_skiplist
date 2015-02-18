@@ -137,10 +137,6 @@ fcntl30
 fcntl30_64
 fcntl31
 fcntl31_64     
-flock01
-flock03
-flock04
-flock06
 fork05
 fork09
 fork13
