@@ -26,7 +26,7 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 /*
- * Copyright 2014, Joyent, Inc.  All rights reserved.
+ * Copyright 2015, Joyent, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -69,6 +69,7 @@
 #include <sys/sdt.h>
 #include <sys/brand.h>
 #include <sys/klpd.h>
+#include <sys/random.h>
 
 #include <c2/audit.h>
 
@@ -1589,8 +1590,6 @@ stk_copyin(execa_t *uap, uarg_t *args, intpdata_t *intp, void **auxvpp)
 	size_t size, pad;
 	char *argv = (char *)uap->argp;
 	char *envp = (char *)uap->envp;
-	uint32_t rvals;
-	uint8_t *rtp;
 	uint8_t rdata[RANDOM_LEN];
 
 	/*
@@ -1679,22 +1678,9 @@ stk_copyin(execa_t *uap, uarg_t *args, intpdata_t *intp, void **auxvpp)
 
 		/*
 		 * For the AT_RANDOM aux vector we provide 16 bytes of random
-		 * data. However, we don't want to depend on
-		 * kcf_rnd_get_pseudo_bytes for early processes, so just jumble
-		 * some bits from hrtime to get some (pseudo)randomness.
+		 * data.
 		 */
-		rvals = (uint32_t)gethrtime();
-		rtp = (uint8_t *)&rvals;
-		rdata[0] = rdata[11] = *rtp++;
-		rdata[1] = rdata[15] = *rtp++;
-		rdata[2] = rdata[9] = *rtp++;
-		rdata[3] = rdata[12] = *rtp;
-
-		rtp = (uint8_t *)&rvals;
-		rdata[4] = rdata[8] = ~(*rtp++);
-		rdata[5] = rdata[14] = ~(*rtp++);
-		rdata[6] = rdata[13] = ~(*rtp++);
-		rdata[7] = rdata[10] = ~(*rtp);
+		(void) random_get_pseudo_bytes(rdata, sizeof (rdata));
 
 		if ((error = stk_byte_add(args, rdata, sizeof (rdata))) != 0)
 			return (error);
