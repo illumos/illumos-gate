@@ -387,7 +387,11 @@ _netdir_options(struct netconfig *netconfigp, int option, int fd, void *par)
 		 */
 		argp = (struct nd_mergearg *)par;
 		argp->m_uaddr = strdup(argp->s_uaddr);
-		return (argp->m_uaddr == NULL? -1 : 0);
+		if (argp->m_uaddr == NULL) {
+			_nderror = ND_NOMEM;
+			return (-1);
+		}
+		return (0);
 	default:
 		_nderror = ND_NOCTRL;
 		return (-1);
