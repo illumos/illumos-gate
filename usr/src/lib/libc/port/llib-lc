@@ -26,6 +26,7 @@
  * Copyright (c) 2013 Gary Mills
  * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  * Copyright 2015 Circonus, Inc.  All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  */
 
 /* LINTLIBRARY */
@@ -426,6 +427,9 @@ int fdetach(const char *path);
 
 /* ffs.c */
 int ffs(int field);
+
+/* flock.c */
+int flock(int filedes, int operation);
 
 /* fmtmsg.c */
 int addseverity(int value, const char *string);

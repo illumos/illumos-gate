@@ -1,0 +1,203 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 1989 AT&T
+.\" Copyright (c) 2002, Sun Microsystems, Inc.  All Rights Reserved
+.\" Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.TH FLOCK 3C "Feb 16, 2015"
+.SH NAME
+flock \- OFD(open file description)-style file locking
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/file.h>
+
+\fBint\fR \fBflock\fR(\fBint\fR \fIfildes\fR, \fBint\fR \fIoperation\fR);
+.fi
+
+.SH DESCRIPTION
+.LP
+The \fBflock()\fR function allows advisory locks to be applied to and removed
+from a file. Calls to \fBflock()\fR from callers that attempt to lock
+the locked file section via a different open file handle will either return an
+error value or be put to sleep until the resource becomes unlocked.
+See \fBfcntl\fR(2) for more information about record locking. Locks created or
+removed via this function will apply to the entire file, including any future
+growth in the file's length.
+.sp
+.LP
+The \fIfildes\fR argument is an open file descriptor. A lock can be established
+without regard for the mode with which the file was opened.
+.sp
+.LP
+The \fIoperation\fR argument is a control value that specifies the action to be
+taken. The permissible values for \fIoperation\fR are defined in
+<\fBsys/file.h\fR> as follows:
+.sp
+.in +2
+.nf
+#define   LOCK_SH   1   /* shared file lock */
+#define   LOCK_EX   2   /* exclusive file lock */
+#define   LOCK_NB   4   /* do not block when attempting to create lock */
+#define   LOCK_UN   8   /* remove existing file lock */
+.fi
+.in -2
+
+.sp
+.LP
+To create a lock, either \fBLOCK_SH\fR or \fBLOCK_EX\fR should be specified,
+optionally bitwise-ored with \fBLOCK_NB\fR.  To remove a lock, \fBLOCK_UN\fR
+should be specified. All other values of \fIoperation\fR are reserved for
+future extensions and will result in an error if not implemented.
+.sp
+.LP
+This function creates, upgrades, downgrades, or removes either shared or
+exclusive OFD-style locks. Locks created by this function are owned by open
+files, not file descriptors. That is, file descriptors duplicated through
+\fBdup\fR(2), \fBfork\fR(2), or \fBfcntl\fR(2) do not result in multiple
+instances of a lock, but rather multiple references to the same lock. If a
+process holding a lock on a file forks and the child explicitly unlocks the
+file, the parent will lose its lock.  See \fBfcntl\fR(2) for more information
+about file locking and the interaction between locks created by this function
+and those created by other mechanisms. These locks are currently not supported
+over remote file systems (e.g. \fBnfs\fR(4)) which use the Network Lock
+Manager.
+.sp
+.LP
+Sleeping on a resource is interrupted with any signal. The \fBalarm\fR(2)
+function may be used to provide a timeout facility in applications that require
+this facility.
+.SH RETURN VALUES
+.LP
+Upon successful completion, \fB0\fR is returned.  Otherwise, \fB\(mi1\fR is
+returned and \fBerrno\fR is set to indicate the error.
+.SH ERRORS
+.LP
+The \fBflock()\fR function will fail if:
+.sp
+.ne 2
+.na
+\fB\fBEBADF\fR\fR
+.ad
+.RS 20n
+The \fIfildes\fR argument is not a valid open file descriptor; or
+\fIoperation\fR contains \fBLOCK_SH\fR and \fIfiledes\fR is not open for
+reading; or \fIoperation\fR contains \fBLOCK_EX\fR and \fIfiledes\fR is not
+open for writing.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBEWOULDBLOCK\fR\fR
+.ad
+.RS 20n
+The \fIoperation\fR argument contains \fBLOCK_NB\fR and a conflicting lock
+exists.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBEINTR\fR\fR
+.ad
+.RS 20n
+A signal was caught during execution of the function.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 20n
+The \fIoperation\fR argument does not contain one of \fBLOCK_SH\fR,
+\fBLOCK_EX\fR, or \fBLOCK_UN\fR; or the \fIoperation\fR argument contains
+\fBLOCK_UN\fR and \fBLOCK_NB\fR; or the \fIoperation\fR argument contains
+any bits other than those set by \fBLOCK_SH\fR, \fBLOCK_EX\fR, \fBLOCK_NB\fR,
+and \fBLOCK_UN\fR.
+.RE
+
+.sp
+.LP
+The \fBflock()\fR function may fail if:
+.sp
+.ne 2
+.na
+\fB\fBEAGAIN\fR\fR
+.ad
+.RS 24n
+The \fIoperation\fR argument contains \fBLOCK_SH\fR or \fBLOCK_EX\fR and the
+file is mapped with \fBmmap\fR(2).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBENOLCK\fR\fR
+.ad
+.RS 20n
+The number of locked file regions in the system would exceed a system-imposed
+limit.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBEOPNOTSUPP\fR
+.ad
+.RS 24n
+The locking of files of the type indicated by the \fIfildes\fR argument is not
+supported.
+.RE
+
+.SH USAGE
+.LP
+File-locking should not be used in combination with the \fBfopen\fR(3C),
+\fBfread\fR(3C), \fBfwrite\fR(3C) and other \fBstdio\fR functions.  Instead,
+the more primitive, non-buffered functions (such as \fBopen\fR(2)) should be
+used.  Unexpected results may occur in processes that do buffering in the user
+address space.  The process may later read/write data which is/was locked.  The
+\fBstdio\fR functions are the most common source of unexpected buffering.
+.sp
+.LP
+The \fBalarm\fR(2) function may be used to provide a timeout facility in
+applications requiring it.
+.sp
+.LP
+Locks created by this facility conflict with those created by the
+\fBlockf\fR(3C) and \fBfcntl\fR(2) facilities.  This facility creates and
+removed OFD-style locks; see \fBfcntl\fR(2) for information about the
+interaction between OFD-style and POSIX-style file locks.
+.SH ATTRIBUTES
+.LP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Interface Stability	Standard
+_
+MT-Level	MT-Safe
+.TE
+
+.SH SEE ALSO
+.LP
+\fBIntro\fR(2), \fBalarm\fR(2), \fBchmod\fR(2), \fBclose\fR(2), \fBcreat\fR(2),
+\fBfcntl\fR(2), \fBmmap\fR(2), \fBopen\fR(2), \fBread\fR(2), \fBwrite\fR(2),
+\fBattributes\fR(5), \fBstandards\fR(5)

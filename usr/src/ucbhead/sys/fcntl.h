@@ -22,6 +22,7 @@
 /*
  * Copyright 1998 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2015 Joyent, Inc.  All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -39,8 +40,6 @@
 
 #ifndef _SYS_FCNTL_H
 #define	_SYS_FCNTL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifndef _SYS_TYPES_H
 #include <sys/types.h>
@@ -79,6 +78,8 @@ extern "C" {
 #define	F_SETFL		4	/* Set file flags */
 #define	F_SETLK		6	/* Set file lock */
 #define	F_SETLKW	7	/* Set file lock and wait */
+#define	F_FLOCK		53	/* private - flock */
+#define	F_FLOCKW	54	/* private - flock wait */
 
 /*
  * Applications that read /dev/mem must be built like the kernel. A new
