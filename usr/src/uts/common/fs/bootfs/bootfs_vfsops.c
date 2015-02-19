@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright (c) 2014 Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2015 Joyent, Inc.
  */
 
 #include <sys/errno.h>
@@ -227,6 +227,7 @@ static const fs_operation_def_t bootfs_vfsops_tmpl[] = {
 	VFSNAME_UNMOUNT,	{ .vfs_unmount = bootfs_unmount },
 	VFSNAME_ROOT,		{ .vfs_root = bootfs_root },
 	VFSNAME_STATVFS,	{ .vfs_statvfs = bootfs_statvfs },
+	NULL,			NULL
 };
 
 static int
