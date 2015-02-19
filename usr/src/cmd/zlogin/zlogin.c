@@ -1854,6 +1854,7 @@ int
 main(int argc, char **argv)
 {
 	int arg, console = 0, imode = 0;
+	int estatus = 0;
 	zoneid_t zoneid;
 	zone_state_t st;
 	char *login = "root";
@@ -1864,6 +1865,7 @@ main(int argc, char **argv)
 	char **proc_args = NULL;
 	char **new_args, **new_env;
 	sigset_t block_cld;
+	siginfo_t si;
 	char devroot[MAXPATHLEN];
 	char *slavename, slaveshortname[MAXPATHLEN];
 	priv_set_t *privset;
@@ -2440,7 +2442,7 @@ main(int argc, char **argv)
 			(void) execve(new_args[0], new_args, new_env);
 		}
 		zperror("exec failure");
-		return (1);
+		return (ENOEXEC);
 	}
 
 	(void) ct_tmpl_clear(tmpl_fd);
@@ -2465,8 +2467,19 @@ main(int argc, char **argv)
 	if (pollerr != 0) {
 		(void) fprintf(stderr, gettext("Error: connection closed due "
 		    "to unexpected pollevents=0x%x.\n"), pollerr);
-		return (1);
+		return (EPIPE);
 	}
 
-	return (0);
+	/* reap child and get its status */
+	if (waitid(P_PID, child_pid, &si, WEXITED | WNOHANG) == -1) {
+		estatus = errno;
+	} else if (si.si_pid == 0) {
+		estatus = ECHILD;
+	} else if (si.si_code == CLD_EXITED) {
+		estatus = si.si_status;
+	} else {
+		estatus = ECONNABORTED;
+	}
+
+	return (estatus);
 }
