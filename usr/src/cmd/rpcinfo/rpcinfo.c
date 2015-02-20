@@ -1581,20 +1581,22 @@ progping(netid, argc, argv)
 static void
 usage()
 {
-	(void) fprintf(stderr, "Usage: rpcinfo [-m | -s] [host]\n");
+	(void) fprintf(stderr, "Usage: rpcinfo [-T netid] [-m | -s] [host]\n");
 #ifdef PORTMAP
 	(void) fprintf(stderr, "       rpcinfo -p [host]\n");
 #endif
 	(void) fprintf(stderr,
 	    "       rpcinfo -T netid host prognum [versnum]\n");
-	(void) fprintf(stderr, "       rpcinfo -l host prognum versnum\n");
+	(void) fprintf(stderr,
+	    "       rpcinfo -l [-T netid] host prognum versnum\n");
 #ifdef PORTMAP
 	(void) fprintf(stderr,
-"       rpcinfo [-n portnum] -u | -t host prognum [versnum]\n");
+	    "       rpcinfo [-n portnum] -u | -t host prognum [versnum]\n");
 #endif
 	(void) fprintf(stderr,
-"       rpcinfo -a serv_address -T netid prognum [version]\n");
-	(void) fprintf(stderr, "       rpcinfo -b prognum versnum\n");
+	    "       rpcinfo -a serv_address -T netid prognum [versnum]\n");
+	(void) fprintf(stderr,
+	    "       rpcinfo -b [-T netid] prognum versnum\n");
 	(void) fprintf(stderr,
 	    "       rpcinfo -d [-T netid] prognum versnum\n");
 }

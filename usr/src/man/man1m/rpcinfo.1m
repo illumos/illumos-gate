@@ -1,16 +1,17 @@
 '\" te
+.\" Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 .\" Copyright (c) 2001 Sun Microsystems, Inc. All Rights Reserved
 .\" Copyright 1989 AT&T
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH RPCINFO 1M "Jul 13, 2001"
+.TH RPCINFO 1M "Feb 20, 2015"
 .SH NAME
 rpcinfo \- report RPC information
 .SH SYNOPSIS
 .LP
 .nf
-\fBrpcinfo\fR [\fB-m\fR | \fB-s\fR] [\fIhost\fR]
+\fBrpcinfo\fR [\fB-T\fR \fItransport\fR] [\fB-m\fR | \fB-s\fR] [\fIhost\fR]
 .fi
 
 .LP
@@ -54,7 +55,6 @@ rpcinfo \- report RPC information
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 \fBrpcinfo\fR makes an \fBRPC\fR call to an \fBRPC\fR server and reports what
 it finds.
@@ -95,7 +95,6 @@ required for \fB-b\fR and \fB-d\fR options.
 .LP
 The \fBEXAMPLES\fR section describe other ways of using \fBrpcinfo\fR.
 .SH OPTIONS
-.sp
 .ne 2
 .na
 \fB\fB-T\fR\fI transport\fR\fR
@@ -280,7 +279,7 @@ The information displayed by the above commands can be quite lengthy. Use the
 .TS
 l l l l l
 l l l l l .
-\fBprogram\fR	\fBvrsn\fR	\fBnetid(s)\fR	\fBservice\fR	\fBowner\fR
+\fBprogram\fR	\fBversion(s)\fR	\fBnetid(s)\fR	\fBservice\fR	\fBowner\fR
 \fB100000\fR	\fB2,3,4\fR	\fBtcp,udp,ticlts,ticots,ticotsord\fR	\fBrpcbind\fR	\fBsuperuser\fR
 \fB100008\fR	\fB1\fR	\fBticotsord,ticots,ticlts,udp,tcp\fR	\fBwalld\fR	\fBsuperuser\fR
 \fB100002\fR	\fB2,1\fR	\fBticotsord,ticots,ticlts,udp,tcp\fR	\fBrusersd\fR	\fBsuperuser\fR
@@ -288,7 +287,7 @@ l l l l l .
 \fB100012\fR	\fB1\fR	\fBticotsord,ticots,ticlts,udp,tcp\fR	\fBsprayd\fR	\fBsuperuser\fR
 \fB100007\fR	\fB3\fR	\fBticotsord,ticots,ticlts,udp,tcp\fR	\fBypbind\fR	\fBsuperuser\fR
 \fB100029\fR	\fB1\fR	\fBticotsord,ticots,ticlts\fR	\fBkeyserv\fR	\fBsuperuser\fR
-\fB100078\fR	\fB4\fR	\fBticotsord,ticots,ticlts\fR	\fB-\fR	superuser
+\fB100078\fR	\fB4\fR	\fBticotsord,ticots,ticlts\fR	\fB-\fR	\fBsuperuser\fR
 \fB100024\fR	\fB1\fR	\fBticotsord,ticots,ticlts,udp,tcp\fR	\fBstatus\fR	\fBsuperuser\fR
 \fB100021\fR	\fB2,1\fR	\fBticotsord,ticots,ticlts,udp,tcp\fR	\fBnlockmgr\fR	\fBsuperuser\fR
 \fB100020\fR	\fB1\fR	\fBticotsord,ticots,ticlts,udp,tcp\fR	\fBllockmgr\fR	\fBsuperuser\fR
@@ -347,7 +346,6 @@ or
 .sp
 
 .SH SEE ALSO
-.sp
 .LP
 \fBrpcbind\fR(1M), \fBrpc\fR(3NSL), \fBnetconfig\fR(4), \fBrpc\fR(4),
 \fBattributes\fR(5)
