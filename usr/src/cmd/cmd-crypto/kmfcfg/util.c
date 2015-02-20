@@ -22,8 +22,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <strings.h>
 #include <ctype.h>
@@ -242,7 +240,7 @@ parseEKUOIDs(char *ekulist, KMF_POLICY_RECORD *plc)
 {
 	int rv = KC_OK;
 	char *p;
-	KMF_OID newoid = {NULL, 0};
+	KMF_OID newoid = { 0, NULL };
 	KMF_EKU_POLICY *ekus = &plc->eku_set;
 
 	if (ekulist == NULL || !strlen(ekulist))

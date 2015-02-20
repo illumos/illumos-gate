@@ -17,7 +17,13 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
+ */
+
+/*
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ */
+
+/*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -39,7 +45,7 @@
  */
 
 /*
- * We are for now defining PORTMAP here.  It doesnt even compile
+ * We are for now defining PORTMAP here.  It doesn't even compile
  * unless it is defined.
  */
 #ifndef	PORTMAP
@@ -57,7 +63,6 @@
 #include <rpc/nettype.h>
 #include <netdir.h>
 #include <rpc/rpcent.h>
-#include <sys/utsname.h>
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
@@ -488,7 +493,6 @@ pmapdump(argc, argv)
 	struct rpcent *rpc;
 	enum clnt_stat clnt_st;
 	struct rpc_err err;
-	struct utsname utsname;
 	char *host;
 
 	if (argc > 1) {
@@ -497,12 +501,11 @@ pmapdump(argc, argv)
 	}
 	if (argc == 1) {
 		host = argv[0];
-		get_inet_address(&server_addr, host);
 	} else {
-		(void) uname(&utsname);
-		host = utsname.nodename;
-		get_inet_address(&server_addr, host);
+		host = HOST_SELF_CONNECT;
 	}
+	get_inet_address(&server_addr, host);
+
 	minutetimeout.tv_sec = 60;
 	minutetimeout.tv_usec = 0;
 	server_addr.sin_port = htons(PMAPPORT);
@@ -715,7 +718,6 @@ rpcbdump(dumptype, netid, argc, argv)
 	struct rpcbdump_short *rs, *rs_tail;
 	enum clnt_stat clnt_st;
 	struct rpc_err err;
-	struct utsname utsname;
 	struct rpcbdump_short *rs_head = NULL;
 
 	if (argc > 1) {
@@ -725,8 +727,7 @@ rpcbdump(dumptype, netid, argc, argv)
 	if (argc == 1) {
 		host = argv[0];
 	} else {
-		(void) uname(&utsname);
-		host = utsname.nodename;
+		host = HOST_SELF_CONNECT;
 	}
 	if (netid == NULL) {
 	    if (loopback_netid == NULL) {
@@ -1061,7 +1062,6 @@ rpcbgetstat(argc, argv)
 	rpcbs_addrlist *pa;
 	rpcbs_rmtcalllist *pr;
 	int cnt, flen;
-	struct utsname utsname;
 #define	MAXFIELD	64
 	char fieldbuf[MAXFIELD];
 #define	MAXLINE		256
@@ -1085,8 +1085,7 @@ rpcbgetstat(argc, argv)
 	if (argc >= 1) {
 		host = argv[0];
 	} else {
-		(void) uname(&utsname);
-		host = utsname.nodename;
+		host = HOST_SELF_CONNECT;
 	}
 	if (loopback_netid != NULL) {
 		client = getclnthandle(host, loopback_nconf, RPCBVERS4, NULL);

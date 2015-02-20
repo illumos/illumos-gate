@@ -49,8 +49,8 @@ read_csrdata(KMF_HANDLE_T handle, char *csrfile, KMF_CSR_DATA *csrdata)
 {
 	KMF_RETURN rv = KMF_OK;
 	KMF_ENCODE_FORMAT csrfmt;
-	KMF_DATA csrfiledata = {NULL, 0};
-	KMF_DATA rawcsr = {NULL, 0};
+	KMF_DATA csrfiledata = { 0, NULL };
+	KMF_DATA rawcsr = { 0, NULL };
 
 	rv = kmf_get_file_format(csrfile, &csrfmt);
 	if (rv != KMF_OK)
@@ -265,7 +265,7 @@ pk_signcsr_files(KMF_HANDLE_T handle,
 	KMF_KEYSTORE_TYPE kstype = KMF_KEYSTORE_OPENSSL;
 	KMF_KEY_CLASS keyclass = KMF_ASYM_PRI;
 	KMF_KEY_HANDLE cakey;
-	KMF_DATA certdata = {NULL, 0};
+	KMF_DATA certdata = { 0, NULL };
 	int numattr, count;
 
 	(void) memset(&cakey, 0, sizeof (cakey));
@@ -361,8 +361,8 @@ pk_signcsr_pk11_nss(KMF_HANDLE_T handle,
 	KMF_ENCODE_FORMAT fmt, int store, char *outlabel)
 {
 	KMF_RETURN rv = KMF_OK;
-	KMF_DATA outcert = {NULL, 0};
-	KMF_CSR_DATA csrdata = {NULL, 0};
+	KMF_DATA outcert = { 0, NULL };
+	KMF_CSR_DATA csrdata = { 0, NULL };
 	KMF_KEY_HANDLE casignkey;
 	KMF_KEY_CLASS keyclass = KMF_ASYM_PRI;
 	KMF_ATTRIBUTE attrlist[16];
@@ -548,7 +548,7 @@ pk_signcsr(int argc, char *argv[])
 	KMF_KEYSTORE_TYPE	kstype = 0;
 	KMF_RETURN		rv = KMF_OK;
 	KMF_HANDLE_T		kmfhandle = NULL;
-	KMF_CREDENTIAL		tokencred = {NULL, 0};
+	KMF_CREDENTIAL		tokencred = { NULL, 0 };
 	KMF_GENERALNAMECHOICES	alttype = 0;
 	KMF_ENCODE_FORMAT	fmt = KMF_FORMAT_PEM;
 

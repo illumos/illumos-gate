@@ -1,4 +1,5 @@
 '\" te
+.\" Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 .\"  Copyright 1994, The X/Open Company Ltd.  All Rights Reserved  Portions Copyright 1989 AT&T  Portions Copyright (c) 1998, Sun Microsystems, Inc.  All Rights Reserved
 .\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
@@ -7,7 +8,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH T_LISTEN 3NSL "May 7, 1998"
+.TH T_LISTEN 3NSL "Feb 18, 2015"
 .SH NAME
 t_listen \- listen for a connection indication
 .SH SYNOPSIS
@@ -21,7 +22,6 @@ t_listen \- listen for a connection indication
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 This routine is part of the \fBXTI\fR interfaces which evolved from the
 \fBTLI\fR interfaces. \fBXTI\fR represents the future evolution of these
@@ -75,16 +75,13 @@ connection indication to arrive before returning to the user. However, if
 connection indications. If none are available, it returns  -1 and sets
 \fBt_errno\fR to \fBTNODATA\fR.
 .SH RETURN VALUES
-.sp
 .LP
 Upon successful completion, a value of 0 is returned.  Otherwise, a value of
 \(mi1 is returned and \fBt_errno\fR is set to indicate an error.
 .SH VALID STATES
-.sp
 .LP
 \fBT_IDLE\fR, \fBT_INCON\fR
 .SH ERRORS
-.sp
 .LP
 On failure, \fBt_errno\fR is set to one of the following:
 .sp
@@ -191,13 +188,11 @@ A system error has occurred during execution of this function.
 .RE
 
 .SH TLI COMPATIBILITY
-.sp
 .LP
 The \fBXTI\fR and \fBTLI\fR interface definitions have common names but use
 different header files. This, and other semantic differences between the two
 interfaces are described in the subsections below.
 .SS "Interface Header"
-.sp
 .LP
 The \fBXTI\fR interfaces use the header file, \fBxti.h\fR. \fBTLI\fR interfaces
 should \fInot\fR use this header.  They should use the header:
@@ -209,9 +204,8 @@ should \fInot\fR use this header.  They should use the header:
 .in -2
 
 .SS "Error Description Values"
-.sp
 .LP
-The \fBt_errno\fR values \fBTPROT0,\fR \fBTBADQLEN,\fR and \fBTQFULL\fR can be
+The \fBt_errno\fR values \fBTPROTO,\fR \fBTBADQLEN,\fR and \fBTQFULL\fR can be
 set by the \fBXTI\fR interface but not by the \fBTLI\fR interface.
 .sp
 .LP
@@ -220,13 +214,11 @@ circumstances than its \fBXTI\fR counterpart is \fBTBUFOVFLW\fR. It can be
 returned even when the \fBmaxlen\fR field of the corresponding buffer has been
 set to zero.
 .SS "Option Buffers"
-.sp
 .LP
 The format of the options in an \fBopt\fR buffer is dictated by the transport
 provider. Unlike the \fBXTI\fR interface, the \fBTLI\fR interface does not fix
 the buffer format.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5)  for descriptions of the following attributes:
 .sp
@@ -242,13 +234,11 @@ MT Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBfcntl\fR(2), \fBt_accept\fR(3NSL), \fBt_alloc\fR(3NSL), \fBt_bind\fR(3NSL),
 \fBt_connect\fR(3NSL), \fBt_open\fR(3NSL), \fBt_optmgmt\fR(3NSL),
 \fBt_rcvconnect\fR(3NSL), \fBt_snddis\fR(3NSL), \fBattributes\fR(5)
 .SH WARNINGS
-.sp
 .LP
 Some transport providers do not differentiate between a connection indication
 and the connection itself. If this is the case, a successful return of

@@ -164,7 +164,7 @@ pk_export_pk12_nss(KMF_HANDLE_T kmfhandle,
 {
 	KMF_RETURN rv = KMF_OK;
 	KMF_KEYSTORE_TYPE kstype;
-	KMF_CREDENTIAL p12cred = { NULL, 0};
+	KMF_CREDENTIAL p12cred = { NULL, 0 };
 	KMF_ATTRIBUTE attrlist[16];
 	int numattr = 0;
 
@@ -238,7 +238,7 @@ pk_export_pk12_files(KMF_HANDLE_T kmfhandle,
 {
 	KMF_RETURN rv;
 	KMF_KEYSTORE_TYPE kstype;
-	KMF_CREDENTIAL p12cred = { NULL, 0};
+	KMF_CREDENTIAL p12cred = { NULL, 0 };
 	KMF_ATTRIBUTE attrlist[16];
 	int numattr = 0;
 
@@ -373,7 +373,7 @@ pk_export_pk12_pk11(KMF_HANDLE_T kmfhandle, char *token_spec,
 {
 	KMF_RETURN rv = KMF_OK;
 	KMF_KEYSTORE_TYPE kstype;
-	KMF_CREDENTIAL p12cred = { NULL, 0};
+	KMF_CREDENTIAL p12cred = { NULL, 0 };
 	KMF_ATTRIBUTE attrlist[16];
 	int numattr = 0;
 
@@ -693,7 +693,7 @@ pk_export(int argc, char *argv[])
 	int		oclass = PK_CERT_OBJ;
 	KMF_BIGINT	serial = { NULL, 0 };
 	KMF_HANDLE_T	kmfhandle = NULL;
-	KMF_CREDENTIAL	tokencred = {NULL, 0};
+	KMF_CREDENTIAL	tokencred = { NULL, 0 };
 
 	/* Parse command line options.  Do NOT i18n/l10n. */
 	while ((opt = getopt_av(argc, argv,

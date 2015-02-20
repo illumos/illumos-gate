@@ -520,20 +520,20 @@ static int	pk_help(int argc, char *argv[]);
 
 /* Command structure for verbs and their actions.  Do NOT i18n/l10n. */
 static verbcmd	cmds[] = {
-	{ NULL,	pk_tokens, 0, NULL, NULL},
-	{ NULL,	pk_setpin, 0, NULL, NULL},
-	{ NULL, pk_list, 0, NULL, NULL},
-	{ NULL, pk_delete, 0, NULL, NULL},
-	{ NULL,	pk_import, 0, NULL, NULL},
-	{ NULL,	pk_export, 0, NULL, NULL},
-	{ NULL,	pk_gencert, 0, NULL, NULL},
-	{ NULL,	pk_gencsr, 0, NULL, NULL},
-	{ NULL,	pk_download, 0, NULL, NULL},
-	{ NULL,	pk_genkey, 0, NULL, NULL},
-	{ NULL, pk_signcsr, 0, NULL, NULL},
-	{ NULL, pk_inittoken, 0, NULL, NULL},
-	{ NULL, pk_genkeypair, 0, NULL, NULL},
-	{ NULL,	pk_help, 0, NULL, NULL}
+	{ NULL,	pk_tokens, 0, NULL, NULL },
+	{ NULL,	pk_setpin, 0, NULL, NULL },
+	{ NULL, pk_list, 0, NULL, NULL },
+	{ NULL, pk_delete, 0, NULL, NULL },
+	{ NULL,	pk_import, 0, NULL, NULL },
+	{ NULL,	pk_export, 0, NULL, NULL },
+	{ NULL,	pk_gencert, 0, NULL, NULL },
+	{ NULL,	pk_gencsr, 0, NULL, NULL },
+	{ NULL,	pk_download, 0, NULL, NULL },
+	{ NULL,	pk_genkey, 0, NULL, NULL },
+	{ NULL, pk_signcsr, 0, NULL, NULL },
+	{ NULL, pk_inittoken, 0, NULL, NULL },
+	{ NULL, pk_genkeypair, 0, NULL, NULL },
+	{ NULL,	pk_help, 0, NULL, NULL }
 };
 
 static int	num_cmds = sizeof (cmds) / sizeof (verbcmd);

@@ -1264,7 +1264,7 @@ OpenSSL_DeleteCert(KMF_HANDLE_T handle, int numattr, KMF_ATTRIBUTE *attrlist)
 {
 	KMF_RETURN rv;
 	KMF_HANDLE *kmfh = (KMF_HANDLE *)handle;
-	KMF_DATA certdata = {NULL, 0};
+	KMF_DATA certdata = { 0, NULL };
 	char *dirpath = NULL;
 	char *filename = NULL;
 	char *fullpath = NULL;
@@ -4852,7 +4852,7 @@ OpenSSL_StoreKey(KMF_HANDLE_T handle, int numattr,
 	KMF_RAW_KEY_DATA *rawkey;
 	EVP_PKEY *pkey = NULL;
 	KMF_ENCODE_FORMAT format = KMF_FORMAT_PEM;
-	KMF_CREDENTIAL cred = {NULL, 0};
+	KMF_CREDENTIAL cred = { NULL, 0 };
 	BIO *out = NULL;
 	int keys = 0;
 	char *fullpath = NULL;
