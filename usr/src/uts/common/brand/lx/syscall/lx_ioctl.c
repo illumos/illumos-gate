@@ -110,6 +110,7 @@
 #define	LX_SIOCSIFHWADDR	0x8924
 #define	LX_SIOCGIFHWADDR	0x8927
 #define	LX_SIOCGIFINDEX		0x8933
+#define	LX_SIOCGIFTXQLEN	0x8942
 
 #define	FLUSER(fp)	fp->f_flag | get_udatamodel()
 #define	FLFAKE(fp)	fp->f_flag | FKIOCTL
@@ -891,7 +892,25 @@ ict_siolifreq(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 			lreq.lifr_addr.ss_family = 1;
 		}
 		break;
-
+	case LX_SIOCGIFTXQLEN:
+		/*
+		 * Illumos lacks the notion of txqlen.  Confirm the provided
+		 * interface is valid with SIOCGLIFINDEX and return a fake
+		 * txqlen of 1.  Loopback devices will report txqlen of 0.
+		 */
+		if (strncmp(lreq.lifr_name, "lo", 2) == 0) {
+			lreq.lifr_index = 0;
+			error = 0;
+			break;
+		}
+		cmd = SIOCGLIFINDEX;
+		error = VOP_IOCTL(fp->f_vnode, cmd, (intptr_t)&lreq,
+		    FLFAKE(fp), fp->f_cred, &rv, NULL);
+		if (error == 0) {
+			/* lifr_index aliases to the qlen field */
+			lreq.lifr_index = 1;
+		}
+		break;
 	case LX_SIOCSIFHWADDR:
 		/*
 		 * We're not going to support SIOCSIFHWADDR, but we need to be
@@ -1122,6 +1141,7 @@ static ioc_cmd_translator_t ioc_translators[] = {
 	IOC_CMD_TRANSLATOR_FILTER(SIOCGIFHWADDR,	ict_siolifreq)
 	IOC_CMD_TRANSLATOR_CUSTOM(LX_SIOCSIFHWADDR,	ict_siolifreq)
 	IOC_CMD_TRANSLATOR_FILTER(SIOCGIFINDEX,		ict_siolifreq)
+	IOC_CMD_TRANSLATOR_CUSTOM(LX_SIOCGIFTXQLEN,	ict_siolifreq)
 	IOC_CMD_TRANSLATOR_FILTER(SIOCGIFCONF,		ict_siocgifconf)
 
 	IOC_CMD_TRANSLATOR_END
