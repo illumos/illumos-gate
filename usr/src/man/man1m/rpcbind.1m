@@ -1,11 +1,11 @@
 '\" te
+.\" Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 .\" Copyright 1989 AT&T
 .\" Copyright (C) 2006, Sun Microsystems, Inc. All Rights Reserved
-.\" Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH RPCBIND 1M "Jan 9, 2014"
+.TH RPCBIND 1M "Feb 13, 2015"
 .SH NAME
 rpcbind \- universal addresses to RPC program number mapper
 .SH SYNOPSIS
@@ -15,7 +15,6 @@ rpcbind \- universal addresses to RPC program number mapper
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 \fBrpcbind\fR is a server that converts \fBRPC\fR program numbers into
 universal addresses. It must be running on the host to be able to make
@@ -154,7 +153,6 @@ calls.
 .RE
 
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -177,7 +175,7 @@ in detail.
 .RS 6n
 Do a warm start. If \fBrpcbind\fR aborts or terminates on \fBSIGINT\fR or
 \fB\fR\fBSIGTERM\fR, it writes the current list of registered services to
-\fB/var/run/portmap.file\fR and \fB/var/run/rpcbind.file\fR. Starting
+\fB/var/run/daemon/portmap.file\fR and \fB/var/run/daemon/rpcbind.file\fR. Starting
 \fBrpcbind\fR with the \fB-w\fR option instructs it to look for these files and
 start operation with the registrations found in them. This allows \fBrpcbind\fR
 to resume operation without requiring all \fBRPC\fR services to be restarted.
@@ -209,10 +207,9 @@ The following sequence of commands allows remote access to \fBrpcbind\fR.
 .sp
 
 .SH FILES
-.sp
 .ne 2
 .na
-\fB\fB/var/run/portmap.file\fR\fR
+\fB\fB/var/run/daemon/portmap.file\fR\fR
 .ad
 .RS 25n
 Stores the information for \fBRPC\fR services registered over IP based
@@ -222,7 +219,7 @@ transports for warm start purposes.
 .sp
 .ne 2
 .na
-\fB\fB/var/run/rpcbind.file\fR\fR
+\fB\fB/var/run/daemon/rpcbind.file\fR\fR
 .ad
 .RS 25n
 Stores the information for all registered \fBRPC\fR services for warm start
@@ -230,7 +227,6 @@ purposes.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -249,7 +245,6 @@ Interface Stability	See below.
 .LP
 TCP wrappers is External.
 .SH SEE ALSO
-.sp
 .LP
 \fBsmf\fR(5), \fBrpcinfo\fR(1M), \fBsvcadm\fR(1M), \fBsvccfg\fR(1M),
 \fBrpcbind\fR(3NSL), \fBsyslog.conf\fR(4), \fBattributes\fR(5), \fBsmf\fR(5)
@@ -258,7 +253,6 @@ TCP wrappers is External.
 For information on the TCP wrappers facility, see the \fBhosts_access(4)\fR man
 page available in the \fBSUNWtcpd\fR package.
 .SH NOTES
-.sp
 .LP
 Terminating \fBrpcbind\fR with \fBSIGKILL\fR prevents the warm-start files from
 being written.

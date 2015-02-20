@@ -1,11 +1,11 @@
 '\" te
-.\" Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+.\" Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 .\"  Copyright 1989 AT&T
 .\" Copyright (C) 1999, Sun Microsystems, Inc. All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH RPC_CONTROL 3NSL "Oct 22, 2014"
+.TH RPC_CONTROL 3NSL "Feb 18, 2015"
 .SH NAME
 rpc_control \- library routine for manipulating global RPC attributes for
 client and server applications
@@ -16,7 +16,6 @@ client and server applications
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 This \fBRPC\fR library routine allows applications to set and modify global
 \fBRPC\fR attributes that apply to clients as well as servers.  At present, it
@@ -80,7 +79,7 @@ or connections due to limitations in the historical interfaces
 \fBsvc_fdset\fR(3NSL) and \fBsvc_getreqset\fR(3NSL). Applications written to
 use the preferred interfaces of \fBsvc_pollfd\fR(3NSL) and
 \fBsvc_getreq_poll\fR(3NSL) can use an unlimited number of file descriptors.
-Setting \fBinfo\fR to point to a non-zero integer and  \fIop\fR to
+Setting \fIinfo\fR to point to a non-zero integer and  \fIop\fR to
 \fBRPC_SVC_USE_POLLFD\fR removes the limitation.
 .sp
 .LP
@@ -108,12 +107,10 @@ blocking mode.
 transports ignore \fBRPC_SVC_CONNMAXREC_SET\fR and
 \fBRPC_SVC_CONNMAXREC_GET\fR.
 .SH RETURN VALUES
-.sp
 .LP
 This routine returns \fBTRUE\fR if the operation was successful and
 returns \fBFALSE\fR otherwise.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -129,7 +126,6 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBrpcbind\fR(1M), \fBrpc\fR(3NSL), \fBrpc_svc_calls\fR(3NSL),
 \fBattributes\fR(5)

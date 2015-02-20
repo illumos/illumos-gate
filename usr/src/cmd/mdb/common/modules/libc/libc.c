@@ -24,7 +24,7 @@
  * Copyright (c) 2012 by Delphix. All rights reserved.
  */
 /*
- * Copyright 2015 Joyent, Inc.
+ * Copyright (c) 2015, Joyent, Inc.
  */
 
 #include <sys/mdb_modapi.h>
