@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/sysmacros.h>
 
@@ -154,6 +152,7 @@ fmd_trace_full(fmd_tracebuf_t *tbp, uint_t tag, const char *format, va_list ap)
 	}
 
 	(void) getcontext(&uc);
+	trp->tr_depth = 0;
 	trp->tr_tag = tbp->tb_frames; /* for use by fmd_trace_frame() */
 	(void) walkcontext(&uc, (int (*)())fmd_trace_frame, trp);
 
