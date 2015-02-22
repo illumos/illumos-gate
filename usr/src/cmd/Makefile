@@ -20,7 +20,7 @@
 #
 
 # Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 # Copyright (c) 2012 Joyent, Inc.  All rights reserved.
 # Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright (c) 2013 DEY Storage Systems, Inc. All rights reserved.
@@ -248,7 +248,6 @@ COMMON_SUBDIRS=		\
 	luxadm		\
 	lvm		\
 	mach		\
-	machid		\
 	mail		\
 	mailwrapper	\
 	mailx		\

@@ -20,20 +20,20 @@
 #
 # Copyright 1998 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright 2015 Nexenta Systems, Inc. All rights reserved.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 # The initial machine wide defaults for csh.
 
 if ( $?TERM == 0 ) then
-	if { /bin/i386 } then
+	if ( `uname -p` == "i386" ) then
 		setenv TERM sun-color
 	else
 		setenv TERM sun
 	endif
 else
 	if ( $TERM == "" ) then
-		if { /bin/i386 } then
+		if ( `uname -p` == "i386" ) then
 			setenv TERM sun-color
 		else
 			setenv TERM sun
