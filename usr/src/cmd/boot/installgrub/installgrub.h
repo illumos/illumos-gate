@@ -91,6 +91,12 @@ enum ig_devtype_t {
 #define	STAGE2_BLKOFF(type)	\
 	(is_efi(type) ? 1024 : 50)	/* offset from start of part */
 
+/*
+ * Maximum size of stage2 on EFI-labeled disks. Must not be larger than
+ * VDEV_BOOT_SIZE, defined in usr/src/uts/common/fs/zfs/sys/vdev_impl.h
+ */
+#define	STAGE2_MAXSIZE		(1ULL << 19)
+
 #ifdef	__cplusplus
 }
 #endif
