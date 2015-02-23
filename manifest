@@ -17188,9 +17188,11 @@ s usr/share/man/man3socket/endnetent.3socket=getnetbyname.3socket
 s usr/share/man/man3socket/endprotoent.3socket=getprotobyname.3socket
 s usr/share/man/man3socket/endservent.3socket=getservbyname.3socket
 s usr/share/man/man3socket/ether_aton.3socket=ethers.3socket
+s usr/share/man/man3socket/ether_aton_r.3socket=ethers.3socket
 s usr/share/man/man3socket/ether_hostton.3socket=ethers.3socket
 s usr/share/man/man3socket/ether_line.3socket=ethers.3socket
 s usr/share/man/man3socket/ether_ntoa.3socket=ethers.3socket
+s usr/share/man/man3socket/ether_ntoa_r.3socket=ethers.3socket
 s usr/share/man/man3socket/ether_ntohost.3socket=ethers.3socket
 f usr/share/man/man3socket/ethers.3socket 0444 root bin
 s usr/share/man/man3socket/freeaddrinfo.3socket=getaddrinfo.3socket

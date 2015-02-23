@@ -22,6 +22,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -36,8 +37,6 @@
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * All routines necessary to deal the "ethers" database.  The sources
@@ -258,38 +257,42 @@ ea_buf(void)
 }
 
 /*
- * Converts a 48 bit ethernet number to its string representation.
+ * Converts a 48 bit ethernet number to its string representation using a user
+ * defined buffer.
+ */
+char *
+ether_ntoa_r(const struct ether_addr *e, char *buf)
+{
+	(void) sprintf(buf, "%x:%x:%x:%x:%x:%x",
+	    e->ether_addr_octet[0], e->ether_addr_octet[1],
+	    e->ether_addr_octet[2], e->ether_addr_octet[3],
+	    e->ether_addr_octet[4], e->ether_addr_octet[5]);
+	return (buf);
+}
+
+/*
+ * Converts a 48 bit ethernet number to its string representation using a
+ * per-thread buffer.
  */
 char *
 ether_ntoa(const struct ether_addr *e)
 {
 	eabuf_t *eabuf;
-	char *s;
 
 	if ((eabuf = ea_buf()) == NULL)
 		return (NULL);
-	s = eabuf->ea_string;
-	(void) sprintf(s, "%x:%x:%x:%x:%x:%x",
-	    e->ether_addr_octet[0], e->ether_addr_octet[1],
-	    e->ether_addr_octet[2], e->ether_addr_octet[3],
-	    e->ether_addr_octet[4], e->ether_addr_octet[5]);
-	return (s);
+	return (ether_ntoa_r(e, eabuf->ea_string));
 }
 
 /*
- * Converts an ethernet address representation back into its 48 bits.
+ * Converts an ethernet address representation back into its 48 bits using a
+ * user defined buffer.
  */
 struct ether_addr *
-ether_aton(const char *s)
+ether_aton_r(const char *s, struct ether_addr *e)
 {
-	eabuf_t *eabuf;
-	struct ether_addr *e;
 	int i;
 	uint_t t[6];
-
-	if ((eabuf = ea_buf()) == NULL)
-		return (NULL);
-	e = &eabuf->ea_addr;
 	i = sscanf(s, " %x:%x:%x:%x:%x:%x",
 	    &t[0], &t[1], &t[2], &t[3], &t[4], &t[5]);
 	if (i != 6)
@@ -297,4 +300,18 @@ ether_aton(const char *s)
 	for (i = 0; i < 6; i++)
 		e->ether_addr_octet[i] = (uchar_t)t[i];
 	return (e);
+}
+
+/*
+ * Converts an ethernet address representation back into its 48 bits using a
+ * per-thread buffer.
+ */
+struct ether_addr *
+ether_aton(const char *s)
+{
+	eabuf_t *eabuf;
+
+	if ((eabuf = ea_buf()) == NULL)
+		return (NULL);
+	return (ether_aton_r(s, &eabuf->ea_addr));
 }

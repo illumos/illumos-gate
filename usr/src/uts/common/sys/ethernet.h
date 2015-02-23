@@ -38,6 +38,7 @@ extern "C" {
 
 #define	ETHERADDRL	(6)		/* ethernet address length in octets */
 #define	ETHERFCSL	(4)		/* ethernet FCS length in octets */
+#define	ETHERADDRSTRL	(18)		/* char size of ETHERADDRL with null */
 
 /*
  * Ethernet address - 6 octets
@@ -144,7 +145,9 @@ extern char *ether_sprintf(struct ether_addr *);
 extern int ether_aton(char *, uchar_t *);
 #else	/* _KERNEL */
 extern char *ether_ntoa(const struct ether_addr *);
+extern char *ether_ntoa_r(const struct ether_addr *, char *);
 extern struct ether_addr *ether_aton(const char *);
+extern struct ether_addr *ether_aton_r(const char *, struct ether_addr *);
 extern int ether_ntohost(char *, const struct ether_addr *);
 extern int ether_hostton(const char *, struct ether_addr *);
 extern int ether_line(const char *, struct ether_addr *, char *);

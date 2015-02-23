@@ -27,7 +27,7 @@
 LIBRARY= libresolv.a
 VERS= .2
 
-BSDOBJS=   	daemon.o	putenv.o	strcasecmp.o	strsep.o \
+BSDOBJS=   	putenv.o	strcasecmp.o	strsep.o \
 		ftruncate.o	readv.o		strdup.o	strtoul.o \
 		gettimeofday.o	setenv.o	strerror.o	utimes.o \
 		mktemp.o	setitimer.o	strpbrk.o	writev.o

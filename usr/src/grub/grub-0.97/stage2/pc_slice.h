@@ -118,6 +118,7 @@
 #define PC_SLICE_TYPE_SOLARIS_BOOT	0xbe	/* Solaris boot (fat) */
 #define PC_SLICE_TYPE_SOLARIS2		0xbf	/* new Solaris type */
 #define PC_SLICE_TYPE_DELL_UTIL		0xde
+#define PC_SLICE_TYPE_GPT              0xee
 #define PC_SLICE_TYPE_LINUX_RAID	0xfd
 
 

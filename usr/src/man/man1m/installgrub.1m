@@ -1,9 +1,10 @@
 '\" te
+.\" Copyright 2015 Nexenta Systems Inc.
 .\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH INSTALLGRUB 1M "Jul 2, 2009"
+.TH INSTALLGRUB 1M "Jan 14, 2015"
 .SH NAME
 installgrub \- install GRUB in a disk partition or a floppy
 .SH SYNOPSIS
@@ -13,7 +14,6 @@ installgrub \- install GRUB in a disk partition or a floppy
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBinstallgrub\fR command is an x86-only program. GRUB stands for GRand
 Unified Bootloader.
@@ -23,7 +23,6 @@ Unified Bootloader.
 disk partition. If you specify the \fB-m\fR option, \fBinstallgrub\fR installs
 the stage 1 file on the master boot sector of the disk.
 .SH OPTIONS
-.sp
 .LP
 The \fBinstallgrub\fR command accepts the following options:
 .sp
@@ -42,11 +41,11 @@ Suppresses interaction when overwriting the master boot sector.
 .ad
 .RS 6n
 Installs GRUB \fIstage1\fR on the master boot sector interactively. You must
-use this option if Solaris is installed on an extended partition.
+use this option if Solaris is installed on an extended FDISK or an EFI/GPT
+partition.
 .RE
 
 .SH OPERANDS
-.sp
 .LP
 The \fBinstallgrub\fR command accepts the following operands:
 .sp
@@ -114,7 +113,6 @@ example# mount -F pcfs /dev/diskette /mnt
 .in -2
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/boot/grub\fR\fR
@@ -124,7 +122,6 @@ Directory where GRUB files reside.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -140,12 +137,10 @@ Interface Stability	Uncommitted
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBboot\fR(1M), \fBfdisk\fR(1M), \fBfmthard\fR(1M), \fBkernel\fR(1M),
 \fBattributes\fR(5)
 .SH WARNINGS
-.sp
 .LP
 Installing GRUB on the master boot sector (\fB-m\fR option) overrides any boot
 manager currently installed on the machine. The system will always boot the

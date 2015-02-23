@@ -144,7 +144,6 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	asn1buf_wrap_data;
 	com_err;
 	com_err_va;
-	daemon;
 	decode_krb5_alt_method;
 	decode_krb5_ap_rep;
 	decode_krb5_ap_rep_enc_part;

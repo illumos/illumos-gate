@@ -61,9 +61,11 @@ link path=usr/share/man/man3socket/endprotoent.3socket \
 link path=usr/share/man/man3socket/endservent.3socket \
     target=getservbyname.3socket
 link path=usr/share/man/man3socket/ether_aton.3socket target=ethers.3socket
+link path=usr/share/man/man3socket/ether_aton_r.3socket target=ethers.3socket
 link path=usr/share/man/man3socket/ether_hostton.3socket target=ethers.3socket
 link path=usr/share/man/man3socket/ether_line.3socket target=ethers.3socket
 link path=usr/share/man/man3socket/ether_ntoa.3socket target=ethers.3socket
+link path=usr/share/man/man3socket/ether_ntoa_r.3socket target=ethers.3socket
 link path=usr/share/man/man3socket/ether_ntohost.3socket target=ethers.3socket
 link path=usr/share/man/man3socket/freeaddrinfo.3socket \
     target=getaddrinfo.3socket
