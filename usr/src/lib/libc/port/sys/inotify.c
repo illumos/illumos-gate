@@ -121,7 +121,7 @@ inotify_add_watch(int fd, const char *pathname, uint32_t mask)
 			case EFAULT:
 			case EBADF:
 				(void) closedir(dir);
-				inotify_rm_watch(fd, wd);
+				(void) inotify_rm_watch(fd, wd);
 				return (-1);
 			default:
 				break;
