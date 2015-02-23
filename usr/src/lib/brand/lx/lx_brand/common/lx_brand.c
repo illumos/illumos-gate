@@ -1395,11 +1395,11 @@ static struct lx_sysent sysents[] = {
 	{"utimensat",	lx_utimensat,		0,		4}, /* 280 */
 	{"epoll_pwait",	lx_epoll_pwait,		0,		5}, /* 281 */
 	{"signalfd",	NULL,			NOSYS_NULL,	0}, /* 282 */
-	{"timerfd_create", NULL,		NOSYS_NULL,	0}, /* 283 */
+	{"timerfd_create", lx_timerfd_create,	0,		2}, /* 283 */
 	{"eventfd",	lx_eventfd,		0,		1}, /* 284 */
 	{"fallocate",	NULL,			NOSYS_NULL,	0}, /* 285 */
-	{"timerfd_settime", NULL,		NOSYS_NULL,	0}, /* 286 */
-	{"timerfd_gettime", NULL,		NOSYS_NULL,	0}, /* 287 */
+	{"timerfd_settime", lx_timerfd_settime,	0,		4}, /* 286 */
+	{"timerfd_gettime", lx_timerfd_gettime,	0,		2}, /* 287 */
 	{"accept4",	lx_accept4,		0,		4}, /* 288 */
 	{"signalfd4",	NULL,			NOSYS_NULL,	0}, /* 289 */
 	{"eventfd2",	lx_eventfd2,		0,		2}, /* 290 */
@@ -1761,11 +1761,11 @@ static struct lx_sysent sysents[] = {
 	{"epoll_pwait",	lx_epoll_pwait, 0,		5},	/* 319 */
 	{"utimensat",	lx_utimensat,	0,		4},	/* 320 */
 	{"signalfd",	NULL,		NOSYS_NULL,	0},	/* 321 */
-	{"timerfd_create", NULL,	NOSYS_NULL,	0},	/* 322 */
+	{"timerfd_create", lx_timerfd_create, 0,	2},	/* 322 */
 	{"eventfd",	lx_eventfd,	0,		1},	/* 323 */
 	{"fallocate",	NULL,		NOSYS_NULL,	0},	/* 324 */
-	{"timerfd_settime", NULL,	NOSYS_NULL,	0},	/* 325 */
-	{"timerfd_gettime", NULL,	NOSYS_NULL,	0},	/* 326 */
+	{"timerfd_settime", lx_timerfd_settime,	0,	4},	/* 325 */
+	{"timerfd_gettime", lx_timerfd_gettime,	0,	2},	/* 326 */
 	{"signalfd4",	NULL,		NOSYS_NULL,	0},	/* 327 */
 	{"eventfd2",	lx_eventfd2,	0,		2},	/* 328 */
 	{"epoll_create1", lx_epoll_create1, 0,		1},	/* 329 */
