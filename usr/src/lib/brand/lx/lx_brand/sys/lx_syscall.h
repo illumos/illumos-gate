@@ -352,6 +352,10 @@ extern long lx_stime(const time_t *);
 extern long lx_symlink(const char *, const char *);
 extern long lx_syslog(int, char *, int);
 extern long lx_sysinfo32(uintptr_t);
+extern long lx_timerfd_create(int, int);
+extern long lx_timerfd_settime(int, int,
+    const struct itimerspec *, struct itimerspec *);
+extern long lx_timerfd_gettime(int, struct itimerspec *);
 extern long lx_umask(mode_t);
 extern long lx_utimes(const char *, const struct timeval *);
 extern long lx_write(int, const void *, size_t);

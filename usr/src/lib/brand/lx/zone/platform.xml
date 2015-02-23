@@ -79,6 +79,7 @@
 	<device match="random" />
 	<device match="tcp" />
 	<device match="tcp6" />
+	<device match="timerfd" />
 	<device match="tty" />
 	<device match="udp" />
 	<device match="udp6" />
