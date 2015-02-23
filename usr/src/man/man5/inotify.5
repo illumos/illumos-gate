@@ -281,9 +281,9 @@ instance can be determined via a \fBFIONREAD\fR \fBioctl\fR(2).
 
 While a best effort has been made to mimic the Linux semantics, there
 remains a fundamental difference with respect to hard links:  on Linux,
-if a file has multiple hard links to it, a notification on watched
+if a file has multiple hard links to it, a notification on a watched
 directory or file will be received if and only if that event was received
-via a watched directory or file.  For events that are induced by open files
+via the watched path.  For events that are induced by open files
 (such as \fBIN_MODIFY\fR), these semantics seem peculiar:  the watched
 file is in fact changing, but because it is not changing via the watched
 path, no notification is received.  By contrast, the implementation here
