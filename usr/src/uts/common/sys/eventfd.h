@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright (c) 2014 Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2015 Joyent, Inc.  All rights reserved.
  */
 
 /*
@@ -55,7 +55,7 @@ extern int eventfd_write(int, eventfd_t);
 
 #else
 
-#define	EVENTFDMNRN_INOTIFY	0
+#define	EVENTFDMNRN_EVENTFD	0
 #define	EVENTFDMNRN_CLONE	1
 #define	EVENTFD_VALMAX		(ULLONG_MAX - 1ULL)
 

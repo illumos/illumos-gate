@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2015, Joyent, Inc.  All rights reserved.
  */
 
 #include <sys/eventfd.h>
@@ -26,8 +26,10 @@ eventfd(unsigned int initval, int flags)
 	uint64_t val = initval;
 	int fd;
 
-	if (flags & ~(EFD_NONBLOCK | EFD_CLOEXEC | EFD_SEMAPHORE))
-		return (EINVAL);
+	if (flags & ~(EFD_NONBLOCK | EFD_CLOEXEC | EFD_SEMAPHORE)) {
+		errno = EINVAL;
+		return (-1);
+	}
 
 	if (flags & EFD_NONBLOCK)
 		oflags |= O_NONBLOCK;

@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright (c) 2014 Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2015 Joyent, Inc.  All rights reserved.
  */
 
 /*
@@ -57,7 +57,7 @@ eventfd_open(dev_t *devp, int flag, int otyp, cred_t *cred_p)
 	major_t major = getemajor(*devp);
 	minor_t minor = getminor(*devp);
 
-	if (minor != EVENTFDMNRN_INOTIFY)
+	if (minor != EVENTFDMNRN_EVENTFD)
 		return (ENXIO);
 
 	mutex_enter(&eventfd_lock);
@@ -278,7 +278,7 @@ eventfd_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	}
 
 	if (ddi_create_minor_node(devi, "eventfd", S_IFCHR,
-	    EVENTFDMNRN_INOTIFY, DDI_PSEUDO, NULL) == DDI_FAILURE) {
+	    EVENTFDMNRN_EVENTFD, DDI_PSEUDO, NULL) == DDI_FAILURE) {
 		cmn_err(CE_NOTE, "/dev/eventfd couldn't create minor node");
 		ddi_soft_state_fini(&eventfd_softstate);
 		mutex_exit(&eventfd_lock);
