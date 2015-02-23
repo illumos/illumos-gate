@@ -22,7 +22,7 @@
 # Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 # Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2012 by Delphix. All rights reserved.
-# Copyright (c) 2012, Joyent, Inc. All rights reserved.
+# Copyright 2015, Joyent, Inc.
 # Copyright (c) 2013 Gary Mills
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 
@@ -165,6 +165,7 @@ SUBDIRS += \
 	libmvec		\
 	libvnd		\
 	libidspace	\
+	varpd		\
 	libbunyan
 
 SUBDIRS += \
@@ -574,7 +575,7 @@ libdevinfo:	libnvpair libsec
 libdhcpagent:	libsocket libdhcputil libuuid libdlpi libcontract
 libdhcputil:	libnsl libgen libinetutil libdlpi
 libdladm:	libdevinfo libinetutil libsocket libscf librcm libnvpair \
-		libexacct libnsl libkstat libcurses
+		libexacct libnsl libkstat libcurses varpd
 libdll: 	libast
 libdlpi:	libinetutil libdladm
 libds:		libsysevent
@@ -673,6 +674,8 @@ libbunyan:	libnvpair
 
 
 $(INTEL_BUILD)libdiskmgt:libfdisk
+varpd:		libavl libidspace libumem libnsl libnvpair libmd5 librename \
+		libbunyan libcmdutils
 
 #
 # The reason this rule checks for the existence of the

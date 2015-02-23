@@ -10,11 +10,11 @@
  */
 
 /*
- * Copyright 2014 Joyent, Inc.  All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  */
 
-#ifndef	_SYS_SCSI_ADAPTERS_MPTHASH_H
-#define	_SYS_SCSI_ADAPTERS_MPTHASH_H
+#ifndef	_SYS_REFHASH_H
+#define	_SYS_REFHASH_H
 
 #include <sys/types.h>
 #include <sys/list.h>
@@ -58,4 +58,4 @@ extern void *refhash_first(refhash_t *);
 extern void *refhash_next(refhash_t *, void *);
 extern boolean_t refhash_obj_valid(refhash_t *hp, const void *);
 
-#endif	/* _SYS_SCSI_ADAPTERS_MPTHASH_H */
+#endif	/* _SYS_REFHASH_H */

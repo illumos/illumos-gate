@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
+ * Copyright 2015, Joyent, Inc.
  */
 
 #ifndef	_SYS_MAC_H
@@ -100,6 +100,14 @@ typedef struct mac_propval_uint32_range_s {
 } mac_propval_uint32_range_t;
 
 /*
+ * Defines ranges which are a series of C style strings.
+ */
+typedef struct mac_propval_str_range_s {
+	uint32_t mpur_nextbyte;
+	char mpur_data[1];
+} mac_propval_str_range_t;
+
+/*
  * Data type of property values.
  */
 typedef enum {
@@ -119,6 +127,7 @@ typedef struct mac_propval_range_s {
 	mac_propval_type_t mpr_type;		/* type of value */
 	union {
 		mac_propval_uint32_range_t mpr_uint32[1];
+		mac_propval_str_range_t mpr_str;
 	} u;
 } mac_propval_range_t;
 

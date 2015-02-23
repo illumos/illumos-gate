@@ -422,6 +422,9 @@ CHKHDRS=			\
 	ontrap.h		\
 	open.h			\
 	openpromio.h		\
+	overlay.h		\
+	overlay_common.h	\
+	overlay_target.h	\
 	panic.h			\
 	param.h			\
 	pathconf.h		\
@@ -655,6 +658,7 @@ CHKHDRS=			\
 	vuid_queue.h		\
 	vuid_state.h		\
 	vuid_store.h		\
+	vxlan.h			\
 	wait.h			\
 	waitq.h			\
 	wanboot_impl.h		\

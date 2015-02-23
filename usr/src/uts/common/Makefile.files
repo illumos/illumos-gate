@@ -281,6 +281,7 @@ GENUNIX_OBJS +=	\
 		rctl.o		\
 		rctlsys.o	\
 		readlink.o	\
+		refhash.o	\
 		refstr.o	\
 		rename.o	\
 		resolvepath.o	\
@@ -682,6 +683,11 @@ NET80211_OBJS += net80211.o net80211_proto.o net80211_input.o \
 		 net80211_ht.o
 
 VNIC_OBJS +=	vnic_ctl.o vnic_dev.o
+
+OVERLAY_OBJS +=	overlay.o overlay_fm.o overlay_mux.o overlay_plugin.o \
+		overlay_prop.o overlay_target.o
+
+OVERLAY_VXLAN_OBJS +=	overlay_vxlan.o
 
 VND_OBJS +=	vnd.o frameio.o
 
@@ -1876,7 +1882,7 @@ ZYD_OBJS += zyd.o zyd_usb.o zyd_hw.o zyd_fw.o
 
 MXFE_OBJS += mxfe.o
 
-MPTSAS_OBJS += mptsas.o mptsas_hash.o mptsas_impl.o mptsas_init.o \
+MPTSAS_OBJS += mptsas.o mptsas_impl.o mptsas_init.o \
 		mptsas_raid.o mptsas_smhba.o
 
 SFE_OBJS += sfe.o sfe_util.o

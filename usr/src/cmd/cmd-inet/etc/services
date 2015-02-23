@@ -1,6 +1,7 @@
 #
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright 2015 Joyent, Inc.
 #
 # CDDL HEADER START
 #
@@ -215,6 +216,8 @@ krb5_prop	754/tcp				# Kerberos V5 KDC propogation
 swat		901/tcp				# Samba Web Adm.Tool
 ufsd		1008/tcp	ufsd		# UFS-aware server
 ufsd		1008/udp	ufsd
+portolan	1296/tcp			# Portolan
+svp-underlay	1339/tcp			# SDC VXLAN underlay invalidation
 cvc		1495/tcp			# Network Console
 ingreslock	1524/tcp
 www-ldap-gw	1760/tcp			# HTTP to LDAP gateway

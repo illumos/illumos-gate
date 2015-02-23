@@ -21,6 +21,7 @@
 /*
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2015, Joyent, Inc.
  */
 
 #ifndef _SYS_KSOCKET_H_
@@ -120,6 +121,10 @@ extern int	ksocket_setcallbacks(ksocket_t, ksocket_callbacks_t *, void *,
 extern int 	ksocket_close(ksocket_t, struct cred *);
 extern void	ksocket_hold(ksocket_t);
 extern void	ksocket_rele(ksocket_t);
+
+typedef boolean_t (*ksocket_krecv_f)(ksocket_t, mblk_t *, size_t, int, void *);
+extern int	ksocket_krecv_set(ksocket_t, ksocket_krecv_f, void *);
+extern void	ksocket_krecv_unblock(ksocket_t);
 
 #ifdef	__cplusplus
 }

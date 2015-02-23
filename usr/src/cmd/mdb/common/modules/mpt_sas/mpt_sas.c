@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright 2014 Joyent, Inc.  All rights reserved.
+ * Copyright 2015 Joyent, Inc.  All rights reserved.
  * Copyright (c) 2014, Tegile Systems Inc. All rights reserved.
  */
 
@@ -34,6 +34,7 @@
 #include <sys/sunmdi.h>
 #include <sys/list.h>
 #include <sys/scsi/scsi.h>
+#include <sys/refhash.h>
 
 #pragma pack(1)
 #include <sys/scsi/adapters/mpt_sas/mpi/mpi2_type.h>
@@ -47,7 +48,6 @@
 #pragma pack()
 
 #include <sys/scsi/adapters/mpt_sas/mptsas_var.h>
-#include <sys/scsi/adapters/mpt_sas/mptsas_hash.h>
 
 struct {
 	int	value;

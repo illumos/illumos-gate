@@ -10,15 +10,17 @@
  */
 
 /*
- * Copyright 2014 Joyent, Inc.  All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  */
 
-#include <sys/scsi/adapters/mpt_sas/mptsas_hash.h>
+#include <sys/refhash.h>
 #include <sys/sysmacros.h>
 #include <sys/types.h>
 #include <sys/kmem.h>
 #include <sys/list.h>
 #include <sys/ddi.h>
+
+#define	RHL_F_DEAD	0x01
 
 #ifdef lint
 extern refhash_link_t *obj_to_link(refhash_t *, void *);

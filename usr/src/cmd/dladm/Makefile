@@ -21,6 +21,7 @@
 #
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright 2015 Joyent, Inc.
 #
 
 PROG= dladm
@@ -35,7 +36,7 @@ include ../Makefile.cmd
 XGETFLAGS += -a -x $(PROG).xcl
 LDLIBS += -L$(ROOT)/lib -lsocket
 LDLIBS += -ldladm -ldlpi -lkstat -lsecdb -lbsm -linetutil -ldevinfo
-LDLIBS += $(ZLAZYLOAD) -lrstp $(ZNOLAZYLOAD)
+LDLIBS += $(ZLAZYLOAD) -lrstp $(ZNOLAZYLOAD) -lnsl -lumem -lcmdutils
 
 CERRWARN += -_gcc=-Wno-switch
 CERRWARN += -_gcc=-Wno-unused-label

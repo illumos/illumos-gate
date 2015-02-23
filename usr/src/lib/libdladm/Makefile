@@ -20,6 +20,7 @@
 #
 #
 # Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2015, Joyent, Inc.
 #
 #
 
@@ -29,7 +30,7 @@ HDRS =		libdladm.h libdladm_impl.h libdllink.h libdlaggr.h	\
 		libdlwlan.h libdlwlan_impl.h libdlvnic.h libdlvlan.h	\
 		libdlmgmt.h libdlflow.h libdlflow_impl.h libdlstat.h	\
 		libdlether.h libdlsim.h libdlbridge.h libdliptun.h	\
-		libdlib.h
+		libdlib.h libdloverlay.h
 
 HDRDIR =	common
 
@@ -50,6 +51,14 @@ MSGFILES =	common/libdladm.c common/linkprop.c common/secobj.c	\
 
 XGETFLAGS =     -a -x libdladm.xcl
 
+TYPECHECK_LIB =	libdladm.so.1
+TYPELIST =	overlay_ioc_create_t \
+		overlay_ioc_activate_t \
+		overlay_ioc_delete_t \
+		overlay_ioc_nprops_t \
+		overlay_ioc_propinfo_t \
+		overlay_ioc_prop_t
+
 all :=		TARGET = all
 clean :=	TARGET = clean
 clobber :=	TARGET = clobber
@@ -62,7 +71,7 @@ all clean clobber install lint: $(SUBDIRS)
 
 install_h:	$(ROOTHDRS)
 
-check:		$(CHECKHDRS)
+check:		$(CHECKHDRS) $(TYPECHECK)
 
 $(POFILE):	pofile_MSGFILES
 

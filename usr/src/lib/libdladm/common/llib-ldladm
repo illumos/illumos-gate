@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  */
 
 /*LINTLIBRARY*/
@@ -38,3 +39,4 @@
 #include <libdlether.h>
 #include <libdlsim.h>
 #include <libdlbridge.h>
+#include <libdloverlay.h>

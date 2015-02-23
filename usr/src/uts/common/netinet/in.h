@@ -3,6 +3,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2015, Joyent, Inc.
  */
 /*
  * Copyright (c) 1982, 1986 Regents of the University of California.
@@ -225,6 +226,7 @@ typedef	uint16_t	sa_family_t;
 #define	IPPORT_SLP		427
 #define	IPPORT_MIP		434
 #define	IPPORT_SMB		445		/* a.k.a. microsoft-ds */
+#define	IPPORT_VXLAN		4789
 
 /*
  * Internet Key Exchange (IKE) ports

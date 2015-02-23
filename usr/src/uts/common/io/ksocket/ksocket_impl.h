@@ -22,11 +22,17 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2015, Joyent, Inc.
  */
 
 #ifndef	_INET_KSOCKET_KSOCKET_IMPL_H
 #define	_INET_KSOCKET_KSOCKET_IMPL_H
 
+/*
+ * Note that if this relationship ever changes, the logic in ksocket_krecv_set
+ * must be updated and we must maintain local state about this on whatever the
+ * new ksocket object is.
+ */
 #define	KSTOSO(ks)	((struct sonode *)(ks))
 #define	SOTOKS(so)	((ksocket_t)(uintptr_t)(so))
 

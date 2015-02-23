@@ -434,6 +434,7 @@ COMMON_SUBDIRS=		\
 	utmp_update	\
 	utmpd		\
 	valtools	\
+	varpd		\
 	vgrind		\
 	vi		\
 	vndadm		\

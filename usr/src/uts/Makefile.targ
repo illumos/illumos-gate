@@ -20,6 +20,7 @@
 #
 #
 # Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2015, Joyent, Inc.
 #
 #	This Makefiles contains the common targets and definitions for
 #	all kernels. It is to be included in the Makefiles for specific
@@ -203,6 +204,9 @@ $(ROOT_FONT_DIR)/%:	$(OBJS_DIR)/% $(ROOT_MOD_DIR) $(ROOT_FONT_DIR) FRC
 	$(INS.file)
 
 $(ROOT_MAC_DIR)/%:	$(OBJS_DIR)/% $(ROOT_MOD_DIR) $(ROOT_MAC_DIR) FRC
+	$(INS.file)
+
+$(ROOT_OVERLAY_DIR)/%:	$(OBJS_DIR)/% $(ROOT_MOD_DIR) $(ROOT_OVERLAY_DIR) FRC
 	$(INS.file)
 
 $(USR_DRV_DIR)/%:	$(OBJS_DIR)/% $(USR_DRV_DIR) FRC

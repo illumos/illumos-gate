@@ -718,6 +718,12 @@ MAC_KMODS	+= mac_wifi
 MAC_KMODS	+= mac_ib
 
 #
+#	Overlay related modules (/kernel/overlay)
+#
+DRV_KMODS	+= overlay
+OVERLAY_KMODS	+= vxlan
+
+#
 # socketmod (kernel/socketmod)
 #
 SOCKET_KMODS	+= sockpfp
