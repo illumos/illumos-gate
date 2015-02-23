@@ -209,7 +209,7 @@ retry:
 		 * Commit the string we read to the buffer.
 		 */
 		pos += j + 1;
-		if (!found_nul) {
+		if (!found_nul && pos < bufsz) {
 			/*
 			 * A NUL terminator was not found; add one.
 			 */
