@@ -178,6 +178,14 @@ dladm \- administer data links
 
 .LP
 .nf
+\fBdladm create-overlay\fR [\fB-t\fR] \fB-e\fR \fIencap\fR \fB-s\fR \fIsearch\fR \fB-v\fR \fIvnetid\fR [\fB-p\fR \fIprop\fR=\fIvalue\fR[,...]] \fIoverlay\fR
+\fBdladm delete-overlay\fR \fIoverlay\fR
+\fBdladm modify-overlay\fR \fB-d\fR \fImac\fR | \fB-f\fR | \fB-s\fR \fImac=ip:port\fR \fIoverlay\fR
+\fBdladm show-overlay\fR [ \fB-f\fR | \fB-t\fR ] [[\fB-p\fR] \fB-o\fR \fIfield\fR[,...]] [\fIoverlay\fR]
+.fi
+
+.LP
+.nf
 \fBdladm show-usage\fR [\fB-a\fR] \fB-f\fR \fIfilename\fR [\fB-p\fR \fIplotfile\fR \fB-F\fR \fIformat\fR] [\fB-s\fR \fItime\fR]
      [\fB-e\fR \fItime\fR] [\fIlink\fR]
 .fi
@@ -264,9 +272,9 @@ A WiFi datalink.
 .ad
 .sp .6
 .RS 4n
-A virtual network interface created on a link or an \fBetherstub\fR. It is a
-pseudo device that can be treated as if it were an network interface card on a
-machine.
+A virtual network interface created on a link, an \fBetherstub\fR, or \fBan
+overlay\fR. It is a pseudo device that can be treated as if it were an network
+interface card on a machine.
 .RE
 
 .sp
@@ -332,6 +340,20 @@ A secure object, identified by an administratively-chosen name. The name can
 use any alphanumeric characters, as well as underscore (\fB_\fR), period
 (\fB\&.\fR), and hyphen (\fB-\fR). A secure object name can be at most 32
 characters.
+.RE
+
+.sp
+.ne 2
+.na
+.B overlay
+.ad
+.sp .6
+.RS 4n
+An overlay instance, identified by an administratively-chosen name. An overlay
+can be used to create or join an existing software defined network.
+VNICs created on an overlay will appear to be connected by a local virtual
+switch and will also be connected to interfaces on matching overlays provided by
+other hosts. For more information on overlay devices, see \fBoverlay\fR(5).
 .RE
 
 .SS "Options"
@@ -4370,6 +4392,348 @@ The tunnel destination address.
 .sp
 .ne 2
 .na
+\fBdladm create-overlay\fR \fB-e\fR \fIencap\fR \fB-s\fR \fIsearch\fR
+\fB-v\fR \fIvnetid\fR [\fB-p\fR \fIprop\fR=\fIvalue\fR[,...]] \fIoverlay\fR
+.ad
+.sp .6
+.RS 4n
+Create an overlay device named \fIoverlay\fR.
+.sp
+Overlay devices are similar to etherstubs. VNICs can be created on top
+of them. However, unlike an etherstub which is local to the system, an
+overlay device can be configured to communicate to remote hosts,
+providing a means for network virtualization. The way in which it does
+this is described by the encapsulation module and the search plugin. For
+more information on these, see \fBoverlay\fR(5).
+.sp
+An overlay device has a series of required and optional properties.  These
+properties vary based upon the search and encapsulation modules and are fully
+specified in \fBoverlay\fR(5). Not every property needs to be specified - some
+have default values which will be used if nothing specific is specified. For
+example, the default port for VXLAN comes from its IANA standard. If a
+required property is missing, the command will fail and inform you of the
+missing properties.
+.sp
+.ne 2
+.na
+\fB\fB-t\fR, \fB--temporary\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies that the overlay is temporary. Temporary overlays last until
+the next reboot.
+.RE
+
+.sp
+.ne 2
+.na
+\fB-e\fR \fIencap\fR, \fB--encap\fR=\fIencap\fR
+.ad
+.sp .6
+.RS 4n
+Use \fIencap\fR as the encapsulation plugin for the overlay device
+\fIoverlay\fR. The encapsulation plugin determines how packets are transformed
+before being put on the wire.
+.RE
+
+.sp
+.ne 2
+.na
+\fB-s\fR \fIsearch\fR, \fB--search\fR=\fIsearch\fR
+.ad
+.sp .6
+.RS 4n
+Use \fIsearch\fR as the search plugin for \fIoverlay\fR. The search plugin
+determines how non-local targets are found and where packets are directed to.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-p\fR \fIprop\fR=\fIvalue\fR,..., \fB--prop\fR
+\fIprop\fR=\fIvalue\fR,...\fR
+.ad
+.sp .6
+.RS 4n
+A comma-separated list of properties to set to the specified values.
+.RE
+
+.sp
+.ne 2
+.na
+\fB-v\fR \fIvnetid\fR, \fB--vnetid\fR=\fIvnetid\fR
+.ad
+.sp .6
+.RS 4n
+Sets the virtual networking identifier to \fIvnetid\fR. A virtual network
+identifier determines is similar to a VLAN identifier, in that it identifies a
+unique virtual network. All overlay devices on the system share the same space
+for the virtual network identifier. However, the valid range of identifiers is
+determined by the encapsulation plugin specified by \fB-e\fR.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fBdladm delete-overlay\fR \fIoverlay\fR
+.ad
+.sp .6
+.RS 4n
+Delete the specified overlay. This will fail if there are VNICs on top of the
+device.
+.RE
+
+.sp
+.ne 2
+.na
+\fBdladm modify-overlay\fR \fB-d\fR \fImac\fR | \fB-f\fR | \fB-s\fR \fImac=ip:port\fR \fIoverlay\fR
+.ad
+.sp .6
+.RS 4n
+Modifies the target tables for the specified overlay.
+.sp
+The different options allow for different ways of modifying the target table.
+One of \fB-d\fR, \fB-f\fR, and \fB-s\fR is required. This is not applicable for
+all kinds of overlay devices. For more information, see \fBoverlay\fR(5).
+.sp
+.ne 2
+.na
+\fB-d\fR \fImac\fR, \fB--delete-entry\fR=\fImac\fR
+.ad
+.sp .6
+.RS 4n
+Deletes the entry for \fImac\fR from the target table for \fIoverlay\fR. Note,
+if a lookup is pending or outstanding, this does not cancel it or stop it from
+updating the value.
+.RE
+
+.sp
+.ne 2
+.na
+\fB-f\fR, \fB--flush-table\fR
+.ad
+.sp .6
+.RS 4n
+Flushes all values in the target table for \fIoverlay\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB-s\fR \fImac\fR=\fIvalue\fR, \fB--set-entry\fR=\fImac\fR=\fIvalue\fR
+.ad
+.sp .6
+.RS 4n
+Sets the value of \fIoverlay\fR's target table entry for \fImac\fR to the
+specified value. The specified value varies upon the encapsulation plugin. The
+value may be a combination of a MAC address, IP address, and port. Generally,
+this looks like [\fImac\fR,][\fIIP\fR:][\fIport\fR]. If a component is the last
+one, then there is no need for a separator. eg. if just the MAC address or IP
+is needed, it would look like \fImac\fR and \fIIP\fR respectively.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fBdladm show-overlay\fR [ \fB-f\fR | \fB-t\fR ] [[\fB-p\fR] \fB-o\fR \fIfield\fR[,...]] [\fIoverlay\fR]
+.ad
+.sp .6
+.RS 4n
+Shows overlay configuration (the default), internal target tables (\fB-t\fR), or
+the FMA state (\fB-f\fR), either for all overlays or the specified overlay.
+.sp
+By default (with neither \fB-f\fR or \fB-t\fR specified), the following fields
+will be displayed:
+.sp
+.ne 2
+.na
+\fB\fBLINK\fR\fR
+.ad
+.sp .6
+.RS 4n
+The name of the overlay.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBPROPERTY\fR\fR
+.ad
+.sp .6
+.RS 4n
+The name of the property.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBPERM\fR\fR
+.ad
+.sp .6
+.RS 4n
+The read/write permissions of the property. The value shown is one of \fBr-\fR
+or \fBrw\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBVALUE\fR\fR
+.ad
+.sp .6
+.RS 4n
+The current  property value. If the value is not set, it is shown as \fB--\fR.
+If it is unknown, the value is shown as \fB?\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBDEFAULT\fR\fR
+.ad
+.sp .6
+.RS 4n
+The default value of the property. If the property has no default value,
+\fB--\fR is shown.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBPOSSIBLE\fR\fR
+.ad
+.sp .6
+.RS 4n
+A comma-separated list of the values the property can have. If the values span
+a numeric range, \fImin\fR - \fImax\fR might be shown as shorthand. If the
+possible values are unknown or unbounded, \fB--\fR is shown.
+.RE
+
+.sp
+When the \fB-f\fR option is displayed, the following fields will be displayed:
+.sp
+.ne 2
+.na
+\fB\fBLINK\fR\fR
+.ad
+.sp .6
+.RS 4n
+The name of the overlay.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBSTATUS\fR\fR
+.ad
+.sp .6
+.RS 4n
+Either \fBONLINE\fR or \fBDEGRADED\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBDETAILS\fR\fR
+.ad
+.sp .6
+.RS 4n
+When the \fBoverlay\fR's status is \fBONLINE\fR, then this has the value
+\fB--\fR. Otherwise, when it is \fBDEGRADED\fR, this field provides a more
+detailed explanation as to why it's degraded.
+.RE
+
+.sp
+When the \fB-t\fR option is displayed, the following fields will be displayed:
+.sp
+.ne 2
+.na
+\fB\fBLINK\fR\fR
+.ad
+.sp .6
+.RS 4n
+The name of the overlay.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBTARGET\fR\fR
+.ad
+.sp .6
+.RS 4n
+The target MAC address of a table entry.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBDESTINATION\fR\fR
+.ad
+.sp .6
+.RS 4n
+The address that an encapsulated packet will be sent to when a packet has the
+address specified by \fBTARGET\fR.
+.RE
+
+The \fBshow-overlay\fR command supports the following options:
+
+.sp
+.ne 2
+.na
+\fB-f\fR, \fB--fma\fR
+.ad
+.sp .6
+.RS 4n
+Displays information about an overlay device's FMA state. For more
+information on the target table, see \fBoverlay\fR(5).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-o\fR \fIfield\fR[,...], \fB--output\fR=\fIfield\fR\fR
+.ad
+.sp .6
+.RS 4n
+A case-insensitive, comma-separated list of output fields to display. The field
+name must be one of the fields listed above, or the special value \fBall\fR, to
+display all fields. The fields applicable to the \fB-o\fR option are limited to
+those listed under each output mode. For example, if using \fB-L\fR, only the
+fields listed under \fB-L\fR, above, can be used with \fB-o\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-p\fR, \fB--parsable\fR\fR
+.ad
+.sp .6
+.RS 4n
+Display using a stable machine-parsable format. The \fB-o\fR option is
+required with \fB-p\fR. See "Parsable Output Format", below.
+.RE
+
+.sp
+.ne 2
+.na
+\fB-t\fR, \fB--target\fR
+.ad
+.sp .6
+.RS 4n
+Displays information about an overlay device's target table. For more
+information on the target table, see \fBoverlay\fR(5).
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
 \fB\fBdladm show-usage\fR [\fB-a\fR] \fB-f\fR \fIfilename\fR [\fB-p\fR
 \fIplotfile\fR \fB-F\fR \fIformat\fR] [\fB-s\fR \fItime\fR] [\fB-e\fR
 \fItime\fR] [\fIlink\fR]\fR
@@ -5606,7 +5970,7 @@ Interface Stability	Committed
 .SH SEE ALSO
 \fBacctadm\fR(1M), \fBautopush\fR(1M), \fBifconfig\fR(1M), \fBipsecconf\fR(1M),
 \fBndd\fR(1M), \fBpsrset\fR(1M), \fBwpad\fR(1M), \fBzonecfg\fR(1M),
-\fBattributes\fR(5), \fBieee802.3\fR(5), \fBdlpi\fR(7P)
+\fBattributes\fR(5), \fBieee802.3\fR(5), \fBoverlay\fR(5), \fBdlpi\fR(7P)
 .SH NOTES
 The preferred method of referring to an aggregation in the aggregation
 subcommands is by its link name. Referring to an aggregation by its integer

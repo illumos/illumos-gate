@@ -609,6 +609,7 @@ struct mac_impl_s {
 #define	MIS_LEGACY		0x0040
 #define	MIS_NO_ACTIVE		0x0080
 #define	MIS_POLL_DISABLE	0x0100
+#define	MIS_IS_OVERLAY		0x0200
 
 #define	mi_getstat	mi_callbacks->mc_getstat
 #define	mi_start	mi_callbacks->mc_start

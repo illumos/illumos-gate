@@ -705,6 +705,11 @@ NET80211_OBJS += net80211.o net80211_proto.o net80211_input.o \
 
 VNIC_OBJS +=	vnic_ctl.o vnic_dev.o
 
+OVERLAY_OBJS +=	overlay.o overlay_fm.o overlay_mux.o overlay_plugin.o \
+		overlay_prop.o overlay_target.o
+
+OVERLAY_VXLAN_OBJS +=	overlay_vxlan.o
+
 SIMNET_OBJS +=	simnet.o
 
 IB_OBJS +=	ibnex.o ibnex_ioctl.o ibnex_hca.o

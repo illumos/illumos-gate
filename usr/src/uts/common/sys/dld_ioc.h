@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  */
 
 #ifndef	_SYS_DLD_IOC_H
@@ -59,6 +60,7 @@ extern "C" {
 #define	IPTUN_IOC	0x454A
 #define	BRIDGE_IOC	0xB81D
 #define	IBPART_IOC	0x6171
+#define	OVERLAY_IOC	0x2005
 
 /* GLDv3 modules use these macros to generate unique ioctl commands */
 #define	DLDIOC(cmdid)		DLD_IOC_CMD(DLD_IOC, (cmdid))
@@ -68,6 +70,7 @@ extern "C" {
 #define	IPTUNIOC(cmdid)		DLD_IOC_CMD(IPTUN_IOC, (cmdid))
 #define	BRIDGEIOC(cmdid)	DLD_IOC_CMD(BRIDGE_IOC, (cmdid))
 #define	IBPARTIOC(cmdid)	DLD_IOC_CMD(IBPART_IOC, (cmdid))
+#define	OVERLAYIOC(cmdid)	DLD_IOC_CMD(OVERLAY_IOC, (cmdid))
 
 #ifdef _KERNEL
 

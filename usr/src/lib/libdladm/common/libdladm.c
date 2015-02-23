@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2015, Joyent, Inc.
  */
 
 /*
@@ -37,6 +38,9 @@
 #include <strings.h>
 #include <dirent.h>
 #include <stdlib.h>
+#include <assert.h>
+#include <stdio.h>
+#include <stdarg.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <sys/param.h>
@@ -440,6 +444,9 @@ dladm_status2str(dladm_status_t status, char *buf)
 	case DLADM_STATUS_PERSIST_ON_TEMP:
 		s = "can't create persistent object on top of temporary object";
 		break;
+	case DLADM_STATUS_BAD_ENCAP:
+		s = "invalid encapsulation protocol";
+		break;
 	default:
 		s = "<unknown error>";
 		break;
@@ -671,6 +678,9 @@ dladm_class2str(datalink_class_t class, char *buf)
 		break;
 	case DATALINK_CLASS_PART:
 		s = "part";
+		break;
+	case DATALINK_CLASS_OVERLAY:
+		s = "overlay";
 		break;
 	default:
 		s = "unknown";
@@ -1157,15 +1167,15 @@ dladm_strs2range(char **prop_val, uint_t val_cnt, mac_propval_type_t type,
  * Convert a mac_propval_range_t structure into an array of elements.
  */
 dladm_status_t
-dladm_range2list(mac_propval_range_t *rangep, void *elem, uint_t *nelem)
+dladm_range2list(const mac_propval_range_t *rangep, void *elem, uint_t *nelem)
 {
 	int		i, j, k;
 	dladm_status_t	status = DLADM_STATUS_OK;
 
 	switch (rangep->mpr_type) {
 	case MAC_PROPVAL_UINT32: {
-		mac_propval_uint32_range_t	*ur;
-		uint32_t			*elem32 = elem;
+		const mac_propval_uint32_range_t	*ur;
+		uint32_t				*elem32 = elem;
 
 		k = 0;
 		ur = &rangep->mpr_range_uint32[0];
@@ -1193,13 +1203,13 @@ dladm_range2list(mac_propval_range_t *rangep, void *elem, uint_t *nelem)
  * of single elements or ranges.
  */
 int
-dladm_range2strs(mac_propval_range_t *rangep, char **prop_val)
+dladm_range2strs(const mac_propval_range_t *rangep, char **prop_val)
 {
 	int	i;
 
 	switch (rangep->mpr_type) {
 	case MAC_PROPVAL_UINT32: {
-		mac_propval_uint32_range_t	*ur;
+		const mac_propval_uint32_range_t	*ur;
 
 		/* Write ranges and individual elements */
 		ur = &rangep->mpr_range_uint32[0];
@@ -1213,6 +1223,20 @@ dladm_range2strs(mac_propval_range_t *rangep, char **prop_val)
 				(void) snprintf(prop_val[i], DLADM_PROP_VAL_MAX,
 				    "%u-%u", ur->mpur_min, ur->mpur_max);
 			}
+		}
+		return (0);
+	}
+	case MAC_PROPVAL_STR: {
+		const mac_propval_str_range_t	*str;
+		size_t				coff, len;
+
+		coff = 0;
+		str = &rangep->u.mpr_str;
+		for (i = 0; i < rangep->mpr_count; i++) {
+			len = strlen(&str->mpur_data[coff]);
+			(void) strlcpy(prop_val[i], &str->mpur_data[coff],
+			    DLADM_PROP_VAL_MAX);
+			coff += len + 1;
 		}
 		return (0);
 	}
@@ -1292,4 +1316,55 @@ dladm_list2range(void *elem, uint_t nelem, mac_propval_type_t type,
 	*range = rangep;
 
 	return (status);
+}
+
+void
+dladm_errlist_init(dladm_errlist_t *erl)
+{
+	bzero(erl, sizeof (dladm_errlist_t));
+}
+
+void
+dladm_errlist_reset(dladm_errlist_t *erl)
+{
+	uint_t i;
+
+	for (i = 0; i < erl->el_count; i++)
+		free(erl->el_errs[i]);
+	free(erl->el_errs);
+	dladm_errlist_init(erl);
+}
+
+dladm_status_t
+dladm_errlist_append(dladm_errlist_t *erl, const char *fmt, ...)
+{
+	int ret;
+	va_list ap;
+	char *m = NULL;
+
+	if (erl->el_count == erl->el_alloc) {
+		int alloc;
+		void *addr;
+		if (erl->el_alloc == 0) {
+			assert(erl->el_errs == NULL);
+			alloc = 32;
+		} else {
+			alloc = erl->el_alloc + 32;
+		}
+		addr = realloc(erl->el_errs, sizeof (char *) * alloc);
+		if (addr == NULL)
+			return (DLADM_STATUS_NOMEM);
+
+		erl->el_errs = addr;
+		erl->el_alloc = alloc;
+	}
+
+	va_start(ap, fmt);
+	ret = vasprintf(&m, fmt, ap);
+	va_end(ap);
+	if (ret == -1)
+		return (dladm_errno2status(errno));
+	erl->el_errs[erl->el_count] = m;
+	erl->el_count++;
+	return (DLADM_STATUS_OK);
 }

@@ -1,6 +1,7 @@
 #
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright 2015 Joyent, Inc.
 #
 # CDDL HEADER START
 #
@@ -33,7 +34,7 @@ systat		11/tcp		users
 daytime		13/tcp
 daytime		13/udp
 netstat		15/tcp
-qotd		17/tcp 				# Quote of the Day
+qotd		17/tcp				# Quote of the Day
 chargen		19/tcp		ttytst source
 chargen		19/udp		ttytst source
 ftp-data	20/tcp
@@ -80,7 +81,7 @@ imap3		220/tcp
 imap3		220/udp
 clearcase	371/tcp
 clearcase	371/udp
-ldap		389/tcp				# Lightweight Directory Access Protocol	
+ldap		389/tcp				# Lightweight Directory Access Protocol
 ldap		389/udp				# Lightweight Directory Access Protocol
 https		443/tcp
 https		443/udp
@@ -227,6 +228,7 @@ eklogin		2105/tcp			# Kerberos encrypted rlogin
 lockd		4045/udp			# NFS lock daemon/manager
 lockd		4045/tcp
 ipsec-nat-t	4500/udp			# IPsec NAT-Traversal
+vxlan		4789/udp			# Virtual eXtensible Local Area Network (VXLAN)
 mdns		5353/udp			# Multicast DNS
 mdns		5353/tcp
 vnc-server	5900/tcp			# VNC Server

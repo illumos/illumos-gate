@@ -20,6 +20,7 @@
 #
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright 2015 Joyent, Inc.
 #
 # Copyright (c) 2018, Joyent, Inc.
 
@@ -38,7 +39,7 @@ XGETFLAGS +=	-a -x $(PROG).xcl
 
 LDLIBS +=	-L$(ROOT)/lib -lsocket
 LDLIBS +=	-ldladm -ldlpi -lkstat -lsecdb -lbsm -lofmt -linetutil -ldevinfo
-LDLIBS +=	$(ZLAZYLOAD) -lrstp $(ZNOLAZYLOAD)
+LDLIBS +=	$(ZLAZYLOAD) -lrstp $(ZNOLAZYLOAD) -lnsl -lumem -lcustr
 
 CERRWARN +=	-_gcc=-Wno-switch
 CERRWARN +=	-_gcc=-Wno-unused-label

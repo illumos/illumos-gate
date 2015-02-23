@@ -22,7 +22,7 @@
  * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2014, OmniTI Computer Consulting, Inc. All rights reserved.
- * Copyright 2015, Joyent, Inc.
+ * Copyright 2018, Joyent, Inc.
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -388,7 +388,19 @@ udp_srcport_hash(mblk_t *mp, int type, uint16_t min, uint16_t max,
 	if (!IS_P2ALIGNED(mp->b_rptr, sizeof (uint16_t)))
 		return (def);
 
-	if (MBLKL(mp) < VXLAN_HDR_LEN) {
+	/*
+	 * The following logic is VXLAN specific to get at the header, if we
+	 * have formats, eg. GENEVE, then we should ignore this.
+	 *
+	 * The kernel overlay device often puts a first mblk_t for the data
+	 * which is just the encap. If so, then we're going to use that and try
+	 * to avoid a pull up.
+	 */
+	if (MBLKL(mp) == VXLAN_HDR_LEN) {
+		if (mp->b_cont == NULL)
+			return (def);
+		mp = mp->b_cont;
+	} else if (MBLKL(mp) < VXLAN_HDR_LEN) {
 		return (def);
 	} else {
 		szused = VXLAN_HDR_LEN;

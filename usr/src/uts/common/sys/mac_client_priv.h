@@ -188,6 +188,7 @@ extern void mac_client_set_intr_cpu(void *, mac_client_handle_t, int32_t);
 extern void *mac_get_devinfo(mac_handle_t);
 
 extern boolean_t mac_is_vnic(mac_handle_t);
+extern boolean_t mac_is_overlay(mac_handle_t);
 extern uint32_t mac_no_notification(mac_handle_t);
 
 extern int mac_set_prop(mac_handle_t, mac_prop_id_t, char *, void *, uint_t);

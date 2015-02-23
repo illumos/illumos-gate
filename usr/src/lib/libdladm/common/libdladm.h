@@ -23,6 +23,7 @@
  */
 
 /*
+ * Copyright 2015, Joyent, Inc.
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association
  */
 
@@ -179,7 +180,8 @@ typedef enum {
 	DLADM_STATUS_INVALID_PKEY_TBL_SIZE,
 	DLADM_STATUS_PORT_NOPROTO,
 	DLADM_STATUS_INVALID_MTU,
-	DLADM_STATUS_PERSIST_ON_TEMP
+	DLADM_STATUS_PERSIST_ON_TEMP,
+	DLADM_STATUS_BAD_ENCAP
 } dladm_status_t;
 
 typedef enum {
@@ -232,6 +234,12 @@ typedef struct dladm_arg_list {
 	uint_t			al_count;
 	char			*al_buf;
 } dladm_arg_list_t;
+
+typedef struct dladm_errlist {
+	uint_t		el_count;
+	uint_t		el_alloc;
+	char		**el_errs;
+} dladm_errlist_t;
 
 typedef enum {
 	DLADM_LOGTYPE_LINK = 1,
@@ -294,11 +302,14 @@ extern dladm_status_t	dladm_zone_halt(dladm_handle_t, zoneid_t);
 
 extern dladm_status_t	dladm_strs2range(char **, uint_t, mac_propval_type_t,
 			    mac_propval_range_t **);
-extern dladm_status_t	dladm_range2list(mac_propval_range_t *, void*,
+extern dladm_status_t	dladm_range2list(const mac_propval_range_t *, void *,
 			    uint_t *);
-extern int		dladm_range2strs(mac_propval_range_t *, char **);
+extern int		dladm_range2strs(const mac_propval_range_t *, char **);
 extern dladm_status_t	dladm_list2range(void *, uint_t, mac_propval_type_t,
 			    mac_propval_range_t **);
+
+extern void		dladm_errlist_init(dladm_errlist_t *);
+extern void		dladm_errlist_reset(dladm_errlist_t *);
 
 #ifdef	__cplusplus
 }

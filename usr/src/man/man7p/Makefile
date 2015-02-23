@@ -16,30 +16,31 @@
 
 include		$(SRC)/Makefile.master
 
-MANSECT= 	7p
+MANSECT=	7p
 
-MANFILES= 	arp.7p		\
-	 	dlpi.7p		\
-	 	icmp.7p		\
-	 	icmp6.7p	\
-	 	if_tcp.7p	\
-	 	inet.7p		\
-	 	inet6.7p	\
-	 	ip.7p		\
-	 	ip6.7p		\
-	 	ipsec.7p	\
-	 	ipsecah.7p	\
-	 	ipsecesp.7p	\
-	 	ndp.7p		\
-	 	pf_key.7p	\
-	 	rarp.7p		\
-	 	route.7p	\
-	 	routing.7p	\
-	 	sctp.7p		\
-	 	sip.7p		\
-	 	slp.7p		\
-	 	tcp.7p		\
-	 	udp.7p
+MANFILES=	arp.7p		\
+		dlpi.7p		\
+		icmp.7p		\
+		icmp6.7p	\
+		if_tcp.7p	\
+		inet.7p		\
+		inet6.7p	\
+		ip.7p		\
+		ip6.7p		\
+		ipsec.7p	\
+		ipsecah.7p	\
+		ipsecesp.7p	\
+		ndp.7p		\
+		pf_key.7p	\
+		rarp.7p		\
+		route.7p	\
+		routing.7p	\
+		sctp.7p		\
+		sip.7p		\
+		slp.7p		\
+		tcp.7p		\
+		udp.7p		\
+		vxlan.7p
 
 MANLINKS=	AH.7p		\
 		ARP.7p		\
@@ -51,7 +52,8 @@ MANLINKS=	AH.7p		\
 		SCTP.7p		\
 		TCP.7p		\
 		UDP.7p		\
-	 	if.7p
+		VXLAN.7p	\
+		if.7p
 
 ARP.7p		:= LINKSRC = arp.7p
 
@@ -67,13 +69,15 @@ ESP.7p		:= LINKSRC = ipsecesp.7p
 
 NDP.7p		:= LINKSRC = ndp.7p
 
-RARP.7p 	:= LINKSRC = rarp.7p
+RARP.7p		:= LINKSRC = rarp.7p
 
-SCTP.7p 	:= LINKSRC = sctp.7p
+SCTP.7p		:= LINKSRC = sctp.7p
 
 TCP.7p		:= LINKSRC = tcp.7p
 
 UDP.7p		:= LINKSRC = udp.7p
+
+VXLAN.7p	:= LINKSRC = vxlan.7p
 
 .KEEP_STATE:
 

@@ -55,7 +55,8 @@ typedef struct dladm_vnic_attr {
 extern dladm_status_t	dladm_vnic_create(dladm_handle_t, const char *,
 			    datalink_id_t, vnic_mac_addr_type_t, uchar_t *,
 			    uint_t, int *, uint_t, uint16_t, vrid_t, int,
-			    datalink_id_t *, dladm_arg_list_t *, uint32_t);
+			    datalink_id_t *, dladm_arg_list_t *,
+			    dladm_errlist_t *, uint32_t);
 
 extern dladm_status_t	dladm_vnic_delete(dladm_handle_t, datalink_id_t,
 			    uint32_t);

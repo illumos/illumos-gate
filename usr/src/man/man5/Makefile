@@ -83,6 +83,7 @@ _MANFILES=	Intro.5			\
 		ms.5			\
 		mutex.5			\
 		nfssec.5		\
+		overlay.5		\
 		pam_allow.5		\
 		pam_authtok_check.5	\
 		pam_authtok_get.5	\

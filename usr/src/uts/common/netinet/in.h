@@ -3,6 +3,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2015, Joyent, Inc.
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  */
 /*

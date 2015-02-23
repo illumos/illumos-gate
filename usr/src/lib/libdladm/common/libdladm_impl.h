@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2015, Joyent, Inc.
  */
 
 /*
@@ -172,6 +173,12 @@ typedef struct resource_prop_s {
  * Set for bridged links only
  */
 #define	FBRIDGE		"bridge"	/* string */
+
+/*
+ * For error lists
+ */
+extern dladm_status_t	dladm_errlist_append(dladm_errlist_t *,
+    const char *, ...);
 
 #ifdef	__cplusplus
 }

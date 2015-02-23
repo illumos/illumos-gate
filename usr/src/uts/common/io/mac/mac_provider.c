@@ -393,6 +393,9 @@ mac_register(mac_register_t *mregp, mac_handle_t *mhp)
 	if (i_mac_capab_get((mac_handle_t)mip, MAC_CAPAB_AGGR, NULL))
 		mip->mi_state_flags |= MIS_IS_AGGR;
 
+	if (i_mac_capab_get((mac_handle_t)mip, MAC_CAPAB_OVERLAY, NULL))
+		mip->mi_state_flags |= MIS_IS_OVERLAY;
+
 	mac_addr_factory_init(mip);
 
 	mac_transceiver_init(mip);
