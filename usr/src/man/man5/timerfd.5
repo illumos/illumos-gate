@@ -1,0 +1,44 @@
+'\" te
+.\"  Copyright (c) 2015, Joyent, Inc. All Rights Reserved.
+.\"  This file and its contents are supplied under the terms of the
+.\"  Common Development and Distribution License ("CDDL"), version 1.0.
+.\"  You may only use this file in accordance with the terms of version
+.\"  1.0 of the CDDL.
+.\" 
+.\"  A full copy of the text of the CDDL should have accompanied this
+.\"  source.  A copy of the CDDL is also available via the Internet at
+.\"  http://www.illumos.org/license/CDDL.
+.TH TIMERFD 5 "Feb 23, 2015"
+.SH NAME
+timerfd \- Linux-compatible timer notification facility
+.SH SYNOPSIS
+
+.LP
+.nf
+#include <sys/timerfd.h>
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+
+\fBtimerfd\fR is a Linux-borne facility for creating POSIX timers and
+receiving their subsequent events via a file descriptor.
+The facility itself is arguably unnecessary:
+portable code can either use the timeout value present in 
+\fBpoll\fR(2)/\fBport_get\fR(3C)/\fBepoll_wait\fR(3C) or -- if this
+is deemed of unacceptably poor resolution -- create a POSIX timer
+via \fBtimer_create\fR(3C) and use the resulting signal to induce an
+\fBEINTR\fR to polling threads.  (For code that need not be
+portable, the \fBSIGEV_PORT\fR signal notification allows for explicit,
+event-oriented timer notification to be sent to a specified port;
+see \fBsignal.h\fR(3HEAD) for details.)
+This facility therefore exists only to accommodate Linux-borne
+applications and binaries; it is compatible with its Linux antecedent in both
+binary interface and in semantics.
+
+.SH SEE ALSO
+.sp
+.LP
+\fBtimerfd_create\fR(3C), \fBtimerfd_gettime\fR(3C), \fBtimerfd_settime\fR(3C)
+

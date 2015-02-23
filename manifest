@@ -4300,6 +4300,7 @@ f usr/include/sys/time_impl.h 0644 root bin
 f usr/include/sys/time_std_impl.h 0644 root bin
 f usr/include/sys/timeb.h 0644 root bin
 f usr/include/sys/timer.h 0644 root bin
+f usr/include/sys/timerfd.h 0644 root bin
 f usr/include/sys/times.h 0644 root bin
 f usr/include/sys/timex.h 0644 root bin
 f usr/include/sys/timod.h 0644 root bin
@@ -4547,6 +4548,7 @@ f usr/kernel/drv/amd64/pts 0755 root sys
 f usr/kernel/drv/amd64/smbsrv 0755 root sys
 f usr/kernel/drv/amd64/sppp 0755 root sys
 f usr/kernel/drv/amd64/sppptun 0755 root sys
+f usr/kernel/drv/amd64/timerfd 0755 root sys
 f usr/kernel/drv/amd64/zcons 0755 root sys
 f usr/kernel/drv/amd64/zfd 0755 root sys
 f usr/kernel/drv/bpf.conf 0644 root sys
@@ -4570,6 +4572,7 @@ f usr/kernel/drv/pts.conf 0644 root sys
 f usr/kernel/drv/smbsrv.conf 0644 root sys
 f usr/kernel/drv/sppp.conf 0644 root sys
 f usr/kernel/drv/sppptun.conf 0644 root sys
+f usr/kernel/drv/timerfd.conf 0644 root sys
 d usr/kernel/fs 0755 root sys
 d usr/kernel/fs/amd64 0755 root sys
 f usr/kernel/fs/amd64/fdfs 0755 root sys
@@ -13638,6 +13641,9 @@ f usr/share/man/man3c/timer_settime.3c 0444 root bin
 f usr/share/man/man3c/timeradd.3c 0444 root bin
 s usr/share/man/man3c/timerclear.3c=timeradd.3c
 s usr/share/man/man3c/timercmp.3c=timeradd.3c
+f usr/share/man/man3c/timerfd_create.3c 0444 root bin
+s usr/share/man/man3c/timerfd_gettime.3c=timerfd_create.3c
+s usr/share/man/man3c/timerfd_settime.3c=timerfd_create.3c
 s usr/share/man/man3c/timerisset.3c=timeradd.3c
 s usr/share/man/man3c/timersub.3c=timeradd.3c
 f usr/share/man/man3c/tmpfile.3c 0444 root bin
@@ -18301,6 +18307,7 @@ f usr/share/man/man5/tecla.5 0444 root bin
 s usr/share/man/man5/teclarc.5=tecla.5
 f usr/share/man/man5/term.5 0444 root bin
 f usr/share/man/man5/threads.5 0444 root bin
+f usr/share/man/man5/timerfd.5 0444 root bin
 f usr/share/man/man5/vgrindefs.5 0444 root bin
 f usr/share/man/man5/zones.5 0444 root bin
 f usr/share/man/man5/zpool-features.5 0444 root bin

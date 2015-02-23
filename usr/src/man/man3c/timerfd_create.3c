@@ -1,0 +1,181 @@
+'\" te
+.\"  Copyright (c) 2014, Joyent, Inc. All Rights Reserved.
+.\"  This file and its contents are supplied under the terms of the
+.\"  Common Development and Distribution License ("CDDL"), version 1.0.
+.\"  You may only use this file in accordance with the terms of version
+.\"  1.0 of the CDDL.
+.\" 
+.\"  A full copy of the text of the CDDL should have accompanied this
+.\"  source.  A copy of the CDDL is also available via the Internet at
+.\"  http://www.illumos.org/license/CDDL.
+.TH TIMERFD 3C "Feb 23, 2015"
+.SH NAME
+timerfd_create, timerfd_settime, timerfd_gettime \- create and manipulate
+timers via a file descriptor interface
+.SH SYNOPSIS
+
+.LP
+.nf
+#include <sys/timerfd.h>
+
+\fBint\fR \fBtimerfd_create\fR(\fBint\fR \fIclockid\fR, \fBint\fR \fIflags\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBtimerfd_settime\fR(\fBint\fR \fIfd\fR, \fBint\fR \fIflags\fR,
+     \fBconst struct itimerspec *restrict\fR \fIvalue\fR,
+     \fBstruct itimerspec *restrict\fR \fIovalue\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBtimerfd_gettime\fR(\fBint\fR \fIfd\fR, \fBstruct itimerspec *\fR\fIvalue\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+These routines create and manipulate timers in which events are associated
+with a file descriptor, allowing for timer-based events to be used
+in file-descriptor based facilities like 
+\fBpoll\fR(2), \fBport_get\fR(3C) or \fBepoll_wait\fR(3C).
+
+The \fBtimerfd_create()\fR function creates a timer with the clock
+type specified by \fIclockid\fR.  The \fBCLOCK_REALTIME\fR and
+\fBCLOCK_HIGHRES\fR clock types, as defined in \fBtimer_create\fR(3C),
+are supported by \fBtimerfd_create()\fR.  (Note that \fBCLOCK_MONOTONIC\fR
+may be used as an alias for \fBCLOCK_HIGHRES\fR.)
+
+.sp
+The \fIflags\fR argument specifies additional parameters for the
+timer instance, and can have any of the following values:
+
+.sp
+.ne 2
+.na
+\fBTFD_CLOEXEC\fR
+.ad
+.RS 12n
+Instance will be closed upon an
+\fBexec\fR(2); see \fBopen\fR(2)'s description of \fBO_CLOEXEC\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fBTFD_NONBLOCK\fR
+.ad
+.RS 12n
+Instance will be set to be non-blocking.  A \fBread\fR(2) on a
+\fBtimerfd\fR instance that has been initialized with
+\fBTFD_NONBLOCK\fR will return \fBEAGAIN\fR in lieu of blocking if the
+timer has not expired since the last \fBtimerfd_settime()\fR or successful
+\fBread()\fR.
+.RE
+
+.sp
+The following operations can be performed upon a \fBtimerfd\fR instance:
+
+.sp
+.ne 2
+.na
+\fBread\fR(2)
+.ad
+.RS 12n
+Atomically reads and clears the number of timer expirations since the
+last successful \fBread\fR(2) or \fBtimerfd_settime()\fR. Upon success,
+the number of expirations will be copied into the eight byte buffer
+passed to the system call. If there have been no expirations of the
+timer since the last successful \fBread\fR(2) or \fBtimerfd_settime()\fR,
+\fBread\fR(2) will block until at least the next expiration,
+or return \fBEAGAIN\fR if the instance was created with
+\fBTFD_NONBLOCK\fR. Note that if multiple threads are blocked in
+\fBread\fR(2) for the same timer, only one of them will return upon
+a single timer expiration.
+
+If the buffer specified to \fBread\fR(2) is less than
+eight bytes in length, \fBEINVAL\fR will be returned.
+.RE
+
+.sp
+.ne 2
+.na
+\fBpoll\fR(2), \fBport_get\fR(3C), \fBepoll_wait\fR(3C)
+.ad
+.RS 12n
+Provide notification when the timer expires or has expired in the past without
+a more recent \fBread\fR(2). Note that threads being simultaneously
+blocked in \fBread\fR(2) and \fBpoll\fR(2) (or equivalents) for the same
+timer constitute an application-level race; on a timer expiration,
+the thread blocked in \fBpoll\fR(2) may or may not return depending on how
+it is scheduled with respect to the thread blocked in \fBread\fR(2). 
+.RE
+
+.sp
+.ne 2
+.na
+\fBtimerfd_gettime()\fR
+.ad
+.RS 12n
+Returns the amount of time until the next timer expiration, with the
+same functional signature and semantics as \fBtimer_gettime\fR(3C).
+.RE
+
+.sp
+.ne 2
+.na
+\fBtimerfd_settime()\fR
+.ad
+.RS 12n
+Sets or disarms the timer, with the
+same functional signature and semantics as \fBtimer_settime\fR(3C).
+.RE
+
+.SH RETURN VALUES
+.sp
+.LP
+Upon succesful completion, a file descriptor associated with the instance
+is returned. Otherwise, -1 is returned and errno
+is set to indicate the error.
+.SH ERRORS
+.sp
+.LP
+The \fBtimerfd_create()\fR function will fail if:
+.sp
+.ne 2
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+The \fIflags\fR are invalid.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBEMFILE\fR\fR
+.ad
+.RS 10n
+There are currently {\fBOPEN_MAX\fR} file descriptors open in the calling
+process.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBEPERM\fR\fR
+.ad
+.RS 10n
+The \fIclock_id\fR, is \fBCLOCK_HIGHRES\fR and the
+{\fBPRIV_PROC_CLOCK_HIGHRES\fR} is not asserted in the effective set of the
+calling process.
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBpoll\fR(2), \fBport_get\fR(3C), \fBepoll_wait\fR(3C),
+\fBtimer_create\fR(3C), \fBtimer_gettime\fR(3C), \fBtimer_settime\fR(3C),
+\fBprivileges\fR(5), \fBtimerfd\fR(5)
+

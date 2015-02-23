@@ -477,6 +477,7 @@ MANFILES= 	__fbufsize.3c					\
 	 	timer_delete.3c					\
 	 	timer_settime.3c				\
 	 	timeradd.3c					\
+		timerfd_create.3c				\
 	 	tmpfile.3c					\
 	 	tmpnam.3c					\
 	 	toascii.3c					\
