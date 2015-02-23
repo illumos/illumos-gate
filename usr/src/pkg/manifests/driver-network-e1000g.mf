@@ -138,6 +138,10 @@ driver name=e1000g clone_perms="e1000g 0666 root sys" perms="* 0666 root sys" \
     alias=pci8086,153b \
     alias=pci8086,1559 \
     alias=pci8086,155a \
+    alias=pci8086,15a0 \
+    alias=pci8086,15a1 \
+    alias=pci8086,15a2 \
+    alias=pci8086,15a3 \
     alias=pci8086,294c \
     alias=pci8086,f0fe \
     alias=pciex8086,1049 \
@@ -193,6 +197,10 @@ driver name=e1000g clone_perms="e1000g 0666 root sys" perms="* 0666 root sys" \
     alias=pciex8086,153b \
     alias=pciex8086,1559 \
     alias=pciex8086,155a \
+    alias=pciex8086,15a0 \
+    alias=pciex8086,15a1 \
+    alias=pciex8086,15a2 \
+    alias=pciex8086,15a3 \
     alias=pciex8086,294c \
     alias=pciex8086,f0fe
 file path=kernel/drv/$(ARCH64)/e1000g group=sys

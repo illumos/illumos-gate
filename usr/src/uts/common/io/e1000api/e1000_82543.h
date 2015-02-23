@@ -35,10 +35,6 @@
 #ifndef _E1000_82543_H_
 #define _E1000_82543_H_
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #define PHY_PREAMBLE      0xFFFFFFFF
 #define PHY_PREAMBLE_SIZE 32
 #define PHY_SOF           0x1
@@ -58,8 +54,4 @@ void e1000_set_tbi_compatibility_82543(struct e1000_hw *hw,
                                        bool state);
 bool e1000_tbi_sbp_enabled_82543(struct e1000_hw *hw);
 
-#ifdef __cplusplus
-}
 #endif
-
-#endif	/* _E1000_82543_H_ */

@@ -25,7 +25,7 @@
 /*
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
- * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2015, Joyent, Inc.
  */
 
 /*
@@ -492,6 +492,11 @@ e1000g_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 		ddi_fm_service_impact(Adapter->dip, DDI_SERVICE_LOST);
 		goto attach_fail;
 	}
+
+	/*
+	 * Disable ULP support
+	 */
+	(void) e1000_disable_ulp_lpt_lp(hw, TRUE);
 
 	/*
 	 * Initialize interrupts
@@ -2494,12 +2499,12 @@ e1000g_init_unicst(struct e1000g *Adapter)
 		/* Workaround for an erratum of 82571 chipst */
 		if ((hw->mac.type == e1000_82571) &&
 		    (e1000_get_laa_state_82571(hw) == B_TRUE))
-			e1000_rar_set(hw, hw->mac.addr, LAST_RAR_ENTRY);
+			(void) e1000_rar_set(hw, hw->mac.addr, LAST_RAR_ENTRY);
 
 		/* Re-configure the RAR registers */
 		for (slot = 0; slot < Adapter->unicst_total; slot++)
 			if (Adapter->unicst_addr[slot].mac.set == 1)
-				e1000_rar_set(hw,
+				(void) e1000_rar_set(hw,
 				    Adapter->unicst_addr[slot].mac.addr, slot);
 	}
 
@@ -2541,7 +2546,7 @@ e1000g_unicst_set(struct e1000g *Adapter, const uint8_t *mac_addr,
 	} else {
 		bcopy(mac_addr, Adapter->unicst_addr[slot].mac.addr,
 		    ETHERADDRL);
-		e1000_rar_set(hw, (uint8_t *)mac_addr, slot);
+		(void) e1000_rar_set(hw, (uint8_t *)mac_addr, slot);
 		Adapter->unicst_addr[slot].mac.set = 1;
 	}
 
@@ -2557,7 +2562,7 @@ e1000g_unicst_set(struct e1000g *Adapter, const uint8_t *mac_addr,
 				    (slot << 1) + 1, 0);
 				E1000_WRITE_FLUSH(hw);
 			} else {
-				e1000_rar_set(hw, (uint8_t *)mac_addr,
+				(void) e1000_rar_set(hw, (uint8_t *)mac_addr,
 				    LAST_RAR_ENTRY);
 			}
 	}
@@ -4417,7 +4422,7 @@ e1000g_local_timer(void *ws)
 		    (ether_addr.mac.addr[2] != hw->mac.addr[3]) ||
 		    (ether_addr.mac.addr[1] != hw->mac.addr[4]) ||
 		    (ether_addr.mac.addr[0] != hw->mac.addr[5])) {
-			e1000_rar_set(hw, hw->mac.addr, 0);
+			(void) e1000_rar_set(hw, hw->mac.addr, 0);
 		}
 	}
 
