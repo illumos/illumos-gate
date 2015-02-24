@@ -13,29 +13,30 @@
 # Copyright 2015 Joyent, Inc.
 #
 
-include ../../../Makefile.lib
+PROG =			vdso_tool
 
-SUBDIRS = tools
-$(BUILD64)SUBDIRS += $(MACH64)
+include ../../../../../cmd/Makefile.cmd
 
-LINT_SUBDIRS = 
-$(BUILD64)LINT_SUBDIRS += $(MACH64)
+OBJS =			vdso_tool.o
 
-all :=          TARGET= all
-clean :=        TARGET= clean
-clobber :=      TARGET= clobber
-install :=      TARGET= install
-lint :=         TARGET= lint
+CLOBBERFILES +=		$(PROG)
+
+NATIVECC_CFLAGS +=	$(CFLAGS) $(CCVERBOSE)
+NATIVECC_LDLIBS +=	-lelf
 
 .KEEP_STATE:
 
-all install clean clobber: $(SUBDIRS)
+all: $(PROG)
 
-lint: $(LINT_SUBDIRS)
+install: all
 
-$(MACH64): tools
+lint:	lint_PROG
 
-$(SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
+clean:
+	$(RM) $(OBJS)
 
-FRC:
+$(PROG): $(OBJS)
+	$(NATIVECC) $(NATIVECC_CFLAGS) $(NATIVECC_LDLIBS) $(OBJS) -o $@
+	$(POST_PROCESS)
+
+include ../../../../../cmd/Makefile.targ
