@@ -1254,8 +1254,8 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_dup3,
 	NULL,		/* 293: pipe2 */
 	lx_inotify_init1,
-	NULL,		/* 295: preadv */
-	NULL,		/* 296: pwritev */
+	lx_preadv,
+	lx_pwritev,
 	lx_rt_tgsigqueueinfo,
 	NULL,		/* 298: perf_event_open */
 	NULL,		/* 299: recvmmsg */
@@ -1623,8 +1623,8 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_dup3,
 	NULL,		/* 331: pipe2 */
 	lx_inotify_init1,
-	NULL,		/* 333: preadv */
-	NULL,		/* 334: pwritev */
+	lx_preadv,
+	lx_pwritev,
 	lx_rt_tgsigqueueinfo,
 	NULL,		/* 336: perf_event_open */
 	NULL,		/* 337: recvmmsg */
