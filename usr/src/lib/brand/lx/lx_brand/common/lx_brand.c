@@ -1165,11 +1165,11 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_sched_setaffinity,
 	lx_sched_getaffinity,
 	NULL,		/* 205: set_thread_area */
-	NULL,		/* 206: io_setup */
-	NULL,		/* 207: io_destroy */
-	NULL,		/* 208: io_getevents */
-	NULL,		/* 209: io_submit */
-	NULL,		/* 210: io_cancel */
+	lx_io_setup,
+	lx_io_destroy,
+	lx_io_getevents,
+	lx_io_submit,
+	lx_io_cancel,
 	NULL,		/* 211: get_thread_area */
 	NULL,		/* 212: lookup_dcookie */
 	lx_epoll_create,
@@ -1535,11 +1535,11 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_sched_getaffinity,
 	NULL,		/* 243: set_thread_area */
 	NULL,		/* 244: get_thread_area */
-	NULL,		/* 245: io_setup */
-	NULL,		/* 246: io_destroy */
-	NULL,		/* 247: io_getevents */
-	NULL,		/* 248: io_submit */
-	NULL,		/* 249: io_cancel */
+	lx_io_setup,
+	lx_io_destroy,
+	lx_io_getevents,
+	lx_io_submit,
+	lx_io_cancel,
 	lx_fadvise64,
 	NULL,		/* 251: nosys */
 	lx_group_exit,
