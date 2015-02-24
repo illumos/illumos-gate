@@ -671,11 +671,11 @@ lx_sysent_t lx_sysent32[] = {
 	{"sched_getaffinity", NULL, 		0,		3}, /* 242 */
 	{"set_thread_area", lx_set_thread_area,	0,		1}, /* 243 */
 	{"get_thread_area", lx_get_thread_area,	0,		1}, /* 244 */
-	{"io_setup",	NULL,			NOSYS_NO_EQUIV,	0}, /* 245 */
-	{"io_destroy",	NULL,			NOSYS_NO_EQUIV,	0}, /* 246 */
-	{"io_getevents", NULL,			NOSYS_NO_EQUIV,	0}, /* 247 */
-	{"io_submit",	NULL,			NOSYS_NO_EQUIV,	0}, /* 248 */
-	{"io_cancel",	NULL,			NOSYS_NO_EQUIV,	0}, /* 249 */
+	{"io_setup",	NULL,			0,		2}, /* 245 */
+	{"io_destroy",	NULL,			0,		1}, /* 246 */
+	{"io_getevents", NULL,			0,		5}, /* 247 */
+	{"io_submit",	NULL,			0,		3}, /* 248 */
+	{"io_cancel",	NULL,			0,		3}, /* 249 */
 	{"fadvise64",	NULL,			0,		4}, /* 250 */
 	{"nosys",	NULL,			0,		0}, /* 251 */
 	{"group_exit",	NULL,			0,		1}, /* 252 */
@@ -1003,11 +1003,11 @@ lx_sysent_t lx_sysent64[] = {
 	{"sched_setaffinity", NULL,		0,		3}, /* 203 */
 	{"sched_getaffinity", NULL,		0,		3}, /* 204 */
 	{"set_thread_area", lx_set_thread_area, 0,		1}, /* 205 */
-	{"io_setup",	NULL,			NOSYS_NO_EQUIV,	0}, /* 206 */
-	{"io_destroy",	NULL,			NOSYS_NO_EQUIV,	0}, /* 207 */
-	{"io_getevents", NULL,			NOSYS_NO_EQUIV,	0}, /* 208 */
-	{"io_submit",	NULL,			NOSYS_NO_EQUIV,	0}, /* 209 */
-	{"io_cancel",	NULL,			NOSYS_NO_EQUIV,	0}, /* 210 */
+	{"io_setup",	NULL,			0,		2}, /* 206 */
+	{"io_destroy",	NULL,			0,		1}, /* 207 */
+	{"io_getevents", NULL,			0,		5}, /* 208 */
+	{"io_submit",	NULL,			0,		3}, /* 209 */
+	{"io_cancel",	NULL,			0,		3}, /* 210 */
 	{"get_thread_area", lx_get_thread_area,	0,		1}, /* 211 */
 	{"lookup_dcookie", NULL,		NOSYS_NO_EQUIV,	0}, /* 212 */
 	{"epoll_create", NULL,			0,		1}, /* 213 */
