@@ -13,6 +13,7 @@
 # Copyright 2011, Richard Lowe
 # Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2014 Garrett D'Amore <garrett@damore>
+# Copyright (c) 2015 Joyent, Inc.  All rights reserved.
 #
 
 include		$(SRC)/Makefile.master
@@ -392,6 +393,7 @@ MANFILES= 	ASSERT.9f				\
 	 	pm_power_has_changed.9f			\
 	 	pm_raise_power.9f			\
 	 	pm_trans_check.9f			\
+		pollhead_clean.9f			\
 	 	pollwakeup.9f				\
 	 	priv_getbyname.9f			\
 	 	priv_policy.9f				\

@@ -246,6 +246,11 @@ eventfd_close(dev_t dev, int flag, int otyp, cred_t *cred_p)
 
 	state = ddi_get_soft_state(eventfd_softstate, minor);
 
+	if (state->efd_pollhd.ph_list != NULL) {
+		pollwakeup(&state->efd_pollhd, POLLERR);
+		pollhead_clean(&state->efd_pollhd);
+	}
+
 	mutex_enter(&eventfd_lock);
 
 	/*

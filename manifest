@@ -19559,6 +19559,7 @@ s usr/share/man/man9f/pm_lower_power.9f=pm_raise_power.9f
 f usr/share/man/man9f/pm_power_has_changed.9f 0444 root bin
 f usr/share/man/man9f/pm_raise_power.9f 0444 root bin
 f usr/share/man/man9f/pm_trans_check.9f 0444 root bin
+f usr/share/man/man9f/pollhead_clean.9f 0444 root bin
 f usr/share/man/man9f/pollwakeup.9f 0444 root bin
 f usr/share/man/man9f/priv_getbyname.9f 0444 root bin
 f usr/share/man/man9f/priv_policy.9f 0444 root bin

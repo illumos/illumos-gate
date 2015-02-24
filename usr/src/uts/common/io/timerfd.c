@@ -371,6 +371,11 @@ timerfd_close(dev_t dev, int flag, int otyp, cred_t *cred_p)
 
 	state = ddi_get_soft_state(timerfd_softstate, minor);
 
+	if (state->tfd_pollhd.ph_list != NULL) {
+		pollwakeup(&state->tfd_pollhd, POLLERR);
+		pollhead_clean(&state->tfd_pollhd);
+	}
+
 	/*
 	 * No one can get to this timer; we don't need to lock it -- we can
 	 * just call on the backend to delete it.
