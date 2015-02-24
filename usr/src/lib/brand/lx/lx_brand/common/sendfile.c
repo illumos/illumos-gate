@@ -22,7 +22,7 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2014 Joyent, Inc.  All rights reserved.
+ * Copyright 2015 Joyent, Inc.  All rights reserved.
  */
 
 /*
@@ -58,6 +58,8 @@ lx_sendfile(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4)
 	} else {
 		if (sz > 0 && uucopy(offp, &off, sizeof (off)) != 0)
 			return (-errno);
+		if (off < 0)
+			return (-EINVAL);
 	}
 
 	sfv.sfv_fd = p2;
@@ -100,6 +102,8 @@ lx_sendfile64(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4)
 	} else {
 		if (sz > 0 && uucopy(offp, &off, sizeof (off)) != 0)
 			return (-errno);
+		if (off < 0)
+			return (-EINVAL);
 	}
 
 	sfv.sfv_fd = p2;
