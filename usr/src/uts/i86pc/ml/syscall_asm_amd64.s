@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  */
 
 #include <sys/asm_linkage.h>
@@ -503,6 +503,7 @@ noprod_sys_syscall:
 	
 	movq	T_LWP(%r15), %r14
 	ASSERT_NO_RUPDATE_PENDING(%r14)
+
 	ENABLE_INTR_FLAGS
 
 	MSTATE_TRANSITION(LMS_USER, LMS_SYSTEM)
@@ -516,6 +517,26 @@ noprod_sys_syscall:
 
 	incq	%gs:CPU_STATS_SYS_SYSCALL
 
+	/*
+	 * If our LWP has an alternate system call handler, run that instead of
+	 * the regular system call path.
+	 */
+	movq	LWP_BRAND_SYSCALL(%r14), %rdi
+	testq	%rdi, %rdi
+	jz	_syscall_no_brand
+
+	pushq	%rax
+	call	*%rdi
+
+	/*
+	 * If the alternate handler returns 0, we skip straight to the return to
+	 * usermode.  Otherwise, we resume regular system call processing.
+	 */
+	testl	%eax, %eax
+	popq	%rax
+	jz	_syscall_after_brand
+
+_syscall_no_brand:
 	movw	%ax, T_SYSNUM(%r15)
 	movzbl	T_PRE_SYS(%r15), %ebx
 	ORL_SYSCALLTRACE(%ebx)
@@ -550,6 +571,8 @@ _syscall_invoke:
 	shrq	$32, %r13	/* upper 32-bits into %edx */
 	movl	%r12d, %r12d	/* lower 32-bits into %eax */
 5:
+
+_syscall_after_brand:
 	/*
 	 * Optimistically assume that there's no post-syscall
 	 * work to do.  (This is to avoid having to call syscall_mstate()
@@ -795,6 +818,25 @@ _syscall32_save:
 	incq	 %gs:CPU_STATS_SYS_SYSCALL
 
 	/*
+	 * If our lwp has an alternate system call handler, run that instead
+	 * of the regular system call path.
+	 */
+	movq	LWP_BRAND_SYSCALL(%r14), %rax
+	testq	%rax, %rax
+	jz	_syscall32_no_brand
+
+	movb	$LWP_SYS, LWP_STATE(%r14)
+	call	*%rax
+
+	/*
+	 * If the alternate handler returns 0, we skip straight to the return
+	 * to usermode.  Otherwise, we resume regular system call processing.
+	 */
+	testl	%eax, %eax
+	jz	_syscall32_after_brand
+
+_syscall32_no_brand:
+	/*
 	 * Make some space for MAXSYSARGS (currently 8) 32-bit args placed
 	 * into 64-bit (long) arg slots, maintaining 16 byte alignment.  Or
 	 * more succinctly:
@@ -860,6 +902,8 @@ _syscall32_save:
 	movq	%rax, %r13
 	shrq	$32, %r13	/* upper 32-bits into %edx */
 	movl	%eax, %r12d	/* lower 32-bits into %eax */
+
+_syscall32_after_brand:
 
 	/*
 	 * Optimistically assume that there's no post-syscall
@@ -1191,7 +1235,31 @@ sys_int80()
 	ENTRY_NP(brand_sys_int80)
 	SWAPGS				/* kernel gsbase */
 	XPV_TRAP_POP
+
+	/*
+	 * We first attempt to call the "b_int80" handler from the "struct
+	 * brand_mach_ops" for this brand.  If no handler function is installed
+	 * for this brand, the BRAND_CALLBACK() macro returns here and we
+	 * check the lwp for a "lwp_brand_syscall" handler.
+	 */
 	BRAND_CALLBACK(BRAND_CB_INT80, BRAND_URET_FROM_INTR_STACK())
+
+	/*
+	 * Check to see if this lwp provides "lwp_brand_syscall".  If so, we
+	 * will route this int80 through the regular system call handling path.
+	 */
+	movq	%r15, %gs:CPU_RTMP_R15
+	movq	%gs:CPU_THREAD, %r15
+	movq	T_LWP(%r15), %r15
+	movq	LWP_BRAND_SYSCALL(%r15), %r15
+	testq	%r15, %r15
+	movq	%gs:CPU_RTMP_R15, %r15
+	jnz	nopop_syscall_int
+
+	/*
+	 * The brand provided neither a "b_int80", nor a "lwp_brand_syscall"
+	 * function, and has thus opted out of handling this trap.
+	 */
 	SWAPGS				/* user gsbase */
 	jmp	nopop_int80
 

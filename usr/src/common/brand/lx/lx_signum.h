@@ -21,7 +21,7 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2014 Joyent, Inc.  All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  */
 
 #ifndef _LX_SIGNUM_H
@@ -73,6 +73,10 @@ extern "C" {
 
 extern const int ltos_signo[];
 extern const int stol_signo[];
+
+extern int lx_stol_signo(int, int);
+extern int lx_stol_status(int, int);
+extern int lx_stol_sigcode(int);
 
 #ifdef	__cplusplus
 }

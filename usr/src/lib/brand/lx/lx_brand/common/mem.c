@@ -21,7 +21,7 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2014 Joyent, Inc.  All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  */
 
 #include <errno.h>
@@ -110,6 +110,21 @@ mmap_common(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 	 */
 	if (flags & LX_MAP_ANONYMOUS)
 		fd = -1;
+
+	/*
+	 * We refuse, as a matter of principle, to overcommit memory.
+	 * Unfortunately, several bits of important and popular software expect
+	 * to be able to pre-allocate large amounts of virtual memory but then
+	 * probably never use it.  One particularly bad example of this
+	 * practice is golang.
+	 *
+	 * In the interest of running software, unsafe or not, we fudge
+	 * something vaguely similar to overcommit by permanently enabling
+	 * MAP_NORESERVE unless MAP_LOCKED was requested:
+	 */
+	if (!(flags & LX_MAP_LOCKED)) {
+		flags |= LX_MAP_NORESERVE;
+	}
 
 	/*
 	 * This is totally insane. The NOTES section in the linux mmap(2) man

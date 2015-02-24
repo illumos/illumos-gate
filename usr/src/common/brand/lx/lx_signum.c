@@ -22,11 +22,17 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  */
 
 #include <sys/signal.h>
+#include <sys/lx_siginfo.h>
 #include <lx_signum.h>
+#ifdef _KERNEL
+#include <sys/debug.h>
+#else
+#include <assert.h>
+#endif
 
 /*
  * Delivering signals to a Linux process is complicated by differences in
@@ -242,3 +248,75 @@ stol_signo[NSIG] = {
 	LX_SIGRTMIN + 30,
 	LX_SIGRTMAX,		/* 73: Solaris _SIGRTMAX */
 };
+
+/*
+ * Convert an illumos native signal number to a Linux signal number and return
+ * it.  If no valid conversion is possible, the function fails back to the
+ * value of "defsig".  In userland, passing a default signal number of "-1"
+ * will abort the program if the signal number could not be converted.
+ */
+int
+lx_stol_signo(int signo, int defsig)
+{
+	int rval;
+
+#ifdef	_KERNEL
+	VERIFY(defsig != -1);
+#endif
+
+	if (signo < 0 || signo >= NSIG || (rval = stol_signo[signo]) < 1) {
+#ifndef	_KERNEL
+		if (defsig == -1) {
+			assert(0);
+		}
+#endif
+		return (defsig);
+	}
+
+	return (rval);
+}
+
+/*
+ * Convert the "status" field of a SIGCLD siginfo_t.  We need to extract the
+ * illumos signal number and convert it to a Linux signal number while leaving
+ * the ptrace(2) event bits intact.  In userland, passing a default signal
+ * number of "-1" will abort the program if the signal number could not be
+ * converted, as for lx_stol_signo().
+ */
+int
+lx_stol_status(int s, int defsig)
+{
+	/*
+	 * We mask out the top bit here in case PTRACE_O_TRACESYSGOOD
+	 * is in use and 0x80 has been ORed with the signal number.
+	 */
+	int stat = lx_stol_signo(s & 0x7f, defsig);
+
+	/*
+	 * We must mix in the ptrace(2) event which may be stored in
+	 * the second byte of the status code.  We also re-include the
+	 * PTRACE_O_TRACESYSGOOD bit.
+	 */
+	return ((s & 0xff80) | stat);
+}
+
+int
+lx_stol_sigcode(int code)
+{
+	switch (code) {
+	case SI_USER:
+		return (LX_SI_USER);
+	case SI_LWP:
+		return (LX_SI_TKILL);
+	case SI_QUEUE:
+		return (LX_SI_QUEUE);
+	case SI_TIMER:
+		return (LX_SI_TIMER);
+	case SI_ASYNCIO:
+		return (LX_SI_ASYNCIO);
+	case SI_MESGQ:
+		return (LX_SI_MESGQ);
+	default:
+		return (code);
+	}
+}

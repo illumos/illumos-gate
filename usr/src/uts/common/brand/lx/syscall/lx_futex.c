@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -40,6 +40,8 @@
 #include <sys/condvar.h>
 #include <sys/inttypes.h>
 #include <sys/cmn_err.h>
+#include <sys/brand.h>
+#include <sys/lx_brand.h>
 #include <sys/lx_futex.h>
 #include <sys/lx_impl.h>
 
@@ -277,10 +279,16 @@ futex_wait(memid_t *memid, caddr_t addr, int val, timespec_t *timeout)
 	while ((fw.fw_woken == 0) && (err == 0)) {
 		ret = cv_waituntil_sig(&fw.fw_cv, &futex_hash_lock[index],
 		    timeout, timechanged);
-		if (ret < 0)
+		if (ret < 0) {
 			err = set_errno(ETIMEDOUT);
-		else if (ret == 0)
+		} else if (ret == 0) {
+			/*
+			 * According to signal(7), a futex(2) call with the
+			 * FUTEX_WAIT operation is restartable.
+			 */
+			ttolxlwp(curthread)->br_syscall_restart = B_TRUE;
 			err = set_errno(EINTR);
+		}
 	}
 
 	/*

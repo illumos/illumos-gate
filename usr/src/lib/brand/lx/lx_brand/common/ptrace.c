@@ -59,13 +59,6 @@
  * detail.
  */
 
-/* execve syscall numbers for 64-bit vs. 32-bit */
-#if defined(_LP64)
-#define	LX_SYS_execve	59
-#else
-#define	LX_SYS_execve	11
-#endif
-
 /*
  * This corresponds to the user_i387_struct Linux structure.
  */
@@ -98,61 +91,6 @@ typedef struct lx_user_fpxregs {
 	long lxux_xmm_space[32];
 	long lxux_padding[56];
 } lx_user_fpxregs_t;
-
-/*
- * This corresponds to the user_regs_struct Linux structure.
- */
-#if defined(_LP64)
-typedef struct lx_user_regs {
-	long lxur_r15;
-	long lxur_r14;
-	long lxur_r13;
-	long lxur_r12;
-	long lxur_rbp;
-	long lxur_rbx;
-	long lxur_r11;
-	long lxur_r10;
-	long lxur_r9;
-	long lxur_r8;
-	long lxur_rax;
-	long lxur_rcx;
-	long lxur_rdx;
-	long lxur_rsi;
-	long lxur_rdi;
-	long lxur_orig_rax;
-	long lxur_rip;
-	long lxur_xcs;
-	long lxur_rflags;
-	long lxur_rsp;
-	long lxur_xss;
-	long lxur_xfs_base;
-	long lxur_xgs_base;
-	long lxur_xds;
-	long lxur_xes;
-	long lxur_xfs;
-	long lxur_xgs;
-} lx_user_regs_t;
-#else
-typedef struct lx_user_regs {
-	long lxur_ebx;
-	long lxur_ecx;
-	long lxur_edx;
-	long lxur_esi;
-	long lxur_edi;
-	long lxur_ebp;
-	long lxur_eax;
-	long lxur_xds;
-	long lxur_xes;
-	long lxur_xfs;
-	long lxur_xgs;
-	long lxur_orig_eax;
-	long lxur_eip;
-	long lxur_xcs;
-	long lxur_eflags;
-	long lxur_esp;
-	long lxur_xss;
-} lx_user_regs_t;
-#endif
 
 typedef struct lx_user {
 	lx_user_regs_t lxu_regs;
@@ -233,336 +171,6 @@ get_lwpstatus(pid_t pid, lwpid_t lwpid, lwpstatus_t *lsp)
 		return (-ESRCH);
 
 	if (read(fd, lsp, sizeof (lwpstatus_t)) != sizeof (lwpstatus_t)) {
-		(void) close(fd);
-		return (-EIO);
-	}
-
-	(void) close(fd);
-
-	return (0);
-}
-
-static uintptr_t
-syscall_regs(int fd, uintptr_t fp, pid_t pid)
-{
-	uintptr_t addr, done;
-	struct frame fr;
-	auxv_t auxv;
-	int afd;
-#if defined(_LP64)
-	Elf64_Phdr phdr;
-#elif defined(_ILP32)
-	Elf32_Phdr phdr;
-#endif
-
-	/*
-	 * Try to walk the stack looking for a return address that corresponds
-	 * to the traced process's lx_emulate_done symbol. This relies on the
-	 * fact that the brand library in the traced process is the same as the
-	 * brand library in this process (indeed, this is true of all processes
-	 * in a given branded zone).
-	 */
-
-	/*
-	 * Find the base address for the brand library in the traced process
-	 * by grabbing the AT_PHDR auxv entry, reading in the program header
-	 * at that location and subtracting off the p_vaddr member. We use
-	 * this to compute the location of lx_emulate done in the traced
-	 * process.
-	 */
-	if ((afd = open_procfile(pid, O_RDONLY, "auxv")) < 0)
-		return (0);
-
-	do {
-		if (read(afd, &auxv, sizeof (auxv)) != sizeof (auxv)) {
-			(void) close(afd);
-			return (0);
-		}
-	} while (auxv.a_type != AT_PHDR);
-
-	(void) close(afd);
-
-	if (pread(fd, &phdr, sizeof (phdr), auxv.a_un.a_val) != sizeof (phdr)) {
-		lx_debug("failed to read brand library's phdr");
-		return (0);
-	}
-
-	addr = auxv.a_un.a_val - phdr.p_vaddr;
-	done = (uintptr_t)&lx_emulate_done - (uintptr_t)&_START_ + addr;
-
-	fr.fr_savfp = fp;
-
-	do {
-		addr = fr.fr_savfp;
-		if (pread(fd, &fr, sizeof (fr), addr) != sizeof (fr)) {
-			lx_debug("ptrace read failed for stack walk");
-			return (0);
-		}
-
-		if (addr >= fr.fr_savfp) {
-			lx_debug("ptrace stack not monotonically increasing "
-			    "%p %p (%p)", addr, fr.fr_savfp, done);
-			return (0);
-		}
-	} while (fr.fr_savpc != done);
-
-	/*
-	 * The first argument to lx_emulate is known to be an lx_regs_t
-	 * structure and the ABI specifies that it will be placed on the stack
-	 * immediately preceeding the return address.
-	 */
-	addr += sizeof (fr);
-
-	/*
-	 * On i386 we need to perform an additional read as we used the stack
-	 * to pass the argument to lx_emulate.  On amd64 we passed the argument
-	 * in %rdi so addr already contains the correct address.
-	 */
-#if defined(_ILP32)
-	if (pread(fd, &addr, sizeof (addr), addr) != sizeof (addr)) {
-		lx_debug("ptrace stack failed to read register set address");
-		return (0);
-	}
-#endif
-
-	return (addr);
-}
-
-static int
-getregs(pid_t pid, lwpid_t lwpid, lx_user_regs_t *rp)
-{
-	lwpstatus_t status;
-	uintptr_t addr;
-	int fd, ret;
-
-	if ((ret = get_lwpstatus(pid, lwpid, &status)) != 0)
-		return (ret);
-
-	if ((fd = open_procfile(pid, O_RDONLY, "as")) < 0)
-		return (-ESRCH);
-
-	/*
-	 * If we find the syscall regs (and are therefore in an emulated
-	 * syscall, use the register set at given address. Otherwise, use the
-	 * registers as reported by /proc.
-	 */
-	if ((addr = syscall_regs(fd, status.pr_reg[REG_FP], pid)) != 0) {
-		lx_regs_t regs;
-
-		if (pread(fd, &regs, sizeof (regs), addr) != sizeof (regs)) {
-			(void) close(fd);
-			lx_debug("ptrace failed to read register set");
-			return (-EIO);
-		}
-
-		(void) close(fd);
-
-#if defined(_LP64)
-		rp->lxur_r15 = regs.lxr_r15;
-		rp->lxur_r14 = regs.lxr_r14;
-		rp->lxur_r13 = regs.lxr_r13;
-		rp->lxur_r12 = regs.lxr_r12;
-		rp->lxur_rbp = regs.lxr_rbp;
-		rp->lxur_rbx = regs.lxr_rbx;
-		rp->lxur_r11 = regs.lxr_r11;
-		rp->lxur_r10 = regs.lxr_r10;
-		rp->lxur_r9 = regs.lxr_r9;
-		rp->lxur_r8 = regs.lxr_r8;
-		rp->lxur_rax = regs.lxr_rax;
-		rp->lxur_rcx = regs.lxr_rcx;
-		rp->lxur_rdx = regs.lxr_rdx;
-		rp->lxur_rsi = regs.lxr_rsi;
-		rp->lxur_rdi = regs.lxr_rdi;
-		rp->lxur_orig_rax = regs.lxr_orig_rax;
-		rp->lxur_rip = regs.lxr_rip;
-		rp->lxur_xcs = status.pr_reg[REG_CS];
-		rp->lxur_rflags = status.pr_reg[REG_RFL];
-		rp->lxur_rsp = regs.lxr_rsp;
-		rp->lxur_xss = status.pr_reg[REG_SS];
-		rp->lxur_xfs_base = status.pr_reg[REG_FSBASE];
-		rp->lxur_xgs_base = status.pr_reg[REG_GSBASE];
-		rp->lxur_xds = status.pr_reg[REG_DS];
-		rp->lxur_xes = status.pr_reg[REG_ES];
-		rp->lxur_xfs = regs.lxr_fs;
-		rp->lxur_xgs = status.pr_reg[REG_GS];
-#elif defined(_ILP32)
-		rp->lxur_ebx = regs.lxr_ebx;
-		rp->lxur_ecx = regs.lxr_ecx;
-		rp->lxur_edx = regs.lxr_edx;
-		rp->lxur_esi = regs.lxr_esi;
-		rp->lxur_edi = regs.lxr_edi;
-		rp->lxur_ebp = regs.lxr_ebp;
-		rp->lxur_eax = regs.lxr_eax;
-		rp->lxur_xds = status.pr_reg[DS];
-		rp->lxur_xes = status.pr_reg[ES];
-		rp->lxur_xfs = status.pr_reg[FS];
-		rp->lxur_xgs = regs.lxr_gs;
-		rp->lxur_orig_eax = regs.lxr_orig_eax;
-		rp->lxur_eip = regs.lxr_eip;
-		rp->lxur_xcs = status.pr_reg[CS];
-		rp->lxur_eflags = status.pr_reg[EFL];
-		rp->lxur_esp = regs.lxr_esp;
-		rp->lxur_xss = status.pr_reg[SS];
-#endif
-
-	} else {
-		(void) close(fd);
-
-#if defined(_LP64)
-		rp->lxur_r15 = status.pr_reg[REG_R15];
-		rp->lxur_r14 = status.pr_reg[REG_R14];
-		rp->lxur_r13 = status.pr_reg[REG_R13];
-		rp->lxur_r12 = status.pr_reg[REG_R12];
-		rp->lxur_rbp = status.pr_reg[REG_RBP];
-		rp->lxur_rbx = status.pr_reg[REG_RBX];
-		rp->lxur_r11 = status.pr_reg[REG_R11];
-		rp->lxur_r10 = status.pr_reg[REG_R10];
-		rp->lxur_r9 = status.pr_reg[REG_R9];
-		rp->lxur_r8 = status.pr_reg[REG_R8];
-		rp->lxur_rax = status.pr_reg[REG_RAX];
-		rp->lxur_rcx = status.pr_reg[REG_RCX];
-		rp->lxur_rdx = status.pr_reg[REG_RDX];
-		rp->lxur_rsi = status.pr_reg[REG_RSI];
-		rp->lxur_rdi = status.pr_reg[REG_RDI];
-		rp->lxur_orig_rax = 0;
-		rp->lxur_rip = status.pr_reg[REG_RIP];
-		rp->lxur_xcs = status.pr_reg[REG_CS];
-		rp->lxur_rflags = status.pr_reg[REG_RFL];
-		rp->lxur_rsp = status.pr_reg[REG_RSP];
-		rp->lxur_xss = status.pr_reg[REG_SS];
-		rp->lxur_xfs = status.pr_reg[REG_FSBASE];
-		rp->lxur_xgs = status.pr_reg[REG_GSBASE];
-		rp->lxur_xds = status.pr_reg[REG_DS];
-		rp->lxur_xes = status.pr_reg[REG_ES];
-		rp->lxur_xfs = status.pr_reg[REG_FSBASE];
-		rp->lxur_xgs = status.pr_reg[REG_GSBASE];
-#elif defined(_ILP32)
-		rp->lxur_ebx = status.pr_reg[EBX];
-		rp->lxur_ecx = status.pr_reg[ECX];
-		rp->lxur_edx = status.pr_reg[EDX];
-		rp->lxur_esi = status.pr_reg[ESI];
-		rp->lxur_edi = status.pr_reg[EDI];
-		rp->lxur_ebp = status.pr_reg[EBP];
-		rp->lxur_eax = status.pr_reg[EAX];
-		rp->lxur_xds = status.pr_reg[DS];
-		rp->lxur_xes = status.pr_reg[ES];
-		rp->lxur_xfs = status.pr_reg[FS];
-		rp->lxur_xgs = status.pr_reg[GS];
-		rp->lxur_orig_eax = 0;
-		rp->lxur_eip = status.pr_reg[EIP];
-		rp->lxur_xcs = status.pr_reg[CS];
-		rp->lxur_eflags = status.pr_reg[EFL];
-		rp->lxur_esp = status.pr_reg[UESP];
-		rp->lxur_xss = status.pr_reg[SS];
-#endif
-
-		/*
-		 * If the target process has just returned from exec, it's not
-		 * going to be sitting in the emulation function. In that case
-		 * we need to manually fake up the values for %eax and orig_eax
-		 * to indicate a successful return and that the traced process
-		 * had called execve (respectively).
-		 */
-		if (status.pr_why == PR_SYSEXIT &&
-		    status.pr_what == SYS_execve) {
-#if defined(_LP64)
-			rp->lxur_rax = 0;
-			rp->lxur_orig_rax = LX_SYS_execve;
-#elif defined(_ILP32)
-			rp->lxur_eax = 0;
-			rp->lxur_orig_eax = LX_SYS_execve;
-#endif
-		}
-	}
-
-	return (0);
-}
-
-static int
-setregs(pid_t pid, lwpid_t lwpid, const lx_user_regs_t *rp)
-{
-	long ctl[1 + sizeof (prgregset_t) / sizeof (long)];
-	lwpstatus_t status;
-	uintptr_t addr;
-	int fd, ret;
-
-	if ((ret = get_lwpstatus(pid, lwpid, &status)) != 0)
-		return (ret);
-
-	if ((fd = open_procfile(pid, O_RDWR, "as")) < 0)
-		return (-ESRCH);
-
-	/*
-	 * If we find the syscall regs (and are therefore in an emulated
-	 * syscall, modify the register set at given address and set the
-	 * remaining registers through the /proc interface. Otherwise just use
-	 * the /proc interface to set register values;
-	 */
-	if ((addr = syscall_regs(fd, status.pr_reg[REG_FP], pid)) != 0) {
-#if defined(_ILP32)
-		lx_regs_t regs;
-
-		regs.lxr_ebx = rp->lxur_ebx;
-		regs.lxr_ecx = rp->lxur_ecx;
-		regs.lxr_edx = rp->lxur_edx;
-		regs.lxr_esi = rp->lxur_esi;
-		regs.lxr_edi = rp->lxur_edi;
-		regs.lxr_ebp = rp->lxur_ebp;
-		regs.lxr_eax = rp->lxur_eax;
-		regs.lxr_gs = rp->lxur_xgs;
-		regs.lxr_orig_eax = rp->lxur_orig_eax;
-		regs.lxr_eip = rp->lxur_eip;
-		regs.lxr_esp = rp->lxur_esp;
-
-		if (pwrite(fd, &regs, sizeof (regs), addr) != sizeof (regs)) {
-			(void) close(fd);
-			lx_debug("ptrace failed to write register set");
-			return (-EIO);
-		}
-#endif
-
-		(void) close(fd);
-
-#if defined(_ILP32)
-		status.pr_reg[DS] = rp->lxur_xds;
-		status.pr_reg[ES] = rp->lxur_xes;
-		status.pr_reg[FS] = rp->lxur_xfs;
-		status.pr_reg[CS] = rp->lxur_xcs;
-		status.pr_reg[EFL] = rp->lxur_eflags;
-		status.pr_reg[SS] = rp->lxur_xss;
-#endif
-
-	} else {
-		(void) close(fd);
-
-#if defined(_ILP32)
-		status.pr_reg[EBX] = rp->lxur_ebx;
-		status.pr_reg[ECX] = rp->lxur_ecx;
-		status.pr_reg[EDX] = rp->lxur_edx;
-		status.pr_reg[ESI] = rp->lxur_esi;
-		status.pr_reg[EDI] = rp->lxur_edi;
-		status.pr_reg[EBP] = rp->lxur_ebp;
-		status.pr_reg[EAX] = rp->lxur_eax;
-		status.pr_reg[DS] = rp->lxur_xds;
-		status.pr_reg[ES] = rp->lxur_xes;
-		status.pr_reg[FS] = rp->lxur_xfs;
-		status.pr_reg[GS] = rp->lxur_xgs;
-		status.pr_reg[EIP] = rp->lxur_eip;
-		status.pr_reg[CS] = rp->lxur_xcs;
-		status.pr_reg[EFL] = rp->lxur_eflags;
-		status.pr_reg[UESP] = rp->lxur_esp;
-		status.pr_reg[SS] = rp->lxur_xss;
-		status.pr_reg[SS] = rp->lxur_xss;
-#endif
-	}
-
-	if ((fd = open_lwpfile(pid, lwpid, O_WRONLY, "lwpctl")) < 0)
-		return (-ESRCH);
-
-	ctl[0] = PCSREG;
-	bcopy(status.pr_reg, &ctl[1], sizeof (prgregset_t));
-
-	if (write(fd, &ctl, sizeof (ctl)) != sizeof (ctl)) {
 		(void) close(fd);
 		return (-EIO);
 	}
@@ -904,7 +512,7 @@ ptrace_peek(pid_t pid, uintptr_t addr, long *ret)
 (offsetof(lx_user_t, m) + sizeof (((lx_user_t *)NULL)->m))
 
 static int
-ptrace_peek_user(pid_t pid, lwpid_t lwpid, uintptr_t off, int *ret)
+ptrace_peek_user(pid_t lxpid, pid_t pid, lwpid_t lwpid, uintptr_t off, int *ret)
 {
 	int err, data;
 	uintptr_t *debugreg;
@@ -919,8 +527,10 @@ ptrace_peek_user(pid_t pid, lwpid_t lwpid, uintptr_t off, int *ret)
 	if (off < LX_USER_BOUND(lxu_regs)) {
 		lx_user_regs_t regs;
 
-		if ((err = getregs(pid, lwpid, &regs)) != 0)
+		if ((err = lx_ptrace_kernel(LX_PTRACE_GETREGS, lxpid, NULL,
+		    (uintptr_t)&regs)) != 0) {
 			return (err);
+		}
 
 		data = *(int *)((uintptr_t)&regs + off -
 		    offsetof(lx_user_t, lxu_regs));
@@ -1019,7 +629,7 @@ ptrace_poke(pid_t pid, uintptr_t addr, int data)
 }
 
 static int
-ptrace_poke_user(pid_t pid, lwpid_t lwpid, uintptr_t off, int data)
+ptrace_poke_user(pid_t lxpid, pid_t pid, lwpid_t lwpid, uintptr_t off, int data)
 {
 	lx_user_regs_t regs;
 	int err = 0;
@@ -1030,11 +640,16 @@ ptrace_poke_user(pid_t pid, lwpid_t lwpid, uintptr_t off, int data)
 		return (-EINVAL);
 
 	if (off < offsetof(lx_user_t, lxu_regs) + sizeof (lx_user_regs_t)) {
-		if ((err = getregs(pid, lwpid, &regs)) != 0)
+		if ((err = lx_ptrace_kernel(LX_PTRACE_GETREGS, lxpid, NULL,
+		    (uintptr_t)&regs)) != 0) {
 			return (err);
+		}
+
 		*(int *)((uintptr_t)&regs + off -
 		    offsetof(lx_user_t, lxu_regs)) = data;
-		return (setregs(pid, lwpid, &regs));
+
+		return (lx_ptrace_kernel(LX_PTRACE_SETREGS, lxpid, NULL,
+		    (uintptr_t)&regs));
 	}
 
 	if (off >= offsetof(lx_user_t, lxu_debugreg) &&
@@ -1065,32 +680,6 @@ ptrace_kill(pid_t pid)
 	ret = kill(pid, SIGKILL);
 
 	return (ret == 0 ? ret : -errno);
-}
-
-static int
-ptrace_getregs(pid_t pid, lwpid_t lwpid, uintptr_t addr)
-{
-	lx_user_regs_t regs;
-	int ret;
-
-	if ((ret = getregs(pid, lwpid, &regs)) != 0)
-		return (ret);
-
-	if (uucopy(&regs, (void *)addr, sizeof (regs)) != 0)
-		return (-errno);
-
-	return (0);
-}
-
-static int
-ptrace_setregs(pid_t pid, lwpid_t lwpid, uintptr_t addr)
-{
-	lx_user_regs_t regs;
-
-	if (uucopy((void *)addr, &regs, sizeof (regs)) != 0)
-		return (-errno);
-
-	return (setregs(pid, lwpid, &regs));
 }
 
 static int
@@ -1146,16 +735,21 @@ ptrace_setfpxregs(pid_t pid, lwpid_t lwpid, uintptr_t addr)
 }
 
 void
-lx_ptrace_stop_if_option(int option, boolean_t child, ulong_t msg)
+lx_ptrace_stop_if_option(int option, boolean_t child, ulong_t msg,
+    ucontext_t *ucp)
 {
 	/*
 	 * We call into the kernel to see if we need to stop for specific
 	 * ptrace(2) events.
 	 */
-	lx_debug("lx_ptrace_stop_if_option(%d, %s, %lu)", option,
-	    child ? "TRUE [child]" : "FALSE [parent]", msg);
-	if (syscall(SYS_brand, B_PTRACE_STOP_FOR_OPT, option, child,
-	    msg) != 0) {
+	lx_debug("lx_ptrace_stop_if_option(%d, %s, %lu, %p)", option,
+	    child ? "TRUE [child]" : "FALSE [parent]", msg, ucp);
+	if (ucp == NULL) {
+		ucp = (ucontext_t *)lx_find_brand_uc();
+		lx_debug("\tucp = %p", ucp);
+	}
+	if (syscall(SYS_brand, B_PTRACE_STOP_FOR_OPT, option, child, msg,
+	    ucp) != 0) {
 		if (errno != ESRCH) {
 			/*
 			 * This should _only_ fail if we are not traced, or do
@@ -1243,6 +837,8 @@ lx_ptrace(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4)
 	 */
 	case LX_PTRACE_SETOPTIONS:
 	case LX_PTRACE_GETEVENTMSG:
+	case LX_PTRACE_GETREGS:
+	case LX_PTRACE_SETREGS:
 		return (lx_ptrace_kernel(ptrace_op, lxpid, p3, p4));
 	}
 
@@ -1262,23 +858,17 @@ lx_ptrace(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4)
 		return (ptrace_peek(pid, p3, (long *)p4));
 
 	case LX_PTRACE_PEEKUSER:
-		return (ptrace_peek_user(pid, lwpid, p3, (int *)p4));
+		return (ptrace_peek_user(lxpid, pid, lwpid, p3, (int *)p4));
 
 	case LX_PTRACE_POKETEXT:
 	case LX_PTRACE_POKEDATA:
 		return (ptrace_poke(pid, p3, (int)p4));
 
 	case LX_PTRACE_POKEUSER:
-		return (ptrace_poke_user(pid, lwpid, p3, (int)p4));
+		return (ptrace_poke_user(lxpid, pid, lwpid, p3, (int)p4));
 
 	case LX_PTRACE_KILL:
 		return (ptrace_kill(pid));
-
-	case LX_PTRACE_GETREGS:
-		return (ptrace_getregs(pid, lwpid, p4));
-
-	case LX_PTRACE_SETREGS:
-		return (ptrace_setregs(pid, lwpid, p4));
 
 	case LX_PTRACE_GETFPREGS:
 		return (ptrace_getfpregs(pid, lwpid, p4));

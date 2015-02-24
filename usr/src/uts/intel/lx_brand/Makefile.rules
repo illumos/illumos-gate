@@ -21,7 +21,7 @@
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-# Copyright 2014 Joyent, Inc.  All rights reserved.
+# Copyright 2015 Joyent, Inc.
 #
 #
 
@@ -44,15 +44,23 @@ $(OBJS_DIR_DBG64)/%.o:		$(UTSBASE)/common/brand/lx/syscall/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
+$(OBJS_DIR_OBJ64)/%.o:		$(UTSBASE)/intel/brand/lx/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR_DBG64)/%.o:		$(UTSBASE)/intel/brand/lx/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
 $(OBJS_DIR_OBJ64)/%.o:		$(UTSBASE)/intel/brand/lx/%.s
-	$(COMPILE.s) -o $@ $<
+	$(COMPILE.s) -I$(UTSBASE)/i86pc -o $@ $<
 
 $(OBJS_DIR_OBJ64)/%.o:		$(LX_CMN)/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
 $(OBJS_DIR_DBG64)/%.o:		$(UTSBASE)/intel/brand/lx/%.s
-	$(COMPILE.s) -o $@ $<
+	$(COMPILE.s) -I$(UTSBASE)/i86pc -o $@ $<
 
 $(OBJS_DIR)/%.o:		$(UTSBASE)/common/brand/lx/os/%.c
 	$(COMPILE.c) -o $@ $<
@@ -62,12 +70,16 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/brand/lx/syscall/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
+$(OBJS_DIR)/%.o:		$(UTSBASE)/intel/brand/lx/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
 $(OBJS_DIR)/%.o:		$(LX_CMN)/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
 $(OBJS_DIR)/%.o:		$(UTSBASE)/intel/brand/lx/%.s
-	$(COMPILE.s) -o $@ $<
+	$(COMPILE.s) -I$(UTSBASE)/i86pc -o $@ $<
 
 #
 #	Section 1b: Lint `object' build rules.

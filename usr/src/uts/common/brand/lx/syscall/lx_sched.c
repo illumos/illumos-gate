@@ -22,8 +22,9 @@
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2015 Joyent, Inc.
+ */
 
 #include <sys/types.h>
 #include <sys/systm.h>
@@ -38,7 +39,16 @@
 #include <sys/lx_sched.h>
 #include <sys/lx_brand.h>
 
+extern int yield();
 extern long priocntl_common(int, procset_t *, int, caddr_t, caddr_t, uio_seg_t);
+
+long
+lx_sched_yield(void)
+{
+	yield();
+
+	return (0);
+}
 
 int
 lx_sched_affinity(int cmd, uintptr_t pid, int len, uintptr_t maskp,
@@ -169,13 +179,14 @@ lx_sched_setscheduler(l_pid_t pid, int policy, struct lx_sched_param *param)
 		if (lwp->lwp_errno)
 			return (lwp->lwp_errno);
 
-		if (strcmp(pcinfo.pc_clname, "TS") == 0)
+		if (strcmp(pcinfo.pc_clname, "TS") == 0) {
 			policy = LX_SCHED_OTHER;
-		else if (strcmp(pcinfo.pc_clname, "RT") == 0)
+		} else if (strcmp(pcinfo.pc_clname, "RT") == 0) {
 			policy = ((rtparms_t *)pcparm.pc_clparms)->rt_tqnsecs ==
-				RT_TQINF ? LX_SCHED_FIFO : LX_SCHED_RR;
-		else
+			    RT_TQINF ? LX_SCHED_FIFO : LX_SCHED_RR;
+		} else {
 			return (set_errno(EINVAL));
+		}
 	}
 
 	bzero(&pcinfo, sizeof (pcinfo));
@@ -195,7 +206,7 @@ lx_sched_setscheduler(l_pid_t pid, int policy, struct lx_sched_param *param)
 		pcparm.pc_cid = pcinfo.pc_cid;
 		((rtparms_t *)pcparm.pc_clparms)->rt_pri = prio;
 		((rtparms_t *)pcparm.pc_clparms)->rt_tqnsecs =
-			policy == LX_SCHED_RR ? RT_TQDEF : RT_TQINF;
+		    policy == LX_SCHED_RR ? RT_TQDEF : RT_TQINF;
 		break;
 
 	case LX_SCHED_OTHER:
@@ -263,7 +274,7 @@ lx_sched_getscheduler(l_pid_t pid)
 		policy = LX_SCHED_OTHER;
 	else if (strcmp(pcinfo.pc_clname, "RT") == 0)
 		policy = ((rtparms_t *)pcparm.pc_clparms)->rt_tqnsecs ==
-			RT_TQINF ? LX_SCHED_FIFO : LX_SCHED_RR;
+		    RT_TQINF ? LX_SCHED_FIFO : LX_SCHED_RR;
 	else
 		policy = set_errno(EINVAL);
 
@@ -316,7 +327,7 @@ lx_sched_setparam(l_pid_t pid, struct lx_sched_param *param)
 		policy = LX_SCHED_OTHER;
 	else if (strcmp(pcinfo.pc_clname, "RT") == 0)
 		policy = ((rtparms_t *)pcparm.pc_clparms)->rt_tqnsecs ==
-			RT_TQINF ? LX_SCHED_FIFO : LX_SCHED_RR;
+		    RT_TQINF ? LX_SCHED_FIFO : LX_SCHED_RR;
 	else
 		return (set_errno(EINVAL));
 
@@ -337,7 +348,7 @@ lx_sched_setparam(l_pid_t pid, struct lx_sched_param *param)
 		pcparm.pc_cid = pcinfo.pc_cid;
 		((rtparms_t *)pcparm.pc_clparms)->rt_pri = prio;
 		((rtparms_t *)pcparm.pc_clparms)->rt_tqnsecs =
-			policy == LX_SCHED_RR ? RT_TQDEF : RT_TQINF;
+		    policy == LX_SCHED_RR ? RT_TQDEF : RT_TQINF;
 		break;
 
 	case LX_SCHED_OTHER:
@@ -416,11 +427,12 @@ lx_sched_getparam(l_pid_t pid, struct lx_sched_param *param)
 			local_param.lx_sched_prio = 0;
 		else
 			local_param.lx_sched_prio = -(prio * 20) / scale;
-	} else if (strcmp(pcinfo.pc_clname, "RT") == 0)
+	} else if (strcmp(pcinfo.pc_clname, "RT") == 0) {
 		local_param.lx_sched_prio =
-			((rtparms_t *)pcparm.pc_clparms)->rt_pri;
-	else
+		    ((rtparms_t *)pcparm.pc_clparms)->rt_pri;
+	} else {
 		rv = set_errno(EINVAL);
+	}
 
 	if (rv == 0)
 		if (copyout(&local_param, param, sizeof (local_param)))

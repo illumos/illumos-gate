@@ -28,6 +28,110 @@
  * Copyright 2015, Joyent, Inc. All rights reserved.
  */
 
+/*
+ * The LX Brand: emulation of a Linux operating environment within a zone.
+ *
+ * OVERVIEW
+ *
+ * The LX brand enables a full Linux userland -- including a C library,
+ * init(1) framework, and some set of applications -- to run unmodified
+ * within an illumos zone.  Unlike illumos, where applications are expected
+ * to link against and consume functions exported from libraries, the
+ * supported Linux binary compatibility boundary is the system call
+ * interface.  By accurately emulating the behaviour of Linux system calls,
+ * Linux software can be executed in this environment as if it were running
+ * on a native Linux system.
+ *
+ * EMULATING LINUX SYSTEM CALLS
+ *
+ * Linux system calls are made in 32-bit processes via the "int 0x80"
+ * instruction; in 64-bit processes the "syscall" instruction is used, as it
+ * is with native illumos processes.  In both cases, arguments to system
+ * calls are generally passed in registers and the usermode stack is not
+ * interpreted or modified by the Linux kernel.
+ *
+ * When the emulated Linux process makes a system call, it traps into the
+ * illumos kernel.  The in-kernel brand module contains various emulation
+ * routines, and can fully service some emulated system calls; e.g. read(2)
+ * and write(2).  Other system calls require assistance from the illumos
+ * libc, bouncing back out to the brand library ("lx_brand.so.1") for
+ * emulation.
+ *
+ * The brand mechanism allows for the provision of an alternative trap
+ * handler for the various system call mechanisms.  Traditionally this was
+ * used to immediately revector execution to the usermode emulation library,
+ * which was responsible for handling all system calls.  In the interests of
+ * more accurate emulation and increased performance, much of the regular
+ * illumos system call path is now invoked.  Only the argument processing and
+ * handler dispatch are replaced by the brand, via the per-LWP
+ * "lwp_brand_syscall" interposition function pointer.
+ *
+ * THE NATIVE AND BRAND STACKS
+ *
+ * Some runtime environments (e.g. the Go language) allocate very small
+ * thread stacks, preferring to grow or split the stack as necessary.  The
+ * Linux kernel generally does not use the usermode stack when servicing
+ * system calls, so this is not a problem.  In order for our emulation to
+ * have the same zero stack impact, we must execute usermode emulation
+ * routines on an _alternate_ stack.  This is similar, in principle, to the
+ * use of sigaltstack(3C) to run signal handlers off the main thread stack.
+ *
+ * To this end, the brand library allocates and installs an alternate stack
+ * (called the "native" stack) for each LWP.  The in-kernel brand code uses
+ * this stack for usermode emulation calls and interposed signal delivery,
+ * while the emulated Linux process sees only the data on the main thread
+ * stack, known as the "brand" stack.  The stack mode is tracked in the
+ * per-LWP brand-private data, using the LX_STACK_MODE_* enum.
+ *
+ * The stack mode doubles as a system call "mode bit".  When in the
+ * LX_STACK_MODE_BRAND mode, system calls are processed as emulated Linux
+ * system calls.  In other modes, system calls are assumed to be native
+ * illumos system calls as made during brand library initialisation and
+ * usermode emulation.
+ *
+ * USERMODE EMULATION
+ *
+ * When a Linux system call cannot be emulated within the kernel, we preserve
+ * the register state of the Linux process and revector the LWP to the brand
+ * library usermode emulation handler: the "lx_emulate()" function in
+ * "lx_brand.so.1".  This revectoring is modelled on the delivery of signals,
+ * and is performed in "lx_emulate_user()".
+ *
+ * First, the emulated process state is written out to the usermode stack of
+ * the process as a "ucontext_t" object.  Arguments to the emulation routine
+ * are passed on the stack or in registers, depending on the ABI.  When the
+ * usermode emulation is complete, the result is passed back to the kernel
+ * (via the "B_EMULATION_DONE" brandsys subcommand) with the saved context
+ * for restoration.
+ *
+ * SIGNAL DELIVERY, SETCONTEXT AND GETCONTEXT
+ *
+ * When servicing emulated system calls in the usermode brand library, or
+ * during signal delivery, various state is preserved by the kernel so that
+ * the running LWP may be revectored to a handling routine.  The context
+ * allows the kernel to restart the program at the point of interruption,
+ * either at the return of the signal handler, via setcontext(3C); or after
+ * the usermode emulation request has been serviced, via B_EMULATION_DONE.
+ *
+ * In illumos native processes, the saved context (a "ucontext_t" object)
+ * includes the state of registers and the current signal mask at the point
+ * of interruption.  The context also includes a link to the most recently
+ * saved context, forming a chain to be unwound as requests complete.  The LX
+ * brand requires additional book-keeping to describe the machine state: in
+ * particular, the current stack mode and the occupied extent of the native
+ * stack.
+ *
+ * The brand code is able to interpose on the context save and restore
+ * operations in the kernel -- see "lx_savecontext()" and
+ * "lx_restorecontext()" -- to enable getcontext(3C) and setcontext(3C) to
+ * function correctly in the face of a dual stack LWP.  The brand also
+ * interposes on the signal delivery mechanism -- see "lx_sendsig()" and
+ * "lx_sendsig_stack()" -- to allow all signals to be delivered to the brand
+ * library interposer on the native stack, regardless of the interrupted
+ * execution mode.  Linux sigaltstack(2) emulation is performed entirely by
+ * the usermode brand library during signal handler interposition.
+ */
+
 #include <sys/types.h>
 #include <sys/kmem.h>
 #include <sys/errno.h>
@@ -63,6 +167,7 @@
 #include <sys/x86_archext.h>
 #include <sys/controlregs.h>
 #include <sys/core.h>
+#include <sys/stack.h>
 #include <lx_signum.h>
 
 int	lx_debug = 0;
@@ -80,17 +185,15 @@ void	lx_copy_procdata(proc_t *, proc_t *);
 extern int getsetcontext(int, void *);
 extern int waitsys(idtype_t, id_t, siginfo_t *, int);
 #if defined(_SYSCALL32_IMPL)
+extern int getsetcontext32(int, void *);
 extern int waitsys32(idtype_t, id_t, siginfo_t *, int);
 #endif
 
 extern void lx_proc_exit(proc_t *, klwp_t *);
-static void lx_psig_to_proc(proc_t *, kthread_t *, int);
 extern int lx_sched_affinity(int, uintptr_t, int, uintptr_t, int64_t *);
 
 extern void lx_ioctl_init();
 extern void lx_ioctl_fini();
-
-int lx_systrace_brand_enabled;
 
 lx_systrace_f *lx_systrace_entry_ptr;
 lx_systrace_f *lx_systrace_return_ptr;
@@ -113,6 +216,15 @@ static int lx_elfexec(struct vnode *vp, struct execa *uap, struct uarg *args,
 static boolean_t lx_native_exec(uint8_t, const char **);
 static uint32_t lx_map32limit(proc_t *);
 
+static void lx_savecontext(ucontext_t *);
+static void lx_restorecontext(ucontext_t *);
+static caddr_t lx_sendsig_stack(int);
+static void lx_sendsig(int);
+#if defined(_SYSCALL32_IMPL)
+static void lx_savecontext32(ucontext32_t *);
+#endif
+
+
 /* lx brand */
 struct brand_ops lx_brops = {
 	lx_init_brand_data,		/* b_init_brand_data */
@@ -132,7 +244,7 @@ struct brand_ops lx_brops = {
 	lx_elfexec,			/* b_elfexec */
 	NULL,				/* b_sigset_native_to_brand */
 	NULL,				/* b_sigset_brand_to_native */
-	lx_psig_to_proc,		/* b_psig_to_proc */
+	NULL,				/* b_psig_to_proc */
 	NSIG,				/* b_nsig */
 	lx_exit_with_sig,		/* b_exit_with_sig */
 	lx_wait_filter,			/* b_wait_filter */
@@ -142,14 +254,21 @@ struct brand_ops lx_brops = {
 	lx_stop_notify,			/* b_stop_notify */
 	lx_waitid_helper,		/* b_waitid_helper */
 	lx_sigcld_repost,		/* b_sigcld_repost */
-	lx_issig_stop			/* b_issig_stop */
+	lx_issig_stop,			/* b_issig_stop */
+	lx_savecontext,			/* b_savecontext */
+#if defined(_SYSCALL32_IMPL)
+	lx_savecontext32,		/* b_savecontext32 */
+#endif
+	lx_restorecontext,		/* b_restorecontext */
+	lx_sendsig_stack,		/* b_sendsig_stack */
+	lx_sendsig			/* b_sendsig */
 };
 
 struct brand_mach_ops lx_mops = {
 	NULL,
-	lx_brand_int80_callback,	/* 32-bit Linux entry point */
 	NULL,
-	lx_brand_syscall_callback,	/* 64-bit common entry point */
+	NULL,
+	NULL,
 	NULL,
 	lx_fixsegreg,
 	lx_fsbase
@@ -294,18 +413,7 @@ lx_map32limit(proc_t *p)
 void
 lx_brand_systrace_enable(void)
 {
-	extern void lx_brand_int80_enable(void);
-
-	ASSERT(!lx_systrace_enabled);
-
-#if defined(__amd64)
-	/* enable the trace points for both 32-bit and 64-bit lx calls */
-	extern void lx_brand_syscall_enable(void);
-	lx_brand_syscall_enable();
-	lx_brand_int80_enable();
-#else
-	lx_brand_int80_enable();
-#endif
+	VERIFY(!lx_systrace_enabled);
 
 	lx_systrace_enabled = 1;
 }
@@ -313,106 +421,260 @@ lx_brand_systrace_enable(void)
 void
 lx_brand_systrace_disable(void)
 {
-	extern void lx_brand_int80_disable(void);
-
-	ASSERT(lx_systrace_enabled);
-
-#if defined(__amd64)
-	/* disable the trace points for both 32-bit and 64-bit lx calls */
-	extern void lx_brand_syscall_disable(void);
-	lx_brand_syscall_disable();
-	lx_brand_int80_disable();
-#else
-	lx_brand_int80_disable();
-#endif
+	VERIFY(lx_systrace_enabled);
 
 	lx_systrace_enabled = 0;
 }
 
-/*
- * Posting a signal to a proc/thread, switch to native syscall mode.
- * See the comment on lwp_segregs_save() for how we handle the user-land
- * registers when we come into the kernel and see update_sregs() for how we
- * restore.
- */
-/*ARGSUSED*/
-static void
-lx_psig_to_proc(proc_t *p, kthread_t *t, int sig)
+void
+lx_lwp_set_native_stack_current(lx_lwp_data_t *lwpd, uintptr_t new_sp)
 {
-#if defined(__amd64)
-	lx_lwp_data_t *lwpd = ttolxlwp(t);
-	klwp_t *lwp = ttolwp(t);
-	pcb_t *pcb;
-	model_t datamodel;
+	VERIFY(lwpd->br_ntv_stack != 0);
 
-	datamodel = lwp_getdatamodel(lwp);
-	if (datamodel != DATAMODEL_NATIVE)
-		return;
-
-	pcb = &lwp->lwp_pcb;
-
-#ifdef DEBUG
 	/*
-	 * Debug check to see if we have the correct fsbase.
-	 *
-	 * Note that it is not guaranteed that our %fsbase is loaded (i.e.
-	 * rdmsr(MSR_AMD_FSBASE) won't necessarily return our expected fsbase)
-	 * when this function runs. While it is usually loaded, it's possible
-	 * to be in this function via the following sequence:
-	 *    we go off-cpu in the kernel
-	 *    another process runs in user-land and its fsbase gets loaded
-	 *    we go on-cpu to run and post a signal, but since we haven't run
-	 *	in user-land yet, our fsbase has not yet been loaded by
-	 *	update_sregs.
+	 * The "brand-lx-set-ntv-stack-current" probe has arguments:
+	 *   arg0: stack pointer before change
+	 *   arg1: stack pointer after change
+	 *   arg2: current stack base
 	 */
-	if (lwpd->br_ntv_syscall == 0 && lwpd->br_lx_fsbase != 0) {
-		/* should have Linux fsbase */
-		if (lwpd->br_lx_fsbase != pcb->pcb_fsbase) {
-			DTRACE_PROBE2(brand__lx__psig__lx__pcb,
-			    uintptr_t, lwpd->br_lx_fsbase,
-			    uintptr_t, pcb->pcb_fsbase);
-		}
+	DTRACE_PROBE3(brand__lx__set__ntv__stack__current,
+	    uintptr_t, lwpd->br_ntv_stack_current,
+	    uintptr_t, new_sp,
+	    uintptr_t, lwpd->br_ntv_stack);
 
-	}
+	lwpd->br_ntv_stack_current = new_sp;
+}
 
-	if (lwpd->br_ntv_syscall == 1 && lwpd->br_ntv_fsbase != 0) {
-		/* should have Illumos fsbase */
-		if (lwpd->br_ntv_fsbase != pcb->pcb_fsbase) {
-			DTRACE_PROBE2(brand__lx__psig__ntv__pcb,
-			    uintptr_t, lwpd->br_ntv_fsbase,
-			    uintptr_t, pcb->pcb_fsbase);
-		}
-	}
-#endif
+/*
+ * This hook runs prior to sendsig() processing and allows us to nominate
+ * an alternative stack pointer for delivery of the signal handling frame.
+ * Critically, this routine should _not_ modify any LWP state as the
+ * savecontext() does not run until after this hook.
+ */
+static caddr_t
+lx_sendsig_stack(int sig)
+{
+	klwp_t *lwp = ttolwp(curthread);
+	lx_lwp_data_t *lwpd = lwptolxlwp(lwp);
 
-	/* We "push" the current syscall mode flag on the "stack". */
-	ASSERT(lwpd->br_ntv_syscall == 0 || lwpd->br_ntv_syscall == 1);
-	lwpd->br_scms = (lwpd->br_scms << 1) | lwpd->br_ntv_syscall;
-
-	if (lwpd->br_ntv_syscall == 0 && lwpd->br_ntv_fsbase != 0) {
+	/*
+	 * We want to take signal delivery on the native stack, but only if
+	 * one has been allocated and installed for this LWP.
+	 */
+	if (lwpd->br_stack_mode == LX_STACK_MODE_BRAND) {
 		/*
-		 * We were executing in Linux code but now that we're handling
-		 * a signal we have to make sure we have the native fsbase
-		 * loaded. Also update pcb so that if we service an interrupt
-		 * we will restore the correct fsbase in update_sregs().
-		 * Because of the amd64 guard and datamodel check, this
-		 * obviously will only happen for the 64-bit user-land.
-		 *
-		 * There is a non-obvious side-effect here. Since the fsbase
-		 * will now be the native value, when we bounce out to
-		 * user-land the ucontext will capture the native value, even
-		 * though we need to restore the Linux value when we return
-		 * from the signal. This is handled by the B_SIGNAL_RETURN
-		 * code in lx_brandsys().
+		 * The program is not running on the native stack.  Return
+		 * the native stack pointer from our brand-private data so
+		 * that we may switch to it for signal handling.
 		 */
-		pcb->pcb_fsbase = lwpd->br_ntv_fsbase;
+		return ((caddr_t)lwpd->br_ntv_stack_current);
+	} else {
+		struct regs *rp = lwptoregs(lwp);
 
-		/* Ensure that we go out via update_sregs */
-		pcb->pcb_rupdate = 1;
+		/*
+		 * Either the program is already running on the native stack,
+		 * or one has not yet been allocated for this LWP.  Use the
+		 * current stack pointer value.
+		 */
+		return ((caddr_t)rp->r_sp);
 	}
-	lwpd->br_ntv_syscall = 1;
+}
+
+/*
+ * This hook runs after sendsig() processing and allows us to update the
+ * per-LWP mode flags for system calls and stacks.  The pre-signal
+ * context has already been saved and delivered to the user at this point.
+ */
+static void
+lx_sendsig(int sig)
+{
+	klwp_t *lwp = ttolwp(curthread);
+	lx_lwp_data_t *lwpd = lwptolxlwp(lwp);
+	struct regs *rp = lwptoregs(lwp);
+
+	switch (lwpd->br_stack_mode) {
+	case LX_STACK_MODE_BRAND:
+	case LX_STACK_MODE_NATIVE:
+		/*
+		 * In lx_sendsig_stack(), we nominated a stack pointer from the
+		 * native stack.  Update the stack mode, and the current in-use
+		 * extent of the native stack, accordingly:
+		 */
+		lwpd->br_stack_mode = LX_STACK_MODE_NATIVE;
+		lx_lwp_set_native_stack_current(lwpd, rp->r_sp);
+
+		/*
+		 * Fix up segment registers, etc.
+		 */
+		lx_switch_to_native(lwp);
+		break;
+
+	default:
+		/*
+		 * Otherwise, the brand library has not yet installed the
+		 * alternate stack for this LWP.  Signals will be handled on
+		 * the regular stack thread.
+		 */
+		return;
+	}
+}
+
+/*
+ * This hook runs prior to the context restoration, allowing us to take action
+ * or modify the context before it is loaded.
+ */
+static void
+lx_restorecontext(ucontext_t *ucp)
+{
+	klwp_t *lwp = ttolwp(curthread);
+	lx_lwp_data_t *lwpd = lwptolxlwp(lwp);
+	uintptr_t flags = (uintptr_t)ucp->uc_brand_data[0];
+	caddr_t sp = ucp->uc_brand_data[1];
+
+	/*
+	 * We have a saved native stack pointer value that we must restore
+	 * into the per-LWP data.
+	 */
+	if (flags & LX_UC_RESTORE_NATIVE_SP) {
+		lx_lwp_set_native_stack_current(lwpd, (uintptr_t)sp);
+	}
+
+	/*
+	 * We do not wish to restore the value of uc_link in this context,
+	 * so replace it with the value currently in the LWP.
+	 */
+	if (flags & LX_UC_IGNORE_LINK) {
+		ucp->uc_link = (ucontext_t *)lwp->lwp_oldcontext;
+	}
+
+	/*
+	 * Restore the stack mode:
+	 */
+	if (flags & LX_UC_STACK_NATIVE) {
+		lwpd->br_stack_mode = LX_STACK_MODE_NATIVE;
+	} else if (flags & LX_UC_STACK_BRAND) {
+		lwpd->br_stack_mode = LX_STACK_MODE_BRAND;
+	}
+
+#if defined(__amd64)
+	/*
+	 * Override the fsbase in the context with the value provided through
+	 * the Linux arch_prctl(2) system call.
+	 */
+	if (flags & LX_UC_STACK_BRAND) {
+		if (lwpd->br_lx_fsbase != 0) {
+			ucp->uc_mcontext.gregs[REG_FSBASE] = lwpd->br_lx_fsbase;
+		}
+	}
 #endif
 }
+
+static void
+lx_savecontext(ucontext_t *ucp)
+{
+	klwp_t *lwp = ttolwp(curthread);
+	lx_lwp_data_t *lwpd = lwptolxlwp(lwp);
+	uintptr_t flags = 0;
+
+	/*
+	 * The ucontext_t affords us three private pointer-sized members in
+	 * "uc_brand_data".  We pack a variety of flags into the first element,
+	 * and an optional stack pointer in the second element.  The flags
+	 * determine which stack pointer (native or brand), if any, is stored
+	 * in the second element.  The third element may contain the system
+	 * call number; this is analogous to the "orig_[er]ax" member of a
+	 * Linux "user_regs_struct".
+	 */
+
+	if (lwpd->br_stack_mode != LX_STACK_MODE_INIT &&
+	    lwpd->br_stack_mode != LX_STACK_MODE_PREINIT) {
+		/*
+		 * Record the value of the native stack pointer to restore
+		 * when returning to this branded context:
+		 */
+		flags |= LX_UC_RESTORE_NATIVE_SP;
+		ucp->uc_brand_data[1] = (void *)lwpd->br_ntv_stack_current;
+	}
+
+	/*
+	 * Save the stack mode:
+	 */
+	if (lwpd->br_stack_mode == LX_STACK_MODE_NATIVE) {
+		flags |= LX_UC_STACK_NATIVE;
+	} else if (lwpd->br_stack_mode == LX_STACK_MODE_BRAND) {
+		flags |= LX_UC_STACK_BRAND;
+	}
+
+	/*
+	 * If we might need to restart this system call, save that information
+	 * in the context:
+	 */
+	if (lwpd->br_stack_mode == LX_STACK_MODE_BRAND) {
+		ucp->uc_brand_data[2] =
+		    (void *)(uintptr_t)lwpd->br_syscall_num;
+		if (lwpd->br_syscall_restart) {
+			flags |= LX_UC_RESTART_SYSCALL;
+		}
+	} else {
+		ucp->uc_brand_data[2] = NULL;
+	}
+
+	ucp->uc_brand_data[0] = (void *)flags;
+}
+
+#if defined(_SYSCALL32_IMPL)
+static void
+lx_savecontext32(ucontext32_t *ucp)
+{
+	klwp_t *lwp = ttolwp(curthread);
+	lx_lwp_data_t *lwpd = lwptolxlwp(lwp);
+	unsigned int flags = 0;
+
+	/*
+	 * The ucontext_t affords us three private pointer-sized members in
+	 * "uc_brand_data".  We pack a variety of flags into the first element,
+	 * and an optional stack pointer in the second element.  The flags
+	 * determine which stack pointer (native or brand), if any, is stored
+	 * in the second element.  The third element may contain the system
+	 * call number; this is analogous to the "orig_[er]ax" member of a
+	 * Linux "user_regs_struct".
+	 */
+
+	if (lwpd->br_stack_mode != LX_STACK_MODE_INIT &&
+	    lwpd->br_stack_mode != LX_STACK_MODE_PREINIT) {
+		/*
+		 * Record the value of the native stack pointer to restore
+		 * when returning to this branded context:
+		 */
+		flags |= LX_UC_RESTORE_NATIVE_SP;
+		ucp->uc_brand_data[1] = (caddr32_t)lwpd->br_ntv_stack_current;
+	}
+
+	/*
+	 * Save the stack mode:
+	 */
+	if (lwpd->br_stack_mode == LX_STACK_MODE_NATIVE) {
+		flags |= LX_UC_STACK_NATIVE;
+	} else if (lwpd->br_stack_mode == LX_STACK_MODE_BRAND) {
+		flags |= LX_UC_STACK_BRAND;
+	}
+
+	/*
+	 * If we might need to restart this system call, save that information
+	 * in the context:
+	 */
+	if (lwpd->br_stack_mode == LX_STACK_MODE_BRAND) {
+		ucp->uc_brand_data[2] = (caddr32_t)lwpd->br_syscall_num;
+		if (lwpd->br_syscall_restart) {
+			flags |= LX_UC_RESTART_SYSCALL;
+		}
+	} else {
+		ucp->uc_brand_data[2] = NULL;
+	}
+
+	ucp->uc_brand_data[0] = flags;
+}
+#endif
 
 void
 lx_init_brand_data(zone_t *zone)
@@ -426,7 +688,6 @@ lx_init_brand_data(zone_t *zone)
 	 * This can be changed by a call to setattr() during zone boot.
 	 */
 	(void) strlcpy(data->lxzd_kernel_version, "2.4.21", LX_VERS_MAX);
-	data->lxzd_max_syscall = LX_NSYSCALLS;
 	zone->zone_brand_data = data;
 
 	/*
@@ -448,6 +709,27 @@ lx_unsupported(char *dmsg)
 	DTRACE_PROBE1(brand__lx__unsupported, char *, dmsg);
 }
 
+void
+lx_trace_sysenter(int syscall_num, uintptr_t *args)
+{
+	if (lx_systrace_enabled) {
+		VERIFY(lx_systrace_entry_ptr != NULL);
+
+		(*lx_systrace_entry_ptr)(syscall_num, args[0], args[1],
+		    args[2], args[3], args[4], args[5]);
+	}
+}
+
+void
+lx_trace_sysreturn(int syscall_num, long ret)
+{
+	if (lx_systrace_enabled) {
+		VERIFY(lx_systrace_return_ptr != NULL);
+
+		(*lx_systrace_return_ptr)(syscall_num, ret, ret, 0, 0, 0, 0);
+	}
+}
+
 /*
  * Get the addresses of the user-space system call handler and attach it to
  * the proc structure. Returning 0 indicates success; the value returned
@@ -462,16 +744,16 @@ lx_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
     uintptr_t arg3, uintptr_t arg4, uintptr_t arg5)
 {
 	kthread_t *t = curthread;
+	klwp_t *lwp = ttolwp(t);
 	proc_t *p = ttoproc(t);
 	lx_proc_data_t *pd;
-	int ike_call;
 	struct termios *termios;
 	uint_t termios_len;
 	int error;
 	int code;
 	int sig;
 	lx_brand_registration_t reg;
-	lx_lwp_data_t *lwpd;
+	lx_lwp_data_t *lwpd = lwptolxlwp(lwp);
 
 	/*
 	 * There is one operation that is suppored for non-branded
@@ -480,8 +762,8 @@ lx_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 	 * a branded process.
 	 */
 	if (cmd == B_EXEC_BRAND) {
-		ASSERT(p->p_zone != NULL);
-		ASSERT(p->p_zone->zone_brand == &lx_brand);
+		VERIFY(p->p_zone != NULL);
+		VERIFY(p->p_zone->zone_brand == &lx_brand);
 		return (exec_common(
 		    (char *)arg1, (const char **)arg2, (const char **)arg3,
 		    EBA_BRAND));
@@ -489,13 +771,19 @@ lx_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 
 	/* For all other operations this must be a branded process. */
 	if (p->p_brand == NULL)
-		return (set_errno(ENOSYS));
+		return (ENOSYS);
 
-	ASSERT(p->p_brand == &lx_brand);
-	ASSERT(p->p_brand_data != NULL);
+	VERIFY(p->p_brand == &lx_brand);
+	VERIFY(p->p_brand_data != NULL);
 
 	switch (cmd) {
 	case B_REGISTER:
+		if (lwpd->br_stack_mode != LX_STACK_MODE_PREINIT) {
+			lx_print("stack mode was not PREINIT during "
+			    "REGISTER\n");
+			return (EINVAL);
+		}
+
 		if (p->p_model == DATAMODEL_NATIVE) {
 			if (copyin((void *)arg1, &reg, sizeof (reg)) != 0) {
 				lx_print("Failed to copyin brand registration "
@@ -517,10 +805,6 @@ lx_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 			reg.lxbr_version = (uint_t)reg32.lxbr_version;
 			reg.lxbr_handler =
 			    (void *)(uintptr_t)reg32.lxbr_handler;
-			reg.lxbr_tracehandler =
-			    (void *)(uintptr_t)reg32.lxbr_tracehandler;
-			reg.lxbr_traceflag =
-			    (void *)(uintptr_t)reg32.lxbr_traceflag;
 		}
 #endif
 
@@ -534,34 +818,9 @@ lx_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 		    (void *)&lx_brand, (void *)reg.lxbr_handler, (void *)p);
 		pd = p->p_brand_data;
 		pd->l_handler = (uintptr_t)reg.lxbr_handler;
-		pd->l_tracehandler = (uintptr_t)reg.lxbr_tracehandler;
-		pd->l_traceflag = (uintptr_t)reg.lxbr_traceflag;
 
-#if defined(__amd64)
-		/*
-		 * When we register, start with native syscalls enabled so that
-		 * lx_init can finish initialization before switch to Linux
-		 * syscall mode. Also initialize the syscall mode "stack" to
-		 * native. We push/pop bits into this "stack" during signal
-		 * handling.
-		 */
-		lwpd = ttolxlwp(t);
-		lwpd->br_ntv_syscall = 1;
-		lwpd->br_scms = 1;
-#endif
-
-		if (pd->l_traceflag != NULL && pd->l_ptrace != 0) {
-			/*
-			 * If ptrace(2) is active on this process, it is likely
-			 * that we just finished an emulated execve(2) in a
-			 * traced child.  The usermode traceflag will have been
-			 * clobbered by the exec, so we set it again here:
-			 */
-			(void) suword32((void *)pd->l_traceflag, 1);
-		}
-
-		*rval = 0;
 		return (0);
+
 	case B_TTYMODES:
 		/* This is necessary for emulating TCGETS ioctls. */
 		if (ddi_prop_lookup_byte_array(DDI_DEV_T_ANY, ddi_root_node(),
@@ -577,7 +836,6 @@ lx_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 		}
 
 		ddi_prop_free(termios);
-		*rval = 0;
 		return (0);
 
 	case B_ELFDATA:
@@ -585,8 +843,7 @@ lx_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 		if (get_udatamodel() == DATAMODEL_NATIVE) {
 			if (copyout(&pd->l_elf_data, (void *)arg1,
 			    sizeof (lx_elf_data_t)) != 0) {
-				(void) set_errno(EFAULT);
-				return (*rval = -1);
+				return (EFAULT);
 			}
 		}
 #if defined(_LP64)
@@ -603,23 +860,15 @@ lx_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 
 			if (copyout(&led32, (void *)arg1,
 			    sizeof (led32)) != 0) {
-				(void) set_errno(EFAULT);
-				return (*rval = -1);
+				return (EFAULT);
 			}
 		}
 #endif
-		*rval = 0;
 		return (0);
 
 	case B_EXEC_NATIVE:
-		error = exec_common(
-		    (char *)arg1, (const char **)arg2, (const char **)arg3,
-		    EBA_NATIVE);
-		if (error) {
-			(void) set_errno(error);
-			return (*rval = -1);
-		}
-		return (*rval = 0);
+		return (exec_common((char *)arg1, (const char **)arg2,
+		    (const char **)arg3, EBA_NATIVE));
 
 	/*
 	 * The B_TRUSS_POINT subcommand is used so that we can make a no-op
@@ -627,99 +876,34 @@ lx_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 	 * emulation.
 	 */
 	case B_TRUSS_POINT:
-		*rval = 0;
 		return (0);
 
-	case B_LPID_TO_SPAIR:
+	case B_LPID_TO_SPAIR: {
 		/*
 		 * Given a Linux pid as arg1, return the Solaris pid in arg2 and
 		 * the Solaris LWP in arg3.  We also translate pid 1 (which is
 		 * hardcoded in many applications) to the zone's init process.
 		 */
-		{
-			pid_t s_pid;
-			id_t s_tid;
+		pid_t s_pid;
+		id_t s_tid;
 
-			if ((pid_t)arg1 == 1) {
-				s_pid = p->p_zone->zone_proc_initpid;
-				/* handle the dead/missing init(1M) case */
-				if (s_pid == -1)
-					s_pid = 1;
-				s_tid = 1;
-			} else if (lx_lpid_to_spair((pid_t)arg1, &s_pid,
-			    &s_tid) < 0)
-				return (ESRCH);
-
-			if (copyout(&s_pid, (void *)arg2,
-			    sizeof (s_pid)) != 0 ||
-			    copyout(&s_tid, (void *)arg3, sizeof (s_tid)) != 0)
-				return (EFAULT);
-
-			*rval = 0;
-			return (0);
+		if ((pid_t)arg1 == 1) {
+			s_pid = p->p_zone->zone_proc_initpid;
+			/* handle the dead/missing init(1M) case */
+			if (s_pid == -1)
+				s_pid = 1;
+			s_tid = 1;
+		} else if (lx_lpid_to_spair((pid_t)arg1, &s_pid, &s_tid) < 0) {
+			return (ESRCH);
 		}
 
-	case B_SYSENTRY:
-		if (lx_systrace_enabled) {
-			ASSERT(lx_systrace_entry_ptr != NULL);
-
-			if (get_udatamodel() == DATAMODEL_NATIVE) {
-				uintptr_t a[6];
-
-				if (copyin((void *)arg2, a, sizeof (a)) != 0)
-					return (EFAULT);
-
-				(*lx_systrace_entry_ptr)(arg1, a[0], a[1],
-				    a[2], a[3], a[4], a[5]);
-			}
-#if defined(_LP64)
-			else {
-				/* 32-bit userland on 64-bit kernel */
-				uint32_t a[6];
-
-				if (copyin((void *)arg2, a, sizeof (a)) != 0)
-					return (EFAULT);
-
-				(*lx_systrace_entry_ptr)(arg1, a[0], a[1],
-				    a[2], a[3], a[4], a[5]);
-			}
-#endif
+		if (copyout(&s_pid, (void *)arg2, sizeof (s_pid)) != 0 ||
+		    copyout(&s_tid, (void *)arg3, sizeof (s_tid)) != 0) {
+			return (EFAULT);
 		}
 
-		(void) lx_ptrace_stop(LX_PR_SYSENTRY);
-
-		pd = p->p_brand_data;
-
-		/*
-		 * If neither DTrace not ptrace are interested in tracing
-		 * this process any more, turn off the trace flag.
-		 */
-		if (!lx_systrace_enabled && !pd->l_ptrace)
-			(void) suword32((void *)pd->l_traceflag, 0);
-
-		*rval = 0;
 		return (0);
-
-	case B_SYSRETURN:
-		if (lx_systrace_enabled) {
-			ASSERT(lx_systrace_return_ptr != NULL);
-
-			(*lx_systrace_return_ptr)(arg1, arg2, arg2, 0, 0, 0, 0);
-		}
-
-		(void) lx_ptrace_stop(LX_PR_SYSEXIT);
-
-		pd = p->p_brand_data;
-
-		/*
-		 * If neither DTrace not ptrace are interested in tracing
-		 * this process any more, turn off the trace flag.
-		 */
-		if (!lx_systrace_enabled && !pd->l_ptrace)
-			(void) suword32((void *)pd->l_traceflag, 0);
-
-		*rval = 0;
-		return (0);
+	}
 
 	case B_SET_AFFINITY_MASK:
 	case B_GET_AFFINITY_MASK:
@@ -735,7 +919,7 @@ lx_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 
 	case B_PTRACE_STOP_FOR_OPT:
 		return (lx_ptrace_stop_for_option((int)arg1, arg2 == 0 ?
-		    B_FALSE : B_TRUE, (ulong_t)arg3));
+		    B_FALSE : B_TRUE, (ulong_t)arg3, arg4));
 
 	case B_PTRACE_CLONE_BEGIN:
 		return (lx_ptrace_set_clone_inherit((int)arg1, arg2 == 0 ?
@@ -783,8 +967,7 @@ lx_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 		return (0);
 	}
 
-	case B_UNSUPPORTED:
-		{
+	case B_UNSUPPORTED: {
 		char dmsg[256];
 
 		if (copyin((void *)arg1, &dmsg, sizeof (dmsg)) != 0) {
@@ -794,11 +977,11 @@ lx_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 		}
 		dmsg[255] = '\0';
 		lx_unsupported(dmsg);
-		}
 
 		return (0);
+	}
 
-	case B_STORE_ARGS:
+	case B_STORE_ARGS: {
 		/*
 		 * B_STORE_ARGS subcommand
 		 * arg1 = address of struct to be copied in
@@ -806,141 +989,208 @@ lx_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 		 * arg3-arg6 ignored
 		 * rval = the amount of data copied.
 		 */
+		void *buf;
+
+		/* only have upper limit because arg2 is unsigned */
+		if (arg2 > LX_BR_ARGS_SIZE_MAX) {
+			return (EINVAL);
+		}
+
+		buf = kmem_alloc(arg2, KM_SLEEP);
+		if (copyin((void *)arg1, buf, arg2) != 0) {
+			lx_print("Failed to copyin scall arg at 0x%p\n",
+			    (void *) arg1);
+			kmem_free(buf, arg2);
+			/*
+			 * Purposely not setting br_scall_args to NULL
+			 * to preserve data for debugging.
+			 */
+			return (EFAULT);
+		}
+
+		if (lwpd->br_scall_args != NULL) {
+			ASSERT(lwpd->br_args_size > 0);
+			kmem_free(lwpd->br_scall_args,
+			    lwpd->br_args_size);
+		}
+
+		lwpd->br_scall_args = buf;
+		lwpd->br_args_size = arg2;
+		*rval = arg2;
+		return (0);
+	}
+
+	case B_HELPER_CLONE:
+		return (lx_helper_clone(rval, arg1, (void *)arg2, (void *)arg3,
+		    (void *)arg4));
+
+	case B_HELPER_SETGROUPS:
+		return (lx_helper_setgroups(arg1, (gid_t *)arg2));
+
+	case B_HELPER_SIGQUEUE:
+		return (lx_helper_rt_sigqueueinfo(arg1, arg2,
+		    (siginfo_t *)arg3));
+
+	case B_HELPER_TGSIGQUEUE:
+		return (lx_helper_rt_tgsigqueueinfo(arg1, arg2, arg3,
+		    (siginfo_t *)arg4));
+
+	case B_SET_THUNK_PID:
+		lwpd->br_lx_thunk_pid = arg1;
+		return (0);
+
+	case B_GETPID:
+		/*
+		 * The usermode clone(2) code needs to be able to call
+		 * lx_getpid() from native code:
+		 */
+		*rval = lx_getpid();
+		return (0);
+
+	case B_SET_NATIVE_STACK:
+		/*
+		 * B_SET_NATIVE_STACK subcommand
+		 * arg1 = the base of the stack to use for emulation
+		 */
+		if (lwpd->br_stack_mode != LX_STACK_MODE_PREINIT) {
+			lx_print("B_SET_NATIVE_STACK when stack was already "
+			    "set to %p\n", (void *)arg1);
+			return (EEXIST);
+		}
+
+		/*
+		 * We move from the PREINIT state, where we have no brand
+		 * emulation stack, to the INIT state.  Here, we are still
+		 * running on what will become the BRAND stack, but are running
+		 * emulation (i.e. native) code.  Once the initialisation
+		 * process for this thread has finished, we will jump to
+		 * brand-specific code, while moving to the BRAND mode.
+		 *
+		 * When a new LWP is created, lx_initlwp() will clear the
+		 * stack data.  If that LWP is actually being duplicated
+		 * into a child process by fork(2), lx_forklwp() will copy
+		 * it so that the cloned thread will keep using the same
+		 * alternate stack.
+		 */
+		lwpd->br_ntv_stack = arg1;
+		lwpd->br_stack_mode = LX_STACK_MODE_INIT;
+		lx_lwp_set_native_stack_current(lwpd, arg1);
+
+		return (0);
+
+	case B_GET_CURRENT_CONTEXT:
+		/*
+		 * B_GET_CURRENT_CONTEXT subcommand:
+		 * arg1 = address for pointer to current ucontext_t
+		 */
+
+#if defined(_SYSCALL32_IMPL)
+		if (get_udatamodel() != DATAMODEL_NATIVE) {
+			caddr32_t addr = (caddr32_t)lwp->lwp_oldcontext;
+
+			error = copyout(&addr, (void *)arg1, sizeof (addr));
+		} else
+#endif
 		{
-			int err;
-			void *buf;
+			error = copyout(&lwp->lwp_oldcontext, (void *)arg1,
+			    sizeof (lwp->lwp_oldcontext));
+		}
 
-			lwpd = ttolxlwp(curthread);
-			/* only have upper limit because arg2 is unsigned */
-			if (arg2 > LX_BR_ARGS_SIZE_MAX) {
-				return (EINVAL);
-			}
+		return (error != 0 ? EFAULT : 0);
 
-			buf = kmem_alloc(arg2, KM_SLEEP);
-			if ((err = copyin((void *)arg1, buf, arg2)) != 0) {
-				lx_print("Failed to copyin scall arg at 0x%p\n",
-				    (void *) arg1);
-				kmem_free(buf, arg2);
-				/*
-				 * Purposely not setting br_scall_args to NULL
-				 * to preserve data for debugging.
-				 */
-				return (EFAULT);
-			}
+	case B_JUMP_TO_LINUX:
+		/*
+		 * B_JUMP_TO_LINUX subcommand:
+		 * arg1 = ucontext_t pointer for jump state
+		 */
 
-			if (lwpd->br_scall_args != NULL) {
-				ASSERT(lwpd->br_args_size > 0);
-				kmem_free(lwpd->br_scall_args,
-				    lwpd->br_args_size);
-			}
+		if (arg1 == NULL)
+			return (EINVAL);
 
-			lwpd->br_scall_args = buf;
-			lwpd->br_args_size = arg2;
-			*rval = arg2;
+		switch (lwpd->br_stack_mode) {
+		case LX_STACK_MODE_NATIVE: {
+			struct regs *rp = lwptoregs(lwp);
+
+			/*
+			 * We are on the NATIVE stack, so we must preserve
+			 * the extent of that stack.  The pointer will be
+			 * reset by a future setcontext().
+			 */
+			lx_lwp_set_native_stack_current(lwpd,
+			    (uintptr_t)rp->r_sp);
+			break;
+		}
+
+		case LX_STACK_MODE_INIT:
+			/*
+			 * The LWP is transitioning to Linux code for the first
+			 * time.
+			 */
+			break;
+
+		case LX_STACK_MODE_PREINIT:
+			/*
+			 * This LWP has not installed an alternate stack for
+			 * usermode emulation handling.
+			 */
+			return (ENOENT);
+
+		case LX_STACK_MODE_BRAND:
+			/*
+			 * The LWP should not be on the BRAND stack.
+			 */
+			exit(CLD_KILLED, SIGSYS);
 			return (0);
 		}
 
-	case B_CLR_NTV_SYSC_FLAG:
-#if defined(__amd64)
-		lwpd = ttolxlwp(curthread);
-		lwpd->br_ntv_syscall = 0;
+		/*
+		 * Transfer control to Linux:
+		 */
+		return (lx_runexe(lwp, (void *)arg1));
+
+	case B_EMULATION_DONE:
+		/*
+		 * B_EMULATION_DONE subcommand:
+		 * arg1 = ucontext_t * to restore
+		 * arg2 = system call number
+		 * arg3 = return code
+		 * arg4 = if operation failed, the errno value
+		 */
 
 		/*
-		 * If Linux fsbase has been set, restore it. The user-level
-		 * code only ever calls this in the 64-bit library.
-		 *
-		 * Note that it is not guaranteed that our %fsbase is loaded
-		 * (i.e. rdmsr(MSR_AMD_FSBASE) won't necessarily return our
-		 * expected fsbase) when this block runs. While it is usually
-		 * loaded, it's possible to be in this function via the
-		 * following sequence:
-		 *    we make the brandsys syscall and go off-cpu on entering
-		 *	the kernel
-		 *    another process runs in user-land and its fsbase gets
-		 *	loaded
-		 *    we go on-cpu to finish the syscall but since we haven't
-		 *	run again in user-land yet, our fsbase has not yet been
-		 *	reloaded by update_sregs
+		 * The first part of this operation is a setcontext() to
+		 * restore the register state to the copy we preserved
+		 * before vectoring to the usermode emulation routine.
+		 * If that fails, we return (hopefully) to the emulation
+		 * routine and it will handle the error.
 		 */
-		if (lwpd->br_lx_fsbase != 0) {
-			klwp_t *lwp = ttolwp(t);
-			pcb_t *pcb = &lwp->lwp_pcb;
-
-			pcb->pcb_fsbase = lwpd->br_lx_fsbase;
-
-			/* Ensure that we go out via update_sregs */
-			pcb->pcb_rupdate = 1;
-		}
+#if (_SYSCALL32_IMPL)
+		if (get_udatamodel() != DATAMODEL_NATIVE) {
+			error = getsetcontext32(SETCONTEXT, (void *)arg1);
+		} else
 #endif
-		return (0);
+		{
+			error = getsetcontext(SETCONTEXT, (void *)arg1);
+		}
 
-	case B_SIGNAL_RETURN:
-#if defined(__amd64)
-		/*
-		 * Set the syscall mode and do the setcontext syscall. The
-		 * user-level code only ever calls this in the 64-bit library.
-		 *
-		 * We get the previous syscall mode off of the br_scms "stack".
-		 * That is a sequence of syscall mode flag bits we've pushed
-		 * into that int as we took signals.
-		 * arg1 = ucontext_t pointer
-		 */
-		lwpd = ttolxlwp(curthread);
-
-		lwpd->br_ntv_syscall = lwpd->br_scms & 0x1;
-		/* "pop" this value from the "stack" */
-		lwpd->br_scms >>= 1;
+		if (error != 0) {
+			return (error);
+		}
 
 		/*
-		 * If setting the mode to lx, make sure we fix up the context
-		 * so that we load the lx fsbase when we return to the Linux
-		 * code. For the native case, the context already has the
-		 * correct native fsbase so we don't need to do anything here.
-		 * Note that setgregs updates the pcb and in update_sregs we
-		 * wrmsr the correct fsbase when we return to user-level.
-		 *	getsetcontext -> restorecontext -> setgregs
+		 * The saved Linux context has been restored.  We handle the
+		 * return value or errno with code common to the in-kernel
+		 * system call emulation.
 		 */
-		if (lwpd->br_ntv_syscall == 0 && lwpd->br_lx_fsbase != 0 &&
-		    arg1 != NULL) {
+		if ((error = (int)arg4) != 0) {
 			/*
-			 * Linux fsbase has been initialized, restore it.
-			 * We have to copyin to modify since the user-level
-			 * emulation doesn't have a copy of the lx fsbase or
-			 * know that we are returning to Linux code.
+			 * lx_syscall_return() looks at the errno in the LWP,
+			 * so set it here:
 			 */
-			ucontext_t uc;
-			klwp_t *lwp = ttolwp(t);
-			pcb_t *pcb = &lwp->lwp_pcb;
-
-			if (copyin((void *)arg1, &uc, sizeof (ucontext_t) -
-			    sizeof (uc.uc_filler) -
-			    sizeof (uc.uc_mcontext.fpregs)))
-				return (set_errno(EFAULT));
-
-			uc.uc_mcontext.gregs[REG_FSBASE] = lwpd->br_lx_fsbase;
-
-			if (copyout(&uc, (void *)arg1, sizeof (ucontext_t) -
-			    sizeof (uc.uc_filler) -
-			    sizeof (uc.uc_mcontext.fpregs)))
-				return (set_errno(EFAULT));
-
-			/* Ensure that we go out via update_sregs */
-			pcb->pcb_rupdate = 1;
+			set_errno(error);
 		}
-#endif /* amd64 */
-		return (getsetcontext(SETCONTEXT, (void *)arg1));
+		lx_syscall_return(ttolwp(curthread), (int)arg2, (long)arg3);
 
-	case B_UNWIND_NTV_SYSC_FLAG:
-#if defined(__amd64)
-		/*
-		 * Used when exiting to support the setcontext back to the
-		 * getcontext we performed in lx_init. We need to unwin
-		 * whatever signal state is in br_scms since we are exiting.
-		 * This sets us up for the B_SIGNAL_RETURN from lx_setcontext.
-		 */
-		lwpd = ttolxlwp(curthread);
-		lwpd->br_scms = 1;
-#endif
 		return (0);
 
 	case B_EXIT_AS_SIG:
@@ -959,41 +1209,6 @@ lx_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 		exit(code, sig);
 		/* NOTREACHED */
 		break;
-
-	case B_IKE_SYSCALL:
-		if (arg1 > LX_N_IKE_FUNCS)
-			return (EINVAL);
-
-		if (get_udatamodel() == DATAMODEL_NATIVE) {
-			uintptr_t a[6];
-
-			if (copyin((void *)arg2, a, sizeof (a)) != 0)
-				return (EFAULT);
-
-			*rval = lx_emulate_syscall(arg1, a[0], a[1],
-			    a[2], a[3], a[4], a[5]);
-#if defined(_LP64)
-		} else {
-			/* 32-bit userland on 64-bit kernel */
-			uint32_t a[6];
-
-			if (copyin((void *)arg2, a, sizeof (a)) != 0)
-				return (EFAULT);
-
-			*rval = lx_emulate_syscall(arg1, a[0], a[1],
-			    a[2], a[3], a[4], a[5]);
-#endif
-		}
-
-		return (0);
-
-	default:
-		ike_call = cmd - B_IKE_SYSCALL;
-		if (ike_call > 0 && ike_call <= LX_N_IKE_FUNCS) {
-			*rval = lx_emulate_syscall(ike_call, arg1, arg2,
-			    arg3, arg4, arg5, 0xbadbeef);
-			return (0);
-		}
 	}
 
 	return (EINVAL);
@@ -1443,10 +1658,36 @@ lx_native_exec(uint8_t osabi, const char **interp)
 	return (B_TRUE);
 }
 
+static void
+lx_syscall_init(void)
+{
+	int i;
+
+	/*
+	 * Count up the 32-bit Linux system calls.  Note that lx_sysent32
+	 * has (LX_NSYSCALLS + 1) entries.
+	 */
+	for (i = 0; i <= LX_NSYSCALLS && lx_sysent32[i].sy_name != NULL; i++)
+		continue;
+	lx_nsysent32 = i;
+
+#if defined(_LP64)
+	/*
+	 * Count up the 64-bit Linux system calls.  Note that lx_sysent64
+	 * has (LX_NSYSCALLS + 1) entries.
+	 */
+	for (i = 0; i <= LX_NSYSCALLS && lx_sysent64[i].sy_name != NULL; i++)
+		continue;
+	lx_nsysent64 = i;
+#endif
+}
+
 int
 _init(void)
 {
 	int err = 0;
+
+	lx_syscall_init();
 
 	/* pid/tid conversion hash tables */
 	lx_pid_init();

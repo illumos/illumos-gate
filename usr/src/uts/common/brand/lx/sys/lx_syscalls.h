@@ -22,7 +22,7 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2014 Joyent, Inc.  All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  */
 
 #ifndef _SYS_LINUX_SYSCALLS_H
@@ -38,7 +38,6 @@ extern long lx_arch_prctl();
 extern long lx_brk();
 extern long lx_getpid();
 extern long lx_getppid();
-extern long lx_clone();
 extern long lx_kill();
 extern long lx_tkill();
 extern long lx_tgkill();
@@ -55,16 +54,20 @@ extern long lx_sched_getscheduler();
 extern long lx_sched_rr_get_interval();
 extern long lx_sched_setparam();
 extern long lx_sched_setscheduler();
+extern long lx_sched_yield();
 extern long lx_set_thread_area();
 extern long lx_set_tid_address();
 extern long lx_setresgid();
 extern long lx_setresgid16();
 extern long lx_setresuid();
 extern long lx_setresuid16();
-extern long lx_sysinfo();
-extern long lx_setgroups();
-extern long lx_rt_sigqueueinfo();
-extern long lx_rt_tgsigqueueinfo();
+extern long lx_sysinfo32();
+extern long lx_sysinfo64();
+extern long lx_wait4();
+extern long lx_waitid();
+extern long lx_waitpid();
+extern long lx_write();
+extern long lx_xattr();
 
 #endif	/* _KERNEL */
 

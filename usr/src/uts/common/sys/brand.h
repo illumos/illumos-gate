@@ -137,6 +137,13 @@ struct brand_ops {
 	    boolean_t *, int *);
 	int	(*b_sigcld_repost)(proc_t *, sigqueue_t *);
 	int	(*b_issig_stop)(proc_t *, klwp_t *);
+	void	(*b_savecontext)(ucontext_t *);
+#if defined(_SYSCALL32_IMPL)
+	void	(*b_savecontext32)(ucontext32_t *);
+#endif
+	void	(*b_restorecontext)(ucontext_t *);
+	caddr_t	(*b_sendsig_stack)(int);
+	void	(*b_sendsig)(int);
 };
 
 /*

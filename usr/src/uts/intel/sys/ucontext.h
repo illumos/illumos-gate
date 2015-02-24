@@ -20,6 +20,9 @@
  */
 
 /*
+ * Copyright 2015 Joyent, Inc.
+ */
+/*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -82,9 +85,16 @@ struct	__ucontext {
 	sigset_t   	uc_sigmask;
 	stack_t 	uc_stack;
 	mcontext_t 	uc_mcontext;
-	long		uc_filler[5];	/* see ABI spec for Intel386 */
+	/*
+	 * The Intel386 ABI specification includes a 5-element array of longs
+	 * called "uc_filler", padding the size of the struct to 512 bytes.  To
+	 * allow zone brands to communicate extra data right the way through
+	 * the signal handling process, from sigacthandler to setcontext, we
+	 * steal the first three of these longs as a brand-private member.
+	 */
+	void		*uc_brand_data[3];
+	long		uc_filler[2];
 };
-
 #if defined(_SYSCALL32)
 
 /* Kernel view of user ILP32 ucontext structure */
@@ -95,7 +105,8 @@ typedef struct ucontext32 {
 	sigset_t	uc_sigmask;
 	stack32_t	uc_stack;
 	mcontext32_t	uc_mcontext;
-	int32_t		uc_filler[5];
+	caddr32_t	uc_brand_data[3];
+	int32_t		uc_filler[2];
 } ucontext32_t;
 
 #if defined(_KERNEL)

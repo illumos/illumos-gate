@@ -25,7 +25,7 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 /*
- * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  */
 
@@ -575,6 +575,13 @@ ucontext_32ton(const ucontext32_t *src, ucontext_t *dst)
 	if (src->uc_flags & UC_FPU)
 		fpregset_32ton(&src->uc_mcontext.fpregs,
 		    &dst->uc_mcontext.fpregs);
+
+	/*
+	 * Copy the brand-private data:
+	 */
+	dst->uc_brand_data[0] = (void *)(uintptr_t)src->uc_brand_data[0];
+	dst->uc_brand_data[1] = (void *)(uintptr_t)src->uc_brand_data[1];
+	dst->uc_brand_data[2] = (void *)(uintptr_t)src->uc_brand_data[2];
 }
 
 #endif	/* _SYSCALL32_IMPL */
@@ -633,7 +640,7 @@ static greg_t
 fix_segreg(greg_t sr, int iscs, model_t datamodel)
 {
 	kthread_t *t = curthread;
-	
+
 	switch (sr &= 0xffff) {
 
 	case 0:
@@ -669,7 +676,7 @@ fix_segreg(greg_t sr, int iscs, model_t datamodel)
 		break;
 	}
 
- 	/*
+	/*
 	 * Allow this process's brand to do any necessary segment register
 	 * manipulation.
 	 */

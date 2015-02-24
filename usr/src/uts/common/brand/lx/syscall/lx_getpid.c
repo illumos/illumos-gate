@@ -22,8 +22,9 @@
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2015 Joyent, Inc.
+ */
 
 #include <sys/zone.h>
 #include <sys/types.h>
@@ -38,7 +39,7 @@
  * return the pid
  */
 long
-lx_getpid()
+lx_getpid(void)
 {
 	lx_lwp_data_t *lwpd = ttolxlwp(curthread);
 	long rv;
@@ -46,8 +47,13 @@ lx_getpid()
 	if (curproc->p_pid == curproc->p_zone->zone_proc_initpid) {
 		rv = 1;
 	} else {
-		ASSERT(lwpd != NULL);
-		rv = lwpd->br_tgid;
+		VERIFY(lwpd != NULL);
+
+		if (lwpd->br_lx_thunk_pid != 0) {
+			rv = lwpd->br_lx_thunk_pid;
+		} else {
+			rv = lwpd->br_tgid;
+		}
 	}
 
 	return (rv);

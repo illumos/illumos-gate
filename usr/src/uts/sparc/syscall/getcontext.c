@@ -20,6 +20,9 @@
  */
 
 /*
+ * Copyright 2015 Joyent, Inc.
+ */
+/*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -110,10 +113,15 @@ savecontext(ucontext_t *ucp, const k_sigset_t *mask)
 		ucp->uc_flags &= ~UC_FPU;
 	ucp->uc_mcontext.gwins = (gwindows_t *)NULL;
 
-	/*
-	 * Save signal mask.
-	 */
-	sigktou(mask, &ucp->uc_sigmask);
+	if (mask != NULL) {
+		/*
+		 * Save signal mask.
+		 */
+		sigktou(mask, &ucp->uc_sigmask);
+	} else {
+		ucp->uc_flags &= ~UC_SIGMASK;
+		bzero(&ucp->uc_sigmask, sizeof (ucp->uc_sigmask));
+	}
 }
 
 
@@ -412,11 +420,16 @@ savecontext32(ucontext32_t *ucp, const k_sigset_t *mask, struct fq32 *dfq)
 		ucp->uc_flags &= ~UC_FPU;
 	ucp->uc_mcontext.gwins = (caddr32_t)NULL;
 
-	/*
-	 * Save signal mask (the 32- and 64-bit sigset_t structures are
-	 * identical).
-	 */
-	sigktou(mask, (sigset_t *)&ucp->uc_sigmask);
+	if (mask != NULL) {
+		/*
+		 * Save signal mask (the 32- and 64-bit sigset_t structures are
+		 * identical).
+		 */
+		sigktou(mask, (sigset_t *)&ucp->uc_sigmask);
+	} else {
+		ucp->uc_flags &= ~UC_SIGMASK;
+		bzero(&ucp->uc_sigmask, sizeof (ucp->uc_sigmask));
+	}
 }
 
 int

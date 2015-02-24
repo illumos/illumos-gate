@@ -63,29 +63,41 @@ int	sngl_elfexec(vnode_t *, execa_t *, uarg_t *, intpdata_t *, int,
 
 /* SNGL brand */
 struct brand_ops sngl_brops = {
-	sngl_init_brand_data,
-	sngl_free_brand_data,
-	sngl_brandsys,
-	sngl_setbrand,
-	sngl_getattr,
-	sngl_setattr,
-	sngl_copy_procdata,
-	sngl_proc_exit,
-	sngl_exec,
-	lwp_setrval,
-	sngl_initlwp,
-	sngl_forklwp,
-	sngl_freelwp,
-	sngl_lwpexit,
-	sngl_elfexec,
-	NULL,
-	NULL,
-	NULL,
-	NSIG,
-	NULL,
-	NULL,
-	NULL,
-	NULL
+	sngl_init_brand_data,		/* b_init_brand_data */
+	sngl_free_brand_data,		/* b_free_brand_data */
+	sngl_brandsys,			/* b_brandsys */
+	sngl_setbrand,			/* b_setbrand */
+	sngl_getattr,			/* b_getattr */
+	sngl_setattr,			/* b_setattr */
+	sngl_copy_procdata,		/* b_copy_procdata */
+	sngl_proc_exit,			/* b_proc_exit */
+	sngl_exec,			/* b_exec */
+	lwp_setrval,			/* b_lwp_setrval */
+	sngl_initlwp,			/* b_initlwp */
+	sngl_forklwp,			/* b_forklwp */
+	sngl_freelwp,			/* b_freelwp */
+	sngl_lwpexit,			/* b_lwpexit */
+	sngl_elfexec,			/* b_elfexec */
+	NULL,				/* b_sigset_native_to_brand */
+	NULL,				/* b_sigset_brand_to_native */
+	NULL,				/* b_psig_to_proc */
+	NSIG,				/* b_nsig */
+	NULL,				/* b_exit_with_sig */
+	NULL,				/* b_wait_filter */
+	NULL,				/* b_native_exec */
+	NULL,				/* b_ptrace_exectrap */
+	NULL,				/* b_map32limit */
+	NULL,				/* b_stop_notify */
+	NULL,				/* b_waitid_helper */
+	NULL,				/* b_sigcld_repost */
+	NULL,				/* b_issig_stop */
+	NULL,				/* b_savecontext */
+#if defined(_SYSCALL32_IMPL)
+	NULL,				/* b_savecontext32 */
+#endif
+	NULL,				/* b_restorecontext */
+	NULL,				/* b_sendsig_stack */
+	NULL				/* b_sendsig */
 };
 
 #ifdef	__amd64

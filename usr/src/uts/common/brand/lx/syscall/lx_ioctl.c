@@ -1145,7 +1145,7 @@ lx_ioctl_fini()
 	vsd_destroy(&lx_ioctl_vsd);
 }
 
-int
+long
 lx_ioctl(int fdes, int cmd, intptr_t arg)
 {
 	file_t *fp;
