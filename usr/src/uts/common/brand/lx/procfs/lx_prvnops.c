@@ -1256,6 +1256,29 @@ get_locked(proc_t *p)
 }
 
 /*
+ * Linux wants to prefer the main thread for the pid status info so we
+ * only use prchoose if we can't find the main thread.
+ */
+static kthread_t *
+get_main_thread(proc_t *p)
+{
+	kthread_t *t;
+
+	if ((t = p->p_tlist) == NULL)
+		return (t);
+
+	do {
+		/* we know the main thread is always tid 1 */
+		if (t->t_tid == 1) {
+			thread_lock(t);
+			return (t);
+		}
+	} while ((t = t->t_forw) != p->p_tlist);
+
+	return (prchoose(p));
+}
+
+/*
  * lxpr_read_pid_status(): status file
  */
 static void
@@ -1312,7 +1335,7 @@ lxpr_read_pid_status(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 			ppid = 1;
 	}
 
-	t = prchoose(p);
+	t = get_main_thread(p);
 	if (t != NULL) {
 		switch (t->t_state) {
 		case TS_SLEEP:
@@ -1520,7 +1543,7 @@ lxpr_read_pid_stat(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 		mutex_exit(&p->p_splock);
 	}
 
-	t = prchoose(p);
+	t = get_main_thread(p);
 	if (t != NULL) {
 		switch (t->t_state) {
 		case TS_SLEEP:
