@@ -42,8 +42,8 @@
  * linux cloned thread.
  */
 /* ARGSUSED */
-long
-lx_clone(int flags, void *stkp, void *ptidp, void *tls, void *ctidp)
+int
+lx_helper_clone(int64_t *rval, int flags, void *ptidp, void *tls, void *ctidp)
 {
 	struct lx_lwp_data *lwpd = ttolxlwp(curthread);
 	struct lx_proc_data *lproc = ttolxproc(curthread);
@@ -85,19 +85,10 @@ lx_clone(int flags, void *stkp, void *ptidp, void *tls, void *ctidp)
 				lx_set_gdt(entry, &lwpd->br_tls[tls_index]);
 			} else {
 				/*
-				 * For 64-bit, we need to set %fsbase -- which
-				 * requires us to save the native %fsbase and
-				 * set our LX %fsbase. Don't use rdmsr since
-				 * the value might get changed before we get to
-				 * this code. We use the value from the pcb
-				 * which the native libc should have already
-				 * setup via syslwp_private.
+				 * Set the Linux %fsbase for this LWP.  We will
+				 * restore it the next time we return to Linux
+				 * via setcontext()/lx_restorecontext().
 				 */
-#if defined(__amd64)
-				pcb_t *pcb;
-				pcb = (pcb_t *)&curthread->t_lwp->lwp_pcb;
-				lwpd->br_ntv_fsbase = pcb->pcb_fsbase;
-#endif
 				lwpd->br_lx_fsbase = (uintptr_t)tls;
 			}
 		}
@@ -129,7 +120,9 @@ lx_clone(int flags, void *stkp, void *ptidp, void *tls, void *ctidp)
 			return (set_errno(EFAULT));
 		}
 	}
-	return (lwpd->br_pid);
+
+	*rval = lwpd->br_pid;
+	return (0);
 }
 
 long

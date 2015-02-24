@@ -21,7 +21,7 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2014 Joyent, Inc.  All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  */
 
 #include <vm/anon.h>
@@ -30,7 +30,7 @@
 #include <sys/zone.h>
 #include <sys/time.h>
 
-struct lx_sysinfo {
+typedef struct lx_sysinfo {
 	int64_t si_uptime;	/* Seconds since boot */
 	uint64_t si_loads[3];	/* 1, 5, and 15 minute avg runq length */
 	uint64_t si_totalram;	/* Total memory size */
@@ -44,28 +44,51 @@ struct lx_sysinfo {
 	uint64_t si_totalhigh;	/* High memory size */
 	uint64_t si_freehigh;	/* Avail high memory */
 	uint32_t si_mem_unit;	/* Unit size of memory fields */
-};
+} lx_sysinfo_t;
+
+#if defined(_SYSCALL32_IMPL)
+/*
+ * 64-bit kernel view of the 32-bit usermode struct.
+ */
+#pragma pack(4)
+typedef struct lx_sysinfo32 {
+	int32_t si_uptime;	/* Seconds since boot */
+	uint32_t si_loads[3];	/* 1, 5, and 15 minute avg runq length */
+	uint32_t si_totalram;	/* Total memory size */
+	uint32_t si_freeram;	/* Available memory */
+	uint32_t si_sharedram;	/* Shared memory */
+	uint32_t si_bufferram;	/* Buffer memory */
+	uint32_t si_totalswap;	/* Total swap space */
+	uint32_t si_freeswap;	/* Avail swap space */
+	uint16_t si_procs;	/* Process count */
+	uint16_t si_pad;	/* Padding */
+	uint32_t si_totalhigh;	/* High memory size */
+	uint32_t si_freehigh;	/* Avail high memory */
+	uint32_t si_mem_unit;	/* Unit size of memory fields */
+	char __si_pad[8];
+} lx_sysinfo32_t;
+#pragma pack()
+#endif
 
 extern pgcnt_t swapfs_minfree;
 
-long
-lx_sysinfo(struct lx_sysinfo *sip)
+static void
+lx_sysinfo_common(lx_sysinfo_t *si)
 {
-	struct lx_sysinfo si;
 	zone_t *zone = curthread->t_procp->p_zone;
 	uint64_t zphysmem, zfreemem, ztotswap, zfreeswap;
 
-	si.si_uptime = gethrestime_sec() - zone->zone_boot_time;
+	si->si_uptime = gethrestime_sec() - zone->zone_boot_time;
 
-	si.si_loads[0] = zone->zone_hp_avenrun[0];
-	si.si_loads[1] = zone->zone_hp_avenrun[1];
-	si.si_loads[2] = zone->zone_hp_avenrun[2];
+	si->si_loads[0] = zone->zone_hp_avenrun[0];
+	si->si_loads[1] = zone->zone_hp_avenrun[1];
+	si->si_loads[2] = zone->zone_hp_avenrun[2];
 
 	/*
 	 * In linux each thread looks like a process, so we conflate the
 	 * two in this stat as well.
 	 */
-	si.si_procs = (int32_t)zone->zone_nlwps;
+	si->si_procs = (int32_t)zone->zone_nlwps;
 
 	/*
 	 * If memory or swap limits are set on the zone, use those, otherwise
@@ -111,30 +134,85 @@ lx_sysinfo(struct lx_sysinfo *sip)
 	 * option.
 	 */
 	if (MAX(zphysmem, ztotswap) < 1024 * 1024) {
-		si.si_totalram = ptob(zphysmem);
-		si.si_freeram = ptob(zfreemem);
-		si.si_totalswap = ptob(ztotswap);
-		si.si_freeswap = ptob(zfreeswap);
-		si.si_mem_unit = 1;
+		si->si_totalram = ptob(zphysmem);
+		si->si_freeram = ptob(zfreemem);
+		si->si_totalswap = ptob(ztotswap);
+		si->si_freeswap = ptob(zfreeswap);
+		si->si_mem_unit = 1;
 	} else {
-		si.si_totalram = zphysmem;
-		si.si_freeram = zfreemem;
-		si.si_totalswap = ztotswap;
-		si.si_freeswap = zfreeswap;
-		si.si_mem_unit = PAGESIZE;
+		si->si_totalram = zphysmem;
+		si->si_freeram = zfreemem;
+		si->si_totalswap = ztotswap;
+		si->si_freeswap = zfreeswap;
+		si->si_mem_unit = PAGESIZE;
 	}
-	si.si_bufferram = 0;
-	si.si_sharedram = 0;
+	si->si_bufferram = 0;
+	si->si_sharedram = 0;
 
 	/*
 	 * These two stats refer to high physical memory.  If an
 	 * application running in a Linux zone cares about this, then
 	 * either it or we are broken.
 	 */
-	si.si_totalhigh = 0;
-	si.si_freehigh = 0;
+	si->si_totalhigh = 0;
+	si->si_freehigh = 0;
+}
 
-	if (copyout(&si, sip, sizeof (si)) != 0)
+long
+lx_sysinfo64(caddr_t sip)
+{
+	lx_sysinfo_t si;
+
+	bzero(&si, sizeof (si));
+	lx_sysinfo_common(&si);
+
+	if (copyout(&si, sip, sizeof (si)) != 0) {
 		return (set_errno(EFAULT));
+	}
+
 	return (0);
 }
+
+#if defined(_SYSCALL32_IMPL)
+long
+lx_sysinfo32(caddr_t sip)
+{
+	lx_sysinfo_t si;
+	lx_sysinfo32_t si32;
+	int i;
+
+	lx_sysinfo_common(&si);
+
+	/*
+	 * Convert the lx_sysinfo_t into the legacy 32-bit view:
+	 */
+	bzero(&si32, sizeof (si32));
+	si32.si_uptime = si.si_uptime;
+
+	for (i = 0; i < 3; i++) {
+		if ((si.si_loads[i]) > 0x7fffffff)
+			si32.si_loads[i] = 0x7fffffff;
+		else
+			si32.si_loads[i] = si.si_loads[i];
+	}
+
+	si32.si_procs = si.si_procs;
+	si32.si_totalram = si.si_totalram;
+	si32.si_freeram = si.si_freeram;
+	si32.si_totalswap = si.si_totalswap;
+	si32.si_freeswap = si.si_freeswap;
+	si32.si_mem_unit = si.si_mem_unit;
+
+	si32.si_bufferram = si.si_bufferram;
+	si32.si_sharedram = si.si_sharedram;
+
+	si32.si_totalhigh = si.si_totalhigh;
+	si32.si_freehigh = si.si_freehigh;
+
+	if (copyout(&si32, sip, sizeof (si32)) != 0) {
+		return (set_errno(EFAULT));
+	}
+
+	return (0);
+}
+#endif

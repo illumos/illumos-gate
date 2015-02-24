@@ -66,10 +66,7 @@ extern "C" {
 /*
  * This must be large enough for both the 32-bit table and 64-bit table.
  */
-#define	LX_NSYSCALLS		352
-
-/* The number of In-Kernel Emulation functions */
-#define	LX_N_IKE_FUNCS		29
+#define	LX_NSYSCALLS		358
 
 /*
  * brand(2) subcommands
@@ -78,8 +75,8 @@ extern "C" {
  * > 192 is reserved for in-kernel emulated system calls.
  */
 #define	B_LPID_TO_SPAIR		128
-#define	B_SYSENTRY		129
-#define	B_SYSRETURN		130
+#define	B_GET_CURRENT_CONTEXT	129
+#define	B_EMULATION_DONE	130
 #define	B_PTRACE_KERNEL		131
 #define	B_SET_AFFINITY_MASK	132
 #define	B_GET_AFFINITY_MASK	133
@@ -87,13 +84,16 @@ extern "C" {
 #define	B_PTRACE_STOP_FOR_OPT	135
 #define	B_UNSUPPORTED		136
 #define	B_STORE_ARGS		137
-#define	B_CLR_NTV_SYSC_FLAG	138
-#define	B_SIGNAL_RETURN		139
-#define	B_UNWIND_NTV_SYSC_FLAG	140
+#define	B_GETPID		138
+#define	B_JUMP_TO_LINUX		139
+#define	B_SET_THUNK_PID		140
 #define	B_EXIT_AS_SIG		141
 #define	B_HELPER_WAITID		142
-
-#define	B_IKE_SYSCALL		192
+#define	B_HELPER_CLONE		143
+#define	B_HELPER_SETGROUPS	144
+#define	B_HELPER_SIGQUEUE	145
+#define	B_HELPER_TGSIGQUEUE	146
+#define	B_SET_NATIVE_STACK	147
 
 #ifndef _ASM
 /*
@@ -157,6 +157,45 @@ typedef enum lx_ptrace_options {
 /* Aux vector containing vDSO addr */
 #define	AT_SYSINFO_EHDR	33
 
+/*
+ * This table initialiser maps errno values from illumos to Linux numbers.
+ * It is presently used in both the usermode and kernel emulation code,
+ * so it is defined here.
+ */
+/* BEGIN CSTYLED */
+#define	LX_STOL_ERRNO_INIT	{					\
+	  0,   1,   2,   3,   4,   5,   6,   7,   8,   9,		\
+	 10,  11,  12,  13,  14,  15,  16,  17,  18,  19,		\
+	 20,  21,  22,  23,  24,  25,  26,  27,  28,  29,		\
+	 30,  31,  32,  33,  34,  42,  43,  44,  45,  46,		\
+	 47,  48,  49,  50,  51,  35,  47,  22,  38,  22, /* 49 */	\
+	 52,  53,  54,  55,  56,  57,  58,  59,  22,  22,		\
+	 61,  61,  62,  63,  64,  65,  66,  67,  68,  69,		\
+	 70,  71,  22,  22,  72,  22,  22,  74,  36,  75,		\
+	 76,  77,  78,  79,  80,  81,  82,  83,  84,  38,		\
+	 40,  85,  86,  39,  87,  88,  89,  90,  91,  92, /* 99 */	\
+	 22,  22,  22,  22,  22,  22,  22,  22,  22,  22,		\
+	 22,  22,  22,  22,  22,  22,  22,  22,  22,  22,		\
+	 93,  94,  95,  96,  97,  98,  99, 100, 101, 102,		\
+	103, 104, 105, 106, 107,  22,  22,  22,  22,  22,		\
+	 22,  22,  22, 108, 109, 110, 111, 112, 113, 114, /* 149 */	\
+	115, 116 }
+/* END CSTYLED */
+
+/*
+ * Usermode emulation routines are run on an alternate stack allocated by
+ * the brand library.  Every LWP in a process will incur this overhead beyond
+ * the regular thread stack:
+ */
+#define	LX_NATIVE_STACK_PAGE_COUNT	64
+
+/*
+ * When returning in a new child process created with vfork(2) (or CLONE_VFORK)
+ * we discard some of the native stack to prevent corruption of the parent
+ * emulation state.
+ */
+#define	LX_NATIVE_STACK_VFORK_GAP	0x3000
+
 #ifndef	_ASM
 
 extern struct brand lx_brand;
@@ -164,18 +203,15 @@ extern struct brand lx_brand;
 typedef struct lx_brand_registration {
 	uint_t lxbr_version;		/* version number */
 	void *lxbr_handler;		/* base address of handler */
-	void *lxbr_tracehandler;	/* base address of trace handler */
-	void *lxbr_traceflag;		/* address of trace flag */
 } lx_brand_registration_t;
 
 typedef struct lx_brand_registration32 {
 	uint_t lxbr_version;		/* version number */
 	uint32_t lxbr_handler;		/* base address of handler */
-	uint32_t lxbr_tracehandler;	/* base address of trace handler */
-	uint32_t lxbr_traceflag;	/* address of trace flag */
 } lx_brand_registration32_t;
 
 #ifdef __amd64
+
 typedef struct lx_regs {
 	long lxr_fs;
 	long lxr_rdi;
@@ -198,7 +234,24 @@ typedef struct lx_regs {
 
 	long lxr_orig_rax;
 } lx_regs_t;
+
+typedef struct lx_regs32 {
+	uint32_t lxr_gs;
+	uint32_t lxr_edi;
+	uint32_t lxr_esi;
+	uint32_t lxr_ebp;
+	uint32_t lxr_esp;
+	uint32_t lxr_ebx;
+	uint32_t lxr_edx;
+	uint32_t lxr_ecx;
+	uint32_t lxr_eax;
+	uint32_t lxr_eip;
+
+	uint32_t lxr_orig_eax;
+} lx_regs32_t;
+
 #else /* ! __amd64 */
+
 typedef struct lx_regs {
 	long lxr_gs;
 	long lxr_edi;
@@ -213,6 +266,91 @@ typedef struct lx_regs {
 
 	long lxr_orig_eax;
 } lx_regs_t;
+
+#endif /* __amd64 */
+
+#ifdef __amd64
+/*
+ * The 64-bit native "user_regs_struct" Linux structure.
+ */
+typedef struct lx_user_regs {
+	long lxur_r15;
+	long lxur_r14;
+	long lxur_r13;
+	long lxur_r12;
+	long lxur_rbp;
+	long lxur_rbx;
+	long lxur_r11;
+	long lxur_r10;
+	long lxur_r9;
+	long lxur_r8;
+	long lxur_rax;
+	long lxur_rcx;
+	long lxur_rdx;
+	long lxur_rsi;
+	long lxur_rdi;
+	long lxur_orig_rax;
+	long lxur_rip;
+	long lxur_xcs;
+	long lxur_rflags;
+	long lxur_rsp;
+	long lxur_xss;
+	long lxur_xfs_base;
+	long lxur_xgs_base;
+	long lxur_xds;
+	long lxur_xes;
+	long lxur_xfs;
+	long lxur_xgs;
+} lx_user_regs_t;
+
+#if defined(_KERNEL) && defined(_SYSCALL32_IMPL)
+/*
+ * 64-bit kernel view of the 32-bit "user_regs_struct" Linux structure.
+ */
+typedef struct lx_user_regs32 {
+	int32_t lxur_ebx;
+	int32_t lxur_ecx;
+	int32_t lxur_edx;
+	int32_t lxur_esi;
+	int32_t lxur_edi;
+	int32_t lxur_ebp;
+	int32_t lxur_eax;
+	int32_t lxur_xds;
+	int32_t lxur_xes;
+	int32_t lxur_xfs;
+	int32_t lxur_xgs;
+	int32_t lxur_orig_eax;
+	int32_t lxur_eip;
+	int32_t lxur_xcs;
+	int32_t lxur_eflags;
+	int32_t lxur_esp;
+	int32_t lxur_xss;
+} lx_user_regs32_t;
+#endif /* defined(_KERNEL) && defined(_SYSCALL32_IMPL) */
+
+#else /* !__amd64 */
+/*
+ * The 32-bit native "user_regs_struct" Linux structure.
+ */
+typedef struct lx_user_regs {
+	long lxur_ebx;
+	long lxur_ecx;
+	long lxur_edx;
+	long lxur_esi;
+	long lxur_edi;
+	long lxur_ebp;
+	long lxur_eax;
+	long lxur_xds;
+	long lxur_xes;
+	long lxur_xfs;
+	long lxur_xgs;
+	long lxur_orig_eax;
+	long lxur_eip;
+	long lxur_xcs;
+	long lxur_eflags;
+	long lxur_esp;
+	long lxur_xss;
+} lx_user_regs_t;
 #endif /* __amd64 */
 
 #endif /* _ASM */
@@ -240,12 +378,12 @@ typedef struct lx_elf_data64 {
 } lx_elf_data64_t;
 
 typedef struct lx_elf_data32 {
-	int	ed_phdr;
-	int	ed_phent;
-	int	ed_phnum;
-	int	ed_entry;
-	int	ed_base;
-	int	ed_ldentry;
+	uint32_t	ed_phdr;
+	uint32_t	ed_phent;
+	uint32_t	ed_phnum;
+	uint32_t	ed_entry;
+	uint32_t	ed_base;
+	uint32_t	ed_ldentry;
 } lx_elf_data32_t;
 
 #if defined(_LP64)
@@ -258,8 +396,6 @@ typedef lx_elf_data32_t lx_elf_data_t;
 
 typedef struct lx_proc_data {
 	uintptr_t l_handler;	/* address of user-space handler */
-	uintptr_t l_tracehandler; /* address of user-space traced handler */
-	uintptr_t l_traceflag;	/* address of 32-bit tracing flag */
 	pid_t l_ppid;		/* pid of originating parent proc */
 	uint64_t l_ptrace;	/* process being observed with ptrace */
 	lx_elf_data_t l_elf_data; /* ELF data for linux executable */
@@ -280,6 +416,16 @@ typedef ulong_t lx_affmask_t[LX_AFF_ULONGS];
 
 /* Max. length of kernel version string */
 #define	LX_VERS_MAX	16
+
+/*
+ * Flag values for uc_brand_data[0] in the ucontext_t:
+ */
+#define	LX_UC_STACK_NATIVE	0x00001
+#define	LX_UC_STACK_BRAND	0x00002
+#define	LX_UC_RESTORE_NATIVE_SP	0x00010
+#define	LX_UC_FRAME_IS_SYSCALL	0x00100
+#define	LX_UC_RESTART_SYSCALL	0x01000
+#define	LX_UC_IGNORE_LINK	0x10000
 
 #ifdef	_KERNEL
 
@@ -303,7 +449,8 @@ typedef enum lx_ptrace_state {
 	LX_PTRACE_STOPPED = 0x10,
 	LX_PTRACE_PARENT_WAIT = 0x20,
 	LX_PTRACE_CLDPEND = 0x40,
-	LX_PTRACE_CLONING = 0x80
+	LX_PTRACE_CLONING = 0x80,
+	LX_PTRACE_WAITPEND = 0x100
 } lx_ptrace_state_t;
 
 /*
@@ -343,11 +490,17 @@ typedef enum lx_ptrace_attach {
 	LX_PTA_INHERIT_OPTIONS = 0x08	/* due to PTRACE_SETOPTIONS options */
 } lx_ptrace_attach_t;
 
+typedef enum lx_stack_mode {
+	LX_STACK_MODE_PREINIT = 0,
+	LX_STACK_MODE_INIT,
+	LX_STACK_MODE_NATIVE,
+	LX_STACK_MODE_BRAND
+} lx_stack_mode_t;
+
 /*
  * lx-specific data in the klwp_t
  */
 struct lx_lwp_data {
-	uint_t	br_ntv_syscall;		/* 1 = syscall from native libc */
 	uint_t	br_lwp_flags;		/* misc. flags */
 	klwp_t	*br_lwp;		/* back pointer to container lwp */
 	int	br_signal;		/* signal to send to parent when */
@@ -359,12 +512,6 @@ struct lx_lwp_data {
 			/* descriptors used by libc for TLS */
 	ulong_t	br_lx_fsbase;		/* lx fsbase for 64-bit thread ptr */
 	ulong_t	br_ntv_fsbase;		/* native fsbase 64-bit thread ptr */
-	/*
-	 * 64-bit thread-specific syscall mode state "stack". Bits tracking the
-	 * syscall mode are shifted on/off this int like a stack as we take
-	 * signals and return.
-	 */
-	uint_t	br_scms;
 	pid_t	br_pid;			/* converted pid for this thread */
 	pid_t	br_tgid;		/* thread group ID for this thread */
 	pid_t	br_ppid;		/* parent pid for this thread */
@@ -396,9 +543,30 @@ struct lx_lwp_data {
 	ushort_t br_ptrace_whatstop;	/* stop sub-reason */
 
 	int32_t br_ptrace_stopsig;	/* stop signal, 0 for no signal */
+	uintptr_t br_ptrace_stopucp;	/* usermode ucontext_t pointer */
 
 	uint_t	br_ptrace_event;
 	ulong_t	br_ptrace_eventmsg;
+
+	int	br_syscall_num;		/* current system call number */
+	boolean_t br_syscall_restart;	/* should restart on EINTR */
+
+	/*
+	 * Store the LX_STACK_MODE for this LWP, and the current extent of the
+	 * native (emulation) stack.  This is similar, in principle, to the
+	 * sigaltstack mechanism for signal handling.  We also use this mode
+	 * flag to determine how to process system calls from this LWP.
+	 */
+	lx_stack_mode_t	br_stack_mode;
+	uintptr_t br_ntv_stack;
+	uintptr_t br_ntv_stack_current;
+
+	/*
+	 * If this pid is set, we return it with getpid().  This allows the
+	 * thunking server to interpose on the pid returned to the Linux
+	 * syslog software.
+	 */
+	pid_t	br_lx_thunk_pid;
 };
 
 /*
@@ -410,7 +578,6 @@ struct lx_lwp_data {
 /* brand specific data */
 typedef struct lx_zone_data {
 	char lxzd_kernel_version[LX_VERS_MAX];
-	int lxzd_max_syscall;
 } lx_zone_data_t;
 
 #define	BR_CPU_BOUND	0x0001
@@ -428,15 +595,60 @@ typedef struct lx_zone_data {
 #define	LX_ARGS(scall) ((struct lx_##scall##_args *)\
 	(ttolxlwp(curthread)->br_scall_args))
 
-void	lx_brand_int80_callback(void);
-void	lx_brand_syscall_callback(void);
-int64_t	lx_emulate_syscall(int, uintptr_t, uintptr_t, uintptr_t, uintptr_t,
-	uintptr_t, uintptr_t);
+/*
+ * Determine the upper bound on the system call number:
+ */
+#if defined(_LP64)
+#define	LX_MAX_SYSCALL(lwp)						\
+	((lwp_getdatamodel(lwp) == DATAMODEL_NATIVE) ?			\
+	    lx_nsysent64 : lx_nsysent32)
+#else
+#define	LX_MAX_SYSCALL(lwp)	lx_nsysent32
+#endif
 
 extern char *lx_get_zone_kern_version(zone_t *);
 
+extern void lx_lwp_set_native_stack_current(lx_lwp_data_t *, uintptr_t);
+extern void lx_divert(klwp_t *, uintptr_t);
+extern int lx_runexe(klwp_t *, void *);
+extern void lx_switch_to_native(klwp_t *);
+extern int lx_regs_to_userregs(lx_lwp_data_t *, void *);
+extern int lx_uc_to_userregs(lx_lwp_data_t *, void *, void *);
+extern int lx_userregs_to_regs(lx_lwp_data_t *lwpd, void *);
+extern int lx_userregs_to_uc(lx_lwp_data_t *lwpd, void *, void *);
+
+extern int lx_syscall_enter(void);
+extern int lx_syscall_return(klwp_t *, int, long);
+
+extern void lx_trace_sysenter(int, uintptr_t *);
+extern void lx_trace_sysreturn(int, long);
+
+extern void lx_emulate_user(klwp_t *, int, uintptr_t *);
+#if defined(_SYSCALL32_IMPL)
+extern void lx_emulate_user32(klwp_t *, int, uintptr_t *);
+#endif
+
 extern int lx_debug;
 #define	lx_print	if (lx_debug) printf
+
+extern int lx_stol_errno[];
+
+/*
+ * In-Kernel Linux System Call Description.
+ */
+typedef struct lx_sysent {
+	char	*sy_name;
+	long	(*sy_callc)();
+	char	sy_flags;
+	char	sy_narg;
+} lx_sysent_t;
+
+#if defined(_LP64)
+extern lx_sysent_t lx_sysent64[LX_NSYSCALLS + 1];
+extern int lx_nsysent64;
+#endif
+extern lx_sysent_t lx_sysent32[LX_NSYSCALLS + 1];
+extern int lx_nsysent32;
 
 #endif	/* _KERNEL */
 #endif /* _ASM */

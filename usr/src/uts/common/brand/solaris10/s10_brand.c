@@ -67,29 +67,41 @@ void	s10_sigset_s10_to_native(sigset_t *);
 
 /* s10 brand */
 struct brand_ops s10_brops = {
-	s10_init_brand_data,
-	s10_free_brand_data,
-	s10_brandsys,
-	s10_setbrand,
-	s10_getattr,
-	s10_setattr,
-	s10_copy_procdata,
-	s10_proc_exit,
-	s10_exec,
-	lwp_setrval,
-	s10_initlwp,
-	s10_forklwp,
-	s10_freelwp,
-	s10_lwpexit,
-	s10_elfexec,
-	s10_sigset_native_to_s10,
-	s10_sigset_s10_to_native,
-	NULL,
-	S10_NSIG,
-	NULL,
-	NULL,
-	NULL,
-	NULL
+	s10_init_brand_data,		/* b_init_brand_data */
+	s10_free_brand_data,		/* b_free_brand_data */
+	s10_brandsys,			/* b_brandsys */
+	s10_setbrand,			/* b_setbrand */
+	s10_getattr,			/* b_getattr */
+	s10_setattr,			/* b_setattr */
+	s10_copy_procdata,		/* b_copy_procdata */
+	s10_proc_exit,			/* b_proc_exit */
+	s10_exec,			/* b_exec */
+	lwp_setrval,			/* b_lwp_setrval */
+	s10_initlwp,			/* b_initlwp */
+	s10_forklwp,			/* b_forklwp */
+	s10_freelwp,			/* b_freelwp */
+	s10_lwpexit,			/* b_lwpexit */
+	s10_elfexec,			/* b_elfexec */
+	s10_sigset_native_to_s10,	/* b_sigset_native_to_brand */
+	s10_sigset_s10_to_native,	/* b_sigset_brand_to_native */
+	NULL,				/* b_psig_to_proc */
+	S10_NSIG,			/* b_nsig */
+	NULL,				/* b_exit_with_sig */
+	NULL,				/* b_wait_filter */
+	NULL,				/* b_native_exec */
+	NULL,				/* b_ptrace_exectrap */
+	NULL,				/* b_map32limit */
+	NULL,				/* b_stop_notify */
+	NULL,				/* b_waitid_helper */
+	NULL,				/* b_sigcld_repost */
+	NULL,				/* b_issig_stop */
+	NULL,				/* b_savecontext */
+#if defined(_SYSCALL32_IMPL)
+	NULL,				/* b_savecontext32 */
+#endif
+	NULL,				/* b_restorecontext */
+	NULL,				/* b_sendsig_stack */
+	NULL				/* b_sendsig */
 };
 
 #ifdef	sparc

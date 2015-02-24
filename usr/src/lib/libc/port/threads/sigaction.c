@@ -22,7 +22,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2014 Joyent, Inc.  All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  */
 
 #include "lint.h"
@@ -285,6 +285,24 @@ take_deferred_signal(int sig)
 		thr_panic("take_deferred_signal(): __sigresend() failed");
 }
 
+/*
+ * sigacthandler() attempts to clean up dangling uc_link pointers in
+ * signal handling contexts when libc believes us to have escaped
+ * a signal handler incorrectly in the past.
+ *
+ * Branded processes have a legitimate use for a chain including contexts
+ * other than those used for signal handling when tracking emulation
+ * requests from the kernel.  We allow them to disable this cleanup
+ * behaviour.
+ */
+static int escaped_context_cleanup = 1;
+
+void
+set_escaped_context_cleanup(int on)
+{
+	escaped_context_cleanup = on;
+}
+
 void
 sigacthandler(int sig, siginfo_t *sip, void *uvp)
 {
@@ -307,7 +325,7 @@ sigacthandler(int sig, siginfo_t *sip, void *uvp)
 	 * we are actually executing at main level (self->ul_siglink == NULL).
 	 * See the code for setjmp()/longjmp() for more details.
 	 */
-	if (self->ul_siglink == NULL)
+	if (escaped_context_cleanup && self->ul_siglink == NULL)
 		ucp->uc_link = NULL;
 
 	/*

@@ -272,8 +272,8 @@ IOMMULIB_OBJS = iommulib.o
 SN1_BRAND_OBJS	=	sn1_brand.o sn1_brand_asm.o
 S10_BRAND_OBJS	=	s10_brand.o s10_brand_asm.o
 LX_BRAND_OBJS  =		\
+	lx_archdep.o		\
 	lx_brand.o		\
-	lx_brand_asm.o		\
 	lx_brk.o		\
 	lx_clone.o		\
 	lx_futex.o		\
@@ -291,7 +291,9 @@ LX_BRAND_OBJS  =		\
 	lx_signum.o		\
 	lx_syscall.o		\
 	lx_sysinfo.o		\
-	lx_thread_area.o
+	lx_thread_area.o	\
+	lx_wait.o		\
+	lx_xattr.o
 
 #
 #	special files

@@ -88,7 +88,6 @@ lx_exec()
 	 * invalid; clear them.
 	 */
 	pd->l_handler = NULL;
-	pd->l_tracehandler = NULL;
 
 	/*
 	 * There are two mutually exclusive special cases we need to
@@ -118,11 +117,19 @@ lx_exec()
 	 * we are traced we can post either the PTRACE_EVENT_EXEC event or the
 	 * legacy SIGTRAP.
 	 */
-	(void) lx_ptrace_stop_for_option(LX_PTRACE_O_TRACEEXEC, B_FALSE, 0);
+	(void) lx_ptrace_stop_for_option(LX_PTRACE_O_TRACEEXEC, B_FALSE, 0, 0);
 
 	/* clear the fsbase values until the app. can reinitialize them */
 	lwpd->br_lx_fsbase = NULL;
 	lwpd->br_ntv_fsbase = NULL;
+
+	/*
+	 * Clear the native stack flags.  This will be reinitialised by
+	 * lx_init() in the new process image.
+	 */
+	lwpd->br_stack_mode = LX_STACK_MODE_PREINIT;
+	lwpd->br_ntv_stack = 0;
+	lwpd->br_ntv_stack_current = 0;
 
 	installctx(lwptot(lwp), lwp, lx_save, lx_restore, NULL, NULL, lx_save,
 	    NULL);
@@ -236,6 +243,11 @@ lx_freelwp(klwp_t *lwp)
 {
 	struct lx_lwp_data *lwpd = lwptolxlwp(lwp);
 
+	/*
+	 * Remove our system call interposer.
+	 */
+	lwp->lwp_brand_syscall = NULL;
+
 	if (lwpd != NULL) {
 		(void) removectx(lwptot(lwp), lwp, lx_save, lx_restore,
 		    NULL, NULL, lx_save, NULL);
@@ -269,8 +281,7 @@ lx_initlwp(klwp_t *lwp)
 	lwpd->br_clear_ctidp = NULL;
 	lwpd->br_set_ctidp = NULL;
 	lwpd->br_signal = 0;
-	lwpd->br_ntv_syscall = 1;
-	lwpd->br_scms = 1;
+	lwpd->br_stack_mode = LX_STACK_MODE_PREINIT;
 
 	/*
 	 * lwpd->br_affinitymask was zeroed by kmem_zalloc()
@@ -320,6 +331,11 @@ lx_initlwp(klwp_t *lwp)
 		lx_ptrace_inherit_tracer(plwpd, lwpd);
 	}
 
+	/*
+	 * Install branded system call hook for this LWP:
+	 */
+	lwp->lwp_brand_syscall = lx_syscall_enter;
+
 	return (0);
 }
 
@@ -338,6 +354,27 @@ lx_forklwp(klwp_t *srclwp, klwp_t *dstlwp)
 	dst->br_ppid = src->br_pid;
 	dst->br_ptid = lwptot(srclwp)->t_tid;
 	bcopy(src->br_tls, dst->br_tls, sizeof (dst->br_tls));
+
+	switch (src->br_stack_mode) {
+	case LX_STACK_MODE_BRAND:
+	case LX_STACK_MODE_NATIVE:
+		/*
+		 * The parent LWP has an alternate stack installed.
+		 * The child LWP should have the same stack base and extent.
+		 */
+		dst->br_stack_mode = src->br_stack_mode;
+		dst->br_ntv_stack = src->br_ntv_stack;
+		dst->br_ntv_stack_current = src->br_ntv_stack_current;
+		break;
+
+	default:
+		/*
+		 * Otherwise, clear the stack data for this LWP.
+		 */
+		dst->br_stack_mode = LX_STACK_MODE_PREINIT;
+		dst->br_ntv_stack = 0;
+		dst->br_ntv_stack_current = 0;
+	}
 
 	/*
 	 * copy only these flags
@@ -436,7 +473,7 @@ lx_fixsegreg(greg_t sr, model_t datamodel)
 }
 
 /*
- * Brand-specific function to convert the fsbase as pulled from the regsiter
+ * Brand-specific function to convert the fsbase as pulled from the register
  * into a native fsbase suitable for locating the ulwp_t from the kernel.
  */
 uintptr_t
@@ -444,8 +481,10 @@ lx_fsbase(klwp_t *lwp, uintptr_t fsbase)
 {
 	lx_lwp_data_t *lwpd = lwp->lwp_brand;
 
-	if (lwpd->br_ntv_syscall || lwpd->br_ntv_fsbase == NULL)
+	if (lwpd->br_stack_mode != LX_STACK_MODE_BRAND ||
+	    lwpd->br_ntv_fsbase == NULL) {
 		return (fsbase);
+	}
 
 	return (lwpd->br_ntv_fsbase);
 }

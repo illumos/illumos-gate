@@ -21,7 +21,7 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2014 Joyent, Inc.  All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  */
 
 
@@ -275,8 +275,8 @@ lx_kill(pid_t lx_pid, int lx_sig)
  * queuable are sent through the sigqueue syscall via the user level function
  * lx_rt_sigqueueinfo().
  */
-long
-lx_rt_sigqueueinfo(pid_t tgid, int sig, siginfo_t *uinfo)
+int
+lx_helper_rt_sigqueueinfo(pid_t tgid, int sig, siginfo_t *uinfo)
 {
 	proc_t *target_proc;
 	pid_t s_pid;
@@ -310,7 +310,7 @@ lx_rt_sigqueueinfo(pid_t tgid, int sig, siginfo_t *uinfo)
 	}
 	/*
 	 * We shouldn't have queuable signals here, those are sent elsewhere by
-	 * the useland handler for this emulated call.
+	 * the usermode handler for this emulated call.
 	 */
 	if (!SI_CANQUEUE(kinfo.si_code)) {
 		return (set_errno(EINVAL));
@@ -341,8 +341,8 @@ lx_rt_sigqueueinfo(pid_t tgid, int sig, siginfo_t *uinfo)
  * Unlike the above function, this handles all system calls to rt_tgsigqueue
  * regardless of si_code.
  */
-long
-lx_rt_tgsigqueueinfo(pid_t tgid, pid_t tid, int sig, siginfo_t *uinfo)
+int
+lx_helper_rt_tgsigqueueinfo(pid_t tgid, pid_t tid, int sig, siginfo_t *uinfo)
 {
 	id_t s_tid;
 	pid_t s_pid;

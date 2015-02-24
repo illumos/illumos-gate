@@ -66,19 +66,19 @@
  *     covers at least fork() and pthread_create().
  */
 
-#include <errno.h>
 #include <sys/wait.h>
+#include <sys/brand.h>
+#include <sys/lx_brand.h>
 #include <sys/lx_types.h>
-#include <sys/lx_signal.h>
-#include <sys/lx_debug.h>
-#include <sys/lx_misc.h>
-#include <sys/lx_syscall.h>
-#include <sys/syscall.h>
-#include <sys/times.h>
-#include <strings.h>
-#include <unistd.h>
-#include <assert.h>
+#include <sys/lx_siginfo.h>
+#include <lx_signum.h>
 #include <lx_syscall.h>
+
+/*
+ * From "uts/common/os/exit.c" and "uts/common/syscall/rusagesys.c":
+ */
+extern int waitid(idtype_t, id_t, k_siginfo_t *, int);
+extern int rusagesys(int, void *, void *, void *, void *);
 
 /*
  * Convert between Linux options and Solaris options, returning -1 if any
@@ -98,8 +98,6 @@
 #define	LX_P_ALL	0x0
 #define	LX_P_PID	0x1
 #define	LX_P_GID	0x2
-
-extern long max_pid;
 
 /*
  * Split the passed waitpid/waitid options into two separate variables:
@@ -149,17 +147,14 @@ lx_wstat(int code, int status)
 		stat = status << 8;
 		break;
 	case CLD_DUMPED:
-		stat = stol_signo[status];
-		assert(stat != -1);
-		stat |= WCOREFLG;
+		stat = lx_stol_signo(status, SIGKILL) | WCOREFLG;
 		break;
 	case CLD_KILLED:
-		stat = stol_signo[status];
-		assert(stat != -1);
+		stat = lx_stol_signo(status, SIGKILL);
 		break;
 	case CLD_TRAPPED:
 	case CLD_STOPPED:
-		stat = (stol_status(status) << 8) | WSTOPFLG;
+		stat = (lx_stol_status(status, SIGKILL) << 8) | WSTOPFLG;
 		break;
 	case CLD_CONTINUED:
 		stat = WCONTFLG;
@@ -170,50 +165,62 @@ lx_wstat(int code, int status)
 }
 
 static int
-lx_waitid_helper(idtype_t idtype, id_t id, siginfo_t *sip, int native_options,
+lx_call_waitid(idtype_t idtype, id_t id, k_siginfo_t *sip, int native_options,
     int extra_options)
 {
+	lx_lwp_data_t *lwpd = ttolxlwp(curthread);
+	int error;
+
 	/*
-	 * Call into our in-kernel waitid() wrapper:
+	 * Our brand-specific waitid helper only understands a subset of
+	 * the possible idtypes.  Ensure we keep to that subset here:
 	 */
-restart:
-	lx_had_sigchild = 0;
-	if (syscall(SYS_brand, B_HELPER_WAITID, idtype, id, sip,
-	    native_options, extra_options) != 0) {
-		if (errno == EINTR && (lx_had_sigchild ||
-		    lx_do_syscall_restart)) {
-			/*
-			 * If we handled a SIGCLD while blocked in waitid(),
-			 * or the SA_RESTART flag was set, we should wait
-			 * again.
-			 */
-			lx_debug("lx_waitid_helper() restarting due to"
-			    " interrupted system call");
-			goto restart;
-		}
-		return (-1);
+	if (idtype != P_ALL && idtype != P_PID && idtype != P_PGID) {
+		return (EINVAL);
 	}
 
-	return (0);
+	/*
+	 * Enable the return of emulated ptrace(2) stop conditions
+	 * through lx_waitid_helper, and stash the Linux-specific
+	 * extra waitid() flags.
+	 */
+	lwpd->br_waitid_emulate = B_TRUE;
+	lwpd->br_waitid_flags = extra_options;
+
+	if ((error = waitid(idtype, id, sip, native_options)) == EINTR) {
+		/*
+		 * According to signal(7), the wait4(2), waitid(2), and
+		 * waitpid(2) system calls are restartable.
+		 */
+		ttolxlwp(curthread)->br_syscall_restart = B_TRUE;
+	}
+
+	lwpd->br_waitid_emulate = B_FALSE;
+	lwpd->br_waitid_flags = 0;
+
+	return (error);
 }
 
 long
 lx_wait4(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4)
 {
-	siginfo_t info = { 0 };
-	struct rusage ru = { 0 };
+	k_siginfo_t info = { 0 };
 	idtype_t idtype;
 	id_t id;
 	int status = 0;
 	pid_t pid = (pid_t)p1;
-	int rval;
+	int error;
 	int native_options, extra_options;
+	int *statusp = (int *)p2;
+	void *rup = (void *)p4;
 
-	if (ltos_options(p3, &native_options, &extra_options) == -1)
-		return (-EINVAL);
+	if (ltos_options(p3, &native_options, &extra_options) == -1) {
+		return (set_errno(EINVAL));
+	}
 
-	if (pid > max_pid)
-		return (-ECHILD);
+	if (pid > maxpid) {
+		return (set_errno(ECHILD));
+	}
 
 	/*
 	 * While not listed as a valid return code, Linux's wait4(2) does,
@@ -226,15 +233,34 @@ lx_wait4(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4)
 	 *
 	 * This will fail if the buffers in question are write-only.
 	 */
-	if ((void *)p2 != NULL &&
-	    ((uucopy((void *)p2, &status, sizeof (status)) != 0) ||
-	    (uucopy(&status, (void *)p2, sizeof (status)) != 0)))
-		return (-EFAULT);
+	if (statusp != NULL) {
+		if (copyin(statusp, &status, sizeof (status)) != 0 ||
+		    copyout(&status, statusp, sizeof (status)) != 0) {
+			return (set_errno(EFAULT));
+		}
+	}
 
-	if ((void *)p4 != NULL) {
-		if ((uucopy((void *)p4, &ru, sizeof (ru)) != 0) ||
-		    (uucopy(&ru, (void *)p4, sizeof (ru)) != 0))
-			return (-EFAULT);
+	/*
+	 * Do the same check for the "struct rusage" pointer, which differs
+	 * in size for 32- and 64-bit processes.
+	 */
+	if (rup != NULL) {
+		struct rusage ru;
+		void *krup = &ru;
+		size_t rusz = sizeof (ru);
+#if defined(_SYSCALL32_IMPL)
+		struct rusage32 ru32;
+
+		if (get_udatamodel() != DATAMODEL_NATIVE) {
+			krup = &ru32;
+			rusz = sizeof (ru32);
+		}
+#endif
+
+		if (copyin(rup, krup, rusz) != 0 ||
+		    copyout(krup, rup, rusz) != 0) {
+			return (set_errno(EFAULT));
+		}
 	}
 
 	if (pid < -1) {
@@ -245,24 +271,27 @@ lx_wait4(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4)
 		id = 0;
 	} else if (pid == 0) {
 		idtype = P_PGID;
-		id = getpgrp();
+		mutex_enter(&pidlock);
+		id = curproc->p_pgrp;
+		mutex_exit(&pidlock);
 	} else {
 		idtype = P_PID;
 		id = pid;
 	}
 
-	native_options |= WEXITED | WTRAPPED;
+	native_options |= (WEXITED | WTRAPPED);
 
-	if (lx_waitid_helper(idtype, id, &info, native_options,
-	    extra_options) == -1) {
-		return (-errno);
+	if ((error = lx_call_waitid(idtype, id, &info, native_options,
+	    extra_options)) != 0) {
+		return (set_errno(error));
 	}
 
 	/*
 	 * If the WNOHANG flag was specified and no child was found return 0.
 	 */
-	if ((native_options & WNOHANG) && info.si_pid == 0)
+	if ((native_options & WNOHANG) && info.si_pid == 0) {
 		return (0);
+	}
 
 	status = lx_wstat(info.si_code, info.si_status);
 
@@ -273,11 +302,18 @@ lx_wait4(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4)
 	 * should succeed on a Linux system. This, however, is rather
 	 * unlikely since we tested the validity of both above.
 	 */
-	if (p2 != NULL && uucopy(&status, (void *)p2, sizeof (status)) != 0)
-		return (-EFAULT);
+	if (statusp != NULL) {
+		if (copyout(&status, statusp, sizeof (status)) != 0) {
+			return (set_errno(EFAULT));
+		}
+	}
 
-	if (p4 != NULL && (rval = lx_getrusage(LX_RUSAGE_CHILDREN, p4)) != 0)
-		return (rval);
+	if (rup != NULL) {
+		if ((error = rusagesys(_RUSAGESYS_GETRUSAGE_CHLD, rup, NULL,
+		    NULL, NULL)) != 0) {
+			return (set_errno(error));
+		}
+	}
 
 	return (info.si_pid);
 }
@@ -288,17 +324,116 @@ lx_waitpid(uintptr_t p1, uintptr_t p2, uintptr_t p3)
 	return (lx_wait4(p1, p2, p3, NULL));
 }
 
+static int
+stol_ksiginfo(k_siginfo_t *sip, uintptr_t lxsip)
+{
+	lx_siginfo_t lsi;
+
+	bzero(&lsi, sizeof (lsi));
+	lsi.lsi_signo = lx_stol_signo(sip->si_signo, SIGCLD);
+	lsi.lsi_code = lx_stol_sigcode(sip->si_code);
+	lsi.lsi_errno = lx_stol_errno[sip->si_errno];
+
+	switch (lsi.lsi_signo) {
+	case LX_SIGPOLL:
+		lsi.lsi_band = sip->si_band;
+		lsi.lsi_fd = sip->si_fd;
+		break;
+
+	case LX_SIGCHLD:
+		lsi.lsi_pid = sip->si_pid;
+		if (sip->si_code <= 0 || sip->si_code == CLD_EXITED) {
+			lsi.lsi_status = sip->si_status;
+		} else {
+			lsi.lsi_status = lx_stol_status(sip->si_status,
+			    SIGKILL);
+		}
+		lsi.lsi_utime = sip->si_utime;
+		lsi.lsi_stime = sip->si_stime;
+		break;
+
+	case LX_SIGILL:
+	case LX_SIGBUS:
+	case LX_SIGFPE:
+	case LX_SIGSEGV:
+		lsi.lsi_addr = sip->si_addr;
+		break;
+
+	default:
+		lsi.lsi_pid = sip->si_pid;
+		lsi.lsi_uid = LX_UID32_TO_UID16(sip->si_uid);
+	}
+
+	if (copyout(&lsi, (void *)lxsip, sizeof (lsi)) != 0) {
+		return (set_errno(EFAULT));
+	}
+
+	return (0);
+}
+
+#if defined(_SYSCALL32_IMPL)
+static int
+stol_ksiginfo32(k_siginfo_t *sip, uintptr_t lxsip)
+{
+	lx_siginfo32_t lsi;
+
+	bzero(&lsi, sizeof (lsi));
+	lsi.lsi_signo = lx_stol_signo(sip->si_signo, SIGCLD);
+	lsi.lsi_code = lx_stol_sigcode(sip->si_code);
+	lsi.lsi_errno = lx_stol_errno[sip->si_errno];
+
+	switch (lsi.lsi_signo) {
+	case LX_SIGPOLL:
+		lsi.lsi_band = sip->si_band;
+		lsi.lsi_fd = sip->si_fd;
+		break;
+
+	case LX_SIGCHLD:
+		lsi.lsi_pid = sip->si_pid;
+		if (sip->si_code <= 0 || sip->si_code == CLD_EXITED) {
+			lsi.lsi_status = sip->si_status;
+		} else {
+			lsi.lsi_status = lx_stol_status(sip->si_status,
+			    SIGKILL);
+		}
+		lsi.lsi_utime = sip->si_utime;
+		lsi.lsi_stime = sip->si_stime;
+		break;
+
+	case LX_SIGILL:
+	case LX_SIGBUS:
+	case LX_SIGFPE:
+	case LX_SIGSEGV:
+		lsi.lsi_addr = (caddr32_t)(uintptr_t)sip->si_addr;
+		break;
+
+	default:
+		lsi.lsi_pid = sip->si_pid;
+		lsi.lsi_uid = LX_UID32_TO_UID16(sip->si_uid);
+	}
+
+	if (copyout(&lsi, (void *)lxsip, sizeof (lsi)) != 0) {
+		return (set_errno(EFAULT));
+	}
+
+	return (0);
+}
+#endif
+
 long
 lx_waitid(uintptr_t idtype, uintptr_t id, uintptr_t infop, uintptr_t opt)
 {
+	int error;
 	int native_options, extra_options;
-	siginfo_t s_info = {0};
+	k_siginfo_t info = { 0 };
 
-	if (ltos_options(opt, &native_options, &extra_options) == -1)
-		return (-EINVAL);
+	if (ltos_options(opt, &native_options, &extra_options) == -1) {
+		return (set_errno(EINVAL));
+	}
 
-	if (((opt) & (LX_WEXITED | LX_WSTOPPED | LX_WCONTINUED)) == 0)
-		return (-EINVAL);
+	if (((opt) & (LX_WEXITED | LX_WSTOPPED | LX_WCONTINUED)) == 0) {
+		return (set_errno(EINVAL));
+	}
 
 	switch (idtype) {
 	case LX_P_ALL:
@@ -311,17 +446,27 @@ lx_waitid(uintptr_t idtype, uintptr_t id, uintptr_t infop, uintptr_t opt)
 		idtype = P_PGID;
 		break;
 	default:
-		return (-EINVAL);
+		return (set_errno(EINVAL));
 	}
 
-	if (lx_waitid_helper(idtype, id, &s_info, native_options,
-	    extra_options) == -1) {
-		return (-errno);
+	if ((error = lx_call_waitid(idtype, id, &info, native_options,
+	    extra_options)) != 0) {
+		return (set_errno(error));
 	}
 
-	/* If the WNOHANG flag was specified and no child was found return 0. */
-	if ((native_options & WNOHANG) && s_info.si_pid == 0)
+	/*
+	 * If the WNOHANG flag was specified and no child was found return 0.
+	 */
+	if ((native_options & WNOHANG) && info.si_pid == 0) {
 		return (0);
+	}
 
-	return (stol_siginfo(&s_info, (lx_siginfo_t *)infop));
+#if defined(_SYSCALL32_IMPL)
+	if (get_udatamodel() != DATAMODEL_NATIVE) {
+		return (stol_ksiginfo32(&info, infop));
+	} else
+#endif
+	{
+		return (stol_ksiginfo(&info, infop));
+	}
 }

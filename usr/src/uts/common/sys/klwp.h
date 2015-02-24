@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  */
 
 #ifndef	_SYS_KLWP_H
@@ -192,6 +192,8 @@ typedef struct _klwp {
 	struct contract	*lwp_ct_latest[CTT_MAXTYPE]; /* last created contract */
 
 	void	*lwp_brand;		/* per-lwp brand data */
+	int	(*lwp_brand_syscall)(void); /* brand syscall interposer */
+
 	struct psinfo *lwp_spymaster;	/* if an agent LWP, our spymaster */
 } klwp_t;
 

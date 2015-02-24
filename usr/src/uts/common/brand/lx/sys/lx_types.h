@@ -31,6 +31,8 @@
 extern "C" {
 #endif
 
+#ifndef	_KERNEL
+
 #define	SHRT_MIN	(-32768)	/* min value of a "short int" */
 #define	SHRT_MAX	32767		/* max value of a "short int" */
 #define	USHRT_MAX	65535		/* max of "unsigned short int" */
@@ -45,6 +47,8 @@ extern "C" {
 #define	LONG_MAX	2147483647L	/* max value of a 32-bit "long int" */
 #define	ULONG_MAX	4294967295UL	/* max value of a 32-bit "ulong int" */
 #endif
+
+#endif /* !_KERNEL */
 
 #define	LX_SYS_UTS_LN	65
 

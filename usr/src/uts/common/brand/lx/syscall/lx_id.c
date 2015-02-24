@@ -22,10 +22,9 @@
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
+/*
+ * Copyright 2015 Joyent, Inc.
+ */
 
 #include <sys/types.h>
 #include <sys/systm.h>
@@ -50,7 +49,7 @@ extern int setgroups(int, gid_t *);
 
 /*
  * This function is based on setreuid in common/syscall/uid.c and exists
- * because Solaris does not have a way to explicitly set the saved uid (suid)
+ * because illumos does not have a way to explicitly set the saved uid (suid)
  * from any other system call.
  */
 long
@@ -179,9 +178,9 @@ lx_setresuid16(l_uid16_t ruid16, l_uid16_t euid16, l_uid16_t suid16)
 	long	rval;
 
 	rval = lx_setresuid(
-			LINUX_UID16_TO_UID32(ruid16),
-			LINUX_UID16_TO_UID32(euid16),
-			LINUX_UID16_TO_UID32(suid16));
+	    LINUX_UID16_TO_UID32(ruid16),
+	    LINUX_UID16_TO_UID32(euid16),
+	    LINUX_UID16_TO_UID32(suid16));
 
 	return (rval);
 }
@@ -274,19 +273,19 @@ lx_setresgid16(l_gid16_t rgid16, l_gid16_t egid16, l_gid16_t sgid16)
 	long	rval;
 
 	rval = lx_setresgid(
-			LINUX_GID16_TO_GID32(rgid16),
-			LINUX_GID16_TO_GID32(egid16),
-			LINUX_GID16_TO_GID32(sgid16));
+	    LINUX_GID16_TO_GID32(rgid16),
+	    LINUX_GID16_TO_GID32(egid16),
+	    LINUX_GID16_TO_GID32(sgid16));
 
 	return (rval);
 }
 
 /*
- * Linux defines NGROUPS_MAX to be 32, but on Solaris it is only 16. We employ
+ * Linux defines NGROUPS_MAX to be 32, but on illumos it is only 16. We employ
  * the terrible hack below so that tests may proceed, if only on DEBUG kernels.
  */
 long
-lx_setgroups(int ngroups, gid_t *grouplist)
+lx_helper_setgroups(int ngroups, gid_t *grouplist)
 {
 #ifdef DEBUG
 	if (ngroups > ngroups_max && ngroups <= LX_NGROUPS_MAX)

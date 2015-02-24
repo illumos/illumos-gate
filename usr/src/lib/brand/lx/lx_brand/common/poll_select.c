@@ -70,21 +70,21 @@ lx_select(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 
 	if (nfds > 0) {
 		if (p2 != NULL) {
-			rfdsp = SAFE_ALLOCA(fd_set_len);
+			rfdsp = alloca(fd_set_len);
 			if (rfdsp == NULL)
 				return (-ENOMEM);
 			if (uucopy((void *)p2, rfdsp, fd_set_len) != 0)
 				return (-errno);
 		}
 		if (p3 != NULL) {
-			wfdsp = SAFE_ALLOCA(fd_set_len);
+			wfdsp = alloca(fd_set_len);
 			if (wfdsp == NULL)
 				return (-ENOMEM);
 			if (uucopy((void *)p3, wfdsp, fd_set_len) != 0)
 				return (-errno);
 		}
 		if (p4 != NULL) {
-			efdsp = SAFE_ALLOCA(fd_set_len);
+			efdsp = alloca(fd_set_len);
 			if (efdsp == NULL)
 				return (-ENOMEM);
 			if (uucopy((void *)p4, efdsp, fd_set_len) != 0)
@@ -165,7 +165,7 @@ lx_poll(uintptr_t p1, uintptr_t p2, uintptr_t p3)
 	 * structures are identical.  Copy in the linux poll structure.
 	 */
 	fds_size = sizeof (struct pollfd) * nfds;
-	lfds = (struct pollfd *)SAFE_ALLOCA(fds_size);
+	lfds = (struct pollfd *)alloca(fds_size);
 	if (lfds == NULL)
 		return (-ENOMEM);
 	if (uucopy((void *)p1, lfds, fds_size) != 0)
@@ -175,7 +175,7 @@ lx_poll(uintptr_t p1, uintptr_t p2, uintptr_t p3)
 	 * The poll system call modifies the poll structures passed in
 	 * so we'll need to make an extra copy of them.
 	 */
-	sfds = (struct pollfd *)SAFE_ALLOCA(fds_size);
+	sfds = (struct pollfd *)alloca(fds_size);
 	if (sfds == NULL)
 		return (-ENOMEM);
 

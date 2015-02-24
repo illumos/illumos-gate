@@ -362,6 +362,8 @@ exec_common(const char *fname, const char **argp, const char **envp,
 	 * pending held signals remain held, so don't clear t_hold.
 	 */
 	mutex_enter(&p->p_lock);
+	DTRACE_PROBE3(oldcontext__set, klwp_t *, lwp,
+	    uintptr_t, lwp->lwp_oldcontext, uintptr_t, 0);
 	lwp->lwp_oldcontext = 0;
 	lwp->lwp_ustack = 0;
 	lwp->lwp_old_stk_ctl = 0;

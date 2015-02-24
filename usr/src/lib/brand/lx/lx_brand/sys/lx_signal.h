@@ -30,6 +30,7 @@
 #if !defined(_ASM)
 #include <sys/lx_types.h>
 #include <sys/ucontext.h>
+#include <sys/lx_siginfo.h>
 #include <lx_signum.h>
 
 #endif	/* !defined(_ASM) */
@@ -117,93 +118,6 @@ typedef struct lx_osigaction {
  */
 #define	USE_OSIGSET	0
 #define	USE_SIGSET	1
-
-#define	LX_SI_MAX_SIZE	128
-#if defined(_LP64)
-/*
- * Because of the odd number (3) of ints before the union, we need to account
- * for the smaller padding needed on x64 due to the union being offset to an 8
- * byte boundary.
- */
-#define	LX_SI_PAD_SIZE	((LX_SI_MAX_SIZE/sizeof (int)) - 4)
-
-#else
-#define	LX_SI_PAD_SIZE	((LX_SI_MAX_SIZE/sizeof (int)) - 3)
-#endif
-
-typedef struct lx_siginfo {
-	int lsi_signo;
-	int lsi_errno;
-	int lsi_code;
-	union {
-		int _pad[LX_SI_PAD_SIZE];
-
-		struct {
-			pid_t _pid;
-			lx_uid16_t _uid;
-		} _kill;
-
-		struct {
-			uint_t _timer1;
-			uint_t _timer2;
-		} _timer;
-
-		struct {
-			pid_t _pid;		/* sender's pid */
-			lx_uid16_t _uid;	/* sender's uid */
-			union sigval _sigval;
-		} _rt;
-
-		struct {
-			pid_t _pid;		/* which child */
-			lx_uid16_t _uid;	/* sender's uid */
-			int _status;		/* exit code */
-			clock_t _utime;
-			clock_t _stime;
-		} _sigchld;
-
-		struct {
-			void *_addr; 		/* faulting insn/memory ref. */
-		} _sigfault;
-
-		struct {
-			int _band;  		/* POLL_IN,POLL_OUT,POLL_MSG */
-			int _fd;
-		} _sigpoll;
-	} _sifields;
-} lx_siginfo_t;
-
-/*
- * lx_siginfo_t lsi_code values
- *
- *	LX_SI_ASYNCNL:	Sent by asynch name lookup completion
- *	LX_SI_DETHREAD:	Sent by execve() killing subsidiary threads
- *	LX_SI_SIGIO:	Sent by queued SIGIO
- *	LX_SI_ASYNCIO:	Sent by asynchronous I/O completion
- *	LX_SI_MESGQ:	Sent by real time message queue state change
- *	LX_SI_TIMER:	Sent by timer expiration
- *	LX_SI_QUEUE:	Sent by sigqueue
- *	LX_SI_USER:	Sent by kill, sigsend, raise, etc.
- *	LX_SI_KERNEL:	Sent by kernel
- *	LX_SI_CODE_NOT_EXIST: Error code. When translating from Linux to
- *	    illumos errors, if there is no translation available, this value
- *	    should be used. This value should have no meaning as an si_code in
- *	    illumos or Linux.
- *
- * At present, LX_SI_ASYNCNL, LX_SI_DETHREAD, and LX_SI_SIGIO are unused by
- * BrandZ.
- */
-#define	LX_SI_CODE_NOT_EXIST	(-61)
-#define	LX_SI_ASYNCNL	(-60)
-#define	LX_SI_DETHREAD	(-7)
-#define	LX_SI_TKILL	(-6)
-#define	LX_SI_SIGIO	(-5)
-#define	LX_SI_ASYNCIO	(-4)
-#define	LX_SI_MESGQ	(-3)
-#define	LX_SI_TIMER	(-2)
-#define	LX_SI_QUEUE	(-1)
-#define	LX_SI_USER	(0)
-#define	LX_SI_KERNEL	(0x80)
 
 typedef struct lx_sighandlers {
 	struct lx_sigaction lx_sa[LX_NSIG + 1];
@@ -370,18 +284,6 @@ typedef struct lx_ucontext {
 	lx_sigset_t uc_sigmask;
 } lx_ucontext_t;
 
-#define	lsi_pid		_sifields._kill._pid
-#define	lsi_uid		_sifields._kill._uid
-#define	lsi_status	_sifields._sigchld._status
-#define	lsi_utime	_sifields._sigchld._utime
-#define	lsi_stime	_sifields._sigchld._stime
-#define	lsi_value	_sifields._rt._sigval
-#define	lsi_int		_sifields._rt._sigval.sivalx_int
-#define	lsi_ptr		_sifields._rt._sigval.sivalx_ptr
-#define	lsi_addr	_sifields._sigfault._addr
-#define	lsi_band	_sifields._sigpoll._band
-#define	lsi_fd		_sifields._sigpoll._fd
-
 extern const int ltos_signo[];
 extern const int stol_signo[];
 
@@ -390,10 +292,6 @@ extern void setsigacthandler(void (*)(int, siginfo_t *, void *),
     int (*)(const ucontext_t *));
 
 extern int lx_siginit(void);
-
-extern void lx_sigreturn_tolibc(uintptr_t);
-extern void lx_sigdeliver(int, siginfo_t *, void *, size_t, void (*)(),
-    void (*)(), uintptr_t);
 
 extern int stol_siginfo(siginfo_t *siginfop, lx_siginfo_t *lx_siginfop);
 extern int stol_status(int);

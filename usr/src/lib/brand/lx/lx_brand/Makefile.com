@@ -21,7 +21,7 @@
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-# Copyright 2014 Joyent, Inc.  All rights reserved.
+# Copyright 2015 Joyent, Inc.
 #
 
 LX_CMN  =	$(SRC)/common/brand/lx
@@ -55,17 +55,16 @@ COBJS	=	aio.o			\
 		sendfile.o		\
 		signal.o		\
 		socket.o		\
+		stack.o			\
 		stat.o			\
 		statfs.o		\
 		sysctl.o		\
 		sysv_ipc.o		\
 		time.o			\
-		truncate.o		\
-		wait.o			\
-		xattr.o
+		truncate.o
 
 CMNOBJS =	lx_signum.o
-ASOBJS	=	lx_handler.o lx_runexe.o lx_crt.o
+ASOBJS	=	lx_handler.o lx_crt.o
 OBJECTS	=	$(CMNOBJS) $(COBJS) $(ASOBJS)
 
 USDT_PROVIDERS =	lx_provider.d

@@ -485,7 +485,8 @@ lx_ptrace_restart_lwp(klwp_t *lwp)
 		 */
 		rlwpd->br_ptrace_whystop = 0;
 		rlwpd->br_ptrace_whatstop = 0;
-		rlwpd->br_ptrace_flags &= ~LX_PTRACE_CLDPEND;
+		rlwpd->br_ptrace_flags &= ~(LX_PTRACE_CLDPEND |
+		    LX_PTRACE_WAITPEND);
 	}
 	thread_unlock(rt);
 }
@@ -551,9 +552,8 @@ lx_winfo(lx_lwp_data_t *remote, k_siginfo_t *ip, boolean_t waitflag,
 	 * so that it may be re-fetched on another call to waitid().
 	 */
 	if (waitflag) {
-		remote->br_ptrace_whystop = 0;
-		remote->br_ptrace_whatstop = 0;
-		remote->br_ptrace_flags &= ~LX_PTRACE_CLDPEND;
+		remote->br_ptrace_flags &= ~(LX_PTRACE_CLDPEND |
+		    LX_PTRACE_WAITPEND);
 	}
 }
 
@@ -637,6 +637,7 @@ lx_stop_notify(proc_t *p, klwp_t *lwp, ushort_t why, ushort_t what)
 	 */
 	lwpd->br_ptrace_whystop = why;
 	lwpd->br_ptrace_whatstop = what;
+	lwpd->br_ptrace_flags |= LX_PTRACE_WAITPEND;
 
 	/*
 	 * If this event does not depend on an event from the parent LWP,
@@ -805,6 +806,60 @@ lx_ptrace_geteventmsg(lx_lwp_data_t *remote, void *umsgp)
 	return (error);
 }
 
+static int
+lx_ptrace_getregs(lx_lwp_data_t *remote, void *uregsp)
+{
+	if (remote->br_stack_mode == LX_STACK_MODE_BRAND) {
+		/*
+		 * The LWP was stopped with the brand stack and register
+		 * state loaded, e.g. during a system call emulated within
+		 * the kernel.  Return the LWP register state.
+		 */
+		return (lx_regs_to_userregs(remote, uregsp));
+	} else if (remote->br_ptrace_stopucp != NULL) {
+		/*
+		 * The LWP was stopped in the usermode emulation library
+		 * but a ucontext_t for the preserved brand stack and
+		 * register state was provided.  Return the register state
+		 * from that ucontext_t.
+		 */
+		return (lx_uc_to_userregs(remote,
+		    (void *)remote->br_ptrace_stopucp, uregsp));
+	} else {
+		/*
+		 * The register state is not currently available.
+		 */
+		return (EIO);
+	}
+}
+
+static int
+lx_ptrace_setregs(lx_lwp_data_t *remote, void *uregsp)
+{
+	if (remote->br_stack_mode == LX_STACK_MODE_BRAND) {
+		/*
+		 * The LWP was stopped with the brand stack and register
+		 * state loaded, e.g. during a system call emulated within
+		 * the kernel.  Write to the LWP register state.
+		 */
+		return (lx_userregs_to_regs(remote, uregsp));
+	} else if (remote->br_ptrace_stopucp != NULL) {
+		/*
+		 * The LWP was stopped in the usermode emulation library
+		 * but a ucontext_t for the preserved brand stack and
+		 * register state was provided.  Write to the register state
+		 * in that ucontext_t.
+		 */
+		return (lx_userregs_to_uc(remote,
+		    (void *)remote->br_ptrace_stopucp, uregsp));
+	} else {
+		/*
+		 * The register state is not currently available.
+		 */
+		return (EIO);
+	}
+}
+
 /*
  * Implements the PTRACE_CONT subcommand of the Linux ptrace(2) interface.
  */
@@ -907,7 +962,6 @@ static int
 lx_ptrace_attach(pid_t lx_pid)
 {
 	int error = ESRCH;
-	int32_t one = 1;
 	/*
 	 * Our (Tracer) LWP:
 	 */
@@ -1016,15 +1070,9 @@ lx_ptrace_attach(pid_t lx_pid)
 
 		/*
 		 * Set the in-kernel process-wide ptrace(2) enable flag.
-		 * Attempt also to write the usermode trace flag so that the
-		 * process knows to enter the kernel for potential ptrace(2)
-		 * syscall-stops.
 		 */
 		rprocd = ttolxproc(rthr);
 		rprocd->l_ptrace = 1;
-		mutex_exit(&rproc->p_lock);
-		(void) uwrite(rproc, &one, sizeof (one), rprocd->l_traceflag);
-		mutex_enter(&rproc->p_lock);
 
 		error = 0;
 	}
@@ -1294,12 +1342,9 @@ lx_ptrace_traceme(void)
 
 			/*
 			 * Set the in-kernel process-wide ptrace(2) enable
-			 * flag.  Attempt also to write the usermode trace flag
-			 * so that the process knows to enter the kernel for
-			 * potential ptrace(2) syscall-stops.
+			 * flag.
 			 */
 			procd->l_ptrace = 1;
-			(void) suword32((void *)procd->l_traceflag, 1);
 
 			return (0);
 		}
@@ -1360,6 +1405,7 @@ lx_ptrace_stop_common(proc_t *p, lx_lwp_data_t *lwpd, ushort_t what)
 	 */
 	lwpd->br_ptrace_flags &= ~(LX_PTRACE_STOPPING | LX_PTRACE_STOPPED |
 	    LX_PTRACE_CLDPEND);
+	lwpd->br_ptrace_stopucp = NULL;
 	cv_broadcast(&lx_ptrace_busy_cv);
 	mutex_exit(&p->p_lock);
 
@@ -1367,7 +1413,8 @@ lx_ptrace_stop_common(proc_t *p, lx_lwp_data_t *lwpd, ushort_t what)
 }
 
 int
-lx_ptrace_stop_for_option(int option, boolean_t child, ulong_t msg)
+lx_ptrace_stop_for_option(int option, boolean_t child, ulong_t msg,
+    uintptr_t ucp)
 {
 	kthread_t *t = curthread;
 	klwp_t *lwp = ttolwp(t);
@@ -1451,6 +1498,12 @@ lx_ptrace_stop_for_option(int option, boolean_t child, ulong_t msg)
 	default:
 		goto nostop;
 	}
+
+	/*
+	 * Userland may have passed in a ucontext_t pointer for
+	 * PTRACE_GETREGS/PTRACE_SETREGS usage while stopped.
+	 */
+	lwpd->br_ptrace_stopucp = ucp;
 
 	/*
 	 * p_lock for the process containing the tracee will be dropped by
@@ -1874,7 +1927,8 @@ lx_sigcld_repost(proc_t *pp, sigqueue_t *sqp)
 			continue;
 		}
 
-		if (remote->br_ptrace_whystop == 0 ||
+		if (!(remote->br_ptrace_flags & LX_PTRACE_WAITPEND) ||
+		    remote->br_ptrace_whystop == 0 ||
 		    remote->br_ptrace_whatstop == 0) {
 			/*
 			 * No (new) stop reason to post for this LWP.
@@ -2041,7 +2095,8 @@ lx_waitid_helper(idtype_t idtype, id_t id, k_siginfo_t *ip, int options,
 			continue;
 		}
 
-		if (remote->br_ptrace_whystop == 0 ||
+		if (!(remote->br_ptrace_flags & LX_PTRACE_WAITPEND) ||
+		    remote->br_ptrace_whystop == 0 ||
 		    remote->br_ptrace_whatstop == 0) {
 			/*
 			 * No (new) stop reason to post for this LWP.
@@ -2228,6 +2283,14 @@ lx_ptrace_kernel(int ptrace_op, pid_t lxpid, uintptr_t addr, uintptr_t data)
 
 	case LX_PTRACE_GETEVENTMSG:
 		error = lx_ptrace_geteventmsg(remote, (void *)data);
+		break;
+
+	case LX_PTRACE_GETREGS:
+		error = lx_ptrace_getregs(remote, (void *)data);
+		break;
+
+	case LX_PTRACE_SETREGS:
+		error = lx_ptrace_setregs(remote, (void *)data);
 		break;
 
 	default:

@@ -32,6 +32,7 @@
 extern "C" {
 #endif
 
+#include <sys/lx_signal.h>
 #include <thread.h>
 
 typedef enum lx_exit_type {
@@ -41,23 +42,32 @@ typedef enum lx_exit_type {
 } lx_exit_type_t;
 
 typedef struct lx_tsd {
-#if defined(_ILP32)
-	/* 32-bit thread-specific Linux %gs value */
-	uintptr_t	lxtsd_gs;
-#else
-	/* 64-bit thread-specific Linux %fsbase value */
-	uintptr_t	lxtsd_fsbase;
-#endif
 	lx_exit_type_t	lxtsd_exit;
 	int		lxtsd_exit_status;
 	ucontext_t	lxtsd_exit_context;
+
+	/*
+	 * If this value is non-zero, we use it in lx_sigdeliver() to represent
+	 * the in-use extent of the Linux (i.e. BRAND) stack for this thread.
+	 * Access to this value must be protected by _sigoff()/_sigon().
+	 */
+	uintptr_t	lxtsd_lx_sp;
+
+	/*
+	 * Alternate stack for Linux sigaltstack emulation:
+	 */
+	lx_stack_t	lxtsd_sigaltstack;
+
+	void		*lxtsd_clone_state;
 } lx_tsd_t;
 
 extern thread_key_t	lx_tsd_key;
 
 extern void		lx_swap_gs(long, long *);
 
-extern void		lx_exit_common(lx_exit_type_t, uintptr_t) __NORETURN;
+extern void		lx_exit_common(void) __NORETURN;
+
+extern lx_tsd_t		*lx_get_tsd(void);
 
 #ifdef	__cplusplus
 }

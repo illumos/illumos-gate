@@ -39,6 +39,7 @@
 #include <sys/lwp.h>
 
 #include <sys/lx_brand.h>
+#include <sys/lx_thread.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -53,13 +54,6 @@ extern pid_t zoneinit_pid;
  */
 extern int lx_rpm_delay;
 extern boolean_t lx_is_rpm;
-
-/*
- * These thread-specific variables allow the signal interposition code
- * to communicate restart disposition for any interrupting signals.
- */
-extern __thread int lx_had_sigchild;
-extern __thread int lx_do_syscall_restart;
 
 /*
  * Values Linux expects for init
@@ -151,6 +145,11 @@ extern __thread int lx_do_syscall_restart;
 	B_TRACE_POINT_5(0, 0, 0, 0, 0)
 
 /*
+ * Macros to access register state within a ucontext_t:
+ */
+#define	LX_REG(ucp, r)	((ucp)->uc_mcontext.gregs[(r)])
+
+/*
  * normally we never want to write to stderr or stdout because it's unsafe
  * to make assumptions about the underlying file descriptors.  to protect
  * against writes to these file descriptors we go ahead and close them
@@ -166,10 +165,9 @@ extern void lx_unsupported(char *, ...);
 
 struct ucontext;
 
-extern void lx_handler_table(void);
-extern void lx_handler_trace_table(void);
-extern void lx_emulate_done(void);
-extern lx_regs_t *lx_syscall_regs(void);
+extern ucontext_t *lx_syscall_regs(void);
+extern uintptr_t lx_find_brand_sp(void);
+extern const ucontext_t *lx_find_brand_uc(void);
 extern int lx_errno(int);
 
 extern char *lx_fd_to_path(int fd, char *buf, int buf_size);
@@ -179,13 +177,19 @@ extern int lx_lpid_to_spid(pid_t, pid_t *);
 extern void lx_ptrace_init();
 extern int lx_ptrace_wait(siginfo_t *);
 extern void lx_ptrace_fork(void);
-extern void lx_ptrace_stop_if_option(int, boolean_t, ulong_t msg);
+extern void lx_ptrace_stop_if_option(int, boolean_t, ulong_t msg, ucontext_t *);
 extern void lx_ptrace_clone_begin(int, boolean_t);
 
 extern int lx_check_alloca(size_t);
 #define	SAFE_ALLOCA(sz)	(lx_check_alloca(sz) ? alloca(sz) : NULL)
 
 extern int ltos_at_flag(int lflag, int allow, boolean_t enforce);
+
+extern void lx_init_tsd(lx_tsd_t *);
+extern int lx_alloc_stack(void **, size_t *);
+extern void lx_install_stack(void *, size_t, lx_tsd_t *);
+extern void lx_free_stack(void);
+extern void lx_free_other_stacks(void);
 
 /*
  * NO_UUCOPY disables calls to the uucopy* system calls to help with
@@ -200,6 +204,13 @@ int uucopystr_unsafe(const void *src, void *dst, size_t n);
 #define	uucopystr(src, dst, n)	uucopystr_unsafe((src), (dst), (n))
 
 #endif /* NO_UUCOPY */
+
+/*
+ * We use these Private libc interfaces to defer signals during critical
+ * sections.
+ */
+extern void _sigon(void);
+extern void _sigoff(void);
 
 #ifdef	__cplusplus
 }

@@ -22,7 +22,7 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2014 Joyent, Inc.  All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  */
 
 /*
@@ -262,7 +262,6 @@ static cond_t		lxt_req_cv = DEFAULTCV;
 static lxt_req_t	*lxt_req_ptr = NULL;
 
 static mutex_t		lxt_pid_lock = DEFAULTMUTEX;
-static pid_t		lxt_pid = NULL;
 
 /*
  * Interfaces used to call from lx_brand.so into Linux code.
@@ -370,26 +369,26 @@ lx_call(lx_handle_sym_t lx_ch, uintptr_t p1, uintptr_t p2,
 {
 	typedef uintptr_t	(*fp8_t)(uintptr_t, uintptr_t, uintptr_t,
 	    uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t);
-	lx_regs_t		*rp;
+	ucontext_t		*ucp;
 	uintptr_t		ret;
 	fp8_t			lx_funcp = (fp8_t)lx_ch;
 #if defined(_ILP32)
 	long			cur_gs;
 #endif
 
-	rp = lx_syscall_regs();
+	ucp = lx_syscall_regs();
 
 #if defined(_ILP32)
-	lx_debug("lx_call: loading Linux gs, rp = 0x%p, gs = 0x%p",
-	    rp, rp->lxr_gs);
-	lx_swap_gs(rp->lxr_gs, &cur_gs);
+	lx_debug("lx_call: loading Linux gs, ucp = 0x%p, gs = 0x%p",
+	    ucp, LX_REG(ucp, GS));
+	lx_swap_gs(LX_REG(ucp, GS), &cur_gs);
 #endif
 
 	lx_debug("lx_call: calling to Linux code at 0x%p", lx_ch);
 	ret = lx_funcp(p1, p2, p3, p4, p5, p6, p7, p8);
 
 #if defined(_ILP32)
-	lx_swap_gs(cur_gs, &rp->lxr_gs);
+	lx_swap_gs(cur_gs, (long *)&LX_REG(ucp, GS));
 #endif
 
 	lx_debug("lx_call: returned from Linux code at 0x%p (%p)", lx_ch, ret);
@@ -725,7 +724,7 @@ lxt_server_syslog(lxt_server_arg_t *request, size_t request_size,
 	 * We do this by telling our getpid() system call to return a
 	 * different value.
 	 */
-	lxt_pid = data->lxt_sl_pid;
+	(void) syscall(SYS_brand, B_SET_THUNK_PID, data->lxt_sl_pid);
 
 	/*
 	 * Ensure the message has the correct program name.
@@ -750,7 +749,7 @@ lxt_server_syslog(lxt_server_arg_t *request, size_t request_size,
 	/* Restore pid and program name. */
 	(void) uucopy(&progname_ptr_old,
 	    lxt_handles[LXTH_PROGNAME].lxth_handle, sizeof (char *));
-	lxt_pid = NULL;
+	(void) syscall(SYS_brand, B_SET_THUNK_PID, 0);
 
 	(void) mutex_unlock(&lxt_pid_lock);
 
@@ -1021,13 +1020,4 @@ lxt_server_init(int argc, char *argv[])
 
 	lxt_server_processes = 1;
 	lx_debug("lx_thunk server detected, delaying initalization");
-}
-
-int
-lxt_server_pid(int *pid)
-{
-	if (lxt_server_processes == 0)
-		return (0);
-	*pid = lxt_pid;
-	return (1);
 }

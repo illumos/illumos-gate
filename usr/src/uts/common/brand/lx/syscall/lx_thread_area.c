@@ -42,28 +42,34 @@ long
 lx_arch_prctl(int code, ulong_t addr)
 {
 #if defined(__amd64)
-	struct lx_lwp_data *llwp = ttolxlwp(curthread);
-	pcb_t *pcb;
-
+	klwp_t *lwp = ttolwp(curthread);
+	lx_lwp_data_t *llwp = lwptolxlwp(lwp);
+	pcb_t *pcb = &lwp->lwp_pcb;
 
 	/* We currently only support [g|s]et_fs */
 	switch (code) {
 	case LX_ARCH_GET_FS:
 		if (copyout(&llwp->br_lx_fsbase, (void *)addr,
-		    sizeof (llwp->br_lx_fsbase)))
+		    sizeof (llwp->br_lx_fsbase)) != 0) {
 			return (set_errno(EFAULT));
+		}
 		break;
+
 	case LX_ARCH_SET_FS:
 		llwp->br_lx_fsbase = addr;
-		/*
-		 * Save current native libc fsbase. Don't use rdmsr since the
-		 * value might get changed before we get to this code. We
-		 * use the value from the pcb which the native libc should
-		 * have already setup via syslwp_private.
-		 */
-		pcb = (pcb_t *)&curthread->t_lwp->lwp_pcb;
-		llwp->br_ntv_fsbase = pcb->pcb_fsbase;
+
+		kpreempt_disable();
+		if (pcb->pcb_fsbase != llwp->br_lx_fsbase) {
+			pcb->pcb_fsbase = llwp->br_lx_fsbase;
+
+			/*
+			 * Ensure we go out via update_sregs.
+			 */
+			pcb->pcb_rupdate = 1;
+		}
+		kpreempt_enable();
 		break;
+
 	default:
 		return (set_errno(EINVAL));
 	}

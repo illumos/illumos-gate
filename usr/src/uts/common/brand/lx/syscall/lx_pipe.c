@@ -24,7 +24,7 @@
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2013 OmniTI Computer Consulting, Inc. All rights reserved.
- * Copyright 2014 Joyent, Inc.  All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  */
 
 #include <sys/zone.h>
@@ -44,6 +44,9 @@
 #include <sys/fcntl.h>
 #include <sys/brand.h>
 #include <sys/lx_brand.h>
+
+#define	LX_O_NONBLOCK	04000
+#define	LX_O_CLOEXEC	02000000
 
 /*
  * Based on native pipe(2) system call, except that the pipe is half-duplex.
@@ -174,7 +177,26 @@ lx_pipe(intptr_t arg)
  * pipe2(2) system call.
  */
 long
-lx_pipe2(intptr_t arg, int flags)
+lx_pipe2(intptr_t arg, int lxflags)
 {
+	int flags = 0;
+
+	/*
+	 * Validate allowed flags.
+	 */
+	if ((lxflags & ~(LX_O_NONBLOCK | LX_O_CLOEXEC)) != 0) {
+		return (set_errno(EINVAL));
+	}
+
+	/*
+	 * Convert from Linux flags to illumos flags.
+	 */
+	if (lxflags & LX_O_NONBLOCK) {
+		flags |= FNONBLOCK;
+	}
+	if (lxflags & LX_O_CLOEXEC) {
+		flags |= FCLOEXEC;
+	}
+
 	return (lx_hd_pipe(arg, flags));
 }

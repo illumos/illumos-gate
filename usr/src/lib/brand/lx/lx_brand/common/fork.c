@@ -37,77 +37,75 @@
  * initialization or else bad things will happen (i.e. ending up with a bad
  * schedctl page).  On Linux, there is no such thing as forkall(), so we use
  * fork1() here.
- */
-long
-lx_fork(void)
-{
-	int ret;
-
-	/*
-	 * Inform the in-kernel ptrace(2) subsystem that we are about to
-	 * emulate fork(2).
-	 */
-	lx_ptrace_clone_begin(LX_PTRACE_O_TRACEFORK, B_FALSE);
-
-	switch (ret = fork1()) {
-	case -1:
-		return (-errno);
-
-	case 0:
-		/*
-		 * Returning in the new child.
-		 */
-		if (lx_is_rpm) {
-			(void) sleep(lx_rpm_delay);
-		}
-		lx_ptrace_stop_if_option(LX_PTRACE_O_TRACEFORK, B_TRUE, 0);
-		return (0);
-
-	default:
-		/*
-		 * Returning in the new parent.
-		 */
-		lx_ptrace_stop_if_option(LX_PTRACE_O_TRACEFORK, B_FALSE,
-		    (ulong_t)ret);
-		return (ret);
-	}
-}
-
-/*
+ *
  * For vfork(), we have a serious problem because the child is not allowed to
  * return from the current frame because it will corrupt the parent's stack.
  * Since the semantics of vfork() are rather ill-defined (other than "it's
  * faster than fork"), we should theoretically be safe by falling back to
  * fork1().
  */
-long
-lx_vfork(void)
+static long
+lx_fork_common(boolean_t is_vfork)
 {
 	int ret;
+	int ptopt = is_vfork ? LX_PTRACE_O_TRACEVFORK : LX_PTRACE_O_TRACEFORK;
 
 	/*
 	 * Inform the in-kernel ptrace(2) subsystem that we are about to
-	 * emulate vfork(2).
+	 * emulate fork(2).
 	 */
-	lx_ptrace_clone_begin(LX_PTRACE_O_TRACEVFORK, B_FALSE);
+	lx_ptrace_clone_begin(ptopt, B_FALSE);
 
+	/*
+	 * Suspend signal delivery and perform the fork operation.
+	 */
+	_sigoff();
 	switch (ret = fork1()) {
 	case -1:
+		_sigon();
 		return (-errno);
 
 	case 0:
 		/*
-		 * Returning in the new child.
+		 * Returning in the new child.  We must free the stacks and
+		 * thread-specific data objects for the threads we did not
+		 * duplicate; i.e. every other thread.
 		 */
-		lx_ptrace_stop_if_option(LX_PTRACE_O_TRACEVFORK, B_TRUE, 0);
+		lx_free_other_stacks();
+
+		if (!is_vfork && lx_is_rpm) {
+			(void) sleep(lx_rpm_delay);
+		}
+
+		lx_ptrace_stop_if_option(ptopt, B_TRUE, 0, NULL);
+
+		/*
+		 * Re-enable signal delivery in the child and return to the
+		 * new process.
+		 */
+		_sigon();
 		return (0);
 
 	default:
+		lx_ptrace_stop_if_option(ptopt, B_FALSE, (ulong_t)ret, NULL);
+
 		/*
-		 * Returning in the new parent.
+		 * Re-enable signal delivery in the parent and return from
+		 * the emulated system call.
 		 */
-		lx_ptrace_stop_if_option(LX_PTRACE_O_TRACEVFORK, B_FALSE,
-		    (ulong_t)ret);
+		_sigon();
 		return (ret);
 	}
+}
+
+long
+lx_fork(void)
+{
+	return (lx_fork_common(B_FALSE));
+}
+
+long
+lx_vfork(void)
+{
+	return (lx_fork_common(B_TRUE));
 }
