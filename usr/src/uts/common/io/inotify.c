@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright (c) 2014 Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2015 Joyent, Inc.  All rights reserved.
  */
 
 /*
@@ -1271,6 +1271,11 @@ inotify_close(dev_t dev, int flag, int otyp, cred_t *cred_p)
 	minor_t minor = getminor(dev);
 
 	state = ddi_get_soft_state(inotify_softstate, minor);
+
+	if (state->ins_pollhd.ph_list != NULL) {
+		pollwakeup(&state->ins_pollhd, POLLERR);
+		pollhead_clean(&state->ins_pollhd);
+	}
 
 	mutex_enter(&state->ins_lock);
 
