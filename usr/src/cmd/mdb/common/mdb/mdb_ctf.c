@@ -2127,7 +2127,7 @@ mdb_ctf_synthetics_from_file(const char *file)
 	ti.ti_fp = fp;
 	ti.ti_arg = syn;
 	ti.ti_cb = mdb_ctf_synthetics_file_cb;
-	if (ctf_type_iter(fp, B_TRUE, type_iter_cb, &ti) == CTF_ERR) {
+	if (ctf_type_iter(fp, B_FALSE, type_iter_cb, &ti) == CTF_ERR) {
 		ret = set_errno(ctf_to_errno(ctf_errno(fp)));
 		mdb_warn("failed to add types");
 		goto cleanup;
