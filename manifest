@@ -2141,7 +2141,6 @@ f usr/bin/lorder 0555 root bin
 # also matches the setup on a stock solaris box.
 f usr/bin/ls 0555 root bin
 f usr/bin/m4 0555 root bin
-f usr/bin/m68k 0555 root bin
 h usr/bin/mac=usr/lib/isaexec
 f usr/bin/mach 0555 root bin
 f usr/bin/mail 2511 root mail
