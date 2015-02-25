@@ -19,12 +19,15 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ */
+
 /*
  * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *  Kernel code to obtain client handle to gssd server
@@ -39,7 +42,6 @@
 #include <sys/vnode.h>
 #include <sys/uio.h>
 #include <sys/pathname.h>
-#include <sys/utsname.h>
 
 #define	GSSD_RETRY 5
 
@@ -94,7 +96,6 @@ getgssd_handle(void)
 	struct vnode *vp;
 	int error;
 	CLIENT *clnt;
-	char *gssname;
 	enum clnt_stat stat;
 	struct netbuf tmpaddr;
 	struct gss_globals *gssg;
@@ -107,7 +108,7 @@ getgssd_handle(void)
 	 */
 	if (gssg->gss_config.knc_rdev == 0) {
 		if ((error = lookupname("/dev/ticotsord", UIO_SYSSPACE,
-					    FOLLOW, NULLVPP, &vp)) != 0) {
+		    FOLLOW, NULLVPP, &vp)) != 0) {
 			GSSLOG(1, "getgssd_handle: lookupname: %d\n", error);
 			return (NULL);
 		}
@@ -125,27 +126,20 @@ getgssd_handle(void)
 	netaddrp = &gssg->gss_netaddr;
 
 	if (netaddrp->len == 0 || gssg->gss_last_stat != RPC_SUCCESS) {
-		char *nodename = uts_nodename();
-
-		/* Set up netaddr to be <nodename>. */
-		netaddrp->len = strlen(nodename) + 1;
-		if (netaddrp->buf != (char *)NULL)
+		if (netaddrp->buf != NULL)
 			kmem_free(netaddrp->buf, netaddrp->maxlen);
-		gssname = kmem_zalloc(netaddrp->len, KM_SLEEP);
 
-		(void) strncpy(gssname, nodename, netaddrp->len - 1);
-
-		/* Append "." to end of gssname */
-		(void) strncpy(gssname+(netaddrp->len-1), ".", 1);
-		netaddrp->buf = gssname;
-		netaddrp->maxlen = netaddrp->len;
+		/* Set up netaddr to be "localhost." (strlen is 10) */
+		netaddrp->len = netaddrp->maxlen = 10;
+		netaddrp->buf = kmem_alloc(netaddrp->len, KM_SLEEP);
+		(void) strncpy(netaddrp->buf, "localhost.", netaddrp->len);
 
 		/* Get address of gssd from rpcbind */
 		stat = rpcbind_getaddr(&gssg->gss_config, GSSPROG, GSSVERS,
 		    netaddrp);
 		if (stat != RPC_SUCCESS) {
 			kmem_free(netaddrp->buf, netaddrp->maxlen);
-			netaddrp->buf = (char *)NULL;
+			netaddrp->buf = NULL;
 			netaddrp->len = netaddrp->maxlen = 0;
 			mutex_exit(&gssrpcb_lock);
 			return (NULL);
@@ -166,7 +160,7 @@ getgssd_handle(void)
 	mutex_exit(&gssrpcb_lock);
 
 	error = clnt_tli_kcreate(&gssg->gss_config, &tmpaddr, GSSPROG,
-		GSSVERS, 0, GSSD_RETRY, kcred, &clnt);
+	    GSSVERS, 0, GSSD_RETRY, kcred, &clnt);
 
 	kmem_free(tmpaddr.buf, tmpaddr.maxlen);
 
