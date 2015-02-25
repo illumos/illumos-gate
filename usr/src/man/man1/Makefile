@@ -11,7 +11,7 @@
 
 #
 # Copyright 2011, Richard Lowe
-# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2015 Nexenta Systems, Inc. All rights reserved.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 #
 
@@ -222,7 +222,6 @@ MANFILES=	acctcom.1			\
 	 	m4.1				\
 	 	mac.1				\
 	 	mach.1				\
-	 	machid.1			\
 	 	madv.so.1.1			\
 	 	mail.1				\
 	 	mailcompat.1			\
@@ -476,11 +475,6 @@ MANLINKS=	batch.1		\
 		helpuid.1	\
 		helpyorn.1	\
 		hist.1		\
-		i286.1		\
-		i386.1		\
-		i486.1		\
-		i860.1		\
-		iAPX286.1	\
 		if.1		\
 		intro.1		\
 		jsh.1		\
@@ -492,7 +486,6 @@ MANLINKS=	batch.1		\
 		page.1		\
 		pcat.1		\
 		pcred.1		\
-		pdp11.1		\
 		pfcsh.1		\
 		pfiles.1	\
 		pfksh.1		\
@@ -526,17 +519,10 @@ MANLINKS=	batch.1		\
 		sh.1		\
 		snca.1		\
 		source.1	\
-		sparc.1		\
 		spellin.1	\
 		stop.1		\
 		strconf.1	\
-		sun.1		\
 		switch.1	\
-		u370.1		\
-		u3b.1		\
-		u3b15.1		\
-		u3b2.1		\
-		u3b5.1		\
 		ulimit.1	\
 		unalias.1	\
 		uncompress.1	\
@@ -556,7 +542,6 @@ MANLINKS=	batch.1		\
 		valtime.1	\
 		valuid.1	\
 		valyorn.1	\
-		vax.1		\
 		vedit.1		\
 		whatis.1	\
 		whence.1	\
@@ -663,21 +648,6 @@ ulimit.1	:= LINKSRC = limit.1
 unlimit.1	:= LINKSRC = limit.1
 
 dumpkeys.1	:= LINKSRC = loadkeys.1
-
-i286.1		:= LINKSRC = machid.1
-i386.1		:= LINKSRC = machid.1
-i486.1		:= LINKSRC = machid.1
-i860.1		:= LINKSRC = machid.1
-iAPX286.1	:= LINKSRC = machid.1
-pdp11.1		:= LINKSRC = machid.1
-sparc.1		:= LINKSRC = machid.1
-sun.1		:= LINKSRC = machid.1
-u370.1		:= LINKSRC = machid.1
-u3b.1		:= LINKSRC = machid.1
-u3b15.1		:= LINKSRC = machid.1
-u3b2.1		:= LINKSRC = machid.1
-u3b5.1		:= LINKSRC = machid.1
-vax.1		:= LINKSRC = machid.1
 
 rmail.1		:= LINKSRC = mail.1
 

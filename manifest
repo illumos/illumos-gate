@@ -2084,13 +2084,9 @@ h usr/bin/hash=usr/bin/alias
 f usr/bin/head 0555 root bin
 f usr/bin/hostid 0555 root bin
 f usr/bin/hostname 0555 root bin
-h usr/bin/i286=usr/bin/sun
-h usr/bin/i386=usr/bin/sun
-h usr/bin/i486=usr/bin/sun
 d usr/bin/i86 0755 root bin
 f usr/bin/i86/ksh93 0555 root bin
 f usr/bin/i86/mdb 0555 root bin
-h usr/bin/i86pc=usr/bin/sun
 f usr/bin/iconv 0555 root bin
 f usr/bin/id 0555 root bin
 f usr/bin/infocmp 0555 root bin
@@ -2290,7 +2286,6 @@ f usr/bin/smbutil 0555 root bin
 f usr/bin/soelim 0555 root bin
 h usr/bin/sort=usr/lib/isaexec
 f usr/bin/sotruss 0755 root bin
-h usr/bin/sparc=usr/bin/sun
 f usr/bin/spell 0555 root bin
 f usr/bin/split 0555 root bin
 f usr/bin/srchtxt 0555 root bin
@@ -2309,15 +2304,6 @@ f usr/bin/strip 0555 root bin
 f usr/bin/stty 0555 root bin
 f usr/bin/su 4555 root sys
 h usr/bin/sum=usr/bin/alias
-f usr/bin/sun 0555 root bin
-h usr/bin/sun2=usr/bin/sun
-h usr/bin/sun3=usr/bin/sun
-h usr/bin/sun3x=usr/bin/sun
-h usr/bin/sun4=usr/bin/sun
-h usr/bin/sun4c=usr/bin/sun
-h usr/bin/sun4d=usr/bin/sun
-h usr/bin/sun4e=usr/bin/sun
-h usr/bin/sun4m=usr/bin/sun
 f usr/bin/svcprop 0555 root bin
 f usr/bin/svcs 0555 root bin
 s usr/bin/sync=../../sbin/sync
@@ -11548,9 +11534,6 @@ s usr/share/man/man1/helpyorn.1=ckyorn.1
 f usr/share/man/man1/history.1 0444 root bin
 f usr/share/man/man1/hostid.1 0444 root bin
 f usr/share/man/man1/hostname.1 0444 root bin
-s usr/share/man/man1/i286.1=machid.1
-s usr/share/man/man1/i386.1=machid.1
-s usr/share/man/man1/i486.1=machid.1
 f usr/share/man/man1/iconv.1 0444 root bin
 s usr/share/man/man1/intro.1=Intro.1
 f usr/share/man/man1/ipcrm.1 0444 root bin
@@ -11605,7 +11588,6 @@ f usr/share/man/man1/ls.1 0444 root bin
 f usr/share/man/man1/m4.1 0444 root bin
 f usr/share/man/man1/mac.1 0444 root bin
 f usr/share/man/man1/mach.1 0444 root bin
-f usr/share/man/man1/machid.1 0444 root bin
 f usr/share/man/man1/mail.1 0444 root bin
 f usr/share/man/man1/mailcompat.1 0444 root bin
 f usr/share/man/man1/mailq.1 0444 root bin
@@ -11731,7 +11713,6 @@ f usr/share/man/man1/smbutil.1 0444 root bin
 f usr/share/man/man1/soelim.1 0444 root bin
 f usr/share/man/man1/sort.1 0444 root bin
 f usr/share/man/man1/sotruss.1 0444 root bin
-s usr/share/man/man1/sparc.1=machid.1
 f usr/share/man/man1/spell.1 0444 root bin
 f usr/share/man/man1/split.1 0444 root bin
 f usr/share/man/man1/srchtxt.1 0444 root bin
@@ -11748,7 +11729,6 @@ f usr/share/man/man1/strings.1 0444 root bin
 f usr/share/man/man1/strip.1 044 root bin
 f usr/share/man/man1/stty.1 0444 root bin
 f usr/share/man/man1/sum.1 0444 root bin
-s usr/share/man/man1/sun.1=machid.1
 f usr/share/man/man1/svcprop.1 0444 root bin
 f usr/share/man/man1/svcs.1 0444 root bin
 f usr/share/man/man1/tabs.1 0444 root bin
