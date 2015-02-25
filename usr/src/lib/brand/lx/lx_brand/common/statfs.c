@@ -87,7 +87,9 @@ static struct lx_ftype_path {
 };
 
 /*
- * For lack of linux equivalents, we present lofs and zfs as being ufs.
+ * For lack of linux equivalents, we present lofs and zfs as being ext2. Yes,
+ * this is a total lie, but Linux can't handle the truth of ZFS -- and ext2's
+ * small surface area seems to make it the most tenable lie to tell.
  */
 static struct lx_ftype_name {
 	const char	*lfn_name;
@@ -100,8 +102,8 @@ static struct lx_ftype_name {
 	{ "lx_proc",	LX_PROC_SUPER_MAGIC,	"LX_PROC_SUPER_MAGIC"	},
 	{ "tmpfs",	LX_TMPFS_SUPER_MAGIC,	"LX_TMPFS_SUPER_MAGIC"	},
 	{ "ufs",	LX_UFS_MAGIC,		"LX_UFS_MAGIC"		},
-	{ "lofs",	LX_UFS_MAGIC,		"LX_UFS_MAGIC"		},
-	{ "zfs",	LX_UFS_MAGIC,		"LX_UFS_MAGIC"		},
+	{ "lofs",	LX_EXT2_SUPER_MAGIC,	"LX_EXT2_SUPER_MAGIC"	},
+	{ "zfs",	LX_EXT2_SUPER_MAGIC,	"LX_EXT2_SUPER_MAGIC"	},
 	{ NULL,		0,			NULL	}
 };
 

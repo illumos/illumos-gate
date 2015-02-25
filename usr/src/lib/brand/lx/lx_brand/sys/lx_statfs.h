@@ -66,6 +66,7 @@ struct lx_statfs64 {
  */
 #define	LX_DEVFS_SUPER_MAGIC		0x1373
 #define	LX_DEVPTS_SUPER_MAGIC		0x1cd1
+#define	LX_EXT2_SUPER_MAGIC		0xEF53
 #define	LX_ISOFS_SUPER_MAGIC		0x9660
 #define	LX_MSDOS_SUPER_MAGIC		0x4d44
 #define	LX_NFS_SUPER_MAGIC		0x6969
