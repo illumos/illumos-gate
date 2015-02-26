@@ -21,7 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2014 Joyent, Inc.  All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  */
 
 #ifndef _SYS_LX_FCNTL_H
@@ -94,7 +94,7 @@ extern "C" {
  * AT_REMOVEDIR is used only by unlinkat and AT_EACCESS is used only by
  * faccessat.
  */
-#define	LX_AT_FDCWD		-100
+#define	LX_AT_FDCWD		(-100)
 #define	LX_AT_SYMLINK_NOFOLLOW	0x100
 #define	LX_AT_REMOVEDIR		0x200
 #define	LX_AT_EACCESS		0x200
@@ -102,21 +102,46 @@ extern "C" {
 #define	LX_AT_NO_AUTOMOUNT	0x800
 #define	LX_AT_EMPTY_PATH	0x1000
 
-struct lx_flock {
+typedef struct lx_flock {
 	short		l_type;
 	short		l_whence;
 	long		l_start;
 	long		l_len;
 	int		l_pid;
-};
+} lx_flock_t;
 
-struct lx_flock64 {
+typedef struct lx_flock64 {
 	short		l_type;
 	short		l_whence;
 	long long	l_start;
 	long long	l_len;
 	int		l_pid;
-};
+} lx_flock64_t;
+
+#if defined(_KERNEL) && defined(_SYSCALL32_IMPL)
+
+/*
+ * 64-bit kernel view of 32-bit usermode structs.
+ */
+#pragma pack(4)
+typedef struct lx_flock32 {
+	int16_t		l_type;
+	int16_t		l_whence;
+	int32_t		l_start;
+	int32_t		l_len;
+	int32_t		l_pid;
+} lx_flock32_t;
+
+typedef struct lx_flock64_32 {
+	int16_t		l_type;
+	int16_t		l_whence;
+	int64_t		l_start;
+	int64_t		l_len;
+	int32_t		l_pid;
+} lx_flock64_32_t;
+#pragma pack()
+
+#endif /* _KERNEL && _SYSCALL32_IMPL */
 
 #ifdef	__cplusplus
 }

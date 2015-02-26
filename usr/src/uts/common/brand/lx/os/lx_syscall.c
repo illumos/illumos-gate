@@ -441,7 +441,7 @@ lx_sysent_t lx_sysent32[] = {
 	{"chdir",	NULL,			0,		1}, /* 12 */
 	{"time",	NULL,			0,		1}, /* 13 */
 	{"mknod",	NULL,			0,		3}, /* 14 */
-	{"chmod",	NULL,			0,		2}, /* 15 */
+	{"chmod",	lx_chmod,		0,		2}, /* 15 */
 	{"lchown16",	NULL,			0,		3}, /* 16 */
 	{"break",	NULL,			NOSYS_OBSOLETE,	0}, /* 17 */
 	{"stat",	NULL,			NOSYS_OBSOLETE,	0}, /* 18 */
@@ -520,7 +520,7 @@ lx_sysent_t lx_sysent32[] = {
 	{"munmap",	NULL,			0,		2}, /* 91 */
 	{"truncate",	NULL,			0,		2}, /* 92 */
 	{"ftruncate",	NULL,			0,		2}, /* 93 */
-	{"fchmod",	NULL,			0,		2}, /* 94 */
+	{"fchmod",	lx_fchmod,		0,		2}, /* 94 */
 	{"fchown16",	NULL,			0,		3}, /* 95 */
 	{"getpriority",	NULL,			0,		2}, /* 96 */
 	{"setpriority",	NULL,			0,		3}, /* 97 */
@@ -736,7 +736,7 @@ lx_sysent_t lx_sysent32[] = {
 	{"linkat",	NULL,			0,		5}, /* 303 */
 	{"symlinkat",	NULL,			0,		3}, /* 304 */
 	{"readlinkat",	NULL,			0,		4}, /* 305 */
-	{"fchmodat",	NULL,			0,		4}, /* 306 */
+	{"fchmodat",	lx_fchmodat,		0,		3}, /* 306 */
 	{"faccessat",	NULL,			0,		4}, /* 307 */
 	{"pselect6",	NULL,			LX_SYS_EBPARG6,	6}, /* 308 */
 	{"ppoll",	NULL,			0,		5}, /* 309 */
@@ -887,8 +887,8 @@ lx_sysent_t lx_sysent64[] = {
 	{"unlink",	NULL,			0,		1}, /* 87 */
 	{"symlink",	NULL,			0,		2}, /* 88 */
 	{"readlink",	NULL,			0,		3}, /* 89 */
-	{"chmod",	NULL,			0,		2}, /* 90 */
-	{"fchmod",	NULL,			0,		2}, /* 91 */
+	{"chmod",	lx_chmod,		0,		2}, /* 90 */
+	{"fchmod",	lx_fchmod,		0,		2}, /* 91 */
 	{"chown",	NULL,			0,		3}, /* 92 */
 	{"fchown",	NULL,			0,		3}, /* 93 */
 	{"lchown",	NULL,			0,		3}, /* 94 */
@@ -1065,7 +1065,7 @@ lx_sysent_t lx_sysent64[] = {
 	{"linkat",	NULL,			0,		5}, /* 265 */
 	{"symlinkat",	NULL,			0,		3}, /* 266 */
 	{"readlinkat",	NULL,			0,		4}, /* 267 */
-	{"fchmodat",	NULL,			0,		4}, /* 268 */
+	{"fchmodat",	lx_fchmodat,		0,		3}, /* 268 */
 	{"faccessat",	NULL,			0,		4}, /* 269 */
 	{"pselect6",	NULL,			0,		6}, /* 270 */
 	{"ppoll",	NULL,			0,		5}, /* 271 */

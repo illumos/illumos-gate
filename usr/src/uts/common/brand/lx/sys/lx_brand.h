@@ -203,11 +203,13 @@ extern struct brand lx_brand;
 typedef struct lx_brand_registration {
 	uint_t lxbr_version;		/* version number */
 	void *lxbr_handler;		/* base address of handler */
+	uint32_t lxbr_flags;		/* LX_PROC_* registration flags */
 } lx_brand_registration_t;
 
 typedef struct lx_brand_registration32 {
 	uint_t lxbr_version;		/* version number */
 	uint32_t lxbr_handler;		/* base address of handler */
+	uint32_t lxbr_flags;		/* LX_PROC_* registration flags */
 } lx_brand_registration32_t;
 
 #ifdef __amd64
@@ -392,6 +394,12 @@ typedef lx_elf_data64_t lx_elf_data_t;
 typedef lx_elf_data32_t lx_elf_data_t;
 #endif
 
+typedef enum lx_proc_flags {
+	LX_PROC_INSTALL_MODE = 0x01
+} lx_proc_flags_t;
+
+#define	LX_PROC_ALL	LX_PROC_INSTALL_MODE
+
 #ifdef	_KERNEL
 
 typedef struct lx_proc_data {
@@ -401,6 +409,7 @@ typedef struct lx_proc_data {
 	lx_elf_data_t l_elf_data; /* ELF data for linux executable */
 	int l_signal;		/* signal to deliver to parent when this */
 				/* thread group dies */
+	lx_proc_flags_t l_flags;
 } lx_proc_data_t;
 
 #endif	/* _KERNEL */

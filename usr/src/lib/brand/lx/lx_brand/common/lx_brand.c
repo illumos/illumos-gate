@@ -583,6 +583,8 @@ lx_init(int argc, char *argv[], char *envp[])
 	void		*vdso_hdr;
 #endif
 
+	bzero(&reg, sizeof (reg));
+
 	stack_bottom = 2 * sysconf(_SC_PAGESIZE);
 
 	/*
@@ -621,6 +623,7 @@ lx_init(int argc, char *argv[], char *envp[])
 	 * Are we in install mode?
 	 */
 	if (getenv("LX_INSTALL") != NULL) {
+		reg.lxbr_flags |= LX_PROC_INSTALL_MODE;
 		lx_install = 1;
 		lx_debug("INSTALL mode enabled.\n");
 	}
@@ -1049,8 +1052,8 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_unlink,			/*  87: unlink */
 	lx_symlink,			/*  88: symlink */
 	lx_readlink,			/*  89: readlink */
-	lx_chmod,			/*  90: chmod */
-	lx_fchmod,			/*  91: fchmod */
+	NULL,				/*  90: chmod */
+	NULL,				/*  91: fchmod */
 	lx_chown,			/*  92: chown */
 	lx_fchown,			/*  93: fchown */
 	lx_lchown,			/*  94: lchown */
@@ -1227,7 +1230,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_linkat,			/* 265: linkat */
 	lx_symlinkat,			/* 266: symlinkat */
 	lx_readlinkat,			/* 267: readlinkat */
-	lx_fchmodat,			/* 268: fchmodat */
+	NULL,				/* 268: fchmodat */
 	lx_faccessat,			/* 269: faccessat */
 	lx_pselect6,			/* 270: pselect6 */
 	lx_ppoll,			/* 271: ppoll */
@@ -1305,7 +1308,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_chdir,			/*  12: chdir */
 	lx_time,			/*  13: time */
 	lx_mknod,			/*  14: mknod */
-	lx_chmod,			/*  15: chmod */
+	NULL,				/*  15: chmod */
 	lx_lchown16,			/*  16: lchown16 */
 	NULL,				/*  17: break */
 	NULL,				/*  18: stat */
@@ -1384,7 +1387,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_munmap,			/*  91: munmap */
 	lx_truncate,			/*  92: truncate */
 	lx_ftruncate,			/*  93: ftruncate */
-	lx_fchmod,			/*  94: fchmod */
+	NULL,				/*  94: fchmod */
 	lx_fchown16,			/*  95: fchown16 */
 	lx_getpriority,			/*  96: getpriority */
 	lx_setpriority,			/*  97: setpriority */
@@ -1596,7 +1599,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_linkat,			/* 303: linkat */
 	lx_symlinkat,			/* 304: symlinkat */
 	lx_readlinkat,			/* 305: readlinkat */
-	lx_fchmodat,			/* 306: fchmodat */
+	NULL,				/* 306: fchmodat */
 	lx_faccessat,			/* 307: faccessat */
 	lx_pselect6,			/* 308: pselect6 */
 	lx_ppoll,			/* 309: ppoll */

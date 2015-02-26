@@ -275,6 +275,7 @@ LX_BRAND_OBJS  =		\
 	lx_archdep.o		\
 	lx_brand.o		\
 	lx_brk.o		\
+	lx_chmod.o		\
 	lx_clone.o		\
 	lx_futex.o		\
 	lx_getpid.o		\
