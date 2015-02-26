@@ -945,15 +945,6 @@ lx_mincore(caddr_t addr, size_t len, char *vec)
 }
 
 long
-lx_mkdir(const char *path, mode_t mode)
-{
-	int r;
-
-	r = mkdir(path, mode);
-	return ((r == -1) ? -errno : r);
-}
-
-long
 lx_munmap(void *addr, size_t len)
 {
 	int r;

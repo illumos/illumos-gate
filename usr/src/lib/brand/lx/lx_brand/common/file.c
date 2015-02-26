@@ -679,21 +679,6 @@ getpathat(int fd, uintptr_t p1, char *outbuf, size_t outbuf_size)
 }
 
 long
-lx_mkdirat(uintptr_t p1, uintptr_t p2, uintptr_t p3)
-{
-	int atfd = (int)p1;
-	mode_t mode = (mode_t)p3;
-	char pathbuf[MAXPATHLEN];
-	int ret;
-
-	ret = getpathat(atfd, p2, pathbuf, sizeof (pathbuf));
-	if (ret < 0)
-		return (ret);
-
-	return (mkdir(pathbuf, mode) ? -errno : 0);
-}
-
-long
 lx_mknodat(uintptr_t ext1, uintptr_t p1, uintptr_t p2, uintptr_t p3)
 {
 	int atfd = (int)ext1;

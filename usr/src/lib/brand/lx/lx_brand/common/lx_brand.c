@@ -1045,7 +1045,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_chdir,			/*  80: chdir */
 	lx_fchdir,			/*  81: fchdir */
 	lx_rename,			/*  82: rename */
-	lx_mkdir,			/*  83: mkdir */
+	NULL,				/*  83: mkdir */
 	lx_rmdir,			/*  84: rmdir */
 	lx_creat,			/*  85: creat */
 	lx_link,			/*  86: link */
@@ -1220,7 +1220,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_inotify_rm_watch,		/* 255: inotify_rm_watch */
 	NULL,				/* 256: migrate_pages */
 	lx_openat,			/* 257: openat */
-	lx_mkdirat,			/* 258: mkdirat */
+	NULL,				/* 258: mkdirat */
 	lx_mknodat,			/* 259: mknodat */
 	lx_fchownat,			/* 260: fchownat */
 	lx_futimesat,			/* 261: futimesat */
@@ -1332,7 +1332,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_sync,			/*  36: sync */
 	NULL,				/*  37: kill */
 	lx_rename,			/*  38: rename */
-	lx_mkdir,			/*  39: mkdir */
+	NULL,				/*  39: mkdir */
 	lx_rmdir,			/*  40: rmdir */
 	lx_dup,				/*  41: dup */
 	NULL,				/*  42: pipe */
@@ -1589,7 +1589,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_inotify_rm_watch,		/* 293: inotify_rm_watch */
 	NULL,				/* 294: migrate_pages */
 	lx_openat,			/* 295: openat */
-	lx_mkdirat,			/* 296: mkdirat */
+	NULL,				/* 296: mkdirat */
 	lx_mknodat,			/* 297: mknodat */
 	lx_fchownat,			/* 298: fchownat */
 	lx_futimesat,			/* 299: futimesat */
