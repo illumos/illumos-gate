@@ -79,7 +79,6 @@ my %cols = (# HDR => [Size, Scale, Description]
 	"mrug" 		=>[4, 1000, "MRU Ghost List hits per second"],
 	"eskip"		=>[5, 1000, "evict_skip per second"],
 	"mtxmis"	=>[6, 1000, "mutex_miss per second"],
-	"rmis"		=>[4, 1000, "recycle_miss per second"],
 	"dread"		=>[5, 1000, "Demand data accesses per second"],
 	"pread"		=>[5, 1000, "Prefetch accesses per second"],
 	"l2hits"	=>[6, 1000, "L2ARC hits per second"],
@@ -93,7 +92,7 @@ my %cols = (# HDR => [Size, Scale, Description]
 );
 my %v=();
 my @hdr = qw(time read miss miss% dmis dm% pmis pm% mmis mm% arcsz c);
-my @xhdr = qw(time mfu mru mfug mrug eskip mtxmis rmis dread pread read);
+my @xhdr = qw(time mfu mru mfug mrug eskip mtxmis dread pread read);
 my $int = 1;		# Default interval is 1 second
 my $count = 1;		# Default count is 1 
 my $hdr_intr = 20;	# Print header every 20 lines of output
@@ -326,7 +325,6 @@ sub calculate {
 	$v{"mrug"} = $d{"mru_ghost_hits"}/$int;
 	$v{"mfug"} = $d{"mfu_ghost_hits"}/$int;
 	$v{"eskip"} = $d{"evict_skip"}/$int;
-	$v{"rmiss"} = $d{"recycle_miss"}/$int;
 	$v{"mtxmis"} = $d{"mutex_miss"}/$int;
 
 	if ($l2exist) {
