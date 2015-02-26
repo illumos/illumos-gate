@@ -465,7 +465,7 @@ lx_sysent_t lx_sysent32[] = {
 	{"sync",	NULL,			0, 		0}, /* 36 */
 	{"kill",	lx_kill,		0,		2}, /* 37 */
 	{"rename",	NULL,			0,		2}, /* 38 */
-	{"mkdir",	NULL,			0,		2}, /* 39 */
+	{"mkdir",	lx_mkdir,		0,		2}, /* 39 */
 	{"rmdir",	NULL,			0,		1}, /* 40 */
 	{"dup",		NULL,			0,		1}, /* 41 */
 	{"pipe",	lx_pipe,		0,		1}, /* 42 */
@@ -726,7 +726,7 @@ lx_sysent_t lx_sysent32[] = {
 	{"inotify_rm_watch", NULL,		0,		2}, /* 293 */
 	{"migrate_pages", NULL,			NOSYS_NULL,	0}, /* 294 */
 	{"openat",	NULL,			0,		4}, /* 295 */
-	{"mkdirat",	NULL,			0,		3}, /* 296 */
+	{"mkdirat",	lx_mkdirat,		0,		3}, /* 296 */
 	{"mknodat",	NULL,			0,		4}, /* 297 */
 	{"fchownat",	NULL,			0,		5}, /* 298 */
 	{"futimesat",	NULL,			0,		3}, /* 299 */
@@ -880,7 +880,7 @@ lx_sysent_t lx_sysent64[] = {
 	{"chdir",	NULL,			0,		1}, /* 80 */
 	{"fchdir",	NULL,			0,		1}, /* 81 */
 	{"rename",	NULL,			0,		2}, /* 82 */
-	{"mkdir",	NULL,			0,		2}, /* 83 */
+	{"mkdir",	lx_mkdir,		0,		2}, /* 83 */
 	{"rmdir",	NULL,			0,		1}, /* 84 */
 	{"creat",	NULL,			0,		2}, /* 85 */
 	{"link",	NULL,			0,		2}, /* 86 */
@@ -1055,7 +1055,7 @@ lx_sysent_t lx_sysent64[] = {
 	{"inotify_rm_watch", NULL,		0,		2}, /* 255 */
 	{"migrate_pages", NULL,			NOSYS_NULL,	0}, /* 256 */
 	{"openat",	NULL,			0,		4}, /* 257 */
-	{"mkdirat",	NULL,			0,		3}, /* 258 */
+	{"mkdirat",	lx_mkdirat,		0,		3}, /* 258 */
 	{"mknodat",	NULL,			0,		4}, /* 259 */
 	{"fchownat",	NULL,			0,		5}, /* 260 */
 	{"futimesat",	NULL,			0,		3}, /* 261 */

@@ -46,6 +46,8 @@ extern long lx_getppid();
 extern long lx_gettid();
 extern long lx_ioctl();
 extern long lx_kill();
+extern long lx_mkdir();
+extern long lx_mkdirat();
 extern long lx_modify_ldt();
 extern long lx_pipe();
 extern long lx_pipe2();

@@ -45,7 +45,6 @@ extern "C" {
 extern int lx_install;
 
 extern long lx_openat(uintptr_t, uintptr_t, uintptr_t, uintptr_t);
-extern long lx_mkdirat(uintptr_t, uintptr_t, uintptr_t);
 extern long lx_mknodat(uintptr_t, uintptr_t, uintptr_t, uintptr_t);
 extern long lx_fchownat(uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t);
 extern long lx_futimesat(uintptr_t, uintptr_t, uintptr_t);
@@ -327,7 +326,6 @@ extern long lx_inotify_init1(int);
 extern long lx_inotify_rm_watch(int, int);
 extern long lx_lchown(const char *, uid_t, gid_t);
 extern long lx_mincore(caddr_t, size_t, char *);
-extern long lx_mkdir(const char *, mode_t);
 extern long lx_munmap(void *, size_t);
 extern long lx_nanosleep(const struct timespec *, struct timespec *);
 extern long lx_nice(int);
