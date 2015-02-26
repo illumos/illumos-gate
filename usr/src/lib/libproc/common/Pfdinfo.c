@@ -134,10 +134,20 @@ load_fdinfo(struct ps_prochandle *P)
 			info->pr_offset = pr_llseek(P, fd, 0, SEEK_CUR);
 
 			/* attempt to determine the path to it */
-			(void) snprintf(path, sizeof (path),
-			    "%s/%d/path/%d", procfs_path, (int)P->pid, fd);
-			len = readlink(path, info->pr_path,
-			    sizeof (info->pr_path) - 1);
+			switch (info->pr_mode & S_IFMT) {
+			case S_IFDOOR:
+			case S_IFSOCK:
+				/* not applicable */
+				len = -1;
+				break;
+			default:
+				(void) snprintf(path, sizeof (path),
+				    "%s/%d/path/%d", procfs_path, (int)P->pid,
+				    fd);
+				len = readlink(path, info->pr_path,
+				    sizeof (info->pr_path) - 1);
+				break;
+			}
 
 			if (len < 0) {
 				info->pr_path[0] = 0;

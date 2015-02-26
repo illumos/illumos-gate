@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -1575,7 +1576,6 @@ hsfs_getpage(
 	struct cred *cred,
 	caller_context_t *ct)
 {
-	int err;
 	uint_t filsiz;
 	struct hsfs *fsp;
 	struct hsnode *hp;
@@ -1653,14 +1653,8 @@ hsfs_getpage(
 	if (protp != NULL)
 		*protp = PROT_ALL;
 
-	if (len <= PAGESIZE)
-		err = hsfs_getapage(vp, (u_offset_t)off, len, protp, pl, plsz,
-		    seg, addr, rw, cred);
-	else
-		err = pvn_getpages(hsfs_getapage, vp, off, len, protp,
-		    pl, plsz, seg, addr, rw, cred);
-
-	return (err);
+	return (pvn_getpages(hsfs_getapage, vp, off, len, protp, pl, plsz,
+	    seg, addr, rw, cred));
 }
 
 

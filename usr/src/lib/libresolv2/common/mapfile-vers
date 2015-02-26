@@ -130,7 +130,7 @@ SYMBOL_VERSION SUNWprivate_2.1 {
 	__ctl_sendhelp;
 	__ctl_server;
 	__ctl_setcsctx;
-	daemon;
+	daemon		{ TYPE = FUNCTION; FILTER = libc.so.1 };
 	dn_count_labels;
 	__dn_count_labels;
 	dn_skipname;

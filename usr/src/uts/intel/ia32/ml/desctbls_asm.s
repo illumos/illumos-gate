@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/asm_linkage.h>
 #include <sys/asm_misc.h>
 #include <sys/regset.h>
@@ -198,8 +196,7 @@ get_cs_register()
 	SET_SIZE(load_segment_registers)
 
 	ENTRY_NP(get_cs_register)
-	movq	$0, %rax
-	movw	%cs, %rax
+	movq	%cs, %rax
 	ret
 	SET_SIZE(get_cs_register)
 

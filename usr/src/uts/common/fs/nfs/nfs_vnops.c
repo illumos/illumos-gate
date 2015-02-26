@@ -27,6 +27,7 @@
 
 /*
  * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/param.h>
@@ -3681,13 +3682,8 @@ retry:
 
 	mutex_exit(&rp->r_statelock);
 
-	if (len <= PAGESIZE) {
-		error = nfs_getapage(vp, off, len, protp, pl, plsz,
-		    seg, addr, rw, cr);
-	} else {
-		error = pvn_getpages(nfs_getapage, vp, off, len, protp,
-		    pl, plsz, seg, addr, rw, cr);
-	}
+	error = pvn_getpages(nfs_getapage, vp, off, len, protp, pl, plsz,
+	    seg, addr, rw, cr);
 
 	switch (error) {
 	case NFS_EOF:
@@ -3701,7 +3697,7 @@ retry:
 }
 
 /*
- * Called from pvn_getpages or nfs_getpage to get a particular page.
+ * Called from pvn_getpages to get a particular page.
  */
 /* ARGSUSED */
 static int

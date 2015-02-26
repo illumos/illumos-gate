@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/param.h>
@@ -7385,13 +7386,8 @@ cachefs_getpage(struct vnode *vp, offset_t off, size_t len,
 				break;
 			}
 		}
-		if (len <= PAGESIZE)
-			error = cachefs_getapage(vp, (u_offset_t)off, len,
-			    protp, pl, plsz, seg, addr, rw, cr);
-		else
-			error = pvn_getpages(cachefs_getapage, vp,
-			    (u_offset_t)off, len, protp, pl, plsz, seg, addr,
-			    rw, cr);
+		error = pvn_getpages(cachefs_getapage, vp, (u_offset_t)off,
+		    len, protp, pl, plsz, seg, addr, rw, cr);
 		if (error == 0)
 			break;
 
@@ -7411,17 +7407,10 @@ cachefs_getpage(struct vnode *vp, offset_t off, size_t len,
 		} else {
 			if (CFS_TIMEOUT(fscp, error)) {
 				if (cachefs_cd_access_miss(fscp)) {
-					if (len <= PAGESIZE)
-						error = cachefs_getapage_back(
-						    vp, (u_offset_t)off,
-						    len, protp, pl,
-						    plsz, seg, addr, rw, cr);
-					else
-						error = pvn_getpages(
-						    cachefs_getapage_back, vp,
-						    (u_offset_t)off, len,
-						    protp, pl,
-						    plsz, seg, addr, rw, cr);
+					error = pvn_getpages(
+					    cachefs_getapage_back, vp,
+					    (u_offset_t)off, len, protp, pl,
+					    plsz, seg, addr, rw, cr);
 					if (!CFS_TIMEOUT(fscp, error) &&
 					    (error != EAGAIN))
 						break;
@@ -7498,7 +7487,7 @@ cachefs_getpage_backfs_nfsv4(struct vnode *vp, offset_t off, size_t len,
 }
 
 /*
- * Called from pvn_getpages or cachefs_getpage to get a particular page.
+ * Called from pvn_getpages to get a particular page.
  */
 /*ARGSUSED*/
 static int

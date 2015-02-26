@@ -33,6 +33,7 @@ $(PROG): $(PROG).core $(KCTLOBJS)
 	$(LD) -dy -r -o $@ $@.core -Nmisc/ctf $(KCTLOBJS)
 	$(CTFMERGE) -L VERSION -o $@ $(OBJS) $(KCTLOBJS)
 	$(KMDB_FPTEST)
+	$(POST_PROCESS)
 	$(SETDYNFLAG) -f DF_1_IGNMULDEF,DF_1_NOKSYMS $@
 
 clean.lint:

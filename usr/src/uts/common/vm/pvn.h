@@ -91,27 +91,6 @@ void		pvn_init(void);
  */
 #define	PVN_VPLIST_HASH_TAG	((page_t *)-1)
 
-/*
- * When requesting pages from the getpage routines, pvn_getpages will
- * allocate space to return PVN_GETPAGE_NUM pages which map PVN_GETPAGE_SZ
- * worth of bytes.  These numbers are chosen to be the minimum of the max's
- * given in terms of bytes and pages.
- */
-#define	PVN_MAX_GETPAGE_SZ	0x10000		/* getpage size limit */
-#define	PVN_MAX_GETPAGE_NUM	0x8		/* getpage page limit */
-
-#if PVN_MAX_GETPAGE_SZ > PVN_MAX_GETPAGE_NUM * PAGESIZE
-
-#define	PVN_GETPAGE_SZ	ptob(PVN_MAX_GETPAGE_NUM)
-#define	PVN_GETPAGE_NUM	PVN_MAX_GETPAGE_NUM
-
-#else
-
-#define	PVN_GETPAGE_SZ	PVN_MAX_GETPAGE_SZ
-#define	PVN_GETPAGE_NUM	btop(PVN_MAX_GETPAGE_SZ)
-
-#endif
-
 #endif	/* _KERNEL */
 
 #ifdef	__cplusplus

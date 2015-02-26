@@ -47,7 +47,6 @@ SKIP		^usr/src/			# no objects in source code
 
 # Individual files that we don't examine
 SKIP		^boot/grub/bin/grub$
-SKIP		^usr/apache/libexec/mod_ipp.so$	# Apache loadable module
 # USIII specific extns. cause ldd noise on USII bld. m/c
 SKIP		^usr/lib/fps/sun4u/UltraSPARC.*/fptest$
 SKIP		^usr/MACH(lib)/lddstub$		# lddstub has no dependencies

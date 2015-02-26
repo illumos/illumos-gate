@@ -20,7 +20,6 @@
  */
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2012 OmniTI Computer Consulting, Inc.  All rights reserved.
  */
 
 /*
@@ -28,10 +27,10 @@
  * sets non-/attributable mask in the kernel context.
  */
 
-#include <zone.h>
 #include <audit_scf.h>
 #include <bsm/adt.h>
 #include <bsm/libbsm.h>
+#include <zone.h>
 #include <errno.h>
 #include <locale.h>
 #include <stdio.h>
@@ -69,6 +68,7 @@ main(void)
 {
 	char		*auditset_fmri;
 	char		*mask_cfg;
+	uint32_t	policy;
 
 	(void) setlocale(LC_ALL, "");
 	(void) textdomain(TEXT_DOMAIN);
@@ -94,12 +94,15 @@ main(void)
 		return (SMF_EXIT_OK);
 	}
 
-	if (getzoneid() != 0) {
-#ifdef	DEBUG
-		(void) printf("auditset service is disabled within zones.\n");
-#endif
-		return (SMF_EXIT_OK);
+	/* check the audit policy */
+	if (auditon(A_GETPOLICY, (caddr_t)&policy, 0) == -1) {
+		(void) printf("Could not read audit policy: %s\n",
+		    strerror(errno));
+		return (SMF_EXIT_ERR_OTHER);
 	}
+
+	if (!(policy & AUDIT_PERZONE) && (getzoneid() != GLOBAL_ZONEID))
+		return (SMF_EXIT_OK);
 
 	/* update attributable mask */
 	if (!do_getflags_scf(&mask_cfg) || mask_cfg == NULL) {

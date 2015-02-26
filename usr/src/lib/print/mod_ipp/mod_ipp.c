@@ -23,11 +23,10 @@
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /* $Id: mod_ipp.c 149 2006-04-25 16:55:01Z njacobs $ */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Internet Printing Protocol (IPP) module for Apache.
@@ -36,6 +35,7 @@
 #include "ap_config.h"
 
 #include <stdio.h>
+#include <unistd.h>
 #include <time.h>
 #include <sys/time.h>
 #include <values.h>
@@ -48,11 +48,12 @@
 #include "http_protocol.h"
 #include "http_log.h"
 #include "http_main.h"
-#include "papi.h"
-#ifndef APACHE_RELEASE	/* appears to only exist in Apache 1.X */
-#define	APACHE2
+#ifndef	APACHE2
 #include "apr_compat.h"
-#endif
+#define	apr_table_get ap_table_get
+#endif	/* APACHE2 */
+
+#include "papi.h"
 
 #include <papi.h>
 #include <ipp-listener.h>
@@ -123,7 +124,7 @@ read_data(void *fd, void *buf, size_t siz)
 
 #ifdef DEBUG
 	fprintf(stderr, "read_data(0x%8.8x, 0x%8.8x, %d): %d",
-			fd, buf, siz, len_read);
+	    fd, buf, siz, len_read);
 	if (len_read < 0)
 		fprintf(stderr, ": %s", strerror(errno));
 	putc('\n', stderr);
@@ -194,7 +195,7 @@ void _log_rerror(const char *file, int line, int level, request_rec *r,
 	va_end(args);
 
 #ifdef APACHE2
-	ap_log_rerror(file, line, level, NULL, r, message);
+	ap_log_rerror(file, line, level, APR_SUCCESS, r, message);
 #else
 	ap_log_rerror(file, line, level, r, message);
 #endif
@@ -206,28 +207,26 @@ ipp_handler(request_rec *r)
 	papi_attribute_t **request = NULL, **response = NULL;
 	IPPListenerConfig *config;
 	papi_status_t status;
+	const char *s;
+	int sockfd = -1;
 	int ret;
 
 	/* Really, IPP is all POST requests */
 	if (r->method_number != M_POST)
 		return (DECLINED);
 
-#ifndef APACHE2
 	/*
 	 * An IPP request must have a MIME type of "application/ipp"
 	 * (RFC-2910, Section 4, page 19).  If it doesn't match this
 	 * MIME type, we should decline the request and let someone else
 	 * try and handle it.
 	 */
-	if (r->headers_in != NULL) {
-		char *mime_type = (char *)ap_table_get(r->headers_in,
-							"Content-Type");
+	if (r->headers_in == NULL)
+		return (DECLINED);
+	s = apr_table_get(r->headers_in, "Content-Type");
+	if ((s == NULL) || (strcasecmp(s, "application/ipp") != 0))
+		return (DECLINED);
 
-		if ((mime_type == NULL) ||
-		    (strcasecmp(mime_type, "application/ipp") != 0))
-			return (DECLINED);
-	}
-#endif
 	/* CHUNKED_DECHUNK might not work right for IPP? */
 	if ((ret = ap_setup_client_block(r, REQUEST_CHUNKED_DECHUNK)) != OK)
 		return (ret);
@@ -243,49 +242,50 @@ ipp_handler(request_rec *r)
 
 	if (status != PAPI_OK)
 		_log_rerror(APLOG_MARK, APLOG_ERR, r,
-			"read failed: %s\n", papiStatusString(status));
+		    "read failed: %s\n", papiStatusString(status));
 #ifdef DEBUG
 	papiAttributeListPrint(stderr, request, "request (%d)  ", getpid());
 #endif
 
-	(void) papiAttributeListAddString(&request, PAPI_ATTR_EXCL,
-		"originating-host", (char *)
 #ifdef APACHE2
-		ap_get_remote_host
-			(r->connection, r->per_dir_config, REMOTE_NAME, NULL));
+	s = ap_get_remote_host(r->connection, r->per_dir_config,
+	    REMOTE_NAME, NULL);
 #else
-		ap_get_remote_host
-			(r->connection, r->per_dir_config, REMOTE_NAME));
+	s = ap_get_remote_host(r->connection, r->per_dir_config,
+	    REMOTE_NAME);
 #endif
+	(void) papiAttributeListAddString(&request, PAPI_ATTR_EXCL,
+	    "originating-host", (char *)s);
 
 	(void) papiAttributeListAddInteger(&request, PAPI_ATTR_EXCL,
-				"uri-port", ap_get_server_port(r));
+	    "uri-port", ap_get_server_port(r));
+
 	if (r->headers_in != NULL) {
-		char *host = (char *)ap_table_get(r->headers_in, "Host");
+		char *host = (char *)apr_table_get(r->headers_in, "Host");
 
 		if ((host == NULL) || (host[0] == '\0'))
 			host = (char *)ap_get_server_name(r);
 
 		(void) papiAttributeListAddString(&request, PAPI_ATTR_EXCL,
-				"uri-host", host);
+		    "uri-host", host);
 	}
 	(void) papiAttributeListAddString(&request, PAPI_ATTR_EXCL,
-				"uri-path", r->uri);
+	    "uri-path", r->uri);
 
 	config = ap_get_module_config(r->per_dir_config, &ipp_module);
 	if (config != NULL) {
 		(void) papiAttributeListAddInteger(&request, PAPI_ATTR_EXCL,
-				"conformance", config->conformance);
+		    "conformance", config->conformance);
 		(void) papiAttributeListAddCollection(&request, PAPI_ATTR_EXCL,
-				"operations", config->operations);
+		    "operations", config->operations);
 		if (config->default_user != NULL)
 			(void) papiAttributeListAddString(&request,
-						PAPI_ATTR_EXCL, "default-user",
-						config->default_user);
+			    PAPI_ATTR_EXCL, "default-user",
+			    config->default_user);
 		if (config->default_svc != NULL)
 			(void) papiAttributeListAddString(&request,
-					PAPI_ATTR_EXCL, "default-service",
-					config->default_svc);
+			    PAPI_ATTR_EXCL, "default-service",
+			    config->default_svc);
 	}
 
 	/*
@@ -294,15 +294,35 @@ ipp_handler(request_rec *r)
 	 * service to retrieve the sensativity label off of a multi-level
 	 * port.
 	 */
-	(void) papiAttributeListAddInteger(&request, PAPI_ATTR_EXCL,
-			"peer-socket", ap_bfileno(r->connection->client, B_RD));
+#ifdef	APACHE2
+	/*
+	 * In Apache 2.4 and later, could use: ap_get_conn_socket()
+	 * Apache 2.2 uses ap_get_module_config() but that needs
+	 * &core_module, for .module_index (which is just zero).
+	 * Could either inline that with index zero, or declare
+	 * core_module here.  Latter seems less evil.
+	 */
+	{
+		extern module core_module;
+		apr_socket_t *csd = ap_get_module_config(
+		    r->connection->conn_config, &core_module);
+		if (csd != NULL)
+			(void) apr_os_sock_get(&sockfd, csd);
+	}
+#else
+	sockfd = ap_bfileno(r->connection->client, B_RD);
+#endif
+	if (sockfd != -1) {
+		(void) papiAttributeListAddInteger(&request,
+		    PAPI_ATTR_EXCL, "peer-socket", sockfd);
+	}
 
 	/* process the request */
 	status = ipp_process_request(request, &response, read_data, r);
 	if (status != PAPI_OK) {
 		errno = 0;
 		_log_rerror(APLOG_MARK, APLOG_ERR, r,
-			"request failed: %s\n", papiStatusString(status));
+		    "request failed: %s\n", papiStatusString(status));
 		discard_data(r);
 	}
 #ifdef DEBUG
@@ -316,7 +336,7 @@ ipp_handler(request_rec *r)
 	 * remain in the post request.
 	 */
 	if ((r->read_chunked != 0) &&
-	    (ap_table_get(r->headers_in, "Content-Length") == NULL))
+	    (apr_table_get(r->headers_in, "Content-Length") == NULL))
 		discard_data(r);
 
 	/* write an IPP response back to the network */
@@ -329,7 +349,7 @@ ipp_handler(request_rec *r)
 	status = ipp_write_message(write_data, r, response);
 	if (status != PAPI_OK)
 		_log_rerror(APLOG_MARK, APLOG_ERR, r,
-			"write failed: %s\n", papiStatusString(status));
+		    "write failed: %s\n", papiStatusString(status));
 #ifdef DEBUG
 	fprintf(stderr, "write result: %s\n", papiStatusString(status));
 	fflush(stderr);
@@ -342,7 +362,7 @@ ipp_handler(request_rec *r)
 	ap_kill_timeout(r);
 	if (ap_rflush(r) < 0)
 		_log_rerror(APLOG_MARK, APLOG_ERR, r,
-			"flush failed, response may not have been sent");
+		    "flush failed, response may not have been sent");
 #endif
 
 	return (OK);
@@ -359,11 +379,11 @@ create_ipp_dir_config(
 #endif
 	char *dirspec)
 {
-	IPPListenerConfig *config =
+	IPPListenerConfig *config;
 #ifndef APACHE2
-		ap_pcalloc(p, sizeof (*config));
+	config = ap_pcalloc(p, sizeof (*config));
 #else
-		apr_pcalloc(p, sizeof (*config));
+	config = apr_pcalloc(p, sizeof (*config));
 #endif
 
 	if (config != NULL) {
@@ -371,8 +391,8 @@ create_ipp_dir_config(
 		config->conformance = IPP_PARSE_CONFORMANCE_RASH;
 		config->default_user = NULL;
 		config->default_svc = NULL;
-		(void) ipp_configure_operation(&config->operations, "required",
-				"enable");
+		(void) ipp_configure_operation(&config->operations,
+		    "required", "enable");
 	}
 
 	return (config);
@@ -399,12 +419,13 @@ ipp_conformance(cmd_parms *cmd, void *cfg, const char *arg)
 
 /*ARGSUSED0*/
 static const char *
-ipp_operation(cmd_parms *cmd, void *cfg, char *op, char *toggle)
+ipp_operation(cmd_parms *cmd, void *cfg, const char *op, const char *toggle)
 {
 	IPPListenerConfig *config = (IPPListenerConfig *)cfg;
 	papi_status_t status;
 
-	status = ipp_configure_operation(&config->operations, op, toggle);
+	status = ipp_configure_operation(&config->operations,
+	    (char *)op, (char *)toggle);
 	switch (status) {
 	case PAPI_OK:
 		return (NULL);
@@ -440,13 +461,17 @@ ipp_default_svc(cmd_parms *cmd, void *cfg, const char *arg)
 
 #ifdef DEBUG
 /*ARGSUSED0*/
+volatile int ipp_module_hang_sleeping = 1;
 static const char *
 ipp_module_hang(cmd_parms *cmd, void *cfg)
 {
-	static int i = 1;
 
-	/* wait so we can attach a debugger, assign i = 0,  and step through */
-	while (i);
+	/*
+	 * Wait so we can attach with a debugger.  Once attached,
+	 * assign ipp_module_hang_sleeping = 0 and step through.
+	 */
+	while (ipp_module_hang_sleeping)
+		sleep(1);
 
 	return (NULL);
 }
@@ -472,7 +497,7 @@ static const command_rec ipp_cmds[] =
 #ifdef APACHE2
 /*ARGSUSED0*/
 static const char *
-ipp_method(const request_rec *r)
+ipp_scheme(const request_rec *r)
 {
 	return ("ipp");
 }
@@ -494,7 +519,7 @@ ipp_register_hooks(apr_pool_t *p)
 	/* Need to make sure we don't get directory listings by accident */
 	ap_hook_handler(ipp_handler, NULL, modules, APR_HOOK_MIDDLE);
 	ap_hook_default_port(ipp_port, NULL, NULL, APR_HOOK_MIDDLE);
-	ap_hook_http_method(ipp_method, NULL, NULL, APR_HOOK_MIDDLE);
+	ap_hook_http_scheme(ipp_scheme, NULL, NULL, APR_HOOK_MIDDLE);
 }
 
 module AP_MODULE_DECLARE_DATA ipp_module = {

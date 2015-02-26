@@ -50,9 +50,8 @@
  * The following variable lives in libc on Solaris 10, where it
  * gets set to a nonzero value at startup time on systems with SSE.
  */
-int _sse_hw = 0;
-#pragma weak _sse_hw
-#define test_sse_hw	&_sse_hw && _sse_hw
+extern int _sse_hw;
+#define test_sse_hw	_sse_hw
 #endif
 
 static int accrued = 0;
@@ -216,7 +215,7 @@ my_fp_classl(long double *x)
 	if (i < 0x7fff) {
 		if (i < 1) {
 			if (*(1+(int*)x) < 0) return fp_normal; /* pseudo-denormal */
-			return (((*(1+(int*)x) | *(int*)x) == 0)?	
+			return (((*(1+(int*)x) | *(int*)x) == 0)?
 				fp_zero : fp_subnormal);
 		}
 		return ((*(1+(int*)x) < 0)? fp_normal :
