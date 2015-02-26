@@ -526,7 +526,9 @@ noprod_sys_syscall:
 	jz	_syscall_no_brand
 
 	pushq	%rax
+	subq	$8, %rsp	/* align stack for call to C */
 	call	*%rdi
+	addq	$8, %rsp
 
 	/*
 	 * If the alternate handler returns 0, we skip straight to the return to
