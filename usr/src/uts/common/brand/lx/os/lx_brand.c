@@ -805,6 +805,7 @@ lx_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 			reg.lxbr_version = (uint_t)reg32.lxbr_version;
 			reg.lxbr_handler =
 			    (void *)(uintptr_t)reg32.lxbr_handler;
+			reg.lxbr_flags = reg32.lxbr_flags;
 		}
 #endif
 
@@ -814,10 +815,17 @@ lx_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 			return (EINVAL);
 		}
 
+		if ((reg.lxbr_flags & ~LX_PROC_ALL) != 0) {
+			lx_print("Invalid brand flags (%u)\n",
+			    reg.lxbr_flags);
+			return (EINVAL);
+		}
+
 		lx_print("Assigning brand 0x%p and handler 0x%p to proc 0x%p\n",
 		    (void *)&lx_brand, (void *)reg.lxbr_handler, (void *)p);
 		pd = p->p_brand_data;
 		pd->l_handler = (uintptr_t)reg.lxbr_handler;
+		pd->l_flags = reg.lxbr_flags;
 
 		return (0);
 

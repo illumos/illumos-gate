@@ -823,15 +823,6 @@ lx_fchdir(int fildes)
 	return ((r == -1) ? -errno : r);
 }
 
-long
-lx_fchmod(int fildes, mode_t mode)
-{
-	int r;
-
-	r = fchmod(fildes, mode);
-	return ((r == -1) ? -errno : r);
-}
-
 /*
  * We support neither the second argument (NUMA node), nor the third (obsolete
  * pre-2.6.24 caching functionality which was ultimately broken).

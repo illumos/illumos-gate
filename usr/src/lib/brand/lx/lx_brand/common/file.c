@@ -316,29 +316,6 @@ lx_fchown(uintptr_t p1, uintptr_t p2, uintptr_t p3)
 }
 
 long
-lx_chmod(uintptr_t p1, uintptr_t p2)
-{
-	int ret;
-
-	ret = chmod((const char *)p1, (mode_t)p2);
-
-	if (ret < 0) {
-		/*
-		 * If chown() failed and we're in install mode, return success
-		 * if the the reason we failed was because the source file
-		 * didn't actually exist or if we're trying to modify /dev/pts.
-		 */
-		if ((lx_install != 0) &&
-		    ((errno == ENOENT) || (install_checkpath(p1) == 0)))
-			return (0);
-
-		return (-errno);
-	}
-
-	return (0);
-}
-
-long
 lx_utime(uintptr_t p1, uintptr_t p2)
 {
 	int ret;
@@ -867,24 +844,4 @@ lx_fchownat(uintptr_t ext1, uintptr_t p1, uintptr_t p2, uintptr_t p3,
 		return (lchown(pathbuf, (uid_t)p2, (gid_t)p3) ? -errno : 0);
 	else
 		return (lx_chown((uintptr_t)pathbuf, p2, p3));
-}
-
-/*ARGSUSED*/
-long
-lx_fchmodat(uintptr_t ext1, uintptr_t p1, uintptr_t p2, uintptr_t p3)
-{
-	int atfd = (int)ext1;
-	char pathbuf[MAXPATHLEN];
-	int ret;
-
-	/*
-	 * It seems that at least some versions of glibc do not set or clear
-	 * the flags arg, so checking them will result in random behaviour.
-	 */
-
-	ret = getpathat(atfd, p1, pathbuf, sizeof (pathbuf));
-	if (ret < 0)
-		return (ret);
-
-	return (lx_chmod((uintptr_t)pathbuf, p2));
 }
