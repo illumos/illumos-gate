@@ -230,8 +230,25 @@ lx_madvise(uintptr_t start, uintptr_t len, uintptr_t advice)
 	case MADV_RANDOM:
 	case MADV_SEQUENTIAL:
 	case MADV_WILLNEED:
-	case MADV_DONTNEED:
 	case MADV_FREE:
+	case MADV_DONTNEED:
+		if (advice == MADV_DONTNEED) {
+			/*
+			 * On Linux, MADV_DONTNEED implies an immediate purge
+			 * of the specified region.  This is spuriously
+			 * different from (nearly) every other Unix, having
+			 * apparently been done to mimic the semantics on
+			 * Digital Unix (!).  This is bad enough (MADV_FREE
+			 * both has better semantics and results in better
+			 * performance), but it gets worse:  Linux applications
+			 * (and notably, jemalloc) have managed to depend on
+			 * the busted semantics of MADV_DONTNEED on Linux.  We
+			 * implement these semantics via MADV_PURGE -- and
+			 * we translate our advice accordingly.
+			 */
+			advice = MADV_PURGE;
+		}
+
 		ret = madvise((void *)start, len, advice);
 		if (ret == -1) {
 			if (errno == EBUSY)
