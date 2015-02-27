@@ -8043,7 +8043,7 @@ out:
 
 /*
  * Set advice from user for specified pages
- * There are 9 types of advice:
+ * There are 10 types of advice:
  *	MADV_NORMAL	- Normal (default) behavior (whatever that is)
  *	MADV_RANDOM	- Random page references
  *				do not allow readahead or 'klustering'
@@ -8057,6 +8057,7 @@ out:
  *	MADV_ACCESS_DEFAULT- Default access
  *	MADV_ACCESS_LWP	- Next LWP will access heavily
  *	MADV_ACCESS_MANY- Many LWPs or processes will access heavily
+ *	MADV_PURGE	- Contents will be immediately discarded
  */
 static int
 segvn_advise(struct seg *seg, caddr_t addr, size_t len, uint_t behav)
@@ -8075,10 +8076,10 @@ segvn_advise(struct seg *seg, caddr_t addr, size_t len, uint_t behav)
 	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as, &seg->s_as->a_lock));
 
 	/*
-	 * In case of MADV_FREE, we won't be modifying any segment private
-	 * data structures; so, we only need to grab READER's lock
+	 * In case of MADV_FREE/MADV_PURGE, we won't be modifying any segment
+	 * private data structures; so, we only need to grab READER's lock
 	 */
-	if (behav != MADV_FREE) {
+	if (behav != MADV_FREE && behav != MADV_PURGE) {
 		SEGVN_LOCK_ENTER(seg->s_as, &svd->lock, RW_WRITER);
 		if (svd->tr_state != SEGVN_TR_OFF) {
 			SEGVN_LOCK_EXIT(seg->s_as, &svd->lock);
@@ -8154,7 +8155,7 @@ segvn_advise(struct seg *seg, caddr_t addr, size_t len, uint_t behav)
 
 	amp = svd->amp;
 	vp = svd->vp;
-	if (behav == MADV_FREE) {
+	if (behav == MADV_FREE || behav == MADV_PURGE) {
 		/*
 		 * MADV_FREE is not supported for segments with
 		 * underlying object; if anonmap is NULL, anon slots
@@ -8162,7 +8163,7 @@ segvn_advise(struct seg *seg, caddr_t addr, size_t len, uint_t behav)
 		 * us to do. As MADV_FREE is advisory, we don't
 		 * return error in either case.
 		 */
-		if (vp != NULL || amp == NULL) {
+		if ((vp != NULL && behav == MADV_FREE) || amp == NULL) {
 			SEGVN_LOCK_EXIT(seg->s_as, &svd->lock);
 			return (0);
 		}
@@ -8171,7 +8172,7 @@ segvn_advise(struct seg *seg, caddr_t addr, size_t len, uint_t behav)
 
 		page = seg_page(seg, addr);
 		ANON_LOCK_ENTER(&amp->a_rwlock, RW_READER);
-		anon_disclaim(amp, svd->anon_index + page, len);
+		anon_disclaim(amp, svd->anon_index + page, len, behav);
 		ANON_LOCK_EXIT(&amp->a_rwlock);
 		SEGVN_LOCK_EXIT(seg->s_as, &svd->lock);
 		return (0);
@@ -8280,6 +8281,7 @@ segvn_advise(struct seg *seg, caddr_t addr, size_t len, uint_t behav)
 		case MADV_WILLNEED:	/* handled in memcntl */
 		case MADV_DONTNEED:	/* handled in memcntl */
 		case MADV_FREE:		/* handled above */
+		case MADV_PURGE:	/* handled above */
 			break;
 		default:
 			err = EINVAL;
@@ -8515,6 +8517,7 @@ segvn_advise(struct seg *seg, caddr_t addr, size_t len, uint_t behav)
 		case MADV_WILLNEED:	/* handled in memcntl */
 		case MADV_DONTNEED:	/* handled in memcntl */
 		case MADV_FREE:		/* handled above */
+		case MADV_PURGE:	/* handled above */
 			break;
 		default:
 			err = EINVAL;

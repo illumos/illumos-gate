@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 1986, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2015, Joyent, Inc. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -1670,7 +1670,7 @@ anon_free_pages(
  * Make anonymous pages discardable
  */
 void
-anon_disclaim(struct anon_map *amp, ulong_t index, size_t size)
+anon_disclaim(struct anon_map *amp, ulong_t index, size_t size, uint_t behav)
 {
 	spgcnt_t npages = btopr(size);
 	struct anon *ap;
@@ -1683,6 +1683,7 @@ anon_disclaim(struct anon_map *amp, ulong_t index, size_t size)
 	struct anon_hdr *ahp = amp->ahp;
 	anon_sync_obj_t cookie;
 
+	VERIFY(behav == MADV_FREE || behav == MADV_PURGE);
 	ASSERT(RW_READ_HELD(&amp->a_rwlock));
 	pgcnt = 1;
 	for (; npages > 0; index = (pgcnt == 1) ? index + 1 :
@@ -1747,6 +1748,15 @@ anon_disclaim(struct anon_map *amp, ulong_t index, size_t size)
 			continue;
 		}
 
+		if (behav == MADV_PURGE && pp->p_szc != 0) {
+			/*
+			 * If we're purging and we have a large page, simplify
+			 * things a bit by demoting ourselves into the base
+			 * page case.
+			 */
+			(void) page_try_demote_pages(pp);
+		}
+
 		if (pp->p_szc == 0) {
 			pgcnt = 1;
 
@@ -1759,7 +1769,27 @@ anon_disclaim(struct anon_map *amp, ulong_t index, size_t size)
 				ap->an_pvp = NULL;
 				ap->an_poff = 0;
 			}
-			mutex_exit(ahm);
+
+			if (behav == MADV_PURGE) {
+				/*
+				 * If we're purging (instead of merely freeing),
+				 * rip out this anon structure entirely to
+				 * assure that any subsequent fault pulls from
+				 * the backing vnode (if any).
+				 */
+				if (--ap->an_refcnt == 0)
+					anon_rmhash(ap);
+
+				mutex_exit(ahm);
+				(void) anon_set_ptr(ahp, index,
+				    NULL, ANON_SLEEP);
+
+				ANI_ADD(1);
+				kmem_cache_free(anon_cache, ap);
+			} else {
+				mutex_exit(ahm);
+			}
+
 			segadvstat.MADV_FREE_hit.value.ul++;
 
 			/*
@@ -1768,7 +1798,9 @@ anon_disclaim(struct anon_map *amp, ulong_t index, size_t size)
 			 */
 			(void) hat_pageunload(pp, HAT_FORCE_PGUNLOAD);
 			/*LINTED: constant in conditional context */
-			VN_DISPOSE(pp, B_FREE, 0, kcred);
+			VN_DISPOSE(pp,
+			    behav == MADV_FREE ? B_FREE : B_INVAL, 0, kcred);
+
 			anon_array_exit(&cookie);
 			continue;
 		}

@@ -22,7 +22,10 @@ The \fBmadvise()\fR function advises the kernel that a region of user mapped
 memory in the range [\fIaddr\fR, \fIaddr\fR + \fIlen\fR) will be accessed
 following a type of pattern. The kernel uses this information to optimize the
 procedure for manipulating and maintaining the resources associated with the
-specified mapping range.
+specified mapping range. In general (and true to the name of the function),
+the advice is merely advisory, and the only user-visible ramifications
+are in terms of performance, not semantics. Note that 
+\fBMADV_PURGE\fR is an exception to this; see below for details.
 .sp
 .LP
 Values for \fIadvice\fR are defined in <\fBsys/mman.h\fR> as:
@@ -38,6 +41,7 @@ Values for \fIadvice\fR are defined in <\fBsys/mman.h\fR> as:
 #define MADV_ACCESS_DEFAULT   0x6  /* default access */
 #define MADV_ACCESS_LWP       0x7  /* next LWP to access heavily */
 #define MADV_ACCESS_MANY      0x8  /* many processes to access heavily */
+#define MADV_PURGE            0x9  /* contents will be purged */
 .fi
 .in -2
 
@@ -99,6 +103,12 @@ kernel would need to read in from the file.
 .RS 23n
 Tell the kernel that the specified address range is no longer needed, so the
 system starts to free the resources associated with the address range.
+While the semantics of \fBMADV_DONTNEED\fR are similar to other systems,
+they differ signifcantly from the semantics on Linux, where
+\fBMADV_DONTNEED\fR will actually synchronously purge the address range,
+and subsequent faults will load from either backing store or be
+zero-filled on demand. If the peculiar Linux semantics are
+desired, \fBMADV_PURGE\fR should be used in lieu of \fBMADV_DONTNEED\fR.
 .RE
 
 .sp
@@ -117,6 +127,26 @@ the system read from backing store (swap space) until the page is modified
 again.
 .sp
 This value cannot be used on mappings that have underlying file objects.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBMADV_PURGE\fR\fR
+.ad
+.RS 23n
+Tell the kernel to purge the specified address range.  The mapping will
+be retained, but the pages themselves will be destroyed; subsequent
+faults on the range will result in the page being read from backing
+store (if file-backed) or being zero-filled on demand (if anonymous).  Note 
+that these semantics are generally inferior to \fBMADV_FREE\fR, which gives the
+system more flexibility and results in better performance
+when pages are, in fact, reused by the caller. Indeed, \fBMADV_PURGE\fR only
+exists to provide an equivalent to the unfortunate 
+\fBMADV_DONTNEED\fR semantics found in Linux, upon which some programs
+have (regretably) come to depend. In de novo applications,
+\fBMADV_PURGE\fR should be avoided; \fBMADV_FREE\fR should always be
+preferred.
 .RE
 
 .sp

@@ -318,6 +318,7 @@ struct memcntl_mha32 {
 #define	MADV_ACCESS_DEFAULT	6	/* default access */
 #define	MADV_ACCESS_LWP		7	/* next LWP to access heavily */
 #define	MADV_ACCESS_MANY	8	/* many processes to access heavily */
+#define	MADV_PURGE		9	/* contents will be purged */
 
 #endif	/* (_POSIX_C_SOURCE <= 2) && !defined(_XPG4_2) ...  */
 

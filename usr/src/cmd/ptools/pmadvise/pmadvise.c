@@ -25,6 +25,10 @@
  */
 
 /*
+ * Copyright (c) 2015, Joyent, Inc. All rights reserved.
+ */
+
+/*
  * pmadvise
  *
  * ptool wrapper for madvise(3C) to apply memory advice to running processes
@@ -153,7 +157,7 @@
  * Advice that can be passed to madvise fit into three groups that each
  * contain 3 mutually exclusive options.  These groups are defined below:
  *   Group 1: normal, random, sequential
- *   Group 2: willneed, dontneed, free
+ *   Group 2: willneed, dontneed, free, purge
  *   Group 3: default, accesslwp, accessmany
  * Thus, advice that includes (at most) one from each group is valid.
  *
@@ -164,7 +168,7 @@
 #define	GRP1_ADV	(1 << MADV_NORMAL | 1 << MADV_RANDOM | \
 			1 << MADV_SEQUENTIAL)
 #define	GRP2_ADV	(1 << MADV_WILLNEED | 1 << MADV_DONTNEED | \
-			1 << MADV_FREE)
+			1 << MADV_FREE | 1 << MADV_PURGE)
 #define	GRP3_ADV	(1 << MADV_ACCESS_DEFAULT | 1 << MADV_ACCESS_LWP | \
 			1 << MADV_ACCESS_MANY)
 
@@ -346,6 +350,8 @@ get_advice(char *optarg)
 		return (1 << MADV_NORMAL);
 	else if (strcmp(optarg, "free") == 0)
 		return (1 << MADV_FREE);
+	else if (strcmp(optarg, "purge") == 0)
+		return (1 << MADV_PURGE);
 	else {
 		(void) fprintf(stderr, gettext("%s: invalid advice: %s\n"),
 		    progname, optarg);
@@ -676,7 +682,7 @@ apply_advice(saddr_t **advicelist)
 		 * with the for loop.
 		 */
 		if (psaddr->adv != NO_ADVICE) {
-			for (i = MADV_NORMAL; i <= MADV_ACCESS_MANY; i++) {
+			for (i = MADV_NORMAL; i <= MADV_PURGE; i++) {
 				if ((psaddr->adv & (1 << i)) &&
 				    (pr_madvise(Pr, (caddr_t)psaddr->addr,
 				    psaddr->length, i) < 0)) {
@@ -898,7 +904,7 @@ advtostr(int adv)
 	*buf = '\0';
 
 	if (adv != NO_ADVICE) {
-		for (i = MADV_NORMAL; i <= MADV_ACCESS_MANY; i++) {
+		for (i = MADV_NORMAL; i <= MADV_PURGE; i++) {
 			if (adv & (1 << i)) {
 				/*
 				 * check if it's the first advice entry
