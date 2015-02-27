@@ -248,6 +248,7 @@ COMMON_SUBDIRS=		\
 	ls		\
 	luxadm		\
 	mach		\
+	machid		\
 	mail		\
 	mailwrapper	\
 	mailx		\

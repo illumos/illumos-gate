@@ -222,6 +222,7 @@ MANFILES=	acctcom.1			\
 	 	m4.1				\
 	 	mac.1				\
 	 	mach.1				\
+		machid.1			\
 	 	madv.so.1.1			\
 	 	mail.1				\
 	 	mailcompat.1			\
@@ -475,6 +476,9 @@ MANLINKS=	batch.1		\
 		helpuid.1	\
 		helpyorn.1	\
 		hist.1		\
+		i286.1		\
+		i386.1		\
+		i486.1		\
 		if.1		\
 		intro.1		\
 		jsh.1		\
@@ -519,9 +523,11 @@ MANLINKS=	batch.1		\
 		sh.1		\
 		snca.1		\
 		source.1	\
+		sparc.1		\
 		spellin.1	\
 		stop.1		\
 		strconf.1	\
+		sun.1		\
 		switch.1	\
 		ulimit.1	\
 		unalias.1	\
@@ -648,6 +654,12 @@ ulimit.1	:= LINKSRC = limit.1
 unlimit.1	:= LINKSRC = limit.1
 
 dumpkeys.1	:= LINKSRC = loadkeys.1
+
+i286.1		:= LINKSRC = machid.1
+i386.1		:= LINKSRC = machid.1
+i486.1		:= LINKSRC = machid.1
+sparc.1		:= LINKSRC = machid.1
+sun.1		:= LINKSRC = machid.1
 
 rmail.1		:= LINKSRC = mail.1
 
