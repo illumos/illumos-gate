@@ -31,17 +31,19 @@
  * the Linux /proc implementation for purposes of offering some compatibility
  * for simple Linux /proc readers (e.g., ps/top/htop).  However, it is not
  * intended to exactly mimic Linux semantics; when choosing between offering
- * compatibility and telling the truth, we emphatically pick the truth.  A
- * particular glaring example of this is the Linux notion of "tasks" (that is,
- * threads), which -- due to historical misadventures on Linux -- allocate their
- * identifiers from the process identifier space.  (That is, each thread has in
- * effect a pid.)  Some Linux /proc readers have come to depend on this
- * attribute, and become confused when threads appear with proper identifiers,
- * so we simply opt for the pre-2.6 behavior, and do not present the tasks
- * directory at all.  Similarly, when choosing between offering compatibility
- * and remaining consistent with our broader security model, we (obviously)
- * choose security over compatibility.  In short, this is meant to be a best
- * effort -- no more.
+ * compatibility and telling the truth, we emphatically pick the truth (in most
+ * cases ;-) ).  A particular glaring example of this is the Linux notion of
+ * "tasks" (that is, threads), which -- due to historical misadventures on
+ * Linux -- allocate their identifiers from the process identifier space (that
+ * is, each thread has in effect a pid). Some Linux /proc readers have come to
+ * depend on this attribute, and become confused when threads appear with
+ * proper identifiers. To deal with this the lx brand emulates per-thread pids
+ * in the per-lwp brand data (see lx_pid_assign in the lx brand module). Under
+ * the tasks directory we use this lx-assigned pid instead of the real tid.
+ *
+ * Similarly, when choosing between offering compatibility and remaining
+ * consistent with our broader security model, we (obviously) choose security
+ * over compatibility. In short, this is meant to be a best effort -- no more.
  */
 
 #include <sys/cpupart.h>
@@ -70,6 +72,7 @@
 #include <sys/rctl.h>
 #include <sys/kstat.h>
 #include <sys/lx_misc.h>
+#include <sys/brand.h>
 #include <sys/cred_impl.h>
 #include <sys/tihdr.h>
 #include <inet/ip.h>
@@ -125,6 +128,8 @@ static vnode_t *lxpr_lookup_sysdir(vnode_t *, char *);
 static vnode_t *lxpr_lookup_sys_fsdir(vnode_t *, char *);
 static vnode_t *lxpr_lookup_sys_fs_inotifydir(vnode_t *, char *);
 static vnode_t *lxpr_lookup_sys_kerneldir(vnode_t *, char *);
+static vnode_t *lxpr_lookup_taskdir(vnode_t *, char *);
+static vnode_t *lxpr_lookup_task_tid_dir(vnode_t *, char *);
 
 static int lxpr_readdir_procdir(lxpr_node_t *, uio_t *, int *);
 static int lxpr_readdir_piddir(lxpr_node_t *, uio_t *, int *);
@@ -135,6 +140,8 @@ static int lxpr_readdir_sysdir(lxpr_node_t *, uio_t *, int *);
 static int lxpr_readdir_sys_fsdir(lxpr_node_t *, uio_t *, int *);
 static int lxpr_readdir_sys_fs_inotifydir(lxpr_node_t *, uio_t *, int *);
 static int lxpr_readdir_sys_kerneldir(lxpr_node_t *, uio_t *, int *);
+static int lxpr_readdir_taskdir(lxpr_node_t *, uio_t *, int *);
+static int lxpr_readdir_task_tid_dir(lxpr_node_t *, uio_t *, int *);
 
 static void lxpr_read_invalid(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_empty(lxpr_node_t *, lxpr_uiobuf_t *);
@@ -158,6 +165,9 @@ static void lxpr_read_pid_mountinfo(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_pid_stat(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_pid_statm(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_pid_status(lxpr_node_t *, lxpr_uiobuf_t *);
+
+static void lxpr_read_pid_tid_stat(lxpr_node_t *, lxpr_uiobuf_t *);
+static void lxpr_read_pid_tid_status(lxpr_node_t *, lxpr_uiobuf_t *);
 
 static void lxpr_read_net_arp(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_net_dev(lxpr_node_t *, lxpr_uiobuf_t *);
@@ -199,6 +209,8 @@ static void lxpr_read_sys_kernel_threads_max(lxpr_node_t *, lxpr_uiobuf_t *);
  */
 #define	btok(x)	((x) >> 10)			/* bytes to kbytes */
 #define	ptok(x)	((x) << (PAGESHIFT - 10))	/* pages to kbytes */
+
+#define	ttolxlwp(t)	((struct lx_lwp_data *)ttolwpbrand(t))
 
 extern rctl_hndl_t rc_zone_msgmni;
 extern rctl_hndl_t rc_zone_shmmax;
@@ -277,10 +289,33 @@ static lxpr_dirent_t piddir[] = {
 	{ LXPR_PID_STAT,	"stat" },
 	{ LXPR_PID_STATM,	"statm" },
 	{ LXPR_PID_STATUS,	"status" },
+	{ LXPR_PID_TASKDIR,	"task" },
 	{ LXPR_PID_FDDIR,	"fd" }
 };
 
 #define	PIDDIRFILES	(sizeof (piddir) / sizeof (piddir[0]))
+
+/*
+ * Contents of an lx /proc/<pid>/task/<tid> directory.
+ */
+static lxpr_dirent_t tiddir[] = {
+	{ LXPR_PID_CMDLINE,	"cmdline" },
+	{ LXPR_PID_CPU,		"cpu" },
+	{ LXPR_PID_CURDIR,	"cwd" },
+	{ LXPR_PID_ENV,		"environ" },
+	{ LXPR_PID_EXE,		"exe" },
+	{ LXPR_PID_LIMITS,	"limits" },
+	{ LXPR_PID_MAPS,	"maps" },
+	{ LXPR_PID_MEM,		"mem" },
+	{ LXPR_PID_MOUNTINFO,	"mountinfo" },
+	{ LXPR_PID_ROOTDIR,	"root" },
+	{ LXPR_PID_TID_STAT,	"stat" },
+	{ LXPR_PID_STATM,	"statm" },
+	{ LXPR_PID_TID_STATUS,	"status" },
+	{ LXPR_PID_FDDIR,	"fd" }
+};
+
+#define	TIDDIRFILES	(sizeof (tiddir) / sizeof (tiddir[0]))
 
 #define	LX_RLIM_INFINITY	0xFFFFFFFFFFFFFFFF
 
@@ -484,8 +519,25 @@ static void (*lxpr_read_function[LXPR_NFILES])() = {
 	lxpr_read_pid_stat,		/* /proc/<pid>/stat	*/
 	lxpr_read_pid_statm,		/* /proc/<pid>/statm	*/
 	lxpr_read_pid_status,		/* /proc/<pid>/status	*/
+	lxpr_read_isdir,		/* /proc/<pid>/task	*/
+	lxpr_read_isdir,		/* /proc/<pid>/task/nn	*/
 	lxpr_read_isdir,		/* /proc/<pid>/fd	*/
 	lxpr_read_fd,			/* /proc/<pid>/fd/nn	*/
+	lxpr_read_pid_cmdline,		/* /proc/<pid>/task/<tid>/cmdline */
+	lxpr_read_empty,		/* /proc/<pid>/task/<tid>/cpu	*/
+	lxpr_read_invalid,		/* /proc/<pid>/task/<tid>/cwd	*/
+	lxpr_read_empty,		/* /proc/<pid>/task/<tid>/environ */
+	lxpr_read_invalid,		/* /proc/<pid>/task/<tid>/exe	*/
+	lxpr_read_pid_limits,		/* /proc/<pid>/task/<tid>/limits */
+	lxpr_read_pid_maps,		/* /proc/<pid>/task/<tid>/maps	*/
+	lxpr_read_empty,		/* /proc/<pid>/task/<tid>/mem	*/
+	lxpr_read_pid_mountinfo,	/* /proc/<pid>/task/<tid>/mountinfo */
+	lxpr_read_invalid,		/* /proc/<pid>/task/<tid>/root	*/
+	lxpr_read_pid_tid_stat,		/* /proc/<pid>/task/<tid>/stat	*/
+	lxpr_read_pid_statm,		/* /proc/<pid>/task/<tid>/statm	*/
+	lxpr_read_pid_tid_status,	/* /proc/<pid>/task/<tid>/status */
+	lxpr_read_isdir,		/* /proc/<pid>/task/<tid>/fd	*/
+	lxpr_read_fd,			/* /proc/<pid>/task/<tid>/fd/nn	*/
 	lxpr_read_empty,		/* /proc/cmdline	*/
 	lxpr_read_cpuinfo,		/* /proc/cpuinfo	*/
 	lxpr_read_empty,		/* /proc/devices	*/
@@ -562,8 +614,25 @@ static vnode_t *(*lxpr_lookup_function[LXPR_NFILES])() = {
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/stat	*/
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/statm	*/
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/status	*/
+	lxpr_lookup_taskdir,		/* /proc/<pid>/task	*/
+	lxpr_lookup_task_tid_dir,	/* /proc/<pid>/task/nn	*/
 	lxpr_lookup_fddir,		/* /proc/<pid>/fd	*/
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/fd/nn	*/
+	lxpr_lookup_not_a_dir,		/* /proc/<pid>/task/<tid>/cmdline */
+	lxpr_lookup_not_a_dir,		/* /proc/<pid>/task/<tid>/cpu	*/
+	lxpr_lookup_not_a_dir,		/* /proc/<pid>/task/<tid>/cwd	*/
+	lxpr_lookup_not_a_dir,		/* /proc/<pid>/task/<tid>/environ */
+	lxpr_lookup_not_a_dir,		/* /proc/<pid>/task/<tid>/exe	*/
+	lxpr_lookup_not_a_dir,		/* /proc/<pid>/task/<tid>/limits */
+	lxpr_lookup_not_a_dir,		/* /proc/<pid>/task/<tid>/maps	*/
+	lxpr_lookup_not_a_dir,		/* /proc/<pid>/task/<tid>/mem	*/
+	lxpr_lookup_not_a_dir,		/* /proc/<pid>/task/<tid>/mountinfo */
+	lxpr_lookup_not_a_dir,		/* /proc/<pid>/task/<tid>/root	*/
+	lxpr_lookup_not_a_dir,		/* /proc/<pid>/task/<tid>/stat	*/
+	lxpr_lookup_not_a_dir,		/* /proc/<pid>/task/<tid>/statm	*/
+	lxpr_lookup_not_a_dir,		/* /proc/<pid>/task/<tid>/status */
+	lxpr_lookup_fddir,		/* /proc/<pid>/task/<tid>/fd	*/
+	lxpr_lookup_not_a_dir,		/* /proc/<pid>/task/<tid>/fd/nn	*/
 	lxpr_lookup_not_a_dir,		/* /proc/cmdline	*/
 	lxpr_lookup_not_a_dir,		/* /proc/cpuinfo	*/
 	lxpr_lookup_not_a_dir,		/* /proc/devices	*/
@@ -640,8 +709,25 @@ static int (*lxpr_readdir_function[LXPR_NFILES])() = {
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/stat	*/
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/statm	*/
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/status	*/
+	lxpr_readdir_taskdir,		/* /proc/<pid>/task	*/
+	lxpr_readdir_task_tid_dir,	/* /proc/<pid>/task/nn	*/
 	lxpr_readdir_fddir,		/* /proc/<pid>/fd	*/
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/fd/nn	*/
+	lxpr_readdir_not_a_dir,		/* /proc/<pid>/task/<tid>/cmdline */
+	lxpr_readdir_not_a_dir,		/* /proc/<pid>/task/<tid>/cpu	*/
+	lxpr_readdir_not_a_dir,		/* /proc/<pid>/task/<tid>/cwd	*/
+	lxpr_readdir_not_a_dir,		/* /proc/<pid>/task/<tid>/environ */
+	lxpr_readdir_not_a_dir,		/* /proc/<pid>/task/<tid>/exe	*/
+	lxpr_readdir_not_a_dir,		/* /proc/<pid>/task/<tid>/limits */
+	lxpr_readdir_not_a_dir,		/* /proc/<pid>/task/<tid>/maps	*/
+	lxpr_readdir_not_a_dir,		/* /proc/<pid>/task/<tid>/mem	*/
+	lxpr_readdir_not_a_dir,		/* /proc/<pid>/task/<tid>/mountinfo */
+	lxpr_readdir_not_a_dir,		/* /proc/<pid>/task/<tid>/root	*/
+	lxpr_readdir_not_a_dir,		/* /proc/<pid>/task/<tid>/stat	*/
+	lxpr_readdir_not_a_dir,		/* /proc/<pid>/task/<tid>/statm	*/
+	lxpr_readdir_not_a_dir,		/* /proc/<pid>/task/<tid>/status */
+	lxpr_readdir_fddir,		/* /proc/<pid>/task/<tid>/fd	*/
+	lxpr_readdir_not_a_dir,		/* /proc/<pid>/task/<tid>/fd/nn	*/
 	lxpr_readdir_not_a_dir,		/* /proc/cmdline	*/
 	lxpr_readdir_not_a_dir,		/* /proc/cpuinfo	*/
 	lxpr_readdir_not_a_dir,		/* /proc/devices	*/
@@ -800,7 +886,8 @@ lxpr_read_pid_cmdline(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	char *buf;
 	size_t asz = lxpr_maxargvlen, sz;
 
-	ASSERT(lxpnp->lxpr_type == LXPR_PID_CMDLINE);
+	ASSERT(lxpnp->lxpr_type == LXPR_PID_CMDLINE ||
+	    lxpnp->lxpr_type == LXPR_PID_TID_CMDLINE);
 
 	buf = kmem_alloc(asz, KM_SLEEP);
 
@@ -834,7 +921,8 @@ lxpr_read_pid_limits(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	char *kname;
 	int i;
 
-	ASSERT(lxpnp->lxpr_type == LXPR_PID_LIMITS);
+	ASSERT(lxpnp->lxpr_type == LXPR_PID_LIMITS ||
+	    lxpnp->lxpr_type == LXPR_PID_TID_LIMITS);
 
 	nval = kmem_alloc(sizeof (rctl_val_t), KM_SLEEP);
 
@@ -913,7 +1001,8 @@ lxpr_read_pid_maps(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	struct print_data **print_tail = &print_head;
 	struct print_data *pbuf;
 
-	ASSERT(lxpnp->lxpr_type == LXPR_PID_MAPS);
+	ASSERT(lxpnp->lxpr_type == LXPR_PID_MAPS ||
+	    lxpnp->lxpr_type == LXPR_PID_TID_MAPS);
 
 	p = lxpr_lock(lxpnp->lxpr_pid);
 	if (p == NULL) {
@@ -1046,7 +1135,8 @@ lxpr_read_pid_mountinfo(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	int root_id = 15;	/* use a made-up value */
 	int mnt_id;
 
-	ASSERT(lxpnp->lxpr_type == LXPR_PID_MOUNTINFO);
+	ASSERT(lxpnp->lxpr_type == LXPR_PID_MOUNTINFO ||
+	    lxpnp->lxpr_type == LXPR_PID_TID_MOUNTINFO);
 
 	vfs_list_read_lock();
 
@@ -1195,7 +1285,8 @@ lxpr_read_pid_statm(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	size_t vsize;
 	size_t rss;
 
-	ASSERT(lxpnp->lxpr_type == LXPR_PID_STATM);
+	ASSERT(lxpnp->lxpr_type == LXPR_PID_STATM ||
+	    lxpnp->lxpr_type == LXPR_PID_TID_STATM);
 
 	p = lxpr_lock(lxpnp->lxpr_pid);
 	if (p == NULL) {
@@ -1256,33 +1347,75 @@ get_locked(proc_t *p)
 }
 
 /*
- * Linux wants to prefer the main thread for the pid status info so we
- * only use prchoose if we can't find the main thread.
+ * Look for either the main thread (lookup_id is 0) or the specified thread.
+ * If we're looking for the main thread but the proc does not have one, we
+ * fallback to using prchoose to get any thread available.
  */
 static kthread_t *
-get_main_thread(proc_t *p)
+lxpr_get_thread(proc_t *p, uint_t lookup_id)
 {
 	kthread_t *t;
+	uint_t emul_tid;
+	lx_lwp_data_t *lwpd;
+	pid_t pid = p->p_pid;
+	pid_t init_pid = curproc->p_zone->zone_proc_initpid;
 
+	/* get specified thread  */
 	if ((t = p->p_tlist) == NULL)
-		return (t);
+		return (NULL);
 
 	do {
-		/* we know the main thread is always tid 1 */
-		if (t->t_tid == 1) {
+		if (lookup_id == 0 && t->t_tid == 1) {
+			thread_lock(t);
+			return (t);
+		}
+
+		lwpd = ttolxlwp(t);
+		if (lwpd == NULL) {
+			emul_tid = t->t_tid;
+		} else {
+			if (pid == init_pid && lookup_id == 1) {
+				emul_tid = t->t_tid;
+			} else {
+				emul_tid = lwpd->br_pid;
+			}
+		}
+		if (emul_tid == lookup_id) {
 			thread_lock(t);
 			return (t);
 		}
 	} while ((t = t->t_forw) != p->p_tlist);
 
-	return (prchoose(p));
+	if (lookup_id == 0)
+		return (prchoose(p));
+	return (NULL);
 }
 
 /*
- * lxpr_read_pid_status(): status file
+ * Lookup the real pid for procs 0 or 1.
+ */
+static pid_t
+get_real_pid(pid_t p)
+{
+	pid_t find_pid;
+
+	if (p == 1) {
+		find_pid = curproc->p_zone->zone_proc_initpid;
+	} else if (p == 0) {
+		find_pid = curproc->p_zone->zone_zsched->p_pid;
+	} else {
+		find_pid = p;
+	}
+
+	return (find_pid);
+}
+
+/*
+ * pid/tid common code to read status file
  */
 static void
-lxpr_read_pid_status(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
+lxpr_read_status_common(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf,
+    uint_t lookup_id)
 {
 	proc_t *p;
 	kthread_t *t;
@@ -1298,10 +1431,10 @@ lxpr_read_pid_status(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	size_t rss;
 	k_sigset_t current, ignore, handle;
 	int    i, lx_sig;
+	pid_t real_pid;
 
-	ASSERT(lxpnp->lxpr_type == LXPR_PID_STATUS);
-
-	p = lxpr_lock(lxpnp->lxpr_pid);
+	real_pid = get_real_pid(lxpnp->lxpr_pid);
+	p = lxpr_lock(real_pid);
 	if (p == NULL) {
 		lxpr_uiobuf_seterr(uiobuf, EINVAL);
 		return;
@@ -1335,7 +1468,7 @@ lxpr_read_pid_status(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 			ppid = 1;
 	}
 
-	t = get_main_thread(p);
+	t = lxpr_get_thread(p, lookup_id);
 	if (t != NULL) {
 		switch (t->t_state) {
 		case TS_SLEEP:
@@ -1357,6 +1490,13 @@ lxpr_read_pid_status(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 		}
 		thread_unlock(t);
 	} else {
+		if (lookup_id != 0) {
+			/* we can't find this specific thread */
+			lxpr_uiobuf_seterr(uiobuf, EINVAL);
+			lxpr_unlock(p);
+			return;
+		}
+
 		/*
 		 * there is a hole in the exit code, where a proc can have
 		 * no threads but it is yet to be flagged SZOMB. We will
@@ -1384,12 +1524,13 @@ lxpr_read_pid_status(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	    up->u_comm,
 	    status,
 	    pid, /* thread group id - same as pid */
-	    pid,
+	    (lookup_id == 0) ? pid : lxpnp->lxpr_desc,
 	    ppid,
 	    0,
 	    crgetruid(cr), crgetuid(cr), crgetsuid(cr), crgetuid(cr),
 	    crgetrgid(cr), crgetgid(cr), crgetsgid(cr), crgetgid(cr),
 	    p->p_fno_ctl);
+
 
 	ngroups = crgetngroups(cr);
 	groups  = crgetgroups(cr);
@@ -1427,6 +1568,8 @@ lxpr_read_pid_status(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 		    ptok(rss),
 		    0l);
 	}
+
+	lxpr_uiobuf_printf(uiobuf, "\nThreads:\t%u", p->p_lwpcnt);
 
 	sigemptyset(&current);
 	sigemptyset(&ignore);
@@ -1467,12 +1610,33 @@ lxpr_read_pid_status(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	lxpr_unlock(p);
 }
 
-
 /*
- * lxpr_read_pid_stat(): pid stat file
+ * lxpr_read_pid_status(): status file
  */
 static void
-lxpr_read_pid_stat(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
+lxpr_read_pid_status(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
+{
+	ASSERT(lxpnp->lxpr_type == LXPR_PID_STATUS);
+
+	lxpr_read_status_common(lxpnp, uiobuf, 0);
+}
+
+/*
+ * lxpr_read_pid_tid_status(): status file
+ */
+static void
+lxpr_read_pid_tid_status(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
+{
+	ASSERT(lxpnp->lxpr_type == LXPR_PID_TID_STATUS);
+	lxpr_read_status_common(lxpnp, uiobuf, lxpnp->lxpr_desc);
+}
+
+/*
+ * pid/tid common code to read stat file
+ */
+static void
+lxpr_read_stat_common(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf,
+    uint_t lookup_id)
 {
 	proc_t *p;
 	kthread_t *t;
@@ -1485,10 +1649,10 @@ lxpr_read_pid_stat(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	int nice, pri;
 	caddr_t wchan;
 	processorid_t cpu;
+	pid_t real_pid;
 
-	ASSERT(lxpnp->lxpr_type == LXPR_PID_STAT);
-
-	p = lxpr_lock(lxpnp->lxpr_pid);
+	real_pid = get_real_pid(lxpnp->lxpr_pid);
+	p = lxpr_lock(real_pid);
 	if (p == NULL) {
 		lxpr_uiobuf_seterr(uiobuf, EINVAL);
 		return;
@@ -1543,7 +1707,7 @@ lxpr_read_pid_stat(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 		mutex_exit(&p->p_splock);
 	}
 
-	t = get_main_thread(p);
+	t = lxpr_get_thread(p, lookup_id);
 	if (t != NULL) {
 		switch (t->t_state) {
 		case TS_SLEEP:
@@ -1567,6 +1731,13 @@ lxpr_read_pid_stat(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 		cpu = t->t_cpu->cpu_id;
 		thread_unlock(t);
 	} else {
+		if (lookup_id != 0) {
+			/* we can't find this specific thread */
+			lxpr_uiobuf_seterr(uiobuf, EINVAL);
+			lxpr_unlock(p);
+			return;
+		}
+
 		/* Only zombies have no threads */
 		stat = 'Z';
 		nice = 0;
@@ -1598,7 +1769,8 @@ lxpr_read_pid_stat(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	    "%d "
 	    "%d"
 	    "\n",
-	    pid, PTOU(p)->u_comm, stat, ppid, pgpid, spid, psdev, psgid,
+	    (lookup_id == 0) ? pid : lxpnp->lxpr_desc,
+	    PTOU(p)->u_comm, stat, ppid, pgpid, spid, psdev, psgid,
 	    0l, 0l, 0l, 0l, 0l, /* flags, minflt, cminflt, majflt, cmajflt */
 	    p->p_utime, p->p_stime, p->p_cutime, p->p_cstime,
 	    pri, nice, p->p_lwpcnt,
@@ -1614,6 +1786,27 @@ lxpr_read_pid_stat(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	    cpu);
 
 	lxpr_unlock(p);
+}
+
+/*
+ * lxpr_read_pid_stat(): pid stat file
+ */
+static void
+lxpr_read_pid_stat(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
+{
+	ASSERT(lxpnp->lxpr_type == LXPR_PID_STAT);
+
+	lxpr_read_stat_common(lxpnp, uiobuf, 0);
+}
+
+/*
+ * lxpr_read_pid_tid_stat(): pid stat file
+ */
+static void
+lxpr_read_pid_tid_stat(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
+{
+	ASSERT(lxpnp->lxpr_type == LXPR_PID_TID_STAT);
+	lxpr_read_stat_common(lxpnp, uiobuf, lxpnp->lxpr_desc);
 }
 
 /* ARGSUSED */
@@ -3588,11 +3781,16 @@ lxpr_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 		vap->va_nlink = PIDDIRFILES;
 		vap->va_size = PIDDIRFILES * LXPR_SDSIZE;
 		break;
+	case LXPR_PID_TASK_IDDIR:
+		vap->va_nlink = TIDDIRFILES;
+		vap->va_size = TIDDIRFILES * LXPR_SDSIZE;
+		break;
 	case LXPR_SELF:
 		vap->va_uid = crgetruid(curproc->p_cred);
 		vap->va_gid = crgetrgid(curproc->p_cred);
 		break;
 	case LXPR_PID_FD_FD:
+	case LXPR_PID_TID_FD_FD:
 		/*
 		 * Restore VLNK type for lstat-type activity.
 		 * See lxpr_readlink for more details.
@@ -3636,6 +3834,8 @@ lxpr_access(vnode_t *vp, int mode, int flags, cred_t *cr, caller_context_t *ct)
 	case LXPR_PID_ROOTDIR:
 	case LXPR_PID_FDDIR:
 	case LXPR_PID_FD_FD:
+	case LXPR_PID_TID_FDDIR:
+	case LXPR_PID_TID_FD_FD:
 		if ((tp = lxpr_lock(lxpnp->lxpr_pid)) == NULL)
 			return (ENOENT);
 		if (tp != curproc && secpolicy_proc_access(cr) != 0 &&
@@ -3779,6 +3979,131 @@ lxpr_lookup_piddir(vnode_t *dp, char *comp)
 }
 
 /*
+ * Lookup one of the process's task ID's.
+ */
+static vnode_t *
+lxpr_lookup_taskdir(vnode_t *dp, char *comp)
+{
+	lxpr_node_t *dlxpnp = VTOLXP(dp);
+	lxpr_node_t *lxpnp;
+	proc_t *p;
+	pid_t real_pid;
+	uint_t tid;
+	int c;
+	kthread_t *t;
+
+	ASSERT(dlxpnp->lxpr_type == LXPR_PID_TASKDIR);
+
+	/*
+	 * convert the string rendition of the filename to a thread ID
+	 */
+	tid = 0;
+	while ((c = *comp++) != '\0') {
+		int otid;
+		if (c < '0' || c > '9')
+			return (NULL);
+
+		otid = tid;
+		tid = 10 * tid + c - '0';
+		/* integer overflow */
+		if (tid / 10 != otid)
+			return (NULL);
+	}
+
+	/*
+	 * get the proc to work with and lock it
+	 */
+	real_pid = get_real_pid(dlxpnp->lxpr_pid);
+	p = lxpr_lock(real_pid);
+	if ((p == NULL))
+		return (NULL);
+
+	/*
+	 * If the process is a zombie or system process
+	 * it can't have any threads.
+	 */
+	if ((p->p_stat == SZOMB) || (p->p_flag & SSYS) || (p->p_as == &kas)) {
+		lxpr_unlock(p);
+		return (NULL);
+	}
+
+	t = lxpr_get_thread(p, tid);
+	if (t == NULL) {
+		lxpr_unlock(p);
+		return (NULL);
+	}
+	thread_unlock(t);
+
+	/*
+	 * Allocate and fill in a new lx /proc taskid node.
+	 * Instead of the last arg being a fd, it is a tid.
+	 */
+	lxpnp = lxpr_getnode(dp, LXPR_PID_TASK_IDDIR, p, tid);
+	dp = LXPTOV(lxpnp);
+	ASSERT(dp != NULL);
+	lxpr_unlock(p);
+	return (dp);
+}
+
+/*
+ * Lookup one of the process's task ID's.
+ */
+static vnode_t *
+lxpr_lookup_task_tid_dir(vnode_t *dp, char *comp)
+{
+	lxpr_node_t *dlxpnp = VTOLXP(dp);
+	lxpr_node_t *lxpnp;
+	proc_t *p;
+	pid_t real_pid;
+	kthread_t *t;
+	int i;
+
+	ASSERT(dlxpnp->lxpr_type == LXPR_PID_TASK_IDDIR);
+
+	/*
+	 * get the proc to work with and lock it
+	 */
+	real_pid = get_real_pid(dlxpnp->lxpr_pid);
+	p = lxpr_lock(real_pid);
+	if ((p == NULL))
+		return (NULL);
+
+	/*
+	 * If the process is a zombie or system process
+	 * it can't have any threads.
+	 */
+	if ((p->p_stat == SZOMB) || (p->p_flag & SSYS) || (p->p_as == &kas)) {
+		lxpr_unlock(p);
+		return (NULL);
+	}
+
+	/* need to confirm tid is still there */
+	t = lxpr_get_thread(p, dlxpnp->lxpr_desc);
+	if (t == NULL) {
+		lxpr_unlock(p);
+		return (NULL);
+	}
+	thread_unlock(t);
+
+	/*
+	 * allocate and fill in the new lx /proc taskid dir node
+	 */
+	for (i = 0; i < TIDDIRFILES; i++) {
+		if (strcmp(tiddir[i].d_name, comp) == 0) {
+			lxpnp = lxpr_getnode(dp, tiddir[i].d_type, p,
+			    dlxpnp->lxpr_desc);
+			dp = LXPTOV(lxpnp);
+			ASSERT(dp != NULL);
+			lxpr_unlock(p);
+			return (dp);
+		}
+	}
+
+	lxpr_unlock(p);
+	return (NULL);
+}
+
+/*
  * Lookup one of the process's open files.
  */
 static vnode_t *
@@ -3794,7 +4119,8 @@ lxpr_lookup_fddir(vnode_t *dp, char *comp)
 	uf_entry_t *ufp;
 	uf_info_t *fip;
 
-	ASSERT(dlxpnp->lxpr_type == LXPR_PID_FDDIR);
+	ASSERT(dlxpnp->lxpr_type == LXPR_PID_FDDIR ||
+	    dlxpnp->lxpr_type == LXPR_PID_TID_FDDIR);
 
 	/*
 	 * convert the string rendition of the filename
@@ -4326,6 +4652,189 @@ lxpr_readdir_netdir(lxpr_node_t *lxpnp, uio_t *uiop, int *eofp)
 }
 
 static int
+lxpr_readdir_taskdir(lxpr_node_t *lxpnp, uio_t *uiop, int *eofp)
+{
+	/* bp holds one dirent64 structure */
+	longlong_t bp[DIRENT64_RECLEN(LXPNSIZ) / sizeof (longlong_t)];
+	dirent64_t *dirent = (dirent64_t *)bp;
+	ssize_t oresid;	/* save a copy for testing later */
+	ssize_t uresid;
+	off_t uoffset;
+	int error;
+	int ceof;
+	proc_t *p;
+	int tiddirsize = -1;
+	int tasknum;
+	pid_t real_pid;
+	kthread_t *t;
+
+	ASSERT(lxpnp->lxpr_type == LXPR_PID_TASKDIR);
+
+	oresid = uiop->uio_resid;
+
+	real_pid = get_real_pid(lxpnp->lxpr_pid);
+	p = lxpr_lock(real_pid);
+
+	/* can't read its contents if it died */
+	if (p == NULL) {
+		return (ENOENT);
+	}
+	if (p->p_stat == SIDL) {
+		lxpr_unlock(p);
+		return (ENOENT);
+	}
+
+	if ((p->p_stat == SZOMB) || (p->p_flag & SSYS) || (p->p_as == &kas))
+		tiddirsize = 0;
+
+	/*
+	 * Drop p_lock, but keep the process P_PR_LOCK'd to prevent it from
+	 * going away while we iterate over its threads.
+	 */
+	mutex_exit(&p->p_lock);
+
+	if (tiddirsize == -1)
+		tiddirsize = p->p_lwpcnt;
+
+	/* Do the fixed entries (in this case just "." & "..") */
+	error = lxpr_readdir_common(lxpnp, uiop, &ceof, 0, 0);
+
+	/* Finished if we got an error or if we couldn't do all the table */
+	if (error != 0 || ceof == 0)
+		goto out;
+
+	if ((t = p->p_tlist) == NULL) {
+		if (eofp != NULL)
+			*eofp = 1;
+		goto out;
+	}
+
+	/* clear out the dirent buffer */
+	bzero(bp, sizeof (bp));
+
+	/*
+	 * Loop until user's request is satisfied or until all thread's have
+	 * been returned.
+	 */
+	for (tasknum = 0; (uresid = uiop->uio_resid) > 0; tasknum++) {
+		int i;
+		int reclen;
+		int len;
+		uint_t emul_tid;
+		lx_lwp_data_t *lwpd;
+
+		uoffset = uiop->uio_offset;
+
+		/*
+		 * Stop at the end of the thread list
+		 */
+		i = (uoffset / LXPR_SDSIZE) - 2;
+		if (i >= tiddirsize) {
+			if (eofp) {
+				*eofp = 1;
+			}
+			goto out;
+		}
+
+		if (i != tasknum)
+			goto next;
+
+		lwpd = ttolxlwp(t);
+		if (lwpd == NULL) {
+			emul_tid = t->t_tid;
+		} else {
+			emul_tid = lwpd->br_pid;
+			/*
+			 * Convert pid to Linux default of 1 if we're the
+			 * zone's init.
+			 */
+			if (emul_tid == curproc->p_zone->zone_proc_initpid)
+				emul_tid = 1;
+		}
+
+		dirent->d_ino = lxpr_inode(LXPR_PID_TASK_IDDIR, lxpnp->lxpr_pid,
+		    emul_tid);
+		len = snprintf(dirent->d_name, LXPNSIZ, "%d", emul_tid);
+		ASSERT(len < LXPNSIZ);
+		reclen = DIRENT64_RECLEN(len);
+
+		dirent->d_off = (off64_t)(uoffset + LXPR_SDSIZE);
+		dirent->d_reclen = (ushort_t)reclen;
+
+		if (reclen > uresid) {
+			/*
+			 * Error if no entries have been returned yet.
+			 */
+			if (uresid == oresid)
+				error = EINVAL;
+			goto out;
+		}
+
+		/*
+		 * uiomove() updates both uiop->uio_resid and uiop->uio_offset
+		 * by the same amount.  But we want uiop->uio_offset to change
+		 * in increments of LXPR_SDSIZE, which is different from the
+		 * number of bytes being returned to the user.  So we set
+		 * uiop->uio_offset separately, in the increment of this for
+		 * the loop, ignoring what uiomove() does.
+		 */
+		if ((error = uiomove((caddr_t)dirent, reclen, UIO_READ,
+		    uiop)) != 0)
+			goto out;
+
+next:
+		uiop->uio_offset = uoffset + LXPR_SDSIZE;
+
+		if ((t = t->t_forw) == p->p_tlist) {
+			if (eofp != NULL)
+				*eofp = 1;
+			goto out;
+		}
+	}
+
+	if (eofp != NULL)
+		*eofp = 0;
+
+out:
+	mutex_enter(&p->p_lock);
+	lxpr_unlock(p);
+	return (error);
+}
+
+static int
+lxpr_readdir_task_tid_dir(lxpr_node_t *lxpnp, uio_t *uiop, int *eofp)
+{
+	proc_t *p;
+	pid_t real_pid;
+	kthread_t *t;
+
+	ASSERT(lxpnp->lxpr_type == LXPR_PID_TASK_IDDIR);
+
+	mutex_enter(&pidlock);
+
+	real_pid = get_real_pid(lxpnp->lxpr_pid);
+	p = prfind(real_pid);
+
+	/* can't read its contents if it died */
+	if (p == NULL || p->p_stat == SIDL) {
+		mutex_exit(&pidlock);
+		return (ENOENT);
+	}
+
+	mutex_exit(&pidlock);
+
+	/* need to confirm tid is still there */
+	t = lxpr_get_thread(p, lxpnp->lxpr_desc);
+	if (t == NULL) {
+		/* we can't find this specific thread */
+		return (NULL);
+	}
+	thread_unlock(t);
+
+	return (lxpr_readdir_common(lxpnp, uiop, eofp, tiddir, TIDDIRFILES));
+}
+
+static int
 lxpr_readdir_fddir(lxpr_node_t *lxpnp, uio_t *uiop, int *eofp)
 {
 	/* bp holds one dirent64 structure */
@@ -4340,7 +4849,8 @@ lxpr_readdir_fddir(lxpr_node_t *lxpnp, uio_t *uiop, int *eofp)
 	int fddirsize = -1;
 	uf_info_t *fip;
 
-	ASSERT(lxpnp->lxpr_type == LXPR_PID_FDDIR);
+	ASSERT(lxpnp->lxpr_type == LXPR_PID_FDDIR ||
+	    lxpnp->lxpr_type == LXPR_PID_TID_FDDIR);
 
 	oresid = uiop->uio_resid;
 

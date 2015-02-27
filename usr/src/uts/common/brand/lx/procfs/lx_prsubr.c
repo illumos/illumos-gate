@@ -319,7 +319,7 @@ lxpr_node_destructor(void *buf, void *un)
  * to give the inode number for an lxproc node
  */
 ino_t
-lxpr_inode(lxpr_nodetype_t type, pid_t pid, int fd)
+lxpr_inode(lxpr_nodetype_t type, pid_t pid, int desc)
 {
 	if (pid == 1) {
 		pid = curproc->p_zone->zone_proc_initpid;
@@ -329,13 +329,15 @@ lxpr_inode(lxpr_nodetype_t type, pid_t pid, int fd)
 
 	switch (type) {
 	case LXPR_PIDDIR:
-		return (pid + 1);
+		return (maxpid + pid + 1);
+	case LXPR_PID_TASK_IDDIR:
+		return (maxpid + (desc * 10));
 	case LXPR_PROCDIR:
 		return (maxpid + 2);
 	case LXPR_PID_FD_FD:
 		return (maxpid + 2 +
 		    (pid * (LXPR_FD_PERPROC + LXPR_NFILES)) +
-		    LXPR_NFILES + fd);
+		    LXPR_NFILES + desc);
 	default:
 		return (maxpid + 2 +
 		    (pid * (LXPR_FD_PERPROC + LXPR_NFILES)) +
@@ -365,7 +367,7 @@ lxpr_parentinode(lxpr_node_t *lxpnp)
  * This also allocates the vnode associated with it
  */
 lxpr_node_t *
-lxpr_getnode(vnode_t *dp, lxpr_nodetype_t type, proc_t *p, int fd)
+lxpr_getnode(vnode_t *dp, lxpr_nodetype_t type, proc_t *p, int desc)
 {
 	lxpr_node_t *lxpnp;
 	vnode_t *vp;
@@ -384,6 +386,7 @@ lxpr_getnode(vnode_t *dp, lxpr_nodetype_t type, proc_t *p, int fd)
 	lxpnp->lxpr_type = type;
 	lxpnp->lxpr_realvp = NULL;
 	lxpnp->lxpr_parent = dp;
+	lxpnp->lxpr_desc = desc;
 	VN_HOLD(dp);
 	if (p != NULL) {
 		if (p->p_pid == curproc->p_zone->zone_proc_initpid) {
@@ -397,7 +400,7 @@ lxpr_getnode(vnode_t *dp, lxpr_nodetype_t type, proc_t *p, int fd)
 		lxpnp->lxpr_time = PTOU(p)->u_start;
 		lxpnp->lxpr_uid = crgetruid(p->p_cred);
 		lxpnp->lxpr_gid = crgetrgid(p->p_cred);
-		lxpnp->lxpr_ino = lxpr_inode(type, p->p_pid, fd);
+		lxpnp->lxpr_ino = lxpr_inode(type, p->p_pid, desc);
 	} else {
 		/* Pretend files without a proc belong to sched */
 		lxpnp->lxpr_pid = 0;
@@ -479,6 +482,18 @@ lxpr_getnode(vnode_t *dp, lxpr_nodetype_t type, proc_t *p, int fd)
 		lxpnp->lxpr_mode = 0777;	/* anyone does anything ! */
 		break;
 
+	case LXPR_PID_TASKDIR:
+		ASSERT(p != NULL);
+		vp->v_type = VDIR;
+		lxpnp->lxpr_mode = 0555;	/* read-search by everyone */
+		break;
+
+	case LXPR_PID_TASK_IDDIR:
+		ASSERT(p != NULL);
+		vp->v_type = VDIR;
+		lxpnp->lxpr_mode = 0555;	/* read-search by everyone */
+		break;
+
 	case LXPR_PID_FD_FD:
 		ASSERT(p != NULL);
 		/* lxpr_realvp is set after we return */
@@ -487,6 +502,7 @@ lxpr_getnode(vnode_t *dp, lxpr_nodetype_t type, proc_t *p, int fd)
 		break;
 
 	case LXPR_PID_FDDIR:
+	case LXPR_PID_TID_FDDIR:
 		ASSERT(p != NULL);
 		vp->v_type = VDIR;
 		lxpnp->lxpr_mode = 0500;	/* read-search by owner only */
