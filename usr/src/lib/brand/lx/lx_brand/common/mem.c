@@ -28,6 +28,8 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <procfs.h>
+#include <stdlib.h>
+#include <string.h>
 #include <sys/mman.h>
 #include <sys/param.h>
 #include <sys/lx_debug.h>
@@ -295,10 +297,13 @@ long
 lx_remap(uintptr_t old_address, uintptr_t old_size,
     uintptr_t new_size, uintptr_t flags, uintptr_t new_address)
 {
-	int prot = 0, oflags, mflags = 0, len, fd;
-	prmap_t map;
+	int prot = 0, oflags, mflags = 0, len, fd = -1, i, nmap;
+	prmap_t map, *maps;
 	uintptr_t rval;
 	char path[256], buf[MAXPATHLEN + 1];
+	struct stat st;
+	ssize_t n;
+	boolean_t found = B_FALSE;
 
 	/*
 	 * The kernel doesn't actually support mremap(), so to emulate it,
@@ -309,22 +314,57 @@ lx_remap(uintptr_t old_address, uintptr_t old_size,
 	 * many reasons why this might fail; generally, we'll return EINVAL,
 	 * but in some cases we'll return ENOMEM.
 	 */
-	if ((fd = open("/native/proc/self/map", O_RDONLY)) == -1)
-		return (-EINVAL);
-
-	do {
-		if (read(fd, &map, sizeof (map)) < sizeof (map)) {
-			/*
-			 * This is either a short read or we've hit the end
-			 * of the mappings.  Either way, our passed mapping is
-			 * invalid; return EINVAL.
-			 */
+	if ((fd = open("/native/proc/self/map", O_RDONLY)) == -1 ||
+	    fstat(fd, &st) != 0) {
+		if (fd >= 0) {
 			(void) close(fd);
-			return (-EINVAL);
 		}
-	} while (map.pr_vaddr != old_address || map.pr_size != old_size);
+		return (-EINVAL);
+	}
+
+	/*
+	 * Determine the number of mappings we need to read and allocate
+	 * a buffer:
+	 */
+	nmap = st.st_size / sizeof (prmap_t);
+	if ((maps = malloc((nmap + 1) * sizeof (prmap_t))) == NULL) {
+		(void) close(fd);
+		return (-EINVAL);
+	}
+
+	/*
+	 * Read mappings from the kernel and determine how many complete
+	 * mappings were read:
+	 */
+	if ((n = read(fd, maps, (nmap + 1) * sizeof (prmap_t))) < 0) {
+		lx_debug("\rread of /proc/self/map failed: %s",
+		    strerror(errno));
+		(void) close(fd);
+		free(maps);
+		return (-EINVAL);
+	}
+	nmap = n / sizeof (prmap_t);
+	lx_debug("\tfound %d mappings", nmap);
+
+	/*
+	 * Check if any mappings match our arguments:
+	 */
+	for (i = 0; i < nmap; i++) {
+		if (maps[i].pr_vaddr == old_address &&
+		    maps[i].pr_size == old_size) {
+			map = maps[i];
+			found = B_TRUE;
+			break;
+		}
+	}
 
 	(void) close(fd);
+	free(maps);
+
+	if (!found) {
+		lx_debug("\tno matching mapping found");
+		return (-EINVAL);
+	}
 
 	if (!(map.pr_mflags & MA_SHARED)) {
 		/*
