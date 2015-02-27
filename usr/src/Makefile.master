@@ -911,7 +911,6 @@ AS_BIGPICFLAGS=		$(C_BIGPICFLAGS)
 # Default label for CTF sections
 #
 CTFCVTFLAGS=		-i -L VERSION
-$(SRCDBGBLD)CTFCVTFLAGS 	+= -g
 
 #
 # Override to pass module-specific flags to ctfmerge.  Currently used only by
@@ -919,8 +918,6 @@ $(SRCDBGBLD)CTFCVTFLAGS 	+= -g
 # stripping.
 #
 CTFMRGFLAGS=
-$(SRCDBGBLD)CTFMRGFLAGS 	+= -g
-
 
 CTFCONVERT_O		= $(CTFCONVERT) $(CTFCVTFLAGS) $@
 
@@ -983,8 +980,7 @@ DEV_CM=		"@($(POUND_SIGN))SunOS Internal Development: non-nightly build"
 PROCESS_COMMENT=  @?${MCS} -d -a $(RELEASE_CM) -a $(DEV_CM)
 $(RELEASE_BUILD)PROCESS_COMMENT=   @?${MCS} -d -a $(RELEASE_CM)
 
-STRIP_STABS=			   :
-$(RELEASE_BUILD)STRIP_STABS=	   $(STRIP) -x $@
+STRIP_STABS=			   $(STRIP) -x $@
 $(SRCDBGBLD)STRIP_STABS=	   :
 
 POST_PROCESS_O=	

@@ -672,16 +672,18 @@ init_device(ig_device_t *device, char *path)
 	if (get_raw_partition_fd(device) != BC_SUCCESS)
 		return (BC_ERROR);
 
-	if (fstyp_init(device->part_fd, 0, NULL, &fhdl) != 0)
-		return (BC_ERROR);
+	if (is_efi(device->type)) {
+		if (fstyp_init(device->part_fd, 0, NULL, &fhdl) != 0)
+			return (BC_ERROR);
 
-	if (fstyp_ident(fhdl, "zfs", &fident) != 0) {
+		if (fstyp_ident(fhdl, "zfs", &fident) != 0) {
+			fstyp_fini(fhdl);
+			(void) fprintf(stderr, gettext("Booting of EFI labeled "
+			    "disks is only supported with ZFS\n"));
+			return (BC_ERROR);
+		}
 		fstyp_fini(fhdl);
-		(void) fprintf(stderr, gettext("Booting of EFI labeled disks "
-		    "is only supported with ZFS\n"));
-		return (BC_ERROR);
 	}
-	fstyp_fini(fhdl);
 
 	if (get_start_sector(device) != BC_SUCCESS)
 		return (BC_ERROR);
@@ -998,7 +1000,16 @@ write_stage2(ig_data_t *install)
 	 * For disk, write stage2 starting at STAGE2_BLKOFF sector.
 	 * Note that we use stage2->buf rather than stage2->file, because we
 	 * may have extended information after the latter.
+	 *
+	 * If we're writing to an EFI-labeled disk where stage2 lives in the
+	 * 3.5MB boot loader gap following the ZFS vdev labels, make sure the
+	 * size of the buffer doesn't exceed the size of the gap.
 	 */
+	if (is_efi(device->type) && stage2->buf_size > STAGE2_MAXSIZE) {
+		(void) fprintf(stderr, WRITE_FAIL_STAGE2);
+		return (BC_ERROR);
+	}
+
 	offset = STAGE2_BLKOFF(device->type) * SECTOR_SIZE;
 
 	if (write_out(device->part_fd, stage2->buf, stage2->buf_size,

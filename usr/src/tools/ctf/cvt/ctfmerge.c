@@ -600,7 +600,7 @@ terminate_cleanup(void)
 }
 
 static void
-copy_ctf_data(char *srcfile, char *destfile, int keep_stabs)
+copy_ctf_data(char *srcfile, char *destfile)
 {
 	tdata_t *srctd;
 
@@ -608,7 +608,7 @@ copy_ctf_data(char *srcfile, char *destfile, int keep_stabs)
 		terminate("No CTF data found in source file %s\n", srcfile);
 
 	tmpname = mktmpname(destfile, ".ctf");
-	write_ctf(srctd, destfile, tmpname, CTF_COMPRESS | keep_stabs);
+	write_ctf(srctd, destfile, tmpname, CTF_COMPRESS);
 	if (rename(tmpname, destfile) != 0) {
 		terminate("Couldn't rename temp file %s to %s", tmpname,
 		    destfile);
@@ -739,7 +739,6 @@ main(int argc, char **argv)
 	char **ifiles, **tifiles;
 	int verbose = 0, docopy = 0;
 	int write_fuzzy_match = 0;
-	int keep_stabs = 0;
 	int require_ctf = 0;
 	int nifiles, nielems;
 	int c, i, idx, tidx, err;
@@ -752,7 +751,7 @@ main(int argc, char **argv)
 		debug_level = atoi(getenv("CTFMERGE_DEBUG_LEVEL"));
 
 	err = 0;
-	while ((c = getopt(argc, argv, ":cd:D:fgl:L:o:tvw:s")) != EOF) {
+	while ((c = getopt(argc, argv, ":cd:D:fl:L:o:tvw:s")) != EOF) {
 		switch (c) {
 		case 'c':
 			docopy = 1;
@@ -767,9 +766,6 @@ main(int argc, char **argv)
 			break;
 		case 'f':
 			write_fuzzy_match = CTF_FUZZY_MATCH;
-			break;
-		case 'g':
-			keep_stabs = CTF_KEEP_STABS;
 			break;
 		case 'l':
 			/* Label merged types with `label' */
@@ -833,9 +829,6 @@ main(int argc, char **argv)
 		exit(2);
 	}
 
-	if (getenv("STRIPSTABS_KEEP_STABS") != NULL)
-		keep_stabs = CTF_KEEP_STABS;
-
 	if (uniqfile && access(uniqfile, R_OK) != 0) {
 		warning("Uniquification file %s couldn't be opened and "
 		    "will be ignored.\n", uniqfile);
@@ -855,7 +848,7 @@ main(int argc, char **argv)
 	 * so we shoe-horn a copier into ctfmerge.
 	 */
 	if (docopy) {
-		copy_ctf_data(argv[optind], argv[optind + 1], keep_stabs);
+		copy_ctf_data(argv[optind], argv[optind + 1]);
 
 		exit(0);
 	}
@@ -999,7 +992,7 @@ main(int argc, char **argv)
 
 	tmpname = mktmpname(outfile, ".ctf");
 	write_ctf(savetd, outfile, tmpname,
-	    CTF_COMPRESS | write_fuzzy_match | dynsym | keep_stabs);
+	    CTF_COMPRESS | write_fuzzy_match | dynsym);
 	if (rename(tmpname, outfile) != 0)
 		terminate("Couldn't rename output temp file %s", tmpname);
 	free(tmpname);

@@ -401,7 +401,6 @@ void merge_into_master(tdata_t *, tdata_t *, tdata_t *, int);
 #define	CTF_FUZZY_MATCH	0x1 /* match local symbols to global CTF */
 #define	CTF_USE_DYNSYM	0x2 /* use .dynsym not .symtab */
 #define	CTF_COMPRESS	0x4 /* compress CTF output */
-#define	CTF_KEEP_STABS	0x8 /* keep .stabs sections */
 
 void write_ctf(tdata_t *, const char *, const char *, int);
 

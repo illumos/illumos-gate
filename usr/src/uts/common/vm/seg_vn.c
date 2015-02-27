@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 1986, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2015, Joyent, Inc. All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -74,6 +75,27 @@
 #include <sys/project.h>
 #include <sys/zone.h>
 #include <sys/shm_impl.h>
+
+/*
+ * segvn_fault needs a temporary page list array.  To avoid calling kmem all
+ * the time, it creates a small (PVN_GETPAGE_NUM entry) array and uses it if
+ * it can.  In the rare case when this page list is not large enough, it
+ * goes and gets a large enough array from kmem.
+ *
+ * This small page list array covers either 8 pages or 64kB worth of pages -
+ * whichever is smaller.
+ */
+#define	PVN_MAX_GETPAGE_SZ	0x10000
+#define	PVN_MAX_GETPAGE_NUM	0x8
+
+#if PVN_MAX_GETPAGE_SZ > PVN_MAX_GETPAGE_NUM * PAGESIZE
+#define	PVN_GETPAGE_SZ	ptob(PVN_MAX_GETPAGE_NUM)
+#define	PVN_GETPAGE_NUM	PVN_MAX_GETPAGE_NUM
+#else
+#define	PVN_GETPAGE_SZ	PVN_MAX_GETPAGE_SZ
+#define	PVN_GETPAGE_NUM	btop(PVN_MAX_GETPAGE_SZ)
+#endif
+
 /*
  * Private seg op routines.
  */

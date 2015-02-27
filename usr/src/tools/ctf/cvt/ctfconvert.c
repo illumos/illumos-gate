@@ -149,7 +149,6 @@ main(int argc, char **argv)
 	char *altexec;
 	int verbose = 0;
 	int ignore_non_c = 0;
-	int keep_stabs = 0;
 	int c;
 
 	sighold(SIGINT);
@@ -190,9 +189,6 @@ main(int argc, char **argv)
 		case 'i':
 			ignore_non_c = 1;
 			break;
-		case 'g':
-			keep_stabs = CTF_KEEP_STABS;
-			break;
 		case 'v':
 			verbose = 1;
 			break;
@@ -201,9 +197,6 @@ main(int argc, char **argv)
 			exit(2);
 		}
 	}
-
-	if (getenv("STRIPSTABS_KEEP_STABS") != NULL)
-		keep_stabs = CTF_KEEP_STABS;
 
 	if (argc - optind != 1 || label == NULL) {
 		usage();
@@ -248,11 +241,11 @@ main(int argc, char **argv)
 	 * to a temporary file, and replace the input file when we're done.
 	 */
 	if (outfile && strcmp(infile, outfile) != 0) {
-		write_ctf(mstrtd, infile, outfile, dynsym | keep_stabs);
+		write_ctf(mstrtd, infile, outfile, dynsym);
 	} else {
 		char *tmpname = mktmpname(infile, ".ctf");
 
-		write_ctf(mstrtd, infile, tmpname, dynsym | keep_stabs);
+		write_ctf(mstrtd, infile, tmpname, dynsym);
 		if (rename(tmpname, infile) != 0)
 			terminate("Couldn't rename temp file %s", tmpname);
 		free(tmpname);
