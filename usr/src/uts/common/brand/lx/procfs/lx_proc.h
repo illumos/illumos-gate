@@ -115,8 +115,25 @@ typedef enum lxpr_nodetype {
 	LXPR_PID_STAT,		/* /proc/<pid>/stat	*/
 	LXPR_PID_STATM,		/* /proc/<pid>/statm	*/
 	LXPR_PID_STATUS,	/* /proc/<pid>/status	*/
+	LXPR_PID_TASKDIR,	/* /proc/<pid>/task	*/
+	LXPR_PID_TASK_IDDIR,	/* /proc/<pid>/task/<tid>		*/
 	LXPR_PID_FDDIR,		/* /proc/<pid>/fd	*/
 	LXPR_PID_FD_FD,		/* /proc/<pid>/fd/nn	*/
+	LXPR_PID_TID_CMDLINE,	/* /proc/<pid>/task/<tid>/cmdline	*/
+	LXPR_PID_TID_CPU,	/* /proc/<pid>/task/<tid>/cpu		*/
+	LXPR_PID_TID_CURDIR,	/* /proc/<pid>/task/<tid>/cwd		*/
+	LXPR_PID_TID_ENV,	/* /proc/<pid>/task/<tid>/environ	*/
+	LXPR_PID_TID_EXE,	/* /proc/<pid>/task/<tid>/exe		*/
+	LXPR_PID_TID_LIMITS,	/* /proc/<pid>/task/<tid>/limits	*/
+	LXPR_PID_TID_MAPS,	/* /proc/<pid>/task/<tid>/maps		*/
+	LXPR_PID_TID_MEM,	/* /proc/<pid>/task/<tid>/mem		*/
+	LXPR_PID_TID_MOUNTINFO,	/* /proc/<pid>/task/<tid>/mountinfo	*/
+	LXPR_PID_TID_ROOTDIR,	/* /proc/<pid>/task/<tid>/root		*/
+	LXPR_PID_TID_STAT,	/* /proc/<pid>/task/<tid>/stat		*/
+	LXPR_PID_TID_STATM,	/* /proc/<pid>/task/<tid>/statm		*/
+	LXPR_PID_TID_STATUS,	/* /proc/<pid>/task/<tid>/status	*/
+	LXPR_PID_TID_FDDIR,	/* /proc/<pid>/task/<tid>/fd		*/
+	LXPR_PID_TID_FD_FD,	/* /proc/<pid>/task/<tid>/fd/nn		*/
 	LXPR_CMDLINE,		/* /proc/cmdline	*/
 	LXPR_CPUINFO,		/* /proc/cpuinfo	*/
 	LXPR_DEVICES,		/* /proc/devices	*/
@@ -205,6 +222,7 @@ typedef struct lxpr_node {
 	uid_t		lxpr_uid;	/* file owner			*/
 	gid_t		lxpr_gid;	/* file group owner		*/
 	pid_t		lxpr_pid;	/* pid of proc referred to	*/
+	uint_t		lxpr_desc;	/* addl. descriptor (fd or tid)	*/
 	ino_t		lxpr_ino;	/* node id 			*/
 	ldi_handle_t	lxpr_cons_ldih; /* ldi handle for console device */
 } lxpr_node_t;
