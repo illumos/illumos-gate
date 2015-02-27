@@ -176,6 +176,8 @@ process_vm_readv03
 process_vm_writev01
 process_vm_writev02
 prot_hsymlinks
+ptrace01
+ptrace02
 ptrace05
 read02
 readahead01
