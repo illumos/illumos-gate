@@ -1044,7 +1044,7 @@ overlay_target_list_copyout(void *ubuf, void *buf, size_t bufsize, int flags)
 		if (ddi_copyout(otl->otli_ents,
 		    (void *)((uintptr_t)ubuf +
 		    offsetof(overlay_targ_list_t, otl_ents)),
-		    sizeof (uint32_t *) * otl->otli_nents,
+		    sizeof (uint32_t) * otl->otli_nents,
 		    flags & FKIOCTL) != 0)
 			return (EFAULT);
 	}

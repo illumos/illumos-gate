@@ -57,6 +57,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 #include <thread.h>
+#include <priv.h>
 
 #define	VARPD_EXIT_REQUESTED	0
 #define	VARPD_EXIT_FATAL	1
@@ -133,19 +134,27 @@ varpd_plugin_walk_cb(varpd_handle_t *vph, const char *name, void *unused)
 	return (0);
 }
 
-static void
+static int
 varpd_dir_setup(void)
 {
 	int fd;
 
 	if (mkdir(VARPD_RUNDIR, 0700) != 0) {
 		if (errno != EEXIST)
-			varpd_fatal("failed to create %s", VARPD_RUNDIR);
+			varpd_fatal("failed to create %s: %s", VARPD_RUNDIR,
+			    strerror(errno));
 	}
 
 	fd = open(VARPD_RUNDIR, O_RDONLY);
 	if (fd < 0)
-		varpd_fatal("failed to open %s", VARPD_RUNDIR);
+		varpd_fatal("failed to open %s: %s", VARPD_RUNDIR,
+		    strerror(errno));
+
+	if (fchown(fd, UID_NETADM, GID_NETADM) != 0)
+		varpd_fatal("failed to chown %s: %s\n", VARPD_RUNDIR,
+		    strerror(errno));
+
+	return (fd);
 }
 
 /*
@@ -160,9 +169,10 @@ varpd_fd_setup(void)
 	closefrom(STDERR_FILENO + 1);
 	dupfd = open(_PATH_DEVNULL, O_RDONLY);
 	if (dupfd < 0)
-		varpd_fatal("failed to open %s", _PATH_DEVNULL);
+		varpd_fatal("failed to open %s: %s", _PATH_DEVNULL,
+		    strerror(errno));
 	if (dup2(dupfd, STDIN_FILENO) == -1)
-		varpd_fatal("failed to dup out stdin");
+		varpd_fatal("failed to dup out stdin: %s", strerror(errno));
 }
 
 /*
@@ -171,13 +181,14 @@ varpd_fd_setup(void)
  * before we say that we're good to go.
  */
 static int
-varpd_daemonize(void)
+varpd_daemonize(int dirfd)
 {
 	char path[PATH_MAX];
 	struct rlimit rlim;
 	sigset_t set, oset;
 	int estatus, pfds[2];
 	pid_t child;
+	priv_set_t *pset;
 
 	/*
 	 * Set a per-process core path to be inside of /var/run/varpd. Make sure
@@ -202,18 +213,8 @@ varpd_daemonize(void)
 	/*
 	 * chdir /var/run/varpd
 	 */
-	if (chdir(VARPD_RUNDIR) != 0)
+	if (fchdir(dirfd) != 0)
 		varpd_fatal("failed to chdir to %s", VARPD_RUNDIR);
-
-	/*
-	 * Drop privileges here some day soon.
-	 *
-	 * We should make sure we keep around PRIV_NET_PRIVADDR and
-	 * PRIV_SYS_DLCONFIG, but drop everything else; however, keep basic
-	 * privs and have our child drop them.
-	 *
-	 * We should also run as netadm:netadm and drop all of our groups.
-	 */
 
 
 	/*
@@ -248,6 +249,42 @@ varpd_daemonize(void)
 
 		_exit(VARPD_EXIT_FATAL);
 	}
+
+	/*
+	 * Drop privileges here.
+	 *
+	 * We should make sure we keep around PRIV_NET_PRIVADDR and
+	 * PRIV_SYS_DLCONFIG, but drop everything else; however, keep basic
+	 * privs and have our child drop them.
+	 *
+	 * We should also run as netadm:netadm and drop all of our groups.
+	 */
+	if (setgroups(0, NULL) != 0)
+		abort();
+	if (setgid(GID_NETADM) == -1 || seteuid(UID_NETADM) == -1)
+		abort();
+	if ((pset = priv_allocset()) == NULL)
+		abort();
+	priv_basicset(pset);
+	if (priv_delset(pset, PRIV_PROC_EXEC) == -1 ||
+	    priv_delset(pset, PRIV_PROC_INFO) == -1 ||
+	    priv_delset(pset, PRIV_PROC_FORK) == -1 ||
+	    priv_delset(pset, PRIV_PROC_SESSION) == -1 ||
+	    priv_delset(pset, PRIV_FILE_LINK_ANY) == -1 ||
+	    priv_addset(pset, PRIV_SYS_DL_CONFIG) == -1 ||
+	    priv_addset(pset, PRIV_NET_PRIVADDR) == -1) {
+		abort();
+	}
+	/*
+	 * Remove privs from the permitted set. That will cause them to be
+	 * removed from the effective set. We want to make sure that in the case
+	 * of a vulnerability, something can't get back in here and wreak more
+	 * havoc.
+	 */
+	if (setppriv(PRIV_SET, PRIV_PERMITTED, pset) == -1)
+		abort();
+
+	priv_freeset(pset);
 
 	if (close(pfds[0]) != 0)
 		abort();
@@ -303,7 +340,7 @@ varpd_cleanup(void)
 int
 main(int argc, char *argv[])
 {
-	int err, c, dfd, i;
+	int err, c, dirfd, dfd, i;
 	const char *doorpath = VARPD_DEFAULT_DOOR;
 	sigset_t set;
 	struct sigaction act;
@@ -353,11 +390,11 @@ main(int argc, char *argv[])
 		}
 	}
 
-	varpd_dir_setup();
+	dirfd = varpd_dir_setup();
 
 	(void) libvarpd_plugin_walk(varpd_handle, varpd_plugin_walk_cb, NULL);
 
-	dfd = varpd_daemonize();
+	dfd = varpd_daemonize(dirfd);
 
 	/*
 	 * Now that we're in the child, go ahead and load all of our plug-ins.
