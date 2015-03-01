@@ -84,7 +84,6 @@ extern int ctf_merge_merge(ctf_merge_t *, ctf_file_t **);
 extern void ctf_merge_fini(ctf_merge_t *);
 
 #define	CTF_ELFWRITE_F_COMPRESS		0x1
-#define	CTF_ELFWRITE_F_KEEP_STABS	0x2
 extern int ctf_elffdwrite(ctf_file_t *, int, int, int);
 extern int ctf_elfwrite(ctf_file_t *, const char *, const char *, int);
 

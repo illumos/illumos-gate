@@ -329,7 +329,7 @@ main(int argc, char *argv[])
 			/* Silently ignored for compatibility */
 			break;
 		case 'g':
-			wflags |= CTF_ELFWRITE_F_KEEP_STABS;
+			/* Silently ignored for compatibility */
 			break;
 		case 'l':
 			label = optarg;

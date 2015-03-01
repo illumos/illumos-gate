@@ -51,7 +51,6 @@ ctf_write_elf(ctf_file_t *fp, Elf *src, Elf *dst, int flags)
 	int symtab_idx = -1;
 	off_t new_offset = 0;
 	off_t ctfnameoff = 0;
-	int keep_stabs = (flags & CTF_ELFWRITE_F_KEEP_STABS);
 	int compress = (flags & CTF_ELFWRITE_F_COMPRESS);
 	int *secxlate;
 	int srcidx, dstidx, pad, i;
@@ -61,8 +60,7 @@ ctf_write_elf(ctf_file_t *fp, Elf *src, Elf *dst, int flags)
 
 	void *cdata = NULL;
 
-	if ((flags & ~(CTF_ELFWRITE_F_KEEP_STABS |
-	    CTF_ELFWRITE_F_COMPRESS)) != 0)
+	if ((flags & ~(CTF_ELFWRITE_F_COMPRESS)) != 0)
 		return (ctf_set_errno(fp, EINVAL));
 
 	if (gelf_newehdr(dst, gelf_getclass(src)) == NULL)
@@ -124,12 +122,6 @@ ctf_write_elf(ctf_file_t *fp, Elf *src, Elf *dst, int flags)
 		}
 
 		if (strcmp(sname, CTF_ELF_SCN_NAME) == 0) {
-			secxlate[srcidx] = -1;
-		} else if (!keep_stabs &&
-		    (strncmp(sname, ".stab", 5) == 0 ||
-		    strncmp(sname, ".debug", 6) == 0 ||
-		    strncmp(sname, ".rel.debug", 10) == 0 ||
-		    strncmp(sname, ".rela.debug", 11) == 0)) {
 			secxlate[srcidx] = -1;
 		} else {
 			secxlate[srcidx] = dstidx++;
