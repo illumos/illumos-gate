@@ -153,9 +153,6 @@ extern long lx_setfsgid16(uintptr_t);
 extern long lx_setfsuid(uintptr_t);
 extern long lx_setfsgid(uintptr_t);
 
-extern long lx_clock_settime(int, struct timespec *);
-extern long lx_clock_gettime(int, struct timespec *);
-extern long lx_clock_getres(int, struct timespec *);
 extern long lx_clock_nanosleep(int, int flags, struct timespec *,
     struct timespec *);
 extern long lx_adjtimex(void *);

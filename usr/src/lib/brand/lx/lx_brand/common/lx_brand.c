@@ -1189,9 +1189,9 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_timer_gettime,		/* 224: timer_gettime */
 	lx_timer_getoverrun,		/* 225: timer_getoverrun */
 	lx_timer_delete,		/* 226: timer_delete */
-	lx_clock_settime,		/* 227: clock_settime */
-	lx_clock_gettime,		/* 228: clock_gettime */
-	lx_clock_getres,		/* 229: clock_getres */
+	NULL,				/* 227: clock_settime */
+	NULL,				/* 228: clock_gettime */
+	NULL,				/* 229: clock_getres */
 	lx_clock_nanosleep,		/* 230: clock_nanosleep */
 	lx_group_exit,			/* 231: exit_group */
 	lx_epoll_wait,			/* 232: epoll_wait */
@@ -1557,9 +1557,9 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_timer_gettime,		/* 261: timer_gettime */
 	lx_timer_getoverrun,		/* 262: timer_getoverrun */
 	lx_timer_delete,		/* 263: timer_delete */
-	lx_clock_settime,		/* 264: clock_settime */
-	lx_clock_gettime,		/* 265: clock_gettime */
-	lx_clock_getres,		/* 266: clock_getres */
+	NULL,				/* 264: clock_settime */
+	NULL,				/* 265: clock_gettime */
+	NULL,				/* 266: clock_getres */
 	lx_clock_nanosleep,		/* 267: clock_nanosleep */
 	lx_statfs64,			/* 268: statfs64 */
 	lx_fstatfs64,			/* 269: fstatfs64 */

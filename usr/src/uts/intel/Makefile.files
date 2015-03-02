@@ -294,6 +294,7 @@ LX_BRAND_OBJS  =		\
 	lx_syscall.o		\
 	lx_sysinfo.o		\
 	lx_thread_area.o	\
+	lx_timer.o		\
 	lx_wait.o		\
 	lx_xattr.o
 
