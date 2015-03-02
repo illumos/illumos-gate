@@ -19,6 +19,7 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2015 Gary Mills
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -1015,7 +1016,7 @@ ztop(char *arg, char *diskname)
 	}
 	arg += 14;
 	(void) strncpy(pool_name, arg, MAXPATHLEN);
-	if (p = strchr(pool_name, '/'))
+	if ((p = strchr(pool_name, '/')) != NULL)
 		*p = '\0';
 	STRCPYLIM(new_cc.cf_fs, p + 1, "statefile path");
 

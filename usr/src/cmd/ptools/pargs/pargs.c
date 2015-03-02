@@ -1331,15 +1331,15 @@ main(int argc, char *argv[])
 
 	if (errflg || argc <= 0) {
 		(void) fprintf(stderr,
-		    "usage:  %s [-acexF] { pid | core } ...\n"
+		    "usage:  %s [-aceFlx] { pid | core } ...\n"
 		    "  (show process arguments and environment)\n"
 		    "  -a: show process arguments (default)\n"
 		    "  -c: interpret characters as 7-bit ascii regardless of "
 		    "locale\n"
 		    "  -e: show environment variables\n"
+		    "  -F: force grabbing of the target process\n"
 		    "  -l: display arguments as command line\n"
-		    "  -x: show aux vector entries\n"
-		    "  -F: force grabbing of the target process\n", command);
+		    "  -x: show aux vector entries\n", command);
 		return (2);
 	}
 
