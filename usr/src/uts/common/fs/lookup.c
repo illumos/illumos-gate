@@ -1168,38 +1168,6 @@ dirtopath(vnode_t *vrootp, vnode_t *vp, char *buf, size_t buflen, int flags,
 		}
 
 		/*
-		 * Try to obtain the path component from dnlc cache
-		 * before searching through the directory.
-		 */
-		if ((cmpvp = dnlc_reverse_lookup(vp, dbuf, dlen)) != NULL) {
-			/*
-			 * If we got parent vnode as a result,
-			 * then the answered path is correct.
-			 */
-			if (VN_CMP(cmpvp, pvp)) {
-				VN_RELE(cmpvp);
-				complen = strlen(dbuf);
-				bufloc -= complen;
-				if (bufloc <= buf) {
-					err = ENAMETOOLONG;
-					goto out;
-				}
-				bcopy(dbuf, bufloc, complen);
-
-				/* Prepend a slash to the current path */
-				*--bufloc = '/';
-
-				/* And continue with the next component */
-				VN_RELE(vp);
-				vp = pvp;
-				pvp = NULL;
-				continue;
-			} else {
-				VN_RELE(cmpvp);
-			}
-		}
-
-		/*
 		 * Search the parent directory for the entry corresponding to
 		 * this vnode.
 		 */
@@ -1410,55 +1378,11 @@ notcached:
 
 	pn_free(&pn);
 
-	if (PROC_IS_BRANDED(curproc)) {
-		/*
-		 * If v_path doesn't work out and we're in a branded zone,
-		 * we're not going to bother doing more work here:  because
-		 * directories from the global can be lofs mounted into odd
-		 * locations (e.g., /native in an lx zone), it is likely that
-		 * the DNLC reverse lookup will yield nothing.  Indeed, the
-		 * only certainty is that the DNLC reverse lookup will be
-		 * exceedingly painful; we save ourselves the substantial
-		 * grief of scanning the entire DNLC and kick out with ENOENT
-		 * in this case.
-		 */
+	if (vp->v_type != VDIR) {
 		ret = ENOENT;
-	} else if (vp->v_type != VDIR) {
-		/*
-		 * If we don't have a directory, try to find it in the dnlc via
-		 * reverse lookup.  Once this is found, we can use the regular
-		 * directory search to find the full path.
-		 */
-		if ((pvp = dnlc_reverse_lookup(vp, path, MAXNAMELEN)) != NULL) {
-			/*
-			 * Check if we have read privilege so, that
-			 * we can lookup the path in the directory
-			 */
-			ret = 0;
-			if ((flags & LOOKUP_CHECKREAD)) {
-				ret = VOP_ACCESS(pvp, VREAD, 0, cr, NULL);
-			}
-			if (ret == 0) {
-				ret = dirtopath(vrootp, pvp, buf, buflen,
-				    flags, cr);
-			}
-			if (ret == 0) {
-				len = strlen(buf);
-				if (len + strlen(path) + 1 >= buflen) {
-					ret = ENAMETOOLONG;
-				} else {
-					if (buf[len - 1] != '/')
-						buf[len++] = '/';
-					bcopy(path, buf + len,
-					    strlen(path) + 1);
-				}
-			}
-
-			VN_RELE(pvp);
-		} else
-			ret = ENOENT;
-	} else
+	} else {
 		ret = dirtopath(vrootp, vp, buf, buflen, flags, cr);
+	}
 
 	VN_RELE(vrootp);
 	if (doclose) {

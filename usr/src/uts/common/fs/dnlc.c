@@ -921,50 +921,6 @@ dnlc_fs_purge1(vnodeops_t *vop)
 }
 
 /*
- * Perform a reverse lookup in the DNLC.  This will find the first occurrence of
- * the vnode.  If successful, it will return the vnode of the parent, and the
- * name of the entry in the given buffer.  If it cannot be found, or the buffer
- * is too small, then it will return NULL.  Note that this is a highly
- * inefficient function, since the DNLC is constructed solely for forward
- * lookups.
- */
-vnode_t *
-dnlc_reverse_lookup(vnode_t *vp, char *buf, size_t buflen)
-{
-	nc_hash_t *nch;
-	ncache_t *ncp;
-	vnode_t *pvp;
-
-	if (!doingcache)
-		return (NULL);
-
-	for (nch = nc_hash; nch < &nc_hash[nc_hashsz]; nch++) {
-		mutex_enter(&nch->hash_lock);
-		ncp = nch->hash_next;
-		while (ncp != (ncache_t *)nch) {
-			/*
-			 * We ignore '..' entries since it can create
-			 * confusion and infinite loops.
-			 */
-			if (ncp->vp == vp && !(ncp->namlen == 2 &&
-			    0 == bcmp(ncp->name, "..", 2)) &&
-			    ncp->namlen < buflen) {
-				bcopy(ncp->name, buf, ncp->namlen);
-				buf[ncp->namlen] = '\0';
-				pvp = ncp->dp;
-				/* VN_HOLD 2 of 2 in this file */
-				VN_HOLD_CALLER(pvp);
-				mutex_exit(&nch->hash_lock);
-				return (pvp);
-			}
-			ncp = ncp->hash_next;
-		}
-		mutex_exit(&nch->hash_lock);
-	}
-
-	return (NULL);
-}
-/*
  * Utility routine to search for a cache entry. Return the
  * ncache entry if found, NULL otherwise.
  */
