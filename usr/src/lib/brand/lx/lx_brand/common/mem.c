@@ -253,8 +253,28 @@ lx_madvise(uintptr_t start, uintptr_t len, uintptr_t advice)
 
 		ret = madvise((void *)start, len, advice);
 		if (ret == -1) {
-			if (errno == EBUSY)
+			if (errno == EBUSY) {
+				if (advice != MADV_PURGE)
+					return (-EINVAL);
+
+				/*
+				 * If we got an EBUSY from a MADV_PURGE, we
+				 * will now try again with a MADV_DONTNEED:
+				 * there are conditions (namely, with locked
+				 * mappings that haven't yet been faulted in)
+				 * where MADV_PURGE will fail but MADV_DONTNEED
+				 * will succeed.  If this succeeds, we'll call
+				 * the operation successful; if not, we'll kick
+				 * back EINVAL.
+				 */
+				advice = MADV_DONTNEED;
+
+				if (madvise((void *)start, len, advice) == 0)
+					return (0);
+
 				return (-EINVAL);
+			}
+
 			return (-errno);
 		} else {
 			return (0);
