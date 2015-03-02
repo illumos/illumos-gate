@@ -21,6 +21,7 @@
 
 /*
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright (c) 2015, Joyent, Inc. All rights reserved.
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -57,6 +58,7 @@
 #include <sys/zone.h>
 #include <sys/dnlc.h>
 #include <sys/fs/snode.h>
+#include <sys/brand.h>
 
 /* Controls whether paths are stored with vnodes. */
 int vfs_vnode_path = 1;
@@ -1408,7 +1410,20 @@ notcached:
 
 	pn_free(&pn);
 
-	if (vp->v_type != VDIR) {
+	if (PROC_IS_BRANDED(curproc)) {
+		/*
+		 * If v_path doesn't work out and we're in a branded zone,
+		 * we're not going to bother doing more work here:  because
+		 * directories from the global can be lofs mounted into odd
+		 * locations (e.g., /native in an lx zone), it is likely that
+		 * the DNLC reverse lookup will yield nothing.  Indeed, the
+		 * only certainty is that the DNLC reverse lookup will be
+		 * exceedingly painful; we save ourselves the substantial
+		 * grief of scanning the entire DNLC and kick out with ENOENT
+		 * in this case.
+		 */
+		ret = ENOENT;
+	} else if (vp->v_type != VDIR) {
 		/*
 		 * If we don't have a directory, try to find it in the dnlc via
 		 * reverse lookup.  Once this is found, we can use the regular
