@@ -8178,26 +8178,44 @@ segvn_advise(struct seg *seg, caddr_t addr, size_t len, uint_t behav)
 	amp = svd->amp;
 	vp = svd->vp;
 	if (behav == MADV_FREE || behav == MADV_PURGE) {
-		/*
-		 * MADV_FREE is not supported for segments with
-		 * underlying object; if anonmap is NULL, anon slots
-		 * are not yet populated and there is nothing for
-		 * us to do. As MADV_FREE is advisory, we don't
-		 * return error in either case.
-		 */
-		if ((vp != NULL && behav == MADV_FREE) || amp == NULL) {
+		if (behav == MADV_FREE && (vp != NULL || amp == NULL)) {
+			/*
+			 * MADV_FREE is not supported for segments with an
+			 * underlying object; if anonmap is NULL, anon slots
+			 * are not yet populated and there is nothing for us
+			 * to do. As MADV_FREE is advisory, we don't return an
+			 * error in either case.
+			 */
 			SEGVN_LOCK_EXIT(seg->s_as, &svd->lock);
 			return (0);
+		}
+
+		if (amp == NULL) {
+			/*
+			 * If we're here with a NULL anonmap, it's because we
+			 * are doing a MADV_PURGE.  We have nothing to do, but
+			 * because MADV_PURGE isn't merely advisory, we return
+			 * an error in this case.
+			 */
+			SEGVN_LOCK_EXIT(seg->s_as, &svd->lock);
+			return (EBUSY);
 		}
 
 		segvn_purge(seg);
 
 		page = seg_page(seg, addr);
 		ANON_LOCK_ENTER(&amp->a_rwlock, RW_READER);
-		anon_disclaim(amp, svd->anon_index + page, len, behav);
+		err = anon_disclaim(amp, svd->anon_index + page, len, behav);
 		ANON_LOCK_EXIT(&amp->a_rwlock);
 		SEGVN_LOCK_EXIT(seg->s_as, &svd->lock);
-		return (0);
+
+		/*
+		 * MADV_PURGE and MADV_FREE differ in their return semantics:
+		 * because MADV_PURGE is designed to be bug-for-bug compatible
+		 * with its clumsy Linux forebear, it will fail where MADV_FREE
+		 * does not.
+		 */
+		return (behav == MADV_PURGE ? err : 0);
 	}
 
 	/*

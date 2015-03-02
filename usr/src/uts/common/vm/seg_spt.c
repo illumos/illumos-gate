@@ -2892,7 +2892,7 @@ segspt_shmadvise(struct seg *seg, caddr_t addr, size_t len, uint_t behav)
 		if ((ppa = sptd->spt_ppa) == NULL) {
 			mutex_exit(&sptd->spt_lock);
 			ANON_LOCK_ENTER(&amp->a_rwlock, RW_READER);
-			anon_disclaim(amp, pg_idx, len, behav);
+			(void) anon_disclaim(amp, pg_idx, len, behav);
 			ANON_LOCK_EXIT(&amp->a_rwlock);
 			return (0);
 		}
@@ -2951,7 +2951,7 @@ segspt_shmadvise(struct seg *seg, caddr_t addr, size_t len, uint_t behav)
 		}
 
 		ANON_LOCK_ENTER(&amp->a_rwlock, RW_READER);
-		anon_disclaim(amp, pg_idx, len, behav);
+		(void) anon_disclaim(amp, pg_idx, len, behav);
 		ANON_LOCK_EXIT(&amp->a_rwlock);
 	} else if (lgrp_optimizations() && (behav == MADV_ACCESS_LWP ||
 	    behav == MADV_ACCESS_MANY || behav == MADV_ACCESS_DEFAULT)) {

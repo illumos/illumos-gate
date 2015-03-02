@@ -1669,7 +1669,7 @@ anon_free_pages(
 /*
  * Make anonymous pages discardable
  */
-void
+int
 anon_disclaim(struct anon_map *amp, ulong_t index, size_t size, uint_t behav)
 {
 	spgcnt_t npages = btopr(size);
@@ -1682,6 +1682,7 @@ anon_disclaim(struct anon_map *amp, ulong_t index, size_t size, uint_t behav)
 	ulong_t old_idx, idx, i;
 	struct anon_hdr *ahp = amp->ahp;
 	anon_sync_obj_t cookie;
+	int err = 0;
 
 	VERIFY(behav == MADV_FREE || behav == MADV_PURGE);
 	ASSERT(RW_READ_HELD(&amp->a_rwlock));
@@ -1731,6 +1732,7 @@ anon_disclaim(struct anon_map *amp, ulong_t index, size_t size, uint_t behav)
 			page_unlock(pp);
 			segadvstat.MADV_FREE_miss.value.ul++;
 			anon_array_exit(&cookie);
+			err = EBUSY;
 			continue;
 		}
 
@@ -1812,6 +1814,7 @@ anon_disclaim(struct anon_map *amp, ulong_t index, size_t size, uint_t behav)
 				page_unlock(pp);
 				segadvstat.MADV_FREE_miss.value.ul++;
 				anon_array_exit(&cookie);
+				err = EBUSY;
 				continue;
 			} else {
 				pgcnt = 1;
@@ -1883,6 +1886,8 @@ skiplp:
 			page_unlock(pp);
 		anon_array_exit(&cookie);
 	}
+
+	return (err);
 }
 
 /*

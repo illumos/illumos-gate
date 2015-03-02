@@ -391,7 +391,7 @@ extern int	anon_fill_cow_holes(struct seg *, caddr_t, struct anon_hdr *,
 		    uint_t, struct vpage [], struct cred *);
 extern void	anon_free(struct anon_hdr *, ulong_t, size_t);
 extern void	anon_free_pages(struct anon_hdr *, ulong_t, size_t, uint_t);
-extern void	anon_disclaim(struct anon_map *, ulong_t, size_t, uint_t);
+extern int	anon_disclaim(struct anon_map *, ulong_t, size_t, uint_t);
 extern int	anon_getpage(struct anon **, uint_t *, struct page **,
 		    size_t, struct seg *, caddr_t, enum seg_rw, struct cred *);
 extern int	swap_getconpage(struct vnode *, u_offset_t, size_t,
