@@ -519,6 +519,8 @@ varpd_svp_lookup(void *arg, varpd_query_handle_t *vqh,
 {
 	svp_lookup_t *slp;
 	svp_t *svp = arg;
+	static const uint8_t bcast[6] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
+	static const uint8_t v4mcast[3] = { 0x10, 0x00, 0x53 };
 
 	/*
 	 * Check if this is something that we need to proxy, eg. arp or ndp.
@@ -528,10 +530,26 @@ varpd_svp_lookup(void *arg, varpd_query_handle_t *vqh,
 		return;
 	}
 
-	if (otl->otl_sap == ETHERTYPE_IPV6 &&
-	    otl->otl_dstaddr[0] == 0x33 &&
+	if (otl->otl_dstaddr[0] == 0x33 &&
 	    otl->otl_dstaddr[1] == 0x33) {
-		libvarpd_plugin_proxy_ndp(svp->svp_hdl, vqh, otl);
+		if (otl->otl_sap == ETHERTYPE_IPV6) {
+			libvarpd_plugin_proxy_ndp(svp->svp_hdl, vqh, otl);
+		} else {
+			libvarpd_plugin_query_reply(vqh, VARPD_LOOKUP_DROP);
+		}
+		return;
+	}
+
+	/*
+	 * Watch out for various multicast and broadcast addresses. We've
+	 * already taken care of the IPv6 range above. Now we just need to
+	 * handle broadcast and if the multicast bit is set, lowest bit of the
+	 * first octet of the MAC, then we drop it now.
+	 */
+	if (bcmp(otl->otl_dstaddr, bcast, ETHERADDRL) == 0 ||
+	    (otl->otl_dstaddr[0] & 0x01) == 0x01) {
+		libvarpd_plugin_query_reply(vqh, VARPD_LOOKUP_DROP);
+		return;
 	}
 
 	/*
