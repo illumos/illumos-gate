@@ -22,7 +22,7 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2014 Joyent, Inc.  All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  */
 
 #include <errno.h>
@@ -63,10 +63,13 @@
  */
 
 static int ltos_clock[] = {
-	CLOCK_REALTIME,
-	CLOCK_MONOTONIC,
-	CLOCK_PROCESS_CPUTIME_ID,
-	CLOCK_THREAD_CPUTIME_ID
+	CLOCK_REALTIME,			/* LX_CLOCK_REALTIME */
+	CLOCK_HIGHRES,			/* LX_CLOCK_MONOTONIC */
+	CLOCK_PROCESS_CPUTIME_ID,	/* LX_CLOCK_PROCESS_CPUTIME_ID */
+	CLOCK_THREAD_CPUTIME_ID,	/* LX_CLOCK_THREAD_CPUTIME_ID */
+	CLOCK_HIGHRES,			/* LX_CLOCK_MONOTONIC_RAW */
+	CLOCK_REALTIME,			/* LX_CLOCK_REALTIME_COARSE */
+	CLOCK_HIGHRES			/* LX_CLOCK_MONOTONIC_COARSE */
 };
 
 /*
@@ -78,13 +81,11 @@ static int ltos_timer[] = {
 	CLOCK_REALTIME,
 	CLOCK_REALTIME,
 	CLOCK_THREAD_CPUTIME_ID,	/* XXX thread, not process but fails */
-	CLOCK_THREAD_CPUTIME_ID
+	CLOCK_THREAD_CPUTIME_ID,
+	CLOCK_REALTIME,
+	CLOCK_REALTIME,
+	CLOCK_REALTIME
 };
-
-#define	LX_CLOCK_REALTIME		0
-#define	LX_CLOCK_MONOTONIC		1
-#define	LX_CLOCK_PROCESS_CPUTIME_ID	2
-#define	LX_CLOCK_THREAD_CPUTIME_ID	3
 
 #define	LX_CLOCK_MAX	(sizeof (ltos_clock) / sizeof (ltos_clock[0]))
 #define	LX_TIMER_MAX	(sizeof (ltos_timer) / sizeof (ltos_timer[0]))
@@ -117,81 +118,6 @@ static int ltos_sigev[] = {
 
 #define	LX_SIGEV_MAX	(sizeof (ltos_sigev) / sizeof (ltos_sigev[0]))
 
-static long
-get_cputime(int who, struct timespec *tp)
-{
-	struct timespec ts;
-	struct rusage ru;
-	long ns;
-
-	if (getrusage(who, &ru) != 0)
-		return (-EINVAL);
-
-	ts.tv_sec = ru.ru_utime.tv_sec + ru.ru_stime.tv_sec;
-	ns = (ru.ru_utime.tv_usec + ru.ru_stime.tv_usec) * 1000;
-	if (ns > NANOSEC) {
-		ts.tv_sec += 1;
-		ns -= NANOSEC;
-	}
-	ts.tv_nsec = ns;
-	return ((uucopy(&ts, tp, sizeof (struct timespec)) < 0) ?  -EFAULT : 0);
-}
-
-long
-lx_clock_gettime(int clock, struct timespec *tp)
-{
-	struct timespec ts;
-
-	if (tp == NULL)
-		return (-EFAULT);
-
-	if (clock == LX_CLOCK_PROCESS_CPUTIME_ID) {
-		return (get_cputime(RUSAGE_SELF, tp));
-	} else if (clock == LX_CLOCK_THREAD_CPUTIME_ID) {
-		return (get_cputime(RUSAGE_LWP, tp));
-	}
-
-	if (clock < 0 || clock > LX_CLOCK_MAX)
-		return (-EINVAL);
-
-	if (clock_gettime(ltos_clock[clock], &ts) < 0)
-		return (-errno);
-
-	return ((uucopy(&ts, tp, sizeof (struct timespec)) < 0) ? -EFAULT : 0);
-}
-
-long
-lx_clock_settime(int clock, struct timespec *tp)
-{
-	struct timespec ts;
-
-	if (clock < 0 || clock > LX_CLOCK_MAX)
-		return (-EINVAL);
-
-	if (uucopy(tp, &ts, sizeof (struct timespec)) < 0)
-		return (-EFAULT);
-
-	return ((clock_settime(ltos_clock[clock], &ts) < 0) ? -errno : 0);
-}
-
-long
-lx_clock_getres(int clock, struct timespec *tp)
-{
-	struct timespec ts;
-
-	if (clock < 0 || clock > LX_CLOCK_MAX)
-		return (-EINVAL);
-
-	if (clock_getres(ltos_clock[clock], &ts) < 0)
-		return (-errno);
-
-	/* the timespec pointer is allowed to be NULL */
-	if (tp == NULL)
-		return (0);
-
-	return ((uucopy(&ts, tp, sizeof (struct timespec)) < 0) ? -EFAULT : 0);
-}
-
 long
 lx_clock_nanosleep(int clock, int flags, struct timespec *rqtp,
     struct timespec *rmtp)
@@ -200,7 +126,7 @@ lx_clock_nanosleep(int clock, int flags, struct timespec *rqtp,
 	int err;
 	struct timespec rqt, rmt;
 
-	if (clock < 0 || clock > LX_CLOCK_MAX)
+	if (clock < 0 || clock >= LX_CLOCK_MAX)
 		return (-EINVAL);
 
 	if (uucopy(rqtp, &rqt, sizeof (struct timespec)) < 0)
@@ -252,7 +178,7 @@ lx_timer_create(int clock, struct sigevent *lx_sevp, timer_t *tid)
 	lx_sigevent_t lev;
 	struct sigevent sev;
 
-	if (clock < 0 || clock > LX_TIMER_MAX)
+	if (clock < 0 || clock >= LX_TIMER_MAX)
 		return (-EINVAL);
 
 	/* We have to convert the Linux sigevent layout to the Illumos layout */

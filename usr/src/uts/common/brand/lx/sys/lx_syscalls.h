@@ -37,6 +37,9 @@ extern "C" {
 extern long lx_arch_prctl();
 extern long lx_brk();
 extern long lx_chmod();
+extern long lx_clock_getres();
+extern long lx_clock_gettime();
+extern long lx_clock_settime();
 extern long lx_fchmod();
 extern long lx_fchmodat();
 extern long lx_futex();

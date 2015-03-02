@@ -690,9 +690,9 @@ lx_sysent_t lx_sysent32[] = {
 	{"timer_gettime", NULL,			0,		2}, /* 261 */
 	{"timer_getoverrun", NULL,		0,		1}, /* 262 */
 	{"timer_delete", NULL,			0,		1}, /* 263 */
-	{"clock_settime", NULL,			0,		2}, /* 264 */
-	{"clock_gettime", NULL,			0,		2}, /* 265 */
-	{"clock_getres", NULL,			0,		2}, /* 266 */
+	{"clock_settime", lx_clock_settime,	0,		2}, /* 264 */
+	{"clock_gettime", lx_clock_gettime,	0,		2}, /* 265 */
+	{"clock_getres", lx_clock_getres,	0,		2}, /* 266 */
 	{"clock_nanosleep", NULL,		0,		4}, /* 267 */
 	{"statfs64",	NULL,			0,		2}, /* 268 */
 	{"fstatfs64",	NULL,			0,		2}, /* 269 */
@@ -1024,9 +1024,9 @@ lx_sysent_t lx_sysent64[] = {
 	{"timer_gettime", NULL,			0,		2}, /* 224 */
 	{"timer_getoverrun", NULL,		0,		1}, /* 225 */
 	{"timer_delete", NULL,			0,		1}, /* 226 */
-	{"clock_settime", NULL,			0,		2}, /* 227 */
-	{"clock_gettime", NULL,			0,		2}, /* 228 */
-	{"clock_getres", NULL,			0,		2}, /* 229 */
+	{"clock_settime", lx_clock_settime,	0,		2}, /* 227 */
+	{"clock_gettime", lx_clock_gettime,	0,		2}, /* 228 */
+	{"clock_getres", lx_clock_getres,	0,		2}, /* 229 */
 	{"clock_nanosleep", NULL,		0,		4}, /* 230 */
 	{"exit_group",	NULL,			0,		1}, /* 231 */
 	{"epoll_wait",	NULL,			0,		4}, /* 232 */
