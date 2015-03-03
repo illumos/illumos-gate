@@ -96,7 +96,8 @@ struct brand_ops sn1_brops = {
 #endif
 	NULL,				/* b_restorecontext */
 	NULL,				/* b_sendsig_stack */
-	NULL				/* b_sendsig */
+	NULL,				/* b_sendsig */
+	NULL				/* b_setid_clear */
 };
 
 #ifdef	sparc

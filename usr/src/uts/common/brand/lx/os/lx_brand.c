@@ -168,6 +168,7 @@
 #include <sys/controlregs.h>
 #include <sys/core.h>
 #include <sys/stack.h>
+#include <sys/stat.h>
 #include <lx_signum.h>
 
 int	lx_debug = 0;
@@ -223,6 +224,7 @@ static void lx_sendsig(int);
 #if defined(_SYSCALL32_IMPL)
 static void lx_savecontext32(ucontext32_t *);
 #endif
+static int lx_setid_clear(vattr_t *, cred_t *);
 
 
 /* lx brand */
@@ -261,7 +263,8 @@ struct brand_ops lx_brops = {
 #endif
 	lx_restorecontext,		/* b_restorecontext */
 	lx_sendsig_stack,		/* b_sendsig_stack */
-	lx_sendsig			/* b_sendsig */
+	lx_sendsig,			/* b_sendsig */
+	lx_setid_clear			/* b_setid_clear */
 };
 
 struct brand_mach_ops lx_mops = {
@@ -1234,6 +1237,30 @@ lx_set_kern_version(zone_t *zone, char *vers)
 	lx_zone_data_t *lxzd = (lx_zone_data_t *)zone->zone_brand_data;
 
 	(void) strlcpy(lxzd->lxzd_kernel_version, vers, LX_VERS_MAX);
+}
+
+/*
+ * Linux unconditionally removes the setuid and setgid bits when changing
+ * file ownership.  This brand hook overrides the illumos native behaviour,
+ * which is based on the PRIV_FILE_SETID privilege.
+ */
+static int
+lx_setid_clear(vattr_t *vap, cred_t *cr)
+{
+	if (S_ISDIR(vap->va_mode)) {
+		return (0);
+	}
+
+	if (vap->va_mode & S_ISUID) {
+		vap->va_mask |= AT_MODE;
+		vap->va_mode &= ~S_ISUID;
+	}
+	if ((vap->va_mode & (S_ISGID | S_IXGRP)) == (S_ISGID | S_IXGRP)) {
+		vap->va_mask |= AT_MODE;
+		vap->va_mode &= ~S_ISGID;
+	}
+
+	return (0);
 }
 
 /*

@@ -144,6 +144,7 @@ struct brand_ops {
 	void	(*b_restorecontext)(ucontext_t *);
 	caddr_t	(*b_sendsig_stack)(int);
 	void	(*b_sendsig)(int);
+	int	(*b_setid_clear)(vattr_t *vap, cred_t *cr);
 };
 
 /*

@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013, Joyent, Inc. All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -55,6 +55,7 @@
 #include <sys/mntent.h>
 #include <sys/contract_impl.h>
 #include <sys/dld_ioc.h>
+#include <sys/brand.h>
 
 /*
  * There are two possible layers of privilege routines and two possible
@@ -1243,6 +1244,22 @@ secpolicy_vnode_owner(const cred_t *cr, uid_t owner)
 void
 secpolicy_setid_clear(vattr_t *vap, cred_t *cr)
 {
+	proc_t *p = curproc;
+
+	/*
+	 * Allow the brand to override this behaviour.
+	 */
+	if (PROC_IS_BRANDED(p) && BROP(p)->b_setid_clear != NULL) {
+		/*
+		 * This brand hook will return 0 if handling is complete, or
+		 * some other value if the brand would like us to fall back to
+		 * the usual behaviour.
+		 */
+		if (BROP(p)->b_setid_clear(vap, cr) == 0) {
+			return;
+		}
+	}
+
 	if ((vap->va_mode & (S_ISUID | S_ISGID)) != 0 &&
 	    secpolicy_vnode_setid_retain(cr,
 	    (vap->va_mode & S_ISUID) != 0 &&
@@ -2583,4 +2600,3 @@ secpolicy_hyprlofs_control(const cred_t *cr)
 		return (EPERM);
 	return (0);
 }
-

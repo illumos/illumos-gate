@@ -1054,9 +1054,9 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_readlink,			/*  89: readlink */
 	NULL,				/*  90: chmod */
 	NULL,				/*  91: fchmod */
-	lx_chown,			/*  92: chown */
-	lx_fchown,			/*  93: fchown */
-	lx_lchown,			/*  94: lchown */
+	NULL,				/*  92: chown */
+	NULL,				/*  93: fchown */
+	NULL,				/*  94: lchown */
 	lx_umask,			/*  95: umask */
 	lx_gettimeofday,		/*  96: gettimeofday */
 	lx_getrlimit,			/*  97: getrlimit */
@@ -1222,7 +1222,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_openat,			/* 257: openat */
 	NULL,				/* 258: mkdirat */
 	lx_mknodat,			/* 259: mknodat */
-	lx_fchownat,			/* 260: fchownat */
+	NULL,				/* 260: fchownat */
 	lx_futimesat,			/* 261: futimesat */
 	lx_fstatat64,			/* 262: fstatat64 */
 	lx_unlinkat,			/* 263: unlinkat */
@@ -1309,7 +1309,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_time,			/*  13: time */
 	lx_mknod,			/*  14: mknod */
 	NULL,				/*  15: chmod */
-	lx_lchown16,			/*  16: lchown16 */
+	NULL,				/*  16: lchown16 */
 	NULL,				/*  17: break */
 	NULL,				/*  18: stat */
 	lx_lseek,			/*  19: lseek */
@@ -1388,7 +1388,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_truncate,			/*  92: truncate */
 	lx_ftruncate,			/*  93: ftruncate */
 	NULL,				/*  94: fchmod */
-	lx_fchown16,			/*  95: fchown16 */
+	NULL,				/*  95: fchown16 */
 	lx_getpriority,			/*  96: getpriority */
 	lx_setpriority,			/*  97: setpriority */
 	NULL,				/*  98: profil */
@@ -1475,7 +1475,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_rt_sigsuspend,		/* 179: rt_sigsuspend */
 	lx_pread64,			/* 180: pread64 */
 	lx_pwrite64,			/* 181: pwrite64 */
-	lx_chown16,			/* 182: chown16 */
+	NULL,				/* 182: chown16 */
 	lx_getcwd,			/* 183: getcwd */
 	lx_capget,			/* 184: capget */
 	lx_capset,			/* 185: capset */
@@ -1491,7 +1491,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_stat64,			/* 195: stat64 */
 	lx_lstat64,			/* 196: lstat64 */
 	lx_fstat64,			/* 197: fstat64 */
-	lx_lchown,			/* 198: lchown */
+	NULL,				/* 198: lchown */
 	lx_getuid,			/* 199: getuid */
 	lx_getgid,			/* 200: getgid */
 	lx_geteuid,			/* 201: geteuid */
@@ -1500,12 +1500,12 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_setregid,			/* 204: setregid */
 	lx_getgroups,			/* 205: getgroups */
 	lx_setgroups,			/* 206: setgroups */
-	lx_fchown,			/* 207: fchown */
+	NULL,				/* 207: fchown */
 	NULL,				/* 208: setresuid */
 	lx_getresuid,			/* 209: getresuid */
 	NULL,				/* 210: setresgid */
 	lx_getresgid,			/* 211: getresgid */
-	lx_chown,			/* 212: chown */
+	NULL,				/* 212: chown */
 	lx_setuid,			/* 213: setuid */
 	lx_setgid,			/* 214: setgid */
 	lx_setfsuid,			/* 215: setfsuid */
@@ -1591,7 +1591,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_openat,			/* 295: openat */
 	NULL,				/* 296: mkdirat */
 	lx_mknodat,			/* 297: mknodat */
-	lx_fchownat,			/* 298: fchownat */
+	NULL,				/* 298: fchownat */
 	lx_futimesat,			/* 299: futimesat */
 	lx_fstatat64,			/* 300: fstatat64 */
 	lx_unlinkat,			/* 301: unlinkat */
