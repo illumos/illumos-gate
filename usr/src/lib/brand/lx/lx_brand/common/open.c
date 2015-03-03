@@ -22,7 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2014 Joyent, Inc.  All rights reserved.
+ * Copyright 2015 Joyent, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -180,7 +180,7 @@ lx_open(uintptr_t p1, uintptr_t p2, uintptr_t p3)
 	if (p2 & LX_O_DIRECTORY) {
 		struct stat64 statbuf;
 
-		if (lstat64(path, &statbuf) < 0) {
+		if (stat64(path, &statbuf) < 0) {
 			return (-errno);
 		}
 
