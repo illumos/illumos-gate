@@ -34,10 +34,10 @@ include ../../Makefile.rootfs
 
 # These *BASE paths are used ONLY at build time to locate headers.
 # This builds against Apache 2.2 but the module should work with
-# any Apache 2.x version
+# any Apache 2.x version, and APR 1.3 or later.
 APACHEBASE =	/usr/apache2/2.2
-APR_BASE =	/usr/apr
-APRUBASE =	/usr/apr-util
+APR_BASE =	/usr/apr/1.3
+APRUBASE =	/usr/apr-util/1.3
 
 IPPCONFDIR =	$(ROOT)/etc/lp/ipp
 IPPLIBDIR =	$(ROOT)/usr/lib/lp/ipp
