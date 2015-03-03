@@ -399,7 +399,7 @@ file path=etc/nsswitch.files group=sys
 file path=etc/nsswitch.ldap group=sys
 file path=etc/pam.conf group=sys preserve=true
 file path=etc/passwd group=sys preserve=true
-file path=etc/profile group=sys preserve=true
+file path=etc/profile group=sys preserve=renamenew
 file path=etc/project group=sys preserve=true
 file path=etc/rc2.d/README group=sys
 file path=etc/rc3.d/README group=sys
