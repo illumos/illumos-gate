@@ -24,6 +24,8 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2015 Nexenta Systems, Inc.
+#
 
 . $STF_SUITE/include/libtest.shlib
 
@@ -34,21 +36,13 @@
 #
 # STRATEGY:
 #
-# 1. Create a snapshot and a zvol
-# 2. Verify that we can't set the bootfs to those datasets
+# 1. Create a zvol 
+# 2. Verify that we can't set the bootfs to that dataset
 #
 
 verify_runnable "global"
 
 function cleanup {
-	if snapexists $TESTPOOL/$TESTFS@snap
-	then
-		$ZFS destroy $TESTPOOL/$TESTFS@snap
-	fi
-	if datasetexists $TESTPOOL/$TESTFS
-	then
-		log_must $ZFS destroy $TESTPOOL/$TESTFS
-	fi
 	if datasetexists $TESTPOOL/vol
 	then
 		log_must $ZFS destroy $TESTPOOL/vol
@@ -56,6 +50,9 @@ function cleanup {
 	if poolexists $TESTPOOL
 	then
 		log_must $ZPOOL destroy $TESTPOOL
+	fi
+	if [[ -f $VDEV ]]; then
+		log_must $RM -f $VDEV
 	fi
 }
 
@@ -69,14 +66,12 @@ fi
 log_assert "Invalid datasets are rejected as boot property values"
 log_onexit cleanup
 
-DISK=${DISKS%% *}
+typeset VDEV=/bootfs_002_neg_a.$$.dat
 
-log_must $ZPOOL create $TESTPOOL $DISK
-log_must $ZFS create $TESTPOOL/$TESTFS
-log_must $ZFS snapshot $TESTPOOL/$TESTFS@snap
+log_must $MKFILE 400m $VDEV
+create_pool "$TESTPOOL" "$VDEV"
 log_must $ZFS create -V 10m $TESTPOOL/vol
 
-log_mustnot $ZPOOL set bootfs=$TESTPOOL/$TESTFS@snap $TESTPOOL
 log_mustnot $ZPOOL set bootfs=$TESTPOOL/vol $TESTPOOL
 
 log_pass "Invalid datasets are rejected as boot property values"
