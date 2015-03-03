@@ -918,15 +918,6 @@ lx_inotify_rm_watch(int fd, int wd)
 }
 
 long
-lx_lchown(const char *path, uid_t owner, gid_t group)
-{
-	int r;
-
-	r = lchown(path, owner, group);
-	return ((r == -1) ? -errno : r);
-}
-
-long
 lx_mincore(caddr_t addr, size_t len, char *vec)
 {
 	int r;
