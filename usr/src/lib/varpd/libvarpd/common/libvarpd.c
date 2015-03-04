@@ -345,7 +345,8 @@ static void
 libvarpd_init(void)
 {
 	libvarpd_plugin_init();
-	if (pthread_atfork(NULL, libvarpd_prefork, libvarpd_postfork) != 0)
+	if (pthread_atfork(libvarpd_prefork, libvarpd_postfork,
+	    libvarpd_postfork) != 0)
 		libvarpd_panic("failed to create varpd atfork: %d", errno);
 }
 
