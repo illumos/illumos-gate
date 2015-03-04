@@ -241,7 +241,7 @@ dladm_overlay_activate_cb(dladm_handle_t handle, datalink_id_t linkid,
 		return (DLADM_WALK_CONTINUE);
 
 	if (size == 0)
-		(void) dladm_errlist_append(errs, "unset required propert: %s",
+		(void) dladm_errlist_append(errs, "unset required property: %s",
 		    name);
 
 	return (DLADM_WALK_CONTINUE);
