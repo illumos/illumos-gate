@@ -45,7 +45,6 @@ setup_net()
             printf("# network       Bring up/down networking\n#\n")
 	    printf("### BEGIN INIT INFO\n");
 	    printf("# Provides: $network\n");
-	    printf("# Should-Start: iptables ip6tables\n");
 	    printf("# Short-Description: Bring up/down networking\n");
 	    printf("# Description: Bring up/down networking\n");
 	    printf("### END INIT INFO\n\n");
@@ -159,79 +158,88 @@ setup_net()
 }
 
 #
+# Before doing anything else, make sure some Centos-specific dirs are safe.
+# /etc/init.d is normally a symlink so we can't easily tell if it's safe so
+# check rc.d/init.d instead.
+#
+safe_dir /etc/sysconfig
+safe_dir /etc/rc.d
+safe_dir /etc/rc.d/init.d
+safe_dir /etc/rc.d/rc0.d
+safe_dir /etc/rc.d/rc1.d
+safe_dir /etc/rc.d/rc2.d
+safe_dir /etc/rc.d/rc3.d
+safe_dir /etc/rc.d/rc4.d
+safe_dir /etc/rc.d/rc5.d
+safe_dir /etc/rc.d/rc6.d
+safe_opt_dir /etc/selinux
+
+#
 # The default /etc/inittab might spawn mingetty on each of the virtual consoles
 # as well as xdm on the X console.  Since we don't have virtual consoles nor
 # an X console, spawn a single mingetty on /dev/console instead.
 #
 # Don't bother changing the file if it looks like we already did.
 #
-if ! egrep -s "Modified by lx brand" $ZONEROOT/etc/inittab; then
+fnm=$ZONEROOT/etc/inittab
+if ! egrep -s "Modified by lx brand" $fnm; then
 	sed 's/^[1-6]:/# Disabled by lx brand: &/
 	    s/^id:5:initdefault:/id:3:initdefault: &/' \
-	    $ZONEROOT/etc/inittab > $tmpfile
+	    $fnm > $tmpfile
 	echo "# Modified by lx brand" >> $tmpfile
 
-	#
-	# Attempt to save off the original inittab
-	# before moving over the modified version.
-	#
-	mv -f $ZONEROOT/etc/inittab $ZONEROOT/etc/inittab.$tag 2>/dev/null
-	mv -f $tmpfile $ZONEROOT/etc/inittab
-	chmod 644 $ZONEROOT/etc/inittab
+	if [[ ! -h $fnm ]]; then
+		mv -f $tmpfile $fnm
+		chmod 644 $fnm
+	fi
 fi
 
 #
-# We use our own way of bringing up networking, so don't let the init system
-# try.
+# Ensure svcs depending on $network will start.
 #
-
-mv -f $ZONEROOT/etc/sysconfig/network $ZONEROOT/etc/sysconfig/network.$tag \
-    2>/dev/null
-
-cat > $ZONEROOT/etc/sysconfig/network <<- EOF
-	NETWORKING="no"
-	#
-	# To enable networking, change the "no" above to "yes" and
-	# uncomment and fill in the following parameters.
-	#
-	# If you are specifying a hostname by name rather than by IP address,
-	# be sure the system can resolve the name properly via the use of a
-	# name service and/or the proper name files, as specified by
-	# nsswitch.conf.  See nsswitch.conf(5) for further details.
-	#
-	# HOSTNAME=your_hostname_here
-	#
-EOF
+fnm=$ZONEROOT/etc/sysconfig/network
+if ! egrep -s "NETWORKING=yes" $fnm; then
+	if [[ ! -h $fnm ]]; then
+		cat > $fnm <<- EOF
+		NETWORKING=yes
+		HOSTNAME=$ZONENAME
+		EOF
+	fi
+fi
 
 #
 # SELinux must be disabled otherwise we won't get past init.
 #
-egrep -s "^SELINUX=enforcing|^SELINUX=permissive" $ZONEROOT/etc/selinux/config
-if [[ $? -eq 0 ]]; then
+fnm=$ZONEROOT/etc/selinux/config
+if egrep -s "^SELINUX=enforcing|^SELINUX=permissive" $fnm; then
 	tmpfile=/tmp/selinux_config.$$
 
-	sed 's/^SELINUX=.*$/SELINUX=disabled/' \
-	    $ZONEROOT/etc/selinux/config > $tmpfile
-
-	mv -f $ZONEROOT/etc/selinux/config \
-	    $ZONEROOT/etc/selinux/config.$tag 2>/dev/null
-	mv -f $tmpfile $ZONEROOT/etc/selinux/config
-	chmod 644 $ZONEROOT/etc/selinux/config
+	sed 's/^SELINUX=.*$/SELINUX=disabled/' $fnm > $tmpfile
+	if [[ ! -h $fnm ]]; then
+		mv -f $tmpfile $fnm
+		chmod 644 $fnm
+	fi
 fi
 
 #
 # /etc/rc.d/init.d/keytable tries to load a physical keyboard map, which won't
 # work in a zone. If we remove etc/sysconfig/keyboard, it won't try this at all.
 #
-mv -f $ZONEROOT/etc/sysconfig/keyboard $ZONEROOT/etc/sysconfig/keyboard.$tag \
-    2>/dev/null
+fnm=$ZONEROOT/etc/sysconfig/keyboard
+if [[ ! -h $fnm ]]; then
+	rm -f $ZONEROOT/etc/sysconfig/keyboard
+fi
+
+# The Centos init uses a combination of traditional rc-style service
+# definitions and upstart-style definitions.
 
 #
-# The following scripts attempt to start services or otherwise configure
-# the system in ways incompatible with zones, so don't execute them at boot
-# time.
+# The following rc-style scripts attempt to start services or otherwise
+# configure the system in ways incompatible with zones, so don't execute them
+# at boot time.
 #
 unsupported_rc_services="
+	acpid
 	auditd
 	gpm
 	hpoj
@@ -241,22 +249,26 @@ unsupported_rc_services="
 	irqbalance
 	iscsi
 	isdn
+	kdump
 	kudzu
 	mdmpd
 	mdmonitor
 	microcode_ctl
 	netdump
+	ntpd
+	ntpdate
 	pcmcia
 	psacct
+	quota_nld
 	random
 	rawdevices
 	smartd
 "
 
 for file in $unsupported_rc_services; do
-	if [[ -a "$ZONEROOT/etc/rc.d/init.d/$file" ]]; then
-		mv -f "$ZONEROOT/etc/rc.d/init.d/$file" \
-		    "$ZONEROOT/etc/rc.d/init.d/$file.$tag"
+	fnm=$ZONEROOT/etc/rc.d/init.d/$file
+	if [[ ! -h $fnm ]]; then
+		rm -f $fnm
 	fi
 
 	rc_files="$(echo $ZONEROOT/etc/rc.d/rc[0-6].d/[SK]+([0-9])$file)"
@@ -264,7 +276,9 @@ for file in $unsupported_rc_services; do
 	if [[ "$rc_files" != \
 	    "$ZONEROOT/etc/rc.d/rc[0-6].d/[SK]+([0-9])$file" ]]; then
 		for file in $rc_files; do
-			rm -f "$file"
+			if [[ ! -h "$file" ]]; then
+				rm -f "$file"
+			fi
 		done
 	fi
 done
@@ -273,18 +287,21 @@ disable_svc()
 {
 	# XXX - TBD does this work like on Ubuntu?
 	#
-	# fnm=$ZONEROOT/etc/init/$1.override
-	# [[ -h $fnm || -f $fnm ]] && return
-	# echo "manual" > $fnm
+	fnm=$ZONEROOT/etc/init/$1.override
+	[[ -h $fnm || -f $fnm ]] && return
+	echo "manual" > $fnm
 
-	fnm=$ZONEROOT/etc/init/$1.conf
-	rm -f $fnm
+	# fnm=$ZONEROOT/etc/init/$1.conf
+	# if [[ ! -h $fnm ]]; then
+	#	rm -f $fnm
+	# fi
 }
 
-RMSVCS="ttyS0"
+RMSVCS="control-alt-delete
+	ttyS0"
 
 #
-# Now customize upstart
+# Now customize upstart services
 #
 
 for f in $RMSVCS
@@ -303,7 +320,7 @@ if [[ ! -f $ZONEROOT/etc/init/tty.override ]]; then
 	respawn
 	instance console
 	exec /sbin/mingetty console
-EOF
+	EOF
 fi
 
 if [[ ! -f $ZONEROOT/etc/init/start-ttys.override ]]; then
@@ -317,7 +334,7 @@ if [[ ! -f $ZONEROOT/etc/init/start-ttys.override ]]; then
 	script
 		initctl start tty
 	end script
-EOF
+	EOF
 fi
 
 #
@@ -327,17 +344,16 @@ fi
 #
 # Don't bother to modify the file if it looks like we already did.
 #
-if ! egrep -s "Disabled by lx brand" $ZONEROOT/etc/rc.d/init.d/halt; then
+fnm=$ZONEROOT/etc/rc.d/init.d/halt
+if ! egrep -s "Disabled by lx brand" $fnm; then
 	awk 'BEGIN {skip = ""}
 	    /^# Save mixer/ {skip = "# Disabled by lx brand: "}
 	    /halt.local/ {skip = ""}
-	    /./ {print skip $0}' $ZONEROOT/etc/rc.d/init.d/halt > /tmp/halt.$$
+	    /./ {print skip $0}' $fnm > /tmp/halt.$$
 
-	if [[ $? -eq 0 ]]; then
-		mv -f $ZONEROOT/etc/rc.d/init.d/halt \
-		    $ZONEROOT/etc/rc.d/init.d/halt.$tag 2>/dev/null
-		mv -f /tmp/halt.$$ $ZONEROOT/etc/rc.d/init.d/halt
-		chmod 755 $ZONEROOT/etc/rc.d/init.d/halt
+	if [[ $? -eq 0 && ! -h $fnm ]]; then
+		mv -f /tmp/halt.$$ $fnm
+		chmod 755 $fnm
 	fi
 fi
 
@@ -360,7 +376,8 @@ fi
 #
 # Don't modify the rc.sysinit file if it looks like we already did.
 #
-if ! egrep -s "Disabled by lx brand" $ZONEROOT/etc/rc.d/rc.sysinit; then
+fnm=$ZONEROOT/etc/rc.d/rc.sysinit
+if ! egrep -s "Disabled by lx brand" $fnm; then
 	tmpfile=/tmp/lx_rc.sysinit.$$
 
 	sed 's@^/sbin/hwclock@# Disabled by lx brand: &@
@@ -369,16 +386,12 @@ if ! egrep -s "Disabled by lx brand" $ZONEROOT/etc/rc.d/rc.sysinit; then
 	    s@^dmesg -s@# Disabled by lx brand: &@
 	    s@initlog -c \"fsck@: # Disabled by lx brand: &@
 	    s@^.*mount .* /dev/pts$@# Disabled by lx brand: &@' \
-	    $ZONEROOT/etc/rc.d/rc.sysinit > $tmpfile
+	    $fnm > $tmpfile
 
-	#
-	# Attempt to save off the original rc.sysinit
-	# before moving over the modified version.
-	#
-	mv -f $ZONEROOT/etc/rc.d/rc.sysinit \
-	    $ZONEROOT/etc/rc.d/rc.sysinit.$tag 2>/dev/null
-	mv -f $tmpfile $ZONEROOT/etc/rc.d/rc.sysinit
-	chmod 755 $ZONEROOT/etc/rc.d/rc.sysinit
+	if [[ ! -h $fnm ]]; then
+		mv -f $tmpfile $fnm
+		chmod 755 $fnm
+	fi
 fi
 
 
