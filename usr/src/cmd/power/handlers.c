@@ -1116,7 +1116,7 @@ sfpath(void)
 	char diskname[256];
 	struct stat stbuf;
 	int dir = 0;
-	dev_t dev;
+	dev_t dev = NODEV;
 
 	if (statefile) {
 		mesg(MERR, "ignored redundant statefile entry\n");
