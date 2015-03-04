@@ -1059,10 +1059,11 @@ vnode_valid_pn(vnode_t *vp, vnode_t *vrootp, pathname_t *pn, pathname_t *rpn,
 		    vnode_match(vp, compvp, cr)) {
 			VN_RELE(compvp);
 			return (0);
+		} else {
+			VN_RELE(compvp);
 		}
 	}
 
-	VN_RELE(compvp);
 	return (1);
 }
 
