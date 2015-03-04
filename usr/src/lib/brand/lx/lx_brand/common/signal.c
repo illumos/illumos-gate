@@ -280,30 +280,6 @@ struct lx_oldsigstack {
  */
 static lx_sighandlers_t lx_sighandlers;
 
-#if defined(_LP64)
-struct lx_vsyscall
-{
-	uintptr_t lv_addr;
-	uintptr_t lv_scnum;
-	char *lv_msg;
-} lx_vsyscalls[] = {
-	{LX_VSYS_gettimeofday, LX_SYS_gettimeofday,
-	    "vsyscall gettimeofday(%p, %p)" },
-	{LX_VSYS_time, LX_SYS_time, "vsyscall time(%p)" },
-	{LX_VSYS_getcpu, LX_SYS_getcpu, "vsyscall getcpu(%p, %lx, %lx)" },
-	{NULL, NULL, NULL}
-};
-
-/*
- * Because of the odd SIGSEGV handling required to support vsyscall emulation,
- * there are situations where the lx interposition handler will need to defer a
- * SIGSEGV on behalf of the user process.  This is performed by tracking depth
- * of potential SIGSEGV recursion.
- */
-static int lx_sigsegv_depth = 0;
-
-#endif
-
 /*
  * Setting LX_NO_ABORT_HANDLER in the environment will prevent the emulated
  * Linux program from modifying the signal handling disposition for SIGSEGV or
@@ -764,18 +740,6 @@ lx_sigprocmask_common(uintptr_t how, uintptr_t l_setp, uintptr_t l_osetp,
 		if (err != 0)
 			return (err);
 
-#if defined(_LP64)
-		/*
-		 * To assure that vsyscall operates correctly, we must never
-		 * block SIGSEGV.  (Fortunately, SIGSEGV is a synchronous
-		 * signal for which the default disposition is to nuke the
-		 * process -- it would be hard for a correctly-written program
-		 * to rely upon its ability to block SIGSEGV.)
-		 */
-		if (how == SIG_BLOCK || how == SIG_SETMASK)
-			sigdelset(s_setp, SIGSEGV);
-#endif
-
 	}
 
 	s_osetp = (l_osetp ? &oset : NULL);
@@ -1119,12 +1083,6 @@ lx_rt_sigreturn(void)
 #if defined(_LP64)
 	lx_ucp = &lx_ssp->uc;
 
-	/* Track SIGSEGV recursion depth for vsyscall */
-	if (lx_ssp->si.lsi_signo == LX_SIGSEGV) {
-		assert(lx_sigsegv_depth > 0);
-		--lx_sigsegv_depth;
-	}
-
 	/*
 	 * General register layout is completely different.
 	 */
@@ -1447,88 +1405,6 @@ lx_call_user_handler(int sig, siginfo_t *sip, void *p)
 
 	lxsap = &lx_sighandlers.lx_sa[lx_sig];
 	lx_debug("lxsap @ 0x%p", lxsap);
-
-	/*
-	 * Emulate vsyscall support.
-	 *
-	 * Linux magically maps a single page into the address space of each
-	 * process, allowing them to make 'vsyscalls'.  Originally designed to
-	 * counteract the perceived overhead of regular system calls, vsyscalls
-	 * were implemented as code residing in userspace which could be
-	 * called directly.  To do so, user processes call into the static
-	 * offset corresponding to one of the three vsyscalls supported by the
-	 * mechanism.  The userspace implementations of these vsyscalls which
-	 * once occupied that page have now been replaced by instructions which
-	 * vector into the normal syscall path.  Any performance benefit which
-	 * was present on older microprocessers has long since been erased.
-	 * (vsyscalls are now slower than their syscall counterparts.)
-	 * Additionally, the unconventional manner by which vsyscalls are
-	 * accessed has a tendency to confuse some debuggers, further reducing
-	 * platform observability.
-	 *
-	 * Implementing vsyscall on Illumos is somewhat complicated by the fact
-	 * that the required static address resides inside the kernel address
-	 * space.  Rather than going to potential extremes to statically map a
-	 * user-accessible page into the KAS, a different approach is taken.
-	 * The vsyscall gate can be emulated by intercepting SIGSEGVs and
-	 * inspecting the associated context to detect user calls to those
-	 * known addresses.
-	 */
-#if defined(_LP64)
-	if (sig == SIGSEGV) {
-		int i;
-		for (i = 0; lx_vsyscalls[i].lv_addr != NULL; i++) {
-			extern void lx_vsyscall_tramp(void);
-			uintptr_t addr = (uintptr_t)sip->si_addr;
-
-			if (lx_vsyscalls[i].lv_addr != addr)
-				continue;
-
-			/*
-			 * Users of vsyscall must commit fully by using
-			 * jmp/call access the vsyscall.  Cowardly reading data
-			 * from the page beforehand isn't allowed or possible.
-			 */
-			if (addr != LX_REG(ucp, REG_PC))
-				continue;
-
-			lx_debug(lx_vsyscalls[i].lv_msg, LX_REG(ucp, REG_RDI),
-			    LX_REG(ucp, REG_RSI), LX_REG(ucp, REG_RDX));
-
-			/*
-			 * Modify the interrupted context so that, on return
-			 * from the signal handler, the kernel revectors this
-			 * LWP to the vsyscall trampoline.  That trampoline
-			 * will immediately invoke the "syscall" instruction
-			 * and returns to the address on the stack when
-			 * complete.
-			 */
-			LX_REG(ucp, REG_R0) = lx_vsyscalls[i].lv_scnum;
-			LX_REG(ucp, REG_PC) = (uintptr_t)&lx_vsyscall_tramp;
-			lx_debug("\treturning from signal handler\n");
-			return;
-		}
-
-		/*
-		 * Because a SIGSEGV handler must be maintained at all times on
-		 * 64bit for vsyscall emulation, there are certain cases
-		 * where a SIGSEGV is ignored or forces an exit.
-		 */
-		if (lxsap->lxsa_handler == SIG_IGN &&
-		    sip->si_code == SI_USER) {
-			/* Safely ignore a user-sent signal */
-			return;
-		} else if (lxsap->lxsa_handler == SIG_DFL ||
-		    lxsap->lxsa_handler == SIG_IGN ||
-		    ((lxsap->lxsa_flags & LX_SA_NODEFER) == 0 &&
-		    lx_sigsegv_depth > 0)) {
-			(void) syscall(SYS_brand, B_EXIT_AS_SIG, SIGSEGV);
-			assert(0);
-		} else {
-			++lx_sigsegv_depth;
-		}
-	}
-#endif
 
 	if ((sig == SIGPWR) && (lxsap->lxsa_handler == SIG_DFL)) {
 		/*
@@ -1989,31 +1865,12 @@ lx_sigaction_common(int lx_sig, struct lx_sigaction *lxsp,
 
 				/*
 				 * RESETHAND cannot be used be passed through
-				 * for several of the syscalls.
-				 * - SIGPWR:	Due to different default actions
-				 * 		between Linux and Illumos.
-				 * - SIGSEGV:	Due to being used for vsyscall
-				 * 		emulation on 64bit.
+				 * for SIGPWR due to different default actions
+				 * between Linux and Illumos.
 				 */
-#if defined(_LP64)
-				if ((sig != SIGPWR && sig != SIGSEGV) &&
-				    (lxsa.lxsa_flags & LX_SA_RESETHAND))
-					sa.sa_flags |= SA_RESETHAND;
-#else
 				if ((sig != SIGPWR) &&
 				    (lxsa.lxsa_flags & LX_SA_RESETHAND))
 					sa.sa_flags |= SA_RESETHAND;
-#endif
-
-				/*
-				 * NODEFER is required for proper vsyscall
-				 * emulation in case a vsyscall is made during
-				 * the user's SEGV handler.
-				 */
-#if defined(_LP64)
-				if (sig == SIGSEGV)
-					sa.sa_flags |= SA_NODEFER;
-#endif
 
 				if (ltos_sigset(&lxsa.lxsa_mask,
 				    &sa.sa_mask) != 0) {
@@ -2022,15 +1879,6 @@ lx_sigaction_common(int lx_sig, struct lx_sigaction *lxsp,
 					    NULL);
 					return (-err);
 				}
-
-#if defined(_LP64)
-				/*
-				 * To assure that vsyscall can operate properly
-				 * from within signal handlers, we (implicitly)
-				 * disallow blocking SEGV in any signal handler.
-				 */
-				sigdelset(&sa.sa_mask, SIGSEGV);
-#endif
 
 				lx_debug("interposing handler @ 0x%p for "
 				    "signal %d (lx %d), flags 0x%x",
@@ -2046,16 +1894,6 @@ lx_sigaction_common(int lx_sig, struct lx_sigaction *lxsp,
 					    NULL);
 					return (-err);
 				}
-#if defined(_LP64)
-			} else if (sig == SIGSEGV) {
-				/*
-				 * If user code attempts to set SIGSEGV to
-				 * SIG_IGN or SIG_DFL, the interposing handler
-				 * is still required to handle vsyscalls.
-				 */
-				lx_debug("interposing handler maintained "
-				    "for SIGSEGV");
-#endif
 			} else if ((sig != SIGPWR) ||
 			    ((sig == SIGPWR) &&
 			    (lxsa.lxsa_handler == SIG_IGN))) {
@@ -2266,13 +2104,6 @@ lx_siginit(void)
 
 	if (sigaction(SIGPWR, &sa, NULL) < 0)
 		lx_err_fatal("sigaction(SIGPWR) failed: %s", strerror(errno));
-
-	/* SIGSEGV handler is needed for vsyscall emulation */
-#if defined(_LP64)
-	sa.sa_flags |= SA_NODEFER;
-	if (sigaction(SIGSEGV, &sa, NULL) < 0)
-		lx_err_fatal("sigaction(SIGSEGV) failed: %s", strerror(errno));
-#endif
 
 	/*
 	 * Illumos' libc forces certain register values in the ucontext_t

@@ -216,6 +216,7 @@ static int lx_elfexec(struct vnode *vp, struct execa *uap, struct uarg *args,
 
 static boolean_t lx_native_exec(uint8_t, const char **);
 static uint32_t lx_map32limit(proc_t *);
+static int lx_issig_stop(proc_t *, klwp_t *);
 
 static void lx_savecontext(ucontext_t *);
 static void lx_restorecontext(ucontext_t *);
@@ -446,6 +447,22 @@ lx_lwp_set_native_stack_current(lx_lwp_data_t *lwpd, uintptr_t new_sp)
 	    uintptr_t, lwpd->br_ntv_stack);
 
 	lwpd->br_ntv_stack_current = new_sp;
+}
+
+
+static int
+lx_issig_stop(proc_t *p, klwp_t *lwp)
+{
+#if defined(_LP64)
+	/* Check first for vsyscalls (on 64bit) */
+	if (lwp_getdatamodel(lwp) == DATAMODEL_NATIVE &&
+	    lx_vsyscall_issig_stop(p, lwp) != 0) {
+		return (-1);
+	}
+#endif
+
+	/* Do ptrace signal handling as well */
+	return (lx_ptrace_issig_stop(p, lwp));
 }
 
 /*
