@@ -100,6 +100,19 @@ int lx_nsysent32;
  */
 int lx_stol_errno[] = LX_STOL_ERRNO_INIT;
 
+#if defined(_LP64)
+struct lx_vsyscall
+{
+	uintptr_t lv_addr;
+	uintptr_t lv_scnum;
+} lx_vsyscalls[] = {
+	{ LX_VSYS_gettimeofday, LX_SYS_gettimeofday },
+	{ LX_VSYS_time, LX_SYS_time },
+	{ LX_VSYS_getcpu, LX_SYS_getcpu },
+	{ NULL, NULL }
+};
+#endif
+
 #if defined(__amd64)
 static int
 lx_emulate_args(klwp_t *lwp, const lx_sysent_t *s, uintptr_t *args)
@@ -420,6 +433,107 @@ lx_syscall_enter(void)
 		return (0);
 	}
 }
+
+#if defined(_LP64)
+/*
+ * Emulate vsyscall support.
+ *
+ * Linux magically maps a single page into the address space of each process,
+ * allowing them to make 'vsyscalls'.  Originally designed to counteract the
+ * perceived overhead of regular system calls, vsyscalls were implemented as
+ * code residing in userspace which could be called directly.  The userspace
+ * implementations of these vsyscalls which have now been replaced by
+ * instructions which vector into the normal syscall path.
+ *
+ * Implementing vsyscalls on Illumos is complicated by the fact that the
+ * required static address region resides inside the kernel address space.
+ * Rather than mapping a user-accessible page into the KAS, a different
+ * approach is taken.  The vsyscall gate is emulated by intercepting SIGSEGVs
+ * and inspecting the context to detect calls to those specific addresses.
+ */
+
+static int
+lx_vsyscall_call(proc_t *p, klwp_t *lwp, uintptr_t scnum)
+{
+	struct regs *rp = lwptoregs(lwp);
+	uintptr_t raddr;
+	/* Fetch the return address */
+	if (uread(p, &raddr, sizeof (raddr), rp->r_rsp) != 0) {
+		/*
+		 * Alter the siginfo to indicate %rsp as the failed address if
+		 * the return address cannot be read off the stack.  Little
+		 * sympathy will be afforded to those making vsyscalls on a
+		 * bad stack.
+		 */
+		lwp->lwp_curinfo->sq_info.si_addr = (void *)rp->r_rsp;
+		return (-1);
+	}
+
+	/* Clean up remnants of the SIGSEGV */
+	lwp->lwp_cursig = 0;
+	lwp->lwp_extsig = 0;
+	siginfofree(lwp->lwp_curinfo);
+	lwp->lwp_curinfo = NULL;
+
+	DTRACE_PROBE1(brand__lx__vsyscall, int, (int)scnum);
+
+	/* Simulate vectoring into the syscall */
+	rp->r_rax = scnum;
+	rp->r_rip = raddr;
+	rp->r_rsp += sizeof (uintptr_t);
+
+	mutex_exit(&p->p_lock);
+	lx_syscall_enter();
+	mutex_enter(&p->p_lock);
+
+	return (0);
+}
+
+int
+lx_vsyscall_issig_stop(proc_t *p, klwp_t *lwp)
+{
+	uintptr_t addr;
+	struct regs *rp = lwptoregs(lwp);
+	lx_lwp_data_t *lwpd = lwptolxlwp(lwp);
+	int i;
+
+	VERIFY(MUTEX_HELD(&p->p_lock));
+	if (lwp->lwp_cursig != SIGSEGV || lwp->lwp_curinfo == NULL ||
+	    lwpd->br_stack_mode != LX_STACK_MODE_BRAND) {
+		return (0);
+	}
+
+	addr = (uintptr_t)lwp->lwp_curinfo->sq_info.si_addr;
+	if (addr < LX_VSYSCALL_ADDR ||
+	    addr >= (LX_VSYSCALL_ADDR + LX_VSYSCALL_SIZE)) {
+		/* Ignore faults outside vsyscall page */
+		return (0);
+	}
+	for (i = 0; lx_vsyscalls[i].lv_addr != NULL; i++) {
+		if (addr != lx_vsyscalls[i].lv_addr)
+			continue;
+		/*
+		 * Users of vsyscall must commit fully by using jmp/call to
+		 * access the vsyscall.  Cowardly reading data from the page
+		 * beforehand isn't allowed or possible.
+		 */
+		if (addr != rp->r_rip)
+			continue;
+
+		if (lx_vsyscall_call(p, lwp, lx_vsyscalls[i].lv_scnum) == 0) {
+			return (-1);
+		} else {
+			/*
+			 * If we were unable to vector into the vsyscall, let
+			 * processing of this signal continue as normal.
+			 */
+			break;
+		}
+	}
+	lx_unsupported("bad vsyscall access");
+	return (0);
+}
+#endif
 
 /*
  * Linux defines system call numbers for 32-bit x86 in the file:

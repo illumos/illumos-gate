@@ -40,10 +40,6 @@ void
 lx_rt_sigreturn_tramp(void)
 {}
 
-void
-lx_vsyscall_tramp(void)
-{}
-
 #else	/* lint */
 
 	/*
@@ -55,18 +51,5 @@ lx_vsyscall_tramp(void)
 	movq	$LX_SYS_rt_sigreturn, %rax
 	syscall
 	SET_SIZE(lx_rt_sigreturn_tramp)
-
-	/*
-	 * Before calling to a vsyscall address, the system call arguments
-	 * are loaded into the usual registers by the emulated program.  The
-	 * brand SIGSEGV handler detects a jump to these addresses and modifies
-	 * the interrupted context to restart at this trampoline with %rax set
-	 * to the intended system call number.  When the system call returns,
-	 * we return to the address on the stack from the original call.
-	 */
-	ENTRY_NP(lx_vsyscall_tramp)
-	syscall
-	ret
-	SET_SIZE(lx_vsyscall_tramp)
 
 #endif	/* lint */

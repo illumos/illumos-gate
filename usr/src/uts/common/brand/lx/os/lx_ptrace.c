@@ -1573,7 +1573,7 @@ lx_ptrace_stop(ushort_t what)
 }
 
 int
-lx_issig_stop(proc_t *p, klwp_t *lwp)
+lx_ptrace_issig_stop(proc_t *p, klwp_t *lwp)
 {
 	lx_lwp_data_t *lwpd = lwptolxlwp(lwp);
 	int lx_sig;

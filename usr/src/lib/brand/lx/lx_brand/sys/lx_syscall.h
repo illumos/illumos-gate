@@ -339,22 +339,6 @@ extern long lx_utimes(const char *, const struct timeval *);
 
 
 #if defined(_LP64)
-/*
- * Linux vsyscall addresses:
- */
-#define	LX_VSYS_gettimeofday	(uintptr_t)0xffffffffff600000
-#define	LX_VSYS_time		(uintptr_t)0xffffffffff600400
-#define	LX_VSYS_getcpu		(uintptr_t)0xffffffffff600800
-
-/*
- * System call numbers for vsyscall revectoring:
- */
-#define	LX_SYS_gettimeofday	96
-#define	LX_SYS_time		201
-#define	LX_SYS_getcpu		309
-#endif
-
-#if defined(_LP64)
 #define	LX_SYS_clone		56
 #else
 #define	LX_SYS_clone		120
