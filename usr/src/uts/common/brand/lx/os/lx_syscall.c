@@ -42,6 +42,7 @@
 #include <sys/lx_brand.h>
 #include <sys/lx_impl.h>
 #include <sys/lx_misc.h>
+#include <lx_errno.h>
 
 
 /*
@@ -94,11 +95,6 @@ int lx_nsysent64;
  */
 lx_sysent_t lx_sysent32[LX_NSYSCALLS + 1];
 int lx_nsysent32;
-
-/*
- * Map Illumos errno to the Linux equivalent.
- */
-int lx_stol_errno[] = LX_STOL_ERRNO_INIT;
 
 #if defined(_LP64)
 struct lx_vsyscall
@@ -232,14 +228,7 @@ lx_syscall_return(klwp_t *lwp, int syscall_num, long ret)
 		/*
 		 * Convert from illumos to Linux errno:
 		 */
-		if (error < 1 || error >= (sizeof (lx_stol_errno) /
-		    sizeof (lx_stol_errno[0]))) {
-			/*
-			 * The provided error number is not valid.
-			 */
-			error = EINVAL;
-		}
-		ret = -lx_stol_errno[error];
+		ret = -lx_errno(error, EINVAL);
 	}
 
 	/*

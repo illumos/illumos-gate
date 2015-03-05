@@ -28,11 +28,7 @@
 #include <sys/signal.h>
 #include <sys/lx_siginfo.h>
 #include <lx_signum.h>
-#ifdef _KERNEL
 #include <sys/debug.h>
-#else
-#include <assert.h>
-#endif
 
 /*
  * Delivering signals to a Linux process is complicated by differences in
@@ -261,14 +257,12 @@ lx_stol_signo(int signo, int defsig)
 	int rval;
 
 #ifdef	_KERNEL
-	VERIFY(defsig != -1);
+	VERIFY3S(defsig, >=, 0);
 #endif
 
 	if (signo < 0 || signo >= NSIG || (rval = stol_signo[signo]) < 1) {
 #ifndef	_KERNEL
-		if (defsig == -1) {
-			assert(0);
-		}
+		VERIFY3S(defsig, >=, 0);
 #endif
 		return (defsig);
 	}

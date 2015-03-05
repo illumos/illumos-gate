@@ -28,6 +28,7 @@
 #include <sys/stack.h>
 #include <sys/sdt.h>
 #include <sys/sysmacros.h>
+#include <lx_errno.h>
 
 #define	LX_REG(ucp, r)	((ucp)->uc_mcontext.gregs[(r)])
 
@@ -563,7 +564,7 @@ lx_regs_to_userregs(lx_lwp_data_t *lwpd, void *uregsp)
 	switch (lwpd->br_ptrace_whatstop) {
 	case LX_PR_SYSENTRY:
 		orig_r0 = lwpd->br_syscall_num;
-		r0 = -lx_stol_errno[ENOTSUP];
+		r0 = -lx_errno(ENOTSUP, EINVAL);
 		break;
 	case LX_PR_SYSEXIT:
 		orig_r0 = lwpd->br_syscall_num;

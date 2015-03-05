@@ -1451,7 +1451,7 @@ lx_call_user_handler(int sig, siginfo_t *sip, void *p)
 	if (lxsap->lxsa_flags & LX_SA_RESTART) {
 		uintptr_t flags = (uintptr_t)ucp->uc_brand_data[0];
 		long ret = (long)LX_REG(ucp, REG_R0);
-		boolean_t interrupted = (ret == -lx_errno(EINTR));
+		boolean_t interrupted = (ret == -lx_errno(EINTR, -1));
 
 		/*
 		 * If the system call returned EINTR, and the system

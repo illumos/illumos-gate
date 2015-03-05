@@ -88,11 +88,6 @@
  * function should return -errno back to the Linux caller.
  */
 
-/*
- * Map Illumos errno to the Linux equivalent.
- */
-static int stol_errno[] = LX_STOL_ERRNO_INIT;
-
 char lx_release[LX_VERS_MAX];
 char lx_cmd_name[MAXNAMLEN];
 
@@ -143,17 +138,6 @@ int lx_debug_enabled = 0;	/* debugging output enabled if non-zero */
 pid_t zoneinit_pid;		/* zone init PID */
 
 thread_key_t lx_tsd_key;
-
-int
-lx_errno(int err)
-{
-	if (err >= sizeof (stol_errno) / sizeof (stol_errno[0])) {
-		lx_debug("invalid errno %d\n", err);
-		assert(0);
-	}
-
-	return (stol_errno[err]);
-}
 
 int
 uucopy_unsafe(const void *src, void *dst, size_t n)
