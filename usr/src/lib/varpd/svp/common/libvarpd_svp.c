@@ -520,7 +520,6 @@ varpd_svp_lookup(void *arg, varpd_query_handle_t *vqh,
 	svp_lookup_t *slp;
 	svp_t *svp = arg;
 	static const uint8_t bcast[6] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
-	static const uint8_t v4mcast[3] = { 0x10, 0x00, 0x53 };
 
 	/*
 	 * Check if this is something that we need to proxy, eg. arp or ndp.
