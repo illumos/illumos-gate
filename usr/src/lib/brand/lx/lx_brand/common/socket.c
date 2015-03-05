@@ -2088,7 +2088,7 @@ lx_getsockopt(int sockfd, int level, int optname, void *optval, int *optlenp)
 			break;
 
 		case SO_ERROR:
-			*(int *)optval = lx_errno(*(int *)optval);
+			*(int *)optval = lx_errno(*(int *)optval, -1);
 			break;
 		}
 	}

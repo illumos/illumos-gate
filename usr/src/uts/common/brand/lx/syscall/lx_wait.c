@@ -72,6 +72,7 @@
 #include <sys/lx_types.h>
 #include <sys/lx_siginfo.h>
 #include <lx_signum.h>
+#include <lx_errno.h>
 #include <lx_syscall.h>
 
 /*
@@ -332,7 +333,7 @@ stol_ksiginfo(k_siginfo_t *sip, uintptr_t lxsip)
 	bzero(&lsi, sizeof (lsi));
 	lsi.lsi_signo = lx_stol_signo(sip->si_signo, SIGCLD);
 	lsi.lsi_code = lx_stol_sigcode(sip->si_code);
-	lsi.lsi_errno = lx_stol_errno[sip->si_errno];
+	lsi.lsi_errno = lx_errno(sip->si_errno, EINVAL);
 
 	switch (lsi.lsi_signo) {
 	case LX_SIGPOLL:
@@ -380,7 +381,7 @@ stol_ksiginfo32(k_siginfo_t *sip, uintptr_t lxsip)
 	bzero(&lsi, sizeof (lsi));
 	lsi.lsi_signo = lx_stol_signo(sip->si_signo, SIGCLD);
 	lsi.lsi_code = lx_stol_sigcode(sip->si_code);
-	lsi.lsi_errno = lx_stol_errno[sip->si_errno];
+	lsi.lsi_errno = lx_errno(sip->si_errno, EINVAL);
 
 	switch (lsi.lsi_signo) {
 	case LX_SIGPOLL:

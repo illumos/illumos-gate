@@ -63,7 +63,8 @@ COBJS	=	aio.o			\
 		time.o			\
 		truncate.o
 
-CMNOBJS =	lx_signum.o
+CMNOBJS =	lx_errno.o		\
+		lx_signum.o
 ASOBJS	=	lx_handler.o lx_crt.o
 OBJECTS	=	$(CMNOBJS) $(COBJS) $(ASOBJS)
 
