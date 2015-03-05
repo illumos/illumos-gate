@@ -2048,7 +2048,7 @@ overlay_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	mutex_exit(&overlay_dev_lock);
 
 
-	dld_ioc_unregister(VNIC_IOC);
+	dld_ioc_unregister(OVERLAY_IOC);
 	ddi_remove_minor_node(dip, OVERLAY_CTL);
 	ddi_fm_fini(dip);
 	overlay_dip = NULL;
