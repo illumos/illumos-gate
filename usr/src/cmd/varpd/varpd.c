@@ -279,9 +279,12 @@ varpd_daemonize(int dirfd)
 	 * Remove privs from the permitted set. That will cause them to be
 	 * removed from the effective set. We want to make sure that in the case
 	 * of a vulnerability, something can't get back in here and wreak more
-	 * havoc.
+	 * havoc. But if we want non-basic privs in the effective set, we have
+	 * to request them explicitly.
 	 */
 	if (setppriv(PRIV_SET, PRIV_PERMITTED, pset) == -1)
+		abort();
+	if (setppriv(PRIV_SET, PRIV_EFFECTIVE, pset) == -1)
 		abort();
 
 	priv_freeset(pset);
