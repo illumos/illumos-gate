@@ -48,9 +48,15 @@
 #include <inet/ip.h>
 #include <netinet/in.h>
 #include <sys/strsun.h>
+#include <netinet/udp.h>
 
 static const char *vxlan_ident = "vxlan";
 static uint16_t vxlan_defport = IPPORT_VXLAN;
+
+/*
+ * Should we enable UDP source port hashing for fanout.
+ */
+boolean_t vxlan_fanout = B_TRUE;
 
 static const char *vxlan_props[] = {
 	"vxlan/listen_ip",
@@ -119,6 +125,19 @@ vxlan_o_socket(void *arg, int *dp, int *fp, int *pp, struct sockaddr *addr,
 	*slenp = sizeof (struct sockaddr_in6);
 
 	return (0);
+}
+
+static int
+vxlan_o_sockopt(ksocket_t ksock)
+{
+	int val, err;
+	if (vxlan_fanout == B_FALSE)
+		return (0);
+
+	val = UDP_HASH_VXLAN;
+	err = ksocket_setsockopt(ksock, IPPROTO_UDP, UDP_SRCPORT_HASH, &val,
+	    sizeof (val), kcred);
+	return (err);
 }
 
 /* ARGSUSED */
@@ -293,6 +312,7 @@ static struct overlay_plugin_ops vxlan_o_ops = {
 	vxlan_o_encap,
 	vxlan_o_decap,
 	vxlan_o_socket,
+	vxlan_o_sockopt,
 	vxlan_o_getprop,
 	vxlan_o_setprop,
 	vxlan_o_propinfo

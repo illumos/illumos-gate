@@ -254,6 +254,18 @@ overlay_mux_open(overlay_plugin_t *opp, int domain, int family, int protocol,
 		return (NULL);
 	}
 
+	/*
+	 * Ask our lower layer to optionally toggle anythin they need on this
+	 * socket. Because a socket is owned by a single type of plugin, we can
+	 * then ask it to perform any socket set up it'd like to do.
+	 */
+	if (opp->ovp_ops->ovpo_sockopt != NULL &&
+	    (*errp = opp->ovp_ops->ovpo_sockopt(ksock)) != 0) {
+		mutex_exit(&overlay_mux_lock);
+		ksocket_close(ksock, kcred);
+		return (NULL);
+	}
+
 	mux = kmem_alloc(sizeof (overlay_mux_t), KM_SLEEP);
 	list_link_init(&mux->omux_lnode);
 	mux->omux_ksock = ksock;

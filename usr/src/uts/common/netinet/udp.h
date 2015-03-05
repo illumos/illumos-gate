@@ -17,9 +17,6 @@
 #ifndef	_NETINET_UDP_H
 #define	_NETINET_UDP_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-/* udp.h 1.7 88/08/19 SMI; from UCB 7.1 6/5/86	*/
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -36,6 +33,15 @@ struct udphdr {
 #define	UDP_EXCLBIND		0x0101		/* for internal use only */
 #define	UDP_RCVHDR		0x0102		/* for internal use only */
 #define	UDP_NAT_T_ENDPOINT	0x0103		/* for internal use only */
+#define	UDP_SRCPORT_HASH	0x0104		/* for internal use only */
+
+/*
+ * Hash definitions for UDP_SRCPORT_HASH that effectively tell UDP how to go
+ * handle UDP_SRCPORT_HASH.
+ */
+#define	UDP_HASH_DISABLE	0x0000		/* for internal use only */
+#define	UDP_HASH_VXLAN		0x0001		/* for internal use only */
+
 /*
  * Following option in UDP_ namespace required to be exposed through
  * <xti.h> (It also requires exposing options not implemented). The options

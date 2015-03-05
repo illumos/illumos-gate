@@ -270,6 +270,11 @@ typedef	uint16_t	sa_family_t;
 #define	IPPORT_RESERVED		1024
 #define	IPPORT_USERRESERVED	5000
 
+#ifdef _KERNEL
+#define	IPPORT_DYNAMIC_MIN	49152
+#define	IPPORT_DYNAMIC_MAX	65535
+#endif
+
 /*
  * Link numbers
  */

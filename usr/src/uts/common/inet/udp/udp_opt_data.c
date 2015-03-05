@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2015, Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -292,6 +293,7 @@ opdes_t	udp_opt_arr[] = {
 	},
 { UDP_NAT_T_ENDPOINT, IPPROTO_UDP, OA_RW, OA_RW, OP_PRIVPORT, 0, sizeof (int),
 	0 },
+{ UDP_SRCPORT_HASH, IPPROTO_UDP, OA_R, OA_RW, OP_CONFIG, 0, sizeof (int), 0 }
 };
 
 /*

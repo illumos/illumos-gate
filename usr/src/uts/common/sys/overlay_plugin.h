@@ -98,6 +98,11 @@
  *   	be used to define such a socket. The actual socket may be multiplexed
  *   	with other uses of it.
  *
+ *   overlay_plugin_sockopt_t
+ *
+ *   	Allow a plugin to set any necessary socket options that it needs on the
+ *   	kernel socket that is being used by a mux.
+ *
  *   overlay_plugin_encap_t
  *
  *   	In this routine you're given a message block and information about the
@@ -222,6 +227,7 @@
 
 #include <sys/stream.h>
 #include <sys/mac_provider.h>
+#include <sys/ksocket.h>
 #include <sys/overlay_common.h>
 
 #ifdef __cplusplus
@@ -259,6 +265,7 @@ typedef int (*overlay_plugin_init_t)(overlay_handle_t, void **);
 typedef void (*overlay_plugin_fini_t)(void *);
 typedef int (*overlay_plugin_socket_t)(void *, int *, int *, int *,
     struct sockaddr *, socklen_t *);
+typedef int (*overlay_plugin_sockopt_t)(ksocket_t);
 typedef int (*overlay_plugin_getprop_t)(void *, const char *, void *,
     uint32_t *);
 typedef int (*overlay_plugin_setprop_t)(void *, const char *, const void *,
@@ -272,6 +279,7 @@ typedef struct overlay_plugin_ops {
 	overlay_plugin_encap_t	ovpo_encap;
 	overlay_plugin_decap_t	ovpo_decap;
 	overlay_plugin_socket_t ovpo_socket;
+	overlay_plugin_sockopt_t ovpo_sockopt;
 	overlay_plugin_getprop_t ovpo_getprop;
 	overlay_plugin_setprop_t ovpo_setprop;
 	overlay_plugin_propinfo_t ovpo_propinfo;
