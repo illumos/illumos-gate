@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
+ * Copyright 2015, Joyent, Inc.
  */
 
 /*
@@ -4323,7 +4323,13 @@ mac_addr_len(mac_handle_t mh)
 boolean_t
 mac_is_vnic(mac_handle_t mh)
 {
-	return (((mac_impl_t *)mh)->mi_state_flags & MIS_IS_VNIC);
+	return ((((mac_impl_t *)mh)->mi_state_flags & MIS_IS_VNIC) != 0);
+}
+
+boolean_t
+mac_is_overlay(mac_handle_t mh)
+{
+	return ((((mac_impl_t *)mh)->mi_state_flags & MIS_IS_OVERLAY) != 0);
 }
 
 mac_handle_t

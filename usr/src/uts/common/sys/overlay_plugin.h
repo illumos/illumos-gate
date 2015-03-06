@@ -101,7 +101,9 @@
  *   overlay_plugin_sockopt_t
  *
  *   	Allow a plugin to set any necessary socket options that it needs on the
- *   	kernel socket that is being used by a mux.
+ *   	kernel socket that is being used by a mux. This will only be called once
+ *   	for a given mux, if additional devices are added to a mux, it will not
+ *   	be called additional times.
  *
  *   overlay_plugin_encap_t
  *

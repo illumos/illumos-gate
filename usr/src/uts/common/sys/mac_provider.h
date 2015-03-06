@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2015, Joyent, Inc.
  */
 
 #ifndef	_SYS_MAC_PROVIDER_H
@@ -106,7 +107,8 @@ typedef enum {
 	MAC_CAPAB_NO_NATIVEVLAN	= 0x00080000, /* boolean only, no data */
 	MAC_CAPAB_NO_ZCOPY	= 0x00100000, /* boolean only, no data */
 	MAC_CAPAB_LEGACY	= 0x00200000, /* data is mac_capab_legacy_t */
-	MAC_CAPAB_VRRP		= 0x00400000  /* data is mac_capab_vrrp_t */
+	MAC_CAPAB_VRRP		= 0x00400000, /* data is mac_capab_vrrp_t */
+	MAC_CAPAB_OVERLAY	= 0x00800000  /* boolean only, no data */
 } mac_capab_t;
 
 /*
