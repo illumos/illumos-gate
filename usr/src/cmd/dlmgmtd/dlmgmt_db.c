@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2014, Joyent Inc. All rights reserved.
+ * Copyright 2015, Joyent Inc.
  */
 
 #include <assert.h>
@@ -1470,6 +1470,8 @@ dlmgmt_db_init(zoneid_t zoneid, char *zoneroot)
 	dlmgmt_db_req_t	*req;
 	int		err;
 	boolean_t	boot = B_FALSE;
+	char 		tdir[MAXPATHLEN];
+	char		*path = cachefile;
 
 	if ((req = dlmgmt_db_req_alloc(DLMGMT_DB_OP_READ, NULL,
 	    DATALINK_INVALID_LINKID, zoneid, DLMGMT_ACTIVE, &err)) == NULL)
@@ -1477,13 +1479,11 @@ dlmgmt_db_init(zoneid_t zoneid, char *zoneroot)
 
 	/* Handle running in a non-native branded zone (i.e. has /native) */
 	if (zone_file_exists(zoneroot, "/native" DLMGMT_TMPFS_DIR)) {
-		char tdir[MAXPATHLEN];
-
 		(void) snprintf(tdir, sizeof (tdir), "/native%s", cachefile);
-		(void) strlcpy(cachefile, tdir, sizeof (cachefile));
+		path = cachefile;
 	}
 
-	if (zone_file_exists(zoneroot, cachefile)) {
+	if (zone_file_exists(zoneroot, path)) {
 		if ((err = dlmgmt_process_db_req(req)) != 0) {
 			/*
 			 * If we get back ENOENT, that means that the active
