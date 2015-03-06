@@ -1480,7 +1480,7 @@ dlmgmt_db_init(zoneid_t zoneid, char *zoneroot)
 	/* Handle running in a non-native branded zone (i.e. has /native) */
 	if (zone_file_exists(zoneroot, "/native" DLMGMT_TMPFS_DIR)) {
 		(void) snprintf(tdir, sizeof (tdir), "/native%s", cachefile);
-		path = cachefile;
+		path = tdir;
 	}
 
 	if (zone_file_exists(zoneroot, path)) {
