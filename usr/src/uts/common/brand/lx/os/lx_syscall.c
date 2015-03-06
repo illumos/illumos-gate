@@ -441,28 +441,45 @@ lx_syscall_enter(void)
  * and inspecting the context to detect calls to those specific addresses.
  */
 
-static int
+static void
 lx_vsyscall_call(proc_t *p, klwp_t *lwp, uintptr_t scnum)
 {
 	struct regs *rp = lwptoregs(lwp);
 	uintptr_t raddr;
-	/* Fetch the return address */
-	if (uread(p, &raddr, sizeof (raddr), rp->r_rsp) != 0) {
-		/*
-		 * Alter the siginfo to indicate %rsp as the failed address if
-		 * the return address cannot be read off the stack.  Little
-		 * sympathy will be afforded to those making vsyscalls on a
-		 * bad stack.
-		 */
-		lwp->lwp_curinfo->sq_info.si_addr = (void *)rp->r_rsp;
-		return (-1);
-	}
 
-	/* Clean up remnants of the SIGSEGV */
+	/*
+	 * Clean up remnants of the SIGSEGV.  If we subsequently fail
+	 * to copy in the return address, we'll exit the process.
+	 */
+	VERIFY(MUTEX_HELD(&p->p_lock));
 	lwp->lwp_cursig = 0;
 	lwp->lwp_extsig = 0;
 	siginfofree(lwp->lwp_curinfo);
 	lwp->lwp_curinfo = NULL;
+
+	/*
+	 * Fetch the return address from the process stack.  We must drop
+	 * p_lock to prevent deadlock with page fault processing.  Signal
+	 * handling will be restarted after this call, so we do not need to
+	 * exclude concurrent modification.
+	 */
+	mutex_exit(&p->p_lock);
+	if (copyin((void *)rp->r_rsp, &raddr, sizeof (raddr)) != 0) {
+#if DEBUG
+		printf("lx_vsyscall_call: bad brand stack at vsyscall "
+		    "cmd=%s, pid=%d, sp=0x%p\n", PTOU(p)->u_comm,
+		    p->p_pid, (void *)rp->r_rsp);
+#endif
+
+		/*
+		 * The process jumped to the vsyscall address without a
+		 * correctly configured stack.  Terminate the process.
+		 */
+		exit(CLD_KILLED, SIGSEGV);
+
+		mutex_enter(&p->p_lock);
+		return;
+	}
 
 	DTRACE_PROBE1(brand__lx__vsyscall, int, (int)scnum);
 
@@ -471,11 +488,9 @@ lx_vsyscall_call(proc_t *p, klwp_t *lwp, uintptr_t scnum)
 	rp->r_rip = raddr;
 	rp->r_rsp += sizeof (uintptr_t);
 
-	mutex_exit(&p->p_lock);
 	lx_syscall_enter();
-	mutex_enter(&p->p_lock);
 
-	return (0);
+	mutex_enter(&p->p_lock);
 }
 
 int
@@ -509,15 +524,13 @@ lx_vsyscall_issig_stop(proc_t *p, klwp_t *lwp)
 		if (addr != rp->r_rip)
 			continue;
 
-		if (lx_vsyscall_call(p, lwp, lx_vsyscalls[i].lv_scnum) == 0) {
-			return (-1);
-		} else {
-			/*
-			 * If we were unable to vector into the vsyscall, let
-			 * processing of this signal continue as normal.
-			 */
-			break;
-		}
+		/*
+		 * Process the vsyscall.  Signal handling must be restarted
+		 * after processing in case the LWP or process state has
+		 * been altered.
+		 */
+		lx_vsyscall_call(p, lwp, lx_vsyscalls[i].lv_scnum);
+		return (-1);
 	}
 	lx_unsupported("bad vsyscall access");
 	return (0);
