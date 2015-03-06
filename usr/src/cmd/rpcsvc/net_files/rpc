@@ -61,6 +61,7 @@ ioadmd		100055	rpc.ioadmd
 NETlicense	100062
 sunisamd	100065
 debug_svc 	100066  dbsrv
+ypxfrd		100069
 bugtraqd	100071
 event		100101	na.event	# SunNet Manager
 logger		100102	na.logger	# SunNet Manager
