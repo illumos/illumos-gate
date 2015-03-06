@@ -5,7 +5,7 @@
  *
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  *
- * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2015, Joyent, Inc.  All rights reserved.
  */
 
 #if !defined(lint)
@@ -1867,6 +1867,28 @@ fr_info_t *fin;
 	return (((phy_if_t)fin->fin_ifp == phy_ifdata_routeto) ? 1 : 0); 
 }
 
+/*
+ * Return true only if forwarding is enabled on the interface.
+ */
+static int
+fr_forwarding_enabled(phy_if_t phyif, net_handle_t ndp)
+{
+	lif_if_t lif;
+
+	for (lif = net_lifgetnext(ndp, phyif, 0); lif > 0;
+	    lif = net_lifgetnext(ndp, phyif, lif)) {
+		int res;
+		uint64_t flags;
+
+		res = net_getlifflags(ndp, phyif, lif, &flags);
+		if (res != 0)
+			return (0);
+		if (flags & IFF_ROUTER)
+			return (1);
+	}
+
+	return (0);
+}
 
 /*
  * Function:	fr_fastroute
@@ -1917,6 +1939,10 @@ frdest_t *fdp;
 	} else {
 		return (-1);
 	}
+
+	/* Check the src here, fin_ifp is the src interface. */
+	if (!fr_forwarding_enabled((phy_if_t)fin->fin_ifp, net_data_p))
+		return (-1);
 
 	inj = net_inject_alloc(NETINFO_VERSION);
 	if (inj == NULL)
@@ -1981,6 +2007,10 @@ frdest_t *fdp;
 		}
 		inj->ni_physical = net_routeto(net_data_p, sinp, NULL);
 	}
+
+	/* we're checking the destinatation here */
+	if (!fr_forwarding_enabled(inj->ni_physical, net_data_p))
+		goto bad_fastroute;
 
 	/*
 	 * Clear the hardware checksum flags from packets that we are doing
