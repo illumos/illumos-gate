@@ -199,10 +199,15 @@ fi
 #
 fnm=$ZONEROOT/etc/sysconfig/network
 if ! egrep -s "NETWORKING=yes" $fnm; then
+	cfghnm=$(zonecfg -z $ZONENAME info attr name=hostname | \
+	    awk '{if ($1 == "value:") print $2}')
+	if [[ -z "$cfghnm" ]]; then
+		cfghnm=$ZONENAME
+	fi
 	if [[ ! -h $fnm ]]; then
 		cat > $fnm <<- EOF
 		NETWORKING=yes
-		HOSTNAME=$ZONENAME
+		HOSTNAME=$cfghnm
 		EOF
 	fi
 fi
