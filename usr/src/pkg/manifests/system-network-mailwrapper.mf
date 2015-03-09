@@ -42,4 +42,4 @@ link path=usr/sbin/newaliases mediator=mta mediator-implementation=mailwrapper \
     target=../lib/mailwrapper
 link path=usr/sbin/sendmail mediator=mta mediator-implementation=mailwrapper \
     target=../lib/mailwrapper
-depend fmri=service/network/smtp/sendmail type=require
+depend fmri=service/network/smtp/sendmail type=optional
