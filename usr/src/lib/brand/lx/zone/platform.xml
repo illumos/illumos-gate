@@ -140,9 +140,11 @@
 	<symlink source="kmsg" target="console" />
 	<symlink source="conslog" target="log" />
 
-	<!-- Create a mount point for for the /dev/initctl fifo -->
+	<!-- Create a mount point for the /dev/initctl fifo -->
 	<device match="null" name="initctl" />
-	<!-- Create a mount point for for the /dev/log socket -->
+	<!-- Create a dummy for the /dev/log socket -->
 	<device match="null" name="log" />
+	<!-- Create a dummy /dev/xconsole -->
+	<device match="null" name="xconsole" />
 
 </platform>
