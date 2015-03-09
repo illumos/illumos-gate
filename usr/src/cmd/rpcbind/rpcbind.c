@@ -1058,7 +1058,7 @@ static boolean_t
 get_smf_prop(const char *var, boolean_t def_val)
 {
 	scf_simple_prop_t *prop;
-	uint8_t *val;
+	uint8_t *val = NULL;
 	boolean_t res = def_val;
 
 	prop = scf_simple_prop_get(NULL, NULL, "config", var);
@@ -1081,7 +1081,7 @@ static int
 get_smf_iprop(const char *var, int def_val, int min, int max)
 {
 	scf_simple_prop_t *prop;
-	int64_t *val;
+	int64_t *val = NULL;
 	int res = def_val;
 
 	prop = scf_simple_prop_get(NULL, NULL, "config", var);
