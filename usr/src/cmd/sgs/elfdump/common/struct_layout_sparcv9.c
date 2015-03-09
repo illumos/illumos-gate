@@ -377,6 +377,8 @@ static const sl_prfdinfo_layout_t prfdinfo_layout = {
 };
 
 
+
+
 static const sl_arch_layout_t layout_sparcv9 = {
 	&auxv_layout,
 	&fltset_layout,

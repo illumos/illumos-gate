@@ -68,7 +68,6 @@ extern "C" {
 
 #define	MAXMAPSIZE	(1024*1024*8)	/* map at most 8MB */
 #define	SMALLFILESIZE	(32*1024)	/* don't use mmap on little file */
-#define	ISREG(A)	(((A).st_mode & S_IFMT) == S_IFREG)
 
 /* avltree */
 #define	OFFSETOF(s, m)	((size_t)(&(((s *)0)->m)))
