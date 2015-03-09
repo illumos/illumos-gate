@@ -2531,7 +2531,7 @@ zone_init(void)
 	rc_zone_zfs_io_pri = rctl_register("zone.zfs-io-priority",
 	    RCENTITY_ZONE, RCTL_GLOBAL_SIGNAL_NEVER | RCTL_GLOBAL_DENY_NEVER |
 	    RCTL_GLOBAL_NOBASIC | RCTL_GLOBAL_COUNT | RCTL_GLOBAL_SYSLOG_NEVER,
-	    1024, 1024, &zone_zfs_io_pri_ops);
+	    16384, 16384, &zone_zfs_io_pri_ops);
 
 	rc_zone_nlwps = rctl_register("zone.max-lwps", RCENTITY_ZONE,
 	    RCTL_GLOBAL_NOACTION | RCTL_GLOBAL_NOBASIC | RCTL_GLOBAL_COUNT,
