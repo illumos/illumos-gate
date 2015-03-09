@@ -153,8 +153,14 @@ lx_unlink(uintptr_t p)
 	 * cranky if they can't cleanup /dev/log so we lie and tell them they
 	 * succeeded.
 	 */
-	if (strcmp(pathname, "/dev/log") == 0)
-		return (0);
+	if (pathname != NULL) {
+		char p[MAXPATHLEN];
+
+		if (uucopystr((void *)pathname, p, sizeof (p)) < 0)
+			return (-errno);
+		if (strcmp(p, "/dev/log") == 0)
+			return (0);
+	}
 
 	return (unlink(pathname) ? -errno : 0);
 }
@@ -180,8 +186,14 @@ lx_unlinkat(uintptr_t ext1, uintptr_t p1, uintptr_t p2)
 		    0) && S_ISDIR(statbuf.st_mode))
 			return (-EISDIR);
 
-		if (strcmp(pathname, "/dev/log") == 0)
-			return (0);
+		if (pathname != NULL) {
+			char p[MAXPATHLEN];
+
+			if (uucopystr((void *)pathname, p, sizeof (p)) < 0)
+				return (-errno);
+			if (strcmp(p, "/dev/log") == 0)
+				return (0);
+		}
 	}
 
 	return (unlinkat(atfd, pathname, flag) ? -errno : 0);
