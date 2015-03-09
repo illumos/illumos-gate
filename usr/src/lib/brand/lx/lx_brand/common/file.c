@@ -22,7 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2014 Joyent, Inc.  All rights reserved.
+ * Copyright 2015 Joyent, Inc.  All rights reserved.
  */
 
 #include <sys/fstyp.h>
@@ -148,6 +148,14 @@ lx_unlink(uintptr_t p)
 	if ((lstat64(pathname, &statbuf) == 0) && S_ISDIR(statbuf.st_mode))
 		return (-EISDIR);
 
+	/*
+	 * Some versions of the zone's /dev/log setup code (e.g. syslog-ng) get
+	 * cranky if they can't cleanup /dev/log so we lie and tell them they
+	 * succeeded.
+	 */
+	if (strcmp(pathname, "/dev/log") == 0)
+		return (0);
+
 	return (unlink(pathname) ? -errno : 0);
 }
 
@@ -171,6 +179,9 @@ lx_unlinkat(uintptr_t ext1, uintptr_t p1, uintptr_t p2)
 		if ((fstatat64(atfd, pathname, &statbuf, AT_SYMLINK_NOFOLLOW) ==
 		    0) && S_ISDIR(statbuf.st_mode))
 			return (-EISDIR);
+
+		if (strcmp(pathname, "/dev/log") == 0)
+			return (0);
 	}
 
 	return (unlinkat(atfd, pathname, flag) ? -errno : 0);
