@@ -52,7 +52,7 @@ static void
 usage(void)
 {
 	(void) fprintf(stderr,
-	    "Usage: %s [-gis] -l label | -L labelenv [-o outfile] object_file\n"
+	    "Usage: %s [-is] -l label | -L labelenv [-o outfile] object_file\n"
 	    "\n"
 	    "  Note: if -L labelenv is specified and labelenv is not set in\n"
 	    "  the environment, a default value is used.\n",
