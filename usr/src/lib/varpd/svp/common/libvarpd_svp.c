@@ -61,7 +61,7 @@
  * server, sdc-portolan (see https://github.com/joyent/sdc-portolan).
  *
  * At this time, we don't quite support everything that we need to. Including
- * the SVP_R_LOG_REQ, SVP_R_BULK_REQ, and SVP_R_SHOOTDOWN.
+ * the SVP_R_BULK_REQ and SVP_R_SHOOTDOWN.
  *
  * ---------------------------------
  * General Design and Considerations
@@ -251,6 +251,31 @@
  *            | Destroyed  |
  *            +------------+
  *
+ * --------------------------
+ * Connection Event Injection
+ * --------------------------
+ *
+ * For each connection that exists in the system, we have a timer in place that
+ * is in charge of performing timeout activity. It fires once every thirty
+ * seconds or so for a given connection and checks to ensure that we have had
+ * activity for the most recent query on the connection. If not, it terminates
+ * the connection. This is important as if we have sent all our data and are
+ * waiting for the remote end to reply, without enabling something like TCP
+ * keep-alive, we will not be notified that anything that has happened to the
+ * remote connection, for example a panic. In addition, this also protects
+ * against a server that is up, but a portolan that is not making forward
+ * progress.
+ *
+ * When a timeout occurs, we first try to disassociate any active events, which
+ * by definition must exist. Once that's done, we inject a port source user
+ * event. Now, there is a small gotcha. Let's assume for a moment that we have a
+ * pathological portolan. That means that it knows to inject activity right at
+ * the time out window. That means, that the event may be disassociated before
+ * we could get to it. If that's the case, we must _not_ inject the user event
+ * and instead, we'll let the pending event take care of it. We know that the
+ * pending event hasn't hit the main part of the loop yet, otherwise, it would
+ * have released the lock protecting our state and associated the event.
+ *
  * ------------
  * Notes on DNS
  * ------------
@@ -274,6 +299,41 @@
  * access, we don't want them to end up in there. The timer itself is just a
  * simple avl tree sorted by expiration time, which is stored as a tick in the
  * future, a tick is just one second.
+ *
+ * ----------
+ * Shootdowns
+ * ----------
+ *
+ * As part of the protocol, we need to be able to handle shootdowns that inform
+ * us some of the information in the system is out of date. This information
+ * needs to be processed promptly; however, the information is hopefully going
+ * to be relatively infrequent relative to the normal flow of information.
+ *
+ * The shoot down information needs to be done on a per-backend basis. The
+ * general design is that we'll have a single query for this which can fire on a
+ * 5-10s period, we randmoize the latter part to give us a bit more load
+ * spreading. If we complete because there's no work to do, then we wait the
+ * normal period. If we complete, but there's still work to do, we'll go again
+ * after a second.
+ *
+ * A shootdown has a few different parts. We first receive a list of items to
+ * shootdown. After performing all of those, we need to acknowledge them. When
+ * that's been done successfully, we can move onto the next part. From a
+ * protocol perspective, we make a SVP_R_LOG_REQ, we get a reply, and then after
+ * processing them, send an SVP_R_LOG_RM. Only once that's been acked do we
+ * continue.
+ *
+ * However, one of the challenges that we have is that these invalidations are
+ * just that, an invalidation. For a virtual layer two request, that's fine,
+ * because the kernel supports that. However, for virtual layer three
+ * invalidations, we have a bit more work to do. These protocols, ARP and NDP,
+ * don't really support a notion of just an invalidation, instead you have to
+ * inject the new data in a gratuitous fashion.
+ *
+ * To that end, what we instead do is when we receive a VL3 invalidation, we
+ * turn that info a VL3 request. We hold the general request as outstanding
+ * until we receive all of the callbacks for the VL3 invalidations, at which
+ * point we go through and do the log removal request.
  */
 
 #include <umem.h>
@@ -324,6 +384,8 @@ static const char *varpd_svp_props[] = {
 	"svp/underlay_ip",
 	"svp/underlay_port"
 };
+
+static const uint8_t svp_bcast[6] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
 
 int
 svp_comparator(const void *l, const void *r)
@@ -403,10 +465,19 @@ svp_vl3_inject_cb(svp_t *svp, const uint16_t vlan, const struct in6_addr *vl3ip,
 {
 	struct in_addr v4;
 
-	if (IN6_IS_ADDR_V4MAPPED(vl3ip) == 0)
-		libvarpd_panic("implement libvarpd_inject_ndp");
-	IN6_V4MAPPED_TO_INADDR(vl3ip, &v4);
-	libvarpd_inject_arp(svp->svp_hdl, vlan, vl2mac, &v4, targmac);
+	/*
+	 * At the moment we don't support any IPv6 related log entries, this
+	 * will change soon as we develop a bit more of the IPv6 related
+	 * infrastructure so we can properly test the injection.
+	 */
+	if (IN6_IS_ADDR_V4MAPPED(vl3ip) == 0) {
+		return;
+	} else {
+		IN6_V4MAPPED_TO_INADDR(vl3ip, &v4);
+		if (targmac == NULL)
+			targmac = svp_bcast;
+		libvarpd_inject_arp(svp->svp_hdl, vlan, vl2mac, &v4, targmac);
+	}
 }
 
 /* ARGSUSED */
@@ -481,7 +552,8 @@ varpd_svp_start(void *arg)
 	}
 	mutex_exit(&svp->svp_lock);
 
-	if ((ret = svp_remote_find(svp->svp_host, svp->svp_port, &srp)) != 0)
+	if ((ret = svp_remote_find(svp->svp_host, svp->svp_port, &svp->svp_uip,
+	    &srp)) != 0)
 		return (ret);
 
 	if ((ret = svp_remote_attach(srp, svp)) != 0) {
@@ -520,7 +592,6 @@ varpd_svp_lookup(void *arg, varpd_query_handle_t *vqh,
 {
 	svp_lookup_t *slp;
 	svp_t *svp = arg;
-	static const uint8_t bcast[6] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
 
 	/*
 	 * Check if this is something that we need to proxy, eg. arp or ndp.
@@ -546,7 +617,7 @@ varpd_svp_lookup(void *arg, varpd_query_handle_t *vqh,
 	 * handle broadcast and if the multicast bit is set, lowest bit of the
 	 * first octet of the MAC, then we drop it now.
 	 */
-	if (bcmp(otl->otl_dstaddr, bcast, ETHERADDRL) == 0 ||
+	if (bcmp(otl->otl_dstaddr, svp_bcast, ETHERADDRL) == 0 ||
 	    (otl->otl_dstaddr[0] & 0x01) == 0x01) {
 		libvarpd_plugin_query_reply(vqh, VARPD_LOOKUP_DROP);
 		return;

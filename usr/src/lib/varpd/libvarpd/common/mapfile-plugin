@@ -33,6 +33,7 @@ SYMBOL_SCOPE {
     global:
 	libvarpd_fma_degrade		{ FLAGS = EXTERN };
 	libvarpd_inject_arp		{ FLAGS = EXTERN };
+	libvarpd_inject_ndp		{ FLAGS = EXTERN };
 	libvarpd_inject_varp		{ FLAGS = EXTERN };
 	libvarpd_fma_restore		{ FLAGS = EXTERN };
 	libvarpd_panic			{ FLAGS = EXTERN };

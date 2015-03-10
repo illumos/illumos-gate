@@ -121,7 +121,7 @@ svp_event_dissociate(svp_event_t *sep, int fd)
 }
 
 int
-svp_event_inject(void *user)
+svp_event_inject(svp_event_t *user)
 {
 	return (port_send(svp_event.sel_port, 0, user));
 }

@@ -45,20 +45,20 @@ typedef struct svp_req {
 } svp_req_t;
 
 typedef enum svp_op {
-	SVP_R_UNKNOWN	= 0x00,
-	SVP_R_PING	= 0x01,
-	SVP_R_PONG	= 0x02,
-	SVP_R_VL2_REQ	= 0x03,
-	SVP_R_VL2_ACK	= 0x04,
-	SVP_R_VL3_REQ	= 0x05,
-	SVP_R_VL3_ACK	= 0x06,
-	SVP_R_BULK_REQ	= 0x07,
-	SVP_R_BULK_ACK	= 0x08,
-	SVP_R_LOG_REQ	= 0x09,
-	SVP_R_LOG_ACK	= 0x0A,
-	SVP_R_LOG_RM	= 0x0B,
-	SVP_R_LOG_RACK	= 0x0C,
-	SVP_R_SHOOTDOWN	= 0x0D
+	SVP_R_UNKNOWN		= 0x00,
+	SVP_R_PING		= 0x01,
+	SVP_R_PONG		= 0x02,
+	SVP_R_VL2_REQ		= 0x03,
+	SVP_R_VL2_ACK		= 0x04,
+	SVP_R_VL3_REQ		= 0x05,
+	SVP_R_VL3_ACK		= 0x06,
+	SVP_R_BULK_REQ		= 0x07,
+	SVP_R_BULK_ACK		= 0x08,
+	SVP_R_LOG_REQ		= 0x09,
+	SVP_R_LOG_ACK		= 0x0A,
+	SVP_R_LOG_RM		= 0x0B,
+	SVP_R_LOG_RM_ACK	= 0x0C,
+	SVP_R_SHOOTDOWN		= 0x0D
 } svp_op_t;
 
 typedef enum svp_status {
@@ -66,9 +66,7 @@ typedef enum svp_status {
 	SVP_S_FATAL	= 0x01,	/* Fatal error, close connection */
 	SVP_S_NOTFOUND	= 0x02,	/* Entry not found */
 	SVP_S_BADL3TYPE	= 0x03,	/* Unknown svp_vl3_type_t */
-	SVP_S_BADBULK	= 0x04,	/* Unknown svp_bulk_type_t */
-	SVP_S_BADLOG	= 0x05,	/* Unknown svp_log_type_t */
-	SVP_S_LOGAGAIN	= 0x06	/* Nothing in the log yet */
+	SVP_S_BADBULK	= 0x04	/* Unknown svp_bulk_type_t */
 } svp_status_t;
 
 /*
@@ -150,29 +148,32 @@ typedef struct svp_bulk_ack {
 
 /*
  * SVP_R_LOG_REQ requests a log entries from the specified log from the server.
- * The total number of entries that the client is prepared to receive are in
- * svlr_count.  However, the client may receive less than they asked for.
+ * The total number of bytes that the user is ready to receive is in svlr_count.
+ * However, the server should not block for data if none is available and thus
+ * may return less than svlr_count bytes back. We identify the IP address of the
+ * underlay to use here explicitly.
+ */
+typedef struct svp_log_req {
+	uint32_t	svlr_count;
+	uint8_t		svlr_ip[16];
+} svp_log_req_t;
+
+/*
+ * The server replies to a log request by sending a series of log entries.
+ * These log entries may be a mixture of both vl2 and vl3 records. The reply is
+ * a stream of bytes after the status message whose length is determined baseed
+ * on the header itself. Each entry begins with a uint32_t that describes its
+ * type and then is followed by the remaining data payload. The next entry
+ * follows immediately which again begins with the uint32_t word that describes
+ * what it should be.
  */
 typedef enum svp_log_type {
 	SVP_LOG_VL2	= 0x01,
 	SVP_LOG_VL3	= 0x02
 } svp_log_type_t;
 
-typedef struct svp_log_req {
-	uint32_t	svlr_type;
-	uint32_t	svlr_count;
-} svp_log_req_t;
-
-/*
- * The server replies to a log request by sending a series of log entries based
- * on the type of svp_log_type_t in the SVP_R_LOG_ACK. If it's a VL2 request,
- * then the svp_log_vl2_t is used, otherwise the svp_log_vl3_t is used. The
- * response always leads with a svp_bulk_ack_t. It is then followed by a number
- * of entries which can be calculated based on taking the toal data payload,
- * subtracting the svp_log_ack_t, and then dividing that by the size of the
- * corresponding data structure.
- */
 typedef struct svp_log_vl2 {
+	uint32_t	svl2_type;	/* Should be SVP_LOG_VL2 */
 	uint8_t		svl2_id[16];	/* 16-byte UUID */
 	uint8_t		svl2_mac[ETHERADDRL];
 	uint8_t		svl2_pad[2];
@@ -180,18 +181,16 @@ typedef struct svp_log_vl2 {
 } svp_log_vl2_t;
 
 typedef struct svp_log_vl3 {
+	uint32_t	svl3_type;	/* Should be SVP_LOG_VL3 */
 	uint8_t		svl3_id[16];	/* 16-byte UUID */
-	uint8_t		slv3_ip[16];
-	uint8_t		svl3_mac[ETHERADDRL];
+	uint8_t		svl3_ip[16];
+	uint8_t		svl3_pad[2];
 	uint16_t	svl3_vlan;
-	uint8_t		svl3_tmac[ETHERADDRL];
-	uint8_t		svl3_tpad[2];
 	uint32_t	svl3_vnetid;
 } svp_log_vl3_t;
 
 typedef struct svp_log_ack {
 	uint32_t	svla_status;
-	uint32_t	svla_type;
 	uint8_t		svla_data[];
 } svp_log_ack_t;
 
@@ -199,12 +198,10 @@ typedef struct svp_log_ack {
  * SVP_R_LOG_RM is used after the client successfully processes a series of the
  * log stream. It replies to tell the server that it can remove those IDs from
  * processing. The IDs used are the same IDs that were in the individual
- * SVP_R_LOG_ACK entries. Again, the member svrr_type should be a svp_log_type_t
- * member.
+ * SVP_R_LOG_ACK entries.
  */
 typedef struct svp_lrm_req {
-	uint32_t	svrr_type;
-	uint32_t	svrr_pad;
+	uint32_t	svrr_count;
 	uint8_t		svrr_ids[];
 } svp_lrm_req_t;
 

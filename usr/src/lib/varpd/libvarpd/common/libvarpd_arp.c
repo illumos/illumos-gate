@@ -611,7 +611,7 @@ void
 libvarpd_inject_arp(varpd_provider_handle_t *vph, const uint16_t vlan,
     const uint8_t *srcmac, const struct in_addr *srcip, const uint8_t *dstmac)
 {
-	char buf[1500];
+	char buf[500];
 	size_t bsize = 0;
 	struct ether_arp *ea;
 	varpd_instance_t *inst = (varpd_instance_t *)vph;

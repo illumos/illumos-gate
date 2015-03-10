@@ -21,6 +21,7 @@ OBJECTS =	libvarpd_svp.o \
 		libvarpd_svp_host.o \
 		libvarpd_svp_loop.o \
 		libvarpd_svp_remote.o \
+		libvarpd_svp_shootdown.o \
 		libvarpd_svp_timer.o
 
 include ../../../Makefile.lib

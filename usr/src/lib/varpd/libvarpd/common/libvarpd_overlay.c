@@ -525,6 +525,11 @@ libvarpd_inject_varp(varpd_provider_handle_t *vph, const uint8_t *mac,
 	varpd_instance_t *inst = (varpd_instance_t *)vph;
 	varpd_impl_t *vip = inst->vri_impl;
 
+	if (otp == NULL) {
+		(void) libvarpd_overlay_cache_delete(inst, mac);
+		return;
+	}
+
 	otc.otc_linkid = inst->vri_linkid;
 	otc.otc_entry.otce_flags = 0;
 	bcopy(mac, otc.otc_entry.otce_mac, ETHERADDRL);

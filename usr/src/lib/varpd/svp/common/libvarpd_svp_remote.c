@@ -35,6 +35,13 @@
 #include <libvarpd_provider.h>
 #include <libvarpd_svp.h>
 
+typedef struct svp_shoot_vl3 {
+	svp_query_t		ssv_query;
+	struct sockaddr_in6	ssv_sock;
+	svp_log_vl3_t 		*ssv_vl3;
+	svp_sdlog_t		*ssv_log;
+} svp_shoot_vl3_t;
+
 static mutex_t svp_remote_lock = ERRORCHECKMUTEX;
 static avl_tree_t svp_remote_tree;
 static svp_timer_t svp_dns_timer;
@@ -74,8 +81,8 @@ svp_remote_comparator(const void *l, const void *r)
 		return (1);
 	else if (lr->sr_rport < rr->sr_rport)
 		return (-1);
-	else
-		return (0);
+
+	return (memcmp(&lr->sr_uip, &rr->sr_uip, sizeof (struct in6_addr)));
 }
 
 void
@@ -101,9 +108,10 @@ svp_remote_destroy(svp_remote_t *srp)
 		(void) cond_wait(&srp->sr_cond, &srp->sr_lock);
 	}
 	mutex_exit(&srp->sr_lock);
+	svp_shootdown_fini(srp);
 
 	if (cond_destroy(&srp->sr_cond) != 0)
-		libvarpd_panic("faile to destroy cond sr_cond");
+		libvarpd_panic("failed to destroy cond sr_cond");
 
 	if (mutex_destroy(&srp->sr_lock) != 0)
 		libvarpd_panic("failed to destroy mutex sr_lock");
@@ -116,7 +124,8 @@ svp_remote_destroy(svp_remote_t *srp)
 }
 
 static int
-svp_remote_create(const char *host, uint16_t port, svp_remote_t **outp)
+svp_remote_create(const char *host, uint16_t port, struct in6_addr *uip,
+    svp_remote_t **outp)
 {
 	size_t hlen;
 	svp_remote_t *remote;
@@ -128,9 +137,17 @@ svp_remote_create(const char *host, uint16_t port, svp_remote_t **outp)
 		mutex_exit(&svp_remote_lock);
 		return (ENOMEM);
 	}
+
+	if (svp_shootdown_init(remote) != 0) {
+		umem_free(remote, sizeof (svp_remote_t));
+		mutex_exit(&svp_remote_lock);
+		return (ENOMEM);
+	}
+
 	hlen = strlen(host) + 1;
 	remote->sr_hostname = umem_alloc(hlen, UMEM_DEFAULT);
 	if (remote->sr_hostname == NULL) {
+		svp_shootdown_fini(remote);
 		umem_free(remote, sizeof (svp_remote_t));
 		mutex_exit(&svp_remote_lock);
 		return (ENOMEM);
@@ -147,19 +164,24 @@ svp_remote_create(const char *host, uint16_t port, svp_remote_t **outp)
 	    offsetof(svp_t, svp_rlink));
 	(void) strlcpy(remote->sr_hostname, host, hlen);
 	remote->sr_count = 1;
+	remote->sr_uip = *uip;
+
+	svp_shootdown_start(remote);
 
 	*outp = remote;
 	return (0);
 }
 
 int
-svp_remote_find(char *host, uint16_t port, svp_remote_t **outp)
+svp_remote_find(char *host, uint16_t port, struct in6_addr *uip,
+    svp_remote_t **outp)
 {
 	int ret;
 	svp_remote_t lookup, *remote;
 
 	lookup.sr_hostname = host;
 	lookup.sr_rport = port;
+	lookup.sr_uip = *uip;
 	mutex_enter(&svp_remote_lock);
 	remote = avl_find(&svp_remote_tree, &lookup, NULL);
 	if (remote != NULL) {
@@ -170,7 +192,7 @@ svp_remote_find(char *host, uint16_t port, svp_remote_t **outp)
 		return (0);
 	}
 
-	if ((ret = svp_remote_create(host, port, outp)) != 0) {
+	if ((ret = svp_remote_create(host, port, uip, outp)) != 0) {
 		mutex_exit(&svp_remote_lock);
 		return (ret);
 	}
@@ -344,24 +366,21 @@ svp_remote_vl3_lookup_cb(svp_query_t *sqp, void *arg)
 		    arg);
 }
 
-void
-svp_remote_vl3_lookup(svp_t *svp, svp_query_t *sqp,
-    const struct sockaddr *addr, void *arg)
+static void
+svp_remote_vl3_common(svp_remote_t *srp, svp_query_t *sqp,
+    const struct sockaddr *addr,  svp_query_f func, void *arg, uint32_t vid)
 {
-	svp_remote_t *srp;
 	svp_vl3_req_t *vl3r = &sqp->sq_rdun.sdq_vl3r;
 
 	if (addr->sa_family != AF_INET && addr->sa_family != AF_INET6)
 		libvarpd_panic("unexpected sa_family for the vl3 lookup");
 
-	srp = svp->svp_remote;
-	sqp->sq_func = svp_remote_vl3_lookup_cb;
+	sqp->sq_func = func;
 	sqp->sq_arg = arg;
-	sqp->sq_svp = svp;
 	sqp->sq_state = SVP_QUERY_INIT;
 	sqp->sq_header.svp_ver = htons(SVP_CURRENT_VERSION);
 	sqp->sq_header.svp_op = htons(SVP_R_VL3_REQ);
-	sqp->sq_header.svp_size = htons(sizeof (svp_vl3_req_t));
+	sqp->sq_header.svp_size = htonl(sizeof (svp_vl3_req_t));
 	sqp->sq_header.svp_id = id_alloc(svp_idspace);
 	if (sqp->sq_header.svp_id == (id_t)-1)
 		libvarpd_panic("failed to allcoate from svp_idspace: %d",
@@ -374,24 +393,147 @@ svp_remote_vl3_lookup(svp_t *svp, svp_query_t *sqp,
 
 	if (addr->sa_family == AF_INET6) {
 		struct sockaddr_in6 *s6 = (struct sockaddr_in6 *)addr;
-		vl3r->sl3r_type = SVP_VL3_IPV6;
+		vl3r->sl3r_type = htonl(SVP_VL3_IPV6);
 		bcopy(&s6->sin6_addr, vl3r->sl3r_ip,
 		    sizeof (struct in6_addr));
 	} else {
 		struct sockaddr_in *s4 = (struct sockaddr_in *)addr;
 		struct in6_addr v6;
 
-		vl3r->sl3r_type = SVP_VL3_IP;
+		vl3r->sl3r_type = htonl(SVP_VL3_IP);
 		IN6_INADDR_TO_V4MAPPED(&s4->sin_addr, &v6);
 		bcopy(&v6, vl3r->sl3r_ip, sizeof (struct in6_addr));
 	}
-	vl3r->sl3r_vnetid = ntohl(svp->svp_vid);
+	vl3r->sl3r_vnetid = htonl(vid);
 
 	mutex_enter(&srp->sr_lock);
-	if (svp_remote_conn_queue(srp, sqp) == B_FALSE)
-		svp->svp_cb.scb_vl3_lookup(svp, SVP_S_FATAL, NULL, NULL, NULL,
-		    arg);
+	if (svp_remote_conn_queue(srp, sqp) == B_FALSE) {
+		sqp->sq_status = SVP_S_FATAL;
+		sqp->sq_func(sqp, arg);
+	}
 	mutex_exit(&srp->sr_lock);
+}
+
+/*
+ * This is a request to do a VL3 look-up that originated internally as opposed
+ * to coming from varpd. As such we need a slightly different query callback
+ * function upon completion and don't go through the normal path with the svp_t.
+ */
+void
+svp_remote_vl3_logreq(svp_remote_t *srp, svp_query_t *sqp, uint32_t vid,
+    const struct sockaddr *addr, svp_query_f func, void *arg)
+{
+	svp_remote_vl3_common(srp, sqp, addr, func, arg, vid);
+}
+
+void
+svp_remote_vl3_lookup(svp_t *svp, svp_query_t *sqp,
+    const struct sockaddr *addr, void *arg)
+{
+	svp_remote_t *srp = svp->svp_remote;
+
+	sqp->sq_svp = svp;
+	svp_remote_vl3_common(srp, sqp, addr, svp_remote_vl3_lookup_cb,
+	    arg, svp->svp_vid);
+}
+
+static void
+svp_remote_log_request_cb(svp_query_t *sqp, void *arg)
+{
+	svp_remote_t *srp = sqp->sq_arg;
+
+	assert(sqp->sq_wdata != NULL);
+	if (sqp->sq_status == SVP_S_OK)
+		svp_shootdown_logr_cb(srp, sqp->sq_status, sqp->sq_wdata,
+		    sqp->sq_size);
+	else
+		svp_shootdown_logr_cb(srp, sqp->sq_status, NULL, 0);
+}
+
+void
+svp_remote_log_request(svp_remote_t *srp, svp_query_t *sqp, void *buf,
+    size_t buflen)
+{
+	svp_log_req_t *logr = &sqp->sq_rdun.sdq_logr;
+	boolean_t queued;
+
+	sqp->sq_func = svp_remote_log_request_cb;
+	sqp->sq_state = SVP_QUERY_INIT;
+	sqp->sq_arg = srp;
+	sqp->sq_header.svp_ver = htons(SVP_CURRENT_VERSION);
+	sqp->sq_header.svp_op = htons(SVP_R_LOG_REQ);
+	sqp->sq_header.svp_size = htonl(sizeof (svp_log_req_t));
+	sqp->sq_header.svp_id = id_alloc(svp_idspace);
+	if (sqp->sq_header.svp_id == (id_t)-1)
+		libvarpd_panic("failed to allcoate from svp_idspace: %d",
+		    errno);
+	sqp->sq_header.svp_crc32 = htonl(0);
+	sqp->sq_rdata = logr;
+	sqp->sq_rsize = sizeof (svp_log_req_t);
+	sqp->sq_wdata = buf;
+	sqp->sq_wsize = buflen;
+
+	logr->svlr_count = htonl(buflen);
+	bcopy(&srp->sr_uip, logr->svlr_ip, sizeof (struct in6_addr));
+
+	/*
+	 * If this fails, there isn't much that we can't do. Give the callback
+	 * with a fatal status.
+	 */
+	mutex_enter(&srp->sr_lock);
+	queued = svp_remote_conn_queue(srp, sqp);
+	mutex_exit(&srp->sr_lock);
+
+	if (queued == B_FALSE)
+		svp_shootdown_logr_cb(srp, SVP_S_FATAL, NULL, 0);
+}
+
+static void
+svp_remote_lrm_request_cb(svp_query_t *sqp, void *arg)
+{
+	svp_remote_t *srp = arg;
+
+	svp_shootdown_lrm_cb(srp, sqp->sq_status);
+}
+
+void
+svp_remote_lrm_request(svp_remote_t *srp, svp_query_t *sqp, void *buf,
+    size_t buflen)
+{
+	boolean_t queued;
+	svp_lrm_req_t *svrr = buf;
+
+	sqp->sq_func = svp_remote_lrm_request_cb;
+	sqp->sq_state = SVP_QUERY_INIT;
+	sqp->sq_arg = srp;
+	sqp->sq_header.svp_ver = htons(SVP_CURRENT_VERSION);
+	sqp->sq_header.svp_op = htons(SVP_R_LOG_RM);
+	sqp->sq_header.svp_size = htonl(buflen);
+	sqp->sq_header.svp_id = id_alloc(svp_idspace);
+	if (sqp->sq_header.svp_id == (id_t)-1)
+		libvarpd_panic("failed to allcoate from svp_idspace: %d",
+		    errno);
+	sqp->sq_header.svp_crc32 = htonl(0);
+	sqp->sq_rdata = buf;
+	sqp->sq_rsize = buflen;
+	sqp->sq_wdata = NULL;
+	sqp->sq_wsize = 0;
+
+	/*
+	 * We need to fix up the count to be in proper network order.
+	 */
+	svrr->svrr_count = htonl(svrr->svrr_count);
+
+	/*
+	 * If this fails, there isn't much that we can't do. Give the callback
+	 * with a fatal status.
+	 */
+	mutex_enter(&srp->sr_lock);
+	queued = svp_remote_conn_queue(srp, sqp);
+	mutex_exit(&srp->sr_lock);
+
+	if (queued == B_FALSE)
+		svp_shootdown_logr_cb(srp, SVP_S_FATAL, NULL, 0);
 }
 
 /* ARGSUSED */
@@ -483,22 +625,31 @@ svp_remote_resolved(svp_remote_t *srp, struct addrinfo *newaddrs)
 
 /*
  * This connection is in the process of being reset, we need to reassign all of
- * its queries to other places or mark them as fatal.
+ * its queries to other places or mark them as fatal. Note that the first
+ * connection was the one in flight when this failed. We always mark it as
+ * failed to avoid trying to reset its state.
  */
 void
 svp_remote_reassign(svp_remote_t *srp, svp_conn_t *scp)
 {
+	boolean_t first = B_TRUE;
+	assert(MUTEX_HELD(&srp->sr_lock));
 	assert(MUTEX_HELD(&srp->sr_lock));
 	svp_query_t *sqp;
 
 	/*
-	 * As we try to reassing all of its queries, remove it from the list.
+	 * As we try to reassigning all of its queries, remove it from the list.
 	 */
 	list_remove(&srp->sr_conns, scp);
 
 	while ((sqp = list_remove_head(&scp->sc_queries)) != NULL) {
-		sqp->sq_wdata = NULL;
-		sqp->sq_wsize = 0;
+
+		if (first == B_TRUE) {
+			sqp->sq_status = SVP_S_FATAL;
+			sqp->sq_func(sqp, sqp->sq_arg);
+			continue;
+		}
+
 		sqp->sq_acttime = -1;
 
 		/*
@@ -578,6 +729,70 @@ svp_remote_restore(svp_remote_t *srp, svp_degrade_state_t flag)
 			libvarpd_fma_degrade(svp->svp_hdl, buf);
 		}
 	}
+}
+
+void
+svp_remote_shootdown_vl3_cb(svp_query_t *sqp, void *arg)
+{
+	svp_shoot_vl3_t *squery = arg;
+	svp_log_vl3_t *svl3 = squery->ssv_vl3;
+	svp_sdlog_t *sdl = squery->ssv_log;
+
+	if (sqp->sq_status == SVP_S_OK) {
+		svp_t *svp, lookup;
+
+		svp_remote_t *srp = sdl->sdl_remote;
+		svp_vl3_ack_t *vl3a = (svp_vl3_ack_t *)sqp->sq_wdata;
+
+		lookup.svp_vid = ntohl(svl3->svl3_vnetid);
+		mutex_enter(&srp->sr_lock);
+		if ((svp = avl_find(&srp->sr_tree, &lookup, NULL)) != NULL) {
+			svp->svp_cb.scb_vl3_inject(svp, ntohs(svl3->svl3_vlan),
+			    (struct in6_addr *)svl3->svl3_ip, vl3a->sl3a_mac,
+			    NULL);
+		}
+		mutex_exit(&srp->sr_lock);
+
+	}
+
+	svp_shootdown_vl3_cb(sqp->sq_status, svl3, sdl);
+
+	umem_free(squery, sizeof (svp_shoot_vl3_t));
+}
+
+void
+svp_remote_shootdown_vl3(svp_remote_t *srp, svp_log_vl3_t *svl3,
+    svp_sdlog_t *sdl)
+{
+	svp_shoot_vl3_t *squery;
+
+	squery = umem_zalloc(sizeof (svp_shoot_vl3_t), UMEM_DEFAULT);
+	if (squery == NULL) {
+		svp_shootdown_vl3_cb(SVP_S_FATAL, svl3, sdl);
+		return;
+	}
+
+	squery->ssv_vl3 = svl3;
+	squery->ssv_log = sdl;
+	squery->ssv_sock.sin6_family = AF_INET6;
+	bcopy(svl3->svl3_ip, &squery->ssv_sock.sin6_addr,
+	    sizeof (svl3->svl3_ip));
+	svp_remote_vl3_logreq(srp, &squery->ssv_query, ntohl(svl3->svl3_vnetid),
+	    (struct sockaddr *)&squery->ssv_sock, svp_remote_shootdown_vl3_cb,
+	    squery);
+}
+
+void
+svp_remote_shootdown_vl2(svp_remote_t *srp, svp_log_vl2_t *svl2)
+{
+	svp_t *svp, lookup;
+
+	lookup.svp_vid = ntohl(svl2->svl2_vnetid);
+	mutex_enter(&srp->sr_lock);
+	if ((svp = avl_find(&srp->sr_tree, &lookup, NULL)) != NULL) {
+		svp->svp_cb.scb_vl2_invalidate(svp, svl2->svl2_mac);
+	}
+	mutex_exit(&srp->sr_lock);
 }
 
 int

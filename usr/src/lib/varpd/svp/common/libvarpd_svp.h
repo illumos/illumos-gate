@@ -52,21 +52,28 @@ typedef struct svp_event {
 typedef void (*svp_timer_f)(void *);
 
 typedef struct svp_timer {
-	svp_timer_f	st_func;
-	void		*st_arg;
-	boolean_t	st_oneshot;
-	uint32_t	st_value;
+	svp_timer_f	st_func;	/* Timer callback function */
+	void		*st_arg;	/* Timer callback arg */
+	boolean_t	st_oneshot;	/* Is timer a one shot? */
+	uint32_t	st_value;	/* periodic or one-shot time */
 	/* Fields below here are private to the svp_timer implementaiton */
-	uint64_t	st_expire;
-	boolean_t	st_delivering;
+	uint64_t	st_expire;	/* Next expiration */
+	boolean_t	st_delivering;	/* Are we currently delivering this */
 	avl_node_t	st_link;
 } svp_timer_t;
 
+/*
+ * Note, both the svp_log_ack_t and svp_lrm_req_t are not part of this structure
+ * as they are rather variable sized data and we don't want to constrain their
+ * size. Instead, the rdata and wdata members must be set appropriately.
+ */
 typedef union svp_query_data {
 	svp_vl2_req_t	sqd_vl2r;
 	svp_vl2_ack_t	sqd_vl2a;
 	svp_vl3_req_t	sdq_vl3r;
 	svp_vl3_ack_t	sdq_vl3a;
+	svp_log_req_t	sdq_logr;
+	svp_lrm_ack_t	sdq_lrma;
 } svp_query_data_t;
 
 typedef void (*svp_query_f)(svp_query_t *, void *);
@@ -86,20 +93,21 @@ typedef enum svp_query_state {
  * may need to make additional changes for those.
  */
 struct svp_query {
-	list_node_t		sq_lnode;
-	svp_query_f		sq_func;
-	svp_query_state_t	sq_state;
-	void			*sq_arg;
-	svp_t			*sq_svp;
-	svp_req_t		sq_header;
-	svp_query_data_t	sq_rdun;
-	svp_query_data_t	sq_wdun;
-	svp_status_t		sq_status;
-	void			*sq_rdata;
-	size_t			sq_rsize;
-	void			*sq_wdata;
-	size_t			sq_wsize;
-	hrtime_t		sq_acttime;
+	list_node_t		sq_lnode;	/* List entry */
+	svp_query_f		sq_func;	/* Callback function */
+	svp_query_state_t	sq_state;	/* Query state */
+	void			*sq_arg;	/* Callback function arg */
+	svp_t			*sq_svp;	/* Pointer back to svp_t */
+	svp_req_t		sq_header;	/* Header for the query */
+	svp_query_data_t	sq_rdun;	/* Union for read data */
+	svp_query_data_t	sq_wdun;	/* Union for write data */
+	svp_status_t		sq_status;	/* Query response status */
+	size_t			sq_size;	/* Query response size */
+	void			*sq_rdata;	/* Read data pointer */
+	size_t			sq_rsize;	/* Read data size */
+	void			*sq_wdata;	/* Write data pointer */
+	size_t			sq_wsize;	/* Write data size */
+	hrtime_t		sq_acttime;	/* Last I/O activity time */
 };
 
 typedef enum svp_conn_state {
@@ -153,7 +161,6 @@ struct svp_conn {
 	svp_conn_state_t	sc_cstate;
 	svp_conn_error_t	sc_error;
 	int			sc_errno;
-	hrtime_t		sc_lastact;
 	list_t			sc_queries;
 	svp_conn_out_t		sc_output;
 	svp_conn_in_t		sc_input;
@@ -176,9 +183,33 @@ typedef enum svp_degrade_state {
 	SVP_RD_ALL		= 0x03	/* Only suitable for restore */
 } svp_degrade_state_t;
 
+typedef enum svp_shootdown_flags {
+	SVP_SD_RUNNING		= 0x01,
+	SVP_SD_QUIESCE		= 0x02,
+	SVP_SD_DORM		= 0x04
+} svp_shootdown_flags_t;
+
+/*
+ * There is a single svp_sdlog_t per svp_remote_t. It maintains its own lock and
+ * condition variables. See the big theory statement for more information on how
+ * it's used.
+ */
+typedef struct svp_sdlog {
+	mutex_t			sdl_lock;
+	cond_t			sdl_cond;
+	uint_t			sdl_ref;
+	svp_timer_t		sdl_timer;
+	svp_shootdown_flags_t	sdl_flags;
+	svp_query_t		sdl_query;
+	void			*sdl_logack;
+	void			*sdl_logrm;
+	void			*sdl_remote;
+} svp_sdlog_t;
+
 struct svp_remote {
 	char			*sr_hostname;	/* RO */
 	uint16_t		sr_rport;	/* RO */
+	struct in6_addr		sr_uip;		/* RO */
 	avl_node_t		sr_gnode;	/* svp_remote_lock */
 	svp_remote_t		*sr_nexthost;	/* svp_host_lock */
 	mutex_t			sr_lock;
@@ -192,6 +223,7 @@ struct svp_remote {
 	uint_t			sr_tconns;	/* total conns + dconns */
 	uint_t			sr_ndconns;	/* number of degraded conns */
 	list_t			sr_conns;	/* all conns */
+	svp_sdlog_t		sr_shoot;
 };
 
 /*
@@ -242,7 +274,8 @@ struct svp {
 
 extern bunyan_logger_t *svp_bunyan;
 
-extern int svp_remote_find(char *, uint16_t, svp_remote_t **);
+extern int svp_remote_find(char *, uint16_t, struct in6_addr *,
+    svp_remote_t **);
 extern int svp_remote_attach(svp_remote_t *, svp_t *);
 extern void svp_remote_detach(svp_t *);
 extern void svp_remote_release(svp_remote_t *);
@@ -274,7 +307,7 @@ extern void svp_timer_remove(svp_timer_t *);
  */
 extern int svp_event_associate(svp_event_t *, int);
 extern int svp_event_dissociate(svp_event_t *, int);
-extern int svp_event_inject(void *);
+extern int svp_event_inject(svp_event_t *);
 
 /*
  * Connection manager
@@ -299,6 +332,23 @@ extern void svp_remote_resolved(svp_remote_t *, struct addrinfo *);
 extern void svp_host_queue(svp_remote_t *);
 extern void svp_query_release(svp_query_t *);
 extern void svp_query_crc32(svp_req_t *, void *, size_t);
+
+/*
+ * Shootdown related
+ */
+extern void svp_remote_shootdown_vl3(svp_remote_t *, svp_log_vl3_t *,
+    svp_sdlog_t *);
+extern void svp_remote_shootdown_vl2(svp_remote_t *, svp_log_vl2_t *);
+extern void svp_remote_log_request(svp_remote_t *, svp_query_t *, void *,
+    size_t);
+extern void svp_remote_lrm_request(svp_remote_t *, svp_query_t *, void *,
+    size_t);
+extern void svp_shootdown_logr_cb(svp_remote_t *, svp_status_t, void *, size_t);
+extern void svp_shootdown_lrm_cb(svp_remote_t *, svp_status_t);
+extern void svp_shootdown_vl3_cb(svp_status_t, svp_log_vl3_t *, svp_sdlog_t *);
+extern int svp_shootdown_init(svp_remote_t *);
+extern void svp_shootdown_fini(svp_remote_t *);
+extern void svp_shootdown_start(svp_remote_t *);
 
 #ifdef __cplusplus
 }

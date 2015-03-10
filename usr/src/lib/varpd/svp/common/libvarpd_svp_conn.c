@@ -27,10 +27,11 @@
 #include <unistd.h>
 #include <stddef.h>
 #include <sys/uio.h>
+#include <sys/debug.h>
 
 #include <libvarpd_svp.h>
 
-static int svp_conn_query_timeout = 30;
+int svp_conn_query_timeout = 30;
 static int svp_conn_backoff_tbl[] = { 1, 2, 4, 8, 16, 32 };
 static int svp_conn_nbackoff = sizeof (svp_conn_backoff_tbl) / sizeof (int);
 
@@ -51,7 +52,7 @@ svp_conn_inject(svp_conn_t *scp)
 	if (scp->sc_flags & SVP_CF_USER)
 		return;
 	scp->sc_flags |= SVP_CF_USER;
-	if ((ret = svp_event_inject(scp)) != 0)
+	if ((ret = svp_event_inject(&scp->sc_event)) != 0)
 		libvarpd_panic("failed to inject event: %d\n", ret);
 }
 
@@ -371,6 +372,7 @@ svp_conn_pollout(svp_conn_t *scp)
 		}
 	}
 
+	sqp->sq_acttime = gethrtime();
 	scp->sc_output.sco_offset += ret;
 	if (ret >= sizeof (svp_req_t) + sqp->sq_rsize) {
 		sqp->sq_state = SVP_QUERY_READING;
@@ -406,7 +408,8 @@ svp_conn_pollin_validate(svp_conn_t *scp)
 		return (B_FALSE);
 	}
 
-	if (nop != SVP_R_VL2_ACK && nop != SVP_R_VL3_ACK) {
+	if (nop != SVP_R_VL2_ACK && nop != SVP_R_VL3_ACK &&
+	    nop != SVP_R_LOG_ACK && nop != SVP_R_LOG_RM_ACK) {
 		(void) bunyan_warn(svp_bunyan, "unsupported operation",
 		    BUNYAN_T_IP, "remote_ip", &scp->sc_addr,
 		    BUNYAN_T_INT32, "remote_port", scp->sc_remote->sr_rport,
@@ -443,24 +446,60 @@ svp_conn_pollin_validate(svp_conn_t *scp)
 	}
 
 	if ((nop == SVP_R_VL2_ACK && nsize != sizeof (svp_vl2_ack_t)) ||
-	    (nop == SVP_R_VL3_ACK && nsize != sizeof (svp_vl3_ack_t))) {
+	    (nop == SVP_R_VL3_ACK && nsize != sizeof (svp_vl3_ack_t)) ||
+	    (nop == SVP_R_LOG_RM_ACK && nsize != sizeof (svp_lrm_ack_t))) {
 		(void) bunyan_warn(svp_bunyan, "response size too large",
-		    BUNYAN_T_IP, "remote ip", &scp->sc_addr,
-		    BUNYAN_T_INT32, "remote port", scp->sc_remote->sr_rport,
+		    BUNYAN_T_IP, "remote_ip", &scp->sc_addr,
+		    BUNYAN_T_INT32, "remote_port", scp->sc_remote->sr_rport,
 		    BUNYAN_T_INT32, "version", nvers,
 		    BUNYAN_T_INT32, "operation", nop,
-		    BUNYAN_T_INT32, "response id", resp->svp_id,
-		    BUNYAN_T_INT32, "response size", nsize,
-		    BUNYAN_T_INT32, "expected size", nop == SVP_R_VL2_ACK ?
+		    BUNYAN_T_INT32, "response_id", resp->svp_id,
+		    BUNYAN_T_INT32, "response_size", nsize,
+		    BUNYAN_T_INT32, "expected_size", nop == SVP_R_VL2_ACK ?
 		    sizeof (svp_vl2_ack_t) : sizeof (svp_vl3_ack_t),
-		    BUNYAN_T_INT32, "query state", sqp->sq_state,
+		    BUNYAN_T_INT32, "query_state", sqp->sq_state,
 		    BUNYAN_T_END);
 		return (B_FALSE);
 	}
 
+	/*
+	 * The valid size is anything <= to what the user requested, but at
+	 * least svp_log_ack_t bytes large.
+	 */
+	if (nop == SVP_R_LOG_ACK) {
+		const char *msg = NULL;
+		if (nsize < sizeof (svp_log_ack_t))
+			msg = "response size too small";
+		else if (nsize > ((svp_log_req_t *)sqp->sq_rdata)->svlr_count)
+			msg = "response size too large";
+		if (msg != NULL) {
+			(void) bunyan_warn(svp_bunyan, msg,
+			    BUNYAN_T_IP, "remote_ip", &scp->sc_addr,
+			    BUNYAN_T_INT32, "remote_port",
+			    scp->sc_remote->sr_rport,
+			    BUNYAN_T_INT32, "version", nvers,
+			    BUNYAN_T_INT32, "operation", nop,
+			    BUNYAN_T_INT32, "response_id", resp->svp_id,
+			    BUNYAN_T_INT32, "response_size", nsize,
+			    BUNYAN_T_INT32, "expected_size",
+			    ((svp_log_req_t *)sqp->sq_rdata)->svlr_count,
+			    BUNYAN_T_INT32, "query_state", sqp->sq_state,
+			    BUNYAN_T_END);
+			return (B_FALSE);
+		}
+	}
+
+	sqp->sq_size = nsize;
 	scp->sc_input.sci_query = sqp;
-	sqp->sq_wdata = &sqp->sq_wdun;
-	sqp->sq_wsize = sizeof (svp_query_data_t);
+	if (nop == SVP_R_VL2_ACK || nop == SVP_R_VL3_ACK ||
+	    nop == SVP_R_LOG_RM_ACK) {
+		sqp->sq_wdata = &sqp->sq_wdun;
+		sqp->sq_wsize = sizeof (svp_query_data_t);
+	} else {
+		VERIFY(nop == SVP_R_LOG_ACK);
+		assert(sqp->sq_wdata != NULL);
+		assert(sqp->sq_wsize != 0);
+	}
 
 	return (B_TRUE);
 }
@@ -523,6 +562,7 @@ svp_conn_pollin(svp_conn_t *scp)
 
 	sqp = scp->sc_input.sci_query;
 	assert(sqp != NULL);
+	sqp->sq_acttime = gethrtime();
 	total = ntohl(scp->sc_input.sci_req.svp_size);
 	do {
 		ret = read(scp->sc_socket,
@@ -580,6 +620,12 @@ svp_conn_pollin(svp_conn_t *scp)
 	} else if (nop == SVP_R_VL3_ACK) {
 		svp_vl3_ack_t *sl3a = sqp->sq_wdata;
 		sqp->sq_status = ntohl(sl3a->sl3a_status);
+	} else if (nop == SVP_R_LOG_ACK) {
+		svp_log_ack_t *svla = sqp->sq_wdata;
+		sqp->sq_status = ntohl(svla->svla_status);
+	} else if (nop == SVP_R_LOG_RM_ACK) {
+		svp_lrm_ack_t *svra = sqp->sq_wdata;
+		sqp->sq_status = ntohl(svra->svra_status);
 	} else {
 		libvarpd_panic("unhandled nop: %d", nop);
 	}
@@ -613,6 +659,7 @@ svp_conn_reset(svp_conn_t *scp)
 	if (close(scp->sc_socket) != 0)
 		libvarpd_panic("failed to close socket %d: %d", scp->sc_socket,
 		    errno);
+	scp->sc_flags &= ~SVP_CF_TEARDOWN;
 	scp->sc_socket = -1;
 	scp->sc_cstate = SVP_CS_INITIAL;
 	scp->sc_input.sci_query = NULL;
@@ -650,7 +697,6 @@ svp_conn_handler(port_event_t *pe, void *arg)
 	 * tear us down. That will also indicate to us that we have nothing to
 	 * worry about as far as general timing and the like goes.
 	 */
-
 	if ((scp->sc_flags & SVP_CF_UFLAG) != 0 &&
 	    (scp->sc_flags & SVP_CF_USER) != 0 &&
 	    pe != NULL &&
@@ -676,6 +722,7 @@ svp_conn_handler(port_event_t *pe, void *arg)
 
 	/* Check if this needs to be reset */
 	if (scp->sc_flags & SVP_CF_TEARDOWN) {
+		/* Make sure any other users of this are disassociated */
 		ret = SVP_RA_ERROR;
 		goto out;
 	}
@@ -763,6 +810,7 @@ svp_conn_backtimer(void *arg)
 static void
 svp_conn_querytimer(void *arg)
 {
+	int ret;
 	svp_query_t *sqp;
 	svp_conn_t *scp = arg;
 	hrtime_t now = gethrtime();
@@ -783,7 +831,7 @@ svp_conn_querytimer(void *arg)
 	    sqp = list_next(&scp->sc_queries, sqp)) {
 		if (sqp->sq_acttime == -1)
 			continue;
-		if ((sqp->sq_acttime - now) / NANOSEC > svp_conn_query_timeout)
+		if ((now - sqp->sq_acttime) / NANOSEC > svp_conn_query_timeout)
 			break;
 	}
 
@@ -793,8 +841,24 @@ svp_conn_querytimer(void *arg)
 		return;
 	}
 
+	(void) bunyan_warn(svp_bunyan, "query timed out on connection",
+	    BUNYAN_T_IP, "remote_ip", &scp->sc_addr,
+	    BUNYAN_T_INT32, "remote_port", scp->sc_remote->sr_rport,
+	    BUNYAN_T_INT32, "operation", ntohs(sqp->sq_header.svp_op),
+	    BUNYAN_T_END);
+
+	/*
+	 * Begin the tear down process for this connect. If we lose the
+	 * disassociate, then we don't inject an event. See the big theory
+	 * statement in libvarpd_svp.c for more information.
+	 */
 	scp->sc_flags |= SVP_CF_TEARDOWN;
-	svp_conn_inject(scp);
+
+	ret = svp_event_dissociate(&scp->sc_event, scp->sc_socket);
+	if (ret == 0)
+		svp_conn_inject(scp);
+	else
+		VERIFY(ret == ENOENT);
 
 	mutex_exit(&scp->sc_lock);
 }
