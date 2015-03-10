@@ -37,8 +37,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "libcmdutils.h"
 
 
@@ -98,7 +96,7 @@ writefile(int fi, int fo, char *infile, char *outfile, char *asfile,
 		(void) snprintf(targbuf, targ_size, "%s", outfile);
 	}
 
-	if (ISREG(*s1p) && s1p->st_size > SMALLFILESIZE) {
+	if (S_ISREG(s1p->st_mode) && s1p->st_size > SMALLFILESIZE) {
 		/*
 		 * Determine size of initial mapping.  This will determine the
 		 * size of the address space chunk we work with.  This initial
@@ -140,7 +138,7 @@ writefile(int fi, int fo, char *infile, char *outfile, char *asfile,
 						(void) close(fi);
 						(void) close(fo);
 						(void) munmap(cp, munmapsize);
-						if (ISREG(*s2p))
+						if (S_ISREG(s2p->st_mode))
 							(void) unlink(targbuf);
 						return (1);
 					}
@@ -164,7 +162,7 @@ writefile(int fi, int fo, char *infile, char *outfile, char *asfile,
 				(void) close(fi);
 				(void) close(fo);
 				(void) munmap(cp, munmapsize);
-				if (ISREG(*s2p))
+				if (S_ISREG(s2p->st_mode))
 					(void) unlink(targbuf);
 				if (srcbuf != NULL)
 					free(srcbuf);
@@ -184,7 +182,7 @@ writefile(int fi, int fo, char *infile, char *outfile, char *asfile,
 				(void) close(fi);
 				(void) close(fo);
 				(void) munmap(cp, munmapsize);
-				if (ISREG(*s2p))
+				if (S_ISREG(s2p->st_mode))
 					(void) unlink(targbuf);
 				if (srcbuf != NULL)
 					free(srcbuf);
@@ -203,7 +201,7 @@ writefile(int fi, int fo, char *infile, char *outfile, char *asfile,
 			} else if (n < 0) {
 				(void) close(fi);
 				(void) close(fo);
-				if (ISREG(*s2p))
+				if (S_ISREG(s2p->st_mode))
 					(void) unlink(targbuf);
 				if (srcbuf != NULL)
 					free(srcbuf);
@@ -213,7 +211,7 @@ writefile(int fi, int fo, char *infile, char *outfile, char *asfile,
 			} else if (write(fo, buf, n) != n) {
 				(void) close(fi);
 				(void) close(fo);
-				if (ISREG(*s2p))
+				if (S_ISREG(s2p->st_mode))
 					(void) unlink(targbuf);
 				if (srcbuf != NULL)
 					free(srcbuf);

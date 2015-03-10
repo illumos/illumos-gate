@@ -211,12 +211,12 @@ void
 usage(void)
 {
 	(void) fprintf(stderr,
-	    "Usage: %s [-fgstv] -l label | -L labelenv -o outfile file ...\n"
-	    "       %s [-fgstv] -l label | -L labelenv -o outfile -d uniqfile\n"
-	    "       %*s [-g] [-D uniqlabel] file ...\n"
-	    "       %s [-fgstv] -l label | -L labelenv -o outfile -w withfile "
+	    "Usage: %s [-fstv] -l label | -L labelenv -o outfile file ...\n"
+	    "       %s [-fstv] -l label | -L labelenv -o outfile -d uniqfile\n"
+	    "       %*s [-D uniqlabel] file ...\n"
+	    "       %s [-fstv] -l label | -L labelenv -o outfile -w withfile "
 	    "file ...\n"
-	    "       %s [-g] -c srcfile destfile\n"
+	    "       %s -c srcfile destfile\n"
 	    "\n"
 	    "  Note: if -L labelenv is specified and labelenv is not set in\n"
 	    "  the environment, a default value is used.\n",
