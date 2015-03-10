@@ -710,14 +710,38 @@ dpwrite(dev_t dev, struct uio *uiop, cred_t *credp)
 	for (pfdp = pollfdp; (uintptr_t)pfdp < limit;
 	    pfdp = (pollfd_t *)((uintptr_t)pfdp + size)) {
 		fd = pfdp->fd;
-		if ((uint_t)fd >= P_FINFO(curproc)->fi_nfiles)
+		if ((uint_t)fd >= P_FINFO(curproc)->fi_nfiles) {
+			/*
+			 * epoll semantics demand that we return EBADF if our
+			 * specified fd is invalid.
+			 */
+			if (dpep->dpe_flag & DP_ISEPOLLCOMPAT) {
+				error = EBADF;
+				break;
+			}
+
 			continue;
+		}
+
 		pdp = pcache_lookup_fd(pcp, fd);
 		if (pfdp->events != POLLREMOVE) {
 
 			fp = NULL;
 
 			if (pdp == NULL) {
+				/*
+				 * If we're in epoll compatibility mode, check
+				 * that the fd is valid before allocating
+				 * anything for it; epoll semantics demand that
+				 * we return EBADF if our specified fd is
+				 * invalid.
+				 */
+				if ((dpep->dpe_flag & DP_ISEPOLLCOMPAT) &&
+				    (fp = getf(fd)) == NULL) {
+					error = EBADF;
+					break;
+				}
+
 				pdp = pcache_alloc_fd(0);
 				pdp->pd_fd = fd;
 				pdp->pd_pcache = pcp;
