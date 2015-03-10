@@ -1,3 +1,6 @@
+# Broken tests
+poll02		# OS-3997
+
 # tests functionality not allowed in a zone
 accept4_01
 acct01
@@ -143,7 +146,7 @@ fork13
 fork14
 ftruncate04
 ftruncate04_64
-futex_wait_bitset01
+futex_wait_bitset01	# OS-3978
 futex_wait_bitset02
 getdents02
 getdents02_64
@@ -178,9 +181,9 @@ process_vm_readv03
 process_vm_writev01
 process_vm_writev02
 prot_hsymlinks
-ptrace01
+ptrace01		# OS-3915
 ptrace02
-ptrace05
+ptrace05		# OS-3307
 read02
 readahead01
 readahead02
@@ -193,7 +196,7 @@ sched_getscheduler01
 sched_getscheduler02 
 semctl01
 semop02
-sendfile02
+sendfile02		# OS-3296
 sendfile02_64
 sendfile04
 sendfile04_64
@@ -209,24 +212,24 @@ setpgid02
 setregid02
 setregid02_16
 setrlimit01
-set_robust_list01
+set_robust_list01	# OS-3224
 setxattr01
 setxattr02
 setxattr03
 sgetmask01
-shmget05
-sighold02
+shmget05		# OS-3326
+sighold02		# OS-3307
 signal_test_05
 signalfd01
 signalfd4_01
 signalfd4_02
-sigrelse01
+sigrelse01		# OS-3307
 splice01
 splice02
 splice03
 ssetmask01
 sync_file_range01
-sysconf01
+sysconf01		# OS-3305
 sysctl01
 sysctl03
 sysctl04
@@ -252,7 +255,7 @@ timerfd_create01
 timerfd_gettime01
 timerfd_settime01
 unshare01
-utimensat01
+utimensat01		# OS-3328
 unshare02
 vmsplice01
 vmsplice02
