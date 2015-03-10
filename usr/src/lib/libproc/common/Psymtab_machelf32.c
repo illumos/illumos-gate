@@ -24,6 +24,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright (c) 2015, Joyent, Inc. All rights reserved.
+ */
+
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -635,7 +639,7 @@ done_with_plt:
 		if (Pread(P, &ndx, sizeof (ndx), (uintptr_t)hash) !=
 		    sizeof (ndx)) {
 			dprintf("Pread of .hash at %lx failed\n", (long)hash);
-			goto bad;
+			goto badplt;
 		}
 
 		while (ndx) {
@@ -643,7 +647,7 @@ done_with_plt:
 			    (uintptr_t)&symtabptr[ndx]) != sizeof (sym)) {
 				dprintf("Pread of .symtab at %lx failed\n",
 				    (long)&symtabptr[ndx]);
-				goto bad;
+				goto badplt;
 			}
 
 			strtabname = strtabptr + sym.st_name;
@@ -651,7 +655,7 @@ done_with_plt:
 			    strtabname) < 0) {
 				dprintf("Pread of .strtab at %lx failed\n",
 				    (long)strtabname);
-				goto bad;
+				goto badplt;
 			}
 
 			if (strcmp("_PROCEDURE_LINKAGE_TABLE_", strbuf) == 0)
@@ -662,7 +666,7 @@ done_with_plt:
 			    sizeof (ndx)) {
 				dprintf("Pread of .hash at %lx failed\n",
 				    (long)hash);
-				goto bad;
+				goto badplt;
 			}
 		}
 
@@ -678,7 +682,7 @@ done_with_plt:
 		if (ndx == 0) {
 			dprintf(
 			    "Failed to find \"_PROCEDURE_LINKAGE_TABLE_\"\n");
-			goto bad;
+			goto badplt;
 		}
 
 		sp->sh_name = SHSTR_NDX_plt;
@@ -698,12 +702,13 @@ done_with_plt:
 		    sp->sh_size) {
 			dprintf("failed to read .plt at %lx\n",
 			    (long)sp->sh_addr);
-			goto bad;
+			goto badplt;
 		}
 		off += roundup(sp->sh_size, SH_ADDRALIGN);
 		sp++;
 	}
 
+badplt:
 	/* make sure we didn't write past the end of allocated memory */
 	sp++;
 	assert(((uintptr_t)(sp) - 1) < ((uintptr_t)elfdata + size));
