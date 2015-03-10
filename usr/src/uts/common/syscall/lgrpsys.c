@@ -22,9 +22,8 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2015 Joyent, Inc.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * lgroup system calls
@@ -40,6 +39,7 @@
 #include <sys/lgrp_user.h>
 #include <sys/promif.h>		/* for prom_printf() */
 #include <sys/sysmacros.h>
+#include <sys/policy.h>
 
 #include <vm/as.h>
 
@@ -138,6 +138,24 @@ meminfo(int addr_count, struct meminfo *mip)
 		kmem_free(req_array, req_size);
 		kmem_free(in_array, in_size);
 		return (set_errno(EFAULT));
+	}
+
+	/*
+	 * Validate privs for each req.
+	 */
+	for (i = 0; i < info_count; i++) {
+		switch (req_array[i] & MEMINFO_MASK) {
+		case MEMINFO_VLGRP:
+		case MEMINFO_VPAGESIZE:
+			break;
+		default:
+			if (secpolicy_meminfo(CRED()) != 0) {
+				kmem_free(req_array, req_size);
+				kmem_free(in_array, in_size);
+				return (set_errno(EPERM));
+			}
+			break;
+		}
 	}
 
 	/*
