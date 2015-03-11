@@ -38,6 +38,7 @@ SUBDIRS = acl \
 	inuse \
 	large_files \
 	largest_pool \
+	libzfs \
 	link_count \
 	mdb \
 	migration \
