@@ -576,10 +576,10 @@ svp_conn_pollin(svp_conn_t *scp)
 
 	if (nop == SVP_R_VL2_ACK) {
 		svp_vl2_ack_t *sl2a = sqp->sq_wdata;
-		sqp->sq_status = ntohs(sl2a->sl2a_status);
+		sqp->sq_status = ntohl(sl2a->sl2a_status);
 	} else if (nop == SVP_R_VL3_ACK) {
 		svp_vl3_ack_t *sl3a = sqp->sq_wdata;
-		sqp->sq_status = ntohs(sl3a->sl3a_status);
+		sqp->sq_status = ntohl(sl3a->sl3a_status);
 	} else {
 		libvarpd_panic("unhandled nop: %d", nop);
 	}
