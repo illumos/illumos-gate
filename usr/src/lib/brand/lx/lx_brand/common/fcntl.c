@@ -91,27 +91,39 @@ lx_fcntl(uintptr_t p1, uintptr_t p2, uintptr_t p3)
 	int		lk = 0;
 	int		rc;
 
-	/*
-	 * The 64-bit fcntl commands must go through fcntl64().
-	 */
-	if (cmd == LX_F_GETLK64 || cmd == LX_F_SETLK64 ||
-	    cmd == LX_F_SETLKW64)
+	switch (cmd) {
+	case LX_F_GETLK64:
+	case LX_F_SETLK64:
+	case LX_F_SETLKW64:
+		/*
+		 * The 64-bit fcntl commands must go through fcntl64().
+		 */
 		return (-EINVAL);
 
-	if (cmd == LX_F_SETSIG || cmd == LX_F_GETSIG || cmd == LX_F_SETLEASE ||
-	    cmd == LX_F_GETLEASE) {
+	case LX_F_SETSIG:
+	case LX_F_GETSIG:
+	case LX_F_SETLEASE:
+	case LX_F_GETLEASE:
+	case LX_F_NOTIFY:
+	case LX_F_CANCELLK:
+	case LX_F_SETPIPE_SZ:
+	case LX_F_GETPIPE_SZ:
 		lx_unsupported("unsupported fcntl command: %d", cmd);
 		return (-ENOTSUP);
-	}
 
-	if (cmd == LX_F_GETLK || cmd == LX_F_SETLK ||
-	    cmd == LX_F_SETLKW) {
+	case LX_F_GETLK:
+	case LX_F_SETLK:
+	case LX_F_SETLKW:
 		if (uucopy((void *)p3, (void *)&lxflk,
 		    sizeof (struct lx_flock)) != 0)
 			return (-errno);
 		lk = 1;
 		ltos_flock(&lxflk, &fl);
 		arg = (ulong_t)&fl;
+		break;
+
+	default:
+		break;
 	}
 
 	rc = lx_fcntl_com(fd, cmd, arg);
@@ -137,13 +149,21 @@ lx_fcntl64(uintptr_t p1, uintptr_t p2, uintptr_t p3)
 	struct flock64	fl64;
 	int		rc;
 
-	if (cmd == LX_F_SETSIG || cmd == LX_F_GETSIG || cmd == LX_F_SETLEASE ||
-	    cmd == LX_F_GETLEASE) {
+	switch (cmd) {
+	case LX_F_SETSIG:
+	case LX_F_GETSIG:
+	case LX_F_SETLEASE:
+	case LX_F_GETLEASE:
+	case LX_F_NOTIFY:
+	case LX_F_CANCELLK:
+	case LX_F_SETPIPE_SZ:
+	case LX_F_GETPIPE_SZ:
 		lx_unsupported("unsupported fcntl64 command: %d", cmd);
 		return (-ENOTSUP);
-	}
 
-	if (cmd == LX_F_GETLK || cmd == LX_F_SETLK || cmd == LX_F_SETLKW) {
+	case LX_F_GETLK:
+	case LX_F_SETLK:
+	case LX_F_SETLKW:
 		if (uucopy((void *)p3, (void *)&lxflk,
 		    sizeof (struct lx_flock)) != 0)
 			return (-errno);
@@ -155,8 +175,12 @@ lx_fcntl64(uintptr_t p1, uintptr_t p2, uintptr_t p3)
 			    sizeof (struct lx_flock)) != 0)
 				return (-errno);
 		}
-	} else if (cmd == LX_F_GETLK64 || cmd == LX_F_SETLKW64 || \
-	    cmd == LX_F_SETLK64) {
+
+		break;
+
+	case LX_F_GETLK64:
+	case LX_F_SETLKW64:
+	case LX_F_SETLK64:
 		if (uucopy((void *)p3, (void *)&lxflk64,
 		    sizeof (struct lx_flock64)) != 0)
 			return (-errno);
@@ -168,7 +192,10 @@ lx_fcntl64(uintptr_t p1, uintptr_t p2, uintptr_t p3)
 			    sizeof (struct lx_flock64)) != 0)
 				return (-errno);
 		}
-	} else {
+
+		break;
+
+	default:
 		rc = lx_fcntl_com(fd, cmd, (ulong_t)p3);
 	}
 
