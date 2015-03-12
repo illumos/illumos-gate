@@ -16,6 +16,9 @@
 ./kernel/drv/cpqary3
 ./kernel/drv/cpqary3.conf
 ./kernel/drv/amd64/cpqary3
+./kernel/drv/bnxe
+./kernel/drv/bnxe.conf
+./kernel/drv/amd64/bnxe
 ./kernel/drv/iprb
 ./kernel/drv/amd64/iprb
 ./kernel/drv/pcn
