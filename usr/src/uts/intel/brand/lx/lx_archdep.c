@@ -311,7 +311,19 @@ lx_uc_to_userregs(lx_lwp_data_t *lwpd, void *ucp, void *uregsp)
 			lxur.lxur_rdi = LX_REG(&uc, REG_RDI);
 			lxur.lxur_orig_rax = 0;
 			lxur.lxur_rip = LX_REG(&uc, REG_RIP);
-			lxur.lxur_xcs = LX_REG(&uc, REG_CS);
+			/*
+			 * strace on some releases (e.g. centos) uses the %cs
+			 * value to determine what kind of process is being
+			 * traced. Here is a sample comment:
+			 *	Check CS register value. On x86-64 linux it is:
+			 *	    0x33	for long mode (64 bit and x32))
+			 *	    0x23	for compatibility mode (32 bit)
+			 *	%ds = 0x2b for x32 mode (x86-64 in 32 bit)
+			 * We can't change the %cs value in the ucp (see
+			 * setgregs and _sys_rtt) so we emulate the expected
+			 * value for ptrace use.
+			 */
+			lxur.lxur_xcs = 0x33;
 			lxur.lxur_rflags = LX_REG(&uc, REG_RFL);
 			lxur.lxur_rsp = LX_REG(&uc, REG_RSP);
 			lxur.lxur_xss = LX_REG(&uc, REG_SS);
@@ -354,7 +366,8 @@ lx_uc_to_userregs(lx_lwp_data_t *lwpd, void *ucp, void *uregsp)
 			lxur.lxur_rdi = LX_REG(&uc, EDI);
 			lxur.lxur_orig_rax = 0;
 			lxur.lxur_rip = LX_REG(&uc, EIP);
-			lxur.lxur_xcs = LX_REG(&uc, CS);
+			/* See comment above re: %cs register */
+			lxur.lxur_xcs = 0x23;
 			lxur.lxur_rflags = LX_REG(&uc, EFL);
 			lxur.lxur_rsp = LX_REG(&uc, UESP);
 			lxur.lxur_xss = LX_REG(&uc, SS);
@@ -404,7 +417,8 @@ lx_uc_to_userregs(lx_lwp_data_t *lwpd, void *ucp, void *uregsp)
 		lxur.lxur_eax = LX_REG(&uc, EAX);
 		lxur.lxur_orig_eax = 0;
 		lxur.lxur_eip = LX_REG(&uc, EIP);
-		lxur.lxur_xcs = LX_REG(&uc, CS);
+		/* See comment above re: %cs register */
+		lxur.lxur_xcs = 0x23;
 		lxur.lxur_eflags = LX_REG(&uc, EFL);
 		lxur.lxur_esp = LX_REG(&uc, UESP);
 		lxur.lxur_xss = LX_REG(&uc, SS);
@@ -607,7 +621,11 @@ lx_regs_to_userregs(lx_lwp_data_t *lwpd, void *uregsp)
 		 * We can't change the %cs value in the ucp (see setgregs and
 		 * _sys_rtt) so we emulate the expected value for ptrace use.
 		 */
-		lxur.lxur_xcs = 0x33;
+		if (lwp_getdatamodel(lwp) == DATAMODEL_ILP32) {
+			lxur.lxur_xcs = 0x23;
+		} else {
+			lxur.lxur_xcs = 0x33;
+		}
 		lxur.lxur_rflags = rp->r_rfl;
 		lxur.lxur_rsp = rp->r_rsp;
 		lxur.lxur_xss = rp->r_ss;
