@@ -49,14 +49,6 @@
 #include <nfs/nfs_clnt.h>
 #include <nfs/auth.h>
 
-#define	EQADDR(a1, a2)  \
-	(bcmp((char *)(a1)->buf, (char *)(a2)->buf, (a1)->len) == 0 && \
-	(a1)->len == (a2)->len)
-
-static struct knetconfig auth_knconf;
-static servinfo_t svp;
-static clinfo_t ci;
-
 static struct kmem_cache *exi_cache_handle;
 static void exi_cache_reclaim(void *);
 static void exi_cache_trim(struct exportinfo *exi);

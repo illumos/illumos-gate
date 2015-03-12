@@ -12,6 +12,7 @@
 #
 # Copyright (c) 2012, 2014 by Delphix. All rights reserved.
 # Copyright 2014, OmniTI Computer Consulting, Inc. All rights reserved.
+# Copyright 2015, Nexenta Systems Inc. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/system/test/zfstest@$(PKGVERS)
@@ -300,7 +301,7 @@ file path=opt/zfs-tests/tests/functional/bootfs/bootfs_003_pos mode=0555
 file path=opt/zfs-tests/tests/functional/bootfs/bootfs_004_neg mode=0555
 file path=opt/zfs-tests/tests/functional/bootfs/bootfs_005_neg mode=0555
 file path=opt/zfs-tests/tests/functional/bootfs/bootfs_006_pos mode=0555
-file path=opt/zfs-tests/tests/functional/bootfs/bootfs_007_neg mode=0555
+file path=opt/zfs-tests/tests/functional/bootfs/bootfs_007_pos mode=0555
 file path=opt/zfs-tests/tests/functional/bootfs/bootfs_008_neg mode=0555
 file path=opt/zfs-tests/tests/functional/cache/cache.cfg mode=0555
 file path=opt/zfs-tests/tests/functional/cache/cache.kshlib mode=0555

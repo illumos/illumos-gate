@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ * Copyright 2015 Gary Mills
  */
 
 /*
@@ -1260,7 +1261,8 @@ pentry(struct lbuf *ap)
 	char *str;
 
 	if (noflist) {
-		(void) printf("%s\n", ap->ln.lname);
+		(void) printf("%s\n", (ap->lflags & ISARG) ? ap->ln.namep :
+		    ap->ln.lname);
 		return;
 	}
 
@@ -1811,30 +1813,22 @@ gstat(char *file, int argfl, struct ditem *myparent)
 		rep = flist[nfiles++];
 	}
 
+	/* Clear the lbuf */
+	(void) memset((void *) rep, 0, sizeof (struct lbuf));
+
 	/*
 	 * When noflist is set, none of the extra information about the dirent
-	 * will be printed, so omit initialization of this lbuf as well as the
-	 * stat(2) call.
+	 * will be printed, so omit remaining initialization of this lbuf
+	 * as well as the  stat(2) call.
 	 */
 	if (!argfl && noflist)
 		return (rep);
 
-	/* Initialize */
+	/* Initialize non-zero members */
 
-	rep->lflags = (mode_t)0;
-	rep->flinkto = NULL;
-	rep->cycle = 0;
 	rep->lat.tv_sec = time(NULL);
-	rep->lat.tv_nsec = 0;
 	rep->lct.tv_sec = time(NULL);
-	rep->lct.tv_nsec = 0;
 	rep->lmt.tv_sec = time(NULL);
-	rep->lmt.tv_nsec = 0;
-	rep->aclp = NULL;
-	rep->exttr = NULL;
-	rep->extm = NULL;
-	rep->color = NULL;
-	rep->link_color = NULL;
 
 	if (argfl || statreq) {
 		int doacl;

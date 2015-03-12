@@ -35,10 +35,6 @@
 #ifndef _E1000_MANAGE_H_
 #define _E1000_MANAGE_H_
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 bool e1000_check_mng_mode_generic(struct e1000_hw *hw);
 bool e1000_enable_tx_pkt_filtering_generic(struct e1000_hw *hw);
 s32  e1000_mng_enable_host_if_generic(struct e1000_hw *hw);
@@ -97,8 +93,4 @@ enum e1000_mng_mode {
 /* Intel(R) Active Management Technology signature */
 #define E1000_IAMT_SIGNATURE		0x544D4149
 
-#ifdef __cplusplus
-}
 #endif
-
-#endif	/* _E1000_MANAGE_H_ */

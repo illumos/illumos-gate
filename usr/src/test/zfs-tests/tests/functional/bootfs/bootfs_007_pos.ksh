@@ -24,6 +24,8 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2015 Nexenta Systems, Inc.
+#
 
 . $STF_SUITE/include/libtest.shlib
 
@@ -31,12 +33,12 @@
 # DESCRIPTION:
 #
 # Setting bootfs on a pool which was configured with the whole disk
-# (i.e. EFI) will fail
+# (i.e. EFI) works.
 #
 # STRATEGY:
 # 1. create a pool with a whole disk
 # 2. create a filesystem on this pool
-# 3. verify we can not set bootfs on the filesystem we just created.
+# 3. verify we can set bootfs on the filesystem we just created.
 #
 
 verify_runnable "global"
@@ -52,12 +54,12 @@ log_onexit cleanup
 DISK=${DISKS%% *}
 typeset EFI_BOOTFS=$TESTPOOL/efs
 typeset assert_mesg="setting bootfs on a pool which was configured with the \
-    whole disk will fail"
+    whole disk works"
 
 log_assert $assert_mesg
 create_pool "$TESTPOOL" "$DISK"
 log_must $ZFS create $EFI_BOOTFS
 
-log_mustnot $ZPOOL set bootfs=$EFI_BOOTFS $TESTPOOL
+log_must $ZPOOL set bootfs=$EFI_BOOTFS $TESTPOOL
 
 log_pass $assert_mesg
