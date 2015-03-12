@@ -1742,7 +1742,19 @@ lx_native_exec(uint8_t osabi, const char **interp)
 	if (osabi != ELFOSABI_SOLARIS)
 		return (B_FALSE);
 
-	*interp = "/native";
+	/*
+	 * If the process root matches the zone root, prepend /native to the
+	 * interpreter path for native executables.  Absolute precision from
+	 * VN_CMP is not necessary since any change of process root is likely
+	 * to make native binaries inaccessible via /native.
+	 *
+	 * Processes which chroot directly into /native will be able to
+	 * function as expected with no need for the prefix.
+	 */
+	if (VN_CMP(curproc->p_user.u_rdir, curproc->p_zone->zone_rootvp)) {
+		*interp = "/native";
+	}
+
 	return (B_TRUE);
 }
 
