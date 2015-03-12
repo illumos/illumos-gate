@@ -816,6 +816,13 @@ lx_ptrace_getregs(lx_lwp_data_t *remote, void *uregsp)
 		 * the kernel.  Return the LWP register state.
 		 */
 		return (lx_regs_to_userregs(remote, uregsp));
+	} else if (remote->br_stack_mode == LX_STACK_MODE_PREINIT &&
+	    remote->br_ptrace_whatstop == LX_PR_SIGNALLED) {
+		/*
+		 * The LWP was stopped by tracing on exec. br_ptrace_stopucp
+		 * is NULL. Return the LWP register state.
+		 */
+		return (lx_regs_to_userregs(remote, uregsp));
 	} else if (remote->br_ptrace_stopucp != NULL) {
 		/*
 		 * The LWP was stopped in the usermode emulation library
