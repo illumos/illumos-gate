@@ -87,6 +87,19 @@
  *	Wake up val1 processes that are waiting on futex1.  The call
  *	returns the number of blocked threads that were woken up.
  *
+ * FUTEX_WAIT_BITSET/FUTEX_WAKE_BITSET
+ *
+ *	Similar to FUTEX_WAIT/FUTEX_WAKE, but each takes an additional argument
+ *	denoting a bit vector, with wakers will only waking waiters that match
+ *	in one or more bits.  These semantics are dubious enough, but the
+ *	interface has an inconsistency that is glaring even by the
+ *	embarrassingly low standards that Linux sets for itself:  the timeout
+ *	argument to FUTEX_WAIT_BITSET is absolute, not relative as it is for
+ *	FUTEX_WAIT.  And as if that weren't enough unnecessary complexity,
+ *	the caller may specify this absolute timeout to be against either
+ *	CLOCK_MONOTONIC or CLOCK_REALTIME -- but only for FUTEX_WAIT_BITSET,
+ *	of course!
+ *
  * FUTEX_WAKE_OP
  *
  *	The implementation of a conditional variable in terms of futexes
@@ -189,6 +202,7 @@ typedef struct fwaiter {
 	kcondvar_t	fw_cv;		/* cond var */
 	struct fwaiter	*fw_next;	/* hash queue */
 	struct fwaiter	*fw_prev;	/* hash queue */
+	uint32_t	fw_bits;	/* bits waiting on */
 	volatile int	fw_woken;
 } fwaiter_t;
 
@@ -250,7 +264,8 @@ futex_hashout(fwaiter_t *fwp)
  * signal, or the timeout expires.
  */
 static int
-futex_wait(memid_t *memid, caddr_t addr, int val, timespec_t *timeout)
+futex_wait(memid_t *memid, caddr_t addr,
+    int val, timespec_t *timeout, uint32_t bits)
 {
 	int err, ret;
 	int32_t curval;
@@ -258,6 +273,8 @@ futex_wait(memid_t *memid, caddr_t addr, int val, timespec_t *timeout)
 	int index;
 
 	fw.fw_woken = 0;
+	fw.fw_bits = bits;
+
 	MEMID_COPY(memid, &fw.fw_memid);
 	cv_init(&fw.fw_cv, NULL, CV_DEFAULT, NULL);
 
@@ -308,7 +325,7 @@ out:
  * Wake up to wake_threads threads that are blocked on the futex at memid.
  */
 static int
-futex_wake(memid_t *memid, int wake_threads)
+futex_wake(memid_t *memid, int wake_threads, uint32_t mask)
 {
 	fwaiter_t *fwp, *next;
 	int index;
@@ -320,7 +337,8 @@ futex_wake(memid_t *memid, int wake_threads)
 
 	for (fwp = futex_hash[index]; fwp && ret < wake_threads; fwp = next) {
 		next = fwp->fw_next;
-		if (MEMID_EQUAL(&fwp->fw_memid, memid)) {
+		if (MEMID_EQUAL(&fwp->fw_memid, memid) &&
+		    (fwp->fw_bits & mask)) {
 			futex_hashout(fwp);
 			fwp->fw_woken = 1;
 			cv_signal(&fwp->fw_cv);
@@ -564,10 +582,14 @@ out:
 
 /*
  * Copy in the relative timeout provided by the application and convert it
- * to an absolute timeout.
+ * to an absolute timeout.  Sadly, this is complicated by the different
+ * timeout of semantics of FUTEX_WAIT vs. FUTEX_WAIT_BITSET.  (Yes, you read
+ * that correctly; FUTEX_WAIT and FUTEX_WAIT_BITSET have different timeout
+ * semantics; see the block comment at the top of the file for commentary
+ * on this inanity.)
  */
 static int
-get_timeout(void *lx_timeout, timestruc_t *timeout)
+get_timeout(void *lx_timeout, timestruc_t *timeout, int cmd, int clock)
 {
 	timestruc_t now;
 
@@ -584,12 +606,51 @@ get_timeout(void *lx_timeout, timestruc_t *timeout)
 		timeout->tv_nsec = timeout32.tv_nsec;
 	}
 #endif
-	gethrestime(&now);
-
 	if (itimerspecfix(timeout))
 		return (EINVAL);
 
-	timespecadd(timeout, &now);
+	if (cmd == FUTEX_WAIT) {
+		/*
+		 * We've been given a relative time; add it to the current
+		 * time to derive an absolute time.
+		 */
+		gethrestime(&now);
+		timespecadd(timeout, &now);
+	} else {
+		/*
+		 * This is a FUTEX_WAIT_BITSET operation, which (1) specifies
+		 * the timeout as an absolute rather than a relative timeout
+		 * and (2) allows for different clock types to be specified.
+		 * If the clock is CLOCK_REALTIME, we actually have nothing
+		 * to do -- but if this is CLOCK_MONOTONIC, we need to convert
+		 * our absolute time back into a relative time and then add
+		 * it to our current hrestime to get an absolute CLOCK_REALTIME
+		 * timeout.
+		 */
+		if (clock == CLOCK_MONOTONIC) {
+			/*
+			 * Get our current time, and subtract it from our
+			 * timeout to get the relative value.
+			 */
+			hrt2ts(gethrtime(), &now);
+			timespecsub(timeout, &now);
+
+			/*
+			 * If our timeout is in the past, set it to be 0.
+			 */
+			if (timeout->tv_sec < 0) {
+				timeout->tv_sec = 0;
+				timeout->tv_nsec = 0;
+			}
+
+			/*
+			 * Add the relative time back into the current time.
+			 */
+			gethrestime(&now);
+			timespecadd(timeout, &now);
+		}
+	}
+
 	return (0);
 }
 
@@ -630,8 +691,6 @@ lx_futex(uintptr_t addr, int op, int val, uintptr_t lx_timeout,
 	case FUTEX_LOCK_PI:
 	case FUTEX_UNLOCK_PI:
 	case FUTEX_TRYLOCK_PI:
-	case FUTEX_WAIT_BITSET:
-	case FUTEX_WAKE_BITSET:
 	case FUTEX_WAIT_REQUEUE_PI:
 	case FUTEX_CMP_REQUEUE_PI:
 		/*
@@ -645,9 +704,21 @@ lx_futex(uintptr_t addr, int op, int val, uintptr_t lx_timeout,
 		return (set_errno(ENOSYS));
 	}
 
+	if ((op & FUTEX_CLOCK_REALTIME) && cmd != FUTEX_WAIT_BITSET) {
+		/*
+		 * Linux only allows FUTEX_CLOCK_REALTIME to be set on the
+		 * FUTEX_WAIT_BITSET and FUTEX_WAIT_REQUEUE_PI commands.
+		 */
+		return (set_errno(ENOSYS));
+	}
+
 	/* Copy in the timeout structure from userspace. */
-	if (cmd == FUTEX_WAIT && lx_timeout != NULL) {
-		rval = get_timeout((timespec_t *)lx_timeout, &timeout);
+	if ((cmd == FUTEX_WAIT || cmd == FUTEX_WAIT_BITSET) &&
+	    lx_timeout != NULL) {
+		rval = get_timeout((timespec_t *)lx_timeout, &timeout, cmd,
+		    op & FUTEX_CLOCK_REALTIME ? CLOCK_REALTIME :
+		    CLOCK_MONOTONIC);
+
 		if (rval != 0)
 			return (set_errno(rval));
 		tptr = &timeout;
@@ -660,7 +731,7 @@ lx_futex(uintptr_t addr, int op, int val, uintptr_t lx_timeout,
 		/*
 		 * lx_timeout is nominally a pointer to a userspace address.
 		 * For several commands, however, it actually contains
-		 * an additional interage parameter.  This is horrible, and
+		 * an additional integer parameter.  This is horrible, and
 		 * the people who did this to us should be sorry.
 		 */
 		val2 = (int)lx_timeout;
@@ -698,11 +769,20 @@ lx_futex(uintptr_t addr, int op, int val, uintptr_t lx_timeout,
 
 	switch (cmd) {
 	case FUTEX_WAIT:
-		rval = futex_wait(&memid, (void *)addr, val, tptr);
+		rval = futex_wait(&memid, (void *)addr, val,
+		    tptr, FUTEX_BITSET_MATCH_ANY);
+		break;
+
+	case FUTEX_WAIT_BITSET:
+		rval = futex_wait(&memid, (void *)addr, val, tptr, val3);
 		break;
 
 	case FUTEX_WAKE:
-		rval = futex_wake(&memid, val);
+		rval = futex_wake(&memid, val, FUTEX_BITSET_MATCH_ANY);
+		break;
+
+	case FUTEX_WAKE_BITSET:
+		rval = futex_wake(&memid, val, val3);
 		break;
 
 	case FUTEX_WAKE_OP:

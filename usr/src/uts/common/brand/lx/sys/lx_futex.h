@@ -56,6 +56,7 @@ extern "C" {
 #define	FUTEX_PRIVATE_FLAG	0x0080
 #define	FUTEX_CLOCK_REALTIME	0x0100
 
+#define	FUTEX_BITSET_MATCH_ANY	0xffffffff
 /*
  * FUTEX_WAKE_OP operations
  */
