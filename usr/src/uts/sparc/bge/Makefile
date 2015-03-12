@@ -39,7 +39,7 @@ UTSBASE		= ../..
 #
 MODULE		= bge
 OBJECTS		= $(BGE_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(BGE_OBJS:%.o=$(LINTS_DIR)/%.ln)
+LINTS		= $(LINTS_DIR)/bge_lint.ln
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/common/io/bge
 
