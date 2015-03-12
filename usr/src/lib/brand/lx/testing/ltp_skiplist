@@ -146,8 +146,6 @@ fork13
 fork14
 ftruncate04
 ftruncate04_64
-futex_wait_bitset01	# OS-3978
-futex_wait_bitset02
 getdents02
 getdents02_64
 get_mempolicy01
