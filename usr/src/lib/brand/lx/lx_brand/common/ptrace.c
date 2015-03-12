@@ -514,7 +514,8 @@ ptrace_peek(pid_t pid, uintptr_t addr, long *ret)
 static int
 ptrace_peek_user(pid_t lxpid, pid_t pid, lwpid_t lwpid, uintptr_t off, int *ret)
 {
-	int err, data;
+	int err;
+	long data;
 	uintptr_t *debugreg;
 	int dreg;
 
@@ -532,7 +533,7 @@ ptrace_peek_user(pid_t lxpid, pid_t pid, lwpid_t lwpid, uintptr_t off, int *ret)
 			return (err);
 		}
 
-		data = *(int *)((uintptr_t)&regs + off -
+		data = *(long *)((uintptr_t)&regs + off -
 		    offsetof(lx_user_t, lxu_regs));
 
 	} else if (off < LX_USER_BOUND(lxu_fpvalid)) {
@@ -544,7 +545,7 @@ ptrace_peek_user(pid_t lxpid, pid_t pid, lwpid_t lwpid, uintptr_t off, int *ret)
 		if ((err = getfpregs(pid, lwpid, &regs)) != 0)
 			return (err);
 
-		data = *(int *)((uintptr_t)&regs + off -
+		data = *(long *)((uintptr_t)&regs + off -
 		    offsetof(lx_user_t, lxu_i387));
 
 	} else if (off < LX_USER_BOUND(lxu_tsize)) {
