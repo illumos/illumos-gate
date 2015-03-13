@@ -206,8 +206,8 @@ typedef struct usb_log_handle *usb_log_handle_t;
 #define	USB_LOG_L4	4	/* tracing, debug only */
 
 #ifdef DEBUG
-#define	USB_DPRINTF_L4	usb_dprintf4
-#define	USB_DPRINTF_L3	usb_dprintf3
+#define	USB_DPRINTF_L4(...)	usb_dprintf4(__VA_ARGS__)
+#define	USB_DPRINTF_L3(...)	usb_dprintf3(__VA_ARGS__)
 
 /*PRINTFLIKE3*/
 void usb_dprintf4(
@@ -220,8 +220,8 @@ void usb_dprintf3(
 	usb_log_handle_t handle,
 	char		*fmt, ...);
 #else
-#define	USB_DPRINTF_L4 0 &&
-#define	USB_DPRINTF_L3 0 &&
+#define	USB_DPRINTF_L4(...)	((void)0)
+#define	USB_DPRINTF_L3(...)	((void)0)
 #endif
 
 #define	USB_DPRINTF_L2	usb_dprintf2
