@@ -18,6 +18,11 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ */
+
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -25,9 +30,6 @@
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	 All Rights Reserved 	*/
-
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <ctype.h>
 #include <stdio.h>
@@ -38,7 +40,6 @@
 #include <sys/param.h>
 #include <string.h>
 #include <stdlib.h>
-#include <synch.h>
 
 /*
  *	The generic name to address mappings for any transport that
@@ -70,10 +71,10 @@
 #define	SERVICEFILE	"/etc/net/%s/services"
 #define	FIELD1		1
 #define	FIELD2		2
+#define	LOCALHOST	"localhost"
 
 static int searchhost(struct netconfig *, char *, int, char *);
 static int searchserv(struct netconfig *, char *, int, char *);
-static const char *nodename(void);
 
 /*
  *	_netdir_getbyname() returns all of the addresses for
@@ -344,8 +345,8 @@ _uaddr2taddr(struct netconfig *netconfigp, char *uaddr)
 				from += 2;
 			} else {
 				*to = ((*(from+1) - '0') << 6) +
-					((*(from+2) - '0') << 3) +
-					(*(from+3) - '0');
+				    ((*(from+2) - '0') << 3) +
+				    (*(from+3) - '0');
 				from += 4;
 			}
 		} else {
@@ -386,7 +387,11 @@ _netdir_options(struct netconfig *netconfigp, int option, int fd, void *par)
 		 */
 		argp = (struct nd_mergearg *)par;
 		argp->m_uaddr = strdup(argp->s_uaddr);
-		return (argp->m_uaddr == NULL? -1 : 0);
+		if (argp->m_uaddr == NULL) {
+			_nderror = ND_NOMEM;
+			return (-1);
+		}
+		return (0);
 	default:
 		_nderror = ND_NOCTRL;
 		return (-1);
@@ -411,28 +416,21 @@ searchhost(struct netconfig *netconfigp, char *token, int field, char *hostbuf)
 	char *nexttok;		/* next token to process		    */
 	FILE *fp;		/* the opened searchfile		    */
 	int   nelements = 0;	/* total number of elements found	    */
-	const char *myname;	/* my own nodename			    */
-
-	myname = nodename();
+	struct utsname utsname;
 
 	/*
-	 *	Unless /etc/netconfig has been altered, the only transport
-	 *	that will use straddr.so is loopback.  In this case, we
-	 *	always return our nodename if that's what we were passed,
-	 *	or we fail (note that we'd like to return a constant like
-	 *	"localhost" so that changes to the machine name won't cause
-	 *	problems, but things like autofs actually assume that we're
-	 *	using our nodename).
+	 *	Unless /etc/netconfig has been altered, the only transport that
+	 *	will use straddr.so is loopback.  In this case, we always
+	 *	return "localhost" if either our nodename, or "localhost", or
+	 *	some of special-case host names were passed, or we fail.
 	 */
 
 	if ((strcmp(token, HOST_SELF_BIND) == 0) ||
 	    (strcmp(token, HOST_SELF_CONNECT) == 0) ||
 	    (strcmp(token, HOST_ANY) == 0) ||
-	    (myname != NULL && (strcmp(token, myname) == 0))) {
-		if (myname == NULL)
-			return (0);
-
-		(void) strcpy(hostbuf, myname);
+	    (strcmp(token, LOCALHOST) == 0) ||
+	    (uname(&utsname) >= 0 && strcmp(token, utsname.nodename) == 0)) {
+		(void) strcpy(hostbuf, LOCALHOST);
 		return (1);
 	}
 
@@ -559,31 +557,4 @@ searchserv(struct netconfig *netconfigp, char *token, int field, char *servname)
 
 	(void) fclose(fp);
 	return (0);
-}
-
-static const char *
-nodename(void)
-{
-	static mutex_t	nodename_lock = DEFAULTMUTEX;
-	static const char *myname;
-	struct utsname utsname;
-
-	(void) mutex_lock(&nodename_lock);
-	if (myname != NULL) {
-		(void) mutex_unlock(&nodename_lock);
-		return (myname);
-	}
-
-	if (uname(&utsname) == -1) {
-		(void) mutex_unlock(&nodename_lock);
-		_nderror = ND_SYSTEM;
-		return (NULL);
-	}
-
-	myname = strdup(utsname.nodename);
-	if (myname == NULL)
-		_nderror = ND_NOMEM;
-
-	(void) mutex_unlock(&nodename_lock);
-	return (myname);
 }
