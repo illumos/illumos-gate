@@ -1028,12 +1028,6 @@ stol_sockaddr(struct sockaddr *addr, socklen_t *len,
 	case AF_UNIX:
 		if (inlen > sizeof (struct sockaddr_un))
 			return (EINVAL);
-		/*
-		 * If inlen is larger than orig, copy out the maximum amount of
-		 * data possible and then update *len to indicate the actual
-		 * size of all the data that it wanted to copy out.
-		 */
-		size = (orig > 0 && orig < size) ? orig : size;
 		break;
 
 	case (sa_family_t)AF_NOTSUPPORTED:
@@ -1045,6 +1039,13 @@ stol_sockaddr(struct sockaddr *addr, socklen_t *len,
 	default:
 		break;
 	}
+
+	/*
+	 * If inlen is larger than orig, copy out the maximum amount of
+	 * data possible and then update *len to indicate the actual
+	 * size of all the data that it wanted to copy out.
+	 */
+	size = (orig > 0 && orig < size) ? orig : size;
 
 	if (uucopy(inaddr, addr, size) < 0)
 		return (errno);
