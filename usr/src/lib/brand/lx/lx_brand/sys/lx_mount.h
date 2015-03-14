@@ -22,7 +22,7 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2014 Joyent, Inc. All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  */
 
 #ifndef	_LX_MOUNT_H
@@ -55,11 +55,22 @@ extern "C" {
 #define	LX_MS_MOVE		0x00002000
 #define	LX_MS_REC		0x00004000
 #define	LX_MS_SILENT		0x00008000
+#define	LX_MS_POSIXACL		0x00010000
+#define	LX_MS_UNBINDABLE	0x00020000
+#define	LX_MS_PRIVATE		0x00040000
+#define	LX_MS_SLAVE		0x00080000
+#define	LX_MS_SHARED		0x00100000
+#define	LX_MS_RELATIME		0x00200000
+#define	LX_MS_KERNMOUNT		0x00400000
+#define	LX_MS_I_VERSION		0x00800000
+#define	LX_MS_STRICTATIME	0x01000000
+#define	LX_MS_LAZYTIME		0x02000000
 #define	LX_MS_SUPPORTED		(LX_MS_MGC_VAL | \
 				LX_MS_RDONLY | LX_MS_NOSUID | \
 				LX_MS_NODEV | LX_MS_NOEXEC | \
 				LX_MS_REMOUNT | LX_MS_NOATIME | \
-				LX_MS_BIND | LX_MS_SILENT)
+				LX_MS_BIND | LX_MS_SILENT | \
+				LX_MS_STRICTATIME)
 
 /*
  * support for nfs mounts

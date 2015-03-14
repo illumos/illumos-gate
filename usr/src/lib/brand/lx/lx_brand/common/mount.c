@@ -22,7 +22,7 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2014 Joyent, Inc.  All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  */
 
 #include <alloca.h>
@@ -59,7 +59,8 @@ union fh_buffer {
 typedef enum mount_opt_type {
 	MOUNT_OPT_INVALID	= 0,
 	MOUNT_OPT_NORMAL	= 1,	/* option value: none */
-	MOUNT_OPT_UINT		= 2	/* option value: unsigned int */
+	MOUNT_OPT_UINT		= 2,	/* option value: unsigned int */
+	MOUNT_OPT_BYTESIZE	= 3	/* option value: byte size, e.g. 25m */
 } mount_opt_type_t;
 
 typedef struct mount_opt {
@@ -72,15 +73,17 @@ typedef struct mount_opt {
  * Globals
  */
 mount_opt_t lofs_options[] = {
-	{ NULL, MOUNT_OPT_INVALID }
+	{ NULL,			MOUNT_OPT_INVALID }
 };
 
 mount_opt_t lx_proc_options[] = {
-	{ NULL, MOUNT_OPT_INVALID }
+	{ NULL,			MOUNT_OPT_INVALID }
 };
 
 mount_opt_t lx_tmpfs_options[] = {
-	{ NULL, MOUNT_OPT_INVALID }
+	{ LX_MNTOPT_SIZE,	MOUNT_OPT_BYTESIZE },
+	{ LX_MNTOPT_MODE,	MOUNT_OPT_UINT },
+	{ NULL,			MOUNT_OPT_INVALID }
 };
 
 mount_opt_t lx_autofs_options[] = {
@@ -88,6 +91,7 @@ mount_opt_t lx_autofs_options[] = {
 	{ LX_MNTOPT_PGRP,	MOUNT_OPT_UINT },
 	{ LX_MNTOPT_MINPROTO,	MOUNT_OPT_UINT },
 	{ LX_MNTOPT_MAXPROTO,	MOUNT_OPT_UINT },
+	{ NULL,			MOUNT_OPT_INVALID }
 };
 
 
@@ -114,29 +118,40 @@ i_lx_opt_verify(char *opts, mount_opt_t *mop)
 	assert((opts != NULL) && (mop != NULL));
 
 	/* If no options were specified, there's no problem. */
-	if (opts_len == 0)
-		return (1);
+	if (opts_len == 0) {
+		errno = 0;
+		return (0);
+	}
 
 	/* If no options are allowed, fail. */
-	if (mop[0].mo_name == NULL)
-		return (0);
+	if (mop[0].mo_name == NULL) {
+		errno = ENOTSUP;
+		return (-1);
+	}
 
 	/* Don't accept leading or trailing ','. */
-	if ((opts[0] == ',') || (opts[opts_len] == ','))
-		return (0);
+	if ((opts[0] == ',') || (opts[opts_len] == ',')) {
+		errno = EINVAL;
+		return (-1);
+	}
 
 	/* Don't accept sequential ','. */
-	for (i = 1; i < opts_len; i++)
-		if ((opts[i - 1] ==  ',') && (opts[i] ==  ','))
-			return (0);
+	for (i = 1; i < opts_len; i++) {
+		if ((opts[i - 1] ==  ',') && (opts[i] ==  ',')) {
+			errno = EINVAL;
+			return (-1);
+		}
+	}
 
 	/*
 	 * We're going to use strtok() which modifies the target
 	 * string so make a temporary copy.
 	 */
 	opts_tmp = SAFE_ALLOCA(opts_len);
-	if (opts_tmp == NULL)
+	if (opts_tmp == NULL) {
+		errno = ENOMEM;
 		return (-1);
+	}
 	bcopy(opts, opts_tmp, opts_len + 1);
 
 	/* Verify each prop one at a time. */
@@ -184,15 +199,73 @@ i_lx_opt_verify(char *opts, mount_opt_t *mop)
 			ovalue_len = strlen(ovalue);
 
 			/* Value can't be zero length string. */
-			if (ovalue_len == 0)
-				return (0);
+			if (ovalue_len == 0) {
+				errno = EINVAL;
+				return (-1);
+			}
 
 			if (mop[i].mo_type == MOUNT_OPT_UINT) {
 				int j;
 				/* Verify that value is an unsigned int. */
-				for (j = 0; j < ovalue_len; j++)
-					if (!isdigit(ovalue[j]))
-						return (0);
+				for (j = 0; j < ovalue_len; j++) {
+					if (!isdigit(ovalue[j])) {
+						errno = EINVAL;
+						return (-1);
+					}
+				}
+			} else if (mop[i].mo_type == MOUNT_OPT_BYTESIZE) {
+				int j;
+				int stage = 0;
+
+				/*
+				 * Verify that the value is an unsigned integer
+				 * that ends in a magnitude suffix, i.e. 'k'
+				 * or 'm'.
+				 */
+				for (j = 0; j < ovalue_len; j++) {
+					switch (stage) {
+					case 0:
+						/*
+						 * Look for at least one digit.
+						 */
+						if (!isdigit(ovalue[j])) {
+							errno = EINVAL;
+							return (-1);
+						}
+						stage = 1;
+						break;
+					case 1:
+						/*
+						 * Allow an unlimited number of
+						 * digits.
+						 */
+						if (isdigit(ovalue[j])) {
+							break;
+						}
+						/*
+						 * Allow one (valid) byte
+						 * magnitude character.
+						 */
+						if (ovalue[j] == 'm' ||
+						    ovalue[j] == 'k') {
+							stage = 2;
+							break;
+						}
+						errno = EINVAL;
+						return (-1);
+					case 2:
+						/*
+						 * Invalid trailing characters.
+						 */
+						errno = EINVAL;
+						return (-1);
+					}
+				}
+
+				if (stage < 1) {
+					errno = EINVAL;
+					return (-1);
+				}
 			} else {
 				/* Unknown option type specified. */
 				assert(0);
@@ -203,8 +276,10 @@ i_lx_opt_verify(char *opts, mount_opt_t *mop)
 		}
 
 		/* If there were no matches this is an unsupported option. */
-		if (mop[i].mo_name == NULL)
-			return (0);
+		if (mop[i].mo_name == NULL) {
+			errno = EINVAL;
+			return (-1);
+		}
 
 		/* This option is ok, move onto the next option. */
 		if ((opt = strtok(NULL, ",")) == NULL)
@@ -213,7 +288,7 @@ i_lx_opt_verify(char *opts, mount_opt_t *mop)
 	};
 
 	/* We verified all the options. */
-	return (1);
+	return (0);
 }
 
 static int
@@ -588,10 +663,10 @@ lx_mount(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 		lx_debug("\tlinux mount options: \"%s\"", options);
 
 		/* Verify Linux mount options. */
-		if (i_lx_opt_verify(options, lofs_options) == 0) {
+		if (i_lx_opt_verify(options, lofs_options) != 0) {
 			lx_unsupported("unsupported lofs mount options: %s",
 			    options);
-			return (-ENOTSUP);
+			return (-errno);
 		}
 	} else if (strcmp(fstype, "tmpfs") == 0) {
 
@@ -605,10 +680,10 @@ lx_mount(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 		lx_debug("\tlinux mount options: \"%s\"", options);
 
 		/* Verify Linux mount options. */
-		if (i_lx_opt_verify(options, lx_tmpfs_options) == 0) {
+		if (i_lx_opt_verify(options, lx_tmpfs_options) != 0) {
 			lx_unsupported("unsupported tmpfs mount options: %s",
 			    options);
-			return (-ENOTSUP);
+			return (-errno);
 		}
 	} else if (strcmp(fstype, "proc") == 0) {
 		struct stat64	sb;
@@ -626,10 +701,10 @@ lx_mount(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 		lx_debug("\tlinux mount options: \"%s\"", options);
 
 		/* Verify Linux mount options. */
-		if (i_lx_opt_verify(options, lx_proc_options) == 0) {
+		if (i_lx_opt_verify(options, lx_proc_options) != 0) {
 			lx_unsupported("unsupported proc mount options: %s",
 			    options);
-			return (-ENOTSUP);
+			return (-errno);
 		}
 
 		/* If mounting proc over itself, just return ok */
@@ -652,10 +727,10 @@ lx_mount(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 		lx_debug("\tlinux mount options: \"%s\"", options);
 
 		/* Verify Linux mount options. */
-		if (i_lx_opt_verify(options, lx_autofs_options) == 0) {
+		if (i_lx_opt_verify(options, lx_autofs_options) != 0) {
 			lx_unsupported("unsupported autofs mount options: %s",
 			    options);
-			return (-ENOTSUP);
+			return (-errno);
 		}
 	} else if (strcmp(fstype, "nfs") == 0) {
 
@@ -687,7 +762,7 @@ lx_mount(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 		sdatalen = sizeof (nfs_args);
 	} else {
 		lx_unsupported("unsupported mount filesystem type: %s", fstype);
-		return (-ENOTSUP);
+		return (-ENODEV);
 	}
 
 	/* Convert some Linux flags to Solaris flags. */
@@ -698,7 +773,16 @@ lx_mount(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 	if (flags & LX_MS_REMOUNT)
 		sflags |= MS_REMOUNT;
 
-	/* Convert some Linux flags to Solaris option strings. */
+	/*
+	 * Convert some Linux flags to Solaris option strings.
+	 */
+	if (flags & LX_MS_STRICTATIME) {
+		/*
+		 * The "strictatime" mount option ensures that none of the
+		 * weaker atime-related mode options are in effect.
+		 */
+		flags &= ~(LX_MS_RELATIME | LX_MS_NOATIME);
+	}
 	if ((flags & LX_MS_NODEV) &&
 	    ((rv = i_add_option("nodev", options, sizeof (options))) != 0))
 		return (rv);
