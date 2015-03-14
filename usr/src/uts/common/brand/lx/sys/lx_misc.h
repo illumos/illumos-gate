@@ -65,7 +65,8 @@ extern int lx_helper_setgroups(int, gid_t *);
 extern int lx_helper_rt_sigqueueinfo(pid_t, int, siginfo_t *);
 extern int lx_helper_rt_tgsigqueueinfo(pid_t, pid_t, int, siginfo_t *);
 
-extern int lx_vsyscall_issig_stop(proc_t *, klwp_t *);
+extern boolean_t lx_vsyscall_iscall(klwp_t *, uintptr_t, int *);
+extern void lx_vsyscall_enter(proc_t *, klwp_t *, int);
 
 #endif
 
