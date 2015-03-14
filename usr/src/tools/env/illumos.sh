@@ -228,8 +228,13 @@ export SPRO_VROOT="$SPRO_ROOT"
 # nightly(1) for interactions between environment variables and this command.
 #POST_NIGHTLY=
 
-# Uncomment this to disable support for SMB printing.
-# export ENABLE_SMB_PRINTING='#'
+# Comment this out to disable support for IPP printing, i.e. if you
+# don't want to bother providing the Apache headers this needs.
+export ENABLE_IPP_PRINTING=
+
+# Comment this out to disable support for SMB printing, i.e. if you
+# don't want to bother providing the CUPS headers this needs.
+export ENABLE_SMB_PRINTING=
 
 # If your distro uses certain versions of Perl, make sure either Makefile.master
 # contains your new defaults OR your .env file sets them.
