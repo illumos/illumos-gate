@@ -23,11 +23,12 @@
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2015 Joyent, Inc.
+ */
 
 #ifndef	_LX_AUTOFS_H
 #define	_LX_AUTOFS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * The lx_autofs filesystem exists to emulate the Linux autofs filesystem
@@ -229,6 +230,8 @@ extern "C" {
 #define	LX_MNTOPT_PGRP			"pgrp"
 #define	LX_MNTOPT_MINPROTO		"minproto"
 #define	LX_MNTOPT_MAXPROTO		"maxproto"
+#define	LX_MNTOPT_MODE			"mode"
+#define	LX_MNTOPT_SIZE			"size"
 
 /* Version of the Linux kernel automount protocol we support. */
 #define	LX_AUTOFS_PROTO_VERSION		2
