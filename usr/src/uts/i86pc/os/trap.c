@@ -32,7 +32,7 @@
 /*								*/
 
 /*
- * Copyright 2012 Joyent, Inc. All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -101,6 +101,7 @@
 #include <sys/hypervisor.h>
 #endif
 #include <sys/contract/process_impl.h>
+#include <sys/brand.h>
 
 #define	USER	0x10000		/* user-mode flag added to trap type */
 
@@ -832,6 +833,17 @@ trap(struct regs *rp, caddr_t addr, processorid_t cpuid)
 				goto out;
 			do_watch_step(vaddr, sz, rw, 0, 0);
 			fault_type = F_INVAL;
+		}
+
+		/*
+		 * Allow the brand to interpose on invalid memory accesses
+		 * prior to running the native pagefault handler.  If this
+		 * brand hook returns zero, it was able to handle the fault
+		 * completely.  Otherwise, drive on and call pagefault().
+		 */
+		if (PROC_IS_BRANDED(p) && BROP(p)->b_pagefault != NULL &&
+		    BROP(p)->b_pagefault(p, lwp, addr, fault_type, rw) == 0) {
+			goto out;
 		}
 
 		res = pagefault(addr, fault_type, rw, 0);

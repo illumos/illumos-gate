@@ -437,33 +437,21 @@ lx_syscall_enter(void)
  * Implementing vsyscalls on Illumos is complicated by the fact that the
  * required static address region resides inside the kernel address space.
  * Rather than mapping a user-accessible page into the KAS, a different
- * approach is taken.  The vsyscall gate is emulated by intercepting SIGSEGVs
- * and inspecting the context to detect calls to those specific addresses.
+ * approach is taken.  The vsyscall gate is emulated by interposing on
+ * pagefaults in trap().  An attempt to execute a known vsyscall address will
+ * result in emulating the appropriate system call rather than inducing a
+ * SIGSEGV.
  */
-
-static void
-lx_vsyscall_call(proc_t *p, klwp_t *lwp, uintptr_t scnum)
+void
+lx_vsyscall_enter(proc_t *p, klwp_t *lwp, int scnum)
 {
 	struct regs *rp = lwptoregs(lwp);
 	uintptr_t raddr;
 
 	/*
-	 * Clean up remnants of the SIGSEGV.  If we subsequently fail
-	 * to copy in the return address, we'll exit the process.
+	 * Fetch the return address from the process stack.
 	 */
-	VERIFY(MUTEX_HELD(&p->p_lock));
-	lwp->lwp_cursig = 0;
-	lwp->lwp_extsig = 0;
-	siginfofree(lwp->lwp_curinfo);
-	lwp->lwp_curinfo = NULL;
-
-	/*
-	 * Fetch the return address from the process stack.  We must drop
-	 * p_lock to prevent deadlock with page fault processing.  Signal
-	 * handling will be restarted after this call, so we do not need to
-	 * exclude concurrent modification.
-	 */
-	mutex_exit(&p->p_lock);
+	VERIFY(MUTEX_NOT_HELD(&p->p_lock));
 	if (copyin((void *)rp->r_rsp, &raddr, sizeof (raddr)) != 0) {
 #if DEBUG
 		printf("lx_vsyscall_call: bad brand stack at vsyscall "
@@ -476,12 +464,10 @@ lx_vsyscall_call(proc_t *p, klwp_t *lwp, uintptr_t scnum)
 		 * correctly configured stack.  Terminate the process.
 		 */
 		exit(CLD_KILLED, SIGSEGV);
-
-		mutex_enter(&p->p_lock);
 		return;
 	}
 
-	DTRACE_PROBE1(brand__lx__vsyscall, int, (int)scnum);
+	DTRACE_PROBE1(brand__lx__vsyscall, int, scnum);
 
 	/* Simulate vectoring into the syscall */
 	rp->r_rax = scnum;
@@ -489,51 +475,41 @@ lx_vsyscall_call(proc_t *p, klwp_t *lwp, uintptr_t scnum)
 	rp->r_rsp += sizeof (uintptr_t);
 
 	lx_syscall_enter();
-
-	mutex_enter(&p->p_lock);
 }
 
-int
-lx_vsyscall_issig_stop(proc_t *p, klwp_t *lwp)
+boolean_t
+lx_vsyscall_iscall(klwp_t *lwp, uintptr_t addr, int *scnum)
 {
-	uintptr_t addr;
-	struct regs *rp = lwptoregs(lwp);
 	lx_lwp_data_t *lwpd = lwptolxlwp(lwp);
 	int i;
 
-	VERIFY(MUTEX_HELD(&p->p_lock));
-	if (lwp->lwp_cursig != SIGSEGV || lwp->lwp_curinfo == NULL ||
-	    lwpd->br_stack_mode != LX_STACK_MODE_BRAND) {
-		return (0);
+	if (lwpd->br_stack_mode != LX_STACK_MODE_BRAND) {
+		/*
+		 * We only handle vsyscalls when running Linux code.
+		 */
+		return (B_FALSE);
 	}
 
-	addr = (uintptr_t)lwp->lwp_curinfo->sq_info.si_addr;
 	if (addr < LX_VSYSCALL_ADDR ||
 	    addr >= (LX_VSYSCALL_ADDR + LX_VSYSCALL_SIZE)) {
-		/* Ignore faults outside vsyscall page */
-		return (0);
-	}
-	for (i = 0; lx_vsyscalls[i].lv_addr != NULL; i++) {
-		if (addr != lx_vsyscalls[i].lv_addr)
-			continue;
 		/*
-		 * Users of vsyscall must commit fully by using jmp/call to
-		 * access the vsyscall.  Cowardly reading data from the page
-		 * beforehand isn't allowed or possible.
+		 * Ignore faults outside the vsyscall page.
 		 */
-		if (addr != rp->r_rip)
-			continue;
+		return (B_FALSE);
+	}
 
-		/*
-		 * Process the vsyscall.  Signal handling must be restarted
-		 * after processing in case the LWP or process state has
-		 * been altered.
-		 */
-		lx_vsyscall_call(p, lwp, lx_vsyscalls[i].lv_scnum);
-		return (-1);
+	for (i = 0; lx_vsyscalls[i].lv_addr != NULL; i++) {
+		if (addr == lx_vsyscalls[i].lv_addr) {
+			/*
+			 * This is a valid vsyscall address.
+			 */
+			*scnum = lx_vsyscalls[i].lv_scnum;
+			return (B_TRUE);
+		}
 	}
+
 	lx_unsupported("bad vsyscall access");
-	return (0);
+	return (B_FALSE);
 }
 #endif
 
