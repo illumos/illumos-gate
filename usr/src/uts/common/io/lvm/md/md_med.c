@@ -18,6 +18,11 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ */
+
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -1070,14 +1075,12 @@ med_net_callrpc(
 		}
 
 		if (strcmp(uap->ua_kn.knc_protofmly, NC_LOOPBACK) == 0) {
-			size_t	alen = strlen(utsname.nodename) + 1 + 1;
-
-			dst.buf = kmem_zalloc(alen, KM_SLEEP);
-			dst.maxlen = (uint_t)alen;
-
-			(void) strcpy(dst.buf, utsname.nodename);
-			(void) strcat(dst.buf, ".");
-
+			/*
+			 * strlen("localhost.") is 10
+			 */
+			dst.len = dst.maxlen = 10;
+			dst.buf = kmem_alloc(dst.len, KM_SLEEP);
+			(void) strncpy(dst.buf, "localhost.", dst.len);
 		} else if (strcmp(uap->ua_kn.knc_protofmly, NC_INET) == 0) {
 			struct sockaddr_in	*s;
 

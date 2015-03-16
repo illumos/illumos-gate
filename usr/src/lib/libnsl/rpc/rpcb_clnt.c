@@ -21,6 +21,10 @@
  */
 
 /*
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ */
+
+/*
  * Copyright 2014 Gary Mills
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -52,7 +56,6 @@
 #include <netinet/in.h>		/* FOR IPPROTO_TCP/UDP definitions */
 #include <rpc/pmap_prot.h>
 #endif
-#include <sys/utsname.h>
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
@@ -404,7 +407,6 @@ static CLIENT *
 local_rpcb(void)
 {
 	static struct netconfig *loopnconf;
-	static char hostname[MAXHOSTNAMELEN + 1];
 	extern mutex_t loopnconf_lock;
 
 /* VARIABLES PROTECTED BY loopnconf_lock: loopnconf */
@@ -413,13 +415,6 @@ local_rpcb(void)
 		struct netconfig *nconf, *tmpnconf = NULL;
 		void *nc_handle;
 
-		if ((hostname[0] == '\0') && (gethostname(hostname,
-		    sizeof (hostname)) < 0)) {
-			syslog(LOG_ERR, "local_rpcb: gethostname failed.");
-			rpc_createerr.cf_stat = RPC_UNKNOWNHOST;
-			(void) mutex_unlock(&loopnconf_lock);
-			return (NULL);
-		}
 		nc_handle = setnetconfig();
 		if (nc_handle == NULL) {
 			/* fails to open netconfig file */
@@ -444,7 +439,7 @@ local_rpcb(void)
 		(void) endnetconfig(nc_handle);
 	}
 	(void) mutex_unlock(&loopnconf_lock);
-	return (getclnthandle(hostname, loopnconf, NULL));
+	return (getclnthandle(HOST_SELF_CONNECT, loopnconf, NULL));
 }
 
 /*
@@ -564,16 +559,11 @@ got_entry(rpcb_entry_list_ptr relp, struct netconfig *nconf)
 bool_t
 __rpcbind_is_up(void)
 {
-	char hostname[MAXHOSTNAMELEN + 1];
-	char uaddr[SYS_NMLN];
 	struct netbuf *addr;
 	int fd;
 	struct t_call *sndcall;
 	struct netconfig *netconf;
 	bool_t res;
-
-	if (gethostname(hostname, sizeof (hostname)) < 0)
-		return (TRUE);
 
 	if ((fd = t_open("/dev/ticotsord", O_RDWR, NULL)) == -1)
 		return (TRUE);
@@ -589,15 +579,12 @@ __rpcbind_is_up(void)
 		return (TRUE);
 	}
 
-	uaddr[0] = '\0';
-	(void) strlcpy(uaddr, hostname, sizeof (uaddr) - 5);
-	(void) strcat(uaddr, ".rpc");
 	if ((netconf = getnetconfigent("ticotsord")) == NULL) {
 		(void) t_free((char *)sndcall, T_CALL);
 		(void) t_close(fd);
 		return (FALSE);
 	}
-	addr = uaddr2taddr(netconf, uaddr);
+	addr = uaddr2taddr(netconf, "localhost.rpc");
 	freenetconfigent(netconf);
 	if (addr == NULL || addr->buf == NULL) {
 		if (addr)
