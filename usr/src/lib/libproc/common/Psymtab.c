@@ -2025,10 +2025,12 @@ Pbuild_file_symtab(struct ps_prochandle *P, file_info_t *fptr)
 				 * file. If we don't see this, we're going to
 				 * assume this is bogus.
 				 */
-				if ((i % sizeof (uint32_t)) == 0)
+				if ((i % sizeof (uint32_t)) == 0) {
 					i += 4;
-				else
-					i += i % sizeof (uint32_t);
+				} else {
+					i += sizeof (uint32_t) -
+					    (i % sizeof (uint32_t));
+				}
 				if (i + sizeof (uint32_t) ==
 				    dbglink->c_data->d_size) {
 					found = B_TRUE;
