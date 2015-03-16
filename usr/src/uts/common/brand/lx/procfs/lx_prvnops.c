@@ -1836,13 +1836,15 @@ lxpr_kstat_read(kstat_t *kn, boolean_t byname, size_t *size, int *num)
 	size_t bufsize;
 	void *buf = NULL;
 
-	if (byname == B_TRUE)
+	if (byname == B_TRUE) {
 		kp = kstat_hold_byname(kn->ks_module, kn->ks_instance,
 		    kn->ks_name, getzoneid());
-	else
+	} else {
 		kp = kstat_hold_bykid(kn->ks_kid, getzoneid());
-	if (kp == NULL)
+	}
+	if (kp == NULL) {
 		return (NULL);
+	}
 	if (kp->ks_flags & KSTAT_FLAG_INVALID) {
 		kstat_rele(kp);
 		return (NULL);
@@ -1861,14 +1863,16 @@ lxpr_kstat_read(kstat_t *kn, boolean_t byname, size_t *size, int *num)
 		buf = kmem_alloc(bufsize, KM_SLEEP);
 
 		/* Check if bufsize still appropriate */
-		if (byname == B_TRUE)
+		if (byname == B_TRUE) {
 			kp = kstat_hold_byname(kn->ks_module, kn->ks_instance,
 			    kn->ks_name, getzoneid());
-		else
+		} else {
 			kp = kstat_hold_bykid(kn->ks_kid, getzoneid());
+		}
 		if (kp == NULL || kp->ks_flags & KSTAT_FLAG_INVALID) {
-			if (kp != NULL)
+			if (kp != NULL) {
 				kstat_rele(kp);
+			}
 			kmem_free(buf, bufsize);
 			return (NULL);
 		}
@@ -1876,6 +1880,7 @@ lxpr_kstat_read(kstat_t *kn, boolean_t byname, size_t *size, int *num)
 		(void) KSTAT_UPDATE(kp, KSTAT_READ);
 		if (bufsize < kp->ks_data_size) {
 			kmem_free(buf, bufsize);
+			buf = NULL;
 			bufsize = kp->ks_data_size + 1;
 			KSTAT_EXIT(kp);
 			kstat_rele(kp);
