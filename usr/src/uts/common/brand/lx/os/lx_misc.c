@@ -81,6 +81,7 @@ lx_exec()
 	struct lx_lwp_data *lwpd = lwptolxlwp(lwp);
 	proc_t *p = ttoproc(curthread);
 	lx_proc_data_t *pd = ptolxproc(p);
+	struct regs *rp = lwptoregs(lwp);
 	int err;
 
 	/*
@@ -145,6 +146,15 @@ lx_exec()
 	kpreempt_disable();
 	lx_restore(lwp);
 	kpreempt_enable();
+
+	/*
+	 * The exec syscall doesn't return (so we don't call lx_syscall_return)
+	 * but for our ptrace emulation we need to do this so that a tracer
+	 * does not get out of sync. We know that by the time this lx_exec
+	 * function is called that the exec has succeeded.
+	 */
+	rp->r_r0 = 0;
+	lx_ptrace_stop(LX_PR_SYSEXIT);
 }
 
 void

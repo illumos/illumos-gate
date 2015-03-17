@@ -817,10 +817,17 @@ lx_ptrace_getregs(lx_lwp_data_t *remote, void *uregsp)
 		 */
 		return (lx_regs_to_userregs(remote, uregsp));
 	} else if (remote->br_stack_mode == LX_STACK_MODE_PREINIT &&
-	    remote->br_ptrace_whatstop == LX_PR_SIGNALLED) {
+	    (remote->br_ptrace_whatstop == LX_PR_SIGNALLED ||
+	    remote->br_ptrace_whatstop == LX_PR_SYSEXIT)) {
 		/*
-		 * The LWP was stopped by tracing on exec. br_ptrace_stopucp
-		 * is NULL. Return the LWP register state.
+		 * The LWP was stopped by tracing on exec.
+		 */
+		return (lx_regs_to_userregs(remote, uregsp));
+	} else if (remote->br_stack_mode == LX_STACK_MODE_NATIVE &&
+	    remote->br_ptrace_whystop == PR_BRAND &&
+	    remote->br_ptrace_whatstop == LX_PR_EVENT) {
+		/*
+		 * Called while we're ptrace event stopped by lx_exec.
 		 */
 		return (lx_regs_to_userregs(remote, uregsp));
 	} else if (remote->br_ptrace_stopucp != NULL) {
@@ -1398,6 +1405,8 @@ lx_ptrace_traceme(void)
 static boolean_t
 lx_ptrace_stop_common(proc_t *p, lx_lwp_data_t *lwpd, ushort_t what)
 {
+	boolean_t reset_nostop = B_FALSE;
+
 	VERIFY(MUTEX_HELD(&p->p_lock));
 
 	/*
@@ -1405,7 +1414,20 @@ lx_ptrace_stop_common(proc_t *p, lx_lwp_data_t *lwpd, ushort_t what)
 	 */
 	VERIFY0(lwpd->br_ptrace_flags & LX_PTRACE_STOPPING);
 	lwpd->br_ptrace_flags |= LX_PTRACE_STOPPING;
+
+	if (lwpd->br_lwp->lwp_nostop == 1 &&
+	    lwpd->br_ptrace_event == LX_PTRACE_EVENT_EXEC) {
+		/* We need to clear this to get the signal delivered. */
+		lwpd->br_lwp->lwp_nostop = 0;
+		reset_nostop = B_TRUE;
+	}
+
 	stop(PR_BRAND, what);
+
+	if (reset_nostop) {
+		VERIFY(lwpd->br_lwp->lwp_nostop == 0);
+		lwpd->br_lwp->lwp_nostop = 1;
+	}
 
 	/*
 	 * We are back from "ptrace-stop" with our process lock held.
