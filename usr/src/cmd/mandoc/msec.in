@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 LINE("1",		"User Commands")
@@ -93,7 +93,7 @@ LINE("3XCURSES",	"X/Open Curses Library Functions")
 LINE("3XNET",		"X/Open Networking Services Library Functions")
 LINE("3F",		"Fortran Library Routines")
 LINE("3X",		"Miscellaneous Library Functions")
-LINE("4",		"File Formats")
+LINE("4",		"File Formats and Configurations")
 LINE("5",		"Standards, Environments, and Macros")
 LINE("6",		"Games and Demos")
 LINE("7",		"Device and Network Interfaces")
