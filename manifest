@@ -18067,6 +18067,14 @@ f usr/share/man/man4/hosts_options.4 0444 root bin
 f usr/share/man/man4/ib.4 0444 root bin
 f usr/share/man/man4/ike.config.4 0444 root bin
 f usr/share/man/man4/ike.preshared.4 0444 root bin
+f usr/share/man/man4/ipf.4 0444 root bin
+s usr/share/man/man4/ipf.conf.4=ipf.4
+f usr/share/man/man4/ipmon.4 0444 root bin
+s usr/share/man/man4/ipmon.conf.4=ipmon.4
+f usr/share/man/man4/ipnat.4 0444 root bin
+s usr/share/man/man4/ipnat.conf.4=ipnat.4
+f usr/share/man/man4/ippool.4 0444 root bin
+s usr/share/man/man4/ippool.conf.4=ippool.4
 f usr/share/man/man4/inet_type.4 0444 root bin
 f usr/share/man/man4/inetd.conf.4 0444 root bin
 f usr/share/man/man4/init.d.4 0444 root bin
