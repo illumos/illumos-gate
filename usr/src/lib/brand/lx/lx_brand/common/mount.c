@@ -219,8 +219,8 @@ i_lx_opt_verify(char *opts, mount_opt_t *mop)
 
 				/*
 				 * Verify that the value is an unsigned integer
-				 * that ends in a magnitude suffix, i.e. 'k'
-				 * or 'm'.
+				 * that ends in a magnitude suffix (i.e. 'k'
+				 * or 'm') or a '%' character.
 				 */
 				for (j = 0; j < ovalue_len; j++) {
 					switch (stage) {
@@ -247,7 +247,8 @@ i_lx_opt_verify(char *opts, mount_opt_t *mop)
 						 * magnitude character.
 						 */
 						if (ovalue[j] == 'm' ||
-						    ovalue[j] == 'k') {
+						    ovalue[j] == 'k' ||
+						    ovalue[j] == '\%') {
 							stage = 2;
 							break;
 						}
