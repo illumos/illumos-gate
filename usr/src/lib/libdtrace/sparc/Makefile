@@ -22,12 +22,12 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 ASFLAGS += -D_ASM -K PIC -P
 
 include ../Makefile.com
+
+LINTFLAGS += -erroff=E_BAD_PTR_CAST_ALIGN
 
 install yydebug: all $(ROOTLIBS) $(ROOTLINKS) $(ROOTLINT) \
 	$(ROOTDLIBS) $(ROOTDOBJS)

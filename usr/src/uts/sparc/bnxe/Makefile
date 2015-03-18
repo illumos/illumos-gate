@@ -32,7 +32,7 @@ UTSBASE = ../..
 #
 MODULE		= bnxe
 OBJECTS		= $(BNXE_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(BNXE_OBJS:%.o=$(LINTS_DIR)/%.ln)
+LINTS		= $(LINTS_DIR)/bnxe_lint.ln
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 SRCDIR		= $(UTSBASE)/common/io/bnxe
 CONF_SRCDIR	= $(SRCDIR)

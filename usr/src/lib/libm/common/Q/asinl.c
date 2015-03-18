@@ -51,7 +51,9 @@ static const long double big = 1.0e+20L;
 long double
 asinl(long double x) {
 	long double t, w;
+#ifndef lint
 	volatile long double dummy;
+#endif
 
 	w = fabsl(x);
 	if (isnanl(x))

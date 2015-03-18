@@ -22,8 +22,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 ASFLAGS += -D_ASM -K PIC -P
 
@@ -31,6 +29,8 @@ include ../Makefile.com
 include ../../Makefile.lib.64
 
 CPPFLAGS += -D_ELF64
+
+LINTFLAGS64 += -erroff=E_BAD_PTR_CAST_ALIGN
 
 install yydebug: all $(ROOTLIBS64) $(ROOTLINKS64) $(ROOTLINT64) \
 	$(ROOTDLIBS) $(ROOTDOBJS64)
