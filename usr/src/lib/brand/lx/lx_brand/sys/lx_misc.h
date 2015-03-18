@@ -52,12 +52,6 @@ extern char lx_cmd_name[MAXNAMLEN];
 extern pid_t zoneinit_pid;
 
 /*
- * Support for the unfortunate RPM race condition workaround.
- */
-extern int lx_rpm_delay;
-extern boolean_t lx_is_rpm;
-
-/*
  * Values Linux expects for init
  */
 #define	LX_INIT_PGID	0
