@@ -426,8 +426,6 @@ lx_clone(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 				is_vforked--;
 		} else {
 			rval = forkx(fork_flags);
-			if (rval == 0 && lx_is_rpm)
-				(void) sleep(lx_rpm_delay);
 		}
 
 		/*

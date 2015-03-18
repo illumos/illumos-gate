@@ -73,10 +73,6 @@ lx_fork_common(boolean_t is_vfork)
 		 */
 		lx_free_other_stacks();
 
-		if (!is_vfork && lx_is_rpm) {
-			(void) sleep(lx_rpm_delay);
-		}
-
 		lx_ptrace_stop_if_option(ptopt, B_TRUE, 0, NULL);
 
 		/*
