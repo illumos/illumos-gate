@@ -52,6 +52,8 @@
 
 #define	VALIDMODEBITS	07777
 
+extern pgcnt_t swapfs_minfree;
+
 int
 tmp_taccess(void *vtp, int mode, struct cred *cred)
 {
@@ -82,7 +84,7 @@ tmp_taccess(void *vtp, int mode, struct cred *cred)
  */
 int
 tmp_sticky_remove_access(struct tmpnode *dir, struct tmpnode *entry,
-	struct cred *cr)
+    struct cred *cr)
 {
 	uid_t uid = crgetuid(cr);
 
@@ -142,7 +144,9 @@ tmp_memfree(void *cp, size_t size)
  * namely, they cascade.  For example, the caller may specify "2mk", which is
  * interpreted as 2 gigabytes.  It would seem, at this late stage, that the
  * horse has left not only the barn but indeed the country, and possibly the
- * entire planetary system.
+ * entire planetary system. Alternatively, the number may be followed by a
+ * single '%' sign, indicating the size is a percentage of either the zone's
+ * swap limit or the system's overall swap size.
  *
  * Parse and overflow errors are detected and a non-zero number returned on
  * error.
@@ -180,6 +184,37 @@ tmp_convnum(char *str, pgcnt_t *maxpg)
 	}
 
 	/*
+	 * Handle a size in percent. Anything other than a single percent
+	 * modifier is invalid. We use either the zone's swap limit or the
+	 * system's total available swap size as the initial value. Perform the
+	 * intermediate calculation in pages to avoid overflow.
+	 */
+	if (*c == '%') {
+		u_longlong_t cap;
+
+		if (*(c + 1) != '\0')
+			return (EINVAL);
+
+		if (num > 100)
+			return (EINVAL);
+
+		cap = (u_longlong_t)curproc->p_zone->zone_max_swap_ctl;
+		if (cap == UINT64_MAX) {
+			/*
+			 * Use the amount of available physical and memory swap
+			 */
+			mutex_enter(&anoninfo_lock);
+			cap = TOTAL_AVAILABLE_SWAP;
+			mutex_exit(&anoninfo_lock);
+		} else {
+			cap = btop(cap);
+		}
+
+		num = ptob(cap * num / 100);
+		goto done;
+	}
+
+	/*
 	 * Apply the (potentially cascading) magnitude suffixes until an
 	 * invalid character is found, or the string comes to an end.
 	 */
@@ -213,6 +248,7 @@ valid_char:
 		continue;
 	}
 
+done:
 	/*
 	 * Since btopr() rounds up to page granularity, this round-up can
 	 * cause an overflow only if 'num' is between (max_bytes - PAGESIZE)
