@@ -5071,6 +5071,7 @@ f usr/lib/brand/lx/etc_netconfig 0444 root root
 f usr/lib/brand/lx/ltp_skiplist 0444 root root
 f usr/lib/brand/lx/ltp_tests 0444 root root
 f usr/lib/brand/lx/lx_boot 0755 root root
+f usr/lib/brand/lx/lx_boot_zone_debian 0755 root root
 f usr/lib/brand/lx/lx_boot_zone_redhat 0755 root root
 f usr/lib/brand/lx/lx_boot_zone_ubuntu 0755 root root
 f usr/lib/brand/lx/lx_isaexec_wrapper 0755 root root
