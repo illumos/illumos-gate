@@ -158,7 +158,7 @@ tmp_convnum(char *str, pgcnt_t *maxpg)
 #endif
 	char *c;
 	const struct convchar {
-		char cc_char[3];
+		char *cc_char;
 		uint64_t cc_factor;
 	} convchars[] = {
 		{ "kK", KILOBYTE },
