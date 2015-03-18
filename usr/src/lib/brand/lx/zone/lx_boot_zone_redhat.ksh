@@ -24,12 +24,7 @@
 #
 
 # This script was taken from an earlier file.  Initialize some variables here.
-install_aborted="Install aborted"
-disable_failed="Disable failed"
-create_failed="Create failed"
-tag=lx-redhat.$$
-tmpfile=/tmp/$tag
-cmd2_failed=lx_boot_zone_redhat
+tmpfile=/tmp/lx-redhat.$$
 
 # Function for setting up networking in the zone.
 # Generate the /etc/rc.d/init,d/network rc script
@@ -175,16 +170,13 @@ safe_dir /etc/rc.d/rc6.d
 safe_opt_dir /etc/selinux
 
 #
-# The default /etc/inittab might spawn mingetty on each of the virtual consoles
-# as well as xdm on the X console.  Since we don't have virtual consoles nor
-# an X console, spawn a single mingetty on /dev/console instead.
-#
+# The default /etc/inittab only sets the runlevel. Make sure it's runlevel 3
+# and not runlevel 5 (X11).
 # Don't bother changing the file if it looks like we already did.
 #
 fnm=$ZONEROOT/etc/inittab
 if ! egrep -s "Modified by lx brand" $fnm; then
-	sed 's/^[1-6]:/# Disabled by lx brand: &/
-	    s/^id:5:initdefault:/id:3:initdefault: &/' \
+	sed 's/^id:5:initdefault:/id:3:initdefault: &/' \
 	    $fnm > $tmpfile
 	echo "# Modified by lx brand" >> $tmpfile
 
@@ -271,19 +263,14 @@ unsupported_rc_services="
 "
 
 for file in $unsupported_rc_services; do
-	fnm=$ZONEROOT/etc/rc.d/init.d/$file
-	if [[ ! -h $fnm ]]; then
-		rm -f $fnm
-	fi
+	rm -f $ZONEROOT/etc/rc.d/init.d/$file
 
 	rc_files="$(echo $ZONEROOT/etc/rc.d/rc[0-6].d/[SK]+([0-9])$file)"
 
 	if [[ "$rc_files" != \
 	    "$ZONEROOT/etc/rc.d/rc[0-6].d/[SK]+([0-9])$file" ]]; then
 		for file in $rc_files; do
-			if [[ ! -h "$file" ]]; then
-				rm -f "$file"
-			fi
+			rm -f "$file"
 		done
 	fi
 done
@@ -297,9 +284,7 @@ disable_svc()
 	echo "manual" > $fnm
 
 	# fnm=$ZONEROOT/etc/init/$1.conf
-	# if [[ ! -h $fnm ]]; then
-	#	rm -f $fnm
-	# fi
+	# rm -f $fnm
 }
 
 RMSVCS="control-alt-delete
