@@ -1022,7 +1022,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	NULL,				/*  93: fchown */
 	NULL,				/*  94: lchown */
 	lx_umask,			/*  95: umask */
-	lx_gettimeofday,		/*  96: gettimeofday */
+	NULL,				/*  96: gettimeofday */
 	lx_getrlimit,			/*  97: getrlimit */
 	lx_getrusage,			/*  98: getrusage */
 	NULL,				/*  99: sysinfo */
@@ -1335,7 +1335,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_setrlimit,			/*  75: setrlimit */
 	lx_oldgetrlimit,		/*  76: getrlimit */
 	lx_getrusage,			/*  77: getrusage */
-	lx_gettimeofday,		/*  78: gettimeofday */
+	NULL,				/*  78: gettimeofday */
 	lx_settimeofday,		/*  79: settimeofday */
 	lx_getgroups16,			/*  80: getgroups16 */
 	lx_setgroups16,			/*  81: setgroups16 */

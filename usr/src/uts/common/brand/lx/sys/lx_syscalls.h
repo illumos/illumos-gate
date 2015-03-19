@@ -52,6 +52,7 @@ extern long lx_get_thread_area();
 extern long lx_getpid();
 extern long lx_getppid();
 extern long lx_gettid();
+extern long lx_gettimeofday();
 extern long lx_ioctl();
 extern long lx_kill();
 extern long lx_lchown();

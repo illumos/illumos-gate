@@ -118,7 +118,6 @@ extern long lx_oldgetrlimit(uintptr_t, uintptr_t);
 extern long lx_getrlimit(uintptr_t, uintptr_t);
 extern long lx_setrlimit(uintptr_t, uintptr_t);
 extern long lx_prlimit64(uintptr_t, uintptr_t, uintptr_t, uintptr_t);
-extern long lx_gettimeofday(uintptr_t, uintptr_t);
 extern long lx_settimeofday(uintptr_t, uintptr_t);
 extern long lx_getrusage(uintptr_t, uintptr_t);
 extern long lx_mknod(uintptr_t, uintptr_t, uintptr_t);
