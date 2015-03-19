@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2015, OmniTI Computer Consulting, Inc. All rights reserved.
 #
 
 include ../Makefile.cmd
@@ -46,6 +47,26 @@ $(HWDATADIR)/%: %
 	$(INS.file)
 
 lint check clean clobber:
+
+# The "update" target family allows a simple pull-from-the-source update.
+# One can then use revision-control diffs to see what actually changed.
+update: usb.update pci.update
+
+# URLs for PCI IDs and USB IDs
+PCIURL=http://pci-ids.ucw.cz/v2.2/pci.ids
+USBURL=http://www.linux-usb.org/usb.ids
+
+# These could move into Makefile.master
+URL_FETCH=wget
+URL_FETCHARGS=
+
+pci.update:
+	$(RM) pci.ids
+	$(URL_FETCH) $(URL_FETCHARGS) $(PCIURL)
+
+usb.update:
+	$(RM) usb.ids
+	$(URL_FETCH) $(URL_FETCHARGS) $(USBURL)
 
 FRC:
 
