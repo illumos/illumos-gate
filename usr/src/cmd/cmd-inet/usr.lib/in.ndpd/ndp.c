@@ -24,6 +24,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2015, OmniTI Computer Consulting, Inc. All rights reserved.
+ */
+
 #include "defs.h"
 #include "tables.h"
 
@@ -404,6 +408,23 @@ retry:
 }
 
 /*
+ * Globals to check if we're seeing unusual hop counts in Router
+ * Advertisements (RAs).  We record the hopcounts in the kernel using
+ * SIOCSLIFLNKINFO, but the kernel ignores these when actually setting IPv6
+ * hop counts for packets.
+ *
+ * RFC 3756 does mention the possibility of an adversary throttling down
+ * hopcounts using unsolicited RAs.  These variables can be tuned with 'mdb -p'
+ * to reduce/increase our logging threshholds.
+ */
+/* Really a boolean... if set, also log the offending sending address. */
+int bad_hopcount_record_addr = 0;
+/* Anything less triggers a warning.  Set to 0 to disable. */
+int bad_hopcount_threshhold = 16;
+/* Number of packets received below the threshhold. */
+uint64_t bad_hopcount_packets;
+
+/*
  * Process a received router advertisement.
  * Called both when packets arrive as well as when we send RAs.
  * In the latter case 'loopback' is set.
@@ -433,6 +454,19 @@ incoming_ra(struct phyint *pi, struct nd_router_advert *ra, int len,
 		pi->pi_CurHopLimit = ra->nd_ra_curhoplimit;
 		lifr.lifr_ifinfo.lir_maxhops = pi->pi_CurHopLimit;
 		set_needed = _B_TRUE;
+
+		if (pi->pi_CurHopLimit < bad_hopcount_threshhold) {
+			char abuf[INET6_ADDRSTRLEN];
+
+			bad_hopcount_packets++;
+			logmsg(LOG_ALERT,
+			    "Low hopcount %d received on %s%s%s\n",
+			    pi->pi_CurHopLimit, pi->pi_name,
+			    bad_hopcount_record_addr ? " from " : "",
+			    bad_hopcount_record_addr ?
+			    inet_ntop(AF_INET6, &from->sin6_addr, abuf,
+			    INET6_ADDRSTRLEN) : "");
+		}
 	}
 
 	reachable = ntohl(ra->nd_ra_reachable);
