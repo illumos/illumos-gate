@@ -49,7 +49,25 @@ setup_net()
             if ($1 == "net:") {
                 in_net = 1
                 in_attr = 0
+
+                if (phys != "") {
+                    printf("    /sbin/ifconfig-native %s plumb || true\n", phys)
+                    printf("    /sbin/ifconfig-native %s %s netmask %s up || true\n",
+                        phys, ip, mask)
+                    printf("    /sbin/ifconfig-native %s inet6 plumb up || true\n", phys)
+                    if (prim == "true" && length(gw) > 0)
+		        printf("    /sbin/route add default %s || true\n", gw)
+                    printf("    /sbin/initctl emit --no-wait net-device-up IFACE=%s\n",
+                        phys)
+
+                    phys = ""
+                    prim = ""
+                    gw = ""
+                    ip = ""
+                    mask = ""
+                }
                 next
+
             } else if ($1 == "attr:") {
                 in_net = 0
                 in_attr = 1
@@ -77,20 +95,6 @@ setup_net()
                         gw = val
                 }
 
-                if ($1 == "net:" && phys != "") {
-                    printf("    /sbin/ifconfig-native %s plumb || true\n", phys)
-                    printf("    /sbin/ifconfig-native %s %s netmask %s up || true\n",
-                        phys, ip, mask)
-                    printf("    /sbin/ifconfig-native %s inet6 plumb up || true\n", phys)
-                    if (prim == "true" && length(gw) > 0)
-		        printf("    /sbin/route add default %s || true\n", gw)
-                    printf("    /sbin/initctl emit --no-wait net-device-up IFACE=%s\n",
-                        phys)
-
-                    phys = ""
-                    prim = ""
-                    gw = ""
-                }
             } else if (in_attr == 1) {
                 if ($1 == "value:") {
                     nres = split($2, resolvers, ",")
