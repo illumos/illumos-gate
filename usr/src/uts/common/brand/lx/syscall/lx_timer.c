@@ -299,8 +299,22 @@ lx_gettimeofday(struct timeval *tvp, struct lx_timezone *tzp)
 		tv.tv_sec = ts.tv_sec;
 		tv.tv_usec = usec;
 
-		if (copyout(&tv, tvp, sizeof (tv)) != 0)
-			return (set_errno(EFAULT));
+		if (get_udatamodel() == DATAMODEL_NATIVE) {
+			if (copyout(&tv, tvp, sizeof (tv)) != 0)
+				return (set_errno(EFAULT));
+		}
+#ifdef _SYSCALL32_IMPL
+		else {
+			struct timeval32 tv32;
+
+			if (TIMEVAL_OVERFLOW(&tv))
+				return (set_errno(EOVERFLOW));
+			TIMEVAL_TO_TIMEVAL32(&tv32, &tv);
+
+			if (copyout(&tv32, tvp, sizeof (tv32)))
+				return (set_errno(EFAULT));
+		}
+#endif
 	}
 
 	/*
