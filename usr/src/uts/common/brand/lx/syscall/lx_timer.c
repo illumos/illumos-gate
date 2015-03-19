@@ -50,6 +50,15 @@ typedef struct lx_clock_backend {
 } lx_clock_backend_t;
 
 /*
+ * NOTE: The Linux man pages state this structure is obsolete and is
+ * unsupported, so it is declared here for sizing purposes only.
+ */
+struct lx_timezone {
+	int tz_minuteswest;	/* minutes W of Greenwich */
+	int tz_dsttime;		/* type of dst correction */
+};
+
+/*
  * Use the native clock_* system call implementation, but with a translated
  * clock identifier:
  */
@@ -251,4 +260,56 @@ lx_clock_getres(int clock, timespec_t *tp)
 	}
 
 	return (backend->lclk_clock_getres(backend->lclk_ntv_id, tp));
+}
+
+
+long
+lx_gettimeofday(struct timeval *tvp, struct lx_timezone *tzp)
+{
+	struct lx_timezone tz;
+
+	bzero(&tz, sizeof (tz));
+
+	/*
+	 * We want to be similar to libc which just does a fasttrap to
+	 * gethrestime and simply converts that result. We follow how uniqtime
+	 * does the conversion but we can't use that code since it does some
+	 * extra work which can cause the result to bounce around based on which
+	 * CPU we run on.
+	 */
+	if (tvp != NULL) {
+		struct timeval tv;
+		timestruc_t ts;
+		int usec, nsec;
+
+		gethrestime(&ts);
+		nsec = ts.tv_nsec;
+		usec = nsec + (nsec >> 2);
+		usec = nsec + (usec >> 1);
+		usec = nsec + (usec >> 2);
+		usec = nsec + (usec >> 4);
+		usec = nsec - (usec >> 3);
+		usec = nsec + (usec >> 2);
+		usec = nsec + (usec >> 3);
+		usec = nsec + (usec >> 4);
+		usec = nsec + (usec >> 1);
+		usec = nsec + (usec >> 6);
+		usec = usec >> 10;
+
+		tv.tv_sec = ts.tv_sec;
+		tv.tv_usec = usec;
+
+		if (copyout(&tv, tvp, sizeof (tv)) != 0)
+			return (set_errno(EFAULT));
+	}
+
+	/*
+	 * The Linux man page states use of the second parameter is obsolete,
+	 * but gettimeofday(2) should still return EFAULT if it is set
+	 * to a bad non-NULL pointer (sigh...)
+	 */
+	if (tzp != NULL && copyout(&tz, tzp, sizeof (tz)) != 0)
+		return (set_errno(EFAULT));
+
+	return (0);
 }

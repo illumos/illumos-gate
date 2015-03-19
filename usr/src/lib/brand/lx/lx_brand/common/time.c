@@ -127,36 +127,6 @@ struct lx_timezone {
 	int tz_dsttime;		/* type of dst correction */
 };
 
-/*
- * lx_gettimeofday() and lx_settimeofday() are implemented here rather than
- * as pass-through calls to Solaris' libc due to the need to return EFAULT
- * for a bad buffer rather than die with a segmentation fault.
- */
-long
-lx_gettimeofday(uintptr_t p1, uintptr_t p2)
-{
-	struct timeval tv;
-	struct lx_timezone tz;
-
-	bzero(&tz, sizeof (tz));
-	(void) gettimeofday(&tv, NULL);
-
-	if ((p1 != NULL) &&
-	    (uucopy(&tv, (struct timeval *)p1, sizeof (tv)) < 0))
-		return (-errno);
-
-	/*
-	 * The Linux man page states use of the second parameter is obsolete,
-	 * but gettimeofday(2) should still return EFAULT if it is set
-	 * to a bad non-NULL pointer (sigh...)
-	 */
-	if ((p2 != NULL) &&
-	    (uucopy(&tz, (struct lx_timezone *)p2, sizeof (tz)) < 0))
-		return (-errno);
-
-	return (0);
-}
-
 long
 lx_settimeofday(uintptr_t p1, uintptr_t p2)
 {

@@ -596,7 +596,7 @@ lx_sysent_t lx_sysent32[] = {
 	{"setrlimit",	NULL,			0,		2}, /* 75 */
 	{"getrlimit",	NULL,			0,		2}, /* 76 */
 	{"getrusage",	NULL,			0,		2}, /* 77 */
-	{"gettimeofday", NULL, 			0,		2}, /* 78 */
+	{"gettimeofday", lx_gettimeofday,	0,		2}, /* 78 */
 	{"settimeofday", NULL, 			0,		2}, /* 79 */
 	{"getgroups16",	NULL,			0,		2}, /* 80 */
 	{"setgroups16",	NULL,			0,		2}, /* 81 */
@@ -985,7 +985,7 @@ lx_sysent_t lx_sysent64[] = {
 	{"fchown",	lx_fchown,		0,		3}, /* 93 */
 	{"lchown",	lx_lchown,		0,		3}, /* 94 */
 	{"umask",	NULL,			0,		1}, /* 95 */
-	{"gettimeofday", NULL,			0,		2}, /* 96 */
+	{"gettimeofday", lx_gettimeofday,	0,		2}, /* 96 */
 	{"getrlimit",	NULL,			0,		2}, /* 97 */
 	{"getrusage",	NULL,			0,		2}, /* 98 */
 	{"sysinfo",	lx_sysinfo64,		0,		1}, /* 99 */
