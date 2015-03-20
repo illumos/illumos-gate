@@ -138,7 +138,6 @@ x fchmod03	need PRIV_SYS_CONFIG to set sticky bit on reg file
 # fork14	"
 # ftruncate04	need a mnt with mandatory locking
 # ftruncate04_64
-x getcpu01
 # getdents02	wrong errno on test 4 - perf. impact too high
 # getdents02_64
 # get_mempolicy01

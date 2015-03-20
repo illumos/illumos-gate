@@ -16,7 +16,6 @@ execve04
 fchmod02
 fchmod03
 getrusage03
-getcpu01
 ioperm01
 ioperm02
 iopl01
