@@ -10321,8 +10321,8 @@ show_one_overlay_fma_cb(dladm_handle_t handle, datalink_id_t linkid,
     dladm_overlay_status_t *stat, void *arg)
 {
 	showoverlay_fma_state_t	*shof = arg;
-
-	ofmt_print(shof->shof_ofmt, arg);
+	shof->shof_status = stat;
+	ofmt_print(shof->shof_ofmt, shof);
 }
 
 

@@ -10097,6 +10097,7 @@ f usr/lib/varpd/libvarpd_files.so.1 0555 root bin
 s usr/lib/varpd/libvarpd_files.so=libvarpd_files.so.1
 f usr/lib/varpd/libvarpd_svp.so.1 0555 root bin
 s usr/lib/varpd/libvarpd_svp.so=libvarpd_svp.so.1
+f usr/lib/varpd/varpd 0555 root bin
 f usr/lib/vfontedpr 0555 root bin
 f usr/lib/vgrindefs 0444 root bin
 d usr/lib/vscan 0755 root bin
@@ -10547,7 +10548,6 @@ h usr/sbin/update_drv=usr/lib/isaexec
 h usr/sbin/useradd=usr/sbin/roleadd
 h usr/sbin/userdel=usr/sbin/roledel
 h usr/sbin/usermod=usr/sbin/rolemod
-f usr/sbin/varpd 0555 root bin
 f usr/sbin/vndadm 0555 root bin
 f usr/sbin/volcopy 0555 root bin
 f usr/sbin/vrrpadm 0555 root bin

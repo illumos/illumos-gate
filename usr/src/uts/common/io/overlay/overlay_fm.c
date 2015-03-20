@@ -71,6 +71,7 @@ overlay_fm_restore(overlay_dev_t *odd)
 	if (!(odd->odd_flags & OVERLAY_F_DEGRADED))
 		goto out;
 
+	odd->odd_fmamsg[0] = '\0';
 	odd->odd_flags &= ~OVERLAY_F_DEGRADED;
 	overlay_fm_count--;
 	if (overlay_fm_count == 0) {

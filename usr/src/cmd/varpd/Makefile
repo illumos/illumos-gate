@@ -18,6 +18,8 @@ OBJS = varpd.o
 SRCS = $(OBJS:%.o=../%.c)
 SVCMETHOD = svc-varpd
 MANIFEST = varpd.xml
+ROOTLIBVARPD = $(ROOTLIB)/varpd
+ROOTLIBVARPDPROG=	$(PROG:%=$(ROOTLIBVARPD)/%)
 
 
 include ../Makefile.cmd
@@ -59,7 +61,13 @@ check: $(CHKMANIFEST)
 clobber: clean
 	$(RM) $(PROG)
 
-install: $(PROG) $(ROOTUSRSBINPROG) $(ROOTMANIFEST) $(ROOTSVCMETHOD)
+install: $(PROG) $(ROOTLIBVARPDPROG) $(ROOTMANIFEST) $(ROOTSVCMETHOD)
+
+$(ROOTLIBVARPD):
+	$(INS.dir)
+
+$(ROOTLIBVARPD)/%: % $(ROOTLIBVARPD)
+	$(INS.file)
 
 FRC:
 
