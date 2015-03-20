@@ -70,7 +70,9 @@ long double
 tanhl(long double x) {
 	long double t, y, z;
 	int signx;
+#ifndef lint
 	volatile long double dummy;
+#endif
 
 	if (isnanl(x))
 		return (x + x);		/* x is NaN */
