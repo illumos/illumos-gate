@@ -531,7 +531,7 @@ lx_sysent_t lx_sysent32[] = {
 	{"unlink",	NULL,			0,		1}, /* 10 */
 	{"execve",	NULL,			0,		3}, /* 11 */
 	{"chdir",	NULL,			0,		1}, /* 12 */
-	{"time",	NULL,			0,		1}, /* 13 */
+	{"time",	lx_time,		0,		1}, /* 13 */
 	{"mknod",	NULL,			0,		3}, /* 14 */
 	{"chmod",	lx_chmod,		0,		2}, /* 15 */
 	{"lchown16",	lx_lchown16,		0,		3}, /* 16 */
@@ -840,7 +840,7 @@ lx_sysent_t lx_sysent32[] = {
 	{"tee",		NULL,			NOSYS_NULL,	0}, /* 315 */
 	{"vmsplice",	NULL,			NOSYS_NULL,	0}, /* 316 */
 	{"move_pages",	NULL,			NOSYS_NULL,	0}, /* 317 */
-	{"getcpu",	NULL,			0,		3}, /* 318 */
+	{"getcpu",	lx_getcpu,		0,		3}, /* 318 */
 	{"epoll_pwait",	NULL,			0,		5}, /* 319 */
 	{"utimensat",	NULL,			0,		4}, /* 320 */
 	{"signalfd",	NULL,			NOSYS_NULL,	0}, /* 321 */
@@ -1090,7 +1090,7 @@ lx_sysent_t lx_sysent64[] = {
 	{"lremovexattr", lx_xattr,		0,		2}, /* 198 */
 	{"fremovexattr", lx_xattr,		0,		2}, /* 199 */
 	{"tkill",	lx_tkill,		0,		2}, /* 200 */
-	{"time",	NULL,			0,		1}, /* 201 */
+	{"time",	lx_time,		0,		1}, /* 201 */
 	{"futex",	lx_futex,		0,		6}, /* 202 */
 	{"sched_setaffinity", NULL,		0,		3}, /* 203 */
 	{"sched_getaffinity", NULL,		0,		3}, /* 204 */
@@ -1198,7 +1198,7 @@ lx_sysent_t lx_sysent64[] = {
 	{"syncfs",	NULL,			NOSYS_NULL,	0}, /* 306 */
 	{"sendmmsg",	NULL,			NOSYS_NULL,	0}, /* 307 */
 	{"setns",	NULL,			NOSYS_NULL,	0}, /* 309 */
-	{"getcpu",	NULL,			0,		3}, /* 309 */
+	{"getcpu",	lx_getcpu,		0,		3}, /* 309 */
 	{"process_vm_readv", NULL,		NOSYS_NULL,	0}, /* 310 */
 	{"process_vm_writev", NULL,		NOSYS_NULL,	0}, /* 311 */
 	{"kcmp",	NULL,			NOSYS_NULL,	0}, /* 312 */

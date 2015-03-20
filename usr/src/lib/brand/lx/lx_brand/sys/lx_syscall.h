@@ -178,7 +178,6 @@ extern long lx_llseek(uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t);
 extern long lx_lseek(uintptr_t, uintptr_t, uintptr_t);
 extern long lx_sysfs(uintptr_t, uintptr_t, uintptr_t);
 
-extern long lx_getcpu(unsigned int *, uintptr_t, uintptr_t);
 extern long lx_getcwd(uintptr_t, uintptr_t);
 extern long lx_uname(uintptr_t);
 extern long lx_reboot(uintptr_t, uintptr_t, uintptr_t, uintptr_t);
@@ -190,7 +189,6 @@ extern long lx_personality(uintptr_t);
 extern long lx_query_module(uintptr_t, uintptr_t, uintptr_t, uintptr_t,
     uintptr_t);
 
-extern long lx_time(uintptr_t);
 extern long lx_times(uintptr_t);
 extern long lx_setitimer(uintptr_t, uintptr_t, uintptr_t);
 

@@ -282,6 +282,7 @@ LX_BRAND_OBJS  =		\
 	lx_chmod.o		\
 	lx_chown.o		\
 	lx_clone.o		\
+	lx_cpu.o		\
 	lx_errno.o		\
 	lx_futex.o		\
 	lx_getpid.o		\
