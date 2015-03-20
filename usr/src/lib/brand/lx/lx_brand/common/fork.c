@@ -57,10 +57,15 @@ lx_fork_common(boolean_t is_vfork)
 	lx_ptrace_clone_begin(ptopt, B_FALSE);
 
 	/*
-	 * Suspend signal delivery and perform the fork operation.
+	 * Suspend signal delivery, run the stack management prefork handler
+	 * and perform the fork operation.
 	 */
 	_sigoff();
-	switch (ret = fork1()) {
+	lx_stack_prefork();
+	ret = fork1();
+	lx_stack_postfork();
+
+	switch (ret) {
 	case -1:
 		_sigon();
 		return (-errno);

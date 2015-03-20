@@ -26,6 +26,7 @@
 #include <sys/mman.h>
 #include <sys/brand.h>
 #include <sys/syscall.h>
+#include <sys/debug.h>
 
 #include <sys/lx_brand.h>
 #include <sys/lx_misc.h>
@@ -40,7 +41,7 @@ typedef struct lx_stack_list_ent {
 	lx_tsd_t *sle_tsd;
 } lx_stack_list_ent_t;
 
-static mutex_t lx_stack_list_lock = DEFAULTMUTEX;
+static mutex_t lx_stack_list_lock = ERRORCHECKMUTEX;
 lx_stack_list_ent_t *lx_stack_list = NULL;
 unsigned int lx_stack_list_elems = 0;
 
@@ -56,6 +57,38 @@ int lx_native_stack_page_count = LX_NATIVE_STACK_PAGE_COUNT;
 extern void _sigon(void);
 extern void _sigoff(void);
 
+void
+lx_stack_prefork(void)
+{
+	/*
+	 * The "lx_stack_list_lock" mutex is used to protect access to the list
+	 * of per-thread native stacks.  Management of native stacks is
+	 * generally performed while servicing an emulated fork(2), vfork(2) or
+	 * clone(2) system call.
+	 *
+	 * Multiple threads may be attempting to create new threads or
+	 * processes concurrently, but in the case of fork(2) only the
+	 * currently executing thread is duplicated in the child process.  We
+	 * require that the stack list lock be taken before the native fork1()
+	 * or forkx(), and released in both the parent and the child once the
+	 * operation is complete.
+	 *
+	 * Holding this mutex prevents the forked child from containing a
+	 * copy-on-write copy of a locked mutex without the thread that would
+	 * later unlock it.  We also suspend signal delivery while entering
+	 * this critical section to ensure async signal safety.
+	 */
+	_sigoff();
+	VERIFY0(mutex_lock(&lx_stack_list_lock));
+}
+
+void
+lx_stack_postfork(void)
+{
+	VERIFY0(mutex_unlock(&lx_stack_list_lock));
+	_sigon();
+}
+
 /*
  * Free the alternate stack for this thread.
  */
@@ -66,7 +99,7 @@ lx_free_stack(void)
 	int i;
 
 	_sigoff();
-	mutex_lock(&lx_stack_list_lock);
+	VERIFY0(mutex_lock(&lx_stack_list_lock));
 
 	/*
 	 * Find this thread's stack in the list of stacks.
@@ -92,7 +125,7 @@ lx_free_stack(void)
 		 */
 		bzero(&lx_stack_list[i], sizeof (lx_stack_list[i]));
 
-		mutex_unlock(&lx_stack_list_lock);
+		VERIFY0(mutex_unlock(&lx_stack_list_lock));
 		_sigon();
 		return;
 	}
@@ -114,7 +147,7 @@ lx_free_other_stacks(void)
 	thread_t me = thr_self();
 
 	_sigoff();
-	mutex_lock(&lx_stack_list_lock);
+	VERIFY0(mutex_lock(&lx_stack_list_lock));
 
 	for (i = 0; i < lx_stack_list_elems; i++) {
 		if (lx_stack_list[i].sle_tid == me) {
@@ -164,7 +197,7 @@ lx_free_other_stacks(void)
 		    strerror(errno));
 	}
 
-	mutex_unlock(&lx_stack_list_lock);
+	VERIFY0(mutex_unlock(&lx_stack_list_lock));
 	_sigon();
 }
 
@@ -244,7 +277,7 @@ lx_install_stack(void *stack, size_t stacksize, lx_tsd_t *tsd)
 	 * Install the stack in the global list of thread stacks.
 	 */
 	_sigoff();
-	mutex_lock(&lx_stack_list_lock);
+	VERIFY0(mutex_lock(&lx_stack_list_lock));
 
 	for (i = 0; i < lx_stack_list_elems; i++) {
 		assert(lx_stack_list[i].sle_tid != me);
@@ -265,7 +298,7 @@ lx_install_stack(void *stack, size_t stacksize, lx_tsd_t *tsd)
 	lx_stack_list[i].sle_stack_size = stacksize;
 	lx_stack_list[i].sle_tsd = tsd;
 
-	mutex_unlock(&lx_stack_list_lock);
+	VERIFY0(mutex_unlock(&lx_stack_list_lock));
 	_sigon();
 
 	/*
