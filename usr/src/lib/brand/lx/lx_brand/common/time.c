@@ -34,27 +34,6 @@
 #include <sys/lx_misc.h>
 
 /*
- * time() - This cannot be passthrough because on Linux a bad buffer will
- *	    set errno to EFAULT, and on Illumos the failure mode is documented
- *	    as "undefined."
- *
- *	    (At present, Illumos' time(2) will segmentation fault, as the call
- *	    is simply a libc wrapper atop the time() syscall that will
- *	    dereference the passed  pointer if it is non-zero.)
- */
-long
-lx_time(uintptr_t p1)
-{
-	time_t ret = time((time_t *)0);
-
-	if ((ret == (time_t)-1) ||
-	    ((p1 != 0) && (uucopy(&ret, (time_t *)p1, sizeof (ret)) != 0)))
-		return (-errno);
-
-	return (ret);
-}
-
-/*
  * times() - The Linux implementation avoids writing to NULL, while Illumos
  *	     returns EFAULT.
  */

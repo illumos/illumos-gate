@@ -823,28 +823,6 @@ lx_fchdir(int fildes)
 	return ((r == -1) ? -errno : r);
 }
 
-/*
- * We support neither the second argument (NUMA node), nor the third (obsolete
- * pre-2.6.24 caching functionality which was ultimately broken).
- */
-long
-lx_getcpu(unsigned int *cpu, uintptr_t p2, uintptr_t p3)
-{
-	psinfo_t psinfo;
-	int procfd;
-	unsigned int curcpu;
-
-	if ((procfd = open("/native/proc/self/psinfo", O_RDONLY)) == -1)
-		return (-errno);
-
-	if (read(procfd, &psinfo, sizeof (psinfo_t)) == -1)
-		return (-errno);
-
-	curcpu = psinfo.pr_lwp.pr_onpro;
-
-	return ((uucopy(&curcpu, cpu, sizeof (curcpu)) != 0) ? -errno : 0);
-}
-
 long
 lx_getgid(void)
 {

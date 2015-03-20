@@ -1127,7 +1127,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	NULL,				/* 198: lremovexattr */
 	NULL,				/* 199: fremovexattr */
 	NULL,				/* 200: tkill */
-	lx_time,			/* 201: time */
+	NULL,				/* 201: time */
 	NULL,				/* 202: futex */
 	lx_sched_setaffinity,		/* 203: sched_setaffinity */
 	lx_sched_getaffinity,		/* 204: sched_getaffinity */
@@ -1235,7 +1235,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	NULL,				/* 306: syncfs */
 	NULL,				/* 307: sendmmsg */
 	NULL,				/* 309: setns */
-	lx_getcpu,			/* 309: getcpu */
+	NULL,				/* 309: getcpu */
 	NULL,				/* 310: process_vm_readv */
 	NULL,				/* 311: process_vm_writev */
 	NULL,				/* 312: kcmp */
@@ -1270,7 +1270,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_unlink,			/*  10: unlink */
 	lx_execve,			/*  11: execve */
 	lx_chdir,			/*  12: chdir */
-	lx_time,			/*  13: time */
+	NULL,				/*  13: time */
 	lx_mknod,			/*  14: mknod */
 	NULL,				/*  15: chmod */
 	NULL,				/*  16: lchown16 */
@@ -1575,7 +1575,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	NULL,				/* 315: tee */
 	NULL,				/* 316: vmsplice */
 	NULL,				/* 317: move_pages */
-	lx_getcpu,			/* 318: getcpu */
+	NULL,				/* 318: getcpu */
 	lx_epoll_pwait,			/* 319: epoll_pwait */
 	lx_utimensat,			/* 320: utimensat */
 	NULL,				/* 321: signalfd */

@@ -327,3 +327,41 @@ lx_gettimeofday(struct timeval *tvp, struct lx_timezone *tzp)
 
 	return (0);
 }
+
+/*
+ * On Linux a bad buffer will set errno to EFAULT, and on Illumos the failure
+ * mode is documented as "undefined."
+ */
+long
+lx_time(time_t *tp)
+{
+	timestruc_t ts;
+	struct timeval tv;
+
+	gethrestime(&ts);
+	tv.tv_sec = ts.tv_sec;
+	tv.tv_usec = 0;
+
+	if (get_udatamodel() == DATAMODEL_NATIVE) {
+		if (tp != NULL &&
+		    copyout(&tv.tv_sec, tp, sizeof (tv.tv_sec)) != 0)
+			return (set_errno(EFAULT));
+
+		return (tv.tv_sec);
+	}
+#ifdef _SYSCALL32_IMPL
+	else {
+		struct timeval32 tv32;
+
+		if (TIMEVAL_OVERFLOW(&tv))
+			return (set_errno(EOVERFLOW));
+		TIMEVAL_TO_TIMEVAL32(&tv32, &tv);
+
+		if (tp != NULL &&
+		    copyout(&tv32.tv_sec, tp, sizeof (tv32.tv_sec)))
+			return (set_errno(EFAULT));
+
+		return (tv32.tv_sec);
+	}
+#endif
+}
