@@ -185,6 +185,8 @@ extern int lx_alloc_stack(void **, size_t *);
 extern void lx_install_stack(void *, size_t, lx_tsd_t *);
 extern void lx_free_stack(void);
 extern void lx_free_other_stacks(void);
+extern void lx_stack_prefork(void);
+extern void lx_stack_postfork(void);
 
 /*
  * NO_UUCOPY disables calls to the uucopy* system calls to help with
