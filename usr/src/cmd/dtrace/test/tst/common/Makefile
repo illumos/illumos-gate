@@ -83,6 +83,8 @@ json/tst.usdt.o: json/usdt.h
 json/usdt.h: json/usdt.d
 	$(DTRACE) -h -s json/usdt.d -o json/usdt.h
 
+CLOBBERFILES +=	json/usdt.h
+
 json/usdt.o: json/usdt.d json/tst.usdt.o
 	$(COMPILE.d) -o json/usdt.o -s json/usdt.d json/tst.usdt.o
 

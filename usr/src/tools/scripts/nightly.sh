@@ -2136,9 +2136,9 @@ if [ "$CHECK_PATHS" = y -a "$N_FLAG" != y ]; then
 		>>$mail_msg_file
 	arg=-b
 	[ "$build_ok" = y ] && arg=
-	checkpaths $arg $checkroot > $SRC/checkpaths.out 2>&1
-	if [[ -s $SRC/checkpaths.out ]]; then
-		tee -a $LOGFILE < $SRC/checkpaths.out >> $mail_msg_file
+	checkpaths $arg $checkroot > $SRC/check-paths.out 2>&1
+	if [[ -s $SRC/check-paths.out ]]; then
+		tee -a $LOGFILE < $SRC/check-paths.out >> $mail_msg_file
 		build_extras_ok=n
 	fi
 fi
