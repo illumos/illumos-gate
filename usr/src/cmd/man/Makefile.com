@@ -14,29 +14,10 @@
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 #
 
-include 	Makefile.com
-include		$(SRC)/cmd/Makefile.cmd
+PROG=		man
+LINKS=		apropos whatis catman
+LIBLINKS =	makewhatis
+OBJS=		makewhatis.o man.o stringlist.o
+SRCS=		$(OBJS:%.o=%.c)
 
-CFLAGS +=	$(CCVERBOSE)
 
-ROOTLINKS=	$(LINKS:%=$(ROOTBIN)/%) $(LIBLINKS:%=$(ROOTLIB)/%)
-
-.KEEP_STATE :
-
-all:		$(PROG)
-
-clean:
-		$(RM) $(OBJS)
-
-install:	all $(ROOTPROG) $(ROOTLINKS)
-
-lint: 		lint_SRCS
-
-$(PROG):	$(OBJS)
-		$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
-		$(POST_PROCESS)
-
-$(ROOTLINKS):	$(ROOTPROG)
-		$(RM) $@; $(LN) $(ROOTPROG) $@
-
-include		$(SRC)/cmd/Makefile.targ

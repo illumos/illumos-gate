@@ -55,6 +55,7 @@ COMMON_SUBDIRS= \
 #
 UNSHIPPED_SUBDIRS = \
 	elfsign \
+	man \
 	mandoc
 
 sparc_SUBDIRS= \
