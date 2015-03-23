@@ -36,7 +36,7 @@
 int
 libvarpd_overlay_init(varpd_impl_t *vip)
 {
-	vip->vdi_overlayfd = open(OVERLAY_PATH, O_RDWR);
+	vip->vdi_overlayfd = open(OVERLAY_PATH, O_RDWR | O_EXCL);
 	if (vip->vdi_overlayfd == -1)
 		return (errno);
 	return (0);

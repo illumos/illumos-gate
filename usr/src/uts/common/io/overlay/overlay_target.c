@@ -59,6 +59,7 @@
 typedef struct overlay_target_hdl {
 	minor_t oth_minor;		/* RO */
 	zoneid_t oth_zoneid;		/* RO */
+	int oth_oflags;			/* RO */
 	list_node_t oth_link;		/* overlay_target_lock */
 	kmutex_t oth_lock;
 	list_t	oth_outstanding;	/* oth_lock */
@@ -92,6 +93,7 @@ static list_t overlay_thdl_list;
 static kmutex_t overlay_target_lock;
 static kcondvar_t overlay_target_condvar;
 static list_t overlay_target_list;
+static boolean_t overlay_target_excl;
 
 /*
  * Outstanding data per hash table entry.
@@ -1519,7 +1521,11 @@ overlay_target_open(dev_t *devp, int flags, int otype, cred_t *credp)
 	if (otype & OTYP_BLK)
 		return (EINVAL);
 
-	if (flags & ~(FREAD | FWRITE))
+	if (flags & ~(FREAD | FWRITE | FEXCL))
+		return (EINVAL);
+
+	if ((flags & FWRITE) &&
+	    !(flags & FEXCL))
 		return (EINVAL);
 
 	if (!(flags & FREAD) && !(flags & FWRITE))
@@ -1538,12 +1544,24 @@ overlay_target_open(dev_t *devp, int flags, int otype, cred_t *credp)
 	VERIFY(thdl != NULL);
 	thdl->oth_minor = mid;
 	thdl->oth_zoneid = crgetzoneid(credp);
+	thdl->oth_oflags = flags;
 	mutex_init(&thdl->oth_lock, NULL, MUTEX_DRIVER, NULL);
 	list_create(&thdl->oth_outstanding, sizeof (overlay_target_entry_t),
 	    offsetof(overlay_target_entry_t, ote_qlink));
 	*devp = makedevice(getmajor(*devp), mid);
 
 	mutex_enter(&overlay_target_lock);
+	if ((flags & FEXCL) && overlay_target_excl == B_TRUE) {
+		mutex_exit(&overlay_target_lock);
+		list_destroy(&thdl->oth_outstanding);
+		mutex_destroy(&thdl->oth_lock);
+		ddi_soft_state_free(overlay_thdl_state, mid);
+		id_free(overlay_thdl_idspace, mid);
+		return (EEXIST);
+	} else if ((flags & FEXCL) != 0) {
+		VERIFY(overlay_target_excl == B_FALSE);
+		overlay_target_excl = B_TRUE;
+	}
 	list_insert_tail(&overlay_thdl_list, thdl);
 	mutex_exit(&overlay_target_lock);
 
@@ -1628,6 +1646,10 @@ overlay_target_close(dev_t dev, int flags, int otype, cred_t *credp)
 		list_insert_tail(&overlay_target_list, entry);
 	cv_signal(&overlay_target_condvar);
 	mutex_exit(&thdl->oth_lock);
+	if ((thdl->oth_oflags & FEXCL) != 0) {
+		VERIFY(overlay_target_excl == B_TRUE);
+		overlay_target_excl = B_FALSE;
+	}
 	mutex_exit(&overlay_target_lock);
 
 	list_destroy(&thdl->oth_outstanding);
