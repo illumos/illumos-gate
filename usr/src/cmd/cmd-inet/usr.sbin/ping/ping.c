@@ -2393,7 +2393,7 @@ usage(char *cmdname)
 	Fprintf(stderr, "usage: %s host [timeout]\n", cmdname);
 	Fprintf(stderr,
 /* CSTYLED */
-"usage: %s -s [-l | U] [abdDLnRrv] [-A addr_family] [-c traffic_class]\n\t"
+"usage: %s -s [-l | -U] [-abdDLnRrv] [-A addr_family] [-c traffic_class]\n\t"
 "[-g gateway [-g gateway ...]] [-N nexthop] [-F flow_label] [-I interval]\n\t"
 "[-i interface] [-P tos] [-p port] [-t ttl] host [data_size] [npackets]\n",
 	    cmdname);

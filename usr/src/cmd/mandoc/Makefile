@@ -24,6 +24,8 @@ ROOTPROGS =	$(ROOTBIN)/mandoc $(ROOTLIB)/mandoc_preconv
 
 OBJS=		$(preconv_OBJS) $(mandoc_OBJS)
 
+CLOBBERFILES +=	$(PROGS)
+
 include		$(SRC)/cmd/Makefile.cmd
 include		$(SRC)/cmd/mandoc/Makefile.common
 
