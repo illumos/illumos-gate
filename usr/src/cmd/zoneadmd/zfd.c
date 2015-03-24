@@ -333,14 +333,22 @@ init_zfd_devs(zlog_t *zlogp, zlog_mode_t mode)
 	di_devlink_handle_t dl = NULL;
 	int rv = -1;
 	int ndevs;
+	int reqdevs;
 	int i;
+
+	/*
+	 * Three zfd devices are required for log mode.
+	 * Interactive mode needs only one.
+	 */
+	reqdevs = (mode != ZLOG_INTERACTIVE) ? 3 : 1;
 
 	/*
 	 * Don't re-setup zone fd devs if they already exist; just
 	 * skip ahead to making devlinks, which we do for sanity's sake.
 	 */
 	ndevs = count_zfd_devs(zlogp);
-	if (ndevs == 3)
+
+	if (ndevs == reqdevs)
 		goto devlinks;
 
 	if (ndevs > 0 || ndevs == -1) {
@@ -356,7 +364,7 @@ init_zfd_devs(zlog_t *zlogp, zlog_mode_t mode)
 		goto error;
 	}
 
-	for (i = 0; i < 3; i++) {
+	for (i = 0; i < reqdevs; i++) {
 		if (init_zfd_dev(zlogp, bus_hdl, i) != 0)
 			goto error;
 	}
@@ -372,8 +380,7 @@ devlinks:
 
 	if (mode == ZLOG_INTERACTIVE) {
 		/* We want to look like a tty. */
-		for (i = 0; i < 3; i++)
-			make_tty(zlogp, i);
+		make_tty(zlogp, 0);
 	}
 
 error:
@@ -383,69 +390,42 @@ error:
 }
 
 static int
-init_server_socks(zlog_t *zlogp, int *stdoutfd, int *stderrfd)
+init_server_sock(zlog_t *zlogp, int *servfd, char *nm)
 {
-	int outfd = -1, errfd = -1;
+	int resfd = -1;
 	struct sockaddr_un servaddr;
 
 	bzero(&servaddr, sizeof (servaddr));
 	servaddr.sun_family = AF_UNIX;
 	(void) snprintf(servaddr.sun_path, sizeof (servaddr.sun_path),
-	    SERVER_SOCKPATH, zone_name, "out");
+	    SERVER_SOCKPATH, zone_name, nm);
 
-	if ((outfd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
+	if ((resfd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
 		zerror(zlogp, B_TRUE, "server setup: could not create socket");
 		goto err;
 	}
 	(void) unlink(servaddr.sun_path);
 
-	if (bind(outfd, (struct sockaddr *)&servaddr, sizeof (servaddr))
+	if (bind(resfd, (struct sockaddr *)&servaddr, sizeof (servaddr))
 	    == -1) {
 		zerror(zlogp, B_TRUE,
 		    "server setup: could not bind to socket");
 		goto err;
 	}
 
-	if (listen(outfd, 4) == -1) {
+	if (listen(resfd, 4) == -1) {
 		zerror(zlogp, B_TRUE,
 		    "server setup: could not listen on socket");
 		goto err;
 	}
 
-	bzero(&servaddr, sizeof (servaddr));
-	servaddr.sun_family = AF_UNIX;
-	(void) snprintf(servaddr.sun_path, sizeof (servaddr.sun_path),
-	    SERVER_SOCKPATH, zone_name, "err");
-
-	if ((errfd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
-		zerror(zlogp, B_TRUE, "server setup: could not create socket");
-		goto err;
-	}
-	(void) unlink(servaddr.sun_path);
-
-	if (bind(errfd, (struct sockaddr *)&servaddr, sizeof (servaddr))
-	    == -1) {
-		zerror(zlogp, B_TRUE,
-		    "server setup: could not bind to socket");
-		goto err;
-	}
-
-	if (listen(errfd, 4) == -1) {
-		zerror(zlogp, B_TRUE,
-		    "server setup: could not listen on socket");
-		goto err;
-	}
-
-	*stdoutfd = outfd;
-	*stderrfd = errfd;
+	*servfd = resfd;
 	return (0);
 
 err:
 	(void) unlink(servaddr.sun_path);
-	if (outfd != -1)
-		(void) close(outfd);
-	if (errfd != -1)
-		(void) close(errfd);
+	if (resfd != -1)
+		(void) close(resfd);
 	return (-1);
 }
 
@@ -924,7 +904,7 @@ do_zfd_io(int gzservfd, int gzerrfd, int stdinfd, int stdoutfd, int stderrfd)
 }
 
 static int
-open_fd(int id)
+open_fd(zlog_t *zlogp, int id, int rw)
 {
 	int fd;
 	int flag = O_NONBLOCK | O_NOCTTY | O_CLOEXEC;
@@ -933,18 +913,25 @@ open_fd(int id)
 
 	(void) snprintf(stdpath, sizeof (stdpath), "/dev/zfd/%s/master/%d",
 	    zone_name, id);
-
-	if (id == 0) {
-		/* zone's stdin, so we're writing to it */
-		flag |= O_WRONLY;
-	} else {
-		/* zone's stdout or stderr, so we're reading from it */
-		flag |= O_RDONLY;
-	}
+	flag |= rw;
 
 	while (!shutting_down) {
-		if ((fd = open(stdpath, flag)) != -1)
+		if ((fd = open(stdpath, flag)) != -1) {
+			/*
+			 * Setting RPROTDIS on the stream means that the
+			 * control portion of messages received (which we don't
+			 * care about) will be discarded by the stream head. If
+			 * we allowed such messages, we wouldn't be able to use
+			 * read(2), as it fails (EBADMSG) when a message with a
+			 * control element is received.
+			 */
+			if (ioctl(fd, I_SRDOPT, RNORM|RPROTDIS) == -1) {
+				zerror(zlogp, B_TRUE,
+				    "failed to set options on zfd");
+				return (-1);
+			}
 			return (fd);
+		}
 
 		if (retried++ > 60)
 			break;
@@ -952,6 +939,7 @@ open_fd(int id)
 		(void) sleep(1);
 	}
 
+	zerror(zlogp, B_TRUE, "failed to open zfd");
 	return (-1);
 }
 
@@ -989,14 +977,15 @@ hup_handler(int i)
  * and read from the stdout/stderr fds).
  */
 static void
-srvr()
+srvr(void *modearg)
 {
+	zlog_mode_t mode = (zlog_mode_t)modearg;
 	int gzoutfd = -1;
-	int gzerrfd = -1;
 	int stdinfd = -1;
 	int stdoutfd = -1;
-	int stderrfd = -1;
 	sigset_t blockset;
+	int gzerrfd = -1;
+	int stderrfd = -1;
 
 	if (!shutting_down) {
 		open_logfile();
@@ -1020,58 +1009,26 @@ srvr()
 	}
 
 	while (!shutting_down) {
-		if (init_server_socks(zlogp, &gzoutfd, &gzerrfd) == -1) {
+		if (init_server_sock(zlogp, &gzoutfd, "out") == -1) {
 			zerror(zlogp, B_FALSE,
-			    "server setup: socket initialization failed");
+			    "server setup: stdout socket init failed");
+			goto death;
+		}
+		if (init_server_sock(zlogp, &gzerrfd, "err") == -1) {
+			zerror(zlogp, B_FALSE,
+			    "server setup: stderr socket init failed");
 			goto death;
 		}
 
-		if (!shutting_down) {
-			if ((stdinfd = open_fd(0)) == -1) {
-				zerror(zlogp, B_TRUE,
-				    "failed to open stdin zfd");
+		if (mode == ZLOG_INTERACTIVE) {
+			if ((stdinfd = open_fd(zlogp, 0, O_RDWR)) == -1) {
 				goto death;
 			}
-
-			/*
-			 * Setting RPROTDIS on the stream means that the
-			 * control portion of messages received (which we don't
-			 * care about) will be discarded by the stream head. If
-			 * we allowed such messages, we wouldn't be able to use
-			 * read(2), as it fails (EBADMSG) when a message with a
-			 * control element is received.
-			 */
-			if (ioctl(stdinfd, I_SRDOPT, RNORM|RPROTDIS) == -1) {
-				zerror(zlogp, B_TRUE,
-				    "failed to set options on stdin zfd");
-				goto death;
-			}
-		}
-
-		if (!shutting_down) {
-			if ((stdoutfd = open_fd(1)) == -1) {
-				zerror(zlogp, B_TRUE,
-				    "failed to open stdout zfd");
-				goto death;
-			}
-
-			if (ioctl(stdoutfd, I_SRDOPT, RNORM|RPROTDIS) == -1) {
-				zerror(zlogp, B_TRUE,
-				    "failed to set options on stdout zfd");
-				goto death;
-			}
-		}
-
-		if (!shutting_down) {
-			if ((stderrfd = open_fd(2)) == -1) {
-				zerror(zlogp, B_TRUE,
-				    "failed to open stderr zfd");
-				goto death;
-			}
-
-			if (ioctl(stderrfd, I_SRDOPT, RNORM|RPROTDIS) == -1) {
-				zerror(zlogp, B_TRUE,
-				    "failed to set options on stderr zfd");
+			stdoutfd = stdinfd;
+		} else {
+			if ((stdinfd = open_fd(zlogp, 0, O_WRONLY)) == -1 ||
+			    (stdoutfd = open_fd(zlogp, 1, O_RDONLY)) == -1 ||
+			    (stderrfd = open_fd(zlogp, 2, O_RDONLY)) == -1) {
 				goto death;
 			}
 		}
@@ -1080,10 +1037,11 @@ srvr()
 death:
 		destroy_server_sock(gzoutfd, "out");
 		destroy_server_sock(gzerrfd, "err");
-
 		(void) close(stdinfd);
-		(void) close(stdoutfd);
-		(void) close(stderrfd);
+		if (mode != ZLOG_INTERACTIVE) {
+			(void) close(stdoutfd);
+			(void) close(stderrfd);
+		}
 	}
 
 	(void) close(eventstream[0]);
@@ -1145,7 +1103,7 @@ create_log_thread(zlog_t *logp, zoneid_t id)
 		return;
 	}
 
-	res = thr_create(NULL, NULL, (void * (*)(void *))srvr, NULL, NULL,
+	res = thr_create(NULL, 0, (void * (*)(void *))srvr, (void *)mode, 0,
 	    &logger_tid);
 	if (res != 0) {
 		zerror(zlogp, B_FALSE, "error %d creating logger thread", res);

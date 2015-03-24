@@ -54,8 +54,8 @@ extern pid_t zoneinit_pid;
 /*
  * Values Linux expects for init
  */
-#define	LX_INIT_PGID	0
-#define	LX_INIT_SID	0
+#define	LX_INIT_PGID	1
+#define	LX_INIT_SID	1
 #define	LX_INIT_PID	1
 
 /*
