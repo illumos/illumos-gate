@@ -2612,7 +2612,7 @@ refcount(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		off = mdb_ctf_offsetof_by_name("refcount_t", "rc_removed");
 		if (off == -1)
 			return (DCMD_ERR);
-		mdb_pwalk("list", reference_cb, (void*)B_FALSE, addr + off);
+		mdb_pwalk("list", reference_cb, (void*)B_TRUE, addr + off);
 	}
 
 	return (DCMD_OK);
