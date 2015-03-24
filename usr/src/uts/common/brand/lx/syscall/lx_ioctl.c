@@ -635,23 +635,19 @@ ict_tcsbrkp(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 static int
 ict_tiocgpgrp(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 {
-	pid_t	ttysid;
+	pid_t	spgrp;
 	int	error, rv;
 
-	error = VOP_IOCTL(fp->f_vnode, TIOCGSID, (intptr_t)&ttysid,
-	    FLFAKE(fp), fp->f_cred, &rv, NULL);
-	if (error != 0)
-		return (set_errno(error));
-
-	mutex_enter(&curproc->p_splock);
-	if (ttysid != curproc->p_sessp->s_sid) {
-		mutex_exit(&curproc->p_splock);
-		return (set_errno(ENOTTY));
-	}
-	mutex_exit(&curproc->p_splock);
-
-	error = VOP_IOCTL(fp->f_vnode, cmd, arg, FLUSER(fp),
+	error = VOP_IOCTL(fp->f_vnode, cmd, (intptr_t)&spgrp, FLFAKE(fp),
 	    fp->f_cred, &rv, NULL);
+	if (error == 0) {
+		if (spgrp == curproc->p_zone->zone_proc_initpid) {
+			spgrp = 1;
+		}
+		if (copyout(&spgrp, (caddr_t)arg, sizeof (spgrp))) {
+			return (set_errno(EFAULT));
+		}
+	}
 	return ((error != 0) ? set_errno(error) : 0);
 }
 
