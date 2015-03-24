@@ -23,6 +23,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2012 Joyent, Inc.  All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  */
 
 /*
@@ -509,7 +510,8 @@ destroy_console_sock(int servfd)
  * the ident string from a client without saving it.
  */
 static int
-get_client_ident(int clifd, pid_t *pid, char *locale, size_t locale_len)
+get_client_ident(int clifd, pid_t *pid, char *locale, size_t locale_len,
+	int *disconnect)
 {
 	char buf[BUFSIZ], *bufp;
 	size_t buflen = sizeof (buf);
@@ -549,7 +551,8 @@ get_client_ident(int clifd, pid_t *pid, char *locale, size_t locale_len)
 	}
 
 	/*
-	 * Parse buffer for message of the form: IDENT <pid> <locale>
+	 * Parse buffer for message of the form:
+	 * IDENT <pid> <locale> <disconnect flag>
 	 */
 	bufp = buf;
 	if (strncmp(bufp, "IDENT ", 6) != 0)
@@ -562,13 +565,17 @@ get_client_ident(int clifd, pid_t *pid, char *locale, size_t locale_len)
 
 	while (*bufp != '\0' && isspace(*bufp))
 		bufp++;
+	buflen = strlen(bufp) - 1;
+	*disconnect = atoi(&bufp[buflen]);
+	bufp[buflen - 1] = '\0';
 	(void) strlcpy(locale, bufp, locale_len);
 
 	return (0);
 }
 
 static int
-accept_client(int servfd, pid_t *pid, char *locale, size_t locale_len)
+accept_client(int servfd, pid_t *pid, char *locale, size_t locale_len,
+	int *disconnect)
 {
 	int connfd;
 	struct sockaddr_un cliaddr;
@@ -578,7 +585,8 @@ accept_client(int servfd, pid_t *pid, char *locale, size_t locale_len)
 	connfd = accept(servfd, (struct sockaddr *)&cliaddr, &clilen);
 	if (connfd == -1)
 		return (-1);
-	if (get_client_ident(connfd, pid, locale, locale_len) == -1) {
+	if (get_client_ident(connfd, pid, locale, locale_len,
+	    disconnect) == -1) {
 		(void) shutdown(connfd, SHUT_RDWR);
 		(void) close(connfd);
 		return (-1);
@@ -601,7 +609,7 @@ reject_client(int servfd, pid_t clientpid)
 	/*
 	 * After hear its ident string, tell client to get lost.
 	 */
-	if (get_client_ident(connfd, NULL, NULL, 0) == 0) {
+	if (get_client_ident(connfd, NULL, NULL, 0, NULL) == 0) {
 		(void) snprintf(nak, sizeof (nak), "%lu\n",
 		    clientpid);
 		(void) write(connfd, nak, strlen(nak));
@@ -611,7 +619,7 @@ reject_client(int servfd, pid_t clientpid)
 }
 
 static void
-event_message(int clifd, char *clilocale, zone_evt_t evt)
+event_message(int clifd, char *clilocale, zone_evt_t evt, int dflag)
 {
 	char *str, *lstr = NULL;
 	char lmsg[BUFSIZ];
@@ -635,7 +643,10 @@ event_message(int clifd, char *clilocale, zone_evt_t evt)
 		str = "NOTICE: Zone readied";
 		break;
 	case Z_EVT_ZONE_HALTED:
-		str = "NOTICE: Zone halted";
+		if (dflag)
+			str = "NOTICE: Zone halted.  Disconnecting...";
+		else
+			str = "NOTICE: Zone halted";
 		break;
 	case Z_EVT_ZONE_REBOOTING:
 		if (*boot_args == '\0') {
@@ -651,7 +662,10 @@ event_message(int clifd, char *clilocale, zone_evt_t evt)
 		str = "NOTICE: Zone is being uninstalled.  Disconnecting...";
 		break;
 	case Z_EVT_ZONE_BOOTFAILED:
-		str = "NOTICE: Zone boot failed";
+		if (dflag)
+			str = "NOTICE: Zone boot failed.  Disconnecting...";
+		else
+			str = "NOTICE: Zone boot failed";
 		break;
 	case Z_EVT_ZONE_BADARGS:
 		/*LINTED*/
@@ -708,6 +722,7 @@ do_console_io(zlog_t *zlogp, int consfd, int servfd)
 	int pollerr = 0;
 	char clilocale[MAXPATHLEN];
 	pid_t clipid = 0;
+	int disconnect = 0;
 
 	/* console side, watch for read events */
 	pollfds[0].fd = consfd;
@@ -801,7 +816,8 @@ do_console_io(zlog_t *zlogp, int consfd, int servfd)
 
 
 			} else if ((clifd = accept_client(servfd, &clipid,
-			    clilocale, sizeof (clilocale))) != -1) {
+			    clilocale, sizeof (clilocale),
+			    &disconnect)) != -1) {
 				pollfds[1].fd = clifd;
 
 			} else {
@@ -827,7 +843,7 @@ do_console_io(zlog_t *zlogp, int consfd, int servfd)
 			if (clifd == -1) {
 				break;
 			}
-			event_message(clifd, clilocale, evt);
+			event_message(clifd, clilocale, evt, disconnect);
 			/*
 			 * Special handling for the message that the zone is
 			 * uninstalling; we boot the client, then break out
@@ -836,6 +852,14 @@ do_console_io(zlog_t *zlogp, int consfd, int servfd)
 			 * in a state < READY, and so zoneadmd will shutdown.
 			 */
 			if (evt == Z_EVT_ZONE_UNINSTALLING) {
+				break;
+			}
+			/*
+			 * Diconnect if -C and -d options were specified and
+			 * zone was halted or failed to boot.
+			 */
+			if ((evt == Z_EVT_ZONE_HALTED ||
+			    evt == Z_EVT_ZONE_BOOTFAILED) && disconnect) {
 				break;
 			}
 		}
