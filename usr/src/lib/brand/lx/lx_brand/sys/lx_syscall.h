@@ -114,10 +114,6 @@ extern long lx_pselect6(uintptr_t, uintptr_t, uintptr_t, uintptr_t,
 extern long lx_poll(uintptr_t, uintptr_t, uintptr_t);
 extern long lx_ppoll(uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t);
 extern long lx_epoll_ctl(uintptr_t, uintptr_t, uintptr_t, uintptr_t);
-extern long lx_oldgetrlimit(uintptr_t, uintptr_t);
-extern long lx_getrlimit(uintptr_t, uintptr_t);
-extern long lx_setrlimit(uintptr_t, uintptr_t);
-extern long lx_prlimit64(uintptr_t, uintptr_t, uintptr_t, uintptr_t);
 extern long lx_settimeofday(uintptr_t, uintptr_t);
 extern long lx_getrusage(uintptr_t, uintptr_t);
 extern long lx_mknod(uintptr_t, uintptr_t, uintptr_t);
