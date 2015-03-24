@@ -50,7 +50,6 @@ COBJS	=	aio.o			\
 		poll_select.o		\
 		priority.o		\
 		ptrace.o		\
-		rlimit.o		\
 		sched.o			\
 		sendfile.o		\
 		signal.o		\

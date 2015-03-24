@@ -377,6 +377,20 @@ typedef enum lx_proc_flags {
 
 #ifdef	_KERNEL
 
+#define	LX_RLFAKE_LOCKS		0
+#define	LX_RLFAKE_NICE		1
+#define	LX_RLFAKE_RTPRIO	2
+#define	LX_RLFAKE_RTTIME	3
+
+#define	LX_RLFAKE_NLIMITS	4
+
+#define	LX_RLIM64_INFINITY	(~0ULL)
+
+typedef struct {
+	uint64_t	rlim_cur;
+	uint64_t	rlim_max;
+} lx_rlimit64_t;
+
 typedef struct lx_proc_data {
 	uintptr_t l_handler;	/* address of user-space handler */
 	pid_t l_ppid;		/* pid of originating parent proc */
@@ -385,6 +399,8 @@ typedef struct lx_proc_data {
 	int l_signal;		/* signal to deliver to parent when this */
 				/* thread group dies */
 	lx_proc_flags_t l_flags;
+
+	lx_rlimit64_t l_fake_limits[LX_RLFAKE_NLIMITS];
 } lx_proc_data_t;
 
 #endif	/* _KERNEL */

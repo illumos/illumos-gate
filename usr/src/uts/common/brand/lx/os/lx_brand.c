@@ -1321,6 +1321,18 @@ lx_copy_procdata(proc_t *child, proc_t *parent)
 	*cpd = *ppd;
 
 	child->p_brand_data = cpd;
+
+	cpd->l_fake_limits[LX_RLFAKE_LOCKS].rlim_cur = LX_RLIM64_INFINITY;
+	cpd->l_fake_limits[LX_RLFAKE_LOCKS].rlim_max = LX_RLIM64_INFINITY;
+
+	cpd->l_fake_limits[LX_RLFAKE_NICE].rlim_cur = 20;
+	cpd->l_fake_limits[LX_RLFAKE_NICE].rlim_max = 20;
+
+	cpd->l_fake_limits[LX_RLFAKE_RTPRIO].rlim_cur = LX_RLIM64_INFINITY;
+	cpd->l_fake_limits[LX_RLFAKE_RTPRIO].rlim_max = LX_RLIM64_INFINITY;
+
+	cpd->l_fake_limits[LX_RLFAKE_RTTIME].rlim_cur = LX_RLIM64_INFINITY;
+	cpd->l_fake_limits[LX_RLFAKE_RTTIME].rlim_max = LX_RLIM64_INFINITY;
 }
 
 #if defined(_LP64)

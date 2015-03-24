@@ -1095,3 +1095,28 @@ lx_timerfd_gettime(int fd, struct itimerspec *value)
 
 	return (r == -1 ? -errno : r);
 }
+
+/*
+ * We lucked out here.  Linux and Solaris have exactly the same
+ * rusage structures.
+ */
+long
+lx_getrusage(uintptr_t p1, uintptr_t p2)
+{
+	int who = (int)p1;
+	struct rusage *rup = (struct rusage *)p2;
+	int rv, swho;
+
+	if (who == LX_RUSAGE_SELF)
+		swho = RUSAGE_SELF;
+	else if (who == LX_RUSAGE_CHILDREN)
+		swho = RUSAGE_CHILDREN;
+	else if (who == LX_RUSAGE_THREAD)
+		swho = RUSAGE_LWP;
+	else
+		return (-EINVAL);
+
+	rv = getrusage(swho, rup);
+
+	return (rv < 0 ? -errno : 0);
+}

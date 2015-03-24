@@ -1023,7 +1023,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	NULL,				/*  94: lchown */
 	lx_umask,			/*  95: umask */
 	NULL,				/*  96: gettimeofday */
-	lx_getrlimit,			/*  97: getrlimit */
+	NULL,				/*  97: getrlimit */
 	lx_getrusage,			/*  98: getrusage */
 	NULL,				/*  99: sysinfo */
 	lx_times,			/* 100: times */
@@ -1086,7 +1086,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_prctl,			/* 157: prctl */
 	NULL,				/* 158: arch_prctl */
 	lx_adjtimex,			/* 159: adjtimex */
-	lx_setrlimit,			/* 160: setrlimit */
+	NULL,				/* 160: setrlimit */
 	lx_chroot,			/* 161: chroot */
 	lx_sync,			/* 162: sync */
 	NULL,				/* 163: acct */
@@ -1228,7 +1228,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	NULL,				/* 299: recvmmsg */
 	NULL,				/* 300: fanotify_init */
 	NULL,				/* 301: fanotify_mark */
-	lx_prlimit64,			/* 302: prlimit64 */
+	NULL,				/* 302: prlimit64 */
 	NULL,				/* 303: name_to_handle_at */
 	NULL,				/* 304: open_by_handle_at */
 	NULL,				/* 305: clock_adjtime */
@@ -1332,8 +1332,8 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_sigsuspend,			/*  72: sigsuspend */
 	lx_sigpending,			/*  73: sigpending */
 	lx_sethostname,			/*  74: sethostname */
-	lx_setrlimit,			/*  75: setrlimit */
-	lx_oldgetrlimit,		/*  76: getrlimit */
+	NULL,				/*  75: setrlimit */
+	NULL,				/*  76: getrlimit */
 	lx_getrusage,			/*  77: getrusage */
 	NULL,				/*  78: gettimeofday */
 	lx_settimeofday,		/*  79: settimeofday */
@@ -1448,7 +1448,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	NULL,				/* 188: getpmsg */
 	NULL,				/* 189: putpmsg */
 	lx_vfork,			/* 190: vfork */
-	lx_getrlimit,			/* 191: getrlimit */
+	NULL,				/* 191: getrlimit */
 	lx_mmap2,			/* 192: mmap2 */
 	lx_truncate64,			/* 193: truncate64 */
 	lx_ftruncate64,			/* 194: ftruncate64 */
@@ -1597,7 +1597,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	NULL,				/* 337: recvmmsg */
 	NULL,				/* 338: fanotify_init */
 	NULL,				/* 339: fanotify_mark */
-	lx_prlimit64,			/* 340: prlimit64 */
+	NULL,				/* 340: prlimit64 */
 	NULL,				/* 341: name_to_handle_at */
 	NULL,				/* 342: open_by_handle_at */
 	NULL,				/* 343: clock_adjtime */

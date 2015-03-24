@@ -295,6 +295,7 @@ LX_BRAND_OBJS  =		\
 	lx_pid.o		\
 	lx_pipe.o		\
 	lx_ptrace.o		\
+	lx_rlimit.o		\
 	lx_rw.o			\
 	lx_sched.o		\
 	lx_signum.o		\

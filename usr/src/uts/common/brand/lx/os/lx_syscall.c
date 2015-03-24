@@ -593,8 +593,8 @@ lx_sysent_t lx_sysent32[] = {
 	{"sigsuspend",	NULL,			0,		1}, /* 72 */
 	{"sigpending",	NULL,			0,		1}, /* 73 */
 	{"sethostname",	NULL,			0,		2}, /* 74 */
-	{"setrlimit",	NULL,			0,		2}, /* 75 */
-	{"getrlimit",	NULL,			0,		2}, /* 76 */
+	{"setrlimit",	lx_setrlimit,		0,		2}, /* 75 */
+	{"getrlimit",	lx_oldgetrlimit,	0,		2}, /* 76 */
 	{"getrusage",	NULL,			0,		2}, /* 77 */
 	{"gettimeofday", lx_gettimeofday,	0,		2}, /* 78 */
 	{"settimeofday", NULL, 			0,		2}, /* 79 */
@@ -709,7 +709,7 @@ lx_sysent_t lx_sysent32[] = {
 	{"getpmsg",	NULL,			NOSYS_OBSOLETE,	0}, /* 188 */
 	{"putpmsg",	NULL,			NOSYS_OBSOLETE,	0}, /* 189 */
 	{"vfork",	NULL,			0,		0}, /* 190 */
-	{"getrlimit",	NULL,			0,		2}, /* 191 */
+	{"getrlimit",	lx_getrlimit,		0,		2}, /* 191 */
 	{"mmap2",	NULL,			LX_SYS_EBPARG6,	6}, /* 192 */
 	{"truncate64",	NULL,			0,		3}, /* 193 */
 	{"ftruncate64",	NULL,			0,		3}, /* 194 */
@@ -862,7 +862,7 @@ lx_sysent_t lx_sysent32[] = {
 	{"recvmmsg",	NULL,			NOSYS_NULL,	0}, /* 337 */
 	{"fanotify_init", NULL,			NOSYS_NULL,	0}, /* 338 */
 	{"fanotify_mark", NULL,			NOSYS_NULL,	0}, /* 339 */
-	{"prlimit64",	NULL,			0,		4}, /* 340 */
+	{"prlimit64",	lx_prlimit64,		0,		4}, /* 340 */
 	{"name_to_handle_at", NULL,		NOSYS_NULL,	0}, /* 341 */
 	{"open_by_handle_at", NULL,		NOSYS_NULL,	0}, /* 342 */
 	{"clock_adjtime", NULL,			NOSYS_NULL,	0}, /* 343 */
@@ -986,7 +986,7 @@ lx_sysent_t lx_sysent64[] = {
 	{"lchown",	lx_lchown,		0,		3}, /* 94 */
 	{"umask",	NULL,			0,		1}, /* 95 */
 	{"gettimeofday", lx_gettimeofday,	0,		2}, /* 96 */
-	{"getrlimit",	NULL,			0,		2}, /* 97 */
+	{"getrlimit",	lx_getrlimit,		0,		2}, /* 97 */
 	{"getrusage",	NULL,			0,		2}, /* 98 */
 	{"sysinfo",	lx_sysinfo64,		0,		1}, /* 99 */
 	{"times",	NULL,			0,		1}, /* 100 */
@@ -1049,7 +1049,7 @@ lx_sysent_t lx_sysent64[] = {
 	{"prctl",	NULL,			0,		5}, /* 157 */
 	{"arch_prctl",	lx_arch_prctl,		0,		2}, /* 158 */
 	{"adjtimex",	NULL,			0,		1}, /* 159 */
-	{"setrlimit",	NULL,			0,		2}, /* 160 */
+	{"setrlimit",	lx_setrlimit,		0,		2}, /* 160 */
 	{"chroot",	NULL,			0,		1}, /* 161 */
 	{"sync",	NULL,			0,		0}, /* 162 */
 	{"acct",	NULL,			NOSYS_NO_EQUIV,	0}, /* 163 */
@@ -1191,7 +1191,7 @@ lx_sysent_t lx_sysent64[] = {
 	{"recvmmsg",	NULL,			NOSYS_NULL,	0}, /* 299 */
 	{"fanotify_init", NULL,			NOSYS_NULL,	0}, /* 300 */
 	{"fanotify_mark", NULL,			NOSYS_NULL,	0}, /* 301 */
-	{"prlimit64",	NULL,			0,		4}, /* 302 */
+	{"prlimit64",	lx_prlimit64,		0,		4}, /* 302 */
 	{"name_to_handle_at", NULL,		NOSYS_NULL,	0}, /* 303 */
 	{"open_by_handle_at", NULL,		NOSYS_NULL,	0}, /* 304 */
 	{"clock_adjtime", NULL,			NOSYS_NULL,	0}, /* 305 */
