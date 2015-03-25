@@ -22,8 +22,8 @@
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2013 DEY Storage Systems, Inc.
  * Copyright (c) 2014 Gary Mills
- * Copyright 2014 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2015 Joyent, Inc. All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  */
 
 /*
@@ -115,6 +115,7 @@ static priv_set_t *dropprivs;
 
 static int nocmdchar = 0;
 static int failsafe = 0;
+static int disconnect = 0;
 static char cmdchar = '~';
 static int quiet = 0;
 static char zonebrand[MAXNAMELEN];
@@ -166,7 +167,7 @@ static boolean_t forced_login = B_FALSE;
 static void
 usage(void)
 {
-	(void) fprintf(stderr, gettext("usage: %s [-inQCIES] [-e cmdchar] "
+	(void) fprintf(stderr, gettext("usage: %s [-dinQCIES] [-e cmdchar] "
 	    "[-l user] zonename [command [args ...] ]\n"), pname);
 	exit(2);
 }
@@ -304,8 +305,8 @@ get_interactive_master(const char *zname, int notcons)
 	}
 	masterfd = sockfd;
 
-	msglen = snprintf(clientid, sizeof (clientid), "IDENT %lu %s\n",
-	    getpid(), setlocale(LC_MESSAGES, NULL));
+	msglen = snprintf(clientid, sizeof (clientid), "IDENT %lu %s %d\n",
+	    getpid(), setlocale(LC_MESSAGES, NULL), disconnect);
 
 	if (msglen >= sizeof (clientid) || msglen < 0) {
 		zerror("protocol error");
@@ -1883,7 +1884,7 @@ main(int argc, char **argv)
 	(void) getpname(argv[0]);
 	username = get_username();
 
-	while ((arg = getopt(argc, argv, "inECIR:Se:l:Q")) != EOF) {
+	while ((arg = getopt(argc, argv, "dinECIR:Se:l:Q")) != EOF) {
 		switch (arg) {
 		case 'C':
 			console = 1;
@@ -1916,6 +1917,9 @@ main(int argc, char **argv)
 			break;
 		case 'S':
 			failsafe = 1;
+			break;
+		case 'd':
+			disconnect = 1;
 			break;
 		case 'e':
 			set_cmdchar(optarg);
@@ -1970,6 +1974,12 @@ main(int argc, char **argv)
 
 	if (failsafe != 0 && lflag != 0) {
 		zerror(gettext("-l may not be specified for failsafe login"));
+		usage();
+	}
+
+	if (!console && disconnect != 0) {
+		zerror(gettext(
+		    "-d may only be specified with console login"));
 		usage();
 	}
 

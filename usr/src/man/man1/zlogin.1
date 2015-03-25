@@ -14,13 +14,14 @@
 .\" Copyright 2013 DEY Storage Systems, Inc.
 .\" Copyright (c) 2014 Gary Mills
 .\" Copyright (c) 2014, Joyent, Inc. All Rights Reserved
-.TH ZLOGIN 1 "Dec 22, 2014"
+.\" Copyright 2015 Nexenta Systems, Inc. All rights reserved.
+.TH ZLOGIN 1 "Mar 17, 2015"
 .SH NAME
 zlogin \- enter a zone
 .SH SYNOPSIS
 .LP
 .nf
-\fBzlogin\fR [\fB-CEIQ\fR] [\fB-e\fR \fIc\fR] [\fB-l\fR \fIusername\fR] \fIzonename\fR
+\fBzlogin\fR [\fB-dCEIQ\fR] [\fB-e\fR \fIc\fR] [\fB-l\fR \fIusername\fR] \fIzonename\fR
 .fi
 
 .LP
@@ -102,6 +103,16 @@ The following options are supported:
 .ad
 .RS 15n
 Connects to the zone console.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-d\fR\fR
+.ad
+.RS 15n
+Disconnect from the console when the zone halts. This option may only be used
+if the \fB-C\fR option is specified.
 .RE
 
 .sp
