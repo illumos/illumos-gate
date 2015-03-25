@@ -183,14 +183,24 @@ static const int stol_socktype[SOCK_SEQPACKET + 1] = {
  * defined as value 1 but in Illumos it is defined as value 3. This table
  * maps all the Protocol levels to their options and maps them between
  * Linux and Illumos and vice versa.  Hence the reason for the complexity.
+ *
+ * For a certain subset of sockopts, Linux will implicitly truncate optval
+ * input, so long as optlen meets a minimum size.  Because illumos is strict
+ * about optlen, we must cap optlen for those options.
  */
 
+typedef struct lx_sockopt_map {
+	const int lsm_opt;	/* Illumos-native equivalent */
+	const int lsm_lcap;	/* Cap optlen to this size. (Ignored if 0) */
+} lx_sockopt_map_t;
+
 typedef struct lx_proto_opts {
-	const int *proto;	/* Linux to Illumos mapping table */
-	int maxentries;		/* max entries in this table */
+	const lx_sockopt_map_t *proto;	/* Linux to Illumos mapping table */
+	int maxentries;			/* max entries in this table */
 } lx_proto_opts_t;
 
 #define	OPTNOTSUP	-1	/* we don't support it */
+
 
 /*
  * Linux					Illumos
@@ -243,22 +253,33 @@ typedef struct lx_proto_opts {
  * The Illumos options preceeded by '->' can be added but we might also need
  * emulation to convert the ip_mreq_source struct.
  */
-static const int ltos_ip_sockopts[LX_IP_UNICAST_IF + 1] = {
-	OPTNOTSUP, IP_TOS, IP_TTL, IP_HDRINCL,			/* 3 */
-	IP_OPTIONS, OPTNOTSUP, IP_RECVOPTS, IP_RETOPTS,		/* 7 */
-	OPTNOTSUP, OPTNOTSUP, OPTNOTSUP, OPTNOTSUP,		/* 11 */
-	IP_RECVTTL, OPTNOTSUP, OPTNOTSUP, OPTNOTSUP,		/* 15 */
-	OPTNOTSUP, OPTNOTSUP, OPTNOTSUP, OPTNOTSUP,		/* 19 */
-	OPTNOTSUP, OPTNOTSUP, OPTNOTSUP, OPTNOTSUP,		/* 23 */
-	OPTNOTSUP, OPTNOTSUP, OPTNOTSUP, OPTNOTSUP,		/* 27 */
-	OPTNOTSUP, OPTNOTSUP, OPTNOTSUP, OPTNOTSUP,		/* 31 */
-	IP_MULTICAST_IF, IP_MULTICAST_TTL,			/* 33 */
-	IP_MULTICAST_LOOP, IP_ADD_MEMBERSHIP,			/* 35 */
-	IP_DROP_MEMBERSHIP, IP_UNBLOCK_SOURCE,			/* 37 */
-	IP_BLOCK_SOURCE, IP_ADD_SOURCE_MEMBERSHIP,		/* 39 */
-	OPTNOTSUP, OPTNOTSUP, OPTNOTSUP, OPTNOTSUP,		/* 43 */
-	OPTNOTSUP, OPTNOTSUP, OPTNOTSUP, OPTNOTSUP,		/* 47 */
-	OPTNOTSUP, OPTNOTSUP, OPTNOTSUP				/* 50 */
+static const lx_sockopt_map_t ltos_ip_sockopts[LX_IP_UNICAST_IF + 1] = {
+	{ OPTNOTSUP, 0 },
+	{ IP_TOS, sizeof (int) },
+	{ IP_TTL, sizeof (int) },
+	{ IP_HDRINCL, sizeof (int) },
+	{ IP_OPTIONS, 0 },
+	{ OPTNOTSUP, 0 },
+	{ IP_RECVOPTS, sizeof (int) },
+	{ IP_RETOPTS, sizeof (int) },
+	{ OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 },
+	{ IP_RECVTTL, sizeof (int) },
+	{ OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 },
+	{ IP_MULTICAST_IF, sizeof (int) },
+	{ IP_MULTICAST_TTL, sizeof (int) },
+	{ IP_MULTICAST_LOOP, sizeof (int) },
+	{ IP_ADD_MEMBERSHIP, 0 },
+	{ IP_DROP_MEMBERSHIP, 0 },
+	{ IP_UNBLOCK_SOURCE, 0 },
+	{ IP_BLOCK_SOURCE, 0 },
+	{ IP_ADD_SOURCE_MEMBERSHIP, 0 },
+	{ OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }
 };
 
 /*
@@ -307,26 +328,34 @@ static const int ltos_ip_sockopts[LX_IP_UNICAST_IF + 1] = {
  */
 
 
-static const int ltos_ipv6_sockopts[LX_IPV6_TCLASS + 1] = {
-	OPTNOTSUP, OPTNOTSUP, OPTNOTSUP, OPTNOTSUP,		/* 3 */
-	OPTNOTSUP, OPTNOTSUP, OPTNOTSUP, IPV6_CHECKSUM,		/* 7 */
-	OPTNOTSUP, OPTNOTSUP, OPTNOTSUP, OPTNOTSUP,		/* 11 */
-	OPTNOTSUP, OPTNOTSUP, OPTNOTSUP, OPTNOTSUP,		/* 15 */
-	IPV6_UNICAST_HOPS, IPV6_MULTICAST_IF,			/* 17 */
-	IPV6_MULTICAST_HOPS, IPV6_MULTICAST_LOOP,		/* 19 */
-	OPTNOTSUP, OPTNOTSUP, OPTNOTSUP, OPTNOTSUP,		/* 23 */
-	OPTNOTSUP, OPTNOTSUP, IPV6_V6ONLY, OPTNOTSUP,		/* 27 */
-	OPTNOTSUP, OPTNOTSUP, OPTNOTSUP, OPTNOTSUP,		/* 31 */
-	OPTNOTSUP, OPTNOTSUP, OPTNOTSUP, OPTNOTSUP,		/* 35 */
-	OPTNOTSUP, OPTNOTSUP, OPTNOTSUP, OPTNOTSUP,		/* 39 */
-	OPTNOTSUP, OPTNOTSUP, OPTNOTSUP, OPTNOTSUP,		/* 43 */
-	OPTNOTSUP, OPTNOTSUP, OPTNOTSUP, OPTNOTSUP,		/* 47 */
-	OPTNOTSUP, IPV6_RECVPKTINFO,				/* 49 */
-	IPV6_PKTINFO, IPV6_RECVHOPLIMIT,			/* 51 */
-	IPV6_HOPLIMIT, OPTNOTSUP, OPTNOTSUP, OPTNOTSUP,		/* 55 */
-	OPTNOTSUP, OPTNOTSUP, OPTNOTSUP, OPTNOTSUP,		/* 59 */
-	OPTNOTSUP, OPTNOTSUP, OPTNOTSUP, OPTNOTSUP,		/* 63 */
-	OPTNOTSUP, OPTNOTSUP, OPTNOTSUP, IPV6_TCLASS,		/* 67 */
+static const lx_sockopt_map_t ltos_ipv6_sockopts[LX_IPV6_TCLASS + 1] = {
+	{ OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 },
+	{ IPV6_CHECKSUM, sizeof (int) },
+	{ OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 },
+	{ IPV6_UNICAST_HOPS, sizeof (int) },
+	{ IPV6_MULTICAST_IF, sizeof (int) },
+	{ IPV6_MULTICAST_HOPS, sizeof (int) },
+	{ IPV6_MULTICAST_LOOP, sizeof (int) },
+	{ OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 }, { OPTNOTSUP, 0 },
+	{ IPV6_V6ONLY, sizeof (int) },
+	{ OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 }, { OPTNOTSUP, 0 },
+	{ IPV6_RECVPKTINFO, sizeof (int) },
+	{ IPV6_PKTINFO, 0 },
+	{ IPV6_RECVHOPLIMIT, sizeof (int) },
+	{ IPV6_HOPLIMIT, 0 },
+	{ OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 }, { OPTNOTSUP, 0 },
+	{ IPV6_TCLASS, sizeof (int) }
 };
 
 /*
@@ -336,8 +365,9 @@ static const int ltos_ipv6_sockopts[LX_IPV6_TCLASS + 1] = {
  * ICMP6_FILTER	1		ICMP6_FILTER	1
  */
 
-static const int ltos_icmpv6_sockopts[LX_ICMP6_FILTER + 1] = {
-	OPTNOTSUP, ICMP6_FILTER
+static const lx_sockopt_map_t ltos_icmpv6_sockopts[LX_ICMP6_FILTER + 1] = {
+	{ OPTNOTSUP, 0 },
+	{ ICMP6_FILTER, 0 }
 };
 
 /*
@@ -372,27 +402,40 @@ static const int ltos_icmpv6_sockopts[LX_ICMP6_FILTER + 1] = {
  * TCP_NOTSENT_LOWAT          25
  */
 
-static const int ltos_tcp_sockopts[LX_TCP_NOTSENT_LOWAT + 1] = {
-	OPTNOTSUP, TCP_NODELAY, TCP_MAXSEG, TCP_CORK,		/* 0-3 */
-	TCP_KEEPIDLE, TCP_KEEPINTVL, TCP_KEEPCNT, OPTNOTSUP,	/* 4-7 */
-	TCP_LINGER2, OPTNOTSUP, OPTNOTSUP, OPTNOTSUP,		/* 8-11 */
-	OPTNOTSUP, OPTNOTSUP, OPTNOTSUP, OPTNOTSUP,		/* 12-15 */
-	OPTNOTSUP, OPTNOTSUP, OPTNOTSUP, OPTNOTSUP,		/* 16-19 */
-	OPTNOTSUP, OPTNOTSUP, OPTNOTSUP, OPTNOTSUP,		/* 20-23 */
-	OPTNOTSUP, OPTNOTSUP					/* 24-25 */
+static const lx_sockopt_map_t ltos_tcp_sockopts[LX_TCP_NOTSENT_LOWAT + 1] = {
+	{ OPTNOTSUP, 0 },
+	{ TCP_NODELAY, sizeof (int) },
+	{ TCP_MAXSEG, sizeof (int) },
+	{ TCP_CORK, sizeof (int) },
+	{ TCP_KEEPIDLE, sizeof (int) },
+	{ TCP_KEEPINTVL, sizeof (int) },
+	{ TCP_KEEPCNT, sizeof (int) },
+	{ OPTNOTSUP, 0 },
+	{ TCP_LINGER2, sizeof (int) },
+	{ OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 }
 };
 
-static const int ltos_igmp_sockopts[IGMP_MTRACE + 1] = {
-	OPTNOTSUP, OPTNOTSUP, OPTNOTSUP, OPTNOTSUP,
-	OPTNOTSUP, OPTNOTSUP, OPTNOTSUP, OPTNOTSUP,
-	IGMP_MINLEN, OPTNOTSUP, OPTNOTSUP, /* XXX: was IGMP_TIMER_SCALE */
-	OPTNOTSUP, OPTNOTSUP, OPTNOTSUP, OPTNOTSUP,
-	OPTNOTSUP, OPTNOTSUP, IGMP_MEMBERSHIP_QUERY,
-	IGMP_V1_MEMBERSHIP_REPORT, IGMP_DVMRP,
-	IGMP_PIM, OPTNOTSUP, IGMP_V2_MEMBERSHIP_REPORT,
-	IGMP_V2_LEAVE_GROUP, OPTNOTSUP, OPTNOTSUP,
-	OPTNOTSUP, OPTNOTSUP, OPTNOTSUP, OPTNOTSUP,
-	IGMP_MTRACE_RESP, IGMP_MTRACE
+static const lx_sockopt_map_t ltos_igmp_sockopts[IGMP_MTRACE + 1] = {
+	{ OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 },
+	{ IGMP_MINLEN, 0 },
+	{ OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 },
+	{ IGMP_MEMBERSHIP_QUERY, 0 },
+	{ IGMP_V1_MEMBERSHIP_REPORT, 0 },
+	{ IGMP_DVMRP, 0 },
+	{ IGMP_PIM, 0 },
+	{ OPTNOTSUP, 0 },
+	{ IGMP_V2_MEMBERSHIP_REPORT, 0 },
+	{ IGMP_V2_LEAVE_GROUP, 0 },
+	{ OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 }, { OPTNOTSUP, 0 },
+	{ IGMP_MTRACE_RESP, 0 },
+	{ IGMP_MTRACE, 0 }
 };
 
 /*
@@ -449,29 +492,51 @@ static const int ltos_igmp_sockopts[IGMP_MTRACE + 1] = {
  * SO_MAX_PACING_RATE    47
  * SO_BPF_EXTENSIONS     48
  */
-static const int ltos_socket_sockopts[LX_SO_BPF_EXTENSIONS + 1] = {
-	OPTNOTSUP,	SO_DEBUG,	SO_REUSEADDR,	SO_TYPE,	/* 3 */
-	SO_ERROR,	SO_DONTROUTE,	SO_BROADCAST,	SO_SNDBUF,	/* 7 */
-	SO_RCVBUF,	SO_KEEPALIVE,	SO_OOBINLINE,	OPTNOTSUP,	/* 11 */
-	OPTNOTSUP,	SO_LINGER,	OPTNOTSUP,	OPTNOTSUP,	/* 15 */
-	SO_RECVUCRED,	OPTNOTSUP,	SO_RCVLOWAT,	SO_SNDLOWAT,	/* 19 */
-	SO_RCVTIMEO,	SO_SNDTIMEO,	OPTNOTSUP,	OPTNOTSUP,	/* 23 */
-	OPTNOTSUP,	OPTNOTSUP, SO_ATTACH_FILTER, SO_DETACH_FILTER,	/* 27 */
-	OPTNOTSUP,	SO_TIMESTAMP,	SO_ACCEPTCONN,	OPTNOTSUP,	/* 31 */
-	SO_SNDBUF,	SO_RCVBUF,	OPTNOTSUP,	OPTNOTSUP,	/* 35 */
-	OPTNOTSUP,	OPTNOTSUP,	SO_PROTOTYPE,	SO_DOMAIN,	/* 39 */
-	OPTNOTSUP,	OPTNOTSUP,	OPTNOTSUP,	OPTNOTSUP,	/* 43 */
-	OPTNOTSUP,	OPTNOTSUP,	OPTNOTSUP,	OPTNOTSUP,	/* 47 */
-	OPTNOTSUP							/* 48 */
+static const lx_sockopt_map_t ltos_socket_sockopts[LX_SO_BPF_EXTENSIONS + 1] = {
+	{ OPTNOTSUP, 0 },
+	{ SO_DEBUG, sizeof (int) },
+	{ SO_REUSEADDR, sizeof (int) },
+	{ SO_TYPE, 0 },
+	{ SO_ERROR, 0 },
+	{ SO_DONTROUTE, sizeof (int) },
+	{ SO_BROADCAST, sizeof (int) },
+	{ SO_SNDBUF, sizeof (int) },
+	{ SO_RCVBUF, sizeof (int) },
+	{ SO_KEEPALIVE, sizeof (int) },
+	{ SO_OOBINLINE, sizeof (int) },
+	{ OPTNOTSUP, 0 }, { OPTNOTSUP, 0 },
+	{ SO_LINGER, 0 },
+	{ OPTNOTSUP, 0 }, { OPTNOTSUP, 0 },
+	{ SO_RECVUCRED, sizeof (int) },
+	{ OPTNOTSUP, 0 },
+	{ SO_RCVLOWAT, sizeof (int) },
+	{ SO_SNDLOWAT, sizeof (int) },
+	{ SO_RCVTIMEO, 0 },
+	{ SO_SNDTIMEO, 0 },
+	{ OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 },
+	{ SO_ATTACH_FILTER, 0 },
+	{ SO_DETACH_FILTER, 0 },
+	{ OPTNOTSUP, 0 },
+	{ SO_TIMESTAMP, sizeof (int) },
+	{ SO_ACCEPTCONN, 0 },
+	{ OPTNOTSUP, 0 },
+	{ SO_SNDBUF, sizeof (int) },
+	{ SO_RCVBUF, sizeof (int) },
+	{ OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 },
+	{ SO_PROTOTYPE, 0 },
+	{ SO_DOMAIN, 0 },
+	{ OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 }
 };
 
 /*
  * See the Linux raw.7 man page for description of the socket options.
  *    In Linux ICMP_FILTER is defined as 1 in include/uapi/linux/icmp.h
  */
-static const int ltos_raw_sockopts[LX_IPV6_CHECKSUM + 1] = {
-	OPTNOTSUP, OPTNOTSUP, OPTNOTSUP, OPTNOTSUP,
-	OPTNOTSUP, OPTNOTSUP, OPTNOTSUP, OPTNOTSUP
+static const lx_sockopt_map_t ltos_raw_sockopts[LX_IPV6_CHECKSUM + 1] = {
+	{ OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }
 };
 
 /*
@@ -485,9 +550,12 @@ static const int ltos_raw_sockopts[LX_IPV6_CHECKSUM + 1] = {
  * PACKET_STATISTICS		6	PACKET_STATISTICS	0x5
  */
 
-static const int ltos_packet_sockopts[LX_PACKET_STATISTICS + 1] = {
-	OPTNOTSUP, PACKET_ADD_MEMBERSHIP, PACKET_DROP_MEMBERSHIP, OPTNOTSUP,
-	OPTNOTSUP, OPTNOTSUP, PACKET_STATISTICS
+static const lx_sockopt_map_t ltos_packet_sockopts[LX_PACKET_STATISTICS + 1] = {
+	{ OPTNOTSUP, 0 },
+	{ PACKET_ADD_MEMBERSHIP, 0 },
+	{ PACKET_DROP_MEMBERSHIP, 0 },
+	{ OPTNOTSUP, 0 }, { OPTNOTSUP, 0 }, { OPTNOTSUP, 0 },
+	{ PACKET_STATISTICS, 0 }
 };
 
 #define	PROTO_SOCKOPTS(opts)    \
@@ -1934,17 +2002,21 @@ lx_setsockopt(int sockfd, int level, int optname, void *optval, int optlen)
 	}
 
 	if (!converted) {
-		int orig_optname = optname;
-
+		const lx_sockopt_map_t *mapping;
 		/*
 		 * Do a table lookup of the Illumos equivalent of the given
 		 * option.
 		 */
-		optname = proto_opts->proto[optname];
-		if (optname == OPTNOTSUP) {
+		mapping = &proto_opts->proto[optname];
+		if (mapping->lsm_opt == OPTNOTSUP) {
 			lx_unsupported("unsupported sockopt %d, proto %d",
-			    orig_optname, level);
+			    optname, level);
 			return (-ENOPROTOOPT);
+		}
+		optname = mapping->lsm_opt;
+		/* Truncate the optlen if needed/allowed */
+		if (mapping->lsm_lcap != 0 && optlen > mapping->lsm_lcap) {
+			optlen = mapping->lsm_lcap;
 		}
 	}
 
@@ -2073,7 +2145,7 @@ lx_getsockopt(int sockfd, int level, int optname, void *optval, int *optlenp)
 
 	orig_optname = optname;
 
-	optname = proto_opts->proto[optname];
+	optname = proto_opts->proto[optname].lsm_opt;
 	if (optname == OPTNOTSUP) {
 		lx_unsupported("unsupported sockopt %d, proto %d",
 		    orig_optname, level);
