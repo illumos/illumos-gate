@@ -1670,7 +1670,8 @@ anon_free_pages(
  * Make anonymous pages discardable
  */
 int
-anon_disclaim(struct anon_map *amp, ulong_t index, size_t size, uint_t behav)
+anon_disclaim(struct anon_map *amp, ulong_t index, size_t size,
+    uint_t behav, pgcnt_t *purged)
 {
 	spgcnt_t npages = btopr(size);
 	struct anon *ap;
@@ -1678,7 +1679,7 @@ anon_disclaim(struct anon_map *amp, ulong_t index, size_t size, uint_t behav)
 	anoff_t off;
 	page_t *pp, *root_pp;
 	kmutex_t *ahm;
-	pgcnt_t pgcnt;
+	pgcnt_t pgcnt, npurged = 0;
 	ulong_t old_idx, idx, i;
 	struct anon_hdr *ahp = amp->ahp;
 	anon_sync_obj_t cookie;
@@ -1785,7 +1786,7 @@ anon_disclaim(struct anon_map *amp, ulong_t index, size_t size, uint_t behav)
 				mutex_exit(ahm);
 				(void) anon_set_ptr(ahp, index,
 				    NULL, ANON_SLEEP);
-
+				npurged++;
 				ANI_ADD(1);
 				kmem_cache_free(anon_cache, ap);
 			} else {
@@ -1886,6 +1887,9 @@ skiplp:
 			page_unlock(pp);
 		anon_array_exit(&cookie);
 	}
+
+	if (purged != NULL)
+		*purged = npurged;
 
 	return (err);
 }

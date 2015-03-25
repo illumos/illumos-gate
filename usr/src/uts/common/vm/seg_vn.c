@@ -8178,6 +8178,8 @@ segvn_advise(struct seg *seg, caddr_t addr, size_t len, uint_t behav)
 	amp = svd->amp;
 	vp = svd->vp;
 	if (behav == MADV_FREE || behav == MADV_PURGE) {
+		pgcnt_t purged;
+
 		if (behav == MADV_FREE && (vp != NULL || amp == NULL)) {
 			/*
 			 * MADV_FREE is not supported for segments with an
@@ -8205,7 +8207,25 @@ segvn_advise(struct seg *seg, caddr_t addr, size_t len, uint_t behav)
 
 		page = seg_page(seg, addr);
 		ANON_LOCK_ENTER(&amp->a_rwlock, RW_READER);
-		err = anon_disclaim(amp, svd->anon_index + page, len, behav);
+		err = anon_disclaim(amp,
+		    svd->anon_index + page, len, behav, &purged);
+
+		if (purged != 0 && (svd->flags & MAP_NORESERVE)) {
+			/*
+			 * If we purged pages on a MAP_NORESERVE mapping, we
+			 * need to be sure to now unreserve our reserved swap.
+			 * (We use the atomic operations to manipulate our
+			 * segment and address space counters because we only
+			 * have the corresponding locks held as reader, not
+			 * writer.)
+			 */
+			ssize_t bytes = ptob(purged);
+
+			anon_unresv_zone(bytes, seg->s_as->a_proc->p_zone);
+			atomic_add_long(&svd->swresv, -bytes);
+			atomic_add_long(&seg->s_as->a_resvsize, -bytes);
+		}
+
 		ANON_LOCK_EXIT(&amp->a_rwlock);
 		SEGVN_LOCK_EXIT(seg->s_as, &svd->lock);
 
