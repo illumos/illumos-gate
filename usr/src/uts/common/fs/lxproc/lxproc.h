@@ -24,11 +24,16 @@
  */
 
 /*
- * Copyright 2014 Joyent, Inc. All rights reserved.
+ * Copyright 2015 Joyent, Inc. All rights reserved.
  */
+
+#ifdef _LXPROC_BRANDED_H
+#error Attempted to include native lxproc.h after branded lx_proc.h
+#endif
 
 #ifndef	_LXPROC_H
 #define	_LXPROC_H
+#define	_LXPROC_NATIVE_H
 
 #ifdef	__cplusplus
 extern "C" {

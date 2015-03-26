@@ -24,8 +24,13 @@
  * Copyright 2015 Joyent, Inc.
  */
 
+#ifdef _LXPROC_NATIVE_H
+#error Attempted to include branded lx_proc.h after native lxproc.h
+#endif
+
 #ifndef	_LXPROC_H
 #define	_LXPROC_H
+#define	_LXPROC_BRANDED_H
 
 #ifdef	__cplusplus
 extern "C" {
@@ -137,6 +142,7 @@ typedef enum lxpr_nodetype {
 	LXPR_CMDLINE,		/* /proc/cmdline	*/
 	LXPR_CPUINFO,		/* /proc/cpuinfo	*/
 	LXPR_DEVICES,		/* /proc/devices	*/
+	LXPR_DISKSTATS,		/* /proc/diskstats	*/
 	LXPR_DMA,		/* /proc/dma		*/
 	LXPR_FILESYSTEMS,	/* /proc/filesystems	*/
 	LXPR_INTERRUPTS,	/* /proc/interrupts	*/
@@ -199,6 +205,11 @@ typedef enum lxpr_nodetype {
  * may be duplicated)
  */
 #define	LXPR_FD_PERPROC 2000
+
+/*
+ * Linux sector size for /proc/diskstats
+ */
+#define	LXPR_SECTOR_SIZE	512
 
 /*
  * external dirent characteristics
