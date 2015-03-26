@@ -20,6 +20,7 @@
  */
 
 /*
+ * Copyright 2015 OmniTI Computer Consulting, Inc.  All rights reserved.
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -411,7 +412,9 @@ int
 smbios_info_chassis(smbios_hdl_t *shp, id_t id, smbios_chassis_t *chp)
 {
 	const smb_struct_t *stp = smb_lookup_id(shp, id);
-	smb_chassis_t ch;
+	/* Length is measurable by one byte, so it'll be no more than 255. */
+	uint8_t buf[256];
+	smb_chassis_t *ch = (smb_chassis_t *)&buf[0];
 
 	if (stp == NULL)
 		return (-1); /* errno is set for us */
@@ -419,20 +422,25 @@ smbios_info_chassis(smbios_hdl_t *shp, id_t id, smbios_chassis_t *chp)
 	if (stp->smbst_hdr->smbh_type != SMB_TYPE_CHASSIS)
 		return (smb_set_errno(shp, ESMB_TYPE));
 
-	smb_info_bcopy(stp->smbst_hdr, &ch, sizeof (ch));
+	smb_info_bcopy(stp->smbst_hdr, ch, sizeof (buf));
 	bzero(chp, sizeof (smbios_chassis_t));
 
-	chp->smbc_oemdata = ch.smbch_oemdata;
-	chp->smbc_lock = (ch.smbch_type & SMB_CHT_LOCK) != 0;
-	chp->smbc_type = ch.smbch_type & ~SMB_CHT_LOCK;
-	chp->smbc_bustate = ch.smbch_bustate;
-	chp->smbc_psstate = ch.smbch_psstate;
-	chp->smbc_thstate = ch.smbch_thstate;
-	chp->smbc_security = ch.smbch_security;
-	chp->smbc_uheight = ch.smbch_uheight;
-	chp->smbc_cords = ch.smbch_cords;
-	chp->smbc_elems = ch.smbch_cn;
-	chp->smbc_elemlen = ch.smbch_cm;
+	chp->smbc_oemdata = ch->smbch_oemdata;
+	chp->smbc_lock = (ch->smbch_type & SMB_CHT_LOCK) != 0;
+	chp->smbc_type = ch->smbch_type & ~SMB_CHT_LOCK;
+	chp->smbc_bustate = ch->smbch_bustate;
+	chp->smbc_psstate = ch->smbch_psstate;
+	chp->smbc_thstate = ch->smbch_thstate;
+	chp->smbc_security = ch->smbch_security;
+	chp->smbc_uheight = ch->smbch_uheight;
+	chp->smbc_cords = ch->smbch_cords;
+	chp->smbc_elems = ch->smbch_cn;
+	chp->smbc_elemlen = ch->smbch_cm;
+
+	if (shp->sh_smbvers >= SMB_VERSION_27) {
+		(void) strlcpy(chp->smbc_sku, SMB_CH_SKU(ch),
+		    sizeof (chp->smbc_sku));
+	}
 
 	return (0);
 }
@@ -463,6 +471,16 @@ smbios_info_processor(smbios_hdl_t *shp, id_t id, smbios_processor_t *pp)
 	pp->smbp_l1cache = p.smbpr_l1cache;
 	pp->smbp_l2cache = p.smbpr_l2cache;
 	pp->smbp_l3cache = p.smbpr_l3cache;
+
+	if (shp->sh_smbvers >= SMB_VERSION_25) {
+		pp->smbp_corecount = p.smbpr_corecount;
+		pp->smbp_coresenabled = p.smbpr_coresenabled;
+		pp->smbp_threadcount = p.smbpr_threadcount;
+		pp->smbp_cflags = p.smbpr_cflags;
+	}
+
+	if (shp->sh_smbvers >= SMB_VERSION_26)
+		pp->smbp_family2 = p.smbpr_family2;
 
 	return (0);
 }
@@ -718,6 +736,8 @@ smbios_info_memarray(smbios_hdl_t *shp, id_t id, smbios_memarray_t *map)
 
 	if (m.smbmarr_cap != 0x80000000)
 		map->smbma_size = (uint64_t)m.smbmarr_cap * 1024;
+	else if (m.smbmarr_extcap != 0)
+		map->smbma_size = m.smbmarr_extcap;
 	else
 		map->smbma_size = 0; /* unknown */
 
@@ -741,9 +761,15 @@ smbios_info_memarrmap(smbios_hdl_t *shp, id_t id, smbios_memarrmap_t *map)
 
 	map->smbmam_array = m.smbamap_array;
 	map->smbmam_width = m.smbamap_width;
-	map->smbmam_addr = (uint64_t)m.smbamap_start * 1024;
-	map->smbmam_size = (uint64_t)
-	    (m.smbamap_end - m.smbamap_start + 1) * 1024;
+
+	if (m.smbamap_start != 0xFFFFFFFF && m.smbamap_end != 0xFFFFFFFF) {
+		map->smbmam_addr = (uint64_t)m.smbamap_start * 1024;
+		map->smbmam_size = (uint64_t)
+		    (m.smbamap_end - m.smbamap_start + 1) * 1024;
+	} else if (m.smbamap_extstart != 0 && m.smbamap_extend != 0) {
+		map->smbmam_addr = m.smbamap_extstart;
+		map->smbmam_size = m.smbamap_extend - m.smbamap_extstart + 1;
+	}
 
 	return (0);
 }
@@ -768,7 +794,10 @@ smbios_info_memdevice(smbios_hdl_t *shp, id_t id, smbios_memdevice_t *mdp)
 	mdp->smbmd_twidth = m.smbmdev_twidth == 0xFFFF ? -1U : m.smbmdev_twidth;
 	mdp->smbmd_dwidth = m.smbmdev_dwidth == 0xFFFF ? -1U : m.smbmdev_dwidth;
 
-	if (mdp->smbmd_size != 0xFFFF) {
+	if (m.smbmdev_size == 0x7FFF) {
+		mdp->smbmd_size = (uint64_t)m.smbmdev_extsize;
+		mdp->smbmd_size *= 1024 * 1024; /* convert MB to bytes */
+	} else if (m.smbmdev_size != 0xFFFF) {
 		mdp->smbmd_size = (uint64_t)(m.smbmdev_size & ~SMB_MDS_KBYTES);
 		if (m.smbmdev_size & SMB_MDS_KBYTES)
 			mdp->smbmd_size *= 1024;
@@ -780,12 +809,22 @@ smbios_info_memdevice(smbios_hdl_t *shp, id_t id, smbios_memdevice_t *mdp)
 	mdp->smbmd_form = m.smbmdev_form;
 	mdp->smbmd_set = m.smbmdev_set;
 	mdp->smbmd_type = m.smbmdev_type;
+	mdp->smbmd_speed = m.smbmdev_speed;
 	mdp->smbmd_flags = m.smbmdev_flags;
 	mdp->smbmd_dloc = smb_strptr(stp, m.smbmdev_dloc);
 	mdp->smbmd_bloc = smb_strptr(stp, m.smbmdev_bloc);
 
-	if (m.smbmdev_speed != 0)
-		mdp->smbmd_speed = 1000 / m.smbmdev_speed; /* MHz -> nsec */
+	if (shp->sh_smbvers >= SMB_VERSION_26)
+		mdp->smbmd_rank = m.smbmdev_attrs & 0x0F;
+
+	if (shp->sh_smbvers >= SMB_VERSION_27)
+		mdp->smbmd_clkspeed = m.smbmdev_clkspeed;
+
+	if (shp->sh_smbvers >= SMB_VERSION_28) {
+		mdp->smbmd_minvolt = m.smbmdev_minvolt;
+		mdp->smbmd_maxvolt = m.smbmdev_maxvolt;
+		mdp->smbmd_confvolt = m.smbmdev_confvolt;
+	}
 
 	return (0);
 }
@@ -807,12 +846,18 @@ smbios_info_memdevmap(smbios_hdl_t *shp, id_t id, smbios_memdevmap_t *mdp)
 
 	mdp->smbmdm_device = m.smbdmap_device;
 	mdp->smbmdm_arrmap = m.smbdmap_array;
-	mdp->smbmdm_addr = (uint64_t)m.smbdmap_start * 1024;
-	mdp->smbmdm_size = (uint64_t)
-	    (m.smbdmap_end - m.smbdmap_start + 1) * 1024;
 	mdp->smbmdm_rpos = m.smbdmap_rpos;
 	mdp->smbmdm_ipos = m.smbdmap_ipos;
 	mdp->smbmdm_idepth = m.smbdmap_idepth;
+
+	if (m.smbdmap_start != 0xFFFFFFFF && m.smbdmap_end != 0xFFFFFFFF) {
+		mdp->smbmdm_addr = (uint64_t)m.smbdmap_start * 1024;
+		mdp->smbmdm_size = (uint64_t)
+		    (m.smbdmap_end - m.smbdmap_start + 1) * 1024;
+	} else if (m.smbdmap_extstart != 0 && m.smbdmap_extend != 0) {
+		mdp->smbmdm_addr = m.smbdmap_extstart;
+		mdp->smbmdm_size = m.smbdmap_extend - m.smbdmap_extstart + 1;
+	}
 
 	return (0);
 }
