@@ -24,13 +24,17 @@
  */
 
 /*
- * Copyright 2014 Joyent, Inc. All rights reserved.
+ * Copyright 2015 Joyent, Inc. All rights reserved.
  */
 
 /*
  * lxproc -- a loosely Linux-compatible /proc
  *
- * The aspiration here is to provide something that sufficiently approximates
+ * We have -- confusingly -- two implementations of Linux /proc.  One is to
+ * support the LX brand with a Linux /proc entirely compatible with the Linux
+ * world view; the other -- this one -- is to support native (but Linux-borne)
+ * programs that wish to view the native system via the Linux /proc model.  So
+ * the aspiration here is to provide something that sufficiently approximates
  * the Linux /proc implementation for purposes of offering some compatibility
  * for simple Linux /proc readers (e.g., ps/top/htop).  However, it is not
  * intended to exactly mimic Linux semantics; when choosing between offering
@@ -44,7 +48,8 @@
  * directory at all.  Similarly, when choosing between offering compatibility
  * and remaining consistent with our broader security model, we (obviously)
  * choose security over compatibility.  In short, this is meant to be a best
- * effort -- no more.
+ * effort -- no more -- and as such, it should not be unified with the much
+ * more complete Linux /proc implementation found in the LX brand.
  */
 
 #include <sys/cpupart.h>

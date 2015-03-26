@@ -25,25 +25,14 @@
  */
 
 /*
- * lxproc -- a loosely Linux-compatible /proc
+ * lx_proc -- a Linux-compatible /proc for the LX brand
  *
- * The aspiration here is to provide something that sufficiently approximates
- * the Linux /proc implementation for purposes of offering some compatibility
- * for simple Linux /proc readers (e.g., ps/top/htop).  However, it is not
- * intended to exactly mimic Linux semantics; when choosing between offering
- * compatibility and telling the truth, we emphatically pick the truth (in most
- * cases ;-) ).  A particular glaring example of this is the Linux notion of
- * "tasks" (that is, threads), which -- due to historical misadventures on
- * Linux -- allocate their identifiers from the process identifier space (that
- * is, each thread has in effect a pid). Some Linux /proc readers have come to
- * depend on this attribute, and become confused when threads appear with
- * proper identifiers. To deal with this the lx brand emulates per-thread pids
- * in the per-lwp brand data (see lx_pid_assign in the lx brand module). Under
- * the tasks directory we use this lx-assigned pid instead of the real tid.
- *
- * Similarly, when choosing between offering compatibility and remaining
- * consistent with our broader security model, we (obviously) choose security
- * over compatibility. In short, this is meant to be a best effort -- no more.
+ * We have -- confusingly -- two implementations of Linux /proc.  One is to
+ * support native (but Linux-borne) programs that wish to view the native
+ * system through the Linux /proc model; the other -- this one -- is to
+ * support Linux binaries via the LX brand.  These two implementations differ
+ * greatly in their aspirations (and their willingness to bend the truth
+ * of the system to accommodate those aspirations); they should not be unified.
  */
 
 #include <sys/cpupart.h>
@@ -146,6 +135,7 @@ static int lxpr_readdir_task_tid_dir(lxpr_node_t *, uio_t *, int *);
 static void lxpr_read_invalid(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_empty(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_cpuinfo(lxpr_node_t *, lxpr_uiobuf_t *);
+static void lxpr_read_diskstats(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_isdir(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_fd(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_kmsg(lxpr_node_t *, lxpr_uiobuf_t *);
@@ -250,6 +240,7 @@ static lxpr_dirent_t lx_procdir[] = {
 	{ LXPR_CMDLINE,		"cmdline" },
 	{ LXPR_CPUINFO,		"cpuinfo" },
 	{ LXPR_DEVICES,		"devices" },
+	{ LXPR_DISKSTATS,	"diskstats" },
 	{ LXPR_DMA,		"dma" },
 	{ LXPR_FILESYSTEMS,	"filesystems" },
 	{ LXPR_INTERRUPTS,	"interrupts" },
@@ -541,6 +532,7 @@ static void (*lxpr_read_function[LXPR_NFILES])() = {
 	lxpr_read_empty,		/* /proc/cmdline	*/
 	lxpr_read_cpuinfo,		/* /proc/cpuinfo	*/
 	lxpr_read_empty,		/* /proc/devices	*/
+	lxpr_read_diskstats,		/* /proc/diskstats	*/
 	lxpr_read_empty,		/* /proc/dma		*/
 	lxpr_read_empty,		/* /proc/filesystems	*/
 	lxpr_read_empty,		/* /proc/interrupts	*/
@@ -636,6 +628,7 @@ static vnode_t *(*lxpr_lookup_function[LXPR_NFILES])() = {
 	lxpr_lookup_not_a_dir,		/* /proc/cmdline	*/
 	lxpr_lookup_not_a_dir,		/* /proc/cpuinfo	*/
 	lxpr_lookup_not_a_dir,		/* /proc/devices	*/
+	lxpr_lookup_not_a_dir,		/* /proc/diskstats	*/
 	lxpr_lookup_not_a_dir,		/* /proc/dma		*/
 	lxpr_lookup_not_a_dir,		/* /proc/filesystems	*/
 	lxpr_lookup_not_a_dir,		/* /proc/interrupts	*/
@@ -731,6 +724,7 @@ static int (*lxpr_readdir_function[LXPR_NFILES])() = {
 	lxpr_readdir_not_a_dir,		/* /proc/cmdline	*/
 	lxpr_readdir_not_a_dir,		/* /proc/cpuinfo	*/
 	lxpr_readdir_not_a_dir,		/* /proc/devices	*/
+	lxpr_readdir_not_a_dir,		/* /proc/diskstats	*/
 	lxpr_readdir_not_a_dir,		/* /proc/dma		*/
 	lxpr_readdir_not_a_dir,		/* /proc/filesystems	*/
 	lxpr_readdir_not_a_dir,		/* /proc/interrupts	*/
@@ -3105,17 +3099,151 @@ nextp:
 /*
  * lxpr_read_partitions():
  *
- * We don't support partitions in a local zone because it requires access to
- * physical devices.  But we need to fake up enough of the file to show that we
- * have no partitions.
+ * Over the years, /proc/partitions has been made considerably smaller -- to
+ * the point that it really is only major number, minor number, number of
+ * blocks (which we report as 0), and partition name.  We support this only
+ * because some things want to see it to make sense of /proc/diskstats.
  */
 /* ARGSUSED */
 static void
 lxpr_read_partitions(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
-	lxpr_uiobuf_printf(uiobuf,
-	    "major minor  #blocks  name     rio rmerge rsect ruse "
-	    "wio wmerge wsect wuse running use aveq\n\n");
+
+	kstat_t *ksr;
+	kstat_t ks0;
+	int nidx, num, i;
+	size_t sidx, size;
+
+	ASSERT(lxpnp->lxpr_type == LXPR_PARTITIONS);
+
+	ks0.ks_kid = 0;
+	ksr = (kstat_t *)lxpr_kstat_read(&ks0, B_FALSE, &sidx, &nidx);
+
+	if (ksr == NULL)
+		return;
+
+	lxpr_uiobuf_printf(uiobuf, "major minor  #blocks  name\n\n");
+
+	for (i = 1; i < nidx; i++) {
+		kstat_t *ksp = &ksr[i];
+		kstat_io_t *kip;
+
+		if (ksp->ks_type != KSTAT_TYPE_IO ||
+		    strcmp(ksp->ks_class, "disk") != 0)
+			continue;
+
+		if ((kip = (kstat_io_t *)lxpr_kstat_read(ksp, B_TRUE,
+		    &size, &num)) == NULL)
+			continue;
+
+		if (size < sizeof (kstat_io_t)) {
+			kmem_free(kip, size);
+			continue;
+		}
+
+		lxpr_uiobuf_printf(uiobuf, "%4d %7d %10d %s\n",
+		    mod_name_to_major(ksp->ks_module),
+		    ksp->ks_instance, 0, ksp->ks_name);
+
+		kmem_free(kip, size);
+	}
+
+	kmem_free(ksr, sidx);
+}
+
+/*
+ * lxpr_read_diskstats():
+ *
+ * See the block comment above the per-device output-generating line for the
+ * details of the format.
+ */
+/* ARGSUSED */
+static void
+lxpr_read_diskstats(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
+{
+	kstat_t *ksr;
+	kstat_t ks0;
+	int nidx, num, i;
+	size_t sidx, size;
+
+	ASSERT(lxpnp->lxpr_type == LXPR_DISKSTATS);
+
+	ks0.ks_kid = 0;
+	ksr = (kstat_t *)lxpr_kstat_read(&ks0, B_FALSE, &sidx, &nidx);
+
+	if (ksr == NULL)
+		return;
+
+	for (i = 1; i < nidx; i++) {
+		kstat_t *ksp = &ksr[i];
+		kstat_io_t *kip;
+
+		if (ksp->ks_type != KSTAT_TYPE_IO ||
+		    strcmp(ksp->ks_class, "disk") != 0)
+			continue;
+
+		if ((kip = (kstat_io_t *)lxpr_kstat_read(ksp, B_TRUE,
+		    &size, &num)) == NULL)
+			continue;
+
+		if (size < sizeof (kstat_io_t)) {
+			kmem_free(kip, size);
+			continue;
+		}
+
+		/*
+		 * /proc/diskstats is defined to have one line of output for
+		 * each block device, with each line containing the following
+		 * 14 fields:
+		 *
+		 *	1 - major number
+		 *	2 - minor mumber
+		 *	3 - device name
+		 *	4 - reads completed successfully
+		 * 	5 - reads merged
+		 *	6 - sectors read
+		 *	7 - time spent reading (ms)
+		 *	8 - writes completed
+		 *	9 - writes merged
+		 *	10 - sectors written
+		 *	11 - time spent writing (ms)
+		 *	12 - I/Os currently in progress
+		 *	13 - time spent doing I/Os (ms)
+		 *	14 - weighted time spent doing I/Os (ms)
+		 *
+		 * One small hiccup:  we don't actually keep track of time
+		 * spent reading vs. time spent writing -- we keep track of
+		 * time waiting vs. time actually performing I/O.  While we
+		 * could divide the total time by the I/O mix (making the
+		 * obviously wrong assumption that I/O operations all take the
+		 * same amount of time), this has the undesirable side-effect
+		 * of moving backwards.  Instead, we report the total time
+		 * (read + write) for all three stats (read, write, total).
+		 * This is also a lie of sorts, but it should be more
+		 * immediately clear to the user that reads and writes are
+		 * each being double-counted as the other.
+		 */
+		lxpr_uiobuf_printf(uiobuf, "%4d %7d %s "
+		    "%llu %llu %llu %llu "
+		    "%llu %llu %llu %llu "
+		    "%llu %llu %llu\n",
+		    mod_name_to_major(ksp->ks_module),
+		    ksp->ks_instance, ksp->ks_name,
+		    (uint64_t)kip->reads, 0LL,
+		    kip->nread / (uint64_t)LXPR_SECTOR_SIZE,
+		    (kip->rtime + kip->wtime) / (uint64_t)(NANOSEC / MILLISEC),
+		    (uint64_t)kip->writes, 0LL,
+		    kip->nwritten / (uint64_t)LXPR_SECTOR_SIZE,
+		    (kip->rtime + kip->wtime) / (uint64_t)(NANOSEC / MILLISEC),
+		    (uint64_t)(kip->rcnt + kip->wcnt),
+		    (kip->rtime + kip->wtime) / (uint64_t)(NANOSEC / MILLISEC),
+		    (kip->rlentime + kip->wlentime) /
+		    (uint64_t)(NANOSEC / MILLISEC));
+
+		kmem_free(kip, size);
+	}
+
+	kmem_free(ksr, sidx);
 }
 
 /*
