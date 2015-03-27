@@ -219,9 +219,3 @@ lx_open(char *path, int fmode, int cmode)
 {
 	return (lx_openat(LX_AT_FDCWD, path, fmode, cmode));
 }
-
-long
-lx_close(int fildes)
-{
-	return (close(fildes));
-}

@@ -42,7 +42,6 @@ extern long lx_chown16();
 extern long lx_clock_getres();
 extern long lx_clock_gettime();
 extern long lx_clock_settime();
-extern long lx_close();
 extern long lx_fchmod();
 extern long lx_fchmodat();
 extern long lx_fchown();

@@ -284,6 +284,7 @@ extern long lx_shmctl(int, int, void *);
 extern long lx_prctl(int, uintptr_t, uintptr_t, uintptr_t, uintptr_t);
 
 extern long lx_alarm(unsigned int);
+extern long lx_close(int);
 extern long lx_chdir(const char *);
 extern long lx_chroot(const char *);
 extern long lx_creat(const char *, mode_t);

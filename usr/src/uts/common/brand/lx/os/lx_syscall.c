@@ -524,7 +524,7 @@ lx_sysent_t lx_sysent32[] = {
 	{"read",	lx_read,		0,		3}, /*  3 */
 	{"write",	lx_write,		0,		3}, /*  4 */
 	{"open",	lx_open,		0,		3}, /*  5 */
-	{"close",	lx_close,		0,		1}, /*  6 */
+	{"close",	NULL,			0,		1}, /*  6 */
 	{"waitpid",	lx_waitpid,		0,		3}, /*  7 */
 	{"creat",	NULL,			0,		2}, /*  8 */
 	{"link",	NULL,			0,		2}, /*  9 */
@@ -892,7 +892,7 @@ lx_sysent_t lx_sysent64[] = {
 	{"read",	lx_read,		0,		3}, /* 0 */
 	{"write",	lx_write,		0,		3}, /* 1 */
 	{"open",	lx_open,		0,		3}, /* 2 */
-	{"close",	lx_close,		0,		1}, /* 3 */
+	{"close",	NULL,			0,		1}, /* 3 */
 	{"stat",	NULL,			0,		2}, /* 4 */
 	{"fstat",	NULL,			0,		2}, /* 5 */
 	{"lstat",	NULL,			0,		2}, /* 6 */
