@@ -45,7 +45,6 @@ COBJS	=	aio.o			\
 		misc.o			\
 		module.o		\
 		mount.o			\
-		open.o			\
 		pgrp.o			\
 		poll_select.o		\
 		priority.o		\

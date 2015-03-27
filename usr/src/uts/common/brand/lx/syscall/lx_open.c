@@ -25,20 +25,24 @@
  * Copyright 2015 Joyent, Inc.  All rights reserved.
  */
 
+#include <sys/systm.h>
+#include <sys/fcntl.h>
+#include <sys/filio.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/inttypes.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <errno.h>
-#include <libintl.h>
-#include <stdio.h>
 
 #include <sys/lx_types.h>
-#include <sys/lx_debug.h>
-#include <sys/lx_syscall.h>
 #include <sys/lx_fcntl.h>
 #include <sys/lx_misc.h>
+
+extern int fcntl(int, int, intptr_t);
+extern int openat(int, char *, int, int);
+extern int open(char *, int, int);
+extern int close(int);
+extern int ioctl(int, int, intptr_t);
+extern int lookupnameat(char *, enum uio_seg, int, vnode_t **, vnode_t **,
+    vnode_t *);
 
 static int
 ltos_open_flags(uintptr_t p2)
@@ -77,7 +81,7 @@ ltos_open_flags(uintptr_t p2)
 
 	/*
 	 * Linux uses the LX_O_DIRECT flag to do raw, synchronous I/O to the
-	 * device backing the fd in question.  Solaris doesn't have similar
+	 * device backing the fd in question.  Illumos doesn't have similar
 	 * functionality, but we can attempt to simulate it using the flags
 	 * (O_RSYNC|O_SYNC) and directio(3C).
 	 *
@@ -100,39 +104,21 @@ ltos_open_flags(uintptr_t p2)
 }
 
 static int
-lx_open_postprocess(int fd, uintptr_t p2)
+lx_open_postprocess(int fd, int fmode)
 {
-	struct stat64 statbuf;
-
-	/*
-	 * Check the file type AFTER opening the file to avoid a race condition
-	 * where the file we want to open could change types between a stat64()
-	 * and an open().
-	 */
-	if (p2 & LX_O_DIRECTORY) {
-		if (fstat64(fd, &statbuf) < 0) {
-			int ret = -errno;
-
-			(void) close(fd);
-			return (ret);
-		} else if (!S_ISDIR(statbuf.st_mode)) {
-			(void) close(fd);
-			return (-ENOTDIR);
-		}
+	if (fmode & LX_O_DIRECT) {
+		(void) ioctl(fd, _FIODIRECTIO, DIRECTIO_ON);
 	}
-
-	if (p2 & LX_O_DIRECT)
-		(void) directio(fd, DIRECTIO_ON);
 
 	/*
 	 * Set the ASYNC flag if passsed.
 	 */
-	if (p2 & LX_O_ASYNC) {
-		if (fcntl(fd, F_SETFL, FASYNC) < 0) {
-			int ret = -errno;
+	if (fmode & LX_O_ASYNC) {
+		int res;
 
+		if ((res = fcntl(fd, F_SETFL, FASYNC)) != 0) {
 			(void) close(fd);
-			return (ret);
+			return (res);
 		}
 	}
 
@@ -140,65 +126,102 @@ lx_open_postprocess(int fd, uintptr_t p2)
 }
 
 long
-lx_openat(uintptr_t ext1, uintptr_t p1, uintptr_t p2, uintptr_t p3)
+lx_openat(int atfd, char *path, int fmode, int cmode)
 {
-	int atfd = (int)ext1;
 	int flags, fd;
 	mode_t mode = 0;
-	char *path = (char *)p1;
 
 	if (atfd == LX_AT_FDCWD)
 		atfd = AT_FDCWD;
 
-	flags = ltos_open_flags(p2);
+	flags = ltos_open_flags(fmode);
 
-	if (flags & O_CREAT) {
-		mode = (mode_t)p3;
+	/*
+	 * We use the FSEARCH flag to make sure this is a directory. We have to
+	 * explicitly add 1 to emulate the FREAD/FWRITE mapping of the OPENMODE
+	 * macro since it won't get set via OPENMODE when FSEARCH is used.
+	 */
+	if (fmode & LX_O_DIRECTORY) {
+		flags |= FSEARCH;
+		flags++;
 	}
 
-	lx_debug("\topenat(%d, %s, 0%o, 0%o)", atfd, path, flags, mode);
+	if (flags & O_CREAT)
+		mode = (mode_t)cmode;
 
-	if ((fd = openat(atfd, path, flags, mode)) < 0)
-		return (-errno);
+	ttolwp(curthread)->lwp_errno = 0;
+	fd = openat(atfd, path, flags, mode);
+	if (ttolwp(curthread)->lwp_errno != 0) {
+		if ((fmode & LX_O_DIRECTORY) &&
+		    ttolwp(curthread)->lwp_errno != ENOTDIR) {
+			/*
+			 * We got an error trying to open a file as a directory.
+			 * We need to determine if we should return the original
+			 * error or ENOTDIR.
+			 */
+			vnode_t *startvp;
+			vnode_t *vp;
+			int oerror, error = 0;
 
-	return (lx_open_postprocess(fd, p2));
+			oerror = ttolwp(curthread)->lwp_errno;
+
+			if (atfd == AT_FDCWD) {
+				/* regular open */
+				startvp = NULL;
+			} else {
+				char startchar;
+
+				if (copyin(path, &startchar, sizeof (char)))
+					return (set_errno(oerror));
+
+				/* if startchar is / then startfd is ignored */
+				if (startchar == '/') {
+					startvp = NULL;
+				} else {
+					file_t *startfp;
+
+					if ((startfp = getf(atfd)) == NULL)
+						return (set_errno(oerror));
+					startvp = startfp->f_vnode;
+					VN_HOLD(startvp);
+					releasef(atfd);
+				}
+			}
+
+			if (lookupnameat(path, UIO_USERSPACE,
+			    (fmode & LX_O_NOFOLLOW) ?  NO_FOLLOW : FOLLOW,
+			    NULLVPP, &vp, startvp) != 0) {
+				if (startvp != NULL)
+					VN_RELE(startvp);
+				return (set_errno(oerror));
+			}
+
+			if (startvp != NULL)
+				VN_RELE(startvp);
+
+			if (vp->v_type != VDIR)
+				error = ENOTDIR;
+
+			VN_RELE(vp);
+			if (error != 0)
+				return (set_errno(ENOTDIR));
+
+			set_errno(oerror);
+		}
+		return (ttolwp(curthread)->lwp_errno);
+	}
+
+	return (lx_open_postprocess(fd, fmode));
 }
 
 long
-lx_open(uintptr_t p1, uintptr_t p2, uintptr_t p3)
+lx_open(char *path, int fmode, int cmode)
 {
-	int flags, fd;
-	mode_t mode = 0;
-	char *path = (char *)p1;
+	return (lx_openat(LX_AT_FDCWD, path, fmode, cmode));
+}
 
-	/*
-	 * We'll check the file type again after opening the file (see the
-	 * explanation in lx_open_postprocess), but we also need to check BEFORE
-	 * to avoid the very hang O_DIRECTORY is trying to avoid for opendir(3)
-	 * when given a FIFO.
-	 */
-	if (p2 & LX_O_DIRECTORY) {
-		struct stat64 statbuf;
-
-		if (stat64(path, &statbuf) < 0) {
-			return (-errno);
-		}
-
-		if (!S_ISDIR(statbuf.st_mode)) {
-			return (-ENOTDIR);
-		}
-	}
-
-	flags = ltos_open_flags(p2);
-
-	if (flags & O_CREAT) {
-		mode = (mode_t)p3;
-	}
-
-	lx_debug("\topen(%s, 0%o, 0%o)", path, flags, mode);
-
-	if ((fd = open(path, flags, mode)) < 0)
-		return (-errno);
-
-	return (lx_open_postprocess(fd, p2));
+long
+lx_close(int fildes)
+{
+	return (close(fildes));
 }

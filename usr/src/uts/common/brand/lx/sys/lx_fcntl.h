@@ -121,7 +121,7 @@ typedef struct lx_flock64 {
 	int		l_pid;
 } lx_flock64_t;
 
-#if defined(_KERNEL) && defined(_SYSCALL32_IMPL)
+#if defined(_KERNEL)
 
 /*
  * 64-bit kernel view of 32-bit usermode structs.

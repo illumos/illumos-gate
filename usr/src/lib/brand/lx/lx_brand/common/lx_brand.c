@@ -928,8 +928,8 @@ lx_fd_to_path(int fd, char *buf, int buf_size)
 static lx_syscall_handler_t lx_handlers[] = {
 	NULL,				/*   0: read */
 	NULL,				/*   1: write */
-	lx_open,			/*   2: open */
-	lx_close,			/*   3: close */
+	NULL,				/*   2: open */
+	NULL,				/*   3: close */
 	lx_stat64,			/*   4: stat */
 	lx_fstat64,			/*   5: fstat */
 	lx_lstat64,			/*   6: lstat */
@@ -998,7 +998,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_msgsnd,			/*  69: msgsnd */
 	lx_msgrcv,			/*  70: msgrcv */
 	lx_msgctl,			/*  71: msgctl */
-	lx_fcntl64,			/*  72: fcntl */
+	NULL,				/*  72: fcntl */
 	lx_flock,			/*  73: flock */
 	lx_fsync,			/*  74: fsync */
 	lx_fdatasync,			/*  75: fdatasync */
@@ -1183,7 +1183,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_inotify_add_watch,		/* 254: inotify_add_watch */
 	lx_inotify_rm_watch,		/* 255: inotify_rm_watch */
 	NULL,				/* 256: migrate_pages */
-	lx_openat,			/* 257: openat */
+	NULL,				/* 257: openat */
 	NULL,				/* 258: mkdirat */
 	lx_mknodat,			/* 259: mknodat */
 	NULL,				/* 260: fchownat */
@@ -1262,8 +1262,8 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_fork,			/*   2: fork */
 	NULL,				/*   3: read */
 	NULL,				/*   4: write */
-	lx_open,			/*   5: open */
-	lx_close,			/*   6: close */
+	NULL,				/*   5: open */
+	NULL,				/*   6: close */
 	NULL,				/*   7: waitpid */
 	lx_creat,			/*   8: creat */
 	lx_link,			/*   9: link */
@@ -1312,7 +1312,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_umount2,			/*  52: umount2 */
 	NULL,				/*  53: lock */
 	NULL,				/*  54: ioctl */
-	lx_fcntl,			/*  55: fcntl */
+	NULL,				/*  55: fcntl */
 	NULL,				/*  56: mpx */
 	lx_setpgid,			/*  57: setpgid */
 	NULL,				/*  58: ulimit */
@@ -1478,7 +1478,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_mincore,			/* 218: mincore */
 	lx_madvise,			/* 219: madvise */
 	lx_getdents64,			/* 220: getdents64 */
-	lx_fcntl64,			/* 221: fcntl64 */
+	NULL,				/* 221: fcntl64 */
 	NULL,				/* 222: tux */
 	NULL,				/* 223: security */
 	NULL,				/* 224: gettid */
@@ -1552,7 +1552,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_inotify_add_watch,		/* 292: inotify_add_watch */
 	lx_inotify_rm_watch,		/* 293: inotify_rm_watch */
 	NULL,				/* 294: migrate_pages */
-	lx_openat,			/* 295: openat */
+	NULL,				/* 295: openat */
 	NULL,				/* 296: mkdirat */
 	lx_mknodat,			/* 297: mknodat */
 	NULL,				/* 298: fchownat */

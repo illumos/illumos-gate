@@ -74,12 +74,12 @@ copen(int startfd, char *fname, int filemode, int createmode)
 
 	if (filemode & (FSEARCH|FEXEC)) {
 		/*
-		 * Must be one or the other and neither FREAD nor FWRITE
+		 * Must be one or the other.
 		 * Must not be any of FAPPEND FCREAT FTRUNC FXATTR FXATTRDIROPEN
-		 * XXX: Should these just be silently ignored?
+		 * XXX: Should these just be silently ignored like we
+		 * silently ignore FREAD|FWRITE?
 		 */
-		if ((filemode & (FREAD|FWRITE)) ||
-		    (filemode & (FSEARCH|FEXEC)) == (FSEARCH|FEXEC) ||
+		if ((filemode & (FSEARCH|FEXEC)) == (FSEARCH|FEXEC) ||
 		    (filemode & (FAPPEND|FCREAT|FTRUNC|FXATTR|FXATTRDIROPEN)))
 			return (set_errno(EINVAL));
 	}
