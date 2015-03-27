@@ -929,7 +929,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	NULL,				/*   0: read */
 	NULL,				/*   1: write */
 	NULL,				/*   2: open */
-	NULL,				/*   3: close */
+	lx_close,			/*   3: close */
 	lx_stat64,			/*   4: stat */
 	lx_fstat64,			/*   5: fstat */
 	lx_lstat64,			/*   6: lstat */
@@ -1263,7 +1263,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	NULL,				/*   3: read */
 	NULL,				/*   4: write */
 	NULL,				/*   5: open */
-	NULL,				/*   6: close */
+	lx_close,			/*   6: close */
 	NULL,				/*   7: waitpid */
 	lx_creat,			/*   8: creat */
 	lx_link,			/*   9: link */
