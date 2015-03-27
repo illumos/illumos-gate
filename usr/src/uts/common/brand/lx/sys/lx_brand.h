@@ -370,10 +370,11 @@ typedef lx_elf_data32_t lx_elf_data_t;
 #endif
 
 typedef enum lx_proc_flags {
-	LX_PROC_INSTALL_MODE = 0x01
+	LX_PROC_INSTALL_MODE = 0x01,
+	LX_PROC_STRICT_MODE = 0x02
 } lx_proc_flags_t;
 
-#define	LX_PROC_ALL	LX_PROC_INSTALL_MODE
+#define	LX_PROC_ALL	(LX_PROC_INSTALL_MODE | LX_PROC_STRICT_MODE)
 
 #ifdef	_KERNEL
 
@@ -567,6 +568,14 @@ struct lx_lwp_data {
 	 * syslog software.
 	 */
 	pid_t	br_lx_thunk_pid;
+
+	/*
+	 * If strict mode is enabled (via LX_STRICT in the environment), any
+	 * call to lx_unsupported() will set this boolean to B_TRUE.  This will
+	 * cause us to drop SIGSYS on the LWP as it attempts to return to
+	 * usermode.
+	 */
+	boolean_t br_strict_failure;
 };
 
 /*
