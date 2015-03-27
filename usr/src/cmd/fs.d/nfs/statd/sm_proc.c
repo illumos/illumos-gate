@@ -19,12 +19,16 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
  */
 
@@ -113,7 +117,7 @@ sm_mon_svc(mon *monp, sm_stat_res *resp)
 	rw_rdlock(&thr_rwlock);
 	if (debug) {
 		(void) printf("proc sm_mon: mon_name = %s, id = %d\n",
-		    monidp->mon_name, * ((int *)monp->priv));
+		    monidp->mon_name, *((int *)monp->priv));
 		pr_mon(monp->mon_id.mon_name);
 	}
 
@@ -159,7 +163,7 @@ sm_unmon_all_svc(my_id *myidp, sm_stat *resp)
 		    myidp->my_name,
 		    myidp->my_prog, myidp->my_vers,
 		    myidp->my_proc);
-	delete_mon((char *)NULL, myidp);
+	delete_mon(NULL, myidp);
 	pr_mon(NULL);
 	resp->state = local_state;
 	rw_unlock(&thr_rwlock);
@@ -187,23 +191,22 @@ sm_simu_crash_svc(void *myidp)
 	struct mon_entry *monitor_q;
 	int found = 0;
 
-	/* Only one crash should be running at a time. */
-	mutex_lock(&crash_lock);
 	if (debug)
 		(void) printf("proc sm_simu_crash\n");
-	if (in_crash) {
-		cond_wait(&crash_finish, &crash_lock);
+
+	/* Only one crash should be running at a time. */
+	mutex_lock(&crash_lock);
+	if (in_crash != 0) {
 		mutex_unlock(&crash_lock);
 		return;
-	} else {
-		in_crash = 1;
 	}
+	in_crash = 1;
 	mutex_unlock(&crash_lock);
 
 	for (i = 0; i < MAX_HASHSIZE; i++) {
 		mutex_lock(&mon_table[i].lock);
 		monitor_q = mon_table[i].sm_monhdp;
-		if (monitor_q != (struct mon_entry *)NULL) {
+		if (monitor_q != NULL) {
 			mutex_unlock(&mon_table[i].lock);
 			found = 1;
 			break;
@@ -217,7 +220,7 @@ sm_simu_crash_svc(void *myidp)
 	if (found) {
 		mutex_lock(&crash_lock);
 		die = 1;
-		/* Signal sm_retry() thread if sleeping. */
+		/* Signal sm_try() thread if sleeping. */
 		cond_signal(&retrywait);
 		mutex_unlock(&crash_lock);
 		rw_wrlock(&thr_rwlock);
@@ -232,9 +235,7 @@ sm_simu_crash_svc(void *myidp)
 
 /* ARGSUSED */
 void
-nsmaddrproc1_reg(regargs, regresp)
-	reg1args *regargs;
-	reg1res  *regresp;
+nsmaddrproc1_reg(reg1args *regargs, reg1res *regresp)
 {
 	nsm_addr_res status;
 	name_addr_entry_t *entry;
@@ -246,13 +247,11 @@ nsmaddrproc1_reg(regargs, regresp)
 		int i;
 
 		(void) printf("nap1_reg: fam= %d, name= %s, len= %d\n",
-				regargs->family,
-				regargs->name,
-				regargs->address.n_len);
+		    regargs->family, regargs->name, regargs->address.n_len);
 		(void) printf("address is: ");
 		for (i = 0; i < regargs->address.n_len; i++) {
 			(void) printf("%d.",
-				(unsigned char)regargs->address.n_bytes[i]);
+			    (unsigned char)regargs->address.n_bytes[i]);
 		}
 		(void) printf("\n");
 	}
@@ -267,7 +266,7 @@ nsmaddrproc1_reg(regargs, regresp)
 		if (strcmp(regargs->name, entry->name) == 0) {
 			if (debug) {
 				(void) printf("nap1_reg: matched name %s\n",
-						entry->name);
+				    entry->name);
 			}
 			break;
 		}
@@ -315,18 +314,17 @@ nsmaddrproc1_reg(regargs, regresp)
 		if (addr->family == (sa_family_t)regargs->family &&
 		    addr->ah.n_len == regargs->address.n_len &&
 		    memcmp(addr->ah.n_bytes, regargs->address.n_bytes,
-			addr->ah.n_len) == 0) {
+		    addr->ah.n_len) == 0) {
 			if (debug) {
 				int i;
 
 				(void) printf("nap1_reg: matched addr ");
 				for (i = 0; i < addr->ah.n_len; i++) {
 					(void) printf("%d.",
-					(unsigned char)addr->ah.n_bytes[i]);
+					    (unsigned char)addr->ah.n_bytes[i]);
 				}
 				(void) printf(" family %d for name %s\n",
-						addr->family,
-						entry->name);
+				    addr->family, entry->name);
 			}
 			break;
 		}
@@ -337,8 +335,7 @@ nsmaddrproc1_reg(regargs, regresp)
 		tmp_n_bytes = (char *)malloc(regargs->address.n_len);
 		if (addr == NULL || tmp_n_bytes == NULL) {
 			if (debug) {
-				(void) printf(
-					"nap1_reg: no memory for addr\n");
+				(void) printf("nap1_reg: no memory for addr\n");
 			}
 
 			/*
@@ -371,15 +368,15 @@ nsmaddrproc1_reg(regargs, regresp)
 		addr->ah.n_bytes = tmp_n_bytes;
 		addr->family = regargs->family;
 		if (debug) {
-			if ((addr->family != AF_INET) && \
-				(addr->family != AF_INET6)) {
+			if ((addr->family != AF_INET) &&
+			    (addr->family != AF_INET6)) {
 				(void) printf(
-					"nap1_reg: unknown addr family %d\n",
-					addr->family);
+				    "nap1_reg: unknown addr family %d\n",
+				    addr->family);
 			}
 		}
 		(void) memcpy(addr->ah.n_bytes, regargs->address.n_bytes,
-				addr->ah.n_len);
+		    addr->ah.n_len);
 
 		addr->next = entry->addresses;
 		entry->addresses = addr;
@@ -401,8 +398,7 @@ done:
  * here.  It is then filled in from the information passed in.
  */
 static void
-insert_mon(monp)
-	mon *monp;
+insert_mon(mon *monp)
 {
 	mon_entry *new, *found;
 	my_id *my_idp, *nl_idp;
@@ -414,8 +410,8 @@ insert_mon(monp)
 	/* Allocate entry for new */
 	if ((new = (mon_entry *) malloc(sizeof (mon_entry))) == 0) {
 		syslog(LOG_ERR,
-			"statd: insert_mon: malloc error on mon %s (id=%d)\n",
-			monp->mon_id.mon_name, * ((int *)monp->priv));
+		    "statd: insert_mon: malloc error on mon %s (id=%d)\n",
+		    monp->mon_id.mon_name, *((int *)monp->priv));
 		return;
 	}
 
@@ -426,8 +422,8 @@ insert_mon(monp)
 	/* Allocate entry for new mon_name */
 	if ((new->id.mon_id.mon_name = strdup(monp->mon_id.mon_name)) == 0) {
 		syslog(LOG_ERR,
-			"statd: insert_mon: malloc error on mon %s (id=%d)\n",
-			monp->mon_id.mon_name, * ((int *)monp->priv));
+		    "statd: insert_mon: malloc error on mon %s (id=%d)\n",
+		    monp->mon_id.mon_name, *((int *)monp->priv));
 		free(new);
 		return;
 	}
@@ -435,10 +431,10 @@ insert_mon(monp)
 
 	/* Allocate entry for new my_name */
 	if ((new->id.mon_id.my_id.my_name =
-		strdup(monp->mon_id.my_id.my_name)) == 0) {
+	    strdup(monp->mon_id.my_id.my_name)) == 0) {
 		syslog(LOG_ERR,
-			"statd: insert_mon: malloc error on mon %s (id=%d)\n",
-			monp->mon_id.mon_name, * ((int *)monp->priv));
+		    "statd: insert_mon: malloc error on mon %s (id=%d)\n",
+		    monp->mon_id.mon_name, *((int *)monp->priv));
 		free(new->id.mon_id.mon_name);
 		free(new);
 		return;
@@ -446,7 +442,7 @@ insert_mon(monp)
 
 	if (debug)
 		(void) printf("add_mon(%x) %s (id=%d)\n",
-		(int)new, new->id.mon_id.mon_name, * ((int *)new->id.priv));
+		    (int)new, new->id.mon_id.mon_name, *((int *)new->id.priv));
 
 	/*
 	 * Record the name, and all addresses which have been registered
@@ -462,7 +458,7 @@ insert_mon(monp)
 
 			for (addr = entry->addresses; addr; addr = addr->next) {
 				record_addr(new->id.mon_id.mon_name,
-						addr->family, &addr->ah);
+				    addr->family, &addr->ah);
 			}
 			break;
 		}
@@ -474,17 +470,17 @@ insert_mon(monp)
 	monitor_q = mon_table[hash].sm_monhdp;
 
 	/* If mon_table hash list is empty. */
-	if (monitor_q == (struct mon_entry *)NULL) {
+	if (monitor_q == NULL) {
 		if (debug)
 			(void) printf("\nAdding to monitor_q hash %d\n", hash);
-		new->nxt = new->prev = (mon_entry *)NULL;
+		new->nxt = new->prev = NULL;
 		mon_table[hash].sm_monhdp = new;
 		mutex_unlock(&mon_table[hash].lock);
 		return;
 	} else {
 		found = 0;
 		my_idp = &new->id.mon_id.my_id;
-		while (monitor_q != (mon_entry *)NULL)  {
+		while (monitor_q != NULL)  {
 			/*
 			 * This list is searched sequentially for the
 			 * tuple (hostname, prog, vers, proc). The tuples
@@ -499,15 +495,15 @@ insert_mon(monp)
 			 */
 
 			if (str_cmp_unqual_hostname(
-				monitor_q->id.mon_id.mon_name,
-				new->id.mon_id.mon_name) == 0) {
+			    monitor_q->id.mon_id.mon_name,
+			    new->id.mon_id.mon_name) == 0) {
 				/* found */
 				nl_idp = &monitor_q->id.mon_id.my_id;
 				if ((str_cmp_unqual_hostname(my_idp->my_name,
-					nl_idp->my_name) == 0) &&
-					my_idp->my_prog == nl_idp->my_prog &&
-					my_idp->my_vers == nl_idp->my_vers &&
-					my_idp->my_proc == nl_idp->my_proc) {
+				    nl_idp->my_name) == 0) &&
+				    my_idp->my_prog == nl_idp->my_prog &&
+				    my_idp->my_vers == nl_idp->my_vers &&
+				    my_idp->my_proc == nl_idp->my_proc) {
 					/*
 					 * already exists an identical one,
 					 * release the space allocated for the
@@ -536,7 +532,7 @@ insert_mon(monp)
 			 */
 			new->nxt = found->nxt;
 			new->prev = found;
-			if (found->nxt != (mon_entry *)NULL)
+			if (found->nxt != NULL)
 				found->nxt->prev = new;
 			found->nxt = new;
 		} else {
@@ -559,13 +555,11 @@ insert_mon(monp)
  * in hash table.
  */
 static void
-delete_mon(mon_name, my_idp)
-	char *mon_name;
-	my_id *my_idp;
+delete_mon(char *mon_name, my_id *my_idp)
 {
 	unsigned int hash;
 
-	if (mon_name != (char *)NULL) {
+	if (mon_name != NULL) {
 		record_name(mon_name, 0);
 		SMHASH(mon_name, hash);
 		mutex_lock(&mon_table[hash].lock);
@@ -575,7 +569,7 @@ delete_mon(mon_name, my_idp)
 		for (hash = 0; hash < MAX_HASHSIZE; hash++) {
 			mutex_lock(&mon_table[hash].lock);
 			delete_onemon(mon_name, my_idp,
-					&mon_table[hash].sm_monhdp);
+			    &mon_table[hash].sm_monhdp);
 			mutex_unlock(&mon_table[hash].lock);
 		}
 	}
@@ -587,44 +581,41 @@ delete_mon(mon_name, my_idp)
  * else delete specific monitor.
  */
 void
-delete_onemon(mon_name, my_idp, monitor_q)
-	char *mon_name;
-	my_id *my_idp;
-	mon_entry **monitor_q;
+delete_onemon(char *mon_name, my_id *my_idp, mon_entry **monitor_q)
 {
 
 	mon_entry *next, *nl;
 	my_id *nl_idp;
 
 	next = *monitor_q;
-	while ((nl = next) != (struct mon_entry *)NULL) {
+	while ((nl = next) != NULL) {
 		next = next->nxt;
-		if (mon_name == (char *)NULL || (mon_name != (char *)NULL &&
-			str_cmp_unqual_hostname(nl->id.mon_id.mon_name,
-			mon_name) == 0)) {
+		if (mon_name == NULL || (mon_name != NULL &&
+		    str_cmp_unqual_hostname(nl->id.mon_id.mon_name,
+		    mon_name) == 0)) {
 			nl_idp = &nl->id.mon_id.my_id;
 			if ((str_cmp_unqual_hostname(my_idp->my_name,
-					nl_idp->my_name) == 0) &&
-				my_idp->my_prog == nl_idp->my_prog &&
-				my_idp->my_vers == nl_idp->my_vers &&
-				my_idp->my_proc == nl_idp->my_proc) {
+			    nl_idp->my_name) == 0) &&
+			    my_idp->my_prog == nl_idp->my_prog &&
+			    my_idp->my_vers == nl_idp->my_vers &&
+			    my_idp->my_proc == nl_idp->my_proc) {
 				/* found */
 				if (debug)
 					(void) printf("delete_mon(%x): %s\n",
-							(int)nl, mon_name ?
-							mon_name : "<NULL>");
+					    (int)nl, mon_name ?
+					    mon_name : "<NULL>");
 				/*
 				 * Remove the monitor name from the
 				 * record_q, if id matches.
 				 */
 				record_name(nl->id.mon_id.mon_name, 0);
 				/* if nl is not the first entry on list */
-				if (nl->prev != (struct mon_entry *)NULL)
+				if (nl->prev != NULL)
 					nl->prev->nxt = nl->nxt;
 				else {
 					*monitor_q = nl->nxt;
 				}
-				if (nl->nxt != (struct mon_entry *)NULL)
+				if (nl->nxt != NULL)
 					nl->nxt->prev = nl->prev;
 				free(nl->id.mon_id.mon_name);
 				free(nl_idp->my_name);
@@ -639,9 +630,7 @@ delete_onemon(mon_name, my_idp, monitor_q)
  * has changed.
  */
 static void
-send_notice(mon_name, state)
-	char *mon_name;
-	int state;
+send_notice(char *mon_name, int state)
 {
 	struct mon_entry *next;
 	mon_entry *monitor_q;
@@ -654,7 +643,7 @@ send_notice(mon_name, state)
 	monitor_q = mon_table[hash].sm_monhdp;
 
 	next = monitor_q;
-	while (next != (struct mon_entry *)NULL) {
+	while (next != NULL) {
 		if (hostname_eq(next->id.mon_id.mon_name, mon_name)) {
 			monp = &next->id;
 			/*
@@ -663,26 +652,25 @@ send_notice(mon_name, state)
 			 * mon info and state.
 			 */
 			if ((minfop =
-				(moninfo_t *)xmalloc(sizeof (moninfo_t))) !=
-				(moninfo_t *)NULL) {
+			    (moninfo_t *)xmalloc(sizeof (moninfo_t))) != NULL) {
 				(void) memcpy(&minfop->id, monp, sizeof (mon));
 				/* Allocate entry for mon_name */
 				if ((minfop->id.mon_id.mon_name =
-					strdup(monp->mon_id.mon_name)) == 0) {
-					syslog(LOG_ERR,
-			"statd: send_notice: malloc error on mon %s (id=%d)\n",
-						monp->mon_id.mon_name,
-						* ((int *)monp->priv));
+				    strdup(monp->mon_id.mon_name)) == 0) {
+					syslog(LOG_ERR, "statd: send_notice: "
+					    "malloc error on mon %s (id=%d)\n",
+					    monp->mon_id.mon_name,
+					    *((int *)monp->priv));
 					free(minfop);
 					continue;
 				}
 				/* Allocate entry for my_name */
 				if ((minfop->id.mon_id.my_id.my_name =
-				strdup(monp->mon_id.my_id.my_name)) == 0) {
-					syslog(LOG_ERR,
-			"statd: send_notice: malloc error on mon %s (id=%d)\n",
-						monp->mon_id.mon_name,
-						* ((int *)monp->priv));
+				    strdup(monp->mon_id.my_id.my_name)) == 0) {
+					syslog(LOG_ERR, "statd: send_notice: "
+					    "malloc error on mon %s (id=%d)\n",
+					    monp->mon_id.mon_name,
+					    *((int *)monp->priv));
 					free(minfop->id.mon_id.mon_name);
 					free(minfop);
 					continue;
@@ -694,15 +682,14 @@ send_notice(mon_name, state)
 				 * resources and continue.
 				 */
 				if (thr_create(NULL, NULL, thr_send_notice,
-						(void *)minfop, THR_DETACHED,
-						NULL)) {
-				    syslog(LOG_ERR,
-		"statd: unable to create thread to send_notice to %s.\n",
-					mon_name);
-				    free(minfop->id.mon_id.mon_name);
-				    free(minfop->id.mon_id.my_id.my_name);
-				    free(minfop);
-				    continue;
+				    minfop, THR_DETACHED, NULL)) {
+					syslog(LOG_ERR, "statd: unable to "
+					    "create thread to send_notice to "
+					    "%s.\n", mon_name);
+					free(minfop->id.mon_id.mon_name);
+					free(minfop->id.mon_id.my_id.my_name);
+					free(minfop);
+					continue;
 				}
 			}
 		}
@@ -745,9 +732,7 @@ thr_send_notice(void *arg)
  * Contact lockd specified by monp.
  */
 static int
-statd_call_lockd(monp, state)
-	mon *monp;
-	int state;
+statd_call_lockd(mon *monp, int state)
 {
 	enum clnt_stat clnt_stat;
 	struct timeval tottimeout;
@@ -768,7 +753,7 @@ statd_call_lockd(monp, state)
 	}
 	if (debug)
 		(void) printf("statd_call_lockd: %s state = %d\n",
-			stat.mon_name, stat.state);
+		    stat.mon_name, stat.state);
 
 	tottimeout.tv_sec = SM_RPC_TIMEOUT;
 	tottimeout.tv_usec = 0;
@@ -779,17 +764,16 @@ statd_call_lockd(monp, state)
 		return (-1);
 	}
 
-	clnt_stat = clnt_call(clnt, my_idp->my_proc,
-				xdr_sm_status, (char *)&stat,
-				xdr_void, NULL, tottimeout);
+	clnt_stat = clnt_call(clnt, my_idp->my_proc, xdr_sm_status,
+	    (char *)&stat, xdr_void, NULL, tottimeout);
 	if (debug) {
 		(void) printf("clnt_stat=%s(%d)\n",
-			clnt_sperrno(clnt_stat), clnt_stat);
+		    clnt_sperrno(clnt_stat), clnt_stat);
 	}
 	if (clnt_stat != (int)RPC_SUCCESS) {
 		syslog(LOG_WARNING,
-			"statd: cannot talk to lockd at %s, %s(%d)\n",
-			my_idp->my_name, clnt_sperrno(clnt_stat), clnt_stat);
+		    "statd: cannot talk to lockd at %s, %s(%d)\n",
+		    my_idp->my_name, clnt_sperrno(clnt_stat), clnt_stat);
 		rc = -1;
 	}
 
@@ -855,8 +839,7 @@ create_client(char *host, int prognum, int versnum, char *netid,
  * to name, otherwise print out the entire monitor table.
  */
 static void
-pr_mon(name)
-	char *name;
+pr_mon(char *name)
 {
 	mon_entry *nl;
 	int hash;
@@ -869,17 +852,16 @@ pr_mon(name)
 		for (hash = 0; hash < MAX_HASHSIZE; hash++) {
 			mutex_lock(&mon_table[hash].lock);
 			nl = mon_table[hash].sm_monhdp;
-			if (nl == (struct mon_entry *)NULL) {
+			if (nl == NULL) {
 				(void) printf(
-					"*****monitor_q = NULL hash %d\n",
-					hash);
+				    "*****monitor_q = NULL hash %d\n", hash);
 				mutex_unlock(&mon_table[hash].lock);
 				continue;
 			}
 			(void) printf("*****monitor_q:\n ");
-			while (nl != (mon_entry *)NULL) {
+			while (nl != NULL) {
 				(void) printf("%s:(%x), ",
-					nl->id.mon_id.mon_name, (int)nl);
+				    nl->id.mon_id.mon_name, (int)nl);
 				nl = nl->nxt;
 			}
 			mutex_unlock(&mon_table[hash].lock);
@@ -889,13 +871,13 @@ pr_mon(name)
 		SMHASH(name, hash);
 		mutex_lock(&mon_table[hash].lock);
 		nl = mon_table[hash].sm_monhdp;
-		if (nl == (struct mon_entry *)NULL) {
+		if (nl == NULL) {
 			(void) printf("*****monitor_q = NULL hash %d\n", hash);
 		} else {
 			(void) printf("*****monitor_q:\n ");
-			while (nl != (mon_entry *)NULL) {
+			while (nl != NULL) {
 				(void) printf("%s:(%x), ",
-					nl->id.mon_id.mon_name, (int)nl);
+				    nl->id.mon_id.mon_name, (int)nl);
 				nl = nl->nxt;
 			}
 			(void) printf("\n");
@@ -1010,7 +992,7 @@ get_system_id(char *hostname)
 	if (hp == (void *) NULL) {
 		return (NULL);
 	}
-	while ((ncp = getnetconfig(hp)) != (struct netconfig *)NULL) {
+	while ((ncp = getnetconfig(hp)) != NULL) {
 		if ((strcmp(ncp->nc_protofmly, NC_INET) == 0) ||
 		    (strcmp(ncp->nc_protofmly, NC_INET6) == 0)) {
 			addrs = NULL;
@@ -1067,7 +1049,7 @@ merge_hosts(void)
 	 * those of the receiver.
 	 */
 	lifc = getmyaddrs();
-	if (lifc == (struct lifconf *)NULL) {
+	if (lifc == NULL) {
 		goto finish;
 	}
 	lifrp = lifc->lifc_req;
