@@ -44,7 +44,6 @@ extern "C" {
 
 extern int lx_install;
 
-extern long lx_openat(uintptr_t, uintptr_t, uintptr_t, uintptr_t);
 extern long lx_mknodat(uintptr_t, uintptr_t, uintptr_t, uintptr_t);
 extern long lx_futimesat(uintptr_t, uintptr_t, uintptr_t);
 extern long lx_utimensat(uintptr_t, uintptr_t, uintptr_t, uintptr_t);
@@ -63,10 +62,7 @@ extern long lx_lstat(uintptr_t, uintptr_t);
 extern long lx_stat64(uintptr_t, uintptr_t);
 extern long lx_fstat64(uintptr_t, uintptr_t);
 extern long lx_lstat64(uintptr_t, uintptr_t);
-extern long lx_fcntl(uintptr_t, uintptr_t, uintptr_t);
-extern long lx_fcntl64(uintptr_t, uintptr_t, uintptr_t);
 extern long lx_flock(uintptr_t, uintptr_t);
-extern long lx_open(uintptr_t, uintptr_t, uintptr_t);
 extern long lx_readlink(uintptr_t, uintptr_t, uintptr_t);
 extern long lx_readdir(uintptr_t, uintptr_t, uintptr_t);
 extern long lx_getdents(uintptr_t, uintptr_t, uintptr_t);
@@ -288,7 +284,6 @@ extern long lx_shmctl(int, int, void *);
 extern long lx_prctl(int, uintptr_t, uintptr_t, uintptr_t, uintptr_t);
 
 extern long lx_alarm(unsigned int);
-extern long lx_close(int);
 extern long lx_chdir(const char *);
 extern long lx_chroot(const char *);
 extern long lx_creat(const char *, mode_t);

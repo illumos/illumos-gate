@@ -284,6 +284,7 @@ LX_BRAND_OBJS  =		\
 	lx_clone.o		\
 	lx_cpu.o		\
 	lx_errno.o		\
+	lx_fcntl.o		\
 	lx_futex.o		\
 	lx_getpid.o		\
 	lx_id.o			\
@@ -292,6 +293,7 @@ LX_BRAND_OBJS  =		\
 	lx_misc.o		\
 	lx_mkdir.o		\
 	lx_modify_ldt.o		\
+	lx_open.o		\
 	lx_pid.o		\
 	lx_pipe.o		\
 	lx_ptrace.o		\

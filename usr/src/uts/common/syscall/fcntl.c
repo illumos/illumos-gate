@@ -54,7 +54,8 @@
 
 #include <sys/cmn_err.h>
 
-static int flock_check(vnode_t *, flock64_t *, offset_t, offset_t);
+/* This is global so that it can be used by brand emulation. */
+int flock_check(vnode_t *, flock64_t *, offset_t, offset_t);
 static int flock_get_start(vnode_t *, flock64_t *, offset_t, u_offset_t *);
 static void fd_too_big(proc_t *);
 
