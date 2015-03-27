@@ -256,6 +256,8 @@ lx_syscall_return(klwp_t *lwp, int syscall_num, long ret)
 	 */
 	lwp->lwp_errno = 0;
 
+	lx_check_strict_failure(lwpd);
+
 	/*
 	 * We want complete control of the registers on return from this
 	 * emulated Linux system call:

@@ -129,7 +129,6 @@ long lx_fsb;
 long lx_fs;
 #endif
 int lx_install = 0;		/* install mode enabled if non-zero */
-int lx_strict = 0;		/* "strict" mode enabled if non-zero */
 int lx_verbose = 0;		/* verbose mode enabled if non-zero */
 int lx_debug_enabled = 0;	/* debugging output enabled if non-zero */
 
@@ -317,13 +316,6 @@ lx_unsupported(char *msg, ...)
 	va_start(ap, msg);
 	i_lx_msg(STDERR_FILENO, msg, ap);
 	va_end(ap);
-
-	/*
-	 * If the user doesn't trust the application to responsibly
-	 * handle ENOTSUP, we kill the application.
-	 */
-	if (lx_strict)
-		(void) kill(getpid(), SIGSYS);
 }
 
 int lx_init(int argc, char *argv[], char *envp[]);
@@ -597,7 +589,7 @@ lx_init(int argc, char *argv[], char *envp[])
 	 * system call?
 	 */
 	if (getenv("LX_STRICT") != NULL) {
-		lx_strict = 1;
+		reg.lxbr_flags |= LX_PROC_STRICT_MODE;
 		lx_debug("STRICT mode enabled.\n");
 	}
 

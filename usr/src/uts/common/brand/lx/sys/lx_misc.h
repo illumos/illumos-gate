@@ -68,6 +68,8 @@ extern int lx_helper_rt_tgsigqueueinfo(pid_t, pid_t, int, siginfo_t *);
 extern boolean_t lx_vsyscall_iscall(klwp_t *, uintptr_t, int *);
 extern void lx_vsyscall_enter(proc_t *, klwp_t *, int);
 
+extern void lx_check_strict_failure(lx_lwp_data_t *);
+
 #endif
 
 #ifdef	__cplusplus

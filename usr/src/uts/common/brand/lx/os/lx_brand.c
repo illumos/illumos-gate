@@ -750,7 +750,44 @@ lx_free_brand_data(zone_t *zone)
 void
 lx_unsupported(char *dmsg)
 {
+	lx_proc_data_t *pd = ttolxproc(curthread);
+
 	DTRACE_PROBE1(brand__lx__unsupported, char *, dmsg);
+
+	if (pd != NULL && (pd->l_flags & LX_PROC_STRICT_MODE) != 0) {
+		/*
+		 * If this process was run with strict mode enabled
+		 * (via LX_STRICT in the environment), we mark this
+		 * LWP as having triggered an unsupported behaviour.
+		 * This flag will be checked at an appropriate point
+		 * by lx_check_strict_failure().
+		 */
+		lx_lwp_data_t *lwpd = ttolxlwp(curthread);
+
+		lwpd->br_strict_failure = B_TRUE;
+	}
+}
+
+void
+lx_check_strict_failure(lx_lwp_data_t *lwpd)
+{
+	proc_t *p;
+
+	if (!lwpd->br_strict_failure) {
+		return;
+	}
+
+	lwpd->br_strict_failure = B_FALSE;
+
+	/*
+	 * If this process is operating in strict mode (via LX_STRICT in
+	 * the environment), and has triggered a call to
+	 * lx_unsupported(), we drop SIGSYS on it as we return.
+	 */
+	p = curproc;
+	mutex_enter(&p->p_lock);
+	sigtoproc(p, curthread, SIGSYS);
+	mutex_exit(&p->p_lock);
 }
 
 void
@@ -1029,6 +1066,8 @@ lx_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 		}
 		dmsg[255] = '\0';
 		lx_unsupported(dmsg);
+
+		lx_check_strict_failure(lwpd);
 
 		return (0);
 	}
