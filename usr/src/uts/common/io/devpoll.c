@@ -736,10 +736,18 @@ dpwrite(dev_t dev, struct uio *uiop, cred_t *credp)
 				 * we return EBADF if our specified fd is
 				 * invalid.
 				 */
-				if ((dpep->dpe_flag & DP_ISEPOLLCOMPAT) &&
-				    (fp = getf(fd)) == NULL) {
-					error = EBADF;
-					break;
+				if (dpep->dpe_flag & DP_ISEPOLLCOMPAT) {
+					if ((fp = getf(fd)) == NULL) {
+						error = EBADF;
+						break;
+					}
+
+					/*
+					 * To (greatly) reduce EEXIST false
+					 * positives, we denote that this
+					 * fp has been epoll()'d; see below.
+					 */
+					fp->f_flag2 |= FEPOLLED;
 				}
 
 				pdp = pcache_alloc_fd(0);
@@ -755,15 +763,26 @@ dpwrite(dev_t dev, struct uio *uiop, cred_t *credp)
 				 * file pointer that correponds to the file
 				 * descriptor matches our cached value.  (If
 				 * there is a pointer mismatch, the file
-				 * descriptor was closed without being removed
-				 * -- though the converse is clearly not true,
-				 * and represents a window whereby EEXIST can
-				 * spuriously be returned.)
+				 * descriptor was closed without being removed.
+				 * The converse is clearly not true, however,
+				 * so to narrow the window by which a spurious
+				 * EEXIST may be returned, we also check if
+				 * this fp has been added to an epoll control
+				 * descriptor in the past; if it hasn't, we
+				 * know that this is due to fp reuse -- it's
+				 * not a true EEXIST case.  (By performing this
+				 * additional check, we limit the window of
+				 * spurious EEXIST to situations where a single
+				 * file descriptor is being used across two or
+				 * more epoll control descriptors -- and even
+				 * then, the file descriptor must be closed and
+				 * reused in a relatively tight time span.)
 				 */
 				if ((dpep->dpe_flag & DP_ISEPOLLCOMPAT) &&
 				    pdp->pd_fp != NULL &&
 				    (fp = getf(fd)) != NULL &&
-				    fp == pdp->pd_fp) {
+				    fp == pdp->pd_fp &&
+				    (fp->f_flag2 & FEPOLLED)) {
 					error = EEXIST;
 					releasef(fd);
 					break;
