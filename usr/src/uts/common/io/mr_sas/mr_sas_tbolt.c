@@ -26,6 +26,7 @@
 #include <sys/atomic.h>
 #include <sys/scsi/scsi.h>
 #include <sys/byteorder.h>
+#include <sys/sdt.h>
 #include "ld_pd_map.h"
 #include "mr_sas.h"
 #include "fusion.h"
@@ -1166,6 +1167,9 @@ mrsas_tbolt_tran_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 		if (instance->fw_outstanding > instance->max_fw_cmds) {
 			dev_err(instance->dip, CE_WARN,
 			    "Command Queue Full... Returning BUSY");
+			DTRACE_PROBE2(tbolt_start_tran_err,
+			    uint16_t, instance->fw_outstanding,
+			    uint16_t, instance->max_fw_cmds);
 			return_raid_msg_pkt(instance, cmd);
 			return (TRAN_BUSY);
 		}
@@ -1183,6 +1187,9 @@ mrsas_tbolt_tran_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 		instance->func_ptr->issue_cmd(cmd, instance);
 		(void) wait_for_outstanding_poll_io(instance);
 		(void) mrsas_common_check(instance, cmd);
+		DTRACE_PROBE2(tbolt_start_nointr_done,
+		    uint8_t, cmd->frame->hdr.cmd,
+		    uint8_t, cmd->frame->hdr.cmd_status);
 	}
 
 	return (TRAN_ACCEPT);
@@ -1439,6 +1446,8 @@ mrsas_tbolt_build_cmd(struct mrsas_instance *instance, struct scsi_address *ap,
 
 	/* get the command packet */
 	if (!(cmd = get_raid_msg_pkt(instance))) {
+		DTRACE_PROBE2(tbolt_build_cmd_mfi_err, uint16_t,
+		    instance->fw_outstanding, uint16_t, instance->max_fw_cmds);
 		return (NULL);
 	}
 
@@ -1454,6 +1463,10 @@ mrsas_tbolt_build_cmd(struct mrsas_instance *instance, struct scsi_address *ap,
 	cmd->request_desc = ReqDescUnion;
 	cmd->pkt = pkt;
 	cmd->cmd = acmd;
+
+	DTRACE_PROBE4(tbolt_build_cmd, uint8_t, pkt->pkt_cdbp[0],
+	    ulong_t, acmd->cmd_dmacount, ulong_t, acmd->cmd_dma_len,
+	    uint16_t, acmd->device_id);
 
 	/* lets get the command directions */
 	if (acmd->cmd_flags & CFLAG_DMASEND) {
@@ -2279,6 +2292,7 @@ tbolt_complete_cmd(struct mrsas_instance *instance,
 {
 	uint8_t				status;
 	uint8_t				extStatus;
+	uint8_t				function;
 	uint8_t				arm;
 	struct scsa_cmd			*acmd;
 	struct scsi_pkt			*pkt;
@@ -2306,7 +2320,11 @@ tbolt_complete_cmd(struct mrsas_instance *instance,
 
 	/* regular commands */
 
-	switch (ddi_get8(acc_handle, &scsi_raid_io->Function)) {
+	function = ddi_get8(acc_handle, &scsi_raid_io->Function);
+	DTRACE_PROBE3(tbolt_complete_cmd, uint8_t, function,
+	    uint8_t, status, uint8_t, extStatus);
+
+	switch (function) {
 
 	case MPI2_FUNCTION_SCSI_IO_REQUEST :  /* Fast Path IO. */
 		acmd =	(struct scsa_cmd *)cmd->cmd;
