@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2012, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2015, Joyent, Inc.
  */
 
 #ifndef	_SYS_AUXV_386_H
@@ -85,10 +85,14 @@ extern "C" {
 
 #define	AV_386_2_F16C		0x00001	/* F16C half percision extensions */
 #define	AV_386_2_RDRAND		0x00002	/* RDRAND insn */
+#define	AV_386_2_BMI1		0x00004 /* BMI1 insns */
+#define	AV_386_2_BMI2		0x00008 /* BMI2 insns */
+#define	AV_386_2_FMA		0x00010	/* FMA insns */
+#define	AV_386_2_AVX2		0x00020	/* AVX2 insns */
 
 #define	FMT_AV_386_2							\
 	"\020"								\
-	"\02rdrand\01f16c"
+	"\06avx2\05fma\04bmi2\03bmi1\02rdrand\01f16c"
 
 #ifdef __cplusplus
 }
