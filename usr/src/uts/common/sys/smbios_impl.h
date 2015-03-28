@@ -20,6 +20,7 @@
  */
 
 /*
+ * Copyright 2015 OmniTI Computer Consulting, Inc.  All rights reserved.
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -114,6 +115,9 @@ typedef struct smb_chassis {
 	uint8_t smbch_cv[1];		/* array of contained records */
 } smb_chassis_t;
 
+/* WARNING: the argument is evaluated three times! */
+#define	SMB_CH_SKU(smbcp) ((char *) \
+	(smbcp)->smbch_cv + ((smbcp)->smbch_cn * (smbcp)->smbch_cm))
 #define	SMB_CHT_LOCK	0x80		/* lock bit within smbch_type */
 
 typedef struct smb_processor {
@@ -136,6 +140,11 @@ typedef struct smb_processor {
 	uint8_t smbpr_serial;		/* serial number */
 	uint8_t smbpr_asset;		/* asset tag */
 	uint8_t smbpr_part;		/* part number */
+	uint8_t smbpr_corecount;	/* number of cores per socket */
+	uint8_t smbpr_coresenabled;	/* number of enabled cores per socket */
+	uint8_t smbpr_threadcount;	/* number of threads per socket */
+	uint16_t smbpr_cflags;	/* cpu characteristics (see <smbios.h>) */
+	uint16_t smbpr_family2;		/* processor family2 (see <smbios.h>) */
 } smb_processor_t;
 
 typedef struct smb_cache {
@@ -153,7 +162,7 @@ typedef struct smb_cache {
 } smb_cache_t;
 
 /*
- * Convert encoded cache size to bytes: DSP0134 Section 3.3.8 explains the
+ * Convert encoded cache size to bytes: DSP0134 Section 7.8 explains the
  * encoding.  The highest bit is 0 for 1k units, 1 for 64k units, and this
  * macro decodes the value into bytes for exporting to our clients.
  */
@@ -192,7 +201,7 @@ typedef struct smb_slot {
 
 typedef struct smb_obdev {
 	uint8_t smbob_type;		/* encoded type and enable bit */
-	uint8_t smbob_name;		/* descriptiong string */
+	uint8_t smbob_name;		/* description string */
 } smb_obdev_t;
 
 #define	SMB_OBT_ENABLED		0x80	/* enable bit within smbob_type */
@@ -233,6 +242,7 @@ typedef struct smb_memarray {
 	uint32_t smbmarr_cap;		/* maximum capacity */
 	uint16_t smbmarr_err;		/* error handle */
 	uint16_t smbmarr_ndevs;		/* number of slots or sockets */
+	uint64_t smbmarr_extcap;	/* extended maximum capacity */
 } smb_memarray_t;
 
 typedef struct smb_memarrmap {
@@ -241,6 +251,8 @@ typedef struct smb_memarrmap {
 	uint32_t smbamap_end;		/* ending address in kilobytes */
 	uint16_t smbamap_array;		/* physical memory array handle */
 	uint8_t smbamap_width;		/* partition width */
+	uint64_t smbamap_extstart;	/* extended starting address in bytes */
+	uint64_t smbamap_extend;	/* extended ending address in bytes */
 } smb_memarrmap_t;
 
 typedef struct smb_memdevice {
@@ -261,6 +273,12 @@ typedef struct smb_memdevice {
 	uint8_t smbmdev_serial;		/* serial number */
 	uint8_t smbmdev_asset;		/* asset tag */
 	uint8_t smbmdev_part;		/* part number */
+	uint8_t smbmdev_attrs;		/* attributes */
+	uint32_t smbmdev_extsize;	/* extended size */
+	uint16_t smbmdev_clkspeed;	/* configured clock speed */
+	uint16_t smbmdev_minvolt;	/* minimum voltage */
+	uint16_t smbmdev_maxvolt;	/* maximum voltage */
+	uint16_t smbmdev_confvolt;	/* configured voltage */
 } smb_memdevice_t;
 
 #define	SMB_MDS_KBYTES		0x8000	/* size in specified in kilobytes */
@@ -274,6 +292,8 @@ typedef struct smb_memdevmap {
 	uint8_t smbdmap_rpos;		/* row position */
 	uint8_t smbdmap_ipos;		/* interleave position */
 	uint8_t smbdmap_idepth;		/* interleave depth */
+	uint64_t smbdmap_extstart;	/* extended starting address */
+	uint64_t smbdmap_extend;	/* extended ending address */
 } smb_memdevmap_t;
 
 typedef struct smb_battery {
