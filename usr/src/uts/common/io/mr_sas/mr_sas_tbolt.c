@@ -17,6 +17,7 @@
 
 /*
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2015 Citrus IT Limited. All rights reserved.
  */
 
 
@@ -1495,17 +1496,18 @@ mrsas_tbolt_build_cmd(struct mrsas_instance *instance, struct scsi_address *ap,
 
 	pd_cmd_cdblen = acmd->cmd_cdblen;
 
-	switch (pkt->pkt_cdbp[0]) {
-	case SCMD_READ:
-	case SCMD_WRITE:
-	case SCMD_READ_G1:
-	case SCMD_WRITE_G1:
-	case SCMD_READ_G4:
-	case SCMD_WRITE_G4:
-	case SCMD_READ_G5:
-	case SCMD_WRITE_G5:
+	if (acmd->islogical) {
 
-		if (acmd->islogical) {
+		switch (pkt->pkt_cdbp[0]) {
+		case SCMD_READ:
+		case SCMD_WRITE:
+		case SCMD_READ_G1:
+		case SCMD_WRITE_G1:
+		case SCMD_READ_G4:
+		case SCMD_WRITE_G4:
+		case SCMD_READ_G5:
+		case SCMD_WRITE_G5:
+
 			/* Initialize sense Information */
 			if (cmd->sense1 == NULL) {
 				con_log(CL_ANN, (CE_NOTE, "tbolt_build_cmd: "
@@ -1689,7 +1691,8 @@ mrsas_tbolt_build_cmd(struct mrsas_instance *instance, struct scsi_address *ap,
 			ddi_put16(acc_handle, &scsi_raid_io->DevHandle,
 			    io_info.devHandle);
 
-		} else {
+		} else { /* FP Not Possible */
+
 			ddi_put8(acc_handle, &scsi_raid_io->Function,
 			    MPI2_FUNCTION_LD_IO_REQUEST);
 
@@ -1731,33 +1734,8 @@ mrsas_tbolt_build_cmd(struct mrsas_instance *instance, struct scsi_address *ap,
 		/* Release SYNC MAP UPDATE lock */
 		mutex_exit(&instance->sync_map_mtx);
 
-
-		/*
-		 * Set sense buffer physical address/length in scsi_io_request.
-		 */
-		ddi_put32(acc_handle, &scsi_raid_io->SenseBufferLowAddress,
-		    cmd->sense_phys_addr1);
-		ddi_put8(acc_handle, &scsi_raid_io->SenseBufferLength,
-		    SENSE_LENGTH);
-
-		/* Construct SGL */
-		ddi_put8(acc_handle, &scsi_raid_io->SGLOffset0,
-		    offsetof(MPI2_RAID_SCSI_IO_REQUEST, SGL) / 4);
-
-		(void) mr_sas_tbolt_build_sgl(instance, acmd, cmd,
-		    scsi_raid_io, &datalen);
-
-		ddi_put32(acc_handle, &scsi_raid_io->DataLength, datalen);
-
 		break;
-#ifndef PDSUPPORT	/* if PDSUPPORT, skip break and fall through */
-	} else {
-		break;
-#endif
-	}
-	/* fall through For all non-rd/wr cmds */
-	default:
-		switch (pkt->pkt_cdbp[0]) {
+
 		case 0x35: { /* SCMD_SYNCHRONIZE_CACHE */
 			return_raid_msg_pkt(instance, cmd);
 			*cmd_done = 1;
@@ -1779,107 +1757,103 @@ mrsas_tbolt_build_cmd(struct mrsas_instance *instance, struct scsi_address *ap,
 				*cmd_done = 1;
 				return (NULL);
 			}
+			return (cmd);
+		}
+
+		default:
+			/* Pass-through command to logical drive */
+			ddi_put8(acc_handle, &scsi_raid_io->Function,
+			    MPI2_FUNCTION_LD_IO_REQUEST);
+			ddi_put8(acc_handle, &scsi_raid_io->LUN[1], acmd->lun);
+			ddi_put16(acc_handle, &scsi_raid_io->DevHandle,
+			    acmd->device_id);
+			ReqDescUnion->SCSIIO.RequestFlags =
+			    (MPI2_REQ_DESCRIPT_FLAGS_SCSI_IO <<
+			    MPI2_REQ_DESCRIPT_FLAGS_TYPE_SHIFT);
 			break;
 		}
+	} else { /* Physical */
+#ifdef PDSUPPORT
+		/* Pass-through command to physical drive */
 
-		default: {
-			/*
-			 * Here we need to handle PASSTHRU for
-			 * Logical Devices. Like Inquiry etc.
-			 */
+		/* Acquire SYNC MAP UPDATE lock */
+		mutex_enter(&instance->sync_map_mtx);
 
-			if (!(acmd->islogical)) {
+		local_map_ptr = instance->ld_map[instance->map_id & 1];
 
-				/* Acquire SYNC MAP UPDATE lock */
-				mutex_enter(&instance->sync_map_mtx);
+		ddi_put8(acc_handle, &scsi_raid_io->Function,
+		    MPI2_FUNCTION_SCSI_IO_REQUEST);
 
-				local_map_ptr =
-				    instance->ld_map[(instance->map_id & 1)];
+		ReqDescUnion->SCSIIO.RequestFlags =
+		    (MPI2_REQ_DESCRIPT_FLAGS_HIGH_PRIORITY <<
+		    MPI2_REQ_DESCRIPT_FLAGS_TYPE_SHIFT);
 
-				ddi_put8(acc_handle, &scsi_raid_io->Function,
-				    MPI2_FUNCTION_SCSI_IO_REQUEST);
+		ddi_put16(acc_handle, &scsi_raid_io->DevHandle,
+		    local_map_ptr->raidMap.
+		    devHndlInfo[acmd->device_id].curDevHdl);
 
-				ReqDescUnion->SCSIIO.RequestFlags =
-				    (MPI2_REQ_DESCRIPT_FLAGS_HIGH_PRIORITY <<
-				    MPI2_REQ_DESCRIPT_FLAGS_TYPE_SHIFT);
+		/* Set regLockFlasgs to REGION_TYPE_BYPASS */
+		ddi_put8(acc_handle,
+		    &scsi_raid_io->RaidContext.regLockFlags, 0);
+		ddi_put64(acc_handle,
+		    &scsi_raid_io->RaidContext.regLockRowLBA, 0);
+		ddi_put32(acc_handle,
+		    &scsi_raid_io->RaidContext.regLockLength, 0);
+		ddi_put8(acc_handle,
+		    &scsi_raid_io->RaidContext.RAIDFlags,
+		    MR_RAID_FLAGS_IO_SUB_TYPE_SYSTEM_PD <<
+		    MR_RAID_CTX_RAID_FLAGS_IO_SUB_TYPE_SHIFT);
+		ddi_put16(acc_handle,
+		    &scsi_raid_io->RaidContext.timeoutValue,
+		    local_map_ptr->raidMap.fpPdIoTimeoutSec);
+		ddi_put16(acc_handle,
+		    &scsi_raid_io->RaidContext.ldTargetId,
+		    acmd->device_id);
+		ddi_put8(acc_handle,
+		    &scsi_raid_io->LUN[1], acmd->lun);
 
-				ddi_put16(acc_handle, &scsi_raid_io->DevHandle,
-				    local_map_ptr->raidMap.
-				    devHndlInfo[acmd->device_id].curDevHdl);
-
-
-				/* Set regLockFlasgs to REGION_TYPE_BYPASS */
-				ddi_put8(acc_handle,
-				    &scsi_raid_io->RaidContext.regLockFlags, 0);
-				ddi_put64(acc_handle,
-				    &scsi_raid_io->RaidContext.regLockRowLBA,
-				    0);
-				ddi_put32(acc_handle,
-				    &scsi_raid_io->RaidContext.regLockLength,
-				    0);
-				ddi_put8(acc_handle,
-				    &scsi_raid_io->RaidContext.RAIDFlags,
-				    MR_RAID_FLAGS_IO_SUB_TYPE_SYSTEM_PD <<
-				    MR_RAID_CTX_RAID_FLAGS_IO_SUB_TYPE_SHIFT);
-				ddi_put16(acc_handle,
-				    &scsi_raid_io->RaidContext.timeoutValue,
-				    local_map_ptr->raidMap.fpPdIoTimeoutSec);
-				ddi_put16(acc_handle,
-				    &scsi_raid_io->RaidContext.ldTargetId,
-				    acmd->device_id);
-				ddi_put8(acc_handle,
-				    &scsi_raid_io->LUN[1], acmd->lun);
-
-				/* Release SYNC MAP UPDATE lock */
-				mutex_exit(&instance->sync_map_mtx);
-
-			} else {
-				ddi_put8(acc_handle, &scsi_raid_io->Function,
-				    MPI2_FUNCTION_LD_IO_REQUEST);
-				ddi_put8(acc_handle,
-				    &scsi_raid_io->LUN[1], acmd->lun);
-				ddi_put16(acc_handle,
-				    &scsi_raid_io->DevHandle, acmd->device_id);
-				ReqDescUnion->SCSIIO.RequestFlags =
-				    (MPI2_REQ_DESCRIPT_FLAGS_SCSI_IO <<
-				    MPI2_REQ_DESCRIPT_FLAGS_TYPE_SHIFT);
-			}
-
-			/*
-			 * Set sense buffer physical address/length in
-			 * scsi_io_request.
-			 */
-			ddi_put32(acc_handle,
-			    &scsi_raid_io->SenseBufferLowAddress,
-			    cmd->sense_phys_addr1);
-			ddi_put8(acc_handle,
-			    &scsi_raid_io->SenseBufferLength, SENSE_LENGTH);
-
-			/* Construct SGL */
-			ddi_put8(acc_handle, &scsi_raid_io->SGLOffset0,
-			    offsetof(MPI2_RAID_SCSI_IO_REQUEST, SGL) / 4);
-
-			(void) mr_sas_tbolt_build_sgl(instance, acmd, cmd,
-			    scsi_raid_io, &datalen);
-
-			ddi_put32(acc_handle,
-			    &scsi_raid_io->DataLength, datalen);
-
-
-			con_log(CL_ANN, (CE_CONT,
-			    "tbolt_build_cmd CDB[0] =%x, TargetID =%x\n",
-			    pkt->pkt_cdbp[0], acmd->device_id));
-			con_log(CL_DLEVEL1, (CE_CONT,
-			    "data length = %x\n",
-			    scsi_raid_io->DataLength));
-			con_log(CL_DLEVEL1, (CE_CONT,
-			    "cdb length = %x\n",
-			    acmd->cmd_cdblen));
+		if (instance->fast_path_io &&
+		    instance->device_id == PCI_DEVICE_ID_LSI_INVADER) {
+			uint16_t IoFlags = ddi_get16(acc_handle,
+			    &scsi_raid_io->IoFlags);
+			IoFlags |= MPI25_SAS_DEVICE0_FLAGS_ENABLED_FAST_PATH;
+			ddi_put16(acc_handle, &scsi_raid_io->IoFlags, IoFlags);
 		}
-			break;
-		}
+		ddi_put16(acc_handle, &ReqDescUnion->SCSIIO.DevHandle,
+		    local_map_ptr->raidMap.
+		    devHndlInfo[acmd->device_id].curDevHdl);
 
+		/* Release SYNC MAP UPDATE lock */
+		mutex_exit(&instance->sync_map_mtx);
+#else
+		/* If no PD support, return here. */
+		return (cmd);
+#endif
 	}
+
+	/* Set sense buffer physical address/length in scsi_io_request. */
+	ddi_put32(acc_handle, &scsi_raid_io->SenseBufferLowAddress,
+	    cmd->sense_phys_addr1);
+	ddi_put8(acc_handle, &scsi_raid_io->SenseBufferLength, SENSE_LENGTH);
+
+	/* Construct SGL */
+	ddi_put8(acc_handle, &scsi_raid_io->SGLOffset0,
+	    offsetof(MPI2_RAID_SCSI_IO_REQUEST, SGL) / 4);
+
+	(void) mr_sas_tbolt_build_sgl(instance, acmd, cmd,
+	    scsi_raid_io, &datalen);
+
+	ddi_put32(acc_handle, &scsi_raid_io->DataLength, datalen);
+
+	con_log(CL_ANN, (CE_CONT,
+	    "tbolt_build_cmd CDB[0] =%x, TargetID =%x\n",
+	    pkt->pkt_cdbp[0], acmd->device_id));
+	con_log(CL_DLEVEL1, (CE_CONT,
+	    "data length = %x\n",
+	    scsi_raid_io->DataLength));
+	con_log(CL_DLEVEL1, (CE_CONT,
+	    "cdb length = %x\n",
+	    acmd->cmd_cdblen));
 
 	return (cmd);
 }
@@ -2545,8 +2519,8 @@ tbolt_complete_cmd(struct mrsas_instance *instance,
 				    PRIu64 " \n", instance->map_id);
 			}
 
-			if (MR_ValidateMapInfo(instance->ld_map[
-			    (instance->map_id & 1)],
+			if (MR_ValidateMapInfo(
+			    instance->ld_map[instance->map_id & 1],
 			    instance->load_balance_info)) {
 				instance->fast_path_io = 1;
 			} else {
@@ -2807,8 +2781,8 @@ mrsas_tbolt_get_ld_map_info(struct mrsas_instance *instance)
 	con_log(CL_ANN, (CE_NOTE,
 	    "size_map_info : 0x%x", size_map_info));
 
-	ci = instance->ld_map[(instance->map_id & 1)];
-	ci_h = instance->ld_map_phy[(instance->map_id & 1)];
+	ci = instance->ld_map[instance->map_id & 1];
+	ci_h = instance->ld_map_phy[instance->map_id & 1];
 
 	if (!ci) {
 		cmn_err(CE_WARN, "Failed to alloc mem for ld_map_info");
@@ -3107,13 +3081,14 @@ mrsas_tbolt_check_map_info(struct mrsas_instance *instance)
 
 	if (!mrsas_tbolt_get_ld_map_info(instance)) {
 
-		ld_map = instance->ld_map[(instance->map_id & 1)];
+		ld_map = instance->ld_map[instance->map_id & 1];
 
 		con_log(CL_ANN1, (CE_NOTE, "ldCount=%d, map size=%d",
 		    ld_map->raidMap.ldCount, ld_map->raidMap.totalSize));
 
-		if (MR_ValidateMapInfo(instance->ld_map[
-		    (instance->map_id & 1)], instance->load_balance_info)) {
+		if (MR_ValidateMapInfo(
+		    instance->ld_map[instance->map_id & 1],
+		    instance->load_balance_info)) {
 			con_log(CL_ANN,
 			    (CE_CONT, "MR_ValidateMapInfo success"));
 
