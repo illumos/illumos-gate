@@ -34,6 +34,17 @@ extern void test_failed(test_t, const char *format, ...);
 extern void test_passed(test_t);
 extern void test_debugf(test_t, const char *format, ...);
 extern void test_run(int nthr, test_func_t, void *arg, const char *, ...);
+extern void test_summary(void);
+
+extern void test_trim(char **);
+
+typedef int (*test_cfg_func_t)(char **fields, int nfields, char **err);
+
+/*
+ * Args list is array of pairs of const char *keyword, test_config_func_t,
+ * terminated by NULL.
+ */
+extern int test_load_config(test_t, const char *, ...);
 
 #ifdef	__cplusplus
 }

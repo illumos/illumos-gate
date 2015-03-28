@@ -1,0 +1,72 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2015 Garrett D'Amore <garrett@damore.org>
+#
+
+The configuration files in this directory are structured using the
+syntax defined in the ../README file.  They make use of the compilation
+environments declared in ../compilation.cfg, and are processed by the
+symbols test.
+
+We have organized the files by header file, that is the tests for symbols
+declared in a header file (e.g. <unistd.h> appear in a file based on that
+header file's name (e.g. unistd_h.cfg.)  This is purely for convenience.
+
+Within these various declarations, we have the following field types:
+
+<envs>    This is a list of compilation environments where the symbol
+          should be legal.  To indicate that the symbol must not be legal
+          an environment group can be prefixed with "-".  For example,
+          "SUS+ -SUSv4+" indicates a symbol that is legal in all SUS
+	  environments up to SUSv3, and was removed in SUSv4 and subsequent
+          versions of SUS.  As you can see, we can list multiple environments
+          or environment groups, and we can add or remove to previous groups
+          with subsequent ones.
+
+<name>    This is a symbol name.  It follows the rules for C symbol names.
+
+<header>  This is a header file, for example, unistd.h.  Conventionally,
+          the header files used should match the file where the test is
+          declared.
+
+<type>    This is a C type.  Function types can be declared without their
+          names, e.g. "void (*)(int)".  Structures (e.g. "struct stat") and
+          pointer types (e.g. "pthead_t *") are legal as well.
+
+Here are the types of declarations in these files:
+
+type | <name> | <header> | <envs>
+
+    Tests for a C type with <name>.  The test verifies that a variable with
+    this type can be declared when the <header> is included.
+
+value | <name> | <type> | <header> | <envs>
+
+    Tests for a value named <name>, of type <type>.  The test attempts to
+    assign the given value to a scratch variable declared with the given
+    type.  The value can be a macro or other C symbol.
+
+func | <name> | <type> | <type> [; <type> ]... | <header> | <envs>
+
+    Tests whether a function <name>, returning the first <type>, and
+    taking arguments of following <type> values, is declared.  Note that
+    the argument types are separated by semicolons.  For varargs style
+    functions, leave out the ... part.  For function declarations
+    that have no declared arguments, either void can specified, or
+    the type list can be omitted.
+
+Examples:
+
+    type | size_t | sys/types.h | ALL
+    value | NULL | void * | stdlib.h | ALL
+    func strnlen | int | const char *; int | string.h | ALL
