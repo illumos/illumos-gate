@@ -212,8 +212,8 @@ create_mpi2_frame_pool(struct mrsas_instance *instance)
 
 	if (mrsas_alloc_dma_obj(instance, &instance->mpi2_frame_pool_dma_obj,
 	    (uchar_t)DDI_STRUCTURE_LE_ACC) != 1) {
-		cmn_err(CE_WARN,
-		    "mr_sas: could not alloc mpi2 frame pool");
+		dev_err(instance->dip, CE_WARN,
+		    "could not alloc mpi2 frame pool");
 		return (DDI_FAILURE);
 	}
 
@@ -315,8 +315,8 @@ mrsas_tbolt_alloc_additional_dma_buffer(struct mrsas_instance *instance)
 
 	if (mrsas_alloc_dma_obj(instance, &instance->mfi_internal_dma_obj,
 	    (uchar_t)DDI_STRUCTURE_LE_ACC) != 1) {
-		cmn_err(CE_WARN,
-		    "mr_sas: could not alloc reply queue");
+		dev_err(instance->dip, CE_WARN,
+		    "could not alloc reply queue");
 		return (DDI_FAILURE);
 	}
 
@@ -339,7 +339,8 @@ mrsas_tbolt_alloc_additional_dma_buffer(struct mrsas_instance *instance)
 
 	if (mrsas_alloc_dma_obj(instance, &instance->mfi_evt_detail_obj,
 	    (uchar_t)DDI_STRUCTURE_LE_ACC) != 1) {
-		cmn_err(CE_WARN, "mrsas_tbolt_alloc_additional_dma_buffer: "
+		dev_err(instance->dip, CE_WARN,
+		    "mrsas_tbolt_alloc_additional_dma_buffer: "
 		    "could not allocate data transfer buffer.");
 		goto fail_tbolt_additional_buff;
 	}
@@ -364,7 +365,7 @@ mrsas_tbolt_alloc_additional_dma_buffer(struct mrsas_instance *instance)
 
 		if (mrsas_alloc_dma_obj(instance, &instance->ld_map_obj[i],
 		    (uchar_t)DDI_STRUCTURE_LE_ACC) != 1) {
-			cmn_err(CE_WARN,
+			dev_err(instance->dip, CE_WARN,
 			    "could not allocate data transfer buffer.");
 			goto fail_tbolt_additional_buff;
 		}
@@ -460,8 +461,7 @@ alloc_req_rep_desc(struct mrsas_instance *instance)
 
 	if (mrsas_alloc_dma_obj(instance, &instance->reply_desc_dma_obj,
 	    (uchar_t)DDI_STRUCTURE_LE_ACC) != 1) {
-		cmn_err(CE_WARN,
-		    "mr_sas: could not alloc reply queue");
+		dev_err(instance->dip, CE_WARN, "could not alloc reply queue");
 		return (DDI_FAILURE);
 	}
 
@@ -523,8 +523,8 @@ alloc_req_rep_desc(struct mrsas_instance *instance)
 
 	if (mrsas_alloc_dma_obj(instance, &instance->request_desc_dma_obj,
 	    (uchar_t)DDI_STRUCTURE_LE_ACC) != 1) {
-		cmn_err(CE_WARN,
-		    "mr_sas: could not alloc request queue desc");
+		dev_err(instance->dip, CE_WARN,
+		    "could not alloc request queue desc");
 		goto fail_undo_reply_queue;
 	}
 
@@ -669,7 +669,7 @@ alloc_space_for_mpi2(struct mrsas_instance *instance)
 {
 	/* Allocate command pool (memory for cmd_list & individual commands) */
 	if (mrsas_alloc_cmd_pool_tbolt(instance)) {
-		cmn_err(CE_WARN, "Error creating cmd pool");
+		dev_err(instance->dip, CE_WARN, "Error creating cmd pool");
 		return (DDI_FAILURE);
 	}
 
@@ -696,7 +696,7 @@ alloc_space_for_mpi2(struct mrsas_instance *instance)
 	/* Allocate Request and Reply descriptors Array */
 	/* Make sure the buffer is aligned to 8 for req/rep  descriptor Pool */
 	if (alloc_req_rep_desc(instance)) {
-		cmn_err(CE_WARN,
+		dev_err(instance->dip, CE_WARN,
 		    "Error, allocating memory for descripter-pool");
 		goto mpi2_undo_cmd_pool;
 	}
@@ -706,7 +706,7 @@ alloc_space_for_mpi2(struct mrsas_instance *instance)
 
 	/* Allocate MFI Frame pool - for MPI-MFI passthru commands */
 	if (create_mfi_frame_pool(instance)) {
-		cmn_err(CE_WARN,
+		dev_err(instance->dip, CE_WARN,
 		    "Error, allocating memory for MFI frame-pool");
 		goto mpi2_undo_descripter_pool;
 	}
@@ -719,7 +719,7 @@ alloc_space_for_mpi2(struct mrsas_instance *instance)
 	 */
 
 	if (create_mpi2_frame_pool(instance)) {
-		cmn_err(CE_WARN,
+		dev_err(instance->dip, CE_WARN,
 		    "Error, allocating memory for MPI2 Message-pool");
 		goto mpi2_undo_mfi_frame_pool;
 	}
@@ -740,7 +740,7 @@ alloc_space_for_mpi2(struct mrsas_instance *instance)
 
 	/* Allocate additional dma buffer */
 	if (mrsas_tbolt_alloc_additional_dma_buffer(instance)) {
-		cmn_err(CE_WARN,
+		dev_err(instance->dip, CE_WARN,
 		    "Error, allocating tbolt additional DMA buffer");
 		goto mpi2_undo_message_pool;
 	}
@@ -782,13 +782,13 @@ mrsas_init_adapter_tbolt(struct mrsas_instance *instance)
 	}
 
 	con_log(CL_ANN, (CE_NOTE, "mrsas_init_adapter_tbolt: "
-	    " instance->max_fw_cmds 0x%X.", instance->max_fw_cmds));
+	    "instance->max_fw_cmds 0x%X.", instance->max_fw_cmds));
 
 
 	/* create a pool of commands */
 	if (alloc_space_for_mpi2(instance) != DDI_SUCCESS) {
-		cmn_err(CE_WARN,
-		    " alloc_space_for_mpi2() failed.");
+		dev_err(instance->dip, CE_WARN,
+		    "alloc_space_for_mpi2() failed.");
 
 		return (DDI_FAILURE);
 	}
@@ -796,8 +796,8 @@ mrsas_init_adapter_tbolt(struct mrsas_instance *instance)
 	/* Send ioc init message */
 	/* NOTE: the issue_init call does FMA checking already. */
 	if (mrsas_issue_init_mpi2(instance) != DDI_SUCCESS) {
-		cmn_err(CE_WARN,
-		    " mrsas_issue_init_mpi2() failed.");
+		dev_err(instance->dip, CE_WARN,
+		    "mrsas_issue_init_mpi2() failed.");
 
 		goto fail_init_fusion;
 	}
@@ -836,7 +836,7 @@ mrsas_issue_init_mpi2(struct mrsas_instance *instance)
 
 	if (mrsas_alloc_dma_obj(instance, &init2_dma_obj,
 	    (uchar_t)DDI_STRUCTURE_LE_ACC) != 1) {
-		cmn_err(CE_WARN, "mr_sas_issue_init_mpi2 "
+		dev_err(instance->dip, CE_WARN, "mr_sas_issue_init_mpi2 "
 		    "could not allocate data transfer buffer.");
 		return (DDI_FAILURE);
 	}
@@ -1016,7 +1016,7 @@ mrsas_tbolt_ioc_init(struct mrsas_instance *instance, dma_obj_t *mpi2_dma_obj)
 
 	if (mrsas_alloc_dma_obj(instance, &instance->drv_ver_dma_obj,
 	    (uchar_t)DDI_STRUCTURE_LE_ACC) != 1) {
-		cmn_err(CE_WARN,
+		dev_err(instance->dip, CE_WARN,
 		    "fusion init: Could not allocate driver version buffer.");
 		return (DDI_FAILURE);
 	}
@@ -1122,7 +1122,7 @@ mrsas_tbolt_tran_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 
 	con_log(CL_DLEVEL1, (CE_NOTE, "chkpnt:%s:%d", __func__, __LINE__));
 	if (instance->deadadapter == 1) {
-		cmn_err(CE_WARN,
+		dev_err(instance->dip, CE_WARN,
 		    "mrsas_tran_start:TBOLT return TRAN_FATAL_ERROR "
 		    "for IO, as the HBA doesnt take any more IOs");
 		if (pkt) {
@@ -1164,7 +1164,7 @@ mrsas_tbolt_tran_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 
 	if ((pkt->pkt_flags & FLAG_NOINTR) == 0) {
 		if (instance->fw_outstanding > instance->max_fw_cmds) {
-			cmn_err(CE_WARN,
+			dev_err(instance->dip, CE_WARN,
 			    "Command Queue Full... Returning BUSY");
 			return_raid_msg_pkt(instance, cmd);
 			return (TRAN_BUSY);
@@ -1573,7 +1573,8 @@ mrsas_tbolt_build_cmd(struct mrsas_instance *instance, struct scsi_address *ap,
 
 			if (instance->tbolt &&
 			    ((lba_count * 512) > mrsas_tbolt_max_cap_maxxfer)) {
-				cmn_err(CE_WARN, " IO SECTOR COUNT exceeds "
+				dev_err(instance->dip, CE_WARN,
+				    "IO SECTOR COUNT exceeds "
 				    "controller limit 0x%x sectors",
 				    lba_count);
 			}
@@ -1599,7 +1600,8 @@ mrsas_tbolt_build_cmd(struct mrsas_instance *instance, struct scsi_address *ap,
 			if ((MR_TargetIdToLdGet(
 			    acmd->device_id, local_map_ptr) >=
 			    MAX_LOGICAL_DRIVES) || !instance->fast_path_io) {
-				cmn_err(CE_NOTE, "Fast Path NOT Possible, "
+				dev_err(instance->dip, CE_NOTE,
+				    "Fast Path NOT Possible, "
 				    "targetId >= MAX_LOGICAL_DRIVES || "
 				    "!instance->fast_path_io");
 				fp_possible = 0;
@@ -2379,7 +2381,8 @@ tbolt_complete_cmd(struct mrsas_instance *instance,
 			pkt->pkt_reason	= CMD_TRAN_ERR;
 			break;
 		case MFI_STAT_SCSI_IO_FAILED:
-			cmn_err(CE_WARN, "tbolt_complete_cmd: scsi_io failed");
+			dev_err(instance->dip, CE_WARN,
+			    "tbolt_complete_cmd: scsi_io failed");
 			pkt->pkt_reason	= CMD_TRAN_ERR;
 			break;
 		case MFI_STAT_SCSI_DONE_WITH_ERROR:
@@ -2416,7 +2419,7 @@ tbolt_complete_cmd(struct mrsas_instance *instance,
 			}
 			break;
 		case MFI_STAT_LD_OFFLINE:
-			cmn_err(CE_WARN,
+			dev_err(instance->dip, CE_WARN,
 			    "tbolt_complete_cmd: ld offline "
 			    "CDB[0]=0x%x targetId=0x%x devhandle=0x%x",
 			    /* UNDO: */
@@ -2466,7 +2469,8 @@ tbolt_complete_cmd(struct mrsas_instance *instance,
 		case MFI_STAT_INVALID_PARAMETER:
 		case MFI_STAT_INVALID_SEQUENCE_NUMBER:
 		default:
-			cmn_err(CE_WARN, "tbolt_complete_cmd: Unknown status!");
+			dev_err(instance->dip, CE_WARN,
+			    "tbolt_complete_cmd: Unknown status!");
 			pkt->pkt_reason	= CMD_TRAN_ERR;
 
 			break;
@@ -2509,14 +2513,14 @@ tbolt_complete_cmd(struct mrsas_instance *instance,
 			    "LDMAP sync command	SMID RECEIVED 0x%X",
 			    cmd->SMID));
 			if (cmd->frame->hdr.cmd_status != 0) {
-				cmn_err(CE_WARN,
+				dev_err(instance->dip, CE_WARN,
 				    "map sync failed, status = 0x%x.",
 				    cmd->frame->hdr.cmd_status);
 			} else {
 				instance->map_id++;
-				cmn_err(CE_NOTE,
+				con_log(CL_ANN1, (CE_NOTE,
 				    "map sync received, switched map_id to %"
-				    PRIu64 " \n", instance->map_id);
+				    PRIu64, instance->map_id));
 			}
 
 			if (MR_ValidateMapInfo(
@@ -2539,7 +2543,10 @@ tbolt_complete_cmd(struct mrsas_instance *instance,
 				(void) mrsas_tbolt_sync_map_info(instance);
 			}
 
-			cmn_err(CE_NOTE, "LDMAP sync completed.");
+			con_log(CL_ANN1, (CE_NOTE,
+			    "LDMAP sync completed, ldcount=%d",
+			    instance->ld_map[instance->map_id & 1]
+			    ->raidMap.ldCount));
 			mutex_exit(&instance->sync_map_mtx);
 			break;
 		}
@@ -2767,7 +2774,7 @@ mrsas_tbolt_get_ld_map_info(struct mrsas_instance *instance)
 	cmd = get_raid_msg_pkt(instance);
 
 	if (cmd == NULL) {
-		cmn_err(CE_WARN,
+		dev_err(instance->dip, CE_WARN,
 		    "Failed to get a cmd from free-pool in get_ld_map_info()");
 		return (DDI_FAILURE);
 	}
@@ -2785,7 +2792,8 @@ mrsas_tbolt_get_ld_map_info(struct mrsas_instance *instance)
 	ci_h = instance->ld_map_phy[instance->map_id & 1];
 
 	if (!ci) {
-		cmn_err(CE_WARN, "Failed to alloc mem for ld_map_info");
+		dev_err(instance->dip, CE_WARN,
+		    "Failed to alloc mem for ld_map_info");
 		return_raid_msg_pkt(instance, cmd);
 		return (-1);
 	}
@@ -2811,7 +2819,7 @@ mrsas_tbolt_get_ld_map_info(struct mrsas_instance *instance)
 		ret = 0;
 		con_log(CL_ANN1, (CE_NOTE, "Get LD Map Info success"));
 	} else {
-		cmn_err(CE_WARN, "Get LD Map Info failed");
+		dev_err(instance->dip, CE_WARN, "Get LD Map Info failed");
 		ret = -1;
 	}
 
@@ -3103,7 +3111,7 @@ mrsas_tbolt_check_map_info(struct mrsas_instance *instance)
 	}
 
 	instance->fast_path_io = 0;
-	cmn_err(CE_WARN, "MR_ValidateMapInfo failed");
+	dev_err(instance->dip, CE_WARN, "MR_ValidateMapInfo failed");
 	con_log(CL_ANN, (CE_NOTE,
 	    "instance->fast_path_io %d", instance->fast_path_io));
 
@@ -3119,7 +3127,7 @@ mrsas_tbolt_check_map_info(struct mrsas_instance *instance)
 void
 mrsas_tbolt_kill_adapter(struct mrsas_instance *instance)
 {
-	cmn_err(CE_NOTE, "TBOLT Kill adapter called");
+	dev_err(instance->dip, CE_NOTE, "TBOLT Kill adapter called");
 
 	if (instance->deadadapter == 1)
 		return;
@@ -3168,7 +3176,7 @@ mrsas_tbolt_reset_ppc(struct mrsas_instance *instance)
 	    "mrsas_tbolt_reset_ppc entered"));
 
 	if (instance->deadadapter == 1) {
-		cmn_err(CE_WARN, "mrsas_tbolt_reset_ppc: "
+		dev_err(instance->dip, CE_WARN, "mrsas_tbolt_reset_ppc: "
 		    "no more resets as HBA has been marked dead ");
 		return (DDI_FAILURE);
 	}
@@ -3211,7 +3219,7 @@ retry_reset:
 		delay(100 * drv_usectohz(MILLISEC));
 		status = RD_TBOLT_HOST_DIAG(instance);
 		if (retry++ == 100) {
-			cmn_err(CE_WARN,
+			dev_err(instance->dip, CE_WARN,
 			    "mrsas_tbolt_reset_ppc:"
 			    "resetadapter bit is set already "
 			    "check retry count %d", retry);
@@ -3235,9 +3243,8 @@ retry_reset:
 			/* Dont call kill adapter here */
 			/* RESET BIT ADAPTER is cleared by firmare */
 			/* mrsas_tbolt_kill_adapter(instance); */
-			cmn_err(CE_WARN,
-			    "mr_sas %d: %s(): RESET FAILED; return failure!!!",
-			    instance->instance, __func__);
+			dev_err(instance->dip, CE_WARN,
+			    "%s(): RESET FAILED; return failure!!!", __func__);
 			return (DDI_FAILURE);
 		}
 	}
@@ -3254,7 +3261,7 @@ retry_reset:
 		abs_state = instance->func_ptr->read_fw_status_reg(instance);
 	}
 	if (abs_state <= MFI_STATE_FW_INIT) {
-		cmn_err(CE_WARN,
+		dev_err(instance->dip, CE_WARN,
 		    "mrsas_tbolt_reset_ppc: firmware state < MFI_STATE_FW_INIT"
 		    "state = 0x%x, RETRY RESET.", abs_state);
 		goto retry_reset;
@@ -3282,18 +3289,18 @@ retry_reset:
 			instance->fw_fault_count_after_ocr++;
 			if (instance->fw_fault_count_after_ocr
 			    < MAX_FW_RESET_COUNT) {
-				cmn_err(CE_WARN, "mrsas_tbolt_reset_ppc: "
+				dev_err(instance->dip, CE_WARN,
+				    "mrsas_tbolt_reset_ppc: "
 				    "FW is in fault after OCR count %d "
 				    "Retry Reset",
 				    instance->fw_fault_count_after_ocr);
 				goto retry_reset;
 
 			} else {
-				cmn_err(CE_WARN, "mrsas %d: %s:"
+				dev_err(instance->dip, CE_WARN, "%s:"
 				    "Max Reset Count exceeded >%d"
 				    "Mark HBA as bad, KILL adapter",
-				    instance->instance, __func__,
-				    MAX_FW_RESET_COUNT);
+				    __func__, MAX_FW_RESET_COUNT);
 
 				mrsas_tbolt_kill_adapter(instance);
 				return (DDI_FAILURE);
@@ -3311,7 +3318,7 @@ retry_reset:
 	    "Calling mrsas_issue_init_mpi2"));
 	abs_state = mrsas_issue_init_mpi2(instance);
 	if (abs_state == (uint32_t)DDI_FAILURE) {
-		cmn_err(CE_WARN, "mrsas_tbolt_reset_ppc: "
+		dev_err(instance->dip, CE_WARN, "mrsas_tbolt_reset_ppc: "
 		    "INIT failed Retrying Reset");
 		goto retry_reset;
 	}
@@ -3380,8 +3387,9 @@ mrsas_tbolt_sync_map_info(struct mrsas_instance *instance)
 	cmd = get_raid_msg_pkt(instance);
 
 	if (cmd == NULL) {
-		cmn_err(CE_WARN, "Failed to get a cmd from free-pool in "
-		    "mrsas_tbolt_sync_map_info(). ");
+		dev_err(instance->dip, CE_WARN,
+		    "Failed to get a cmd from free-pool in "
+		    "mrsas_tbolt_sync_map_info().");
 		return (DDI_FAILURE);
 	}
 
@@ -3474,7 +3482,7 @@ abort_syncmap_cmd(struct mrsas_instance *instance,
 	cmd = get_raid_msg_mfi_pkt(instance);
 
 	if (!cmd) {
-		cmn_err(CE_WARN,
+		dev_err(instance->dip, CE_WARN,
 		    "Failed to get a cmd from free-pool abort_syncmap_cmd().");
 		return (DDI_FAILURE);
 	}
@@ -3573,9 +3581,9 @@ mrsas_tbolt_config_pd(struct mrsas_instance *instance, uint16_t tgt,
 
 		if (scsi_hba_probe(sd, NULL) == SCSIPROBE_EXISTS) {
 			rval = mrsas_config_scsi_device(instance, sd, ldip);
-			con_log(CL_DLEVEL1, (CE_NOTE,
-			    "Phys. device found: tgt %d dtype %d: %s",
-			    tgt, dtype, sd->sd_inq->inq_vid));
+			dev_err(instance->dip, CE_CONT,
+			    "?Phys. device found: tgt %d dtype %d: %s\n",
+			    tgt, dtype, sd->sd_inq->inq_vid);
 		} else {
 			rval = NDI_FAILURE;
 			con_log(CL_DLEVEL1, (CE_NOTE, "Phys. device Not found "
@@ -3591,7 +3599,7 @@ mrsas_tbolt_config_pd(struct mrsas_instance *instance, uint16_t tgt,
 		kmem_free(sd, sizeof (struct scsi_device));
 	} else {
 		con_log(CL_ANN1, (CE_NOTE,
-		    "Device not supported: tgt %d lun %d dtype %d",
+		    "?Device not supported: tgt %d lun %d dtype %d",
 		    tgt, lun, dtype));
 		rval = NDI_FAILURE;
 	}
