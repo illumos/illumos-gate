@@ -446,7 +446,8 @@ destroy_server_sock(int servfd, char *nm)
  * the ident string from a client without saving it.
  */
 static int
-get_client_ident(int clifd, pid_t *pid, char *locale, size_t locale_len)
+get_client_ident(int clifd, pid_t *pid, char *locale, size_t locale_len,
+    uint_t *flagsp)
 {
 	char buf[BUFSIZ], *bufp;
 	size_t buflen = sizeof (buf);
@@ -486,7 +487,7 @@ get_client_ident(int clifd, pid_t *pid, char *locale, size_t locale_len)
 	}
 
 	/*
-	 * Parse buffer for message of the form: IDENT <pid> <locale>
+	 * Parse buffer for message of the form: IDENT <pid> <locale> <flags>
 	 */
 	bufp = buf;
 	if (strncmp(bufp, "IDENT ", 6) != 0)
@@ -499,13 +500,18 @@ get_client_ident(int clifd, pid_t *pid, char *locale, size_t locale_len)
 
 	while (*bufp != '\0' && isspace(*bufp))
 		bufp++;
+	buflen = strlen(bufp) - 1;
+	bufp[buflen - 1] = '\0';
 	(void) strlcpy(locale, bufp, locale_len);
+
+	*flagsp = atoi(&bufp[buflen]);
 
 	return (0);
 }
 
 static int
-accept_client(int servfd, pid_t *pid, char *locale, size_t locale_len)
+accept_client(int servfd, pid_t *pid, char *locale, size_t locale_len,
+    uint_t *flagsp)
 {
 	int connfd;
 	struct sockaddr_un cliaddr;
@@ -517,7 +523,8 @@ accept_client(int servfd, pid_t *pid, char *locale, size_t locale_len)
 	if (connfd == -1)
 		return (-1);
 	if (pid != NULL) {
-		if (get_client_ident(connfd, pid, locale, locale_len) == -1) {
+		if (get_client_ident(connfd, pid, locale, locale_len, flagsp)
+		    == -1) {
 			(void) shutdown(connfd, SHUT_RDWR);
 			(void) close(connfd);
 			return (-1);
@@ -546,7 +553,7 @@ reject_client(int servfd, pid_t clientpid)
 	/*
 	 * After getting its ident string, tell client to get lost.
 	 */
-	if (get_client_ident(connfd, NULL, NULL, 0) == 0) {
+	if (get_client_ident(connfd, NULL, NULL, 0, NULL) == 0) {
 		(void) snprintf(nak, sizeof (nak), "%lu\n",
 		    clientpid);
 		(void) write(connfd, nak, strlen(nak));
@@ -705,6 +712,7 @@ do_zfd_io(int gzservfd, int gzerrfd, int stdinfd, int stdoutfd, int stderrfd)
 	int pollerr = 0;
 	char clilocale[MAXPATHLEN];
 	pid_t clipid = 0;
+	uint_t flags = 0;
 
 	/* client, watch for read events */
 	pollfds[0].fd = clifd;
@@ -745,6 +753,12 @@ do_zfd_io(int gzservfd, int gzerrfd, int stdinfd, int stdoutfd, int stderrfd)
 
 		/* event from client side */
 		if (pollfds[0].revents) {
+			if (pollfds[0].revents & POLLHUP &&
+			    flags & ZLOGIN_ZFD_EOF) {
+				/* Let the client know */
+				(void) ioctl(stdinfd, ZFD_EOF);
+			}
+
 			if (pollfds[0].revents &
 			    (POLLIN | POLLRDNORM | POLLRDBAND | POLLPRI)) {
 				errno = 0;
@@ -843,7 +857,7 @@ do_zfd_io(int gzservfd, int gzerrfd, int stdinfd, int stdoutfd, int stderrfd)
 				reject_client(gzservfd, clipid);
 
 			} else if ((clifd = accept_client(gzservfd, &clipid,
-			    clilocale, sizeof (clilocale))) != -1) {
+			    clilocale, sizeof (clilocale), &flags)) != -1) {
 				pollfds[0].fd = clifd;
 
 			} else {
@@ -867,8 +881,8 @@ do_zfd_io(int gzservfd, int gzerrfd, int stdinfd, int stdoutfd, int stderrfd)
 			}
 
 			assert(clierrfd == -1);
-			if ((clierrfd = accept_client(gzerrfd, NULL, NULL, 0))
-			    != -1) {
+			if ((clierrfd = accept_client(gzerrfd, NULL, NULL, 0,
+			    NULL)) != -1) {
 				/*
 				 * Once connected, we no longer poll on the
 				 * gzerrfd since the CLI handshake takes place

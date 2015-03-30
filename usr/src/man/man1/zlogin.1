@@ -13,15 +13,15 @@
 .\" Portions Copyright [yyyy] [name of copyright owner]
 .\" Copyright 2013 DEY Storage Systems, Inc.
 .\" Copyright (c) 2014 Gary Mills
-.\" Copyright (c) 2014, Joyent, Inc. All Rights Reserved
+.\" Copyright (c) 2015, Joyent, Inc. All Rights Reserved
 .\" Copyright 2015 Nexenta Systems, Inc. All rights reserved.
-.TH ZLOGIN 1 "Mar 17, 2015"
+.TH ZLOGIN 1 "Mar 30, 2015"
 .SH NAME
 zlogin \- enter a zone
 .SH SYNOPSIS
 .LP
 .nf
-\fBzlogin\fR [\fB-dCEIQ\fR] [\fB-e\fR \fIc\fR] [\fB-l\fR \fIusername\fR] \fIzonename\fR
+\fBzlogin\fR [\fB-dCEINQ\fR] [\fB-e\fR \fIc\fR] [\fB-l\fR \fIusername\fR] \fIzonename\fR
 .fi
 
 .LP
@@ -175,6 +175,16 @@ option, the zone username used is "root". This option is invalid if the
 Redirect the input of \fBzlogin\fR to \fB/dev/null\fR.
 This option is useful when the command running in the local zone
 and the shell which invokes \fBzlogin\fR both read from standard input.
+.RE
+
+.sp
+.ne 2
+.na
+\fB-N\fR
+.ad
+.RS 15n
+Nohup. This may only be used with the -I option to avoid sending EOF to the zfd
+device when zlogin's stdin receives EOF.
 .RE
 
 .sp
