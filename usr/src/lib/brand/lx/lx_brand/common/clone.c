@@ -421,10 +421,26 @@ lx_clone(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 		_sigoff();
 		lx_stack_prefork();
 		if (flags & LX_CLONE_VFORK) {
+			lx_sighandlers_t saved;
+
+			/*
+			 * Because we keep our signal disposition at user-land
+			 * (and in memory), we must prevent it from being
+			 * clobbered should our vforked child change the
+			 * disposition (e.g., via sigaction()) before releasing
+			 * the address space.  We preserve our disposition by
+			 * taking a snapshot of it before the vfork and
+			 * restoring it afterwards -- which we can get away
+			 * with because we know that we aren't executing
+			 * concurrently with our child.
+			 */
+			lx_sighandlers_save(&saved);
 			is_vforked++;
 			rval = vforkx(fork_flags);
-			if (rval != 0)
+			if (rval != 0) {
 				is_vforked--;
+				lx_sighandlers_restore(&saved);
+			}
 		} else {
 			rval = forkx(fork_flags);
 		}
