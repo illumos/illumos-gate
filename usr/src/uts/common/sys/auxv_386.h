@@ -87,7 +87,7 @@ extern "C" {
 #define	AV_386_2_RDRAND		0x00002	/* RDRAND insn */
 #define	AV_386_2_BMI1		0x00004 /* BMI1 insns */
 #define	AV_386_2_BMI2		0x00008 /* BMI2 insns */
-#define	AV_386_2_FMA		0x00010	/* FMA3 insns */
+#define	AV_386_2_FMA		0x00010	/* FMA insns */
 #define	AV_386_2_AVX2		0x00020	/* AVX2 insns */
 
 #define	FMT_AV_386_2							\

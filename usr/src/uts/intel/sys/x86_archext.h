@@ -224,7 +224,7 @@ extern "C" {
 
 /*
  * Intel also uses cpuid leaf 7 to have additional instructions and features.
- * Like some other leaves, but unlinke the current ones we care about, it
+ * Like some other leaves, but unlink the current ones we care about, it
  * requires us to specify both a leaf in %eax and a sub-leaf in %ecx. To deal
  * with the potential use of additional sub-leaves in the future, we now
  * specifically label the EBX features with their leaf and sub-leaf.
@@ -405,7 +405,7 @@ extern "C" {
 #define	X86FSET_AVX2		41
 #define	X86FSET_BMI1		42
 #define	X86FSET_BMI2		43
-#define	X86FSET_FMA3		44
+#define	X86FSET_FMA		44
 
 /*
  * flags to patch tsc_read routine.

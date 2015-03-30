@@ -20,6 +20,7 @@
  */
 
 /*
+ * Copyright 2015 OmniTI Computer Consulting, Inc.  All rights reserved.
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -82,6 +83,10 @@ smbios_bufopen(const smbios_entry_t *ep, const void *buf, size_t len,
 	switch (version) {
 	case SMB_VERSION_23:
 	case SMB_VERSION_24:
+	case SMB_VERSION_25:
+	case SMB_VERSION_26:
+	case SMB_VERSION_27:
+	case SMB_VERSION_28:
 		break;
 	default:
 		return (smb_open_error(shp, errp, ESMB_VERSION));

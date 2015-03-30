@@ -18,9 +18,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -81,6 +82,9 @@
 #define	backup1		"statmon/sm.bak/"
 #define	state1		"statmon/state"
 
+extern int	daemonize_init(void);
+extern void	daemonize_fini(int fd);
+
 /*
  * User and group IDs to run as.  These are hardwired, rather than looked
  * up at runtime, because they are very unlikely to change and because they
@@ -120,11 +124,14 @@ int  pathix = 0;  /* # of -p entries */
 mutex_t crash_lock;
 int die;
 int in_crash;
-cond_t crash_finish;
 mutex_t sm_trylock;
 rwlock_t thr_rwlock;
 cond_t retrywait;
 mutex_t name_addrlock;
+
+mutex_t merges_lock;
+cond_t merges_cond;
+boolean_t in_merges;
 
 /* forward references */
 static void set_statmon_owner(void);
@@ -138,7 +145,7 @@ static int nftw_owner(const char *, const struct stat *, int, struct FTW *);
  * 		SM_STAT
  * 			returns stat_fail to caller
  * 		SM_MON
- * 			adds an entry to the monitor_q and the record_q
+ * 			adds an entry to the monitor_q and the record_q.
  *			This message is sent by the server lockd to the server
  *			statd, to indicate that a new client is to be monitored.
  *			It is also sent by the server lockd to the client statd
@@ -150,7 +157,7 @@ static int nftw_owner(const char *, const struct stat *, int, struct FTW *);
  * 			monitor_q and the record_q.  Our statd has this
  * 			disabled.
  * 		SM_SIMU_CRASH
- * 			simulate a crash.  removes everything from the
+ * 			simulate a crash.  Removes everything from the
  * 			record_q and the recovery_q, then calls statd_init()
  * 			to restart things.  This message is sent by the server
  *			lockd to the server statd to have all clients notified
@@ -184,9 +191,7 @@ static int nftw_owner(const char *, const struct stat *, int, struct FTW *);
  */
 
 static void
-sm_prog_1(rqstp, transp)
-	struct svc_req *rqstp;
-	SVCXPRT *transp;
+sm_prog_1(struct svc_req *rqstp, SVCXPRT *transp)
 {
 	union {
 		struct sm_name sm_stat_1_arg;
@@ -299,29 +304,29 @@ sm_prog_1(rqstp, transp)
  * Remove all files under directory path_dir.
  */
 static int
-remove_dir(path_dir)
-char *path_dir;
+remove_dir(char *path_dir)
 {
 	DIR	*dp;
 	struct dirent   *dirp;
 	char tmp_path[MAXPATHLEN];
 
-	if ((dp = opendir(path_dir)) == (DIR *)NULL) {
+	if ((dp = opendir(path_dir)) == NULL) {
 		if (debug)
-		    syslog(LOG_ERR,
-			"warning: open directory %s failed: %m\n", path_dir);
+			syslog(LOG_ERR,
+			    "warning: open directory %s failed: %m\n",
+			    path_dir);
 		return (1);
 	}
 
 	while ((dirp = readdir(dp)) != NULL) {
 		if (strcmp(dirp->d_name, ".") != 0 &&
-			strcmp(dirp->d_name, "..") != 0) {
+		    strcmp(dirp->d_name, "..") != 0) {
 			if (strlen(path_dir) + strlen(dirp->d_name) +2 >
-				MAXPATHLEN) {
+			    MAXPATHLEN) {
 
-				syslog(LOG_ERR,
-		"statd: remove dir %s/%s failed.  Pathname too long.\n",
-				path_dir, dirp->d_name);
+				syslog(LOG_ERR, "statd: remove dir %s/%s "
+				    "failed.  Pathname too long.\n", path_dir,
+				    dirp->d_name);
 
 				continue;
 			}
@@ -341,9 +346,7 @@ char *path_dir;
  * Symlinks, if any, are preserved.
  */
 void
-copydir_from_to(from_dir, to_dir)
-char *from_dir;
-char *to_dir;
+copydir_from_to(char *from_dir, char *to_dir)
 {
 	int	n;
 	DIR	*dp;
@@ -351,16 +354,17 @@ char *to_dir;
 	char rname[MAXNAMELEN + 1];
 	char path[MAXPATHLEN+MAXNAMELEN+2];
 
-	if ((dp = opendir(from_dir)) == (DIR *)NULL) {
+	if ((dp = opendir(from_dir)) == NULL) {
 		if (debug)
-		    syslog(LOG_ERR,
-			"warning: open directory %s failed: %m\n", from_dir);
+			syslog(LOG_ERR,
+			    "warning: open directory %s failed: %m\n",
+			    from_dir);
 		return;
 	}
 
 	while ((dirp = readdir(dp)) != NULL) {
 		if (strcmp(dirp->d_name, ".") == 0 ||
-			strcmp(dirp->d_name, "..") == 0) {
+		    strcmp(dirp->d_name, "..") == 0) {
 			continue;
 		}
 
@@ -376,9 +380,8 @@ char *to_dir;
 			n = readlink(path, rname, MAXNAMELEN);
 			if (n <= 0) {
 				if (debug >= 2) {
-				    (void) printf(
-					"copydir_from_to: can't read link %s\n",
-					path);
+					(void) printf("copydir_from_to: can't "
+					    "read link %s\n", path);
 				}
 				continue;
 			}
@@ -422,7 +425,7 @@ init_hostname(void)
 
 	host_name_count = lifn.lifn_count;
 
-	host_name = (char **)malloc(host_name_count * sizeof (char *));
+	host_name = malloc(host_name_count * sizeof (char *));
 	if (host_name == NULL) {
 		perror("statd -a can't get ip configuration\n");
 		close(sock);
@@ -430,6 +433,28 @@ init_hostname(void)
 	}
 	close(sock);
 	return (0);
+}
+
+static void
+thr_statd_merges(void)
+{
+	/*
+	 * Get other aliases from each interface.
+	 */
+	merge_hosts();
+
+	/*
+	 * Get all of the configured IP addresses.
+	 */
+	merge_ips();
+
+	/*
+	 * Notify the waiters.
+	 */
+	(void) mutex_lock(&merges_lock);
+	in_merges = B_FALSE;
+	(void) cond_broadcast(&merges_cond);
+	(void) mutex_unlock(&merges_lock);
 }
 
 int
@@ -442,6 +467,7 @@ main(int argc, char *argv[])
 	struct rlimit rl;
 	int mode;
 	int sz;
+	int pipe_fd = -1;
 	int connmaxrec = RPC_MAXDATASIZE;
 
 	addrix = 0;
@@ -552,20 +578,8 @@ main(int argc, char *argv[])
 	(void) enable_extended_FILE_stdio(-1, -1);
 
 	if (!debug) {
-		ppid = fork();
-		if (ppid == -1) {
-			(void) fprintf(stderr, "statd: fork failure\n");
-			(void) fflush(stderr);
-			abort();
-		}
-		if (ppid != 0) {
-			exit(0);
-		}
-		closefrom(0);
-		(void) open("/dev/null", O_RDONLY);
-		(void) open("/dev/null", O_WRONLY);
-		(void) dup(1);
-		(void) setsid();
+		pipe_fd = daemonize_init();
+
 		openlog("statd", LOG_PID, LOG_DAEMON);
 	}
 
@@ -588,11 +602,20 @@ main(int argc, char *argv[])
 		exit(0);
 	}
 
-	/* Get other aliases from each interface. */
-	merge_hosts();
+	mutex_init(&merges_lock, USYNC_THREAD, NULL);
+	cond_init(&merges_cond, USYNC_THREAD, NULL);
+	in_merges = B_TRUE;
 
-	/* Get all of the configured IP addresses. */
-	merge_ips();
+	/*
+	 * Create thr_statd_merges() thread to populate the host_name list
+	 * asynchronously.
+	 */
+	if (thr_create(NULL, 0, (void *(*)(void *))thr_statd_merges, NULL,
+	    THR_DETACHED, NULL) != 0) {
+		syslog(LOG_ERR, "statd: unable to create thread for "
+		    "thr_statd_merges().");
+		exit(1);
+	}
 
 	/*
 	 * Set to automatic mode such that threads are automatically
@@ -614,14 +637,14 @@ main(int argc, char *argv[])
 	}
 
 	if (!svc_create(sm_prog_1, SM_PROG, SM_VERS, "netpath")) {
-		syslog(LOG_ERR,
-	    "statd: unable to create (SM_PROG, SM_VERS) for netpath.");
+		syslog(LOG_ERR, "statd: unable to create (SM_PROG, SM_VERS) "
+		    "for netpath.");
 		exit(1);
 	}
 
 	if (!svc_create(sm_prog_1, NSM_ADDR_PROGRAM, NSM_ADDR_V1, "netpath")) {
-		syslog(LOG_ERR,
-	"statd: unable to create (NSM_ADDR_PROGRAM, NSM_ADDR_V1) for netpath.");
+		syslog(LOG_ERR, "statd: unable to create (NSM_ADDR_PROGRAM, "
+		    "NSM_ADDR_V1) for netpath.");
 	}
 
 	/*
@@ -655,7 +678,6 @@ main(int argc, char *argv[])
 	rwlock_init(&thr_rwlock, USYNC_THREAD, NULL);
 	mutex_init(&crash_lock, USYNC_THREAD, NULL);
 	mutex_init(&name_addrlock, USYNC_THREAD, NULL);
-	cond_init(&crash_finish, USYNC_THREAD, NULL);
 	cond_init(&retrywait, USYNC_THREAD, NULL);
 	sm_inithash();
 	die = 0;
@@ -668,12 +690,17 @@ main(int argc, char *argv[])
 	in_crash = 1;
 	statd_init();
 
+	/*
+	 * statd is up and running as far as we are concerned.
+	 */
+	daemonize_fini(pipe_fd);
+
 	if (debug)
 		(void) printf("Starting svc_run\n");
 	svc_run();
 	syslog(LOG_ERR, "statd: svc_run returned\n");
 	/* NOTREACHED */
-	thr_exit((void *) 1);
+	thr_exit((void *)1);
 	return (0);
 
 }
@@ -714,7 +741,7 @@ set_statmon_owner(void)
 	}
 
 	__fini_daemon_priv(PRIV_PROC_EXEC, PRIV_PROC_SESSION,
-	    PRIV_FILE_LINK_ANY, PRIV_PROC_INFO, (char *)NULL);
+	    PRIV_FILE_LINK_ANY, PRIV_PROC_INFO, NULL);
 }
 
 /*
@@ -724,7 +751,7 @@ set_statmon_owner(void)
  */
 
 static void
-copy_client_names()
+copy_client_names(void)
 {
 	int i;
 	char buf[MAXPATHLEN+SM_MAXPATHLEN];

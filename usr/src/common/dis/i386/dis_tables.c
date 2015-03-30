@@ -237,7 +237,7 @@ enum {
 	VMxo,		/* VMx instruction with optional prefix */
 	SVM,		/* AMD SVM instructions */
 	BLS,		/* BLSR, BLSMSK, BLSI */
-	FMA3		/* FMA instructions, all VEX_RMrX */
+	FMA		/* FMA instructions, all VEX_RMrX */
 };
 
 /*
@@ -1535,19 +1535,19 @@ const instable_t dis_opAVX660F38[256] = {
 /* XXX All of the gather things are a bit wrong. We're not properly changing the last character */
 
 /*  [90]  */	TNSZ("vpgatherd",VEX_SbVM,16),TNSZ("vpgatherq",VEX_SbVM,16),TNSZ("vgatherdp",VEX_SbVM,16),TNSZ("vgatherqp",VEX_SbVM,16),
-/*  [94]  */	INVALID,		INVALID,		TNSZ("vfmaddsub132p",FMA3,16),TNSZ("vfmsubadd132p",FMA3,16),
-/*  [98]  */	TNSZ("vfmadd132p",FMA3,16),TNSZ("vfmadd132s",FMA3,16),TNSZ("vfmsub132p",FMA3,16),TNSZ("vfmsub132s",FMA3,16),
-/*  [9C]  */	TNSZ("vfnmadd132p",FMA3,16),TNSZ("vfnmadd132s",FMA3,16),TNSZ("vfnmsub132p",FMA3,16),TNSZ("vfnmsub132s",FMA3,16),
+/*  [94]  */	INVALID,		INVALID,		TNSZ("vfmaddsub132p",FMA,16),TNSZ("vfmsubadd132p",FMA,16),
+/*  [98]  */	TNSZ("vfmadd132p",FMA,16),TNSZ("vfmadd132s",FMA,16),TNSZ("vfmsub132p",FMA,16),TNSZ("vfmsub132s",FMA,16),
+/*  [9C]  */	TNSZ("vfnmadd132p",FMA,16),TNSZ("vfnmadd132s",FMA,16),TNSZ("vfnmsub132p",FMA,16),TNSZ("vfnmsub132s",FMA,16),
 
 /*  [A0]  */	INVALID,		INVALID,		INVALID,		INVALID,
-/*  [A4]  */	INVALID,		INVALID,		TNSZ("vfmaddsub213p",FMA3,16),TNSZ("vfmsubadd213p",FMA3,16),
-/*  [A8]  */	TNSZ("vfmadd213p",FMA3,16),TNSZ("vfmadd213s",FMA3,16),TNSZ("vfmsub213p",FMA3,16),TNSZ("vfmsub213s",FMA3,16),
-/*  [AC]  */	TNSZ("vfnmadd213p",FMA3,16),TNSZ("vfnmadd213s",FMA3,16),TNSZ("vfnmsub213p",FMA3,16),TNSZ("vfnmsub213s",FMA3,16),
+/*  [A4]  */	INVALID,		INVALID,		TNSZ("vfmaddsub213p",FMA,16),TNSZ("vfmsubadd213p",FMA,16),
+/*  [A8]  */	TNSZ("vfmadd213p",FMA,16),TNSZ("vfmadd213s",FMA,16),TNSZ("vfmsub213p",FMA,16),TNSZ("vfmsub213s",FMA,16),
+/*  [AC]  */	TNSZ("vfnmadd213p",FMA,16),TNSZ("vfnmadd213s",FMA,16),TNSZ("vfnmsub213p",FMA,16),TNSZ("vfnmsub213s",FMA,16),
 
 /*  [B0]  */	INVALID,		INVALID,		INVALID,		INVALID,
-/*  [B4]  */	INVALID,		INVALID,		TNSZ("vfmaddsub231p",FMA3,16),TNSZ("vfmsubadd231p",FMA3,16),
-/*  [B8]  */	TNSZ("vfmadd231p",FMA3,16),TNSZ("vfmadd231s",FMA3,16),TNSZ("vfmsub231p",FMA3,16),TNSZ("vfmsub231s",FMA3,16),
-/*  [BC]  */	TNSZ("vfnmadd231p",FMA3,16),TNSZ("vfnmadd231s",FMA3,16),TNSZ("vfnmsub231p",FMA3,16),TNSZ("vfnmsub231s",FMA3,16),
+/*  [B4]  */	INVALID,		INVALID,		TNSZ("vfmaddsub231p",FMA,16),TNSZ("vfmsubadd231p",FMA,16),
+/*  [B8]  */	TNSZ("vfmadd231p",FMA,16),TNSZ("vfmadd231s",FMA,16),TNSZ("vfmsub231p",FMA,16),TNSZ("vfmsub231s",FMA,16),
+/*  [BC]  */	TNSZ("vfnmadd231p",FMA,16),TNSZ("vfnmadd231s",FMA,16),TNSZ("vfnmsub231p",FMA,16),TNSZ("vfnmsub231s",FMA,16),
 
 /*  [C0]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [C4]  */	INVALID,		INVALID,		INVALID,		INVALID,
@@ -2936,6 +2936,10 @@ dtrace_disx86(dis86_t *x, uint_t cpu_mode)
 	uint_t vex_L;
 	dis_gather_regs_t *vreg;
 
+#ifdef	DIS_TEXT
+	/* Instruction name for BLS* family of instructions */
+	char *blsinstr;
+#endif
 
 	size_t	off;
 
@@ -4711,22 +4715,22 @@ xmmprm:
 		dtrace_get_operand(x, mode, r_m, wbit, 0);
 		break;
 	case VEX_RMrX:
-	case FMA3:
+	case FMA:
 		/* ModR/M.reg := op(VEX.vvvv, ModR/M.r/m) */
 		x->d86_numopnds = 3;
 		dtrace_get_modrm(x, &mode, &reg, &r_m);
 		dtrace_vex_adjust(vex_byte1, mode, &reg, &r_m);
 
 		/*
-		 * In classic Intel fashion, the opcodes for all of the FMA3
+		 * In classic Intel fashion, the opcodes for all of the FMA
 		 * instructions all have two possible mnemonics which vary by
 		 * one letter, which is selected based on the value of the wbit.
 		 * When wbit is one, they have the 'd' suffix and when 'wbit' is
-		 * 0, they have the 's' suffix. Otherwise, the FMA3 instructions
+		 * 0, they have the 's' suffix. Otherwise, the FMA instructions
 		 * are all a standard VEX_RMrX.
 		 */
 #ifdef DIS_TEXT
-		if (dp->it_adrmode == FMA3) {
+		if (dp->it_adrmode == FMA) {
 			size_t len = strlen(dp->it_name);
 			(void) strncpy(x->d86_mnem, dp->it_name, OPLEN);
 			if (len + 1 < OPLEN) {
@@ -4735,7 +4739,6 @@ xmmprm:
 			}
 		}
 #endif
-
 
 		if (mode != REG_ONLY) {
 			if ((dp == &dis_opAVXF20F[0x10]) ||
@@ -5149,17 +5152,21 @@ L_VEX_RM:
 		dtrace_get_modrm(x, &mode, &reg, &r_m);
 		dtrace_vex_adjust(vex_byte1, mode, &reg, &r_m);
 
-		char *blsinstr;
-
 		switch (reg) {
 		case 1:
+#ifdef	DIS_TEXT
 			blsinstr = "blsr";
+#endif
 			break;
 		case 2:
+#ifdef	DIS_TEXT
 			blsinstr = "blsmsk";
+#endif
 			break;
 		case 3:
+#ifdef	DIS_TEXT
 			blsinstr = "blsi";
+#endif
 			break;
 		default:
 			goto error;

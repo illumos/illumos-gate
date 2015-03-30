@@ -169,7 +169,7 @@ static char *x86_feature_names[NUM_X86_FEATURES] = {
 	"avx2",
 	"bmi1",
 	"bmi2",
-	"fma3"
+	"fma"
 };
 
 boolean_t
@@ -1345,7 +1345,7 @@ cpuid_pass1(cpu_t *cpu, uchar_t *featureset)
 
 				if (cp->cp_ecx & CPUID_INTC_ECX_FMA)
 					add_x86_feature(featureset,
-					    X86FSET_FMA3);
+					    X86FSET_FMA);
 
 				if (cpi->cpi_std[7].cp_ebx &
 				    CPUID_INTC_EBX_7_0_BMI1)
@@ -2015,7 +2015,7 @@ cpuid_pass2(cpu_t *cpu)
 					remove_x86_feature(x86_featureset,
 					    X86FSET_BMI2);
 					remove_x86_feature(x86_featureset,
-					    X86FSET_FMA3);
+					    X86FSET_FMA);
 					remove_x86_feature(x86_featureset,
 					    X86FSET_AVX2);
 					CPI_FEATURES_ECX(cpi) &=
@@ -2712,7 +2712,7 @@ cpuid_pass4(cpu_t *cpu, uint_t *hwcap_out)
 			*ecx &= ~CPUID_INTC_ECX_AVX;
 		if (!is_x86_feature(x86_featureset, X86FSET_F16C))
 			*ecx &= ~CPUID_INTC_ECX_F16C;
-		if (!is_x86_feature(x86_featureset, X86FSET_FMA3))
+		if (!is_x86_feature(x86_featureset, X86FSET_FMA))
 			*ecx &= ~CPUID_INTC_ECX_FMA;
 		if (!is_x86_feature(x86_featureset, X86FSET_BMI1))
 			*ebx &= ~CPUID_INTC_EBX_7_0_BMI1;

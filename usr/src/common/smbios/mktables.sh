@@ -21,10 +21,10 @@
 # CDDL HEADER END
 #
 #
+# Copyright 2015 OmniTI Computer Consulting, Inc.  All rights reserved.
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 #
 # The SMBIOS interfaces defined in <sys/smbios.h> include a set of integer-to-
@@ -48,6 +48,7 @@ SMB_CAF_	smbios_cache_flag_name		uint_t
 SMB_EVFL_	smbios_evlog_flag_name		uint_t
 SMB_IPMI_F_	smbios_ipmi_flag_name		uint_t
 SMB_MDF_	smbios_memdevice_flag_name	uint_t
+SMB_PRC_	smbios_processor_core_flag_name	uint_t
 SMB_TYPE_ 	smbios_type_name		uint_t
 SMB_SLCH1_	smbios_slot_ch1_name		uint_t
 SMB_SLCH2_	smbios_slot_ch2_name		uint_t
@@ -81,8 +82,10 @@ SMB_MAE_	smbios_memarray_ecc_desc	uint_t
 SMB_MDF_	smbios_memdevice_flag_desc	uint_t
 SMB_MDFF_	smbios_memdevice_form_desc	uint_t
 SMB_MDT_	smbios_memdevice_type_desc	uint_t
+SMB_MDR_	smbios_memdevice_rank_desc	uint_t
 SMB_POC_	smbios_port_conn_desc		uint_t
 SMB_POT_	smbios_port_type_desc		uint_t
+SMB_PRC_	smbios_processor_core_flag_desc	uint_t
 SMB_PRF_	smbios_processor_family_desc	uint_t
 SMB_PRS_	smbios_processor_status_desc	uint_t
 SMB_PRT_	smbios_processor_type_desc	uint_t
@@ -104,11 +107,10 @@ fi
 
 echo "\
 /*\n\
+ * Copyright 2015 OmniTI Computer Consulting, Inc.  All rights reserved.\n\
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.\n\
  * Use is subject to license terms.\n\
  */\n\
-\n\
-#pragma ident\t\"%Z%%M%\t%I%\t%E% SMI\"\n\
 \n\
 #include <smbios.h>"
 
