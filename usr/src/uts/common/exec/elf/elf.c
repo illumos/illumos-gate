@@ -270,6 +270,9 @@ mapexec_brand(vnode_t *vp, uarg_t *args, Ehdr *ehdr, Addr *uphdr_vaddr,
 
 	if (uphdr != NULL) {
 		*uphdr_vaddr = uphdr->p_vaddr;
+
+		if (uphdr->p_flags == 0)
+			kmem_free(uphdr, sizeof (Phdr));
 	} else {
 		*uphdr_vaddr = (Addr)-1;
 	}
@@ -768,9 +771,10 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 
 		dtrphdr = NULL;
 
-		error = mapelfexec(nvp, ehdrp, nphdrs, phdrbase, &junk, &junk,
+		error = mapelfexec(nvp, ehdrp, nphdrs, phdrbase, NULL, &junk,
 		    &junk, &dtrphdr, NULL, NULL, NULL, &voffset, NULL, len,
 		    execsz, NULL);
+
 		if (error || junk != NULL) {
 			VN_RELE(nvp);
 			uprintf("%s: Cannot map %s\n", exec_file, dlnp);
@@ -977,6 +981,8 @@ bad:
 	if (error == 0)
 		error = ENOEXEC;
 out:
+	if (uphdr != NULL && uphdr->p_flags == 0)
+		kmem_free(uphdr, sizeof (Phdr));
 	if (phdrbase != NULL)
 		kmem_free(phdrbase, phdrsize);
 	if (cap != NULL)
@@ -1307,9 +1313,6 @@ mapelfexec(
 	for (i = nphdrs; i > 0; i--) {
 		switch (phdr->p_type) {
 		case PT_LOAD:
-			if ((*dyphdr != NULL) && (*uphdr == NULL))
-				return (0);
-
 			ptload = 1;
 			prot = PROT_USER;
 			if (phdr->p_flags & PF_R)
@@ -1320,6 +1323,34 @@ mapelfexec(
 				prot |= PROT_EXEC;
 
 			addr = (caddr_t)((uintptr_t)phdr->p_vaddr + *voffset);
+
+			if ((*dyphdr != NULL) && uphdr != NULL &&
+			    (*uphdr == NULL)) {
+				/*
+				 * The PT_PHDR program header is, strictly
+				 * speaking, optional.  If we find that this
+				 * is missing, we will determine the location
+				 * of the program headers based on the address
+				 * of the lowest PT_LOAD segment (namely, this
+				 * one):  we subtract the p_offset to get to
+				 * the ELF header and then add back the program
+				 * header offset to get to the program headers.
+				 * We then cons up a Phdr that corresponds to
+				 * the (missing) PT_PHDR, setting the flags
+				 * to 0 to denote that this is artificial and
+				 * should (must) be freed by the caller.
+				 */
+				Phdr *cons;
+
+				cons = kmem_zalloc(sizeof (Phdr), KM_SLEEP);
+
+				cons->p_flags = 0;
+				cons->p_type = PT_PHDR;
+				cons->p_vaddr = ((uintptr_t)addr -
+				    phdr->p_offset) + ehdr->e_phoff;
+
+				*uphdr = cons;
+			}
 
 			/*
 			 * Keep track of the segment with the lowest starting
@@ -1437,9 +1468,12 @@ mapelfexec(
 			break;
 
 		case PT_PHDR:
-			if (ptload)
+			if (ptload || phdr->p_flags == 0)
 				goto bad;
-			*uphdr = phdr;
+
+			if (uphdr != NULL)
+				*uphdr = phdr;
+
 			break;
 
 		case PT_NULL:
