@@ -1,179 +1,286 @@
-'\" te
+.\" Copyright 2014 Garrett D'Amore <garrett@damore.org>
 .\" Copyright (c) 2004, Sun Microsystems, Inc.  All Rights Reserved.
 .\" Copyright 1989 AT&T.
-.\" Copyright (c) 1980 Regents of the University of California.  All rights reserved.  The Berkeley software License Agreement  specifies the terms and conditions for redistribution.
-.TH VFORK 2 "Dec 13, 2006"
-.SH NAME
-vfork, vforkx \- spawn new process in a virtual memory efficient way
-.SH SYNOPSIS
-.LP
-.nf
-#include <unistd.h>
-
-\fBpid_t\fR \fBvfork\fR(\fBvoid\fR);
-.fi
-
-.LP
-.nf
-#include <sys/fork.h>
-
-\fBpid_t\fR \fBvforkx\fR(\fBint\fR \fIflags\fR);
-.fi
-
-.SH DESCRIPTION
-.sp
-.LP
-The \fBvfork()\fR and \fBvforkx()\fR functions create a new process without
+.\" Copyright (c) 1980 Regents of the University of California.
+.\" All rights reserved.  The Berkeley software License Agreement
+.\" specifies the terms and conditions for redistribution.
+.Dd Aug 20, 2014
+.Dt VFORK 2
+.Os
+.Sh NAME
+.Nm vfork ,
+.Nm vforkx
+.Nd spawn new process in a virtual memory efficient way
+.Sh SYNOPSIS
+.In unistd.h
+.Ft pid_t
+.Fn vfork void
+.
+.In sys/fork.h
+.Ft pid_t
+.Fn vforkx "int flags"
+.Sh DESCRIPTION
+The
+.Fn vfork
+and
+.Fn vforkx
+functions create a new process without
 fully copying the address space of the old process. These functions are useful
-in instances where the purpose of a \fBfork\fR(2) operation is to create a new
-system context for an \fBexecve()\fR operation (see \fBexec\fR(2)).
-.sp
-.LP
-Unlike with the \fBfork()\fR function, the child process borrows the parent's
-memory and thread of control until a call to \fBexecve()\fR or an exit (either
-abnormally or by a call to \fB_exit()\fR (see \fBexit\fR(2)). Any modification
+in instances where the purpose of a
+.Xr fork 2
+operation is to create a new
+system context for an
+.Xr exec 2
+operation.
+.Lp
+Unlike with the
+.Fn fork
+function, the child process borrows the parent's
+memory and thread of control until a call to
+.Fn execve
+or an exit
+.Pq either abnormally or by a call to Xr _exit 2 .
+Any modification
 made during this time to any part of memory in the child process is reflected
-in the parent process on return from \fBvfork()\fR or \fBvforkx()\fR. The
-parent process is suspended while the child is using its resources.
-.sp
-.LP
-In a multithreaded application,  \fBvfork()\fR and \fBvforkx()\fR borrow only
-the thread of control that called \fBvfork()\fR or \fBvforkx()\fR in the
-parent; that is, the child contains only one thread. The use of \fBvfork()\fR
-or \fBvforkx()\fR in multithreaded applications, however, is unsafe due to race
+in the parent process on return from
+.Fn vfork
+or
+.Fn vforkx .
+The parent process is suspended while the child is using its resources.
+.Lp
+In a multithreaded application,
+.Fn vfork
+and
+.Fn vforkx
+borrow only the thread of control that called
+.Fn vfork
+or
+.Fn vforkx
+in the parent; that is, the child contains only one thread. The use of
+.Fn vfork
+or
+.Fn vforkx
+in multithreaded applications, however, is unsafe due to race
 conditions that can cause the child process to become deadlocked and
 consequently block both the child and parent process from execution
 indefinitely.
-.sp
-.LP
-The \fBvfork()\fR and \fBvforkx()\fR functions can normally be used the same
-way as \fBfork()\fR and \fBforkx()\fR, respectively. The calling procedure,
+.Lp
+The
+.Fn vfork
+and
+.Fn vforkx
+functions can normally be used the same way as
+.Fn fork
+and
+.Fn forkx ,
+respectively. The calling procedure,
 however, should not return while running in the child's context, since the
-eventual return from \fBvfork()\fR or \fBvforkx()\fR in the parent would be to
-a stack frame that no longer exists. The \fB_exit()\fR function should be used
-in favor of \fBexit\fR(3C) if unable to perform an \fBexecve()\fR operation,
-since \fBexit()\fR will invoke all functions registered by \fBatexit\fR(3C) and
-will flush and close standard I/O channels, thereby corrupting the parent
+eventual return from
+.Fn vfork
+or
+.Fn vforkx
+in the parent would be to
+a stack frame that no longer exists. The
+.Fn _exit
+function should be used
+in favor of
+.Xr exit 3C
+if unable to perform an
+.Fn execve
+operation, since
+.Fn exit
+will invoke all functions registered by
+.Xr atexit 3C
+and will flush and close standard I/O channels, thereby corrupting the parent
 process's standard I/O data structures. Care must be taken in the child process
 not to modify any global or local data that affects the behavior of the parent
-process on return from \fBvfork()\fR or \fBvforkx()\fR, unless such an effect
+process on return from
+.Fn vfork
+or
+.Fn vforkx ,
+unless such an effect
 is intentional.
-.sp
-.LP
-Unlike \fBfork()\fR and \fBforkx()\fR, fork handlers are not run when
-\fBvfork()\fR and \fBvforkx()\fR are called.
-.sp
-.LP
-The \fBvfork()\fR and \fBvforkx()\fR functions are deprecated. Their sole
+.Lp
+Unlike
+.Fn fork
+and
+.Fn forkx ,
+fork handlers are not run when
+.Fn vfork
+and
+.Fn vforkx
+are called.
+.Lp
+The
+.Fn vfork
+and
+.Fn vforkx
+functions are deprecated. Their sole
 legitimate use as a prelude to an immediate call to a function from the
-\fBexec\fR family can be achieved safely by \fBposix_spawn\fR(3C) or
-\fBposix_spawnp\fR(3C).
-.SS "Fork Extensions"
-.sp
-.LP
-The \fBvforkx()\fR function accepts a \fIflags\fR argument consisting of a
+.Xr exec 2
+family can be achieved safely by
+.Xr posix_spawn 3C
+or
+.Xr posix_spawnp 3C .
+.Ss "Fork Extensions"
+The
+.Fn vforkx
+function accepts a
+.Fa flags
+argument consisting of a
 bitwise inclusive-OR of zero or more of the following flags, which are defined
-in the header \fB<sys/fork.h>\fR:
-.br
-.in +2
-\fBFORK_NOSIGCHLD\fR
-.in -2
-.br
-.in +2
-\fBFORK_WAITPID\fR
-.in -2
-.sp
-.LP
-See \fBfork\fR(2) for descriptions of these flags. If the \fIflags\fR argument
-is 0, \fBvforkx()\fR is identical to \fBvfork()\fR.
-.SH RETURN VALUES
-.sp
-.LP
-Upon successful completion, \fBvfork()\fR and \fBvforkx()\fR return  \fB0\fR to
-the child process and returns the process ID of the child process to the parent
-process. Otherwise, \fB\(mi1\fR is returned to the parent process, no child
-process is created, and \fBerrno\fR is set to indicate the error.
-.SH ERRORS
-.sp
-.LP
-The \fBvfork()\fR and \fBvforkx()\fR functions will fail if:
-.sp
-.ne 2
-.na
-\fB\fBEAGAIN\fR\fR
-.ad
-.RS 10n
+in the header
+.In sys/fork.h :
+.Lp
+.Bl -item -compact -offset indent
+.It
+.Dv FORK_NOSIGCHLD
+.It
+.Dv FORK_WAITPID
+.El
+.Lp
+See
+.Xr fork 2
+for descriptions of these flags. If the
+.Fa flags
+argument is 0,
+.Fn vforkx
+is identical to
+.Fn vfork .
+.Sh RETURN VALUES
+Upon successful completion,
+.Fn vfork
+and
+.Fn vforkx
+return 0 to
+the child process and return the process ID of the child process to the parent
+process. Otherwise, \(mi1 is returned to the parent process, no child
+process is created, and
+.Va errno
+is set to indicate the error.
+.Sh ERRORS
+The
+.Fn vfork
+and
+.Fn vforkx
+functions will fail if:
+.Bl -tag -width Er
+.It Er EAGAIN
 The system-imposed limit on the total number of processes under execution
 (either system-quality or by a single user) would be exceeded. This limit is
 determined when the system is generated.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBENOMEM\fR\fR
-.ad
-.RS 10n
+.
+.It Er ENOMEM
 There is insufficient swap space for the new process.
-.RE
-
-.sp
-.LP
-The \fBvforkx()\fR function will fail if:
-.sp
-.ne 2
-.na
-\fB\fBEINVAL\fR\fR
-.ad
-.RS 10n
-The \fIflags\fR argument is invalid.
-.RE
-
-.SH ATTRIBUTES
-.sp
-.LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-Interface Stability	Obsolete
-_
-MT-Level	Unsafe
-.TE
-
-.SH SEE ALSO
-.sp
-.LP
-\fBexec\fR(2), \fBexit\fR(2), \fBfork\fR(2), \fBioctl\fR(2), \fBatexit\fR(3C),
-\fBexit\fR(3C), \fBposix_spawn\fR(3C), \fBposix_spawnp\fR(3C),
-\fBsignal.h\fR(3HEAD), \fBwait\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)
-.SH NOTES
-.sp
-.LP
+.El
+.Lp
+The
+.Fn vforkx
+function will fail if:
+.Bl -tag -width Er
+.It Er EINVAL
+The
+.Va flags
+argument is invalid.
+.El
+.Sh INTERFACE STABILITY
+The
+.Fn vfork
+function is
+.Sy Obsolete Standard .
+.Lp
+The
+.Fn vforkx
+function is
+.Sy Obsolete Uncommitted .
+.Sh MT-LEVEL
+.Sy Unsafe .
+.Sh SEE ALSO
+.Xr exec 2 ,
+.Xr exit 2 ,
+.Xr fork 2 ,
+.Xr ioctl 2 ,
+.Xr atexit 3C ,
+.Xr exit 3C ,
+.Xr posix_spawn 3C ,
+.Xr posix_spawnp 3C ,
+.Xr signal.h 3HEAD ,
+.Xr wait 3C ,
+.Xr standards 5
+.Sh NOTES
 To avoid a possible deadlock situation, processes that are children in the
-middle of a \fBvfork()\fR or \fBvforkx()\fR are never sent \fBSIGTTOU\fR or
-\fBSIGTTIN\fR signals; rather, output or ioctls are allowed and input attempts
-result in an \fBEOF\fR indication.
-.sp
-.LP
+middle of a
+.Fn vfork
+or
+.Fn vforkx
+are never sent
+.Dv SIGTTOU
+or
+.Dv SIGTTIN
+signals; rather, output or ioctls are allowed and input attempts
+result in an
+.Dv EOF
+indication.
+.Lp
 To forestall parent memory corruption due to race conditions with signal
-handling, \fBvfork()\fR and \fBvforkx()\fR treat signal handlers in the child
-process in the same manner as the \fBexec\fR(2) functions: signals set to be
-caught by the parent process are set to the default action (\fBSIG_DFL\fR) in
-the child process (see \fBsignal.h\fR(3HEAD)). Any attempt to set a signal
-handler in the child before \fBexecve()\fR to anything other than \fBSIG_DFL\fR
-or \fBSIG_IGN\fR is disallowed and results in setting the handler to
-\fBSIG_DFL\fR.
-.sp
-.LP
-On some systems, the implementation of \fBvfork()\fR and \fBvforkx()\fR cause
+handling,
+.Fn vfork
+and
+.Fn vforkx
+treat signal handlers in the child
+process in the same manner as the
+.Xr exec 2
+functions: signals set to be
+caught by the parent process are set to the default action
+.Pq Dv SIG_DFL
+in the child process
+.Pq see Xr signal.h 3HEAD .
+Any attempt to set a signal
+handler in the child before
+.Fn execve
+to anything other than
+.Dv SIG_DFL
+or
+.Dv SIG_IGN
+is disallowed and results in setting the handler to
+.Dv SIG_DFL .
+.Lp
+On some systems, the implementation of
+.Fn vfork
+and
+.Fn vforkx
+cause
 the parent to inherit register values from the child. This can create problems
-for certain optimizing compilers if \fB<unistd.h>\fR is not included in the
-source calling \fBvfork()\fR or if \fB<sys/fork.h>\fR is not included in the
-source calling \fBvforkx()\fR.
+for certain optimizing compilers if
+.In unistd.h
+is not included in the source calling
+.Fn vfork
+or if
+.In sys/fork.h
+is not included in the
+source calling
+.Fn vforkx .
+.Sh STANDARDS
+The
+.Fn vfork
+function is available in the following compilation environments.  See
+.Xr standards 5 .
+.Lp
+.Bl -bullet -compact
+.It
+.St -xpg4.2
+.It
+.St -susv2
+.It
+.St -susv3
+.El
+.Lp
+It was marked obsolete in
+.St -susv3
+and removed from
+.St -p1003.1-2008 .
+.Lp
+The
+.Fn vforkx
+function is a local extension and not available in any strictly
+standards-compliant compilation environment.
