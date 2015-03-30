@@ -2044,6 +2044,18 @@ lx_signal(uintptr_t lx_sig, uintptr_t handler)
 }
 #endif
 
+void
+lx_sighandlers_save(lx_sighandlers_t *saved)
+{
+	bcopy(&lx_sighandlers, saved, sizeof (lx_sighandlers_t));
+}
+
+void
+lx_sighandlers_restore(lx_sighandlers_t *saved)
+{
+	bcopy(saved, &lx_sighandlers, sizeof (lx_sighandlers_t));
+}
+
 int
 lx_siginit(void)
 {
