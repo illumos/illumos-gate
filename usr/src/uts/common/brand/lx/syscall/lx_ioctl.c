@@ -41,6 +41,7 @@
 #include <sys/socketvar.h>
 #include <net/if_arp.h>
 #include <sys/ioccom.h>
+#include <sys/dtrace.h>
 
 /*
  * Supported ioctls
@@ -1071,6 +1072,9 @@ typedef struct ioc_cmd_translator {
 #define	IOC_CMD_TRANSLATOR_CUSTOM(ioc_cmd_sym, ioct_handler)		\
 	{ (int)ioc_cmd_sym, (int)ioc_cmd_sym, ioct_handler },
 
+#define	IOC_CMD_TRANSLATOR_PTHRU(ioc_cmd_sym)				\
+	{ (int)ioc_cmd_sym, (int)ioc_cmd_sym, ict_pass },
+
 #define	IOC_CMD_TRANSLATOR_END						\
 	{0, 0, NULL}
 
@@ -1139,6 +1143,11 @@ static ioc_cmd_translator_t ioc_translators[] = {
 	IOC_CMD_TRANSLATOR_FILTER(SIOCGIFINDEX,		ict_siolifreq)
 	IOC_CMD_TRANSLATOR_CUSTOM(LX_SIOCGIFTXQLEN,	ict_siolifreq)
 	IOC_CMD_TRANSLATOR_FILTER(SIOCGIFCONF,		ict_siocgifconf)
+
+	/* dtrace related */
+	IOC_CMD_TRANSLATOR_PTHRU(DTRACEHIOC_ADD)
+	IOC_CMD_TRANSLATOR_PTHRU(DTRACEHIOC_REMOVE)
+	IOC_CMD_TRANSLATOR_PTHRU(DTRACEHIOC_ADDDOF)
 
 	IOC_CMD_TRANSLATOR_END
 };
