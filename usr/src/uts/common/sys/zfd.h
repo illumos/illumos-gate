@@ -9,7 +9,7 @@
  * http://www.illumos.org/license/CDDL.
  */
 /*
- * Copyright 2014 Joyent, Inc.  All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  */
 
 #ifndef _SYS_ZFD_H
@@ -45,6 +45,11 @@ extern "C" {
  * so that the fd looks like a tty.
  */
 #define	ZFD_MAKETTY		(ZFD_IOC | 0)
+
+/*
+ * This ioctl puts a hangup into the stream so that the slave side sees EOF.
+ */
+#define	ZFD_EOF			(ZFD_IOC | 1)
 
 #ifdef	__cplusplus
 }

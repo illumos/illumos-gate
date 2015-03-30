@@ -21,7 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2011 Joyent Inc.  All rights reserved.
+ * Copyright 2015 Joyent Inc.
  */
 
 #ifndef _ZONE_H
@@ -47,9 +47,12 @@ extern ssize_t		getzonenamebyid(zoneid_t, char *, size_t);
  * NOTE
  *
  * The remaining contents of this file are private to the implementation
- * of Solaris and are subject to change at any time without notice,
+ * of Illumos and are subject to change at any time without notice,
  * Applications using these interfaces may fail to run on future releases.
  */
+
+#define	ZLOGIN_DISCONNECT	0x1	/* disconnect on zone halt */
+#define	ZLOGIN_ZFD_EOF		0x2	/* EOF on ZFD */
 
 extern int zonept(int, zoneid_t);
 extern int zone_get_id(const char *, zoneid_t *);

@@ -115,7 +115,7 @@ static priv_set_t *dropprivs;
 
 static int nocmdchar = 0;
 static int failsafe = 0;
-static int disconnect = 0;
+static uint_t connect_flags = 0;
 static char cmdchar = '~';
 static int quiet = 0;
 static char zonebrand[MAXNAMELEN];
@@ -167,7 +167,7 @@ static boolean_t forced_login = B_FALSE;
 static void
 usage(void)
 {
-	(void) fprintf(stderr, gettext("usage: %s [-dinQCIES] [-e cmdchar] "
+	(void) fprintf(stderr, gettext("usage: %s [-dinCEINQS] [-e cmdchar] "
 	    "[-l user] zonename [command [args ...] ]\n"), pname);
 	exit(2);
 }
@@ -305,8 +305,8 @@ get_interactive_master(const char *zname, int notcons)
 	}
 	masterfd = sockfd;
 
-	msglen = snprintf(clientid, sizeof (clientid), "IDENT %lu %s %d\n",
-	    getpid(), setlocale(LC_MESSAGES, NULL), disconnect);
+	msglen = snprintf(clientid, sizeof (clientid), "IDENT %lu %s %u\n",
+	    getpid(), setlocale(LC_MESSAGES, NULL), connect_flags);
 
 	if (msglen >= sizeof (clientid) || msglen < 0) {
 		zerror("protocol error");
@@ -1884,7 +1884,7 @@ main(int argc, char **argv)
 	(void) getpname(argv[0]);
 	username = get_username();
 
-	while ((arg = getopt(argc, argv, "dinECIR:Se:l:Q")) != EOF) {
+	while ((arg = getopt(argc, argv, "diNnECIR:Se:l:Q")) != EOF) {
 		switch (arg) {
 		case 'C':
 			console = 1;
@@ -1899,6 +1899,8 @@ main(int argc, char **argv)
 			 */
 			console = 1;
 			imode = 1;
+			/* The default is HUP, disconnect on EOF */
+			connect_flags ^= ZLOGIN_ZFD_EOF;
 			break;
 		case 'R':	/* undocumented */
 			if (*optarg != '/') {
@@ -1919,7 +1921,7 @@ main(int argc, char **argv)
 			failsafe = 1;
 			break;
 		case 'd':
-			disconnect = 1;
+			connect_flags |= ZLOGIN_DISCONNECT;
 			break;
 		case 'e':
 			set_cmdchar(optarg);
@@ -1931,6 +1933,10 @@ main(int argc, char **argv)
 			login = optarg;
 			lflag = 1;
 			break;
+		case 'N':
+			/* NOHUP - do not send EOF */
+			connect_flags ^= ZLOGIN_ZFD_EOF;
+			break;
 		case 'n':
 			nflag = 1;
 			break;
@@ -1940,6 +1946,12 @@ main(int argc, char **argv)
 	}
 
 	if (console != 0) {
+
+		/*
+		 * The only connect option in console mode is ZLOGIN_DISCONNECT
+		 */
+		if (imode == 0)
+			connect_flags &= ZLOGIN_DISCONNECT;
 
 		if (lflag != 0) {
 			zerror(gettext(
@@ -1977,9 +1989,14 @@ main(int argc, char **argv)
 		usage();
 	}
 
-	if (!console && disconnect != 0) {
+	if (!console && (connect_flags & ZLOGIN_DISCONNECT) != 0) {
 		zerror(gettext(
 		    "-d may only be specified with console login"));
+		usage();
+	}
+
+	if (imode == 0 && (connect_flags & ZLOGIN_ZFD_EOF) != 0) {
+		zerror(gettext("-N may only be specified with -I"));
 		usage();
 	}
 
