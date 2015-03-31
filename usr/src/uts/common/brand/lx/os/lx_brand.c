@@ -190,7 +190,7 @@ extern int getsetcontext32(int, void *);
 extern int waitsys32(idtype_t, id_t, siginfo_t *, int);
 #endif
 
-extern void lx_proc_exit(proc_t *, klwp_t *);
+extern void lx_proc_exit(proc_t *);
 extern int lx_sched_affinity(int, uintptr_t, int, uintptr_t, int64_t *);
 
 extern void lx_ioctl_init();
@@ -303,51 +303,10 @@ static struct modlinkage modlinkage = {
 };
 
 void
-lx_proc_exit(proc_t *p, klwp_t *lwp)
+lx_proc_exit(proc_t *p)
 {
-	int sig = ptolxproc(p)->l_signal;
-
 	VERIFY(p->p_brand == &lx_brand);
 	VERIFY(p->p_brand_data != NULL);
-
-	/*
-	 * We might get here if fork failed (e.g. ENOMEM) so we don't always
-	 * have an lwp (see brand_clearbrand).
-	 */
-	if (lwp != NULL) {
-		boolean_t reenter_mutex = B_FALSE;
-
-		/*
-		 * This brand entry point is called variously with and without
-		 * the process p_lock held.  It would be possible to refactor
-		 * the brand infrastructure so that proc_exit() explicitly
-		 * calls this hook (b_lwpexit/lx_exitlwp) for the last LWP in a
-		 * process prior to detaching the brand with
-		 * brand_clearbrand().  Absent such refactoring, we
-		 * conditionally exit the mutex for the duration of the call.
-		 *
-		 * The atomic replacement of both "p_brand" and "p_brand_data"
-		 * is not affected by dropping and reacquiring the mutex here.
-		 */
-		if (mutex_owned(&p->p_lock) != 0) {
-			mutex_exit(&p->p_lock);
-			reenter_mutex = B_TRUE;
-		}
-		lx_exitlwp(lwp);
-		if (reenter_mutex) {
-			mutex_enter(&p->p_lock);
-		}
-	}
-
-	/*
-	 * The call path here is:
-	 *    proc_exit -> brand_clearbrand -> b_proc_exit
-	 * and then brand_clearbrand will set p_brand to be the native brand.
-	 * We are done with our brand data but we don't free it here since
-	 * that is done for us by proc_exit due to the fact that we have a
-	 * b_exit_with_sig handler setup.
-	 */
-	p->p_exit_data = sig;
 }
 
 void

@@ -332,26 +332,20 @@ brand_setbrand(proc_t *p)
 }
 
 void
-brand_clearbrand(proc_t *p, boolean_t no_lwps)
+brand_clearbrand(proc_t *p)
 {
 	brand_t *bp = p->p_zone->zone_brand;
 	klwp_t *lwp = NULL;
 	ASSERT(bp != NULL);
-	ASSERT(!no_lwps || (p->p_tlist == NULL));
-
-	/*
-	 * If called from exec_common() or proc_exit(),
-	 * we know the process is single-threaded.
-	 * If called from fork_fail, p_tlist is NULL.
-	 */
-	if (!no_lwps) {
-		ASSERT(p->p_tlist == p->p_tlist->t_forw);
-		lwp = p->p_tlist->t_lwp;
-	}
-
 	ASSERT(PROC_IS_BRANDED(p));
-	BROP(p)->b_proc_exit(p, lwp);
+	VERIFY(mutex_owned(&p->p_lock));
+	VERIFY((p->p_tlist == NULL) || (p->p_tlist == p->p_tlist->t_forw));
+
 	p->p_brand = &native_brand;
+	if (p->p_brand_data != NULL) {
+		kmem_free(p->p_brand_data, bp->b_data_size);
+		p->p_brand_data = NULL;
+	}
 }
 
 #if defined(__sparcv9)
@@ -1099,40 +1093,17 @@ brand_solaris_initlwp(klwp_t *l, struct brand *pbrand)
 void
 brand_solaris_lwpexit(klwp_t *l, struct brand *pbrand)
 {
-	proc_t  *p = l->lwp_procp;
-
 	ASSERT(l->lwp_procp->p_brand == pbrand);
 	ASSERT(l->lwp_procp->p_brand_data != NULL);
 	ASSERT(l->lwp_brand != NULL);
-
-	/*
-	 * We should never be called for the last thread in a process.
-	 * (That case is handled by brand_solaris_proc_exit().)
-	 * Therefore this lwp must be exiting from a multi-threaded
-	 * process.
-	 */
-	ASSERT(p->p_tlist != p->p_tlist->t_forw);
-
-	l->lwp_brand = NULL;
 }
 
 /*ARGSUSED*/
 void
-brand_solaris_proc_exit(struct proc *p, klwp_t *l, struct brand *pbrand)
+brand_solaris_proc_exit(struct proc *p, struct brand *pbrand)
 {
 	ASSERT(p->p_brand == pbrand);
 	ASSERT(p->p_brand_data != NULL);
-
-	/*
-	 * When called from proc_exit(), we know that process is
-	 * single-threaded and free our lwp brand data.
-	 * otherwise just free p_brand_data and return.
-	 */
-	if (l != NULL) {
-		ASSERT(p->p_tlist == p->p_tlist->t_forw);
-		ASSERT(p->p_tlist->t_lwp == l);
-		(void) brand_solaris_freelwp(l, pbrand);
-	}
 
 	/* upon exit, free our proc brand data */
 	kmem_free(p->p_brand_data, sizeof (brand_proc_data_t));

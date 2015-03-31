@@ -112,7 +112,7 @@ struct brand_ops {
 	int	(*b_getattr)(zone_t *, int, void *, size_t *);
 	int	(*b_setattr)(zone_t *, int, void *, size_t);
 	void	(*b_copy_procdata)(struct proc *, struct proc *);
-	void	(*b_proc_exit)(struct proc *, klwp_t *);
+	void	(*b_proc_exit)(struct proc *);
 	void	(*b_exec)();
 	void	(*b_lwp_setrval)(klwp_t *, int, int);
 	int	(*b_initlwp)(klwp_t *);
@@ -127,7 +127,7 @@ struct brand_ops {
 	void	(*b_sigset_brand_to_native)(sigset_t *);
 	void	(*b_psig_to_proc)(proc_t *, kthread_t *, int);
 	int	b_nsig;
-	void	(*b_exit_with_sig)(proc_t *, sigqueue_t *, void *);
+	void	(*b_exit_with_sig)(proc_t *, sigqueue_t *);
 	boolean_t (*b_wait_filter)(proc_t *, proc_t *);
 	boolean_t (*b_native_exec)(uint8_t, const char **);
 	void (*b_ptrace_exectrap)(proc_t *);
@@ -189,7 +189,7 @@ extern brand_t	*brand_find_name(char *);
 extern void	brand_unregister_zone(brand_t *);
 extern int	brand_zone_count(brand_t *);
 extern void	brand_setbrand(proc_t *);
-extern void	brand_clearbrand(proc_t *, boolean_t);
+extern void	brand_clearbrand(proc_t *);
 
 /*
  * The following functions can be shared among kernel brand modules which
@@ -210,8 +210,7 @@ extern void	brand_solaris_forklwp(klwp_t *, klwp_t *, struct brand *);
 extern void	brand_solaris_freelwp(klwp_t *, struct brand *);
 extern int	brand_solaris_initlwp(klwp_t *, struct brand *);
 extern void	brand_solaris_lwpexit(klwp_t *, struct brand *);
-extern void	brand_solaris_proc_exit(struct proc *, klwp_t *,
-		    struct brand *);
+extern void	brand_solaris_proc_exit(struct proc *, struct brand *);
 extern void	brand_solaris_setbrand(proc_t *, struct brand *);
 
 #if defined(_SYSCALL32)

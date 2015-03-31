@@ -244,38 +244,35 @@ free:
 	}
 	if (sqp)
 		kmem_free(sqp, sizeof (sigqueue_t));
-
-	lx_freelwp(lwp);
 }
 
 void
 lx_freelwp(klwp_t *lwp)
 {
 	struct lx_lwp_data *lwpd = lwptolxlwp(lwp);
+	VERIFY(lwpd != NULL);
 
 	/*
 	 * Remove our system call interposer.
 	 */
 	lwp->lwp_brand_syscall = NULL;
 
-	if (lwpd != NULL) {
-		(void) removectx(lwptot(lwp), lwp, lx_save, lx_restore,
-		    NULL, NULL, lx_save, NULL);
-		if (lwpd->br_pid != 0) {
-			lx_pid_rele(lwptoproc(lwp)->p_pid,
-			    lwptot(lwp)->t_tid);
-		}
-
-		/*
-		 * Ensure that lx_ptrace_exit() has been called to detach
-		 * ptrace(2) tracers and tracees.
-		 */
-		VERIFY(lwpd->br_ptrace_tracer == NULL);
-		VERIFY(lwpd->br_ptrace_accord == NULL);
-
-		lwp->lwp_brand = NULL;
-		kmem_free(lwpd, sizeof (struct lx_lwp_data));
+	(void) removectx(lwptot(lwp), lwp, lx_save, lx_restore, NULL, NULL,
+	    lx_save, NULL);
+	if (lwpd->br_pid != 0) {
+		lx_pid_rele(lwptoproc(lwp)->p_pid,
+		    lwptot(lwp)->t_tid);
 	}
+
+	/*
+	 * Ensure that lx_ptrace_exit() has been called to detach
+	 * ptrace(2) tracers and tracees.
+	 */
+	VERIFY(lwpd->br_ptrace_tracer == NULL);
+	VERIFY(lwpd->br_ptrace_accord == NULL);
+
+	lwp->lwp_brand = NULL;
+	kmem_free(lwpd, sizeof (struct lx_lwp_data));
 }
 
 int
@@ -542,10 +539,10 @@ lx_post_exit_sig(proc_t *cp, sigqueue_t *sqp, struct lx_proc_data *dat)
  * opposed to sigcld().
  */
 void
-lx_exit_with_sig(proc_t *cp, sigqueue_t *sqp, void *brand_data)
+lx_exit_with_sig(proc_t *cp, sigqueue_t *sqp)
 {
 	proc_t *pp = cp->p_parent;
-	struct lx_proc_data *lx_brand_data = brand_data;
+	lx_proc_data_t *lx_brand_data = ptolxproc(cp);
 	ASSERT(MUTEX_HELD(&pidlock));
 
 	switch (cp->p_wcode) {
@@ -592,7 +589,7 @@ lx_exit_with_sig(proc_t *cp, sigqueue_t *sqp, void *brand_data)
  * applied, otherwise we look at the difference between a clone and non-clone
  * process.
  * The definition of a clone process in Linux is a thread that does not deliver
- * SIGCHLD to its parent. The option __WCLONE   indicates to wait only on clone
+ * SIGCHLD to its parent. The option __WCLONE indicates to wait only on clone
  * processes. Without that option, a process should only wait on normal
  * children. The following table shows the cases.
  *
@@ -620,30 +617,23 @@ lx_wait_filter(proc_t *pp, proc_t *cp)
 	mutex_enter(&cp->p_lock);
 	if (flags & LX_WALL) {
 		ret = B_TRUE;
-
 	} else {
-		int exitsig;
-		boolean_t is_clone, _wclone;
+		lx_proc_data_t *pd = ptolxproc(cp);
+		boolean_t is_sigchld = B_TRUE;
+		boolean_t match_wclone = B_FALSE;
 
 		/*
-		 * Determine the exit signal for this process:
+		 * When calling clone, an alternate signal can be chosen to
+		 * deliver to the parent when the child exits.
 		 */
-		if (cp->p_stat == SZOMB || cp->p_brand == &native_brand) {
-			exitsig = cp->p_exit_data;
-		} else {
-			exitsig = ptolxproc(cp)->l_signal;
+		if (pd != NULL && pd->l_signal != stol_signo[SIGCHLD]) {
+			is_sigchld = B_FALSE;
+		}
+		if ((flags & LX_WCLONE) != 0) {
+			match_wclone = B_TRUE;
 		}
 
-		/*
-		 * To enable the bitwise XOR to stand in for the absent C
-		 * logical XOR, we use the logical NOT operator twice to
-		 * ensure the least significant bit is populated with the
-		 * __WCLONE flag status.
-		 */
-		_wclone = !!(flags & LX_WCLONE);
-		is_clone = (stol_signo[SIGCHLD] == exitsig);
-
-		ret = (_wclone ^ is_clone) ? B_TRUE : B_FALSE;
+		ret = (match_wclone ^ is_sigchld) ? B_TRUE : B_FALSE;
 	}
 	mutex_exit(&cp->p_lock);
 

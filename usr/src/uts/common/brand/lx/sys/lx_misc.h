@@ -38,7 +38,7 @@ extern longlong_t lx_nosys();
 
 extern greg_t lx_fixsegreg(greg_t, model_t);
 extern uintptr_t lx_fsbase(klwp_t *, uintptr_t);
-extern void lx_exit_with_sig(proc_t *, sigqueue_t *, void *);
+extern void lx_exit_with_sig(proc_t *, sigqueue_t *);
 extern boolean_t lx_wait_filter(proc_t *, proc_t *);
 
 #define	LX_IFNAME_FROMNATIVE	0

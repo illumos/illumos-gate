@@ -81,7 +81,7 @@ proc		PROCSIZE
 	p_agenttp
 	p_zone
 	p_brand
-	__p_brand_data
+	p_brand_data
 
 _kthread	THREAD_SIZE
 	t_pcb			T_LABEL

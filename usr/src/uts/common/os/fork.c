@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013, Joyent, Inc. All rights reserved.
+ * Copyright 2015, Joyent, Inc.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -696,7 +696,9 @@ fork_fail(proc_t *cp)
 	if (PTOU(curproc)->u_cwd)
 		refstr_rele(PTOU(curproc)->u_cwd);
 	if (PROC_IS_BRANDED(cp)) {
-		brand_clearbrand(cp, B_TRUE);
+		mutex_enter(&cp->p_lock);
+		brand_clearbrand(cp);
+		mutex_exit(&cp->p_lock);
 	}
 }
 
