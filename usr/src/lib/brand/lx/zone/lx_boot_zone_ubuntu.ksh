@@ -253,8 +253,10 @@ script
     echo "proc /proc proc rw,noexec,nosuid,nodev 0 0" >> /etc/mtab
 
     /sbin/initctl emit --no-wait virtual-filesystems
+    /bin/mount -t tmpfs tmpfs /dev/shm || true
     /bin/mount -t tmpfs tmpfs /run || true
     /bin/mkdir -p /run/lock || true
+    /bin/ln -s /dev/shm /run/shm || true
     /sbin/initctl emit --no-wait mounted MOUNTPOINT=/run TYPE=tmpfs
     /sbin/initctl emit --no-wait local-filesystems
     /sbin/initctl emit --no-wait all-swaps

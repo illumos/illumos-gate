@@ -368,26 +368,22 @@ fi
 # 5) Don't try to check the root filesystem (/) as there is no associated
 #    physical device, and any attempt to run fsck will fail.
 #
-# Don't modify the rc.sysinit file if it looks like we already did.
-#
 fnm=$ZONEROOT/etc/rc.d/rc.sysinit
-if ! egrep -s "Disabled by lx brand" $fnm; then
-	tmpfile=/tmp/lx_rc.sysinit.$$
+tmpfile=/tmp/lx_rc.sysinit.$$
 
-	sed 's@^/sbin/hwclock@# Disabled by lx brand: &@
-	    s@^HOSTTYPE=@HOSTTYPE=\"s390\" # Spoofed for lx brand: &@
-	    s@/bin/dmesg -n@: # Disabled by lx brand: &@
-	    s@^dmesg -s@# Disabled by lx brand: &@
-	    s@initlog -c \"fsck@: # Disabled by lx brand: &@
-	    s@^.*mount .* /dev/pts$@# Disabled by lx brand: &@' \
-	    $fnm > $tmpfile
+sed 's@^/sbin/hwclock@# lx: &@
+    s@^/bin/dmesg -n@# lx: &@
+    s@^dmesg -s@# lx: &@
+    s@^initlog -c \"fsck@# lx: &@
+    s@^mount -n -o remount /dev/shm @mount -t tmpfs tmpfs /dev/shm @
+    s@^mount .* /dev/pts@# lx: &@
+    /^#remount \/dev\/shm/d' \
+    $fnm > $tmpfile
 
-	if [[ ! -h $fnm ]]; then
-		mv -f $tmpfile $fnm
-		chmod 755 $fnm
-	fi
+if [[ ! -h $fnm ]]; then
+	mv -f $tmpfile $fnm
+	chmod 755 $fnm
 fi
-
 
 # NOTE: The networking setup assumes an exclusive-stack zone.
 iptype=`/usr/sbin/zonecfg -z $ZONENAME info ip-type | cut -f2 -d' '`

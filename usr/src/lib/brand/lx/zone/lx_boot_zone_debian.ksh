@@ -246,6 +246,17 @@ if [[ "$iptype" == "exclusive" ]]; then
 fi
 
 #
+# We need to setup for the /dev/shm mount. Unlike some other distros, Debian
+# can handle it as either /dev/shm or /run/shm. For simplicity we create an
+# fstab entry to force it into the /dev/shm style.
+#
+fnm=$ZONEROOT/etc/fstab
+entry=$(awk '{if ($2 == "/dev/shm") print $2}' $fnm)
+if [[ -z "$entry" && ! -h $fnm ]]; then
+    echo "swapfs    /dev/shm    tmpfs    defaults    0 0" >> $fnm
+fi
+
+#
 # upstart modifications are complete 
 #
 
