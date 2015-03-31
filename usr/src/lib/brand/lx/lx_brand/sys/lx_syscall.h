@@ -62,6 +62,8 @@ extern long lx_lstat(uintptr_t, uintptr_t);
 extern long lx_stat64(uintptr_t, uintptr_t);
 extern long lx_fstat64(uintptr_t, uintptr_t);
 extern long lx_lstat64(uintptr_t, uintptr_t);
+extern long lx_fcntl(uintptr_t, uintptr_t, uintptr_t);
+extern long lx_fcntl64(uintptr_t, uintptr_t, uintptr_t);
 extern long lx_flock(uintptr_t, uintptr_t);
 extern long lx_readlink(uintptr_t, uintptr_t, uintptr_t);
 extern long lx_readdir(uintptr_t, uintptr_t, uintptr_t);

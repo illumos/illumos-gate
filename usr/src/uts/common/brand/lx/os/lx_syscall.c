@@ -573,7 +573,7 @@ lx_sysent_t lx_sysent32[] = {
 	{"umount2",	NULL,			0,		2}, /* 52 */
 	{"lock",	NULL,			NOSYS_OBSOLETE,	0}, /* 53 */
 	{"ioctl",	lx_ioctl,		0,		3}, /* 54 */
-	{"fcntl",	lx_fcntl,		0,		3}, /* 55 */
+	{"fcntl",	NULL,			0,		3}, /* 55 */
 	{"mpx",		NULL,			NOSYS_OBSOLETE,	0}, /* 56 */
 	{"setpgid",	NULL,			0,		2}, /* 57 */
 	{"ulimit",	NULL,			NOSYS_OBSOLETE,	0}, /* 58 */
@@ -739,7 +739,7 @@ lx_sysent_t lx_sysent32[] = {
 	{"mincore",	NULL,			0,		3}, /* 218 */
 	{"madvise",	NULL,			0,		3}, /* 219 */
 	{"getdents64",	NULL,			0,		3}, /* 220 */
-	{"fcntl64",	lx_fcntl64,		0,		3}, /* 221 */
+	{"fcntl64",	NULL,			0,		3}, /* 221 */
 	{"tux",		NULL,			NOSYS_NO_EQUIV,	0}, /* 222 */
 	{"security",	NULL,			NOSYS_NO_EQUIV,	0}, /* 223 */
 	{"gettid",	lx_gettid,		0,		0}, /* 224 */
@@ -961,7 +961,7 @@ lx_sysent_t lx_sysent64[] = {
 	{"msgsnd",	NULL,			0,		4}, /* 69 */
 	{"msgrcv",	NULL,			0,		5}, /* 70 */
 	{"msgctl",	NULL,			0,		3}, /* 71 */
-	{"fcntl",	lx_fcntl64,		0,		3}, /* 72 */
+	{"fcntl",	NULL,			0,		3}, /* 72 */
 	{"flock",	NULL,			0,		2}, /* 73 */
 	{"fsync",	NULL,			0,		1}, /* 74 */
 	{"fdatasync",	NULL,			0,		1}, /* 75 */
