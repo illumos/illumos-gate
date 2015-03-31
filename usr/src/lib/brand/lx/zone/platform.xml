@@ -131,7 +131,6 @@
 	<device match="brand/lx/mixer" name="mixer" />
 
 	<!-- Symlinks to create under /dev -->
-	<symlink source="shm" target="/run/shm" />
 	<symlink source="fd" target="../proc/self/fd" />
 	<symlink source="stderr" target="../proc/self/fd/2" />
 	<symlink source="stdin" target="../proc/self/fd/0" />
@@ -144,6 +143,9 @@
 	<device match="null" name="initctl" />
 	<!-- Create a dummy for the /dev/log socket -->
 	<device match="null" name="log" />
+	<!-- Create a mount point for /dev/shm tmpfs (see shm_overview(7)) -->
+	<!-- We need to force a dir for the Linux mount to work ok -->
+	<symlink source="shm/loop" target="." />
 	<!-- Create a dummy /dev/xconsole -->
 	<device match="null" name="xconsole" />
 
