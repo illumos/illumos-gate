@@ -349,10 +349,7 @@ typedef struct	proc {
 	struct brand	*p_brand;	/* process's brand  */
 
 	/* per-process brand state */
-	union {
-		void	*__brand_data;
-		int	__exit_data;
-	} __p_brand_data;
+	void		*p_brand_data;
 
 	/* additional lock to protect p_sessp (but not its contents) */
 	kmutex_t p_splock;
@@ -367,8 +364,6 @@ typedef struct	proc {
 	 */
 	struct user p_user;		/* (see sys/user.h) */
 } proc_t;
-#define	p_brand_data		__p_brand_data.__brand_data
-#define	p_exit_data		__p_brand_data.__exit_data
 #define	PROC_T				/* headers relying on proc_t are OK */
 
 #ifdef _KERNEL

@@ -305,8 +305,11 @@ exec_common(const char *fname, const char **argp, const char **envp,
 
 	if ((error = gexec(&vp, &ua, &args, NULL, 0, &execsz,
 	    exec_file, p->p_cred, brand_action)) != 0) {
-		if (brandme)
-			brand_clearbrand(p, B_FALSE);
+		if (brandme) {
+			mutex_enter(&p->p_lock);
+			brand_clearbrand(p);
+			mutex_exit(&p->p_lock);
+		}
 		VN_RELE(vp);
 		if (dir != NULL)
 			VN_RELE(dir);
@@ -423,8 +426,11 @@ exec_common(const char *fname, const char **argp, const char **envp,
 	TRACE_2(TR_FAC_PROC, TR_PROC_EXEC, "proc_exec:p %p up %p", p, up);
 
 	/* Unbrand ourself if necessary. */
-	if (PROC_IS_BRANDED(p) && (brand_action == EBA_NATIVE))
-		brand_clearbrand(p, B_FALSE);
+	if (PROC_IS_BRANDED(p) && (brand_action == EBA_NATIVE)) {
+		mutex_enter(&p->p_lock);
+		brand_clearbrand(p);
+		mutex_exit(&p->p_lock);
+	}
 
 	setregs(&args);
 

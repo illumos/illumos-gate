@@ -54,7 +54,7 @@ int	s10_setattr(zone_t *, int, void *, size_t);
 int	s10_brandsys(int, int64_t *, uintptr_t, uintptr_t, uintptr_t,
 		uintptr_t, uintptr_t);
 void	s10_copy_procdata(proc_t *, proc_t *);
-void	s10_proc_exit(struct proc *, klwp_t *);
+void	s10_proc_exit(struct proc *);
 void	s10_exec();
 int	s10_initlwp(klwp_t *);
 void	s10_forklwp(klwp_t *, klwp_t *);
@@ -353,9 +353,9 @@ s10_copy_procdata(proc_t *child, proc_t *parent)
 }
 
 void
-s10_proc_exit(struct proc *p, klwp_t *l)
+s10_proc_exit(struct proc *p)
 {
-	brand_solaris_proc_exit(p, l, &s10_brand);
+	brand_solaris_proc_exit(p, &s10_brand);
 }
 
 void

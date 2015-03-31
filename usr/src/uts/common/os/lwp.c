@@ -25,7 +25,7 @@
  */
 
 /*
- * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ * Copyright 2015, Joyent, Inc.
  */
 
 #include <sys/param.h>
@@ -891,13 +891,6 @@ lwp_exit(void)
 	if (t->t_upimutex != NULL)
 		upimutex_cleanup();
 
-	/*
-	 * Perform any brand specific exit processing, then release any
-	 * brand data associated with the lwp
-	 */
-	if (PROC_IS_BRANDED(p))
-		BROP(p)->b_lwpexit(lwp);
-
 	lwp_pcb_exit();
 
 	mutex_enter(&p->p_lock);
@@ -939,6 +932,17 @@ lwp_exit(void)
 	}
 
 	DTRACE_PROC(lwp__exit);
+
+	/*
+	 * Perform any brand specific exit processing, then release any
+	 * brand data associated with the lwp
+	 */
+	if (PROC_IS_BRANDED(p)) {
+		mutex_exit(&p->p_lock);
+		BROP(p)->b_lwpexit(lwp);
+		BROP(p)->b_freelwp(lwp);
+		mutex_enter(&p->p_lock);
+	}
 
 	/*
 	 * If the lwp is a detached lwp or if the process is exiting,

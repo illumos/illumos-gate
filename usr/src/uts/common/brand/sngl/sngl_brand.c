@@ -52,7 +52,7 @@ int	sngl_setattr(zone_t *, int, void *, size_t);
 int	sngl_brandsys(int, int64_t *, uintptr_t, uintptr_t, uintptr_t,
 	uintptr_t, uintptr_t);
 void	sngl_copy_procdata(proc_t *, proc_t *);
-void	sngl_proc_exit(struct proc *, klwp_t *);
+void	sngl_proc_exit(struct proc *);
 void	sngl_exec();
 int	sngl_initlwp(klwp_t *);
 void	sngl_forklwp(klwp_t *, klwp_t *);
@@ -184,9 +184,9 @@ sngl_copy_procdata(proc_t *child, proc_t *parent)
 }
 
 void
-sngl_proc_exit(struct proc *p, klwp_t *l)
+sngl_proc_exit(struct proc *p)
 {
-	brand_solaris_proc_exit(p, l, &sngl_brand);
+	brand_solaris_proc_exit(p, &sngl_brand);
 }
 
 void
