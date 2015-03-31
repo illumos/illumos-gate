@@ -879,7 +879,7 @@ lx_sysent_t lx_sysent32[] = {
 	{"sched_getattr", NULL,			NOSYS_NULL,	0}, /* 352 */
 	{"renameat2",	NULL,			NOSYS_NULL,	0}, /* 353 */
 	{"seccomp",	NULL,			NOSYS_NULL,	0}, /* 354 */
-	{"getrandom",	NULL,			NOSYS_NULL,	0}, /* 355 */
+	{"getrandom",	lx_getrandom,		0,		3}, /* 355 */
 	{"memfd_create", NULL,			NOSYS_NULL,	0}, /* 356 */
 	{"bpf",		NULL,			NOSYS_NULL,	0}, /* 357 */
 	{"execveat",	NULL,			NOSYS_NULL,	0}, /* 358 */
@@ -1209,7 +1209,7 @@ lx_sysent_t lx_sysent64[] = {
 	{"sched_getattr", NULL,			NOSYS_NULL,	0}, /* 315 */
 	{"renameat2", NULL,			NOSYS_NULL,	0}, /* 316 */
 	{"seccomp",	NULL,			NOSYS_NULL,	0}, /* 317 */
-	{"getrandom",	NULL,			NOSYS_NULL,	0}, /* 318 */
+	{"getrandom",	lx_getrandom,		0,		3}, /* 318 */
 	{"memfd_create", NULL,			NOSYS_NULL,	0}, /* 319 */
 	{"kexec_file_load", NULL,		NOSYS_NULL,	0}, /* 320 */
 	{"bpf",		NULL,			NOSYS_NULL,	0}, /* 321 */
