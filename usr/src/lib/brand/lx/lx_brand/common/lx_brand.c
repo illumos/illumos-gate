@@ -998,7 +998,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_msgsnd,			/*  69: msgsnd */
 	lx_msgrcv,			/*  70: msgrcv */
 	lx_msgctl,			/*  71: msgctl */
-	NULL,				/*  72: fcntl */
+	lx_fcntl64,			/*  72: fcntl */
 	lx_flock,			/*  73: flock */
 	lx_fsync,			/*  74: fsync */
 	lx_fdatasync,			/*  75: fdatasync */
@@ -1312,7 +1312,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_umount2,			/*  52: umount2 */
 	NULL,				/*  53: lock */
 	NULL,				/*  54: ioctl */
-	NULL,				/*  55: fcntl */
+	lx_fcntl,			/*  55: fcntl */
 	NULL,				/*  56: mpx */
 	lx_setpgid,			/*  57: setpgid */
 	NULL,				/*  58: ulimit */
@@ -1478,7 +1478,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_mincore,			/* 218: mincore */
 	lx_madvise,			/* 219: madvise */
 	lx_getdents64,			/* 220: getdents64 */
-	NULL,				/* 221: fcntl64 */
+	lx_fcntl64,			/* 221: fcntl64 */
 	NULL,				/* 222: tux */
 	NULL,				/* 223: security */
 	NULL,				/* 224: gettid */
