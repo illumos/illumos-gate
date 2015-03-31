@@ -287,6 +287,7 @@ LX_BRAND_OBJS  =		\
 	lx_fcntl.o		\
 	lx_futex.o		\
 	lx_getpid.o		\
+	lx_getrandom.o		\
 	lx_id.o			\
 	lx_ioctl.o		\
 	lx_kill.o		\
