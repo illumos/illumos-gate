@@ -23,10 +23,14 @@
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2015, Joyent, Inc.
+ */
 
 #include <sys/cpuvar.h>
 #include <sys/stack.h>
 #include <vm/seg_kp.h>
+#include <sys/machparam.h>
 #include <sys/proc.h>
 #include <sys/pset.h>
 #include <sys/sysmacros.h>
@@ -39,7 +43,7 @@ thread_create_intr(cpu_t *cp)
 {
 	kthread_t *tp;
 
-	tp = thread_create(NULL, 0,
+	tp = thread_create(NULL, LL_INTR_STKSZ,
 	    (void (*)())thread_create_intr, NULL, 0, &p0, TS_ONPROC, 0);
 
 	/*
@@ -85,9 +89,12 @@ thread_create_intr(cpu_t *cp)
 }
 
 /*
- * Allocate a given number of interrupt threads for a given CPU.
- * These threads will get freed by cpu_destroy_bound_threads()
- * when CPU gets unconfigured.
+ * Allocate a given number of interrupt threads for a given CPU.  These threads
+ * will get freed by cpu_destroy_bound_threads() when the CPU gets unconfigured.
+ *
+ * Note, high level interrupts are always serviced using cpu_intr_stack and are
+ * not allowed to block. Low level interrupts or soft-interrupts use the
+ * kthread_t's that we create through the calls to thread_create_intr().
  */
 void
 cpu_intr_alloc(cpu_t *cp, int n)
