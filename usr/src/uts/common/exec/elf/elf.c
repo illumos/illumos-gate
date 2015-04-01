@@ -216,6 +216,8 @@ mapexec_brand(vnode_t *vp, uarg_t *args, Ehdr *ehdr, Addr *uphdr_vaddr,
 	    &junk, &dtrphdr, NULL, bssbase, brkbase, voffset, &minaddr,
 	    len, &execsz, brksize)) {
 		uprintf("%s: Cannot map %s\n", exec_file, args->pathname);
+		if (uphdr != NULL && uphdr->p_flags == 0)
+			kmem_free(uphdr, sizeof (Phdr));
 		kmem_free(phdrbase, phdrsize);
 		return (error);
 	}
@@ -744,8 +746,13 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 
 		/*
 		 * Now obtain the ELF header along with the entire program
-		 * header contained in "nvp".
+		 * header contained in "nvp".  Before we free our program
+		 * headers, we need to be sure to let go of the uphdr if it
+		 * wasn't dynamically allocated.
 		 */
+		if (uphdr != NULL && uphdr->p_flags != 0)
+			uphdr = NULL;
+
 		kmem_free(phdrbase, phdrsize);
 		phdrbase = NULL;
 		if ((error = getelfhead(nvp, CRED(), ehdrp, &nshdrs,
