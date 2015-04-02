@@ -22,7 +22,7 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2014 Joyent, Inc.  All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -196,15 +196,15 @@ stol_sparam(int policy, struct sched_param *sp, struct lx_sched_param *lsp)
 	    ? -errno : 0);
 }
 
-#define	BITINDEX(ind)	(ind / (sizeof (ulong_t) * 8))
-#define	BITSHIFT(ind)	(1 << (ind % (sizeof (ulong_t) * 8)))
+#define	BITINDEX(ind)	(ind / (sizeof (uint_t) * 8))
+#define	BITSHIFT(ind)	(1 << (ind % (sizeof (uint_t) * 8)))
 
 /* ARGSUSED */
 long
 lx_sched_getaffinity(uintptr_t pid, uintptr_t len, uintptr_t maskp)
 {
 	int	sz;
-	ulong_t	*lmask, *zmask;
+	uint_t	*lmask, *zmask;
 	int	i;
 
 	sz = syscall(SYS_brand, B_GET_AFFINITY_MASK, pid, len, maskp);
@@ -249,7 +249,7 @@ lx_sched_setaffinity(uintptr_t pid, uintptr_t len, uintptr_t maskp)
 	int		sz;
 	int		i;
 	int		found;
-	ulong_t		*lmask;
+	uint_t		*lmask;
 	pid_t		s_pid;
 	lwpid_t		s_tid;
 	processorid_t	cpuid = NULL;
