@@ -366,27 +366,6 @@ proc_exit(int why, int what)
 	}
 	mutex_exit(&p->p_lock);
 
-	DTRACE_PROC(lwp__exit);
-	DTRACE_PROC1(exit, int, why);
-
-
-	/*
-	 * Will perform any brand specific proc exit processing. Since this
-	 * is always the last lwp, will also perform lwp exit/free and proc
-	 * exit. Brand data will be freed when the process is reaped.
-	 */
-	if (PROC_IS_BRANDED(p)) {
-		BROP(p)->b_lwpexit(lwp);
-		BROP(p)->b_proc_exit(p);
-		/*
-		 * To ensure that b_proc_exit has access to brand-specific data
-		 * contained by the one remaining lwp, call the freelwp hook as
-		 * the last part of this clean-up process.
-		 */
-		BROP(p)->b_freelwp(lwp);
-		lwp_detach_brand_hdlrs(lwp);
-	}
-
 	/*
 	 * Don't let init exit unless zone_start_init() failed its exec, or
 	 * we are shutting down the zone or the machine.
@@ -436,6 +415,32 @@ proc_exit(int why, int what)
 		 * processing.
 		 */
 		z->zone_proc_initpid = -1;
+	}
+
+	/*
+	 * Delay firing probes (and performing brand cleanup) until after the
+	 * zone_proc_initpid check. Cases which result in zone shutdown or
+	 * restart via zone_kadmin eventually result in a call back to
+	 * proc_exit.
+	 */
+	DTRACE_PROC(lwp__exit);
+	DTRACE_PROC1(exit, int, why);
+
+	/*
+	 * Will perform any brand specific proc exit processing. Since this
+	 * is always the last lwp, will also perform lwp exit/free and proc
+	 * exit. Brand data will be freed when the process is reaped.
+	 */
+	if (PROC_IS_BRANDED(p)) {
+		BROP(p)->b_lwpexit(lwp);
+		BROP(p)->b_proc_exit(p);
+		/*
+		 * To ensure that b_proc_exit has access to brand-specific data
+		 * contained by the one remaining lwp, call the freelwp hook as
+		 * the last part of this clean-up process.
+		 */
+		BROP(p)->b_freelwp(lwp);
+		lwp_detach_brand_hdlrs(lwp);
 	}
 
 	lwp_pcb_exit();
