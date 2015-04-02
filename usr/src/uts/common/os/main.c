@@ -27,7 +27,7 @@
 /*	  All Rights Reserved  	*/
 
 /*
- * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ * Copyright 2015, Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -157,7 +157,7 @@ exec_init(const char *initpath, const char *args)
 	int error = 0, count = 0;
 	proc_t *p = ttoproc(curthread);
 	klwp_t *lwp = ttolwp(curthread);
-	int brand_action;
+	int brand_action = EBA_NONE;
 
 	if (args == NULL)
 		args = "";
@@ -268,7 +268,15 @@ exec_init(const char *initpath, const char *args)
 	 */
 	sigemptyset(&curthread->t_hold);
 
-	brand_action = ZONE_IS_BRANDED(p->p_zone) ? EBA_BRAND : EBA_NONE;
+	/*
+	 * Only instruct exec_common to brand the process if necessary.  It is
+	 * possible that the init process is already properly branded due to the
+	 * proc_exit -> restart_init -> exec_init call chain.
+	 */
+	if (ZONE_IS_BRANDED(p->p_zone) &&
+	    p->p_brand != p->p_zone->zone_brand) {
+		brand_action = EBA_BRAND;
+	}
 again:
 	error = exec_common((const char *)(uintptr_t)exec_fnamep,
 	    (const char **)(uintptr_t)uap, NULL, brand_action);
