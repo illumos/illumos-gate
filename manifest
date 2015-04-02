@@ -10471,7 +10471,7 @@ f usr/sbin/rwall 0555 root bin
 f usr/sbin/sacadm 4755 root sys
 f usr/sbin/safe_finger 0555 root bin
 f usr/sbin/sbdadm 0555 root bin
-s usr/sbin/sendmail=../lib/smtp/sendmail/sendmail
+s usr/sbin/sendmail=../lib/mailwrapper
 f usr/sbin/setmnt 0555 root bin
 h usr/sbin/share=usr/sbin/sharemgr
 f usr/sbin/shareall 0555 root bin
