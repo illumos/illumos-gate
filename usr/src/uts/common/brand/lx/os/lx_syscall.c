@@ -746,9 +746,9 @@ lx_sysent_t lx_sysent32[] = {
 	{"security",	NULL,			NOSYS_NO_EQUIV,	0}, /* 223 */
 	{"gettid",	lx_gettid,		0,		0}, /* 224 */
 	{"readahead",	NULL,			NOSYS_NO_EQUIV,	0}, /* 225 */
-	{"setxattr",	NULL,			NOSYS_NO_EQUIV,	0}, /* 226 */
-	{"lsetxattr",	NULL,			NOSYS_NO_EQUIV,	0}, /* 227 */
-	{"fsetxattr",	NULL,			NOSYS_NO_EQUIV,	0}, /* 228 */
+	{"setxattr",	lx_xattr,		0,		5}, /* 226 */
+	{"lsetxattr",	lx_xattr,		0,		5}, /* 227 */
+	{"fsetxattr",	lx_xattr,		0,		5}, /* 228 */
 	{"getxattr",	lx_xattr,		0,		4}, /* 229 */
 	{"lgetxattr",	lx_xattr,		0,		4}, /* 230 */
 	{"fgetxattr",	lx_xattr,		0,		4}, /* 231 */
@@ -1079,9 +1079,9 @@ lx_sysent_t lx_sysent64[] = {
 	{"security",	NULL,			NOSYS_NO_EQUIV,	0}, /* 185 */
 	{"gettid",	lx_gettid,		0,		0}, /* 186 */
 	{"readahead",	NULL,			NOSYS_NO_EQUIV,	0}, /* 187 */
-	{"setxattr",	NULL,			NOSYS_NO_EQUIV,	0}, /* 188 */
-	{"lsetxattr",	NULL,			NOSYS_NO_EQUIV,	0}, /* 189 */
-	{"fsetxattr",	NULL,			NOSYS_NO_EQUIV,	0}, /* 190 */
+	{"setxattr",	lx_xattr,		0,		5}, /* 188 */
+	{"lsetxattr",	lx_xattr,		0,		5}, /* 189 */
+	{"fsetxattr",	lx_xattr,		0,		5}, /* 190 */
 	{"getxattr",	lx_xattr,		0,		4}, /* 191 */
 	{"lgetxattr",	lx_xattr,		0,		4}, /* 192 */
 	{"fgetxattr",	lx_xattr,		0,		4}, /* 193 */
