@@ -160,6 +160,11 @@ static int
 lx_fcntl_common(int fd, int cmd, ulong_t arg)
 {
 	int		rc = 0;
+	pid_t		pid;
+	int		error;
+	int		rv;
+	int32_t		flag;
+	file_t		*fp;
 
 	/*
 	 * We depend on the call to fcntl to set the errno if necessary.
@@ -209,20 +214,46 @@ lx_fcntl_common(int fd, int cmd, ulong_t arg)
 		break;
 
 	case LX_F_SETOWN:
-		if ((int)arg == 1) {
+		pid = (pid_t)arg;
+		if (pid == 1) {
 			/* Setown for the init process uses the real pid. */
-			arg = (ulong_t)curzone->zone_proc_initpid;
+			pid = curzone->zone_proc_initpid;
 		}
 
-		rc = fcntl(fd, F_SETOWN, arg);
+		if ((fp = getf(fd)) == NULL)
+			return (set_errno(EBADF));
+
+		rv = 0;
+
+		flag = fp->f_flag | get_udatamodel() | FKIOCTL;
+		error = VOP_IOCTL(fp->f_vnode, FIOSETOWN, (intptr_t)&pid,
+		    flag, CRED(), &rv, NULL);
+		releasef(fd);
+		if (error != 0)
+			return (set_errno(error));
+
+		rc = 0;
 		break;
 
 	case LX_F_GETOWN:
-		rc = fcntl(fd, F_GETOWN, arg);
-		if (rc == curzone->zone_proc_initpid) {
+		if ((fp = getf(fd)) == NULL)
+			return (set_errno(EBADF));
+
+		rv = 0;
+
+		flag = fp->f_flag | get_udatamodel() | FKIOCTL;
+		error = VOP_IOCTL(fp->f_vnode, FIOGETOWN, (intptr_t)&pid,
+		    flag, CRED(), &rv, NULL);
+		releasef(fd);
+		if (error != 0)
+			return (set_errno(error));
+
+		if (pid == curzone->zone_proc_initpid) {
 			/* Getown for the init process returns 1. */
-			rc = 1;
+			pid = 1;
 		}
+
+		rc = pid;
 		break;
 
 	default:
