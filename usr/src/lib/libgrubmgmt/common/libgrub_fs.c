@@ -24,6 +24,7 @@
  */
 /*
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2015 Toomas Soome <tsoome@me.com>
  */
 
 /*
@@ -42,6 +43,8 @@
 #include <sys/mount.h>
 #include <sys/mntent.h>
 #include <sys/mnttab.h>
+#include <sys/efi_partition.h>
+#include <sys/vtoc.h>
 #include <sys/fs/ufs_mount.h>
 #include <sys/dktp/fdisk.h>
 #include <libfstyp.h>
@@ -55,6 +58,10 @@ static int
 slice_match(const char *physpath, int slice)
 {
 	const char *pos;
+
+	/* always match whole disk slice */
+	if (slice == SLCNUM_WHOLE_DISK)
+		return (0);
 
 	return ((pos = strrchr(physpath, slice)) == NULL ||
 	    pos[1] != 0 || pos[-1] != ':');
@@ -99,6 +106,26 @@ get_sol_prtnum(const char *physpath)
 
 	if ((pos = strrchr(rdev, ':')) == NULL)
 		return (PRTNUM_INVALID);
+
+	/*
+	 * first check for EFI partitioning, efi_alloc_and_read()
+	 * will return partition number.
+	 */
+	if ((fd = open(rdev, O_RDONLY|O_NDELAY)) >= 0) {
+		struct dk_gpt *vtoc;
+
+		if ((i = efi_alloc_and_read(fd, &vtoc)) >= 0) {
+			/* zfs is using V_USR */
+			if (vtoc->efi_parts[i].p_tag != V_USR)
+				i = PRTNUM_INVALID; /* error */
+			efi_free(vtoc);
+			(void) close(fd);
+			return (i);
+		}
+		(void) close(fd);
+	} else {
+		return (PRTNUM_INVALID);
+	}
 
 	pos[1] = SLCNUM_WHOLE_DISK;
 
