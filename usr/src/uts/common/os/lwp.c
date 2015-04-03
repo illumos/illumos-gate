@@ -115,7 +115,7 @@ lwp_create(void (*proc)(), caddr_t arg, size_t len, proc_t *p,
 	ret_tidhash_t *ret_tidhash = NULL;
 	int i;
 	int rctlfail = 0;
-	boolean_t branded = 0;
+	boolean_t branded = B_FALSE;
 	struct ctxop *ctx = NULL;
 
 	ASSERT(cid != sysdccid);	/* system threads must start in SYS */
@@ -630,18 +630,6 @@ grow:
 		} while (lwp_hash_lookup(p, t->t_tid) != NULL);
 	}
 
-	/*
-	 * If this is a branded process, let the brand do any necessary lwp
-	 * initialization.
-	 */
-	if (PROC_IS_BRANDED(p)) {
-		if (BROP(p)->b_initlwp(lwp)) {
-			err = 1;
-			atomic_inc_32(&p->p_zone->zone_ffmisc);
-			goto error;
-		}
-		branded = 1;
-	}
 
 	if (t->t_tid == 1) {
 		kpreempt_disable();
@@ -654,7 +642,6 @@ grow:
 		}
 	}
 
-	p->p_lwpcnt++;
 	t->t_waitfor = -1;
 
 	/*
@@ -695,9 +682,31 @@ grow:
 	t->t_pre_sys = 1;
 	t->t_post_sys = 1;
 
+	mutex_exit(&p->p_lock);
+	/*
+	 * If this is a branded process, allocate any brand-specific lwp data.
+	 */
+	if (PROC_IS_BRANDED(p)) {
+		if (BROP(p)->b_brandlwp(lwp) != 0) {
+			mutex_enter(&p->p_lock);
+			err = 1;
+			atomic_inc_32(&p->p_zone->zone_ffmisc);
+			goto error;
+		}
+		branded = B_TRUE;
+	}
+
+	mutex_enter(&p->p_lock);
+
+	/* Complete branded lwp initialization */
+	if (branded && BROP(p)->b_initlwp != NULL) {
+		BROP(p)->b_initlwp(lwp);
+	}
+
 	/*
 	 * Insert the new thread into the list of all threads.
 	 */
+	p->p_lwpcnt++;
 	if ((tx = p->p_tlist) == NULL) {
 		t->t_back = t;
 		t->t_forw = t;
@@ -753,8 +762,9 @@ error:
 		if (cid != NOCLASS && bufp != NULL)
 			CL_FREE(cid, bufp);
 
-		if (branded)
+		if (branded) {
 			BROP(p)->b_freelwp(lwp);
+		}
 
 		mutex_exit(&p->p_lock);
 		t->t_state = TS_FREE;

@@ -56,7 +56,7 @@ int	s10_brandsys(int, int64_t *, uintptr_t, uintptr_t, uintptr_t,
 void	s10_copy_procdata(proc_t *, proc_t *);
 void	s10_proc_exit(struct proc *);
 void	s10_exec();
-int	s10_initlwp(klwp_t *);
+int	s10_brandlwp(klwp_t *);
 void	s10_forklwp(klwp_t *, klwp_t *);
 void	s10_freelwp(klwp_t *);
 void	s10_lwpexit(klwp_t *);
@@ -77,7 +77,8 @@ struct brand_ops s10_brops = {
 	s10_proc_exit,			/* b_proc_exit */
 	s10_exec,			/* b_exec */
 	lwp_setrval,			/* b_lwp_setrval */
-	s10_initlwp,			/* b_initlwp */
+	s10_brandlwp,			/* b_brandlwp */
+	NULL,				/* b_initlwp */
 	s10_forklwp,			/* b_forklwp */
 	s10_freelwp,			/* b_freelwp */
 	s10_lwpexit,			/* b_lwpexit */
@@ -365,9 +366,9 @@ s10_exec()
 }
 
 int
-s10_initlwp(klwp_t *l)
+s10_brandlwp(klwp_t *l)
 {
-	return (brand_solaris_initlwp(l, &s10_brand));
+	return (brand_solaris_brandlwp(l, &s10_brand));
 }
 
 void
