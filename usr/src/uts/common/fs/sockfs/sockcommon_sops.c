@@ -996,8 +996,10 @@ so_poll(struct sonode *so, short events, int anyyet, short *reventsp,
 			mutex_enter(&so->so_lock);
 			if (SO_HAVE_DATA(so) ||
 			    !list_is_empty(&so->so_acceptq_list)) {
-				if (events & POLLET)
+				if (events & POLLET) {
 					so->so_pollev |= SO_POLLEV_IN;
+					*phpp = &so->so_poll_list;
+				}
 
 				mutex_exit(&so->so_lock);
 				*reventsp |= (POLLIN|POLLRDNORM) & events;
