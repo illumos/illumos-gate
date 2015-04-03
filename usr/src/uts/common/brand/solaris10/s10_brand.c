@@ -61,7 +61,7 @@ void	s10_forklwp(klwp_t *, klwp_t *);
 void	s10_freelwp(klwp_t *);
 void	s10_lwpexit(klwp_t *);
 int	s10_elfexec(vnode_t *, execa_t *, uarg_t *, intpdata_t *, int,
-	long *, int, caddr_t, cred_t *, int);
+	long *, int, caddr_t, cred_t *, int *);
 void	s10_sigset_native_to_s10(sigset_t *);
 void	s10_sigset_s10_to_native(sigset_t *);
 
@@ -418,7 +418,7 @@ s10_init_brand_data(zone_t *zone)
 int
 s10_elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 	int level, long *execsz, int setid, caddr_t exec_file, cred_t *cred,
-	int brand_action)
+	int *brand_action)
 {
 	return (brand_solaris_elfexec(vp, uap, args, idatap, level, execsz,
 	    setid, exec_file, cred, brand_action, &s10_brand, S10_BRANDNAME,

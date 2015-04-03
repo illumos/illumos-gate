@@ -287,7 +287,7 @@ mapexec_brand(vnode_t *vp, uarg_t *args, Ehdr *ehdr, Addr *uphdr_vaddr,
 int
 elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
     int level, long *execsz, int setid, caddr_t exec_file, cred_t *cred,
-    int brand_action)
+    int *brand_action)
 {
 	caddr_t		phdrbase = NULL;
 	caddr_t 	bssbase = 0;
@@ -405,11 +405,11 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 	 * be branded and be subject to all of the normal actions of the brand.
 	 */
 	if ((level < 2) &&
-	    (brand_action != EBA_NATIVE) && (PROC_IS_BRANDED(p))) {
+	    (*brand_action != EBA_NATIVE) && (PROC_IS_BRANDED(p))) {
 		if (BROP(p)->b_native_exec(ehdrp->e_ident[EI_OSABI],
 		    &args->brand_nroot) == B_TRUE) {
 			ASSERT(ehdrp->e_ident[EI_OSABI]);
-			brand_action = EBA_NATIVE;
+			*brand_action = EBA_NATIVE;
 			/* Add one for the trailing '/' in the path */
 			if (args->brand_nroot != NULL)
 				nsize = strlen(args->brand_nroot) + 1;
@@ -417,7 +417,7 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 	}
 
 	if ((level < 2) &&
-	    (brand_action != EBA_NATIVE) && (PROC_IS_BRANDED(p))) {
+	    (*brand_action != EBA_NATIVE) && (PROC_IS_BRANDED(p))) {
 		error = BROP(p)->b_elfexec(vp, uap, args,
 		    idatap, level + 1, execsz, setid, exec_file, cred,
 		    brand_action);
@@ -544,7 +544,7 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 		args->auxsize += sizeof (aux_entry_t);
 	}
 
-	if ((brand_action != EBA_NATIVE) && (PROC_IS_BRANDED(p))) {
+	if ((*brand_action != EBA_NATIVE) && (PROC_IS_BRANDED(p))) {
 		branded = 1;
 		/*
 		 * We will be adding 5 entries to the aux vectors.  One for
@@ -842,7 +842,7 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 		 * malicious user within the zone from crafting a wrapper to
 		 * run native suid commands with unsecure libraries interposed.
 		 */
-		if ((brand_action == EBA_NATIVE) && (PROC_IS_BRANDED(p) &&
+		if ((*brand_action == EBA_NATIVE) && (PROC_IS_BRANDED(p) &&
 		    (setid &= ~EXECSETID_SETID) != 0))
 			auxf &= ~AF_SUN_SETUGID;
 
@@ -2333,7 +2333,7 @@ static struct modlexec modlexec = {
 extern int elf32exec(vnode_t *vp, execa_t *uap, uarg_t *args,
 			intpdata_t *idatap, int level, long *execsz,
 			int setid, caddr_t exec_file, cred_t *cred,
-			int brand_action);
+			int *brand_action);
 extern int elf32core(vnode_t *vp, proc_t *p, cred_t *credp,
 			rlim64_t rlimit, int sig, core_content_t content);
 

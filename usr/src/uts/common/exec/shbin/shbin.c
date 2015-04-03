@@ -22,6 +22,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2015, Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -58,7 +59,7 @@ shbinexec(
 	int setid,
 	caddr_t exec_file,
 	struct cred *cred,
-	int brand_action);
+	int *brand_action);
 
 #define	SHBIN_CNTL(x)	((x)&037)
 #define	SHBINMAGIC_LEN	4
@@ -162,7 +163,7 @@ shbinexec(
 	int setid,
 	caddr_t exec_file,
 	struct cred *cred,
-	int brand_action)
+	int *brand_action)
 {
 	_NOTE(ARGUNUSED(brand_action))
 	vnode_t *nvp;
