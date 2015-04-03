@@ -1463,13 +1463,13 @@ typedef enum {
 
 static const ofmt_field_t overlay_fields[] = {
 /* name,	field width,  index */
-{ "LINK",	13,	OVERLAY_LINK,		print_overlay_cb },
-{ "PROPERTY",	20,	OVERLAY_PROPERTY,	print_overlay_cb },
+{ "LINK",	19,	OVERLAY_LINK,		print_overlay_cb },
+{ "PROPERTY",	19,	OVERLAY_PROPERTY,	print_overlay_cb },
 { "PERM",	5,	OVERLAY_PERM,		print_overlay_cb },
 { "REQ",	4,	OVERLAY_REQ,		print_overlay_cb },
-{ "VALUE",	12,	OVERLAY_VALUE,		print_overlay_cb },
-{ "DEFAULT",	12,	OVERLAY_DEFAULT,	print_overlay_cb },
-{ "POSSIBLE",	12,	OVERLAY_POSSIBLE,	print_overlay_cb },
+{ "VALUE",	11,	OVERLAY_VALUE,		print_overlay_cb },
+{ "DEFAULT",	10,	OVERLAY_DEFAULT,	print_overlay_cb },
+{ "POSSIBLE",	10,	OVERLAY_POSSIBLE,	print_overlay_cb },
 { NULL,		0,	0,	NULL }
 };
 
@@ -1480,9 +1480,9 @@ typedef enum {
 } overlay_fma_field_index_t;
 
 static const ofmt_field_t overlay_fma_fields[] = {
-{ "LINK",	14,	OVERLAY_FMA_LINK,	print_overlay_fma_cb },
+{ "LINK",	20,	OVERLAY_FMA_LINK,	print_overlay_fma_cb },
 { "STATUS",	8,	OVERLAY_FMA_STATUS,	print_overlay_fma_cb },
-{ "DETAILS",	58,	OVERLAY_FMA_DETAILS,	print_overlay_fma_cb },
+{ "DETAILS",	52,	OVERLAY_FMA_DETAILS,	print_overlay_fma_cb },
 { NULL,		0,	0,			NULL }
 };
 
@@ -1493,9 +1493,9 @@ typedef enum {
 } overlay_targ_field_index_t;
 
 static const ofmt_field_t overlay_targ_fields[] = {
-{ "LINK",		14,	OVERLAY_TARG_LINK,	print_overlay_targ_cb },
-{ "TARGET",		8,	OVERLAY_TARG_TARGET,	print_overlay_targ_cb },
-{ "DESTINATION",	58,	OVERLAY_TARG_DEST,	print_overlay_targ_cb },
+{ "LINK",		20,	OVERLAY_TARG_LINK,	print_overlay_targ_cb },
+{ "TARGET",		18,	OVERLAY_TARG_TARGET,	print_overlay_targ_cb },
+{ "DESTINATION",	42,	OVERLAY_TARG_DEST,	print_overlay_targ_cb },
 { NULL,			0,	0,			NULL }
 };
 
