@@ -22,6 +22,7 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2012 Milan Jurik. All rights reserved.
+ * Copyright 2015, Joyent, Inc.
  */
 
 /*	Copyright (c) 1988 AT&T	*/
@@ -54,7 +55,7 @@
 #include <sys/modctl.h>
 
 extern int intpexec(struct vnode *, struct execa *, struct uarg *,
-    struct intpdata *, int, long *, int, caddr_t, struct cred *, int);
+    struct intpdata *, int, long *, int, caddr_t, struct cred *, int *);
 
 static struct execsw esw = {
 	intpmagicstr,
@@ -188,7 +189,7 @@ intpexec(
 	int setid,
 	caddr_t exec_file,
 	struct cred *cred,
-	int brand_action)
+	int *brand_action)
 {
 	_NOTE(ARGUNUSED(brand_action))
 	vnode_t *nvp;
@@ -199,6 +200,7 @@ intpexec(
 	char *opath;
 	char devfd[19]; /* 32-bit int fits in 10 digits + 8 for "/dev/fd/" */
 	int fd = -1;
+	int custom_action = EBA_NONE;
 
 	if (level >= INTP_MAXDEPTH) {	/* Can't recurse past maxdepth */
 		error = ELOOP;
@@ -281,7 +283,7 @@ intpexec(
 	}
 
 	error = gexec(&nvp, uap, args, &idata, ++level, execsz, exec_file, cred,
-	    EBA_NONE);
+	    &custom_action);
 
 	if (!error) {
 		/*

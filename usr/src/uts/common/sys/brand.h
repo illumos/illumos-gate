@@ -165,7 +165,7 @@ struct brand_ops {
 	int	(*b_elfexec)(struct vnode *vp, struct execa *uap,
 	    struct uarg *args, struct intpdata *idata, int level,
 	    long *execsz, int setid, caddr_t exec_file,
-	    struct cred *cred, int brand_action);
+	    struct cred *cred, int *brand_action);
 	void	(*b_sigset_native_to_brand)(sigset_t *);
 	void	(*b_sigset_brand_to_native)(sigset_t *);
 	void	(*b_psig_to_proc)(proc_t *, kthread_t *, int);
@@ -244,7 +244,7 @@ extern int	brand_solaris_cmd(int, uintptr_t, uintptr_t, uintptr_t,
 extern void	brand_solaris_copy_procdata(proc_t *, proc_t *,
 		    struct brand *);
 extern int	brand_solaris_elfexec(vnode_t *, execa_t *, uarg_t *,
-		    intpdata_t *, int, long *, int, caddr_t, cred_t *, int,
+		    intpdata_t *, int, long *, int, caddr_t, cred_t *, int *,
 		    struct brand *, char *, char *, char *);
 extern void	brand_solaris_exec(struct brand *);
 extern int	brand_solaris_fini(char **, struct modlinkage *,

@@ -22,6 +22,7 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright (c) 2011 Bayard G. Bell. All rights reserved.
+ * Copyright 2015, Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -54,7 +55,7 @@
 
 static int aoutexec(vnode_t *vp, execa_t *uap, uarg_t *args,
     intpdata_t *idatap, int level, long *execsz, int setid,
-    caddr_t exec_file, cred_t *cred, int brand_action);
+    caddr_t exec_file, cred_t *cred, int *brand_action);
 static int get_aout_head(struct vnode **vpp, struct exdata *edp, long *execsz,
     int *isdyn);
 static int aoutcore(vnode_t *vp, proc_t *pp, cred_t *credp,
@@ -130,7 +131,7 @@ _info(struct modinfo *modinfop)
 static int
 aoutexec(vnode_t *vp, struct execa *uap, struct uarg *args,
     struct intpdata *idatap, int level, long *execsz, int setid,
-    caddr_t exec_file, cred_t *cred, int brand_action)
+    caddr_t exec_file, cred_t *cred, int *brand_action)
 {
 	auxv32_t auxflags_auxv32;
 	int error;

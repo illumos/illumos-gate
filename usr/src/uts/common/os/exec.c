@@ -317,7 +317,7 @@ exec_common(const char *fname, const char **argp, const char **envp,
 	}
 
 	if ((error = gexec(&vp, &ua, &args, NULL, 0, &execsz,
-	    exec_file, p->p_cred, brand_action)) != 0) {
+	    exec_file, p->p_cred, &brand_action)) != 0) {
 		if (brandme) {
 			BROP(p)->b_freelwp(lwp);
 			brand_clearbrand(p);
@@ -565,7 +565,7 @@ gexec(
 	long *execsz,
 	caddr_t exec_file,
 	struct cred *cred,
-	int brand_action)
+	int *brand_action)
 {
 	struct vnode *vp, *execvp = NULL;
 	proc_t *pp = ttoproc(curthread);

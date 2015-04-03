@@ -616,7 +616,7 @@ restoreexecenv(struct execenv *ep, stack_t *sp)
 int
 brand_solaris_elfexec(vnode_t *vp, execa_t *uap, uarg_t *args,
     intpdata_t *idatap, int level, long *execsz, int setid, caddr_t exec_file,
-    cred_t *cred, int brand_action, struct brand *pbrand, char *bname,
+    cred_t *cred, int *brand_action, struct brand *pbrand, char *bname,
     char *brandlib, char *brandlib32)
 {
 

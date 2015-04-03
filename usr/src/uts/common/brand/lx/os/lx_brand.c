@@ -212,7 +212,7 @@ uint64_t lx_maxstack64 = LX_MAXSTACK64;
 
 static int lx_elfexec(struct vnode *vp, struct execa *uap, struct uarg *args,
     struct intpdata *idata, int level, long *execsz, int setid,
-    caddr_t exec_file, struct cred *cred, int brand_action);
+    caddr_t exec_file, struct cred *cred, int *brand_action);
 
 static boolean_t lx_native_exec(uint8_t, const char **);
 static uint32_t lx_map32limit(proc_t *);
@@ -1351,10 +1351,10 @@ restoreexecenv(struct execenv *ep, stack_t *sp)
 }
 
 extern int elfexec(vnode_t *, execa_t *, uarg_t *, intpdata_t *, int,
-    long *, int, caddr_t, cred_t *, int);
+    long *, int, caddr_t, cred_t *, int *);
 
 extern int elf32exec(struct vnode *, execa_t *, uarg_t *, intpdata_t *, int,
-    long *, int, caddr_t, cred_t *, int);
+    long *, int, caddr_t, cred_t *, int *);
 
 /*
  * Exec routine called by elfexec() to load either 32-bit or 64-bit Linux
@@ -1363,7 +1363,7 @@ extern int elf32exec(struct vnode *, execa_t *, uarg_t *, intpdata_t *, int,
 static int
 lx_elfexec(struct vnode *vp, struct execa *uap, struct uarg *args,
     struct intpdata *idata, int level, long *execsz, int setid,
-    caddr_t exec_file, struct cred *cred, int brand_action)
+    caddr_t exec_file, struct cred *cred, int *brand_action)
 {
 	int		error;
 	vnode_t		*nvp;

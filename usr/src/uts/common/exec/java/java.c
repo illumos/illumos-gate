@@ -21,6 +21,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2015, Joyent, Inc.
  */
 
 /*
@@ -85,7 +86,7 @@ char *jexec_arg = "-jar";
 static int
 javaexec(vnode_t *vp, struct execa *uap, struct uarg *args,
     struct intpdata *idatap, int level, long *execsz, int setid,
-    caddr_t execfile, cred_t *cred, int brand_action)
+    caddr_t execfile, cred_t *cred, int *brand_action)
 {
 	struct intpdata idata;
 	int error;
