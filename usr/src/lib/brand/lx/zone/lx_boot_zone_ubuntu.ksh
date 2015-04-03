@@ -140,6 +140,9 @@ RMSVCS="acpid
 	bluetooth
 	bootmisc.sh
 	checkroot.sh
+	cloud-init-blocknet
+	cloud-init-container
+	cloud-init-nonet
 	control-alt-delete
 	console-setup
 	dmesg
