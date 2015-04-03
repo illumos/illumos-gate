@@ -54,7 +54,7 @@ int	sngl_brandsys(int, int64_t *, uintptr_t, uintptr_t, uintptr_t,
 void	sngl_copy_procdata(proc_t *, proc_t *);
 void	sngl_proc_exit(struct proc *);
 void	sngl_exec();
-int	sngl_initlwp(klwp_t *);
+int	sngl_brandlwp(klwp_t *);
 void	sngl_forklwp(klwp_t *, klwp_t *);
 void	sngl_freelwp(klwp_t *);
 void	sngl_lwpexit(klwp_t *);
@@ -73,7 +73,8 @@ struct brand_ops sngl_brops = {
 	sngl_proc_exit,			/* b_proc_exit */
 	sngl_exec,			/* b_exec */
 	lwp_setrval,			/* b_lwp_setrval */
-	sngl_initlwp,			/* b_initlwp */
+	sngl_brandlwp,			/* b_brandlwp */
+	NULL,				/* b_initlwp */
 	sngl_forklwp,			/* b_forklwp */
 	sngl_freelwp,			/* b_freelwp */
 	sngl_lwpexit,			/* b_lwpexit */
@@ -196,9 +197,9 @@ sngl_exec()
 }
 
 int
-sngl_initlwp(klwp_t *l)
+sngl_brandlwp(klwp_t *l)
 {
-	return (brand_solaris_initlwp(l, &sngl_brand));
+	return (brand_solaris_brandlwp(l, &sngl_brand));
 }
 
 void

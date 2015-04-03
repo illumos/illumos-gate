@@ -55,7 +55,7 @@ brand_t native_brand = {
 		"native",
 		NULL,
 		&native_mach_ops,
-		0,
+		0
 };
 
 /*
@@ -316,35 +316,54 @@ void
 brand_setbrand(proc_t *p)
 {
 	brand_t *bp = p->p_zone->zone_brand;
+	void *brand_data = NULL;
 
-	ASSERT(bp != NULL);
-	ASSERT(p->p_brand == &native_brand);
+	VERIFY(MUTEX_NOT_HELD(&p->p_lock));
+	VERIFY(bp != NULL);
 
 	/*
-	 * We should only be called from exec(), when we know the process
-	 * is single-threaded.
+	 * We should only be called from exec() or getproc(), when we know the
+	 * process has 0 or 1 threads.
 	 */
-	ASSERT(p->p_tlist == p->p_tlist->t_forw);
+	VERIFY((p->p_tlist == NULL) || (p->p_tlist == p->p_tlist->t_forw));
 
+	if (bp->b_data_size > 0) {
+		brand_data = kmem_zalloc(bp->b_data_size, KM_SLEEP);
+	}
+
+	mutex_enter(&p->p_lock);
+	ASSERT(!PROC_IS_BRANDED(p));
 	p->p_brand = bp;
+	p->p_brand_data = brand_data;
 	ASSERT(PROC_IS_BRANDED(p));
 	BROP(p)->b_setbrand(p);
+	mutex_exit(&p->p_lock);
 }
 
 void
 brand_clearbrand(proc_t *p)
 {
 	brand_t *bp = p->p_zone->zone_brand;
-	klwp_t *lwp = NULL;
-	ASSERT(bp != NULL);
-	ASSERT(PROC_IS_BRANDED(p));
-	VERIFY(mutex_owned(&p->p_lock));
+	void *brand_data;
+
+	VERIFY(MUTEX_NOT_HELD(&p->p_lock));
+	VERIFY(bp != NULL);
+	VERIFY(PROC_IS_BRANDED(p));
+
+	/*
+	 * There cannot be more than one lwp associated with a process when
+	 * stripping the brand.
+	 */
 	VERIFY((p->p_tlist == NULL) || (p->p_tlist == p->p_tlist->t_forw));
 
+	mutex_enter(&p->p_lock);
 	p->p_brand = &native_brand;
-	if (p->p_brand_data != NULL) {
-		kmem_free(p->p_brand_data, bp->b_data_size);
-		p->p_brand_data = NULL;
+	brand_data = p->p_brand_data;
+	p->p_brand_data = NULL;
+	mutex_exit(&p->p_lock);
+
+	if (brand_data != NULL) {
+		kmem_free(brand_data, bp->b_data_size);
 	}
 }
 
@@ -479,7 +498,7 @@ brand_solaris_cmd(int cmd, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3,
 		return (ENOSYS);
 
 	/* For all other operations this must be a branded process. */
-	if (p->p_brand == &native_brand)
+	if (!PROC_IS_BRANDED(p))
 		return (ENOSYS);
 
 	ASSERT(p->p_brand == pbrand);
@@ -1018,7 +1037,7 @@ brand_solaris_exec(struct brand *pbrand)
 
 	/* Upon exec, reset our lwp brand data. */
 	(void) brand_solaris_freelwp(ttolwp(curthread), pbrand);
-	(void) brand_solaris_initlwp(ttolwp(curthread), pbrand);
+	(void) brand_solaris_brandlwp(ttolwp(curthread), pbrand);
 
 	/*
 	 * Upon exec, reset all the proc brand data, except for the elf
@@ -1062,7 +1081,7 @@ brand_solaris_forklwp(klwp_t *p, klwp_t *c, struct brand *pbrand)
 
 	/*
 	 * Both LWPs have already had been initialized via
-	 * brand_solaris_initlwp().
+	 * brand_solaris_brandlwp().
 	 */
 	ASSERT(p->lwp_brand != NULL);
 	ASSERT(c->lwp_brand != NULL);
@@ -1080,7 +1099,7 @@ brand_solaris_freelwp(klwp_t *l, struct brand *pbrand)
 
 /*ARGSUSED*/
 int
-brand_solaris_initlwp(klwp_t *l, struct brand *pbrand)
+brand_solaris_brandlwp(klwp_t *l, struct brand *pbrand)
 {
 	ASSERT(l->lwp_procp->p_brand == pbrand);
 	ASSERT(l->lwp_procp->p_brand_data != NULL);
@@ -1123,5 +1142,4 @@ brand_solaris_setbrand(proc_t *p, struct brand *pbrand)
 	ASSERT(p->p_tlist == p->p_tlist->t_forw);
 
 	p->p_brand_data = kmem_zalloc(sizeof (brand_proc_data_t), KM_SLEEP);
-	(void) brand_solaris_initlwp(p->p_tlist->t_lwp, pbrand);
 }

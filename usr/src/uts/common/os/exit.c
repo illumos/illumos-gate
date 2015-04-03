@@ -1348,9 +1348,7 @@ freeproc(proc_t *p)
 
 	/* Clear any remaining brand data */
 	if (PROC_IS_BRANDED(p)) {
-		mutex_enter(&p->p_lock);
 		brand_clearbrand(p);
-		mutex_exit(&p->p_lock);
 	}
 
 

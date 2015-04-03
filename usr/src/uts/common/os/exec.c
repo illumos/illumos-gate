@@ -299,16 +299,28 @@ exec_common(const char *fname, const char **argp, const char **envp,
 	ua.argp = argp;
 	ua.envp = envp;
 
-	/* If necessary, brand this process before we start the exec. */
-	if (brandme)
+	/* If necessary, brand this process/lwp before we start the exec. */
+	if (brandme) {
 		brand_setbrand(p);
+		if (BROP(p)->b_brandlwp(lwp) != 0) {
+			VN_RELE(vp);
+			if (dir != NULL)
+				VN_RELE(dir);
+			pn_free(&resolvepn);
+			goto fail;
+		}
+		if (BROP(p)->b_initlwp != NULL) {
+			mutex_enter(&p->p_lock);
+			BROP(p)->b_initlwp(lwp);
+			mutex_exit(&p->p_lock);
+		}
+	}
 
 	if ((error = gexec(&vp, &ua, &args, NULL, 0, &execsz,
 	    exec_file, p->p_cred, brand_action)) != 0) {
 		if (brandme) {
-			mutex_enter(&p->p_lock);
+			BROP(p)->b_freelwp(lwp);
 			brand_clearbrand(p);
-			mutex_exit(&p->p_lock);
 		}
 		VN_RELE(vp);
 		if (dir != NULL)
@@ -427,9 +439,8 @@ exec_common(const char *fname, const char **argp, const char **envp,
 
 	/* Unbrand ourself if necessary. */
 	if (PROC_IS_BRANDED(p) && (brand_action == EBA_NATIVE)) {
-		mutex_enter(&p->p_lock);
+		BROP(p)->b_freelwp(lwp);
 		brand_clearbrand(p);
-		mutex_exit(&p->p_lock);
 	}
 
 	setregs(&args);

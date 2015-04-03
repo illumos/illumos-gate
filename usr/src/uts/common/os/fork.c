@@ -696,9 +696,7 @@ fork_fail(proc_t *cp)
 	if (PTOU(curproc)->u_cwd)
 		refstr_rele(PTOU(curproc)->u_cwd);
 	if (PROC_IS_BRANDED(cp)) {
-		mutex_enter(&cp->p_lock);
 		brand_clearbrand(cp);
-		mutex_exit(&cp->p_lock);
 	}
 }
 
@@ -1006,6 +1004,9 @@ getproc(proc_t **cpp, pid_t pid, uint_t flags)
 	cp->p_t1_lgrpid = LGRP_NONE;
 	cp->p_tr_lgrpid = LGRP_NONE;
 
+	/* Default to native brand initially */
+	cp->p_brand = &native_brand;
+
 	if ((newpid = pid_allocate(cp, pid, PID_ALLOC_PROC)) == -1) {
 		if (nproc == v.v_proc) {
 			CPU_STATS_ADDQ(CPU, sys, procovf, 1);
@@ -1073,9 +1074,6 @@ getproc(proc_t **cpp, pid_t pid, uint_t flags)
 	cp->p_flag = pp->p_flag & (SJCTL|SNOWAIT|SNOCD);
 	cp->p_sessp = pp->p_sessp;
 	sess_hold(pp);
-	cp->p_brand = pp->p_brand;
-	if (PROC_IS_BRANDED(pp))
-		BROP(pp)->b_copy_procdata(cp, pp);
 	cp->p_bssbase = pp->p_bssbase;
 	cp->p_brkbase = pp->p_brkbase;
 	cp->p_brksize = pp->p_brksize;
@@ -1154,6 +1152,11 @@ getproc(proc_t **cpp, pid_t pid, uint_t flags)
 		task_attach(pp->p_task, cp);
 	mutex_exit(&cp->p_lock);
 	mutex_exit(&pidlock);
+
+	if (PROC_IS_BRANDED(pp)) {
+		brand_setbrand(cp);
+		BROP(pp)->b_copy_procdata(cp, pp);
+	}
 
 	avl_create(&cp->p_ct_held, contract_compar, sizeof (contract_t),
 	    offsetof(contract_t, ct_ctlist));

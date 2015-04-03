@@ -51,15 +51,8 @@
 #include <sys/sunddi.h>
 
 /* Linux specific functions and definitions */
-void lx_setrval(klwp_t *, int, int);
-void lx_exec();
-int lx_initlwp(klwp_t *);
-void lx_forklwp(klwp_t *, klwp_t *);
-void lx_exitlwp(klwp_t *);
-void lx_freelwp(klwp_t *);
 static void lx_save(klwp_t *);
 static void lx_restore(klwp_t *);
-extern void lx_ptrace_free(proc_t *);
 
 /*
  * Set the return code for the forked child, always zero
@@ -82,7 +75,6 @@ lx_exec()
 	proc_t *p = ttoproc(curthread);
 	lx_proc_data_t *pd = ptolxproc(p);
 	struct regs *rp = lwptoregs(lwp);
-	int err;
 
 	/*
 	 * Any l_handler handlers set as a result of B_REGISTER are now
@@ -91,25 +83,10 @@ lx_exec()
 	pd->l_handler = NULL;
 
 	/*
-	 * There are two mutually exclusive special cases we need to
-	 * address.  First, if this was a native process prior to this
-	 * exec(), then this lwp won't have its brand-specific data
-	 * initialized and it won't be assigned a Linux PID yet.  Second,
-	 * if this was a multi-threaded Linux process and this lwp wasn't
-	 * the main lwp, then we need to make its Solaris and Linux PIDS
-	 * match.
+	 * If this was a multi-threaded Linux process and this lwp wasn't the
+	 * main lwp, then we need to make its Illumos and Linux PIDs match.
 	 */
-	if (lwpd == NULL) {
-		err = lx_initlwp(lwp);
-		/*
-		 * Only possible failure from this routine should be an
-		 * inability to allocate a new PID.  Since single-threaded
-		 * processes don't need a new PID, we should never hit this
-		 * error.
-		 */
-		ASSERT(err == 0);
-		lwpd = lwptolxlwp(lwp);
-	} else if (curthread->t_tid != 1) {
+	if (curthread->t_tid != 1) {
 		lx_pid_reassign(curthread);
 	}
 
@@ -260,8 +237,7 @@ lx_freelwp(klwp_t *lwp)
 	(void) removectx(lwptot(lwp), lwp, lx_save, lx_restore, NULL, NULL,
 	    lx_save, NULL);
 	if (lwpd->br_pid != 0) {
-		lx_pid_rele(lwptoproc(lwp)->p_pid,
-		    lwptot(lwp)->t_tid);
+		lx_pid_rele(lwptoproc(lwp)->p_pid, lwptot(lwp)->t_tid);
 	}
 
 	/*
@@ -276,11 +252,13 @@ lx_freelwp(klwp_t *lwp)
 }
 
 int
-lx_initlwp(klwp_t *lwp)
+lx_brandlwp(klwp_t *lwp)
 {
 	lx_lwp_data_t *lwpd;
 	lx_lwp_data_t *plwpd = ttolxlwp(curthread);
 	kthread_t *tp = lwptot(lwp);
+
+	VERIFY(lwp->lwp_brand == NULL);
 
 	lwpd = kmem_zalloc(sizeof (struct lx_lwp_data), KM_SLEEP);
 	lwpd->br_exitwhy = CLD_EXITED;
@@ -289,7 +267,6 @@ lx_initlwp(klwp_t *lwp)
 	lwpd->br_set_ctidp = NULL;
 	lwpd->br_signal = 0;
 	lwpd->br_stack_mode = LX_STACK_MODE_PREINIT;
-
 	/*
 	 * lwpd->br_affinitymask was zeroed by kmem_zalloc()
 	 * as was lwpd->br_scall_args and lwpd->br_args_size.
@@ -331,19 +308,24 @@ lx_initlwp(klwp_t *lwp)
 	    lx_save, NULL);
 
 	/*
+	 * Install branded system call hook for this LWP:
+	 */
+	lwp->lwp_brand_syscall = lx_syscall_enter;
+	return (0);
+}
+
+void
+lx_initlwp(klwp_t *lwp)
+{
+	lx_lwp_data_t *lwpd = lwptolxlwp(lwp);
+	lx_lwp_data_t *plwpd = ttolxlwp(curthread);
+	/*
 	 * If the parent LWP has a ptrace(2) tracer, the new LWP may
 	 * need to inherit that same tracer.
 	 */
 	if (plwpd != NULL) {
 		lx_ptrace_inherit_tracer(plwpd, lwpd);
 	}
-
-	/*
-	 * Install branded system call hook for this LWP:
-	 */
-	lwp->lwp_brand_syscall = lx_syscall_enter;
-
-	return (0);
 }
 
 /*

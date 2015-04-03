@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright (c) 2014 Joyent, Inc.  All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  */
 
 /*
@@ -392,7 +392,7 @@ lx_netlink_getsockname(sock_lower_handle_t handle, struct sockaddr *sa,
 	/*
 	 * Make sure our lies are consistent with the lies told by other liars.
 	 */
-	if (p->p_brand != &native_brand && curthread != p->p_agenttp) {
+	if (PROC_IS_BRANDED(p) && curthread != p->p_agenttp) {
 		lxsa->lxnl_family = LX_AF_NETLINK;
 	} else {
 		lxsa->lxnl_family = AF_LX_NETLINK;

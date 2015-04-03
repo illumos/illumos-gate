@@ -243,6 +243,7 @@ struct brand_ops lx_brops = {
 	lx_proc_exit,			/* b_proc_exit */
 	lx_exec,			/* b_exec */
 	lx_setrval,			/* b_lwp_setrval */
+	lx_brandlwp,			/* b_brandlwp */
 	lx_initlwp,			/* b_initlwp */
 	lx_forklwp,			/* b_forklwp */
 	lx_freelwp,			/* b_freelwp */
@@ -312,22 +313,8 @@ lx_proc_exit(proc_t *p)
 void
 lx_setbrand(proc_t *p)
 {
-	kthread_t *t = p->p_tlist;
-	int err;
-
-	ASSERT(p->p_brand_data == NULL);
-	ASSERT(ttolxlwp(curthread) == NULL);
-
-	p->p_brand_data = kmem_zalloc(sizeof (struct lx_proc_data), KM_SLEEP);
+	/* Send SIGCHLD to parent by default when child exits */
 	ptolxproc(p)->l_signal = stol_signo[SIGCHLD];
-
-	/*
-	 * This routine can only be called for single-threaded processes.
-	 * Since lx_initlwp() can only fail if we run out of PIDs for
-	 * multithreaded processes, we know that this can never fail.
-	 */
-	err = lx_initlwp(t->t_lwp);
-	ASSERT(err == 0);
 }
 
 /* ARGSUSED */
@@ -1308,17 +1295,15 @@ lx_setid_clear(vattr_t *vap, cred_t *cr)
 void
 lx_copy_procdata(proc_t *child, proc_t *parent)
 {
-	lx_proc_data_t *cpd, *ppd;
+	lx_proc_data_t *cpd = child->p_brand_data;
+	lx_proc_data_t *ppd = parent->p_brand_data;
 
-	ppd = parent->p_brand_data;
+	VERIFY(parent->p_brand == &lx_brand);
+	VERIFY(child->p_brand == &lx_brand);
+	VERIFY(ppd != NULL);
+	VERIFY(cpd != NULL);
 
-	ASSERT(ppd != NULL);
-	ASSERT(parent->p_brand == &lx_brand);
-
-	cpd = kmem_alloc(sizeof (lx_proc_data_t), KM_SLEEP);
 	*cpd = *ppd;
-
-	child->p_brand_data = cpd;
 
 	cpd->l_fake_limits[LX_RLFAKE_LOCKS].rlim_cur = LX_RLIM64_INFINITY;
 	cpd->l_fake_limits[LX_RLFAKE_LOCKS].rlim_max = LX_RLIM64_INFINITY;

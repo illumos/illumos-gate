@@ -103,6 +103,48 @@ struct brand_mach_ops;
 struct intpdata;
 struct execa;
 
+/*
+ * Common structure to define hooks for brand operation.
+ *
+ * Required Fields:
+ * b_init_brand_data - Setup zone brand data during zone_setbrand
+ * b_free_brand_data - Free zone brand data during zone_destroy
+ * b_brandsys - Syscall handler for brandsys
+ * b_setbrand - Initialize process brand data
+ * b_getattr - Get brand-custom zone attribute
+ * b_setattr - Set brand-custom zone attribute
+ * b_copy_procdata - Copy process brand data during fork
+ * b_proc_exit - Perform process brand exit processing
+ * b_exec - Reset branded process state on exec
+ * b_lwp_setrval - Set return code for forked child
+ * b_brandlwp - Allocate lwp brand data (p_lock not held)
+ * b_forklwp - Copy lwp brand data during fork
+ * b_freelwp - Free lwp brand data
+ * b_lwpexit - Perform lwp-specific brand exit processing
+ * b_elfexec - Load and execute ELF binary
+ * b_sigset_native_to_brand - Convert sigset native->brand
+ * b_sigset_brand_to_native - Convert sigset brand->native
+ * b_nsig - Maxiumum signal number
+ * b_sendsig - Update process state after sendsig
+ *
+ * Optional Fields:
+ * b_initlwp - Populate lwp brand data after b_brandlwp (p_lock held)
+ * b_exit_with_sig - Instead of sending SIGCLD, exit with custom behavior
+ * b_psig_to_proc - Custom additional behavior during psig
+ * b_wait_filter - Filter processes from being matched by waitid
+ * b_native_exec - Provide interpreter path prefix for executables
+ * b_ptrace_exectrap - Custom behavior for legacy ptrace traps
+ * b_map32limit - Specify alternate limit for MAP_32BIT mappings
+ * b_stop_notify - Hook process stop events
+ * b_waitid_helper - Generate synthetic results for waitid
+ * b_sigcld_repost - Post synthetic SIGCLD signals
+ * b_issig_stop - Alter/suppress signal delivery during issig
+ * b_savecontext - Alter context during savecontext
+ * b_restorecontext - Alter context during restorecontext
+ * b_sendsig_stack - Override stack used for signal delivery
+ * b_setid_clear - Override setid_clear behavior
+ * b_pagefault - Trap pagefault events
+ */
 struct brand_ops {
 	void	(*b_init_brand_data)(zone_t *);
 	void	(*b_free_brand_data)(zone_t *);
@@ -115,7 +157,8 @@ struct brand_ops {
 	void	(*b_proc_exit)(struct proc *);
 	void	(*b_exec)();
 	void	(*b_lwp_setrval)(klwp_t *, int, int);
-	int	(*b_initlwp)(klwp_t *);
+	int	(*b_brandlwp)(klwp_t *);
+	void	(*b_initlwp)(klwp_t *);
 	void	(*b_forklwp)(klwp_t *, klwp_t *);
 	void	(*b_freelwp)(klwp_t *);
 	void	(*b_lwpexit)(klwp_t *);
@@ -208,7 +251,7 @@ extern int	brand_solaris_fini(char **, struct modlinkage *,
 		    struct brand *);
 extern void	brand_solaris_forklwp(klwp_t *, klwp_t *, struct brand *);
 extern void	brand_solaris_freelwp(klwp_t *, struct brand *);
-extern int	brand_solaris_initlwp(klwp_t *, struct brand *);
+extern int	brand_solaris_brandlwp(klwp_t *, struct brand *);
 extern void	brand_solaris_lwpexit(klwp_t *, struct brand *);
 extern void	brand_solaris_proc_exit(struct proc *, struct brand *);
 extern void	brand_solaris_setbrand(proc_t *, struct brand *);
