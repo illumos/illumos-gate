@@ -1041,11 +1041,11 @@ print_struct(smbios_hdl_t *shp, const smbios_struct_t *sp, void *fp)
 	    (uint_t)sp->smbstr_id, (ulong_t)sp->smbstr_size);
 
 	if ((s = smbios_type_name(sp->smbstr_type)) != NULL)
-		oprintf(fp, " (%u) %s", sp->smbstr_type, s);
+		oprintf(fp, " %s (type %u)", s, sp->smbstr_type);
 	else if (sp->smbstr_type > SMB_TYPE_OEM_LO &&
 	    sp->smbstr_type < SMB_TYPE_OEM_HI)
-		oprintf(fp, " (%u) %s+%u", sp->smbstr_type, "SMB_TYPE_OEM_LO",
-		    sp->smbstr_type - SMB_TYPE_OEM_LO);
+		oprintf(fp, " %s+%u (type %u)", "SMB_TYPE_OEM_LO",
+		    sp->smbstr_type - SMB_TYPE_OEM_LO, sp->smbstr_type);
 	else
 		oprintf(fp, " %u", sp->smbstr_type);
 
