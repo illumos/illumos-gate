@@ -74,7 +74,6 @@ lx_thrkill(pid_t tgid, pid_t pid, int lx_sig, boolean_t tgkill)
 	proc_t *pp, *cp = curproc;
 	pid_t initpid;
 	sigqueue_t *sqp;
-	struct lx_lwp_data *br = ttolxlwp(curthread);
 	int tid = 1;	/* default tid */
 	int sig, rv;
 
