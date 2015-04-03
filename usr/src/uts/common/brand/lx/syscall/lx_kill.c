@@ -71,7 +71,7 @@ static long
 lx_thrkill(pid_t tgid, pid_t pid, int lx_sig, boolean_t tgkill)
 {
 	kthread_t *t;
-	proc_t *pp;
+	proc_t *pp, *cp = curproc;
 	pid_t initpid;
 	sigqueue_t *sqp;
 	struct lx_lwp_data *br = ttolxlwp(curthread);
@@ -94,7 +94,7 @@ lx_thrkill(pid_t tgid, pid_t pid, int lx_sig, boolean_t tgkill)
 	 *
 	 * Otherwise, extract the tid and real pid from the Linux pid.
 	 */
-	initpid = curproc->p_zone->zone_proc_initpid;
+	initpid = cp->p_zone->zone_proc_initpid;
 	if (pid == 1)
 		pid = initpid;
 	if ((pid == initpid) && ((rv = init_sig_check(sig, pid)) != 0))
@@ -129,8 +129,8 @@ lx_thrkill(pid_t tgid, pid_t pid, int lx_sig, boolean_t tgkill)
 	 *	+ prochasprocperm() shows the user lacks sufficient permission
 	 *	  to send the signal to the target pid
 	 */
-	if (((sig == SIGCONT) && (pp->p_sessp != curproc->p_sessp)) ||
-	    (!prochasprocperm(pp, curproc, CRED()))) {
+	if (((sig == SIGCONT) && (pp->p_sessp != cp->p_sessp)) ||
+	    (!prochasprocperm(pp, cp, CRED()))) {
 		mutex_exit(&pp->p_lock);
 		rv = set_errno(EPERM);
 		goto free_and_exit;
@@ -152,7 +152,7 @@ lx_thrkill(pid_t tgid, pid_t pid, int lx_sig, boolean_t tgkill)
 
 	sqp->sq_info.si_signo = sig;
 	sqp->sq_info.si_code = SI_LWP;
-	sqp->sq_info.si_pid = br->br_pid;
+	sqp->sq_info.si_pid = cp->p_pid;
 	sqp->sq_info.si_zoneid = getzoneid();
 	sqp->sq_info.si_uid = crgetruid(CRED());
 	sigaddqa(pp, t, sqp);
