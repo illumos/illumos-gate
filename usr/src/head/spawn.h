@@ -74,16 +74,16 @@ extern int posix_spawn(
 	const char *_RESTRICT_KYWD path,
 	const posix_spawn_file_actions_t *file_actions,
 	const posix_spawnattr_t *_RESTRICT_KYWD attrp,
-	char *const argv[_RESTRICT_KYWD],
-	char *const envp[_RESTRICT_KYWD]);
+	char *const *_RESTRICT_KYWD argv,
+	char *const *_RESTRICT_KYWD envp);
 
 extern int posix_spawnp(
 	pid_t *_RESTRICT_KYWD pid,
 	const char *_RESTRICT_KYWD file,
 	const posix_spawn_file_actions_t *file_actions,
 	const posix_spawnattr_t *_RESTRICT_KYWD attrp,
-	char *const argv[_RESTRICT_KYWD],
-	char *const envp[_RESTRICT_KYWD]);
+	char *const *_RESTRICT_KYWD argv,
+	char *const *_RESTRICT_KYWD envp);
 
 extern int posix_spawn_file_actions_init(
 	posix_spawn_file_actions_t *file_actions);
