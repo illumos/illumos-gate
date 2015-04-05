@@ -64,7 +64,7 @@ dladm_vlan_create(dladm_handle_t handle, const char *vlan, datalink_id_t linkid,
 {
 	return (dladm_vnic_create(handle, vlan, linkid,
 	    VNIC_MAC_ADDR_TYPE_PRIMARY, NULL, 0, NULL, 0, vid, VRRP_VRID_NONE,
-	    AF_UNSPEC, vlan_id_out, proplist, flags | DLADM_OPT_VLAN));
+	    AF_UNSPEC, vlan_id_out, proplist, NULL, flags | DLADM_OPT_VLAN));
 }
 
 /*

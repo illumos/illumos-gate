@@ -261,8 +261,11 @@ static void	die(const char *, ...);
 static void	die_optdup(int);
 static void	die_opterr(int, int, const char *);
 static void	die_dlerr(dladm_status_t, const char *, ...);
+static void	die_dlerrlist(dladm_status_t, dladm_errlist_t *,
+    const char *, ...);
 static void	warn(const char *, ...);
 static void	warn_dlerr(dladm_status_t, const char *, ...);
+static void	warn_dlerrlist(dladm_errlist_t *);
 
 typedef struct	cmd {
 	char		*c_name;
@@ -4881,7 +4884,7 @@ do_create_vnic(int argc, char *argv[], const char *use)
 
 	status = dladm_vnic_create(handle, name, dev_linkid, mac_addr_type,
 	    mac_addr, maclen, &mac_slot, mac_prefix_len, vid, vrid, af,
-	    &linkid, proplist, flags);
+	    &linkid, proplist, &errlist, flags);
 	switch (status) {
 	case DLADM_STATUS_OK:
 		break;
@@ -4892,7 +4895,8 @@ do_create_vnic(int argc, char *argv[], const char *use)
 		break;
 
 	default:
-		die_dlerr(status, "vnic creation over %s failed", devname);
+		die_dlerrlist(status, &errlist, "vnic creation over %s failed",
+		    devname);
 	}
 
 	dladm_free_props(proplist);
@@ -5422,7 +5426,7 @@ do_create_etherstub(int argc, char *argv[], const char *use)
 
 	status = dladm_vnic_create(handle, name, DATALINK_INVALID_LINKID,
 	    VNIC_MAC_ADDR_TYPE_AUTO, mac_addr, ETHERADDRL, NULL, 0, 0,
-	    VRRP_VRID_NONE, AF_UNSPEC, NULL, NULL, flags);
+	    VRRP_VRID_NONE, AF_UNSPEC, NULL, NULL, &errlist, flags);
 	if (status != DLADM_STATUS_OK)
 		die_dlerr(status, "etherstub creation failed");
 }
@@ -9081,6 +9085,21 @@ warn_dlerr(dladm_status_t err, const char *format, ...)
 	(void) fprintf(stderr, ": %s\n", dladm_status2str(err, errmsg));
 }
 
+static void
+warn_dlerrlist(dladm_errlist_t *errlist)
+{
+	if (errlist != NULL && errlist->el_count > 0) {
+		int i;
+		for (i = 0; i < errlist->el_count; i++) {
+			(void) fprintf(stderr, gettext("%s: warning: "),
+			    progname);
+
+			(void) fprintf(stderr, "%s\n",
+			    gettext(errlist->el_errs[i]));
+		}
+	}
+}
+
 /*
  * Also closes the dladm handle if it is not NULL.
  */
@@ -9104,6 +9123,34 @@ die_dlerr(dladm_status_t err, const char *format, ...)
 		dladm_close(handle);
 
 	exit(EXIT_FAILURE);
+}
+
+/*
+ * Like die_dlerr, but uses the errlist for additional information.
+ */
+/* PRINTFLIKE3 */
+static void
+die_dlerrlist(dladm_status_t err, dladm_errlist_t *errlist,
+    const char *format, ...)
+{
+	va_list	alist;
+	char	errmsg[DLADM_STRSIZE];
+
+	warn_dlerrlist(errlist);
+	format = gettext(format);
+	(void) fprintf(stderr, "%s: ", progname);
+
+	va_start(alist, format);
+	(void) vfprintf(stderr, format, alist);
+	va_end(alist);
+	(void) fprintf(stderr, ": %s\n", dladm_status2str(err, errmsg));
+
+	/* close dladm handle if it was opened */
+	if (handle != NULL)
+		dladm_close(handle);
+
+	exit(EXIT_FAILURE);
+
 }
 
 /* PRINTFLIKE1 */
@@ -9912,10 +9959,7 @@ do_create_overlay(int argc, char *argv[], const char *use)
 	    proplist, &errlist, flags);
 	dladm_free_props(proplist);
 	if (status != DLADM_STATUS_OK) {
-		int i;
-		for (i = 0; i < errlist.el_count; i++)
-			(void) fprintf(stderr, "%s\n", errlist.el_errs[i]);
-		die_dlerr(status, "overlay creation failed");
+		die_dlerrlist(status, &errlist, "overlay creation failed");
 	}
 }
 
@@ -10169,11 +10213,7 @@ show_one_overlay(dladm_handle_t hdl, datalink_id_t linkid, void *arg)
 	dladm_errlist_reset(&errlist);
 	(void) dladm_overlay_walk_prop(handle, linkid, dladm_overlay_show_one,
 	    &state, &errlist);
-	if (errlist.el_count != 0) {
-		int i;
-		for (i = 0; i < errlist.el_count; i++)
-			(void) fprintf(stderr, "%s\n", errlist.el_errs[i]);
-	}
+	warn_dlerrlist(&errlist);
 
 	return (DLADM_WALK_CONTINUE);
 }
