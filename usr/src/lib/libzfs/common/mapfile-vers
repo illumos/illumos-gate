@@ -77,6 +77,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	zfs_expand_proplist;
 	zfs_get_handle;
 	zfs_get_holds;
+	zfs_get_hole_count;
 	zfs_get_name;
 	zfs_get_pool_handle;
 	zfs_get_user_props;
