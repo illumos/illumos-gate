@@ -36,6 +36,7 @@ file path=usr/share/man/man3c/aiocancel.3c
 file path=usr/share/man/man3c/aioread.3c
 file path=usr/share/man/man3c/aiowait.3c
 file path=usr/share/man/man3c/assert.3c
+file path=usr/share/man/man3c/arc4random.3c
 file path=usr/share/man/man3c/atexit.3c
 file path=usr/share/man/man3c/atomic_add.3c
 file path=usr/share/man/man3c/atomic_and.3c
@@ -146,6 +147,7 @@ file path=usr/share/man/man3c/getcpuid.3c
 file path=usr/share/man/man3c/getcwd.3c
 file path=usr/share/man/man3c/getdate.3c
 file path=usr/share/man/man3c/getdtablesize.3c
+file path=usr/share/man/man3c/getentropy.3c
 file path=usr/share/man/man3c/getenv.3c
 file path=usr/share/man/man3c/getexecname.3c
 file path=usr/share/man/man3c/getgrnam.3c
@@ -546,6 +548,8 @@ link path=usr/share/man/man3c/addrtosymstr.3c target=walkcontext.3c
 link path=usr/share/man/man3c/aiowrite.3c target=aioread.3c
 link path=usr/share/man/man3c/alloca.3c target=malloc.3c
 link path=usr/share/man/man3c/alphasort.3c target=scandir.3c
+link path=usr/share/man/man3c/arc4random_buf.3c target=arc4random.3c
+link path=usr/share/man/man3c/arc4random_uniform.3c target=arc4random.3c
 link path=usr/share/man/man3c/ascftime.3c target=strftime.3c
 link path=usr/share/man/man3c/asctime.3c target=ctime.3c
 link path=usr/share/man/man3c/asctime_r.3c target=ctime.3c
@@ -733,6 +737,7 @@ link path=usr/share/man/man3c/errx.3c target=err.3c
 link path=usr/share/man/man3c/etext.3c target=end.3c
 link path=usr/share/man/man3c/euccol.3c target=euclen.3c
 link path=usr/share/man/man3c/eucscol.3c target=euclen.3c
+link path=usr/share/man/man3c/explicit_bzero.3c target=bstring.3c
 link path=usr/share/man/man3c/extended_to_decimal.3c \
     target=floating_to_decimal.3c
 link path=usr/share/man/man3c/fconvert.3c target=econvert.3c

@@ -260,6 +260,17 @@ extern char *ulltostr(unsigned long long, char *);
 
 #endif /* defined(__EXTENSIONS__) || !defined(_STRICT_STDC) ... */
 
+/* OpenBSD compatibility functions */
+#if !defined(_STRICT_SYMBOLS)
+
+#include <inttypes.h>
+extern uint32_t arc4random(void);
+extern void arc4random_buf(void *, size_t);
+extern uint32_t arc4random_uniform(uint32_t);
+
+#endif	/* !_STRICT_SYBMOLS */
+
+
 #ifdef	__cplusplus
 }
 #endif

@@ -169,6 +169,7 @@ static struct	seg_ops segkp_ops = {
 	segkp_getmemid,			/* getmemid */
 	segkp_getpolicy,		/* getpolicy */
 	segkp_capable,			/* capable */
+	seg_inherit_notsup		/* inherit */
 };
 
 

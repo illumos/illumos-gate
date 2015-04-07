@@ -276,6 +276,7 @@ GENUNIX_OBJS +=	\
 		profil.o	\
 		project.o	\
 		qsort.o		\
+		getrandom.o	\
 		rctl.o		\
 		rctlsys.o	\
 		readlink.o	\

@@ -93,6 +93,15 @@ $if _x86 && _ELF64
 $add amd64
 $endif
 
+SYMBOL_VERSION ILLUMOS_0.12 {	# arc4random and friends
+    protected:
+	arc4random;
+	arc4random_buf;
+	arc4random_uniform;
+	explicit_bzero;
+	getentropy;
+} ILLUMOS_0.11;
+
 SYMBOL_VERSION ILLUMOS_0.11 {	# Illumos additions
     protected:
 	iswxdigit_l;
@@ -2859,6 +2868,7 @@ $endif
 	_getfp;
 	_getgroupsbymember;
 	_getlogin_r;
+	getrandom;
 	_getsp;
 	__gettsp;
 	getvmusage;

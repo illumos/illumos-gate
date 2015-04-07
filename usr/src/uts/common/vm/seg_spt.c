@@ -109,6 +109,7 @@ struct seg_ops segspt_ops = {
 	SEGSPT_BADOP(int),		/* getmemid */
 	segspt_getpolicy,		/* getpolicy */
 	SEGSPT_BADOP(int),		/* capable */
+	seg_inherit_notsup		/* inherit */
 };
 
 static int segspt_shmdup(struct seg *seg, struct seg *newseg);
@@ -168,6 +169,7 @@ struct seg_ops segspt_shmops = {
 	segspt_shmgetmemid,
 	segspt_shmgetpolicy,
 	segspt_shmcapable,
+	seg_inherit_notsup
 };
 
 static void segspt_purge(struct seg *seg);

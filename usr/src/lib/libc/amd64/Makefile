@@ -89,6 +89,9 @@ FPASMOBJS=			\
 ATOMICOBJS=			\
 	atomic.o
 
+CHACHAOBJS=			\
+	chacha.o
+
 XATTROBJS=			\
 	xattr_common.o
 COMOBJS=			\
@@ -106,6 +109,8 @@ GENOBJS=			\
 	_getsp.o		\
 	abs.o			\
 	alloca.o		\
+	arc4random.o		\
+	arc4random_uniform.o	\
 	attrat.o		\
 	byteorder.o		\
 	cuexit.o		\
@@ -202,6 +207,7 @@ COMSYSOBJS=			\
 	getpid.o		\
 	getpmsg.o		\
 	getppid.o		\
+	getrandom.o		\
 	getrlimit.o		\
 	getuid.o		\
 	gtty.o			\
@@ -374,6 +380,7 @@ PORTGEN=			\
 	euclen.o		\
 	event_port.o		\
 	execvp.o		\
+	explicit_bzero.o	\
 	fattach.o		\
 	fdetach.o		\
 	fdopendir.o		\
@@ -388,6 +395,7 @@ PORTGEN=			\
 	getcwd.o		\
 	getdate_err.o		\
 	getdtblsize.o		\
+	getentropy.o		\
 	getenv.o		\
 	getexecname.o		\
 	getgrnam.o		\
@@ -922,6 +930,7 @@ MOSTOBJS=			\
 	$(I386FPOBJS)		\
 	$(FPASMOBJS)		\
 	$(ATOMICOBJS)		\
+	$(CHACHAOBJS)		\
 	$(XATTROBJS)		\
 	$(COMOBJS)		\
 	$(GENOBJS)		\
@@ -1163,6 +1172,8 @@ $(PORTSTDIO_C89:%=pics/%) := \
 
 $(PORTI18N_COND:%=pics/%) := \
 	CPPFLAGS += -D_WCS_LONGLONG
+
+pics/arc4random.o :=	CPPFLAGS += -I$(SRC)/common/crypto/chacha
 
 .KEEP_STATE:
 

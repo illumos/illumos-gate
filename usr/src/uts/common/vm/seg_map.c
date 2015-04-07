@@ -124,6 +124,7 @@ static struct seg_ops segmap_ops = {
 	segmap_getmemid,	/* getmemid */
 	segmap_getpolicy,	/* getpolicy */
 	segmap_capable,		/* capable */
+	seg_inherit_notsup	/* inherit */
 };
 
 /*

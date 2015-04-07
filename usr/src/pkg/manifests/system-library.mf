@@ -588,6 +588,10 @@ license usr/src/lib/passwdutil/THIRDPARTYLICENSE \
     license=usr/src/lib/passwdutil/THIRDPARTYLICENSE
 license usr/src/lib/pkcs11/pkcs11_tpm/THIRDPARTYLICENSE \
     license=usr/src/lib/pkcs11/pkcs11_tpm/THIRDPARTYLICENSE
+license usr/src/man/man3c/THIRDPARTYLICENSE.arc4random \
+    license=usr/src/man/man3c/THIRDPARTYLICENSE.arc4random
+license usr/src/man/man3c/THIRDPARTYLICENSE.getentropy \
+    license=usr/src/man/man3c/THIRDPARTYLICENSE.getentropy
 license usr/src/uts/common/sys/THIRDPARTYLICENSE.unicode \
     license=usr/src/uts/common/sys/THIRDPARTYLICENSE.unicode
 link path=lib/$(ARCH64)/libadm.so target=libadm.so.1

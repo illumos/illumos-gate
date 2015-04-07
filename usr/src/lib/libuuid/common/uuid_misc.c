@@ -22,6 +22,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2015, Joyent, Inc.
  */
 
 /*
@@ -120,18 +121,7 @@ get_current_time(uuid_time_t *timestamp)
 uint16_t
 get_random(void)
 {
-	static int	initted = 0;
-	uuid_time_t	time_now;
-	long		seed;
-
-	if (!initted) {
-		get_system_time(&time_now);
-		time_now = time_now/UUIDS_PER_TOD_CALL;
-		seed = (unsigned)(((time_now >> 32) ^ time_now)&0xffffffff);
-		srand48(seed);
-		initted = 1;
-	}
-	return (mrand48());
+	return (arc4random_uniform(UINT16_MAX));
 }
 
 /*

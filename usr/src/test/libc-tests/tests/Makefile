@@ -14,7 +14,7 @@
 # Copyright 2015 Garrett D'Amore <garrett@damore.org>
 #
 
-SUBDIRS = fpround newlocale nl_langinfo symbols wcsrtombs wctype
+SUBDIRS = fpround newlocale nl_langinfo symbols wcsrtombs wctype random
 
 include $(SRC)/Makefile.master
 include $(SRC)/test/Makefile.com

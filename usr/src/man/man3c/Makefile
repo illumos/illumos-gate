@@ -14,6 +14,7 @@
 # Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2013, OmniTI Computer Consulting, Inc. All rights reserved.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
+# Copyright (c) 2015, Joyent, Inc.  All rights reserved.
 #
 
 include		$(SRC)/Makefile.master
@@ -39,6 +40,7 @@ MANFILES= 	__fbufsize.3c					\
 	 	aiocancel.3c					\
 	 	aioread.3c					\
 	 	aiowait.3c					\
+		arc4random.3c					\
 	 	assert.3c					\
 	 	atexit.3c					\
 	 	atomic_add.3c					\
@@ -150,6 +152,7 @@ MANFILES= 	__fbufsize.3c					\
 	 	getcwd.3c					\
 	 	getdate.3c					\
 	 	getdtablesize.3c				\
+		getentropy.3c					\
 	 	getenv.3c					\
 	 	getexecname.3c					\
 	 	getgrnam.3c					\
@@ -559,6 +562,8 @@ MANLINKS=	FD_CLR.3c				\
 	 	atoi.3c					\
 	 	atol.3c					\
 	 	atoll.3c				\
+		arc4random_buf.3c			\
+		arc4random_uniform.3c			\
 	 	atomic_add_16.3c			\
 	 	atomic_add_16_nv.3c			\
 	 	atomic_add_32.3c			\
@@ -733,6 +738,7 @@ MANLINKS=	FD_CLR.3c				\
 	 	etext.3c				\
 	 	euccol.3c				\
 	 	eucscol.3c				\
+		explicit_bzero.3c			\
 	 	extended_to_decimal.3c			\
 	 	fconvert.3c				\
 	 	fcvt.3c					\
@@ -1344,6 +1350,9 @@ llabs.3c				:= LINKSRC = abs.3c
 
 aiowrite.3c				:= LINKSRC = aioread.3c
 
+arc4random_buf.3c			:= LINKSRC = arc4random.3c
+arc4random_uniform.3c			:= LINKSRC = arc4random.3c
+
 atomic_add_16.3c			:= LINKSRC = atomic_add.3c
 atomic_add_16_nv.3c			:= LINKSRC = atomic_add.3c
 atomic_add_32.3c			:= LINKSRC = atomic_add.3c
@@ -1460,6 +1469,7 @@ atomic_swap_ushort.3c			:= LINKSRC = atomic_swap.3c
 bcmp.3c					:= LINKSRC = bstring.3c
 bcopy.3c				:= LINKSRC = bstring.3c
 bzero.3c				:= LINKSRC = bstring.3c
+explicit_bzero.3c			:= LINKSRC = bstring.3c
 
 btowc_l.3c				:= LINKSRC = btowc.3c
 

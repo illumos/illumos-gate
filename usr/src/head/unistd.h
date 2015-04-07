@@ -710,6 +710,10 @@ extern char *ttyname_r(int, char *, int);
 
 #endif /* defined(__EXTENSIONS__) || defined(_REENTRANT)... */
 
+#if !defined(_STRICT_SYMBOLS)
+extern int getentropy(void *, size_t);
+#endif	/* !_STRICT_SYMBOLS */
+
 #ifdef	__cplusplus
 }
 #endif
