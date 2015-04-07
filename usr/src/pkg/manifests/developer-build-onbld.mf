@@ -92,8 +92,6 @@ file path=opt/onbld/bin/checkpaths mode=0555
 file path=opt/onbld/bin/checkproto mode=0555
 file path=opt/onbld/bin/copyrightchk mode=0555
 file path=opt/onbld/bin/cstyle mode=0555
-file path=opt/onbld/bin/ctfcvtptbl mode=0555
-file path=opt/onbld/bin/ctffindmod mode=0555
 file path=opt/onbld/bin/elfcmp mode=0555
 file path=opt/onbld/bin/elfsigncmp mode=0555
 file path=opt/onbld/bin/find_elf mode=0555

@@ -50,3 +50,26 @@ outputdir = /var/tmp/test_results
 [/opt/libc-tests/tests/random/arc4random_forksig]
 [/opt/libc-tests/tests/random/arc4random_preforksig]
 [/opt/libc-tests/tests/random/arc4key.ksh]
+
+[/opt/libc-tests/tests/symbols]
+pre = setup
+tests = [
+	'ctype_h',
+	'dirent_h',
+	'fcntl_h',
+	'locale_h',
+	'math_h',
+	'netdb_h',
+	'pthread_h',
+	'signal_h',
+	'stdio_h',
+	'stdlib_h',
+	'strings_h',
+	'sys_stat_h',
+	'sys_time_h',
+	'sys_timeb_h',
+	'ucontext_h',
+	'unistd_h',
+	'wchar_h',
+	'wctype_h'
+	 ]

@@ -523,11 +523,6 @@ function use_tools {
 	CTFMERGE=${TOOLSROOT}/opt/onbld/bin/${MACH}/ctfmerge
 	export CTFMERGE
 
-	CTFCVTPTBL=${TOOLSROOT}/opt/onbld/bin/ctfcvtptbl
-	export CTFCVTPTBL
-	CTFFINDMOD=${TOOLSROOT}/opt/onbld/bin/ctffindmod
-	export CTFFINDMOD
-
 	if [ "$VERIFY_ELFSIGN" = "y" ]; then
 		ELFSIGN=${TOOLSROOT}/opt/onbld/bin/elfsigncmp
 	else
@@ -549,8 +544,6 @@ function use_tools {
 	echo "CTFSTABS=${CTFSTABS}" >> $LOGFILE
 	echo "CTFCONVERT=${CTFCONVERT}" >> $LOGFILE
 	echo "CTFMERGE=${CTFMERGE}" >> $LOGFILE
-	echo "CTFCVTPTBL=${CTFCVTPTBL}" >> $LOGFILE
-	echo "CTFFINDMOD=${CTFFINDMOD}" >> $LOGFILE
 	echo "ELFSIGN=${ELFSIGN}" >> $LOGFILE
 	echo "PATH=${PATH}" >> $LOGFILE
 	echo "ONBLD_TOOLS=${ONBLD_TOOLS}" >> $LOGFILE

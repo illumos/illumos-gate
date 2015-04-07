@@ -12,7 +12,7 @@
 #
 # Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright 2014, OmniTI Computer Consulting, Inc. All rights reserved.
-# Copyright 2014 Garrett D'Amore <garrett@damore.org>
+# Copyright 2015 Garrett D'Amore <garrett@damore.org>
 #
 
 set name=pkg.fmri value=pkg:/system/test/libctest@$(PKGVERS)
@@ -23,27 +23,45 @@ set name=info.classification \
 set name=variant.arch value=$(ARCH)
 dir path=opt/libc-tests
 dir path=opt/libc-tests/bin
+dir path=opt/libc-tests/cfg
+dir path=opt/libc-tests/cfg/symbols
 dir path=opt/libc-tests/runfiles
 dir path=opt/libc-tests/tests
 dir path=opt/libc-tests/tests/random
+dir path=opt/libc-tests/tests/symbols
 file path=opt/libc-tests/README mode=0444
 file path=opt/libc-tests/bin/libctest mode=0555
+file path=opt/libc-tests/cfg/README mode=0444
+file path=opt/libc-tests/cfg/compilation.cfg mode=0444
+file path=opt/libc-tests/cfg/symbols/README mode=0444
+file path=opt/libc-tests/cfg/symbols/ctype_h.cfg mode=0444
+file path=opt/libc-tests/cfg/symbols/dirent_h.cfg mode=0444
+file path=opt/libc-tests/cfg/symbols/fcntl_h.cfg mode=0444
+file path=opt/libc-tests/cfg/symbols/locale_h.cfg mode=0444
+file path=opt/libc-tests/cfg/symbols/math_h.cfg mode=0444
+file path=opt/libc-tests/cfg/symbols/netdb_h.cfg mode=0444
+file path=opt/libc-tests/cfg/symbols/pthread_h.cfg mode=0444
+file path=opt/libc-tests/cfg/symbols/signal_h.cfg mode=0444
+file path=opt/libc-tests/cfg/symbols/stdio_h.cfg mode=0444
+file path=opt/libc-tests/cfg/symbols/stdlib_h.cfg mode=0444
+file path=opt/libc-tests/cfg/symbols/strings_h.cfg mode=0444
+file path=opt/libc-tests/cfg/symbols/sys_stat_h.cfg mode=0444
+file path=opt/libc-tests/cfg/symbols/sys_time_h.cfg mode=0444
+file path=opt/libc-tests/cfg/symbols/sys_timeb_h.cfg mode=0444
+file path=opt/libc-tests/cfg/symbols/ucontext_h.cfg mode=0444
+file path=opt/libc-tests/cfg/symbols/unistd_h.cfg mode=0444
+file path=opt/libc-tests/cfg/symbols/wchar_h.cfg mode=0444
+file path=opt/libc-tests/cfg/symbols/wctype_h.cfg mode=0444
 file path=opt/libc-tests/runfiles/default.run mode=0444
 file path=opt/libc-tests/tests/fpround_test mode=0555
-$(i386_ONLY)file path=opt/libc-tests/tests/fpround_test.amd64 mode=0555
-$(i386_ONLY)file path=opt/libc-tests/tests/fpround_test.i386 mode=0555
-$(sparc_ONLY)file path=opt/libc-tests/tests/fpround_test.sparc mode=0555
-$(sparc_ONLY)file path=opt/libc-tests/tests/fpround_test.sparcv9 mode=0555
+file path=opt/libc-tests/tests/fpround_test.$(ARCH) mode=0555
+file path=opt/libc-tests/tests/fpround_test.$(ARCH64) mode=0555
 file path=opt/libc-tests/tests/newlocale_test mode=0555
-$(i386_ONLY)file path=opt/libc-tests/tests/newlocale_test.amd64 mode=0555
-$(i386_ONLY)file path=opt/libc-tests/tests/newlocale_test.i386 mode=0555
-$(sparc_ONLY)file path=opt/libc-tests/tests/newlocale_test.sparc mode=0555
-$(sparc_ONLY)file path=opt/libc-tests/tests/newlocale_test.sparcv9 mode=0555
+file path=opt/libc-tests/tests/newlocale_test.$(ARCH) mode=0555
+file path=opt/libc-tests/tests/newlocale_test.$(ARCH64) mode=0555
 file path=opt/libc-tests/tests/nl_langinfo_test mode=0555
-$(i386_ONLY)file path=opt/libc-tests/tests/nl_langinfo_test.amd64 mode=0555
-$(i386_ONLY)file path=opt/libc-tests/tests/nl_langinfo_test.i386 mode=0555
-$(sparc_ONLY)file path=opt/libc-tests/tests/nl_langinfo_test.sparc mode=0555
-$(sparc_ONLY)file path=opt/libc-tests/tests/nl_langinfo_test.sparcv9 mode=0555
+file path=opt/libc-tests/tests/nl_langinfo_test.$(ARCH) mode=0555
+file path=opt/libc-tests/tests/nl_langinfo_test.$(ARCH64) mode=0555
 file path=opt/libc-tests/tests/random/arc4key.ksh mode=0555
 file path=opt/libc-tests/tests/random/arc4random mode=0555
 file path=opt/libc-tests/tests/random/arc4random_fork mode=0555
@@ -63,16 +81,33 @@ file path=opt/libc-tests/tests/random/inz_region mode=0555
 file path=opt/libc-tests/tests/random/inz_split mode=0555
 file path=opt/libc-tests/tests/random/inz_split_vpp mode=0555
 file path=opt/libc-tests/tests/random/inz_vpp mode=0555
+file path=opt/libc-tests/tests/symbols/setup mode=0555
+file path=opt/libc-tests/tests/symbols/symbols_test.$(ARCH) mode=0555
+file path=opt/libc-tests/tests/symbols/symbols_test.$(ARCH64) mode=0555
 file path=opt/libc-tests/tests/wcsrtombs_test mode=0555
-$(i386_ONLY)file path=opt/libc-tests/tests/wcsrtombs_test.amd64 mode=0555
-$(i386_ONLY)file path=opt/libc-tests/tests/wcsrtombs_test.i386 mode=0555
-$(sparc_ONLY)file path=opt/libc-tests/tests/wcsrtombs_test.sparc mode=0555
-$(sparc_ONLY)file path=opt/libc-tests/tests/wcsrtombs_test.sparcv9 mode=0555
+file path=opt/libc-tests/tests/wcsrtombs_test.$(ARCH) mode=0555
+file path=opt/libc-tests/tests/wcsrtombs_test.$(ARCH64) mode=0555
 file path=opt/libc-tests/tests/wctype_test mode=0555
-$(i386_ONLY)file path=opt/libc-tests/tests/wctype_test.amd64 mode=0555
-$(i386_ONLY)file path=opt/libc-tests/tests/wctype_test.i386 mode=0555
-$(sparc_ONLY)file path=opt/libc-tests/tests/wctype_test.sparc mode=0555
-$(sparc_ONLY)file path=opt/libc-tests/tests/wctype_test.sparcv9 mode=0555
+file path=opt/libc-tests/tests/wctype_test.$(ARCH) mode=0555
+file path=opt/libc-tests/tests/wctype_test.$(ARCH64) mode=0555
+hardlink path=opt/libc-tests/tests/symbols/ctype_h target=setup
+hardlink path=opt/libc-tests/tests/symbols/dirent_h target=setup
+hardlink path=opt/libc-tests/tests/symbols/fcntl_h target=setup
+hardlink path=opt/libc-tests/tests/symbols/locale_h target=setup
+hardlink path=opt/libc-tests/tests/symbols/math_h target=setup
+hardlink path=opt/libc-tests/tests/symbols/netdb_h target=setup
+hardlink path=opt/libc-tests/tests/symbols/pthread_h target=setup
+hardlink path=opt/libc-tests/tests/symbols/signal_h target=setup
+hardlink path=opt/libc-tests/tests/symbols/stdio_h target=setup
+hardlink path=opt/libc-tests/tests/symbols/stdlib_h target=setup
+hardlink path=opt/libc-tests/tests/symbols/strings_h target=setup
+hardlink path=opt/libc-tests/tests/symbols/sys_stat_h target=setup
+hardlink path=opt/libc-tests/tests/symbols/sys_time_h target=setup
+hardlink path=opt/libc-tests/tests/symbols/sys_timeb_h target=setup
+hardlink path=opt/libc-tests/tests/symbols/ucontext_h target=setup
+hardlink path=opt/libc-tests/tests/symbols/unistd_h target=setup
+hardlink path=opt/libc-tests/tests/symbols/wchar_h target=setup
+hardlink path=opt/libc-tests/tests/symbols/wctype_h target=setup
 license lic_CDDL license=lic_CDDL
 depend fmri=locale/de type=require
 depend fmri=locale/en type=require

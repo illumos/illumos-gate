@@ -162,8 +162,6 @@ CTFSTABS=	$(ONBLD_TOOLS)/bin/$(MACH)/ctfstabs
 CTFSTRIP=	$(ONBLD_TOOLS)/bin/$(MACH)/ctfstrip
 NDRGEN=		$(ONBLD_TOOLS)/bin/$(MACH)/ndrgen
 GENOFFSETS=	$(ONBLD_TOOLS)/bin/genoffsets
-CTFCVTPTBL=	$(ONBLD_TOOLS)/bin/ctfcvtptbl
-CTFFINDMOD=	$(ONBLD_TOOLS)/bin/ctffindmod
 XREF=		$(ONBLD_TOOLS)/bin/xref
 FIND=		/usr/bin/find
 PERL=		/usr/bin/perl
@@ -187,11 +185,6 @@ MSGCC=		$(ASTBINDIR)/msgcc
 
 FILEMODE=	644
 DIRMODE=	755
-
-#
-# The version of the patch makeup table optimized for build-time use.  Used
-# during patch builds only.
-$(PATCH_BUILD)PMTMO_FILE=$(SRC)/patch_makeup_table.mo
 
 # Declare that nothing should be built in parallel.
 # Individual Makefiles can use the .PARALLEL target to declare otherwise.

@@ -24,7 +24,7 @@
 /*	definitions for international functions	*/
 
 /*
- * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ * Copyright 2015 Garrett D'Amore <garrett@damore.org>
  *
  * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -141,6 +141,7 @@ extern wint_t towctrans_l(wint_t, wctrans_t, locale_t);
 extern int iswctype_l(wint_t, wctype_t, locale_t);
 extern int iswalnum_l(wint_t, locale_t);
 extern int iswalpha_l(wint_t, locale_t);
+extern int iswblank_l(wint_t, locale_t);
 extern int iswcntrl_l(wint_t, locale_t);
 extern int iswdigit_l(wint_t, locale_t);
 extern int iswgraph_l(wint_t, locale_t);

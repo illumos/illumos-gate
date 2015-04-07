@@ -10,12 +10,38 @@
 #
 
 #
-# Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 #
 
-.PARALLEL: $(SUBDIRS)
+include $(SRC)/Makefile.master
 
-SUBDIRS = cfg cmd runfiles tests doc
+TESTSUBDIR = symbols
+PROG = symbols_test
+KSHPROG = setup
+SYMTESTS = \
+	ctype_h \
+	dirent_h \
+	fcntl_h \
+	locale_h \
+	math_h \
+	netdb_h \
+	pthread_h \
+	signal_h \
+	stdio_h \
+	stdlib_h \
+	strings_h \
+	sys_stat_h \
+	sys_time_h \
+	sys_timeb_h \
+	ucontext_h \
+	unistd_h \
+	wchar_h \
+	wctype_h
 
-include $(SRC)/test/Makefile.com
+EXTRAPROG += $(SYMTESTS)
+
+include ../Makefile.com
+
+$(SYMTESTS:%=$(TESTDIR)/%): $(TESTDIR)/setup
+	-$(RM) $@
+	$(LN) $(TESTDIR)/setup $@

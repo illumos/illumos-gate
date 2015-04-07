@@ -29,13 +29,15 @@ $(OBJS_OVERRIDE)SRCS = $(PROG).c ../common/test_common.c
 
 C99MODE = -xc99=%all
 LINTFLAGS += -I../common -DARCH=\"ARCH\" -DLINT
-CPPFLAGS += -I../common
+CPPFLAGS += -I$(ROOT)/usr/include -I../common
 
 ROOTOPTPKG = $(ROOT)/opt/libc-tests
-TESTDIR = $(ROOTOPTPKG)/tests
+TESTDIR = $(ROOTOPTPKG)/tests/$(TESTSUBDIR)
 
 CMDS = $(PROG32:%=$(TESTDIR)/%) $(PROG64:%=$(TESTDIR)/%) \
-	$(KSHPROG:%=$(TESTDIR)/%) $(ARCHPROG:%=$(TESTDIR)/%)
+	$(KSHPROG:%=$(TESTDIR)/%) $(ARCHPROG:%=$(TESTDIR)/%) \
+	$(EXTRAPROG:%=$(TESTDIR)/%)
+
 $(CMDS) := FILEMODE = 0555
 
 all: $(PROG32) $(PROG64) $(KSHPROG) $(ARCHPROG) $(SUBDIRS)
