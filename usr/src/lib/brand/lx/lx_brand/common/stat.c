@@ -21,7 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2014 Joyent, Inc.  All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  */
 
 /*
@@ -162,7 +162,7 @@ lx_stat_init()
 			} else {
 				/* make sure the major node matches */
 				assert(getmajor(st.st_rdev) == major);
-				assert(mt[j].mt_minor < LX_MINORMASK);
+				assert(mt[j].mt_lx_minor < LX_MINORMASK);
 			}
 
 			/* save the minor node value */
@@ -277,7 +277,8 @@ s2l_devt(dev_t dev, lx_dev_t *jdev, int fd)
 			mt = devt_translators[i].dt_list;
 			for (j = 0; mt[j].mt_path != NULL; j++) {
 				if (mt[j].mt_minor == min) {
-					assert(mt[j].mt_minor < LX_MINORMASK);
+					assert(
+					    mt[j].mt_lx_minor < LX_MINORMASK);
 
 					/* found a translation */
 					*jdev = LX_MAKEDEVICE(
