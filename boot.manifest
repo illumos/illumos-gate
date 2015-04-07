@@ -1,25 +1,18 @@
 #
-# CDDL HEADER START
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
 #
-# The contents of this file are subject to the terms of the
-# Common Development and Distribution License (the "License").
-# You may not use this file except in compliance with the License.
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
 #
-# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or http://www.opensolaris.org/os/licensing.
-# See the License for the specific language governing permissions
-# and limitations under the License.
+
 #
-# When distributing Covered Code, include this CDDL HEADER in each
-# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
-# If applicable, add the following below this CDDL HEADER, with the
-# fields enclosed by brackets "[]" replaced with your own identifying
-# information: Portions Copyright [yyyy] [name of copyright owner]
+# Copyright 2015 Joyent, Inc.
 #
-# CDDL HEADER END
-#
-#
-# Copyright (c) 2013, Joyent, Inc. All rights reserved.
+
 #
 # This lists the boot-package files that illumos-joyent delivers as part of
 # a build.  These are not part of the platform image but rather the bootable
@@ -30,5 +23,10 @@ d boot/grub 0755 root sys
 d boot/grub/bin 0755 root sys
 f boot/grub/bin/grub 0755 root sys
 f boot/grub/fat_stage1_5 0644 root sys
+f boot/grub/iso9660_stage1_5 0644 root sys
+f boot/grub/pxegrub 0644 root sys
 f boot/grub/stage1 0644 root sys
 f boot/grub/stage2 0644 root sys
+f boot/grub/stage2_eltorito 0644 root sys
+f boot/grub/ufs_stage1_5 0644 root sys
+f boot/grub/zfs_stage1_5 0644 root sys
