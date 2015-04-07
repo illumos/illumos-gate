@@ -689,7 +689,9 @@ zfd_wput(queue_t *qp, mblk_t *mp)
 				miocack(qp, mp, 0, EINVAL);
 				return;
 			}
-			(void) putnextctl(zfds->zfd_slave_rdq, M_HANGUP);
+			if (zfds->zfd_slave_rdq != NULL)
+				(void) putnextctl(zfds->zfd_slave_rdq,
+				    M_HANGUP);
 			miocack(qp, mp, 0, 0);
 			return;
 		default:
