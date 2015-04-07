@@ -169,6 +169,7 @@
 #include <sys/core.h>
 #include <sys/stack.h>
 #include <sys/stat.h>
+#include <sys/socket.h>
 #include <lx_signum.h>
 
 int	lx_debug = 0;
@@ -678,6 +679,15 @@ lx_init_brand_data(zone_t *zone)
 	 * This can be changed by a call to setattr() during zone boot.
 	 */
 	(void) strlcpy(data->lxzd_kernel_version, "2.4.21", LX_VERS_MAX);
+
+	/*
+	 * Linux is not at all picky about address family when it comes to
+	 * supporting interface-related ioctls.  To mimic this behavior, we'll
+	 * attempt those ioctls against a ksocket configured for that purpose.
+	 */
+	(void) ksocket_socket(&data->lxzd_ioctl_sock, AF_INET, SOCK_DGRAM, 0,
+	    0, zone->zone_kcred);
+
 	zone->zone_brand_data = data;
 
 	/*
@@ -690,7 +700,14 @@ lx_init_brand_data(zone_t *zone)
 void
 lx_free_brand_data(zone_t *zone)
 {
-	kmem_free(zone->zone_brand_data, sizeof (lx_zone_data_t));
+	lx_zone_data_t *data = ztolxzd(zone);
+	ASSERT(data != NULL);
+	if (data->lxzd_ioctl_sock != NULL) {
+		ksocket_close(data->lxzd_ioctl_sock, zone->zone_kcred);
+		data->lxzd_ioctl_sock = NULL;
+	}
+	zone->zone_brand_data = NULL;
+	kmem_free(data, sizeof (*data));
 }
 
 void
