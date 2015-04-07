@@ -404,8 +404,8 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 	 * execution of a non-illumos binary in the form of /bin/ls will still
 	 * be branded and be subject to all of the normal actions of the brand.
 	 */
-	if ((level < 2) &&
-	    (*brand_action != EBA_NATIVE) && (PROC_IS_BRANDED(p))) {
+	if ((level < 2) && (*brand_action != EBA_NATIVE) &&
+	    (PROC_IS_BRANDED(p)) && (BROP(p)->b_native_exec != NULL)) {
 		if (BROP(p)->b_native_exec(ehdrp->e_ident[EI_OSABI],
 		    &args->brand_nroot) == B_TRUE) {
 			ASSERT(ehdrp->e_ident[EI_OSABI]);
