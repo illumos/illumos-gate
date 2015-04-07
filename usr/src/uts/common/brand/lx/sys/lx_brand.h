@@ -34,6 +34,7 @@
 #include <sys/types.h>
 #include <sys/cpuvar.h>
 #include <sys/zone.h>
+#include <sys/ksocket.h>
 #endif
 
 #ifdef	__cplusplus
@@ -587,6 +588,7 @@ struct lx_lwp_data {
 /* brand specific data */
 typedef struct lx_zone_data {
 	char lxzd_kernel_version[LX_VERS_MAX];
+	ksocket_t lxzd_ioctl_sock;
 } lx_zone_data_t;
 
 #define	BR_CPU_BOUND	0x0001
@@ -599,6 +601,9 @@ typedef struct lx_zone_data {
 #define	ptolxproc(p)	\
 	(((p)->p_brand == &lx_brand) ? \
 	(struct lx_proc_data *)(p)->p_brand_data : NULL)
+#define	ztolxzd(z)		\
+	(((z)->zone_brand == &lx_brand) ?  \
+	(lx_zone_data_t *)(z)->zone_brand_data : NULL)
 
 /* Macro for converting to system call arguments. */
 #define	LX_ARGS(scall) ((struct lx_##scall##_args *)\

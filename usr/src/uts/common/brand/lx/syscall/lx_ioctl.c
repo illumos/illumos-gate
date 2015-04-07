@@ -806,11 +806,35 @@ ict_convert_ifflags(uint64_t *flags, boolean_t tonative)
 }
 
 static int
+ict_if_ioctl(vnode_t *vn, int cmd, intptr_t arg, int flags, cred_t *cred)
+{
+	int error, rv;
+	lx_zone_data_t *lxzd = ztolxzd(curproc->p_zone);
+	ksocket_t ks;
+
+	ASSERT(lxzd != NULL);
+	ks = lxzd->lxzd_ioctl_sock;
+
+	/*
+	 * For ioctls of this type, Illumos is strict about address family
+	 * whereas Linux is lenient.  This strictness can be avoided by using
+	 * an internal AF_INET ksocket.
+	 */
+	if (ks != NULL) {
+		error = ksocket_ioctl(ks, cmd, arg, &rv, cred);
+	} else {
+		error = VOP_IOCTL(vn, cmd, arg, flags, cred, &rv, NULL);
+	}
+
+	return (error);
+}
+
+static int
 ict_siolifreq(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 {
 	struct ifreq	req;
 	struct lifreq	lreq;
-	int		error, rv, len;
+	int		error, len;
 
 	/* Convert from Linux ifreq to illumos lifreq */
 	if (curproc->p_model == DATAMODEL_LP64)
@@ -844,31 +868,31 @@ ict_siolifreq(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 		 */
 		cmd = ((cmd & IOC_INOUT) |
 		    _IOW('i', ((cmd & 0xff) + 100), struct lifreq));
-		error = VOP_IOCTL(fp->f_vnode, cmd, (intptr_t)&lreq,
-		    FLFAKE(fp), fp->f_cred, &rv, NULL);
+		error = ict_if_ioctl(fp->f_vnode, cmd, (intptr_t)&lreq,
+		    FLFAKE(fp), fp->f_cred);
 		break;
 	case SIOCGIFINDEX:
 		cmd = SIOCGLIFINDEX;
-		error = VOP_IOCTL(fp->f_vnode, cmd, (intptr_t)&lreq,
-		    FLFAKE(fp), fp->f_cred, &rv, NULL);
+		error = ict_if_ioctl(fp->f_vnode, cmd, (intptr_t)&lreq,
+		    FLFAKE(fp), fp->f_cred);
 		break;
 	case SIOCGIFFLAGS:
 		cmd = SIOCGLIFFLAGS;
-		error = VOP_IOCTL(fp->f_vnode, cmd, (intptr_t)&lreq,
-		    FLFAKE(fp), fp->f_cred, &rv, NULL);
+		error = ict_if_ioctl(fp->f_vnode, cmd, (intptr_t)&lreq,
+		    FLFAKE(fp), fp->f_cred);
 		if (error == 0)
 			ict_convert_ifflags(&lreq.lifr_flags, B_FALSE);
 		break;
 	case SIOCSIFFLAGS:
 		cmd = SIOCSLIFFLAGS;
 		ict_convert_ifflags(&lreq.lifr_flags, B_TRUE);
-		error = VOP_IOCTL(fp->f_vnode, cmd, (intptr_t)&lreq,
-		    FLFAKE(fp), fp->f_cred, &rv, NULL);
+		error = ict_if_ioctl(fp->f_vnode, cmd, (intptr_t)&lreq,
+		    FLFAKE(fp), fp->f_cred);
 		break;
 	case SIOCGIFHWADDR:
 		cmd = SIOCGLIFHWADDR;
-		error = VOP_IOCTL(fp->f_vnode, cmd, (intptr_t)&lreq,
-		    FLFAKE(fp), fp->f_cred, &rv, NULL);
+		error = ict_if_ioctl(fp->f_vnode, cmd, (intptr_t)&lreq,
+		    FLFAKE(fp), fp->f_cred);
 		/*
 		 * SIOCGIFHWADDR on Linux sets sa_family to ARPHRD_ETHER (1) on
 		 * ethernet and ARPHRD_LOOPBACK (772) on loopback.
@@ -901,8 +925,8 @@ ict_siolifreq(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 			break;
 		}
 		cmd = SIOCGLIFINDEX;
-		error = VOP_IOCTL(fp->f_vnode, cmd, (intptr_t)&lreq,
-		    FLFAKE(fp), fp->f_cred, &rv, NULL);
+		error = ict_if_ioctl(fp->f_vnode, cmd, (intptr_t)&lreq,
+		    FLFAKE(fp), fp->f_cred);
 		if (error == 0) {
 			/* lifr_index aliases to the qlen field */
 			lreq.lifr_index = 1;
@@ -939,15 +963,15 @@ ict_siocgifconf32(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 	lx_ifconf32_t	conf;
 	lx_ifreq32_t	*oreq;
 	struct ifconf	sconf;
-	int		ifcount, error, rv, i, buf_len;
+	int		ifcount, error, i, buf_len;
 
 	if (copyin((lx_ifconf32_t *)arg, &conf, sizeof (conf)) != 0)
 		return (set_errno(EFAULT));
 
 	/* They want to know how many interfaces there are. */
 	if (conf.if_len <= 0 || conf.if_buf == NULL) {
-		error = VOP_IOCTL(fp->f_vnode, SIOCGIFNUM, (intptr_t)&ifcount,
-		    FLFAKE(fp), fp->f_cred, &rv, NULL);
+		error = ict_if_ioctl(fp->f_vnode, SIOCGIFNUM,
+		    (intptr_t)&ifcount, FLFAKE(fp), fp->f_cred);
 		if (error != 0)
 			return (set_errno(error));
 
@@ -964,8 +988,8 @@ ict_siocgifconf32(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 	sconf.ifc_len = ifcount * sizeof (struct ifreq);
 	sconf.ifc_req = (struct ifreq *)kmem_alloc(sconf.ifc_len, KM_SLEEP);
 
-	error = VOP_IOCTL(fp->f_vnode, cmd, (intptr_t)&sconf,
-	    FLFAKE(fp), fp->f_cred, &rv, NULL);
+	error = ict_if_ioctl(fp->f_vnode, cmd, (intptr_t)&sconf, FLFAKE(fp),
+	    fp->f_cred);
 	if (error != 0) {
 		kmem_free(sconf.ifc_req, ifcount * sizeof (struct ifreq));
 		return (set_errno(error));
@@ -981,13 +1005,13 @@ ict_siocgifconf32(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 	conf.if_len = i * sizeof (*oreq);
 	kmem_free(sconf.ifc_req, ifcount * sizeof (struct ifreq));
 
-	rv = 0;
+	error = 0;
 	if (copyout(oreq, (caddr_t)(uintptr_t)conf.if_buf, conf.if_len) != 0 ||
 	    copyout(&conf, (lx_ifconf32_t *)arg, sizeof (conf)) != 0)
-		rv = set_errno(EFAULT);
+		error = set_errno(EFAULT);
 
 	kmem_free(oreq, buf_len);
-	return (rv);
+	return (error);
 }
 
 static int
@@ -996,15 +1020,15 @@ ict_siocgifconf64(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 	lx_ifconf64_t	conf;
 	lx_ifreq64_t	*oreq;
 	struct ifconf	sconf;
-	int		ifcount, error, rv, i, buf_len;
+	int		ifcount, error, i, buf_len;
 
 	if (copyin((lx_ifconf64_t *)arg, &conf, sizeof (conf)) != 0)
 		return (set_errno(EFAULT));
 
 	/* They want to know how many interfaces there are. */
 	if (conf.if_len <= 0 || conf.if_buf == NULL) {
-		error = VOP_IOCTL(fp->f_vnode, SIOCGIFNUM, (intptr_t)&ifcount,
-		    FLFAKE(fp), fp->f_cred, &rv, NULL);
+		error = ict_if_ioctl(fp->f_vnode, SIOCGIFNUM,
+		    (intptr_t)&ifcount, FLFAKE(fp), fp->f_cred);
 		if (error != 0)
 			return (set_errno(error));
 
@@ -1021,8 +1045,8 @@ ict_siocgifconf64(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 	sconf.ifc_len = ifcount * sizeof (struct ifreq);
 	sconf.ifc_req = (struct ifreq *)kmem_alloc(sconf.ifc_len, KM_SLEEP);
 
-	error = VOP_IOCTL(fp->f_vnode, cmd, (intptr_t)&sconf,
-	    FLFAKE(fp), fp->f_cred, &rv, NULL);
+	error = ict_if_ioctl(fp->f_vnode, cmd, (intptr_t)&sconf, FLFAKE(fp),
+	    fp->f_cred);
 	if (error != 0) {
 		kmem_free(sconf.ifc_req, ifcount * sizeof (struct ifreq));
 		return (set_errno(error));
@@ -1038,13 +1062,13 @@ ict_siocgifconf64(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 	conf.if_len = i * sizeof (*oreq);
 	kmem_free(sconf.ifc_req, ifcount * sizeof (struct ifreq));
 
-	rv = 0;
+	error = 0;
 	if (copyout(oreq, (caddr_t)(uintptr_t)conf.if_buf, conf.if_len) != 0 ||
 	    copyout(&conf, (lx_ifconf64_t *)arg, sizeof (conf)) != 0)
-		rv = set_errno(EFAULT);
+		error = set_errno(EFAULT);
 
 	kmem_free(oreq, buf_len);
-	return (rv);
+	return (error);
 }
 
 static int
