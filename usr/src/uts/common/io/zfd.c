@@ -694,6 +694,21 @@ zfd_wput(queue_t *qp, mblk_t *mp)
 				    M_HANGUP);
 			miocack(qp, mp, 0, 0);
 			return;
+		case ZFD_HAS_SLAVE:
+			/*
+			 * The process that passed the ioctl must be running in
+			 * the global zone.
+			 */
+			if (crgetzoneid(iocbp->ioc_cr) != GLOBAL_ZONEID) {
+				miocack(qp, mp, 0, EINVAL);
+				return;
+			}
+			if ((zfds->zfd_state & ZFD_STATE_SOPEN) != 0) {
+				miocack(qp, mp, 0, 0);
+			} else {
+				miocack(qp, mp, 0, ENOTTY);
+			}
+			return;
 		default:
 			break;
 		}
