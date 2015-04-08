@@ -12591,6 +12591,9 @@ f usr/share/man/man3c/aiowait.3c 0444 root bin
 s usr/share/man/man3c/aiowrite.3c=aioread.3c
 s usr/share/man/man3c/alloca.3c=malloc.3c
 s usr/share/man/man3c/alphasort.3c=scandir.3c
+f usr/share/man/man3c/arc4random.3c 0444 root bin
+s usr/share/man/man3c/arc4random_buf.3c=arc4random.3c
+s usr/share/man/man3c/arc4random_uniform.3c=arc4random.3c
 s usr/share/man/man3c/ascftime.3c=strftime.3c
 s usr/share/man/man3c/asctime.3c=ctime.3c
 s usr/share/man/man3c/asctime_r.3c=ctime.3c
@@ -12853,6 +12856,7 @@ f usr/share/man/man3c/eventfd.3c 0444 root bin
 s usr/share/man/man3c/eventfd_read.3c=eventfd.3c
 s usr/share/man/man3c/eventfd_write.3c=eventfd.3c
 f usr/share/man/man3c/exit.3c 0444 root bin
+s usr/share/man/man3c/explicit_bzero.3c=bstring.3c
 s usr/share/man/man3c/extended_to_decimal.3c=floating_to_decimal.3c
 f usr/share/man/man3c/fattach.3c 0444 root bin
 f usr/share/man/man3c/fclose.3c 0444 root bin
@@ -12944,6 +12948,7 @@ f usr/share/man/man3c/getcwd.3c 0444 root bin
 f usr/share/man/man3c/getdate.3c 0444 root bin
 s usr/share/man/man3c/getdelim.3c=getline.3c
 f usr/share/man/man3c/getdtablesize.3c 0444 root bin
+f usr/share/man/man3c/getentropy.3c 0444 root bin
 f usr/share/man/man3c/getenv.3c 0444 root bin
 f usr/share/man/man3c/getexecname.3c 0444 root bin
 s usr/share/man/man3c/getextmntent.3c=getmntent.3c
