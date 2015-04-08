@@ -680,6 +680,26 @@ wr_log_msg(char *buf, int len, int from)
 }
 
 /*
+ * We want to sleep for a little while but need to be responsive if the zone is
+ * halting. We poll/sleep on the event stream so we can notice if we're halting.
+ * Return true if halting, otherwise false.
+ */
+static boolean_t
+halt_sleep(int slptime)
+{
+	struct pollfd evfd[1];
+
+	evfd[0].fd = eventstream[1];
+	evfd[0].events = POLLIN | POLLRDNORM | POLLRDBAND | POLLPRI;
+
+	if (poll(evfd, 1, slptime) > 0) {
+		/* zone halting */
+		return (B_TRUE);
+	}
+	return (B_FALSE);
+}
+
+/*
  * This routine drives the logging and interactive I/O loop. It polls for
  * input from the zone side of the fd (output to stdout/stderr), and from the
  * client (input to the zone's stdin).  Additionally, it polls on the server
@@ -697,9 +717,18 @@ wr_log_msg(char *buf, int len, int from)
  *
  * We need to handle the case where there is no server within the zone (or
  * the server gets stuck) and data that we're writing to the zone server's
- * stdin fills the pipe. Because open_fd() always opens non-blocking our
- * writes could return -1 with EAGAIN. Since we ignore errors on the write
- * to stdin, we won't get blocked.
+ * stdin fills the pipe. Because of the way the zfd device works writes can
+ * flow into the stream and simply be dropped, if there is no server, or writes
+ * could return -1 with EAGAIN if the server is stuck. Since we ignore errors
+ * on the write to stdin, we won't get blocked in that case but we'd like to
+ * avoid dropping initial input if the server within the zone hasn't started
+ * yet. To handle this we wait to read initial input until we detect that there
+ * is a server inside the zone. We have to poll for this so that we can
+ * re-run the ioctl to notice when a server shows up. This poll/wait is handled
+ * by halt_sleep() so that we can be responsive if the zone wants to halt.
+ * We only do this check to avoid dropping initial input so it is possible for
+ * the server within the zone to go away later. At that point zfd will just
+ * drop any new input flowing into the stream.
  */
 static void
 do_zfd_io(int gzservfd, int gzerrfd, int stdinfd, int stdoutfd, int stderrfd)
@@ -713,6 +742,8 @@ do_zfd_io(int gzservfd, int gzerrfd, int stdinfd, int stdoutfd, int stderrfd)
 	char clilocale[MAXPATHLEN];
 	pid_t clipid = 0;
 	uint_t flags = 0;
+	boolean_t stdin_ready = B_FALSE;
+	int slptime = 250;	/* initial poll sleep time in ms */
 
 	/* client, watch for read events */
 	pollfds[0].fd = clifd;
@@ -753,30 +784,67 @@ do_zfd_io(int gzservfd, int gzerrfd, int stdinfd, int stdoutfd, int stderrfd)
 
 		/* event from client side */
 		if (pollfds[0].revents) {
-			if (pollfds[0].revents & POLLHUP &&
-			    flags & ZLOGIN_ZFD_EOF) {
-				/* Let the client know */
-				(void) ioctl(stdinfd, ZFD_EOF);
-			}
-
-			if (pollfds[0].revents &
-			    (POLLIN | POLLRDNORM | POLLRDBAND | POLLPRI)) {
-				errno = 0;
-				cc = read(clifd, ibuf, BUFSIZ);
-				if (cc <= 0 && (errno != EINTR) &&
-				    (errno != EAGAIN)) {
+			if (stdin_ready) {
+				if (pollfds[0].revents & (POLLIN |
+				    POLLRDNORM | POLLRDBAND | POLLPRI)) {
+					errno = 0;
+					cc = read(clifd, ibuf, BUFSIZ);
+					if (cc > 0) {
+						/*
+						 * See comment for this
+						 * function on what happens if
+						 * there is no reader in the
+						 * zone. EOF is handled below.
+						 */
+						(void) write(stdinfd, ibuf, cc);
+					}
+				} else if (pollfds[0].revents & (POLLERR |
+				    POLLNVAL))  {
+					pollerr = pollfds[0].revents;
+					zerror(zlogp, B_FALSE,
+					    "closing connection "
+					    "with client, pollerr %d\n",
+					    pollerr);
 					break;
 				}
-				/*
-				 * See comment for this function on what
-				 * happens if there is no reader in the zone.
-				 */
-				(void) write(stdinfd, ibuf, cc);
+
+				if (pollfds[0].revents & POLLHUP) {
+					if (flags & ZLOGIN_ZFD_EOF) {
+						/*
+						 * Let the client know. We've
+						 * already serviced any pending
+						 * regular input. Let the
+						 * stream clear since the EOF
+						 * ioctl jumps to the head.
+						 */
+						(void) ioctl(stdinfd, I_FLUSH);
+						if (halt_sleep(250))
+							break;
+						(void) ioctl(stdinfd, ZFD_EOF);
+					}
+					break;
+				}
 			} else {
-				pollerr = pollfds[0].revents;
-				zerror(zlogp, B_FALSE, "closing connection "
-				    "with client, pollerr %d\n", pollerr);
-				break;
+				if (ioctl(stdinfd, ZFD_HAS_SLAVE) == 0) {
+					stdin_ready = B_TRUE;
+				} else {
+					/*
+					 * There is nothing in the zone to read
+					 * our input. Presumably the user
+					 * providing input expects something to
+					 * show up, but that is no guarantee.
+					 * Since we haven't serviced the pending
+					 * input poll yet, we don't want to
+					 * immediately loop around but we also
+					 * need to be responsive if the zone is
+					 * halting.
+					 */
+					if (halt_sleep(slptime))
+						break;
+
+					if (slptime < 5000)
+						slptime += 250;
+				}
 			}
 		}
 

@@ -51,6 +51,11 @@ extern "C" {
  */
 #define	ZFD_EOF			(ZFD_IOC | 1)
 
+/*
+ * This ioctl succeeds if the slave side is open.
+ */
+#define	ZFD_HAS_SLAVE		(ZFD_IOC | 2)
+
 #ifdef	__cplusplus
 }
 #endif
