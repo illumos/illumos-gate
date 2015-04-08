@@ -1,0 +1,83 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2014 Garrett D'Amore <garrett@damore.org>
+#
+
+The configuration files in this directory are structured as lines,
+where each line is made up of fields, separated by "|" characters,
+possibly surrounded by whitespace.
+
+New lines preceeded by backslashes are ignored, allowing for a continuation
+of lines, in the usual UNIX way.
+
+A line beginning with a hashmark is a comment, and is ignored, as are lines
+consisting solely of whitespace.
+
+The first field is always the "keyword", which determines the meaning and
+presence of any other fields.
+
+These files are parsed using the test_load_config() function.  This
+function has the following prototype:
+
+	int test_load_config(test_t, const char *, ...);
+
+The variable arguments are the keywords and handling functions.  These
+must be supplied in pairs and the list is terminated with a NULL, like this:
+
+	test_config_load(t, "myfile.cfg", "mykeyword", keywordcb, NULL);
+
+The test_config_load function will search for the named file (provided it
+is not an absolute path) in a few locations:
+
+	* relative to the current directory, exactly as specified
+	* relative to $STF_SUITE/cfg/	(if $STF_SUITE is defined)
+	* relative to ../../cfg/	(if $STF_SUITE is undefined)
+	* relative to cfg/
+
+The handling functions (keywordcb in the example above) have the following
+typedef:
+
+	typedef int (*test_cfg_func_t)(char **fields, int nfields, char **err);
+
+so for example, keywordcb should be declared thusly:
+
+	int keywordcb(char **fields, int nfields, char **err);
+
+These functions are called each time a paired keyword is seen in the file.
+"fields" is an array of fields, pre-split with surrounding whitespace removed,
+and contains "nfields" items.  Internal whitespace is unaffected.
+
+The function should return 0 on successful handling, or -1 on failure.  In
+the event of failure, it should record an error string in "err" using
+asprintf() or strdup(). ("err" should be unmodified otherwise.)
+
+This parser is rather simplistic, and it lacks support for embedding "|"
+fields in lines, and also doesn't support escaping, so you can't add "\"
+at the end of a line (if you need that, leave some trailing whitespace).
+
+There are also some internal limits on the length of lines (1K), and on the
+number of fields (20).  As this is only used for these test suites, this
+should not be a significant limitation.
+
+Please see ../tests/symbols/symbols_test.c for an example of correct usage.
+
+Aside:
+
+  Astute readers may ask why invent a new configuration file, and why use
+  position based parsing instead of name value pairs.  These files are
+  optimized for specific needs, and intended to support relatively dense
+  information in a format that is easy for humans to work with.  JSON or XML
+  or even YAML could have served, but the overhead of a syntax was more than
+  we wanted to introduce.  Test suites are free to use other formats if they
+  choose, but this simple format has the advantage of being built-in and
+  easy to use.

@@ -474,6 +474,10 @@
 @ MSG_SCN_MULTICOMDAT	"file %s: section [%u]%s: cannot be susceptible to multiple \
 			 COMDAT mechanisms: %s"
 
+@ MSG_SCN_DWFOVRFLW	"%s: section %s: encoded DWARF data exceeds \
+			 section size"
+@ MSG_SCN_DWFBADENC	"%s: section %s: invalid DWARF encoding: %#x"                         
+
 # Symbol processing errors
 
 @ MSG_SYM_NOSECDEF	"symbol '%s' in file %s has no section definition"

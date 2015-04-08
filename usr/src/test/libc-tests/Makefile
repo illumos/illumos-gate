@@ -16,6 +16,6 @@
 
 .PARALLEL: $(SUBDIRS)
 
-SUBDIRS = cmd runfiles tests doc
+SUBDIRS = cfg cmd runfiles tests doc
 
 include $(SRC)/test/Makefile.com

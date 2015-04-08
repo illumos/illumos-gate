@@ -1,5 +1,6 @@
 '\" te
 .\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright (c) 2015, Circonus, Inc. All Rights Reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
@@ -13,7 +14,6 @@ ike.config \- configuration file for IKE policy
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fB/etc/inet/ike/config\fR file contains rules for matching inbound IKE
 requests. It also contains rules for preparing outbound \fBIKE\fR requests.
@@ -24,7 +24,6 @@ using the \fB-c\fR or \fB-f\fR options of \fBin.iked\fR(1M). You must use the
 \fB-c\fR option to test a \fBconfig\fR file. You might need to use the \fB-f\fR
 option if it is not in \fB/etc/inet/ike/config\fR.
 .SS "Lexical Components"
-.sp
 .LP
 On any line, an unquoted \fB#\fR character introduces a comment. The remainder
 of that line is ignored. Additionally, on any line, an unquoted \fB//\fR
@@ -207,7 +206,6 @@ A list of parameters.
 .RE
 
 .SS "File Body Entries"
-.sp
 .LP
 There are four main types of entries:
 .RS +4
@@ -570,31 +568,79 @@ transform's parameter-list:
 .sp .6
 .RS 4n
 The Oakley Diffie-Hellman group used for IKE SA key derivation. The group
-numbers are defined in RFC 2409, Appendix A, and RFC 3526. Acceptable values
-are currently:
+numbers are defined in RFC 2409, Appendix A, RFC 3526, and RFC 5114, section
+3.2. Acceptable values are currently:
 .br
 .in +2
-1 (768-bit)
+1 (MODP 768-bit)
 .in -2
 .br
 .in +2
-2 (1024-bit)
+2 (MODP 1024-bit)
 .in -2
 .br
 .in +2
-5 (1536-bit)
+3 (EC2N 155-bit)
 .in -2
 .br
 .in +2
-14 (2048-bit)
+4 (EC2N 185-bit)
 .in -2
 .br
 .in +2
-15 (3072-bit)
+5 (MODP 1536-bit)
 .in -2
 .br
 .in +2
-16 (4096-bit)
+14 (MODP 2048-bit)
+.in -2
+.br
+.in +2
+15 (MODP 3072-bit)
+.in -2
+.br
+.in +2
+16 (MODP 4096-bit)
+.in -2
+.br
+.in +2
+17 (MODP 6144-bit)
+.in -2
+.br
+.in +2
+18 (MODP 8192-bit)
+.in -2
+.br
+.in +2
+19 (ECP 256-bit)
+.in -2
+.br
+.in +2
+20 (ECP 384-bit)
+.in -2
+.br
+.in +2
+21 (ECP 521-bit)
+.in -2
+.br
+.in +2
+22 (MODP 1024-bit, with 160-bit Prime Order Subgroup)
+.in -2
+.br
+.in +2
+23 (MODP 2048-bit, with 224-bit Prime Order Subgroup)
+.in -2
+.br
+.in +2
+24 (MODP 2048-bit, with 256-bit Prime Order Subgroup)
+.in -2
+.br
+.in +2
+25 (ECP 192-bit)
+.in -2
+.br
+.in +2
+26 (ECP 224-bit)
 .in -2
 .RE
 
@@ -1108,7 +1154,6 @@ p2_pfs 2
 .in -2
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -1124,7 +1169,6 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBcryptoadm\fR(1M), \fBikeadm\fR(1M), \fBin.iked\fR(1M), \fBikecert\fR(1M),
 \fBipseckey\fR(1M), \fBipsecalgs\fR(1M), \fBipsecconf\fR(1M), \fBsvccfg\fR(1M),
@@ -1147,3 +1191,11 @@ for ISAKMP\fR. Network Alchemy. Santa Cruz, California. November 1998.
 Kivinen, T. \fIRFC 3526, More Modular Exponential (MODP) Diffie-Hellman Groups
 for Internet Key Exchange (IKE)\fR. The Internet Society, Network Working
 Group. May 2003.
+.sp
+.LP
+Lepinksi, M. and Kent, S. \fIRFC 5114, Additional Diffie-Hellman Groups for Use
+with IETF Standards\fR. BBN Technologies, January 2008.
+.sp
+.LP
+Fu, D. and Solinas, J. \fIRFC 5903, Elliptic Curve Groups modulo a Prime (ECP
+Groups) for IKE and IKEv2\fR. NSA, June 2010.

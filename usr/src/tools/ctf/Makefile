@@ -26,7 +26,7 @@
 
 include ../Makefile.tools
 
-SUBDIRS = cvt dump stabs scripts ctfstrip
+SUBDIRS = cvt dump stabs ctfstrip
 
 .PARALLEL: $(SUBDIRS)
 

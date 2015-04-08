@@ -21,6 +21,7 @@
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright 2015 Toomas Soome <tsoome@me.com>
 #
 #
 
@@ -42,7 +43,7 @@ $(LINTLIB) :=	SRCS =	$(SRCDIR)/$(LINTSRC)
 #
 # Libraries added to the next line must be present in miniroot
 #
-LDLIBS +=	-lc -lzfs -ldevinfo -lfstyp
+LDLIBS +=	-lc -lzfs -ldevinfo -lfstyp -lefi
 
 CFLAGS +=	$(CCVERBOSE)
 
