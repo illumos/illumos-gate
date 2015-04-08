@@ -45,7 +45,6 @@ MANFILES=	acctcom.1			\
 	 	basename.1			\
 	 	bc.1				\
 	 	bdiff.1				\
-	 	bfs.1				\
 	 	break.1				\
 	 	builtin.1			\
 	 	cal.1				\
