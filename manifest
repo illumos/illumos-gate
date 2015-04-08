@@ -13086,6 +13086,7 @@ s usr/share/man/man3c/iswascii.3c=iswalpha.3c
 s usr/share/man/man3c/iswblank.3c=iswalpha.3c
 s usr/share/man/man3c/iswblank_l.3c=iswalpha.3c
 s usr/share/man/man3c/iswcntrl.3c=iswalpha.3c
+s usr/share/man/man3c/iswcntrl_l.3c=iswalpha.3c
 s usr/share/man/man3c/iswantrl_l.3c=iswalpha.3c
 f usr/share/man/man3c/iswctype.3c 0444 root bin
 s usr/share/man/man3c/iswctype_l.3c=iswalpha.3c
@@ -17368,6 +17369,7 @@ f usr/share/man/man3stmf/stmfGetHostGroupMembers.3stmf 0444 root bin
 f usr/share/man/man3stmf/stmfGetLogicalUnitList.3stmf 0444 root bin
 f usr/share/man/man3stmf/stmfGetLogicalUnitProperties.3stmf 0444 root bin
 f usr/share/man/man3stmf/stmfGetLuResource.3stmf 0444 root bin
+s usr/share/man/man3stmf/stmfGetLuProp.3stmf=stmfSetLuProp.3stmf
 f usr/share/man/man3stmf/stmfGetPersistMethod.3stmf 0444 root bin
 f usr/share/man/man3stmf/stmfGetProviderData.3stmf 0444 root bin
 f usr/share/man/man3stmf/stmfGetProviderDataProt.3stmf 0444 root bin
@@ -17378,6 +17380,7 @@ f usr/share/man/man3stmf/stmfGetTargetList.3stmf 0444 root bin
 f usr/share/man/man3stmf/stmfGetTargetProperties.3stmf 0444 root bin
 f usr/share/man/man3stmf/stmfGetViewEntryList.3stmf 0444 root bin
 f usr/share/man/man3stmf/stmfModifyLu.3stmf 0444 root bin
+s usr/share/man/man3stmf/stmfModifyLuByFname.3stmf=stmfModifyLu.3stmf
 f usr/share/man/man3stmf/stmfOfflineLogicalUnit.3stmf 0444 root bin
 f usr/share/man/man3stmf/stmfOfflineTarget.3stmf 0444 root bin
 f usr/share/man/man3stmf/stmfOnlineLogicalUnit.3stmf 0444 root bin
@@ -17515,6 +17518,8 @@ s usr/share/man/man3uuid/uuid_is_null.3uuid=uuid_clear.3uuid
 s usr/share/man/man3uuid/uuid_parse.3uuid=uuid_clear.3uuid
 s usr/share/man/man3uuid/uuid_time.3uuid=uuid_clear.3uuid
 s usr/share/man/man3uuid/uuid_unparse.3uuid=uuid_clear.3uuid
+s usr/share/man/man3uuid/uuid_unparse_lower.3uuid=uuid_clear.3uuid
+s usr/share/man/man3uuid/uuid_unparse_upper.3uuid=uuid_clear.3uuid
 d usr/share/man/man3vnd 0755 root bin
 s usr/share/man/man3vnd/frameio_t.3vnd=vnd_frameio_read.3vnd
 s usr/share/man/man3vnd/framevec_t.3vnd=vnd_frameio_read.3vnd
@@ -18081,6 +18086,7 @@ f usr/share/man/man4/hosts_options.4 0444 root bin
 f usr/share/man/man4/ib.4 0444 root bin
 f usr/share/man/man4/ike.config.4 0444 root bin
 f usr/share/man/man4/ike.preshared.4 0444 root bin
+f usr/share/man/man4/init.4 0444 root bin
 f usr/share/man/man4/ipf.4 0444 root bin
 s usr/share/man/man4/ipf.conf.4=ipf.4
 f usr/share/man/man4/ipmon.4 0444 root bin
@@ -18173,6 +18179,7 @@ f usr/share/man/man4/rcmscript.4 0444 root bin
 f usr/share/man/man4/rdc.cf.4 0444 root bin
 f usr/share/man/man4/remote.4 0444 root bin
 f usr/share/man/man4/resolv.conf.4 0444 root bin
+s usr/share/man/man4/rhosts.4=hosts.equiv.4
 f usr/share/man/man4/rmtab.4 0444 root bin
 f usr/share/man/man4/rpc.4 0444 root bin
 f usr/share/man/man4/rt_dptbl.4 0444 root bin
@@ -18581,6 +18588,7 @@ s usr/share/man/man7p/ARP.7p=arp.7p
 s usr/share/man/man7p/ESP.7p=ipsecesp.7p
 s usr/share/man/man7p/ICMP.7p=icmp.7p
 s usr/share/man/man7p/IP.7p=ip.7p
+s usr/share/man/man7p/RARP.7p=rarp.7p
 s usr/share/man/man7p/SCTP.7p=sctp.7p
 s usr/share/man/man7p/TCP.7p=tcp.7p
 s usr/share/man/man7p/UDP.7p=udp.7p
@@ -18598,6 +18606,7 @@ f usr/share/man/man7p/ipsec.7p 0444 root bin
 f usr/share/man/man7p/ipsecah.7p 0444 root bin
 f usr/share/man/man7p/ipsecesp.7p 0444 root bin
 f usr/share/man/man7p/pf_key.7p 0444 root bin
+f usr/share/man/man7p/rarp.7p 0444 root bin
 f usr/share/man/man7p/route.7p 0444 root bin
 f usr/share/man/man7p/routing.7p 0444 root bin
 f usr/share/man/man7p/sctp.7p 0444 root bin
