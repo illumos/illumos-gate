@@ -895,7 +895,8 @@ mrsas_tbolt_ioc_init(struct mrsas_instance *instance, dma_obj_t *mpi2_dma_obj)
 	Mpi2IOCInitRequest_t		*init;
 	struct mrsas_cmd		*cmd = NULL;
 	struct mrsas_drv_ver		drv_ver_info;
-	MRSAS_REQUEST_DESCRIPTOR_UNION	*req_desc;
+	MRSAS_REQUEST_DESCRIPTOR_UNION	req_desc;
+	uint32_t			timeout;
 
 	con_log(CL_ANN, (CE_NOTE, "chkpnt:%s:%d", __func__, __LINE__));
 
@@ -1045,20 +1046,31 @@ mrsas_tbolt_ioc_init(struct mrsas_instance *instance, dma_obj_t *mpi2_dma_obj)
 	/* disable interrupts before sending INIT2 frame */
 	instance->func_ptr->disable_intr(instance);
 
-	req_desc = (MRSAS_REQUEST_DESCRIPTOR_UNION *)
-	    instance->request_message_pool;
-	req_desc->Words = cmd->scsi_io_request_phys_addr;
-	req_desc->MFAIo.RequestFlags =
+	req_desc.Words = cmd->scsi_io_request_phys_addr;
+	req_desc.MFAIo.RequestFlags =
 	    (MPI2_REQ_DESCRIPT_FLAGS_MFA << MPI2_REQ_DESCRIPT_FLAGS_TYPE_SHIFT);
 
-	cmd->request_desc = req_desc;
+	cmd->request_desc = &req_desc;
 
 	/* issue the init frame */
-	instance->func_ptr->issue_cmd_in_poll_mode(instance, cmd);
+
+	mutex_enter(&instance->reg_write_mtx);
+	WR_IB_LOW_QPORT((uint32_t)(req_desc.Words), instance);
+	WR_IB_HIGH_QPORT((uint32_t)(req_desc.Words >> 32), instance);
+	mutex_exit(&instance->reg_write_mtx);
 
 	con_log(CL_ANN1, (CE_CONT, "[cmd = %d] ", frame_hdr->cmd));
 	con_log(CL_ANN1, (CE_CONT, "[cmd  Status= %x] ",
 	    frame_hdr->cmd_status));
+
+	timeout = drv_usectohz(MFI_POLL_TIMEOUT_SECS * MICROSEC);
+	do {
+		if (ddi_get8(cmd->frame_dma_obj.acc_handle,
+		    &mfiFrameInit2->cmd_status) != MFI_CMD_STATUS_POLL_MODE)
+			break;
+		delay(1);
+		timeout--;
+	} while (timeout > 0);
 
 	if (ddi_get8(instance->mpi2_frame_pool_dma_obj.acc_handle,
 	    &mfiFrameInit2->cmd_status) == 0) {
@@ -2042,6 +2054,8 @@ tbolt_issue_cmd_in_poll_mode(struct mrsas_instance *instance,
 		/* wait for cmd_status to change from 0xFF */
 		drv_usecwait(MILLISEC); /* wait for 1000 usecs */
 	}
+
+	DTRACE_PROBE1(tbolt_complete_poll_cmd, uint8_t, i);
 
 	if (ddi_get8(cmd->frame_dma_obj.acc_handle,
 	    &frame_hdr->cmd_status) == MFI_CMD_STATUS_POLL_MODE) {
