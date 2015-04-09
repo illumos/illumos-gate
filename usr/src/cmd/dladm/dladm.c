@@ -413,16 +413,16 @@ static cmd_t	cmds[] = {
 	    "    show-bridge      -t [-p] [-o <field>,...] [-s [-i <interval>]]"
 	    " <bridge>\n"						},
 	{ "create-overlay",	do_create_overlay,
-	    "    create-overlay   -e <encap> -s <search> -v <vnetid>\n"
-	    "\t\t     [ -p <prop>=<value>[,...]] <overlay-name>"	},
+	    "    create-overlay   [-t] -e <encap> -s <search> -v <vnetid>\n"
+	    "\t\t     [ -p <prop>=<value>[,...]] <overlay>"	},
 	{ "delete-overlay",	do_delete_overlay,
-	    "    delete-overlay   <overlay-name>"			},
+	    "    delete-overlay   <overlay>"			},
 	{ "modify-overlay",	do_modify_overlay,
-	    "    modify-overlay   [-d mac] [-f] [-s mac=ip:port] "
-	    "<overlay-name>"						},
+	    "    modify-overlay   -d mac | -f | -s mac=ip:port "
+	    "<overlay>"						},
 	{ "show-overlay",	do_show_overlay,
-	    "    show-overlay     [-f | -t] [-p] [-o <field>,...]"
-	    "<overlay> \n"						},
+	    "    show-overlay     [-f | -t] [[-p] -o <field>,...] "
+	    "[<overlay>]\n"						},
 	{ "show-usage",		do_show_usage,
 	    "    show-usage       [-a] [-d | -F <format>] "
 	    "[-s <DD/MM/YYYY,HH:MM:SS>]\n"
@@ -1450,6 +1450,31 @@ static ofmt_field_t bridge_trill_fields[] = {
 { "NEXTHOP",	17,
     offsetof(bridge_trill_fields_buf_t, bridget_nexthop), print_default_cb },
 { NULL,		0, 0, NULL}};
+
+static const struct option overlay_create_lopts[] = {
+	{ "encap",	required_argument,	NULL,	'e' },
+	{ "prop",	required_argument,	NULL,	'p' },
+	{ "search",	required_argument,	NULL,	's' },
+	{ "temporary", 	no_argument,		NULL,	't' },
+	{ "vnetid",	required_argument,	NULL,	'v' },
+	{ NULL,		0,			NULL,	0 }
+};
+
+static const struct option overlay_modify_lopts[] = {
+	{ "delete-entry",	required_argument,	NULL,	'd' },
+	{ "flush-table",	no_argument,		NULL,	'f' },
+	{ "set-entry",		required_argument,	NULL,	's' },
+	{ NULL,			0,			NULL,	0 }
+};
+
+static const struct option overlay_show_lopts[] = {
+	{ "fma",	no_argument,		NULL,	'f' },
+	{ "target",	no_argument,		NULL,	't' },
+	{ "parsable",	no_argument,		NULL,	'p' },
+	{ "parseable",	no_argument,		NULL,	'p' },
+	{ "output",	required_argument,	NULL,	'o' },
+	{ NULL,		0,			NULL,	0 }
+};
 
 /*
  * Structures for dladm show-overlay
@@ -9891,20 +9916,24 @@ do_create_overlay(int argc, char *argv[], const char *use)
 	char			*encap = NULL, *endp, *search = NULL;
 	char			name[MAXLINKNAMELEN];
 	dladm_status_t		status;
-	uint32_t		flags = DLADM_OPT_ACTIVE | DLADM_OPT_TRANSIENT;
+	uint32_t		flags = DLADM_OPT_ACTIVE | DLADM_OPT_PERSIST;
 	uint64_t		vid;
 	boolean_t		havevid = B_FALSE;
 	char			propstr[DLADM_STRSIZE];
 	dladm_arg_list_t	*proplist = NULL;
 
 	bzero(propstr, sizeof (propstr));
-	while ((opt = getopt(argc, argv, ":e:v:p:s:")) != -1) {
+	while ((opt = getopt_long(argc, argv, ":te:v:p:s:",
+	    overlay_create_lopts, NULL)) != -1) {
 		switch (opt) {
 		case 'e':
 			encap = optarg;
 			break;
 		case 's':
 			search = optarg;
+			break;
+		case 't':
+			flags &= ~DLADM_OPT_PERSIST;
 			break;
 		case 'p':
 			(void) strlcat(propstr, optarg, DLADM_STRSIZE);
@@ -10412,7 +10441,8 @@ do_show_overlay(int argc, char *argv[], const char *use)
 	fieldsp = overlay_fields;
 	parse = B_FALSE;
 	ofmtflags = OFMT_WRAP;
-	while ((opt = getopt(argc, argv, ":o:pft")) != -1) {
+	while ((opt = getopt_long(argc, argv, ":o:pft", overlay_show_lopts,
+	    NULL)) != -1) {
 		switch (opt) {
 		case 'f':
 			funcp = show_one_overlay_fma;
@@ -10474,7 +10504,8 @@ do_modify_overlay(int argc, char *argv[], const char *use)
 	dladm_status_t		status;
 
 	flush = set = delete = B_FALSE;
-	while ((opt = getopt(argc, argv, ":fd:s:")) != -1) {
+	while ((opt = getopt_long(argc, argv, ":fd:s:", overlay_modify_lopts,
+	    NULL)) != -1) {
 		switch (opt) {
 		case 'd':
 			if (delete == B_TRUE)

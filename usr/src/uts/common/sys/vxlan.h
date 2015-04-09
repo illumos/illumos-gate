@@ -30,7 +30,6 @@ extern "C" {
 #define	VXLAN_HDR_LEN	8
 #define	VXLAN_ID_LEN	3
 
-#define	VXLAN_MAGIC	0x08000000
 #define	VXLAN_F_VDI	0x08000000
 #define	VXLAN_ID_SHIFT	8
 

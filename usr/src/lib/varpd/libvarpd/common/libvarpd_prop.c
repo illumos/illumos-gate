@@ -35,6 +35,26 @@ typedef struct varpd_prop_info {
 	uint8_t			vprop_poss[LIBVARPD_PROP_SIZEMAX];
 } varpd_prop_info_t;
 
+/* Internal Properties */
+static int varpd_nintprops = 1;
+static const char *varpd_intprops[] = {
+	"search"
+};
+
+static int
+libvarpd_prop_get_search(varpd_prop_info_t *infop, void *buf, uint32_t *sizep)
+{
+	varpd_plugin_t *vpp = infop->vprop_instance->vri_plugin;
+	size_t nlen;
+
+	nlen = strlen(vpp->vpp_name) + 1;
+	if (nlen > *sizep)
+		return (EOVERFLOW);
+	*sizep = nlen;
+	(void) strlcpy(buf, vpp->vpp_name, *sizep);
+	return (0);
+}
+
 void
 libvarpd_prop_set_name(varpd_prop_handle_t *phdl, const char *name)
 {
@@ -151,9 +171,38 @@ libvarpd_prop_handle_free(varpd_prop_handle_t *phdl)
 int
 libvarpd_prop_nprops(varpd_instance_handle_t *ihdl, uint_t *np)
 {
+	int ret;
 	varpd_instance_t *instp = (varpd_instance_t *)ihdl;
 
-	return (instp->vri_plugin->vpp_ops->vpo_nprops(instp->vri_private, np));
+	ret = instp->vri_plugin->vpp_ops->vpo_nprops(instp->vri_private, np);
+	if (ret != 0)
+		return (ret);
+	*np += varpd_nintprops;
+	return (0);
+}
+
+static int
+libvarpd_prop_info_fill_int_cb(varpd_handle_t *handle, const char *name,
+    void *arg)
+{
+	varpd_prop_handle_t *vph = arg;
+	libvarpd_prop_set_range_str(vph, name);
+	return (0);
+}
+
+static int
+libvarpd_prop_info_fill_int(varpd_prop_handle_t *vph, uint_t propid)
+{
+	varpd_prop_info_t *infop = (varpd_prop_info_t *)vph;
+	if (propid >= varpd_nintprops)
+		abort();
+	libvarpd_prop_set_name(vph, varpd_intprops[0]);
+	libvarpd_prop_set_prot(vph, OVERLAY_PROP_PERM_READ);
+	libvarpd_prop_set_type(vph, OVERLAY_PROP_T_STRING);
+	libvarpd_prop_set_nodefault(vph);
+	libvarpd_plugin_walk((varpd_handle_t *)infop->vprop_instance->vri_impl,
+	    libvarpd_prop_info_fill_int_cb, vph);
+	return (0);
 }
 
 int
@@ -164,9 +213,15 @@ libvarpd_prop_info_fill(varpd_prop_handle_t *phdl, uint_t propid)
 	mac_propval_range_t *rangep = (mac_propval_range_t *)infop->vprop_poss;
 
 	infop->vprop_psize = sizeof (mac_propval_range_t);
+
 	bzero(rangep, sizeof (mac_propval_range_t));
-	return (instp->vri_plugin->vpp_ops->vpo_propinfo(instp->vri_private,
-	    propid, phdl));
+	if (propid < varpd_nintprops) {
+		return (libvarpd_prop_info_fill_int(phdl, propid));
+	} else {
+		varpd_plugin_t *vpp = instp->vri_plugin;
+		return (vpp->vpp_ops->vpo_propinfo(instp->vri_private,
+		    propid - varpd_nintprops, phdl));
+	}
 }
 
 int
@@ -193,11 +248,17 @@ libvarpd_prop_info(varpd_prop_handle_t *phdl, const char **namep,
 int
 libvarpd_prop_get(varpd_prop_handle_t *phdl, void *buf, uint32_t *sizep)
 {
+	int i;
 	varpd_prop_info_t *infop = (varpd_prop_info_t *)phdl;
 	varpd_instance_t *instp = infop->vprop_instance;
 
 	if (infop->vprop_name[0] == '\0')
 		return (EINVAL);
+
+	if (strcmp(varpd_intprops[0], infop->vprop_name) == 0) {
+		/* search property */
+		return (libvarpd_prop_get_search(infop, buf, sizep));
+	}
 
 	return (instp->vri_plugin->vpp_ops->vpo_getprop(instp->vri_private,
 	    infop->vprop_name, buf, sizep));
@@ -206,11 +267,18 @@ libvarpd_prop_get(varpd_prop_handle_t *phdl, void *buf, uint32_t *sizep)
 int
 libvarpd_prop_set(varpd_prop_handle_t *phdl, const void *buf, uint32_t size)
 {
+	int i;
 	varpd_prop_info_t *infop = (varpd_prop_info_t *)phdl;
 	varpd_instance_t *instp = infop->vprop_instance;
 
 	if (infop->vprop_name[0] == '\0')
 		return (EINVAL);
+
+	for (i = 0; i < varpd_nintprops; i++) {
+		if (strcmp(infop->vprop_name, varpd_intprops[i]) == 0) {
+			return (EPERM);
+		}
+	}
 
 	return (instp->vri_plugin->vpp_ops->vpo_setprop(instp->vri_private,
 	    infop->vprop_name, buf, size));

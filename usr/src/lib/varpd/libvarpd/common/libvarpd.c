@@ -57,7 +57,6 @@ libvarpd_instance_lcomparator(const void *lp, const void *rp)
 	return (0);
 }
 
-
 int
 libvarpd_create(varpd_handle_t **vphp)
 {

@@ -193,6 +193,7 @@ extern void libvarpd_plugin_postfork(void);
 extern void libvarpd_plugin_fini(void);
 extern int libvarpd_plugin_comparator(const void *, const void *);
 extern varpd_plugin_t *libvarpd_plugin_lookup(varpd_impl_t *, const char *);
+
 extern varpd_instance_t *libvarpd_instance_lookup_by_dlid(varpd_impl_t *,
     datalink_id_t);
 

@@ -18133,6 +18133,7 @@ f usr/share/man/man4/nscd.conf.4 0444 root bin
 f usr/share/man/man4/nsmbrc.4 0444 root bin
 f usr/share/man/man4/nss.4 0444 root bin
 f usr/share/man/man4/nsswitch.conf.4 0444 root bin
+f usr/share/man/man4/overlay_files.4 0444 root bin
 f usr/share/man/man4/packingrules.4 0444 root bin
 f usr/share/man/man4/pam.conf.4 0444 root bin
 f usr/share/man/man4/passwd.4 0444 root bin
@@ -18303,6 +18304,7 @@ f usr/share/man/man5/mm.5 0444 root bin
 f usr/share/man/man5/ms.5 0444 root bin
 f usr/share/man/man5/mutex.5 0444 root bin
 f usr/share/man/man5/nfssec.5 0444 root bin
+f usr/share/man/man5/overlay.5 0444 root bin
 f usr/share/man/man5/pam_allow.5 0444 root bin
 f usr/share/man/man5/pam_authtok_check.5 0444 root bin
 f usr/share/man/man5/pam_authtok_get.5 0444 root bin
@@ -18569,6 +18571,7 @@ s usr/share/man/man7p/RARP.7p=rarp.7p
 s usr/share/man/man7p/SCTP.7p=sctp.7p
 s usr/share/man/man7p/TCP.7p=tcp.7p
 s usr/share/man/man7p/UDP.7p=udp.7p
+s usr/share/man/man7p/VXLAN.7p=vxlan.7p
 f usr/share/man/man7p/arp.7p 0444 root bin
 f usr/share/man/man7p/dlpi.7p 0444 root bin
 f usr/share/man/man7p/icmp.7p 0444 root bin
@@ -18591,6 +18594,7 @@ f usr/share/man/man7p/sip.7p 0444 root bin
 f usr/share/man/man7p/slp.7p 0444 root bin
 f usr/share/man/man7p/tcp.7p 0444 root bin
 f usr/share/man/man7p/udp.7p 0444 root bin
+f usr/share/man/man7p/vxlan.7p 0444 root bin
 d usr/share/man/man9 0755 root bin
 s usr/share/man/man9/Intro.9=../man9e/Intro.9e
 s usr/share/man/man9/intro.9=../man9e/Intro.9e

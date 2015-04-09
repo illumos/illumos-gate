@@ -163,7 +163,7 @@ vxlan_o_encap(void *arg, mblk_t *mp, ovep_encap_info_t *einfop,
 		return (ENOMEM);
 
 	vxh = (vxlan_hdr_t *)ob->b_rptr;
-	vxh->vxlan_flags = ntohl(VXLAN_MAGIC);
+	vxh->vxlan_flags = ntohl(VXLAN_F_VDI);
 	vxh->vxlan_id = htonl((uint32_t)einfop->ovdi_id << VXLAN_ID_SHIFT);
 	ob->b_wptr += VXLAN_HDR_LEN;
 	*outp = ob;
@@ -180,7 +180,7 @@ vxlan_o_decap(void *arg, mblk_t *mp, ovep_encap_info_t *dinfop)
 	if (MBLKL(mp) < sizeof (vxlan_hdr_t))
 		return (EINVAL);
 	vxh = (vxlan_hdr_t *)mp->b_rptr;
-	if ((ntohl(vxh->vxlan_flags) & VXLAN_MAGIC) == 0)
+	if ((ntohl(vxh->vxlan_flags) & VXLAN_F_VDI) == 0)
 		return (EINVAL);
 
 	dinfop->ovdi_id = ntohl(vxh->vxlan_id) >> VXLAN_ID_SHIFT;
