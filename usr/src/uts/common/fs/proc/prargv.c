@@ -28,7 +28,7 @@
  * returned to the caller via 'rdsz'.
  */
 static int
-prreadbuf(proc_t *p, uintptr_t addr, uint8_t *buf, size_t sz, size_t *rdsz)
+prreadbuf(proc_t *p, uintptr_t ustart, uint8_t *buf, size_t sz, size_t *rdsz)
 {
 	int error = 0;
 	size_t rem = sz;
@@ -38,9 +38,10 @@ prreadbuf(proc_t *p, uintptr_t addr, uint8_t *buf, size_t sz, size_t *rdsz)
 		*rdsz = 0;
 
 	while (rem != 0) {
+		uintptr_t addr = ustart + pos;
 		size_t len = MIN(rem, PAGESIZE - (addr & PAGEOFFSET));
 
-		if ((error = uread(p, buf + pos, len, addr + pos)) != 0) {
+		if ((error = uread(p, buf + pos, len, addr)) != 0) {
 			if (error == ENXIO) {
 				/*
 				 * ENXIO from uread() indicates that the page
