@@ -703,7 +703,11 @@ lx_free_brand_data(zone_t *zone)
 	lx_zone_data_t *data = ztolxzd(zone);
 	ASSERT(data != NULL);
 	if (data->lxzd_ioctl_sock != NULL) {
-		ksocket_close(data->lxzd_ioctl_sock, zone->zone_kcred);
+		/*
+		 * Since zone_kcred has been cleaned up already, close the
+		 * socket using the global kcred.
+		 */
+		ksocket_close(data->lxzd_ioctl_sock, kcred);
 		data->lxzd_ioctl_sock = NULL;
 	}
 	zone->zone_brand_data = NULL;
