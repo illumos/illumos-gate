@@ -103,7 +103,8 @@
 #include <auth_attr.h>
 #include <secdb.h>
 
-static int masterfd;
+static int masterfd = -1;
+static int ctlfd = -1;
 static struct termios save_termios;
 static struct termios effective_termios;
 static int save_fd;
@@ -115,7 +116,6 @@ static priv_set_t *dropprivs;
 
 static int nocmdchar = 0;
 static int failsafe = 0;
-static uint_t connect_flags = 0;
 static char cmdchar = '~';
 static int quiet = 0;
 static char zonebrand[MAXNAMELEN];
@@ -262,69 +262,58 @@ postfork_dropprivs()
 	}
 }
 
-/*
- * Create the unix domain socket and call the zoneadmd server; handshake
- * with it to determine whether it will allow us to connect.
- */
 static int
-get_interactive_master(const char *zname, int notcons)
+connect_zone_sock(const char *zname, const char *suffix)
 {
 	int sockfd = -1;
 	struct sockaddr_un servaddr;
-	char clientid[MAXPATHLEN];
-	char handshake[MAXPATHLEN], c;
-	int msglen;
-	int i = 0, err = 0;
-	char *sock_str;
 
 	if ((sockfd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
 		zperror(gettext("could not create socket"));
 		return (-1);
 	}
 
-	if (notcons) {
-		sock_str = "%s/%s.server_out";
-	} else {
-		sock_str = "%s/%s.console_sock";
-	}
-
 	bzero(&servaddr, sizeof (servaddr));
 	servaddr.sun_family = AF_UNIX;
 	(void) snprintf(servaddr.sun_path, sizeof (servaddr.sun_path),
-	    sock_str, ZONES_TMPDIR, zname);
-
+	    "%s/%s.%s", ZONES_TMPDIR, zname, suffix);
 	if (connect(sockfd, (struct sockaddr *)&servaddr,
 	    sizeof (servaddr)) == -1) {
-		if (errno == ENOENT && notcons)
-			(void) fprintf(stderr, "%s: %s\n", pname,
-			    gettext("Could not connect to zone (is interactive "
-			    "mode enabled?)"));
-		else
-			zperror(gettext("Could not connect to zone"));
-		goto bad;
+		zperror(gettext("Could not connect to zone"));
+		close(sockfd);
+		return (-1);
 	}
-	masterfd = sockfd;
+	return (sockfd);
+}
 
-	msglen = snprintf(clientid, sizeof (clientid), "IDENT %lu %s %u\n",
-	    getpid(), setlocale(LC_MESSAGES, NULL), connect_flags);
+
+static int
+handshake_zone_sock(int sockfd, unsigned int flags)
+{
+	char clientid[MAXPATHLEN];
+	char handshake[MAXPATHLEN], c;
+	int msglen;
+	int i = 0, err = 0;
+
+	msglen = snprintf(clientid, sizeof (clientid), "IDENT %s %u\n",
+	    setlocale(LC_MESSAGES, NULL), flags);
 
 	if (msglen >= sizeof (clientid) || msglen < 0) {
 		zerror("protocol error");
-		goto bad;
+		return (-1);
 	}
 
-	if (write(masterfd, clientid, msglen) != msglen) {
+	if (write(sockfd, clientid, msglen) != msglen) {
 		zerror("protocol error");
-		goto bad;
+		return (-1);
 	}
-
-	bzero(handshake, sizeof (handshake));
 
 	/*
 	 * Take care not to accumulate more than our fill, and leave room for
 	 * the NUL at the end.
 	 */
-	while ((err = read(masterfd, &c, 1)) == 1) {
+	bzero(handshake, sizeof (handshake));
+	while ((err = read(sockfd, &c, 1)) == 1) {
 		if (i >= (sizeof (handshake) - 1))
 			break;
 		if (c == '\n')
@@ -334,56 +323,48 @@ get_interactive_master(const char *zname, int notcons)
 	}
 
 	/*
-	 * If something went wrong during the handshake we bail; perhaps
-	 * the server died off.
+	 * If something went wrong during the handshake we bail.
+	 * Perhaps the server died off.
 	 */
 	if (err == -1) {
 		zperror(gettext("Could not connect to zone"));
-		goto bad;
+		return (-1);
 	}
 
-	if (strncmp(handshake, "OK", sizeof (handshake)) == 0)
-		return (0);
+	if (strncmp(handshake, "OK", sizeof (handshake)) != 0) {
+		zerror(gettext("Zone is already in use by process ID %s."),
+		    handshake);
+		return (-1);
+	}
 
-	zerror(gettext("Zone is already in use by process ID %s."), handshake);
-bad:
-	(void) close(sockfd);
-	masterfd = -1;
-	return (-1);
+	return (0);
 }
 
-/*
- * Create the unix domain stderr socket and connect to the zoneadmd server.
- */
 static int
-get_interactive_stderr(const char *zname)
+send_ctl_sock(const char *buf, size_t len)
 {
-	int sockfd = -1;
-	struct sockaddr_un servaddr;
-	char *sock_str;
-
-	if ((sockfd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
-		zperror(gettext("could not create socket"));
+	char rbuf[BUFSIZ];
+	int i;
+	if (ctlfd == -1) {
 		return (-1);
 	}
-
-	sock_str = "%s/%s.server_err";
-
-	bzero(&servaddr, sizeof (servaddr));
-	servaddr.sun_family = AF_UNIX;
-	(void) snprintf(servaddr.sun_path, sizeof (servaddr.sun_path),
-	    sock_str, ZONES_TMPDIR, zname);
-
-	if (connect(sockfd, (struct sockaddr *)&servaddr,
-	    sizeof (servaddr)) == -1) {
-		zperror(gettext("Could not connect to zone's stderr"));
-		(void) close(sockfd);
+	if (write(ctlfd, buf, len) != len) {
 		return (-1);
 	}
-
-	return (sockfd);
+	/* read the response */
+	for (i = 0; i < (BUFSIZ - 1); i++) {
+		char c;
+		if (read(ctlfd, &c, 1) != 1 || c == '\n' || c == '\0') {
+			break;
+		}
+		rbuf[i] = c;
+	}
+	rbuf[i+1] = '\0';
+	if (strncmp("OK", rbuf, BUFSIZ) != 0) {
+		return (-1);
+	}
+	return (0);
 }
-
 /*
  * Routines to handle pty creation upon zone entry and to shuttle I/O back
  * and forth between the two terminals.  We also compute and store the
@@ -572,8 +553,16 @@ sigwinch(int s)
 {
 	struct winsize ws;
 
-	if (ioctl(0, TIOCGWINSZ, &ws) == 0)
-		(void) ioctl(masterfd, TIOCSWINSZ, &ws);
+	if (ioctl(0, TIOCGWINSZ, &ws) == 0) {
+		if (ctlfd != -1) {
+			char buf[BUFSIZ];
+			snprintf(buf, sizeof (buf), "TIOCSWINSZ %hu %hu\n",
+			    ws.ws_row, ws.ws_col);
+			(void) send_ctl_sock(buf, strlen(buf));
+		} else {
+			(void) ioctl(masterfd, TIOCSWINSZ, &ws);
+		}
+	}
 }
 
 static volatile int close_on_sig = -1;
@@ -1877,6 +1866,7 @@ main(int argc, char **argv)
 	brand_handle_t bh;
 	char user_cmd[MAXPATHLEN];
 	char authname[MAXAUTHS];
+	unsigned int connect_flags = 0;
 
 	(void) setlocale(LC_ALL, "");
 	(void) textdomain(TEXT_DOMAIN);
@@ -2128,11 +2118,37 @@ main(int argc, char **argv)
 		/*
 		 * Make contact with zoneadmd.
 		 */
-		if (get_interactive_master(zonename, imode) == -1)
-			return (1);
-
-		if (imode) {
-			gz_stderr_fd = get_interactive_stderr(zonename);
+		if (!imode) {
+			masterfd = connect_zone_sock(zonename, "console_sock");
+			if (masterfd == -1) {
+				return (1);
+			}
+			if (handshake_zone_sock(masterfd,
+			    connect_flags) != 0) {
+				(void) close(masterfd);
+				return (1);
+			}
+		} else {
+			/* handshake with the control socket first */
+			ctlfd = connect_zone_sock(zonename, "server_ctl");
+			if (ctlfd == -1) {
+				return (1);
+			}
+			if (handshake_zone_sock(ctlfd,
+			    connect_flags) != 0) {
+				(void) close(ctlfd);
+				return (1);
+			}
+			/* then open the io-related sockets */
+			masterfd = connect_zone_sock(zonename, "server_out");
+			gz_stderr_fd = connect_zone_sock(zonename,
+			    "server_err");
+			if (masterfd == -1 || gz_stderr_fd == -1) {
+				(void) close(ctlfd);
+				(void) close(masterfd);
+				(void) close(gz_stderr_fd);
+				return (1);
+			}
 		}
 
 		if (!quiet) {
