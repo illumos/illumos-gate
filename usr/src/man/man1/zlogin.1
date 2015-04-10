@@ -31,7 +31,6 @@ zlogin \- enter a zone
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBzlogin\fR utility is used by the administrator to enter an operating
 system zone. Only a superuser operating in the global system zone can use this
@@ -93,7 +92,6 @@ stdout and stderr \fBzfd(7D)\fR devices.
 .RE
 
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -184,7 +182,8 @@ and the shell which invokes \fBzlogin\fR both read from standard input.
 .ad
 .RS 15n
 Nohup. This may only be used with the -I option to avoid sending EOF to the zfd
-device when zlogin's stdin receives EOF.
+device when zlogin's stdin receives EOF. It can also be toggled by sending
+\fBSIGUSR1\fR to an attached zlogin process.
 .RE
 
 .sp
@@ -213,7 +212,6 @@ other forms of login have become impossible.
 .RE
 
 .SS "Escape Sequences"
-.sp
 .LP
 Lines that you type that start with the tilde character (\fB~\fR) are "escape
 sequences". The escape character can be changed using the \fB-e\fR option.
@@ -228,12 +226,10 @@ host breaks the connection with no warning to the zone's end.
 .RE
 
 .SH SECURITY
-.sp
 .LP
 Once a process has been placed in a zone other than the global zone, the
 process cannot change zone again, nor can any of its children.
 .SH OPERANDS
-.sp
 .LP
 The following operands are supported:
 .sp
@@ -264,7 +260,6 @@ Arguments passed to the utility.
 .RE
 
 .SH EXIT STATUS
-.sp
 .LP
 In interactive and non-interactive modes, the \fBzlogin\fR utility exits when
 the command or shell in the non-global zone exits. In non-interactive mode, the
@@ -309,7 +304,6 @@ mode.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -325,12 +319,10 @@ Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBlogin\fR(1), \fBrsh\fR(1), \fBvi\fR(1), \fBsu\fR(1M), \fBzoneadm\fR(1M),
 \fBzonecfg\fR(1M), \fBattributes\fR(5), \fBzones\fR(5)
 .SH NOTES
-.sp
 .LP
 \fBzlogin\fR fails if its open files or any portion of its address space
 corresponds to an NFS file. This includes the executable itself or the shared
