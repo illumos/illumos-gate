@@ -113,6 +113,7 @@ static volatile int dead;
 static volatile pid_t child_pid = -1;
 static int interactive = 0;
 static priv_set_t *dropprivs;
+static unsigned int connect_flags = 0;
 
 static int nocmdchar = 0;
 static int failsafe = 0;
@@ -562,6 +563,22 @@ sigwinch(int s)
 		} else {
 			(void) ioctl(masterfd, TIOCSWINSZ, &ws);
 		}
+	}
+}
+
+/*
+ * Toggle zfd EOF mode and notify zoneadmd
+ */
+/*ARGSUSED*/
+static void
+sigusr1(int s)
+{
+	connect_flags ^= ZLOGIN_ZFD_EOF;
+	if (ctlfd != -1) {
+		char buf[BUFSIZ];
+		snprintf(buf, sizeof (buf), "SETFLAGS %u\n",
+		    connect_flags);
+		(void) send_ctl_sock(buf, strlen(buf));
 	}
 }
 
@@ -1866,7 +1883,6 @@ main(int argc, char **argv)
 	brand_handle_t bh;
 	char user_cmd[MAXPATHLEN];
 	char authname[MAXAUTHS];
-	unsigned int connect_flags = 0;
 
 	(void) setlocale(LC_ALL, "");
 	(void) textdomain(TEXT_DOMAIN);
@@ -2168,6 +2184,11 @@ main(int argc, char **argv)
 
 		(void) sigset(SIGWINCH, sigwinch);
 		(void) sigwinch(0);
+
+		if (imode) {
+			/* Allow EOF mode toggling via SIGUSR1 */
+			(void) sigset(SIGUSR1, sigusr1);
+		}
 
 		/*
 		 * Run the I/O loop until we get disconnected.

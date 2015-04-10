@@ -600,7 +600,7 @@ accept_socket(int servfd, pid_t verpid)
 }
 
 static void
-ctlcmd_process(int sockfd, int stdoutfd)
+ctlcmd_process(int sockfd, int stdoutfd, unsigned int *flags)
 {
 	char buf[BUFSIZ];
 	int i;
@@ -633,6 +633,18 @@ ctlcmd_process(int sockfd, int stdoutfd)
 			(void) write(sockfd, "OK\n", 3);
 			return;
 		}
+	}
+	if (strncmp(buf, "SETFLAGS ", 9) == 0) {
+		char *next = buf + 9;
+		unsigned int result;
+		errno = 0;
+		result = strtoul(next, &next, 10);
+		if (errno == EINVAL) {
+			goto fail;
+		}
+		*flags = result;
+		(void) write(sockfd, "OK\n", 3);
+		return;
 	}
 fail:
 	(void) write(sockfd, "FAIL\n", 5);
@@ -873,7 +885,7 @@ do_zfd_io(int gzctlfd, int gzservfd, int gzerrfd, int stdinfd, int stdoutfd,
 		if (pollfds[0].revents &
 		    (POLLIN | POLLRDNORM | POLLRDBAND | POLLPRI)) {
 			/* process control message */
-			ctlcmd_process(ctlfd, stdoutfd);
+			ctlcmd_process(ctlfd, stdoutfd, &flags);
 		} else if (pollfds[0].revents) {
 			/* bail if any error occurs */
 			pollerr = pollfds[0].revents;
