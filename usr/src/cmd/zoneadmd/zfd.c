@@ -453,6 +453,7 @@ get_client_ident(int clifd, pid_t *pid, char *locale, size_t locale_len,
 	size_t buflen = sizeof (buf);
 	char c = '\0';
 	int i = 0, r;
+	ucred_t *cred = NULL;
 
 	/* "eat up the ident string" case, for simplicity */
 	if (pid == NULL) {
@@ -487,16 +488,20 @@ get_client_ident(int clifd, pid_t *pid, char *locale, size_t locale_len,
 	}
 
 	/*
-	 * Parse buffer for message of the form: IDENT <pid> <locale> <flags>
+	 * Parse buffer for message of the form:
+	 * IDENT <locale> <flags>
 	 */
 	bufp = buf;
 	if (strncmp(bufp, "IDENT ", 6) != 0)
 		return (-1);
 	bufp += 6;
-	errno = 0;
-	*pid = strtoll(bufp, &bufp, 10);
-	if (errno != 0)
+
+	if (getpeerucred(clifd, &cred) == 0) {
+		*pid = ucred_getpid((const ucred_t *)cred);
+		ucred_free(cred);
+	} else {
 		return (-1);
+	}
 
 	while (*bufp != '\0' && isspace(*bufp))
 		bufp++;
@@ -532,9 +537,9 @@ accept_client(int servfd, pid_t *pid, char *locale, size_t locale_len,
 		(void) write(connfd, "OK\n", 3);
 	}
 
-	flags = fcntl(connfd, F_GETFD, 0);
+	flags = fcntl(connfd, F_GETFL, 0);
 	if (flags != -1)
-		(void) fcntl(connfd, F_SETFD, flags | O_NONBLOCK | FD_CLOEXEC);
+		(void) fcntl(connfd, F_SETFL, flags | O_NONBLOCK | FD_CLOEXEC);
 
 	return (connfd);
 }
@@ -560,6 +565,77 @@ reject_client(int servfd, pid_t clientpid)
 	}
 	(void) shutdown(connfd, SHUT_RDWR);
 	(void) close(connfd);
+}
+
+static int
+accept_socket(int servfd, pid_t verpid)
+{
+	int connfd;
+	struct sockaddr_un cliaddr;
+	socklen_t clilen = sizeof (cliaddr);
+	ucred_t *cred = NULL;
+	pid_t rpid = -1;
+	int flags;
+
+	connfd = accept(servfd, (struct sockaddr *)&cliaddr, &clilen);
+	if (connfd == -1)
+		return (-1);
+
+	/* Confirm connecting process is who we expect */
+	if (getpeerucred(connfd, &cred) == 0) {
+		rpid = ucred_getpid((const ucred_t *)cred);
+		ucred_free(cred);
+	}
+	if (rpid == -1 || rpid != verpid) {
+		(void) shutdown(connfd, SHUT_RDWR);
+		(void) close(connfd);
+		return (-1);
+	}
+
+	flags = fcntl(connfd, F_GETFL, 0);
+	if (flags != -1)
+		(void) fcntl(connfd, F_SETFL, flags | O_NONBLOCK | FD_CLOEXEC);
+
+	return (connfd);
+}
+
+static void
+ctlcmd_process(int sockfd, int stdoutfd)
+{
+	char buf[BUFSIZ];
+	int i;
+	for (i = 0; i < BUFSIZ-1; i++) {
+		char c;
+		if (read(sockfd, &c, 1) != 1 ||
+		    c == '\n' || c == '\0') {
+			break;
+		}
+		buf[i] = c;
+	}
+	if (i == 0) {
+		goto fail;
+	}
+	buf[i+1] = '\0';
+
+	if (strncmp(buf, "TIOCSWINSZ ", 11) == 0) {
+		char *next = buf + 11;
+		struct winsize ws;
+		errno = 0;
+		ws.ws_row = strtol(next, &next, 10);
+		if (errno == EINVAL) {
+			goto fail;
+		}
+		ws.ws_col = strtol(next + 1, &next, 10);
+		if (errno == EINVAL) {
+			goto fail;
+		}
+		if (ioctl(stdoutfd, TIOCSWINSZ, &ws) == 0) {
+			(void) write(sockfd, "OK\n", 3);
+			return;
+		}
+	}
+fail:
+	(void) write(sockfd, "FAIL\n", 5);
 }
 
 /*
@@ -731,11 +807,13 @@ halt_sleep(int slptime)
  * drop any new input flowing into the stream.
  */
 static void
-do_zfd_io(int gzservfd, int gzerrfd, int stdinfd, int stdoutfd, int stderrfd)
+do_zfd_io(int gzctlfd, int gzservfd, int gzerrfd, int stdinfd, int stdoutfd,
+    int stderrfd)
 {
-	struct pollfd pollfds[6];
+	struct pollfd pollfds[8];
 	char ibuf[BUFSIZ + 1];
 	int cc, ret;
+	int ctlfd = -1;
 	int clifd = -1;
 	int clierrfd = -1;
 	int pollerr = 0;
@@ -745,47 +823,69 @@ do_zfd_io(int gzservfd, int gzerrfd, int stdinfd, int stdoutfd, int stderrfd)
 	boolean_t stdin_ready = B_FALSE;
 	int slptime = 250;	/* initial poll sleep time in ms */
 
-	/* client, watch for read events */
-	pollfds[0].fd = clifd;
+	/* client control socket, watch for read events */
+	pollfds[0].fd = ctlfd;
 	pollfds[0].events = POLLIN | POLLRDNORM | POLLRDBAND |
 	    POLLPRI | POLLERR | POLLHUP | POLLNVAL;
 
-	/* stdout, watch for read events */
-	pollfds[1].fd = stdoutfd;
+	/* client socket, watch for read events */
+	pollfds[1].fd = clifd;
 	pollfds[1].events = pollfds[0].events;
 
-	/* stderr, watch for read events */
-	pollfds[2].fd = stderrfd;
+	/* stdout, watch for read events */
+	pollfds[2].fd = stdoutfd;
 	pollfds[2].events = pollfds[0].events;
 
-	/* the server stdin/out socket; watch for events (new connections) */
-	pollfds[3].fd = gzservfd;
+	/* stderr, watch for read events */
+	pollfds[3].fd = stderrfd;
 	pollfds[3].events = pollfds[0].events;
 
-	/* the server stderr socket; watch for events (new connections) */
-	pollfds[4].fd = gzerrfd;
-	pollfds[4].events = pollfds[0].events;
+	/* the server control socket; watch for new connections */
+	pollfds[4].fd = gzctlfd;
+	pollfds[4].events = POLLIN | POLLRDNORM;
+
+	/* the server stdin/out socket; watch for new connections */
+	pollfds[5].fd = gzservfd;
+	pollfds[5].events = POLLIN | POLLRDNORM;
+
+	/* the server stderr socket; watch for new connections */
+	pollfds[6].fd = gzerrfd;
+	pollfds[6].events = POLLIN | POLLRDNORM;
 
 	/* the eventstream; any input means the zone is halting */
-	pollfds[5].fd = eventstream[1];
-	pollfds[5].events = pollfds[0].events;
+	pollfds[7].fd = eventstream[1];
+	pollfds[7].events = pollfds[0].events;
 
 	while (!shutting_down) {
 		pollfds[0].revents = pollfds[1].revents = 0;
 		pollfds[2].revents = pollfds[3].revents = 0;
 		pollfds[4].revents = pollfds[5].revents = 0;
+		pollfds[6].revents = pollfds[7].revents = 0;
 
-		ret = poll(pollfds, 6, -1);
+		ret = poll(pollfds, 8, -1);
 		if (ret == -1 && errno != EINTR) {
 			zerror(zlogp, B_TRUE, "poll failed");
 			/* we are hosed, close connection */
 			break;
 		}
 
+		/* control events from client */
+		if (pollfds[0].revents &
+		    (POLLIN | POLLRDNORM | POLLRDBAND | POLLPRI)) {
+			/* process control message */
+			ctlcmd_process(ctlfd, stdoutfd);
+		} else if (pollfds[0].revents) {
+			/* bail if any error occurs */
+			pollerr = pollfds[0].revents;
+			zerror(zlogp, B_FALSE, "closing connection "
+			    "with control channel, pollerr %d\n", pollerr);
+			break;
+		}
+
 		/* event from client side */
-		if (pollfds[0].revents) {
+		if (pollfds[1].revents) {
 			if (stdin_ready) {
-				if (pollfds[0].revents & (POLLIN |
+				if (pollfds[1].revents & (POLLIN |
 				    POLLRDNORM | POLLRDBAND | POLLPRI)) {
 					errno = 0;
 					cc = read(clifd, ibuf, BUFSIZ);
@@ -798,9 +898,9 @@ do_zfd_io(int gzservfd, int gzerrfd, int stdinfd, int stdoutfd, int stderrfd)
 						 */
 						(void) write(stdinfd, ibuf, cc);
 					}
-				} else if (pollfds[0].revents & (POLLERR |
+				} else if (pollfds[1].revents & (POLLERR |
 				    POLLNVAL))  {
-					pollerr = pollfds[0].revents;
+					pollerr = pollfds[1].revents;
 					zerror(zlogp, B_FALSE,
 					    "closing connection "
 					    "with client, pollerr %d\n",
@@ -808,7 +908,7 @@ do_zfd_io(int gzservfd, int gzerrfd, int stdinfd, int stdoutfd, int stderrfd)
 					break;
 				}
 
-				if (pollfds[0].revents & POLLHUP) {
+				if (pollfds[1].revents & POLLHUP) {
 					if (flags & ZLOGIN_ZFD_EOF) {
 						/*
 						 * Let the client know. We've
@@ -849,8 +949,8 @@ do_zfd_io(int gzservfd, int gzerrfd, int stdinfd, int stdoutfd, int stderrfd)
 		}
 
 		/* event from the zone's stdout */
-		if (pollfds[1].revents) {
-			if (pollfds[1].revents &
+		if (pollfds[2].revents) {
+			if (pollfds[2].revents &
 			    (POLLIN | POLLRDNORM | POLLRDBAND | POLLPRI)) {
 				errno = 0;
 				cc = read(stdoutfd, ibuf, BUFSIZ);
@@ -868,7 +968,7 @@ do_zfd_io(int gzservfd, int gzerrfd, int stdinfd, int stdoutfd, int stderrfd)
 						(void) write(clifd, ibuf, cc);
 				}
 			} else {
-				pollerr = pollfds[1].revents;
+				pollerr = pollfds[2].revents;
 				zerror(zlogp, B_FALSE,
 				    "closing connection with stdout zfd, "
 				    "pollerr %d\n", pollerr);
@@ -877,8 +977,8 @@ do_zfd_io(int gzservfd, int gzerrfd, int stdinfd, int stdoutfd, int stderrfd)
 		}
 
 		/* event from the zone's stderr */
-		if (pollfds[2].revents) {
-			if (pollfds[2].revents &
+		if (pollfds[3].revents) {
+			if (pollfds[3].revents &
 			    (POLLIN | POLLRDNORM | POLLRDBAND | POLLPRI)) {
 				errno = 0;
 				cc = read(stderrfd, ibuf, BUFSIZ);
@@ -897,7 +997,7 @@ do_zfd_io(int gzservfd, int gzerrfd, int stdinfd, int stdoutfd, int stderrfd)
 						    cc);
 				}
 			} else {
-				pollerr = pollfds[2].revents;
+				pollerr = pollfds[3].revents;
 				zerror(zlogp, B_FALSE,
 				    "closing connection with stderr zfd, "
 				    "pollerr %d\n", pollerr);
@@ -905,10 +1005,9 @@ do_zfd_io(int gzservfd, int gzerrfd, int stdinfd, int stdoutfd, int stderrfd)
 			}
 		}
 
-		/* event from primary server stdin/out socket */
-		if (pollfds[3].revents &&
-		    (pollfds[3].revents & (POLLIN | POLLRDNORM))) {
-			if (clifd != -1) {
+		/* connect event from server control socket */
+		if (pollfds[4].revents) {
+			if (ctlfd != -1) {
 				/*
 				 * Test the client to see if it is really
 				 * still alive.  If it has died but we
@@ -918,46 +1017,60 @@ do_zfd_io(int gzservfd, int gzerrfd, int stdinfd, int stdoutfd, int stderrfd)
 				 * the old connection, the new connection
 				 * will happen.
 				 */
-				if (test_client(clifd) == -1) {
+				if (test_client(ctlfd) == -1) {
 					break;
 				}
 				/* we're already handling a client */
-				reject_client(gzservfd, clipid);
+				reject_client(gzctlfd, clipid);
+			} else {
+				ctlfd = accept_client(gzctlfd, &clipid,
+				    clilocale, sizeof (clilocale), &flags);
+				if (ctlfd != -1) {
+					pollfds[0].fd = ctlfd;
+				} else {
+					break;
+				}
+			}
+		}
 
-			} else if ((clifd = accept_client(gzservfd, &clipid,
-			    clilocale, sizeof (clilocale), &flags)) != -1) {
-				pollfds[0].fd = clifd;
-
+		/* connect event from server stdin/out socket */
+		if (pollfds[5].revents) {
+			if (ctlfd == -1) {
+				/*
+				 * This shouldn't happen since the client is
+				 * expected to connect on the control socket
+				 * first. If we see this, tear everything down
+				 * and start over.
+				 */
+				zerror(zlogp, B_FALSE, "GZ zfd stdin/stdout "
+				    "connection attempt with no GZ control\n");
+				break;
+			}
+			assert(clifd == -1);
+			if ((clifd = accept_socket(gzservfd, clipid)) != -1) {
+				/* No need to watch for other new connections */
+				pollfds[5].fd = -1;
+				/* Client input is of interest, though */
+				pollfds[1].fd = clifd;
 			} else {
 				break;
 			}
 		}
 
 		/* connection event from server stderr socket */
-		if (pollfds[4].revents &&
-		    (pollfds[4].revents & (POLLIN | POLLRDNORM))) {
-			if (clifd == -1) {
+		if (pollfds[6].revents) {
+			if (ctlfd == -1) {
 				/*
-				 * This shouldn't happen since the client is
-				 * expected to connect on the primary socket
-				 * first. If we see this, tear everything down
-				 * and start over.
+				 * Same conditions apply to stderr as stdin/out.
 				 */
 				zerror(zlogp, B_FALSE, "GZ zfd stderr "
-				    "connection attempt with no GZ primary\n");
+				    "connection attempt with no GZ control\n");
 				break;
 			}
-
 			assert(clierrfd == -1);
-			if ((clierrfd = accept_client(gzerrfd, NULL, NULL, 0,
-			    NULL)) != -1) {
-				/*
-				 * Once connected, we no longer poll on the
-				 * gzerrfd since the CLI handshake takes place
-				 * on the primary gzservfd.
-				 */
-				pollfds[4].fd = -1;
-
+			if ((clierrfd = accept_socket(gzerrfd, clipid)) != -1) {
+				/* No need to watch for other new connections */
+				pollfds[6].fd = -1;
 			} else {
 				break;
 			}
@@ -969,7 +1082,7 @@ do_zfd_io(int gzservfd, int gzerrfd, int stdinfd, int stdoutfd, int stderrfd)
 		 * "wakeup" from poll when important things happen, which
 		 * is good.
 		 */
-		if (pollfds[5].revents) {
+		if (pollfds[7].revents) {
 			break;
 		}
 	}
@@ -1062,6 +1175,7 @@ static void
 srvr(void *modearg)
 {
 	zlog_mode_t mode = (zlog_mode_t)modearg;
+	int gzctlfd = -1;
 	int gzoutfd = -1;
 	int stdinfd = -1;
 	int stdoutfd = -1;
@@ -1091,6 +1205,11 @@ srvr(void *modearg)
 	}
 
 	while (!shutting_down) {
+		if (init_server_sock(zlogp, &gzctlfd, "ctl") == -1) {
+			zerror(zlogp, B_FALSE,
+			    "server setup: control socket init failed");
+			goto death;
+		}
 		if (init_server_sock(zlogp, &gzoutfd, "out") == -1) {
 			zerror(zlogp, B_FALSE,
 			    "server setup: stdout socket init failed");
@@ -1115,8 +1234,10 @@ srvr(void *modearg)
 			}
 		}
 
-		do_zfd_io(gzoutfd, gzerrfd, stdinfd, stdoutfd, stderrfd);
+		do_zfd_io(gzctlfd, gzoutfd, gzerrfd, stdinfd, stdoutfd,
+		    stderrfd);
 death:
+		destroy_server_sock(gzctlfd, "ctl");
 		destroy_server_sock(gzoutfd, "out");
 		destroy_server_sock(gzerrfd, "err");
 		(void) close(stdinfd);
