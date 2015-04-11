@@ -115,11 +115,6 @@ ONBLD_TOOLS=		$(BUILD_TOOLS)/onbld
 
 JAVA_ROOT=	/usr/java
 
-SFW_ROOT=	/usr/sfw
-SFWINCDIR=	$(SFW_ROOT)/include
-SFWLIBDIR=	$(SFW_ROOT)/lib
-SFWLIBDIR64=	$(SFW_ROOT)/lib/$(MACH64)
-
 GCC_ROOT=	/opt/gcc/4.4.4
 GCCLIBDIR=	$(GCC_ROOT)/lib
 GCCLIBDIR64=	$(GCC_ROOT)/lib/$(MACH64)
@@ -154,7 +149,7 @@ ELFDUMP=	/usr/ccs/bin/elfdump
 M4=		/usr/ccs/bin/m4
 STRIP=		/usr/ccs/bin/strip
 LEX=		/usr/ccs/bin/lex
-FLEX=		$(SFW_ROOT)/bin/flex
+FLEX=		/usr/bin/flex
 YACC=		/usr/ccs/bin/yacc
 CPP=		/usr/lib/cpp
 JAVAC=		$(JAVA_ROOT)/bin/javac
@@ -762,7 +757,7 @@ NATIVE_MACH=	$(MACH:amd64=i386)
 #
 SPRO_ROOT=		$(BUILD_TOOLS)/SUNWspro
 SPRO_VROOT=		$(SPRO_ROOT)/SS12
-GNU_ROOT=		$(SFW_ROOT)
+GNU_ROOT=		/usr
 
 # Till SS12u1 formally becomes the NV CBE, LINT is hard
 # coded to be picked up from the $SPRO_ROOT/sunstudio12.1/

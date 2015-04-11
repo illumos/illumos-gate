@@ -49,9 +49,8 @@ LDLIBS.cmd =	$(LDLIBS64)
 LDLIBS.lib =	$(LDLIBS64)
 
 #
-# Override Makefile.master's settings of SFWLIBDIR and GCCLIBDIR
+# Override Makefile.master's settings of GCCLIBDIR
 #
-SFWLIBDIR=	$(SFWLIBDIR64)
 GCCLIBDIR=	$(GCCLIBDIR64)
 
 #
