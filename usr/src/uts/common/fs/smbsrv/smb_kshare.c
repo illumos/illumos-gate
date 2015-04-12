@@ -311,7 +311,7 @@ smb_kshare_init(void)
 	    sizeof (smb_unshare_t), offsetof(smb_unshare_t, us_lnd));
 
 	smb_thread_init(&smb_export.e_unexport_thread, "smb_thread_unexport",
-	    smb_kshare_unexport_thread, NULL);
+	    smb_kshare_unexport_thread, NULL, smbsrv_base_pri);
 
 	if ((rc = smb_thread_start(&smb_export.e_unexport_thread)) != 0)
 		return (rc);

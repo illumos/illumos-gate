@@ -397,8 +397,8 @@ smb_server_create(void)
 	sv->si_cache_event = kmem_cache_create("smb_event_cache",
 	    sizeof (smb_event_t), 8, NULL, NULL, NULL, NULL, NULL, 0);
 
-	smb_thread_init(&sv->si_thread_timers,
-	    "smb_timers", smb_server_timers, sv);
+	smb_thread_init(&sv->si_thread_timers, "smb_timers",
+	    smb_server_timers, sv, smbsrv_timer_pri);
 
 	sv->sv_pid = curproc->p_pid;
 	smb_srqueue_init(&sv->sv_srqueue);
@@ -576,12 +576,12 @@ smb_server_start(smb_ioc_start_t *ioc)
 		smb_codepage_init();
 
 		sv->sv_worker_pool = taskq_create("smb_workers",
-		    sv->sv_cfg.skc_maxworkers, SMB_WORKER_PRIORITY,
+		    sv->sv_cfg.skc_maxworkers, smbsrv_worker_pri,
 		    sv->sv_cfg.skc_maxworkers, INT_MAX,
 		    TASKQ_DYNAMIC|TASKQ_PREPOPULATE);
 
 		sv->sv_receiver_pool = taskq_create("smb_receivers",
-		    sv->sv_cfg.skc_maxconnections, SMB_WORKER_PRIORITY,
+		    sv->sv_cfg.skc_maxconnections, smbsrv_receive_pri,
 		    sv->sv_cfg.skc_maxconnections, INT_MAX,
 		    TASKQ_DYNAMIC);
 
@@ -1468,7 +1468,8 @@ smb_server_listener_init(
 
 	smb_llist_constructor(&ld->ld_session_list, sizeof (smb_session_t),
 	    offsetof(smb_session_t, s_lnd));
-	smb_thread_init(&ld->ld_thread, name, smb_server_listener, ld);
+	smb_thread_init(&ld->ld_thread, name, smb_server_listener, ld,
+	    smbsrv_listen_pri);
 	ld->ld_magic = SMB_LISTENER_MAGIC;
 }
 

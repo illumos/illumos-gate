@@ -19,6 +19,7 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -98,7 +99,7 @@ smb_oplock_init(void)
 	    offsetof(smb_oplock_break_t, ob_lnd));
 
 	smb_thread_init(&smb_oplock_thread, "smb_thread_oplock_break",
-	    smb_oplock_break_thread, NULL);
+	    smb_oplock_break_thread, NULL, smbsrv_notify_pri);
 
 	rc = smb_thread_start(&smb_oplock_thread);
 	if (rc != 0) {

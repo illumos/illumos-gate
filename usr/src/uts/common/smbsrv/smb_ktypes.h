@@ -186,7 +186,6 @@ typedef struct {
 	smb_audit_record_node_t	anb_records[SMB_AUDIT_BUF_MAX_REC];
 } smb_audit_buf_node_t;
 
-#define	SMB_WORKER_PRIORITY	99
 /*
  * Thread State Machine
  * --------------------
@@ -261,6 +260,7 @@ typedef struct _smb_thread {
 	kt_did_t		sth_did;
 	smb_thread_ep_t		sth_ep;
 	void			*sth_ep_arg;
+	pri_t			sth_pri;
 	boolean_t		sth_kill;
 	kmutex_t		sth_mtx;
 	kcondvar_t		sth_cv;

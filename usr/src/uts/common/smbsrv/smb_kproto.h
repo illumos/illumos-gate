@@ -72,6 +72,14 @@ extern	int smb_opipe_timeout;
 extern	int smb_threshold_debug;
 extern const uint32_t smb_vop_dosattr_settable;
 
+/* Thread priorities - see smb_init.c */
+extern	int smbsrv_base_pri;
+extern	int smbsrv_listen_pri;
+extern	int smbsrv_receive_pri;
+extern	int smbsrv_worker_pri;
+extern	int smbsrv_notify_pri;
+extern	int smbsrv_timer_pri;
+
 int		fd_dealloc(int);
 
 off_t		lseek(int fildes, off_t offset, int whence);
@@ -732,7 +740,8 @@ int	smb_rwx_rwwait(smb_rwx_t *rwx, clock_t timeout);
 krw_t   smb_rwx_rwupgrade(smb_rwx_t *rwx);
 void    smb_rwx_rwdowngrade(smb_rwx_t *rwx, krw_t mode);
 
-void	smb_thread_init(smb_thread_t *, char *, smb_thread_ep_t, void *);
+void	smb_thread_init(smb_thread_t *, char *, smb_thread_ep_t,
+		void *, pri_t);
 void	smb_thread_destroy(smb_thread_t *);
 int	smb_thread_start(smb_thread_t *);
 void	smb_thread_stop(smb_thread_t *);
