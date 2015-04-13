@@ -3197,17 +3197,6 @@ $if i386
 	__udivrem64;
 $endif
 
-#
-# The following functions should become public symbols when they get
-# upstreamed to illumos and become part of their own appropriate symbol
-# version.
-#
-	arc4random;
-	arc4random_buf;
-	arc4random_uniform;
-	explicit_bzero;
-	getentropy;
-
 # The following functions should not be exported from libc,
 # but /lib/libm.so.2, some older versions of the Studio
 # compiler/debugger components, and some ancient programs
