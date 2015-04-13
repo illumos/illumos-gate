@@ -1,5 +1,5 @@
-'\" te
-.\"  Copyright (c) 1992, X/Open Company Limited All Rights Reserved  Portions Copyright (c) 2002, Sun Microsystems, Inc.  All Rights Reserved
+.\" Copyright 2015 Garrett D'Amore <garrett@damore.org>
+.\" Copyright (c) 1992, X/Open Company Limited All Rights Reserved  Portions Copyright (c) 2002, Sun Microsystems, Inc.  All Rights Reserved
 .\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
@@ -7,62 +7,66 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH GETWD 3C "Jul 24, 2002"
-.SH NAME
-getwd \- get current working directory pathname
-.SH SYNOPSIS
-.LP
-.nf
-#include <unistd.h>
-
-\fBchar *\fR\fBgetwd\fR(\fBchar *\fR\fIpath_name\fR);
-.fi
-
-.SH DESCRIPTION
-.sp
-.LP
-The \fBgetwd()\fR function determines an absolute pathname of the current
+.Dd Mar 30, 2015
+.Dt GETWD 3C
+.Os
+.Sh NAME
+.Nm getwd
+.Nd get current working directory pathname
+.Sh SYNOPSIS
+.In unistd.h
+.Ft "char *"
+.Fn getwd "char *path_name"
+.Sh DESCRIPTION
+The
+.Fn getwd
+function determines an absolute pathname of the current
 working directory of the calling process, and copies that pathname into the
-array pointed to by the \fIpath_name\fR argument.
-.sp
-.LP
+array pointed to by the
+.Fa path_name
+argument.
+.Lp
 If the length of the pathname of the current working directory is greater than
-(\fIPATH_MAX\fR + 1) including the null byte, \fBgetwd()\fR fails and returns a
-null pointer.
-.SH RETURN VALUES
-.sp
-.LP
+.Pq Dv PATH_MAX + 1
+including the null byte,
+.Fn getwd
+fails and returns a null pointer.
+.Sh RETURN VALUES
 Upon successful completion, a pointer to the string containing the absolute
 pathname of the current working directory is returned.  Otherwise,
-\fBgetwd()\fR returns a null pointer and the contents of the array pointed to
-by \fIpath_name\fR are undefined.
-.SH ERRORS
-.sp
-.LP
+.Fn getwd
+returns a null pointer and the contents of the array pointed to by
+.Fa path_name
+are undefined.
+.Sh ERRORS
 No errors are defined.
-.SH USAGE
-.sp
-.LP
-For portability to implementations conforming to versions of the X/Open
-Portability Guide prior to SUS, \fBgetcwd\fR(3C) is preferred over this
-function.
-.SH ATTRIBUTES
-.sp
-.LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-Interface Stability	Standard
-.TE
-
-.SH SEE ALSO
-.sp
-.LP
-\fBgetcwd\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)
+.Sh USAGE
+The
+.Fn getwd
+function is supplied for backwards compatibility.  The
+.Xr getcwd 3C
+should be used instead.
+.Sh INTERFACE STABILITY
+.Sy Obsolete Standard .
+.Sh SEE ALSO
+.Xr getcwd 3C ,
+.Xr standards 5
+.Sh STANDARDS
+The
+.Fn getwd
+function is available in the following compilation environments. See
+.Xr standards 5 .
+.Lp
+.Bl -bullet -compact
+.It
+.St -xpg4.2
+.It
+.St -susv2
+.It
+.St -susv3
+.El
+.Lp
+It was marked obsolete in
+.St -susv3
+and removed from
+.St -p1003.1-2008 .

@@ -26,7 +26,7 @@ set -o errexit
 
 arc_pname=$(basename $0)
 arc_root=$(dirname $0)/../..
-arc_bin=$arc_root/bin/arc4random_rekey
+arc_bin=$arc_root/tests/random/arc4random_rekey
 arc_tmpfile=/tmp/$arc_pname.$$
 arc_count=
 

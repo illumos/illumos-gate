@@ -395,9 +395,6 @@ extern uid_t getuid(void);
 #if !defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__)
 extern char *getusershell(void);
 #endif /* !defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__) */
-#if !defined(__XOPEN_OR_POSIX) || defined(_XPG4_2) || defined(__EXTENSIONS__)
-extern char *getwd(char *);
-#endif /* !defined(__XOPEN_OR_POSIX) || defined(_XPG4_2)... */
 /*
  * The following ioctl prototype is duplicated in <stropts.h>. The
  * duplication is necessitated by XPG4.2 which requires the prototype
@@ -559,11 +556,11 @@ extern useconds_t ualarm(useconds_t, useconds_t);
 #endif
 extern int unlink(const char *);
 #if (defined(_XPG4_2) && !defined(_XPG7)) || !defined(_STRICT_SYMBOLS)
+extern char *getwd(char *);
 extern int usleep(useconds_t);
-#endif
-#if !defined(__XOPEN_OR_POSIX) || defined(_XPG4_2) || defined(__EXTENSIONS__)
 extern pid_t vfork(void) __RETURNS_TWICE;
-#endif /* !defined(__XOPEN_OR_POSIX) || defined(_XPG4_2)... */
+#pragma unknown_control_flow(vfork)
+#endif
 #if !defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__)
 extern void vhangup(void);
 #endif /* !defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__) */
@@ -600,10 +597,6 @@ extern off64_t	tell64(int);
 extern int	truncate64(const char *, off64_t);
 extern int	lockf64(int, int, off64_t);
 #endif	/* _LARGEFILE64_SOURCE */
-
-#if !defined(__XOPEN_OR_POSIX) || defined(_XPG4_2) || defined(__EXTENSIONS__)
-#pragma unknown_control_flow(vfork)
-#endif /* !defined(__XOPEN_OR_POSIX) || defined(_XPG4_2)... */
 
 /*
  * getlogin_r() & ttyname_r() prototypes are defined here.

@@ -1,0 +1,405 @@
+#!/bin/ksh
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+#
+
+# Use distributed make (dmake) by default.
+make=${MAKE:-dmake}
+
+CLOSED_IS_PRESENT=no
+export CLOSED_IS_PRESENT
+
+[ -n "$SRC" ] || {
+  echo "SRC not set.  Run 'ws' or 'bldenv' first."
+  exit 1
+}
+
+cpu=`uname -p`
+case $cpu in
+i386)
+	x=intel
+	mdb_arch="ia32 amd64"
+	arch32=i86
+	arch64=amd64
+	;;
+sparc)
+	x=sparc
+	mdb_arch=v9
+	arch32=sparc
+	arch64=sparcv9
+	;;
+*)  echo "Huh?" ; exit 1;;
+esac
+
+################################################################
+
+build_tools() {
+  test -f $SRC/tools/proto/root_i386-nd/opt/onbld/bin/genoffsets ||
+    (cd $SRC/tools && $make install)
+  (cd $SRC/common/mapfiles; $make install)
+}
+
+clobber_tools() {
+  (cd $SRC/tools && $make clobber)
+  (cd $SRC/common/mapfiles; $make clobber)
+}
+
+################################################################
+
+do_hdrs() {
+
+targ=$1
+if [ "$targ" = clobber ]
+then
+  (cd $SRC/uts && $make -k clobber_h)
+  (cd $SRC/head && $make clobber)
+fi
+
+if [ "$targ" = install ]
+then
+  targ=install_h
+
+  # Just the parts of "make sgs" we need, and
+  # skip them if they appear to be done.
+  # ... stuff under $SRC
+  test -f $SRC/uts/common/sys/priv_names.h ||
+    (cd $SRC/uts && $make -k all_h)
+
+  test -f $SRC/head/rpcsvc/nispasswd.h ||
+    (cd $SRC/head && $make -k install_h)
+
+  # ... stuff under $ROOT (proto area)
+  test -d $ROOT/usr/include/sys ||
+    (cd $SRC && $make rootdirs)
+  test -f $ROOT/usr/include/sys/types.h ||
+    (cd $SRC/uts && $make -k install_h)
+  test -f $ROOT/usr/include/rpcsvc/daemon_utils.h ||
+    (cd $SRC/head && $make install_h)
+
+  # always update the sys headers to be safe
+  (cd $SRC/uts/common/sys && $make -k install_h)
+
+fi
+
+# Need some library headers too...
+for lib in \
+  libbsm \
+  libcmdutils \
+  libcryptoutil \
+  libdevid \
+  libdiskmgt \
+  libidmap \
+  libpam \
+  libsec \
+  libscf \
+  libshare \
+  libuutil \
+  libzpool \
+  libzfs_core \
+  libzfs \
+  libzfs_jni
+do
+  (cd $SRC/lib/$lib && $make $targ)
+done
+  # Should fix the Makefile here so all_h or install_h works.
+  (cd $SRC/lib/libzpool/$cpu && $make ../common/zfs.h)
+}
+
+################################################################
+
+do_kern() {
+  case $1 in
+  lint) targ=modlintlib ;;
+  *) targ=$1 ;;
+  esac
+  (cd $SRC/uts/$x/zfs && $make $targ)
+}
+
+################################################################
+#
+# Build all libraries used by the other targets in here.
+#
+# Run this once (at least) in each new workspace where you
+# will run "make-zfs install", if you want to avoid linking
+# against the libraries from your build host.
+#
+do_deplibs() {
+
+# install all the lib headers
+if [ "$1" = install ] ; then
+  (cd $SRC/lib && $make install_h)
+fi
+
+# Wow, building libc takes a while.  Really want that?
+for lib in \
+	libc \
+	libavl \
+	libnvpair \
+	libsec \
+	libcmdutils \
+	libdevinfo \
+	libuutil \
+	libbrand \
+	libzonecfg \
+	libinetutil \
+	libdladm \
+	libdlpi \
+	libdiskmgt \
+	libumem \
+	libdisasm \
+	libidmap \
+	libdevid \
+	libsaveargs
+do
+  (cd $SRC/lib/$lib && $make $1)
+done
+}
+
+################################################################
+
+do_libs() {
+
+for lib in \
+  libavl \
+  libcmdutils \
+  libuutil \
+  libzpool \
+  libzfs_core \
+  libzfs \
+  libzfs_jni \
+  pyzfs
+do
+  (cd $SRC/lib/$lib && $make $1)
+done
+(cd $SRC/lib/libshare && $make $1 PLUGINS=)
+}
+
+################################################################
+
+do_cmds() {
+
+for cmd in \
+  availdevs \
+  isaexec \
+  fstyp \
+  zdb \
+  zfs \
+  zhack \
+  zinject \
+  zpool \
+  ztest \
+  zstreamdump \
+  pyzfs
+do
+  (cd $SRC/cmd/$cmd && $make $1)
+done
+
+case $1 in
+install)
+  # mount programs need fslib.o
+  (cd $SRC/cmd/fs.d/zfs && $make $1)
+  # Build just the ZFS devfsadm module
+  (cd $SRC/cmd/devfsadm/$cpu && $make SUNW_zfs_link.so \
+    ${ROOT}/usr/lib/devfsadm/linkmod \
+    ${ROOT}/usr/lib/devfsadm/linkmod/SUNW_zfs_link.so )
+  ;;
+clean|clobber)
+  (cd $SRC/cmd/fs.d/zfs && $make clobber)
+  (cd $SRC/cmd/fs.d && $make ${1}_local)
+  (cd $SRC/cmd/devfsadm && $make $1)
+  ;;
+esac
+
+(cd $SRC/cmd/syseventd/modules/zfs_mod && $make $1)
+
+# Build the MDB modules, WITH the linktest
+(cd $SRC/cmd/mdb/tools && $make $1)
+for a in $mdb_arch
+do
+  case $1 in
+  install|lint)
+    (cd $SRC/cmd/mdb/$x/$a/kmdb &&
+	$make kmdb_modlinktest.o )
+    ;;
+  clean|clobber)
+    (cd $SRC/cmd/mdb/$x/$a/kmdb &&
+	$make -k $1 )
+    ;;
+  esac
+
+  (cd $SRC/cmd/mdb/$x/$a/zfs &&
+	$make $1 KMDB_LINKTEST_ENABLE= )
+
+  (cd $SRC/cmd/mdb/$x/$a/libzpool &&
+	$make $1 )
+
+done
+}
+
+################################################################
+
+do_mans() {
+
+  case "$1" in
+  install)
+    (cd $SRC/man/man1m && make \
+      $ROOT/usr/share/man/man1m/zdb.1m \
+      $ROOT/usr/share/man/man1m/zfs.1m \
+      $ROOT/usr/share/man/man1m/zpool.1m )
+    (cd $SRC/man/man5 && make \
+      $ROOT/usr/share/man/man5/zpool-features.5 )
+    ;;
+  lint)
+    (cd $SRC/man/man1m && make zdb.1m.check zfs.1m.check zpool.1m.check)
+    (cd $SRC/man/man5 && make zpool-features.5.check)
+    ;;
+  *)
+    (cd $SRC/man/man1m && make $1)
+    (cd $SRC/man/man5 && make $)
+    ;;
+  esac
+}
+
+################################################################
+# This builds $SRC/TAGS (and cscope.files) in a helpful order.
+
+do_tags() {
+	(cd $SRC ;
+	find uts/common/sys -name '*.[ch]' -print |sort
+	find uts/common/fs/zfs -name '*.[ch]' -print |sort
+	find lib/libzpool -name '*.[ch]' -print |sort
+	find lib/libzfs -name '*.[ch]' -print |sort
+	find cmd/zpool -name '*.[ch]' -print |sort
+	find cmd/zfs -name '*.[ch]' -print |sort
+	find cmd/zdb -name '*.[ch]' -print |sort
+	find cmd/zhack -name '*.[ch]' -print |sort
+	find cmd/zinject -name '*.[ch]' -print |sort
+	find cmd/ztest -name '*.[ch]' -print |sort
+	find common/zfs -name '*.[ch]' -print |sort
+	echo cmd/mdb/common/modules/zfs/zfs.c
+	) > $SRC/cscope.files
+
+	(cd $SRC ;
+	exctags -e --langmap=c:+.ndl -h ndl -L - < cscope.files
+	cscope -b )
+}
+
+################################################################
+# This creates a tarfile one can use to update a test machine.
+
+do_tar() {
+	git_rev=`git rev-parse --short=8 HEAD`
+	files="
+kernel/drv/$arch64/zfs
+kernel/drv/zfs
+kernel/fs/$arch64/zfs
+kernel/fs/zfs
+kernel/kmdb/$arch64/zfs
+kernel/kmdb/zfs
+lib/$arch64/libzfs.so.1
+lib/$arch64/libzfs_core.so.1
+lib/libzfs.so.1
+lib/libzfs_core.so.1
+usr/bin/$arch32/ztest
+usr/bin/$arch64/ztest
+usr/lib/$arch64/libzfs_jni.so.1
+usr/lib/$arch64/libzpool.so.1
+usr/lib/devfsadm/linkmod/SUNW_zfs_link.so
+usr/lib/fs/zfs/bootinstall
+usr/lib/fs/zfs/fstyp.so.1
+usr/lib/libzfs_jni.so.1
+usr/lib/libzpool.so.1
+usr/lib/mdb/kvm/$arch64/zfs.so
+usr/lib/mdb/kvm/zfs.so
+usr/lib/mdb/proc/$arch64/libzpool.so
+usr/lib/mdb/proc/libzpool.so
+sbin/zfs
+sbin/zpool
+usr/lib/sysevent/modules/zfs_mod.so
+usr/lib/zfs/availdevs
+usr/lib/zfs/pyzfs.py
+usr/lib/zfs/pyzfs.pyc
+usr/sbin/$arch32/zdb
+usr/sbin/$arch64/zdb
+usr/sbin/$arch32/zhack
+usr/sbin/$arch64/zhack
+usr/sbin/$arch32/zinject
+usr/sbin/$arch64/zinject
+usr/sbin/zstreamdump
+usr/share/man/man1m/zdb.1m
+usr/share/man/man1m/zfs.1m
+usr/share/man/man1m/zpool.1m
+usr/share/man/man5/zpool-features.5
+"
+	(cd $ROOT && tar cfj ../../zfs-${git_rev}.tar.bz2 $files)
+}
+
+################################################################
+
+if [ "$1" = "" ]; then
+  set '?' # force usage
+fi
+
+set -x
+
+for arg
+do
+  case "$arg" in
+  install)
+    build_tools
+    set -e
+    do_hdrs $arg
+    do_kern $arg
+    do_libs $arg
+    do_cmds $arg
+    do_mans $arg
+    ;;
+  lint)
+    do_kern $arg
+    do_libs $arg
+    do_cmds $arg
+    do_mans $arg
+    ;;
+  clean)
+    do_mans $arg
+    do_cmds $arg
+    do_libs $arg
+    do_kern $arg
+    ;;
+  clobber)
+    do_mans $arg
+    do_cmds $arg
+    do_libs $arg
+    do_kern $arg
+    do_hdrs $arg
+    clobber_tools
+    ;;
+  deplibs)
+    build_tools
+    set -e
+    do_hdrs install
+    do_deplibs install
+    ;;
+  tags)
+    do_tags
+    ;;
+  tar)
+    do_tar
+    ;;
+  *)
+    echo "Usage: $0 {install|lint|clean|clobber|deplibs|tags|tar}";
+    exit 1;
+    ;;
+  esac
+done

@@ -1,0 +1,229 @@
+#!/bin/ksh
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+#
+
+# Use distributed make (dmake) by default.
+make=${MAKE:-dmake}
+
+CLOSED_IS_PRESENT=no
+export CLOSED_IS_PRESENT
+
+# Do this if you want to use dbx or gdb
+# export SOURCEDEBUG=yes
+
+[ -n "$SRC" ] || {
+  echo "SRC not set.  Run 'ws' or 'bldenv' first."
+  exit 1
+}
+
+cpu=`uname -p`
+case $cpu in
+i386)
+	x=intel
+	mdb_arch="ia32 amd64"
+	arch64=amd64
+	;;
+sparc)
+	x=sparc
+	mdb_arch=v9
+	arch64=sparcv9
+	;;
+*)  echo "Huh?" ; exit 1;;
+esac
+
+################################################################
+
+build_tools() {
+  test -f $SRC/tools/proto/root_i386-nd/opt/onbld/bin/genoffsets ||
+    (cd $SRC/tools && $make install)
+  (cd $SRC/common/mapfiles; $make install)
+}
+
+clobber_tools() {
+  (cd $SRC/tools && $make clobber)
+  (cd $SRC/common/mapfiles; $make clobber)
+}
+
+################################################################
+
+do_hdrs() {
+
+targ=$1
+if [ "$targ" = clobber ]
+then
+  (cd $SRC/uts && $make -k clobber_h)
+  (cd $SRC/head && $make clobber)
+fi
+
+if [ "$targ" = install ]
+then
+  targ=install_h
+
+  # Just the parts of "make sgs" we need, and
+  # skip them if they appear to be done.
+  # ... stuff under $SRC
+  test -f $SRC/uts/common/sys/priv_names.h ||
+    (cd $SRC/uts && $make -k all_h)
+
+  test -f $SRC/head/rpcsvc/nispasswd.h ||
+    (cd $SRC/head && $make -k install_h)
+
+  # ... stuff under $ROOT (proto area)
+  test -d $ROOT/usr/include/sys ||
+    (cd $SRC && $make rootdirs)
+  test -f $ROOT/usr/include/sys/types.h ||
+    (cd $SRC/uts && $make -k install_h)
+  test -f $ROOT/usr/include/rpcsvc/daemon_utils.h ||
+    (cd $SRC/head && $make install_h)
+
+  # system headers
+  (cd $SRC/uts/common/sys && $make -k install_h)
+
+fi
+
+# Need some library headers too...
+for lib in \
+  libgss \
+  libkrb5
+do
+  (cd $SRC/lib/$lib && $make $targ)
+done
+}
+
+################################################################
+
+do_kern() {
+  case $1 in
+  lint) targ=modlintlib ;;
+  *) targ=$1 ;;
+  esac
+  ( unset SOURCEDEBUG ;
+  (cd $SRC/uts/$x/kgssapi && $make $targ) )
+}
+
+################################################################
+
+do_libs() {
+
+for lib in \
+  libgss
+do
+  (cd $SRC/lib/$lib && $make $1)
+done
+
+# For some reason, mech_krb5 does not build for debug.
+# It also takes forever to lint.  skip that.
+if [ "$1" != "lint" ]; then
+  (cd $SRC/lib/gss_mechs/mech_krb5 && unset SOURCEDEBUG && $make $1)
+  (cd $SRC/lib/gss_mechs/mech_spnego && $make $1)
+fi
+
+}
+
+################################################################
+
+do_cmds() {
+
+(cd $SRC/cmd/gss && $make $1)
+
+}
+
+
+################################################################
+# This builds $SRC/TAGS (and cscope.files) in a helpful order.
+
+do_tags() {
+	(cd $SRC ;
+	find uts/common/sys -name '*.[ch]' -print |sort
+	find uts/common/net -name '*.[ch]' -print |sort
+	find uts/common/netinet -name '*.[ch]' -print |sort
+	find uts/common/gssapi -name '*.[ch]' -print |sort
+	find head -name '*.h' -print |sort
+	find lib/gss_mechs -name '*.[ch]' -print |sort
+	find cmd/gss -name '*.[ch]' -print |sort
+	) > $SRC/cscope.files
+
+	(cd $SRC ;
+	exctags -e --langmap=c:+.ndl -h ndl -L - < cscope.files
+	cscope -b )
+}
+
+################################################################
+# This creates a tarfile one can use to update a test machine.
+
+do_tar() {
+	git_rev=`git rev-parse --short=8 HEAD`
+	files="
+usr/lib/gss/gssd
+usr/lib/gss/mech_krb5.so.1
+usr/lib/$arch64/gss/mech_krb5.so.1
+usr/lib/gss/mech_spnego.so.1
+usr/lib/$arch64/gss/mech_spnego.so.1
+usr/lib/libgss.so.1
+usr/lib/$arch64/libgss.so.1
+"
+
+	(cd $ROOT && tar cfj ../../gss-${git_rev}.tar.bz2 $files)
+}
+
+################################################################
+
+if [ "$1" = "" ]; then
+  set '?' # force usage
+fi
+
+set -x
+
+for arg
+do
+  case "$arg" in
+  build|install)
+    arg=install
+    build_tools
+    set -e
+    do_hdrs $arg
+    do_kern $arg
+    do_libs $arg
+    do_cmds $arg
+    ;;
+  lint)
+    do_kern $arg
+    do_libs $arg
+    do_cmds $arg
+    ;;
+  clean)
+    do_cmds $arg
+    do_libs $arg
+    do_kern $arg
+    ;;
+  clobber)
+    do_cmds $arg
+    do_libs $arg
+    do_kern $arg
+    do_hdrs $arg
+    clobber_tools
+    ;;
+  tags)
+    do_tags
+    ;;
+  tar)
+    do_tar
+    ;;
+  *)
+    echo "Usage: $0 {build|lint|clean|clobber|tags|tar}";
+    exit 1;
+    ;;
+  esac
+done

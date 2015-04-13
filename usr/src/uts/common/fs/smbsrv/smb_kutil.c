@@ -803,7 +803,8 @@ smb_thread_init(
     smb_thread_t	*thread,
     char		*name,
     smb_thread_ep_t	ep,
-    void		*ep_arg)
+    void		*ep_arg,
+    pri_t		pri)
 {
 	ASSERT(thread->sth_magic != SMB_THREAD_MAGIC);
 
@@ -813,6 +814,7 @@ smb_thread_init(
 	thread->sth_ep = ep;
 	thread->sth_ep_arg = ep_arg;
 	thread->sth_state = SMB_THREAD_STATE_EXITED;
+	thread->sth_pri = pri;
 	mutex_init(&thread->sth_mtx, NULL, MUTEX_DEFAULT, NULL);
 	cv_init(&thread->sth_cv, NULL, CV_DEFAULT, NULL);
 	thread->sth_magic = SMB_THREAD_MAGIC;
@@ -854,7 +856,7 @@ smb_thread_start(
 		thread->sth_state = SMB_THREAD_STATE_STARTING;
 		mutex_exit(&thread->sth_mtx);
 		tmpthread = thread_create(NULL, 0, smb_thread_entry_point,
-		    thread, 0, &p0, TS_RUN, minclsyspri);
+		    thread, 0, &p0, TS_RUN, thread->sth_pri);
 		ASSERT(tmpthread != NULL);
 		mutex_enter(&thread->sth_mtx);
 		while (thread->sth_state == SMB_THREAD_STATE_STARTING)
