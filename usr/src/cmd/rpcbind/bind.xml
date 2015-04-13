@@ -22,7 +22,7 @@
     CDDL HEADER END
    
     Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
-
+    Copyright 2014 OmniTI Computer Consulting, Inc. All rights reserved.
     Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
     Use is subject to license terms.
 
@@ -51,15 +51,6 @@
 		restart_on='none'
 		type='service'>
 		<service_fmri value='svc:/system/filesystem/minimal' />
-	</dependency>
-
-	<dependency
-		name='sysidtool'
-		grouping='require_all'
-		restart_on='none'
-		type='service'>
-		<service_fmri
-			value='svc:/system/sysidtool:net' />
 	</dependency>
 
 	<!--
