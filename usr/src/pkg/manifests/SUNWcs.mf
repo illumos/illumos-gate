@@ -1442,7 +1442,6 @@ file path=usr/share/doc/ksh/images/tag_ksh93.png
 file path=usr/share/doc/ksh/images/tag_l10n.png
 file path=usr/share/doc/ksh/images/tag_perf.png
 file path=usr/share/doc/ksh/shell_styleguide.docbook
-file path=usr/share/doc/ksh/shell_styleguide.html
 file path=usr/share/lib/mailx/mailx.help
 file path=usr/share/lib/mailx/mailx.help.~
 file path=usr/share/lib/tabset/3101
