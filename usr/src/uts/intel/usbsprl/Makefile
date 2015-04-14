@@ -23,6 +23,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2014 Garrett D'Amore <garrett@damore.org>
 #
 #	This makefile drives the production of the Prolific USB Serial
 #	Adapter driver.
@@ -96,7 +97,7 @@ TEST		= test
 #
 WARLOCK_CMD	= $(WLCMD_DIR)/$(MODULE).wlcmd
 USBSER_FILES = $(USBSER_OBJS:%.o=../usbser/%.ll)
-USBA_FILES = $(USBA_WITHOUT_WUSB_OBJS:%.o=../usba/%.ll)
+USBA_FILES = $(USBA_OBJS:%.o=../usba/%.ll)
 UHCI_FILES = $(UHCI_OBJS:%.o=../uhci/%.ll)
 OHCI_FILES = $(OHCI_OBJS:%.o=../ohci/%.ll)
 EHCI_FILES = $(EHCI_OBJS:%.o=../ehci/%.ll)

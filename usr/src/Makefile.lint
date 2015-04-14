@@ -20,11 +20,10 @@
 #
 
 #
-# Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
-#
 # Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright 2015 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2015 Garrett D'Amore <garrett@damore.org>
 
 # include global definitions
 include Makefile.master
@@ -53,7 +52,6 @@ COMMON_SUBDIRS = \
 	cmd/bart \
 	cmd/basename \
 	cmd/bdiff \
-	cmd/bfs \
 	cmd/busstat \
 	cmd/boot \
 	cmd/cal \
@@ -319,7 +317,6 @@ COMMON_SUBDIRS = \
 	cmd/who \
 	cmd/whodo \
 	cmd/wracct \
-	cmd/wusbadm \
 	cmd/xargs \
 	cmd/xstr \
 	cmd/yes \

@@ -21,6 +21,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  */
 
 #ifndef	_SYS_USB_USBA_USBA_IMPL_H
@@ -265,15 +267,9 @@ void	usba_devdb_destroy();
 int	usba_hubdi_register(dev_info_t	*, uint_t);
 int	usba_hubdi_unregister(dev_info_t *);
 
-void	usba_whcdi_initialization();
-void	usba_whcdi_destroy();
-
 int	usba_is_root_hub(dev_info_t *dip);
-int	usba_is_wa(dev_info_t *dip);
-int	usba_is_hwa(dev_info_t *dip);
 
 usba_device_t *usba_alloc_usba_device(dev_info_t *);
-void	usba_free_wireless_data(usba_wireless_data_t *wireless_data);
 void	usba_free_usba_device(usba_device_t *usba_device_t);
 void	usba_clear_data_toggle(usba_device_t *usba_device);
 

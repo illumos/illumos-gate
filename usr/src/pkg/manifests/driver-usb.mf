@@ -22,6 +22,7 @@
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2014 Garrett D'Amore <garrett@damore.org>
 #
 
 #
@@ -61,8 +62,6 @@ dir path=usr/share/man/man9s
 driver name=ehci alias=pciclass,0c0320 perms="* 0644 root sys"
 driver name=hid alias=usbif,class3 perms="* 0600 root sys"
 driver name=hubd alias=usbif,class9 perms="* 0644 root sys"
-driver name=hwahc alias=usbif,classe0.2.1 perms="* 0644 root sys"
-driver name=hwarc alias=usbif,classe0.1.2 perms="* 0644 root sys"
 driver name=ohci alias=pciclass,0c0310 perms="* 0644 root sys"
 driver name=scsa2usb \
     alias=usb584,222 \
@@ -73,17 +72,11 @@ driver name=usb_as alias=usbif,class1.2 perms="* 0600 root sys"
 driver name=usb_ia alias=usb,ia
 driver name=usb_mid alias=usb,device
 driver name=usbprn alias=usbif,class7.1 perms="* 0666 root sys"
-driver name=wusb_ca alias=usbif,classef.3.1 perms="* 0666 root sys"
-driver name=wusb_df perms="* 0666 root sys" \
-    alias=usb15a9,5 \
-    alias=usb3495,3007
 file path=etc/usb/config_map.conf group=sys \
     original_name=SUNWusb:etc/usb/config_map.conf preserve=true
 file path=kernel/drv/$(ARCH64)/ehci group=sys
 file path=kernel/drv/$(ARCH64)/hid group=sys
 file path=kernel/drv/$(ARCH64)/hubd group=sys
-file path=kernel/drv/$(ARCH64)/hwahc group=sys
-file path=kernel/drv/$(ARCH64)/hwarc group=sys
 file path=kernel/drv/$(ARCH64)/ohci group=sys
 file path=kernel/drv/$(ARCH64)/scsa2usb group=sys
 file path=kernel/drv/$(ARCH64)/uhci group=sys
@@ -92,14 +85,10 @@ file path=kernel/drv/$(ARCH64)/usb_as group=sys
 file path=kernel/drv/$(ARCH64)/usb_ia group=sys
 file path=kernel/drv/$(ARCH64)/usb_mid group=sys
 file path=kernel/drv/$(ARCH64)/usbprn group=sys
-file path=kernel/drv/$(ARCH64)/wusb_ca group=sys
-file path=kernel/drv/$(ARCH64)/wusb_df group=sys
 $(i386_ONLY)file path=kernel/drv/ehci group=sys
 file path=kernel/drv/ehci.conf group=sys
 $(i386_ONLY)file path=kernel/drv/hid group=sys
 $(i386_ONLY)file path=kernel/drv/hubd group=sys
-$(i386_ONLY)file path=kernel/drv/hwahc group=sys
-$(i386_ONLY)file path=kernel/drv/hwarc group=sys
 $(i386_ONLY)file path=kernel/drv/ohci group=sys
 file path=kernel/drv/ohci.conf group=sys
 $(i386_ONLY)file path=kernel/drv/scsa2usb group=sys
@@ -113,14 +102,10 @@ $(i386_ONLY)file path=kernel/drv/usb_as group=sys
 $(i386_ONLY)file path=kernel/drv/usb_ia group=sys
 $(i386_ONLY)file path=kernel/drv/usb_mid group=sys
 $(i386_ONLY)file path=kernel/drv/usbprn group=sys
-$(i386_ONLY)file path=kernel/drv/wusb_ca group=sys
-$(i386_ONLY)file path=kernel/drv/wusb_df group=sys
 file path=kernel/misc/$(ARCH64)/hidparser group=sys mode=0755
-file path=kernel/misc/$(ARCH64)/hwa1480_fw group=sys mode=0755
 file path=kernel/misc/$(ARCH64)/usba group=sys mode=0755
 file path=kernel/misc/$(ARCH64)/usba10 group=sys mode=0755
 $(i386_ONLY)file path=kernel/misc/hidparser group=sys mode=0755
-$(i386_ONLY)file path=kernel/misc/hwa1480_fw group=sys mode=0755
 $(i386_ONLY)file path=kernel/misc/usba group=sys mode=0755
 $(i386_ONLY)file path=kernel/misc/usba10 group=sys mode=0755
 file path=kernel/strmod/$(ARCH64)/usb_ah group=sys mode=0755
@@ -131,13 +116,9 @@ $(i386_ONLY)file path=kernel/strmod/usb_ah group=sys mode=0755
 $(i386_ONLY)file path=kernel/strmod/usbkbm group=sys mode=0755
 $(i386_ONLY)file path=kernel/strmod/usbms group=sys mode=0755
 $(i386_ONLY)file path=kernel/strmod/usbwcm group=sys mode=0755
-file path=lib/svc/manifest/system/wusb.xml group=sys mode=0444
-file path=lib/svc/method/svc-wusb mode=0555
 file path=usr/share/man/man7d/ehci.7d
 file path=usr/share/man/man7d/hid.7d
 file path=usr/share/man/man7d/hubd.7d
-file path=usr/share/man/man7d/hwahc.7d
-file path=usr/share/man/man7d/hwarc.7d
 file path=usr/share/man/man7d/ohci.7d
 file path=usr/share/man/man7d/scsa2usb.7d
 file path=usr/share/man/man7d/uhci.7d
@@ -147,8 +128,6 @@ file path=usr/share/man/man7d/usb_ia.7d
 file path=usr/share/man/man7d/usb_mid.7d
 file path=usr/share/man/man7d/usba.7d
 file path=usr/share/man/man7d/usbprn.7d
-file path=usr/share/man/man7d/wusb_ca.7d
-file path=usr/share/man/man7d/wusb_df.7d
 file path=usr/share/man/man7m/usb_ah.7m
 file path=usr/share/man/man7m/usbkbm.7m
 file path=usr/share/man/man7m/usbms.7m
@@ -200,9 +179,6 @@ legacy pkg=SUNWusb desc="USBA (USB framework) and USB Device Drivers" \
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 license license_in_headers license=license_in_headers
-license usr/src/uts/common/io/usb/clients/hwa1480_fw/i1480/LICENSE \
-    license=usr/src/uts/common/io/usb/clients/hwa1480_fw/i1480/LICENSE
-link path=usr/share/man/man7d/hwa1480_fw.7d target=wusb_df.7d
 link path=usr/share/man/man7d/usb.7d target=usba.7d
 link path=usr/share/man/man9f/usb_alloc_bulk_req.9f \
     target=usb_alloc_request.9f

@@ -21,6 +21,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  */
 
 
@@ -620,63 +622,4 @@ usb_parse_CV_ep_descr(uchar_t	*buf,	/* from GET_DESCRIPTOR(CONFIGURATION) */
 	}
 
 	return (USB_PARSE_ERROR);
-}
-
-size_t
-usb_parse_bos_descr(uchar_t	*buf,	/* from GET_DESCRIPTOR(BOS) */
-	size_t			buflen,
-	usb_bos_descr_t		*ret_descr,
-	size_t			ret_buf_len)
-{
-	if ((buf == NULL) || (ret_descr == NULL) ||
-	    (buflen < 2) || (buf[1] != USB_DESCR_TYPE_BOS)) {
-
-		return (USB_PARSE_ERROR);
-	}
-
-	return (usb_parse_data("ccsc",
-	    buf, buflen, ret_descr, ret_buf_len));
-}
-
-size_t
-usb_parse_uwb_bos_descr(uchar_t	*buf,	/* from GET_DESCRIPTOR(BOS) */
-	size_t			buflen,
-	usb_uwb_cap_descr_t	*ret_descr,
-	size_t			ret_buf_len)
-{
-	uchar_t *bufend = buf + buflen;
-
-	if ((buf == NULL) || (ret_descr == NULL)) {
-
-		return (USB_PARSE_ERROR);
-	}
-
-	while (buf + 3 <= bufend) {
-		if ((buf[1] == USB_DESCR_TYPE_DEV_CAPABILITY) &&
-		    (buf[2] == USB_CAP_TYPE_WUSB)) {
-
-			return (usb_parse_data("ccccsccsc",
-			    buf, _PTRDIFF(bufend, buf), ret_descr,
-			    ret_buf_len));
-		}
-
-		INCREMENT_BUF(buf);
-	}
-
-	return (USB_PARSE_ERROR);
-}
-
-size_t
-usb_parse_comp_ep_descr(uchar_t	*buf,	/* from GET_DESCRIPTOR(CONFIGURATION) */
-	size_t			buflen,
-	uint_t			if_number,
-	uint_t			alt_if_setting,
-	uint_t			ep_index,
-	usb_ep_comp_descr_t	*ret_descr,
-	size_t			ret_buf_len)
-{
-	return (usb_parse_CV_ep_descr(buf, buflen, "ccccsscc",
-	    if_number, alt_if_setting, ep_index,
-	    USB_DESCR_TYPE_WIRELESS_EP_COMP, 0,
-	    ret_descr, ret_buf_len));
 }

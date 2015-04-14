@@ -569,7 +569,6 @@ _MANFILES=	6to4relay.1m		\
 		wificonfig.1m		\
 		wpad.1m			\
 		wracct.1m		\
-		wusbadm.1m		\
 		ypbind.1m		\
 		ypinit.1m		\
 		ypmake.1m		\

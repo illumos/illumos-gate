@@ -597,11 +597,6 @@ static usb_event_t hubd_events = {
 
 /*
  * hubd_get_soft_state() returns the hubd soft state
- *
- * WUSB support extends this function to support wire adapter class
- * devices. The hubd soft state for the wire adapter class device
- * would be stored in usb_root_hubd field of the usba_device structure,
- * just as the USB host controller drivers do.
  */
 hubd_t *
 hubd_get_soft_state(dev_info_t *dip)
@@ -611,7 +606,7 @@ hubd_get_soft_state(dev_info_t *dip)
 		return (NULL);
 	}
 
-	if (usba_is_root_hub(dip) || usba_is_wa(dip)) {
+	if (usba_is_root_hub(dip)) {
 		usba_device_t *usba_device = usba_get_usba_device(dip);
 
 		return (usba_device->usb_root_hubd);
@@ -6465,19 +6460,6 @@ hubd_delete_child(hubd_t *hubd, usb_port_t port, uint_t flag, boolean_t retry)
 		}
 
 		rval = usba_destroy_child_devi(child_dip, flag);
-
-		if ((rval != USB_SUCCESS) && usba_is_hwa(child_dip)) {
-			/*
-			 * This is only useful for HWA device node.
-			 * Since hwahc interface must hold hwarc interface
-			 * open until hwahc is detached, the first call to
-			 * ndi_devi_unconfig_one() can only offline hwahc
-			 * driver but not hwarc driver. Need to make a second
-			 * call to ndi_devi_unconfig_one() to make the hwarc
-			 * driver detach.
-			 */
-			rval = usba_destroy_child_devi(child_dip, flag);
-		}
 
 		if ((rval == USB_SUCCESS) && (flag & NDI_DEVI_REMOVE)) {
 			/*
