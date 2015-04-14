@@ -3,17 +3,16 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH VMSTAT 1M "Mar 23, 2009"
+.TH VMSTAT 1M "April 14, 2015"
 .SH NAME
 vmstat \- report virtual memory statistics
 .SH SYNOPSIS
 .LP
 .nf
-\fBvmstat\fR [\fB-cipqsS\fR] [\fB-T\fR u | d] [\fIdisks\fR] [\fIinterval\fR [\fIcount\fR]]
+\fBvmstat\fR [\fB-ipqsS\fR] [\fB-T\fR u | d] [\fIdisks\fR] [\fIinterval\fR [\fIcount\fR]]
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 \fBvmstat\fR reports virtual memory statistics regarding kernel thread, virtual
 memory, disk, trap, and \fBCPU\fR activity.
@@ -49,19 +48,8 @@ output, in one of the following forms:
 .LP
 See \fI\fR for device naming conventions for disks.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
-.sp
-.ne 2
-.na
-\fB\fB-c\fR\fR
-.ad
-.RS 13n
-Report cache flushing statistics. This option is obsolete, and no longer
-meaningful. This option might be removed in a future version of Solaris.
-.RE
-
 .sp
 .ne 2
 .na
@@ -208,7 +196,6 @@ time. See \fBtime\fR(2). Specify \fBd\fR for standard date format. See
 .RE
 
 .SH OPERANDS
-.sp
 .LP
 The following operands are supported:
 .sp
@@ -512,7 +499,6 @@ above only report actitivity on the processors in the processor set of the
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -531,16 +517,11 @@ Interface Stability	See below.
 .LP
 Invocation is evolving. Human readable output is unstable.
 .SH SEE ALSO
-.sp
 .LP
 \fBdate\fR(1), \fBsar\fR(1), \fBiostat\fR(1M), \fBmpstat\fR(1M), \fBsar\fR(1M),
 \fBtime\fR(2), \fBattributes\fR(5)
 .SH NOTES
-.sp
 .LP
 The sum of CPU utilization might vary slightly from 100 because of rounding
 errors in the production of a percentage figure.
 .sp
-.LP
-The \fB-c\fR option (Report cache flushing statistics) is not supported in this
-release.
