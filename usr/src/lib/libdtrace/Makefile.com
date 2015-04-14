@@ -134,6 +134,7 @@ CERRWARN += -_gcc=-Wno-switch
 YYCFLAGS =
 LDLIBS += -lgen -lproc -lrtld_db -lnsl -lsocket -lctf -lelf -lc
 DRTILDLIBS = $(LDLIBS.lib) -lc
+LIBDAUDITLIBS = $(LDLIBS.lib) -lmapmalloc -lc -lproc
 
 yydebug := YYCFLAGS += -DYYDEBUG
 
@@ -230,7 +231,7 @@ $(DRTIOBJ): $(DRTIOBJS)
 $(LIBDAUDIT): $(LIBDAUDITOBJS)
 	$(LINK.c) -o $@ $(GSHARED) -h$(LIBDAUDIT) $(ZTEXT) $(ZDEFS) $(BDIRECT) \
 	    $(MAPFILE.PGA:%=-M%) $(MAPFILE.NED:%=-M%) $(LIBDAUDITOBJS) \
-	    -lmapmalloc -lc -lproc
+	    $(LIBDAUDITLIBS)
 	$(POST_PROCESS_SO)
 
 $(ROOTDLIBDIR):
