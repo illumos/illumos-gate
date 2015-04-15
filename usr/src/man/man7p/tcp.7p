@@ -5,7 +5,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH TCP 7P "May 27, 2014"
+.TH TCP 7P "Apr 27, 2015"
 .SH NAME
 tcp, TCP \- Internet Transmission Control Protocol
 .SH SYNOPSIS
@@ -40,7 +40,6 @@ tcp, TCP \- Internet Transmission Control Protocol
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 \fBTCP\fR is the virtual circuit protocol of the Internet protocol family. It
 provides reliable, flow-controlled, in order, two-way transmission of data. It
@@ -183,11 +182,13 @@ PRIV_SYS_NET_CONFIG privilege if it wants to specify a number greater than that
 calculated by \fIRFC 3390\fR.
 .sp
 .LP
-SunOS supports \fBTCP\fR Extensions for High Performance (\fIRFC 1323\fR) which
-includes the window scale and timestamp options, and Protection Against Wrap
-Around Sequence Numbers (PAWS). SunOS also supports Selective Acknowledgment
-(SACK) capabilities (RFC 2018) and Explicit Congestion Notification (ECN)
-mechanism (\fIRFC 3168\fR).
+illumos supports \fBTCP\fR Extensions for High Performance (\fIRFC 7323\fR)
+which includes the window scale and timestamp options, and Protection Against
+Wrap Around Sequence Numbers (PAWS). Note that if timestamps are negotiated on
+a connection, received segments without timestamps on that connection are
+silently dropped per the suggestion in the RFC. illumos also supports Selective
+Acknowledgment (SACK) capabilities (RFC 2018) and Explicit Congestion
+Notification (ECN) mechanism (\fIRFC 3168\fR).
 .sp
 .LP
 Turn on the window scale option in one of the following ways:
@@ -354,7 +355,6 @@ specifies the number of keep-alive probes to be sent before aborting the
 connection in the event of no response from peer. TCP_KEEPINTVL specifies the
 interval in seconds between successive keep-alive probes.
 .SH SEE ALSO
-.sp
 .LP
 \fBsvcs\fR(1), \fBndd\fR(1M), \fBioctl\fR(2), \fBread\fR(2), \fBsvcadm\fR(1M),
 \fBwrite\fR(2), \fBaccept\fR(3SOCKET), \fBbind\fR(3SOCKET),
@@ -376,15 +376,14 @@ Bellovin, S., \fIRFC 1948, Defending Against Sequence Number Attacks\fR, May
 1996.
 .sp
 .LP
-Jacobson, V., Braden, R., and Borman, D., \fIRFC 1323, TCP Extensions for High
-Performance\fR, May 1992.
+D. Borman, B. Braden, V. Jacobson and R. Scheffenegger, Ed., \fIRFC 7323, TCP
+Extensions for High Performance\fR, September 2014.
 .sp
 .LP
 Postel, Jon, \fIRFC 793, Transmission Control Protocol - DARPA Internet Program
 Protocol Specification\fR, Network Information Center, SRI International, Menlo
 Park, CA., September 1981.
 .SH DIAGNOSTICS
-.sp
 .LP
 A socket operation may fail if:
 .sp
@@ -466,7 +465,6 @@ The system ran out of memory for internal data structures.
 .RE
 
 .SH NOTES
-.sp
 .LP
 The \fBtcp\fR service is managed by the service management facility,
 \fBsmf\fR(5), under the service identifier:
