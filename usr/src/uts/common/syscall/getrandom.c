@@ -52,9 +52,9 @@ getrandom(void *bufp, size_t buflen, int flags)
 		buflen = MAXURANDBYTES;
 	}
 
-	while (buflen > out) {
+	while (out < buflen) {
 		int err;
-		size_t len = MIN(sizeof (rbytes), buflen);
+		size_t len = MIN(sizeof (rbytes), buflen - out);
 
 		if (flags & GRND_RANDOM) {
 			if (flags & GRND_NONBLOCK)

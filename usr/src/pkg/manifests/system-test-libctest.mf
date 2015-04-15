@@ -74,6 +74,7 @@ file path=opt/libc-tests/tests/random/arc4random_rekey mode=0555
 file path=opt/libc-tests/tests/random/chacha mode=0555
 file path=opt/libc-tests/tests/random/getentropy mode=0555
 file path=opt/libc-tests/tests/random/getrandom mode=0555
+file path=opt/libc-tests/tests/random/getrandred mode=0555
 file path=opt/libc-tests/tests/random/inz_child mode=0555
 file path=opt/libc-tests/tests/random/inz_inval mode=0555
 file path=opt/libc-tests/tests/random/inz_mlock mode=0555
