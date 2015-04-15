@@ -45,6 +45,7 @@ COBJS	=	aio.o			\
 		misc.o			\
 		module.o		\
 		mount.o			\
+		mount_nfs.o		\
 		pgrp.o			\
 		poll_select.o		\
 		priority.o		\
@@ -79,7 +80,7 @@ SRCDIR =	../common
 UTSBASE	=	../../../../../uts
 
 LIBS =		$(DYNLIB)
-LDLIBS +=	-lc -lsocket -lmapmalloc -lproc -lrtld_db
+LDLIBS +=	-lc -lsocket -lmapmalloc -lproc -lrtld_db -lrpcsvc -lnsl
 DYNFLAGS +=	$(DYNFLAGS_$(CLASS))
 DYNFLAGS +=	$(BLOCAL) $(ZNOVERSION) -Wl,-e_start -M../common/mapfile
 CFLAGS +=	$(CCVERBOSE)

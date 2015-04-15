@@ -35,6 +35,8 @@ extern "C" {
 #include <rpc/rpc.h>
 #include <nfs/nfs.h>
 
+extern int lx_nfs_mount(char *, char *, char *, int, char *);
+
 /*
  * mount() is significantly different between Linux and Solaris.  The main
  * difference is between the set of flags.  Some flags on Linux can be
