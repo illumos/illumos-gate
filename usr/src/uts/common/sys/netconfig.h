@@ -28,6 +28,7 @@
  *
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2015 Joyent, Inc.
  */
 
 #ifndef	_SYS_NETCONFIG_H
@@ -147,6 +148,8 @@ extern int		endnetpath(void *);
 extern struct netconfig *getnetpath(void *);
 extern void		nc_perror(const char *);
 extern char		*nc_sperror(void);
+extern void		_nsl_brand_set_hooks(int (*)(void),
+			    struct netconfig *(*)(int));
 
 #ifdef	__cplusplus
 }

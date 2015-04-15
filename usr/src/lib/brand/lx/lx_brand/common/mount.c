@@ -606,8 +606,9 @@ lx_mount(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 	const void		*datap = (const void *)p5;
 
 	/* Variables needed for all mounts. */
-	char			source[MAXPATHLEN], target[MAXPATHLEN];
-	char			fstype[MAXPATHLEN], options[MAXPATHLEN];
+	char			source[MAXPATHLEN + LX_NMD_MAXHOSTNAMELEN + 1];
+	char			target[MAXPATHLEN];
+	char			fstype[MAXPATHLEN], options[MAX_MNTOPT_STR];
 	int			sflags, rv;
 
 	/* Variables needed for nfs mounts. */
@@ -736,23 +737,67 @@ lx_mount(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 	} else if (strcmp(fstype, "nfs") == 0) {
 
 		/*
-		 * Copy in Linux mount options.  Note that for Linux
-		 * nfs mounts the mount options pointer (which normally
-		 * points to a string) points to a structure.
+		 * Copy in Linux mount options. Note that for older Linux
+		 * kernels (pre 2.6.23) the mount options pointer (which
+		 * normally points to a string) points to a structure which
+		 * is populated by the user-level code after it has done the
+		 * preliminary RPCs (similar to how our NFS mount cmd works).
+		 * For newer kernels the options pointer is just a string of
+		 * options. We're unlikely to actually emulate a kernel that
+		 * uses the old style but support is kept and handled in
+		 * i_make_nfs_args(). The new style handling is implemented in
+		 * nfs_pre_mount(). The user-level mount caller is in charge of
+		 * determining the format in which it passes the data parameter.
 		 */
-		if (uucopy((void *)datap, &lx_nmd, sizeof (lx_nmd)) < 0)
+		int vers;
+
+		if (uucopy((void *)datap, &vers, sizeof (int)) < 0)
 			return (-errno);
 
 		/*
-		 * For Solaris nfs mounts, the kernel expects a special
-		 * strucutre, but a pointer to this structure is passed
-		 * in via an extra parameter (sdataptr below.)
+		 * As described above, the data parameter might be a versioned
+		 * lx_nmd structure or (most likely) it is just a string.
 		 */
-		if ((rv = i_make_nfs_args(&lx_nmd, &nfs_args,
-		    &nfs_args_addr, &nfs_args_knconf, &nfs_args_fh,
-		    &nfs_args_secdata, fstype,
-		    options, sizeof (options))) != 0)
-			return (rv);
+		switch (vers) {
+		case 1:
+		case 2:
+		case 3:
+		case 5:
+		case 6:
+			lx_unsupported("unsupported nfs mount request "
+			    "version: %d\n", vers);
+			return (-ENOTSUP);
+
+		case 4:
+			if (uucopy((void *)datap, &lx_nmd, sizeof (lx_nmd)) < 0)
+				return (-errno);
+
+			/*
+			 * For Illumos nfs mounts, the kernel expects a special
+			 * structure, but a pointer to this structure is passed
+			 * in via an extra parameter (sdataptr below.)
+			 */
+			if ((rv = i_make_nfs_args(&lx_nmd, &nfs_args,
+			    &nfs_args_addr, &nfs_args_knconf, &nfs_args_fh,
+			    &nfs_args_secdata, fstype, options,
+			    sizeof (options))) != 0)
+				return (rv);
+
+			break;
+
+		default:
+			/*
+			 * Handle new style with options as a string, make
+			 * the preliminary RPC calls and do the native mount
+			 * all within lx_nfs_mount().
+			 */
+			if (uucopystr((void *)datap, options,
+			    sizeof (options)) < 0)
+				return (-errno);
+			return (lx_nfs_mount(source, target, fstype, flags,
+			    options));
+			break;
+		}
 
 		/*
 		 * For nfs mounts we need to tell the mount system call
@@ -766,7 +811,7 @@ lx_mount(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 		return (-ENODEV);
 	}
 
-	/* Convert some Linux flags to Solaris flags. */
+	/* Convert some Linux flags to Illumos flags. */
 	if (flags & LX_MS_RDONLY)
 		sflags |= MS_RDONLY;
 	if (flags & LX_MS_NOSUID)
@@ -775,7 +820,7 @@ lx_mount(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 		sflags |= MS_REMOUNT;
 
 	/*
-	 * Convert some Linux flags to Solaris option strings.
+	 * Convert some Linux flags to Illumos option strings.
 	 */
 	if (flags & LX_MS_STRICTATIME) {
 		/*

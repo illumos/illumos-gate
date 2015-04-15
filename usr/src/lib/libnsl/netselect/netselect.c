@@ -22,6 +22,7 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2015 Joyent, Inc.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -31,8 +32,6 @@
  * Portions of this source code were derived from Berkeley 4.3 BSD
  * under license from the Regents of the University of California.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "mt.h"
 #include "../rpc/rpc_mt.h"		/* for MT declarations only */
@@ -69,6 +68,9 @@ static void free_entry(void *);
 static struct netconfig *netconfig_dup(struct netconfig *);
 
 extern const char __nsl_dom[];
+
+static int (*brand_get_sz)(void) = NULL;
+static struct netconfig *(*brand_get_net_ent)(int) = NULL;
 
 /*
  *	Static global variables used by the library procedures:
@@ -255,6 +257,14 @@ freenetconfigent(struct netconfig *netp)
 	netconfig_free(netp);
 }
 
+void
+_nsl_brand_set_hooks(int (*set_sz_func)(void),
+    struct netconfig *(*get_ent_func)(int))
+{
+	brand_get_sz = set_sz_func;
+	brand_get_net_ent = get_ent_func;
+}
+
 /*
  *	getnetlist() reads the netconfig file and creates a
  *	NULL-terminated list of entries.
@@ -265,52 +275,73 @@ freenetconfigent(struct netconfig *netp)
 static struct netconfig **
 getnetlist(void)
 {
-	char line[BUFSIZ];	/* holds each line of NETCONFIG */
-	FILE *fp;		/* file stream for NETCONFIG */
+	FILE *fp = NULL;	/* file stream for NETCONFIG */
 	struct netconfig **listpp; /* the beginning of the netconfig list */
 	struct netconfig **tpp;	/* used to traverse the netconfig list */
 	int count;		/* the number of entries in file */
 
-	if ((fp = fopen(NETCONFIG, "rF")) == NULL) {
-		nc_error = NC_OPENFAIL;
-		return (NULL);
-	}
+	if (brand_get_sz != NULL) {
+		count = brand_get_sz();
+	} else {
+		char line[BUFSIZ];	/* holds each line of NETCONFIG */
 
-	count = 0;
-	while (fgets(line, BUFSIZ, fp)) {
-		if (!(blank(line) || comment(line))) {
-			++count;
+		if ((fp = fopen(NETCONFIG, "rF")) == NULL) {
+			nc_error = NC_OPENFAIL;
+			return (NULL);
 		}
+
+		count = 0;
+		while (fgets(line, BUFSIZ, fp)) {
+			if (!(blank(line) || comment(line))) {
+				++count;
+			}
+		}
+		rewind(fp);
 	}
-	rewind(fp);
 
 	if (count == 0) {
 		nc_error = NC_NOTFOUND;
-		(void) fclose(fp);
+		if (fp != NULL)
+			(void) fclose(fp);
 		return (NULL);
 	}
+
 	if ((listpp = malloc((count + 1) *
 	    sizeof (struct netconfig *))) == NULL) {
 		nc_error = NC_NOMEM;
-		(void) fclose(fp);
+		if (fp != NULL)
+			(void) fclose(fp);
 		return (NULL);
 	}
 
-	/*
-	 *	The following loop fills in the list (loops until
-	 *	fgetnetconfig() returns a NULL) and counts the
-	 *	number of entries placed in the list.  Note that
-	 *	when the loop is completed, the last entry in the
-	 *	list will contain a NULL (signifying the end of
-	 *	the list).
-	 */
-	linenum = 0;
-	for (tpp = listpp; *tpp = fgetnetconfig(fp, NULL); tpp++)
-		;
-	(void) fclose(fp);
+	if (brand_get_net_ent != NULL) {
+		int i;
 
-	if (nc_error != NC_NOMOREENTRIES) /* Something is screwed up */
-		netlist_free(&listpp);
+		tpp = listpp;
+		for (i = 0; i < count; i++) {
+			*tpp = brand_get_net_ent(i);
+			tpp++;
+		}
+		*tpp = NULL;
+		nc_error = NC_NOMOREENTRIES;
+	} else {
+		/*
+		 *	The following loop fills in the list (loops until
+		 *	fgetnetconfig() returns a NULL) and counts the
+		 *	number of entries placed in the list.  Note that
+		 *	when the loop is completed, the last entry in the
+		 *	list will contain a NULL (signifying the end of
+		 *	the list).
+		 */
+		linenum = 0;
+		for (tpp = listpp; *tpp = fgetnetconfig(fp, NULL); tpp++)
+			;
+		(void) fclose(fp);
+
+		if (nc_error != NC_NOMOREENTRIES) /* Something is screwed up */
+			netlist_free(&listpp);
+	}
+
 	return (listpp);
 }
 
