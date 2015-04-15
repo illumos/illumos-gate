@@ -780,5 +780,6 @@ static struct seg_ops segmf_ops = {
 	segmf_setpagesize,
 	segmf_getmemid,
 	segmf_getpolicy,
-	segmf_capable
+	segmf_capable,
+	seg_inherit_notsup
 };

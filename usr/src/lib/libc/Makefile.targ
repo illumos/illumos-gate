@@ -288,6 +288,11 @@ $(UNICODEOBJS:%=pics/%): $(SRC)/common/unicode/$$(@F:.o=.c)
 	$(COMPILE.c) -o $@ $(SRC)/common/unicode/$(@F:.o=.c)
 	$(POST_PROCESS_O)
 
+$(CHACHAOBJS:%=pics/%): $(SRC)/common/crypto/chacha/$$(@F:.o=.c)
+	$(COMPILE.c) -I$(SRC)/common/crypto/chacha -DKEYSTREAM_ONLY \
+	    -o $@ $(SRC)/common/crypto/chacha/$(@F:.o=.c)
+	$(POST_PROCESS_O)
+
 # DTrace rules
 pics/%.o: $(LIBCBASE)/../port/threads/%.d $(THREADSOBJS:%=pics/%)
 	$(COMPILE.d) -C -xlazyload -s $< -o $@ $(THREADSOBJS:%=pics/%)

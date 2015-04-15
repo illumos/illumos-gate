@@ -32,6 +32,25 @@ outputdir = /var/tmp/test_results
 
 [/opt/libc-tests/tests/wctype_test]
 
+[/opt/libc-tests/tests/random/getrandom]
+[/opt/libc-tests/tests/random/getentropy]
+[/opt/libc-tests/tests/random/chacha]
+[/opt/libc-tests/tests/random/inz_child]
+[/opt/libc-tests/tests/random/inz_inval]
+[/opt/libc-tests/tests/random/inz_mlock]
+[/opt/libc-tests/tests/random/inz_region]
+[/opt/libc-tests/tests/random/inz_split]
+[/opt/libc-tests/tests/random/inz_split_vpp]
+[/opt/libc-tests/tests/random/inz_vpp]
+[/opt/libc-tests/tests/random/arc4random]
+[/opt/libc-tests/tests/random/arc4random_fork]
+[/opt/libc-tests/tests/random/arc4random_prefork]
+[/opt/libc-tests/tests/random/arc4random_forkall]
+[/opt/libc-tests/tests/random/arc4random_preforkall]
+[/opt/libc-tests/tests/random/arc4random_forksig]
+[/opt/libc-tests/tests/random/arc4random_preforksig]
+[/opt/libc-tests/tests/random/arc4key.ksh]
+
 [/opt/libc-tests/tests/symbols]
 pre = setup
 tests = [

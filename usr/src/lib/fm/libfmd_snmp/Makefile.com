@@ -60,8 +60,8 @@ LDLIBS += -lfmd_adm -luutil -lnvpair -ltopo
 LDLIBS += $(SNMPLIBS)
 LDLIBS += -lc
 
-LINTFLAGS = -msux
-LINTFLAGS64 = -msux -m64
+LINTFLAGS = -msux $(C99LMODE)
+LINTFLAGS64 = -msux -m64 $(C99LMODE)
 
 # Net-SNMP's headers use do {} while (0) a lot
 LINTCHECKFLAGS += -erroff=E_CONSTANT_CONDITION

@@ -23,6 +23,7 @@
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2014 Garrett D'Amore <garrett@damore.org>
 #
 #	This makefile drives the production of Abstract Control Model of
 #	USB Communication Devices Class dirver.
@@ -99,7 +100,6 @@ TEST		= test
 #
 WARLOCK_CMD	= $(WLCMD_DIR)/$(MODULE).wlcmd
 
-USBA_FILES = $(USBA_WITHOUT_WUSB_OBJS:%.o=../usba/%.ll)
 UHCI_FILES = $(UHCI_OBJS:%.o=../uhci/%.ll)
 OHCI_FILES = $(OHCI_OBJS:%.o=../ohci/%.ll)
 EHCI_FILES = $(EHCI_OBJS:%.o=../ehci/%.ll)

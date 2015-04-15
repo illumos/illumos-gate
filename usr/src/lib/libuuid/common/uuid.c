@@ -22,7 +22,7 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2012 Milan Jurik. All rights reserved.
- * Copyright 2014 Joyent, Inc. All rights reserved.
+ * Copyright 2015 Joyent, Inc. All rights reserved.
  * Copyright 2014 Andrew Stormont.
  */
 
@@ -77,16 +77,6 @@ static	int		file_type;
 static	int		fd;
 
 /*
- * The urandmtx mutex prevents multiple opens of /dev/urandom and protects the
- * cache.
- */
-#define	RCACHE_SIZE	65535
-static	mutex_t		urandmtx;
-static	int		fd_urand = -1;
-static	char		rcache[RCACHE_SIZE];
-static	char		*rcachep = rcache;
-
-/*
  * misc routines
  */
 uint16_t		get_random(void);
@@ -102,7 +92,6 @@ int			get_ethernet_address(uuid_node_t *);
 static	int		map_state();
 static	void 		format_uuid(struct uuid *, uint16_t, uuid_time_t,
     uuid_node_t);
-static	void		fill_random_bytes(uchar_t *, int);
 static	int		uuid_create(struct uuid *);
 static	void		gen_ethernet_address(uuid_node_t *);
 static	void		revalidate_data(uuid_node_t *);
@@ -196,7 +185,7 @@ gen_ethernet_address(uuid_node_t *system_node)
 	uchar_t		node[6];
 
 	if (get_ethernet_address(system_node) != 0) {
-		fill_random_bytes(node, 6);
+		arc4random_buf(node, 6);
 		(void) memcpy(system_node->nodeID, node, 6);
 		/*
 		 * use 8:0:20 with the multicast bit set
@@ -324,111 +313,6 @@ uuid_print(struct uuid u)
 }
 
 /*
- * Only called with urandmtx held.
- * Fills/refills the cache of randomness. We know that our allocations of
- * randomness are always much less than the total size of the cache.
- * Tries to use /dev/urandom random number generator - if that fails for some
- * reason, it retries MAX_RETRY times then sets rcachep to NULL so we no
- * longer use the cache.
- */
-static void
-load_cache()
-{
-	int i, retries = 0;
-	int nbytes = RCACHE_SIZE;
-	char *buf = rcache;
-
-	while (nbytes > 0) {
-		i = read(fd_urand, buf, nbytes);
-		if ((i < 0) && (errno == EINTR)) {
-			continue;
-		}
-		if (i <= 0) {
-			if (retries++ == MAX_RETRY)
-				break;
-			continue;
-		}
-		nbytes -= i;
-		buf += i;
-		retries = 0;
-	}
-	if (nbytes == 0)
-		rcachep = rcache;
-	else
-		rcachep = NULL;
-}
-
-static void
-close_pre()
-{
-	(void) mutex_lock(&urandmtx);
-}
-
-static void
-close_parent()
-{
-	(void) mutex_unlock(&urandmtx);
-}
-
-static void
-close_child()
-{
-	if (fd_urand != -1) {
-		(void) close(fd_urand);
-		fd_urand = -1;
-	}
-	(void) mutex_unlock(&urandmtx);
-}
-
-#pragma init(cache_init)
-static void
-cache_init(void)
-{
-	(void) pthread_atfork(close_pre, close_parent, close_child);
-}
-
-/*
- * Fills buf with random numbers - nbytes is the number of bytes
- * to fill-in. Tries to use cached data from the /dev/urandom random number
- * generator - if that fails for some reason, it uses srand48(3C)
- */
-static void
-fill_random_bytes(uchar_t *buf, int nbytes)
-{
-	int i;
-
-	if (fd_urand == -1) {
-		(void) mutex_lock(&urandmtx);
-		/* check again now that we have the mutex */
-		if (fd_urand == -1) {
-			if ((fd_urand = open(URANDOM_PATH,
-			    O_RDONLY | O_CLOEXEC)) >= 0)
-				load_cache();
-		}
-		(void) mutex_unlock(&urandmtx);
-	}
-	if (fd_urand >= 0 && rcachep != NULL) {
-		int cnt;
-
-		(void) mutex_lock(&urandmtx);
-		if (rcachep != NULL &&
-		    (rcachep + nbytes) >= (rcache + RCACHE_SIZE))
-			load_cache();
-
-		if (rcachep != NULL) {
-			for (cnt = 0; cnt < nbytes; cnt++)
-				*buf++ = *rcachep++;
-			(void) mutex_unlock(&urandmtx);
-			return;
-		}
-		(void) mutex_unlock(&urandmtx);
-	}
-	for (i = 0; i < nbytes; i++) {
-		*buf++ = get_random() & 0xFF;
-	}
-}
-
-/*
  * Unpacks the structure members in "struct uuid" to a char string "uuid_t".
  */
 void
@@ -514,7 +398,7 @@ uuid_generate_random(uuid_t uu)
 	(void) memset(uu, 0, sizeof (uuid_t));
 	(void) memset(&uuid, 0, sizeof (struct uuid));
 
-	fill_random_bytes(uu, sizeof (uuid_t));
+	arc4random_buf(uu, sizeof (uuid_t));
 	string_to_struct(&uuid, uu);
 	/*
 	 * This is version 4, so say so in the UUID version field (4 bits)
@@ -560,30 +444,12 @@ uuid_generate_time(uuid_t uu)
 
 /*
  * Creates a new UUID. The uuid will be generated based on high-quality
- * randomness from /dev/urandom, if available by calling uuid_generate_random.
- * If it failed to generate UUID then uuid_generate will call
- * uuid_generate_time.
+ * randomness from arc4random(3C).
  */
 void
 uuid_generate(uuid_t uu)
 {
-	if (uu == NULL) {
-		return;
-	}
-	if (fd_urand == -1) {
-		(void) mutex_lock(&urandmtx);
-		/* check again now that we have the mutex */
-		if (fd_urand == -1) {
-			if ((fd_urand = open(URANDOM_PATH, O_RDONLY)) >= 0)
-				load_cache();
-		}
-		(void) mutex_unlock(&urandmtx);
-	}
-	if (fd_urand >= 0) {
-		uuid_generate_random(uu);
-	} else {
-		(void) uuid_generate_time(uu);
-	}
+	uuid_generate_random(uu);
 }
 
 /*

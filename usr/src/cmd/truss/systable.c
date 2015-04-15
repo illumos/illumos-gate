@@ -345,7 +345,7 @@ const struct systable systable[] = {
 {"preadv",	4, DEC, NOV, DEC, HEX, DEC, DEC},		/* 123 */
 {"pwritev",	4, DEC, NOV, DEC, HEX, DEC, DEC},		/* 124 */
 { NULL,		8, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX},
-{ NULL,		8, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX},
+{"getrandom",	3, DEC, NOV, IOB, UNS, GRF},			/* 126 */
 {"mmapobj",	5, DEC, NOV, DEC, MOB, HEX, HEX, HEX},		/* 127 */
 {"setrlimit",	2, DEC, NOV, RLM, HEX},				/* 128 */
 {"getrlimit",	2, DEC, NOV, RLM, HEX},				/* 129 */

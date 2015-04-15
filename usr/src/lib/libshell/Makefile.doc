@@ -64,21 +64,6 @@ ROOTDOCDIRS=	\
 	$(ROOTDOCDIRBASE)/images .WAIT \
 	$(ROOTDOCDIRBASE)/images/callouts
 
-$(ROOTDOCDIRBASE)/%.html: misc/%.docbook
-	/usr/bin/xsltproc \
-		--nonet \
-		--stringparam generate.section.toc.level 0 \
-		--stringparam toc.max.depth 3 \
-		--stringparam toc.section.depth 12 \
-		--xinclude \
-		-o "$(@F)" \
-			$(DOCBOOK_XSL_ROOT)/html/docbook.xsl \
-			"$<" >xsltproc.log 2>&1
-	$(INS) -s -m $(FILEMODE) -f "$(@D)" "$(@F)"
-	$(RM) "$(@F)"
-
-CLOBBERFILES += xsltproc.log
-
 # Generic documentation rules
 DOCFILESRCDIR=         common
 ROOTDOCFILES=  $(DOCFILES:%=$(ROOTDOCDIRBASE)/%)

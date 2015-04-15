@@ -21,6 +21,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2015, Joyent, Inc.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -38,8 +39,6 @@
 
 #ifndef	_VM_SEG_H
 #define	_VM_SEG_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/vnode.h>
 #include <sys/avl.h>
@@ -142,6 +141,7 @@ struct	seg_ops {
 	int	(*getmemid)(struct seg *, caddr_t, memid_t *);
 	struct lgrp_mem_policy_info	*(*getpolicy)(struct seg *, caddr_t);
 	int	(*capable)(struct seg *, segcapability_t);
+	int	(*inherit)(struct seg *, caddr_t, size_t, uint_t);
 };
 
 #ifdef _KERNEL
@@ -238,6 +238,7 @@ extern	segadvstat_t	segadvstat;
 #define	SEGOP_GETMEMID(s, a, mp)    (*(s)->s_ops->getmemid)((s), (a), (mp))
 #define	SEGOP_GETPOLICY(s, a)	    (*(s)->s_ops->getpolicy)((s), (a))
 #define	SEGOP_CAPABLE(s, c)	    (*(s)->s_ops->capable)((s), (c))
+#define	SEGOP_INHERIT(s, a, l, b)   (*(s)->s_ops->inherit)((s), (a), (l), (b))
 
 #define	seg_page(seg, addr) \
 	(((uintptr_t)((addr) - (seg)->s_base)) >> PAGESHIFT)
@@ -248,6 +249,11 @@ extern	segadvstat_t	segadvstat;
 #define	IE_NOMEM	-1	/* internal to seg layer */
 #define	IE_RETRY	-2	/* internal to seg layer */
 #define	IE_REATTACH	-3	/* internal to seg layer */
+
+/* Values for SEGOP_INHERIT */
+#define	SEGP_INH_ZERO	0x01
+
+int seg_inherit_notsup(struct seg *, caddr_t, size_t, uint_t);
 
 /* Delay/retry factors for seg_p_mem_config_pre_del */
 #define	SEGP_PREDEL_DELAY_FACTOR	4

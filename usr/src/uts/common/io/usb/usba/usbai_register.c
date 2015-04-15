@@ -21,6 +21,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  */
 
 /*
@@ -112,14 +114,12 @@ uint_t			usbai_register_dump_errlevel = USB_LOG_L2;
 uint_t			usbai_register_errmask = (uint_t)-1;
 
 /* Function prototypes */
-static int usba_build_bos(usba_device_t *, usb_client_dev_data_t *);
 static int usba_build_descr_tree(dev_info_t *, usba_device_t *,
 				usb_client_dev_data_t *);
 static void usba_process_cfg_descr(usba_reg_state_t *);
 static int usba_process_if_descr(usba_reg_state_t *, boolean_t *);
 static int usba_process_ep_descr(usba_reg_state_t *);
 static int usba_process_cv_descr(usba_reg_state_t *);
-static int usba_process_ep_comp_descr(usba_reg_state_t *);
 static int usba_set_parse_values(dev_info_t *dip, usba_device_t *usba_device,
     usba_reg_state_t *state);
 static void* usba_kmem_realloc(void *, int, int);
@@ -427,16 +427,6 @@ usb_get_dev_data(dev_info_t *dip,
 		return (USB_FAILURE);
 	}
 
-	/* get parsed bos for wusb device */
-	if (usba_device->usb_is_wireless) {
-		if ((rval = usba_build_bos(usba_device, usb_reg)) !=
-		    USB_SUCCESS) {
-			kmem_free(usb_reg, sizeof (usb_client_dev_data_t));
-
-			return (rval);
-		}
-	}
-
 	usb_reg->dev_iblock_cookie = usba_hcdi_get_hcdi(
 	    usba_device->usb_root_hub_dip)->hcdi_soft_iblock_cookie;
 
@@ -595,10 +585,6 @@ usb_free_dev_data(dev_info_t *dip, usb_client_dev_data_t *reg)
 			usb_free_descr_tree(dip, reg);
 		}
 
-		if (reg->dev_bos != NULL) {
-			kmem_free(reg->dev_bos, sizeof (usb_bos_data_t));
-		}
-
 		mutex_enter(&usba_device->usb_mutex);
 		prev = &usba_device->usb_client_dev_data_list;
 		entry = usba_device->usb_client_dev_data_list.cddl_next;
@@ -645,40 +631,6 @@ usb_free_dev_data(dev_info_t *dip, usb_client_dev_data_t *reg)
 	USB_DPRINTF_L4(DPRINT_MASK_REGISTER, usbai_reg_log_handle,
 	    "usb_free_dev_data done");
 }
-
-/*
- * This builds the BOS descriptors for WUSB device
- */
-static int
-usba_build_bos(usba_device_t *usba_device, usb_client_dev_data_t *usb_reg)
-{
-	uint8_t		*buf;
-	size_t		size, buflen;
-
-	buf = usba_device->usb_wireless_data->wusb_bos;
-	buflen = usba_device->usb_wireless_data->wusb_bos_length;
-
-	usb_reg->dev_bos = kmem_zalloc(sizeof (usb_bos_data_t),
-	    KM_SLEEP);
-	size = usb_parse_bos_descr(buf, buflen, &usb_reg->dev_bos->bos_descr,
-	    sizeof (usb_bos_descr_t));
-	if (size != USB_BOS_DESCR_SIZE) {
-		kmem_free(usb_reg->dev_bos, sizeof (usb_bos_data_t));
-
-		return (USB_FAILURE);
-	}
-
-	size = usb_parse_uwb_bos_descr(buf, buflen,
-	    &usb_reg->dev_bos->bos_uwb_cap, sizeof (usb_uwb_cap_descr_t));
-	if (size != USB_UWB_CAP_DESCR_SIZE) {
-		kmem_free(usb_reg->dev_bos, sizeof (usb_bos_data_t));
-
-		return (USB_FAILURE);
-	}
-
-	return (USB_SUCCESS);
-}
-
 
 /*
  * usba_build_descr_tree:
@@ -844,18 +796,6 @@ usba_build_descr_tree(dev_info_t *dip, usba_device_t *usba_device,
 					}
 					state.st_last_processed_descr_type =
 					    USB_DESCR_TYPE_EP;
-				}
-
-				break;
-			case USB_DESCR_TYPE_WIRELESS_EP_COMP:
-				/* for WUSB devices */
-				if (process_this_if_tree &&
-				    state.st_build_ep_comp) {
-					if (usba_process_ep_comp_descr(
-					    &state) != USB_SUCCESS) {
-
-						return (USB_FAILURE);
-					}
 				}
 
 				break;
@@ -1107,30 +1047,6 @@ usba_process_ep_descr(usba_reg_state_t *state)
 }
 
 
-static int
-usba_process_ep_comp_descr(usba_reg_state_t *state)
-{
-	USB_DPRINTF_L4(DPRINT_MASK_REGISTER, usbai_reg_log_handle,
-	    "usba_process_ep_comp_descr starting");
-
-	/* No endpoint descr preceeds this descr */
-	if (state->st_curr_ep == NULL) {
-		USB_DPRINTF_L2(DPRINT_MASK_REGISTER, usbai_reg_log_handle,
-		    "usba_process_ep_comp_descr: no endpt before the descr");
-
-		return (USB_FAILURE);
-	}
-
-	(void) usb_parse_data("ccccsscc", state->st_curr_raw_descr,
-	    state->st_curr_raw_descr_len,
-	    &state->st_curr_ep->ep_comp_descr,
-	    sizeof (usb_ep_comp_descr_t));
-	USB_DPRINTF_L4(DPRINT_MASK_REGISTER, usbai_reg_log_handle,
-	    "usba_process_ep_comp_descr done");
-
-	return (USB_SUCCESS);
-}
-
 /*
  * usba_process_cv_descr:
  *	This processes a raw endpoint descriptor, and sets up an analogous
@@ -1227,7 +1143,6 @@ usba_set_parse_values(dev_info_t *dip, usba_device_t *usba_device,
 	/* Default to *all* in case configuration# prop not set. */
 	mutex_enter(&usba_device->usb_mutex);
 	state->st_cfg_to_build = usba_device->usb_active_cfg_ndx;
-	state->st_build_ep_comp = usba_device->usb_is_wireless;
 	mutex_exit(&usba_device->usb_mutex);
 	if (state->st_cfg_to_build == USBA_DEV_CONFIG_INDEX_UNDEFINED) {
 		state->st_cfg_to_build = USBA_ALL;

@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2014 Garrett D'Amore <garrett@damore.org>
 #
 
 set name=pkg.fmri value=pkg:/system/header/header-usb@$(PKGVERS)
@@ -36,7 +37,6 @@ dir path=usr/include/sys/usb
 dir path=usr/include/sys/usb/clients
 dir path=usr/include/sys/usb/clients/audio
 dir path=usr/include/sys/usb/clients/hid
-dir path=usr/include/sys/usb/clients/hwarc
 dir path=usr/include/sys/usb/clients/mass_storage
 dir path=usr/include/sys/usb/clients/printer
 dir path=usr/include/sys/usb/clients/usbcdc
@@ -45,11 +45,8 @@ dir path=usr/include/sys/usb/clients/usbinput/usbwcm
 dir path=usr/include/sys/usb/clients/video
 dir path=usr/include/sys/usb/clients/video/usbvc
 dir path=usr/include/sys/usb/hubd
-dir path=usr/include/sys/uwb
-dir path=usr/include/sys/uwb/uwba
 file path=usr/include/sys/usb/clients/audio/usb_audio.h
 file path=usr/include/sys/usb/clients/hid/hid.h
-file path=usr/include/sys/usb/clients/hwarc/hwarc.h
 file path=usr/include/sys/usb/clients/mass_storage/usb_bulkonly.h
 file path=usr/include/sys/usb/clients/mass_storage/usb_cbi.h
 file path=usr/include/sys/usb/clients/printer/usb_printer.h
@@ -60,9 +57,6 @@ file path=usr/include/sys/usb/hubd/hub.h
 file path=usr/include/sys/usb/usba.h
 file path=usr/include/sys/usb/usbai.h
 file path=usr/include/sys/usb/usbdevs.h
-file path=usr/include/sys/uwb/uwb.h
-file path=usr/include/sys/uwb/uwba/uwba.h
-file path=usr/include/sys/uwb/uwbai.h
 legacy pkg=SUNWusbu desc="USB Headers" name="USB Headers"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

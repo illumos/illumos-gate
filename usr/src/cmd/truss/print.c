@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2015, Joyent, Inc. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -82,6 +83,7 @@
 #include <sys/rctl_impl.h>
 #include <sys/fork.h>
 #include <sys/task.h>
+#include <sys/random.h>
 #include "ramdata.h"
 #include "print.h"
 #include "proto.h"
@@ -2741,6 +2743,27 @@ prt_snf(private_t *pri, int raw, long val)
 		prt_hex(pri, 0, val);
 }
 
+void
+prt_grf(private_t *pri, int raw, long val)
+{
+	int first = 1;
+
+	if (raw != 0 || val == 0 ||
+	    (val & ~(GRND_NONBLOCK | GRND_RANDOM)) != 0) {
+		outstring(pri, "0");
+		return;
+	}
+
+	if (val & GRND_NONBLOCK) {
+		outstring(pri, "|GRND_NONBLOCK" + first);
+		first = 0;
+	}
+	if (val & GRND_RANDOM) {
+		outstring(pri, "|GRND_RANDOM" + first);
+		first = 0;
+	}
+}
+
 /*
  * Array of pointers to print functions, one for each format.
  */
@@ -2846,5 +2869,6 @@ void (* const Print[])() = {
 	prt_skc,	/* SKC -- print sockconfig() subcode */
 	prt_acf,	/* ACF -- print accept4 flags */
 	prt_pfd,	/* PFD -- print pipe fds */
+	prt_grf,	/* GRF -- print getrandom flags */
 	prt_dec,	/* HID -- hidden argument, make this the last one */
 };

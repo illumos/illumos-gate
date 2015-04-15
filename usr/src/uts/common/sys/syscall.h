@@ -296,6 +296,7 @@ extern "C" {
 #define	SYS_writev	122
 #define	SYS_preadv	123
 #define	SYS_pwritev	124
+#define	SYS_getrandom	126
 #define	SYS_mmapobj	127
 #define	SYS_setrlimit	128
 #define	SYS_getrlimit	129

@@ -32,7 +32,6 @@ random, srandom, initstate, setstate \- pseudorandom number functions
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBrandom()\fR function uses a nonlinear additive feedback random-number
 generator employing a default state array size of 31 long integers to return
@@ -100,8 +99,10 @@ state arrays. The array defined by the \fIstate\fR argument is used for further
 random-number generation until \fBinitstate()\fR is called or \fBsetstate()\fR
 is called again. The \fBsetstate()\fR function returns a pointer to the
 previous state array.
-.SH RETURN VALUES
 .sp
+.LP
+For a more powerful random number generator, see \fBarc4random\fR(3C).
+.SH RETURN VALUES
 .LP
 The \fBrandom()\fR function returns the generated pseudo-random number.
 .sp
@@ -112,11 +113,9 @@ The \fBsrandom()\fR function returns no value.
 Upon successful completion, \fBinitstate()\fR and \fBsetstate()\fR return a
 pointer to the previous state array.  Otherwise, a null pointer is returned.
 .SH ERRORS
-.sp
 .LP
 No errors are defined.
 .SH USAGE
-.sp
 .LP
 After initialization, a state array can be restarted at a different point in
 one of two ways:
@@ -175,7 +174,6 @@ main() {
 .in -2
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -193,11 +191,10 @@ MT-Level	See \fBNOTES\fR below.
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
-\fBdrand48\fR(3C), \fBrand\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)
+\fBarc4random\fR(3C), \fBdrand48\fR(3C), \fBrand\fR(3C), \fBattributes\fR(5),
+\fBstandards\fR(5)
 .SH NOTES
-.sp
 .LP
 The \fBrandom()\fR and \fBsrandom()\fR functions are unsafe in multithreaded
 applications.
@@ -210,5 +207,5 @@ For \fBinitstate()\fR and \fBsetstate()\fR, the \fIstate\fR argument must be
 aligned on an \fBint\fR boundary.
 .sp
 .LP
-Newer and better performing random number generators such as \fBaddrans()\fR
-and \fBlcrans()\fR are available with the SUNWspro package.
+\fBarc4random\fR(3C) is a newer and better performing random number generator.
+Use it instead.

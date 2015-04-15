@@ -21,6 +21,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  */
 
 #ifndef	_SYS_USB_USBA_USBA_PRIVATE_H
@@ -201,30 +203,6 @@ size_t usb_parse_CV_descr(
 	size_t			datalen,
 	void			*structure,
 	size_t			structlen);
-
-/*
- * For WUSB extended descriptors
- */
-size_t
-usb_parse_bos_descr(uchar_t	*buf,	/* from GET_DESCRIPTOR(BOS) */
-	size_t			buflen,
-	usb_bos_descr_t		*ret_descr,
-	size_t			ret_buf_len);
-
-size_t
-usb_parse_uwb_bos_descr(uchar_t	*buf,	/* from GET_DESCRIPTOR(BOS) */
-	size_t			buflen,
-	usb_uwb_cap_descr_t		*ret_descr,
-	size_t			ret_buf_len);
-
-size_t
-usb_parse_comp_ep_descr(uchar_t	*buf,	/* from GET_DESCRIPTOR(CONFIGURATION) */
-	size_t			buflen,
-	uint_t			if_number,
-	uint_t			alt_if_setting,
-	uint_t			ep_index,
-	usb_ep_comp_descr_t	*ret_descr,
-	size_t			ret_buf_len);
 
 /*
  * Returns pointer to the raw config cloud. The client should

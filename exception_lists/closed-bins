@@ -41,6 +41,9 @@
 ./usr/has/bin
 ./usr/has/bin/patch
 ./usr/include/sys/pcmcia
+./usr/include/sys/usb/clients/hwarc
+./usr/include/sys/uwb
+./usr/include/sys/uwb/uwba
 ./usr/kernel
 ./usr/kernel/strmod
 ./usr/kernel/strmod/amd64

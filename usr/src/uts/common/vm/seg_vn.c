@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 1986, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2014, Joyent, Inc. All rights reserved.
+ * Copyright 2015, Joyent, Inc. All rights reserved.
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
@@ -135,6 +135,7 @@ static int	segvn_getmemid(struct seg *seg, caddr_t addr,
 		    memid_t *memidp);
 static lgrp_mem_policy_info_t	*segvn_getpolicy(struct seg *, caddr_t);
 static int	segvn_capable(struct seg *seg, segcapability_t capable);
+static int	segvn_inherit(struct seg *, caddr_t, size_t, uint_t);
 
 struct	seg_ops segvn_ops = {
 	segvn_dup,
@@ -160,6 +161,7 @@ struct	seg_ops segvn_ops = {
 	segvn_getmemid,
 	segvn_getpolicy,
 	segvn_capable,
+	segvn_inherit
 };
 
 /*
@@ -829,6 +831,7 @@ segvn_create(struct seg *seg, void *argsp)
 	svd->softlockcnt = 0;
 	svd->softlockcnt_sbase = 0;
 	svd->softlockcnt_send = 0;
+	svd->svn_inz = 0;
 	svd->rcookie = HAT_INVALID_REGION_COOKIE;
 	svd->pageswap = 0;
 
@@ -1487,6 +1490,81 @@ segvn_extend_next(
 	return (0);
 }
 
+/*
+ * Duplicate all the pages in the segment. This may break COW sharing for a
+ * given page. If the page is marked with inherit zero set, then instead of
+ * duplicating the page, we zero the page.
+ */
+static int
+segvn_dup_pages(struct seg *seg, struct seg *newseg)
+{
+	int error;
+	uint_t prot;
+	page_t *pp;
+	struct anon *ap, *newap;
+	size_t i;
+	caddr_t addr;
+
+	struct segvn_data *svd = (struct segvn_data *)seg->s_data;
+	struct segvn_data *newsvd = (struct segvn_data *)newseg->s_data;
+	ulong_t old_idx = svd->anon_index;
+	ulong_t new_idx = 0;
+
+	i = btopr(seg->s_size);
+	addr = seg->s_base;
+
+	/*
+	 * XXX break cow sharing using PAGESIZE
+	 * pages. They will be relocated into larger
+	 * pages at fault time.
+	 */
+	while (i-- > 0) {
+		if ((ap = anon_get_ptr(svd->amp->ahp, old_idx)) != NULL) {
+			struct vpage *vpp;
+
+			vpp = &svd->vpage[seg_page(seg, addr)];
+
+			/*
+			 * prot need not be computed below 'cause anon_private
+			 * is going to ignore it anyway as child doesn't inherit
+			 * pagelock from parent.
+			 */
+			prot = svd->pageprot ? VPP_PROT(vpp) : svd->prot;
+
+			/*
+			 * Check whether we should zero this or dup it.
+			 */
+			if (svd->svn_inz == SEGVN_INZ_ALL ||
+			    (svd->svn_inz == SEGVN_INZ_VPP &&
+			    VPP_ISINHZERO(vpp))) {
+				pp = anon_zero(newseg, addr, &newap,
+				    newsvd->cred);
+			} else {
+				page_t *anon_pl[1+1];
+				uint_t vpprot;
+				error = anon_getpage(&ap, &vpprot, anon_pl,
+				    PAGESIZE, seg, addr, S_READ, svd->cred);
+				if (error != 0)
+					return (error);
+
+				pp = anon_private(&newap, newseg, addr, prot,
+				    anon_pl[0], 0, newsvd->cred);
+			}
+			if (pp == NULL) {
+				return (ENOMEM);
+			}
+			(void) anon_set_ptr(newsvd->amp->ahp, new_idx, newap,
+			    ANON_SLEEP);
+			page_unlock(pp);
+		}
+		addr += PAGESIZE;
+		old_idx++;
+		new_idx++;
+	}
+
+	return (0);
+}
+
 static int
 segvn_dup(struct seg *seg, struct seg *newseg)
 {
@@ -1494,7 +1572,6 @@ segvn_dup(struct seg *seg, struct seg *newseg)
 	struct segvn_data *newsvd;
 	pgcnt_t npages = seg_pages(seg);
 	int error = 0;
-	uint_t prot;
 	size_t len;
 	struct anon_map *amp;
 
@@ -1538,6 +1615,7 @@ segvn_dup(struct seg *seg, struct seg *newseg)
 	crhold(newsvd->cred);
 	newsvd->advice = svd->advice;
 	newsvd->pageadvice = svd->pageadvice;
+	newsvd->svn_inz = svd->svn_inz;
 	newsvd->swresv = svd->swresv;
 	newsvd->pageswap = svd->pageswap;
 	newsvd->flags = svd->flags;
@@ -1567,6 +1645,7 @@ segvn_dup(struct seg *seg, struct seg *newseg)
 		ASSERT(svd->tr_state == SEGVN_TR_OFF);
 		newsvd->tr_state = SEGVN_TR_OFF;
 		if (svd->type == MAP_SHARED) {
+			ASSERT(svd->svn_inz == SEGVN_INZ_NONE);
 			newsvd->amp = amp;
 			ANON_LOCK_ENTER(&amp->a_rwlock, RW_WRITER);
 			amp->refcnt++;
@@ -1582,6 +1661,9 @@ segvn_dup(struct seg *seg, struct seg *newseg)
 			    ANON_SLEEP);
 			newsvd->amp->a_szc = newseg->s_szc;
 			newsvd->anon_index = 0;
+			ASSERT(svd->svn_inz == SEGVN_INZ_NONE ||
+			    svd->svn_inz == SEGVN_INZ_ALL ||
+			    svd->svn_inz == SEGVN_INZ_VPP);
 
 			/*
 			 * We don't have to acquire the anon_map lock
@@ -1605,17 +1687,16 @@ segvn_dup(struct seg *seg, struct seg *newseg)
 			 * The strategy here is to just break the
 			 * sharing on pages that could possibly be
 			 * softlocked.
+			 *
+			 * In addition, if any pages have been marked that they
+			 * should be inherited as zero, then we immediately go
+			 * ahead and break COW and zero them. In the case of a
+			 * softlocked page that should be inherited zero, we
+			 * break COW and just get a zero page.
 			 */
 retry:
-			if (svd->softlockcnt) {
-				struct anon *ap, *newap;
-				size_t i;
-				uint_t vpprot;
-				page_t *anon_pl[1+1], *pp;
-				caddr_t addr;
-				ulong_t old_idx = svd->anon_index;
-				ulong_t new_idx = 0;
-
+			if (svd->softlockcnt ||
+			    svd->svn_inz != SEGVN_INZ_NONE) {
 				/*
 				 * The softlock count might be non zero
 				 * because some pages are still stuck in the
@@ -1625,59 +1706,16 @@ retry:
 				 * pages]. Note, we have the writers lock so
 				 * nothing gets inserted during the flush.
 				 */
-				if (reclaim == 1) {
+				if (svd->softlockcnt && reclaim == 1) {
 					segvn_purge(seg);
 					reclaim = 0;
 					goto retry;
 				}
-				i = btopr(seg->s_size);
-				addr = seg->s_base;
-				/*
-				 * XXX break cow sharing using PAGESIZE
-				 * pages. They will be relocated into larger
-				 * pages at fault time.
-				 */
-				while (i-- > 0) {
-					if (ap = anon_get_ptr(amp->ahp,
-					    old_idx)) {
-						error = anon_getpage(&ap,
-						    &vpprot, anon_pl, PAGESIZE,
-						    seg, addr, S_READ,
-						    svd->cred);
-						if (error) {
-							newsvd->vpage = NULL;
-							goto out;
-						}
-						/*
-						 * prot need not be computed
-						 * below 'cause anon_private is
-						 * going to ignore it anyway
-						 * as child doesn't inherit
-						 * pagelock from parent.
-						 */
-						prot = svd->pageprot ?
-						    VPP_PROT(
-						    &svd->vpage[
-						    seg_page(seg, addr)])
-						    : svd->prot;
-						pp = anon_private(&newap,
-						    newseg, addr, prot,
-						    anon_pl[0],	0,
-						    newsvd->cred);
-						if (pp == NULL) {
-							/* no mem abort */
-							newsvd->vpage = NULL;
-							error = ENOMEM;
-							goto out;
-						}
-						(void) anon_set_ptr(
-						    newsvd->amp->ahp, new_idx,
-						    newap, ANON_SLEEP);
-						page_unlock(pp);
-					}
-					addr += PAGESIZE;
-					old_idx++;
-					new_idx++;
+
+				error = segvn_dup_pages(seg, newseg);
+				if (error != 0) {
+					newsvd->vpage = NULL;
+					goto out;
 				}
 			} else {	/* common case */
 				if (seg->s_szc != 0) {
@@ -2214,6 +2252,7 @@ retry:
 	nsvd->softlockcnt = 0;
 	nsvd->softlockcnt_sbase = 0;
 	nsvd->softlockcnt_send = 0;
+	nsvd->svn_inz = svd->svn_inz;
 	ASSERT(nsvd->rcookie == HAT_INVALID_REGION_COOKIE);
 
 	if (svd->vp != NULL) {
@@ -8025,7 +8064,7 @@ out:
 
 /*
  * Set advice from user for specified pages
- * There are 5 types of advice:
+ * There are 9 types of advice:
  *	MADV_NORMAL	- Normal (default) behavior (whatever that is)
  *	MADV_RANDOM	- Random page references
  *				do not allow readahead or 'klustering'
@@ -8504,6 +8543,81 @@ segvn_advise(struct seg *seg, caddr_t addr, size_t len, uint_t behav)
 	}
 	SEGVN_LOCK_EXIT(seg->s_as, &svd->lock);
 	return (err);
+}
+
+/*
+ * There is one kind of inheritance that can be specified for pages:
+ *
+ *     SEGP_INH_ZERO - Pages should be zeroed in the child
+ */
+static int
+segvn_inherit(struct seg *seg, caddr_t addr, size_t len, uint_t behav)
+{
+	struct segvn_data *svd = (struct segvn_data *)seg->s_data;
+	struct vpage *bvpp, *evpp;
+	size_t page;
+	int ret = 0;
+
+	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as, &seg->s_as->a_lock));
+
+	/* Can't support something we don't know about */
+	if (behav != SEGP_INH_ZERO)
+		return (ENOTSUP);
+
+	SEGVN_LOCK_ENTER(seg->s_as, &svd->lock, RW_WRITER);
+
+	/*
+	 * This must be a straightforward anonymous segment that is mapped
+	 * privately and is not backed by a vnode.
+	 */
+	if (svd->tr_state != SEGVN_TR_OFF ||
+	    svd->type != MAP_PRIVATE ||
+	    svd->vp != NULL) {
+		ret = EINVAL;
+		goto out;
+	}
+
+	/*
+	 * If the entire segment has been marked as inherit zero, then no reason
+	 * to do anything else.
+	 */
+	if (svd->svn_inz == SEGVN_INZ_ALL) {
+		ret = 0;
+		goto out;
+	}
+
+	/*
+	 * If this applies to the entire segment, simply mark it and we're done.
+	 */
+	if ((addr == seg->s_base) && (len == seg->s_size)) {
+		svd->svn_inz = SEGVN_INZ_ALL;
+		ret = 0;
+		goto out;
+	}
+
+	/*
+	 * We've been asked to mark a subset of this segment as inherit zero,
+	 * therefore we need to mainpulate its vpages.
+	 */
+	if (svd->vpage == NULL) {
+		segvn_vpage(seg);
+		if (svd->vpage == NULL) {
+			ret = ENOMEM;
+			goto out;
+		}
+	}
+
+	svd->svn_inz = SEGVN_INZ_VPP;
+	page = seg_page(seg, addr);
+	bvpp = &svd->vpage[page];
+	evpp = &svd->vpage[page + (len >> PAGESHIFT)];
+	for (; bvpp < evpp; bvpp++)
+		VPP_SETINHZERO(bvpp);
+	ret = 0;
+
+out:
+	SEGVN_LOCK_EXIT(seg->s_as, &svd->lock);
+	return (ret);
 }
 
 /*

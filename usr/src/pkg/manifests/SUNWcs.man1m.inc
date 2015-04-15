@@ -276,7 +276,6 @@ file path=usr/share/man/man1m/volcopy_ufs.1m
 file path=usr/share/man/man1m/wall.1m
 file path=usr/share/man/man1m/whodo.1m
 file path=usr/share/man/man1m/wracct.1m
-file path=usr/share/man/man1m/wusbadm.1m
 file path=usr/share/man/man1m/zdump.1m
 file path=usr/share/man/man1m/zic.1m
 link path=usr/share/man/man1m/dcopy.1m target=clri.1m

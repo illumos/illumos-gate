@@ -239,7 +239,7 @@ static const char *const systable[] = {
 	"preadv",		/* 123 */
 	"pwritev",		/* 124 */
 	NULL,			/* 125 */
-	NULL,			/* 126 */
+	"getrandom",		/* 126 */
 	"mmapobj",		/* 127 */
 	"setrlimit",		/* 128 */
 	"getrlimit",		/* 129 */
