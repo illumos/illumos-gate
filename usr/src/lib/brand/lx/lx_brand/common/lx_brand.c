@@ -956,7 +956,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	NULL,				/*  39: getpid */
 	lx_sendfile64,			/*  40: sendfile */
 	lx_socket,			/*  41: socket */
-	lx_connect,			/*  42: connect */
+	NULL,				/*  42: connect */
 	lx_accept,			/*  43: accept */
 	lx_sendto,			/*  44: sendto */
 	lx_recvfrom,			/*  45: recvfrom */

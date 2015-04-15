@@ -389,9 +389,12 @@ lx_syscall_enter(void)
 		/*
 		 * Call the in-kernel handler for this Linux system call:
 		 */
+		lwpd->br_eosys = NORMALRETURN;
 		ret = s->sy_callc(args[0], args[1], args[2], args[3], args[4],
 		    args[5]);
-		lx_syscall_return(lwp, syscall_num, ret);
+		if (lwpd->br_eosys == NORMALRETURN) {
+			lx_syscall_return(lwp, syscall_num, ret);
+		}
 		return (0);
 	}
 
@@ -622,7 +625,7 @@ lx_sysent_t lx_sysent32[] = {
 	{"statfs",	NULL,			0,		2}, /* 99 */
 	{"fstatfs",	NULL,			0,		2}, /* 100 */
 	{"ioperm",	NULL,			NOSYS_NO_EQUIV,	0}, /* 101 */
-	{"socketcall",	NULL,			0,		2}, /* 102 */
+	{"socketcall",	lx_socketcall,		0,		2}, /* 102 */
 	{"syslog",	NULL,			0,		3}, /* 103 */
 	{"setitimer",	NULL,			0,		3}, /* 104 */
 	{"getitimer",	NULL,			0,		2}, /* 105 */
@@ -933,7 +936,7 @@ lx_sysent_t lx_sysent64[] = {
 	{"getpid",	lx_getpid,		0,		0}, /* 39 */
 	{"sendfile",	NULL,			0,		4}, /* 40 */
 	{"socket",	NULL,			0,		3}, /* 41 */
-	{"connect",	NULL,			0,		3}, /* 42 */
+	{"connect",	lx_connect,		0,		3}, /* 42 */
 	{"accept",	NULL,			0,		3}, /* 43 */
 	{"sendto",	NULL,			0,		6}, /* 44 */
 	{"recvfrom",	NULL,			0,		6}, /* 45 */

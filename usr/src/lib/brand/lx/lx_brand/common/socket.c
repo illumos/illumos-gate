@@ -78,7 +78,6 @@ typedef enum {
 
 static int lx_socket32(ulong_t *);
 static int lx_bind32(ulong_t *);
-static int lx_connect32(ulong_t *);
 static int lx_listen32(ulong_t *);
 static int lx_accept32(ulong_t *);
 static int lx_getsockname32(ulong_t *);
@@ -105,7 +104,7 @@ static struct {
 } sockfns[] = {
 	lx_socket32, 3,
 	lx_bind32, 3,
-	lx_connect32, 3,
+	NULL, 3,
 	lx_listen32, 2,
 	lx_accept32, 3,
 	lx_getsockname32, 3,
@@ -1402,35 +1401,6 @@ lx_bind(int sockfd, void *np, int nl)
 }
 
 long
-lx_connect(int sockfd, void *np, int nl)
-{
-	struct sockaddr *name;
-	socklen_t len;
-	int r;
-	int nlen;
-	lx_addr_type_t type;
-
-	if ((nlen = calc_addr_size(np, nl, &type)) < 0)
-		return (nlen);
-
-	if ((name = SAFE_ALLOCA(nlen)) == NULL)
-		return (-EINVAL);
-	bzero(name, nlen);
-
-	if ((r = ltos_sockaddr(name, &len, np, nl, type)) < 0)
-		return (r);
-
-	lx_debug("\tconnect(%d, 0x%p, %d)", sockfd, name, len);
-
-	if (name->sa_family == AF_UNIX)
-		lx_debug("\t\tAF_UNIX, path = %s", name->sa_data);
-
-	r = connect(sockfd, name, len);
-
-	return ((r < 0) ? -errno : r);
-}
-
-long
 lx_listen(int sockfd, int backlog)
 {
 	int r;
@@ -2612,13 +2582,6 @@ lx_bind32(ulong_t *args)
 }
 
 static int
-lx_connect32(ulong_t *args)
-{
-	return (lx_connect((int)args[0], (struct sockaddr *)args[1],
-	    (int)args[2]));
-}
-
-static int
 lx_listen32(ulong_t *args)
 {
 	return (lx_listen((int)args[0], (int)args[1]));
@@ -2824,6 +2787,11 @@ lx_socketcall(uintptr_t p1, uintptr_t p2)
 
 	if (subcmd < 0 || subcmd >= LX_SENDMMSG)
 		return (-EINVAL);
+
+	/* Bail out if we are trying to call an IKE function */
+	if (sockfns[subcmd].s_fn == NULL) {
+		lx_err_fatal("lx_socketcall: deprecated subcmd: %d", subcmd);
+	}
 
 	/*
 	 * Copy the arguments to the subcommand in from the app's address
