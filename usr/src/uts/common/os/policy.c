@@ -2095,6 +2095,13 @@ secpolicy_meminfo(const cred_t *cr)
 }
 
 int
+secpolicy_fs_import(const cred_t *cr)
+{
+	return (PRIV_POLICY(cr, PRIV_SYS_FS_IMPORT, B_FALSE, EPERM, NULL));
+}
+
+
+int
 secpolicy_pfexec_register(const cred_t *cr)
 {
 	return (PRIV_POLICY(cr, PRIV_SYS_ADMIN, B_TRUE, EPERM, NULL));

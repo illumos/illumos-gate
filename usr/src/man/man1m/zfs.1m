@@ -24,7 +24,7 @@
 .\" Copyright 2011 Joshua M. Clulow <josh@sysmgr.org>
 .\" Copyright (c) 2011, 2014 by Delphix. All rights reserved.
 .\" Copyright (c) 2013 by Saso Kiselkov. All rights reserved.
-.\" Copyright (c) 2014, Joyent, Inc. All rights reserved.
+.\" Copyright (c) 2015, Joyent, Inc. All rights reserved.
 .\" Copyright (c) 2014 by Adam Stevko. All rights reserved.
 .\" Copyright 2014 Nexenta Systems, Inc.  All Rights Reserved.
 .\"
@@ -3249,6 +3249,8 @@ pool name) is used and any required intermediate file systems within the
 specified one are created.  If the \fB-e\fR option is specified, then only the
 last element of the sent snapshot's file system name (i.e. the name of the
 source file system itself) is used as the target file system name.
+.sp
+The process requires the \fBPRIV_SYS_FS_IMPORT\fR privilege to receive.
 .sp
 .ne 2
 .na

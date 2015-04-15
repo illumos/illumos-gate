@@ -108,6 +108,7 @@ int secpolicy_ipc_owner(const cred_t *, const struct kipc_perm *);
 int secpolicy_kmdb(const cred_t *);
 int secpolicy_lock_memory(const cred_t *);
 int secpolicy_meminfo(const cred_t *);
+int secpolicy_fs_import(const cred_t *);
 int secpolicy_modctl(const cred_t *, int);
 int secpolicy_net(const cred_t *, int, boolean_t);
 int secpolicy_net_bindmlp(const cred_t *);

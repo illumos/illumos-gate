@@ -376,6 +376,10 @@ privilege PRIV_SYS_DEVICES
 	Allows a process to open the real console device directly.
 	Allows a process to open devices that have been exclusively opened.
 
+privilege PRIV_SYS_FS_IMPORT
+
+	Allows a process to import a potentially untrusted file system.
+
 privilege PRIV_SYS_IPC_CONFIG
 
 	Allows a process to increase the size of a System V IPC Message
