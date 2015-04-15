@@ -196,6 +196,8 @@ extern int lx_sched_affinity(int, uintptr_t, int, uintptr_t, int64_t *);
 
 extern void lx_ioctl_init();
 extern void lx_ioctl_fini();
+extern void lx_socket_init();
+extern void lx_socket_fini();
 
 lx_systrace_f *lx_systrace_entry_ptr;
 lx_systrace_f *lx_systrace_return_ptr;
@@ -1825,17 +1827,11 @@ _init(void)
 	int err = 0;
 
 	lx_syscall_init();
-
-	/* pid/tid conversion hash tables */
 	lx_pid_init();
-
-	/* for lx_ioctl() */
 	lx_ioctl_init();
-
-	/* for lx_futex() */
 	lx_futex_init();
-
 	lx_ptrace_init();
+	lx_socket_init();
 
 	err = mod_install(&modlinkage);
 	if (err != 0) {
@@ -1878,6 +1874,7 @@ _fini(void)
 	lx_ptrace_fini();
 	lx_pid_fini();
 	lx_ioctl_fini();
+	lx_socket_fini();
 
 	if ((err = lx_futex_fini()) != 0) {
 		goto done;
@@ -1895,6 +1892,7 @@ done:
 		lx_ptrace_init();
 		lx_pid_init();
 		lx_ioctl_init();
+		lx_socket_init();
 
 		if (futex_done) {
 			lx_futex_init();

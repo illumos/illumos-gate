@@ -592,6 +592,15 @@ struct lx_lwp_data {
 	boolean_t br_strict_failure;
 
 	/*
+	 * Some syscalls emulated in-kernel still call back out to the
+	 * userspace emulation for certain functions.  When that is the case,
+	 * the syscall_return logic must be bypassed at the end of the
+	 * in-kernel syscall code.  The NORMALRETURN and JUSTRETURN constants
+	 * are used to choose the behavior.
+	 */
+	char br_eosys;
+
+	/*
 	 * Hold a pre-allocated lx_pid structure to be used during lx_initlwp.
 	 */
 	struct lx_pid *br_lpid;
