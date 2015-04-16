@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2015, Joyent, Inc.
  */
 
 #include <sys/atomic.h>
@@ -847,7 +848,7 @@ pfexec_call(const cred_t *cr, struct pathname *rpnp, cred_t **pfcr,
 	door_arg_t da;
 	int dres;
 	cred_t *ncr = NULL;
-	int err = -1;
+	int err = EACCES;
 	priv_set_t *iset;
 	priv_set_t *lset;
 	zone_t *myzone = crgetzone(CRED());
@@ -908,7 +909,7 @@ pfexec_call(const cred_t *cr, struct pathname *rpnp, cred_t **pfcr,
 	    prp->pfr_ioff > da.rsize - sizeof (priv_set_t) ||
 	    prp->pfr_loff > da.rsize - sizeof (priv_set_t) ||
 	    (prp->pfr_loff & (sizeof (priv_chunk_t) - 1)) != 0 ||
-	    (prp->pfr_loff & (sizeof (priv_chunk_t) - 1)) != 0)
+	    (prp->pfr_ioff & (sizeof (priv_chunk_t) - 1)) != 0)
 		goto out;
 
 	/*
