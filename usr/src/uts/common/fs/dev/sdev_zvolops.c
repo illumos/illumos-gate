@@ -21,7 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2013 Joyent, Inc.  All rights reserved.
+ * Copyright 2015 Joyent, Inc.  All rights reserved.
  */
 
 /* vnode ops for the /dev/zvol directory */
@@ -370,8 +370,10 @@ devzvol_create_pool_dirs(struct vnode *dvp)
 		ASSERT(dvp->v_count > 0);
 		rc = VOP_LOOKUP(dvp, nvpair_name(elem), &vp, NULL, 0,
 		    NULL, kcred, NULL, 0, NULL);
-		/* should either work, or not be visible from a zone */
-		ASSERT(rc == 0 || rc == ENOENT);
+		/*
+		 * should either work or we should get an error if this should
+		 * not be visible from the zone, or disallowed in the zone
+		 */
 		if (rc == 0)
 			VN_RELE(vp);
 		pools++;
