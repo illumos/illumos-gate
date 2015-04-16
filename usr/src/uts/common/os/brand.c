@@ -1037,7 +1037,7 @@ brand_solaris_exec(struct brand *pbrand)
 
 	/* Upon exec, reset our lwp brand data. */
 	(void) brand_solaris_freelwp(ttolwp(curthread), pbrand);
-	(void) brand_solaris_brandlwp(ttolwp(curthread), pbrand);
+	(void) brand_solaris_initlwp(ttolwp(curthread), pbrand);
 
 	/*
 	 * Upon exec, reset all the proc brand data, except for the elf
@@ -1081,7 +1081,7 @@ brand_solaris_forklwp(klwp_t *p, klwp_t *c, struct brand *pbrand)
 
 	/*
 	 * Both LWPs have already had been initialized via
-	 * brand_solaris_brandlwp().
+	 * brand_solaris_initlwp().
 	 */
 	ASSERT(p->lwp_brand != NULL);
 	ASSERT(c->lwp_brand != NULL);
@@ -1098,14 +1098,13 @@ brand_solaris_freelwp(klwp_t *l, struct brand *pbrand)
 }
 
 /*ARGSUSED*/
-int
-brand_solaris_brandlwp(klwp_t *l, struct brand *pbrand)
+void
+brand_solaris_initlwp(klwp_t *l, struct brand *pbrand)
 {
 	ASSERT(l->lwp_procp->p_brand == pbrand);
 	ASSERT(l->lwp_procp->p_brand_data != NULL);
 	ASSERT(l->lwp_brand == NULL);
 	l->lwp_brand = (void *)-1;
-	return (0);
 }
 
 /*ARGSUSED*/

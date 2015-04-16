@@ -117,7 +117,7 @@ struct execa;
  * b_proc_exit - Perform process brand exit processing
  * b_exec - Reset branded process state on exec
  * b_lwp_setrval - Set return code for forked child
- * b_brandlwp - Allocate lwp brand data (p_lock not held)
+ * b_initlwp - Initialize lwp brand data
  * b_forklwp - Copy lwp brand data during fork
  * b_freelwp - Free lwp brand data
  * b_lwpexit - Perform lwp-specific brand exit processing
@@ -128,7 +128,9 @@ struct execa;
  * b_sendsig - Update process state after sendsig
  *
  * Optional Fields:
- * b_initlwp - Populate lwp brand data after b_brandlwp (p_lock held)
+ * b_lwpdata_alloc - Speculatively allocate data for use in b_initlwp
+ * b_lwpdata_free - Free data from allocated by b_lwpdata_alloc if errors occur
+ *                  during lwp creation before b_initlwp could be called.
  * b_exit_with_sig - Instead of sending SIGCLD, exit with custom behavior
  * b_psig_to_proc - Custom additional behavior during psig
  * b_wait_filter - Filter processes from being matched by waitid
@@ -157,8 +159,9 @@ struct brand_ops {
 	void	(*b_proc_exit)(struct proc *);
 	void	(*b_exec)();
 	void	(*b_lwp_setrval)(klwp_t *, int, int);
-	int	(*b_brandlwp)(klwp_t *);
-	void	(*b_initlwp)(klwp_t *);
+	void	*(*b_lwpdata_alloc)(struct proc *);
+	void	(*b_lwpdata_free)(void *);
+	void	(*b_initlwp)(klwp_t *, void *);
 	void	(*b_forklwp)(klwp_t *, klwp_t *);
 	void	(*b_freelwp)(klwp_t *);
 	void	(*b_lwpexit)(klwp_t *);
@@ -251,7 +254,7 @@ extern int	brand_solaris_fini(char **, struct modlinkage *,
 		    struct brand *);
 extern void	brand_solaris_forklwp(klwp_t *, klwp_t *, struct brand *);
 extern void	brand_solaris_freelwp(klwp_t *, struct brand *);
-extern int	brand_solaris_brandlwp(klwp_t *, struct brand *);
+extern void	brand_solaris_initlwp(klwp_t *, struct brand *);
 extern void	brand_solaris_lwpexit(klwp_t *, struct brand *);
 extern void	brand_solaris_proc_exit(struct proc *, struct brand *);
 extern void	brand_solaris_setbrand(proc_t *, struct brand *);

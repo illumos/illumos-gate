@@ -35,7 +35,6 @@
 #include <sys/brand.h>
 #include <sys/zone.h>
 #include <sys/lx_brand.h>
-#include <sys/lx_pid.h>
 
 #define	LINUX_PROC_FACTOR	8	/* factor down the hash table by this */
 static int hash_len = 4;		/* desired average hash chain length */
@@ -101,47 +100,45 @@ lx_pid_remove_hash(pid_t pid, id_t tid)
 	return (lpidp);
 }
 
-struct pid *pid_find(pid_t pid);
-
 /*
  * given a solaris pid/tid pair, create a linux pid
  */
-int
-lx_pid_assign(kthread_t *t)
+void
+lx_pid_assign(kthread_t *t, struct lx_pid *lpidp)
 {
 	proc_t *p = ttoproc(t);
+	lx_lwp_data_t *lwpd = ttolxlwp(t);
 	pid_t s_pid = p->p_pid;
 	id_t s_tid = t->t_tid;
-	struct pid *pidp;
-	struct lx_pid *lpidp;
-	lx_lwp_data_t *lwpd = ttolxlwp(t);
-	pid_t newpid;
 
 	/*
 	 * When lx_initlwp is called from lx_setbrand, p_lwpcnt will already be
 	 * equal to 1. Since lx_initlwp is being called against an lwp that
-	 * already exists, pid_allocate is not necessary.
+	 * already exists, an additional pid allocation is not necessary.
 	 *
 	 * We check for this by testing br_ppid == 0.
 	 */
 	if (p->p_lwpcnt > 0 && lwpd->br_ppid != 0) {
 		/*
-		 * Allocate a pid for any thread other than the first
+		 * Assign allocated pid to any thread other than the first.
+		 * The l_pid and l_pidp fields should be populated.
 		 */
-		if ((newpid = pid_allocate(p, 0, 0)) < 0)
-			return (-1);
-
-		pidp = pid_find(newpid);
+		VERIFY(lpidp->l_pidp != NULL);
+		VERIFY(lpidp->l_pid != 0);
 	} else {
-		pidp = NULL;
-		newpid = s_pid;
+		/*
+		 * There are cases where a pid is speculatively allocated but
+		 * is not needed.  We are obligated to free it here.
+		 */
+		if (lpidp->l_pidp != NULL) {
+			(void) pid_rele(lpidp->l_pidp);
+		}
+		lpidp->l_pidp = NULL;
+		lpidp->l_pid = s_pid;
 	}
 
-	lpidp = kmem_alloc(sizeof (struct lx_pid), KM_SLEEP);
-	lpidp->l_pid = newpid;
 	lpidp->s_pid = s_pid;
 	lpidp->s_tid = s_tid;
-	lpidp->l_pidp = pidp;
 	lpidp->l_start = t->t_start;
 
 	/*
@@ -152,9 +149,7 @@ lx_pid_assign(kthread_t *t)
 	lx_pid_insert_hash(lpidp);
 	mutex_exit(&hash_lock);
 
-	lwpd->br_pid = newpid;
-
-	return (0);
+	lwpd->br_pid = lpidp->l_pid;
 }
 
 /*

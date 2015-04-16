@@ -33,7 +33,6 @@
 #include <sys/cpuvar.h>
 #include <sys/brand.h>
 #include <sys/lx_brand.h>
-#include <sys/lx_pid.h>
 
 /*
  * return the pid

@@ -207,7 +207,6 @@
 #include <sys/lx_brand.h>
 #include <sys/lx_impl.h>
 #include <sys/lx_misc.h>
-#include <sys/lx_pid.h>
 #include <lx_syscall.h>
 #include <lx_signum.h>
 

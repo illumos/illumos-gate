@@ -45,7 +45,6 @@
 #include <sys/lx_brand.h>
 #include <sys/lx_futex.h>
 #include <sys/lx_impl.h>
-#include <sys/lx_pid.h>
 
 /*
  * Futexes are a Linux-specific implementation of inter-process mutexes.
