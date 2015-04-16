@@ -96,10 +96,22 @@ extern "C" {
 #define	FUTEX_OP_CMPARG(x)	(((x) << 20) >> 20)
 
 #ifdef _KERNEL
+
+#define	FUTEX_WAITERS			0x80000000
+#define	FUTEX_OWNER_DIED		0x40000000
+#define	FUTEX_TID_MASK			0x3fffffff
+
+#define	FUTEX_ROBUST_LOCK_PI		1
+#define	FUTEX_ROBUST_LIST_LIMIT		2048
+
 extern long lx_futex(uintptr_t addr, int cmd, int val, uintptr_t lx_timeout,
     uintptr_t addr2, int val2);
 extern void lx_futex_init(void);
 extern int lx_futex_fini(void);
+extern long lx_set_robust_list(void *listp, size_t len);
+extern long lx_get_robust_list(pid_t pid, void **listp, size_t *lenp);
+extern void lx_futex_robust_exit(uintptr_t addr, uint32_t tid);
+
 #endif /* _KERNEL */
 
 #ifdef	__cplusplus

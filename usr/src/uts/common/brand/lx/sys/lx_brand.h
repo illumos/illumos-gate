@@ -520,6 +520,7 @@ struct lx_lwp_data {
 	id_t	br_ptid;		/* parent tid for this thread */
 	void	*br_clear_ctidp;	/* clone thread id ptr */
 	void	*br_set_ctidp;		/* clone thread id ptr */
+	void	*br_robust_list;	/* robust lock list, if any */
 
 	/*
 	 * The following struct is used by some system calls to pass extra
