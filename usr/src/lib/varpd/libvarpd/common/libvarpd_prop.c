@@ -248,7 +248,6 @@ libvarpd_prop_info(varpd_prop_handle_t *phdl, const char **namep,
 int
 libvarpd_prop_get(varpd_prop_handle_t *phdl, void *buf, uint32_t *sizep)
 {
-	int i;
 	varpd_prop_info_t *infop = (varpd_prop_info_t *)phdl;
 	varpd_instance_t *instp = infop->vprop_instance;
 
