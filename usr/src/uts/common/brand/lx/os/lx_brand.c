@@ -147,7 +147,6 @@
 #include <sys/machbrand.h>
 #include <sys/lx_syscalls.h>
 #include <sys/lx_misc.h>
-#include <sys/lx_pid.h>
 #include <sys/lx_futex.h>
 #include <sys/lx_brand.h>
 #include <sys/param.h>
@@ -244,7 +243,8 @@ struct brand_ops lx_brops = {
 	lx_proc_exit,			/* b_proc_exit */
 	lx_exec,			/* b_exec */
 	lx_setrval,			/* b_lwp_setrval */
-	lx_brandlwp,			/* b_brandlwp */
+	lx_lwpdata_alloc,		/* b_lwpdata_alloc */
+	lx_lwpdata_free,		/* b_lwpdata_free */
 	lx_initlwp,			/* b_initlwp */
 	lx_forklwp,			/* b_forklwp */
 	lx_freelwp,			/* b_freelwp */

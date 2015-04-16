@@ -301,19 +301,20 @@ exec_common(const char *fname, const char **argp, const char **envp,
 
 	/* If necessary, brand this process/lwp before we start the exec. */
 	if (brandme) {
+		void *brand_data = NULL;
+
 		brand_setbrand(p);
-		if (BROP(p)->b_brandlwp(lwp) != 0) {
+		if (BROP(p)->b_lwpdata_alloc != NULL &&
+		    (brand_data = BROP(p)->b_lwpdata_alloc(p)) == NULL) {
 			VN_RELE(vp);
 			if (dir != NULL)
 				VN_RELE(dir);
 			pn_free(&resolvepn);
 			goto fail;
 		}
-		if (BROP(p)->b_initlwp != NULL) {
-			mutex_enter(&p->p_lock);
-			BROP(p)->b_initlwp(lwp);
-			mutex_exit(&p->p_lock);
-		}
+		mutex_enter(&p->p_lock);
+		BROP(p)->b_initlwp(lwp, brand_data);
+		mutex_exit(&p->p_lock);
 	}
 
 	if ((error = gexec(&vp, &ua, &args, NULL, 0, &execsz,

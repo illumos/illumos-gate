@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright 2015 Joyent, Inc. All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  */
 
 #ifndef _LX_BRAND_H
@@ -499,6 +499,16 @@ typedef enum lx_stack_mode {
 	LX_STACK_MODE_BRAND
 } lx_stack_mode_t;
 
+struct lx_pid {
+	pid_t	s_pid;			/* the SunOS pid and ... */
+	id_t	s_tid;			/* ... tid pair */
+	pid_t	l_pid;			/* the corresponding linux pid */
+	time_t	l_start;		/* birthday of this pid */
+	struct pid *l_pidp;
+	struct lx_pid *stol_next;	/* link in stol hash table */
+	struct lx_pid *ltos_next;	/* link in ltos hash table */
+};
+
 /*
  * lx-specific data in the klwp_t
  */
@@ -578,6 +588,11 @@ struct lx_lwp_data {
 	 * usermode.
 	 */
 	boolean_t br_strict_failure;
+
+	/*
+	 * Hold a pre-allocated lx_pid structure to be used during lx_initlwp.
+	 */
+	struct lx_pid *br_lpid;
 };
 
 /*
@@ -645,6 +660,14 @@ extern void lx_emulate_user32(klwp_t *, int, uintptr_t *);
 
 extern int lx_debug;
 #define	lx_print	if (lx_debug) printf
+
+extern void lx_pid_assign(kthread_t *, struct lx_pid *);
+extern void lx_pid_reassign(kthread_t *);
+extern void lx_pid_rele(pid_t, id_t);
+extern pid_t lx_lpid_to_spair(pid_t, pid_t *, id_t *);
+extern pid_t lx_lwp_ppid(klwp_t *, pid_t *, id_t *);
+extern void lx_pid_init(void);
+extern void lx_pid_fini(void);
 
 /*
  * In-Kernel Linux System Call Description.

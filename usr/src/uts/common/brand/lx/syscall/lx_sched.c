@@ -35,7 +35,6 @@
 #include <sys/tspriocntl.h>
 #include <sys/processor.h>
 #include <sys/brand.h>
-#include <sys/lx_pid.h>
 #include <sys/lx_sched.h>
 #include <sys/lx_brand.h>
 

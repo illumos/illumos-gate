@@ -37,7 +37,6 @@
 #include <sys/brand.h>
 #include <sys/lx_brand.h>
 #include <sys/lx_misc.h>
-#include <sys/lx_pid.h>
 #include <sys/lx_futex.h>
 #include <sys/cmn_err.h>
 #include <sys/siginfo.h>
@@ -256,16 +255,68 @@ lx_freelwp(klwp_t *lwp)
 	kmem_free(lwpd, sizeof (struct lx_lwp_data));
 }
 
-int
-lx_brandlwp(klwp_t *lwp)
+void *
+lx_lwpdata_alloc(proc_t *p)
 {
 	lx_lwp_data_t *lwpd;
-	lx_lwp_data_t *plwpd = ttolxlwp(curthread);
-	kthread_t *tp = lwptot(lwp);
+	struct lx_pid *lpidp;
+	pid_t newpid = 0;
+	struct pid *pidp = NULL;
 
-	VERIFY(lwp->lwp_brand == NULL);
+	VERIFY(MUTEX_NOT_HELD(&p->p_lock));
+
+	/*
+	 * LWPs beyond the first will require a pid to be allocated to emulate
+	 * Linux's goofy thread model.  While this  allocation may be
+	 * unnecessary when a single-lwp process undergoes branding, it cannot
+	 * be performed during b_initlwp due to p_lock being held.
+	 */
+	if (p->p_lwpcnt > 0) {
+		if ((newpid = pid_allocate(p, 0, 0)) < 0) {
+			return (NULL);
+		}
+		pidp = pid_find(newpid);
+	}
 
 	lwpd = kmem_zalloc(sizeof (struct lx_lwp_data), KM_SLEEP);
+	lpidp = kmem_zalloc(sizeof (struct lx_pid), KM_SLEEP);
+
+	lpidp->l_pid = newpid;
+	lpidp->l_pidp = pidp;
+	lwpd->br_lpid = lpidp;
+	return (lwpd);
+}
+
+/*
+ * Free lwp brand data if an error occurred during lwp_create.
+ * Otherwise, lx_freelwp will be used to free the resources after they're
+ * associated with the lwp via lx_initlwp.
+ */
+void
+lx_lwpdata_free(void *lwpbd)
+{
+	lx_lwp_data_t *lwpd = (lx_lwp_data_t *)lwpbd;
+	VERIFY(lwpd != NULL);
+	VERIFY(lwpd->br_lpid != NULL);
+
+	if (lwpd->br_lpid->l_pidp != NULL) {
+		(void) pid_rele(lwpd->br_lpid->l_pidp);
+	}
+	kmem_free(lwpd->br_lpid, sizeof (*lwpd->br_lpid));
+	kmem_free(lwpd, sizeof (*lwpd));
+}
+
+void
+lx_initlwp(klwp_t *lwp, void *lwpbd)
+{
+	lx_lwp_data_t *lwpd = (lx_lwp_data_t *)lwpbd;
+	lx_lwp_data_t *plwpd = ttolxlwp(curthread);
+	kthread_t *tp = lwptot(lwp);
+	proc_t *p = lwptoproc(lwp);
+
+	VERIFY(MUTEX_HELD(&p->p_lock));
+	VERIFY(lwp->lwp_brand == NULL);
+
 	lwpd->br_exitwhy = CLD_EXITED;
 	lwpd->br_lwp = lwp;
 	lwpd->br_clear_ctidp = NULL;
@@ -302,12 +353,28 @@ lx_brandlwp(klwp_t *lwp)
 	}
 	lwp->lwp_brand = lwpd;
 
-	if (lx_pid_assign(tp)) {
-		kmem_free(lwpd, sizeof (struct lx_lwp_data));
-		lwp->lwp_brand = NULL;
-		return (-1);
-	}
+	/*
+	 * When during lx_lwpdata_alloc, we must decide whether or not to
+	 * allocate a new pid to associate with the lwp. Since p_lock is not
+	 * held at that point, the only time we can guarantee a new pid isn't
+	 * needed is when p_lwpcnt == 0.  This is because other lwps won't be
+	 * present to race with us with regards to pid allocation.
+	 *
+	 * This means that in all other cases (where p_lwpcnt > 0), we expect
+	 * that lx_lwpdata_alloc will allocate a pid for us to use here, even
+	 * if it is uneeded.  If this process is undergoing an exec, for
+	 * example, the single existing lwp will not need a new pid when it is
+	 * rebranded.  In that case, lx_pid_assign will free the uneeded pid.
+	 */
+	VERIFY(lwpd->br_lpid->l_pidp != NULL || p->p_lwpcnt == 0);
+
+	lx_pid_assign(tp, lwpd->br_lpid);
 	lwpd->br_tgid = lwpd->br_pid;
+	/*
+	 * Having performed the lx pid assignement, the lpid reference is no
+	 * longer needed.  The underlying data will be freed during lx_freelwp.
+	 */
+	lwpd->br_lpid = NULL;
 
 	installctx(lwptot(lwp), lwp, lx_save, lx_restore, NULL, NULL,
 	    lx_save, NULL);
@@ -316,14 +383,7 @@ lx_brandlwp(klwp_t *lwp)
 	 * Install branded system call hook for this LWP:
 	 */
 	lwp->lwp_brand_syscall = lx_syscall_enter;
-	return (0);
-}
 
-void
-lx_initlwp(klwp_t *lwp)
-{
-	lx_lwp_data_t *lwpd = lwptolxlwp(lwp);
-	lx_lwp_data_t *plwpd = ttolxlwp(curthread);
 	/*
 	 * If the parent LWP has a ptrace(2) tracer, the new LWP may
 	 * need to inherit that same tracer.

@@ -115,7 +115,7 @@ lwp_create(void (*proc)(), caddr_t arg, size_t len, proc_t *p,
 	ret_tidhash_t *ret_tidhash = NULL;
 	int i;
 	int rctlfail = 0;
-	boolean_t branded = B_FALSE;
+	void *brand_data = NULL;
 	struct ctxop *ctx = NULL;
 
 	ASSERT(cid != sysdccid);	/* system threads must start in SYS */
@@ -282,6 +282,19 @@ lwp_create(void (*proc)(), caddr_t arg, size_t len, proc_t *p,
 	 * Allocate an lwp directory entry for the new lwp.
 	 */
 	lep = kmem_zalloc(sizeof (*lep), KM_SLEEP);
+
+	/*
+	 * If necessary, speculatively allocate lwp brand data.  This is done
+	 * ahead of time so p_lock need not be dropped during lwp branding.
+	 */
+	if (PROC_IS_BRANDED(p) && BROP(p)->b_lwpdata_alloc != NULL) {
+		if ((brand_data = BROP(p)->b_lwpdata_alloc(p)) == NULL) {
+			mutex_enter(&p->p_lock);
+			err = 1;
+			atomic_inc_32(&p->p_zone->zone_ffmisc);
+			goto error;
+		}
+	}
 
 	mutex_enter(&p->p_lock);
 grow:
@@ -682,25 +695,15 @@ grow:
 	t->t_pre_sys = 1;
 	t->t_post_sys = 1;
 
-	mutex_exit(&p->p_lock);
-	/*
-	 * If this is a branded process, allocate any brand-specific lwp data.
-	 */
-	if (PROC_IS_BRANDED(p)) {
-		if (BROP(p)->b_brandlwp(lwp) != 0) {
-			mutex_enter(&p->p_lock);
-			err = 1;
-			atomic_inc_32(&p->p_zone->zone_ffmisc);
-			goto error;
-		}
-		branded = B_TRUE;
-	}
-
-	mutex_enter(&p->p_lock);
-
 	/* Complete branded lwp initialization */
-	if (branded && BROP(p)->b_initlwp != NULL) {
-		BROP(p)->b_initlwp(lwp);
+	if (PROC_IS_BRANDED(p)) {
+		BROP(p)->b_initlwp(lwp, brand_data);
+		/*
+		 * The b_initlwp hook is expected to consume any preallocated
+		 * brand_data in a way that prepares it for deallocation by the
+		 * b_freelwp hook.
+		 */
+		brand_data = NULL;
 	}
 
 	/*
@@ -762,8 +765,8 @@ error:
 		if (cid != NOCLASS && bufp != NULL)
 			CL_FREE(cid, bufp);
 
-		if (branded) {
-			BROP(p)->b_freelwp(lwp);
+		if (brand_data != NULL) {
+			BROP(p)->b_lwpdata_free(brand_data);
 		}
 
 		mutex_exit(&p->p_lock);

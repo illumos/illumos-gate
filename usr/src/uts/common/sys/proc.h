@@ -629,6 +629,7 @@ extern int signal_is_blocked(kthread_t *, int);
 extern int sigcheck(proc_t *, kthread_t *);
 extern void sigdefault(proc_t *);
 
+extern struct pid *pid_find(pid_t pid);
 extern void pid_setmin(void);
 extern pid_t pid_allocate(proc_t *, pid_t, int);
 extern int pid_rele(struct pid *);

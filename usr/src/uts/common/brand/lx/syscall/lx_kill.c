@@ -36,7 +36,6 @@
 #include <sys/signal.h>
 #include <sys/brand.h>
 #include <sys/lx_brand.h>
-#include <sys/lx_pid.h>
 #include <lx_signum.h>
 #include <sys/contract/process_impl.h>
 
