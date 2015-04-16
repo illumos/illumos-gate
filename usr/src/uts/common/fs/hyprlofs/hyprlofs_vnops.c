@@ -628,7 +628,8 @@ hyprlofs_add_entry(vnode_t *vp, char *fspath, char *fsname,
 		*p = '\0';
 
 		/* Path component cannot be empty or relative */
-		if (pnm[0] == '\0' || (pnm[0] == '.' && pnm[1] == '.')) {
+		if (pnm[0] == '\0' ||
+		    (pnm[0] == '.' && pnm[1] == '.' && pnm[2] == '\0')) {
 			VN_RELE(realvp);
 			return (EINVAL);
 		}
@@ -689,7 +690,8 @@ hyprlofs_rm_entry(vnode_t *dvp, char *fsname, cred_t *cr, caller_context_t *ct,
 		*p = '\0';
 
 		/* Path component cannot be empty or relative */
-		if (pnm[0] == '\0' || (pnm[0] == '.' && pnm[1] == '.'))
+		if (pnm[0] == '\0' ||
+		    (pnm[0] == '.' && pnm[1] == '.' && pnm[2] == '\0'))
 			return (EINVAL);
 
 		if ((error = hyprlofs_dirlookup(parent, pnm, &fndtp, cr)) != 0)
