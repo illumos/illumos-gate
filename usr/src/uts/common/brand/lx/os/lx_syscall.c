@@ -835,8 +835,8 @@ lx_sysent_t lx_sysent32[] = {
 	{"pselect6",	NULL,			LX_SYS_EBPARG6,	6}, /* 308 */
 	{"ppoll",	NULL,			0,		5}, /* 309 */
 	{"unshare",	NULL,			NOSYS_NULL,	0}, /* 310 */
-	{"set_robust_list", NULL,		NOSYS_NULL,	0}, /* 311 */
-	{"get_robust_list", NULL,		NOSYS_NULL,	0}, /* 312 */
+	{"set_robust_list", lx_set_robust_list,	0,		2}, /* 311 */
+	{"get_robust_list", lx_get_robust_list,	0,		3}, /* 312 */
 	{"splice",	NULL,			NOSYS_NULL,	0}, /* 313 */
 	{"sync_file_range", NULL,		NOSYS_NULL,	0}, /* 314 */
 	{"tee",		NULL,			NOSYS_NULL,	0}, /* 315 */
@@ -1164,8 +1164,8 @@ lx_sysent_t lx_sysent64[] = {
 	{"pselect6",	NULL,			0,		6}, /* 270 */
 	{"ppoll",	NULL,			0,		5}, /* 271 */
 	{"unshare",	NULL,			NOSYS_NULL,	0}, /* 272 */
-	{"set_robust_list", NULL,		NOSYS_NULL,	0}, /* 273 */
-	{"get_robust_list", NULL,		NOSYS_NULL,	0}, /* 274 */
+	{"set_robust_list", lx_set_robust_list,	0,		2}, /* 273 */
+	{"get_robust_list", lx_get_robust_list,	0,		3}, /* 274 */
 	{"splice",	NULL,			NOSYS_NULL,	0}, /* 275 */
 	{"tee",		NULL,			NOSYS_NULL,	0}, /* 276 */
 	{"sync_file_range", NULL,		NOSYS_NULL,	0}, /* 277 */

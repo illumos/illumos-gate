@@ -35,6 +35,7 @@
 #include <vm/seg.h>
 #include <vm/seg_vn.h>
 #include <vm/page.h>
+#include <sys/priv.h>
 #include <sys/mman.h>
 #include <sys/timer.h>
 #include <sys/condvar.h>
@@ -44,6 +45,7 @@
 #include <sys/lx_brand.h>
 #include <sys/lx_futex.h>
 #include <sys/lx_impl.h>
+#include <sys/lx_pid.h>
 
 /*
  * Futexes are a Linux-specific implementation of inter-process mutexes.
@@ -205,6 +207,28 @@ typedef struct fwaiter {
 	uint32_t	fw_bits;	/* bits waiting on */
 	volatile int	fw_woken;
 } fwaiter_t;
+
+/*
+ * The structure of the robust_list, as set with the set_robust_list() system
+ * call.  See lx_futex_robust_exit(), below, for details.
+ */
+typedef struct futex_robust_list {
+	uintptr_t	frl_head;	/* list of robust locks held */
+	uint64_t	frl_offset;	/* offset of lock word within a lock */
+	uintptr_t	frl_pending;	/* pending operation */
+} futex_robust_list_t;
+
+#if defined(_SYSCALL32_IMPL)
+
+#pragma pack(4)
+typedef struct futex_robust_list32 {
+	uint32_t	frl_head;	/* list of robust locks held */
+	uint32_t	frl_offset;	/* offset of lock word within a lock */
+	uint32_t	frl_pending;	/* pending operation */
+} futex_robust_list32_t;
+#pragma pack()
+
+#endif
 
 #define	MEMID_COPY(s, d) \
 	{ (d)->val[0] = (s)->val[0]; (d)->val[1] = (s)->val[1]; }
@@ -799,6 +823,233 @@ lx_futex(uintptr_t addr, int op, int val, uintptr_t lx_timeout,
 	}
 
 	return (rval);
+}
+
+/*
+ * Does the dirty work of actually dropping a held robust lock in the event
+ * of the untimely death of the owner; see lx_futex_robust_exit(), below.
+ */
+static void
+lx_futex_robust_drop(uintptr_t addr, uint32_t tid)
+{
+	memid_t memid;
+	uint32_t oldval, newval;
+
+	VERIFY(addr + sizeof (uint32_t) < KERNELBASE);
+
+	do {
+		fuword32_noerr((void *)addr, &oldval);
+
+		if ((oldval & FUTEX_TID_MASK) != tid)
+			return;
+
+		newval = (oldval & FUTEX_WAITERS) | FUTEX_OWNER_DIED;
+	} while (atomic_cas_32((uint32_t *)addr, oldval, newval) != oldval);
+
+	/*
+	 * We have now denoted that this lock's owner is dead; we need to
+	 * wake any waiters.
+	 */
+	if (as_getmemid(curproc->p_as, (void *)addr, &memid) != 0)
+		return;
+
+	(void) futex_wake(&memid, 1, FUTEX_BITSET_MATCH_ANY);
+}
+
+/*
+ * Called when a thread is exiting.  The role of the kernel is very clearly
+ * spelled out in the Linux design document entitled robust-futex-ABI.txt:
+ * we must (carefully!) iterate over the list of held locks pointed to by
+ * the robust list head; for each lock, we'll check to see if the calling
+ * (exiting) thread is the owner, and if so, denote that the lock is dead
+ * and wake any waiters.  (The "pending" field of the head points to a lock
+ * that is in transition; it should be dropped if held.)  If there are any
+ * errors through here at all (including memory operations), we abort the
+ * entire operation.
+ */
+void
+lx_futex_robust_exit(uintptr_t addr, uint32_t tid)
+{
+	futex_robust_list_t list;
+	uintptr_t entry, next;
+	model_t model = get_udatamodel();
+	int length = 0;
+	label_t ljb;
+
+	if (on_fault(&ljb))
+		return;
+
+	if (addr + sizeof (futex_robust_list_t) >= KERNELBASE)
+		goto out;
+
+	if (model == DATAMODEL_NATIVE) {
+		copyin_noerr((void *)addr, &list, sizeof (list));
+	}
+#if defined(_SYSCALL32_IMPL)
+	else {
+		futex_robust_list32_t list32;
+
+		copyin_noerr((void *)addr, &list32, sizeof (list32));
+		list.frl_head = list32.frl_head;
+		list.frl_offset = list32.frl_offset;
+		list.frl_pending = list32.frl_pending;
+	}
+#endif
+
+	/*
+	 * Strip off the PI bit, if any.
+	 */
+	entry = list.frl_head & ~FUTEX_ROBUST_LOCK_PI;
+
+	while (entry != addr && length++ < FUTEX_ROBUST_LIST_LIMIT) {
+		if (entry + list.frl_offset + sizeof (uint32_t) >= KERNELBASE)
+			goto out;
+
+		if (model == DATAMODEL_NATIVE) {
+			fulword_noerr((void *)entry, &next);
+		}
+#if defined(_SYSCALL32_IMPL)
+		else {
+			uint32_t next32;
+			fuword32_noerr((void *)entry, &next32);
+			next = next32;
+		}
+#endif
+
+		/*
+		 * Drop the robust mutex -- but only if our pending lock didn't
+		 * somehow sneak on there.
+		 */
+		if (entry != list.frl_pending)
+			lx_futex_robust_drop(entry + list.frl_offset, tid);
+
+		entry = next & ~FUTEX_LOCK_PI;
+	}
+
+	/*
+	 * Finally, drop the pending lock if there is one.
+	 */
+	if (list.frl_pending != NULL && list.frl_pending +
+	    list.frl_offset + sizeof (uint32_t) < KERNELBASE)
+		lx_futex_robust_drop(list.frl_pending + list.frl_offset, tid);
+
+out:
+	no_fault();
+}
+
+long
+lx_set_robust_list(void *listp, size_t len)
+{
+	proc_t *p = curproc;
+	klwp_t *lwp = ttolwp(curthread);
+	struct lx_lwp_data *lwpd = lwptolxlwp(lwp);
+
+	if (get_udatamodel() == DATAMODEL_NATIVE) {
+		if (len != sizeof (futex_robust_list_t))
+			return (set_errno(EINVAL));
+	}
+#if defined(_SYSCALL32_IMPL)
+	else {
+		if (len != sizeof (futex_robust_list32_t))
+			return (set_errno(EINVAL));
+	}
+#endif
+
+	/*
+	 * To assure that we are serialized with respect to any racing call
+	 * to lx_get_robust_list(), we lock ourselves to set the value.  (Note
+	 * that sprunlock() drops p_lock.)
+	 */
+	mutex_enter(&p->p_lock);
+	sprlock_proc(p);
+	lwpd->br_robust_list = listp;
+	sprunlock(p);
+
+	return (0);
+}
+
+long
+lx_get_robust_list(pid_t pid, void **listp, size_t *lenp)
+{
+	model_t model = get_udatamodel();
+	pid_t rpid;
+	id_t rtid;
+	proc_t *rproc;
+	klwp_t *rlwp;
+	lx_lwp_data_t *rlwpd;
+	kthread_t *rthr;
+	void *list;
+	int err = 0;
+
+	if (pid == 0) {
+		/*
+		 * A pid of 0 denotes the current thread; we lock the current
+		 * process even though it isn't strictly necessary (we can't
+		 * race with set_robust_list() because a thread may only set
+		 * its robust list on itself).
+		 */
+		rproc = curproc;
+		rlwpd = lwptolxlwp(ttolwp(curthread));
+		mutex_enter(&curproc->p_lock);
+		sprlock_proc(rproc);
+	} else {
+		if (lx_lpid_to_spair(pid, &rpid, &rtid) != 0 ||
+		    (rproc = sprlock(rpid)) == NULL) {
+			/*
+			 * We couldn't find the specified process.
+			 */
+			return (set_errno(ESRCH));
+		}
+
+		if (rproc->p_model != model ||
+		    (rthr = idtot(rproc, rtid)) == NULL ||
+		    (rlwp = ttolwp(rthr)) == NULL ||
+		    (rlwpd = lwptolxlwp(rlwp)) == NULL) {
+			/*
+			 * The target process does not match our data model, or
+			 * we couldn't find the LWP, or the target process is
+			 * not branded.
+			 */
+			err = ESRCH;
+			goto out;
+		}
+	}
+
+	if (curproc != rproc &&
+	    priv_proc_cred_perm(curproc->p_cred, rproc, NULL, VREAD) != 0) {
+		/*
+		 * We don't have the permission to examine the target.
+		 */
+		err = EPERM;
+		goto out;
+	}
+
+	list = rlwpd->br_robust_list;
+
+out:
+	sprunlock(rproc);
+
+	if (err != 0)
+		return (set_errno(err));
+
+	if (model == DATAMODEL_NATIVE) {
+		if (sulword(listp, (uintptr_t)list) != 0)
+			return (set_errno(EFAULT));
+
+		if (sulword(lenp, sizeof (futex_robust_list_t)) != 0)
+			return (set_errno(EFAULT));
+	}
+#if defined(_SYSCALL32_IMPL)
+	else {
+		if (suword32(listp, (uint32_t)(uintptr_t)list) != 0)
+			return (set_errno(EFAULT));
+
+		if (suword32(lenp, sizeof (futex_robust_list32_t)) != 0)
+			return (set_errno(EFAULT));
+	}
+#endif
+
+	return (0);
 }
 
 void

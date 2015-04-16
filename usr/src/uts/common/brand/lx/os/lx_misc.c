@@ -153,6 +153,11 @@ lx_exitlwp(klwp_t *lwp)
 	lx_ptrace_exit(p, lwp);
 	mutex_exit(&p->p_lock);
 
+	if (lwpd->br_robust_list != NULL) {
+		lx_futex_robust_exit((uintptr_t)lwpd->br_robust_list,
+		    lwpd->br_pid);
+	}
+
 	if (lwpd->br_clear_ctidp != NULL) {
 		(void) suword32(lwpd->br_clear_ctidp, 0);
 		(void) lx_futex((uintptr_t)lwpd->br_clear_ctidp, FUTEX_WAKE, 1,
