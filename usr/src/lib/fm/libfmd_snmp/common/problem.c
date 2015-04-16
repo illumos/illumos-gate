@@ -536,7 +536,7 @@ sunFmProblemTable_nextpr(netsnmp_handler_registration *reginfo,
 		}
 		table_info->colnum++;
 		DEBUGMSGTL((MODNAME_STR, "nextpr: search for col %u empty "
-		    "uuid\n", table_info->colnum, uuid));
+		    "uuid\n", table_info->colnum));
 
 		if ((data = problem_lookup_uuid_next("")) == NULL) {
 			DEBUGMSGTL((MODNAME_STR, "nextpr: next match not found "
