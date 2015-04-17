@@ -733,10 +733,11 @@ lx_runexe(klwp_t *lwp, void *ucp)
 		struct pcb *pcb = &lwp->lwp_pcb;
 
 		/*
-		 * Preserve the %fsbase value for this LWP, as set and used by
-		 * native illumos code.
+		 * Preserve the %fs/%gsbase value for this LWP, as set and used
+		 * by native illumos code.
 		 */
 		lwpd->br_ntv_fsbase = pcb->pcb_fsbase;
+		lwpd->br_ntv_gsbase = pcb->pcb_gsbase;
 
 		return (getsetcontext(SETCONTEXT, ucp));
 	} else {
@@ -812,6 +813,23 @@ lx_switch_to_native(klwp_t *lwp)
 			kpreempt_disable();
 			if (pcb->pcb_fsbase != lwpd->br_ntv_fsbase) {
 				pcb->pcb_fsbase = lwpd->br_ntv_fsbase;
+
+				/*
+				 * Ensure we go out via update_sregs.
+				 */
+				pcb->pcb_rupdate = 1;
+			}
+			kpreempt_enable();
+		}
+		/*
+		 * ... and the correct %gsbase
+		 */
+		if (lwpd->br_ntv_gsbase != 0) {
+			struct pcb *pcb = &lwp->lwp_pcb;
+
+			kpreempt_disable();
+			if (pcb->pcb_gsbase != lwpd->br_ntv_gsbase) {
+				pcb->pcb_gsbase = lwpd->br_ntv_gsbase;
 
 				/*
 				 * Ensure we go out via update_sregs.
