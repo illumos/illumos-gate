@@ -19,7 +19,7 @@
  * CDDL HEADER END
  *
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
- *
+ * Copyright 2015, Joyent, Inc.
  */
 
 #define	_POSIX_PTHREAD_SEMANTICS 1
@@ -359,6 +359,21 @@ callback_pfexec(pfexec_arg_t *pap)
 	priv_set_t *lset, *iset;
 	size_t mysz = repsz - 2 * setsz;
 	char *path = pap->pfa_path;
+
+	/*
+	 * Initialize the pfexec_reply_t to a sane state.
+	 */
+	res->pfr_vers = pap->pfa_vers;
+	res->pfr_len = 0;
+	res->pfr_ruid = PFEXEC_NOTSET;
+	res->pfr_euid = PFEXEC_NOTSET;
+	res->pfr_rgid = PFEXEC_NOTSET;
+	res->pfr_egid = PFEXEC_NOTSET;
+	res->pfr_setcred = B_FALSE;
+	res->pfr_scrubenv = B_TRUE;
+	res->pfr_allowed = B_FALSE;
+	res->pfr_ioff = 0;
+	res->pfr_loff = 0;
 
 	uuid = pap->pfa_uid;
 
