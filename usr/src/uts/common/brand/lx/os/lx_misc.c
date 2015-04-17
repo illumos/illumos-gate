@@ -96,9 +96,11 @@ lx_exec()
 	 */
 	(void) lx_ptrace_stop_for_option(LX_PTRACE_O_TRACEEXEC, B_FALSE, 0, 0);
 
-	/* clear the fsbase values until the app. can reinitialize them */
+	/* clear the fs/gsbase values until the app. can reinitialize them */
 	lwpd->br_lx_fsbase = NULL;
 	lwpd->br_ntv_fsbase = NULL;
+	lwpd->br_lx_gsbase = NULL;
+	lwpd->br_ntv_gsbase = NULL;
 
 	/*
 	 * Clear the native stack flags.  This will be reinitialised by
@@ -341,9 +343,11 @@ lx_initlwp(klwp_t *lwp, void *lwpbd)
 		bcopy(plwpd->br_tls, lwpd->br_tls, sizeof (lwpd->br_tls));
 		lwpd->br_ppid = plwpd->br_pid;
 		lwpd->br_ptid = curthread->t_tid;
-		/* The child inherits the 2 fsbase values from the parent */
+		/* The child inherits the fs/gsbase values from the parent */
 		lwpd->br_lx_fsbase = plwpd->br_lx_fsbase;
 		lwpd->br_ntv_fsbase = plwpd->br_ntv_fsbase;
+		lwpd->br_lx_gsbase = plwpd->br_lx_gsbase;
+		lwpd->br_ntv_gsbase = plwpd->br_ntv_gsbase;
 	} else {
 		/*
 		 * Oddball case: the parent thread isn't a Linux process.

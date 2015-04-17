@@ -524,6 +524,8 @@ struct lx_lwp_data {
 			/* descriptors used by libc for TLS */
 	ulong_t	br_lx_fsbase;		/* lx fsbase for 64-bit thread ptr */
 	ulong_t	br_ntv_fsbase;		/* native fsbase 64-bit thread ptr */
+	ulong_t	br_lx_gsbase;		/* lx user-land gsbase */
+	ulong_t	br_ntv_gsbase;		/* native user-land gsbase */
 	pid_t	br_pid;			/* converted pid for this thread */
 	pid_t	br_tgid;		/* thread group ID for this thread */
 	pid_t	br_ppid;		/* parent pid for this thread */

@@ -46,7 +46,6 @@ lx_arch_prctl(int code, ulong_t addr)
 	lx_lwp_data_t *llwp = lwptolxlwp(lwp);
 	pcb_t *pcb = &lwp->lwp_pcb;
 
-	/* We currently only support [g|s]et_fs */
 	switch (code) {
 	case LX_ARCH_GET_FS:
 		if (copyout(&llwp->br_lx_fsbase, (void *)addr,
@@ -61,6 +60,28 @@ lx_arch_prctl(int code, ulong_t addr)
 		kpreempt_disable();
 		if (pcb->pcb_fsbase != llwp->br_lx_fsbase) {
 			pcb->pcb_fsbase = llwp->br_lx_fsbase;
+
+			/*
+			 * Ensure we go out via update_sregs.
+			 */
+			pcb->pcb_rupdate = 1;
+		}
+		kpreempt_enable();
+		break;
+
+	case LX_ARCH_GET_GS:
+		if (copyout(&llwp->br_lx_gsbase, (void *)addr,
+		    sizeof (llwp->br_lx_gsbase)) != 0) {
+			return (set_errno(EFAULT));
+		}
+		break;
+
+	case LX_ARCH_SET_GS:
+		llwp->br_lx_gsbase = addr;
+
+		kpreempt_disable();
+		if (pcb->pcb_gsbase != llwp->br_lx_gsbase) {
+			pcb->pcb_gsbase = llwp->br_lx_gsbase;
 
 			/*
 			 * Ensure we go out via update_sregs.

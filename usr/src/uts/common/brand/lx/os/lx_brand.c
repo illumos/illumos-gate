@@ -549,12 +549,15 @@ lx_restorecontext(ucontext_t *ucp)
 
 #if defined(__amd64)
 	/*
-	 * Override the fsbase in the context with the value provided through
-	 * the Linux arch_prctl(2) system call.
+	 * Override the fs/gsbase in the context with the value provided
+	 * through the Linux arch_prctl(2) system call.
 	 */
 	if (flags & LX_UC_STACK_BRAND) {
 		if (lwpd->br_lx_fsbase != 0) {
 			ucp->uc_mcontext.gregs[REG_FSBASE] = lwpd->br_lx_fsbase;
+		}
+		if (lwpd->br_lx_gsbase != 0) {
+			ucp->uc_mcontext.gregs[REG_GSBASE] = lwpd->br_lx_gsbase;
 		}
 	}
 #endif
