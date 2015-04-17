@@ -86,6 +86,8 @@ extern "C" {
 #define	PF_ERR_USER	0x04	/* processor was in user mode */
 				/*	(else supervisor) */
 #define	PF_ERR_EXEC	0x10	/* attempt to execute a No eXec page (AMD) */
+				/* or kernel tried to execute a user page  */
+				/* (Intel SMEP) */
 
 /*
  *  Definitions for fast system call subfunctions
