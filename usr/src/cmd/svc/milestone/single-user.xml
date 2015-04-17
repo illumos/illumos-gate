@@ -3,6 +3,7 @@
 <!--
  Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  Use is subject to license terms.
+ Copyright 2015 OmniTI Computer Consulting, Inc.  All rights reserved.
 
  CDDL HEADER START
 
@@ -24,8 +25,6 @@
 
  CDDL HEADER END
 
-	ident	"%Z%%M%	%I%	%E% SMI"
-
 	NOTE:  This service manifest is not editable; its contents will
 	be overwritten by package or patch operations, including
 	operating system upgrade.  Make customizations in a different
@@ -42,32 +41,6 @@
 	<create_default_instance enabled='true' />
 
 	<single_instance />
-
-	<!--
-	  Single-user's dependency on sysidtool is obsolete, but instead of
-	  removing it from this manifest, retain it here with its delete
-	  attribute set to true. This is to try and prevent a dependency
-	  cycle with the new sysidtool which declares a dependency on
-	  single-user. This will force the deletion of single-user's
-	  sysidtool dependency as soon as this manifest is imported
-	  (instead of waiting for upgrade to delete it).
-
-	  Note that this does not guarantee the prevention of a dependency
-	  cycle (if the new sysidtool manifest is imported before
-	  single-user's) - if this does occur, the code in upgrade will
-	  catch it - it deletes single-user's dependency and "svcadm
-	  clear"s sysidtool.
-	-->
-
-	<dependency
-		name='sysidtool'
-		grouping='require_all'
-		restart_on='none'
-		type='service'
-		delete='true'>
-		<service_fmri value='svc:/system/sysidtool:net' />
-		<service_fmri value='svc:/system/sysidtool:system' />
-	</dependency>
 
 	<dependency
 		name='nodename'
