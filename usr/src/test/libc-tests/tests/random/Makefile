@@ -30,6 +30,7 @@ PROGS = arc4random 		\
 	chacha 			\
 	getentropy 		\
 	getrandom 		\
+	getrandred		\
 	inz_child		\
 	inz_inval		\
 	inz_mlock		\
