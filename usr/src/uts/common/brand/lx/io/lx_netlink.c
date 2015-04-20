@@ -384,20 +384,11 @@ lx_netlink_getsockname(sock_lower_handle_t handle, struct sockaddr *sa,
 {
 	lx_netlink_sock_t *lxsock = (lx_netlink_sock_t *)handle;
 	lx_netlink_sockaddr_t *lxsa = (lx_netlink_sockaddr_t *)sa;
-	proc_t *p = curthread->t_procp;
 
 	if (*len < sizeof (lx_netlink_sockaddr_t))
 		return (EINVAL);
 
-	/*
-	 * Make sure our lies are consistent with the lies told by other liars.
-	 */
-	if (PROC_IS_BRANDED(p) && curthread != p->p_agenttp) {
-		lxsa->lxnl_family = LX_AF_NETLINK;
-	} else {
-		lxsa->lxnl_family = AF_LX_NETLINK;
-	}
-
+	lxsa->lxnl_family = AF_LX_NETLINK;
 	lxsa->lxnl_pad = 0;
 	lxsa->lxnl_port = lxsock->lxns_port;
 	lxsa->lxnl_groups = 0;
