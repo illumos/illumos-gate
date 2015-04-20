@@ -140,21 +140,24 @@ static const int ltos_family[LX_AF_MAX + 1] =  {
 	AF_PACKET, AF_NOTSUPPORTED, AF_NOTSUPPORTED, AF_NOTSUPPORTED,
 	AF_NOTSUPPORTED, AF_NOTSUPPORTED, AF_NOTSUPPORTED, AF_NOTSUPPORTED,
 	AF_NOTSUPPORTED, AF_NOTSUPPORTED, AF_NOTSUPPORTED, AF_NOTSUPPORTED,
-	AF_NOTSUPPORTED, AF_NOTSUPPORTED, AF_NOTSUPPORTED, AF_NOTSUPPORTED
+	AF_NOTSUPPORTED, AF_NOTSUPPORTED, AF_NOTSUPPORTED, AF_NOTSUPPORTED,
+	AF_NOTSUPPORTED
 };
 
 #define	LX_AF_INET6	10
+#define	LX_AF_NETLINK	16
 #define	LX_AF_PACKET	17
 
 static const int stol_family[LX_AF_MAX + 1] =  {
 	AF_UNSPEC, AF_UNIX, AF_INET, AF_NOTSUPPORTED, AF_NOTSUPPORTED,
 	AF_NOTSUPPORTED, AF_NOTSUPPORTED, AF_NOTSUPPORTED, AF_NOTSUPPORTED,
 	AF_NOTSUPPORTED, AF_NOTSUPPORTED, AF_NOTSUPPORTED, AF_NOTSUPPORTED,
-	AF_NOTSUPPORTED, AF_NOTSUPPORTED, AF_NOTSUPPORTED, AF_LX_NETLINK,
+	AF_NOTSUPPORTED, AF_NOTSUPPORTED, AF_NOTSUPPORTED, AF_NOTSUPPORTED,
 	AF_NOTSUPPORTED, AF_NOTSUPPORTED, AF_NOTSUPPORTED, AF_NOTSUPPORTED,
 	AF_NOTSUPPORTED, AF_NOTSUPPORTED, AF_NOTSUPPORTED, AF_NOTSUPPORTED,
 	AF_NOTSUPPORTED, LX_AF_INET6, AF_NOTSUPPORTED, AF_NOTSUPPORTED,
-	AF_NOTSUPPORTED, AF_NOTSUPPORTED, AF_NOTSUPPORTED, LX_AF_PACKET
+	AF_NOTSUPPORTED, AF_NOTSUPPORTED, AF_NOTSUPPORTED, LX_AF_PACKET,
+	LX_AF_NETLINK
 };
 
 #define	LTOS_FAMILY(d) ((d) <= LX_AF_MAX ? ltos_family[(d)] : AF_INVAL)
@@ -616,7 +619,6 @@ struct lx_bpf_program {
 #define	LX_TO_SOL	1
 #define	SOL_TO_LX	2
 
-#define	LX_AF_NETLINK			16
 #define	LX_NETLINK_KOBJECT_UEVENT	15
 #define	LX_NETLINK_ROUTE		0
 
@@ -1069,7 +1071,6 @@ static int
 stol_sockaddr(struct sockaddr *addr, socklen_t *len,
     struct sockaddr *inaddr, socklen_t inlen, socklen_t orig)
 {
-	struct sockaddr_in6 stemp;
 	int size = inlen;
 
 	switch (inaddr->sa_family) {
@@ -1081,17 +1082,12 @@ stol_sockaddr(struct sockaddr *addr, socklen_t *len,
 	case AF_INET6:
 		if (inlen != sizeof (struct sockaddr_in6))
 			return (EINVAL);
-		size = (sizeof (lx_sockaddr_in6_t));
-
-		if (uucopy(inaddr, &stemp, inlen) < 0)
-			return (errno);
 		/*
-		 * AF_INET6 is different between Linux/illumos.
-		 * Perform this translation in a temporary sockaddr.
+		 * The linux sockaddr_in6 is shorter than illumos.
+		 * We just truncate the extra field on the way out
 		 */
-		stemp.sin6_family = STOL_FAMILY(stemp.sin6_family);
-		inaddr = (struct sockaddr *)&stemp;
-		inlen = sizeof (lx_sockaddr_in6_t);
+		size = (sizeof (lx_sockaddr_in6_t));
+		inlen = (sizeof (lx_sockaddr_in6_t));
 		break;
 
 	case AF_UNIX:
@@ -1108,6 +1104,8 @@ stol_sockaddr(struct sockaddr *addr, socklen_t *len,
 	default:
 		break;
 	}
+
+	inaddr->sa_family = STOL_FAMILY(inaddr->sa_family);
 
 	/*
 	 * If inlen is larger than orig, copy out the maximum amount of

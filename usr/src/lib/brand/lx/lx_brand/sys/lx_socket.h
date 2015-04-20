@@ -63,7 +63,7 @@ extern "C" {
 #define	LX_AF_PPPOX		24 /* PPPoX sockets */
 #define	LX_AF_WANPIPE		25 /* Wanpipe API sockets */
 #define	LX_AF_BLUETOOTH		31 /* Bluetooth sockets */
-#define	LX_AF_MAX		32 /* MAX socket type  */
+#define	LX_AF_MAX		33 /* MAX socket type  */
 
 #define	AF_NOTSUPPORTED		-1
 #define	AF_INVAL		-2
