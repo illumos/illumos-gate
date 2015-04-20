@@ -384,7 +384,7 @@ memcntl(caddr_t addr, size_t len, int cmd, caddr_t arg, int attr, int mask)
 		}
 		break;
 	case MC_INHERIT_ZERO:
-		if (arg != 0 || attr != NULL || mask != 0)
+		if (arg != 0 || attr != 0 || mask != 0)
 			return (set_errno(EINVAL));
 		break;
 	default:
