@@ -32,6 +32,8 @@
 #include <inet/ip.h>
 #include <inet/ip_impl.h>
 #include <sys/lx_misc.h>
+#include <sys/ethernet.h>
+#include <sys/dlpi.h>
 
 /*
  * Flags in netlink header
@@ -271,7 +273,8 @@ typedef struct lx_netlink_attr {
 
 typedef struct lx_netlink_ifinfomsg {
 	uint8_t		lxnl_ifi_family;	/* family: AF_UNSPEC */
-	uint8_t		lxnl_ifi_type;		/* device type */
+	uint8_t		lxnl_ifi__pad;
+	uint16_t	lxnl_ifi_type;		/* device type */
 	uint32_t	lxnl_ifi_index;		/* interface index */
 	uint32_t	lxnl_ifi_flags;		/* device flags */
 	uint32_t 	lxnl_ifi_change;	/* unused; must be -1 */
@@ -676,6 +679,10 @@ lx_netlink_getlink_lifreq(lx_netlink_reply_t *reply, struct lifreq *lifr)
 	lx_netlink_ifinfomsg_t ifi;
 	int i;
 	char if_name[IFNAMSIZ];
+	struct sockaddr_dl *sdl;
+	struct sockaddr hwaddr;
+	int hwaddr_size;
+	boolean_t is_loopback;
 
 	struct {
 		int native;
@@ -695,9 +702,26 @@ lx_netlink_getlink_lifreq(lx_netlink_reply_t *reply, struct lifreq *lifr)
 		{ 0 }
 	};
 
+	/*
+	 * Most of the lx_netlink module is architected to emit information in
+	 * an illumos-native manner.  Socket syscalls such as getsockname will
+	 * not translate fields to values Linux programs would expect since
+	 * that conversion is performed by the generic socket emulation.
+	 *
+	 * This is _not_ true of the actual protocol output from lx_netlink.
+	 * Since translating it at the socket layer would be onerous, all
+	 * output (including constants and names) is pre-translated to values
+	 * valid for Linux.
+	 */
+
 	bzero(&ifi, sizeof (ifi));
-	ifi.lxnl_ifi_type = AF_UNSPEC;
+	ifi.lxnl_ifi_family = AF_UNSPEC;
 	ifi.lxnl_ifi_change = (uint32_t)-1;
+
+	/* Convert the name to be Linux-friendly */
+	(void) strlcpy(if_name, lifr->lifr_name, IFNAMSIZ);
+	lx_ifname_convert(if_name, LX_IFNAME_FROMNATIVE);
+	is_loopback = (strncmp(if_name, "lo", 2) == 0);
 
 	if (lx_netlink_reply_ioctl(reply, SIOCGLIFINDEX, lifr) != 0)
 		return;
@@ -712,11 +736,25 @@ lx_netlink_getlink_lifreq(lx_netlink_reply_t *reply, struct lifreq *lifr)
 			ifi.lxnl_ifi_flags |= flags[i].lx;
 	}
 
+	/*
+	 * Query the datalink address.
+	 * The interface type will be included in the outgoing infomsg while
+	 * the address itself will be output separately.
+	 */
+	sdl = (struct sockaddr_dl *)&lifr->lifr_addr;
+	bzero(sdl, sizeof (*sdl));
+	if (!is_loopback) {
+		lx_netlink_reply_ioctl(reply, SIOCGLIFHWADDR, lifr);
+	} else {
+		/* Simulate an empty hwaddr for loopback */
+		sdl->sdl_type = DL_LOOP;
+		sdl->sdl_alen = ETHERADDRL;
+	}
+	lx_stol_hwaddr(sdl, &hwaddr, &hwaddr_size);
+
+	ifi.lxnl_ifi_type = hwaddr.sa_family;
 	lx_netlink_reply_msg(reply, &ifi, sizeof (lx_netlink_ifinfomsg_t));
 
-	/* output a Linux-friendly name */
-	(void) strlcpy(if_name, lifr->lifr_name, IFNAMSIZ);
-	lx_ifname_convert(if_name, LX_IFNAME_FROMNATIVE);
 	lx_netlink_reply_attr_string(reply, LX_NETLINK_IFLA_IFNAME, if_name);
 
 	if (lx_netlink_reply_ioctl(reply, SIOCGLIFMTU, lifr) != 0)
@@ -724,12 +762,14 @@ lx_netlink_getlink_lifreq(lx_netlink_reply_t *reply, struct lifreq *lifr)
 
 	lx_netlink_reply_attr_int32(reply, LX_NETLINK_IFLA_MTU, lifr->lifr_mtu);
 
-	/*
-	 * We don't have a notion of TX queue length (or not an easily
-	 * accessible one, anyway), so we lie.  (Which is to say we lie more
-	 * than we're already lying -- which is saying something.)
-	 */
-	lx_netlink_reply_attr_int32(reply, LX_NETLINK_IFLA_TXQLEN, 1);
+	if (hwaddr_size != 0) {
+		lx_netlink_reply_attr(reply, LX_NETLINK_IFLA_ADDRESS,
+		    hwaddr.sa_data, hwaddr_size);
+	}
+
+	/* Emulate a txqlen of 1. (0 for loopbacks) */
+	lx_netlink_reply_attr_int32(reply, LX_NETLINK_IFLA_TXQLEN,
+	    (is_loopback) ? 0 : 1);
 
 	lx_netlink_reply_send(reply);
 }
