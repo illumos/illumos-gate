@@ -46,7 +46,14 @@ extern boolean_t lx_wait_filter(proc_t *, proc_t *);
 #define	LX_IFNAME_FROMNATIVE	0
 #define	LX_IFNAME_TONATIVE	1
 
+/* Linux ARP protocol hardware identifiers */
+#define	LX_ARPHRD_ETHER		1	/* Ethernet */
+#define	LX_ARPHRD_LOOPBACK	772	/* Loopback */
+#define	LX_ARPHRD_VOID		0xffff	/* Unknown */
+
 extern void lx_ifname_convert(char *, int);
+extern void lx_stol_hwaddr(const struct sockaddr_dl *, struct sockaddr *,
+    int *);
 
 extern boolean_t lx_ptrace_stop(ushort_t);
 extern void lx_stop_notify(proc_t *, klwp_t *, ushort_t, ushort_t);

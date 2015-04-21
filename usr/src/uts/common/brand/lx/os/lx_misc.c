@@ -48,6 +48,8 @@
 #include <sys/proc.h>
 #include <net/if.h>
 #include <sys/sunddi.h>
+#include <sys/dlpi.h>
+#include <sys/sysmacros.h>
 
 /* Linux specific functions and definitions */
 static void lx_save(klwp_t *);
@@ -704,4 +706,24 @@ lx_ifname_convert(char *ifname, int flag)
 		if (strncmp(ifname, "lo0", IFNAMSIZ) == 0)
 			(void) strlcpy(ifname, "lo", IFNAMSIZ);
 	}
+}
+
+void
+lx_stol_hwaddr(const struct sockaddr_dl *src, struct sockaddr *dst, int *size)
+{
+	int copy_size = MIN(src->sdl_alen, sizeof (dst->sa_data));
+
+	switch (src->sdl_type) {
+	case DL_ETHER:
+		dst->sa_family = LX_ARPHRD_ETHER;
+		break;
+	case DL_LOOP:
+		dst->sa_family = LX_ARPHRD_LOOPBACK;
+		break;
+	default:
+		dst->sa_family = LX_ARPHRD_VOID;
+	}
+
+	bcopy(LLADDR(src), dst->sa_data, copy_size);
+	*size = copy_size;
 }

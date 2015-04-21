@@ -42,6 +42,8 @@
 #include <net/if_arp.h>
 #include <sys/ioccom.h>
 #include <sys/dtrace.h>
+#include <sys/ethernet.h>
+#include <sys/dlpi.h>
 
 /*
  * Supported ioctls
@@ -386,11 +388,6 @@ typedef struct lx_ifconf64 {
 	int32_t	if_len;
 	caddr_t if_buf;
 } lx_ifconf64_t;
-
-/* Linux ARP protocol hardware identifiers */
-#define	LX_ARPHRD_ETHER		1	/* Ethernet */
-#define	LX_ARPHRD_LOOPBACK	772	/* Loopback */
-#define	LX_ARPHRD_VOID		0xffff	/* Unknown */
 
 
 /* Generic translators */
@@ -830,6 +827,33 @@ ict_if_ioctl(vnode_t *vn, int cmd, intptr_t arg, int flags, cred_t *cred)
 }
 
 static int
+ict_sioghwaddr(file_t *fp, struct lifreq *lreq)
+{
+	struct sockaddr_dl *sdl = (struct sockaddr_dl *)&lreq->lifr_addr;
+	struct sockaddr hwaddr;
+	int error, size;
+
+	error = ict_if_ioctl(fp->f_vnode, SIOCGLIFHWADDR, (intptr_t)lreq,
+	    FLFAKE(fp), fp->f_cred);
+
+	if (error == EADDRNOTAVAIL &&
+	    strncmp(lreq->lifr_name, "lo", 2) == 0) {
+		/* Emulate success on suspected loopbacks */
+		sdl->sdl_type = DL_LOOP;
+		sdl->sdl_alen = ETHERADDRL;
+		error = 0;
+	}
+
+	if (error == 0) {
+		bzero(&hwaddr, sizeof (hwaddr));
+		lx_stol_hwaddr(sdl, &hwaddr, &size);
+		bcopy(&hwaddr, &lreq->lifr_addr, size);
+	}
+
+	return (error);
+}
+
+static int
 ict_siolifreq(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 {
 	struct ifreq	req;
@@ -890,28 +914,7 @@ ict_siolifreq(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 		    FLFAKE(fp), fp->f_cred);
 		break;
 	case SIOCGIFHWADDR:
-		cmd = SIOCGLIFHWADDR;
-		error = ict_if_ioctl(fp->f_vnode, cmd, (intptr_t)&lreq,
-		    FLFAKE(fp), fp->f_cred);
-		/*
-		 * SIOCGIFHWADDR on Linux sets sa_family to ARPHRD_ETHER (1) on
-		 * ethernet and ARPHRD_LOOPBACK (772) on loopback.
-		 */
-		if (error == EADDRNOTAVAIL &&
-		    strncmp(lreq.lifr_name, "lo", 2) == 0) {
-			/* Emulate success on suspected loopbacks */
-			lreq.lifr_addr.ss_family = 772;
-			error = 0;
-		} else if (error == 0) {
-			/* convert illumos sockaddr to Linux */
-			struct sockaddr_dl *src =
-			    (struct sockaddr_dl *)&lreq.lifr_addr;
-			caddr_t dst = (caddr_t)&lreq.lifr_addr +
-			    sizeof (lreq.lifr_addr.ss_family);
-			bcopy(LLADDR(src), dst, src->sdl_alen);
-			/* Default to Ethernet type for all successes */
-			lreq.lifr_addr.ss_family = 1;
-		}
+		error = ict_sioghwaddr(fp, &lreq);
 		break;
 	case LX_SIOCGIFTXQLEN:
 		/*
