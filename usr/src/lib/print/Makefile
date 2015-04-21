@@ -23,8 +23,8 @@
 # Copyright 2012 OmniTI Computer Consulting, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
+
+include $(SRC)/Makefile.master
 
 SUBDIRS = \
 	libprint \
@@ -42,8 +42,6 @@ clobber :=              TARGET = clobber
 install :=              TARGET = install
 install_h :=              TARGET = install_h
 lint :=                 TARGET = lint
-
-include $(SRC)/Makefile.master
 
 TEXT_DOMAIN=	SUNW_OST_OSLIB
 POFILE= print-lib.po
@@ -91,4 +89,3 @@ libipp-core:		libpapi-common
 libpapi-ipp:		libpapi-common libipp-core libhttp-core
 libipp-listener:	libpapi-dynamic libipp-core
 mod_ipp:		libipp-listener
-

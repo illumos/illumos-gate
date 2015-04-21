@@ -96,6 +96,13 @@ __SUNC=			$(POUND_SIGN)
 $(__SUNC)__GNUC=	$(POUND_SIGN)
 __GNUC64=		$(__GNUC)
 
+# Allow build-time "configuration" to enable or disable some things.
+# The default is POUND_SIGN, meaning "not enabled". If the environment
+# passes in an override like ENABLE_SMB_PRINTING= (empty) that will
+# uncomment things in the lower Makefiles to enable the feature.
+ENABLE_IPP_PRINTING=	$(POUND_SIGN)
+ENABLE_SMB_PRINTING=	$(POUND_SIGN)
+
 # CLOSED is the root of the tree that contains source which isn't released
 # as open source
 CLOSED=		$(SRC)/../closed
