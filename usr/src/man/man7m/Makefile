@@ -12,6 +12,7 @@
 #
 # Copyright 2011, Richard Lowe
 # Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2015 Joyent, Inc.
 #
 
 include		$(SRC)/Makefile.master
@@ -20,6 +21,7 @@ MANSECT= 	7m
 
 _MANFILES = 	bufmod.7m	\
 		connld.7m	\
+		datafilt.7m	\
 		ldterm.7m	\
 		pckt.7m		\
 		pfmod.7m	\

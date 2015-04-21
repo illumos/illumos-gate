@@ -727,6 +727,7 @@ SOCKET_KMODS	+= socksctp
 SOCKET_KMODS    += socksdp
 SOCKET_KMODS	+= sockrds
 SOCKET_KMODS	+= ksslf
+SOCKET_KMODS	+= datafilt
 
 #
 #	kiconv modules (/kernel/kiconv):

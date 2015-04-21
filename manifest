@@ -1057,6 +1057,7 @@ f kernel/sched/amd64/TS 0755 root sys
 f kernel/sched/amd64/TS_DPTBL 0755 root sys
 d kernel/socketmod 0755 root sys
 d kernel/socketmod/amd64 0755 root sys
+f kernel/socketmod/amd64/datafilt 0755 root sys
 h kernel/socketmod/amd64/icmp=kernel/drv/amd64/icmp
 f kernel/socketmod/amd64/ksslf 0755 root sys
 f kernel/socketmod/amd64/lx_netlink 0755 root sys
@@ -18543,6 +18544,7 @@ f usr/share/man/man7ipp/tswtclmt.7ipp 0444 root bin
 d usr/share/man/man7m 0755 root bin
 f usr/share/man/man7m/bufmod.7m 0444 root bin
 f usr/share/man/man7m/connld.7m 0444 root bin
+f usr/share/man/man7m/datafilt.7m 0444 root bin
 f usr/share/man/man7m/ldterm.7m 0444 root bin
 f usr/share/man/man7m/pckt.7m 0444 root bin
 f usr/share/man/man7m/pfmod.7m 0444 root bin

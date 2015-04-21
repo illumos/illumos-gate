@@ -20,6 +20,7 @@
 #
 
 # Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2012, Nexenta Systems, Inc. All rights reserved.
 # Copyright (c) 2013 Andrew Stormont.  All rights reserved.
 # Copyright (c) 2015, Joyent, Inc. All rights reserved.
 
@@ -491,6 +492,7 @@ SOCKET_KMODS	+= socksctp
 SOCKET_KMODS	+= socksdp
 SOCKET_KMODS	+= sockrds
 SOCKET_KMODS	+= ksslf
+SOCKET_KMODS	+= datafilt
 
 #
 #	kiconv modules (/kernel/kiconv):

@@ -589,6 +589,8 @@ IPSECESP_OBJS += ipsecespddi.o ipsecesp.o
 
 IPSECAH_OBJS +=	ipsecahddi.o ipsecah.o sadb.o
 
+DATAFILT_OBJS += datafilt.o
+
 SPPP_OBJS +=	sppp.o sppp_dlpi.o sppp_mod.o s_common.o
 
 SPPPTUN_OBJS +=	sppptun.o sppptun_mod.o
