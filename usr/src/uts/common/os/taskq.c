@@ -1782,13 +1782,7 @@ taskq_d_thread(taskq_ent_t *tqe)
 			mutex_exit(&tq->tq_lock);
 			CALLB_CPR_EXIT(&cprinfo);
 			kmem_cache_free(taskq_ent_cache, tqe);
-
-			if (curthread->t_lwp != NULL) {
-				mutex_enter(&curproc->p_lock);
-				lwp_exit();
-			} else {
-				thread_exit();
-			}
+			thread_exit();
 		}
 	}
 }
@@ -2148,7 +2142,6 @@ taskq_destroy(taskq_t *tq)
 static void
 taskq_bucket_extend(void *arg)
 {
-	kthread_t *th;
 	taskq_ent_t *tqe;
 	taskq_bucket_t *b = (taskq_bucket_t *)arg;
 	taskq_t *tq = b->tqbucket_taskq;
@@ -2189,14 +2182,8 @@ taskq_bucket_extend(void *arg)
 	 * Create a thread in a TS_STOPPED state first. If it is successfully
 	 * created, place the entry on the free list and start the thread.
 	 */
-	if (tq->tq_proc != &p0) {
-		th = lwp_kernel_create(tq->tq_proc, taskq_d_thread, tqe,
-		    TS_STOPPED, tq->tq_pri);
-	} else {
-		th = thread_create(NULL, 0, taskq_d_thread, tqe,
-		    0, &p0, TS_STOPPED, tq->tq_pri);
-	}
-	tqe->tqent_thread = th;
+	tqe->tqent_thread = thread_create(NULL, 0, taskq_d_thread, tqe,
+	    0, &p0, TS_STOPPED, tq->tq_pri);
 
 	/*
 	 * Once the entry is ready, link it to the the bucket free list.
