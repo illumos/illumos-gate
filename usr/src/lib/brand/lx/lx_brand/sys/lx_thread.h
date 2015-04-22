@@ -59,6 +59,8 @@ typedef struct lx_tsd {
 	lx_stack_t	lxtsd_sigaltstack;
 
 	void		*lxtsd_clone_state;
+
+	lx_sigbackup_t	*lxtsd_sigbackup;
 } lx_tsd_t;
 
 extern thread_key_t	lx_tsd_key;
