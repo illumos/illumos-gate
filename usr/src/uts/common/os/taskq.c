@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -1435,12 +1435,19 @@ taskq_thread_create(taskq_t *tq)
 	tq->tq_active++;
 	mutex_exit(&tq->tq_lock);
 
-	if (tq->tq_proc != &p0) {
+	/*
+	 * With TASKQ_DUTY_CYCLE the new thread must have an LWP
+	 * as explained in ../disp/sysdc.c (for the msacct data).
+	 * Otherwise simple kthreads are preferred.
+	 */
+	if ((tq->tq_flags & TASKQ_DUTY_CYCLE) != 0) {
+		/* Enforced in taskq_create_common */
+		ASSERT3P(tq->tq_proc, !=, &p0);
 		t = lwp_kernel_create(tq->tq_proc, taskq_thread, tq, TS_RUN,
 		    tq->tq_pri);
 	} else {
-		t = thread_create(NULL, 0, taskq_thread, tq, 0, &p0, TS_RUN,
-		    tq->tq_pri);
+		t = thread_create(NULL, 0, taskq_thread, tq, 0, tq->tq_proc,
+		    TS_RUN, tq->tq_pri);
 	}
 
 	if (!first) {
@@ -1867,7 +1874,10 @@ taskq_create_common(const char *name, int instance, int nthreads, pri_t pri,
 	IMPLY((flags & TASKQ_DYNAMIC), !(flags & TASKQ_THREADS_CPU_PCT));
 	IMPLY((flags & TASKQ_CPR_SAFE), !(flags & TASKQ_THREADS_CPU_PCT));
 
-	/* Cannot have DUTY_CYCLE without a non-p0 kernel process */
+	/* Cannot have DYNAMIC with DUTY_CYCLE */
+	IMPLY((flags & TASKQ_DYNAMIC), !(flags & TASKQ_DUTY_CYCLE));
+
+	/* Cannot have DUTY_CYCLE with a p0 kernel process */
 	IMPLY((flags & TASKQ_DUTY_CYCLE), proc != &p0);
 
 	/* Cannot have DC_BATCH without DUTY_CYCLE */
@@ -1943,6 +1953,14 @@ taskq_create_common(const char *name, int instance, int nthreads, pri_t pri,
 		while (minalloc-- > 0)
 			taskq_ent_free(tq, taskq_ent_alloc(tq, TQ_SLEEP));
 	}
+
+	/*
+	 * Before we start creating threads for this taskq, take a
+	 * zone hold so the zone can't go away before taskq_destroy
+	 * makes sure all the taskq threads are gone.  This hold is
+	 * similar in purpose to those taken by zthread_create().
+	 */
+	zone_hold(tq->tq_proc->p_zone);
 
 	/*
 	 * Create the first thread, which will create any other threads
@@ -2122,6 +2140,12 @@ taskq_destroy(taskq_t *tq)
 		ASSERT(!(tq->tq_flags & TASKQ_DYNAMIC));
 	}
 
+	/*
+	 * Now that all the taskq threads are gone, we can
+	 * drop the zone hold taken in taskq_create_common
+	 */
+	zone_rele(tq->tq_proc->p_zone);
+
 	tq->tq_threads_ncpus_pct = 0;
 	tq->tq_totaltime = 0;
 	tq->tq_tasks = 0;
@@ -2183,7 +2207,7 @@ taskq_bucket_extend(void *arg)
 	 * created, place the entry on the free list and start the thread.
 	 */
 	tqe->tqent_thread = thread_create(NULL, 0, taskq_d_thread, tqe,
-	    0, &p0, TS_STOPPED, tq->tq_pri);
+	    0, tq->tq_proc, TS_STOPPED, tq->tq_pri);
 
 	/*
 	 * Once the entry is ready, link it to the the bucket free list.
