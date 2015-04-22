@@ -244,12 +244,25 @@ extern int pselect_large_fdset(int nfds, fd_set *in0, fd_set *out0, fd_set *ex0,
  * handler.  The lx_sigdeliver() function is then able to return to the
  * native libc signal handler in the usual way.  This results in a further
  * setcontext() back to whatever was running when we took the signal.
+ *
+ * There are some edge cases where the "return" context cannot be located
+ * by inspection of the Linux stack; e.g. if the guard value has been
+ * corrupted, or the emulated program has relocated parts of the signal
+ * delivery stack frame.  If this case is detected, a fallback mechanism is
+ * used to attempt to find the return context.  A chain of "lx_sigbackup_t"
+ * objects is maintained in signal interposer call frames, with the current
+ * head stored in the thread-specific "lx_tsd_t".  This mechanism is
+ * similar in principle to the "lwp_oldcontext" member of the "klwp_t" used
+ * by the native signal handling infrastructure.  This backup chain is used
+ * by the sigreturn(2) family of emulated system calls in the event that
+ * the Linux stack did not correctly reference a return context.
  */
 
 typedef struct lx_sigdeliver_frame {
 	uintptr_t lxsdf_magic;
 	ucontext_t *lxsdf_retucp;
 	ucontext_t *lxsdf_sigucp;
+	lx_sigbackup_t *lxsdf_sigbackup;
 } lx_sigdeliver_frame_t;
 
 struct lx_oldsigstack {
@@ -881,6 +894,82 @@ lx_rt_sigtimedwait(uintptr_t set, uintptr_t sinfo, uintptr_t toutp,
 	    ? -errno : stol_signo[rc]);
 }
 
+static void
+lx_sigreturn_find_native_context(const char *caller, ucontext_t **sigucp,
+    ucontext_t **retucp, uintptr_t sp)
+{
+	lx_tsd_t *lxtsd = lx_get_tsd();
+	lx_sigdeliver_frame_t *lxsdfp = (lx_sigdeliver_frame_t *)sp;
+	lx_sigdeliver_frame_t lxsdf;
+	boolean_t copy_ok;
+
+	lx_debug("%s: reading lx_sigdeliver_frame_t @ %p\n", caller, lxsdfp);
+	if (uucopy(lxsdfp, &lxsdf, sizeof (lxsdf)) != 0) {
+		lx_debug("%s: failed to read lx_sigdeliver_frame_t @ %p\n",
+		    lxsdfp);
+
+		copy_ok = B_FALSE;
+	} else {
+		lx_debug("%s: lxsdf: magic %p retucp %p sigucp %p\n", caller,
+		    lxsdf.lxsdf_magic, lxsdf.lxsdf_retucp, lxsdf.lxsdf_sigucp);
+
+		copy_ok = B_TRUE;
+	}
+
+	/*
+	 * lx_sigdeliver() pushes a lx_sigdeliver_frame_t onto the stack
+	 * before it creates the struct lx_oldsigstack.
+	 */
+	if (copy_ok && lxsdf.lxsdf_magic == LX_SIGRT_MAGIC) {
+		LX_SIGNAL_DELIVERY_FRAME_FOUND(lxsdfp);
+
+		/*
+		 * The guard value is intact; use the context pointers stored
+		 * in the signal delivery frame:
+		 */
+		*sigucp = lxsdf.lxsdf_sigucp;
+		*retucp = lxsdf.lxsdf_retucp;
+
+		/*
+		 * Ensure that the backup signal delivery chain is in sync with
+		 * the frame we are returning via:
+		 */
+		lxtsd->lxtsd_sigbackup = lxsdf.lxsdf_sigbackup;
+	} else {
+		/*
+		 * The guard value was not intact.  Either the program smashed
+		 * the stack unintentionally, or worse: intentionally moved
+		 * some parts of the signal delivery frame we constructed to
+		 * another location before calling rt_sigreturn(2).
+		 */
+		LX_SIGNAL_DELIVERY_FRAME_CORRUPT(lxsdfp);
+
+		if (lxtsd->lxtsd_sigbackup == NULL) {
+			/*
+			 * There was no backup context to use, so we must
+			 * kill the process.
+			 */
+			if (copy_ok) {
+				lx_err_fatal("%s: sp 0x%p, expected 0x%x, "
+				    "found 0x%x!", caller, sp, LX_SIGRT_MAGIC,
+				    lxsdf.lxsdf_magic);
+			} else {
+				lx_err_fatal("%s: sp 0x%p, could not read "
+				    "magic", caller, sp);
+			}
+		}
+
+		/*
+		 * Attempt to recover by using the backup signal delivery
+		 * chain:
+		 */
+		lx_debug("%s: SIGRT_MAGIC not found @ sp %p; using backup "
+		    "@ %p\n", caller, (void *)sp, lxtsd->lxtsd_sigbackup);
+		*sigucp = lxtsd->lxtsd_sigbackup->lxsb_sigucp;
+		*retucp = lxtsd->lxtsd_sigbackup->lxsb_retucp;
+	}
+}
+
 #if defined(_ILP32)
 /*
  * Intercept the Linux sigreturn() syscall to turn it into the return through
@@ -895,11 +984,11 @@ lx_rt_sigtimedwait(uintptr_t set, uintptr_t sinfo, uintptr_t toutp,
 long
 lx_sigreturn(void)
 {
-	lx_sigdeliver_frame_t *lxsdf;
 	struct lx_oldsigstack *lx_ossp;
 	lx_sigset_t lx_sigset;
 	ucontext_t *ucp;
 	ucontext_t *sigucp;
+	ucontext_t *retucp;
 	uintptr_t sp;
 
 	ucp = lx_syscall_regs();
@@ -920,34 +1009,12 @@ lx_sigreturn(void)
 	lx_ossp = (struct lx_oldsigstack *)sp;
 	sp += SA(sizeof (struct lx_oldsigstack));
 
-
-	/*
-	 * lx_sigdeliver() pushes a lx_sigdeliver_frame_t onto the stack
-	 * before it creates the struct lx_oldsigstack.
-	 *
-	 * If we do not find it here, the stack has been corrupted and we
-	 * need to kill ourselves.
-	 */
-	lxsdf = (lx_sigdeliver_frame_t *)sp;
-	lx_debug("lx_sigreturn: reading lx_sigdeliver_frame_t @ %p\n",
-	    lxsdf);
-	lx_debug("lx_sigreturn: lxsdf: magic %p retucp %p sigucp %p\n",
-	    lxsdf->lxsdf_magic, lxsdf->lxsdf_retucp, lxsdf->lxsdf_sigucp);
-	if (lxsdf->lxsdf_magic != LX_SIGRT_MAGIC) {
-		LX_SIGNAL_DELIVERY_FRAME_CORRUPT(lxsdf);
-		lx_err_fatal("sp @ 0x%p, expected 0x%x, found 0x%x!",
-		    sp, LX_SIGRT_MAGIC, lxsdf->lxsdf_magic);
-	}
-
-	LX_SIGNAL_DELIVERY_FRAME_FOUND(lxsdf);
+	lx_sigreturn_find_native_context(__func__, &sigucp, &retucp, sp);
 
 	/*
 	 * We need to copy machine registers the Linux signal handler may have
 	 * modified back to the Illumos ucontext_t.
-	 */
-	sigucp = lxsdf->lxsdf_sigucp;
-
-	/*
+	 *
 	 * General registers copy across as-is, except Linux expects that
 	 * changes made to uc_mcontext.gregs[ESP] will be reflected when the
 	 * interrupted thread resumes execution after the signal handler. To
@@ -977,9 +1044,8 @@ lx_sigreturn(void)
 	 * interrupted execution as the original Linux code would do.
 	 */
 	lx_debug("lx_sigreturn: calling setcontext; retucp %p flags %lx "
-	    "link %p\n", lxsdf->lxsdf_retucp, lxsdf->lxsdf_retucp->uc_flags,
-	    lxsdf->lxsdf_retucp->uc_link);
-	setcontext(lxsdf->lxsdf_retucp);
+	    "link %p\n", retucp, retucp->uc_flags, retucp->uc_link);
+	setcontext(retucp);
 	assert(0);
 
 	/*NOTREACHED*/
@@ -993,11 +1059,13 @@ lx_sigreturn(void)
 long
 lx_rt_sigreturn(void)
 {
+	lx_tsd_t *lxtsd = lx_get_tsd();
 	lx_sigdeliver_frame_t *lxsdf;
 	struct lx_sigstack *lx_ssp;
 	lx_ucontext_t *lx_ucp;
 	ucontext_t *ucp;
 	ucontext_t *sigucp;
+	ucontext_t *retucp;
 	uintptr_t sp;
 
 	/* Get the registers at the emulated Linux rt_sigreturn syscall */
@@ -1058,23 +1126,7 @@ lx_rt_sigreturn(void)
 	sp += 8;
 #endif
 
-	/*
-	 * lx_sigdeliver() pushes a lx_sigdeliver_frame_t onto the stack
-	 * before it creates the struct lx_oldsigstack.
-	 *
-	 * If we do not find it here, the stack has been corrupted and we
-	 * need to kill ourselves.
-	 */
-	lxsdf = (lx_sigdeliver_frame_t *)sp;
-	if (lxsdf->lxsdf_magic != LX_SIGRT_MAGIC) {
-		LX_SIGNAL_DELIVERY_FRAME_CORRUPT(lxsdf);
-		lx_err_fatal("sp @ 0x%p, expected 0x%x, found 0x%x!",
-		    sp, LX_SIGRT_MAGIC, lxsdf->lxsdf_magic);
-	}
-
-	LX_SIGNAL_DELIVERY_FRAME_FOUND(lxsdf);
-
-	sigucp = lxsdf->lxsdf_sigucp;
+	lx_sigreturn_find_native_context(__func__, &sigucp, &retucp, sp);
 
 	/*
 	 * We need to copy machine registers the Linux signal handler may have
@@ -1151,9 +1203,8 @@ lx_rt_sigreturn(void)
 	 * rather than directly set the context back to the place the signal
 	 * interrupted execution as the original Linux code would do.
 	 */
-	lx_debug("lx_rt_sigreturn: calling setcontext; retucp %p\n",
-	    lxsdf->lxsdf_retucp);
-	setcontext(lxsdf->lxsdf_retucp);
+	lx_debug("lx_rt_sigreturn: calling setcontext; retucp %p\n", retucp);
+	setcontext(retucp);
 	assert(0);
 
 	/*NOTREACHED*/
@@ -1495,6 +1546,7 @@ lx_sigdeliver(int lx_sig, siginfo_t *sip, ucontext_t *ucp, size_t stacksz,
     void (*stack_builder)(), void (*user_handler)(),
     struct lx_sigaction *lxsap)
 {
+	lx_sigbackup_t sigbackup;
 	ucontext_t uc;
 	lx_tsd_t *lxtsd = lx_get_tsd();
 	int totsz = 0;
@@ -1652,6 +1704,7 @@ lx_sigdeliver(int lx_sig, siginfo_t *sip, ucontext_t *ucp, size_t stacksz,
 		frm.lxsdf_magic = LX_SIGRT_MAGIC;
 		frm.lxsdf_retucp = &uc;
 		frm.lxsdf_sigucp = ucp;
+		frm.lxsdf_sigbackup = &sigbackup;
 
 		lx_debug("lx_sigdeliver: retucp %p sigucp %p\n",
 		    frm.lxsdf_retucp, frm.lxsdf_sigucp);
@@ -1666,6 +1719,26 @@ lx_sigdeliver(int lx_sig, siginfo_t *sip, ucontext_t *ucp, size_t stacksz,
 		}
 
 		LX_SIGNAL_DELIVERY_FRAME_CREATE((void *)lxfp);
+
+		/*
+		 * Populate a backup copy of signal linkage to use in case
+		 * the Linux program completely destroys (or relocates) the
+		 * delivery frame.
+		 *
+		 * This is necessary for programs that have flown so far off
+		 * the architectural rails that they believe it is
+		 * acceptable to make assumptions about the precise size and
+		 * layout of the signal handling frame assembled by the
+		 * kernel.
+		 */
+		sigbackup.lxsb_retucp = frm.lxsdf_retucp;
+		sigbackup.lxsb_sigucp = frm.lxsdf_sigucp;
+		sigbackup.lxsb_sigdeliver_frame = lxfp;
+		sigbackup.lxsb_previous = lxtsd->lxtsd_sigbackup;
+		lxtsd->lxtsd_sigbackup = &sigbackup;
+
+		lx_debug("lx_sigdeliver: installed sigbackup %p; prev %p\n",
+		    &sigbackup, sigbackup.lxsb_previous);
 	}
 
 	/*
@@ -1755,6 +1828,17 @@ after_signal_handler:
 		LX_SIGNAL_ALTSTACK_DISABLE();
 		lx_debug("lx_sigdeliver: disabling ALTSTACK sp %p\n", lxfp);
 		lxtsd->lxtsd_sigaltstack.ss_flags &= ~LX_SS_ONSTACK;
+	}
+	/*
+	 * Restore backup signal tracking chain pointer to previous value:
+	 */
+	if (lxtsd->lxtsd_sigbackup != NULL) {
+		lx_sigbackup_t *bprev = lxtsd->lxtsd_sigbackup->lxsb_previous;
+
+		lx_debug("lx_sigdeliver: restoring sigbackup %p to %p\n",
+		    lxtsd->lxtsd_sigbackup, bprev);
+
+		lxtsd->lxtsd_sigbackup = bprev;
 	}
 	_sigon();
 

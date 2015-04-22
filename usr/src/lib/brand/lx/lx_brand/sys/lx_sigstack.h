@@ -1,9 +1,9 @@
 /*
-* This file and its contents are supplied under the terms of the
+ * This file and its contents are supplied under the terms of the
  * Common Development and Distribution License ("CDDL"), version 1.0.
- * You may only use this file in accordance with the terms of version 
+ * You may only use this file in accordance with the terms of version
  * 1.0 of the CDDL.
- *       
+ *
  * A full copy of the text of the CDDL should have accompanied this
  * source.  A copy of the CDDL is also available via the Internet at
  * http://www.illumos.org/license/CDDL.
@@ -11,7 +11,7 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2014 Joyent, Inc.  All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  */
 
 #ifndef _SYS_LX_SIGSTACK_H
@@ -44,12 +44,17 @@ extern "C" {
  *	 aligned in size (4 bytes) so the stack remains word aligned per the
  *	 i386 ABI, or, for 64-bit code they must be 16 byte aligned as per the
  *	 AMD64 ABI.
+ *
+ *	 The precise layout of these stack frames is also potentially
+ *	 depended on by particularly esoteric (or broken) software, and
+ *	 should be preserved.  The Linux structures (rt_sigframe, et al)
+ *	 are defined in "arch/x86/include/asm/sigframe.h".
  */
 #if defined(_LP64)
 typedef struct lx_sigstack {
 	void (*retaddr)();	/* address of real lx_rt_sigreturn code */
-	lx_siginfo_t si;	/* saved signal information */
 	lx_ucontext_t uc;	/* saved user context */
+	lx_siginfo_t si;	/* saved signal information */
 	lx_fpstate_t fpstate;	/* saved FP state */
 	char pad[2];		/* stack alignment */
 } lx_sigstack_t;

@@ -284,6 +284,14 @@ typedef struct lx_ucontext {
 	lx_sigset_t uc_sigmask;
 } lx_ucontext_t;
 
+typedef struct lx_sigbackup lx_sigbackup_t;
+struct lx_sigbackup {
+	ucontext_t *lxsb_retucp;
+	ucontext_t *lxsb_sigucp;
+	uintptr_t lxsb_sigdeliver_frame;
+	lx_sigbackup_t *lxsb_previous;
+};
+
 extern const int ltos_signo[];
 extern const int stol_signo[];
 
