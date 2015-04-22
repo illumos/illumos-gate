@@ -264,6 +264,13 @@
  * subflows before attempting a link property change.
  * Some of the above rules can be overridden by specifying additional command
  * line options while creating or modifying link or subflow properties.
+ *
+ * Datapath
+ * --------
+ *
+ * For information on the datapath, the world of soft rings, hardware rings, how
+ * it is structured, and the path of an mblk_t between a driver and a mac
+ * client, see mac_sched.c.
  */
 
 #include <sys/types.h>
