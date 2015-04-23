@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  */
 
 #ifndef	_SYS_SOCKFILTER_H
@@ -128,6 +129,15 @@ typedef struct sof_ops {
 } sof_ops_t;
 
 #define	SOF_VERSION	1
+
+/*
+ * Flag indicating that the filter module is safe to attach after bind,
+ * getsockname, getsockopt or setsockopt calls. By default filters are unsafe
+ * so may not be attached after any socket operation. However, a safe filter
+ * can still be attached after one of the above calls. This makes attaching
+ * the filter less dependent on the initial socket setup order.
+ */
+#define	SOF_ATT_SAFE	0x1
 
 extern int	sof_register(int, const char *, const sof_ops_t *, int);
 extern int	sof_unregister(const char *);

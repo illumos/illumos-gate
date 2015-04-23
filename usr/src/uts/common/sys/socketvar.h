@@ -300,15 +300,16 @@ struct sonode {
 #define	SS_OOBPEND		0x00002000 /* OOB pending or present - poll */
 #define	SS_HAVEOOBDATA		0x00004000 /* OOB data present */
 #define	SS_HADOOBDATA		0x00008000 /* OOB data consumed */
-#define	SS_CLOSING		0x00010000 /* in process of closing */
 
+#define	SS_CLOSING		0x00010000 /* in process of closing */
 #define	SS_FIL_DEFER		0x00020000 /* filter deferred notification */
 #define	SS_FILOP_OK		0x00040000 /* socket can attach filters */
 #define	SS_FIL_RCV_FLOWCTRL	0x00080000 /* filter asserted rcv flow ctrl */
+
 #define	SS_FIL_SND_FLOWCTRL	0x00100000 /* filter asserted snd flow ctrl */
 #define	SS_FIL_STOP		0x00200000 /* no more filter actions */
-
 #define	SS_SODIRECT		0x00400000 /* transport supports sodirect */
+#define	SS_FILOP_UNSF		0x00800000 /* block attaching unsafe filters */
 
 #define	SS_SENTLASTREADSIG	0x01000000 /* last rx signal has been sent */
 #define	SS_SENTLASTWRITESIG	0x02000000 /* last tx signal has been sent */
@@ -324,7 +325,8 @@ struct sonode {
 
 /*
  * Sockets that can fall back to TPI must ensure that fall back is not
- * initiated while a thread is using a socket.
+ * initiated while a thread is using a socket. Otherwise this disables all
+ * future filter attachment.
  */
 #define	SO_BLOCK_FALLBACK(so, fn)				\
 	ASSERT(MUTEX_NOT_HELD(&(so)->so_lock));			\
@@ -338,6 +340,24 @@ struct sonode {
 			(so)->so_state &= ~SS_FILOP_OK;		\
 			mutex_exit(&(so)->so_lock);		\
 		}						\
+	}
+
+/*
+ * Sockets that can fall back to TPI must ensure that fall back is not
+ * initiated while a thread is using a socket. Otherwise this disables all
+ * future unsafe filter attachment. Safe filters can still attach after
+ * we execute the function in which this macro is used.
+ */
+#define	SO_BLOCK_FALLBACK_SAFE(so, fn)				\
+	ASSERT(MUTEX_NOT_HELD(&(so)->so_lock));			\
+	rw_enter(&(so)->so_fallback_rwlock, RW_READER);		\
+	if ((so)->so_state & SS_FALLBACK_COMP) {		\
+		rw_exit(&(so)->so_fallback_rwlock);		\
+		return (fn);					\
+	} else if (((so)->so_state & SS_FILOP_UNSF) == 0) {	\
+		mutex_enter(&(so)->so_lock);			\
+		(so)->so_state |= SS_FILOP_UNSF;		\
+		mutex_exit(&(so)->so_lock);			\
 	}
 
 #define	SO_UNBLOCK_FALLBACK(so)	{			\

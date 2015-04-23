@@ -84,7 +84,12 @@ _init(void)
 {
 	int err;
 
-	err = sof_register(SOF_VERSION, DATAFILT_MODULE, &dataf_ops, 0);
+	/*
+	 * This module is safe to attach even after some preliminary socket
+	 * setup calls have taken place. See the comment for SOF_ATT_SAFE.
+	 */
+	err = sof_register(SOF_VERSION, DATAFILT_MODULE, &dataf_ops,
+	    SOF_ATT_SAFE);
 	if (err != 0)
 		return (err);
 	if ((err = mod_install(&dataf_modlinkage)) != 0)

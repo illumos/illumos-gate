@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  */
 
 #include <sys/systm.h>
@@ -246,6 +247,18 @@ sof_setsockopt_impl(struct sonode *so, int option_name,
 
 		/* Module loaded OK, so there must be an ops vector */
 		ASSERT(ent->sofe_mod != NULL);
+
+		/*
+		 * Check again to confirm ATTACH is ok. See if the the module
+		 * is not SOF_ATT_SAFE after an unsafe operation has taken
+		 * place.
+		 */
+		if ((ent->sofe_mod->sofm_flags & SOF_ATT_SAFE) == 0 &&
+		    so->so_state & SS_FILOP_UNSF) {
+			sof_instance_destroy(inst);
+			return (EINVAL);
+		}
+
 		inst->sofi_ops = &ent->sofe_mod->sofm_ops;
 
 		SOF_STAT_ADD(inst, tot_active_attach, 1);
@@ -1444,7 +1457,13 @@ sof_filter_ioctl(struct sonode *so, int cmd, intptr_t arg, int mode,
  * sof_register(version, name, ops, flags)
  *
  * Register a socket filter identified by name `name' and which should use
- * the ops vector `ops' for event notification. `flags' should be set to 0.
+ * the ops vector `ops' for event notification. `flags' should be set to 0
+ * by default for "unsafe" modules or SOF_ATT_SAFE for "safe" modules. An
+ * unsafe filter is one that cannot be attached after any socket operation has
+ * occured. This is the legacy default. A "safe" filter can be attached even
+ * after some basic initial socket operations have taken place. This set is
+ * currently bind, getsockname, getsockopt and setsockopt. The order in which
+ * a "safe" filter can be attached is more relaxed, and thus more flexible.
  * On success 0 is returned, otherwise an errno is returned.
  */
 int
@@ -1452,14 +1471,13 @@ sof_register(int version, const char *name, const sof_ops_t *ops, int flags)
 {
 	sof_module_t *mod;
 
-	_NOTE(ARGUNUSED(flags));
-
 	if (version != SOF_VERSION)
 		return (EINVAL);
 
 	mod = kmem_zalloc(sizeof (sof_module_t), KM_SLEEP);
 	mod->sofm_name = kmem_alloc(strlen(name) + 1, KM_SLEEP);
 	(void) strcpy(mod->sofm_name, name);
+	mod->sofm_flags = flags;
 	mod->sofm_ops = *ops;
 
 	mutex_enter(&sof_module_lock);
