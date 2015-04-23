@@ -19,12 +19,15 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ */
+
 /*
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This file was initially generated using rpcgen.  The rpcgen-erated
@@ -73,8 +76,8 @@ xdr_bitmap4(register XDR *xdrs, bitmap4 *objp)
 {
 
 	if (!xdr_array(xdrs, (char **)&objp->bitmap4_val,
-			(uint_t *)&objp->bitmap4_len, ~0,
-			sizeof (uint32_t), (xdrproc_t)xdr_uint32_t))
+	    (uint_t *)&objp->bitmap4_len, ~0,
+	    sizeof (uint32_t), (xdrproc_t)xdr_uint32_t))
 		return (FALSE);
 	return (TRUE);
 }
@@ -129,7 +132,7 @@ xdr_utf8string(register XDR *xdrs, utf8string *objp)
 {
 
 	if (!xdr_bytes(xdrs, (char **)&objp->utf8string_val,
-			(uint_t *)&objp->utf8string_len, NFS4_MAX_UTF8STRING))
+	    (uint_t *)&objp->utf8string_len, NFS4_MAX_UTF8STRING))
 		return (FALSE);
 	return (TRUE);
 }
@@ -148,8 +151,8 @@ xdr_pathname4(register XDR *xdrs, pathname4 *objp)
 {
 
 	if (!xdr_array(xdrs, (char **)&objp->pathname4_val,
-			(uint_t *)&objp->pathname4_len, NFS4_MAX_PATHNAME4,
-			sizeof (component4), (xdrproc_t)xdr_component4))
+	    (uint_t *)&objp->pathname4_len, NFS4_MAX_PATHNAME4,
+	    sizeof (component4), (xdrproc_t)xdr_component4))
 		return (FALSE);
 	return (TRUE);
 }
@@ -176,6 +179,16 @@ bool_t
 xdr_linktext4(register XDR *xdrs, linktext4 *objp)
 {
 
+	if (!xdr_bytes(xdrs, (char **)&objp->linktext4_val,
+	    (uint_t *)&objp->linktext4_len, NFS4_MAX_LINKTEXT4))
+		return (FALSE);
+	return (TRUE);
+}
+
+bool_t
+xdr_ascii_REQUIRED4(register XDR *xdrs, ascii_REQUIRED4 *objp)
+{
+
 	if (!xdr_utf8string(xdrs, objp))
 		return (FALSE);
 	return (TRUE);
@@ -186,7 +199,7 @@ xdr_sec_oid4(register XDR *xdrs, sec_oid4 *objp)
 {
 
 	if (!xdr_bytes(xdrs, (char **)&objp->sec_oid4_val,
-			(uint_t *)&objp->sec_oid4_len, NFS4_MAX_SECOID4))
+	    (uint_t *)&objp->sec_oid4_len, NFS4_MAX_SECOID4))
 		return (FALSE);
 	return (TRUE);
 }
@@ -267,7 +280,7 @@ xdr_nfs_fh4(register XDR *xdrs, nfs_fh4 *objp)
 {
 
 	if (!xdr_bytes(xdrs, (char **)&objp->nfs_fh4_val,
-			(uint_t *)&objp->nfs_fh4_len, NFS4_FHSIZE))
+	    (uint_t *)&objp->nfs_fh4_len, NFS4_FHSIZE))
 		return (FALSE);
 	return (TRUE);
 }
@@ -288,8 +301,8 @@ xdr_fs_location4(register XDR *xdrs, fs_location4 *objp)
 {
 
 	if (!xdr_array(xdrs, (char **)&objp->server.server_val,
-			(uint_t *)&objp->server.server_len, ~0,
-			sizeof (utf8string), (xdrproc_t)xdr_utf8string))
+	    (uint_t *)&objp->server.server_len, ~0,
+	    sizeof (utf8string), (xdrproc_t)xdr_utf8string))
 		return (FALSE);
 	if (!xdr_pathname4(xdrs, &objp->rootpath))
 		return (FALSE);
@@ -303,8 +316,8 @@ xdr_fs_locations4(register XDR *xdrs, fs_locations4 *objp)
 	if (!xdr_pathname4(xdrs, &objp->fs_root))
 		return (FALSE);
 	if (!xdr_array(xdrs, (char **)&objp->locations.locations_val,
-			(uint_t *)&objp->locations.locations_len, ~0,
-			sizeof (fs_location4), (xdrproc_t)xdr_fs_location4))
+	    (uint_t *)&objp->locations.locations_len, ~0,
+	    sizeof (fs_location4), (xdrproc_t)xdr_fs_location4))
 		return (FALSE);
 	return (TRUE);
 }
@@ -478,8 +491,8 @@ xdr_fattr4_acl(register XDR *xdrs, fattr4_acl *objp)
 {
 
 	if (!xdr_array(xdrs, (char **)&objp->fattr4_acl_val,
-			(uint_t *)&objp->fattr4_acl_len, ~0,
-			sizeof (nfsace4), (xdrproc_t)xdr_nfsace4))
+	    (uint_t *)&objp->fattr4_acl_len, ~0,
+	    sizeof (nfsace4), (xdrproc_t)xdr_nfsace4))
 		return (FALSE);
 	return (TRUE);
 }
@@ -659,7 +672,7 @@ bool_t
 xdr_fattr4_mimetype(register XDR *xdrs, fattr4_mimetype *objp)
 {
 
-	if (!xdr_utf8string(xdrs, objp))
+	if (!xdr_ascii_REQUIRED4(xdrs, objp))
 		return (FALSE);
 	return (TRUE);
 }
@@ -876,7 +889,7 @@ xdr_attrlist4(register XDR *xdrs, attrlist4 *objp)
 {
 
 	if (!xdr_bytes(xdrs, (char **)&objp->attrlist4_val,
-			(uint_t *)&objp->attrlist4_len, ~0))
+	    (uint_t *)&objp->attrlist4_len, ~0))
 		return (FALSE);
 	return (TRUE);
 }
@@ -920,7 +933,7 @@ bool_t
 xdr_cb_client4(register XDR *xdrs, cb_client4 *objp)
 {
 
-	if (!xdr_uint32_t(xdrs, &objp->cb_program))
+	if (!xdr_u_int(xdrs, &objp->cb_program))
 		return (FALSE);
 	if (!xdr_clientaddr4(xdrs, &objp->cb_location))
 		return (FALSE);
@@ -945,7 +958,7 @@ xdr_nfs_client_id4(register XDR *xdrs, nfs_client_id4 *objp)
 	if (!xdr_verifier4(xdrs, objp->verifier))
 		return (FALSE);
 	if (!xdr_bytes(xdrs, (char **)&objp->id.id_val,
-			(uint_t *)&objp->id.id_len, NFS4_OPAQUE_LIMIT))
+	    (uint_t *)&objp->id.id_len, NFS4_OPAQUE_LIMIT))
 		return (FALSE);
 	return (TRUE);
 }
@@ -957,7 +970,7 @@ xdr_open_owner4(register XDR *xdrs, open_owner4 *objp)
 	if (!xdr_clientid4(xdrs, &objp->clientid))
 		return (FALSE);
 	if (!xdr_bytes(xdrs, (char **)&objp->owner.owner_val,
-			(uint_t *)&objp->owner.owner_len, NFS4_OPAQUE_LIMIT))
+	    (uint_t *)&objp->owner.owner_len, NFS4_OPAQUE_LIMIT))
 		return (FALSE);
 	return (TRUE);
 }
@@ -969,7 +982,7 @@ xdr_lock_owner4(register XDR *xdrs, lock_owner4 *objp)
 	if (!xdr_clientid4(xdrs, &objp->clientid))
 		return (FALSE);
 	if (!xdr_bytes(xdrs, (char **)&objp->owner.owner_val,
-			(uint_t *)&objp->owner.owner_len, NFS4_OPAQUE_LIMIT))
+	    (uint_t *)&objp->owner.owner_len, NFS4_OPAQUE_LIMIT))
 		return (FALSE);
 	return (TRUE);
 }
@@ -1572,7 +1585,7 @@ xdr_nfs_space_limit4(register XDR *xdrs, nfs_space_limit4 *objp)
 		break;
 	case NFS_LIMIT_BLOCKS:
 		if (!xdr_nfs_modified_limit4(xdrs, &objp->nfs_space_limit4_u.
-							mod_blocks))
+		    mod_blocks))
 			return (FALSE);
 		break;
 	default:
@@ -1623,17 +1636,17 @@ xdr_open_claim4(register XDR *xdrs, open_claim4 *objp)
 		break;
 	case CLAIM_PREVIOUS:
 		if (!xdr_open_delegation_type4(xdrs, &objp->open_claim4_u.
-							delegate_type))
+		    delegate_type))
 			return (FALSE);
 		break;
 	case CLAIM_DELEGATE_CUR:
 		if (!xdr_open_claim_delegate_cur4(xdrs, &objp->open_claim4_u.
-							delegate_cur_info))
+		    delegate_cur_info))
 			return (FALSE);
 		break;
 	case CLAIM_DELEGATE_PREV:
 		if (!xdr_component4(xdrs, &objp->open_claim4_u.
-					file_delegate_prev))
+		    file_delegate_prev))
 			return (FALSE);
 		break;
 	default:
@@ -1700,12 +1713,12 @@ xdr_open_delegation4(register XDR *xdrs, open_delegation4 *objp)
 		break;
 	case OPEN_DELEGATE_READ:
 		if (!xdr_open_read_delegation4(xdrs, &objp->open_delegation4_u.
-							read))
+		    read))
 			return (FALSE);
 		break;
 	case OPEN_DELEGATE_WRITE:
 		if (!xdr_open_write_delegation4(xdrs, &objp->open_delegation4_u.
-							write))
+		    write))
 			return (FALSE);
 		break;
 	default:
@@ -1793,7 +1806,7 @@ xdr_OPEN_CONFIRM4res(register XDR *xdrs, OPEN_CONFIRM4res *objp)
 	switch (objp->status) {
 	case NFS4_OK:
 		if (!xdr_OPEN_CONFIRM4resok(xdrs, &objp->OPEN_CONFIRM4res_u.
-						resok4))
+		    resok4))
 			return (FALSE);
 		break;
 	}
@@ -1833,7 +1846,7 @@ xdr_OPEN_DOWNGRADE4res(register XDR *xdrs, OPEN_DOWNGRADE4res *objp)
 	switch (objp->status) {
 	case NFS4_OK:
 		if (!xdr_OPEN_DOWNGRADE4resok(xdrs, &objp->OPEN_DOWNGRADE4res_u.
-							resok4))
+		    resok4))
 			return (FALSE);
 		break;
 	}
@@ -1909,7 +1922,7 @@ xdr_READ4resok(register XDR *xdrs, READ4resok *objp)
 	nfs4_skip_bytes = objp->data.data_len;
 #else
 	if (!xdr_bytes(xdrs, (char **)&objp->data.data_val,
-			(uint_t *)&objp->data.data_len, ~0))
+	    (uint_t *)&objp->data.data_len, ~0))
 		return (FALSE);
 #endif
 	return (TRUE);
@@ -1976,8 +1989,7 @@ xdr_entry4(register XDR *xdrs, entry4 *objp)
 				break;
 			}
 
-			objp->nextentry = (entry4 *)
-				mem_alloc(sizeof (entry4));
+			objp->nextentry = (entry4 *)mem_alloc(sizeof (entry4));
 			if (objp->nextentry == NULL)
 				return (NULL);
 			bzero(objp->nextentry, sizeof (entry4));
@@ -2011,7 +2023,7 @@ xdr_dirlist4(register XDR *xdrs, dirlist4 *objp)
 {
 
 	if (!xdr_pointer(xdrs, (char **)&objp->entries, sizeof (entry4),
-			(xdrproc_t)xdr_entry4))
+	    (xdrproc_t)xdr_entry4))
 		return (FALSE);
 	if (!xdr_bool(xdrs, &objp->eof))
 		return (FALSE);
@@ -2225,8 +2237,8 @@ xdr_SECINFO4resok(register XDR *xdrs, SECINFO4resok *objp)
 {
 
 	if (!xdr_array(xdrs, (char **)&objp->SECINFO4resok_val,
-			(uint_t *)&objp->SECINFO4resok_len, ~0,
-			sizeof (secinfo4), (xdrproc_t)xdr_secinfo4))
+	    (uint_t *)&objp->SECINFO4resok_len, ~0,
+	    sizeof (secinfo4), (xdrproc_t)xdr_secinfo4))
 		return (FALSE);
 	return (TRUE);
 }
@@ -2301,12 +2313,12 @@ xdr_SETCLIENTID4res(register XDR *xdrs, SETCLIENTID4res *objp)
 	switch (objp->status) {
 	case NFS4_OK:
 		if (!xdr_SETCLIENTID4resok(xdrs, &objp->SETCLIENTID4res_u.
-						resok4))
+		    resok4))
 			return (FALSE);
 		break;
 	case NFS4ERR_CLID_INUSE:
 		if (!xdr_clientaddr4(xdrs, &objp->SETCLIENTID4res_u.
-						client_using))
+		    client_using))
 			return (FALSE);
 		break;
 	}
@@ -2384,7 +2396,7 @@ xdr_WRITE4args(register XDR *xdrs, WRITE4args *objp)
 	nfs4_skip_bytes = objp->data.data_len;
 #else
 	if (!xdr_bytes(xdrs, (char **)&objp->data.data_val,
-			(uint_t *)&objp->data.data_len, ~0))
+	    (uint_t *)&objp->data.data_len, ~0))
 		return (FALSE);
 #endif
 	return (TRUE);
@@ -2479,17 +2491,17 @@ xdr_nfs_argop4(register XDR *xdrs, nfs_argop4 *objp)
 		break;
 	case OP_DELEGPURGE:
 		if (!xdr_DELEGPURGE4args(xdrs, &objp->nfs_argop4_u.
-						opdelegpurge))
+		    opdelegpurge))
 			return (FALSE);
 		break;
 	case OP_DELEGRETURN:
 		if (!xdr_DELEGRETURN4args(xdrs, &objp->nfs_argop4_u.
-						opdelegreturn))
+		    opdelegreturn))
 			return (FALSE);
 		break;
 	case OP_GETATTR:
 		if (!xdr_GETATTR4args(xdrs, &objp->nfs_argop4_u.
-						opgetattr))
+		    opgetattr))
 			return (FALSE);
 		break;
 	case OP_GETFH:
@@ -2530,12 +2542,12 @@ xdr_nfs_argop4(register XDR *xdrs, nfs_argop4 *objp)
 		break;
 	case OP_OPEN_CONFIRM:
 		if (!xdr_OPEN_CONFIRM4args(xdrs, &objp->nfs_argop4_u.
-						opopen_confirm))
+		    opopen_confirm))
 			return (FALSE);
 		break;
 	case OP_OPEN_DOWNGRADE:
 		if (!xdr_OPEN_DOWNGRADE4args(xdrs, &objp->nfs_argop4_u.
-						opopen_downgrade))
+		    opopen_downgrade))
 			return (FALSE);
 		break;
 	case OP_PUTFH:
@@ -2582,12 +2594,12 @@ xdr_nfs_argop4(register XDR *xdrs, nfs_argop4 *objp)
 		break;
 	case OP_SETCLIENTID:
 		if (!xdr_SETCLIENTID4args(xdrs, &objp->nfs_argop4_u.
-						opsetclientid))
+		    opsetclientid))
 			return (FALSE);
 		break;
 	case OP_SETCLIENTID_CONFIRM:
 		if (!xdr_SETCLIENTID_CONFIRM4args(xdrs, &objp->nfs_argop4_u.
-							opsetclientid_confirm))
+		    opsetclientid_confirm))
 			return (FALSE);
 		break;
 	case OP_VERIFY:
@@ -2600,7 +2612,7 @@ xdr_nfs_argop4(register XDR *xdrs, nfs_argop4 *objp)
 		break;
 	case OP_RELEASE_LOCKOWNER:
 		if (!xdr_RELEASE_LOCKOWNER4args(xdrs,
-				&objp->nfs_argop4_u.oprelease_lockowner))
+		    &objp->nfs_argop4_u.oprelease_lockowner))
 			return (FALSE);
 		break;
 	case OP_ILLEGAL:
@@ -2640,7 +2652,7 @@ xdr_nfs_resop4(register XDR *xdrs, nfs_resop4 *objp)
 		break;
 	case OP_DELEGRETURN:
 		if (!xdr_DELEGRETURN4res(xdrs, &objp->nfs_resop4_u.
-						opdelegreturn))
+		    opdelegreturn))
 			return (FALSE);
 		break;
 	case OP_GETATTR:
@@ -2689,12 +2701,12 @@ xdr_nfs_resop4(register XDR *xdrs, nfs_resop4 *objp)
 		break;
 	case OP_OPEN_CONFIRM:
 		if (!xdr_OPEN_CONFIRM4res(xdrs, &objp->nfs_resop4_u.
-						opopen_confirm))
+		    opopen_confirm))
 			return (FALSE);
 		break;
 	case OP_OPEN_DOWNGRADE:
 		if (!xdr_OPEN_DOWNGRADE4res(xdrs, &objp->nfs_resop4_u.
-						opopen_downgrade))
+		    opopen_downgrade))
 			return (FALSE);
 		break;
 	case OP_PUTFH:
@@ -2751,12 +2763,12 @@ xdr_nfs_resop4(register XDR *xdrs, nfs_resop4 *objp)
 		break;
 	case OP_SETCLIENTID:
 		if (!xdr_SETCLIENTID4res(xdrs, &objp->nfs_resop4_u.
-						opsetclientid))
+		    opsetclientid))
 			return (FALSE);
 		break;
 	case OP_SETCLIENTID_CONFIRM:
 		if (!xdr_SETCLIENTID_CONFIRM4res(xdrs, &objp->nfs_resop4_u.
-							opsetclientid_confirm))
+		    opsetclientid_confirm))
 			return (FALSE);
 		break;
 	case OP_VERIFY:
@@ -2769,7 +2781,7 @@ xdr_nfs_resop4(register XDR *xdrs, nfs_resop4 *objp)
 		break;
 	case OP_RELEASE_LOCKOWNER:
 		if (!xdr_RELEASE_LOCKOWNER4res(xdrs,
-				&objp->nfs_resop4_u.oprelease_lockowner))
+		    &objp->nfs_resop4_u.oprelease_lockowner))
 			return (FALSE);
 		break;
 	case OP_ILLEGAL:
@@ -2791,8 +2803,8 @@ xdr_COMPOUND4args(register XDR *xdrs, COMPOUND4args *objp)
 	if (!xdr_uint32_t(xdrs, &objp->minorversion))
 		return (FALSE);
 	if (!xdr_array(xdrs, (char **)&objp->argarray.argarray_val,
-			(uint_t *)&objp->argarray.argarray_len, ~0,
-			sizeof (nfs_argop4), (xdrproc_t)xdr_nfs_argop4))
+	    (uint_t *)&objp->argarray.argarray_len, ~0,
+	    sizeof (nfs_argop4), (xdrproc_t)xdr_nfs_argop4))
 		return (FALSE);
 	return (TRUE);
 }
@@ -2806,8 +2818,8 @@ xdr_COMPOUND4res(register XDR *xdrs, COMPOUND4res *objp)
 	if (!xdr_utf8string(xdrs, &objp->tag))
 		return (FALSE);
 	if (!xdr_array(xdrs, (char **)&objp->resarray.resarray_val,
-			(uint_t *)&objp->resarray.resarray_len, ~0,
-			sizeof (nfs_resop4), (xdrproc_t)xdr_nfs_resop4))
+	    (uint_t *)&objp->resarray.resarray_len, ~0,
+	    sizeof (nfs_resop4), (xdrproc_t)xdr_nfs_resop4))
 		return (FALSE);
 	return (TRUE);
 }
@@ -2896,12 +2908,12 @@ xdr_nfs_cb_argop4(register XDR *xdrs, nfs_cb_argop4 *objp)
 	switch (objp->argop) {
 	case OP_CB_GETATTR:
 		if (!xdr_CB_GETATTR4args(xdrs, &objp->nfs_cb_argop4_u.
-						opcbgetattr))
+		    opcbgetattr))
 			return (FALSE);
 		break;
 	case OP_CB_RECALL:
 		if (!xdr_CB_RECALL4args(xdrs, &objp->nfs_cb_argop4_u.
-						opcbrecall))
+		    opcbrecall))
 			return (FALSE);
 		break;
 	case OP_CB_ILLEGAL:
@@ -2921,7 +2933,7 @@ xdr_nfs_cb_resop4(register XDR *xdrs, nfs_cb_resop4 *objp)
 	switch (objp->resop) {
 	case OP_CB_GETATTR:
 		if (!xdr_CB_GETATTR4res(xdrs, &objp->nfs_cb_resop4_u.
-						opcbgetattr))
+		    opcbgetattr))
 			return (FALSE);
 		break;
 	case OP_CB_RECALL:
@@ -2930,7 +2942,7 @@ xdr_nfs_cb_resop4(register XDR *xdrs, nfs_cb_resop4 *objp)
 		break;
 	case OP_CB_ILLEGAL:
 		if (!xdr_CB_ILLEGAL4res(xdrs,
-					&objp->nfs_cb_resop4_u.opcbillegal))
+		    &objp->nfs_cb_resop4_u.opcbillegal))
 			return (FALSE);
 		break;
 	default:
@@ -2950,8 +2962,8 @@ xdr_CB_COMPOUND4args(register XDR *xdrs, CB_COMPOUND4args *objp)
 	if (!xdr_uint32_t(xdrs, &objp->callback_ident))
 		return (FALSE);
 	if (!xdr_array(xdrs, (char **)&objp->argarray.argarray_val,
-			(uint_t *)&objp->argarray.argarray_len, ~0,
-			sizeof (nfs_cb_argop4), (xdrproc_t)xdr_nfs_cb_argop4))
+	    (uint_t *)&objp->argarray.argarray_len, ~0,
+	    sizeof (nfs_cb_argop4), (xdrproc_t)xdr_nfs_cb_argop4))
 		return (FALSE);
 	return (TRUE);
 }
@@ -2965,8 +2977,8 @@ xdr_CB_COMPOUND4res(register XDR *xdrs, CB_COMPOUND4res *objp)
 	if (!xdr_utf8string(xdrs, &objp->tag))
 		return (FALSE);
 	if (!xdr_array(xdrs, (char **)&objp->resarray.resarray_val,
-			(uint_t *)&objp->resarray.resarray_len, ~0,
-			sizeof (nfs_cb_resop4), (xdrproc_t)xdr_nfs_cb_resop4))
+	    (uint_t *)&objp->resarray.resarray_len, ~0,
+	    sizeof (nfs_cb_resop4), (xdrproc_t)xdr_nfs_cb_resop4))
 		return (FALSE);
 	return (TRUE);
 }

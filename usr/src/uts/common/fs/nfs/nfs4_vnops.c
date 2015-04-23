@@ -18,12 +18,14 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ */
+
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- */
-/*
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -4587,7 +4589,7 @@ recov_retry:
 	/*
 	 * treat symlink names as data
 	 */
-	linkdata = utf8_to_str(&lr_res->link, &len, NULL);
+	linkdata = utf8_to_str((utf8string *)&lr_res->link, &len, NULL);
 	if (linkdata != NULL) {
 		int uio_len = len - 1;
 		/* len includes null byte, which we won't uiomove */

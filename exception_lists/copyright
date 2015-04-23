@@ -18,8 +18,10 @@
 #
 # CDDL HEADER END
 #
+
+#
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 # Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2011 Nexenta Systems, Inc. All rights reserved.
 # Copyright (c) 2011 by Delphix. All rights reserved.
 #
 
@@ -73,6 +75,7 @@ usr/src/grub/grub-0.97/stage2/disk_io.c
 usr/src/grub/grub-0.97/stage2/pc_slice.h
 usr/src/grub/grub-0.97/stage2/gpt.h
 usr/src/grub/grub-0.97/stage2/shared.h
+usr/src/head/rpcsvc/THIRDPARTYLICENSE.nfs4_prot.descrip
 usr/src/lib/gss_mechs/mech_krb5/crypto/cksumtype_to_string.c
 usr/src/lib/gss_mechs/mech_krb5/crypto/coll_proof_cksum.c
 usr/src/lib/gss_mechs/mech_krb5/crypto/enctype_compare.c

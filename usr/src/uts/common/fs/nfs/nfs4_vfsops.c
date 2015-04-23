@@ -18,7 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2013, Joyent, Inc. All rights reserved.
  */
@@ -1316,7 +1318,7 @@ recov_retry:
 	lr_res = &resop->nfs_resop4_u.opreadlink;
 
 	/* treat symlink name as data */
-	*linktextp = utf8_to_str(&lr_res->link, &len, NULL);
+	*linktextp = utf8_to_str((utf8string *)&lr_res->link, &len, NULL);
 
 	if (! recovery)
 		nfs4_end_op(mi, NULL, NULL, &recov_state, needrecov);
