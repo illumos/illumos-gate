@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  */
 
 #ifndef	_SOCKFS_SOCKFILTER_H
@@ -51,6 +52,7 @@ typedef struct sof_kstat	sof_kstat_t;
 
 struct sof_module {
 	char		*sofm_name;
+	int		sofm_flags;
 	sof_ops_t	sofm_ops;
 	uint_t		sofm_refcnt;
 	list_node_t	sofm_node;

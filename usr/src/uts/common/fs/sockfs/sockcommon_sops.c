@@ -128,7 +128,7 @@ so_bind(struct sonode *so, struct sockaddr *name, socklen_t namelen,
 {
 	int error;
 
-	SO_BLOCK_FALLBACK(so, SOP_BIND(so, name, namelen, flags, cr));
+	SO_BLOCK_FALLBACK_SAFE(so, SOP_BIND(so, name, namelen, flags, cr));
 
 	ASSERT(flags == _SOBIND_XPG4_2 || flags == _SOBIND_SOCKBSD);
 
@@ -648,7 +648,7 @@ so_getsockname(struct sonode *so, struct sockaddr *addr,
 {
 	int error;
 
-	SO_BLOCK_FALLBACK(so, SOP_GETSOCKNAME(so, addr, addrlen, cr));
+	SO_BLOCK_FALLBACK_SAFE(so, SOP_GETSOCKNAME(so, addr, addrlen, cr));
 
 	if (so->so_filter_active == 0 ||
 	    (error = sof_filter_getsockname(so, addr, addrlen, cr)) < 0)
@@ -697,7 +697,7 @@ so_getsockopt(struct sonode *so, int level, int option_name,
 	if (level == SOL_FILTER)
 		return (sof_getsockopt(so, option_name, optval, optlenp, cr));
 
-	SO_BLOCK_FALLBACK(so,
+	SO_BLOCK_FALLBACK_SAFE(so,
 	    SOP_GETSOCKOPT(so, level, option_name, optval, optlenp, flags, cr));
 
 	if ((so->so_filter_active == 0 ||
@@ -786,7 +786,7 @@ so_setsockopt(struct sonode *so, int level, int option_name,
 	if (level == SOL_FILTER)
 		return (sof_setsockopt(so, option_name, optval, optlen, cr));
 
-	SO_BLOCK_FALLBACK(so,
+	SO_BLOCK_FALLBACK_SAFE(so,
 	    SOP_SETSOCKOPT(so, level, option_name, optval, optlen, cr));
 
 	/* X/Open requires this check */
