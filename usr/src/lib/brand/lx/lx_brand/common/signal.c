@@ -1059,8 +1059,6 @@ lx_sigreturn(void)
 long
 lx_rt_sigreturn(void)
 {
-	lx_tsd_t *lxtsd = lx_get_tsd();
-	lx_sigdeliver_frame_t *lxsdf;
 	struct lx_sigstack *lx_ssp;
 	lx_ucontext_t *lx_ucp;
 	ucontext_t *ucp;
