@@ -7,8 +7,10 @@
  * A full copy of the text of the CDDL should have accompanied this
  * source.  A copy of the CDDL is also available via the Internet at
  * http://www.illumos.org/license/CDDL.
- *
- * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
+ */
+
+/*
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -35,6 +37,7 @@
 
 #include <ctype.h>
 #include <err.h>
+#include <errno.h>
 #include <netdb.h>
 #include <stdlib.h>
 #include <strings.h>
@@ -99,9 +102,10 @@ inet_matchaddr(const void *sa, const char *name)
 		int bits, i;
 		uint32_t hcaddr4 = 0, mask4;
 
-		if (claddr4 == 0)
+		if (claddr4 == 0) {
 			claddr4 = ntohl(
 			    ((struct sockaddr_in *)sa)->sin_addr.s_addr);
+		}
 
 		for (i = 0; i < 4; i++) {
 			hcaddr4 |= (int)strtol(p, (char **)NULL, 10) <<
@@ -111,12 +115,13 @@ inet_matchaddr(const void *sa, const char *name)
 			p++;
 		}
 
-		if (hcaddr4 == 0)
+		if (hcaddr4 == 0 && errno != 0)
 			break;
 
 		if (mp != NULL) {
 			/* Mask is specified explicitly */
-			if ((bits = (int)strtol(mp, (char **)NULL, 10)) == 0)
+			if ((bits = (int)strtol(mp, (char **)NULL, 10)) == 0 &&
+			    errno != 0)
 				break;
 			mask4 = bits ? ~0 << ((sizeof (struct in_addr) * NBBY)
 			    - bits) : 0;
