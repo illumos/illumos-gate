@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc.
  */
 
 /*
@@ -26,6 +26,14 @@
  * IPv6:
  *	[IPv6]
  *	[IPv6]/prefix
+ *
+ * Return values:
+ *
+ * 0		mismatch
+ * 1		match
+ * -1		error occured, caller should check errno:
+ * 		EINVAL	access list entry is invalid
+ *		ENOMEM	failed to allocate memory
  */
 
 #include <sys/socket.h>
@@ -36,22 +44,24 @@
 #include <netinet/in.h>
 
 #include <ctype.h>
-#include <err.h>
 #include <errno.h>
 #include <netdb.h>
 #include <stdlib.h>
 #include <strings.h>
 
-
-boolean_t
+int
 inet_matchaddr(const void *sa, const char *name)
 {
-	boolean_t ret = B_FALSE;
+	int ret = -1;
 	char *lname, *mp, *p;
+	char *ep;
+	int serrno = errno;
 	uint32_t claddr4 = 0;
 
-	if ((p = lname = strdup(name)) == NULL)
-		err(1, "strdup");
+	if ((p = lname = strdup(name)) == NULL) {
+		errno = ENOMEM;
+		return (-1);
+	}
 
 	if ((mp = strchr(p, '/')) != NULL)
 		*mp++ = '\0';
@@ -59,7 +69,6 @@ inet_matchaddr(const void *sa, const char *name)
 	switch (((struct sockaddr_in *)sa)->sin_family) {
 	case AF_INET6: {
 		char *pp;
-		int prefix6;
 		ipaddr_t ipaddr4;
 		struct in6_addr hcaddr6;
 		struct in6_addr *claddr6 =
@@ -67,28 +76,43 @@ inet_matchaddr(const void *sa, const char *name)
 
 		if (!IN6_IS_ADDR_V4MAPPED(claddr6)) {
 			/* IPv6 address */
-			if ((p = strchr(p, '[')) == NULL)
+			if (*p != '[') {
+				errno = EINVAL;
 				break;
+			}
 			p++;
 
-			if ((pp = strchr(p, ']')) == NULL)
+			if ((pp = strchr(p, ']')) == NULL ||
+			    (mp != NULL && pp != mp - 2) ||
+			    (mp == NULL && *(pp + 1) != '\0')) {
+				errno = EINVAL;
 				break;
+			}
 			*pp = '\0';
 
-			if (inet_pton(AF_INET6, p, &hcaddr6) != 1)
+			if (inet_pton(AF_INET6, p, &hcaddr6) != 1) {
+				errno = EINVAL;
 				break;
+			}
 
 			if (mp != NULL) {
 				/* Match only first prefix bits */
-				if ((prefix6 = (int)strtol(mp,
-				    (char **)NULL, 10)) == 0)
+				long prefix6;
+
+				errno = 0;
+				prefix6 = strtol(mp, &ep, 10);
+				if (errno != 0 || prefix6 < 0 ||
+				    prefix6 > 128 || *ep != '\0') {
+					errno = EINVAL;
 					break;
+				}
 				ret = IN6_ARE_PREFIXEDADDR_EQUAL(claddr6,
-				    &hcaddr6, prefix6);
+				    &hcaddr6, prefix6) ? 1 : 0;
 				break;
 			} else {
 				/* No prefix, exact match */
-				ret = IN6_ARE_ADDR_EQUAL(claddr6, &hcaddr6);
+				ret = IN6_ARE_ADDR_EQUAL(claddr6,
+				    &hcaddr6) ? 1 : 0;
 				break;
 			}
 		} else {
@@ -99,7 +123,7 @@ inet_matchaddr(const void *sa, const char *name)
 		/*FALLTHROUGH*/
 	}
 	case AF_INET: {
-		int bits, i;
+		int i;
 		uint32_t hcaddr4 = 0, mask4;
 
 		if (claddr4 == 0) {
@@ -108,23 +132,36 @@ inet_matchaddr(const void *sa, const char *name)
 		}
 
 		for (i = 0; i < 4; i++) {
-			hcaddr4 |= (int)strtol(p, (char **)NULL, 10) <<
-			    ((3 - i) * 8);
-			if ((p = strchr(p, '.')) == NULL)
+			long qaddr4;
+
+			errno = 0;
+			qaddr4 = strtol(p, &ep, 10);
+			if (errno != 0 || qaddr4 < 0 || qaddr4 > 255 ||
+			    (*ep != '.' && *ep != '\0')) {
+				errno = EINVAL;
 				break;
-			p++;
+			}
+			hcaddr4 |= qaddr4 << ((3 - i) * 8);
+			if (*ep == '\0')
+				break;
+			p = ep + 1;
 		}
 
-		if (hcaddr4 == 0 && errno != 0)
+		if (errno != 0)
 			break;
 
 		if (mp != NULL) {
 			/* Mask is specified explicitly */
-			if ((bits = (int)strtol(mp, (char **)NULL, 10)) == 0 &&
-			    errno != 0)
+			long mb;
+
+			errno = 0;
+			mb = strtol(mp, &ep, 10);
+			if (errno != 0 || mb < 0 || mb > 32 || *ep != '\0') {
+				errno = EINVAL;
 				break;
-			mask4 = bits ? ~0 << ((sizeof (struct in_addr) * NBBY)
-			    - bits) : 0;
+			}
+			mask4 = mb ? ~0 << ((sizeof (struct in_addr) * NBBY)
+			    - mb) : 0;
 			hcaddr4 &= mask4;
 		} else {
 			/*
@@ -144,12 +181,14 @@ inet_matchaddr(const void *sa, const char *name)
 				mask4 = IN_CLASSE_NET;
 		}
 
-		ret = ((claddr4 & mask4) == hcaddr4);
+		ret = ((claddr4 & mask4) == hcaddr4) ? 1 : 0;
 		break;
 	}
 	}
 
 	free(lname);
 
+	if (ret != -1)
+		errno = serrno;
 	return (ret);
 }

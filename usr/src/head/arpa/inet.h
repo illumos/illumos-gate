@@ -58,7 +58,7 @@ extern "C" {
  */
 #if !defined(_XPG4_2) || defined(__EXTENSIONS__)
 extern int inet_net_pton(int, const char *, void *, size_t);
-extern boolean_t inet_matchaddr(const void *, const char *);
+extern int inet_matchaddr(const void *, const char *);
 #endif /* !defined(_XPG4_2) || defined(__EXTENSIONS__) */
 
 #if !defined(_XPG4_2) || defined(_XPG6) || defined(__EXTENSIONS__)
