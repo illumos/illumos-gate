@@ -73,6 +73,7 @@ struct inotify_watch {
 	avl_tree_t inw_children;		/* children, if a parent */
 	char *inw_name;				/* name, if a child */
 	list_node_t inw_orphan;			/* orphan list */
+	cred_t *inw_cred;			/* cred, if orphaned */
 	inotify_state_t *inw_state;		/* corresponding state */
 };
 
@@ -673,8 +674,10 @@ inotify_watch_remove(inotify_state_t *state, inotify_watch_t *watch)
 		 * If this child watch has been orphaned, remove it from the
 		 * state's list of orphans.
 		 */
-		if (child->inw_orphaned)
+		if (child->inw_orphaned) {
 			list_remove(&state->ins_orphans, child);
+			crfree(child->inw_cred);
+		}
 
 		VN_RELE(child->inw_vp);
 
@@ -744,6 +747,8 @@ inotify_watch_delete(inotify_watch_t *watch, uint32_t event)
 			 */
 			if (!watch->inw_orphaned) {
 				watch->inw_orphaned = 1;
+				watch->inw_cred = CRED();
+				crhold(watch->inw_cred);
 				list_insert_head(&state->ins_orphans, watch);
 			}
 
@@ -759,6 +764,7 @@ inotify_watch_delete(inotify_watch_t *watch, uint32_t event)
 			 * the move because we don't want to spuriously
 			 * drop events if we can avoid it.
 			 */
+			crfree(watch->inw_cred);
 			list_remove(&state->ins_orphans, watch);
 		}
 	}
@@ -975,6 +981,7 @@ inotify_clean(void *arg)
 {
 	inotify_state_t *state = arg;
 	inotify_watch_t *watch, *parent, *next, **prev;
+	cred_t *savecred;
 	int err;
 
 	mutex_enter(&state->ins_lock);
@@ -995,7 +1002,17 @@ inotify_clean(void *arg)
 
 		list_remove(&state->ins_orphans, watch);
 
+		/*
+		 * For purposes of releasing the vnode, we need to switch our
+		 * cred to be the cred of the orphaning thread (which we held
+		 * at the time this watch was orphaned).
+		 */
+		savecred = curthread->t_cred;
+		curthread->t_cred = watch->inw_cred;
 		VN_RELE(watch->inw_vp);
+		crfree(watch->inw_cred);
+		curthread->t_cred = savecred;
+
 		inotify_watch_zombify(watch);
 	}
 
