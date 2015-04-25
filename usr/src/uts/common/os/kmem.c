@@ -159,10 +159,22 @@
  *               find known objects and is about to free it, or
  *            c) the client has freed the object.
  *            In all these cases (a, b, and c) kmem frees the new object (the
- *            unused copy destination) and searches for the old object in the
- *            magazine layer. If found, the object is removed from the magazine
- *            layer and freed to the slab layer so it will no longer hold the
- *            slab hostage.
+ *            unused copy destination).  In the first case, the object is in
+ *            use and the correct action is that for LATER; in the latter two
+ *            cases, we know that the object is either freed or about to be
+ *            freed, in which case it is either already in a magazine or about
+ *            to be in one.  In these cases, we know that the object will either
+ *            be reallocated and reused, or it will end up in a full magazine
+ *            that will be reaped (thereby liberating the slab).  Because it
+ *            is prohibitively expensive to differentiate these cases, and
+ *            because the defrag code is executed when we're low on memory
+ *            (thereby biasing the system to reclaim full magazines) we treat
+ *            all DONT_KNOW cases as LATER and rely on cache reaping to
+ *            generally clean up full magazines.  While we take the same action
+ *            for these cases, we maintain their semantic distinction:  if
+ *            defragmentation is not occurring, it is useful to know if this
+ *            is due to objects in use (LATER) or objects in an unknown state
+ *            of transition (DONT_KNOW).
  *
  * 2.3 Object States
  *
@@ -285,10 +297,10 @@
  * view of the slab layer, making it a candidate for the move callback. Most
  * objects unrecognized by the client in the move callback fall into this
  * category and are cheaply distinguished from known objects by the test
- * described earlier. Since recognition is cheap for the client, and searching
- * magazines is expensive for kmem, kmem defers searching until the client first
- * returns KMEM_CBRC_DONT_KNOW. As long as the needed effort is reasonable, kmem
- * elsewhere does what it can to avoid bothering the client unnecessarily.
+ * described earlier. Because searching magazines is prohibitively expensive
+ * for kmem, clients that do not mark freed objects (and therefore return
+ * KMEM_CBRC_DONT_KNOW for large numbers of objects) may find defragmentation
+ * efficacy reduced.
  *
  * Invalidating the designated pointer member before freeing the object marks
  * the object to be avoided in the callback, and conversely, assigning a valid
@@ -1039,22 +1051,6 @@ static vmem_t		*kmem_firewall_va_arena;
 static vmem_t		*kmem_firewall_arena;
 
 /*
- * Define KMEM_STATS to turn on statistic gathering. By default, it is only
- * turned on when DEBUG is also defined.
- */
-#ifdef	DEBUG
-#define	KMEM_STATS
-#endif	/* DEBUG */
-
-#ifdef	KMEM_STATS
-#define	KMEM_STAT_ADD(stat)			((stat)++)
-#define	KMEM_STAT_COND_ADD(cond, stat)		((void) (!(cond) || (stat)++))
-#else
-#define	KMEM_STAT_ADD(stat)			/* nothing */
-#define	KMEM_STAT_COND_ADD(cond, stat)		/* nothing */
-#endif	/* KMEM_STATS */
-
-/*
  * kmem slab consolidator thresholds (tunables)
  */
 size_t kmem_frag_minslabs = 101;	/* minimum total slabs */
@@ -1070,47 +1066,6 @@ size_t kmem_reclaim_max_slabs = 1;
  * when searching for buffers to relocate.
  */
 size_t kmem_reclaim_scan_range = 12;
-
-#ifdef	KMEM_STATS
-static struct {
-	uint64_t kms_callbacks;
-	uint64_t kms_yes;
-	uint64_t kms_no;
-	uint64_t kms_later;
-	uint64_t kms_dont_need;
-	uint64_t kms_dont_know;
-	uint64_t kms_hunt_found_mag;
-	uint64_t kms_hunt_found_slab;
-	uint64_t kms_hunt_alloc_fail;
-	uint64_t kms_hunt_lucky;
-	uint64_t kms_notify;
-	uint64_t kms_notify_callbacks;
-	uint64_t kms_disbelief;
-	uint64_t kms_already_pending;
-	uint64_t kms_callback_alloc_fail;
-	uint64_t kms_callback_taskq_fail;
-	uint64_t kms_endscan_slab_dead;
-	uint64_t kms_endscan_slab_destroyed;
-	uint64_t kms_endscan_nomem;
-	uint64_t kms_endscan_refcnt_changed;
-	uint64_t kms_endscan_nomove_changed;
-	uint64_t kms_endscan_freelist;
-	uint64_t kms_avl_update;
-	uint64_t kms_avl_noupdate;
-	uint64_t kms_no_longer_reclaimable;
-	uint64_t kms_notify_no_longer_reclaimable;
-	uint64_t kms_notify_slab_dead;
-	uint64_t kms_notify_slab_destroyed;
-	uint64_t kms_alloc_fail;
-	uint64_t kms_constructor_fail;
-	uint64_t kms_dead_slabs_freed;
-	uint64_t kms_defrags;
-	uint64_t kms_scans;
-	uint64_t kms_scan_depot_ws_reaps;
-	uint64_t kms_debug_reaps;
-	uint64_t kms_debug_scans;
-} kmem_move_stats;
-#endif	/* KMEM_STATS */
 
 /* consolidator knobs */
 boolean_t kmem_move_noreap;
@@ -1922,15 +1877,7 @@ kmem_slab_free(kmem_cache_t *cp, void *buf)
 		cp->cache_complete_slab_count--;
 		avl_add(&cp->cache_partial_slabs, sp);
 	} else {
-#ifdef	DEBUG
-		if (avl_update_gt(&cp->cache_partial_slabs, sp)) {
-			KMEM_STAT_ADD(kmem_move_stats.kms_avl_update);
-		} else {
-			KMEM_STAT_ADD(kmem_move_stats.kms_avl_noupdate);
-		}
-#else
 		(void) avl_update_gt(&cp->cache_partial_slabs, sp);
-#endif
 	}
 
 	ASSERT((cp->cache_slab_create - cp->cache_slab_destroy) ==
@@ -3579,7 +3526,7 @@ kmem_cache_kstat_update(kstat_t *ksp, int rw)
 		kmcp->kmc_move_later.value.ui64		= kd->kmd_later;
 		kmcp->kmc_move_dont_need.value.ui64	= kd->kmd_dont_need;
 		kmcp->kmc_move_dont_know.value.ui64	= kd->kmd_dont_know;
-		kmcp->kmc_move_hunt_found.value.ui64	= kd->kmd_hunt_found;
+		kmcp->kmc_move_hunt_found.value.ui64	= 0;
 		kmcp->kmc_move_slabs_freed.value.ui64	= kd->kmd_slabs_freed;
 		kmcp->kmc_defrag.value.ui64		= kd->kmd_defrags;
 		kmcp->kmc_scan.value.ui64		= kd->kmd_scans;
@@ -4150,7 +4097,8 @@ kmem_cache_destroy(kmem_cache_t *cp)
 
 	if (kmem_taskq != NULL)
 		taskq_wait(kmem_taskq);
-	if (kmem_move_taskq != NULL)
+
+	if (kmem_move_taskq != NULL && cp->cache_defrag != NULL)
 		taskq_wait(kmem_move_taskq);
 
 	kmem_cache_magazine_purge(cp);
@@ -4677,94 +4625,6 @@ kmem_slab_is_reclaimable(kmem_cache_t *cp, kmem_slab_t *sp, int flags)
 	    (sp->slab_chunks * cp->cache_defrag->kmd_reclaim_numer));
 }
 
-static void *
-kmem_hunt_mag(kmem_cache_t *cp, kmem_magazine_t *m, int n, void *buf,
-    void *tbuf)
-{
-	int i;		/* magazine round index */
-
-	for (i = 0; i < n; i++) {
-		if (buf == m->mag_round[i]) {
-			if (cp->cache_flags & KMF_BUFTAG) {
-				(void) kmem_cache_free_debug(cp, tbuf,
-				    caller());
-			}
-			m->mag_round[i] = tbuf;
-			return (buf);
-		}
-	}
-
-	return (NULL);
-}
-
-/*
- * Hunt the magazine layer for the given buffer. If found, the buffer is
- * removed from the magazine layer and returned, otherwise NULL is returned.
- * The state of the returned buffer is freed and constructed.
- */
-static void *
-kmem_hunt_mags(kmem_cache_t *cp, void *buf)
-{
-	kmem_cpu_cache_t *ccp;
-	kmem_magazine_t	*m;
-	int cpu_seqid;
-	int n;		/* magazine rounds */
-	void *tbuf;	/* temporary swap buffer */
-
-	ASSERT(MUTEX_NOT_HELD(&cp->cache_lock));
-
-	/*
-	 * Allocated a buffer to swap with the one we hope to pull out of a
-	 * magazine when found.
-	 */
-	tbuf = kmem_cache_alloc(cp, KM_NOSLEEP);
-	if (tbuf == NULL) {
-		KMEM_STAT_ADD(kmem_move_stats.kms_hunt_alloc_fail);
-		return (NULL);
-	}
-	if (tbuf == buf) {
-		KMEM_STAT_ADD(kmem_move_stats.kms_hunt_lucky);
-		if (cp->cache_flags & KMF_BUFTAG) {
-			(void) kmem_cache_free_debug(cp, buf, caller());
-		}
-		return (buf);
-	}
-
-	/* Hunt the depot. */
-	mutex_enter(&cp->cache_depot_lock);
-	n = cp->cache_magtype->mt_magsize;
-	for (m = cp->cache_full.ml_list; m != NULL; m = m->mag_next) {
-		if (kmem_hunt_mag(cp, m, n, buf, tbuf) != NULL) {
-			mutex_exit(&cp->cache_depot_lock);
-			return (buf);
-		}
-	}
-	mutex_exit(&cp->cache_depot_lock);
-
-	/* Hunt the per-CPU magazines. */
-	for (cpu_seqid = 0; cpu_seqid < max_ncpus; cpu_seqid++) {
-		ccp = &cp->cache_cpu[cpu_seqid];
-
-		mutex_enter(&ccp->cc_lock);
-		m = ccp->cc_loaded;
-		n = ccp->cc_rounds;
-		if (kmem_hunt_mag(cp, m, n, buf, tbuf) != NULL) {
-			mutex_exit(&ccp->cc_lock);
-			return (buf);
-		}
-		m = ccp->cc_ploaded;
-		n = ccp->cc_prounds;
-		if (kmem_hunt_mag(cp, m, n, buf, tbuf) != NULL) {
-			mutex_exit(&ccp->cc_lock);
-			return (buf);
-		}
-		mutex_exit(&ccp->cc_lock);
-	}
-
-	kmem_cache_free(cp, tbuf);
-	return (NULL);
-}
-
 /*
  * May be called from the kmem_move_taskq, from kmem_cache_move_notify_task(),
  * or when the buffer is freed.
@@ -4828,7 +4688,7 @@ static void kmem_move_end(kmem_cache_t *, kmem_move_t *);
  * NO		kmem frees the new buffer, marks the slab of the old buffer
  *              non-reclaimable to avoid bothering the client again
  * LATER	kmem frees the new buffer, increments slab_later_count
- * DONT_KNOW	kmem frees the new buffer, searches mags for the old buffer
+ * DONT_KNOW	kmem frees the new buffer
  * DONT_NEED	kmem frees both the old buffer and the new buffer
  *
  * The pending callback argument now being processed contains both of the
@@ -4862,19 +4722,14 @@ kmem_move_buffer(kmem_move_t *callback)
 	 * another buffer on the same slab.
 	 */
 	if (!kmem_slab_is_reclaimable(cp, sp, callback->kmm_flags)) {
-		KMEM_STAT_ADD(kmem_move_stats.kms_no_longer_reclaimable);
-		KMEM_STAT_COND_ADD((callback->kmm_flags & KMM_NOTIFY),
-		    kmem_move_stats.kms_notify_no_longer_reclaimable);
 		kmem_slab_free(cp, callback->kmm_to_buf);
 		kmem_move_end(cp, callback);
 		return;
 	}
 
 	/*
-	 * Hunting magazines is expensive, so we'll wait to do that until the
-	 * client responds KMEM_CBRC_DONT_KNOW. However, checking the slab layer
-	 * is cheap, so we might as well do that here in case we can avoid
-	 * bothering the client.
+	 * Checking the slab layer is easy, so we might as well do that here
+	 * in case we can avoid bothering the client.
 	 */
 	mutex_enter(&cp->cache_lock);
 	free_on_slab = (kmem_slab_allocated(cp, sp,
@@ -4882,7 +4737,6 @@ kmem_move_buffer(kmem_move_t *callback)
 	mutex_exit(&cp->cache_lock);
 
 	if (free_on_slab) {
-		KMEM_STAT_ADD(kmem_move_stats.kms_hunt_found_slab);
 		kmem_slab_free(cp, callback->kmm_to_buf);
 		kmem_move_end(cp, callback);
 		return;
@@ -4894,7 +4748,6 @@ kmem_move_buffer(kmem_move_t *callback)
 		 */
 		if (kmem_cache_alloc_debug(cp, callback->kmm_to_buf,
 		    KM_NOSLEEP, 1, caller()) != 0) {
-			KMEM_STAT_ADD(kmem_move_stats.kms_alloc_fail);
 			kmem_move_end(cp, callback);
 			return;
 		}
@@ -4902,15 +4755,11 @@ kmem_move_buffer(kmem_move_t *callback)
 	    cp->cache_constructor(callback->kmm_to_buf, cp->cache_private,
 	    KM_NOSLEEP) != 0) {
 		atomic_inc_64(&cp->cache_alloc_fail);
-		KMEM_STAT_ADD(kmem_move_stats.kms_constructor_fail);
 		kmem_slab_free(cp, callback->kmm_to_buf);
 		kmem_move_end(cp, callback);
 		return;
 	}
 
-	KMEM_STAT_ADD(kmem_move_stats.kms_callbacks);
-	KMEM_STAT_COND_ADD((callback->kmm_flags & KMM_NOTIFY),
-	    kmem_move_stats.kms_notify_callbacks);
 	cp->cache_defrag->kmd_callbacks++;
 	cp->cache_defrag->kmd_thread = curthread;
 	cp->cache_defrag->kmd_from_buf = callback->kmm_from_buf;
@@ -4928,7 +4777,6 @@ kmem_move_buffer(kmem_move_t *callback)
 	cp->cache_defrag->kmd_to_buf = NULL;
 
 	if (response == KMEM_CBRC_YES) {
-		KMEM_STAT_ADD(kmem_move_stats.kms_yes);
 		cp->cache_defrag->kmd_yes++;
 		kmem_slab_free_constructed(cp, callback->kmm_from_buf, B_FALSE);
 		/* slab safe to access until kmem_move_end() */
@@ -4943,14 +4791,12 @@ kmem_move_buffer(kmem_move_t *callback)
 
 	switch (response) {
 	case KMEM_CBRC_NO:
-		KMEM_STAT_ADD(kmem_move_stats.kms_no);
 		cp->cache_defrag->kmd_no++;
 		mutex_enter(&cp->cache_lock);
 		kmem_slab_move_no(cp, sp, callback->kmm_from_buf);
 		mutex_exit(&cp->cache_lock);
 		break;
 	case KMEM_CBRC_LATER:
-		KMEM_STAT_ADD(kmem_move_stats.kms_later);
 		cp->cache_defrag->kmd_later++;
 		mutex_enter(&cp->cache_lock);
 		if (!KMEM_SLAB_IS_PARTIAL(sp)) {
@@ -4959,7 +4805,6 @@ kmem_move_buffer(kmem_move_t *callback)
 		}
 
 		if (++sp->slab_later_count >= KMEM_DISBELIEF) {
-			KMEM_STAT_ADD(kmem_move_stats.kms_disbelief);
 			kmem_slab_move_no(cp, sp, callback->kmm_from_buf);
 		} else if (!(sp->slab_flags & KMEM_SLAB_NOMOVE)) {
 			sp->slab_stuck_offset = KMEM_SLAB_OFFSET(sp,
@@ -4968,7 +4813,6 @@ kmem_move_buffer(kmem_move_t *callback)
 		mutex_exit(&cp->cache_lock);
 		break;
 	case KMEM_CBRC_DONT_NEED:
-		KMEM_STAT_ADD(kmem_move_stats.kms_dont_need);
 		cp->cache_defrag->kmd_dont_need++;
 		kmem_slab_free_constructed(cp, callback->kmm_from_buf, B_FALSE);
 		if (sp->slab_refcnt == 0)
@@ -4978,19 +4822,21 @@ kmem_move_buffer(kmem_move_t *callback)
 		mutex_exit(&cp->cache_lock);
 		break;
 	case KMEM_CBRC_DONT_KNOW:
-		KMEM_STAT_ADD(kmem_move_stats.kms_dont_know);
+		/*
+		 * If we don't know if we can move this buffer or not, we'll
+		 * just assume that we can't:  if the buffer is in fact free,
+		 * then it is sitting in one of the per-CPU magazines or in
+		 * a full magazine in the depot layer.  Either way, because
+		 * defrag is induced in the same logic that reaps a cache,
+		 * it's likely that full magazines will be returned to the
+		 * system soon (thereby accomplishing what we're trying to
+		 * accomplish here: return those magazines to their slabs).
+		 * Given this, any work that we might do now to locate a buffer
+		 * in a magazine is wasted (and expensive!) work; we bump
+		 * a counter in this case and otherwise assume that we can't
+		 * move it.
+		 */
 		cp->cache_defrag->kmd_dont_know++;
-		if (kmem_hunt_mags(cp, callback->kmm_from_buf) != NULL) {
-			KMEM_STAT_ADD(kmem_move_stats.kms_hunt_found_mag);
-			cp->cache_defrag->kmd_hunt_found++;
-			kmem_slab_free_constructed(cp, callback->kmm_from_buf,
-			    B_TRUE);
-			if (sp->slab_refcnt == 0)
-				cp->cache_defrag->kmd_slabs_freed++;
-			mutex_enter(&cp->cache_lock);
-			kmem_slab_move_yes(cp, sp, callback->kmm_from_buf);
-			mutex_exit(&cp->cache_lock);
-		}
 		break;
 	default:
 		panic("'%s' (%p) unexpected move callback response %d\n",
@@ -5015,10 +4861,9 @@ kmem_move_begin(kmem_cache_t *cp, kmem_slab_t *sp, void *buf, int flags)
 	ASSERT(sp->slab_flags & KMEM_SLAB_MOVE_PENDING);
 
 	callback = kmem_cache_alloc(kmem_move_cache, KM_NOSLEEP);
-	if (callback == NULL) {
-		KMEM_STAT_ADD(kmem_move_stats.kms_callback_alloc_fail);
+
+	if (callback == NULL)
 		return (B_FALSE);
-	}
 
 	callback->kmm_from_slab = sp;
 	callback->kmm_from_buf = buf;
@@ -5043,7 +4888,6 @@ kmem_move_begin(kmem_cache_t *cp, kmem_slab_t *sp, void *buf, int flags)
 			pending->kmm_flags |= KMM_DESPERATE;
 		}
 		mutex_exit(&cp->cache_lock);
-		KMEM_STAT_ADD(kmem_move_stats.kms_already_pending);
 		kmem_cache_free(kmem_move_cache, callback);
 		return (B_TRUE);
 	}
@@ -5057,7 +4901,6 @@ kmem_move_begin(kmem_cache_t *cp, kmem_slab_t *sp, void *buf, int flags)
 
 	if (!taskq_dispatch(kmem_move_taskq, (task_func_t *)kmem_move_buffer,
 	    callback, TQ_NOSLEEP)) {
-		KMEM_STAT_ADD(kmem_move_stats.kms_callback_taskq_fail);
 		mutex_enter(&cp->cache_lock);
 		avl_remove(&cp->cache_defrag->kmd_moves_pending, callback);
 		mutex_exit(&cp->cache_lock);
@@ -5103,7 +4946,6 @@ kmem_move_end(kmem_cache_t *cp, kmem_move_t *callback)
 			cp->cache_slab_destroy++;
 			mutex_exit(&cp->cache_lock);
 			kmem_slab_destroy(cp, sp);
-			KMEM_STAT_ADD(kmem_move_stats.kms_dead_slabs_freed);
 			mutex_enter(&cp->cache_lock);
 		}
 	}
@@ -5248,8 +5090,6 @@ kmem_move_buffers(kmem_cache_t *cp, size_t max_scan, size_t max_slabs,
 					 * pending move completes.
 					 */
 					list_insert_head(deadlist, sp);
-					KMEM_STAT_ADD(kmem_move_stats.
-					    kms_endscan_slab_dead);
 					return (-1);
 				}
 
@@ -5264,10 +5104,6 @@ kmem_move_buffers(kmem_cache_t *cp, size_t max_scan, size_t max_slabs,
 				cp->cache_slab_destroy++;
 				mutex_exit(&cp->cache_lock);
 				kmem_slab_destroy(cp, sp);
-				KMEM_STAT_ADD(kmem_move_stats.
-				    kms_dead_slabs_freed);
-				KMEM_STAT_ADD(kmem_move_stats.
-				    kms_endscan_slab_destroyed);
 				mutex_enter(&cp->cache_lock);
 				/*
 				 * Since we can't pick up the scan where we left
@@ -5283,8 +5119,6 @@ kmem_move_buffers(kmem_cache_t *cp, size_t max_scan, size_t max_slabs,
 				 * for the request and say nothing about the
 				 * number of reclaimable slabs.
 				 */
-				KMEM_STAT_COND_ADD(s < max_slabs,
-				    kmem_move_stats.kms_endscan_nomem);
 				return (-1);
 			}
 
@@ -5300,16 +5134,10 @@ kmem_move_buffers(kmem_cache_t *cp, size_t max_scan, size_t max_slabs,
 				 * destination buffer on the same slab. In that
 				 * case, we're not interested in counting it.
 				 */
-				KMEM_STAT_COND_ADD(!(flags & KMM_DEBUG) &&
-				    (s < max_slabs),
-				    kmem_move_stats.kms_endscan_refcnt_changed);
 				return (-1);
 			}
-			if ((sp->slab_flags & KMEM_SLAB_NOMOVE) != nomove) {
-				KMEM_STAT_COND_ADD(s < max_slabs,
-				    kmem_move_stats.kms_endscan_nomove_changed);
+			if ((sp->slab_flags & KMEM_SLAB_NOMOVE) != nomove)
 				return (-1);
-			}
 
 			/*
 			 * Generating a move request allocates a destination
@@ -5335,11 +5163,6 @@ kmem_move_buffers(kmem_cache_t *cp, size_t max_scan, size_t max_slabs,
 		}
 	}
 end_scan:
-
-	KMEM_STAT_COND_ADD(!(flags & KMM_DEBUG) &&
-	    (s < max_slabs) &&
-	    (sp == avl_first(&cp->cache_partial_slabs)),
-	    kmem_move_stats.kms_endscan_freelist);
 
 	return (s);
 }
@@ -5400,8 +5223,6 @@ kmem_cache_move_notify_task(void *arg)
 			    &cp->cache_defrag->kmd_moves_pending)) {
 				list_insert_head(deadlist, sp);
 				mutex_exit(&cp->cache_lock);
-				KMEM_STAT_ADD(kmem_move_stats.
-				    kms_notify_slab_dead);
 				return;
 			}
 
@@ -5409,9 +5230,6 @@ kmem_cache_move_notify_task(void *arg)
 			cp->cache_slab_destroy++;
 			mutex_exit(&cp->cache_lock);
 			kmem_slab_destroy(cp, sp);
-			KMEM_STAT_ADD(kmem_move_stats.kms_dead_slabs_freed);
-			KMEM_STAT_ADD(kmem_move_stats.
-			    kms_notify_slab_destroyed);
 			return;
 		}
 	} else {
@@ -5425,7 +5243,6 @@ kmem_cache_move_notify(kmem_cache_t *cp, void *buf)
 {
 	kmem_move_notify_args_t *args;
 
-	KMEM_STAT_ADD(kmem_move_stats.kms_notify);
 	args = kmem_alloc(sizeof (kmem_move_notify_args_t), KM_NOSLEEP);
 	if (args != NULL) {
 		args->kmna_cache = cp;
@@ -5448,7 +5265,6 @@ kmem_cache_defrag(kmem_cache_t *cp)
 	n = avl_numnodes(&cp->cache_partial_slabs);
 	if (n > 1) {
 		/* kmem_move_buffers() drops and reacquires cache_lock */
-		KMEM_STAT_ADD(kmem_move_stats.kms_defrags);
 		cp->cache_defrag->kmd_defrags++;
 		(void) kmem_move_buffers(cp, n, 0, KMM_DESPERATE);
 	}
@@ -5547,7 +5363,6 @@ kmem_cache_scan(kmem_cache_t *cp)
 		 *
 		 * kmem_move_buffers() drops and reacquires cache_lock.
 		 */
-		KMEM_STAT_ADD(kmem_move_stats.kms_scans);
 		kmd->kmd_scans++;
 		slabs_found = kmem_move_buffers(cp, kmem_reclaim_scan_range,
 		    kmem_reclaim_max_slabs, 0);
@@ -5588,12 +5403,9 @@ kmem_cache_scan(kmem_cache_t *cp)
 			if (!kmem_move_noreap &&
 			    ((debug_rand % kmem_mtb_reap) == 0)) {
 				mutex_exit(&cp->cache_lock);
-				KMEM_STAT_ADD(kmem_move_stats.kms_debug_reaps);
 				kmem_cache_reap(cp);
 				return;
 			} else if ((debug_rand % kmem_mtb_move) == 0) {
-				KMEM_STAT_ADD(kmem_move_stats.kms_scans);
-				KMEM_STAT_ADD(kmem_move_stats.kms_debug_scans);
 				kmd->kmd_scans++;
 				(void) kmem_move_buffers(cp,
 				    kmem_reclaim_scan_range, 1, KMM_DEBUG);
@@ -5604,8 +5416,6 @@ kmem_cache_scan(kmem_cache_t *cp)
 
 	mutex_exit(&cp->cache_lock);
 
-	if (reap) {
-		KMEM_STAT_ADD(kmem_move_stats.kms_scan_depot_ws_reaps);
+	if (reap)
 		kmem_depot_ws_reap(cp);
-	}
 }
