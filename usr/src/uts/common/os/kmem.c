@@ -4127,7 +4127,8 @@ kmem_cache_destroy(kmem_cache_t *cp)
 
 	if (kmem_taskq != NULL)
 		taskq_wait(kmem_taskq);
-	if (kmem_move_taskq != NULL)
+
+	if (kmem_move_taskq != NULL && cp->cache_defrag != NULL)
 		taskq_wait(kmem_move_taskq);
 
 	kmem_cache_magazine_purge(cp);
