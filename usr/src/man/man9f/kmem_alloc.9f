@@ -129,5 +129,8 @@ uninitialized kernel memory should be handled carefully. For example, never
 .SH NOTES
 .sp
 .LP
-\fBkmem_alloc(0\fR, \fIflag\fR\fB)\fR always returns \fINULL\fR.
-\fBkmem_free(NULL, 0)\fR is legal.
+\fBkmem_alloc(0\fR, \fIflag\fR\fB)\fR always returns \fINULL\fR, but
+if \fBKM_SLEEP\fR is set, this behavior is considered to be deprecated;
+the system may be configured to explicitly panic in this case in lieu
+of returning \fINULL\fR.
+\fBkmem_free(NULL, 0)\fR is legal, however.

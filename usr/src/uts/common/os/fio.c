@@ -852,7 +852,8 @@ flist_fork(uf_info_t *pfip, uf_info_t *cfip)
 	 */
 	cfip->fi_nfiles = nfiles = flist_minsize(pfip);
 
-	cfip->fi_list = kmem_zalloc(nfiles * sizeof (uf_entry_t), KM_SLEEP);
+	cfip->fi_list = nfiles == 0 ? NULL :
+	    kmem_zalloc(nfiles * sizeof (uf_entry_t), KM_SLEEP);
 
 	for (fd = 0, pufp = pfip->fi_list, cufp = cfip->fi_list; fd < nfiles;
 	    fd++, pufp++, cufp++) {

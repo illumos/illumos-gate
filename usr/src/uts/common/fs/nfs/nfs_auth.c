@@ -22,6 +22,7 @@
 /*
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 1995, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2015 Joyent, Inc.  All rights reserved.
  */
 
 #include <sys/param.h>
@@ -559,11 +560,16 @@ retry:
 			*access = res.ares.auth_perm;
 			*srv_uid = res.ares.auth_srv_uid;
 			*srv_gid = res.ares.auth_srv_gid;
-			*srv_gids_cnt = res.ares.auth_srv_gids.len;
-			*srv_gids = kmem_alloc(*srv_gids_cnt * sizeof (gid_t),
-			    KM_SLEEP);
-			bcopy(res.ares.auth_srv_gids.val, *srv_gids,
-			    *srv_gids_cnt * sizeof (gid_t));
+
+			if ((*srv_gids_cnt = res.ares.auth_srv_gids.len) != 0) {
+				*srv_gids = kmem_alloc(*srv_gids_cnt *
+				    sizeof (gid_t), KM_SLEEP);
+				bcopy(res.ares.auth_srv_gids.val, *srv_gids,
+				    *srv_gids_cnt * sizeof (gid_t));
+			} else {
+				*srv_gids = NULL;
+			}
+
 			break;
 
 		case NFSAUTH_DR_EFAIL:
@@ -1114,9 +1120,13 @@ wait:
 		if (gid != NULL)
 			*gid = p->auth_srv_gid;
 		if (ngids != NULL && gids != NULL) {
-			*ngids = p->auth_srv_ngids;
-			*gids = kmem_alloc(*ngids * sizeof (gid_t), KM_SLEEP);
-			bcopy(p->auth_srv_gids, *gids, *ngids * sizeof (gid_t));
+			if ((*ngids = p->auth_srv_ngids) != 0) {
+				size_t sz = *ngids * sizeof (gid_t);
+				*gids = kmem_alloc(sz, KM_SLEEP);
+				bcopy(p->auth_srv_gids, *gids, sz);
+			} else {
+				*gids = NULL;
+			}
 		}
 
 		access = p->auth_access;

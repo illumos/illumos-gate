@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2015 Joyent, Inc.  All rights reserved.
  */
 
 /*
@@ -1002,6 +1003,13 @@ size_t kmem_lite_maxalign = 1024; /* maximum buffer alignment for KMF_LITE */
 int kmem_lite_pcs = 4;		/* number of PCs to store in KMF_LITE mode */
 size_t kmem_maxverify;		/* maximum bytes to inspect in debug routines */
 size_t kmem_minfirewall;	/* hardware-enforced redzone threshold */
+int kmem_warn_zerosized = 1;	/* whether to warn on zero-sized KM_SLEEP */
+
+#ifdef DEBUG
+int kmem_panic_zerosized = 1;	/* whether to panic on zero-sized KM_SLEEP */
+#else
+int kmem_panic_zerosized = 0;	/* whether to panic on zero-sized KM_SLEEP */
+#endif
 
 #ifdef _LP64
 size_t	kmem_max_cached = KMEM_BIG_MAXBUF;	/* maximum kmem_alloc cache */
@@ -1035,6 +1043,8 @@ static vmem_t		*kmem_va_arena;
 static vmem_t		*kmem_default_arena;
 static vmem_t		*kmem_firewall_va_arena;
 static vmem_t		*kmem_firewall_arena;
+
+static int		kmem_zerosized;		/* # of zero-sized allocs */
 
 /*
  * Define KMEM_STATS to turn on statistic gathering. By default, it is only
@@ -2925,8 +2935,31 @@ kmem_alloc(size_t size, int kmflag)
 		/* fall through to kmem_cache_alloc() */
 
 	} else {
-		if (size == 0)
+		if (size == 0) {
+			if (kmflag != KM_SLEEP && !(kmflag & KM_PANIC))
+				return (NULL);
+
+			/*
+			 * If this is a sleeping allocation or one that has
+			 * been specified to panic on allocation failure, we
+			 * consider it to be deprecated behavior to allocate
+			 * 0 bytes.  If we have been configured to panic under
+			 * this condition, we panic; if to warn, we warn -- and
+			 * regardless, we bump a counter to at least indicate
+			 * that this condition has occurred.
+			 */
+			if (kmem_panic && kmem_panic_zerosized)
+				panic("attempted to kmem_alloc() size of 0");
+
+			if (kmem_warn_zerosized) {
+				cmn_err(CE_WARN, "kmem_alloc(): sleeping "
+				    "allocation with size of 0");
+			}
+
+			kmem_zerosized++;
+
 			return (NULL);
+		}
 
 		buf = vmem_alloc(kmem_oversize_arena, size,
 		    kmflag & KM_VMFLAGS);
