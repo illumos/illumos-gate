@@ -57,4 +57,6 @@ kmdb_unix_getcr4(void)
 	ret
 	SET_SIZE(kmdb_unix_getcr4)
 
+#endif	/* __i386 */
+
 #endif /* __lint */
