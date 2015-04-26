@@ -24,6 +24,11 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+
+#
+# Copyright (c) 2014 by Delphix. All rights reserved.
+#
+
 . $STF_SUITE/include/libtest.shlib
 . $STF_SUITE/tests/functional/cli_root/zpool_add/zpool_add.kshlib
 
@@ -63,7 +68,7 @@ log_must poolexists "$TESTPOOL"
 
 $ZPOOL add -n "$TESTPOOL" ${disk}s${SLICE1} > $tmpfile
 
-log_mustnot iscontained "$TESTPOOL" "${disk}s${SLICE1}"
+log_mustnot vdevs_in_pool "$TESTPOOL" "${disk}s${SLICE1}"
 
 str="would update '$TESTPOOL' to the following configuration:"
 $CAT $tmpfile | $GREP "$str" >/dev/null 2>&1

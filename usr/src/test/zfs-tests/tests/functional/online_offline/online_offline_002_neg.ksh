@@ -26,21 +26,21 @@
 #
 
 #
-# Copyright (c) 2013 by Delphix. All rights reserved.
+# Copyright (c) 2013, 2014 by Delphix. All rights reserved.
 #
 
 . $STF_SUITE/include/libtest.shlib
-. $STF_SUITE/tests/functional/online_offline/online_offline.cfg
 
 #
 # DESCRIPTION:
-# 	Turning both disks offline should fail.
+# Turning disks in a pool offline should fail when there is no longer
+# sufficient redundancy.
 #
 # STRATEGY:
-#	1. Create a mirror and start some random I/O
-#	2. For each disk in the mirror, set them offline sequentially.
-#	3. Only one disk can be offline at any one time.
-#	4. Verify the integrity of the file system and the resilvering.
+# 1. Start some random I/O on the mirror or raidz.
+# 2. Verify that we can offline as many disks as the redundancy level
+# will support, but not more.
+# 3. Verify the integrity of the file system and the resilvering.
 #
 
 verify_runnable "global"
@@ -49,13 +49,6 @@ DISKLIST=$(get_disklist $TESTPOOL)
 
 function cleanup
 {
-	if [[ -n "$child_pids" ]]; then
-		for wait_pid in $child_pids
-		do
-		        $KILL $wait_pid
-		done
-	fi
-
 	#
 	# Ensure we don't leave disks in the offline state
 	#
@@ -68,72 +61,70 @@ function cleanup
 
 	done
 
+	$KILL $killpid >/dev/null 2>&1
 	[[ -e $TESTDIR ]] && log_must $RM -rf $TESTDIR/*
 }
 
 log_assert "Turning both disks offline should fail."
 
-options=""
-options_display="default options"
-
 log_onexit cleanup
 
-[[ -n "$HOLES_FILESIZE" ]] && options=" $options -f $HOLES_FILESIZE "
+$FILE_TRUNC -f $((64 * 1024 * 1024)) -b 8192 -c 0 -r $TESTDIR/$TESTFILE1 &
+typeset killpid="$! "
 
-[[ -n "$HOLES_BLKSIZE" ]] && options="$options -b $HOLES_BLKSIZE "
+disks=($DISKLIST)
 
-[[ -n "$HOLES_COUNT" ]] && options="$options -c $HOLES_COUNT "
+#
+# The setup script will give us either a mirror or a raidz. The former can have
+# all but one vdev offlined, whereas with raidz there can be only one.
+#
+pooltype='mirror'
+$ZPOOL list -v $TESTPOOL | $GREP raidz >/dev/null 2>&1 && pooltype='raidz'
 
-[[ -n "$HOLES_SEED" ]] && options="$options -s $HOLES_SEED "
-
-[[ -n "$HOLES_FILEOFFSET" ]] && options="$options -o $HOLES_FILEOFFSET "
-
-options="$options -r "
-
-[[ -n "$options" ]] && options_display=$options
-
-child_pid=""
-
-typeset -i iters=2
-typeset -i index=0
-
-i=0
-while [[ $i -lt $iters ]]; do
-	log_note "Invoking $FILE_TRUNC with: $options_display"
-	$FILE_TRUNC $options $TESTDIR/$TESTFILE.$i &
-	typeset pid=$!
-
-	$SLEEP 1
-	if ! $PS -p $pid > /dev/null 2>&1; then
-		log_fail "$FILE_TRUNC $options $TESTDIR/$TESTFILE.$i"
+typeset -i i=0
+while [[ $i -lt ${#disks[*]} ]]; do
+	typeset -i j=0
+	if [[ $pooltype = 'mirror' ]]; then
+		# Hold one disk online, verify the others can be offlined.
+		log_must $ZPOOL online $TESTPOOL ${disks[$i]}
+		check_state $TESTPOOL ${disks[$i]} "online" || \
+		    log_fail "Failed to set ${disks[$i]} online"
+		while [[ $j -lt ${#disks[*]} ]]; do
+			if [[ $j -eq $i ]]; then
+				((j++))
+				continue
+			fi
+			log_must $ZPOOL offline $TESTPOOL ${disks[$j]}
+			check_state $TESTPOOL ${disks[$j]} "offline" || \
+			    log_fail "Failed to set ${disks[$j]} offline"
+			((j++))
+		done
+	elif [[ $pooltype = 'raidz' ]]; then
+		# Hold one disk offline, verify the others can't be offlined.
+		log_must $ZPOOL offline $TESTPOOL ${disks[$i]}
+		check_state $TESTPOOL ${disks[$i]} "offline" || \
+		    log_fail "Failed to set ${disks[$i]} offline"
+		while [[ $j -lt ${#disks[*]} ]]; do
+			if [[ $j -eq $i ]]; then
+				((j++))
+				continue
+			fi
+			log_mustnot $ZPOOL offline $TESTPOOL ${disks[$j]}
+			check_state $TESTPOOL ${disks[$j]} "online" || \
+			    log_fail "Failed to set ${disks[$j]} online"
+			check_state $TESTPOOL ${disks[$i]} "offline" || \
+			    log_fail "Failed to set ${disks[$i]} offline"
+			((j++))
+		done
+		log_must $ZPOOL online $TESTPOOL ${disks[$i]}
+		check_state $TESTPOOL ${disks[$i]} "online" || \
+		    log_fail "Failed to set ${disks[$i]} online"
 	fi
-
-	child_pids="$child_pids $pid"
-	((i = i + 1))
+	((i++))
 done
 
-set -A disk "" $DISKLIST
-
-log_must $ZPOOL offline $TESTPOOL ${disk[1]}
-
-$SLEEP 60
-
-for wait_pid in $child_pids
-do
-	$KILL $wait_pid
-done
-child_pids=""
-
-i=1
-while [[ $i != ${#disk[*]} ]]; do
-	log_must $ZPOOL online $TESTPOOL ${disk[$i]}
-	check_state $TESTPOOL ${disk[$i]} "online"
-	if [[ $? != 0 ]]; then
-		log_fail "${disk[$i]} of $TESTPOOL did not match online state"
-	fi
-
-	((i = i + 1))
-done
+log_must $KILL $killpid
+$SYNC
 
 typeset dir=$(get_device_dir $DISKS)
 verify_filesys "$TESTPOOL" "$TESTPOOL/$TESTFS" "$dir"

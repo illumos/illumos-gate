@@ -25,7 +25,7 @@
 #
 
 #
-# Copyright (c) 2013 by Delphix. All rights reserved.
+# Copyright (c) 2012, 2014 by Delphix. All rights reserved.
 #
 
 . ${STF_TOOLS}/contrib/include/logapi.shlib
@@ -2573,7 +2573,7 @@ function is_te_enabled
 # Utility function to determine if a system has multiple cpus.
 function is_mp
 {
-	(($(psrinfo -p) > 1))
+	(($($PSRINFO | $WC -l) > 1))
 }
 
 # Run the given command as the user provided.
@@ -2584,4 +2584,37 @@ function user_run
 
 	eval \$SU \$user -c \"$@\" > /tmp/out 2>/tmp/err
 	return $?
+}
+
+#
+# Check if the pool contains the specified vdevs
+#
+# $1 pool
+# $2..n <vdev> ...
+#
+# Return 0 if the vdevs are contained in the pool, 1 if any of the specified
+# vdevs is not in the pool, and 2 if pool name is missing.
+#
+function vdevs_in_pool
+{
+	typeset pool=$1
+	typeset vdev
+
+        if [[ -z $pool ]]; then
+                log_note "Missing pool name."
+                return 2
+        fi
+
+	shift
+
+	typeset tmpfile=$($MKTEMP)
+	$ZPOOL list -Hv "$pool" >$tmpfile
+	for vdev in $@; do
+		$GREP -w ${vdev##*/} $tmpfile >/dev/null 2>&1
+		[[ $? -ne 0 ]] && return 1
+	done
+
+	$RM -f $tmpfile
+
+	return 0;
 }
