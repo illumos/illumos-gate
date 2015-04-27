@@ -25,49 +25,11 @@
 #
 
 #
-# Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright (c) 2012, 2014 by Delphix. All rights reserved.
 #
 
 . $STF_SUITE/include/libtest.shlib
 . $STF_SUITE/tests/functional/cli_root/zpool_add/zpool_add.cfg
-
-#
-# check if the <pool> contains <vdev> ...
-#
-# $1 pool
-# $2..n <vdev> ...
-#
-# Return 0 if <vdev> are contained in the <pool>; 1 if not used; 2 if pool
-# name is missing
-#
-function iscontained
-{
-	typeset pool=$1
-	typeset vdev
-
-        if [[ -z $pool ]]; then
-                log_note "Missing pool name."
-                return 2
-        fi
-
-	shift
-
-	for vdev in $@; do
-
-# remove /dev/dsk in vdev if there is
-		$ECHO $vdev | $GREP "^/dev/dsk" >/dev/null 2>&1
-		(( $? == 0 )) && \
-			vdev=${vdev##*/}
-
-		$ZPOOL status "$pool" | $AWK '$1 == vdevname {exit 1}' \
-			vdevname=$vdev >/dev/null 2>&1
-		(( $? != 1 )) && \
-			return 1
-	done
-
-	return 0;
-
-}
 
 #
 # Find the storage device in /etc/vfstab

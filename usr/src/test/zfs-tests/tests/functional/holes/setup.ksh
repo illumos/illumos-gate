@@ -1,3 +1,5 @@
+#!/usr/bin/ksh
+
 #
 # This file and its contents are supplied under the terms of the
 # Common Development and Distribution License ("CDDL"), version 1.0.
@@ -10,27 +12,10 @@
 #
 
 #
-# Copyright (c) 2012, 2014 by Delphix. All rights reserved.
+# Copyright (c) 2014 by Delphix. All rights reserved.
 #
 
-.PARALLEL: $(SUBDIRS)
+. $STF_SUITE/include/libtest.shlib
 
-SUBDIRS = chg_usr_exec \
-	devname2devid \
-	dir_rd_update \
-	file_check \
-	file_trunc \
-	file_write \
-	getholes \
-	largest_file \
-	mkbusy \
-	mkholes \
-	mktree \
-	mmapwrite \
-	randfree_file \
-	readmmap \
-	rename_dir \
-	rm_lnkcnt_zero_file \
-	scripts
-
-include $(SRC)/test/Makefile.com
+DISK=${DISKS%% *}
+default_setup $DISK

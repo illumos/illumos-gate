@@ -24,6 +24,10 @@
 # Use is subject to license terms.
 #
 
+#
+# Copyright (c) 2014 by Delphix. All rights reserved.
+#
+
 . $STF_SUITE/include/libtest.shlib
 
 set -A VALID_NAME_CHAR a b c d e f g h i j k l m n o p q r s t u v w x y z \
@@ -132,6 +136,9 @@ function random_string
 	typeset -i len=${2:-5}
 
 	eval typeset -i count=\${#$char_set[@]}
+
+	# No consumers want an empty string.
+	((len == 0)) && len=3
 
 	typeset str
 	typeset -i i=0
