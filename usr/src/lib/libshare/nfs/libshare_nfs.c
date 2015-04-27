@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -1897,10 +1897,10 @@ nfs_enable_share(sa_share_t share)
 	}
 	/*
 	 * when we get here, we can do the exportfs system call and
-	 * initiate things. We probably want to enable the nfs.server
-	 * service first if it isn't running within SMF.
+	 * initiate things. We probably want to enable the
+	 * svc:/network/nfs/server service first if it isn't running.
 	 */
-	/* check nfs.server status and start if needed */
+	/* check svc:/network/nfs/server status and start if needed */
 	/* now add the share to the internal tables */
 	printarg(path, &export);
 	/*

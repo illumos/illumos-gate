@@ -373,10 +373,7 @@ file path=etc/inet/wanboot.conf.sample group=sys mode=0444
 file path=etc/init.d/PRESERVE group=sys mode=0744 preserve=true
 file path=etc/init.d/README group=sys preserve=true
 file path=etc/init.d/cachefs.daemon group=sys mode=0744 preserve=true
-file path=etc/init.d/ldap.client group=sys mode=0744
-file path=etc/init.d/nscd group=sys mode=0744
 file path=etc/init.d/sysetup group=sys mode=0744 preserve=true
-file path=etc/init.d/ufs_quota group=sys mode=0744 preserve=true
 file path=etc/inittab group=sys preserve=true
 file path=etc/ioctl.syscon group=sys preserve=true
 file path=etc/ksh.kshrc group=sys preserve=renameold

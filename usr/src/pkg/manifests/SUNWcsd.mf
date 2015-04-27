@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2015 Nexenta Systems, Inc. All rights reserved.
 #
 
 #
@@ -51,7 +52,6 @@ dir path=dev/zcons group=sys
 dir path=devices group=sys
 dir path=devices/pseudo group=sys
 dir path=etc group=sys
-dir path=etc/init.d group=sys
 dir path=etc/rcm group=sys
 dir path=etc/rcm/scripts group=sys
 dir path=etc/security group=sys
@@ -66,8 +66,6 @@ file path=etc/dacf.conf group=sys
 file path=etc/devlink.tab group=sys preserve=true
 file path=etc/driver_aliases group=sys preserve=true
 file path=etc/driver_classes group=sys preserve=true
-file path=etc/init.d/devlinks group=sys mode=0744 preserve=true
-file path=etc/init.d/drvconfig group=sys mode=0744 preserve=true
 file path=etc/iu.ap group=sys preserve=true
 file path=etc/minor_perm group=sys preserve=true
 file path=etc/name_to_major group=sys preserve=true
