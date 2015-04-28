@@ -22,6 +22,7 @@
 #
 # Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
+# Copyright 2015 Nexenta Systems, Inc. All rights reserved.
 #
 
 include		../../Makefile.cmd
@@ -32,13 +33,6 @@ i386_PROG=
 PROG=		\
 	README		\
 	cachefs.daemon	\
-	devlinks	\
-	drvconfig	\
-	ldap.client	\
-	nfs.server	\
-	nscd		\
-	sendmail	\
-	slpd		\
 	sysetup		\
 	uucp		\
 	$($(MACH)_PROG)

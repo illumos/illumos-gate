@@ -19,6 +19,7 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -62,14 +63,13 @@
 
 static kmem_cache_t	*smb_mbc_cache = NULL;
 
-int
+void
 smb_mbc_init(void)
 {
-	if (smb_mbc_cache == NULL) {
-		smb_mbc_cache = kmem_cache_create(SMBSRV_KSTAT_MBC_CACHE,
-		    sizeof (mbuf_chain_t), 8, NULL, NULL, NULL, NULL, NULL, 0);
-	}
-	return (0);
+	if (smb_mbc_cache != NULL)
+		return;
+	smb_mbc_cache = kmem_cache_create(SMBSRV_KSTAT_MBC_CACHE,
+	    sizeof (mbuf_chain_t), 8, NULL, NULL, NULL, NULL, NULL, 0);
 }
 
 void

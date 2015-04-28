@@ -808,7 +808,7 @@ smb_rename_check_attr(smb_request_t *sr, smb_node_t *node, uint16_t sattr)
 
 	bzero(&attr, sizeof (attr));
 	attr.sa_mask = SMB_AT_DOSATTR;
-	if (smb_node_getattr(sr, node, kcred, NULL, &attr) != 0)
+	if (smb_node_getattr(sr, node, zone_kcred(), NULL, &attr) != 0)
 		return (EACCES);
 
 	if ((attr.sa_dosattr & FILE_ATTRIBUTE_HIDDEN) &&

@@ -455,7 +455,7 @@ smb_open_subr(smb_request_t *sr)
 	if ((op->desired_access & ~FILE_READ_ATTRIBUTES) == DELETE)
 		lookup_flags &= ~SMB_FOLLOW_LINKS;
 
-	rc = smb_fsop_lookup_name(sr, kcred, lookup_flags,
+	rc = smb_fsop_lookup_name(sr, zone_kcred(), lookup_flags,
 	    sr->tid_tree->t_snode, op->fqi.fq_dnode, op->fqi.fq_last_comp,
 	    &op->fqi.fq_fnode);
 
@@ -466,7 +466,7 @@ smb_open_subr(smb_request_t *sr)
 		 * check the search attributes (sattr).
 		 */
 		op->fqi.fq_fattr.sa_mask = SMB_AT_DOSATTR;
-		rc = smb_node_getattr(sr, op->fqi.fq_fnode, kcred,
+		rc = smb_node_getattr(sr, op->fqi.fq_fnode, zone_kcred(),
 		    NULL, &op->fqi.fq_fattr);
 		if (rc != 0) {
 			smb_node_release(op->fqi.fq_fnode);
@@ -854,7 +854,7 @@ smb_open_subr(smb_request_t *sr)
 		 * so pass kcred here.
 		 */
 		op->fqi.fq_fattr.sa_mask = SMB_AT_ALL;
-		rc = smb_node_getattr(sr, node, kcred, of,
+		rc = smb_node_getattr(sr, node, zone_kcred(), of,
 		    &op->fqi.fq_fattr);
 		if (rc != 0) {
 			smbsr_error(sr, NT_STATUS_INTERNAL_ERROR,

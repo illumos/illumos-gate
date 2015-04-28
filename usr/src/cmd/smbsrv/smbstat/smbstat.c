@@ -20,6 +20,7 @@
  */
 
 /*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -307,18 +308,11 @@ main(int argc, char *argv[])
 	(void) setlocale(LC_ALL, "");
 	(void) textdomain(TEXT_DOMAIN);
 
-	if (getzoneid() != GLOBAL_ZONEID) {
-		(void) fprintf(stderr,
-		    gettext("%s: Cannot execute in non-global zone.\n"),
-		    argv[0]);
-		return (0);
-	}
-
 	if (is_system_labeled()) {
 		(void) fprintf(stderr,
 		    gettext("%s: Trusted Extensions not supported.\n"),
 		    argv[0]);
-		return (0);
+		return (1);
 	}
 
 	while ((c = getopt(argc, argv, "achnrtuz")) != EOF) {

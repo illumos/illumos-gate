@@ -119,8 +119,8 @@ static void smb_node_init_system(smb_node_t *);
 #define	SMB_ALLOCSZ(sz)	(((sz) + DEV_BSIZE-1) & ~(DEV_BSIZE-1))
 
 static kmem_cache_t	*smb_node_cache = NULL;
-static boolean_t	smb_node_initialized = B_FALSE;
 static smb_llist_t	smb_node_hash_table[SMBND_HASH_MASK+1];
+static smb_node_t	*smb_root_node;
 
 /*
  * smb_node_init
@@ -130,13 +130,18 @@ static smb_llist_t	smb_node_hash_table[SMBND_HASH_MASK+1];
  * This function is not multi-thread safe. The caller must make sure only one
  * thread makes the call.
  */
-int
+void
 smb_node_init(void)
 {
-	int	i;
+	smb_attr_t	attr;
+	smb_llist_t	*node_hdr;
+	smb_node_t	*node;
+	uint32_t	hashkey;
+	int		i;
 
-	if (smb_node_initialized)
-		return (0);
+	if (smb_node_cache != NULL)
+		return;
+
 	smb_node_cache = kmem_cache_create(SMBSRV_KSTAT_NODE_CACHE,
 	    sizeof (smb_node_t), 8, smb_node_constructor, smb_node_destructor,
 	    NULL, NULL, NULL, 0);
@@ -145,8 +150,21 @@ smb_node_init(void)
 		smb_llist_constructor(&smb_node_hash_table[i],
 		    sizeof (smb_node_t), offsetof(smb_node_t, n_lnd));
 	}
-	smb_node_initialized = B_TRUE;
-	return (0);
+
+	/*
+	 * The node cache is shared by all zones, so the smb_root_node
+	 * must represent the real (global zone) rootdir.
+	 * Note intentional use of kcred here.
+	 */
+	attr.sa_mask = SMB_AT_ALL;
+	VERIFY0(smb_vop_getattr(rootdir, NULL, &attr, 0, kcred));
+	node_hdr = smb_node_get_hash(&rootdir->v_vfsp->vfs_fsid, &attr,
+	    &hashkey);
+	node = smb_node_alloc("/", rootdir, node_hdr, hashkey);
+	smb_llist_enter(node_hdr, RW_WRITER);
+	smb_llist_insert_head(node_hdr, node);
+	smb_llist_exit(node_hdr);
+	smb_root_node = node;	/* smb_node_release in smb_node_fini */
 }
 
 /*
@@ -160,7 +178,12 @@ smb_node_fini(void)
 {
 	int	i;
 
-	if (!smb_node_initialized)
+	if (smb_root_node != NULL) {
+		smb_node_release(smb_root_node);
+		smb_root_node = NULL;
+	}
+
+	if (smb_node_cache == NULL)
 		return;
 
 #ifdef DEBUG
@@ -190,7 +213,6 @@ smb_node_fini(void)
 	}
 	kmem_cache_destroy(smb_node_cache);
 	smb_node_cache = NULL;
-	smb_node_initialized = B_FALSE;
 }
 
 /*
@@ -248,7 +270,7 @@ smb_node_lookup(
 	 * that's why kcred is used not the user's cred
 	 */
 	attr.sa_mask = SMB_AT_ALL;
-	error = smb_vop_getattr(vp, unnamed_vp, &attr, 0, kcred);
+	error = smb_vop_getattr(vp, unnamed_vp, &attr, 0, zone_kcred());
 	if (error)
 		return (NULL);
 
@@ -545,33 +567,28 @@ smb_node_rename(
 	}
 }
 
+/*
+ * Find/create an SMB node for the root of this zone and store it
+ * in *svrootp.  Also create nodes leading to this directory.
+ */
 int
-smb_node_root_init(vnode_t *vp, smb_server_t *sv, smb_node_t **root)
+smb_node_root_init(smb_server_t *sv, smb_node_t **svrootp)
 {
-	smb_attr_t	attr;
+	zone_t		*zone = curzone;
 	int		error;
-	uint32_t	hashkey;
-	smb_llist_t	*node_hdr;
-	smb_node_t	*node;
 
-	attr.sa_mask = SMB_AT_ALL;
-	error = smb_vop_getattr(vp, NULL, &attr, 0, kcred);
-	if (error) {
-		VN_RELE(vp);
-		return (error);
-	}
+	ASSERT(zone->zone_id == sv->sv_zid);
+	if (smb_root_node == NULL)
+		return (ENOENT);
 
-	node_hdr = smb_node_get_hash(&vp->v_vfsp->vfs_fsid, &attr, &hashkey);
+	/*
+	 * We're getting smb nodes below the zone root here,
+	 * so need to use kcred, not zone_kcred().
+	 */
+	error = smb_pathname(NULL, zone->zone_rootpath, 0,
+	    smb_root_node, smb_root_node, NULL, svrootp, kcred);
 
-	node = smb_node_alloc(ROOTVOL, vp, node_hdr, hashkey);
-
-	sv->si_root_smb_node = node;
-	smb_node_audit(node);
-	smb_llist_enter(node_hdr, RW_WRITER);
-	smb_llist_insert_head(node_hdr, node);
-	smb_llist_exit(node_hdr);
-	*root = node;
-	return (0);
+	return (error);
 }
 
 /*
@@ -597,7 +614,7 @@ smb_node_set_delete_on_close(smb_node_t *node, cred_t *cr, uint32_t flags)
 
 	bzero(&attr, sizeof (smb_attr_t));
 	attr.sa_mask = SMB_AT_DOSATTR;
-	rc = smb_fsop_getattr(NULL, kcred, node, &attr);
+	rc = smb_fsop_getattr(NULL, zone_kcred(), node, &attr);
 	if ((rc != 0) || (attr.sa_dosattr & FILE_ATTRIBUTE_READONLY)) {
 		return (-1);
 	}
@@ -770,7 +787,7 @@ smb_node_fcn_subscribe(smb_node_t *node, smb_request_t *sr)
 
 	mutex_enter(&fcn->fcn_mutex);
 	if (fcn->fcn_count == 0)
-		smb_fem_fcn_install(node);
+		(void) smb_fem_fcn_install(node);
 	fcn->fcn_count++;
 	list_insert_tail(&fcn->fcn_watchers, sr);
 	mutex_exit(&fcn->fcn_mutex);
@@ -966,7 +983,7 @@ smb_node_getmntpath(smb_node_t *node, char *buf, uint32_t buflen)
 	VN_HOLD(vp);
 
 	/* NULL is passed in as we want to start at "/" */
-	err = vnodetopath(NULL, root_vp, buf, buflen, kcred);
+	err = vnodetopath(NULL, root_vp, buf, buflen, zone_kcred());
 
 	VN_RELE(vp);
 	VN_RELE(root_vp);
@@ -1015,6 +1032,7 @@ smb_node_getpath(smb_node_t *node, vnode_t *rootvp, char *buf, uint32_t buflen)
 	int rc;
 	vnode_t *vp;
 	smb_node_t *unode, *dnode;
+	cred_t *kcr = zone_kcred();
 
 	unode = (SMB_IS_STREAM(node)) ? node->n_unode : node;
 	dnode = (smb_node_is_dir(unode)) ? unode : unode->n_dnode;
@@ -1024,10 +1042,10 @@ smb_node_getpath(smb_node_t *node, vnode_t *rootvp, char *buf, uint32_t buflen)
 	VN_HOLD(vp);
 	if (rootvp) {
 		VN_HOLD(rootvp);
-		rc = vnodetopath(rootvp, vp, buf, buflen, kcred);
+		rc = vnodetopath(rootvp, vp, buf, buflen, kcr);
 		VN_RELE(rootvp);
 	} else {
-		rc = vnodetopath(NULL, vp, buf, buflen, kcred);
+		rc = vnodetopath(NULL, vp, buf, buflen, kcr);
 	}
 	VN_RELE(vp);
 
@@ -1308,7 +1326,7 @@ smb_node_file_is_readonly(smb_node_t *node)
 
 	bzero(&attr, sizeof (smb_attr_t));
 	attr.sa_mask = SMB_AT_DOSATTR;
-	(void) smb_fsop_getattr(NULL, kcred, node, &attr);
+	(void) smb_fsop_getattr(NULL, zone_kcred(), node, &attr);
 	return ((attr.sa_dosattr & FILE_ATTRIBUTE_READONLY) != 0);
 }
 
@@ -1392,10 +1410,12 @@ smb_node_setattr(smb_request_t *sr, smb_node_t *node,
 		 * Setting the allocation size but not EOF position.
 		 * Get the current EOF in tmp_attr and (if necessary)
 		 * truncate to the (rounded up) allocation size.
+		 * Using kcred here because if we don't have access,
+		 * we want to fail at setattr below and not here.
 		 */
 		bzero(&tmp_attr, sizeof (smb_attr_t));
 		tmp_attr.sa_mask = SMB_AT_SIZE;
-		rc = smb_fsop_getattr(NULL, kcred, node, &tmp_attr);
+		rc = smb_fsop_getattr(NULL, zone_kcred(), node, &tmp_attr);
 		if (rc != 0)
 			return (rc);
 		attr->sa_allocsz = SMB_ALLOCSZ(attr->sa_allocsz);

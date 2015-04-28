@@ -18,6 +18,9 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2015 Circonus, Inc.  All rights reserved.
+ */
 
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
@@ -26,8 +29,6 @@
 
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Print the name of the siginfo indicated by "sig", along with the
@@ -46,7 +47,7 @@
 #define	strsignal(i)	(_libc_gettext(_sys_siglistp[i]))
 
 void
-psiginfo(siginfo_t *sip, char *s)
+psiginfo(const siginfo_t *sip, const char *s)
 {
 	char buf[256];
 	char *c;

@@ -19,6 +19,7 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -55,9 +56,10 @@ static uint32_t smb_vss_encode_gmttokens(smb_request_t *, smb_xa_t *,
     int32_t, smb_gmttoken_response_t *);
 static void smb_vss_remove_first_token_from_path(char *);
 
-static uint32_t smb_vss_get_count(char *);
-static void smb_vss_map_gmttoken(char *, char *, char *);
-static void smb_vss_get_snapshots(char *, uint32_t, smb_gmttoken_response_t *);
+static uint32_t smb_vss_get_count(smb_tree_t *, char *);
+static void smb_vss_map_gmttoken(smb_tree_t *, char *, char *, char *);
+static void smb_vss_get_snapshots(smb_tree_t *, char *,
+    uint32_t, smb_gmttoken_response_t *);
 static void smb_vss_get_snapshots_free(smb_gmttoken_response_t *);
 static int smb_vss_lookup_node(smb_request_t *sr, smb_node_t *, vnode_t *,
     char *, smb_node_t *, char *, smb_node_t **);
@@ -91,7 +93,7 @@ smb_vss_ioctl_enumerate_snaps(smb_request_t *sr, smb_xa_t *xa)
 		return (NT_STATUS_INVALID_PARAMETER);
 
 	if (xa->smb_mdrcnt == SMB_VSS_COUNT_SIZE) {
-		count = smb_vss_get_count(root_path);
+		count = smb_vss_get_count(sr->tid_tree, root_path);
 		if (smb_mbc_encodef(&xa->rep_data_mb, "lllw", count, 0,
 		    (count * SMB_VSS_GMT_NET_SIZE(sr) +
 		    smb_ascii_or_unicode_null_len(sr)), 0) != 0) {
@@ -100,7 +102,8 @@ smb_vss_ioctl_enumerate_snaps(smb_request_t *sr, smb_xa_t *xa)
 	} else {
 		count = xa->smb_mdrcnt / SMB_VSS_GMT_NET_SIZE(sr);
 
-		smb_vss_get_snapshots(root_path, count, &gmttokens);
+		smb_vss_get_snapshots(sr->tid_tree, root_path,
+		    count, &gmttokens);
 
 		status = smb_vss_encode_gmttokens(sr, xa, count, &gmttokens);
 
@@ -170,7 +173,7 @@ smb_vss_lookup_nodes(smb_request_t *sr, smb_node_t *root_node,
 		return (err);
 
 	*snapname = '\0';
-	smb_vss_map_gmttoken(path, gmttoken, snapname);
+	smb_vss_map_gmttoken(sr->tid_tree, path, gmttoken, snapname);
 	if (!*snapname)
 		return (ENOENT);
 
@@ -222,8 +225,8 @@ smb_vss_lookup_node(smb_request_t *sr, smb_node_t *node, vnode_t *fsrootvp,
 	if (err == 0) {
 		vp = smb_lookuppathvptovp(sr, path, fsrootvp, fsrootvp);
 		if (vp) {
-			*vss_node = smb_node_lookup(sr, NULL, kcred, vp,
-			    odname, dnode, NULL);
+			*vss_node = smb_node_lookup(sr, NULL, zone_kcred(),
+			    vp, odname, dnode, NULL);
 			VN_RELE(vp);
 		}
 	}
@@ -350,7 +353,7 @@ smb_vss_remove_first_token_from_path(char *path)
  * of the path provided.
  */
 static uint32_t
-smb_vss_get_count(char *resource_path)
+smb_vss_get_count(smb_tree_t *tree, char *resource_path)
 {
 	uint32_t	count = 0;
 	int		rc;
@@ -358,7 +361,7 @@ smb_vss_get_count(char *resource_path)
 
 	path.buf = resource_path;
 
-	rc = smb_kdoor_upcall(SMB_DR_VSS_GET_COUNT,
+	rc = smb_kdoor_upcall(tree->t_server, SMB_DR_VSS_GET_COUNT,
 	    &path, smb_string_xdr, &count, xdr_uint32_t);
 
 	if (rc != 0)
@@ -375,8 +378,8 @@ smb_vss_get_count(char *resource_path)
  * Call smb_vss_get_snapshots_free after to free up the data.
  */
 static void
-smb_vss_get_snapshots(char *resource_path, uint32_t count,
-    smb_gmttoken_response_t *gmttokens)
+smb_vss_get_snapshots(smb_tree_t *tree, char *resource_path,
+    uint32_t count, smb_gmttoken_response_t *gmttokens)
 {
 	smb_gmttoken_query_t	request;
 
@@ -384,7 +387,7 @@ smb_vss_get_snapshots(char *resource_path, uint32_t count,
 	request.gtq_path = resource_path;
 	bzero(gmttokens, sizeof (smb_gmttoken_response_t));
 
-	(void) smb_kdoor_upcall(SMB_DR_VSS_GET_SNAPSHOTS,
+	(void) smb_kdoor_upcall(tree->t_server, SMB_DR_VSS_GET_SNAPSHOTS,
 	    &request, smb_gmttoken_query_xdr,
 	    gmttokens, smb_gmttoken_response_xdr);
 }
@@ -401,7 +404,8 @@ smb_vss_get_snapshots_free(smb_gmttoken_response_t *reply)
  * is returned.
  */
 static void
-smb_vss_map_gmttoken(char *path, char *gmttoken, char *snapname)
+smb_vss_map_gmttoken(smb_tree_t *tree, char *path, char *gmttoken,
+    char *snapname)
 {
 	smb_gmttoken_snapname_t	request;
 	smb_string_t		result;
@@ -412,7 +416,7 @@ smb_vss_map_gmttoken(char *path, char *gmttoken, char *snapname)
 	request.gts_path = path;
 	request.gts_gmttoken = gmttoken;
 
-	(void) smb_kdoor_upcall(SMB_DR_VSS_MAP_GMTTOKEN,
+	(void) smb_kdoor_upcall(tree->t_server, SMB_DR_VSS_MAP_GMTTOKEN,
 	    &request, smb_gmttoken_snapname_xdr,
 	    &result, smb_string_xdr);
 }

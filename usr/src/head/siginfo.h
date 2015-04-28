@@ -20,6 +20,9 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2015 Circonus, Inc.  All rights reserved.
+ */
+/*
  * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  */
 /*	Copyright (c) 1988 AT&T	*/
@@ -40,17 +43,17 @@ struct siginfolist {
 	char **vsiginfo;
 };
 
-extern const char * _sys_illlist[];
-extern const char * _sys_fpelist[];
-extern const char * _sys_segvlist[];
-extern const char * _sys_buslist[];
-extern const char * _sys_traplist[];
-extern const char * _sys_cldlist[];
+extern const char *_sys_illlist[];
+extern const char *_sys_fpelist[];
+extern const char *_sys_segvlist[];
+extern const char *_sys_buslist[];
+extern const char *_sys_traplist[];
+extern const char *_sys_cldlist[];
 extern const struct siginfolist *_sys_siginfolistp;
 #define	_sys_siginfolist	_sys_siginfolistp
 
 extern void psignal(int, const char *);
-extern void psiginfo(siginfo_t *, char *);
+extern void psiginfo(const siginfo_t *, const char *);
 
 #ifdef	__cplusplus
 }

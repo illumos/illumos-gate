@@ -141,14 +141,11 @@
 #include <sys/sdt.h>
 #include <sys/spl.h>
 
-static int smb_legacy_dispatch_stats_update(kstat_t *, int);
 static int is_andx_com(unsigned char);
 static int smbsr_check_result(struct smb_request *, int, int);
 
-static kstat_t *smb_legacy_dispatch_ksp = NULL;
-static kmutex_t smb_legacy_dispatch_ksmtx;
-
-static smb_disp_entry_t	smb_disp_table[SMB_COM_NUM] = {
+static const smb_disp_entry_t const
+smb_disp_table[SMB_COM_NUM] = {
 	{ "SmbCreateDirectory", SMB_SDT_OPS(create_directory),  /* 0x00 000 */
 	    0x00, PC_NETWORK_PROGRAM_1_0 },
 	{ "SmbDeleteDirectory", SMB_SDT_OPS(delete_directory),	/* 0x01 001 */
@@ -184,8 +181,8 @@ static smb_disp_entry_t	smb_disp_table[SMB_COM_NUM] = {
 	{ "SmbCheckDirectory", SMB_SDT_OPS(check_directory),	/* 0x10 016 */
 	    0x10, PC_NETWORK_PROGRAM_1_0 },
 	{ "SmbProcessExit", SMB_SDT_OPS(process_exit),		/* 0x11 017 */
-	    0x11, PC_NETWORK_PROGRAM_1_0, SDDF_SUPPRESS_TID | SDDF_SUPPRESS_UID,
-	    0, 0, { 0 } },
+	    0x11, PC_NETWORK_PROGRAM_1_0,
+	    SDDF_SUPPRESS_TID | SDDF_SUPPRESS_UID },
 	{ "SmbSeek", SMB_SDT_OPS(seek),				/* 0x12 018 */
 	    0x12, PC_NETWORK_PROGRAM_1_0 },
 	{ "SmbLockAndRead", SMB_SDT_OPS(lock_and_read),		/* 0x13 019 */
@@ -307,11 +304,11 @@ static smb_disp_entry_t	smb_disp_table[SMB_COM_NUM] = {
 	{ "SmbTreeConnect", SMB_SDT_OPS(tree_connect),		/* 0x70 112 */
 	    0x70, PC_NETWORK_PROGRAM_1_0, SDDF_SUPPRESS_TID },
 	{ "SmbTreeDisconnect", SMB_SDT_OPS(tree_disconnect),	/* 0x71 113 */
-	    0x71, PC_NETWORK_PROGRAM_1_0, SDDF_SUPPRESS_TID | SDDF_SUPPRESS_UID,
-	    NULL },
+	    0x71, PC_NETWORK_PROGRAM_1_0,
+	    SDDF_SUPPRESS_TID | SDDF_SUPPRESS_UID },
 	{ "SmbNegotiate", SMB_SDT_OPS(negotiate),		/* 0x72 114 */
-	    0x72, PC_NETWORK_PROGRAM_1_0, SDDF_SUPPRESS_TID | SDDF_SUPPRESS_UID,
-	    NULL },
+	    0x72, PC_NETWORK_PROGRAM_1_0,
+	    SDDF_SUPPRESS_TID | SDDF_SUPPRESS_UID },
 	{ "SmbSessionSetupX", SMB_SDT_OPS(session_setup_andx),	/* 0x73 115 */
 	    0x73, LANMAN1_0, SDDF_SUPPRESS_TID | SDDF_SUPPRESS_UID },
 	{ "SmbLogoffX", SMB_SDT_OPS(logoff_andx),		/* 0x74 116 */
@@ -519,14 +516,17 @@ boolean_t
 smb_dispatch_request(struct smb_request *sr)
 {
 	smb_sdrc_t		sdrc;
-	smb_disp_entry_t	*sdd;
+	const smb_disp_entry_t	*sdd;
+	smb_disp_stats_t	*sds;
 	boolean_t		disconnect = B_FALSE;
 	smb_session_t		*session;
+	smb_server_t		*server;
 	uint32_t		capabilities;
 	uint32_t		byte_count;
 	uint32_t		max_bytes;
 
 	session = sr->session;
+	server = session->s_server;
 	capabilities = session->capabilities;
 
 	ASSERT(sr->tid_tree == 0);
@@ -535,7 +535,7 @@ smb_dispatch_request(struct smb_request *sr)
 	sr->smb_fid = (uint16_t)-1;
 
 	/* temporary until we identify a user */
-	sr->user_cr = kcred;
+	sr->user_cr = zone_kcred();
 	sr->orig_request_hdr = sr->command.chain_offset;
 
 	/* If this connection is shutting down just kill request */
@@ -603,6 +603,7 @@ smb_dispatch_request(struct smb_request *sr)
 andx_more:
 	sdd = &smb_disp_table[sr->smb_com];
 	ASSERT(sdd->sdt_function);
+	sds = &server->sv_disp_stats[sr->smb_com];
 
 	if (smb_mbc_decodef(&sr->command, "b", &sr->smb_wct) != 0) {
 		disconnect = B_TRUE;
@@ -617,7 +618,7 @@ andx_more:
 		goto report_error;
 	}
 
-	atomic_add_64(&sdd->sdt_rxb,
+	atomic_add_64(&sds->sdt_rxb,
 	    (int64_t)(sr->smb_wct * 2 + sr->smb_bcc + 1));
 	sr->sr_txb = sr->reply.chain_offset;
 
@@ -727,9 +728,9 @@ andx_more:
 		(*sdd->sdt_post_op)(sr);
 		smbsr_cleanup(sr);
 	}
-	smb_latency_add_sample(&sdd->sdt_lat, gethrtime() - sr->sr_time_start);
+	smb_latency_add_sample(&sds->sdt_lat, gethrtime() - sr->sr_time_start);
 
-	atomic_add_64(&sdd->sdt_txb,
+	atomic_add_64(&sds->sdt_txb,
 	    (int64_t)(sr->reply.chain_offset - sr->sr_txb));
 
 	if (sdrc != SDRC_SUCCESS) {
@@ -972,12 +973,12 @@ smbsr_send_reply(smb_request_t *sr)
  * Map errno values to SMB and NT status values.
  * Note: ESRCH is a special case to handle a streams lookup failure.
  */
-static struct {
+static const struct {
 	int errnum;
 	int errcls;
 	int errcode;
 	DWORD status32;
-} smb_errno_map[] = {
+} const smb_errno_map[] = {
 	{ ENOSPC,	ERRDOS, ERROR_DISK_FULL, NT_STATUS_DISK_FULL },
 	{ EDQUOT,	ERRDOS, ERROR_DISK_FULL, NT_STATUS_DISK_FULL },
 	{ EPERM,	ERRSRV, ERRaccess, NT_STATUS_ACCESS_DENIED },
@@ -1186,14 +1187,17 @@ smb_com_invalid(smb_request_t *sr)
  * Initializes dispatch statistics.
  */
 void
-smb_dispatch_stats_init(smb_kstat_req_t *ksr)
+smb_dispatch_stats_init(smb_server_t *sv)
 {
-	kstat_named_t	*ksn;
+	smb_disp_stats_t *sds = sv->sv_disp_stats;
+	smb_kstat_req_t *ksr;
 	int		ks_ndata;
 	int		i;
 
+	ksr = ((smbsrv_kstats_t *)sv->sv_ksp->ks_data)->ks_reqs;
+
 	for (i = 0; i < SMB_COM_NUM; i++, ksr++) {
-		smb_latency_init(&smb_disp_table[i].sdt_lat);
+		smb_latency_init(&sds[i].sdt_lat);
 		(void) strlcpy(ksr->kr_name, smb_disp_table[i].sdt_name,
 		    sizeof (ksr->kr_name));
 	}
@@ -1201,30 +1205,6 @@ smb_dispatch_stats_init(smb_kstat_req_t *ksr)
 	for (i = 0, ks_ndata = 0; i < SMB_COM_NUM; i++) {
 		if (smb_disp_table[i].sdt_function != smb_com_invalid)
 			ks_ndata++;
-	}
-
-	smb_legacy_dispatch_ksp = kstat_create(SMBSRV_KSTAT_MODULE, 0,
-	    SMBSRV_KSTAT_NAME_CMDS, SMBSRV_KSTAT_CLASS,
-	    KSTAT_TYPE_NAMED, ks_ndata, 0);
-
-	if (smb_legacy_dispatch_ksp != NULL) {
-		ksn = smb_legacy_dispatch_ksp->ks_data;
-
-		for (i = 0, ks_ndata = 0; i < SMB_COM_NUM; i++) {
-			if (smb_disp_table[i].sdt_function != smb_com_invalid) {
-				(void) strlcpy(ksn->name,
-				    smb_disp_table[i].sdt_name,
-				    sizeof (ksn->name));
-				ksn->data_type = KSTAT_DATA_UINT64;
-				++ksn;
-			}
-		}
-		mutex_init(&smb_legacy_dispatch_ksmtx, NULL,
-		    MUTEX_DEFAULT, NULL);
-		smb_legacy_dispatch_ksp->ks_update =
-		    smb_legacy_dispatch_stats_update;
-		smb_legacy_dispatch_ksp->ks_lock = &smb_legacy_dispatch_ksmtx;
-		kstat_install(smb_legacy_dispatch_ksp);
 	}
 }
 
@@ -1234,23 +1214,20 @@ smb_dispatch_stats_init(smb_kstat_req_t *ksr)
  * Frees and destroyes the resources used for statistics.
  */
 void
-smb_dispatch_stats_fini(void)
+smb_dispatch_stats_fini(smb_server_t *sv)
 {
+	smb_disp_stats_t *sds = sv->sv_disp_stats;
 	int	i;
 
-	if (smb_legacy_dispatch_ksp != NULL) {
-		kstat_delete(smb_legacy_dispatch_ksp);
-		mutex_destroy(&smb_legacy_dispatch_ksmtx);
-		smb_legacy_dispatch_ksp = NULL;
-	}
-
 	for (i = 0; i < SMB_COM_NUM; i++)
-		smb_latency_destroy(&smb_disp_table[i].sdt_lat);
+		smb_latency_destroy(&sds[i].sdt_lat);
 }
 
 void
-smb_dispatch_stats_update(smb_kstat_req_t *ksr, int first, int nreq)
+smb_dispatch_stats_update(smb_server_t *sv,
+    smb_kstat_req_t *ksr, int first, int nreq)
 {
+	smb_disp_stats_t *sds = sv->sv_disp_stats;
 	int	i;
 	int	last;
 
@@ -1258,56 +1235,22 @@ smb_dispatch_stats_update(smb_kstat_req_t *ksr, int first, int nreq)
 
 	if ((first < SMB_COM_NUM) && (last < SMB_COM_NUM))  {
 		for (i = first; i <= last; i++, ksr++) {
-			ksr->kr_rxb = smb_disp_table[i].sdt_rxb;
-			ksr->kr_txb = smb_disp_table[i].sdt_txb;
-			mutex_enter(&smb_disp_table[i].sdt_lat.ly_mutex);
-			ksr->kr_nreq = smb_disp_table[i].sdt_lat.ly_a_nreq;
-			ksr->kr_sum = smb_disp_table[i].sdt_lat.ly_a_sum;
-			ksr->kr_a_mean = smb_disp_table[i].sdt_lat.ly_a_mean;
+			ksr->kr_rxb = sds[i].sdt_rxb;
+			ksr->kr_txb = sds[i].sdt_txb;
+			mutex_enter(&sds[i].sdt_lat.ly_mutex);
+			ksr->kr_nreq = sds[i].sdt_lat.ly_a_nreq;
+			ksr->kr_sum = sds[i].sdt_lat.ly_a_sum;
+			ksr->kr_a_mean = sds[i].sdt_lat.ly_a_mean;
 			ksr->kr_a_stddev =
-			    smb_disp_table[i].sdt_lat.ly_a_stddev;
-			ksr->kr_d_mean = smb_disp_table[i].sdt_lat.ly_d_mean;
+			    sds[i].sdt_lat.ly_a_stddev;
+			ksr->kr_d_mean = sds[i].sdt_lat.ly_d_mean;
 			ksr->kr_d_stddev =
-			    smb_disp_table[i].sdt_lat.ly_d_stddev;
-			smb_disp_table[i].sdt_lat.ly_d_mean = 0;
-			smb_disp_table[i].sdt_lat.ly_d_nreq = 0;
-			smb_disp_table[i].sdt_lat.ly_d_stddev = 0;
-			smb_disp_table[i].sdt_lat.ly_d_sum = 0;
-			mutex_exit(&smb_disp_table[i].sdt_lat.ly_mutex);
+			    sds[i].sdt_lat.ly_d_stddev;
+			sds[i].sdt_lat.ly_d_mean = 0;
+			sds[i].sdt_lat.ly_d_nreq = 0;
+			sds[i].sdt_lat.ly_d_stddev = 0;
+			sds[i].sdt_lat.ly_d_sum = 0;
+			mutex_exit(&sds[i].sdt_lat.ly_mutex);
 		}
-	}
-}
-
-/*
- * smb_legacy_dispatch_stats_update
- *
- * This callback function updates the smb_legacy_dispatch_kstat_data when kstat
- * command is invoked.
- */
-static int
-smb_legacy_dispatch_stats_update(kstat_t *ksp, int rw)
-{
-	kstat_named_t   *ksn;
-	int		i;
-
-	ASSERT(MUTEX_HELD(ksp->ks_lock));
-
-	switch (rw) {
-	case KSTAT_WRITE:
-		return (EACCES);
-
-	case KSTAT_READ:
-		ksn = ksp->ks_data;
-		for (i = 0; i < SMB_COM_NUM; i++) {
-			if (smb_disp_table[i].sdt_function != smb_com_invalid) {
-				ksn->value.ui64 =
-				    smb_disp_table[i].sdt_lat.ly_a_nreq;
-				++ksn;
-			}
-		}
-		return (0);
-
-	default:
-		return (EIO);
 	}
 }

@@ -193,7 +193,7 @@
 #include <smbsrv/smb_kproto.h>
 #include <smbsrv/smbinfo.h>
 
-static smb_xlate_t smb_dialect[] = {
+static const smb_xlate_t smb_dialect[] = {
 	{ DIALECT_UNKNOWN,		"DIALECT_UNKNOWN" },
 	{ PC_NETWORK_PROGRAM_1_0,	"PC NETWORK PROGRAM 1.0" },
 	{ PCLAN1_0,			"PCLAN1.0" },
@@ -486,7 +486,7 @@ smb_com_negotiate(smb_request_t *sr)
 static int
 smb_xlate_dialect(const char *dialect)
 {
-	smb_xlate_t	*dp;
+	const smb_xlate_t *dp;
 	int		i;
 
 	for (i = 0; i < sizeof (smb_dialect) / sizeof (smb_dialect[0]); ++i) {

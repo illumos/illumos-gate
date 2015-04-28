@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2015 Nexenta Systems, Inc. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/service/network/slp@$(PKGVERS)
@@ -32,7 +33,6 @@ set name=info.classification \
 set name=variant.arch value=$(ARCH)
 dir path=etc group=sys
 dir path=etc/inet group=sys
-dir path=etc/init.d group=sys
 dir path=lib
 dir path=lib/svc
 dir path=lib/svc/manifest group=sys
@@ -53,7 +53,6 @@ dir path=usr/share/man/man3slp
 dir path=usr/share/man/man4
 dir path=usr/share/man/man7p
 file path=etc/inet/slp.conf.example group=sys
-file path=etc/init.d/slpd group=sys mode=0744
 file path=lib/svc/manifest/network/slp.xml group=sys mode=0444
 file path=lib/svc/method/slp mode=0555
 file path=usr/include/slp.h

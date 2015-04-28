@@ -172,8 +172,8 @@
 static boolean_t smb_user_is_logged_in(smb_user_t *);
 static int smb_user_enum_private(smb_user_t *, smb_svcenum_t *);
 static void smb_user_setcred(smb_user_t *, cred_t *, uint32_t);
-static void smb_user_nonauth_logon(uint32_t);
-static void smb_user_auth_logoff(uint32_t);
+static void smb_user_nonauth_logon(smb_user_t *);
+static void smb_user_auth_logoff(smb_user_t *);
 
 /*
  * Create a new user.
@@ -196,7 +196,7 @@ smb_user_login(
 	ASSERT(account_name);
 	ASSERT(domain_name);
 
-	user = kmem_cache_alloc(session->s_server->si_cache_user, KM_SLEEP);
+	user = kmem_cache_alloc(smb_cache_user, KM_SLEEP);
 	bzero(user, sizeof (smb_user_t));
 	user->u_refcnt = 1;
 	user->u_session = session;
@@ -222,7 +222,7 @@ smb_user_login(
 	}
 	smb_mem_free(user->u_name);
 	smb_mem_free(user->u_domain);
-	kmem_cache_free(session->s_server->si_cache_user, user);
+	kmem_cache_free(smb_cache_user, user);
 	return (NULL);
 }
 
@@ -247,7 +247,7 @@ smb_user_dup(
 	    orig_user->u_privileges, orig_user->u_audit_sid);
 
 	if (user)
-		smb_user_nonauth_logon(orig_user->u_audit_sid);
+		smb_user_nonauth_logon(orig_user);
 
 	return (user);
 }
@@ -275,7 +275,7 @@ smb_user_logoff(
 		user->u_state = SMB_USER_STATE_LOGGING_OFF;
 		mutex_exit(&user->u_mutex);
 		smb_session_disconnect_owned_trees(user->u_session, user);
-		smb_user_auth_logoff(user->u_audit_sid);
+		smb_user_auth_logoff(user);
 		mutex_enter(&user->u_mutex);
 		user->u_state = SMB_USER_STATE_LOGGED_OFF;
 		smb_server_dec_users(user->u_server);
@@ -518,7 +518,7 @@ smb_user_delete(void *arg)
 		crfree(user->u_privcred);
 	smb_mem_free(user->u_name);
 	smb_mem_free(user->u_domain);
-	kmem_cache_free(user->u_server->si_cache_user, user);
+	kmem_cache_free(smb_cache_user, user);
 }
 
 cred_t *
@@ -673,28 +673,32 @@ smb_user_netinfo_fini(smb_netuserinfo_t *info)
 }
 
 static void
-smb_user_nonauth_logon(uint32_t audit_sid)
+smb_user_nonauth_logon(smb_user_t *user)
 {
-	(void) smb_kdoor_upcall(SMB_DR_USER_NONAUTH_LOGON,
+	uint32_t audit_sid = user->u_audit_sid;
+
+	(void) smb_kdoor_upcall(user->u_server, SMB_DR_USER_NONAUTH_LOGON,
 	    &audit_sid, xdr_uint32_t, NULL, NULL);
 }
 
 static void
-smb_user_auth_logoff(uint32_t audit_sid)
+smb_user_auth_logoff(smb_user_t *user)
 {
-	(void) smb_kdoor_upcall(SMB_DR_USER_AUTH_LOGOFF,
+	uint32_t audit_sid = user->u_audit_sid;
+
+	(void) smb_kdoor_upcall(user->u_server, SMB_DR_USER_AUTH_LOGOFF,
 	    &audit_sid, xdr_uint32_t, NULL, NULL);
 }
 
 smb_token_t *
-smb_get_token(smb_logon_t *user_info)
+smb_get_token(smb_session_t *session, smb_logon_t *user_info)
 {
 	smb_token_t	*token;
 	int		rc;
 
 	token = kmem_zalloc(sizeof (smb_token_t), KM_SLEEP);
 
-	rc = smb_kdoor_upcall(SMB_DR_USER_AUTH_LOGON,
+	rc = smb_kdoor_upcall(session->s_server, SMB_DR_USER_AUTH_LOGON,
 	    user_info, smb_logon_xdr, token, smb_token_xdr);
 
 	if (rc != 0) {

@@ -19,6 +19,7 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -39,7 +40,7 @@ struct unicode_cp {
 	smb_wchar_t upper;
 };
 
-struct unicode_cp a_unicode[] = {
+const struct unicode_cp a_unicode[] = {
 	{ 0x0000, CODEPAGE_ISNONE, 0xFFFF, 0xFFFF },
 	{ 0x0001, CODEPAGE_ISNONE, 0xFFFF, 0xFFFF },
 	{ 0x0002, CODEPAGE_ISNONE, 0xFFFF, 0xFFFF },
