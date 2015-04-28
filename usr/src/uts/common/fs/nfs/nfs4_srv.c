@@ -1692,7 +1692,8 @@ rfs4_op_create(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 		/*
 		 * symlink names must be treated as data
 		 */
-		lnm = utf8_to_str(&args->ftype4_u.linkdata, &llen, NULL);
+		lnm = utf8_to_str((utf8string *)&args->ftype4_u.linkdata,
+		    &llen, NULL);
 
 		if (lnm == NULL) {
 			*cs->statusp = resp->status = NFS4ERR_INVAL;
@@ -3853,7 +3854,7 @@ rfs4_op_readlink(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	/*
 	 * treat link name as data
 	 */
-	(void) str_to_utf8(name, &resp->link);
+	(void) str_to_utf8(name, (utf8string *)&resp->link);
 
 	if (name != data)
 		kmem_free(name, MAXPATHLEN + 1);
@@ -3869,7 +3870,7 @@ static void
 rfs4_op_readlink_free(nfs_resop4 *resop)
 {
 	READLINK4res *resp = &resop->nfs_resop4_u.opreadlink;
-	utf8string *symlink = &resp->link;
+	utf8string *symlink = (utf8string *)&resp->link;
 
 	if (symlink->utf8string_val) {
 		UTF8STRING_FREE(*symlink)

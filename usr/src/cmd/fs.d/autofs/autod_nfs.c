@@ -18,7 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -68,6 +70,7 @@
 #include <assert.h>
 #include <nfs/nfs_clnt.h>
 #include <rpcsvc/nfs4_prot.h>
+#include <nfs/nfs4.h>
 #define	NO_RDDIR_CACHE
 #include "automount.h"
 #include "replica.h"

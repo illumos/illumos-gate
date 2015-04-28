@@ -18,12 +18,14 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ */
+
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- */
-/*
- * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  */
 
 #ifndef _NFS4_H
@@ -49,9 +51,19 @@
 extern "C" {
 #endif
 
-#define	NFS4_MAX_UTF8STRING	65536
-#define	NFS4_MAX_PATHNAME4	65536
 #define	NFS4_MAX_SECOID4	65536
+#define	NFS4_MAX_UTF8STRING	65536
+#define	NFS4_MAX_LINKTEXT4	65536
+#define	NFS4_MAX_PATHNAME4	65536
+
+struct nfs_fsl_info {
+	uint_t netbuf_len;
+	uint_t netnm_len;
+	uint_t knconf_len;
+	char *netname;
+	struct netbuf *addr;
+	struct knetconfig *knconf;
+};
 
 #ifdef _KERNEL
 

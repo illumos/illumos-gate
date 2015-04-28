@@ -10,21 +10,21 @@
 #
 
 #
-# Copyright (c) 2013, 2014 by Delphix. All rights reserved.
+# Copyright (c) 2014 by Delphix. All rights reserved.
 #
 
 include $(SRC)/Makefile.master
 
 ROOTOPTPKG = $(ROOT)/opt/zfs-tests
-TESTDIR = $(ROOTOPTPKG)/tests/functional/online_offline
+TESTDIR = $(ROOTOPTPKG)/tests/functional/holes
 
 PROGS = cleanup \
-	online_offline_001_pos \
-	online_offline_002_neg \
-	online_offline_003_neg \
+	holes_sanity \
 	setup
 
-CMDS = $(PROGS:%=$(TESTDIR)/%)
+FILES = holes.shlib
+
+CMDS = $(PROGS:%=$(TESTDIR)/%) $(FILES:%=$(TESTDIR)/%)
 $(CMDS) := FILEMODE = 0555
 
 all lint clean clobber:

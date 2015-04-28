@@ -26,108 +26,56 @@
 #
 
 #
-# Copyright (c) 2013 by Delphix. All rights reserved.
+# Copyright (c) 2013, 2014 by Delphix. All rights reserved.
 #
 
 . $STF_SUITE/include/libtest.shlib
-. $STF_SUITE/tests/functional/online_offline/online_offline.cfg
 
 #
 # DESCRIPTION:
-# 	Turning both disks offline should fail.
+# Offlining disks in a non-redundant pool should fail.
 #
 # STRATEGY:
-#	1. Create a multidisk stripe and start some random I/O
-#	2. For two disks in the stripe, set them offline sequentially.
-#	3. Zpool offline should fail in both cases.
-#	4. Verify the integrity of the file system and the resilvering.
+# 1. Create a multidisk stripe and start some random I/O
+# 2. zpool offline should fail on each disk.
 #
 
 verify_runnable "global"
 
-DISKLIST=$(get_disklist $TESTPOOL)
-
 function cleanup
 {
-	if [[ -n "$child_pids" ]]; then
-		for wait_pid in $child_pids
-		do
-		        $KILL $wait_pid
-		done
-	fi
-
 	if poolexists $TESTPOOL1; then
 		destroy_pool $TESTPOOL1
 	fi
 
+	$KILL $killpid >/dev/null 2>&1
 	[[ -e $TESTDIR ]] && log_must $RM -rf $TESTDIR/*
 }
 
-log_assert "Turning a disk offline and back online during I/O completes."
-
-options=""
-options_display="default options"
+log_assert "Offlining disks in a non-redundant pool should fail."
 
 log_onexit cleanup
 
-[[ -n "$HOLES_FILESIZE" ]] && options=" $options -f $HOLES_FILESIZE "
-
-[[ -n "$HOLES_BLKSIZE" ]] && options="$options -b $HOLES_BLKSIZE "
-
-[[ -n "$HOLES_COUNT" ]] && options="$options -c $HOLES_COUNT "
-
-[[ -n "$HOLES_SEED" ]] && options="$options -s $HOLES_SEED "
-
-[[ -n "$HOLES_FILEOFFSET" ]] && options="$options -o $HOLES_FILEOFFSET "
-
-options="$options -r "
-
-[[ -n "$options" ]] && options_display=$options
-
-child_pid=""
-
-typeset -i iters=2
-typeset -i index=0
-
 specials_list=""
-i=0
-while [[ $i != 3 ]]; do
-	$MKFILE 100m $TESTDIR/$TESTFILE1.$i
+for i in 0 1 2; do
+	$MKFILE 64m $TESTDIR/$TESTFILE1.$i
 	specials_list="$specials_list $TESTDIR/$TESTFILE1.$i"
-
-	((i = i + 1))
 done
+disk=($specials_list)
 
 create_pool $TESTPOOL1 $specials_list
 log_must $ZFS create $TESTPOOL1/$TESTFS1
 log_must $ZFS set mountpoint=$TESTDIR1 $TESTPOOL1/$TESTFS1
 
-i=0
-while [[ $i -lt $iters ]]; do
-	log_note "Invoking $FILE_TRUNC with: $options_display"
-	$FILE_TRUNC $options $TESTDIR/$TESTFILE.$i &
-	typeset pid=$!
+$FILE_TRUNC -f $((64 * 1024 * 1024)) -b 8192 -c 0 -r $TESTDIR/$TESTFILE1 &
+typeset killpid="$! "
 
-	$SLEEP 1
-	if ! $PS -p $pid > /dev/null 2>&1; then
-		log_fail "$FILE_TRUNC $options $TESTDIR/$TESTFILE.$i"
-	fi
-
-	child_pids="$child_pids $pid"
-	((i = i + 1))
+for i in 0 1 2; do
+	log_mustnot $ZPOOL offline $TESTPOOL1 ${disk[$i]}
+	check_state $TESTPOOL1 ${disk[$i]} "online"
 done
 
-set -A disk "" $specials_list
-
-log_mustnot $ZPOOL offline $TESTPOOL1 ${disk[1]}
-log_mustnot $ZPOOL offline $TESTPOOL1 ${disk[2]}
-
-$SLEEP 60
-
-for wait_pid in $child_pids
-do
-	$KILL $wait_pid
-done
-child_pids=""
+log_must $KILL $killpid
+$SYNC
 
 log_pass

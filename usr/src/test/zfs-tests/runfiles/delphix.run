@@ -351,6 +351,9 @@ tests = ['history_001_pos', 'history_002_pos', 'history_003_pos',
     'history_004_pos', 'history_005_neg', 'history_006_neg', 'history_007_pos',
     'history_008_pos', 'history_009_pos', 'history_010_pos']
 
+[/opt/zfs-tests/tests/functional/holes]
+tests = ['holes_sanity']
+
 [/opt/zfs-tests/tests/functional/inheritance]
 tests = ['inherit_001_pos']
 pre =
@@ -455,7 +458,7 @@ tests = ['rootpool_002_neg', 'rootpool_003_neg', 'rootpool_007_neg']
 tests = ['rsend_001_pos', 'rsend_002_pos', 'rsend_003_pos', 'rsend_004_pos',
     'rsend_005_pos', 'rsend_006_pos', 'rsend_007_pos', 'rsend_008_pos',
     'rsend_009_pos', 'rsend_010_pos', 'rsend_011_pos', 'rsend_012_pos',
-    'rsend_013_pos']
+    'rsend_013_pos', 'rsend_014_pos']
 
 [/opt/zfs-tests/tests/functional/scrub_mirror]
 tests = ['scrub_mirror_001_pos', 'scrub_mirror_002_pos',

@@ -25,6 +25,10 @@
 # Use is subject to license terms.
 #
 
+#
+# Copyright (c) 2014 by Delphix. All rights reserved.
+#
+
 . $STF_SUITE/tests/functional/cli_root/zfs_set/zfs_set_common.kshlib
 
 #
@@ -81,7 +85,7 @@ function verify_readonly # $1 dataset, $2 on|off
 	typeset value=$2
 
 	if datasetnonexists $dataset ; then
-		log_note "$dataset not exist!"
+		log_note "$dataset does not exist!"
 		return 1
 	fi
 
@@ -98,18 +102,19 @@ function verify_readonly # $1 dataset, $2 on|off
 			typeset mtpt=$(get_prop mountpoint $dataset)
 			$expect $TOUCH $mtpt/$TESTFILE1
 			$expect $MKDIR -p $mtpt/$TESTDIR1
-			$expect $ECHO 'y' | $RM $mtpt/$TESTFILE0
+			$expect eval "$ECHO 'y' | $RM $mtpt/$TESTFILE0"
 			$expect $RMDIR $mtpt/$TESTDIR0
 
 			if [[ $expect == "log_must" ]] ; then
-				log_must $ECHO 'y' | $RM $mtpt/$TESTFILE1
+				log_must eval "$ECHO 'y' | $RM $mtpt/$TESTFILE1"
 				log_must $RMDIR $mtpt/$TESTDIR1
 				log_must $TOUCH $mtpt/$TESTFILE0
 				log_must $MKDIR -p $mtpt/$TESTDIR0
 			fi
 			;;
 		volume)
-			$expect eval "$ECHO 'y' | $NEWFS /dev/zvol/dsk/$dataset > /dev/null 2>&1"
+			$expect eval "$ECHO 'y' | $NEWFS \
+			    /dev/zvol/dsk/$dataset > /dev/null 2>&1"
 			;;
 		*)
 			;;
@@ -132,7 +137,8 @@ log_must $ZFS clone $TESTPOOL/$TESTFS@$TESTSNAP $TESTPOOL/$TESTCLONE
 if is_global_zone ; then
 	log_must $ZFS snapshot $TESTPOOL/$TESTVOL@$TESTSNAP
 	log_must $ZFS clone $TESTPOOL/$TESTVOL@$TESTSNAP $TESTPOOL/$TESTCLONE1
-	all_datasets="$TESTPOOL $TESTPOOL/$TESTFS $TESTPOOL/$TESTVOL $TESTPOOL/$TESTCLONE $TESTPOOL/$TESTCLONE1"
+	all_datasets="$TESTPOOL $TESTPOOL/$TESTFS $TESTPOOL/$TESTVOL "
+	all_datasets+="$TESTPOOL/$TESTCLONE $TESTPOOL/$TESTCLONE1"
 else
 	all_datasets="$TESTPOOL $TESTPOOL/$TESTFS $TESTPOOL/$TESTCLONE"
 fi
