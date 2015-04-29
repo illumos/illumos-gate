@@ -1467,16 +1467,10 @@ main(int argc, char **argv)
 
 	progname = basename(argv[0]);
 
-	if (getzoneid() != GLOBAL_ZONEID) {
-		(void) fprintf(stderr,
-		    gettext("cannot execute in non-global zone\n"));
-		return (0);
-	}
-
 	if (is_system_labeled()) {
 		(void) fprintf(stderr,
 		    gettext("Trusted Extensions not supported\n"));
-		return (0);
+		return (1);
 	}
 
 	if (argc < 2) {

@@ -19,6 +19,7 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
@@ -107,6 +108,18 @@ int i;
 /* This holds the MD5 mechanism */
 static	crypto_mechanism_t crypto_mech = {CRYPTO_MECHANISM_INVALID, 0, 0};
 
+void
+smb_sign_g_init(void)
+{
+	/*
+	 * Initialise the crypto mechanism to MD5 if it not
+	 * already initialised.
+	 */
+	if (crypto_mech.cm_type == CRYPTO_MECHANISM_INVALID) {
+		crypto_mech.cm_type = crypto_mech2id(SUN_CKM_MD5);
+	}
+}
+
 /*
  * smb_sign_init
  *
@@ -119,24 +132,17 @@ smb_sign_init(smb_request_t *sr, smb_session_key_t *session_key,
 {
 	struct smb_sign *sign = &sr->session->signing;
 
-	/*
-	 * Initialise the crypto mechanism to MD5 if it not
-	 * already initialised.
-	 */
-	if (crypto_mech.cm_type ==  CRYPTO_MECHANISM_INVALID) {
-		crypto_mech.cm_type = crypto_mech2id(SUN_CKM_MD5);
-		if (crypto_mech.cm_type == CRYPTO_MECHANISM_INVALID) {
-			/*
-			 * There is no MD5 crypto mechanism
-			 * so turn off signing
-			 */
-			sr->sr_cfg->skc_signing_enable = 0;
-			sr->session->secmode &=
-			    (~NEGOTIATE_SECURITY_SIGNATURES_ENABLED);
-			cmn_err(CE_WARN,
-			    "SmbSignInit: signing disabled (no MD5)");
-			return;
-		}
+	if (crypto_mech.cm_type == CRYPTO_MECHANISM_INVALID) {
+		/*
+		 * There is no MD5 crypto mechanism
+		 * so turn off signing
+		 */
+		sr->sr_cfg->skc_signing_enable = 0;
+		sr->session->secmode &=
+		    (~NEGOTIATE_SECURITY_SIGNATURES_ENABLED);
+		cmn_err(CE_WARN,
+		    "SmbSignInit: signing disabled (no MD5)");
+		return;
 	}
 
 	/* MAC key = concat (SessKey, NTLMResponse) */
@@ -150,7 +156,6 @@ smb_sign_init(smb_request_t *sr, smb_session_key_t *session_key,
 	sr->sr_seqnum = 2;
 	sr->reply_seqnum = 1;
 	sign->flags = SMB_SIGNING_ENABLED;
-
 }
 
 /*

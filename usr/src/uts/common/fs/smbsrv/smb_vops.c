@@ -111,7 +111,7 @@ typedef struct smb_catia_map
 	smb_wchar_t winchar;	/* v5 */
 } smb_catia_map_t;
 
-smb_catia_map_t catia_maps[SMB_CATIA_NUM_MAPS] =
+smb_catia_map_t const catia_maps[SMB_CATIA_NUM_MAPS] =
 {
 	{'"',  SMB_CATIA_WIN_DIAERESIS},
 	{'*',  SMB_CATIA_WIN_CURRENCY},
@@ -135,7 +135,7 @@ static void smb_vop_catia_init();
 extern sysid_t lm_alloc_sysidt();
 
 #define	SMB_AT_MAX	16
-static uint_t smb_attrmap[SMB_AT_MAX] = {
+static const uint_t smb_attrmap[SMB_AT_MAX] = {
 	0,
 	AT_TYPE,
 	AT_MODE,
@@ -173,6 +173,8 @@ smb_vop_init(void)
 	 * Since the CIFS server is mapping its locks to POSIX locks,
 	 * only one pid is used for operations originating from the
 	 * CIFS server (to represent CIFS in the VOP_FRLOCK routines).
+	 *
+	 * XXX: Should smb_ct be per-zone?
 	 */
 	smb_ct.cc_sysid = lm_alloc_sysidt();
 	if (smb_ct.cc_sysid == LM_NOSYSID)
@@ -490,7 +492,8 @@ smb_vop_setattr(vnode_t *vp, vnode_t *unnamed_vp, smb_attr_t *attr,
 
 	if (at_size) {
 		attr->sa_vattr.va_mask = AT_SIZE;
-		error = VOP_SETATTR(vp, &attr->sa_vattr, flags, kcred, &smb_ct);
+		error = VOP_SETATTR(vp, &attr->sa_vattr, flags,
+		    zone_kcred(), &smb_ct);
 	}
 
 	return (error);
@@ -622,7 +625,8 @@ smb_vop_lookup(
 
 		if (attr != NULL) {
 			attr->sa_mask = SMB_AT_ALL;
-			(void) smb_vop_getattr(*vpp, NULL, attr, 0, kcred);
+			(void) smb_vop_getattr(*vpp, NULL, attr, 0,
+			    zone_kcred());
 		}
 	}
 
@@ -1254,7 +1258,8 @@ smb_vop_acl_type(vnode_t *vp)
 	int error;
 	ulong_t whichacl;
 
-	error = VOP_PATHCONF(vp, _PC_ACL_ENABLED, &whichacl, kcred, NULL);
+	error = VOP_PATHCONF(vp, _PC_ACL_ENABLED, &whichacl,
+	    zone_kcred(), NULL);
 	if (error != 0) {
 		/*
 		 * If we got an error, then the filesystem
@@ -1286,14 +1291,14 @@ smb_vop_acl_type(vnode_t *vp)
 	return (ACE_T);
 }
 
-static int zfs_perms[] = {
+static const int zfs_perms[] = {
 	ACE_READ_DATA, ACE_WRITE_DATA, ACE_APPEND_DATA, ACE_READ_NAMED_ATTRS,
 	ACE_WRITE_NAMED_ATTRS, ACE_EXECUTE, ACE_DELETE_CHILD,
 	ACE_READ_ATTRIBUTES, ACE_WRITE_ATTRIBUTES, ACE_DELETE, ACE_READ_ACL,
 	ACE_WRITE_ACL, ACE_WRITE_OWNER, ACE_SYNCHRONIZE
 };
 
-static int unix_perms[] = { VREAD, VWRITE, VEXEC };
+static const int unix_perms[] = { VREAD, VWRITE, VEXEC };
 /*
  * smb_vop_eaccess
  *

@@ -131,11 +131,6 @@ main(int argc, char *argv[])
 		return (SMF_EXIT_ERR_FATAL);
 	}
 
-	if (getzoneid() != GLOBAL_ZONEID) {
-		smbd_report("non-global zones are not supported");
-		return (SMF_EXIT_ERR_FATAL);
-	}
-
 	if (is_system_labeled()) {
 		smbd_report("Trusted Extensions not supported");
 		return (SMF_EXIT_ERR_FATAL);

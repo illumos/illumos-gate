@@ -19,6 +19,7 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -57,18 +58,15 @@ static	kmem_cache_t	*smb_txr_cache = NULL;
  *	0	Initialization successful
  *	ENOMEM	Initialization failed
  */
-int
+void
 smb_net_init(void)
 {
-	int	rc = 0;
 
-	ASSERT(smb_txr_cache == NULL);
+	if (smb_txr_cache != NULL)
+		return;
 
 	smb_txr_cache = kmem_cache_create(SMBSRV_KSTAT_TXRCACHE,
 	    sizeof (smb_txreq_t), 8, NULL, NULL, NULL, NULL, NULL, 0);
-	if (smb_txr_cache == NULL)
-		rc = ENOMEM;
-	return (rc);
 }
 
 /*

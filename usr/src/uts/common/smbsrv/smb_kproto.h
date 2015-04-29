@@ -80,6 +80,17 @@ extern	int smbsrv_worker_pri;
 extern	int smbsrv_notify_pri;
 extern	int smbsrv_timer_pri;
 
+extern	kmem_cache_t		*smb_cache_request;
+extern	kmem_cache_t		*smb_cache_session;
+extern	kmem_cache_t		*smb_cache_user;
+extern	kmem_cache_t		*smb_cache_tree;
+extern	kmem_cache_t		*smb_cache_ofile;
+extern	kmem_cache_t		*smb_cache_odir;
+extern	kmem_cache_t		*smb_cache_opipe;
+extern	kmem_cache_t		*smb_cache_event;
+
+extern	kmem_cache_t		*smb_kshare_cache_vfs;
+
 int		fd_dealloc(int);
 
 off_t		lseek(int fildes, off_t offset, int whence);
@@ -87,6 +98,9 @@ off_t		lseek(int fildes, off_t offset, int whence);
 int		arpioctl(int cmd, void *data);
 int		microtime(timestruc_t *tvp);
 int		clock_get_uptime(void);
+
+int smb_server_lookup(smb_server_t **);
+void smb_server_release(smb_server_t *);
 
 /*
  * SMB request handers called from the dispatcher.  Each SMB request
@@ -276,9 +290,10 @@ uint32_t smb_omode_to_amask(uint32_t desired_access);
 
 void	sshow_distribution_info(char *);
 
-void	smb_dispatch_stats_init(smb_kstat_req_t *);
-void	smb_dispatch_stats_fini(void);
-void	smb_dispatch_stats_update(smb_kstat_req_t *, int, int);
+void	smb_dispatch_stats_init(smb_server_t *);
+void	smb_dispatch_stats_fini(smb_server_t *);
+void	smb_dispatch_stats_update(smb_server_t *,
+		smb_kstat_req_t *, int, int);
 
 boolean_t smb_dispatch_request(smb_request_t *);
 int	smbsr_encode_empty_result(smb_request_t *);
@@ -331,7 +346,7 @@ ksocket_t smb_socreate(int domain, int type, int protocol);
 void smb_soshutdown(ksocket_t so);
 void smb_sodestroy(ksocket_t so);
 int smb_sorecv(ksocket_t so, void *msg, size_t len);
-int smb_net_init(void);
+void smb_net_init(void);
 void smb_net_fini(void);
 void smb_net_txl_constructor(smb_txlst_t *);
 void smb_net_txl_destructor(smb_txlst_t *);
@@ -350,43 +365,44 @@ smb_sdrc_t smb_opipe_transact(smb_request_t *, struct uio *);
 int smb_opipe_read(smb_request_t *, struct uio *);
 int smb_opipe_write(smb_request_t *, struct uio *);
 
-void smb_opipe_door_init(void);
-void smb_opipe_door_fini(void);
-int smb_opipe_door_open(int);
-void smb_opipe_door_close(void);
+void smb_opipe_door_init(smb_server_t *);
+void smb_opipe_door_fini(smb_server_t *);
+int smb_opipe_door_open(smb_server_t *, int);
+void smb_opipe_door_close(smb_server_t *);
 
-void smb_kdoor_init(void);
-void smb_kdoor_fini(void);
-int smb_kdoor_open(int);
-void smb_kdoor_close(void);
-int smb_kdoor_upcall(uint32_t, void *, xdrproc_t, void *, xdrproc_t);
+void smb_kdoor_init(smb_server_t *);
+void smb_kdoor_fini(smb_server_t *);
+int smb_kdoor_open(smb_server_t *, int);
+void smb_kdoor_close(smb_server_t *);
+int smb_kdoor_upcall(smb_server_t *, uint32_t,
+	void *, xdrproc_t, void *, xdrproc_t);
 
 /*
  * SMB server functions (file smb_server.c)
  */
-int smb_server_svc_init(void);
-int smb_server_svc_fini(void);
+int smb_server_g_init(void);
+int smb_server_g_fini(void);
 int smb_server_create(void);
 int smb_server_delete(void);
 int smb_server_configure(smb_ioc_cfg_t *);
 int smb_server_start(smb_ioc_start_t *);
 int smb_server_stop(void);
-boolean_t smb_server_is_stopping(void);
-int smb_server_cancel_event(uint32_t);
+boolean_t smb_server_is_stopping(smb_server_t *);
+void smb_server_cancel_event(smb_server_t *, uint32_t);
 int smb_server_notify_event(smb_ioc_event_t *);
-uint32_t smb_server_get_session_count(void);
+uint32_t smb_server_get_session_count(smb_server_t *);
 int smb_server_set_gmtoff(smb_ioc_gmt_t *);
 int smb_server_numopen(smb_ioc_opennum_t *);
 int smb_server_enum(smb_ioc_svcenum_t *);
 int smb_server_session_close(smb_ioc_session_t *);
 int smb_server_file_close(smb_ioc_fileid_t *);
-int smb_server_sharevp(const char *, vnode_t **);
+int smb_server_sharevp(smb_server_t *, const char *, vnode_t **);
 int smb_server_unshare(const char *);
 
 void smb_server_get_cfg(smb_server_t *, smb_kmod_cfg_t *);
 
 int smb_server_spooldoc(smb_ioc_spooldoc_t *);
-int smb_spool_add_doc(smb_kspooldoc_t *);
+int smb_spool_add_doc(smb_tree_t *, smb_kspooldoc_t *);
 void smb_spool_add_fid(smb_server_t *, uint16_t);
 
 void smb_server_inc_nbt_sess(smb_server_t *);
@@ -405,7 +421,7 @@ void smb_server_add_rxb(smb_server_t *, int64_t);
 void smb_server_add_txb(smb_server_t *, int64_t);
 void smb_server_inc_req(smb_server_t *);
 
-smb_event_t *smb_event_create(int);
+smb_event_t *smb_event_create(smb_server_t *, int);
 void smb_event_destroy(smb_event_t *);
 uint32_t smb_event_txid(smb_event_t *);
 int smb_event_wait(smb_event_t *);
@@ -414,7 +430,7 @@ void smb_event_notify(smb_server_t *, uint32_t);
 /*
  * SMB node functions (file smb_node.c)
  */
-int smb_node_init(void);
+void smb_node_init(void);
 void smb_node_fini(void);
 smb_node_t *smb_node_lookup(smb_request_t *, smb_arg_open_t *,
     cred_t *, vnode_t *, char *, smb_node_t *, smb_node_t *);
@@ -424,7 +440,7 @@ smb_node_t *smb_stream_node_lookup(smb_request_t *, cred_t *,
 void smb_node_ref(smb_node_t *);
 void smb_node_release(smb_node_t *);
 void smb_node_rename(smb_node_t *, smb_node_t *, smb_node_t *, char *);
-int smb_node_root_init(vnode_t *, smb_server_t *, smb_node_t **);
+int smb_node_root_init(smb_server_t *, smb_node_t **);
 void smb_node_add_lock(smb_node_t *, smb_lock_t *);
 void smb_node_destroy_lock(smb_node_t *, smb_lock_t *);
 void smb_node_destroy_lock_by_ofile(smb_node_t *, smb_ofile_t *);
@@ -491,8 +507,10 @@ void smb_vfs_rele_all(smb_export_t *);
 void smb_notify_event(smb_node_t *, uint_t, const char *);
 void smb_notify_file_closed(smb_ofile_t *of);
 
-void smb_fem_fcn_install(smb_node_t *);
+int smb_fem_fcn_install(smb_node_t *);
 void smb_fem_fcn_uninstall(smb_node_t *);
+int smb_fem_oplock_install(smb_node_t *);
+void smb_fem_oplock_uninstall(smb_node_t *);
 
 /* FEM */
 
@@ -504,6 +522,7 @@ int smb_try_grow(smb_request_t *sr, int64_t new_size);
 unsigned short smb_worker_getnum();
 
 /* SMB signing routines smb_signing.c */
+void smb_sign_g_init(void);
 void smb_sign_init(smb_request_t *, smb_session_key_t *, char *, int);
 int smb_sign_check_request(smb_request_t *);
 int smb_sign_check_secondary(smb_request_t *, unsigned int);
@@ -631,7 +650,7 @@ cred_t *smb_user_getprivcred(smb_user_t *);
 void smb_user_netinfo_init(smb_user_t *, smb_netuserinfo_t *);
 void smb_user_netinfo_fini(smb_netuserinfo_t *);
 int smb_user_netinfo_encode(smb_user_t *, uint8_t *, size_t, uint32_t *);
-smb_token_t *smb_get_token(smb_logon_t *);
+smb_token_t *smb_get_token(smb_session_t *, smb_logon_t *);
 
 /*
  * SMB tree functions (file smb_tree.c)
@@ -803,26 +822,31 @@ void *smb_srm_realloc(smb_request_t *, void *, size_t);
 void *smb_srm_rezalloc(smb_request_t *, void *, size_t);
 char *smb_srm_strdup(smb_request_t *, const char *);
 
-void smb_export_start(void);
-void smb_export_stop(void);
+void smb_export_start(smb_server_t *);
+void smb_export_stop(smb_server_t *);
 
 door_handle_t smb_kshare_door_init(int);
 void smb_kshare_door_fini(door_handle_t);
 int smb_kshare_upcall(door_handle_t, void *, boolean_t);
 
-int smb_kshare_init(void);
-void smb_kshare_fini(void);
+void smb_kshare_g_init(void);
+void smb_kshare_g_fini(void);
+void smb_kshare_init(smb_server_t *);
+void smb_kshare_fini(smb_server_t *);
+int smb_kshare_start(smb_server_t *);
+void smb_kshare_stop(smb_server_t *);
+
 int smb_kshare_export_list(smb_ioc_share_t *);
 int smb_kshare_unexport_list(smb_ioc_share_t *);
 int smb_kshare_info(smb_ioc_shareinfo_t *);
-void smb_kshare_enum(smb_enumshare_info_t *);
-smb_kshare_t *smb_kshare_lookup(const char *);
-void smb_kshare_release(smb_kshare_t *);
-int smb_kshare_exec(smb_shr_execinfo_t *);
-uint32_t smb_kshare_hostaccess(smb_kshare_t *, smb_inaddr_t *);
+void smb_kshare_enum(smb_server_t *, smb_enumshare_info_t *);
+smb_kshare_t *smb_kshare_lookup(smb_server_t *, const char *);
+void smb_kshare_release(smb_server_t *, smb_kshare_t *);
+int smb_kshare_exec(smb_server_t *, smb_shr_execinfo_t *);
+uint32_t smb_kshare_hostaccess(smb_kshare_t *, smb_session_t *);
 
 
-void smb_avl_create(smb_avl_t *, size_t, size_t, smb_avl_nops_t *);
+void smb_avl_create(smb_avl_t *, size_t, size_t, const smb_avl_nops_t *);
 void smb_avl_destroy(smb_avl_t *);
 int smb_avl_add(smb_avl_t *, void *);
 void smb_avl_remove(smb_avl_t *, void *);
@@ -831,7 +855,8 @@ void smb_avl_release(smb_avl_t *, void *);
 void smb_avl_iterinit(smb_avl_t *, smb_avl_cursor_t *);
 void *smb_avl_iterate(smb_avl_t *, smb_avl_cursor_t *);
 
-void smb_threshold_init(smb_cmd_threshold_t *, char *, int, int);
+void smb_threshold_init(smb_cmd_threshold_t *, smb_server_t *,
+    char *, int, int);
 void smb_threshold_fini(smb_cmd_threshold_t *);
 int smb_threshold_enter(smb_cmd_threshold_t *);
 void smb_threshold_exit(smb_cmd_threshold_t *, smb_server_t *);

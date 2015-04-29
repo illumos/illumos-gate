@@ -618,16 +618,16 @@ smb_session_create(ksocket_t new_so, uint16_t port, smb_server_t *sv,
 	smb_session_t		*session;
 	int64_t			now;
 
-	session = kmem_cache_alloc(sv->si_cache_session, KM_SLEEP);
+	session = kmem_cache_alloc(smb_cache_session, KM_SLEEP);
 	bzero(session, sizeof (smb_session_t));
 
 	if (smb_idpool_constructor(&session->s_uid_pool)) {
-		kmem_cache_free(sv->si_cache_session, session);
+		kmem_cache_free(smb_cache_session, session);
 		return (NULL);
 	}
 	if (smb_idpool_constructor(&session->s_tid_pool)) {
 		smb_idpool_destructor(&session->s_uid_pool);
-		kmem_cache_free(sv->si_cache_session, session);
+		kmem_cache_free(smb_cache_session, session);
 		return (NULL);
 	}
 
@@ -702,8 +702,6 @@ smb_session_create(ksocket_t new_so, uint16_t port, smb_server_t *sv,
 	smb_server_get_cfg(sv, &session->s_cfg);
 	session->s_srqueue = &sv->sv_srqueue;
 
-	session->s_cache_request = sv->si_cache_request;
-	session->s_cache = sv->si_cache_session;
 	session->s_magic = SMB_SESSION_MAGIC;
 	return (session);
 }
@@ -745,7 +743,7 @@ smb_session_delete(smb_session_t *session)
 			smb_server_dec_tcp_sess(session->s_server);
 		smb_sodestroy(session->sock);
 	}
-	kmem_cache_free(session->s_cache, session);
+	kmem_cache_free(smb_cache_session, session);
 }
 
 static void
@@ -1330,7 +1328,7 @@ smb_request_alloc(smb_session_t *session, int req_length)
 
 	ASSERT(session->s_magic == SMB_SESSION_MAGIC);
 
-	sr = kmem_cache_alloc(session->s_cache_request, KM_SLEEP);
+	sr = kmem_cache_alloc(smb_cache_request, KM_SLEEP);
 
 	/*
 	 * Future:  Use constructor to pre-initialize some fields.  For now
@@ -1345,7 +1343,6 @@ smb_request_alloc(smb_session_t *session, int req_length)
 	sr->session = session;
 	sr->sr_server = session->s_server;
 	sr->sr_gmtoff = session->s_server->si_gmtoff;
-	sr->sr_cache = session->s_server->si_cache_request;
 	sr->sr_cfg = &session->s_cfg;
 	sr->command.max_bytes = req_length;
 	sr->reply.max_bytes = smb_maxbufsize;
@@ -1400,7 +1397,7 @@ smb_request_free(smb_request_t *sr)
 	sr->sr_magic = 0;
 	cv_destroy(&sr->sr_ncr.nc_cv);
 	mutex_destroy(&sr->sr_mutex);
-	kmem_cache_free(sr->sr_cache, sr);
+	kmem_cache_free(smb_cache_request, sr);
 }
 
 void

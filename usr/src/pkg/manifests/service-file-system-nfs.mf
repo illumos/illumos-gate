@@ -21,7 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/service/file-system/nfs@$(PKGVERS)
@@ -32,7 +32,6 @@ set name=info.classification \
 set name=variant.arch value=$(ARCH)
 dir path=etc group=sys
 dir path=etc/default group=sys
-dir path=etc/init.d group=sys
 dir path=etc/nfs group=sys
 dir path=kernel group=sys
 dir path=kernel/misc group=sys
@@ -57,8 +56,6 @@ dir path=usr/share/man/man1m
 dir path=usr/share/man/man5
 file path=etc/default/nfslogd group=sys \
     original_name=SUNWnfss:etc/default/nfslogd preserve=true
-file path=etc/init.d/nfs.server group=sys mode=0744 \
-    original_name=SUNWnfss:etc/init.d/nfs.server preserve=true
 file path=etc/nfs/nfslog.conf group=sys \
     original_name=SUNWnfss:etc/nfs/nfslog.conf preserve=true
 file path=kernel/misc/$(ARCH64)/nfssrv group=sys mode=0755

@@ -47,7 +47,6 @@
 extern "C" {
 #endif
 
-#define	ROOTVOL ""
 #define	XATTR_DIR "xattr_dir"
 
 #define	SMB_STREAM_PREFIX "SUNWsmb"

@@ -21,7 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2015 Nexenta Systems, Inc. All rights reserved.
 #
 
 set name=pkg.fmri \
@@ -31,7 +31,6 @@ set name=pkg.summary value=Sendmail
 set name=info.classification value=org.opensolaris.category.2008:System/Core
 set name=variant.arch value=$(ARCH)
 dir path=etc group=sys
-dir path=etc/init.d group=sys
 dir path=etc/mail group=mail
 dir path=etc/mail/cf group=mail
 dir path=etc/mail/cf/cf group=mail
@@ -69,8 +68,6 @@ dir path=var/adm/sm.bin group=sys
 dir path=var/spool
 dir path=var/spool/clientmqueue group=smmsp mode=0770 owner=smmsp
 dir path=var/spool/mqueue mode=0750
-file path=etc/init.d/sendmail group=sys mode=0744 \
-    original_name=SUNWsndm:etc/init.d/sendmail preserve=true
 file path=etc/mail/aliases original_name=SUNWsndm:etc/mail/aliases \
     preserve=true
 file path=etc/mail/cf/README group=mail mode=0444

@@ -19,6 +19,7 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -37,7 +38,7 @@
 extern "C" {
 #endif
 
-smb_codepage_t usascii_codepage[256] = {
+const smb_codepage_t usascii_codepage[256] = {
 	{ CODEPAGE_ISNONE,  0x0000, 0x0000 },    /* 0x0000 */
 	{ CODEPAGE_ISNONE,  0x0001, 0x0001 },    /* 0x0001 */
 	{ CODEPAGE_ISNONE,  0x0002, 0x0002 },    /* 0x0002 */

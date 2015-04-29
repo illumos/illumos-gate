@@ -348,17 +348,9 @@ d etc/init.d 0755 root sys
 f etc/init.d/PRESERVE 0744 root sys
 f etc/init.d/README 0644 root sys
 f etc/init.d/acct 0744 root sys
-f etc/init.d/devlinks 0744 root sys
 f etc/init.d/dodatadm.udaplt 0744 root sys
-f etc/init.d/drvconfig 0744 root sys
-f etc/init.d/ldap.client 0744 root sys
-f etc/init.d/nfs.server 0744 root sys
-f etc/init.d/nscd 0744 root sys
 f etc/init.d/pppd 0744 root sys
-f etc/init.d/sendmail 0744 root sys
-f etc/init.d/slpd 0744 root sys
 f etc/init.d/sysetup 0744 root sys
-f etc/init.d/ufs_quota 0744 root sys
 f etc/ioctl.syscon 0644 root sys
 d etc/ipadm 0755 netadm netadm
 f etc/ipadm/ipadm.conf 0644 netadm netadm

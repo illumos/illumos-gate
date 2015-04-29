@@ -286,7 +286,7 @@ smb_com_delete_directory(smb_request_t *sr)
 	 * and don't want access errors for this.
 	 */
 	fqi->fq_fattr.sa_mask = SMB_AT_DOSATTR;
-	rc = smb_node_getattr(sr, fqi->fq_fnode, kcred, NULL,
+	rc = smb_node_getattr(sr, fqi->fq_fnode, zone_kcred(), NULL,
 	    &fqi->fq_fattr);
 	if (rc != 0) {
 		smbsr_errno(sr, rc);

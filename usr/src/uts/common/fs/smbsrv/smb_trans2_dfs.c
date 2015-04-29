@@ -19,6 +19,7 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -494,7 +495,7 @@ smb_dfs_referrals_get(smb_request_t *sr, char *dfs_path, dfs_reftype_t reftype,
 	bzero(refrsp, sizeof (dfs_referral_response_t));
 	refrsp->rp_status = NT_STATUS_NOT_FOUND;
 
-	rc = smb_kdoor_upcall(SMB_DR_DFS_GET_REFERRALS,
+	rc = smb_kdoor_upcall(sr->sr_server, SMB_DR_DFS_GET_REFERRALS,
 	    &req, dfs_referral_query_xdr, refrsp, dfs_referral_response_xdr);
 
 	if (rc != 0 || refrsp->rp_status != ERROR_SUCCESS) {

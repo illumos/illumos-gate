@@ -26,6 +26,7 @@
  * Copyright (c) 2013 Gary Mills
  * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  * Copyright 2015 Joyent, Inc.
+ * Copyright 2015 Circonus, Inc.  All rights reserved.
  */
 
 /* LINTLIBRARY */
@@ -764,7 +765,7 @@ void perror(const char *s);
 int pipe(int *fds);
 
 /* psiginfo.c */
-void psiginfo(siginfo_t *sip, char *s);
+void psiginfo(const siginfo_t *sip, const char *s);
 
 /* psignal.c */
 void psignal(int sig, const char *s);
