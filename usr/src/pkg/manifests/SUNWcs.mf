@@ -130,6 +130,7 @@ dir path=proc group=root mode=0555
 dir path=root group=root mode=0700
 dir path=sbin group=sys
 dir path=system group=root
+dir path=system/boot group=root mode=0555
 dir path=system/contract group=root mode=0555
 dir path=system/object group=root mode=0555
 dir path=tmp group=sys mode=1777
@@ -177,6 +178,7 @@ dir path=usr/lib/devfsadm/linkmod group=sys
 dir path=usr/lib/fs group=sys
 dir path=usr/lib/fs/autofs group=sys
 dir path=usr/lib/fs/autofs/$(ARCH64) group=sys
+dir path=usr/lib/fs/bootfs group=sys
 dir path=usr/lib/fs/ctfs group=sys
 dir path=usr/lib/fs/dev group=sys
 dir path=usr/lib/fs/fd group=sys
@@ -951,6 +953,7 @@ $(i386_ONLY)file path=usr/lib/devfsadm/linkmod/SUNW_xen_link.so group=sys
 file path=usr/lib/diffh mode=0555
 file path=usr/lib/expreserve mode=0555
 file path=usr/lib/exrecover mode=0555
+file path=usr/lib/fs/bootfs/mount mode=0555
 file path=usr/lib/fs/ctfs/mount mode=0555
 file path=usr/lib/fs/fd/mount mode=0555
 file path=usr/lib/fs/hsfs/fstyp.so.1 mode=0555

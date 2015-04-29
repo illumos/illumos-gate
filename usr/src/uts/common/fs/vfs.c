@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2014, Joyent, Inc. All rights reserved.
  * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  */
 
@@ -906,6 +906,7 @@ vfs_mountroot(void)
 	vfs_mountfs("mntfs", "/etc/mnttab", "/etc/mnttab");
 	vfs_mountfs("tmpfs", "/etc/svc/volatile", "/etc/svc/volatile");
 	vfs_mountfs("objfs", "objfs", OBJFS_ROOT);
+	vfs_mountfs("bootfs", "bootfs", "/system/boot");
 
 	if (getzoneid() == GLOBAL_ZONEID) {
 		vfs_mountfs("sharefs", "sharefs", "/etc/dfs/sharetab");

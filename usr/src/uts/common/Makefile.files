@@ -1338,6 +1338,7 @@ SMBFS_OBJS +=	smbfs_vfsops.o	smbfs_vnops.o	smbfs_node.o	\
 		smbfs_rwlock.o	smbfs_xattr.o	\
 		$(SMBFS_COMMON_OBJS)
 
+BOOTFS_OBJS +=	bootfs_construct.o bootfs_vfsops.o bootfs_vnops.o
 
 #
 #			LVM modules
