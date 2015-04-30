@@ -14,7 +14,6 @@ auditconfig \- configure auditing
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 \fBauditconfig\fR provides a command line interface to get and set kernel audit
 parameters.
@@ -37,7 +36,6 @@ global zone; setting these policies requires the privileges of a global zone
 administrator. \fBperzone\fR and \fBahlt\fR are described under the
 \fB-setpolicy\fR option, below.
 .SH OPTIONS
-.sp
 .ne 2
 .na
 \fB\fB-aconf\fR\fR
@@ -369,11 +367,13 @@ the specified process.
 .sp
 .ne 2
 .na
-\fB\fB-getplugin\fR\fR
+\fB\fB-getplugin\fR [\fIplugin\fR]\fR
 .ad
 .sp .6
 .RS 4n
-Display the currently installed plugins and their attributes. For example:
+Display the currently installed plugins and their attributes. If \fIplugin\fR is
+specified, \fB-getplugin\fR only shows information for that \fIplugin\fR. For
+example:
 .sp
 .in +2
 .nf
@@ -628,7 +628,7 @@ global zone.
 .sp
 .ne 2
 .na
-\fB\fB-setflags\fR\fR
+\fB\fB-setflags\fR \fIaudit_flags\fR\fR
 .ad
 .sp .6
 .RS 4n
@@ -671,7 +671,7 @@ If \fBperzone\fR is not set, this option is valid only in the global zone.
 .sp
 .ne 2
 .na
-\fB\fB-setnaflags\fR\fR
+\fB\fB-setnaflags\fR \fIaudit_flags\fR\fR
 .ad
 .sp .6
 .RS 4n
@@ -1005,7 +1005,6 @@ The following is an example of an \fBauditconfig\fR program:
 .sp
 
 .SH EXIT STATUS
-.sp
 .ne 2
 .na
 \fB\fB0\fR\fR
@@ -1024,7 +1023,6 @@ An error occurred.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/security/audit_event\fR\fR
@@ -1043,7 +1041,6 @@ Stores class definitions used in the audit system.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -1059,7 +1056,6 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBaudit\fR(1M), \fBauditd\fR(1M), \fBauditstat\fR(1M), \fBbsmconv\fR(1M),
 \fBpraudit\fR(1M), \fBauditon\fR(2), \fBexecv\fR(2), \fBaudit_class\fR(4),
@@ -1070,7 +1066,6 @@ Interface Stability	Committed
 See the section on Solaris Auditing in \fISystem Administration Guide: Security
 Services\fR.
 .SH NOTES
-.sp
 .LP
 If plugin output is selected using \fBaudit_control\fR(4), the behavior of the
 system with respect to the \fB-setpolicy\fR \fB+cnt\fR and the
