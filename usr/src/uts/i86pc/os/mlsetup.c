@@ -267,8 +267,14 @@ mlsetup(struct regs *rp)
 	if (is_x86_feature(x86_featureset, X86FSET_TSCP))
 		(void) wrmsr(MSR_AMD_TSCAUX, 0);
 
+	/*
+	 * Let's get the other %cr4 stuff while we're here.
+	 */
 	if (is_x86_feature(x86_featureset, X86FSET_DE))
 		setcr4(getcr4() | CR4_DE);
+
+	if (is_x86_feature(x86_featureset, X86FSET_SMEP))
+		setcr4(getcr4() | CR4_SMEP);
 #endif /* __xpv */
 
 	/*

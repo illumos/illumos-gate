@@ -20,10 +20,7 @@
  */
 /*
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
- */
-
-/*
- * Copyright (c) 2012 Joyent, Inc.  All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  */
 
 #include <mdb/mdb_modapi.h>
@@ -39,9 +36,11 @@
 #include <sys/mutex.h>
 #include <sys/mutex_impl.h>
 #include "i86mmu.h"
+#include "unix_sup.h"
 #include <sys/apix.h>
 #include <sys/x86_archext.h>
 #include <sys/bitmap.h>
+#include <sys/controlregs.h>
 
 #define	TT_HDLR_WIDTH	17
 
@@ -882,6 +881,54 @@ x86_featureset_cmd(uintptr_t addr, uint_t flags, int argc,
 	return (DCMD_OK);
 }
 
+#ifdef _KMDB
+/* ARGSUSED */
+static int
+crregs_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	ulong_t cr0, cr4;
+	static const mdb_bitmask_t cr0_flag_bits[] = {
+		{ "PE",		CR0_PE,		CR0_PE },
+		{ "MP",		CR0_MP,		CR0_MP },
+		{ "EM",		CR0_EM,		CR0_EM },
+		{ "TS",		CR0_TS,		CR0_TS },
+		{ "ET",		CR0_ET,		CR0_ET },
+		{ "NE",		CR0_NE,		CR0_NE },
+		{ "WP",		CR0_WP,		CR0_WP },
+		{ "AM",		CR0_AM,		CR0_AM },
+		{ "NW",		CR0_NW,		CR0_NW },
+		{ "CD",		CR0_CD,		CR0_CD },
+		{ "PG",		CR0_PG,		CR0_PG },
+		{ NULL,		0,		0 }
+	};
+
+	static const mdb_bitmask_t cr4_flag_bits[] = {
+		{ "VME",	CR4_VME,	CR4_VME },
+		{ "PVI",	CR4_PVI,	CR4_PVI },
+		{ "TSD",	CR4_TSD,	CR4_TSD },
+		{ "DE",		CR4_DE,		CR4_DE },
+		{ "PSE",	CR4_PSE,	CR4_PSE },
+		{ "PAE",	CR4_PAE,	CR4_PAE },
+		{ "MCE",	CR4_MCE,	CR4_MCE },
+		{ "PGE",	CR4_PGE,	CR4_PGE },
+		{ "PCE",	CR4_PCE,	CR4_PCE },
+		{ "OSFXSR",	CR4_OSFXSR,	CR4_OSFXSR },
+		{ "OSXMMEXCPT",	CR4_OSXMMEXCPT,	CR4_OSXMMEXCPT },
+		{ "VMXE",	CR4_VMXE,	CR4_VMXE },
+		{ "SMXE",	CR4_SMXE,	CR4_SMXE },
+		{ "OSXSAVE",	CR4_OSXSAVE,	CR4_OSXSAVE },
+		{ "SMEP",	CR4_SMEP,	CR4_SMEP },
+		{ NULL,		0,		0 }
+	};
+
+	cr0 = kmdb_unix_getcr0();
+	cr4 = kmdb_unix_getcr4();
+	mdb_printf("%%cr0 = 0x%08x <%b>\n", cr0, cr0, cr0_flag_bits);
+	mdb_printf("%%cr4 = 0x%08x <%b>\n", cr4, cr4, cr4_flag_bits);
+	return (DCMD_OK);
+}
+#endif
+
 static const mdb_dcmd_t dcmds[] = {
 	{ "gate_desc", ":", "dump a gate descriptor", gate_desc },
 	{ "idt", ":[-v]", "dump an IDT", idt },
@@ -906,6 +953,9 @@ static const mdb_dcmd_t dcmds[] = {
 	    "scale an unscaled high-res time", scalehrtime_cmd },
 	{ "x86_featureset", NULL, "dump the x86_featureset vector",
 		x86_featureset_cmd },
+#ifdef _KMDB
+	{ "crregs", NULL, "dump control registers", crregs_dcmd },
+#endif
 	{ NULL }
 };
 

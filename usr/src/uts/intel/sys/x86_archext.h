@@ -214,13 +214,14 @@ extern "C" {
 
 /*
  * Intel also uses cpuid leaf 7 to have additional instructions and features.
- * Like some other leaves, but unlink the current ones we care about, it
+ * Like some other leaves, but unlike the current ones we care about, it
  * requires us to specify both a leaf in %eax and a sub-leaf in %ecx. To deal
  * with the potential use of additional sub-leaves in the future, we now
  * specifically label the EBX features with their leaf and sub-leaf.
  */
 #define	CPUID_INTC_EBX_7_0_BMI1		0x00000008	/* BMI1 instrs */
 #define	CPUID_INTC_EBX_7_0_AVX2		0x00000020	/* AVX2 supported */
+#define	CPUID_INTC_EBX_7_0_SMEP		0x00000080	/* SMEP in CR4 */
 #define	CPUID_INTC_EBX_7_0_BMI2		0x00000100	/* BMI2 Instrs */
 
 #define	P5_MCHADDR	0x0
@@ -396,6 +397,7 @@ extern "C" {
 #define	X86FSET_BMI1		42
 #define	X86FSET_BMI2		43
 #define	X86FSET_FMA		44
+#define	X86FSET_SMEP		45
 
 /*
  * flags to patch tsc_read routine.
@@ -656,7 +658,7 @@ extern "C" {
 
 #if defined(_KERNEL) || defined(_KMEMUSER)
 
-#define	NUM_X86_FEATURES	45
+#define	NUM_X86_FEATURES	46
 extern uchar_t x86_featureset[];
 
 extern void free_x86_featureset(void *featureset);
