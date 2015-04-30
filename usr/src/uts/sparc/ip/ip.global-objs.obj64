@@ -105,7 +105,6 @@ ilb_sticky_expiry
 ilb_sticky_timer_size
 ilb_sticky_timeout
 ill_no_arena
-ill_null
 inet_dev_info
 inet_devops
 ip6_ftable_hash_size
