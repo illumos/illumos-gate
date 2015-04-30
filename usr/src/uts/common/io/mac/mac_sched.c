@@ -21,8 +21,950 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2011 Joyent, Inc.  All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
+ */
+
+/*
+ * MAC data path
+ *
+ * The MAC data path is concerned with the flow of traffic from mac clients --
+ * DLS, IP, etc. -- to various GLDv3 device drivers -- e1000g, vnic, aggr,
+ * ixgbe, etc. -- and from the GLDv3 device drivers back to clients.
+ *
+ * -----------
+ * Terminology
+ * -----------
+ *
+ * MAC uses a lot of different, but related terms that are associated with the
+ * design and structure of the data path. Before we cover other aspects, first
+ * let's review the terminology that MAC uses.
+ *
+ * MAC
+ *
+ * 	This driver. It interfaces with device drivers and provides abstractions
+ * 	that the rest of the system consumes. All data links -- things managed
+ * 	with dladm(1M), are accessed through MAC.
+ *
+ * GLDv3 DEVICE DRIVER
+ *
+ * 	A GLDv3 device driver refers to a driver, both for pseudo-devices and
+ * 	real devices, which implement the GLDv3 driver API. Common examples of
+ * 	these are igb and ixgbe, which are drivers for various Intel networking
+ * 	cards. These devices may or may not have various features, such as
+ * 	hardware rings and checksum offloading. For MAC, a GLDv3 device is the
+ * 	final point for the transmission of a packet and the starting point for
+ * 	the receipt of a packet.
+ *
+ * FLOWS
+ *
+ * 	At a high level, a flow refers to a series of packets that are related.
+ * 	Often times the term is used in the context of TCP to indicate a unique
+ * 	TCP connection and the traffic over it. However, a flow can exist at
+ * 	other levels of the system as well. MAC has a notion of a default flow
+ * 	which is used for all unicast traffic addressed to the address of a MAC
+ * 	device. For example, when a VNIC is created, a default flow is created
+ * 	for the VNIC's MAC address. In addition, flows are created for broadcast
+ * 	groups and a user may create a flow with flowadm(1M).
+ *
+ * CLASSIFICATION
+ *
+ * 	Classification refers to the notion of identifying an incoming frame
+ * 	based on its destination address and optionally its source addresses and
+ * 	doing different processing based on that information. Classification can
+ * 	be done in both hardware and software. In general, we usually only
+ * 	classify based on the layer two destination, eg. for Ethernet, the
+ * 	destination MAC address.
+ *
+ * 	The system also will do classification based on layer three and layer
+ * 	four properties. This is used to support things like flowadm(1M), which
+ * 	allows setting QoS and other properties on a per-flow basis.
+ *
+ * RING
+ *
+ * 	Conceptually, a ring represents a series of framed messages, often in a
+ * 	contiguous chunk of memory that acts as a circular buffer. Rings come in
+ * 	a couple of forms. Generally they are either a hardware construct (hw
+ * 	ring) or they are a software construct (sw ring) maintained by MAC.
+ *
+ * HW RING
+ *
+ * 	A hardware ring is a set of resources provided by a GLDv3 device driver
+ * 	(even if it is a pseudo-device). A hardware ring comes in two different
+ * 	forms: receive (rx) rings and transmit (tx) rings. An rx hw ring is
+ * 	something that has a unique DMA (direct memory access) region and
+ * 	generally supports some form of classification (though it isn't always
+ * 	used), as well as a means of generating an interrupt specific to that
+ * 	ring. For example, the device may generate a specific MSI-X for a PCI
+ * 	express device. A tx ring is similar, except that it is dedicated to
+ * 	transmission. It may also be a vector for enabling features such as VLAN
+ * 	tagging and large transmit offloading. It usually has its own dedicated
+ * 	interrupts for transmit being completed.
+ *
+ * SW RING
+ *
+ * 	A software ring is a construction of MAC. It represents the same thing
+ * 	that a hardware ring generally does, a collection of frames. However,
+ * 	instead of being in a contiguous ring of memory, they're instead linked
+ * 	by using the mblk_t's b_next pointer. Each frame may itself be multiple
+ * 	mblk_t's linked together by the b_cont pointer. A software ring always
+ * 	represents a collection of classified packets; however, it varies as to
+ * 	whether it uses only layer two information, or a combination of that and
+ * 	additional layer three and layer four data.
+ *
+ * FANOUT
+ *
+ * 	Fanout is the idea of spreading out the load of processing frames based
+ * 	on the source and destination information contained in the layer two,
+ * 	three, and four headers, such that the data can then be processed in
+ * 	parallel using multiple hardware threads.
+ *
+ * 	A fanout algorithm hashes the headers and uses that to place different
+ * 	flows into a bucket. The most important thing is that packets that are
+ * 	in the same flow end up in the same bucket. If they do not, performance
+ * 	can be adversely affected. Consider the case of TCP.  TCP severely
+ * 	penalizes a connection if the data arrives out of order. If a given flow
+ * 	is processed on different CPUs, then the data will appear out of order,
+ * 	hence the invariant that fanout always hash a given flow to the same
+ * 	bucket and thus get processed on the same CPU.
+ *
+ * RECEIVE SIDE SCALING (RSS)
+ *
+ *
+ * 	Receive side scaling is a term that isn't common in illumos, but is used
+ * 	by vendors and was popularized by Microsoft. It refers to the idea of
+ * 	spreading the incoming receive load out across multiple interrupts which
+ * 	can be directed to different CPUs. This allows a device to leverage
+ * 	hardware rings even when it doesn't support hardware classification. The
+ * 	hardware uses an algorithm to perform fanout that ensures the flow
+ * 	invariant is maintained.
+ *
+ * SOFT RING SET
+ *
+ * 	A soft ring set, commonly abbreviated SRS, is a collection of rings and
+ * 	is used for both transmitting and receiving. It is maintained in the
+ * 	structure mac_soft_ring_set_t. A soft ring set is usually associated
+ * 	with flows, and coordinates both the use of hardware and software rings.
+ * 	Because the use of hardware rings can change as devices such as VNICs
+ * 	come and go, we always ensure that the set has software classification
+ * 	rules that correspond to the hardware classification rules from rings.
+ *
+ * 	Soft ring sets are also used for the enforcement of various QoS
+ * 	properties. For example, if a bandwidth limit has been placed on a
+ * 	specific flow or device, then that will be enforced by the soft ring
+ * 	set.
+ *
+ * SERVICE ATTACHMENT POINT (SAP)
+ *
+ * 	The service attachment point is a DLPI (Data Link Provider Interface)
+ * 	concept; however, it comes up quite often in MAC. Most MAC devices speak
+ * 	a protocol that has some notion of different channels or message type
+ * 	identifiers. For example, Ethernet defines an EtherType which is a part
+ * 	of the Ethernet header and defines the particular protocol of the data
+ * 	payload. If the EtherType is set to 0x0800, then it defines that the
+ * 	contents of that Ethernet frame is IPv4 traffic. For Ethernet, the
+ * 	EtherType is the SAP.
+ *
+ * 	In DLPI, a given consumer attaches to a specific SAP. In illumos, the ip
+ * 	and arp drivers attach to the EtherTypes for IPv4, IPv6, and ARP. Using
+ * 	libdlpi(3LIB) user software can attach to arbitrary SAPs. With the
+ * 	exception of 802.1Q VLAN tagged traffic, MAC itself does not directly
+ * 	consume the SAP; however, it uses that information as part of hashing
+ * 	and it may be used as part of the construction of flows.
+ *
+ * PRIMARY MAC CLIENT
+ *
+ * 	The primary mac client refers to a mac client whose unicast address
+ * 	matches the address of the device itself. For example, if the system has
+ * 	instance of the e1000g driver such as e1000g0, e1000g1, etc., the
+ * 	primary mac client is the one named after the device itself. VNICs that
+ * 	are created on top of such devices are not the primary client.
+ *
+ * TRANSMIT DESCRIPTORS
+ *
+ * 	Transmit descriptors are a resource that most GLDv3 device drivers have.
+ * 	Generally, a GLDv3 device driver takes a frame that's meant to be output
+ * 	and puts a copy of it into a region of memory. Each region of memory
+ * 	usually has an associated descriptor that the device uses to manage
+ * 	properties of the frames. Devices have a limited number of such
+ * 	descriptors. They get reclaimed once the device finishes putting the
+ * 	frame on the wire.
+ *
+ * 	If the driver runs out of transmit descriptors, for example, the OS is
+ * 	generating more frames than it can put on the wire, then it will return
+ * 	them back to the MAC layer.
+ *
+ * ---------------------------------
+ * Rings, Classification, and Fanout
+ * ---------------------------------
+ *
+ * The heart of MAC is made up of rings, and not those that Elven-kings wear.
+ * When receiving a packet, MAC breaks the work into two different, though
+ * interrelated phases. The first phase is generally classification and then the
+ * second phase is generally fanout. When a frame comes in from a GLDv3 Device,
+ * MAC needs to determine where that frame should be delivered. If it's a
+ * unicast frame (say a normal TCP/IP packet), then it will be delivered to a
+ * single MAC client; however, if it's a broadcast or multicast frame, then MAC
+ * may need to deliver it to multiple MAC clients.
+ *
+ * On transmit, classification isn't quite as important, but may still be used.
+ * Unlike with the receive path, the classification is not used to determine
+ * devices that should transmit something, but rather is used for special
+ * properties of a flow, eg. bandwidth limits for a given IP address, device, or
+ * connection.
+ *
+ * MAC employs a software classifier and leverages hardware classification as
+ * well. The software classifier can leverage the full layer two information,
+ * source, destination, VLAN, and SAP. If the SAP indicates that IP traffic is
+ * being sent, it can classify based on the IP header, and finally, it also
+ * knows how to classify based on the local and remote ports of TCP, UDP, and
+ * SCTP.
+ *
+ * Hardware classifiers vary in capability. Generally all hardware classifiers
+ * provide the capability to classify based on the destination MAC address. Some
+ * hardware has additional filters built in for performing more in-depth
+ * classification; however, it often has much more limited resources for these
+ * activities as compared to the layer two destination address classification.
+ *
+ * The modus operandi in MAC is to always ensure that we have software-based
+ * capabilities and rules in place and then to supplement that with hardware
+ * resources when available. In general, simple layer two classification is
+ * sufficient and nothing else is used, unless a specific flow is created with
+ * tools such as flowadm(1M) or bandwidth limits are set on a device with
+ * dladm(1M).
+ *
+ * RINGS AND GROUPS
+ *
+ * To get into how rings and classification play together, it's first important
+ * to understand how hardware devices commonly associate rings and allow them to
+ * be programmed. Recall that a hardware ring should be thought of as a DMA
+ * buffer and an interrupt resource. Rings are then collected into groups. A
+ * group itself has a series of classification rules. One or more MAC addresses
+ * are assigned to a group.
+ *
+ * Hardware devices vary in terms of what capabilities they provide. Sometimes
+ * they allow for a dynamic assignment of rings to a group and sometimes they
+ * have a static assignment of rings to a group. For example, the ixgbe driver
+ * has a static assignment of rings to groups such that every group has exactly
+ * one ring and the number of groups is equal to the number of rings.
+ *
+ * Classification and receive side scaling both come into play with how a device
+ * advertises itself to MAC and how MAC uses it. If a device supports layer two
+ * classification of frames, then MAC will assign MAC addresses to a group as a
+ * form of primary classification. If a single MAC address is assigned to a
+ * group, a common case, then MAC will consider packets that come in from rings
+ * on that group to be fully classified and will not need to do any software
+ * classification unless a specific flow has been created.
+ *
+ * If a device supports receive side scaling, then it may advertise or support
+ * groups with multiple rings. In those cases, then receive side scaling will
+ * come into play and MAC will use that as a means of fanning out received
+ * frames across multiple CPUs. This can also be combined with groups that
+ * support layer two classification.
+ *
+ * If a device supports dynamic assignments of rings to groups, then MAC will
+ * change around the way that rings are assigned to various groups as devices
+ * come and go from the system. For example, when a VNIC is created, a new flow
+ * will be created for the VNIC's MAC address. If a hardware ring is available,
+ * MAC may opt to reassign it from one group to another.
+ *
+ * ASSIGNMENT OF HARDWARE RINGS
+ *
+ * This is a bit of a complicated subject that varies depending on the device,
+ * the use of aggregations, the special nature of the primary mac client. This
+ * section deserves being fleshed out.
+ *
+ * FANOUT
+ *
+ * illumos uses fanout to help spread out the incoming processing load of chains
+ * of frames away from a single CPU. If a device supports receive side scaling,
+ * then that provides an initial form of fanout; however, what we're concerned
+ * with all happens after the context of a given set of frames being classified
+ * to a soft ring set.
+ *
+ * After frames reach a soft ring set and account for any potential bandwidth
+ * related accounting, they may be fanned out based on one of the following
+ * three modes:
+ *
+ *     o No Fanout
+ *     o Protocol level fanout
+ *     o Full software ring protocol fanout
+ *
+ * MAC makes the determination as to which of these modes a given soft ring set
+ * obtains based on parameters such as whether or not it's the primary mac
+ * client, whether it's on a 10 GbE or faster device, user controlled dladm(1M)
+ * properties, and the nature of the hardware and the resources that it has.
+ *
+ * When there is no fanout, MAC does not create any soft rings for a device and
+ * the device has frames delivered directly to the MAC client.
+ *
+ * Otherwise, all fanout is performed by software. MAC divides incoming frames
+ * into one of three buckets -- IPv4 TCP traffic, IPv4 UDP traffic, and
+ * everything else. Note, VLAN tagged traffic is considered other, regardless of
+ * the interior EtherType. Regardless of the type of fanout, these three
+ * categories or buckets are always used.
+ *
+ * The difference between protocol level fanout and full software ring protocol
+ * fanout is the number of software rings that end up getting created. The
+ * system always uses the same number of software rings per protocol bucket. So
+ * in the first case when we're just doing protocol level fanout, we just create
+ * one software ring each for IPv4 TCP traffic, IPv4 UDP traffic, and everything
+ * else.
+ *
+ * In the case where we do full software ring protocol fanout, we generally use
+ * mac_compute_soft_ring_count() to determine the number of rings. There are
+ * other combinations of properties and devices that may send us down other
+ * paths, but this is a common starting point. If it's a non-bandwidth enforced
+ * device and we're on at least a 10 GbE link, then we'll use eight soft rings
+ * per protocol bucket as a starting point. See mac_compute_soft_ring_count()
+ * for more information on the total number.
+ *
+ * For each of these rings, we create a mac_soft_ring_t and an associated worker
+ * thread. Particularly when doing full software ring protocol fanout, we bind
+ * each of the worker threads to individual CPUs.
+ *
+ * The other advantage of these software rings is that it allows upper layers to
+ * optionally poll on them. For example, TCP can leverage an squeue to poll on
+ * the software ring, see squeue.c for more information.
+ *
+ * DLS BYPASS
+ *
+ * DLS is the data link services module. It interfaces with DLPI, which is the
+ * primary way that other parts of the system such as IP interface with the MAC
+ * layer. While DLS is traditionally a STREAMS-based interface, it allows for
+ * certain modules such as IP to negotiate various more modern interfaces to be
+ * used, which are useful for higher performance and allow it to use direct
+ * function calls to DLS instead of using STREAMS.
+ *
+ * When we have IPv4 TCP or UDP software rings, then traffic on those rings is
+ * eligible for what we call the dls bypass. In those cases, rather than going
+ * out mac_rx_deliver() to DLS, DLS instead registers them to go directly via
+ * the direct callback registered with DLS, generally ip_input().
+ *
+ * HARDWARE RING POLLING
+ *
+ * GLDv3 devices with hardware rings generally deliver chains of messages
+ * (mblk_t chain) during the context of a single interrupt. However, interrupts
+ * are not the only way that these devices may be used. As part of implementing
+ * ring support, a GLDv3 device driver must have a way to disable the generation
+ * of that interrupt and allow for the operating system to poll on that ring.
+ *
+ * To implement this, every soft ring set has a worker thread and a polling
+ * thread. If a sufficient packet rate comes into the system, MAC will 'blank'
+ * (disable) interrupts on that specific ring and the polling thread will start
+ * consuming packets from the hardware device and deliver them to the soft ring
+ * set, where the worker thread will take over.
+ *
+ * Once the rate of packet intake drops down below a certain threshold, then
+ * polling on the hardware ring will be quiesced and interrupts will be
+ * re-enabled for the given ring. This effectively allows the system to shift
+ * how it handles a ring based on its load. At high packet rates, polling on the
+ * device as opposed to relying on interrupts can actually reduce overall system
+ * load due to the minimization of interrupt activity.
+ *
+ * Note the importance of each ring having its own interrupt source. The whole
+ * idea here is that we do not disable interrupts on the device as a whole, but
+ * rather each ring can be independently toggled.
+ *
+ * USE OF WORKER THREADS
+ *
+ * Both the soft ring set and individual soft rings have a worker thread
+ * associated with them that may be bound to a specific CPU in the system. Any
+ * such assignment will get reassessed as part of dynamic reconfiguration events
+ * in the system such as the onlining and offlining of CPUs and the creation of
+ * CPU partitions.
+ *
+ * In many cases, while in an interrupt, we try to deliver a frame all the way
+ * through the stack in the context of the interrupt itself. However, if the
+ * amount of queued frames has exceeded a threshold, then we instead defer to
+ * the worker thread to do this work and signal it. This is particularly useful
+ * when you have the soft ring set delivering frames into multiple software
+ * rings. If it was only delivering frames into a single software ring then
+ * there'd be no need to have another thread take over. However, if it's
+ * delivering chains of frames to multiple rings, then it's worthwhile to have
+ * the worker for the software ring take over so that the different software
+ * rings can be processed in parallel.
+ *
+ * In a similar fashion to the hardware polling thread, if we don't have a
+ * backlog or there's nothing to do, then the worker thread will go back to
+ * sleep and frames can be delivered all the way from an interrupt. This
+ * behavior is useful as it's designed to minimize latency and the default
+ * disposition of MAC is to optimize for latency.
+ *
+ * MAINTAINING CHAINS
+ *
+ * Another useful idea that MAC uses is to try and maintain frames in chains for
+ * as long as possible. The idea is that all of MAC can handle chains of frames
+ * structured as a series of mblk_t structures linked with the b_next pointer.
+ * When performing software classification and software fanout, MAC does not
+ * simply determine the destination and send the frame along. Instead, in the
+ * case of classification, it tries to maintain a chain for as long as possible
+ * before passing it along and performing additional processing.
+ *
+ * In the case of fanout, MAC first determines what the target software ring is
+ * for every frame in the original chain and constructs a new chain for each
+ * target. MAC then delivers the new chain to each software ring in succession.
+ *
+ * The whole rationale for doing this is that we want to try and maintain the
+ * pipe as much as possible and deliver as many frames through the stack at once
+ * that we can, rather than just pushing a single frame through. This can often
+ * help bring down latency and allows MAC to get a better sense of the overall
+ * activity in the system and properly engage worker threads.
+ *
+ * --------------------
+ * Bandwidth Management
+ * --------------------
+ *
+ * Bandwidth management is something that's built into the soft ring set itself.
+ * When bandwidth limits are placed on a flow, a corresponding soft ring set is
+ * toggled into bandwidth mode. This changes how we transmit and receive the
+ * frames in question.
+ *
+ * Bandwidth management is done on a per-tick basis. We translate the user's
+ * requested bandwidth from a quantity per-second into a quantity per-tick. MAC
+ * cannot process a frame across more than one tick, thus it sets a lower bound
+ * for the bandwidth cap to be a single MTU. This also means that when
+ * hires ticks are enabled (hz is set to 1000), that the minimum amount of
+ * bandwidth is higher, because the number of ticks has increased and MAC has to
+ * go from accepting 100 packets / sec to 1000 / sec.
+ *
+ * The bandwidth counter is reset by either the soft ring set's worker thread or
+ * a thread that is doing an inline transmit or receive if they discover that
+ * the current tick is in the future from the recorded tick.
+ *
+ * Whenever we're receiving or transmitting data, we end up leaving most of the
+ * work to the soft ring set's worker thread. This forces data inserted into the
+ * soft ring set to be effectively serialized and allows us to exhume bandwidth
+ * at a reasonable rate. If there is nothing in the soft ring set at the moment
+ * and the set has available bandwidth, then it may processed inline.
+ * Otherwise, the worker is responsible for taking care of the soft ring set.
+ *
+ * ---------------------
+ * The Receive Data Path
+ * ---------------------
+ *
+ * The following series of ASCII art images breaks apart the way that a frame
+ * comes in and is processed in MAC.
+ *
+ * Part 1 -- Initial frame receipt, SRS classification
+ *
+ * Here, a frame is received by a GLDv3 driver, generally in the context of an
+ * interrupt, and it ends up in mac_rx_common(). A driver calls either mac_rx or
+ * mac_rx_ring, depending on whether or not it supports rings and can identify
+ * the interrupt as having come from a specific ring. Here we determine whether
+ * or not it's fully classified and perform software classification as
+ * appropriate. From here, everything always ends up going to either entry [A]
+ * or entry [B] based on whether or not they have subflow processing needed. We
+ * leave via fanout or delivery.
+ *
+ *           +===========+
+ *           v hardware  v
+ *           v interrupt v
+ *           +===========+
+ *                 |
+ *                 * . . appropriate
+ *                 |     upcall made
+ *                 |     by GLDv3 driver  . . always
+ *                 |                      .
+ *  +--------+     |     +----------+     .    +---------------+
+ *  | GLDv3  |     +---->| mac_rx   |-----*--->| mac_rx_common |
+ *  | Driver |-->--+     +----------+          +---------------+
+ *  +--------+     |        ^                         |
+ *      |          |        ^                         v
+ *      ^          |        * . . always   +----------------------+
+ *      |          |        |              | mac_promisc_dispatch |
+ *      |          |    +-------------+    +----------------------+
+ *      |          +--->| mac_rx_ring |               |
+ *      |               +-------------+               * . . hw classified
+ *      |                                             v     or single flow?
+ *      |                                             |
+ *      |                                   +--------++--------------+
+ *      |                                   |        |               * hw class,
+ *      |                                   |        * hw classified | subflows
+ *      |                 no hw class and . *        | or single     | exist
+ *      |                 subflows          |        | flow          |
+ *      |                                   |        v               v
+ *      |                                   |   +-----------+   +-----------+
+ *      |                                   |   |   goto    |   |  goto     |
+ *      |                                   |   | entry [A] |   | entry [B] |
+ *      |                                   |   +-----------+   +-----------+
+ *      |                                   v          ^
+ *      |                            +-------------+   |
+ *      |                            | mac_rx_flow |   * SRS and flow found,
+ *      |                            +-------------+   | call flow cb
+ *      |                                   |          +------+
+ *      |                                   v                 |
+ *      v                             +==========+    +-----------------+
+ *      |                             v For each v--->| mac_rx_classify |
+ * +----------+                       v  mblk_t  v    +-----------------+
+ * |   srs    |                       +==========+
+ * | pollling |
+ * |  thread  |->------------------------------------------+
+ * +----------+                                            |
+ *                                                         v       . inline
+ *            +--------------------+   +----------+   +---------+  .
+ *    [A]---->| mac_rx_srs_process |-->| check bw |-->| enqueue |--*---------+
+ *            +--------------------+   |  limits  |   | frames  |            |
+ *               ^                     +----------+   | to SRS  |            |
+ *               |                                    +---------+            |
+ *               |  send chain              +--------+    |                  |
+ *               *  when clasified          | signal |    * BW limits,       |
+ *               |  flow changes            |  srs   |<---+ loopback,        |
+ *               |                          | worker |      stack too        |
+ *               |                          +--------+      deep             |
+ *      +-----------------+        +--------+                                |
+ *      | mac_flow_lookup |        |  srs   |     +---------------------+    |
+ *      +-----------------+        | worker |---->| mac_rx_srs_drain    |<---+
+ *               ^                 | thread |     | mac_rx_srs_drain_bw |
+ *               |                 +--------+     +---------------------+
+ *               |                                          |
+ *         +----------------------------+                   * software rings
+ *   [B]-->| mac_rx_srs_subflow_process |                   | for fanout?
+ *         +----------------------------+                   |
+ *                                               +----------+-----------+
+ *                                               |                      |
+ *                                               v                      v
+ *                                          +--------+             +--------+
+ *                                          |  goto  |             |  goto  |
+ *                                          | Part 2 |             | Part 3 |
+ *                                          +--------+             +--------+
+ *
+ * Part 2 -- Fanout
+ *
+ * This part is concerned with using software fanout to assign frames to
+ * software rings and then deliver them to MAC clients or allow those rings to
+ * be polled upon. While there are two different primary fanout entry points,
+ * mac_rx_fanout and mac_rx_proto_fanout, they behave in similar ways, and aside
+ * from some of the individual hashing techniques used, most of the general
+ * flow is the same.
+ *
+ *  +--------+              +-------------------+
+ *  |  From  |---+--------->| mac_rx_srs_fanout |----+
+ *  | Part 1 |   |          +-------------------+    |    +=================+
+ *  +--------+   |                                   |    v for each mblk_t v
+ *               * . . protocol only                 +--->v assign to new   v
+ *               |     fanout                        |    v chain based on  v
+ *               |                                   |    v hash % nrings   v
+ *               |    +-------------------------+    |    +=================+
+ *               +--->| mac_rx_srs_proto_fanout |----+             |
+ *                    +-------------------------+                  |
+ *                                                                 v
+ *    +------------+    +--------------------------+       +================+
+ *    | enqueue in |<---| mac_rx_soft_ring_process |<------v for each chain v
+ *    | soft ring  |    +--------------------------+       +================+
+ *    +------------+
+ *         |                                    +-----------+
+ *         * soft ring set                      | soft ring |
+ *         | empty and no                       |  worker   |
+ *         | worker?                            |  thread   |
+ *         |                                    +-----------+
+ *         +------*----------------+                  |
+ *         |      .                |                  v
+ *    No . *      . Yes            |       +------------------------+
+ *         |                       +----<--| mac_rx_soft_ring_drain |
+ *         |                       |       +------------------------+
+ *         v                       |
+ *   +-----------+                 v
+ *   |   signal  |         +---------------+
+ *   | soft ring |         | Deliver chain |
+ *   |   worker  |         | goto Part 3   |
+ *   +-----------+         +---------------+
+ *
+ *
+ * Part 3 -- Packet Delivery
+ *
+ * Here, we go through and deliver the mblk_t chain directly to a given
+ * processing function. In a lot of cases this is mac_rx_deliver(). In the case
+ * of DLS bypass being used, then instead we end up going ahead and deliver it
+ * to the direct callback registered with DLS, generally ip_input.
+ *
+ *
+ *   +---------+            +----------------+    +------------------+
+ *   |  From   |---+------->| mac_rx_deliver |--->| Off to DLS, or   |
+ *   | Parts 1 |   |        +----------------+    | other MAC client |
+ *   |  and 2  |   * DLS bypass                   +------------------+
+ *   +---------+   | enabled   +----------+    +-------------+
+ *                 +---------->| ip_input |--->|    To IP    |
+ *                             +----------+    | and beyond! |
+ *                                             +-------------+
+ *
+ * ----------------------
+ * The Transmit Data Path
+ * ----------------------
+ *
+ * Before we go into the images, it's worth talking about a problem that is a
+ * bit different from the receive data path. GLDv3 device drivers have a finite
+ * amount of transmit descriptors. When they run out, they return unused frames
+ * back to MAC. MAC, at this point has several options about what it will do,
+ * which vary based upon the settings that the client uses.
+ *
+ * When a device runs out of descriptors, the next thing that MAC does is
+ * enqueue them off of the soft ring set or a software ring, depending on the
+ * configuration of the soft ring set. MAC will enqueue up to a high watermark
+ * of mblk_t chains, at which point it will indicate flow control back to the
+ * client. Once this condition is reached, any mblk_t chains that were not
+ * enqueued will be returned to the caller and they will have to decide what to
+ * do with them. There are various flags that control this behavior that a
+ * client may pass, which are discussed below.
+ *
+ * When this condition is hit, MAC also returns a cookie to the client in
+ * addition to unconsumed frames. Clients can poll on that cookie and register a
+ * callback with MAC to be notified when they are no longer subject to flow
+ * control, at which point they may continue to call mac_tx(). This flow control
+ * actually manages to work itself all the way up the stack, back through dls,
+ * to ip, through the various protocols, and to sockfs.
+ *
+ * While the behavior described above is the default, this behavior can be
+ * modified. There are two alternate modes, described below, which are
+ * controlled with flags.
+ *
+ * DROP MODE
+ *
+ * This mode is controlled by having the client pass the MAC_DROP_ON_NO_DESC
+ * flag. When this is passed, if a device driver runs out of transmit
+ * descriptors, then the MAC layer will drop any unsent traffic. The client in
+ * this case will never have any frames returned to it.
+ *
+ * DON'T ENQUEUE
+ *
+ * This mode is controlled by having the client pass the MAC_TX_NO_ENQUEUE flag.
+ * If the MAC_DROP_ON_NO_DESC flag is also passed, it takes precedence. In this
+ * mode, when we hit a case where a driver runs out of transmit descriptors,
+ * then instead of enqueuing packets in a soft ring set or software ring, we
+ * instead return the mblk_t chain back to the caller and immediately put the
+ * soft ring set into flow control mode.
+ *
+ * The following series of ASCII art images describe the transmit data path that
+ * MAC clients enter into based on calling into mac_tx(). A soft ring set has a
+ * transmission function associated with it. There are seven possible
+ * transmission modes, some of which share function entry points. The one that a
+ * soft ring set gets depends on properties such as whether there are
+ * transmission rings for fanout, whether the device involves aggregations,
+ * whether any bandwidth limits exist, etc.
+ *
+ *
+ * Part 1 -- Initial checks
+ *
+ *      * . called by
+ *      |   MAC clients
+ *      v                     . . No
+ *  +--------+  +-----------+ .   +-------------------+  +====================+
+ *  | mac_tx |->| device    |-*-->| mac_protect_check |->v Is this the simple v
+ *  +--------+  | quiesced? |     +-------------------+  v case? See [1]      v
+ *              +-----------+            |               +====================+
+ *                  * . Yes              * failed                 |
+ *                  v                    | frames                 |
+ *             +--------------+          |                +-------+---------+
+ *             | freemsgchain |<---------+          Yes . *            No . *
+ *             +--------------+                           v                 v
+ *                                                  +-----------+     +--------+
+ *                                                  |   goto    |     |  goto  |
+ *                                                  |  Part 2   |     | SRS TX |
+ *                                                  | Entry [A] |     |  func  |
+ *                                                  +-----------+     +--------+
+ *                                                        |                 |
+ *                                                        |                 v
+ *                                                        |           +--------+
+ *                                                        +---------->| return |
+ *                                                                    | cookie |
+ *                                                                    +--------+
+ *
+ * [1] The simple case refers to the SRS being configured with the
+ * SRS_TX_DEFAULT transmission mode, having a single mblk_t (not a chain), their
+ * being only a single active client, and not having a backlog in the srs.
+ *
+ *
+ * Part 2 -- The SRS transmission functions
+ *
+ * This part is a bit more complicated. The different transmission paths often
+ * leverage one another. In this case, we'll draw out the more common ones
+ * before the parts that depend upon them. Here, we're going to start with the
+ * workings of mac_tx_send() a common function that most of the others end up
+ * calling.
+ *
+ *      +-------------+
+ *      | mac_tx_send |
+ *      +-------------+
+ *            |
+ *            v
+ *      +=============+    +==============+
+ *      v  more than  v--->v    check     v
+ *      v one client? v    v VLAN and add v
+ *      +=============+    v  VLAN tags   v
+ *            |            +==============+
+ *            |                  |
+ *            +------------------+
+ *            |
+ *            |                 [A]
+ *            v                  |
+ *       +============+ . No     v
+ *       v more than  v .     +==========+     +--------------------------+
+ *       v one active v-*---->v for each v---->| mac_promisc_dispatch_one |---+
+ *       v  client?   v       v mblk_t   v     +--------------------------+   |
+ *       +============+       +==========+        ^                           |
+ *            |                                   |       +==========+        |
+ *            * . Yes                             |       v hardware v<-------+
+ *            v                      +------------+       v  rings?  v
+ *       +==========+                |                    +==========+
+ *       v for each v       No . . . *                         |
+ *       v mblk_t   v       specific |                         |
+ *       +==========+       flow     |                   +-----+-----+
+ *            |                      |                   |           |
+ *            v                      |                   v           v
+ *    +-----------------+            |               +-------+  +---------+
+ *    | mac_tx_classify |------------+               | GLDv3 |  |  GLDv3  |
+ *    +-----------------+                            |TX func|  | ring tx |
+ *            |                                      +-------+  |  func   |
+ *            * Specific flow, generally                 |      +---------+
+ *            | bcast, mcast, loopback                   |           |
+ *            v                                          +-----+-----+
+ *      +==========+       +---------+                         |
+ *      v valid L2 v--*--->| freemsg |                         v
+ *      v  header  v  . No +---------+               +-------------------+
+ *      +==========+                                 | return unconsumed |
+ *            * . Yes                                |   frames to the   |
+ *            v                                      |      caller       |
+ *      +===========+                                +-------------------+
+ *      v braodcast v      +----------------+                  ^
+ *      v   flow?   v--*-->| mac_bcast_send |------------------+
+ *      +===========+  .   +----------------+                  |
+ *            |        . . Yes                                 |
+ *       No . *                                                v
+ *            |  +---------------------+  +---------------+  +----------+
+ *            +->|mac_promisc_dispatch |->| mac_fix_cksum |->|   flow   |
+ *               +---------------------+  +---------------+  | callback |
+ *                                                           +----------+
+ *
+ *
+ * In addition, many but not all of the routines, all rely on
+ * mac_tx_softring_process as an entry point.
+ *
+ *
+ *                                           . No             . No
+ * +--------------------------+   +========+ .  +===========+ .  +-------------+
+ * | mac_tx_soft_ring_process |-->v worker v-*->v out of tx v-*->|    goto     |
+ * +--------------------------+   v only?  v    v  descr.?  v    | mac_tx_send |
+ *                                +========+    +===========+    +-------------+
+ *                              Yes . *               * . Yes           |
+ *                   . No             v               |                 v
+ *     v=========+   .          +===========+ . Yes   |     Yes .  +==========+
+ *     v apppend v<--*----------v out of tx v-*-------+---------*--v returned v
+ *     v mblk_t  v              v  descr.?  v         |            v frames?  v
+ *     v chain   v              +===========+         |            +==========+
+ *     +=========+                                    |                 *. No
+ *         |                                          |                 v
+ *         v                                          v           +------------+
+ * +===================+           +----------------------+       |   done     |
+ * v worker scheduled? v           | mac_tx_sring_enqueue |       | processing |
+ * v Out of tx descr?  v           +----------------------+       +------------+
+ * +===================+                      |
+ *    |           |           . Yes           v
+ *    * Yes       * No        .         +============+
+ *    |           v         +-*---------v drop on no v
+ *    |      +========+     v           v  TX desc?  v
+ *    |      v  wake  v  +----------+   +============+
+ *    |      v worker v  | mac_pkt_ |         * . No
+ *    |      +========+  | drop     |         |         . Yes         . No
+ *    |           |      +----------+         v         .             .
+ *    |           |         v   ^     +===============+ .  +========+ .
+ *    +--+--------+---------+   |     v Don't enqueue v-*->v ring   v-*----+
+ *       |                      |     v     Set?      v    v empty? v      |
+ *       |      +---------------+     +===============+    +========+      |
+ *       |      |                            |                |            |
+ *       |      |        +-------------------+                |            |
+ *       |      *. Yes   |                          +---------+            |
+ *       |      |        v                          v                      v
+ *       |      |  +===========+               +========+      +--------------+
+ *       |      +<-v At hiwat? v               v append v      |    return    |
+ *       |         +===========+               v mblk_t v      | mblk_t chain |
+ *       |                  * No               v chain  v      |   and flow   |
+ *       |                  v                  +========+      |    control   |
+ *       |               +=========+                |          |    cookie    |
+ *       |               v  append v                v          +--------------+
+ *       |               v  mblk_t v           +========+
+ *       |               v  chain  v           v  wake  v   +------------+
+ *       |               +=========+           v worker v-->|    done    |
+ *       |                    |                +========+   | processing |
+ *       |                    v       .. Yes                +------------+
+ *       |               +=========+  .   +========+
+ *       |               v  first  v--*-->v  wake  v
+ *       |               v append? v      v worker v
+ *       |               +=========+      +========+
+ *       |                   |                |
+ *       |              No . *                |
+ *       |                   v                |
+ *       |       +--------------+             |
+ *       +------>|   Return     |             |
+ *               | flow control |<------------+
+ *               |   cookie     |
+ *               +--------------+
+ *
+ *
+ * The remaining images are all specific to each of the different transmission
+ * modes.
+ *
+ * SRS TX DEFAULT
+ *
+ *      [ From Part 1 ]
+ *             |
+ *             v
+ * +-------------------------+
+ * | mac_tx_single_ring_mode |
+ * +-------------------------+
+ *            |
+ *            |       . Yes
+ *            v       .
+ *       +==========+ .  +============+
+ *       v   SRS    v-*->v   Try to   v---->---------------------+
+ *       v backlog? v    v enqueue in v                          |
+ *       +==========+    v     SRS    v-->------+                * . . Queue too
+ *            |          +============+         * don't enqueue  |     deep or
+ *            * . No         ^     |            | flag or at     |     drop flag
+ *            |              |     v            | hiwat,         |
+ *            v              |     |            | return    +---------+
+ *     +-------------+       |     |            | cookie    | freemsg |
+ *     |    goto     |-*-----+     |            |           +---------+
+ *     | mac_tx_send | . returned  |            |                |
+ *     +-------------+   mblk_t    |            |                |
+ *            |                    |            |                |
+ *            |                    |            |                |
+ *            * . . all mblk_t     * queued,    |                |
+ *            v     consumed       | may return |                |
+ *     +-------------+             | tx cookie  |                |
+ *     | SRS TX func |<------------+------------+----------------+
+ *     |  completed  |
+ *     +-------------+
+ *
+ * SRS_TX_SERIALIZE
+ *
+ *   +------------------------+
+ *   | mac_tx_serializer_mode |
+ *   +------------------------+
+ *               |
+ *               |        . No
+ *               v        .
+ *         +============+ .  +============+    +-------------+   +============+
+ *         v srs being  v-*->v  set SRS   v--->|    goto     |-->v remove SRS v
+ *         v processed? v    v proc flags v    | mac_tx_send |   v proc flag  v
+ *         +============+    +============+    +-------------+   +============+
+ *               |                                                     |
+ *               * Yes                                                 |
+ *               v                                       . No          v
+ *      +--------------------+                           .        +==========+
+ *      | mac_tx_srs_enqueue |  +------------------------*-----<--v returned v
+ *      +--------------------+  |                                 v frames?  v
+ *               |              |   . Yes                         +==========+
+ *               |              |   .                                  |
+ *               |              |   . +=========+                      v
+ *               v              +-<-*-v queued  v     +--------------------+
+ *        +-------------+       |     v frames? v<----| mac_tx_srs_enqueue |
+ *        | SRS TX func |       |     +=========+     +--------------------+
+ *        | completed,  |<------+         * . Yes
+ *        | may return  |       |         v
+ *        |   cookie    |       |     +========+
+ *        +-------------+       +-<---v  wake  v
+ *                                    v worker v
+ *                                    +========+
+ *
+ *
+ * SRS_TX_FANOUT
+ *
+ *                                             . Yes
+ *   +--------------------+    +=============+ .   +--------------------------+
+ *   | mac_tx_fanout_mode |--->v Have fanout v-*-->|           goto           |
+ *   +--------------------+    v   hint?     v     | mac_rx_soft_ring_process |
+ *                             +=============+     +--------------------------+
+ *                                   * . No                    |
+ *                                   v                         ^
+ *                             +===========+                   |
+ *                        +--->v for each  v           +===============+
+ *                        |    v   mblk_t  v           v pick softring v
+ *                 same   *    +===========+           v   from hash   v
+ *                 hash   |          |                 +===============+
+ *                        |          v                         |
+ *                        |   +--------------+                 |
+ *                        +---| mac_pkt_hash |--->*------------+
+ *                            +--------------+    . different
+ *                                                  hash or
+ *                                                  done proc.
+ * SRS_TX_AGGR                                      chain
+ *
+ *   +------------------+    +================================+
+ *   | mac_tx_aggr_mode |--->v Use aggr capab function to     v
+ *   +------------------+    v find appropriate tx ring.      v
+ *                           v Applies hash based on aggr     v
+ *                           v policy, see mac_tx_aggr_mode() v
+ *                           +================================+
+ *                                          |
+ *                                          v
+ *                           +-------------------------------+
+ *                           |            goto               |
+ *                           |  mac_rx_srs_soft_ring_process |
+ *                           +-------------------------------+
+ *
+ *
+ * SRS_TX_BW, SRS_TX_BW_FANOUT, SRS_TX_BW_AGGR
+ *
+ * Note, all three of these tx functions start from the same place --
+ * mac_tx_bw_mode().
+ *
+ *  +----------------+
+ *  | mac_tx_bw_mode |
+ *  +----------------+
+ *         |
+ *         v          . No               . No               . Yes
+ *  +==============+  .  +============+  .  +=============+ .  +=========+
+ *  v  Out of BW?  v--*->v SRS empty? v--*->v  reset BW   v-*->v Bump BW v
+ *  +==============+     +============+     v tick count? v    v Usage   v
+ *         |                   |            +=============+    +=========+
+ *         |         +---------+                   |                |
+ *         |         |        +--------------------+                |
+ *         |         |        |              +----------------------+
+ *         v         |        v              v
+ * +===============+ |  +==========+   +==========+      +------------------+
+ * v Don't enqueue v |  v  set bw  v   v Is aggr? v--*-->|       goto       |
+ * v   flag set?   v |  v enforced v   +==========+  .   | mac_tx_aggr_mode |-+
+ * +===============+ |  +==========+         |       .   +------------------+ |
+ *   |    Yes .*     |        |         No . *       .                        |
+ *   |         |     |        |              |       . Yes                    |
+ *   * . No    |     |        v              |                                |
+ *   |  +---------+  |   +========+          v              +======+          |
+ *   |  | freemsg |  |   v append v   +============+  . Yes v pick v          |
+ *   |  +---------+  |   v mblk_t v   v Is fanout? v--*---->v ring v          |
+ *   |      |        |   v chain  v   +============+        +======+          |
+ *   +------+        |   +========+          |                  |             |
+ *          v        |        |              v                  v             |
+ *    +---------+    |        v       +-------------+ +--------------------+  |
+ *    | return  |    |   +========+   |    goto     | |       goto         |  |
+ *    |  flow   |    |   v wakeup v   | mac_tx_send | | mac_tx_fanout_mode |  |
+ *    | control |    |   v worker v   +-------------+ +--------------------+  |
+ *    | cookie  |    |   +========+          |                  |             |
+ *    +---------+    |        |              |                  +------+------+
+ *                   |        v              |                         |
+ *                   |   +---------+         |                         v
+ *                   |   | return  |   +============+           +------------+
+ *                   |   |  flow   |   v unconsumed v-------+   |   done     |
+ *                   |   | control |   v   frames?  v       |   | processing |
+ *                   |   | cookie  |   +============+       |   +------------+
+ *                   |   +---------+         |              |
+ *                   |                  Yes  *              |
+ *                   |                       |              |
+ *                   |                 +===========+        |
+ *                   |                 v subtract  v        |
+ *                   |                 v unused bw v        |
+ *                   |                 +===========+        |
+ *                   |                       |              |
+ *                   |                       v              |
+ *                   |              +--------------------+  |
+ *                   +------------->| mac_tx_srs_enqueue |  |
+ *                                  +--------------------+  |
+ *                                           |              |
+ *                                           |              |
+ *                                     +------------+       |
+ *                                     |  return fc |       |
+ *                                     | cookie and |<------+
+ *                                     |    mblk_t  |
+ *                                     +------------+
  */
 
 #include <sys/types.h>
