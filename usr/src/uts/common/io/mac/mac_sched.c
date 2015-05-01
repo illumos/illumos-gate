@@ -1362,7 +1362,7 @@ int mac_srs_worker_wakeup_ticks = 0;
  * said, the constant is left as a static variable to allow it to be
  * dynamically tuned in the field if and as needed.
  */
-static uintptr_t mac_rx_srs_stack_needed = 10240;
+static uintptr_t mac_rx_srs_stack_needed = 13312;
 static uint_t mac_rx_srs_stack_toodeep;
 
 #ifndef STACK_GROWTH_DOWN
