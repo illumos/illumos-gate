@@ -123,97 +123,15 @@ setup_net()
         rm -f /tmp/$ZONENAME.$$
 }
 
-disable_svc()
-{
-	fnm=$ZONEROOT/etc/init/$1.override
-	[[ -h $fnm || -f $fnm ]] && return
-	echo "manual" > $fnm
-}
-
-
-RMSVCS="acpid
-	alsa-restore
-	alsa-state
-	alsa-store
-	avahi-cups-reload
-	avahi-daemon
-	bluetooth
-	bootmisc.sh
-	checkroot.sh
-	cloud-init-blocknet
-	cloud-init-container
-	cloud-init-nonet
-	control-alt-delete
-	console-setup
-	dmesg
-	hwclock
-	hwclock-save
-	irqbalance
-	lightdm
-	modemmanager
-	module-init-tools
-	mountdevsubfs.sh
-	mounted-dev
-	mounted-debugfs
-	mountkernfs.sh
-	mtab.sh
-	network-interface-security
-	network-manager
-	plymouth
-	plymouth-log
-	plymouth-splash
-	plymouth-stop
-	plymouth-upstart-bridge
-	pulseaudio
-	setvtrgb
-	systemd-logind
-	tty1
-	tty2
-	tty3
-	tty4
-	tty5
-	tty6
-	upstart-udev-bridge
-	udev
-	udevmonitor
-	udevtrigger
-	udev-fallback-graphics
-	udev-finish
-	ureadahead-other
-	ureadahead
-	whoopsie"
-
-
-#
-# Now customize upstart
-#
-
-for f in $RMSVCS
-do
-	disable_svc $f
-done
-
-# remove these?
-# etc/init.d
-#    networking
-#    umountfs
-
-RMSVCS="kerneloops"
-
-for f in $RMSVCS
-do
-	fnm=$ZONEROOT/etc/init.d/$f
-	[[ ! -h $fnm && -f $fnm ]] && rm -f $fnm
-done
-
-fnm=$ZONEROOT/etc/init/console.conf
-if [[ ! -h $fnm && -f $fnm ]] then
-	sed -e 's/lxc/zones/' $fnm > /tmp/console.conf.$$
-	mv /tmp/console.conf.$$ $fnm
+src_fnm=$ZONEROOT/etc/init/console.conf
+tgt_fnm=$ZONEROOT/etc/init/console.override
+if [[ -f $src_fnm && ! -f $tgt_fnm && ! -h $tgt_fnm ]] then
+	sed -e 's/lxc/smartos/' $src_fnm > /tmp/console.conf.$$
+	mv /tmp/console.conf.$$ $tgt_fnm
 fi
 
-fnm=$ZONEROOT/etc/init/container-detect.conf
-if [[ ! -h $fnm && -f $fnm ]] then
+fnm=$ZONEROOT/etc/init/container-detect.override
+if [[ ! -f $fnm && ! -h $fnm ]] then
 	cat <<'DONE' > $fnm
 description "Track if upstart is running in a container"
 
@@ -225,7 +143,7 @@ env LIBVIRT_LXC_UUID
 emits container
 
 pre-start script
-    container=zones
+    container=smartos
     echo "$container" > /run/container_type || true
     initctl emit --no-wait container CONTAINER=$container
     exit 0
@@ -235,8 +153,8 @@ fi
 
 # XXX need to add real mounting into this svc definition
 
-fnm=$ZONEROOT/etc/init/mountall.conf
-if [[ ! -h $fnm && -f $fnm ]] then
+fnm=$ZONEROOT/etc/init/mountall.override
+if [[ ! -f $fnm && ! -h $fnm ]] then
 	cat <<'DONE' > $fnm
 description	"Mount filesystems on boot"
 
@@ -269,47 +187,12 @@ DONE
 fi
 
 iptype=`/usr/sbin/zonecfg -z $ZONENAME info ip-type | cut -f2 -d' '`
-
 if [[ "$iptype" == "exclusive" ]]; then
-	fnm=$ZONEROOT/etc/init/networking.conf
-	if [[ ! -h $fnm && -f $fnm ]] then
+	fnm=$ZONEROOT/etc/init/networking.override
+	if [[ ! -h $fnm ]] then
 		setup_net
 	fi
 fi
-
-fnm=$ZONEROOT/etc/init/ssh.conf
-if [[ ! -h $fnm && -f $fnm && ! -h $ZONEROOT/etc/init/ssh.conf.$$ ]] then
-    awk '{
-        if (substr($0, "start on", 8) == "start on") {
-            print "start on static-network-up"
-        } else if ($0 == "env SSH_SIGSTOP=1") {
-            print "# env SSH_SIGSTOP=1"
-        } else if ($0 == "expect stop") {
-            print "# expect stop"
-        } else {
-            print $0
-        }
-    }' $fnm >$ZONEROOT/etc/init/ssh.conf.$$
-    mv $ZONEROOT/etc/init/ssh.conf.$$ $fnm
-fi
-
-fnm=$ZONEROOT/etc/init/plymouth-ready.conf
-if [[ ! -h $fnm && -f $fnm ]] then
-	cat <<'DONE' > $fnm
-description "Send an event to indicate plymouth is up"
-
-task
-start on startup
-instance $UPSTART_EVENTS
-
-emits plymouth-ready
-
-script
-  initctl emit --no-wait plymouth-ready
-end script
-DONE
-fi
-
 #
 # upstart modifications are complete 
 #
