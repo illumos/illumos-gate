@@ -4877,7 +4877,7 @@ done(int n)
 	 * we're waiting for to finish compressing or uncompressing the tar
 	 * stream.
 	 */
-	if (n == 0 && comp_pid != 0)
+	if (comp_pid != 0)
 		wait_pid(comp_pid);
 	exit(n);
 }

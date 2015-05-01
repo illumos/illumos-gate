@@ -286,7 +286,7 @@ extern	int	mac_tx_percpu_cnt;
 
 /*
  * To allow the hot path to not grab any additional locks, we keep a single
- * entry VLAD ID cache that caches whether or not a given VID belongs to a
+ * entry VLAN ID cache that caches whether or not a given VID belongs to a
  * MAC client.
  */
 #define	MCIP_VIDCACHE_VALIDSHIFT	31

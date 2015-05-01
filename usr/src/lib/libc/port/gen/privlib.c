@@ -20,6 +20,7 @@
  */
 
 /*
+ * Copyright 2015 Gary Mills
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -571,10 +572,12 @@ __fini_daemon_priv(const char *priv, ...)
 	priv_set_t *nset;
 	va_list pa;
 
-	va_start(pa, priv);
-
 	if (priv != NULL) {
+
+		va_start(pa, priv);
 		nset = priv_vlist(pa);
+		va_end(pa);
+
 		if (nset == NULL)
 			return;
 
@@ -582,8 +585,6 @@ __fini_daemon_priv(const char *priv, ...)
 		(void) setppriv(PRIV_OFF, permitted, nset);
 		priv_freeset(nset);
 	}
-
-	va_end(pa);
 
 	(void) setpflags(__PROC_PROTECT, 0);
 }
