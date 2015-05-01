@@ -74,7 +74,8 @@ INCS =		-I../common \
 		-I$(JAVA_ROOT)/include \
 		-I$(JAVA_ROOT)/include/solaris
 LDLIBS +=	-lpool -L$(JAVA_ROOT)/jre/lib/$(MACH)/client -ljvm
-LDFLAGS +=	-R$(JAVA_ROOT)/jre/lib/$(MACH)/client
+# runpath should point to runtime JAVA_HOME
+LDFLAGS +=	-R$(JAVA_HOME)/jre/lib/$(MACH)/client
 LINTFLAGS +=	-erroff=E_NAME_USED_NOT_DEF2
 LINTLIBS +=	-L$(ROOTLIB) -lpool
 
