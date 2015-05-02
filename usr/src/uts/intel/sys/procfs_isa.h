@@ -27,8 +27,6 @@
 #ifndef _SYS_PROCFS_ISA_H
 #define	_SYS_PROCFS_ISA_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Instruction Set Architecture specific component of <sys/procfs.h>
  * i386 version
@@ -69,7 +67,7 @@ typedef	uchar_t instr_t;
 #define	NPRGREG		_NGREG
 #define	prgreg_t	greg_t
 #define	prgregset_t	gregset_t
-#define	prfpregset	fpu
+#define	prfpregset	_fpu
 #define	prfpregset_t	fpregset_t
 
 #if defined(_SYSCALL32)
@@ -87,7 +85,7 @@ typedef	uchar_t		instr32_t;
 #define	NPRGREG32	_NGREG
 #define	prgreg32_t	greg_t
 #define	prgregset32_t	gregset_t
-#define	prfpregset32	fpu
+#define	prfpregset32	_fpu
 #define	prfpregset32_t	fpregset_t
 #endif
 #endif	/* _SYSCALL32 */

@@ -39,6 +39,7 @@
 #include <string.h>
 #include <signal.h>
 #include <ucontext.h>
+#include <sys/regset.h>
 #include <sys/frame.h>
 #include <fenv.h>
 #include <sys/ieeefp.h>

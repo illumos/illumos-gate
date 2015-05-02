@@ -40,6 +40,7 @@
 #include <sunmath.h>
 #endif
 #include <fenv.h>
+#include <sys/regset.h>
 #include "fex_handler.h"
 #include "fenv_inlines.h"
 

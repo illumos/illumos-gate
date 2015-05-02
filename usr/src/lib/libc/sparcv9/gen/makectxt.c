@@ -27,8 +27,6 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #pragma weak _makecontext = makecontext
 #pragma weak ___makecontext_v2 = __makecontext_v2
 
@@ -38,6 +36,7 @@
 #include <sys/ucontext.h>
 #include <sys/stack.h>
 #include <sys/frame.h>
+#include <sys/regset.h>
 
 /*
  * The ucontext_t that the user passes in must have been primed with a

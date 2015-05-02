@@ -12,8 +12,6 @@
  * specifies the terms and conditions for redistribution.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * 4.3BSD signal compatibility functions
  *
@@ -28,6 +26,7 @@
 #include <sys/types.h>
 #include <sys/siginfo.h>
 #include <sys/ucontext.h>
+#include <sys/regset.h>
 #include <signal.h>
 #include "signal.h"
 #include <errno.h>

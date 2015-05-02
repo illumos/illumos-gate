@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Context-saving routine used for pipelines.  Designed for use only
  * with kmdb_setcontext, and with the assumption that func() will never
@@ -36,6 +34,7 @@
 #include <ucontext.h>
 #include <sys/types.h>
 #include <sys/stack.h>
+#include <sys/regset.h>
 
 #include <kmdb/kmdb_context_impl.h>
 #include <mdb/mdb_kreg.h>
