@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/mkdev.h>
 #include <sys/regset.h>
@@ -267,7 +265,7 @@ prfpregset_32_to_n(const prfpregset32_t *src, prfpregset_t *dst)
 #elif defined(__amd64)
 
 	struct _fpstate32 *src32 = (struct _fpstate32 *)src;
-	struct fpchip_state *dst64 = (struct fpchip_state *)dst;
+	struct _fpchip_state *dst64 = (struct _fpchip_state *)dst;
 	int i;
 
 	(void) memcpy(dst64->st, src32->_st, sizeof (src32->_st));
@@ -598,7 +596,7 @@ prfpregset_n_to_32(const prfpregset_t *src, prfpregset32_t *dst)
 #elif defined(__amd64)
 
 	struct _fpstate32 *dst32 = (struct _fpstate32 *)dst;
-	struct fpchip_state *src64 = (struct fpchip_state *)src;
+	struct _fpchip_state *src64 = (struct _fpchip_state *)src;
 	uint32_t top;
 	int i;
 

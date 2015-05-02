@@ -27,15 +27,15 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #pragma weak _makecontext = makecontext
 #pragma weak ___makecontext_v2 = __makecontext_v2
 
 #include "lint.h"
 #include <stdarg.h>
 #include <strings.h>
+/* Can't just use <ucontext.h> due to redefine_extname stuff. */
 #include <sys/ucontext.h>
+#include <sys/regset.h>
 #include <sys/stack.h>
 #include <sys/frame.h>
 

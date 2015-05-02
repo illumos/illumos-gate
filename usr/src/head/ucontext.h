@@ -33,8 +33,19 @@
 #define	_UCONTEXT_H
 
 #include <sys/ucontext.h>
-
+/*
+ * The file sys/regset.h defines indices in the gregset_t array,
+ * such as EIP on i386.  Those defines were historically exposed
+ * via sys/ucontext.h, sys/signal.h, etc. which caused surprises
+ * due to those defines unexpectedly polluting the namespace.
+ * On the other hand, several existing applications assume that
+ * the regset names are defined after an include <ucontext.h>.
+ * To solve both problems at once: <ucontext.h> (this file)
+ * DOES include sys/regset.h for you but <sys/ucontext.h>
+ * does NOT include sys/regset.h anymore.
+ */
 #if !defined(_XPG4_2) || defined(__EXTENSIONS__)
+#include <sys/regset.h>
 #include <sys/siginfo.h>
 #endif
 

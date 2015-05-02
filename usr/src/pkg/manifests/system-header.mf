@@ -1222,6 +1222,7 @@ $(i386_ONLY)file path=usr/include/sys/mc_amd.h
 $(i386_ONLY)file path=usr/include/sys/mc_intel.h
 $(i386_ONLY)file path=usr/include/sys/mca_amd.h
 $(i386_ONLY)file path=usr/include/sys/mca_x86.h
+file path=usr/include/sys/mcontext.h
 file path=usr/include/sys/md4.h
 file path=usr/include/sys/md5.h
 file path=usr/include/sys/md5_consts.h
