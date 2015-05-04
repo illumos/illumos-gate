@@ -24,11 +24,8 @@
 # Copyright 2015 Joyent, Inc.  All rights reserved.
 #
 
-PROGS =	lx_install lx_init_zone lx_boot
-PROGS += lx_init_zone_debian lx_init_zone_redhat lx_init_zone_ubuntu
-PROGS += lx_networking lx_boot_zone_redhat lx_boot_zone_ubuntu
-PROGS += lx_boot_zone_debian
-SUBDIRS = distros
+PROGS =	lx_boot
+PROGS += lx_boot_zone_redhat lx_boot_zone_ubuntu lx_boot_zone_debian
 XMLDOCS =	config.xml platform.xml
 TEMPLATES =	SUNWlx.xml SUNWlx26.xml
 
@@ -50,7 +47,7 @@ $(POFILE): $(POFILES)
 
 _msg: $(MSGDOMAINPOFILE)
 
-install: $(PROGS) $(ROOTXMLDOCS) $(ROOTTEMPLATES) $(ROOTPROGS) $(SUBDIRS)
+install: $(PROGS) $(ROOTXMLDOCS) $(ROOTTEMPLATES) $(ROOTPROGS)
 	mkdir -p $(ROOT)/usr/lib/brand/lx/ld/64
 	crle -c $(ROOT)/usr/lib/brand/lx/ld/ld.config \
 		-l /native/lib:/native/usr/lib \
@@ -64,11 +61,8 @@ lint:
 clean:
 	-$(RM) $(PROGS)
 
-clobber: clean $(SUBDIRS)
+clobber: clean
 	-$(RM) $(ROOTXMLDOCS) $(ROOTPROGS) $(ROOTTEMPLATES)
-
-$(SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
 
 FRC:
 
