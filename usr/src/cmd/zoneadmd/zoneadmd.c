@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2014 Nexenta Systems, Inc. All rights reserved.
- * Copyright 2014, Joyent, Inc. All rights reserved.
+ * Copyright 2015, Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -1080,7 +1080,10 @@ zone_bootup(zlog_t *zlogp, const char *bootargs, int zstate, boolean_t debug)
 
 	assert(init_file[0] != '\0');
 
-	/* Try to anticipate possible problems: Make sure init is executable. */
+	/*
+	 * Try to anticipate possible problems: If possible, make sure init is
+	 * executable.
+	 */
 	if (zone_get_rootpath(zone_name, rpath, sizeof (rpath)) != Z_OK) {
 		zerror(zlogp, B_FALSE, "unable to determine zone root");
 		goto bad;
@@ -1088,12 +1091,14 @@ zone_bootup(zlog_t *zlogp, const char *bootargs, int zstate, boolean_t debug)
 
 	(void) snprintf(initpath, sizeof (initpath), "%s%s", rpath, init_file);
 
-	if (stat(initpath, &st) == -1) {
+	if (lstat(initpath, &st) == -1) {
 		zerror(zlogp, B_TRUE, "could not stat %s", initpath);
 		goto bad;
 	}
 
-	if ((st.st_mode & S_IXUSR) == 0) {
+	if ((st.st_mode & S_IFMT) == S_IFLNK) {
+		/* symlink, we'll have to wait and resolve when we boot */
+	} else if ((st.st_mode & S_IXUSR) == 0) {
 		zerror(zlogp, B_FALSE, "%s is not executable", initpath);
 		goto bad;
 	}
