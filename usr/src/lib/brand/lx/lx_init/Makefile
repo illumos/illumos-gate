@@ -18,38 +18,36 @@
 #
 # CDDL HEADER END
 #
-
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
 # Copyright 2015 Joyent, Inc.
 #
 
-default: all
+PROG =		lxinit
+PROGS =		$(PROG)
+OBJS =		lxinit
 
-include Makefile.lx
+all:		$(PROG)
 
-# Build everything in parallel; use .WAIT for dependencies
-.PARALLEL:
+include ../Makefile.lx
+include $(SRC)/cmd/Makefile.cmd
 
-SUBDIRS=	cmd librtld_db lx_support lx_init lx_brand lx_thunk netfiles \
-		zone lx_vdso testing .WAIT lx_nametoaddr
-MSGSUBDIRS=	lx_brand lx_support zone
+# override the install directory
+ROOTBIN =	$(ROOTBRANDDIR)
+CLOBBERFILES =	$(OBJS) $(ROOTPROGS)
 
-all :=		TARGET= all
-install :=	TARGET= install
-clean :=	TARGET= clean
-clobber :=	TARGET= clobber
-lint :=		TARGET= lint
-_msg :=		TARGET= _msg
+UTSBASE =	$(SRC)/uts
+
+CFLAGS +=	$(CCVERBOSE)
+CPPFLAGS +=	-D_REENTRANT -I$(UTSBASE)/common/brand/lx
+LDLIBS +=	-lzonecfg -lipadm -lsocket -linetutil -lnsl
 
 .KEEP_STATE:
 
-all install clean clobber lint: $(SUBDIRS)
+install:	all $(ROOTPROGS)
 
-_msg: $(MSGSUBDIRS)
+clean:
+		$(RM) $(PROG) $(OBJS)
 
-$(SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
+lint:		lint_PROG
 
-FRC:
+include $(SRC)/cmd/Makefile.targ

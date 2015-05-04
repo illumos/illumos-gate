@@ -41,7 +41,7 @@ if [ "$arch" = "i386" ]; then
 	ARCH32=i86
         ARCH64=amd64
 else
-        echo "Unsupported architecture: $arch" 
+        echo "Unsupported architecture: $arch"
         exit 2
 fi
 
@@ -55,56 +55,6 @@ fi
 
 BRANDDIR=/native/usr/lib/brand/lx;
 EXIT_CODE=1
-
-# All native executables must be run using the native linker. By default, the
-# kernel runs the linker at /lib/ld.so.1, which doesn't exist in an lx zone.
-# In lx, the linker is ld-linux.so.N. Hence when we run the native executable
-# from the wrappers, we explicitly specify /native/lib/ld.so.1 as our 32-bit
-# linker (or /native/lib/64/ld.so.1 as our 64-bit linker).
-#
-# $1 is lx cmd, $2 is native cmd, $3 is an optional inclusion in the script
-# the lx cmd path must have already be verified with safe_dir
-#
-setup_native_chroot_cmd() {
-	cmd_name=$ZONEROOT/$1
-
-	if [ -h $cmd_name -o \( -e $cmd_name -a ! -f $cmd_name \) ]; then
-		logger -p daemon.err "dangerous zone cmd: $ZONENAME, $1" 
-		return
-	fi
-
-	cat <<-DONE >$ZONEROOT/$1
-	#!/bin/sh
-
-	$3
-	exec /native/usr/sbin/chroot /native \
-	    /lib/ld.so.1 -e LD_NOENVIRON=1 -e LD_NOCONFIG=1 \
-	    $2 "\$@"
-	DONE
-
-	chmod 755 $ZONEROOT/$1
-}
-
-# $1 is lx cmd, $2 is native cmd
-# the lx cmd path must have already be verified with safe_dir
-setup_native_cmd() {
-	cmd_name=$ZONEROOT/$1
-
-	if [ -h $cmd_name -o \( -e $cmd_name -a ! -f $cmd_name \) ]; then
-		logger -p daemon.err "dangerous zone cmd: $ZONENAME, $1" 
-		return
-	fi
-
-	cat <<-DONE >$ZONEROOT/$1
-	#!/bin/sh
-
-	exec /native/usr/lib/brand/lx/lx_native \
-	    /native/lib/ld.so.1 -e LD_NOENVIRON=1 -e LD_NOCONFIG=1 \
-	    -e LD_LIBRARY_PATH_32="/native/lib:/native/usr/lib" $2 "\$@"
-	DONE
-
-	chmod 755 $ZONEROOT/$1
-}
 
 #
 # Before we boot we validate and fix, if necessary, the required files within
@@ -134,59 +84,6 @@ fi
 
 [[ -z $distro ]] && fatal "Unsupported distribution!"
 
-#
-# BINARY REPLACEMENT
-#
-# This section of the boot script is responsible for replacing Linux
-# binaries within the booting zone with native binaries.  This is a two-step
-# process: First, the directory structure of the zone is validated to ensure
-# that binary replacement will proceed safely.  Second, the Linux binaries
-# are replaced with native binaries.
-#
-# Here's an example.  Suppose that you want to replace /usr/bin/zcat with the
-# native /usr/bin/zcat binary.  Then you should do the following:
-#
-#	1.  Go to the section below labeled "STEP ONE" and add the following
-#	    two lines:
-#
-#		safe_dir /usr
-#		safe_dir /usr/bin
-#
-#	    These lines ensure that both /usr and /usr/bin are directories
-#	    within the booting zone that can be safely accessed by the global
-#	    zone.
-#	2.  Go to the section below labeled "STEP TWO" and add the following
-#	    line:
-#
-#		setup_native_cmd /usr/bin/zcat /native/usr/bin/zcat
-#
-
-#
-# STEP ONE
-#
-# Validate that the zone filesystem looks like we expect it to.
-#
-safe_dir /lib
-safe_dir /bin
-safe_dir /sbin
-safe_dir /etc
-safe_opt_dir /etc/init
-safe_opt_dir /etc/update-motd.d
-
-#
-# STEP TWO
-#
-# Add native binaries.
-#
-setup_native_chroot_cmd /sbin/ipmgmtd /lib/inet/ipmgmtd \
-	"export SMF_FMRI=\"svc:/network/ip-interface-management:default\""
-setup_native_chroot_cmd /sbin/dladm /usr/sbin/dladm
-setup_native_chroot_cmd /sbin/ifconfig-native /sbin/ifconfig
-
-setup_native_cmd /sbin/route /native/usr/sbin/route
-
-#
-# STEP THREE
 #
 # Perform distro-specific customization.
 #

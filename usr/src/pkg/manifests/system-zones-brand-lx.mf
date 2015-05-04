@@ -22,6 +22,7 @@
 #
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright 2015 Joyent, Inc.
 #
 
 #
@@ -95,6 +96,7 @@ file path=usr/lib/brand/lx/distros/rhel_centos_common mode=0444
 file path=usr/lib/brand/lx/etc_default_nfs group=sys mode=0444
 file path=usr/lib/brand/lx/etc_netconfig group=sys mode=0444
 file path=usr/lib/brand/lx/lx_distro_install mode=0755
+file path=usr/lib/brand/lx/lxinit mode=0755
 file path=usr/lib/brand/lx/lx_init_zone mode=0755
 file path=usr/lib/brand/lx/lx_init_zone_debian mode=0755
 file path=usr/lib/brand/lx/lx_init_zone_redhat mode=0755
