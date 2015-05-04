@@ -805,6 +805,10 @@ lx_netlink_reply_eachfamily(lx_netlink_reply_t *reply,
 		lifc->lifc_family = lifn->lifn_family;
 		lifc->lifc_flags = 0;
 		lifc->lifc_len = lifn->lifn_count * sizeof (struct lifreq);
+		if (lifn->lifn_count == 0) {
+			lifc->lifc_buf = NULL;
+			continue;
+		}
 		lifc->lifc_buf = kmem_alloc(lifc->lifc_len, KM_SLEEP);
 
 		if (lx_netlink_reply_ioctl(reply, SIOCGLIFCONF, lifc) != 0)
