@@ -11,7 +11,7 @@
 #
 
 #
-# Copyright 2015 Joyent, Inc.  All rights reserved.
+# Copyright 2015 Joyent, Inc.
 # Copyright 2015 OmniTI Computer Consulting, Inc. All rights reserved.
 #
 
@@ -23,144 +23,13 @@
 # CentOS 6.x or earlier.  Testing has been done on CentOS 6.6.
 #
 
-# This script was taken from an earlier file.  Initialize some variables here.
 tmpfile=/tmp/lx-redhat.$$
 
-# Function for setting up networking in the zone.
-# Generate the /etc/rc.d/init,d/network rc script
-setup_net()
-{
-    zonecfg -z $ZONENAME info net >/tmp/$ZONENAME.$$
-    zonecfg -z $ZONENAME info attr name=resolvers >>/tmp/$ZONENAME.$$
-    rm -f $ZONEROOT/tmp/.lx_net_up
 
-    awk '
-        BEGIN {
-            printf("#! /bin/bash \n\n")
-            printf("# network       Bring up/down networking\n#\n")
-	    printf("### BEGIN INIT INFO\n");
-	    printf("# Provides: $network\n");
-	    printf("# Short-Description: Bring up/down networking\n");
-	    printf("# Description: Bring up/down networking\n");
-	    printf("### END INIT INFO\n\n");
-
-            printf("case \"\$1\" in\n")
-            printf("  start)\n")
-            printf("    [ \"\$EUID\" != \"0\" ] && exit 4\n")
-            printf("    [ -f /tmp/.lx_net_up ] && exit 0\n")
-            printf("    touch /tmp/.lx_net_up\n\n")
-            printf("    /sbin/ipmgmtd || true\n")
-            printf("    /sbin/ifconfig-native lo0 plumb\n")
-            printf("    /sbin/ifconfig-native lo0 up\n")
-            printf("    /sbin/ifconfig-native lo0 inet6 plumb\n")
-            printf("    /sbin/ifconfig-native lo0 inet6 up\n")
-
-	} {
-            if ($1 == "net:") {
-                in_net = 1
-                in_attr = 0
-
-                if (phys != "") {
-                    printf("    /sbin/ifconfig-native %s plumb || true\n", phys)
-                    printf("    /sbin/ifconfig-native %s %s netmask %s up || true\n",
-                        phys, ip, mask)
-                    printf("    /sbin/ifconfig-native %s inet6 plumb up || true\n", phys)
-                    if (prim == "true" && length(gw) > 0)
-
-                        printf("    /sbin/route add default %s || true\n", gw)
-
-                    phys = ""
-                    prim = ""
-                    gw = ""
-                    ip = ""
-                    mask = ""
-                }
-                next
-
-            } else if ($1 == "attr:") {
-                in_net = 0
-                in_attr = 1
-                next
-            }
-
-            if (in_net == 1) {
-                if ($1 == "physical:") {
-                    phys = $2
-                } else if ($1 == "property:") {
-                    split($2, a, ",")
-                    split(a[1], k, "=")
-                    split(a[2], v, "=")
-
-                    val = substr(v[2], 2)
-                    val = substr(val, 1, length(val) - 2)
-
-                    if (k[2] == "ip")
-                        ip = val
-                    else if (k[2] == "netmask")
-                        mask = val
-                    else if (k[2] == "primary")
-                        prim = val
-                    else if (k[2] == "gateway")
-                        gw = val
-                }
-
-            } else if (in_attr == 1) {
-                if ($1 == "value:") {
-                    nres = split($2, resolvers, ",")
-                }
-            }
-        }
-        END {
-            printf("    /sbin/ifconfig-native %s plumb || true\n", phys)
-            printf("    /sbin/ifconfig-native %s %s netmask %s up || true\n",
-                phys, ip, mask)
-            printf("    /sbin/ifconfig-native %s inet6 plumb up || true\n", phys)
-            if (prim == "true" && length(gw) > 0)
-                printf("    /sbin/route add default %s || true\n", gw)
-
-            printf("    rm -f /etc/resolv.conf\n")
-            for (i = 1; i <= nres; i++)
-                printf("    echo \"nameserver %s\" >> %s\n", resolvers[i],
-                    "/etc/resolv.conf")
-
-            printf("    touch /var/lock/subsys/network\n")
-            printf("    rc=0\n")
-            printf("    ;;\n")
-            printf("  stop)\n")
-            printf("    [ \"\$EUID\" != \"0\" ] && exit 4\n\n")
-	    printf("    rm -f /var/lock/subsys/network\n")
-            printf("    rc=0\n")
-	    printf("    ;;\n")
-	    printf("  status)\n")
-	    printf("    echo \"Configured devices:\"\n")
-	    printf("    echo \"lo \$(cd /dev/net; ls)\"\n")
-	    printf("    echo \"Currently active devices:\"\n")
-	    printf("    echo \$(/sbin/ip -o link show up | awk -F \": \" %s{ print \$2 }%s)\n", "\047", "\047")
-            printf("    rc=0\n")
-	    printf("    ;;\n")
-	    printf("  restart|reload|force-reload)\n")
-	    printf("    cd \"\$CWD\"\n")
-	    printf("    \$0 stop\n")
-	    printf("    \$0 start\n")
-	    printf("    rc=\$?\n")
-	    printf("    ;;\n")
-	    printf("  *)\n")
-	    printf("    echo \"Usage: \$0 {start|stop|status|restart|reload|force-reload}\"\n")
-	    printf("    exit 2\n")
-	    printf("esac\n\n")
-	    printf("exit \$rc\n")
-
-        }' /tmp/$ZONENAME.$$ > $fnm
-	chmod +x $fnm
-
-	rm -f /tmp/$ZONENAME.$$
-}
-
-#
 # Before doing anything else, make sure some Centos-specific dirs are safe.
 # /etc/init.d is normally a symlink so we can't easily tell if it's safe so
 # check rc.d/init.d instead.
-#
+
 safe_dir /etc/sysconfig
 safe_dir /etc/rc.d
 safe_dir /etc/rc.d/init.d
@@ -172,6 +41,74 @@ safe_dir /etc/rc.d/rc4.d
 safe_dir /etc/rc.d/rc5.d
 safe_dir /etc/rc.d/rc6.d
 safe_opt_dir /etc/selinux
+
+# Generate the /etc/rc.d/init.d/network rc script
+cat > $tmpfile <<EOF
+#!/bin/bash
+# network       Bring up/down networking
+#
+### BEGIN INIT INFO
+# Provides: \$network
+# Short-Description: Bring up/down networking
+# Description: Bring up/down networking
+### END INIT INFO
+
+case "\$1" in
+    start)
+    [ "\$EUID" != "0" ] && exit 4
+
+    if [ ! -e /etc/resolv.conf ]; then
+        echo "# AUTOMATIC ZONE CONFIG" > /etc/resolv.conf
+$(zonecfg -z $ZONENAME info attr name=resolvers |
+awk '
+    {
+        if ($1 == "value:") {
+            nres = split($2, resolvers, ",")
+        }
+    }
+    END {
+        for (i = 1; i <= nres; i++) {
+            printf("        echo \"nameserver %s\" >> %s\n", resolvers[i],
+                "/etc/resolv.conf")
+        }
+    }
+')
+    fi
+    touch /var/lock/subsys/network
+    rc=0
+    ;;
+  stop)
+    [ "\$EUID" != "0" ] && exit 4
+
+    rm -f /var/lock/subsys/network
+    rc=0
+    ;;
+  status)
+    echo "Configured devices:"
+    echo "lo \$(cd /dev/net; ls)"
+    echo "Currently active devices:"
+    echo \$(/sbin/ip -o link show up | awk -F ": " '{ print \$2 }')
+    rc=0
+    ;;
+  restart|reload|force-reload)
+    cd "\$CWD"
+    \$0 stop
+    \$0 start
+    rc=\$?
+    ;;
+  *)
+    echo "Usage: \$0 {start|stop|status|restart|reload|force-reload}"
+    exit 2
+esac
+
+exit \$rc
+EOF
+fnm=$ZONEROOT/etc/rc.d/init.d/network
+if [[ -f $fnm || -h $fnm ]]; then
+	mv -f $tmpfile $fnm
+	chmod 755 $fnm
+fi
+
 
 #
 # The default /etc/inittab only sets the runlevel. Make sure it's runlevel 3
@@ -385,18 +322,9 @@ if [[ ! -h $fnm ]]; then
 	chmod 755 $fnm
 fi
 
-# NOTE: The networking setup assumes an exclusive-stack zone.
-iptype=`/usr/sbin/zonecfg -z $ZONENAME info ip-type | cut -f2 -d' '`
-
-if [[ "$iptype" == "exclusive" ]]; then
-	fnm=$ZONEROOT/etc/rc.d/init.d/network
-	if [[ ! -h $fnm && -f $fnm ]] then
-		setup_net
-	fi
-fi
-
 #
-# upstart modifications are complete
+# sysinit modifications are complete
 #
+rm -f $tmpfile
 
 # Hand control back to lx_boot

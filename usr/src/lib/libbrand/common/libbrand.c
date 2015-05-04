@@ -817,6 +817,7 @@ i_brand_platform_iter_mounts(struct brand_handle *bhp, const char *zonename,
 	xmlNodePtr node;
 	xmlChar *special, *dir, *type, *opt;
 	char special_exp[MAXPATHLEN];
+	char dir_exp[MAXPATHLEN];
 	char opt_exp[MAXPATHLEN];
 	int ret;
 
@@ -843,6 +844,10 @@ i_brand_platform_iter_mounts(struct brand_handle *bhp, const char *zonename,
 		    special_exp, sizeof (special_exp),
 		    zonename, zonepath, NULL, NULL)) != 0)
 			goto next;
+		if ((ret = i_substitute_tokens((char *)dir,
+		    dir_exp, sizeof (dir_exp),
+		    zonename, zonepath, NULL, NULL)) != 0)
+			goto next;
 
 		/* opt might not be defined */
 		if (strlen((const char *)opt) == 0) {
@@ -855,7 +860,7 @@ i_brand_platform_iter_mounts(struct brand_handle *bhp, const char *zonename,
 				goto next;
 		}
 
-		ret = func(data, (char *)special_exp, (char *)dir,
+		ret = func(data, (char *)special_exp, (char *)dir_exp,
 		    (char *)type, ((opt != NULL) ? opt_exp : NULL));
 
 next:

@@ -11,7 +11,7 @@
 #
 
 #
-# Copyright 2015 Joyent, Inc.  All rights reserved.
+# Copyright 2015 Joyent, Inc.
 #
 
 #
@@ -21,109 +21,50 @@
 
 tmpfile=/tmp/lx-busybox.$$
 
-# Generate the networking.conf upstart script 
-setup_net()
-{
-    zonecfg -z $ZONENAME info net >/tmp/$ZONENAME.$$
-    zonecfg -z $ZONENAME info attr name=resolvers >>/tmp/$ZONENAME.$$
-
-    awk '
-        BEGIN {
-            printf("#!/sbin/runscript\n\n")
-	    printf("depend() {\n\tneed localmount\n");
-	    printf("\tafter bootmisc hwdrivers modules\n\tprovide net\n");
-	    printf("\tkeyword nojail noprefix novserver\n}\n\n");
-
-	    printf("start() {\n")
-            printf("    /sbin/ipmgmtd || true\n")
-            printf("    /sbin/ifconfig-native lo0 plumb\n")
-            printf("    /sbin/ifconfig-native lo0 up\n")
-            printf("    /sbin/ifconfig-native lo0 inet6 plumb\n")
-            printf("    /sbin/ifconfig-native lo0 inet6 up\n")
-
-	} {
-            if ($1 == "net:") {
-                in_net = 1
-                in_attr = 0
-
-                if (phys != "") {
-                    printf("    /sbin/ifconfig-native %s plumb || true\n", phys)
-                    printf("    /sbin/ifconfig-native %s %s netmask %s up || true\n",
-                        phys, ip, mask)
-                    printf("    /sbin/ifconfig-native %s inet6 plumb up || true\n", phys)
-                    if (prim == "true" && length(gw) > 0)
-
-                        printf("    /sbin/route add default %s || true\n", gw)
-
-                    phys = ""
-                    prim = ""
-                    gw = ""
-                    ip = ""
-                    mask = ""
-                }
-                next
-
-            } else if ($1 == "attr:") {
-                in_net = 0
-                in_attr = 1
-                next
-            }
-
-            if (in_net == 1) {
-                if ($1 == "physical:") {
-                    phys = $2
-                } else if ($1 == "property:") {
-                    split($2, a, ",")
-                    split(a[1], k, "=")
-                    split(a[2], v, "=")
-
-                    val = substr(v[2], 2)
-                    val = substr(val, 1, length(val) - 2)
-
-                    if (k[2] == "ip")
-                        ip = val
-                    else if (k[2] == "netmask")
-                        mask = val
-                    else if (k[2] == "primary")
-                        prim = val
-                    else if (k[2] == "gateway")
-                        gw = val
-                }
-
-            } else if (in_attr == 1) {
-                if ($1 == "value:") {
-                    nres = split($2, resolvers, ",")
-                }
-            }
-        }
-        END {
-            printf("    /sbin/ifconfig-native %s plumb || true\n", phys)
-            printf("    /sbin/ifconfig-native %s %s netmask %s up || true\n",
-                phys, ip, mask)
-            printf("    /sbin/ifconfig-native %s inet6 plumb up || true\n",
-                phys)
-            if (prim == "true" && length(gw) > 0)
-                printf("    /sbin/route add default %s || true\n", gw)
-
-            printf("    rm -f /etc/resolv.conf\n")
-            for (i = 1; i <= nres; i++)
-                printf("    echo \"nameserver %s\" >> %s\n", resolvers[i],
-                    "/etc/resolv.conf")
-
-	    printf("    return 0\n}\n\n")
-            printf("stop() {\n")
-            printf("    return 0\n")
-	    printf("}\n")
-        }' /tmp/$ZONENAME.$$ > $fnm
-	chmod +x $fnm
-
-	rm -f /tmp/$ZONENAME.$$
-}
-
-#
-# Before doing anything else, make sure some dirs are safe.
-#
+# Check that the directories we're writing to aren't symlinks outside the zone
+safe_dir /etc
 safe_dir /etc/init.d
+
+# Generate network setup script
+#
+cat > $tmpfile <<EOF
+#!/sbin/runscript
+depend() {
+    need localmount
+    after bootmisc hwdrivers modules
+    provide net
+    keyword nojail noprefix novserver
+}
+start() {
+    if [ ! -e /etc/resolv.conf ]; then
+        echo "# AUTOMATIC ZONE CONFIG" > /etc/resolv.conf
+$(zonecfg -z $ZONENAME info attr name=resolvers |
+awk '
+    {
+        if ($1 == "value:") {
+            nres = split($2, resolvers, ",")
+        }
+    }
+    END {
+        for (i = 1; i <= nres; i++) {
+            printf("        echo \"nameserver %s\" >> %s\n", resolvers[i],
+                "/etc/resolv.conf")
+        }
+    }
+')
+    fi
+    return 0
+}
+stop() {
+    return 0
+}
+EOF
+fnm=$ZONEROOT/etc/init.d/networking
+if [[ -f $fnm || -h $fnm ]]; then
+	mv -f $tmpfile $fnm
+	chmod 755 $fnm
+fi
+
 
 #
 # The default /etc/inittab might spawn mingetty on each of the virtual consoles
@@ -201,14 +142,6 @@ start() {
     return 0
 }
 DONE
-
-iptype=`/usr/sbin/zonecfg -z $ZONENAME info ip-type | cut -f2 -d' '`
-if [[ "$iptype" == "exclusive" ]]; then
-	fnm=$ZONEROOT/etc/init.d/networking
-	if [[ ! -h $fnm && -f $fnm ]] then
-		setup_net
-	fi
-fi
 
 #
 # Setup for the /dev/shm mount.
