@@ -151,6 +151,12 @@ end script
 DONE
 fi
 
+# udev-bridge currently aborts and drops core due to missing AF_NETLINK support
+fnm=$ZONEROOT/etc/init/upstart-udev-bridge.override
+if [[ ! -f $fnm && ! -h $fnm ]] then
+	echo "manual" > $fnm
+fi
+
 # XXX need to add real mounting into this svc definition
 
 fnm=$ZONEROOT/etc/init/mountall.override
