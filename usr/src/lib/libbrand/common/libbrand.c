@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2011, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2015, Joyent, Inc.
  * Copyright 2014 Nexenta Systems, Inc. All rights reserved.
  */
 
@@ -810,9 +810,9 @@ brand_config_iter_privilege(brand_handle_t bh,
 }
 
 static int
-i_brand_platform_iter_mounts(struct brand_handle *bhp, const char *zonepath,
-    int (*func)(void *, const char *, const char *, const char *,
-    const char *), void *data, const xmlChar *mount_type)
+i_brand_platform_iter_mounts(struct brand_handle *bhp, const char *zonename,
+    const char *zonepath, int (*func)(void *, const char *, const char *,
+    const char *, const char *), void *data, const xmlChar *mount_type)
 {
 	xmlNodePtr node;
 	xmlChar *special, *dir, *type, *opt;
@@ -841,7 +841,7 @@ i_brand_platform_iter_mounts(struct brand_handle *bhp, const char *zonepath,
 		/* Substitute token values as needed. */
 		if ((ret = i_substitute_tokens((char *)special,
 		    special_exp, sizeof (special_exp),
-		    NULL, zonepath, NULL, NULL)) != 0)
+		    zonename, zonepath, NULL, NULL)) != 0)
 			goto next;
 
 		/* opt might not be defined */
@@ -851,7 +851,7 @@ i_brand_platform_iter_mounts(struct brand_handle *bhp, const char *zonepath,
 		} else {
 			if ((ret = i_substitute_tokens((char *)opt,
 			    opt_exp, sizeof (opt_exp),
-			    NULL, zonepath, NULL, NULL)) != 0)
+			    zonename, zonepath, NULL, NULL)) != 0)
 				goto next;
 		}
 
@@ -885,13 +885,13 @@ next:
  *	%R	Zonepath of zone
  */
 int
-brand_platform_iter_gmounts(brand_handle_t bh, const char *zonepath,
-    int (*func)(void *, const char *, const char *, const char *,
-    const char *), void *data)
+brand_platform_iter_gmounts(brand_handle_t bh, const char *zonename,
+    const char *zonepath, int (*func)(void *, const char *, const char *,
+    const char *, const char *), void *data)
 {
 	struct brand_handle *bhp = (struct brand_handle *)bh;
-	return (i_brand_platform_iter_mounts(bhp, zonepath, func, data,
-	    DTD_ELEM_GLOBAL_MOUNT));
+	return (i_brand_platform_iter_mounts(bhp, zonename, zonepath, func,
+	    data, DTD_ELEM_GLOBAL_MOUNT));
 }
 
 /*
@@ -905,7 +905,7 @@ brand_platform_iter_mounts(brand_handle_t bh, int (*func)(void *,
     const char *, const char *, const char *, const char *), void *data)
 {
 	struct brand_handle *bhp = (struct brand_handle *)bh;
-	return (i_brand_platform_iter_mounts(bhp, NULL, func, data,
+	return (i_brand_platform_iter_mounts(bhp, NULL, NULL, func, data,
 	    DTD_ELEM_MOUNT));
 }
 
