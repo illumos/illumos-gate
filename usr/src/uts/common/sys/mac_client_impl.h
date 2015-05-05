@@ -22,6 +22,9 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
+ */
 
 #ifndef	_SYS_MAC_CLIENT_IMPL_H
 #define	_SYS_MAC_CLIENT_IMPL_H
@@ -137,6 +140,7 @@ struct mac_client_impl_s {			/* Protected by */
 	flow_entry_t		*mci_flent_list;	/* mci_rw_lock */
 	uint_t			mci_nflents;		/* mci_rw_lock */
 	uint_t			mci_nvids;		/* mci_rw_lock */
+	volatile uint32_t	mci_vidcache;		/* VID cache */
 
 	/* Resource Management Functions */
 	mac_resource_add_t	mci_resource_add;	/* SL */
@@ -279,6 +283,28 @@ extern	int	mac_tx_percpu_cnt;
 		}							\
 	}								\
 }
+
+/*
+ * To allow the hot path to not grab any additional locks, we keep a single
+ * entry VLAN ID cache that caches whether or not a given VID belongs to a
+ * MAC client.
+ */
+#define	MCIP_VIDCACHE_VALIDSHIFT	31
+#define	MCIP_VIDCACHE_VIDSHIFT		1
+#define	MCIP_VIDCACHE_VIDMASK		(UINT16_MAX << MCIP_VIDCACHE_VIDSHIFT)
+#define	MCIP_VIDCACHE_BOOLSHIFT		0
+
+#define	MCIP_VIDCACHE_INVALID		0
+
+#define	MCIP_VIDCACHE_CACHE(vid, bool)	\
+	((1U << MCIP_VIDCACHE_VALIDSHIFT) | \
+	((vid) << MCIP_VIDCACHE_VIDSHIFT) | \
+	((bool) ? (1U << MCIP_VIDCACHE_BOOLSHIFT) : 0))
+
+#define	MCIP_VIDCACHE_ISVALID(v)	((v) & (1U << MCIP_VIDCACHE_VALIDSHIFT))
+#define	MCIP_VIDCACHE_VID(v)		\
+	(((v) & MCIP_VIDCACHE_VIDMASK) >> MCIP_VIDCACHE_VIDSHIFT)
+#define	MCIP_VIDCACHE_BOOL(v)		((v) & (1U << MCIP_VIDCACHE_BOOLSHIFT))
 
 #define	MAC_TAG_NEEDED(mcip)						\
 	(((mcip)->mci_state_flags & MCIS_TAG_DISABLE) == 0 &&		\

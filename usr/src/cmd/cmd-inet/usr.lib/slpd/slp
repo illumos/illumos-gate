@@ -23,7 +23,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 # Service Method Support Script for the SLP service
 #
@@ -35,7 +34,7 @@
 . /lib/svc/share/smf_include.sh
 
 CONF=/etc/inet/slp.conf
-JAVA_BIN=/usr/j2se/bin/java
+JAVA_BIN=/usr/java/bin/java
 CLASSPATH=/usr/share/lib/slp/slpd.jar
 MAIN_CLASS=com.sun.slp.slpd
 SLPD_HOME=/usr/lib/inet
