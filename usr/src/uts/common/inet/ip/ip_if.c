@@ -22,6 +22,7 @@
  * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 1990 Mentat Inc.
  * Copyright (c) 2013 by Delphix. All rights reserved.
+ * Copyright 2013 Joyent, Inc.
  * Copyright (c) 2014, OmniTI Computer Consulting, Inc. All rights reserved.
  */
 /*
@@ -3460,10 +3461,6 @@ ill_init(queue_t *q, ill_t *ill)
 		return (ENOMEM);
 
 	/*
-	 * The ill is initialized to zero by mi_alloc*(). In addition
-	 * some fields already contain valid values, initialized in
-	 * ip_open(), before we reach here.
-	 *
 	 * For now pretend this is a v4 ill. We need to set phyint_ill*
 	 * at this point because of the following reason. If we can't
 	 * enter the ipsq at some point and cv_wait, the writer that
