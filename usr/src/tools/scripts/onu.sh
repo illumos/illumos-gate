@@ -86,11 +86,16 @@ configure_publishers()
 	typeset on_publisher=$(pkg -R $root list -Hv \
 	    "${consolidation}-incorporation" | cut -d/ -f3)
 
+	# NOTE:  ONU BEs must weaken the publisher's default security policy.
+	# If an IPS-based distro ever goes whole-image signature policy, this
+	# will need to change even more.
         if [[ "$on_publisher" != "$redistpub" ]]; then
 	        do_cmd pkg -R $root set-publisher --no-refresh \
-                    --non-sticky $on_publisher
+		    --set-property signature-policy=verify \
+		    --non-sticky $on_publisher
         fi
-	do_cmd pkg -R $root set-publisher -e --no-refresh -P -O $uri $redistpub
+	do_cmd pkg -R $root set-publisher -e --no-refresh -P \
+	    --set-property signature-policy=verify -O $uri $redistpub
 	do_cmd pkg -R $root refresh --full
 }
 
