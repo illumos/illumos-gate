@@ -128,6 +128,8 @@ elif [[ -f $ZONEROOT/etc/lsb-release ]]; then
 	fi
 elif [[ -f $ZONEROOT/etc/debian_version ]]; then
 	distro="debian"
+elif [[ -f $ZONEROOT/etc/alpine-release ]]; then
+	distro="busybox"
 fi
 
 [[ -z $distro ]] && fatal "Unsupported distribution!"
@@ -174,7 +176,7 @@ safe_opt_dir /etc/update-motd.d
 #
 # STEP TWO
 #
-# Replace Linux binaries with native binaries.
+# Add native binaries.
 #
 setup_native_chroot_cmd /sbin/ipmgmtd /lib/inet/ipmgmtd \
 	"export SMF_FMRI=\"svc:/network/ip-interface-management:default\""
