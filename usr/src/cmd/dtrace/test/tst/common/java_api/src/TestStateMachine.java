@@ -22,8 +22,6 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- *
- * ident	"%Z%%M%	%I%	%E% SMI"
  */
 
 import org.opensolaris.os.dtrace.*;
@@ -609,7 +607,7 @@ public class TestStateMachine {
 	    consumer.go();
 	    // Avoid race, call afterGo() in ConsumerListener
 	    try {
-		Thread.currentThread().sleep(300);
+		Thread.sleep(300);
 	    } catch (InterruptedException e) {
 		e.printStackTrace();
 		exit(1);

@@ -58,6 +58,8 @@ CLEANFILES +=   $(MSGFILES)
 # use of macros for stack management.
 LINTFLAGS=      -umx -errtags \
 		-erroff=E_BAD_PTR_CAST_ALIGN,E_BAD_PTR_CAST
+LINTFLAGS +=	-erroff=E_SUPPRESSION_DIRECTIVE_UNUSED
+LINTFLAGS64 +=	-erroff=E_SUPPRESSION_DIRECTIVE_UNUSED
 $(LINTLIB):=	SRCS = $(SRCDIR)/$(LINTSRC)
 
 

@@ -23,8 +23,6 @@
 # Copyright (c) 1999-2001 by Sun Microsystems, Inc.
 # All rights reserved.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # usr/src/cmd/krb5/kadmin/gui/native/Makefile
 #
 
@@ -38,7 +36,6 @@ clobber :=	TARGET= clobber
 install :=	TARGET= install
 lint :=		TARGET= lint
 
-JAVAFLAGS= -nowarn -O
 
 CLASSES=Kadmin
 

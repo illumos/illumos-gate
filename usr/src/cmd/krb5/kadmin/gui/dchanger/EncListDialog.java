@@ -1,8 +1,6 @@
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- *
- * ident	"%Z%%M%	%I%	%E% SMI"
  */
 
 import java.awt.*;
@@ -49,13 +47,13 @@ public class EncListDialog extends Dialog {
 
 	// For I18N
 	private static ResourceBundle rb =
-	    ResourceBundle.getBundle("GuiResource" /* NOI18N */); 
+	    ResourceBundle.getBundle("GuiResource" /* NOI18N */);
 	private static ResourceBundle hrb =
-	    ResourceBundle.getBundle("HelpData" /* NOI18N */); 
+	    ResourceBundle.getBundle("HelpData" /* NOI18N */);
 
 	/*
 	 * Constructor that lays out the components and sets the different
-	 * event handlers. 
+	 * event handlers.
 	 */
 	public EncListDialog(Frame parent, Color background, Color foreground,
 	    Kadmin session) {
@@ -154,7 +152,7 @@ public class EncListDialog extends Dialog {
 	 * Closes (hides) the dialog box when the user is done
 	 * @param save true if the box is being dismissed by clicking on
 	 * "ok" and the user wants to retain the modified value, false
-	 * otherwise. 
+	 * otherwise.
 	 */
 	private void encListDialogClose(boolean save) {
 		this.save = save;
@@ -195,7 +193,7 @@ public class EncListDialog extends Dialog {
 	}
 
 	// ***********************************************
-	// 	 I N N E R    C L A S S E S   F O L L O W
+	//	 I N N E R    C L A S S E S   F O L L O W
 	// ***********************************************
 
 	/*
@@ -256,16 +254,16 @@ public class EncListDialog extends Dialog {
 				}
 			} else if (e.getSource() == help) {
 				if (hd != null)
-					hd.show();
+					hd.setVisible(true);
 				else {
 					hd = new HelpDialog(
 					    EncListDialog.this.parent,
-				   	    getString(
+					    getString(
 					    "Help for Encryption Type Dialog"),
-				   	    false);
+					    false);
 					hd.setVisible(true);
 					hd.setText(getString(hrb,
-					     "EncryptionTypeDialogHelp"));
+					    "EncryptionTypeDialogHelp"));
 				}
 			}
 		} // actionPerformed
