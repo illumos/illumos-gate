@@ -22,11 +22,10 @@
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright 2015 Joyent, Inc.
 #
 
-TXTS = etc_netconfig etc_default_nfs
+TXTS = etc_default_nfs
 NFS_DFL = ../../../../cmd/fs.d/nfs/etc/nfs.dfl
 
 all: $(TXTS)

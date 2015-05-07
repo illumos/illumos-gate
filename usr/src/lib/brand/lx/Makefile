@@ -32,8 +32,8 @@ include Makefile.lx
 # Build everything in parallel; use .WAIT for dependencies
 .PARALLEL:
 
-SUBDIRS=	cmd librtld_db lx_support lx_init lx_brand lx_thunk netfiles \
-		zone lx_vdso testing .WAIT lx_nametoaddr
+SUBDIRS=	cmd librtld_db lx_support lx_init lx_brand netfiles \
+		zone lx_vdso testing .WAIT
 MSGSUBDIRS=	lx_brand lx_support zone
 
 all :=		TARGET= all

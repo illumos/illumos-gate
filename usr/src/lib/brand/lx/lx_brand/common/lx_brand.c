@@ -73,7 +73,6 @@
 #include <sys/lx_signal.h>
 #include <sys/lx_syscall.h>
 #include <sys/lx_thread.h>
-#include <sys/lx_thunk_server.h>
 #include <sys/lx_aio.h>
 
 /*
@@ -688,9 +687,6 @@ lx_init(int argc, char *argv[], char *envp[])
 				break;
 		}
 	}
-
-	/* Do any thunk server initalization. */
-	lxt_server_init(argc, argv);
 
 	/* Setup signal handler information. */
 	if (lx_siginit()) {
