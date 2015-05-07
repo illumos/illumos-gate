@@ -40,7 +40,6 @@ COBJS	=	aio.o			\
 		id.o			\
 		iovec.o			\
 		lx_brand.o		\
-		lx_thunk_server.o	\
 		mem.o			\
 		misc.o			\
 		module.o		\

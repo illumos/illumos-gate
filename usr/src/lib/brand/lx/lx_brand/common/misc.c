@@ -41,12 +41,12 @@
 #include <sys/epoll.h>
 #include <sys/mman.h>
 #include <sys/shm.h>
+#include <sys/socket.h>
 #include <sys/lx_types.h>
 #include <sys/lx_debug.h>
 #include <sys/lx_misc.h>
 #include <sys/lx_stat.h>
 #include <sys/lx_syscall.h>
-#include <sys/lx_thunk_server.h>
 #include <sys/lx_fcntl.h>
 #include <sys/lx_thread.h>
 #include <sys/inotify.h>
@@ -57,6 +57,7 @@
 #include <libintl.h>
 #include <zone.h>
 #include <priv.h>
+#include <procfs.h>
 #include <lx_syscall.h>
 
 extern int sethostname(char *, int);
@@ -522,9 +523,6 @@ lx_execve(uintptr_t p1, uintptr_t p2, uintptr_t p3)
 	char **envp = (char **)p3;
 	char *nullist[] = { NULL };
 	char path[64];
-
-	/* First call the thunk server hook. */
-	lxt_server_exec_check();
 
 	/* Get a copy of the executable we're trying to run */
 	path[0] = '\0';
