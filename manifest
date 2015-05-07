@@ -4564,6 +4564,7 @@ d usr/kernel/fs/amd64 0755 root sys
 f usr/kernel/fs/amd64/fdfs 0755 root sys
 f usr/kernel/fs/amd64/lx_afs 0755 root sys
 f usr/kernel/fs/amd64/lx_proc 0755 root sys
+f usr/kernel/fs/amd64/lx_sysfs 0755 root sys
 f usr/kernel/fs/amd64/pcfs 0755 root sys
 f usr/kernel/fs/amd64/smbfs 0755 root sys
 d usr/kernel/kmdb 0755 root sys
