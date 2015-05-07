@@ -468,8 +468,15 @@ static void
 lxi_init_exec()
 {
 	char *cmd[] = {"/sbin/init", "init", NULL};
+	char *env[] = {"container=zone", NULL};
 
-	execv(cmd[0], cmd + 1);
+	/*
+	 * systemd uses the 'container' env var to determine it is running
+	 * inside a container. It only supports a few well-known types and
+	 * treats anything else as 'other' but this is enough to make it
+	 * behave better inside a zone. See 'detect_container' in systemd.
+	 */
+	execve(cmd[0], cmd + 1, env);
 }
 
 int
