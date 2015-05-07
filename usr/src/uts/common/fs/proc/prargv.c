@@ -235,3 +235,199 @@ retry:
 
 	return (error);
 }
+
+/*
+ * Similar to prreadargv except reads the env vector. This is slightly more
+ * complex because there is no count for the env vector that corresponds to
+ * u_argc.
+ */
+int
+prreadenvv(proc_t *p, char *buf, size_t bufsz, size_t *slen)
+{
+	int error;
+	user_t *up;
+	struct as *as;
+	size_t pos = 0;
+	caddr_t *envp = NULL;
+	uintptr_t tmpp = NULL;
+	size_t envpsz = 0, rdsz = 0;
+	int i;
+	int cnt, bound;
+
+	VERIFY(MUTEX_HELD(&p->p_lock));
+	VERIFY(p->p_proc_flag & P_PR_LOCK);
+
+	up = PTOU(p);
+	as = p->p_as;
+
+	if ((p->p_flag & SSYS) || as == &kas || up->u_envp == NULL) {
+		/*
+		 * Return empty string.
+		 */
+		buf[0] = '\0';
+		*slen = 1;
+
+		return (0);
+	}
+
+	/*
+	 * Drop p_lock while we do I/O to avoid deadlock with the clock thread.
+	 */
+	mutex_exit(&p->p_lock);
+
+	/*
+	 * We first have to count how many env entries we have. This is
+	 * somewhat painful. We extract the env entries from the target process
+	 * one entry at a time. Stop trying to read env entries if we reach a
+	 * NULL pointer in the vector or hit our upper bound (which we take
+	 * as the bufsz/4) to ensure we don't run off.
+	 */
+	rdsz = (p->p_model == DATAMODEL_ILP32 ?
+	    sizeof (caddr32_t) : sizeof (caddr_t));
+	bound = (int)(bufsz / 4);
+	for (cnt = 0, tmpp = up->u_envp; cnt < bound; cnt++, tmpp += rdsz) {
+		caddr_t tmp = NULL;
+
+		if ((error = prreadbuf(p, tmpp, (uint8_t *)&tmp, rdsz,
+		    NULL)) != 0) {
+			mutex_enter(&p->p_lock);
+			VERIFY(p->p_proc_flag & P_PR_LOCK);
+			return (-1);
+		}
+
+		if (tmp == NULL)
+			break;
+	}
+
+	/*
+	 * Allocate space to store env array.
+	 */
+	envpsz = cnt * (p->p_model == DATAMODEL_ILP32 ?
+	    sizeof (caddr32_t) : sizeof (caddr_t));
+	envp = kmem_alloc(envpsz, KM_SLEEP);
+
+	/*
+	 * Extract the env array from the target process.
+	 */
+	if ((error = prreadbuf(p, up->u_envp, (uint8_t *)envp, envpsz,
+	    NULL)) != 0) {
+		kmem_free(envp, envpsz);
+		mutex_enter(&p->p_lock);
+		VERIFY(p->p_proc_flag & P_PR_LOCK);
+		return (-1);
+	}
+
+	/*
+	 * Read each env string from the pointers in the env array.
+	 */
+	pos = 0;
+	for (i = 0; i < cnt; i++) {
+		size_t rdsz, trysz;
+		uintptr_t ev;
+		off_t j;
+		boolean_t found_nul;
+		boolean_t do_retry = B_TRUE;
+
+#ifdef	_SYSCALL32_IMPL
+		if (p->p_model == DATAMODEL_ILP32) {
+			ev = (uintptr_t)((caddr32_t *)envp)[i];
+		} else {
+			ev = (uintptr_t)envp[i];
+		}
+#else
+		ev = (uintptr_t)envp[i];
+#endif
+
+		/*
+		 * Stop trying to read env entries if we reach a NULL
+		 * pointer in the vector.
+		 */
+		if (ev == NULL)
+			break;
+
+		/*
+		 * Stop reading if we have read the maximum length
+		 * we can return to the user.
+		 */
+		if (pos >= bufsz)
+			break;
+
+		/*
+		 * Initially we try a short read, on the assumption that
+		 * most individual env strings are less than 80
+		 * characters long.
+		 */
+		if ((trysz = MIN(80, bufsz - pos - 1)) < 80) {
+			/*
+			 * We don't have room in the target buffer for even
+			 * an entire short read, so there is no need to retry
+			 * with a longer read.
+			 */
+			do_retry = B_FALSE;
+		}
+
+retry:
+		/*
+		 * Read string data for this env var.  Leave room
+		 * in the buffer for a final NUL terminator.
+		 */
+		if ((error = prreadbuf(p, ev, (uint8_t *)&buf[pos], trysz,
+		    &rdsz)) != 0) {
+			/*
+			 * There was a problem reading this string
+			 * from the process.  Give up.
+			 */
+			break;
+		}
+
+		/*
+		 * Find the NUL terminator.
+		 */
+		found_nul = B_FALSE;
+		for (j = 0; j < rdsz; j++) {
+			if (buf[pos + j] == '\0') {
+				found_nul = B_TRUE;
+				break;
+			}
+		}
+
+		if (!found_nul && do_retry) {
+			/*
+			 * We did not find a NUL terminator, but this
+			 * was a first pass short read.  Try once more
+			 * with feeling.
+			 */
+			trysz = bufsz - pos - 1;
+			do_retry = B_FALSE;
+			goto retry;
+		}
+
+		/*
+		 * Commit the string we read to the buffer.
+		 */
+		pos += j + 1;
+		if (!found_nul && pos < bufsz) {
+			/*
+			 * A NUL terminator was not found; add one.
+			 */
+			buf[pos++] = '\0';
+		}
+	}
+
+	/*
+	 * Ensure the entire string is NUL-terminated.
+	 */
+	buf[bufsz - 1] = '\0';
+
+	mutex_enter(&p->p_lock);
+	VERIFY(p->p_proc_flag & P_PR_LOCK);
+	kmem_free(envp, envpsz);
+
+	/*
+	 * If the operation was a success, return the copied string length
+	 * to the caller.
+	 */
+	*slen = (error == 0) ? pos : 0;
+
+	return (error);
+}

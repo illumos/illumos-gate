@@ -77,6 +77,7 @@
 /* Dependent on procfs */
 extern kthread_t *prchoose(proc_t *);
 extern int prreadargv(proc_t *, char *, size_t, size_t *);
+extern int prreadenvv(proc_t *, char *, size_t, size_t *);
 
 #include "lx_proc.h"
 
@@ -149,6 +150,7 @@ static void lxpr_read_uptime(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_version(lxpr_node_t *, lxpr_uiobuf_t *);
 
 static void lxpr_read_pid_cmdline(lxpr_node_t *, lxpr_uiobuf_t *);
+static void lxpr_read_pid_env(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_pid_limits(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_pid_maps(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_pid_mountinfo(lxpr_node_t *, lxpr_uiobuf_t *);
@@ -208,9 +210,10 @@ extern rctl_hndl_t rc_zone_shmmax;
 
 /*
  * The maximum length of the concatenation of argument vector strings we
- * will return to the user via the branded procfs:
+ * will return to the user via the branded procfs. Likewise for the env vector.
  */
 int lxpr_maxargvlen = 4096;
+int lxpr_maxenvvlen = 4096;
 
 /*
  * The lx /proc vnode operations vector
@@ -500,7 +503,7 @@ static void (*lxpr_read_function[LXPR_NFILES])() = {
 	lxpr_read_pid_cmdline,		/* /proc/<pid>/cmdline	*/
 	lxpr_read_empty,		/* /proc/<pid>/cpu	*/
 	lxpr_read_invalid,		/* /proc/<pid>/cwd	*/
-	lxpr_read_empty,		/* /proc/<pid>/environ	*/
+	lxpr_read_pid_env,		/* /proc/<pid>/environ	*/
 	lxpr_read_invalid,		/* /proc/<pid>/exe	*/
 	lxpr_read_pid_limits,		/* /proc/<pid>/limits	*/
 	lxpr_read_pid_maps,		/* /proc/<pid>/maps	*/
@@ -517,7 +520,7 @@ static void (*lxpr_read_function[LXPR_NFILES])() = {
 	lxpr_read_pid_cmdline,		/* /proc/<pid>/task/<tid>/cmdline */
 	lxpr_read_empty,		/* /proc/<pid>/task/<tid>/cpu	*/
 	lxpr_read_invalid,		/* /proc/<pid>/task/<tid>/cwd	*/
-	lxpr_read_empty,		/* /proc/<pid>/task/<tid>/environ */
+	lxpr_read_pid_env,		/* /proc/<pid>/task/<tid>/environ */
 	lxpr_read_invalid,		/* /proc/<pid>/task/<tid>/exe	*/
 	lxpr_read_pid_limits,		/* /proc/<pid>/task/<tid>/limits */
 	lxpr_read_pid_maps,		/* /proc/<pid>/task/<tid>/maps	*/
@@ -893,6 +896,37 @@ lxpr_read_pid_cmdline(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	}
 
 	if (prreadargv(p, buf, asz, &sz) != 0) {
+		lxpr_uiobuf_seterr(uiobuf, EINVAL);
+	} else {
+		lxpr_uiobuf_write(uiobuf, buf, sz);
+	}
+
+	lxpr_unlock(p);
+	kmem_free(buf, asz);
+}
+
+/*
+ * lxpr_read_pid_env(): read env vector from process
+ */
+static void
+lxpr_read_pid_env(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
+{
+	proc_t *p;
+	char *buf;
+	size_t asz = lxpr_maxenvvlen, sz;
+
+	ASSERT(lxpnp->lxpr_type == LXPR_PID_ENV);
+
+	buf = kmem_alloc(asz, KM_SLEEP);
+
+	p = lxpr_lock(lxpnp->lxpr_pid);
+	if (p == NULL) {
+		lxpr_uiobuf_seterr(uiobuf, EINVAL);
+		kmem_free(buf, asz);
+		return;
+	}
+
+	if (prreadenvv(p, buf, asz, &sz) != 0) {
 		lxpr_uiobuf_seterr(uiobuf, EINVAL);
 	} else {
 		lxpr_uiobuf_write(uiobuf, buf, sz);

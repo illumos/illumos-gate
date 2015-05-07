@@ -349,6 +349,7 @@ extern	void	pr_sethold(prnode_t *, sigset_t *);
 extern	void	pr_setfault(proc_t *, fltset_t *);
 extern	int	prusrio(proc_t *, enum uio_rw, struct uio *, int);
 extern	int	prreadargv(proc_t *, char *, size_t, size_t *);
+extern	int	prreadenvv(proc_t *, char *, size_t, size_t *);
 extern	int	prwritectl(vnode_t *, struct uio *, cred_t *);
 extern	int	prlock(prnode_t *, int);
 extern	void	prunmark(proc_t *);
