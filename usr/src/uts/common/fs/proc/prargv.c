@@ -298,6 +298,14 @@ prreadenvv(proc_t *p, char *buf, size_t bufsz, size_t *slen)
 		if (tmp == NULL)
 			break;
 	}
+	if (cnt == 0) {
+		/* Return empty string. */
+		buf[0] = '\0';
+		*slen = 1;
+		mutex_enter(&p->p_lock);
+		VERIFY(p->p_proc_flag & P_PR_LOCK);
+		return (0);
+	}
 
 	/*
 	 * Allocate space to store env array.
