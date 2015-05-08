@@ -19,11 +19,15 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ *	Copyright 2015 Gary Mills
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.13	*/
 /* EMACS_MODES: !fill, lnumb, !overwrite, !nodelete, !picture */
 
 #include "string.h"
@@ -72,6 +76,9 @@ getlist (str, ws, hardsep)
 	char			buf[10];
 
 
+	char			*copy,
+				*begin;
+
 	if (!str || !*str)
 		return (0);
 
@@ -92,24 +99,35 @@ getlist (str, ws, hardsep)
 	strcat (sep, ws);
 
 	/*
+	 * Copy the input string because getlist() sometimes writes to it.
+	 */
+	if (!(begin = Strdup(str))) {
+		errno = ENOMEM;
+		return (0);
+	}
+	copy = begin;
+
+	/*
 	 * Skip leading white-space.
 	 */
-	str += strspn(str, ws);
-	if (!*str)
+	copy += strspn(copy, ws);
+	if (!*copy) {
+		Free (begin);
 		return (0);
+	}
 
 	/*
 	 * Strip trailing white-space.
 	 */
-	p = strchr(str, '\0');
-	while (--p != str && strchr(ws, *p))
+	p = strchr(copy, '\0');
+	while (--p != copy && strchr(ws, *p))
 		;
 	*++p = 0;
 
 	/*
 	 * Pass 1: Count the number of items in the list.
 	 */
-	for (n = 0, p = str; *p; ) {
+	for (n = 0, p = copy; *p; ) {
 		if ((c = *p++) == '\\')
 			p++;
 		else
@@ -142,14 +160,14 @@ getlist (str, ws, hardsep)
 	/*
 	 * This loop will copy all but the last item.
 	 */
-	for (n = 0, p = str; *p; )
+	for (n = 0, p = copy; *p; )
 		if ((c = *p++) == '\\')
 			p++;
 		else
 			if (strchr(sep, c)) {
 
 				p[-1] = 0;
-				list[n++] = unq_strdup(str, sep);
+				list[n++] = unq_strdup(copy, sep);
 				p[-1] = c;
 
 				p += strspn(p, ws);
@@ -160,16 +178,17 @@ getlist (str, ws, hardsep)
 					p++;
 					p += strspn(p, ws);
 				}
-				str = p;
+				copy = p;
 
 			}
 
-	list[n++] = unq_strdup(str, sep);
+	list[n++] = unq_strdup(copy, sep);
 
 	list[n] = 0;
 
 Done:	if (sep != buf)
 		Free (sep);
+	Free (begin);
 	return (list);
 }
 
