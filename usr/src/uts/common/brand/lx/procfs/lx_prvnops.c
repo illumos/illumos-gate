@@ -2754,10 +2754,13 @@ lxpr_read_net_unix(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 		mutex_enter(&so->so_lock);
 		sti = _SOTOTPI(so);
 
-		if (sti->sti_laddr_sa != NULL)
+		if (sti->sti_laddr_sa != NULL &&
+		    sti->sti_laddr_len > 0) {
 			name = sti->sti_laddr_sa->sa_data;
-		else if (sti->sti_faddr_sa != NULL)
+		} else if (sti->sti_faddr_sa != NULL &&
+		    sti->sti_faddr_len > 0) {
 			name = sti->sti_faddr_sa->sa_data;
+		}
 
 		/*
 		 * Derived from enum values in Linux kernel source:
