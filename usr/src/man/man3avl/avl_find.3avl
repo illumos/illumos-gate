@@ -1,0 +1,103 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 07, 2015
+.Dt AVL_FIND 3AVL
+.Os
+.Sh NAME
+.Nm avl_find
+.Nd find a node in an AVL tree
+.Sh SYNOPSIS
+.Lb libavl
+.In sys/avl.h
+.Ft void *
+.Fo avl_find
+.Fa "avl_tree_t *tree"
+.Fa "const void *node"
+.Fa "avl_index_t *where"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn avl_find
+function is used to look up a node in the tree rooted at
+.Fa tree .
+.Pp
+To perform a lookup, a caller should construct an instance of the data
+structure, the argument
+.Fa node .
+.Fn avl_find
+searches through the tree for a node which compares equal to the passed
+in
+.Fa node
+using the comparison function specified when the tree was created with
+.Xr avl_create 3AVL .
+The only fields of
+.Fa node
+that need to be initialized are those that the comparison function will
+use, the others may remain uninitialized.
+.Pp
+If a match exists in the tree, then that entry will be returned.
+Otherwise,
+.Sy NULL
+is returned.
+.Pp
+If
+.Fa node
+does not match anything in the tree and the value of
+.Fa where
+is a
+.Pf non- Sy NULL
+pointer, then
+.Fa where
+will be updated to a value that can be used with both
+.Xr avl_insert 3AVL
+and
+.Xr avl_nearest 3AVL .
+This value is only valid as long as the tree is not modified. If
+anything is added or removed from the tree, then the value of
+.Fa where
+is no longer valid. This is commonly used as part of a pattern to see if
+something that should be added to the tree already exists, and if not,
+insert it. For more information, see the examples in
+.Xr libavl 3LIB .
+.Pp
+If the lookup is successful, then the contents of
+.Fa where
+are undefined.
+.Sh RETURN VALUES
+If
+.Fa node
+matches an entry in the tree, the matching entry is returned. Otherwise,
+.Sy NULL
+is returned and if
+.Fa where
+is
+.Pf non- Sy NULL ,
+it is updated to point to a location in the tree.
+.Sh EXAMPLES
+See the
+.Sy EXAMPLES
+section in
+.Xr libavl 3LIB .
+.Sh INTERFACE STABILITY
+.Sy Committed
+.Sh MT-Level
+See
+.Sx Locking
+in
+.Xr libavl 3LIB .
+.Sh SEE ALSO
+.Xr libavl 3LIB ,
+.Xr avl_create 3AVL ,
+.Xr avl_insert 3AVL ,
+.Xr avl_nearest 3AVL

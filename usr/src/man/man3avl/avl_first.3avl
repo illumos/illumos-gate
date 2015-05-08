@@ -1,0 +1,132 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 07, 2015
+.Dt AVL_FIRST 3AVL
+.Os
+.Sh NAME
+.Nm avl_first ,
+.Nm AVL_NEXT ,
+.Nm AVL_PREV ,
+.Nm avl_last
+.Nd get the first, next, previous, and last entries from an AVL tree
+.Sh SYNOPSIS
+.Lb libavl
+.In sys/avl.h
+.Ft void *
+.Fo avl_first
+.Fa "avl_tree_t *tree"
+.Fc
+.Ft void *
+.Fo avl_last
+.Fa "avl_tree_t *tree"
+.Fc
+.Ft void *
+.Fo AVL_NEXT
+.Fa "avl_tree_t *tree"
+.Fa "void *node"
+.Fc
+.Ft void *
+.Fo AVL_PREV
+.Fa "avl_tree_t *tree"
+.Fa "void *node"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn avl_first
+and
+.Fn avl_last
+respectively return the first and last entry in the tree specified by
+.Fa tree .
+Order in the tree is determined by the comparison function that was
+specified at the time the tree was created with
+.Xr avl_create 3AVL .
+If
+.Fa tree
+is empty, then
+.Fn avl_first
+and
+.Fn avl_last
+return
+.Sy NULL .
+.Pp
+The
+.Fn AVL_NEXT
+and
+.Fn AVL_PREV
+functions are macros that may be used to obtain the next and previous
+entry following
+.Fa node
+in the AVL tree
+.Fa tree .
+If there is no next or previous node, for example, if one was at the
+beginning or end of the tree, then
+.Sy NULL
+is returned.
+.Pp
+These constructs are generally used as part of loops to iterate the
+tree. See the examples section in
+.Xr libavl 3LIB
+for more information on using this
+interface.
+.Sh RETURN VALUES
+The
+.Fn avl_first
+function returns a pointer to the first entry in the AVL tree
+.Fa tree
+or
+.Sy NULL
+if the AVL tree is empty.
+.Pp
+The
+.Fn avl_last
+function returns a pointer to the last entry in the AVL tree
+.Fa tree
+or
+.Sy NULL
+if the AVL tree is empty.
+.Pp
+The
+.Fn AVL_NEXT
+macro returns a pointer to the object in the tree that follows
+.Fa node .
+If
+.Fa node
+is the last entry in the tree,
+.Sy NULL
+is returned instead.
+.Pp
+The
+.Fn AVL_PREV
+macro returns a pointer to the object in the tree that precedes
+.Fa node .
+If
+.Fa node
+is the first entry in the tree,
+.Sy NULL
+is returned instead.
+.Sh EXAMPLES
+See the
+.Sy EXAMPLES
+section in
+.Xr libavl 3LIB .
+.Sh INTERFACE STABILITY
+.Sy Committed
+.Sh MT-Level
+See
+.Sx Locking
+in
+.Xr libavl 3LIB .
+.Sh SEE ALSO
+.Xr libavl 3LIB ,
+.Xr avl_create 3AVL

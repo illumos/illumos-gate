@@ -1,0 +1,48 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 07, 2015
+.Dt AVL_NUMNODES 3AVL
+.Os
+.Sh NAME
+.Nm avl_numnodes
+.Nd return the number of nodes in an AVL tree
+.Sh SYNOPSIS
+.Lb libavl
+.In sys/avl.h
+.Ft ulong_t
+.Fo avl_numnodes
+.Fa "avl_tree_t *tree"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn avl_numnodes
+function returns the number of nodes in the AVL tree rooted
+at
+.Fa tree .
+.Sh RETURN VALUES
+The number of nodes in the tree is returned.
+.Sh EXAMPLES
+See the
+.Sy EXAMPLES
+section in
+.Xr libavl 3LIB .
+.Sh INTERFACE STABILITY
+.Sy Committed
+.Sh MT-Level
+See
+.Sx Locking
+in
+.Xr libavl 3LIB .
+.Sh SEE ALSO
+.Xr libavl 3LIB

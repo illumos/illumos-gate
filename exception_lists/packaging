@@ -454,25 +454,6 @@ usr/include/sys/crypto/ops_impl.h
 usr/include/sys/crypto/sched_impl.h
 #
 # The following files are installed in the proto area
-# by the build of libavl (AVL Tree Interface Library).
-# libavl contains interfaces which are all private interfaces.
-#
-lib/libavl.so
-lib/amd64/libavl.so		i386
-lib/sparcv9/libavl.so		sparc
-lib/llib-lavl
-lib/llib-lavl.ln
-lib/amd64/llib-lavl.ln		i386
-lib/sparcv9/llib-lavl.ln	sparc
-usr/lib/libavl.so
-usr/lib/amd64/libavl.so		i386
-usr/lib/sparcv9/libavl.so	sparc
-usr/lib/llib-lavl
-usr/lib/llib-lavl.ln
-usr/lib/amd64/llib-lavl.ln	i386
-usr/lib/sparcv9/llib-lavl.ln	sparc
-#
-# The following files are installed in the proto area
 # by the build of libcmdutils (Command Utilities Library).
 # libcmdutils contains interfaces which are all private interfaces.
 #

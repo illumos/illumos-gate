@@ -1,0 +1,96 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Joyent, Inc.
+.\"
+.Dd May 07, 2015
+.Dt AVL_DESTROY_NODES 3AVL
+.Os
+.Sh NAME
+.Nm avl_destroy_nodes
+.Nd efficiently remove nodes from an AVL tree
+.Sh SYNOPSIS
+.Lb libavl
+.In sys/avl.h
+.Ft void *
+.Fo avl_destroy_nodes
+.Fa "avl_tree_t *tree"
+.Fa "void **cookie"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn avl_destroy_nodes
+function is used to efficiently remove nodes from the AVL tree rooted at
+.Fa tree .
+.Pp
+After the
+.Fn avl_destroy_nodes
+function is called on an AVL tree, the only valid functions that may be
+called on it are additional calls to
+.Fn avl_destroy_nodes
+and finally
+.Fn avl_destroy .
+.Pp
+Before calling
+.Fn avl_destroy_nodes ,
+callers must first initialize a value of type
+.Vt "void *"
+to
+.Sy NULL
+and pass a pointer to it as the argument
+.Fa cookie .
+This is an opaque value that will be used to maintain where to next
+delete items from the tree. Callers should never modify it after
+initializing it. After each call to
+.Fn avl_destroy_nodes ,
+.Fa cookie
+will be updated and must be passed to subsequent calls to
+.Fn avl_destroy_nodes.
+.Pp
+Each time
+.Fn avl_destroy_nodes
+is called, it will return a pointer to an object that had previously
+been inserted into the tree, allowing a caller the opportunity to delete
+or clean it up. Once
+.Fn avl_destroy_nodes
+returns a
+.Sy NULL
+pointer, then the tree is empty and the caller should proceed to call
+.Xr avl_destroy 3AVL .
+.Pp
+The examples in
+.Xr libavl 3LIB
+demonstrate the correct usage of this interface.
+.Sh RETURN VALUES
+The
+.Fn avl_destroy_nodes
+function will return a pointer to the object just removed from
+the tree rooted at
+.Fa tree
+and if
+.Fa tree
+is empty, it will return
+.Sy NULL .
+.Sh EXAMPLES
+See the
+.Sy EXAMPLES
+section in
+.Xr libavl 3LIB .
+.Sh INTERFACE STABILITY
+.Sy Committed
+.Sh MT-Level
+See
+.Sx Locking
+in
+.Xr libavl 3LIB .
+.Sh SEE ALSO
+.Xr libavl 3LIB ,
+.Xr avl_destroy 3AVL
