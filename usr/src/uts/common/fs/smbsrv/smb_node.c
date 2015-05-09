@@ -91,6 +91,8 @@
 #include <smbsrv/smb_kproto.h>
 #include <smbsrv/smb_fsops.h>
 #include <smbsrv/smb_kstat.h>
+#include <sys/ddi.h>
+#include <sys/extdirent.h>
 #include <sys/pathname.h>
 #include <sys/sdt.h>
 #include <sys/nbmlock.h>
@@ -590,6 +592,48 @@ smb_node_root_init(smb_server_t *sv, smb_node_t **svrootp)
 
 	return (error);
 }
+/*
+ * Helper function for smb_node_set_delete_on_close(). Assumes node is a dir.
+ * Return 0 if this is an empty dir. Otherwise return a NT_STATUS code.
+ * We distinguish between readdir failure and non-empty dir by returning
+ * different values.
+ */
+static uint32_t
+smb_rmdir_possible(smb_node_t *n, uint32_t flags)
+{
+	ASSERT(n->vp->v_type == VDIR);
+	char buf[512]; /* Only large enough to see if the dir is empty. */
+	int eof, bsize = sizeof (buf), reclen = 0;
+	char *name;
+	boolean_t edp = vfs_has_feature(n->vp->v_vfsp, VFSFT_DIRENTFLAGS);
+
+	union {
+		char		*u_bufptr;
+		struct edirent	*u_edp;
+		struct dirent64	*u_dp;
+	} u;
+#define	bufptr	u.u_bufptr
+#define	extdp	u.u_edp
+#define	dp	u.u_dp
+
+	if (smb_vop_readdir(n->vp, 0, buf, &bsize, &eof, flags, zone_kcred()))
+		return (NT_STATUS_CANNOT_DELETE);
+	if (bsize == 0)
+		return (NT_STATUS_CANNOT_DELETE);
+	bufptr = buf;
+	while ((bufptr += reclen) < buf + bsize) {
+		if (edp) {
+			reclen = extdp->ed_reclen;
+			name = extdp->ed_name;
+		} else {
+			reclen = dp->d_reclen;
+			name = dp->d_name;
+		}
+		if (strcmp(name, ".") != 0 && strcmp(name, "..") != 0)
+			return (NT_STATUS_DIRECTORY_NOT_EMPTY);
+	}
+	return (0);
+}
 
 /*
  * When DeleteOnClose is set on an smb_node, the common open code will
@@ -603,34 +647,48 @@ smb_node_root_init(smb_server_t *sv, smb_node_t **svrootp)
  * marked as delete-on-close. The credentials of that ofile will be used
  * as the delete-on-close credentials of the node.
  */
-int
+uint32_t
 smb_node_set_delete_on_close(smb_node_t *node, cred_t *cr, uint32_t flags)
 {
 	int rc = 0;
+	uint32_t status;
 	smb_attr_t attr;
 
 	if (node->n_pending_dosattr & FILE_ATTRIBUTE_READONLY)
-		return (-1);
+		return (NT_STATUS_CANNOT_DELETE);
 
 	bzero(&attr, sizeof (smb_attr_t));
 	attr.sa_mask = SMB_AT_DOSATTR;
 	rc = smb_fsop_getattr(NULL, zone_kcred(), node, &attr);
 	if ((rc != 0) || (attr.sa_dosattr & FILE_ATTRIBUTE_READONLY)) {
-		return (-1);
+		return (NT_STATUS_CANNOT_DELETE);
+	}
+
+	/*
+	 * If the directory is not empty we should fail setting del-on-close
+	 * with STATUS_DIRECTORY_NOT_EMPTY. see MS's
+	 * "File System Behavior Overview" doc section 4.3.2
+	 */
+	if (smb_node_is_dir(node)) {
+		status = smb_rmdir_possible(node, flags);
+		if (status != 0) {
+			return (status);
+		}
 	}
 
 	mutex_enter(&node->n_mutex);
 	if (node->flags & NODE_FLAGS_DELETE_ON_CLOSE) {
-		rc = -1;
-	} else {
-		crhold(cr);
-		node->delete_on_close_cred = cr;
-		node->n_delete_on_close_flags = flags;
-		node->flags |= NODE_FLAGS_DELETE_ON_CLOSE;
-		rc = 0;
+		mutex_exit(&node->n_mutex);
+		return (NT_STATUS_CANNOT_DELETE);
 	}
+
+	crhold(cr);
+	node->delete_on_close_cred = cr;
+	node->n_delete_on_close_flags = flags;
+	node->flags |= NODE_FLAGS_DELETE_ON_CLOSE;
 	mutex_exit(&node->n_mutex);
-	return (rc);
+
+	return (NT_STATUS_SUCCESS);
 }
 
 void

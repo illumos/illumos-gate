@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/sdt.h>
@@ -355,20 +355,31 @@ smb_pre_write_andx(smb_request_t *sr)
 		    &off_low, &param->rw_mode, &remcnt, &datalen_high,
 		    &datalen_low, &param->rw_dsoff, &off_high);
 
-		param->rw_dsoff -= 63;
+		if (param->rw_dsoff >= 63)
+			param->rw_dsoff -= 63;
 		param->rw_offset = ((uint64_t)off_high << 32) | off_low;
-	} else {
+	} else if (sr->smb_wct == 12) {
 		rc = smbsr_decode_vwv(sr, "4.wl4.wwwww", &sr->smb_fid,
 		    &off_low, &param->rw_mode, &remcnt, &datalen_high,
 		    &datalen_low, &param->rw_dsoff);
 
+		if (param->rw_dsoff >= 59)
+			param->rw_dsoff -= 59;
 		param->rw_offset = (uint64_t)off_low;
-		param->rw_dsoff -= 59;
+		/* off_high not present */
+	} else {
+		rc = -1;
 	}
 
 	param->rw_count = (uint32_t)datalen_low;
 
-	if (sr->session->capabilities & CAP_LARGE_WRITEX)
+	/*
+	 * Work-around a Win7 bug, where it fails to set the
+	 * CAP_LARGE_WRITEX flag during session setup.  Assume
+	 * a large write if the data remaining is >= 64k.
+	 */
+	if ((sr->session->capabilities & CAP_LARGE_WRITEX) != 0 ||
+	    (sr->smb_data.max_bytes > (sr->smb_data.chain_offset + 0xFFFF)))
 		param->rw_count |= ((uint32_t)datalen_high << 16);
 
 	DTRACE_SMB_2(op__WriteX__start, smb_request_t *, sr,

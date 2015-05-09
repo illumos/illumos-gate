@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -69,7 +69,6 @@ extern	int smb_opipe_threshold;
 extern	int smb_ssetup_timeout;
 extern	int smb_tcon_timeout;
 extern	int smb_opipe_timeout;
-extern	int smb_threshold_debug;
 extern const uint32_t smb_vop_dosattr_settable;
 
 /* Thread priorities - see smb_init.c */
@@ -477,7 +476,7 @@ int smb_node_getattr(smb_request_t *, smb_node_t *, cred_t *,
     smb_ofile_t *, smb_attr_t *);
 int smb_node_setattr(smb_request_t *, smb_node_t *, cred_t *,
     smb_ofile_t *, smb_attr_t *);
-int smb_node_set_delete_on_close(smb_node_t *, cred_t *, uint32_t);
+uint32_t smb_node_set_delete_on_close(smb_node_t *, cred_t *, uint32_t);
 void smb_node_reset_delete_on_close(smb_node_t *);
 boolean_t smb_node_file_is_readonly(smb_node_t *);
 int smb_node_getpath(smb_node_t *, vnode_t *, char *, uint32_t);
@@ -855,11 +854,13 @@ void smb_avl_release(smb_avl_t *, void *);
 void smb_avl_iterinit(smb_avl_t *, smb_avl_cursor_t *);
 void *smb_avl_iterate(smb_avl_t *, smb_avl_cursor_t *);
 
-void smb_threshold_init(smb_cmd_threshold_t *, smb_server_t *,
-    char *, int, int);
+void smb_threshold_init(smb_cmd_threshold_t *,
+    char *, uint_t, uint_t);
 void smb_threshold_fini(smb_cmd_threshold_t *);
 int smb_threshold_enter(smb_cmd_threshold_t *);
-void smb_threshold_exit(smb_cmd_threshold_t *, smb_server_t *);
+void smb_threshold_exit(smb_cmd_threshold_t *);
+void smb_threshold_wake_all(smb_cmd_threshold_t *);
+
 #ifdef	__cplusplus
 }
 #endif
