@@ -2639,13 +2639,13 @@ lxpr_readdir_common(lxpr_node_t *lxpnp, uio_t *uiop, int *eofp,
 			dirent->d_name[2] = '\0';
 			reclen = DIRENT64_RECLEN(2);
 
-		} else if (dirindex < dirtablen) {
+		} else if (dirindex >= 0 && dirindex < dirtablen) {
 			int slen = strlen(dirtab[dirindex].d_name);
 
 			dirent->d_ino = lxpr_inode(dirtab[dirindex].d_type,
 			    lxpnp->lxpr_pid, 0);
 
-			ASSERT(slen < LXPNSIZ);
+			VERIFY(slen < LXPNSIZ);
 			(void) strcpy(dirent->d_name, dirtab[dirindex].d_name);
 			reclen = DIRENT64_RECLEN(slen);
 
