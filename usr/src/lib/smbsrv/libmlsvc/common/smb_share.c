@@ -19,7 +19,7 @@
  * CDDL HEADER END
  *
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2014 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  */
 
 /*
@@ -285,6 +285,12 @@ smb_shr_sa_enter(void)
 	if (!smb_sa_handle.sa_in_service) {
 		(void) mutex_unlock(&smb_sa_handle.sa_mtx);
 		return (NULL);
+	}
+
+	if (smb_sa_handle.sa_handle != NULL &&
+	    sa_needs_refresh(smb_sa_handle.sa_handle)) {
+		sa_fini(smb_sa_handle.sa_handle);
+		smb_sa_handle.sa_handle = NULL;
 	}
 
 	if (smb_sa_handle.sa_handle == NULL) {
