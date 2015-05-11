@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2015 Joyent, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -403,7 +404,6 @@ sosctp_connect(struct sonode *so, struct sockaddr *name,
 	}
 
 	if (name == NULL || namelen == 0) {
-		mutex_exit(&so->so_lock);
 		error = EINVAL;
 		eprintsoline(so, error);
 		goto done;
