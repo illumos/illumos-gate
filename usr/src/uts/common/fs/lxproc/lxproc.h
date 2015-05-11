@@ -231,7 +231,6 @@ typedef struct lxpr_node {
 	gid_t		lxpr_gid;	/* file group owner		*/
 	pid_t		lxpr_pid;	/* pid of proc referred to	*/
 	ino_t		lxpr_ino;	/* node id 			*/
-	ldi_handle_t	lxpr_cons_ldih; /* ldi handle for console device */
 } lxpr_node_t;
 
 struct zone;    /* forward declaration */
