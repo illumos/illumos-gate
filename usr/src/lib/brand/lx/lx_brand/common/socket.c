@@ -578,6 +578,11 @@ static lx_proto_opts_t tcp_sockopts_tbl = PROTO_SOCKOPTS(ltos_tcp_sockopts);
 static lx_proto_opts_t raw_sockopts_tbl = PROTO_SOCKOPTS(ltos_raw_sockopts);
 static lx_proto_opts_t packet_sockopts_tbl =
     PROTO_SOCKOPTS(ltos_packet_sockopts);
+/* lx_netlink does straight passthrough, so fake a table for it */
+static lx_proto_opts_t netlink_sockopts_tbl = {
+	NULL,
+	LX_SOL_NETLINK_MAX_ENTRY
+};
 
 
 /* Needed for SO_ATTACH_FILTER */
@@ -1834,6 +1839,7 @@ get_proto_opt_tbl(int level)
 	case LX_IPPROTO_ICMPV6:	return (&icmpv6_sockopts_tbl);
 	case LX_IPPROTO_RAW:	return (&raw_sockopts_tbl);
 	case LX_SOL_PACKET:	return (&packet_sockopts_tbl);
+	case LX_SOL_NETLINK:	return (&netlink_sockopts_tbl);
 	default:
 		lx_unsupported("Unsupported sockopt level %d", level);
 		return (NULL);
@@ -1859,7 +1865,7 @@ lx_setsockopt(int sockfd, int level, int optname, void *optval, int optlen)
 	if (optval == NULL)
 		return (-EFAULT);
 
-	if (level > LX_SOL_PACKET || level == LX_IPPROTO_UDP)
+	if (level > LX_SOL_NETLINK || level == LX_IPPROTO_UDP)
 		return (-ENOPROTOOPT);
 
 	if ((proto_opts = get_proto_opt_tbl(level)) == NULL)
@@ -2026,6 +2032,9 @@ lx_setsockopt(int sockfd, int level, int optname, void *optval, int optlen)
 				return (-EINVAL);
 			optval = mr;
 		}
+	} else if (level == LX_SOL_NETLINK) {
+		/* Just pass netlink options straight through */
+		converted = B_TRUE;
 	}
 
 	if (!converted) {

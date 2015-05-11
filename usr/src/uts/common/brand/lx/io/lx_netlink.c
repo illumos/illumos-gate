@@ -34,6 +34,10 @@
 #include <sys/lx_misc.h>
 #include <sys/ethernet.h>
 #include <sys/dlpi.h>
+#include <sys/priv_const.h>
+#include <sys/priv_impl.h>
+#include <sys/priv.h>
+#include <sys/policy.h>
 
 /*
  * Flags in netlink header
@@ -252,6 +256,20 @@
 #define	LX_IFF_DORMANT		(1<<17)
 #define	LX_IFF_ECHO		(1<<18)
 
+
+/*
+ * Netlink sockopts
+ */
+#define	SOL_LX_NETLINK	270
+
+#define	LX_NETLINK_SO_ADD_MEMBERSHIP	1
+#define	LX_NETLINK_SO_DROP_MEMBERSHIP	2
+#define	LX_NETLINK_SO_PKTINFO		3
+#define	LX_NETLINK_SO_BROADCAST_ERROR	4
+#define	LX_NETLINK_SO_NO_ENOBUFS	5
+#define	LX_NETLINK_SO_RX_RING		6
+#define	LX_NETLINK_SO_TX_RING		7
+
 typedef struct lx_netlink_hdr {
 	uint32_t lxnh_len;			/* length of message */
 	uint16_t lxnh_type;			/* type of message */
@@ -304,6 +322,7 @@ typedef struct lx_netlink_sock {
 	ldi_handle_t lxns_current;		/* current ip handle */
 	int lxns_proto;				/* protocol */
 	uint32_t lxns_port;			/* port identifier */
+	uint32_t lxns_groups;			/* group subscriptions */
 	uint32_t lxns_bufsize;			/* buffer size */
 } lx_netlink_sock_t;
 
@@ -321,7 +340,6 @@ typedef struct lx_netlink_reply {
 static lx_netlink_sock_t *lx_netlink_head;	/* head of lx_netlink sockets */
 static kmutex_t lx_netlink_lock;		/* lock to protect state */
 static ldi_ident_t lx_netlink_ldi;		/* LDI handle */
-static uint32_t lx_netlink_port;		/* next port identifier */
 static int lx_netlink_bufsize = 4096;		/* default buffer size */
 static int lx_netlink_flowctrld;		/* # of times flow controlled */
 
@@ -356,10 +374,25 @@ static int
 lx_netlink_setsockopt(sock_lower_handle_t handle, int level,
     int option_name, const void *optval, socklen_t optlen, struct cred *cr)
 {
-	if (level == SOL_SOCKET)
+	if (level == SOL_SOCKET) {
 		return (0);
+	} else if (level != SOL_LX_NETLINK) {
+		return (EOPNOTSUPP);
+	}
 
-	return (EOPNOTSUPP);
+	switch (option_name) {
+	case LX_NETLINK_SO_ADD_MEMBERSHIP:
+	case LX_NETLINK_SO_DROP_MEMBERSHIP:
+	case LX_NETLINK_SO_PKTINFO:
+	case LX_NETLINK_SO_BROADCAST_ERROR:
+	case LX_NETLINK_SO_NO_ENOBUFS:
+	case LX_NETLINK_SO_RX_RING:
+	case LX_NETLINK_SO_TX_RING:
+		/* Blatant lie */
+		return (0);
+	default:
+		return (EINVAL);
+	}
 }
 
 /*ARGSUSED*/
@@ -367,6 +400,7 @@ static int
 lx_netlink_bind(sock_lower_handle_t handle, struct sockaddr *name,
     socklen_t namelen, struct cred *cr)
 {
+	lx_netlink_sock_t *lxsock = (lx_netlink_sock_t *)handle;
 	lx_netlink_sockaddr_t *lxsa = (lx_netlink_sockaddr_t *)name;
 
 	if (namelen != sizeof (lx_netlink_sockaddr_t) ||
@@ -374,8 +408,39 @@ lx_netlink_bind(sock_lower_handle_t handle, struct sockaddr *name,
 		return (EINVAL);
 	}
 
-	if (lxsa->lxnl_groups != 0 || lxsa->lxnl_port != 0)
-		return (EOPNOTSUPP);
+
+	if (lxsa->lxnl_groups != 0) {
+		/*
+		 * On linux, CAP_NET_ADMIN is needed to bind to netlink groups.
+		 * This roughly maps to PRIV_SYS_IP_CONFIG.
+		 */
+		if (secpolicy_ip_config(cr, B_FALSE) != 0) {
+			return (EACCES);
+		}
+
+		/* Lie about group subscription for now */
+		lxsock->lxns_groups = lxsa->lxnl_groups;
+	}
+
+	/*
+	 * Linux netlink uses nl_port to identify distinct netlink sockets.
+	 * Binding to an address of nl_port=0 triggers the kernel to
+	 * automatically assign a free nl_port identifier.  Originally,
+	 * consumers of lx_netlink were required to bind with that automatic
+	 * address.  We now support non-zero values for nl_port although strict
+	 * checking to identify conflicts is not performed.  Use of the
+	 * id_space facility could be a convenient solution, if a need arose.
+	 */
+	if (lxsa->lxnl_port == 0) {
+		/*
+		 * Because we are not doing conflict detection, there is no
+		 * need to expend effort selecting a unique port for automatic
+		 * addressing during bind.
+		 */
+		lxsock->lxns_port = curproc->p_pid;
+	} else {
+		lxsock->lxns_port = lxsa->lxnl_port;
+	}
 
 	return (0);
 }
@@ -394,7 +459,7 @@ lx_netlink_getsockname(sock_lower_handle_t handle, struct sockaddr *sa,
 	lxsa->lxnl_family = AF_LX_NETLINK;
 	lxsa->lxnl_pad = 0;
 	lxsa->lxnl_port = lxsock->lxns_port;
-	lxsa->lxnl_groups = 0;
+	lxsa->lxnl_groups = lxsock->lxns_groups;
 
 	*len = sizeof (lx_netlink_sockaddr_t);
 
@@ -1124,7 +1189,6 @@ lx_netlink_create(int family, int type, int proto,
 	mutex_enter(&lx_netlink_lock);
 
 	lxsock->lxns_next = lx_netlink_head;
-	lxsock->lxns_port = ++lx_netlink_port;
 	lx_netlink_head = lxsock;
 
 	mutex_exit(&lx_netlink_lock);
