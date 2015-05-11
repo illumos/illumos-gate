@@ -971,8 +971,10 @@ dpioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 
 	if (!(dpep->dpe_flag & DP_ISEPOLLCOMPAT) &&
 	    curproc->p_pid != pcp->pc_pid) {
-		if (pcp->pc_pid != -1)
+		if (pcp->pc_pid != -1) {
+			mutex_exit(&dpep->dpe_lock);
 			return (EACCES);
+		}
 
 		pcp->pc_pid = curproc->p_pid;
 	}
