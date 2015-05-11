@@ -514,6 +514,9 @@ inotify_watch_event(inotify_watch_t *watch, uint64_t mask, char *name)
 	state->ins_nevents++;
 	state->ins_size += sizeof (event->ine_event) + len;
 
+	if (removal)
+		return;
+
 	if ((watch->inw_mask & IN_ONESHOT) && !watch->inw_fired) {
 		/*
 		 * If this is a one-shot, we need to remove the watch.  (Note
@@ -523,9 +526,6 @@ inotify_watch_event(inotify_watch_t *watch, uint64_t mask, char *name)
 		watch->inw_fired = 1;
 		inotify_watch_remove(state, watch);
 	}
-
-	if (removal)
-		return;
 
 	mutex_exit(&state->ins_lock);
 	pollwakeup(&state->ins_pollhd, POLLRDNORM | POLLIN);
