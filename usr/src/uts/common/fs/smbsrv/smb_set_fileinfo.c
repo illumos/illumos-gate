@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -687,6 +688,8 @@ smb_set_disposition_info(smb_request_t *sr, smb_setinfo_t *sinfo)
 {
 	unsigned char	mark_delete;
 	uint32_t	flags = 0;
+	int		doserr;
+	uint32_t	status;
 
 	if (smb_mbc_decodef(&sinfo->si_xa->req_data_mb, "b", &mark_delete) != 0)
 		return (-1);
@@ -702,10 +705,21 @@ smb_set_disposition_info(smb_request_t *sr, smb_setinfo_t *sinfo)
 		if (SMB_TREE_SUPPORTS_CATIA(sr))
 			flags |= SMB_CATIA;
 
-		if (smb_node_set_delete_on_close(sinfo->si_node,
-		    sr->user_cr, flags)) {
-			smbsr_error(sr, NT_STATUS_CANNOT_DELETE,
-			    ERRDOS, ERROR_ACCESS_DENIED);
+		status = smb_node_set_delete_on_close(sinfo->si_node,
+		    sr->user_cr, flags);
+		if (status != NT_STATUS_SUCCESS) {
+			switch (status) {
+			case NT_STATUS_CANNOT_DELETE:
+				doserr = ERROR_ACCESS_DENIED;
+				break;
+			case NT_STATUS_DIRECTORY_NOT_EMPTY:
+				doserr = ERROR_DIR_NOT_EMPTY;
+				break;
+			default:
+				doserr = ERROR_GEN_FAILURE;
+				break;
+			}
+			smbsr_error(sr, status, ERRDOS, doserr);
 			return (-1);
 		}
 	} else {

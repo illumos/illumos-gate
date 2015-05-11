@@ -20,11 +20,12 @@
  */
 
 /*
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ */
+
+/*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- */
-/*
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -65,10 +66,13 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <netinet/tcp.h>
+#include <limits.h>
 
 #define	MCALL_MSG_SIZE 24
-#define	SECS_TO_MS 1000
-#define	USECS_TO_MS 1/1000
+#define	SECS_TO_NS(x)	((hrtime_t)(x) * 1000 * 1000 * 1000)
+#define	MSECS_TO_NS(x)	((hrtime_t)(x) * 1000 * 1000)
+#define	USECS_TO_NS(x)	((hrtime_t)(x) * 1000)
+#define	NSECS_TO_MS(x)	((x) / 1000 / 1000)
 #ifndef MIN
 #define	MIN(a, b)	(((a) < (b)) ? (a) : (b))
 #endif
@@ -414,7 +418,7 @@ _set_tcp_conntime(int fd, int optval)
 
 /*
  * Get current tcp connection timeout value.
- * Retun 0 for success, -1 for failure.
+ * Retun the timeout in milliseconds, or -1 for failure.
  */
 static int
 _get_tcp_conntime(int fd)
@@ -452,13 +456,15 @@ _get_tcp_conntime(int fd)
 
 static bool_t
 set_up_connection(int fd, struct netbuf *svcaddr, struct ct_data *ct,
-						const struct timeval *tp)
+    const struct timeval *tp)
 {
 	int state;
 	struct t_call sndcallstr, *rcvcall;
 	int nconnect;
 	bool_t connected, do_rcv_connect;
-	int curr_time = 0;
+	int curr_time = -1;
+	hrtime_t start;
+	hrtime_t tout;	/* timeout in nanoseconds (from tp) */
 
 	ct->ct_addr.len = 0;
 	state = t_getstate(fd);
@@ -469,9 +475,6 @@ set_up_connection(int fd, struct netbuf *svcaddr, struct ct_data *ct,
 		return (FALSE);
 	}
 
-#ifdef DEBUG
-	fprintf(stderr, "set_up_connection: state = %d\n", state);
-#endif
 	switch (state) {
 	case T_IDLE:
 		if (svcaddr == NULL) {
@@ -508,25 +511,48 @@ set_up_connection(int fd, struct netbuf *svcaddr, struct ct_data *ct,
 		 * for other reason, default timeout will be used.
 		 */
 		if (tp != NULL) {
-			int ms;
+			start = gethrtime();
 
 			/*
-			 * TCP_CONN_ABORT_THRESHOLD takes int value in millisecs
+			 * Calculate the timeout in nanoseconds
 			 */
-			ms = tp->tv_sec * SECS_TO_MS +
-			    tp->tv_usec * USECS_TO_MS;
-			if (((curr_time = _get_tcp_conntime(fd)) != -1) &&
-			    (_set_tcp_conntime(fd, ms) == 0)) {
-				/* EMPTY */
-#ifdef DEBUG
-				fprintf(stderr, "set_up_connection: set tcp ");
-				fprintf(stderr, "connection timeout to %d ms\n",
-				    ms);
-#endif
-			}
+			tout = SECS_TO_NS(tp->tv_sec) +
+			    USECS_TO_NS(tp->tv_usec);
+			curr_time = _get_tcp_conntime(fd);
 		}
 
 		for (nconnect = 0; nconnect < 3; nconnect++) {
+			if (tp != NULL) {
+				/*
+				 * Calculate the elapsed time
+				 */
+				hrtime_t elapsed = gethrtime() - start;
+				if (elapsed >= tout)
+					break;
+
+				if (curr_time != -1) {
+					int ms;
+
+					/*
+					 * TCP_CONN_ABORT_THRESHOLD takes int
+					 * value in milliseconds.  Make sure we
+					 * do not overflow.
+					 */
+					if (NSECS_TO_MS(tout - elapsed) >=
+					    INT_MAX) {
+						ms = INT_MAX;
+					} else {
+						ms = (int)
+						    NSECS_TO_MS(tout - elapsed);
+						if (MSECS_TO_NS(ms) !=
+						    tout - elapsed)
+							ms++;
+					}
+
+					(void) _set_tcp_conntime(fd, ms);
+				}
+			}
+
 			if (t_connect(fd, &sndcallstr, rcvcall) != -1) {
 				connected = TRUE;
 				break;
@@ -563,7 +589,7 @@ set_up_connection(int fd, struct netbuf *svcaddr, struct ct_data *ct,
 		/*
 		 * Set the connection timeout back to its old value.
 		 */
-		if (curr_time) {
+		if (curr_time != -1) {
 			(void) _set_tcp_conntime(fd, curr_time);
 		}
 
@@ -572,10 +598,6 @@ set_up_connection(int fd, struct netbuf *svcaddr, struct ct_data *ct,
 			rpc_createerr.cf_error.re_terrno = t_errno;
 			rpc_createerr.cf_error.re_errno = errno;
 			(void) t_free((char *)rcvcall, T_CALL);
-#ifdef DEBUG
-			fprintf(stderr, "clnt_vc: t_connect error %d\n",
-			    rpc_createerr.cf_error.re_terrno);
-#endif
 			return (FALSE);
 		}
 
