@@ -355,7 +355,12 @@ extern "C" {
 #define	LX_PACKET_RX_RING			5
 #define	LX_PACKET_STATISTICS			6
 
-
+/*
+ * Options for use with [gs]etsockopt at the NETLINK level.
+ * SOL_NETLINK
+ */
+#define	LX_SOL_NETLINK				270
+#define	LX_SOL_NETLINK_MAX_ENTRY		8
 
 /*
  * Linux socketcall indices.
