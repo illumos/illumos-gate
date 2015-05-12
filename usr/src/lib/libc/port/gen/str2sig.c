@@ -22,7 +22,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
+ * Copyright 2015, Joyent, Inc.
  */
 
 /*	Copyright (c) 1988 AT&T	*/
@@ -102,6 +102,7 @@ static signame_t signames[] = {
 	{ "RTMIN+13",	_SIGRTMIN+13 },
 	{ "RTMIN+14",	_SIGRTMIN+14 },
 	{ "RTMIN+15",	_SIGRTMIN+15 },
+	{ "RTMIN+16",	_SIGRTMIN+16 },
 	{ "RTMAX-15",	_SIGRTMAX-15 },
 	{ "RTMAX-14",	_SIGRTMAX-14 },
 	{ "RTMAX-13",	_SIGRTMAX-13 },

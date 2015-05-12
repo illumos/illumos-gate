@@ -158,7 +158,7 @@ ltos_signo[LX_NSIG + 1] = {
 	_SIGRTMIN + 28,
 	_SIGRTMIN + 29,
 	_SIGRTMIN + 30,
-	-1,			/* 63:  Linux SIGRTMIN + 31, or SIGRTMAX - 1 */
+	_SIGRTMIN + 31,
 	_SIGRTMAX,		/* 64:  Linux SIGRTMAX */
 };
 
@@ -242,7 +242,8 @@ stol_signo[NSIG] = {
 	LX_SIGRTMIN + 28,
 	LX_SIGRTMIN + 29,
 	LX_SIGRTMIN + 30,
-	LX_SIGRTMAX,		/* 73: Solaris _SIGRTMAX */
+	LX_SIGRTMIN + 31,
+	LX_SIGRTMAX,		/* 74: Solaris _SIGRTMAX */
 };
 
 /*
