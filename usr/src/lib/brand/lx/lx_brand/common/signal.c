@@ -491,6 +491,7 @@ stol_siginfo(siginfo_t *siginfop, lx_siginfo_t *lx_siginfop)
 			lx_siginfo.lsi_pid = siginfop->si_pid;
 			lx_siginfo.lsi_uid =
 			    LX_UID32_TO_UID16(siginfop->si_uid);
+			lx_siginfo.lsi_value = siginfop->si_value;
 			break;
 	}
 
