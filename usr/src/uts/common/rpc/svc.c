@@ -20,11 +20,12 @@
  */
 
 /*
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ */
+
+/*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- */
-/*
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -47,7 +48,7 @@
  *   threads processing events on the transport. Some fields in the
  *   master structure are protected by locks
  *   - xp_req_lock protects the request queue:
- *	xp_req_head, xp_req_tail
+ *	xp_req_head, xp_req_tail, xp_reqs, xp_size, xp_full, xp_enable
  *   - xp_thread_lock protects the thread (clone) counts
  *	xp_threads, xp_detached_threads, xp_wq
  *   Each master transport is registered to exactly one thread pool.
@@ -72,7 +73,7 @@
  *   to restrict resource usage by the service. Some fields are protected
  *   by locks:
  *   - p_req_lock protects several counts and flags:
- *	p_reqs, p_walkers, p_asleep, p_drowsy, p_req_cv
+ *	p_reqs, p_size, p_walkers, p_asleep, p_drowsy, p_req_cv
  *   - p_thread_lock governs other thread counts:
  *	p_threads, p_detached_threads, p_reserved_threads, p_closing
  *
@@ -112,13 +113,6 @@
  *   previous request will wake up or create the next thread. After a service
  *   thread processes a request and sends a reply it returns to svc_run()
  *   and svc_run() calls svc_poll() to find new input.
- *
- *   There is no longer an "inconsistent" but "safe" optimization in the
- *   svc_queuereq() code. This "inconsistent" state was leading to
- *   inconsistencies between the actual number of requests and the value
- *   of p_reqs (the total number of requests). Because of this, hangs were
- *   occurring in svc_poll() where p_reqs was greater than one and no
- *   requests were found on the request queues.
  *
  * svc_poll().
  *   In order to avoid unnecessary locking, which causes performance
@@ -201,6 +195,7 @@
 #include <sys/user.h>
 #include <sys/stream.h>
 #include <sys/strsubr.h>
+#include <sys/strsun.h>
 #include <sys/tihdr.h>
 #include <sys/debug.h>
 #include <sys/cmn_err.h>
@@ -292,6 +287,11 @@ struct svc_globals {
 int rdma_check = 0;
 
 /*
+ * This allows disabling flow control in svc_queuereq().
+ */
+volatile int svc_flowcontrol_disable = 0;
+
+/*
  * Authentication parameters list.
  */
 static caddr_t rqcred_head;
@@ -300,15 +300,15 @@ static kmutex_t rqcred_lock;
 /*
  * Pointers to transport specific `rele' routines in rpcmod (set from rpcmod).
  */
-void	(*rpc_rele)(queue_t *, mblk_t *) = NULL;
-void	(*mir_rele)(queue_t *, mblk_t *) = NULL;
+void	(*rpc_rele)(queue_t *, mblk_t *, bool_t) = NULL;
+void	(*mir_rele)(queue_t *, mblk_t *, bool_t) = NULL;
 
 /* ARGSUSED */
 void
-rpc_rdma_rele(queue_t *q, mblk_t *mp)
+rpc_rdma_rele(queue_t *q, mblk_t *mp, bool_t enable)
 {
 }
-void    (*rdma_rele)(queue_t *, mblk_t *) = rpc_rdma_rele;
+void    (*rdma_rele)(queue_t *, mblk_t *, bool_t) = rpc_rdma_rele;
 
 
 /*
@@ -914,7 +914,7 @@ svc_xprt_qinit(SVCPOOL *pool, size_t qsize)
  * - insert a pointer to xprt into the xprt-ready queue (FIFO)
  * - if the xprt-ready queue is full turn the overflow flag on.
  *
- * NOTICE: pool->p_qtop is protected by the the pool's request lock
+ * NOTICE: pool->p_qtop is protected by the pool's request lock
  * and the caller (svc_queuereq()) must hold the lock.
  */
 static void
@@ -922,7 +922,7 @@ svc_xprt_qput(SVCPOOL *pool, SVCMASTERXPRT *xprt)
 {
 	ASSERT(MUTEX_HELD(&pool->p_req_lock));
 
-	/* If the overflow flag is there is nothing we can do */
+	/* If the overflow flag is on there is nothing we can do */
 	if (pool->p_qoverflow)
 		return;
 
@@ -1871,15 +1871,8 @@ svc_poll(SVCPOOL *pool, SVCMASTERXPRT *xprt, SVCXPRT *clone_xprt)
 		if (xprt && xprt->xp_req_head && (!pool->p_qoverflow ||
 		    clone_xprt->xp_same_xprt++ < pool->p_max_same_xprt)) {
 			mutex_enter(&xprt->xp_req_lock);
-			if (xprt->xp_req_head) {
-				mutex_enter(&pool->p_req_lock);
-				pool->p_reqs--;
-				if (pool->p_reqs == 0)
-					pool->p_qoverflow = FALSE;
-				mutex_exit(&pool->p_req_lock);
-
+			if (xprt->xp_req_head)
 				return (xprt);
-			}
 			mutex_exit(&xprt->xp_req_lock);
 		}
 		clone_xprt->xp_same_xprt = 0;
@@ -1921,9 +1914,6 @@ svc_poll(SVCPOOL *pool, SVCMASTERXPRT *xprt, SVCXPRT *clone_xprt)
 					rw_exit(&pool->p_lrwlock);
 
 					mutex_enter(&pool->p_req_lock);
-					pool->p_reqs--;
-					if (pool->p_reqs == 0)
-						pool->p_qoverflow = FALSE;
 					pool->p_walkers--;
 					mutex_exit(&pool->p_req_lock);
 
@@ -1994,9 +1984,6 @@ svc_poll(SVCPOOL *pool, SVCMASTERXPRT *xprt, SVCXPRT *clone_xprt)
 					rw_exit(&pool->p_lrwlock);
 
 					mutex_enter(&pool->p_req_lock);
-					pool->p_reqs--;
-					if (pool->p_reqs == 0)
-						pool->p_qoverflow = FALSE;
 					pool->p_walkers--;
 					mutex_exit(&pool->p_req_lock);
 
@@ -2086,6 +2073,139 @@ svc_poll(SVCPOOL *pool, SVCMASTERXPRT *xprt, SVCXPRT *clone_xprt)
 }
 
 /*
+ * calculate memory space used by message
+ */
+static size_t
+svc_msgsize(mblk_t *mp)
+{
+	size_t count = 0;
+
+	for (; mp; mp = mp->b_cont)
+		count += MBLKSIZE(mp);
+
+	return (count);
+}
+
+/*
+ * svc_flowcontrol() attempts to turn the flow control on or off for the
+ * transport.
+ *
+ * On input the xprt->xp_full determines whether the flow control is currently
+ * off (FALSE) or on (TRUE).  If it is off we do tests to see whether we should
+ * turn it on, and vice versa.
+ *
+ * There are two conditions considered for the flow control.  Both conditions
+ * have the low and the high watermark.  Once the high watermark is reached in
+ * EITHER condition the flow control is turned on.  For turning the flow
+ * control off BOTH conditions must be below the low watermark.
+ *
+ * Condition #1 - Number of requests queued:
+ *
+ * The max number of threads working on the pool is roughly pool->p_maxthreads.
+ * Every thread could handle up to pool->p_max_same_xprt requests from one
+ * transport before it moves to another transport.  See svc_poll() for details.
+ * In case all threads in the pool are working on a transport they will handle
+ * no more than enough_reqs (pool->p_maxthreads * pool->p_max_same_xprt)
+ * requests in one shot from that transport.  We are turning the flow control
+ * on once the high watermark is reached for a transport so that the underlying
+ * queue knows the rate of incoming requests is higher than we are able to
+ * handle.
+ *
+ * The high watermark: 2 * enough_reqs
+ * The low watermark: enough_reqs
+ *
+ * Condition #2 - Length of the data payload for the queued messages/requests:
+ *
+ * We want to prevent a particular pool exhausting the memory, so once the
+ * total length of queued requests for the whole pool reaches the high
+ * watermark we start to turn on the flow control for significant memory
+ * consumers (individual transports).  To keep the implementation simple
+ * enough, this condition is not exact, because we count only the data part of
+ * the queued requests and we ignore the overhead.  For our purposes this
+ * should be enough.  We should also consider that up to pool->p_maxthreads
+ * threads for the pool might work on large requests (this is not counted for
+ * this condition).  We need to leave some space for rest of the system and for
+ * other big memory consumers (like ZFS).  Also, after the flow control is
+ * turned on (on cots transports) we can start to accumulate a few megabytes in
+ * queues for each transport.
+ *
+ * Usually, the big memory consumers are NFS WRITE requests, so we do not
+ * expect to see this condition met for other than NFS pools.
+ *
+ * The high watermark: 1/5 of available memory
+ * The low watermark: 1/6 of available memory
+ *
+ * Once the high watermark is reached we turn the flow control on only for
+ * transports exceeding a per-transport memory limit.  The per-transport
+ * fraction of memory is calculated as:
+ *
+ * the high watermark / number of transports
+ *
+ * For transports with less than the per-transport fraction of memory consumed,
+ * the flow control is not turned on, so they are not blocked by a few "hungry"
+ * transports.  Because of this, the total memory consumption for the
+ * particular pool might grow up to 2 * the high watermark.
+ *
+ * The individual transports are unblocked once their consumption is below:
+ *
+ * per-transport fraction of memory / 2
+ *
+ * or once the total memory consumption for the whole pool falls below the low
+ * watermark.
+ *
+ */
+static void
+svc_flowcontrol(SVCMASTERXPRT *xprt)
+{
+	SVCPOOL *pool = xprt->xp_pool;
+	size_t totalmem = ptob(physmem);
+	int enough_reqs = pool->p_maxthreads * pool->p_max_same_xprt;
+
+	ASSERT(MUTEX_HELD(&xprt->xp_req_lock));
+
+	/* Should we turn the flow control on? */
+	if (xprt->xp_full == FALSE) {
+		/* Is flow control disabled? */
+		if (svc_flowcontrol_disable != 0)
+			return;
+
+		/* Is there enough requests queued? */
+		if (xprt->xp_reqs >= enough_reqs * 2) {
+			xprt->xp_full = TRUE;
+			return;
+		}
+
+		/*
+		 * If this pool uses over 20% of memory and this transport is
+		 * significant memory consumer then we are full
+		 */
+		if (pool->p_size >= totalmem / 5 &&
+		    xprt->xp_size >= totalmem / 5 / pool->p_lcount)
+			xprt->xp_full = TRUE;
+
+		return;
+	}
+
+	/* We might want to turn the flow control off */
+
+	/* Do we still have enough requests? */
+	if (xprt->xp_reqs > enough_reqs)
+		return;
+
+	/*
+	 * If this pool still uses over 16% of memory and this transport is
+	 * still significant memory consumer then we are still full
+	 */
+	if (pool->p_size >= totalmem / 6 &&
+	    xprt->xp_size >= totalmem / 5 / pool->p_lcount / 2)
+		return;
+
+	/* Turn the flow control off and make sure rpcmod is notified */
+	xprt->xp_full = FALSE;
+	xprt->xp_enable = TRUE;
+}
+
+/*
  * Main loop of the kernel RPC server
  * - wait for input (find a transport with a pending request).
  * - dequeue the request
@@ -2111,6 +2231,8 @@ svc_run(SVCPOOL *pool)
 	for (;;) {
 		SVCMASTERXPRT *next;
 		mblk_t *mp;
+		bool_t enable;
+		size_t size;
 
 		TRACE_0(TR_FAC_KRPC, TR_SVC_RUN, "svc_run");
 
@@ -2168,6 +2290,20 @@ svc_run(SVCPOOL *pool)
 		mp = next->xp_req_head;
 		next->xp_req_head = mp->b_next;
 		mp->b_next = (mblk_t *)0;
+		size = svc_msgsize(mp);
+
+		mutex_enter(&pool->p_req_lock);
+		pool->p_reqs--;
+		if (pool->p_reqs == 0)
+			pool->p_qoverflow = FALSE;
+		pool->p_size -= size;
+		mutex_exit(&pool->p_req_lock);
+
+		next->xp_reqs--;
+		next->xp_size -= size;
+
+		if (next->xp_full)
+			svc_flowcontrol(next);
 
 		TRACE_2(TR_FAC_KRPC, TR_NFSFP_QUE_REQ_DEQ,
 		    "rpc_que_req_deq:pool %p mp %p", pool, mp);
@@ -2248,14 +2384,19 @@ svc_run(SVCPOOL *pool)
 		 * Release our reference on the rpcmod
 		 * slot attached to xp_wq->q_ptr.
 		 */
-		(*RELE_PROC(xprt)) (clone_xprt->xp_wq, NULL);
+		mutex_enter(&xprt->xp_req_lock);
+		enable = xprt->xp_enable;
+		if (enable)
+			xprt->xp_enable = FALSE;
+		mutex_exit(&xprt->xp_req_lock);
+		(*RELE_PROC(xprt)) (clone_xprt->xp_wq, NULL, enable);
 	}
 	/* NOTREACHED */
 }
 
 /*
  * Flush any pending requests for the queue and
- * and free the associated mblks.
+ * free the associated mblks.
  */
 void
 svc_queueclean(queue_t *q)
@@ -2270,14 +2411,21 @@ svc_queueclean(queue_t *q)
 	mutex_enter(&xprt->xp_req_lock);
 	pool = xprt->xp_pool;
 	while ((mp = xprt->xp_req_head) != NULL) {
-		/* remove the request from the list and decrement p_reqs */
+		/* remove the request from the list */
 		xprt->xp_req_head = mp->b_next;
-		mutex_enter(&pool->p_req_lock);
 		mp->b_next = (mblk_t *)0;
-		pool->p_reqs--;
-		mutex_exit(&pool->p_req_lock);
-		(*RELE_PROC(xprt)) (xprt->xp_wq, mp);
+		(*RELE_PROC(xprt)) (xprt->xp_wq, mp, FALSE);
 	}
+
+	mutex_enter(&pool->p_req_lock);
+	pool->p_reqs -= xprt->xp_reqs;
+	pool->p_size -= xprt->xp_size;
+	mutex_exit(&pool->p_req_lock);
+
+	xprt->xp_reqs = 0;
+	xprt->xp_size = 0;
+	xprt->xp_full = FALSE;
+	xprt->xp_enable = FALSE;
 	mutex_exit(&xprt->xp_req_lock);
 }
 
@@ -2362,14 +2510,16 @@ svc_queueclose(queue_t *q)
  * - put a request at the tail of the transport request queue
  * - insert a hint for svc_poll() into the xprt-ready queue
  * - increment the `pending-requests' count for the pool
+ * - handle flow control
  * - wake up a thread sleeping in svc_poll() if necessary
  * - if all the threads are running ask the creator for a new one.
  */
-void
-svc_queuereq(queue_t *q, mblk_t *mp)
+bool_t
+svc_queuereq(queue_t *q, mblk_t *mp, bool_t flowcontrol)
 {
 	SVCMASTERXPRT *xprt = ((void **) q->q_ptr)[0];
 	SVCPOOL *pool = xprt->xp_pool;
+	size_t size;
 
 	TRACE_0(TR_FAC_KRPC, TR_SVC_QUEUEREQ_START, "svc_queuereq_start");
 
@@ -2386,6 +2536,12 @@ svc_queuereq(queue_t *q, mblk_t *mp)
 	 * pending request count it looks atomic.
 	 */
 	mutex_enter(&xprt->xp_req_lock);
+	if (flowcontrol && xprt->xp_full) {
+		mutex_exit(&xprt->xp_req_lock);
+
+		return (FALSE);
+	}
+	ASSERT(xprt->xp_full == FALSE);
 	mutex_enter(&pool->p_req_lock);
 	if (xprt->xp_req_head == NULL)
 		xprt->xp_req_head = mp;
@@ -2396,15 +2552,24 @@ svc_queuereq(queue_t *q, mblk_t *mp)
 	/*
 	 * Step 2.
 	 * Insert a hint into the xprt-ready queue, increment
-	 * `pending-requests' count for the pool, and wake up
+	 * counters, handle flow control, and wake up
 	 * a thread sleeping in svc_poll() if necessary.
 	 */
 
 	/* Insert pointer to this transport into the xprt-ready queue */
 	svc_xprt_qput(pool, xprt);
 
-	/* Increment the `pending-requests' count for the pool */
+	/* Increment counters */
 	pool->p_reqs++;
+	xprt->xp_reqs++;
+
+	size = svc_msgsize(mp);
+	xprt->xp_size += size;
+	pool->p_size += size;
+
+	/* Handle flow control */
+	if (flowcontrol)
+		svc_flowcontrol(xprt);
 
 	TRACE_2(TR_FAC_KRPC, TR_NFSFP_QUE_REQ_ENQ,
 	    "rpc_que_req_enq:pool %p mp %p", pool, mp);
@@ -2449,6 +2614,8 @@ svc_queuereq(queue_t *q, mblk_t *mp)
 
 	TRACE_1(TR_FAC_KRPC, TR_SVC_QUEUEREQ_END,
 	    "svc_queuereq_end:(%S)", "end");
+
+	return (TRUE);
 }
 
 /*
@@ -2539,6 +2706,7 @@ svc_detach_thread(SVCXPRT *clone_xprt)
 {
 	SVCMASTERXPRT *xprt = clone_xprt->xp_master;
 	SVCPOOL *pool = xprt->xp_pool;
+	bool_t enable;
 
 	/* Thread must have a reservation */
 	ASSERT(clone_xprt->xp_reserved);
@@ -2558,7 +2726,12 @@ svc_detach_thread(SVCXPRT *clone_xprt)
 	mutex_exit(&pool->p_thread_lock);
 
 	/* Release an rpcmod slot for this request */
-	(*RELE_PROC(xprt)) (clone_xprt->xp_wq, NULL);
+	mutex_enter(&xprt->xp_req_lock);
+	enable = xprt->xp_enable;
+	if (enable)
+		xprt->xp_enable = FALSE;
+	mutex_exit(&xprt->xp_req_lock);
+	(*RELE_PROC(xprt)) (clone_xprt->xp_wq, NULL, enable);
 
 	/* Mark the clone (thread) as detached */
 	clone_xprt->xp_reserved = FALSE;
@@ -2603,23 +2776,24 @@ rdma_stop(rdma_xprt_group_t *rdma_xprts)
 		mutex_enter(&xprt->xp_req_lock);
 		pool = xprt->xp_pool;
 		while ((mp = xprt->xp_req_head) != NULL) {
-			/*
-			 * remove the request from the list and
-			 * decrement p_reqs
-			 */
+			rdma_recv_data_t *rdp = (rdma_recv_data_t *)mp->b_rptr;
+
+			/* remove the request from the list */
 			xprt->xp_req_head = mp->b_next;
-			mutex_enter(&pool->p_req_lock);
 			mp->b_next = (mblk_t *)0;
-			pool->p_reqs--;
-			mutex_exit(&pool->p_req_lock);
-			if (mp) {
-				rdma_recv_data_t *rdp = (rdma_recv_data_t *)
-				    mp->b_rptr;
-				RDMA_BUF_FREE(rdp->conn, &rdp->rpcmsg);
-				RDMA_REL_CONN(rdp->conn);
-				freemsg(mp);
-			}
+
+			RDMA_BUF_FREE(rdp->conn, &rdp->rpcmsg);
+			RDMA_REL_CONN(rdp->conn);
+			freemsg(mp);
 		}
+		mutex_enter(&pool->p_req_lock);
+		pool->p_reqs -= xprt->xp_reqs;
+		pool->p_size -= xprt->xp_size;
+		mutex_exit(&pool->p_req_lock);
+		xprt->xp_reqs = 0;
+		xprt->xp_size = 0;
+		xprt->xp_full = FALSE;
+		xprt->xp_enable = FALSE;
 		mutex_exit(&xprt->xp_req_lock);
 		svc_queueclose(q);
 #ifdef	DEBUG
