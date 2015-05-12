@@ -22,6 +22,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2015, Joyent, Inc.
  */
 
 /*	Copyright (c) 1988 AT&T	*/
@@ -128,6 +129,7 @@ static const char *_sys_siglist_data[NSIG] = {
 		"Fourteenth Realtime Signal",		/* SIGRTMIN+13	*/
 		"Fifteenth Realtime Signal",		/* SIGRTMIN+14	*/
 		"Sixteenth Realtime Signal",		/* SIGRTMIN+15	*/
+		"Seventeenth Realtime Signal",		/* SIGRTMIN+16	*/
 		"Sixteenth Last Realtime Signal",	/* SIGRTMAX-15	*/
 		"Fifteenth Last Realtime Signal",	/* SIGRTMAX-14	*/
 		"Fourteenth Last Realtime Signal",	/* SIGRTMAX-13	*/

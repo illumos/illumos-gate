@@ -22,6 +22,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2015, Joyent, Inc.
  */
 
 /*	Copyright (c) 1988 AT&T	*/
@@ -188,6 +189,7 @@ static const struct siginfolist _sys_siginfolist_data[NSIG-1] = {
 	0,		0,
 	0,		0,
 	0,		0,			/* SIGRTMIN+15 */
+	0,		0,			/* SIGRTMIN+16 */
 	0,		0,			/* SIGRTMAX-15 */
 	0,		0,
 	0,		0,

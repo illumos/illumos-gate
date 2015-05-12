@@ -22,6 +22,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2015, Joyent, Inc.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -158,8 +159,8 @@ struct sigaction32 {
  * use of these symbols by applications is injurious
  *	to binary compatibility
  */
-#define	NSIG	74	/* valid signals range from 1 to NSIG-1 */
-#define	MAXSIG	73	/* size of u_signal[], NSIG-1 <= MAXSIG */
+#define	NSIG	75	/* valid signals range from 1 to NSIG-1 */
+#define	MAXSIG	74	/* size of u_signal[], NSIG-1 <= MAXSIG */
 #endif /* defined(__EXTENSIONS__) || !defined(_XPG4_2) */
 
 #define	MINSIGSTKSZ	2048

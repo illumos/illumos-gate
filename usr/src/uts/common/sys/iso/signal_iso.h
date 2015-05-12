@@ -22,6 +22,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2015, Joyent, Inc.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -95,7 +96,7 @@ extern "C" {
 
 /* insert new signals here, and move _SIGRTM* appropriately */
 #define	_SIGRTMIN 42	/* first (highest-priority) realtime signal */
-#define	_SIGRTMAX 73	/* last (lowest-priority) realtime signal */
+#define	_SIGRTMAX 74	/* last (lowest-priority) realtime signal */
 extern long _sysconf(int);	/* System Private interface to sysconf() */
 #define	SIGRTMIN ((int)_sysconf(_SC_SIGRT_MIN))	/* first realtime signal */
 #define	SIGRTMAX ((int)_sysconf(_SC_SIGRT_MAX))	/* last realtime signal */
