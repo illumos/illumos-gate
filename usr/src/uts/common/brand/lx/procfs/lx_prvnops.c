@@ -1341,41 +1341,6 @@ lxpr_read_pid_statm(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 }
 
 /*
- * Derived from procfs prgetxmap32
- */
-static size_t
-get_locked(proc_t *p)
-{
-	struct as *as = p->p_as;
-	struct seg *seg;
-	uint_t nlocked = 0;
-
-	ASSERT(as != &kas && AS_READ_HELD(as, &as->a_lock));
-
-	if ((seg = AS_SEGFIRST(as)) == NULL)
-		return (0);
-
-	do {
-		char *parr;
-		uint64_t npages;
-		uint64_t pagenum;
-
-		npages = ((uintptr_t)seg->s_size) >> PAGESHIFT;
-		parr = kmem_zalloc(npages, KM_SLEEP);
-
-		SEGOP_INCORE(seg, seg->s_base, seg->s_size, parr);
-
-		for (pagenum = 0; pagenum < npages; pagenum++) {
-			if (parr[pagenum] & SEG_PAGE_LOCKED)
-				nlocked++;
-		}
-		kmem_free(parr, npages);
-	} while ((seg = AS_SEGNEXT(as, seg)) != NULL);
-
-	return (nlocked);
-}
-
-/*
  * Look for either the main thread (lookup_id is 0) or the specified thread.
  * If we're looking for the main thread but the proc does not have one, we
  * fallback to using prchoose to get any thread available.
@@ -1455,9 +1420,6 @@ lxpr_read_status_common(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf,
 	struct as *as;
 	char *status;
 	pid_t pid, ppid;
-	size_t vsize;
-	size_t nlocked;
-	size_t rss;
 	k_sigset_t current, ignore, handle;
 	int    i, lx_sig;
 	pid_t real_pid;
@@ -1572,13 +1534,15 @@ lxpr_read_status_common(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf,
 
 	as = p->p_as;
 	if ((p->p_stat != SZOMB) && !(p->p_flag & SSYS) && (as != &kas)) {
+		size_t vsize, nlocked, rss;
+
 		mutex_exit(&p->p_lock);
 		AS_LOCK_ENTER(as, &as->a_lock, RW_READER);
 		vsize = as->a_resvsize;
 		rss = rm_asrss(as);
-		nlocked = get_locked(p);
 		AS_LOCK_EXIT(as, &as->a_lock);
 		mutex_enter(&p->p_lock);
+		nlocked = p->p_locked_mem;
 
 		lxpr_uiobuf_printf(uiobuf,
 		    "\n"
@@ -1590,7 +1554,7 @@ lxpr_read_status_common(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf,
 		    "VmExe:\t%8lu kB\n"
 		    "VmLib:\t%8lu kB",
 		    btok(vsize),
-		    ptok(nlocked),
+		    btok(nlocked),
 		    ptok(rss),
 		    0l,
 		    btok(p->p_stksize),
