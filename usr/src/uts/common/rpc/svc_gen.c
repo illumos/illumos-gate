@@ -23,6 +23,9 @@
  *  Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  *  Use is subject to license terms.
  */
+/*
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved	*/
@@ -31,8 +34,6 @@
  * Portions of this source code were derived from Berkeley 4.3 BSD
  * under license from the Regents of the University of California.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/sysmacros.h>
@@ -177,6 +178,10 @@ svc_tli_kcreate(
 	 */
 	xprt->xp_req_head = (mblk_t *)0;
 	xprt->xp_req_tail = (mblk_t *)0;
+	xprt->xp_full = FALSE;
+	xprt->xp_enable = FALSE;
+	xprt->xp_reqs = 0;
+	xprt->xp_size = 0;
 	mutex_init(&xprt->xp_req_lock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&xprt->xp_thread_lock, NULL, MUTEX_DEFAULT, NULL);
 	xprt->xp_type = tinfo.SERV_type;
@@ -226,7 +231,7 @@ svc_tli_kcreate(
 	if (hotstream && tinfo.SERV_type == T_CLTS) {
 		udpmaj = ddi_name_to_major("udp");
 		if (udpmaj != (major_t)-1 &&
-			getmajor(fp->f_vnode->v_rdev) == udpmaj)
+		    getmajor(fp->f_vnode->v_rdev) == udpmaj)
 			create_putlocks(wq, 1);
 	}
 

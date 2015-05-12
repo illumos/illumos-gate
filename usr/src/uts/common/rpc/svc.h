@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
 /* All Rights Reserved */
@@ -254,7 +255,7 @@ struct __svcpool {
 	 * The pool's thread lock p_thread_lock protects:
 	 * - p_threads, p_detached_threads, p_reserved_threads and p_closing
 	 * The pool's request lock protects:
-	 * - p_asleep, p_drowsy, p_reqs, p_walkers, p_req_cv.
+	 * - p_asleep, p_drowsy, p_reqs, p_size, p_walkers, p_req_cv.
 	 * The following fields are `initialized constants':
 	 * - p_id, p_stksize, p_timeout.
 	 * Access to p_next and p_prev is protected by the pool
@@ -359,6 +360,8 @@ struct __svcpool {
 	kmutex_t	p_user_lock;		/* Creator lock		  */
 	void		(*p_offline)();		/* callout for unregister */
 	void		(*p_shutdown)();	/* callout for shutdown */
+
+	size_t		p_size;			/* Total size of queued msgs */
 };
 
 /*
@@ -426,6 +429,11 @@ struct __svcmasterxprt {
 	struct netbuf	xp_addrmask;	/* address mask			*/
 
 	caddr_t		xp_p2;		/* private: for use by svc ops  */
+
+	int		xp_full : 1;	/* xprt is full			*/
+	int		xp_enable : 1;	/* xprt needs to be enabled	*/
+	int		xp_reqs;	/* number of requests queued	*/
+	size_t		xp_size;	/* total size of queued msgs	*/
 };
 
 /*
@@ -787,7 +795,7 @@ extern int	svc_clts_kcreate(struct file *, uint_t, struct T_info_ack *,
 				SVCMASTERXPRT **);
 extern int	svc_cots_kcreate(struct file *, uint_t, struct T_info_ack *,
 				SVCMASTERXPRT **);
-extern void	svc_queuereq(queue_t *, mblk_t *);
+extern bool_t	svc_queuereq(queue_t *, mblk_t *, bool_t);
 extern void	svc_queueclean(queue_t *);
 extern void	svc_queueclose(queue_t *);
 extern int	svc_reserve_thread(SVCXPRT *);
