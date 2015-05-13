@@ -1677,6 +1677,22 @@ lx_ptrace_issig_stop(proc_t *p, klwp_t *lwp)
 	return (0);
 }
 
+boolean_t
+lx_ptrace_sig_ignorable(proc_t *p, int sig)
+{
+	lx_proc_data_t *lxpd = ptolxproc(p);
+
+	if (lxpd->l_ptrace != 0 && lx_stol_signo(sig, 0) != 0) {
+		/*
+		 * In order to preserve proper ptrace behavior when it comes to
+		 * signal handling, it is unacceptable to ignore any signals.
+		 * Doing so would bypass the logic in lx_ptrace_issig_stop.
+		 */
+		return (B_FALSE);
+	}
+	return (B_TRUE);
+}
+
 static void
 lx_ptrace_exit_tracer(proc_t *p, lx_lwp_data_t *lwpd,
     lx_ptrace_accord_t *accord)

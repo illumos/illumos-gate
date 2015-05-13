@@ -142,6 +142,21 @@ signal_is_blocked(kthread_t *t, int sig)
 }
 
 /*
+ * Return true if the signal can safely be ignored.
+ * That is, if the signal is included in the p_ignore mask and doing so is not
+ * forbidden by any process branding.
+ */
+static int
+sig_ignorable(proc_t *p, int sig)
+{
+	return (sigismember(&p->p_ignore, sig) &&	/* sig in ignore mask */
+	    !(PROC_IS_BRANDED(p) &&			/* allowed by brand */
+	    BROP(p)->b_sig_ignorable != NULL &&
+	    BROP(p)->b_sig_ignorable(p, sig) == B_FALSE));
+
+}
+
+/*
  * Return true if the signal can safely be discarded on generation.
  * That is, if there is no need for the signal on the receiving end.
  * The answer is true if the process is a zombie or
@@ -158,7 +173,7 @@ sig_discardable(proc_t *p, int sig)
 	kthread_t *t = p->p_tlist;
 
 	return (t == NULL ||		/* if zombie or ... */
-	    (sigismember(&p->p_ignore, sig) &&	/* signal is ignored */
+	    (sig_ignorable(p, sig) &&		/* signal is ignored */
 	    t->t_forw == t &&			/* and single-threaded */
 	    !tracing(p, sig) &&			/* and no /proc tracing */
 	    !signal_is_blocked(t, sig) &&	/* and signal not blocked */
@@ -482,7 +497,7 @@ issig_justlooking(void)
 			if (sigismember(&set, sig) &&
 			    (tracing(p, sig) ||
 			    sigismember(&t->t_sigwait, sig) ||
-			    !sigismember(&p->p_ignore, sig))) {
+			    !sig_ignorable(p, sig))) {
 				/*
 				 * Don't promote a signal that will stop
 				 * the process when lwp_nostop is set.
@@ -656,7 +671,7 @@ issig_forreal(void)
 			lwp->lwp_cursig = 0;
 			lwp->lwp_extsig = 0;
 			if (sigismember(&t->t_sigwait, sig) ||
-			    (!sigismember(&p->p_ignore, sig) &&
+			    (!sig_ignorable(p, sig) &&
 			    !isjobstop(sig))) {
 				if (p->p_flag & (SEXITLWPS|SKILLED)) {
 					sig = SIGKILL;
@@ -708,7 +723,7 @@ issig_forreal(void)
 				toproc = 0;
 				if (tracing(p, sig) ||
 				    sigismember(&t->t_sigwait, sig) ||
-				    !sigismember(&p->p_ignore, sig)) {
+				    !sig_ignorable(p, sig)) {
 					if (sigismember(&t->t_extsig, sig))
 						ext = 1;
 					break;
@@ -722,7 +737,7 @@ issig_forreal(void)
 				toproc = 1;
 				if (tracing(p, sig) ||
 				    sigismember(&t->t_sigwait, sig) ||
-				    !sigismember(&p->p_ignore, sig)) {
+				    !sig_ignorable(p, sig)) {
 					if (sigismember(&p->p_extsig, sig))
 						ext = 1;
 					break;
@@ -1344,7 +1359,7 @@ psig(void)
 	 * this signal from pending to current (we dropped p->p_lock).
 	 * This can happen only in a multi-threaded process.
 	 */
-	if (sigismember(&p->p_ignore, sig) ||
+	if (sig_ignorable(p, sig) ||
 	    (func == SIG_DFL && sigismember(&stopdefault, sig))) {
 		lwp->lwp_cursig = 0;
 		lwp->lwp_extsig = 0;

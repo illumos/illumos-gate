@@ -97,6 +97,7 @@ struct brand_ops s10_brops = {
 	NULL,				/* b_waitid_helper */
 	NULL,				/* b_sigcld_repost */
 	NULL,				/* b_issig_stop */
+	NULL,				/* b_sig_ignorable */
 	NULL,				/* b_savecontext */
 #if defined(_SYSCALL32_IMPL)
 	NULL,				/* b_savecontext32 */

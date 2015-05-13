@@ -191,9 +191,6 @@ process_vm_readv03
 process_vm_writev01
 process_vm_writev02
 prot_hsymlinks
-ptrace01		# OS-3915
-ptrace02
-ptrace05		# OS-4303
 read02
 readahead01
 readahead02

@@ -141,6 +141,7 @@ struct execa;
  * b_waitid_helper - Generate synthetic results for waitid
  * b_sigcld_repost - Post synthetic SIGCLD signals
  * b_issig_stop - Alter/suppress signal delivery during issig
+ * b_sig_ignorable - Disallow discarding of signals
  * b_savecontext - Alter context during savecontext
  * b_restorecontext - Alter context during restorecontext
  * b_sendsig_stack - Override stack used for signal delivery
@@ -183,6 +184,7 @@ struct brand_ops {
 	    boolean_t *, int *);
 	int	(*b_sigcld_repost)(proc_t *, sigqueue_t *);
 	int	(*b_issig_stop)(proc_t *, klwp_t *);
+	boolean_t (*b_sig_ignorable)(proc_t *, int);
 	void	(*b_savecontext)(ucontext_t *);
 #if defined(_SYSCALL32_IMPL)
 	void	(*b_savecontext32)(ucontext32_t *);
