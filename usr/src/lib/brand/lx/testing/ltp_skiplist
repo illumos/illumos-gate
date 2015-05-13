@@ -1,3 +1,16 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+# Copyright 2015, Joyent, Inc.
+
 # Broken tests
 poll02		# OS-3997
 
@@ -73,7 +86,7 @@ swapoff01
 swapoff02
 swapon01
 swapon02
-swapon03        
+swapon03
 switch01
 ustat01
 ustat02
@@ -138,7 +151,7 @@ fcntl26_64
 fcntl30
 fcntl30_64
 fcntl31
-fcntl31_64     
+fcntl31_64
 fork05
 fork09
 fork13
@@ -154,7 +167,7 @@ io_cancel01
 io_destroy01
 io_getevents01
 io_setup01
-io_submit01 
+io_submit01
 keyctl01
 mmap13
 mq_notify01
@@ -180,7 +193,7 @@ process_vm_writev02
 prot_hsymlinks
 ptrace01		# OS-3915
 ptrace02
-ptrace05		# OS-3307
+ptrace05		# OS-4303
 read02
 readahead01
 readahead02
@@ -188,9 +201,9 @@ readdir2
 readdir21
 sched_rr_get_interval01
 sched_rr_get_interval02
-sched_rr_get_interval03   
+sched_rr_get_interval03
 sched_getscheduler01
-sched_getscheduler02 
+sched_getscheduler02
 semctl01
 semop02
 sendfile02		# OS-3296
@@ -215,12 +228,9 @@ setxattr02
 setxattr03
 sgetmask01
 shmget05		# OS-3326
-sighold02		# OS-3307
-signal_test_05
 signalfd01
 signalfd4_01
 signalfd4_02
-sigrelse01		# OS-3307
 splice01
 splice02
 splice03
