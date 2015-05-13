@@ -1,17 +1,17 @@
 '\" te
 .\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved
-.\" Copyright 2013 Nexenta Systems, Inc.  All Rights Reserved.
+.\" Copyright 2015 Nexenta Systems, Inc.  All Rights Reserved.
 .\" Copyright (c) 2013 by Delphix. All rights reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DUMPADM 1M "Feb 15, 2013"
+.TH DUMPADM 1M "Apr 09, 2015"
 .SH NAME
 dumpadm \- configure operating system crash dump
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/sbin/dumpadm\fR [\fB-nuy\fR] [\fB-c\fR \fIcontent-type\fR] [\fB-d\fR \fIdump-device\fR]
+\fB/usr/sbin/dumpadm\fR [\fB-enuy\fR] [\fB-c\fR \fIcontent-type\fR] [\fB-d\fR \fIdump-device\fR]
      [\fB-m\fR \fImin\fRk | \fImin\fRm | \fImin\fR%] [\fB-s\fR \fIsavecore-dir\fR]
      [\fB-r\fR \fIroot-dir\fR] [\fB-z\fR on | off]
 .fi
@@ -184,6 +184,16 @@ If the special token \fBnone\fR is specified, the active dump device is removed
 and crash dumps are disabled.
 .RE
 
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-e\fR\fR
+.ad
+.sp .6
+.RS 4n
+Estimates the size of the dump for the current running system.
 .RE
 
 .sp

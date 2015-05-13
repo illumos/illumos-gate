@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -517,6 +518,23 @@ dconf_write_uuid(dumpconf_t *dcp)
 		warn(gettext("kernel image uuid write failed"));
 
 	return (err == 0);
+}
+
+int
+dconf_get_dumpsize(dumpconf_t *dcp)
+{
+	char buf[32];
+	uint64_t d;
+
+	if (ioctl(dcp->dc_dump_fd, DIOCGETDUMPSIZE, &d) == -1) {
+		warn(gettext("failed to get kernel dump size"));
+		return (-1);
+	}
+
+	zfs_nicenum(d, buf, sizeof (buf));
+
+	(void) printf(gettext("Estimated dump size: %s\n"), buf);
+	return (0);
 }
 
 void
