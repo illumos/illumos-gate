@@ -263,6 +263,7 @@ struct brand_ops lx_brops = {
 	lx_waitid_helper,		/* b_waitid_helper */
 	lx_sigcld_repost,		/* b_sigcld_repost */
 	lx_ptrace_issig_stop,		/* b_issig_stop */
+	lx_ptrace_sig_ignorable,	/* b_sig_ignorable */
 	lx_savecontext,			/* b_savecontext */
 #if defined(_SYSCALL32_IMPL)
 	lx_savecontext32,		/* b_savecontext32 */
