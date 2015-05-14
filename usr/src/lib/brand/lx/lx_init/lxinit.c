@@ -477,6 +477,13 @@ lxi_init_exec()
 	 * behave better inside a zone. See 'detect_container' in systemd.
 	 */
 	execve(cmd[0], cmd + 1, env);
+
+	/*
+	 * Because stdout was closed prior to exec, it must be opened again in
+	 * the face of failure to log the error.
+	 */
+	lxi_log_open();
+	lxi_err("exec(%s) failed: %s", cmd[0], strerror(errno));
 }
 
 int
