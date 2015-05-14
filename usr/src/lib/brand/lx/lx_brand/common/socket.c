@@ -1849,8 +1849,6 @@ get_proto_opt_tbl(int level)
 long
 lx_setsockopt(int sockfd, int level, int optname, void *optval, int optlen)
 {
-	int internal_opt;
-	uchar_t internal_uchar;
 	int r;
 	lx_proto_opts_t *proto_opts;
 	boolean_t converted = B_FALSE;
@@ -1907,21 +1905,24 @@ lx_setsockopt(int sockfd, int level, int optname, void *optval, int optlen)
 		 * the option value to be an integer while we define it to be
 		 * an unsigned character.  To prevent the kernel from spitting
 		 * back an error on an illegal length, verify that the option
-		 * value is less than UCHAR_MAX and then swizzle it.
+		 * value is less than UCHAR_MAX before truncating optlen.
 		 */
 		if (optname == LX_IP_MULTICAST_TTL ||
 		    optname == LX_IP_MULTICAST_LOOP) {
-			if (optlen != sizeof (int))
+			int optcopy = 0;
+
+			if (optlen > sizeof (int) || optlen <= 0)
 				return (-EINVAL);
 
-			if (uucopy(optval, &internal_opt, sizeof (int)) != 0)
+			if (uucopy(optval, &optcopy, optlen) != 0)
 				return (-errno);
 
-			if (internal_opt > UCHAR_MAX)
+			if (optcopy > UCHAR_MAX)
 				return (-EINVAL);
 
-			internal_uchar = (uchar_t)internal_opt;
-			optval = &internal_uchar;
+			/*
+			 * With optval validated, only optlen must be changed.
+			 */
 			optlen = sizeof (uchar_t);
 		}
 	} else if (level == LX_IPPROTO_IPV6) {
