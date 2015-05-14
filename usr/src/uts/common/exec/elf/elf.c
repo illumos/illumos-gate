@@ -163,7 +163,11 @@ dtrace_safe_phdr(Phdr *phdrp, struct uarg *args, uintptr_t base)
 }
 
 /*
- * Map in the executable pointed to by vp. Returns 0 on success.
+ * Map in the executable pointed to by vp. Returns 0 on success.  Note that
+ * this function currently has the maximum number of arguments allowed by
+ * modstubs on x86 (MAXNARG)!  Do _not_ add to this function signature without
+ * adding to MAXNARG.  (Better yet, do not add to this monster of a function
+ * signature!)
  */
 int
 mapexec_brand(vnode_t *vp, uarg_t *args, Ehdr *ehdr, Addr *uphdr_vaddr,
