@@ -723,7 +723,7 @@ start_order_char(wchar_t wc)
 				} else {
 					set_pri(cc->ref[i], ref, REFER);
 				}
-				ellipsis_weights[i] = NULL;
+				ellipsis_weights[i] = 0;
 			}
 			ellipsis_start++;
 			nextpri++;
@@ -884,8 +884,8 @@ add_order_symbol(char *sym)
 void
 add_order_ellipsis(void)
 {
-	/* special NULL value indicates self reference */
-	add_order_pri(NULL);
+	/* special 0 value indicates self reference */
+	add_order_pri(0);
 }
 
 void

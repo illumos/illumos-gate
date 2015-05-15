@@ -13,28 +13,42 @@
 # Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2011 EveryCity Ltd. All rights reserved.
 # Copyright 2013 DEY Storage Systems, Inc.
+# Copyright 2015 Joyent, Inc.
 #
 
 PROG=localedef
+
+NDIR=native
+NPROG=$(NDIR)/localedef
 
 include ../Makefile.cmd
 
 OBJS = 	charmap.o collate.o ctype.o messages.o monetary.o numeric.o time.o \
 	scanner.o localedef.o wide.o parser.tab.o
+NOBJS = $(OBJS:%.o=native/%.o)
 
 HDRS	= localedef.h
 
-SRCS	= $(OBJS:%.o=%.c)
-
 CPPFLAGS	+= -I $(SRC)/lib/libc/port/locale
+NATIVE_CPPFLAGS	+= -I $(SRC)/lib/libc/port/locale
 CERRWARN	+= -_gcc=-Wno-char-subscripts
 CERRWARN	+= -_gcc=-Wno-uninitialized
 CERRWARN	+= -_gcc=-Wno-unused-label
 LDLIBS		+= -lgen
 LDLIBS 		+= -lavl
+NATIVELDLIBS	+= -lgen
+
+#
+# Unfortunately, we have a chicken and an egg problem. libavl is becoming
+# public, which means that all of its symbols are in a version that the build
+# machine doesn't have and traditionally there has been no libavl compilation
+# symlink. Therefore, because we know that we only support building on illumos,
+# we regrettably have to link explicitly against the full library path. Sorry.
+#
+NATIVELDLIBS	+= /usr/lib/libavl.so.1
 YFLAGS		= -d -b parser
 
-CLEANFILES	= $(OBJS) parser.tab.c parser.tab.h
+CLEANFILES	= $(NOBJS) $(OBJS) parser.tab.c parser.tab.h
 CLEANFILES	+= \
 		UTF-8.cm UTF-8.ct \
 		8859-1.cm 8859-2.cm 8859-3.cm 8859-4.cm \
@@ -43,7 +57,7 @@ CLEANFILES	+= \
 		8859-11.cm 8859-13.cm 8859-14.cm 8859-15.cm \
 		8859-16.cm \
 		KOI8-R.cm
-CLOBBERFILES	= $(PROG) $(POFILE) \
+CLOBBERFILES	= $(PROG) $(NPROG) $(POFILE) \
 		GB18030.cm UTF-8.cm
 
 PIFILES		= $(OBJS:%.o=%.i)
@@ -235,11 +249,22 @@ all: $(PROG) $(DATA)
 
 install: all $(ROOTPROG) $(ROOTDATA)
 
+$(NDIR):
+	mkdir $@
+
+$(NDIR)/%.o: %.c
+	$(NATIVECC) $(NATIVE_CFLAGS) $(NATIVE_CPPFLAGS) -o $@ -c $<
+	$(POST_PROCESS_O)
+
+$(NPROG): $(NDIR) .WAIT $(NOBJS)
+	$(LINK.c) $(NOBJS) -o $@ $(NATIVELDLIBS)
+	$(POST_PROCESS)
+
 $(PROG): $(OBJS)
 	$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
 	$(POST_PROCESS)
 
-$(OBJS):	parser.tab.h
+$(OBJS) $(NOBJS):	parser.tab.h
 
 parser.tab.c parser.tab.h: parser.y $(HDRS)
 	$(YACC) $(YFLAGS) parser.y
@@ -254,6 +279,7 @@ clean:
 clobber: clean
 	$(RM) $(CLOBBERFILES)
 	$(RM) -r $(LOCDIRS)
+	$(RM) -r $(NDIR)
 
 $(POFILE):	$(PIFILES)
 	$(RM) $@
@@ -271,42 +297,42 @@ $(ROOTBIN)/%: $(ROOTBIN) %
 # Strip LC_CTYPE contents for UTF-8 locales and replace them
 # with UTF-8.ct we compiled
 locale/%.UTF-8/stamp:		data/%.UTF-8.src UTF-8.cm \
-				UTF-8.ct locale $(PROG)
+				UTF-8.ct locale $(NPROG)
 	$(SED) '/^LC_CTYPE/,/^END LC_CTYPE/d;$$r UTF-8.ct' $< | \
-		./$(PROG) -U -w data/widths.txt -f UTF-8.cm $(@D)
+		./$(NPROG) -U -w data/widths.txt -f UTF-8.cm $(@D)
 	$(TOUCH) $@
-locale/%.ISO8859-1/stamp:	data/%.UTF-8.src 8859-1.cm locale $(PROG)
-	./$(PROG) -U -w data/widths.txt -i $< -f 8859-1.cm $(@D)
+locale/%.ISO8859-1/stamp:	data/%.UTF-8.src 8859-1.cm locale $(NPROG)
+	./$(NPROG) -U -w data/widths.txt -i $< -f 8859-1.cm $(@D)
 	$(TOUCH) $@
-locale/%.ISO8859-2/stamp:	data/%.UTF-8.src 8859-2.cm locale $(PROG)
-	./$(PROG) -U -w data/widths.txt -i $< -f 8859-2.cm $(@D)
+locale/%.ISO8859-2/stamp:	data/%.UTF-8.src 8859-2.cm locale $(NPROG)
+	./$(NPROG) -U -w data/widths.txt -i $< -f 8859-2.cm $(@D)
 	$(TOUCH) $@
-locale/%.ISO8859-5/stamp:	data/%.UTF-8.src 8859-5.cm locale $(PROG)
-	./$(PROG) -U -w data/widths.txt -i $< -f 8859-5.cm $(@D)
+locale/%.ISO8859-5/stamp:	data/%.UTF-8.src 8859-5.cm locale $(NPROG)
+	./$(NPROG) -U -w data/widths.txt -i $< -f 8859-5.cm $(@D)
 	$(TOUCH) $@
-locale/%.ISO8859-7/stamp:	data/%.UTF-8.src 8859-7.cm locale $(PROG)
-	./$(PROG) -U -w data/widths.txt -i $< -f 8859-7.cm $(@D)
+locale/%.ISO8859-7/stamp:	data/%.UTF-8.src 8859-7.cm locale $(NPROG)
+	./$(NPROG) -U -w data/widths.txt -i $< -f 8859-7.cm $(@D)
 	$(TOUCH) $@
-locale/%.ISO8859-6/stamp:	data/%.UTF-8.src 8859-6.cm locale $(PROG)
-	./$(PROG) -U -w data/widths.txt -i $< -f 8859-6.cm $(@D)
+locale/%.ISO8859-6/stamp:	data/%.UTF-8.src 8859-6.cm locale $(NPROG)
+	./$(NPROG) -U -w data/widths.txt -i $< -f 8859-6.cm $(@D)
 	$(TOUCH) $@
-locale/%.ISO8859-9/stamp:	data/%.UTF-8.src 8859-9.cm locale $(PROG)
-	./$(PROG) -U -w data/widths.txt -i $< -f 8859-9.cm $(@D)
+locale/%.ISO8859-9/stamp:	data/%.UTF-8.src 8859-9.cm locale $(NPROG)
+	./$(NPROG) -U -w data/widths.txt -i $< -f 8859-9.cm $(@D)
 	$(TOUCH) $@
-locale/%.ISO8859-11/stamp:	data/%.UTF-8.src 8859-11.cm locale $(PROG)
-	./$(PROG) -U -w data/widths.txt -i $< -f 8859-11.cm $(@D)
+locale/%.ISO8859-11/stamp:	data/%.UTF-8.src 8859-11.cm locale $(NPROG)
+	./$(NPROG) -U -w data/widths.txt -i $< -f 8859-11.cm $(@D)
 	$(TOUCH) $@
-locale/%.ISO8859-13/stamp:	data/%.UTF-8.src 8859-13.cm locale $(PROG)
-	./$(PROG) -U -w data/widths.txt -i $< -f 8859-13.cm $(@D)
+locale/%.ISO8859-13/stamp:	data/%.UTF-8.src 8859-13.cm locale $(NPROG)
+	./$(NPROG) -U -w data/widths.txt -i $< -f 8859-13.cm $(@D)
 	$(TOUCH) $@
-locale/%.ISO8859-15/stamp:	data/%.UTF-8.src 8859-15.cm locale $(PROG)
-	./$(PROG) -U -w data/widths.txt -i $< -f 8859-15.cm $(@D)
+locale/%.ISO8859-15/stamp:	data/%.UTF-8.src 8859-15.cm locale $(NPROG)
+	./$(NPROG) -U -w data/widths.txt -i $< -f 8859-15.cm $(@D)
 	$(TOUCH) $@
-locale/%.KOI8-R/stamp:		data/%.UTF-8.src KOI8-R.cm locale $(PROG)
-	./$(PROG) -U -w data/widths.txt -i $< -f KOI8-R.cm $(@D)
+locale/%.KOI8-R/stamp:		data/%.UTF-8.src KOI8-R.cm locale $(NPROG)
+	./$(NPROG) -U -w data/widths.txt -i $< -f KOI8-R.cm $(@D)
 	$(TOUCH) $@
-locale/%.GB18030/stamp:		data/%.UTF-8.src GB18030.cm locale $(PROG)
-	./$(PROG) -U -w data/widths.txt -i $< -f GB18030.cm $(@D)
+locale/%.GB18030/stamp:		data/%.UTF-8.src GB18030.cm locale $(NPROG)
+	./$(NPROG) -U -w data/widths.txt -i $< -f GB18030.cm $(@D)
 	$(TOUCH) $@
 
 locale/%/$(DCOLL):	locale/%/stamp
