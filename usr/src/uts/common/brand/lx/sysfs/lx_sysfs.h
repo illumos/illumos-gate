@@ -54,6 +54,9 @@ extern "C" {
 #include <sys/sunldi.h>
 #include <vm/as.h>
 #include <vm/anon.h>
+#include <sys/netstack.h>
+#include <inet/ip.h>
+#include <inet/ip_if.h>
 
 /*
  * Convert a vnode into an lxsys_mnt_t
@@ -83,50 +86,64 @@ extern "C" {
  */
 #define	LXSYS_SDSIZE	16
 
+/* Root sysfs lxsys_instance */
+#define	LXSYS_INST_ROOT	0
+
 /*
  * Node/file types for lx /sys files
  * (directories and files contained therein).
  */
 typedef enum lxsys_nodetype {
-	LXSYS_SYSDIR,		/* /sys			*/
-	LXSYS_FSDIR,		/* /sys/fs		*/
-	LXSYS_FS_CGROUPDIR,	/* /sys/fs/cgroup	*/
-	LXSYS_NFILES		/* number of lx /sys file types */
+	LXSYS_NONE,		/* None-type to keep inodes non-zero	*/
+	LXSYS_STATIC,		/* Statically defined entries		*/
+	LXSYS_CLASS_NET,	/* /sys/class/net/<iface>		*/
+	LXSYS_DEVICES_NET,	/* /sys/devices/virtual/net/<iface>	*/
+	LXSYS_MAXTYPE,		/* type limit				*/
 } lxsys_nodetype_t;
 
 /*
  * external dirent characteristics
  */
 typedef struct {
-	lxsys_nodetype_t	d_type;
-	char			*d_name;
+	unsigned int	d_idnum;
+	char		*d_name;
 } lxsys_dirent_t;
+
+typedef struct {
+	unsigned int	dl_instance;
+	lxsys_dirent_t	*dl_list;
+	int		dl_length;
+} lxsys_dirlookup_t;
 
 /*
  * This is the lx sysfs private data object
  * which is attached to v_data in the vnode structure
  */
-typedef struct lxsys_node {
-	lxsys_nodetype_t lxsys_type;	/* type of this node 		*/
-	vnode_t		*lxsys_vnode;	/* vnode for the node		*/
-	vnode_t		*lxsys_parent;	/* parent directory		*/
-	vnode_t		*lxsys_realvp;	/* real vnode, file in dirs	*/
-	timestruc_t	lxsys_time;	/* creation etc time for file	*/
-	mode_t		lxsys_mode;	/* file mode bits		*/
-	uid_t		lxsys_uid;	/* file owner			*/
-	gid_t		lxsys_gid;	/* file group owner		*/
-	ino_t		lxsys_ino;	/* node id 			*/
-} lxsys_node_t;
-
-struct zone;    /* forward declaration */
+struct lxsys_node;
+typedef struct lxsys_node lxsys_node_t;
+struct lxsys_node {
+	lxsys_nodetype_t	lxsys_type;	/* type ID of node 	*/
+	unsigned int		lxsys_instance;	/* instance ID node	*/
+	unsigned int		lxsys_endpoint;	/* endpoint ID node	*/
+	vnode_t			*lxsys_vnode;	/* vnode for the node	*/
+	vnode_t			*lxsys_parent;	/* parent directory	*/
+	vnode_t			*lxsys_realvp;	/* real vnode		*/
+	lxsys_node_t		*lxsys_next;	/* next list entry	*/
+	timestruc_t		lxsys_time;	/* creation time	*/
+	mode_t			lxsys_mode;	/* file mode bits	*/
+	uid_t			lxsys_uid;	/* file owner		*/
+	gid_t			lxsys_gid;	/* file group owner	*/
+	ino_t			lxsys_ino;	/* node id		*/
+};
 
 /*
  * This is the lxsysfs private data object
  * which is attached to vfs_data in the vfs structure
  */
 typedef struct lxsys_mnt {
-	lxsys_node_t	*lxsysm_node;	/* node at root of sys mount */
-	struct zone	*lxsysm_zone;	/* zone for this mount */
+	kmutex_t	lxsysm_lock;	/* protects fields		*/
+	lxsys_node_t	*lxsysm_node;	/* node at root of sys mount	*/
+	zone_t		*lxsysm_zone;	/* zone for this mount		*/
 } lxsys_mnt_t;
 
 extern vnodeops_t	*lxsys_vnodeops;
@@ -135,10 +152,31 @@ typedef struct mounta	mounta_t;
 
 extern void lxsys_initnodecache();
 extern void lxsys_fininodecache();
-extern ino_t lxsys_inode(lxsys_nodetype_t);
+extern ino_t lxsys_inode(lxsys_nodetype_t, unsigned int, unsigned int);
 extern ino_t lxsys_parentinode(lxsys_node_t *);
-extern lxsys_node_t *lxsys_getnode(vnode_t *, lxsys_nodetype_t, proc_t *);
+extern lxsys_node_t *lxsys_getnode(vnode_t *, lxsys_nodetype_t, unsigned int,
+    unsigned int);
+extern lxsys_node_t *lxsys_getnode_static(vnode_t *, unsigned int);
 extern void lxsys_freenode(lxsys_node_t *);
+
+extern netstack_t *lxsys_netstack(lxsys_node_t *);
+extern ill_t *lxsys_find_ill(ip_stack_t *, uint_t);
+
+typedef struct lxpr_uiobuf {
+	uio_t *uiop;
+	char *buffer;
+	uint32_t bufsize;
+	char *pos;
+	size_t beg;
+	int error;
+} lxsys_uiobuf_t;
+
+extern lxsys_uiobuf_t *lxsys_uiobuf_new(uio_t *);
+extern void lxsys_uiobuf_free(lxsys_uiobuf_t *);
+extern void lxsys_uiobuf_seterr(lxsys_uiobuf_t *, int);
+extern int lxsys_uiobuf_flush(lxsys_uiobuf_t *);
+extern void lxsys_uiobuf_write(lxsys_uiobuf_t *, const char *, size_t);
+extern void lxsys_uiobuf_printf(lxsys_uiobuf_t *uiobuf, const char *fmt, ...);
 
 #ifdef	__cplusplus
 }

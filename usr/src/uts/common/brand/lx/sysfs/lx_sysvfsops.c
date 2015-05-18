@@ -225,13 +225,14 @@ lxsys_mount(vfs_t *vfsp, vnode_t *mvp, mounta_t *uap, cred_t *cr)
 	}
 	mutex_exit(&mvp->v_lock);
 
-	/*
-	 * allocate the first vnode
-	 */
+
+	mutex_init(&lxsys_mnt->lxsysm_lock, NULL, MUTEX_DEFAULT, NULL);
 	zone_hold(lxsys_mnt->lxsysm_zone = zone);
 
 	/* Arbitrarily set the parent vnode to the mounted over directory */
-	lxsys_mnt->lxsysm_node = lxsys_getnode(mvp, LXSYS_SYSDIR, NULL);
+	lxsys_mnt->lxsysm_node = lxsys_getnode(mvp, LXSYS_STATIC,
+	    LXSYS_INST_ROOT, 0);
+	lxsys_mnt->lxsysm_node->lxsys_next = NULL;
 
 	/* Correctly set the fs for the root node */
 	lxsys_mnt->lxsysm_node->lxsys_vnode->v_vfsp = vfsp;
@@ -251,33 +252,29 @@ static int
 lxsys_unmount(vfs_t *vfsp, int flag, cred_t *cr)
 {
 	lxsys_mnt_t *lxsys_mnt = (lxsys_mnt_t *)vfsp->vfs_data;
+	lxsys_node_t *lnp;
 	vnode_t *vp;
 	int count;
 
-	ASSERT(lxsys_mnt != NULL);
-	vp = LXSTOV(lxsys_mnt->lxsysm_node);
+	VERIFY(lxsys_mnt != NULL);
 
 	mutex_enter(&lxsys_mount_lock);
 
-	/*
-	 * must be root to unmount
-	 */
+	/* must be root to unmount */
 	if (secpolicy_fs_unmount(cr, vfsp) != 0) {
 		mutex_exit(&lxsys_mount_lock);
 		return (EPERM);
 	}
 
-	/*
-	 * forced unmount is not supported by this file system
-	 */
+	/* forced unmount is not supported by this fs */
 	if (flag & MS_FORCE) {
 		mutex_exit(&lxsys_mount_lock);
 		return (ENOTSUP);
 	}
 
-	/*
-	 * Ensure that no vnodes are in use on this mount point.
-	 */
+	/* Ensure that no vnodes are in use on this mount point. */
+	lnp = lxsys_mnt->lxsysm_node;
+	vp = LXSTOV(lnp);
 	mutex_enter(&vp->v_lock);
 	count = vp->v_count;
 	mutex_exit(&vp->v_lock);
@@ -286,18 +283,18 @@ lxsys_unmount(vfs_t *vfsp, int flag, cred_t *cr)
 		return (EBUSY);
 	}
 
-
 	/*
-	 * purge the dnlc cache for vnode entries
-	 * associated with this file system
+	 * If there are no references to the root vnode the list of persistent
+	 * static vnodes should be empty
 	 */
-	count = dnlc_purge_vfsp(vfsp, 0);
+	VERIFY(lnp->lxsys_next == NULL);
 
-	/*
-	 * free up the lxsysnode
-	 */
-	lxsys_freenode(lxsys_mnt->lxsysm_node);
+	(void) dnlc_purge_vfsp(vfsp, 0);
+
+	lxsys_mnt->lxsysm_node = NULL;
+	lxsys_freenode(lnp);
 	zone_rele(lxsys_mnt->lxsysm_zone);
+	vfsp->vfs_data = NULL;
 	kmem_free(lxsys_mnt, sizeof (*lxsys_mnt));
 
 	mutex_exit(&lxsys_mount_lock);
@@ -308,11 +305,16 @@ lxsys_unmount(vfs_t *vfsp, int flag, cred_t *cr)
 static int
 lxsys_root(vfs_t *vfsp, vnode_t **vpp)
 {
-	lxsys_node_t *lxsnp = ((lxsys_mnt_t *)vfsp->vfs_data)->lxsysm_node;
-	vnode_t *vp = LXSTOV(lxsnp);
+	lxsys_mnt_t *lxsm = (lxsys_mnt_t *)vfsp->vfs_data;
+	vnode_t *vp;
 
+	VERIFY(lxsm != NULL);
+	VERIFY(lxsm->lxsysm_node != NULL);
+
+	vp = LXSTOV(lxsm->lxsysm_node);
 	VN_HOLD(vp);
 	*vpp = vp;
+
 	return (0);
 }
 

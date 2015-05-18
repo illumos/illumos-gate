@@ -1966,7 +1966,7 @@ lxpr_read_net_dev(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 				continue;
 
 			/* Overwriting the name is ok in the local snapshot */
-			lx_ifname_convert(ksr[i].ks_name, LX_IFNAME_FROMNATIVE);
+			lx_ifname_convert(ksr[i].ks_name, LX_IF_FROMNATIVE);
 			lxpr_uiobuf_printf(uiobuf, "%6s: %7llu %7llu %4lu "
 			    "%4lu %4u %5u %10u %9lu %8llu %7llu %4lu %4lu %4u "
 			    "%5lu %7u %10u\n",
@@ -2032,7 +2032,7 @@ lxpr_read_net_if_inet6(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 			int flag = 0x80;
 
 			ipif_get_name(ipif, ifname, sizeof (ifname));
-			lx_ifname_convert(ifname, LX_IFNAME_FROMNATIVE);
+			lx_ifname_convert(ifname, LX_IF_FROMNATIVE);
 			lxpr_inet6_out(&ipif->ipif_v6lcl_addr, ip6out);
 			/* Scope output is shifted on Linux */
 			scope = scope << 4;
@@ -2089,7 +2089,7 @@ lxpr_format_route_ipv6(ire_t *ire, lxpr_uiobuf_t *uiobuf)
 
 	if (ire->ire_ill != NULL) {
 		ill_get_name(ire->ire_ill, name, sizeof (name));
-		lx_ifname_convert(name, LX_IFNAME_FROMNATIVE);
+		lx_ifname_convert(name, LX_IF_FROMNATIVE);
 	} else {
 		name[0] = '\0';
 	}
@@ -2175,7 +2175,7 @@ lxpr_format_route_ipv4(ire_t *ire, lxpr_uiobuf_t *uiobuf)
 	} while (ill == NULL && nire != NULL);
 	if (ill != NULL) {
 		ill_get_name(ill, name, sizeof (name));
-		lx_ifname_convert(name, LX_IFNAME_FROMNATIVE);
+		lx_ifname_convert(name, LX_IF_FROMNATIVE);
 	} else {
 		name[0] = '*';
 		name[1] = '\0';
