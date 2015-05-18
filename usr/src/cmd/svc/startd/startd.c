@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ * Copyright 2015, Joyent, Inc.
  */
 
 /*
@@ -41,6 +41,137 @@
  * svc.startd and is primarily contained in restarter.c.  It responds to graph
  * engine commands by executing methods, updating the repository, and sending
  * feedback (mostly state updates) to the graph engine.
+ *
+ * Overview of the SMF Architecture
+ *
+ * There are a few different components that make up SMF and are responsible
+ * for different pieces of functionality that are used:
+ *
+ * svc.startd(1M): A daemon that is in charge of starting, stopping, and
+ *     restarting services and instances.
+ * svc.configd(1M): A daemon that manages the repository that stores
+ *     information, property groups, and state of the different services and
+ *     instances.
+ * libscf(3LIB): A C library that provides the glue for communicating,
+ *     accessing, and updating information about services and instances.
+ * svccfg(1M): A utility to add and remove services as well as change the
+ *     properties associated with different services and instances.
+ * svcadm(1M): A utility to control the different instance of a service. You
+ *     can use this to enable and disable them among some other useful things.
+ * svcs(1): A utility that reports on the status of various services on the
+ *     system.
+ *
+ * The following block diagram explains how these components communicate:
+ *
+ * The SMF Block Diagram
+ *                                                       Repository
+ *   This attempts to show       +---------+             +--------+
+ *   the relations between       |         |     SQL     |        |
+ *   the different pieces        | configd |<----------->| SQLite |
+ *   that make SMF work and      |         | Transaction |        |
+ *   users/administrators        +---------+             +--------+
+ *   call into.                   ^      ^
+ *                                |      |
+ *                   door_call(3C)|      | door_call(3C)
+ *                                |      |
+ *                                v      v
+ *      +----------+     +--------+      +--------+      +----------+
+ *      |          |     |        |      |        |      |  svccfg  |
+ *      |  startd  |<--->| libscf |      | libscf |<---->|  svcadm  |
+ *      |          |     | (3LIB) |      | (3LIB) |      |   svcs   |
+ *      +----------+     +--------+      +--------+      +----------+
+ *        ^      ^
+ *        |      | fork(2)/exec(2)
+ *        |      | libcontract(3LIB)
+ *        v      v                           Various System/User services
+ *       +-------------------------------------------------------------------+
+ *       | system/filesystem/local:default      system/coreadm:default       |
+ *       | network/loopback:default             system/zones:default         |
+ *       | milestone/multi-user:default         system/cron:default          |
+ *       | system/console-login:default         network/ssh:default          |
+ *       | system/pfexec:default                system/svc/restarter:default |
+ *       +-------------------------------------------------------------------+
+ *
+ * Chatting with Configd and Sharing Repository Information
+ *
+ * As you run commands with svcs, svccfg, and svcadm, they are all creating a
+ * libscf handle to communicate with configd. As calls are made via libscf they
+ * ultimately go and talk to configd to get information. However, how we
+ * actually are talking to configd is not as straightforward as it appears.
+ *
+ * When configd starts up it creates a door located at
+ * /etc/svc/volatile/repository_door. This door runs the routine called
+ * main_switcher() from usr/src/cmd/svc/configd/maindoor.c. When you first
+ * invoke svc(cfg|s|adm), one of the first things that occurs is creating a
+ * scf_handle_t and binding it to configd by calling scf_handle_bind(). This
+ * function makes a door call to configd and gets returned a new file
+ * descriptor. This file descriptor is itself another door which calls into
+ * configd's client_switcher(). This is the door that is actually used when
+ * getting and fetching properties, and many other useful things.
+ *
+ * svc.startd needs a way to notice the changes that occur to the repository.
+ * For example, if you enabled a service that was not previously running, it's
+ * up to startd to notice that this has happened, check dependencies, and
+ * eventually start up the service. The way it gets these notifications is via
+ * a thread who's sole purpose in life is to call _scf_notify_wait(). This
+ * function acts like poll(2) but for changes that occur in the repository.
+ * Once this thread gets the event, it dispatches the event appropriately.
+ *
+ * The Events of svc.startd
+ *
+ * svc.startd has to handle a lot of complexity. Understanding how you go from
+ * getting the notification that a service was enabled to actually enabling it
+ * is not obvious from a cursory glance. The first thing to keep in mind is
+ * that startd maintains a graph of all the related services and instances so
+ * it can keep track of what is enabled, what dependencies exist, etc. all so
+ * that it can answer the question of what is affected by a change. Internally
+ * there are a lot of different queues for events, threads to process these
+ * queues, and different paths to have events enter these queues. What follows
+ * is a diagram that attempts to explain some of those paths, though it's
+ * important to note that for some of these pieces, such as the graph and
+ * vertex events, there are many additional ways and code paths these threads
+ * and functions can take. And yes, restarter_event_enqueue() is not the same
+ * thing as restarter_queue_event().
+ *
+ *   Threads/Functions                 Queues                  Threads/Functions
+ *
+ * called by various
+ *     +----------------+             +-------+                  +-------------+
+ * --->| graph_protocol | graph_event | graph |   graph_event_   | graph_event |
+ * --->| _send_event()  |------------>| event |----------------->| _thread     |
+ *     +----------------+ _enqueue()  | queue |   dequeue()      +-------------+
+ *                                    +-------+                         |
+ *  _scf_notify_wait()                               vertex_send_event()|
+ *  |                                                                   v
+ *  |  +------------------+                              +--------------------+
+ *  +->| repository_event | vertex_send_event()          | restarter_protocol |
+ *     | _thread          |----------------------------->| _send_event()      |
+ *     +------------------+                              +--------------------+
+ *                                                          |    | out to other
+ *                restarter_                     restarter_ |    | restarters
+ *                event_dequeue() +-----------+  event_     |    | not startd
+ *               +----------------| restarter |<------------+    +------------->
+ *               v                |   event   |  enqueue()
+ *      +-----------------+       |   queue   |             +------------------>
+ *      | restarter_event |       +-----------+             |+----------------->
+ *      | _thread         |                                 ||+---------------->
+ *      +-----------------+                                 ||| start/stop inst
+ *               |               +--------------+       +--------------------+
+ *               |               |   instance   |       | restarter_process_ |
+ *               +-------------->|    event     |------>| events             |
+ *                restarter_     |    queue     |       | per-instance lwp   |
+ *                queue_event()  +--------------+       +--------------------+
+ *                                                          ||| various funcs
+ *                                                          ||| controlling
+ *                                                          ||| instance state
+ *                                                          ||+--------------->
+ *                                                          |+---------------->
+ *                                                          +----------------->
+ *
+ * What's important to take away is that there is a queue for each instance on
+ * the system that handles events related to dealing directly with that
+ * instance and that events can be added to it because of changes to properties
+ * that are made to configd and acted upon asynchronously by startd.
  *
  * Error handling
  *

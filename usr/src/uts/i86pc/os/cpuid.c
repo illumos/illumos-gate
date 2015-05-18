@@ -169,7 +169,8 @@ static char *x86_feature_names[NUM_X86_FEATURES] = {
 	"avx2",
 	"bmi1",
 	"bmi2",
-	"fma"
+	"fma",
+	"smep"
 };
 
 boolean_t
@@ -1245,6 +1246,9 @@ cpuid_pass1(cpu_t *cpu, uchar_t *featureset)
 			ecp->cp_ebx &= ~CPUID_INTC_EBX_7_0_BMI2;
 			ecp->cp_ebx &= ~CPUID_INTC_EBX_7_0_AVX2;
 		}
+
+		if (ecp->cp_ebx & CPUID_INTC_EBX_7_0_SMEP)
+			add_x86_feature(featureset, X86FSET_SMEP);
 	}
 
 	/*

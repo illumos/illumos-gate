@@ -205,6 +205,7 @@ struct ip_stack {
 	int		ips_igmp_deferred_next;
 	timeout_id_t	ips_igmp_timeout_id;
 	boolean_t	ips_igmp_timer_setter_active;
+	boolean_t	ips_igmp_timer_quiesce;
 
 	/* Following protected by mld_timer_lock */
 	int 		ips_mld_time_to_next;	/* Time since last timeout */
@@ -212,14 +213,17 @@ struct ip_stack {
 	int		ips_mld_deferred_next;
 	timeout_id_t	ips_mld_timeout_id;
 	boolean_t	ips_mld_timer_setter_active;
+	boolean_t	ips_mld_timer_quiesce;
 
 	/* Protected by igmp_slowtimeout_lock */
 	timeout_id_t	ips_igmp_slowtimeout_id;
 	kmutex_t	ips_igmp_slowtimeout_lock;
+	boolean_t	ips_igmp_slowtimeout_quiesce;
 
 	/* Protected by mld_slowtimeout_lock */
 	timeout_id_t	ips_mld_slowtimeout_id;
 	kmutex_t	ips_mld_slowtimeout_lock;
+	boolean_t	ips_mld_slowtimeout_quiesce;
 
 	/* IPv4 forwarding table */
 	struct radix_node_head *ips_ip_ftable;

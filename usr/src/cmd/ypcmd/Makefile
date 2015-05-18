@@ -19,6 +19,7 @@
 # CDDL HEADER END
 #
 #
+# Copyright 2015 Gary Mills
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -35,6 +36,10 @@ PROG=	$(BINPROG) $(SBINPROG) $(NETYPPROG) $(NIS2LDAPPROG) $(SVCMETHOD)
 
 MANIFEST = server.xml client.xml xfr.xml
 
+# These only need -lnsl
+LNSLPROG = ypmatch ypwhich ypcat yppoll ypset \
+	ypbind ypxfr yppush mkalias stdhosts
+
 include ../Makefile.cmd
 
 ROOTMANIFESTDIR = $(ROOTSVCNETWORKNIS)
@@ -49,12 +54,9 @@ ROOTDIRS =	$(ROOT) $(ROOTUSR) $(ROOTLIB) $(ROOTETC) $(ROOTVAR) \
 		$(NETSVC) $(NETYP) $(ROOTVAR_YP) $(ROOTBINDING) \
 		$(ROOTUSRSBIN) $(ROOTBIN)
 
-$(BINPROG) :=	LDLIBS += -lnsl
-$(NETYPPROG) :=	LDLIBS += -lnsl
+$(LNSLPROG) :=	LDLIBS += -lnsl
 $(NIS2LDAPPROG) := LDLIBS += -lc -lnsl -lnisdb
-ypinit :=	LDLIBS += -lnsl
-yppoll :=	LDLIBS += -lnsl
-ypset :=	LDLIBS += -lnsl
+stdethers :=	LDLIBS += -lsocket
 makedbm :=	MAPFILES = $(MAPFILE.INT) $(MAPFILE.NGB)
 makedbm :=	LDFLAGS += $(MAPFILES:%=-M%)
 
@@ -243,15 +245,15 @@ yppush: $(YPPUSHOBJ) $(COMMONOBJ)
 	$(POST_PROCESS)
 
 udpublickey: $(UDPUBLICKEYOBJ)
-	$(LINK.c) $(UDPUBLICKEYOBJ) -o $@
+	$(LINK.c) $(UDPUBLICKEYOBJ) -o $@ $(LDLIBS)
 	$(POST_PROCESS)
 
 mkalias: $(MKALIASOBJ)
-	$(LINK.c) $(MKALIASOBJ) -o $@ -lnsl
+	$(LINK.c) $(MKALIASOBJ) -o $@ $(LDLIBS)
 	$(POST_PROCESS)
 
 stdethers: $(STDETHERSOBJ)
-	$(LINK.c) $(STDETHERSOBJ) -o $@ -lsocket
+	$(LINK.c) $(STDETHERSOBJ) -o $@ $(LDLIBS)
 	$(POST_PROCESS)
 
 stdhosts: $(STDHOSTSOBJ)

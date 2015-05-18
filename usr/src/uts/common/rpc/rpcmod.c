@@ -1017,7 +1017,7 @@ static void	mir_wput(queue_t *q, mblk_t *mp);
 static void	mir_wput_other(queue_t *q, mblk_t *mp);
 static void	mir_wsrv(queue_t *q);
 static	void	mir_disconnect(queue_t *, mir_t *ir);
-static	int	mir_check_len(queue_t *, int32_t, mblk_t *);
+static	int	mir_check_len(queue_t *, mblk_t *);
 static	void	mir_timer(void *);
 
 extern void	(*mir_rele)(queue_t *, mblk_t *, bool_t);
@@ -1555,9 +1555,7 @@ mir_rput(queue_t *q, mblk_t *mp)
 			if (!mir->mir_hold_inbound) {
 				if (mir->mir_krpc_cell) {
 
-					if (mir_check_len(q,
-					    (int32_t)msgdsize(head_mp),
-					    head_mp))
+					if (mir_check_len(q, head_mp))
 						return;
 
 					if (q->q_first == NULL &&
@@ -1614,7 +1612,7 @@ mir_rput(queue_t *q, mblk_t *mp)
 	 * will shutdown the connection, drop mir_mutex, and return non-zero.
 	 */
 	if (head_mp != NULL && mir->mir_setup_complete &&
-	    mir_check_len(q, frag_len, head_mp))
+	    mir_check_len(q, head_mp))
 		return;
 
 	/* Save our local copies back in the mir structure. */
@@ -1878,8 +1876,7 @@ mir_rsrv(queue_t *q)
 			if (mir->mir_krpc_cell &&
 			    (mir->mir_svc_no_more_msgs == 0)) {
 
-				if (mir_check_len(q,
-				    (int32_t)msgdsize(mp), mp))
+				if (mir_check_len(q, mp))
 					return;
 
 				if (svc_queuereq(q, mp, TRUE)) {
@@ -2818,15 +2815,16 @@ mir_disconnect(queue_t *q, mir_t *mir)
  * connection.  Returns 1 if the connection is shutdown; 0 otherwise.
  */
 static int
-mir_check_len(queue_t *q, int32_t frag_len, mblk_t *head_mp)
+mir_check_len(queue_t *q, mblk_t *head_mp)
 {
 	mir_t *mir = q->q_ptr;
 	uint_t maxsize = 0;
+	size_t msg_len = msgdsize(head_mp);
 
 	if (mir->mir_max_msg_sizep != NULL)
 		maxsize = *mir->mir_max_msg_sizep;
 
-	if (maxsize == 0 || frag_len <= (int)maxsize)
+	if (maxsize == 0 || msg_len <= maxsize)
 		return (0);
 
 	freemsg(head_mp);
@@ -2836,11 +2834,11 @@ mir_check_len(queue_t *q, int32_t frag_len, mblk_t *head_mp)
 	mir->mir_frag_len = -(int32_t)sizeof (uint32_t);
 	if (mir->mir_type != RPC_SERVER || mir->mir_setup_complete) {
 		cmn_err(CE_NOTE,
-		    "kRPC: record fragment from %s of size(%d) exceeds "
+		    "kRPC: record fragment from %s of size(%lu) exceeds "
 		    "maximum (%u). Disconnecting",
 		    (mir->mir_type == RPC_CLIENT) ? "server" :
 		    (mir->mir_type == RPC_SERVER) ? "client" :
-		    "test tool", frag_len, maxsize);
+		    "test tool", msg_len, maxsize);
 	}
 
 	mir_disconnect(q, mir);
