@@ -28,7 +28,13 @@ MANCHECKS=	$(MANFILES:%=%.check)
 ROOTMANFILES= 	$(MANFILES:%=$(ROOTMAN)/man$(MANSECT)/%)
 ROOTMANLINKS=	$(MANLINKS:%=$(ROOTMAN)/man$(MANSECT)/%)
 
-$(ROOTMAN)/man$(MANSECT)/% $(ROOTHASMAN)/man$(MANSECT)/%: %
+$(ROOTMAN)/man$(MANSECT) $(ROOTHASMAN)/man$(MANSECT):
+		$(INS.dir)
+
+$(ROOTHASMAN)/man$(MANSECT)/%: % $(ROOTHASMAN)/man$(MANSECT)
+		$(INS.file)
+
+$(ROOTMAN)/man$(MANSECT)/% : % $(ROOTMAN)/man$(MANSECT)
 		$(INS.file)
 
 #
@@ -45,7 +51,7 @@ $(MANCHECKS):
 $(MANLINKS):
 		$(RM) $@; $(SYMLINK) $(LINKSRC) $@
 
-$(ROOTMANLINKS): $(MANLINKS)
+$(ROOTMANLINKS): $(MANLINKS) $(ROOTMAN)/man$(MANSECT)
 		$(RM) $@; $(CP) -RP $(@F) $(@D)
 
 all:

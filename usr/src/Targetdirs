@@ -225,7 +225,6 @@ DIRS= \
 	/usr/has/bin \
 	/usr/has/lib \
         /usr/has/man \
-        /usr/has/man/man1has \
 	/usr/include \
 	/usr/include/ast \
 	/usr/include/fm \
@@ -326,89 +325,6 @@ DIRS= \
 	/usr/share/lib/xml \
 	/usr/share/lib/xml/dtd \
 	/usr/share/man \
-	/usr/share/man/man1 \
-	/usr/share/man/man1b \
-	/usr/share/man/man1c \
-	/usr/share/man/man1m \
-       	/usr/share/man/man1s \
-	/usr/share/man/man2 \
-	/usr/share/man/man3 \
-	/usr/share/man/man3bsm \
-	/usr/share/man/man3c \
-	/usr/share/man/man3c_db \
-	/usr/share/man/man3cfgadm \
-	/usr/share/man/man3commputil \
-	/usr/share/man/man3contract \
-	/usr/share/man/man3cpc \
-	/usr/share/man/man3curses \
-	/usr/share/man/man3dat \
-	/usr/share/man/man3devid \
-	/usr/share/man/man3devinfo \
-	/usr/share/man/man3dlpi \
-	/usr/share/man/man3dns_sd \
-	/usr/share/man/man3elf \
-	/usr/share/man/man3exacct \
-	/usr/share/man/man3ext \
-	/usr/share/man/man3fcoe \
-	/usr/share/man/man3fstyp \
-	/usr/share/man/man3gen \
-	/usr/share/man/man3gss \
-	/usr/share/man/man3head \
-	/usr/share/man/man3iscsit \
-	/usr/share/man/man3kstat \
-	/usr/share/man/man3kvm \
-	/usr/share/man/man3ldap \
-	/usr/share/man/man3lgrp \
-	/usr/share/man/man3lib \
-	/usr/share/man/man3m \
-	/usr/share/man/man3mail \
-	/usr/share/man/man3malloc \
-	/usr/share/man/man3mp \
-	/usr/share/man/man3mpapi \
-	/usr/share/man/man3mvec \
-	/usr/share/man/man3nsl \
-	/usr/share/man/man3nvpair \
-	/usr/share/man/man3pam \
-	/usr/share/man/man3papi \
-	/usr/share/man/man3perl \
-	/usr/share/man/man3picl	\
-	/usr/share/man/man3picltree \
-	/usr/share/man/man3pool \
-	/usr/share/man/man3proc \
-	/usr/share/man/man3project \
-	/usr/share/man/man3resolv \
-	/usr/share/man/man3rpc \
-	/usr/share/man/man3rsm \
-	/usr/share/man/man3sasl \
-	/usr/share/man/man3scf \
-	/usr/share/man/man3sec \
-	/usr/share/man/man3secdb \
-	/usr/share/man/man3sip \
-	/usr/share/man/man3slp \
-	/usr/share/man/man3socket \
-	/usr/share/man/man3stmf \
-	/usr/share/man/man3sysevent \
-	/usr/share/man/man3tecla \
-	/usr/share/man/man3tnf \
-	/usr/share/man/man3tsol \
-	/usr/share/man/man3uuid \
-	/usr/share/man/man3volmgt \
-	/usr/share/man/man3xcurses \
-	/usr/share/man/man3xnet \
-	/usr/share/man/man4 \
-	/usr/share/man/man5 \
-	/usr/share/man/man7 \
-	/usr/share/man/man7d \
-	/usr/share/man/man7fs \
-	/usr/share/man/man7i \
-	/usr/share/man/man7ipp \
-	/usr/share/man/man7m \
-	/usr/share/man/man7p \
-        /usr/share/man/man9 \
-	/usr/share/man/man9e \
-	/usr/share/man/man9f \
-	/usr/share/man/man9p \
-	/usr/share/man/man9s \
 	/usr/share/src \
 	/usr/snadm \
 	/usr/snadm/lib \
