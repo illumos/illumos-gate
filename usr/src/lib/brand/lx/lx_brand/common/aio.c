@@ -25,6 +25,7 @@
 #include <errno.h>
 #include <limits.h>
 #include <strings.h>
+#include <stdlib.h>
 #include <sys/lx_types.h>
 #include <sys/lx_debug.h>
 #include <sys/lx_stat.h>
@@ -132,12 +133,13 @@ lx_io_submit(lx_aio_context_t *ctx, long nr, uintptr_t **bpp)
 	if (nr <= 0 || ctx == NULL)
 		return (-EINVAL);
 
-	if ((iocbpp =
-	    (lx_iocb_t **)SAFE_ALLOCA(nr * sizeof (uintptr_t))) == NULL)
+	if ((iocbpp = (lx_iocb_t **)malloc(nr * sizeof (uintptr_t))) == NULL)
 		return (-EAGAIN);
 
-	if (uucopy(bpp, iocbpp, nr * sizeof (uintptr_t)) != 0)
+	if (uucopy(bpp, iocbpp, nr * sizeof (uintptr_t)) != 0) {
+		free(iocbpp);
 		return (-EFAULT);
+	}
 
 	mutex_lock(&ctx->lxaio_lock);
 
@@ -255,6 +257,7 @@ lx_io_submit(lx_aio_context_t *ctx, long nr, uintptr_t **bpp)
 
 	mutex_unlock(&ctx->lxaio_lock);
 
+	free(iocbpp);
 	if (processed == 0)
 		return (-err);
 
