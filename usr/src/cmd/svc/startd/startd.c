@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ * Copyright 2015, Joyent, Inc.
  */
 
 /*
@@ -48,50 +48,51 @@
  * for different pieces of functionality that are used:
  *
  * svc.startd(1M): A daemon that is in charge of starting, stopping, and
- *     restarting services and instances
- * svc.configd: A daemon that manages the repository that stores information,
- *     property groups, and state of the different services and instances
+ *     restarting services and instances.
+ * svc.configd(1M): A daemon that manages the repository that stores
+ *     information, property groups, and state of the different services and
+ *     instances.
  * libscf(3LIB): A C library that provides the glue for communicating,
- *     accessing, and updating information about services and instances
+ *     accessing, and updating information about services and instances.
  * svccfg(1M): A utility to add and remove services as well as change the
  *     properties associated with different services and instances.
  * svcadm(1M): A utility to control the different instance of a service. You
  *     can use this to enable and disable them among some other useful things.
  * svcs(1): A utility that reports on the status of various services on the
- *     system
+ *     system.
  *
  * The following block diagram explains how these components communicate:
  *
  * The SMF Block Diagram
  *                                                       Repository
- *   This attempts to show       ___________             __________
+ *   This attempts to show       +---------+             +--------+
  *   the relations between       |         |     SQL     |        |
  *   the different pieces        | configd |<----------->| SQLite |
  *   that make SMF work and      |         | Transaction |        |
- *   users/administrators        -----------             ----------
- *   call into.                  /|\    /|\
+ *   users/administrators        +---------+             +--------+
+ *   call into.                   ^      ^
  *                                |      |
  *                   door_call(3C)|      | door_call(3C)
  *                                |      |
- *                               \|/    \|/
- *      ____________     __________      __________      ____________
+ *                                v      v
+ *      +----------+     +--------+      +--------+      +----------+
  *      |          |     |        |      |        |      |  svccfg  |
  *      |  startd  |<--->| libscf |      | libscf |<---->|  svcadm  |
  *      |          |     | (3LIB) |      | (3LIB) |      |   svcs   |
- *      ------------     ----------      ----------      ------------
- *       /|\    /|\
+ *      +----------+     +--------+      +--------+      +----------+
+ *        ^      ^
  *        |      | fork(2)/exec(2)
  *        |      | libcontract(3LIB)
- *       \|/    \|/                          Various System/User services
- *       ---------------------------------------------------------------------
+ *        v      v                           Various System/User services
+ *       +-------------------------------------------------------------------+
  *       | system/filesystem/local:default      system/coreadm:default       |
- *       | network/lookpback:default            system/zones:default         |
- *       | network/ntp:default                  system/cron:default          |
- *       | smartdc/agent/ca/cainstsvc:default   network/ssh:default          |
- *       | appliance/kit/akd:default            system/svc/restarter:default |
- *       ---------------------------------------------------------------------
+ *       | network/loopback:default             system/zones:default         |
+ *       | milestone/multi-user:default         system/cron:default          |
+ *       | system/console-login:default         network/ssh:default          |
+ *       | system/pfexec:default                system/svc/restarter:default |
+ *       +-------------------------------------------------------------------+
  *
- * Chatting with configd and sharing repository information
+ * Chatting with Configd and Sharing Repository Information
  *
  * As you run commands with svcs, svccfg, and svcadm, they are all creating a
  * libscf handle to communicate with configd. As calls are made via libscf they
@@ -135,37 +136,37 @@
  *   Threads/Functions                 Queues                  Threads/Functions
  *
  * called by various
- *     ------------------             ---------                  ---------------
+ *     +----------------+             +-------+                  +-------------+
  * --->| graph_protocol | graph_event | graph |   graph_event_   | graph_event |
  * --->| _send_event()  |------------>| event |----------------->| _thread     |
- *     ------------------ _enqueue()  | queue |   dequeue()      ---------------
- *                                    ---------                         |
+ *     +----------------+ _enqueue()  | queue |   dequeue()      +-------------+
+ *                                    +-------+                         |
  *  _scf_notify_wait()                               vertex_send_event()|
- *  |                                                                  \|/
- *  |  --------------------                              ----------------------
- *  |->| repository_event | vertex_send_event()          | restarter_protocol |
+ *  |                                                                   v
+ *  |  +------------------+                              +--------------------+
+ *  +->| repository_event | vertex_send_event()          | restarter_protocol |
  *     | _thread          |----------------------------->| _send_event()      |
- *     --------------------                              ----------------------
+ *     +------------------+                              +--------------------+
  *                                                          |    | out to other
  *                restarter_                     restarter_ |    | restarters
- *                event_dequeue() -------------  event_     |    | not startd
- *               |----------------| restarter |<------------|    |------------->
- *              \|/               |   event   |  enqueue()
- *      -------------------       |   queue   |             |------------------>
- *      | restarter_event |       -------------             ||----------------->
- *      | _thread         |                                 |||---------------->
- *      -------------------                                 ||| start/stop inst
- *               |               ----------------       ----------------------
+ *                event_dequeue() +-----------+  event_     |    | not startd
+ *               +----------------| restarter |<------------+    +------------->
+ *               v                |   event   |  enqueue()
+ *      +-----------------+       |   queue   |             +------------------>
+ *      | restarter_event |       +-----------+             |+----------------->
+ *      | _thread         |                                 ||+---------------->
+ *      +-----------------+                                 ||| start/stop inst
+ *               |               +--------------+       +--------------------+
  *               |               |   instance   |       | restarter_process_ |
- *               |-------------->|    event     |------>| events             |
+ *               +-------------->|    event     |------>| events             |
  *                restarter_     |    queue     |       | per-instance lwp   |
- *                queue_event()  ----------------       ----------------------
+ *                queue_event()  +--------------+       +--------------------+
  *                                                          ||| various funcs
  *                                                          ||| controlling
  *                                                          ||| instance state
- *                                                          |||--------------->
- *                                                          ||---------------->
- *                                                          |----------------->
+ *                                                          ||+--------------->
+ *                                                          |+---------------->
+ *                                                          +----------------->
  *
  * What's important to take away is that there is a queue for each instance on
  * the system that handles events related to dealing directly with that

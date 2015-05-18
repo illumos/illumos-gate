@@ -40,6 +40,12 @@
  * design and structure of the data path. Before we cover other aspects, first
  * let's review the terminology that MAC uses.
  *
+ * MAC
+ *
+ * 	This driver. It interfaces with device drivers and provides abstractions
+ * 	that the rest of the system consumes. All data links -- things managed
+ * 	with dladm(1M), are accessed through MAC.
+ *
  * GLDv3 DEVICE DRIVER
  *
  * 	A GLDv3 device driver refers to a driver, both for pseudo-devices and
@@ -92,17 +98,19 @@
  * 	ring. For example, the device may generate a specific MSI-X for a PCI
  * 	express device. A tx ring is similar, except that it is dedicated to
  * 	transmission. It may also be a vector for enabling features such as VLAN
- * 	tagging and large transmit offloading.
+ * 	tagging and large transmit offloading. It usually has its own dedicated
+ * 	interrupts for transmit being completed.
  *
  * SW RING
  *
  * 	A software ring is a construction of MAC. It represents the same thing
  * 	that a hardware ring generally does, a collection of frames. However,
  * 	instead of being in a contiguous ring of memory, they're instead linked
- * 	by using the mblk_t's b_next pointer. A software ring always represents
- * 	a collection of classified packets; however, it varies as to whether it
- * 	uses only layer two information, or a combination of that and additional
- * 	layer three and layer four data.
+ * 	by using the mblk_t's b_next pointer. Each frame may itself be multiple
+ * 	mblk_t's linked together by the b_cont pointer. A software ring always
+ * 	represents a collection of classified packets; however, it varies as to
+ * 	whether it uses only layer two information, or a combination of that and
+ * 	additional layer three and layer four data.
  *
  * FANOUT
  *
@@ -118,7 +126,7 @@
  * 	penalizes a connection if the data arrives out of order. If a given flow
  * 	is processed on different CPUs, then the data will appear out of order,
  * 	hence the invariant that fanout always hash a given flow to the same
- * 	bucket.
+ * 	bucket and thus get processed on the same CPU.
  *
  * RECEIVE SIDE SCALING (RSS)
  *
@@ -168,9 +176,9 @@
  *
  * 	The primary mac client refers to a mac client whose unicast address
  * 	matches the address of the device itself. For example, if the system has
- * 	instance of the e1000g driver such as e1000g0, e1000g1, etc. The primary
- * 	mac client is the one named after the device itself. VNICs that are
- * 	created on top of such devices are not the primary client.
+ * 	instance of the e1000g driver such as e1000g0, e1000g1, etc., the
+ * 	primary mac client is the one named after the device itself. VNICs that
+ * 	are created on top of such devices are not the primary client.
  *
  * TRANSMIT DESCRIPTORS
  *
@@ -238,7 +246,7 @@
  * they allow for a dynamic assignment of rings to a group and sometimes they
  * have a static assignment of rings to a group. For example, the ixgbe driver
  * has a static assignment of rings to groups such that every group has exactly
- * one ring and there are a number of groups equal to the number of rings.
+ * one ring and the number of groups is equal to the number of rings.
  *
  * Classification and receive side scaling both come into play with how a device
  * advertises itself to MAC and how MAC uses it. If a device supports layer two
@@ -258,7 +266,7 @@
  * change around the way that rings are assigned to various groups as devices
  * come and go from the system. For example, when a VNIC is created, a new flow
  * will be created for the VNIC's MAC address. If a hardware ring is available,
- * MAC may opt to reassign a it from one group to another.
+ * MAC may opt to reassign it from one group to another.
  *
  * ASSIGNMENT OF HARDWARE RINGS
  *
@@ -287,7 +295,7 @@
  * client, whether it's on a 10 GbE or faster device, user controlled dladm(1M)
  * properties, and the nature of the hardware and the resources that it has.
  *
- * When there is no fanout, MAC does not create any soft rings on a device and
+ * When there is no fanout, MAC does not create any soft rings for a device and
  * the device has frames delivered directly to the MAC client.
  *
  * Otherwise, all fanout is performed by software. MAC divides incoming frames
@@ -317,7 +325,7 @@
  *
  * The other advantage of these software rings is that it allows upper layers to
  * optionally poll on them. For example, TCP can leverage an squeue to poll on
- * the software ring.
+ * the software ring, see squeue.c for more information.
  *
  * DLS BYPASS
  *
@@ -330,8 +338,8 @@
  *
  * When we have IPv4 TCP or UDP software rings, then traffic on those rings is
  * eligible for what we call the dls bypass. In those cases, rather than going
- * out mac_rx_deliver() to DLS, DLS instead registers them to go directly the
- * direct callback registered with DLS, generally ip_input().
+ * out mac_rx_deliver() to DLS, DLS instead registers them to go directly via
+ * the direct callback registered with DLS, generally ip_input().
  *
  * HARDWARE RING POLLING
  *

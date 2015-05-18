@@ -25,6 +25,7 @@
  */
 /*
  * Copyright 2015 Joyent, Inc.
+ * Copyright (c) 2014 by Delphix. All rights reserved.
  */
 
 /*
@@ -1566,7 +1567,7 @@ pt_status_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		int state;
 		GElf_Sym sym;
 		uintptr_t panicstr;
-		char panicbuf[128];
+		char *panicbuf = mdb_alloc(1024, UM_SLEEP);
 		const siginfo_t *sip = &(psp->pr_lwp.pr_info);
 
 		char execname[MAXPATHLEN], buf[BUFSIZ];
@@ -1738,6 +1739,7 @@ pt_status_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		default:
 			mdb_printf("unknown libproc Pstate: %d\n", Pstate(P));
 		}
+		mdb_free(panicbuf, 1024);
 
 	} else if (pt->p_file != NULL) {
 		const GElf_Ehdr *ehp = &pt->p_file->gf_ehdr;

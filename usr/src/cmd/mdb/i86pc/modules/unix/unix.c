@@ -830,7 +830,7 @@ static int
 x86_featureset_cmd(uintptr_t addr, uint_t flags, int argc,
     const mdb_arg_t *argv)
 {
-	uchar_t *fset;
+	void *fset;
 	GElf_Sym sym;
 	uintptr_t nptr;
 	char name[128];
@@ -882,6 +882,7 @@ x86_featureset_cmd(uintptr_t addr, uint_t flags, int argc,
 }
 
 #ifdef _KMDB
+/* ARGSUSED */
 static int
 crregs_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {

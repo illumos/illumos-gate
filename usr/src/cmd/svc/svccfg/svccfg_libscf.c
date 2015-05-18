@@ -6765,25 +6765,23 @@ connaborted:
  * These values are added asynchronously by startd. We should not return from
  * this routine until we can verify that the property group we need is there.
  *
- * Before we go ahead and verify this, we have to ask ourselves an
- * important question: Is the early manifest service currently running?
- * Because if is running and invoked us, then the service will never get
- * a restarter property because svc.startd is blocked on EMI finishing
- * before it lets itself fully connect to svc.configd. Of course, this
- * means that this race condition is in fact impossible to 100%
- * eliminate.
+ * Before we go ahead and verify this, we have to ask ourselves an important
+ * question: Is the early manifest service currently running?  Because if it is
+ * running and it has invoked us, then the service will never get a restarter
+ * property because svc.startd is blocked on EMI finishing before it lets itself
+ * fully connect to svc.configd. Of course, this means that this race condition
+ * is in fact impossible to 100% eliminate.
  *
- * svc.startd makes sure that EMI only runs once and has succeeded by
- * checking the state of the EMI instance. If it is online it bails out
- * and makes sure that it doesn't run again. In this case, we're going
- * to do something similar, only if the state is online, then we're
- * going to actually verify. EMI always has to be present, but it
- * can be explicitly disabled to reduce the amount of damage it can cause. If
- * EMI has been disabled then we no longer have to worry about the implicit race
- * condition and can go ahead and check things. If EMI is in some tate that
- * isn't online or disabled and isn't runinng, then we assume that things are
- * rather bad and we're not going to get in your way, even if the rest of SMF
- * does.
+ * svc.startd makes sure that EMI only runs once and has succeeded by checking
+ * the state of the EMI instance. If it is online it bails out and makes sure
+ * that it doesn't run again. In this case, we're going to do something similar,
+ * only if the state is online, then we're going to actually verify. EMI always
+ * has to be present, but it can be explicitly disabled to reduce the amount of
+ * damage it can cause. If EMI has been disabled then we no longer have to worry
+ * about the implicit race condition and can go ahead and check things. If EMI
+ * is in some state that isn't online or disabled and isn't runinng, then we
+ * assume that things are rather bad and we're not going to get in your way,
+ * even if the rest of SMF does.
  *
  * Returns 0 on success or returns an errno.
  */
@@ -8338,7 +8336,7 @@ lscf_bundle_import(bundle_t *bndl, const char *filename, uint_t flags)
 		 * This snippet of code assumes that we are running svccfg as we
 		 * normally do -- witih svc.startd running. Of course, that is
 		 * not actually the case all the time because we also use a
-		 * varient of svc.configd and svcccfg which are only meant to
+		 * varient of svc.configd and svccfg which are only meant to
 		 * run during the build process. During this time we have no
 		 * svc.startd, so this check would hang the build process.
 		 */

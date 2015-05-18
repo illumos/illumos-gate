@@ -247,14 +247,26 @@ dmod/%.o kmod%.o: $$(MODSRCS_DIR)/%.s
 dmod/%.ln kmod/%.ln: %.c
 	$(LINT.c) -dirout=$(@D) -c $<
 
+dmod/%.ln kmod/%.ln: %.s
+	$(LINT.s) -dirout=$(@D) -c $<
+
 dmod/%.ln kmod/%.ln: ../%.c
 	$(LINT.c) -dirout=$(@D) -c $<
+
+dmod/%.ln kmod/%.ln: ../%.s
+	$(LINT.s) -dirout=$(@D) -c $<
 
 dmod/%.ln kmod/%.ln: ../../../common/modules/$(MODNAME)/%.c
 	$(LINT.c) -dirout=$(@D) -c $<
 
+dmod/%.ln kmod/%.ln: ../../../common/modules/$(MODNAME)/%.s
+	$(LINT.s) -dirout=$(@D) -c $<
+
 dmod/%.ln kmod/%.ln: $$(MODSRCS_DIR)/%.c
 	$(LINT.c) -dirout=$(@D) -c $<
+
+dmod/%.ln kmod/%.ln: $$(MODSRCS_DIR)/%.s
+	$(LINT.s) -dirout=$(@D) -c $<
 
 #
 # Installation targets

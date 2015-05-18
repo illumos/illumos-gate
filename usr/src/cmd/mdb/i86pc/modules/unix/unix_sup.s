@@ -13,7 +13,9 @@
  * Copyright 2015 Joyent, Inc.
  */
 
+#if !defined(__lint)
 	.file	"unix_sup.s"
+#endif /* __lint */
 
 /*
  * Support routines for the unix kmdb module
