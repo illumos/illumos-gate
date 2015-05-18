@@ -785,7 +785,7 @@ lx_netlink_getlink_lifreq(lx_netlink_reply_t *reply, struct lifreq *lifr)
 
 	/* Convert the name to be Linux-friendly */
 	(void) strlcpy(if_name, lifr->lifr_name, IFNAMSIZ);
-	lx_ifname_convert(if_name, LX_IFNAME_FROMNATIVE);
+	lx_ifname_convert(if_name, LX_IF_FROMNATIVE);
 	is_loopback = (strncmp(if_name, "lo", 2) == 0);
 
 	if (lx_netlink_reply_ioctl(reply, SIOCGLIFINDEX, lifr) != 0)

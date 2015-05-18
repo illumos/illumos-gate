@@ -694,19 +694,37 @@ lx_wait_filter(proc_t *pp, proc_t *cp)
 }
 
 void
-lx_ifname_convert(char *ifname, int flag)
+lx_ifname_convert(char *ifname, lx_if_action_t act)
 {
-	ASSERT(flag == LX_IFNAME_FROMNATIVE ||
-	    flag == LX_IFNAME_TONATIVE);
-
-	if (flag == LX_IFNAME_TONATIVE) {
+	if (act == LX_IF_TONATIVE) {
 		if (strncmp(ifname, "lo", IFNAMSIZ) == 0)
 			(void) strlcpy(ifname, "lo0", IFNAMSIZ);
-	} else if (flag == LX_IFNAME_FROMNATIVE) {
+	} else {
 		if (strncmp(ifname, "lo0", IFNAMSIZ) == 0)
 			(void) strlcpy(ifname, "lo", IFNAMSIZ);
 	}
 }
+
+void
+lx_ifflags_convert(uint64_t *flags, lx_if_action_t act)
+{
+	uint64_t buf;
+
+	buf = *flags & (IFF_UP | IFF_BROADCAST | IFF_DEBUG |
+	    IFF_LOOPBACK | IFF_POINTOPOINT | IFF_NOTRAILERS |
+	    IFF_RUNNING | IFF_NOARP | IFF_PROMISC | IFF_ALLMULTI);
+
+	/* Linux has different shift for multicast flag */
+	if (act == LX_IF_TONATIVE) {
+		if (*flags & 0x1000)
+			buf |= IFF_MULTICAST;
+	} else {
+		if (*flags & IFF_MULTICAST)
+			buf |= 0x1000;
+	}
+	*flags = buf;
+}
+
 
 void
 lx_stol_hwaddr(const struct sockaddr_dl *src, struct sockaddr *dst, int *size)

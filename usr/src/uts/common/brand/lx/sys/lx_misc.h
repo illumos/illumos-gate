@@ -43,15 +43,18 @@ extern uintptr_t lx_fsbase(klwp_t *, uintptr_t);
 extern void lx_exit_with_sig(proc_t *, sigqueue_t *);
 extern boolean_t lx_wait_filter(proc_t *, proc_t *);
 
-#define	LX_IFNAME_FROMNATIVE	0
-#define	LX_IFNAME_TONATIVE	1
+typedef enum lx_if_action {
+	LX_IF_FROMNATIVE,
+	LX_IF_TONATIVE
+} lx_if_action_t;
 
 /* Linux ARP protocol hardware identifiers */
 #define	LX_ARPHRD_ETHER		1	/* Ethernet */
 #define	LX_ARPHRD_LOOPBACK	772	/* Loopback */
 #define	LX_ARPHRD_VOID		0xffff	/* Unknown */
 
-extern void lx_ifname_convert(char *, int);
+extern void lx_ifname_convert(char *, lx_if_action_t);
+extern void lx_ifflags_convert(uint64_t *, lx_if_action_t);
 extern void lx_stol_hwaddr(const struct sockaddr_dl *, struct sockaddr *,
     int *);
 

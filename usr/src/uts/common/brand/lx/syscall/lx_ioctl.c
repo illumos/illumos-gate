@@ -783,25 +783,6 @@ ict_siocatmark(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 	return (0);
 }
 
-static void
-ict_convert_ifflags(uint64_t *flags, boolean_t tonative)
-{
-	uint64_t buf;
-	buf = *flags & (IFF_UP | IFF_BROADCAST | IFF_DEBUG |
-	    IFF_LOOPBACK | IFF_POINTOPOINT | IFF_NOTRAILERS |
-	    IFF_RUNNING | IFF_NOARP | IFF_PROMISC | IFF_ALLMULTI);
-
-	/* Linux has different shift for multicast flag */
-	if (tonative == B_TRUE) {
-		if (*flags & 0x1000)
-			buf |= IFF_MULTICAST;
-	} else {
-		if (*flags & IFF_MULTICAST)
-			buf |= 0x1000;
-	}
-	*flags = buf;
-}
-
 static int
 ict_if_ioctl(vnode_t *vn, int cmd, intptr_t arg, int flags, cred_t *cred)
 {
@@ -870,7 +851,7 @@ ict_siolifreq(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 	bzero(&lreq, sizeof (lreq));
 	strncpy(lreq.lifr_name, req.ifr_name, IFNAMSIZ);
 	bcopy(&req.ifr_ifru, &lreq.lifr_lifru, len - IFNAMSIZ);
-	lx_ifname_convert(lreq.lifr_name, LX_IFNAME_TONATIVE);
+	lx_ifname_convert(lreq.lifr_name, LX_IF_TONATIVE);
 
 	switch (cmd) {
 	case SIOCGIFADDR:
@@ -905,11 +886,11 @@ ict_siolifreq(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 		error = ict_if_ioctl(fp->f_vnode, cmd, (intptr_t)&lreq,
 		    FLFAKE(fp), fp->f_cred);
 		if (error == 0)
-			ict_convert_ifflags(&lreq.lifr_flags, B_FALSE);
+			lx_ifflags_convert(&lreq.lifr_flags, LX_IF_FROMNATIVE);
 		break;
 	case SIOCSIFFLAGS:
 		cmd = SIOCSLIFFLAGS;
-		ict_convert_ifflags(&lreq.lifr_flags, B_TRUE);
+		lx_ifflags_convert(&lreq.lifr_flags, LX_IF_TONATIVE);
 		error = ict_if_ioctl(fp->f_vnode, cmd, (intptr_t)&lreq,
 		    FLFAKE(fp), fp->f_cred);
 		break;
@@ -949,7 +930,7 @@ ict_siolifreq(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 		return (set_errno(error));
 
 	/* Convert back to a Linux ifreq */
-	lx_ifname_convert(lreq.lifr_name, LX_IFNAME_FROMNATIVE);
+	lx_ifname_convert(lreq.lifr_name, LX_IF_FROMNATIVE);
 	bzero(&req, sizeof (req));
 	strncpy(req.ifr_name, lreq.lifr_name, IFNAMSIZ);
 	bcopy(&lreq.lifr_lifru, &req.ifr_ifru, len - IFNAMSIZ);
@@ -1003,7 +984,7 @@ ict_siocgifconf32(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 	oreq = (lx_ifreq32_t *)kmem_alloc(buf_len, KM_SLEEP);
 	for (i = 0; i < sconf.ifc_len / sizeof (struct ifreq); i++) {
 		bcopy(&sconf.ifc_req[i], oreq + i, sizeof (lx_ifreq32_t));
-		lx_ifname_convert(oreq[i].ifr_name, LX_IFNAME_FROMNATIVE);
+		lx_ifname_convert(oreq[i].ifr_name, LX_IF_FROMNATIVE);
 	}
 	conf.if_len = i * sizeof (*oreq);
 	kmem_free(sconf.ifc_req, ifcount * sizeof (struct ifreq));
@@ -1060,7 +1041,7 @@ ict_siocgifconf64(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 	oreq = (lx_ifreq64_t *)kmem_alloc(buf_len, KM_SLEEP);
 	for (i = 0; i < sconf.ifc_len / sizeof (struct ifreq); i++) {
 		bcopy(&sconf.ifc_req[i], oreq + i, sizeof (lx_ifreq64_t));
-		lx_ifname_convert(oreq[i].ifr_name, LX_IFNAME_FROMNATIVE);
+		lx_ifname_convert(oreq[i].ifr_name, LX_IF_FROMNATIVE);
 	}
 	conf.if_len = i * sizeof (*oreq);
 	kmem_free(sconf.ifc_req, ifcount * sizeof (struct ifreq));

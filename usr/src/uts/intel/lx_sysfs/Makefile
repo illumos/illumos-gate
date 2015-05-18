@@ -32,7 +32,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 CFLAGS		+= $(CCVERBOSE)
 
-LDFLAGS		+= -dy -Nbrand/lx_brand
+LDFLAGS		+= -dy -Nbrand/lx_brand -Ndrv/ip
 
 #
 # For now, disable these lint checks; maintainers should endeavor
