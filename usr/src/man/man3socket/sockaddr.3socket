@@ -9,9 +9,9 @@
 .\" http://www.illumos.org/license/CDDL.
 .\"
 .\"
-.\" Copyright (c) 2014, Joyent, Inc.
+.\" Copyright 2015, Joyent, Inc.
 .\"
-.Dd Nov 13, 2014
+.Dd May 18, 2015
 .Dt SOCKADDR 3SOCKET
 .Os
 .Sh NAME
@@ -42,7 +42,7 @@
 .Em in_sock ;
 .Lp
 .In sys/socket.h
-.In netinet/in6.h
+.In netinet/in.h
 .Lp
 .Sy struct sockaddr_in6
 .Em in6_sock ;
