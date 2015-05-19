@@ -21,7 +21,7 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2014 Joyent, Inc.  All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  */
 
 #include <string.h>
@@ -44,54 +44,6 @@ struct lx_old_dirent {
 	ushort_t	d_reclen;
 	char 		d_name[LX_NAMEMAX];
 };
-
-/*
- * The positioning of d_type depends on d_reclen, since it follows
- * d_name which varies in size.  Because d_type is not being emulated
- * beyond DT_UNKNOWN (0), this can be achieved by zero-filling the
- * structure to d_reclen bytes after the end of d_name.
- */
-struct lx_dirent {
-	long		d_ino;
-	long		d_off;
-	ushort_t	d_reclen;
-	char 		d_name[LX_NAMEMAX];
-	uchar_t		d_type;
-};
-
-/* base definition of linux_dirent from readdir.c - sizeof is 12 */
-typedef struct {
-	ulong_t		d_ino;
-	ulong_t		d_off;
-	ushort_t	d_reclen;
-	char		d_name[1];
-} lx_linux_dirent_t;
-
-/*
- * Record must be long enough to house d_name string, null terminator and
- * d_type field.  It's then padded to nearest 8-byte boundary
- */
-#define	LX_RECLEN(namelen)	\
-	((offsetof(struct lx_dirent, d_name) + 2 + (namelen) + 7) & ~7)
-
-/*
- * Bytes after d_name string until d_reclen should be zeroed.
- * Includes zero-terminating d_name
- */
-#define	LX_ZEROLEN(namelen)	\
-	(LX_RECLEN(namelen) - \
-	((offsetof(struct lx_dirent, d_name) + (namelen))))
-
-struct lx_dirent64 {
-	uint64_t	d_ino;
-	int64_t		d_off;
-	ushort_t	d_reclen;
-	uchar_t		d_type;
-	char		d_name[LX_NAMEMAX];
-};
-
-#define	LX_RECLEN64(namelen)	\
-	((offsetof(struct lx_dirent64, d_name) + 1 + (namelen) + 7) & ~7)
 
 /*
  * Read in one dirent structure from fd into dirp.
@@ -125,151 +77,6 @@ lx_readdir(uintptr_t p1, uintptr_t p2, uintptr_t p3)
 
 	if (uucopy(sd, dirp, count) != 0)
 		return (-errno);
-
-	return (rc);
-}
-
-/*
- * Read in dirent structures from p1 (fd) into p2 (buffer).
- * p3 (count) is the size of the memory area.
- */
-long
-lx_getdents(uintptr_t p1, uintptr_t p2, uintptr_t p3)
-{
-	int fd = (int)p1;
-	void *buf = (void *)p2;
-	void *sbuf, *lbuf;
-	int lbufsz = (uint_t)p3;
-	int sbufsz;
-	int namelen;
-	struct dirent *sd;
-	struct lx_dirent *ld;
-	int bytes, rc;
-
-	/*
-	 * readdir will pass in the full size, but some test code calls getdents
-	 * directly and uses the bare struct. For these, just pretend we got
-	 * a single full-size entry so we can obtain the proper errno.
-	 */
-	if (lbufsz == sizeof (lx_linux_dirent_t))
-		lbufsz = sizeof (struct lx_dirent);
-
-	if (lbufsz < sizeof (struct lx_dirent))
-		return (-EINVAL);
-
-	/*
-	 * The Linux dirent is bigger than the Solaris dirent.  To
-	 * avoid inadvertently consuming more of the directory than we can
-	 * pass back to the Linux app, we hand the kernel a smaller buffer
-	 * than the app handed us.
-	 */
-	sbufsz = (lbufsz / 32) * 24;
-
-	sbuf = SAFE_ALLOCA(sbufsz);
-	lbuf = SAFE_ALLOCA(lbufsz);
-	if (sbuf == NULL || lbuf == NULL)
-		return (-ENOMEM);
-
-	if ((bytes = getdents(fd, sbuf, sbufsz)) < 0)
-		return (-errno);
-
-	/* munge the Solaris buffer to a linux buffer. */
-	sd = (struct dirent *)sbuf;
-	ld = (struct lx_dirent *)lbuf;
-	rc = 0;
-	while (bytes > 0) {
-		namelen = strlen(sd->d_name);
-		if (namelen >= LX_NAMEMAX)
-			namelen = LX_NAMEMAX - 1;
-		ld->d_ino = (uint64_t)sd->d_ino;
-		ld->d_off = (int64_t)sd->d_off;
-
-		(void) strncpy(ld->d_name, sd->d_name, namelen);
-		/*
-		 * Zero out the rest of the record.
-		 * This effective sets ld->d_type = 0 and zero-terminates d_name
-		 */
-		memset(ld->d_name + namelen, '\0', LX_ZEROLEN(namelen));
-		ld->d_reclen = (ushort_t)LX_RECLEN(namelen);
-
-		bytes -= (int)sd->d_reclen;
-		rc += (int)ld->d_reclen;
-
-		sd = (struct dirent *)(void *)((caddr_t)sd + sd->d_reclen);
-		ld = (struct lx_dirent *)(void *)((caddr_t)ld + ld->d_reclen);
-	}
-
-	/* now copy the lbuf to the userland buffer */
-	assert(rc <= lbufsz);
-	if (uucopy(lbuf, buf, rc) != 0)
-		return (-EFAULT);
-
-	return (rc);
-}
-
-/*
- * Read in dirent64 structures from p1 (fd) into p2 (buffer).
- * p3 (count) is the size of the memory area.
- */
-long
-lx_getdents64(uintptr_t p1, uintptr_t p2, uintptr_t p3)
-{
-	int fd = (uint_t)p1;
-	void *buf = (void *)p2;
-	void *sbuf, *lbuf;
-	int lbufsz = (uint_t)p3;
-	int sbufsz;
-	int namelen;
-	struct dirent *sd;
-	struct lx_dirent64 *ld;
-	int bytes, rc;
-
-	if (lbufsz < sizeof (struct lx_dirent64))
-		return (-EINVAL);
-
-	/*
-	 * The Linux dirent64 is bigger than the Solaris dirent64.  To
-	 * avoid inadvertently consuming more of the directory than we can
-	 * pass back to the Linux app, we hand the kernel a smaller buffer
-	 * than the app handed us.
-	 */
-	sbufsz = (lbufsz / 32) * 24;
-
-	sbuf = SAFE_ALLOCA(sbufsz);
-	lbuf = SAFE_ALLOCA(lbufsz);
-	if (sbuf == NULL || lbuf == NULL)
-		return (-ENOMEM);
-
-	if ((bytes = getdents(fd, sbuf, sbufsz)) < 0)
-		return (-errno);
-
-	/* munge the Solaris buffer to a linux buffer. */
-	sd = (struct dirent *)sbuf;
-	ld = (struct lx_dirent64 *)lbuf;
-	rc = 0;
-	while (bytes > 0) {
-		namelen = strlen(sd->d_name);
-		if (namelen >= LX_NAMEMAX)
-			namelen = LX_NAMEMAX - 1;
-		ld->d_ino = (uint64_t)sd->d_ino;
-		ld->d_off = (int64_t)sd->d_off;
-		ld->d_type = 0;
-
-		(void) strncpy(ld->d_name, sd->d_name, namelen);
-		ld->d_name[namelen] = 0;
-		ld->d_reclen = (ushort_t)LX_RECLEN64(namelen);
-
-		bytes -= (int)sd->d_reclen;
-		rc += (int)ld->d_reclen;
-
-		sd = (struct dirent *)(void *)((caddr_t)sd + sd->d_reclen);
-		ld = (struct lx_dirent64 *)(void *)((caddr_t)ld + ld->d_reclen);
-	}
-
-	/* now copy the lbuf to the userland buffer */
-	assert(rc <= lbufsz);
-	if (uucopy(lbuf, buf, rc) != 0)
-		return (-EFAULT);
 
 	return (rc);
 }

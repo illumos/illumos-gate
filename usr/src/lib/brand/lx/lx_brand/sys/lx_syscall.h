@@ -67,8 +67,6 @@ extern long lx_fcntl64(uintptr_t, uintptr_t, uintptr_t);
 extern long lx_flock(uintptr_t, uintptr_t);
 extern long lx_readlink(uintptr_t, uintptr_t, uintptr_t);
 extern long lx_readdir(uintptr_t, uintptr_t, uintptr_t);
-extern long lx_getdents(uintptr_t, uintptr_t, uintptr_t);
-extern long lx_getdents64(uintptr_t, uintptr_t, uintptr_t);
 extern long lx_execve(uintptr_t, uintptr_t, uintptr_t);
 extern long lx_dup2(uintptr_t, uintptr_t);
 extern long lx_dup3(uintptr_t, uintptr_t, uintptr_t);

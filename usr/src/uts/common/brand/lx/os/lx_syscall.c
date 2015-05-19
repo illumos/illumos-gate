@@ -661,7 +661,7 @@ lx_sysent_t lx_sysent32[] = {
 	{"setfsuid16",	NULL,			0,		1}, /* 138 */
 	{"setfsgid16",	NULL,			0,		1}, /* 139 */
 	{"llseek",	NULL,			0,		5}, /* 140 */
-	{"getdents",	NULL,			0,		3}, /* 141 */
+	{"getdents",	lx_getdents_32,		0,		3}, /* 141 */
 	{"select",	NULL,			0,		5}, /* 142 */
 	{"flock",	NULL,			0,		2}, /* 143 */
 	{"msync",	NULL,			0,		3}, /* 144 */
@@ -740,7 +740,7 @@ lx_sysent_t lx_sysent32[] = {
 	{"pivot_root",	NULL,			NOSYS_KERNEL,	0}, /* 217 */
 	{"mincore",	NULL,			0,		3}, /* 218 */
 	{"madvise",	NULL,			0,		3}, /* 219 */
-	{"getdents64",	NULL,			0,		3}, /* 220 */
+	{"getdents64",	lx_getdents64,		0,		3}, /* 220 */
 	{"fcntl64",	lx_fcntl64,		0,		3}, /* 221 */
 	{"tux",		NULL,			NOSYS_NO_EQUIV,	0}, /* 222 */
 	{"security",	NULL,			NOSYS_NO_EQUIV,	0}, /* 223 */
@@ -969,7 +969,7 @@ lx_sysent_t lx_sysent64[] = {
 	{"fdatasync",	NULL,			0,		1}, /* 75 */
 	{"truncate",	NULL,			0,		2}, /* 76 */
 	{"ftruncate",	NULL,			0,		2}, /* 77 */
-	{"getdents",	NULL,			0,		3}, /* 78 */
+	{"getdents",	lx_getdents_64,		0,		3}, /* 78 */
 	{"getcwd",	NULL,			0,		2}, /* 79 */
 	{"chdir",	NULL,			0,		1}, /* 80 */
 	{"fchdir",	NULL,			0,		1}, /* 81 */
@@ -1108,7 +1108,7 @@ lx_sysent_t lx_sysent64[] = {
 	{"epoll_ctl_old", NULL,			NOSYS_NULL,	0}, /* 214 */
 	{"epoll_wait_old", NULL,		NOSYS_NULL,	0}, /* 215 */
 	{"remap_file_pages", NULL,		NOSYS_NO_EQUIV,	0}, /* 216 */
-	{"getdents64",	NULL,			0,		3}, /* 217 */
+	{"getdents64",	lx_getdents64,		0,		3}, /* 217 */
 	{"set_tid_address", lx_set_tid_address, 0,		1}, /* 218 */
 	{"restart_syscall", NULL,		NOSYS_NULL,	0}, /* 219 */
 	{"semtimedop",	NULL,			0,		4}, /* 220 */

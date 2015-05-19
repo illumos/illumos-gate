@@ -992,7 +992,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_fdatasync,			/*  75: fdatasync */
 	lx_truncate,			/*  76: truncate */
 	lx_ftruncate,			/*  77: ftruncate */
-	lx_getdents,			/*  78: getdents */
+	NULL,				/*  78: getdents */
 	lx_getcwd,			/*  79: getcwd */
 	lx_chdir,			/*  80: chdir */
 	lx_fchdir,			/*  81: fchdir */
@@ -1131,7 +1131,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	NULL,				/* 214: epoll_ctl_old */
 	NULL,				/* 215: epoll_wait_old */
 	NULL,				/* 216: remap_file_pages */
-	lx_getdents64,			/* 217: getdents64 */
+	NULL,				/* 217: getdents64 */
 	NULL,				/* 218: set_tid_address */
 	NULL,				/* 219: restart_syscall */
 	lx_semtimedop,			/* 220: semtimedop */
@@ -1386,7 +1386,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_setfsuid16,			/* 138: setfsuid16 */
 	lx_setfsgid16,			/* 139: setfsgid16 */
 	lx_llseek,			/* 140: llseek */
-	lx_getdents,			/* 141: getdents */
+	NULL,				/* 141: getdents */
 	lx_select,			/* 142: select */
 	lx_flock,			/* 143: flock */
 	lx_msync,			/* 144: msync */
@@ -1465,7 +1465,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	NULL,				/* 217: pivot_root */
 	lx_mincore,			/* 218: mincore */
 	lx_madvise,			/* 219: madvise */
-	lx_getdents64,			/* 220: getdents64 */
+	NULL,				/* 220: getdents64 */
 	NULL,				/* 221: fcntl64 */
 	NULL,				/* 222: tux */
 	NULL,				/* 223: security */
