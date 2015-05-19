@@ -712,7 +712,8 @@ ltos_xform_cmsgs(struct lx_msghdr *msg, struct cmsghdr *ntv_cmsg)
 		lcmsg = LX_CMSG_NXTHDR(msg, last);
 
 		lp = cmsg;
-		cmsg = CMSG_NXTHDR(msg, lp);
+		cmsg = (struct cmsghdr *)_CMSG_HDR_ALIGN((char *)cmsg +
+		    cmsg->cmsg_len);
 
 		nlen += (int)((uint64_t)cmsg - (uint64_t)lp);
 	}
@@ -2252,10 +2253,10 @@ long
 lx_sendmsg(int sockfd, void *lmp, int flags)
 {
 	struct lx_msghdr msg;
-	struct sockaddr *name;
-	struct cmsghdr *cmsg;
+	struct sockaddr *name = NULL;
+	struct cmsghdr *cmsg = NULL;
 	void *new_cmsg = NULL;
-	int r, size;
+	int r, size, res;
 	lx_addr_type_t type;
 	socklen_t len;
 
@@ -2278,13 +2279,17 @@ lx_sendmsg(int sockfd, void *lmp, int flags)
 		size = calc_addr_size(msg.msg_name, msg.msg_namelen, &type);
 		if (size < 0)
 			return (size);
-		if ((name = SAFE_ALLOCA(size)) == NULL)
-			return (-ENOMEM);
+		if ((name = malloc(size)) == NULL) {
+			res = -ENOMEM;
+			goto err;
+		}
 		bzero(name, size);
 
 		if ((r = ltos_sockaddr(name, &len, msg.msg_name,
-		    msg.msg_namelen, type)) < 0)
-			return (r);
+		    msg.msg_namelen, type)) < 0) {
+			res = r;
+			goto err;
+		}
 		msg.msg_name = name;
 		msg.msg_namelen = len;
 	}
@@ -2297,9 +2302,11 @@ lx_sendmsg(int sockfd, void *lmp, int flags)
 		if (msg.msg_controllen == 0) {
 			cmsg = NULL;
 		} else {
-			cmsg = SAFE_ALLOCA(msg.msg_controllen);
-			if (cmsg == NULL)
-				return (-EINVAL);
+			cmsg = malloc(msg.msg_controllen);
+			if (cmsg == NULL) {
+				res = -EINVAL;
+				goto err;
+			}
 #if defined(_LP64)
 			/*
 			 * We don't know in advance how many control msgs
@@ -2308,18 +2315,23 @@ lx_sendmsg(int sockfd, void *lmp, int flags)
 			 * the same size will over-estimate what we actually
 			 * need.
 			 */
-			new_cmsg = SAFE_ALLOCA(msg.msg_controllen);
-			if (new_cmsg == NULL)
-				return (-EINVAL);
+			new_cmsg = malloc(msg.msg_controllen);
+			if (new_cmsg == NULL) {
+				res = -EINVAL;
+				goto err;
+			}
 #endif
 		}
-		if ((uucopy(msg.msg_control, cmsg,
-		    msg.msg_controllen)) != 0)
-			return (-errno);
+		if ((uucopy(msg.msg_control, cmsg, msg.msg_controllen)) != 0) {
+			res = -errno;
+			goto err;
+		}
 		msg.msg_control = cmsg;
 		if ((r = convert_cmsgs(LX_TO_SOL, &msg, new_cmsg,
-		    "sendmsg()")) != 0)
-			return (-r);
+		    "sendmsg()")) != 0) {
+			res = -r;
+			goto err;
+		}
 	}
 
 	/*
@@ -2354,12 +2366,22 @@ lx_sendmsg(int sockfd, void *lmp, int flags)
 		 * this case is EPIPE.
 		 */
 		if (errno == ENOTCONN)
-			return (-EPIPE);
+			res = -EPIPE;
 		else
-			return (-errno);
+			res = -errno;
+		goto err;
 	}
 
-	return (r);
+	res = r;
+
+err:
+	if (name != NULL)
+		free(name);
+	if (cmsg != NULL)
+		free(cmsg);
+	if (new_cmsg != NULL)
+		free(new_cmsg);
+	return (res);
 }
 
 long
