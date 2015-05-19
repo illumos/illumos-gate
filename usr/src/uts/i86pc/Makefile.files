@@ -110,6 +110,7 @@ CORE_OBJS +=			\
 	ppage.o			\
 	pwrnow.o		\
 	speedstep.o		\
+	ssp.o			\
 	startup.o		\
 	timestamp.o		\
 	todpc_subr.o		\

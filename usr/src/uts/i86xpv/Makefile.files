@@ -94,6 +94,7 @@ CORE_OBJS +=			\
 	pmem.o			\
 	ppage.o			\
 	startup.o		\
+	ssp.o			\
 	xpv_timestamp.o		\
 	todpc_subr.o		\
 	trap.o			\
