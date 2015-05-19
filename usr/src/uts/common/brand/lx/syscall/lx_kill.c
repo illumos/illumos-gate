@@ -355,9 +355,11 @@ lx_helper_rt_tgsigqueueinfo(pid_t tgid, pid_t tid, int sig, siginfo_t *uinfo)
 		return (set_errno(ESRCH));
 	/*
 	 * For group leaders, solaris pid == linux pid, so the solaris leader
-	 * pid should be the same as the tgid.
+	 * pid should be the same as the tgid but since the tgid comes in via
+	 * the syscall we need to check for an invalid value.
 	 */
-	ASSERT(s_pid == tgid);
+	if (s_pid != tgid)
+		return (set_errno(EINVAL));
 
 	mutex_enter(&pidlock);
 	target_proc = prfind(s_pid);
