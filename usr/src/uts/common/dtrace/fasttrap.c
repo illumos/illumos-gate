@@ -943,7 +943,6 @@ fasttrap_pid_enable(void *arg, dtrace_id_t id, void *parg)
 		 * Confirm that curproc is indeed forking the process in which
 		 * we're trying to enable probes.
 		 */
-		ASSERT(p != NULL);
 		ASSERT(p->p_parent == curproc);
 		ASSERT(p->p_stat == SIDL);
 
