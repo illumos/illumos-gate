@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2013, 2014 by Delphix. All rights reserved.
+ * Copyright (c) 2015, Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -847,9 +848,9 @@ zfs_link_destroy(zfs_dirlock_t *dl, znode_t *zp, dmu_tx_t *tx, int flag,
 		if (zp->z_links <= zp_is_dir) {
 			zfs_panic_recover("zfs: link count on %s is %u, "
 			    "should be at least %u",
-			    zp->z_vnode->v_path ? zp->z_vnode->v_path :
-			    "<unknown>", (int)zp->z_links,
-			    zp_is_dir + 1);
+			    zp->z_vnode->v_path != vn_vpath_empty ?
+			    zp->z_vnode->v_path : "<unknown>",
+			    (int)zp->z_links, zp_is_dir + 1);
 			zp->z_links = zp_is_dir + 1;
 		}
 		if (--zp->z_links == zp_is_dir) {

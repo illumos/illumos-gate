@@ -986,8 +986,8 @@ static void
 vnode_clear_vpath(vnode_t *vp, char *vpath_old)
 {
 	mutex_enter(&vp->v_lock);
-	if (vp->v_path != NULL && vp->v_path == vpath_old) {
-		vp->v_path = NULL;
+	if (vp->v_path != vn_vpath_empty && vp->v_path == vpath_old) {
+		vp->v_path = vn_vpath_empty;
 		mutex_exit(&vp->v_lock);
 		kmem_free(vpath_old, strlen(vpath_old) + 1);
 	} else {
@@ -1185,7 +1185,7 @@ dirtopath(vnode_t *vrootp, vnode_t *vp, char *buf, size_t buflen, int flags,
 		vpath_cached = NULL;
 		vpath_stale = B_FALSE;
 		mutex_enter(&vp->v_lock);
-		if ((vp->v_path != NULL) &&
+		if (vp->v_path != vn_vpath_empty &&
 		    pn_set(&pn, vp->v_path) == 0) {
 			vpath_cached = vp->v_path;
 			mutex_exit(&vp->v_lock);
@@ -1266,8 +1266,9 @@ dirtopath(vnode_t *vrootp, vnode_t *vp, char *buf, size_t buflen, int flags,
 		*--bufloc = '/';
 
 		/* Clear vp->v_path if it was found to be stale. */
-		if (vpath_stale == B_TRUE)
+		if (vpath_stale == B_TRUE) {
 			vnode_clear_vpath(vp, vpath_cached);
+		}
 
 		/* And continue with the next component */
 		VN_RELE(vp);
@@ -1366,7 +1367,7 @@ vnodetopath_common(vnode_t *vrootp, vnode_t *vp, char *buf, size_t buflen,
 	 */
 	pn_alloc(&pn);
 	mutex_enter(&vp->v_lock);
-	if (vp->v_path != NULL) {
+	if (vp->v_path != vn_vpath_empty) {
 		(void) pn_set(&pn, vp->v_path);
 		mutex_exit(&vp->v_lock);
 

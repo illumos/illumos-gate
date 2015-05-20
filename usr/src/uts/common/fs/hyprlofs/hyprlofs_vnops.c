@@ -867,7 +867,7 @@ hyprlofs_get_all_entries(vnode_t *dvp, hyprlofs_curr_entry_t *hcp,
 				}
 
 				tvp = REALVP(HLNTOV(fndhp));
-				if (tvp->v_path == NULL) {
+				if (tvp->v_path == vn_vpath_empty) {
 					p = "<unknown>";
 				} else {
 					p = tvp->v_path;

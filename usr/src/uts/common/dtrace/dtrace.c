@@ -785,8 +785,8 @@ dtrace_canload(uint64_t addr, size_t sz, dtrace_mstate_t *mstate,
 			if (DTRACE_INRANGE(addr, sz, &vp->v_path, psz))
 				return (1);
 
-			if (vp->v_path != NULL && DTRACE_INRANGE(addr, sz,
-			    vp->v_path, strlen(vp->v_path) + 1)) {
+			if (DTRACE_INRANGE(addr, sz, vp->v_path,
+			    strlen(vp->v_path) + 1)) {
 				return (1);
 			}
 

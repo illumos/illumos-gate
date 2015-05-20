@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2014, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2015, Joyent, Inc.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -235,7 +235,8 @@ fsop_root(vfs_t *vfsp, vnode_t **vpp)
 	 * Make sure this root has a path.  With lofs, it is possible to have
 	 * a NULL mountpoint.
 	 */
-	if (ret == 0 && vfsp->vfs_mntpt != NULL && (*vpp)->v_path == NULL) {
+	if (ret == 0 && vfsp->vfs_mntpt != NULL &&
+	    (*vpp)->v_path == vn_vpath_empty) {
 		mntpt = vfs_getmntpoint(vfsp);
 		vn_setpath_str(*vpp, refstr_value(mntpt),
 		    strlen(refstr_value(mntpt)));

@@ -23,7 +23,7 @@
  * Copyright (c) 2011 Bayard G. Bell. All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
  * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
- * Copyright (c) 2012 Joyent, Inc. All rights reserved.
+ * Copyright (c) 2015, Joyent, Inc.
  */
 
 /*
@@ -3212,7 +3212,7 @@ nfs_getflabel(vnode_t *vp, struct exportinfo *exi)
 	char *path;
 
 	mutex_enter(&vp->v_lock);
-	if (vp->v_path != NULL) {
+	if (vp->v_path != vn_vpath_empty) {
 		zone = zone_find_by_any_path(vp->v_path, B_FALSE);
 		mutex_exit(&vp->v_lock);
 	} else {

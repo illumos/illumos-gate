@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2014, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2015, Joyent, Inc.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -102,6 +102,9 @@ kmutex_t	vskstat_tree_lock;
 
 /* Global variable which enables/disables the vopstats collection */
 int vopstats_enabled = 1;
+
+/* Global used for empty/invalid v_path */
+char *vn_vpath_empty = "";
 
 /*
  * forward declarations for internal vnode specific data (vsd)
@@ -2290,7 +2293,7 @@ vn_cache_constructor(void *buf, void *cdrarg, int kmflags)
 	cv_init(&vp->v_cv, NULL, CV_DEFAULT, NULL);
 	rw_init(&vp->v_nbllock, NULL, RW_DEFAULT, NULL);
 	vp->v_femhead = NULL;	/* Must be done before vn_reinit() */
-	vp->v_path = NULL;
+	vp->v_path = vn_vpath_empty;
 	vp->v_mpssdata = NULL;
 	vp->v_vsd = NULL;
 	vp->v_fopdata = NULL;
@@ -2337,6 +2340,7 @@ void
 vn_recycle(vnode_t *vp)
 {
 	ASSERT(vp->v_pages == NULL);
+	VERIFY(vp->v_path != NULL);
 
 	/*
 	 * XXX - This really belongs in vn_reinit(), but we have some issues
@@ -2359,9 +2363,9 @@ vn_recycle(vnode_t *vp)
 		kmem_free(vp->v_femhead, sizeof (*(vp->v_femhead)));
 		vp->v_femhead = NULL;
 	}
-	if (vp->v_path) {
+	if (vp->v_path != vn_vpath_empty) {
 		kmem_free(vp->v_path, strlen(vp->v_path) + 1);
-		vp->v_path = NULL;
+		vp->v_path = vn_vpath_empty;
 	}
 
 	if (vp->v_fopdata != NULL) {
@@ -2433,9 +2437,10 @@ vn_free(vnode_t *vp)
 	 */
 	ASSERT((vp->v_count == 0) || (vp->v_count == 1));
 	ASSERT(vp->v_count_dnlc == 0);
-	if (vp->v_path != NULL) {
+	VERIFY(vp->v_path != NULL);
+	if (vp->v_path != vn_vpath_empty) {
 		kmem_free(vp->v_path, strlen(vp->v_path) + 1);
-		vp->v_path = NULL;
+		vp->v_path = vn_vpath_empty;
 	}
 
 	/* If FEM was in use, make sure everything gets cleaned up */
@@ -2959,7 +2964,7 @@ vn_setpath(vnode_t *rootvp, struct vnode *startvp, struct vnode *vp,
 	 * the potential for deadlock.
 	 */
 	mutex_enter(&base->v_lock);
-	if (base->v_path == NULL) {
+	if (base->v_path == vn_vpath_empty) {
 		mutex_exit(&base->v_lock);
 		return;
 	}
@@ -2986,7 +2991,8 @@ vn_setpath(vnode_t *rootvp, struct vnode *startvp, struct vnode *vp,
 	rpath = kmem_alloc(rpathalloc, KM_SLEEP);
 
 	mutex_enter(&base->v_lock);
-	if (base->v_path == NULL || strlen(base->v_path) != rpathlen) {
+	if (base->v_path == vn_vpath_empty ||
+	    strlen(base->v_path) != rpathlen) {
 		mutex_exit(&base->v_lock);
 		kmem_free(rpath, rpathalloc);
 		return;
@@ -3000,7 +3006,7 @@ vn_setpath(vnode_t *rootvp, struct vnode *startvp, struct vnode *vp,
 	rpath[rpathlen + plen] = '\0';
 
 	mutex_enter(&vp->v_lock);
-	if (vp->v_path != NULL) {
+	if (vp->v_path != vn_vpath_empty) {
 		mutex_exit(&vp->v_lock);
 		kmem_free(rpath, rpathalloc);
 	} else {
@@ -3020,7 +3026,7 @@ vn_setpath_str(struct vnode *vp, const char *str, size_t len)
 	char *buf = kmem_alloc(len + 1, KM_SLEEP);
 
 	mutex_enter(&vp->v_lock);
-	if (vp->v_path != NULL) {
+	if (vp->v_path != vn_vpath_empty) {
 		mutex_exit(&vp->v_lock);
 		kmem_free(buf, len + 1);
 		return;
@@ -3044,10 +3050,10 @@ vn_renamepath(vnode_t *dvp, vnode_t *vp, const char *nm, size_t len)
 
 	mutex_enter(&vp->v_lock);
 	tmp = vp->v_path;
-	vp->v_path = NULL;
+	vp->v_path = vn_vpath_empty;
 	mutex_exit(&vp->v_lock);
 	vn_setpath(rootdir, dvp, vp, nm, len);
-	if (tmp != NULL)
+	if (tmp != vn_vpath_empty)
 		kmem_free(tmp, strlen(tmp) + 1);
 }
 
@@ -3062,7 +3068,7 @@ vn_copypath(struct vnode *src, struct vnode *dst)
 	int alloc;
 
 	mutex_enter(&src->v_lock);
-	if (src->v_path == NULL) {
+	if (src->v_path == vn_vpath_empty) {
 		mutex_exit(&src->v_lock);
 		return;
 	}
@@ -3072,7 +3078,7 @@ vn_copypath(struct vnode *src, struct vnode *dst)
 	mutex_exit(&src->v_lock);
 	buf = kmem_alloc(alloc, KM_SLEEP);
 	mutex_enter(&src->v_lock);
-	if (src->v_path == NULL || strlen(src->v_path) + 1 != alloc) {
+	if (src->v_path == vn_vpath_empty || strlen(src->v_path) + 1 != alloc) {
 		mutex_exit(&src->v_lock);
 		kmem_free(buf, alloc);
 		return;
@@ -3081,7 +3087,7 @@ vn_copypath(struct vnode *src, struct vnode *dst)
 	mutex_exit(&src->v_lock);
 
 	mutex_enter(&dst->v_lock);
-	if (dst->v_path != NULL) {
+	if (dst->v_path != vn_vpath_empty) {
 		mutex_exit(&dst->v_lock);
 		kmem_free(buf, alloc);
 		return;
@@ -3520,7 +3526,7 @@ fop_lookup(
 	}
 	if (ret == 0 && *vpp) {
 		VOPSTATS_UPDATE(*vpp, lookup);
-		if ((*vpp)->v_path == NULL) {
+		if ((*vpp)->v_path == vn_vpath_empty) {
 			vn_setpath(rootdir, dvp, *vpp, nm, strlen(nm));
 		}
 	}
@@ -3562,7 +3568,7 @@ fop_create(
 	    (dvp, name, vap, excl, mode, vpp, cr, flags, ct, vsecp);
 	if (ret == 0 && *vpp) {
 		VOPSTATS_UPDATE(*vpp, create);
-		if ((*vpp)->v_path == NULL) {
+		if ((*vpp)->v_path == vn_vpath_empty) {
 			vn_setpath(rootdir, dvp, *vpp, name, strlen(name));
 		}
 	}
@@ -3684,7 +3690,7 @@ fop_mkdir(
 	    (dvp, dirname, vap, vpp, cr, ct, flags, vsecp);
 	if (ret == 0 && *vpp) {
 		VOPSTATS_UPDATE(*vpp, mkdir);
-		if ((*vpp)->v_path == NULL) {
+		if ((*vpp)->v_path == vn_vpath_empty) {
 			vn_setpath(rootdir, dvp, *vpp, dirname,
 			    strlen(dirname));
 		}
