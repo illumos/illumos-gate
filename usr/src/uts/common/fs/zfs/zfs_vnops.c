@@ -23,7 +23,7 @@
  * Copyright (c) 2012, 2015 by Delphix. All rights reserved.
  * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2014 Integros [integros.com]
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2015 Joyent, Inc.  All rights reserved.
  */
 
 /* Portions Copyright 2007 Jeremy Teo */
@@ -664,6 +664,7 @@ zfs_write(vnode_t *vp, uio_t *uio, int ioflag, cred_t *cr, caller_context_t *ct)
 	rl_t		*rl;
 	int		max_blksz = zfsvfs->z_max_blksz;
 	int		error = 0;
+	int		prev_error;
 	arc_buf_t	*abuf;
 	iovec_t		*aiov = NULL;
 	xuio_t		*xuio = NULL;
@@ -968,7 +969,6 @@ zfs_write(vnode_t *vp, uio_t *uio, int ioflag, cred_t *cr, caller_context_t *ct)
 		while ((end_size = zp->z_size) < uio->uio_loffset) {
 			(void) atomic_cas_64(&zp->z_size, end_size,
 			    uio->uio_loffset);
-			ASSERT(error == 0);
 		}
 		/*
 		 * If we are replaying and eof is non zero then force
@@ -978,12 +978,17 @@ zfs_write(vnode_t *vp, uio_t *uio, int ioflag, cred_t *cr, caller_context_t *ct)
 		if (zfsvfs->z_replay && zfsvfs->z_replay_eof != 0)
 			zp->z_size = zfsvfs->z_replay_eof;
 
+		/*
+		 * Keep track of a possible pre-existing error from a partial
+		 * write via dmu_write_uio_dbuf above.
+		 */
+		prev_error = error;
 		error = sa_bulk_update(zp->z_sa_hdl, bulk, count, tx);
 
 		zfs_log_write(zilog, tx, TX_WRITE, zp, woff, tx_bytes, ioflag);
 		dmu_tx_commit(tx);
 
-		if (error != 0)
+		if (prev_error != 0 || error != 0)
 			break;
 		ASSERT(tx_bytes == nbytes);
 		n -= nbytes;
