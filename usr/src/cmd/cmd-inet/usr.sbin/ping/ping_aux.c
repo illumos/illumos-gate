@@ -28,11 +28,13 @@
 /*	  All Rights Reserved  	*/
 
 /*
+ * Copyright 2015, Joyent, Inc.
+ */
+
+/*
  * Portions of this source code were derived from Berkeley 4.3 BSD
  * under license from the Regents of the University of California.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <string.h>
@@ -233,9 +235,10 @@ check_reply(struct addrinfo *ai_dst, struct msghdr *msg, int cc,
 	int hlen, hlen1;
 	int64_t triptime;
 	boolean_t valid_reply = _B_FALSE;
-	boolean_t reply_matched_current_target;	/* Is the source address of */
-						/* this reply same as where */
-						/* we're sending currently? */
+	boolean_t reply_matched_current_target = _B_FALSE; /* Is the source */
+						/* address of this reply same */
+						/* as where we're sending */
+						/* currently? */
 	boolean_t last_reply_from_targetaddr = _B_FALSE; /* Is this stats, */
 						/* probe all with npackets>0 */
 						/* and we received reply for */
@@ -282,7 +285,7 @@ check_reply(struct addrinfo *ai_dst, struct msghdr *msg, int cc,
 	/* LINTED */
 	intp = (int32_t *)buf;
 
-	(void) gettimeofday(&tv, (struct timezone *)NULL);
+	ping_gettime(msg, &tv);
 
 	/* LINTED */
 	ip = (struct ip *)buf;
@@ -352,8 +355,8 @@ check_reply(struct addrinfo *ai_dst, struct msghdr *msg, int cc,
 			nreceived++;
 			reply_matched_current_target =
 			    seq_match(current_targetaddr->starting_seq_num,
-				current_targetaddr->num_sent,
-				ntohs(up->uh_dport));
+			    current_targetaddr->num_sent,
+			    ntohs(up->uh_dport));
 			if (reply_matched_current_target) {
 				current_targetaddr->got_reply = _B_TRUE;
 				nreceived_last_target++;
@@ -552,8 +555,8 @@ check_reply(struct addrinfo *ai_dst, struct msghdr *msg, int cc,
 			nreceived++;
 			reply_matched_current_target =
 			    seq_match(current_targetaddr->starting_seq_num,
-				current_targetaddr->num_sent,
-				ntohs(icp->icmp_seq));
+			    current_targetaddr->num_sent,
+			    ntohs(icp->icmp_seq));
 			if (reply_matched_current_target) {
 				current_targetaddr->got_reply = _B_TRUE;
 				nreceived_last_target++;
@@ -863,8 +866,8 @@ check_reply(struct addrinfo *ai_dst, struct msghdr *msg, int cc,
 			nreceived++;
 			reply_matched_current_target =
 			    seq_match(current_targetaddr->starting_seq_num,
-				current_targetaddr->num_sent,
-				ntohs(icp->icmp_seq));
+			    current_targetaddr->num_sent,
+			    ntohs(icp->icmp_seq));
 			if (reply_matched_current_target) {
 				current_targetaddr->got_reply = _B_TRUE;
 				nreceived_last_target++;

@@ -28,11 +28,13 @@
 /*	  All Rights Reserved  	*/
 
 /*
+ * Copyright 2015, Joyent, Inc.
+ */
+
+/*
  * Portions of this source code were derived from Berkeley 4.3 BSD
  * under license from the Regents of the University of California.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <string.h>
@@ -236,7 +238,7 @@ set_ancillary_data(struct msghdr *msgp, int hoplimit,
 		 * therefore let's use bcopy, instead of assignment.
 		 */
 		(void) bcopy(&in6addr_any, &pktinfop->ipi6_addr,
-		sizeof (struct in6_addr));
+		    sizeof (struct in6_addr));
 
 		/*
 		 *  We can assume pktinfop->ipi6_ifindex is 32 bit aligned.
@@ -271,9 +273,10 @@ check_reply6(struct addrinfo *ai_dst, struct msghdr *msg, int cc,
 	struct timeval *tp;
 	int64_t triptime;
 	boolean_t valid_reply = _B_FALSE;
-	boolean_t reply_matched_current_target;	/* Is the source address of */
-						/* this reply same as where */
-						/* we're sending currently? */
+	boolean_t reply_matched_current_target = _B_FALSE; /* Is the source */
+						/* address of this reply same */
+						/* as where we're sending */
+						/* currently? */
 	boolean_t last_reply_from_targetaddr = _B_FALSE; /* Is this stats, */
 						/* probe all with npackets>0 */
 						/* and we received reply for */
@@ -309,8 +312,7 @@ check_reply6(struct addrinfo *ai_dst, struct msghdr *msg, int cc,
 	/* LINTED */
 	intp = (int32_t *)buf;
 
-	/* get time now for most accurate time calculation */
-	(void) gettimeofday(&tv, (struct timezone *)NULL);
+	ping_gettime(msg, &tv);
 
 	/* Ignore packets > 64k or control buffers that don't fit */
 	if (msg->msg_flags & (MSG_TRUNC|MSG_CTRUNC)) {
@@ -341,7 +343,7 @@ check_reply6(struct addrinfo *ai_dst, struct msghdr *msg, int cc,
 				Printf("packet too short (%d bytes) from %s\n",
 				    cc,
 				    pr_name((char *)&from6->sin6_addr,
-					AF_INET6));
+				    AF_INET6));
 			}
 			return;
 		}
@@ -362,7 +364,7 @@ check_reply6(struct addrinfo *ai_dst, struct msghdr *msg, int cc,
 				Printf("packet too short (%d bytes) from %s\n",
 				    cc,
 				    pr_name((char *)&from6->sin6_addr,
-					AF_INET6));
+				    AF_INET6));
 			}
 			return;
 		}
@@ -389,8 +391,8 @@ check_reply6(struct addrinfo *ai_dst, struct msghdr *msg, int cc,
 			nreceived++;
 			reply_matched_current_target =
 			    seq_match(current_targetaddr->starting_seq_num,
-				current_targetaddr->num_sent,
-				ntohs(up->uh_dport));
+			    current_targetaddr->num_sent,
+			    ntohs(up->uh_dport));
 			if (reply_matched_current_target) {
 				current_targetaddr->got_reply = _B_TRUE;
 				nreceived_last_target++;
@@ -489,12 +491,12 @@ check_reply6(struct addrinfo *ai_dst, struct msghdr *msg, int cc,
 				Printf("ICMPv6 %d Unreachable from gateway "
 				    "%s\n", icmp6->icmp6_code,
 				    pr_name((char *)&from6->sin6_addr,
-					AF_INET6));
+				    AF_INET6));
 			} else {
 				Printf("ICMPv6 %s from gateway %s\n",
 				    unreach6[icmp6->icmp6_code],
 				    pr_name((char *)&from6->sin6_addr,
-					AF_INET6));
+				    AF_INET6));
 			}
 			Printf(" for %s from %s", pr_protocol(last_hdr),
 			    pr_name((char *)&ip6h->ip6_src, AF_INET6));
@@ -584,7 +586,7 @@ check_reply6(struct addrinfo *ai_dst, struct msghdr *msg, int cc,
 				Printf("packet too short (%d bytes) from %s\n",
 				    cc,
 				    pr_name((char *)&from6->sin6_addr,
-					AF_INET6));
+				    AF_INET6));
 			}
 			return;
 		}
@@ -596,12 +598,12 @@ check_reply6(struct addrinfo *ai_dst, struct msghdr *msg, int cc,
 				Printf("ICMPv6 %d time exceeded from %s\n",
 				    icmp6->icmp6_code,
 				    pr_name((char *)&from6->sin6_addr,
-					AF_INET6));
+				    AF_INET6));
 			} else {
 				Printf("ICMPv6 %s from %s\n",
 				    timexceed6[icmp6->icmp6_code],
 				    pr_name((char *)&from6->sin6_addr,
-					AF_INET6));
+				    AF_INET6));
 			}
 			Printf(" for %s from %s", pr_protocol(last_hdr),
 			    pr_name((char *)&ip6h->ip6_src, AF_INET6));
@@ -627,7 +629,7 @@ check_reply6(struct addrinfo *ai_dst, struct msghdr *msg, int cc,
 				Printf("packet too short (%d bytes) from %s\n",
 				    cc,
 				    pr_name((char *)&from6->sin6_addr,
-					AF_INET6));
+				    AF_INET6));
 			}
 			return;
 		}
@@ -639,12 +641,12 @@ check_reply6(struct addrinfo *ai_dst, struct msghdr *msg, int cc,
 				Printf("ICMPv6 %d parameter problem from %s\n",
 				    icmp6->icmp6_code,
 				    pr_name((char *)&from6->sin6_addr,
-					AF_INET6));
+				    AF_INET6));
 			} else {
 				Printf("ICMPv6 %s from %s\n",
 				    param_prob6[icmp6->icmp6_code],
 				    pr_name((char *)&from6->sin6_addr,
-					AF_INET6));
+				    AF_INET6));
 			}
 			icmp6->icmp6_pptr = ntohl(icmp6->icmp6_pptr);
 			Printf(" in byte %d", icmp6->icmp6_pptr);
@@ -692,8 +694,8 @@ check_reply6(struct addrinfo *ai_dst, struct msghdr *msg, int cc,
 			nreceived++;
 			reply_matched_current_target =
 			    seq_match(current_targetaddr->starting_seq_num,
-				current_targetaddr->num_sent,
-				ntohs(icmp6->icmp6_seq));
+			    current_targetaddr->num_sent,
+			    ntohs(icmp6->icmp6_seq));
 			if (reply_matched_current_target) {
 				current_targetaddr->got_reply = _B_TRUE;
 				nreceived_last_target++;
@@ -859,7 +861,7 @@ check_reply6(struct addrinfo *ai_dst, struct msghdr *msg, int cc,
 				Printf("packet too short (%d bytes) from %s\n",
 				    cc,
 				    pr_name((char *)&from6->sin6_addr,
-					AF_INET6));
+				    AF_INET6));
 			}
 			return;
 		}

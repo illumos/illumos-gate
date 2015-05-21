@@ -27,7 +27,9 @@
 #ifndef _PING_H
 #define	_PING_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <sys/uio.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -130,6 +132,8 @@ extern boolean_t use_icmp_ts;
 extern boolean_t use_udp;
 extern boolean_t verbose;
 extern boolean_t send_reply;
+
+extern void ping_gettime(struct msghdr *, struct timeval *);
 
 #ifdef __cplusplus
 }
