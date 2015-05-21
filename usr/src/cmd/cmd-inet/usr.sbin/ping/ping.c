@@ -37,6 +37,11 @@
  * contributors.
  */
 
+/*
+ * Copyright 2015, Joyent, Inc.
+ */
+
+#include <assert.h>
 #include <stdio.h>
 #include <strings.h>
 #include <errno.h>
@@ -45,6 +50,9 @@
 #include <signal.h>
 #include <limits.h>
 #include <math.h>
+#include <locale.h>
+#include <thread.h>
+#include <synch.h>
 
 #include <sys/time.h>
 #include <sys/param.h>
@@ -53,6 +61,7 @@
 #include <sys/stropts.h>
 #include <sys/file.h>
 #include <sys/sysmacros.h>
+#include <sys/debug.h>
 
 #include <arpa/inet.h>
 #include <net/if.h>
@@ -153,7 +162,6 @@ static int eff_num_gw;			/* effective number of gateways */
 static int num_wraps = -1;		/* no of times 64K icmp_seq wrapped */
 static ushort_t dest_port = 32768 + 666; /* starting port for the UDP probes */
 static char *gw_list[MAXMAX_GWS];	/* list of gateways as user enters */
-static int interval = 1;		/* interval between transmissions */
 static int options;			/* socket options */
 static int moptions;			/* multicast options */
 int npackets;				/* number of packets to send */
@@ -164,6 +172,22 @@ static int timeout = TIMEOUT;		/* timeout value (sec) for probes */
 static struct if_entry out_if;		/* interface argument */
 int ident;				/* ID for this ping run */
 static hrtime_t t_last_probe_sent;	/* the time we sent the last probe */
+static timer_t timer;			/* timer for waiting */
+static volatile boolean_t timer_done = _B_FALSE; /* timer finished? */
+static struct itimerspec interval = { { 0, 0 }, { 1, 0 } }; /* Interval for */
+					/* -I. The default interval is 1s. */
+static hrtime_t mintime = NSEC2MSEC(500);	/* minimum time between pings */
+
+/*
+ * Globals for our name services warning. See ns_warning_thr() for more on why
+ * this exists.
+ */
+static mutex_t ns_lock = ERRORCHECKMUTEX; /* Protects the following data */
+static boolean_t ns_active = _B_FALSE;	/* Lookup is going on */
+static hrtime_t ns_starttime;		/* Time the lookup started */
+static int ns_sleeptime = 2;		/* Time in seconds between checks */
+static int ns_warntime = 2;		/* Time in seconds before warning */
+static int ns_warninter = 60;		/* Time in seconds between warnings */
 
 /*
  * This buffer stores the received packets. Currently it needs to be 32 bit
@@ -203,6 +227,8 @@ static ushort_t in_cksum(ushort_t *, int);
 static int int_arg(char *s, char *what);
 boolean_t is_a_target(struct addrinfo *, union any_in_addr *);
 static void mirror_gws(union any_in_addr *, int);
+static void *ns_warning_thr(void *);
+static void parse_interval(char *s);
 static void pinger(int, struct sockaddr *, struct msghdr *, int);
 char *pr_name(char *, int);
 char *pr_protocol(int);
@@ -248,6 +274,8 @@ main(int argc, char *argv[])
 	boolean_t has_sys_ip_config;
 
 	progname = argv[0];
+
+	(void) setlocale(LC_ALL, "");
 
 	/*
 	 * This program needs the net_icmpaccess privilege for creating
@@ -322,7 +350,7 @@ main(int argc, char *argv[])
 
 		case 'I':
 			stats = _B_TRUE;
-			interval = int_arg(optarg, "interval");
+			parse_interval(optarg);
 			break;
 
 		case 'i':
@@ -687,6 +715,23 @@ main(int argc, char *argv[])
 			Printf("PING %s (%s): %d data bytes\n",
 			    targethost, abuf, datalen);
 		}
+	}
+
+	/* Create our timer for future use */
+	if (timer_create(CLOCK_REALTIME, NULL, &timer) != 0) {
+		Fprintf(stderr, "%s: failed to create timer: %s\n",
+		    progname, strerror(errno));
+		exit(EXIT_FAILURE);
+	}
+
+	/*
+	 * Finally start up the name services warning thread.
+	 */
+	if (thr_create(NULL, 0, ns_warning_thr, NULL,
+	    THR_DETACHED | THR_DAEMON, NULL) != 0) {
+		Fprintf(stderr, "%s: failed to create name services "
+		    "thread: %s\n", progname, strerror(errno));
+		exit(EXIT_FAILURE);
 	}
 
 	/* Let's get things going */
@@ -1142,8 +1187,8 @@ select_src_addr(union any_in_addr *dst_addr, int family,
     union any_in_addr *src_addr)
 {
 	struct sockaddr *sock;
-	struct sockaddr_in *sin;
-	struct sockaddr_in6 *sin6;
+	struct sockaddr_in *sin = NULL;
+	struct sockaddr_in6 *sin6 = NULL;
 	int tmp_fd;
 	size_t sock_len;
 
@@ -1202,8 +1247,10 @@ select_src_addr(union any_in_addr *dst_addr, int family,
 	}
 
 	if (family == AF_INET) {
+		assert(sin != NULL);
 		src_addr->addr = sin->sin_addr;
 	} else {
+		assert(sin6 != NULL);
 		src_addr->addr6 = sin6->sin6_addr;
 	}
 
@@ -1606,6 +1653,14 @@ setup_socket(int family, int *send_sockp, int *recv_sockp, int *if_index,
 		}
 	}
 
+	/* Ensure that timestamping is requested on the receive socket */
+	if (setsockopt(recv_sock, SOL_SOCKET, SO_TIMESTAMP,
+	    &on, sizeof (on)) == -1) {
+		Fprintf(stderr, "%s: warning: timing accuracy diminished -- "
+		    "setsockopt SO_TIMESTAMP failed %s", progname,
+		    strerror(errno));
+	}
+
 	*send_sockp = send_sock;
 	*recv_sockp = recv_sock;
 
@@ -1683,14 +1738,21 @@ void
 sigalrm_handler(void)
 {
 	/*
-	 * Guard againist denial-of-service attacks. Make sure ping doesn't
-	 * send probes for every SIGALRM it receives. Evil hacker can generate
-	 * SIGALRMs as fast as it can, but ping will ignore those which are
-	 * received too soon (earlier than 0.5 sec) after it sent the last
-	 * probe.  We use gethrtime() instead of gettimeofday() because
-	 * the latter is not linear and is prone to resetting or drifting
+	 * If we've been told that we're done, the timer should be cancelled
+	 * and not rescheduled, just return.
 	 */
-	if ((gethrtime() - t_last_probe_sent) < 500000000) {
+	if (timer_done == _B_TRUE)
+		return;
+
+	/*
+	 * Guard against denial-of-service attacks. Make sure ping doesn't send
+	 * probes for every SIGALRM it receives in the case of errant SIGALRMs.
+	 * ping will ignore those which are received too soon (the smaller of
+	 * 0.5 sec and the ping interval, if in effect) after it sent the last
+	 * probe.  We use gethrtime() instead of gettimeofday() because the
+	 * latter is not linear and is prone to resetting or drifting.
+	 */
+	if ((gethrtime() - t_last_probe_sent) < mintime) {
 		return;
 	}
 	send_scheduled_probe();
@@ -1704,10 +1766,12 @@ void
 schedule_sigalrm(void)
 {
 	int waittime;
+	struct itimerspec it;
 
+	bzero(&it, sizeof (struct itimerspec));
 	if (npackets == 0 ||
 	    current_targetaddr->num_sent < current_targetaddr->num_probes) {
-		(void) alarm(interval);
+		it = interval;
 	} else {
 		if (current_targetaddr->got_reply) {
 			waittime = 2 * tmax / MICROSEC;
@@ -1716,7 +1780,13 @@ schedule_sigalrm(void)
 		} else {
 			waittime = MAX_WAIT;
 		}
-		(void) alarm(waittime);
+		it.it_value.tv_sec = waittime;
+	}
+
+	if (timer_settime(timer, TIMER_RELTIME, &it, NULL) != 0) {
+		Fprintf(stderr, "%s: unexpected error updating time: %s\n",
+		    progname, strerror(errno));
+		exit(EXIT_FAILURE);
 	}
 }
 
@@ -1772,7 +1842,7 @@ send_scheduled_probe()
 		 * Did we reach the end of road?
 		 */
 		if (current_targetaddr == NULL) {
-			(void) alarm(0);	/* cancel alarm */
+			timer_done = _B_TRUE;
 			if (stats)
 				finish();
 			if (is_alive)
@@ -1933,7 +2003,7 @@ ushort_t udp_src_port6, ushort_t udp_src_port)
 		 */
 		if ((npackets > 0) && (current_targetaddr->next == NULL) &&
 		    (nreceived_last_target == npackets)) {
-			(void) alarm(0);	/* cancel alarm */
+			timer_done = _B_TRUE;
 			finish();
 		}
 	} /* infinite loop */
@@ -2144,6 +2214,10 @@ pr_name(char *addr, int family)
 	/* compare with the buffered (previous) lookup */
 	if (memcmp(addr, &prev_addr, alen) != 0) {
 		int flags = (nflag) ? NI_NUMERICHOST : NI_NAMEREQD;
+		mutex_enter(&ns_lock);
+		ns_active = _B_TRUE;
+		ns_starttime = gethrtime();
+		mutex_exit(&ns_lock);
 		if (getnameinfo(sa, slen, buf, sizeof (buf),
 		    NULL, 0, flags) != 0) {
 			/* getnameinfo() failed; return just the address */
@@ -2158,6 +2232,9 @@ pr_name(char *addr, int family)
 			    inet_ntop(family, (const void *)addr, abuf,
 			    sizeof (abuf)));
 		}
+		mutex_enter(&ns_lock);
+		ns_active = _B_FALSE;
+		mutex_exit(&ns_lock);
 
 		/* LINTED E_BAD_PTR_CAST_ALIGN */
 		prev_addr = *(struct in6_addr *)addr;
@@ -2419,10 +2496,123 @@ int_arg(char *s, char *what)
 	}
 
 	if (errno || *ep != '\0' || num < 0) {
-		(void) Fprintf(stderr, "%s: bad %s: %s\n",
-		    progname, what, s);
+		Fprintf(stderr, "%s: bad %s: %s\n", progname, what, s);
 		exit(EXIT_FAILURE);
 	}
 
 	return (num);
+}
+
+/*
+ * Parse the interval into a itimerspec. The interval used to originally be
+ * parsed as an integer argument. That means that one used to be able to specify
+ * an interval in hex. The strtod() family honors that at times, with strtod
+ * sometimes doing so depending on the compilation environment and strtof() and
+ * srtold() always doing that. To facilitiate that and not worry about a
+ * careless Makefile change breaking us, we instead just use strtold here, even
+ * though we really don't need the precision.
+ */
+static void
+parse_interval(char *s)
+{
+	long double val;
+	char *end;
+
+	errno = 0;
+	val = strtold(s, &end);
+	if (errno != 0 || *end != '\0') {
+		Fprintf(stderr, "%s: bad interval: %s\n", progname, s);
+		exit(EXIT_FAILURE);
+	}
+
+	/*
+	 * Check values that we know are going to be bad. Anything greater than
+	 * INT_MAX, anything less than 0, look for specific NaNs. Also, clamp
+	 * the value at 0.01 seconds.
+	 */
+	if (val == NAN || val <= 0.0 || val >= INT_MAX) {
+		Fprintf(stderr, "%s: bad interval: %s\n", progname, s);
+		exit(EXIT_FAILURE);
+	}
+
+	if (val < 0.01) {
+		Fprintf(stderr, "%s: interval too small: %Lf\n", progname, val);
+		exit(EXIT_FAILURE);
+	}
+
+	interval.it_value.tv_sec = (long)val;
+	interval.it_value.tv_nsec = (long)((val - interval.it_value.tv_sec) *
+	    NANOSEC);
+
+	if (interval.it_value.tv_sec == 0 &&
+	    interval.it_value.tv_nsec < mintime) {
+		mintime = interval.it_value.tv_nsec;
+	}
+}
+
+/*
+ * We should have an SO_TIMESTAMP message for this socket to indicate
+ * the actual time that the message took. If we don't we'll fall back to
+ * gettimeofday(); however, that can cause any delays due to DNS
+ * resolution and the like to end up wreaking havoc on us.
+ */
+void
+ping_gettime(struct msghdr *msg, struct timeval *tv)
+{
+	struct cmsghdr *cmsg;
+
+	for (cmsg = CMSG_FIRSTHDR(msg); cmsg != NULL;
+	    cmsg = CMSG_NXTHDR(msg, cmsg)) {
+		if (cmsg->cmsg_level == SOL_SOCKET &&
+		    cmsg->cmsg_type == SO_TIMESTAMP &&
+		    cmsg->cmsg_len == CMSG_LEN(sizeof (*tv))) {
+			bcopy(CMSG_DATA(cmsg), tv, sizeof (*tv));
+			return;
+		}
+	}
+
+	(void) gettimeofday(tv, (struct timezone *)NULL);
+}
+
+/*
+ * The purpose of this thread is to try and inform a user that we're blocked
+ * doing name lookups. For various reasons, ping has to try and look up the IP
+ * addresses it receives via name services unless the -n flag is specified. The
+ * irony of this is that when trying to use ping to actually diagnose a broken
+ * network, name services are unlikely to be available and that will result in a
+ * lot of confusion as to why pings seem like they're not working. As such, we
+ * basically wake up every 2 seconds and check whether or not we've hit such a
+ * condition where we should inform the user via stderr.
+ *
+ * Once they've been informed, we do not inform them again until approximately a
+ * minute of time has passed, in case that things are working intermittently.
+ */
+/*ARGSUSED*/
+static void *
+ns_warning_thr(void *unused)
+{
+	hrtime_t last_warn = 0;
+	for (;;) {
+		hrtime_t now;
+
+		(void) sleep(ns_sleeptime);
+		now = gethrtime();
+		mutex_enter(&ns_lock);
+		if (ns_active == _B_TRUE &&
+		    now - ns_starttime >= ns_warntime * NANOSEC) {
+			if (now - last_warn >=
+			    ns_warninter * NANOSEC) {
+				last_warn = now;
+				Fprintf(stderr, "%s: warning: ICMP responses "
+				    "received, but name service lookups are "
+				    "taking a while. Use ping -n to disable "
+				    "name service lookups.\n",
+				    progname);
+			}
+		}
+		mutex_exit(&ns_lock);
+	}
+
+	/* LINTED: E_STMT_NOT_REACHED */
+	return (NULL);
 }

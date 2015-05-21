@@ -1,10 +1,11 @@
 '\" te
 .\" Copyright (C) 2006, Sun Microsystems, Inc. All Rights Reserved
 .\" Copyright 1989 AT&T
+.\" Copyright 2015, Joyent, Inc.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PING 1M "Feb 20, 2015"
+.TH PING 1M "May 21, 2015"
 .SH NAME
 ping \- send ICMP (ICMP6) ECHO_REQUEST packets to network hosts
 .SH SYNOPSIS
@@ -123,7 +124,8 @@ range from 0 to 1048575. This option is valid only on IPv6.
 .RS 24n
 Turn on the statistics mode and specify the interval between successive
 transmissions. The default is one second. See the discussion of the \fB-s\fR
-option.
+option. The minimum interval is 0.01 seconds. It is an error to specify
+a smaller interval.
 .RE
 
 .sp
@@ -422,3 +424,50 @@ machine was not alive.
 \fBifconfig\fR(1M), \fBin.routed\fR(1M), \fBndd\fR(1M), \fBnetstat\fR(1M),
 \fBrpcinfo\fR(1M), \fBtraceroute\fR(1M), \fBattributes\fR(5), \fBicmp\fR(7P),
 \fBicmp6\fR(7P)
+
+.SH DIAGNOSTICS
+.ne 2
+.na
+\fB\fBping: warning: ICMP responses received, but name service lookups
+are taking a while. Use ping -n to disable name service lookups.\fB\fB
+.ad
+.sp .6
+.RS 4n
+When the
+.B -n
+flag is not specified,
+.B ping
+tries to lookup the name corresponding to the IP address that it
+received via name services. If name services are unavailable, it may
+take time before the system properly times out the name service lookups.
+As a result, it may appear that no ICMP replies are being received when
+they in fact are. This diagnostic indicates that this has occurred and
+indicates that there are valid responses and that using the
+.B -n
+flag will stop this from occurring.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBping: warning: timing accuracy diminished -- setsockopt
+SO_TIMESTAMP failed\fR\fR
+.ad
+.sp .6
+.RS 4n
+By default, the system attempts to use the
+.B SO_TIMESTAMP
+socket option to allow for more accurate time stamps that reflect when
+the ICMP echo replies were received by the system as opposed to when
+they were received by the
+.B ping
+command. These differences may occur because an operator stopped the
+process or because
+.B ping
+was blocked up behind a name service look up. When this diagnostic is
+emitted, the
+.B ping
+command will continue to function, but it will be doing the time
+stamping itself, which may cause the timing intervals reported to be
+longer than they actually are.
+.RE
