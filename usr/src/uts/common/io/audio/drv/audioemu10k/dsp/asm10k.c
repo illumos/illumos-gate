@@ -214,7 +214,7 @@ getaline(FILE *input, char **tokens)
 
 			/* strip off any C++ style comments that CPP missed */
 			if ((s = strstr(line, "//")) != NULL) {
-				*s = NULL;
+				*s = '\0';
 			}
 			stmt = strtok_r(line, ";\n", &lasts);
 		} else {
