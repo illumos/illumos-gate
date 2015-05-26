@@ -26,9 +26,8 @@
 /*
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2015 Gary Mills
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *	cscope - interactive C symbol cross-reference
@@ -387,7 +386,7 @@ search(void)
 {
 	char	*egreperror = NULL;	/* egrep error message */
 	FINDINIT rc = NOERROR;		/* findinit return code */
-	SIGTYPE	(*savesig)();		/* old value of signal */
+	SIGTYPE	(*volatile savesig)() = SIG_DFL; /* old value of signal */
 	FP	f;			/* searching function */
 	char	*s;
 	int	c;

@@ -20,6 +20,7 @@
  */
 
 /*
+ * Copyright 2015 Gary Mills
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -63,7 +64,7 @@ ungetch(int c)
 int
 mygetch(void)
 {
-	SIGTYPE	(*savesig)();		/* old value of signal */
+	SIGTYPE	(*volatile savesig)() = SIG_DFL; /* old value of signal */
 	int	c;
 
 	/* change an interrupt signal to a break key character */
