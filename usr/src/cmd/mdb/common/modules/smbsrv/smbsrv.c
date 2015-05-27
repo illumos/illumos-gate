@@ -32,6 +32,10 @@
 #include <smbsrv/smb.h>
 #include <smbsrv/smb_ktypes.h>
 
+#ifndef _KMDB
+#include "smbsrv_pcap.h"
+#endif
+
 #ifdef _KERNEL
 #define	SMBSRV_OBJNAME	"smbsrv"
 #else
@@ -392,6 +396,15 @@ static int smb_dcmd_setopt(uint_t, int, mdb_arg_t *);
 static int smb_obj_expand(uintptr_t, uint_t, const smb_exp_t *, ulong_t);
 static int smb_obj_list(const char *, uint_t, uint_t);
 static int smb_worker_findstack(uintptr_t);
+static void smb_inaddr_ntop(smb_inaddr_t *, char *, size_t);
+
+typedef int (*dump_func_t)(struct mbuf_chain *, int32_t,
+    smb_inaddr_t *, uint16_t, smb_inaddr_t *, uint16_t,
+    hrtime_t, boolean_t);
+static int smb_req_dump(struct mbuf_chain *, int32_t,
+    smb_inaddr_t *, uint16_t, smb_inaddr_t *, uint16_t,
+    hrtime_t, boolean_t);
+static int smb_req_dump_m(uintptr_t, const void *, void *);
 
 /*
  * *****************************************************************************
@@ -622,7 +635,7 @@ smbsess_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    !(opts & SMB_OPT_WALK)) {
 		char	cipaddr[INET6_ADDRSTRLEN];
 		char	lipaddr[INET6_ADDRSTRLEN];
-		int	ipaddrstrlen;
+		int	ipaddrstrlen = INET6_ADDRSTRLEN;
 		smb_session_t	*se;
 		const char	*state;
 
@@ -638,28 +651,10 @@ smbsess_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		else
 			state = smb_session_state[se->s_state];
 
-		switch (se->ipaddr.a_family) {
-		case AF_INET:
+		if (se->ipaddr.a_family == AF_INET)
 			ipaddrstrlen = INET_ADDRSTRLEN;
-			(void) mdb_snprintf(cipaddr, sizeof (cipaddr),
-			    "%I", se->ipaddr.a_ipv4);
-			(void) mdb_snprintf(lipaddr, sizeof (lipaddr),
-			    "%I", se->local_ipaddr.a_ipv4);
-			break;
-		case AF_INET6:
-			ipaddrstrlen = INET6_ADDRSTRLEN;
-			(void) mdb_snprintf(cipaddr, sizeof (cipaddr),
-			    "%N", &(se->ipaddr.a_ipv6));
-			(void) mdb_snprintf(lipaddr, sizeof (lipaddr),
-			    "%N", &(se->local_ipaddr.a_ipv6));
-			break;
-		default:
-			ipaddrstrlen = INET_ADDRSTRLEN;
-			(void) mdb_snprintf(cipaddr, sizeof (cipaddr),
-			    "unknown");
-			(void) mdb_snprintf(lipaddr, sizeof (lipaddr),
-			    "unknown");
-		}
+		smb_inaddr_ntop(&se->ipaddr, cipaddr, ipaddrstrlen);
+		smb_inaddr_ntop(&se->local_ipaddr, lipaddr, ipaddrstrlen);
 
 		if (opts & SMB_OPT_VERBOSE) {
 			mdb_printf("%<b>%<u>SMB session information "
@@ -874,6 +869,209 @@ smbreq_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		}
 	}
 	return (DCMD_OK);
+}
+
+static void
+smbreq_dump_help(void)
+{
+	mdb_printf(
+	    "Dump the network data for an smb_request_t, either"
+	    " command, reply, or (by default) both.  Optionally"
+	    " append data to a pcap file (mdb only, not kmdb).\n\n");
+	(void) mdb_dec_indent(2);
+	mdb_printf("%<b>OPTIONS%</b>\n");
+	(void) mdb_inc_indent(2);
+	mdb_printf(
+	    "-c\tDump only the SMB command message\n"
+	    "-r\tDump only the SMB reply message (if present)\n"
+	    "-o FILE\tOutput to FILE (append) in pcap format\n");
+}
+
+#define	SMB_RDOPT_COMMAND	1
+#define	SMB_RDOPT_REPLY		2
+#define	SMB_RDOPT_OUTFILE	4
+
+/*
+ * Like "smbreq" but just dump the command/reply messages.
+ * With the output file option, append to a pcap file.
+ */
+static int
+smbreq_dump_dcmd(uintptr_t rqaddr, uint_t flags, int argc,
+    const mdb_arg_t *argv)
+{
+	smb_session_t	*ssn;
+	smb_request_t	*sr;
+	char		*outfile = NULL;
+	dump_func_t	dump_func;
+	uint64_t	msgid;
+	uintptr_t	ssnaddr;
+	uint_t		opts = 0;
+	int		rc = DCMD_OK;
+
+	if (!(flags & DCMD_ADDRSPEC))
+		return (DCMD_USAGE);
+
+	if (mdb_getopts(argc, argv,
+	    'c', MDB_OPT_SETBITS, SMB_RDOPT_COMMAND, &opts,
+	    'r', MDB_OPT_SETBITS, SMB_RDOPT_REPLY, &opts,
+	    'o', MDB_OPT_STR, &outfile,
+	    NULL) != argc)
+		return (DCMD_USAGE);
+#ifdef	_KMDB
+	if (outfile != NULL) {
+		mdb_warn("smbreq_dump -o option not supported in kmdb\n");
+		return (DCMD_ERR);
+	}
+#endif	/* _KMDB */
+
+	/*
+	 * Default without -c or -r is to dump both.
+	 */
+	if ((opts & (SMB_RDOPT_COMMAND | SMB_RDOPT_REPLY)) == 0)
+		opts |= SMB_RDOPT_COMMAND | SMB_RDOPT_REPLY;
+
+	/*
+	 * Get the smb_request_t, for the cmd/reply messages.
+	 */
+	sr = mdb_alloc(sizeof (*sr), UM_SLEEP | UM_GC);
+	if (mdb_vread(sr, sizeof (*sr), rqaddr) == -1) {
+		mdb_warn("failed to read smb_request at %p", rqaddr);
+		return (DCMD_ERR);
+	}
+	if (sr->sr_magic != SMB_REQ_MAGIC) {
+		mdb_warn("not an smb_request_t (%p)>", rqaddr);
+		return (DCMD_ERR);
+	}
+
+	/*
+	 * Get the session too, for the IP addresses & ports.
+	 */
+	ssnaddr = (uintptr_t)sr->session;
+	ssn = mdb_alloc(sizeof (*ssn), UM_SLEEP | UM_GC);
+	if (mdb_vread(ssn, sizeof (*ssn), ssnaddr) == -1) {
+		mdb_warn("failed to read smb_request at %p", ssnaddr);
+		return (DCMD_ERR);
+	}
+	if (ssn->s_magic != SMB_SESSION_MAGIC) {
+		mdb_warn("not an smb_session_t (%p)>", ssnaddr);
+		return (DCMD_ERR);
+	}
+
+#ifndef	_KMDB
+	if (outfile != NULL) {
+		rc = smbsrv_pcap_open(outfile);
+		if (rc != DCMD_OK)
+			return (rc);
+		dump_func = smbsrv_pcap_dump;
+	} else
+#endif	/* _KMDB */
+	{
+		dump_func = smb_req_dump;
+	}
+
+	if (sr->smb2_messageid != 0)
+		msgid = sr->smb2_messageid;
+	else
+		msgid = sr->smb_mid;
+	mdb_printf("Dumping request %-?p, Msg_ID 0x%llx\n",
+	    rqaddr, msgid);
+
+	if (opts & SMB_RDOPT_COMMAND) {
+		/*
+		 * Dump the command, length=max_bytes
+		 * src=remote, dst=local
+		 */
+		rc = dump_func(&sr->command, sr->command.max_bytes,
+		    &ssn->ipaddr, ssn->s_remote_port,
+		    &ssn->local_ipaddr, ssn->s_local_port,
+		    sr->sr_time_submitted, B_FALSE);
+	}
+
+	if ((opts & SMB_RDOPT_REPLY) != 0 &&
+	    rc == DCMD_OK) {
+		/*
+		 * Dump the reply, length=chain_offset
+		 * src=local, dst=remote
+		 */
+		rc = dump_func(&sr->reply, sr->reply.chain_offset,
+		    &ssn->local_ipaddr, ssn->s_local_port,
+		    &ssn->ipaddr, ssn->s_remote_port,
+		    sr->sr_time_start, B_TRUE);
+	}
+
+#ifndef	_KMDB
+	if (outfile != NULL) {
+		smbsrv_pcap_close();
+	}
+#endif
+
+	return (DCMD_OK);
+}
+
+struct req_dump_state {
+	int32_t rem_len;
+};
+
+static int
+smb_req_dump(struct mbuf_chain *mbc, int32_t smb_len,
+    smb_inaddr_t *src_ip, uint16_t src_port,
+    smb_inaddr_t *dst_ip, uint16_t dst_port,
+    hrtime_t rqtime, boolean_t is_reply)
+{
+	char	src_buf[INET6_ADDRSTRLEN];
+	char	dst_buf[INET6_ADDRSTRLEN];
+	struct req_dump_state dump_state;
+	_NOTE(ARGUNUSED(rqtime));
+
+	if (smb_len < 4)
+		return (DCMD_OK);
+	if (mbc->chain == NULL)
+		return (DCMD_ERR);
+
+	smb_inaddr_ntop(src_ip, src_buf, sizeof (src_buf));
+	smb_inaddr_ntop(dst_ip, dst_buf, sizeof (dst_buf));
+
+	mdb_printf("%-8s SRC: %s/%u  DST: %s/%u  LEN: %u\n",
+	    (is_reply) ? "Reply:" : "Call:",
+	    src_buf, src_port, dst_buf, dst_port, smb_len);
+
+	/*
+	 * Calling "smb_mbuf_dump" with a wrapper function
+	 * so we can set its length arg, and decrement
+	 * req_dump_state.rem_len as it goes.
+	 */
+	dump_state.rem_len = smb_len;
+	if (mdb_pwalk("smb_mbuf_walker", smb_req_dump_m,
+	    &dump_state, (uintptr_t)mbc->chain) == -1) {
+		mdb_warn("cannot walk smb_req mbuf_chain");
+		return (DCMD_ERR);
+	}
+	return (DCMD_OK);
+}
+
+static int
+smb_req_dump_m(uintptr_t m_addr, const void *data, void *arg)
+{
+	struct req_dump_state *st = arg;
+	const struct mbuf *m = data;
+	mdb_arg_t	argv;
+	int cnt;
+
+	cnt = st->rem_len;
+	if (cnt > m->m_len)
+		cnt = m->m_len;
+	if (cnt <= 0)
+		return (WALK_DONE);
+
+	argv.a_type = MDB_TYPE_IMMEDIATE;
+	argv.a_un.a_val = cnt;
+	if (mdb_call_dcmd("smb_mbuf_dump", m_addr, 0, 1, &argv) < 0) {
+		mdb_warn("%p::smb_mbuf_dump failed\n", m_addr);
+		return (WALK_ERR);
+	}
+
+	st->rem_len -= cnt;
+	return (WALK_NEXT);
 }
 
 /*
@@ -1922,6 +2120,92 @@ smboplock_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 }
 
 /*
+ * *******************************************************************
+ * (smb) mbuf_t
+ *
+ * ::smb_mbuf_dump [max_len]
+ * dcmd to dump the data portion of an mbuf_t
+ * stop at max_len
+ */
+static int
+smb_mbuf_dump_dcmd(uintptr_t addr, uint_t flags, int argc,
+    const mdb_arg_t *argv)
+{
+	struct m_hdr mh;
+	uintptr_t mdata;
+	int len, max_len;
+	int dumpptr_flags;
+
+	if (mdb_vread(&mh, sizeof (mh), addr) < 0) {
+		mdb_warn("failed to read mbuf at %p", addr);
+		return (DCMD_ERR);
+	}
+	len = mh.mh_len;
+	mdata = (uintptr_t)mh.mh_data;
+
+	if (argc > 0) {
+		if (argv[0].a_type == MDB_TYPE_IMMEDIATE)
+			max_len = argv[0].a_un.a_val;
+		else
+			max_len = mdb_strtoull(argv[0].a_un.a_str);
+		if (len > max_len)
+			len = max_len;
+	}
+	if (len <= 0)
+		return (DCMD_OK);
+
+	if (DCMD_HDRSPEC(flags)) {
+		mdb_printf("%<u>%-16s %-16s %-12s%</u>\n",
+		    "mbuf_t", "m_data", "m_len");
+	}
+	mdb_printf("%-16p %-16p %-12u\n",
+	    addr, mdata, mh.mh_len);
+
+	dumpptr_flags = MDB_DUMP_RELATIVE | MDB_DUMP_ASCII | MDB_DUMP_HEADER;
+	if (mdb_dumpptr(mdata, len, dumpptr_flags,
+	    (mdb_dumpptr_cb_t)mdb_vread, NULL) < 0)
+		return (DCMD_ERR);
+
+	return (DCMD_OK);
+}
+
+static int
+smb_mbuf_walk_init(mdb_walk_state_t *wsp)
+{
+	mbuf_t *m;
+
+	if (wsp->walk_addr == 0) {
+		mdb_printf("require address of an mbuf_t\n");
+		return (WALK_ERR);
+	}
+	m = mdb_alloc(sizeof (*m), UM_SLEEP | UM_GC);
+	wsp->walk_data = m;
+	return (WALK_NEXT);
+}
+
+static int
+smb_mbuf_walk_step(mdb_walk_state_t *wsp)
+{
+	uintptr_t addr = wsp->walk_addr;
+	mbuf_t *m = wsp->walk_data;
+	int rc;
+
+	if (wsp->walk_addr == 0)
+		return (WALK_DONE);
+
+	if (mdb_vread(m, sizeof (*m), addr) == -1) {
+		mdb_warn("failed to read mbuf_t at %p", addr);
+		return (WALK_ERR);
+	}
+
+	rc = wsp->walk_callback(addr, m, wsp->walk_cbdata);
+	wsp->walk_addr = (uintptr_t)m->m_next;
+
+	return (rc);
+}
+
+/*
+ * *******************************************************************
  * ::smbstat
  *
  * Prints SMB requests statistics.
@@ -2466,6 +2750,23 @@ smb_worker_findstack(uintptr_t addr)
 	return (DCMD_OK);
 }
 
+static void
+smb_inaddr_ntop(smb_inaddr_t *ina, char *buf, size_t sz)
+{
+
+	switch (ina->a_family) {
+	case AF_INET:
+		(void) mdb_snprintf(buf, sz, "%I", ina->a_ipv4);
+		break;
+	case AF_INET6:
+		(void) mdb_snprintf(buf, sz, "%N", ina->a_ipv6);
+		break;
+	default:
+		(void) mdb_snprintf(buf, sz, "(?)");
+		break;
+	}
+}
+
 /*
  * MDB module linkage information:
  *
@@ -2505,6 +2806,12 @@ static const mdb_dcmd_t dcmds[] = {
 	    ":[-v]",
 	    "print smb_request_t information",
 	    smbreq_dcmd },
+	{   "smbreq_dump",
+	    ":[-cr] [-o outfile]",
+	    "dump smb_request_t packets (cmd/reply)",
+	    smbreq_dump_dcmd,
+	    smbreq_dump_help,
+	},
 	{   "smblock", ":[-v]",
 	    "print smb_lock_t information",
 	    smblock_dcmd },
@@ -2550,6 +2857,9 @@ static const mdb_dcmd_t dcmds[] = {
 	{   "smbfssd", "[-v]",
 	    "print smb_fssd_t information",
 	    smbfssd_dcmd },
+	{   "smb_mbuf_dump", ":[max_len]",
+	    "print mbuf_t data",
+	    smb_mbuf_dump_dcmd },
 	{ NULL }
 };
 
@@ -2576,6 +2886,12 @@ static const mdb_walker_t walkers[] = {
 	    "walk list of smb_ace_t structures",
 	    smb_ace_walk_init,
 	    smb_ace_walk_step,
+	    NULL,
+	    NULL },
+	{   "smb_mbuf_walker",
+	    "walk list of mbuf_t structures",
+	    smb_mbuf_walk_init,
+	    smb_mbuf_walk_step,
 	    NULL,
 	    NULL },
 	{ NULL }

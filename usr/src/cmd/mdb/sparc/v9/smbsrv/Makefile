@@ -22,13 +22,19 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 #
 
 MODULE = smbsrv.so
 MDBTGT = kvm
 
-MODSRCS = smbsrv.c
+#
+# This signals that $(KMODSRCS) != $(MODSRCS).  Dump to a pcap file
+# is not available in kmdb, so don't bother compiling that code.
+KMOD_SOURCES_DIFFERENT=$(POUND_SIGN)
+
+KMODSRCS = smbsrv.c
+MODSRCS = smbsrv.c smbsrv_pcap.c
 
 include ../../../../Makefile.cmd
 include ../../../../Makefile.cmd.64
