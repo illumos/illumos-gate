@@ -822,13 +822,15 @@ ict_sioghwaddr(file_t *fp, struct lifreq *lreq)
 		/* Emulate success on suspected loopbacks */
 		sdl->sdl_type = DL_LOOP;
 		sdl->sdl_alen = ETHERADDRL;
+		bzero(LLADDR(sdl), sdl->sdl_alen);
 		error = 0;
 	}
 
 	if (error == 0) {
 		bzero(&hwaddr, sizeof (hwaddr));
 		lx_stol_hwaddr(sdl, &hwaddr, &size);
-		bcopy(&hwaddr, &lreq->lifr_addr, size);
+		bcopy(&hwaddr, &lreq->lifr_addr,
+		    size + sizeof (sdl->sdl_family));
 	}
 
 	return (error);
