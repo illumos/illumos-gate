@@ -1671,8 +1671,7 @@ mp_startup_common(boolean_t boot)
 	/*
 	 * Program this cpu's PAT
 	 */
-	if (is_x86_feature(x86_featureset, X86FSET_PAT))
-		pat_sync();
+	pat_sync();
 #endif
 
 	/*
