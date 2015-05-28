@@ -1025,10 +1025,12 @@ recv_begin_check_existing_impl(dmu_recv_begin_arg_t *drba, dsl_dataset_t *ds,
 
 		dsl_dataset_rele(snap, FTAG);
 	} else {
-		/* if full, most recent snapshot must be $ORIGIN */
-		if (dsl_dataset_phys(ds)->ds_prev_snap_txg >= TXG_INITIAL)
-			return (SET_ERROR(ENODEV));
-		drba->drba_snapobj = dsl_dataset_phys(ds)->ds_prev_snap_obj;
+		/* if full, then must be forced */
+		if (!drba->drba_cookie->drc_force)
+			return (SET_ERROR(EEXIST));
+		/* start from $ORIGIN@$ORIGIN, if supported */
+		drba->drba_snapobj = dp->dp_origin_snap != NULL ?
+		    dp->dp_origin_snap->ds_object : 0;
 	}
 
 	return (0);
@@ -2083,7 +2085,7 @@ dmu_recv_end_check(void *arg, dmu_tx_t *tx)
 				error = dsl_dataset_hold_obj(dp, obj, FTAG,
 				    &snap);
 				if (error != 0)
-					return (error);
+					break;
 				if (snap->ds_dir != origin_head->ds_dir)
 					error = SET_ERROR(EINVAL);
 				if (error == 0)  {
@@ -2093,7 +2095,11 @@ dmu_recv_end_check(void *arg, dmu_tx_t *tx)
 				obj = dsl_dataset_phys(snap)->ds_prev_snap_obj;
 				dsl_dataset_rele(snap, FTAG);
 				if (error != 0)
-					return (error);
+					break;
+			}
+			if (error != 0) {
+				dsl_dataset_rele(origin_head, FTAG);
+				return (error);
 			}
 		}
 		error = dsl_dataset_clone_swap_check_impl(drc->drc_ds,
