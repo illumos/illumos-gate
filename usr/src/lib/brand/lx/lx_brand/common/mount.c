@@ -737,6 +737,24 @@ lx_mount(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 			    options);
 			return (-errno);
 		}
+	} else if (strcmp(fstype, "cgroup") == 0) {
+		/* Translate cgroup mount requests to lx_cgroup requests. */
+		(void) strcpy(fstype, "lx_cgroup");
+
+		/* Copy in Linux mount options. */
+		if (datap != NULL) {
+			rv = uucopystr((void *)datap,
+			    options, sizeof (options));
+			if ((rv == -1) || (rv == sizeof (options)))
+				return (-EFAULT);
+		}
+		lx_debug("\tlinux mount options: \"%s\"", options);
+
+		/*
+		 * Currently don't verify Linux mount options since we can
+		 * have asubsystem string provided.
+		 */
+
 	} else if (strcmp(fstype, "autofs") == 0) {
 
 		/* Translate autofs mount requests to lx_afs requests. */

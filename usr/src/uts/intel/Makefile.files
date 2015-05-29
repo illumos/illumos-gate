@@ -100,6 +100,11 @@ GENUNIX_OBJS +=		\
 CORE_OBJS +=		\
 	prmachdep.o
  
+LX_CGROUP_OBJS +=	\
+	cgrps_node.o	\
+	cgrps_vfsops.o	\
+	cgrps_vnops.o
+
 LX_PROC_OBJS +=	\
 	lx_prsubr.o	\
 	lx_prvfsops.o	\
