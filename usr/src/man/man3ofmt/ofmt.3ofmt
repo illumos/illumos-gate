@@ -13,13 +13,15 @@
 .\" Copyright 2017 Nexenta Systems, Inc.
 .\" Copyright 2018 Joyent, Inc.
 .\"
-.Dd December 20, 2018
+.Dd February 13, 2019
 .Dt OFMT 3OFMT
 .Os
 .Sh NAME
 .Nm ofmt_open ,
 .Nm ofmt_print ,
+.Nm ofmt_print_header ,
 .Nm ofmt_update_winsize ,
+.Nm ofmt_set_fs ,
 .Nm ofmt_strerror ,
 .Nm ofmt_close
 .Nd data structures and routines for printing output
@@ -41,8 +43,17 @@
 .Fa "void *cbarg"
 .Fc
 .Ft void
+.Fo ofmt_print_header
+.Fa "ofmt_handle_t ofmt"
+.Fc
+.Ft void
 .Fo ofmt_update_winsize
 .Fa "ofmt_handle_t ofmt"
+.Fc
+.Ft void
+.Fo ofmt_set_fs
+.Fa "ofmt_handle_t ofmt"
+.Fa "char fs"
 .Fc
 .Ft "char *"
 .Fo ofmt_strerror
@@ -212,6 +223,9 @@ will result in
 .Dv OFMT_EPARSEMULTI .
 .It Dv OFMT_RIGHTJUST
 Right justified output.
+.It Dv OFMT_NOHEADER
+Skip printing the header when calling
+.Fn ofmt_print .
 .El
 .Pp
 The non-zero
@@ -241,6 +255,15 @@ The callback function should fill
 .Fa buf
 with the string to be printed for the field using the data in
 .Fa cbarg .
+.Ss Fn ofmt_print_header
+The
+.Fn ofmt_print_header
+function prints the output header.
+This is usually done as part of calling
+.Fn ofmt_print ,
+but is skipped when using
+.Dv OFMT_NOHEADER .
+This function allows you to insert it when and where desired.
 .Ss Fn ofmt_update_winsize
 The
 .Fn ofmt_update_winsize
@@ -251,6 +274,10 @@ in the
 If the
 .Dv TIOCGWINSZ
 ioctl fails, the window size is set to 80x24.
+.Ss Fn ofmt_set_fs
+The
+.Fn ofmt_set_fs
+function sets the output field separator for parsable output.
 .Ss Fn ofmt_strerror
 The
 .Fn ofmt_strerror

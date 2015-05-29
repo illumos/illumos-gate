@@ -32,12 +32,14 @@ $mapfile_version 2
 
 SYMBOL_VERSION ILLUMOSprivate {
     global:
+	ofmt_check;
 	ofmt_close;
 	ofmt_open;
 	ofmt_print;
+	ofmt_print_header;
+	ofmt_set_fs;
 	ofmt_strerror;
 	ofmt_update_winsize;
-	ofmt_check;
 
     local:
 	*;

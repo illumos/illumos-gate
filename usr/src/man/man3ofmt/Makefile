@@ -15,7 +15,7 @@
 
 include		$(SRC)/Makefile.master
 
-MANSECT= 	3ofmt
+MANSECT=	3ofmt
 
 MANFILES=	ofmt.3ofmt
 
@@ -28,6 +28,8 @@ MANLINKS=	ofmt_close.3ofmt \
 ofmt_close.3ofmt		:= LINKSRC = ofmt.3ofmt
 ofmt_open.3ofmt			:= LINKSRC = ofmt.3ofmt
 ofmt_print.3ofmt		:= LINKSRC = ofmt.3ofmt
+ofmt_print_header.3ofmt		:= LINKSRC = ofmt.3ofmt
+ofmt_set_fs.3ofmt		:= LINKSRC = ofmt.3ofmt
 ofmt_strerror.3ofmt		:= LINKSRC = ofmt.3ofmt
 ofmt_update_winsize.3ofmt	:= LINKSRC = ofmt.3ofmt
 
@@ -35,4 +37,4 @@ ofmt_update_winsize.3ofmt	:= LINKSRC = ofmt.3ofmt
 
 include		$(SRC)/man/Makefile.man
 
-install: 	$(ROOTMANFILES) $(ROOTMANLINKS)
+install:	$(ROOTMANFILES) $(ROOTMANLINKS)
