@@ -28,6 +28,8 @@ MANLINKS=	ofmt_close.3ofmt \
 ofmt_close.3ofmt		:= LINKSRC = ofmt.3ofmt
 ofmt_open.3ofmt			:= LINKSRC = ofmt.3ofmt
 ofmt_print.3ofmt		:= LINKSRC = ofmt.3ofmt
+ofmt_print_header.3ofmt		:= LINKSRC = ofmt.3ofmt
+ofmt_set_fs.3ofmt		:= LINKSRC = ofmt.3ofmt
 ofmt_strerror.3ofmt		:= LINKSRC = ofmt.3ofmt
 ofmt_update_winsize.3ofmt	:= LINKSRC = ofmt.3ofmt
 
