@@ -193,6 +193,7 @@ static lxsys_dirlookup_t lxsys_dirlookup[] = {
 	SYSDLENT(LXSYS_INST_FSDIR, dirlist_fs),
 	SYSDLENT(LXSYS_INST_FS_CGROUPDIR, dirlist_empty),
 	SYSDLENT(LXSYS_INST_DEVICESDIR, dirlist_devices),
+	SYSDLENT(LXSYS_INST_DEVICES_SYSTEMDIR, dirlist_empty),
 	SYSDLENT(LXSYS_INST_DEVICES_VIRTUALDIR, dirlist_devices_virtual)
 };
 
