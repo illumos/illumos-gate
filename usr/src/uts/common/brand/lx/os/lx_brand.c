@@ -170,6 +170,7 @@
 #include <sys/stat.h>
 #include <sys/socket.h>
 #include <lx_signum.h>
+#include <util/sscanf.h>
 
 int	lx_debug = 0;
 
@@ -1288,6 +1289,34 @@ lx_set_kern_version(zone_t *zone, char *vers)
 	lx_zone_data_t *lxzd = (lx_zone_data_t *)zone->zone_brand_data;
 
 	(void) strlcpy(lxzd->lxzd_kernel_version, vers, LX_VERS_MAX);
+}
+
+/*
+ * Compare linux kernel version to the one set for the zone.
+ * Returns greater than 0 if zone version is higher, less than 0 if the zone
+ * version is lower, and 0 if the version are equal.
+ */
+int
+lx_kern_version_cmp(zone_t *zone, const char *vers)
+{
+	int zvers[3] = {0, 0, 0};
+	int cvers[3] = {0, 0, 0};
+	int i;
+
+	VERIFY(zone->zone_brand == &lx_brand);
+
+	(void) sscanf(ztolxzd(zone)->lxzd_kernel_version, "%d.%d.%d", &zvers[0],
+	    &zvers[1], &zvers[2]);
+	(void) sscanf(vers, "%d.%d.%d", &cvers[0], &cvers[1], &cvers[2]);
+
+	for (i = 0; i < 3; i++) {
+		if (zvers[i] > cvers[i]) {
+			return (1);
+		} else if (zvers[i] < cvers[i]) {
+			return (-1);
+		}
+	}
+	return (0);
 }
 
 /*

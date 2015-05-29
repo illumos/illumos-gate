@@ -862,8 +862,9 @@ calc_addr_size(struct sockaddr *a, int nlen, lx_addr_type_t *type)
 	struct sockaddr name;
 	sa_family_t family;
 	size_t fsize = sizeof (name.sa_family);
+	int copylen = MIN(nlen, sizeof (struct sockaddr));
 
-	if (uucopy(a, &name, sizeof (struct sockaddr)) != 0)
+	if (uucopy(a, &name, copylen) != 0)
 		return (-errno);
 	family = LTOS_FAMILY(name.sa_family);
 
@@ -2274,8 +2275,6 @@ lx_sendmsg(int sockfd, void *lmp, int flags)
 	 * Perform conversion on msg_name, if present.
 	 */
 	if (msg.msg_name != NULL) {
-		if (msg.msg_namelen < sizeof (struct sockaddr))
-			return (-EINVAL);
 		size = calc_addr_size(msg.msg_name, msg.msg_namelen, &type);
 		if (size < 0)
 			return (size);

@@ -45,6 +45,9 @@
 #include <sys/ethernet.h>
 #include <sys/dlpi.h>
 #include <sys/lx_autofs.h>
+#include <sys/netstack.h>
+#include <inet/ip.h>
+#include <inet/ip_if.h>
 
 /*
  * Supported ioctls
@@ -94,6 +97,7 @@
 #define	LX_SIOCGPGRP		0x8904
 #define	LX_SIOCATMARK		0x8905
 #define	LX_SIOCGSTAMP		0x8906
+#define	LX_SIOCGIFNAME		0x8910
 #define	LX_SIOCGIFCONF		0x8912
 #define	LX_SIOCGIFFLAGS		0x8913
 #define	LX_SIOCSIFFLAGS		0x8914
@@ -838,6 +842,60 @@ ict_sioghwaddr(file_t *fp, struct lifreq *lreq)
 }
 
 static int
+ict_siocgifname(file_t *fp, int cmd, intptr_t arg, int lxcmd)
+{
+	struct ifreq	req;
+	int		len;
+	char		name[LIFNAMSIZ];
+	netstack_t *ns;
+	ip_stack_t *ipst;
+	phyint_t *phyi;
+
+	if (fp->f_vnode->v_type != VSOCK) {
+		return (set_errno(EINVAL));
+	}
+
+	len = (curproc->p_model == DATAMODEL_LP64) ? sizeof (lx_ifreq64_t) :
+	    sizeof (lx_ifreq32_t);
+	if (copyin((struct ifreq *)arg, &req, len) != 0) {
+		return (set_errno(EFAULT));
+	}
+
+	/*
+	 * Since Linux calls this ioctl on all sorts of sockets, perform the
+	 * interface name lookup manually.
+	 */
+	if ((ns = netstack_get_current()) == NULL) {
+		return (set_errno(EINVAL));
+	}
+	ipst = ns->netstack_ip;
+
+	rw_enter(&ipst->ips_ill_g_lock, RW_READER);
+	phyi = avl_find(&ipst->ips_phyint_g_list->phyint_list_avl_by_index,
+	    (void *) &req.ifr_index, NULL);
+	if (phyi != NULL) {
+		strncpy(name, phyi->phyint_name, LIFNAMSIZ);
+		lx_ifname_convert(name, LX_IF_FROMNATIVE);
+	} else {
+		name[0] = '\0';
+	}
+
+	rw_exit(&ipst->ips_ill_g_lock);
+	netstack_rele(ns);
+
+	if (strlen(name) != 0) {
+		/* Truncate for ifreq and copyout */
+		strncpy(req.ifr_name, name, IFNAMSIZ);
+		if (copyout(&req, (struct ifreq *)arg, len) != 0) {
+			return (set_errno(EFAULT));
+		}
+		return (0);
+	}
+
+	return (set_errno(EINVAL));
+}
+
+static int
 ict_siolifreq(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 {
 	struct ifreq	req;
@@ -1154,6 +1212,7 @@ static ioc_cmd_translator_t ioc_translators[] = {
 	IOC_CMD_TRANSLATOR_FILTER(SIOCGIFINDEX,		ict_siolifreq)
 	IOC_CMD_TRANSLATOR_CUSTOM(LX_SIOCGIFTXQLEN,	ict_siolifreq)
 	IOC_CMD_TRANSLATOR_FILTER(SIOCGIFCONF,		ict_siocgifconf)
+	IOC_CMD_TRANSLATOR_CUSTOM(LX_SIOCGIFNAME,	ict_siocgifname)
 
 	/* dtrace related */
 	IOC_CMD_TRANSLATOR_PTHRU(DTRACEHIOC_ADD)

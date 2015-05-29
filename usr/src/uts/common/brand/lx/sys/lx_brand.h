@@ -639,6 +639,7 @@ typedef struct lx_zone_data {
 #endif
 
 extern char *lx_get_zone_kern_version(zone_t *);
+extern int lx_kern_version_cmp(zone_t *, const char *);
 
 extern void lx_lwp_set_native_stack_current(lx_lwp_data_t *, uintptr_t);
 extern void lx_divert(klwp_t *, uintptr_t);
