@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 1997, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2015, Joyent, Inc. All rights reserved.
+ * Copyright 2015, Joyent, Inc.
  * Copyright (c) 2013 by Delphix. All rights reserved.
  */
 
@@ -70,6 +70,22 @@ static uint32_t psym_crc32[] = { CRC32_TABLE };
 #define	IS_DATA_TYPE(tp)	(((1 << (tp)) & DATA_TYPES) != 0)
 
 #define	MA_RWX	(MA_READ | MA_WRITE | MA_EXEC)
+
+/*
+ * Minimum and maximum length of a build-id that we'll accept. Generally it's a
+ * 20 byte SHA1 and it's expected that the first byte (which is two ascii
+ * characters) indicates a directory and the remaining bytes become the file
+ * name. Therefore, our minimum length is at least 2 bytes (one for the
+ * directory and one for the name) and the max is a bit over the minimum -- 64,
+ * just in case folks do something odd. The string length is three times the max
+ * length. This accounts for the fact that each byte is two characters, a null
+ * terminator, and the directory '/' character.
+ */
+#define	MINBUILDID	2
+#define	MAXBUILDID	64
+#define	BUILDID_STRLEN	(3*MAXBUILDID)
+#define	BUILDID_NAME	".note.gnu.build-id"
+#define	DBGLINK_NAME	".gnu_debuglink"
 
 typedef enum {
 	PRO_NATURAL,
@@ -1575,13 +1591,17 @@ build_fake_elf(struct ps_prochandle *P, file_info_t *fptr, GElf_Ehdr *ehdr,
 
 /*
  * Try and find the file described by path in the file system and validate that
- * it matches our CRC before we try and process it for symbol information.
+ * it matches our CRC before we try and process it for symbol information. If we
+ * instead have an ELF data section, then that means we're checking a build-id
+ * section instead. In that case we just need to find and bcmp the corresponding
+ * section.
  *
- * Before we valiate if it's a crc, we check to ensure that it's a normal file
- * and not anything else.
+ * Before we validate if it's a valid CRC or data section, we check to ensure
+ * that it's a normal file and not anything else.
  */
 static boolean_t
-build_alt_debug(file_info_t *fptr, const char *path, uint32_t crc)
+build_alt_debug(file_info_t *fptr, const char *path, uint32_t crc,
+    Elf_Data *data)
 {
 	int fd;
 	struct stat st;
@@ -1589,6 +1609,7 @@ build_alt_debug(file_info_t *fptr, const char *path, uint32_t crc)
 	Elf_Scn *scn;
 	GElf_Shdr symshdr, strshdr;
 	Elf_Data *symdata, *strdata;
+	boolean_t valid;
 	uint32_t c = -1U;
 
 	if ((fd = open(path, O_RDONLY)) < 0)
@@ -1604,26 +1625,33 @@ build_alt_debug(file_info_t *fptr, const char *path, uint32_t crc)
 		return (B_FALSE);
 	}
 
-	for (;;) {
-		char buf[4096];
-		ssize_t ret = read(fd, buf, sizeof (buf));
-		if (ret == -1) {
-			if (ret == EINTR)
-				continue;
-			(void) close(fd);
-			return (B_FALSE);
-		}
-		if (ret == 0) {
-			c = ~c;
-			if (c != crc) {
-				dprintf("crc mismatch, found: 0x%x "
-				    "expected 0x%x\n", c, crc);
+	/*
+	 * Only check the CRC if we've come here through a GNU debug link
+	 * section as opposed to the build id. This is indicated by having the
+	 * value of data be NULL.
+	 */
+	if (data == NULL) {
+		for (;;) {
+			char buf[4096];
+			ssize_t ret = read(fd, buf, sizeof (buf));
+			if (ret == -1) {
+				if (ret == EINTR)
+					continue;
 				(void) close(fd);
 				return (B_FALSE);
 			}
-			break;
+			if (ret == 0) {
+				c = ~c;
+				if (c != crc) {
+					dprintf("crc mismatch, found: 0x%x "
+					    "expected 0x%x\n", c, crc);
+					(void) close(fd);
+					return (B_FALSE);
+				}
+				break;
+			}
+			CRC32(c, buf, ret, c, psym_crc32);
 		}
-		CRC32(c, buf, ret, c, psym_crc32);
 	}
 
 	elf = elf_begin(fd, ELF_C_READ, NULL);
@@ -1635,6 +1663,48 @@ build_alt_debug(file_info_t *fptr, const char *path, uint32_t crc)
 	if (elf_kind(elf) != ELF_K_ELF) {
 		goto fail;
 	}
+
+	/*
+	 * If we have a data section, that indicates we have a build-id which
+	 * means we need to find the corresponding build-id section and compare
+	 * it.
+	 */
+	scn = NULL;
+	valid = B_FALSE;
+	for (scn = elf_nextscn(elf, scn); data != NULL && scn != NULL;
+	    scn = elf_nextscn(elf, scn)) {
+		GElf_Shdr hdr;
+		Elf_Data *ntdata;
+
+		if (gelf_getshdr(scn, &hdr) == NULL)
+			goto fail;
+
+		if (hdr.sh_type != SHT_NOTE)
+			continue;
+
+		if ((ntdata = elf_getdata(scn, NULL)) == NULL)
+			goto fail;
+
+		/*
+		 * First verify the data section sizes are equal, then the
+		 * section name. If that's all true, then we can just do a bcmp.
+		 */
+		if (data->d_size != ntdata->d_size)
+			continue;
+
+		dprintf("found corresponding section in alternate file\n");
+		if (bcmp(ntdata->d_buf, data->d_buf, data->d_size) != 0)
+			goto fail;
+
+		valid = B_TRUE;
+		break;
+	}
+	if (data != NULL && valid == B_FALSE) {
+		dprintf("failed to find a matching %s section in %s\n",
+		    BUILDID_NAME, path);
+		goto fail;
+	}
+
 
 	/*
 	 * Do two passes, first see if we have a symbol header, then see if we
@@ -1697,10 +1767,11 @@ fail:
  * /usr/lib/debug/<dirname>/<debug-name>
  *
  * In the future, we should consider supporting looking in the prefix's
- * lib/debug directory for a matching object.
+ * lib/debug directory for a matching object or supporting an arbitrary user
+ * defined set of places to look.
  */
 static void
-find_alt_debug(file_info_t *fptr, const char *name, uint32_t crc)
+find_alt_debuglink(file_info_t *fptr, const char *name, uint32_t crc)
 {
 	boolean_t r;
 	char *dup = NULL, *path = NULL, *dname;
@@ -1719,7 +1790,7 @@ find_alt_debug(file_info_t *fptr, const char *name, uint32_t crc)
 	if (asprintf(&path, "%s/.debug/%s", dname, name) != -1) {
 		dprintf("attempting to load alternate debug information "
 		    "from %s\n", path);
-		r = build_alt_debug(fptr, path, crc);
+		r = build_alt_debug(fptr, path, crc, NULL);
 		free(path);
 		if (r == B_TRUE)
 			goto out;
@@ -1728,7 +1799,7 @@ find_alt_debug(file_info_t *fptr, const char *name, uint32_t crc)
 	if (asprintf(&path, "/usr/lib/debug/%s/%s", dname, name) != -1) {
 		dprintf("attempting to load alternate debug information "
 		    "from %s\n", path);
-		r = build_alt_debug(fptr, path, crc);
+		r = build_alt_debug(fptr, path, crc, NULL);
 		free(path);
 		if (r == B_TRUE)
 			goto out;
@@ -1759,7 +1830,7 @@ Pbuild_file_symtab(struct ps_prochandle *P, file_info_t *fptr)
 		Elf_Data *c_data;
 		const char *c_name;
 	} *cp, *cache = NULL, *dyn = NULL, *plt = NULL, *ctf = NULL,
-	*dbglink = NULL;
+	*dbglink = NULL, *buildid = NULL;
 
 	if (fptr->file_init)
 		return;	/* We've already processed this file */
@@ -1985,28 +2056,110 @@ Pbuild_file_symtab(struct ps_prochandle *P, file_info_t *fptr)
 				continue;
 			}
 			ctf = cp;
-		} else if (strcmp(cp->c_name, ".gnu_debuglink") == 0) {
-			dprintf("found .gnu_debuglink section for %s\n",
+		} else if (strcmp(cp->c_name, BUILDID_NAME) == 0) {
+			dprintf("Found a %s section for %s\n", BUILDID_NAME,
+			    fptr->file_rname);
+			/* The ElfXX_Nhdr is 32/64-bit neutral */
+			if (cp->c_shdr.sh_type == SHT_NOTE &&
+			    cp->c_data->d_buf != NULL &&
+			    cp->c_data->d_size >= sizeof (Elf32_Nhdr)) {
+				Elf32_Nhdr *hdr = cp->c_data->d_buf;
+				if (hdr->n_type != 3)
+					continue;
+				if (hdr->n_namesz != 4)
+					continue;
+				if (hdr->n_descsz < MINBUILDID)
+					continue;
+				/* Set a reasonable upper bound */
+				if (hdr->n_descsz > MAXBUILDID) {
+					dprintf("Skipped %s as too large "
+					    "(%ld)\n", BUILDID_NAME,
+					    (unsigned long)hdr->n_descsz);
+					continue;
+				}
+
+				if (cp->c_data->d_size < sizeof (hdr) +
+				    hdr->n_namesz + hdr->n_descsz)
+					continue;
+				buildid = cp;
+			}
+		} else if (strcmp(cp->c_name, DBGLINK_NAME) == 0) {
+			dprintf("found %s section for %s\n", DBGLINK_NAME,
 			    fptr->file_rname);
 			/*
 			 * Let's make sure of a few things before we do this.
 			 */
 			if (cp->c_shdr.sh_type == SHT_PROGBITS &&
-			    cp->c_data->d_buf != NULL) {
-				dprintf(".gnu_debuglink pases initial "
-				    "sanity\n");
+			    cp->c_data->d_buf != NULL &&
+			    cp->c_data->d_size) {
 				dbglink = cp;
 			}
 		}
 	}
 
 	/*
-	 * If we haven't found any symbol table information and we have found a
-	 * .gnu_debuglink, it's time to try and figure out where we might find
-	 * this. To do so, we're going to first verify that the elf data seems
-	 * somewhat sane, eg. the elf data should be a string, so we want to
-	 * verify we have a null-terminator.
+	 * If we haven't found any symbol table information and we have found
+	 * either a .note.gnu.build-id or a .gnu_debuglink, it's time to try and
+	 * figure out where we might find this. Originally, GNU used the
+	 * .gnu_debuglink solely, but then they added a .note.gnu.build-id. The
+	 * build-id is some size, usually 16 or 20 bytes, often a SHA1 sum of
+	 * the old, but not present file. All that you have to do to compare
+	 * things is see if the sections are less, in theory saving you from
+	 * doing lots of expensive I/O.
+	 *
+	 * For the .note.gnu.build-id, we're going to check a few things before
+	 * using it, first that the name is 4 bytes, and is GNU and that the
+	 * type is 3, which they say is the build-id identifier.
+	 *
+	 * To verify that the elf data for the .gnu_debuglink seems somewhat
+	 * sane, eg. the elf data should be a string, so we want to verify we
+	 * have a null-terminator.
 	 */
+	if (fptr->file_symtab.sym_data_pri == NULL && buildid != NULL) {
+		int i, bo;
+		uint8_t *dp;
+		char buf[BUILDID_STRLEN], *path;
+		Elf32_Nhdr *hdr = buildid->c_data->d_buf;
+
+		/*
+		 * This was checked for validity when assigning the buildid
+		 * variable.
+		 */
+		bzero(buf, sizeof (buf));
+		dp = (uint8_t *)((uintptr_t)hdr + sizeof (*hdr) +
+		    hdr->n_namesz);
+		for (i = 0, bo = 0; i < hdr->n_descsz; i++, bo += 2, dp++) {
+			assert(sizeof (buf) - bo > 0);
+
+			/*
+			 * Recall that the build-id is structured as a series of
+			 * bytes. However, the first two characters are supposed
+			 * to represent a directory. Hence, once we reach offset
+			 * two, we insert a '/' character.
+			 */
+			if (bo == 2) {
+				buf[bo] = '/';
+				bo++;
+			}
+			(void) snprintf(buf + bo, sizeof (buf) - bo, "%2x",
+			    *dp);
+		}
+
+		if (asprintf(&path, "/usr/lib/debug/.build-id/%s.debug",
+		    buf) != -1) {
+			boolean_t r;
+			dprintf("attempting to find build id alternate debug "
+			    "file at %s\n", path);
+			r = build_alt_debug(fptr, path, 0, buildid->c_data);
+			dprintf("attempt %s\n", r == B_TRUE ?
+			    "succeeded" : "failed");
+			free(path);
+		} else {
+			dprintf("failed to construct build id path: %s\n",
+			    strerror(errno));
+		}
+	}
+
 	if (fptr->file_symtab.sym_data_pri == NULL && dbglink != NULL) {
 		char *c = dbglink->c_data->d_buf;
 		size_t i;
@@ -2047,7 +2200,7 @@ Pbuild_file_symtab(struct ps_prochandle *P, file_info_t *fptr)
 		}
 
 		if (found == B_TRUE)
-			find_alt_debug(fptr, dbglink->c_data->d_buf, crc);
+			find_alt_debuglink(fptr, dbglink->c_data->d_buf, crc);
 	}
 
 	/*
