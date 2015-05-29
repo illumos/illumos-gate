@@ -135,6 +135,7 @@ static int lxpr_readdir_task_tid_dir(lxpr_node_t *, uio_t *, int *);
 
 static void lxpr_read_invalid(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_empty(lxpr_node_t *, lxpr_uiobuf_t *);
+static void lxpr_read_cgroups(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_cpuinfo(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_diskstats(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_isdir(lxpr_node_t *, lxpr_uiobuf_t *);
@@ -240,6 +241,7 @@ const fs_operation_def_t lxpr_vnodeops_template[] = {
  * file contents of an lx /proc directory.
  */
 static lxpr_dirent_t lx_procdir[] = {
+	{ LXPR_CGROUPS,		"cgroups" },
 	{ LXPR_CMDLINE,		"cmdline" },
 	{ LXPR_CPUINFO,		"cpuinfo" },
 	{ LXPR_DEVICES,		"devices" },
@@ -532,6 +534,7 @@ static void (*lxpr_read_function[LXPR_NFILES])() = {
 	lxpr_read_pid_tid_status,	/* /proc/<pid>/task/<tid>/status */
 	lxpr_read_isdir,		/* /proc/<pid>/task/<tid>/fd	*/
 	lxpr_read_fd,			/* /proc/<pid>/task/<tid>/fd/nn	*/
+	lxpr_read_cgroups,		/* /proc/cgroups	*/
 	lxpr_read_empty,		/* /proc/cmdline	*/
 	lxpr_read_cpuinfo,		/* /proc/cpuinfo	*/
 	lxpr_read_empty,		/* /proc/devices	*/
@@ -628,6 +631,7 @@ static vnode_t *(*lxpr_lookup_function[LXPR_NFILES])() = {
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/task/<tid>/status */
 	lxpr_lookup_fddir,		/* /proc/<pid>/task/<tid>/fd	*/
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/task/<tid>/fd/nn	*/
+	lxpr_lookup_not_a_dir,		/* /proc/cgroups	*/
 	lxpr_lookup_not_a_dir,		/* /proc/cmdline	*/
 	lxpr_lookup_not_a_dir,		/* /proc/cpuinfo	*/
 	lxpr_lookup_not_a_dir,		/* /proc/devices	*/
@@ -724,6 +728,7 @@ static int (*lxpr_readdir_function[LXPR_NFILES])() = {
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/task/<tid>/status */
 	lxpr_readdir_fddir,		/* /proc/<pid>/task/<tid>/fd	*/
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/task/<tid>/fd/nn	*/
+	lxpr_readdir_not_a_dir,		/* /proc/cgroups	*/
 	lxpr_readdir_not_a_dir,		/* /proc/cmdline	*/
 	lxpr_readdir_not_a_dir,		/* /proc/cpuinfo	*/
 	lxpr_readdir_not_a_dir,		/* /proc/devices	*/
@@ -3678,6 +3683,24 @@ static const char *intc_ecx[] = {
 	"tm2",	NULL,	"cid", NULL,
 	NULL,	"cx16",	"xtpr"
 };
+
+/*
+ * Report a list of each cgroup subsystem supported by our emulated cgroup fs.
+ * This needs to exist for systemd to run but for now we don't report any
+ * cgroup subsystems as being installed. The commented example below shows
+ * how to print a subsystem entry.
+ */
+static void
+lxpr_read_cgroups(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
+{
+	lxpr_uiobuf_printf(uiobuf, "%s\t%s\t%s\t%s\n",
+	    "#subsys_name", "hierarchy", "num_cgroups", "enabled");
+
+	/*
+	 * lxpr_uiobuf_printf(uiobuf, "%s\t%s\t%s\t%s\n",
+	 *   "cpu,cpuacct", "2", "1", "1");
+	 */
+}
 
 static void
 lxpr_read_cpuinfo(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
