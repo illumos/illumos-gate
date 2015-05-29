@@ -30,7 +30,10 @@
 #include <sys/sockio.h>
 #include <sys/brand.h>
 #include <inet/ip.h>
+#include <inet/ip6.h>
 #include <inet/ip_impl.h>
+#include <inet/ip_ire.h>
+#include <sys/lx_brand.h>
 #include <sys/lx_misc.h>
 #include <sys/ethernet.h>
 #include <sys/dlpi.h>
@@ -140,24 +143,25 @@
 /*
  * rtnetlink(7) attribute constants
  */
-#define	LX_NETLINK_RTA_UNSPEC			1
-#define	LX_NETLINK_RTA_DST			2
-#define	LX_NETLINK_RTA_SRC			3
-#define	LX_NETLINK_RTA_IIF			4
-#define	LX_NETLINK_RTA_OIF			5
-#define	LX_NETLINK_RTA_GATEWAY			6
-#define	LX_NETLINK_RTA_PRIORITY			7
-#define	LX_NETLINK_RTA_PREFSRC			8
-#define	LX_NETLINK_RTA_METRICS			9
-#define	LX_NETLINK_RTA_MULTIPATH		10
-#define	LX_NETLINK_RTA_PROTOINFO		11
-#define	LX_NETLINK_RTA_FLOW			12
-#define	LX_NETLINK_RTA_CACHEINFO		13
-#define	LX_NETLINK_RTA_SESSION			14
-#define	LX_NETLINK_RTA_MP_ALGO			15
-#define	LX_NETLINK_RTA_TABLE			16
-#define	LX_NETLINK_RTA_MARK			17
-#define	LX_NETLINK_RTA_MFC_STATS		18
+#define	LX_NETLINK_RTA_UNSPEC		0
+#define	LX_NETLINK_RTA_DST		1
+#define	LX_NETLINK_RTA_SRC		2
+#define	LX_NETLINK_RTA_IIF		3
+#define	LX_NETLINK_RTA_OIF		4
+#define	LX_NETLINK_RTA_GATEWAY		5
+#define	LX_NETLINK_RTA_PRIORITY		6
+#define	LX_NETLINK_RTA_PREFSRC		7
+#define	LX_NETLINK_RTA_METRICS		8
+#define	LX_NETLINK_RTA_MULTIPATH	9
+#define	LX_NETLINK_RTA_PROTOINFO	10
+#define	LX_NETLINK_RTA_FLOW		11
+#define	LX_NETLINK_RTA_CACHEINFO	12
+#define	LX_NETLINK_RTA_SESSION		13
+#define	LX_NETLINK_RTA_MP_ALGO		14
+#define	LX_NETLINK_RTA_TABLE		15
+#define	LX_NETLINK_RTA_MARK		16
+#define	LX_NETLINK_RTA_MFC_STATS	17
+#define	LX_NETLINK_MAX_RTA	LX_NETLINK_RTA_MFC_STATS
 
 /*
  * rtnetlink(7) NEWLINK/DELLINK/GETLINK constants
@@ -256,6 +260,38 @@
 #define	LX_IFF_DORMANT		(1<<17)
 #define	LX_IFF_ECHO		(1<<18)
 
+/* rtm_table */
+#define	LX_ROUTE_TABLE_MAIN	254
+
+/* rtm_type */
+#define	LX_RTN_UNSPEC		0
+#define	LX_RTN_UNICAST		1
+#define	LX_RTN_LOCAL		2
+#define	LX_RTN_BROADCAST	3
+#define	LX_RTN_ANYCAST		4
+#define	LX_RTN_MULTICAST	5
+#define	LX_RTN_BLACKHOLE	6
+#define	LX_RTN_UNREACHABLE	7
+#define	LX_RTN_PROHIBIT		8
+#define	LX_RTN_THROW		9
+#define	LX_RTN_NAT		10
+#define	LX_RTN_XRESOLVE		11
+
+/* rtm_protocol */
+#define	LX_RTPROT_UNSPEC	0
+#define	LX_RTPROT_REDIRECT	1	/* From ICMP redir	*/
+#define	LX_RTPROT_KERNEL	2	/* From kernel		*/
+#define	LX_RTPROT_BOOT		3	/* From boot		*/
+#define	LX_RTPROT_STATIC	4	/* From administrator	*/
+#define	LX_RTPROT_NULL		0xff	/* Uninitialized	*/
+
+/* rtm_scope */
+#define	LX_RTSCOPE_UNIVERSE	0
+#define	LX_RTSCOPE_SITE		200
+#define	LX_RTSCOPE_LINK		253
+#define	LX_RTSCOPE_HOST		254
+#define	LX_RTSCOPE_NOWHERE	255
+
 
 /*
  * Netlink sockopts
@@ -269,6 +305,22 @@
 #define	LX_NETLINK_SO_NO_ENOBUFS	5
 #define	LX_NETLINK_SO_RX_RING		6
 #define	LX_NETLINK_SO_TX_RING		7
+
+#define	LXNLMSG_ALIGNTO	4
+#define	LXNLMSG_ALIGN(len)	\
+	(((len) + LXNLMSG_ALIGNTO - 1) & ~(LXNLMSG_ALIGNTO - 1))
+#define	LXNLMSG_HDRLEN	\
+	((int)LXNLMSG_ALIGN(sizeof (lx_netlink_hdr_t)))
+#define	LXNLMSG_LENGTH(len)	((len) + NLMSG_HDRLEN)
+#define	LXNLMSG_SPACE(len)	NLMSG_ALIGN(NLMSG_LENGTH(len))
+#define	LXNLMSG_DATA(nlh)	((void*)(((char *)nlh) + NLMSG_LENGTH(0)))
+#define	LXNLMSG_PAYLOAD(nlh, len)	\
+	((nlh)->nlmsg_len - NLMSG_SPACE((len)))
+
+#define	LXATTR_PAYLOAD(lxa)	\
+	((void*)((caddr_t)(lxa) + sizeof (lx_netlink_attr_t)))
+#define	LXATTR_HDRLEN	LXNLMSG_ALIGN(sizeof (lx_netlink_attr_t))
+#define	LXATTR_LEN(len)	(LXATTR_HDRLEN + LXNLMSG_ALIGN(len))
 
 typedef struct lx_netlink_hdr {
 	uint32_t lxnh_len;			/* length of message */
@@ -305,6 +357,18 @@ typedef struct lx_netlink_ifaddrmsg {
 	uint8_t		lxnl_ifa_scope;		/* address scope */
 	uint8_t		lxnl_ifa_index;		/* interface index */
 } lx_netlink_ifaddrmsg_t;
+
+typedef struct lx_netlink_rtmsg {
+	uint8_t		rtm_family;	/* route AF			*/
+	uint8_t		rtm_dst_len;	/* destination addr length	*/
+	uint8_t		rtm_src_len;	/* source addr length		*/
+	uint8_t		rtm_tos;	/* TOS filter			*/
+	uint8_t		rtm_table;	/* routing table ID		*/
+	uint8_t		rtm_protocol;	/* routing protocol		*/
+	uint8_t		rtm_scope;
+	uint8_t		rtm_type;
+	uint32_t	rtm_flags;
+} lx_netlink_rtmsg_t;
 
 typedef struct lx_netlink_sockaddr {
 	sa_family_t	lxnl_family;		/* AF_LX_NETLINK */
@@ -507,25 +571,23 @@ lx_netlink_reply_add(lx_netlink_reply_t *reply, void *payload, uint32_t size)
 {
 	lx_netlink_hdr_t *hdr;
 	lx_netlink_sock_t *lxsock = reply->lxnr_sock;
-	uint32_t align, alignto = LX_NETLINK_NLA_ALIGNTO;
+	uint32_t aligned;
 	mblk_t *mp = reply->lxnr_mp;
 
 	if (reply->lxnr_errno)
 		return;
 
-	align = (alignto - (size & (alignto - 1))) & (alignto - 1);
-
+	aligned = LXNLMSG_ALIGN(size);
 	hdr = (lx_netlink_hdr_t *)mp->b_rptr;
 
-	if (hdr->lxnh_len + size + align > lxsock->lxns_bufsize) {
+	if (hdr->lxnh_len + aligned > lxsock->lxns_bufsize) {
 		reply->lxnr_errno = E2BIG;
 		return;
 	}
 
 	bcopy(payload, mp->b_wptr, size);
-
-	hdr->lxnh_len += size + align;
-	mp->b_wptr += size + align;
+	hdr->lxnh_len += aligned;
+	mp->b_wptr += aligned;
 }
 
 static void
@@ -548,11 +610,11 @@ lx_netlink_reply_msg(lx_netlink_reply_t *reply, void *payload, uint32_t size)
 	bzero(mp->b_rptr, lxsock->lxns_bufsize);
 	hdr = (lx_netlink_hdr_t *)mp->b_rptr;
 	hdr->lxnh_flags = LX_NETLINK_NLM_F_MULTI;
-	hdr->lxnh_len = sizeof (lx_netlink_hdr_t);
+	hdr->lxnh_len = LXNLMSG_ALIGN(sizeof (lx_netlink_hdr_t));
 	hdr->lxnh_seq = reply->lxnr_hdr.lxnh_seq;
 	hdr->lxnh_pid = lxsock->lxns_port;
 
-	mp->b_wptr += sizeof (lx_netlink_hdr_t);
+	mp->b_wptr += LXNLMSG_ALIGN(sizeof (lx_netlink_hdr_t));
 
 	if (payload == NULL) {
 		/*
@@ -734,6 +796,52 @@ lx_netlink_reply_error(lx_netlink_sock_t *lxsock,
 
 	reply->lxnr_errno = errno;
 	lx_netlink_reply_done(reply);
+
+	return (0);
+}
+
+static int
+lx_netlink_parse_msg_attrs(mblk_t *mp, void **msgp, unsigned int msg_size,
+    lx_netlink_attr_t **attrp, unsigned int *attr_max)
+{
+	lx_netlink_hdr_t *hdr = (lx_netlink_hdr_t *)mp->b_rptr;
+	lx_netlink_attr_t *lxa;
+	unsigned char *buf = mp->b_rptr + LXNLMSG_HDRLEN;
+	unsigned int i;
+	uint32_t buf_left = MBLKL(mp) - LXNLMSG_HDRLEN;
+	uint32_t msg_left = hdr->lxnh_len;
+
+	msg_size = LXNLMSG_ALIGN(msg_size);
+	if (msg_size > buf_left || msg_size > msg_left) {
+		return (-1);
+	}
+
+	*msgp = (void *)buf;
+	buf += msg_size;
+	buf_left -= msg_size;
+	msg_left -= msg_size;
+
+	/* Do not bother with attr parsing if not requested */
+	if (attrp == NULL || *attr_max == 0) {
+		return (0);
+	}
+
+	for (i = 0; i < *attr_max; i++) {
+		if (buf_left < LXATTR_HDRLEN || msg_left < LXATTR_HDRLEN) {
+			break;
+		}
+
+		lxa = (lx_netlink_attr_t *)buf;
+		if (lxa->lxna_len > buf_left || lxa->lxna_len > msg_left) {
+			return (-1);
+		}
+
+		attrp[i] = lxa;
+		buf += lxa->lxna_len;
+		buf_left -= lxa->lxna_len;
+		msg_left -= lxa->lxna_len;
+	}
+	*attr_max = i;
 
 	return (0);
 }
@@ -1015,6 +1123,188 @@ lx_netlink_getaddr(lx_netlink_sock_t *lxsock, lx_netlink_hdr_t *hdr, mblk_t *mp)
 	return (0);
 }
 
+struct lx_getroute_ctx {
+	lx_netlink_reply_t *lgrtctx_reply;
+	lx_netlink_rtmsg_t *lgrtctx_rtmsg;
+	lx_netlink_attr_t *lgrtctx_attrs[LX_NETLINK_MAX_RTA];
+	unsigned int lgrtctx_max_attr;
+	lx_netlink_attr_t *lgrtctx_rtadst;
+};
+
+static void
+lx_netlink_getroute_ipv4(ire_t *ire, struct lx_getroute_ctx *ctx)
+{
+	lx_netlink_reply_t *reply = ctx->lgrtctx_reply;
+	lx_netlink_rtmsg_t *rtmsg = ctx->lgrtctx_rtmsg;
+	lx_netlink_attr_t *rtadst = ctx->lgrtctx_rtadst;
+	lx_netlink_rtmsg_t res;
+	ill_t *ill = NULL;
+
+	/* Certain IREs are too specific for netlink */
+	if ((ire->ire_type & (IRE_BROADCAST | IRE_MULTICAST | IRE_NOROUTE |
+	    IRE_LOOPBACK | IRE_LOCAL)) != 0 || ire->ire_testhidden != 0) {
+		return;
+	}
+	/*
+	 * When listing routes, CLONE entries are undesired.
+	 * They are required for 'ip route get' on a local address.
+	 */
+	if (rtmsg->rtm_dst_len == 0 && (ire->ire_type & IRE_IF_CLONE) != 0) {
+		return;
+	}
+
+	bzero(&res, sizeof (res));
+	res.rtm_family = LX_AF_INET;
+	res.rtm_table = LX_ROUTE_TABLE_MAIN;
+	res.rtm_type = LX_RTN_UNICAST;
+	res.rtm_dst_len = ire->ire_masklen;
+
+	if (ire->ire_type & (IRE_IF_NORESOLVER|IRE_IF_RESOLVER)) {
+		/* Interface-local networks considered kernel-created */
+		res.rtm_protocol = LX_RTPROT_KERNEL;
+		res.rtm_scope = LX_RTSCOPE_LINK;
+	} else if (ire->ire_flags & RTF_STATIC) {
+		res.rtm_protocol = LX_RTPROT_STATIC;
+	}
+
+	if (rtmsg->rtm_dst_len == 0x20 && rtadst != NULL) {
+		/*
+		 * SpecifY single-destination route.
+		 * RTA_DST details will be added later
+		 */
+		res.rtm_dst_len = rtmsg->rtm_dst_len;
+	}
+
+
+	lx_netlink_reply_msg(reply, &res, sizeof (res));
+
+	if (rtmsg->rtm_dst_len == 0x20 && rtadst != NULL) {
+		/* Add RTA_DST details for single-destination route. */
+		lx_netlink_reply_attr(reply, LX_NETLINK_RTA_DST,
+		    LXATTR_PAYLOAD(rtadst), sizeof (ipaddr_t));
+	} else if (ire->ire_masklen != 0) {
+		lx_netlink_reply_attr(reply, LX_NETLINK_RTA_DST,
+		    &ire->ire_addr, sizeof (ire->ire_addr));
+	}
+
+	if (ire->ire_ill != NULL) {
+		ill = ire->ire_ill;
+	} else if (ire->ire_dep_parent != NULL) {
+		ill = ire->ire_dep_parent->ire_ill;
+	}
+
+	if (ill != NULL) {
+		uint32_t ifindex, addr_src;
+
+		ifindex = ill->ill_phyint->phyint_ifindex;
+		lx_netlink_reply_attr(reply, LX_NETLINK_RTA_OIF,
+		    &ifindex, sizeof (ifindex));
+
+		addr_src = ill->ill_ipif->ipif_lcl_addr;
+		lx_netlink_reply_attr(reply, LX_NETLINK_RTA_PREFSRC,
+		    &addr_src, sizeof (addr_src));
+	}
+
+	if (ire->ire_flags & RTF_GATEWAY) {
+		lx_netlink_reply_attr(reply, LX_NETLINK_RTA_GATEWAY,
+		    &ire->ire_gateway_addr, sizeof (ire->ire_gateway_addr));
+	}
+
+	lx_netlink_reply_send(reply);
+}
+
+/*ARGSUSED*/
+static int
+lx_netlink_getroute(lx_netlink_sock_t *lxsock, lx_netlink_hdr_t *hdr,
+    mblk_t *mp)
+{
+	struct lx_getroute_ctx ctx;
+	lx_netlink_reply_t *reply;
+	lx_netlink_rtmsg_t rtmsg, *rtmsgp;
+	int rtmsg_size = sizeof (rtmsg);
+	netstack_t *ns;
+	int i;
+
+	bzero(&ctx, sizeof (ctx));
+	ctx.lgrtctx_max_attr = LX_NETLINK_MAX_RTA;
+
+	if (lx_netlink_parse_msg_attrs(mp, (void **)&rtmsgp,
+	    rtmsg_size, ctx.lgrtctx_attrs, &ctx.lgrtctx_max_attr) != 0) {
+		return (EPROTO);
+	}
+
+	/*
+	 * Older version of libnetlink send a truncated rtmsg struct for
+	 * certain RTM_GETROUTE queries.  We must detect this condition and
+	 * truncate our input to prevent later confusion.
+	 */
+	if (curproc->p_zone->zone_brand == &lx_brand &&
+	    lx_kern_version_cmp(curproc->p_zone, "2.6.32") <= 0 &&
+	    rtmsgp->rtm_dst_len == 0) {
+		rtmsg_size = sizeof (rtmsg.rtm_family);
+	}
+	bzero(&rtmsg, sizeof (rtmsg));
+	bcopy(rtmsgp, &rtmsg, rtmsg_size);
+	ctx.lgrtctx_rtmsg = &rtmsg;
+
+	/* If RTA_DST was passed, it effects later decisions */
+	for (i = 0; i < ctx.lgrtctx_max_attr; i++) {
+		lx_netlink_attr_t *attr = ctx.lgrtctx_attrs[i];
+
+		if (attr->lxna_type == LX_NETLINK_RTA_DST &&
+		    attr->lxna_len == LXATTR_LEN(sizeof (ipaddr_t))) {
+			ctx.lgrtctx_rtadst = attr;
+			break;
+		}
+	}
+
+	reply = lx_netlink_reply(lxsock, hdr, LX_NETLINK_RTM_NEWROUTE);
+	if (reply == NULL) {
+		return (ENOMEM);
+	}
+	ctx.lgrtctx_reply = reply;
+
+	/* Do not report anything outside the main table */
+	if (rtmsg.rtm_table != LX_ROUTE_TABLE_MAIN &&
+	    rtmsg.rtm_table != 0) {
+		lx_netlink_reply_done(reply);
+		return (0);
+	}
+
+	ns = netstack_get_current();
+	if (ns == NULL) {
+		lx_netlink_reply_done(reply);
+		return (0);
+	}
+	if (rtmsg.rtm_family == LX_AF_INET || rtmsg.rtm_family == 0) {
+		if (rtmsg.rtm_dst_len == 0x20 && ctx.lgrtctx_rtadst != NULL) {
+			/* resolve route for host */
+			ipaddr_t *dst = LXATTR_PAYLOAD(ctx.lgrtctx_rtadst);
+			ire_t *ire_dst;
+
+			ire_dst = ire_route_recursive_dstonly_v4(*dst, 0, 0,
+			    ns->netstack_ip);
+			lx_netlink_getroute_ipv4(ire_dst, &ctx);
+			ire_refrele(ire_dst);
+		} else {
+			/* get route listing */
+			ire_walk_v4(&lx_netlink_getroute_ipv4, &ctx, ALL_ZONES,
+			    ns->netstack_ip);
+		}
+	}
+	if (rtmsg.rtm_family == LX_AF_INET6) {
+		/* punt on ipv6 for now */
+		netstack_rele(ns);
+		lx_netlink_reply_done(reply);
+		return (EPROTO);
+	}
+	netstack_rele(ns);
+
+	lx_netlink_reply_done(reply);
+	return (0);
+}
+
+
 /*ARGSUSED*/
 static int
 lx_netlink_audit(lx_netlink_sock_t *lxsock, lx_netlink_hdr_t *hdr, mblk_t *mp)
@@ -1057,6 +1347,8 @@ lx_netlink_send(sock_lower_handle_t handle, mblk_t *mp,
 		    LX_NETLINK_RTM_GETLINK, lx_netlink_getlink },
 		{ LX_NETLINK_ROUTE,
 		    LX_NETLINK_RTM_GETADDR, lx_netlink_getaddr },
+		{ LX_NETLINK_ROUTE,
+		    LX_NETLINK_RTM_GETROUTE, lx_netlink_getroute },
 		{ LX_NETLINK_AUDIT,
 		    LX_NETLINK_NLMSG_NONE, lx_netlink_audit },
 		{ LX_NETLINK_KOBJECT_UEVENT,

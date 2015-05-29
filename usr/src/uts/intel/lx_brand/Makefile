@@ -21,7 +21,7 @@
 #
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-# Copyright 2014 Joyent, Inc.  All rights reserved.
+# Copyright 2015 Joyent, Inc.
 #
 #	This makefile drives the production of the kernel component of
 #	the lx brand
@@ -58,6 +58,7 @@ LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 INC_PATH	+= -I$(UTSBASE)/common/brand/lx -I$(LX_CMN)
+INC_PATH	+= -I$(SRC)/common
 AS_INC_PATH	+= -I$(UTSBASE)/i86pc/genassym/$(OBJS_DIR)
 
 #
