@@ -1,0 +1,395 @@
+.\"
+.\" CDDL HEADER START
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\" CDDL HEADER END
+.\"
+.\"
+.\" Copyright (c) 2016 by Delphix. All rights reserved.
+.\"
+.Dd July 5, 2016
+.Dt CONNSTAT 1M
+.Os
+.Sh NAME
+.Nm connstat
+.Nd report TCP connection statistics
+.Sh SYNOPSIS
+.Nm
+.Op Fl eLP
+.Op Fl 4 Ns | Ns Fl 6
+.Op Fl T Sy d Ns | Ns Sy u
+.Op Fl F Ar filter
+.Op Fl i Ar interval
+.Op Fl c Ar count
+.Op Fl o Ar field Ns Oo , Ns Ar field Oc Ns ...
+.Sh DESCRIPTION
+The
+.Nm
+command reports TCP connection statistics in tabular form.
+Each row of the table represents the activity of one connection.
+The
+.Nm
+command adds virtually no overhead to run as it is aggregating statistics that
+are always collected in the kernel.
+.Pp
+With no arguments,
+.Nm
+prints a single report containing all TCP connections, and includes a basic
+set of fields representing IP address and port information, as well as connection
+state.
+The
+.Fl o
+flag can be used to specify which fields to display, and other arguments to
+filter the set of connections included in the output.
+.Sh OPTIONS
+The arguments are as follows:
+.Bl -tag -width ""
+.It Fl 4 , Fl -ipv4
+Only displays IPv4 connections.
+.It Fl 6 , Fl -ipv6
+Only displays IPv6 connections
+.It Fl c Ar count , Fl -count Ns = Ns Ar count
+Print a specified number of reports before exiting.
+This is used in conjunction with
+.Fl i .
+.It Fl e , Fl -established
+Only display connections that are in state ESTABLISHED.
+This is equivalent to including
+.Sy state=ESTABLISHED
+in the filter argument to the
+.Fl F
+option.
+.It Fl F Ar filter , Fl -filter Ns = Ns Ar filter
+Only display connections that match the filter argument provided.
+The format of the filter is:
+.Pp
+.Ar field Ns = Ns Ar value Ns Oo , Ns Ar field Ns = Ns Ar value Oc Ns ...
+.Pp
+Fields that can currently be filtered are
+.Ar laddr , Ar lport , Ar raddr , Ar rport , and Ar state .
+See the
+.Sx Fields
+section for a description of these fields.
+The filter matches a connection if all of the filter elements match, and a
+field must only appears once in the filter.
+.It Fl i Ar interval , Fl -interval Ns = Ns Ar interval
+Specify an output interval in seconds.
+For each interval, a report containing all connections appropriate given other
+command-line options is printed.
+.It Fl L , Fl -no-loopback
+Exclude connections to the loopback address.
+.It Fl o Ar fields , Fl -output Ns = Ns Ar fields
+Restrict the output to the specified comma-delimited list of field names.
+See the
+.Sx Fields
+section for information about possible fields.
+.It Fl P , Fl -parsable
+Display using a stable, machine-parsable output format.
+The
+.Fl o
+flag must also be given to specify which fields to output and their order.
+Each line of output will consist of comma-delimited (,) fields,
+and no header will be emittted.
+When also using the
+.Fl T
+option, lines indicating the current time will begin with
+.Dq "= " .
+See
+.Sx Example 4
+for an example of how to process parsable output.
+.It Fl T Sy d Ns | Ns Sy u , Fl -timestamp Ns = Ns Sy d Ns | Ns Sy u
+Print a timestamp before each block of output.
+.Pp
+Specify
+.Sy u
+for a printed representation of the internal representation of time (see
+.Xr time 2 Ns ).
+Specify
+.Sy d
+for standard date format (see
+.Xr date 1 Ns ).
+.El
+.Ss Fields
+The following fields are supported.
+Field names are case insensitive.
+Unless otherwise indicated, the values of fields that represent a count (e.g.
+bytes or segments) are cumulative since the connection was established.
+Some of these fields refer to data segments, which are segments that contain
+non-zero amount of data.
+All sizes are in bytes.
+.Bl -tag -width "inunorderbytes"
+.It Sy cwnd
+The size of the local TCP congestion window at this instant.
+.It Sy inbytes
+The number of data bytes received.
+This does not include duplicate bytes received.
+.It Sy insegs
+The number of data segments received.
+This does not include duplicate segments received.
+.It Sy inunorderbytes
+The number of data bytes that were received out of order.
+.It Sy inunordersegs
+The number of data segments that were received out of order.
+.It Sy laddr
+The local IP address.
+.It Sy lport
+The local TCP port.
+.It Sy mss
+The maximum TCP segment size for this connection.
+.It Sy outbytes
+The number of data bytes sent.
+This does not include retransmitted bytes counted by
+.Sy retransbytes .
+.It Sy outsegs
+The number of data segments sent.
+This does not include segments containing retransmitted bytes counted by
+.Sy retranssegs .
+.It Sy raddr
+The remote IP address.
+.It Sy retransbytes
+The number of data bytes retransmitted.
+.It Sy retranssegs
+The number of data segments sent that contained retransmitted bytes.
+.It Sy rport
+The remote TCP port.
+.It Sy rto
+The current retransmission timeout in milliseconds.
+.It Sy rtt
+The current smoothed round-trip time to the peer in microseconds.
+The smoothed RTT average algorithm used is as described in RFC 6298.
+.It Sy rttc
+The number of times that a round-trip sample was added to
+.Sy rtts .
+See
+.Sy rtts
+for a description of how these two fields can be used together to calculate the
+average round-trip over a given period.
+.It Sy rtts
+The sum of all round-trip samples taken over the lifetime of the connection in
+microseconds.
+Each time TCP updates the value of
+.Sy rtt
+with a new sample, that sample's value is added to
+.Sy rtts .
+To calculate the average round-trip over a given period (e.g. between T1 and T2),
+take samples of
+.Sy rtts
+and
+.Sy rttc
+at T1 and T2, and calculate
+.br
+((
+.Sy rtts Ns
+_T2 -
+.Sy rtts Ns
+_T1 ) / (
+.Sy rttc Ns
+_T2 -
+.Sy rttc Ns
+_T1 )).
+.br
+See
+.Sx Example 4
+for an example of how this can be done programmatically from a shell script.
+.It Sy rwnd
+The size of the local TCP receive window at this instant.
+.It Sy state
+The TCP connection state.
+Possible values are:
+.Bl -tag -width "SYN_RECEIVED"
+.It Sy BOUND
+Bound, ready to connect or listen.
+.It Sy CLOSED
+Closed.
+The local endpoint (e.g. socket) is not being used.
+.It Sy CLOSING
+Closed, but still waiting for a termination acknowledgment from the peer.
+.It Sy CLOSE_WAIT
+The peer has shutdown; waiting for the local endpoint to close.
+.It Sy ESTABLISHED
+Connection has been established and data can be transferred.
+.It Sy FIN_WAIT_1
+Local endpoint is closed, but waiting for termination acknowledgment from the
+peer.
+.It Sy FIN_WAIT_2
+Local endpoint is closed, but waiting for a termination request from the peer.
+.It Sy IDLE
+The local endpoint (e.g. socket) has been opened, but is not bound.
+.It Sy LAST_ACK
+The remote endpoint has terminated, and the local endpoint has sent a termination
+request.
+The acknowledgment for this request has not been received.
+.It Sy LISTEN
+Listening for incoming connections.
+.It Sy SYN_RECEIVED
+Initial connection request has been received and acknowledged, and a connection
+request has been sent but not yet acknowledged.
+.It Sy SYN_SENT
+A connection establishment request has been sent but not yet acknowledged.
+.It Sy TIME_WAIT
+Waiting for time to pass after having sent an acknowledgment for the peer's
+connection termination request.
+.El
+.Pp
+See RFC 793 for a more complete understanding of the TCP protocol and TCP
+connection states.
+.It Sy suna
+The number of unacknowledged bytes outstanding at this instant.
+.It Sy swnd
+The size of the local TCP send window (the peer's receive window) at this
+instant.
+.It Sy unsent
+The number of unsent bytes in the local TCP transmit queue at this instant.
+.El
+.Sh EXIT STATUS
+The
+.Nm
+utility exits 0 on success, or 1 if an error occurs.
+.Sh EXAMPLES
+.Bl -tag -width ""
+.It Sy Example 1 List established connections.
+By default, connstat lists basic connection details.
+Using the
+.Fl e
+option allows the user to get a quick glance of established connections.
+.Bd -literal
+$ connstat -e
+          LADDR  LPORT           RADDR  RPORT        STATE
+   10.43.37.172  51275    172.16.105.4    389  ESTABLISHED
+   10.43.37.172     22    172.16.98.16  62270  ESTABLISHED
+   10.43.37.172   1020  172.16.100.162   2049  ESTABLISHED
+   10.43.37.172   1019     10.43.11.64   2049  ESTABLISHED
+   10.43.37.172     22    172.16.98.16  61520  ESTABLISHED
+   10.43.37.172     80    10.43.16.132  59467  ESTABLISHED
+.Ed
+.It Sy Example 2 Show one connection's I/O stats every second
+The
+.Fl F
+option is used to filter a specific connection,
+.Fl o
+is used to output specific fields, and
+.Fl i
+to provide the output interval in seconds.
+.Bd -literal
+$ connstat -F lport=22,rport=49675,raddr=172.16.168.30 \e
+  -o inbytes,outbytes -i 1
+    INBYTES    OUTBYTES
+       9589       18101
+    INBYTES    OUTBYTES
+       9589       18341
+    INBYTES    OUTBYTES
+       9589       18501
+    INBYTES    OUTBYTES
+       9589       18661
+    ...
+.Ed
+.It Sy Example 3 Understanding the bottleneck for a given connection
+Understanding the transmit bottleneck for a connection requires knowing the
+size of the congestion window, whether the window is full, and the round-trip
+time to the peer.
+The congestion window is full when
+.Sy suna
+is equal to
+.Sy cwnd .
+If the window is full, then the throughput is limited by the size of the window
+and the round-trip time.
+In that case, knowing these two values is critical.
+Either the window is small because of retransmissions, or the round-trip
+latency is high, or both.
+In the example below, the window is small due to high congestion or an
+unreliable network.
+.Bd -literal
+$ connstat -F lport=41934,rport=50001 \e
+  -o outbytes,suna,cwnd,unsent,retransbytes,rtt -T d -i 1
+July  7, 2016 11:04:40 AM EDT
+   OUTBYTES        SUNA        CWND      UNSENT  RETRANSBYTES      RTT
+ 1647048093       47784       47784     3017352       3701844      495
+July  7, 2016 11:04:41 AM EDT
+   OUTBYTES        SUNA        CWND      UNSENT  RETRANSBYTES      RTT
+ 1660720109       41992       41992     1535032       3765556      673
+July  7, 2016 11:04:42 AM EDT
+   OUTBYTES        SUNA        CWND      UNSENT  RETRANSBYTES      RTT
+ 1661875613       26064       26064     4311688       3829268      571
+July  7, 2016 11:04:43 AM EDT
+   OUTBYTES        SUNA        CWND      UNSENT  RETRANSBYTES      RTT
+ 1681478637       41992       41992      437304       3932076     1471
+July  7, 2016 11:04:44 AM EDT
+   OUTBYTES        SUNA        CWND      UNSENT  RETRANSBYTES      RTT
+ 1692028765       44888       44888     1945800       4014612      921
+\&...
+.Ed
+.It Sy Example 4 Calculating average RTT over intervals
+As described in the
+.Sx Fields
+section, the
+.Sy rtts
+and
+.Sy rttc
+fields can be used to calculate average RTT over a period of time.
+The following example combines machine parsable output with these fields to do
+this programmatically.
+The script:
+.Bd -literal
+#!/bin/bash
+
+i=0
+connstat -P -F lport=41934,rport=50001 -o rttc,rtts -i 1 | \e
+    while IFS=, read rttc[$i] rtts[$i]; do
+        if [[ $i != 0 ]]; then
+                let rtt="(${rtts[$i]} - ${rtts[$i - 1]}) / \e
+                    (${rttc[$i]} - ${rttc[$i - 1]})"
+                print "avg rtt = ${rtt}us"
+        fi
+        ((i++))
+done
+.Ed
+.Pp
+The output:
+.Bd -literal
+\&...
+avg rtt = 992us
+avg rtt = 829us
+avg rtt = 712us
+avg rtt = 869us
+\&...
+.Ed
+.It Sy Example 5 Show HTTP server connections in TIME_WAIT state
+Connections accumulating in TIME_WAIT state can sometimes be an issue, as these
+connections linger and take up port number space while their time wait timer
+is ticking.
+.Bd -literal
+$ connstat -F state=time_wait,lport=80
+          LADDR  LPORT           RADDR  RPORT        STATE
+   10.43.37.172     80   172.16.168.30  56067    TIME_WAIT
+   10.43.37.172     80   172.16.168.30  56068    TIME_WAIT
+   10.43.37.172     80   172.16.168.30  56070    TIME_WAIT
+.Ed
+.El
+.Sh INTERFACE STABILITY
+The command line options for this command are stable, but the output format
+when not using the
+.Fl P
+option and diagnostic messages are not.
+.Sh SEE ALSO
+.Xr netstat 1M
+.Rs
+.%A J. Postel
+.%B Transmission Control Protocol, STD 7, RFC 793
+.%D September 1981
+.Re
+.Rs
+.%A V. Paxson
+.%A M. Allman
+.%A J. Chu
+.%A M. Sargent
+.%B Computing TCP's Retransmission Timer, RFC 6298
+.%D June 2011
+.Re

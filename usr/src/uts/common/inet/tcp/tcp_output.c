@@ -1273,7 +1273,9 @@ tcp_output(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *dummy)
 
 	TCPS_BUMP_MIB(tcps, tcpOutDataSegs);
 	TCPS_UPDATE_MIB(tcps, tcpOutDataBytes, len);
-	BUMP_LOCAL(tcp->tcp_obsegs);
+	TCPS_BUMP_MIB(tcps, tcpHCOutSegs);
+	tcp->tcp_cs.tcp_out_data_segs++;
+	tcp->tcp_cs.tcp_out_data_bytes += len;
 
 	/* Update the latest receive window size in TCP header. */
 	tcpha->tha_win = htons(tcp->tcp_rwnd >> tcp->tcp_rcv_ws);
@@ -1960,16 +1962,21 @@ tcp_send(tcp_t *tcp, const int mss, const int total_hdr_len,
 			}
 			*snxt += len;
 			*tail_unsent = (*xmit_tail)->b_wptr - mp1->b_wptr;
-			BUMP_LOCAL(tcp->tcp_obsegs);
+			TCPS_BUMP_MIB(tcps, tcpHCOutSegs);
 			TCPS_BUMP_MIB(tcps, tcpOutDataSegs);
 			TCPS_UPDATE_MIB(tcps, tcpOutDataBytes, len);
+			tcp->tcp_cs.tcp_out_data_segs++;
+			tcp->tcp_cs.tcp_out_data_bytes += len;
 			tcp_send_data(tcp, mp);
 			continue;
 		}
 
 		*snxt += len;	/* Adjust later if we don't send all of len */
+		TCPS_BUMP_MIB(tcps, tcpHCOutSegs);
 		TCPS_BUMP_MIB(tcps, tcpOutDataSegs);
 		TCPS_UPDATE_MIB(tcps, tcpOutDataBytes, len);
+		tcp->tcp_cs.tcp_out_data_segs++;
+		tcp->tcp_cs.tcp_out_data_bytes += len;
 
 		if (*tail_unsent) {
 			/* Are the bytes above us in flight? */
@@ -2145,6 +2152,7 @@ tcp_send(tcp_t *tcp, const int mss, const int total_hdr_len,
 				*snxt += spill;
 				tcp->tcp_last_sent_len += spill;
 				TCPS_UPDATE_MIB(tcps, tcpOutDataBytes, spill);
+				tcp->tcp_cs.tcp_out_data_bytes += spill;
 				/*
 				 * Adjust the checksum
 				 */
@@ -2193,7 +2201,7 @@ tcp_send(tcp_t *tcp, const int mss, const int total_hdr_len,
 			 */
 			ixa->ixa_fragsize = ixa->ixa_pmtu;
 			ixa->ixa_extra_ident = 0;
-			tcp->tcp_obsegs += num_lso_seg;
+			TCPS_BUMP_MIB(tcps, tcpHCOutSegs);
 			TCP_STAT(tcps, tcp_lso_times);
 			TCP_STAT_UPDATE(tcps, tcp_lso_pkt_out, num_lso_seg);
 		} else {
@@ -2204,7 +2212,7 @@ tcp_send(tcp_t *tcp, const int mss, const int total_hdr_len,
 			 */
 			lso_info_cleanup(mp);
 			tcp_send_data(tcp, mp);
-			BUMP_LOCAL(tcp->tcp_obsegs);
+			TCPS_BUMP_MIB(tcps, tcpHCOutSegs);
 		}
 	}
 
@@ -2420,7 +2428,7 @@ tcp_xmit_ctl(char *str, tcp_t *tcp, uint32_t seq, uint32_t ack, int ctl)
 		tcp->tcp_rack_cnt = 0;
 		TCPS_BUMP_MIB(tcps, tcpOutAck);
 	}
-	BUMP_LOCAL(tcp->tcp_obsegs);
+	TCPS_BUMP_MIB(tcps, tcpHCOutSegs);
 	tcpha->tha_seq = htonl(seq);
 	tcpha->tha_ack = htonl(ack);
 	/*
@@ -3394,6 +3402,8 @@ tcp_sack_rexmit(tcp_t *tcp, uint_t *flags)
 		TCPS_BUMP_MIB(tcps, tcpRetransSegs);
 		TCPS_UPDATE_MIB(tcps, tcpRetransBytes, seg_len);
 		TCPS_BUMP_MIB(tcps, tcpOutSackRetransSegs);
+		tcp->tcp_cs.tcp_out_retrans_segs++;
+		tcp->tcp_cs.tcp_out_retrans_bytes += seg_len;
 		/*
 		 * Update tcp_rexmit_max to extend this SACK recovery phase.
 		 * This happens when new data sent during fast recovery is
@@ -3464,6 +3474,8 @@ tcp_ss_rexmit(tcp_t *tcp)
 			old_snxt_mp->b_prev = (mblk_t *)(intptr_t)gethrtime();
 			TCPS_BUMP_MIB(tcps, tcpRetransSegs);
 			TCPS_UPDATE_MIB(tcps, tcpRetransBytes, cnt);
+			tcp->tcp_cs.tcp_out_retrans_segs++;
+			tcp->tcp_cs.tcp_out_retrans_bytes += cnt;
 
 			tcp->tcp_rexmit_nxt = snxt;
 		}

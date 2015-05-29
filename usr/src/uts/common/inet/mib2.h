@@ -20,7 +20,10 @@
  *
  * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-/* Copyright (c) 1990 Mentat Inc. */
+/*
+ * Copyright (c) 1990 Mentat Inc.
+ * Copyright (c) 2015, 2016 by Delphix. All rights reserved.
+ */
 
 #ifndef	_INET_MIB2_H
 #define	_INET_MIB2_H
@@ -1354,25 +1357,46 @@ typedef struct mib2_tcpConnEntry {
 		/* remote port for this connection	{ tcpConnEntry 5 } */
 	int		tcpConnRemPort;		/* In host byte order */
 	struct tcpConnEntryInfo_s {
-			/* seq # of next segment to send */
+		Counter64	ce_in_data_inorder_bytes;
+		Counter64	ce_in_data_inorder_segs;
+		Counter64	ce_in_data_unorder_bytes;
+		Counter64	ce_in_data_unorder_segs;
+		Counter64	ce_in_zwnd_probes;
+
+		Counter64	ce_out_data_bytes;
+		Counter64	ce_out_data_segs;
+		Counter64	ce_out_retrans_bytes;
+		Counter64	ce_out_retrans_segs;
+		Counter64	ce_out_zwnd_probes;
+		Counter64	ce_rtt_sum;
+
+				/* seq # of next segment to send */
 		Gauge		ce_snxt;
 				/* seq # of of last segment unacknowledged */
 		Gauge		ce_suna;
-				/* currect send window size */
+				/* current send window size */
 		Gauge		ce_swnd;
+				/* current congestion window size */
+		Gauge		ce_cwnd;
 				/* seq # of next expected segment */
 		Gauge		ce_rnxt;
 				/* seq # of last ack'd segment */
 		Gauge		ce_rack;
-				/* currenct receive window size */
+				/* # of unsent bytes in the xmit queue */
+		Gauge		ce_unsent;
+				/* current receive window size */
 		Gauge		ce_rwnd;
-					/* current rto (retransmit timeout) */
+				/* round-trip time smoothed average (us) */
+		Gauge		ce_rtt_sa;
+				/* current rto (retransmit timeout) */
 		Gauge		ce_rto;
-					/* current max segment size */
+				/* round-trip time count */
+		Gauge		ce_rtt_cnt;
+				/* current max segment size */
 		Gauge		ce_mss;
 				/* actual internal state */
 		int		ce_state;
-	} 		tcpConnEntryInfo;
+	}		tcpConnEntryInfo;
 
 	/* pid of the processes that created this connection */
 	uint32_t	tcpConnCreationProcess;
@@ -1408,26 +1432,7 @@ typedef struct mib2_tcp6ConnEntry {
 	DeviceIndex	tcp6ConnIfIndex;
 	/* state of tcp6 connection		{ ipv6TcpConnEntry 6 } RW */
 	int		tcp6ConnState;
-	struct tcp6ConnEntryInfo_s {
-			/* seq # of next segment to send */
-		Gauge		ce_snxt;
-				/* seq # of of last segment unacknowledged */
-		Gauge		ce_suna;
-				/* currect send window size */
-		Gauge		ce_swnd;
-				/* seq # of next expected segment */
-		Gauge		ce_rnxt;
-				/* seq # of last ack'd segment */
-		Gauge		ce_rack;
-				/* currenct receive window size */
-		Gauge		ce_rwnd;
-					/* current rto (retransmit timeout) */
-		Gauge		ce_rto;
-					/* current max segment size */
-		Gauge		ce_mss;
-				/* actual internal state */
-		int		ce_state;
-	} 		tcp6ConnEntryInfo;
+	struct tcpConnEntryInfo_s tcp6ConnEntryInfo;
 
 	/* pid of the processes that created this connection */
 	uint32_t	tcp6ConnCreationProcess;

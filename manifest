@@ -2357,6 +2357,7 @@ f usr/bin/cktime 0555 root bin
 f usr/bin/ckuid 0555 root bin
 f usr/bin/ckyorn 0555 root bin
 f usr/bin/clear 0555 root bin
+f usr/bin/connstat 0555 root bin
 h usr/bin/cmp=usr/bin/alias
 f usr/bin/col 0555 root bin
 f usr/bin/column 0555 root bin
@@ -12095,6 +12096,7 @@ f usr/share/man/man1m/chroot.1m 0444 root bin
 f usr/share/man/man1m/clear_locks.1m 0444 root bin
 f usr/share/man/man1m/clinfo.1m 0444 root bin
 f usr/share/man/man1m/clri.1m 0444 root bin
+f usr/share/man/man1m/connstat.1m 0444 root bin
 f usr/share/man/man1m/consadm.1m 0444 root bin
 f usr/share/man/man1m/coreadm.1m 0444 root bin
 f usr/share/man/man1m/cpustat.1m 0444 root bin

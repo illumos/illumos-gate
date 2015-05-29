@@ -14,6 +14,7 @@
 # Copyright 2015 Nexenta Systems, Inc. All rights reserved.
 # Copyright 2016 Toomas Soome <tsoome@me.com>
 # Copyright (c) 2017, Chris Fraire <cfraire@me.com>.
+# Copyright (c) 2016 by Delphix. All rights reserved.
 #
 
 file path=usr/share/man/man1m/6to4relay.1m
@@ -48,6 +49,7 @@ file path=usr/share/man/man1m/chroot.1m
 file path=usr/share/man/man1m/clear_locks.1m
 file path=usr/share/man/man1m/clinfo.1m
 file path=usr/share/man/man1m/clri.1m
+file path=usr/share/man/man1m/connstat.1m
 file path=usr/share/man/man1m/consadm.1m
 file path=usr/share/man/man1m/coreadm.1m
 file path=usr/share/man/man1m/cron.1m
