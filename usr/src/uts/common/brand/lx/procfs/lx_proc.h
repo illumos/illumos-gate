@@ -139,6 +139,7 @@ typedef enum lxpr_nodetype {
 	LXPR_PID_TID_STATUS,	/* /proc/<pid>/task/<tid>/status	*/
 	LXPR_PID_TID_FDDIR,	/* /proc/<pid>/task/<tid>/fd		*/
 	LXPR_PID_TID_FD_FD,	/* /proc/<pid>/task/<tid>/fd/nn		*/
+	LXPR_CGROUPS,		/* /proc/cgroups	*/
 	LXPR_CMDLINE,		/* /proc/cmdline	*/
 	LXPR_CPUINFO,		/* /proc/cpuinfo	*/
 	LXPR_DEVICES,		/* /proc/devices	*/
