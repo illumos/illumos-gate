@@ -177,24 +177,17 @@ typedef struct tcp_s {
 	mblk_t	*tcp_xmit_tail;		/* Last data sent */
 	uint32_t tcp_unsent;		/* # of bytes in hand that are unsent */
 	uint32_t tcp_xmit_tail_unsent;	/* # of unsent bytes in xmit_tail */
-
 	uint32_t tcp_suna;		/* Sender unacknowledged */
 	uint32_t tcp_rexmit_nxt;	/* Next rexmit seq num */
 	uint32_t tcp_rexmit_max;	/* Max retran seq num */
 	uint32_t tcp_cwnd;		/* Congestion window */
 	int32_t tcp_cwnd_cnt;		/* cwnd cnt in congestion avoidance */
-
-	uint32_t tcp_ibsegs;		/* Inbound segments on this stream */
-	uint32_t tcp_obsegs;		/* Outbound segments on this stream */
-
 	uint32_t tcp_naglim;		/* Tunable nagle limit */
 	uint32_t	tcp_valid_bits;
 #define	TCP_ISS_VALID	0x1	/* Is the tcp_iss seq num active? */
 #define	TCP_FSS_VALID	0x2	/* Is the tcp_fss seq num active? */
 #define	TCP_URG_VALID	0x4	/* Is the tcp_urg seq num active? */
 #define	TCP_OFO_FIN_VALID 0x8	/* Has TCP received an out of order FIN? */
-
-
 
 	timeout_id_t	tcp_timer_tid;	/* Control block for timer service */
 	uchar_t	tcp_timer_backoff;	/* Backoff shift count. */
@@ -282,6 +275,8 @@ typedef struct tcp_s {
 	uint32_t tcp_cwnd_max;
 	uint32_t tcp_csuna;		/* Clear (no rexmits in window) suna */
 
+	hrtime_t tcp_rtt_sum;		/* Round trip sum */
+	uint32_t tcp_rtt_cnt;		/* Round trip count (non_dup ACKs) */
 	hrtime_t tcp_rtt_sa;		/* Round trip smoothed average */
 	hrtime_t tcp_rtt_sd;		/* Round trip smoothed deviation */
 	uint32_t tcp_rtt_update;	/* Round trip update(s) */
@@ -492,6 +487,8 @@ typedef struct tcp_s {
 
 	/* FIN-WAIT-2 flush timeout */
 	uint32_t		tcp_fin_wait_2_flush_interval;
+
+	tcp_conn_stats_t	tcp_cs;
 
 #ifdef DEBUG
 	pc_t			tcmp_stk[15];

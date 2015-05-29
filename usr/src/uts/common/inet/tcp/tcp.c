@@ -1231,11 +1231,6 @@ tcp_closei_local(tcp_t *tcp)
 	if (!TCP_IS_SOCKET(tcp))
 		tcp_acceptor_hash_remove(tcp);
 
-	TCPS_UPDATE_MIB(tcps, tcpHCInSegs, tcp->tcp_ibsegs);
-	tcp->tcp_ibsegs = 0;
-	TCPS_UPDATE_MIB(tcps, tcpHCOutSegs, tcp->tcp_obsegs);
-	tcp->tcp_obsegs = 0;
-
 	/*
 	 * This can be called via tcp_time_wait_processing() if TCP gets a
 	 * SYN with sequence number outside the TIME-WAIT connection's
@@ -1904,15 +1899,6 @@ tcp_reinit(tcp_t *tcp)
 	/* Cancel outstanding timers */
 	tcp_timers_stop(tcp);
 
-	/*
-	 * Reset everything in the state vector, after updating global
-	 * MIB data from instance counters.
-	 */
-	TCPS_UPDATE_MIB(tcps, tcpHCInSegs, tcp->tcp_ibsegs);
-	tcp->tcp_ibsegs = 0;
-	TCPS_UPDATE_MIB(tcps, tcpHCOutSegs, tcp->tcp_obsegs);
-	tcp->tcp_obsegs = 0;
-
 	tcp_close_mpp(&tcp->tcp_xmit_head);
 	if (tcp->tcp_snd_zcopy_aware)
 		tcp_zcopy_notify(tcp);
@@ -2084,9 +2070,6 @@ tcp_reinit_values(tcp_t *tcp)
 	tcp->tcp_swnd = 0;
 	DONTCARE(tcp->tcp_cwnd);	/* Init in tcp_process_options */
 
-	ASSERT(tcp->tcp_ibsegs == 0);
-	ASSERT(tcp->tcp_obsegs == 0);
-
 	if (connp->conn_ht_iphc != NULL) {
 		kmem_free(connp->conn_ht_iphc, connp->conn_ht_iphc_allocated);
 		connp->conn_ht_iphc = NULL;
@@ -2178,6 +2161,8 @@ tcp_reinit_values(tcp_t *tcp)
 	DONTCARE(tcp->tcp_rtt_sa);		/* Init in tcp_init_values */
 	DONTCARE(tcp->tcp_rtt_sd);		/* Init in tcp_init_values */
 	tcp->tcp_rtt_update = 0;
+	tcp->tcp_rtt_sum = 0;
+	tcp->tcp_rtt_cnt = 0;
 
 	DONTCARE(tcp->tcp_swl1); /* Init in case TCPS_LISTEN/TCPS_SYN_SENT */
 	DONTCARE(tcp->tcp_swl2); /* Init in case TCPS_LISTEN/TCPS_SYN_SENT */

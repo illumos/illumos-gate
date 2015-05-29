@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2011, Joyent Inc. All rights reserved.
+ * Copyright (c) 2015, 2016 by Delphix. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -84,6 +85,50 @@ tcp_snmp_state(tcp_t *tcp)
 	default:
 		return (0);
 	}
+}
+
+static void
+tcp_set_conninfo(tcp_t *tcp, struct tcpConnEntryInfo_s *tcei, boolean_t ispriv)
+{
+	/* Don't want just anybody seeing these... */
+	if (ispriv) {
+		tcei->ce_snxt = tcp->tcp_snxt;
+		tcei->ce_suna = tcp->tcp_suna;
+		tcei->ce_rnxt = tcp->tcp_rnxt;
+		tcei->ce_rack = tcp->tcp_rack;
+	} else {
+		/*
+		 * Netstat, unfortunately, uses this to get send/receive queue
+		 * sizes.  How to fix? Why not compute the difference only?
+		 */
+		tcei->ce_snxt = tcp->tcp_snxt - tcp->tcp_suna;
+		tcei->ce_suna = 0;
+		tcei->ce_rnxt = tcp->tcp_rnxt - tcp->tcp_rack;
+		tcei->ce_rack = 0;
+	}
+
+	tcei->ce_in_data_inorder_bytes = tcp->tcp_cs.tcp_in_data_inorder_bytes;
+	tcei->ce_in_data_inorder_segs = tcp->tcp_cs.tcp_in_data_inorder_segs;
+	tcei->ce_in_data_unorder_bytes = tcp->tcp_cs.tcp_in_data_unorder_bytes;
+	tcei->ce_in_data_unorder_segs = tcp->tcp_cs.tcp_in_data_unorder_segs;
+	tcei->ce_in_zwnd_probes = tcp->tcp_cs.tcp_in_zwnd_probes;
+
+	tcei->ce_out_data_bytes = tcp->tcp_cs.tcp_out_data_bytes;
+	tcei->ce_out_data_segs = tcp->tcp_cs.tcp_out_data_segs;
+	tcei->ce_out_retrans_bytes = tcp->tcp_cs.tcp_out_retrans_bytes;
+	tcei->ce_out_retrans_segs = tcp->tcp_cs.tcp_out_retrans_segs;
+	tcei->ce_out_zwnd_probes = tcp->tcp_cs.tcp_out_zwnd_probes;
+
+	tcei->ce_unsent = tcp->tcp_unsent;
+	tcei->ce_swnd = tcp->tcp_swnd;
+	tcei->ce_cwnd = tcp->tcp_cwnd;
+	tcei->ce_rwnd = tcp->tcp_rwnd;
+	tcei->ce_rto =  tcp->tcp_rto;
+	tcei->ce_mss =  tcp->tcp_mss;
+	tcei->ce_state = tcp->tcp_state;
+	tcei->ce_rtt_sa = NSEC2USEC(tcp->tcp_rtt_sa >> 3);
+	tcei->ce_rtt_sum = NSEC2USEC(tcp->tcp_rtt_sum);
+	tcei->ce_rtt_cnt = tcp->tcp_rtt_cnt;
 }
 
 /*
@@ -183,11 +228,6 @@ tcp_snmp_get(queue_t *q, mblk_t *mpctl, boolean_t legacy_req)
 				continue;	/* not in this zone */
 
 			tcp = connp->conn_tcp;
-			TCPS_UPDATE_MIB(tcps, tcpHCInSegs, tcp->tcp_ibsegs);
-			tcp->tcp_ibsegs = 0;
-			TCPS_UPDATE_MIB(tcps, tcpHCOutSegs, tcp->tcp_obsegs);
-			tcp->tcp_obsegs = 0;
-
 			tce6.tcp6ConnState = tce.tcpConnState =
 			    tcp_snmp_state(tcp);
 			if (tce.tcpConnState == MIB2_TCP_established ||
@@ -243,35 +283,9 @@ tcp_snmp_get(queue_t *q, mblk_t *mpctl, boolean_t legacy_req)
 			} else {
 				tce6.tcp6ConnIfIndex = connp->conn_bound_if;
 			}
-			/* Don't want just anybody seeing these... */
-			if (ispriv) {
-				tce6.tcp6ConnEntryInfo.ce_snxt =
-				    tcp->tcp_snxt;
-				tce6.tcp6ConnEntryInfo.ce_suna =
-				    tcp->tcp_suna;
-				tce6.tcp6ConnEntryInfo.ce_rnxt =
-				    tcp->tcp_rnxt;
-				tce6.tcp6ConnEntryInfo.ce_rack =
-				    tcp->tcp_rack;
-			} else {
-				/*
-				 * Netstat, unfortunately, uses this to
-				 * get send/receive queue sizes.  How to fix?
-				 * Why not compute the difference only?
-				 */
-				tce6.tcp6ConnEntryInfo.ce_snxt =
-				    tcp->tcp_snxt - tcp->tcp_suna;
-				tce6.tcp6ConnEntryInfo.ce_suna = 0;
-				tce6.tcp6ConnEntryInfo.ce_rnxt =
-				    tcp->tcp_rnxt - tcp->tcp_rack;
-				tce6.tcp6ConnEntryInfo.ce_rack = 0;
-			}
 
-			tce6.tcp6ConnEntryInfo.ce_swnd = tcp->tcp_swnd;
-			tce6.tcp6ConnEntryInfo.ce_rwnd = tcp->tcp_rwnd;
-			tce6.tcp6ConnEntryInfo.ce_rto =  tcp->tcp_rto;
-			tce6.tcp6ConnEntryInfo.ce_mss =  tcp->tcp_mss;
-			tce6.tcp6ConnEntryInfo.ce_state = tcp->tcp_state;
+			tcp_set_conninfo(tcp, &tce6.tcp6ConnEntryInfo,
+			    ispriv);
 
 			tce6.tcp6ConnCreationProcess =
 			    (connp->conn_cpid < 0) ? MIB2_UNKNOWN_PROCESS :
@@ -307,37 +321,9 @@ tcp_snmp_get(queue_t *q, mblk_t *mpctl, boolean_t legacy_req)
 				}
 				tce.tcpConnLocalPort = ntohs(connp->conn_lport);
 				tce.tcpConnRemPort = ntohs(connp->conn_fport);
-				/* Don't want just anybody seeing these... */
-				if (ispriv) {
-					tce.tcpConnEntryInfo.ce_snxt =
-					    tcp->tcp_snxt;
-					tce.tcpConnEntryInfo.ce_suna =
-					    tcp->tcp_suna;
-					tce.tcpConnEntryInfo.ce_rnxt =
-					    tcp->tcp_rnxt;
-					tce.tcpConnEntryInfo.ce_rack =
-					    tcp->tcp_rack;
-				} else {
-					/*
-					 * Netstat, unfortunately, uses this to
-					 * get send/receive queue sizes.  How
-					 * to fix?
-					 * Why not compute the difference only?
-					 */
-					tce.tcpConnEntryInfo.ce_snxt =
-					    tcp->tcp_snxt - tcp->tcp_suna;
-					tce.tcpConnEntryInfo.ce_suna = 0;
-					tce.tcpConnEntryInfo.ce_rnxt =
-					    tcp->tcp_rnxt - tcp->tcp_rack;
-					tce.tcpConnEntryInfo.ce_rack = 0;
-				}
 
-				tce.tcpConnEntryInfo.ce_swnd = tcp->tcp_swnd;
-				tce.tcpConnEntryInfo.ce_rwnd = tcp->tcp_rwnd;
-				tce.tcpConnEntryInfo.ce_rto =  tcp->tcp_rto;
-				tce.tcpConnEntryInfo.ce_mss =  tcp->tcp_mss;
-				tce.tcpConnEntryInfo.ce_state =
-				    tcp->tcp_state;
+				tcp_set_conninfo(tcp, &tce.tcpConnEntryInfo,
+				    ispriv);
 
 				tce.tcpConnCreationProcess =
 				    (connp->conn_cpid < 0) ?

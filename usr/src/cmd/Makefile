@@ -21,8 +21,8 @@
 
 #
 # Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2019 Joyent, Inc.
-# Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright (c) 2019, Joyent, Inc.
+# Copyright (c) 2012, 2015 by Delphix. All rights reserved.
 # Copyright (c) 2013 DEY Storage Systems, Inc. All rights reserved.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright 2016 Toomas Soome <tsoome@me.com>
@@ -98,6 +98,7 @@ COMMON_SUBDIRS=		\
 	cmd-inet	\
 	col		\
 	compress	\
+	connstat	\
 	consadm		\
 	coreadm		\
 	cpio		\
@@ -547,6 +548,7 @@ MSGSUBDIRS=		\
 	cmd-inet	\
 	col		\
 	compress	\
+	connstat	\
 	consadm		\
 	coreadm		\
 	cpio		\

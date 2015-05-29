@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2015 by Delphix. All rights reserved.
  */
 
 #ifndef	_INET_TCP_STATS_H
@@ -204,6 +205,26 @@ typedef struct {
 	mib2_tcp_t		tcp_sc_mib;
 	tcp_stat_counter_t	tcp_sc_stats;
 } tcp_stats_cpu_t;
+
+/*
+ * Per-connection statistics. Some of these are also kept globally in the
+ * per-cpu tcp_sc_mib entry (see tcp_stats_cpu_t above). We need not maintain
+ * per-cpu versions of these stats since a connection is typically processed
+ * on the same CPU.
+ */
+typedef struct tcp_conn_stats {
+	uint64_t	tcp_in_data_inorder_bytes;
+	uint64_t	tcp_in_data_inorder_segs;
+	uint64_t	tcp_in_data_unorder_bytes;
+	uint64_t	tcp_in_data_unorder_segs;
+	uint64_t	tcp_in_zwnd_probes;
+
+	uint64_t	tcp_out_data_bytes;
+	uint64_t	tcp_out_data_segs;
+	uint64_t	tcp_out_retrans_bytes;
+	uint64_t	tcp_out_retrans_segs;
+	uint64_t	tcp_out_zwnd_probes;
+} tcp_conn_stats_t;
 
 #define	TCPS_BUMP_MIB(tcps, x) \
 	BUMP_MIB(&(tcps)->tcps_sc[CPU->cpu_seqid]->tcp_sc_mib, x)

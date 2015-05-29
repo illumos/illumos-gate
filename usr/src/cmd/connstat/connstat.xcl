@@ -1,0 +1,84 @@
+#
+# CDDL HEADER START
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+# CDDL HEADER END
+#
+#
+# Copyright (c) 2015 by Delphix. All rights reserved.
+#
+
+msgid  "count"
+msgid  "established"
+msgid  "filter"
+msgid  "help"
+msgid  "interval"
+msgid  "ipv4"
+msgid  "ipv6"
+msgid  "no-loopback"
+msgid  "output"
+msgid  "parsable"
+msgid  "protocol"
+msgid  "timestamp"
+msgid  "tcp"
+msgid  "laddr,lport,raddr,rport,inbytes,outbytes,"
+       "retransbytes,suna,swnd,cwnd,rwnd"
+msgid  "  %s\n"
+msgid  ""
+msgid  "c:eF:hi:Lo:Pp:T:46"
+msgid  "all"
+msgid  "laddr"
+msgid  "raddr"
+msgid  "lport"
+msgid  "rport"
+msgid  "= "
+msgid  "%s%ld\n"
+msgid  "%s%s\n"
+msgid  "%hu"
+msgid  "%u"
+msgid  "%llu"
+msgid  "%s: "
+msgid  "LADDR"
+msgid  "RADDR"
+msgid  "LPORT"
+msgid  "RPORT"
+msgid  "INBYTES"
+msgid  "INSEGS"
+msgid  "INUNORDERBYTES"
+msgid  "INUNORDERSEGS"
+msgid  "OUTBYTES"
+msgid  "OUTSEGS"
+msgid  "RETRANSBYTES"
+msgid  "RETRANSSEGS"
+msgid  "SUNA"
+msgid  "count"
+msgid  "SWND"
+msgid  "CWND"
+msgid  "RWND"
+msgid  "STATE"
+msgid  "CLOSED"
+msgid  "IDLE"
+msgid  "BOUND"
+msgid  "LISTEN"
+msgid  "SYN_SENT"
+msgid  "SYN_RCVD"
+msgid  "ESTABLISHED"
+msgid  "CLOSE_WAIT"
+msgid  "FIN_WAIT_1"
+msgid  "CLOSING"
+msgid  "LAST_ACK"
+msgid  "FIN_WAIT_2"
+msgid  "TIME_WAIT"
+msgid  "UNKNOWN(%d)"
+msgid  "/dev/arp"
+msgid  "putmsg"
+msgid  "getmsg"
+msgid  "malloc"

@@ -594,7 +594,7 @@ tcp_ack_timer(void *arg)
 	mp = tcp_ack_mp(tcp);
 
 	if (mp != NULL) {
-		BUMP_LOCAL(tcp->tcp_obsegs);
+		TCPS_BUMP_MIB(tcps, tcpHCOutSegs);
 		TCPS_BUMP_MIB(tcps, tcpOutAck);
 		TCPS_BUMP_MIB(tcps, tcpOutAckDelayed);
 		tcp_send_data(tcp, mp);
@@ -853,6 +853,7 @@ tcp_timer(void *arg)
 				tcp->tcp_swnd++;
 				tcp->tcp_zero_win_probe = B_TRUE;
 				TCPS_BUMP_MIB(tcps, tcpOutWinProbe);
+				tcp->tcp_cs.tcp_out_zwnd_probes++;
 			} else {
 				/*
 				 * Handle timeout from sender SWS avoidance.
@@ -1081,6 +1082,8 @@ timer_rexmit:
 	tcp->tcp_csuna = tcp->tcp_snxt;
 	TCPS_BUMP_MIB(tcps, tcpRetransSegs);
 	TCPS_UPDATE_MIB(tcps, tcpRetransBytes, mss);
+	tcp->tcp_cs.tcp_out_retrans_segs++;
+	tcp->tcp_cs.tcp_out_retrans_bytes += mss;
 	tcp_send_data(tcp, mp);
 
 }
