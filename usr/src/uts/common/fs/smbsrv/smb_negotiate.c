@@ -284,7 +284,6 @@ smb_com_negotiate(smb_request_t *sr)
 	uint16_t		secmode;
 	uint16_t		rawmode = 0;
 	uint32_t		sesskey;
-	char			ipaddr_buf[INET6_ADDRSTRLEN];
 	char			*nbdomain;
 	uint8_t			*wcbuf;
 	int			wclen;
@@ -333,9 +332,6 @@ smb_com_negotiate(smb_request_t *sr)
 		cmn_err(CE_NOTE, "smbsrv: cap passthru is %s",
 		    (negprot->ni_capabilities & CAP_INFOLEVEL_PASSTHRU) ?
 		    "enabled" : "disabled");
-
-	(void) smb_inet_ntop(&sr->session->ipaddr, ipaddr_buf,
-	    SMB_IPSTRLEN(sr->session->ipaddr.a_family));
 
 	switch (negprot->ni_dialect) {
 	case PC_NETWORK_PROGRAM_1_0:	/* core */
