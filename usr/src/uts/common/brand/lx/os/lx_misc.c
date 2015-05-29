@@ -137,6 +137,33 @@ lx_exec()
 	lx_ptrace_stop(LX_PR_SYSEXIT);
 }
 
+static void
+lx_cleanlwp(klwp_t *lwp, proc_t *p)
+{
+	struct lx_lwp_data *lwpd = lwptolxlwp(lwp);
+	void *rb_list = NULL;
+
+	VERIFY(lwpd != NULL);
+
+	mutex_enter(&p->p_lock);
+	if ((lwpd->br_ptrace_flags & LX_PTRACE_EXITING) == 0) {
+		lx_ptrace_exit(p, lwp);
+	}
+
+	/*
+	 * While we have p_lock, safely grab any robust_list references and
+	 * clear the lwp field.
+	 */
+	sprlock_proc(p);
+	rb_list = lwpd->br_robust_list;
+	lwpd->br_robust_list = NULL;
+	sprunlock(p);
+
+	if (rb_list != NULL) {
+		lx_futex_robust_exit((uintptr_t)rb_list, lwpd->br_pid);
+	}
+}
+
 void
 lx_exitlwp(klwp_t *lwp)
 {
@@ -149,22 +176,18 @@ lx_exitlwp(klwp_t *lwp)
 
 	VERIFY(MUTEX_NOT_HELD(&p->p_lock));
 
-	if (lwpd == NULL)
-		return;		/* second time thru' */
-
-	mutex_enter(&p->p_lock);
-	lx_ptrace_exit(p, lwp);
-	mutex_exit(&p->p_lock);
-
-	if (lwpd->br_robust_list != NULL) {
-		lx_futex_robust_exit((uintptr_t)lwpd->br_robust_list,
-		    lwpd->br_pid);
+	if (lwpd == NULL) {
+		/* second time thru' */
+		return;
 	}
+
+	lx_cleanlwp(lwp, p);
 
 	if (lwpd->br_clear_ctidp != NULL) {
 		(void) suword32(lwpd->br_clear_ctidp, 0);
 		(void) lx_futex((uintptr_t)lwpd->br_clear_ctidp, FUTEX_WAKE, 1,
 		    NULL, NULL, 0);
+		lwpd->br_clear_ctidp = NULL;
 	}
 
 	if (lwpd->br_signal != 0) {
@@ -235,7 +258,21 @@ void
 lx_freelwp(klwp_t *lwp)
 {
 	struct lx_lwp_data *lwpd = lwptolxlwp(lwp);
+	proc_t *p = lwptoproc(lwp);
+
 	VERIFY(lwpd != NULL);
+	VERIFY(MUTEX_NOT_HELD(&p->p_lock));
+
+	/*
+	 * It is possible for the lx_freelwp hook to be called without a prior
+	 * call to lx_exitlwp being made.  This happens as part of lwp
+	 * de-branding when a native binary is executed from a branded process.
+	 *
+	 * To cover all cases, lx_cleanlwp is called from lx_exitlwp as well
+	 * here in lx_freelwp.  When the second call is redundant, the
+	 * resources will already be freed and no work will be needed.
+	 */
+	lx_cleanlwp(lwp, p);
 
 	/*
 	 * Remove our system call interposer.
