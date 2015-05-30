@@ -4335,12 +4335,6 @@ kmem_init(void)
 	kstat_init();
 
 	/*
-	 * Small-memory systems (< 24 MB) can't handle kmem_flags overhead.
-	 */
-	if (physmem < btop(24 << 20) && !(old_kmem_flags & KMF_STICKY))
-		kmem_flags = 0;
-
-	/*
 	 * Don't do firewalled allocations if the heap is less than 1TB
 	 * (i.e. on a 32-bit kernel)
 	 * The resulting VM_NEXTFIT allocations would create too much
