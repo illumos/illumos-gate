@@ -3171,9 +3171,9 @@ kmem_reap_common(void *flag_arg)
 
 	/*
 	 * It may not be kosher to do memory allocation when a reap is called
-	 * is called (for example, if vmem_populate() is in the call chain).
-	 * So we start the reap going with a TQ_NOALLOC dispatch.  If the
-	 * dispatch fails, we reset the flag, and the next reap will try again.
+	 * (for example, if vmem_populate() is in the call chain).  So we
+	 * start the reap going with a TQ_NOALLOC dispatch.  If the dispatch
+	 * fails, we reset the flag, and the next reap will try again.
 	 */
 	if (!taskq_dispatch(kmem_taskq, kmem_reap_start, flag, TQ_NOALLOC))
 		*flag = 0;
