@@ -8268,6 +8268,7 @@ lscf_bundle_import(bundle_t *bndl, const char *filename, uint_t flags)
 
 	if (uu_list_walk(bndl->sc_bundle_services, lscf_service_import,
 	    &cbdata, UU_DEFAULT) == 0) {
+		char *eptr;
 		/* Success.  Refresh everything. */
 
 		if (flags & SCI_NOREFRESH || no_refresh) {
@@ -8339,13 +8340,22 @@ lscf_bundle_import(bundle_t *bndl, const char *filename, uint_t flags)
 		 * varient of svc.configd and svccfg which are only meant to
 		 * run during the build process. During this time we have no
 		 * svc.startd, so this check would hang the build process.
+		 *
+		 * However, we've also given other consolidations, a bit of a
+		 * means to tie themselves into a knot. They're not properly
+		 * using the native build equivalents, but they've been getting
+		 * away with it anyways. Therefore, if we've found that
+		 * SVCCFG_REPOSITORY is set indicating that a separate configd
+		 * should be spun up, then we have to assume it's not using a
+		 * startd and we should not do this check.
 		 */
 #ifndef NATIVE_BUILD
 		/*
 		 * Verify that the restarter group is preset
 		 */
+		eptr = getenv("SVCCFG_REPOSITORY");
 		for (svc = uu_list_first(bndl->sc_bundle_services);
-		    svc != NULL;
+		    svc != NULL && eptr == NULL;
 		    svc = uu_list_next(bndl->sc_bundle_services, svc)) {
 
 			insts = svc->sc_u.sc_service.sc_service_instances;
