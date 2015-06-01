@@ -703,11 +703,11 @@ usr/include/sys/u8_textprep_data.h
 #
 # SQLite is private, used by SMF (svc.configd), idmapd and libsmb.
 #
-usr/include/sqlite
-usr/lib/libsqlite-native.o
-usr/lib/libsqlite.o
-usr/lib/llib-lsqlite.ln
-usr/lib/smbsrv/libsqlite.so
+usr/include/sqlite-sys
+lib/libsqlite-native.o
+lib/libsqlite-sys.so
+lib/llib-lsqlite-sys
+lib/llib-lsqlite-sys.ln
 #
 # Private/Internal kiconv header files. Do not ship.
 #

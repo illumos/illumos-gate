@@ -34,7 +34,7 @@
 #include <thread.h>
 #include <libintl.h>
 #include <strings.h>
-#include <sqlite/sqlite.h>
+#include <sqlite-sys/sqlite.h>
 #include <syslog.h>
 #include <inttypes.h>
 #include <rpcsvc/idmap_prot.h>

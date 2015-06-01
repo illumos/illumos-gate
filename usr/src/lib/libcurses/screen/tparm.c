@@ -20,15 +20,13 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2015 Gary Mills
  * Copyright (c) 1996-1997 by Sun Microsystems, Inc.
  * All rights reserved.
  */
 
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /* Copyright (c) 1979 Regents of the University of California */
 
@@ -260,7 +258,7 @@ tparm(char *instring, long fp1, long fp2, long p3, long p4,
 	long		op2;
 	int		sign;
 	int		onrow = 0;
-	long		p1 = fp1, p2 = fp2;  /* copy in case < 2 actual parms */
+	volatile long	p1 = fp1, p2 = fp2; /* copy in case < 2 actual parms */
 	char		*xp;
 	char		formatbuffer[100];
 	char		*format;

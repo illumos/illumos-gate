@@ -300,6 +300,7 @@ file path=lib/libsec.so.1
 file path=lib/libsecdb.so.1
 file path=lib/libsendfile.so.1
 file path=lib/libsocket.so.1
+file path=lib/libsqlite-sys.so.2.8.15
 file path=lib/libsysevent.so.1
 file path=lib/libtermcap.so.1
 file path=lib/libthread.so.1

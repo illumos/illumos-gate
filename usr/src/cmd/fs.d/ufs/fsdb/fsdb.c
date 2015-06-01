@@ -1,4 +1,5 @@
 /*
+ * Copyright 2015 Gary Mills
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -383,7 +384,8 @@ main(int argc, char *argv[])
 	struct direct	*dirp;
 	struct lbuf	*bp;
 	char		*progname;
-	short		colon, mode;
+	volatile short	colon;
+	short		mode;
 	long		temp;
 
 	/* Options/Suboptions processing */

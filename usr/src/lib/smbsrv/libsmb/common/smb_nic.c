@@ -47,6 +47,7 @@
 #include <sys/systeminfo.h>
 
 #include <smbsrv/libsmb.h>
+#include <sqlite-sys/sqlite.h>
 
 #define	SMB_NIC_DB_NAME		"/var/smb/smbhosts.db"
 #define	SMB_NIC_DB_TIMEOUT	3000		/* in millisecond */

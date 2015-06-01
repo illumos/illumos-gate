@@ -1424,6 +1424,7 @@ f lib/libsmartsshd.so.1 0755 root bin
 s lib/libsmartsshd.so=libsmartsshd.so.1
 f lib/libsocket.so.1 0755 root bin
 s lib/libsocket.so=libsocket.so.1
+f lib/libsqlite-sys.so.2.8.15 0755 root bin
 f lib/libsysevent.so.1 0755 root bin
 s lib/libsysevent.so=libsysevent.so.1
 f lib/libtermcap.so.1 0755 root bin
@@ -6380,8 +6381,6 @@ s usr/lib/libsocket.so.1=../../lib/libsocket.so.1
 s usr/lib/libsocket.so=../../lib/libsocket.so.1
 f usr/lib/libsoftcrypto.so.1 0755 root bin
 s usr/lib/libsoftcrypto.so=libsoftcrypto.so.1
-f usr/lib/libsqlite-native.o 0644 root bin
-f usr/lib/libsqlite.o 0644 root bin
 f usr/lib/libsrpt.so.1 0755 root bin
 s usr/lib/libsrpt.so=libsrpt.so.1
 f usr/lib/libstanddisasm.so 0644 root bin
@@ -9994,8 +9993,6 @@ f usr/lib/smbsrv/libsmb.so.1 0755 root bin
 s usr/lib/smbsrv/libsmb.so=libsmb.so.1
 f usr/lib/smbsrv/libsmbns.so.1 0755 root bin
 s usr/lib/smbsrv/libsmbns.so=libsmbns.so.1
-f usr/lib/smbsrv/libsqlite.so.1 0755 root bin
-s usr/lib/smbsrv/libsqlite.so=libsqlite.so.1
 f usr/lib/smbsrv/smbd 0755 root bin
 d usr/lib/smedia 0755 root bin
 d usr/lib/smedia/amd64 0755 root bin
