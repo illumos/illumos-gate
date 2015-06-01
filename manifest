@@ -3294,9 +3294,6 @@ f usr/include/smbsrv/winsvc.h 0644 root bin
 f usr/include/smbsrv/wintypes.h 0644 root bin
 f usr/include/smhbaapi.h 0644 root bin
 f usr/include/spawn.h 0644 root bin
-d usr/include/sqlite 0755 root bin
-f usr/include/sqlite/sqlite-misc.h 0644 root bin
-f usr/include/sqlite/sqlite.h 0644 root bin
 f usr/include/stack_unwind.h 0644 root bin
 f usr/include/stdarg.h 0644 root bin
 f usr/include/stdbool.h 0644 root bin
