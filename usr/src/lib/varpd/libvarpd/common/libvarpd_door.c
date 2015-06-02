@@ -405,16 +405,16 @@ libvarpd_door_server_create(varpd_handle_t *vhp, const char *path)
 	int fd, ret;
 	varpd_impl_t *vip = (varpd_impl_t *)vhp;
 
-	(void) mutex_lock(&vip->vdi_lock);
+	mutex_enter(&vip->vdi_lock);
 	if (vip->vdi_doorfd >= 0) {
-		(void) mutex_unlock(&vip->vdi_lock);
+		mutex_exit(&vip->vdi_lock);
 		return (EEXIST);
 	}
 
 	vip->vdi_doorfd = door_create(libvarpd_door_server, vip,
 	    DOOR_REFUSE_DESC | DOOR_NO_CANCEL);
 	if (vip->vdi_doorfd == -1) {
-		(void) mutex_unlock(&vip->vdi_lock);
+		mutex_exit(&vip->vdi_lock);
 		return (errno);
 	}
 
@@ -423,7 +423,7 @@ libvarpd_door_server_create(varpd_handle_t *vhp, const char *path)
 		if (door_revoke(vip->vdi_doorfd) != 0)
 			libvarpd_panic("failed to revoke door: %d",
 			    errno);
-		(void) mutex_unlock(&vip->vdi_lock);
+		mutex_exit(&vip->vdi_lock);
 		return (errno);
 	}
 
@@ -432,7 +432,7 @@ libvarpd_door_server_create(varpd_handle_t *vhp, const char *path)
 		if (door_revoke(vip->vdi_doorfd) != 0)
 			libvarpd_panic("failed to revoke door: %d",
 			    errno);
-		(void) mutex_unlock(&vip->vdi_lock);
+		mutex_exit(&vip->vdi_lock);
 		return (ret);
 	}
 
@@ -445,11 +445,11 @@ libvarpd_door_server_create(varpd_handle_t *vhp, const char *path)
 		if (door_revoke(vip->vdi_doorfd) != 0)
 			libvarpd_panic("failed to revoke door: %d",
 			    errno);
-		(void) mutex_unlock(&vip->vdi_lock);
+		mutex_exit(&vip->vdi_lock);
 		return (ret);
 	}
 
-	(void) mutex_unlock(&vip->vdi_lock);
+	mutex_exit(&vip->vdi_lock);
 	return (0);
 }
 
@@ -458,12 +458,12 @@ libvarpd_door_server_destroy(varpd_handle_t *vhp)
 {
 	varpd_impl_t *vip = (varpd_impl_t *)vhp;
 
-	(void) mutex_lock(&vip->vdi_lock);
+	mutex_enter(&vip->vdi_lock);
 	if (vip->vdi_doorfd != 0) {
 		if (door_revoke(vip->vdi_doorfd) != 0)
 			libvarpd_panic("failed to revoke door: %d",
 			    errno);
 		vip->vdi_doorfd = -1;
 	}
-	(void) mutex_unlock(&vip->vdi_lock);
+	mutex_exit(&vip->vdi_lock);
 }

@@ -24,10 +24,7 @@
 #
 add_drv overlay 2>/dev/null
 
-#
-# This should be a service property.
-#
-/usr/lib/varpd/varpd -i /usr/lib/varpd
+/usr/lib/varpd/varpd
 if [ $? = 0 ]; then
 	exit $SMF_EXIT_OK
 else

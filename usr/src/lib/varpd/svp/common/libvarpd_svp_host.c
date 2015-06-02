@@ -31,7 +31,7 @@
 
 int svp_host_nthreads = 8;
 
-static mutex_t svp_host_lock = DEFAULTMUTEX;
+static mutex_t svp_host_lock = ERRORCHECKMUTEX;
 static cond_t svp_host_cv = DEFAULTCV;
 static svp_remote_t *svp_host_head;
 
@@ -44,24 +44,24 @@ svp_host_loop(void *unused)
 		svp_remote_t *srp;
 		struct addrinfo *addrs;
 
-		(void) mutex_lock(&svp_host_lock);
+		mutex_enter(&svp_host_lock);
 		while (svp_host_head == NULL)
 			(void) cond_wait(&svp_host_cv, &svp_host_lock);
 		srp = svp_host_head;
 		svp_host_head = srp->sr_nexthost;
 		if (svp_host_head != NULL)
 			(void) cond_signal(&svp_host_cv);
-		(void) mutex_unlock(&svp_host_lock);
+		mutex_exit(&svp_host_lock);
 
-		(void) mutex_lock(&srp->sr_lock);
+		mutex_enter(&srp->sr_lock);
 		assert(srp->sr_state & SVP_RS_LOOKUP_SCHEDULED);
 		srp->sr_state &= ~SVP_RS_LOOKUP_SCHEDULED;
 		if (srp->sr_state & SVP_RS_LOOKUP_INPROGRESS) {
-			(void) mutex_unlock(&srp->sr_lock);
+			mutex_exit(&srp->sr_lock);
 			continue;
 		}
 		srp->sr_state |= SVP_RS_LOOKUP_INPROGRESS;
-		(void) mutex_unlock(&srp->sr_lock);
+		mutex_exit(&srp->sr_lock);
 
 		for (;;) {
 			err = getaddrinfo(srp->sr_hostname, NULL, NULL, &addrs);
@@ -98,10 +98,10 @@ svp_host_loop(void *unused)
 					 * of an EREPORT to describe what
 					 * happened, some day.
 					 */
-					(void) mutex_lock(&srp->sr_lock);
+					mutex_enter(&srp->sr_lock);
 					svp_remote_degrade(srp,
 					    SVP_RD_DNS_FAIL);
-					(void) mutex_unlock(&srp->sr_lock);
+					mutex_exit(&srp->sr_lock);
 					break;
 				}
 			}
@@ -113,16 +113,16 @@ svp_host_loop(void *unused)
 			 * We've successfully resolved something, mark this
 			 * degredation over for now.
 			 */
-			(void) mutex_lock(&srp->sr_lock);
+			mutex_enter(&srp->sr_lock);
 			svp_remote_restore(srp, SVP_RD_DNS_FAIL);
-			(void) mutex_unlock(&srp->sr_lock);
+			mutex_exit(&srp->sr_lock);
 			svp_remote_resolved(srp, addrs);
 		}
 
-		(void) mutex_lock(&srp->sr_lock);
+		mutex_enter(&srp->sr_lock);
 		srp->sr_state &= ~SVP_RS_LOOKUP_INPROGRESS;
 		(void) cond_broadcast(&srp->sr_cond);
-		(void) mutex_unlock(&srp->sr_lock);
+		mutex_exit(&srp->sr_lock);
 	}
 
 	/* LINTED: E_STMT_NOT_REACHED */
@@ -133,11 +133,11 @@ void
 svp_host_queue(svp_remote_t *srp)
 {
 	svp_remote_t *s;
-	(void) mutex_lock(&svp_host_lock);
-	(void) mutex_lock(&srp->sr_lock);
+	mutex_enter(&svp_host_lock);
+	mutex_enter(&srp->sr_lock);
 	if (srp->sr_state & SVP_RS_LOOKUP_SCHEDULED) {
-		(void) mutex_unlock(&srp->sr_lock);
-		(void) mutex_unlock(&svp_host_lock);
+		mutex_exit(&srp->sr_lock);
+		mutex_exit(&svp_host_lock);
 		return;
 	}
 	srp->sr_state |= SVP_RS_LOOKUP_SCHEDULED;
@@ -152,8 +152,8 @@ svp_host_queue(svp_remote_t *srp)
 	}
 	srp->sr_nexthost = NULL;
 	(void) cond_signal(&svp_host_cv);
-	(void) mutex_unlock(&srp->sr_lock);
-	(void) mutex_unlock(&svp_host_lock);
+	mutex_exit(&srp->sr_lock);
+	mutex_exit(&svp_host_lock);
 }
 
 int

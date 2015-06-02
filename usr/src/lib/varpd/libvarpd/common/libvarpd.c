@@ -116,7 +116,8 @@ libvarpd_create(varpd_handle_t **vphp)
 	avl_create(&vip->vdi_linstances, libvarpd_instance_lcomparator,
 	    sizeof (varpd_instance_t), offsetof(varpd_instance_t, vri_lnode));
 
-	if (mutex_init(&vip->vdi_lock, USYNC_THREAD, NULL) != 0)
+	if (mutex_init(&vip->vdi_lock, USYNC_THREAD | LOCK_ERRORCHECK,
+	    NULL) != 0)
 		libvarpd_panic("failed to create mutex: %d", errno);
 
 	vip->vdi_doorfd = -1;
@@ -181,10 +182,11 @@ libvarpd_instance_create(varpd_handle_t *vhp, datalink_id_t linkid,
 		return (ret);
 	}
 
-	if (mutex_init(&inst->vri_lock, USYNC_THREAD, NULL) != 0)
+	if (mutex_init(&inst->vri_lock, USYNC_THREAD | LOCK_ERRORCHECK,
+	    NULL) != 0)
 		libvarpd_panic("failed to create mutex: %d", errno);
 
-	(void) mutex_lock(&vip->vdi_lock);
+	mutex_enter(&vip->vdi_lock);
 	lookup.vri_id = inst->vri_id;
 	if (avl_find(&vip->vdi_instances, &lookup, NULL) != NULL)
 		libvarpd_panic("found duplicate instance with id %d",
@@ -195,7 +197,7 @@ libvarpd_instance_create(varpd_handle_t *vhp, datalink_id_t linkid,
 		libvarpd_panic("found duplicate linstance with id %d",
 		    lookup.vri_linkid);
 	avl_add(&vip->vdi_linstances, inst);
-	(void) mutex_unlock(&vip->vdi_lock);
+	mutex_exit(&vip->vdi_lock);
 	*outp = (varpd_instance_handle_t *)inst;
 	return (0);
 }
@@ -221,9 +223,9 @@ libvarpd_instance_lookup(varpd_handle_t *vhp, uint64_t id)
 	varpd_instance_t lookup, *retp;
 
 	lookup.vri_id = id;
-	(void) mutex_lock(&vip->vdi_lock);
+	mutex_enter(&vip->vdi_lock);
 	retp = avl_find(&vip->vdi_instances, &lookup, NULL);
-	(void) mutex_unlock(&vip->vdi_lock);
+	mutex_exit(&vip->vdi_lock);
 	return ((varpd_instance_handle_t *)retp);
 }
 
@@ -237,9 +239,9 @@ libvarpd_instance_lookup_by_dlid(varpd_impl_t *vip, datalink_id_t linkid)
 	varpd_instance_t lookup, *retp;
 
 	lookup.vri_linkid = linkid;
-	(void) mutex_lock(&vip->vdi_lock);
+	mutex_enter(&vip->vdi_lock);
 	retp = avl_find(&vip->vdi_linstances, &lookup, NULL);
-	(void) mutex_unlock(&vip->vdi_lock);
+	mutex_exit(&vip->vdi_lock);
 	return (retp);
 }
 
@@ -257,12 +259,12 @@ libvarpd_instance_destroy(varpd_instance_handle_t *ihp)
 	/*
 	 * First things first, remove it from global visibility.
 	 */
-	(void) mutex_lock(&vip->vdi_lock);
+	mutex_enter(&vip->vdi_lock);
 	avl_remove(&vip->vdi_instances, inst);
 	avl_remove(&vip->vdi_linstances, inst);
-	(void) mutex_unlock(&vip->vdi_lock);
+	mutex_exit(&vip->vdi_lock);
 
-	(void) mutex_lock(&inst->vri_lock);
+	mutex_enter(&inst->vri_lock);
 
 	/*
 	 * We need to clean up this instance, that means remove it from
@@ -276,7 +278,7 @@ libvarpd_instance_destroy(varpd_instance_handle_t *ihp)
 		inst->vri_plugin->vpp_ops->vpo_destroy(inst->vri_private);
 		inst->vri_private = NULL;
 	}
-	(void) mutex_unlock(&inst->vri_lock);
+	mutex_exit(&inst->vri_lock);
 
 	/* Do the full clean up of the instance */
 	if (mutex_destroy(&inst->vri_lock) != 0)
@@ -291,7 +293,7 @@ libvarpd_instance_activate(varpd_instance_handle_t *ihp)
 	int ret;
 	varpd_instance_t *inst = (varpd_instance_t *)ihp;
 
-	(void) mutex_lock(&inst->vri_lock);
+	mutex_enter(&inst->vri_lock);
 
 	if (inst->vri_flags & VARPD_INSTANCE_F_ACTIVATED) {
 		ret = EEXIST;
@@ -316,7 +318,7 @@ libvarpd_instance_activate(varpd_instance_handle_t *ihp)
 	inst->vri_flags |= VARPD_INSTANCE_F_ACTIVATED;
 
 out:
-	(void) mutex_unlock(&inst->vri_lock);
+	mutex_exit(&inst->vri_lock);
 	return (ret);
 }
 

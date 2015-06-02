@@ -30,6 +30,7 @@
 #include <dirent.h>
 #include <sys/mman.h>
 #include <umem.h>
+#include <sys/debug.h>
 
 #include <libvarpd_impl.h>
 
@@ -101,16 +102,16 @@ libvarpd_persist_enable(varpd_handle_t *vhp, const char *rootdir)
 	}
 
 
-	(void) rw_wrlock(&vip->vdi_pfdlock);
+	VERIFY0(rw_wrlock(&vip->vdi_pfdlock));
 	if (vip->vdi_persistfd != -1) {
-		(void) rw_unlock(&vip->vdi_pfdlock);
+		VERIFY0(rw_unlock(&vip->vdi_pfdlock));
 		if (close(fd) != 0)
 			libvarpd_panic("failed to close rootdir fd (%s) %d: %d",
 			    rootdir, fd, errno);
 		return (EEXIST);
 	}
 	vip->vdi_persistfd = fd;
-	(void) rw_unlock(&vip->vdi_pfdlock);
+	VERIFY0(rw_unlock(&vip->vdi_pfdlock));
 
 	return (0);
 }
@@ -199,7 +200,7 @@ libvarpd_persist_instance(varpd_impl_t *vip, varpd_instance_t *inst)
 	int err = 0;
 	nvlist_t *nvl = NULL, *cvl = NULL;
 
-	(void) rw_rdlock(&vip->vdi_pfdlock);
+	VERIFY0(rw_rdlock(&vip->vdi_pfdlock));
 	/* Check if persistence exists */
 	if (vip->vdi_persistfd == -1)
 		goto out;
@@ -238,7 +239,7 @@ libvarpd_persist_instance(varpd_impl_t *vip, varpd_instance_t *inst)
 out:
 	nvlist_free(nvl);
 	nvlist_free(cvl);
-	(void) rw_unlock(&vip->vdi_pfdlock);
+	VERIFY0(rw_unlock(&vip->vdi_pfdlock));
 	return (err);
 }
 
@@ -248,9 +249,9 @@ libvarpd_torch_instance(varpd_impl_t *vip, varpd_instance_t *inst)
 	char buf[32];
 	int ret;
 
-	(void) rw_rdlock(&vip->vdi_pfdlock);
+	VERIFY0(rw_rdlock(&vip->vdi_pfdlock));
 	if (vip->vdi_persistfd == -1) {
-		(void) rw_unlock(&vip->vdi_pfdlock);
+		VERIFY0(rw_unlock(&vip->vdi_pfdlock));
 		return;
 	}
 
@@ -271,7 +272,7 @@ libvarpd_torch_instance(varpd_impl_t *vip, varpd_instance_t *inst)
 		}
 	}
 
-	(void) rw_unlock(&vip->vdi_pfdlock);
+	VERIFY0(rw_unlock(&vip->vdi_pfdlock));
 }
 
 static int
@@ -341,10 +342,11 @@ libvarpd_persist_restore_instance(varpd_impl_t *vip, nvlist_t *nvl)
 		return (EINVAL);
 	}
 
-	if (mutex_init(&inst->vri_lock, USYNC_THREAD, NULL) != 0)
+	if (mutex_init(&inst->vri_lock, USYNC_THREAD | LOCK_ERRORCHECK,
+	    NULL) != 0)
 		libvarpd_panic("failed to create vri_lock mutex");
 
-	(void) mutex_lock(&vip->vdi_lock);
+	mutex_enter(&vip->vdi_lock);
 	lookup.vri_id = inst->vri_id;
 	if (avl_find(&vip->vdi_instances, &lookup, NULL) != NULL)
 		libvarpd_panic("found duplicate instance with id %d",
@@ -355,7 +357,7 @@ libvarpd_persist_restore_instance(varpd_impl_t *vip, nvlist_t *nvl)
 		libvarpd_panic("found duplicate linstance with id %d",
 		    lookup.vri_linkid);
 	avl_add(&vip->vdi_linstances, inst);
-	(void) mutex_unlock(&vip->vdi_lock);
+	mutex_exit(&vip->vdi_lock);
 
 	if (plugin->vpp_ops->vpo_start(inst->vri_private) != 0) {
 		libvarpd_instance_destroy((varpd_instance_handle_t *)inst);
@@ -377,9 +379,9 @@ libvarpd_persist_restore_instance(varpd_impl_t *vip, nvlist_t *nvl)
 		}
 	}
 
-	(void) mutex_lock(&inst->vri_lock);
+	mutex_enter(&inst->vri_lock);
 	inst->vri_flags |= VARPD_INSTANCE_F_ACTIVATED;
-	(void) mutex_unlock(&inst->vri_lock);
+	mutex_exit(&inst->vri_lock);
 
 	return (0);
 }
@@ -446,16 +448,16 @@ libvarpd_check_degrade_cb(varpd_impl_t *vip, datalink_id_t linkid, void *arg)
 {
 	varpd_instance_t *inst;
 
-	(void) mutex_lock(&vip->vdi_lock);
+	mutex_enter(&vip->vdi_lock);
 	for (inst = avl_first(&vip->vdi_instances); inst != NULL;
 	    inst = AVL_NEXT(&vip->vdi_instances, inst)) {
 		if (inst->vri_linkid == linkid) {
-			(void) mutex_unlock(&vip->vdi_lock);
+			mutex_exit(&vip->vdi_lock);
 			return (0);
 		}
 	}
 
-	(void) mutex_unlock(&vip->vdi_lock);
+	mutex_exit(&vip->vdi_lock);
 
 	(void) libvarpd_overlay_degrade_datalink(vip, linkid,
 	    "no varpd instance exists");
@@ -477,7 +479,7 @@ libvarpd_persist_restore(varpd_handle_t *vhp)
 	struct dirent *dp;
 	varpd_impl_t *vip = (varpd_impl_t *)vhp;
 
-	(void) rw_rdlock(&vip->vdi_pfdlock);
+	VERIFY0(rw_rdlock(&vip->vdi_pfdlock));
 	if ((dirfd = dup(vip->vdi_persistfd)) < 0) {
 		ret = errno;
 		goto out;
@@ -560,7 +562,7 @@ libvarpd_persist_restore(varpd_handle_t *vhp)
 out:
 	if (dirp != NULL)
 		(void) closedir(dirp);
-	(void) rw_unlock(&vip->vdi_pfdlock);
+	VERIFY0(rw_unlock(&vip->vdi_pfdlock));
 	return (ret);
 }
 
@@ -569,16 +571,16 @@ libvarpd_persist_disable(varpd_handle_t *vhp)
 {
 	varpd_impl_t *vip = (varpd_impl_t *)vhp;
 
-	(void) rw_wrlock(&vip->vdi_pfdlock);
+	VERIFY0(rw_wrlock(&vip->vdi_pfdlock));
 	if (vip->vdi_persistfd == -1) {
-		(void) mutex_unlock(&vip->vdi_lock);
-		(void) rw_unlock(&vip->vdi_pfdlock);
+		mutex_exit(&vip->vdi_lock);
+		VERIFY0(rw_unlock(&vip->vdi_pfdlock));
 		return (ENOENT);
 	}
 	if (close(vip->vdi_persistfd) != 0)
 		libvarpd_panic("failed to close persist fd %d: %d",
 		    vip->vdi_persistfd, errno);
 	vip->vdi_persistfd = -1;
-	(void) rw_unlock(&vip->vdi_pfdlock);
+	VERIFY0(rw_unlock(&vip->vdi_pfdlock));
 	return (0);
 }

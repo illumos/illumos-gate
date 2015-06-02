@@ -585,7 +585,7 @@ svp_conn_pollin(svp_conn_t *scp)
 	}
 
 	list_remove(&scp->sc_queries, sqp);
-	(void) mutex_unlock(&scp->sc_lock);
+	mutex_exit(&scp->sc_lock);
 
 	/*
 	 * We have to release all of our resources associated with this entry
@@ -594,7 +594,7 @@ svp_conn_pollin(svp_conn_t *scp)
 	 */
 	svp_query_release(sqp);
 	sqp->sq_func(sqp, sqp->sq_arg);
-	(void) mutex_lock(&scp->sc_lock);
+	mutex_enter(&scp->sc_lock);
 	scp->sc_event.se_events |= POLLIN | POLLRDNORM;
 
 	return (SVP_RA_NONE);
@@ -637,7 +637,7 @@ svp_conn_handler(port_event_t *pe, void *arg)
 	svp_conn_act_t ret = SVP_RA_NONE;
 	svp_conn_state_t oldstate;
 
-	(void) mutex_lock(&scp->sc_lock);
+	mutex_enter(&scp->sc_lock);
 
 	/*
 	 * Check if one of our event interrupts is set. An event interrupt, such
@@ -655,21 +655,21 @@ svp_conn_handler(port_event_t *pe, void *arg)
 	    (scp->sc_flags & SVP_CF_USER) != 0 &&
 	    pe != NULL &&
 	    pe->portev_source != PORT_SOURCE_USER) {
-		(void) mutex_unlock(&scp->sc_lock);
+		mutex_exit(&scp->sc_lock);
 		return;
 	}
 
 	if (pe != NULL && pe->portev_source == PORT_SOURCE_USER) {
 		scp->sc_flags &= ~SVP_CF_USER;
 		if ((scp->sc_flags & SVP_CF_UFLAG) == 0) {
-			(void) mutex_unlock(&scp->sc_lock);
+			mutex_exit(&scp->sc_lock);
 			return;
 		}
 	}
 
 	/* Check if this needs to be freed */
 	if (scp->sc_flags & SVP_CF_REAP) {
-		(void) mutex_unlock(&scp->sc_lock);
+		mutex_exit(&scp->sc_lock);
 		svp_conn_destroy(scp);
 		return;
 	}
@@ -720,13 +720,13 @@ svp_conn_handler(port_event_t *pe, void *arg)
 		    "state: %d", scp->sc_cstate);
 	}
 out:
-	(void) mutex_unlock(&scp->sc_lock);
+	mutex_exit(&scp->sc_lock);
 
 	if (ret == SVP_RA_NONE)
 		return;
 
-	(void) mutex_lock(&srp->sr_lock);
-	(void) mutex_lock(&scp->sc_lock);
+	mutex_enter(&srp->sr_lock);
+	mutex_enter(&scp->sc_lock);
 	if (ret == SVP_RA_ERROR)
 		ret = svp_conn_reset(scp);
 
@@ -740,8 +740,8 @@ out:
 		scp->sc_flags |= SVP_CF_REAP;
 		svp_conn_inject(scp);
 	}
-	(void) mutex_unlock(&scp->sc_lock);
-	(void) mutex_unlock(&srp->sr_lock);
+	mutex_exit(&scp->sc_lock);
+	mutex_exit(&srp->sr_lock);
 }
 
 static void
@@ -767,7 +767,7 @@ svp_conn_querytimer(void *arg)
 	svp_conn_t *scp = arg;
 	hrtime_t now = gethrtime();
 
-	(void) mutex_lock(&scp->sc_lock);
+	mutex_enter(&scp->sc_lock);
 
 	/*
 	 * If we're not in the active state, then we don't care about this as
@@ -775,7 +775,7 @@ svp_conn_querytimer(void *arg)
 	 * about.
 	 */
 	if (scp->sc_cstate != SVP_CS_ACTIVE) {
-		(void) mutex_unlock(&scp->sc_lock);
+		mutex_exit(&scp->sc_lock);
 		return;
 	}
 
@@ -789,14 +789,14 @@ svp_conn_querytimer(void *arg)
 
 	/* Nothing timed out, we're good here */
 	if (sqp == NULL) {
-		(void) mutex_unlock(&scp->sc_lock);
+		mutex_exit(&scp->sc_lock);
 		return;
 	}
 
 	scp->sc_flags |= SVP_CF_TEARDOWN;
 	svp_conn_inject(scp);
 
-	(void) mutex_unlock(&scp->sc_lock);
+	mutex_exit(&scp->sc_lock);
 }
 
 /*
@@ -809,7 +809,7 @@ svp_conn_fallout(svp_conn_t *scp)
 
 	assert(MUTEX_HELD(&srp->sr_lock));
 
-	(void) mutex_lock(&scp->sc_lock);
+	mutex_enter(&scp->sc_lock);
 	switch (scp->sc_cstate) {
 	case SVP_CS_ERROR:
 		/*
@@ -854,19 +854,26 @@ svp_conn_fallout(svp_conn_t *scp)
 		libvarpd_panic("svp_conn_fallout encountered"
 		    "unkonwn state");
 	}
-	(void) mutex_unlock(&scp->sc_lock);
-	(void) mutex_unlock(&srp->sr_lock);
+	mutex_exit(&scp->sc_lock);
+	mutex_exit(&srp->sr_lock);
 }
 
 int
 svp_conn_create(svp_remote_t *srp, const struct in6_addr *addr)
 {
+	int ret;
 	svp_conn_t *scp;
 
 	assert(MUTEX_HELD(&srp->sr_lock));
 	scp = umem_zalloc(sizeof (svp_conn_t), UMEM_DEFAULT);
 	if (scp == NULL)
 		return (ENOMEM);
+
+	if ((ret = mutex_init(&scp->sc_lock, USYNC_THREAD | LOCK_ERRORCHECK,
+	    NULL)) != 0) {
+		umem_free(scp, sizeof (svp_conn_t));
+		return (ret);
+	}
 
 	scp->sc_remote = srp;
 	scp->sc_event.se_func = svp_conn_handler;
@@ -888,9 +895,9 @@ svp_conn_create(svp_remote_t *srp, const struct in6_addr *addr)
 	scp->sc_gen = srp->sr_gen;
 	bcopy(addr, &scp->sc_addr, sizeof (struct in6_addr));
 	scp->sc_cstate = SVP_CS_INITIAL;
-	(void) mutex_lock(&scp->sc_lock);
+	mutex_enter(&scp->sc_lock);
 	svp_conn_add(scp);
-	(void) mutex_unlock(&scp->sc_lock);
+	mutex_exit(&scp->sc_lock);
 
 	/* Now that we're locked and loaded, add our timers */
 	svp_timer_add(&scp->sc_qtimer);
@@ -911,7 +918,7 @@ svp_conn_destroy(svp_conn_t *scp)
 {
 	int ret;
 
-	(void) mutex_lock(&scp->sc_lock);
+	mutex_enter(&scp->sc_lock);
 	if (scp->sc_cstate != SVP_CS_ERROR)
 		libvarpd_panic("asked to tear down an active connection");
 	if (scp->sc_flags & SVP_CF_ADDED)
@@ -926,7 +933,7 @@ svp_conn_destroy(svp_conn_t *scp)
 		libvarpd_panic("dissociate failed or was actually "
 		    "associated: %d", ret);
 	}
-	(void) mutex_unlock(&scp->sc_lock);
+	mutex_exit(&scp->sc_lock);
 
 	/* Verify our timers are killed */
 	svp_timer_remove(&scp->sc_btimer);

@@ -288,24 +288,24 @@ libvarpd_overlay_lookup_run(varpd_handle_t *vhp)
 {
 	varpd_impl_t *vip = (varpd_impl_t *)vhp;
 
-	(void) mutex_lock(&vip->vdi_lock);
+	mutex_enter(&vip->vdi_lock);
 	if (vip->vdi_lthr_quiesce == B_TRUE) {
-		(void) mutex_unlock(&vip->vdi_lock);
+		mutex_exit(&vip->vdi_lock);
 		return;
 	}
 	vip->vdi_lthr_count++;
 
 	for (;;) {
-		(void) mutex_unlock(&vip->vdi_lock);
+		mutex_exit(&vip->vdi_lock);
 		libvarpd_overlay_lookup_handle(vip);
-		(void) mutex_lock(&vip->vdi_lock);
+		mutex_enter(&vip->vdi_lock);
 		if (vip->vdi_lthr_quiesce == B_TRUE)
 			break;
 	}
 	assert(vip->vdi_lthr_count > 0);
 	vip->vdi_lthr_count--;
 	(void) cond_signal(&vip->vdi_lthr_cv);
-	(void) mutex_unlock(&vip->vdi_lock);
+	mutex_exit(&vip->vdi_lock);
 }
 
 void
@@ -313,16 +313,16 @@ libvarpd_overlay_lookup_quiesce(varpd_handle_t *vhp)
 {
 	varpd_impl_t *vip = (varpd_impl_t *)vhp;
 
-	(void) mutex_lock(&vip->vdi_lock);
+	mutex_enter(&vip->vdi_lock);
 	if (vip->vdi_lthr_count == 0) {
-		(void) mutex_unlock(&vip->vdi_lock);
+		mutex_exit(&vip->vdi_lock);
 		return;
 	}
 	vip->vdi_lthr_quiesce = B_TRUE;
 	while (vip->vdi_lthr_count > 0)
 		(void) cond_wait(&vip->vdi_lthr_cv, &vip->vdi_lock);
 	vip->vdi_lthr_quiesce = B_FALSE;
-	(void) mutex_unlock(&vip->vdi_lock);
+	mutex_exit(&vip->vdi_lock);
 }
 
 int

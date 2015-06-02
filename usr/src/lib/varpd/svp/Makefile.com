@@ -33,7 +33,7 @@ LIBS =		$(DYNLIB)
 # functions and better to use that then compile list.o yet again
 # ourselves... probably.
 #
-LDLIBS +=	-lc -lvarpd -lumem -lnvpair -lsocket -lnsl -lavl \
+LDLIBS +=	-lc -lumem -lnvpair -lsocket -lnsl -lavl \
 		-lcmdutils -lidspace -lbunyan
 CPPFLAGS +=	-I../common
 

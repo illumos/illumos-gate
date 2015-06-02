@@ -31,12 +31,21 @@ $mapfile_version 2
 
 SYMBOL_SCOPE {
     global:
+	libvarpd_fma_degrade		{ FLAGS = EXTERN };
+	libvarpd_inject_arp		{ FLAGS = EXTERN };
+	libvarpd_inject_varp		{ FLAGS = EXTERN };
+	libvarpd_fma_restore		{ FLAGS = EXTERN };
+	libvarpd_panic			{ FLAGS = EXTERN };
 	libvarpd_plugin_alloc		{ FLAGS = EXTERN };
+	libvarpd_plugin_arp_reply	{ FLAGS = EXTERN };
+	libvarpd_plugin_dhcp_reply	{ FLAGS = EXTERN };
 	libvarpd_plugin_free		{ FLAGS = EXTERN };
 	libvarpd_plugin_proxy_arp	{ FLAGS = EXTERN };
 	libvarpd_plugin_proxy_dhcp	{ FLAGS = EXTERN };
 	libvarpd_plugin_proxy_ndp	{ FLAGS = EXTERN };
+	libvarpd_plugin_query_reply	{ FLAGS = EXTERN };
 	libvarpd_plugin_register	{ FLAGS = EXTERN };
+	libvarpd_plugin_vnetid		{ FLAGS = EXTERN };
 	libvarpd_prop_set_name		{ FLAGS = EXTERN };
 	libvarpd_prop_set_prot		{ FLAGS = EXTERN };
 	libvarpd_prop_set_type		{ FLAGS = EXTERN };

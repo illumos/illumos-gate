@@ -84,7 +84,8 @@ varpd_direct_create(varpd_provider_handle_t *hdl, void **outp,
 	if (vdp == NULL)
 		return (ENOMEM);
 
-	if ((ret = mutex_init(&vdp->vad_lock, USYNC_THREAD, NULL)) != 0) {
+	if ((ret = mutex_init(&vdp->vad_lock, USYNC_THREAD | LOCK_ERRORCHECK,
+	    NULL)) != 0) {
 		umem_free(vdp, sizeof (varpd_direct_t));
 		return (ret);
 	}
@@ -101,13 +102,13 @@ varpd_direct_start(void *arg)
 {
 	varpd_direct_t *vdp = arg;
 
-	(void) mutex_lock(&vdp->vad_lock);
+	mutex_enter(&vdp->vad_lock);
 	if (vdp->vad_hip == B_FALSE ||((vdp->vad_dest & OVERLAY_PLUGIN_D_IP) &&
 	    vdp->vad_hport == B_FALSE)) {
-		(void) mutex_unlock(&vdp->vad_lock);
+		mutex_exit(&vdp->vad_lock);
 		return (EAGAIN);
 	}
-	(void) mutex_unlock(&vdp->vad_lock);
+	mutex_exit(&vdp->vad_lock);
 
 	return (0);
 }
@@ -133,10 +134,10 @@ varpd_direct_default(void *arg, overlay_target_point_t *otp)
 {
 	varpd_direct_t *vdp = arg;
 
-	(void) mutex_lock(&vdp->vad_lock);
+	mutex_enter(&vdp->vad_lock);
 	bcopy(&vdp->vad_ip, &otp->otp_ip, sizeof (struct in6_addr));
 	otp->otp_port = vdp->vad_port;
-	(void) mutex_unlock(&vdp->vad_lock);
+	mutex_exit(&vdp->vad_lock);
 
 	return (VARPD_LOOKUP_OK);
 }
@@ -200,14 +201,14 @@ varpd_direct_getprop(void *arg, const char *pname, void *buf, uint32_t *sizep)
 	if (strcmp(pname, varpd_direct_props[0]) == 0) {
 		if (*sizep < sizeof (struct in6_addr))
 			return (EOVERFLOW);
-		(void) mutex_lock(&vdp->vad_lock);
+		mutex_enter(&vdp->vad_lock);
 		if (vdp->vad_hip == B_FALSE) {
 			*sizep = 0;
 		} else {
 			bcopy(&vdp->vad_ip, buf, sizeof (struct in6_addr));
 			*sizep = sizeof (struct in6_addr);
 		}
-		(void) mutex_unlock(&vdp->vad_lock);
+		mutex_exit(&vdp->vad_lock);
 		return (0);
 	}
 
@@ -217,7 +218,7 @@ varpd_direct_getprop(void *arg, const char *pname, void *buf, uint32_t *sizep)
 
 		if (*sizep < sizeof (uint64_t))
 			return (EOVERFLOW);
-		(void) mutex_lock(&vdp->vad_lock);
+		mutex_enter(&vdp->vad_lock);
 		if (vdp->vad_hport == B_FALSE) {
 			*sizep = 0;
 		} else {
@@ -225,7 +226,7 @@ varpd_direct_getprop(void *arg, const char *pname, void *buf, uint32_t *sizep)
 			bcopy(&val, buf, sizeof (uint64_t));
 			*sizep = sizeof (uint64_t);
 		}
-		(void) mutex_unlock(&vdp->vad_lock);
+		mutex_exit(&vdp->vad_lock);
 		return (0);
 	}
 
@@ -251,10 +252,10 @@ varpd_direct_setprop(void *arg, const char *pname, const void *buf,
 		if (IN6_IS_ADDR_6TO4(ipv6))
 			return (EINVAL);
 
-		(void) mutex_lock(&vdp->vad_lock);
+		mutex_enter(&vdp->vad_lock);
 		bcopy(buf, &vdp->vad_ip, sizeof (struct in6_addr));
 		vdp->vad_hip = B_TRUE;
-		(void) mutex_unlock(&vdp->vad_lock);
+		mutex_exit(&vdp->vad_lock);
 		return (0);
 	}
 
@@ -267,10 +268,10 @@ varpd_direct_setprop(void *arg, const char *pname, const void *buf,
 		if (*valp == 0 || *valp > UINT16_MAX)
 			return (EINVAL);
 
-		(void) mutex_lock(&vdp->vad_lock);
+		mutex_enter(&vdp->vad_lock);
 		vdp->vad_port = (uint16_t)*valp;
 		vdp->vad_hport = B_TRUE;
-		(void) mutex_unlock(&vdp->vad_lock);
+		mutex_exit(&vdp->vad_lock);
 		return (0);
 	}
 
@@ -283,11 +284,11 @@ varpd_direct_save(void *arg, nvlist_t *nvp)
 	int ret;
 	varpd_direct_t *vdp = arg;
 
-	(void) mutex_lock(&vdp->vad_lock);
+	mutex_enter(&vdp->vad_lock);
 	if (vdp->vad_hport == B_TRUE) {
 		if ((ret = nvlist_add_uint16(nvp, varpd_direct_props[1],
 		    vdp->vad_port)) != 0) {
-			(void) mutex_unlock(&vdp->vad_lock);
+			mutex_exit(&vdp->vad_lock);
 			return (ret);
 		}
 	}
@@ -300,11 +301,11 @@ varpd_direct_save(void *arg, nvlist_t *nvp)
 			abort();
 		if ((ret = nvlist_add_string(nvp, varpd_direct_props[0],
 		    buf)) != 0) {
-			(void) mutex_unlock(&vdp->vad_lock);
+			mutex_exit(&vdp->vad_lock);
 			return (ret);
 		}
 	}
-	(void) mutex_unlock(&vdp->vad_lock);
+	mutex_exit(&vdp->vad_lock);
 
 	return (0);
 }

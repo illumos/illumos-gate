@@ -451,7 +451,8 @@ varpd_svp_create(varpd_provider_handle_t *hdl, void **outp,
 	if (svp == NULL)
 		return (ENOMEM);
 
-	if ((ret = mutex_init(&svp->svp_lock, USYNC_THREAD, NULL)) != 0) {
+	if ((ret = mutex_init(&svp->svp_lock, USYNC_THREAD | LOCK_ERRORCHECK,
+	    NULL)) != 0) {
 		umem_free(svp, sizeof (svp_t));
 		return (ret);
 	}
@@ -472,13 +473,13 @@ varpd_svp_start(void *arg)
 	svp_remote_t *srp;
 	svp_t *svp = arg;
 
-	(void) mutex_lock(&svp->svp_lock);
+	mutex_enter(&svp->svp_lock);
 	if (svp->svp_host == NULL || svp->svp_port == 0 ||
 	    svp->svp_huip == B_FALSE || svp->svp_uport == 0) {
-		(void) mutex_unlock(&svp->svp_lock);
+		mutex_exit(&svp->svp_lock);
 		return (EAGAIN);
 	}
-	(void) mutex_unlock(&svp->svp_lock);
+	mutex_exit(&svp->svp_lock);
 
 	if ((ret = svp_remote_find(svp->svp_host, svp->svp_port, &srp)) != 0)
 		return (ret);
@@ -630,19 +631,19 @@ varpd_svp_getprop(void *arg, const char *pname, void *buf, uint32_t *sizep)
 	if (strcmp(pname, varpd_svp_props[0]) == 0) {
 		size_t len;
 
-		(void) mutex_lock(&svp->svp_lock);
+		mutex_enter(&svp->svp_lock);
 		if (svp->svp_host == NULL) {
 			*sizep = 0;
 		} else {
 			len = strlen(svp->svp_host) + 1;
 			if (*sizep < len) {
-				(void) mutex_unlock(&svp->svp_lock);
+				mutex_exit(&svp->svp_lock);
 				return (EOVERFLOW);
 			}
 			*sizep = len;
 			(void) strlcpy(buf, svp->svp_host, *sizep);
 		}
-		(void) mutex_unlock(&svp->svp_lock);
+		mutex_exit(&svp->svp_lock);
 		return (0);
 	}
 
@@ -653,7 +654,7 @@ varpd_svp_getprop(void *arg, const char *pname, void *buf, uint32_t *sizep)
 		if (*sizep < sizeof (uint64_t))
 			return (EOVERFLOW);
 
-		(void) mutex_lock(&svp->svp_lock);
+		mutex_enter(&svp->svp_lock);
 		if (svp->svp_port == 0) {
 			*sizep = 0;
 		} else {
@@ -662,7 +663,7 @@ varpd_svp_getprop(void *arg, const char *pname, void *buf, uint32_t *sizep)
 			*sizep = sizeof (uint64_t);
 		}
 
-		(void) mutex_unlock(&svp->svp_lock);
+		mutex_exit(&svp->svp_lock);
 		return (0);
 	}
 
@@ -670,7 +671,7 @@ varpd_svp_getprop(void *arg, const char *pname, void *buf, uint32_t *sizep)
 	if (strcmp(pname, varpd_svp_props[2]) == 0) {
 		if (*sizep > sizeof (struct in6_addr))
 			return (EOVERFLOW);
-		(void) mutex_lock(&svp->svp_lock);
+		mutex_enter(&svp->svp_lock);
 		if (svp->svp_huip == B_FALSE) {
 			*sizep = 0;
 		} else {
@@ -687,7 +688,7 @@ varpd_svp_getprop(void *arg, const char *pname, void *buf, uint32_t *sizep)
 		if (*sizep < sizeof (uint64_t))
 			return (EOVERFLOW);
 
-		(void) mutex_lock(&svp->svp_lock);
+		mutex_enter(&svp->svp_lock);
 		if (svp->svp_uport == 0) {
 			*sizep = 0;
 		} else {
@@ -696,7 +697,7 @@ varpd_svp_getprop(void *arg, const char *pname, void *buf, uint32_t *sizep)
 			*sizep = sizeof (uint64_t);
 		}
 
-		(void) mutex_unlock(&svp->svp_lock);
+		mutex_exit(&svp->svp_lock);
 		return (0);
 	}
 
@@ -716,11 +717,11 @@ varpd_svp_setprop(void *arg, const char *pname, const void *buf,
 		(void) strlcpy(dup, buf, size);
 		if (dup == NULL)
 			return (ENOMEM);
-		(void) mutex_lock(&svp->svp_lock);
+		mutex_enter(&svp->svp_lock);
 		if (svp->svp_host != NULL)
 			umem_free(svp->svp_host, strlen(svp->svp_host) + 1);
 		svp->svp_host = dup;
-		(void) mutex_unlock(&svp->svp_lock);
+		mutex_exit(&svp->svp_lock);
 		return (0);
 	}
 
@@ -733,9 +734,9 @@ varpd_svp_setprop(void *arg, const char *pname, const void *buf,
 		if (*valp == 0 || *valp > UINT16_MAX)
 			return (EINVAL);
 
-		(void) mutex_lock(&svp->svp_lock);
+		mutex_enter(&svp->svp_lock);
 		svp->svp_port = (uint16_t)*valp;
-		(void) mutex_unlock(&svp->svp_lock);
+		mutex_exit(&svp->svp_lock);
 		return (0);
 	}
 
@@ -762,10 +763,10 @@ varpd_svp_setprop(void *arg, const char *pname, const void *buf,
 				return (EINVAL);
 		}
 
-		(void) mutex_lock(&svp->svp_lock);
+		mutex_enter(&svp->svp_lock);
 		bcopy(buf, &svp->svp_uip, sizeof (struct in6_addr));
 		svp->svp_huip = B_TRUE;
-		(void) mutex_unlock(&svp->svp_lock);
+		mutex_exit(&svp->svp_lock);
 		return (0);
 	}
 
@@ -778,9 +779,9 @@ varpd_svp_setprop(void *arg, const char *pname, const void *buf,
 		if (*valp == 0 || *valp > UINT16_MAX)
 			return (EINVAL);
 
-		(void) mutex_lock(&svp->svp_lock);
+		mutex_enter(&svp->svp_lock);
 		svp->svp_uport = (uint16_t)*valp;
-		(void) mutex_unlock(&svp->svp_lock);
+		mutex_exit(&svp->svp_lock);
 
 		return (0);
 	}
@@ -794,11 +795,11 @@ varpd_svp_save(void *arg, nvlist_t *nvp)
 	int ret;
 	svp_t *svp = arg;
 
-	(void) mutex_lock(&svp->svp_lock);
+	mutex_enter(&svp->svp_lock);
 	if (svp->svp_host != NULL) {
 		if ((ret = nvlist_add_string(nvp, varpd_svp_props[0],
 		    svp->svp_host)) != 0) {
-			(void) mutex_unlock(&svp->svp_lock);
+			mutex_exit(&svp->svp_lock);
 			return (ret);
 		}
 	}
@@ -806,7 +807,7 @@ varpd_svp_save(void *arg, nvlist_t *nvp)
 	if (svp->svp_port != 0) {
 		if ((ret = nvlist_add_uint16(nvp, varpd_svp_props[1],
 		    svp->svp_port)) != 0) {
-			(void) mutex_unlock(&svp->svp_lock);
+			mutex_exit(&svp->svp_lock);
 			return (ret);
 		}
 	}
@@ -821,7 +822,7 @@ varpd_svp_save(void *arg, nvlist_t *nvp)
 
 		if ((ret = nvlist_add_string(nvp, varpd_svp_props[2],
 		    buf)) != 0) {
-			(void) mutex_unlock(&svp->svp_lock);
+			mutex_exit(&svp->svp_lock);
 			return (ret);
 		}
 	}
@@ -829,12 +830,12 @@ varpd_svp_save(void *arg, nvlist_t *nvp)
 	if (svp->svp_uport != 0) {
 		if ((ret = nvlist_add_uint16(nvp, varpd_svp_props[3],
 		    svp->svp_uport)) != 0) {
-			(void) mutex_unlock(&svp->svp_lock);
+			mutex_exit(&svp->svp_lock);
 			return (ret);
 		}
 	}
 
-	(void) mutex_unlock(&svp->svp_lock);
+	mutex_exit(&svp->svp_lock);
 	return (0);
 }
 

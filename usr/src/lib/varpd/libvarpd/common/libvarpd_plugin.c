@@ -114,11 +114,11 @@ libvarpd_plugin_register(varpd_plugin_register_t *vprp)
 		return (EINVAL);
 	}
 
-	(void) mutex_lock(&varpd_load_lock);
+	mutex_enter(&varpd_load_lock);
 	if (varpd_load_handle == NULL)
 		libvarpd_panic("varpd_load_handle was unexpectedly null");
 
-	(void) mutex_lock(&varpd_load_handle->vdi_lock);
+	mutex_enter(&varpd_load_handle->vdi_lock);
 	lookup.vpp_name = vprp->vpr_name;
 	if (avl_find(&varpd_load_handle->vdi_plugins, &lookup, NULL) != NULL) {
 		(void) bunyan_warn(varpd_load_handle->vdi_bunyan,
@@ -126,8 +126,8 @@ libvarpd_plugin_register(varpd_plugin_register_t *vprp)
 		    BUNYAN_T_STRING, "module_path", varpd_load_path,
 		    BUNYAN_T_STRING, "name", vprp->vpr_name,
 		    BUNYAN_T_END);
-		(void) mutex_unlock(&varpd_load_handle->vdi_lock);
-		(void) mutex_unlock(&varpd_load_lock);
+		mutex_exit(&varpd_load_handle->vdi_lock);
+		mutex_exit(&varpd_load_lock);
 		umem_free(vpp, sizeof (varpd_plugin_t));
 		return (EEXIST);
 	}
@@ -137,20 +137,21 @@ libvarpd_plugin_register(varpd_plugin_register_t *vprp)
 		    "failed to allocate memory to duplicate name",
 		    BUNYAN_T_STRING, "module_path", varpd_load_path,
 		    BUNYAN_T_END);
-		(void) mutex_unlock(&varpd_load_handle->vdi_lock);
-		(void) mutex_unlock(&varpd_load_lock);
+		mutex_exit(&varpd_load_handle->vdi_lock);
+		mutex_exit(&varpd_load_lock);
 		umem_free(vpp, sizeof (varpd_plugin_t));
 		return (ENOMEM);
 	}
 
 	vpp->vpp_mode = vprp->vpr_mode;
 	vpp->vpp_ops = vprp->vpr_ops;
-	if (mutex_init(&vpp->vpp_lock, USYNC_THREAD, NULL) != 0)
+	if (mutex_init(&vpp->vpp_lock, USYNC_THREAD | LOCK_ERRORCHECK,
+	    NULL) != 0)
 		libvarpd_panic("failed to create plugin's vpp_lock");
 	vpp->vpp_active = 0;
 	avl_add(&varpd_load_handle->vdi_plugins, vpp);
-	(void) mutex_unlock(&varpd_load_handle->vdi_lock);
-	(void) mutex_unlock(&varpd_load_lock);
+	mutex_exit(&varpd_load_handle->vdi_lock);
+	mutex_exit(&varpd_load_lock);
 
 	return (0);
 }
@@ -161,9 +162,9 @@ libvarpd_plugin_lookup(varpd_impl_t *vip, const char *name)
 	varpd_plugin_t lookup, *ret;
 
 	lookup.vpp_name = name;
-	(void) mutex_lock(&vip->vdi_lock);
+	mutex_enter(&vip->vdi_lock);
 	ret = avl_find(&vip->vdi_plugins, &lookup, NULL);
-	(void) mutex_unlock(&vip->vdi_lock);
+	mutex_exit(&vip->vdi_lock);
 
 	return (ret);
 }
@@ -194,18 +195,18 @@ libvarpd_plugin_load(varpd_handle_t *vph, const char *path)
 
 	if (vip == NULL || path == NULL)
 		return (EINVAL);
-	(void) mutex_lock(&varpd_load_lock);
+	mutex_enter(&varpd_load_lock);
 	while (varpd_load_handle != NULL)
 		(void) cond_wait(&varpd_load_cv, &varpd_load_lock);
 	varpd_load_handle = vip;
-	(void) mutex_unlock(&varpd_load_lock);
+	mutex_exit(&varpd_load_lock);
 
 	ret = libvarpd_dirwalk(vip, path, ".so", libvarpd_plugin_load_cb, NULL);
 
-	(void) mutex_lock(&varpd_load_lock);
+	mutex_enter(&varpd_load_lock);
 	varpd_load_handle = NULL;
 	(void) cond_signal(&varpd_load_cv);
-	(void) mutex_unlock(&varpd_load_lock);
+	mutex_exit(&varpd_load_lock);
 
 	return (ret);
 }
@@ -217,15 +218,15 @@ libvarpd_plugin_walk(varpd_handle_t *vph, libvarpd_plugin_walk_f func,
 	varpd_impl_t *vip = (varpd_impl_t *)vph;
 	varpd_plugin_t *vpp;
 
-	(void) mutex_lock(&vip->vdi_lock);
+	mutex_enter(&vip->vdi_lock);
 	for (vpp = avl_first(&vip->vdi_plugins); vpp != NULL;
 	    vpp = AVL_NEXT(&vip->vdi_plugins, vpp)) {
 		if (func(vph, vpp->vpp_name, arg) != 0) {
-			(void) mutex_unlock(&vip->vdi_lock);
+			mutex_exit(&vip->vdi_lock);
 			return (1);
 		}
 	}
-	(void) mutex_unlock(&vip->vdi_lock);
+	mutex_exit(&vip->vdi_lock);
 	return (0);
 }
 
@@ -255,7 +256,7 @@ libvarpd_plugin_fini(void)
 void
 libvarpd_plugin_prefork(void)
 {
-	(void) mutex_lock(&varpd_load_lock);
+	mutex_enter(&varpd_load_lock);
 	while (varpd_load_handle != NULL)
 		(void) cond_wait(&varpd_load_cv, &varpd_load_lock);
 }
@@ -264,5 +265,5 @@ void
 libvarpd_plugin_postfork(void)
 {
 	(void) cond_signal(&varpd_load_cv);
-	(void) mutex_unlock(&varpd_load_lock);
+	mutex_exit(&varpd_load_lock);
 }

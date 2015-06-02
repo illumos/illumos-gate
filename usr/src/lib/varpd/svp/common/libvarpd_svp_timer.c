@@ -29,7 +29,7 @@
 
 int svp_tickrate = 1;
 static svp_event_t svp_timer_event;
-static mutex_t svp_timer_lock = DEFAULTMUTEX;
+static mutex_t svp_timer_lock = ERRORCHECKMUTEX;
 static cond_t svp_timer_cv = DEFAULTCV;
 static avl_tree_t svp_timer_tree;
 static uint64_t svp_timer_nticks;
@@ -63,7 +63,7 @@ svp_timer_comparator(const void *l, const void *r)
 static void
 svp_timer_tick(port_event_t *pe, void *arg)
 {
-	(void) mutex_lock(&svp_timer_lock);
+	mutex_enter(&svp_timer_lock);
 	svp_timer_nticks++;
 
 	for (;;) {
@@ -80,9 +80,9 @@ svp_timer_tick(port_event_t *pe, void *arg)
 		 * can advance in the face of a long-running callback.
 		 */
 		t->st_delivering = B_TRUE;
-		(void) mutex_unlock(&svp_timer_lock);
+		mutex_exit(&svp_timer_lock);
 		t->st_func(t->st_arg);
-		(void) mutex_lock(&svp_timer_lock);
+		mutex_enter(&svp_timer_lock);
 		t->st_delivering = B_FALSE;
 		(void) cond_broadcast(&svp_timer_cv);
 		if (t->st_oneshot == B_FALSE) {
@@ -90,7 +90,7 @@ svp_timer_tick(port_event_t *pe, void *arg)
 			avl_add(&svp_timer_tree, t);
 		}
 	}
-	(void) mutex_unlock(&svp_timer_lock);
+	mutex_exit(&svp_timer_lock);
 }
 
 void
@@ -99,17 +99,17 @@ svp_timer_add(svp_timer_t *stp)
 	if (stp->st_value == 0)
 		libvarpd_panic("tried to add svp timer with zero value");
 
-	(void) mutex_lock(&svp_timer_lock);
+	mutex_enter(&svp_timer_lock);
 	stp->st_delivering = B_FALSE;
 	stp->st_expire = svp_timer_nticks + stp->st_value;
 	avl_add(&svp_timer_tree, stp);
-	(void) mutex_unlock(&svp_timer_lock);
+	mutex_exit(&svp_timer_lock);
 }
 
 void
 svp_timer_remove(svp_timer_t *stp)
 {
-	(void) mutex_lock(&svp_timer_lock);
+	mutex_enter(&svp_timer_lock);
 
 	/*
 	 * If the event in question is not currently being delivered, then we
@@ -120,7 +120,7 @@ svp_timer_remove(svp_timer_t *stp)
 	 */
 	if (stp->st_delivering == B_FALSE) {
 		avl_remove(&svp_timer_tree, stp);
-		(void) mutex_unlock(&svp_timer_lock);
+		mutex_exit(&svp_timer_lock);
 		return;
 	}
 
@@ -128,7 +128,7 @@ svp_timer_remove(svp_timer_t *stp)
 	while (stp->st_delivering == B_TRUE)
 		(void) cond_wait(&svp_timer_cv, &svp_timer_lock);
 
-	(void) mutex_unlock(&svp_timer_lock);
+	mutex_exit(&svp_timer_lock);
 }
 
 int

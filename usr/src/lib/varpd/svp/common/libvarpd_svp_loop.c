@@ -39,7 +39,7 @@ typedef struct svp_event_loop {
 } svp_event_loop_t;
 
 static svp_event_loop_t svp_event;
-static mutex_t svp_elock = DEFAULTMUTEX;
+static mutex_t svp_elock = ERRORCHECKMUTEX;
 
 /* ARGSUSED */
 static void *
@@ -50,12 +50,12 @@ svp_event_thr(void *arg)
 		port_event_t pe;
 		svp_event_t *sep;
 
-		(void) mutex_lock(&svp_elock);
+		mutex_enter(&svp_elock);
 		if (svp_event.sel_stop == B_TRUE) {
-			(void) mutex_unlock(&svp_elock);
+			mutex_exit(&svp_elock);
 			break;
 		}
-		(void) mutex_unlock(&svp_elock);
+		mutex_exit(&svp_elock);
 
 		ret = port_get(svp_event.sel_port, &pe, NULL);
 		if (ret != 0) {
@@ -201,9 +201,9 @@ svp_event_init(void)
 void
 svp_event_fini(void)
 {
-	(void) mutex_lock(&svp_elock);
+	mutex_enter(&svp_elock);
 	svp_event.sel_stop = B_TRUE;
-	(void) mutex_unlock(&svp_elock);
+	mutex_exit(&svp_elock);
 
 	(void) timer_delete(svp_event.sel_hosttimer);
 	(void) close(svp_event.sel_port);

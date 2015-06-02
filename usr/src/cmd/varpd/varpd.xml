@@ -40,6 +40,14 @@ Copyright 2015, Joyent, Inc.
 			exec=":kill"
 			timeout_seconds="10" />
 
+		<property_group name='varpd' type='application'>
+			<property name='include_path' type='astring'>
+				<astring_list>
+					<value_node value='/usr/lib/varpd'/>
+				</astring_list>
+			</property>
+		</property_group>
+
 		<stability value='Unstable' />
 
 		<template>

@@ -58,6 +58,7 @@
 #include <unistd.h>
 #include <thread.h>
 #include <priv.h>
+#include <libscf.h>
 
 #define	VARPD_EXIT_REQUESTED	0
 #define	VARPD_EXIT_FATAL	1
@@ -65,6 +66,9 @@
 
 #define	VARPD_RUNDIR	"/var/run/varpd"
 #define	VARPD_DEFAULT_DOOR	"/var/run/varpd/varpd.door"
+
+#define	VARPD_PG	"varpd"
+#define	VARPD_PROP_INC	"include_path"
 
 static varpd_handle_t *varpd_handle;
 static const char *varpd_pname;
@@ -328,6 +332,38 @@ varpd_cleanup(void)
 }
 
 /*
+ * Load default information from SMF and apply any of if necessary. We recognize
+ * the following properties:
+ *
+ * 	varpd/include_path		Treat these as a series of -i options.
+ *
+ * If we're not under SMF, just move on.
+ */
+static void
+varpd_load_smf(int dfd)
+{
+	char *fmri, *inc;
+	scf_simple_prop_t *prop;
+
+	if ((fmri = getenv("SMF_FMRI")) == NULL)
+		return;
+
+	if ((prop = scf_simple_prop_get(NULL, fmri, VARPD_PG,
+	    VARPD_PROP_INC)) == NULL)
+		return;
+
+	while ((inc = scf_simple_prop_next_astring(prop)) != NULL) {
+		int err = libvarpd_plugin_load(varpd_handle, inc);
+		if (err != 0) {
+			varpd_dfatal(dfd, "failed to load from %s: %s\n",
+			    inc, strerror(err));
+		}
+	}
+
+	scf_simple_prop_free(prop);
+}
+
+/*
  * There are a bunch of things we need to do to be a proper daemon here.
  *
  *   o Ensure that /var/run/varpd exists or create it
@@ -408,11 +444,12 @@ main(int argc, char *argv[])
 	for (i = 0; i < nextincpath; i++) {
 		err = libvarpd_plugin_load(varpd_handle, incpath[i]);
 		if (err != 0) {
-			(void) fprintf(stderr, "failed to load from %s: %s\n",
-			    optarg, strerror(err));
-			return (1);
+			varpd_dfatal(dfd, "failed to load from %s: %s\n",
+			    incpath[i], strerror(err));
 		}
 	}
+
+	varpd_load_smf(dfd);
 
 	if ((err = libvarpd_persist_enable(varpd_handle, VARPD_RUNDIR)) != 0)
 		varpd_dfatal(dfd, "failed to enable varpd persistence: %s\n",
@@ -455,12 +492,20 @@ main(int argc, char *argv[])
 	act.sa_flags = 0;
 	if (sigaction(SIGHUP, &act, NULL) != 0)
 		varpd_dfatal(dfd, "failed to register HUP handler");
+	if (sigdelset(&set, SIGHUP) != 0)
+		varpd_dfatal(dfd, "failed to remove HUP from mask");
 	if (sigaction(SIGQUIT, &act, NULL) != 0)
 		varpd_dfatal(dfd, "failed to register QUIT handler");
+	if (sigdelset(&set, SIGQUIT) != 0)
+		varpd_dfatal(dfd, "failed to remove QUIT from mask");
 	if (sigaction(SIGINT, &act, NULL) != 0)
 		varpd_dfatal(dfd, "failed to register INT handler");
+	if (sigdelset(&set, SIGINT) != 0)
+		varpd_dfatal(dfd, "failed to remove INT from mask");
 	if (sigaction(SIGTERM, &act, NULL) != 0)
 		varpd_dfatal(dfd, "failed to register TERM handler");
+	if (sigdelset(&set, SIGTERM) != 0)
+		varpd_dfatal(dfd, "failed to remove TERM from mask");
 
 	err = 0;
 	(void) write(dfd, &err, sizeof (err));

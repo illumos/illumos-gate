@@ -35,7 +35,7 @@
 #include <libvarpd_provider.h>
 #include <libvarpd_svp.h>
 
-static mutex_t svp_remote_lock = DEFAULTMUTEX;
+static mutex_t svp_remote_lock = ERRORCHECKMUTEX;
 static avl_tree_t svp_remote_tree;
 static svp_timer_t svp_dns_timer;
 static id_space_t *svp_idspace;
@@ -95,12 +95,12 @@ svp_remote_destroy(svp_remote_t *srp)
 	 * cannot queue us. However, if any of our DNS related state flags are
 	 * set, we have to hang out.
 	 */
-	(void) mutex_lock(&srp->sr_lock);
+	mutex_enter(&srp->sr_lock);
 	while (srp->sr_state &
 	    (SVP_RS_LOOKUP_SCHEDULED | SVP_RS_LOOKUP_INPROGRESS)) {
 		(void) cond_wait(&srp->sr_cond, &srp->sr_lock);
 	}
-	(void) mutex_unlock(&srp->sr_lock);
+	mutex_exit(&srp->sr_lock);
 
 	if (cond_destroy(&srp->sr_cond) != 0)
 		libvarpd_panic("faile to destroy cond sr_cond");
@@ -125,18 +125,19 @@ svp_remote_create(const char *host, uint16_t port, svp_remote_t **outp)
 
 	remote = umem_zalloc(sizeof (svp_remote_t), UMEM_DEFAULT);
 	if (remote == NULL) {
-		(void) mutex_unlock(&svp_remote_lock);
+		mutex_exit(&svp_remote_lock);
 		return (ENOMEM);
 	}
 	hlen = strlen(host) + 1;
 	remote->sr_hostname = umem_alloc(hlen, UMEM_DEFAULT);
 	if (remote->sr_hostname == NULL) {
 		umem_free(remote, sizeof (svp_remote_t));
-		(void) mutex_unlock(&svp_remote_lock);
+		mutex_exit(&svp_remote_lock);
 		return (ENOMEM);
 	}
 	remote->sr_rport = port;
-	if (mutex_init(&remote->sr_lock, USYNC_THREAD, NULL) != 0)
+	if (mutex_init(&remote->sr_lock,
+	    USYNC_THREAD | LOCK_ERRORCHECK, NULL) != 0)
 		libvarpd_panic("failed to create mutex sr_lock");
 	if (cond_init(&remote->sr_cond, USYNC_PROCESS, NULL) != 0)
 		libvarpd_panic("failed to create cond sr_cond");
@@ -159,23 +160,23 @@ svp_remote_find(char *host, uint16_t port, svp_remote_t **outp)
 
 	lookup.sr_hostname = host;
 	lookup.sr_rport = port;
-	(void) mutex_lock(&svp_remote_lock);
+	mutex_enter(&svp_remote_lock);
 	remote = avl_find(&svp_remote_tree, &lookup, NULL);
 	if (remote != NULL) {
 		assert(remote->sr_count > 0);
 		remote->sr_count++;
 		*outp = remote;
-		(void) mutex_unlock(&svp_remote_lock);
+		mutex_exit(&svp_remote_lock);
 		return (0);
 	}
 
 	if ((ret = svp_remote_create(host, port, outp)) != 0) {
-		(void) mutex_unlock(&svp_remote_lock);
+		mutex_exit(&svp_remote_lock);
 		return (ret);
 	}
 
 	avl_add(&svp_remote_tree, *outp);
-	(void) mutex_unlock(&svp_remote_lock);
+	mutex_exit(&svp_remote_lock);
 
 	/* Make sure DNS is up to date */
 	svp_host_queue(*outp);
@@ -186,18 +187,18 @@ svp_remote_find(char *host, uint16_t port, svp_remote_t **outp)
 void
 svp_remote_release(svp_remote_t *srp)
 {
-	(void) mutex_lock(&svp_remote_lock);
-	(void) mutex_lock(&srp->sr_lock);
+	mutex_enter(&svp_remote_lock);
+	mutex_enter(&srp->sr_lock);
 	srp->sr_count--;
 	if (srp->sr_count != 0) {
-		(void) mutex_unlock(&srp->sr_lock);
-		(void) mutex_unlock(&svp_remote_lock);
+		mutex_exit(&srp->sr_lock);
+		mutex_exit(&svp_remote_lock);
 		return;
 	}
-	(void) mutex_unlock(&srp->sr_lock);
+	mutex_exit(&srp->sr_lock);
 
 	avl_remove(&svp_remote_tree, srp);
-	(void) mutex_unlock(&svp_remote_lock);
+	mutex_exit(&svp_remote_lock);
 	svp_remote_destroy(srp);
 }
 
@@ -207,7 +208,7 @@ svp_remote_attach(svp_remote_t *srp, svp_t *svp)
 	svp_t check;
 	avl_index_t where;
 
-	(void) mutex_lock(&srp->sr_lock);
+	mutex_enter(&srp->sr_lock);
 	if (svp->svp_remote != NULL)
 		libvarpd_panic("failed to create mutex sr_lock");
 
@@ -229,7 +230,7 @@ svp_remote_attach(svp_remote_t *srp, svp_t *svp)
 		    svp->svp_vid);
 	avl_insert(&srp->sr_tree, svp, where);
 	svp->svp_remote = srp;
-	(void) mutex_unlock(&srp->sr_lock);
+	mutex_exit(&srp->sr_lock);
 
 	return (0);
 }
@@ -243,13 +244,13 @@ svp_remote_detach(svp_t *svp)
 	if (srp == NULL)
 		libvarpd_panic("trying to detach remote when none exists");
 
-	(void) mutex_lock(&srp->sr_lock);
+	mutex_enter(&srp->sr_lock);
 	lookup = avl_find(&srp->sr_tree, svp, NULL);
 	if (lookup == NULL || lookup != svp)
 		libvarpd_panic("inconsitent remote avl tree...");
 	avl_remove(&srp->sr_tree, svp);
 	svp->svp_remote = NULL;
-	(void) mutex_unlock(&srp->sr_lock);
+	mutex_exit(&srp->sr_lock);
 	svp_remote_release(srp);
 }
 
@@ -265,13 +266,13 @@ svp_remote_conn_queue(svp_remote_t *srp, svp_query_t *sqp)
 	assert(MUTEX_HELD(&srp->sr_lock));
 	for (scp = list_head(&srp->sr_conns); scp != NULL;
 	    scp = list_next(&srp->sr_conns, scp)) {
-		(void) mutex_lock(&scp->sc_lock);
+		mutex_enter(&scp->sc_lock);
 		if (scp->sc_cstate != SVP_CS_ACTIVE) {
-			(void) mutex_unlock(&scp->sc_lock);
+			mutex_exit(&scp->sc_lock);
 			continue;
 		}
 		svp_conn_queue(scp, sqp);
-		(void) mutex_unlock(&scp->sc_lock);
+		mutex_exit(&scp->sc_lock);
 		list_remove(&srp->sr_conns, scp);
 		list_insert_tail(&srp->sr_conns, scp);
 		return (B_TRUE);
@@ -322,10 +323,10 @@ svp_remote_vl2_lookup(svp_t *svp, svp_query_t *sqp, const uint8_t *mac,
 	bcopy(mac, vl2r->sl2r_mac, ETHERADDRL);
 	vl2r->sl2r_vnetid = ntohl(svp->svp_vid);
 
-	(void) mutex_lock(&srp->sr_lock);
+	mutex_enter(&srp->sr_lock);
 	if (svp_remote_conn_queue(srp, sqp) == B_FALSE)
 		svp->svp_cb.scb_vl2_lookup(svp, SVP_S_FATAL, NULL, NULL, arg);
-	(void) mutex_unlock(&srp->sr_lock);
+	mutex_exit(&srp->sr_lock);
 }
 
 static void
@@ -386,11 +387,11 @@ svp_remote_vl3_lookup(svp_t *svp, svp_query_t *sqp,
 	}
 	vl3r->sl3r_vnetid = ntohl(svp->svp_vid);
 
-	(void) mutex_lock(&srp->sr_lock);
+	mutex_enter(&srp->sr_lock);
 	if (svp_remote_conn_queue(srp, sqp) == B_FALSE)
 		svp->svp_cb.scb_vl3_lookup(svp, SVP_S_FATAL, NULL, NULL, NULL,
 		    arg);
-	(void) mutex_unlock(&srp->sr_lock);
+	mutex_exit(&srp->sr_lock);
 }
 
 /* ARGSUSED */
@@ -398,12 +399,12 @@ void
 svp_remote_dns_timer(void *unused)
 {
 	svp_remote_t *s;
-	(void) mutex_lock(&svp_remote_lock);
+	mutex_enter(&svp_remote_lock);
 	for (s = avl_first(&svp_remote_tree); s != NULL;
 	    s = AVL_NEXT(&svp_remote_tree, s)) {
 		svp_host_queue(s);
 	}
-	(void) mutex_unlock(&svp_remote_lock);
+	mutex_exit(&svp_remote_lock);
 }
 
 void
@@ -413,10 +414,10 @@ svp_remote_resolved(svp_remote_t *srp, struct addrinfo *newaddrs)
 	svp_conn_t *scp;
 	int ngen;
 
-	(void) mutex_lock(&srp->sr_lock);
+	mutex_enter(&srp->sr_lock);
 	srp->sr_gen++;
 	ngen = srp->sr_gen;
-	(void) mutex_unlock(&srp->sr_lock);
+	mutex_exit(&srp->sr_lock);
 
 	for (a = newaddrs; a != NULL; a = a->ai_next) {
 		struct in6_addr in6;
@@ -436,17 +437,17 @@ svp_remote_resolved(svp_remote_t *srp, struct addrinfo *newaddrs)
 			addrp = &v6->sin6_addr;
 		}
 
-		(void) mutex_lock(&srp->sr_lock);
+		mutex_enter(&srp->sr_lock);
 		for (scp = list_head(&srp->sr_conns); scp != NULL;
 		    scp = list_next(&srp->sr_conns, scp)) {
-			(void) mutex_lock(&scp->sc_lock);
+			mutex_enter(&scp->sc_lock);
 			if (bcmp(addrp, &scp->sc_addr,
 			    sizeof (struct in6_addr)) == 0) {
 				scp->sc_gen = ngen;
-				(void) mutex_unlock(&scp->sc_lock);
+				mutex_exit(&scp->sc_lock);
 				break;
 			}
-			(void) mutex_unlock(&scp->sc_lock);
+			mutex_exit(&scp->sc_lock);
 		}
 
 		/*
@@ -457,7 +458,7 @@ svp_remote_resolved(svp_remote_t *srp, struct addrinfo *newaddrs)
 		 */
 		if (scp == NULL)
 			(void) svp_conn_create(srp, addrp);
-		(void) mutex_unlock(&srp->sr_lock);
+		mutex_exit(&srp->sr_lock);
 	}
 
 	/*
@@ -466,18 +467,18 @@ svp_remote_resolved(svp_remote_t *srp, struct addrinfo *newaddrs)
 	 * around assuming that they're still useful. Instead, we go through and
 	 * purge the degraded list for anything that's from an older generation.
 	 */
-	(void) mutex_lock(&srp->sr_lock);
+	mutex_enter(&srp->sr_lock);
 	for (scp = list_head(&srp->sr_conns); scp != NULL;
 	    scp = list_next(&srp->sr_conns, scp)) {
 		boolean_t fall = B_FALSE;
-		(void) mutex_lock(&scp->sc_lock);
+		mutex_enter(&scp->sc_lock);
 		if (scp->sc_gen < srp->sr_gen)
 			fall = B_TRUE;
-		(void) mutex_unlock(&scp->sc_lock);
+		mutex_exit(&scp->sc_lock);
 		if (fall == B_TRUE)
 			svp_conn_fallout(scp);
 	}
-	(void) mutex_unlock(&srp->sr_lock);
+	mutex_exit(&srp->sr_lock);
 }
 
 /*
