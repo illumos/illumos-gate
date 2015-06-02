@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2015, Joyent, Inc.
  */
 
 #include "lint.h"
@@ -2314,6 +2315,29 @@ mutex_lock(mutex_t *mp)
 	return (mutex_lock_impl(mp, NULL));
 }
 
+void
+mutex_enter(mutex_t *mp)
+{
+	int ret;
+	int attr = mp->mutex_type & ALL_ATTRIBUTES;
+
+	/*
+	 * Require LOCK_ERRORCHECK, accept LOCK_RECURSIVE.
+	 */
+	if (attr != LOCK_ERRORCHECK &&
+	    attr != (LOCK_ERRORCHECK | LOCK_RECURSIVE)) {
+		mutex_panic(mp, "mutex_enter: bad mutex type");
+	}
+	ret = mutex_lock(mp);
+	if (ret == EDEADLK) {
+		mutex_panic(mp, "recursive mutex_enter");
+	} else if (ret == EAGAIN) {
+		mutex_panic(mp, "excessive recursive mutex_enter");
+	} else if (ret != 0) {
+		mutex_panic(mp, "unknown mutex_enter failure");
+	}
+}
+
 int
 pthread_mutex_timedlock(pthread_mutex_t *_RESTRICT_KYWD mp,
 	const struct timespec *_RESTRICT_KYWD abstime)
@@ -2571,6 +2595,25 @@ fast_unlock:
 	/* else do it the long way */
 slow_unlock:
 	return (mutex_unlock_internal(mp, 0));
+}
+
+void
+mutex_exit(mutex_t *mp)
+{
+	int ret;
+	int attr = mp->mutex_type & ALL_ATTRIBUTES;
+
+	if (attr != LOCK_ERRORCHECK &&
+	    attr != (LOCK_ERRORCHECK | LOCK_RECURSIVE)) {
+		mutex_panic(mp, "mutex_exit: bad mutex type");
+	}
+	ret = mutex_unlock(mp);
+	if (ret == EPERM) {
+		mutex_panic(mp, "mutex_exit: not owner");
+	} else if (ret != 0) {
+		mutex_panic(mp, "unknown mutex_exit failure");
+	}
+
 }
 
 /*

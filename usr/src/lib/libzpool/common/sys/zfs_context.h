@@ -225,11 +225,13 @@ extern int _mutex_destroy(mutex_t *mp);
 
 #define	mutex_init(mp, b, c, d)		zmutex_init((kmutex_t *)(mp))
 #define	mutex_destroy(mp)		zmutex_destroy((kmutex_t *)(mp))
+#define	mutex_enter(mp)			zmutex_enter(mp)
+#define	mutex_exit(mp)			zmutex_exit(mp)
 
 extern void zmutex_init(kmutex_t *mp);
 extern void zmutex_destroy(kmutex_t *mp);
-extern void mutex_enter(kmutex_t *mp);
-extern void mutex_exit(kmutex_t *mp);
+extern void zmutex_enter(kmutex_t *mp);
+extern void zmutex_exit(kmutex_t *mp);
 extern int mutex_tryenter(kmutex_t *mp);
 extern void *mutex_owner(kmutex_t *mp);
 

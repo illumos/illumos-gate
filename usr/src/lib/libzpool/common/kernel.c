@@ -156,7 +156,7 @@ zmutex_destroy(kmutex_t *mp)
 }
 
 void
-mutex_enter(kmutex_t *mp)
+zmutex_enter(kmutex_t *mp)
 {
 	ASSERT(mp->initialized == B_TRUE);
 	ASSERT(mp->m_owner != (void *)-1UL);
@@ -181,7 +181,7 @@ mutex_tryenter(kmutex_t *mp)
 }
 
 void
-mutex_exit(kmutex_t *mp)
+zmutex_exit(kmutex_t *mp)
 {
 	ASSERT(mp->initialized == B_TRUE);
 	ASSERT(mutex_owner(mp) == curthread);
