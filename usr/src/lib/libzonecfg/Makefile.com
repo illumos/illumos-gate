@@ -20,11 +20,14 @@
 #
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2015 Joyent, Inc.
 #
 
 LIBRARY=	libzonecfg.a
 VERS=		.1
-OBJECTS=	libzonecfg.o getzoneent.o scratchops.o
+LIB_OBJS=	libzonecfg.o getzoneent.o scratchops.o
+XML_OBJS=	os_dtd.o
+OBJECTS=	$(LIB_OBJS) $(XML_OBJS)
 
 include ../../Makefile.lib
 
@@ -35,15 +38,27 @@ LDLIBS +=	-lc -lsocket -lnsl -luuid -lnvpair -lsysevent -lsec -lbrand \
 $(DYNLIB) :=	LDLIBS += -lxml2
 
 SRCDIR =	../common
+
+XMLDIR =	$(SRC)/lib/xml
+SRCS = \
+		$(LIB_OBJS:%.o=$(SRCDIR)/%.c) \
+		$(XML_OBJS:%.o=$(XMLDIR)/%.c) \
+
 CPPFLAGS +=	-I$(ADJUNCT_PROTO)/usr/include/libxml2 -I$(SRCDIR) -D_REENTRANT
 CERRWARN +=	-_gcc=-Wno-uninitialized
 CERRWARN +=	-_gcc=-Wno-parentheses
 $(LINTLIB) := SRCS=	$(SRCDIR)/$(LINTSRC)
+
+CPPFLAGS +=	-I$(XMLDIR)
 
 .KEEP_STATE:
 
 all:	$(LIBS)
 
 lint:	lintcheck
+
+pics/%.o: $(XMLDIR)/%.c
+	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)
 
 include ../../Makefile.targ

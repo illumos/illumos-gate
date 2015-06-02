@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  */
 
 
@@ -170,10 +171,32 @@ getzoneent_private(FILE *cookie)
 }
 
 static boolean_t
-get_index_path(char *path)
+path_common(char *path, size_t path_size, const char *stem)
 {
-	return (snprintf(path, MAXPATHLEN, "%s%s", zonecfg_root,
-	    ZONE_INDEX_FILE) < MAXPATHLEN);
+	const char *native_root = zone_get_nroot();
+
+	if (native_root == NULL || zonecfg_in_alt_root()) {
+		/*
+		 * Do not prepend the native system root (e.g. "/native") if an
+		 * alternative configuration root has been selected.
+		 */
+		native_root = "";
+	}
+
+	return (snprintf(path, path_size, "%s%s%s", native_root, zonecfg_root,
+	    stem) < path_size);
+}
+
+static boolean_t
+get_index_path(char *path, size_t path_size)
+{
+	return (path_common(path, path_size, ZONE_INDEX_FILE));
+}
+
+static boolean_t
+get_temp_path(char *path, size_t path_size)
+{
+	return (path_common(path, path_size, _PATH_TMPFILE));
 }
 
 FILE *
@@ -181,7 +204,7 @@ setzoneent(void)
 {
 	char path[MAXPATHLEN];
 
-	if (!get_index_path(path)) {
+	if (!get_index_path(path, sizeof (path))) {
 		errno = EINVAL;
 		return (NULL);
 	}
@@ -202,8 +225,7 @@ lock_index_file(void)
 	struct flock lock;
 	char path[MAXPATHLEN];
 
-	if (snprintf(path, sizeof (path), "%s%s", zonecfg_root,
-	    ZONE_INDEX_LOCK_DIR) >= sizeof (path))
+	if (!path_common(path, sizeof (path), ZONE_INDEX_LOCK_DIR))
 		return (-1);
 	if ((mkdir(path, S_IRWXU) == -1) && errno != EEXIST)
 		return (-1);
@@ -269,13 +291,14 @@ int
 putzoneent(struct zoneent *ze, zoneent_op_t operation)
 {
 	FILE *index_file, *tmp_file;
-	char *tmp_file_name, buf[MAX_INDEX_LEN];
+	char buf[MAX_INDEX_LEN];
 	int tmp_file_desc, lock_fd, err;
 	boolean_t exist, need_quotes;
 	char *cp;
+	char tmp_path[MAXPATHLEN];
 	char path[MAXPATHLEN];
 	char uuidstr[UUID_PRINTABLE_STRING_LENGTH];
-	size_t tlen, namelen;
+	size_t namelen;
 	const char *zone_name, *zone_state, *zone_path, *zone_uuid;
 
 	assert(ze != NULL);
@@ -299,20 +322,14 @@ putzoneent(struct zoneent *ze, zoneent_op_t operation)
 	if ((lock_fd = lock_index_file()) == -1)
 		return (Z_LOCKING_FILE);
 
-	/* using sizeof gives us room for the terminating NUL byte as well */
-	tlen = sizeof (_PATH_TMPFILE) + strlen(zonecfg_root);
-	tmp_file_name = malloc(tlen);
-	if (tmp_file_name == NULL) {
+	if (!get_temp_path(tmp_path, sizeof (tmp_path))) {
 		(void) unlock_index_file(lock_fd);
 		return (Z_NOMEM);
 	}
-	(void) snprintf(tmp_file_name, tlen, "%s%s", zonecfg_root,
-	    _PATH_TMPFILE);
 
-	tmp_file_desc = mkstemp(tmp_file_name);
+	tmp_file_desc = mkstemp(tmp_path);
 	if (tmp_file_desc == -1) {
-		(void) unlink(tmp_file_name);
-		free(tmp_file_name);
+		(void) unlink(tmp_path);
 		(void) unlock_index_file(lock_fd);
 		return (Z_TEMP_FILE);
 	}
@@ -323,7 +340,7 @@ putzoneent(struct zoneent *ze, zoneent_op_t operation)
 		err = Z_MISC_FS;
 		goto error;
 	}
-	if (!get_index_path(path)) {
+	if (!get_index_path(path, sizeof (path))) {
 		err = Z_MISC_FS;
 		goto error;
 	}
@@ -462,11 +479,10 @@ putzoneent(struct zoneent *ze, zoneent_op_t operation)
 		goto error;
 	}
 	tmp_file = NULL;
-	if (rename(tmp_file_name, path) == -1) {
+	if (rename(tmp_path, path) == -1) {
 		err = errno == EACCES ? Z_ACCES : Z_MISC_FS;
 		goto error;
 	}
-	free(tmp_file_name);
 	if (unlock_index_file(lock_fd) != Z_OK)
 		return (Z_UNLOCKING_FILE);
 	return (Z_OK);
@@ -476,8 +492,7 @@ error:
 		(void) fclose(index_file);
 	if (tmp_file != NULL)
 		(void) fclose(tmp_file);
-	(void) unlink(tmp_file_name);
-	free(tmp_file_name);
+	(void) unlink(tmp_path);
 	(void) unlock_index_file(lock_fd);
 	return (err);
 }
