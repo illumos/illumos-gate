@@ -44,6 +44,7 @@
 #include <malloc.h>
 #include <libintl.h>
 #include <syslog.h>
+#include <zone.h>
 #include "netcspace.h"
 
 #define	FAILURE  (unsigned)(-1)
@@ -279,13 +280,22 @@ getnetlist(void)
 	struct netconfig **listpp; /* the beginning of the netconfig list */
 	struct netconfig **tpp;	/* used to traverse the netconfig list */
 	int count;		/* the number of entries in file */
+	char nc_path[MAXPATHLEN];
+	const char *zroot = zone_get_nroot();
+
+	/*
+	 * If we are running in a branded zone, ensure we use the "/native"
+	 * prefix when opening the netconfig file:
+	 */
+	(void) snprintf(nc_path, sizeof (nc_path), "%s%s", zroot != NULL ?
+	    zroot : "", NETCONFIG);
 
 	if (brand_get_sz != NULL) {
 		count = brand_get_sz();
 	} else {
 		char line[BUFSIZ];	/* holds each line of NETCONFIG */
 
-		if ((fp = fopen(NETCONFIG, "rF")) == NULL) {
+		if ((fp = fopen(nc_path, "rF")) == NULL) {
 			nc_error = NC_OPENFAIL;
 			return (NULL);
 		}
