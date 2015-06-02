@@ -42,7 +42,7 @@ $1 == "value:" {
 }
 ' > $tmpfile
 fnm=$ZONEROOT/etc/resolvconf/resolv.conf.d/tail
-if [[ -f $fnm || -h $fnm ]]; then
+if [[ -f $fnm || -h $fnm || ! -e $fnm ]]; then
 	mv -f $tmpfile $fnm
 fi
 
