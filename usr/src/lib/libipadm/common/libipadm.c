@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2014, Joyent, Inc. All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
@@ -906,9 +906,21 @@ ipadm_door_call(ipadm_handle_t iph, void *arg, size_t asize, void **rbufp,
 
 reopen:
 	(void) pthread_mutex_lock(&iph->iph_lock);
-	/* The door descriptor is opened if it isn't already */
+	/*
+	 * The door descriptor is opened if it isn't already.
+	 */
 	if (iph->iph_door_fd == -1) {
-		if ((iph->iph_door_fd = open(IPMGMT_DOOR, O_RDONLY)) < 0) {
+		char door[MAXPATHLEN];
+		const char *zroot = zone_get_nroot();
+
+		/*
+		 * If this is a branded zone, make sure we use the "/native"
+		 * prefix for the door path:
+		 */
+		(void) snprintf(door, sizeof (door), "%s%s", zroot != NULL ?
+		    zroot : "", IPMGMT_DOOR);
+
+		if ((iph->iph_door_fd = open(door, O_RDONLY)) < 0) {
 			err = errno;
 			(void) pthread_mutex_unlock(&iph->iph_lock);
 			return (err);

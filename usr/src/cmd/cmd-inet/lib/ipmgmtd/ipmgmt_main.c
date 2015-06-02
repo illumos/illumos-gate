@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  */
 
 /*
@@ -105,6 +106,7 @@ ipmgmt_db_init()
 	int		fd, err, scferr;
 	scf_resources_t	res;
 	boolean_t	upgrade = B_TRUE;
+	char		aobjpath[MAXPATHLEN];
 
 	/*
 	 * Check to see if we need to upgrade the data-store. We need to
@@ -134,11 +136,11 @@ ipmgmt_db_init()
 		ipmgmt_release_scf_resources(&res);
 
 	/* creates the address object data store, if it doesn't exist */
-	if ((fd = open(ADDROBJ_MAPPING_DB_FILE, O_CREAT|O_RDONLY,
-	    IPADM_FILE_MODE)) == -1) {
+	ipmgmt_path(IPADM_PATH_ADDROBJ_MAP_DB, aobjpath, sizeof (aobjpath));
+	if ((fd = open(aobjpath, O_CREAT|O_RDONLY, IPADM_FILE_MODE)) == -1) {
 		err = errno;
-		ipmgmt_log(LOG_ERR, "could not open %s: %s",
-		    ADDROBJ_MAPPING_DB_FILE, strerror(err));
+		ipmgmt_log(LOG_ERR, "could not open %s: %s", aobjpath,
+		    strerror(err));
 		return (err);
 	}
 	(void) close(fd);
@@ -152,8 +154,8 @@ ipmgmt_db_init()
 	 * representation of the mapping. That is, build `aobjmap' structure
 	 * from address object data store.
 	 */
-	if ((err = ipadm_rw_db(ipmgmt_aobjmap_init, NULL,
-	    ADDROBJ_MAPPING_DB_FILE, 0, IPADM_DB_READ)) != 0) {
+	if ((err = ipadm_rw_db(ipmgmt_aobjmap_init, NULL, aobjpath, 0,
+	    IPADM_DB_READ)) != 0) {
 		/* if there was nothing to initialize, it's fine */
 		if (err != ENOENT)
 			return (err);
@@ -165,17 +167,42 @@ ipmgmt_db_init()
 	return (err);
 }
 
+static const char *
+ipmgmt_door_path()
+{
+	static char door[MAXPATHLEN];
+	static boolean_t init_done = B_FALSE;
+
+	if (!init_done) {
+		const char *zroot = zone_get_nroot();
+
+		/*
+		 * If this is a branded zone, make sure we use the "/native"
+		 * prefix for the door path:
+		 */
+		(void) snprintf(door, sizeof (door), "%s%s", zroot != NULL ?
+		    zroot : "", IPMGMT_DOOR);
+
+		init_done = B_TRUE;
+	}
+
+	return (door);
+}
+
 static int
 ipmgmt_door_init()
 {
 	int fd;
 	int err;
+	const char *door = ipmgmt_door_path();
 
-	/* create the door file for ipmgmtd */
-	if ((fd = open(IPMGMT_DOOR, O_CREAT|O_RDONLY, IPADM_FILE_MODE)) == -1) {
+	/*
+	 * Create the door file for ipmgmtd.
+	 */
+	if ((fd = open(door, O_CREAT | O_RDONLY, IPADM_FILE_MODE)) == -1) {
 		err = errno;
-		ipmgmt_log(LOG_ERR, "could not open %s: %s",
-		    IPMGMT_DOOR, strerror(err));
+		ipmgmt_log(LOG_ERR, "could not open %s: %s", door,
+		    strerror(err));
 		return (err);
 	}
 	(void) close(fd);
@@ -186,15 +213,16 @@ ipmgmt_door_init()
 		ipmgmt_log(LOG_ERR, "failed to create door: %s", strerror(err));
 		return (err);
 	}
+
 	/*
 	 * fdetach first in case a previous daemon instance exited
 	 * ungracefully.
 	 */
-	(void) fdetach(IPMGMT_DOOR);
-	if (fattach(ipmgmt_door_fd, IPMGMT_DOOR) != 0) {
+	(void) fdetach(door);
+	if (fattach(ipmgmt_door_fd, door) != 0) {
 		err = errno;
-		ipmgmt_log(LOG_ERR, "failed to attach door to %s: %s",
-		    IPMGMT_DOOR, strerror(err));
+		ipmgmt_log(LOG_ERR, "failed to attach door to %s: %s", door,
+		    strerror(err));
 		goto fail;
 	}
 	return (0);
@@ -207,13 +235,15 @@ fail:
 static void
 ipmgmt_door_fini()
 {
+	const char *door = ipmgmt_door_path();
+
 	if (ipmgmt_door_fd == -1)
 		return;
 
-	(void) fdetach(IPMGMT_DOOR);
+	(void) fdetach(door);
 	if (door_revoke(ipmgmt_door_fd) == -1) {
 		ipmgmt_log(LOG_ERR, "failed to revoke access to door %s: %s",
-		    IPMGMT_DOOR, strerror(errno));
+		    door, strerror(errno));
 	}
 }
 
@@ -350,10 +380,14 @@ ipmgmt_init_privileges()
 {
 	struct stat	statbuf;
 	int		err;
+	char		tmpfsdir[MAXPATHLEN];
 
-	/* create the IPADM_TMPFS_DIR directory */
-	if (stat(IPADM_TMPFS_DIR, &statbuf) < 0) {
-		if (mkdir(IPADM_TMPFS_DIR, (mode_t)0755) < 0) {
+	/*
+	 * Create the volatile storage directory:
+	 */
+	ipmgmt_path(IPADM_PATH_TMPFS_DIR, tmpfsdir, sizeof (tmpfsdir));
+	if (stat(tmpfsdir, &statbuf) < 0) {
+		if (mkdir(tmpfsdir, (mode_t)0755) < 0) {
 			err = errno;
 			goto fail;
 		}
@@ -364,8 +398,8 @@ ipmgmt_init_privileges()
 		}
 	}
 
-	if ((chmod(IPADM_TMPFS_DIR, 0755) < 0) ||
-	    (chown(IPADM_TMPFS_DIR, UID_NETADM, GID_NETADM) < 0)) {
+	if ((chmod(tmpfsdir, 0755) < 0) ||
+	    (chown(tmpfsdir, UID_NETADM, GID_NETADM) < 0)) {
 		err = errno;
 		goto fail;
 	}
