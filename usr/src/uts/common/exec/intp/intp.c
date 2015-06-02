@@ -172,7 +172,6 @@ intpexec(
 	struct cred *cred,
 	int *brand_action)
 {
-	_NOTE(ARGUNUSED(brand_action))
 	vnode_t *nvp;
 	int error = 0;
 	struct intpdata idata;
@@ -181,7 +180,6 @@ intpexec(
 	char *opath;
 	char devfd[19]; /* 32-bit int fits in 10 digits + 8 for "/dev/fd/" */
 	int fd = -1;
-	int custom_action = EBA_NONE;
 
 	if (level) {		/* Can't recurse */
 		error = ENOEXEC;
@@ -230,7 +228,7 @@ intpexec(
 	}
 
 	error = gexec(&nvp, uap, args, &idata, ++level, execsz, exec_file, cred,
-	    &custom_action);
+	    brand_action);
 
 	if (!error) {
 		/*
