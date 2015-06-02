@@ -23,7 +23,7 @@
  * Copyright 2014 Gary Mills
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
- * Copyright 2015, Joyent Inc. All rights reserved.
+ * Copyright 2015 Joyent Inc.
  */
 
 #include <libsysevent.h>
@@ -60,6 +60,8 @@
 #include <secdb.h>
 #include <user_attr.h>
 #include <prof_attr.h>
+#include <sys/debug.h>
+#include <os_dtd.h>
 
 #include <arpa/inet.h>
 #include <netdb.h>
@@ -272,17 +274,35 @@ zonecfg_in_alt_root(void)
  */
 
 static boolean_t
-config_file_path(const char *zonename, char *answer)
+file_path_common(const char *zonename, const char *subdir, const char *stem,
+    char *answer, size_t answer_size)
 {
-	return (snprintf(answer, MAXPATHLEN, "%s%s/%s.xml", zonecfg_root,
-	    ZONE_CONFIG_ROOT, zonename) < MAXPATHLEN);
+	const char *native_root = zone_get_nroot();
+
+	if (native_root == NULL || zonecfg_in_alt_root()) {
+		/*
+		 * Do not prepend the native system root (e.g. "/native") if an
+		 * alternative configuration root has been selected.
+		 */
+		native_root = "";
+	}
+
+	return (snprintf(answer, answer_size, "%s%s%s/%s.%s", native_root,
+	    zonecfg_root, subdir, zonename, stem) < answer_size);
 }
 
 static boolean_t
-snap_file_path(const char *zonename, char *answer)
+config_file_path(const char *zonename, char *answer, size_t answer_size)
 {
-	return (snprintf(answer, MAXPATHLEN, "%s%s/%s.snapshot.xml",
-	    zonecfg_root, ZONE_SNAPSHOT_ROOT, zonename) < MAXPATHLEN);
+	return (file_path_common(zonename, ZONE_CONFIG_ROOT, "xml", answer,
+	    answer_size));
+}
+
+static boolean_t
+snap_file_path(const char *zonename, char *answer, size_t answer_size)
+{
+	return (file_path_common(zonename, ZONE_SNAPSHOT_ROOT, "snapshot.xml",
+	    answer, answer_size));
 }
 
 /*ARGSUSED*/
@@ -353,7 +373,7 @@ zonecfg_destroy(const char *zonename, boolean_t force)
 	int err, state_err;
 	zone_state_t state;
 
-	if (!config_file_path(zonename, path))
+	if (!config_file_path(zonename, path, sizeof (path)))
 		return (Z_MISC_FS);
 
 	state_err = zone_get_state((char *)zonename, &state);
@@ -410,7 +430,7 @@ zonecfg_destroy_snapshot(const char *zonename)
 {
 	char path[MAXPATHLEN];
 
-	if (!snap_file_path(zonename, path))
+	if (!snap_file_path(zonename, path, sizeof (path)))
 		return (Z_MISC_FS);
 	return (zonecfg_destroy_impl(path));
 }
@@ -577,9 +597,8 @@ static int
 zonecfg_get_handle_impl(const char *zonename, const char *filename,
     zone_dochandle_t handle)
 {
-	xmlValidCtxtPtr cvp;
 	struct stat statbuf;
-	int valid;
+	boolean_t valid;
 
 	if (zonename == NULL)
 		return (Z_NO_ZONE);
@@ -590,14 +609,13 @@ zonecfg_get_handle_impl(const char *zonename, const char *filename,
 			return (Z_INVALID_DOCUMENT);
 		return (Z_NO_ZONE);
 	}
-	if ((cvp = xmlNewValidCtxt()) == NULL)
+
+	if (os_dtd_validate(handle->zone_dh_doc, B_FALSE, &valid) != 0) {
 		return (Z_NOMEM);
-	cvp->error = zonecfg_error_func;
-	cvp->warning = zonecfg_error_func;
-	valid = xmlValidateDocument(cvp, handle->zone_dh_doc);
-	xmlFreeValidCtxt(cvp);
-	if (valid == 0)
+	}
+	if (!valid) {
 		return (Z_INVALID_DOCUMENT);
+	}
 
 	/* delete any comments such as inherited Sun copyright / ident str */
 	stripcomments(handle);
@@ -609,7 +627,7 @@ zonecfg_get_handle(const char *zonename, zone_dochandle_t handle)
 {
 	char path[MAXPATHLEN];
 
-	if (!config_file_path(zonename, path))
+	if (!config_file_path(zonename, path, sizeof (path)))
 		return (Z_MISC_FS);
 	handle->zone_dh_newzone = B_FALSE;
 
@@ -653,7 +671,7 @@ zonecfg_get_snapshot_handle(const char *zonename, zone_dochandle_t handle)
 {
 	char path[MAXPATHLEN];
 
-	if (!snap_file_path(zonename, path))
+	if (!snap_file_path(zonename, path, sizeof (path)))
 		return (Z_MISC_FS);
 	handle->zone_dh_newzone = B_FALSE;
 	return (zonecfg_get_handle_impl(zonename, path, handle));
@@ -666,7 +684,7 @@ zonecfg_get_template_handle(const char *template, const char *zonename,
 	char path[MAXPATHLEN];
 	int err;
 
-	if (!config_file_path(template, path))
+	if (!config_file_path(template, path, sizeof (path)))
 		return (Z_MISC_FS);
 
 	if ((err = zonecfg_get_handle_impl(template, path, handle)) != Z_OK)
@@ -700,21 +718,19 @@ int
 zonecfg_attach_manifest(int fd, zone_dochandle_t local_handle,
     zone_dochandle_t rem_handle)
 {
-	xmlValidCtxtPtr cvp;
-	int valid;
+	boolean_t valid;
 
 	/* load the manifest into the handle for the remote system */
 	if ((rem_handle->zone_dh_doc = xmlReadFd(fd, NULL, NULL, 0)) == NULL) {
 		return (Z_INVALID_DOCUMENT);
 	}
-	if ((cvp = xmlNewValidCtxt()) == NULL)
+
+	if (os_dtd_validate(rem_handle->zone_dh_doc, B_FALSE, &valid) != 0) {
 		return (Z_NOMEM);
-	cvp->error = zonecfg_error_func;
-	cvp->warning = zonecfg_error_func;
-	valid = xmlValidateDocument(cvp, rem_handle->zone_dh_doc);
-	xmlFreeValidCtxt(cvp);
-	if (valid == 0)
+	}
+	if (!valid) {
 		return (Z_INVALID_DOCUMENT);
+	}
 
 	/* delete any comments such as inherited Sun copyright / ident str */
 	stripcomments(rem_handle);
@@ -735,14 +751,12 @@ zonecfg_attach_manifest(int fd, zone_dochandle_t local_handle,
 	 * We need to re-run xmlValidateDocument on local_handle to properly
 	 * update the in-core representation of the configuration.
 	 */
-	if ((cvp = xmlNewValidCtxt()) == NULL)
+	if (os_dtd_validate(local_handle->zone_dh_doc, B_FALSE, &valid) != 0) {
 		return (Z_NOMEM);
-	cvp->error = zonecfg_error_func;
-	cvp->warning = zonecfg_error_func;
-	valid = xmlValidateDocument(cvp, local_handle->zone_dh_doc);
-	xmlFreeValidCtxt(cvp);
-	if (valid == 0)
+	}
+	if (!valid) {
 		return (Z_INVALID_DOCUMENT);
+	}
 
 	strip_sw_inv(local_handle);
 
@@ -1196,9 +1210,9 @@ zonecfg_save_impl(zone_dochandle_t handle, char *filename)
 {
 	char tmpfile[MAXPATHLEN];
 	char bakdir[MAXPATHLEN], bakbase[MAXPATHLEN], bakfile[MAXPATHLEN];
-	int tmpfd, err, valid;
-	xmlValidCtxt cvp = { NULL };
+	int tmpfd, err;
 	boolean_t backup;
+	boolean_t valid;
 
 	(void) strlcpy(tmpfile, filename, sizeof (tmpfile));
 	(void) dirname(tmpfile);
@@ -1211,16 +1225,13 @@ zonecfg_save_impl(zone_dochandle_t handle, char *filename)
 	}
 	(void) close(tmpfd);
 
-	cvp.error = zonecfg_error_func;
-	cvp.warning = zonecfg_error_func;
-
 	/*
 	 * We do a final validation of the document.  Since the library has
 	 * malfunctioned if it fails to validate, we follow-up with an
 	 * assert() that the doc is valid.
 	 */
-	valid = xmlValidateDocument(&cvp, handle->zone_dh_doc);
-	assert(valid != 0);
+	VERIFY0(os_dtd_validate(handle->zone_dh_doc, B_FALSE, &valid));
+	VERIFY(valid == B_TRUE);
 
 	if (xmlSaveFormatFile(tmpfile, handle->zone_dh_doc, 1) <= 0)
 		goto err;
@@ -1317,7 +1328,7 @@ zonecfg_save(zone_dochandle_t handle)
 	if ((err = zonecfg_get_name(handle, zname, sizeof (zname))) != Z_OK)
 		return (err);
 
-	if (!config_file_path(zname, path))
+	if (!config_file_path(zname, path, sizeof (path)))
 		return (Z_MISC_FS);
 
 	addcomment(handle, "\n    DO NOT EDIT THIS "
@@ -1338,8 +1349,10 @@ zonecfg_save(zone_dochandle_t handle)
 	handle->zone_dh_newzone = B_FALSE;
 
 	if (is_renaming(handle)) {
-		if (config_file_path(handle->zone_dh_delete_name, delpath))
+		if (config_file_path(handle->zone_dh_delete_name, delpath,
+		    sizeof (delpath))) {
 			(void) unlink(delpath);
+		}
 		handle->zone_dh_delete_name[0] = '\0';
 	}
 
@@ -1349,23 +1362,18 @@ zonecfg_save(zone_dochandle_t handle)
 int
 zonecfg_verify_save(zone_dochandle_t handle, char *filename)
 {
-	int valid;
-
-	xmlValidCtxt cvp = { NULL };
+	boolean_t valid;
 
 	if (zonecfg_check_handle(handle) != Z_OK)
 		return (Z_BAD_HANDLE);
-
-	cvp.error = zonecfg_error_func;
-	cvp.warning = zonecfg_error_func;
 
 	/*
 	 * We do a final validation of the document.  Since the library has
 	 * malfunctioned if it fails to validate, we follow-up with an
 	 * assert() that the doc is valid.
 	 */
-	valid = xmlValidateDocument(&cvp, handle->zone_dh_doc);
-	assert(valid != 0);
+	VERIFY0(os_dtd_validate(handle->zone_dh_doc, B_FALSE, &valid));
+	VERIFY(valid == B_TRUE);
 
 	if (xmlSaveFormatFile(filename, handle->zone_dh_doc, 1) <= 0)
 		return (Z_SAVING_FILE);
@@ -1379,9 +1387,8 @@ zonecfg_detach_save(zone_dochandle_t handle, uint_t flags)
 	char zname[ZONENAME_MAX];
 	char path[MAXPATHLEN];
 	char migpath[MAXPATHLEN];
-	xmlValidCtxt cvp = { NULL };
 	int err = Z_SAVING_FILE;
-	int valid;
+	boolean_t valid;
 
 	if (zonecfg_check_handle(handle) != Z_OK)
 		return (Z_BAD_HANDLE);
@@ -1408,16 +1415,13 @@ zonecfg_detach_save(zone_dochandle_t handle, uint_t flags)
 	addcomment(handle, "\n    DO NOT EDIT THIS FILE.  "
 	    "Use zonecfg(1M) and zoneadm(1M) attach.\n");
 
-	cvp.error = zonecfg_error_func;
-	cvp.warning = zonecfg_error_func;
-
 	/*
 	 * We do a final validation of the document.  Since the library has
 	 * malfunctioned if it fails to validate, we follow-up with an
 	 * assert() that the doc is valid.
 	 */
-	valid = xmlValidateDocument(&cvp, handle->zone_dh_doc);
-	assert(valid != 0);
+	VERIFY0(os_dtd_validate(handle->zone_dh_doc, B_FALSE, &valid));
+	VERIFY(valid == B_TRUE);
 
 	if (xmlSaveFormatFile(migpath, handle->zone_dh_doc, 1) <= 0)
 		return (Z_SAVING_FILE);
@@ -1490,7 +1494,7 @@ zonecfg_access(const char *zonename, int amode)
 {
 	char path[MAXPATHLEN];
 
-	if (!config_file_path(zonename, path))
+	if (!config_file_path(zonename, path, sizeof (path)))
 		return (Z_INVAL);
 	if (access(path, amode) == 0)
 		return (Z_OK);
@@ -1555,7 +1559,7 @@ zonecfg_create_snapshot(const char *zonename)
 		goto out;
 	}
 
-	if (!snap_file_path(zonename, path)) {
+	if (!snap_file_path(zonename, path, sizeof (path))) {
 		error = Z_MISC_FS;
 		goto out;
 	}
@@ -7551,7 +7555,7 @@ zonecfg_update_userauths(zone_dochandle_t handle, char *zonename)
 		(void) fclose(uaf);
 		return (Z_MISC_FS);
 	}
-	if (!config_file_path(zonename, config_file)) {
+	if (!config_file_path(zonename, config_file, sizeof (config_file))) {
 		(void) fclose(uaf);
 		return (Z_MISC_FS);
 	}
