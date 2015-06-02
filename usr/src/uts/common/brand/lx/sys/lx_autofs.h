@@ -321,8 +321,17 @@ typedef struct lx_autofs_pkt {
  * usage of subdirectories of an autofs directory.
  */
 #define	LX_AUTOFS_IOC_PROTOVER		0x80049363 /* arg: int */
-#define	LX_AUTOFS_IOC_EXPIRE		0x81109365 /* arg: lx_autofs_expire * */
 #define	LX_AUTOFS_IOC_SETTIMEOUT	0xc0049364 /* arg: ulong_t */
+#define	LX_AUTOFS_IOC_EXPIRE		0x81109365 /* arg: lx_autofs_expire * */
+
+/*
+ * Ioctls not supported (v5 protocol).
+ */
+#define	LX_AUTOFS_IOC_EXPIRE_MULTI	0x40049366 /* arg: int */
+#define	LX_AUTOFS_IOC_EXPIRE_INDIRECT	LX_AUTOFS_IOC_EXPIRE_MULTI
+#define	LX_AUTOFS_IOC_EXPIRE_DIRECT	LX_AUTOFS_IOC_EXPIRE_MULTI
+#define	LX_AUTOFS_IOC_PROTOSUBVER	0x80049367 /* arg: int */
+#define	LX_AUTOFS_IOC_ASKUMOUNT		0x80049370 /* arg: int */
 
 typedef struct lx_autofs_expire {
 	int	lap_protover;	/* protol version number */
