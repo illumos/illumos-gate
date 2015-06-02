@@ -78,7 +78,7 @@
  *
  * INTERFACES ==================================================================
  *
- * taskq_t *taskq_create(name, nthreads, pri, minalloc, maxall, flags);
+ * taskq_t *taskq_create(name, nthreads, pri, minalloc, maxalloc, flags);
  *
  *	Create a taskq with specified properties.
  *	Possible 'flags':
@@ -128,19 +128,19 @@
  *	service all scheduled tasks.
  *
  * taskq_t *taskq_create_instance(name, instance, nthreads, pri, minalloc,
- *    maxall, flags);
+ *    maxalloc, flags);
  *
  *	Like taskq_create(), but takes an instance number (or -1 to indicate
  *	no instance).
  *
- * taskq_t *taskq_create_proc(name, nthreads, pri, minalloc, maxall, proc,
+ * taskq_t *taskq_create_proc(name, nthreads, pri, minalloc, maxalloc, proc,
  *    flags);
  *
  *	Like taskq_create(), but creates the taskq threads in the specified
  *	system process.  If proc != &p0, this must be called from a thread
  *	in that process.
  *
- * taskq_t *taskq_create_sysdc(name, nthreads, minalloc, maxall, proc,
+ * taskq_t *taskq_create_sysdc(name, nthreads, minalloc, maxalloc, proc,
  *    dc, flags);
  *
  *	Like taskq_create_proc(), but the taskq threads will use the
