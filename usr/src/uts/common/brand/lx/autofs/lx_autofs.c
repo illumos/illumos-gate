@@ -1423,21 +1423,23 @@ lx_autofs_lookup(vnode_t *dvp, char *nm, vnode_t **vpp, struct pathname *pnp,
 	return (error);
 }
 
-/*ARGSUSED*/
 static int
 lx_autofs_ioctl(vnode_t *vp, int cmd, intptr_t arg, int mode, cred_t *cr,
     int *rvalp, caller_context_t *ctp)
 {
 	vnode_t			*uvp = vp->v_data;
 
-	/* Intercept certain ioctls. */
+	/* Intercept our ioctls. */
 	switch ((uint_t)cmd) {
 	case LX_AUTOFS_IOC_READY:
 	case LX_AUTOFS_IOC_FAIL:
 	case LX_AUTOFS_IOC_CATATONIC:
-	case LX_AUTOFS_IOC_EXPIRE:
 	case LX_AUTOFS_IOC_PROTOVER:
 	case LX_AUTOFS_IOC_SETTIMEOUT:
+	case LX_AUTOFS_IOC_EXPIRE:
+	case LX_AUTOFS_IOC_EXPIRE_MULTI:
+	case LX_AUTOFS_IOC_PROTOSUBVER:
+	case LX_AUTOFS_IOC_ASKUMOUNT:
 		return (lx_autofs_automounter_ioctl(vp, cmd, arg));
 	}
 
