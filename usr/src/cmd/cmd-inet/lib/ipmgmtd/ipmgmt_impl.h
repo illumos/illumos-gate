@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  */
 
 #ifndef	_IPMGMT_IMPL_H
@@ -134,8 +135,6 @@ extern ipmgmt_aobjmap_list_t aobjmap;
 #define	ADDROBJ_LOOKUPADD	0x00000004
 #define	ADDROBJ_SETLIFNUM	0x00000008
 
-/* Permanent data store for ipadm */
-#define	IPADM_DB_FILE		"/etc/ipadm/ipadm.conf"
 #define	IPADM_FILE_MODE		(S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)
 
 /*
@@ -145,20 +144,12 @@ extern ipmgmt_aobjmap_list_t aobjmap;
  */
 #define	IPADM_DB_VERSION	1
 
-/*
- * A temporary file created in SMF volatile filesystem. This file captures the
- * in-memory copy of list `aobjmap' on disk. This is done to recover from
- * daemon reboot (using svcadm) or crashes.
- */
-#define	IPADM_TMPFS_DIR		"/etc/svc/volatile/ipadm"
-#define	ADDROBJ_MAPPING_DB_FILE	IPADM_TMPFS_DIR"/aobjmap.conf"
-
-/*
- * A temporary copy of the ipadm configuration file might need
- * to be created if write requests are encountered during boottime
- * and the root filesystem is mounted read-only.
- */
-#define	IPADM_VOL_DB_FILE	IPADM_TMPFS_DIR"/ipadm.conf"
+typedef enum ipadm_path {
+	IPADM_PATH_TMPFS_DIR = 1,
+	IPADM_PATH_ADDROBJ_MAP_DB,
+	IPADM_PATH_DB,
+	IPADM_PATH_VOL_DB
+} ipadm_path_t;
 
 /* SCF resources required to interact with svc.configd */
 typedef struct scf_resources {
@@ -187,6 +178,8 @@ extern int		ipmgmt_create_scf_resources(const char *,
 extern void		ipmgmt_release_scf_resources(scf_resources_t *);
 extern boolean_t	ipmgmt_needs_upgrade(scf_resources_t *);
 extern void		ipmgmt_update_dbver(scf_resources_t *);
+
+extern void		ipmgmt_path(ipadm_path_t, char *, size_t);
 
 #ifdef  __cplusplus
 }

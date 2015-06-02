@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  */
 
 /*
@@ -380,13 +381,18 @@ static void *
 ipmgmt_db_restore_thread(void *arg)
 {
 	int err;
+	char confpath[MAXPATHLEN];
+	char tmpconfpath[MAXPATHLEN];
+
+	ipmgmt_path(IPADM_PATH_DB, confpath, sizeof (confpath));
+	ipmgmt_path(IPADM_PATH_VOL_DB, tmpconfpath, sizeof (tmpconfpath));
 
 	for (;;) {
 		(void) sleep(5);
 		(void) pthread_rwlock_wrlock(&ipmgmt_dbconf_lock);
 		if (!ipmgmt_rdonly_root)
 			break;
-		err = ipmgmt_cpfile(IPADM_VOL_DB_FILE, IPADM_DB_FILE, B_FALSE);
+		err = ipmgmt_cpfile(tmpconfpath, confpath, B_FALSE);
 		if (err == 0) {
 			ipmgmt_rdonly_root = B_FALSE;
 			break;
@@ -418,6 +424,11 @@ ipmgmt_db_walk(db_wfunc_t *db_walk_func, void *db_warg, ipadm_db_op_t db_op)
 	mode_t		mode;
 	pthread_t	tid;
 	pthread_attr_t	attr;
+	char		confpath[MAXPATHLEN];
+	char		tmpconfpath[MAXPATHLEN];
+
+	ipmgmt_path(IPADM_PATH_DB, confpath, sizeof (confpath));
+	ipmgmt_path(IPADM_PATH_VOL_DB, tmpconfpath, sizeof (tmpconfpath));
 
 	writeop = (db_op != IPADM_DB_READ);
 	if (writeop) {
@@ -430,11 +441,10 @@ ipmgmt_db_walk(db_wfunc_t *db_walk_func, void *db_warg, ipadm_db_op_t db_op)
 
 	/*
 	 * Did a previous write attempt fail? If so, don't even try to
-	 * read/write to IPADM_DB_FILE.
+	 * read/write to the permanent configuration file.
 	 */
 	if (!ipmgmt_rdonly_root) {
-		err = ipadm_rw_db(db_walk_func, db_warg, IPADM_DB_FILE,
-		    mode, db_op);
+		err = ipadm_rw_db(db_walk_func, db_warg, confpath, mode, db_op);
 		if (err != EROFS)
 			goto done;
 	}
@@ -442,11 +452,11 @@ ipmgmt_db_walk(db_wfunc_t *db_walk_func, void *db_warg, ipadm_db_op_t db_op)
 	/*
 	 * If we haven't already copied the file to the volatile
 	 * file system, do so. This should only happen on a failed
-	 * writeop(i.e., we have acquired the write lock above).
+	 * writeop (i.e., we have acquired the write lock above).
 	 */
-	if (access(IPADM_VOL_DB_FILE, F_OK) != 0) {
+	if (access(tmpconfpath, F_OK) != 0) {
 		assert(writeop);
-		err = ipmgmt_cpfile(IPADM_DB_FILE, IPADM_VOL_DB_FILE, B_TRUE);
+		err = ipmgmt_cpfile(confpath, tmpconfpath, B_TRUE);
 		if (err != 0)
 			goto done;
 		(void) pthread_attr_init(&attr);
@@ -456,7 +466,7 @@ ipmgmt_db_walk(db_wfunc_t *db_walk_func, void *db_warg, ipadm_db_op_t db_op)
 		    NULL);
 		(void) pthread_attr_destroy(&attr);
 		if (err != 0) {
-			(void) unlink(IPADM_VOL_DB_FILE);
+			(void) unlink(tmpconfpath);
 			goto done;
 		}
 		ipmgmt_rdonly_root = B_TRUE;
@@ -465,7 +475,7 @@ ipmgmt_db_walk(db_wfunc_t *db_walk_func, void *db_warg, ipadm_db_op_t db_op)
 	/*
 	 * Read/write from the volatile copy.
 	 */
-	err = ipadm_rw_db(db_walk_func, db_warg, IPADM_VOL_DB_FILE,
+	err = ipadm_rw_db(db_walk_func, db_warg, tmpconfpath,
 	    mode, db_op);
 done:
 	(void) pthread_rwlock_unlock(&ipmgmt_dbconf_lock);
@@ -1233,6 +1243,9 @@ ipmgmt_persist_aobjmap(ipmgmt_aobjmap_t *nodep, ipadm_db_op_t op)
 	int			err;
 	ipadm_dbwrite_cbarg_t	cb;
 	nvlist_t		*nvl = NULL;
+	char			aobjpath[MAXPATHLEN];
+
+	ipmgmt_path(IPADM_PATH_ADDROBJ_MAP_DB, aobjpath, sizeof (aobjpath));
 
 	if (op == IPADM_DB_WRITE) {
 		if ((err = i_ipmgmt_node2nvl(&nvl, nodep)) != 0)
@@ -1243,14 +1256,14 @@ ipmgmt_persist_aobjmap(ipmgmt_aobjmap_t *nodep, ipadm_db_op_t op)
 		else
 			cb.dbw_flags = 0;
 
-		err = ipadm_rw_db(ipmgmt_update_aobjmap, &cb,
-		    ADDROBJ_MAPPING_DB_FILE, IPADM_FILE_MODE, IPADM_DB_WRITE);
+		err = ipadm_rw_db(ipmgmt_update_aobjmap, &cb, aobjpath,
+		    IPADM_FILE_MODE, IPADM_DB_WRITE);
 		nvlist_free(nvl);
 	} else {
 		assert(op == IPADM_DB_DELETE);
 
-		err = ipadm_rw_db(ipmgmt_delete_aobjmap, nodep,
-		    ADDROBJ_MAPPING_DB_FILE, IPADM_FILE_MODE, IPADM_DB_DELETE);
+		err = ipadm_rw_db(ipmgmt_delete_aobjmap, nodep, aobjpath,
+		    IPADM_FILE_MODE, IPADM_DB_DELETE);
 	}
 	return (err);
 }
