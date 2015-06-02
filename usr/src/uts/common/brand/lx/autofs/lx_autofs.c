@@ -22,9 +22,12 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2015 Joyent, Inc.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * See the big theory statement in ../sys/lx_autofs.h
+ */
 
 #include <fs/fs_subr.h>
 #include <sys/atomic.h>
@@ -61,13 +64,13 @@ static minor_t			lx_autofs_minor = 0;
  * Support functions
  */
 static void
-i_strfree(char *str)
+lx_autofs_strfree(char *str)
 {
 	kmem_free(str, strlen(str) + 1);
 }
 
 static char *
-i_strdup(char *str)
+lx_autofs_strdup(char *str)
 {
 	int	n = strlen(str);
 	char	*ptr = kmem_alloc(n + 1, KM_SLEEP);
@@ -76,7 +79,7 @@ i_strdup(char *str)
 }
 
 static int
-i_str_to_int(char *str, int *val)
+lx_autofs_str_to_int(char *str, int *val)
 {
 	long	res;
 
@@ -92,21 +95,21 @@ i_str_to_int(char *str, int *val)
 }
 
 static void
-i_stack_init(list_t *lp)
+ls_autofs_stack_init(list_t *lp)
 {
 	list_create(lp,
 	    sizeof (stack_elem_t), offsetof(stack_elem_t, se_list));
 }
 
 static void
-i_stack_fini(list_t *lp)
+lx_autofs_stack_fini(list_t *lp)
 {
 	ASSERT(list_head(lp) == NULL);
 	list_destroy(lp);
 }
 
 static void
-i_stack_push(list_t *lp, caddr_t ptr1, caddr_t ptr2, caddr_t ptr3)
+lx_autofs_stack_push(list_t *lp, caddr_t ptr1, caddr_t ptr2, caddr_t ptr3)
 {
 	stack_elem_t	*se;
 
@@ -118,7 +121,7 @@ i_stack_push(list_t *lp, caddr_t ptr1, caddr_t ptr2, caddr_t ptr3)
 }
 
 static int
-i_stack_pop(list_t *lp, caddr_t *ptr1, caddr_t *ptr2, caddr_t *ptr3)
+lx_autofs_stack_pop(list_t *lp, caddr_t *ptr1, caddr_t *ptr2, caddr_t *ptr3)
 {
 	stack_elem_t	*se;
 
@@ -136,7 +139,7 @@ i_stack_pop(list_t *lp, caddr_t *ptr1, caddr_t *ptr2, caddr_t *ptr3)
 }
 
 static vnode_t *
-fifo_peer_vp(vnode_t *vp)
+lx_autofs_fifo_peer_vp(vnode_t *vp)
 {
 	fifonode_t *fnp = VTOF(vp);
 	fifonode_t *fn_dest = fnp->fn_dest;
@@ -144,7 +147,7 @@ fifo_peer_vp(vnode_t *vp)
 }
 
 static vnode_t *
-i_vn_alloc(vfs_t *vfsp, vnode_t *uvp)
+lx_autofs_vn_alloc(vfs_t *vfsp, vnode_t *uvp)
 {
 	lx_autofs_vfs_t	*data = vfsp->vfs_data;
 	vnode_t		*vp, *vp_old;
@@ -195,7 +198,7 @@ i_vn_alloc(vfs_t *vfsp, vnode_t *uvp)
 }
 
 static void
-i_vn_free(vnode_t *vp)
+lx_autofs_vn_free(vnode_t *vp)
 {
 	vfs_t		*vfsp = vp->v_vfsp;
 	lx_autofs_vfs_t	*data = vfsp->vfs_data;
@@ -226,7 +229,7 @@ i_vn_free(vnode_t *vp)
 }
 
 static lx_autofs_lookup_req_t *
-i_lalr_alloc(lx_autofs_vfs_t *data, int *dup_request, char *nm)
+lx_autofs_lalr_alloc(lx_autofs_vfs_t *data, int *dup_request, char *nm)
 {
 	lx_autofs_lookup_req_t	*lalr, *lalr_dup;
 
@@ -279,7 +282,7 @@ i_lalr_alloc(lx_autofs_vfs_t *data, int *dup_request, char *nm)
 		    (mod_hash_key_t)(uintptr_t)lalr->lalr_pkt.lap_id,
 		    (mod_hash_val_t)lalr) == 0);
 		VERIFY(mod_hash_insert(data->lav_path_hash,
-		    (mod_hash_key_t)i_strdup(nm),
+		    (mod_hash_key_t)lx_autofs_strdup(nm),
 		    (mod_hash_val_t)lalr) == 0);
 
 		*dup_request = 0;
@@ -290,7 +293,7 @@ i_lalr_alloc(lx_autofs_vfs_t *data, int *dup_request, char *nm)
 }
 
 static lx_autofs_lookup_req_t *
-i_lalr_find(lx_autofs_vfs_t *data, int id)
+lx_autofs_lalr_find(lx_autofs_vfs_t *data, int id)
 {
 	lx_autofs_lookup_req_t	*lalr;
 
@@ -307,18 +310,18 @@ i_lalr_find(lx_autofs_vfs_t *data, int id)
 }
 
 static void
-i_lalr_complete(lx_autofs_vfs_t *data, lx_autofs_lookup_req_t *lalr)
+lx_autofs_lalr_complete(lx_autofs_vfs_t *data, lx_autofs_lookup_req_t *lalr)
 {
 	lx_autofs_lookup_req_t	*lalr_tmp;
 
 	/* Remove this request from the hashes so no one can look it up. */
 	mutex_enter(&data->lav_lock);
 	(void) mod_hash_remove(data->lav_id_hash,
-		    (mod_hash_key_t)(uintptr_t)lalr->lalr_pkt.lap_id,
-		    (mod_hash_val_t)&lalr_tmp);
+	    (mod_hash_key_t)(uintptr_t)lalr->lalr_pkt.lap_id,
+	    (mod_hash_val_t)&lalr_tmp);
 	(void) mod_hash_remove(data->lav_path_hash,
-		    (mod_hash_key_t)lalr->lalr_pkt.lap_name,
-		    (mod_hash_val_t)&lalr_tmp);
+	    (mod_hash_key_t)lalr->lalr_pkt.lap_name,
+	    (mod_hash_val_t)&lalr_tmp);
 	mutex_exit(&data->lav_lock);
 
 	/* Mark this requst as complete and wakeup anyone waiting on it. */
@@ -329,7 +332,7 @@ i_lalr_complete(lx_autofs_vfs_t *data, lx_autofs_lookup_req_t *lalr)
 }
 
 static void
-i_lalr_release(lx_autofs_vfs_t *data, lx_autofs_lookup_req_t *lalr)
+lx_autofs_lalr_release(lx_autofs_vfs_t *data, lx_autofs_lookup_req_t *lalr)
 {
 	ASSERT(!MUTEX_HELD(&lalr->lalr_lock));
 	if (atomic_add_int_nv(&lalr->lalr_ref, -1) > 0)
@@ -340,7 +343,7 @@ i_lalr_release(lx_autofs_vfs_t *data, lx_autofs_lookup_req_t *lalr)
 }
 
 static void
-i_lalr_abort(lx_autofs_vfs_t *data, lx_autofs_lookup_req_t *lalr)
+lx_autofs_lalr_abort(lx_autofs_vfs_t *data, lx_autofs_lookup_req_t *lalr)
 {
 	lx_autofs_lookup_req_t	*lalr_tmp;
 
@@ -359,11 +362,11 @@ i_lalr_abort(lx_autofs_vfs_t *data, lx_autofs_lookup_req_t *lalr)
 
 	/* Remove this request from the hashes so no one can look it up. */
 	(void) mod_hash_remove(data->lav_id_hash,
-		    (mod_hash_key_t)(uintptr_t)lalr->lalr_pkt.lap_id,
-		    (mod_hash_val_t)&lalr_tmp);
+	    (mod_hash_key_t)(uintptr_t)lalr->lalr_pkt.lap_id,
+	    (mod_hash_val_t)&lalr_tmp);
 	(void) mod_hash_remove(data->lav_path_hash,
-		    (mod_hash_key_t)lalr->lalr_pkt.lap_name,
-		    (mod_hash_val_t)&lalr_tmp);
+	    (mod_hash_key_t)lalr->lalr_pkt.lap_name,
+	    (mod_hash_val_t)&lalr_tmp);
 	mutex_exit(&data->lav_lock);
 
 	/* It's ok to free this now because the ref count was zero. */
@@ -372,7 +375,7 @@ i_lalr_abort(lx_autofs_vfs_t *data, lx_autofs_lookup_req_t *lalr)
 }
 
 static int
-i_fifo_lookup(pid_t pgrp, int fd, file_t **fpp_wr, file_t **fpp_rd)
+lx_autofs_fifo_lookup(pid_t pgrp, int fd, file_t **fpp_wr, file_t **fpp_rd)
 {
 	proc_t		*prp;
 	uf_info_t	*fip;
@@ -424,7 +427,7 @@ i_fifo_lookup(pid_t pgrp, int fd, file_t **fpp_wr, file_t **fpp_rd)
 	 * explained below.)  We assume that the read end of the fifo
 	 * is in the same process as the write end.
 	 */
-	vp_rd = fifo_peer_vp(fp_wr->f_vnode);
+	vp_rd = lx_autofs_fifo_peer_vp(fp_wr->f_vnode);
 	for (i = 0; i < fip->fi_nfiles; i++) {
 		UF_ENTER(ufp_rd, fip, i);
 		if (((fp_rd = ufp_rd->uf_file) != NULL) &&
@@ -483,7 +486,7 @@ i_fifo_lookup(pid_t pgrp, int fd, file_t **fpp_wr, file_t **fpp_rd)
 
 static uint_t
 /*ARGSUSED*/
-i_fifo_close_cb(mod_hash_key_t key, mod_hash_val_t *val, void *arg)
+lx_autofs_fifo_close_cb(mod_hash_key_t key, mod_hash_val_t *val, void *arg)
 {
 	int	*id = (int *)arg;
 	/* Return the key and terminate the walk. */
@@ -492,7 +495,7 @@ i_fifo_close_cb(mod_hash_key_t key, mod_hash_val_t *val, void *arg)
 }
 
 static void
-i_fifo_close(lx_autofs_vfs_t *data)
+lx_autofs_fifo_close(lx_autofs_vfs_t *data)
 {
 	/*
 	 * Close the fifo to prevent any future requests from
@@ -521,24 +524,24 @@ i_fifo_close(lx_autofs_vfs_t *data)
 		/* Lookup the first entry in the hash. */
 		id = -1;
 		mod_hash_walk(data->lav_id_hash,
-		    i_fifo_close_cb, &id);
+		    lx_autofs_fifo_close_cb, &id);
 		if (id == -1) {
 			/* No more id's in the hash. */
 			break;
 		}
-		if ((lalr = i_lalr_find(data, id)) == NULL) {
+		if ((lalr = lx_autofs_lalr_find(data, id)) == NULL) {
 			/* Someone else beat us to it. */
 			continue;
 		}
 
 		/* Mark the request as compleate and release it. */
-		i_lalr_complete(data, lalr);
-		i_lalr_release(data, lalr);
+		lx_autofs_lalr_complete(data, lalr);
+		lx_autofs_lalr_release(data, lalr);
 	}
 }
 
 static int
-i_fifo_verify_rd(lx_autofs_vfs_t *data)
+lx_autofs_fifo_verify_rd(lx_autofs_vfs_t *data)
 {
 	proc_t		*prp;
 	uf_info_t	*fip;
@@ -554,7 +557,7 @@ i_fifo_verify_rd(lx_autofs_vfs_t *data)
 		ASSERT(data->lav_fifo_rd == NULL);
 		return (-1);
 	}
-	vp_rd = fifo_peer_vp(data->lav_fifo_wr->f_vnode);
+	vp_rd = lx_autofs_fifo_peer_vp(data->lav_fifo_wr->f_vnode);
 
 	/*
 	 * sprlock() is zone aware, so assuming this mount call was
@@ -607,7 +610,7 @@ i_fifo_verify_rd(lx_autofs_vfs_t *data)
 }
 
 static int
-i_fifo_write(lx_autofs_vfs_t *data, lx_autofs_pkt_t *lap)
+lx_autofs_fifo_write(lx_autofs_vfs_t *data, lx_autofs_pkt_t *lap)
 {
 	struct uio	uio;
 	struct iovec	iov;
@@ -661,13 +664,13 @@ i_fifo_write(lx_autofs_vfs_t *data, lx_autofs_pkt_t *lap)
 	 * these files open.
 	 */
 	mutex_enter(&data->lav_lock);
-	if (i_fifo_verify_rd(data) != 0) {
+	if (lx_autofs_fifo_verify_rd(data) != 0) {
 		/*
 		 * Something happened to the automounter.
 		 * Close down the communication pipe we setup.
 		 */
 		mutex_exit(&data->lav_lock);
-		i_fifo_close(data);
+		lx_autofs_fifo_close(data);
 		if (error != 0)
 			return (error);
 		return (ENOENT);
@@ -678,7 +681,7 @@ i_fifo_write(lx_autofs_vfs_t *data, lx_autofs_pkt_t *lap)
 }
 
 static int
-i_bs_readdir(vnode_t *dvp, list_t *dir_stack, list_t *file_stack)
+lx_autofs_bs_readdir(vnode_t *dvp, list_t *dir_stack, list_t *file_stack)
 {
 	struct iovec	iov;
 	struct uio	uio;
@@ -720,7 +723,7 @@ i_bs_readdir(vnode_t *dvp, list_t *dir_stack, list_t *file_stack)
 		}
 
 		for (dp = dbuf; ((intptr_t)dp < (intptr_t)dbuf + dbuflen);
-			dp = (dirent64_t *)((intptr_t)dp + dp->d_reclen)) {
+		    dp = (dirent64_t *)((intptr_t)dp + dp->d_reclen)) {
 
 			nm = dp->d_name;
 
@@ -734,15 +737,17 @@ i_bs_readdir(vnode_t *dvp, list_t *dir_stack, list_t *file_stack)
 			}
 			if (vp->v_type == VDIR) {
 				if (dir_stack != NULL) {
-					i_stack_push(dir_stack, (caddr_t)dvp,
-					    (caddr_t)vp, i_strdup(nm));
+					lx_autofs_stack_push(dir_stack,
+					    (caddr_t)dvp,
+					    (caddr_t)vp, lx_autofs_strdup(nm));
 				} else {
 					VN_RELE(vp);
 				}
 			} else {
 				if (file_stack != NULL) {
-					i_stack_push(file_stack, (caddr_t)dvp,
-					    (caddr_t)vp, i_strdup(nm));
+					lx_autofs_stack_push(file_stack,
+					    (caddr_t)dvp,
+					    (caddr_t)vp, lx_autofs_strdup(nm));
 				} else {
 					VN_RELE(vp);
 				}
@@ -754,7 +759,7 @@ i_bs_readdir(vnode_t *dvp, list_t *dir_stack, list_t *file_stack)
 }
 
 static void
-i_bs_destroy(vnode_t *dvp, char *path)
+lx_autofs_bs_destroy(vnode_t *dvp, char *path)
 {
 	list_t	search_stack;
 	list_t	dir_stack;
@@ -782,47 +787,49 @@ i_bs_destroy(vnode_t *dvp, char *path)
 	 * It would have been much easier to do this recursively but kernel
 	 * stacks are notoriously small.
 	 */
-	i_stack_init(&search_stack);
-	i_stack_init(&dir_stack);
-	i_stack_init(&file_stack);
+	ls_autofs_stack_init(&search_stack);
+	ls_autofs_stack_init(&dir_stack);
+	ls_autofs_stack_init(&file_stack);
 
 	/* Save our newfound subdirectory into a list. */
-	i_stack_push(&search_stack, (caddr_t)dvp, (caddr_t)vp, i_strdup(path));
+	lx_autofs_stack_push(&search_stack, (caddr_t)dvp, (caddr_t)vp,
+	    lx_autofs_strdup(path));
 
 	/* Do a recursive depth first search into the subdirectories. */
-	while (i_stack_pop(&search_stack,
+	while (lx_autofs_stack_pop(&search_stack,
 	    (caddr_t *)&pdvp, (caddr_t *)&dvp, &dpath) == 0) {
 
 		/* Get a list of the subdirectories in this directory. */
-		if (i_bs_readdir(dvp, &search_stack, NULL) != 0)
+		if (lx_autofs_bs_readdir(dvp, &search_stack, NULL) != 0)
 			goto exit;
 
 		/* Save the current directory a separate stack. */
-		i_stack_push(&dir_stack, (caddr_t)pdvp, (caddr_t)dvp, dpath);
+		lx_autofs_stack_push(&dir_stack, (caddr_t)pdvp, (caddr_t)dvp,
+		    dpath);
 	}
 
 	/*
 	 * Now dir_stack contains a list of directories, the deepest paths
 	 * are at the top of the list.  So let's go through and process them.
 	 */
-	while (i_stack_pop(&dir_stack,
+	while (lx_autofs_stack_pop(&dir_stack,
 	    (caddr_t *)&pdvp, (caddr_t *)&dvp, &dpath) == 0) {
 
 		/* Get a list of the files in this directory. */
-		if (i_bs_readdir(dvp, NULL, &file_stack) != 0) {
+		if (lx_autofs_bs_readdir(dvp, NULL, &file_stack) != 0) {
 			VN_RELE(dvp);
-			i_strfree(dpath);
+			lx_autofs_strfree(dpath);
 			goto exit;
 		}
 
 		/* Delete all the files in this directory. */
-		while (i_stack_pop(&file_stack,
+		while (lx_autofs_stack_pop(&file_stack,
 		    NULL, (caddr_t *)&vp, &fpath) == 0) {
 			VN_RELE(vp)
 			ret = VOP_REMOVE(dvp, fpath, kcred, NULL, 0);
-			i_strfree(fpath);
+			lx_autofs_strfree(fpath);
 			if (ret != 0) {
-				i_strfree(dpath);
+				lx_autofs_strfree(dpath);
 				goto exit;
 			}
 		}
@@ -830,26 +837,29 @@ i_bs_destroy(vnode_t *dvp, char *path)
 		/* Delete this directory. */
 		VN_RELE(dvp);
 		ret = VOP_RMDIR(pdvp, dpath, pdvp, kcred, NULL, 0);
-		i_strfree(dpath);
+		lx_autofs_strfree(dpath);
 		if (ret != 0)
 			goto exit;
 	}
 
 exit:
 	while (
-	    (i_stack_pop(&search_stack, NULL, (caddr_t *)&vp, &path) == 0) ||
-	    (i_stack_pop(&dir_stack, NULL, (caddr_t *)&vp, &path) == 0) ||
-	    (i_stack_pop(&file_stack, NULL, (caddr_t *)&vp, &path) == 0)) {
+	    (lx_autofs_stack_pop(&search_stack, NULL, (caddr_t *)&vp,
+	    &path) == 0) ||
+	    (lx_autofs_stack_pop(&dir_stack, NULL, (caddr_t *)&vp,
+	    &path) == 0) ||
+	    (lx_autofs_stack_pop(&file_stack, NULL, (caddr_t *)&vp,
+	    &path) == 0)) {
 		VN_RELE(vp);
-		i_strfree(path);
+		lx_autofs_strfree(path);
 	}
-	i_stack_fini(&search_stack);
-	i_stack_fini(&dir_stack);
-	i_stack_fini(&file_stack);
+	lx_autofs_stack_fini(&search_stack);
+	lx_autofs_stack_fini(&dir_stack);
+	lx_autofs_stack_fini(&file_stack);
 }
 
 static vnode_t *
-i_bs_create(vnode_t *dvp, char *bs_name)
+lx_autofs_bs_create(vnode_t *dvp, char *bs_name)
 {
 	vnode_t	*vp;
 	vattr_t	vattr;
@@ -869,7 +879,7 @@ i_bs_create(vnode_t *dvp, char *bs_name)
 }
 
 static int
-i_automounter_call(vnode_t *dvp, char *nm)
+lx_autofs_automounter_call(vnode_t *dvp, char *nm)
 {
 	lx_autofs_lookup_req_t	*lalr;
 	lx_autofs_vfs_t		*data;
@@ -906,7 +916,7 @@ i_automounter_call(vnode_t *dvp, char *nm)
 	mutex_exit(&data->lav_lock);
 
 	/* Allocate an automounter request structure. */
-	if ((lalr = i_lalr_alloc(data, &dup_request, nm)) == NULL)
+	if ((lalr = lx_autofs_lalr_alloc(data, &dup_request, nm)) == NULL)
 		return (ENOENT);
 
 	/*
@@ -914,14 +924,14 @@ i_automounter_call(vnode_t *dvp, char *nm)
 	 * need to send it to the automounter.
 	 */
 	if ((!dup_request) &&
-	    ((error = i_fifo_write(data, &lalr->lalr_pkt)) != 0)) {
+	    ((error = lx_autofs_fifo_write(data, &lalr->lalr_pkt)) != 0)) {
 		/*
 		 * Unable to send the request to the automounter.
 		 * Unblock any other threads waiting on the request
 		 * and release the request.
 		 */
-		i_lalr_complete(data, lalr);
-		i_lalr_release(data, lalr);
+		lx_autofs_lalr_complete(data, lalr);
+		lx_autofs_lalr_release(data, lalr);
 		return (error);
 	}
 
@@ -931,18 +941,18 @@ i_automounter_call(vnode_t *dvp, char *nm)
 		if (cv_wait_sig(&lalr->lalr_cv, &lalr->lalr_lock) == 0) {
 			/* We got a signal, abort this lookup. */
 			mutex_exit(&lalr->lalr_lock);
-			i_lalr_abort(data, lalr);
+			lx_autofs_lalr_abort(data, lalr);
 			return (EINTR);
 		}
 	}
 	mutex_exit(&lalr->lalr_lock);
-	i_lalr_release(data, lalr);
+	lx_autofs_lalr_release(data, lalr);
 
 	return (0);
 }
 
 static int
-i_automounter_ioctl(vnode_t *vp, int cmd, intptr_t arg)
+lx_autofs_automounter_ioctl(vnode_t *vp, int cmd, intptr_t arg)
 {
 	lx_autofs_vfs_t *data = (lx_autofs_vfs_t *)vp->v_vfsp->vfs_data;
 
@@ -965,24 +975,24 @@ i_automounter_ioctl(vnode_t *vp, int cmd, intptr_t arg)
 		 * We don't actually care if the request failed or succeeded.
 		 * We do the same thing either way.
 		 */
-		if ((lalr = i_lalr_find(data, id)) == NULL)
+		if ((lalr = lx_autofs_lalr_find(data, id)) == NULL)
 			return (ENXIO);
 
 		/* Mark the request as compleate and release it. */
-		i_lalr_complete(data, lalr);
-		i_lalr_release(data, lalr);
+		lx_autofs_lalr_complete(data, lalr);
+		lx_autofs_lalr_release(data, lalr);
 		return (0);
 	}
 	if (cmd == LX_AUTOFS_IOC_CATATONIC) {
 		/* The automounter is shutting down. */
-		i_fifo_close(data);
+		lx_autofs_fifo_close(data);
 		return (0);
 	}
 	return (ENOTSUP);
 }
 
 static int
-i_parse_mntopt(vfs_t *vfsp, lx_autofs_vfs_t *data)
+lx_autofs_parse_mntopt(vfs_t *vfsp, lx_autofs_vfs_t *data)
 {
 	char		*fd_str, *pgrp_str, *minproto_str, *maxproto_str;
 	int		fd, pgrp, minproto, maxproto;
@@ -996,25 +1006,25 @@ i_parse_mntopt(vfs_t *vfsp, lx_autofs_vfs_t *data)
 		return (EINVAL);
 
 	/* Get the values for each parameter. */
-	if ((i_str_to_int(fd_str, &fd) != 0) ||
-	    (i_str_to_int(pgrp_str, &pgrp) != 0) ||
-	    (i_str_to_int(minproto_str, &minproto) != 0) ||
-	    (i_str_to_int(maxproto_str, &maxproto) != 0))
+	if ((lx_autofs_str_to_int(fd_str, &fd) != 0) ||
+	    (lx_autofs_str_to_int(pgrp_str, &pgrp) != 0) ||
+	    (lx_autofs_str_to_int(minproto_str, &minproto) != 0) ||
+	    (lx_autofs_str_to_int(maxproto_str, &maxproto) != 0))
 		return (EINVAL);
 
 	/*
-	 * We support v2 of the linux kernel automounter protocol.
-	 * Make sure the mount request we got indicates support
-	 * for this version of the protocol.
+	 * We essentially only support v2 of the linux kernel automounter
+	 * protocol, but v3 is just a slight superset which we'll accept here.
+	 * We'll reject unsupported ioctls later if we get one.
 	 */
-	if ((minproto > 2) || (maxproto < 2))
+	if ((minproto > 3) || (maxproto < 2))
 		return (EINVAL);
 
 	/*
 	 * Now we need to lookup the fifos we'll be using
 	 * to talk to the userland automounter process.
 	 */
-	if (i_fifo_lookup(pgrp, fd, &fp_wr, &fp_rd) != 0)
+	if (lx_autofs_fifo_lookup(pgrp, fd, &fp_wr, &fp_rd) != 0)
 		return (EINVAL);
 
 	/* Save the mount options and fifo pointers. */
@@ -1046,7 +1056,7 @@ lx_autofs_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 	    (mvp->v_count > 1 || (mvp->v_flag & VROOT)))
 		return (EBUSY);
 
-	/* We don't support mountes in the global zone. */
+	/* We don't support mounts in the global zone. */
 	if (getzoneid() == GLOBAL_ZONEID)
 		return (EPERM);
 
@@ -1058,14 +1068,15 @@ lx_autofs_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 	data = kmem_zalloc(sizeof (lx_autofs_vfs_t), KM_SLEEP);
 
 	/* Parse mount options. */
-	if ((error = i_parse_mntopt(vfsp, data)) != 0) {
+	if ((error = lx_autofs_parse_mntopt(vfsp, data)) != 0) {
 		kmem_free(data, sizeof (lx_autofs_vfs_t));
 		return (error);
 	}
 
 	/* Initialize the backing store. */
-	i_bs_destroy(mvp, LX_AUTOFS_BS_DIR);
-	if ((data->lav_bs_vp = i_bs_create(mvp, LX_AUTOFS_BS_DIR)) == NULL) {
+	lx_autofs_bs_destroy(mvp, LX_AUTOFS_BS_DIR);
+	data->lav_bs_vp = lx_autofs_bs_create(mvp, LX_AUTOFS_BS_DIR);
+	if (data->lav_bs_vp == NULL) {
 		kmem_free(data, sizeof (lx_autofs_vfs_t));
 		return (EBUSY);
 	}
@@ -1112,7 +1123,7 @@ lx_autofs_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 	    sizeof (vnode_t));
 
 	/* Create root vnode */
-	data->lav_root = i_vn_alloc(vfsp, data->lav_bs_vp);
+	data->lav_root = lx_autofs_vn_alloc(vfsp, data->lav_bs_vp);
 	data->lav_root->v_flag |=
 	    VROOT | VNOCACHE | VNOMAP | VNOSWAP | VNOMOUNT;
 
@@ -1161,7 +1172,7 @@ lx_autofs_unmount(vfs_t *vfsp, int flag, struct cred *cr)
 	VN_RELE(data->lav_root);
 
 	/* Cleanup the backing store. */
-	i_bs_destroy(data->lav_mvp, data->lav_bs_name);
+	lx_autofs_bs_destroy(data->lav_mvp, data->lav_bs_name);
 	VN_RELE(data->lav_mvp);
 
 	/* Cleanup out remaining data structures. */
@@ -1303,7 +1314,7 @@ lx_autofs_open(vnode_t **vpp, int flag, cred_t *cr, caller_context_t *ctp)
 		return (0);
 
 	/* Deal with clone opens by returning a new vnode. */
-	*vpp = i_vn_alloc(ovp->v_vfsp, uvp);
+	*vpp = lx_autofs_vn_alloc(ovp->v_vfsp, uvp);
 	VN_RELE(ovp);
 	return (0);
 }
@@ -1339,7 +1350,7 @@ lx_autofs_mkdir(vnode_t *dvp, char *nm, struct vattr *vap, vnode_t **vpp,
 	vap->va_fsid = dvp->v_vfsp->vfs_dev;
 
 	/* Allocate a new vnode. */
-	*vpp = i_vn_alloc(dvp->v_vfsp, uvp);
+	*vpp = lx_autofs_vn_alloc(dvp->v_vfsp, uvp);
 	return (0);
 }
 
@@ -1376,7 +1387,7 @@ lx_autofs_inactive(struct vnode *vp, struct cred *cr, caller_context_t *ctp)
 	 * No one should have been blocked on this lock because we're
 	 * about to free this vnode.
 	 */
-	i_vn_free(vp);
+	lx_autofs_vn_free(vp);
 }
 
 static int
@@ -1391,7 +1402,7 @@ lx_autofs_lookup(vnode_t *dvp, char *nm, vnode_t **vpp, struct pathname *pnp,
 	/* First try to lookup if this path component already exitst. */
 	if ((error = VOP_LOOKUP(udvp, nm, &uvp, pnp, flags, rdir, cr, ctp,
 	    direntflags, realpnp)) == 0) {
-		*vpp = i_vn_alloc(dvp->v_vfsp, uvp);
+		*vpp = lx_autofs_vn_alloc(dvp->v_vfsp, uvp);
 		return (0);
 	}
 
@@ -1400,13 +1411,13 @@ lx_autofs_lookup(vnode_t *dvp, char *nm, vnode_t **vpp, struct pathname *pnp,
 		return (error);
 
 	/* Refer the lookup to the automounter. */
-	if ((error = i_automounter_call(dvp, nm)) != 0)
+	if ((error = lx_autofs_automounter_call(dvp, nm)) != 0)
 		return (error);
 
 	/* Retry the lookup operation. */
 	if ((error = VOP_LOOKUP(udvp, nm, &uvp, pnp, flags, rdir, cr, ctp,
 	    direntflags, realpnp)) == 0) {
-		*vpp = i_vn_alloc(dvp->v_vfsp, uvp);
+		*vpp = lx_autofs_vn_alloc(dvp->v_vfsp, uvp);
 		return (0);
 	}
 	return (error);
@@ -1427,7 +1438,7 @@ lx_autofs_ioctl(vnode_t *vp, int cmd, intptr_t arg, int mode, cred_t *cr,
 	case LX_AUTOFS_IOC_EXPIRE:
 	case LX_AUTOFS_IOC_PROTOVER:
 	case LX_AUTOFS_IOC_SETTIMEOUT:
-		return (i_automounter_ioctl(vp, cmd, arg));
+		return (lx_autofs_automounter_ioctl(vp, cmd, arg));
 	}
 
 	/* Pass any remaining ioctl on. */
@@ -1519,7 +1530,7 @@ static vfsdef_t vfw = {
 	VFSDEF_VERSION,
 	LX_AUTOFS_NAME,
 	lx_autofs_init,
-	VSW_HASPROTO | VSW_VOLATILEDEV,
+	VSW_HASPROTO | VSW_VOLATILEDEV | VSW_ZMOUNT,
 	&lx_autofs_mntopts
 };
 

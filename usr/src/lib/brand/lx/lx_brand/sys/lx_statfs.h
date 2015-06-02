@@ -21,7 +21,7 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2014 Joyent, Inc.  All rights reserved.
+ * Copyright 2015 Joyent, Inc.  All rights reserved.
  */
 
 #ifndef	_LX_STATFS_H
@@ -64,6 +64,7 @@ struct lx_statfs64 {
 /*
  * These magic values are taken mostly from statfs(2) or magic.h
  */
+#define	LX_AUTOFS_SUPER_MAGIC		0x0187
 #define	LX_DEVFS_SUPER_MAGIC		0x1373
 #define	LX_DEVPTS_SUPER_MAGIC		0x1cd1
 #define	LX_EXT2_SUPER_MAGIC		0xEF53

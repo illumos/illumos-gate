@@ -140,6 +140,7 @@ static void lxpr_read_cpuinfo(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_diskstats(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_isdir(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_fd(lxpr_node_t *, lxpr_uiobuf_t *);
+static void lxpr_read_filesystems(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_kmsg(lxpr_node_t *, lxpr_uiobuf_t *, ldi_handle_t);
 static void lxpr_read_loadavg(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_meminfo(lxpr_node_t *, lxpr_uiobuf_t *);
@@ -540,7 +541,7 @@ static void (*lxpr_read_function[LXPR_NFILES])() = {
 	lxpr_read_empty,		/* /proc/devices	*/
 	lxpr_read_diskstats,		/* /proc/diskstats	*/
 	lxpr_read_empty,		/* /proc/dma		*/
-	lxpr_read_empty,		/* /proc/filesystems	*/
+	lxpr_read_filesystems,		/* /proc/filesystems	*/
 	lxpr_read_empty,		/* /proc/interrupts	*/
 	lxpr_read_empty,		/* /proc/ioports	*/
 	lxpr_read_empty,		/* /proc/kcore		*/
@@ -3868,6 +3869,22 @@ lxpr_read_fd(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
 	ASSERT(lxpnp->lxpr_type == LXPR_PID_FD_FD);
 	lxpr_uiobuf_seterr(uiobuf, EFAULT);
+}
+
+/*
+ * Report a list of file systems loaded in the kernel. We only report the ones
+ * which we support and which may be checked by various components to see if
+ * they are loaded.
+ */
+static void
+lxpr_read_filesystems(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
+{
+	lxpr_uiobuf_printf(uiobuf, "%s\t%s\n", "nodev", "autofs");
+	lxpr_uiobuf_printf(uiobuf, "%s\t%s\n", "nodev", "cgroup");
+	lxpr_uiobuf_printf(uiobuf, "%s\t%s\n", "nodev", "nfs");
+	lxpr_uiobuf_printf(uiobuf, "%s\t%s\n", "nodev", "proc");
+	lxpr_uiobuf_printf(uiobuf, "%s\t%s\n", "nodev", "sysfs");
+	lxpr_uiobuf_printf(uiobuf, "%s\t%s\n", "nodev", "tmpfs");
 }
 
 /*
