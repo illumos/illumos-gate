@@ -113,6 +113,9 @@ CLOSED=		$(SRC)/../closed
 BUILD_TOOLS=		/ws/onnv-tools
 ONBLD_TOOLS=		$(BUILD_TOOLS)/onbld
 
+# define runtime JAVA_HOME, primarily for cmd/pools/poold
+JAVA_HOME=	/usr/java
+# define buildtime JAVA_ROOT
 JAVA_ROOT=	/usr/java
 
 GCC_ROOT=	/opt/gcc/4.4.4

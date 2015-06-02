@@ -20,11 +20,10 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2015 Gary Mills
  * Copyright (c) 1995, by Sun Microsystems, Inc.
  * All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * doupdate.c
@@ -913,7 +912,7 @@ doupdate()
 
 #ifdef M_CURSES_TYPEAHEAD
 	unsigned char cc;
-	int min, time, icanon;
+	volatile int min, time, icanon;
 
 	if (__m_screen->_flags & S_ISATTY) {
 		/* Set up non-blocking input for typeahead trapping. */

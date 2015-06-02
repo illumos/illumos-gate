@@ -26,13 +26,11 @@
 #ifndef	_SMB_SQLITE_H
 #define	_SMB_SQLITE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
 
-#include <sqlite/sqlite.h>
+#include <sqlite-sys/sqlite.h>
 
 #ifdef _LP64
 /*

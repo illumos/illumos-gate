@@ -103,6 +103,8 @@ main(int argc, char *argv[], char *envp[])
 	addarg(&al, argv[0]);
 
 	if ((config = fopen(_PATH_MAILERCONF, "r")) == NULL) {
+		for (i = 1; i < argc; i++)
+			addarg(&al, argv[i]);
 		addarg(&al, NULL);
 		openlog(getprogname(), LOG_PID, LOG_MAIL);
 		syslog(LOG_INFO, "cannot open %s, using %s as default MTA",

@@ -133,9 +133,10 @@ static void	usbser_inbound_flow_ctl(usbser_port_t *);
 static int	usbser_dev_is_online(usbser_state_t *);
 static void	usbser_serialize_port_act(usbser_port_t *, int);
 static void	usbser_release_port_act(usbser_port_t *, int);
+#ifdef DEBUG
 static char	*usbser_msgtype2str(int);
 static char	*usbser_ioctl2str(int);
-
+#endif
 
 /* USBA events */
 usb_event_t usbser_usb_events = {
@@ -233,7 +234,8 @@ _init(void)
 	int err;
 
 	mutex_init(&usbser_lock, NULL, MUTEX_DRIVER, (void *)NULL);
-	if (err = mod_install(&modlinkage))
+
+	if ((err = mod_install(&modlinkage)) != 0)
 		mutex_destroy(&usbser_lock);
 
 	return (err);
@@ -245,8 +247,7 @@ _fini(void)
 {
 	int err;
 
-	if (err = mod_remove(&modlinkage))
-
+	if ((err = mod_remove(&modlinkage)) != 0)
 		return (err);
 
 	mutex_destroy(&usbser_lock);
@@ -1759,7 +1760,7 @@ usbser_close_drain(usbser_port_t *pp)
 {
 	int	need_drain;
 	clock_t	until;
-	int	rval;
+	int	rval = USB_SUCCESS;
 
 	/*
 	 * port_wq_data_cnt indicates amount of data on the write queue,
@@ -1780,7 +1781,7 @@ usbser_close_drain(usbser_port_t *pp)
 
 	/* don't drain if timed out or received a signal */
 	need_drain = (pp->port_wq_data_cnt == 0) || !USBSER_PORT_IS_BUSY(pp) ||
-	    (rval != 0);
+	    (rval != USB_SUCCESS);
 
 	mutex_exit(&pp->port_mutex);
 	/*
@@ -1864,6 +1865,7 @@ usbser_thr_dispatch(usbser_thread_t *thr)
 {
 	usbser_port_t	*pp = thr->thr_port;
 	usbser_state_t	*usp = pp->port_usp;
+	/*LINTED E_FUNC_SET_NOT_USED*/
 	int		rval;
 
 	ASSERT(mutex_owned(&pp->port_mutex));
@@ -1904,9 +1906,7 @@ usbser_thr_cancel(usbser_thread_t *thr)
 static void
 usbser_thr_wake(usbser_thread_t *thr)
 {
-	usbser_port_t	*pp = thr->thr_port;
-
-	ASSERT(mutex_owned(&pp->port_mutex));
+	ASSERT(mutex_owned(&thr->thr_port->port_mutex));
 
 	thr->thr_flags |= USBSER_THR_WAKE;
 	cv_signal(&thr->thr_cv);
@@ -2587,7 +2587,7 @@ usbser_ioctl(usbser_port_t *pp, mblk_t *mp)
 	struct iocblk	*iocp;
 	int		cmd;
 	mblk_t		*datamp;
-	int		error = 0, rval;
+	int		error = 0, rval = USB_SUCCESS;
 	int		val;
 
 	ASSERT(mutex_owned(&pp->port_mutex));
@@ -2864,7 +2864,7 @@ usbser_iocdata(usbser_port_t *pp, mblk_t *mp)
 	struct copyresp	*csp;
 	int		cmd;
 	int		val;
-	int		rval;
+	int		rval = USB_FAILURE;
 
 	ASSERT(mutex_owned(&pp->port_mutex));
 
@@ -3297,7 +3297,7 @@ usbser_release_port_act(usbser_port_t *pp, int act)
 	cv_broadcast(&pp->port_act_cv);
 }
 
-
+#ifdef DEBUG
 /*
  * message type to string and back conversion.
  *
@@ -3328,7 +3328,6 @@ usbser_msgtype2str(int type)
 
 	return (str);
 }
-
 
 static char *
 usbser_ioctl2str(int ioctl)
@@ -3364,7 +3363,7 @@ usbser_ioctl2str(int ioctl)
 
 	return (str);
 }
-
+#endif
 /*
  * Polled IO support
  */

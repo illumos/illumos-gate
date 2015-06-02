@@ -50,9 +50,6 @@ install :=	TARGET = install
 clean :=	TARGET = clean
 clobber :=	TARGET = clobber
 
-LIBSQLITE =	$(ROOT)/usr/lib/libsqlite.o
-SQLITELINT =	$(ROOT)/usr/lib/llib-lsqlite.ln
-
 include ../../Makefile.cmd
 
 CERRWARN +=	-_gcc=-Wno-type-limits
@@ -82,7 +79,9 @@ $(OBJS) := CPPFLAGS += $(INCS) -D_REENTRANT
 $(POFILE) := CPPFLAGS += $(INCS)
 
 CFLAGS += $(CCVERBOSE)
-LDLIBS += -lsecdb \
+LDLIBS += \
+	-lsqlite-sys \
+	-lsecdb \
 	-lsocket \
 	-lnsl \
 	-lidmap \
@@ -107,7 +106,6 @@ DIRMODE = 0755
 FILEMODE = 0555
 
 lint_SRCS := CPPFLAGS += $(INCS) -D_REENTRANT $(RPC_MSGOUT_OPT)
-lint := LDLIBS += $(SQLITELINT)
 
 .KEEP_STATE:
 
@@ -116,7 +114,7 @@ lint := LDLIBS += $(SQLITELINT)
 all: $(PROG)
 
 $(PROG): $(OBJS) $$(MAPFILES)
-	$(LINK.c) -o $@ $(OBJS) $(LIBSQLITE) $(LDLIBS)
+	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
 	$(POST_PROCESS)
 
 $(POFILE): $(POFILES)
