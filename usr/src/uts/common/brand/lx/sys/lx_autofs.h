@@ -46,7 +46,7 @@
  * kernel to the "amd" process via rpc.  "amd" then looks up any information
  * required to resolve the requests, mounts real NFS filesystems if
  * necessary, and returns.  "amd" has it's own strange configuration
- * mechanism that doesn't seem to be very compatabile with Solaris's network
+ * mechanism that doesn't seem to be very compatabile with Illumos's network
  * based automounter map support.
  *
  * 2) "automount" is the other Linux automounter.  It utilizes a kernel
@@ -86,14 +86,14 @@
  * C) Autofs only intercepts vop lookup operations.  Notably, it does _not_
  * intercept and re-direct vop readdir operations.  This means that the
  * observed behavior of the Linux automounter can be considerably different
- * from that of the Solaris automounter.  Specifically, on Solaris if autofs
+ * from that of the Illumos automounter.  Specifically, on Illumos if autofs
  * mount point is mounted _without_ the -nobrowse option then if a user does
  * an ls operation (which translates into a vop readdir operation) then the
  * automounter will intercept that operation and list all the possible
  * directories and mount points without actually mounting any filesystems.
  * Essentially, all automounter managed mount points on Linux will behave
- * like "-nobrowse" mount points on Solaris.  Here's an example to
- * illustrate this.  If /ws was mounted on Solaris without the -nobrowse
+ * like "-nobrowse" mount points on Illumos.  Here's an example to
+ * illustrate this.  If /ws was mounted on Illumos without the -nobrowse
  * option and an auto_ws yp map was setup as the backing store for this
  * mount point, then an "ls /ws" would list all the keys in the map as
  * valid directories, but an "ls /ws" on Linux would list an emptry
@@ -176,12 +176,13 @@
  * it's requested.  For the purposes of discussion, we'll call the underlying
  * filesystem the "backing store."
  *
- * The backing store is actually directory called ".lx_afs" which is created in
- * the directory where the lx_autofs filesystem is mounted.  When the lx_autofs
- * filesystem is unmounted this backing store directory is deleted.  If this
- * directory exists at mount time (perhaps the system crashed while a previous
- * lx_autofs instance was mounted at the same location) it will be deleted.
- * There are a few implications of using a backing store worth mentioning.
+ * The backing store is actually directory called ".lxautoafs" which is created
+ * in the directory where the lx_autofs filesystem is mounted. When the
+ * lx_autofs filesystem is unmounted this backing store directory is deleted.
+ * If this directory exists at mount time (perhaps the system crashed while a
+ * previous lx_autofs instance was mounted at the same location) it will be
+ * deleted. There are a few implications of using a backing store worth
+ * mentioning.
  *
  * 	2.1) lx_autofs can't be mounted on a read only filesystem.  If this
  * 	proves to be a problem we can probably move the location of the
@@ -217,11 +218,11 @@ extern "C" {
 #endif
 
 /*
- * Note that the name of the actual Solaris filesystem is lx_afs and not
+ * Note that the name of the actual Illumos filesystem is lxautofs and not
  * lx_autofs.  This is becase filesystem names are stupidly limited to 8
  * characters.
  */
-#define	LX_AUTOFS_NAME			"lx_afs"
+#define	LX_AUTOFS_NAME			"lxautofs"
 
 /*
  * Mount options supported.
@@ -284,7 +285,7 @@ typedef struct lx_autofs_pkt {
  * had passed the autofs filesystem would let the automounter know that
  * "mcescher" could be unmounted.  (Note the granularity of notification
  * is directories in the root of the autofs filesystem.)  Here's two
- * ideas for how this functionality could be implemented on Solaris:
+ * ideas for how this functionality could be implemented on Illumos:
  *
  * 2.1) The easy incomplete way.  Don't do any in-use detection.  Simply
  * tell the automounter it can try to unmount the filesystem every time

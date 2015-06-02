@@ -22,10 +22,11 @@
 #
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright 2015 Joyent, Inc.
 #
 
 #
-#	This makefile drives the production of the lxproc file system
+#	This makefile drives the production of the lxautofs file system
 #	kernel module.
 #
 #	i86 architecture dependent
@@ -39,11 +40,11 @@ UTSBASE	= ../..
 #
 #	Define the module and object file sets.
 #
-#	Note that the name of the actual filesystem is lx_afs and
+#	Note that the name of the actual filesystem is lxautofs and
 #	not lx_autofs.  This is becase filesystem names are stupidly
 #	limited to 8 characters.
 #
-MODULE		= lx_afs
+MODULE		= lxautofs
 OBJECTS		= $(LX_AUTOFS_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(LX_AUTOFS_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(USR_FS_DIR)/$(MODULE)
@@ -105,4 +106,4 @@ include $(UTSBASE)/intel/Makefile.targ
 #	Include brand-specific rules
 #
 
-include $(UTSBASE)/intel/lx_afs/Makefile.rules
+include $(UTSBASE)/intel/lxautofs/Makefile.rules

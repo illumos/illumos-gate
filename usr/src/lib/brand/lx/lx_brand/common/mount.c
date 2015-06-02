@@ -757,7 +757,7 @@ lx_mount(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 
 	} else if (strcmp(fstype, "autofs") == 0) {
 
-		/* Translate autofs mount requests to lx_afs requests. */
+		/* Translate autofs mount requests to lxautofs requests. */
 		(void) strcpy(fstype, LX_AUTOFS_NAME);
 
 		/* Copy in Linux mount options. */
