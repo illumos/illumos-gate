@@ -27,7 +27,7 @@
  * lxinit performs zone-specific initialization prior to handing control to the
  * guest Linux init.  This primarily consists of:
  *
- * - Starting ipmgmtd chrooted into /native
+ * - Starting ipmgmtd
  * - Configuring network interfaces
  * - Adding a default route
  */
@@ -64,8 +64,7 @@
 static void lxi_err(char *msg, ...) __NORETURN;
 static void lxi_err(char *msg, ...);
 
-#define	CHROOT_NAME	"lx_init-chroot"
-#define	CHROOT_PREFIX	"/native"
+#define	IPMGMTD_PATH	"/lib/inet/ipmgmtd"
 
 #define	PREFIX_LOG_WARN	"lx_init warn: "
 #define	PREFIX_LOG_ERR	"lx_init err: "
@@ -199,13 +198,11 @@ lxi_net_ipmgmtd_start()
 {
 	pid_t pid;
 	int status;
-	char *cmd[] = {
-		"/lib/inet/ipmgmtd",
+	char *const argv[] = {
 		"ipmgmtd",
 		NULL
 	};
-	char *env[] = {
-		/* ipmgmtd thinks SMF is awesome */
+	char *const envp[] = {
 		"SMF_FMRI=svc:/network/ip-interface-management:default",
 		NULL
 	};
@@ -217,10 +214,19 @@ lxi_net_ipmgmtd_start()
 
 	if (pid == 0) {
 		/* child */
-		execve(cmd[0], cmd + 1, env);
+		const char *zroot = zone_get_nroot();
+		char cmd[MAXPATHLEN];
 
-		lxi_err("execve(%s) failed: %s", cmd[0],
-		    strerror(errno));
+		/*
+		 * Construct the full path to ipmgmtd, including the native
+		 * system root (e.g. "/native") if in use for this zone:
+		 */
+		(void) snprintf(cmd, sizeof (cmd), "%s%s", zroot != NULL ?
+		    zroot : "", IPMGMTD_PATH);
+
+		execve(cmd, argv, envp);
+
+		lxi_err("execve(%s) failed: %s", cmd, strerror(errno));
 		/* NOTREACHED */
 	}
 
@@ -467,8 +473,10 @@ lxi_config_close(zone_dochandle_t handle)
 static void
 lxi_init_exec()
 {
-	char *cmd[] = {"/sbin/init", "init", NULL};
-	char *env[] = {"container=zone", NULL};
+	const char *cmd = "/sbin/init";
+	char *const argv[] = { "init", NULL };
+	char *const envp[] = { "container=zone", NULL };
+	int e;
 
 	/*
 	 * systemd uses the 'container' env var to determine it is running
@@ -476,74 +484,39 @@ lxi_init_exec()
 	 * treats anything else as 'other' but this is enough to make it
 	 * behave better inside a zone. See 'detect_container' in systemd.
 	 */
-	execve(cmd[0], cmd + 1, env);
+	execve(cmd, argv, envp);
+	e = errno;
 
 	/*
 	 * Because stdout was closed prior to exec, it must be opened again in
 	 * the face of failure to log the error.
 	 */
 	lxi_log_open();
-	lxi_err("exec(%s) failed: %s", cmd[0], strerror(errno));
+	lxi_err("execve(%s) failed: %s", cmd, strerror(e));
 }
 
+/*ARGSUSED*/
 int
 main(int argc, char *argv[])
 {
 	zone_dochandle_t handle;
-	pid_t pid;
-	int status = 0;
-
-	if (strcmp(argv[0], CHROOT_NAME) == 0) {
-		/* we've been forked/chrooted, run setup */
-		lxi_net_ipmgmtd_start();
-		lxi_net_ipadm_open();
-
-		handle = lxi_config_open();
-		lxi_net_loopback();
-		lxi_net_setup(handle);
-		lxi_config_close(handle);
-
-		lxi_net_ipadm_close();
-		/* failures will bail before now */
-		exit(0);
-	}
 
 	lxi_log_open();
 
-	/* The config stuff needs to be chrooted to /native */
-	pid = fork();
-	if (pid < 0) {
-		lxi_err("fork() failed: %s"), strerror(errno);
-	} else if (pid == 0) {
-		const char *execname;
-		char *args[] = {
-			CHROOT_NAME, NULL
-		};
+	lxi_net_ipmgmtd_start();
+	lxi_net_ipadm_open();
 
-		if ((execname = getexecname()) == NULL) {
-			lxi_err("getexecname() failed: %s",
-			    strerror(errno));
-		}
-		execname += strlen(CHROOT_PREFIX);
+	handle = lxi_config_open();
+	lxi_net_loopback();
+	lxi_net_setup(handle);
+	lxi_config_close(handle);
 
-		if (chroot(CHROOT_PREFIX) != 0) {
-			lxi_err("chroot() failed: %s",
-			    strerror(errno));
-		}
-		execv(execname, args);
-		exit(1);
-	} else {
-		/* parent */
-		while (wait(&status) != pid) {
-			/* EMPTY */;
-		}
-		if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
-			lxi_err("configuration error %d", status);
-		}
-	}
+	lxi_net_ipadm_close();
 
 	lxi_log_close();
+
 	lxi_init_exec();
+
 	/* NOTREACHED */
 	return (0);
 }
