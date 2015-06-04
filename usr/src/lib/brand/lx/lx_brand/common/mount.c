@@ -85,8 +85,8 @@ mount_opt_t lx_sysfs_options[] = {
 };
 
 mount_opt_t lx_tmpfs_options[] = {
-	{ LX_MNTOPT_SIZE,	MOUNT_OPT_BYTESIZE },
-	{ LX_MNTOPT_MODE,	MOUNT_OPT_UINT },
+	{ "size",		MOUNT_OPT_BYTESIZE },
+	{ "mode",		MOUNT_OPT_UINT },
 	{ NULL,			MOUNT_OPT_INVALID }
 };
 
@@ -95,6 +95,8 @@ mount_opt_t lx_autofs_options[] = {
 	{ LX_MNTOPT_PGRP,	MOUNT_OPT_UINT },
 	{ LX_MNTOPT_MINPROTO,	MOUNT_OPT_UINT },
 	{ LX_MNTOPT_MAXPROTO,	MOUNT_OPT_UINT },
+	{ LX_MNTOPT_INDIRECT,	MOUNT_OPT_NORMAL },
+	{ LX_MNTOPT_DIRECT,	MOUNT_OPT_NORMAL },
 	{ NULL,			MOUNT_OPT_INVALID }
 };
 

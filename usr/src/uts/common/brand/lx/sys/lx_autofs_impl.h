@@ -22,12 +22,11 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2015 Joyent, Inc.
  */
 
 #ifndef	_LX_AUTOFS_IMPL_H
 #define	_LX_AUTOFS_IMPL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -70,6 +69,10 @@ typedef struct lx_autofs_vfs {
 	file_t		*lav_fifo_wr;
 	file_t		*lav_fifo_rd;
 
+	/* options from the mount */
+	boolean_t	lav_indirect;
+	int		lav_min_proto;
+
 	/* Each automount requests needs a unique id. */
 	id_space_t	*lav_ids;
 
@@ -90,7 +93,8 @@ typedef struct lx_autofs_vfs {
  */
 typedef struct lx_autofs_lookup_req {
 	/* Packet that gets sent to the automounter. */
-	lx_autofs_pkt_t	lalr_pkt;
+	union lx_autofs_pkt lalr_pkt;
+	int		lalr_pkt_size;
 
 	/* Reference count.  Always updated atomically. */
 	uint_t		lalr_ref;
