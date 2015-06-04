@@ -138,9 +138,9 @@ function check_test_result #init_mode node acl_flag acl_access a_type
 	typeset acl_access=$4
 	typeset acl_type=$5
 
-	typeset -3L u_bits=$init_mode
+	typeset -L3 u_bits=$init_mode
 	typeset g_bits=$(get_substr $init_mode 4 3)
-	typeset -3R o_bits=$init_mode
+	typeset -R3 o_bits=$init_mode
 
 	if [[ $acl_flag == "owner" || $acl_flag == "everyone" ]]; then
 		u_bits=$(cal_bits $u_bits $acl_access $acl_type)
@@ -156,7 +156,7 @@ function check_test_result #init_mode node acl_flag acl_access a_type
 	cur_mode=$(get_substr $cur_mode 2 9)
 
 	if [[ $cur_mode == $u_bits$g_bits$o_bits ]]; then
-		log_note "SUCCESS: Current map($cur_mode) ==" \
+		log_note "SUCCESS: Current map($cur_mode) == " \
 			"expected map($u_bits$g_bits$o_bits)"
 	else
 		log_fail "FAIL: Current map($cur_mode) != " \
@@ -171,7 +171,7 @@ function test_chmod_map #<node>
 	typeset -i cnt
 
 	if (( ${#node} == 0 )); then
-		log_fail "FAIL: file name or directroy name is not defined."
+		log_fail "FAIL: file name or directory name is not defined."
 	fi
 
 	# Get the initial map
@@ -209,8 +209,8 @@ function test_chmod_map #<node>
 		log_must usr_exec eval "$LS -vd $node > $cur_ace"
 
 		if $DIFF $orig_ace $cur_ace; then
-			log_note "SUCCESS: original ACEs equivalence the " \
-				"current ACEs. 'chmod A-' succeeded."
+			log_note "SUCCESS: current ACEs are equal to " \
+				"original ACEs. 'chmod A-' succeeded."
 		else
 			log_fail "FAIL: 'chmod A-' failed."
 		fi
@@ -238,4 +238,4 @@ for user in root $ZFS_ACL_STAFF1; do
 done
 
 log_pass "chmod A{+|-|=} read_data|write_data|execute for owner@, group@ " \
-	"oreveryone@ correctly alters mode bits passed."
+	"or everyone@ correctly alters mode bits passed."
