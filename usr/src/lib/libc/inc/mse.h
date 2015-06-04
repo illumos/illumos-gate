@@ -86,9 +86,9 @@ extern void	_setorientation(FILE *, _IOP_orientation_t);
  * From page 32 of XSH5
  * Once a wide-character I/O function has been applied
  * to a stream without orientation, the stream becomes
- * wide-orientated.  Similarly, once a byte I/O function
+ * wide-oriented.  Similarly, once a byte I/O function
  * has been applied to a stream without orientation,
- * the stream becomes byte-orientated.  Only a call to
+ * the stream becomes byte-oriented.  Only a call to
  * the freopen() function or the fwide() function can
  * otherwise alter the orientation of a stream.
  */
