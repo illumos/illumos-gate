@@ -2795,6 +2795,13 @@ cpuid_pass4(cpu_t *cpu, uint_t *hwcap_out)
 			hwcap_flags_2 |= AV_386_2_RDRAND;
 	}
 
+	/* Detect systems with a potential CPUID limit  */
+	if (cpi->cpi_vendor == X86_VENDOR_Intel && cpi->cpi_maxeax < 4) {
+		cmn_err(CE_NOTE, "CPUID limit detected, "
+		    "see the CPUID(7D) man page for details\n");
+	}
+
+
 	if (cpi->cpi_xmaxeax < 0x80000001)
 		goto pass4_done;
 
