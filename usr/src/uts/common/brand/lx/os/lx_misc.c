@@ -146,7 +146,7 @@ lx_cleanlwp(klwp_t *lwp, proc_t *p)
 	VERIFY(lwpd != NULL);
 
 	mutex_enter(&p->p_lock);
-	if ((lwpd->br_ptrace_flags & LX_PTRACE_EXITING) == 0) {
+	if ((lwpd->br_ptrace_flags & LX_PTF_EXITING) == 0) {
 		lx_ptrace_exit(p, lwp);
 	}
 

@@ -111,7 +111,7 @@
  * accord structure is not released from that LWP until it arrives in
  * lx_exitlwp(), as called by lwp_exit().  A new accord will not be
  * allocated, even if one does not exist, once an LWP arrives in lx_exitlwp()
- * and sets the LX_PTRACE_EXITING flag.  An LWP will have at most one accord
+ * and sets the LX_PTF_EXITING flag.  An LWP will have at most one accord
  * structure throughout its entire lifecycle; once it has one, it has the
  * same one until death.
  *
@@ -141,10 +141,10 @@
  *
  * The ptrace(2) interface enables the tracer to hold the tracee on entry and
  * exit from system calls.  When a stopped tracee is restarted through the
- * PTRACE_SYSCALL request, the LX_PTRACE_SYSCALL flag is set until the next
+ * PTRACE_SYSCALL request, the LX_PTF_SYSCALL flag is set until the next
  * system call boundary.  Whether this is a "syscall-entry-stop" or
  * "syscall-exit-stop", the tracee is held and the tracer is notified via
- * SIGCLD/waitpid(2) in the usual way.  The flag LX_PTRACE_SYSCALL flag is
+ * SIGCLD/waitpid(2) in the usual way.  The flag LX_PTF_SYSCALL flag is
  * cleared after each stop; for ongoing system call tracing the tracee must
  * be continuously restarted with PTRACE_SYSCALL.
  *
@@ -180,10 +180,10 @@
  * It is NOT legal to take a tracee p_lock and then attempt to enter the
  * accord mutex (or tracee list mutex) of its tracer.  When running as the
  * tracee LWP, the tracee's hold will prevent the accord from being freed.
- * Use of the LX_PTRACE_STOPPING or LX_PTRACE_CLONING flag in the
- * LWP-specific brand data prevents an exiting tracer from altering the
- * tracee until the tracee has come to an orderly stop, without requiring the
- * tracee to hold its own p_lock the entire time it is stopping.
+ * Use of the LX_PTF_STOPPING or LX_PTF_CLONING flag in the LWP-specific brand
+ * data prevents an exiting tracer from altering the tracee until the tracee
+ * has come to an orderly stop, without requiring the tracee to hold its own
+ * p_lock the entire time it is stopping.
  *
  * It is not safe, in general, to enter "pidlock" while holding the p_lock of
  * any process.  It is similarly illegal to hold any accord locks (lxpa_lock
@@ -221,9 +221,9 @@ typedef enum lx_ptrace_cont_flags_t {
  * Macros for checking the state of an LWP via "br_ptrace_flags":
  */
 #define	LX_PTRACE_BUSY \
-	(LX_PTRACE_EXITING | LX_PTRACE_STOPPING | LX_PTRACE_CLONING)
+	(LX_PTF_EXITING | LX_PTF_STOPPING | LX_PTF_CLONING)
 
-#define	VISIBLE(a)	(((a)->br_ptrace_flags & LX_PTRACE_EXITING) == 0)
+#define	VISIBLE(a)	(((a)->br_ptrace_flags & LX_PTF_EXITING) == 0)
 #define	TRACEE_BUSY(a)	(((a)->br_ptrace_flags & LX_PTRACE_BUSY) != 0)
 
 #define	ACCORD_HELD(a)	MUTEX_HELD(&(a)->lxpa_lock)
@@ -484,8 +484,7 @@ lx_ptrace_restart_lwp(klwp_t *lwp)
 		 */
 		rlwpd->br_ptrace_whystop = 0;
 		rlwpd->br_ptrace_whatstop = 0;
-		rlwpd->br_ptrace_flags &= ~(LX_PTRACE_CLDPEND |
-		    LX_PTRACE_WAITPEND);
+		rlwpd->br_ptrace_flags &= ~(LX_PTF_CLDPEND | LX_PTF_WAITPEND);
 	}
 	thread_unlock(rt);
 }
@@ -550,10 +549,8 @@ lx_winfo(lx_lwp_data_t *remote, k_siginfo_t *ip, boolean_t waitflag,
 	 * If WNOWAIT was specified, do not mark the event as posted
 	 * so that it may be re-fetched on another call to waitid().
 	 */
-	if (waitflag) {
-		remote->br_ptrace_flags &= ~(LX_PTRACE_CLDPEND |
-		    LX_PTRACE_WAITPEND);
-	}
+	if (waitflag)
+		remote->br_ptrace_flags &= ~(LX_PTF_CLDPEND | LX_PTF_WAITPEND);
 }
 
 /*
@@ -594,12 +591,12 @@ lx_stop_notify(proc_t *p, klwp_t *lwp, ushort_t why, ushort_t what)
 	 * PR_BRAND stops.
 	 */
 	VERIFY(MUTEX_HELD(&p->p_lock));
-	VERIFY(lwpd->br_ptrace_flags & LX_PTRACE_STOPPING);
+	VERIFY(lwpd->br_ptrace_flags & LX_PTF_STOPPING);
 	VERIFY((accord = lwpd->br_ptrace_tracer) != NULL);
 
 	/*
 	 * We must drop our process lock to take "pidlock".  The
-	 * LX_PTRACE_STOPPING flag protects us from an exiting tracer.
+	 * LX_PTF_STOPPING flag protects us from an exiting tracer.
 	 */
 	mutex_exit(&p->p_lock);
 
@@ -626,7 +623,7 @@ lx_stop_notify(proc_t *p, klwp_t *lwp, ushort_t why, ushort_t what)
 
 	/*
 	 * Our tracer should not have been modified in our absence; the
-	 * LX_PTRACE_STOPPING flag prevents it.
+	 * LX_PTF_STOPPING flag prevents it.
 	 */
 	VERIFY(lwpd->br_ptrace_tracer == accord);
 
@@ -636,13 +633,13 @@ lx_stop_notify(proc_t *p, klwp_t *lwp, ushort_t why, ushort_t what)
 	 */
 	lwpd->br_ptrace_whystop = why;
 	lwpd->br_ptrace_whatstop = what;
-	lwpd->br_ptrace_flags |= LX_PTRACE_WAITPEND;
+	lwpd->br_ptrace_flags |= LX_PTF_WAITPEND;
 
 	/*
 	 * If this event does not depend on an event from the parent LWP,
 	 * populate the siginfo_t for the event pending on this tracee LWP.
 	 */
-	if (!(lwpd->br_ptrace_flags & LX_PTRACE_PARENT_WAIT) && pp != NULL) {
+	if (!(lwpd->br_ptrace_flags & LX_PTF_PARENT_WAIT) && pp != NULL) {
 		cldpost = B_TRUE;
 		lx_winfo(lwpd, &sqp->sq_info, B_FALSE, NULL, NULL);
 	}
@@ -675,18 +672,18 @@ lx_stop_notify(proc_t *p, klwp_t *lwp, ushort_t why, ushort_t what)
 	 * We clear the STOPPING flag; stop() continues to hold our p_lock
 	 * until our thread stop state is visible.
 	 */
-	lwpd->br_ptrace_flags &= ~LX_PTRACE_STOPPING;
-	lwpd->br_ptrace_flags |= LX_PTRACE_STOPPED;
+	lwpd->br_ptrace_flags &= ~LX_PTF_STOPPING;
+	lwpd->br_ptrace_flags |= LX_PTF_STOPPED;
 	if (cldpend) {
 		/*
 		 * We sent the SIGCLD for this new wait condition already.
 		 */
-		lwpd->br_ptrace_flags |= LX_PTRACE_CLDPEND;
+		lwpd->br_ptrace_flags |= LX_PTF_CLDPEND;
 	}
 
 	/*
 	 * If lx_ptrace_exit_tracer() is trying to detach our tracer, it will
-	 * be sleeping on this CV until LX_PTRACE_STOPPING is clear.  Wake it
+	 * be sleeping on this CV until LX_PTF_STOPPING is clear.  Wake it
 	 * now.
 	 */
 	cv_broadcast(&lx_ptrace_busy_cv);
@@ -751,7 +748,7 @@ lx_ptrace_lock_if_stopped(lx_ptrace_accord_t *accord, lx_lwp_data_t *remote)
 	 */
 	VERIFY(remote->br_ptrace_tracer == accord);
 
-	if (!(remote->br_ptrace_flags & LX_PTRACE_STOPPED)) {
+	if (!(remote->br_ptrace_flags & LX_PTF_STOPPED)) {
 		/*
 		 * The tracee is not in "ptrace-stop", so we release the
 		 * process.
@@ -904,9 +901,9 @@ lx_ptrace_cont(lx_lwp_data_t *remote, lx_ptrace_cont_flags_t flags, int signo)
 	 * Handle the syscall-stop flag if this is a PTRACE_SYSCALL restart:
 	 */
 	if (flags & LX_PTC_SYSCALL) {
-		remote->br_ptrace_flags |= LX_PTRACE_SYSCALL;
+		remote->br_ptrace_flags |= LX_PTF_SYSCALL;
 	} else {
-		remote->br_ptrace_flags &= ~LX_PTRACE_SYSCALL;
+		remote->br_ptrace_flags &= ~LX_PTF_SYSCALL;
 	}
 
 	lx_ptrace_restart_lwp(lwp);
@@ -937,7 +934,7 @@ lx_ptrace_detach(lx_ptrace_accord_t *accord, lx_lwp_data_t *remote, int signo,
 	 * Detach the LWP from the accord and set it running.
 	 */
 	VERIFY(!TRACEE_BUSY(remote));
-	remote->br_ptrace_flags &= ~(LX_PTRACE_SYSCALL | LX_PTRACE_INHERIT);
+	remote->br_ptrace_flags &= ~(LX_PTF_SYSCALL | LX_PTF_INHERIT);
 	VERIFY(list_link_active(&remote->br_ptrace_linkage));
 	list_remove(&accord->lxpa_tracees, remote);
 
@@ -1002,7 +999,7 @@ lx_ptrace_attach(pid_t lx_pid)
 	 * routine should not fail because the LWP cannot make ptrace(2) system
 	 * calls after it has begun exiting.
 	 */
-	VERIFY0(lwpd->br_ptrace_flags & LX_PTRACE_EXITING);
+	VERIFY0(lwpd->br_ptrace_flags & LX_PTF_EXITING);
 	VERIFY(lx_ptrace_accord_get(&accord, B_TRUE) == 0);
 
 	/*
@@ -1061,7 +1058,7 @@ lx_ptrace_attach(pid_t lx_pid)
 		/*
 		 * Bond the tracee to the accord.
 		 */
-		VERIFY0(rlwpd->br_ptrace_flags & LX_PTRACE_EXITING);
+		VERIFY0(rlwpd->br_ptrace_flags & LX_PTF_EXITING);
 		VERIFY(rlwpd->br_ptrace_attach == LX_PTA_NONE);
 		rlwpd->br_ptrace_attach = LX_PTA_ATTACH;
 		rlwpd->br_ptrace_tracer = accord;
@@ -1131,9 +1128,9 @@ lx_ptrace_set_clone_inherit(int option, boolean_t inherit_flag)
 	}
 
 	if (inherit_flag) {
-		lwpd->br_ptrace_flags |= LX_PTRACE_INHERIT;
+		lwpd->br_ptrace_flags |= LX_PTF_INHERIT;
 	} else {
-		lwpd->br_ptrace_flags &= ~LX_PTRACE_INHERIT;
+		lwpd->br_ptrace_flags &= ~LX_PTF_INHERIT;
 	}
 
 	mutex_exit(&p->p_lock);
@@ -1187,11 +1184,11 @@ lx_ptrace_inherit_tracer(lx_lwp_data_t *src, lx_lwp_data_t *dst)
 		 */
 		dst->br_ptrace_attach |= LX_PTA_INHERIT_OPTIONS;
 
-	} else if ((src->br_ptrace_flags & LX_PTRACE_INHERIT) != 0) {
+	} else if ((src->br_ptrace_flags & LX_PTF_INHERIT) != 0) {
 		/*
 		 * Condition 2:
 		 * If the caller opted in to inheritance with the
-		 * PTRACE_CLONE flag to clone(2), the LX_PTRACE_INHERIT flag
+		 * PTRACE_CLONE flag to clone(2), the LX_PTF_INHERIT flag
 		 * will be set and we inherit.
 		 */
 		dst->br_ptrace_attach |= LX_PTA_INHERIT_CLONE;
@@ -1201,7 +1198,7 @@ lx_ptrace_inherit_tracer(lx_lwp_data_t *src, lx_lwp_data_t *dst)
 	 * These values only apply for the duration of a single clone(2), et
 	 * al, system call.
 	 */
-	src->br_ptrace_flags &= ~LX_PTRACE_INHERIT;
+	src->br_ptrace_flags &= ~LX_PTF_INHERIT;
 	src->br_ptrace_clone_option = 0;
 
 	if (dst->br_ptrace_attach == LX_PTA_NONE) {
@@ -1212,10 +1209,10 @@ lx_ptrace_inherit_tracer(lx_lwp_data_t *src, lx_lwp_data_t *dst)
 	}
 
 	/*
-	 * Set the LX_PTRACE_CLONING flag to prevent us from being detached
+	 * Set the LX_PTF_CLONING flag to prevent us from being detached
 	 * while our p_lock is dropped.
 	 */
-	src->br_ptrace_flags |= LX_PTRACE_CLONING;
+	src->br_ptrace_flags |= LX_PTF_CLONING;
 	mutex_exit(&srcp->p_lock);
 
 	/*
@@ -1236,7 +1233,7 @@ lx_ptrace_inherit_tracer(lx_lwp_data_t *src, lx_lwp_data_t *dst)
 	 * until the parent is able to post the relevant ptrace event to
 	 * the tracer.
 	 */
-	dst->br_ptrace_flags |= LX_PTRACE_PARENT_WAIT;
+	dst->br_ptrace_flags |= LX_PTF_PARENT_WAIT;
 
 	mutex_enter(&accord->lxpa_tracees_lock);
 	VERIFY(list_link_active(&src->br_ptrace_linkage));
@@ -1248,11 +1245,11 @@ lx_ptrace_inherit_tracer(lx_lwp_data_t *src, lx_lwp_data_t *dst)
 	 * Relock our process and clear our busy flag.
 	 */
 	mutex_enter(&srcp->p_lock);
-	src->br_ptrace_flags &= ~LX_PTRACE_CLONING;
+	src->br_ptrace_flags &= ~LX_PTF_CLONING;
 
 	/*
 	 * If lx_ptrace_exit_tracer() is trying to detach our tracer, it will
-	 * be sleeping on this CV until LX_PTRACE_CLONING is clear.  Wake it
+	 * be sleeping on this CV until LX_PTF_CLONING is clear.  Wake it
 	 * now.
 	 */
 	cv_broadcast(&lx_ptrace_busy_cv);
@@ -1411,8 +1408,8 @@ lx_ptrace_stop_common(proc_t *p, lx_lwp_data_t *lwpd, ushort_t what)
 	/*
 	 * Mark this LWP as stopping and call stop() to enter "ptrace-stop".
 	 */
-	VERIFY0(lwpd->br_ptrace_flags & LX_PTRACE_STOPPING);
-	lwpd->br_ptrace_flags |= LX_PTRACE_STOPPING;
+	VERIFY0(lwpd->br_ptrace_flags & LX_PTF_STOPPING);
+	lwpd->br_ptrace_flags |= LX_PTF_STOPPING;
 
 	if (lwpd->br_lwp->lwp_nostop == 1 &&
 	    lwpd->br_ptrace_event == LX_PTRACE_EVENT_EXEC) {
@@ -1431,8 +1428,8 @@ lx_ptrace_stop_common(proc_t *p, lx_lwp_data_t *lwpd, ushort_t what)
 	/*
 	 * We are back from "ptrace-stop" with our process lock held.
 	 */
-	lwpd->br_ptrace_flags &= ~(LX_PTRACE_STOPPING | LX_PTRACE_STOPPED |
-	    LX_PTRACE_CLDPEND);
+	lwpd->br_ptrace_flags &= ~(LX_PTF_STOPPING | LX_PTF_STOPPED |
+	    LX_PTF_CLDPEND);
 	lwpd->br_ptrace_stopucp = NULL;
 	cv_broadcast(&lx_ptrace_busy_cv);
 	mutex_exit(&p->p_lock);
@@ -1462,7 +1459,7 @@ lx_ptrace_stop_for_option(int option, boolean_t child, ulong_t msg,
 		 * it is a "child" event.  This is not a child event, so we
 		 * clear the wait flag.
 		 */
-		lwpd->br_ptrace_flags &= ~LX_PTRACE_PARENT_WAIT;
+		lwpd->br_ptrace_flags &= ~LX_PTF_PARENT_WAIT;
 	}
 
 	if (!(lwpd->br_ptrace_options & option)) {
@@ -1567,7 +1564,7 @@ lx_ptrace_stop(ushort_t what)
 	 */
 	mutex_enter(&p->p_lock);
 	if (lwpd->br_ptrace_tracer == NULL) {
-		VERIFY0(lwpd->br_ptrace_flags & LX_PTRACE_SYSCALL);
+		VERIFY0(lwpd->br_ptrace_flags & LX_PTF_SYSCALL);
 		mutex_exit(&p->p_lock);
 		return (B_FALSE);
 	}
@@ -1576,7 +1573,7 @@ lx_ptrace_stop(ushort_t what)
 		/*
 		 * This is a syscall-entry-stop or syscall-exit-stop point.
 		 */
-		if (!(lwpd->br_ptrace_flags & LX_PTRACE_SYSCALL)) {
+		if (!(lwpd->br_ptrace_flags & LX_PTF_SYSCALL)) {
 			/*
 			 * A system call stop has not been requested.
 			 */
@@ -1590,7 +1587,7 @@ lx_ptrace_stop(ushort_t what)
 		 * PTRACE_SYSCALL while we are in ptrace-stop for us to fire
 		 * again at the next system call boundary.
 		 */
-		lwpd->br_ptrace_flags &= ~LX_PTRACE_SYSCALL;
+		lwpd->br_ptrace_flags &= ~LX_PTF_SYSCALL;
 	}
 
 	/*
@@ -1887,8 +1884,8 @@ lx_ptrace_exit(proc_t *p, klwp_t *lwp)
 	 * prevent a new accord from being allocated if one does not exist
 	 * already, and will make us invisible to PTRACE_ATTACH/PTRACE_TRACEME.
 	 */
-	VERIFY0(lwpd->br_ptrace_flags & LX_PTRACE_EXITING);
-	lwpd->br_ptrace_flags |= LX_PTRACE_EXITING;
+	VERIFY0(lwpd->br_ptrace_flags & LX_PTF_EXITING);
+	lwpd->br_ptrace_flags |= LX_PTF_EXITING;
 
 	if ((accord = lwpd->br_ptrace_tracer) != NULL) {
 		/*
@@ -1954,7 +1951,7 @@ lx_sigcld_repost(proc_t *pp, sigqueue_t *sqp)
 			continue;
 		}
 
-		if (remote->br_ptrace_flags & LX_PTRACE_PARENT_WAIT) {
+		if (remote->br_ptrace_flags & LX_PTF_PARENT_WAIT) {
 			/*
 			 * This event depends on waitid() clearing out the
 			 * event of another LWP.  Skip it for now.
@@ -1963,7 +1960,7 @@ lx_sigcld_repost(proc_t *pp, sigqueue_t *sqp)
 			continue;
 		}
 
-		if (!(remote->br_ptrace_flags & LX_PTRACE_CLDPEND)) {
+		if (!(remote->br_ptrace_flags & LX_PTF_CLDPEND)) {
 			/*
 			 * No SIGCLD is required for this LWP.
 			 */
@@ -1971,7 +1968,7 @@ lx_sigcld_repost(proc_t *pp, sigqueue_t *sqp)
 			continue;
 		}
 
-		if (!(remote->br_ptrace_flags & LX_PTRACE_WAITPEND) ||
+		if (!(remote->br_ptrace_flags & LX_PTF_WAITPEND) ||
 		    remote->br_ptrace_whystop == 0 ||
 		    remote->br_ptrace_whatstop == 0) {
 			/*
@@ -1998,7 +1995,7 @@ lx_sigcld_repost(proc_t *pp, sigqueue_t *sqp)
 	 * Generate siginfo for this tracee LWP.
 	 */
 	lx_winfo(remote, &sqp->sq_info, B_FALSE, NULL, NULL);
-	remote->br_ptrace_flags &= ~LX_PTRACE_CLDPEND;
+	remote->br_ptrace_flags &= ~LX_PTF_CLDPEND;
 	mutex_exit(&rproc->p_lock);
 
 	mutex_enter(&pp->p_lock);
@@ -2006,7 +2003,7 @@ lx_sigcld_repost(proc_t *pp, sigqueue_t *sqp)
 		mutex_exit(&pp->p_lock);
 
 		mutex_enter(&rproc->p_lock);
-		remote->br_ptrace_flags |= LX_PTRACE_CLDPEND;
+		remote->br_ptrace_flags |= LX_PTF_CLDPEND;
 		mutex_exit(&rproc->p_lock);
 
 		return (-1);
@@ -2097,29 +2094,21 @@ lx_waitid_helper(idtype_t idtype, id_t id, k_siginfo_t *ip, int options,
 		rproc = lwptoproc(rlwp);
 
 		/*
-		 * If the __WALL option was passed, we unconditionally consider
-		 * every possible child.
+		 * We check to see if this LWP matches an id we are waiting for.
 		 */
-		if (!(local->br_waitid_flags & LX_WALL)) {
-			/*
-			 * Otherwise, we check to see if this LWP matches an
-			 * id we are waiting for.
-			 */
-			switch (idtype) {
-			case P_ALL:
-				break;
-			case P_PID:
-				if (remote->br_pid != id)
-					continue;
-				break;
-			case P_PGID:
-				if (rproc->p_pgrp != id)
-					continue;
-				break;
-			default:
-				cmn_err(CE_PANIC, "unexpected idtype: %d",
-				    idtype);
-			}
+		switch (idtype) {
+		case P_ALL:
+			break;
+		case P_PID:
+			if (remote->br_pid != id)
+				continue;
+			break;
+		case P_PGID:
+			if (rproc->p_pgrp != id)
+				continue;
+			break;
+		default:
+			cmn_err(CE_PANIC, "unexpected idtype: %d", idtype);
 		}
 
 		/*
@@ -2130,7 +2119,7 @@ lx_waitid_helper(idtype_t idtype, id_t id, k_siginfo_t *ip, int options,
 			continue;
 		}
 
-		if (remote->br_ptrace_flags & LX_PTRACE_PARENT_WAIT) {
+		if (remote->br_ptrace_flags & LX_PTF_PARENT_WAIT) {
 			/*
 			 * This event depends on waitid() clearing out the
 			 * event of another LWP.  Skip it for now.
@@ -2139,7 +2128,7 @@ lx_waitid_helper(idtype_t idtype, id_t id, k_siginfo_t *ip, int options,
 			continue;
 		}
 
-		if (!(remote->br_ptrace_flags & LX_PTRACE_WAITPEND) ||
+		if (!(remote->br_ptrace_flags & LX_PTF_WAITPEND) ||
 		    remote->br_ptrace_whystop == 0 ||
 		    remote->br_ptrace_whatstop == 0) {
 			/*
@@ -2161,10 +2150,13 @@ lx_waitid_helper(idtype_t idtype, id_t id, k_siginfo_t *ip, int options,
 	if (!found) {
 		/*
 		 * There were no events of interest, but we have tracees.
-		 * Signal to waitid() that it should block if the provided
-		 * flags allow for it.
+		 * If specific tracee critera were not specified, signal to
+		 * waitid() that it should block if the provided flags allow
+		 * for it.
 		 */
-		*brand_wants_wait = B_TRUE;
+		if (idtype == P_ALL)
+			*brand_wants_wait = B_TRUE;
+
 		return (-1);
 	}
 
@@ -2198,7 +2190,7 @@ lx_waitid_helper(idtype_t idtype, id_t id, k_siginfo_t *ip, int options,
 				continue;
 			}
 
-			remote->br_ptrace_flags &= ~LX_PTRACE_PARENT_WAIT;
+			remote->br_ptrace_flags &= ~LX_PTF_PARENT_WAIT;
 
 			mutex_exit(&rproc->p_lock);
 		}
@@ -2254,7 +2246,7 @@ lx_ptrace_kernel(int ptrace_op, pid_t lxpid, uintptr_t addr, uintptr_t data)
 	 * should not fail because the LWP cannot make ptrace(2) system calls
 	 * after it has begun exiting.
 	 */
-	VERIFY0(local->br_ptrace_flags & LX_PTRACE_EXITING);
+	VERIFY0(local->br_ptrace_flags & LX_PTF_EXITING);
 	VERIFY(lx_ptrace_accord_get(&accord, B_TRUE) == 0);
 
 	/*
