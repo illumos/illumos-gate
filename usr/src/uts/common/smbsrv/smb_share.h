@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _SMB_SHARE_H
@@ -33,7 +34,7 @@
 #include <smbsrv/wintypes.h>
 #include <smb/lmerr.h>
 
-#ifndef _KERNEL
+#if !defined(_KERNEL) && !defined(_FAKE_KERNEL)
 #include <libshare.h>
 #endif
 
@@ -228,7 +229,7 @@ typedef struct smb_shr_execinfo {
  * will return -1.
  */
 
-#ifndef _KERNEL
+#if !defined(_KERNEL) && !defined(_FAKE_KERNEL)
 
 /*
  * CIFS share management functions exported by libmlsvc
@@ -271,7 +272,7 @@ uint32_t smb_share_rename(char *, char *);
 uint32_t smb_share_create(smb_share_t *);
 uint32_t smb_share_modify(smb_share_t *);
 
-#endif
+#endif	/* _KERNEL */
 
 #ifdef __cplusplus
 }

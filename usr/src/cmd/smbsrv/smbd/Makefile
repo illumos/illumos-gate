@@ -20,21 +20,24 @@
 #
 #
 # Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
 #
 
 
 PROG=	smbd
-SRCS=				\
-	smbd_doorsvc.c		\
-	smbd_join.c		\
-	smbd_logon.c		\
-	smbd_main.c		\
-	smbd_nicmon.c		\
-	smbd_opipe_doorsvc.c	\
-	smbd_share_doorsvc.c	\
-	smbd_spool.c		\
-	smbd_vss.c
+OBJS=				\
+	smbd_doorsvc.o		\
+	smbd_join.o		\
+	smbd_logon.o		\
+	smbd_main.o		\
+	smbd_nicmon.o		\
+	smbd_opipe_doorsvc.o	\
+	smbd_share_doorsvc.o	\
+	smbd_spool.o		\
+	smbd_syslog.o		\
+	smbd_vss.o
+
+SRCS=	$(OBJS:%.o=%.c)
 
 include ../../Makefile.cmd
 
@@ -50,7 +53,15 @@ $(ROOTMANIFEST):= FILEMODE = 0444
 $(ROOTSVCMETHOD):= FILEMODE = 0555
 $(ROOTVARSMBDLL):= FILEMODE = 0755
 
-include ../Makefile.smbsrv.defs
+LINTFLAGS += -xerroff=E_NAME_DEF_NOT_USED2
+
+CFLAGS += $(CCVERBOSE)
+CPPFLAGS += -D_REENTRANT
+CPPFLAGS += -Dsyslog=smb_syslog
+$(NOT_RELEASE_BUILD)CPPFLAGS += -DDEBUG
+
+C99MODE =       -xc99=%all
+C99LMODE =      -Xc99=%all
 
 LDLIBS += -L$(ROOT)/usr/lib/smbsrv -lmlsvc -lmlrpc -lsmbns -lsmb \
 	-lzfs -lbsm -lsocket -lnsl -lscf -lumem -lcmdutils

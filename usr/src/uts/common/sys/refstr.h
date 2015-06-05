@@ -22,12 +22,12 @@
 /*
  * Copyright (c) 1999 by Sun Microsystems, Inc.
  * All rights reserved.
+ *
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _SYS_REFSTR_H
 #define	_SYS_REFSTR_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -40,7 +40,7 @@ extern "C" {
 
 typedef struct refstr refstr_t;
 
-#if	defined(_KERNEL)
+#if	defined(_KERNEL) || defined(_FAKE_KERNEL)
 
 refstr_t	*refstr_alloc(const char *);
 const char	*refstr_value(refstr_t *);

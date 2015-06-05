@@ -1045,8 +1045,8 @@ smb_vop_stream_lookup(
 	 */
 
 	solaris_stream_name = kmem_alloc(MAXNAMELEN, KM_SLEEP);
-	(void) sprintf(solaris_stream_name, "%s%s", SMB_STREAM_PREFIX,
-	    stream_name);
+	(void) snprintf(solaris_stream_name, MAXNAMELEN,
+	    "%s%s", SMB_STREAM_PREFIX, stream_name);
 
 	/*
 	 * "name" will hold the on-disk name returned from smb_vop_lookup
@@ -1085,8 +1085,8 @@ smb_vop_stream_create(vnode_t *fvp, char *stream_name, smb_attr_t *attr,
 	 */
 
 	solaris_stream_name = kmem_alloc(MAXNAMELEN, KM_SLEEP);
-	(void) sprintf(solaris_stream_name, "%s%s", SMB_STREAM_PREFIX,
-	    stream_name);
+	(void) snprintf(solaris_stream_name, MAXNAMELEN,
+	    "%s%s", SMB_STREAM_PREFIX, stream_name);
 
 	if ((error = smb_vop_create(*xattrdirvpp, solaris_stream_name, attr,
 	    vpp, flags, cr, NULL)) != 0)
@@ -1113,8 +1113,8 @@ smb_vop_stream_remove(vnode_t *vp, char *stream_name, int flags, cred_t *cr)
 	 */
 
 	solaris_stream_name = kmem_alloc(MAXNAMELEN, KM_SLEEP);
-	(void) sprintf(solaris_stream_name, "%s%s", SMB_STREAM_PREFIX,
-	    stream_name);
+	(void) snprintf(solaris_stream_name, MAXNAMELEN,
+	    "%s%s", SMB_STREAM_PREFIX, stream_name);
 
 	/* XXX might have to use kcred */
 	error = smb_vop_remove(xattrdirvp, solaris_stream_name, flags, cr);

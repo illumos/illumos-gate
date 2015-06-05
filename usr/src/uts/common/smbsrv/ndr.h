@@ -21,6 +21,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _SMBSRV_NDR_H
@@ -38,7 +40,9 @@
  * ogspecs@opengroup.org
  */
 
-#ifndef _KERNEL
+#if defined(_KERNEL) || defined(_FAKE_KERNEL)
+#error "not used in kernel code"
+#else /* _KERNEL */
 #include <sys/types.h>
 #include <sys/uio.h>
 #include <syslog.h>
@@ -47,7 +51,7 @@
 #include <smbsrv/wintypes.h>
 #include <smbsrv/ndl/rpcpdu.ndl>
 #include <smbsrv/string.h>
-#endif
+#endif	/* _KERNEL */
 
 #ifdef __cplusplus
 extern "C" {

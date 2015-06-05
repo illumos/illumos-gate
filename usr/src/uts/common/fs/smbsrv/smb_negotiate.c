@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -186,8 +186,6 @@
  * ERRSRV/ERRerror
  */
 #include <sys/types.h>
-#include <sys/strsubr.h>
-#include <sys/socketvar.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <smbsrv/smb_kproto.h>

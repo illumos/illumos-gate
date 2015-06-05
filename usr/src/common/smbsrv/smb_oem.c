@@ -19,16 +19,17 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
  * Support for oem <-> unicode translations.
  */
 
-#ifndef _KERNEL
+#if !defined(_KERNEL) && !defined(_FAKE_KERNEL)
 #include <stdlib.h>
 #include <thread.h>
 #include <synch.h>
@@ -307,7 +308,7 @@ oem_get_ucspage(uint32_t cpid)
 static void
 oem_codepage_init(uint32_t cpid)
 {
-#ifndef _KERNEL
+#if !defined(_KERNEL) && !defined(_FAKE_KERNEL)
 	static mutex_t mutex;
 
 	(void) mutex_lock(&mutex);

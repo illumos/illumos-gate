@@ -255,6 +255,7 @@ SUBDIRS += \
 	libvrrpadm	\
 	libvscan	\
 	libgrubmgmt	\
+	libfakekernel	\
 	smbsrv		\
 	libilb		\
 	scsi		\
@@ -402,6 +403,7 @@ HDRSUBDIRS=		\
 	libdtrace_jni	\
 	libelfsign	\
 	libeti		\
+	libfakekernel	\
 	libfru		\
 	libfstyp	\
 	libgen		\
@@ -649,7 +651,7 @@ libexacct/demo:	libexacct libproject libsocket libnsl
 libtsalarm:	libpcp
 smbsrv:		libsocket libnsl libmd libxnet libpthread librt \
 		libshare libidmap pkcs11 libsqlite libcryptoutil \
-		libreparse libcmdutils
+		libreparse libcmdutils libfakekernel
 libv12n:	libds libuuid
 libvrrpadm:	libsocket libdladm libscf
 libvscan:	libscf

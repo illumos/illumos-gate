@@ -29,6 +29,7 @@
 
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/atomic.h>
 #include <strings.h>
 #include <syslog.h>
 #include <signal.h>
@@ -115,7 +116,7 @@ smbd_spool_start(void)
 	(void) pthread_attr_destroy(&attr);
 
 	if (rc != 0)
-		smb_log(smbd.s_loghd, LOG_NOTICE,
+		syslog(LOG_NOTICE,
 		    "failed to start print monitor: %s", strerror(errno));
 }
 
@@ -201,12 +202,12 @@ smbd_spool_copyfile(smb_inaddr_t *ipaddr, char *username, char *path,
 	char		uri[HTTP_MAX_URI];	/* printer-uri attribute */
 	char		new_jobname[SMBD_PJOBLEN];
 	smbd_printjob_t	pjob;
-	char 		clientname[INET6_ADDRSTRLEN];
+	char		clientname[INET6_ADDRSTRLEN];
 	struct stat 	sbuf;
 	int		rc = 1;
 
 	if (stat(path, &sbuf)) {
-		smb_log(smbd.s_loghd, LOG_INFO, "smbd_spool_copyfile: %s: %s",
+		syslog(LOG_INFO, "smbd_spool_copyfile: %s: %s",
 		    path, strerror(errno));
 		return;
 	}
@@ -217,7 +218,7 @@ smbd_spool_copyfile(smb_inaddr_t *ipaddr, char *username, char *path,
 	 */
 	if (sbuf.st_size == 0) {
 		if (remove(path) != 0)
-			smb_log(smbd.s_loghd, LOG_INFO,
+			syslog(LOG_INFO,
 			    "smbd_spool_copyfile: cannot remove %s: %s",
 			    path, strerror(errno));
 		return;
@@ -227,13 +228,13 @@ smbd_spool_copyfile(smb_inaddr_t *ipaddr, char *username, char *path,
 		return;
 
 	if ((http = cups->httpConnect("localhost", 631)) == NULL) {
-		smb_log(smbd.s_loghd, LOG_INFO,
+		syslog(LOG_INFO,
 		    "smbd_spool_copyfile: cupsd not running");
 		return;
 	}
 
 	if ((request = cups->ippNew()) == NULL) {
-		smb_log(smbd.s_loghd, LOG_INFO,
+		syslog(LOG_INFO,
 		    "smbd_spool_copyfile: ipp not running");
 		return;
 	}
@@ -272,7 +273,7 @@ smbd_spool_copyfile(smb_inaddr_t *ipaddr, char *username, char *path,
 
 	if (smb_inet_ntop(ipaddr, clientname,
 	    SMB_IPSTRLEN(ipaddr->a_family)) == NULL) {
-		smb_log(smbd.s_loghd, LOG_INFO,
+		syslog(LOG_INFO,
 		    "smbd_spool_copyfile: %s: unknown client", clientname);
 		goto out;
 	}
@@ -291,7 +292,7 @@ smbd_spool_copyfile(smb_inaddr_t *ipaddr, char *username, char *path,
 	    pjob.pj_filename);
 	if (response != NULL) {
 		if (response->request.status.status_code >= IPP_OK_CONFLICT) {
-			smb_log(smbd.s_loghd, LOG_ERR,
+			syslog(LOG_ERR,
 			    "smbd_spool_copyfile: printer %s: %s",
 			    SMBD_PRINTER,
 			    cups->ippErrorString(cups->cupsLastError()));
@@ -300,7 +301,7 @@ smbd_spool_copyfile(smb_inaddr_t *ipaddr, char *username, char *path,
 			rc = 0;
 		}
 	} else {
-		smb_log(smbd.s_loghd, LOG_ERR,
+		syslog(LOG_ERR,
 		    "smbd_spool_copyfile: unable to print to %s",
 		    cups->ippErrorString(cups->cupsLastError()));
 	}
@@ -331,7 +332,7 @@ smbd_cups_init(void)
 
 	if ((smb_cups.cups_hdl = dlopen("libcups.so.2", RTLD_NOW)) == NULL) {
 		(void) mutex_unlock(&smbd_cups_mutex);
-		smb_log(smbd.s_loghd, LOG_DEBUG,
+		syslog(LOG_DEBUG,
 		    "smbd_cups_init: cannot open libcups");
 		return (ENOENT);
 	}
@@ -380,7 +381,7 @@ smbd_cups_init(void)
 		(void) dlclose(smb_cups.cups_hdl);
 		smb_cups.cups_hdl = NULL;
 		(void) mutex_unlock(&smbd_cups_mutex);
-		smb_log(smbd.s_loghd, LOG_DEBUG,
+		syslog(LOG_DEBUG,
 		    "smbd_cups_init: cannot load libcups");
 		return (ENOENT);
 	}
@@ -427,7 +428,7 @@ smbd_load_printers(void)
 	(void) pthread_attr_destroy(&attr);
 
 	if (rc != 0)
-		smb_log(smbd.s_loghd, LOG_NOTICE,
+		syslog(LOG_NOTICE,
 		    "unable to load printer shares: %s", strerror(errno));
 }
 
@@ -453,7 +454,7 @@ smbd_share_printers(void *arg)
 		return (NULL);
 
 	if (smb_shr_get(SMB_SHARE_PRINT, &si) != NERR_Success) {
-		smb_log(smbd.s_loghd, LOG_DEBUG,
+		syslog(LOG_DEBUG,
 		    "smbd_share_printers unable to load %s", SMB_SHARE_PRINT);
 		return (NULL);
 	}
@@ -470,10 +471,10 @@ smbd_share_printers(void *arg)
 
 		nerr = smb_shr_add(&si);
 		if (nerr == NERR_Success || nerr == NERR_DuplicateShare)
-			smb_log(smbd.s_loghd, LOG_DEBUG,
+			syslog(LOG_DEBUG,
 			    "shared printer: %s", si.shr_name);
 		else
-			smb_log(smbd.s_loghd, LOG_DEBUG,
+			syslog(LOG_DEBUG,
 			    "smbd_share_printers: unable to add share %s: %u",
 			    si.shr_name, nerr);
 	}

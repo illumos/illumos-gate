@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  */
 
 /*
@@ -171,9 +171,9 @@
 
 static boolean_t smb_user_is_logged_in(smb_user_t *);
 static int smb_user_enum_private(smb_user_t *, smb_svcenum_t *);
-static void smb_user_setcred(smb_user_t *, cred_t *, uint32_t);
 static void smb_user_nonauth_logon(smb_user_t *);
 static void smb_user_auth_logoff(smb_user_t *);
+
 
 /*
  * Create a new user.
@@ -366,12 +366,14 @@ smb_user_release(
 boolean_t
 smb_user_is_admin(smb_user_t *user)
 {
+#ifdef	_KERNEL
 	char		sidstr[SMB_SID_STRSZ];
 	ksidlist_t	*ksidlist;
 	ksid_t		ksid1;
 	ksid_t		*ksid2;
-	boolean_t	rc = B_FALSE;
 	int		i;
+#endif	/* _KERNEL */
+	boolean_t	rc = B_FALSE;
 
 	ASSERT(user);
 	ASSERT(user->u_cred);
@@ -379,6 +381,7 @@ smb_user_is_admin(smb_user_t *user)
 	if (SMB_USER_IS_ADMIN(user))
 		return (B_TRUE);
 
+#ifdef	_KERNEL
 	bzero(&ksid1, sizeof (ksid_t));
 	(void) strlcpy(sidstr, ADMINISTRATORS_SID, SMB_SID_STRSZ);
 	ASSERT(smb_sid_splitstr(sidstr, &ksid1.ks_rid) == 0);
@@ -407,6 +410,7 @@ smb_user_is_admin(smb_user_t *user)
 	} while (i++ < ksidlist->ksl_nsid);
 
 	ksid_rele(&ksid1);
+#endif	/* _KERNEL */
 	return (rc);
 }
 
@@ -533,13 +537,14 @@ smb_user_getprivcred(smb_user_t *user)
 	return ((user->u_privcred)? user->u_privcred : user->u_cred);
 }
 
+#ifdef	_KERNEL
 /*
  * Assign the user cred and privileges.
  *
  * If the user has backup and/or restore privleges, dup the cred
  * and add those privileges to this new privileged cred.
  */
-static void
+void
 smb_user_setcred(smb_user_t *user, cred_t *cr, uint32_t privileges)
 {
 	cred_t *privcred = NULL;
@@ -569,6 +574,7 @@ smb_user_setcred(smb_user_t *user, cred_t *cr, uint32_t privileges)
 	user->u_privcred = privcred;
 	user->u_privileges = privileges;
 }
+#endif	/* _KERNEL */
 
 /*
  * Private function to support smb_user_enum.

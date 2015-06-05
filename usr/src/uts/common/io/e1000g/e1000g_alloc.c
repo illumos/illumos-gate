@@ -1455,6 +1455,9 @@ e1000g_free_rx_packets(e1000g_rx_data_t *rx_data, boolean_t full_release)
 		packet = next_packet;
 	}
 
+	if (full_release)
+		rx_data->packet_area = NULL;
+
 	mutex_exit(&e1000g_rx_detach_lock);
 }
 

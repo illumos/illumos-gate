@@ -20,18 +20,19 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
-#ifndef _KERNEL
+#if !defined(_KERNEL) && !defined(_FAKE_KERNEL)
 #include <stdio.h>
 #include <strings.h>
 #include <stdlib.h>
 #include <syslog.h>
-#include <smbsrv/libsmb.h>
-#else /* _KERNEL */
+#else	/* !_KERNEL && !_FAKE_KERNEL */
 #include <sys/types.h>
+#include <sys/systm.h>
 #include <sys/sunddi.h>
-#endif /* _KERNEL */
+#endif	/* !_KERNEL && !_FAKE_KERNEL */
 
 #include <smbsrv/smb_sid.h>
 
@@ -150,14 +151,19 @@ smb_sid_t *
 smb_sid_split(smb_sid_t *sid, uint32_t *rid)
 {
 	smb_sid_t *domsid;
+	int size;
 
 	if (!smb_sid_isvalid(sid) || (sid->sid_subauthcnt == 0))
 		return (NULL);
 
-	if ((domsid = smb_sid_dup(sid)) == NULL)
+	/* We will reduce sid_subauthcnt by one. */
+	size = smb_sid_len(sid) - sizeof (uint32_t);
+	if ((domsid = smb_sid_alloc(size)) == NULL)
 		return (NULL);
 
-	--domsid->sid_subauthcnt;
+	bcopy(sid, domsid, size);
+	domsid->sid_subauthcnt = sid->sid_subauthcnt - 1;
+
 	if (rid)
 		*rid = domsid->sid_subauth[domsid->sid_subauthcnt];
 
@@ -183,7 +189,7 @@ smb_sid_splitstr(char *strsid, uint32_t *rid)
 
 	*p++ = '\0';
 	if (rid) {
-#ifdef _KERNEL
+#if defined(_KERNEL) || defined(_FAKE_KERNEL)
 		unsigned long sua = 0;
 		(void) ddi_strtoul(p, NULL, 10, &sua);
 		*rid = (uint32_t)sua;
@@ -255,25 +261,6 @@ smb_sid_indomain(smb_sid_t *domain_sid, smb_sid_t *sid)
 	return (B_TRUE);
 }
 
-#ifndef _KERNEL
-/*
- * smb_sid_islocal
- *
- * Check a SID to see if it belongs to the local domain.
- */
-boolean_t
-smb_sid_islocal(smb_sid_t *sid)
-{
-	smb_domain_t di;
-	boolean_t islocal = B_FALSE;
-
-	if (smb_domain_lookup_type(SMB_DOMAIN_LOCAL, &di))
-		islocal = smb_sid_indomain(di.di_binsid, sid);
-
-	return (islocal);
-}
-#endif /* _KERNEL */
-
 /*
  * smb_sid_tostr
  *
@@ -322,7 +309,7 @@ smb_sid_tostr(const smb_sid_t *sid, char *strsid)
  * On success, a pointer to a SID is returned. Otherwise a null pointer
  * is returned.
  */
-#ifdef _KERNEL
+#if defined(_KERNEL) || defined(_FAKE_KERNEL)
 smb_sid_t *
 smb_sid_fromstr(const char *sidstr)
 {
@@ -448,7 +435,7 @@ static smb_sid_t *
 smb_sid_alloc(size_t size)
 {
 	smb_sid_t *sid;
-#ifdef _KERNEL
+#if defined(_KERNEL) || defined(_FAKE_KERNEL)
 	sid = kmem_alloc(size, KM_SLEEP);
 #else
 	sid = malloc(size);
@@ -459,7 +446,7 @@ smb_sid_alloc(size_t size)
 void
 smb_sid_free(smb_sid_t *sid)
 {
-#ifdef _KERNEL
+#if defined(_KERNEL) || defined(_FAKE_KERNEL)
 	if (sid == NULL)
 		return;
 
@@ -468,20 +455,3 @@ smb_sid_free(smb_sid_t *sid)
 	free(sid);
 #endif
 }
-
-#ifndef _KERNEL
-void
-smb_ids_free(smb_ids_t *ids)
-{
-	smb_id_t *id;
-	int i;
-
-	if ((ids != NULL) && (ids->i_ids != NULL)) {
-		id = ids->i_ids;
-		for (i = 0; i < ids->i_cnt; i++, id++)
-			smb_sid_free(id->i_sid);
-
-		free(ids->i_ids);
-	}
-}
-#endif

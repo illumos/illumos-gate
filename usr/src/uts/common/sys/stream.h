@@ -36,7 +36,8 @@
  */
 #include <sys/isa_defs.h>
 #ifdef _KERNEL
-#include <sys/vnode.h>
+#include <sys/kmem.h>
+#include <sys/uio.h>
 #endif
 #include <sys/poll.h>
 #include <sys/strmdep.h>

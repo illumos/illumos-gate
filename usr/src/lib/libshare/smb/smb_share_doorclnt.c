@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -77,8 +78,14 @@ smb_share_door_clnt_fini(void)
 static int
 smb_share_door_clnt_open(void)
 {
+	const char	*door_name;
+
 	if (smb_share_dfd == -1) {
-		if ((smb_share_dfd = open(SMB_SHARE_DNAME, O_RDONLY)) < 0)
+		door_name = getenv("SMB_SHARE_DNAME");
+		if (door_name == NULL)
+			door_name = SMB_SHARE_DNAME;
+
+		if ((smb_share_dfd = open(door_name, O_RDONLY)) < 0)
 			smb_share_dfd = -1;
 		else
 			smb_share_dncall = 0;

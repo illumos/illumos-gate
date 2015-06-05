@@ -21,6 +21,8 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _SMB_TOKEN_H
@@ -29,7 +31,6 @@
 #include <smbsrv/netrauth.h>
 #include <smbsrv/smb_privilege.h>
 #include <smbsrv/smb_sid.h>
-#include <smbsrv/smb_xdr.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -43,6 +44,12 @@ extern "C" {
 typedef struct smb_session_key {
 	uint8_t data[16];
 } smb_session_key_t;
+
+/* 32-bit opaque buffer (non-null terminated strings) */
+typedef struct smb_buf32 {
+	uint32_t	len;
+	uint8_t		*val;
+} smb_buf32_t;
 
 /*
  * Access Token
@@ -118,10 +125,12 @@ typedef struct smb_logon {
 	uint32_t	lg_status;	/* filled in user space */
 } smb_logon_t;
 
-bool_t smb_logon_xdr();
-bool_t smb_token_xdr();
+int smb_logon_xdr();
+int smb_token_xdr();
 
-#ifndef _KERNEL
+#if defined(_KERNEL) || defined(_FAKE_KERNEL)
+void smb_token_free(smb_token_t *);
+#else /* _KERNEL */
 smb_token_t *smb_logon(smb_logon_t *);
 void smb_logon_abort(void);
 void smb_token_destroy(smb_token_t *);
@@ -129,8 +138,6 @@ uint8_t *smb_token_encode(smb_token_t *, uint32_t *);
 void smb_token_log(smb_token_t *);
 smb_logon_t *smb_logon_decode(uint8_t *, uint32_t);
 void smb_logon_free(smb_logon_t *);
-#else /* _KERNEL */
-void smb_token_free(smb_token_t *);
 #endif /* _KERNEL */
 
 int smb_token_query_privilege(smb_token_t *token, int priv_id);
@@ -139,6 +146,5 @@ boolean_t smb_token_valid(smb_token_t *);
 #ifdef __cplusplus
 }
 #endif
-
 
 #endif /* _SMB_TOKEN_H */

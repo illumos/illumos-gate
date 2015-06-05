@@ -11,7 +11,7 @@
 #
 
 #
-# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
 #
 
 # Use distributed make (dmake) by default.
@@ -101,6 +101,7 @@ for lib in \
   libcmdutils \
   libcryptoutil \
   libdevid \
+  libfakekernel	\
   libidmap \
   libpam \
   libsec \
@@ -131,14 +132,30 @@ do_kern() {
 
 ################################################################
 
-do_libs() {
+# Note lib1 builds prerequisite libraries not delivered by the
+# tar file we create below.  To accelerate clean/install, we
+# skip these on clean (but still nuke them for clobber)
+
+do_lib1() {
 
 for lib in \
   libavl \
   libcmdutils \
-  libsmbfs \
   libsqlite \
   libuutil
+do
+  (cd $SRC/lib/$lib && $make $1)
+done
+}
+
+# lib2 builds stuff we include in the tar file,
+# or that we don't mind rebuilding after clean.
+
+do_lib2() {
+
+for lib in \
+  libfakekernel \
+  libsmbfs
 do
   (cd $SRC/lib/$lib && $make $1)
 done
@@ -190,6 +207,16 @@ do
 	$make $1 KMDB_LINKTEST_ENABLE= )
   (cd $SRC/cmd/mdb/$x/$a/smbsrv &&
 	$make $1 KMDB_LINKTEST_ENABLE= )
+  (cd $SRC/cmd/mdb/$x/$a/libfksmbsrv &&
+	$make $1 KMDB_LINKTEST_ENABLE= )
+
+# We build these libraries (to the proto area), so we need to
+# build the mdb modules too so mdb will load them.
+  (cd $SRC/cmd/mdb/$x/$a/libcmdutils &&
+	$make $1 )
+  (cd $SRC/cmd/mdb/$x/$a/libavl &&
+	$make $1 )
+
 done
 
 (cd $SRC/cmd/Adm/sun && $make $1)
@@ -265,28 +292,31 @@ set -x
 for arg
 do
   case "$arg" in
-  build|install)
-    arg=install
+  install)
     build_tools
     set -e
     do_hdrs $arg
     do_kern $arg
-    do_libs $arg
+    do_lib1 $arg
+    do_lib2 $arg
     do_cmds $arg
     ;;
   lint)
     do_kern $arg
-    do_libs $arg
+    do_lib1 $arg
+    do_lib2 $arg
     do_cmds $arg
     ;;
   clean)
+    # intentionally skip: lib1, hdrs, tools
     do_cmds $arg
-    do_libs $arg
+    do_lib2 $arg
     do_kern $arg
     ;;
   clobber)
     do_cmds $arg
-    do_libs $arg
+    do_lib2 $arg
+    do_lib1 $arg
     do_kern $arg
     do_hdrs $arg
     clobber_tools
@@ -298,7 +328,7 @@ do
     do_tar
     ;;
   *)
-    echo "Usage: $0 {build|lint|clean|clobber|tags|tar}";
+    echo "Usage: $0 {install|lint|clean|clobber|tags|tar}";
     exit 1;
     ;;
   esac

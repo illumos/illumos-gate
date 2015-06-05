@@ -23,8 +23,8 @@
  * Use is subject to license terms.
  */
 /*
- * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2015, Joyent, Inc.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef	_SYS_RANDOM_H
@@ -54,7 +54,7 @@ typedef struct swrand_stats {
 					/* the pool */
 } swrand_stats_t;
 
-#ifdef	_KERNEL
+#if defined(_KERNEL) || defined(_FAKE_KERNEL)
 
 #define	BUMP_CPU_RND_STATS(rm, x, v)    (((rm)->rm_mag.rm_stats).x += (v))
 #define	BUMP_RND_STATS(x, v)	atomic_add_64(&(rnd_stats).x, (v))

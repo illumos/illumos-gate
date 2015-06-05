@@ -126,7 +126,7 @@ smbd_nicmon_run_check(void)
 	smbd_nicmon_enabled = B_TRUE;
 
 	if ((hd = smb_smf_scf_init(SMBD_FMRI_PREFIX)) == NULL) {
-		smb_log(smbd.s_loghd, LOG_DEBUG,
+		syslog(LOG_DEBUG,
 		    "smbd_nicmon: smb_smf_scf_init failed");
 		return;
 	}
@@ -134,7 +134,7 @@ smbd_nicmon_run_check(void)
 	rc = smb_smf_create_service_pgroup(hd, SMBD_PG_NAME);
 	if (rc != SMBD_SMF_OK) {
 		smb_smf_scf_fini(hd);
-		smb_log(smbd.s_loghd, LOG_DEBUG,
+		syslog(LOG_DEBUG,
 		    "smbd_nicmon: smb_smf_create_service_pgroup failed");
 		return;
 	}
@@ -156,20 +156,20 @@ smbd_nicmon_setup_rtsock(int af)
 	int flags;
 
 	if ((sd = socket(PF_ROUTE, SOCK_RAW, af)) == -1) {
-		smb_log(smbd.s_loghd, LOG_ERR,
+		syslog(LOG_ERR,
 		    "smbd_nicmon: routing socket failed: %d", errno);
 		return (-1);
 	}
 
 	if ((flags = fcntl(sd, F_GETFL, 0)) < 0) {
-		smb_log(smbd.s_loghd, LOG_ERR,
+		syslog(LOG_ERR,
 		    "smbd_nicmon: fcntl F_GETFL failed: %d", errno);
 		(void) close(sd);
 		return (-1);
 	}
 
 	if ((fcntl(sd, F_SETFL, flags | O_NONBLOCK)) < 0) {
-		smb_log(smbd.s_loghd, LOG_ERR,
+		syslog(LOG_ERR,
 		    "smbd_nicmon: fcntl F_SETFL failed: %d", errno);
 		(void) close(sd);
 		return (-1);
@@ -199,7 +199,7 @@ smbd_nicmon_needscan(int sock)
 
 		if (nbytes < rtm->rtm_msglen) {
 			if ((throttle % SMBD_NICMON_THROTTLE) == 0) {
-				smb_log(smbd.s_loghd, LOG_DEBUG,
+				syslog(LOG_DEBUG,
 				    "smbd_nicmon: short read: %d of %d",
 				    nbytes, rtm->rtm_msglen);
 			}
@@ -230,7 +230,7 @@ smbd_nicmon_setup_eventpipe(int *read_pipe, int *write_pipe)
 	int fds[2];
 
 	if ((pipe(fds)) < 0) {
-		smb_log(smbd.s_loghd, LOG_ERR,
+		syslog(LOG_ERR,
 		    "smbd_nicmon: event pipe failed: %d", errno);
 		return (-1);
 	}
@@ -284,7 +284,7 @@ smbd_nicmon_daemon(void *arg)
 			if (errno == EINTR)
 				continue;
 			if ((throttle % SMBD_NICMON_THROTTLE) == 0)
-				smb_log(smbd.s_loghd, LOG_DEBUG,
+				syslog(LOG_DEBUG,
 				    "smbd_nicmon: poll failed: %d", errno);
 			++throttle;
 			break;
@@ -309,7 +309,7 @@ smbd_nicmon_daemon(void *arg)
 		if (smbd_nicmon_enabled && nic_changed &&
 		    smbd_nicmon_caller_fmri) {
 			if (smf_refresh_instance(smbd_nicmon_caller_fmri) != 0)
-				smb_log(smbd.s_loghd, LOG_ERR,
+				syslog(LOG_ERR,
 				    "smbd_nicmon: %s refresh failed",
 				    smbd_nicmon_caller_fmri);
 		}

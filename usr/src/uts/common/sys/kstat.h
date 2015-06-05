@@ -21,12 +21,12 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef	_SYS_KSTAT_H
 #define	_SYS_KSTAT_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Definition of general kernel statistics structures and /dev/kstat ioctls
@@ -698,7 +698,7 @@ typedef struct kstat_timer {
 
 #define	KSTAT_TIMER_PTR(kptr)	((kstat_timer_t *)(kptr)->ks_data)
 
-#if	defined(_KERNEL)
+#if	defined(_KERNEL) || defined(_FAKE_KERNEL)
 
 #include <sys/t_lock.h>
 

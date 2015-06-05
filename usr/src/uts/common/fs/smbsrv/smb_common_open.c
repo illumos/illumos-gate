@@ -39,6 +39,7 @@
 #include <smbsrv/smbinfo.h>
 
 volatile uint32_t smb_fids = 0;
+#define	SMB_UNIQ_FID()	atomic_inc_32_nv(&smb_fids)
 
 static uint32_t smb_open_subr(smb_request_t *);
 extern uint32_t smb_is_executable(char *);
@@ -437,9 +438,10 @@ smb_open_subr(smb_request_t *sr)
 		op->fqi.fq_dnode = cur_node->n_dnode;
 		smb_node_ref(op->fqi.fq_dnode);
 	} else {
-		if (rc = smb_pathname_reduce(sr, sr->user_cr, pn->pn_path,
+		rc = smb_pathname_reduce(sr, sr->user_cr, pn->pn_path,
 		    sr->tid_tree->t_snode, cur_node, &op->fqi.fq_dnode,
-		    op->fqi.fq_last_comp)) {
+		    op->fqi.fq_last_comp);
+		if (rc != 0) {
 			smbsr_errno(sr, rc);
 			return (sr->smb_error.status);
 		}

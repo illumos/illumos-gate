@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -57,7 +58,8 @@ static void smbd_share_dispatch(void *, char *, size_t, door_desc_t *, uint_t);
 int
 smbd_share_start(void)
 {
-	int	newfd;
+	int		newfd;
+	const char	*door_name;
 
 	(void) pthread_mutex_lock(&smb_share_dsrv_mtx);
 
@@ -77,9 +79,13 @@ smbd_share_start(void)
 		return (-1);
 	}
 
-	(void) unlink(SMB_SHARE_DNAME);
+	door_name = getenv("SMB_SHARE_DNAME");
+	if (door_name == NULL)
+		door_name = SMB_SHARE_DNAME;
 
-	if ((newfd = creat(SMB_SHARE_DNAME, 0644)) < 0) {
+	(void) unlink(door_name);
+
+	if ((newfd = creat(door_name, 0644)) < 0) {
 		syslog(LOG_ERR, "smbd_share_start: open: %s",
 		    strerror(errno));
 		(void) door_revoke(smb_share_dsrv_fd);
@@ -89,9 +95,9 @@ smbd_share_start(void)
 	}
 
 	(void) close(newfd);
-	(void) fdetach(SMB_SHARE_DNAME);
+	(void) fdetach(door_name);
 
-	if (fattach(smb_share_dsrv_fd, SMB_SHARE_DNAME) < 0) {
+	if (fattach(smb_share_dsrv_fd, door_name) < 0) {
 		syslog(LOG_ERR, "smbd_share_start: fattach: %s",
 		    strerror(errno));
 		(void) door_revoke(smb_share_dsrv_fd);
@@ -115,7 +121,12 @@ smbd_share_stop(void)
 	smbd_door_fini(&smb_share_sdh);
 
 	if (smb_share_dsrv_fd != -1) {
-		(void) fdetach(SMB_SHARE_DNAME);
+		const char *door_name;
+
+		door_name = getenv("SMB_SHARE_DNAME");
+		if (door_name == NULL)
+			door_name = SMB_SHARE_DNAME;
+		(void) fdetach(door_name);
 		(void) door_revoke(smb_share_dsrv_fd);
 		smb_share_dsrv_fd = -1;
 	}

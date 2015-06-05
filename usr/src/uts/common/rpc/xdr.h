@@ -20,6 +20,8 @@
  *
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
 /* All Rights Reserved */
@@ -39,12 +41,11 @@
 
 #include <sys/byteorder.h>	/* For all ntoh* and hton*() kind of macros */
 #include <rpc/types.h>	/* For all ntoh* and hton*() kind of macros */
-#ifndef _KERNEL
+#if !defined(_KERNEL) && !defined(_FAKE_KERNEL)
 #include <stdio.h> /* defines FILE *, used in ANSI C function prototypes */
-#endif
-#ifdef _KERNEL
+#else	/* _KERNEL */
 #include <sys/stream.h>
-#endif
+#endif	/* _KERNEL */
 
 #ifdef __cplusplus
 extern "C" {
@@ -557,7 +558,7 @@ typedef struct xdr_bytesrec xdr_bytesrec;
  * These are the public routines for the various implementations of
  * xdr streams.
  */
-#ifndef _KERNEL
+#if !defined(_KERNEL) && !defined(_FAKE_KERNEL)
 #ifdef __STDC__
 extern void   xdrmem_create(XDR *, const caddr_t, const uint_t, const enum
 xdr_op);

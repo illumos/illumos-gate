@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef	_SMBSRV_SMBINFO_H
@@ -125,6 +125,7 @@ typedef struct smb_kmod_cfg {
 	int32_t skc_oplock_enable;
 	int32_t skc_sync_enable;
 	int32_t skc_secmode;
+	int32_t skc_netbios_enable;
 	int32_t skc_ipv6_enable;
 	int32_t skc_print_enable;
 	int32_t skc_traverse_mounts;
