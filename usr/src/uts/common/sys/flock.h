@@ -225,8 +225,10 @@ typedef struct locklist {
 #define	FLK_QUERY_ACTIVE	0x1
 #define	FLK_QUERY_SLEEPING	0x2
 
+#if defined(_KERNEL)
 int	ofdlock(file_t *, int, struct flock64 *, int, u_offset_t);
 void	ofdcleanlock(file_t *);
+#endif
 int	reclock(struct vnode *, struct flock64 *, int, int, u_offset_t,
 		flk_callback_t *);
 int	chklock(struct vnode *, int, u_offset_t, ssize_t, int,
