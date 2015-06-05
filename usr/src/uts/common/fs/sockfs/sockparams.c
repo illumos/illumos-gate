@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1996, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -30,6 +31,7 @@
 #include <sys/sysmacros.h>
 #include <sys/cmn_err.h>
 #include <sys/list.h>
+#include <sys/sunddi.h>
 
 #include <sys/stropts.h>
 #include <sys/socket.h>
@@ -823,4 +825,83 @@ sockparams_new_filter(sof_entry_t *ent)
 	if ((error = sockparams_new_filter_impl(ent, &sp_ephem_list)) != 0)
 		sockparams_filter_cleanup_impl(ent, &sphead);
 	return (error);
+}
+
+/*
+ * Setup and return socket configuration table.
+ */
+int
+sockparams_copyout_socktable(uintptr_t socktable)
+{
+	STRUCT_DECL(sockconfig_socktable, st);
+	struct sockparams *sp;
+	uint_t count;
+	uint_t i = 0;
+	int ret = 0;
+	sockconfig_socktable_entry_t *se;
+
+	STRUCT_INIT(st, get_udatamodel());
+	if (ddi_copyin((void *)socktable, STRUCT_BUF(st),
+	    STRUCT_SIZE(st), 0) != 0)
+		return (EFAULT);
+
+	rw_enter(&sockconf_lock, RW_READER);
+
+	count = STRUCT_FGET(st, num_of_entries);
+	/*
+	 * If the output buffer is size zero, just copy out the count.
+	 */
+	if (count == 0) {
+		for (sp = list_head(&sphead); sp != NULL;
+		    sp = list_next(&sphead, sp)) {
+			count++;
+		}
+		STRUCT_FSET(st, num_of_entries, count);
+
+		rw_exit(&sockconf_lock);
+		if (ddi_copyout(STRUCT_BUF(st), (void *)socktable,
+		    STRUCT_SIZE(st), 0) != 0)
+			return (EFAULT);
+
+		return (0);
+	}
+
+	se = kmem_alloc(count * sizeof (sockconfig_socktable_entry_t),
+	    KM_SLEEP);
+	for (sp = list_head(&sphead); sp != NULL;
+	    sp = list_next(&sphead, sp)) {
+		if (i >= count) {
+			/*
+			 * Return if the number of entries has changed.
+			 */
+			rw_exit(&sockconf_lock);
+			kmem_free(se,
+			    count * sizeof (sockconfig_socktable_entry_t));
+			return (EAGAIN);
+		}
+		se[i].se_family = sp->sp_family;
+		se[i].se_type = sp->sp_type;
+		se[i].se_protocol = sp->sp_protocol;
+		(void) strncpy(se[i].se_modname, sp->sp_smod_name,
+		    MODMAXNAMELEN);
+		if (sp->sp_sdev_info.sd_devpath != NULL)
+			(void) strncpy(se[i].se_strdev,
+			    sp->sp_sdev_info.sd_devpath, MAXPATHLEN);
+		se[i].se_refcnt = sp->sp_refcnt;
+		se[i].se_flags = sp->sp_flags;
+		i++;
+	}
+	rw_exit(&sockconf_lock);
+	if (ddi_copyout(se, STRUCT_FGETP(st, st_entries),
+	    i * sizeof (sockconfig_socktable_entry_t), 0) != 0)
+		ret = EFAULT;
+
+	STRUCT_FSET(st, num_of_entries, i);
+	kmem_free(se, count * sizeof (sockconfig_socktable_entry_t));
+
+	if (ddi_copyout(STRUCT_BUF(st), (void *)socktable,
+	    STRUCT_SIZE(st), 0) != 0)
+		ret = EFAULT;
+
+	return (ret);
 }
