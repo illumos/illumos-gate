@@ -630,7 +630,8 @@ ptrace_poke(pid_t pid, uintptr_t addr, int data)
 }
 
 static int
-ptrace_poke_user(pid_t lxpid, pid_t pid, lwpid_t lwpid, uintptr_t off, int data)
+ptrace_poke_user(pid_t lxpid, pid_t pid, lwpid_t lwpid,
+    uintptr_t off, long data)
 {
 	lx_user_regs_t regs;
 	int err = 0;
@@ -646,7 +647,7 @@ ptrace_poke_user(pid_t lxpid, pid_t pid, lwpid_t lwpid, uintptr_t off, int data)
 			return (err);
 		}
 
-		*(int *)((uintptr_t)&regs + off -
+		*(long *)((uintptr_t)&regs + off -
 		    offsetof(lx_user_t, lxu_regs)) = data;
 
 		return (lx_ptrace_kernel(LX_PTRACE_SETREGS, lxpid, NULL,
@@ -866,7 +867,7 @@ lx_ptrace(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4)
 		return (ptrace_poke(pid, p3, (int)p4));
 
 	case LX_PTRACE_POKEUSER:
-		return (ptrace_poke_user(lxpid, pid, lwpid, p3, (int)p4));
+		return (ptrace_poke_user(lxpid, pid, lwpid, p3, (long)p4));
 
 	case LX_PTRACE_KILL:
 		return (ptrace_kill(pid));
