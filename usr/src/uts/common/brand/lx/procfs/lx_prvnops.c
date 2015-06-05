@@ -152,6 +152,7 @@ static void lxpr_read_uptime(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_version(lxpr_node_t *, lxpr_uiobuf_t *);
 
 static void lxpr_read_pid_cmdline(lxpr_node_t *, lxpr_uiobuf_t *);
+static void lxpr_read_pid_comm(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_pid_env(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_pid_limits(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_pid_maps(lxpr_node_t *, lxpr_uiobuf_t *);
@@ -274,6 +275,7 @@ static lxpr_dirent_t lx_procdir[] = {
  */
 static lxpr_dirent_t piddir[] = {
 	{ LXPR_PID_CMDLINE,	"cmdline" },
+	{ LXPR_PID_COMM,	"comm" },
 	{ LXPR_PID_CPU,		"cpu" },
 	{ LXPR_PID_CURDIR,	"cwd" },
 	{ LXPR_PID_ENV,		"environ" },
@@ -297,6 +299,7 @@ static lxpr_dirent_t piddir[] = {
  */
 static lxpr_dirent_t tiddir[] = {
 	{ LXPR_PID_CMDLINE,	"cmdline" },
+	{ LXPR_PID_TID_COMM,	"comm" },
 	{ LXPR_PID_CPU,		"cpu" },
 	{ LXPR_PID_CURDIR,	"cwd" },
 	{ LXPR_PID_ENV,		"environ" },
@@ -504,6 +507,7 @@ static void (*lxpr_read_function[LXPR_NFILES])() = {
 	lxpr_read_isdir,		/* /proc		*/
 	lxpr_read_isdir,		/* /proc/<pid>		*/
 	lxpr_read_pid_cmdline,		/* /proc/<pid>/cmdline	*/
+	lxpr_read_pid_comm,		/* /proc/<pid>/comm	*/
 	lxpr_read_empty,		/* /proc/<pid>/cpu	*/
 	lxpr_read_invalid,		/* /proc/<pid>/cwd	*/
 	lxpr_read_pid_env,		/* /proc/<pid>/environ	*/
@@ -521,6 +525,7 @@ static void (*lxpr_read_function[LXPR_NFILES])() = {
 	lxpr_read_isdir,		/* /proc/<pid>/fd	*/
 	lxpr_read_fd,			/* /proc/<pid>/fd/nn	*/
 	lxpr_read_pid_cmdline,		/* /proc/<pid>/task/<tid>/cmdline */
+	lxpr_read_pid_comm,		/* /proc/<pid>/task/<tid>/comm	*/
 	lxpr_read_empty,		/* /proc/<pid>/task/<tid>/cpu	*/
 	lxpr_read_invalid,		/* /proc/<pid>/task/<tid>/cwd	*/
 	lxpr_read_pid_env,		/* /proc/<pid>/task/<tid>/environ */
@@ -601,6 +606,7 @@ static vnode_t *(*lxpr_lookup_function[LXPR_NFILES])() = {
 	lxpr_lookup_procdir,		/* /proc		*/
 	lxpr_lookup_piddir,		/* /proc/<pid>		*/
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/cmdline	*/
+	lxpr_lookup_not_a_dir,		/* /proc/<pid>/comm	*/
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/cpu	*/
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/cwd	*/
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/environ	*/
@@ -618,6 +624,7 @@ static vnode_t *(*lxpr_lookup_function[LXPR_NFILES])() = {
 	lxpr_lookup_fddir,		/* /proc/<pid>/fd	*/
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/fd/nn	*/
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/task/<tid>/cmdline */
+	lxpr_lookup_not_a_dir,		/* /proc/<pid>/task/<tid>/comm	*/
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/task/<tid>/cpu	*/
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/task/<tid>/cwd	*/
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/task/<tid>/environ */
@@ -698,6 +705,7 @@ static int (*lxpr_readdir_function[LXPR_NFILES])() = {
 	lxpr_readdir_procdir,		/* /proc		*/
 	lxpr_readdir_piddir,		/* /proc/<pid>		*/
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/cmdline	*/
+	lxpr_readdir_not_a_dir,		/* /proc/<pid>/comm	*/
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/cpu	*/
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/cwd	*/
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/environ	*/
@@ -715,6 +723,7 @@ static int (*lxpr_readdir_function[LXPR_NFILES])() = {
 	lxpr_readdir_fddir,		/* /proc/<pid>/fd	*/
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/fd/nn	*/
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/task/<tid>/cmdline */
+	lxpr_readdir_not_a_dir,		/* /proc/<pid>/task/<tid>/comm	*/
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/task/<tid>/cpu	*/
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/task/<tid>/cwd	*/
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/task/<tid>/environ */
@@ -910,6 +919,29 @@ lxpr_read_pid_cmdline(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 
 	lxpr_unlock(p);
 	kmem_free(buf, asz);
+}
+
+/*
+ * lxpr_read_pid_comm(): read command from process
+ */
+static void
+lxpr_read_pid_comm(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
+{
+	proc_t *p;
+
+	VERIFY(lxpnp->lxpr_type == LXPR_PID_COMM ||
+	    lxpnp->lxpr_type == LXPR_PID_COMM);
+
+	/*
+	 * Because prctl(PR_SET_NAME) does not set custom names for threads
+	 * (vs processes), there is no need for special handling here.
+	 */
+	if ((p = lxpr_lock(lxpnp->lxpr_pid)) == NULL) {
+		lxpr_uiobuf_seterr(uiobuf, EINVAL);
+		return;
+	}
+	lxpr_uiobuf_printf(uiobuf, "%s\n", p->p_user.u_comm);
+	lxpr_unlock(p);
 }
 
 /*
