@@ -70,6 +70,7 @@
 #include <sys/lockfs.h>
 #include <sys/filio.h>
 #include <libbe.h>
+#include <deflt.h>
 #ifdef i386
 #include <libfdisk.h>
 #endif
@@ -124,6 +125,10 @@ typedef enum {
 #define	GRUBSIGN_LU_PREFIX	"BE_"
 #define	UFS_SIGNATURE_LIST	"/var/run/grub_ufs_signatures"
 #define	ZFS_LEGACY_MNTPT	"/tmp/bootadm_mnt_zfs_legacy"
+
+/* BE defaults */
+#define	BE_DEFAULTS		"/etc/default/be"
+#define	BE_DFLT_BE_HAS_GRUB	"BE_HAS_GRUB="
 
 #define	BOOTADM_RDONLY_TEST	"BOOTADM_RDONLY_TEST"
 
@@ -3942,15 +3947,34 @@ is_grub(const char *root)
 {
 	char path[PATH_MAX];
 	struct stat sb;
+	void *defp;
+	boolean_t grub = B_FALSE;
+	const char *res = NULL;
 	const char *fcn = "is_grub()";
 
-	(void) snprintf(path, sizeof (path), "%s%s", root, GRUB_STAGE2);
-	if (stat(path, &sb) == -1) {
-		BAM_DPRINTF(("%s: Missing GRUB directory: %s\n", fcn, path));
+	/* grub is disabled by default */
+	if ((defp = defopen_r(BE_DEFAULTS)) == NULL) {
 		return (0);
+	} else {
+		res = defread_r(BE_DFLT_BE_HAS_GRUB, defp);
+		if (res != NULL && res[0] != '\0') {
+			if (strcasecmp(res, "true") == 0)
+				grub = B_TRUE;
+		}
+		defclose_r(defp);
 	}
 
-	return (1);
+	if (grub == B_TRUE) {
+		(void) snprintf(path, sizeof (path), "%s%s", root, GRUB_STAGE2);
+		if (stat(path, &sb) == -1) {
+			BAM_DPRINTF(("%s: Missing GRUB directory: %s\n",
+			    fcn, path));
+			return (0);
+		} else
+			return (1);
+	}
+
+	return (0);
 }
 
 int

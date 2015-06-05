@@ -42,6 +42,7 @@ extern "C" {
 #define	BE_AUTO_NAME_DELIM	'-'
 #define	BE_DEFAULTS		"/etc/default/be"
 #define	BE_DFLT_BENAME_STARTS	"BENAME_STARTS_WITH="
+#define	BE_DFLT_BE_HAS_GRUB	"BE_HAS_GRUB="
 #define	BE_CONTAINER_DS_NAME	"ROOT"
 #define	BE_DEFAULT_CONSOLE	"text"
 #define	BE_POLICY_PROPERTY	"org.opensolaris.libbe:policy"
@@ -137,6 +138,7 @@ typedef struct be_plcy_list {
 
 struct be_defaults {
 	boolean_t	be_deflt_rpool_container;
+	boolean_t	be_deflt_grub;
 	char		be_deflt_bename_starts_with[ZFS_MAX_DATASET_NAME_LEN];
 };
 

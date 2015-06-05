@@ -405,15 +405,23 @@ be_get_defaults(struct be_defaults *defaults)
 {
 	void	*defp;
 
+	defaults->be_deflt_grub = B_FALSE;
 	defaults->be_deflt_rpool_container = B_FALSE;
 	defaults->be_deflt_bename_starts_with[0] = '\0';
 
 	if ((defp = defopen_r(BE_DEFAULTS)) != NULL) {
 		const char *res = defread_r(BE_DFLT_BENAME_STARTS, defp);
-		if (res != NULL && res[0] != NULL) {
+		if (res != NULL && res[0] != '\0') {
 			(void) strlcpy(defaults->be_deflt_bename_starts_with,
 			    res, ZFS_MAX_DATASET_NAME_LEN);
 			defaults->be_deflt_rpool_container = B_TRUE;
+		}
+		if (be_is_isa("i386")) {
+			res = defread_r(BE_DFLT_BE_HAS_GRUB, defp);
+			if (res != NULL && res[0] != '\0') {
+				if (strcasecmp(res, "true") == 0)
+					defaults->be_deflt_grub = B_TRUE;
+			}
 		}
 		defclose_r(defp);
 	}
@@ -3116,11 +3124,16 @@ be_err_to_str(int err)
 boolean_t
 be_has_grub(void)
 {
-	/*
-	 * TODO: This will need to be expanded to check for the existence of
-	 * grub if and when there is grub support for SPARC.
-	 */
-	return (be_is_isa("i386"));
+	static struct be_defaults be_defaults;
+	static boolean_t be_deflts_set = B_FALSE;
+
+	/* Cache the defaults, because be_has_grub is used often. */
+	if (be_deflts_set == B_FALSE) {
+		be_get_defaults(&be_defaults);
+		be_deflts_set = B_TRUE;
+	}
+
+	return (be_defaults.be_deflt_grub);
 }
 
 /*
