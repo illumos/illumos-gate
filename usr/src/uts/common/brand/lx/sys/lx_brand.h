@@ -443,17 +443,17 @@ typedef enum lx_accord_flags {
 /*
  * Flags values for "br_ptrace_flags" in the LWP-specific data.
  */
-typedef enum lx_ptrace_state {
-	LX_PTRACE_SYSCALL = 0x01,
-	LX_PTRACE_EXITING = 0x02,
-	LX_PTRACE_STOPPING = 0x04,
-	LX_PTRACE_INHERIT = 0x08,
-	LX_PTRACE_STOPPED = 0x10,
-	LX_PTRACE_PARENT_WAIT = 0x20,
-	LX_PTRACE_CLDPEND = 0x40,
-	LX_PTRACE_CLONING = 0x80,
-	LX_PTRACE_WAITPEND = 0x100
-} lx_ptrace_state_t;
+typedef enum lx_ptrace_flags {
+	LX_PTF_SYSCALL = 0x01,
+	LX_PTF_EXITING = 0x02,
+	LX_PTF_STOPPING = 0x04,
+	LX_PTF_INHERIT = 0x08,
+	LX_PTF_STOPPED = 0x10,
+	LX_PTF_PARENT_WAIT = 0x20,
+	LX_PTF_CLDPEND = 0x40,
+	LX_PTF_CLONING = 0x80,
+	LX_PTF_WAITPEND = 0x100
+} lx_ptrace_flags_t;
 
 /*
  * A ptrace(2) accord represents the relationship between a tracer LWP and the
@@ -545,7 +545,7 @@ struct lx_lwp_data {
 	boolean_t br_waitid_emulate;
 	int br_waitid_flags;
 
-	lx_ptrace_state_t br_ptrace_flags; /* ptrace state for this LWP */
+	lx_ptrace_flags_t br_ptrace_flags; /* ptrace flags for this LWP */
 	lx_ptrace_options_t br_ptrace_options; /* PTRACE_SETOPTIONS options */
 	lx_ptrace_options_t br_ptrace_clone_option; /* current clone(2) type */
 
