@@ -130,8 +130,10 @@ lx_userregs_to_uc(lx_lwp_data_t *lwpd, void *ucp, void *uregsp)
 			}
 
 			/*
-			 * Note: we currently ignore "lxur_orig_rax" here, as
-			 * this path should not be used for system call stops.
+			 * Note: we currently ignore "lxur_orig_rax" here (as
+			 * this path should not be used for system call stops)
+			 * as well as "lxur_xcs" (lest we get caught up in our
+			 * own lies about %cs from lx_uc_to_userregs()).
 			 */
 			LX_REG(&uc, REG_R15) = lxur.lxur_r15;
 			LX_REG(&uc, REG_R14) = lxur.lxur_r14;
@@ -149,7 +151,6 @@ lx_userregs_to_uc(lx_lwp_data_t *lwpd, void *ucp, void *uregsp)
 			LX_REG(&uc, REG_RSI) = lxur.lxur_rsi;
 			LX_REG(&uc, REG_RDI) = lxur.lxur_rdi;
 			LX_REG(&uc, REG_RIP) = lxur.lxur_rip;
-			LX_REG(&uc, REG_CS) = lxur.lxur_xcs;
 			LX_REG(&uc, REG_RFL) = lxur.lxur_rflags;
 			LX_REG(&uc, REG_RSP) = lxur.lxur_rsp;
 			LX_REG(&uc, REG_SS) = lxur.lxur_xss;
@@ -176,8 +177,10 @@ lx_userregs_to_uc(lx_lwp_data_t *lwpd, void *ucp, void *uregsp)
 			}
 
 			/*
-			 * Note: we currently ignore "lxur_orig_eax" here, as
-			 * this path should not be used for system call stops.
+			 * Note: we currently ignore "lxur_orig_eax" here (as
+			 * this path should not be used for system call stops)
+			 * as well as "lxur_xcs" (lest we get caught up in our
+			 * own lies about %cs from lx_uc_to_userregs()).
 			 */
 			LX_REG(&uc, EBP) = (int32_t)lxur.lxur_rbp;
 			LX_REG(&uc, EBX) = (int32_t)lxur.lxur_rbx;
@@ -187,7 +190,6 @@ lx_userregs_to_uc(lx_lwp_data_t *lwpd, void *ucp, void *uregsp)
 			LX_REG(&uc, ESI) = (int32_t)lxur.lxur_rsi;
 			LX_REG(&uc, EDI) = (int32_t)lxur.lxur_rdi;
 			LX_REG(&uc, EIP) = (int32_t)lxur.lxur_rip;
-			LX_REG(&uc, CS) = (int32_t)lxur.lxur_xcs;
 			LX_REG(&uc, EFL) = (int32_t)lxur.lxur_rflags;
 			LX_REG(&uc, UESP) = (int32_t)lxur.lxur_rsp;
 			LX_REG(&uc, SS) = (int32_t)lxur.lxur_xss;
@@ -244,7 +246,6 @@ lx_userregs_to_uc(lx_lwp_data_t *lwpd, void *ucp, void *uregsp)
 		LX_REG(&uc, EBP) = lxur.lxur_ebp;
 		LX_REG(&uc, EAX) = lxur.lxur_eax;
 		LX_REG(&uc, EIP) = lxur.lxur_eip;
-		LX_REG(&uc, CS) = lxur.lxur_xcs;
 		LX_REG(&uc, EFL) = lxur.lxur_eflags;
 		LX_REG(&uc, UESP) = lxur.lxur_esp;
 		LX_REG(&uc, SS) = lxur.lxur_xss;
@@ -485,7 +486,6 @@ lx_userregs_to_regs(lx_lwp_data_t *lwpd, void *uregsp)
 		rp->r_rdi = lxur.lxur_rdi;
 		lwpd->br_syscall_num = (int)lxur.lxur_orig_rax;
 		rp->r_rip = lxur.lxur_rip;
-		rp->r_cs = lxur.lxur_xcs;
 		rp->r_rfl = lxur.lxur_rflags;
 		rp->r_rsp = lxur.lxur_rsp;
 		rp->r_ss = lxur.lxur_xss;
@@ -528,7 +528,6 @@ lx_userregs_to_regs(lx_lwp_data_t *lwpd, void *uregsp)
 		rp->r_rax = lxur.lxur_eax;
 		lwpd->br_syscall_num = (int)lxur.lxur_orig_eax;
 		rp->r_rip = lxur.lxur_eip;
-		rp->r_cs = lxur.lxur_xcs;
 		rp->r_rfl = lxur.lxur_eflags;
 		rp->r_rsp = lxur.lxur_esp;
 		rp->r_ss = lxur.lxur_xss;
