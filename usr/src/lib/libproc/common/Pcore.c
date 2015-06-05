@@ -2664,11 +2664,15 @@ Pfgrab_core(int core_fd, const char *aout_path, int *perr)
 		P->map_exec = core_name_mapping(P, addr, "a.out");
 
 	/*
-	 * If we're a statically linked executable, then just locate the
-	 * executable's text and data and name them after the executable.
+	 * If we're a statically linked executable (or we're on x86 and looking
+	 * at a Linux core dump), then just locate the executable's text and
+	 * data and name them after the executable.
 	 */
-	if (base_addr == (uintptr_t)-1L ||
-	    core_info->core_osabi == ELFOSABI_NONE) {
+#ifndef __x86
+	if (base_addr == (uintptr_t)-1L) {
+#else
+	if (base_addr == (uintptr_t)-1L || from_linux) {
+#endif
 		dprintf("looking for text and data: %s\n", execname);
 		map_info_t *tmp, *dmp;
 		file_info_t *fp;
