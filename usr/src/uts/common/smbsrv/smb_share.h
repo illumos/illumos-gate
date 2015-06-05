@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
@@ -74,6 +74,8 @@ extern "C" {
  *
  * guestok		Determines whether guest access is allowed
  *
+ * quotas		SMB quotas presented & supported (T/F)
+ *
  * next three properties use access-list a al NFS
  *
  * ro			list of hosts that will have read-only access
@@ -91,6 +93,8 @@ extern "C" {
 #define	SHOPT_NONE		"none"
 #define	SHOPT_DFSROOT		"dfsroot"
 #define	SHOPT_DESCRIPTION	"description"
+#define	SHOPT_QUOTAS		"quotas"
+#define	SHOPT_AUTOHOME		"Autohome"
 
 #define	SMB_DEFAULT_SHARE_GROUP	"smb"
 #define	SMB_PROTOCOL_NAME	"smb"
@@ -169,6 +173,8 @@ extern "C" {
 #define	SMB_SHRF_ACC_RO		0x0200
 #define	SMB_SHRF_ACC_RW		0x0400
 #define	SMB_SHRF_ACC_ALL	0x0F00
+
+#define	SMB_SHRF_QUOTAS		0x1000
 
 /*
  * Runtime flags

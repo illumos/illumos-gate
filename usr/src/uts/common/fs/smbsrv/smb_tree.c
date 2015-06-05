@@ -1205,6 +1205,13 @@ smb_tree_get_flags(const smb_kshare_t *si, vfs_t *vfsp, smb_tree_t *tree)
 			flags |= mtype->mt_flags;
 	}
 
+	/*
+	 * SMB_TREE_QUOTA will be on here if the FS is ZFS.  We want to
+	 * turn it OFF when the share property says false.
+	 */
+	if ((si->shr_flags & SMB_SHRF_QUOTAS) == 0)
+		flags &= ~SMB_TREE_QUOTA;
+
 	(void) strlcpy(tree->t_typename, name, SMB_TYPENAMELEN);
 	(void) smb_strupr((char *)tree->t_typename);
 

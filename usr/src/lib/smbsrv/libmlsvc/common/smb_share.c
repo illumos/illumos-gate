@@ -628,14 +628,15 @@ smb_shr_get(char *sharename, smb_share_t *si)
  *   o comment
  *   o AD container
  *   o host access
- *   o abe
+ *   o flags
  */
 uint32_t
 smb_shr_modify(smb_share_t *new_si)
 {
+	smb_share_t old_si;
 	smb_share_t *si;
 	boolean_t adc_changed = B_FALSE;
-	char old_container[MAXPATHLEN];
+	boolean_t quota_flag_changed = B_FALSE;
 	uint32_t access, flag;
 	nvlist_t *shrlist;
 
@@ -655,16 +656,20 @@ smb_shr_modify(smb_share_t *new_si)
 		return (ERROR_ACCESS_DENIED);
 	}
 
+	/*
+	 * Keep a copy of what the share entry looks like before we
+	 * modify it.  We need this for things like unpublishing
+	 * from the old share container, removing the quota dir.
+	 */
+	bcopy(si, &old_si, sizeof (old_si));
+
+	/* Share comment */
 	(void) strlcpy(si->shr_cmnt, new_si->shr_cmnt, sizeof (si->shr_cmnt));
 
-	adc_changed = (strcmp(new_si->shr_container, si->shr_container) != 0);
-	if (adc_changed) {
-		/* save current container - needed for unpublishing */
-		(void) strlcpy(old_container, si->shr_container,
-		    sizeof (old_container));
-		(void) strlcpy(si->shr_container, new_si->shr_container,
-		    sizeof (si->shr_container));
-	}
+	/* Container */
+	(void) strlcpy(si->shr_container, new_si->shr_container,
+	    sizeof (si->shr_container));
+	adc_changed = (strcmp(old_si.shr_container, si->shr_container) != 0);
 
 	flag = (new_si->shr_flags & SMB_SHRF_ABE);
 	si->shr_flags &= ~SMB_SHRF_ABE;
@@ -681,6 +686,12 @@ smb_shr_modify(smb_share_t *new_si)
 	flag = (new_si->shr_flags & SMB_SHRF_DFSROOT);
 	si->shr_flags &= ~SMB_SHRF_DFSROOT;
 	si->shr_flags |= flag;
+
+	flag = (new_si->shr_flags & SMB_SHRF_QUOTAS);
+	si->shr_flags &= ~SMB_SHRF_QUOTAS;
+	si->shr_flags |= flag;
+	if ((old_si.shr_flags ^ si->shr_flags) & SMB_SHRF_QUOTAS)
+		quota_flag_changed = B_TRUE;
 
 	flag = (new_si->shr_flags & SMB_SHRF_CSC_MASK);
 	si->shr_flags &= ~SMB_SHRF_CSC_MASK;
@@ -715,8 +726,13 @@ smb_shr_modify(smb_share_t *new_si)
 	}
 
 	if (adc_changed) {
-		smb_shr_unpublish(new_si->shr_name, old_container);
+		smb_shr_unpublish(old_si.shr_name, old_si.shr_container);
 		smb_shr_publish(new_si->shr_name, new_si->shr_container);
+	}
+
+	if (quota_flag_changed) {
+		smb_shr_zfs_remove(&old_si);
+		smb_shr_zfs_add(si);
 	}
 
 	return (NERR_Success);
@@ -1648,6 +1664,16 @@ smb_shr_sa_get(sa_share_t share, sa_resource_t resource, smb_share_t *si)
 		free(val);
 	}
 
+	val = smb_shr_sa_getprop(opts, SHOPT_QUOTAS);
+	if (val != NULL) {
+		/* Turn the flag on or off */
+		smb_shr_sa_setflag(val, si, SMB_SHRF_QUOTAS);
+		free(val);
+	} else {
+		/* Default for this is enabled. */
+		si->shr_flags |= SMB_SHRF_QUOTAS;
+	}
+
 	val = smb_shr_sa_getprop(opts, SHOPT_CSC);
 	if (val != NULL) {
 		smb_shr_sa_csc_option(val, si);
@@ -2051,11 +2077,16 @@ smb_shr_zfs_add(smb_share_t *si)
 		syslog(LOG_INFO, "share: failed to add ACL object: %s: %s\n",
 		    si->shr_name, strerror(errno));
 
-	if (zfs_prop_get(zfshd, ZFS_PROP_MOUNTPOINT, buf, MAXPATHLEN,
-	    NULL, NULL, 0, B_FALSE) == 0) {
-		smb_quota_add_fs(buf);
+	if ((si->shr_flags & SMB_SHRF_QUOTAS) != 0) {
+		ret = zfs_prop_get(zfshd, ZFS_PROP_MOUNTPOINT,
+		    buf, MAXPATHLEN, NULL, NULL, 0, B_FALSE);
+		if (ret != 0) {
+			syslog(LOG_INFO, "share: failed to get mountpoint: "
+			    "%s\n", si->shr_name);
+		} else {
+			smb_quota_add_fs(buf);
+		}
 	}
-
 
 	zfs_close(zfshd);
 	libzfs_fini(libhd);
@@ -2091,9 +2122,15 @@ smb_shr_zfs_remove(smb_share_t *si)
 		syslog(LOG_INFO, "share: failed to remove ACL object: %s: %s\n",
 		    si->shr_name, strerror(errno));
 
-	if (zfs_prop_get(zfshd, ZFS_PROP_MOUNTPOINT, buf, MAXPATHLEN,
-	    NULL, NULL, 0, B_FALSE) == 0) {
-		smb_quota_remove_fs(buf);
+	if ((si->shr_flags & SMB_SHRF_QUOTAS) != 0) {
+		ret = zfs_prop_get(zfshd, ZFS_PROP_MOUNTPOINT,
+		    buf, MAXPATHLEN, NULL, NULL, 0, B_FALSE);
+		if (ret != 0) {
+			syslog(LOG_INFO, "share: failed to get mountpoint: "
+			    "%s\n", si->shr_name);
+		} else {
+			smb_quota_remove_fs(buf);
+		}
 	}
 
 	zfs_close(zfshd);
@@ -2415,9 +2452,11 @@ smb_shr_encode(smb_share_t *si, nvlist_t **nvlist)
 		rc |= nvlist_add_string(smb, SHOPT_GUEST, "true");
 	if ((si->shr_flags & SMB_SHRF_DFSROOT) != 0)
 		rc |= nvlist_add_string(smb, SHOPT_DFSROOT, "true");
+	if ((si->shr_flags & SMB_SHRF_QUOTAS) != 0)
+		rc |= nvlist_add_string(smb, SHOPT_QUOTAS, "true");
 
 	if ((si->shr_flags & SMB_SHRF_AUTOHOME) != 0) {
-		rc |= nvlist_add_string(smb, "Autohome", "true");
+		rc |= nvlist_add_string(smb, SHOPT_AUTOHOME, "true");
 		rc |= nvlist_add_uint32(smb, "uid", si->shr_uid);
 		rc |= nvlist_add_uint32(smb, "gid", si->shr_gid);
 	}

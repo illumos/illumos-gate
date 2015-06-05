@@ -98,7 +98,7 @@ static sa_group_t smb_get_defaultgrp(sa_handle_t);
 static int interface_validator(int, char *);
 static int smb_update_optionset_props(sa_handle_t, sa_resource_t, nvlist_t *);
 
-static boolean_t smb_saprop_getbool(sa_optionset_t, char *);
+static boolean_t smb_saprop_getbool(sa_optionset_t, char *, boolean_t);
 static boolean_t smb_saprop_getstr(sa_optionset_t, char *, char *, size_t);
 
 static struct {
@@ -178,6 +178,7 @@ struct option_defs optdefs[] = {
 	{ SHOPT_GUEST,		OPT_TYPE_BOOLEAN },
 	{ SHOPT_DFSROOT,	OPT_TYPE_BOOLEAN },
 	{ SHOPT_DESCRIPTION,	OPT_TYPE_STRING },
+	{ SHOPT_QUOTAS,		OPT_TYPE_BOOLEAN },
 	{ NULL, NULL }
 };
 
@@ -2147,17 +2148,22 @@ smb_build_shareinfo(sa_share_t share, sa_resource_t resource, smb_share_t *si)
 	if (opts == NULL)
 		return (SA_OK);
 
-	if (smb_saprop_getbool(opts, SHOPT_CATIA))
+	if (smb_saprop_getbool(opts, SHOPT_CATIA, B_FALSE))
 		si->shr_flags |= SMB_SHRF_CATIA;
 
-	if (smb_saprop_getbool(opts, SHOPT_ABE))
+	if (smb_saprop_getbool(opts, SHOPT_ABE, B_FALSE))
 		si->shr_flags |= SMB_SHRF_ABE;
 
-	if (smb_saprop_getbool(opts, SHOPT_GUEST))
+	if (smb_saprop_getbool(opts, SHOPT_GUEST, B_FALSE))
 		si->shr_flags |= SMB_SHRF_GUEST_OK;
 
-	if (smb_saprop_getbool(opts, SHOPT_DFSROOT))
+	if (smb_saprop_getbool(opts, SHOPT_DFSROOT, B_FALSE))
 		si->shr_flags |= SMB_SHRF_DFSROOT;
+
+	/* Quotas are enabled by default. */
+	si->shr_flags |= SMB_SHRF_QUOTAS;
+	if (!smb_saprop_getbool(opts, SHOPT_QUOTAS, B_TRUE))
+		si->shr_flags &= ~SMB_SHRF_QUOTAS;
 
 	(void) smb_saprop_getstr(opts, SHOPT_AD_CONTAINER, si->shr_container,
 	    sizeof (si->shr_container));
@@ -2423,20 +2429,29 @@ smb_update_optionset_props(sa_handle_t handle, sa_resource_t resource,
 }
 
 static boolean_t
-smb_saprop_getbool(sa_optionset_t opts, char *propname)
+smb_saprop_getbool(sa_optionset_t opts, char *propname, boolean_t def)
 {
 	sa_property_t prop;
 	char *val;
-	boolean_t propval = B_FALSE;
+	boolean_t ret = def;
 
 	prop = sa_get_property(opts, propname);
 	if ((val = sa_get_property_attr(prop, "value")) != NULL) {
-		if ((strcasecmp(val, "true") == 0) || (strcmp(val, "1") == 0))
-			propval = B_TRUE;
+		if (def) {
+			/* Default is true, ret false if... */
+			if ((strcasecmp(val, "false") == 0) ||
+			    (strcmp(val, "0") == 0))
+				ret = B_FALSE;
+		} else {
+			/* Default is false, ret true if... */
+			if ((strcasecmp(val, "true") == 0) ||
+			    (strcmp(val, "1") == 0))
+				ret = B_TRUE;
+		}
 		free(val);
 	}
 
-	return (propval);
+	return (ret);
 }
 
 static boolean_t
