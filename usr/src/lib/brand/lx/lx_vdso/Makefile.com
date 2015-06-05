@@ -64,7 +64,7 @@ VDSO_TOOL =	../tools/vdso_tool
 # becoming a link-editor; this dark lore is best left to the linker aliens.
 #
 all: $(LIBS)
-	$(ELFEDIT) -e "dyn:value -add VERSYM $$(elfedit \
+	$(ELFEDIT) -e "dyn:value -add VERSYM $$($(ELFEDIT) \
 	    -e 'shdr:dump .SUNW_versym' $(DYNLIB) | \
 	    $(AWK) '{ if ($$1 == "sh_addr:") { print $$2 } }')" $(DYNLIB)
 	$(VDSO_TOOL) -f $(DYNLIB)
