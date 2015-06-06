@@ -26,6 +26,7 @@
  * Copyright 2012 Milan Jurik. All rights reserved.
  * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2015 by Delphix. All rights reserved.
+ * Copyright 2016 Toomas Soome <tsoome@me.com>
  */
 
 /*
@@ -3363,6 +3364,40 @@ to_733(unsigned char *s, unsigned int val)
 }
 
 /*
+ * creates sha1 hash of archive
+ */
+static int
+digest_archive(const char *archive)
+{
+	char *archive_hash;
+	char *hash;
+	int ret;
+	FILE *fp;
+
+	(void) asprintf(&archive_hash, "%s.hash", archive);
+	if (archive_hash == NULL)
+		return (BAM_ERROR);
+
+	if ((ret = bootadm_digest(archive, &hash)) == BAM_ERROR) {
+		free(archive_hash);
+		return (ret);
+	}
+
+	fp = fopen(archive_hash, "w");
+	if (fp == NULL) {
+		free(archive_hash);
+		free(hash);
+		return (BAM_ERROR);
+	}
+
+	(void) fprintf(fp, "%s\n", hash);
+	(void) fclose(fp);
+	free(hash);
+	free(archive_hash);
+	return (BAM_SUCCESS);
+}
+
+/*
  * Extends the current boot archive without recreating it from scratch
  */
 static int
@@ -3495,6 +3530,9 @@ extend_iso_archive(char *archive, char *tempname, char *update_dir)
 
 	(void) unlink(tempname);
 
+	if (digest_archive(archive) == BAM_ERROR && bam_verbose)
+		bam_print("boot archive hashing failed\n");
+
 	if (flushfs(bam_root) != 0)
 		sync();
 
@@ -3623,6 +3661,9 @@ mkisofs_archive(char *root, int what)
 		    get_cachedir(what));
 	}
 
+	if (digest_archive(boot_archive) == BAM_ERROR && bam_verbose)
+		bam_print("boot archive hashing failed\n");
+
 	if (ret == BAM_SUCCESS && bam_verbose)
 		bam_print("Successfully created %s\n", boot_archive);
 
@@ -3656,6 +3697,7 @@ create_ramdisk(char *root)
 
 	/*
 	 * Else setup command args for create_ramdisk.ksh for the UFS archives
+	 * Note: we will not create hash here, CREATE_RAMDISK should create it.
 	 */
 	if (bam_verbose)
 		bam_print("mkisofs not found, creating UFS archive\n");
