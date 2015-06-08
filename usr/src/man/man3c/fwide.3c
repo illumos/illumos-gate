@@ -7,7 +7,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH FWIDE 3C "Jul 24, 2002"
+.TH FWIDE 3C "Jun 3, 2015"
 .SH NAME
 fwide \- set stream orientation
 .SH SYNOPSIS
@@ -20,12 +20,11 @@ fwide \- set stream orientation
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBfwide()\fR function determines the orientation of the stream pointed to
 by \fIstream\fR. If \fImode\fR is greater than 0, the function first attempts
-to make the stream wide-orientated.  If \fImode\fR is less than 0, the function
-first attempts to make the stream byte-orientated.  Otherwise, \fImode\fR is 0
+to make the stream wide-oriented.  If \fImode\fR is less than 0, the function
+first attempts to make the stream byte-oriented.  Otherwise, \fImode\fR is 0
 and the function does not alter the orientation of the stream.
 .sp
 .LP
@@ -38,13 +37,11 @@ wishing to check for error situations should set \fBerrno\fR to 0, then call
 \fBfwide()\fR, then check \fBerrno\fR and if it is non-zero, assume an error
 has occurred.
 .SH RETURN VALUES
-.sp
 .LP
 The \fBfwide()\fR function returns a value greater than 0 if, after the call,
 the stream has wide-orientation, a value less than 0 if the stream has
 byte-orientation, or 0 if the stream has no orientation.
 .SH ERRORS
-.sp
 .LP
 The \fBfwide()\fR function may fail if:
 .sp
@@ -57,12 +54,10 @@ The \fIstream\fR argument is not a valid stream.
 .RE
 
 .SH USAGE
-.sp
 .LP
 A call to \fBfwide()\fR with  \fImode\fR set to 0 can be used to determine the
 current orientation of a stream.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -80,6 +75,5 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBattributes\fR(5), \fBstandards\fR(5)
