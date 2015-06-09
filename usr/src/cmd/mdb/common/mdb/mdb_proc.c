@@ -105,6 +105,7 @@
 #include <string.h>
 
 #define	PC_FAKE		-1UL			/* illegal pc value unequal 0 */
+#define	PANIC_BUFSIZE	1024
 
 static const char PT_EXEC_PATH[] = "a.out";	/* Default executable */
 static const char PT_CORE_PATH[] = "core";	/* Default core file */
@@ -1567,7 +1568,7 @@ pt_status_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		int state;
 		GElf_Sym sym;
 		uintptr_t panicstr;
-		char *panicbuf = mdb_alloc(1024, UM_SLEEP);
+		char *panicbuf = mdb_alloc(PANIC_BUFSIZE, UM_SLEEP);
 		const siginfo_t *sip = &(psp->pr_lwp.pr_info);
 
 		char execname[MAXPATHLEN], buf[BUFSIZ];
@@ -1724,7 +1725,7 @@ pt_status_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			    Pread(t->t_pshandle, &panicstr, sizeof (panicstr),
 			    sym.st_value) == sizeof (panicstr) &&
 			    Pread_string(t->t_pshandle, panicbuf,
-			    sizeof (panicbuf), panicstr) > 0) {
+			    PANIC_BUFSIZE, panicstr) > 0) {
 				mdb_printf("panic message: %s",
 				    panicbuf);
 			}
@@ -1739,7 +1740,7 @@ pt_status_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		default:
 			mdb_printf("unknown libproc Pstate: %d\n", Pstate(P));
 		}
-		mdb_free(panicbuf, 1024);
+		mdb_free(panicbuf, PANIC_BUFSIZE);
 
 	} else if (pt->p_file != NULL) {
 		const GElf_Ehdr *ehp = &pt->p_file->gf_ehdr;
