@@ -11,6 +11,7 @@
 
 /*
  * Copyright (c) 2015 Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2015 The MathWorks, Inc.  All rights reserved.
  */
 
 /*
@@ -99,7 +100,7 @@ struct inotify_state {
 	pollhead_t ins_pollhd;			/* poll head */
 	kcondvar_t ins_cv;			/* condvar for reading */
 	list_t ins_orphans;			/* orphan list */
-	cyclic_id_t ins_cleaner;		/* cyclic for cleaning */
+	ddi_periodic_t ins_cleaner;		/* cyclic for cleaning */
 	inotify_watch_t *ins_zombies;		/* zombie watch list */
 	cred_t *ins_cred;			/* creator's credentials */
 	inotify_state_t *ins_next;		/* next state on global list */
@@ -1042,8 +1043,6 @@ inotify_open(dev_t *devp, int flag, int otyp, cred_t *cred_p)
 	major_t major = getemajor(*devp);
 	minor_t minor = getminor(*devp);
 	int instances = 0;
-	cyc_handler_t hdlr;
-	cyc_time_t when;
 	char c[64];
 
 	if (minor != INOTIFYMNRN_INOTIFY)
@@ -1100,17 +1099,8 @@ inotify_open(dev_t *devp, int flag, int otyp, cred_t *cred_p)
 
 	mutex_exit(&inotify_lock);
 
-	mutex_enter(&cpu_lock);
-
-	hdlr.cyh_func = inotify_clean;
-	hdlr.cyh_level = CY_LOW_LEVEL;
-	hdlr.cyh_arg = state;
-
-	when.cyt_when = 0;
-	when.cyt_interval = NANOSEC;
-
-	state->ins_cleaner = cyclic_add(&hdlr, &when);
-	mutex_exit(&cpu_lock);
+	state->ins_cleaner = ddi_periodic_add(inotify_clean,
+	    state, NANOSEC, DDI_IPL_0);
 
 	return (0);
 }
@@ -1329,9 +1319,10 @@ inotify_close(dev_t dev, int flag, int otyp, cred_t *cred_p)
 		inotify_watch_destroy(watch);
 	}
 
-	mutex_enter(&cpu_lock);
-	cyclic_remove(state->ins_cleaner);
-	mutex_exit(&cpu_lock);
+	if (state->ins_cleaner != NULL) {
+		ddi_periodic_delete(state->ins_cleaner);
+		state->ins_cleaner = NULL;
+	}
 
 	mutex_enter(&inotify_lock);
 
