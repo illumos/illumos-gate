@@ -25,6 +25,11 @@
  * Copyright 2015, Joyent, Inc.  All rights reserved.
  */
 
+/* Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved. */
+/*
+ * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
+ */
+
 #include <sys/types.h>
 #include <sys/t_lock.h>
 #include <sys/param.h>
@@ -1933,6 +1938,9 @@ sockconfig(int cmd, void *arg1, void *arg2, void *arg3, void *arg4)
 		break;
 	case SOCKCONFIG_REMOVE_FILTER:
 		error = sockconfig_remove_filter((const char *)arg1);
+		break;
+	case SOCKCONFIG_GET_SOCKTABLE:
+		error = sockparams_copyout_socktable((int)(uintptr_t)arg1);
 		break;
 	default:
 #ifdef	DEBUG

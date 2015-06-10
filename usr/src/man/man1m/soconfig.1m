@@ -1,9 +1,10 @@
 '\" te
 .\"  Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved
+.\"  Copyright 2015 Nexenta Systems, Inc. All rights reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SOCONFIG 1M "Apr 12, 2014"
+.TH SOCONFIG 1M "May 21, 2015"
 .SH NAME
 soconfig \- configure transport providers for use by sockets
 .SH SYNOPSIS
@@ -20,6 +21,11 @@ soconfig \- configure transport providers for use by sockets
 .LP
 .nf
 \fB/sbin/soconfig\fR \fIfamily\fR \fItype\fR \fIprotocol\fR [\fImodule\fR | \fIpath\fR]
+.fi
+
+.LP
+.nf
+\fB/sbin/soconfig\fR \fB-l\fR
 .fi
 
 .SH DESCRIPTION
@@ -64,6 +70,15 @@ least the first three fields listed below, separated by spaces:
 These fields are described in the \fBOPERANDS\fR section below.
 .sp
 An example of \fIfile\fR can be found in the \fBEXAMPLES\fR section below.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-l\fR
+.ad
+.RS 11n
+Print the in-kernel socket configuration table.
 .RE
 
 .SH OPERANDS

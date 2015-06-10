@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  * Copyright 2012 Milan Jurik. All rights reserved.
  */
 
@@ -6795,10 +6795,14 @@ lscf_instance_verify(scf_scope_t *scope, entity_t *svc, entity_t *inst)
 
 	/*
 	 * smf_get_state does not distinguish between its different failure
-	 * modes: memory allocation failures and SMF internal failures.
+	 * modes: memory allocation failures, SMF internal failures, and a lack
+	 * of EMI entirely because it's been removed. In these cases, we're
+	 * going to be conservative and opt to say that if we don't know, better
+	 * to not block import or falsely warn to the user.
 	 */
-	if ((emi_state = smf_get_state(SCF_INSTANCE_EMI)) == NULL)
-		return (EAGAIN);
+	if ((emi_state = smf_get_state(SCF_INSTANCE_EMI)) == NULL) {
+		return (0);
+	}
 
 	/*
 	 * As per the block comment for this function check the state of EMI

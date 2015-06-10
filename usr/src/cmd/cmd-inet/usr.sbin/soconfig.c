@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1995, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <ctype.h>
@@ -54,6 +55,9 @@
  *	soconfig <fam> <type> <protocol>
  *		deregisters
  *
+ *	soconfig -l
+ *		print the in-kernel socket configuration table
+ *
  * Filter Operations (Consolidation Private):
  *
  *	soconfig -F <name> <modname> {auto [top | bottom | before:filter |
@@ -79,6 +83,8 @@ static void	usage(void);
 
 static int	parse_filter_params(int argc, char **argv);
 
+static int	print_socktable();
+
 int
 main(argc, argv)
 	int argc;
@@ -93,6 +99,11 @@ main(argc, argv)
 #define	TEXT_DOMAIN "SYS_TEST"
 #endif
 	(void) textdomain(TEXT_DOMAIN);
+
+	if (argc == 1 && strcmp(argv[0], "-l") == 0) {
+		ret = print_socktable();
+		exit(ret);
+	}
 
 	if (argc >= 2 && strcmp(argv[0], "-F") == 0) {
 		argc--; argv++;
@@ -128,7 +139,8 @@ usage(void)
 	    "Usage:	soconfig -d <dir>\n"
 	    "\tsoconfig -f <file>\n"
 	    "\tsoconfig <fam> <type> <protocol> <path|module>\n"
-	    "\tsoconfig <fam> <type> <protocol>\n"));
+	    "\tsoconfig <fam> <type> <protocol>\n"
+	    "\tsoconfig -l\n"));
 }
 
 /*
@@ -573,5 +585,61 @@ parse_filter_params(int argc, char **argv)
 		return (1);
 	}
 	free(socktuples);
+	return (0);
+}
+
+/*
+ *  Print the in-kernel socket configuration table
+ */
+
+static int
+print_socktable()
+{
+	sockconfig_socktable_t sc_table;
+	int i;
+
+	(void) memset(&sc_table, 0, sizeof (sockconfig_socktable_t));
+
+	/* get number of entries */
+	if (_sockconfig(SOCKCONFIG_GET_SOCKTABLE, &sc_table) == -1) {
+		fprintf(stderr,
+		    gettext("cannot get in-kernel socket table: %s\n"),
+		    strerror(errno));
+		return (-1);
+	}
+	if (sc_table.num_of_entries == 0)
+		return (0);
+
+	sc_table.st_entries = calloc(sc_table.num_of_entries,
+	    sizeof (sockconfig_socktable_entry_t));
+	if (sc_table.st_entries == NULL) {
+		fprintf(stderr, gettext("out of memory\n"));
+		return (-1);
+	}
+
+	/* get socket table entries */
+	if (_sockconfig(SOCKCONFIG_GET_SOCKTABLE, &sc_table) == -1) {
+		fprintf(stderr,
+		    gettext("cannot get in-kernel socket table: %s\n"),
+		    strerror(errno));
+		return (-1);
+	}
+
+	printf("%6s %4s %5s %15s %15s %6s %6s\n",
+	    "FAMILY", "TYPE", "PROTO", "STRDEV", "SOCKMOD",
+	    "REFS", "FLAGS");
+	for (i = 0; i < sc_table.num_of_entries; i++) {
+		printf("%6u %4u %5u %15s %15s %6u %#6x\n",
+		    sc_table.st_entries[i].se_family,
+		    sc_table.st_entries[i].se_type,
+		    sc_table.st_entries[i].se_protocol,
+		    (strcmp(sc_table.st_entries[i].se_modname,
+		    "socktpi") == 0) ?
+		    sc_table.st_entries[i].se_strdev : "-",
+		    sc_table.st_entries[i].se_modname,
+		    sc_table.st_entries[i].se_refcnt,
+		    sc_table.st_entries[i].se_flags);
+	}
+	free(sc_table.st_entries);
 	return (0);
 }
