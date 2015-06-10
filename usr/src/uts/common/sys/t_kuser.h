@@ -54,7 +54,7 @@ extern "C" {
 
 /*
  * Note this structure will need to be expanded to handle data
- * related to connection orientated transports.
+ * related to connection oriented transports.
  */
 typedef struct tiuser {
 	struct	file *fp;

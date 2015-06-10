@@ -21,6 +21,8 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -29,8 +31,6 @@
 
 #ifndef _SYS_DISP_H
 #define	_SYS_DISP_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.11	*/
 
 #include <sys/priocntl.h>
 #include <sys/thread.h>
@@ -79,7 +79,7 @@ typedef struct _disp {
 	hrtime_t	disp_steal;	/* time when threads become stealable */
 } disp_t;
 
-#if defined(_KERNEL)
+#if defined(_KERNEL) || defined(_FAKE_KERNEL)
 
 #define	MAXCLSYSPRI	99
 #define	MINCLSYSPRI	60
@@ -95,6 +95,9 @@ extern int	nswapped;	/* number of swapped threads */
 extern	pri_t	minclsyspri;	/* minimum level of any system class */
 extern	pri_t	maxclsyspri;	/* maximum level of any system class */
 extern	pri_t	intr_pri;	/* interrupt thread priority base level */
+
+#endif	/* _KERNEL || _FAKE_KERNEL */
+#if defined(_KERNEL)
 
 /*
  * Minimum amount of time that a thread can remain runnable before it can

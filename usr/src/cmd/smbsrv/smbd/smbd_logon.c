@@ -135,7 +135,7 @@ smbd_user_auth_logon(smb_logon_t *user_info)
 		termid.at_type = AU_IPv4;
 	} else {
 		bcopy(&user_info->lg_clnt_ipaddr.a_ip, termid.at_addr,
-		    IPV6_ADDR_LEN);
+		    sizeof (in6_addr_t));
 		termid.at_type = AU_IPv6;
 	}
 	adt_set_termid(ah, &termid);

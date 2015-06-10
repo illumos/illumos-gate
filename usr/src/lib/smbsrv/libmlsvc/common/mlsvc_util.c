@@ -35,6 +35,7 @@
 #include <stdlib.h>
 #include <sys/time.h>
 #include <sys/systm.h>
+#include <note.h>
 #include <syslog.h>
 
 #include <smbsrv/libsmb.h>

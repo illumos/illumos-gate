@@ -23,6 +23,8 @@
  *
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _SYS_ACL_H
@@ -118,8 +120,6 @@ typedef struct acl_info acl_t;
 #define	ACL_FLAGS_ALL			(ACL_AUTO_INHERIT|ACL_PROTECTED| \
     ACL_DEFAULTED)
 
-#ifdef _KERNEL
-
 /*
  * These are only applicable in a CIFS context.
  */
@@ -138,6 +138,8 @@ typedef struct acl_info acl_t;
 #define	ACE_SYSTEM_ALARM_CALLBACK_OBJECT_ACE_TYPE	0x10
 
 #define	ACE_ALL_TYPES	0x001F
+
+#ifdef _KERNEL
 
 typedef struct ace_object {
 	uid_t		a_who;		/* uid or gid */

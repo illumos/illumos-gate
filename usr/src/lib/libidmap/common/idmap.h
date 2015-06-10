@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -41,13 +42,24 @@
 extern "C" {
 #endif
 
+/*
+ * The ifdef's for these two accomodate duplicate definitions in
+ * lib/smbsrv/libfksmbsrv/common/sys/kidmap.h  See notes there.
+ */
+
 /* Status */
+#ifndef	_IDMAP_STAT_TYPE
+#define	_IDMAP_STAT_TYPE
 typedef int32_t	idmap_stat;
+#endif	/* _IDMAP_STAT_TYPE */
+
+/* Opaque get handle */
+#ifndef	_IDMAP_GET_HANDLE_T
+#define	_IDMAP_GET_HANDLE_T
+typedef struct idmap_get_handle idmap_get_handle_t;
+#endif	/* _IDMAP_GET_HANDLE_T */
 
 typedef uint32_t	idmap_rid_t;
-
-/* Opaque "get-mapping" handle */
-typedef struct idmap_get_handle idmap_get_handle_t;
 
 /* Logger prototype which is based on syslog */
 typedef void (*idmap_logger_t)(int, const char *, ...);

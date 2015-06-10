@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T */
@@ -51,7 +52,7 @@ extern "C" {
 
 #define	KM_FLAGS	0xffff	/* all settable kmem flags */
 
-#ifdef _KERNEL
+#if defined(_KERNEL) || defined(_FAKE_KERNEL)
 
 extern void *kmem_alloc(size_t size, int kmflags);
 extern void *kmem_zalloc(size_t size, int kmflags);
@@ -94,7 +95,7 @@ typedef enum kmem_cbrc {
 	KMEM_CBRC_DONT_KNOW
 } kmem_cbrc_t;
 
-#ifdef _KERNEL
+#if defined(_KERNEL) || defined(_FAKE_KERNEL)
 
 /*
  * Helps clients implementing the move() callback to recognize known objects by

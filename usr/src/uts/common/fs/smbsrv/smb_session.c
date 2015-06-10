@@ -20,23 +20,28 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
+
 #include <sys/atomic.h>
-#include <sys/strsubr.h>
 #include <sys/synch.h>
 #include <sys/types.h>
-#include <sys/socketvar.h>
 #include <sys/sdt.h>
 #include <sys/random.h>
 #include <smbsrv/netbios.h>
 #include <smbsrv/smb_kproto.h>
 #include <smbsrv/string.h>
-#include <inet/tcp.h>
+#include <netinet/tcp.h>
+
+#define	SMB_NEW_KID()	atomic_inc_64_nv(&smb_kids)
 
 static volatile uint64_t smb_kids;
 
-uint32_t smb_keep_alive = SSN_KEEP_ALIVE_TIMEOUT;
+/*
+ * We track the keepalive in minutes, but this constant
+ * specifies it in seconds, so convert to minutes.
+ */
+uint32_t smb_keep_alive = SMB_PI_KEEP_ALIVE_MIN / 60;
 
 static void smb_session_cancel(smb_session_t *);
 static int smb_session_message(smb_session_t *);
@@ -74,6 +79,12 @@ void
 smb_session_correct_keep_alive_values(smb_llist_t *ll, uint32_t new_keep_alive)
 {
 	smb_session_t		*sn;
+
+	/*
+	 * Caller specifies seconds, but we track in minutes, so
+	 * convert to minutes (rounded up).
+	 */
+	new_keep_alive = (new_keep_alive + 59) / 60;
 
 	if (new_keep_alive == smb_keep_alive)
 		return;
@@ -415,7 +426,7 @@ smb_request_cancel(smb_request_t *sr)
 void
 smb_session_receiver(smb_session_t *session)
 {
-	int	rc;
+	int	rc = 0;
 
 	SMB_SESSION_VALID(session);
 
@@ -697,6 +708,9 @@ smb_session_delete(smb_session_t *session)
 	ASSERT(session->s_magic == SMB_SESSION_MAGIC);
 
 	session->s_magic = 0;
+
+	if (session->sign_fini != NULL)
+		session->sign_fini(session);
 
 	smb_rwx_destroy(&session->s_lock);
 	smb_net_txl_destructor(&session->s_txlst);

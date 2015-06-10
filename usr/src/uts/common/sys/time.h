@@ -13,6 +13,8 @@
  *
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _SYS_TIME_H
@@ -68,7 +70,7 @@ struct timeval {
 #define	TIMEVAL_OVERFLOW(tv)	\
 	((tv)->tv_sec < TIME32_MIN || (tv)->tv_sec > TIME32_MAX)
 
-#endif	/* _SYSCALL32 || _KERNEL */
+#endif	/* _SYSCALL32 */
 
 #endif	/* _ASM */
 #endif	/* !defined(__XOPEN_OR_POSIX) || defined(_XPG4_2) ... */
@@ -250,7 +252,7 @@ struct itimerval32 {
  */
 typedef	longlong_t	hrtime_t;
 
-#ifdef _KERNEL
+#if defined(_KERNEL) || defined(_FAKE_KERNEL)
 
 #include <sys/time_impl.h>
 #include <sys/mutex.h>
@@ -445,7 +447,7 @@ int gettimeofday(struct timeval *_RESTRICT_KYWD, void *_RESTRICT_KYWD);
  * non-X/Open applications, including this header will still make
  * visible these definitions.
  */
-#if !defined(_BOOT) && !defined(_KERNEL) && \
+#if !defined(_BOOT) && !defined(_KERNEL) && !defined(_FAKE_KERNEL) && \
 	!defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__)
 #include <time.h>
 #endif
@@ -457,8 +459,9 @@ int gettimeofday(struct timeval *_RESTRICT_KYWD, void *_RESTRICT_KYWD);
  * beginning with XSH4v2.  Placement required after definition
  * for itimerval.
  */
-#if !defined(_KERNEL) && !defined(__XOPEN_OR_POSIX) || defined(_XPG4_2) || \
-	defined(__EXTENSIONS__)
+#if !defined(_KERNEL) && !defined(_FAKE_KERNEL) && \
+	!defined(__XOPEN_OR_POSIX) || \
+	defined(_XPG4_2) || defined(__EXTENSIONS__)
 #include <sys/select.h>
 #endif
 

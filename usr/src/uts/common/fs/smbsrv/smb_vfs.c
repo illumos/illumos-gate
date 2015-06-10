@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/vfs.h>
@@ -95,7 +96,7 @@ smb_vfs_rele(smb_export_t *se, vfs_t *vfsp)
 
 	smb_llist_enter(&se->e_vfs_list, RW_WRITER);
 	smb_vfs = smb_vfs_find(se, vfsp);
-	DTRACE_PROBE1(smb_vfs_release, smb_vfs_t *, smb_vfs)
+	DTRACE_PROBE1(smb_vfs_release, smb_vfs_t *, smb_vfs);
 	if (smb_vfs) {
 		ASSERT(smb_vfs->sv_refcnt);
 		if (--smb_vfs->sv_refcnt == 0) {

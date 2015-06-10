@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -1028,7 +1028,7 @@ smbadm_group_show(int argc, char **argv)
 
 	if ((status != SMB_LGRP_NO_MORE) || smb_lgrp_itererror(&gi)) {
 		if (status != SMB_LGRP_NO_MORE)
-			syslog(LOG_ERR, "smb_lgrp_iterate: %s",
+			smb_syslog(LOG_ERR, "smb_lgrp_iterate: %s",
 			    smb_lgrp_strerror(status));
 
 		(void) fprintf(stderr,

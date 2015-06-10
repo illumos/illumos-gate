@@ -20,8 +20,8 @@
  */
 
 /*
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _SMBD_H
@@ -39,6 +39,7 @@ extern "C" {
 #include <smbsrv/libsmb.h>
 #include <smbsrv/libmlsvc.h>
 
+void smbd_report(const char *fmt, ...);
 int smbd_opipe_start(void);
 void smbd_opipe_stop(void);
 int smbd_share_start(void);
@@ -74,9 +75,10 @@ typedef struct smbd {
 	uid_t		s_uid;		/* UID of current daemon */
 	gid_t		s_gid;		/* GID of current daemon */
 	int		s_fg;		/* Run in foreground */
+	int		s_debug;	/* Enable debug output */
+	int		s_dbg_stop;	/* stop for debugger attach */
 	boolean_t	s_initialized;
 	boolean_t	s_shutting_down; /* shutdown control */
-	volatile uint_t	s_sigval;
 	volatile uint_t	s_refreshes;
 	boolean_t	s_kbound;	/* B_TRUE if bound to kernel */
 	int		s_door_lmshr;
@@ -95,11 +97,11 @@ typedef struct smbd {
 	pthread_t	s_nbt_listener_id;
 	pthread_t	s_tcp_listener_id;
 	boolean_t	s_fatal_error;
-	smb_log_hdl_t	s_loghd;
 } smbd_t;
 
-#define	SMBD_LOGNAME		"smbd"
-#define	SMBD_LOGSIZE		1024
+extern smbd_t smbd;
+
+#define	SMBD_LOG_MSGSIZE	256
 
 #define	SMBD_DOOR_NAMESZ	16
 
@@ -110,12 +112,38 @@ typedef struct smbd_door {
 	char		sd_name[SMBD_DOOR_NAMESZ];
 } smbd_door_t;
 
+#define	SMBD_ARG_MAGIC		0x53415247	/* 'SARG' */
+
+/*
+ * Parameter for door operations.
+ */
+typedef struct smbd_arg {
+	uint32_t	magic;
+	list_node_t	lnd;
+	smb_doorhdr_t	hdr;
+	const char	*opname;
+	char		*data;
+	size_t		datalen;
+	char		*rbuf;
+	size_t		rsize;
+	boolean_t	response_ready;
+	boolean_t	response_abort;
+	uint32_t	status;
+} smbd_arg_t;
+
 int smbd_door_start(void);
 void smbd_door_stop(void);
 void smbd_door_init(smbd_door_t *, const char *);
 void smbd_door_fini(smbd_door_t *);
 void smbd_door_enter(smbd_door_t *);
 void smbd_door_return(smbd_door_t *, char *, size_t, door_desc_t *, uint_t);
+
+void *smbd_door_dispatch_op(void *);
+
+/* For fksmbd */
+void fksmbd_init(void);
+int fksmbd_door_dispatch(smb_doorarg_t *);
+int fksmbd_opipe_dispatch(door_arg_t *);
 
 #ifdef __cplusplus
 }

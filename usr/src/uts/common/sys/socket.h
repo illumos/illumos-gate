@@ -217,7 +217,7 @@ struct fil_info {
 #define	FILF_AUTO	0x2		/* automatic attach */
 #define	FILF_BYPASS	0x4		/* filter is not active */
 
-#ifdef	_KERNEL
+#if defined(_KERNEL) || defined(_FAKE_KERNEL)
 /*
  * new socket open flags to identify socket and acceptor streams
  */
@@ -361,7 +361,7 @@ struct msghdr {
 #endif	/* defined(_XPG4_2) || defined(_KERNEL) */
 };
 
-#if	defined(_KERNEL)
+#if	defined(_KERNEL) || defined(_FAKE_KERNEL)
 
 /*
  *	N.B.:  we assume that omsghdr and nmsghdr are isomorphic, with

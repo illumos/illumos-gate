@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _SMB_IOCTL_H_
@@ -89,6 +89,10 @@ typedef	struct smb_ioc_start {
 	int		opipe;
 	int		lmshrd;
 	int		udoor;
+	/* These are used only by libfksmbsrv */
+	void		*opipe_func;
+	void		*lmshr_func;
+	void		*udoor_func;
 } smb_ioc_start_t;
 
 typedef	struct smb_ioc_event {
@@ -160,6 +164,7 @@ typedef struct smb_ioc_cfg {
 	int32_t		ipv6_enable;
 	int32_t		print_enable;
 	int32_t		traverse_mounts;
+	int32_t		netbios_enable;
 	uint32_t	exec_flags;
 	smb_version_t	version;
 	char		nbdomain[NETBIOS_NAME_SZ];
@@ -184,6 +189,12 @@ typedef union smb_ioc {
 } smb_ioc_t;
 
 uint32_t smb_crc_gen(uint8_t *, size_t);
+
+/* fksmbd (init,open,close,ioctl) calls into libfksmbsrv */
+int fksmbsrv_drv_open(void);
+int fksmbsrv_drv_close(void);
+int fksmbsrv_drv_ioctl(int cmd, void *arg);
+void fksmbsrv_drv_load(void);
 
 #ifdef __cplusplus
 }

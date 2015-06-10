@@ -35,6 +35,9 @@
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
+/*
+ * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
+ */
 
 #ifndef _SYS_SOCKETVAR_H
 #define	_SYS_SOCKETVAR_H
@@ -506,6 +509,7 @@ extern int 	sockparams_add(struct sockparams *);
 extern int	sockparams_delete(int, int, int);
 extern int	sockparams_new_filter(struct sof_entry *);
 extern void	sockparams_filter_cleanup(struct sof_entry *);
+extern int	sockparams_copyout_socktable(uintptr_t);
 
 extern void smod_init(void);
 extern void smod_add(smod_info_t *);
@@ -975,6 +979,7 @@ struct sockinfo {
 #define	SOCKCONFIG_REMOVE_SOCK		1
 #define	SOCKCONFIG_ADD_FILTER		2
 #define	SOCKCONFIG_REMOVE_FILTER	3
+#define	SOCKCONFIG_GET_SOCKTABLE	4
 
 /*
  * Data structures for configuring socket filters.
@@ -1013,6 +1018,24 @@ struct sockconfig_filter_props {
 	sof_socktuple_t	*sfp_socktuple;
 };
 
+/*
+ * Data structures for the in-kernel socket configuration table.
+ */
+typedef struct sockconfig_socktable_entry {
+	int		se_family;
+	int		se_type;
+	int		se_protocol;
+	int		se_refcnt;
+	int		se_flags;
+	char		se_modname[MODMAXNAMELEN];
+	char		se_strdev[MAXPATHLEN];
+} sockconfig_socktable_entry_t;
+
+typedef struct sockconfig_socktable {
+	uint_t		num_of_entries;
+	sockconfig_socktable_entry_t *st_entries;
+} sockconfig_socktable_t;
+
 #ifdef	_SYSCALL32
 
 typedef struct sof_socktuple32 {
@@ -1029,6 +1052,11 @@ struct sockconfig_filter_props32 {
 	uint32_t	sfp_socktuple_cnt;
 	caddr32_t	sfp_socktuple;
 };
+
+typedef struct sockconfig_socktable32 {
+	uint_t		num_of_entries;
+	caddr32_t	st_entries;
+} sockconfig_socktable32_t;
 
 #endif	/* _SYSCALL32 */
 

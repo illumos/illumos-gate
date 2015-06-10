@@ -19,8 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 /*
  * These routines provide the SMB MAC signing for the SMB server.
@@ -40,12 +40,20 @@
 
 #include <sys/uio.h>
 #include <smbsrv/smb_kproto.h>
-#include <smbsrv/msgbuf.h>
-#include <sys/crypto/api.h>
+#include <smbsrv/smb_signing.h>
+#include <sys/isa_defs.h>
+#include <sys/byteorder.h>
 
-#define	SMBAUTH_SESSION_KEY_SZ 16
+#define	SSN_KEY_LEN	16
 #define	SMB_SIG_SIZE	8
 #define	SMB_SIG_OFFS	14
+#define	SMB_HDRLEN	32
+
+#ifdef _LITTLE_ENDIAN
+#define	htolel(x)	((uint32_t)(x))
+#else
+#define	htolel(x)	BSWAP_32(x)
+#endif
 
 int
 smb_sign_calc(struct mbuf_chain *mbc,
@@ -54,28 +62,7 @@ smb_sign_calc(struct mbuf_chain *mbc,
     unsigned char *mac_sign);
 
 #ifdef DEBUG
-void smb_sign_find_seqnum(
-    uint32_t seqnum,
-    struct smb_sign *sign,
-    struct mbuf_chain *command,
-    unsigned char *mac_sig,
-    unsigned char *sr_sig,
-    boolean_t *found);
-#define	SMB_CHECK_SEQNUM(seqnum, sign, command, mac_sig, sr_sig, found) \
-{ \
-	if (smb_sign_debug) \
-		smb_sign_find_seqnum(seqnum, sign, \
-		    command, mac_sig, sr_sig, found); \
-}
-#else
-#define	SMB_CHECK_SEQNUM(seqnum, sign, command, mac_sig, sr_sig, found) \
-	{ \
-		*found = 0; \
-	}
-#endif
-
-#ifdef DEBUG
-void
+static void
 smb_sign_find_seqnum(
     uint32_t seqnum,
     struct smb_sign *sign,
@@ -105,57 +92,95 @@ int i;
 }
 #endif
 
-/* This holds the MD5 mechanism */
-static	crypto_mechanism_t crypto_mech = {CRYPTO_MECHANISM_INVALID, 0, 0};
-
-void
-smb_sign_g_init(void)
+/*
+ * Called during session destroy.
+ */
+static void
+smb_sign_fini(smb_session_t *s)
 {
-	/*
-	 * Initialise the crypto mechanism to MD5 if it not
-	 * already initialised.
-	 */
-	if (crypto_mech.cm_type == CRYPTO_MECHANISM_INVALID) {
-		crypto_mech.cm_type = crypto_mech2id(SUN_CKM_MD5);
+	smb_sign_mech_t *mech;
+
+	if ((mech = s->signing.mech) != NULL) {
+		kmem_free(mech, sizeof (*mech));
+		s->signing.mech = NULL;
 	}
 }
 
 /*
- * smb_sign_init
+ * smb_sign_begin
  *
  * Intializes MAC key based on the user session key and
  * NTLM response and store it in the signing structure.
+ * This is what begins SMB signing.
  */
-void
-smb_sign_init(smb_request_t *sr, smb_session_key_t *session_key,
-	char *resp, int resp_len)
+int
+smb_sign_begin(smb_request_t *sr, smb_token_t *token)
 {
-	struct smb_sign *sign = &sr->session->signing;
+	smb_arg_sessionsetup_t *sinfo = sr->sr_ssetup;
+	smb_session_t *session = sr->session;
+	struct smb_sign *sign = &session->signing;
+	smb_sign_mech_t *mech;
+	int rc;
 
-	if (crypto_mech.cm_type == CRYPTO_MECHANISM_INVALID) {
-		/*
-		 * There is no MD5 crypto mechanism
-		 * so turn off signing
-		 */
-		sr->sr_cfg->skc_signing_enable = 0;
-		sr->session->secmode &=
-		    (~NEGOTIATE_SECURITY_SIGNATURES_ENABLED);
-		cmn_err(CE_WARN,
-		    "SmbSignInit: signing disabled (no MD5)");
-		return;
+	/*
+	 * Session-level initialization (once per session)
+	 */
+	smb_rwx_rwenter(&session->s_lock, RW_WRITER);
+
+	/*
+	 * Signing may already have been setup by a prior logon,
+	 * in which case we're done here.
+	 */
+	if (sign->mackey != NULL) {
+		smb_rwx_rwexit(&session->s_lock);
+		return (0);
 	}
 
-	/* MAC key = concat (SessKey, NTLMResponse) */
+	/*
+	 * Get the mech handle
+	 */
+	if (sign->mech == NULL) {
+		mech = kmem_zalloc(sizeof (*mech), KM_SLEEP);
+		rc = smb_md5_getmech(mech);
+		if (rc != 0) {
+			kmem_free(mech, sizeof (*mech));
+			smb_rwx_rwexit(&session->s_lock);
+			return (rc);
+		}
+		sign->mech = mech;
+		session->sign_fini = smb_sign_fini;
+	}
 
-	bcopy(session_key, sign->mackey, sizeof (smb_session_key_t));
-	bcopy(resp, &(sign->mackey[sizeof (smb_session_key_t)]),
-	    resp_len);
-	sign->mackey_len = sizeof (smb_session_key_t) + resp_len;
+	/*
+	 * Compute and store the signing (MAC) key.
+	 *
+	 * With extended security, the MAC key is the same as the
+	 * session key (and we'll have sinfo->ssi_cspwlen == 0).
+	 * With non-extended security, it's the concatenation of
+	 * the session key and the "NT response" we received.
+	 * (NB: no extended security yet)
+	 */
+	sign->mackey_len = SSN_KEY_LEN + sinfo->ssi_cspwlen;
+	sign->mackey = kmem_alloc(sign->mackey_len, KM_SLEEP);
+	bcopy(token->tkn_session_key, sign->mackey, SSN_KEY_LEN);
+	if (sinfo->ssi_cspwlen > 0) {
+		bcopy(sinfo->ssi_cspwd, sign->mackey + SSN_KEY_LEN,
+		    sinfo->ssi_cspwlen);
+	}
 
-	sr->session->signing.seqnum = 0;
+	session->signing.seqnum = 0;
 	sr->sr_seqnum = 2;
 	sr->reply_seqnum = 1;
-	sign->flags = SMB_SIGNING_ENABLED;
+	sign->flags = 0;
+
+	if (session->secmode & NEGOTIATE_SECURITY_SIGNATURES_ENABLED) {
+		sign->flags |= SMB_SIGNING_ENABLED;
+		if (session->secmode & NEGOTIATE_SECURITY_SIGNATURES_REQUIRED)
+			sign->flags |= SMB_SIGNING_CHECK;
+	}
+
+	smb_rwx_rwexit(&session->s_lock);
+	return (0);
 }
 
 /*
@@ -179,7 +204,7 @@ smb_sign_init(smb_request_t *sr, smb_session_key_t *session_key,
  *
  *	SMBMsg is the SMB message containing the sequence number.
  *
- * Return 0 if  success else -1
+ * Return 0 if success
  *
  */
 int
@@ -188,130 +213,87 @@ smb_sign_calc(struct mbuf_chain *mbc,
     uint32_t seqnum,
     unsigned char *mac_sign)
 {
-	uint32_t seq_buf[2] = {0, 0};
-	unsigned char mac[16];
+	smb_sign_ctx_t ctx = 0;
+	uchar_t digest[MD5_DIGEST_LENGTH];
+	uchar_t *hdrp;
 	struct mbuf *mbuf = mbc->chain;
 	int offset = mbc->chain_offset;
 	int size;
-	int status;
-
-	crypto_data_t data;
-	crypto_data_t digest;
-	crypto_context_t crypto_ctx;
-
-	data.cd_format = CRYPTO_DATA_RAW;
-	data.cd_offset = 0;
-	data.cd_length = (size_t)-1;
-	data.cd_miscdata = 0;
-
-	digest.cd_format = CRYPTO_DATA_RAW;
-	digest.cd_offset = 0;
-	digest.cd_length = (size_t)-1;
-	digest.cd_miscdata = 0;
-	digest.cd_raw.iov_base = (char *)mac;
-	digest.cd_raw.iov_len = sizeof (mac);
-
-	status = crypto_digest_init(&crypto_mech, &crypto_ctx, 0);
-	if (status != CRYPTO_SUCCESS)
-		goto error;
+	int rc;
 
 	/*
-	 * Put the sequence number into the first 4 bytes
-	 * of the signature field in little endian format.
-	 * We are using a buffer to represent the signature
-	 * rather than modifying the SMB message.
+	 * This union is a little bit of trickery to:
+	 * (1) get the sequence number int aligned, and
+	 * (2) reduce the number of digest calls, at the
+	 * cost of a copying 32 bytes instead of 8.
+	 * Both sides of this union are 2+32 bytes.
 	 */
-#ifdef __sparc
-	{
-		uint32_t temp;
-		((uint8_t *)&temp)[0] = ((uint8_t *)&seqnum)[3];
-		((uint8_t *)&temp)[1] = ((uint8_t *)&seqnum)[2];
-		((uint8_t *)&temp)[2] = ((uint8_t *)&seqnum)[1];
-		((uint8_t *)&temp)[3] = ((uint8_t *)&seqnum)[0];
+	union {
+		struct {
+			uint8_t skip[2]; /* not used - just alignment */
+			uint8_t raw[SMB_HDRLEN];  /* header length (32) */
+		} r;
+		struct {
+			uint8_t skip[2]; /* not used - just alignment */
+			uint8_t hdr[SMB_SIG_OFFS]; /* sig. offset (14) */
+			uint32_t sig[2]; /* MAC signature, aligned! */
+			uint16_t ids[5]; /* pad, Tid, Pid, Uid, Mid */
+		} s;
+	} smbhdr;
 
-		seq_buf[0] = temp;
-	}
-#else
-	seq_buf[0] = seqnum;
-#endif
+	if (sign->mech == NULL || sign->mackey == NULL)
+		return (-1);
 
-	/* Digest the MACKey */
-	data.cd_raw.iov_base = (char *)sign->mackey;
-	data.cd_raw.iov_len = sign->mackey_len;
-	data.cd_length = sign->mackey_len;
-	status = crypto_digest_update(crypto_ctx, &data, 0);
-	if (status != CRYPTO_SUCCESS)
-		goto error;
+	if ((rc = smb_md5_init(&ctx, sign->mech)) != 0)
+		return (rc);
 
-	/* Find start of data in chain */
-	while (offset >= mbuf->m_len) {
+	/* Digest the MAC Key */
+	rc = smb_md5_update(ctx, sign->mackey, sign->mackey_len);
+	if (rc != 0)
+		return (rc);
+
+	/*
+	 * Make an aligned copy of the SMB header,
+	 * fill in the sequence number, and digest.
+	 */
+	hdrp = (unsigned char *)&smbhdr.r.raw;
+	size = SMB_HDRLEN;
+	if (smb_mbc_peek(mbc, offset, "#c", size, hdrp) != 0)
+		return (-1);
+	smbhdr.s.sig[0] = htolel(seqnum);
+	smbhdr.s.sig[1] = 0;
+
+	rc = smb_md5_update(ctx, &smbhdr.r.raw, size);
+	if (rc != 0)
+		return (rc);
+
+	/*
+	 * Digest the rest of the SMB packet, starting at the data
+	 * just after the SMB header.
+	 */
+	offset += size;
+	while (mbuf != NULL && (offset >= mbuf->m_len)) {
 		offset -= mbuf->m_len;
 		mbuf = mbuf->m_next;
 	}
-
-	/* Digest the SMB packet up to the signature field */
-	size = SMB_SIG_OFFS;
-	while (size >= mbuf->m_len - offset) {
-		data.cd_raw.iov_base = &mbuf->m_data[offset];
-		data.cd_raw.iov_len = mbuf->m_len - offset;
-		data.cd_length = mbuf->m_len - offset;
-		status = crypto_digest_update(crypto_ctx, &data, 0);
-		if (status != CRYPTO_SUCCESS)
-			goto error;
-
-		size -= mbuf->m_len - offset;
-		mbuf = mbuf->m_next;
+	if (mbuf != NULL && (size = (mbuf->m_len - offset)) > 0) {
+		rc = smb_md5_update(ctx, &mbuf->m_data[offset], size);
+		if (rc != 0)
+			return (rc);
 		offset = 0;
-	}
-	if (size > 0) {
-		data.cd_raw.iov_base = &mbuf->m_data[offset];
-		data.cd_raw.iov_len = size;
-		data.cd_length = size;
-		status = crypto_digest_update(crypto_ctx, &data, 0);
-		if (status != CRYPTO_SUCCESS)
-			goto error;
-		offset += size;
-	}
-
-	/*
-	 * Digest in the seq_buf instead of the signature
-	 * which has the sequence number
-	 */
-
-	data.cd_raw.iov_base = (char *)seq_buf;
-	data.cd_raw.iov_len = SMB_SIG_SIZE;
-	data.cd_length = SMB_SIG_SIZE;
-	status = crypto_digest_update(crypto_ctx, &data, 0);
-	if (status != CRYPTO_SUCCESS)
-		goto error;
-
-	/* Find the end of the signature field  */
-	offset += SMB_SIG_SIZE;
-	while (offset >= mbuf->m_len) {
-		offset -= mbuf->m_len;
 		mbuf = mbuf->m_next;
 	}
-	/* Digest the rest of the SMB packet */
-	while (mbuf) {
-		data.cd_raw.iov_base = &mbuf->m_data[offset];
-		data.cd_raw.iov_len = mbuf->m_len - offset;
-		data.cd_length = mbuf->m_len - offset;
-		status = crypto_digest_update(crypto_ctx, &data, 0);
-		if (status != CRYPTO_SUCCESS)
-			goto error;
+	while (mbuf != NULL) {
+		rc = smb_md5_update(ctx, mbuf->m_data, mbuf->m_len);
+		if (rc != 0)
+			return (rc);
 		mbuf = mbuf->m_next;
-		offset = 0;
 	}
-	digest.cd_length = SMBAUTH_SESSION_KEY_SZ;
-	status = crypto_digest_final(crypto_ctx, &digest, 0);
-	if (status != CRYPTO_SUCCESS)
-		goto error;
-	bcopy(mac, mac_sign, SMB_SIG_SIZE);
-	return (0);
-error:
-	cmn_err(CE_WARN, "SmbSignCalc: crypto error %d", status);
-	return (-1);
+	rc = smb_md5_final(ctx, digest);
+	if (rc == 0)
+		bcopy(digest, mac_sign, SMB_SIG_SIZE);
 
+	return (rc);
 }
 
 
@@ -361,8 +343,14 @@ smb_sign_check_request(smb_request_t *sr)
 		/*
 		 * check nearby sequence numbers in debug mode
 		 */
-		SMB_CHECK_SEQNUM(sr->sr_seqnum, sign, &command,
-		    mac_sig, sr->smb_sig, &found);
+#ifdef	DEBUG
+		if (smb_sign_debug)
+			smb_sign_find_seqnum(sr->sr_seqnum, sign,
+			    &command, mac_sig, sr->smb_sig, &found);
+		else
+#endif
+			found = B_FALSE;
+
 		if (found == B_FALSE)
 			rtn = -1;
 	}
@@ -418,10 +406,6 @@ smb_sign_reply(smb_request_t *sr, struct mbuf_chain *reply)
 	struct mbuf_chain resp;
 	struct smb_sign *sign = &sr->session->signing;
 	unsigned char signature[SMB_SIG_SIZE];
-	struct mbuf *mbuf;
-	int size = SMB_SIG_SIZE;
-	unsigned char *sig_ptr = signature;
-	int offset = 0;
 
 	if (reply)
 		resp = *reply;
@@ -430,7 +414,6 @@ smb_sign_reply(smb_request_t *sr, struct mbuf_chain *reply)
 
 	/* Reset offset to start of reply */
 	resp.chain_offset = 0;
-	mbuf = resp.chain;
 
 	/*
 	 * Calculate MAC signature
@@ -442,24 +425,7 @@ smb_sign_reply(smb_request_t *sr, struct mbuf_chain *reply)
 
 	/*
 	 * Put signature in the response
-	 *
-	 * First find start of signature in chain (offset + signature offset)
 	 */
-	offset += SMB_SIG_OFFS;
-	while (offset >= mbuf->m_len) {
-		offset -= mbuf->m_len;
-		mbuf = mbuf->m_next;
-	}
-
-	while (size >= mbuf->m_len - offset) {
-		(void) memcpy(&mbuf->m_data[offset],
-		    sig_ptr, mbuf->m_len - offset);
-		offset = 0;
-		sig_ptr += mbuf->m_len - offset;
-		size -= mbuf->m_len - offset;
-		mbuf = mbuf->m_next;
-	}
-	if (size > 0) {
-		(void) memcpy(&mbuf->m_data[offset], sig_ptr, size);
-	}
+	(void) smb_mbc_poke(&resp, SMB_SIG_OFFS, "#c",
+	    SMB_SIG_SIZE, signature);
 }

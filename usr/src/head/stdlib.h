@@ -94,9 +94,13 @@ typedef	unsigned int	uid_t;		/* UID type		*/
 #ifdef	__PRAGMA_REDEFINE_EXTNAME
 #pragma redefine_extname	mkstemp		mkstemp64
 #pragma redefine_extname	mkstemps	mkstemps64
+#pragma	redefine_extname	mkostemp	mkostemp64
+#pragma	redefine_extname	mkostemps	mkostemps64
 #else	/* __PRAGMA_REDEFINE_EXTNAME */
 #define	mkstemp			mkstemp64
 #define	mkstemps		mkstemps64
+#define	mkostemp		mkostemp64
+#define	mkostemps		mkostemps64
 #endif	/* __PRAGMA_REDEFINE_EXTNAME */
 
 #endif	/* _FILE_OFFSET_BITS == 64 */
@@ -107,9 +111,13 @@ typedef	unsigned int	uid_t;		/* UID type		*/
 #ifdef	__PRAGMA_REDEFINE_EXTNAME
 #pragma redefine_extname	mkstemp64	mkstemp
 #pragma redefine_extname	mkstemps64	mkstemps
+#pragma	redefine_extname	mkostemp64	mkostemp
+#pragma	redefine_extname	mkostemps64	mkostemps
 #else	/* __PRAGMA_REDEFINE_EXTNAME */
 #define	mkstemp64		mkstemp
 #define	mkstemps64		mkstemps
+#define	mkostemp64		mkostemp
+#define	mkostemps64		mkostemps
 #endif	/* __PRAGMA_REDEFINE_EXTNAME */
 
 #endif	/* _LP64 && _LARGEFILE64_SOURCE */
@@ -177,6 +185,20 @@ extern int	mkstemp64(char *);
 extern int	mkstemps64(char *, int);
 #endif
 #endif	/* _LARGEFILE64_SOURCE... */
+
+#if !defined(_STRICT_SYMBOLS) || defined(_XPG7)
+extern char	*mkdtemp(char *);
+#endif	/* !defined(_STRICT_SYMBOLS) || defined(_XPG7) */
+
+#if !defined(_STRICT_SYMBOLS)
+extern int		mkostemp(char *, int);
+extern int		mkostemps(char *, int, int);
+#if defined(_LARGEFILE64_SOURCE) && !((_FILE_OFFSET_BITS == 64) && \
+		!defined(__PRAGMA_REDEFINE_EXTNAME))
+extern int		mkostemp64(char *, int);
+extern int		mkostemps64(char *, int, int);
+#endif	/* defined(_LARGEFILE64_SOURCE) || !((_FILE_OFFSET_BITS == 64) ... */
+#endif	/* !defined(_STRICT_SYMBOLS) */
 
 #if defined(__EXTENSIONS__) || \
 	(!defined(_STRICT_STDC) && !defined(__XOPEN_OR_POSIX)) || \

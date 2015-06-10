@@ -553,18 +553,18 @@ smb_ads_decode_host_ip(int addit_cnt, int ans_cnt, uchar_t **ptr,
 		/* LINTED: E_CONSTANT_CONDITION */
 		NS_GET16(size, *ptr);
 
-		if (size == INADDRSZ) {
+		if (size == NS_INADDRSZ) {
 			/* LINTED: E_CONSTANT_CONDITION */
 			NS_GET32(ipaddr.a_ipv4, *ptr);
 			ipaddr.a_ipv4 = htonl(ipaddr.a_ipv4);
 			ipaddr.a_family = AF_INET;
-		} else if (size == IN6ADDRSZ) {
+		} else if (size == NS_IN6ADDRSZ) {
 #ifdef BIG_ENDIAN
-			bcopy(*ptr, &ipaddr.a_ipv6, IN6ADDRSZ);
+			bcopy(*ptr, &ipaddr.a_ipv6, NS_IN6ADDRSZ);
 #else
-			for (i = 0; i < IN6ADDRSZ; i++)
+			for (i = 0; i < NS_IN6ADDRSZ; i++)
 				(uint8_t *)(ipaddr.a_ipv6)
-				    [IN6ADDRSZ-1-i] = *(*ptr+i);
+				    [NS_IN6ADDRSZ-1-i] = *(*ptr+i);
 #endif
 			ipaddr.a_family = AF_INET6;
 			*ptr += size;
@@ -800,14 +800,14 @@ smb_ads_getipnodebyname(smb_ads_host_info_t *hentry)
 	case AF_INET6:
 		h = getipnodebyname(hentry->name, hentry->ipaddr.a_family,
 		    AI_DEFAULT, &error);
-		if (h == NULL || h->h_length != IPV6_ADDR_LEN)
+		if (h == NULL || h->h_length != NS_IN6ADDRSZ)
 			return (-1);
 		break;
 
 	case AF_INET:
 		h = getipnodebyname(hentry->name, hentry->ipaddr.a_family,
 		    0, &error);
-		if (h == NULL || h->h_length != INADDRSZ)
+		if (h == NULL || h->h_length != NS_INADDRSZ)
 			return (-1);
 		break;
 

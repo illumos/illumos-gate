@@ -27,7 +27,7 @@
  * This file was originally generated using rpcgen.
  */
 
-#ifndef _KERNEL
+#if !defined(_KERNEL) && !defined(_FAKE_KERNEL)
 #include <stdlib.h>
 #endif /* !_KERNEL */
 #include <smbsrv/wintypes.h>

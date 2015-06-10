@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <smbsrv/smb_door.h>
@@ -54,7 +54,9 @@ static void smb_kshare_csc_flags(smb_kshare_t *, const char *);
 
 static boolean_t smb_export_isready(smb_server_t *);
 
+#ifdef	_KERNEL
 static int smb_kshare_chk_dsrv_status(int, smb_dr_ctx_t *);
+#endif	/* _KERNEL */
 
 static const smb_avl_nops_t smb_kshare_avlops = {
 	smb_kshare_cmp,
@@ -63,6 +65,7 @@ static const smb_avl_nops_t smb_kshare_avlops = {
 	smb_kshare_destroy
 };
 
+#ifdef	_KERNEL
 /*
  * This function is not MultiThread safe. The caller has to make sure only one
  * thread calls this function.
@@ -115,7 +118,8 @@ smb_kshare_upcall(door_handle_t dhdl, void *arg, boolean_t add_share)
 	switch (opcode) {
 	case SMB_SHROP_ADD:
 		lmshare = kmem_alloc(sizeof (smb_share_t), KM_SLEEP);
-		if (error = xcopyin(arg, lmshare, sizeof (smb_share_t))) {
+		error = xcopyin(arg, lmshare, sizeof (smb_share_t));
+		if (error != 0) {
 			kmem_free(lmshare, sizeof (smb_share_t));
 			kmem_free(buf, SMB_SHARE_DSIZE);
 			return (error);
@@ -125,7 +129,8 @@ smb_kshare_upcall(door_handle_t dhdl, void *arg, boolean_t add_share)
 
 	case SMB_SHROP_DELETE:
 		str = kmem_alloc(MAXPATHLEN, KM_SLEEP);
-		if (error = copyinstr(arg, str, MAXPATHLEN, NULL)) {
+		error = copyinstr(arg, str, MAXPATHLEN, NULL);
+		if (error != 0) {
 			kmem_free(str, MAXPATHLEN);
 			kmem_free(buf, SMB_SHARE_DSIZE);
 			return (error);
@@ -177,6 +182,7 @@ smb_kshare_upcall(door_handle_t dhdl, void *arg, boolean_t add_share)
 
 	return ((rc == NERR_DuplicateShare && add_share) ? 0 : rc);
 }
+#endif	/* _KERNEL */
 
 /*
  * Executes map and unmap command for shares.
@@ -1197,6 +1203,7 @@ smb_export_isready(smb_server_t *sv)
 	return (ready);
 }
 
+#ifdef	_KERNEL
 /*
  * Return 0 upon success. Otherwise > 0
  */
@@ -1221,3 +1228,4 @@ smb_kshare_chk_dsrv_status(int opcode, smb_dr_ctx_t *dec_ctx)
 	ASSERT(0);
 	return (EINVAL);
 }
+#endif	/* _KERNEL */

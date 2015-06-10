@@ -24,10 +24,12 @@
  * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  */
 
+#include <sys/sunddi.h>
+#include <sys/nbmlock.h>
+
 #include <smbsrv/smb_kproto.h>
 #include <smbsrv/smb_fsops.h>
 #include <smbsrv/smbinfo.h>
-#include <sys/nbmlock.h>
 
 static int smb_delete_check_path(smb_request_t *);
 static int smb_delete_single_file(smb_request_t *, smb_error_t *);

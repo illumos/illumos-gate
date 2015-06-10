@@ -41,7 +41,6 @@
 
 #include <smbsrv/smb_kproto.h>
 #include <sys/nbmlock.h>
-#include <inet/tcp.h>
 
 #define	SMB_OPLOCK_IS_EXCLUSIVE(level)		\
 	(((level) == SMB_OPLOCK_EXCLUSIVE) ||	\
