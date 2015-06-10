@@ -130,6 +130,7 @@ libvarpd_destroy(varpd_handle_t *vhp)
 {
 	varpd_impl_t *vip = (varpd_impl_t *)vhp;
 
+	libvarpd_overlay_lookup_quiesce(vhp);
 	if (mutex_destroy(&vip->vdi_lock) != 0)
 		libvarpd_panic("failed to destroy mutex: %d", errno);
 	libvarpd_persist_fini(vip);
