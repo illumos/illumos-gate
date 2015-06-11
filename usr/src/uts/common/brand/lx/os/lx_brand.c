@@ -1879,8 +1879,9 @@ _fini(void)
 	lx_pid_fini();
 	lx_ioctl_fini();
 
-	if ((err = lx_futex_fini()) != 0)
+	if ((err = lx_futex_fini()) != 0) {
 		goto done;
+	}
 	futex_done = 1;
 
 	err = mod_remove(&modlinkage);
@@ -1891,11 +1892,13 @@ done:
 		 * If we can't unload the module, then we have to get it
 		 * back into a sane state.
 		 */
+		lx_ptrace_init();
 		lx_pid_init();
+		lx_ioctl_init();
 
-		if (futex_done)
+		if (futex_done) {
 			lx_futex_init();
-
+		}
 	}
 
 	return (err);
