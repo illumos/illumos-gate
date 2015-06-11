@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
- * Copyright 2015 Toomas Soome <tsoome@me.com>
+ * Copyright 2016 Toomas Soome <tsoome@me.com>
  * Copyright (c) 2015 by Delphix. All rights reserved.
  */
 
@@ -57,6 +57,8 @@
 #include <libbe.h>
 #include <libbe_priv.h>
 #include <boot_utils.h>
+#include <ficl.h>
+#include <ficlplatform/emu.h>
 
 /* Private function prototypes */
 static int update_dataset(char *, int, char *, char *, char *);
@@ -81,6 +83,212 @@ typedef struct zone_be_name_cb_data {
 /* ********************************************************************	*/
 /*			Public Functions				*/
 /* ******************************************************************** */
+
+/*
+ * Callback for ficl to suppress all output from ficl, as we do not
+ * want to confuse user with messages from ficl, and we are only
+ * checking results from function calls.
+ */
+/*ARGSUSED*/
+static void
+ficlSuppressTextOutput(ficlCallback *cb, char *text)
+{
+	/* This function is intentionally doing nothing. */
+}
+
+/*
+ * Function:	be_get_boot_args
+ * Description:	Returns the fast boot argument string for enumerated BE.
+ * Parameters:
+ *		fbarg - pointer to argument string.
+ *		entry - index of BE.
+ * Returns:
+ *		fast boot argument string.
+ * Scope:
+ *		Public
+ */
+int
+be_get_boot_args(char **fbarg, int entry)
+{
+	be_node_list_t *node, *be_nodes = NULL;
+	be_transaction_data_t bt = {0};
+	char *mountpoint = NULL;
+	boolean_t be_mounted = B_FALSE;
+	int ret = BE_SUCCESS;
+	int index;
+	ficlVm *vm;
+
+	*fbarg = NULL;
+	if (!be_zfs_init())
+		return (BE_ERR_INIT);
+
+	/*
+	 * need pool name, menu.lst has entries from our pool only
+	 */
+	ret = be_find_current_be(&bt);
+	if (ret != BE_SUCCESS) {
+		be_zfs_fini();
+		return (ret);
+	}
+
+	/*
+	 * be_get_boot_args() is for loader, fail with grub will trigger
+	 * normal boot.
+	 */
+	if (be_has_grub()) {
+		ret = BE_ERR_INIT;
+		goto done;
+	}
+
+	ret = _be_list(NULL, &be_nodes);
+	if (ret != BE_SUCCESS)
+		goto done;
+
+	/*
+	 * iterate through be_nodes,
+	 * if entry == -1, stop if be_active_on_boot,
+	 * else stop if index == entry.
+	 */
+	index = 0;
+	for (node = be_nodes; node != NULL; node = node->be_next_node) {
+		if (strcmp(node->be_rpool, bt.obe_zpool) != 0)
+			continue;
+		if (entry == BE_ENTRY_DEFAULT &&
+		    node->be_active_on_boot == B_TRUE)
+			break;
+		if (index == entry)
+			break;
+		index++;
+	}
+	if (node == NULL) {
+		be_free_list(be_nodes);
+		ret = BE_ERR_NOENT;
+		goto done;
+	}
+
+	/* try to mount inactive be */
+	if (node->be_active == B_FALSE) {
+		ret = _be_mount(node->be_node_name, &mountpoint,
+		    BE_MOUNT_FLAG_NO_ZONES);
+		if (ret != BE_SUCCESS && ret != BE_ERR_MOUNTED) {
+			be_free_list(be_nodes);
+			goto done;
+		} else
+			be_mounted = B_TRUE;
+	}
+
+	vm = bf_init("", ficlSuppressTextOutput);
+	if (vm != NULL) {
+		/*
+		 * zfs MAXNAMELEN is 256, so we need to pick buf large enough
+		 * to contain such names.
+		 */
+		char buf[MAXNAMELEN * 2];
+		char *kernel_options = NULL;
+		char *kernel = NULL;
+		char *tmp;
+		zpool_handle_t *zph;
+
+		/*
+		 * just try to interpret following words. on error
+		 * we will be missing kernelname, and will get out.
+		 */
+		(void) snprintf(buf, sizeof (buf), "set currdev=zfs:%s:",
+		    node->be_root_ds);
+		ret = ficlVmEvaluate(vm, buf);
+		if (ret != FICL_VM_STATUS_OUT_OF_TEXT) {
+			be_print_err(gettext("be_get_boot_args: error "
+			    "interpreting boot config: %d\n"), ret);
+			bf_fini();
+			ret = BE_ERR_NO_MENU;
+			goto cleanup;
+		}
+		(void) snprintf(buf, sizeof (buf),
+		    "include /boot/forth/loader.4th");
+		ret = ficlVmEvaluate(vm, buf);
+		if (ret != FICL_VM_STATUS_OUT_OF_TEXT) {
+			be_print_err(gettext("be_get_boot_args: error "
+			    "interpreting boot config: %d\n"), ret);
+			bf_fini();
+			ret = BE_ERR_NO_MENU;
+			goto cleanup;
+		}
+		(void) snprintf(buf, sizeof (buf), "start");
+		ret = ficlVmEvaluate(vm, buf);
+		if (ret != FICL_VM_STATUS_OUT_OF_TEXT) {
+			be_print_err(gettext("be_get_boot_args: error "
+			    "interpreting boot config: %d\n"), ret);
+			bf_fini();
+			ret = BE_ERR_NO_MENU;
+			goto cleanup;
+		}
+		(void) snprintf(buf, sizeof (buf), "boot");
+		ret = ficlVmEvaluate(vm, buf);
+		bf_fini();
+		if (ret != FICL_VM_STATUS_OUT_OF_TEXT) {
+			be_print_err(gettext("be_get_boot_args: error "
+			    "interpreting boot config: %d\n"), ret);
+			ret = BE_ERR_NO_MENU;
+			goto cleanup;
+		}
+
+		kernel_options = getenv("boot-args");
+		kernel = getenv("kernelname");
+
+		if (kernel == NULL) {
+			be_print_err(gettext("be_get_boot_args: no kernel\n"));
+			ret = BE_ERR_NOENT;
+			goto cleanup;
+		}
+
+		if ((zph = zpool_open(g_zfs, node->be_rpool)) == NULL) {
+			be_print_err(gettext("be_get_boot_args: failed to "
+			    "open root pool (%s): %s\n"), node->be_rpool,
+			    libzfs_error_description(g_zfs));
+			ret = zfs_err_to_be_err(g_zfs);
+			goto cleanup;
+		}
+		ret = zpool_get_physpath(zph, buf, sizeof (buf));
+		zpool_close(zph);
+		if (ret != 0) {
+			be_print_err(gettext("be_get_boot_args: failed to "
+			    "get physpath\n"));
+			goto cleanup;
+		}
+
+		/* zpool_get_physpath() can return space separated list */
+		tmp = buf;
+		tmp = strsep(&tmp, " ");
+
+		if (kernel_options == NULL || *kernel_options == '\0')
+			(void) asprintf(fbarg, "/ %s "
+			    "-B zfs-bootfs=%s,bootpath=\"%s\"\n", kernel,
+			    node->be_root_ds, tmp);
+		else
+			(void) asprintf(fbarg, "/ %s %s "
+			    "-B zfs-bootfs=%s,bootpath=\"%s\"\n", kernel,
+			    kernel_options, node->be_root_ds, tmp);
+
+		if (fbarg == NULL)
+			ret = BE_ERR_NOMEM;
+		else
+			ret = 0;
+	} else
+		ret = BE_ERR_NOMEM;
+cleanup:
+	if (be_mounted == B_TRUE)
+		(void) _be_unmount(node->be_node_name, BE_UNMOUNT_FLAG_FORCE);
+	be_free_list(be_nodes);
+done:
+	free(mountpoint);
+	free(bt.obe_name);
+	free(bt.obe_root_ds);
+	free(bt.obe_zpool);
+	free(bt.obe_snap_name);
+	free(bt.obe_altroot);
+	be_zfs_fini();
+	return (ret);
+}
 
 /*
  * Function:	be_max_avail
