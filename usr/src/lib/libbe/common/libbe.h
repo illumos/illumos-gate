@@ -26,6 +26,7 @@
 /*
  * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2015 Toomas Soome <tsoome@me.com>
+ * Copyright 2015 Gary Mills
  */
 
 #ifndef _LIBBE_H
@@ -240,7 +241,7 @@ int be_list(char *, be_node_list_t **);
 void be_free_list(be_node_list_t *);
 int be_max_avail(char *, uint64_t *);
 char *be_err_to_str(int);
-void be_sort(be_node_list_t **, int);
+int be_sort(be_node_list_t **, int);
 
 /*
  * Library functions
