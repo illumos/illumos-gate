@@ -5,7 +5,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\" See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH BOOT 1M "Jan 14, 2015"
+.TH BOOT 1M "Jun 13, 2015"
 .SH NAME
 boot \- start the system kernel or a standalone program
 .SH SYNOPSIS
@@ -1264,15 +1264,6 @@ drive, or, if that fails, from the first hard disk. The processor then jumps to
 the first byte of the sector image in memory.
 .SH X86 PRIMARY BOOT
 .LP
-The first sector on a floppy disk contains the master boot block (GRUB
-\fBstage1\fR). The stage 1 is responsible for loading GRUB \fBstage2\fR. Now
-GRUB is fully functional. It reads and executes the menu file
-\fB/boot/grub/menu.lst\fR. A similar sequence occurs for DVD or CD boot, but
-the master boot block location and contents are dictated by the El Torito
-specification. The El Torito boot also leads to \fBstrap.com\fR, which in turn
-loads \fBboot.bin\fR.
-.sp
-.LP
 The first sector on a hard disk contains the master boot block, which contains
 the master boot program and the \fBFDISK\fR table, named for the \fBPC\fR
 program that maintains it. The master boot finds the active partition in the
@@ -1281,6 +1272,15 @@ first byte in memory. This completes the standard PC-compatible hard disk boot
 sequence. If GRUB \fBstage1\fR is installed on the master boot block (see the
 \fB-m\fR option of \fBinstallgrub\fR(1M)), then \fBstage2\fR is loaded directly
 from the Solaris partition regardless of the active partition.
+.sp
+.LP
+A similar sequence occurs for DVD or CD boot, but the master boot block location
+and contents are dictated by the El Torito specification. The El Torito boot
+will then continue in the same way as with the hard disk.
+.sp
+.LP
+Floppy booting is not longer supported. Booting from USB devices follows the
+same procedure as with hard disks.
 .sp
 .LP
 An x86 \fBFDISK\fR partition for the Solaris software begins with a
@@ -1479,16 +1479,6 @@ to \fB/boot/grub/menu.lst\fR, and use the \fBset-menu\fR subcommand of
 .SH FILES
 .ne 2
 .na
-\fB\fB/platform/\fR\fIplatform-name\fR\fB/ufsboot\fR\fR
-.ad
-.sp .6
-.RS 4n
-Second-level program to boot from a disk, DVD, or CD
-.RE
-
-.sp
-.ne 2
-.na
 \fB\fB/etc/inittab\fR\fR
 .ad
 .sp .6
@@ -1529,11 +1519,16 @@ Directory containing boot-related files.
 .sp
 .ne 2
 .na
-\fB\fB/boot/grub/menu.lst\fR\fR
+\fB\fB/rpool/boot/grub/menu.lst\fR\fR
 .ad
 .sp .6
 .RS 4n
 Menu of bootable operating systems displayed by GRUB.
+.sp
+\fBNote:\fR this file is located on the root ZFS pool. While many installs
+often name their root zpool 'rpool', this is not required and the
+/rpool in the path above should be substituted with the name of
+the root pool of your current system.
 .RE
 
 .sp
