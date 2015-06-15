@@ -1256,7 +1256,6 @@ SMBSRV_OBJS +=	$(SMBSRV_SHARED_OBJS)			\
 		smb_ofile.o				\
 		smb_open_andx.o				\
 		smb_opipe.o				\
-		smb_opipe_door.o			\
 		smb_oplock.o				\
 		smb_pathname.o				\
 		smb_print.o				\

@@ -1,1254 +1,834 @@
-'\" te
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
 .\" Copyright (c) 2012, Joyent, Inc. All Rights Reserved
 .\" Copyright (c) 2013 by Delphix. All rights reserved.
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH IPADM 1M "May 14, 2012"
-.SH NAME
-ipadm \- configure IP network interfaces and protocol properties.
-.SH SYNOPSIS
-.LP
-.nf
-\fBipadm\fR create-if [\fB-t\fR] \fIinterface\fR
-.fi
-
-.LP
-.nf
-\fBipadm\fR disable-if [\fB-t\fR] \fIinterface\fR
-.fi
-
-.LP
-.nf
-\fBipadm\fR enable-if [\fB-t\fR] \fIinterface\fR
-.fi
-
-.LP
-.nf
-\fBipadm\fR delete-if \fIinterface\fR
-.fi
-
-.LP
-.nf
-\fBipadm\fR show-if [[\fB-p\fR] \fB-o\fR \fIfield\fR[,...]] [\fIinterface\fR]
-.fi
-
-.LP
-.nf
-\fBipadm\fR set-ifprop [\fB-t\fR] \fB-p\fR \fIprop\fR=<\fIvalue\fR[,...]> \fB-m\fR \fIprotocol\fR \fIinterface\fR
-.fi
-
-.LP
-.nf
-\fBipadm\fR reset-ifprop [\fB-t\fR] \fB-p\fR \fIprop\fR \fB-m\fR \fIprotocol\fR \fIinterface\fR
-.fi
-
-.LP
-.nf
-\fBipadm\fR show-ifprop [[\fB-c\fR]\fB-o\fR \fIfield\fR[,...]] [\fB-p\fR \fIprop\fR,...] [\fB-m\fR \fIprotocol\fR]
-  [\fIinterface\fR]
-.fi
-
-.LP
-.nf
-\fBipadm\fR create-addr [\fB-t\fR] \fB-T\fR static [\fB-d\fR]
-   \fB-a\fR {local|remote}=\fIaddr\fR[/\fIprefixlen\fR],... \fIaddrobj\fR
-.fi
-
-.LP
-.nf
-\fBipadm\fR create-addr [\fB-t\fR] \fB-T\fR dhcp [\fB-w\fR \fIseconds\fR | forever ] \fIaddrobj\fR
-.fi
-
-.LP
-.nf
-\fBipadm\fR create-addr [\fB-t\fR] \fB-T\fR addrconf [\fB-i\fR \fIinterface-id\fR]
-   [\fB-p\fR {stateful|stateless}={yes|no},..] \fIaddrobj\fR
-.fi
-
-.LP
-.nf
-\fBipadm\fR down-addr [\fB-t\fR] \fIaddrobj\fR
-.fi
-
-.LP
-.nf
-\fBipadm\fR up-addr [\fB-t\fR] \fIaddrobj\fR
-.fi
-
-.LP
-.nf
-\fBipadm\fR disable-addr [\fB-t\fR] \fIaddrobj\fR
-.fi
-
-.LP
-.nf
-\fBipadm\fR enable-addr [\fB-t\fR] \fIaddrobj\fR
-.fi
-
-.LP
-.nf
-\fBipadm\fR refresh-addr [\fB-i\fR] \fIaddrobj\fR
-.fi
-
-.LP
-.nf
-\fBipadm\fR delete-addr [\fB-r\fR] \fIaddrobj\fR
-.fi
-
-.LP
-.nf
-\fBipadm\fR show-addr [[\fB-p\fR] \fB-o\fR \fIfield\fR[,...]] [\fIaddrobj\fR]
-.fi
-
-.LP
-.nf
-\fBipadm\fR set-addrprop [\fB-t\fR] \fB-p\fR \fIprop\fR=<\fIvalue\fR[,...]> \fIaddrobj\fR
-.fi
-
-.LP
-.nf
-\fBipadm\fR reset-addrprop [\fB-t\fR] \fB-p\fR \fIprop\fR=<\fIvalue\fR[,...]> \fIaddrobj\fR
-.fi
-
-.LP
-.nf
-\fBipadm\fR show-addrprop [[\fB-c\fR] \fB-o\fR \fIfield\fR[,...]] [\fB-p\fR \fIprop\fR,...] [\fIaddrobj\fR]
-.fi
-
-.LP
-.nf
-\fBipadm\fR set-prop [\fB-t\fR] \fB-p\fR \fIprop\fR[+|-]=<\fIvalue\fR[,...]> \fIprotocol\fR
-.fi
-
-.LP
-.nf
-\fBipadm\fR reset-prop [\fB-t\fR] \fB-p\fR \fIprop\fR \fIprotocol\fR
-.fi
-
-.LP
-.nf
-\fBipadm\fR show-prop [[\fB-c\fR] \fB-o\fR \fIfield\fR[,...]] [\fB-p\fR \fIprop\fR[,...]] [\fIprotocol\fR]
-.fi
-
-.SH DESCRIPTION
-.sp
-.LP
-
-The \fBipadm\fR command is a stable replacement for the \fBifconfig\fR(1M) and
-\fBndd\fR(1M) commands. It is used to create IP interfaces and to confgure IP
-addresses on those interfaces. It is also used to get, set or reset properties
-on interfaces, addresses and protocols.
-.LP
-For subcommands that take an \fIaddrobj\fR, the \fIaddrobj\fR specifies a
-unique address on the system. It is made up of two parts, delimited by a '/'.
+.\" Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+.\"
+.Dd December 10, 2014
+.Dt IPADM 1M
+.Os
+.Sh NAME
+.Nm ipadm
+.Nd configure IP interfaces, addresses and protocols
+.Sh SYNOPSIS
+.Nm
+.Ic create-if
+.Op Fl t
+.Ar interface
+.Nm
+.Ic disable-if
+.Fl t
+.Ar interface
+.Nm
+.Ic enable-if
+.Fl t
+.Ar interface
+.Nm
+.Ic delete-if
+.Ar interface
+.Nm
+.Ic show-if
+.Op Oo Fl p Oc Fl o Ar field Ns Oo , Ns Ar field Oc Ns ...
+.Op Ar interface
+.Nm
+.Ic set-ifprop
+.Op Fl t
+.Fl p Ar prop Ns = Ns Ar value Ns Oo , Ns Ar value Oc Ns ...
+.Fl m Ar protocol
+.Ar interface
+.Nm
+.Ic reset-ifprop
+.Op Fl t
+.Fl p Ar prop
+.Fl m Ar protocol
+.Ar interface
+.Nm
+.Ic show-ifprop
+.Op Oo Fl c Oc Fl o Ar field Ns Oo , Ns Ar value Oc Ns ...
+.Op Fl p Ar prop Ns Oo , Ns Ar prop Oc Ns ...
+.Op Fl m Ar protocol
+.Op Ar interface
+.Nm
+.Ic create-addr
+.Op Fl t
+.Fl T Cm static
+.Op Fl d
+.Fl a Oo Cm local Ns | Ns Cm remote Ns = Oc Ns
+.Ar addr Ns Oo / Ns Ar prefixlen Oc Ns ...
+.Ar addrobj
+.Nm
+.Ic create-addr
+.Op Fl t
+.Fl T Cm dhcp
+.Op Fl w Ar seconds Ns | Ns Cm forever
+.Ar addrobj
+.Nm
+.Ic create-addr
+.Op Fl t
+.Fl T Cm addrconf
+.Op Fl i Ar interface-id
+.Oo Fl p Bro Cm stateful Ns | Ns Cm stateless Brc Ns = Ns
+.Bro Cm yes Ns | Ns Cm no Brc Oc Ns ...
+.Ar addrobj
+.Nm
+.Ic down-addr
+.Op Fl t
+.Ar addrobj
+.Nm
+.Ic up-addr
+.Op Fl t
+.Ar addrobj
+.Nm
+.Ic disable-addr
+.Op Fl t
+.Ar addrobj
+.Nm
+.Ic enable-addr
+.Op Fl t
+.Ar addrobj
+.Nm
+.Ic refresh-addr
+.Op Fl i
+.Ar addrobj
+.Nm
+.Ic delete-addr
+.Op Fl r
+.Ar addrobj
+.Nm
+.Ic show-addr
+.Op Oo Fl p Oc Fl o Ar field Ns Oo , Ns Ar field Oc Ns ...
+.Op Ar addrobj
+.Nm
+.Ic set-addrprop
+.Op Fl t
+.Fl p Ar prop Ns = Ns Ar value Ns Oo , Ns Ar value Oc Ns ...
+.Ar addrobj
+.Nm
+.Ic reset-addrprop
+.Op Fl t
+.Fl p Ar prop
+.Ar addrobj
+.Nm
+.Ic show-addrprop
+.Op Oo Fl c Oc Fl o Ar field Ns Oo , Ns Ar field Oc Ns ...
+.Op Fl p Ar prop Ns Oo , Ns Ar prop Oc Ns ...
+.Op Ar addrobj
+.Nm
+.Ic set-prop
+.Op Fl t
+.Fl p Ar prop Ns Oo Cm + Ns | Ns Cm - Oc Ns = Ns
+.Ar value Ns Oo , Ns Ar value Oc Ns ...
+.Ar protocol
+.Nm
+.Ic reset-prop
+.Op Fl t
+.Fl p Ar prop
+.Ar protocol
+.Nm
+.Ic show-prop
+.Op Oo Fl c Oc Fl o Ar field Ns Oo , Ns Ar field Oc Ns ...
+.Op Fl p Ar prop Ns Oo , Ns Ar prop Oc Ns ...
+.Op Ar protocol
+.Sh DESCRIPTION
+The
+.Nm
+command is a stable replacement for the
+.Xr ifconfig 1M
+and
+.Xr ndd 1M
+commands. It is used to create IP interfaces and to configure IP addresses on
+those interfaces. It is also used to get, set or reset properties on interfaces,
+addresses and protocols.
+.Pp
+For subcommands that take an
+.Em addrobj ,
+the
+.Em addrobj
+specifies a unique address on the system. It is made up of two parts, delimited
+by a
+.Sq / .
 The first part is the name of the interface and the second part is a string up
-to 32 characters long.  For example, "lo0/v4" is a loopback interface
-addrobj name.
-.LP
-For subcommands that take a \fIprotocol\fR, this can be one of
-the following values: ip, ipv4, ipv6, icmp, tcp, sctp or udp.
-
-.SH SUBCOMMANDS
-.sp
-.LP
+to 32 characters long. For example,
+.Qq lo0/v4
+is a loopback interface
+.Em addrobj
+name.
+.Pp
+For subcommands that take a
+.Em protocol ,
+this can be one of the following values:
+.Cm ip ,
+.Cm ipv4 ,
+.Cm ipv6 ,
+.Cm icmp ,
+.Cm tcp ,
+.Cm sctp
+or
+.Cm udp.
+.Sh SUBCOMMANDS
 The following subcommands are supported:
-.sp
-.ne 2
-.na
-\fB\fBcreate-if\fR [\fB-t\fR] \fIinterface\fR\fR
-.ad
-.sp .6
-.RS 4n
-The \fBcreate-if\fR subcommand is used to create an IP interface that will
-handle both IPv4 and IPv6 packets. The interface will be enabled as part of
-the creation process.  The IPv4 interface will have the address 0.0.0.0.
-The IPv6 interface will have the adress ::.
-.sp
-The \fB-t\fR option (also \fB--temporary\fR) means
-that the creation is temporary and will not be persistent across reboots.
-.sp
-
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBdisable-if\fR [\fB-t\fR] \fIinterface\fR\fR
-.ad
-.sp .6
-.RS 4n
-The \fBdisable-if\fR subcommand is used to disable an IP interface.
-.sp
-The \fB-t\fR option (also \fB--temporary\fR) means
-that the disable is temporary and will not be persistent across reboots.
-.sp
-
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBenable-if\fR [\fB-t\fR] \fIinterface\fR\fR
-.ad
-.sp .6
-.RS 4n
-The \fBenable-if\fR subcommand is used to enable an IP interface.
-.sp
-The \fB-t\fR option (also \fB--temporary\fR) means
-that the enable is temporary and will not be persistent across reboots.
-.sp
-
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fbdelete-if\fR \fIinterface\fR\fR
-.ad
-.sp .6
-.RS 4n
-The \fBdelete-if\fR subcommand is used to permanently delete an IP interface.
-.sp
-
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBshow-if\fR [[\fB-p\fR] \fB-o\fR \fIfield\fR[,...]] [\fIinterface\fR]\fR
-.ad
-.sp .6
-.RS 4n
-The \fBshow-if\fR subcommand is used to show the current IP interface
-configuration.
-.sp
-The \fB-p\fR option (also \fB--parsable\fR) prints
-the output in a parsable format.
-.sp
-The \fB-o\fR option (also \fB--output\fR) is used
-to select which fields will be shown.  The field value can be one of the
-following names:
-.sp
-.ne 2
-.na
-.RS 4n
-\fBALL\fR
-.ad
-.RS 4n
-Display all fields
-.RE
-
-.sp
-.ne 2
-.na
-\fBIFNAME\fR
-.ad
-.RS 4n
-The name of the interface
-.RE
-
-.sp
-.ne 2
-.na
-\fBSTATE\fR
-.ad
-.RS 4n
+.Bl -tag -width ""
+.It Xo
+.Nm
+.Ic create-if
+.Op Fl t
+.Ar interface
+.Xc
+Create an IP interface that will handle both IPv4 and IPv6 packets. The
+interface will be enabled as part of the creation process. The IPv4 interface
+will have the address 0.0.0.0. The IPv6 interface will have the adress ::.
+.Bl -tag -width ""
+.It Fl t Ns , Ns Fl -temporary
+Temporary, not persistent across reboots.
+.El
+.It Xo
+.Nm
+.Ic disable-if
+.Fl t
+.Ar interface
+.Xc
+Disable an IP interface.
+.Bl -tag -width ""
+.It Fl t Ns , Ns Fl -temporary
+Temporary, not persistent across reboots.
+.El
+.It Xo
+.Nm
+.Ic enable-if
+.Fl t
+.Ar interface
+.Xc
+Enable an IP interface.
+.Bl -tag -width ""
+.It Fl t Ns , Ns Fl -temporary
+Temporary, not persistent across reboots.
+.El
+.It Xo
+.Nm
+.Ic delete-if
+.Ar interface
+.Xc
+Permanently delete an IP interface.
+.It Xo
+.Nm
+.Ic show-if
+.Op Oo Fl p Oc Fl o Ar field Ns Oo , Ns Ar field Oc Ns ...
+.Op Ar interface
+.Xc
+Show the current IP interface configuration.
+.Bl -tag -width ""
+.It Fl o Ns , Ns Fl -output
+Select which fields will be shown. The field value can be one of the following
+names:
+.Bl -tag -compact -width "PERSISTENT"
+.It Cm ALL
+Display all fields.
+.It Cm IFNAME
+The name of the interface.
+.It Cm STATE
 The state can be one of the following values:
-.sp
-.ne 2
-.na
-.RS 4n
-ok - resources for the interface have been allocated
-.sp
-offline - the interface is offline
-.sp
-failed - the interface's datalink is down
-.sp
-down - the interface is down
-.sp
-disabled - the interface is disabled
-.RE
-.RE
-
-.sp
-.ne 2
-.na
-\fBCURRENT\fR
-.ad
-.RS 4n
+.Bl -tag -compact -width "disabled"
+.It Sy ok
+resources for the interface have been allocated
+.It Sy offline
+the interface is offline
+.It Sy failed
+the interface's datalink is down
+.It Sy down
+the interface is down
+.It Sy disabled
+the interface is disabled
+.El
+.It Cm CURRENT
 A set of single character flags indicating the following:
-.sp
-.ne 2
-.na
-.RS 4n
-b - broadcast (mutually exclusive with 'p')
-.br
-m - multicast
-.br
-p - point-to-point (mutually exclusive with 'b')
-.br
-v - virtual interface
-.br
-I - IPMP
-.br
-s - IPMP standby
-.br
-i - IPMP inactive
-.br
-V - VRRP
-.br
-a - VRRP accept mode
-.br
-4 - IPv4
-.br
-6 - IPv6
-.RE
-.RE
-
-.sp
-.ne 2
-.na
-\fBPERSISTENT\fR
-.ad
-.RS 4n
+.Bl -tag -compact -width "b"
+.It Sy b
+broadcast (mutually exclusive with
+.Sq p )
+.It Sy m
+multicast
+.It Sy p
+point-to-point (mutually exclusive with
+.Sq b )
+.It Sy v
+virtual interface
+.It Sy I
+IPMP
+.It Sy s
+IPMP standby
+.It Sy i
+IPMP inactive
+.It Sy V
+VRRP
+.It Sy a
+VRRP accept mode
+.It Sy 4
+IPv4
+.It Sy 6
+IPv6
+.El
+.It Cm PERSISTENT
 A set of single character flags showing what configuration will be used the
 next time the interface is enabled:
-.sp
-.ne 2
-.na
-.RS 4n
-s - IPMP standby
-.br
-4 - IPv4
-.br
-6 - IPv6
-.RE
-.RE
-.RE
-
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBset-ifprop\fR [\fB-t\fR] \fB-p\fR \fIprop\fR=<\fIvalue\fR[,...]> \fB-m\fR \fIprotocol\fR \fIinterface\fR\fR
-.ad
-.sp .6
-.RS 4n
-The \fBset-ifprop\fR subcommand is used to set a property's value(s) on the IP
-interface.
-.sp
-The \fB-t\fR option (also \fB--temporary\fR) means
-that the setting is temporary and will not be persistent across reboots.
-.sp
-The \fB-p\fR option (also \fB--prop\fR) specifies the property name and
-value(s).  The property name can be one of the following:
-.sp
-.ne 2
-.na
-
-.RS 4n
-
-\fBarp\fR
-.ad
-.RS 4n
-Enables ("on") or disables ("off") ARP.
-.RE
-
-.sp
-.ne 2
-.na
-\fBexchange_routes\fR
-.ad
-.RS 4n
-Enables ("on") or disables ("off") the exchange of routing data.
-.RE
-
-.sp
-.ne 2
-.na
-\fBforwarding\fR
-.ad
-.RS 4n
-Enables ("on") or disables ("off") IP forwarding.
-.RE
-
-.sp
-.ne 2
-.na
-\fBmetric\fR
-.ad
-.RS 4n
+.Bl -tag -compact -width "s"
+.It Sy s
+IPMP standby
+.It Sy 4
+IPv4
+.It Sy 6
+IPv6
+.El
+.El
+.It Fl p Ns , Ns Fl -parsable
+Print the output in a parsable format.
+.El
+.It Xo
+.Nm
+.Ic set-ifprop
+.Op Fl t
+.Fl p Ar prop Ns = Ns Ar value Ns Oo , Ns Ar value Oc Ns ...
+.Fl m Ar protocol
+.Ar interface
+.Xc
+Set a property's value(s) on the IP interface.
+.Bl -tag -width ""
+.It Fl m Ns , Ns Fl -module
+Specify which protocol the setting applies to.
+.It Fl p Ns , Ns Fl -prop
+Specify the property name and value(s). The property name can be one of the
+following:
+.Bl -tag -compact -width "exchange_routes"
+.It Cm arp
+Address resolution protocol
+.Pq Cm on Ns / Ns Cm off .
+.It Cm exchange_routes
+Exchange of routing data
+.Pq Cm on Ns / Ns Cm off .
+.It Cm forwarding
+IP Forwarding
+.Pq Cm on Ns / Ns Cm off
+.It Cm metric
 Set the routing metric to the numeric value. The value is treated as extra
 hops to the destination.
-.RE
-
-.sp
-.ne 2
-.na
-\fBmtu\fR
-.ad
-.RS 4n
+.It Cm mtu
 Set the maximum transmission unit to the numeric value.
-.RE
-
-.sp
-.ne 2
-.na
-\fBnud\fR
-.ad
-.RS 4n
-Enables ("on") or disables ("off") neighbor unreachability detection.
-.RE
-
-.sp
-.ne 2
-.na
-\fBusesrc\fR
-.ad
-.RS 4n
+.It Cm nud
+Neighbor unreachability detection
+.Pq Cm on Ns / Ns Cm off
+.It Cm usesrc
 Indicates which interface to use for source address selection. A value
-"none" may also be used.
-.RE
-.RE
-
-.sp
-The \fB-m\fR option (also \fB--module\fR) specifies which protocol
-the setting applies to.
-.sp
-
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBreset-ifprop\fR [\fB-t\fR] \fB-p\fR \fIprop\fR \fB-m\fR \fIprotocol\fR \fIinterface\fR\fR
-.ad
-.sp .6
-.RS 4n
-The \fBreset-ifprop\fR subcommand is used to reset an IP interface's property
-value to the default.
-.sp
-The \fB-t\fR option (also \fB--temporary\fR) means
-that the disable is temporary and will not be persistent across reboots.
-.sp
-The \fB-p\fR option (also \fB--prop\fR) specifies the property name.
-See the \fBset-ifprop\fR subcommand for the list of property names.
-.sp
-The \fB-m\fR option (also \fB--module\fR) specifies which protocol
-the setting applies to.
-.sp
-
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBshow-ifprop\fR [[\fB-c\fR]\fB-o\fR \fIfield\fR[,...]] [\fB-p\fR \fIprop\fR,...] [\fB-m\fR \fIprotocol\fR]
-  [\fIinterface\fR]\fR
-.ad
-.sp .6
-.RS 4n
-The \fBshow-ifprop\fR subcommand is used to display the property values
-for one or all of the IP interfaces.
-.sp
-The \fB-c\fR option (also \fB--parsable\fR) prints
-the output in a parsable format.
-.sp
-The \fB-o\fR option (also \fB--output\fR) is used
-to select which fields will be shown.  The field value can be one of the
-following names:
-.sp
-.ne 2
-.na
-.RS 4n
-\fBALL\fR
-.ad
-.RS 4n
-Display all fields
-.RE
-
-.sp
-.ne 2
-.na
-\fBIFNAME\fR
-.ad
-.RS 4n
-The name of the interface
-.RE
-
-.sp
-.ne 2
-.na
-\fBPROPERTY\fR
-.ad
-.RS 4n
-The name of the property
-.RE
-
-.sp
-.ne 2
-.na
-\fBPROTO\fR
-.ad
-.RS 4n
-The name of the protocol
-.RE
-
-.sp
-.ne 2
-.na
-\fBPERM\fR
-.ad
-.RS 4n
-If the property is readable ("r") and/or writable ("w").
-.RE
-
-.sp
-.ne 2
-.na
-\fBCURRENT\fR
-.ad
-.RS 4n
-The value of the property
-.RE
-
-.sp
-.ne 2
-.na
-\fBPERSISTENT\fR
-.ad
-.RS 4n
-The persistent value of the property
-.RE
-
-.sp
-.ne 2
-.na
-\fBDEFAULT\fR
-.ad
-.RS 4n
-The default value of the property
-.RE
-
-.sp
-.ne 2
-.na
-\fBPOSSIBLE\fR
-.ad
-.RS 4n
-The possible values for the property
-.RE
-.RE
-
-.sp
-The \fB-p\fR option (also \fB--prop\fR) is used
-to specify which properties to display.  See the \fBset-ifprop\fR
+.Cm none
+may also be used.
+.El
+.It Fl t Ns , Ns Fl -temporary
+Temporary, not persistent across reboots.
+.El
+.It Xo
+.Nm
+.Ic reset-ifprop
+.Op Fl t
+.Fl p Ar prop
+.Fl m Ar protocol
+.Ar interface
+.Xc
+Reset an IP interface's property value to the default.
+.Bl -tag -width ""
+.It Fl m Ns , Ns Fl -module
+Specify which protocol the setting applies to.
+.It Fl p Ns , Ns Fl -prop
+Specify the property name. See the
+.Nm ipadm Ic set-ifprop
 subcommand for the list of property names.
-.sp
-The \fB-m\fR option (also \fB--module\fR) specifies which protocol
-to display.
-.sp
-
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBcreate-addr\fR [\fB-t\fR] \fB-T\fR static [\fB-d\fR] \\
-   \fB-a\fR {local|remote}=\fIaddr\fR[/\fIprefixlen\fR],... \fIaddrobj\fR\fR
+.It Fl t Ns , Ns Fl -temporary
+Temporary, not persistent across reboots.
+.El
+.It Xo
+.Nm
+.Ic show-ifprop
+.Op Oo Fl c Oc Fl o Ar field Ns Oo , Ns Ar value Oc Ns ...
+.Op Fl p Ar prop Ns Oo , Ns Ar prop Oc Ns ...
+.Op Fl m Ar protocol
+.Op Ar interface
+.Xc
+Display the property values for one or all of the IP interfaces.
+.Bl -tag -width ""
+.It Fl c Ns , Ns Fl -parsable
+Print the output in a parsable format.
+.It Fl m Ns , Ns Fl -module
+Specify which protocol to display.
+.It Fl o Ns , Ns Fl -output
+Select which fields will be shown. The field value can be one of the following
+names:
+.Bl -tag -compact -width "PERSISTENT"
+.It Cm ALL
+Display all fields.
+.It Cm IFNAME
+The name of the interface.
+.It Cm PROPERTY
+The name of the property.
+.It Cm PROTO
+The name of the protocol.
+.It Cm PERM
+If the property is readable
+.Pq Qq r
+and/or writable
+.Pq Qq w .
+.It Cm CURRENT
+The value of the property.
+.It Cm PERSISTENT
+The persistent value of the property.
+.It Cm DEFAULT
+The default value of the property.
+.It Cm POSSIBLE
+The possible values for the property.
+.El
+.It Fl p Ns , Ns Fl -prop
+Specify which properties to display. See the
+.Nm ipadm Ic set-ifprop
+subcommand for the list of property names.
+.El
+.It Xo
+.Nm
+.Ic create-addr
+.Op Fl t
+.Fl T Cm static
+.Op Fl d
+.Fl a Oo Cm local Ns | Ns Cm remote Ns = Oc Ns
+.Ar addr Ns Oo / Ns Ar prefixlen Oc Ns ...
+.Ar addrobj
 .br
-\fB\fBcreate-addr\fR [\fB-t\fR] \fB-T\fR dhcp [\fB-w\fR \fIseconds\fR | forever ] \fIaddrobj\fR\fR
+.Nm
+.Ic create-addr
+.Op Fl t
+.Fl T Cm dhcp
+.Op Fl w Ar seconds Ns | Ns Cm forever
+.Ar addrobj
 .br
-\fB\fBcreate-addr\fR [\fB-t\fR] \fB-T\fR addrconf [\fB-i\fR \fIinterface-id\fR] \\
-   [\fB-p\fR {stateful|stateless}={yes|no},..] \fIaddrobj\fR\fR
-.ad
-.sp .6
-.RS 4n
-The \fBcreate-addr\fR subcommand is used to set an address on an IP interface.
-The address will be enabled but can disabled using the \fBdisable-addr\fR
+.Nm
+.Ic create-addr
+.Op Fl t
+.Fl T Cm addrconf
+.Op Fl i Ar interface-id
+.Oo Fl p Bro Cm stateful Ns | Ns Cm stateless Brc Ns = Ns
+.Bro Cm yes Ns | Ns Cm no Brc Oc Ns ...
+.Ar addrobj
+.Xc
+Create an address on an IP interface. The address will be enabled but can
+disabled using the
+.Nm ipadm Ic disable-addr
 subcommand. This subcommand has three different forms, depending on the
-value of the \fB-T\fR option.
-.sp
-The \fB-t\fR option (also \fB--temporary\fR) means
-that the address is temporary and will not be persistent across reboots.
-.sp
-The \fB-T\fR static option creates a static addrobj.  This takes the following
-options:
-.RS 4n
-
-The \fB-d\fR option (also \fB--down\fR) means the address is down.
-.sp
-The \fB-a\fR option (also \fB--address\fR) specifies the address.
-The "local" or "remote" prefix can be used for a point-to-point interface.
-In this case, both addresses must be given.
-Otherwise, the equal sign ("=") should be omitted and the address should be
-provided by itself and with no second address.
-.sp
-
-.RE
-
-The \fB-T\fR dhcp option causes the address to be obtained via DHCP.
-This takes the following options:
-.RS 4n
-
-The \fB-w\fR option (also \fB--wait\fR) gives the time, in seconds,
-that the command should wait to obtain an address.
-.sp
-
-.RE
-
-The \fB-T\fR addrconf option creates an auto-configured address.
-This takes the following options:
-.RS 4n
-
-The \fB-i\fR option (also \fB--interface-id\fR) gives the interface ID to
-be used.
-.sp
-The \fB-p\fR option (also \fB--prop\fR) indicates which method of
-auto-configuration should be used.
-.sp
-
-.RE
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBdown-addr\fR [\fB-t\fR] \fIaddrobj\fR\fR
-.ad
-.sp .6
-.RS 4n
-The \fBdown-addr\fR subcommand is used to down the address. This will
-stop packets from being sent or received.
-.sp
-The \fB-t\fR option (also \fB--temporary\fR) means
-that the down is temporary and will not be persistent across reboots.
-.sp
-
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBup-addr\fR [\fB-t\fR] \fIaddrobj\fR\fR
-.ad
-.sp .6
-.RS 4n
-The \fBup-addr\fR subcommand is used to up the address. This will
-enable packets to be sent and received.
-.sp
-The \fB-t\fR option (also \fB--temporary\fR) means
-that the up is temporary and will not be persistent across reboots.
-.sp
-
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBdisable-addr\fR [\fB-t\fR] \fIaddrobj\fR\fR
-.ad
-.sp .6
-.RS 4n
-The \fBdisable-addr\fR subcommand is used to disable the address.
-.sp
-The \fB-t\fR option (also \fB--temporary\fR) means
-that the disable is temporary and will not be persistent across reboots.
-.sp
-
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBenable-addr\fR [\fB-t\fR] \fIaddrobj\fR\fR
-.ad
-.sp .6
-.RS 4n
-The \fBenable-addr\fR subcommand is used to enable the address.
-.sp
-The \fB-t\fR option (also \fB--temporary\fR) means
-that the enable is temporary and will not be persistent across reboots.
-.sp
-
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBrefresh-addr\fR [\fB-i\fR] \fIaddrobj\fR\fR
-.ad
-.sp .6
-.RS 4n
-The \fBrefresh-addr\fR subcommand is used to extend the lease for DHCP
-addresses. It also restarts duplicate address detection for Static addresses.
-.sp
-The \fB-i\fR option (also \fB--inform\fR) means
-that the network configuration will be obtained from DHCP without taking
-a lease on the address.
-.sp
-
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBdelete-addr\fR [\fB-r\fR] \fIaddrobj\fR\fR
-.ad
-.sp .6
-.RS 4n
-The \fBdelete-addr\fR subcommand deletes the given address.
-.sp
-The \fB-r\fR option (also \fB--release\fR) is used for DHCP-assigned
-addresses to indicate that the address should be released.
-.sp
-
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBshow-addr\fR [[\fB-p\fR] \fB-o\fR \fIfield\fR[,...]] [\fIaddrobj\fR]\fR
-.ad
-.sp .6
-.RS 4n
-The \fBshow-addr\fR subcommand is used to show the current address properties.
-.sp
-The \fB-p\fR option (also \fB--parsable\fR) prints
-the output in a parsable format.
-.sp
-The \fB-o\fR option (also \fB--output\fR) is used
-to select which fields will be shown.  The field value can be one of the
-following names:
-.sp
-.ne 2
-.na
-.RS 4n
-\fBALL\fR
-.ad
-.RS 4n
-Display all fields
-.RE
-
-.sp
-.ne 2
-.na
-\fBADDROBJ\fR
-.ad
-.RS 4n
-The name of the address
-.RE
-
-.sp
-.ne 2
-.na
-\fBTYPE\fR
-.ad
-.RS 4n
-The type of the address.  It can be "static", "dhcp" or "addrconf".
-.RE
-
-.sp
-.ne 2
-.na
-\fBSTATE\fR
-.ad
-.RS 4n
-The state of the address.  It can be one of the following values:
-.sp
-.ne 2
-.na
-.RS 4n
-disabled s see the \fBdisable-addr\fR subcommand
-.sp
-down - see the \fBdown-addr\fR subcommand
-.sp
-duplicate - the address is a duplicate
-.sp
-inaccessible - the interface for this address has failed
-.sp
-ok - the address is up
-.sp
-tentative - duplicate address detection in progress
-.RE
-.RE
-
-.sp
-.ne 2
-.na
-\fBCURRENT\fR
-.ad
-.RS 4n
+value of the
+.Fl T
+option.
+.Bl -tag -width ""
+.It Fl T Cm static
+Create a static addrobj. Note that
+.Cm addrconf
+address configured on an interface is required to configure
+.Cm static
+IPv6 address on the same interface. This takes the following options:
+.Bl -tag -width ""
+.It Fl a Ns , Ns Fl -address
+Specify the address. The
+.Cm local
+or
+.Cm remote
+prefix can be used for a point-to-point interface. In this case, both addresses
+must be given. Otherwise, the equal sign
+.Pq Qq =
+should be omitted and the address should be provided by itself without second
+address.
+.It Fl d Ns , Ns Fl -down
+The address is down.
+.El
+.It Fl T Cm dhcp
+Obtain the address via DHCP. This takes the following options:
+.Bl -tag -width ""
+.It Fl w Ns , Ns Fl -wait
+Specify the time, in seconds, that the command should wait to obtain an address.
+.El
+.It Fl T Cm addrconf
+Create an auto-configured address. This takes the following options:
+.Bl -tag -width ""
+.It Fl i Ns , Ns Fl -interface-id
+Specify the interface ID to be used.
+.It Fl p Ns , Ns Fl -prop
+Specify which method of auto-configuration should be used.
+.El
+.It Fl t Ns , Ns Fl -temporary
+Temporary, not persistent across reboots.
+.El
+.It Xo
+.Nm
+.Ic down-addr
+.Op Fl t
+.Ar addrobj
+.Xc
+Down the address. This will stop packets from being sent or received.
+.Bl -tag -width ""
+.It Fl t Ns , Ns Fl -temporary
+Temporary, not persistent across reboots.
+.El
+.It Xo
+.Nm
+.Ic up-addr
+.Op Fl t
+.Ar addrobj
+.Xc
+Up the address. This will enable packets to be sent and received.
+.Bl -tag -width ""
+.It Fl t Ns , Ns Fl -temporary
+Temporary, not persistent across reboots.
+.El
+.It Xo
+.Nm
+.Ic disable-addr
+.Op Fl t
+.Ar addrobj
+.Xc
+Disable the address.
+.Bl -tag -width ""
+.It Fl t Ns , Ns Fl -temporary
+Temporary, not persistent across reboots.
+.El
+.It Xo
+.Nm
+.Ic enable-addr
+.Op Fl t
+.Ar addrobj
+.Xc
+Enable the address.
+.Bl -tag -width ""
+.It Fl t Ns , Ns Fl -temporary
+Temporary, not persistent across reboots.
+.El
+.It Xo
+.Nm
+.Ic refresh-addr
+.Op Fl i
+.Ar addrobj
+.Xc
+Extend the lease for
+.Sy DHCP
+addresses. It also restarts duplicate address
+detection for
+.Cm static
+addresses.
+.Bl -tag -width ""
+.It Fl i Ns , Ns Fl -inform
+Obtain network configuration from DHCP without taking a lease on the address.
+.El
+.It Xo
+.Nm
+.Ic delete-addr
+.Op Fl r
+.Ar addrobj
+.Xc
+Delete the given address.
+.Bl -tag -width ""
+.It Fl r Ns , Ns Fl -release
+Indicate that the DHCP-assigned address should be released.
+.El
+.It Xo
+.Nm
+.Ic show-addr
+.Op Oo Fl p Oc Fl o Ar field Ns Oo , Ns Ar field Oc Ns ...
+.Op Ar addrobj
+.Xc
+Show the current address properties.
+.Bl -tag -width ""
+.It Fl o Ns , Ns Fl -output
+Select which fields will be shown. The field value can be one of the following
+names:
+.Bl -tag -compact -width "PERSISTENT"
+.It Cm ALL
+Display all fields.
+.It Cm ADDROBJ
+The name of the address.
+.It Cm TYPE
+The type of the address
+.Pq Sy static Ns / Ns Sy dhcp Ns / Ns Sy addrconf .
+.It Cm STATE
+The state of the address. It can be one of the following values:
+.Bl -tag -compact -width "inaccessible"
+.It Sy disabled
+see the
+.Nm ipadm Ic disable-addr
+subcommand
+.It Sy down
+see the
+.Nm ipadm Ic down-addr
+subcommand
+.It Sy duplicate
+the address is a duplicate
+.It Sy inaccessible
+the interface for this address has failed
+.It Sy ok
+the address is up
+.It Sy tentative
+duplicate address detection in progress
+.El
+.It Cm CURRENT
 A set of single character flags indicating the following:
-.sp
-.ne 2
-.na
-.RS 4n
-U - up
-.br
-u - unnumbered (matches another local address)
-.br
-p - private, not advertised to routing
-.br
-t - temporary IPv6 address
-.br
-d - deprecated (not used for outgoing packets)
-.RE
-.RE
-
-.sp
-.ne 2
-.na
-\fBPERSISTENT\fR
-.ad
-.RS 4n
+.Bl -tag -compact -width "U"
+.It Sy U
+up
+.It Sy u
+unnumbered
+.Pq matches another local address
+.It Sy p
+private, not advertised to routing
+.It Sy t
+temporary IPv6 address
+.It Sy d
+deprecated
+.Pq not used for outgoing packets
+.El
+.It Cm PERSISTENT
 A set of single character flags showing the configuration which will be used
 when the address is enabled.
-.sp
-.ne 2
-.na
-.RS 4n
-U - up
-.br
-p - private, not advertised to routing
-.br
-d - deprecated (not used for outgoing packets)
-.RE
-.RE
-
-.sp
-.ne 2
-.na
-\fBADDR\fR
-.ad
-.RS 4n
-The address
-.RE
-.RE
-
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBset-addrprop\fR [\fB-t\fR] \fB-p\fR \fIprop\fR=<\fIvalue\fR[,...]> \fIaddrobj\fR
-.ad
-.sp .6
-.RS 4n
-The \fBset-addrprop\fR subcommand is used to set a property's value(s) on the
-addrobj.
-.sp
-The \fB-t\fR option (also \fB--temporary\fR) means
-that the setting is temporary and will not be persistent across reboots.
-.sp
-The \fB-p\fR option (also \fB--prop\fR) specifies the property name and
-value(s).  The property name can be one of the following:
-.sp
-.ne 2
-.na
-
-.RS 4n
-
-\fBbroadcast\fR
-.ad
-.RS 4n
-The broadcast address (read-only)
-.RE
-
-.sp
-.ne 2
-.na
-\fBdeprecated\fR
-.ad
-.RS 4n
-The address should not be used to send packets but can still receive packets.
-Can be "on" or "off".
-.RE
-
-.sp
-.ne 2
-.na
-\fBprefixlen\fR
-.ad
-.RS 4n
+.Bl -tag -compact -width "U"
+.It Sy U
+up
+.It Sy p
+private, not advertised to routing
+.It Sy d
+deprecated
+.Pq not used for outgoing packets
+.El
+.It Cm ADDR
+The address.
+.El
+.It Fl p Ns , Ns Fl -parsable
+Print the output in a parsable format.
+.El
+.It Xo
+.Nm
+.Ic set-addrprop
+.Op Fl t
+.Fl p Ar prop Ns = Ns Ar value Ns Oo , Ns Ar value Oc Ns ...
+.Ar addrobj
+.Xc
+Set a property's value(s) on the addrobj.
+.Bl -tag -width ""
+.It Fl p Ns , Ns Fl -prop
+Specify the property name and value(s). The property name can be one of the
+following:
+.Bl -tag -compact -width "deprecated"
+.It Cm broadcast
+The broadcast address (read-only).
+.It Cm deprecated
+The address should not be used to send packets but can still receive packets
+.Pq Cm on Ns / Ns Cm off .
+.It Cm prefixlen
 The number of bits in the IPv4 netmask or IPv6 prefix.
-.RE
-
-.sp
-.ne 2
-.na
-\fBprivate\fR
-.ad
-.RS 4n
-The address is not advertised to routing.
-Can be "on" or "off".
-.RE
-
-.sp
-.ne 2
-.na
-\fBtransmit\fR
-.ad
-.RS 4n
-Packets can be transmitted.
-Can be "on" or "off".
-.RE
-
-.sp
-.ne 2
-.na
-\fBzone\fR
-.ad
-.RS 4n
+.It Cm private
+The address is not advertised to routing
+.Pq Cm on Ns / Ns Cm off .
+.It Cm transmit
+Packets can be transmitted
+.Pq Cm on Ns / Ns Cm off .
+.It Cm zone
 The zone the addrobj is in.
-.RE
-
-.RE
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBreset-addrprop\fR [\fB-t\fR] \fB-p\fR \fIprop\fR \fIaddrobj\fR\fR
-.ad
-.sp .6
-.RS 4n
-The \fBreset-addrprop\fR subcommand is used to reset an addrobj's property
-value to the default.
-.sp
-The \fB-t\fR option (also \fB--temporary\fR) means
-that the disable is temporary and will not be persistent across reboots.
-.sp
-The \fB-p\fR option (also \fB--prop\fR) specifies the property name.
-See the \fBset-addrprop\fR subcommand for the list of property names.
-.sp
-
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBshow-addrprop\fR [[\fB-c\fR]\fB-o\fR \fIfield\fR[,...]] [\fB-p\fR \fIprop\fR,...] \fIaddrobj\fR]
-.ad
-.sp .6
-.RS 4n
-The \fBshow-addrprop\fR subcommand is used to display the property values
-for one or all of the addrobjs.
-.sp
-The \fB-c\fR option (also \fB--parsable\fR) prints
-the output in a parsable format.
-.sp
-The \fB-o\fR option (also \fB--output\fR) is used
-to select which fields will be shown.  The field value can be one of the
-following names:
-.sp
-.ne 2
-.na
-.RS 4n
-\fBALL\fR
-.ad
-.RS 4n
-Display all fields
-.RE
-
-.sp
-.ne 2
-.na
-\fBADDROBJ\fR
-.ad
-.RS 4n
-The name of the addrobj
-.RE
-
-.sp
-.ne 2
-.na
-\fBPROPERTY\fR
-.ad
-.RS 4n
-The name of the property
-.RE
-
-.sp
-.ne 2
-.na
-\fBPERM\fR
-.ad
-.RS 4n
-If the property is readable ("r") and/or writable ("w").
-.RE
-
-.sp
-.ne 2
-.na
-\fBCURRENT\fR
-.ad
-.RS 4n
-The value of the property
-.RE
-
-.sp
-.ne 2
-.na
-\fBPERSISTENT\fR
-.ad
-.RS 4n
-The persistent value of the property
-.RE
-
-.sp
-.ne 2
-.na
-\fBDEFAULT\fR
-.ad
-.RS 4n
-The default value of the property
-.RE
-
-.sp
-.ne 2
-.na
-\fBPOSSIBLE\fR
-.ad
-.RS 4n
-The possible values for the property
-.RE
-.RE
-
-.sp
-The \fB-p\fR option (also \fB--prop\fR) is used
-to specify which properties to display.  See the \fBset-addrprop\fR
+.El
+.It Fl t Ns , Ns Fl -temporary
+Temporary, not persistent across reboots.
+.El
+.It Xo
+.Nm
+.Ic reset-addrprop
+.Op Fl t
+.Fl p Ar prop
+.Ar addrobj
+.Xc
+Reset an addrobj's property value to the default.
+.Bl -tag -width ""
+.It Fl p Ns , Ns Fl -prop
+Specify the property name. See the
+.Nm ipadm Ic set-addrprop
 subcommand for the list of property names.
-.sp
-
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBset-prop\fR [\fB-t\fR] \fB-p\fR \fIprop\fR[+|-]=<\fIvalue\fR[,...]> \fIprotocol\fR
-.ad
-.sp .6
-.RS 4n
-The \fBset-prop\fR subcommand is used to set a property's value(s) on the
-protocol.
-.sp
-The \fB-t\fR option (also \fB--temporary\fR) means
-that the setting is temporary and will not be persistent across reboots.
-.sp
-The \fB-p\fR option (also \fB--prop\fR) specifies the property name and
-value(s). The optional [+|-] syntax can be used to add/remove values from the
-current list of values on the property.
-The property name can be one of the following:
-.sp
-.ne 2
-.na
-
-.RS 4n
-
-\fBecn\fR
-.ad
-.RS 4n
-Explicit congestion control (TCP-only)
-Can be "never", "passive" or "active".
-.RE
-
-\fBextra_priv_ports\fR
-.ad
-.RS 4n
-Additional privileged ports (SCTP, TCP or UDP)
-.RE
-
-\fBforwarding\fR
-.ad
-.RS 4n
-Packet forwarding is enabled.
-Can be "on" or "off".
-.RE
-
-\fBhoplimit\fR
-.ad
-.RS 4n
+.It Fl t Ns , Ns Fl -temporary
+Temporary, not persistent across reboots.
+.El
+.It Xo
+.Nm
+.Ic show-addrprop
+.Op Oo Fl c Oc Fl o Ar field Ns Oo , Ns Ar field Oc Ns ...
+.Op Fl p Ar prop Ns Oo , Ns Ar prop Oc Ns ...
+.Op Ar addrobj
+.Xc
+Display the property values for one or all of the addrobjs.
+.Bl -tag -width ""
+.It Fl c Ns , Ns Fl -parsable
+Print the output in a parsable format.
+.It Fl o Ns , Ns Fl -output
+Select which fields will be shown. The field value can be one of the following
+names:
+.Bl -tag -compact -width "PERSISTENT"
+.It Cm ALL
+Display all fields.
+.It Cm ADDROBJ
+The name of the addrobj.
+.It Cm PROPERTY
+The name of the property.
+.It Cm PERM
+If the property is readable
+.Pq Qq r
+and/or writable
+.Pq Qq w .
+.It Cm CURRENT
+The value of the property.
+.It Cm PERSISTENT
+The persistent value of the property.
+.It Cm DEFAULT
+The default value of the property.
+.It Cm POSSIBLE
+The possible values for the property.
+.El
+.It Fl p Ns , Ns Fl -prop
+Specify which properties to display. See the
+.Nm ipadm Ic set-addrprop
+subcommand for the list of property names.
+.El
+.It Xo
+.Ic set-prop
+.Op Fl t
+.Fl p Ar prop Ns Oo Cm + Ns | Ns Cm - Oc Ns = Ns
+.Ar value Ns Oo , Ns Ar value Oc Ns ...
+.Ar protocol
+.Xc
+Set a property's value(s) on the protocol.
+.Bl -tag -width ""
+.It Fl p Ns , Ns Fl -prop
+Specify the property name and value(s). The optional
+.Sy + Ns | Ns Sy -
+syntax can be used to add/remove values from the current list of values on the
+property. The property name can be one of the following:
+.Bl -tag -compact -width "smallest_nonpriv_port"
+.It Cm ecn
+Explicit congestion control
+.Pq Cm never Ns / Ns Cm passive Ns / Ns Cm active
+.Pq TCP .
+.It Cm extra_priv_ports
+Additional privileged ports
+.Pq SCTP/TCP/UDP .
+.It Cm forwarding
+Packet forwarding
+.Pq Cm on Ns / Ns Cm off .
+.It Cm hoplimit
 The IPv6 hoplimit.
-.RE
-
-\fBlargest_anon_port\fR
-.ad
-.RS 4n
-Largest ephemeral port (SCTP, TCP or UDP)
-.RE
-
-\fBmax_buf\fR
-.ad
-.RS 4n
-Maximum receive or send buffer size (ICMP, SCTP, TCP, or UDP).  This also
-sets the upper limit for the \fBrecv_buf\fB and \fBsend_buf\fB properties.
-.RE
-
-\fBrecv_buf\fR
-.ad
-.RS 4n
-Default receive buffer size (ICMP, SCTP, TCP, or UDP).  The maximum value for
-this property is controlled by the \fBmax_buf\fR property.
-.RE
-
-\fBsack\fR
-.ad
-.RS 4n
-Selective acknowledgement (TCP).
-Can be "active", "passive" or "never".
-.RE
-
-\fBsend_buf\fR
-.ad
-.RS 4n
-Default send buffer size (ICMP, SCTP, TCP, or UDP).  The maximum value for
-this property is controlled by the \fBmax_buf\fR property.
-.RE
-
-\fBsmallest_anon_port\fR
-.ad
-.RS 4n
-Smallest ephemeral port (SCTP, TCP or UDP)
-.RE
-
-\fBsmallest_nonpriv_port\fR
-.ad
-.RS 4n
-Smallest non-privileged port (SCTP, TCP or UDP)
-.RE
-
-\fBttl\fR
-.ad
-.RS 4n
+.It Cm largest_anon_port
+Largest ephemeral port
+.Pq SCTP/TCP/UDP .
+.It Cm max_buf
+Maximum receive or send buffer size
+.Pq ICMP/SCTP/TCP/UDP .
+This also sets the upper limit for the
+.Cm recv_buf
+and
+.Cm send_buf
+properties.
+.It Cm recv_buf
+Default receive buffer size
+.Pq ICMP/SCTP/TCP/UDP .
+The maximum value for this property is controlled by the
+.Cm max_buf
+property.
+.It Cm sack
+Selective acknowledgement
+.Pq Cm active Ns / Ns Cm passive Ns / Ns Cm never
+.Pq TCP .
+.It Cm send_buf
+Default send buffer size
+.Pq ICMP/SCTP/TCP/UDP .
+The maximum value for this property is controlled by the
+.Cm max_buf
+property.
+.It Cm smallest_anon_port
+Smallest ephemeral port
+.Pq SCTP/TCP/UDP .
+.It Cm smallest_nonpriv_port
+Smallest non-privileged port
+.Pq SCTP/TCP/UDP .
+.It Cm ttl
 The IPv4 time-to-live.
-.RE
-
-.RE
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBreset-prop\fR [\fB-t\fR] \fB-p\fR \fIprop\fR \fIprotocol\fR\fR
-.ad
-.sp .6
-.RS 4n
-The \fBreset-prop\fR subcommand is used to reset a protocol's property
-value to the default.
-.sp
-The \fB-t\fR option (also \fB--temporary\fR) means
-that the disable is temporary and will not be persistent across reboots.
-.sp
-The \fB-p\fR option (also \fB--prop\fR) specifies the property name.
-See the \fBset-prop\fR subcommand for the list of property names.
-.sp
-
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBshow-prop\fR [[\fB-c\fR]\fB-o\fR \fIfield\fR[,...]] [\fB-p\fR \fIprop\fR,...] \fIprotocol\fR]
-.ad
-.sp .6
-.RS 4n
-The \fBshow-prop\fR subcommand is used to display the property values
-for one or all of the protocols.
-.sp
-The \fB-c\fR option (also \fB--parsable\fR) prints
-the output in a parsable format.
-.sp
-The \fB-o\fR option (also \fB--output\fR) is used
-to select which fields will be shown.  The field value can be one of the
-following names:
-.sp
-.ne 2
-.na
-.RS 4n
-\fBALL\fR
-.ad
-.RS 4n
-Display all fields
-.RE
-
-.sp
-.ne 2
-.na
-\fBPROTO\fR
-.ad
-.RS 4n
-The name of the protocol
-.RE
-
-.sp
-.ne 2
-.na
-\fBPROPERTY\fR
-.ad
-.RS 4n
-The name of the property
-.RE
-
-.sp
-.ne 2
-.na
-\fBPERM\fR
-.ad
-.RS 4n
-If the property is readable ("r") and/or writable ("w").
-.RE
-
-.sp
-.ne 2
-.na
-\fBCURRENT\fR
-.ad
-.RS 4n
-The value of the property
-.RE
-
-.sp
-.ne 2
-.na
-\fBPERSISTENT\fR
-.ad
-.RS 4n
-The persistent value of the property
-.RE
-
-.sp
-.ne 2
-.na
-\fBDEFAULT\fR
-.ad
-.RS 4n
-The default value of the property
-.RE
-
-.sp
-.ne 2
-.na
-\fBPOSSIBLE\fR
-.ad
-.RS 4n
-The possible values for the property
-.RE
-.RE
-
-.sp
-The \fB-p\fR option (also \fB--prop\fR) is used
-to specify which properties to display.  See the \fBset-prop\fR
+.El
+.It Fl t Ns , Ns Fl -temporary
+Temporary, not persistent across reboots.
+.El
+.It Xo
+.Nm
+.Ic reset-prop
+.Op Fl t
+.Fl p Ar prop
+.Ar protocol
+.Xc
+Reset a protocol's property value to the default.
+.Bl -tag -width ""
+.It Fl p Ns , Ns Fl -prop
+Specify the property name. See the
+.Nm ipadm Ic set-prop
 subcommand for the list of property names.
-.sp
-
-.RE
-
-.SH SEE ALSO
-.sp
-.LP
-\fBifconfig\fR(1M), \fBdladm\fR(1M), \fBndd\fR(1M), \fBzonecfg\fR(1M),
-\fBarp\fR(1M), \fBcfgadm\fR(1M), \fBif_mpadm\fR(1M), \fBnsswitch.conf\fR(4),
-and \fBdhcp\fR(5).
+.It Fl t Ns , Ns Fl -temporary
+Temporary, not persistent across reboots.
+.El
+.It Xo
+.Nm
+.Ic show-prop
+.Op Oo Fl c Oc Fl o Ar field Ns Oo , Ns Ar field Oc Ns ...
+.Op Fl p Ar prop Ns Oo , Ns Ar prop Oc Ns ...
+.Op Ar protocol
+.Xc
+Display the property values for one or all of the protocols.
+.Bl -tag -width ""
+.It Fl c Ns , Ns Fl -parsable
+Print the output in a parsable format.
+.It Fl o Ns , Ns Fl -output
+Select which fields will be shown. The field value can be one of the following
+names:
+.Bl -tag -compact -width "PERSISTENT"
+.It Cm ALL
+Display all fields.
+.It Cm PROTO
+The name of the protocol.
+.It Cm PROPERTY
+The name of the property.
+.It Cm PERM
+If the property is readable
+.Pq Qq r
+and/or writable
+.Pq Qq w .
+.It Cm CURRENT
+The value of the property.
+.It Cm PERSISTENT
+The persistent value of the property.
+.It Cm DEFAULT
+The default value of the property.
+.It Cm POSSIBLE
+The possible values for the property.
+.El
+.It Fl p Ns , Ns Fl -prop
+Specify which properties to display. See the
+.Nm ipadm Ic set-prop
+subcommand for the list of property names.
+.El
+.El
+.Sh SEE ALSO
+.Xr arp 1M ,
+.Xr cfgadm 1M ,
+.Xr dladm 1M ,
+.Xr if_mpadm 1M ,
+.Xr ifconfig 1M ,
+.Xr ndd 1M ,
+.Xr zonecfg 1M ,
+.Xr nsswitch.conf 4 ,
+.Xr dhcp 5 .

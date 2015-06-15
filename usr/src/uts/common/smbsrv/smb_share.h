@@ -47,6 +47,9 @@ extern "C" {
 #define	SMB_SYSTEM32		SMB_SYSROOT "/system32"
 #define	SMB_VSS			SMB_SYSTEM32 "/vss"
 
+/* Exported named pipes are in... */
+#define	SMB_PIPE_DIR		"/var/smb/pipe"
+
 /*
  * Share Properties:
  *

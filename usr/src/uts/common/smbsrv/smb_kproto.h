@@ -375,11 +375,9 @@ int smb_net_txr_send(ksocket_t, smb_txlst_t *, smb_txreq_t *);
 /*
  * SMB RPC interface
  */
-smb_opipe_t *smb_opipe_alloc(smb_server_t *);
 void smb_opipe_dealloc(smb_opipe_t *);
-int smb_opipe_open(smb_request_t *);
+int smb_opipe_open(smb_request_t *, uint32_t);
 void smb_opipe_close(smb_ofile_t *);
-smb_sdrc_t smb_opipe_transact(smb_request_t *, struct uio *);
 int smb_opipe_read(smb_request_t *, struct uio *);
 int smb_opipe_write(smb_request_t *, struct uio *);
 
@@ -598,7 +596,7 @@ void smb_request_free(smb_request_t *);
 smb_ofile_t *smb_ofile_lookup_by_fid(smb_request_t *, uint16_t);
 smb_ofile_t *smb_ofile_lookup_by_uniqid(smb_tree_t *, uint32_t);
 boolean_t smb_ofile_disallow_fclose(smb_ofile_t *);
-smb_ofile_t *smb_ofile_open(smb_request_t *, smb_node_t *, uint16_t,
+smb_ofile_t *smb_ofile_open(smb_request_t *, smb_node_t *,
     smb_arg_open_t *, uint16_t, uint32_t, smb_error_t *);
 void smb_ofile_close(smb_ofile_t *, int32_t);
 void smb_ofile_delete(void *);

@@ -1132,6 +1132,7 @@ typedef struct smb_tree {
 #define	SMB_OPIPE_MAGIC		0x50495045	/* 'PIPE' */
 #define	SMB_OPIPE_VALID(p)	\
     ASSERT(((p) != NULL) && (p)->p_magic == SMB_OPIPE_MAGIC)
+#define	SMB_OPIPE_MAXNAME	32
 
 /*
  * Data structure for SMB_FTYPE_MESG_PIPE ofiles, which is used
@@ -1139,17 +1140,14 @@ typedef struct smb_tree {
  */
 typedef struct smb_opipe {
 	uint32_t		p_magic;
-	list_node_t		p_lnd;
 	kmutex_t		p_mutex;
 	kcondvar_t		p_cv;
+	struct smb_ofile	*p_ofile;
 	struct smb_server	*p_server;
-	struct smb_event	*p_event;
-	char			*p_name;
-	uint32_t		p_busy;
-	smb_doorhdr_t		p_hdr;
-	smb_netuserinfo_t	p_user;
-	uint8_t			*p_doorbuf;
-	uint8_t			*p_data;
+	uint32_t		p_refcnt;
+	ksocket_t		p_socket;
+	/* This is the "flat" name, without path prefix */
+	char			p_name[SMB_OPIPE_MAXNAME];
 } smb_opipe_t;
 
 /*
@@ -1439,8 +1437,8 @@ typedef struct open_param {
 	uint64_t	fileid;
 	uint32_t	rootdirfid;
 	smb_ofile_t	*dir;
-	/* This is only set by NTTransactCreate */
-	struct smb_sd	*sd;
+	smb_opipe_t	*pipe;	/* for smb_opipe_open */
+	struct smb_sd	*sd;	/* for NTTransactCreate */
 	uint8_t		op_oplock_level;	/* requested/granted level */
 	boolean_t	op_oplock_levelII;	/* TRUE if levelII supported */
 } smb_arg_open_t;
@@ -1642,6 +1640,14 @@ typedef struct smb_request {
 	struct smb_ofile	*fid_ofile;
 	smb_user_t		*uid_user;
 
+	cred_t			*user_cr;
+	kthread_t		*sr_worker;
+	hrtime_t		sr_time_submitted;
+	hrtime_t		sr_time_active;
+	hrtime_t		sr_time_start;
+	int32_t			sr_txb;
+	uint32_t		sr_seqnum;
+
 	union {
 		smb_arg_negotiate_t	*negprot;
 		smb_arg_sessionsetup_t	*ssetup;
@@ -1651,14 +1657,6 @@ typedef struct smb_request {
 		smb_rw_param_t		*rw;
 		int32_t			timestamp;
 	} arg;
-
-	cred_t			*user_cr;
-	kthread_t		*sr_worker;
-	hrtime_t		sr_time_submitted;
-	hrtime_t		sr_time_active;
-	hrtime_t		sr_time_start;
-	int32_t			sr_txb;
-	uint32_t		sr_seqnum;
 } smb_request_t;
 
 #define	sr_ssetup	arg.ssetup
@@ -1858,13 +1856,6 @@ typedef struct smb_server {
 	uint64_t		sv_kdoor_ncall;
 	kmutex_t		sv_kdoor_mutex;
 	kcondvar_t		sv_kdoor_cv;
-
-	/* RPC pipes (client side) */
-	struct __door_handle	*sv_opipe_door_hd;
-	int			sv_opipe_door_id;
-	uint64_t		sv_opipe_door_ncall;
-	kmutex_t		sv_opipe_door_mutex;
-	kcondvar_t		sv_opipe_door_cv;
 
 	int32_t			si_gmtoff;
 

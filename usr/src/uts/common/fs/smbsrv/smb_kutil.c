@@ -920,6 +920,18 @@ smb_time_nt_to_unix(uint64_t nt_time, timestruc_t *unix_time)
 		return;
 	}
 
+	/*
+	 * Can't represent times less than or equal NT_TIME_BIAS,
+	 * so convert them to the oldest date we can store.
+	 * Note that time zero is "special" being converted
+	 * both directions as 0:0 (unix-to-nt, nt-to-unix).
+	 */
+	if (nt_time <= NT_TIME_BIAS) {
+		unix_time->tv_sec = 0;
+		unix_time->tv_nsec = 100;
+		return;
+	}
+
 	nt_time -= NT_TIME_BIAS;
 	seconds = nt_time / 10000000;
 	unix_time->tv_sec = seconds;

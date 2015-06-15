@@ -134,7 +134,7 @@ smb_kmod_start(int opipe, int lmshr, int udoor)
 
 	/* These are the "door" dispatch callbacks */
 	ioc.lmshr_func = NULL; /* not used */
-	ioc.opipe_func = (void *)fksmbd_opipe_dispatch;
+	ioc.opipe_func = NULL; /* not used */
 	ioc.udoor_func = (void *)fksmbd_door_dispatch;
 
 	rc = smb_kmod_ioctl(SMB_IOC_START, &ioc.hdr, sizeof (ioc));

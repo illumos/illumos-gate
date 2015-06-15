@@ -38,7 +38,7 @@
 #include <smbsrv/smb_fsops.h>
 #include <smbsrv/smbinfo.h>
 
-volatile uint32_t smb_fids = 0;
+static volatile uint32_t smb_fids = 0;
 #define	SMB_UNIQ_FID()	atomic_inc_32_nv(&smb_fids)
 
 static uint32_t smb_open_subr(smb_request_t *);
@@ -378,7 +378,9 @@ smb_open_subr(smb_request_t *sr)
 		 * No further processing for IPC, we need to either
 		 * raise an exception or return success here.
 		 */
-		if ((status = smb_opipe_open(sr)) != NT_STATUS_SUCCESS)
+		uniq_fid = SMB_UNIQ_FID();
+		status = smb_opipe_open(sr, uniq_fid);
+		if (status != NT_STATUS_SUCCESS)
 			smbsr_error(sr, status, 0, 0);
 
 		smb_threshold_exit(&sv->sv_opipe_ct);
@@ -825,18 +827,24 @@ smb_open_subr(smb_request_t *sr)
 
 	status = NT_STATUS_SUCCESS;
 
-	of = smb_ofile_open(sr, node, sr->smb_pid, op, SMB_FTYPE_DISK, uniq_fid,
+	of = smb_ofile_open(sr, node, op, SMB_FTYPE_DISK, uniq_fid,
 	    &err);
 	if (of == NULL) {
 		smbsr_error(sr, err.status, err.errcls, err.errcode);
 		status = err.status;
 	}
 
-	if (status == NT_STATUS_SUCCESS) {
-		if (!smb_tree_is_connected(sr->tid_tree)) {
-			smbsr_error(sr, 0, ERRSRV, ERRinvnid);
-			status = NT_STATUS_UNSUCCESSFUL;
-		}
+	/*
+	 * We might have blocked in smb_ofile_open long enough so a
+	 * tree disconnect might have happened.  In that case, we've
+	 * just added an ofile to a tree that's disconnecting, and
+	 * need to undo that to avoid interfering with tear-down of
+	 * the tree connection.
+	 */
+	if (status == NT_STATUS_SUCCESS &&
+	    !smb_tree_is_connected(sr->tid_tree)) {
+		smbsr_error(sr, 0, ERRSRV, ERRinvnid);
+		status = NT_STATUS_INVALID_PARAMETER;
 	}
 
 	/*

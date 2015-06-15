@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <smbsrv/smb_kproto.h>
@@ -1383,16 +1383,74 @@ is_supported_mailslot(const char *mailslot)
 }
 
 /*
- * Currently, just return false if the pipe is \\PIPE\repl.
- * Otherwise, return true.
+ * smb_trans_nmpipe
+ *
+ * This is used for RPC bind and request transactions.
+ *
+ * If the data available from the pipe is larger than the maximum
+ * data size requested by the client, return as much as requested.
+ * The residual data remains in the pipe until the client comes back
+ * with a read request or closes the pipe.
+ *
+ * When we read less than what's available, we MUST return the
+ * status NT_STATUS_BUFFER_OVERFLOW (or ERRDOS/ERROR_MORE_DATA)
  */
-static boolean_t
-is_supported_pipe(const char *pname)
+static smb_sdrc_t
+smb_trans_nmpipe(smb_request_t *sr, smb_xa_t *xa)
 {
-	if (smb_strcasecmp(pname, PIPE_REPL, 0) == 0)
-		return (B_FALSE);
+	smb_vdb_t	vdb;
+	struct mbuf	*mb;
+	int rc;
 
-	return (B_TRUE);
+	smbsr_lookup_file(sr);
+	if (sr->fid_ofile == NULL) {
+		smbsr_error(sr, NT_STATUS_INVALID_HANDLE,
+		    ERRDOS, ERRbadfid);
+		return (SDRC_ERROR);
+	}
+
+	rc = smb_mbc_decodef(&xa->req_data_mb, "#B",
+	    xa->smb_tdscnt, &vdb);
+	if (rc != 0) {
+		/* Not enough data sent. */
+		smbsr_error(sr, 0, ERRSRV, ERRerror);
+		return (SDRC_ERROR);
+	}
+
+	rc = smb_opipe_write(sr, &vdb.vdb_uio);
+	if (rc != 0) {
+		smbsr_errno(sr, rc);
+		return (SDRC_ERROR);
+	}
+
+	vdb.vdb_tag = 0;
+	vdb.vdb_uio.uio_iov = &vdb.vdb_iovec[0];
+	vdb.vdb_uio.uio_iovcnt = MAX_IOVEC;
+	vdb.vdb_uio.uio_segflg = UIO_SYSSPACE;
+	vdb.vdb_uio.uio_extflg = UIO_COPY_DEFAULT;
+	vdb.vdb_uio.uio_loffset = (offset_t)0;
+	vdb.vdb_uio.uio_resid = xa->smb_mdrcnt;
+	mb = smb_mbuf_allocate(&vdb.vdb_uio);
+
+	rc = smb_opipe_read(sr, &vdb.vdb_uio);
+	if (rc == E2BIG) {
+		/*
+		 * Note: E2BIG is not a real error.  It just
+		 * tells us there's more data to be read.
+		 */
+		smbsr_status(sr, NT_STATUS_BUFFER_OVERFLOW,
+		    ERRDOS, ERROR_MORE_DATA);
+		rc = 0;
+	}
+	if (rc != 0) {
+		smbsr_errno(sr, rc);
+		return (SDRC_ERROR);
+	}
+
+	smb_mbuf_trim(mb, xa->smb_mdrcnt - vdb.vdb_uio.uio_resid);
+	MBC_ATTACH_MBUF(&xa->rep_data_mb, mb);
+
+	return (SDRC_SUCCESS);
 }
 
 static smb_sdrc_t
@@ -1405,7 +1463,6 @@ smb_trans_dispatch(smb_request_t *sr, smb_xa_t *xa)
 	uint16_t	devstate;
 	char		*req_fmt;
 	char		*rep_fmt;
-	smb_vdb_t	vdb;
 
 	if (xa->smb_suwcnt > 0 && STYPE_ISIPC(sr->tid_tree->t_res_type)) {
 		rc = smb_mbc_decodef(&xa->req_setup_mb, "ww", &opcode,
@@ -1422,26 +1479,11 @@ smb_trans_dispatch(smb_request_t *sr, smb_xa_t *xa)
 			break;
 
 		case TRANS_TRANSACT_NMPIPE:
-			smbsr_lookup_file(sr);
-			if (sr->fid_ofile == NULL) {
-				smbsr_error(sr, NT_STATUS_INVALID_HANDLE,
-				    ERRDOS, ERRbadfid);
-				return (SDRC_ERROR);
-			}
-
-			rc = smb_mbc_decodef(&xa->req_data_mb, "#B",
-			    xa->smb_tdscnt, &vdb);
-			if (rc != 0)
-				goto trans_err_not_supported;
-
-			rc = smb_opipe_transact(sr, &vdb.vdb_uio);
+			rc = smb_trans_nmpipe(sr, xa);
 			break;
 
 		case TRANS_WAIT_NMPIPE:
-			if (!is_supported_pipe(xa->xa_pipe_name)) {
-				smbsr_error(sr, 0, ERRDOS, ERRbadfile);
-				return (SDRC_ERROR);
-			}
+			delay(SEC_TO_TICK(1));
 			rc = SDRC_SUCCESS;
 			break;
 

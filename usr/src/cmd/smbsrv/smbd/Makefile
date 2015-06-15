@@ -31,7 +31,7 @@ OBJS=				\
 	smbd_logon.o		\
 	smbd_main.o		\
 	smbd_nicmon.o		\
-	smbd_opipe_doorsvc.o	\
+	smbd_pipesvc.o		\
 	smbd_share_doorsvc.o	\
 	smbd_spool.o		\
 	smbd_syslog.o		\
