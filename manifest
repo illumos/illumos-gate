@@ -4196,6 +4196,7 @@ f usr/include/sys/shm_impl.h 0644 root bin
 f usr/include/sys/sid.h 0644 root bin
 f usr/include/sys/siginfo.h 0644 root bin
 f usr/include/sys/signal.h 0644 root bin
+f usr/include/sys/signalfd.h 0644 root bin
 f usr/include/sys/sleepq.h 0644 root bin
 f usr/include/sys/smbios.h 0644 root bin
 f usr/include/sys/smbios_impl.h 0644 root bin
@@ -4529,6 +4530,7 @@ f usr/kernel/drv/amd64/pm 0755 root sys
 f usr/kernel/drv/amd64/pool 0755 root sys
 f usr/kernel/drv/amd64/ptm 0755 root sys
 f usr/kernel/drv/amd64/pts 0755 root sys
+f usr/kernel/drv/amd64/signalfd 0755 root sys
 f usr/kernel/drv/amd64/smbsrv 0755 root sys
 f usr/kernel/drv/amd64/sppp 0755 root sys
 f usr/kernel/drv/amd64/sppptun 0755 root sys
@@ -4553,6 +4555,7 @@ f usr/kernel/drv/pm.conf 0644 root sys
 f usr/kernel/drv/pool.conf 0644 root sys
 f usr/kernel/drv/ptm.conf 0644 root sys
 f usr/kernel/drv/pts.conf 0644 root sys
+f usr/kernel/drv/signalfd.conf 0644 root sys
 f usr/kernel/drv/smbsrv.conf 0644 root sys
 f usr/kernel/drv/sppp.conf 0644 root sys
 f usr/kernel/drv/sppptun.conf 0644 root sys
@@ -13513,6 +13516,7 @@ f usr/share/man/man3c/siginterrupt.3c 0444 root bin
 s usr/share/man/man3c/sigismember.3c=sigsetops.3c
 s usr/share/man/man3c/siglongjmp.3c=setjmp.3c
 f usr/share/man/man3c/signal.3c 0444 root bin
+f usr/share/man/man3c/signalfd.3c 0444 root bin
 s usr/share/man/man3c/sigpause.3c=signal.3c
 f usr/share/man/man3c/sigqueue.3c 0444 root bin
 s usr/share/man/man3c/sigrelse.3c=signal.3c

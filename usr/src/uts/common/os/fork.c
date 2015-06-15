@@ -331,6 +331,14 @@ cfork(int isvfork, int isfork1, int flags)
 	}
 
 	/*
+	 * Setup signalfd state.
+	 */
+	if (p->p_sigfd != NULL) {
+		VERIFY(sigfd_fork_helper != NULL);
+		(*sigfd_fork_helper)(p, cp);
+	}
+
+	/*
 	 * Duplicate parent's resource controls.
 	 */
 	dup_set = rctl_set_create();

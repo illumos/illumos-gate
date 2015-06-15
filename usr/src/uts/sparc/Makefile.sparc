@@ -240,6 +240,7 @@ DRV_KMODS	+= bpf
 DRV_KMODS	+= dca
 DRV_KMODS	+= inotify
 DRV_KMODS	+= eventfd
+DRV_KMODS	+= signalfd
 DRV_KMODS	+= timerfd
 
 #
