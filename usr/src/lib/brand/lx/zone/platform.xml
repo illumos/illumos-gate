@@ -80,6 +80,7 @@
 	<device match="poll" />
 	<device match="pts/*" />
 	<device match="random" />
+	<device match="signalfd" />
 	<device match="tcp" />
 	<device match="tcp6" />
 	<device match="timerfd" />

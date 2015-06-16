@@ -38,6 +38,7 @@
 #include <sys/lx_brand.h>
 #include <sys/lx_misc.h>
 #include <sys/lx_futex.h>
+#include <lx_errno.h>
 #include <sys/cmn_err.h>
 #include <sys/siginfo.h>
 #include <sys/contract/process_impl.h>
@@ -781,4 +782,27 @@ lx_stol_hwaddr(const struct sockaddr_dl *src, struct sockaddr *dst, int *size)
 
 	bcopy(LLADDR(src), dst->sa_data, copy_size);
 	*size = copy_size;
+}
+
+/*
+ * Brand hook to convert native kernel siginfo signal number, errno, code, pid
+ * and si_status to Linux values. Similar to the stol_ksiginfo function but
+ * this one converts in-place, converts the pid, and does not copyout.
+ */
+void
+lx_sigfd_translate(k_siginfo_t *infop)
+{
+	infop->si_signo = lx_stol_signo(infop->si_signo, LX_SIGKILL);
+
+	infop->si_status = lx_stol_status(infop->si_status, LX_SIGKILL);
+
+	infop->si_code = lx_stol_sigcode(infop->si_code);
+
+	infop->si_errno = lx_errno(infop->si_errno, EINVAL);
+
+	if (infop->si_pid == curproc->p_zone->zone_proc_initpid) {
+		infop->si_pid = 1;
+	} else if (infop->si_pid == curproc->p_zone->zone_zsched->p_pid) {
+		infop->si_pid = 0;
+	}
 }

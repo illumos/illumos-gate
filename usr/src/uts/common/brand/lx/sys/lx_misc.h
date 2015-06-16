@@ -20,6 +20,7 @@
 extern "C" {
 #endif
 
+#include <sys/siginfo.h>
 #include <sys/lx_brand.h>
 
 #ifdef _KERNEL
@@ -42,6 +43,7 @@ extern greg_t lx_fixsegreg(greg_t, model_t);
 extern uintptr_t lx_fsbase(klwp_t *, uintptr_t);
 extern void lx_exit_with_sig(proc_t *, sigqueue_t *);
 extern boolean_t lx_wait_filter(proc_t *, proc_t *);
+extern void lx_sigfd_translate(k_siginfo_t *);
 
 typedef enum lx_if_action {
 	LX_IF_FROMNATIVE,

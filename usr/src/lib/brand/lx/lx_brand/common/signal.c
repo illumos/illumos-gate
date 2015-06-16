@@ -57,6 +57,7 @@
 #include <stdio.h>
 #include <libintl.h>
 #include <ieeefp.h>
+#include <sys/signalfd.h>
 
 #if defined(_ILP32)
 extern int pselect_large_fdset(int nfds, fd_set *in0, fd_set *out0, fd_set *ex0,
@@ -2568,4 +2569,36 @@ lx_rt_tgsigqueueinfo(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4)
 
 	return ((syscall(SYS_brand, B_HELPER_TGSIGQUEUE, tgid, tid, sig,
 	    &siginfo)) ? (-errno) : 0);
+}
+
+long
+lx_signalfd(int fd, uintptr_t mask, size_t msize)
+{
+	return (lx_signalfd4(fd, mask, msize, 0));
+}
+
+long
+lx_signalfd4(int fd, uintptr_t mask, size_t msize, int flags)
+{
+	sigset_t s_set;
+	int r;
+
+	if (msize != sizeof (int64_t))
+		return (-EINVAL);
+
+	if (ltos_sigset((lx_sigset_t *)mask, &s_set) != 0)
+		return (-errno);
+
+	r = signalfd(fd, &s_set, flags);
+
+	/*
+	 * signalfd(3C) may fail with ENOENT if /dev/signalfd is not available.
+	 * It is less jarring to Linux programs to tell them that internal
+	 * allocation failed than to report an error number they are not
+	 * expecting.
+	 */
+	if (r == -1 && errno == ENOENT)
+		return (-ENODEV);
+
+	return (r == -1 ? -errno : r);
 }

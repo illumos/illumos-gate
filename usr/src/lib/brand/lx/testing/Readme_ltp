@@ -257,9 +257,6 @@ x settimeofday01
 # setxattr03
 # shmget05	OS-3326
 # sighold02	fails on sig 63 OS-3307
-# signalfd01
-# signalfd4_01
-# signalfd4_02
 # sigrelse01	fails on sig 63 OS-3307
 # splice01
 # splice02

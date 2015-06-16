@@ -1196,14 +1196,14 @@ static lx_syscall_handler_t lx_handlers[] = {
 	NULL,				/* 279: move_pages */
 	lx_utimensat,			/* 280: utimensat */
 	lx_epoll_pwait,			/* 281: epoll_pwait */
-	NULL,				/* 282: signalfd */
+	lx_signalfd,			/* 282: signalfd */
 	lx_timerfd_create,		/* 283: timerfd_create */
 	lx_eventfd,			/* 284: eventfd */
 	NULL,				/* 285: fallocate */
 	lx_timerfd_settime,		/* 286: timerfd_settime */
 	lx_timerfd_gettime,		/* 287: timerfd_gettime */
 	lx_accept4,			/* 288: accept4 */
-	NULL,				/* 289: signalfd4 */
+	lx_signalfd4,			/* 289: signalfd4 */
 	lx_eventfd2,			/* 290: eventfd2 */
 	lx_epoll_create1,		/* 291: epoll_create1 */
 	lx_dup3,			/* 292: dup3 */
@@ -1566,13 +1566,13 @@ static lx_syscall_handler_t lx_handlers[] = {
 	NULL,				/* 318: getcpu */
 	lx_epoll_pwait,			/* 319: epoll_pwait */
 	lx_utimensat,			/* 320: utimensat */
-	NULL,				/* 321: signalfd */
+	lx_signalfd,			/* 321: signalfd */
 	lx_timerfd_create,		/* 322: timerfd_create */
 	lx_eventfd,			/* 323: eventfd */
 	NULL,				/* 324: fallocate */
 	lx_timerfd_settime,		/* 325: timerfd_settime */
 	lx_timerfd_gettime,		/* 326: timerfd_gettime */
-	NULL,				/* 327: signalfd4 */
+	lx_signalfd4,			/* 327: signalfd4 */
 	lx_eventfd2,			/* 328: eventfd2 */
 	lx_epoll_create1,		/* 329: epoll_create1 */
 	lx_dup3,			/* 330: dup3 */

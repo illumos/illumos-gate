@@ -1478,9 +1478,6 @@ psig(void)
 		DTRACE_PROC3(signal__handle, int, sig, k_siginfo_t *,
 		    sip, void (*)(void), func);
 
-		if (PROC_IS_BRANDED(p) && BROP(p)->b_psig_to_proc)
-			BROP(p)->b_psig_to_proc(p, t, sig);
-
 		lwp->lwp_cursig = 0;
 		lwp->lwp_extsig = 0;
 		if (lwp->lwp_curinfo) {

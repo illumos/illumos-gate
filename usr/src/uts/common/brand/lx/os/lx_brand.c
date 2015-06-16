@@ -255,12 +255,11 @@ struct brand_ops lx_brops = {
 	lx_elfexec,			/* b_elfexec */
 	NULL,				/* b_sigset_native_to_brand */
 	NULL,				/* b_sigset_brand_to_native */
-	NULL,				/* b_psig_to_proc */
+	lx_sigfd_translate,		/* b_sigfd_translate */
 	NSIG,				/* b_nsig */
 	lx_exit_with_sig,		/* b_exit_with_sig */
 	lx_wait_filter,			/* b_wait_filter */
 	lx_native_exec,			/* b_native_exec */
-	NULL,				/* b_ptrace_exectrap */
 	lx_map32limit,			/* b_map32limit */
 	lx_stop_notify,			/* b_stop_notify */
 	lx_waitid_helper,		/* b_waitid_helper */

@@ -86,12 +86,11 @@ struct brand_ops s10_brops = {
 	s10_elfexec,			/* b_elfexec */
 	s10_sigset_native_to_s10,	/* b_sigset_native_to_brand */
 	s10_sigset_s10_to_native,	/* b_sigset_brand_to_native */
-	NULL,				/* b_psig_to_proc */
+	NULL,				/* b_sigfd_translate */
 	S10_NSIG,			/* b_nsig */
 	NULL,				/* b_exit_with_sig */
 	NULL,				/* b_wait_filter */
 	NULL,				/* b_native_exec */
-	NULL,				/* b_ptrace_exectrap */
 	NULL,				/* b_map32limit */
 	NULL,				/* b_stop_notify */
 	NULL,				/* b_waitid_helper */

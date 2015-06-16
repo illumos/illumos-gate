@@ -225,9 +225,6 @@ setxattr02
 setxattr03
 sgetmask01
 shmget05		# OS-3326
-signalfd01
-signalfd4_01
-signalfd4_02
 splice01
 splice02
 splice03
