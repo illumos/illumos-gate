@@ -20,6 +20,7 @@
 #
 #
 # Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
 #
 #
 
@@ -68,11 +69,7 @@ SYMBOL_VERSION SUNWprivate {
 	ndr_mbtowc;
 	ndr_native_os;
         ndr_params;
-	ndr_pipe_open;
-	ndr_pipe_close;
-	ndr_pipe_read;
-	ndr_pipe_transact;
-	ndr_pipe_write;
+	ndr_pipe_worker;
         ndr_svc_binding_pool_init;
 	ndr_svc_lookup_name;
         ndr_svc_register;

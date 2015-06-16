@@ -26,6 +26,7 @@
 /*
  * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2015 Toomas Soome <tsoome@me.com>
+ * Copyright 2015 Gary Mills
  */
 
 #include <assert.h>
@@ -67,7 +68,7 @@ static int be_get_ds_data(zfs_handle_t *, char *, be_dataset_list_t *,
     be_node_list_t *);
 static int be_get_ss_data(zfs_handle_t *, char *, be_snapshot_list_t *,
     be_node_list_t *);
-static void be_sort_list(be_node_list_t **,
+static int be_sort_list(be_node_list_t **,
     int (*)(const void *, const void *));
 static int be_qsort_compare_BEs_name(const void *, const void *);
 static int be_qsort_compare_BEs_name_rev(const void *, const void *);
@@ -143,20 +144,21 @@ be_list(char *be_name, be_node_list_t **be_nodes)
  * Parameters:
  *		pointer to address of list head
  *		sort order type
- * Returns:
- *		nothing
+ * Return:
+ *              BE_SUCCESS - Success
+ *              be_errno_t - Failure
  * Side effect:
  *		node list sorted by name
  * Scope:
  *		Public
  */
-void
+int
 be_sort(be_node_list_t **be_nodes, int order)
 {
 	int (*compar)(const void *, const void *) = be_qsort_compare_BEs_date;
 
 	if (be_nodes == NULL)
-		return;
+		return (BE_ERR_INVAL);
 
 	switch (order) {
 	case BE_SORT_UNSPECIFIED:
@@ -181,10 +183,10 @@ be_sort(be_node_list_t **be_nodes, int order)
 	default:
 		be_print_err(gettext("be_sort: invalid sort order %d\n"),
 		    order);
-		return;
+		return (BE_ERR_INVAL);
 	}
 
-	be_sort_list(be_nodes, compar);
+	return (be_sort_list(be_nodes, compar));
 }
 
 /* ******************************************************************** */
@@ -214,6 +216,7 @@ _be_list(char *be_name, be_node_list_t **be_nodes)
 	list_callback_data_t cb = { 0 };
 	be_transaction_data_t bt = { 0 };
 	int ret = BE_SUCCESS;
+	int sret;
 	zpool_handle_t *zphp;
 	char *rpool = NULL;
 	struct be_defaults be_defaults;
@@ -277,9 +280,9 @@ _be_list(char *be_name, be_node_list_t **be_nodes)
 
 	free(cb.be_name);
 
-	be_sort(be_nodes, BE_SORT_DATE);
+	sret = be_sort(be_nodes, BE_SORT_DATE);
 
-	return (ret);
+	return ((ret == BE_SUCCESS) ? sret : ret);
 }
 
 /*
@@ -684,30 +687,40 @@ be_add_children_callback(zfs_handle_t *zhp, void *data)
  * Parameters:
  *		pointer to address of list head
  *		compare function
- * Returns:
- *		nothing
+ * Return:
+ *              BE_SUCCESS - Success
+ *              be_errno_t - Failure
  * Side effect:
  *		node list sorted by name
  * Scope:
  *		Private
  */
-static void
+static int
 be_sort_list(be_node_list_t **pstart, int (*compar)(const void *, const void *))
 {
+	int ret = BE_SUCCESS;
 	size_t ibe, nbe;
 	be_node_list_t *p = NULL;
 	be_node_list_t **ptrlist = NULL;
+	be_node_list_t **ptrtmp;
 
-	if (pstart == NULL)
-		return;
+	if (pstart == NULL) /* Nothing to sort */
+		return (BE_SUCCESS);
 	/* build array of linked list BE struct pointers */
 	for (p = *pstart, nbe = 0; p != NULL; nbe++, p = p->be_next_node) {
-		ptrlist = realloc(ptrlist,
+		ptrtmp = realloc(ptrlist,
 		    sizeof (be_node_list_t *) * (nbe + 2));
+		if (ptrtmp == NULL) { /* out of memory */
+			be_print_err(gettext("be_sort_list: memory "
+			    "allocation failed\n"));
+			ret = BE_ERR_NOMEM;
+			goto free;
+		}
+		ptrlist = ptrtmp;
 		ptrlist[nbe] = p;
 	}
-	if (nbe == 0)
-		return;
+	if (nbe == 0) /* Nothing to sort */
+		return (BE_SUCCESS);
 	/* in-place list quicksort using qsort(3C) */
 	if (nbe > 1)	/* no sort if less than 2 BEs */
 		qsort(ptrlist, nbe, sizeof (be_node_list_t *), compar);
@@ -727,8 +740,10 @@ be_sort_list(be_node_list_t **pstart, int (*compar)(const void *, const void *))
 			    malloc(sizeof (be_snapshot_list_t *) * (nmax + 1));
 			be_snapshot_list_t *p;
 
-			if (slist == NULL)
+			if (slist == NULL) {
+				ret = BE_ERR_NOMEM;
 				continue;
+			}
 			/* build array of linked list snapshot struct ptrs */
 			for (ns = 0, p = ptrlist[ibe]->be_node_snapshots;
 			    ns < nmax && p != NULL;
@@ -755,8 +770,10 @@ end_snapshot:
 			    malloc(sizeof (be_dataset_list_t *) * (nmax + 1));
 			be_dataset_list_t *p;
 
-			if (slist == NULL)
+			if (slist == NULL) {
+				ret = BE_ERR_NOMEM;
 				continue;
+			}
 			/* build array of linked list dataset struct ptrs */
 			for (ns = 0, p = ptrlist[ibe]->be_node_datasets;
 			    ns < nmax && p != NULL;
@@ -779,6 +796,7 @@ end_dataset:
 	}
 free:
 	free(ptrlist);
+	return (ret);
 }
 
 /*

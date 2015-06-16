@@ -34,7 +34,6 @@ OBJS_LOCAL = \
 		fksmb_idmap.o \
 		fksmb_init.o \
 		fksmb_kdoor.o \
-		fksmb_opipe_door.o \
 		fksmb_sign_pkcs.o \
 		fake_lookup.o \
 		fake_nblk.o \

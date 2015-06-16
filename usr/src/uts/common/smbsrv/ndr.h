@@ -234,20 +234,6 @@ typedef struct ndr_stream_ops {
 #define	NDS_RESET(NDS)		(*(NDS)->ndo->ndo_reset)(NDS)
 #define	NDS_DESTRUCT(NDS)	(*(NDS)->ndo->ndo_destruct)(NDS)
 
-typedef struct ndr_frag {
-	struct ndr_frag *next;
-	uint8_t *buf;
-	uint32_t len;
-} ndr_frag_t;
-
-typedef struct ndr_fraglist {
-	struct uio	uio;
-	iovec_t		*iov;
-	ndr_frag_t	*head;
-	ndr_frag_t	*tail;
-	uint32_t	nfrag;
-} ndr_fraglist_t;
-
 typedef struct ndr_stream {
 	unsigned long		pdu_size;
 	unsigned long		pdu_max_size;
@@ -255,7 +241,6 @@ typedef struct ndr_stream {
 	unsigned long		pdu_scan_offset;
 	unsigned char		*pdu_base_addr;
 
-	ndr_fraglist_t		frags;
 	ndr_stream_ops_t	*ndo;
 
 	unsigned char		m_op;

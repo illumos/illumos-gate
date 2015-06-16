@@ -31,7 +31,7 @@ OBJS_SMBD=			\
 	smbd_logon.o		\
 	smbd_main.o		\
 	smbd_nicmon.o		\
-	smbd_opipe_doorsvc.o	\
+	smbd_pipesvc.o		\
 	smbd_share_doorsvc.o	\
 	smbd_spool.o		\
 	smbd_vss.o		\
@@ -41,7 +41,6 @@ OBJS_LOCAL =			\
 	fksmbd_door.o		\
 	fksmbd_kmod.o		\
 	fksmbd_ksock.o		\
-	fksmbd_opipe.o		\
 	fksmbd_log.o		\
 	fksmbd_shr.o
 

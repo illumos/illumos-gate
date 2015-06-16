@@ -431,7 +431,8 @@ smbd_service_init(void)
 		{ SMB_CVOL,	0755 },
 		{ SMB_SYSROOT,	0755 },
 		{ SMB_SYSTEM32,	0755 },
-		{ SMB_VSS,	0755 }
+		{ SMB_VSS,	0755 },
+		{ SMB_PIPE_DIR,	0755 },
 	};
 	int	rc, i;
 
@@ -497,14 +498,13 @@ smbd_service_init(void)
 		smbd_report("DC monitor initialization failed %s",
 		    strerror(errno));
 
-	if (mlsvc_init() != 0) {
-		smbd_report("msrpc initialization failed");
+	if (smbd_pipesvc_start() != 0) {
+		smbd_report("pipesvc initialization failed");
 		return (-1);
 	}
 
 	smbd.s_door_srv = smbd_door_start();
-	smbd.s_door_opipe = smbd_opipe_start();
-	if (smbd.s_door_srv < 0 || smbd.s_door_opipe < 0) {
+	if (smbd.s_door_srv < 0) {
 		smbd_report("door initialization failed %s", strerror(errno));
 		return (-1);
 	}
@@ -553,7 +553,7 @@ smbd_service_fini(void)
 	smb_kmod_stop();
 	smb_logon_abort();
 	smb_lgrp_stop();
-	smbd_opipe_stop();
+	smbd_pipesvc_stop();
 	smbd_door_stop();
 	smbd_spool_stop();
 	smbd_kernel_unbind();

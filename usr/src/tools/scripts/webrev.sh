@@ -25,7 +25,7 @@
 # Copyright 2008, 2010, Richard Lowe
 # Copyright 2012 Marcel Telka <marcel@telka.sk>
 # Copyright 2014 Bart Coddens <bart.coddens@gmail.com>
-# Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 #
 
 #
@@ -3170,7 +3170,7 @@ do
 	#
 	if [[ -f "$nfile" && "$nfile" = *.+([0-9])*([a-zA-Z]) && \
 	    -x $MANDOC && -x $COL ]]; then
-		$MANDOC -Tutf8 $nfile | $COL -b > $nfile.man.txt
+		$MANDOC -Tascii $nfile | $COL -b > $nfile.man.txt
 		source_to_html txt < $nfile.man.txt > $nfile.man.txt.html
 		print " man-txt\c"
 		print "$MANCSS" > $WDIR/raw_files/new/$DIR/man.css
@@ -3179,7 +3179,7 @@ do
 		$MANDOC -Tascii $nfile > $nfile.man.raw
 		print " man-raw\c"
 		if [[ -f "$ofile" && -z $mv_but_nodiff ]]; then
-			$MANDOC -Tutf8 $ofile | $COL -b > $ofile.man.txt
+			$MANDOC -Tascii $ofile | $COL -b > $ofile.man.txt
 			${CDIFFCMD:-diff -bt -C 5} $ofile.man.txt \
 			    $nfile.man.txt > $WDIR/$DIR/$F.man.cdiff
 			diff_to_html $F $DIR/$F "C" "$COMM" < \

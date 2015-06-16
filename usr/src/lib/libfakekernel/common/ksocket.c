@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -502,6 +502,27 @@ ksocket_setsockopt(ksocket_t ks, int level, int optname, const void *optval,
 		return (errno);
 
 	return (0);
+}
+
+int
+ksocket_ioctl(ksocket_t ks, int cmd, intptr_t arg, int *rvp, struct cred *cr)
+{
+	int rval;
+
+	/* All Solaris components should pass a cred for this operation. */
+	ASSERT(cr != NULL);
+
+	if (!KSOCKET_VALID(ks))
+		return (ENOTSOCK);
+
+	rval = ioctl(KSTOSO(ks), cmd, arg);
+	if (rvp != NULL)
+		*rvp = rval;
+
+	if (rval != 0)
+		rval = errno;
+
+	return (rval);
 }
 
 void

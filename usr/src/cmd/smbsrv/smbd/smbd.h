@@ -40,8 +40,8 @@ extern "C" {
 #include <smbsrv/libmlsvc.h>
 
 void smbd_report(const char *fmt, ...);
-int smbd_opipe_start(void);
-void smbd_opipe_stop(void);
+int smbd_pipesvc_start(void);
+void smbd_pipesvc_stop(void);
 int smbd_share_start(void);
 void smbd_share_stop(void);
 int smbd_nicmon_start(const char *);
@@ -143,7 +143,6 @@ void *smbd_door_dispatch_op(void *);
 /* For fksmbd */
 void fksmbd_init(void);
 int fksmbd_door_dispatch(smb_doorarg_t *);
-int fksmbd_opipe_dispatch(door_arg_t *);
 
 #ifdef __cplusplus
 }
