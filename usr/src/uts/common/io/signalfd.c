@@ -123,6 +123,7 @@
 #include <sys/schedctl.h>
 #include <sys/id_space.h>
 #include <sys/sdt.h>
+#include <sys/brand.h>
 
 typedef struct signalfd_state signalfd_state_t;
 
@@ -404,6 +405,9 @@ consume_signal(k_sigset_t set, uio_t *uio, boolean_t block)
 	lwp->lwp_cursig = 0;
 	lwp->lwp_extsig = 0;
 	mutex_exit(&p->p_lock);
+
+	if (PROC_IS_BRANDED(p) && BROP(p)->b_sigfd_translate)
+		BROP(p)->b_sigfd_translate(infop);
 
 	/* Convert k_siginfo into external, datamodel independent, struct. */
 	bzero(ssp, sizeof (*ssp));

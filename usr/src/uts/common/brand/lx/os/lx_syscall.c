@@ -848,13 +848,13 @@ lx_sysent_t lx_sysent32[] = {
 	{"getcpu",	lx_getcpu,		0,		3}, /* 318 */
 	{"epoll_pwait",	NULL,			0,		5}, /* 319 */
 	{"utimensat",	NULL,			0,		4}, /* 320 */
-	{"signalfd",	NULL,			NOSYS_NULL,	0}, /* 321 */
+	{"signalfd",	NULL,			0,		3}, /* 321 */
 	{"timerfd_create", NULL,		0,		2}, /* 322 */
 	{"eventfd",	NULL,			0,		1}, /* 323 */
 	{"fallocate",	NULL,			NOSYS_NULL,	0}, /* 324 */
 	{"timerfd_settime", NULL,		0,		4}, /* 325 */
 	{"timerfd_gettime", NULL,		0,		2}, /* 326 */
-	{"signalfd4",	NULL,			NOSYS_NULL,	0}, /* 327 */
+	{"signalfd4",	NULL,			0,		4}, /* 327 */
 	{"eventfd2",	NULL,			0,		2}, /* 328 */
 	{"epoll_create1", NULL,			0,		1}, /* 329 */
 	{"dup3",	NULL,			0,		3}, /* 330 */
@@ -1176,14 +1176,14 @@ lx_sysent_t lx_sysent64[] = {
 	{"move_pages",	NULL,			NOSYS_NULL,	0}, /* 279 */
 	{"utimensat",	NULL,			0,		4}, /* 280 */
 	{"epoll_pwait",	NULL,			0,		5}, /* 281 */
-	{"signalfd",	NULL,			NOSYS_NULL,	0}, /* 282 */
+	{"signalfd",	NULL,			0,		3}, /* 282 */
 	{"timerfd_create", NULL,		0,		2}, /* 283 */
 	{"eventfd",	NULL,			0,		1}, /* 284 */
 	{"fallocate",	NULL,			NOSYS_NULL,	0}, /* 285 */
 	{"timerfd_settime", NULL,		0,		4}, /* 286 */
 	{"timerfd_gettime", NULL,		0,		2}, /* 287 */
 	{"accept4",	NULL,			0,		4}, /* 288 */
-	{"signalfd4",	NULL,			NOSYS_NULL,	0}, /* 289 */
+	{"signalfd4",	NULL,			0,		4}, /* 289 */
 	{"eventfd2",	NULL,			0,		2}, /* 290 */
 	{"epoll_create1", NULL,			0,		1}, /* 291 */
 	{"dup3",	NULL,			0,		3}, /* 292 */

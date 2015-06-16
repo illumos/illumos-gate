@@ -313,6 +313,8 @@ extern long lx_setuid(uid_t);
 extern long lx_setregid(gid_t, gid_t);
 extern long lx_setreuid(uid_t, uid_t);
 extern long lx_shmdt(char *);
+extern long lx_signalfd(int, uintptr_t, size_t);
+extern long lx_signalfd4(int, uintptr_t, size_t, int);
 extern long lx_stime(const time_t *);
 extern long lx_symlink(const char *, const char *);
 extern long lx_syslog(int, char *, int);
