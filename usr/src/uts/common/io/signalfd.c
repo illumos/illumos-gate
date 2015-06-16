@@ -169,6 +169,13 @@ signalfd_wake_list_rm(proc_t *p, signalfd_state_t *state)
 			break;
 		}
 	}
+
+	if (list_is_empty(lst)) {
+		((sigfd_proc_state_t *)p->p_sigfd)->sigfd_pollwake_cb = NULL;
+		list_destroy(lst);
+		kmem_free(p->p_sigfd, sizeof (sigfd_proc_state_t));
+		p->p_sigfd = NULL;
+	}
 }
 
 static void
