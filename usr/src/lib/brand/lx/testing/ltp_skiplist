@@ -127,10 +127,6 @@ add_key02
 clone02
 clone08
 crash02
-eventfd01
-eventfd2_01
-eventfd2_02
-eventfd2_03
 fallocate01
 fallocate01
 fallocate01
@@ -161,7 +157,6 @@ ftruncate04_64
 getdents02
 getdents02_64
 get_mempolicy01
-get_robust_list01
 ioctl03
 io_cancel01
 io_destroy01
@@ -219,7 +214,6 @@ setpgid02
 setregid02
 setregid02_16
 setrlimit01
-set_robust_list01	# OS-3224
 setxattr01
 setxattr02
 setxattr03
@@ -249,12 +243,6 @@ syslog11
 syslog12
 tee01
 tee02
-timerfd01
-timerfd02
-timerfd03
-timerfd_create01
-timerfd_gettime01
-timerfd_settime01
 unshare01
 utimensat01		# OS-3328
 unshare02

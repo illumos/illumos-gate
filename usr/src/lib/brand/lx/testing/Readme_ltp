@@ -105,10 +105,6 @@ x chmod07	need PRIV_SYS_CONFIG to set sticky bit on reg file
 - creat06	wants to mount a ro fs
 x creat07	we don't behave this way for ETXTBSY
 x creat08	sets euid to 'nobody', loses PRIV_FILE_SETID to set sgid
-# eventfd01
-# eventfd2_01
-# eventfd2_02
-# eventfd2_03
 x execve04	we don't behave this way for ETXTBSY
 # fallocate01
 # fallocate02
@@ -141,7 +137,6 @@ x fchmod03	need PRIV_SYS_CONFIG to set sticky bit on reg file
 # getdents02	wrong errno on test 4 - perf. impact too high
 # getdents02_64
 # get_mempolicy01
-# get_robust_list01	OS-3224
 x getrusage03	we don't fill in the ru_maxrss field
 - getxattr01	need attr/xattr.h at build time
 - getxattr02
@@ -152,13 +147,7 @@ x getrusage03	we don't fill in the ru_maxrss field
 # io_getevents01
 # io_setup01
 # io_submit01
-# inotify_init1_01
-# inotify_init1_02
-# inotify01
-# inotify02
-# inotify03
-# inotify04
-# inotify05
+- inotify03	needs dev
 # fanotify01	don't have fanotify
 # fanotify02
 # fanotify03
@@ -250,14 +239,11 @@ x setfsuid04_16
 * setregid02	fails on bare metal, expects to lookup group "nobody" which
 * setregid02_16	doesn't exist. it is "nogroup" on ubuntu at least
 # setrlimit01	all pass but one, expects to set proc limit
-# set_robust_list01	OS-3224
 x settimeofday01
 # setxattr01
 # setxattr02
 # setxattr03
 # shmget05	OS-3326
-# sighold02	fails on sig 63 OS-3307
-# sigrelse01	fails on sig 63 OS-3307
 # splice01
 # splice02
 # splice03
@@ -284,12 +270,6 @@ x switch01
 # syslog10
 # syslog11
 # syslog12
-# timerfd01
-# timerfd02
-# timerfd03
-# timerfd_create01
-# timerfd_gettime01
-# timerfd_settime01
 # unshare01
 # unshare02
 - umount01	needs dev
