@@ -380,6 +380,7 @@ int smb_opipe_open(smb_request_t *, uint32_t);
 void smb_opipe_close(smb_ofile_t *);
 int smb_opipe_read(smb_request_t *, struct uio *);
 int smb_opipe_write(smb_request_t *, struct uio *);
+int smb_opipe_get_nread(smb_request_t *, int *);
 
 void smb_opipe_door_init(smb_server_t *);
 void smb_opipe_door_fini(smb_server_t *);

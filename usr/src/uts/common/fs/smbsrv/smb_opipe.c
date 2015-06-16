@@ -390,19 +390,36 @@ smb_opipe_read(smb_request_t *sr, struct uio *uio)
 	}
 	uio->uio_resid -= recvcnt;
 
-	/*
-	 * If we filled the user's buffer,
-	 * find out if there's more data.
-	 */
-	if (uio->uio_resid == 0) {
-		int rc2, nread, trval;
-		rc2 = ksocket_ioctl(sock, FIONREAD, (intptr_t)&nread,
-		    &trval, ofile->f_cr);
-		if (rc2 == 0 && nread != 0)
-			rc = E2BIG;	/* more data */
-	}
-
 out:
+	ksocket_rele(sock);
+
+	return (rc);
+}
+
+int
+smb_opipe_get_nread(smb_request_t *sr, int *nread)
+{
+	smb_ofile_t *ofile;
+	smb_opipe_t *opipe;
+	ksocket_t sock;
+	int rc, trval;
+
+	ofile = sr->fid_ofile;
+	ASSERT(ofile->f_ftype == SMB_FTYPE_MESG_PIPE);
+	opipe = ofile->f_pipe;
+	SMB_OPIPE_VALID(opipe);
+
+	mutex_enter(&opipe->p_mutex);
+	sock = opipe->p_socket;
+	if (sock != NULL)
+		ksocket_hold(sock);
+	mutex_exit(&opipe->p_mutex);
+	if (sock == NULL)
+		return (EBADF);
+
+	rc = ksocket_ioctl(sock, FIONREAD, (intptr_t)nread, &trval,
+	    ofile->f_cr);
+
 	ksocket_rele(sock);
 
 	return (rc);

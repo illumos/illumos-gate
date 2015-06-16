@@ -1433,22 +1433,33 @@ smb_trans_nmpipe(smb_request_t *sr, smb_xa_t *xa)
 	mb = smb_mbuf_allocate(&vdb.vdb_uio);
 
 	rc = smb_opipe_read(sr, &vdb.vdb_uio);
-	if (rc == E2BIG) {
-		/*
-		 * Note: E2BIG is not a real error.  It just
-		 * tells us there's more data to be read.
-		 */
-		smbsr_status(sr, NT_STATUS_BUFFER_OVERFLOW,
-		    ERRDOS, ERROR_MORE_DATA);
-		rc = 0;
-	}
 	if (rc != 0) {
+		m_freem(mb);
 		smbsr_errno(sr, rc);
 		return (SDRC_ERROR);
 	}
 
 	smb_mbuf_trim(mb, xa->smb_mdrcnt - vdb.vdb_uio.uio_resid);
 	MBC_ATTACH_MBUF(&xa->rep_data_mb, mb);
+
+	/*
+	 * If the output buffer holds a partial pipe message,
+	 * we're supposed to return NT_STATUS_BUFFER_OVERFLOW.
+	 * As we don't have message boundary markers, the best
+	 * we can do is return that status when we have ALL of:
+	 *	Output buffer was < SMB_PIPE_MAX_MSGSIZE
+	 *	We filled the output buffer (resid==0)
+	 *	There's more data (ioctl FIONREAD)
+	 */
+	if (xa->smb_mdrcnt < SMB_PIPE_MAX_MSGSIZE &&
+	    vdb.vdb_uio.uio_resid == 0) {
+		int nread = 0;
+		rc = smb_opipe_get_nread(sr, &nread);
+		if (rc == 0 && nread != 0) {
+			smbsr_status(sr, NT_STATUS_BUFFER_OVERFLOW,
+			    ERRDOS, ERROR_MORE_DATA);
+		}
+	}
 
 	return (SDRC_SUCCESS);
 }
