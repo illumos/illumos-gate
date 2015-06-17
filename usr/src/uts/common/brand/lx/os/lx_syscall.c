@@ -938,10 +938,10 @@ lx_sysent_t lx_sysent64[] = {
 	{"socket",	NULL,			0,		3}, /* 41 */
 	{"connect",	lx_connect,		0,		3}, /* 42 */
 	{"accept",	NULL,			0,		3}, /* 43 */
-	{"sendto",	NULL,			0,		6}, /* 44 */
-	{"recvfrom",	NULL,			0,		6}, /* 45 */
-	{"sendmsg",	NULL,			0,		3}, /* 46 */
-	{"recvmsg",	NULL,			0,		3}, /* 47 */
+	{"sendto",	lx_sendto,		0,		6}, /* 44 */
+	{"recvfrom",	lx_recvfrom,		0,		6}, /* 45 */
+	{"sendmsg",	lx_sendmsg,		0,		3}, /* 46 */
+	{"recvmsg",	lx_recvmsg,		0,		3}, /* 47 */
 	{"shutdown",	NULL,			0,		2}, /* 48 */
 	{"bind",	NULL,			0,		3}, /* 49 */
 	{"listen",	NULL,			0,		2}, /* 50 */
