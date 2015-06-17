@@ -334,6 +334,36 @@ cgrp_create(struct vnode *dvp, char *nm, struct vattr *vap,
     enum vcexcl exclusive, int mode, struct vnode **vpp, struct cred *cred,
     int flag, caller_context_t *ct, vsecattr_t *vsecp)
 {
+	cgrp_node_t *parent = (cgrp_node_t *)VTOCGN(dvp);
+	cgrp_node_t *cn = NULL;
+	int error;
+
+	if (*nm == '\0')
+		return (EPERM);
+
+	error = cgrp_dirlookup(parent, nm, &cn, cred);
+	if (error == 0) {		/* name found */
+		ASSERT(cn);
+
+		/*
+		 * Creating an existing file, allow it except for the following
+		 * errors.
+		 */
+		if (exclusive == EXCL) {
+			error = EEXIST;
+		} else if ((cn->cgn_type == VDIR) && (mode & VWRITE)) {
+			error = EISDIR;
+		} else {
+			error = cgrp_taccess(cn, mode, cred);
+		}
+		if (error != 0) {
+			cgnode_rele(cn);
+			return (error);
+		}
+		*vpp = CGNTOV(cn);
+		return (0);
+	}
+
 	/*
 	 * cgroups doesn't allow creation of additional, non-subsystem specific
 	 * files in a dir
