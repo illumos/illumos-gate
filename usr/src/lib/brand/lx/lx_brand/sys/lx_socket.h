@@ -413,16 +413,6 @@ extern "C" {
 #define	LX_MSG_FASTOPEN		0x20000000
 #define	LX_MSG_CMSG_CLOEXEC	0x40000000
 
-struct lx_msghdr {
-	void		*msg_name;		/* optional address */
-	socklen_t	msg_namelen;		/* size of address */
-	struct iovec	*msg_iov;		/* scatter/gather array */
-	int		msg_iovlen;		/* # elements in msg_iov */
-	void		*msg_control;		/* ancillary data */
-	socklen_t	msg_controllen;		/* ancillary data buffer len */
-	int		msg_flags;		/* flags on received message */
-};
-
 struct lx_ucred {
 	pid_t		lxu_pid;
 	lx_uid_t	lxu_uid;

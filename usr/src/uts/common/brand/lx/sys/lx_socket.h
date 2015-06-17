@@ -204,10 +204,10 @@ extern "C" {
 /*
  * Linux socket flags for use with recv(2)/send(2)/recvmsg(2)/sendmsg(2)
  */
-#define	LX_MSG_OOB		1
-#define	LX_MSG_PEEK		2
-#define	LX_MSG_DONTROUTE	4
-#define	LX_MSG_CTRUNC		8
+#define	LX_MSG_OOB		0x1
+#define	LX_MSG_PEEK		0x2
+#define	LX_MSG_DONTROUTE	0x4
+#define	LX_MSG_CTRUNC		0x8
 #define	LX_MSG_PROXY		0x10
 #define	LX_MSG_TRUNC		0x20
 #define	LX_MSG_DONTWAIT		0x40
@@ -224,15 +224,30 @@ extern "C" {
 #define	LX_MSG_FASTOPEN		0x20000000
 #define	LX_MSG_CMSG_CLOEXEC	0x40000000
 
-struct lx_msghdr {
-	void		*msg_name;		/* optional address */
-	socklen_t	msg_namelen;		/* size of address */
-	struct iovec	*msg_iov;		/* scatter/gather array */
-	int		msg_iovlen;		/* # elements in msg_iov */
-	void		*msg_control;		/* ancillary data */
-	socklen_t	msg_controllen;		/* ancillary data buffer len */
-	int		msg_flags;		/* flags on received message */
-};
+typedef struct lx_msghdr {
+	void		*msg_name;	/* optional address */
+	socklen_t	msg_namelen;	/* size of address */
+	struct iovec	*msg_iov;	/* scatter/gather array */
+	int		msg_iovlen;	/* # elements in msg_iov */
+	void		*msg_control;	/* ancillary data */
+	socklen_t	msg_controllen;	/* ancillary data buffer len */
+	int		msg_flags;	/* flags on received message */
+} lx_msghdr_t;
+
+
+#if defined(_LP64)
+
+typedef struct lx_msghdr32 {
+	caddr32_t	msg_name;	/* optional address */
+	uint32_t	msg_namelen;	/* size of address */
+	caddr32_t	msg_iov;	/* scatter/gather array */
+	int32_t		msg_iovlen;	/* # elements in msg_iov */
+	caddr32_t	msg_control;	/* ancillary data */
+	uint32_t	msg_controllen;	/* ancillary data buffer len */
+	int32_t		msg_flags;	/* flags on received message */
+} lx_msghdr32_t;
+
+#endif
 
 typedef struct lx_sockaddr_in6 {
 	sa_family_t	sin6_family;

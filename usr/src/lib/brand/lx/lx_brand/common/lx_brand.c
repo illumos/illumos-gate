@@ -958,10 +958,10 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_socket,			/*  41: socket */
 	NULL,				/*  42: connect */
 	lx_accept,			/*  43: accept */
-	lx_sendto,			/*  44: sendto */
-	lx_recvfrom,			/*  45: recvfrom */
-	lx_sendmsg,			/*  46: sendmsg */
-	lx_recvmsg,			/*  47: recvmsg */
+	NULL,				/*  44: sendto */
+	NULL,				/*  45: recvfrom */
+	NULL,				/*  46: sendmsg */
+	NULL,				/*  47: recvmsg */
 	lx_shutdown,			/*  48: shutdown */
 	lx_bind,			/*  49: bind */
 	lx_listen,			/*  50: listen */

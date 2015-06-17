@@ -40,6 +40,8 @@
 #include <sys/cred.h>
 #include <sys/model.h>
 #include <sys/brand.h>
+#include <sys/vmsystm.h>
+#include <sys/limits.h>
 #include <netpacket/packet.h>
 #include <sockcommon.h>
 
@@ -61,6 +63,12 @@ typedef struct lx_socket_aux_data
 
 /* VSD key for lx-specific socket information */
 static uint_t lx_socket_vsd = 0;
+
+/* Convenience enum to enforce translation direction */
+typedef enum lx_xlate_dir {
+	SUNOS_TO_LX,
+	LX_TO_SUNOS
+} lx_xlate_dir_t;
 
 /*
  * What follows are a series of tables we use to translate Linux constants
@@ -114,7 +122,6 @@ typedef enum {
 	lxa_devlog
 } lx_addr_type_t;
 
-
 static int
 ltos_pkt_proto(int protocol)
 {
@@ -133,6 +140,94 @@ ltos_pkt_proto(int protocol)
 	default:
 		return (-1);
 	}
+}
+
+
+typedef struct lx_flag_map {
+	enum {
+		LXFM_MAP,
+		LXFM_IGNORE,
+		LXFM_UNSUP
+	} lxfm_action;
+	int lxfm_sunos_flag;
+	int lxfm_linux_flag;
+	char *lxfm_name;
+} lx_flag_map_t;
+
+static lx_flag_map_t lx_flag_map_tbl[] = {
+	{ LXFM_MAP,	MSG_OOB,		LX_MSG_OOB,		NULL },
+	{ LXFM_MAP,	MSG_PEEK,		LX_MSG_PEEK,		NULL },
+	{ LXFM_MAP,	MSG_DONTROUTE,		LX_MSG_DONTROUTE,	NULL },
+	{ LXFM_MAP,	MSG_CTRUNC,		LX_MSG_CTRUNC,		NULL },
+	{ LXFM_MAP,	MSG_TRUNC,		LX_MSG_TRUNC,		NULL },
+	{ LXFM_MAP,	MSG_EOR,		LX_MSG_EOR,		NULL },
+	{ LXFM_MAP,	MSG_WAITALL,		LX_MSG_WAITALL,		NULL },
+	/* MSG_CONFIRM is safe to ignore */
+	{ LXFM_IGNORE,	0,			LX_MSG_CONFIRM,		NULL },
+	/* NOSIGNAL is handled by by the emulation */
+	{ LXFM_IGNORE,	0,			LX_MSG_NOSIGNAL,	NULL },
+	{ LXFM_UNSUP,	LX_MSG_PROXY,		0,	"MSG_PROXY" },
+	{ LXFM_UNSUP,	LX_MSG_FIN,		0,	"MSG_FIN" },
+	{ LXFM_UNSUP,	LX_MSG_SYN,		0,	"MSG_SYN" },
+	{ LXFM_UNSUP,	LX_MSG_RST,		0,	"MSG_RST" },
+	{ LXFM_UNSUP,	LX_MSG_ERRQUEUE,	0,	"MSG_ERRQUEUE" },
+	{ LXFM_UNSUP,	LX_MSG_MORE,		0,	"MSG_MORE" },
+	{ LXFM_UNSUP,	LX_MSG_WAITFORONE,	0,	"MSG_WAITFORONE" },
+	{ LXFM_UNSUP,	LX_MSG_FASTOPEN,	0,	"MSG_FASTOPEN" },
+	{ LXFM_UNSUP,	LX_MSG_CMSG_CLOEXEC,	0,	"MSG_CMSG_CLOEXEC" },
+};
+
+#define	LX_FLAG_MAP_MAX	\
+	(sizeof (lx_flag_map_tbl) / sizeof (lx_flag_map_tbl[0]))
+
+#define	LX_FLAG_BUFSZ	64
+
+static int
+lx_xlate_sock_flags(int inflags, lx_xlate_dir_t dir)
+{
+	int i, outflags = 0;
+	char buf[LX_FLAG_BUFSZ];
+
+	VERIFY(dir == SUNOS_TO_LX || dir == LX_TO_SUNOS);
+
+	for (i = 0; i < LX_FLAG_MAP_MAX; i++) {
+		lx_flag_map_t *map = &lx_flag_map_tbl[i];
+		int match, out;
+
+		if (dir == SUNOS_TO_LX) {
+			match = inflags & map->lxfm_sunos_flag;
+			out = map->lxfm_linux_flag;
+		} else {
+			match = inflags & map->lxfm_linux_flag;
+			out = map->lxfm_sunos_flag;
+		}
+		switch (map->lxfm_action) {
+		case LXFM_MAP:
+			if (match != 0) {
+				inflags &= ~(match);
+				outflags |= out;
+			}
+			break;
+		case LXFM_IGNORE:
+			if (match != 0) {
+				inflags &= ~(match);
+			}
+			break;
+		case LXFM_UNSUP:
+			if (match != 0) {
+				snprintf(buf, LX_FLAG_BUFSZ,
+				    "unsupported sock flag %s", map->lxfm_name);
+				lx_unsupported(buf);
+			}
+		}
+	}
+	if (inflags != 0) {
+		snprintf(buf, LX_FLAG_BUFSZ, "unsupported sock flags 0x%08x",
+		    inflags);
+		lx_unsupported(buf);
+	}
+
+	return (outflags);
 }
 
 static void
@@ -175,33 +270,55 @@ convert_abst_path(const struct sockaddr *inaddr, socklen_t len,
 }
 
 static long
-ltos_sockaddr(const struct sockaddr *inaddr, const socklen_t inlen,
+ltos_sockaddr_copyin(const struct sockaddr *inaddr, const socklen_t inlen,
     struct sockaddr **outaddr, socklen_t *outlen)
 {
 	sa_family_t family;
+	struct sockaddr *laddr;
 	struct sockaddr_ll *sal;
-	int proto;
+	int proto, error = 0;
 
 	VERIFY(inaddr != NULL);
-	family = LTOS_FAMILY(inaddr->sa_family);
 
+	if (inlen < sizeof (sa_family_t) ||
+	    inlen > sizeof (struct sockaddr_un)) {
+		return (EINVAL);
+	}
+	laddr = kmem_alloc(inlen, KM_SLEEP);
+	if (copyin(inaddr, laddr, inlen) != 0) {
+		kmem_free(laddr, inlen);
+		return (EFAULT);
+	}
+
+	family = LTOS_FAMILY(laddr->sa_family);
 	switch (family) {
 		case (sa_family_t)AF_NOTSUPPORTED:
-			return (EPROTONOSUPPORT);
+			error = EPROTONOSUPPORT;
+			break;
 
 		case (sa_family_t)AF_INVAL:
-			return (EAFNOSUPPORT);
+			error = EAFNOSUPPORT;
+			break;
 
 		case AF_UNIX:
-			if (inlen > sizeof (struct sockaddr_un)) {
-				return (EINVAL);
+			if (inlen < sizeof (sa_family_t) + 2 ||
+			    inlen > sizeof (struct sockaddr_un)) {
+				error = EINVAL;
+				break;
 			}
 
+			/*
+			 * Since the address may expand during translation,
+			 * allocate a full sockaddr_un structure for output.
+			 * Use of kmem_zalloc prevents garbage from appearing
+			 * in the output if the address is shorter than the
+			 * maximum.
+			 */
 			*outlen = sizeof (struct sockaddr_un);
 			*outaddr = kmem_zalloc(*outlen, KM_SLEEP);
 			(*outaddr)->sa_family = AF_UNIX;
 
-			if (strcmp(inaddr->sa_data, LX_DEV_LOG) == 0) {
+			if (strcmp(laddr->sa_data, LX_DEV_LOG) == 0) {
 				/*
 				 * In order to support /dev/log -- a Unix
 				 * domain socket used for logging that has had
@@ -213,7 +330,7 @@ ltos_sockaddr(const struct sockaddr *inaddr, const socklen_t inlen,
 				 */
 				(void) strcpy((*outaddr)->sa_data,
 				    LX_DEV_LOG_REDIRECT);
-			} else if (inaddr->sa_data[0] == '\0') {
+			} else if (laddr->sa_data[0] == '\0') {
 				/*
 				 * Linux supports abstract Unix sockets, which
 				 * are simply sockets that do not exist on the
@@ -225,33 +342,35 @@ ltos_sockaddr(const struct sockaddr *inaddr, const socklen_t inlen,
 				 * ABST_PRFX and replacing all illegal
 				 * characters with * '_'.
 				 */
-				convert_abst_path(inaddr, inlen, *outaddr);
+				convert_abst_path(laddr, inlen, *outaddr);
 			} else {
-				bcopy(inaddr->sa_data, (*outaddr)->sa_data,
+				bcopy(laddr->sa_data, (*outaddr)->sa_data,
 				    inlen - sizeof (sa_family_t));
 			}
+			/* AF_UNIX bypasses the standard copy logic */
+			kmem_free(laddr, inlen);
 			return (0);
 
 		case AF_PACKET:
-			sal = (struct sockaddr_ll *)inaddr;
+			if (inlen < sizeof (struct sockaddr_ll)) {
+				error = EINVAL;
+				break;
+			}
+			*outlen = sizeof (struct sockaddr_ll);
+
+			/* sll_protocol must be translated */
+			sal = (struct sockaddr_ll *)laddr;
 			proto = ltos_pkt_proto(sal->sll_protocol);
 			if (proto < 0) {
-				return (EINVAL);
+				error = EINVAL;
 			}
-
-			*outlen = inlen;
-			*outaddr = (struct sockaddr *)kmem_zalloc(*outlen,
-			    KM_SLEEP);
-			bcopy(inaddr, *outaddr, inlen);
-
-			sal = (struct sockaddr_ll *)*outaddr;
-			sal->sll_family = family;
 			sal->sll_protocol = proto;
-			return (0);
+			break;
 
 		case AF_INET:
 			if (inlen < sizeof (struct sockaddr)) {
-				return (EINVAL);
+				error = EINVAL;
+				break;
 			}
 			*outlen = sizeof (struct sockaddr);
 			break;
@@ -259,27 +378,403 @@ ltos_sockaddr(const struct sockaddr *inaddr, const socklen_t inlen,
 		case AF_INET6:
 			/*
 			 * The illumos sockaddr_in6 has one more 32-bit field
-			 * than the Linux version.  We assume the caller has
-			 * zeroed the sockaddr we're copying into.
+			 * than the Linux version.  We simply zero that field
+			 * via kmem_zalloc.
 			 */
 			if (inlen != sizeof (lx_sockaddr_in6_t)) {
-				return (EINVAL);
+				error = EINVAL;
+				break;
 			}
 			*outlen = sizeof (struct sockaddr_in6);
-			break;
+			*outaddr = (struct sockaddr *)kmem_zalloc(*outlen,
+			    KM_SLEEP);
+			bcopy(laddr, *outaddr, sizeof (lx_sockaddr_in6_t));
+			(*outaddr)->sa_family = AF_INET6;
+			/* AF_INET6 bypasses the standard copy logic */
+			kmem_free(laddr, inlen);
+			return (0);
 
 		default:
 			*outlen = inlen;
 	}
 
+	if (error == 0) {
+		/*
+		 * For most address families, just copying into a sockaddr of
+		 * the correct size and updating sa_family is adequate.
+		 */
+		VERIFY(inlen >= *outlen);
+
+		*outaddr = (struct sockaddr *)kmem_zalloc(*outlen, KM_SLEEP);
+		bcopy(laddr, *outaddr, *outlen);
+		(*outaddr)->sa_family = family;
+	}
+	kmem_free(laddr, inlen);
+	return (error);
+}
+
+static long
+stol_sockaddr_copyout(struct sockaddr *inaddr, socklen_t inlen,
+    struct sockaddr *outaddr, socklen_t *outlen, socklen_t orig)
+{
+	socklen_t size = inlen;
+	struct sockaddr_storage buf;
+	struct sockaddr *bufaddr;
+
 	/*
-	 * For most address families, just copying into a sockaddr of the
-	 * correct size and updating sa_family is adequate.
+	 * Either we were passed a valid sockaddr (with length) or the length
+	 * is set to 0.
 	 */
-	*outaddr = (struct sockaddr *)kmem_zalloc(*outlen, KM_SLEEP);
-	bcopy(inaddr, *outaddr, *outlen);
-	(*outaddr)->sa_family = family;
+	VERIFY(inaddr != NULL || inlen == 0);
+
+	if (inlen == 0) {
+		/*
+		 * Inform userspace that there is no sockaddr as the result of
+		 * this operation by setting the output length to 0.
+		 */
+		if (copyout(&inlen, outlen, sizeof (inlen)) != 0) {
+			return (EFAULT);
+		}
+		return (0);
+	}
+
+
+	switch (inaddr->sa_family) {
+	case AF_INET:
+		if (inlen != sizeof (struct sockaddr)) {
+			return (EINVAL);
+		}
+		break;
+
+	case AF_INET6:
+		if (inlen != sizeof (struct sockaddr_in6)) {
+			return (EINVAL);
+		}
+		/*
+		 * The linux sockaddr_in6 is shorter than illumos.
+		 * Truncate the extra field on the way out.
+		 */
+		size = (sizeof (lx_sockaddr_in6_t));
+		inlen = (sizeof (lx_sockaddr_in6_t));
+		break;
+
+	case AF_UNIX:
+		if (inlen > sizeof (struct sockaddr_un)) {
+			return (EINVAL);
+		}
+		break;
+
+	case (sa_family_t)AF_NOTSUPPORTED:
+		return (EPROTONOSUPPORT);
+
+	case (sa_family_t)AF_INVAL:
+		return (EAFNOSUPPORT);
+
+	default:
+		break;
+	}
+
+	/*
+	 * The input should be smaller than sockaddr_storage, the largest
+	 * sockaddr we support.
+	 */
+	VERIFY(inlen <= sizeof (buf));
+
+	bufaddr = (struct sockaddr *)&buf;
+	bcopy(inaddr, bufaddr, inlen);
+	bufaddr->sa_family = STOL_FAMILY(bufaddr->sa_family);
+
+	/*
+	 * It is possible that userspace passed us a smaller buffer than we
+	 * hope to output.  When this is the case, we will truncate our output
+	 * to the max size of their buffer but report the true size of the
+	 * sockaddr when outputting the outlen value.
+	 */
+	size = (orig < size) ? orig : size;
+
+	if (copyout(bufaddr, outaddr, size) != 0) {
+		return (EFAULT);
+	}
+	if (copyout(&inlen, outlen, sizeof (inlen)) != 0) {
+		return (EFAULT);
+	}
+
 	return (0);
+}
+
+
+typedef struct {
+	int lcx_sunos_level;
+	int lcx_sunos_type;
+	int lcx_linux_level;
+	int lcx_linux_type;
+} lx_cmsg_xlate_t;
+
+static lx_cmsg_xlate_t lx_cmsg_xlate_tbl[] = {
+	{ SOL_SOCKET, SCM_RIGHTS, LX_SOL_SOCKET, LX_SCM_RIGHTS },
+	{ SOL_SOCKET, SCM_UCRED, LX_SOL_SOCKET, LX_SCM_CRED },
+	{ SOL_SOCKET, SCM_TIMESTAMP, LX_SOL_SOCKET, LX_SCM_TIMESTAMP },
+	{ IPPROTO_IPV6, IPV6_PKTINFO, LX_IPPROTO_IPV6, LX_IPV6_PKTINFO }
+};
+
+#define	LX_MAX_CMSG_XLATE	\
+	(sizeof (lx_cmsg_xlate_tbl) / sizeof (lx_cmsg_xlate_tbl[0]))
+
+#if defined(_LP64)
+
+typedef struct {
+	int64_t	cmsg_len;
+	int32_t	cmsg_level;
+	int32_t	cmsg_type;
+} lx_cmsghdr64_t;
+
+/* The alignment/padding for 64bit Linux cmsghdr is the same. */
+#define	ISALIGNED_LX_CMSG64(addr)	ISALIGNED_cmsghdr(addr)
+#define	ROUNDUP_LX_CMSG64_LEN(len)	ROUNDUP_cmsglen(len)
+
+#define	LX_CMSG64_IS_ALIGNED(m)			\
+	(((uintptr_t)(m) & (_CMSG_DATA_ALIGNMENT - 1)) == 0)
+#define	LX_CMSG64_DATA(c)	((unsigned char *)(((lx_cmsghdr64_t *)(c)) + 1))
+/*
+ * LX_CMSG64_VALID is closely derived from CMSG_VALID with one particularly
+ * important addition.  Since cmsg_len is 64bit, (cmsg + cmsg_len) is checked
+ * against the start address as well.  This prevents bogus inputs from wrapping
+ * around the address space.
+ */
+#define	LX_CMSG64_VALID(cmsg, start, end)				\
+	(ISALIGNED_LX_CMSG64(cmsg) &&					\
+	((uintptr_t)(cmsg) >= (uintptr_t)(start)) &&			\
+	((uintptr_t)(cmsg) < (uintptr_t)(end)) &&			\
+	((cmsg)->cmsg_len >= sizeof (lx_cmsghdr64_t)) &&		\
+	((uintptr_t)(cmsg) + (cmsg)->cmsg_len <= (uintptr_t)(end)) &&	\
+	((uintptr_t)(cmsg) + (cmsg)->cmsg_len >= (uintptr_t)(start)))
+#define	LX_CMSG64_NEXT(cmsg)				\
+	(lx_cmsghdr64_t *)((uintptr_t)(cmsg) +		\
+	    ROUNDUP_LX_CMSG64_LEN((cmsg)->cmsg_len))
+#define	LX_CMSG64_DIFF	sizeof (uint32_t)
+
+#endif /* defined(_LP64) */
+
+static int
+lx_xlate_cmsg(struct cmsghdr *inmsg, struct cmsghdr *omsg, lx_xlate_dir_t dir)
+{
+	int i;
+
+	VERIFY(dir == SUNOS_TO_LX || dir == LX_TO_SUNOS);
+
+	for (i = 0; i < LX_MAX_CMSG_XLATE; i++) {
+		lx_cmsg_xlate_t *xlate = &lx_cmsg_xlate_tbl[i];
+		if (dir == LX_TO_SUNOS &&
+		    inmsg->cmsg_level == xlate->lcx_linux_level &&
+		    inmsg->cmsg_type == xlate->lcx_linux_level) {
+			if (omsg != NULL) {
+				bcopy(inmsg, omsg, inmsg->cmsg_len);
+				omsg->cmsg_level = xlate->lcx_sunos_level;
+				omsg->cmsg_type = xlate->lcx_sunos_type;
+			}
+			return (inmsg->cmsg_len);
+		} else if (dir == SUNOS_TO_LX &&
+		    inmsg->cmsg_level == xlate->lcx_sunos_level &&
+		    inmsg->cmsg_type == xlate->lcx_sunos_type) {
+			if (omsg != NULL) {
+				bcopy(inmsg, omsg, inmsg->cmsg_len);
+				omsg->cmsg_level = xlate->lcx_linux_level;
+				omsg->cmsg_type = xlate->lcx_linux_type;
+			}
+			return (inmsg->cmsg_len);
+		}
+	}
+	/*
+	 * The Linux man page for sendmsg does not define a specific error for
+	 * unsupported cmsgs.  While it is meant to indicated bad values for
+	 * passed flags, EOPNOTSUPP appears to be the next closest choice.
+	 */
+	return (-EOPNOTSUPP);
+}
+
+static long
+ltos_cmsgs_copyin(void *addr, socklen_t inlen, void **outmsg,
+    socklen_t *outlenp)
+{
+	void *inbuf, *obuf;
+	struct cmsghdr *inmsg, *omsg;
+
+	if (inlen < sizeof (struct cmsghdr) || inlen > SO_MAXARGSIZE) {
+		return (EINVAL);
+	}
+
+#if defined(_LP64)
+	if (get_udatamodel() == DATAMODEL_NATIVE &&
+	    inlen < sizeof (lx_cmsghdr64_t)) {
+		/* The size requirements are more strict for 64bit. */
+		return (EINVAL);
+	}
+#endif /* defined(_LP64) */
+
+	inbuf = kmem_alloc(inlen, KM_SLEEP);
+	if (copyin(addr, inbuf, inlen) != 0) {
+		kmem_free(inbuf, inlen);
+		return (EFAULT);
+	}
+
+#if defined(_LP64)
+	if (get_udatamodel() == DATAMODEL_NATIVE) {
+		/*
+		 * Linux cmsgs are longer than illumos under x86_64.
+		 * Convert to reguar cmsgs first.
+		 */
+		lx_cmsghdr64_t *lmsg;
+		struct cmsghdr *smsg;
+		void *newbuf;
+		int len = 0;
+
+		/* Inventory the new cmsg size */
+		for (lmsg = (lx_cmsghdr64_t *)inbuf;
+		    LX_CMSG64_VALID(lmsg, inbuf, (uintptr_t)inbuf + inlen) != 0;
+		    lmsg = LX_CMSG64_NEXT(lmsg)) {
+			len += ROUNDUP_cmsglen(lmsg->cmsg_len - LX_CMSG64_DIFF);
+		}
+
+		VERIFY(len < inlen);
+		if (len == 0) {
+			/* Input was bogus, so we can give up early. */
+			kmem_free(inbuf, inlen);
+			*outmsg = NULL;
+			*outlenp = 0;
+			return (EINVAL);
+		}
+
+		newbuf = kmem_alloc(len, KM_SLEEP);
+
+		for (lmsg = (lx_cmsghdr64_t *)inbuf,
+		    smsg = (struct cmsghdr *)newbuf;
+		    LX_CMSG64_VALID(lmsg, inbuf, (uintptr_t)inbuf + inlen) != 0;
+		    lmsg = LX_CMSG64_NEXT(lmsg), smsg = CMSG_NEXT(smsg)) {
+			smsg->cmsg_level = lmsg->cmsg_level;
+			smsg->cmsg_type = lmsg->cmsg_type;
+			smsg->cmsg_len = lmsg->cmsg_len - LX_CMSG64_DIFF;
+
+			/* The above length measurement should ensure this */
+			ASSERT(CMSG_VALID(smsg, newbuf,
+			    (uintptr_t)newbuf + len));
+
+			bcopy(LX_CMSG64_DATA(lmsg), CMSG_CONTENT(smsg),
+			    smsg->cmsg_len - sizeof (*smsg));
+		}
+
+		kmem_free(inbuf, inlen);
+		inbuf = newbuf;
+		inlen = len;
+	}
+#endif /* defined(_LP64) */
+
+	obuf = kmem_zalloc(inlen, KM_SLEEP);
+	for (inmsg = (struct cmsghdr *)inbuf, omsg = (struct cmsghdr *)obuf;
+	    CMSG_VALID(inmsg, inbuf, (uintptr_t)inbuf + inlen) != 0;
+	    inmsg = CMSG_NEXT(inmsg), omsg = CMSG_NEXT(omsg)) {
+		int res;
+
+		if ((res = lx_xlate_cmsg(inmsg, omsg, LX_TO_SUNOS)) < 0) {
+			/* unsupported msg */
+			kmem_free(obuf, inlen);
+			kmem_free(inbuf, inlen);
+			return (-res);
+		}
+	}
+
+	kmem_free(inbuf, inlen);
+	*outmsg = obuf;
+	*outlenp = inlen;
+	return (0);
+}
+
+static long
+stol_cmsgs_copyout(void *input, socklen_t inlen, void *addr,
+    socklen_t *outlenp, socklen_t orig_outlen)
+{
+	void *obuf;
+	struct cmsghdr *inmsg, *omsg;
+	int error = 0, count = 0;
+
+	if (inlen == 0) {
+		/* Simply output the zero controllen */
+		goto finish;
+	}
+
+	VERIFY(inlen > sizeof (struct cmsghdr));
+
+	/*
+	 * Since cmsgs are often padded to an aligned size, kmem_zalloc is
+	 * necessary to prevent leaking the contents of uninitialized memory.
+	 */
+	obuf = kmem_zalloc(inlen, KM_SLEEP);
+	for (inmsg = (struct cmsghdr *)input, omsg = (struct cmsghdr *)obuf;
+	    CMSG_VALID(inmsg, input, (uintptr_t)input + inlen) != 0;
+	    inmsg = CMSG_NEXT(inmsg), omsg = CMSG_NEXT(omsg)) {
+		int res;
+
+		if ((res = lx_xlate_cmsg(inmsg, omsg, SUNOS_TO_LX)) < 0) {
+			/* unsupported msg */
+			kmem_free(obuf, inlen);
+			return (-res);
+		}
+		/* maintain a count of outgoing messages */
+		count++;
+	}
+
+#if defined(_LP64)
+	if (get_udatamodel() == DATAMODEL_NATIVE) {
+		/* Linux cmsgs are longer than illumos under x86_64. */
+		struct cmsghdr *smsg;
+		lx_cmsghdr64_t *lmsg;
+		void *newbuf;
+		int len = inlen + (count * LX_CMSG64_DIFF);
+
+		/*
+		 * Once again, kmem_zalloc is needed to avoid leaking the
+		 * contents of uninialized memory
+		 */
+		newbuf = kmem_zalloc(len, KM_SLEEP);
+		for (smsg = (struct cmsghdr *)obuf,
+		    lmsg = (lx_cmsghdr64_t *)newbuf;
+		    CMSG_VALID(smsg, obuf, (uintptr_t)obuf + inlen) != 0;
+		    smsg = CMSG_NEXT(smsg), lmsg = LX_CMSG64_NEXT(lmsg)) {
+			lmsg->cmsg_level = smsg->cmsg_level;
+			lmsg->cmsg_type = smsg->cmsg_type;
+			lmsg->cmsg_len = smsg->cmsg_len + LX_CMSG64_DIFF;
+
+			ASSERT(LX_CMSG64_VALID(lmsg, newbuf,
+			    (uintptr_t)newbuf + len) != 0);
+
+			bcopy(CMSG_CONTENT(smsg), LX_CMSG64_DATA(lmsg),
+			    smsg->cmsg_len - sizeof (*smsg));
+		}
+
+		kmem_free(obuf, inlen);
+		obuf = newbuf;
+		inlen = len;
+	}
+#endif /* defined(_LP64) */
+
+	if (inlen > orig_outlen || addr == NULL) {
+		kmem_free(obuf, inlen);
+		/* This will be interpreted by the caller */
+		error = EMSGSIZE;
+		inlen = 0;
+		goto finish;
+	}
+
+	if (copyout(obuf, addr, inlen) != 0) {
+		kmem_free(obuf, inlen);
+		return (EFAULT);
+	}
+	kmem_free(obuf, inlen);
+
+finish:
+	if (outlenp != NULL && copyout(&inlen, outlenp, sizeof (inlen)) != 0) {
+		return (EFAULT);
+	}
+	return (error);
 }
 
 static lx_socket_aux_data_t *
@@ -312,14 +807,13 @@ lx_sad_acquire(vnode_t *vp)
 	return (cur);
 }
 
-
 long
 lx_connect(long sock, uintptr_t name, socklen_t namelen)
 {
 	struct sonode *so;
-	struct sockaddr *laddr = NULL, *saddr = NULL;
+	struct sockaddr *addr = NULL;
 	lx_socket_aux_data_t *sad = NULL;
-	socklen_t snamelen;
+	socklen_t len;
 	file_t *fp;
 	int error;
 
@@ -333,27 +827,16 @@ lx_connect(long sock, uintptr_t name, socklen_t namelen)
 	 * make later sizing decisions.
 	 */
 	if (namelen != 0) {
-		if (namelen < sizeof (sa_family_t) ||
-		    namelen > SO_MAXARGSIZE) {
-			releasef(sock);
-			return (set_errno(EINVAL));
-		}
-		laddr = kmem_zalloc(namelen, KM_SLEEP);
-		if (copyin((void *)name, laddr, namelen) != 0) {
-			kmem_free(laddr, namelen);
-			releasef(sock);
-			return (set_errno(EFAULT));
-		}
-		error = ltos_sockaddr(laddr, namelen, &saddr, &snamelen);
+		error = ltos_sockaddr_copyin((struct sockaddr *)name, namelen,
+		    &addr, &len);
 		if (error != 0) {
-			kmem_free(laddr, namelen);
 			releasef(sock);
 			return (set_errno(error));
 		}
 	}
 
 
-	error = socket_connect(so, saddr, snamelen, fp->f_flag,
+	error = socket_connect(so, addr, len, fp->f_flag,
 	    _SOCONNECT_XPG4_2, CRED());
 
 	/*
@@ -378,17 +861,697 @@ lx_connect(long sock, uintptr_t name, socklen_t namelen)
 
 	releasef(sock);
 
-	if (laddr != NULL) {
-		kmem_free(laddr, namelen);
-	}
-	if (saddr != NULL) {
-		kmem_free(saddr, snamelen);
+	if (addr != NULL) {
+		kmem_free(addr, len);
 	}
 
 	if (error != 0) {
 		return (set_errno(error));
 	}
 	return (0);
+}
+
+static long
+lx_recv_common(int sock, struct nmsghdr *msg, struct uio *uiop, int flags,
+    socklen_t *namelenp, socklen_t *controllenp, int *flagsp)
+{
+	struct sonode *so;
+	file_t *fp;
+	void *name;
+	socklen_t namelen;
+	void *control;
+	socklen_t controllen;
+	ssize_t len;
+	int error;
+
+	if ((so = getsonode(sock, &error, &fp)) == NULL) {
+		return (set_errno(error));
+	}
+
+	flags = lx_xlate_sock_flags(flags, LX_TO_SUNOS);
+	len = uiop->uio_resid;
+	uiop->uio_fmode = fp->f_flag;
+	uiop->uio_extflg = UIO_COPY_CACHED;
+
+	name = msg->msg_name;
+	namelen = msg->msg_namelen;
+	control = msg->msg_control;
+	controllen = msg->msg_controllen;
+
+	/*
+	 * socket_recvmsg will allocate these if needed.
+	 * NULL them out to prevent any confusion.
+	 */
+	msg->msg_name = NULL;
+	msg->msg_control = NULL;
+
+	msg->msg_flags = flags & (MSG_OOB | MSG_PEEK | MSG_WAITALL |
+	    MSG_DONTWAIT);
+	/* Default to XPG4.2 operation */
+	msg->msg_flags |= MSG_XPG4_2;
+
+	error = socket_recvmsg(so, msg, uiop, CRED());
+	if (error) {
+		releasef(sock);
+		return (set_errno(error));
+	}
+	lwp_stat_update(LWP_STAT_MSGRCV, 1);
+	releasef(sock);
+
+	if (namelen != 0) {
+		error = stol_sockaddr_copyout(msg->msg_name, msg->msg_namelen,
+		    name, namelenp, namelen);
+
+		if (msg->msg_namelen != 0) {
+			kmem_free(msg->msg_name, (size_t)msg->msg_namelen);
+			msg->msg_namelen = 0;
+		}
+
+		/*
+		 * Errors during copyout of the name are not a concern to Linux
+		 * callers at this point in the syscall
+		 */
+		if (error != 0 && error != EFAULT) {
+			goto err;
+		}
+	}
+
+	if (controllen != 0) {
+		error = stol_cmsgs_copyout(msg->msg_control,
+		    msg->msg_controllen, control, controllenp, controllen);
+
+		if (error != 0) {
+			/*
+			 * If there was an error during cmsg translation or
+			 * copyout, we need to clean up any FDs that are being
+			 * passed back via SCM_RIGHTS.  This prevents us from
+			 * leaking those open files.
+			 */
+			so_closefds(msg->msg_control, msg->msg_controllen, 0,
+			    0);
+
+			/*
+			 * An error during cmsg_copyout means we had
+			 * _something_ to process.
+			 */
+			VERIFY(msg->msg_controllen != 0);
+
+			kmem_free(msg->msg_control,
+			    (size_t)msg->msg_controllen);
+			msg->msg_controllen = 0;
+
+			if (error == EMSGSIZE) {
+				/* Communicate that messages were truncated */
+				msg->msg_flags |= MSG_CTRUNC;
+				error = 0;
+			} else {
+				goto err;
+			}
+		} else if (msg->msg_controllen != 0) {
+			kmem_free(msg->msg_control,
+			    (size_t)msg->msg_controllen);
+			msg->msg_controllen = 0;
+		}
+	}
+
+	if (flagsp != NULL) {
+		int flags;
+
+		/* Clear internal flag. */
+		flags = msg->msg_flags & ~MSG_XPG4_2;
+		flags = lx_xlate_sock_flags(flags, SUNOS_TO_LX);
+
+		if (copyout(&flags, flagsp, sizeof (flags) != 0)) {
+			error = EFAULT;
+			goto err;
+		}
+	}
+
+	return (len - uiop->uio_resid);
+
+err:
+	if (msg->msg_controllen != 0) {
+		/* Prevent FD leakage (see above) */
+		so_closefds(msg->msg_control, msg->msg_controllen, 0, 0);
+		kmem_free(msg->msg_control, (size_t)msg->msg_controllen);
+	}
+	if (msg->msg_namelen != 0) {
+		kmem_free(msg->msg_name, (size_t)msg->msg_namelen);
+	}
+	return (set_errno(error));
+}
+
+long
+lx_recv(int sock, void *buffer, size_t len, int flags)
+{
+	struct nmsghdr smsg;
+	struct uio auio;
+	struct iovec aiov[1];
+
+	if ((ssize_t)len < 0) {
+		/*
+		 * The input len is unsigned, so limit it to SSIZE_MAX since
+		 * the return value is signed.
+		 */
+		return (set_errno(EINVAL));
+	}
+
+	aiov[0].iov_base = buffer;
+	aiov[0].iov_len = len;
+	auio.uio_loffset = 0;
+	auio.uio_iov = aiov;
+	auio.uio_iovcnt = 1;
+	auio.uio_resid = len;
+	auio.uio_segflg = UIO_USERSPACE;
+	auio.uio_limit = 0;
+
+	smsg.msg_namelen = 0;
+	smsg.msg_controllen = 0;
+	smsg.msg_flags = 0;
+	return (lx_recv_common(sock, &smsg, &auio, flags, NULL, NULL, NULL));
+}
+
+long
+lx_recvfrom(int sock, void *buffer, size_t len, int flags,
+    struct sockaddr *srcaddr, socklen_t *addrlenp)
+{
+	struct nmsghdr smsg;
+	struct uio auio;
+	struct iovec aiov[1];
+
+	if ((ssize_t)len < 0) {
+		/* Keep len reasonably limited (see lx_recv) */
+		return (set_errno(EINVAL));
+	}
+
+	aiov[0].iov_base = buffer;
+	aiov[0].iov_len = len;
+	auio.uio_loffset = 0;
+	auio.uio_iov = aiov;
+	auio.uio_iovcnt = 1;
+	auio.uio_resid = len;
+	auio.uio_segflg = UIO_USERSPACE;
+	auio.uio_limit = 0;
+
+	smsg.msg_name = (char *)srcaddr;
+	if (addrlenp != NULL && srcaddr != NULL) {
+		/*
+		 * Despite addrlenp being defined as a socklen_t *, Linux
+		 * treats it internally as an int *.  Certain LTP tests depend
+		 * upon this behavior, so we must emulate it as well.
+		 */
+		int namelen;
+
+		if (copyin(addrlenp, &namelen, sizeof (namelen)) != 0) {
+			return (set_errno(EFAULT));
+		}
+		if (namelen < 0) {
+			return (set_errno(EINVAL));
+		}
+		smsg.msg_namelen = namelen;
+	} else {
+		smsg.msg_namelen = 0;
+	}
+	smsg.msg_controllen = 0;
+	smsg.msg_flags = 0;
+
+	return (lx_recv_common(sock, &smsg, &auio, flags, addrlenp, NULL,
+	    NULL));
+}
+
+long
+lx_recvmsg(int sock, void *msg, int flags)
+{
+	struct nmsghdr smsg;
+	struct uio auio;
+	struct iovec buf[IOV_MAX_STACK], *aiov;
+	int i, iovcnt, iovsize;
+	long res;
+	ssize_t len = 0;
+	socklen_t *namelenp;
+	socklen_t *controllenp;
+	int *flagsp;
+
+#if defined(_LP64)
+	if (get_udatamodel() != DATAMODEL_NATIVE) {
+		lx_msghdr32_t lmsg32;
+		if (copyin(msg, &lmsg32, sizeof (lmsg32)) != 0) {
+			return (set_errno(EFAULT));
+		}
+		smsg.msg_name = (void *)(uintptr_t)lmsg32.msg_name;
+		smsg.msg_namelen = lmsg32.msg_namelen;
+		smsg.msg_iov = (struct iovec *)(uintptr_t)lmsg32.msg_iov;
+		smsg.msg_iovlen = lmsg32.msg_iovlen;
+		smsg.msg_control = (void *)(uintptr_t)lmsg32.msg_control;
+		smsg.msg_controllen = lmsg32.msg_controllen;
+		smsg.msg_flags = lmsg32.msg_flags;
+
+		namelenp = &((lx_msghdr32_t *)msg)->msg_namelen;
+		controllenp = &((lx_msghdr32_t *)msg)->msg_controllen;
+		flagsp = &((lx_msghdr32_t *)msg)->msg_flags;
+	} else
+#endif /* defined(_LP64) */
+	{
+		lx_msghdr_t lmsg;
+		if (copyin(msg, &lmsg, sizeof (lmsg)) != 0) {
+			return (set_errno(EFAULT));
+		}
+		smsg.msg_name = lmsg.msg_name;
+		smsg.msg_namelen = lmsg.msg_namelen;
+		smsg.msg_iov = lmsg.msg_iov;
+		smsg.msg_iovlen = lmsg.msg_iovlen;
+		smsg.msg_control = lmsg.msg_control;
+		smsg.msg_controllen = lmsg.msg_controllen;
+		smsg.msg_flags = lmsg.msg_flags;
+
+		namelenp = &((lx_msghdr_t *)msg)->msg_namelen;
+		controllenp = &((lx_msghdr_t *)msg)->msg_controllen;
+		flagsp = &((lx_msghdr_t *)msg)->msg_flags;
+	}
+
+	iovcnt = smsg.msg_iovlen;
+	if (iovcnt <= 0 || iovcnt > IOV_MAX) {
+		return (set_errno(EMSGSIZE));
+	}
+	if (iovcnt > IOV_MAX_STACK) {
+		iovsize = iovcnt * sizeof (struct iovec);
+		aiov = kmem_alloc(iovsize, KM_SLEEP);
+	} else {
+		iovsize = 0;
+		aiov = buf;
+	}
+
+#if defined(_LP64)
+	if (get_udatamodel() != DATAMODEL_NATIVE) {
+		/* convert from 32bit iovec structs */
+		struct iovec32 buf32[IOV_MAX_STACK], *aiov32;
+		ssize_t iov32size;
+		ssize32_t count32;
+
+		iov32size = iovcnt * sizeof (struct iovec32);
+		if (iovsize != 0) {
+			aiov32 = kmem_alloc(iov32size, KM_SLEEP);
+		} else {
+			aiov32 = buf32;
+		}
+
+		if (copyin((struct iovec32 *)smsg.msg_iov, aiov32, iov32size)) {
+			if (iovsize != 0) {
+				kmem_free(aiov32, iov32size);
+				kmem_free(aiov, iovsize);
+			}
+
+			return (set_errno(EFAULT));
+		}
+
+		count32 = 0;
+		for (i = 0; i < iovcnt; i++) {
+			ssize32_t iovlen32;
+
+			iovlen32 = aiov32[i].iov_len;
+			count32 += iovlen32;
+			if (iovlen32 < 0 || count32 < 0) {
+				if (iovsize != 0) {
+					kmem_free(aiov32, iov32size);
+					kmem_free(aiov, iovsize);
+				}
+
+				return (set_errno(EINVAL));
+			}
+
+			aiov[i].iov_len = iovlen32;
+			aiov[i].iov_base =
+			    (caddr_t)(uintptr_t)aiov32[i].iov_base;
+		}
+		len = count32;
+
+		if (iovsize != 0) {
+			kmem_free(aiov32, iov32size);
+		}
+	} else
+#endif /* defined(_LP64) */
+	{
+		if (copyin(smsg.msg_iov, aiov,
+		    iovcnt * sizeof (struct iovec)) != 0) {
+			if (iovsize != 0) {
+				kmem_free(aiov, iovsize);
+			}
+			return (set_errno(EFAULT));
+		}
+
+		len = 0;
+		for (i = 0; i < iovcnt; i++) {
+			ssize_t iovlen = aiov[i].iov_len;
+			len += iovlen;
+			if (iovlen < 0 || len < 0) {
+				if (iovsize != 0) {
+					kmem_free(aiov, iovsize);
+				}
+				return (set_errno(EINVAL));
+			}
+		}
+	}
+	/* Since the iovec is passed via the uio, NULL it out in the msg */
+	smsg.msg_iov = NULL;
+
+	auio.uio_loffset = 0;
+	auio.uio_iov = aiov;
+	auio.uio_iovcnt = iovcnt;
+	auio.uio_resid = len;
+	auio.uio_segflg = UIO_USERSPACE;
+	auio.uio_limit = 0;
+
+	res = lx_recv_common(sock, &smsg, &auio, flags, namelenp, controllenp,
+	    flagsp);
+
+	if (iovsize != 0) {
+		kmem_free(aiov, iovsize);
+	}
+
+	return (res);
+}
+
+/*
+ * Custom version of socket_sendmsg.
+ * This facilitates support of LX_MSG_NOSIGNAL with a parameter to override
+ * SIGPIPE behavior on EPIPE.
+ */
+static int
+lx_socket_sendmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop,
+    cred_t *cr, boolean_t nosig)
+{
+	int error = 0;
+	ssize_t orig_resid = uiop->uio_resid;
+
+	/*
+	 * Do not bypass the cache if we are doing a local (AF_UNIX) write.
+	 */
+	if (so->so_family == AF_UNIX) {
+		uiop->uio_extflg |= UIO_COPY_CACHED;
+	} else {
+		uiop->uio_extflg &= ~UIO_COPY_CACHED;
+	}
+
+	error = SOP_SENDMSG(so, msg, uiop, cr);
+	switch (error) {
+	case EINTR:
+	case ENOMEM:
+	/* EAGAIN is EWOULDBLOCK */
+	case EWOULDBLOCK:
+		/* We did a partial send */
+		if (uiop->uio_resid != orig_resid) {
+			error = 0;
+		}
+		break;
+
+	case ENOTCONN:
+		/* Appease LTP and match behavior detailed in the man page */
+		error = EPIPE;
+		/* FALLTHROUGH */
+
+	case EPIPE:
+		if (nosig == B_FALSE) {
+			tsignal(curthread, SIGPIPE);
+		}
+		break;
+
+	default:
+		break;
+	}
+
+	return (error);
+}
+
+static long
+lx_send_common(int sock, struct nmsghdr *msg, struct uio *uiop, int flags)
+{
+	struct sonode *so;
+	file_t *fp;
+	struct sockaddr *name = NULL;
+	socklen_t namelen;
+	void *control = NULL;
+	socklen_t controllen;
+	ssize_t len = 0;
+	int error;
+	boolean_t nosig;
+
+	if ((so = getsonode(sock, &error, &fp)) == NULL) {
+		return (set_errno(error));
+	}
+
+	uiop->uio_fmode = fp->f_flag;
+
+	/* Allocate and copyin name and control */
+	if (msg->msg_name != NULL && msg->msg_namelen != 0) {
+		ASSERT(MUTEX_NOT_HELD(&so->so_lock));
+
+		error = ltos_sockaddr_copyin((struct sockaddr *)msg->msg_name,
+		    msg->msg_namelen, &name, &namelen);
+		if (error != 0) {
+			goto done;
+		}
+		/* copyin_name null terminates addresses for AF_UNIX */
+		msg->msg_namelen = namelen;
+		msg->msg_name = name;
+	} else {
+		msg->msg_name = name = NULL;
+		msg->msg_namelen = namelen = 0;
+	}
+
+	if (msg->msg_control != NULL && msg->msg_controllen != 0) {
+		/*
+		 * Verify that the length is not excessive to prevent
+		 * an application from consuming all of kernel memory.
+		 */
+		if (msg->msg_controllen > SO_MAXARGSIZE) {
+			error = EINVAL;
+			goto done;
+		}
+		if ((error = ltos_cmsgs_copyin(msg->msg_control,
+		    msg->msg_controllen, &control, &controllen)) != 0) {
+			goto done;
+		}
+		msg->msg_control = control;
+		msg->msg_controllen = controllen;
+	} else {
+		msg->msg_control = control = NULL;
+		msg->msg_controllen = controllen = 0;
+	}
+
+	len = uiop->uio_resid;
+	msg->msg_flags = lx_xlate_sock_flags(flags, LX_TO_SUNOS);
+	/* Default to XPG4.2 operation */
+	msg->msg_flags |= MSG_XPG4_2;
+	nosig = ((flags & LX_MSG_NOSIGNAL) != 0);
+
+	error = lx_socket_sendmsg(so, msg, uiop, CRED(), nosig);
+done:
+	if (control != NULL) {
+		kmem_free(control, controllen);
+	}
+	if (name != NULL) {
+		kmem_free(name, namelen);
+	}
+	if (error != 0) {
+		releasef(sock);
+		return (set_errno(error));
+	}
+	lwp_stat_update(LWP_STAT_MSGSND, 1);
+	releasef(sock);
+	return (len - uiop->uio_resid);
+}
+
+long
+lx_send(int sock, void *buffer, size_t len, int flags)
+{
+	struct nmsghdr smsg;
+	struct uio auio;
+	struct iovec aiov[1];
+
+	if ((ssize_t)len < 0) {
+		/* Keep len reasonably limited (see lx_recv) */
+		return (set_errno(EINVAL));
+	}
+
+	aiov[0].iov_base = buffer;
+	aiov[0].iov_len = len;
+	auio.uio_loffset = 0;
+	auio.uio_iov = aiov;
+	auio.uio_iovcnt = 1;
+	auio.uio_resid = len;
+	auio.uio_segflg = UIO_USERSPACE;
+	auio.uio_limit = 0;
+
+	smsg.msg_name = NULL;
+	smsg.msg_control = NULL;
+	return (lx_send_common(sock, &smsg, &auio, flags));
+}
+
+long
+lx_sendto(int sock, void *buffer, size_t len, int flags,
+    struct sockaddr *dstaddr, socklen_t addrlen)
+{
+	struct nmsghdr smsg;
+	struct uio auio;
+	struct iovec aiov[1];
+
+	if ((ssize_t)len < 0) {
+		/* Keep len reasonably limited (see lx_recv) */
+		return (set_errno(EINVAL));
+	}
+
+	aiov[0].iov_base = buffer;
+	aiov[0].iov_len = len;
+	auio.uio_loffset = 0;
+	auio.uio_iov = aiov;
+	auio.uio_iovcnt = 1;
+	auio.uio_resid = len;
+	auio.uio_segflg = UIO_USERSPACE;
+	auio.uio_limit = 0;
+
+	smsg.msg_name = (char *)dstaddr;
+	smsg.msg_namelen = addrlen;
+	smsg.msg_control = NULL;
+	return (lx_send_common(sock, &smsg, &auio, flags));
+}
+
+long
+lx_sendmsg(int sock, void *msg, int flags)
+{
+	struct nmsghdr smsg;
+	struct uio auio;
+	struct iovec buf[IOV_MAX_STACK], *aiov;
+	int i, iovcnt, iovsize;
+	long res;
+	ssize_t len = 0;
+
+#if defined(_LP64)
+	if (get_udatamodel() != DATAMODEL_NATIVE) {
+		lx_msghdr32_t lmsg32;
+		if (copyin(msg, &lmsg32, sizeof (lmsg32)) != 0) {
+			return (set_errno(EFAULT));
+		}
+		smsg.msg_name = (void *)(uintptr_t)lmsg32.msg_name;
+		smsg.msg_namelen = lmsg32.msg_namelen;
+		smsg.msg_iov = (struct iovec *)(uintptr_t)lmsg32.msg_iov;
+		smsg.msg_iovlen = lmsg32.msg_iovlen;
+		smsg.msg_control = (void *)(uintptr_t)lmsg32.msg_control;
+		smsg.msg_controllen = lmsg32.msg_controllen;
+		smsg.msg_flags = lmsg32.msg_flags;
+	} else
+#endif /* defined(_LP64) */
+	{
+		lx_msghdr_t lmsg;
+		if (copyin(msg, &lmsg, sizeof (lmsg)) != 0) {
+			return (set_errno(EFAULT));
+		}
+		smsg.msg_name = lmsg.msg_name;
+		smsg.msg_namelen = lmsg.msg_namelen;
+		smsg.msg_iov = lmsg.msg_iov;
+		smsg.msg_iovlen = lmsg.msg_iovlen;
+		smsg.msg_control = lmsg.msg_control;
+		smsg.msg_controllen = lmsg.msg_controllen;
+		smsg.msg_flags = lmsg.msg_flags;
+	}
+
+	iovcnt = smsg.msg_iovlen;
+	if (iovcnt <= 0 || iovcnt > IOV_MAX) {
+		return (set_errno(EMSGSIZE));
+	}
+	if (iovcnt > IOV_MAX_STACK) {
+		iovsize = iovcnt * sizeof (struct iovec);
+		aiov = kmem_alloc(iovsize, KM_SLEEP);
+	} else {
+		iovsize = 0;
+		aiov = buf;
+	}
+
+#if defined(_LP64)
+	if (get_udatamodel() != DATAMODEL_NATIVE) {
+		/* convert from 32bit iovec structs */
+		struct iovec32 buf32[IOV_MAX_STACK], *aiov32 = buf32;
+		ssize_t iov32size;
+		ssize32_t count32;
+
+		iov32size = iovcnt * sizeof (struct iovec32);
+		if (iovsize != 0) {
+			aiov32 = kmem_alloc(iov32size, KM_SLEEP);
+		}
+
+		if (copyin((struct iovec32 *)smsg.msg_iov, aiov32, iov32size)) {
+			if (iovsize != 0) {
+				kmem_free(aiov32, iov32size);
+				kmem_free(aiov, iovsize);
+			}
+
+			return (set_errno(EFAULT));
+		}
+
+		count32 = 0;
+		for (i = 0; i < iovcnt; i++) {
+			ssize32_t iovlen32;
+
+			iovlen32 = aiov32[i].iov_len;
+			count32 += iovlen32;
+			if (iovlen32 < 0 || count32 < 0) {
+				if (iovsize != 0) {
+					kmem_free(aiov32, iov32size);
+					kmem_free(aiov, iovsize);
+				}
+
+				return (set_errno(EINVAL));
+			}
+
+			aiov[i].iov_len = iovlen32;
+			aiov[i].iov_base =
+			    (caddr_t)(uintptr_t)aiov32[i].iov_base;
+		}
+		len = count32;
+
+		if (iovsize != 0) {
+			kmem_free(aiov32, iov32size);
+		}
+	} else
+#endif /* defined(_LP64) */
+	{
+		if (copyin(smsg.msg_iov, aiov,
+		    iovcnt * sizeof (struct iovec)) != 0) {
+			if (iovsize != 0) {
+				kmem_free(aiov, iovsize);
+			}
+			return (set_errno(EFAULT));
+		}
+
+		len = 0;
+		for (i = 0; i < iovcnt; i++) {
+			ssize_t iovlen = aiov[i].iov_len;
+
+			len += iovlen;
+			if (iovlen < 0 || len < 0) {
+				if (iovsize != 0) {
+					kmem_free(aiov, iovsize);
+				}
+				return (set_errno(EINVAL));
+			}
+		}
+	}
+	/* Since the iovec is passed via the uio, NULL it out in the msg */
+	smsg.msg_iov = NULL;
+
+	auio.uio_loffset = 0;
+	auio.uio_iov = aiov;
+	auio.uio_iovcnt = iovcnt;
+	auio.uio_resid = len;
+	auio.uio_segflg = UIO_USERSPACE;
+	auio.uio_limit = 0;
+
+	res = lx_send_common(sock, &smsg, &auio, flags);
+
+	if (iovsize != 0) {
+		kmem_free(aiov, iovsize);
+	}
+
+	return (res);
 }
 
 #if defined(_SYSCALL32_IMPL)
@@ -402,26 +1565,26 @@ static struct {
 	lx_sockfn_t s_fn;	/* Function implementing the subcommand */
 	int s_nargs;		/* Number of arguments the function takes */
 } lx_socketcall_fns[] = {
-	NULL, 3,			/* socket */
-	NULL, 3,			/* bind */
-	(lx_sockfn_t)lx_connect, 3,	/* connect */
-	NULL, 2,			/* listen */
-	NULL, 3,			/* accept */
-	NULL, 3,			/* getsockname */
-	NULL, 3,			/* getpeername */
-	NULL, 4,			/* socketpair */
-	NULL, 4,			/* send */
-	NULL, 4,			/* recv */
-	NULL, 6,			/* sendto */
-	NULL, 6,			/* recvfrom */
-	NULL, 2,			/* shutdown */
-	NULL, 5,			/* getsockopt */
-	NULL, 5,			/* getsockopt */
-	NULL, 3,			/* sendmsg */
-	NULL, 3,			/* recvmsg */
-	NULL, 4,			/* accept4 */
-	NULL, 5,			/* recvmmsg */
-	NULL, 4				/* sendmmsg */
+	NULL,		3,	/* socket */
+	NULL,		3,	/* bind */
+	lx_connect,	3,	/* connect */
+	NULL,		2,	/* listen */
+	NULL,		3,	/* accept */
+	NULL,		3,	/* getsockname */
+	NULL,		3,	/* getpeername */
+	NULL,		4,	/* socketpair */
+	lx_send,	4,	/* send */
+	lx_recv,	4,	/* recv */
+	lx_sendto,	6,	/* sendto */
+	lx_recvfrom,	6,	/* recvfrom */
+	NULL,		2,	/* shutdown */
+	NULL,		5,	/* getsockopt */
+	NULL,		5,	/* getsockopt */
+	lx_sendmsg,	3,	/* sendmsg */
+	lx_recvmsg,	3,	/* recvmsg */
+	NULL,		4,	/* accept4 */
+	NULL,		5,	/* recvmmsg */
+	NULL,		4	/* sendmmsg */
 };
 
 long
@@ -464,9 +1627,7 @@ lx_socketcall(long p1, uint32_t *p2)
 	    args[3], args[4], args[5]));
 }
 
-#endif
-
-
+#endif /* defined(_SYSCALL32_IMPL) */
 
 static void
 lx_socket_vsd_free(void *data)
