@@ -23,8 +23,14 @@
 #
 
 PROG =		lxinit
-PROGS =		$(PROG)
-OBJS =		lxinit
+
+PROG_OBJS =	lxinit.o pipe_stream.o run_command.o
+LIST_OBJS =	list.o
+
+OBJS =		$(PROG_OBJS) \
+		$(LIST_OBJS)
+SRCS =		$(PROG_OBJS:%.o=%.c) \
+		$(LIST_OBJS:%.o=$(SRC)/common/list/%.c)
 
 all:		$(PROG)
 
@@ -33,21 +39,33 @@ include $(SRC)/cmd/Makefile.cmd
 
 # override the install directory
 ROOTBIN =	$(ROOTBRANDDIR)
-CLOBBERFILES =	$(OBJS) $(ROOTPROGS)
+CLOBBERFILES =	$(OBJS) $(ROOTPROG)
 
 UTSBASE =	$(SRC)/uts
 
 CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-D_REENTRANT -I$(UTSBASE)/common/brand/lx
-LDLIBS +=	-lzonecfg -lipadm -lsocket -linetutil -lnsl
+LDLIBS +=	-lzonecfg -lipadm -lsocket -linetutil -lnsl -lcmdutils
 
 .KEEP_STATE:
 
-install:	all $(ROOTPROGS)
+install: all $(ROOTPROG)
 
 clean:
-		$(RM) $(PROG) $(OBJS)
+	$(RM) $(PROG) $(OBJS)
 
-lint:		lint_PROG
+lint: lint_PROG lint_SRCS
+
+$(PROG): $(OBJS)
+	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
+	$(POST_PROCESS)
+
+%.o: %.c
+	$(COMPILE.c) $<
+	$(POST_PROCESS_O)
+
+%.o: $(SRC)/common/list/%.c
+	$(COMPILE.c) $<
+	$(POST_PROCESS_O)
 
 include $(SRC)/cmd/Makefile.targ
