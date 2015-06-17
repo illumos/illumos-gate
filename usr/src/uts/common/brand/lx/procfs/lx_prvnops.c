@@ -151,6 +151,7 @@ static void lxpr_read_swaps(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_uptime(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_version(lxpr_node_t *, lxpr_uiobuf_t *);
 
+static void lxpr_read_pid_cgroup(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_pid_cmdline(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_pid_comm(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_pid_env(lxpr_node_t *, lxpr_uiobuf_t *);
@@ -274,6 +275,7 @@ static lxpr_dirent_t lx_procdir[] = {
  * Contents of an lx /proc/<pid> directory.
  */
 static lxpr_dirent_t piddir[] = {
+	{ LXPR_PID_CGROUP,	"cgroup" },
 	{ LXPR_PID_CMDLINE,	"cmdline" },
 	{ LXPR_PID_COMM,	"comm" },
 	{ LXPR_PID_CPU,		"cpu" },
@@ -298,6 +300,7 @@ static lxpr_dirent_t piddir[] = {
  * Contents of an lx /proc/<pid>/task/<tid> directory.
  */
 static lxpr_dirent_t tiddir[] = {
+	{ LXPR_PID_CGROUP,	"cgroup" },
 	{ LXPR_PID_CMDLINE,	"cmdline" },
 	{ LXPR_PID_TID_COMM,	"comm" },
 	{ LXPR_PID_CPU,		"cpu" },
@@ -506,6 +509,7 @@ lxpr_close(vnode_t *vp, int flag, int count, offset_t offset, cred_t *cr,
 static void (*lxpr_read_function[LXPR_NFILES])() = {
 	lxpr_read_isdir,		/* /proc		*/
 	lxpr_read_isdir,		/* /proc/<pid>		*/
+	lxpr_read_pid_cgroup,		/* /proc/<pid>/cgroup	*/
 	lxpr_read_pid_cmdline,		/* /proc/<pid>/cmdline	*/
 	lxpr_read_pid_comm,		/* /proc/<pid>/comm	*/
 	lxpr_read_empty,		/* /proc/<pid>/cpu	*/
@@ -524,6 +528,7 @@ static void (*lxpr_read_function[LXPR_NFILES])() = {
 	lxpr_read_isdir,		/* /proc/<pid>/task/nn	*/
 	lxpr_read_isdir,		/* /proc/<pid>/fd	*/
 	lxpr_read_fd,			/* /proc/<pid>/fd/nn	*/
+	lxpr_read_pid_cgroup,		/* /proc/<pid>/task/<tid>/cgroup */
 	lxpr_read_pid_cmdline,		/* /proc/<pid>/task/<tid>/cmdline */
 	lxpr_read_pid_comm,		/* /proc/<pid>/task/<tid>/comm	*/
 	lxpr_read_empty,		/* /proc/<pid>/task/<tid>/cpu	*/
@@ -605,6 +610,7 @@ static void (*lxpr_read_function[LXPR_NFILES])() = {
 static vnode_t *(*lxpr_lookup_function[LXPR_NFILES])() = {
 	lxpr_lookup_procdir,		/* /proc		*/
 	lxpr_lookup_piddir,		/* /proc/<pid>		*/
+	lxpr_lookup_not_a_dir,		/* /proc/<pid>/cgroup	*/
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/cmdline	*/
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/comm	*/
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/cpu	*/
@@ -623,6 +629,7 @@ static vnode_t *(*lxpr_lookup_function[LXPR_NFILES])() = {
 	lxpr_lookup_task_tid_dir,	/* /proc/<pid>/task/nn	*/
 	lxpr_lookup_fddir,		/* /proc/<pid>/fd	*/
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/fd/nn	*/
+	lxpr_lookup_not_a_dir,		/* /proc/<pid>/task/<tid>/cgroup */
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/task/<tid>/cmdline */
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/task/<tid>/comm	*/
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/task/<tid>/cpu	*/
@@ -704,6 +711,7 @@ static vnode_t *(*lxpr_lookup_function[LXPR_NFILES])() = {
 static int (*lxpr_readdir_function[LXPR_NFILES])() = {
 	lxpr_readdir_procdir,		/* /proc		*/
 	lxpr_readdir_piddir,		/* /proc/<pid>		*/
+	lxpr_readdir_not_a_dir,		/* /proc/<pid>/cgroup	*/
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/cmdline	*/
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/comm	*/
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/cpu	*/
@@ -722,6 +730,7 @@ static int (*lxpr_readdir_function[LXPR_NFILES])() = {
 	lxpr_readdir_task_tid_dir,	/* /proc/<pid>/task/nn	*/
 	lxpr_readdir_fddir,		/* /proc/<pid>/fd	*/
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/fd/nn	*/
+	lxpr_readdir_not_a_dir,		/* /proc/<pid>/task/<tid>/cgroup */
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/task/<tid>/cmdline */
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/task/<tid>/comm	*/
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/task/<tid>/cpu	*/
@@ -887,6 +896,29 @@ lxpr_read_invalid(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 static void
 lxpr_read_empty(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
+}
+
+/*
+ * lxpr_read_pid_cgroup(): read cgroups for process
+ */
+static void
+lxpr_read_pid_cgroup(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
+{
+	proc_t *p;
+
+	ASSERT(lxpnp->lxpr_type == LXPR_PID_CGROUP ||
+	    lxpnp->lxpr_type == LXPR_PID_TID_CGROUP);
+
+	p = lxpr_lock(lxpnp->lxpr_pid);
+	if (p == NULL) {
+		lxpr_uiobuf_seterr(uiobuf, EINVAL);
+		return;
+	}
+
+	/* basic stub, 3rd field will need to be populated */
+	lxpr_uiobuf_printf(uiobuf, "1:name=systemd:/\n");
+
+	lxpr_unlock(p);
 }
 
 /*
