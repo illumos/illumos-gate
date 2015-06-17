@@ -100,6 +100,10 @@ cgrp_wr(cgrp_mnt_t *cgm, cgrp_node_t *cn, struct uio *uio, struct cred *cr,
 	/* XXX implement pseudo file write for subsystem and type */
 	DTRACE_PROBE2(cgrp__wr, int, cgm->cg_ssid, int, cn->cgn_type);
 
+	/* pretend we wrote the whole thing */
+	uio->uio_offset += uio->uio_resid;
+	uio->uio_resid = 0;
+
 	return (error);
 }
 
