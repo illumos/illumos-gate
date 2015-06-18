@@ -183,7 +183,7 @@ struct brand_ops {
 	    boolean_t *, int *);
 	int	(*b_sigcld_repost)(proc_t *, sigqueue_t *);
 	int	(*b_issig_stop)(proc_t *, klwp_t *);
-	boolean_t (*b_sig_ignorable)(proc_t *, int);
+	boolean_t (*b_sig_ignorable)(proc_t *, klwp_t *, int);
 	void	(*b_savecontext)(ucontext_t *);
 #if defined(_SYSCALL32_IMPL)
 	void	(*b_savecontext32)(ucontext32_t *);

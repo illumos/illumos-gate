@@ -896,6 +896,7 @@ lx_ptrace_cont(lx_lwp_data_t *remote, lx_ptrace_cont_flags_t flags, int signo)
 	 * may fail silently if the state machine is not aligned correctly.
 	 */
 	remote->br_ptrace_stopsig = signo;
+	remote->br_ptrace_donesig = 0;
 
 	/*
 	 * Handle the syscall-stop flag if this is a PTRACE_SYSCALL restart:
@@ -948,6 +949,7 @@ lx_ptrace_detach(lx_ptrace_accord_t *accord, lx_lwp_data_t *remote, int signo,
 	 * or modify the delivered signal.
 	 */
 	remote->br_ptrace_stopsig = signo;
+	remote->br_ptrace_donesig = 0;
 
 	lx_ptrace_restart_lwp(rlwp);
 
@@ -1620,6 +1622,7 @@ lx_ptrace_issig_stop(proc_t *p, klwp_t *lwp)
 	 * and enter the ptrace "signal-delivery-stop" condition.
 	 */
 	lwpd->br_ptrace_stopsig = lx_sig;
+	lwpd->br_ptrace_donesig = 0;
 	(void) lx_ptrace_stop_common(p, lwpd, LX_PR_SIGNALLED);
 	mutex_enter(&p->p_lock);
 
@@ -1670,21 +1673,46 @@ lx_ptrace_issig_stop(proc_t *p, klwp_t *lwp)
 		}
 	}
 
+	lwpd->br_ptrace_donesig = lwp->lwp_cursig;
 	lwpd->br_ptrace_stopsig = 0;
 	return (0);
 }
 
 boolean_t
-lx_ptrace_sig_ignorable(proc_t *p, int sig)
+lx_ptrace_sig_ignorable(proc_t *p, klwp_t *lwp, int sig)
 {
 	lx_proc_data_t *lxpd = ptolxproc(p);
 
+	/*
+	 * Ignored signals and ptrace:
+	 *
+	 * When a process is being ptraced by another, special care is needed
+	 * while handling signals.  Since the tracer is interested in all
+	 * signals sent to the tracee, an effort must be made to initially
+	 * bypass signal ignorance logic.  This allows the signal to be placed
+	 * in the tracee's sigqueue to be inspected and potentially altered by
+	 * the tracer.
+	 *
+	 * A critical detail in this procedure is how a signal is handled after
+	 * tracer has completed processing for the event.  If the signal would
+	 * have been ignored, were it not for the initial ptrace override, then
+	 * lx_ptrace_sig_ignorable must report B_TRUE when the tracee is
+	 * restarted and resumes signal processing.  This is done by recording
+	 * the most recent tracee signal consumed by ptrace.
+	 */
+
 	if (lxpd->l_ptrace != 0 && lx_stol_signo(sig, 0) != 0) {
 		/*
-		 * In order to preserve proper ptrace behavior when it comes to
-		 * signal handling, it is unacceptable to ignore any signals.
-		 * Doing so would bypass the logic in lx_ptrace_issig_stop.
+		 * This process is being ptraced.  Bypass signal ignorance for
+		 * anything that maps to a valid Linux signal...
 		 */
+		if (lwp != NULL && lwptolxlwp(lwp)->br_ptrace_donesig == sig) {
+			/*
+			 * ...Unless it is a signal which has already been
+			 * processed by the tracer.
+			 */
+			return (B_TRUE);
+		}
 		return (B_FALSE);
 	}
 	return (B_TRUE);
