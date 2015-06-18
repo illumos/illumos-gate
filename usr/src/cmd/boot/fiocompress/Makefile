@@ -22,6 +22,8 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# ident	"%Z%%M%	%I%	%E% SMI"
+# 
 
 PROG= fiocompress
 
@@ -34,8 +36,7 @@ include ../Makefile.com
 
 .KEEP_STATE:
 
-# There's no lint library for zlib, so only include this when building
-$(PROG) := LDLIBS +=	-lz
+LDLIBS +=	-lz
 
 CFLAGS +=	-I../../../uts/common
 LINTFLAGS +=	-I../../../uts/common
@@ -44,7 +45,6 @@ LINTFLAGS +=	-I../../../uts/common
 # until libz is compiled against ON header files (uid/gid)
 LINTFLAGS += -erroff=E_INCONS_ARG_DECL2
 LINTFLAGS += -erroff=E_INCONS_VAL_TYPE_DECL2
-LINTFLAGS += -erroff=E_NAME_USED_NOT_DEF2
 
 all: $(PROG)
 

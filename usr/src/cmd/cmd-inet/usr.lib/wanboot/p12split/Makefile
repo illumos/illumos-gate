@@ -25,14 +25,9 @@
 include ../Makefile.com
 
 PROG=		p12split
-LDLIBS +=	-lwanboot -linetutil -lwanbootutil
+LDLIBS +=	-lwanboot -linetutil -lwanbootutil -lcrypto
 CPPFLAGS +=	-I$(CMNCRYPTDIR)
 LINTFLAGS +=	-erroff=E_SUPPRESSION_DIRECTIVE_UNUSED
-
-# libcrypto has no lint library, so we can only include this while building
-$(PROG) := LDLIBS += -lcrypto
-
-LINTFLAGS +=	-erroff=E_NAME_USED_NOT_DEF2
 
 all:		$(PROG)
 

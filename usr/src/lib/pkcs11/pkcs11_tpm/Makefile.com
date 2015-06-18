@@ -73,12 +73,7 @@ TSSLIB=-L$(TSPILIBDIR)
 TSSLIB64=-L$(TSPILIBDIR)/$(MACH64)
 TSSINC=-I$(TSPIINCDIR)
 
-LDLIBS += $(TSSLIB) -L$(ADJUNCT_PROTO)/lib -lc -luuid -lmd
-
-# libtspi and libcrypto have no lint library, so we can only use it when
-# building
-$(LIBS) := LDLIBS += -ltspi -lcrypto
-
+LDLIBS += $(TSSLIB) -L$(ADJUNCT_PROTO)/lib -lc -luuid -lmd -ltspi -lcrypto
 CPPFLAGS += -xCC -D_POSIX_PTHREAD_SEMANTICS $(TSSINC)
 CPPFLAGS64 += $(CPPFLAGS)
 C99MODE=        $(C99_ENABLE)

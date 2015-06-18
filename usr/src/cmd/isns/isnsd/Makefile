@@ -68,10 +68,7 @@ CLOBBERFILES += $(DTRACE_HEADER)
 obj.o := CERRWARN += -erroff=E_CONST_OBJ_SHOULD_HAVE_INITIZR
 obj.o := CERRWARN += -erroff=E_IMPLICIT_DECL_FUNC_RETURN_INT
 
-LDLIBS		+= -lsecdb -lsocket -lnsl -lscf
-
-# libxml2 has no lint library, so we can only include this while building
-$(PROG) := LDLIBS += -lxml2
+LDLIBS		+= -lsecdb -lsocket -lnsl -lscf -lxml2
 
 .KEEP_STATE:
 

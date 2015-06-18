@@ -36,10 +36,7 @@ CFLAGS += -I$(INCDIRS)
 LINTFLAGS += -I$(INCDIRS)
 
 LDFLAGS += -L$(ROOT)/usr/lib/fm -R/usr/lib/fm
-LDLIBS += -luutil -L$(ROOTLIB)/fm -ltopo
-
-# libxml2 has no lint library, so we can only include this while building
-$(PROG) := LDLIBS += -lxml2
+LDLIBS += -luutil -lxml2 -L$(ROOTLIB)/fm -ltopo
 
 CERRWARN += -_gcc=-Wno-parentheses
 CERRWARN += -_gcc=-Wno-switch

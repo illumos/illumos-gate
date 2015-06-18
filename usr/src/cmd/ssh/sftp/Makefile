@@ -35,9 +35,7 @@ SRCS =		$(OBJS:.o=.c)
 include ../../Makefile.cmd
 include ../Makefile.ssh-common
 
-LDLIBS +=	$(SSH_COMMON_LDLIBS) -lsocket -ltecla
-# libcrypto has no lint library, so we can only use it when building
-$(PROG) := LDLIBS += -lcrypto
+LDLIBS +=	$(SSH_COMMON_LDLIBS) -lsocket -lcrypto -ltecla
 
 POFILE_DIR =	..
 

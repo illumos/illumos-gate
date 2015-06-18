@@ -29,17 +29,13 @@ OBJS = $(SRCS:%.c=%.o)
 
 include ../../Makefile.cmd
 
-LDLIBS += -lscf -lc
+LDLIBS += -lxml2 -lscf -lc
 CFLAGS += $(CCVERBOSE)
 CPPFLAGS += -I. -I$(ADJUNCT_PROTO)/usr/include/libxml2 -I../isnsd
 POFILE = isnsadm_all.po
 POFILES = $(OBJS:%.o=%.po)
 
-# libxml2 has no lint library, so we can only include this while building
-$(PROG) := LDLIBS += -lxml2
-
 LINTFLAGS += -xerroff=E_BAD_FORMAT_STR2
-LINTFLAGS += -erroff=E_NAME_USED_NOT_DEF2
 
 CERRWARN += -_gcc=-Wno-parentheses
 CERRWARN += -_gcc=-Wno-uninitialized

@@ -40,8 +40,8 @@ BERLIB64=	$(BERLIB)
 OPENSSLLIBS=	$(BERLIB) -lcrypto -lcryptoutil -lc
 OPENSSLLIBS64=	$(BERLIB64) -lcrypto -lcryptoutil -lc
 
-LINTSSLLIBS	= $(BERLIB) -lcryptoutil -lc
-LINTSSLLIBS64	= $(BERLIB64) -lcryptoutil -lc
+LINTSSLLIBS	= $(BERLIB) -lcrypto -lcryptoutil -lc
+LINTSSLLIBS64	= $(BERLIB64) -lcrypto -lcryptoutil -lc
 
 # Because of varying openssl implementations, we need to not have lint
 # complain if we're being liberal in our suppression directives.

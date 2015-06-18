@@ -42,10 +42,7 @@ LIBSRCS = $(LIBOBJS:%.o=$(SRCDIR)/%.c)
 lintcheck := SRCS = $(LIBSRCS)
 
 LIBS =		$(DYNLIB)
-LDLIBS +=	-lshare -lscf -lumem -lc
-
-# libxml2 has no lint library, so we can only use it when building
-$(DYNLIB) := LDLIBS += -lxml2
+LDLIBS +=	-lshare -lscf -lumem -lc -lxml2
 
 #add nfs/lib directory as part of the include path
 CFLAGS +=	$(CCVERBOSE)
@@ -54,7 +51,7 @@ CERRWARN +=	-_gcc=-Wno-unused-variable
 CERRWARN +=	-_gcc=-Wno-uninitialized
 CPPFLAGS +=	-D_REENTRANT -I$(AUTOFSSMFLIB_DIR) \
 			-I$(ADJUNCT_PROTO)/usr/include/libxml2 \
-			-I$(SRCDIR)../common
+  			-I$(SRCDIR)../common
 
 .KEEP_STATE:
 
