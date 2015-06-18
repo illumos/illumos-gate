@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright (c) 2014, Nexenta Systems, Inc. All rights reserved.
+ * Copyright (c) 2015, Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2012, Alexey Zaytsev <alexey.zaytsev@gmail.com>
  */
 
@@ -159,6 +159,8 @@ struct vioblk_softc {
 	kcondvar_t		cv_devid;
 	char			devid[VIRTIO_BLK_ID_BYTES + 1];
 };
+
+static int vioblk_get_id(struct vioblk_softc *sc);
 
 static int vioblk_read(void *arg, bd_xfer_t *xfer);
 static int vioblk_write(void *arg, bd_xfer_t *xfer);
@@ -440,6 +442,19 @@ vioblk_driveinfo(void *arg, bd_drive_t *drive)
 	drive->d_hotpluggable = B_TRUE;
 	drive->d_target = 0;
 	drive->d_lun = 0;
+
+	drive->d_vendor = "Virtio";
+	drive->d_vendor_len = strlen(drive->d_vendor);
+
+	drive->d_product = "Block Device";
+	drive->d_product_len = strlen(drive->d_product);
+
+	(void) vioblk_get_id(sc);
+	drive->d_serial = sc->devid;
+	drive->d_serial_len = strlen(drive->d_serial);
+
+	drive->d_revision = "0000";
+	drive->d_revision_len = strlen(drive->d_revision);
 }
 
 static int
@@ -455,9 +470,8 @@ vioblk_mediainfo(void *arg, bd_media_t *media)
 }
 
 static int
-vioblk_devid_init(void *arg, dev_info_t *devinfo, ddi_devid_t *devid)
+vioblk_get_id(struct vioblk_softc *sc)
 {
-	struct vioblk_softc *sc = (void *)arg;
 	clock_t deadline;
 	int ret;
 	bd_xfer_t xfer;
@@ -497,9 +511,30 @@ vioblk_devid_init(void *arg, dev_info_t *devinfo, ddi_devid_t *devid)
 
 	/* timeout */
 	if (ret < 0) {
-		dev_err(devinfo, CE_WARN, "Cannot get devid from the device");
+		dev_err(sc->sc_dev, CE_WARN,
+		    "Cannot get devid from the device");
 		return (DDI_FAILURE);
 	}
+
+	return (0);
+
+out_rw:
+	(void) ddi_dma_unbind_handle(xfer.x_dmah);
+out_map:
+	ddi_dma_free_handle(&xfer.x_dmah);
+out_alloc:
+	return (ret);
+}
+
+static int
+vioblk_devid_init(void *arg, dev_info_t *devinfo, ddi_devid_t *devid)
+{
+	struct vioblk_softc *sc = (void *)arg;
+	int ret;
+
+	ret = vioblk_get_id(sc);
+	if (ret != DDI_SUCCESS)
+		return (ret);
 
 	ret = ddi_devid_init(devinfo, DEVID_ATA_SERIAL,
 	    VIRTIO_BLK_ID_BYTES, sc->devid, devid);
@@ -517,13 +552,6 @@ vioblk_devid_init(void *arg, dev_info_t *devinfo, ddi_devid_t *devid)
 	    sc->devid[16], sc->devid[17], sc->devid[18], sc->devid[19]);
 
 	return (0);
-
-out_rw:
-	(void) ddi_dma_unbind_handle(xfer.x_dmah);
-out_map:
-	ddi_dma_free_handle(&xfer.x_dmah);
-out_alloc:
-	return (ret);
 }
 
 static void

@@ -180,6 +180,7 @@
 #include <sys/blkdev.h>
 #include <sys/atomic.h>
 #include <sys/archsystm.h>
+#include <sys/sata/sata_hba.h>
 
 #include "nvme_reg.h"
 #include "nvme_var.h"
@@ -1731,6 +1732,8 @@ nvme_init(nvme_t *nvme)
 	nvme_reg_csts_t csts;
 	int i = 0;
 	int nqueues;
+	char model[sizeof (nvme->n_idctl->id_model) + 1];
+	char *vendor, *product;
 
 	/* Setup fixed interrupt for admin queue. */
 	if (nvme_setup_interrupts(nvme, DDI_INTR_TYPE_FIXED, 1)
@@ -1892,6 +1895,20 @@ nvme_init(nvme_t *nvme)
 		    "!failed to identify controller");
 		goto fail;
 	}
+
+	/*
+	 * Get Vendor & Product ID
+	 */
+	bcopy(nvme->n_idctl->id_model, model, sizeof (nvme->n_idctl->id_model));
+	model[sizeof (nvme->n_idctl->id_model)] = '\0';
+	sata_split_model(model, &vendor, &product);
+
+	if (vendor == NULL)
+		nvme->n_vendor = strdup("NVMe");
+	else
+		nvme->n_vendor = strdup(vendor);
+
+	nvme->n_product = strdup(product);
 
 	/*
 	 * Get controller limits.
@@ -2560,6 +2577,12 @@ nvme_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		ddi_fm_fini(nvme->n_dip);
 	}
 
+	if (nvme->n_vendor != NULL)
+		strfree(nvme->n_vendor);
+
+	if (nvme->n_product != NULL)
+		strfree(nvme->n_product);
+
 	ddi_soft_state_free(nvme_state, instance);
 
 	return (DDI_SUCCESS);
@@ -2729,6 +2752,15 @@ nvme_bd_driveinfo(void *arg, bd_drive_t *drive)
 
 	drive->d_target = ns->ns_id;
 	drive->d_lun = 0;
+
+	drive->d_vendor = nvme->n_vendor;
+	drive->d_vendor_len = strlen(nvme->n_vendor);
+	drive->d_product = nvme->n_product;
+	drive->d_product_len = strlen(nvme->n_product);
+	drive->d_serial = nvme->n_idctl->id_serial;
+	drive->d_serial_len = sizeof (nvme->n_idctl->id_serial);
+	drive->d_revision = nvme->n_idctl->id_fwrev;
+	drive->d_revision_len = sizeof (nvme->n_idctl->id_fwrev);
 }
 
 static int

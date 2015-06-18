@@ -22,7 +22,7 @@
 
 /*
  * Copyright 2013 STEC, Inc.  All rights reserved.
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include	<sys/types.h>
@@ -5115,6 +5115,20 @@ skd_bd_driveinfo(void *arg, bd_drive_t *drive)
 	drive->d_hotpluggable	= B_FALSE;
 	drive->d_target		= 0;
 	drive->d_lun		= 0;
+
+	if (skdev->inquiry_is_valid != 0) {
+		drive->d_vendor = skdev->inq_vendor_id;
+		drive->d_vendor_len = strlen(drive->d_vendor);
+
+		drive->d_product = skdev->inq_product_id;
+		drive->d_product_len = strlen(drive->d_product);
+
+		drive->d_serial = skdev->inq_serial_num;
+		drive->d_serial_len = strlen(drive->d_serial);
+
+		drive->d_revision = skdev->inq_product_rev;
+		drive->d_revision_len = strlen(drive->d_revision);
+	}
 }
 
 /*

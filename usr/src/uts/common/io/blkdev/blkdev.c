@@ -22,7 +22,7 @@
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
  * Copyright 2012 Alexey Zaytsev <alexey.zaytsev@gmail.com> All rights reserved.
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -50,6 +50,7 @@
 #include <sys/sunddi.h>
 #include <sys/note.h>
 #include <sys/blkdev.h>
+#include <sys/scsi/impl/inquiry.h>
 
 #define	BD_MAXPART	64
 #define	BDINST(dev)	(getminor(dev) / BD_MAXPART)
@@ -133,6 +134,9 @@ struct bd_xfer_impl {
 /*
  * Private prototypes.
  */
+
+static void bd_prop_update_inqstring(dev_info_t *, char *, char *, size_t);
+static void bd_create_inquiry_props(dev_info_t *, bd_drive_t *);
 
 static int bd_getinfo(dev_info_t *, ddi_info_cmd_t, void *, void **);
 static int bd_attach(dev_info_t *, ddi_attach_cmd_t);
@@ -283,6 +287,43 @@ bd_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg, void **resultp)
 	return (DDI_SUCCESS);
 }
 
+static void
+bd_prop_update_inqstring(dev_info_t *dip, char *name, char *data, size_t len)
+{
+	int	ilen;
+	char	*data_string;
+
+	ilen = scsi_ascii_inquiry_len(data, len);
+	ASSERT3U(ilen, <=, len);
+	if (ilen <= 0)
+		return;
+	/* ensure null termination */
+	data_string = kmem_zalloc(ilen + 1, KM_SLEEP);
+	bcopy(data, data_string, ilen);
+	(void) ndi_prop_update_string(DDI_DEV_T_NONE, dip, name, data_string);
+	kmem_free(data_string, ilen + 1);
+}
+
+static void
+bd_create_inquiry_props(dev_info_t *dip, bd_drive_t *drive)
+{
+	if (drive->d_vendor_len > 0)
+		bd_prop_update_inqstring(dip, INQUIRY_VENDOR_ID,
+		    drive->d_vendor, drive->d_vendor_len);
+
+	if (drive->d_product_len > 0)
+		bd_prop_update_inqstring(dip, INQUIRY_PRODUCT_ID,
+		    drive->d_product, drive->d_product_len);
+
+	if (drive->d_serial_len > 0)
+		bd_prop_update_inqstring(dip, INQUIRY_SERIAL_NO,
+		    drive->d_serial, drive->d_serial_len);
+
+	if (drive->d_revision_len > 0)
+		bd_prop_update_inqstring(dip, INQUIRY_REVISION_ID,
+		    drive->d_revision, drive->d_revision_len);
+}
+
 static int
 bd_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
@@ -405,6 +446,7 @@ bd_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	if (drive.d_maxxfer && drive.d_maxxfer < bd->d_maxxfer)
 		bd->d_maxxfer = drive.d_maxxfer;
 
+	bd_create_inquiry_props(dip, &drive);
 
 	rv = cmlb_attach(dip, &bd_tg_ops, DTYPE_DIRECT,
 	    bd->d_removable, bd->d_hotpluggable,
@@ -1579,7 +1621,7 @@ int
 bd_attach_handle(dev_info_t *dip, bd_handle_t hdl)
 {
 	dev_info_t	*child;
-	bd_drive_t	drive;
+	bd_drive_t	drive = { 0 };
 
 	/* if drivers don't override this, make it assume none */
 	drive.d_lun = -1;

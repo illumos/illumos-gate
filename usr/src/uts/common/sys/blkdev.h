@@ -20,7 +20,7 @@
  */
 /*
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -104,6 +104,14 @@ struct bd_drive {
 	boolean_t		d_hotpluggable;
 	int			d_target;
 	int			d_lun;
+	size_t			d_vendor_len;
+	char			*d_vendor;
+	size_t			d_product_len;
+	char			*d_product;
+	size_t			d_serial_len;
+	char			*d_serial;
+	size_t			d_revision_len;
+	char			*d_revision;
 };
 
 struct bd_media {
