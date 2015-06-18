@@ -23,6 +23,11 @@
  * Use is subject to license terms.
  */
 /*
+ * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright (c) 2012 Joyent, Inc. All rights reserved.
+ */
+
+/*
  * Modular Debugger (MDB)
  *
  * Refer to the white paper "A Modular Debugger for Solaris" for information

@@ -20,7 +20,6 @@
 #
 # Copyright 1998 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-# Copyright 2012 OmniTI Computer Consulting, Inc.  All rights reserved.
 # Copyright 2015 Nexenta Systems, Inc. All rights reserved.
 #
 
