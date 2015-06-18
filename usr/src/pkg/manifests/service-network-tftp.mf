@@ -21,7 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2015 Nexenta Systems, Inc. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/service/network/tftp@$(PKGVERS)
@@ -30,11 +30,16 @@ set name=pkg.summary value="Trivial File Transfer Server"
 set name=info.classification \
     value="org.opensolaris.category.2008:Applications/System Utilities"
 set name=variant.arch value=$(ARCH)
+dir path=lib
+dir path=lib/svc
+dir path=lib/svc/manifest group=sys
+dir path=lib/svc/manifest/network group=sys
 dir path=usr group=sys
 dir path=usr/bin
 dir path=usr/sbin
 dir path=usr/share/man/man1
 dir path=usr/share/man/man1m
+file path=lib/svc/manifest/network/tftp-udp6.xml group=sys mode=0444
 file path=usr/bin/tftp mode=0555
 file path=usr/sbin/in.tftpd mode=0555
 file path=usr/share/man/man1/tftp.1
