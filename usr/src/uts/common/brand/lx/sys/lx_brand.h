@@ -558,6 +558,12 @@ struct lx_lwp_data {
 	ushort_t br_ptrace_whatstop;	/* stop sub-reason */
 
 	int32_t br_ptrace_stopsig;	/* stop signal, 0 for no signal */
+	/*
+	 * Track the last (native) signal number processed by a ptrace.
+	 * This allows the tracee to properly handle ignored signals after
+	 * the tracer has been notified and the tracee restarted.
+	 */
+	int32_t br_ptrace_donesig;
 	uintptr_t br_ptrace_stopucp;	/* usermode ucontext_t pointer */
 
 	uint_t	br_ptrace_event;
