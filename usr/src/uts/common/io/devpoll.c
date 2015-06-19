@@ -741,13 +741,6 @@ dpwrite(dev_t dev, struct uio *uiop, cred_t *credp)
 						error = EBADF;
 						break;
 					}
-
-					/*
-					 * To (greatly) reduce EEXIST false
-					 * positives, we denote that this
-					 * fp has been epoll()'d; see below.
-					 */
-					fp->f_flag2 |= FEPOLLED;
 				}
 
 				pdp = pcache_alloc_fd(0);
@@ -761,7 +754,7 @@ dpwrite(dev_t dev, struct uio *uiop, cred_t *credp)
 				 * check (imperfectly) by checking if we both
 				 * have the file descriptor cached and the
 				 * file pointer that correponds to the file
-				 * descriptor matches our cached value.  (If
+				 * descriptor matches our cached value.  If
 				 * there is a pointer mismatch, the file
 				 * descriptor was closed without being removed.
 				 * The converse is clearly not true, however,
@@ -778,14 +771,26 @@ dpwrite(dev_t dev, struct uio *uiop, cred_t *credp)
 				 * then, the file descriptor must be closed and
 				 * reused in a relatively tight time span.)
 				 */
-				if ((dpep->dpe_flag & DP_ISEPOLLCOMPAT) &&
-				    pdp->pd_fp != NULL &&
-				    (fp = getf(fd)) != NULL &&
-				    fp == pdp->pd_fp &&
-				    (fp->f_flag2 & FEPOLLED)) {
-					error = EEXIST;
-					releasef(fd);
-					break;
+				if (dpep->dpe_flag & DP_ISEPOLLCOMPAT) {
+					if (pdp->pd_fp != NULL &&
+					    (fp = getf(fd)) != NULL &&
+					    fp == pdp->pd_fp &&
+					    (fp->f_flag2 & FEPOLLED)) {
+						error = EEXIST;
+						releasef(fd);
+						break;
+					}
+
+					/*
+					 * We have decided that the cached
+					 * information was stale: it either
+					 * didn't match, or the fp had never
+					 * actually been epoll()'d on before.
+					 * We need to now clear our pd_events
+					 * to assure that we don't mistakenly
+					 * operate on cached event disposition.
+					 */
+					pdp->pd_events = 0;
 				}
 			}
 
@@ -816,6 +821,15 @@ dpwrite(dev_t dev, struct uio *uiop, cred_t *credp)
 				pdp->pd_events |= pfdp->events;
 				continue;
 			}
+
+			/*
+			 * To (greatly) reduce EEXIST false positives, we
+			 * denote that this fp has been epoll()'d.  We do this
+			 * regardless of epoll compatibility mode, as the flag
+			 * is harmless if not in epoll compatibility mode.
+			 */
+			fp->f_flag2 |= FEPOLLED;
+
 			/*
 			 * Don't do VOP_POLL for an already cached fd with
 			 * same poll events.
