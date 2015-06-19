@@ -620,6 +620,16 @@ lx_prctl(int option, uintptr_t arg2, uintptr_t arg3,
 		return (1);
 	}
 
+	if (option == LX_PR_GET_SECUREBITS) {
+		/* Our bits are always 0 */
+		return (0);
+	}
+
+	if (option == LX_PR_SET_SECUREBITS) {
+		/* Ignore setting any bits from arg2 */
+		return (0);
+	}
+
 	if (option == LX_PR_SET_DUMPABLE) {
 		if (arg2 != 1 && arg2 != 0)
 			return (-EINVAL);
