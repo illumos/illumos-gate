@@ -110,6 +110,8 @@ extern pid_t zoneinit_pid;
 #define	LX_PR_SET_DUMPABLE	4
 #define	LX_PR_SET_KEEPCAPS	8
 #define	LX_PR_SET_NAME		15
+#define	LX_PR_GET_SECUREBITS	27
+#define	LX_PR_SET_SECUREBITS	28
 
 #define	LX_PR_SET_NAME_NAMELEN	16
 
