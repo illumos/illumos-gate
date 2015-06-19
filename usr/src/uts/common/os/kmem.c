@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2015 Joyent, Inc.  All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -2179,6 +2180,21 @@ kmem_depot_ws_update(kmem_cache_t *cp)
 }
 
 /*
+ * Set the working set statistics for cp's depot to zero.  (Everything is
+ * eligible for reaping.)
+ */
+static void
+kmem_depot_ws_zero(kmem_cache_t *cp)
+{
+	mutex_enter(&cp->cache_depot_lock);
+	cp->cache_full.ml_reaplimit = cp->cache_full.ml_total;
+	cp->cache_full.ml_min = cp->cache_full.ml_total;
+	cp->cache_empty.ml_reaplimit = cp->cache_empty.ml_total;
+	cp->cache_empty.ml_min = cp->cache_empty.ml_total;
+	mutex_exit(&cp->cache_depot_lock);
+}
+
+/*
  * Reap all magazines that have fallen out of the depot's working set.
  */
 static void
@@ -3204,9 +3220,9 @@ kmem_reap_common(void *flag_arg)
 
 	/*
 	 * It may not be kosher to do memory allocation when a reap is called
-	 * is called (for example, if vmem_populate() is in the call chain).
-	 * So we start the reap going with a TQ_NOALLOC dispatch.  If the
-	 * dispatch fails, we reset the flag, and the next reap will try again.
+	 * (for example, if vmem_populate() is in the call chain).  So we
+	 * start the reap going with a TQ_NOALLOC dispatch.  If the dispatch
+	 * fails, we reset the flag, and the next reap will try again.
 	 */
 	if (!taskq_dispatch(kmem_taskq, kmem_reap_start, flag, TQ_NOALLOC))
 		*flag = 0;
@@ -3271,14 +3287,7 @@ kmem_cache_magazine_purge(kmem_cache_t *cp)
 			kmem_magazine_destroy(cp, pmp, prounds);
 	}
 
-	/*
-	 * Updating the working set statistics twice in a row has the
-	 * effect of setting the working set size to zero, so everything
-	 * is eligible for reaping.
-	 */
-	kmem_depot_ws_update(cp);
-	kmem_depot_ws_update(cp);
-
+	kmem_depot_ws_zero(cp);
 	kmem_depot_ws_reap(cp);
 }
 
@@ -3303,16 +3312,14 @@ kmem_cache_magazine_enable(kmem_cache_t *cp)
 }
 
 /*
- * Reap (almost) everything right now.  See kmem_cache_magazine_purge()
- * for explanation of the back-to-back kmem_depot_ws_update() calls.
+ * Reap (almost) everything right now.
  */
 void
 kmem_cache_reap_now(kmem_cache_t *cp)
 {
 	ASSERT(list_link_active(&cp->cache_link));
 
-	kmem_depot_ws_update(cp);
-	kmem_depot_ws_update(cp);
+	kmem_depot_ws_zero(cp);
 
 	(void) taskq_dispatch(kmem_taskq,
 	    (task_func_t *)kmem_depot_ws_reap, cp, TQ_SLEEP);
@@ -4360,12 +4367,6 @@ kmem_init(void)
 	size_t maxverify, minfirewall;
 
 	kstat_init();
-
-	/*
-	 * Small-memory systems (< 24 MB) can't handle kmem_flags overhead.
-	 */
-	if (physmem < btop(24 << 20) && !(old_kmem_flags & KMF_STICKY))
-		kmem_flags = 0;
 
 	/*
 	 * Don't do firewalled allocations if the heap is less than 1TB

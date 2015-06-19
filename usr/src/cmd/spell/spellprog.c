@@ -20,14 +20,13 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2015 Gary Mills
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdlib.h>
 #include <unistd.h>
@@ -58,7 +57,6 @@ static int	ize(char *, char *, char *, int);
 static int	tion(char *, char *, char *, int);
 static int	an(char *, char *, char *, int);
 int		prime(char *);
-static void	ise(void);
 static int	tryword(char *, char *, int);
 static int	trypref(char *, char *, int);
 static int	trysuff(char *, int);
@@ -67,9 +65,8 @@ static int	dict(char *, char *);
 static int	monosyl(char *, char *);
 static int	VCe(char *, char *, char *, int);
 static char	*skipv(char *);
-static void	ztos(char *);
 
-static struct suftab {
+struct suftab {
 	char *suf;
 	int (*p1)();
 	int n1;
@@ -79,7 +76,9 @@ static struct suftab {
 	int n2;
 	char *d2;
 	char *a2;
-} suftab[] = {
+};
+
+static struct suftab sufa[] = {
 	{"ssen", ily, 4, "-y+iness", "+ness" },
 	{"ssel", ily, 4, "-y+i+less", "+less" },
 	{"se", s, 1, "", "+s", 	es, 2, "-y+ies", "+es" },
@@ -122,6 +121,56 @@ static struct suftab {
 	{"na", an, 1, "", "+n"},
 	{"evi", subst, 0, "-ion+ive", ""},
 	{"ezi", CCe, 3, "-e+ize", "+ize"},
+	{"pihs", strip, 4, "", "+ship"},
+	{"dooh", ily, 4, "-y+ihood", "+hood"},
+	{"luf", ily, 3, "-y+iful", "+ful"},
+	{"ekil", strip, 4, "", "+like"},
+	0
+};
+
+static struct suftab sufb[] = {
+	{"ssen", ily, 4, "-y+iness", "+ness" },
+	{"ssel", ily, 4, "-y+i+less", "+less" },
+	{"se", s, 1, "", "+s", 	es, 2, "-y+ies", "+es" },
+	{"s'", s, 2, "", "+'s"},
+	{"s", s, 1, "", "+s"},
+	{"ecn", subst, 1, "-t+ce", ""},
+	{"ycn", subst, 1, "-t+cy", ""},
+	{"ytilb", nop, 0, "", ""},
+	{"ytilib", bility, 5, "-le+ility", ""},
+	{"elbaif", i_to_y, 4, "-y+iable", ""},
+	{"elba", CCe, 4, "-e+able", "+able"},
+	{"yti", CCe, 3, "-e+ity", "+ity"},
+	{"ylb", y_to_e, 1, "-e+y", ""},
+	{"yl", ily, 2, "-y+ily", "+ly"},
+	{"laci", strip, 2, "", "+al"},
+	{"latnem", strip, 2, "", "+al"},
+	{"lanoi", strip, 2, "", "+al"},
+	{"tnem", strip, 4, "", "+ment"},
+	{"gni", CCe, 3, "-e+ing", "+ing"},
+	{"reta", nop, 0, "", ""},
+	{"retc", nop, 0, "", ""},
+	{"re", strip, 1, "", "+r", i_to_y, 2, "-y+ier", "+er"},
+	{"de", strip, 1, "", "+d", i_to_y, 2, "-y+ied", "+ed"},
+	{"citsi", strip, 2, "", "+ic"},
+	{"citi", ize, 1, "-ic+e", ""},
+	{"cihparg", i_to_y, 1, "-y+ic", ""},
+	{"tse", strip, 2, "", "+st", 	i_to_y, 3, "-y+iest", "+est"},
+	{"cirtem", i_to_y, 1, "-y+ic", ""},
+	{"yrtem", subst, 0, "-er+ry", ""},
+	{"cigol", i_to_y, 1, "-y+ic", ""},
+	{"tsigol", i_to_y, 2, "-y+ist", ""},
+	{"tsi", CCe, 3, "-e+ist", "+ist"},
+	{"msi", CCe, 3, "-e+ism", "+ist"},
+	{"noitacifi", i_to_y, 6, "-y+ication", ""},
+	{"noitasi", ize, 4, "-e+ation", ""},
+	{"rota", tion, 2, "-e+or", ""},
+	{"rotc", tion, 2, "", "+or"},
+	{"noit", tion, 3, "-e+ion", "+ion"},
+	{"naino", an, 3, "", "+ian"},
+	{"na", an, 1, "", "+n"},
+	{"evi", subst, 0, "-ion+ive", ""},
+	{"esi", CCe, 3, "-e+ise", "+ise"},
 	{"pihs", strip, 4, "", "+ship"},
 	{"dooh", ily, 4, "-y+ihood", "+hood"},
 	{"luf", ily, 3, "-y+iful", "+ful"},
@@ -173,8 +222,10 @@ static char *preftab[] = {
 	0
 };
 
+static int bflag;
 static int vflag;
 static int xflag;
+static struct suftab *suftab;
 static char *prog;
 static char word[LINE_MAX];
 static char original[LINE_MAX];
@@ -253,7 +304,7 @@ main(int argc, char **argv)
 	while ((c = getopt(argc, argv, "bvx")) != EOF) {
 		switch (c) {
 		case 'b':
-			ise();
+			bflag++;
 			break;
 		case 'v':
 			vflag++;
@@ -274,6 +325,9 @@ main(int argc, char **argv)
 	}
 	argc--;
 	argv++;
+
+	/* Select the correct suffix table */
+	suftab = (bflag == 0) ? sufa : sufb;
 
 /*
  *	if pass is not 1, it is assumed to be a filename.
@@ -355,12 +409,13 @@ trysuff(char *ep, int lev)
 
 	lev += DLEV;
 	deriv[lev] = deriv[lev-1] = 0;
-	for (t = &suftab[0]; (sp = t->suf) != 0; t++) {
+	for (t = &suftab[0]; (t != 0 && (sp = t->suf) != 0); t++) {
 		cp = ep;
 		while (*sp)
 			if (*--cp != *sp++)
 				goto next;
-		for (sp = cp; --sp >= word && !vowel(*sp); );
+		for (sp = cp; --sp >= word && !vowel(*sp); )
+			;
 		if (sp < word)
 			return (0);
 		if ((*t->p1)(ep-t->n1, t->d1, t->a1, lev+1))
@@ -701,27 +756,6 @@ vowel(int c)
 		return (1);
 	}
 	return (0);
-}
-
-/* crummy way to Britishise */
-static void
-ise(void)
-{
-	struct suftab *p;
-
-	for (p = suftab; p->suf; p++) {
-		ztos(p->suf);
-		ztos(p->d1);
-		ztos(p->a1);
-	}
-}
-
-static void
-ztos(char *s)
-{
-	for (; *s; s++)
-		if (*s == 'z')
-			*s = 's';
 }
 
 static int
