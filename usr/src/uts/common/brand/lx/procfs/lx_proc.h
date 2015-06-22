@@ -118,6 +118,7 @@ typedef enum lxpr_nodetype {
 	LXPR_PID_MAPS,		/* /proc/<pid>/maps	*/
 	LXPR_PID_MEM,		/* /proc/<pid>/mem	*/
 	LXPR_PID_MOUNTINFO,	/* /proc/<pid>/mountinfo */
+	LXPR_PID_OOM_SCR_ADJ,	/* /proc/<pid>/oom_score_adj	*/
 	LXPR_PID_ROOTDIR,	/* /proc/<pid>/root	*/
 	LXPR_PID_STAT,		/* /proc/<pid>/stat	*/
 	LXPR_PID_STATM,		/* /proc/<pid>/statm	*/
@@ -137,6 +138,7 @@ typedef enum lxpr_nodetype {
 	LXPR_PID_TID_MAPS,	/* /proc/<pid>/task/<tid>/maps		*/
 	LXPR_PID_TID_MEM,	/* /proc/<pid>/task/<tid>/mem		*/
 	LXPR_PID_TID_MOUNTINFO,	/* /proc/<pid>/task/<tid>/mountinfo	*/
+	LXPR_PID_TID_OOM_SCR_ADJ, /* /proc/<pid>/task/<tid>/oom_score_adj */
 	LXPR_PID_TID_ROOTDIR,	/* /proc/<pid>/task/<tid>/root		*/
 	LXPR_PID_TID_STAT,	/* /proc/<pid>/task/<tid>/stat		*/
 	LXPR_PID_TID_STATM,	/* /proc/<pid>/task/<tid>/statm		*/

@@ -93,7 +93,10 @@ vnodeops_t *lxpr_vnodeops;
 static int lxpr_open(vnode_t **, int, cred_t *, caller_context_t *);
 static int lxpr_close(vnode_t *, int, int, offset_t, cred_t *,
     caller_context_t *);
+static int lxpr_create(struct vnode *, char *, struct vattr *, enum vcexcl,
+    int, struct vnode **, struct cred *, int, caller_context_t *, vsecattr_t *);
 static int lxpr_read(vnode_t *, uio_t *, int, cred_t *, caller_context_t *);
+static int lxpr_write(vnode_t *, uio_t *, int, cred_t *, caller_context_t *);
 static int lxpr_getattr(vnode_t *, vattr_t *, int, cred_t *,
     caller_context_t *);
 static int lxpr_access(vnode_t *, int, int, cred_t *, caller_context_t *);
@@ -158,6 +161,7 @@ static void lxpr_read_pid_env(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_pid_limits(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_pid_maps(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_pid_mountinfo(lxpr_node_t *, lxpr_uiobuf_t *);
+static void lxpr_read_pid_oom_scr_adj(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_pid_stat(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_pid_statm(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_pid_status(lxpr_node_t *, lxpr_uiobuf_t *);
@@ -226,9 +230,11 @@ const fs_operation_def_t lxpr_vnodeops_template[] = {
 	VOPNAME_OPEN,		{ .vop_open = lxpr_open },
 	VOPNAME_CLOSE,		{ .vop_close = lxpr_close },
 	VOPNAME_READ,		{ .vop_read = lxpr_read },
+	VOPNAME_WRITE,		{ .vop_read = lxpr_write },
 	VOPNAME_GETATTR,	{ .vop_getattr = lxpr_getattr },
 	VOPNAME_ACCESS,		{ .vop_access = lxpr_access },
 	VOPNAME_LOOKUP,		{ .vop_lookup = lxpr_lookup },
+	VOPNAME_CREATE,		{ .vop_create = lxpr_create },
 	VOPNAME_READDIR,	{ .vop_readdir = lxpr_readdir },
 	VOPNAME_READLINK,	{ .vop_readlink = lxpr_readlink },
 	VOPNAME_FSYNC,		{ .error = lxpr_sync },
@@ -286,6 +292,7 @@ static lxpr_dirent_t piddir[] = {
 	{ LXPR_PID_MAPS,	"maps" },
 	{ LXPR_PID_MEM,		"mem" },
 	{ LXPR_PID_MOUNTINFO,	"mountinfo" },
+	{ LXPR_PID_OOM_SCR_ADJ,	"oom_score_adj" },
 	{ LXPR_PID_ROOTDIR,	"root" },
 	{ LXPR_PID_STAT,	"stat" },
 	{ LXPR_PID_STATM,	"statm" },
@@ -311,6 +318,7 @@ static lxpr_dirent_t tiddir[] = {
 	{ LXPR_PID_MAPS,	"maps" },
 	{ LXPR_PID_MEM,		"mem" },
 	{ LXPR_PID_MOUNTINFO,	"mountinfo" },
+	{ LXPR_PID_OOM_SCR_ADJ,	"oom_score_adj" },
 	{ LXPR_PID_ROOTDIR,	"root" },
 	{ LXPR_PID_TID_STAT,	"stat" },
 	{ LXPR_PID_STATM,	"statm" },
@@ -438,11 +446,9 @@ lxpr_open(vnode_t **vpp, int flag, cred_t *cr, caller_context_t *ct)
 	vnode_t		*rvp;
 	int		error = 0;
 
-	/*
-	 * We only allow reading in this file systrem
-	 */
-	if (flag & FWRITE)
-		return (EROFS);
+	/* Restrict writes to oom_score_adj for now */
+	if (flag & FWRITE && type != LXPR_PID_OOM_SCR_ADJ)
+		return (EPERM);
 
 	/*
 	 * If we are opening an underlying file only allow regular files,
@@ -520,6 +526,7 @@ static void (*lxpr_read_function[LXPR_NFILES])() = {
 	lxpr_read_pid_maps,		/* /proc/<pid>/maps	*/
 	lxpr_read_empty,		/* /proc/<pid>/mem	*/
 	lxpr_read_pid_mountinfo,	/* /proc/<pid>/mountinfo */
+	lxpr_read_pid_oom_scr_adj,	/* /proc/<pid>/oom_score_adj */
 	lxpr_read_invalid,		/* /proc/<pid>/root	*/
 	lxpr_read_pid_stat,		/* /proc/<pid>/stat	*/
 	lxpr_read_pid_statm,		/* /proc/<pid>/statm	*/
@@ -539,6 +546,7 @@ static void (*lxpr_read_function[LXPR_NFILES])() = {
 	lxpr_read_pid_maps,		/* /proc/<pid>/task/<tid>/maps	*/
 	lxpr_read_empty,		/* /proc/<pid>/task/<tid>/mem	*/
 	lxpr_read_pid_mountinfo,	/* /proc/<pid>/task/<tid>/mountinfo */
+	lxpr_read_pid_oom_scr_adj,	/* /proc/<pid>/task/<tid>/oom_scr_adj */
 	lxpr_read_invalid,		/* /proc/<pid>/task/<tid>/root	*/
 	lxpr_read_pid_tid_stat,		/* /proc/<pid>/task/<tid>/stat	*/
 	lxpr_read_pid_statm,		/* /proc/<pid>/task/<tid>/statm	*/
@@ -621,6 +629,7 @@ static vnode_t *(*lxpr_lookup_function[LXPR_NFILES])() = {
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/maps	*/
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/mem	*/
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/mountinfo */
+	lxpr_lookup_not_a_dir,		/* /proc/<pid>/oom_score_adj */
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/root	*/
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/stat	*/
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/statm	*/
@@ -640,6 +649,7 @@ static vnode_t *(*lxpr_lookup_function[LXPR_NFILES])() = {
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/task/<tid>/maps	*/
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/task/<tid>/mem	*/
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/task/<tid>/mountinfo */
+	lxpr_lookup_not_a_dir,		/* /proc/<pid>/task/<tid>/oom_scr_adj */
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/task/<tid>/root	*/
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/task/<tid>/stat	*/
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/task/<tid>/statm	*/
@@ -722,6 +732,7 @@ static int (*lxpr_readdir_function[LXPR_NFILES])() = {
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/maps	*/
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/mem	*/
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/mountinfo */
+	lxpr_readdir_not_a_dir,		/* /proc/<pid>/oom_score_adj */
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/root	*/
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/stat	*/
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/statm	*/
@@ -741,6 +752,7 @@ static int (*lxpr_readdir_function[LXPR_NFILES])() = {
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/task/<tid>/maps	*/
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/task/<tid>/mem	*/
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/task/<tid>/mountinfo */
+	lxpr_readdir_not_a_dir,		/* /proc/<pid>/task/<tid/oom_scr_adj */
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/task/<tid>/root	*/
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/task/<tid>/stat	*/
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/task/<tid>/statm	*/
@@ -1372,6 +1384,30 @@ nextp:
 		mnt_id++;
 	}
 }
+
+/*
+ * lxpr_read_pid_oom_scr_adj(): read oom_score_adj for process
+ */
+static void
+lxpr_read_pid_oom_scr_adj(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
+{
+	proc_t *p;
+
+	ASSERT(lxpnp->lxpr_type == LXPR_PID_OOM_SCR_ADJ ||
+	    lxpnp->lxpr_type == LXPR_PID_TID_OOM_SCR_ADJ);
+
+	p = lxpr_lock(lxpnp->lxpr_pid);
+	if (p == NULL) {
+		lxpr_uiobuf_seterr(uiobuf, EINVAL);
+		return;
+	}
+
+	/* always 0 */
+	lxpr_uiobuf_printf(uiobuf, "0\n");
+
+	lxpr_unlock(p);
+}
+
 
 /*
  * lxpr_read_pid_statm(): memory status file
@@ -5397,4 +5433,80 @@ lxpr_realvp(vnode_t *vp, vnode_t **vpp, caller_context_t *ct)
 
 	*vpp = vp;
 	return (0);
+}
+
+static int
+lxpr_write(vnode_t *vp, uio_t *uiop, int ioflag, cred_t *cr,
+    caller_context_t *ct)
+{
+	/* pretend we wrote the whole thing */
+	uiop->uio_offset += uiop->uio_resid;
+	uiop->uio_resid = 0;
+
+	return (0);
+}
+
+/*
+ * We need to allow open with O_CREAT for the oom_score_adj file.
+ */
+/*ARGSUSED7*/
+static int
+lxpr_create(struct vnode *dvp, char *nm, struct vattr *vap,
+    enum vcexcl exclusive, int mode, struct vnode **vpp, struct cred *cred,
+    int flag, caller_context_t *ct, vsecattr_t *vsecp)
+{
+	lxpr_node_t *lxpnp = VTOLXP(dvp);
+	lxpr_nodetype_t type = lxpnp->lxpr_type;
+	vnode_t *vp = NULL;
+	int error;
+
+	ASSERT(type < LXPR_NFILES);
+
+	/*
+	 * restrict create permission to owner or root
+	 */
+	if ((error = lxpr_access(dvp, VEXEC, 0, cred, ct)) != 0) {
+		return (error);
+	}
+
+	if (*nm == '\0')
+		return (EPERM);
+
+	if (dvp->v_type != VDIR)
+		return (EPERM);
+
+	if (exclusive == EXCL)
+		return (EEXIST);
+
+	/*
+	 * We're currently restricting O_CREAT to the oom_score_adj file.
+	 */
+	if (strcmp(nm, "oom_score_adj") != 0)
+		return (EPERM);
+
+	if (type == LXPR_PIDDIR) {
+		proc_t *p;
+		p = lxpr_lock(lxpnp->lxpr_pid);
+		if (p != NULL)
+			vp = lxpr_lookup_common(dvp, nm, p, piddir,
+			    PIDDIRFILES);
+		lxpr_unlock(p);
+	}
+
+	if (vp != NULL) {		/* name found */
+		/*
+		 * Creating an existing file, allow it for regular files.
+		 */
+		if (vp->v_type == VDIR)
+			return (EISDIR);
+
+		*vpp = vp;
+		return (0);
+	}
+
+	/*
+	 * proc doesn't allow creation of additional, non-subsystem specific
+	 * files in a dir
+	 */
+	return (EPERM);
 }
