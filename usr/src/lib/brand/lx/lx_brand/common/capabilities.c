@@ -359,6 +359,14 @@ lx_capget(uintptr_t p1, uintptr_t p2)
 		cap_count = 2;
 		break;
 	default:
+		/*
+		 * As per the man page: call will fail with EINVAL and set the
+		 * version field of the header to the kernel preferred version
+		 * when an unsupported version value is provided.
+		 */
+		uh.version = LX_CAP_VERSION_3;
+		if (uucopy(&uh, uhp, sizeof (uh)) != 0)
+			return (-errno);
 		return (-EINVAL);
 	}
 
