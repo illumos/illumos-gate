@@ -920,6 +920,7 @@ PORTSYS=			\
 	sidsys.o		\
 	siginterrupt.o		\
 	signal.o		\
+	signalfd.o		\
 	sigpending.o		\
 	sigstack.o		\
 	stat.o			\
