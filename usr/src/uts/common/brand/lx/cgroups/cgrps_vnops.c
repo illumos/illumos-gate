@@ -355,7 +355,7 @@ cgrp_create(struct vnode *dvp, char *nm, struct vattr *vap,
 		 */
 		if (exclusive == EXCL) {
 			error = EEXIST;
-		} else if ((cn->cgn_type == VDIR) && (mode & VWRITE)) {
+		} else if ((CGNTOV(cn)->v_type == VDIR) && (mode & VWRITE)) {
 			error = EISDIR;
 		} else {
 			error = cgrp_taccess(cn, mode, cred);
